@@ -7,5 +7,5 @@ package version
 //
 // gofmt -r "unknownVersion -> Version{GitCommit: \"${GIT_COMMIT}\", Version: \"${VERSION}\",}" init.go.tmpl > init.go
 func init() {
-	VersionInfo = Version{GitCommit: "90b3bc73d51d53bfb0d7c1e46924e3917ca1aac2", Version: ""}
+	VersionInfo = Version{GitCommit: "unknown version", Version: ""}
 }
