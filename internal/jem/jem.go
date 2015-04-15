@@ -9,20 +9,20 @@ import (
 	"gopkg.in/mgo.v2"
 )
 
-type JEM struct {
-	// DB holds the mongodb-backed identity store.
-	DB Database
-
-	// Bakery holds the JEM bakery service.
-	Bakery *bakery.Service
+type Pool struct {
+	db     Database
+	bakery *bakery.Service
 }
 
-func New(db *mgo.Database, bakeryParams *bakery.NewServiceParams) (*JEM, error) {
-	j := &JEM{
-		DB: Database{db},
+// NewPool represents a pool of possible JEM instances that use the given
+// database as a store, and use the given bakery parameters to create the
+// bakery.Service.
+func NewPool(db *mgo.Database, bakeryParams *bakery.NewServiceParams) (*Pool, error) {
+	pool := &Pool{
+		db: Database{db},
 	}
 	// TODO migrate database
-	macStore, err := mgostorage.New(j.DB.Macaroons())
+	macStore, err := mgostorage.New(pool.db.Macaroons())
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot create macaroon store")
 	}
@@ -32,8 +32,31 @@ func New(db *mgo.Database, bakeryParams *bakery.NewServiceParams) (*JEM, error) 
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make bakery service")
 	}
-	j.Bakery = bsvc
-	return j, nil
+	pool.bakery = bsvc
+	return pool, nil
+}
+
+// JEM returns a new JEM instance from the pool, suitable
+// for using in short-lived requests. The JEM must be
+// closed with the Close method after use.
+func (p *Pool) JEM() *JEM {
+	return &JEM{
+		DB:     p.db.Copy(),
+		Bakery: p.bakery,
+	}
+}
+
+type JEM struct {
+	// DB holds the mongodb-backed identity store.
+	DB Database
+
+	// Bakery holds the JEM bakery service.
+	Bakery *bakery.Service
+}
+
+func (j *JEM) Close() {
+	j.DB.Close()
+	j.DB = Database{}
 }
 
 // Database wraps an mgo.DB ands adds a few convenience methods.

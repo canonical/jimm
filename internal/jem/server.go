@@ -13,8 +13,8 @@ import (
 )
 
 // NewAPIHandlerFunc is a function that returns set of httprequest
-// handlers that uses the given JEM instance and server params.
-type NewAPIHandlerFunc func(*JEM, ServerParams) ([]httprequest.Handler, error)
+// handlers that uses the given JEM pool and server params.
+type NewAPIHandlerFunc func(*Pool, ServerParams) ([]httprequest.Handler, error)
 
 // ServerParams holds configuration for a new API server.
 // It must be kept in sync with identical definition in the
@@ -37,8 +37,8 @@ type ServerParams struct {
 	PublicKeyLocator bakery.PublicKeyLocator
 }
 
-// NewServer returns a new handler that handles charm store requests and stores
-// its data in the given database.
+// NewServer returns a new handler that handles environment manager
+// requests and stores its data in the given database.
 func NewServer(config ServerParams, versions map[string]NewAPIHandlerFunc) (http.Handler, error) {
 	if len(versions) == 0 {
 		return nil, errgo.Newf("JEM server must serve at least one version of the API")
@@ -52,13 +52,13 @@ func NewServer(config ServerParams, versions map[string]NewAPIHandlerFunc) (http
 		Location: "jem",
 		Locator:  config.PublicKeyLocator,
 	}
-	j, err := New(config.DB, &bparams)
+	p, err := NewPool(config.DB, &bparams)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make store")
 	}
 	router := httprouter.New()
 	for name, newAPI := range versions {
-		handlers, err := newAPI(j, config)
+		handlers, err := newAPI(p, config)
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot create API %s", name)
 		}
