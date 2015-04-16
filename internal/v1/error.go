@@ -30,7 +30,7 @@ func errToResp(err error) (int, interface{}) {
 		status = http.StatusNotFound
 	case params.ErrForbidden, params.ErrAlreadyExists:
 		status = http.StatusForbidden
-	case params.ErrBadRequest:
+	case params.ErrBadRequest, httprequest.ErrUnmarshal:
 		status = http.StatusBadRequest
 	case params.ErrUnauthorized:
 		status = http.StatusUnauthorized
