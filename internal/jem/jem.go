@@ -82,3 +82,7 @@ func (db Database) Close() {
 func (db Database) Macaroons() *mgo.Collection {
 	return db.C("macaroons")
 }
+
+func (db Database) StateServers() *mgo.Collection {
+	return db.C("stateservers")
+}

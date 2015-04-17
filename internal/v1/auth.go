@@ -20,19 +20,19 @@ const (
 // authorization conatains authorization information extracted from an HTTP request.
 // The zero value for a authorization contains no privileges.
 type authorization struct {
-	Username string
-	Groups   []string
+	username string
+	groups   []string
 }
 
 // checkRequest checks for any authorization tokens in the request and returns any
 // found as an authorization. If no suitable credentials are found, or an error occurs,
 // then a zero valued authorization is returned.
 func (h *Handler) checkRequest(req *http.Request) (authorization, error) {
-	attrMap, verr := httpbakery.CheckRequest(h.db.Bakery, req, nil, checkers.New())
+	attrMap, verr := httpbakery.CheckRequest(h.jem.Bakery, req, nil, checkers.New())
 	if verr == nil {
 		return authorization{
-			Username: attrMap[usernameAttr],
-			Groups:   strings.Fields(attrMap[groupsAttr]),
+			username: attrMap[usernameAttr],
+			groups:   strings.Fields(attrMap[groupsAttr]),
 		}, nil
 	}
 	if _, ok := errgo.Cause(verr).(*bakery.VerificationError); !ok {
@@ -51,7 +51,7 @@ func (h *Handler) checkRequest(req *http.Request) (authorization, error) {
 }
 
 func (h *Handler) newMacaroon() (*macaroon.Macaroon, error) {
-	return h.db.Bakery.NewMacaroon("", nil, []checkers.Caveat{
+	return h.jem.Bakery.NewMacaroon("", nil, []checkers.Caveat{
 		checkers.NeedDeclaredCaveat(
 			checkers.Caveat{
 				Location:  h.config.IdentityLocation,
@@ -61,4 +61,16 @@ func (h *Handler) newMacaroon() (*macaroon.Macaroon, error) {
 			groupsAttr,
 		),
 	})
+}
+
+func (h *Handler) isAdmin() bool {
+	if h.auth.username == h.config.StateServerAdmin {
+		return true
+	}
+	for _, g := range h.auth.groups {
+		if g == h.config.StateServerAdmin {
+			return true
+		}
+	}
+	return false
 }
