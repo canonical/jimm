@@ -5,9 +5,9 @@ package v1_test
 import (
 	"testing"
 
-	jujutesting "github.com/juju/testing"
+	jujutesting "github.com/juju/juju/testing"
 )
 
 func TestPackage(t *testing.T) {
-	jujutesting.MgoTestPackage(t, nil)
+	jujutesting.MgoTestPackage(t)
 }
