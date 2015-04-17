@@ -5,7 +5,7 @@ package jem
 import (
 	"net/http"
 
-	"gopkg.in/macaroon-bakery.v0/bakery"
+	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jem/internal/jem"

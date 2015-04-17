@@ -13,17 +13,17 @@ import (
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/v1"
 	"github.com/CanonicalLtd/jem/params"
-	jujutesting "github.com/juju/testing"
+	corejujutesting "github.com/juju/juju/juju/testing"
 	"github.com/juju/testing/httptesting"
-	"gopkg.in/macaroon-bakery.v0/bakery"
-	"gopkg.in/macaroon-bakery.v0/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v0/bakerytest"
-	"gopkg.in/macaroon-bakery.v0/httpbakery"
+	"gopkg.in/macaroon-bakery.v1/bakery"
+	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v1/bakerytest"
+	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/mgo.v2"
 )
 
 type APISuite struct {
-	jujutesting.IsolatedMgoSuite
+	corejujutesting.JujuConnSuite
 	srv        http.Handler
 	jem        *jem.Pool
 	discharger *bakerytest.Discharger
@@ -35,7 +35,7 @@ type APISuite struct {
 var _ = gc.Suite(&APISuite{})
 
 func (s *APISuite) SetUpTest(c *gc.C) {
-	s.IsolatedMgoSuite.SetUpTest(c)
+	s.JujuConnSuite.SetUpTest(c)
 	s.srv, s.jem, s.discharger = s.newServer(c, s.Session)
 	s.username = "testuser"
 	s.client = httpbakery.NewClient()
@@ -43,7 +43,7 @@ func (s *APISuite) SetUpTest(c *gc.C) {
 
 func (s *APISuite) TearDownTest(c *gc.C) {
 	s.discharger.Close()
-	s.IsolatedMgoSuite.TearDownTest(c)
+	s.JujuConnSuite.TearDownTest(c)
 }
 
 const adminUser = "admin"
@@ -79,92 +79,109 @@ func (s *APISuite) do(req *http.Request) (*http.Response, error) {
 	return s.client.DoWithBody(req, req.Body.(io.ReadSeeker))
 }
 
-var addJESTests = []struct {
-	about        string
-	username     string
-	body         interface{}
-	expectStatus int
-	expectBody   interface{}
-}{{
-	about: "add environment",
-	body: params.ServerInfo{
-		HostPorts:   []string{"0.1.2.3:1234"},
-		CACert:      "dodgy",
-		User:        "env-admin",
-		Password:    "password",
-		EnvironUUID: "deadbeef-dead-beef-dead-deaddeaddead",
-	},
-}, {
-	about:    "incorrect user",
-	username: "notadmin",
-	body: params.ServerInfo{
-		HostPorts:   []string{"0.1.2.3:1234"},
-		CACert:      "dodgy",
-		User:        "env-admin",
-		Password:    "password",
-		EnvironUUID: "deadbeef-dead-beef-dead-deaddeaddead",
-	},
-	expectStatus: http.StatusUnauthorized,
-	expectBody: params.Error{
-		Code:    "unauthorized",
-		Message: "unauthorized",
-	},
-}, {
-	about: "no hosts",
-	body: params.ServerInfo{
-		CACert:      "dodgy",
-		User:        "env-admin",
-		Password:    "password",
-		EnvironUUID: "deadbeef-dead-beef-dead-deaddeaddead",
-	},
-	expectStatus: http.StatusBadRequest,
-	expectBody: params.Error{
-		Code:    "bad request",
-		Message: "no host-ports in request",
-	},
-}, {
-	about: "no ca-cert",
-	body: params.ServerInfo{
-		HostPorts:   []string{"0.1.2.3:1234"},
-		User:        "env-admin",
-		Password:    "password",
-		EnvironUUID: "deadbeef-dead-beef-dead-deaddeaddead",
-	},
-	expectStatus: http.StatusBadRequest,
-	expectBody: params.Error{
-		Code:    "bad request",
-		Message: "no ca-cert in request",
-	},
-}, {
-	about: "no user",
-	body: params.ServerInfo{
-		HostPorts:   []string{"0.1.2.3:1234"},
-		CACert:      "dodgy",
-		Password:    "password",
-		EnvironUUID: "deadbeef-dead-beef-dead-deaddeaddead",
-	},
-	expectStatus: http.StatusBadRequest,
-	expectBody: params.Error{
-		Code:    "bad request",
-		Message: "no user in request",
-	},
-}, {
-	about: "no environ uuid",
-	body: params.ServerInfo{
-		HostPorts: []string{"0.1.2.3:1234"},
-		CACert:    "dodgy",
-		User:      "env-admin",
-		Password:  "password",
-	},
-	expectStatus: http.StatusBadRequest,
-	expectBody: params.Error{
-		Code:    "bad request",
-		Message: "bad environment UUID in request",
-	},
-}}
-
 func (s *APISuite) TestAddJES(c *gc.C) {
 	s.username = adminUser
+	info := s.APIInfo(c)
+	var addJESTests = []struct {
+		about        string
+		username     string
+		body         interface{}
+		expectStatus int
+		expectBody   interface{}
+	}{{
+		about: "add environment",
+		body: params.ServerInfo{
+			HostPorts:   info.Addrs,
+			CACert:      info.CACert,
+			User:        info.Tag.Id(),
+			Password:    info.Password,
+			EnvironUUID: info.EnvironTag.Id(),
+		},
+	}, {
+		about:    "incorrect user",
+		username: "notadmin",
+		body: params.ServerInfo{
+			HostPorts:   info.Addrs,
+			CACert:      info.CACert,
+			User:        info.Tag.Id(),
+			Password:    info.Password,
+			EnvironUUID: info.EnvironTag.Id(),
+		},
+		expectStatus: http.StatusUnauthorized,
+		expectBody: params.Error{
+			Code:    "unauthorized",
+			Message: "unauthorized",
+		},
+	}, {
+		about: "no hosts",
+		body: params.ServerInfo{
+			CACert:      info.CACert,
+			User:        info.Tag.Id(),
+			Password:    info.Password,
+			EnvironUUID: info.EnvironTag.Id(),
+		},
+		expectStatus: http.StatusBadRequest,
+		expectBody: params.Error{
+			Code:    "bad request",
+			Message: "no host-ports in request",
+		},
+	}, {
+		about: "no ca-cert",
+		body: params.ServerInfo{
+			HostPorts:   info.Addrs,
+			User:        info.Tag.Id(),
+			Password:    info.Password,
+			EnvironUUID: info.EnvironTag.Id(),
+		},
+		expectStatus: http.StatusBadRequest,
+		expectBody: params.Error{
+			Code:    "bad request",
+			Message: "no ca-cert in request",
+		},
+	}, {
+		about: "no user",
+		body: params.ServerInfo{
+			HostPorts:   info.Addrs,
+			CACert:      info.CACert,
+			Password:    info.Password,
+			EnvironUUID: info.EnvironTag.Id(),
+		},
+		expectStatus: http.StatusBadRequest,
+		expectBody: params.Error{
+			Code:    "bad request",
+			Message: "no user in request",
+		},
+	}, {
+		about: "no environ uuid",
+		body: params.ServerInfo{
+			HostPorts: info.Addrs,
+			CACert:    info.CACert,
+			User:      info.Tag.Id(),
+			Password:  info.Password,
+		},
+		expectStatus: http.StatusBadRequest,
+		expectBody: params.Error{
+			Code:    "bad request",
+			Message: "bad environment UUID in request",
+		},
+	}, {
+		about: "cannot connect to evironment",
+		body: params.ServerInfo{
+			HostPorts: []string{"1.2.3.4:1234"},
+			CACert:    info.CACert,
+			User:      info.Tag.Id(),
+			Password:  info.Password,
+			EnvironUUID: info.EnvironTag.Id(),
+		},
+		expectStatus: http.StatusBadRequest,
+		expectBody: httptesting.BodyAsserter(func(c *gc.C, m json.RawMessage) {
+			var body params.Error
+			err := json.Unmarshal(m, &body)
+			c.Assert(err, gc.IsNil)
+			c.Assert(body.Code, gc.Equals, params.ErrBadRequest)
+			c.Assert(body.Message, gc.Matches, `cannot connect to environment: unable to connect to ".*"`)
+		}),
+	}}
 	for i, test := range addJESTests {
 		c.Logf("%d: %s", i, test.about)
 		username := test.username
@@ -185,24 +202,20 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 
 func (s *APISuite) TestAddJESDuplicate(c *gc.C) {
 	s.username = adminUser
-	s.addJES(c, adminUser, "dupenv", &params.ServerInfo{
-		HostPorts:   []string{"0.1.2.3:1234"},
-		CACert:      "dodgy",
-		User:        "env-admin",
-		Password:    "password",
-		EnvironUUID: "deadbeef-dead-beef-dead-deaddeaddead",
-	})
+	info := s.APIInfo(c)
+	si := &params.ServerInfo{
+		HostPorts:   info.Addrs,
+		CACert:      info.CACert,
+		User:        info.Tag.Id(),
+		Password:    info.Password,
+		EnvironUUID: info.EnvironTag.Id(),
+	}
+	s.addJES(c, adminUser, "dupenv", si)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Method:  "PUT",
-		Handler: s.srv,
-		URL:     "/v1/u/" + adminUser + "/server/dupenv",
-		JSONBody: &params.ServerInfo{
-			HostPorts:   []string{"0.1.2.3:1234"},
-			CACert:      "dodgy",
-			User:        "env-admin",
-			Password:    "password",
-			EnvironUUID: "deadbeef-dead-beef-dead-deaddeaddead",
-		},
+		Method:   "PUT",
+		Handler:  s.srv,
+		URL:      "/v1/u/" + adminUser + "/server/dupenv",
+		JSONBody: si,
 		ExpectBody: &params.Error{
 			Message: "already exists",
 			Code:    "already exists",

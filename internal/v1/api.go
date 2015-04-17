@@ -2,6 +2,7 @@ package v1
 
 import (
 	"github.com/juju/httprequest"
+	"github.com/juju/juju/api"
 	"github.com/juju/names"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2"
@@ -56,7 +57,19 @@ func (h *Handler) AddJES(arg *params.AddJES) error {
 	if !names.IsValidEnvironment(arg.Info.EnvironUUID) {
 		return badRequestf(nil, "bad environment UUID in request")
 	}
-	err := h.jem.DB.StateServers().Insert(mongodoc.StateServer{
+	// Attempt to connect to the environment before accepting it.
+	state, err := api.Open(&api.Info{
+		Addrs:      arg.Info.HostPorts,
+		CACert:     arg.Info.CACert,
+		Tag:        names.NewUserTag(arg.Info.User),
+		Password:   arg.Info.Password,
+		EnvironTag: names.NewEnvironTag(arg.Info.EnvironUUID),
+	}, api.DialOpts{})
+	if err != nil {
+		return badRequestf(err, "cannot connect to environment")
+	}
+	state.Close()
+	err = h.jem.DB.StateServers().Insert(mongodoc.StateServer{
 		Id:   string(arg.User) + "/" + string(arg.Name),
 		User: string(arg.User),
 		Name: string(arg.Name),
