@@ -3,10 +3,11 @@ package v1
 import (
 	"net/http"
 
-	"github.com/CanonicalLtd/jem/params"
 	"github.com/juju/httprequest"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v0/httpbakery"
+	"gopkg.in/macaroon-bakery.v1/httpbakery"
+
+	"github.com/CanonicalLtd/jem/params"
 )
 
 var (
