@@ -7,19 +7,19 @@ import (
 	"net/http"
 	"strings"
 
+	jujutesting "github.com/juju/testing"
+	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v1/bakery"
+	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v1/bakerytest"
+	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/v1"
 	"github.com/CanonicalLtd/jem/params"
-	jujutesting "github.com/juju/testing"
-	"github.com/juju/testing/httptesting"
-	"gopkg.in/macaroon-bakery.v0/bakery"
-	"gopkg.in/macaroon-bakery.v0/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v0/bakerytest"
-	"gopkg.in/macaroon-bakery.v0/httpbakery"
-	"gopkg.in/mgo.v2"
 )
 
 type APISuite struct {
@@ -29,7 +29,6 @@ type APISuite struct {
 	discharger *bakerytest.Discharger
 	username   string
 	groups     []string
-	client     *httpbakery.Client
 }
 
 var _ = gc.Suite(&APISuite{})
@@ -38,7 +37,6 @@ func (s *APISuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	s.srv, s.jem, s.discharger = s.newServer(c, s.Session)
 	s.username = "testuser"
-	s.client = httpbakery.NewClient()
 }
 
 func (s *APISuite) TearDownTest(c *gc.C) {
@@ -70,13 +68,6 @@ func (s *APISuite) newServer(c *gc.C, session *mgo.Session) (http.Handler, *jem.
 	srv, err := jem.NewServer(config, map[string]jem.NewAPIHandlerFunc{"v1": v1.NewAPIHandler})
 	c.Assert(err, gc.IsNil)
 	return srv, j, discharger
-}
-
-func (s *APISuite) do(req *http.Request) (*http.Response, error) {
-	if req.Body == nil {
-		return s.client.Do(req)
-	}
-	return s.client.DoWithBody(req, req.Body.(io.ReadSeeker))
 }
 
 var addJESTests = []struct {
@@ -176,7 +167,7 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 			Handler:      s.srv,
 			JSONBody:     test.body,
 			URL:          fmt.Sprintf("/v1/u/%s/server/env%d", username, i),
-			Do:           s.do,
+			Do:           bakeryDo(nil),
 			ExpectStatus: test.expectStatus,
 			ExpectBody:   test.expectBody,
 		})
@@ -208,7 +199,7 @@ func (s *APISuite) TestAddJESDuplicate(c *gc.C) {
 			Code:    "already exists",
 		},
 		ExpectStatus: http.StatusForbidden,
-		Do:           s.do,
+		Do:           bakeryDo(nil),
 	})
 }
 
@@ -218,7 +209,7 @@ func (s *APISuite) addJES(c *gc.C, user, name string, jes *params.ServerInfo) {
 		Handler:  s.srv,
 		URL:      "/v1/u/" + user + "/server/" + name,
 		JSONBody: jes,
-		Do:       s.do,
+		Do:       bakeryDo(nil),
 	})
 }
 
@@ -232,4 +223,20 @@ func (s *APISuite) TestAddJESUnauthenticated(c *gc.C) {
 		}),
 		ExpectStatus: http.StatusProxyAuthRequired,
 	})
+}
+
+func bakeryDo(client *http.Client) func(*http.Request) (*http.Response, error) {
+	if client == nil {
+		client = httpbakery.NewHTTPClient()
+	}
+	bclient := httpbakery.NewClient()
+	bclient.Client = client
+	return func(req *http.Request) (*http.Response, error) {
+		if req.Body != nil {
+			body := req.Body.(io.ReadSeeker)
+			req.Body = nil
+			return bclient.DoWithBody(req, body)
+		}
+		return bclient.Do(req)
+	}
 }
