@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	corejujutesting "github.com/juju/juju/juju/testing"
 	"github.com/juju/testing/httptesting"
@@ -35,6 +36,7 @@ var _ = gc.Suite(&APISuite{})
 
 func (s *APISuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
+	s.PatchValue(v1.DialTimeout, time.Duration(0))
 	s.srv, s.jem, s.discharger = s.newServer(c, s.Session)
 	s.username = "testuser"
 }

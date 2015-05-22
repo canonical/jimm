@@ -2,6 +2,7 @@ package params
 
 import "github.com/juju/httprequest"
 
+// AddJES holds the parameters for adding a new state server.
 type AddJES struct {
 	httprequest.Route `httprequest:"PUT /v1/u/:User/server/:Name"`
 	User              User       `httprequest:",path"`
