@@ -86,3 +86,7 @@ func (db Database) Macaroons() *mgo.Collection {
 func (db Database) StateServers() *mgo.Collection {
 	return db.C("stateservers")
 }
+
+func (db Database) Environments() *mgo.Collection {
+	return db.C("environments")
+}
