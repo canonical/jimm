@@ -5,12 +5,9 @@ import (
 
 	"github.com/juju/httprequest"
 	"github.com/juju/juju/api"
+	"github.com/juju/juju/network"
 	"github.com/juju/names"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
-
-	"github.com/juju/juju/network"
 
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
@@ -64,22 +61,16 @@ func (h *Handler) AddJES(arg *params.AddJES) error {
 	if !names.IsValidEnvironment(arg.Info.EnvironUUID) {
 		return badRequestf(nil, "bad environment UUID in request")
 	}
-	id := entityPathToId(arg.EntityPath)
-	env := &mongodoc.Environment{
-		Id:            id,
-		User:          arg.User,
-		Name:          arg.Name,
-		AdminUser:     arg.Info.User,
-		AdminPassword: arg.Info.Password,
-		UUID:          arg.Info.EnvironUUID,
-		StateServer:   id,
-	}
 	srv := &mongodoc.StateServer{
-		Id:        id,
 		User:      arg.User,
 		Name:      arg.Name,
 		CACert:    arg.Info.CACert,
 		HostPorts: arg.Info.HostPorts,
+	}
+	env := &mongodoc.Environment{
+		AdminUser:     arg.Info.User,
+		AdminPassword: arg.Info.Password,
+		UUID:          arg.Info.EnvironUUID,
 	}
 	// Attempt to connect to the environment before accepting it.
 	state, err := dialEnvironment(env, srv)
@@ -94,36 +85,21 @@ func (h *Handler) AddJES(arg *params.AddJES) error {
 	// connecting to.
 	srv.HostPorts = collapseHostPorts(state.APIHostPorts())
 
-	// Insert the environment before inserting the state server
-	// to avoid races with other clients creating non-state-server
-	// environments.
-	err = h.jem.DB.Environments().Insert(env)
-	if mgo.IsDup(err) {
-		return errgo.WithCausef(nil, params.ErrAlreadyExists, "")
-	}
+	err = h.jem.AddStateServer(srv, env)
 	if err != nil {
-		return errgo.Notef(err, "cannot insert state server environment")
-	}
-	err = h.jem.DB.StateServers().Insert(srv)
-	if err != nil {
-		return errgo.Notef(err, "cannot insert state server")
+		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
 	return nil
 }
 
 func (h *Handler) GetEnvironment(arg *params.GetEnvironment) (*params.EnvironmentResponse, error) {
-	var env mongodoc.Environment
-	err := h.jem.DB.Environments().Find(bson.D{{"_id", entityPathToId(arg.EntityPath)}}).One(&env)
-	if err == mgo.ErrNotFound {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "environment not found")
-	}
+	env, err := h.jem.Environment(entityPathToId(arg.EntityPath))
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot get environment")
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	var srv mongodoc.StateServer
-	err = h.jem.DB.StateServers().Find(bson.D{{"_id", env.StateServer}}).One(&srv)
+	srv, err := h.jem.StateServer(env.StateServer)
 	if err != nil {
-		return nil, errgo.Notef(err, "state server not found")
+		return nil, errgo.Mask(err)
 	}
 	return &params.EnvironmentResponse{
 		UUID:      env.UUID,
