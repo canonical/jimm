@@ -10,7 +10,7 @@ import (
 type StateServer struct {
 	// Id holds the primary key for a state server.
 	// It's actually in the form user/name.
-	Id   string `bson:"_id"` // Actually user/name.
+	Id string `bson:"_id"` // Actually user/name.
 
 	// User holds the user name containing the state server.
 	User params.User

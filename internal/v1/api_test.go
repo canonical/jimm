@@ -78,7 +78,7 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 	var addJESTests = []struct {
 		about        string
 		username     string
-		body         interface{}
+		body         params.ServerInfo
 		expectStatus int
 		expectBody   interface{}
 	}{{
@@ -181,14 +181,31 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 		if username == "" {
 			username = adminUser
 		}
+		envname := fmt.Sprintf("env%d", i)
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Method:       "PUT",
 			Handler:      s.srv,
 			JSONBody:     test.body,
-			URL:          fmt.Sprintf("/v1/u/%s/server/env%d", username, i),
+			URL:          fmt.Sprintf("/v1/u/%s/server/%s", username, envname),
 			Do:           bakeryDo(nil),
 			ExpectStatus: test.expectStatus,
 			ExpectBody:   test.expectBody,
+		})
+		if test.expectStatus != 0 {
+			continue
+		}
+		// The server was added successfully. Check that we
+		// can fetch its associated environment
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Method:  "GET",
+			Handler: s.srv,
+			URL:     fmt.Sprintf("/v1/u/%s/env/%s", username, envname),
+			ExpectBody: params.EnvironmentResponse{
+				HostPorts: test.body.HostPorts,
+				CACert:    test.body.CACert,
+				UUID:      test.body.EnvironUUID,
+			},
+			Do: bakeryDo(nil),
 		})
 	}
 }
@@ -237,6 +254,20 @@ func (s *APISuite) TestAddJESUnauthenticated(c *gc.C) {
 			// Allow any body - the next check will check that it's a valid macaroon.
 		}),
 		ExpectStatus: http.StatusProxyAuthRequired,
+	})
+}
+
+func (s *APISuite) TestGetEnvironmentNotFound(c *gc.C) {
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "GET",
+		Handler: s.srv,
+		URL:     "/v1/u/user/env/foo",
+		ExpectBody: &params.Error{
+			Message: "environment not found",
+			Code:    params.ErrNotFound,
+		},
+		ExpectStatus: http.StatusNotFound,
+		Do:           bakeryDo(nil),
 	})
 }
 
