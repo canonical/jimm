@@ -176,7 +176,7 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 		}),
 	}}
 	for i, test := range addJESTests {
-		c.Logf("%d: %s", i, test.about)
+		c.Logf("test %d: %s", i, test.about)
 		username := test.username
 		if username == "" {
 			username = adminUser
@@ -263,7 +263,7 @@ func (s *APISuite) TestGetEnvironmentNotFound(c *gc.C) {
 		Handler: s.srv,
 		URL:     "/v1/u/user/env/foo",
 		ExpectBody: &params.Error{
-			Message: "environment not found",
+			Message: `environment "user/foo" not found`,
 			Code:    params.ErrNotFound,
 		},
 		ExpectStatus: http.StatusNotFound,
