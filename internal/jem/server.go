@@ -3,14 +3,18 @@
 package jem
 
 import (
+	"io"
 	"net/http"
 
 	"github.com/juju/httprequest"
+	"github.com/juju/loggo"
 	"github.com/julienschmidt/httprouter"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/mgo.v2"
 )
+
+var logger = loggo.GetLogger("jem.internal.jem")
 
 // NewAPIHandlerFunc is a function that returns set of httprequest
 // handlers that uses the given JEM pool and server params.
@@ -39,7 +43,9 @@ type ServerParams struct {
 
 // NewServer returns a new handler that handles environment manager
 // requests and stores its data in the given database.
-func NewServer(config ServerParams, versions map[string]NewAPIHandlerFunc) (http.Handler, error) {
+// The returned handler should be closed when finished
+// with.
+func NewServer(config ServerParams, versions map[string]NewAPIHandlerFunc) (HandleCloser, error) {
 	if len(versions) == 0 {
 		return nil, errgo.Newf("JEM server must serve at least one version of the API")
 	}
@@ -56,15 +62,40 @@ func NewServer(config ServerParams, versions map[string]NewAPIHandlerFunc) (http
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make store")
 	}
-	router := httprouter.New()
+	srv := &server{
+		router: httprouter.New(),
+	}
 	for name, newAPI := range versions {
 		handlers, err := newAPI(p, config)
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot create API %s", name)
 		}
 		for _, h := range handlers {
-			router.Handle(h.Method, h.Path, h.Handle)
+			srv.router.Handle(h.Method, h.Path, h.Handle)
 		}
 	}
-	return router, nil
+	return srv, nil
+}
+
+type server struct {
+	router *httprouter.Router
+}
+
+// ServeHTTP implements http.Handler.Handle.
+func (srv *server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	srv.router.ServeHTTP(w, req)
+}
+
+// Close implements io.Closer.Close.
+func (srv *server) Close() error {
+	return nil
+}
+
+// HandleCloser represents an HTTP handler that can
+// be closed to free resources associated with the
+// handler. The Close method should not be called
+// until all requests on the handler have completed.
+type HandleCloser interface {
+	http.Handler
+	io.Closer
 }
