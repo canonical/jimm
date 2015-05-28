@@ -2,6 +2,7 @@ github.com/bmizerany/pat	git	48be7df2c27e1cec821a3284a683ce6ef90d9052	2014-04-29
 github.com/coreos/go-systemd	git	2d21675230a81a503f4363f4aa3490af06d52bb8	2015-01-26T19:09:17Z
 github.com/dustin/go-humanize	git	145fabdb1ab757076a70a886d092a3af27f66f4c	2014-12-28T07:11:48Z
 github.com/godbus/dbus	git	88765d85c0fdadcd98a54e30694fa4e4f5b51133	2015-01-22T18:02:51Z
+github.com/golang/groupcache	git	604ed5785183e59ae2789449d89e73f3a2a77987	2015-01-25T18:08:32Z
 github.com/juju/blobstore	git	337aa7d5d712728d181dbda2547a6556d4189626	2015-05-08T07:43:36Z
 github.com/juju/cmd	git	d585b5672a9bec4e04b800ecb69a5035562b06eb	2015-04-10T20:58:56Z
 github.com/juju/errors	git	4567a5e69fd3130ca0d89f69478e7ac025b67452	2015-03-27T19:24:31Z
