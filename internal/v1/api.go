@@ -31,7 +31,7 @@ func NewAPIHandler(jp *jem.Pool, sp jem.ServerParams) ([]httprequest.Handler, er
 		}
 		auth, err := h.checkRequest(p.Request)
 		if err != nil {
-			h.jem.Close()
+			h.Close()
 			return nil, errgo.Mask(err, errgo.Any)
 		}
 		h.auth = auth
@@ -39,6 +39,8 @@ func NewAPIHandler(jp *jem.Pool, sp jem.ServerParams) ([]httprequest.Handler, er
 	}), nil
 }
 
+// Close implements io.Closer and is called by httprequest
+// when the request is complete.
 func (h *Handler) Close() error {
 	h.jem.Close()
 	h.jem = nil

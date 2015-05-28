@@ -3,6 +3,7 @@
 package jem
 
 import (
+	"io"
 	"net/http"
 
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -35,8 +36,19 @@ type ServerParams struct {
 	PublicKeyLocator bakery.PublicKeyLocator
 }
 
+// HandleCloser represents an HTTP handler that can
+// be closed to free resources associated with the
+// handler. The Close method should not be called
+// until all requests on the handler have completed.
+type HandleCloser interface {
+	http.Handler
+	io.Closer
+}
+
 // NewServer returns a new handler that handles charm store requests and stores
-// its data in the given database.
-func NewServer(config ServerParams) (http.Handler, error) {
+// its data in the given database. The returned handler should
+// be closed after use (first ensuring that all outstanding requests have
+// completed).
+func NewServer(config ServerParams) (HandleCloser, error) {
 	return jem.NewServer(jem.ServerParams(config), versions)
 }
