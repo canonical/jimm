@@ -1,0 +1,5 @@
+jem (0.0.1-1) unstable; urgency=low
+
+  * Initial release (Closes: #nnnn)  <nnnn is the bug number of your ITP>
+
+ -- Jay R. Wren <jrwren@xmtp.net>  Wed, 27 May 2015 15:12:49 -0400

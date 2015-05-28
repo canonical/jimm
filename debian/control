@@ -1,0 +1,21 @@
+Source: jem
+Section: web
+Priority: extra
+Maintainer: Rick Harding <rick.harding@canonical.com>
+Build-Depends: debhelper (>= 7.0.50~),
+               gccgo-go [!amd64 !i386 !armhf],
+               golang-go (>= 2:1.2) [amd64 i386 armhf],
+               lsb-release,
+               build-essential,
+               devscripts,
+               debhelper,
+Standards-Version: 3.9.5
+Homepage: https://github.com/jrwren/jem
+Vcs-Git: https://github.com/jrwren/jem.git
+Vcs-Browser: https://github.com/jrwren/jem
+
+Package: jem
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Juju environment manager web service
+ This service provides the ability to manage multiple juju environments.

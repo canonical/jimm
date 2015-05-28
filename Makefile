@@ -6,7 +6,7 @@ $(warning You need to set up a GOPATH.)
 endif
 
 PROJECT := github.com/CanonicalLtd/jem
-PROJECT_DIR := $(shell go list -e -f '{{.Dir}}' $(PROJECT))
+PROJECT_DIR ?= $(shell go list -e -f '{{.Dir}}' $(PROJECT))
 
 GIT_COMMIT := $(shell git rev-parse --verify HEAD)
 GIT_VERSION := $(shell git describe --dirty)
@@ -108,6 +108,24 @@ else
 	@echo on OS X with homebrew try: brew install bazaar mongodb
 endif
 
+deb:
+	make deps GOPATH=${CURDIR}
+	mkdir -p src/${PROJECT}
+	-for f in `find . -maxdepth 1 | grep -Ev '^\.$$|\.git|bin|debian|pkg|src'`  ; do cp -a $$f src/${PROJECT}/ ; done
+	GOPATH=${CURDIR} fakeroot debian/rules clean build binary
+
+# Install binaries to system location.
+system-install: install
+	mkdir -p $(DESTDIR)/usr/bin $(DESTDIR)/etc/jemd
+	# When we get a jemd and config.yaml uncomment these lines
+	# and be sure to add debian/upstart and debian/preinst
+	#install ${GOPATH}/bin/jemd $(DESTDIR)/usr/bin
+	#install cmd/jemd/config.yaml $(DESTDIR)/etc/jemd/config.yaml.sample
+
+
+deb-clean:
+	-$(RM) -rf src bin pkg
+
 help:
 	@echo -e 'Identity service - list of make targets:\n'
 	@echo 'make - Build the package.'
@@ -115,6 +133,9 @@ help:
 	@echo 'make install - Install the package.'
 	@echo 'make server - Start the JEM server.'
 	@echo 'make clean - Remove object files from package source directories.'
+	@echo 'make deb - Create a debian package.'
+	@echo 'make system-install - Install to system paths instead of GOPATH.'
+	@echo 'make deb-clean - Remove debian package GOPATH.'
 	@echo 'make sysdeps - Install the development environment system packages.'
 	@echo 'make deps - Set up the project Go dependencies.'
 	@echo 'make create-deps - Generate the Go dependencies file.'
