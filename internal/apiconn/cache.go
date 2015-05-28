@@ -70,7 +70,7 @@ func (cache *Cache) EvictAll() {
 // responsibility of the caller to ensure this.
 func (cache *Cache) OpenAPI(
 	envUUID string,
-	dial func() (*api.State, error),
+	dial func() (*api.State, *api.Info, error),
 ) (*Conn, error) {
 	// First, a quick check to see whether the connection
 	// is currrently cached.
@@ -88,17 +88,18 @@ func (cache *Cache) OpenAPI(
 	// we only dial the state server once. The group is
 	// keyed by the environment UUID.
 	x, err := cache.group.Do(envUUID, func() (interface{}, error) {
-		st, err := dial()
+		st, stInfo, err := dial()
 		if err != nil {
 			return nil, errgo.Mask(err)
 		}
 		c := &Conn{
-			// Note that we put the State field in the outer struct
-			// so that it's clear in the godoc that it is available.
+			// Note that we put the State and Info fields in the outer struct
+			// so that it's clear in the godoc that they are available.
 			// If godoc showed embedded exported fields,
-			// it might be better to avoid doing it, and embed
+			// it might be better to avoid doing that, and embed
 			// sharedConn instead.
 			State: st,
+			Info:  stInfo,
 			shared: &sharedConn{
 				cache:    cache,
 				uuid:     envUUID,
@@ -121,6 +122,10 @@ type Conn struct {
 	// State holds the actual API connection. It should
 	// not be closed directly.
 	*api.State
+
+	// Info holds the information that was used to make
+	// the connection.
+	Info *api.Info
 
 	closed bool
 	shared *sharedConn

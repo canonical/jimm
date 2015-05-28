@@ -9,6 +9,10 @@ import (
 	"os"
 	"path/filepath"
 
+	// Include any providers known to support JEM.
+	// Avoid including provider/all to reduce build time.
+	_ "github.com/juju/juju/provider/ec2"
+	_ "github.com/juju/juju/provider/local"
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"

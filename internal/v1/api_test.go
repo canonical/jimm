@@ -5,11 +5,16 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
+	"github.com/juju/juju/api"
+	jujufeature "github.com/juju/juju/feature"
 	corejujutesting "github.com/juju/juju/juju/testing"
+	"github.com/juju/names"
 	"github.com/juju/testing/httptesting"
+	"github.com/juju/utils/featureflag"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
@@ -37,12 +42,21 @@ func (s *APISuite) SetUpTest(c *gc.C) {
 	s.PatchValue(&jem.APIOpenTimeout, time.Duration(0))
 	s.srv, s.discharger = s.newServer(c, s.Session)
 	s.username = "testuser"
+	os.Setenv("JUJU_DEV_FEATURE_FLAGS", jujufeature.JES)
+	featureflag.SetFlagsFromEnvironment("JUJU_DEV_FEATURE_FLAGS")
 }
 
 func (s *APISuite) TearDownTest(c *gc.C) {
 	s.discharger.Close()
 	s.srv.Close()
 	s.JujuConnSuite.TearDownTest(c)
+}
+
+const sshKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDOjaOjVRHchF2RFCKQdgBqrIA5nOoqSprLK47l2th5I675jw+QYMIihXQaITss3hjrh3+5ITyBO41PS5rHLNGtlYUHX78p9CHNZsJqHl/z1Ub1tuMe+/5SY2MkDYzgfPtQtVsLasAIiht/5g78AMMXH3HeCKb9V9cP6/lPPq6mCMvg8TDLrPp/P2vlyukAsJYUvVgoaPDUBpedHbkMj07pDJqe4D7c0yEJ8hQo/6nS+3bh9Q1NvmVNsB1pbtk3RKONIiTAXYcjclmOljxxJnl1O50F5sOIi38vyl7Q63f6a3bXMvJEf1lnPNJKAxspIfEu8gRasny3FEsbHfrxEwVj rog@rog-x220"
+
+var dummyEnvConfig = map[string]interface{}{
+	"authorized-keys": sshKey,
+	"state-server":    true,
 }
 
 const adminUser = "admin"
@@ -270,6 +284,295 @@ func (s *APISuite) TestGetEnvironmentNotFound(c *gc.C) {
 	})
 }
 
+func (s *APISuite) TestGetStateServer(c *gc.C) {
+	srvId := s.addStateServer(c, adminUser, "foo")
+
+	s.username = "bob"
+	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Handler: s.srv,
+		URL:     "/v1/u/" + srvId,
+		Do:      bakeryDo(nil),
+	})
+	c.Assert(resp.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %s", resp.Body.Bytes()))
+	var jesInfo params.JESInfo
+	err := json.Unmarshal(resp.Body.Bytes(), &jesInfo)
+	c.Assert(err, gc.IsNil, gc.Commentf("body: %s", resp.Body.String()))
+	c.Assert(jesInfo.ProviderType, gc.Equals, "dummy")
+	c.Assert(jesInfo.Template, gc.Not(gc.HasLen), 0)
+	c.Logf("%#v", jesInfo.Template)
+}
+
+func (s *APISuite) TestNewEnvironment(c *gc.C) {
+	srvId := s.addStateServer(c, adminUser, "foo")
+
+	s.username = "bob"
+	var envRespBody json.RawMessage
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "POST",
+		URL:     "/v1/u/bob/env",
+		Handler: s.srv,
+		JSONBody: params.NewEnvironmentInfo{
+			Name:        params.Name("bar"),
+			StateServer: srvId,
+			Config:      dummyEnvConfig,
+			Password:    "secret",
+		},
+		ExpectBody: httptesting.BodyAsserter(func(_ *gc.C, body json.RawMessage) {
+			envRespBody = body
+		}),
+		Do: bakeryDo(nil),
+	})
+	var envResp params.EnvironmentResponse
+	err := json.Unmarshal(envRespBody, &envResp)
+	c.Assert(err, gc.IsNil)
+
+	// Ensure that we can connect to the new environment
+	apiInfo := &api.Info{
+		Tag:        names.NewUserTag("bob"),
+		Password:   "secret",
+		Addrs:      envResp.HostPorts,
+		CACert:     envResp.CACert,
+		EnvironTag: names.NewEnvironTag(envResp.UUID),
+	}
+	st, err := api.Open(apiInfo, api.DialOpts{})
+	c.Assert(err, gc.IsNil)
+	defer st.Close()
+}
+
+var newEnvironmentWithInvalidStateServerPathTests = []struct {
+	path      string
+	expectErr string
+}{{
+	path:      "x",
+	expectErr: `wrong number of parts`,
+}, {
+	path:      "x/foo/y",
+	expectErr: `second part of state server id must be "server"`,
+}, {
+	path:      "/server/foo",
+	expectErr: `empty user name or entity name`,
+}, {
+	path:      "foo/server/",
+	expectErr: `empty user name or entity name`,
+}}
+
+func (s *APISuite) TestNewEnvironmentWithInvalidStateServerPath(c *gc.C) {
+	s.username = "bob"
+	for _, test := range newEnvironmentWithInvalidStateServerPathTests {
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Method:  "POST",
+			URL:     "/v1/u/bob/env",
+			Handler: s.srv,
+			JSONBody: params.NewEnvironmentInfo{
+				Name:        params.Name("bar"),
+				StateServer: test.path,
+			},
+			ExpectBody: params.Error{
+				Message: fmt.Sprintf("cannot parse state server path %q: %s", test.path, test.expectErr),
+				Code:    params.ErrBadRequest,
+			},
+			ExpectStatus: http.StatusBadRequest,
+			Do:           bakeryDo(nil),
+		})
+	}
+}
+
+func (s *APISuite) TestNewEnvironmentCannotOpenAPI(c *gc.C) {
+	s.username = "bob"
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "POST",
+		URL:     "/v1/u/bob/env",
+		Handler: s.srv,
+		JSONBody: params.NewEnvironmentInfo{
+			Name:        params.Name("bar"),
+			StateServer: "bob/server/foo",
+		},
+		ExpectBody: params.Error{
+			Message: `cannot connect to state server: cannot get environment: environment "bob/foo" not found`,
+			Code:    params.ErrNotFound,
+		},
+		ExpectStatus: http.StatusNotFound,
+		Do:           bakeryDo(nil),
+	})
+}
+
+func (s *APISuite) TestNewEnvironmentInvalidConfig(c *gc.C) {
+	srvId := s.addStateServer(c, adminUser, "foo")
+	s.username = "bob"
+
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "POST",
+		URL:     "/v1/u/bob/env",
+		Handler: s.srv,
+		JSONBody: params.NewEnvironmentInfo{
+			Name:        params.Name("bar"),
+			StateServer: srvId,
+			Config: map[string]interface{}{
+				"authorized-keys": 123,
+			},
+		},
+		ExpectBody: params.Error{
+			Message: `cannot validate attributes: authorized-keys: expected string, got float64(123)`,
+			Code:    params.ErrBadRequest,
+		},
+		ExpectStatus: http.StatusBadRequest,
+		Do:           bakeryDo(nil),
+	})
+}
+
+func (s *APISuite) TestNewEnvironmentTwice(c *gc.C) {
+	srvId := s.addStateServer(c, adminUser, "foo")
+	s.username = "bob"
+
+	body := &params.NewEnvironmentInfo{
+		Name:        "bar",
+		Password:    "password",
+		StateServer: srvId,
+		Config:      dummyEnvConfig,
+	}
+	p := httptesting.JSONCallParams{
+		Method:     "POST",
+		URL:        "/v1/u/bob/env",
+		Handler:    s.srv,
+		JSONBody:   body,
+		ExpectBody: anyBody,
+		Do:         bakeryDo(nil),
+	}
+	httptesting.AssertJSONCall(c, p)
+
+	// Creating the environment the second time may fail because
+	// the juju user does not need to be created the second time.
+	// This test ensures that this works OK.
+	body.Name = "bar2"
+	httptesting.AssertJSONCall(c, p)
+
+	// Check that if we use the same name again, we get an error.
+	p.ExpectBody = params.Error{
+		Code:    params.ErrAlreadyExists,
+		Message: "already exists",
+	}
+	p.ExpectStatus = http.StatusForbidden
+	httptesting.AssertJSONCall(c, p)
+}
+
+func (s *APISuite) TestNewEnvironmentWithNoPassword(c *gc.C) {
+	srvId := s.addStateServer(c, adminUser, "foo")
+	s.username = "bob"
+
+	// N.B. "state-server" is a required attribute
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "POST",
+		URL:     "/v1/u/bob/env",
+		Handler: s.srv,
+		JSONBody: params.NewEnvironmentInfo{
+			Name:        "bar",
+			StateServer: srvId,
+			Config: map[string]interface{}{
+				"authorized-keys": sshKey,
+			},
+		},
+		ExpectBody: params.Error{
+			Code:    params.ErrBadRequest,
+			Message: `cannot create user: no password specified for new user`,
+		},
+		ExpectStatus: http.StatusBadRequest,
+		Do:           bakeryDo(nil),
+	})
+}
+
+func (s *APISuite) TestNewEnvironmentCannotCreate(c *gc.C) {
+	srvId := s.addStateServer(c, adminUser, "foo")
+	s.username = "bob"
+
+	// N.B. "state-server" is a required attribute
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "POST",
+		URL:     "/v1/u/bob/env",
+		Handler: s.srv,
+		JSONBody: params.NewEnvironmentInfo{
+			Name:        "bar",
+			Password:    "secret",
+			StateServer: srvId,
+			Config: map[string]interface{}{
+				"authorized-keys": sshKey,
+			},
+		},
+		ExpectBody: params.Error{
+			Message: `cannot create environment: provider validation failed: state-server: expected bool, got nothing`,
+		},
+		ExpectStatus: http.StatusInternalServerError,
+		Do:           bakeryDo(nil),
+	})
+
+	// Check that the environment is not there (it was added temporarily during the call).
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "GET",
+		Handler: s.srv,
+		URL:     "/v1/u/bob/env/bar",
+		ExpectBody: &params.Error{
+			Message: `environment "bob/bar" not found`,
+			Code:    params.ErrNotFound,
+		},
+		ExpectStatus: http.StatusNotFound,
+		Do:           bakeryDo(nil),
+	})
+}
+
+func (s *APISuite) TestNewEnvironmentUnauthorized(c *gc.C) {
+	srvId := s.addStateServer(c, adminUser, "foo")
+	s.username = "charlie"
+
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "POST",
+		URL:     "/v1/u/bob/env",
+		Handler: s.srv,
+		JSONBody: params.NewEnvironmentInfo{
+			Name:        "bar",
+			StateServer: srvId,
+			Config:      dummyEnvConfig,
+		},
+		ExpectBody: params.Error{
+			Message: `unauthorized`,
+			Code:    params.ErrUnauthorized,
+		},
+		ExpectStatus: http.StatusUnauthorized,
+		Do:           bakeryDo(nil),
+	})
+}
+
+// addStateServer adds a new stateserver named name under the
+// given user. It returns the state server id.
+func (s *APISuite) addStateServer(c *gc.C, user, name string) string {
+	// Note that because the cookies acquired in this request don't
+	// persist, the discharge macaroon we get won't affect subsequent
+	// requests in the caller.
+	olduser := s.username
+	defer func() {
+		s.username = olduser
+	}()
+	s.username = adminUser
+
+	info := s.APIInfo(c)
+
+	// First add the state server that we'll use to create the environment.
+	srvId := adminUser + "/server/foo"
+	c.Logf("user: %v", info.Tag.Id())
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "PUT",
+		Handler: s.srv,
+		JSONBody: params.ServerInfo{
+			HostPorts:   info.Addrs,
+			CACert:      info.CACert,
+			User:        info.Tag.Id(),
+			Password:    info.Password,
+			EnvironUUID: info.EnvironTag.Id(),
+		},
+		URL: "/v1/u/" + srvId,
+		Do:  bakeryDo(nil),
+	})
+	return srvId
+}
+
 func bakeryDo(client *http.Client) func(*http.Request) (*http.Response, error) {
 	if client == nil {
 		client = httpbakery.NewHTTPClient()
@@ -285,3 +588,6 @@ func bakeryDo(client *http.Client) func(*http.Request) (*http.Response, error) {
 		return bclient.Do(req)
 	}
 }
+
+var anyBody = httptesting.BodyAsserter(func(*gc.C, json.RawMessage) {
+})

@@ -65,11 +65,16 @@ func (h *Handler) newMacaroon() (*macaroon.Macaroon, error) {
 }
 
 func (h *Handler) isAdmin() bool {
-	if h.auth.username == h.config.StateServerAdmin {
+	return h.isUser(h.config.StateServerAdmin)
+}
+
+func (h *Handler) isUser(name string) bool {
+	if h.auth.username == name {
 		return true
 	}
+	// TODO fetch groups from id manager.
 	for _, g := range h.auth.groups {
-		if g == h.config.StateServerAdmin {
+		if g == name {
 			return true
 		}
 	}

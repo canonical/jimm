@@ -44,11 +44,14 @@ func (s *cacheSuite) TearDownTest(c *gc.C) {
 func (s *cacheSuite) TestOpenAPI(c *gc.C) {
 	cache := apiconn.NewCache(apiconn.CacheParams{})
 	uuid := s.APIState.Client().EnvironmentUUID()
-	conn, err := cache.OpenAPI(uuid, func() (*api.State, error) {
-		return api.Open(s.APIInfo(c), api.DialOpts{})
+	var info *api.Info
+	conn, err := cache.OpenAPI(uuid, func() (*api.State, *api.Info, error) {
+		info = s.APIInfo(c)
+		return apiOpen(info, api.DialOpts{})
 	})
 	c.Assert(err, gc.IsNil)
 	c.Assert(conn.Ping(), gc.IsNil)
+	c.Assert(conn.Info, gc.Equals, info)
 
 	// If we close the connection, it should still remain around
 	// in the cache.
@@ -59,9 +62,9 @@ func (s *cacheSuite) TestOpenAPI(c *gc.C) {
 	// If we open the same uuid, we should get
 	// the same connection without the dial
 	// function being called.
-	conn1, err := cache.OpenAPI(uuid, func() (*api.State, error) {
+	conn1, err := cache.OpenAPI(uuid, func() (*api.State, *api.Info, error) {
 		c.Error("dial function called unexpectedly")
-		return nil, fmt.Errorf("no")
+		return nil, nil, fmt.Errorf("no")
 	})
 	c.Assert(conn1.State, gc.Equals, conn.State)
 	err = conn1.Close()
@@ -84,13 +87,14 @@ func (s *cacheSuite) TestConcurrentOpenAPI(c *gc.C) {
 	var mu sync.Mutex
 	callCounts := make(map[string]int)
 
-	dialFunc := func(uuid string, st *api.State) func() (*api.State, error) {
-		return func() (*api.State, error) {
+	var info api.Info
+	dialFunc := func(uuid string, st *api.State) func() (*api.State, *api.Info, error) {
+		return func() (*api.State, *api.Info, error) {
 			time.Sleep(10 * time.Millisecond)
 			mu.Lock()
 			defer mu.Unlock()
 			callCounts[uuid]++
-			return st, nil
+			return st, &info, nil
 		}
 	}
 	cache := apiconn.NewCache(apiconn.CacheParams{})
@@ -119,8 +123,8 @@ func (s *cacheSuite) TestConcurrentOpenAPI(c *gc.C) {
 
 func (s *cacheSuite) TestOpenAPIError(c *gc.C) {
 	cache := apiconn.NewCache(apiconn.CacheParams{})
-	conn, err := cache.OpenAPI("uuid", func() (*api.State, error) {
-		return nil, fmt.Errorf("open error")
+	conn, err := cache.OpenAPI("uuid", func() (*api.State, *api.Info, error) {
+		return nil, nil, fmt.Errorf("open error")
 	})
 	c.Assert(err, gc.ErrorMatches, "open error")
 	c.Assert(conn, gc.IsNil)
@@ -129,9 +133,9 @@ func (s *cacheSuite) TestOpenAPIError(c *gc.C) {
 func (s *cacheSuite) TestEvict(c *gc.C) {
 	cache := apiconn.NewCache(apiconn.CacheParams{})
 	dialCount := 0
-	dial := func() (*api.State, error) {
+	dial := func() (*api.State, *api.Info, error) {
 		dialCount++
-		return api.Open(s.APIInfo(c), api.DialOpts{})
+		return apiOpen(s.APIInfo(c), api.DialOpts{})
 	}
 
 	conn, err := cache.OpenAPI("uuid", dial)
@@ -159,14 +163,14 @@ func (s *cacheSuite) TestEvict(c *gc.C) {
 
 func (s *cacheSuite) TestEvictAll(c *gc.C) {
 	cache := apiconn.NewCache(apiconn.CacheParams{})
-	conn, err := cache.OpenAPI("uuid0", func() (*api.State, error) {
-		return api.Open(s.APIInfo(c), api.DialOpts{})
+	conn, err := cache.OpenAPI("uuid0", func() (*api.State, *api.Info, error) {
+		return apiOpen(s.APIInfo(c), api.DialOpts{})
 	})
 	c.Assert(err, gc.IsNil)
 	conn.Close()
 
-	_, err = cache.OpenAPI("uuid1", func() (*api.State, error) {
-		return &api.State{}, nil
+	_, err = cache.OpenAPI("uuid1", func() (*api.State, *api.Info, error) {
+		return &api.State{}, &api.Info{}, nil
 	})
 	cache.EvictAll()
 
@@ -176,13 +180,23 @@ func (s *cacheSuite) TestEvictAll(c *gc.C) {
 	// Make sure both connections have actually been evicted.
 	called := 0
 	for i := 0; i < 2; i++ {
-		_, err := cache.OpenAPI(fmt.Sprintf("uuid%d", i), func() (*api.State, error) {
+		_, err := cache.OpenAPI(fmt.Sprintf("uuid%d", i), func() (*api.State, *api.Info, error) {
 			called++
-			return &api.State{}, nil
+			return &api.State{}, &api.Info{}, nil
 		})
 		c.Assert(err, gc.IsNil)
 	}
 	c.Assert(called, gc.Equals, 2)
+}
+
+// apiOpen is like api.Open except that it also returns its
+// info parameter.
+func apiOpen(info *api.Info, opts api.DialOpts) (*api.State, *api.Info, error) {
+	st, err := api.Open(info, opts)
+	if err != nil {
+		return nil, nil, err
+	}
+	return st, info, nil
 }
 
 func assertConnIsClosed(c *gc.C, conn *apiconn.Conn) {
