@@ -64,6 +64,7 @@ func NewServer(config ServerParams, versions map[string]NewAPIHandlerFunc) (Hand
 	}
 	srv := &server{
 		router: httprouter.New(),
+		pool:   p,
 	}
 	for name, newAPI := range versions {
 		handlers, err := newAPI(p, config)
@@ -79,6 +80,7 @@ func NewServer(config ServerParams, versions map[string]NewAPIHandlerFunc) (Hand
 
 type server struct {
 	router *httprouter.Router
+	pool   *Pool
 }
 
 // ServeHTTP implements http.Handler.Handle.
@@ -88,6 +90,7 @@ func (srv *server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 // Close implements io.Closer.Close.
 func (srv *server) Close() error {
+	srv.pool.Close()
 	return nil
 }
 
