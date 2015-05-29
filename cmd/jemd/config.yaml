@@ -1,0 +1,9 @@
+mongo-addr: localhost:27017
+api-addr: localhost:8082
+state-server-admin: admin
+# For locally running services.
+identity-public-key: CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk=
+identity-location: http://localhost:8081/v1/discharger
+# For production identity manager.
+#identity-public-key: hmHaPgCC1UfuhYHUSX5+aihSAZesqpVdjRv0mgfIwjo=
+#identity-location: https://api.jujucharms.com/identity/v1/discharger
