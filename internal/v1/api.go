@@ -1,11 +1,9 @@
 package v1
 
 import (
-	"time"
-
 	"github.com/juju/httprequest"
-	"github.com/juju/juju/api"
 	"github.com/juju/juju/network"
+	"github.com/juju/loggo"
 	"github.com/juju/names"
 	"gopkg.in/errgo.v1"
 
@@ -20,7 +18,7 @@ type Handler struct {
 	auth   authorization
 }
 
-var dialTimeout = 15 * time.Second
+var logger = loggo.GetLogger("jem.internal.v1")
 
 func NewAPIHandler(jp *jem.Pool, sp jem.ServerParams) ([]httprequest.Handler, error) {
 	return errorMapper.Handlers(func(p httprequest.Params) (*Handler, error) {
@@ -74,9 +72,11 @@ func (h *Handler) AddJES(arg *params.AddJES) error {
 		AdminPassword: arg.Info.Password,
 		UUID:          arg.Info.EnvironUUID,
 	}
+	logger.Infof("dialling environment")
 	// Attempt to connect to the environment before accepting it.
-	state, err := dialEnvironment(env, srv)
+	state, err := h.jem.OpenAPIFromDocs(env, srv)
 	if err != nil {
+		logger.Infof("cannot open API: %v", err)
 		return badRequestf(err, "cannot connect to environment")
 	}
 	state.Close()
@@ -112,22 +112,6 @@ func (h *Handler) GetEnvironment(arg *params.GetEnvironment) (*params.Environmen
 
 func entityPathToId(u params.EntityPath) string {
 	return string(u.User) + "/" + string(u.Name)
-}
-
-func dialEnvironment(
-	env *mongodoc.Environment,
-	srv *mongodoc.StateServer,
-) (*api.State, error) {
-	return api.Open(&api.Info{
-		Addrs:      srv.HostPorts,
-		CACert:     srv.CACert,
-		Tag:        names.NewUserTag(env.AdminUser),
-		Password:   env.AdminPassword,
-		EnvironTag: names.NewEnvironTag(env.UUID),
-	}, api.DialOpts{
-		Timeout:    dialTimeout,
-		RetryDelay: 500 * time.Millisecond,
-	})
 }
 
 func badRequestf(underlying error, f string, a ...interface{}) error {

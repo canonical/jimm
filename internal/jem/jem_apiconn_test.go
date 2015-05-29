@@ -35,7 +35,7 @@ func (s *jemAPIConnSuite) SetUpTest(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	s.pool = pool
 	s.store = s.pool.JEM()
-	s.PatchValue(jem.APIOpenTimeout, time.Duration(0))
+	s.PatchValue(&jem.APIOpenTimeout, time.Duration(0))
 }
 
 func (s *jemAPIConnSuite) TearDownTest(c *gc.C) {

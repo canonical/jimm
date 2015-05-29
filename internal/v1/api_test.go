@@ -12,7 +12,6 @@ import (
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v1/bakerytest"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
@@ -25,8 +24,7 @@ import (
 
 type APISuite struct {
 	corejujutesting.JujuConnSuite
-	srv        http.Handler
-	jem        *jem.Pool
+	srv        *jem.Server
 	discharger *bakerytest.Discharger
 	username   string
 	groups     []string
@@ -36,19 +34,20 @@ var _ = gc.Suite(&APISuite{})
 
 func (s *APISuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
-	s.PatchValue(v1.DialTimeout, time.Duration(0))
-	s.srv, s.jem, s.discharger = s.newServer(c, s.Session)
+	s.PatchValue(&jem.APIOpenTimeout, time.Duration(0))
+	s.srv, s.discharger = s.newServer(c, s.Session)
 	s.username = "testuser"
 }
 
 func (s *APISuite) TearDownTest(c *gc.C) {
 	s.discharger.Close()
+	s.srv.Close()
 	s.JujuConnSuite.TearDownTest(c)
 }
 
 const adminUser = "admin"
 
-func (s *APISuite) newServer(c *gc.C, session *mgo.Session) (http.Handler, *jem.Pool, *bakerytest.Discharger) {
+func (s *APISuite) newServer(c *gc.C, session *mgo.Session) (*jem.Server, *bakerytest.Discharger) {
 	discharger := bakerytest.NewDischarger(nil, func(_ *http.Request, cond string, arg string) ([]checkers.Caveat, error) {
 		if s.username == "" {
 			return nil, errgo.Newf("no specified username for discharge macaroon")
@@ -59,8 +58,6 @@ func (s *APISuite) newServer(c *gc.C, session *mgo.Session) (http.Handler, *jem.
 		}, nil
 	})
 	db := session.DB("jem")
-	j, err := jem.NewPool(db, &bakery.NewServiceParams{})
-	c.Assert(err, gc.IsNil)
 	config := jem.ServerParams{
 		DB:               db,
 		StateServerAdmin: adminUser,
@@ -69,7 +66,7 @@ func (s *APISuite) newServer(c *gc.C, session *mgo.Session) (http.Handler, *jem.
 	}
 	srv, err := jem.NewServer(config, map[string]jem.NewAPIHandlerFunc{"v1": v1.NewAPIHandler})
 	c.Assert(err, gc.IsNil)
-	return srv, j, discharger
+	return srv, discharger
 }
 
 func (s *APISuite) TestAddJES(c *gc.C) {
@@ -207,6 +204,8 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 			},
 			Do: bakeryDo(nil),
 		})
+		// Clear the connection pool for the next test.
+		s.srv.Pool().ClearAPIConnCache()
 	}
 }
 
