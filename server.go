@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 
+	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/mgo.v2"
 
@@ -50,5 +51,9 @@ type HandleCloser interface {
 // be closed after use (first ensuring that all outstanding requests have
 // completed).
 func NewServer(config ServerParams) (HandleCloser, error) {
-	return jem.NewServer(jem.ServerParams(config), versions)
+	srv, err := jem.NewServer(jem.ServerParams(config), versions)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return srv, nil
 }

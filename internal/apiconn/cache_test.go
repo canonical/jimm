@@ -157,6 +157,34 @@ func (s *cacheSuite) TestEvict(c *gc.C) {
 	c.Assert(dialCount, gc.Equals, 2)
 }
 
+func (s *cacheSuite) TestEvictAll(c *gc.C) {
+	cache := apiconn.NewCache(apiconn.CacheParams{})
+	conn, err := cache.OpenAPI("uuid0", func() (*api.State, error) {
+		return api.Open(s.APIInfo(c), api.DialOpts{})
+	})
+	c.Assert(err, gc.IsNil)
+	conn.Close()
+
+	_, err = cache.OpenAPI("uuid1", func() (*api.State, error) {
+		return &api.State{}, nil
+	})
+	cache.EvictAll()
+
+	// Make sure that the connections are closed.
+	assertConnIsClosed(c, conn)
+
+	// Make sure both connections have actually been evicted.
+	called := 0
+	for i := 0; i < 2; i++ {
+		_, err := cache.OpenAPI(fmt.Sprintf("uuid%d", i), func() (*api.State, error) {
+			called++
+			return &api.State{}, nil
+		})
+		c.Assert(err, gc.IsNil)
+	}
+	c.Assert(called, gc.Equals, 2)
+}
+
 func assertConnIsClosed(c *gc.C, conn *apiconn.Conn) {
 	select {
 	case <-conn.State.RPCClient().Dead():

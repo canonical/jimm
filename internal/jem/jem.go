@@ -3,7 +3,6 @@
 package jem
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -29,7 +28,7 @@ type Pool struct {
 	refCount int
 }
 
-var apiOpenTimeout = 15 * time.Second
+var APIOpenTimeout = 15 * time.Second
 
 // NewPool represents a pool of possible JEM instances that use the given
 // database as a store, and use the given bakery parameters to create the
@@ -76,6 +75,12 @@ func (p *Pool) decRef() {
 	if p.refCount < 0 {
 		panic("negative reference count")
 	}
+}
+
+// ClearAPIConnCache clears out the API connection cache.
+// This is useful for testing purposes.
+func (p *Pool) ClearAPIConnCache() {
+	p.connCache.EvictAll()
 }
 
 // JEM returns a new JEM instance from the pool, suitable
@@ -217,7 +222,7 @@ func (j *JEM) Environment(id string) (*mongodoc.Environment, error) {
 func (j *JEM) OpenAPI(envId string) (*apiconn.Conn, error) {
 	env, err := j.Environment(envId)
 	if err != nil {
-		return nil, errgo.NoteMask(err, fmt.Sprintf("cannot get environment"), errgo.Is(params.ErrNotFound))
+		return nil, errgo.NoteMask(err, "cannot get environment", errgo.Is(params.ErrNotFound))
 	}
 	return j.pool.connCache.OpenAPI(env.UUID, func() (*api.State, error) {
 		srv, err := j.StateServer(env.StateServer)
@@ -246,7 +251,7 @@ func (j *JEM) OpenAPIFromDocs(env *mongodoc.Environment, srv *mongodoc.StateServ
 
 func apiDialOpts() api.DialOpts {
 	return api.DialOpts{
-			Timeout:    apiOpenTimeout,
+			Timeout:    APIOpenTimeout,
 			RetryDelay: 500 * time.Millisecond,
 	}
 }

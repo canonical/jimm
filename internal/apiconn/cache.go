@@ -52,6 +52,16 @@ func (c *Cache) Close() error {
 	return nil
 }
 
+// EvictAll clears the entire cache. This can be useful for testing.
+func (cache *Cache) EvictAll() {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	for uuid, conn := range cache.conns {
+		conn.Close()
+		delete(cache.conns, uuid)
+	}
+}
+
 // OpenAPI dials the API server at the environment with the given UUID.
 // If a connection is not currently available, the dial
 // function will be called to connect to it and its returned

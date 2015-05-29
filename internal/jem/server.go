@@ -3,7 +3,6 @@
 package jem
 
 import (
-	"io"
 	"net/http"
 
 	"github.com/juju/httprequest"
@@ -45,7 +44,7 @@ type ServerParams struct {
 // requests and stores its data in the given database.
 // The returned handler should be closed when finished
 // with.
-func NewServer(config ServerParams, versions map[string]NewAPIHandlerFunc) (HandleCloser, error) {
+func NewServer(config ServerParams, versions map[string]NewAPIHandlerFunc) (*Server, error) {
 	if len(versions) == 0 {
 		return nil, errgo.Newf("JEM server must serve at least one version of the API")
 	}
@@ -62,7 +61,7 @@ func NewServer(config ServerParams, versions map[string]NewAPIHandlerFunc) (Hand
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make store")
 	}
-	srv := &server{
+	srv := &Server{
 		router: httprouter.New(),
 		pool:   p,
 	}
@@ -78,27 +77,25 @@ func NewServer(config ServerParams, versions map[string]NewAPIHandlerFunc) (Hand
 	return srv, nil
 }
 
-type server struct {
+type Server struct {
 	router *httprouter.Router
 	pool   *Pool
 }
 
 // ServeHTTP implements http.Handler.Handle.
-func (srv *server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	srv.router.ServeHTTP(w, req)
 }
 
-// Close implements io.Closer.Close.
-func (srv *server) Close() error {
+// Close implements io.Closer.Close. It should not be called
+// until all requests on the handler have completed.
+func (srv *Server) Close() error {
 	srv.pool.Close()
 	return nil
 }
 
-// HandleCloser represents an HTTP handler that can
-// be closed to free resources associated with the
-// handler. The Close method should not be called
-// until all requests on the handler have completed.
-type HandleCloser interface {
-	http.Handler
-	io.Closer
+// Pool returns the JEM pool used by the server.
+// It is made available for testing purposes.
+func (srv *Server) Pool() *Pool {
+	return srv.pool
 }
