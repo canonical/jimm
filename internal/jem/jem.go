@@ -3,26 +3,42 @@
 package jem
 
 import (
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/juju/juju/api"
+	"github.com/juju/names"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
 	"gopkg.in/mgo.v2"
 
+	"github.com/CanonicalLtd/jem/internal/apiconn"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
 
 type Pool struct {
-	db     Database
-	bakery *bakery.Service
+	db        Database
+	bakery    *bakery.Service
+	connCache *apiconn.Cache
+
+	mu       sync.Mutex
+	closed   bool
+	refCount int
 }
+
+var apiOpenTimeout = 15 * time.Second
 
 // NewPool represents a pool of possible JEM instances that use the given
 // database as a store, and use the given bakery parameters to create the
 // bakery.Service.
 func NewPool(db *mgo.Database, bakeryParams *bakery.NewServiceParams) (*Pool, error) {
 	pool := &Pool{
-		db: Database{db},
+		db:        Database{db},
+		connCache: apiconn.NewCache(apiconn.CacheParams{}),
+		refCount:  1,
 	}
 	// TODO migrate database
 	macStore, err := mgostorage.New(pool.db.Macaroons())
@@ -39,13 +55,46 @@ func NewPool(db *mgo.Database, bakeryParams *bakery.NewServiceParams) (*Pool, er
 	return pool, nil
 }
 
+// Close closes the pool. Its resources will be freed
+// when the last JEM instance created from the pool has
+// been closed.
+func (p *Pool) Close() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.closed {
+		return
+	}
+	p.decRef()
+	p.closed = true
+}
+
+func (p *Pool) decRef() {
+	// called with p.mu held.
+	if p.refCount--; p.refCount == 0 {
+		p.connCache.Close()
+	}
+	if p.refCount < 0 {
+		panic("negative reference count")
+	}
+}
+
 // JEM returns a new JEM instance from the pool, suitable
 // for using in short-lived requests. The JEM must be
 // closed with the Close method after use.
+//
+// This method will panic if called after the pool has been
+// closed.
 func (p *Pool) JEM() *JEM {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.closed {
+		panic("JEM call on closed pool")
+	}
+	p.refCount++
 	return &JEM{
 		DB:     p.db.Copy(),
 		Bakery: p.bakery,
+		pool:   p,
 	}
 }
 
@@ -55,11 +104,28 @@ type JEM struct {
 
 	// Bakery holds the JEM bakery service.
 	Bakery *bakery.Service
+
+	// pool holds the Pool from which the JEM instance
+	// was created.
+	pool *Pool
+
+	// closed records whether the JEM instance has
+	// been closed.
+	closed bool
 }
 
+// Close closes the JEM instance. This should be called when
+// the JEM instance is finished with.
 func (j *JEM) Close() {
+	j.pool.mu.Lock()
+	defer j.pool.mu.Unlock()
+	if j.closed {
+		return
+	}
+	j.closed = true
 	j.DB.Close()
 	j.DB = Database{}
+	j.pool.decRef()
 }
 
 // AddStateServer adds a new state server and its associated environment
@@ -143,6 +209,56 @@ func (j *JEM) Environment(id string) (*mongodoc.Environment, error) {
 		return nil, errgo.Notef(err, "cannot get environment %q", id)
 	}
 	return &env, nil
+}
+
+// OpenAPI opens an API connection to the environment with the given id.
+//
+// The returned connection must be closed when finished with.
+func (j *JEM) OpenAPI(envId string) (*apiconn.Conn, error) {
+	env, err := j.Environment(envId)
+	if err != nil {
+		return nil, errgo.NoteMask(err, fmt.Sprintf("cannot get environment"), errgo.Is(params.ErrNotFound))
+	}
+	return j.pool.connCache.OpenAPI(env.UUID, func() (*api.State, error) {
+		srv, err := j.StateServer(env.StateServer)
+		if err != nil {
+			return nil, errgo.Notef(err, "cannot get state server for environment %q", env.UUID)
+		}
+		return api.Open(apiInfoFromDocs(env, srv), apiDialOpts())
+	})
+}
+
+// OpenAPIFromDocs returns an API connection to the environment
+// and state server held in the given documents. This can
+// be useful when we want to connect to an environment
+// before it's added to the database (for example when adding
+// a new state server). Note that a successful return from this
+// function does not necessarily mean that the credentials or
+// API addresses in the docs actually work, as it's possible
+// that there's already a cached connection for the given environment.
+//
+// The returned connection must be closed when finished with.
+func (j *JEM) OpenAPIFromDocs(env *mongodoc.Environment, srv *mongodoc.StateServer) (*apiconn.Conn, error) {
+	return j.pool.connCache.OpenAPI(env.UUID, func() (*api.State, error) {
+		return api.Open(apiInfoFromDocs(env, srv), apiDialOpts())
+	})
+}
+
+func apiDialOpts() api.DialOpts {
+	return api.DialOpts{
+			Timeout:    apiOpenTimeout,
+			RetryDelay: 500 * time.Millisecond,
+	}
+}
+
+func apiInfoFromDocs(env *mongodoc.Environment, srv *mongodoc.StateServer) *api.Info {
+	return &api.Info{
+		Addrs:      srv.HostPorts,
+		CACert:     srv.CACert,
+		Tag:        names.NewUserTag(env.AdminUser),
+		Password:   env.AdminPassword,
+		EnvironTag: names.NewEnvironTag(env.UUID),
+	}
 }
 
 // Database wraps an mgo.DB ands adds a few convenience methods.
