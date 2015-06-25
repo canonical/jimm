@@ -216,7 +216,8 @@ func (j *JEM) Environment(id string) (*mongodoc.Environment, error) {
 	return &env, nil
 }
 
-// OpenAPI opens an API connection to the environment with the given id.
+// OpenAPI opens an API connection to the environment with the given id
+// and returns it along with the information used to connect.
 //
 // The returned connection must be closed when finished with.
 func (j *JEM) OpenAPI(envId string) (*apiconn.Conn, error) {
@@ -224,12 +225,17 @@ func (j *JEM) OpenAPI(envId string) (*apiconn.Conn, error) {
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot get environment", errgo.Is(params.ErrNotFound))
 	}
-	return j.pool.connCache.OpenAPI(env.UUID, func() (*api.State, error) {
+	return j.pool.connCache.OpenAPI(env.UUID, func() (*api.State, *api.Info, error) {
 		srv, err := j.StateServer(env.StateServer)
 		if err != nil {
-			return nil, errgo.Notef(err, "cannot get state server for environment %q", env.UUID)
+			return nil, nil, errgo.Notef(err, "cannot get state server for environment %q", env.UUID)
 		}
-		return api.Open(apiInfoFromDocs(env, srv), apiDialOpts())
+		apiInfo := apiInfoFromDocs(env, srv)
+		st, err := api.Open(apiInfo, apiDialOpts())
+		if err != nil {
+			return nil, nil, errgo.Mask(err)
+		}
+		return st, apiInfo, nil
 	})
 }
 
@@ -244,15 +250,20 @@ func (j *JEM) OpenAPI(envId string) (*apiconn.Conn, error) {
 //
 // The returned connection must be closed when finished with.
 func (j *JEM) OpenAPIFromDocs(env *mongodoc.Environment, srv *mongodoc.StateServer) (*apiconn.Conn, error) {
-	return j.pool.connCache.OpenAPI(env.UUID, func() (*api.State, error) {
-		return api.Open(apiInfoFromDocs(env, srv), apiDialOpts())
+	return j.pool.connCache.OpenAPI(env.UUID, func() (*api.State, *api.Info, error) {
+		stInfo := apiInfoFromDocs(env, srv)
+		st, err := api.Open(stInfo, apiDialOpts())
+		if err != nil {
+			return nil, nil, errgo.Mask(err)
+		}
+		return st, stInfo, nil
 	})
 }
 
 func apiDialOpts() api.DialOpts {
 	return api.DialOpts{
-			Timeout:    APIOpenTimeout,
-			RetryDelay: 500 * time.Millisecond,
+		Timeout:    APIOpenTimeout,
+		RetryDelay: 500 * time.Millisecond,
 	}
 }
 

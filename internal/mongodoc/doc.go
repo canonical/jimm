@@ -49,6 +49,6 @@ type Environment struct {
 	AdminPassword string
 
 	// StateServer holds the id of the environment's
-	// state server.
+	// state server (e.g. bob/myjes)
 	StateServer string
 }
