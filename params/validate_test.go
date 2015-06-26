@@ -72,6 +72,32 @@ var validatorsTests = []struct {
 		User params.User `httprequest:",path"`
 	}),
 	expectError: `cannot unmarshal into field: invalid user name "foo_invalid"`,
+}, {
+	about: "double hyphen in user",
+	params: httprequest.Params{
+		Request: newHTTPRequest("", nil),
+		PathVar: httprouter.Params{{
+			Key:   "User",
+			Value: "foo--invalid",
+		}},
+	},
+	val: new(struct {
+		User params.User `httprequest:",path"`
+	}),
+	expectError: `cannot unmarshal into field: invalid user name "foo--invalid"`,
+}, {
+	about: "double hyphen in name",
+	params: httprequest.Params{
+		Request: newHTTPRequest("", nil),
+		PathVar: httprouter.Params{{
+			Key:   "Name",
+			Value: "foo--invalid",
+		}},
+	},
+	val: new(struct {
+		Name params.Name `httprequest:",path"`
+	}),
+	expectError: `cannot unmarshal into field: invalid name "foo--invalid"`,
 }}
 
 func (*suite) TestValidators(c *gc.C) {

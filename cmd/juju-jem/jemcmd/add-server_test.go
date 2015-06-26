@@ -53,19 +53,9 @@ var addServerErrorTests = []struct {
 	expectStderr: "got 3 arguments, want 1",
 	expectCode:   2,
 }, {
-	about:        "only one part in server id",
+	about:        "invalid server name",
 	args:         []string{"a"},
-	expectStderr: `invalid JEM environment name \(needs to be <user>/<name>\)`,
-	expectCode:   2,
-}, {
-	about:        "too many parts in server id",
-	args:         []string{"a/b/c"},
-	expectStderr: `invalid JEM environment name \(needs to be <user>/<name>\)`,
-	expectCode:   2,
-}, {
-	about:        "empty server id",
-	args:         []string{""},
-	expectStderr: `invalid JEM environment name \(needs to be <user>/<name>\)`,
+	expectStderr: `invalid JEM name "a" \(needs to be <user>/<name>\)`,
 	expectCode:   2,
 }, {
 	about:        "invalid name checked by server",
