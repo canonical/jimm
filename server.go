@@ -46,7 +46,7 @@ type HandleCloser interface {
 	io.Closer
 }
 
-// NewServer returns a new handler that handles charm store requests and stores
+// NewServer returns a new handler that handles JEM requests and stores
 // its data in the given database. The returned handler should
 // be closed after use (first ensuring that all outstanding requests have
 // completed).

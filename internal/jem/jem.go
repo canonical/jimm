@@ -218,6 +218,8 @@ func (j *JEM) Environment(id string) (*mongodoc.Environment, error) {
 
 // OpenAPI opens an API connection to the environment with the given id
 // and returns it along with the information used to connect.
+// If the environment does not exist, the error will have a cause
+// of params.ErrNotFound.
 //
 // The returned connection must be closed when finished with.
 func (j *JEM) OpenAPI(envId string) (*apiconn.Conn, error) {

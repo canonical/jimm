@@ -2,14 +2,20 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/juju/cmd"
+	"github.com/juju/juju/juju"
 
 	"github.com/CanonicalLtd/jem/cmd/juju-jem/jemcmd"
 )
 
 func main() {
+	if err := juju.InitJujuHome(); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %s\n", err)
+		os.Exit(1)
+	}
 	ctxt := &cmd.Context{
 		Dir:    ".",
 		Stdout: os.Stdout,

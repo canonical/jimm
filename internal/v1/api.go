@@ -58,7 +58,8 @@ func (h *Handler) Close() error {
 
 // AddJES adds a new state server.
 func (h *Handler) AddJES(arg *params.AddJES) error {
-	if !h.isAdmin() || string(arg.User) != h.auth.username {
+	if string(arg.User) != h.auth.username {
+		logger.Warningf("authorization denied for user %q to modify environment %s/env/%s", h.auth.username, arg.User, arg.Name)
 		return params.ErrUnauthorized
 	}
 	if len(arg.Info.HostPorts) == 0 {
@@ -110,7 +111,7 @@ func (h *Handler) AddJES(arg *params.AddJES) error {
 func (h *Handler) GetJES(arg *params.GetJES) (*params.JESInfo, error) {
 	neSchema, err := h.schemaForNewEnv(entityId(string(arg.User), string(arg.Name)))
 	if err != nil {
-		return nil, errgo.Mask(err)
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	return &params.JESInfo{
 		ProviderType: neSchema.providerType,
@@ -241,7 +242,7 @@ type schemaForNewEnv struct {
 func (h *Handler) schemaForNewEnv(id string) (*schemaForNewEnv, error) {
 	st, err := h.jem.OpenAPI(id)
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot open API")
+		return nil, errgo.NoteMask(err, "cannot open API", errgo.Is(params.ErrNotFound))
 	}
 	defer st.Close()
 
@@ -252,7 +253,6 @@ func (h *Handler) schemaForNewEnv(id string) (*schemaForNewEnv, error) {
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot get base configuration")
 	}
-	logger.Infof("skeleton: %#v\n", neSchema.skeleton)
 	neSchema.providerType = neSchema.skeleton["type"].(string)
 	provider, err := environs.Provider(neSchema.providerType)
 	if err != nil {
