@@ -50,13 +50,13 @@ func main() {
 }
 
 func serve(confPath string) error {
-	logger.Infof("reading configuration")
+	logger.Debugf("reading configuration")
 	conf, err := config.Read(confPath)
 	if err != nil {
 		return errgo.Notef(err, "cannot read config file %q", confPath)
 	}
 
-	logger.Infof("connecting to mongo")
+	logger.Debugf("connecting to mongo")
 	session, err := mgo.Dial(conf.MongoAddr)
 	if err != nil {
 		return errgo.Notef(err, "cannot dial mongo at %q", conf.MongoAddr)
@@ -67,7 +67,7 @@ func serve(confPath string) error {
 	ring := bakery.NewPublicKeyRing()
 	ring.AddPublicKeyForLocation(conf.IdentityLocation, false, conf.IdentityPublicKey)
 
-	logger.Infof("setting up the API server")
+	logger.Debugf("setting up the API server")
 	cfg := jem.ServerParams{
 		DB:               db,
 		StateServerAdmin: conf.StateServerAdmin,

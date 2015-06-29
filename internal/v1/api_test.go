@@ -302,6 +302,20 @@ func (s *APISuite) TestGetStateServer(c *gc.C) {
 	c.Logf("%#v", jesInfo.Template)
 }
 
+func (s *APISuite) TestGetStateServerNotFound(c *gc.C) {
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "GET",
+		Handler: s.srv,
+		URL:     "/v1/u/user/server/foo",
+		ExpectBody: &params.Error{
+			Message: `cannot open API: cannot get environment: environment "user/foo" not found`,
+			Code:    params.ErrNotFound,
+		},
+		ExpectStatus: http.StatusNotFound,
+		Do:           bakeryDo(nil),
+	})
+}
+
 func (s *APISuite) TestNewEnvironment(c *gc.C) {
 	srvId := s.addStateServer(c, adminUser, "foo")
 

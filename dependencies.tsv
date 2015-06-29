@@ -9,10 +9,11 @@ github.com/juju/errors	git	4567a5e69fd3130ca0d89f69478e7ac025b67452	2015-03-27T1
 github.com/juju/gojsonpointer	git	afe8b77aa08f272b49e01b82de78510c11f61500	2015-02-04T19:46:29Z
 github.com/juju/gojsonreference	git	f0d24ac5ee330baa21721cdff56d45e4ee42628e	2015-02-04T19:46:33Z
 github.com/juju/gojsonschema	git	e1ad140384f254c82f89450d9a7c8dd38a632838	2015-03-12T17:00:16Z
-github.com/juju/httprequest	git	8b8c72e1ff7904af91a049b569cbf6c0b9899af6	2015-04-14T09:56:13Z
+github.com/juju/httprequest	git	4307fac9a8d29eb14aafbda10fa7bd316716a6fa	2015-06-29T16:01:36Z
 github.com/juju/juju	git	91e478fc7d3ce117d8822a144cc743ff5ec78ed3	2015-06-24T09:26:17Z
 github.com/juju/loggo	git	8477fc936adf0e382d680310047ca27e128a309a	2015-05-27T03:58:39Z
 github.com/juju/names	git	a597dd52044cc5a702844642b5cb6e09870422db	2015-04-28T12:56:57Z
+github.com/juju/persistent-cookiejar	git	beee02cb39231c7ad4a01a677fc54c48d2b46b08	2015-04-09T09:48:35Z
 github.com/juju/replicaset	git	fb7294cf57a1e2f08a57691f1246d129a87ab7e8	2015-05-08T02:21:43Z
 github.com/juju/schema	git	1c4e902df91bd058b84029533bf4ce92e6ef87ab	2015-03-30T01:12:23Z
 github.com/juju/testing	git	f521911d9a79aeb62c051fe18e689796369c5564	2015-05-29T04:40:43Z
@@ -36,4 +37,5 @@ gopkg.in/yaml.v1	git	9f9df34309c04878acc86042b16630b0f696e1de	2014-09-24T16:16:0
 gopkg.in/yaml.v2	git	c1cd2254a6dd314c9d73c338c12688c9325d85c6	2015-05-19T10:42:33Z
 launchpad.net/gnuflag	bzr	roger.peppe@canonical.com-20140716064605-pk32dnmfust02yab	13
 launchpad.net/golxc	bzr	ian.booth@canonical.com-20141121040613-ztm1q0iy9rune3zt	13
+launchpad.net/loggo	bzr	tim.penhey@canonical.com-20130729043644-ym0cscir1cist4sm	39
 launchpad.net/tomb	bzr	gustavo@niemeyer.net-20130531003818-70ikdgklbxopn8x4	17
