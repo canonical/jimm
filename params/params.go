@@ -113,6 +113,10 @@ type EnvironmentResponse struct {
 	// UUID holds the UUID of the environment.
 	UUID string `json:"uuid"`
 
+	// ServerUUID holds the UUID of the state server
+	// environment containing this environment.
+	ServerUUID  string `json:"server-uuid"`
+
 	// CACert holds the CA certificate that will be used
 	// to validate the state server's certificate, in PEM format.
 	CACert string `json:"ca-cert"`

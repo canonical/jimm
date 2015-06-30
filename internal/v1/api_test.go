@@ -340,9 +340,51 @@ func (s *APISuite) TestNewEnvironment(c *gc.C) {
 	err := json.Unmarshal(envRespBody, &envResp)
 	c.Assert(err, gc.IsNil)
 
+	c.Assert(envResp.ServerUUID, gc.Equals, s.APIInfo(c).EnvironTag.Id())
+
 	// Ensure that we can connect to the new environment
 	apiInfo := &api.Info{
 		Tag:        names.NewUserTag("bob"),
+		Password:   "secret",
+		Addrs:      envResp.HostPorts,
+		CACert:     envResp.CACert,
+		EnvironTag: names.NewEnvironTag(envResp.UUID),
+	}
+	st, err := api.Open(apiInfo, api.DialOpts{})
+	c.Assert(err, gc.IsNil)
+	defer st.Close()
+}
+
+func (s *APISuite) TestNewEnvironmentUnderGroup(c *gc.C) {
+	srvId := s.addStateServer(c, adminUser, "foo")
+
+	s.username = "bob"
+	s.groups = []string{"beatles"}
+	var envRespBody json.RawMessage
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "POST",
+		URL:     "/v1/u/beatles/env",
+		Handler: s.srv,
+		JSONBody: params.NewEnvironmentInfo{
+			Name:        params.Name("bar"),
+			StateServer: srvId,
+			Config:      dummyEnvConfig,
+			Password:    "secret",
+		},
+		ExpectBody: httptesting.BodyAsserter(func(_ *gc.C, body json.RawMessage) {
+			envRespBody = body
+		}),
+		Do: bakeryDo(nil),
+	})
+	var envResp params.EnvironmentResponse
+	err := json.Unmarshal(envRespBody, &envResp)
+	c.Assert(err, gc.IsNil)
+
+	c.Assert(envResp.ServerUUID, gc.Equals, s.APIInfo(c).EnvironTag.Id())
+
+	// Ensure that we can connect to the new environment
+	apiInfo := &api.Info{
+		Tag:        names.NewUserTag("beatles"),
 		Password:   "secret",
 		Addrs:      envResp.HostPorts,
 		CACert:     envResp.CACert,

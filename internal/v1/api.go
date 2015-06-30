@@ -161,7 +161,8 @@ func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.Environme
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "cannot validate attributes")
 	}
-	if err := h.maybeCreateUser(st.State, h.auth.username, args.Info.Password); err != nil {
+	jujuUser := string(args.User)
+	if err := h.maybeCreateUser(st.State, jujuUser, args.Info.Password); err != nil {
 		return nil, errgo.NoteMask(err, "cannot create user", errgo.Is(params.ErrBadRequest))
 	}
 
@@ -173,7 +174,7 @@ func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.Environme
 	envDoc := &mongodoc.Environment{
 		User:          args.User,
 		Name:          args.Info.Name,
-		AdminUser:     h.auth.username,
+		AdminUser:     jujuUser,
 		AdminPassword: args.Info.Password,
 		StateServer:   id,
 	}
@@ -191,7 +192,7 @@ func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.Environme
 	fields["name"] = idToEnvName(envDoc.Id)
 
 	emclient := environmentmanager.NewClient(st)
-	env, err := emclient.CreateEnvironment(h.auth.username, nil, fields)
+	env, err := emclient.CreateEnvironment(jujuUser, nil, fields)
 	if err != nil {
 		// Remove the environment that was created, because it's no longer valid.
 		if err := h.jem.DB.Environments().RemoveId(envDoc.Id); err != nil {
@@ -203,10 +204,12 @@ func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.Environme
 	if err := h.jem.DB.Environments().UpdateId(envDoc.Id, bson.D{{"uuid", env.UUID}}); err != nil {
 		return nil, errgo.Notef(err, "cannot update environment UUID in database, leaked environment %s", env.UUID)
 	}
+	logger.Infof("returning server uuid %q", st.Info.EnvironTag.Id())
 	return &params.EnvironmentResponse{
-		UUID:      env.UUID,
-		CACert:    st.Info.CACert,
-		HostPorts: st.Info.Addrs,
+		ServerUUID: st.Info.EnvironTag.Id(),
+		UUID:       env.UUID,
+		CACert:     st.Info.CACert,
+		HostPorts:  st.Info.Addrs,
 	}, nil
 }
 
