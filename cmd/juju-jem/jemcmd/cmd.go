@@ -5,6 +5,7 @@ package jemcmd
 import (
 	"os"
 	"path"
+	"strings"
 
 	"github.com/juju/cmd"
 	"github.com/juju/juju/cmd/envcmd"
@@ -18,6 +19,7 @@ import (
 	"launchpad.net/gnuflag"
 
 	"github.com/CanonicalLtd/jem/jemclient"
+	"github.com/CanonicalLtd/jem/params"
 )
 
 var logger = loggo.GetLogger("jem")
@@ -61,6 +63,7 @@ func New() cmd.Command {
 		},
 	})
 	supercmd.Register(&addServerCommand{})
+	supercmd.Register(&createCommand{})
 
 	return supercmd
 }
@@ -164,3 +167,24 @@ func cookieFile() string {
 	}
 	return path.Join(utils.Home(), ".go-cookies")
 }
+
+// entityPathValue holds an EntityPath that
+// can be used as a flag value.
+type entityPathValue struct {
+	params.EntityPath
+}
+
+// Set implements gnuflag.Value.Set, enabling entityPathValue
+// to be used as a custom flag value.
+// The String method is implemented by EntityPath itself.
+func (v *entityPathValue) Set(p string) error {
+	parts := strings.Split(p, "/")
+	if len(parts) != 2 {
+		return errgo.Newf("invalid JEM name %q (needs to be <user>/<name>)", p)
+	}
+	v.User = params.User(parts[0])
+	v.Name = params.Name(parts[1])
+	return nil
+}
+
+var _ gnuflag.Value = (*entityPathValue)(nil)

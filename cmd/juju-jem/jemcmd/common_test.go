@@ -12,6 +12,7 @@ import (
 	"github.com/juju/cmd"
 	jujufeature "github.com/juju/juju/feature"
 	corejujutesting "github.com/juju/juju/juju/testing"
+	"github.com/juju/loggo"
 	"github.com/juju/utils/featureflag"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
@@ -19,7 +20,6 @@ import (
 	"gopkg.in/macaroon-bakery.v1/bakerytest"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/mgo.v2"
-	"launchpad.net/loggo"
 
 	"github.com/CanonicalLtd/jem"
 	"github.com/CanonicalLtd/jem/cmd/juju-jem/jemcmd"
@@ -60,7 +60,6 @@ type commonSuite struct {
 
 func (s *commonSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
-	c.Logf("done jujuconnsuite SetUpTest")
 	s.jemSrv, s.discharger = s.newServer(c, s.Session)
 	s.httpSrv = httptest.NewServer(s.jemSrv)
 	s.username = "testuser"
@@ -107,3 +106,5 @@ func (s *commonSuite) newServer(c *gc.C, session *mgo.Session) (jem.HandleCloser
 	c.Assert(err, gc.IsNil)
 	return srv, discharger
 }
+
+const fakeSSHKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCcEHVJtQyjN0eaNMAQIwhwknKj+8uZCqmzeA6EfnUEsrOHisoKjRVzb3bIRVgbK3SJ2/1yHPpL2WYynt3LtToKgp0Xo7LCsspL2cmUIWNYCbcgNOsT5rFeDsIDr9yQito8A3y31Mf7Ka7Rc0EHtCW4zC5yl/WZjgmMmw930+V1rDa5GjkqivftHE5AvLyRGvZJPOLH8IoO+sl02NjZ7dRhniBO9O5UIwxSkuGA5wvfLV7dyT/LH56gex7C2fkeBkZ7YGqTdssTX6DvFTHjEbBAsdWd8/rqXWtB6Xdi8sb3+aMpg9DRomZfb69Y+JuqWTUaq+q30qG2CTiqFRbgwRpp bob@somewhere"

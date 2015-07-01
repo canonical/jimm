@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/juju/juju/api"
+	"github.com/juju/juju/api/usermanager"
 	jujufeature "github.com/juju/juju/feature"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	"github.com/juju/names"
@@ -212,6 +213,7 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 			Handler: s.srv,
 			URL:     fmt.Sprintf("/v1/u/%s/env/%s", username, envname),
 			ExpectBody: params.EnvironmentResponse{
+				User:      fmt.Sprintf("jem-%s--%s", username, envname),
 				HostPorts: test.body.HostPorts,
 				CACert:    test.body.CACert,
 				UUID:      test.body.EnvironUUID,
@@ -299,6 +301,10 @@ func (s *APISuite) TestGetStateServer(c *gc.C) {
 	c.Assert(err, gc.IsNil, gc.Commentf("body: %s", resp.Body.String()))
 	c.Assert(jesInfo.ProviderType, gc.Equals, "dummy")
 	c.Assert(jesInfo.Template, gc.Not(gc.HasLen), 0)
+	// Check that all path attributes have been removed.
+	for name := range jesInfo.Template {
+		c.Assert(strings.HasSuffix(name, "-path"), gc.Equals, false)
+	}
 	c.Logf("%#v", jesInfo.Template)
 }
 
@@ -344,7 +350,7 @@ func (s *APISuite) TestNewEnvironment(c *gc.C) {
 
 	// Ensure that we can connect to the new environment
 	apiInfo := &api.Info{
-		Tag:        names.NewUserTag("bob"),
+		Tag:        names.NewUserTag(envResp.User),
 		Password:   "secret",
 		Addrs:      envResp.HostPorts,
 		CACert:     envResp.CACert,
@@ -384,7 +390,55 @@ func (s *APISuite) TestNewEnvironmentUnderGroup(c *gc.C) {
 
 	// Ensure that we can connect to the new environment
 	apiInfo := &api.Info{
-		Tag:        names.NewUserTag("beatles"),
+		Tag:        names.NewUserTag(string(envResp.User)),
+		Password:   "secret",
+		Addrs:      envResp.HostPorts,
+		CACert:     envResp.CACert,
+		EnvironTag: names.NewEnvironTag(envResp.UUID),
+	}
+	st, err := api.Open(apiInfo, api.DialOpts{})
+	c.Assert(err, gc.IsNil)
+	defer st.Close()
+}
+
+func (s *APISuite) TestNewEnvironmentWithExistingUser(c *gc.C) {
+	username := "jem-bob--bar"
+
+	_, err := usermanager.NewClient(s.APIState).AddUser(username, "", "old")
+	c.Assert(err, gc.IsNil)
+
+	srvId := s.addStateServer(c, adminUser, "foo")
+
+	s.username = "bob"
+	var envRespBody json.RawMessage
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "POST",
+		URL:     "/v1/u/bob/env",
+		Handler: s.srv,
+		JSONBody: params.NewEnvironmentInfo{
+			Name:        params.Name("bar"),
+			StateServer: srvId,
+			Config:      dummyEnvConfig,
+			Password:    "secret",
+		},
+		ExpectBody: httptesting.BodyAsserter(func(_ *gc.C, body json.RawMessage) {
+			envRespBody = body
+		}),
+		Do: bakeryDo(nil),
+	})
+	var envResp params.EnvironmentResponse
+	err = json.Unmarshal(envRespBody, &envResp)
+	c.Assert(err, gc.IsNil)
+
+	c.Assert(envResp.ServerUUID, gc.Equals, s.APIInfo(c).EnvironTag.Id())
+
+	// Make sure that we really are reusing the username.
+	c.Assert(envResp.User, gc.Equals, username)
+
+	// Ensure that we can connect to the new environment with
+	// the new secret
+	apiInfo := &api.Info{
+		Tag:        names.NewUserTag(username),
 		Password:   "secret",
 		Addrs:      envResp.HostPorts,
 		CACert:     envResp.CACert,
@@ -529,7 +583,7 @@ func (s *APISuite) TestNewEnvironmentWithNoPassword(c *gc.C) {
 		},
 		ExpectBody: params.Error{
 			Code:    params.ErrBadRequest,
-			Message: `cannot create user: no password specified for new user`,
+			Message: `cannot create user: no password specified`,
 		},
 		ExpectStatus: http.StatusBadRequest,
 		Do:           bakeryDo(nil),

@@ -1,6 +1,8 @@
 package params
 
 import (
+	"fmt"
+
 	"github.com/juju/httprequest"
 	"gopkg.in/juju/environschema.v1"
 )
@@ -40,6 +42,10 @@ type ServerInfo struct {
 type EntityPath struct {
 	User User `httprequest:",path"`
 	Name Name `httprequest:",path"`
+}
+
+func (p EntityPath) String() string {
+	return fmt.Sprintf("%s/%s", p.User, p.Name)
 }
 
 // GetEnvironment holds parameters for retrieving
@@ -110,12 +116,16 @@ type NewEnvironmentInfo struct {
 // EnvironmentResponse holds the response body from
 // a NewEnvironment call.
 type EnvironmentResponse struct {
+	// User holds the admin user name associated
+	// with the environment.
+	User string `json:"user"`
+
 	// UUID holds the UUID of the environment.
 	UUID string `json:"uuid"`
 
 	// ServerUUID holds the UUID of the state server
 	// environment containing this environment.
-	ServerUUID  string `json:"server-uuid"`
+	ServerUUID string `json:"server-uuid"`
 
 	// CACert holds the CA certificate that will be used
 	// to validate the state server's certificate, in PEM format.

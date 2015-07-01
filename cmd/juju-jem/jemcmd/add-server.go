@@ -3,8 +3,6 @@
 package jemcmd
 
 import (
-	"strings"
-
 	"github.com/juju/cmd"
 	"gopkg.in/errgo.v1"
 	"launchpad.net/gnuflag"
@@ -16,8 +14,7 @@ type addServerCommand struct {
 	commandBase
 
 	envName string
-	jemUser string
-	jemName string
+	envPath entityPathValue
 }
 
 var addServerDoc = `
@@ -51,12 +48,9 @@ func (c *addServerCommand) Init(args []string) error {
 	if len(args) != 1 {
 		return errgo.Newf("got %d arguments, want 1", len(args))
 	}
-	parts := strings.Split(args[0], "/")
-	if len(parts) != 2 {
-		return errgo.New("invalid JEM environment name (needs to be <user>/<name>)")
+	if err := c.envPath.Set(args[0]); err != nil {
+		return errgo.Mask(err)
 	}
-	c.jemUser = parts[0]
-	c.jemName = parts[1]
 	return nil
 }
 
@@ -83,10 +77,7 @@ func (c *addServerCommand) Run(ctxt *cmd.Context) error {
 
 	logger.Infof("adding JES, user %s, name %s")
 	if err := client.AddJES(&params.AddJES{
-		EntityPath: params.EntityPath{
-			User: params.User(c.jemUser),
-			Name: params.Name(c.jemName),
-		},
+		EntityPath: c.envPath.EntityPath,
 		Info: params.ServerInfo{
 			HostPorts:   hostnames,
 			CACert:      ep.CACert,

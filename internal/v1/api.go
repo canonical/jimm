@@ -130,6 +130,7 @@ func (h *Handler) GetEnvironment(arg *params.GetEnvironment) (*params.Environmen
 		return nil, errgo.Mask(err)
 	}
 	return &params.EnvironmentResponse{
+		User:      userForEnvironment(arg.EntityPath),
 		UUID:      env.UUID,
 		CACert:    srv.CACert,
 		HostPorts: srv.HostPorts,
@@ -161,8 +162,13 @@ func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.Environme
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "cannot validate attributes")
 	}
-	jujuUser := string(args.User)
-	if err := h.maybeCreateUser(st.State, jujuUser, args.Info.Password); err != nil {
+	// We create a user for the environment so that the caller knows
+	// what password to use when accessing their new environment.
+	// When juju supports macaroon authorization, we won't need
+	// to do this - we could just inform the state server of the required
+	// user/group (args.User) instead.
+	jujuUser := userForEnvironment(params.EntityPath{args.User, args.Info.Name})
+	if err := h.createUser(st.State, jujuUser, args.Info.Password); err != nil {
 		return nil, errgo.NoteMask(err, "cannot create user", errgo.Is(params.ErrBadRequest))
 	}
 
@@ -206,6 +212,7 @@ func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.Environme
 	}
 	logger.Infof("returning server uuid %q", st.Info.EnvironTag.Id())
 	return &params.EnvironmentResponse{
+		User:       jujuUser,
 		ServerUUID: st.Info.EnvironTag.Id(),
 		UUID:       env.UUID,
 		CACert:     st.Info.CACert,
@@ -213,24 +220,38 @@ func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.Environme
 	}, nil
 }
 
+// userForEnvironment returns the juju user to use for
+// the environment with the given path.
+// This should go when juju supports macaroon
+// authorization.
+func userForEnvironment(p params.EntityPath) string {
+	return "jem-" + string(p.User) + "--" + string(p.Name)
+}
+
 func idToEnvName(id string) string {
 	return strings.Replace(id, "/", "_", -1)
 }
 
-// maybeCreateUser creates a user account if one does not already exist.
-func (h *Handler) maybeCreateUser(st *api.State, user, password string) error {
+// createUser creates the given user account with the
+// given password. If the account already exists then it changes
+// the password accordingly.
+func (h *Handler) createUser(st *api.State, user, password string) error {
 	if password == "" {
-		return badRequestf(nil, "no password specified for new user")
+		return badRequestf(nil, "no password specified")
 	}
 	uclient := usermanager.NewClient(st)
 	_, err := uclient.AddUser(user, "", password)
 	if err == nil {
 		return nil
 	}
-	if err, ok := errgo.Cause(err).(*jujuparams.Error); ok && err.Code == jujuparams.CodeAlreadyExists {
-		return nil
+	if err, ok := errgo.Cause(err).(*jujuparams.Error); ok && err.Code != jujuparams.CodeAlreadyExists {
+		return errgo.Notef(err, "cannot add user")
 	}
-	return errgo.Mask(err)
+	err = uclient.SetPassword(user, password)
+	if err != nil {
+		return errgo.Notef(err, "cannot change password")
+	}
+	return nil
 }
 
 type schemaForNewEnv struct {
@@ -273,6 +294,13 @@ func (h *Handler) schemaForNewEnv(id string) (*schemaForNewEnv, error) {
 	// Remove everything from the schema that's in the skeleton.
 	for name := range neSchema.skeleton {
 		delete(neSchema.schema, name)
+	}
+	// Also remove any attributes ending in "-path" because
+	// they're only applicable locally.
+	for name := range neSchema.schema {
+		if strings.HasSuffix(name, "-path") {
+			delete(neSchema.schema, name)
+		}
 	}
 	// We're going to set the environment name from the
 	// JEM environment path, so remove it from
