@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/juju/httprequest"
-	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/environmentmanager"
 	"github.com/juju/juju/api/usermanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
@@ -18,6 +17,7 @@ import (
 	"gopkg.in/juju/environschema.v1"
 	"gopkg.in/mgo.v2/bson"
 
+	"github.com/CanonicalLtd/jem/internal/apiconn"
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
@@ -87,18 +87,18 @@ func (h *Handler) AddJES(arg *params.AddJES) error {
 	}
 	logger.Infof("dialling environment")
 	// Attempt to connect to the environment before accepting it.
-	state, err := h.jem.OpenAPIFromDocs(env, srv)
+	conn, err := h.jem.OpenAPIFromDocs(env, srv)
 	if err != nil {
 		logger.Infof("cannot open API: %v", err)
 		return badRequestf(err, "cannot connect to environment")
 	}
-	state.Close()
+	defer conn.Close()
 
 	// Update addresses from latest known in state server.
 	// Note that state.APIHostPorts is always guaranteed
 	// to include the actual address we succeeded in
 	// connecting to.
-	srv.HostPorts = collapseHostPorts(state.APIHostPorts())
+	srv.HostPorts = collapseHostPorts(conn.APIHostPorts())
 
 	err = h.jem.AddStateServer(srv, env)
 	if err != nil {
@@ -130,7 +130,7 @@ func (h *Handler) GetEnvironment(arg *params.GetEnvironment) (*params.Environmen
 		return nil, errgo.Mask(err)
 	}
 	return &params.EnvironmentResponse{
-		User:      userForEnvironment(arg.EntityPath),
+		User:      env.AdminUser,
 		UUID:      env.UUID,
 		CACert:    srv.CACert,
 		HostPorts: srv.HostPorts,
@@ -146,11 +146,11 @@ func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.Environme
 	if err != nil {
 		return nil, errgo.NoteMask(err, fmt.Sprintf("cannot parse state server path %q", args.Info.StateServer), errgo.Is(params.ErrBadRequest))
 	}
-	st, err := h.jem.OpenAPI(id)
+	conn, err := h.jem.OpenAPI(id)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot connect to state server", errgo.Is(params.ErrNotFound))
 	}
-	defer st.Close()
+	defer conn.Close()
 
 	neSchema, err := h.schemaForNewEnv(id)
 	if err != nil {
@@ -168,9 +168,10 @@ func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.Environme
 	// to do this - we could just inform the state server of the required
 	// user/group (args.User) instead.
 	jujuUser := userForEnvironment(params.EntityPath{args.User, args.Info.Name})
-	if err := h.createUser(st.State, jujuUser, args.Info.Password); err != nil {
+	if err := h.createUser(conn, jujuUser, args.Info.Password); err != nil {
 		return nil, errgo.NoteMask(err, "cannot create user", errgo.Is(params.ErrBadRequest))
 	}
+	logger.Infof("created user %q", args.User)
 
 	// Create the environment record in the database before actually
 	// creating the environment on the state server. It will have an invalid
@@ -197,7 +198,7 @@ func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.Environme
 	// Note that AddEnvironment has set envdoc.Id for us.
 	fields["name"] = idToEnvName(envDoc.Id)
 
-	emclient := environmentmanager.NewClient(st)
+	emclient := environmentmanager.NewClient(conn.State)
 	env, err := emclient.CreateEnvironment(jujuUser, nil, fields)
 	if err != nil {
 		// Remove the environment that was created, because it's no longer valid.
@@ -207,16 +208,16 @@ func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.Environme
 		return nil, errgo.Notef(err, "cannot create environment")
 	}
 	// Now set the UUID to that of the actually created environment.
-	if err := h.jem.DB.Environments().UpdateId(envDoc.Id, bson.D{{"uuid", env.UUID}}); err != nil {
+	if err := h.jem.DB.Environments().UpdateId(envDoc.Id, bson.D{{"$set", bson.D{{"uuid", env.UUID}}}}); err != nil {
 		return nil, errgo.Notef(err, "cannot update environment UUID in database, leaked environment %s", env.UUID)
 	}
-	logger.Infof("returning server uuid %q", st.Info.EnvironTag.Id())
+	logger.Infof("returning server uuid %q", conn.Info.EnvironTag.Id())
 	return &params.EnvironmentResponse{
 		User:       jujuUser,
-		ServerUUID: st.Info.EnvironTag.Id(),
+		ServerUUID: conn.Info.EnvironTag.Id(),
 		UUID:       env.UUID,
-		CACert:     st.Info.CACert,
-		HostPorts:  st.Info.Addrs,
+		CACert:     conn.Info.CACert,
+		HostPorts:  conn.Info.Addrs,
 	}, nil
 }
 
@@ -235,11 +236,11 @@ func idToEnvName(id string) string {
 // createUser creates the given user account with the
 // given password. If the account already exists then it changes
 // the password accordingly.
-func (h *Handler) createUser(st *api.State, user, password string) error {
+func (h *Handler) createUser(conn *apiconn.Conn, user, password string) error {
 	if password == "" {
 		return badRequestf(nil, "no password specified")
 	}
-	uclient := usermanager.NewClient(st)
+	uclient := usermanager.NewClient(conn.State)
 	_, err := uclient.AddUser(user, "", password)
 	if err == nil {
 		return nil

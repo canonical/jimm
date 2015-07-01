@@ -11,9 +11,7 @@ import (
 	"strings"
 
 	"github.com/juju/cmd"
-	"github.com/juju/errors"
 	jujuconfig "github.com/juju/juju/environs/config"
-	"github.com/juju/juju/environs/configstore"
 	"github.com/juju/juju/juju/osenv"
 	"github.com/juju/utils"
 	"gopkg.in/errgo.v1"
@@ -105,45 +103,17 @@ func (c *createCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Notef(err, "cannot generate password")
 	}
-	store, err := configstore.Default()
-	if err != nil {
-		return errgo.Notef(err, "cannot get default configstore")
-	}
-	// Check that the environment doesn't exist already.
-	_, err = store.ReadInfo(c.localName)
-	if err == nil {
-		return errgo.Notef(err, "local environment %q already exists", c.localName)
-	}
-	if !errors.IsNotFound(err) {
-		return errgo.Notef(err, "cannot check for existing local environment")
-	}
-	resp, err := client.NewEnvironment(&params.NewEnvironment{
-		User: c.envPath.User,
-		Info: params.NewEnvironmentInfo{
-			Name:        c.envPath.Name,
-			Password:    password,
-			StateServer: fmt.Sprintf("%s/server/%s", c.srvPath.User, c.srvPath.Name),
-			Config:      config,
-		},
+	return writeEnvironment(c.localName, password, func() (*params.EnvironmentResponse, error) {
+		return client.NewEnvironment(&params.NewEnvironment{
+			User: c.envPath.User,
+			Info: params.NewEnvironmentInfo{
+				Name:        c.envPath.Name,
+				Password:    password,
+				StateServer: fmt.Sprintf("%s/server/%s", c.srvPath.User, c.srvPath.Name),
+				Config:      config,
+			},
+		})
 	})
-	if err != nil {
-		return errgo.Mask(err)
-	}
-	envInfo := store.CreateInfo(c.localName)
-	envInfo.SetAPIEndpoint(configstore.APIEndpoint{
-		Addresses:   resp.HostPorts,
-		CACert:      resp.CACert,
-		EnvironUUID: resp.UUID,
-		ServerUUID:  resp.ServerUUID,
-	})
-	envInfo.SetAPICredentials(configstore.APICredentials{
-		User:     resp.User,
-		Password: password,
-	})
-	if err := envInfo.Write(); err != nil {
-		return errgo.Notef(err, "cannot write environment info")
-	}
-	return nil
 }
 
 func (c *createCommand) setConfigDefaults(config map[string]interface{}, jesInfo *params.JESInfo) error {

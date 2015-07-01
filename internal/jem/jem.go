@@ -170,6 +170,7 @@ func (j *JEM) AddStateServer(srv *mongodoc.StateServer, env *mongodoc.Environmen
 // before insertion.
 func (j *JEM) AddEnvironment(env *mongodoc.Environment) error {
 	env.Id = entityPathToId(env.User, env.Name)
+	logger.Infof("adding environment: %#v", env)
 	err := j.DB.Environments().Insert(env)
 	if mgo.IsDup(err) {
 		return errgo.WithCausef(nil, params.ErrAlreadyExists, "")
