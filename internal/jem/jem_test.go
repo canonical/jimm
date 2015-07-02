@@ -26,7 +26,7 @@ func (s *jemSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	pool, err := jem.NewPool(
 		s.Session.DB("jem"),
-		&bakery.NewServiceParams{
+		bakery.NewServiceParams{
 			Location: "here",
 		},
 	)
@@ -118,4 +118,35 @@ func (s *jemSuite) TestAddEnvironment(c *gc.C) {
 	err = s.store.AddEnvironment(env)
 	c.Assert(err, gc.ErrorMatches, "already exists")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
+}
+
+func (s *jemSuite) TestSessionIsCopied(c *gc.C) {
+	session := s.Session.Copy()
+	pool, err := jem.NewPool(
+		session.DB("jem"),
+		bakery.NewServiceParams{
+			Location: "here",
+		},
+	)
+	c.Assert(err, gc.IsNil)
+
+	store := pool.JEM()
+	defer store.Close()
+	// Check that we get an appropriate error when getting
+	// a non-existent environment, indicating that database
+	// access is going OK.
+	_, err = store.Environment("bob/x")
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+
+	// Close the session and check that we still get the
+	// same error.
+	session.Close()
+
+	_, err = store.Environment("bob/x")
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+
+	// Also check the macaroon storage as that also has its own session reference.
+	m, err := store.Bakery.NewMacaroon("", nil, nil)
+	c.Assert(err, gc.IsNil)
+	c.Assert(m, gc.NotNil)
 }
