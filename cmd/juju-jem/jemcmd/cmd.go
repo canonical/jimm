@@ -8,9 +8,12 @@ import (
 	"strings"
 
 	"github.com/juju/cmd"
+	"github.com/juju/errors"
+	"github.com/juju/juju/api"
 	"github.com/juju/juju/cmd/envcmd"
 	"github.com/juju/juju/environs/configstore"
 	"github.com/juju/loggo"
+	"github.com/juju/names"
 	"github.com/juju/persistent-cookiejar"
 	"github.com/juju/utils"
 	"golang.org/x/net/publicsuffix"
@@ -64,6 +67,7 @@ func New() cmd.Command {
 	})
 	supercmd.Register(&addServerCommand{})
 	supercmd.Register(&createCommand{})
+	supercmd.Register(&getCommand{})
 
 	return supercmd
 }
@@ -188,3 +192,58 @@ func (v *entityPathValue) Set(p string) error {
 }
 
 var _ gnuflag.Value = (*entityPathValue)(nil)
+
+// writeEnvironment runs the given getEnv function
+// and writes the result as a local environment .jenv
+// file with the given local name, saving also the
+// given access password.
+func writeEnvironment(localName, password string, getEnv func() (*params.EnvironmentResponse, error)) error {
+	store, err := configstore.Default()
+	if err != nil {
+		return errgo.Notef(err, "cannot get default configstore")
+	}
+	// Check that the environment doesn't exist already.
+	_, err = store.ReadInfo(localName)
+	if err == nil {
+		return errgo.Notef(err, "local environment %q already exists", localName)
+	}
+	if !errors.IsNotFound(err) {
+		return errgo.Notef(err, "cannot check for existing local environment")
+	}
+
+	resp, err := getEnv()
+	if err != nil {
+		return errgo.Mask(err)
+	}
+
+	// First try to connect to the environment to ensure
+	// that the response is somewhat sane.
+	apiInfo := &api.Info{
+		Tag:        names.NewUserTag(resp.User),
+		Password:   password,
+		Addrs:      resp.HostPorts,
+		CACert:     resp.CACert,
+		EnvironTag: names.NewEnvironTag(resp.UUID),
+	}
+	st, err := api.Open(apiInfo, api.DialOpts{})
+	if err != nil {
+		return errgo.Notef(err, "cannot open environment")
+	}
+	st.Close()
+
+	envInfo := store.CreateInfo(localName)
+	envInfo.SetAPIEndpoint(configstore.APIEndpoint{
+		Addresses:   resp.HostPorts,
+		CACert:      resp.CACert,
+		EnvironUUID: resp.UUID,
+		ServerUUID:  resp.ServerUUID,
+	})
+	envInfo.SetAPICredentials(configstore.APICredentials{
+		User:     resp.User,
+		Password: password,
+	})
+	if err := envInfo.Write(); err != nil {
+		return errgo.Notef(err, "cannot write environ info")
+	}
+	return nil
+}

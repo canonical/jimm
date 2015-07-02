@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"time"
@@ -14,6 +15,7 @@ import (
 	jujufeature "github.com/juju/juju/feature"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	"github.com/juju/names"
+	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"github.com/juju/utils/featureflag"
 	gc "gopkg.in/check.v1"
@@ -25,6 +27,7 @@ import (
 
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/v1"
+	"github.com/CanonicalLtd/jem/jemclient"
 	"github.com/CanonicalLtd/jem/params"
 )
 
@@ -34,6 +37,8 @@ type APISuite struct {
 	discharger *bakerytest.Discharger
 	username   string
 	groups     []string
+	httpSrv    *httptest.Server
+	client     *jemclient.Client
 }
 
 var _ = gc.Suite(&APISuite{})
@@ -45,12 +50,24 @@ func (s *APISuite) SetUpTest(c *gc.C) {
 	s.username = "testuser"
 	os.Setenv("JUJU_DEV_FEATURE_FLAGS", jujufeature.JES)
 	featureflag.SetFlagsFromEnvironment("JUJU_DEV_FEATURE_FLAGS")
+	s.httpSrv = httptest.NewServer(s.srv)
+	s.client = jemclient.New(jemclient.NewParams{
+		BaseURL: s.httpSrv.URL,
+		Client:  httpbakery.NewClient(),
+	})
 }
 
 func (s *APISuite) TearDownTest(c *gc.C) {
 	s.discharger.Close()
 	s.srv.Close()
+	s.httpSrv.Close()
 	s.JujuConnSuite.TearDownTest(c)
+}
+
+// resetClientCookies throws away all the cookies in the
+// s.client value.
+func (s *APISuite) resetClientCookies() {
+	s.client.Client.Doer = httpbakery.NewClient()
 }
 
 const sshKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDOjaOjVRHchF2RFCKQdgBqrIA5nOoqSprLK47l2th5I675jw+QYMIihXQaITss3hjrh3+5ITyBO41PS5rHLNGtlYUHX78p9CHNZsJqHl/z1Ub1tuMe+/5SY2MkDYzgfPtQtVsLasAIiht/5g78AMMXH3HeCKb9V9cP6/lPPq6mCMvg8TDLrPp/P2vlyukAsJYUvVgoaPDUBpedHbkMj07pDJqe4D7c0yEJ8hQo/6nS+3bh9Q1NvmVNsB1pbtk3RKONIiTAXYcjclmOljxxJnl1O50F5sOIi38vyl7Q63f6a3bXMvJEf1lnPNJKAxspIfEu8gRasny3FEsbHfrxEwVj rog@rog-x220"
@@ -189,6 +206,7 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 	}}
 	for i, test := range addJESTests {
 		c.Logf("test %d: %s", i, test.about)
+		s.resetClientCookies()
 		username := test.username
 		if username == "" {
 			username = adminUser
@@ -207,19 +225,23 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 			continue
 		}
 		// The server was added successfully. Check that we
-		// can fetch its associated environment
-		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-			Method:  "GET",
-			Handler: s.srv,
-			URL:     fmt.Sprintf("/v1/u/%s/env/%s", username, envname),
-			ExpectBody: params.EnvironmentResponse{
-				User:      fmt.Sprintf("jem-%s--%s", username, envname),
-				HostPorts: test.body.HostPorts,
-				CACert:    test.body.CACert,
-				UUID:      test.body.EnvironUUID,
+		// can fetch its associated environment and that we
+		// can connect to that.
+		envResp, err := s.client.GetEnvironment(&params.GetEnvironment{
+			EntityPath: params.EntityPath{
+				User: params.User(username),
+				Name: params.Name(envname),
 			},
-			Do: bakeryDo(nil),
 		})
+		c.Assert(err, gc.IsNil)
+		c.Assert(envResp, jc.DeepEquals, &params.EnvironmentResponse{
+			User:      test.body.User,
+			HostPorts: test.body.HostPorts,
+			CACert:    test.body.CACert,
+			UUID:      test.body.EnvironUUID,
+		})
+		st := openAPIFromEnvironmentResponse(c, envResp, test.body.Password)
+		st.Close()
 		// Clear the connection pool for the next test.
 		s.srv.Pool().ClearAPIConnCache()
 	}
@@ -348,17 +370,34 @@ func (s *APISuite) TestNewEnvironment(c *gc.C) {
 
 	c.Assert(envResp.ServerUUID, gc.Equals, s.APIInfo(c).EnvironTag.Id())
 
+	st := openAPIFromEnvironmentResponse(c, &envResp, "secret")
+	st.Close()
+
+	// Ensure that we can connect to the new environment
+	// from the information returned by GetEnvironment.
+	envResp2, err := s.client.GetEnvironment(&params.GetEnvironment{
+		EntityPath: params.EntityPath{
+			User: "bob",
+			Name: "bar",
+		},
+	})
+	c.Assert(err, gc.IsNil)
+	st = openAPIFromEnvironmentResponse(c, envResp2, "secret")
+	st.Close()
+}
+
+func openAPIFromEnvironmentResponse(c *gc.C, resp *params.EnvironmentResponse, password string) *api.State {
 	// Ensure that we can connect to the new environment
 	apiInfo := &api.Info{
-		Tag:        names.NewUserTag(envResp.User),
-		Password:   "secret",
-		Addrs:      envResp.HostPorts,
-		CACert:     envResp.CACert,
-		EnvironTag: names.NewEnvironTag(envResp.UUID),
+		Tag:        names.NewUserTag(resp.User),
+		Password:   password,
+		Addrs:      resp.HostPorts,
+		CACert:     resp.CACert,
+		EnvironTag: names.NewEnvironTag(resp.UUID),
 	}
 	st, err := api.Open(apiInfo, api.DialOpts{})
-	c.Assert(err, gc.IsNil)
-	defer st.Close()
+	c.Assert(err, gc.IsNil, gc.Commentf("user: %q; password: %q", resp.User, password))
+	return st
 }
 
 func (s *APISuite) TestNewEnvironmentUnderGroup(c *gc.C) {
