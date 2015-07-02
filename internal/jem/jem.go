@@ -19,9 +19,10 @@ import (
 )
 
 type Pool struct {
-	db        Database
-	bakery    *bakery.Service
-	connCache *apiconn.Cache
+	db           Database
+	bakery       *bakery.Service
+	connCache    *apiconn.Cache
+	bakeryParams bakery.NewServiceParams
 
 	mu       sync.Mutex
 	closed   bool
@@ -33,24 +34,29 @@ var APIOpenTimeout = 15 * time.Second
 // NewPool represents a pool of possible JEM instances that use the given
 // database as a store, and use the given bakery parameters to create the
 // bakery.Service.
-func NewPool(db *mgo.Database, bakeryParams *bakery.NewServiceParams) (*Pool, error) {
+func NewPool(db *mgo.Database, bp bakery.NewServiceParams) (*Pool, error) {
+	// TODO migrate database
 	pool := &Pool{
 		db:        Database{db},
 		connCache: apiconn.NewCache(apiconn.CacheParams{}),
 		refCount:  1,
 	}
-	// TODO migrate database
-	macStore, err := mgostorage.New(pool.db.Macaroons())
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot create macaroon store")
+	// Fill out any bakery parameters explicitly here so
+	// that we use the same values when each Store is
+	// created. We don't fill out bp.Store field though, as
+	// that needs to hold the correct mongo session which we
+	// only know when the Store is created from the Pool.
+	if bp.Key == nil {
+		var err error
+		bp.Key, err = bakery.GenerateKey()
+		if err != nil {
+			return nil, errgo.Notef(err, "cannot generate bakery key")
+		}
 	}
-	p := *bakeryParams
-	p.Store = macStore
-	bsvc, err := bakery.NewService(p)
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot make bakery service")
+	if bp.Locator == nil {
+		bp.Locator = bakery.PublicKeyLocatorMap(nil)
 	}
-	pool.bakery = bsvc
+	pool.bakeryParams = bp
 	return pool, nil
 }
 
@@ -95,12 +101,30 @@ func (p *Pool) JEM() *JEM {
 	if p.closed {
 		panic("JEM call on closed pool")
 	}
+	db := p.db.Copy()
 	p.refCount++
 	return &JEM{
-		DB:     p.db.Copy(),
-		Bakery: p.bakery,
+		DB:     db,
+		Bakery: newBakery(db, p.bakeryParams),
 		pool:   p,
 	}
+}
+
+func newBakery(db Database, bp bakery.NewServiceParams) *bakery.Service {
+	macStore, err := mgostorage.New(db.Macaroons())
+	if err != nil {
+		// Should never happen.
+		panic(errgo.Newf("unexpected error from mgostorage.New: %v", err))
+	}
+	bp.Store = macStore
+	bsvc, err := bakery.NewService(bp)
+	if err != nil {
+		// This should never happen because the only reason bakery.NewService
+		// can fail is if it can't generate a key, and we have already made
+		// sure that the key is generated.
+		panic(errgo.Notef(err, "cannot make bakery service"))
+	}
+	return bsvc
 }
 
 type JEM struct {

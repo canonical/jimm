@@ -57,7 +57,7 @@ func NewServer(config ServerParams, versions map[string]NewAPIHandlerFunc) (*Ser
 		Location: "jem",
 		Locator:  config.PublicKeyLocator,
 	}
-	p, err := NewPool(config.DB, &bparams)
+	p, err := NewPool(config.DB, bparams)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make store")
 	}

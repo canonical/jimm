@@ -26,7 +26,7 @@ func (s *cacheSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
 	pool, err := jem.NewPool(
 		s.Session.DB("jem"),
-		&bakery.NewServiceParams{
+		bakery.NewServiceParams{
 			Location: "here",
 		},
 	)
