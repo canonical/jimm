@@ -1,7 +1,6 @@
 package v1
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/juju/httprequest"
@@ -75,8 +74,7 @@ func (h *Handler) AddJES(arg *params.AddJES) error {
 		return badRequestf(nil, "bad environment UUID in request")
 	}
 	srv := &mongodoc.StateServer{
-		User:      arg.User,
-		Name:      arg.Name,
+		Path:      arg.EntityPath,
 		CACert:    arg.Info.CACert,
 		HostPorts: arg.Info.HostPorts,
 	}
@@ -109,7 +107,7 @@ func (h *Handler) AddJES(arg *params.AddJES) error {
 
 // GetJES returns information on a state server.
 func (h *Handler) GetJES(arg *params.GetJES) (*params.JESInfo, error) {
-	neSchema, err := h.schemaForNewEnv(entityId(string(arg.User), string(arg.Name)))
+	neSchema, err := h.schemaForNewEnv(arg.EntityPath)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
@@ -121,7 +119,7 @@ func (h *Handler) GetJES(arg *params.GetJES) (*params.JESInfo, error) {
 
 // GetEnvironment returns information on a given environment.
 func (h *Handler) GetEnvironment(arg *params.GetEnvironment) (*params.EnvironmentResponse, error) {
-	env, err := h.jem.Environment(entityPathToId(arg.EntityPath))
+	env, err := h.jem.Environment(arg.EntityPath)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
@@ -142,17 +140,13 @@ func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.Environme
 	if !h.isUser(string(args.User)) {
 		return nil, params.ErrUnauthorized
 	}
-	id, err := parseStateServerPath(args.Info.StateServer)
-	if err != nil {
-		return nil, errgo.NoteMask(err, fmt.Sprintf("cannot parse state server path %q", args.Info.StateServer), errgo.Is(params.ErrBadRequest))
-	}
-	conn, err := h.jem.OpenAPI(id)
+	conn, err := h.jem.OpenAPI(args.Info.StateServer)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot connect to state server", errgo.Is(params.ErrNotFound))
 	}
 	defer conn.Close()
 
-	neSchema, err := h.schemaForNewEnv(id)
+	neSchema, err := h.schemaForNewEnv(args.Info.StateServer)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -179,11 +173,13 @@ func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.Environme
 	// an environment that we can't add locally because the name
 	// already exists.
 	envDoc := &mongodoc.Environment{
-		User:          args.User,
-		Name:          args.Info.Name,
+		Path: params.EntityPath{
+			User: args.User,
+			Name: args.Info.Name,
+		},
 		AdminUser:     jujuUser,
 		AdminPassword: args.Info.Password,
-		StateServer:   id,
+		StateServer:   args.Info.StateServer,
 	}
 	if err := h.jem.AddEnvironment(envDoc); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
@@ -264,8 +260,8 @@ type schemaForNewEnv struct {
 
 // schemaForNewEnv returns the schema for the configuration options
 // for creating new environments on the state server with the given id.
-func (h *Handler) schemaForNewEnv(id string) (*schemaForNewEnv, error) {
-	st, err := h.jem.OpenAPI(id)
+func (h *Handler) schemaForNewEnv(srvPath params.EntityPath) (*schemaForNewEnv, error) {
+	st, err := h.jem.OpenAPI(srvPath)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot open API", errgo.Is(params.ErrNotFound))
 	}
@@ -313,31 +309,6 @@ func (h *Handler) schemaForNewEnv(id string) (*schemaForNewEnv, error) {
 	}
 	neSchema.checker = schema.FieldMap(fields, defaults)
 	return &neSchema, nil
-}
-
-// parseStateServerPath parses a path of the form
-// $user/server/$name into an entity id as
-// understood by JEM.StateServer.
-func parseStateServerPath(s string) (string, error) {
-	parts := strings.Split(s, "/")
-	if len(parts) != 3 {
-		return "", badRequestf(nil, "wrong number of parts")
-	}
-	if parts[1] != "server" {
-		return "", badRequestf(nil, `second part of state server id must be "server"`)
-	}
-	if parts[0] == "" || parts[2] == "" {
-		return "", badRequestf(nil, "empty user name or entity name")
-	}
-	return entityId(parts[0], parts[2]), nil
-}
-
-func entityPathToId(u params.EntityPath) string {
-	return entityId(string(u.User), string(u.Name))
-}
-
-func entityId(user, name string) string {
-	return user + "/" + name
 }
 
 func badRequestf(underlying error, f string, a ...interface{}) error {

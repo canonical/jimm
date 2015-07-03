@@ -109,7 +109,7 @@ func (c *createCommand) Run(ctxt *cmd.Context) error {
 			Info: params.NewEnvironmentInfo{
 				Name:        c.envPath.Name,
 				Password:    password,
-				StateServer: fmt.Sprintf("%s/server/%s", c.srvPath.User, c.srvPath.Name),
+				StateServer: c.srvPath.EntityPath,
 				Config:      config,
 			},
 		})

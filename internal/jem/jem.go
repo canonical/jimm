@@ -160,17 +160,16 @@ func (j *JEM) Close() {
 // AddStateServer adds a new state server and its associated environment
 // to the database. It returns an error with a params.ErrAlreadyExists
 // cause if there is already a state server with the given name.
-// The Id field in srv will be set from its User and Name fields,
-// and the Id, User, Name and StateServer fields in env will also be
+// The Id field in srv will be set from its Path field,
+// and the Id, Path and StateServer fields in env will also be
 // set from srv.
 func (j *JEM) AddStateServer(srv *mongodoc.StateServer, env *mongodoc.Environment) error {
 	// Insert the environment before inserting the state server
 	// to avoid races with other clients creating non-state-server
 	// environments.
-	srv.Id = entityPathToId(srv.User, srv.Name)
-	env.User = srv.User
-	env.Name = srv.Name
-	env.StateServer = srv.Id
+	srv.Id = srv.Path.String()
+	env.Path = srv.Path
+	env.StateServer = srv.Path
 	err := j.AddEnvironment(env)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
@@ -193,8 +192,7 @@ func (j *JEM) AddStateServer(srv *mongodoc.StateServer, env *mongodoc.Environmen
 // The Id field in env will be set from its User and Name fields
 // before insertion.
 func (j *JEM) AddEnvironment(env *mongodoc.Environment) error {
-	env.Id = entityPathToId(env.User, env.Name)
-	logger.Infof("adding environment: %#v", env)
+	env.Id = env.Path.String()
 	err := j.DB.Environments().Insert(env)
 	if mgo.IsDup(err) {
 		return errgo.WithCausef(nil, params.ErrAlreadyExists, "")
@@ -205,16 +203,13 @@ func (j *JEM) AddEnvironment(env *mongodoc.Environment) error {
 	return nil
 }
 
-func entityPathToId(user params.User, name params.Name) string {
-	return string(user) + "/" + string(name)
-}
-
 // StateServer returns state server information for
 // the state server with the given id (in the form "$user/$name").
 // It returns an error with a params.ErrNotFound cause
 // if the state server was not found.
-func (j *JEM) StateServer(id string) (*mongodoc.StateServer, error) {
+func (j *JEM) StateServer(path params.EntityPath) (*mongodoc.StateServer, error) {
 	var srv mongodoc.StateServer
+	id := path.String()
 	err := j.DB.StateServers().FindId(id).One(&srv)
 	if err == mgo.ErrNotFound {
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "state server %q not found", id)
@@ -229,7 +224,8 @@ func (j *JEM) StateServer(id string) (*mongodoc.StateServer, error) {
 // the environment with the given id (in the form "$user/$name").
 // It returns an error with a params.ErrNotFound cause
 // if the state server was not found.
-func (j *JEM) Environment(id string) (*mongodoc.Environment, error) {
+func (j *JEM) Environment(path params.EntityPath) (*mongodoc.Environment, error) {
+	id := path.String()
 	var env mongodoc.Environment
 	err := j.DB.Environments().FindId(id).One(&env)
 	if err == mgo.ErrNotFound {
@@ -247,8 +243,8 @@ func (j *JEM) Environment(id string) (*mongodoc.Environment, error) {
 // of params.ErrNotFound.
 //
 // The returned connection must be closed when finished with.
-func (j *JEM) OpenAPI(envId string) (*apiconn.Conn, error) {
-	env, err := j.Environment(envId)
+func (j *JEM) OpenAPI(path params.EntityPath) (*apiconn.Conn, error) {
+	env, err := j.Environment(path)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot get environment", errgo.Is(params.ErrNotFound))
 	}

@@ -44,10 +44,10 @@ func (s *jemAPIConnSuite) TearDownTest(c *gc.C) {
 }
 
 func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
+	srvPath := params.EntityPath{"bob", "stateserver"}
 	info := s.APIInfo(c)
 	srv := &mongodoc.StateServer{
-		User:      "bob",
-		Name:      "stateserver",
+		Path:      srvPath,
 		HostPorts: info.Addrs,
 		CACert:    info.CACert,
 	}
@@ -60,7 +60,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// Open the API and check that it works.
-	conn, err := s.store.OpenAPI("bob/stateserver")
+	conn, err := s.store.OpenAPI(srvPath)
 	c.Assert(err, gc.IsNil)
 	c.Assert(conn.Ping(), gc.IsNil)
 
@@ -69,7 +69,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 
 	// Open it again and check that we get the
 	// same cached connection.
-	conn1, err := s.store.OpenAPI("bob/stateserver")
+	conn1, err := s.store.OpenAPI(srvPath)
 	c.Assert(err, gc.IsNil)
 	c.Assert(conn1.Ping(), gc.IsNil)
 	c.Assert(conn1.State, gc.Equals, conn.State)
@@ -104,25 +104,25 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 }
 
 func (s *jemAPIConnSuite) TestPoolOpenAPIError(c *gc.C) {
-	conn, err := s.store.OpenAPI("bob/notthere")
+
+	conn, err := s.store.OpenAPI(params.EntityPath{"bob", "notthere"})
 	c.Assert(err, gc.ErrorMatches, `cannot get environment: environment "bob/notthere" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	c.Assert(conn, gc.IsNil)
 
 	// Insert an environment with a deliberately missing state server.
 	env := &mongodoc.Environment{
-		User:          "bob",
-		Name:          "env",
+		Path:          params.EntityPath{"bob", "env"},
 		UUID:          "envuuid",
 		AdminUser:     "admin",
 		AdminPassword: "password",
-		StateServer:   "noserver",
+		StateServer:   params.EntityPath{"no", "server"},
 	}
 	err = s.store.AddEnvironment(env)
 	c.Assert(err, gc.IsNil)
 
-	conn, err = s.store.OpenAPI("bob/env")
-	c.Assert(err, gc.ErrorMatches, `cannot get state server for environment "envuuid": state server "noserver" not found`)
+	conn, err = s.store.OpenAPI(params.EntityPath{"bob", "env"})
+	c.Assert(err, gc.ErrorMatches, `cannot get state server for environment "envuuid": state server "no/server" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, err)
 	c.Assert(conn, gc.IsNil)
 }
