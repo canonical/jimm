@@ -106,7 +106,7 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 	info := s.APIInfo(c)
 	var addJESTests = []struct {
 		about        string
-		username     string
+		username     params.User
 		body         params.ServerInfo
 		expectStatus int
 		expectBody   interface{}
@@ -207,16 +207,18 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 	for i, test := range addJESTests {
 		c.Logf("test %d: %s", i, test.about)
 		s.resetClientCookies()
-		username := test.username
-		if username == "" {
-			username = adminUser
+		envPath := params.EntityPath{
+			User: test.username,
+			Name: params.Name(fmt.Sprintf("env%d", i)),
 		}
-		envname := fmt.Sprintf("env%d", i)
+		if envPath.User == "" {
+			envPath.User = adminUser
+		}
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Method:       "PUT",
 			Handler:      s.srv,
 			JSONBody:     test.body,
-			URL:          fmt.Sprintf("/v1/server/%s/%s", username, envname),
+			URL:          fmt.Sprintf("/v1/server/%s", envPath),
 			Do:           bakeryDo(nil),
 			ExpectStatus: test.expectStatus,
 			ExpectBody:   test.expectBody,
@@ -228,13 +230,11 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 		// can fetch its associated environment and that we
 		// can connect to that.
 		envResp, err := s.client.GetEnvironment(&params.GetEnvironment{
-			EntityPath: params.EntityPath{
-				User: params.User(username),
-				Name: params.Name(envname),
-			},
+			EntityPath: envPath,
 		})
 		c.Assert(err, gc.IsNil)
 		c.Assert(envResp, jc.DeepEquals, &params.EnvironmentResponse{
+			Path:      envPath,
 			User:      test.body.User,
 			HostPorts: test.body.HostPorts,
 			CACert:    test.body.CACert,
@@ -319,7 +319,7 @@ func (s *APISuite) TestGetStateServer(c *gc.C) {
 		Do:      bakeryDo(nil),
 	})
 	c.Assert(resp.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %s", resp.Body.Bytes()))
-	var jesInfo params.JESInfo
+	var jesInfo params.JESResponse
 	err := json.Unmarshal(resp.Body.Bytes(), &jesInfo)
 	c.Assert(err, gc.IsNil, gc.Commentf("body: %s", resp.Body.String()))
 	c.Assert(jesInfo.ProviderType, gc.Equals, "dummy")

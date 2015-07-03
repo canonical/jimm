@@ -5,9 +5,8 @@
 package jemclient
 
 import (
-	"github.com/juju/httprequest"
-
 	"github.com/CanonicalLtd/jem/params"
+	"github.com/juju/httprequest"
 )
 
 type client struct {
@@ -24,8 +23,20 @@ func (c *client) GetEnvironment(p *params.GetEnvironment) (*params.EnvironmentRe
 	return r, err
 }
 
-func (c *client) GetJES(p *params.GetJES) (*params.JESInfo, error) {
-	var r *params.JESInfo
+func (c *client) GetJES(p *params.GetJES) (*params.JESResponse, error) {
+	var r *params.JESResponse
+	err := c.Client.Call(p, &r)
+	return r, err
+}
+
+func (c *client) ListEnvironments(p *params.ListEnvironments) (*params.ListEnvironmentsResponse, error) {
+	var r *params.ListEnvironmentsResponse
+	err := c.Client.Call(p, &r)
+	return r, err
+}
+
+func (c *client) ListJES(p *params.ListJES) (*params.ListJESResponse, error) {
+	var r *params.ListJESResponse
 	err := c.Client.Call(p, &r)
 	return r, err
 }

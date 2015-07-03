@@ -106,12 +106,13 @@ func (h *Handler) AddJES(arg *params.AddJES) error {
 }
 
 // GetJES returns information on a state server.
-func (h *Handler) GetJES(arg *params.GetJES) (*params.JESInfo, error) {
+func (h *Handler) GetJES(arg *params.GetJES) (*params.JESResponse, error) {
 	neSchema, err := h.schemaForNewEnv(arg.EntityPath)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	return &params.JESInfo{
+	return &params.JESResponse{
+		Path:         arg.EntityPath,
 		ProviderType: neSchema.providerType,
 		Template:     neSchema.schema,
 	}, nil
@@ -128,10 +129,79 @@ func (h *Handler) GetEnvironment(arg *params.GetEnvironment) (*params.Environmen
 		return nil, errgo.Mask(err)
 	}
 	return &params.EnvironmentResponse{
+		Path:      arg.EntityPath,
 		User:      env.AdminUser,
 		UUID:      env.UUID,
 		CACert:    srv.CACert,
 		HostPorts: srv.HostPorts,
+	}, nil
+}
+
+// ListEnvironments returns all the environments stored in JEM.
+func (h *Handler) ListEnvironments(arg *params.ListEnvironments) (*params.ListEnvironmentsResponse, error) {
+	// TODO provide a way of restricting the results.
+
+	// We get all state servers first, because many environments
+	// will be sharing the same state servers.
+	// TODO we could do better than this and avoid
+	// gathering all the state servers into memory.
+	// Possiblities include caching state servers, and
+	// gathering results to do only a few
+	// concurrent queries.
+	servers := make(map[params.EntityPath]mongodoc.StateServer)
+	iter := h.jem.DB.StateServers().Find(nil).Sort("_id").Iter()
+	var srv mongodoc.StateServer
+	for iter.Next(&srv) {
+		servers[srv.Path] = srv
+	}
+	if err := iter.Err(); err != nil {
+		return nil, errgo.Notef(err, "cannot get state servers")
+	}
+	envs := make([]params.EnvironmentResponse, 0, len(servers))
+	iter = h.jem.DB.Environments().Find(nil).Iter()
+	var env mongodoc.Environment
+	for iter.Next(&env) {
+		srv, ok := servers[env.StateServer]
+		if !ok {
+			logger.Errorf("environment %s has invalid state server value %s; omitting from result", env.Path, env.StateServer)
+			continue
+		}
+		envs = append(envs, params.EnvironmentResponse{
+			Path:      env.Path,
+			User:      env.AdminUser,
+			UUID:      env.UUID,
+			CACert:    srv.CACert,
+			HostPorts: srv.HostPorts,
+		})
+	}
+	if err := iter.Err(); err != nil {
+		return nil, errgo.Notef(err, "cannot get environments")
+	}
+	return &params.ListEnvironmentsResponse{
+		Environments: envs,
+	}, nil
+}
+
+// ListJES returns all the state servers stored in JEM.
+// Currently the Template  and ProviderType field in each JESResponse is not
+// populated.
+func (h *Handler) ListJES(arg *params.ListJES) (*params.ListJESResponse, error) {
+	var srvs []params.JESResponse
+
+	// TODO populate ProviderType and Template fields when we have a cache
+	// for the schemaForNewEnv results.
+	iter := h.jem.DB.StateServers().Find(nil).Iter()
+	var srv mongodoc.StateServer
+	for iter.Next(&srv) {
+		srvs = append(srvs, params.JESResponse{
+			Path: srv.Path,
+		})
+	}
+	if err := iter.Err(); err != nil {
+		return nil, errgo.Notef(err, "cannot get environments")
+	}
+	return &params.ListJESResponse{
+		StateServers: srvs,
 	}, nil
 }
 
@@ -161,7 +231,8 @@ func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.Environme
 	// When juju supports macaroon authorization, we won't need
 	// to do this - we could just inform the state server of the required
 	// user/group (args.User) instead.
-	jujuUser := userForEnvironment(params.EntityPath{args.User, args.Info.Name})
+	envPath := params.EntityPath{args.User, args.Info.Name}
+	jujuUser := userForEnvironment(envPath)
 	if err := h.createUser(conn, jujuUser, args.Info.Password); err != nil {
 		return nil, errgo.NoteMask(err, "cannot create user", errgo.Is(params.ErrBadRequest))
 	}
@@ -173,10 +244,7 @@ func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.Environme
 	// an environment that we can't add locally because the name
 	// already exists.
 	envDoc := &mongodoc.Environment{
-		Path: params.EntityPath{
-			User: args.User,
-			Name: args.Info.Name,
-		},
+		Path:          envPath,
 		AdminUser:     jujuUser,
 		AdminPassword: args.Info.Password,
 		StateServer:   args.Info.StateServer,
@@ -209,6 +277,7 @@ func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.Environme
 	}
 	logger.Infof("returning server uuid %q", conn.Info.EnvironTag.Id())
 	return &params.EnvironmentResponse{
+		Path:       envPath,
 		User:       jujuUser,
 		ServerUUID: conn.Info.EnvironTag.Id(),
 		UUID:       env.UUID,

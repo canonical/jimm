@@ -116,7 +116,7 @@ func (c *createCommand) Run(ctxt *cmd.Context) error {
 	})
 }
 
-func (c *createCommand) setConfigDefaults(config map[string]interface{}, jesInfo *params.JESInfo) error {
+func (c *createCommand) setConfigDefaults(config map[string]interface{}, jesInfo *params.JESResponse) error {
 	// Authorized keys are special because the path is relative
 	// to $HOME/.ssh by default.
 	if _, ok := jesInfo.Template["authorized-keys"]; ok && config["authorized-keys"] == nil {
