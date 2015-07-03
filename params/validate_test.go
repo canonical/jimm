@@ -30,21 +30,30 @@ var validatorsTests = []struct {
 }{{
 	about: "valid params",
 	params: httprequest.Params{
-		Request: newHTTPRequest("", nil),
+		Request: newHTTPRequest("/foo/bar/x?Path=foo/bar", "baz/frob"),
 		PathVar: httprouter.Params{{
 			Key:   "Name",
 			Value: "foo",
 		}, {
 			Key:   "User",
 			Value: "bar",
+		}, {
+			Key:   "slname",
+			Value: "x",
 		}},
 	},
 	val: &struct {
-		Name params.Name `httprequest:",path"`
-		User params.User `httprequest:",path"`
+		Name             params.Name       `httprequest:",path"`
+		User             params.User       `httprequest:",path"`
+		Path             params.EntityPath `httprequest:",form"`
+		Body             params.EntityPath `httprequest:",body"`
+		SingleLetterName params.Name       `httprequest:"slname,path"`
 	}{
-		Name: "foo",
-		User: "bar",
+		Name:             "foo",
+		User:             "bar",
+		SingleLetterName: "x",
+		Path:             params.EntityPath{"foo", "bar"},
+		Body:             params.EntityPath{"baz", "frob"},
 	},
 }, {
 	about: "invalid Name in path",
@@ -98,6 +107,24 @@ var validatorsTests = []struct {
 		Name params.Name `httprequest:",path"`
 	}),
 	expectError: `cannot unmarshal into field: invalid name "foo--invalid"`,
+}, {
+	about: "bad user in entity path",
+	params: httprequest.Params{
+		Request: newHTTPRequest("/?Path=/xx", nil),
+	},
+	val: new(struct {
+		Path params.EntityPath `httprequest:",form"`
+	}),
+	expectError: `cannot unmarshal into field: invalid user name ""`,
+}, {
+	about: "bad name in entity path",
+	params: httprequest.Params{
+		Request: newHTTPRequest("/?Path=xx/", nil),
+	},
+	val: new(struct {
+		Path params.EntityPath `httprequest:",form"`
+	}),
+	expectError: `cannot unmarshal into field: invalid name ""`,
 }}
 
 func (*suite) TestValidators(c *gc.C) {
@@ -108,15 +135,29 @@ func (*suite) TestValidators(c *gc.C) {
 		if test.expectError != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
 			c.Assert(errgo.Cause(err), gc.Equals, httprequest.ErrUnmarshal)
-		} else {
-			c.Assert(v, jc.DeepEquals, test.val)
+			continue
 		}
+		c.Assert(err, gc.IsNil)
+		c.Assert(v, jc.DeepEquals, test.val)
 	}
+}
+
+func (*suite) TestEntityPathMarshalText(c *gc.C) {
+	ep := params.EntityPath{
+		User: "foo",
+		Name: "bar",
+	}
+	data, err := ep.MarshalText()
+	c.Assert(err, gc.IsNil)
+	c.Assert(string(data), gc.Equals, "foo/bar")
 }
 
 func newHTTPRequest(path string, body interface{}) *http.Request {
 	req, err := http.NewRequest("GET", path, nil)
 	if err != nil {
+		panic(err)
+	}
+	if err := req.ParseForm(); err != nil {
 		panic(err)
 	}
 	if body != nil {

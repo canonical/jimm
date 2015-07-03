@@ -216,7 +216,7 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 			Method:       "PUT",
 			Handler:      s.srv,
 			JSONBody:     test.body,
-			URL:          fmt.Sprintf("/v1/u/%s/server/%s", username, envname),
+			URL:          fmt.Sprintf("/v1/server/%s/%s", username, envname),
 			Do:           bakeryDo(nil),
 			ExpectStatus: test.expectStatus,
 			ExpectBody:   test.expectBody,
@@ -257,11 +257,12 @@ func (s *APISuite) TestAddJESDuplicate(c *gc.C) {
 		Password:    info.Password,
 		EnvironUUID: info.EnvironTag.Id(),
 	}
-	s.addJES(c, adminUser, "dupenv", si)
+	srvPath := params.EntityPath{adminUser, "dupenv"}
+	s.addJES(c, srvPath, si)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:   "PUT",
 		Handler:  s.srv,
-		URL:      "/v1/u/" + adminUser + "/server/dupenv",
+		URL:      "/v1/server/" + srvPath.String(),
 		JSONBody: si,
 		ExpectBody: &params.Error{
 			Message: "already exists",
@@ -272,11 +273,11 @@ func (s *APISuite) TestAddJESDuplicate(c *gc.C) {
 	})
 }
 
-func (s *APISuite) addJES(c *gc.C, user, name string, jes *params.ServerInfo) {
+func (s *APISuite) addJES(c *gc.C, path params.EntityPath, jes *params.ServerInfo) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:   "PUT",
 		Handler:  s.srv,
-		URL:      "/v1/u/" + user + "/server/" + name,
+		URL:      "/v1/server/" + path.String(),
 		JSONBody: jes,
 		Do:       bakeryDo(nil),
 	})
@@ -286,7 +287,7 @@ func (s *APISuite) TestAddJESUnauthenticated(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "PUT",
 		Handler: s.srv,
-		URL:     "/v1/u/user/server/env",
+		URL:     "/v1/server/user/env",
 		ExpectBody: httptesting.BodyAsserter(func(c *gc.C, m json.RawMessage) {
 			// Allow any body - the next check will check that it's a valid macaroon.
 		}),
@@ -298,7 +299,7 @@ func (s *APISuite) TestGetEnvironmentNotFound(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "GET",
 		Handler: s.srv,
-		URL:     "/v1/u/user/env/foo",
+		URL:     "/v1/env/user/foo",
 		ExpectBody: &params.Error{
 			Message: `environment "user/foo" not found`,
 			Code:    params.ErrNotFound,
@@ -309,12 +310,12 @@ func (s *APISuite) TestGetEnvironmentNotFound(c *gc.C) {
 }
 
 func (s *APISuite) TestGetStateServer(c *gc.C) {
-	srvId := s.addStateServer(c, adminUser, "foo")
+	srvId := s.addStateServer(c, params.EntityPath{adminUser, "foo"})
 
 	s.username = "bob"
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.srv,
-		URL:     "/v1/u/" + srvId,
+		URL:     "/v1/server/" + srvId.String(),
 		Do:      bakeryDo(nil),
 	})
 	c.Assert(resp.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %s", resp.Body.Bytes()))
@@ -334,7 +335,7 @@ func (s *APISuite) TestGetStateServerNotFound(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "GET",
 		Handler: s.srv,
-		URL:     "/v1/u/user/server/foo",
+		URL:     "/v1/server/user/foo",
 		ExpectBody: &params.Error{
 			Message: `cannot open API: cannot get environment: environment "user/foo" not found`,
 			Code:    params.ErrNotFound,
@@ -345,13 +346,13 @@ func (s *APISuite) TestGetStateServerNotFound(c *gc.C) {
 }
 
 func (s *APISuite) TestNewEnvironment(c *gc.C) {
-	srvId := s.addStateServer(c, adminUser, "foo")
+	srvId := s.addStateServer(c, params.EntityPath{adminUser, "foo"})
 
 	s.username = "bob"
 	var envRespBody json.RawMessage
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
-		URL:     "/v1/u/bob/env",
+		URL:     "/v1/env/bob",
 		Handler: s.srv,
 		JSONBody: params.NewEnvironmentInfo{
 			Name:        params.Name("bar"),
@@ -401,14 +402,14 @@ func openAPIFromEnvironmentResponse(c *gc.C, resp *params.EnvironmentResponse, p
 }
 
 func (s *APISuite) TestNewEnvironmentUnderGroup(c *gc.C) {
-	srvId := s.addStateServer(c, adminUser, "foo")
+	srvId := s.addStateServer(c, params.EntityPath{adminUser, "foo"})
 
 	s.username = "bob"
 	s.groups = []string{"beatles"}
 	var envRespBody json.RawMessage
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
-		URL:     "/v1/u/beatles/env",
+		URL:     "/v1/env/beatles",
 		Handler: s.srv,
 		JSONBody: params.NewEnvironmentInfo{
 			Name:        params.Name("bar"),
@@ -446,13 +447,13 @@ func (s *APISuite) TestNewEnvironmentWithExistingUser(c *gc.C) {
 	_, err := usermanager.NewClient(s.APIState).AddUser(username, "", "old")
 	c.Assert(err, gc.IsNil)
 
-	srvId := s.addStateServer(c, adminUser, "foo")
+	srvId := s.addStateServer(c, params.EntityPath{adminUser, "foo"})
 
 	s.username = "bob"
 	var envRespBody json.RawMessage
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
-		URL:     "/v1/u/bob/env",
+		URL:     "/v1/env/bob",
 		Handler: s.srv,
 		JSONBody: params.NewEnvironmentInfo{
 			Name:        params.Name("bar"),
@@ -493,31 +494,29 @@ var newEnvironmentWithInvalidStateServerPathTests = []struct {
 	expectErr string
 }{{
 	path:      "x",
-	expectErr: `wrong number of parts`,
+	expectErr: `wrong number of parts in entity path`,
 }, {
-	path:      "x/foo/y",
-	expectErr: `second part of state server id must be "server"`,
+	path:      "/foo",
+	expectErr: `invalid user name ""`,
 }, {
-	path:      "/server/foo",
-	expectErr: `empty user name or entity name`,
-}, {
-	path:      "foo/server/",
-	expectErr: `empty user name or entity name`,
+	path:      "foo/",
+	expectErr: `invalid name ""`,
 }}
 
 func (s *APISuite) TestNewEnvironmentWithInvalidStateServerPath(c *gc.C) {
 	s.username = "bob"
-	for _, test := range newEnvironmentWithInvalidStateServerPathTests {
+	for i, test := range newEnvironmentWithInvalidStateServerPathTests {
+		c.Logf("test %d", i)
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Method:  "POST",
-			URL:     "/v1/u/bob/env",
+			URL:     "/v1/env/bob",
 			Handler: s.srv,
-			JSONBody: params.NewEnvironmentInfo{
-				Name:        params.Name("bar"),
-				StateServer: test.path,
+			JSONBody: map[string]interface{}{
+				"name":         "bar",
+				"state-server": test.path,
 			},
 			ExpectBody: params.Error{
-				Message: fmt.Sprintf("cannot parse state server path %q: %s", test.path, test.expectErr),
+				Message: fmt.Sprintf("cannot unmarshal parameters: cannot unmarshal into field: cannot unmarshal request body: %s", test.expectErr),
 				Code:    params.ErrBadRequest,
 			},
 			ExpectStatus: http.StatusBadRequest,
@@ -530,11 +529,11 @@ func (s *APISuite) TestNewEnvironmentCannotOpenAPI(c *gc.C) {
 	s.username = "bob"
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
-		URL:     "/v1/u/bob/env",
+		URL:     "/v1/env/bob",
 		Handler: s.srv,
 		JSONBody: params.NewEnvironmentInfo{
 			Name:        params.Name("bar"),
-			StateServer: "bob/server/foo",
+			StateServer: params.EntityPath{"bob", "foo"},
 		},
 		ExpectBody: params.Error{
 			Message: `cannot connect to state server: cannot get environment: environment "bob/foo" not found`,
@@ -546,12 +545,12 @@ func (s *APISuite) TestNewEnvironmentCannotOpenAPI(c *gc.C) {
 }
 
 func (s *APISuite) TestNewEnvironmentInvalidConfig(c *gc.C) {
-	srvId := s.addStateServer(c, adminUser, "foo")
+	srvId := s.addStateServer(c, params.EntityPath{adminUser, "foo"})
 	s.username = "bob"
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
-		URL:     "/v1/u/bob/env",
+		URL:     "/v1/env/bob",
 		Handler: s.srv,
 		JSONBody: params.NewEnvironmentInfo{
 			Name:        params.Name("bar"),
@@ -570,7 +569,7 @@ func (s *APISuite) TestNewEnvironmentInvalidConfig(c *gc.C) {
 }
 
 func (s *APISuite) TestNewEnvironmentTwice(c *gc.C) {
-	srvId := s.addStateServer(c, adminUser, "foo")
+	srvId := s.addStateServer(c, params.EntityPath{adminUser, "foo"})
 	s.username = "bob"
 
 	body := &params.NewEnvironmentInfo{
@@ -581,7 +580,7 @@ func (s *APISuite) TestNewEnvironmentTwice(c *gc.C) {
 	}
 	p := httptesting.JSONCallParams{
 		Method:     "POST",
-		URL:        "/v1/u/bob/env",
+		URL:        "/v1/env/bob",
 		Handler:    s.srv,
 		JSONBody:   body,
 		ExpectBody: anyBody,
@@ -605,13 +604,13 @@ func (s *APISuite) TestNewEnvironmentTwice(c *gc.C) {
 }
 
 func (s *APISuite) TestNewEnvironmentWithNoPassword(c *gc.C) {
-	srvId := s.addStateServer(c, adminUser, "foo")
+	srvId := s.addStateServer(c, params.EntityPath{adminUser, "foo"})
 	s.username = "bob"
 
 	// N.B. "state-server" is a required attribute
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
-		URL:     "/v1/u/bob/env",
+		URL:     "/v1/env/bob",
 		Handler: s.srv,
 		JSONBody: params.NewEnvironmentInfo{
 			Name:        "bar",
@@ -630,13 +629,13 @@ func (s *APISuite) TestNewEnvironmentWithNoPassword(c *gc.C) {
 }
 
 func (s *APISuite) TestNewEnvironmentCannotCreate(c *gc.C) {
-	srvId := s.addStateServer(c, adminUser, "foo")
+	srvId := s.addStateServer(c, params.EntityPath{adminUser, "foo"})
 	s.username = "bob"
 
 	// N.B. "state-server" is a required attribute
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
-		URL:     "/v1/u/bob/env",
+		URL:     "/v1/env/bob",
 		Handler: s.srv,
 		JSONBody: params.NewEnvironmentInfo{
 			Name:        "bar",
@@ -657,7 +656,7 @@ func (s *APISuite) TestNewEnvironmentCannotCreate(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "GET",
 		Handler: s.srv,
-		URL:     "/v1/u/bob/env/bar",
+		URL:     "/v1/env/bob/bar",
 		ExpectBody: &params.Error{
 			Message: `environment "bob/bar" not found`,
 			Code:    params.ErrNotFound,
@@ -668,12 +667,12 @@ func (s *APISuite) TestNewEnvironmentCannotCreate(c *gc.C) {
 }
 
 func (s *APISuite) TestNewEnvironmentUnauthorized(c *gc.C) {
-	srvId := s.addStateServer(c, adminUser, "foo")
+	srvId := s.addStateServer(c, params.EntityPath{adminUser, "foo"})
 	s.username = "charlie"
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
-		URL:     "/v1/u/bob/env",
+		URL:     "/v1/env/bob",
 		Handler: s.srv,
 		JSONBody: params.NewEnvironmentInfo{
 			Name:        "bar",
@@ -691,7 +690,7 @@ func (s *APISuite) TestNewEnvironmentUnauthorized(c *gc.C) {
 
 // addStateServer adds a new stateserver named name under the
 // given user. It returns the state server id.
-func (s *APISuite) addStateServer(c *gc.C, user, name string) string {
+func (s *APISuite) addStateServer(c *gc.C, srvPath params.EntityPath) params.EntityPath {
 	// Note that because the cookies acquired in this request don't
 	// persist, the discharge macaroon we get won't affect subsequent
 	// requests in the caller.
@@ -704,8 +703,6 @@ func (s *APISuite) addStateServer(c *gc.C, user, name string) string {
 	info := s.APIInfo(c)
 
 	// First add the state server that we'll use to create the environment.
-	srvId := adminUser + "/server/foo"
-	c.Logf("user: %v", info.Tag.Id())
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "PUT",
 		Handler: s.srv,
@@ -716,10 +713,10 @@ func (s *APISuite) addStateServer(c *gc.C, user, name string) string {
 			Password:    info.Password,
 			EnvironUUID: info.EnvironTag.Id(),
 		},
-		URL: "/v1/u/" + srvId,
+		URL: "/v1/server/" + srvPath.String(),
 		Do:  bakeryDo(nil),
 	})
-	return srvId
+	return srvPath
 }
 
 func bakeryDo(client *http.Client) func(*http.Request) (*http.Response, error) {

@@ -41,17 +41,16 @@ func (s *jemSuite) TearDownTest(c *gc.C) {
 }
 
 func (s *jemSuite) TestAddStateServer(c *gc.C) {
+	srvPath := params.EntityPath{"bob", "x"}
 	srv := &mongodoc.StateServer{
 		Id:        "ignored",
-		User:      "bob",
-		Name:      "x",
+		Path:      srvPath,
 		CACert:    "certainly",
 		HostPorts: []string{"host1:1234", "host2:9999"},
 	}
 	env := &mongodoc.Environment{
 		Id:            "ignored",
-		User:          "ignored-user",
-		Name:          "ignored-name",
+		Path:          params.EntityPath{"ignored-user", "ignored-name"},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 	}
@@ -61,30 +60,27 @@ func (s *jemSuite) TestAddStateServer(c *gc.C) {
 	// Check that the fields have been mutated as expected.
 	c.Assert(srv, jc.DeepEquals, &mongodoc.StateServer{
 		Id:        "bob/x",
-		User:      "bob",
-		Name:      "x",
+		Path:      srvPath,
 		CACert:    "certainly",
 		HostPorts: []string{"host1:1234", "host2:9999"},
 	})
 	c.Assert(env, jc.DeepEquals, &mongodoc.Environment{
 		Id:            "bob/x",
-		User:          "bob",
-		Name:          "x",
+		Path:          srvPath,
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
-		StateServer:   "bob/x",
+		StateServer:   srvPath,
 	})
 
-	srv1, err := s.store.StateServer("bob/x")
+	srv1, err := s.store.StateServer(srvPath)
 	c.Assert(err, gc.IsNil)
 	c.Assert(srv1, jc.DeepEquals, &mongodoc.StateServer{
 		Id:        "bob/x",
-		User:      "bob",
-		Name:      "x",
+		Path:      srvPath,
 		CACert:    "certainly",
 		HostPorts: []string{"host1:1234", "host2:9999"},
 	})
-	env1, err := s.store.Environment("bob/x")
+	env1, err := s.store.Environment(srvPath)
 	c.Assert(err, gc.IsNil)
 	c.Assert(env1, jc.DeepEquals, env)
 
@@ -94,10 +90,10 @@ func (s *jemSuite) TestAddStateServer(c *gc.C) {
 }
 
 func (s *jemSuite) TestAddEnvironment(c *gc.C) {
+	srvPath := params.EntityPath{"bob", "x"}
 	env := &mongodoc.Environment{
 		Id:            "ignored",
-		User:          "bob",
-		Name:          "x",
+		Path:          srvPath,
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 	}
@@ -105,13 +101,12 @@ func (s *jemSuite) TestAddEnvironment(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(env, jc.DeepEquals, &mongodoc.Environment{
 		Id:            "bob/x",
-		User:          "bob",
-		Name:          "x",
+		Path:          srvPath,
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 	})
 
-	env1, err := s.store.Environment("bob/x")
+	env1, err := s.store.Environment(srvPath)
 	c.Assert(err, gc.IsNil)
 	c.Assert(env1, jc.DeepEquals, env)
 
@@ -135,14 +130,14 @@ func (s *jemSuite) TestSessionIsCopied(c *gc.C) {
 	// Check that we get an appropriate error when getting
 	// a non-existent environment, indicating that database
 	// access is going OK.
-	_, err = store.Environment("bob/x")
+	_, err = store.Environment(params.EntityPath{"bob", "x"})
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
 	// Close the session and check that we still get the
 	// same error.
 	session.Close()
 
-	_, err = store.Environment("bob/x")
+	_, err = store.Environment(params.EntityPath{"bob", "x"})
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
 	// Also check the macaroon storage as that also has its own session reference.

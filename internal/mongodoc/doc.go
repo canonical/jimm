@@ -9,15 +9,13 @@ import (
 // collection with the same id.
 type StateServer struct {
 	// Id holds the primary key for a state server.
-	// It's actually in the form user/name.
-	Id string `bson:"_id"` // Actually user/name.
+	// It holds Path.String().
+	Id string `bson:"_id"`
 
-	// User holds the user name containing the state server.
-	User params.User
-
-	// Name holds the local name given to the state
-	// server. It is unique within a given user.
-	Name params.Name
+	// EntityPath holds the local user and name given to the
+	// state server, denormalized from Id for convenience
+	// and ease of indexing. Its string value is used as the Id value.
+	Path params.EntityPath
 
 	// CACert holds the CA certificate of the server.
 	CACert string
@@ -29,14 +27,14 @@ type StateServer struct {
 }
 
 type Environment struct {
-	Id string `bson:"_id"` // Actually user/name.
+	// Id holds the primary key for an environment.
+	// It holds Path.String().
+	Id string `bson:"_id"`
 
-	// User holds the user name containing the environment.
-	User params.User
-
-	// Name holds the local name given to the environment.
-	// It is unique within a given user.
-	Name params.Name
+	// EntityPath holds the local user and name given to the
+	// environment, denormalized from Id for convenience
+	// and ease of indexing. Its string value is used as the Id value.
+	Path params.EntityPath
 
 	// UUID holds the UUID of the environment.
 	UUID string
@@ -48,7 +46,7 @@ type Environment struct {
 	// AdminPassword holds the password for the admin user.
 	AdminPassword string
 
-	// StateServer holds the id of the environment's
-	// state server (e.g. bob/myjes)
-	StateServer string
+	// StateServer holds the path of the environment's
+	// state server.
+	StateServer params.EntityPath
 }

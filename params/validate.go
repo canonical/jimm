@@ -8,7 +8,7 @@ import (
 	"gopkg.in/errgo.v1"
 )
 
-var validName = regexp.MustCompile("^[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]$")
+var validName = regexp.MustCompile("^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$")
 
 type User string
 

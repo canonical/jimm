@@ -1,15 +1,17 @@
 package params
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/juju/httprequest"
+	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/environschema.v1"
 )
 
 // AddJES holds the parameters for adding a new state server.
 type AddJES struct {
-	httprequest.Route `httprequest:"PUT /v1/u/:User/server/:Name"`
+	httprequest.Route `httprequest:"PUT /v1/server/:User/:Name"`
 	EntityPath
 	Info ServerInfo `httprequest:",body"`
 }
@@ -38,7 +40,9 @@ type ServerInfo struct {
 }
 
 // EntityPath holds the path parameters for specifying
-// an entity in the API.
+// an entity in the API. It can also be used as a value
+// in its own right, because it implements TextMarshaler
+// and TextUnmarshaler.
 type EntityPath struct {
 	User User `httprequest:",path"`
 	Name Name `httprequest:",path"`
@@ -48,16 +52,40 @@ func (p EntityPath) String() string {
 	return fmt.Sprintf("%s/%s", p.User, p.Name)
 }
 
+var slash = []byte("/")
+
+func (p *EntityPath) UnmarshalText(data []byte) error {
+	parts := bytes.Split(data, slash)
+	if len(parts) != 2 {
+		return errgo.New("wrong number of parts in entity path")
+	}
+	if err := p.User.UnmarshalText(parts[0]); err != nil {
+		return errgo.Mask(err)
+	}
+	if err := p.Name.UnmarshalText(parts[1]); err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
+func (p EntityPath) MarshalText() ([]byte, error) {
+	data := make([]byte, 0, len(p.User)+1+len(p.Name))
+	data = append(data, p.User...)
+	data = append(data, '/')
+	data = append(data, p.Name...)
+	return data, nil
+}
+
 // GetEnvironment holds parameters for retrieving
 // an environment.
 type GetEnvironment struct {
-	httprequest.Route `httprequest:"GET /v1/u/:User/env/:Name"`
+	httprequest.Route `httprequest:"GET /v1/env/:User/:Name"`
 	EntityPath
 }
 
 // NewEnvironment holds parameters for creating a new enviromment.
 type NewEnvironment struct {
-	httprequest.Route `httprequest:"POST /v1/u/:User/env"`
+	httprequest.Route `httprequest:"POST /v1/env/:User"`
 
 	// User holds the User element from the URL path.
 	User User `httprequest:",path"`
@@ -69,7 +97,7 @@ type NewEnvironment struct {
 
 // JESInfo holds information on a given JES.
 // Each JES is also associated with an environment
-// at /u/:User/env/:Name where User and Name
+// at /v1/env/:User/:Name where User and Name
 // are the same as that of the JES's path.
 type JESInfo struct {
 	// ProviderType holds the kind of provider used
@@ -83,7 +111,7 @@ type JESInfo struct {
 
 // GetJES holds parameters for retrieving information on a JES.
 type GetJES struct {
-	httprequest.Route `httprequest:"GET /v1/u/:User/server/:Name"`
+	httprequest.Route `httprequest:"GET /v1/server/:User/:Name"`
 	EntityPath
 }
 
@@ -103,11 +131,9 @@ type NewEnvironmentInfo struct {
 	Password string `json:"password"`
 
 	// StateServer holds the path to the state server entity
-	// to use to start the environment, relative to
-	// the API version; for example "jaas/server/ec2-eu-west".
-	// TODO use attributes to automatically work out which state server
-	// to use.
-	StateServer string `json:"state-server"`
+	// to use to start the environment.
+	// TODO use attributes to automatically work out which state server to use.
+	StateServer EntityPath `json:"state-server"`
 
 	// Config holds the configuration attributes to use to create the new environment.
 	Config map[string]interface{} `json:"config"`
