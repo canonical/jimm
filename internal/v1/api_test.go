@@ -688,6 +688,72 @@ func (s *APISuite) TestNewEnvironmentUnauthorized(c *gc.C) {
 	})
 }
 
+func (s *APISuite) TestListJES(c *gc.C) {
+	srvId := s.addStateServer(c, params.EntityPath{adminUser, "foo"})
+	resp, err := s.client.ListJES(nil)
+	c.Assert(err, gc.IsNil)
+	c.Assert(resp, jc.DeepEquals, &params.ListJESResponse{
+		StateServers: []params.JESResponse{{
+			Path: srvId,
+		}},
+	})
+}
+
+func (s *APISuite) TestListJESNoServers(c *gc.C) {
+	resp, err := s.client.ListJES(nil)
+	c.Assert(err, gc.IsNil)
+	c.Assert(resp, jc.DeepEquals, &params.ListJESResponse{
+		StateServers: nil,
+	})
+}
+
+func (s *APISuite) TestListEnvironmentsNoServers(c *gc.C) {
+	resp, err := s.client.ListEnvironments(nil)
+	c.Assert(err, gc.IsNil)
+	c.Assert(resp, jc.DeepEquals, &params.ListEnvironmentsResponse{
+		Environments: nil,
+	})
+}
+
+func (s *APISuite) TestListEnvironmentsStateServerOnly(c *gc.C) {
+	srvId := s.addStateServer(c, params.EntityPath{adminUser, "foo"})
+	info := s.APIInfo(c)
+	resp, err := s.client.ListEnvironments(nil)
+	c.Assert(err, gc.IsNil)
+	c.Assert(resp, jc.DeepEquals, &params.ListEnvironmentsResponse{
+		Environments: []params.EnvironmentResponse{{
+			Path:      srvId,
+			User:      info.Tag.Id(),
+			UUID:      info.EnvironTag.Id(),
+			CACert:    info.CACert,
+			HostPorts: info.Addrs,
+		}},
+	})
+}
+
+func (s *APISuite) TestListEnvironments(c *gc.C) {
+	srvId := s.addStateServer(c, params.EntityPath{adminUser, "foo"})
+	envId, user, uuid := s.addEnvironment(c, srvId, params.EntityPath{adminUser, "bar"})
+	info := s.APIInfo(c)
+	resp, err := s.client.ListEnvironments(nil)
+	c.Assert(err, gc.IsNil)
+	c.Assert(resp, jc.DeepEquals, &params.ListEnvironmentsResponse{
+		Environments: []params.EnvironmentResponse{{
+			Path:      srvId,
+			User:      info.Tag.Id(),
+			UUID:      info.EnvironTag.Id(),
+			CACert:    info.CACert,
+			HostPorts: info.Addrs,
+		}, {
+			Path:      envId,
+			User:      user,
+			UUID:      uuid,
+			CACert:    info.CACert,
+			HostPorts: info.Addrs,
+		}},
+	})
+}
+
 // addStateServer adds a new stateserver named name under the
 // given user. It returns the state server id.
 func (s *APISuite) addStateServer(c *gc.C, srvPath params.EntityPath) params.EntityPath {
@@ -717,6 +783,33 @@ func (s *APISuite) addStateServer(c *gc.C, srvPath params.EntityPath) params.Ent
 		Do:  bakeryDo(nil),
 	})
 	return srvPath
+}
+
+// addEnvironment adds a new environment in the given state server. It
+// returns the environment id.
+func (s *APISuite) addEnvironment(c *gc.C, srvPath, envPath params.EntityPath) (path params.EntityPath, user, uuid string) {
+	// Note that because the cookies acquired in this request don't
+	// persist, the discharge macaroon we get won't affect subsequent
+	// requests in the caller.
+	olduser := s.username
+	defer func() {
+		s.username = olduser
+	}()
+	s.username = adminUser
+
+	info := s.APIInfo(c)
+
+	resp, err := s.client.NewEnvironment(&params.NewEnvironment{
+		User: envPath.User,
+		Info: params.NewEnvironmentInfo{
+			Name:        envPath.Name,
+			Password:    info.Password,
+			StateServer: srvPath,
+			Config:      dummyEnvConfig,
+		},
+	})
+	c.Assert(err, gc.IsNil)
+	return resp.Path, resp.User, resp.UUID
 }
 
 func bakeryDo(client *http.Client) func(*http.Request) (*http.Response, error) {
