@@ -95,18 +95,51 @@ type NewEnvironment struct {
 	Info NewEnvironmentInfo `httprequest:",body"`
 }
 
-// JESInfo holds information on a given JES.
+// ListEnvironments holds parameters for listing
+// current environments.
+type ListEnvironments struct {
+	httprequest.Route `httprequest:"GET /v1/env"`
+
+	// TODO add parameters for restricting results.
+}
+
+// ListEnvironmentsResponse holds a list of state servers as returned
+// by ListEnvironments.
+type ListEnvironmentsResponse struct {
+	Environments []EnvironmentResponse `json:"environments"`
+}
+
+// ListJES holds parameters for listing all
+// current state servers.
+type ListJES struct {
+	httprequest.Route `httprequest:"GET /v1/server"`
+
+	// TODO add parameters for restricting results.
+}
+
+// ListJESResponse holds a list of state servers as returned
+// by AllStateServers and UserStateServers.
+type ListJESResponse struct {
+	// TODO factor out common items in the templates
+	// into a separate field.
+	StateServers []JESResponse `json:"state-servers"`
+}
+
+// JESResponse holds information on a given JES.
 // Each JES is also associated with an environment
 // at /v1/env/:User/:Name where User and Name
 // are the same as that of the JES's path.
-type JESInfo struct {
+type JESResponse struct {
+	// Path holds the path of the state server.
+	Path EntityPath `json:"path"`
+
 	// ProviderType holds the kind of provider used
 	// by the JES.
-	ProviderType string `json:"provider-type"`
+	ProviderType string `json:"provider-type,omitempty"`
 
 	// Template holds the fields required to start
 	// a new environment using the JES.
-	Template environschema.Fields `json:"template"`
+	Template environschema.Fields `json:"template,omitempty"`
 }
 
 // GetJES holds parameters for retrieving information on a JES.
@@ -142,6 +175,9 @@ type NewEnvironmentInfo struct {
 // EnvironmentResponse holds the response body from
 // a NewEnvironment call.
 type EnvironmentResponse struct {
+	// Path holds the path of the environment.
+	Path EntityPath `json:"path"`
+
 	// User holds the admin user name associated
 	// with the environment.
 	User string `json:"user"`

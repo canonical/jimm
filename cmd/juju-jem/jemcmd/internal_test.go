@@ -72,7 +72,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 	tests := []struct {
 		about   string
 		envName string
-		jesInfo params.JESInfo
+		jesInfo params.JESResponse
 		config  map[string]interface{}
 
 		// envVars holds a map from environment variable
@@ -88,7 +88,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		expectConfig map[string]interface{}
 	}{{
 		about: "one parameter, no defaults",
-		jesInfo: params.JESInfo{
+		jesInfo: params.JESResponse{
 			ProviderType: "something",
 			Template: environschema.Fields{
 				"attr": {
@@ -107,7 +107,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		envVars: map[string]string{
 			"somevar": "avalue",
 		},
-		jesInfo: params.JESInfo{
+		jesInfo: params.JESResponse{
 			ProviderType: "something",
 			Template: environschema.Fields{
 				"attr": {
@@ -124,7 +124,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		files: map[string]string{
 			filepath.Join(home, ".ssh", "id_rsa.pub"): fakeSSHKey,
 		},
-		jesInfo: params.JESInfo{
+		jesInfo: params.JESResponse{
 			ProviderType: "something",
 			Template: environschema.Fields{
 				"authorized-keys": {
@@ -140,7 +140,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		files: map[string]string{
 			filepath.Join(home, ".ssh", "another.pub"): fakeSSHKey,
 		},
-		jesInfo: params.JESInfo{
+		jesInfo: params.JESResponse{
 			ProviderType: "something",
 			Template: environschema.Fields{
 				"authorized-keys": {
@@ -159,7 +159,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		files: map[string]string{
 			filepath.Join(home, "key.pub"): fakeSSHKey,
 		},
-		jesInfo: params.JESInfo{
+		jesInfo: params.JESResponse{
 			ProviderType: "something",
 			Template: environschema.Fields{
 				"authorized-keys": {
@@ -178,7 +178,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		files: map[string]string{
 			filepath.Join(jujuHome, "x"): "content",
 		},
-		jesInfo: params.JESInfo{
+		jesInfo: params.JESResponse{
 			ProviderType: "something",
 			Template: environschema.Fields{
 				"attr": {
@@ -197,7 +197,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		files: map[string]string{
 			filepath.Join(home, "x"): "content",
 		},
-		jesInfo: params.JESInfo{
+		jesInfo: params.JESResponse{
 			ProviderType: "something",
 			Template: environschema.Fields{
 				"attr": {
@@ -216,7 +216,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		files: map[string]string{
 			filepath.Join(home, "x"): "content",
 		},
-		jesInfo: params.JESInfo{
+		jesInfo: params.JESResponse{
 			ProviderType: "something",
 			Template: environschema.Fields{
 				"attr": {
@@ -235,7 +235,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		files: map[string]string{
 			filepath.Join(jujuHome, "x"): "",
 		},
-		jesInfo: params.JESInfo{
+		jesInfo: params.JESResponse{
 			ProviderType: "something",
 			Template: environschema.Fields{
 				"attr": {
@@ -249,7 +249,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		expectError: `cannot get value for "x": file ".*home/ubuntu/.juju/x" is empty`,
 	}, {
 		about: "attribute from path ignored with non-string template entry",
-		jesInfo: params.JESInfo{
+		jesInfo: params.JESResponse{
 			ProviderType: "something",
 			Template: environschema.Fields{
 				"attr": {
@@ -265,7 +265,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		},
 	}, {
 		about: "provider default",
-		jesInfo: params.JESInfo{
+		jesInfo: params.JESResponse{
 			ProviderType: "test",
 			Template: environschema.Fields{
 				"testattr": {
@@ -278,7 +278,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		},
 	}, {
 		about: "provider default error",
-		jesInfo: params.JESInfo{
+		jesInfo: params.JESResponse{
 			ProviderType: "test",
 			Template: environschema.Fields{
 				"testattr-error": {
