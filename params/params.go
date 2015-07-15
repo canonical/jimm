@@ -118,7 +118,7 @@ type ListJES struct {
 }
 
 // ListJESResponse holds a list of state servers as returned
-// by AllStateServers and UserStateServers.
+// by ListJES.
 type ListJESResponse struct {
 	// TODO factor out common items in the templates
 	// into a separate field.
