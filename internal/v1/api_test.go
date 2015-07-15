@@ -15,6 +15,7 @@ import (
 	jujufeature "github.com/juju/juju/feature"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	"github.com/juju/names"
+	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"github.com/juju/utils/featureflag"
@@ -702,17 +703,13 @@ func (s *APISuite) TestListJES(c *gc.C) {
 func (s *APISuite) TestListJESNoServers(c *gc.C) {
 	resp, err := s.client.ListJES(nil)
 	c.Assert(err, gc.IsNil)
-	c.Assert(resp, jc.DeepEquals, &params.ListJESResponse{
-		StateServers: nil,
-	})
+	c.Assert(resp, jc.DeepEquals, &params.ListJESResponse{})
 }
 
 func (s *APISuite) TestListEnvironmentsNoServers(c *gc.C) {
 	resp, err := s.client.ListEnvironments(nil)
 	c.Assert(err, gc.IsNil)
-	c.Assert(resp, jc.DeepEquals, &params.ListEnvironmentsResponse{
-		Environments: nil,
-	})
+	c.Assert(resp, jc.DeepEquals, &params.ListEnvironmentsResponse{})
 }
 
 func (s *APISuite) TestListEnvironmentsStateServerOnly(c *gc.C) {
@@ -791,11 +788,7 @@ func (s *APISuite) addEnvironment(c *gc.C, srvPath, envPath params.EntityPath) (
 	// Note that because the cookies acquired in this request don't
 	// persist, the discharge macaroon we get won't affect subsequent
 	// requests in the caller.
-	olduser := s.username
-	defer func() {
-		s.username = olduser
-	}()
-	s.username = adminUser
+	defer testing.PatchValue(&s.username, adminUser).Restore()
 
 	info := s.APIInfo(c)
 
