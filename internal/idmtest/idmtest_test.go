@@ -26,7 +26,7 @@ func (*suite) TestDischarge(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	m, err := bsvc.NewMacaroon("", nil, []checkers.Caveat{{
-		Location:  srv.URL.String() + "/v1/discharge",
+		Location:  srv.URL.String() + "/v1/discharger",
 		Condition: "is-authenticated-user",
 	}})
 	c.Assert(err, gc.IsNil)
@@ -52,7 +52,7 @@ func (*suite) TestDischargeDefaultUser(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	m, err := bsvc.NewMacaroon("", nil, []checkers.Caveat{{
-		Location:  srv.URL.String() + "/v1/discharge",
+		Location:  srv.URL.String() + "/v1/discharger",
 		Condition: "is-authenticated-user",
 	}})
 	c.Assert(err, gc.IsNil)
@@ -77,7 +77,7 @@ func (*suite) TestGroups(c *gc.C) {
 
 	client := idmclient.New(idmclient.NewParams{
 		BaseURL: srv.URL.String(),
-		Client:  httpbakery.NewClient(),
+		Client:  srv.Client("bob"),
 	})
 	groups, err := client.UserGroups(&idmparams.UserGroupsRequest{
 		Username: "bob",
