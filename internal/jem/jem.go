@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CanonicalLtd/blues-identity/idmclient"
 	"github.com/juju/juju/api"
 	"github.com/juju/names"
 	"gopkg.in/errgo.v1"
@@ -23,6 +24,7 @@ type Pool struct {
 	bakery       *bakery.Service
 	connCache    *apiconn.Cache
 	bakeryParams bakery.NewServiceParams
+	permChecker  *idmclient.PermChecker
 
 	mu       sync.Mutex
 	closed   bool
@@ -31,15 +33,18 @@ type Pool struct {
 
 var APIOpenTimeout = 15 * time.Second
 
+const maxPermCacheDuration = 10 * time.Second
+
 // NewPool represents a pool of possible JEM instances that use the given
 // database as a store, and use the given bakery parameters to create the
 // bakery.Service.
-func NewPool(db *mgo.Database, bp bakery.NewServiceParams) (*Pool, error) {
+func NewPool(db *mgo.Database, bp bakery.NewServiceParams, idmClient *idmclient.Client) (*Pool, error) {
 	// TODO migrate database
 	pool := &Pool{
-		db:        Database{db},
-		connCache: apiconn.NewCache(apiconn.CacheParams{}),
-		refCount:  1,
+		db:          Database{db},
+		connCache:   apiconn.NewCache(apiconn.CacheParams{}),
+		permChecker: idmclient.NewPermChecker(idmClient, maxPermCacheDuration),
+		refCount:    1,
 	}
 	// Fill out any bakery parameters explicitly here so
 	// that we use the same values when each Store is
@@ -104,9 +109,10 @@ func (p *Pool) JEM() *JEM {
 	db := p.db.Copy()
 	p.refCount++
 	return &JEM{
-		DB:     db,
-		Bakery: newBakery(db, p.bakeryParams),
-		pool:   p,
+		DB:          db,
+		Bakery:      newBakery(db, p.bakeryParams),
+		PermChecker: p.permChecker,
+		pool:        p,
 	}
 }
 
@@ -133,6 +139,8 @@ type JEM struct {
 
 	// Bakery holds the JEM bakery service.
 	Bakery *bakery.Service
+
+	PermChecker *idmclient.PermChecker
 
 	// pool holds the Pool from which the JEM instance
 	// was created.

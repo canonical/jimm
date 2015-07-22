@@ -4,12 +4,16 @@ package jem
 
 import (
 	"net/http"
+	"net/url"
 
+	"github.com/CanonicalLtd/blues-identity/idmclient"
 	"github.com/juju/httprequest"
 	"github.com/juju/loggo"
 	"github.com/julienschmidt/httprouter"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
+	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/macaroon-bakery.v1/httpbakery/agent"
 	"gopkg.in/mgo.v2"
 )
 
@@ -31,13 +35,17 @@ type ServerParams struct {
 	// or group that is allowed to create state servers.
 	StateServerAdmin string
 
-	// IdentityLocation holds the location of the third party authorization
-	// service to use when creating third party caveats.
+	// IdentityLocation holds the location of the third party identity service.
 	IdentityLocation string
 
 	// PublicKeyLocator holds a public key store.
 	// It may be nil.
 	PublicKeyLocator bakery.PublicKeyLocator
+
+	// AgentUsername and AgentKey hold the credentials used for agent
+	// authentication.
+	AgentUsername string
+	AgentKey      *bakery.KeyPair
 }
 
 // NewServer returns a new handler that handles environment manager
@@ -57,7 +65,11 @@ func NewServer(config ServerParams, versions map[string]NewAPIHandlerFunc) (*Ser
 		Location: "jem",
 		Locator:  config.PublicKeyLocator,
 	}
-	p, err := NewPool(config.DB, bparams)
+	idmClient, err := newIdentityClient(config)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	p, err := NewPool(config.DB, bparams, idmClient)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make store")
 	}
@@ -75,6 +87,22 @@ func NewServer(config ServerParams, versions map[string]NewAPIHandlerFunc) (*Ser
 		}
 	}
 	return srv, nil
+}
+
+func newIdentityClient(config ServerParams) (*idmclient.Client, error) {
+	// Note: no need for persistent cookies as we'll
+	// be able to recreate the macaroons on startup.
+	bclient := httpbakery.NewClient()
+	bclient.Key = config.AgentKey
+	idmURL, err := url.Parse(config.IdentityLocation)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot parse identity location URL %q", config.IdentityLocation)
+	}
+	agent.SetUpAuth(bclient, idmURL, config.AgentUsername)
+	return idmclient.New(idmclient.NewParams{
+		BaseURL: config.IdentityLocation,
+		Client:  bclient,
+	}), nil
 }
 
 type Server struct {

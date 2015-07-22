@@ -28,13 +28,17 @@ type ServerParams struct {
 	// or group that is allowed to create state servers.
 	StateServerAdmin string
 
-	// IdentityLocation holds the location of the third party authorization
-	// service to use when creating third party caveats.
+	// IdentityLocation holds the location of the third party identity service.
 	IdentityLocation string
 
 	// PublicKeyLocator holds a public key store.
 	// It may be nil.
 	PublicKeyLocator bakery.PublicKeyLocator
+
+	// AgentUsername and AgentKey hold the credentials used for agent
+	// authentication.
+	AgentUsername string
+	AgentKey      *bakery.KeyPair
 }
 
 // HandleCloser represents an HTTP handler that can

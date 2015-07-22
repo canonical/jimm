@@ -2,7 +2,6 @@ package v1
 
 import (
 	"net/http"
-	"strings"
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -15,14 +14,12 @@ import (
 
 const (
 	usernameAttr = "username"
-	groupsAttr   = "groups"
 )
 
 // authorization conatains authorization information extracted from an HTTP request.
 // The zero value for a authorization contains no privileges.
 type authorization struct {
 	username string
-	groups   []string
 }
 
 // checkRequest checks for any authorization tokens in the request and returns any
@@ -33,7 +30,6 @@ func (h *Handler) checkRequest(req *http.Request) (authorization, error) {
 	if verr == nil {
 		return authorization{
 			username: attrMap[usernameAttr],
-			groups:   strings.Fields(attrMap[groupsAttr]),
 		}, nil
 	}
 	if _, ok := errgo.Cause(verr).(*bakery.VerificationError); !ok {
@@ -55,28 +51,25 @@ func (h *Handler) newMacaroon() (*macaroon.Macaroon, error) {
 	return h.jem.Bakery.NewMacaroon("", nil, []checkers.Caveat{
 		checkers.NeedDeclaredCaveat(
 			checkers.Caveat{
-				Location:  h.config.IdentityLocation,
+				Location:  h.config.IdentityLocation + "/v1/discharger",
 				Condition: "is-authenticated-user",
 			},
 			usernameAttr,
-			groupsAttr,
 		),
 	})
 }
 
-func (h *Handler) isAdmin() bool {
-	return h.isUser(h.config.StateServerAdmin)
+func (h *Handler) checkIsAdmin() error {
+	return h.checkIsUser(params.User(h.config.StateServerAdmin))
 }
 
-func (h *Handler) isUser(name string) bool {
-	if h.auth.username == name {
-		return true
+func (h *Handler) checkIsUser(name params.User) error {
+	ok, err := h.jem.PermChecker.Allow(h.auth.username, []string{string(name)})
+	if err != nil {
+		return errgo.Notef(err, "cannot check permissions")
 	}
-	// TODO fetch groups from id manager.
-	for _, g := range h.auth.groups {
-		if g == name {
-			return true
-		}
+	if !ok {
+		return params.ErrUnauthorized
 	}
-	return false
+	return nil
 }

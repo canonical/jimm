@@ -57,9 +57,8 @@ func (h *Handler) Close() error {
 
 // AddJES adds a new state server.
 func (h *Handler) AddJES(arg *params.AddJES) error {
-	if string(arg.User) != h.auth.username {
-		logger.Warningf("authorization denied for user %q to modify environment %s/env/%s", h.auth.username, arg.User, arg.Name)
-		return params.ErrUnauthorized
+	if err := h.checkIsUser(arg.User); err != nil {
+		return errgo.Mask(err, errgo.Any)
 	}
 	if len(arg.Info.HostPorts) == 0 {
 		return badRequestf(nil, "no host-ports in request")
@@ -207,8 +206,8 @@ func (h *Handler) ListJES(arg *params.ListJES) (*params.ListJESResponse, error) 
 
 // NewEnvironment creates a new environment inside an existing JES.
 func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.EnvironmentResponse, error) {
-	if !h.isUser(string(args.User)) {
-		return nil, params.ErrUnauthorized
+	if err := h.checkIsUser(args.User); err != nil {
+		return nil, errgo.Mask(err, errgo.Any)
 	}
 	conn, err := h.jem.OpenAPI(args.Info.StateServer)
 	if err != nil {

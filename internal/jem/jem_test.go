@@ -3,12 +3,14 @@
 package jem_test
 
 import (
+	"github.com/CanonicalLtd/blues-identity/idmclient"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 
+	"github.com/CanonicalLtd/jem/internal/idmtest"
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
@@ -16,19 +18,25 @@ import (
 
 type jemSuite struct {
 	jujutesting.IsolatedMgoSuite
-	pool  *jem.Pool
-	store *jem.JEM
+	idmSrv *idmtest.Server
+	pool   *jem.Pool
+	store  *jem.JEM
 }
 
 var _ = gc.Suite(&jemSuite{})
 
 func (s *jemSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
+	s.idmSrv = idmtest.NewServer()
 	pool, err := jem.NewPool(
 		s.Session.DB("jem"),
 		bakery.NewServiceParams{
 			Location: "here",
 		},
+		idmclient.New(idmclient.NewParams{
+			BaseURL: s.idmSrv.URL.String(),
+			Client:  s.idmSrv.Client("agent"),
+		}),
 	)
 	c.Assert(err, gc.IsNil)
 	s.pool = pool
@@ -122,6 +130,10 @@ func (s *jemSuite) TestSessionIsCopied(c *gc.C) {
 		bakery.NewServiceParams{
 			Location: "here",
 		},
+		idmclient.New(idmclient.NewParams{
+			BaseURL: s.idmSrv.URL.String(),
+			Client:  s.idmSrv.Client("agent"),
+		}),
 	)
 	c.Assert(err, gc.IsNil)
 

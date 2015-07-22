@@ -9,37 +9,15 @@ import (
 	corejujutesting "github.com/juju/juju/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
 
 	"github.com/CanonicalLtd/jem/internal/apiconn"
-	"github.com/CanonicalLtd/jem/internal/jem"
 )
 
 type cacheSuite struct {
 	corejujutesting.JujuConnSuite
-	jem *jem.JEM
 }
 
 var _ = gc.Suite(&cacheSuite{})
-
-func (s *cacheSuite) SetUpTest(c *gc.C) {
-	s.JujuConnSuite.SetUpTest(c)
-	pool, err := jem.NewPool(
-		s.Session.DB("jem"),
-		bakery.NewServiceParams{
-			Location: "here",
-		},
-	)
-	c.Assert(err, gc.IsNil)
-	s.jem = pool.JEM()
-}
-
-func (s *cacheSuite) TearDownTest(c *gc.C) {
-	if s.jem != nil {
-		s.jem.Close()
-	}
-	s.JujuConnSuite.TearDownTest(c)
-}
 
 func (s *cacheSuite) TestOpenAPI(c *gc.C) {
 	cache := apiconn.NewCache(apiconn.CacheParams{})

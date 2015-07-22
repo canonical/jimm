@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	// Include any providers known to support JEM.
 	// Avoid including provider/all to reduce build time.
@@ -55,6 +56,11 @@ func serve(confPath string) error {
 	if err != nil {
 		return errgo.Notef(err, "cannot read config file %q", confPath)
 	}
+	if strings.Contains(conf.IdentityLocation, "v1/discharger") {
+		// It's probably some old code that uses the old IdentityLocation
+		// meaning.
+		return errgo.Notef(err, "identity location must not contain discharge path")
+	}
 
 	logger.Debugf("connecting to mongo")
 	session, err := mgo.Dial(conf.MongoAddr)
@@ -73,6 +79,8 @@ func serve(confPath string) error {
 		StateServerAdmin: conf.StateServerAdmin,
 		IdentityLocation: conf.IdentityLocation,
 		PublicKeyLocator: ring,
+		AgentUsername:    conf.AgentUsername,
+		AgentKey:         conf.AgentKey,
 	}
 	server, err := jem.NewServer(cfg)
 	if err != nil {

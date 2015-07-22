@@ -33,6 +33,10 @@ bar: false
 state-server-admin: adminuser
 identity-location: localhost:18082
 identity-public-key: +qNbDWly3kRTDVv2UN03hrv/CBt4W6nxY5dHdw+KJFA=
+agent-username: agentuser
+agent-key:
+  private: lsvcDkapKoFxIyjX9/eQgb3s41KVwPMISFwAJdVCZ70=
+  public: +qNbDWly3kRTDVv2UN03hrv/CBt4W6nxY5dHdw+KJFA=
 `
 
 func (s *ConfigSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
@@ -56,6 +60,15 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 		IdentityLocation: "localhost:18082",
 		IdentityPublicKey: &bakery.PublicKey{
 			Key: mustParseKey("+qNbDWly3kRTDVv2UN03hrv/CBt4W6nxY5dHdw+KJFA="),
+		},
+		AgentUsername: "agentuser",
+		AgentKey: &bakery.KeyPair{
+			Public: bakery.PublicKey{
+				Key: mustParseKey("+qNbDWly3kRTDVv2UN03hrv/CBt4W6nxY5dHdw+KJFA="),
+			},
+			Private: bakery.PrivateKey{
+				mustParseKey("lsvcDkapKoFxIyjX9/eQgb3s41KVwPMISFwAJdVCZ70="),
+			},
 		},
 	})
 }
