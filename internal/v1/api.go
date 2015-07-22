@@ -14,6 +14,7 @@ import (
 	"github.com/juju/schema"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/environschema.v1"
+	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jem/internal/apiconn"
@@ -58,7 +59,7 @@ func (h *Handler) Close() error {
 // AddJES adds a new state server.
 func (h *Handler) AddJES(arg *params.AddJES) error {
 	if err := h.checkIsUser(arg.User); err != nil {
-		return errgo.Mask(err, errgo.Any)
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	if len(arg.Info.HostPorts) == 0 {
 		return badRequestf(nil, "no host-ports in request")
@@ -106,6 +107,9 @@ func (h *Handler) AddJES(arg *params.AddJES) error {
 
 // GetJES returns information on a state server.
 func (h *Handler) GetJES(arg *params.GetJES) (*params.JESResponse, error) {
+	if err := h.checkReadACL(h.jem.DB.StateServers(), arg.EntityPath); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
 	neSchema, err := h.schemaForNewEnv(arg.EntityPath)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
@@ -119,6 +123,9 @@ func (h *Handler) GetJES(arg *params.GetJES) (*params.JESResponse, error) {
 
 // GetEnvironment returns information on a given environment.
 func (h *Handler) GetEnvironment(arg *params.GetEnvironment) (*params.EnvironmentResponse, error) {
+	if err := h.checkReadACL(h.jem.DB.Environments(), arg.EntityPath); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
 	env, err := h.jem.Environment(arg.EntityPath)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
@@ -160,6 +167,15 @@ func (h *Handler) ListEnvironments(arg *params.ListEnvironments) (*params.ListEn
 	iter = h.jem.DB.Environments().Find(nil).Iter()
 	var env mongodoc.Environment
 	for iter.Next(&env) {
+		ok, err := h.jem.PermChecker.Allow(h.auth.username, env.ACL.Read)
+		if err != nil {
+			return nil, errgo.Notef(err, "cannot check permissions")
+		}
+		if !ok && h.checkIsUser(env.Path.User) != nil {
+			// No permissions to look at the environment, so don't include
+			// it in the results.
+			continue
+		}
 		srv, ok := servers[env.StateServer]
 		if !ok {
 			logger.Errorf("environment %s has invalid state server value %s; omitting from result", env.Path, env.StateServer)
@@ -192,6 +208,15 @@ func (h *Handler) ListJES(arg *params.ListJES) (*params.ListJESResponse, error) 
 	iter := h.jem.DB.StateServers().Find(nil).Iter()
 	var srv mongodoc.StateServer
 	for iter.Next(&srv) {
+		ok, err := h.jem.PermChecker.Allow(h.auth.username, srv.ACL.Read)
+		if err != nil {
+			return nil, errgo.Notef(err, "cannot check permissions")
+		}
+		if !ok && h.checkIsUser(srv.Path.User) != nil {
+			// No permissions to look at the state server, so don't include
+			// it in the results.
+			continue
+		}
 		srvs = append(srvs, params.JESResponse{
 			Path: srv.Path,
 		})
@@ -207,7 +232,10 @@ func (h *Handler) ListJES(arg *params.ListJES) (*params.ListJESResponse, error) 
 // NewEnvironment creates a new environment inside an existing JES.
 func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.EnvironmentResponse, error) {
 	if err := h.checkIsUser(args.User); err != nil {
-		return nil, errgo.Mask(err, errgo.Any)
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	if err := h.checkReadACL(h.jem.DB.StateServers(), args.Info.StateServer); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	conn, err := h.jem.OpenAPI(args.Info.StateServer)
 	if err != nil {
@@ -274,7 +302,6 @@ func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.Environme
 	if err := h.jem.DB.Environments().UpdateId(envDoc.Id, bson.D{{"$set", bson.D{{"uuid", env.UUID}}}}); err != nil {
 		return nil, errgo.Notef(err, "cannot update environment UUID in database, leaked environment %s", env.UUID)
 	}
-	logger.Infof("returning server uuid %q", conn.Info.EnvironTag.Id())
 	return &params.EnvironmentResponse{
 		Path:       envPath,
 		User:       jujuUser,
@@ -283,6 +310,60 @@ func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.Environme
 		CACert:     conn.Info.CACert,
 		HostPorts:  conn.Info.Addrs,
 	}, nil
+}
+
+// SetStateServerPerm sets the permissions on a state server entity.
+// Only the owner (arg.EntityPath.User) can change the permissions
+// on an an entity. The owner can always read an entity, even
+// if it has an empty ACL.
+func (h *Handler) SetStateServerPerm(arg *params.SetStateServerPerm) error {
+	return h.setPerm(h.jem.DB.StateServers(), arg.EntityPath, arg.ACL)
+}
+
+// SetEnvironmentPerm sets the permissions on a state server entity.
+// Only the owner (arg.EntityPath.User) can change the permissions
+// on an an entity. The owner can always read an entity, even
+// if it has an empty ACL.
+func (h *Handler) SetEnvironmentPerm(arg *params.SetEnvironmentPerm) error {
+	return h.setPerm(h.jem.DB.Environments(), arg.EntityPath, arg.ACL)
+}
+
+func (h *Handler) setPerm(coll *mgo.Collection, path params.EntityPath, acl params.ACL) error {
+	// Only path.User (or members thereof) can change permissions.
+	if err := h.checkIsUser(path.User); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	if err := coll.UpdateId(path.String(), bson.D{{"$set", bson.D{{"acl", acl}}}}); err != nil {
+		if err == mgo.ErrNotFound {
+			return params.ErrNotFound
+		}
+		return errgo.Notef(err, "cannot update %v", path)
+	}
+	return nil
+}
+
+// GetStateServerPerm returns the ACL for a given state server.
+// Only the owner (arg.EntityPath.User) can read the ACL.
+func (h *Handler) GetStateServerPerm(arg *params.GetStateServerPerm) (params.ACL, error) {
+	return h.getPerm(h.jem.DB.StateServers(), arg.EntityPath)
+}
+
+// GetEnvironmentPerm returns the ACL for a given environment.
+// Only the owner (arg.EntityPath.User) can read the ACL.
+func (h *Handler) GetEnvironmentPerm(arg *params.GetEnvironmentPerm) (params.ACL, error) {
+	return h.getPerm(h.jem.DB.Environments(), arg.EntityPath)
+}
+
+func (h *Handler) getPerm(coll *mgo.Collection, path params.EntityPath) (params.ACL, error) {
+	// Only the owner can read permissions.
+	if err := h.checkIsUser(path.User); err != nil {
+		return params.ACL{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	acl, err := h.getACL(coll, path)
+	if err != nil {
+		return params.ACL{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return acl, nil
 }
 
 // userForEnvironment returns the juju user to use for
@@ -397,4 +478,42 @@ func collapseHostPorts(hpss [][]network.HostPort) []string {
 	hps = network.FilterUnusableHostPorts(hps)
 	hps = network.DropDuplicatedHostPorts(hps)
 	return network.HostPortsToStrings(hps)
+}
+
+// checkReadACL checks that the entity with the given path in the
+// given collection can be read by the currently authenticated user.
+func (h *Handler) checkReadACL(coll *mgo.Collection, path params.EntityPath) error {
+	// The user can always access their own entities.
+	if err := h.checkIsUser(path.User); err == nil {
+		return nil
+	}
+	acl, err := h.getACL(coll, path)
+	if errgo.Cause(err) == params.ErrNotFound {
+		// The document is not found - and we've already checked
+		// that the currently authenticated user cannot speak for
+		// path.User, so return an unauthorized error to stop
+		// people probing for the existence of other people's entities.
+		return params.ErrUnauthorized
+	}
+	ok, err := h.jem.PermChecker.Allow(h.auth.username, acl.Read)
+	if err != nil {
+		return errgo.Notef(err, "cannot check permisssions")
+	}
+	if !ok {
+		return params.ErrUnauthorized
+	}
+	return nil
+}
+
+func (h *Handler) getACL(coll *mgo.Collection, path params.EntityPath) (params.ACL, error) {
+	var doc struct {
+		ACL params.ACL
+	}
+	if err := coll.FindId(path.String()).One(&doc); err != nil {
+		if err == mgo.ErrNotFound {
+			err = params.ErrNotFound
+		}
+		return params.ACL{}, errgo.Mask(err, errgo.Is(mgo.ErrNotFound))
+	}
+	return doc.ACL, nil
 }

@@ -56,7 +56,8 @@ func serve(confPath string) error {
 	if err != nil {
 		return errgo.Notef(err, "cannot read config file %q", confPath)
 	}
-	if strings.Contains(conf.IdentityLocation, "v1/discharger") {
+	conf.IdentityLocation = strings.TrimSuffix(conf.IdentityLocation, "/")
+	if strings.HasSuffix(conf.IdentityLocation, "v1/discharger") {
 		// It's probably some old code that uses the old IdentityLocation
 		// meaning.
 		return errgo.Notef(err, "identity location must not contain discharge path")
@@ -71,7 +72,7 @@ func serve(confPath string) error {
 	db := session.DB("jem")
 
 	ring := bakery.NewPublicKeyRing()
-	ring.AddPublicKeyForLocation(conf.IdentityLocation, false, conf.IdentityPublicKey)
+	ring.AddPublicKeyForLocation(conf.IdentityLocation+"/", true, conf.IdentityPublicKey)
 
 	logger.Debugf("setting up the API server")
 	cfg := jem.ServerParams{
