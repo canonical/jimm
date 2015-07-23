@@ -91,13 +91,24 @@ func (srv *Server) PublicKeyForLocation(loc string) (*bakery.PublicKey, error) {
 	return srv.PublicKey, nil
 }
 
-// Client returns a bakery client that will discharge as the given user.
+// UserPublicKey returns the key for the given user.
 // It panics if the user has not been added.
+func (srv *Server) UserPublicKey(username string) *bakery.KeyPair {
+	u := srv.user(username)
+	if u == nil {
+		panic("no user found")
+	}
+	return u.key
+}
+
+// Client returns a bakery client that will discharge as the given user.
+// If the user does not exist, it is added with no groups.
 func (srv *Server) Client(username string) *httpbakery.Client {
 	c := httpbakery.NewClient()
 	u := srv.user(username)
 	if u == nil {
-		panic(errgo.Newf("unknown user %q", username))
+		srv.AddUser(username)
+		u = srv.user(username)
 	}
 	c.Key = u.key
 	agent.SetUpAuth(c, srv.URL, username)

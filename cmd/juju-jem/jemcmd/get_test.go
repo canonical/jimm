@@ -14,7 +14,7 @@ type getSuite struct {
 var _ = gc.Suite(&getSuite{})
 
 func (s *getSuite) TestGet(c *gc.C) {
-	s.username = "bob"
+	s.idmSrv.SetDefaultUser("bob")
 
 	// First add a state server. This also adds an environment that we can
 	// get for our test.

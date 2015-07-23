@@ -16,8 +16,10 @@ type addServerSuite struct {
 var _ = gc.Suite(&addServerSuite{})
 
 func (s *addServerSuite) TestAddServer(c *gc.C) {
-	s.username = "bob"
-	_, err := s.jemClient.GetJES(&params.GetJES{
+	s.idmSrv.AddUser("bob")
+	s.idmSrv.SetDefaultUser("bob")
+	client := s.jemClient("bob")
+	_, err := client.GetJES(&params.GetJES{
 		EntityPath: params.EntityPath{
 			User: "bob",
 			Name: "foo",
@@ -28,7 +30,7 @@ func (s *addServerSuite) TestAddServer(c *gc.C) {
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
-	_, err = s.jemClient.GetJES(&params.GetJES{
+	_, err = client.GetJES(&params.GetJES{
 		EntityPath: params.EntityPath{
 			User: "bob",
 			Name: "foo",

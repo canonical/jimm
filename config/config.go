@@ -19,6 +19,8 @@ type Config struct {
 	StateServerAdmin  string            `yaml:"state-server-admin"`
 	IdentityPublicKey *bakery.PublicKey `yaml:"identity-public-key"`
 	IdentityLocation  string            `yaml:"identity-location"`
+	AgentUsername     string            `yaml:"agent-username"`
+	AgentKey          *bakery.KeyPair   `yaml:"agent-key"`
 }
 
 func (c *Config) validate() error {

@@ -18,7 +18,7 @@ type createSuite struct {
 var _ = gc.Suite(&createSuite{})
 
 func (s *createSuite) TestCreate(c *gc.C) {
-	s.username = "bob"
+	s.idmSrv.SetDefaultUser("bob")
 
 	// First add the state server that we're going to use
 	// to create the new environment.
