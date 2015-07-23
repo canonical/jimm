@@ -9,6 +9,41 @@ import (
 	"gopkg.in/juju/environschema.v1"
 )
 
+// SetStateServerPerm holds the parameters for setting the ACL
+// on a state server.
+type SetStateServerPerm struct {
+	httprequest.Route `httprequest:"PUT /v1/server/:User/:Name/perm"`
+	EntityPath
+	ACL ACL `httprequest:",body"`
+}
+
+// GetStateServerPerm holds the parameters for getting the ACL
+// of a state server.
+type GetStateServerPerm struct {
+	httprequest.Route `httprequest:"GET /v1/server/:User/:Name/perm"`
+	EntityPath
+}
+
+// SetEnvironmentPerm holds the parameters for setting the ACL
+// on an environment.
+type SetEnvironmentPerm struct {
+	httprequest.Route `httprequest:"PUT /v1/env/:User/:Name/perm"`
+	EntityPath
+	ACL ACL `httprequest:",body"`
+}
+
+// GetEnvironmentPerm holds the parameters for getting the ACL
+// of an environment.
+type GetEnvironmentPerm struct {
+	httprequest.Route `httprequest:"GET /v1/env/:User/:Name/perm"`
+	EntityPath
+}
+
+// ACL holds an access control list for an entity.
+type ACL struct {
+	Read []string
+}
+
 // AddJES holds the parameters for adding a new state server.
 type AddJES struct {
 	httprequest.Route `httprequest:"PUT /v1/server/:User/:Name"`

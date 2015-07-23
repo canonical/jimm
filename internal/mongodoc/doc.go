@@ -17,6 +17,9 @@ type StateServer struct {
 	// and ease of indexing. Its string value is used as the Id value.
 	Path params.EntityPath
 
+	// ACL holds permissions for the server.
+	ACL ACL
+
 	// CACert holds the CA certificate of the server.
 	CACert string
 
@@ -36,6 +39,9 @@ type Environment struct {
 	// and ease of indexing. Its string value is used as the Id value.
 	Path params.EntityPath
 
+	// ACL holds permissions for the environment.
+	ACL ACL
+
 	// UUID holds the UUID of the environment.
 	UUID string
 
@@ -49,4 +55,12 @@ type Environment struct {
 	// StateServer holds the path of the environment's
 	// state server.
 	StateServer params.EntityPath
+}
+
+// ACL holds lists of users and groups that are
+// allowed to perform specific actions.
+type ACL struct {
+	// Read holds users and groups that are allowed to read the
+	// entity.
+	Read []string `bson:",omitempty"`
 }

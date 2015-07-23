@@ -26,9 +26,25 @@ func (c *client) GetEnvironment(p *params.GetEnvironment) (*params.EnvironmentRe
 	return r, err
 }
 
+// GetEnvironmentPerm returns the ACL for a given environment.
+// Only the owner (arg.EntityPath.User) can read the ACL.
+func (c *client) GetEnvironmentPerm(p *params.GetEnvironmentPerm) (params.ACL, error) {
+	var r params.ACL
+	err := c.Client.Call(p, &r)
+	return r, err
+}
+
 // GetJES returns information on a state server.
 func (c *client) GetJES(p *params.GetJES) (*params.JESResponse, error) {
 	var r *params.JESResponse
+	err := c.Client.Call(p, &r)
+	return r, err
+}
+
+// GetStateServerPerm returns the ACL for a given state server.
+// Only the owner (arg.EntityPath.User) can read the ACL.
+func (c *client) GetStateServerPerm(p *params.GetStateServerPerm) (params.ACL, error) {
+	var r params.ACL
 	err := c.Client.Call(p, &r)
 	return r, err
 }
@@ -54,4 +70,20 @@ func (c *client) NewEnvironment(p *params.NewEnvironment) (*params.EnvironmentRe
 	var r *params.EnvironmentResponse
 	err := c.Client.Call(p, &r)
 	return r, err
+}
+
+// SetEnvironmentPerm sets the permissions on a state server entity.
+// Only the owner (arg.EntityPath.User) can change the permissions
+// on an an entity. The owner can always read an entity, even
+// if it has an empty ACL.
+func (c *client) SetEnvironmentPerm(p *params.SetEnvironmentPerm) error {
+	return c.Client.Call(p, nil)
+}
+
+// SetStateServerPerm sets the permissions on a state server entity.
+// Only the owner (arg.EntityPath.User) can change the permissions
+// on an an entity. The owner can always read an entity, even
+// if it has an empty ACL.
+func (c *client) SetStateServerPerm(p *params.SetStateServerPerm) error {
+	return c.Client.Call(p, nil)
 }
