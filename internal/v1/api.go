@@ -137,6 +137,7 @@ func (h *Handler) GetEnvironment(arg *params.GetEnvironment) (*params.Environmen
 	return &params.EnvironmentResponse{
 		Path:      arg.EntityPath,
 		User:      env.AdminUser,
+		Password:  env.AdminPassword,
 		UUID:      env.UUID,
 		CACert:    srv.CACert,
 		HostPorts: srv.HostPorts,
@@ -184,6 +185,7 @@ func (h *Handler) ListEnvironments(arg *params.ListEnvironments) (*params.ListEn
 		envs = append(envs, params.EnvironmentResponse{
 			Path:      env.Path,
 			User:      env.AdminUser,
+			Password:  env.AdminPassword,
 			UUID:      env.UUID,
 			CACert:    srv.CACert,
 			HostPorts: srv.HostPorts,
@@ -305,6 +307,7 @@ func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.Environme
 	return &params.EnvironmentResponse{
 		Path:       envPath,
 		User:       jujuUser,
+		Password:   args.Info.Password,
 		ServerUUID: conn.Info.EnvironTag.Id(),
 		UUID:       env.UUID,
 		CACert:     conn.Info.CACert,

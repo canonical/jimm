@@ -330,11 +330,12 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 		c.Assert(envResp, jc.DeepEquals, &params.EnvironmentResponse{
 			Path:      envPath,
 			User:      test.body.User,
+			Password:  test.body.Password,
 			HostPorts: test.body.HostPorts,
 			CACert:    test.body.CACert,
 			UUID:      test.body.EnvironUUID,
 		})
-		st := openAPIFromEnvironmentResponse(c, envResp, test.body.Password)
+		st := openAPIFromEnvironmentResponse(c, envResp)
 		st.Close()
 		// Clear the connection pool for the next test.
 		s.srv.Pool().ClearAPIConnCache()
@@ -488,7 +489,7 @@ func (s *APISuite) TestNewEnvironment(c *gc.C) {
 
 	c.Assert(envResp.ServerUUID, gc.Equals, s.APIInfo(c).EnvironTag.Id())
 
-	st := openAPIFromEnvironmentResponse(c, &envResp, "secret")
+	st := openAPIFromEnvironmentResponse(c, &envResp)
 	st.Close()
 
 	// Ensure that we can connect to the new environment
@@ -500,21 +501,21 @@ func (s *APISuite) TestNewEnvironment(c *gc.C) {
 		},
 	})
 	c.Assert(err, gc.IsNil)
-	st = openAPIFromEnvironmentResponse(c, envResp2, "secret")
+	st = openAPIFromEnvironmentResponse(c, envResp2)
 	st.Close()
 }
 
-func openAPIFromEnvironmentResponse(c *gc.C, resp *params.EnvironmentResponse, password string) *api.State {
+func openAPIFromEnvironmentResponse(c *gc.C, resp *params.EnvironmentResponse) *api.State {
 	// Ensure that we can connect to the new environment
 	apiInfo := &api.Info{
 		Tag:        names.NewUserTag(resp.User),
-		Password:   password,
+		Password:   resp.Password,
 		Addrs:      resp.HostPorts,
 		CACert:     resp.CACert,
 		EnvironTag: names.NewEnvironTag(resp.UUID),
 	}
 	st, err := api.Open(apiInfo, api.DialOpts{})
-	c.Assert(err, gc.IsNil, gc.Commentf("user: %q; password: %q", resp.User, password))
+	c.Assert(err, gc.IsNil, gc.Commentf("user: %q; password: %q", resp.User, resp.Password))
 	return st
 }
 
@@ -594,7 +595,7 @@ func (s *APISuite) TestNewEnvironmentWithExistingUser(c *gc.C) {
 	// the new secret
 	apiInfo := &api.Info{
 		Tag:        names.NewUserTag(username),
-		Password:   "secret",
+		Password:   envResp.Password,
 		Addrs:      envResp.HostPorts,
 		CACert:     envResp.CACert,
 		EnvironTag: names.NewEnvironTag(envResp.UUID),
@@ -834,6 +835,7 @@ func (s *APISuite) TestListEnvironmentsStateServerOnly(c *gc.C) {
 		Environments: []params.EnvironmentResponse{{
 			Path:      srvId,
 			User:      info.Tag.Id(),
+			Password:  info.Password,
 			UUID:      info.EnvironTag.Id(),
 			CACert:    info.CACert,
 			HostPorts: info.Addrs,
@@ -872,18 +874,21 @@ func (s *APISuite) TestListEnvironments(c *gc.C) {
 	resps := []params.EnvironmentResponse{{
 		Path:      srvId,
 		User:      info.Tag.Id(),
+		Password:  info.Password,
 		UUID:      info.EnvironTag.Id(),
 		CACert:    info.CACert,
 		HostPorts: info.Addrs,
 	}, {
 		Path:      envId1,
 		User:      user1,
+		Password:  info.Password,
 		UUID:      uuid1,
 		CACert:    info.CACert,
 		HostPorts: info.Addrs,
 	}, {
 		Path:      envId2,
 		User:      user2,
+		Password:  info.Password,
 		UUID:      uuid2,
 		CACert:    info.CACert,
 		HostPorts: info.Addrs,

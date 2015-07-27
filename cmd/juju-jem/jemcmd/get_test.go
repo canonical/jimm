@@ -23,10 +23,8 @@ func (s *getSuite) TestGet(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	apiInfo := s.APIInfo(c)
 	stdout, stderr, code = run(c, c.MkDir(),
 		"get",
-		"--password", apiInfo.Password,
 		"bob/foo",
 	)
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
