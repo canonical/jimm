@@ -197,7 +197,7 @@ var _ gnuflag.Value = (*entityPathValue)(nil)
 // and writes the result as a local environment .jenv
 // file with the given local name, saving also the
 // given access password.
-func writeEnvironment(localName, password string, getEnv func() (*params.EnvironmentResponse, error)) error {
+func writeEnvironment(localName string, getEnv func() (*params.EnvironmentResponse, error)) error {
 	store, err := configstore.Default()
 	if err != nil {
 		return errgo.Notef(err, "cannot get default configstore")
@@ -220,7 +220,7 @@ func writeEnvironment(localName, password string, getEnv func() (*params.Environ
 	// that the response is somewhat sane.
 	apiInfo := &api.Info{
 		Tag:        names.NewUserTag(resp.User),
-		Password:   password,
+		Password:   resp.Password,
 		Addrs:      resp.HostPorts,
 		CACert:     resp.CACert,
 		EnvironTag: names.NewEnvironTag(resp.UUID),
@@ -240,7 +240,7 @@ func writeEnvironment(localName, password string, getEnv func() (*params.Environ
 	})
 	envInfo.SetAPICredentials(configstore.APICredentials{
 		User:     resp.User,
-		Password: password,
+		Password: resp.Password,
 	})
 	if err := envInfo.Write(); err != nil {
 		return errgo.Notef(err, "cannot write environ info")

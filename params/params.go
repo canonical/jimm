@@ -217,6 +217,12 @@ type EnvironmentResponse struct {
 	// with the environment.
 	User string `json:"user"`
 
+	// Password holds the admin password associated with the
+	// environment. If it is empty, macaroon authentication should
+	// be used to connect to the environment (only possible when
+	// macaroon authentication is implemented by Juju).
+	Password string `json:"password"`
+
 	// UUID holds the UUID of the environment.
 	UUID string `json:"uuid"`
 

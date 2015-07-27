@@ -3,10 +3,7 @@
 package jemcmd
 
 import (
-	"fmt"
-
 	"github.com/juju/cmd"
-	"github.com/juju/utils/readpass"
 	"gopkg.in/errgo.v1"
 	"launchpad.net/gnuflag"
 
@@ -19,7 +16,6 @@ type getCommand struct {
 	envPath   entityPathValue
 	localName string
 	user      string
-	password  string
 }
 
 var getDoc = `
@@ -41,8 +37,6 @@ func (c *getCommand) SetFlags(f *gnuflag.FlagSet) {
 	f.StringVar(&c.localName, "local", "", "local name for environment (as used for juju switch). Defaults to <envname>")
 	f.StringVar(&c.user, "u", "", "user name to use when accessing the environment (defaults to user name created for environment)")
 	f.StringVar(&c.user, "user", "", "")
-	f.StringVar(&c.password, "p", "", "access password for environment")
-	f.StringVar(&c.password, "password", "", "")
 }
 
 func (c *getCommand) Init(args []string) error {
@@ -59,22 +53,13 @@ func (c *getCommand) Init(args []string) error {
 }
 
 func (c *getCommand) Run(ctxt *cmd.Context) error {
-	if c.password == "" {
-		fmt.Fprint(ctxt.Stdout, "environment password: ")
-		pass, err := readpass.ReadPassword()
-		if err != nil {
-			return errgo.Notef(err, "cannot read password")
-		}
-		fmt.Println()
-		c.password = pass
-	}
 	client, err := c.newClient()
 	if err != nil {
 		return errgo.Mask(err)
 	}
 	defer client.Close()
 
-	return writeEnvironment(c.localName, c.password, func() (*params.EnvironmentResponse, error) {
+	return writeEnvironment(c.localName, func() (*params.EnvironmentResponse, error) {
 		resp, err := client.GetEnvironment(&params.GetEnvironment{
 			EntityPath: c.envPath.EntityPath,
 		})

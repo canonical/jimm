@@ -103,7 +103,7 @@ func (c *createCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Notef(err, "cannot generate password")
 	}
-	return writeEnvironment(c.localName, password, func() (*params.EnvironmentResponse, error) {
+	return writeEnvironment(c.localName, func() (*params.EnvironmentResponse, error) {
 		return client.NewEnvironment(&params.NewEnvironment{
 			User: c.envPath.User,
 			Info: params.NewEnvironmentInfo{

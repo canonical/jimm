@@ -61,8 +61,8 @@ var addServerErrorTests = []struct {
 	expectCode:   2,
 }, {
 	about:        "invalid name checked by server",
-	args:         []string{"bad+name/foo"},
-	expectStderr: `cannot add state server: cannot unmarshal parameters: cannot unmarshal into field: invalid user name "bad\+name"`,
+	args:         []string{"bad!name/foo"},
+	expectStderr: `cannot add state server: PUT http://.*/v1/server/bad%21name/foo: cannot unmarshal parameters: cannot unmarshal into field: invalid user name "bad\!name"`,
 	expectCode:   1,
 }}
 
