@@ -66,6 +66,7 @@ func New() cmd.Command {
 		},
 	})
 	supercmd.Register(&addServerCommand{})
+	supercmd.Register(&changePermCommand{})
 	supercmd.Register(&createCommand{})
 	supercmd.Register(&getCommand{})
 
@@ -186,8 +187,12 @@ func (v *entityPathValue) Set(p string) error {
 	if len(parts) != 2 {
 		return errgo.Newf("invalid JEM name %q (needs to be <user>/<name>)", p)
 	}
-	v.User = params.User(parts[0])
-	v.Name = params.Name(parts[1])
+	if err := v.User.UnmarshalText([]byte(parts[0])); err != nil {
+		return errgo.Notef(err, "invalid path")
+	}
+	if err := v.Name.UnmarshalText([]byte(parts[1])); err != nil {
+		return errgo.Notef(err, "invalid path")
+	}
 	return nil
 }
 

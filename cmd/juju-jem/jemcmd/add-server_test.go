@@ -62,8 +62,8 @@ var addServerErrorTests = []struct {
 }, {
 	about:        "invalid name checked by server",
 	args:         []string{"bad!name/foo"},
-	expectStderr: `cannot add state server: PUT http://.*/v1/server/bad%21name/foo: cannot unmarshal parameters: cannot unmarshal into field: invalid user name "bad\!name"`,
-	expectCode:   1,
+	expectStderr: `invalid path: invalid user name "bad!name"`,
+	expectCode:   2,
 }}
 
 func (s *addServerSuite) TestAddServerError(c *gc.C) {
