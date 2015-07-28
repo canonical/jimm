@@ -336,6 +336,7 @@ func (h *Handler) setPerm(coll *mgo.Collection, path params.EntityPath, acl para
 	if err := h.checkIsUser(path.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
+	logger.Infof("set perm %s %s to %#v", coll.Name, path, acl)
 	if err := coll.UpdateId(path.String(), bson.D{{"$set", bson.D{{"acl", acl}}}}); err != nil {
 		if err == mgo.ErrNotFound {
 			return params.ErrNotFound

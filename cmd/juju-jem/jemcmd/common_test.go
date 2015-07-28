@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/juju/cmd"
@@ -49,10 +50,17 @@ type commonSuite struct {
 	jemSrv  jem.HandleCloser
 	idmSrv  *idmtest.Server
 	httpSrv *httptest.Server
+
+	cookieFile string
 }
 
 func (s *commonSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
+
+	s.cookieFile = filepath.Join(c.MkDir(), "cookies")
+	s.PatchEnvironment("JUJU_COOKIEFILE", s.cookieFile)
+	s.PatchEnvironment("JUJU_LOGGING_CONFIG", "<root>=DEBUG")
+
 	s.idmSrv = idmtest.NewServer()
 	s.jemSrv = s.newServer(c, s.Session, s.idmSrv)
 	s.httpSrv = httptest.NewServer(s.jemSrv)
@@ -64,6 +72,7 @@ func (s *commonSuite) SetUpTest(c *gc.C) {
 	featureflag.SetFlagsFromEnvironment("JUJU_DEV_FEATURE_FLAGS")
 
 	os.Setenv("JUJU_JEM", s.httpSrv.URL)
+
 }
 
 // jemClient returns a new JEM client that will act as the given user.
@@ -94,6 +103,11 @@ func (s *commonSuite) newServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.S
 	srv, err := jem.NewServer(config)
 	c.Assert(err, gc.IsNil)
 	return srv
+}
+
+func (s *commonSuite) clearCookies(c *gc.C) {
+	err := os.Remove(s.cookieFile)
+	c.Assert(err, gc.IsNil)
 }
 
 const fakeSSHKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCcEHVJtQyjN0eaNMAQIwhwknKj+8uZCqmzeA6EfnUEsrOHisoKjRVzb3bIRVgbK3SJ2/1yHPpL2WYynt3LtToKgp0Xo7LCsspL2cmUIWNYCbcgNOsT5rFeDsIDr9yQito8A3y31Mf7Ka7Rc0EHtCW4zC5yl/WZjgmMmw930+V1rDa5GjkqivftHE5AvLyRGvZJPOLH8IoO+sl02NjZ7dRhniBO9O5UIwxSkuGA5wvfLV7dyT/LH56gex7C2fkeBkZ7YGqTdssTX6DvFTHjEbBAsdWd8/rqXWtB6Xdi8sb3+aMpg9DRomZfb69Y+JuqWTUaq+q30qG2CTiqFRbgwRpp bob@somewhere"
