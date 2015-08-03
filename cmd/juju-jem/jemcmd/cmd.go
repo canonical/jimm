@@ -69,6 +69,8 @@ func New() cmd.Command {
 	supercmd.Register(&changePermCommand{})
 	supercmd.Register(&createCommand{})
 	supercmd.Register(&getCommand{})
+	supercmd.Register(&listCommand{})
+	supercmd.Register(&listServersCommand{})
 
 	return supercmd
 }

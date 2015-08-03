@@ -165,7 +165,7 @@ func (h *Handler) ListEnvironments(arg *params.ListEnvironments) (*params.ListEn
 		return nil, errgo.Notef(err, "cannot get state servers")
 	}
 	envs := make([]params.EnvironmentResponse, 0, len(servers))
-	iter = h.jem.DB.Environments().Find(nil).Iter()
+	iter = h.jem.DB.Environments().Find(nil).Sort("_id").Iter()
 	var env mongodoc.Environment
 	for iter.Next(&env) {
 		ok, err := h.jem.PermChecker.Allow(h.auth.username, env.ACL.Read)
@@ -207,7 +207,7 @@ func (h *Handler) ListJES(arg *params.ListJES) (*params.ListJESResponse, error) 
 
 	// TODO populate ProviderType and Template fields when we have a cache
 	// for the schemaForNewEnv results.
-	iter := h.jem.DB.StateServers().Find(nil).Iter()
+	iter := h.jem.DB.StateServers().Find(nil).Sort("_id").Iter()
 	var srv mongodoc.StateServer
 	for iter.Next(&srv) {
 		ok, err := h.jem.PermChecker.Allow(h.auth.username, srv.ACL.Read)
