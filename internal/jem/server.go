@@ -3,6 +3,7 @@
 package jem
 
 import (
+	"log"
 	"net/http"
 	"net/url"
 
@@ -118,6 +119,7 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 // Close implements io.Closer.Close. It should not be called
 // until all requests on the handler have completed.
 func (srv *Server) Close() error {
+	log.Printf("jem.Server.Close")
 	srv.pool.Close()
 	return nil
 }
