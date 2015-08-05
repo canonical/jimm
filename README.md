@@ -1,6 +1,7 @@
 # Juju Environment Manager
 
-This service provides the ability to manage multiple juju environments.
+This service provides the ability to manage multiple juju environments. It is
+considered a work in progress.
 
 ## Installation
 
