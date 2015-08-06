@@ -119,7 +119,7 @@ func (c *createCommand) Run(ctxt *cmd.Context) error {
 func (c *createCommand) setConfigDefaults(config map[string]interface{}, jesInfo *params.JESResponse) error {
 	// Authorized keys are special because the path is relative
 	// to $HOME/.ssh by default.
-	if _, ok := jesInfo.Template["authorized-keys"]; ok && config["authorized-keys"] == nil {
+	if _, ok := jesInfo.Schema["authorized-keys"]; ok && config["authorized-keys"] == nil {
 		// Load authorized-keys-path into authorized-keys if necessary.
 		path, _ := config["authorized-keys-path"].(string)
 		keys, err := jujuconfig.ReadAuthorizedKeys(path)
@@ -137,7 +137,7 @@ func (c *createCommand) setConfigDefaults(config map[string]interface{}, jesInfo
 			continue
 		}
 		attr := strings.TrimSuffix(pathAttr, "-path")
-		field, ok := jesInfo.Template[attr]
+		field, ok := jesInfo.Schema[attr]
 		if !ok || field.Type != environschema.Tstring {
 			continue
 		}
@@ -155,7 +155,7 @@ func (c *createCommand) setConfigDefaults(config map[string]interface{}, jesInfo
 	}
 
 	// Fill config attributes from appropriate environment variables
-	for name, attr := range jesInfo.Template {
+	for name, attr := range jesInfo.Schema {
 		if config[name] != nil {
 			continue
 		}

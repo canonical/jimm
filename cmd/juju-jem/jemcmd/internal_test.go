@@ -90,7 +90,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		about: "one parameter, no defaults",
 		jesInfo: params.JESResponse{
 			ProviderType: "something",
-			Template: environschema.Fields{
+			Schema: environschema.Fields{
 				"attr": {
 					Type: environschema.Tstring,
 				},
@@ -109,7 +109,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		},
 		jesInfo: params.JESResponse{
 			ProviderType: "something",
-			Template: environschema.Fields{
+			Schema: environschema.Fields{
 				"attr": {
 					Type:   environschema.Tstring,
 					EnvVar: "somevar",
@@ -126,7 +126,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		},
 		jesInfo: params.JESResponse{
 			ProviderType: "something",
-			Template: environschema.Fields{
+			Schema: environschema.Fields{
 				"authorized-keys": {
 					Type: environschema.Tstring,
 				},
@@ -142,7 +142,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		},
 		jesInfo: params.JESResponse{
 			ProviderType: "something",
-			Template: environschema.Fields{
+			Schema: environschema.Fields{
 				"authorized-keys": {
 					Type: environschema.Tstring,
 				},
@@ -161,7 +161,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		},
 		jesInfo: params.JESResponse{
 			ProviderType: "something",
-			Template: environschema.Fields{
+			Schema: environschema.Fields{
 				"authorized-keys": {
 					Type: environschema.Tstring,
 				},
@@ -180,7 +180,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		},
 		jesInfo: params.JESResponse{
 			ProviderType: "something",
-			Template: environschema.Fields{
+			Schema: environschema.Fields{
 				"attr": {
 					Type: environschema.Tstring,
 				},
@@ -199,7 +199,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		},
 		jesInfo: params.JESResponse{
 			ProviderType: "something",
-			Template: environschema.Fields{
+			Schema: environschema.Fields{
 				"attr": {
 					Type: environschema.Tstring,
 				},
@@ -218,7 +218,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		},
 		jesInfo: params.JESResponse{
 			ProviderType: "something",
-			Template: environschema.Fields{
+			Schema: environschema.Fields{
 				"attr": {
 					Type: environschema.Tstring,
 				},
@@ -237,7 +237,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		},
 		jesInfo: params.JESResponse{
 			ProviderType: "something",
-			Template: environschema.Fields{
+			Schema: environschema.Fields{
 				"attr": {
 					Type: environschema.Tstring,
 				},
@@ -251,7 +251,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		about: "attribute from path ignored with non-string template entry",
 		jesInfo: params.JESResponse{
 			ProviderType: "something",
-			Template: environschema.Fields{
+			Schema: environschema.Fields{
 				"attr": {
 					Type: environschema.Tint,
 				},
@@ -267,7 +267,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		about: "provider default",
 		jesInfo: params.JESResponse{
 			ProviderType: "test",
-			Template: environschema.Fields{
+			Schema: environschema.Fields{
 				"testattr": {
 					Type: environschema.Tstring,
 				},
@@ -280,7 +280,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		about: "provider default error",
 		jesInfo: params.JESResponse{
 			ProviderType: "test",
-			Template: environschema.Fields{
+			Schema: environschema.Fields{
 				"testattr-error": {
 					Type: environschema.Tstring,
 				},

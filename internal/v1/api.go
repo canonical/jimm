@@ -117,7 +117,7 @@ func (h *Handler) GetJES(arg *params.GetJES) (*params.JESResponse, error) {
 	return &params.JESResponse{
 		Path:         arg.EntityPath,
 		ProviderType: neSchema.providerType,
-		Template:     neSchema.schema,
+		Schema:       neSchema.schema,
 	}, nil
 }
 
@@ -313,6 +313,37 @@ func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.Environme
 		CACert:     conn.Info.CACert,
 		HostPorts:  conn.Info.Addrs,
 	}, nil
+}
+
+var errNotImplemented = errgo.New("not implemented yet")
+
+// AddTemplate adds a new template.
+func (h *Handler) AddTemplate(arg *params.AddTemplate) error {
+	return errNotImplemented
+}
+
+// GetTemplate returns information on a single template.
+func (h *Handler) GetTemplate(arg *params.GetTemplate) (*params.TemplateResponse, error) {
+	return nil, errNotImplemented
+}
+
+// ListTemplates returns information on all accessible templates.
+func (h *Handler) ListTemplates(arg *params.ListTemplates) (*params.ListTemplatesResponse, error) {
+	return nil, errNotImplemented
+}
+
+// GetTemplatePerm returns the ACL for a given template.
+// Only the owner (arg.EntityPath.User) can read the ACL.
+func (h *Handler) GetTemplatePerm(arg *params.GetTemplatePerm) (*params.ACL, error) {
+	return nil, errNotImplemented
+}
+
+// SetTemplatePerm sets the permissions on a template entity.
+// Only the owner (arg.EntityPath.User) can change the permissions
+// on an an entity. The owner can always read an entity, even
+// if it has an empty ACL.
+func (h *Handler) SetTemplatePerm(arg *params.SetTemplatePerm) error {
+	return errNotImplemented
 }
 
 // SetStateServerPerm sets the permissions on a state server entity.

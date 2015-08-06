@@ -39,6 +39,21 @@ type GetEnvironmentPerm struct {
 	EntityPath
 }
 
+// SetTemplatePerm holds the parameters for setting the ACL
+// on a template.
+type SetTemplatePerm struct {
+	httprequest.Route `httprequest:"PUT /v1/template/:User/:Name/perm"`
+	EntityPath
+	ACL ACL `httprequest:",body"`
+}
+
+// GetTemplatePerm holds the parameters for getting the ACL
+// on a template.
+type GetTemplatePerm struct {
+	httprequest.Route `httprequest:"GET /v1/template/:User/:Name/perm"`
+	EntityPath
+}
+
 // ACL holds an access control list for an entity.
 type ACL struct {
 	Read []string
@@ -144,8 +159,7 @@ type ListEnvironmentsResponse struct {
 	Environments []EnvironmentResponse `json:"environments"`
 }
 
-// ListJES holds parameters for listing all
-// current state servers.
+// ListJES holds parameters for listing all current state servers.
 type ListJES struct {
 	httprequest.Route `httprequest:"GET /v1/server"`
 
@@ -160,6 +174,36 @@ type ListJESResponse struct {
 	StateServers []JESResponse `json:"state-servers"`
 }
 
+// ListTemplate holds parameters for listing all current templates.
+type ListTemplates struct {
+	httprequest.Route `httprequest:"GET /v1/template"`
+
+	// TODO add parameters for restricting results.
+}
+
+// ListTemplatesResponse holds a list of templates as returned
+// by ListTemplates.
+type ListTemplatesResponse struct {
+	Templates []TemplateResponse `json:"templates"`
+}
+
+// TemplateResponse holds information on a template
+type TemplateResponse struct {
+	// Schema holds the state server schema that was used
+	// to create the template.
+	Schema environschema.Fields `json:"schema"`
+
+	// Config holds the template's attributes, with all secret attributes
+	// replaced with their zero value.
+	Config map[string]interface{} `json:"config"`
+}
+
+// GetTemplate holds parameters for retrieving information on a template.
+type GetTemplate struct {
+	httprequest.Route `httprequest:"GET /v1/template/:User/:Name"`
+	EntityPath
+}
+
 // JESResponse holds information on a given JES.
 // Each JES is also associated with an environment
 // at /v1/env/:User/:Name where User and Name
@@ -172,9 +216,9 @@ type JESResponse struct {
 	// by the JES.
 	ProviderType string `json:"provider-type,omitempty"`
 
-	// Template holds the fields required to start
+	// Schema holds the fields required to start
 	// a new environment using the JES.
-	Template environschema.Fields `json:"template,omitempty"`
+	Schema environschema.Fields `json:"schema,omitempty"`
 }
 
 // GetJES holds parameters for retrieving information on a JES.
@@ -203,7 +247,15 @@ type NewEnvironmentInfo struct {
 	// TODO use attributes to automatically work out which state server to use.
 	StateServer EntityPath `json:"state-server"`
 
+	// TemplatePaths optionally holds a sequence of templates to use
+	// to create the base configuration entry on top of which Config is applied.
+	// Each path must refer to an entry in /template, and overrides attributes in the one before it,
+	// followed finally by Config itself. The resulting configuration
+	// is checked for compatibility with the schema of the above state server.
+	TemplatePaths []EntityPath `json:"templates,omitempty"`
+
 	// Config holds the configuration attributes to use to create the new environment.
+	// It is applied on top of the above templates.
 	Config map[string]interface{} `json:"config"`
 }
 
@@ -237,4 +289,25 @@ type EnvironmentResponse struct {
 	// HostPorts holds host/port pairs (in host:port form)
 	// of the state server API endpoints.
 	HostPorts []string `json:"host-ports"`
+}
+
+// AddTemplate holds parameters for adding a template.
+type AddTemplate struct {
+	httprequest.Route `httprequest:"PUT /v1/template/:User/:Name"`
+	EntityPath
+
+	Info AddTemplateInfo `httprequest:",body"`
+}
+
+// AddTemplateInfo holds information on a template to
+// be added.
+type AddTemplateInfo struct {
+	// StateServer holds the name of a state server to use
+	// as the base schema for the template. The Config attributes
+	// below will be checked against the schema of this state
+	// server.
+	StateServer EntityPath `json:"state-server"`
+
+	// Config holds the template's configuration attributes.
+	Config map[string]interface{} `json:"config"`
 }

@@ -429,12 +429,12 @@ func (s *APISuite) TestGetStateServer(c *gc.C) {
 	err := json.Unmarshal(resp.Body.Bytes(), &jesInfo)
 	c.Assert(err, gc.IsNil, gc.Commentf("body: %s", resp.Body.String()))
 	c.Assert(jesInfo.ProviderType, gc.Equals, "dummy")
-	c.Assert(jesInfo.Template, gc.Not(gc.HasLen), 0)
+	c.Assert(jesInfo.Schema, gc.Not(gc.HasLen), 0)
 	// Check that all path attributes have been removed.
-	for name := range jesInfo.Template {
+	for name := range jesInfo.Schema {
 		c.Assert(strings.HasSuffix(name, "-path"), gc.Equals, false)
 	}
-	c.Logf("%#v", jesInfo.Template)
+	c.Logf("%#v", jesInfo.Schema)
 }
 
 func (s *APISuite) TestGetStateServerNotFound(c *gc.C) {
