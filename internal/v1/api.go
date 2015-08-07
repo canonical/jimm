@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"reflect"
 	"strings"
 
 	"github.com/juju/httprequest"
@@ -205,7 +206,7 @@ func (h *Handler) ListEnvironments(arg *params.ListEnvironments) (*params.ListEn
 func (h *Handler) ListJES(arg *params.ListJES) (*params.ListJESResponse, error) {
 	var srvs []params.JESResponse
 
-	// TODO populate ProviderType and Template fields when we have a cache
+	// TODO populate ProviderType and Schema fields when we have a cache
 	// for the schemaForNewEnv results.
 	iter := h.jem.DB.StateServers().Find(nil).Sort("_id").Iter()
 	var srv mongodoc.StateServer
@@ -319,12 +320,63 @@ var errNotImplemented = errgo.New("not implemented yet")
 
 // AddTemplate adds a new template.
 func (h *Handler) AddTemplate(arg *params.AddTemplate) error {
-	return errNotImplemented
+	neSchema, err := h.schemaForNewEnv(arg.Info.StateServer)
+	if err != nil {
+		return errgo.Notef(err, "cannot get schema for state server")
+	}
+
+	fields, defaults, err := neSchema.schema.ValidationSchema()
+	if err != nil {
+		return errgo.Notef(err, "cannot create validation schema for provider %s", neSchema.providerType)
+	}
+	// Delete all fields and defaults that are not in the
+	// provided configuration attributes, so that we can
+	// check only the provided fields for compatibility
+	// without worrying about other mandatory fields.
+	for name := range fields {
+		if _, ok := arg.Info.Config[name]; !ok {
+			delete(fields, name)
+		}
+	}
+	for name := range defaults {
+		if _, ok := arg.Info.Config[name]; !ok {
+			delete(defaults, name)
+		}
+	}
+	result, err := schema.StrictFieldMap(fields, defaults).Coerce(arg.Info.Config, nil)
+	if err != nil {
+		return badRequestf(err, "configuration not compatible with schema")
+	}
+	if err := h.jem.AddTemplate(&mongodoc.Template{
+		Path:   arg.EntityPath,
+		Schema: neSchema.schema,
+		Config: result.(map[string]interface{}),
+	}); err != nil {
+		return errgo.Notef(err, "cannot add template")
+	}
+	return nil
 }
 
 // GetTemplate returns information on a single template.
 func (h *Handler) GetTemplate(arg *params.GetTemplate) (*params.TemplateResponse, error) {
-	return nil, errNotImplemented
+	tmpl, err := h.jem.Template(arg.EntityPath)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	// Zero all secret fields.
+	for name, attr := range tmpl.Config {
+		if tmpl.Schema[name].Secret {
+			tmpl.Config[name] = zeroValueOf(attr)
+		}
+	}
+	return &params.TemplateResponse{
+		Schema: tmpl.Schema,
+		Config: tmpl.Config,
+	}, nil
+}
+
+func zeroValueOf(x interface{}) interface{} {
+	return reflect.Zero(reflect.TypeOf(x)).Interface()
 }
 
 // ListTemplates returns information on all accessible templates.
@@ -340,7 +392,7 @@ func (h *Handler) GetTemplatePerm(arg *params.GetTemplatePerm) (*params.ACL, err
 
 // SetTemplatePerm sets the permissions on a template entity.
 // Only the owner (arg.EntityPath.User) can change the permissions
-// on an an entity. The owner can always read an entity, even
+// on an entity. The owner can always read an entity, even
 // if it has an empty ACL.
 func (h *Handler) SetTemplatePerm(arg *params.SetTemplatePerm) error {
 	return errNotImplemented
@@ -349,7 +401,7 @@ func (h *Handler) SetTemplatePerm(arg *params.SetTemplatePerm) error {
 // SetStateServerPerm sets the permissions on a state server entity.
 // Only the owner (arg.EntityPath.User) can change the permissions
 // on an an entity. The owner can always read an entity, even
-// if it has an empty ACL.
+// if it has empty ACL.
 func (h *Handler) SetStateServerPerm(arg *params.SetStateServerPerm) error {
 	return h.setPerm(h.jem.DB.StateServers(), arg.EntityPath, arg.ACL)
 }
@@ -357,7 +409,7 @@ func (h *Handler) SetStateServerPerm(arg *params.SetStateServerPerm) error {
 // SetEnvironmentPerm sets the permissions on a state server entity.
 // Only the owner (arg.EntityPath.User) can change the permissions
 // on an an entity. The owner can always read an entity, even
-// if it has an empty ACL.
+// if it has empty ACL.
 func (h *Handler) SetEnvironmentPerm(arg *params.SetEnvironmentPerm) error {
 	return h.setPerm(h.jem.DB.Environments(), arg.EntityPath, arg.ACL)
 }

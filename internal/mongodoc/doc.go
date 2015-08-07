@@ -2,6 +2,7 @@ package mongodoc
 
 import (
 	"github.com/CanonicalLtd/jem/params"
+	"gopkg.in/juju/environschema.v1"
 )
 
 // StateServer holds information on a given state server.
@@ -55,6 +56,26 @@ type Environment struct {
 	// StateServer holds the path of the environment's
 	// state server.
 	StateServer params.EntityPath
+}
+
+type Template struct {
+	// Id holds the primary key for a template.
+	// It holds Path.String().
+	Id string `bson:"_id"`
+
+	// EntityPath holds the local user and name given to the
+	// template, denormalized from Id for convenience
+	// and ease of indexing. Its string value is used as the Id value.
+	Path params.EntityPath
+
+	// ACL holds permissions for the environment.
+	ACL ACL
+
+	// Schema holds the schema used to create the template.
+	Schema environschema.Fields
+
+	// Config holds the configuration attributes associated with template.
+	Config map[string]interface{}
 }
 
 // ACL holds lists of users and groups that are
