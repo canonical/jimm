@@ -506,6 +506,85 @@ func (s *APISuite) TestNewEnvironment(c *gc.C) {
 	st.Close()
 }
 
+func (s *APISuite) TestNewEnvironmentWithTemplates(c *gc.C) {
+	srvId := s.addStateServer(c, params.EntityPath{"bob", "foo"})
+
+	// TODO change "admin-secret" to "secret" when we can
+	// make the "secret" configuration attribute marked as secret
+	// in the schema.
+	err := s.client("bob").AddTemplate(&params.AddTemplate{
+		EntityPath: params.EntityPath{"bob", "creds"},
+		Info: params.AddTemplateInfo{
+			StateServer: srvId,
+			Config: map[string]interface{}{
+				"secret":          "my secret",
+				"authorized-keys": sshKey,
+				"state-server":    false,
+			},
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	err = s.client("alice").AddTemplate(&params.AddTemplate{
+		EntityPath: params.EntityPath{"alice", "other"},
+		Info: params.AddTemplateInfo{
+			StateServer: srvId,
+			Config: map[string]interface{}{
+				"state-server": true,
+			},
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	envPath := params.EntityPath{"bob", "env"}
+	resp, err := s.client("bob").NewEnvironment(&params.NewEnvironment{
+		User: envPath.User,
+		Info: params.NewEnvironmentInfo{
+			Name:        envPath.Name,
+			StateServer: srvId,
+			Config: map[string]interface{}{
+				"secret": "another secret",
+			},
+			Password:      "user secret",
+			TemplatePaths: []params.EntityPath{{"bob", "creds"}, {"alice", "other"}},
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Check that the environment was actually created with the right
+	// configuration.
+	env, err := s.State.GetEnvironment(names.NewEnvironTag(resp.UUID))
+	c.Assert(err, gc.IsNil)
+	cfg, err := env.Config()
+	c.Assert(err, gc.IsNil)
+	attrs := cfg.AllAttrs()
+	c.Assert(attrs["state-server"], gc.Equals, true)
+	c.Assert(attrs["secret"], gc.Equals, "another secret")
+	c.Assert(attrs["authorized-keys"], gc.Equals, sshKey)
+
+	st := openAPIFromEnvironmentResponse(c, resp)
+	st.Close()
+}
+
+func (s *APISuite) TestNewEnvironmentWithTemplateNotFound(c *gc.C) {
+	srvId := s.addStateServer(c, params.EntityPath{"bob", "foo"})
+
+	resp, err := s.client("bob").NewEnvironment(&params.NewEnvironment{
+		User: "bob",
+		Info: params.NewEnvironmentInfo{
+			Name:        "x",
+			StateServer: srvId,
+			Config: map[string]interface{}{
+				"secret": "another secret",
+			},
+			Password:      "user secret",
+			TemplatePaths: []params.EntityPath{{"bob", "creds"}},
+		},
+	})
+	c.Assert(err, gc.ErrorMatches, `POST .*/v1/env/bob: cannot get template "bob/creds": template "bob/creds" not found`)
+	c.Assert(resp, gc.IsNil)
+}
+
 func openAPIFromEnvironmentResponse(c *gc.C, resp *params.EnvironmentResponse) *api.State {
 	// Ensure that we can connect to the new environment
 	apiInfo := &api.Info{
