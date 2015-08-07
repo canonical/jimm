@@ -19,7 +19,7 @@ type StateServer struct {
 	Path params.EntityPath
 
 	// ACL holds permissions for the server.
-	ACL ACL
+	ACL params.ACL
 
 	// CACert holds the CA certificate of the server.
 	CACert string
@@ -28,6 +28,14 @@ type StateServer struct {
 	// of host-port addresses for the API servers,
 	// with the most-recently-dialed address at the start.
 	HostPorts []string
+}
+
+func (s *StateServer) Owner() params.User {
+	return s.Path.User
+}
+
+func (s *StateServer) GetACL() params.ACL {
+	return s.ACL
 }
 
 type Environment struct {
@@ -41,7 +49,7 @@ type Environment struct {
 	Path params.EntityPath
 
 	// ACL holds permissions for the environment.
-	ACL ACL
+	ACL params.ACL
 
 	// UUID holds the UUID of the environment.
 	UUID string
@@ -58,6 +66,14 @@ type Environment struct {
 	StateServer params.EntityPath
 }
 
+func (e *Environment) Owner() params.User {
+	return e.Path.User
+}
+
+func (e *Environment) GetACL() params.ACL {
+	return e.ACL
+}
+
 type Template struct {
 	// Id holds the primary key for a template.
 	// It holds Path.String().
@@ -69,7 +85,7 @@ type Template struct {
 	Path params.EntityPath
 
 	// ACL holds permissions for the environment.
-	ACL ACL
+	ACL params.ACL
 
 	// Schema holds the schema used to create the template.
 	Schema environschema.Fields
@@ -78,10 +94,10 @@ type Template struct {
 	Config map[string]interface{}
 }
 
-// ACL holds lists of users and groups that are
-// allowed to perform specific actions.
-type ACL struct {
-	// Read holds users and groups that are allowed to read the
-	// entity.
-	Read []string `bson:",omitempty"`
+func (t *Template) Owner() params.User {
+	return t.Path.User
+}
+
+func (t *Template) GetACL() params.ACL {
+	return t.ACL
 }

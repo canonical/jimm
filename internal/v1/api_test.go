@@ -121,16 +121,30 @@ var unauthorizedTests = []struct {
 		StateServer: params.EntityPath{"bob", "private"},
 	},
 }, {
+	about:  "new template as non-owner",
+	asUser: "other",
+	method: "PUT",
+	path:   "/v1/template/bob/something",
+	body: params.AddTemplateInfo{
+		StateServer: params.EntityPath{"bob", "open"},
+	},
+}, {
 	about:  "set server perm as non-owner",
 	asUser: "other",
 	method: "PUT",
-	path:   "/v1/server/bob/private/perm",
+	path:   "/v1/server/bob/open/perm",
 	body:   params.ACL{},
 }, {
 	about:  "set env perm as non-owner",
 	asUser: "other",
 	method: "PUT",
-	path:   "/v1/env/bob/private/perm",
+	path:   "/v1/env/bob/open/perm",
+	body:   params.ACL{},
+}, {
+	about:  "set template perm as non-owner",
+	asUser: "other",
+	method: "PUT",
+	path:   "/v1/template/bob/open/perm",
 	body:   params.ACL{},
 }, {
 	about:  "get server perm as non-owner",
@@ -143,6 +157,11 @@ var unauthorizedTests = []struct {
 	method: "GET",
 	path:   "/v1/env/bob/private/perm",
 }, {
+	about:  "get template perm as non-owner",
+	asUser: "other",
+	method: "GET",
+	path:   "/v1/template/bob/private/perm",
+}, {
 	about:  "get server perm with ACL that allows us",
 	asUser: "other",
 	method: "GET",
@@ -152,14 +171,22 @@ var unauthorizedTests = []struct {
 	asUser: "other",
 	method: "GET",
 	path:   "/v1/env/bob/open/perm",
+}, {
+	about:  "get template perm with ACL that allows us",
+	asUser: "other",
+	method: "GET",
+	path:   "/v1/template/bob/open/perm",
 }}
 
 func (s *APISuite) TestUnauthorized(c *gc.C) {
 	s.addStateServer(c, params.EntityPath{"bob", "private"})
+	srvId := s.addStateServer(c, params.EntityPath{"bob", "open"})
+	s.addTemplate(c, params.EntityPath{"bob", "open"}, srvId, dummyEnvConfig)
+	s.addTemplate(c, params.EntityPath{"bob", "private"}, srvId, dummyEnvConfig)
 
-	s.addStateServer(c, params.EntityPath{"bob", "open"})
 	s.allowServerAllPerm(c, params.EntityPath{"bob", "open"})
 	s.allowEnvAllPerm(c, params.EntityPath{"bob", "open"})
+	s.allowTemplateAllPerm(c, params.EntityPath{"bob", "private"})
 
 	for i, test := range unauthorizedTests {
 		c.Logf("test %d: %s", i, test.about)
@@ -512,29 +539,14 @@ func (s *APISuite) TestNewEnvironmentWithTemplates(c *gc.C) {
 	// TODO change "admin-secret" to "secret" when we can
 	// make the "secret" configuration attribute marked as secret
 	// in the schema.
-	err := s.client("bob").AddTemplate(&params.AddTemplate{
-		EntityPath: params.EntityPath{"bob", "creds"},
-		Info: params.AddTemplateInfo{
-			StateServer: srvId,
-			Config: map[string]interface{}{
-				"secret":          "my secret",
-				"authorized-keys": sshKey,
-				"state-server":    false,
-			},
-		},
+	s.addTemplate(c, params.EntityPath{"bob", "creds"}, srvId, map[string]interface{}{
+		"secret":          "my secret",
+		"authorized-keys": sshKey,
+		"state-server":    false,
 	})
-	c.Assert(err, gc.IsNil)
-
-	err = s.client("alice").AddTemplate(&params.AddTemplate{
-		EntityPath: params.EntityPath{"alice", "other"},
-		Info: params.AddTemplateInfo{
-			StateServer: srvId,
-			Config: map[string]interface{}{
-				"state-server": true,
-			},
-		},
+	s.addTemplate(c, params.EntityPath{"bob", "other"}, srvId, map[string]interface{}{
+		"state-server": true,
 	})
-	c.Assert(err, gc.IsNil)
 
 	envPath := params.EntityPath{"bob", "env"}
 	resp, err := s.client("bob").NewEnvironment(&params.NewEnvironment{
@@ -546,7 +558,7 @@ func (s *APISuite) TestNewEnvironmentWithTemplates(c *gc.C) {
 				"secret": "another secret",
 			},
 			Password:      "user secret",
-			TemplatePaths: []params.EntityPath{{"bob", "creds"}, {"alice", "other"}},
+			TemplatePaths: []params.EntityPath{{"bob", "creds"}, {"bob", "other"}},
 		},
 	})
 	c.Assert(err, gc.IsNil)
@@ -943,12 +955,22 @@ func (s *APISuite) allowEnvAllPerm(c *gc.C, path params.EntityPath) {
 	c.Assert(err, gc.IsNil)
 }
 
+func (s *APISuite) allowTemplateAllPerm(c *gc.C, path params.EntityPath) {
+	err := s.client(path.User).SetTemplatePerm(&params.SetTemplatePerm{
+		EntityPath: path,
+		ACL: params.ACL{
+			Read: []string{"everyone"},
+		},
+	})
+	c.Assert(err, gc.IsNil)
+}
+
 func (s *APISuite) TestListEnvironments(c *gc.C) {
 	srvId := s.addStateServer(c, params.EntityPath{"alice", "foo"})
 	s.allowEnvAllPerm(c, srvId)
 	s.allowServerAllPerm(c, srvId)
-	envId1, user1, uuid1 := s.addEnvironment(c, srvId, params.EntityPath{"bob", "bar"})
-	envId2, user2, uuid2 := s.addEnvironment(c, srvId, params.EntityPath{"charlie", "bar"})
+	envId1, user1, uuid1 := s.addEnvironment(c, params.EntityPath{"bob", "bar"}, srvId)
+	envId2, user2, uuid2 := s.addEnvironment(c, params.EntityPath{"charlie", "bar"}, srvId)
 	info := s.APIInfo(c)
 
 	resps := []params.EnvironmentResponse{{
@@ -1011,7 +1033,7 @@ func (s *APISuite) TestGetSetStateServerPerm(c *gc.C) {
 		EntityPath: srvId,
 	})
 	c.Assert(err, gc.IsNil)
-	c.Assert(acl, gc.DeepEquals, params.ACL{})
+	c.Assert(acl, jc.DeepEquals, params.ACL{})
 
 	err = s.client("alice").SetStateServerPerm(&params.SetStateServerPerm{
 		EntityPath: srvId,
@@ -1036,7 +1058,7 @@ func (s *APISuite) TestGetSetEnvironmentPerm(c *gc.C) {
 		EntityPath: srvId,
 	})
 	c.Assert(err, gc.IsNil)
-	c.Assert(acl, gc.DeepEquals, params.ACL{})
+	c.Assert(acl, jc.DeepEquals, params.ACL{})
 
 	err = s.client("alice").SetEnvironmentPerm(&params.SetEnvironmentPerm{
 		EntityPath: srvId,
@@ -1223,7 +1245,7 @@ func (s *APISuite) addStateServer(c *gc.C, srvPath params.EntityPath) params.Ent
 
 // addEnvironment adds a new environment in the given state server. It
 // returns the environment id.
-func (s *APISuite) addEnvironment(c *gc.C, srvPath, envPath params.EntityPath) (path params.EntityPath, user, uuid string) {
+func (s *APISuite) addEnvironment(c *gc.C, envPath, srvPath params.EntityPath) (path params.EntityPath, user, uuid string) {
 	// Note that because the cookies acquired in this request don't
 	// persist, the discharge macaroon we get won't affect subsequent
 	// requests in the caller.
@@ -1240,6 +1262,17 @@ func (s *APISuite) addEnvironment(c *gc.C, srvPath, envPath params.EntityPath) (
 	})
 	c.Assert(err, gc.IsNil)
 	return resp.Path, resp.User, resp.UUID
+}
+
+func (s *APISuite) addTemplate(c *gc.C, tmplPath, srvPath params.EntityPath, cfg map[string]interface{}) {
+	err := s.client(tmplPath.User).AddTemplate(&params.AddTemplate{
+		EntityPath: tmplPath,
+		Info: params.AddTemplateInfo{
+			StateServer: srvPath,
+			Config:      cfg,
+		},
+	})
+	c.Assert(err, gc.IsNil)
 }
 
 func bakeryDo(client *httpbakery.Client) func(*http.Request) (*http.Response, error) {

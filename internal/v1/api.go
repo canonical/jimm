@@ -166,18 +166,9 @@ func (h *Handler) ListEnvironments(arg *params.ListEnvironments) (*params.ListEn
 		return nil, errgo.Notef(err, "cannot get state servers")
 	}
 	envs := make([]params.EnvironmentResponse, 0, len(servers))
-	iter = h.jem.DB.Environments().Find(nil).Sort("_id").Iter()
+	envIter := h.listIter(h.jem.DB.Environments().Find(nil).Sort("_id").Iter())
 	var env mongodoc.Environment
-	for iter.Next(&env) {
-		ok, err := h.jem.PermChecker.Allow(h.auth.username, env.ACL.Read)
-		if err != nil {
-			return nil, errgo.Notef(err, "cannot check permissions")
-		}
-		if !ok && h.checkIsUser(env.Path.User) != nil {
-			// No permissions to look at the environment, so don't include
-			// it in the results.
-			continue
-		}
+	for envIter.Next(&env) {
 		srv, ok := servers[env.StateServer]
 		if !ok {
 			logger.Errorf("environment %s has invalid state server value %s; omitting from result", env.Path, env.StateServer)
@@ -208,18 +199,9 @@ func (h *Handler) ListJES(arg *params.ListJES) (*params.ListJESResponse, error) 
 
 	// TODO populate ProviderType and Schema fields when we have a cache
 	// for the schemaForNewEnv results.
-	iter := h.jem.DB.StateServers().Find(nil).Sort("_id").Iter()
+	iter := h.listIter(h.jem.DB.StateServers().Find(nil).Sort("_id").Iter())
 	var srv mongodoc.StateServer
 	for iter.Next(&srv) {
-		ok, err := h.jem.PermChecker.Allow(h.auth.username, srv.ACL.Read)
-		if err != nil {
-			return nil, errgo.Notef(err, "cannot check permissions")
-		}
-		if !ok && h.checkIsUser(srv.Path.User) != nil {
-			// No permissions to look at the state server, so don't include
-			// it in the results.
-			continue
-		}
 		srvs = append(srvs, params.JESResponse{
 			Path: srv.Path,
 		})
@@ -242,6 +224,9 @@ func (h *Handler) configWithTemplates(config map[string]interface{}, paths []par
 		tmpl, err := h.jem.Template(path)
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot get template %q", path)
+		}
+		if err := h.checkCanRead(tmpl); err != nil {
+			return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 		}
 		for name, val := range tmpl.Config {
 			result[name] = val
@@ -345,6 +330,9 @@ var errNotImplemented = errgo.New("not implemented yet")
 
 // AddTemplate adds a new template.
 func (h *Handler) AddTemplate(arg *params.AddTemplate) error {
+	if err := h.checkIsUser(arg.User); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
 	neSchema, err := h.schemaForNewEnv(arg.Info.StateServer)
 	if err != nil {
 		return errgo.Notef(err, "cannot get schema for state server")
@@ -388,6 +376,9 @@ func (h *Handler) GetTemplate(arg *params.GetTemplate) (*params.TemplateResponse
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
+	if err := h.checkCanRead(tmpl); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
 	// Zero all secret fields.
 	for name, attr := range tmpl.Config {
 		if tmpl.Schema[name].Secret {
@@ -411,8 +402,8 @@ func (h *Handler) ListTemplates(arg *params.ListTemplates) (*params.ListTemplate
 
 // GetTemplatePerm returns the ACL for a given template.
 // Only the owner (arg.EntityPath.User) can read the ACL.
-func (h *Handler) GetTemplatePerm(arg *params.GetTemplatePerm) (*params.ACL, error) {
-	return nil, errNotImplemented
+func (h *Handler) GetTemplatePerm(arg *params.GetTemplatePerm) (params.ACL, error) {
+	return h.getPerm(h.jem.DB.Templates(), arg.EntityPath)
 }
 
 // SetTemplatePerm sets the permissions on a template entity.
@@ -420,7 +411,7 @@ func (h *Handler) GetTemplatePerm(arg *params.GetTemplatePerm) (*params.ACL, err
 // on an entity. The owner can always read an entity, even
 // if it has an empty ACL.
 func (h *Handler) SetTemplatePerm(arg *params.SetTemplatePerm) error {
-	return errNotImplemented
+	return h.setPerm(h.jem.DB.Templates(), arg.EntityPath, arg.ACL)
 }
 
 // SetStateServerPerm sets the permissions on a state server entity.
@@ -596,42 +587,4 @@ func collapseHostPorts(hpss [][]network.HostPort) []string {
 	hps = network.FilterUnusableHostPorts(hps)
 	hps = network.DropDuplicatedHostPorts(hps)
 	return network.HostPortsToStrings(hps)
-}
-
-// checkReadACL checks that the entity with the given path in the
-// given collection can be read by the currently authenticated user.
-func (h *Handler) checkReadACL(coll *mgo.Collection, path params.EntityPath) error {
-	// The user can always access their own entities.
-	if err := h.checkIsUser(path.User); err == nil {
-		return nil
-	}
-	acl, err := h.getACL(coll, path)
-	if errgo.Cause(err) == params.ErrNotFound {
-		// The document is not found - and we've already checked
-		// that the currently authenticated user cannot speak for
-		// path.User, so return an unauthorized error to stop
-		// people probing for the existence of other people's entities.
-		return params.ErrUnauthorized
-	}
-	ok, err := h.jem.PermChecker.Allow(h.auth.username, acl.Read)
-	if err != nil {
-		return errgo.Notef(err, "cannot check permisssions")
-	}
-	if !ok {
-		return params.ErrUnauthorized
-	}
-	return nil
-}
-
-func (h *Handler) getACL(coll *mgo.Collection, path params.EntityPath) (params.ACL, error) {
-	var doc struct {
-		ACL params.ACL
-	}
-	if err := coll.FindId(path.String()).One(&doc); err != nil {
-		if err == mgo.ErrNotFound {
-			err = params.ErrNotFound
-		}
-		return params.ACL{}, errgo.Mask(err, errgo.Is(mgo.ErrNotFound))
-	}
-	return doc.ACL, nil
 }
