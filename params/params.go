@@ -56,7 +56,9 @@ type GetTemplatePerm struct {
 
 // ACL holds an access control list for an entity.
 type ACL struct {
-	Read []string
+	// Read holds users and groups that are allowed to read the
+	// entity.
+	Read []string `json:"read"`
 }
 
 // AddJES holds the parameters for adding a new state server.
