@@ -232,6 +232,27 @@ func (h *Handler) ListJES(arg *params.ListJES) (*params.ListJESResponse, error) 
 	}, nil
 }
 
+// configWithTemplates returns the given configuration applied
+// along with the given templates.
+// Each template is applied in turn, then the configuration
+// is added on top of that.
+func (h *Handler) configWithTemplates(config map[string]interface{}, paths []params.EntityPath) (map[string]interface{}, error) {
+	result := make(map[string]interface{})
+	for _, path := range paths {
+		tmpl, err := h.jem.Template(path)
+		if err != nil {
+			return nil, errgo.Notef(err, "cannot get template %q", path)
+		}
+		for name, val := range tmpl.Config {
+			result[name] = val
+		}
+	}
+	for name, val := range config {
+		result[name] = val
+	}
+	return result, nil
+}
+
 // NewEnvironment creates a new environment inside an existing JES.
 func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.EnvironmentResponse, error) {
 	if err := h.checkIsUser(args.User); err != nil {
@@ -250,9 +271,13 @@ func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.Environme
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
+	config, err := h.configWithTemplates(args.Info.Config, args.Info.TemplatePaths)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
 	// Ensure that the attributes look reasonably OK before bothering
 	// the state server with them.
-	attrs, err := neSchema.checker.Coerce(args.Info.Config, nil)
+	attrs, err := neSchema.checker.Coerce(config, nil)
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "cannot validate attributes")
 	}
@@ -539,6 +564,12 @@ func (h *Handler) schemaForNewEnv(srvPath params.EntityPath) (*schemaForNewEnv, 
 	// JEM environment path, so remove it from
 	// the schema.
 	delete(neSchema.schema, "name")
+	// TODO Delete admin-secret too, because it's never a valid
+	// attribute for the client to provide. We can't do that right
+	// now because it's the only secret attribute in the dummy
+	// provider and we need it to test secret template attributes.
+	// When Juju provides the schema over its API, that API call
+	// should delete it before returning.
 	fields, defaults, err := neSchema.schema.ValidationSchema()
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot create validation schema for provider %s", neSchema.providerType)
