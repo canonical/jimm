@@ -5,9 +5,8 @@
 package jemclient
 
 import (
-	"github.com/juju/httprequest"
-
 	"github.com/CanonicalLtd/jem/params"
+	"github.com/juju/httprequest"
 )
 
 type client struct {
@@ -16,6 +15,11 @@ type client struct {
 
 // AddJES adds a new state server.
 func (c *client) AddJES(p *params.AddJES) error {
+	return c.Client.Call(p, nil)
+}
+
+// AddTemplate adds a new template.
+func (c *client) AddTemplate(p *params.AddTemplate) error {
 	return c.Client.Call(p, nil)
 }
 
@@ -49,6 +53,21 @@ func (c *client) GetStateServerPerm(p *params.GetStateServerPerm) (params.ACL, e
 	return r, err
 }
 
+// GetTemplate returns information on a single template.
+func (c *client) GetTemplate(p *params.GetTemplate) (*params.TemplateResponse, error) {
+	var r *params.TemplateResponse
+	err := c.Client.Call(p, &r)
+	return r, err
+}
+
+// GetTemplatePerm returns the ACL for a given template.
+// Only the owner (arg.EntityPath.User) can read the ACL.
+func (c *client) GetTemplatePerm(p *params.GetTemplatePerm) (*params.ACL, error) {
+	var r *params.ACL
+	err := c.Client.Call(p, &r)
+	return r, err
+}
+
 // ListEnvironments returns all the environments stored in JEM.
 func (c *client) ListEnvironments(p *params.ListEnvironments) (*params.ListEnvironmentsResponse, error) {
 	var r *params.ListEnvironmentsResponse
@@ -65,6 +84,13 @@ func (c *client) ListJES(p *params.ListJES) (*params.ListJESResponse, error) {
 	return r, err
 }
 
+// ListTemplates returns information on all accessible templates.
+func (c *client) ListTemplates(p *params.ListTemplates) (*params.ListTemplatesResponse, error) {
+	var r *params.ListTemplatesResponse
+	err := c.Client.Call(p, &r)
+	return r, err
+}
+
 // NewEnvironment creates a new environment inside an existing JES.
 func (c *client) NewEnvironment(p *params.NewEnvironment) (*params.EnvironmentResponse, error) {
 	var r *params.EnvironmentResponse
@@ -75,7 +101,7 @@ func (c *client) NewEnvironment(p *params.NewEnvironment) (*params.EnvironmentRe
 // SetEnvironmentPerm sets the permissions on a state server entity.
 // Only the owner (arg.EntityPath.User) can change the permissions
 // on an an entity. The owner can always read an entity, even
-// if it has an empty ACL.
+// if it has empty ACL.
 func (c *client) SetEnvironmentPerm(p *params.SetEnvironmentPerm) error {
 	return c.Client.Call(p, nil)
 }
@@ -83,7 +109,15 @@ func (c *client) SetEnvironmentPerm(p *params.SetEnvironmentPerm) error {
 // SetStateServerPerm sets the permissions on a state server entity.
 // Only the owner (arg.EntityPath.User) can change the permissions
 // on an an entity. The owner can always read an entity, even
-// if it has an empty ACL.
+// if it has empty ACL.
 func (c *client) SetStateServerPerm(p *params.SetStateServerPerm) error {
+	return c.Client.Call(p, nil)
+}
+
+// SetTemplatePerm sets the permissions on a template entity.
+// Only the owner (arg.EntityPath.User) can change the permissions
+// on an entity. The owner can always read an entity, even
+// if it has an empty ACL.
+func (c *client) SetTemplatePerm(p *params.SetTemplatePerm) error {
 	return c.Client.Call(p, nil)
 }

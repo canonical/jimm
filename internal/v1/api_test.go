@@ -19,6 +19,7 @@ import (
 	"github.com/juju/testing/httptesting"
 	"github.com/juju/utils/featureflag"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/mgo.v2"
 
@@ -972,6 +973,151 @@ func (s *APISuite) TestGetSetEnvironmentPerm(c *gc.C) {
 	c.Assert(acl, gc.DeepEquals, params.ACL{
 		Read: []string{"a", "b"},
 	})
+}
+
+func (s *APISuite) TestAddTemplate(c *gc.C) {
+	srvId := s.addStateServer(c, params.EntityPath{"alice", "foo"})
+	err := s.client("alice").AddTemplate(&params.AddTemplate{
+		EntityPath: params.EntityPath{"alice", "creds"},
+		Info: params.AddTemplateInfo{
+			StateServer: srvId,
+			Config: map[string]interface{}{
+				"state-server":      true,
+				"admin-secret":      "my secret",
+				"authorized-keys":   sshKey,
+				"bootstrap-timeout": 9999,
+			},
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Check that we can get the template and that its secret fields
+	// are zeroed out. Note that because we round-trip through
+	// JSON, any int fields arrive as float64, but that should be
+	// fine in practice.
+	tmpl, err := s.client("alice").GetTemplate(&params.GetTemplate{
+		EntityPath: params.EntityPath{"alice", "creds"},
+	})
+	c.Assert(err, gc.IsNil)
+	c.Assert(tmpl.Schema, gc.Not(gc.HasLen), 0)
+	c.Assert(tmpl.Config, jc.DeepEquals, map[string]interface{}{
+		"state-server":      true,
+		"admin-secret":      "",
+		"authorized-keys":   sshKey,
+		"bootstrap-timeout": 9999.0,
+	})
+
+	// Check that we can overwrite the template with a new one.
+	err = s.client("alice").AddTemplate(&params.AddTemplate{
+		EntityPath: params.EntityPath{"alice", "creds"},
+		Info: params.AddTemplateInfo{
+			StateServer: srvId,
+			Config: map[string]interface{}{
+				"state-server":      false,
+				"admin-secret":      "another secret",
+				"bootstrap-timeout": 888,
+			},
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	tmpl, err = s.client("alice").GetTemplate(&params.GetTemplate{
+		EntityPath: params.EntityPath{"alice", "creds"},
+	})
+	c.Assert(err, gc.IsNil)
+	c.Assert(tmpl.Schema, gc.Not(gc.HasLen), 0)
+	c.Assert(tmpl.Config, jc.DeepEquals, map[string]interface{}{
+		"state-server":      false,
+		"admin-secret":      "",
+		"bootstrap-timeout": 888.0,
+	})
+
+	// Check that we can write to another template without affecting
+	// the original.
+	err = s.client("alice").AddTemplate(&params.AddTemplate{
+		EntityPath: params.EntityPath{"alice", "differentcreds"},
+		Info: params.AddTemplateInfo{
+			StateServer: srvId,
+			Config: map[string]interface{}{
+				"state-server":      true,
+				"bootstrap-timeout": 111,
+			},
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	tmpl, err = s.client("alice").GetTemplate(&params.GetTemplate{
+		EntityPath: params.EntityPath{"alice", "differentcreds"},
+	})
+	c.Assert(err, gc.IsNil)
+	c.Assert(tmpl.Schema, gc.Not(gc.HasLen), 0)
+	c.Assert(tmpl.Config, jc.DeepEquals, map[string]interface{}{
+		"state-server":      true,
+		"bootstrap-timeout": 111.0,
+	})
+
+	tmpl, err = s.client("alice").GetTemplate(&params.GetTemplate{
+		EntityPath: params.EntityPath{"alice", "creds"},
+	})
+	c.Assert(err, gc.IsNil)
+	c.Assert(tmpl.Schema, gc.Not(gc.HasLen), 0)
+	c.Assert(tmpl.Config, jc.DeepEquals, map[string]interface{}{
+		"state-server":      false,
+		"admin-secret":      "",
+		"bootstrap-timeout": 888.0,
+	})
+}
+
+func (s *APISuite) TestGetTemplateNotFound(c *gc.C) {
+	tmpl, err := s.client("alice").GetTemplate(&params.GetTemplate{
+		EntityPath: params.EntityPath{"alice", "xxx"},
+	})
+	c.Assert(err, gc.ErrorMatches, `GET .*/v1/template/alice/xxx: template "alice/xxx" not found`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+	c.Assert(tmpl, gc.IsNil)
+}
+
+var addInvalidTemplateTests = []struct {
+	about       string
+	config      map[string]interface{}
+	srvId       params.EntityPath
+	expectError string
+}{{
+	about: "unknown key",
+	srvId: params.EntityPath{"alice", "foo"},
+	config: map[string]interface{}{
+		"badkey": 34565,
+	},
+	expectError: `PUT .*/v1/template/alice/creds: configuration not compatible with schema: unknown key "badkey" \(value 34565\)`,
+}, {
+	about: "incompatible type",
+	srvId: params.EntityPath{"alice", "foo"},
+	config: map[string]interface{}{
+		"admin-secret": 34565,
+	},
+	expectError: `PUT .*/v1/template/alice/creds: configuration not compatible with schema: admin-secret: expected string, got float64\(34565\)`,
+}, {
+	about: "unknown server id",
+	srvId: params.EntityPath{"alice", "bar"},
+	config: map[string]interface{}{
+		"admin-secret": 34565,
+	},
+	expectError: `PUT .*/v1/template/alice/creds: cannot get schema for state server: cannot open API: cannot get environment: environment "alice/bar" not found`,
+}}
+
+func (s *APISuite) TestAddInvalidTemplate(c *gc.C) {
+	s.addStateServer(c, params.EntityPath{"alice", "foo"})
+	for i, test := range addInvalidTemplateTests {
+		c.Logf("test %d: %s", i, test.about)
+		err := s.client("alice").AddTemplate(&params.AddTemplate{
+			EntityPath: params.EntityPath{"alice", "creds"},
+			Info: params.AddTemplateInfo{
+				StateServer: test.srvId,
+				Config:      test.config,
+			},
+		})
+		c.Assert(err, gc.ErrorMatches, test.expectError)
+	}
 }
 
 // addStateServer adds a new stateserver named name under the

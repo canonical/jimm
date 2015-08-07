@@ -4,10 +4,12 @@ package jem_test
 
 import (
 	"github.com/CanonicalLtd/blues-identity/idmclient"
+	"github.com/juju/schema"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/juju/environschema.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 
 	"github.com/CanonicalLtd/jem/internal/idmtest"
@@ -121,6 +123,51 @@ func (s *jemSuite) TestAddEnvironment(c *gc.C) {
 	err = s.store.AddEnvironment(env)
 	c.Assert(err, gc.ErrorMatches, "already exists")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
+}
+
+func (s *jemSuite) TestAddTemplate(c *gc.C) {
+	path := params.EntityPath{"bob", "x"}
+	tmpl := &mongodoc.Template{
+		Id:   "ignored",
+		Path: path,
+		Schema: environschema.Fields{
+			"name": {
+				Description: "name of environment",
+				Type:        environschema.Tstring,
+				Mandatory:   true,
+				Values:      []interface{}{"venus", "pluto"},
+			},
+			"temperature": {
+				Description: "temperature of environment",
+				Type:        environschema.Tint,
+				Example:     400,
+				Values:      []interface{}{-400, 864.0},
+			},
+		},
+		Config: map[string]interface{}{
+			"name":        "pluto",
+			"temperature": -400.0,
+		},
+	}
+	err := s.store.AddTemplate(tmpl)
+	c.Assert(err, gc.IsNil)
+	c.Assert(tmpl.Id, gc.Equals, "bob/x")
+
+	tmpl1, err := s.store.Template(path)
+	c.Assert(err, gc.IsNil)
+	c.Assert(tmpl1, jc.DeepEquals, tmpl)
+
+	// Ensure that the schema still works even though some
+	// values may have been transformed to float64 by the
+	// JSON unmarshaler.
+	fields, defaults, err := tmpl.Schema.ValidationSchema()
+	c.Assert(err, gc.IsNil)
+	config, err := schema.FieldMap(fields, defaults).Coerce(tmpl.Config, nil)
+	c.Assert(err, gc.IsNil)
+	c.Assert(config, jc.DeepEquals, map[string]interface{}{
+		"name":        "pluto",
+		"temperature": -400,
+	})
 }
 
 func (s *jemSuite) TestSessionIsCopied(c *gc.C) {

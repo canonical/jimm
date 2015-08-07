@@ -211,10 +211,9 @@ func (j *JEM) AddEnvironment(env *mongodoc.Environment) error {
 	return nil
 }
 
-// StateServer returns state server information for
-// the state server with the given id (in the form "$user/$name").
-// It returns an error with a params.ErrNotFound cause
-// if the state server was not found.
+// StateServer returns information on the state server with the given
+// path. It returns an error with a params.ErrNotFound cause if the
+// state server was not found.
 func (j *JEM) StateServer(path params.EntityPath) (*mongodoc.StateServer, error) {
 	var srv mongodoc.StateServer
 	id := path.String()
@@ -228,10 +227,9 @@ func (j *JEM) StateServer(path params.EntityPath) (*mongodoc.StateServer, error)
 	return &srv, nil
 }
 
-// Environment returns environment information for
-// the environment with the given id (in the form "$user/$name").
-// It returns an error with a params.ErrNotFound cause
-// if the state server was not found.
+// Environment returns information on the environment with the given
+// path. It returns an error with a params.ErrNotFound cause if the
+// state server was not found.
 func (j *JEM) Environment(path params.EntityPath) (*mongodoc.Environment, error) {
 	id := path.String()
 	var env mongodoc.Environment
@@ -245,7 +243,7 @@ func (j *JEM) Environment(path params.EntityPath) (*mongodoc.Environment, error)
 	return &env, nil
 }
 
-// OpenAPI opens an API connection to the environment with the given id
+// OpenAPI opens an API connection to the environment with the given path
 // and returns it along with the information used to connect.
 // If the environment does not exist, the error will have a cause
 // of params.ErrNotFound.
@@ -289,6 +287,36 @@ func (j *JEM) OpenAPIFromDocs(env *mongodoc.Environment, srv *mongodoc.StateServ
 		}
 		return st, stInfo, nil
 	})
+}
+
+// AddTemplate adds the given template to the database.
+// If there is already an existing template with the same
+// name, it is overwritten. The Id field in template will be set from its
+// Path field. It is the responsibility of the caller to
+// ensure that the template attributes are compatible
+// with the template schema.
+func (j *JEM) AddTemplate(tmpl *mongodoc.Template) error {
+	tmpl.Id = tmpl.Path.String()
+	_, err := j.DB.Templates().UpsertId(tmpl.Id, tmpl)
+	if err != nil {
+		return errgo.Notef(err, "cannot add template doc")
+	}
+	return nil
+}
+
+// Template returns information on the template with the given path.
+// It returns an error with a params.ErrNotFound cause
+// if the template was not found.
+func (j *JEM) Template(path params.EntityPath) (*mongodoc.Template, error) {
+	var tmpl mongodoc.Template
+	err := j.DB.Templates().FindId(path.String()).One(&tmpl)
+	if err == mgo.ErrNotFound {
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "template %q not found", path)
+	}
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot get template %q", path)
+	}
+	return &tmpl, nil
 }
 
 func apiDialOpts() api.DialOpts {
@@ -338,4 +366,8 @@ func (db Database) StateServers() *mgo.Collection {
 
 func (db Database) Environments() *mgo.Collection {
 	return db.C("environments")
+}
+
+func (db Database) Templates() *mgo.Collection {
+	return db.C("templates")
 }
