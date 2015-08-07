@@ -912,6 +912,86 @@ func (s *APISuite) TestListJESNoServers(c *gc.C) {
 	c.Assert(resp, jc.DeepEquals, &params.ListJESResponse{})
 }
 
+func (s *APISuite) TestListTemplates(c *gc.C) {
+	srvId := s.addStateServer(c, params.EntityPath{"bob", "foo"})
+	s.addTemplate(c, params.EntityPath{"bob", "other"}, srvId, map[string]interface{}{
+		"state-server": true,
+	})
+	s.addTemplate(c, params.EntityPath{"bob", "creds"}, srvId, map[string]interface{}{
+		"secret":          "my secret",
+		"authorized-keys": sshKey,
+		"state-server":    false,
+	})
+	s.addTemplate(c, params.EntityPath{"alice", "x"}, srvId, map[string]interface{}{
+		"state-server":    false,
+		"authorized-keys": sshKey,
+	})
+	s.addTemplate(c, params.EntityPath{"alice", "y"}, srvId, map[string]interface{}{
+		"state-server": false,
+	})
+	s.allowTemplateAllPerm(c, params.EntityPath{"alice", "y"})
+
+	tmpl0, err := s.client("bob").GetTemplate(&params.GetTemplate{
+		EntityPath: params.EntityPath{"bob", "creds"},
+	})
+	c.Assert(err, gc.IsNil)
+
+	resp, err := s.client("bob").ListTemplates(&params.ListTemplates{})
+	c.Assert(err, gc.IsNil)
+
+	// checkAndClear checks the schemas in the templates
+	// response and clears them (they're all the same)
+	// so we can DeepEquals the rest.
+	checkAndClear := func(resp *params.ListTemplatesResponse) {
+		for i := range resp.Templates {
+			tmpl := &resp.Templates[i]
+			c.Assert(tmpl.Schema, jc.DeepEquals, tmpl0.Schema)
+			tmpl.Schema = nil
+		}
+	}
+	checkAndClear(resp)
+	c.Assert(resp, jc.DeepEquals, &params.ListTemplatesResponse{
+		Templates: []params.TemplateResponse{{
+			Path: params.EntityPath{"alice", "y"},
+			Config: map[string]interface{}{
+				"state-server": false,
+			},
+		}, {
+			Path: params.EntityPath{"bob", "creds"},
+			Config: map[string]interface{}{
+				"secret":          "my secret",
+				"authorized-keys": sshKey,
+				"state-server":    false,
+			},
+		}, {
+			Path: params.EntityPath{"bob", "other"},
+			Config: map[string]interface{}{
+				"state-server": true,
+			},
+		}},
+	})
+
+	// Try a similar thing as alice
+	resp, err = s.client("alice").ListTemplates(&params.ListTemplates{})
+	c.Assert(err, gc.IsNil)
+
+	checkAndClear(resp)
+	c.Assert(resp, jc.DeepEquals, &params.ListTemplatesResponse{
+		Templates: []params.TemplateResponse{{
+			Path: params.EntityPath{"alice", "x"},
+			Config: map[string]interface{}{
+				"state-server":    false,
+				"authorized-keys": sshKey,
+			},
+		}, {
+			Path: params.EntityPath{"alice", "y"},
+			Config: map[string]interface{}{
+				"state-server": false,
+			},
+		}},
+	})
+}
+
 func (s *APISuite) TestListEnvironmentsNoServers(c *gc.C) {
 	resp, err := s.client("bob").ListEnvironments(nil)
 	c.Assert(err, gc.IsNil)
@@ -1101,6 +1181,7 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	c.Assert(tmpl.Schema, gc.Not(gc.HasLen), 0)
+	c.Assert(tmpl.Path, gc.Equals, params.EntityPath{"alice", "creds"})
 	c.Assert(tmpl.Config, jc.DeepEquals, map[string]interface{}{
 		"state-server":      true,
 		"admin-secret":      "",
@@ -1127,6 +1208,7 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	c.Assert(tmpl.Schema, gc.Not(gc.HasLen), 0)
+	c.Assert(tmpl.Path, gc.Equals, params.EntityPath{"alice", "creds"})
 	c.Assert(tmpl.Config, jc.DeepEquals, map[string]interface{}{
 		"state-server":      false,
 		"admin-secret":      "",
@@ -1151,6 +1233,7 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 		EntityPath: params.EntityPath{"alice", "differentcreds"},
 	})
 	c.Assert(err, gc.IsNil)
+	c.Assert(tmpl.Path, gc.Equals, params.EntityPath{"alice", "differentcreds"})
 	c.Assert(tmpl.Schema, gc.Not(gc.HasLen), 0)
 	c.Assert(tmpl.Config, jc.DeepEquals, map[string]interface{}{
 		"state-server":      true,
