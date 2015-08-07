@@ -326,8 +326,6 @@ func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.Environme
 	}, nil
 }
 
-var errNotImplemented = errgo.New("not implemented yet")
-
 // AddTemplate adds a new template.
 func (h *Handler) AddTemplate(arg *params.AddTemplate) error {
 	if err := h.checkIsUser(arg.User); err != nil {
@@ -379,16 +377,22 @@ func (h *Handler) GetTemplate(arg *params.GetTemplate) (*params.TemplateResponse
 	if err := h.checkCanRead(tmpl); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	// Zero all secret fields.
+	hideTemplateSecrets(tmpl)
+	return &params.TemplateResponse{
+		Path:   arg.EntityPath,
+		Schema: tmpl.Schema,
+		Config: tmpl.Config,
+	}, nil
+}
+
+// hideTemplateSecrets zeros all secret fields in the
+// given template.
+func hideTemplateSecrets(tmpl *mongodoc.Template) {
 	for name, attr := range tmpl.Config {
 		if tmpl.Schema[name].Secret {
 			tmpl.Config[name] = zeroValueOf(attr)
 		}
 	}
-	return &params.TemplateResponse{
-		Schema: tmpl.Schema,
-		Config: tmpl.Config,
-	}, nil
 }
 
 func zeroValueOf(x interface{}) interface{} {
@@ -397,7 +401,24 @@ func zeroValueOf(x interface{}) interface{} {
 
 // ListTemplates returns information on all accessible templates.
 func (h *Handler) ListTemplates(arg *params.ListTemplates) (*params.ListTemplatesResponse, error) {
-	return nil, errNotImplemented
+	// TODO provide a way of restricting the results.
+	iter := h.listIter(h.jem.DB.Templates().Find(nil).Sort("_id").Iter())
+	var tmpls []params.TemplateResponse
+	var tmpl mongodoc.Template
+	for iter.Next(&tmpl) {
+		hideTemplateSecrets(&tmpl)
+		tmpls = append(tmpls, params.TemplateResponse{
+			Path:   tmpl.Path,
+			Schema: tmpl.Schema,
+			Config: tmpl.Config,
+		})
+	}
+	if err := iter.Err(); err != nil {
+		return nil, errgo.Notef(err, "cannot get templates")
+	}
+	return &params.ListTemplatesResponse{
+		Templates: tmpls,
+	}, nil
 }
 
 // GetTemplatePerm returns the ACL for a given template.

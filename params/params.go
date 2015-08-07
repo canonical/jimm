@@ -191,6 +191,9 @@ type ListTemplatesResponse struct {
 
 // TemplateResponse holds information on a template
 type TemplateResponse struct {
+	// Path holds the path of the template.
+	Path EntityPath `json:"path"`
+
 	// Schema holds the state server schema that was used
 	// to create the template.
 	Schema environschema.Fields `json:"schema"`
