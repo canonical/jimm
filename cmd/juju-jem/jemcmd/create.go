@@ -92,8 +92,10 @@ func (c *createCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Notef(err, "cannot get JES info")
 	}
-
-	if err := c.setConfigDefaults(config, jesInfo); err != nil {
+	defaultsCtxt := providerDefaultsContext{
+		envName: c.envPath.Name,
+	}
+	if err := setConfigDefaults(config, jesInfo, defaultsCtxt); err != nil {
 		return errgo.Notef(err, "cannot add default values for configuration file")
 	}
 	// Generate a random password for the user.
@@ -116,7 +118,7 @@ func (c *createCommand) Run(ctxt *cmd.Context) error {
 	})
 }
 
-func (c *createCommand) setConfigDefaults(config map[string]interface{}, jesInfo *params.JESResponse) error {
+func setConfigDefaults(config map[string]interface{}, jesInfo *params.JESResponse, ctxt providerDefaultsContext) error {
 	// Authorized keys are special because the path is relative
 	// to $HOME/.ssh by default.
 	if _, ok := jesInfo.Schema["authorized-keys"]; ok && config["authorized-keys"] == nil {
@@ -170,7 +172,7 @@ func (c *createCommand) setConfigDefaults(config map[string]interface{}, jesInfo
 			}
 		}
 		if f := providerDefaults[jesInfo.ProviderType][name]; f != nil {
-			v, err := f(c)
+			v, err := f(ctxt)
 			if err != nil {
 				return errgo.Notef(err, "cannot make default value for %q", name)
 			}
@@ -206,7 +208,11 @@ func readFile(path string) (string, error) {
 	return string(data), nil
 }
 
-var providerDefaults = map[string]map[string]func(*createCommand) (interface{}, error){
+type providerDefaultsContext struct {
+	envName params.Name
+}
+
+var providerDefaults = map[string]map[string]func(providerDefaultsContext) (interface{}, error){
 	"azure": {
 		"availability-sets-enabled": constValue(true),
 	},
@@ -217,7 +223,7 @@ var providerDefaults = map[string]map[string]func(*createCommand) (interface{}, 
 		"control-dir": uuidValue,
 	},
 	"local": {
-		"namespace": (*createCommand).localProviderNamespaceValue,
+		"namespace": localProviderNamespaceValue,
 		"proxy-ssh": constValue(false),
 	},
 	"maas": {
@@ -228,17 +234,17 @@ var providerDefaults = map[string]map[string]func(*createCommand) (interface{}, 
 	},
 }
 
-func constValue(v interface{}) func(*createCommand) (interface{}, error) {
-	return func(*createCommand) (interface{}, error) {
+func constValue(v interface{}) func(providerDefaultsContext) (interface{}, error) {
+	return func(providerDefaultsContext) (interface{}, error) {
 		return v, nil
 	}
 }
 
-func uuidValue(*createCommand) (interface{}, error) {
+func uuidValue(providerDefaultsContext) (interface{}, error) {
 	return utils.NewUUID()
 }
 
-func rawUUIDValue(*createCommand) (interface{}, error) {
+func rawUUIDValue(providerDefaultsContext) (interface{}, error) {
 	v, err := utils.NewUUID()
 	if err != nil {
 		return nil, err
@@ -246,7 +252,10 @@ func rawUUIDValue(*createCommand) (interface{}, error) {
 	return fmt.Sprintf("%x", v.Raw()), nil
 }
 
-func (c *createCommand) localProviderNamespaceValue() (interface{}, error) {
+func localProviderNamespaceValue(ctxt providerDefaultsContext) (interface{}, error) {
+	if ctxt.envName == "" {
+		return nil, errgo.Newf("no default value for local provider namespace attribute")
+	}
 	username := os.Getenv("USER")
 	if username == "" {
 		u, err := user.Current()
@@ -255,5 +264,5 @@ func (c *createCommand) localProviderNamespaceValue() (interface{}, error) {
 		}
 		username = u.Username
 	}
-	return fmt.Sprintf("%s-%s", username, c.envPath.Name), nil
+	return fmt.Sprintf("%s-%s", username, ctxt.envName), nil
 }

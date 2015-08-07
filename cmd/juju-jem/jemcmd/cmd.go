@@ -71,6 +71,7 @@ func New() cmd.Command {
 	supercmd.Register(&getCommand{})
 	supercmd.Register(&listCommand{})
 	supercmd.Register(&listServersCommand{})
+	supercmd.Register(&createTemplateCommand{})
 
 	return supercmd
 }
