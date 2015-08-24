@@ -71,7 +71,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 	jujuHome := osenv.JujuHomePath()
 	tests := []struct {
 		about   string
-		envName string
+		envName params.Name
 		jesInfo params.JESResponse
 		config  map[string]interface{}
 
@@ -287,14 +287,31 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 			},
 		},
 		expectError: `cannot make default value for "testattr-error": an error`,
+	}, {
+		about: "attribute from context",
+		jesInfo: params.JESResponse{
+			ProviderType: "test",
+			Schema: environschema.Fields{
+				"testattr-envname": {
+					Type: environschema.Tstring,
+				},
+			},
+		},
+		envName: "foo",
+		expectConfig: map[string]interface{}{
+			"testattr-envname": "envname-foo",
+		},
 	}}
-	s.PatchValue(&providerDefaults, map[string]map[string]func(*createCommand) (interface{}, error){
+	s.PatchValue(&providerDefaults, map[string]map[string]func(providerDefaultsContext) (interface{}, error){
 		"test": {
-			"testattr": func(*createCommand) (interface{}, error) {
+			"testattr": func(providerDefaultsContext) (interface{}, error) {
 				return "testattr-default-value", nil
 			},
-			"testattr-error": func(*createCommand) (interface{}, error) {
+			"testattr-error": func(providerDefaultsContext) (interface{}, error) {
 				return "", errgo.New("an error")
+			},
+			"testattr-envname": func(ctxt providerDefaultsContext) (interface{}, error) {
+				return "envname-" + string(ctxt.envName), nil
 			},
 		},
 	})
@@ -311,14 +328,13 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 			os.Setenv(name, val)
 		}
 
-		var createCmd createCommand
-		createCmd.envPath.Name = params.Name(test.envName)
-
 		config := make(map[string]interface{})
 		for name, val := range test.config {
 			config[name] = val
 		}
-		err := createCmd.setConfigDefaults(config, &test.jesInfo)
+		err := setConfigDefaults(config, &test.jesInfo, providerDefaultsContext{
+			envName: test.envName,
+		})
 		if test.expectError != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
 		} else {
