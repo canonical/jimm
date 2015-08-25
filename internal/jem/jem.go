@@ -254,7 +254,7 @@ func (j *JEM) OpenAPI(path params.EntityPath) (*apiconn.Conn, error) {
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot get environment", errgo.Is(params.ErrNotFound))
 	}
-	return j.pool.connCache.OpenAPI(env.UUID, func() (*api.State, *api.Info, error) {
+	return j.pool.connCache.OpenAPI(env.UUID, func() (api.Connection, *api.Info, error) {
 		srv, err := j.StateServer(env.StateServer)
 		if err != nil {
 			return nil, nil, errgo.Notef(err, "cannot get state server for environment %q", env.UUID)
@@ -279,7 +279,7 @@ func (j *JEM) OpenAPI(path params.EntityPath) (*apiconn.Conn, error) {
 //
 // The returned connection must be closed when finished with.
 func (j *JEM) OpenAPIFromDocs(env *mongodoc.Environment, srv *mongodoc.StateServer) (*apiconn.Conn, error) {
-	return j.pool.connCache.OpenAPI(env.UUID, func() (*api.State, *api.Info, error) {
+	return j.pool.connCache.OpenAPI(env.UUID, func() (api.Connection, *api.Info, error) {
 		stInfo := apiInfoFromDocs(env, srv)
 		st, err := api.Open(stInfo, apiDialOpts())
 		if err != nil {

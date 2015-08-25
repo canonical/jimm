@@ -597,7 +597,7 @@ func (s *APISuite) TestNewEnvironmentWithTemplateNotFound(c *gc.C) {
 	c.Assert(resp, gc.IsNil)
 }
 
-func openAPIFromEnvironmentResponse(c *gc.C, resp *params.EnvironmentResponse) *api.State {
+func openAPIFromEnvironmentResponse(c *gc.C, resp *params.EnvironmentResponse) api.Connection {
 	// Ensure that we can connect to the new environment
 	apiInfo := &api.Info{
 		Tag:        names.NewUserTag(resp.User),

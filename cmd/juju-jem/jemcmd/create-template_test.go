@@ -3,11 +3,11 @@
 package jemcmd_test
 
 import (
+	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/params"
-	jc "github.com/juju/testing/checkers"
 )
 
 type createTemplateSuite struct {

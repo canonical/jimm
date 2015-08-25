@@ -157,6 +157,7 @@ func setConfigDefaults(config map[string]interface{}, jesInfo *params.JESRespons
 	}
 
 	// Fill config attributes from appropriate environment variables
+fill:
 	for name, attr := range jesInfo.Schema {
 		if config[name] != nil {
 			continue
@@ -169,6 +170,12 @@ func setConfigDefaults(config map[string]interface{}, jesInfo *params.JESRespons
 			if v := os.Getenv(attr.EnvVar); v != "" {
 				config[name] = v
 				continue
+			}
+		}
+		for _, vname := range attr.EnvVars {
+			if v := os.Getenv(vname); v != "" {
+				config[name] = v
+				continue fill
 			}
 		}
 		if f := providerDefaults[jesInfo.ProviderType][name]; f != nil {

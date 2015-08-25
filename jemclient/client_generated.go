@@ -5,8 +5,9 @@
 package jemclient
 
 import (
-	"github.com/CanonicalLtd/jem/params"
 	"github.com/juju/httprequest"
+
+	"github.com/CanonicalLtd/jem/params"
 )
 
 type client struct {

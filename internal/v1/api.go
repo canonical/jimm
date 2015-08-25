@@ -302,7 +302,7 @@ func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.Environme
 	// Note that AddEnvironment has set envdoc.Id for us.
 	fields["name"] = idToEnvName(envDoc.Id)
 
-	emclient := environmentmanager.NewClient(conn.State)
+	emclient := environmentmanager.NewClient(conn.Connection)
 	env, err := emclient.CreateEnvironment(jujuUser, nil, fields)
 	if err != nil {
 		// Remove the environment that was created, because it's no longer valid.
@@ -509,7 +509,7 @@ func (h *Handler) createUser(conn *apiconn.Conn, user, password string) error {
 	if password == "" {
 		return badRequestf(nil, "no password specified")
 	}
-	uclient := usermanager.NewClient(conn.State)
+	uclient := usermanager.NewClient(conn.Connection)
 	_, err := uclient.AddUser(user, "", password)
 	if err == nil {
 		return nil
