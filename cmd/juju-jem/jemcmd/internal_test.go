@@ -120,6 +120,42 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 			"attr": "avalue",
 		},
 	}, {
+		about: "fallback environment variable defaults",
+		envVars: map[string]string{
+			"var3": "var3 value",
+		},
+		jesInfo: params.JESResponse{
+			ProviderType: "something",
+			Schema: environschema.Fields{
+				"attr": {
+					Type:    environschema.Tstring,
+					EnvVar:  "somevar",
+					EnvVars: []string{"var2", "var3"},
+				},
+			},
+		},
+		expectConfig: map[string]interface{}{
+			"attr": "var3 value",
+		},
+	}, {
+		about: "fallback environment variable defaults with empty EnvVar",
+		envVars: map[string]string{
+			"var2": "var2 value",
+		},
+		jesInfo: params.JESResponse{
+			ProviderType: "something",
+			Schema: environschema.Fields{
+				"attr": {
+					Type:    environschema.Tstring,
+					EnvVar:  "",
+					EnvVars: []string{"var2", "var3"},
+				},
+			},
+		},
+		expectConfig: map[string]interface{}{
+			"attr": "var2 value",
+		},
+	}, {
 		about: "default authorized keys",
 		files: map[string]string{
 			filepath.Join(home, ".ssh", "id_rsa.pub"): fakeSSHKey,

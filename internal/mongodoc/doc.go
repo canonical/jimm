@@ -1,8 +1,9 @@
 package mongodoc
 
 import (
-	"github.com/CanonicalLtd/jem/params"
 	"gopkg.in/juju/environschema.v1"
+
+	"github.com/CanonicalLtd/jem/params"
 )
 
 // StateServer holds information on a given state server.

@@ -80,7 +80,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 	conn1, err := s.store.OpenAPI(srvPath)
 	c.Assert(err, gc.IsNil)
 	c.Assert(conn1.Ping(), gc.IsNil)
-	c.Assert(conn1.State, gc.Equals, conn.State)
+	c.Assert(conn1.Connection, gc.Equals, conn.Connection)
 	err = conn1.Close()
 	c.Assert(err, gc.IsNil)
 
@@ -88,7 +88,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 	// that we still get the same connection.
 	conn1, err = s.store.OpenAPIFromDocs(env, srv)
 	c.Assert(err, gc.IsNil)
-	c.Assert(conn1.State, gc.Equals, conn.State)
+	c.Assert(conn1.Connection, gc.Equals, conn.Connection)
 	err = conn1.Close()
 	c.Assert(err, gc.IsNil)
 
@@ -137,7 +137,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPIError(c *gc.C) {
 
 func assertConnIsClosed(c *gc.C, conn *apiconn.Conn) {
 	select {
-	case <-conn.State.RPCClient().Dead():
+	case <-conn.RPCClient().Dead():
 	case <-time.After(5 * time.Second):
 		c.Fatalf("timed out waiting for connection close")
 	}

@@ -70,7 +70,7 @@ func (cache *Cache) EvictAll() {
 // responsibility of the caller to ensure this.
 func (cache *Cache) OpenAPI(
 	envUUID string,
-	dial func() (*api.State, *api.Info, error),
+	dial func() (api.Connection, *api.Info, error),
 ) (*Conn, error) {
 	// First, a quick check to see whether the connection
 	// is currrently cached.
@@ -98,8 +98,8 @@ func (cache *Cache) OpenAPI(
 			// If godoc showed embedded exported fields,
 			// it might be better to avoid doing that, and embed
 			// sharedConn instead.
-			State: st,
-			Info:  stInfo,
+			Connection: st,
+			Info:       stInfo,
 			shared: &sharedConn{
 				cache:    cache,
 				uuid:     envUUID,
@@ -121,7 +121,7 @@ func (cache *Cache) OpenAPI(
 type Conn struct {
 	// State holds the actual API connection. It should
 	// not be closed directly.
-	*api.State
+	api.Connection
 
 	// Info holds the information that was used to make
 	// the connection.
@@ -164,7 +164,7 @@ func (c *Conn) Close() error {
 	}
 	c.closed = true
 	if c.shared.refCount--; c.shared.refCount == 0 {
-		return c.State.Close()
+		return c.Connection.Close()
 	}
 	if c.shared.refCount < 0 {
 		panic("negative ref count")
