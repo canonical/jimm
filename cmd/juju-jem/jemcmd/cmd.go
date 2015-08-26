@@ -68,10 +68,11 @@ func New() cmd.Command {
 	supercmd.Register(&addServerCommand{})
 	supercmd.Register(&changePermCommand{})
 	supercmd.Register(&createCommand{})
+	supercmd.Register(&createTemplateCommand{})
 	supercmd.Register(&getCommand{})
 	supercmd.Register(&listCommand{})
 	supercmd.Register(&listServersCommand{})
-	supercmd.Register(&createTemplateCommand{})
+	supercmd.Register(&listTemplatesCommand{})
 
 	return supercmd
 }
@@ -201,6 +202,8 @@ type entityPathsValue struct {
 	paths []params.EntityPath
 }
 
+// Set implements gnuflag.Value.Set, enabling entityPathsValue
+// to be used as a custom flag value.
 func (v *entityPathsValue) Set(p string) error {
 	parts := strings.Split(p, ",")
 	if parts[0] == "" {
@@ -216,6 +219,8 @@ func (v *entityPathsValue) Set(p string) error {
 	return nil
 }
 
+// String implements gnuflag.Value.String, enabling entityPathsValue
+// to be used as a custom flag value.
 func (v *entityPathsValue) String() string {
 	ss := make([]string, len(v.paths))
 	for i, p := range v.paths {
