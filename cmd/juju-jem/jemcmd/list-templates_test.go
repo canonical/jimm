@@ -6,33 +6,40 @@ import (
 	gc "gopkg.in/check.v1"
 )
 
-type listServersSuite struct {
+type listTemplatesSuite struct {
 	commonSuite
 }
 
-var _ = gc.Suite(&listServersSuite{})
+var _ = gc.Suite(&listTemplatesSuite{})
 
-func (s *listServersSuite) TestChangePerm(c *gc.C) {
+func (s *listTemplatesSuite) TestChangePerm(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 
-	// Add a couple of state servers.
-	stdout, stderr, code := run(c, c.MkDir(), "add-server", "bob/foo")
+	// First add the state server that we're going to use
+	// to create the new templates.
+	stdout, stderr, code := run(c, c.MkDir(), "add-server", "bob/env")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	stdout, stderr, code = run(c, c.MkDir(), "add-server", "bob/bar")
+	// Add a couple of templates.
+	stdout, stderr, code = run(c, c.MkDir(), "create-template", "-s", "bob/env", "bob/foo", "state-server=true")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	stdout, stderr, code = run(c, c.MkDir(), "list-servers")
+	stdout, stderr, code = run(c, c.MkDir(), "create-template", "-s", "bob/env", "bob/bar", "state-server=false")
+	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
+	c.Assert(stdout, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, "")
+
+	stdout, stderr, code = run(c, c.MkDir(), "list-templates")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stderr, gc.Equals, "")
 	c.Assert(stdout, gc.Equals, "bob/bar\nbob/foo\n")
 }
 
-var listServersErrorTests = []struct {
+var listTemplatesErrorTests = []struct {
 	about        string
 	args         []string
 	expectStderr string
@@ -44,10 +51,10 @@ var listServersErrorTests = []struct {
 	expectCode:   2,
 }}
 
-func (s *listServersSuite) TestError(c *gc.C) {
-	for i, test := range listServersErrorTests {
+func (s *listTemplatesSuite) TestError(c *gc.C) {
+	for i, test := range listTemplatesErrorTests {
 		c.Logf("test %d: %s", i, test.about)
-		stdout, stderr, code := run(c, c.MkDir(), "list-servers", test.args...)
+		stdout, stderr, code := run(c, c.MkDir(), "list-templates", test.args...)
 		c.Assert(code, gc.Equals, test.expectCode, gc.Commentf("stderr: %s", stderr))
 		c.Assert(stderr, gc.Matches, "(error:|ERROR) "+test.expectStderr+"\n")
 		c.Assert(stdout, gc.Equals, "")

@@ -69,6 +69,9 @@ func (s *createSuite) TestCreateWithTemplate(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
+	// Then create an environment that uses the template as additional config.
+	// Note that because the state-server attribute is mandatory, this
+	// will fail if the template logic is not working correctly.
 	config := map[string]interface{}{
 		"authorized-keys": fakeSSHKey,
 	}
