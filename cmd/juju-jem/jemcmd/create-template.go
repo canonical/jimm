@@ -4,11 +4,11 @@ package jemcmd
 
 import (
 	"github.com/juju/cmd"
-	"github.com/juju/utils/keyvalues"
 	"gopkg.in/errgo.v1"
 	"launchpad.net/gnuflag"
 
 	"github.com/CanonicalLtd/jem/params"
+	"github.com/juju/utils/keyvalues"
 )
 
 type createTemplateCommand struct {
@@ -56,6 +56,9 @@ func (c *createTemplateCommand) Init(args []string) error {
 	}
 	if err := c.templatePath.Set(args[0]); err != nil {
 		return errgo.Mask(err)
+	}
+	if c.srvPath.EntityPath == (params.EntityPath{}) {
+		return errgo.Newf("--server flag required but not provided")
 	}
 	attrs, err := keyvalues.Parse(args[1:], true)
 	if err != nil {

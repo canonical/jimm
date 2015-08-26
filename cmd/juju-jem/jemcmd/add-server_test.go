@@ -57,12 +57,12 @@ var addServerErrorTests = []struct {
 }, {
 	about:        "invalid server name",
 	args:         []string{"a"},
-	expectStderr: `invalid JEM name "a" \(needs to be <user>/<name>\)`,
+	expectStderr: `invalid entity path "a": wrong number of parts in entity path`,
 	expectCode:   2,
 }, {
 	about:        "invalid name checked by server",
 	args:         []string{"bad!name/foo"},
-	expectStderr: `invalid path: invalid user name "bad!name"`,
+	expectStderr: `invalid entity path "bad!name/foo": invalid user name "bad!name"`,
 	expectCode:   2,
 }}
 

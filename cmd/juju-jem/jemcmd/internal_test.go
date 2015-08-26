@@ -39,15 +39,15 @@ var entityPathValueTests = []struct {
 }, {
 	about:       "only one part",
 	val:         "a",
-	expectError: `invalid JEM name "a" \(needs to be <user>/<name>\)`,
+	expectError: `invalid entity path "a": wrong number of parts in entity path`,
 }, {
 	about:       "too many parts",
 	val:         "a/b/c",
-	expectError: `invalid JEM name "a/b/c" \(needs to be <user>/<name>\)`,
+	expectError: `invalid entity path "a/b/c": wrong number of parts in entity path`,
 }, {
-	about:       "empty server id",
+	about:       "empty string",
 	val:         "",
-	expectError: `invalid JEM name "" \(needs to be <user>/<name>\)`,
+	expectError: `invalid entity path "": wrong number of parts in entity path`,
 }}
 
 func (s *internalSuite) TestEntityPathValue(c *gc.C) {
@@ -61,6 +61,45 @@ func (s *internalSuite) TestEntityPathValue(c *gc.C) {
 		}
 		c.Assert(err, gc.IsNil)
 		c.Assert(p.EntityPath, gc.Equals, test.expectEntityPath)
+	}
+}
+
+var entityPathsValueTests = []struct {
+	about             string
+	val               string
+	expectEntityPaths []params.EntityPath
+	expectError       string
+}{{
+	about: "success",
+	val:   "foo/bar,baz/arble",
+	expectEntityPaths: []params.EntityPath{{
+		User: "foo",
+		Name: "bar",
+	}, {
+		User: "baz",
+		Name: "arble",
+	}},
+}, {
+	about:       "no paths",
+	val:         "",
+	expectError: `empty entity paths`,
+}, {
+	about:       "invalid entry",
+	val:         "a/b/c,foo/bar",
+	expectError: `invalid entity path "a/b/c": wrong number of parts in entity path`,
+}}
+
+func (s *internalSuite) TestEntityPathsValue(c *gc.C) {
+	for i, test := range entityPathsValueTests {
+		c.Logf("test %d: %s", i, test.about)
+		var p entityPathsValue
+		err := p.Set(test.val)
+		if test.expectError != "" {
+			c.Assert(err, gc.ErrorMatches, test.expectError)
+			continue
+		}
+		c.Assert(err, gc.IsNil)
+		c.Assert(p.paths, jc.DeepEquals, test.expectEntityPaths)
 	}
 }
 

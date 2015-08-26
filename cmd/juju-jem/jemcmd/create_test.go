@@ -53,6 +53,48 @@ func (s *createSuite) TestCreate(c *gc.C) {
 	client.Close()
 }
 
+func (s *createSuite) TestCreateWithTemplate(c *gc.C) {
+	s.idmSrv.SetDefaultUser("bob")
+
+	// First add the state server that we're going to use
+	// to create the new environment.
+	stdout, stderr, code := run(c, c.MkDir(), "add-server", "bob/foo")
+	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
+	c.Assert(stdout, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, "")
+
+	// Then add a template containing the mandatory state-server parameter.
+	stdout, stderr, code = run(c, c.MkDir(), "create-template", "bob/template", "-s", "bob/foo", "state-server=true")
+	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
+	c.Assert(stdout, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, "")
+
+	config := map[string]interface{}{
+		"authorized-keys": fakeSSHKey,
+	}
+	data, err := yaml.Marshal(config)
+	c.Assert(err, gc.IsNil)
+	configPath := filepath.Join(c.MkDir(), "config.yaml")
+	err = ioutil.WriteFile(configPath, data, 0666)
+	c.Assert(err, gc.IsNil)
+	stdout, stderr, code = run(c, c.MkDir(),
+		"create",
+		"-s", "bob/foo",
+		"--config", configPath,
+		"-t", "bob/template",
+		"bob/newenv",
+	)
+	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
+	c.Assert(stdout, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, "")
+
+	// Check that we can attach to the new environment
+	// through the usual juju connection mechanism.
+	client, err := juju.NewAPIClientFromName("newenv")
+	c.Assert(err, gc.IsNil)
+	client.Close()
+}
+
 var createErrorTests = []struct {
 	about        string
 	args         []string
@@ -71,7 +113,7 @@ var createErrorTests = []struct {
 }, {
 	about:        "only one part in environ id",
 	args:         []string{"a"},
-	expectStderr: `invalid JEM name "a" \(needs to be <user>/<name>\)`,
+	expectStderr: `invalid entity path "a": wrong number of parts in entity path`,
 	expectCode:   2,
 }, {
 	about:        "state server must be specified",
