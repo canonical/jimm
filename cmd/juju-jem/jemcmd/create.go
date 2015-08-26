@@ -25,15 +25,21 @@ import (
 type createCommand struct {
 	commandBase
 
-	srvPath    entityPathValue
-	envPath    entityPathValue
-	configFile string
-	localName  string
+	srvPath       entityPathValue
+	envPath       entityPathValue
+	templatePaths entityPathsValue
+	configFile    string
+	localName     string
 }
 
 var createDoc = `
 The create command creates a new environment inside the specified state
 server. Its argument specifies the JEM name of the new environment.
+
+When one or more templates paths are specified, the final configuration
+is determined by starting with the first and adding attributes from
+each one in turn, finally adding any attributes specified in
+the configuration file specified by the --config flag.
 `
 
 func (c *createCommand) Info() *cmd.Info {
@@ -47,8 +53,11 @@ func (c *createCommand) Info() *cmd.Info {
 
 func (c *createCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.commandBase.SetFlags(f)
-	f.Var(&c.srvPath, "state-server", "state server to create the environment in")
-	f.Var(&c.srvPath, "s", "")
+	f.Var(&c.srvPath, "state-server", "")
+	f.Var(&c.srvPath, "s", "state server to create the environment in")
+	f.Var(&c.templatePaths, "template", "")
+	f.Var(&c.templatePaths, "t", "comma-separated templates to use for config attributes")
+
 	f.StringVar(&c.configFile, "config", "", "YAML config file containing environment configuration")
 	f.StringVar(&c.localName, "local", "", "local name for environment (as used for juju switch). Defaults to <envname>")
 }
@@ -109,10 +118,11 @@ func (c *createCommand) Run(ctxt *cmd.Context) error {
 		return client.NewEnvironment(&params.NewEnvironment{
 			User: c.envPath.User,
 			Info: params.NewEnvironmentInfo{
-				Name:        c.envPath.Name,
-				Password:    password,
-				StateServer: c.srvPath.EntityPath,
-				Config:      config,
+				Name:          c.envPath.Name,
+				Password:      password,
+				StateServer:   c.srvPath.EntityPath,
+				Config:        config,
+				TemplatePaths: c.templatePaths.paths,
 			},
 		})
 	})

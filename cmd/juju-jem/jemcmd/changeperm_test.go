@@ -146,7 +146,7 @@ var changepermErrorTests = []struct {
 }, {
 	about:        "only one part in path",
 	args:         []string{"a"},
-	expectStderr: `invalid JEM name "a" \(needs to be <user>/<name>\)`,
+	expectStderr: `invalid entity path "a": wrong number of parts in entity path`,
 	expectCode:   2,
 }, {
 	about:        "empty user name",

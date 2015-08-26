@@ -186,20 +186,45 @@ type entityPathValue struct {
 // to be used as a custom flag value.
 // The String method is implemented by EntityPath itself.
 func (v *entityPathValue) Set(p string) error {
-	parts := strings.Split(p, "/")
-	if len(parts) != 2 {
-		return errgo.Newf("invalid JEM name %q (needs to be <user>/<name>)", p)
-	}
-	if err := v.User.UnmarshalText([]byte(parts[0])); err != nil {
-		return errgo.Notef(err, "invalid path")
-	}
-	if err := v.Name.UnmarshalText([]byte(parts[1])); err != nil {
-		return errgo.Notef(err, "invalid path")
+	if err := v.EntityPath.UnmarshalText([]byte(p)); err != nil {
+		return errgo.Notef(err, "invalid entity path %q", p)
 	}
 	return nil
 }
 
 var _ gnuflag.Value = (*entityPathValue)(nil)
+
+// entityPathValue holds a slice of EntityPaths that
+// can be used as a flag value. Paths are comma separated,
+// and at least one must be specified.
+type entityPathsValue struct {
+	paths []params.EntityPath
+}
+
+func (v *entityPathsValue) Set(p string) error {
+	parts := strings.Split(p, ",")
+	if parts[0] == "" {
+		return errgo.New("empty entity paths")
+	}
+	paths := make([]params.EntityPath, len(parts))
+	for i, part := range parts {
+		if err := paths[i].UnmarshalText([]byte(part)); err != nil {
+			return errgo.Notef(err, "invalid entity path %q", part)
+		}
+	}
+	v.paths = paths
+	return nil
+}
+
+func (v *entityPathsValue) String() string {
+	ss := make([]string, len(v.paths))
+	for i, p := range v.paths {
+		ss[i] = p.String()
+	}
+	return strings.Join(ss, ",")
+}
+
+var _ gnuflag.Value = (*entityPathsValue)(nil)
 
 // writeEnvironment runs the given getEnv function
 // and writes the result as a local environment .jenv

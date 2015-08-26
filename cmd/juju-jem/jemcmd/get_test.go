@@ -56,7 +56,7 @@ var getErrorTests = []struct {
 }, {
 	about:        "only one part in environ id",
 	args:         []string{"a"},
-	expectStderr: `invalid JEM name "a" \(needs to be <user>/<name>\)`,
+	expectStderr: `invalid entity path "a": wrong number of parts in entity path`,
 	expectCode:   2,
 }}
 

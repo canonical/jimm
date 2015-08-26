@@ -61,11 +61,16 @@ var createTemplateErrorTests = []struct {
 }, {
 	about:        "invalid template name",
 	args:         []string{"a"},
-	expectStderr: `invalid JEM name "a" \(needs to be <user>/<name>\)`,
+	expectStderr: `invalid entity path "a": wrong number of parts in entity path`,
+	expectCode:   2,
+}, {
+	about:        "state server not provided",
+	args:         []string{"bob/foo"},
+	expectStderr: `--server flag required but not provided`,
 	expectCode:   2,
 }, {
 	about:        "duplicate key",
-	args:         []string{"bob/foo", "x=y", "y=z", "x=p"},
+	args:         []string{"bob/foo", "--server", "foo/bar", "x=y", "y=z", "x=p"},
 	expectStderr: `key "x" specified more than once`,
 	expectCode:   2,
 }}
