@@ -46,7 +46,7 @@ func (h *Handler) checkRequest(req *http.Request) (authorization, error) {
 	// to the whole handler.
 	// TODO use a relative URL here: router.RelativeURLPath(req.RequestURI, "/")
 	cookiePath := "/"
-	return authorization{}, httpbakery.NewDischargeRequiredError(m, cookiePath, verr)
+	return authorization{}, httpbakery.NewDischargeRequiredErrorForRequest(m, cookiePath, verr, req)
 }
 
 func (h *Handler) newMacaroon() (*macaroon.Macaroon, error) {
