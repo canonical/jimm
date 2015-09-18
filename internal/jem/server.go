@@ -84,6 +84,10 @@ func NewServer(config ServerParams, versions map[string]NewAPIHandlerFunc) (*Ser
 		}
 		for _, h := range handlers {
 			srv.router.Handle(h.Method, h.Path, h.Handle)
+			l, _, _ := srv.router.Lookup("OPTIONS", h.Path)
+			if l == nil {
+				srv.router.OPTIONS(h.Path, srv.options)
+			}
 		}
 	}
 	return srv, nil
@@ -112,7 +116,24 @@ type Server struct {
 
 // ServeHTTP implements http.Handler.Handle.
 func (srv *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	header := w.Header()
+	ao := "*"
+	if o := req.Header.Get("Origin"); o != "" {
+		ao = o
+	}
+	header.Set("Access-Control-Allow-Origin", ao)
+	header.Set("Access-Control-Allow-Headers", "Bakery-Protocol-Version, Macaroons, X-Requested-With")
+	header.Set("Access-Control-Allow-Credentials", "true")
+	header.Set("Access-Control-Cache-Max-Age", "600")
+	// TODO: in handlers, look up methods for this request path and return only those methods here.
+	header.Set("Access-Control-Allow-Methods", "DELETE,GET,HEAD,PUT,POST,OPTIONS")
+	header.Set("Access-Control-Expose-Headers", "WWW-Authenticate")
 	srv.router.ServeHTTP(w, req)
+}
+
+func (srv *Server) options(http.ResponseWriter, *http.Request, httprouter.Params) {
+	// We don't need to do anything here because all the headers
+	// required by OPTIONS are added for every request anyway.
 }
 
 // Close implements io.Closer.Close. It should not be called

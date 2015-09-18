@@ -111,3 +111,49 @@ func assertDoesNotServeVersion(c *gc.C, h http.Handler, vers string) {
 	})
 	c.Assert(rec.Code, gc.Equals, http.StatusNotFound, gc.Commentf("body: %s", rec.Body.Bytes()))
 }
+
+func (s *serverSuite) TestServerHasAccessControlAllowOrigin(c *gc.C) {
+	serverParams := jem.ServerParams{
+		DB: s.Session.DB("foo"),
+	}
+	impl := map[string]jem.NewAPIHandlerFunc{
+		"/a": func(p *jem.Pool, config jem.ServerParams) ([]httprequest.Handler, error) {
+			return []httprequest.Handler{{
+				Method: "GET",
+				Path:   "/a",
+				Handle: func(w http.ResponseWriter, req *http.Request, p httprouter.Params) {
+				},
+			}}, nil
+		},
+	}
+	h, err := jem.NewServer(serverParams, impl)
+	c.Assert(err, gc.IsNil)
+	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Handler: h,
+		URL:     "/a",
+	})
+	c.Assert(rec.Code, gc.Equals, http.StatusOK)
+
+	c.Assert(len(rec.HeaderMap["Access-Control-Allow-Origin"]), gc.Equals, 1)
+	c.Assert(rec.HeaderMap["Access-Control-Allow-Origin"][0], gc.Equals, "*")
+	c.Assert(len(rec.HeaderMap["Access-Control-Allow-Headers"]), gc.Equals, 1)
+	c.Assert(rec.HeaderMap["Access-Control-Allow-Headers"][0], gc.Equals, "Bakery-Protocol-Version, Macaroons, X-Requested-With")
+	c.Assert(len(rec.HeaderMap["Access-Control-Cache-Max-Age"]), gc.Equals, 1)
+	c.Assert(rec.HeaderMap["Access-Control-Cache-Max-Age"][0], gc.Equals, "600")
+	c.Assert(len(rec.HeaderMap["Access-Control-Allow-Methods"]), gc.Equals, 1)
+	c.Assert(rec.HeaderMap["Access-Control-Allow-Methods"][0], gc.Equals, "DELETE,GET,HEAD,PUT,POST,OPTIONS")
+	c.Assert(len(rec.HeaderMap["Access-Control-Allow-Credentials"]), gc.Equals, 1)
+	c.Assert(rec.HeaderMap["Access-Control-Allow-Credentials"][0], gc.Equals, "true")
+	c.Assert(len(rec.HeaderMap["Access-Control-Expose-Headers"]), gc.Equals, 1)
+	c.Assert(rec.HeaderMap["Access-Control-Expose-Headers"][0], gc.Equals, "WWW-Authenticate")
+
+	rec = httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Handler: h,
+		URL:     "/a",
+		Method:  "OPTIONS",
+		Header:  http.Header{"Origin": []string{"MyHost"}},
+	})
+	c.Assert(rec.Code, gc.Equals, http.StatusOK)
+	c.Assert(len(rec.HeaderMap["Access-Control-Allow-Origin"]), gc.Equals, 1)
+	c.Assert(rec.HeaderMap["Access-Control-Allow-Origin"][0], gc.Equals, "MyHost")
+}
