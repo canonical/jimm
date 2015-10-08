@@ -122,7 +122,7 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		ao = o
 	}
 	header.Set("Access-Control-Allow-Origin", ao)
-	header.Set("Access-Control-Allow-Headers", "Bakery-Protocol-Version, Macaroons, X-Requested-With")
+	header.Set("Access-Control-Allow-Headers", "Bakery-Protocol-Version, Macaroons, X-Requested-With, Content-Type")
 	header.Set("Access-Control-Allow-Credentials", "true")
 	header.Set("Access-Control-Cache-Max-Age", "600")
 	// TODO: in handlers, look up methods for this request path and return only those methods here.
