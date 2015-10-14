@@ -20,6 +20,7 @@ type changePermCommand struct {
 	path entityPathValue
 
 	stateServer bool
+	template    bool
 	addRead     userSet
 	removeRead  userSet
 	setRead     userSet
@@ -44,7 +45,8 @@ func (c *changePermCommand) Info() *cmd.Info {
 }
 
 func (c *changePermCommand) SetFlags(f *gnuflag.FlagSet) {
-	f.BoolVar(&c.stateServer, "server", false, "change perm of state server not environment")
+	f.BoolVar(&c.stateServer, "server", false, "change ACL of state server not environment")
+	f.BoolVar(&c.template, "template", false, "change ACL of template not environment")
 	f.Var(&c.addRead, "add-read", "list of names to add to read ACL")
 	f.Var(&c.removeRead, "remove-read", "list of names to remove from read ACL")
 	f.Var(&c.setRead, "set-read", "set read ACL to this list")
@@ -63,6 +65,9 @@ func (c *changePermCommand) Init(args []string) error {
 	}
 	if c.setRead == nil && len(c.addRead) == 0 && len(c.removeRead) == 0 {
 		return errgo.New("no permissions specified")
+	}
+	if c.template && c.stateServer {
+		return errgo.New("cannot specify both --server and --template")
 	}
 	return nil
 }
@@ -101,12 +106,18 @@ func (c *changePermCommand) Run(ctxt *cmd.Context) error {
 func (c *changePermCommand) setPerm(client *jemClient, acl params.ACL) error {
 	logger.Infof("setPerm %#v\n", acl)
 	var err error
-	if c.stateServer {
+	switch {
+	case c.stateServer:
 		err = client.SetStateServerPerm(&params.SetStateServerPerm{
 			EntityPath: c.path.EntityPath,
 			ACL:        acl,
 		})
-	} else {
+	case c.template:
+		err = client.SetTemplatePerm(&params.SetTemplatePerm{
+			EntityPath: c.path.EntityPath,
+			ACL:        acl,
+		})
+	default:
 		err = client.SetEnvironmentPerm(&params.SetEnvironmentPerm{
 			EntityPath: c.path.EntityPath,
 			ACL:        acl,
@@ -118,11 +129,16 @@ func (c *changePermCommand) setPerm(client *jemClient, acl params.ACL) error {
 func (c *changePermCommand) getPerm(client *jemClient) (params.ACL, error) {
 	var acl params.ACL
 	var err error
-	if c.stateServer {
+	switch {
+	case c.stateServer:
 		acl, err = client.GetStateServerPerm(&params.GetStateServerPerm{
 			EntityPath: c.path.EntityPath,
 		})
-	} else {
+	case c.template:
+		acl, err = client.GetTemplatePerm(&params.GetTemplatePerm{
+			EntityPath: c.path.EntityPath,
+		})
+	default:
 		acl, err = client.GetEnvironmentPerm(&params.GetEnvironmentPerm{
 			EntityPath: c.path.EntityPath,
 		})

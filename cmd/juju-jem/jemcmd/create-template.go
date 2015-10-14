@@ -4,11 +4,11 @@ package jemcmd
 
 import (
 	"github.com/juju/cmd"
+	"github.com/juju/utils/keyvalues"
 	"gopkg.in/errgo.v1"
 	"launchpad.net/gnuflag"
 
 	"github.com/CanonicalLtd/jem/params"
-	"github.com/juju/utils/keyvalues"
 )
 
 type createTemplateCommand struct {
