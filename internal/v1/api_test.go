@@ -420,7 +420,7 @@ func (s *APISuite) TestAddJESUnauthenticatedWithBakeryProtocol(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "PUT",
 		Handler: s.srv,
-		Header : map[string][]string{"Bakery-Protocol-Version": []string{"1"}},
+		Header:  map[string][]string{"Bakery-Protocol-Version": []string{"1"}},
 		URL:     "/v1/server/user/env",
 		ExpectBody: httptesting.BodyAsserter(func(c *gc.C, m json.RawMessage) {
 			// Allow any body - TestGetEnvironmentNotFound will check that it's a valid macaroon.

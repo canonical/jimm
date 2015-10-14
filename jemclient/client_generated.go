@@ -63,8 +63,8 @@ func (c *client) GetTemplate(p *params.GetTemplate) (*params.TemplateResponse, e
 
 // GetTemplatePerm returns the ACL for a given template.
 // Only the owner (arg.EntityPath.User) can read the ACL.
-func (c *client) GetTemplatePerm(p *params.GetTemplatePerm) (*params.ACL, error) {
-	var r *params.ACL
+func (c *client) GetTemplatePerm(p *params.GetTemplatePerm) (params.ACL, error) {
+	var r params.ACL
 	err := c.Client.Call(p, &r)
 	return r, err
 }

@@ -128,6 +128,49 @@ func (s *changepermSuite) TestChangePerm(c *gc.C) {
 	})
 }
 
+func (s *changepermSuite) TestChangeTemplatePerm(c *gc.C) {
+	s.idmSrv.AddUser("bob")
+	s.idmSrv.SetDefaultUser("bob")
+
+	// First add the state server that we're going to use
+	// to create the new template.
+	stdout, stderr, code := run(c, c.MkDir(), "add-server", "bob/foo")
+	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
+	c.Assert(stdout, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, "")
+
+	stdout, stderr, code = run(c, c.MkDir(), "create-template", "--server", "bob/foo", "bob/mytemplate", "state-server=true", "apt-mirror=0.1.2.3")
+	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
+	c.Assert(stdout, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, "")
+
+	// Check that we can't read the template as another user
+	// but we can as bob.
+	aliceClient := s.jemClient("alice")
+	_, err := aliceClient.GetTemplate(&params.GetTemplate{
+		EntityPath: params.EntityPath{"bob", "mytemplate"},
+	})
+	c.Assert(err, gc.ErrorMatches, "GET http://.*/v1/template/bob/mytemplate: unauthorized")
+
+	bobClient := s.jemClient("bob")
+	_, err = bobClient.GetTemplate(&params.GetTemplate{
+		EntityPath: params.EntityPath{"bob", "mytemplate"},
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Change the permissions of the template to allow alice.
+	stdout, stderr, code = run(c, c.MkDir(), "change-perm", "--template", "--add-read", "alice", "bob/mytemplate")
+	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
+	c.Assert(stdout, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, "")
+
+	// Check that alice can now read the template.
+	_, err = aliceClient.GetTemplate(&params.GetTemplate{
+		EntityPath: params.EntityPath{"bob", "mytemplate"},
+	})
+	c.Assert(err, gc.IsNil)
+}
+
 var changepermErrorTests = []struct {
 	about        string
 	args         []string
@@ -172,6 +215,11 @@ var changepermErrorTests = []struct {
 	about:        "--set-read not allowed with --remove-read even when empty",
 	args:         []string{"--set-read", "", "--remove-read", "bob", "foo/bar"},
 	expectStderr: `cannot specify --set-read with either --add-read or --remove-read`,
+	expectCode:   2,
+}, {
+	about:        "--server not allowed with --template",
+	args:         []string{"--server", "--template", "--set-read", "bob", "foo/bar"},
+	expectStderr: `cannot specify both --server and --template`,
 	expectCode:   2,
 }, {
 	about:        "no permissions specified",
