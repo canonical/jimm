@@ -13,6 +13,7 @@ import (
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
 	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jem/internal/apiconn"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
@@ -208,6 +209,31 @@ func (j *JEM) AddStateServer(srv *mongodoc.StateServer, env *mongodoc.Environmen
 	return nil
 }
 
+// DeleteStateServer deletes existing state server and all of its
+// associated environments from the database. It returns an error if
+// either deletion fails. If there is no matching state server then the
+// error will have the cause params.ErrNotFound.
+//
+// Note that this operation is not atomic.
+func (j *JEM) DeleteStateServer(path params.EntityPath) error {
+	// TODO (urosj) make this operation atomic.
+	logger.Infof("Deleting state server %s", path)
+	// Delete its environments first.
+	_, err := j.DB.Environments().RemoveAll(bson.D{{"stateserver", path}})
+	if err != nil {
+		return errgo.Notef(err, "error deleting state-server environments")
+	}
+	// Then delete the state server.
+	err = j.DB.StateServers().RemoveId(path.String())
+	if err == mgo.ErrNotFound {
+		return errgo.WithCausef(nil, params.ErrNotFound, "state server %q not found", path)
+	}
+	if err != nil {
+		return errgo.Notef(err, "cannot delete state server")
+	}
+	return nil
+}
+
 // AddEnvironment adds a new environment to the database.
 // It returns an error with a params.ErrAlreadyExists
 // cause if there is already an environment with the given name.
@@ -221,6 +247,32 @@ func (j *JEM) AddEnvironment(env *mongodoc.Environment) error {
 	}
 	if err != nil {
 		return errgo.Notef(err, "cannot insert state server environment")
+	}
+	return nil
+}
+
+// DeleteEnvironment deletes an environment from the database. If an
+// environment is also a state server it will not be deleted and an error
+// with a cause of params.ErrForbidden will be returned. If the
+// environment cannot be found then an error with a cause of
+// params.ErrNotFound is returned.
+func (j *JEM) DeleteEnvironment(path params.EntityPath) error {
+	// TODO when we monitor environment health, prohibit this method
+	// and delete the environment automatically when it is destroyed.
+	logger.Infof("Deleting environment %s", path)
+	// Check if env is also a JES.
+	var srv mongodoc.StateServer
+	err := j.DB.StateServers().FindId(path.String()).One(&srv)
+	if err == nil {
+		// Environment is a state server, abort delete.
+		return errgo.WithCausef(nil, params.ErrForbidden, "cannot remove environment %q because it is a state server", path)
+	}
+	err = j.DB.Environments().RemoveId(path.String())
+	if err == mgo.ErrNotFound {
+		return errgo.WithCausef(nil, params.ErrNotFound, "environment %q not found", path)
+	}
+	if err != nil {
+		return errgo.Notef(err, "could not delete environment")
 	}
 	return nil
 }
@@ -314,6 +366,18 @@ func (j *JEM) AddTemplate(tmpl *mongodoc.Template) error {
 	_, err := j.DB.Templates().UpsertId(tmpl.Id, tmpl)
 	if err != nil {
 		return errgo.Notef(err, "cannot add template doc")
+	}
+	return nil
+}
+
+// DeleteTemplate removes existing template from the
+// database. It returns an error with a params.ErrNotFound
+// cause if the template was not found.
+func (j *JEM) DeleteTemplate(path params.EntityPath) error {
+	logger.Infof("Deleting template %s", path)
+	err := j.DB.Templates().RemoveId(path.String())
+	if err != nil {
+		return errgo.WithCausef(nil, params.ErrNotFound, "template %q not found", path)
 	}
 	return nil
 }

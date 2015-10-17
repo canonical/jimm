@@ -120,6 +120,18 @@ func (h *Handler) GetJES(arg *params.GetJES) (*params.JESResponse, error) {
 	}, nil
 }
 
+// DeleteJES removes an existing state server.
+func (h *Handler) DeleteJES(arg *params.DeleteJES) error {
+	// Check if user has permissions.
+	if err := h.jem.CheckIsUser(arg.EntityPath.User); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	if err := h.jem.DeleteStateServer(arg.EntityPath); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return nil
+}
+
 // GetEnvironment returns information on a given environment.
 func (h *Handler) GetEnvironment(arg *params.GetEnvironment) (*params.EnvironmentResponse, error) {
 	if err := h.jem.CheckReadACL(h.jem.DB.Environments(), arg.EntityPath); err != nil {
@@ -141,6 +153,17 @@ func (h *Handler) GetEnvironment(arg *params.GetEnvironment) (*params.Environmen
 		CACert:    srv.CACert,
 		HostPorts: srv.HostPorts,
 	}, nil
+}
+
+// DeleteEnvironment deletes an environment from JEM.
+func (h *Handler) DeleteEnvironment(arg *params.DeleteEnvironment) error {
+	if err := h.jem.CheckIsUser(arg.EntityPath.User); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	if err := h.jem.DeleteEnvironment(arg.EntityPath); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrForbidden))
+	}
+	return nil
 }
 
 // ListEnvironments returns all the environments stored in JEM.
@@ -381,6 +404,17 @@ func (h *Handler) GetTemplate(arg *params.GetTemplate) (*params.TemplateResponse
 		Schema: tmpl.Schema,
 		Config: tmpl.Config,
 	}, nil
+}
+
+// DeleteTemplate deletes a template.
+func (h *Handler) DeleteTemplate(arg *params.DeleteTemplate) error {
+	if err := h.jem.CheckIsUser(arg.EntityPath.User); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	if err := h.jem.DeleteTemplate(arg.EntityPath); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return nil
 }
 
 // hideTemplateSecrets zeros all secret fields in the

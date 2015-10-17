@@ -68,6 +68,12 @@ type AddJES struct {
 	Info ServerInfo `httprequest:",body"`
 }
 
+// DeleteJES holds the parameters for removing the JES.
+type DeleteJES struct {
+	httprequest.Route `httprequest:"DELETE /v1/server/:User/:Name"`
+	EntityPath
+}
+
 // ServerInfo holds information specifying how
 // to connect to an existing state server.
 type ServerInfo struct {
@@ -132,6 +138,13 @@ func (p EntityPath) MarshalText() ([]byte, error) {
 // an environment.
 type GetEnvironment struct {
 	httprequest.Route `httprequest:"GET /v1/env/:User/:Name"`
+	EntityPath
+}
+
+// DeleteEnvironment holds parameters for deletion of
+// an environment.
+type DeleteEnvironment struct {
+	httprequest.Route `httprequest:"DELETE /v1/env/:User/:Name"`
 	EntityPath
 }
 
@@ -206,6 +219,12 @@ type TemplateResponse struct {
 // GetTemplate holds parameters for retrieving information on a template.
 type GetTemplate struct {
 	httprequest.Route `httprequest:"GET /v1/template/:User/:Name"`
+	EntityPath
+}
+
+// DeleteTemplate holds parameters for deletion of a template.
+type DeleteTemplate struct {
+	httprequest.Route `httprequest:"DELETE /v1/template/:User/:Name"`
 	EntityPath
 }
 
