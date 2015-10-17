@@ -456,6 +456,63 @@ func (s *APISuite) TestGetEnvironmentNotFound(c *gc.C) {
 	})
 }
 
+func (s *APISuite) TestDeleteEnvironmentNotFound(c *gc.C) {
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "DELETE",
+		Handler: s.srv,
+		URL:     "/v1/env/user/foo",
+		ExpectBody: &params.Error{
+			Message: `environment "user/foo" not found`,
+			Code:    params.ErrNotFound,
+		},
+		ExpectStatus: http.StatusNotFound,
+		Do:           bakeryDo(s.idmSrv.Client("user")),
+	})
+}
+
+func (s *APISuite) TestDeleteEnvironment(c *gc.C) {
+	srvId := s.addStateServer(c, params.EntityPath{"bob", "who"})
+	envPath := params.EntityPath{"bob", "foobarred"}
+	envId, user, uuid := s.addEnvironment(c, envPath, srvId)
+	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Handler: s.srv,
+		URL:     "/v1/env/" + envId.String(),
+		Do:      bakeryDo(s.idmSrv.Client("bob")),
+	})
+	c.Assert(resp.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %s", resp.Body.Bytes()))
+	c.Assert(user, gc.NotNil)
+	c.Assert(uuid, gc.NotNil)
+
+	// Delete environemnt.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:       "DELETE",
+		Handler:      s.srv,
+		URL:          "/v1/env/" + envId.String(),
+		ExpectStatus: http.StatusOK,
+		Do:           bakeryDo(s.idmSrv.Client("bob")),
+	})
+	// Check that it doesn't exist anymore.
+	resp = httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Handler: s.srv,
+		URL:     "/v1/env/" + envId.String(),
+		Do:      bakeryDo(s.idmSrv.Client("bob")),
+	})
+	c.Assert(resp.Code, gc.Equals, http.StatusNotFound, gc.Commentf("body: %s", resp.Body.Bytes()))
+
+	// Try deleting environment for JES.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:       "DELETE",
+		Handler:      s.srv,
+		URL:          "/v1/env/" + srvId.String(),
+		ExpectStatus: http.StatusBadRequest,
+		ExpectBody: &params.Error{
+			Message: `environment "bob/who" is a state server: failed`,
+			Code:    params.ErrBadRequest,
+		},
+		Do: bakeryDo(s.idmSrv.Client("bob")),
+	})
+}
+
 func (s *APISuite) TestGetStateServer(c *gc.C) {
 	srvId := s.addStateServer(c, params.EntityPath{"bob", "foo"})
 
@@ -502,6 +559,55 @@ func (s *APISuite) TestGetStateServerNotFound(c *gc.C) {
 		ExpectStatus: http.StatusUnauthorized,
 		Do:           bakeryDo(s.idmSrv.Client("alice")),
 	})
+}
+
+func (s *APISuite) TestDeleteJESNotFound(c *gc.C) {
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "DELETE",
+		Handler: s.srv,
+		URL:     "/v1/server/bob/foobarred",
+		ExpectBody: &params.Error{
+			Message: `state server "bob/foobarred" not found`,
+			Code:    params.ErrNotFound,
+		},
+		ExpectStatus: http.StatusNotFound,
+		Do:           bakeryDo(s.idmSrv.Client("bob")),
+	})
+}
+
+func (s *APISuite) TestDeleteJES(c *gc.C) {
+	// Define state server.
+	srvId := s.addStateServer(c, params.EntityPath{"bob", "foobarred"})
+	// Add state server to JEM.
+	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Handler: s.srv,
+		URL:     "/v1/server/" + srvId.String(),
+		Do:      bakeryDo(s.idmSrv.Client("bob")),
+	})
+	// Assert that it was added.
+	c.Assert(resp.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %s", resp.Body.Bytes()))
+	// Delete server.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:       "DELETE",
+		Handler:      s.srv,
+		URL:          "/v1/server/bob/foobarred",
+		ExpectStatus: http.StatusOK,
+		Do:           bakeryDo(s.idmSrv.Client("bob")),
+	})
+	// Check that it doesn't exist anymore.
+	resp = httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Handler: s.srv,
+		URL:     "/v1/server/" + srvId.String(),
+		Do:      bakeryDo(s.idmSrv.Client("bob")),
+	})
+	c.Assert(resp.Code, gc.Equals, http.StatusNotFound, gc.Commentf("body: %s", resp.Body.Bytes()))
+	// Check that its environment doesn't exist.
+	resp = httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Handler: s.srv,
+		URL:     "/v1/env/" + srvId.String(),
+		Do:      bakeryDo(s.idmSrv.Client("bob")),
+	})
+	c.Assert(resp.Code, gc.Equals, http.StatusNotFound, gc.Commentf("body: %s", resp.Body.Bytes()))
 }
 
 func (s *APISuite) TestNewEnvironment(c *gc.C) {
@@ -1314,6 +1420,56 @@ func (s *APISuite) TestAddInvalidTemplate(c *gc.C) {
 		})
 		c.Assert(err, gc.ErrorMatches, test.expectError)
 	}
+}
+
+func (s *APISuite) TestDeleteTemplateNotFound(c *gc.C) {
+	templPath := params.EntityPath{"alice", "foo"}
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:       "DELETE",
+		Handler:      s.srv,
+		URL:          "/v1/template/" + templPath.String(),
+		ExpectStatus: http.StatusNotFound,
+		ExpectBody: &params.Error{
+			Message: `template "alice/foo" not found`,
+			Code:    params.ErrNotFound,
+		},
+		Do: bakeryDo(s.idmSrv.Client("alice")),
+	})
+}
+
+func (s *APISuite) TestDeleteTemplate(c *gc.C) {
+	srvId := s.addStateServer(c, params.EntityPath{"alice", "foo"})
+	templPath := params.EntityPath{"alice", "foo"}
+	err := s.client("alice").AddTemplate(&params.AddTemplate{
+		EntityPath: templPath,
+		Info: params.AddTemplateInfo{
+			StateServer: srvId,
+			Config: map[string]interface{}{
+				"state-server":      true,
+				"admin-secret":      "my secret",
+				"authorized-keys":   sshKey,
+				"bootstrap-timeout": 9999,
+			},
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:       "DELETE",
+		Handler:      s.srv,
+		URL:          "/v1/template/" + templPath.String(),
+		ExpectStatus: http.StatusOK,
+		Do:           bakeryDo(s.idmSrv.Client("alice")),
+	})
+
+	// Check that it is no longer available.
+	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Handler: s.srv,
+		URL:     "/v1/template/" + templPath.String(),
+		Do:      bakeryDo(s.idmSrv.Client("alice")),
+	})
+	c.Assert(resp.Code, gc.Equals, http.StatusNotFound, gc.Commentf("body: %s", resp.Body.Bytes()))
+
 }
 
 // addStateServer adds a new stateserver named name under the
