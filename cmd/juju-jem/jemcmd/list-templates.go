@@ -35,7 +35,7 @@ func (c *listTemplatesCommand) Init(args []string) error {
 }
 
 func (c *listTemplatesCommand) Run(ctxt *cmd.Context) error {
-	client, err := c.newClient()
+	client, err := c.newClient(ctxt)
 	if err != nil {
 		return errgo.Mask(err)
 	}
