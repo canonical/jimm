@@ -18,7 +18,9 @@ import (
 	"github.com/juju/utils"
 	"golang.org/x/net/publicsuffix"
 	"gopkg.in/errgo.v1"
+	esform "gopkg.in/juju/environschema.v1/form"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/macaroon-bakery.v1/httpbakery/form"
 	"launchpad.net/gnuflag"
 
 	"github.com/CanonicalLtd/jem/jemclient"
@@ -118,7 +120,7 @@ type jemClient struct {
 // the associated cookie jar used to save authorization
 // macaroons. If authUsername and authPassword are provided, the resulting
 // client will use HTTP basic auth with the given credentials.
-func (c *commandBase) newClient() (*jemClient, error) {
+func (c *commandBase) newClient(ctxt *cmd.Context) (*jemClient, error) {
 	cookieFile := cookieFile()
 	jar, err := cookiejar.New(&cookiejar.Options{
 		PublicSuffixList: publicsuffix.List,
@@ -132,12 +134,19 @@ func (c *commandBase) newClient() (*jemClient, error) {
 	}
 	httpClient := httpbakery.NewHTTPClient()
 	httpClient.Jar = jar
+	httpbakeryClient := &httpbakery.Client{
+		VisitWebPage: httpbakery.OpenWebBrowser,
+		Client:       httpClient,
+	}
+	form.SetUpAuth(httpbakeryClient, &esform.PromptingFiller{
+		Prompter: esform.IOPrompter{
+			In:  ctxt.Stdin,
+			Out: ctxt.Stderr,
+		},
+	})
 	jclient := jemclient.New(jemclient.NewParams{
 		BaseURL: c.serverURL(),
-		Client: &httpbakery.Client{
-			VisitWebPage: httpbakery.OpenWebBrowser,
-			Client:       httpClient,
-		},
+		Client:  httpbakeryClient,
 	})
 	return &jemClient{
 		Client: jclient,
