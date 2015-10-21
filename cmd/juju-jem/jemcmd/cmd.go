@@ -138,11 +138,9 @@ func (c *commandBase) newClient(ctxt *cmd.Context) (*jemClient, error) {
 		VisitWebPage: httpbakery.OpenWebBrowser,
 		Client:       httpClient,
 	}
-	form.SetUpAuth(httpbakeryClient, &esform.PromptingFiller{
-		Prompter: esform.IOPrompter{
-			In:  ctxt.Stdin,
-			Out: ctxt.Stderr,
-		},
+	form.SetUpAuth(httpbakeryClient, esform.IOFiller{
+		In:  ctxt.Stdin,
+		Out: ctxt.Stderr,
 	})
 	jclient := jemclient.New(jemclient.NewParams{
 		BaseURL: c.serverURL(),

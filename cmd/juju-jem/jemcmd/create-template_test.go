@@ -3,10 +3,15 @@
 package jemcmd_test
 
 import (
+	"fmt"
+
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/juju/environschema.v1"
+	"gopkg.in/juju/environschema.v1/form"
 
+	"github.com/CanonicalLtd/jem/cmd/juju-jem/jemcmd"
 	"github.com/CanonicalLtd/jem/params"
 )
 
@@ -28,7 +33,7 @@ func (s *createTemplateSuite) TestCreateTemplate(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	// Then verify that the template does not already exit.
+	// Then verify that the template does not already exist.
 	_, err := client.GetTemplate(&params.GetTemplate{
 		EntityPath: params.EntityPath{"bob", "foo"},
 	})
@@ -45,6 +50,69 @@ func (s *createTemplateSuite) TestCreateTemplate(c *gc.C) {
 	c.Assert(tmpl.Config, jc.DeepEquals, map[string]interface{}{
 		"state-server": true,
 		"apt-mirror":   "0.1.2.3",
+	})
+}
+
+func (s *createTemplateSuite) TestInteractive(c *gc.C) {
+	jemcmd.PatchProviderDefaults(s, map[string]map[string]func() (interface{}, error){
+		"dummy": {
+			"testattr": func() (interface{}, error) {
+				return "testattr-default-value", nil
+			},
+		},
+	})
+	s.PatchValue(jemcmd.IOFillerFill, func(filler form.IOFiller, f form.Form) (map[string]interface{}, error) {
+		// Verify that the filler values look reasonable without actually
+		// invoking the actual IO filler (well tested elsewhere).
+		// This saves us from depending on the actual dummy provider
+		// attributes.
+		c.Assert(filler.In, gc.Equals, emptyReader{})
+		fmt.Fprint(filler.Out, "test output")
+		c.Assert(filler.ShowDescriptions, gc.Equals, true)
+
+		for name, field := range f.Fields {
+			c.Assert(field.Mandatory, gc.Equals, false, gc.Commentf("field %s", name))
+		}
+		// Ensure that the GetDefault machinery is hooked up
+		// by calling GetDefault and ensuring that it fetches
+		// the value from the provider defaults.
+		attr := form.NamedAttr{
+			Name: "testattr",
+			Attr: environschema.Attr{
+				Type: environschema.Tstring,
+			},
+		}
+		checker, err := attr.Checker()
+		c.Assert(err, gc.IsNil)
+		val, display, err := filler.GetDefault(attr, checker)
+		c.Assert(err, gc.IsNil)
+		c.Assert(display, gc.Equals, "")
+		c.Assert(val, gc.Equals, "testattr-default-value")
+		return map[string]interface{}{
+			"state-server": true,
+		}, nil
+	})
+	s.idmSrv.AddUser("bob")
+	s.idmSrv.SetDefaultUser("bob")
+	client := s.jemClient("bob")
+
+	// First add the state server that we're going to use
+	// to create the new environment.
+	stdout, stderr, code := run(c, c.MkDir(), "add-server", "bob/foo")
+	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
+	c.Assert(stdout, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, "")
+
+	stdout, stderr, code = run(c, c.MkDir(), "create-template", "--server", "bob/foo", "-i", "bob/mytemplate")
+	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
+	c.Assert(stdout, gc.Equals, "test output")
+	c.Assert(stderr, gc.Equals, "")
+	tmpl, err := client.GetTemplate(&params.GetTemplate{
+		EntityPath: params.EntityPath{"bob", "mytemplate"},
+	})
+	c.Assert(err, gc.IsNil)
+	c.Assert(tmpl.Config, jc.DeepEquals, map[string]interface{}{
+		"state-server": true,
 	})
 }
 

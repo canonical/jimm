@@ -6,6 +6,7 @@ import (
 	"github.com/juju/cmd"
 	"github.com/juju/utils/keyvalues"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/juju/environschema.v1/form"
 	"launchpad.net/gnuflag"
 
 	"github.com/CanonicalLtd/jem/params"
@@ -17,6 +18,7 @@ type createTemplateCommand struct {
 	templatePath entityPathValue
 	srvPath      entityPathValue
 	attrs        map[string]string
+	interactive  bool
 }
 
 var createTemplateDoc = `
@@ -43,6 +45,8 @@ func (c *createTemplateCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.commandBase.SetFlags(f)
 	f.Var(&c.srvPath, "s", "state server to use as the schema for the template")
 	f.Var(&c.srvPath, "server", "")
+	f.BoolVar(&c.interactive, "i", false, "interactively prompt for configuration attributes")
+	f.BoolVar(&c.interactive, "interactive", false, "")
 	// TODO
 	//f.BoolVar(&c.useDefaults, "default", false, "use environment variables to set default values")
 	// This would call setConfigDefaults on the configuration
@@ -60,6 +64,14 @@ func (c *createTemplateCommand) Init(args []string) error {
 	if c.srvPath.EntityPath == (params.EntityPath{}) {
 		return errgo.Newf("--server flag required but not provided")
 	}
+	if c.interactive {
+		// TODO allow attributes to specify default values (or just omit)
+		// in interactive mode?
+		if len(args) > 1 {
+			return errgo.Newf("attributes cannot be specified in interactive mode")
+		}
+		return nil
+	}
 	attrs, err := keyvalues.Parse(args[1:], true)
 	if err != nil {
 		return errgo.Mask(err)
@@ -68,6 +80,8 @@ func (c *createTemplateCommand) Init(args []string) error {
 	return nil
 }
 
+var ioFillerFill = form.IOFiller.Fill
+
 func (c *createTemplateCommand) Run(ctxt *cmd.Context) error {
 	client, err := c.newClient(ctxt)
 	if err != nil {
@@ -75,11 +89,41 @@ func (c *createTemplateCommand) Run(ctxt *cmd.Context) error {
 	}
 	defer client.Close()
 
-	// TODO GetJES to find the schema when implementing
-	// the --default flag.
-	config := make(map[string]interface{})
-	for name, val := range c.attrs {
-		config[name] = val
+	var config map[string]interface{}
+	if c.interactive {
+		jesInfo, err := client.GetJES(&params.GetJES{
+			EntityPath: c.srvPath.EntityPath,
+		})
+		if err != nil {
+			return errgo.Notef(err, "cannot get state server")
+		}
+		defaultsCtxt := schemaContext{
+			providerType: jesInfo.ProviderType,
+		}
+		filler := form.IOFiller{
+			In:               ctxt.Stdin,
+			Out:              ctxt.Stdout,
+			ShowDescriptions: true,
+			GetDefault:       defaultsCtxt.getDefault,
+		}
+		// All attributes are optional in a template.
+		for name, field := range jesInfo.Schema {
+			field.Mandatory = false
+			jesInfo.Schema[name] = field
+		}
+		config, err = ioFillerFill(filler, form.Form{
+			Fields: jesInfo.Schema,
+		})
+		if err != nil {
+			return errgo.Mask(err)
+		}
+	} else {
+		// TODO GetJES to find the schema when implementing
+		// the --default flag.
+		config = make(map[string]interface{})
+		for name, val := range c.attrs {
+			config[name] = val
+		}
 	}
 	if err := client.AddTemplate(&params.AddTemplate{
 		EntityPath: c.templatePath.EntityPath,
