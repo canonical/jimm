@@ -4,10 +4,10 @@ package jemcmd_test
 
 import (
 	"bytes"
+	"io"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/juju/cmd"
 	jujufeature "github.com/juju/juju/feature"
@@ -36,13 +36,19 @@ func run(c *gc.C, dir string, cmdName string, args ...string) (stdout, stderr st
 	var stdoutBuf, stderrBuf bytes.Buffer
 	ctxt := &cmd.Context{
 		Dir:    dir,
-		Stdin:  strings.NewReader(""),
+		Stdin:  emptyReader{},
 		Stdout: &stdoutBuf,
 		Stderr: &stderrBuf,
 	}
 	allArgs := append([]string{cmdName}, args...)
 	exitCode = cmd.Main(jemcmd.New(), ctxt, allArgs)
 	return stdoutBuf.String(), stderrBuf.String(), exitCode
+}
+
+type emptyReader struct{}
+
+func (emptyReader) Read([]byte) (int, error) {
+	return 0, io.EOF
 }
 
 type commonSuite struct {

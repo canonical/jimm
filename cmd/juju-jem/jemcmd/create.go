@@ -8,14 +8,15 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
-	"strings"
 
 	"github.com/juju/cmd"
 	jujuconfig "github.com/juju/juju/environs/config"
 	"github.com/juju/juju/juju/osenv"
+	"github.com/juju/schema"
 	"github.com/juju/utils"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/environschema.v1"
+	"gopkg.in/juju/environschema.v1/form"
 	"gopkg.in/yaml.v1"
 	"launchpad.net/gnuflag"
 
@@ -101,11 +102,14 @@ func (c *createCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Notef(err, "cannot get JES info")
 	}
-	defaultsCtxt := providerDefaultsContext{
-		envName: c.envPath.Name,
+	defaultsCtxt := schemaContext{
+		envName:      c.envPath.Name,
+		providerType: jesInfo.ProviderType,
+		knownAttrs:   config,
 	}
-	if err := setConfigDefaults(config, jesInfo, defaultsCtxt); err != nil {
-		return errgo.Notef(err, "cannot add default values for configuration file")
+	config, err = defaultsCtxt.generateConfig(jesInfo.Schema)
+	if err != nil {
+		return errgo.Notef(err, "invalid configuration")
 	}
 	// Generate a random password for the user.
 	// TODO potentially allow the password to be specified in
@@ -128,108 +132,134 @@ func (c *createCommand) Run(ctxt *cmd.Context) error {
 	})
 }
 
-func setConfigDefaults(config map[string]interface{}, jesInfo *params.JESResponse, ctxt providerDefaultsContext) error {
-	// Authorized keys are special because the path is relative
-	// to $HOME/.ssh by default.
-	if _, ok := jesInfo.Schema["authorized-keys"]; ok && config["authorized-keys"] == nil {
-		// Load authorized-keys-path into authorized-keys if necessary.
-		path, _ := config["authorized-keys-path"].(string)
+type schemaContext struct {
+	envName      params.Name
+	providerType string
+	knownAttrs   map[string]interface{}
+}
+
+func (ctxt schemaContext) generateConfig(schema environschema.Fields) (map[string]interface{}, error) {
+	config := make(map[string]interface{})
+	for name, attr := range schema {
+		checker, err := attr.Checker()
+		if err != nil {
+			return nil, errgo.Notef(err, "invalid attribute %q", name)
+		}
+		val, _, err := ctxt.getDefault(form.NamedAttr{
+			Name: name,
+			Attr: attr,
+		}, checker)
+		if err != nil {
+			return nil, errgo.Mask(err)
+		}
+		if val == nil && attr.Mandatory {
+			return nil, errgo.Newf("no value found for mandatory attribute %q", name)
+		}
+		if val != nil {
+			config[name] = val
+		}
+	}
+	return config, nil
+}
+
+// getDefault gets the default value for the given attribute.
+// It can be plugged into environschema/form.IOFiller.GetDefault.
+func (ctxt schemaContext) getDefault(attr form.NamedAttr, checker schema.Checker) (val interface{}, display string, err error) {
+	val, display, from, err := ctxt.getDefault1(attr, checker)
+	if err != nil {
+		return nil, "", errgo.Notef(err, "cannot get value for %q", attr.Name)
+	}
+	if val == nil {
+		return nil, "", nil
+	}
+	val, err = checker.Coerce(val, nil)
+	if err != nil {
+		return nil, "", errgo.Notef(err, "bad value for %q in %s", attr.Name, from)
+	}
+	return val, display, nil
+}
+
+// getDefault1 is the internal version of getDefault. It does
+// not coerce the returned value through the checker,
+// and it also returns the source of the value so that
+// that can be included in an error message if the value
+// is erroneous.
+func (ctxt schemaContext) getDefault1(attr form.NamedAttr, checker schema.Checker) (val interface{}, display string, from string, err error) {
+	if val, ok := ctxt.knownAttrs[attr.Name]; ok {
+		return val, "", "attributes", nil
+	}
+	if attr.Name == "authorized-keys" {
+		path, _ := ctxt.knownAttrs["authorized-keys-path"].(string)
 		keys, err := jujuconfig.ReadAuthorizedKeys(path)
 		if err != nil {
-			return errgo.Notef(err, "cannot read authorized keys")
+			return nil, "", "", errgo.Notef(err, "cannot read authorized keys")
 		}
-		config["authorized-keys"] = keys
-		delete(config, "authorized-keys-path")
+		display := path
+		if display == "" {
+			display = "default authorized keys paths"
+		}
+		return keys, display, "authorized keys file", nil
 	}
-
-	// Any string configuration attribute may be specified
-	// with a -path attribute.
-	for pathAttr, path := range config {
-		if !strings.HasSuffix(pathAttr, "-path") {
-			continue
-		}
-		attr := strings.TrimSuffix(pathAttr, "-path")
-		field, ok := jesInfo.Schema[attr]
-		if !ok || field.Type != environschema.Tstring {
-			continue
-		}
-		pathStr, ok := path.(string)
-		if !ok || pathStr == "" {
-			// Probably just malformed - let the server deal with it.
-			continue
-		}
-		delete(config, pathAttr)
-		val, err := readFile(pathStr)
+	path, _ := ctxt.knownAttrs[attr.Name+"-path"].(string)
+	if path != "" && attr.Type == environschema.Tstring {
+		// Any string configuration attribute may be specified
+		// with a -path attribute.
+		val, path, err := readFile(path)
 		if err != nil {
-			return errgo.Notef(err, "cannot get value for %q", pathStr)
+			return nil, "", path, errgo.Mask(err)
 		}
-		config[attr] = val
+		return val, path, path, nil
 	}
-
-	// Fill config attributes from appropriate environment variables
-fill:
-	for name, attr := range jesInfo.Schema {
-		if config[name] != nil {
-			continue
-		}
-		if attr.EnvVar != "" {
-			// TODO it could be a problem that this potentially
-			// enables a rogue JEM server to retrieve arbitrary
-			// environment variables from a client. Implement
-			// some kind of whitelisting scheme?
-			if v := os.Getenv(attr.EnvVar); v != "" {
-				config[name] = v
-				continue
-			}
-		}
-		for _, vname := range attr.EnvVars {
-			if v := os.Getenv(vname); v != "" {
-				config[name] = v
-				continue fill
-			}
-		}
-		if f := providerDefaults[jesInfo.ProviderType][name]; f != nil {
-			v, err := f(ctxt)
-			if err != nil {
-				return errgo.Notef(err, "cannot make default value for %q", name)
-			}
-			config[name] = v
-		}
+	// TODO it could be a problem that this potentially
+	// enables a rogue JEM server to retrieve arbitrary
+	// environment variables from a client. Implement
+	// some kind of whitelisting scheme?
+	val, _, err = form.DefaultFromEnv(attr, checker)
+	if err != nil {
+		return val, "", "", errgo.Mask(err)
 	}
-	return nil
+	if val != nil {
+		return val, "", "", nil
+	}
+	f := providerDefaults[ctxt.providerType][attr.Name]
+	if f == nil {
+		logger.Infof("none found")
+		return nil, "", "", nil
+	}
+	v, err := f(ctxt)
+	if err != nil {
+		return nil, "", "", errgo.Mask(err)
+	}
+	return v, "", "provider defaults", nil
 }
 
 // readFile reads an attribute from the given file path.
 // If the path is relative, then it is treated as releative
 // to $JUJU_HOME. Also, an initial "~" is expanded to $HOME.
-func readFile(path string) (string, error) {
+func readFile(path string) (val string, finalPath string, err error) {
 	// The logic here is largely copied from the
 	// maybeReadAttrFromFile function in juju/environs/config.
-	path, err := utils.NormalizePath(path)
+	finalPath, err = utils.NormalizePath(path)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	if !filepath.IsAbs(path) {
+	if !filepath.IsAbs(finalPath) {
 		if !osenv.IsJujuHomeSet() {
-			return "", errgo.Newf("JUJU_HOME not set, not attempting to read file %q", path)
+			return "", "", errgo.Newf("JUJU_HOME not set, not attempting to read file %q", finalPath)
 		}
-		path = osenv.JujuHomePath(path)
+		finalPath = osenv.JujuHomePath(finalPath)
 	}
-	data, err := ioutil.ReadFile(path)
+	data, err := ioutil.ReadFile(finalPath)
 	if err != nil {
-		return "", errgo.Mask(err)
+		return "", "", errgo.Mask(err)
 	}
 	if len(data) == 0 {
-		return "", fmt.Errorf("file %q is empty", path)
+		return "", "", fmt.Errorf("file %q is empty", finalPath)
 	}
-	return string(data), nil
+	return string(data), finalPath, nil
 }
 
-type providerDefaultsContext struct {
-	envName params.Name
-}
-
-var providerDefaults = map[string]map[string]func(providerDefaultsContext) (interface{}, error){
+var providerDefaults = map[string]map[string]func(schemaContext) (interface{}, error){
 	"azure": {
 		"availability-sets-enabled": constValue(true),
 	},
@@ -251,17 +281,17 @@ var providerDefaults = map[string]map[string]func(providerDefaultsContext) (inte
 	},
 }
 
-func constValue(v interface{}) func(providerDefaultsContext) (interface{}, error) {
-	return func(providerDefaultsContext) (interface{}, error) {
+func constValue(v interface{}) func(schemaContext) (interface{}, error) {
+	return func(schemaContext) (interface{}, error) {
 		return v, nil
 	}
 }
 
-func uuidValue(providerDefaultsContext) (interface{}, error) {
+func uuidValue(schemaContext) (interface{}, error) {
 	return utils.NewUUID()
 }
 
-func rawUUIDValue(providerDefaultsContext) (interface{}, error) {
+func rawUUIDValue(schemaContext) (interface{}, error) {
 	v, err := utils.NewUUID()
 	if err != nil {
 		return nil, err
@@ -269,7 +299,7 @@ func rawUUIDValue(providerDefaultsContext) (interface{}, error) {
 	return fmt.Sprintf("%x", v.Raw()), nil
 }
 
-func localProviderNamespaceValue(ctxt providerDefaultsContext) (interface{}, error) {
+func localProviderNamespaceValue(ctxt schemaContext) (interface{}, error) {
 	if ctxt.envName == "" {
 		return nil, errgo.Newf("no default value for local provider namespace attribute")
 	}
