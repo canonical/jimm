@@ -1,0 +1,5 @@
+name: jem
+summary: 'JEM server'
+description: |
+    Run JEM as a charm
+
