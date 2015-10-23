@@ -14,6 +14,7 @@ import (
 	// Avoid including provider/all to reduce build time.
 	_ "github.com/juju/juju/provider/ec2"
 	_ "github.com/juju/juju/provider/local"
+	_ "github.com/juju/juju/provider/maas"
 	_ "github.com/juju/juju/provider/openstack"
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
