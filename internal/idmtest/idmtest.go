@@ -20,7 +20,6 @@ import (
 // It currently serves only the discharge and groups endpoints.
 type Server struct {
 	// URL holds the URL of the mock identity server.
-	// The discharger endpoint is located at URL/v1/discharge.
 	URL *url.URL
 
 	// PublicKey holds the public key of the mock identity server.
@@ -68,9 +67,9 @@ func NewServer() *Server {
 		router.Handle(route.Method, route.Path, route.Handle)
 	}
 	mux := http.NewServeMux()
-	httpbakery.AddDischargeHandler(mux, "/v1/discharger", srv.bakery, srv.check)
-	router.Handler("POST", "/v1/discharger/*rest", mux)
-	router.Handler("GET", "/v1/discharger/*rest", mux)
+	httpbakery.AddDischargeHandler(mux, "/", srv.bakery, srv.check)
+	router.Handler("POST", "/discharge", mux)
+	router.Handler("GET", "/publickey", mux)
 
 	srv.srv = httptest.NewServer(router)
 	srv.URL, err = url.Parse(srv.srv.URL)
@@ -214,7 +213,7 @@ func (h *handler) checkRequest(req *http.Request) error {
 		return err
 	}
 	m, err := h.srv.bakery.NewMacaroon("", nil, []checkers.Caveat{{
-		Location:  h.srv.URL.String() + "/v1/discharger",
+		Location:  h.srv.URL.String(),
 		Condition: "is-authenticated-user",
 	}})
 	if err != nil {

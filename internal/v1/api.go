@@ -29,7 +29,6 @@ var logger = loggo.GetLogger("jem.internal.v1")
 type Handler struct {
 	jem    *jem.JEM
 	config jem.ServerParams
-	auth   authorization
 }
 
 func NewAPIHandler(jp *jem.Pool, sp jem.ServerParams) ([]httprequest.Handler, error) {
@@ -39,12 +38,10 @@ func NewAPIHandler(jp *jem.Pool, sp jem.ServerParams) ([]httprequest.Handler, er
 			jem:    jp.JEM(),
 			config: sp,
 		}
-		auth, err := h.checkRequest(p.Request)
-		if err != nil {
+		if err := h.jem.Authenticate(p.Request); err != nil {
 			h.Close()
 			return nil, errgo.Mask(err, errgo.Any)
 		}
-		h.auth = auth
 		return h, nil
 	}), nil
 }
@@ -59,7 +56,7 @@ func (h *Handler) Close() error {
 
 // AddJES adds a new state server.
 func (h *Handler) AddJES(arg *params.AddJES) error {
-	if err := h.checkIsUser(arg.User); err != nil {
+	if err := h.jem.CheckIsUser(arg.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	if len(arg.Info.HostPorts) == 0 {
@@ -108,7 +105,7 @@ func (h *Handler) AddJES(arg *params.AddJES) error {
 
 // GetJES returns information on a state server.
 func (h *Handler) GetJES(arg *params.GetJES) (*params.JESResponse, error) {
-	if err := h.checkReadACL(h.jem.DB.StateServers(), arg.EntityPath); err != nil {
+	if err := h.jem.CheckReadACL(h.jem.DB.StateServers(), arg.EntityPath); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	neSchema, err := h.schemaForNewEnv(arg.EntityPath)
@@ -124,7 +121,7 @@ func (h *Handler) GetJES(arg *params.GetJES) (*params.JESResponse, error) {
 
 // GetEnvironment returns information on a given environment.
 func (h *Handler) GetEnvironment(arg *params.GetEnvironment) (*params.EnvironmentResponse, error) {
-	if err := h.checkReadACL(h.jem.DB.Environments(), arg.EntityPath); err != nil {
+	if err := h.jem.CheckReadACL(h.jem.DB.Environments(), arg.EntityPath); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	env, err := h.jem.Environment(arg.EntityPath)
@@ -166,7 +163,7 @@ func (h *Handler) ListEnvironments(arg *params.ListEnvironments) (*params.ListEn
 		return nil, errgo.Notef(err, "cannot get state servers")
 	}
 	envs := make([]params.EnvironmentResponse, 0, len(servers))
-	envIter := h.listIter(h.jem.DB.Environments().Find(nil).Sort("_id").Iter())
+	envIter := h.jem.CanReadIter(h.jem.DB.Environments().Find(nil).Sort("_id").Iter())
 	var env mongodoc.Environment
 	for envIter.Next(&env) {
 		srv, ok := servers[env.StateServer]
@@ -199,7 +196,7 @@ func (h *Handler) ListJES(arg *params.ListJES) (*params.ListJESResponse, error) 
 
 	// TODO populate ProviderType and Schema fields when we have a cache
 	// for the schemaForNewEnv results.
-	iter := h.listIter(h.jem.DB.StateServers().Find(nil).Sort("_id").Iter())
+	iter := h.jem.CanReadIter(h.jem.DB.StateServers().Find(nil).Sort("_id").Iter())
 	var srv mongodoc.StateServer
 	for iter.Next(&srv) {
 		srvs = append(srvs, params.JESResponse{
@@ -225,7 +222,7 @@ func (h *Handler) configWithTemplates(config map[string]interface{}, paths []par
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot get template %q", path)
 		}
-		if err := h.checkCanRead(tmpl); err != nil {
+		if err := h.jem.CheckCanRead(tmpl); err != nil {
 			return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 		}
 		for name, val := range tmpl.Config {
@@ -240,10 +237,10 @@ func (h *Handler) configWithTemplates(config map[string]interface{}, paths []par
 
 // NewEnvironment creates a new environment inside an existing JES.
 func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.EnvironmentResponse, error) {
-	if err := h.checkIsUser(args.User); err != nil {
+	if err := h.jem.CheckIsUser(args.User); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	if err := h.checkReadACL(h.jem.DB.StateServers(), args.Info.StateServer); err != nil {
+	if err := h.jem.CheckReadACL(h.jem.DB.StateServers(), args.Info.StateServer); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	conn, err := h.jem.OpenAPI(args.Info.StateServer)
@@ -328,7 +325,7 @@ func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.Environme
 
 // AddTemplate adds a new template.
 func (h *Handler) AddTemplate(arg *params.AddTemplate) error {
-	if err := h.checkIsUser(arg.User); err != nil {
+	if err := h.jem.CheckIsUser(arg.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	neSchema, err := h.schemaForNewEnv(arg.Info.StateServer)
@@ -374,7 +371,7 @@ func (h *Handler) GetTemplate(arg *params.GetTemplate) (*params.TemplateResponse
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	if err := h.checkCanRead(tmpl); err != nil {
+	if err := h.jem.CheckCanRead(tmpl); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	hideTemplateSecrets(tmpl)
@@ -402,7 +399,7 @@ func zeroValueOf(x interface{}) interface{} {
 // ListTemplates returns information on all accessible templates.
 func (h *Handler) ListTemplates(arg *params.ListTemplates) (*params.ListTemplatesResponse, error) {
 	// TODO provide a way of restricting the results.
-	iter := h.listIter(h.jem.DB.Templates().Find(nil).Sort("_id").Iter())
+	iter := h.jem.CanReadIter(h.jem.DB.Templates().Find(nil).Sort("_id").Iter())
 	var tmpls []params.TemplateResponse
 	var tmpl mongodoc.Template
 	for iter.Next(&tmpl) {
@@ -453,7 +450,7 @@ func (h *Handler) SetEnvironmentPerm(arg *params.SetEnvironmentPerm) error {
 
 func (h *Handler) setPerm(coll *mgo.Collection, path params.EntityPath, acl params.ACL) error {
 	// Only path.User (or members thereof) can change permissions.
-	if err := h.checkIsUser(path.User); err != nil {
+	if err := h.jem.CheckIsUser(path.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	logger.Infof("set perm %s %s to %#v", coll.Name, path, acl)
@@ -480,10 +477,10 @@ func (h *Handler) GetEnvironmentPerm(arg *params.GetEnvironmentPerm) (params.ACL
 
 func (h *Handler) getPerm(coll *mgo.Collection, path params.EntityPath) (params.ACL, error) {
 	// Only the owner can read permissions.
-	if err := h.checkIsUser(path.User); err != nil {
+	if err := h.jem.CheckIsUser(path.User); err != nil {
 		return params.ACL{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	acl, err := h.getACL(coll, path)
+	acl, err := h.jem.GetACL(coll, path)
 	if err != nil {
 		return params.ACL{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}

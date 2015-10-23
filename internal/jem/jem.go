@@ -21,6 +21,7 @@ import (
 
 type Pool struct {
 	db           Database
+	config       ServerParams
 	bakery       *bakery.Service
 	connCache    *apiconn.Cache
 	bakeryParams bakery.NewServiceParams
@@ -38,10 +39,11 @@ const maxPermCacheDuration = 10 * time.Second
 // NewPool represents a pool of possible JEM instances that use the given
 // database as a store, and use the given bakery parameters to create the
 // bakery.Service.
-func NewPool(db *mgo.Database, bp bakery.NewServiceParams, idmClient *idmclient.Client) (*Pool, error) {
+func NewPool(config ServerParams, bp bakery.NewServiceParams, idmClient *idmclient.Client) (*Pool, error) {
 	// TODO migrate database
 	pool := &Pool{
-		db:          Database{db},
+		config:      config,
+		db:          Database{config.DB},
 		connCache:   apiconn.NewCache(apiconn.CacheParams{}),
 		permChecker: idmclient.NewPermChecker(idmClient, maxPermCacheDuration),
 		refCount:    1,
@@ -110,6 +112,7 @@ func (p *Pool) JEM() *JEM {
 	p.refCount++
 	return &JEM{
 		DB:          db,
+		config:      &p.config,
 		Bakery:      newBakery(db, p.bakeryParams),
 		PermChecker: p.permChecker,
 		pool:        p,
@@ -134,13 +137,23 @@ func newBakery(db Database, bp bakery.NewServiceParams) *bakery.Service {
 }
 
 type JEM struct {
+
 	// DB holds the mongodb-backed identity store.
 	DB Database
+
+	// Auth holds any authorization credentials as set by
+	// JEM.Authenticate. If Authenticate has not been called, this
+	// will be zero.
+	Auth Authorization
 
 	// Bakery holds the JEM bakery service.
 	Bakery *bakery.Service
 
 	PermChecker *idmclient.PermChecker
+
+	// config holds the server parameters used to create
+	// the JEM.
+	config *ServerParams
 
 	// pool holds the Pool from which the JEM instance
 	// was created.
@@ -159,6 +172,7 @@ func (j *JEM) Close() {
 	if j.closed {
 		return
 	}
+	j.Auth = Authorization{}
 	j.closed = true
 	j.DB.Close()
 	j.DB = Database{}

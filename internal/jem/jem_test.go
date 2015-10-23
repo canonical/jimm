@@ -31,7 +31,9 @@ func (s *jemSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	s.idmSrv = idmtest.NewServer()
 	pool, err := jem.NewPool(
-		s.Session.DB("jem"),
+		jem.ServerParams{
+			DB: s.Session.DB("jem"),
+		},
 		bakery.NewServiceParams{
 			Location: "here",
 		},
@@ -173,7 +175,9 @@ func (s *jemSuite) TestAddTemplate(c *gc.C) {
 func (s *jemSuite) TestSessionIsCopied(c *gc.C) {
 	session := s.Session.Copy()
 	pool, err := jem.NewPool(
-		session.DB("jem"),
+		jem.ServerParams{
+			DB: s.Session.DB("jem"),
+		},
 		bakery.NewServiceParams{
 			Location: "here",
 		},

@@ -26,7 +26,7 @@ func (*suite) TestDischarge(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	m, err := bsvc.NewMacaroon("", nil, []checkers.Caveat{{
-		Location:  srv.URL.String() + "/v1/discharger",
+		Location:  srv.URL.String(),
 		Condition: "is-authenticated-user",
 	}})
 	c.Assert(err, gc.IsNil)
@@ -52,7 +52,7 @@ func (*suite) TestDischargeDefaultUser(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	m, err := bsvc.NewMacaroon("", nil, []checkers.Caveat{{
-		Location:  srv.URL.String() + "/v1/discharger",
+		Location:  srv.URL.String(),
 		Condition: "is-authenticated-user",
 	}})
 	c.Assert(err, gc.IsNil)
