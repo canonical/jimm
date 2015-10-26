@@ -20,6 +20,7 @@ import (
 
 	"github.com/CanonicalLtd/jem/internal/apiconn"
 	"github.com/CanonicalLtd/jem/internal/jem"
+	"github.com/CanonicalLtd/jem/internal/jemerror"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -32,7 +33,7 @@ type Handler struct {
 }
 
 func NewAPIHandler(jp *jem.Pool, sp jem.ServerParams) ([]httprequest.Handler, error) {
-	return errorMapper.Handlers(func(p httprequest.Params) (*Handler, error) {
+	return jemerror.Mapper.Handlers(func(p httprequest.Params) (*Handler, error) {
 		// All requests require an authenticated client.
 		h := &Handler{
 			jem:    jp.JEM(),

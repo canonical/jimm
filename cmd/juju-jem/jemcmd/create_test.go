@@ -8,6 +8,7 @@ import (
 
 	"github.com/juju/juju/juju"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/yaml.v1"
 )
 
@@ -48,7 +49,7 @@ func (s *createSuite) TestCreate(c *gc.C) {
 
 	// Check that we can attach to the new environment
 	// through the usual juju connection mechanism.
-	client, err := juju.NewAPIClientFromName("newenv")
+	client, err := juju.NewAPIClientFromName("newenv", httpbakery.NewClient())
 	c.Assert(err, gc.IsNil)
 	client.Close()
 }
@@ -93,7 +94,7 @@ func (s *createSuite) TestCreateWithTemplate(c *gc.C) {
 
 	// Check that we can attach to the new environment
 	// through the usual juju connection mechanism.
-	client, err := juju.NewAPIClientFromName("newenv")
+	client, err := juju.NewAPIClientFromName("newenv", httpbakery.NewClient())
 	c.Assert(err, gc.IsNil)
 	client.Close()
 }

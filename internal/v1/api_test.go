@@ -3,87 +3,32 @@ package v1_test
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"net/http/httptest"
-	"os"
 	"strings"
-	"time"
 
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/usermanager"
-	jujufeature "github.com/juju/juju/feature"
-	corejujutesting "github.com/juju/juju/juju/testing"
 	"github.com/juju/names"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
-	"github.com/juju/utils/featureflag"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	"gopkg.in/mgo.v2"
 
-	"github.com/CanonicalLtd/jem/internal/idmtest"
-	"github.com/CanonicalLtd/jem/internal/jem"
-	"github.com/CanonicalLtd/jem/internal/v1"
-	"github.com/CanonicalLtd/jem/jemclient"
+	"github.com/CanonicalLtd/jem/internal/apitest"
 	"github.com/CanonicalLtd/jem/params"
 )
 
 type APISuite struct {
-	corejujutesting.JujuConnSuite
-	srv     *jem.Server
-	httpSrv *httptest.Server
-	idmSrv  *idmtest.Server
+	apitest.Suite
 }
 
 var _ = gc.Suite(&APISuite{})
-
-func (s *APISuite) SetUpTest(c *gc.C) {
-	s.JujuConnSuite.SetUpTest(c)
-	s.PatchValue(&jem.APIOpenTimeout, time.Duration(0))
-	s.idmSrv = idmtest.NewServer()
-	s.srv = s.newServer(c, s.Session, s.idmSrv)
-	os.Setenv("JUJU_DEV_FEATURE_FLAGS", jujufeature.JES)
-	featureflag.SetFlagsFromEnvironment("JUJU_DEV_FEATURE_FLAGS")
-	s.httpSrv = httptest.NewServer(s.srv)
-}
-
-func (s *APISuite) client(username params.User) *jemclient.Client {
-	return jemclient.New(jemclient.NewParams{
-		BaseURL: s.httpSrv.URL,
-		Client:  s.idmSrv.Client(string(username)),
-	})
-}
-
-func (s *APISuite) TearDownTest(c *gc.C) {
-	s.srv.Close()
-	s.httpSrv.Close()
-	s.idmSrv.Close()
-	s.JujuConnSuite.TearDownTest(c)
-}
 
 const sshKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDOjaOjVRHchF2RFCKQdgBqrIA5nOoqSprLK47l2th5I675jw+QYMIihXQaITss3hjrh3+5ITyBO41PS5rHLNGtlYUHX78p9CHNZsJqHl/z1Ub1tuMe+/5SY2MkDYzgfPtQtVsLasAIiht/5g78AMMXH3HeCKb9V9cP6/lPPq6mCMvg8TDLrPp/P2vlyukAsJYUvVgoaPDUBpedHbkMj07pDJqe4D7c0yEJ8hQo/6nS+3bh9Q1NvmVNsB1pbtk3RKONIiTAXYcjclmOljxxJnl1O50F5sOIi38vyl7Q63f6a3bXMvJEf1lnPNJKAxspIfEu8gRasny3FEsbHfrxEwVj rog@rog-x220"
 
 var dummyEnvConfig = map[string]interface{}{
 	"authorized-keys": sshKey,
 	"state-server":    true,
-}
-
-func (s *APISuite) newServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server) *jem.Server {
-	db := session.DB("jem")
-	s.idmSrv.AddUser("agent")
-	config := jem.ServerParams{
-		DB:               db,
-		StateServerAdmin: "admin",
-		IdentityLocation: idmSrv.URL.String(),
-		PublicKeyLocator: idmSrv,
-		AgentUsername:    "agent",
-		AgentKey:         s.idmSrv.UserPublicKey("agent"),
-	}
-	srv, err := jem.NewServer(config, map[string]jem.NewAPIHandlerFunc{"v1": v1.NewAPIHandler})
-	c.Assert(err, gc.IsNil)
-	return srv
 }
 
 var unauthorizedTests = []struct {
@@ -192,7 +137,7 @@ func (s *APISuite) TestUnauthorized(c *gc.C) {
 		c.Logf("test %d: %s", i, test.about)
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Method:   test.method,
-			Handler:  s.srv,
+			Handler:  s.JEMSrv,
 			JSONBody: test.body,
 			URL:      test.path,
 			ExpectBody: &params.Error{
@@ -200,7 +145,7 @@ func (s *APISuite) TestUnauthorized(c *gc.C) {
 				Code:    params.ErrUnauthorized,
 			},
 			ExpectStatus: http.StatusUnauthorized,
-			Do:           bakeryDo(s.idmSrv.Client(test.asUser)),
+			Do:           apitest.Do(s.IDMSrv.Client(test.asUser)),
 		})
 	}
 }
@@ -317,11 +262,11 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 			err := json.Unmarshal(m, &body)
 			c.Assert(err, gc.IsNil)
 			c.Assert(body.Code, gc.Equals, params.ErrBadRequest)
-			c.Assert(body.Message, gc.Matches, `cannot connect to environment: unable to connect to ".*"`)
+			c.Assert(body.Message, gc.Matches, `cannot connect to environment: unable to connect to API: .*`)
 		}),
 	}}
-	s.idmSrv.AddUser("alice", "beatles")
-	s.idmSrv.AddUser("bob", "beatles")
+	s.IDMSrv.AddUser("alice", "beatles")
+	s.IDMSrv.AddUser("bob", "beatles")
 	for i, test := range addJESTests {
 		c.Logf("test %d: %s", i, test.about)
 		envPath := params.EntityPath{
@@ -335,13 +280,13 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 		if authUser == "" {
 			authUser = envPath.User
 		}
-		client := s.idmSrv.Client(string(authUser))
+		client := s.IDMSrv.Client(string(authUser))
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Method:       "PUT",
-			Handler:      s.srv,
+			Handler:      s.JEMSrv,
 			JSONBody:     test.body,
 			URL:          fmt.Sprintf("/v1/server/%s", envPath),
-			Do:           bakeryDo(client),
+			Do:           apitest.Do(client),
 			ExpectStatus: test.expectStatus,
 			ExpectBody:   test.expectBody,
 		})
@@ -351,7 +296,7 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 		// The server was added successfully. Check that we
 		// can fetch its associated environment and that we
 		// can connect to that.
-		envResp, err := s.client(authUser).GetEnvironment(&params.GetEnvironment{
+		envResp, err := s.NewClient(authUser).GetEnvironment(&params.GetEnvironment{
 			EntityPath: envPath,
 		})
 		c.Assert(err, gc.IsNil)
@@ -366,7 +311,7 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 		st := openAPIFromEnvironmentResponse(c, envResp)
 		st.Close()
 		// Clear the connection pool for the next test.
-		s.srv.Pool().ClearAPIConnCache()
+		s.JEMSrv.Pool().ClearAPIConnCache()
 	}
 }
 
@@ -383,7 +328,7 @@ func (s *APISuite) TestAddJESDuplicate(c *gc.C) {
 	s.addJES(c, srvPath, si)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:   "PUT",
-		Handler:  s.srv,
+		Handler:  s.JEMSrv,
 		URL:      "/v1/server/" + srvPath.String(),
 		JSONBody: si,
 		ExpectBody: &params.Error{
@@ -391,23 +336,23 @@ func (s *APISuite) TestAddJESDuplicate(c *gc.C) {
 			Code:    "already exists",
 		},
 		ExpectStatus: http.StatusForbidden,
-		Do:           bakeryDo(s.idmSrv.Client("bob")),
+		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 	})
 }
 
 func (s *APISuite) addJES(c *gc.C, path params.EntityPath, jes *params.ServerInfo) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:   "PUT",
-		Handler:  s.srv,
+		Handler:  s.JEMSrv,
 		URL:      "/v1/server/" + path.String(),
 		JSONBody: jes,
-		Do:       bakeryDo(s.idmSrv.Client(string(path.User))),
+		Do:       apitest.Do(s.IDMSrv.Client(string(path.User))),
 	})
 }
 func (s *APISuite) TestAddJESUnauthenticated(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "PUT",
-		Handler: s.srv,
+		Handler: s.JEMSrv,
 		URL:     "/v1/server/user/env",
 		ExpectBody: httptesting.BodyAsserter(func(c *gc.C, m json.RawMessage) {
 			// Allow any body - TestGetEnvironmentNotFound will check that it's a valid macaroon.
@@ -419,7 +364,7 @@ func (s *APISuite) TestAddJESUnauthenticated(c *gc.C) {
 func (s *APISuite) TestAddJESUnauthenticatedWithBakeryProtocol(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "PUT",
-		Handler: s.srv,
+		Handler: s.JEMSrv,
 		Header:  map[string][]string{"Bakery-Protocol-Version": []string{"1"}},
 		URL:     "/v1/server/user/env",
 		ExpectBody: httptesting.BodyAsserter(func(c *gc.C, m json.RawMessage) {
@@ -432,27 +377,27 @@ func (s *APISuite) TestAddJESUnauthenticatedWithBakeryProtocol(c *gc.C) {
 func (s *APISuite) TestGetEnvironmentNotFound(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "GET",
-		Handler: s.srv,
+		Handler: s.JEMSrv,
 		URL:     "/v1/env/user/foo",
 		ExpectBody: &params.Error{
 			Message: `environment "user/foo" not found`,
 			Code:    params.ErrNotFound,
 		},
 		ExpectStatus: http.StatusNotFound,
-		Do:           bakeryDo(s.idmSrv.Client("user")),
+		Do:           apitest.Do(s.IDMSrv.Client("user")),
 	})
 
 	// If we're some different user, we get Unauthorized.
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "GET",
-		Handler: s.srv,
+		Handler: s.JEMSrv,
 		URL:     "/v1/env/user/foo",
 		ExpectBody: &params.Error{
 			Message: `unauthorized`,
 			Code:    params.ErrUnauthorized,
 		},
 		ExpectStatus: http.StatusUnauthorized,
-		Do:           bakeryDo(s.idmSrv.Client("other")),
+		Do:           apitest.Do(s.IDMSrv.Client("other")),
 	})
 }
 
@@ -460,9 +405,9 @@ func (s *APISuite) TestGetStateServer(c *gc.C) {
 	srvId := s.addStateServer(c, params.EntityPath{"bob", "foo"})
 
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
-		Handler: s.srv,
+		Handler: s.JEMSrv,
 		URL:     "/v1/server/" + srvId.String(),
-		Do:      bakeryDo(s.idmSrv.Client("bob")),
+		Do:      apitest.Do(s.IDMSrv.Client("bob")),
 	})
 	c.Assert(resp.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %s", resp.Body.Bytes()))
 	var jesInfo params.JESResponse
@@ -480,27 +425,27 @@ func (s *APISuite) TestGetStateServer(c *gc.C) {
 func (s *APISuite) TestGetStateServerNotFound(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "GET",
-		Handler: s.srv,
+		Handler: s.JEMSrv,
 		URL:     "/v1/server/bob/foo",
 		ExpectBody: &params.Error{
 			Message: `cannot open API: cannot get environment: environment "bob/foo" not found`,
 			Code:    params.ErrNotFound,
 		},
 		ExpectStatus: http.StatusNotFound,
-		Do:           bakeryDo(s.idmSrv.Client("bob")),
+		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 	})
 
 	// Any other user just sees Unauthorized.
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "GET",
-		Handler: s.srv,
+		Handler: s.JEMSrv,
 		URL:     "/v1/server/bob/foo",
 		ExpectBody: &params.Error{
 			Message: `unauthorized`,
 			Code:    params.ErrUnauthorized,
 		},
 		ExpectStatus: http.StatusUnauthorized,
-		Do:           bakeryDo(s.idmSrv.Client("alice")),
+		Do:           apitest.Do(s.IDMSrv.Client("alice")),
 	})
 }
 
@@ -511,7 +456,7 @@ func (s *APISuite) TestNewEnvironment(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
 		URL:     "/v1/env/bob",
-		Handler: s.srv,
+		Handler: s.JEMSrv,
 		JSONBody: params.NewEnvironmentInfo{
 			Name:        params.Name("bar"),
 			StateServer: srvId,
@@ -521,7 +466,7 @@ func (s *APISuite) TestNewEnvironment(c *gc.C) {
 		ExpectBody: httptesting.BodyAsserter(func(_ *gc.C, body json.RawMessage) {
 			envRespBody = body
 		}),
-		Do: bakeryDo(s.idmSrv.Client("bob")),
+		Do: apitest.Do(s.IDMSrv.Client("bob")),
 	})
 	var envResp params.EnvironmentResponse
 	err := json.Unmarshal(envRespBody, &envResp)
@@ -534,7 +479,7 @@ func (s *APISuite) TestNewEnvironment(c *gc.C) {
 
 	// Ensure that we can connect to the new environment
 	// from the information returned by GetEnvironment.
-	envResp2, err := s.client("bob").GetEnvironment(&params.GetEnvironment{
+	envResp2, err := s.NewClient("bob").GetEnvironment(&params.GetEnvironment{
 		EntityPath: params.EntityPath{
 			User: "bob",
 			Name: "bar",
@@ -561,7 +506,7 @@ func (s *APISuite) TestNewEnvironmentWithTemplates(c *gc.C) {
 	})
 
 	envPath := params.EntityPath{"bob", "env"}
-	resp, err := s.client("bob").NewEnvironment(&params.NewEnvironment{
+	resp, err := s.NewClient("bob").NewEnvironment(&params.NewEnvironment{
 		User: envPath.User,
 		Info: params.NewEnvironmentInfo{
 			Name:        envPath.Name,
@@ -593,7 +538,7 @@ func (s *APISuite) TestNewEnvironmentWithTemplates(c *gc.C) {
 func (s *APISuite) TestNewEnvironmentWithTemplateNotFound(c *gc.C) {
 	srvId := s.addStateServer(c, params.EntityPath{"bob", "foo"})
 
-	resp, err := s.client("bob").NewEnvironment(&params.NewEnvironment{
+	resp, err := s.NewClient("bob").NewEnvironment(&params.NewEnvironment{
 		User: "bob",
 		Info: params.NewEnvironmentInfo{
 			Name:        "x",
@@ -626,12 +571,12 @@ func openAPIFromEnvironmentResponse(c *gc.C, resp *params.EnvironmentResponse) a
 func (s *APISuite) TestNewEnvironmentUnderGroup(c *gc.C) {
 	srvId := s.addStateServer(c, params.EntityPath{"bob", "foo"})
 
-	s.idmSrv.AddUser("bob", "beatles")
+	s.IDMSrv.AddUser("bob", "beatles")
 	var envRespBody json.RawMessage
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
 		URL:     "/v1/env/beatles",
-		Handler: s.srv,
+		Handler: s.JEMSrv,
 		JSONBody: params.NewEnvironmentInfo{
 			Name:        params.Name("bar"),
 			StateServer: srvId,
@@ -641,7 +586,7 @@ func (s *APISuite) TestNewEnvironmentUnderGroup(c *gc.C) {
 		ExpectBody: httptesting.BodyAsserter(func(_ *gc.C, body json.RawMessage) {
 			envRespBody = body
 		}),
-		Do: bakeryDo(s.idmSrv.Client("bob")),
+		Do: apitest.Do(s.IDMSrv.Client("bob")),
 	})
 	var envResp params.EnvironmentResponse
 	err := json.Unmarshal(envRespBody, &envResp)
@@ -674,7 +619,7 @@ func (s *APISuite) TestNewEnvironmentWithExistingUser(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
 		URL:     "/v1/env/bob",
-		Handler: s.srv,
+		Handler: s.JEMSrv,
 		JSONBody: params.NewEnvironmentInfo{
 			Name:        params.Name("bar"),
 			StateServer: srvId,
@@ -684,7 +629,7 @@ func (s *APISuite) TestNewEnvironmentWithExistingUser(c *gc.C) {
 		ExpectBody: httptesting.BodyAsserter(func(_ *gc.C, body json.RawMessage) {
 			envRespBody = body
 		}),
-		Do: bakeryDo(s.idmSrv.Client("bob")),
+		Do: apitest.Do(s.IDMSrv.Client("bob")),
 	})
 	var envResp params.EnvironmentResponse
 	err = json.Unmarshal(envRespBody, &envResp)
@@ -729,7 +674,7 @@ func (s *APISuite) TestNewEnvironmentWithInvalidStateServerPath(c *gc.C) {
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Method:  "POST",
 			URL:     "/v1/env/bob",
-			Handler: s.srv,
+			Handler: s.JEMSrv,
 			JSONBody: map[string]interface{}{
 				"name":         "bar",
 				"state-server": test.path,
@@ -739,7 +684,7 @@ func (s *APISuite) TestNewEnvironmentWithInvalidStateServerPath(c *gc.C) {
 				Code:    params.ErrBadRequest,
 			},
 			ExpectStatus: http.StatusBadRequest,
-			Do:           bakeryDo(s.idmSrv.Client("bob")),
+			Do:           apitest.Do(s.IDMSrv.Client("bob")),
 		})
 	}
 }
@@ -748,7 +693,7 @@ func (s *APISuite) TestNewEnvironmentCannotOpenAPI(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
 		URL:     "/v1/env/bob",
-		Handler: s.srv,
+		Handler: s.JEMSrv,
 		JSONBody: params.NewEnvironmentInfo{
 			Name:        params.Name("bar"),
 			StateServer: params.EntityPath{"bob", "foo"},
@@ -758,7 +703,7 @@ func (s *APISuite) TestNewEnvironmentCannotOpenAPI(c *gc.C) {
 			Code:    params.ErrNotFound,
 		},
 		ExpectStatus: http.StatusNotFound,
-		Do:           bakeryDo(s.idmSrv.Client("bob")),
+		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 	})
 }
 
@@ -768,7 +713,7 @@ func (s *APISuite) TestNewEnvironmentInvalidConfig(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
 		URL:     "/v1/env/bob",
-		Handler: s.srv,
+		Handler: s.JEMSrv,
 		JSONBody: params.NewEnvironmentInfo{
 			Name:        params.Name("bar"),
 			StateServer: srvId,
@@ -781,7 +726,7 @@ func (s *APISuite) TestNewEnvironmentInvalidConfig(c *gc.C) {
 			Code:    params.ErrBadRequest,
 		},
 		ExpectStatus: http.StatusBadRequest,
-		Do:           bakeryDo(s.idmSrv.Client("bob")),
+		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 	})
 }
 
@@ -797,10 +742,10 @@ func (s *APISuite) TestNewEnvironmentTwice(c *gc.C) {
 	p := httptesting.JSONCallParams{
 		Method:     "POST",
 		URL:        "/v1/env/bob",
-		Handler:    s.srv,
+		Handler:    s.JEMSrv,
 		JSONBody:   body,
-		ExpectBody: anyBody,
-		Do:         bakeryDo(s.idmSrv.Client("bob")),
+		ExpectBody: apitest.AnyBody,
+		Do:         apitest.Do(s.IDMSrv.Client("bob")),
 	}
 	httptesting.AssertJSONCall(c, p)
 
@@ -826,7 +771,7 @@ func (s *APISuite) TestNewEnvironmentWithNoPassword(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
 		URL:     "/v1/env/bob",
-		Handler: s.srv,
+		Handler: s.JEMSrv,
 		JSONBody: params.NewEnvironmentInfo{
 			Name:        "bar",
 			StateServer: srvId,
@@ -839,7 +784,7 @@ func (s *APISuite) TestNewEnvironmentWithNoPassword(c *gc.C) {
 			Message: `cannot create user: no password specified`,
 		},
 		ExpectStatus: http.StatusBadRequest,
-		Do:           bakeryDo(s.idmSrv.Client("bob")),
+		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 	})
 }
 
@@ -850,7 +795,7 @@ func (s *APISuite) TestNewEnvironmentCannotCreate(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
 		URL:     "/v1/env/bob",
-		Handler: s.srv,
+		Handler: s.JEMSrv,
 		JSONBody: params.NewEnvironmentInfo{
 			Name:        "bar",
 			Password:    "secret",
@@ -863,20 +808,20 @@ func (s *APISuite) TestNewEnvironmentCannotCreate(c *gc.C) {
 			Message: `cannot create environment: provider validation failed: state-server: expected bool, got nothing`,
 		},
 		ExpectStatus: http.StatusInternalServerError,
-		Do:           bakeryDo(s.idmSrv.Client("bob")),
+		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 	})
 
 	// Check that the environment is not there (it was added temporarily during the call).
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "GET",
-		Handler: s.srv,
+		Handler: s.JEMSrv,
 		URL:     "/v1/env/bob/bar",
 		ExpectBody: &params.Error{
 			Message: `environment "bob/bar" not found`,
 			Code:    params.ErrNotFound,
 		},
 		ExpectStatus: http.StatusNotFound,
-		Do:           bakeryDo(s.idmSrv.Client("bob")),
+		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 	})
 }
 
@@ -886,7 +831,7 @@ func (s *APISuite) TestNewEnvironmentUnauthorized(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
 		URL:     "/v1/env/bob",
-		Handler: s.srv,
+		Handler: s.JEMSrv,
 		JSONBody: params.NewEnvironmentInfo{
 			Name:        "bar",
 			StateServer: srvId,
@@ -897,13 +842,13 @@ func (s *APISuite) TestNewEnvironmentUnauthorized(c *gc.C) {
 			Code:    params.ErrUnauthorized,
 		},
 		ExpectStatus: http.StatusUnauthorized,
-		Do:           bakeryDo(s.idmSrv.Client("other")),
+		Do:           apitest.Do(s.IDMSrv.Client("other")),
 	})
 }
 
 func (s *APISuite) TestListJES(c *gc.C) {
 	srvId := s.addStateServer(c, params.EntityPath{"bob", "foo"})
-	resp, err := s.client("bob").ListJES(nil)
+	resp, err := s.NewClient("bob").ListJES(nil)
 	c.Assert(err, gc.IsNil)
 	c.Assert(resp, jc.DeepEquals, &params.ListJESResponse{
 		StateServers: []params.JESResponse{{
@@ -913,13 +858,13 @@ func (s *APISuite) TestListJES(c *gc.C) {
 
 	// Check that the entry doesn't show up when listing
 	// as a different user.
-	resp, err = s.client("alice").ListJES(nil)
+	resp, err = s.NewClient("alice").ListJES(nil)
 	c.Assert(err, gc.IsNil)
 	c.Assert(resp, jc.DeepEquals, &params.ListJESResponse{})
 }
 
 func (s *APISuite) TestListJESNoServers(c *gc.C) {
-	resp, err := s.client("bob").ListJES(nil)
+	resp, err := s.NewClient("bob").ListJES(nil)
 	c.Assert(err, gc.IsNil)
 	c.Assert(resp, jc.DeepEquals, &params.ListJESResponse{})
 }
@@ -943,12 +888,12 @@ func (s *APISuite) TestListTemplates(c *gc.C) {
 	})
 	s.allowTemplateAllPerm(c, params.EntityPath{"alice", "y"})
 
-	tmpl0, err := s.client("bob").GetTemplate(&params.GetTemplate{
+	tmpl0, err := s.NewClient("bob").GetTemplate(&params.GetTemplate{
 		EntityPath: params.EntityPath{"bob", "creds"},
 	})
 	c.Assert(err, gc.IsNil)
 
-	resp, err := s.client("bob").ListTemplates(&params.ListTemplates{})
+	resp, err := s.NewClient("bob").ListTemplates(&params.ListTemplates{})
 	c.Assert(err, gc.IsNil)
 
 	// checkAndClear checks the schemas in the templates
@@ -984,7 +929,7 @@ func (s *APISuite) TestListTemplates(c *gc.C) {
 	})
 
 	// Try a similar thing as alice
-	resp, err = s.client("alice").ListTemplates(&params.ListTemplates{})
+	resp, err = s.NewClient("alice").ListTemplates(&params.ListTemplates{})
 	c.Assert(err, gc.IsNil)
 
 	checkAndClear(resp)
@@ -1005,7 +950,7 @@ func (s *APISuite) TestListTemplates(c *gc.C) {
 }
 
 func (s *APISuite) TestListEnvironmentsNoServers(c *gc.C) {
-	resp, err := s.client("bob").ListEnvironments(nil)
+	resp, err := s.NewClient("bob").ListEnvironments(nil)
 	c.Assert(err, gc.IsNil)
 	c.Assert(resp, jc.DeepEquals, &params.ListEnvironmentsResponse{})
 }
@@ -1013,7 +958,7 @@ func (s *APISuite) TestListEnvironmentsNoServers(c *gc.C) {
 func (s *APISuite) TestListEnvironmentsStateServerOnly(c *gc.C) {
 	srvId := s.addStateServer(c, params.EntityPath{"bob", "foo"})
 	info := s.APIInfo(c)
-	resp, err := s.client("bob").ListEnvironments(nil)
+	resp, err := s.NewClient("bob").ListEnvironments(nil)
 	c.Assert(err, gc.IsNil)
 	c.Assert(resp, jc.DeepEquals, &params.ListEnvironmentsResponse{
 		Environments: []params.EnvironmentResponse{{
@@ -1028,7 +973,7 @@ func (s *APISuite) TestListEnvironmentsStateServerOnly(c *gc.C) {
 }
 
 func (s *APISuite) allowServerAllPerm(c *gc.C, path params.EntityPath) {
-	err := s.client(path.User).SetStateServerPerm(&params.SetStateServerPerm{
+	err := s.NewClient(path.User).SetStateServerPerm(&params.SetStateServerPerm{
 		EntityPath: path,
 		ACL: params.ACL{
 			Read: []string{"everyone"},
@@ -1038,7 +983,7 @@ func (s *APISuite) allowServerAllPerm(c *gc.C, path params.EntityPath) {
 }
 
 func (s *APISuite) allowEnvAllPerm(c *gc.C, path params.EntityPath) {
-	err := s.client(path.User).SetEnvironmentPerm(&params.SetEnvironmentPerm{
+	err := s.NewClient(path.User).SetEnvironmentPerm(&params.SetEnvironmentPerm{
 		EntityPath: path,
 		ACL: params.ACL{
 			Read: []string{"everyone"},
@@ -1048,7 +993,7 @@ func (s *APISuite) allowEnvAllPerm(c *gc.C, path params.EntityPath) {
 }
 
 func (s *APISuite) allowTemplateAllPerm(c *gc.C, path params.EntityPath) {
-	err := s.client(path.User).SetTemplatePerm(&params.SetTemplatePerm{
+	err := s.NewClient(path.User).SetTemplatePerm(&params.SetTemplatePerm{
 		EntityPath: path,
 		ACL: params.ACL{
 			Read: []string{"everyone"},
@@ -1112,7 +1057,7 @@ func (s *APISuite) TestListEnvironments(c *gc.C) {
 			expectResp.Environments[i] = resps[index]
 		}
 
-		resp, err := s.client(test.user).ListEnvironments(nil)
+		resp, err := s.NewClient(test.user).ListEnvironments(nil)
 		c.Assert(err, gc.IsNil)
 		c.Assert(resp, jc.DeepEquals, expectResp)
 	}
@@ -1121,20 +1066,20 @@ func (s *APISuite) TestListEnvironments(c *gc.C) {
 func (s *APISuite) TestGetSetStateServerPerm(c *gc.C) {
 	srvId := s.addStateServer(c, params.EntityPath{"alice", "foo"})
 
-	acl, err := s.client("alice").GetStateServerPerm(&params.GetStateServerPerm{
+	acl, err := s.NewClient("alice").GetStateServerPerm(&params.GetStateServerPerm{
 		EntityPath: srvId,
 	})
 	c.Assert(err, gc.IsNil)
 	c.Assert(acl, jc.DeepEquals, params.ACL{})
 
-	err = s.client("alice").SetStateServerPerm(&params.SetStateServerPerm{
+	err = s.NewClient("alice").SetStateServerPerm(&params.SetStateServerPerm{
 		EntityPath: srvId,
 		ACL: params.ACL{
 			Read: []string{"a", "b"},
 		},
 	})
 	c.Assert(err, gc.IsNil)
-	acl, err = s.client("alice").GetStateServerPerm(&params.GetStateServerPerm{
+	acl, err = s.NewClient("alice").GetStateServerPerm(&params.GetStateServerPerm{
 		EntityPath: srvId,
 	})
 	c.Assert(err, gc.IsNil)
@@ -1146,20 +1091,20 @@ func (s *APISuite) TestGetSetStateServerPerm(c *gc.C) {
 func (s *APISuite) TestGetSetEnvironmentPerm(c *gc.C) {
 	srvId := s.addStateServer(c, params.EntityPath{"alice", "foo"})
 
-	acl, err := s.client("alice").GetEnvironmentPerm(&params.GetEnvironmentPerm{
+	acl, err := s.NewClient("alice").GetEnvironmentPerm(&params.GetEnvironmentPerm{
 		EntityPath: srvId,
 	})
 	c.Assert(err, gc.IsNil)
 	c.Assert(acl, jc.DeepEquals, params.ACL{})
 
-	err = s.client("alice").SetEnvironmentPerm(&params.SetEnvironmentPerm{
+	err = s.NewClient("alice").SetEnvironmentPerm(&params.SetEnvironmentPerm{
 		EntityPath: srvId,
 		ACL: params.ACL{
 			Read: []string{"a", "b"},
 		},
 	})
 	c.Assert(err, gc.IsNil)
-	acl, err = s.client("alice").GetEnvironmentPerm(&params.GetEnvironmentPerm{
+	acl, err = s.NewClient("alice").GetEnvironmentPerm(&params.GetEnvironmentPerm{
 		EntityPath: srvId,
 	})
 	c.Assert(err, gc.IsNil)
@@ -1170,7 +1115,7 @@ func (s *APISuite) TestGetSetEnvironmentPerm(c *gc.C) {
 
 func (s *APISuite) TestAddTemplate(c *gc.C) {
 	srvId := s.addStateServer(c, params.EntityPath{"alice", "foo"})
-	err := s.client("alice").AddTemplate(&params.AddTemplate{
+	err := s.NewClient("alice").AddTemplate(&params.AddTemplate{
 		EntityPath: params.EntityPath{"alice", "creds"},
 		Info: params.AddTemplateInfo{
 			StateServer: srvId,
@@ -1188,7 +1133,7 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 	// are zeroed out. Note that because we round-trip through
 	// JSON, any int fields arrive as float64, but that should be
 	// fine in practice.
-	tmpl, err := s.client("alice").GetTemplate(&params.GetTemplate{
+	tmpl, err := s.NewClient("alice").GetTemplate(&params.GetTemplate{
 		EntityPath: params.EntityPath{"alice", "creds"},
 	})
 	c.Assert(err, gc.IsNil)
@@ -1202,7 +1147,7 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 	})
 
 	// Check that we can overwrite the template with a new one.
-	err = s.client("alice").AddTemplate(&params.AddTemplate{
+	err = s.NewClient("alice").AddTemplate(&params.AddTemplate{
 		EntityPath: params.EntityPath{"alice", "creds"},
 		Info: params.AddTemplateInfo{
 			StateServer: srvId,
@@ -1215,7 +1160,7 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 
-	tmpl, err = s.client("alice").GetTemplate(&params.GetTemplate{
+	tmpl, err = s.NewClient("alice").GetTemplate(&params.GetTemplate{
 		EntityPath: params.EntityPath{"alice", "creds"},
 	})
 	c.Assert(err, gc.IsNil)
@@ -1229,7 +1174,7 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 
 	// Check that we can write to another template without affecting
 	// the original.
-	err = s.client("alice").AddTemplate(&params.AddTemplate{
+	err = s.NewClient("alice").AddTemplate(&params.AddTemplate{
 		EntityPath: params.EntityPath{"alice", "differentcreds"},
 		Info: params.AddTemplateInfo{
 			StateServer: srvId,
@@ -1241,7 +1186,7 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 
-	tmpl, err = s.client("alice").GetTemplate(&params.GetTemplate{
+	tmpl, err = s.NewClient("alice").GetTemplate(&params.GetTemplate{
 		EntityPath: params.EntityPath{"alice", "differentcreds"},
 	})
 	c.Assert(err, gc.IsNil)
@@ -1252,7 +1197,7 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 		"bootstrap-timeout": 111.0,
 	})
 
-	tmpl, err = s.client("alice").GetTemplate(&params.GetTemplate{
+	tmpl, err = s.NewClient("alice").GetTemplate(&params.GetTemplate{
 		EntityPath: params.EntityPath{"alice", "creds"},
 	})
 	c.Assert(err, gc.IsNil)
@@ -1265,7 +1210,7 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 }
 
 func (s *APISuite) TestGetTemplateNotFound(c *gc.C) {
-	tmpl, err := s.client("alice").GetTemplate(&params.GetTemplate{
+	tmpl, err := s.NewClient("alice").GetTemplate(&params.GetTemplate{
 		EntityPath: params.EntityPath{"alice", "xxx"},
 	})
 	c.Assert(err, gc.ErrorMatches, `GET .*/v1/template/alice/xxx: template "alice/xxx" not found`)
@@ -1305,7 +1250,7 @@ func (s *APISuite) TestAddInvalidTemplate(c *gc.C) {
 	s.addStateServer(c, params.EntityPath{"alice", "foo"})
 	for i, test := range addInvalidTemplateTests {
 		c.Logf("test %d: %s", i, test.about)
-		err := s.client("alice").AddTemplate(&params.AddTemplate{
+		err := s.NewClient("alice").AddTemplate(&params.AddTemplate{
 			EntityPath: params.EntityPath{"alice", "creds"},
 			Info: params.AddTemplateInfo{
 				StateServer: test.srvId,
@@ -1324,7 +1269,7 @@ func (s *APISuite) addStateServer(c *gc.C, srvPath params.EntityPath) params.Ent
 	// requests in the caller.
 
 	info := s.APIInfo(c)
-	err := s.client(srvPath.User).AddJES(&params.AddJES{
+	err := s.NewClient(srvPath.User).AddJES(&params.AddJES{
 		EntityPath: srvPath,
 		Info: params.ServerInfo{
 			HostPorts:   info.Addrs,
@@ -1346,7 +1291,7 @@ func (s *APISuite) addEnvironment(c *gc.C, envPath, srvPath params.EntityPath) (
 	// requests in the caller.
 
 	info := s.APIInfo(c)
-	resp, err := s.client(envPath.User).NewEnvironment(&params.NewEnvironment{
+	resp, err := s.NewClient(envPath.User).NewEnvironment(&params.NewEnvironment{
 		User: envPath.User,
 		Info: params.NewEnvironmentInfo{
 			Name:        envPath.Name,
@@ -1360,7 +1305,7 @@ func (s *APISuite) addEnvironment(c *gc.C, envPath, srvPath params.EntityPath) (
 }
 
 func (s *APISuite) addTemplate(c *gc.C, tmplPath, srvPath params.EntityPath, cfg map[string]interface{}) {
-	err := s.client(tmplPath.User).AddTemplate(&params.AddTemplate{
+	err := s.NewClient(tmplPath.User).AddTemplate(&params.AddTemplate{
 		EntityPath: tmplPath,
 		Info: params.AddTemplateInfo{
 			StateServer: srvPath,
@@ -1369,20 +1314,3 @@ func (s *APISuite) addTemplate(c *gc.C, tmplPath, srvPath params.EntityPath, cfg
 	})
 	c.Assert(err, gc.IsNil)
 }
-
-func bakeryDo(client *httpbakery.Client) func(*http.Request) (*http.Response, error) {
-	if client == nil {
-		client = httpbakery.NewClient()
-	}
-	return func(req *http.Request) (*http.Response, error) {
-		if req.Body != nil {
-			body := req.Body.(io.ReadSeeker)
-			req.Body = nil
-			return client.DoWithBody(req, body)
-		}
-		return client.Do(req)
-	}
-}
-
-var anyBody = httptesting.BodyAsserter(func(*gc.C, json.RawMessage) {
-})
