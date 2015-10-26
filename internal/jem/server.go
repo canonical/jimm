@@ -69,7 +69,7 @@ func NewServer(config ServerParams, versions map[string]NewAPIHandlerFunc) (*Ser
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	p, err := NewPool(config.DB, bparams, idmClient)
+	p, err := NewPool(config, bparams, idmClient)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make store")
 	}

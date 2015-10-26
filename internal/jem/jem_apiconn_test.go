@@ -31,7 +31,9 @@ func (s *jemAPIConnSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
 	s.idmSrv = idmtest.NewServer()
 	pool, err := jem.NewPool(
-		s.Session.DB("jem"),
+		jem.ServerParams{
+			DB: s.Session.DB("jem"),
+		},
 		bakery.NewServiceParams{
 			Location: "here",
 		},
