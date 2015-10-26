@@ -365,6 +365,15 @@ func (s Database) Copy() Database {
 	}
 }
 
+func (db Database) Collections() []*mgo.Collection {
+	return []*mgo.Collection{
+		db.Macaroons(),
+		db.StateServers(),
+		db.Environments(),
+		db.Templates(),
+	}
+}
+
 // Close closes the database's underlying session.
 func (db Database) Close() {
 	db.Session.Close()

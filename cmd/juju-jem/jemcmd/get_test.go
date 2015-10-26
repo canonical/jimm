@@ -5,6 +5,7 @@ package jemcmd_test
 import (
 	"github.com/juju/juju/juju"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/macaroon-bakery.v1/httpbakery"
 )
 
 type getSuite struct {
@@ -33,7 +34,7 @@ func (s *getSuite) TestGet(c *gc.C) {
 
 	// Check that we can attach to the new environment
 	// through the usual juju connection mechanism.
-	client, err := juju.NewAPIClientFromName("foo")
+	client, err := juju.NewAPIClientFromName("foo", httpbakery.NewClient())
 	c.Assert(err, gc.IsNil)
 	client.Close()
 }

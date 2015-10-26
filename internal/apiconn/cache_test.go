@@ -152,7 +152,7 @@ func (s *cacheSuite) TestEvictAll(c *gc.C) {
 	conn.Close()
 
 	_, err = cache.OpenAPI("uuid1", func() (api.Connection, *api.Info, error) {
-		return &api.State{}, &api.Info{}, nil
+		return dummyConn{}, &api.Info{}, nil
 	})
 	cache.EvictAll()
 
@@ -164,11 +164,15 @@ func (s *cacheSuite) TestEvictAll(c *gc.C) {
 	for i := 0; i < 2; i++ {
 		_, err := cache.OpenAPI(fmt.Sprintf("uuid%d", i), func() (api.Connection, *api.Info, error) {
 			called++
-			return &api.State{}, &api.Info{}, nil
+			return dummyConn{}, &api.Info{}, nil
 		})
 		c.Assert(err, gc.IsNil)
 	}
 	c.Assert(called, gc.Equals, 2)
+}
+
+type dummyConn struct {
+	api.Connection
 }
 
 // apiOpen is like api.Open except that it also returns its

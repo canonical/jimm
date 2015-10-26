@@ -1,4 +1,6 @@
-package v1
+// Package jemerror knows how to map from errors to
+// HTTP error responses.
+package jemerror
 
 import (
 	"net/http"
@@ -10,9 +12,10 @@ import (
 	"github.com/CanonicalLtd/jem/params"
 )
 
-var (
-	errorMapper httprequest.ErrorMapper = errToResp
-)
+// Mapper holds an ErrorMapper that can
+// translate from Go errors to standard JEM
+// error responses.
+var Mapper httprequest.ErrorMapper = errToResp
 
 type errorCoder interface {
 	ErrorCode() params.ErrorCode
