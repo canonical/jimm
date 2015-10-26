@@ -108,6 +108,7 @@ func (h *Handler) AddJES(arg *params.AddJES) error {
 
 // GetJES returns information on a state server.
 func (h *Handler) GetJES(arg *params.GetJES) (*params.JESResponse, error) {
+	logger.Debugf("Calling GET JES")
 	if err := h.checkReadACL(h.jem.DB.StateServers(), arg.EntityPath); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
@@ -120,6 +121,25 @@ func (h *Handler) GetJES(arg *params.GetJES) (*params.JESResponse, error) {
 		ProviderType: neSchema.providerType,
 		Schema:       neSchema.schema,
 	}, nil
+}
+
+// RemoveJES removes an existing state server.
+func (h *Handler) DeleteJES(arg *params.DeleteJES) error {
+	logger.Debugf("Calling DELETE JES")
+	// Check if user has permissions.
+	if err := h.checkReadACL(h.jem.DB.StateServers(), arg.EntityPath); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	srv, err := h.jem.StateServer(arg.EntityPath)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	logger.Debugf("found server: %s", srv.Path)
+	err = h.jem.DeleteStateServer(srv)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrBadRequest))
+	}
+	return nil
 }
 
 // GetEnvironment returns information on a given environment.
@@ -143,6 +163,24 @@ func (h *Handler) GetEnvironment(arg *params.GetEnvironment) (*params.Environmen
 		CACert:    srv.CACert,
 		HostPorts: srv.HostPorts,
 	}, nil
+}
+
+// DeleteEnvironment deletes an environment from JEM.
+func (h *Handler) DeleteEnvironment(arg *params.DeleteEnvironment) error {
+	logger.Debugf("Calling DELETE environment")
+	if err := h.checkReadACL(h.jem.DB.Environments(), arg.EntityPath); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	env, err := h.jem.Environment(arg.EntityPath)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	logger.Debugf("found environemt: %s", env.Path)
+	err = h.jem.DeleteEnvironment(env)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrBadRequest))
+	}
+	return nil
 }
 
 // ListEnvironments returns all the environments stored in JEM.
@@ -383,6 +421,23 @@ func (h *Handler) GetTemplate(arg *params.GetTemplate) (*params.TemplateResponse
 		Schema: tmpl.Schema,
 		Config: tmpl.Config,
 	}, nil
+}
+
+// DeleteTemplate surpisingly deletes a template.
+func (h *Handler) DeleteTemplate(arg *params.DeleteTemplate) error {
+	logger.Debugf("Called DELETE template")
+	tmpl, err := h.jem.Template(arg.EntityPath)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	if err := h.checkCanRead(tmpl); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	err = h.jem.DeleteTemplate(tmpl)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrBadRequest))
+	}
+	return nil
 }
 
 // hideTemplateSecrets zeros all secret fields in the
