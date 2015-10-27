@@ -5,9 +5,8 @@
 package jemclient
 
 import (
-	"github.com/juju/httprequest"
-
 	"github.com/CanonicalLtd/jem/params"
+	"github.com/juju/httprequest"
 )
 
 type client struct {
@@ -21,6 +20,21 @@ func (c *client) AddJES(p *params.AddJES) error {
 
 // AddTemplate adds a new template.
 func (c *client) AddTemplate(p *params.AddTemplate) error {
+	return c.Client.Call(p, nil)
+}
+
+// DeleteEnvironment deletes an environment from JEM.
+func (c *client) DeleteEnvironment(p *params.DeleteEnvironment) error {
+	return c.Client.Call(p, nil)
+}
+
+// DeleteJES removes an existing state server.
+func (c *client) DeleteJES(p *params.DeleteJES) error {
+	return c.Client.Call(p, nil)
+}
+
+// DeleteTemplate deletes a template.
+func (c *client) DeleteTemplate(p *params.DeleteTemplate) error {
 	return c.Client.Call(p, nil)
 }
 

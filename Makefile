@@ -76,7 +76,7 @@ simplify:
 
 # Run the JEM server.
 server: install
-	jemd -logging-config INFO cmd/jemd/config.yaml
+	jemd -logging-config DEBUG cmd/jemd/config.yaml
 
 # Update the project Go dependencies to the required revision.
 deps: $(GOPATH)/bin/godeps

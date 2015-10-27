@@ -99,6 +99,118 @@ func (s *jemSuite) TestAddStateServer(c *gc.C) {
 	err = s.store.AddStateServer(srv, env)
 	c.Assert(err, gc.ErrorMatches, "already exists")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
+
+	srvPath2 := params.EntityPath{"bob", "y"}
+	srv2 := &mongodoc.StateServer{
+		Id:        "ignored",
+		Path:      srvPath2,
+		CACert:    "certainly",
+		HostPorts: []string{"host1:1234", "host2:9999"},
+	}
+	env2 := &mongodoc.Environment{
+		Id:            "bob/noty",
+		Path:          params.EntityPath{"ignored-user", "ignored-name"},
+		AdminUser:     "foo-admin",
+		AdminPassword: "foo-password",
+	}
+	err = s.store.AddStateServer(srv2, env2)
+	c.Assert(err, gc.IsNil)
+	env3, err := s.store.Environment(srvPath2)
+	c.Assert(err, gc.IsNil)
+	c.Assert(env3, jc.DeepEquals, env2)
+}
+
+func (s *jemSuite) TestDeleteStateServer(c *gc.C) {
+	srvPath := params.EntityPath{"dalek", "who"}
+	srv := &mongodoc.StateServer{
+		Id:        "ignored",
+		Path:      srvPath,
+		CACert:    "certainly",
+		HostPorts: []string{"host1:1234", "host2:9999"},
+	}
+	env := &mongodoc.Environment{
+		Id:            "dalek/who",
+		Path:          params.EntityPath{"ignored", "ignored"},
+		AdminUser:     "foo-admin",
+		AdminPassword: "foo-password",
+	}
+	err := s.store.AddStateServer(srv, env)
+	c.Assert(err, gc.IsNil)
+	err = s.store.DeleteStateServer(srvPath)
+	c.Assert(err, gc.IsNil)
+
+	srv1, err := s.store.StateServer(srvPath)
+	c.Assert(srv1, gc.IsNil)
+	env1, err := s.store.Environment(srvPath)
+	c.Assert(env1, gc.IsNil)
+
+	err = s.store.DeleteStateServer(srvPath)
+	c.Assert(err, gc.ErrorMatches, "state server \"dalek/who\" not found")
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+
+	// Test with non-existing environment.
+	srv2 := &mongodoc.StateServer{
+		Id:        "dalek/who",
+		Path:      srvPath,
+		CACert:    "certainly",
+		HostPorts: []string{"host1:1234", "host2:9999"},
+	}
+	env2 := &mongodoc.Environment{
+		Id:            "dalek/exterminated",
+		Path:          params.EntityPath{"ignored", "ignored"},
+		AdminUser:     "foo-admin",
+		AdminPassword: "foo-password",
+	}
+	err = s.store.AddStateServer(srv2, env2)
+	c.Assert(err, gc.IsNil)
+
+	err = s.store.DeleteStateServer(srvPath)
+	c.Assert(err, gc.IsNil)
+	srv3, err := s.store.StateServer(srvPath)
+	c.Assert(srv3, gc.IsNil)
+	env3, err := s.store.Environment(srvPath)
+	c.Assert(env3, gc.IsNil)
+}
+
+func (s *jemSuite) TestDeleteEnvironemnt(c *gc.C) {
+	srvPath := params.EntityPath{"dalek", "who"}
+	srv := &mongodoc.StateServer{
+		Id:        "ignored",
+		Path:      srvPath,
+		CACert:    "certainly",
+		HostPorts: []string{"host1:1234", "host2:9999"},
+	}
+	env := &mongodoc.Environment{
+		Id:            "dalek/who",
+		Path:          params.EntityPath{"ignored", "ignored"},
+		AdminUser:     "foo-admin",
+		AdminPassword: "foo-password",
+	}
+	err := s.store.AddStateServer(srv, env)
+	c.Assert(err, gc.IsNil)
+
+	err = s.store.DeleteEnvironment(env.Path)
+	c.Assert(err, gc.ErrorMatches, `cannot remove environment "dalek/who" because it is a state server`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrForbidden)
+
+	envPath := params.EntityPath{"dalek", "exterminate"}
+	env2 := &mongodoc.Environment{
+		Id:            "dalek/exterminate",
+		Path:          envPath,
+		AdminUser:     "foo-admin",
+		AdminPassword: "foo-password",
+	}
+	err = s.store.AddEnvironment(env2)
+	c.Assert(err, gc.IsNil)
+
+	err = s.store.DeleteEnvironment(env2.Path)
+	c.Assert(err, gc.IsNil)
+	env3, err := s.store.Environment(envPath)
+	c.Assert(env3, gc.IsNil)
+
+	err = s.store.DeleteEnvironment(env2.Path)
+	c.Assert(err, gc.ErrorMatches, "environment \"dalek/exterminate\" not found")
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
 func (s *jemSuite) TestAddEnvironment(c *gc.C) {
@@ -170,6 +282,43 @@ func (s *jemSuite) TestAddTemplate(c *gc.C) {
 		"name":        "pluto",
 		"temperature": -400,
 	})
+}
+
+func (s *jemSuite) TestDeleteTemplate(c *gc.C) {
+	path := params.EntityPath{"bob", "x"}
+	tmpl := &mongodoc.Template{
+		Id:   "ignored",
+		Path: path,
+		Schema: environschema.Fields{
+			"name": {
+				Description: "name of environment",
+				Type:        environschema.Tstring,
+				Mandatory:   true,
+				Values:      []interface{}{"venus", "pluto"},
+			},
+			"temperature": {
+				Description: "temperature of environment",
+				Type:        environschema.Tint,
+				Example:     400,
+				Values:      []interface{}{-400, 864.0},
+			},
+		},
+		Config: map[string]interface{}{
+			"name":        "pluto",
+			"temperature": -400.0,
+		},
+	}
+	err := s.store.AddTemplate(tmpl)
+	c.Assert(err, gc.IsNil)
+
+	err = s.store.DeleteTemplate(tmpl.Path)
+	c.Assert(err, gc.IsNil)
+	tmpl1, err := s.store.Template(path)
+	c.Assert(tmpl1, gc.IsNil)
+
+	err = s.store.DeleteTemplate(tmpl.Path)
+	c.Assert(err, gc.ErrorMatches, "template \"bob/x\" not found")
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
 func (s *jemSuite) TestSessionIsCopied(c *gc.C) {
