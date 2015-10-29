@@ -4,6 +4,7 @@ package jemcmd
 
 import (
 	"github.com/juju/cmd"
+	"github.com/juju/juju/cmd/envcmd"
 	"gopkg.in/errgo.v1"
 	"launchpad.net/gnuflag"
 
@@ -15,6 +16,10 @@ type addServerCommand struct {
 
 	envName string
 	envPath entityPathValue
+}
+
+func newAddServerCommand() cmd.Command {
+	return envcmd.WrapBase(&addServerCommand{})
 }
 
 var addServerDoc = `
@@ -59,7 +64,6 @@ func (c *addServerCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	defer client.Close()
 	info, err := environInfo(c.envName)
 	if err != nil {
 		return errgo.Mask(err)

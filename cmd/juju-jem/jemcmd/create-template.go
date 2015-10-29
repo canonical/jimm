@@ -3,9 +3,13 @@
 package jemcmd
 
 import (
+	"io/ioutil"
+
 	"github.com/juju/cmd"
+	"github.com/juju/juju/cmd/envcmd"
 	"github.com/juju/utils/keyvalues"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/yaml.v2"
 	"launchpad.net/gnuflag"
 
 	"github.com/CanonicalLtd/jem/params"
@@ -17,6 +21,11 @@ type createTemplateCommand struct {
 	templatePath entityPathValue
 	srvPath      entityPathValue
 	attrs        map[string]string
+	configFile   string
+}
+
+func newCreateTemplateCommand() cmd.Command {
+	return envcmd.WrapBase(&createTemplateCommand{})
 }
 
 var createTemplateDoc = `
@@ -43,11 +52,7 @@ func (c *createTemplateCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.commandBase.SetFlags(f)
 	f.Var(&c.srvPath, "s", "state server to use as the schema for the template")
 	f.Var(&c.srvPath, "server", "")
-	// TODO
-	//f.BoolVar(&c.useDefaults, "default", false, "use environment variables to set default values")
-	// This would call setConfigDefaults on the configuration
-	// attributes so that it's easy to make a template with
-	// the current defaults.
+	f.StringVar(&c.configFile, "config", "", "YAML config file containing template configuration")
 }
 
 func (c *createTemplateCommand) Init(args []string) error {
@@ -59,6 +64,12 @@ func (c *createTemplateCommand) Init(args []string) error {
 	}
 	if c.srvPath.EntityPath == (params.EntityPath{}) {
 		return errgo.Newf("--server flag required but not provided")
+	}
+	if c.configFile != "" {
+		if len(args) > 1 {
+			return errgo.Newf("--config cannot be specified with attr=value key pairs")
+		}
+		return nil
 	}
 	attrs, err := keyvalues.Parse(args[1:], true)
 	if err != nil {
@@ -73,13 +84,20 @@ func (c *createTemplateCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	defer client.Close()
 
-	// TODO GetJES to find the schema when implementing
-	// the --default flag.
 	config := make(map[string]interface{})
-	for name, val := range c.attrs {
-		config[name] = val
+	if c.configFile != "" {
+		data, err := ioutil.ReadFile(c.configFile)
+		if err != nil {
+			return errgo.Notef(err, "cannot read configuration file")
+		}
+		if err := yaml.Unmarshal(data, &config); err != nil {
+			return errgo.Notef(err, "cannot unmarshal %q", c.configFile)
+		}
+	} else {
+		for name, val := range c.attrs {
+			config[name] = val
+		}
 	}
 	if err := client.AddTemplate(&params.AddTemplate{
 		EntityPath: c.templatePath.EntityPath,

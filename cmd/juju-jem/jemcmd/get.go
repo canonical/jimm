@@ -4,6 +4,7 @@ package jemcmd
 
 import (
 	"github.com/juju/cmd"
+	"github.com/juju/juju/cmd/envcmd"
 	"gopkg.in/errgo.v1"
 	"launchpad.net/gnuflag"
 
@@ -16,6 +17,10 @@ type getCommand struct {
 	envPath   entityPathValue
 	localName string
 	user      string
+}
+
+func newGetCommand() cmd.Command {
+	return envcmd.WrapBase(&getCommand{})
 }
 
 var getDoc = `
@@ -57,7 +62,6 @@ func (c *getCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	defer client.Close()
 
 	return writeEnvironment(c.localName, func() (*params.EnvironmentResponse, error) {
 		resp, err := client.GetEnvironment(&params.GetEnvironment{
