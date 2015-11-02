@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/juju/cmd"
+	"github.com/juju/juju/cmd/envcmd"
 	jujuconfig "github.com/juju/juju/environs/config"
 	"github.com/juju/juju/juju/osenv"
 	"github.com/juju/utils"
@@ -30,6 +31,10 @@ type createCommand struct {
 	templatePaths entityPathsValue
 	configFile    string
 	localName     string
+}
+
+func newCreateCommand() cmd.Command {
+	return envcmd.WrapBase(&createCommand{})
 }
 
 var createDoc = `
@@ -83,7 +88,6 @@ func (c *createCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	defer client.Close()
 
 	config := make(map[string]interface{})
 	if c.configFile != "" {

@@ -14,9 +14,7 @@ import (
 	"github.com/juju/juju/environs/configstore"
 	"github.com/juju/loggo"
 	"github.com/juju/names"
-	"github.com/juju/persistent-cookiejar"
 	"github.com/juju/utils"
-	"golang.org/x/net/publicsuffix"
 	"gopkg.in/errgo.v1"
 	esform "gopkg.in/juju/environschema.v1/form"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
@@ -67,14 +65,14 @@ func New() cmd.Command {
 			DefaultConfig: os.Getenv(jujuLoggingConfigEnvKey),
 		},
 	})
-	supercmd.Register(&addServerCommand{})
-	supercmd.Register(&changePermCommand{})
-	supercmd.Register(&createCommand{})
-	supercmd.Register(&createTemplateCommand{})
-	supercmd.Register(&getCommand{})
-	supercmd.Register(&listCommand{})
-	supercmd.Register(&listServersCommand{})
-	supercmd.Register(&listTemplatesCommand{})
+	supercmd.Register(newAddServerCommand())
+	supercmd.Register(newChangePermCommand())
+	supercmd.Register(newCreateCommand())
+	supercmd.Register(newCreateTemplateCommand())
+	supercmd.Register(newGetCommand())
+	supercmd.Register(newListCommand())
+	supercmd.Register(newListServersCommand())
+	supercmd.Register(newListTemplatesCommand())
 
 	return supercmd
 }
@@ -102,7 +100,7 @@ func environInfo(envName string) (configstore.EnvironInfo, error) {
 
 // commandBase holds the basis for JEM commands.
 type commandBase struct {
-	cmd.CommandBase
+	envcmd.JujuCommandBase
 	jemURL string
 }
 
@@ -110,30 +108,15 @@ func (c *commandBase) SetFlags(f *gnuflag.FlagSet) {
 	f.StringVar(&c.jemURL, "jem-url", "", "URL of JEM server (defaults to $JUJU_JEM)")
 }
 
-// jemClient embeds a jemclient.Client and holds its associated cookie jar.
-type jemClient struct {
-	*jemclient.Client
-	jar *cookiejar.Jar
-}
-
 // newClient creates and return a JEM client with access to
 // the associated cookie jar used to save authorization
 // macaroons. If authUsername and authPassword are provided, the resulting
 // client will use HTTP basic auth with the given credentials.
-func (c *commandBase) newClient(ctxt *cmd.Context) (*jemClient, error) {
-	cookieFile := cookieFile()
-	jar, err := cookiejar.New(&cookiejar.Options{
-		PublicSuffixList: publicsuffix.List,
-	})
+func (c *commandBase) newClient(ctxt *cmd.Context) (*jemclient.Client, error) {
+	httpClient, err := c.HTTPClient()
 	if err != nil {
-		// Can never happen in current implementation.
-		panic(err)
-	}
-	if err := jar.Load(cookieFile); err != nil {
 		return nil, errgo.Mask(err)
 	}
-	httpClient := httpbakery.NewHTTPClient()
-	httpClient.Jar = jar
 	httpbakeryClient := &httpbakery.Client{
 		VisitWebPage: httpbakery.OpenWebBrowser,
 		Client:       httpClient,
@@ -142,21 +125,10 @@ func (c *commandBase) newClient(ctxt *cmd.Context) (*jemClient, error) {
 		In:  ctxt.Stdin,
 		Out: ctxt.Stderr,
 	})
-	jclient := jemclient.New(jemclient.NewParams{
+	return jemclient.New(jemclient.NewParams{
 		BaseURL: c.serverURL(),
 		Client:  httpbakeryClient,
-	})
-	return &jemClient{
-		Client: jclient,
-		jar:    jar,
-	}, nil
-}
-
-// Close closes the jem client, saving any HTTP cookies.
-func (c *jemClient) Close() {
-	if err := c.jar.Save(); err != nil {
-		logger.Errorf("cannot save cookies: %v", err)
-	}
+	}), nil
 }
 
 const jemServerURL = "https://api.jujucharms.com/jem"

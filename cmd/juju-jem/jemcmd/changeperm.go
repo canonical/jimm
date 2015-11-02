@@ -7,10 +7,12 @@ import (
 	"strings"
 
 	"github.com/juju/cmd"
+	"github.com/juju/juju/cmd/envcmd"
 	"github.com/juju/names"
 	"gopkg.in/errgo.v1"
 	"launchpad.net/gnuflag"
 
+	"github.com/CanonicalLtd/jem/jemclient"
 	"github.com/CanonicalLtd/jem/params"
 )
 
@@ -24,6 +26,10 @@ type changePermCommand struct {
 	addRead     userSet
 	removeRead  userSet
 	setRead     userSet
+}
+
+func newChangePermCommand() cmd.Command {
+	return envcmd.WrapBase(&changePermCommand{})
 }
 
 var changePermDoc = `
@@ -77,7 +83,6 @@ func (c *changePermCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	defer client.Close()
 
 	if c.setRead != nil {
 		return c.setPerm(client, params.ACL{
@@ -103,8 +108,7 @@ func (c *changePermCommand) Run(ctxt *cmd.Context) error {
 	})
 }
 
-func (c *changePermCommand) setPerm(client *jemClient, acl params.ACL) error {
-	logger.Infof("setPerm %#v\n", acl)
+func (c *changePermCommand) setPerm(client *jemclient.Client, acl params.ACL) error {
 	var err error
 	switch {
 	case c.stateServer:
@@ -126,7 +130,7 @@ func (c *changePermCommand) setPerm(client *jemClient, acl params.ACL) error {
 	return errgo.Mask(err)
 }
 
-func (c *changePermCommand) getPerm(client *jemClient) (params.ACL, error) {
+func (c *changePermCommand) getPerm(client *jemclient.Client) (params.ACL, error) {
 	var acl params.ACL
 	var err error
 	switch {

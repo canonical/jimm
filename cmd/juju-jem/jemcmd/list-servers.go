@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/juju/cmd"
+	"github.com/juju/juju/cmd/envcmd"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/params"
@@ -13,6 +14,10 @@ import (
 
 type listServersCommand struct {
 	commandBase
+}
+
+func newListServersCommand() cmd.Command {
+	return envcmd.WrapBase(&listServersCommand{})
 }
 
 var listServersDoc = `
@@ -39,7 +44,6 @@ func (c *listServersCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	defer client.Close()
 	resp, err := client.ListJES(&params.ListJES{})
 	if err != nil {
 		return errgo.Mask(err)
