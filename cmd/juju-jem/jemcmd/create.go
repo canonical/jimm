@@ -145,14 +145,10 @@ type schemaContext struct {
 func (ctxt schemaContext) generateConfig(schema environschema.Fields) (map[string]interface{}, error) {
 	config := make(map[string]interface{})
 	for name, attr := range schema {
-		checker, err := attr.Checker()
-		if err != nil {
-			return nil, errgo.Notef(err, "invalid attribute %q", name)
-		}
-		val, err := ctxt.getDefault(form.NamedAttr{
+		val, err := ctxt.getVal(form.NamedAttr{
 			Name: name,
 			Attr: attr,
-		}, checker)
+		})
 		if err != nil {
 			return nil, errgo.Mask(err)
 		}
@@ -166,10 +162,14 @@ func (ctxt schemaContext) generateConfig(schema environschema.Fields) (map[strin
 	return config, nil
 }
 
-// getDefault gets the default value for the given attribute.
-// If there is no default value found, it returns (nil, nil)
-func (ctxt schemaContext) getDefault(attr form.NamedAttr, checker schema.Checker) (val interface{}, err error) {
-	val, from, err := ctxt.getDefault1(attr, checker)
+// getVal gets the value for the given attribute.
+// If there is no known value or default value found, it returns (nil, nil).
+func (ctxt schemaContext) getVal(attr form.NamedAttr) (val interface{}, err error) {
+	checker, err := attr.Checker()
+	if err != nil {
+		return nil, errgo.Notef(err, "invalid attribute %q", attr.Name)
+	}
+	val, from, err := ctxt.getVal1(attr, checker)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot get value for %q", attr.Name)
 	}
@@ -183,12 +183,12 @@ func (ctxt schemaContext) getDefault(attr form.NamedAttr, checker schema.Checker
 	return val, nil
 }
 
-// getDefault1 is the internal version of getDefault. It does
+// getVal1 is the internal version of getVal. It does
 // not coerce the returned value through the checker,
 // and it also returns the source of the value so that
 // that can be included in an error message if the value
 // is erroneous.
-func (ctxt schemaContext) getDefault1(attr form.NamedAttr, checker schema.Checker) (val interface{}, from string, err error) {
+func (ctxt schemaContext) getVal1(attr form.NamedAttr, checker schema.Checker) (val interface{}, from string, err error) {
 	if val, ok := ctxt.knownAttrs[attr.Name]; ok {
 		return val, "attributes", nil
 	}
@@ -196,6 +196,9 @@ func (ctxt schemaContext) getDefault1(attr form.NamedAttr, checker schema.Checke
 		path, _ := ctxt.knownAttrs["authorized-keys-path"].(string)
 		keys, err := jujuconfig.ReadAuthorizedKeys(path)
 		if err != nil {
+			if errgo.Cause(err) == jujuconfig.ErrNoAuthorizedKeys {
+				return nil, "", nil
+			}
 			return nil, "", errgo.Notef(err, "cannot read authorized keys")
 		}
 		display := path
@@ -227,7 +230,6 @@ func (ctxt schemaContext) getDefault1(attr form.NamedAttr, checker schema.Checke
 	}
 	f := providerDefaults[ctxt.providerType][attr.Name]
 	if f == nil {
-		logger.Infof("none found")
 		return nil, "", nil
 	}
 	v, err := f(ctxt)
