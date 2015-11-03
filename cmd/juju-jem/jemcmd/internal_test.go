@@ -103,7 +103,7 @@ func (s *internalSuite) TestEntityPathsValue(c *gc.C) {
 	}
 }
 
-func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
+func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 	// Note: these values are set up by JujuConnSuite
 	// and are not the actual user's home and juju home.
 	home := utils.Home()
@@ -321,7 +321,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		config: map[string]interface{}{
 			"attr-path": "x",
 		},
-		expectError: `cannot get value for "x": file ".*home/ubuntu/.juju/x" is empty`,
+		expectError: `cannot get value for "attr": file ".*home/ubuntu/.juju/x" is empty`,
 	}, {
 		about: "attribute from path ignored with non-string template entry",
 		jesInfo: params.JESResponse{
@@ -335,9 +335,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		config: map[string]interface{}{
 			"attr-path": "nomatter",
 		},
-		expectConfig: map[string]interface{}{
-			"attr-path": "nomatter",
-		},
+		expectConfig: map[string]interface{}{},
 	}, {
 		about: "provider default",
 		jesInfo: params.JESResponse{
@@ -361,7 +359,7 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 				},
 			},
 		},
-		expectError: `cannot make default value for "testattr-error": an error`,
+		expectError: `cannot get value for "testattr-error": an error`,
 	}, {
 		about: "attribute from context",
 		jesInfo: params.JESResponse{
@@ -376,16 +374,85 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		expectConfig: map[string]interface{}{
 			"testattr-envname": "envname-foo",
 		},
+	}, {
+		about: "no value found for mandatory attribute",
+		jesInfo: params.JESResponse{
+			ProviderType: "test",
+			Schema: environschema.Fields{
+				"attr": {
+					Type:      environschema.Tstring,
+					Mandatory: true,
+				},
+			},
+		},
+		expectError: `no value found for mandatory attribute "attr"`,
+	}, {
+		about: "mandatory attribute with value",
+		jesInfo: params.JESResponse{
+			ProviderType: "test",
+			Schema: environschema.Fields{
+				"attr": {
+					Type:      environschema.Tstring,
+					Mandatory: true,
+				},
+			},
+		},
+		config: map[string]interface{}{
+			"attr": "something",
+		},
+		expectConfig: map[string]interface{}{
+			"attr": "something",
+		},
+	}, {
+		about: "invalid attribute",
+		jesInfo: params.JESResponse{
+			ProviderType: "test",
+			Schema: environschema.Fields{
+				"attr": {
+					Type: "bogus",
+				},
+			},
+		},
+		expectError: `invalid attribute "attr": invalid type "bogus"`,
+	}, {
+		about: "invalid value",
+		jesInfo: params.JESResponse{
+			ProviderType: "test",
+			Schema: environschema.Fields{
+				"attr": {
+					Type: environschema.Tint,
+				},
+			},
+		},
+		config: map[string]interface{}{
+			"attr": "something",
+		},
+		expectError: `bad value for "attr" in attributes: expected number, got string\("something"\)`,
+	}, {
+		about: "environment variable with bad value",
+		jesInfo: params.JESResponse{
+			ProviderType: "test",
+			Schema: environschema.Fields{
+				"attr": {
+					Type:   environschema.Tint,
+					EnvVar: "X",
+				},
+			},
+		},
+		envVars: map[string]string{
+			"X": "avalue",
+		},
+		expectError: `cannot get value for "attr": cannot convert \$X: expected number, got string\("avalue"\)`,
 	}}
-	s.PatchValue(&providerDefaults, map[string]map[string]func(providerDefaultsContext) (interface{}, error){
+	s.PatchValue(&providerDefaults, map[string]map[string]func(schemaContext) (interface{}, error){
 		"test": {
-			"testattr": func(providerDefaultsContext) (interface{}, error) {
+			"testattr": func(schemaContext) (interface{}, error) {
 				return "testattr-default-value", nil
 			},
-			"testattr-error": func(providerDefaultsContext) (interface{}, error) {
+			"testattr-error": func(schemaContext) (interface{}, error) {
 				return "", errgo.New("an error")
 			},
-			"testattr-envname": func(ctxt providerDefaultsContext) (interface{}, error) {
+			"testattr-envname": func(ctxt schemaContext) (interface{}, error) {
 				return "envname-" + string(ctxt.envName), nil
 			},
 		},
@@ -402,19 +469,21 @@ func (s *internalSuite) TestCreateComnandSetConfigDefaults(c *gc.C) {
 		for name, val := range test.envVars {
 			os.Setenv(name, val)
 		}
-
 		config := make(map[string]interface{})
 		for name, val := range test.config {
 			config[name] = val
 		}
-		err := setConfigDefaults(config, &test.jesInfo, providerDefaultsContext{
-			envName: test.envName,
-		})
+		ctxt := schemaContext{
+			knownAttrs:   config,
+			envName:      test.envName,
+			providerType: test.jesInfo.ProviderType,
+		}
+		resultConfig, err := ctxt.generateConfig(test.jesInfo.Schema)
 		if test.expectError != "" {
-			c.Assert(err, gc.ErrorMatches, test.expectError)
+			c.Assert(err, gc.ErrorMatches, test.expectError, gc.Commentf("config: %#v", resultConfig))
 		} else {
 			c.Assert(err, gc.IsNil)
-			c.Assert(config, jc.DeepEquals, test.expectConfig)
+			c.Assert(resultConfig, jc.DeepEquals, test.expectConfig)
 		}
 
 		// Remove the test files.
