@@ -74,7 +74,7 @@ func serve(confPath string) error {
 	db := session.DB("jem")
 
 	ring := bakery.NewPublicKeyRing()
-	ring.AddPublicKeyForLocation(conf.IdentityLocation+"/", true, conf.IdentityPublicKey)
+	ring.AddPublicKeyForLocation(conf.IdentityLocation, true, conf.IdentityPublicKey)
 
 	logger.Debugf("setting up the API server")
 	cfg := jem.ServerParams{

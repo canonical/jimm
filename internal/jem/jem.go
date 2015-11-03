@@ -295,7 +295,7 @@ func (j *JEM) StateServer(path params.EntityPath) (*mongodoc.StateServer, error)
 
 // Environment returns information on the environment with the given
 // path. It returns an error with a params.ErrNotFound cause if the
-// state server was not found.
+// environment was not found.
 func (j *JEM) Environment(path params.EntityPath) (*mongodoc.Environment, error) {
 	id := path.String()
 	var env mongodoc.Environment
@@ -305,6 +305,21 @@ func (j *JEM) Environment(path params.EntityPath) (*mongodoc.Environment, error)
 	}
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot get environment %q", id)
+	}
+	return &env, nil
+}
+
+// EnvironmentFromUUID returns information on the environment with the
+// given UUID. It returns an error with a params.ErrNotFound cause if the
+// environment was not found.
+func (j *JEM) EnvironmentFromUUID(uuid string) (*mongodoc.Environment, error) {
+	var env mongodoc.Environment
+	err := j.DB.Environments().Find(bson.D{{"uuid", uuid}}).One(&env)
+	if err == mgo.ErrNotFound {
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "environment with uuid %q not found", uuid)
+	}
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot get environment with uuid %q", uuid)
 	}
 	return &env, nil
 }
