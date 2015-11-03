@@ -12,10 +12,10 @@ type listSuite struct {
 
 var _ = gc.Suite(&listSuite{})
 
-func (s *listSuite) TestChangePerm(c *gc.C) {
+func (s *listSuite) TestList(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 
-	// First add a state server and some environments environments.
+	// First add a state server and some environments.
 	stdout, stderr, code := run(c, c.MkDir(), "add-server", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")

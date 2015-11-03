@@ -73,6 +73,7 @@ func New() cmd.Command {
 	supercmd.Register(newListCommand())
 	supercmd.Register(newListServersCommand())
 	supercmd.Register(newListTemplatesCommand())
+	supercmd.Register(newRemoveCommand())
 
 	return supercmd
 }
