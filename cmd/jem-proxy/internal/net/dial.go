@@ -1,3 +1,5 @@
+// Copyright 2015 Canonical Ltd.
+
 package net
 
 import (
@@ -12,14 +14,20 @@ import (
 
 var logger = loggo.GetLogger("jem-proxy.internal.net")
 
+// Dialer is an interface that can be used to dial network endpoints.
 type Dialer interface {
 	Dial(network, address string) (net.Conn, error)
 }
 
+// Lookuper provides an interface for resolving names to one or more
+// addresses.
 type Lookuper interface {
 	Lookup(name string) ([]string, error)
 }
 
+// ParallelDialer provides a Dial method that will attempt to dial a
+// number of endpoints in parallel. The first successful connection is
+// used.
 type ParallelDialer struct {
 	// MaxParallel is the maximum number of parallel Dial operations
 	// to start at a time. If this is 0 then there is no limit.
@@ -41,6 +49,11 @@ type ParallelDialer struct {
 	Dialer Dialer
 }
 
+// Dial performs a parallel dial. The name is extracted from the supplied
+// address and Lookup is performed on that name. If the addresses
+// returned from Lookup do not have a port then the port from the
+// original address will be added. Each address is then attempted in
+// parallel until one succeeds.
 func (d ParallelDialer) Dial(network, address string) (net.Conn, error) {
 	var addrs []string
 	if d.Lookuper != nil {
@@ -52,13 +65,13 @@ func (d ParallelDialer) Dial(network, address string) (net.Conn, error) {
 		}
 		logger.Debugf("name: %q", name)
 		addrs, err = d.Lookuper.Lookup(name)
+		if err != nil {
+			return nil, errgo.Notef(err, "cannot resolve %q", address)
+		}
 		for i, addr := range addrs {
 			if _, _, err := net.SplitHostPort(addr); err != nil {
 				addrs[i] = net.JoinHostPort(addr, port)
 			}
-		}
-		if err != nil {
-			return nil, errgo.Notef(err, "cannot resolve %q", address)
 		}
 	} else {
 		addrs = append(addrs, address)
