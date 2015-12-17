@@ -18,8 +18,8 @@ var _ = gc.Suite(&removeSuite{})
 func (s *removeSuite) TestRemoveEnvironment(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 
-	// First add a state server and an environment.
-	stdout, stderr, code := run(c, c.MkDir(), "add-server", "bob/foo")
+	// First add a controller and an model.
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
@@ -40,26 +40,26 @@ func (s *removeSuite) TestRemoveEnvironment(c *gc.C) {
 func (s *removeSuite) TestRemoveServer(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 
-	// First add a state server and an environment.
-	stdout, stderr, code := run(c, c.MkDir(), "add-server", "bob/foo")
+	// First add a controller and an model.
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	// Add a second state server, that won't be deleted.
-	stdout, stderr, code = run(c, c.MkDir(), "add-server", "bob/bar")
+	// Add a second controller, that won't be deleted.
+	stdout, stderr, code = run(c, c.MkDir(), "add-controller", "bob/bar")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
 	s.addEnv(c, "bob/foo-1", "bob/foo")
 
-	stdout, stderr, code = run(c, c.MkDir(), "remove", "--server", "bob/foo")
+	stdout, stderr, code = run(c, c.MkDir(), "remove", "--controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	stdout, stderr, code = run(c, c.MkDir(), "list-servers")
+	stdout, stderr, code = run(c, c.MkDir(), "list-controllers")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stderr, gc.Equals, "")
 	c.Assert(stdout, gc.Equals, "bob/bar\n")
@@ -75,14 +75,14 @@ func (s *removeSuite) TestRemoveTemplate(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 	client := s.jemClient("bob")
 
-	// First add the state server that we're going to use
-	// to create the new environment.
-	stdout, stderr, code := run(c, c.MkDir(), "add-server", "bob/foo")
+	// First add the controller that we're going to use
+	// to create the new model.
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	stdout, stderr, code = run(c, c.MkDir(), "create-template", "--server", "bob/foo", "bob/mytemplate", "state-server=true", "apt-mirror=0.1.2.3")
+	stdout, stderr, code = run(c, c.MkDir(), "create-template", "--controller", "bob/foo", "bob/mytemplate", "state-server=true", "apt-mirror=0.1.2.3")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
@@ -106,8 +106,8 @@ func (s *removeSuite) TestRemoveTemplate(c *gc.C) {
 func (s *removeSuite) TestRemoveMultipleEnvironments(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 
-	// First add a state server and an environment.
-	stdout, stderr, code := run(c, c.MkDir(), "add-server", "bob/foo")
+	// First add a controller and an model.
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
@@ -117,7 +117,7 @@ func (s *removeSuite) TestRemoveMultipleEnvironments(c *gc.C) {
 	stdout, stderr, code = run(c, c.MkDir(), "remove", "bob/foo", "bob/foo-1")
 	c.Assert(code, gc.Equals, 1, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Matches, `cannot remove bob/foo: DELETE http://.*/v1/env/bob/foo: cannot remove environment "bob/foo" because it is a state server`+"\nERROR not all environments removed successfully\n")
+	c.Assert(stderr, gc.Matches, `cannot remove bob/foo: DELETE http://.*/v1/env/bob/foo: cannot remove environment "bob/foo" because it is a state server`+"\nERROR not all models removed successfully\n")
 
 	stdout, stderr, code = run(c, c.MkDir(), "list")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
@@ -128,8 +128,8 @@ func (s *removeSuite) TestRemoveMultipleEnvironments(c *gc.C) {
 func (s *removeSuite) TestRemoveVerbose(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 
-	// First add a state server and an environment.
-	stdout, stderr, code := run(c, c.MkDir(), "add-server", "bob/foo")
+	// First add a controller and an model.
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")

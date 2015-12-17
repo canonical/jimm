@@ -21,13 +21,13 @@ func newListServersCommand() cmd.Command {
 }
 
 var listServersDoc = `
-The list-servers command lists available state servers.
+The list-controllers command lists available controllers.
 `
 
 func (c *listServersCommand) Info() *cmd.Info {
 	return &cmd.Info{
-		Name:    "list-servers",
-		Purpose: "list state servers",
+		Name:    "list-controllers",
+		Purpose: "list controllers",
 		Doc:     listServersDoc,
 	}
 }

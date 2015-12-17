@@ -33,8 +33,8 @@ func newChangePermCommand() cmd.Command {
 }
 
 var changePermDoc = `
-The change-perm command changes permissions of an environment
-(default) or state server (with the --server flag) within JEM.
+The change-perm command changes permissions of an model
+(default) or controller (with the --controller flag) within JEM.
 
 For example:
 
@@ -44,15 +44,15 @@ For example:
 func (c *changePermCommand) Info() *cmd.Info {
 	return &cmd.Info{
 		Name:    "change-perm",
-		Args:    "<user>/<envname|servername>",
+		Args:    "<user>/<envname|controllername>",
 		Purpose: "set permissions of JEM entity",
 		Doc:     changePermDoc,
 	}
 }
 
 func (c *changePermCommand) SetFlags(f *gnuflag.FlagSet) {
-	f.BoolVar(&c.stateServer, "server", false, "change ACL of state server not environment")
-	f.BoolVar(&c.template, "template", false, "change ACL of template not environment")
+	f.BoolVar(&c.stateServer, "controller", false, "change ACL of controller not model")
+	f.BoolVar(&c.template, "template", false, "change ACL of template not model")
 	f.Var(&c.addRead, "add-read", "list of names to add to read ACL")
 	f.Var(&c.removeRead, "remove-read", "list of names to remove from read ACL")
 	f.Var(&c.setRead, "set-read", "set read ACL to this list")
@@ -73,7 +73,7 @@ func (c *changePermCommand) Init(args []string) error {
 		return errgo.New("no permissions specified")
 	}
 	if c.template && c.stateServer {
-		return errgo.New("cannot specify both --server and --template")
+		return errgo.New("cannot specify both --controller and --template")
 	}
 	return nil
 }

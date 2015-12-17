@@ -15,20 +15,20 @@ var _ = gc.Suite(&listTemplatesSuite{})
 func (s *listTemplatesSuite) TestChangePerm(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 
-	// First add the state server that we're going to use
+	// First add the controller that we're going to use
 	// to create the new templates.
-	stdout, stderr, code := run(c, c.MkDir(), "add-server", "bob/env")
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/env")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
 	// Add a couple of templates.
-	stdout, stderr, code = run(c, c.MkDir(), "create-template", "-s", "bob/env", "bob/foo", "state-server=true")
+	stdout, stderr, code = run(c, c.MkDir(), "create-template", "-c", "bob/env", "bob/foo", "state-server=true")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	stdout, stderr, code = run(c, c.MkDir(), "create-template", "-s", "bob/env", "bob/bar", "state-server=false")
+	stdout, stderr, code = run(c, c.MkDir(), "create-template", "-c", "bob/env", "bob/bar", "state-server=false")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")

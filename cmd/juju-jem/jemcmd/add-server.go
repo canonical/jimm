@@ -23,30 +23,30 @@ func newAddServerCommand() cmd.Command {
 }
 
 var addServerDoc = `
-The add-server command adds an existing Juju state
-server to the JEM. It takes the information from the
-data stored locally by juju (the current environment by default).
+The add-controller command adds an existing Juju controller (formerly known as
+state server) to the JEM. It takes the information from the
+data stored locally by juju (the current model by default).
 
 The <user>/<name> argument specifies the name
-that will be given to the state server inside JEM.
-This will also be added as an environment, so the
-JEM commands which refer to an environment
-can also use the state server name.
+that will be given to the controller inside JEM.
+This will also be added as a model, so the
+JEM commands which refer to a model
+can also use the controller name.
 `
 
 func (c *addServerCommand) Info() *cmd.Info {
 	return &cmd.Info{
-		Name:    "add-server",
+		Name:    "add-controller",
 		Args:    "<user>/<name>",
-		Purpose: "Add a state server to JEM.",
+		Purpose: "Add a controller to JEM.",
 		Doc:     addServerDoc,
 	}
 }
 
 func (c *addServerCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.commandBase.SetFlags(f)
-	f.StringVar(&c.envName, "e", "", "environment to add")
-	f.StringVar(&c.envName, "environment", "", "")
+	f.StringVar(&c.envName, "m", "", "model to add")
+	f.StringVar(&c.envName, "model", "", "")
 }
 
 func (c *addServerCommand) Init(args []string) error {
@@ -90,7 +90,7 @@ func (c *addServerCommand) Run(ctxt *cmd.Context) error {
 			Password:    creds.Password,
 		},
 	}); err != nil {
-		return errgo.Notef(err, "cannot add state server")
+		return errgo.Notef(err, "cannot add controller")
 	}
 	return nil
 }

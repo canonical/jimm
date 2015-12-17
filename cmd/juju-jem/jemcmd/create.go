@@ -39,8 +39,8 @@ func newCreateCommand() cmd.Command {
 }
 
 var createDoc = `
-The create command creates a new environment inside the specified state
-server. Its argument specifies the JEM name of the new environment.
+The create command creates a new model inside the specified controller.
+Its argument specifies the JEM name of the new model.
 
 When one or more templates paths are specified, the final configuration
 is determined by starting with the first and adding attributes from
@@ -51,21 +51,21 @@ the configuration file specified by the --config flag.
 func (c *createCommand) Info() *cmd.Info {
 	return &cmd.Info{
 		Name:    "create",
-		Args:    "<user>/<envname>",
-		Purpose: "Create a new environment in JEM",
+		Args:    "<user>/<modelname>",
+		Purpose: "Create a new model in JEM",
 		Doc:     createDoc,
 	}
 }
 
 func (c *createCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.commandBase.SetFlags(f)
-	f.Var(&c.srvPath, "state-server", "")
-	f.Var(&c.srvPath, "s", "state server to create the environment in")
+	f.Var(&c.srvPath, "controller", "")
+	f.Var(&c.srvPath, "c", "controller to create the model in")
 	f.Var(&c.templatePaths, "template", "")
 	f.Var(&c.templatePaths, "t", "comma-separated templates to use for config attributes")
 
-	f.StringVar(&c.configFile, "config", "", "YAML config file containing environment configuration")
-	f.StringVar(&c.localName, "local", "", "local name for environment (as used for juju switch). Defaults to <envname>")
+	f.StringVar(&c.configFile, "config", "", "YAML config file containing model configuration")
+	f.StringVar(&c.localName, "local", "", "local name for model (as used for juju switch). Defaults to <modelname>")
 }
 
 func (c *createCommand) Init(args []string) error {
@@ -76,7 +76,7 @@ func (c *createCommand) Init(args []string) error {
 		return errgo.Mask(err)
 	}
 	if c.srvPath.EntityPath == (params.EntityPath{}) {
-		return errgo.Newf("state server must be specified")
+		return errgo.Newf("controller must be specified")
 	}
 	if c.localName == "" {
 		c.localName = string(c.envPath.Name)

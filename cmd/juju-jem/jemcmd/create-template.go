@@ -29,14 +29,14 @@ func newCreateTemplateCommand() cmd.Command {
 }
 
 var createTemplateDoc = `
-The create-template command adds a template for an environment to the JEM.
+The create-template command adds a template for an model to the JEM.
 A template holds some of the configuration attributes required by
-a state server, and may be used when creating a new environment.
+a controller, and may be used when creating a new model.
 Secret attributes may be set but not retrieved.
 
 The <user>/<name> argument specifies the name that will be given to the
 template inside JEM.  Note that this exists in a different name space
-from environments and state servers.
+from model and controllers.
 `
 
 func (c *createTemplateCommand) Info() *cmd.Info {
@@ -50,8 +50,8 @@ func (c *createTemplateCommand) Info() *cmd.Info {
 
 func (c *createTemplateCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.commandBase.SetFlags(f)
-	f.Var(&c.srvPath, "s", "state server to use as the schema for the template")
-	f.Var(&c.srvPath, "server", "")
+	f.Var(&c.srvPath, "c", "controller to use as the schema for the template")
+	f.Var(&c.srvPath, "controller", "")
 	f.StringVar(&c.configFile, "config", "", "YAML config file containing template configuration")
 }
 
@@ -63,7 +63,7 @@ func (c *createTemplateCommand) Init(args []string) error {
 		return errgo.Mask(err)
 	}
 	if c.srvPath.EntityPath == (params.EntityPath{}) {
-		return errgo.Newf("--server flag required but not provided")
+		return errgo.Newf("--controller flag required but not provided")
 	}
 	if c.configFile != "" {
 		if len(args) > 1 {
