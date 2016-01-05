@@ -17,9 +17,9 @@ var _ = gc.Suite(&getSuite{})
 func (s *getSuite) TestGet(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 
-	// First add a state server. This also adds an environment that we can
+	// First add a controller. This also adds an model that we can
 	// get for our test.
-	stdout, stderr, code := run(c, c.MkDir(), "add-server", "bob/foo")
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
@@ -32,7 +32,7 @@ func (s *getSuite) TestGet(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	// Check that we can attach to the new environment
+	// Check that we can attach to the new model
 	// through the usual juju connection mechanism.
 	client, err := juju.NewAPIClientFromName("foo", httpbakery.NewClient())
 	c.Assert(err, gc.IsNil)
@@ -55,7 +55,7 @@ var getErrorTests = []struct {
 	expectStderr: "got 3 arguments, want 1",
 	expectCode:   2,
 }, {
-	about:        "only one part in environ id",
+	about:        "only one part in model id",
 	args:         []string{"a"},
 	expectStderr: `invalid entity path "a": wrong number of parts in entity path`,
 	expectCode:   2,

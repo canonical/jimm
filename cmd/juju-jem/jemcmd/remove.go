@@ -24,7 +24,7 @@ func newRemoveCommand() cmd.Command {
 }
 
 var removeDoc = `
-The remove command removes environments, servers or templates.
+The remove command removes models, controllers or templates.
 `
 
 func (c *removeCommand) Info() *cmd.Info {
@@ -48,8 +48,8 @@ func (c *removeCommand) Init(args []string) error {
 }
 
 func (c *removeCommand) SetFlags(f *gnuflag.FlagSet) {
-	f.BoolVar(&c.stateServer, "server", false, "remove state servers not environments")
-	f.BoolVar(&c.template, "template", false, "remove templates not environments")
+	f.BoolVar(&c.stateServer, "controller", false, "remove controllers not models")
+	f.BoolVar(&c.template, "template", false, "remove templates not models")
 }
 
 func (c *removeCommand) Run(ctxt *cmd.Context) error {
@@ -57,14 +57,14 @@ func (c *removeCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	typeString := "environments"
+	typeString := "models"
 	f := func(path entityPathValue) error {
 		return client.DeleteEnvironment(&params.DeleteEnvironment{
 			EntityPath: path.EntityPath,
 		})
 	}
 	if c.stateServer {
-		typeString = "servers"
+		typeString = "controllers"
 		f = func(path entityPathValue) error {
 			return client.DeleteJES(&params.DeleteJES{
 				EntityPath: path.EntityPath,

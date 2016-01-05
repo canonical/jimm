@@ -21,13 +21,13 @@ func newListCommand() cmd.Command {
 }
 
 var listDoc = `
-The list command lists available environments.
+The list command lists available models.
 `
 
 func (c *listCommand) Info() *cmd.Info {
 	return &cmd.Info{
 		Name:    "list",
-		Purpose: "list environments",
+		Purpose: "list models",
 		Doc:     listDoc,
 	}
 }

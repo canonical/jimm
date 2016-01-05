@@ -36,8 +36,8 @@ The juju jem command provides access to the JEM server.
 The commands are at present for testing purposes only
 and are not stable in any form.
 
-The location of the JEM state server can be specified
-as an environment variable:
+The location of the JEM server can be specified
+as an model variable:
 
 	JUJU_JEM=<JEM server URL>
 
@@ -47,9 +47,9 @@ or as a command line flag:
 
 The latter takes precedence over the former.
 
-Note that any juju state server used by JEM must
-have hosted environments enabled by bootstrapping
-it with the JUJU_DEV_FEATURE_FLAGS environment
+Note that any juju controller used by JEM must
+have hosted models enabled by bootstrapping
+it with the JUJU_DEV_FEATURE_FLAGS model
 variable set to include "jes".
 `
 
@@ -79,9 +79,9 @@ func New() cmd.Command {
 	return supercmd
 }
 
-// environInfo returns information on the local environment
-// with the given name. If envName is empty, the default
-// environment will be used.
+// environInfo returns information on the local environment(model) with the
+// given name. If envName is empty, the default environment(model) will be
+// used.
 func environInfo(envName string) (configstore.EnvironInfo, error) {
 	store, err := configstore.Default()
 	if err != nil {
@@ -90,12 +90,12 @@ func environInfo(envName string) (configstore.EnvironInfo, error) {
 	if envName == "" {
 		envName, err = envcmd.GetDefaultEnvironment()
 		if err != nil {
-			return nil, errgo.Notef(err, "cannot find name of default environment")
+			return nil, errgo.Notef(err, "cannot find name of default model")
 		}
 	}
 	info, err := store.ReadInfo(envName)
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot read info for environment %q", envName)
+		return nil, errgo.Notef(err, "cannot read info for model %q", envName)
 	}
 	return info, nil
 }
@@ -213,7 +213,7 @@ func (v *entityPathsValue) String() string {
 var _ gnuflag.Value = (*entityPathsValue)(nil)
 
 // writeEnvironment runs the given getEnv function
-// and writes the result as a local environment .jenv
+// and writes the result as a local model .jenv
 // file with the given local name, saving also the
 // given access password.
 func writeEnvironment(localName string, getEnv func() (*params.EnvironmentResponse, error)) error {
@@ -221,13 +221,13 @@ func writeEnvironment(localName string, getEnv func() (*params.EnvironmentRespon
 	if err != nil {
 		return errgo.Notef(err, "cannot get default configstore")
 	}
-	// Check that the environment doesn't exist already.
+	// Check that the model doesn't exist already.
 	_, err = store.ReadInfo(localName)
 	if err == nil {
-		return errgo.Notef(err, "local environment %q already exists", localName)
+		return errgo.Notef(err, "local model %q already exists", localName)
 	}
 	if !errors.IsNotFound(err) {
-		return errgo.Notef(err, "cannot check for existing local environment")
+		return errgo.Notef(err, "cannot check for existing local model")
 	}
 
 	resp, err := getEnv()
@@ -235,7 +235,7 @@ func writeEnvironment(localName string, getEnv func() (*params.EnvironmentRespon
 		return errgo.Mask(err)
 	}
 
-	// First try to connect to the environment to ensure
+	// First try to connect to the model to ensure
 	// that the response is somewhat sane.
 	apiInfo := &api.Info{
 		Tag:        names.NewUserTag(resp.User),
@@ -246,7 +246,7 @@ func writeEnvironment(localName string, getEnv func() (*params.EnvironmentRespon
 	}
 	st, err := api.Open(apiInfo, api.DialOpts{})
 	if err != nil {
-		return errgo.Notef(err, "cannot open environment")
+		return errgo.Notef(err, "cannot open model")
 	}
 	st.Close()
 
@@ -262,7 +262,7 @@ func writeEnvironment(localName string, getEnv func() (*params.EnvironmentRespon
 		Password: resp.Password,
 	})
 	if err := envInfo.Write(); err != nil {
-		return errgo.Notef(err, "cannot write environ info")
+		return errgo.Notef(err, "cannot write model info")
 	}
 	return nil
 }

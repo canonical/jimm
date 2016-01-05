@@ -114,7 +114,7 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 		jesInfo params.JESResponse
 		config  map[string]interface{}
 
-		// envVars holds a map from environment variable
+		// envVars holds a map from model variable
 		// name to value. Each entry will be set at the start
 		// of the test.
 		envVars map[string]string
@@ -142,7 +142,7 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 			"attr": "hello",
 		},
 	}, {
-		about: "environment variable defaults",
+		about: "model variable defaults",
 		envVars: map[string]string{
 			"somevar": "avalue",
 		},
@@ -159,7 +159,7 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 			"attr": "avalue",
 		},
 	}, {
-		about: "fallback environment variable defaults",
+		about: "fallback model variable defaults",
 		envVars: map[string]string{
 			"var3": "var3 value",
 		},
@@ -177,7 +177,7 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 			"attr": "var3 value",
 		},
 	}, {
-		about: "fallback environment variable defaults with empty EnvVar",
+		about: "fallback model variable defaults with empty EnvVar",
 		envVars: map[string]string{
 			"var2": "var2 value",
 		},
@@ -429,7 +429,7 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 		},
 		expectError: `bad value for "attr" in attributes: expected number, got string\("something"\)`,
 	}, {
-		about: "environment variable with bad value",
+		about: "model variable with bad value",
 		jesInfo: params.JESResponse{
 			ProviderType: "test",
 			Schema: environschema.Fields{

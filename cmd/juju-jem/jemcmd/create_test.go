@@ -21,9 +21,9 @@ var _ = gc.Suite(&createSuite{})
 func (s *createSuite) TestCreate(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 
-	// First add the state server that we're going to use
-	// to create the new environment.
-	stdout, stderr, code := run(c, c.MkDir(), "add-server", "bob/foo")
+	// First add the controller that we're going to use
+	// to create the new model.
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
@@ -39,7 +39,7 @@ func (s *createSuite) TestCreate(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	stdout, stderr, code = run(c, c.MkDir(),
 		"create",
-		"-s", "bob/foo",
+		"-c", "bob/foo",
 		"--config", configPath,
 		"bob/newenv",
 	)
@@ -47,7 +47,7 @@ func (s *createSuite) TestCreate(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	// Check that we can attach to the new environment
+	// Check that we can attach to the new model
 	// through the usual juju connection mechanism.
 	client, err := juju.NewAPIClientFromName("newenv", httpbakery.NewClient())
 	c.Assert(err, gc.IsNil)
@@ -57,21 +57,21 @@ func (s *createSuite) TestCreate(c *gc.C) {
 func (s *createSuite) TestCreateWithTemplate(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 
-	// First add the state server that we're going to use
-	// to create the new environment.
-	stdout, stderr, code := run(c, c.MkDir(), "add-server", "bob/foo")
+	// First add the controller that we're going to use
+	// to create the new model.
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	// Then add a template containing the mandatory state-server parameter.
-	stdout, stderr, code = run(c, c.MkDir(), "create-template", "bob/template", "-s", "bob/foo", "state-server=true")
+	// Then add a template containing the mandatory controller parameter.
+	stdout, stderr, code = run(c, c.MkDir(), "create-template", "bob/template", "-c", "bob/foo", "state-server=true")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	// Then create an environment that uses the template as additional config.
-	// Note that because the state-server attribute is mandatory, this
+	// Then create an model that uses the template as additional config.
+	// Note that because the controller attribute is mandatory, this
 	// will fail if the template logic is not working correctly.
 	config := map[string]interface{}{
 		"authorized-keys": fakeSSHKey,
@@ -83,7 +83,7 @@ func (s *createSuite) TestCreateWithTemplate(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	stdout, stderr, code = run(c, c.MkDir(),
 		"create",
-		"-s", "bob/foo",
+		"-c", "bob/foo",
 		"--config", configPath,
 		"-t", "bob/template",
 		"bob/newenv",
@@ -92,7 +92,7 @@ func (s *createSuite) TestCreateWithTemplate(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	// Check that we can attach to the new environment
+	// Check that we can attach to the new model
 	// through the usual juju connection mechanism.
 	client, err := juju.NewAPIClientFromName("newenv", httpbakery.NewClient())
 	c.Assert(err, gc.IsNil)
@@ -120,9 +120,9 @@ var createErrorTests = []struct {
 	expectStderr: `invalid entity path "a": wrong number of parts in entity path`,
 	expectCode:   2,
 }, {
-	about:        "state server must be specified",
+	about:        "controller must be specified",
 	args:         []string{"foo/bar"},
-	expectStderr: `state server must be specified`,
+	expectStderr: `controller must be specified`,
 	expectCode:   2,
 }}
 

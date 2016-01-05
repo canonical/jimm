@@ -26,7 +26,7 @@ func (s *addServerSuite) TestAddServer(c *gc.C) {
 		},
 	})
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	stdout, stderr, code := run(c, c.MkDir(), "add-server", "bob/foo")
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
@@ -55,12 +55,12 @@ var addServerErrorTests = []struct {
 	expectStderr: "got 3 arguments, want 1",
 	expectCode:   2,
 }, {
-	about:        "invalid server name",
+	about:        "invalid controller name",
 	args:         []string{"a"},
 	expectStderr: `invalid entity path "a": wrong number of parts in entity path`,
 	expectCode:   2,
 }, {
-	about:        "invalid name checked by server",
+	about:        "invalid name checked by controller",
 	args:         []string{"bad!name/foo"},
 	expectStderr: `invalid entity path "bad!name/foo": invalid user name "bad!name"`,
 	expectCode:   2,
@@ -69,7 +69,7 @@ var addServerErrorTests = []struct {
 func (s *addServerSuite) TestAddServerError(c *gc.C) {
 	for i, test := range addServerErrorTests {
 		c.Logf("test %d: %s", i, test.about)
-		stdout, stderr, code := run(c, c.MkDir(), "add-server", test.args...)
+		stdout, stderr, code := run(c, c.MkDir(), "add-controller", test.args...)
 		c.Assert(code, gc.Equals, test.expectCode, gc.Commentf("stderr: %s", stderr))
 		c.Assert(stderr, gc.Matches, "(error:|ERROR) "+test.expectStderr+"\n")
 		c.Assert(stdout, gc.Equals, "")

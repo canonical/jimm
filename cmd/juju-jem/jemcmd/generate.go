@@ -30,14 +30,14 @@ func newGenerateCommand() cmd.Command {
 
 var generateDoc = `
 The generate command generates a YAML file for use as a template or
-environment configuration. By default it writes the data to standard
+model configuration. By default it writes the data to standard
 output, with attributes set to any default values found in the
-environment.
+model.
 
-The specified state server attributes are used as the basis for the
+The specified controller attributes are used as the basis for the
 configuration file. If any templates are specified, their attributes
 will not be written - the effect is to write configuration data that
-is necessary when using the create command with the state server and
+is necessary when using the create command with the controller and
 those templates.
 `
 
@@ -52,8 +52,8 @@ func (c *generateCommand) Info() *cmd.Info {
 
 func (c *generateCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.commandBase.SetFlags(f)
-	f.Var(&c.srvPath, "s", "state server to use as the schema for the file")
-	f.Var(&c.srvPath, "server", "")
+	f.Var(&c.srvPath, "c", "controller to use as the schema for the file")
+	f.Var(&c.srvPath, "controller", "")
 	f.Var(&c.templatePaths, "template", "")
 	f.Var(&c.templatePaths, "t", "comma-separated templates to exclude from generated configuration")
 	f.StringVar(&c.output, "output", "", "")
@@ -67,7 +67,7 @@ func (c *generateCommand) Init(args []string) error {
 		return errgo.Newf("arguments provided but none expected")
 	}
 	if c.srvPath.EntityPath == (params.EntityPath{}) {
-		return errgo.Newf("state server must be specified")
+		return errgo.Newf("controller must be specified")
 	}
 	return nil
 }
@@ -100,7 +100,7 @@ func (c *generateCommand) Run(ctxt *cmd.Context) error {
 	if scCtxt.providerType == "local" {
 		// We have no way of deciding on the default value
 		// for the namespace attribute because we don't
-		// have an environment name, so prevent
+		// have an model name, so prevent
 		// it being used to generate a default, which would
 		// fail, by adding that attribute to the list
 		// of known attributes.

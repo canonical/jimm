@@ -24,7 +24,7 @@ func newGetCommand() cmd.Command {
 }
 
 var getDoc = `
-The get command gets information about a JEM environment
+The get command gets information about a JEM model
 and writes it to a local .jenv file.
 `
 
@@ -32,15 +32,15 @@ func (c *getCommand) Info() *cmd.Info {
 	return &cmd.Info{
 		Name:    "get",
 		Args:    "<user>/<envname>",
-		Purpose: "Make a JEM environment available to Juju",
+		Purpose: "Make a JEM model available to Juju",
 		Doc:     getDoc,
 	}
 }
 
 func (c *getCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.commandBase.SetFlags(f)
-	f.StringVar(&c.localName, "local", "", "local name for environment (as used for juju switch). Defaults to <envname>")
-	f.StringVar(&c.user, "u", "", "user name to use when accessing the environment (defaults to user name created for environment)")
+	f.StringVar(&c.localName, "local", "", "local name for model (as used for juju switch). Defaults to <envname>")
+	f.StringVar(&c.user, "u", "", "user name to use when accessing the model (defaults to user name created for model)")
 	f.StringVar(&c.user, "user", "", "")
 }
 
@@ -68,7 +68,7 @@ func (c *getCommand) Run(ctxt *cmd.Context) error {
 			EntityPath: c.envPath.EntityPath,
 		})
 		if err != nil {
-			return nil, errgo.Notef(err, "cannot get environment info")
+			return nil, errgo.Notef(err, "cannot get model info")
 		}
 		if c.user != "" {
 			resp.User = c.user

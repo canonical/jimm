@@ -21,14 +21,14 @@ var _ = gc.Suite(&generateSuite{})
 func (s *generateSuite) TestGenerate(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 
-	// First add the state server that we're going to use
+	// First add the controller that we're going to use
 	// to generate the config data.
-	stdout, stderr, code := run(c, c.MkDir(), "add-server", "bob/foo")
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	stdout, stderr, code = run(c, c.MkDir(), "generate", "-s", "bob/foo")
+	stdout, stderr, code = run(c, c.MkDir(), "generate", "-c", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stderr, gc.Equals, "")
 
@@ -64,7 +64,7 @@ func (s *generateSuite) TestGenerate(c *gc.C) {
 
 	// Check that generating to a file generates the same thing.
 	file := filepath.Join(c.MkDir(), "config.yaml")
-	stdout, stderr, code = run(c, c.MkDir(), "generate", "-s", "bob/foo", "-o", file)
+	stdout, stderr, code = run(c, c.MkDir(), "generate", "-c", "bob/foo", "-o", file)
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stderr, gc.Equals, "")
 	c.Assert(stdout, gc.Equals, "")
@@ -77,23 +77,23 @@ func (s *generateSuite) TestGenerate(c *gc.C) {
 func (s *generateSuite) TestGenerateWithTemplates(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 
-	// First add the state server that we're going to use
+	// First add the controller that we're going to use
 	// to generate the config data.
-	stdout, stderr, code := run(c, c.MkDir(), "add-server", "bob/foo")
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	stdout, stderr, code = run(c, c.MkDir(), "create-template", "--server", "bob/foo", "bob/template", "state-server=false")
+	stdout, stderr, code = run(c, c.MkDir(), "create-template", "--controller", "bob/foo", "bob/template", "state-server=false")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	stdout, stderr, code = run(c, c.MkDir(), "generate", "-s", "bob/foo", "-t", "bob/template")
+	stdout, stderr, code = run(c, c.MkDir(), "generate", "-c", "bob/foo", "-t", "bob/template")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stderr, gc.Equals, "")
 
-	// The state-server attribute should be omitted.
+	// The controller server attribute should be omitted.
 	c.Assert(stdout, gc.Not(gc.Matches), `(.|\n)*state-server:(.|\n)*`)
 
 	// But the other attributes should still be there.
@@ -111,8 +111,8 @@ var generateErrorTests = []struct {
 	expectStderr: "arguments provided but none expected",
 	expectCode:   2,
 }, {
-	about:        "state server must be specified",
-	expectStderr: `state server must be specified`,
+	about:        "controller must be specified",
+	expectStderr: `controller must be specified`,
 	expectCode:   2,
 }}
 

@@ -25,9 +25,9 @@ func (s *createTemplateSuite) TestCreateTemplate(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 	client := s.jemClient("bob")
 
-	// First add the state server that we're going to use
+	// First add the controller that we're going to use
 	// to create the new environment.
-	stdout, stderr, code := run(c, c.MkDir(), "add-server", "bob/foo")
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
@@ -38,7 +38,7 @@ func (s *createTemplateSuite) TestCreateTemplate(c *gc.C) {
 	})
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
-	stdout, stderr, code = run(c, c.MkDir(), "create-template", "--server", "bob/foo", "bob/mytemplate", "state-server=true", "apt-mirror=0.1.2.3")
+	stdout, stderr, code = run(c, c.MkDir(), "create-template", "--controller", "bob/foo", "bob/mytemplate", "state-server=true", "apt-mirror=0.1.2.3")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
@@ -57,9 +57,9 @@ func (s *createTemplateSuite) TestCreateTemplateWithConfigFile(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 	client := s.jemClient("bob")
 
-	// First add the state server that we're going to use
+	// First add the controller that we're going to use
 	// to create the new environment.
-	stdout, stderr, code := run(c, c.MkDir(), "add-server", "bob/foo")
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
@@ -81,7 +81,7 @@ func (s *createTemplateSuite) TestCreateTemplateWithConfigFile(c *gc.C) {
 	err = ioutil.WriteFile(configFile, data, 0666)
 	c.Assert(err, gc.IsNil)
 
-	stdout, stderr, code = run(c, c.MkDir(), "create-template", "--server", "bob/foo", "bob/mytemplate", "--config", configFile)
+	stdout, stderr, code = run(c, c.MkDir(), "create-template", "--controller", "bob/foo", "bob/mytemplate", "--config", configFile)
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
@@ -111,18 +111,18 @@ var createTemplateErrorTests = []struct {
 	expectStderr: `invalid entity path "a": wrong number of parts in entity path`,
 	expectCode:   2,
 }, {
-	about:        "state server not provided",
+	about:        "controller not provided",
 	args:         []string{"bob/foo"},
-	expectStderr: `--server flag required but not provided`,
+	expectStderr: `--controller flag required but not provided`,
 	expectCode:   2,
 }, {
 	about:        "duplicate key",
-	args:         []string{"bob/foo", "--server", "foo/bar", "x=y", "y=z", "x=p"},
+	args:         []string{"bob/foo", "--controller", "foo/bar", "x=y", "y=z", "x=p"},
 	expectStderr: `key "x" specified more than once`,
 	expectCode:   2,
 }, {
 	about:        "config file not founD",
-	args:         []string{"bob/foo", "--server", "foo/bar", "--config", "non-existent"},
+	args:         []string{"bob/foo", "--controller", "foo/bar", "--config", "non-existent"},
 	expectStderr: `cannot read configuration file: open non-existent: no such file or directory`,
 	expectCode:   1,
 }}

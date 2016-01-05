@@ -18,14 +18,14 @@ var _ = gc.Suite(&changepermSuite{})
 func (s *changepermSuite) TestChangePerm(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 
-	// First add a state server. This also adds an environment that we can
+	// First add a controller. This also adds an model that we can
 	// alter for our test.
-	stdout, stderr, code := run(c, c.MkDir(), "add-server", "bob/foo")
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	// Check that alice can't get server or environment.
+	// Check that alice can't get server or model.
 	aliceClient := s.jemClient("alice")
 	_, err := aliceClient.GetJES(&params.GetJES{
 		EntityPath: params.EntityPath{
@@ -42,7 +42,7 @@ func (s *changepermSuite) TestChangePerm(c *gc.C) {
 	})
 	c.Assert(err, gc.ErrorMatches, "GET http://.*/v1/env/bob/foo: unauthorized")
 
-	// Add alice to environment permissions list.
+	// Add alice to model permissions list.
 	stdout, stderr, code = run(c, c.MkDir(),
 		"change-perm",
 		"--add-read",
@@ -53,7 +53,7 @@ func (s *changepermSuite) TestChangePerm(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	// Check that alice can get environment but not server.
+	// Check that alice can get model but not server.
 	_, err = aliceClient.GetJES(&params.GetJES{
 		EntityPath: params.EntityPath{
 			User: "bob",
@@ -72,7 +72,7 @@ func (s *changepermSuite) TestChangePerm(c *gc.C) {
 	// Add alice to server permissions list.
 	stdout, stderr, code = run(c, c.MkDir(),
 		"change-perm",
-		"--server",
+		"--controller",
 		"--add-read",
 		"alice",
 		"bob/foo",
@@ -132,14 +132,14 @@ func (s *changepermSuite) TestChangeTemplatePerm(c *gc.C) {
 	s.idmSrv.AddUser("bob")
 	s.idmSrv.SetDefaultUser("bob")
 
-	// First add the state server that we're going to use
+	// First add the controller that we're going to use
 	// to create the new template.
-	stdout, stderr, code := run(c, c.MkDir(), "add-server", "bob/foo")
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	stdout, stderr, code = run(c, c.MkDir(), "create-template", "--server", "bob/foo", "bob/mytemplate", "state-server=true", "apt-mirror=0.1.2.3")
+	stdout, stderr, code = run(c, c.MkDir(), "create-template", "--controller", "bob/foo", "bob/mytemplate", "state-server=true", "apt-mirror=0.1.2.3")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
@@ -217,9 +217,9 @@ var changepermErrorTests = []struct {
 	expectStderr: `cannot specify --set-read with either --add-read or --remove-read`,
 	expectCode:   2,
 }, {
-	about:        "--server not allowed with --template",
-	args:         []string{"--server", "--template", "--set-read", "bob", "foo/bar"},
-	expectStderr: `cannot specify both --server and --template`,
+	about:        "--controller not allowed with --template",
+	args:         []string{"--controller", "--template", "--set-read", "bob", "foo/bar"},
+	expectStderr: `cannot specify both --controller and --template`,
 	expectCode:   2,
 }, {
 	about:        "no permissions specified",
