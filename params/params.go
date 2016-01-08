@@ -335,3 +335,14 @@ type AddTemplateInfo struct {
 	// Config holds the template's configuration attributes.
 	Config map[string]interface{} `json:"config"`
 }
+
+// WhoAmI holds parameters for requesting the current user name.
+type WhoAmI struct {
+	httprequest.Route `httprequest:"GET /v1/whoami"`
+}
+
+// WhoAmIResponse holds information on the currently
+// authenticated user.
+type WhoAmIResponse struct {
+	User string `json:"user"`
+}

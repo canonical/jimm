@@ -1439,7 +1439,12 @@ func (s *APISuite) TestDeleteTemplate(c *gc.C) {
 		Do:      apitest.Do(s.IDMSrv.Client("alice")),
 	})
 	c.Assert(resp.Code, gc.Equals, http.StatusNotFound, gc.Commentf("body: %s", resp.Body.Bytes()))
+}
 
+func (s *APISuite) TestWhoAmI(c *gc.C) {
+	resp, err := s.NewClient("bob").WhoAmI(nil)
+	c.Assert(err, gc.IsNil)
+	c.Assert(resp.User, gc.Equals, "bob")
 }
 
 // addStateServer adds a new stateserver named name under the
