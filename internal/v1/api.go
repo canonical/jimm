@@ -55,6 +55,14 @@ func (h *Handler) Close() error {
 	return nil
 }
 
+// WhoAmI returns authentication information on the client that is
+// making the WhoAmI call.
+func (h *Handler) WhoAmI(arg *params.WhoAmI) (params.WhoAmIResponse, error) {
+	return params.WhoAmIResponse{
+		User: h.jem.Auth.Username,
+	}, nil
+}
+
 // AddJES adds a new state server.
 func (h *Handler) AddJES(arg *params.AddJES) error {
 	if err := h.jem.CheckIsUser(arg.User); err != nil {

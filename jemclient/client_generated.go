@@ -136,3 +136,11 @@ func (c *client) SetStateServerPerm(p *params.SetStateServerPerm) error {
 func (c *client) SetTemplatePerm(p *params.SetTemplatePerm) error {
 	return c.Client.Call(p, nil)
 }
+
+// WhoAmI returns authentication information on the client that is
+// making the WhoAmI call.
+func (c *client) WhoAmI(p *params.WhoAmI) (params.WhoAmIResponse, error) {
+	var r params.WhoAmIResponse
+	err := c.Client.Call(p, &r)
+	return r, err
+}
