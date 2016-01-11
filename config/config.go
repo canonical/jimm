@@ -34,9 +34,6 @@ func (c *Config) validate() error {
 	if c.StateServerAdmin == "" {
 		missing = append(missing, "state-server-admin")
 	}
-	if c.IdentityPublicKey == nil {
-		missing = append(missing, "identity-public-key")
-	}
 	if c.IdentityLocation == "" {
 		missing = append(missing, "identity-location")
 	}

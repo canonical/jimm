@@ -81,7 +81,7 @@ func (s *ConfigSuite) TestReadConfigError(c *gc.C) {
 
 func (s *ConfigSuite) TestValidateConfigError(c *gc.C) {
 	cfg, err := s.readConfig(c, "")
-	c.Assert(err, gc.ErrorMatches, "missing fields mongo-addr, api-addr, state-server-admin, identity-public-key, identity-location in config file")
+	c.Assert(err, gc.ErrorMatches, "missing fields mongo-addr, api-addr, state-server-admin, identity-location in config file")
 	c.Assert(cfg, gc.IsNil)
 }
 

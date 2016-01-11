@@ -19,6 +19,7 @@ import (
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
+	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jem"
@@ -74,15 +75,21 @@ func serve(confPath string) error {
 	db := session.DB("jem")
 
 	logger.Debugf("setting up the API server")
+	var locator bakery.PublicKeyLocator
+	if conf.IdentityPublicKey == nil {
+		locator = httpbakery.NewPublicKeyRing(nil, nil)
+	} else {
+		locator = bakery.PublicKeyLocatorMap{
+			conf.IdentityLocation: conf.IdentityPublicKey,
+		}
+	}
 	cfg := jem.ServerParams{
 		DB:               db,
 		StateServerAdmin: conf.StateServerAdmin,
 		IdentityLocation: conf.IdentityLocation,
-		PublicKeyLocator: bakery.PublicKeyLocatorMap{
-			conf.IdentityLocation: conf.IdentityPublicKey,
-		},
-		AgentUsername: conf.AgentUsername,
-		AgentKey:      conf.AgentKey,
+		PublicKeyLocator: locator,
+		AgentUsername:    conf.AgentUsername,
+		AgentKey:         conf.AgentKey,
 	}
 	server, err := jem.NewServer(cfg)
 	if err != nil {
