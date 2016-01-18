@@ -27,6 +27,12 @@ define DEPENDENCIES
   $(GO_C)
 endef
 
+ifeq ($(VERSION),no)
+	VERSIONDEPS :=
+else
+	VERSIONDEPS := version/init.go
+endif
+
 default: build
 
 $(GOPATH)/bin/godeps:
@@ -36,13 +42,13 @@ $(GOPATH)/bin/godeps:
 # and will only work - when this tree is found on the GOPATH.
 ifeq ($(CURDIR),$(PROJECT_DIR))
 
-build: version/init.go
+build: $(VERSIONDEPS)
 	go build $(PROJECT)/...
 
-check: version/init.go
+check: $(VERSIONDEPS)
 	go test $(PROJECT)/...
 
-install: version/init.go
+install: $(VERSIONDEPS)
 	go install $(INSTALL_FLAGS) -v $(PROJECT)/...
 
 clean:
