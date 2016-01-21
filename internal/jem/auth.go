@@ -3,6 +3,7 @@ package jem
 import (
 	"net/http"
 
+	"github.com/juju/utils"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
@@ -45,10 +46,21 @@ func (j *JEM) Authenticate(req *http.Request) error {
 		return errgo.Notef(err, "cannot mint macaroon")
 	}
 	// Request that this macaroon be supplied for all requests
-	// to the whole handler.
-	// TODO use a relative URL here: router.RelativeURLPath(req.RequestURI, "/")
+	// to the whole handler. We use a relative path because
+	// the JEM server is conventionally under an external
+	// root path, with other services also under the same
+	// externally visible host name, and we don't want our
+	// cookies to be presented to those services.
 	cookiePath := "/"
-	return httpbakery.NewDischargeRequiredErrorForRequest(m, cookiePath, verr, req)
+	if p, err := utils.RelativeURLPath(req.RequestURI, "/"); err != nil {
+		// Should never happen, as RequestURI should always be absolute.
+		logger.Infof("cannot make relative URL from %v", req.RequestURI)
+	} else {
+		cookiePath = p
+	}
+	dischargeErr := httpbakery.NewDischargeRequiredErrorForRequest(m, cookiePath, verr, req)
+	dischargeErr.(*httpbakery.Error).Info.CookieNameSuffix = "authn"
+	return dischargeErr
 }
 
 // NewMacaroon returns a macaroon that, when discharged,
