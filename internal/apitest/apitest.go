@@ -6,13 +6,10 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"time"
 
-	jujufeature "github.com/juju/juju/feature"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	"github.com/juju/testing/httptesting"
-	"github.com/juju/utils/featureflag"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/mgo.v2"
@@ -44,8 +41,6 @@ func (s *Suite) SetUpTest(c *gc.C) {
 	s.PatchValue(&jem.APIOpenTimeout, time.Duration(0))
 	s.IDMSrv = idmtest.NewServer()
 	s.JEMSrv = s.NewServer(c, s.Session, s.IDMSrv)
-	os.Setenv("JUJU_DEV_FEATURE_FLAGS", jujufeature.JES)
-	featureflag.SetFlagsFromEnvironment("JUJU_DEV_FEATURE_FLAGS")
 	s.httpSrv = httptest.NewServer(s.JEMSrv)
 }
 

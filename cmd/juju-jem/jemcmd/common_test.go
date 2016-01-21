@@ -10,10 +10,8 @@ import (
 	"strings"
 
 	"github.com/juju/cmd"
-	jujufeature "github.com/juju/juju/feature"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	"github.com/juju/loggo"
-	"github.com/juju/utils/featureflag"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/mgo.v2"
 
@@ -68,9 +66,6 @@ func (s *commonSuite) SetUpTest(c *gc.C) {
 
 	// Set up the client to act as "testuser" by default.
 	s.idmSrv.SetDefaultUser("testuser")
-
-	os.Setenv("JUJU_DEV_FEATURE_FLAGS", jujufeature.JES)
-	featureflag.SetFlagsFromEnvironment("JUJU_DEV_FEATURE_FLAGS")
 
 	os.Setenv("JUJU_JEM", s.httpSrv.URL)
 
