@@ -9,7 +9,7 @@ To start using JEM, first ensure you have a valid Go environment,
 then run the following:
 
     go get github.com/CanonicalLtd/jem
-    cd $GOPATH/github.com/CanonicalLtd/jem
+    cd $GOPATH/src/github.com/CanonicalLtd/jem
 
 ## Go dependencies
 
