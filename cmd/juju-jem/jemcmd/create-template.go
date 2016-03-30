@@ -102,8 +102,8 @@ func (c *createTemplateCommand) Run(ctxt *cmd.Context) error {
 	if err := client.AddTemplate(&params.AddTemplate{
 		EntityPath: c.templatePath.EntityPath,
 		Info: params.AddTemplateInfo{
-			StateServer: c.srvPath.EntityPath,
-			Config:      config,
+			Controller: c.srvPath.EntityPath,
+			Config:     config,
 		},
 	}); err != nil {
 		return errgo.Notef(err, "cannot add template")

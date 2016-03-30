@@ -77,13 +77,13 @@ func (c *generateCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	jesInfo, err := client.GetJES(&params.GetJES{
+	controllerInfo, err := client.GetController(&params.GetController{
 		EntityPath: c.srvPath.EntityPath,
 	})
 	if err != nil {
-		return errgo.Notef(err, "cannot get JES info")
+		return errgo.Notef(err, "cannot get Controller info")
 	}
-	rootSchema := jesInfo.Schema
+	rootSchema := controllerInfo.Schema
 	templates := make([]*params.TemplateResponse, len(c.templatePaths.paths))
 	for i, tp := range c.templatePaths.paths {
 		t, err := client.GetTemplate(&params.GetTemplate{
@@ -95,7 +95,7 @@ func (c *generateCommand) Run(ctxt *cmd.Context) error {
 		templates[i] = t
 	}
 	scCtxt := schemaContext{
-		providerType: jesInfo.ProviderType,
+		providerType: controllerInfo.ProviderType,
 	}
 	if scCtxt.providerType == "local" {
 		// We have no way of deciding on the default value

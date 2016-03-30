@@ -85,7 +85,7 @@ func serve(confPath string) error {
 	}
 	cfg := jem.ServerParams{
 		DB:               db,
-		StateServerAdmin: conf.StateServerAdmin,
+		ControllerAdmin:  conf.ControllerAdmin,
 		IdentityLocation: conf.IdentityLocation,
 		PublicKeyLocator: locator,
 		AgentUsername:    conf.AgentUsername,

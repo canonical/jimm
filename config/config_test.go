@@ -53,9 +53,9 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 	conf, err := s.readConfig(c, testConfig)
 	c.Assert(err, gc.IsNil)
 	c.Assert(conf, jc.DeepEquals, &config.Config{
-		MongoAddr:        "localhost:23456",
-		APIAddr:          "blah:2324",
-		StateServerAdmin: "adminuser",
+		MongoAddr:       "localhost:23456",
+		APIAddr:         "blah:2324",
+		ControllerAdmin: "adminuser",
 
 		IdentityLocation: "localhost:18082",
 		IdentityPublicKey: &bakery.PublicKey{

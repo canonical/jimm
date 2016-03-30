@@ -41,7 +41,7 @@ func (s *createSuite) TestCreate(c *gc.C) {
 		"create",
 		"-c", "bob/foo",
 		"--config", configPath,
-		"bob/newenv",
+		"bob/newmodel",
 	)
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
@@ -49,7 +49,7 @@ func (s *createSuite) TestCreate(c *gc.C) {
 
 	// Check that we can attach to the new model
 	// through the usual juju connection mechanism.
-	client, err := juju.NewAPIClientFromName("newenv", httpbakery.NewClient())
+	client, err := juju.NewAPIClientFromName("newmodel", httpbakery.NewClient())
 	c.Assert(err, gc.IsNil)
 	client.Close()
 }
@@ -86,7 +86,7 @@ func (s *createSuite) TestCreateWithTemplate(c *gc.C) {
 		"-c", "bob/foo",
 		"--config", configPath,
 		"-t", "bob/template",
-		"bob/newenv",
+		"bob/newmodel",
 	)
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
@@ -94,7 +94,7 @@ func (s *createSuite) TestCreateWithTemplate(c *gc.C) {
 
 	// Check that we can attach to the new model
 	// through the usual juju connection mechanism.
-	client, err := juju.NewAPIClientFromName("newenv", httpbakery.NewClient())
+	client, err := juju.NewAPIClientFromName("newmodel", httpbakery.NewClient())
 	c.Assert(err, gc.IsNil)
 	client.Close()
 }
@@ -115,7 +115,7 @@ var createErrorTests = []struct {
 	expectStderr: "got 3 arguments, want 1",
 	expectCode:   2,
 }, {
-	about:        "only one part in environ id",
+	about:        "only one part in model id",
 	args:         []string{"a"},
 	expectStderr: `invalid entity path "a": wrong number of parts in entity path`,
 	expectCode:   2,

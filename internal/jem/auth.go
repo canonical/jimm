@@ -80,7 +80,7 @@ func (j *JEM) NewMacaroon() (*macaroon.Macaroon, error) {
 // CheckIsAdmin checks that the currently authenticated user has
 // administrator privileges.
 func (j *JEM) CheckIsAdmin() error {
-	return j.CheckIsUser(params.User(j.config.StateServerAdmin))
+	return j.CheckIsUser(params.User(j.config.ControllerAdmin))
 }
 
 // CheckIsUser checks whether the currently authenticated user can

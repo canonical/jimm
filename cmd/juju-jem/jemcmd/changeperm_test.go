@@ -27,20 +27,20 @@ func (s *changepermSuite) TestChangePerm(c *gc.C) {
 
 	// Check that alice can't get server or model.
 	aliceClient := s.jemClient("alice")
-	_, err := aliceClient.GetJES(&params.GetJES{
+	_, err := aliceClient.GetController(&params.GetController{
 		EntityPath: params.EntityPath{
 			User: "bob",
 			Name: "foo",
 		},
 	})
-	c.Assert(err, gc.ErrorMatches, "GET http://.*/v1/server/bob/foo: unauthorized")
-	_, err = aliceClient.GetEnvironment(&params.GetEnvironment{
+	c.Assert(err, gc.ErrorMatches, "GET http://.*/v1/controller/bob/foo: unauthorized")
+	_, err = aliceClient.GetModel(&params.GetModel{
 		EntityPath: params.EntityPath{
 			User: "bob",
 			Name: "foo",
 		},
 	})
-	c.Assert(err, gc.ErrorMatches, "GET http://.*/v1/env/bob/foo: unauthorized")
+	c.Assert(err, gc.ErrorMatches, "GET http://.*/v1/model/bob/foo: unauthorized")
 
 	// Add alice to model permissions list.
 	stdout, stderr, code = run(c, c.MkDir(),
@@ -54,14 +54,14 @@ func (s *changepermSuite) TestChangePerm(c *gc.C) {
 	c.Assert(stderr, gc.Equals, "")
 
 	// Check that alice can get model but not server.
-	_, err = aliceClient.GetJES(&params.GetJES{
+	_, err = aliceClient.GetController(&params.GetController{
 		EntityPath: params.EntityPath{
 			User: "bob",
 			Name: "foo",
 		},
 	})
-	c.Assert(err, gc.ErrorMatches, "GET http://.*/v1/server/bob/foo: unauthorized")
-	_, err = aliceClient.GetEnvironment(&params.GetEnvironment{
+	c.Assert(err, gc.ErrorMatches, "GET http://.*/v1/controller/bob/foo: unauthorized")
+	_, err = aliceClient.GetModel(&params.GetModel{
 		EntityPath: params.EntityPath{
 			User: "bob",
 			Name: "foo",
@@ -82,7 +82,7 @@ func (s *changepermSuite) TestChangePerm(c *gc.C) {
 	c.Assert(stderr, gc.Equals, "")
 
 	// Check that alice can now access the server.
-	_, err = aliceClient.GetJES(&params.GetJES{
+	_, err = aliceClient.GetController(&params.GetController{
 		EntityPath: params.EntityPath{
 			User: "bob",
 			Name: "foo",
@@ -116,7 +116,7 @@ func (s *changepermSuite) TestChangePerm(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	acl, err := bobClient.GetEnvironmentPerm(&params.GetEnvironmentPerm{
+	acl, err := bobClient.GetModelPerm(&params.GetModelPerm{
 		EntityPath: params.EntityPath{
 			User: "bob",
 			Name: "foo",
