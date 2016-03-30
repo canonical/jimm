@@ -92,7 +92,7 @@ func (s *commonSuite) newServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.S
 	db := session.DB("jem")
 	config := jem.ServerParams{
 		DB:               db,
-		StateServerAdmin: adminUser,
+		ControllerAdmin:  adminUser,
 		IdentityLocation: idmSrv.URL.String(),
 		PublicKeyLocator: idmSrv,
 	}
@@ -115,13 +115,13 @@ func (s *commonSuite) addEnv(c *gc.C, pathStr, srvPathStr string) {
 	err = srvPath.UnmarshalText([]byte(srvPathStr))
 	c.Assert(err, gc.IsNil)
 
-	_, err = s.jemClient(string(path.User)).NewEnvironment(&params.NewEnvironment{
+	_, err = s.jemClient(string(path.User)).NewModel(&params.NewModel{
 		User: path.User,
-		Info: params.NewEnvironmentInfo{
-			Name:        path.Name,
-			Password:    "i don't care",
-			StateServer: srvPath,
-			Config:      dummyEnvConfig,
+		Info: params.NewModelInfo{
+			Name:       path.Name,
+			Password:   "i don't care",
+			Controller: srvPath,
+			Config:     dummyEnvConfig,
 		},
 	})
 	c.Assert(err, gc.IsNil)

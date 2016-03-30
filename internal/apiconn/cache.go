@@ -19,7 +19,7 @@ type Cache struct {
 	group  singleflight.Group
 	params CacheParams
 	mu     sync.Mutex
-	// conns maps from environment UUID to API connection.
+	// conns maps from model UUID to API connection.
 	conns map[string]*Conn
 }
 
@@ -62,11 +62,11 @@ func (cache *Cache) EvictAll() {
 	}
 }
 
-// OpenAPI dials the API server at the environment with the given UUID.
+// OpenAPI dials the API server at the model with the given UUID.
 // If a connection is not currently available, the dial
 // function will be called to connect to it and its returned
 // connection will be cached.. It is assumed that all
-// connections to a given environment UUID are equal. It is the
+// connections to a given model UUID are equal. It is the
 // responsibility of the caller to ensure this.
 func (cache *Cache) OpenAPI(
 	envUUID string,
@@ -84,9 +84,9 @@ func (cache *Cache) OpenAPI(
 	}
 	// We use a singleflight.Group so that if several
 	// clients ask for a connection to the same state
-	// server with the same environment UUID at the same time,
-	// we only dial the state server once. The group is
-	// keyed by the environment UUID.
+	// server with the same model UUID at the same time,
+	// we only dial the controller once. The group is
+	// keyed by the model UUID.
 	x, err := cache.group.Do(envUUID, func() (interface{}, error) {
 		st, stInfo, err := dial()
 		if err != nil {

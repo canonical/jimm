@@ -37,7 +37,7 @@ The commands are at present for testing purposes only
 and are not stable in any form.
 
 The location of the JEM server can be specified
-as an model variable:
+as an environment variable:
 
 	JUJU_JEM=<JEM server URL>
 
@@ -46,11 +46,6 @@ or as a command line flag:
 	--jem-url <JEM server URL>
 
 The latter takes precedence over the former.
-
-Note that any juju controller used by JEM must
-have hosted models enabled by bootstrapping
-it with the JUJU_DEV_FEATURE_FLAGS model
-variable set to include "jes".
 `
 
 // New returns a command that can execute juju-jem
@@ -65,7 +60,7 @@ func New() cmd.Command {
 			DefaultConfig: os.Getenv(jujuLoggingConfigEnvKey),
 		},
 	})
-	supercmd.Register(newAddServerCommand())
+	supercmd.Register(newAddControllerCommand())
 	supercmd.Register(newChangePermCommand())
 	supercmd.Register(newCreateCommand())
 	supercmd.Register(newCreateTemplateCommand())
@@ -79,23 +74,23 @@ func New() cmd.Command {
 	return supercmd
 }
 
-// environInfo returns information on the local environment(model) with the
-// given name. If envName is empty, the default environment(model) will be
+// modelInfo returns information on the local model with the
+// given name. If modelName is empty, the default model will be
 // used.
-func environInfo(envName string) (configstore.EnvironInfo, error) {
+func modelInfo(modelName string) (configstore.EnvironInfo, error) {
 	store, err := configstore.Default()
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot get default configstore")
 	}
-	if envName == "" {
-		envName, err = envcmd.GetDefaultEnvironment()
+	if modelName == "" {
+		modelName, err = envcmd.GetDefaultEnvironment()
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot find name of default model")
 		}
 	}
-	info, err := store.ReadInfo(envName)
+	info, err := store.ReadInfo(modelName)
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot read info for model %q", envName)
+		return nil, errgo.Notef(err, "cannot read info for model %q", modelName)
 	}
 	return info, nil
 }
@@ -212,11 +207,11 @@ func (v *entityPathsValue) String() string {
 
 var _ gnuflag.Value = (*entityPathsValue)(nil)
 
-// writeEnvironment runs the given getEnv function
+// writeModel runs the given getEnv function
 // and writes the result as a local model .jenv
 // file with the given local name, saving also the
 // given access password.
-func writeEnvironment(localName string, getEnv func() (*params.EnvironmentResponse, error)) error {
+func writeModel(localName string, getEnv func() (*params.ModelResponse, error)) error {
 	store, err := configstore.Default()
 	if err != nil {
 		return errgo.Notef(err, "cannot get default configstore")
@@ -250,18 +245,18 @@ func writeEnvironment(localName string, getEnv func() (*params.EnvironmentRespon
 	}
 	st.Close()
 
-	envInfo := store.CreateInfo(localName)
-	envInfo.SetAPIEndpoint(configstore.APIEndpoint{
+	modelInfo := store.CreateInfo(localName)
+	modelInfo.SetAPIEndpoint(configstore.APIEndpoint{
 		Addresses:   resp.HostPorts,
 		CACert:      resp.CACert,
 		EnvironUUID: resp.UUID,
-		ServerUUID:  resp.ServerUUID,
+		ServerUUID:  resp.ControllerUUID,
 	})
-	envInfo.SetAPICredentials(configstore.APICredentials{
+	modelInfo.SetAPICredentials(configstore.APICredentials{
 		User:     resp.User,
 		Password: resp.Password,
 	})
-	if err := envInfo.Write(); err != nil {
+	if err := modelInfo.Write(); err != nil {
 		return errgo.Notef(err, "cannot write model info")
 	}
 	return nil

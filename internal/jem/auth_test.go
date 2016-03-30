@@ -37,7 +37,7 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 			DB:               s.Session.DB("jem"),
 			IdentityLocation: s.idmSrv.URL.String(),
 			PublicKeyLocator: s.idmSrv,
-			StateServerAdmin: "admin",
+			ControllerAdmin:  "admin",
 		},
 		bakery.NewServiceParams{
 			Location: "here",
@@ -228,7 +228,7 @@ func (s *authSuite) TestCheckReadACL(c *gc.C) {
 				Name: params.Name(fmt.Sprintf("test%d", i)),
 			}
 			if !test.skipCreateEntity {
-				err := jem.AddEnvironment(&mongodoc.Environment{
+				err := jem.AddModel(&mongodoc.Model{
 					Path: entity,
 					ACL: params.ACL{
 						Read: test.acl,
@@ -236,7 +236,7 @@ func (s *authSuite) TestCheckReadACL(c *gc.C) {
 				})
 				c.Assert(err, gc.IsNil)
 			}
-			err = jem.CheckReadACL(jem.DB.Environments(), entity)
+			err = jem.CheckReadACL(jem.DB.Models(), entity)
 			if test.expectError != "" {
 				c.Assert(err, gc.ErrorMatches, test.expectError)
 				if test.expectCause != nil {
@@ -252,73 +252,73 @@ func (s *authSuite) TestCheckReadACL(c *gc.C) {
 }
 
 func (s *authSuite) TestCheckGetACL(c *gc.C) {
-	env := &mongodoc.Environment{
+	m := &mongodoc.Model{
 		Path: params.EntityPath{
 			User: params.User("bob"),
-			Name: "env",
+			Name: "model",
 		},
 		ACL: params.ACL{
 			Read: []string{"fred", "jim"},
 		},
 	}
-	err := s.jem.AddEnvironment(env)
+	err := s.jem.AddModel(m)
 	c.Assert(err, gc.IsNil)
-	acl, err := s.jem.GetACL(s.jem.DB.Environments(), env.Path)
+	acl, err := s.jem.GetACL(s.jem.DB.Models(), m.Path)
 	c.Assert(err, gc.IsNil)
-	c.Assert(acl, jc.DeepEquals, env.ACL)
+	c.Assert(acl, jc.DeepEquals, m.ACL)
 }
 
 func (s *authSuite) TestCheckGetACLNotFound(c *gc.C) {
-	env := &mongodoc.Environment{
+	m := &mongodoc.Model{
 		Path: params.EntityPath{
 			User: params.User("bob"),
-			Name: "env",
+			Name: "model",
 		},
 	}
-	acl, err := s.jem.GetACL(s.jem.DB.Environments(), env.Path)
+	acl, err := s.jem.GetACL(s.jem.DB.Models(), m.Path)
 	c.Assert(err, gc.ErrorMatches, "not found")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	c.Assert(acl, jc.DeepEquals, env.ACL)
+	c.Assert(acl, jc.DeepEquals, m.ACL)
 }
 
 func (s *authSuite) TestCanReadIter(c *gc.C) {
-	testEnvs := []mongodoc.Environment{{
+	testModels := []mongodoc.Model{{
 		Path: params.EntityPath{
 			User: params.User("bob"),
-			Name: "env1",
+			Name: "m1",
 		},
 	}, {
 		Path: params.EntityPath{
 			User: params.User("fred"),
-			Name: "env2",
+			Name: "m2",
 		},
 	}, {
 		Path: params.EntityPath{
 			User: params.User("fred"),
-			Name: "env3",
+			Name: "m3",
 		},
 		ACL: params.ACL{
 			Read: []string{"bob"},
 		},
 	}}
-	for i := range testEnvs {
-		err := s.jem.AddEnvironment(&testEnvs[i])
+	for i := range testModels {
+		err := s.jem.AddModel(&testModels[i])
 		c.Assert(err, gc.IsNil)
 	}
 	req := s.newRequestForUser(c, "GET", "/", "bob", "bob-group")
 	err := s.jem.Authenticate(req)
 	c.Assert(err, gc.IsNil)
-	it := s.jem.DB.Environments().Find(nil).Sort("_id").Iter()
+	it := s.jem.DB.Models().Find(nil).Sort("_id").Iter()
 	crit := s.jem.CanReadIter(it)
-	var envs []mongodoc.Environment
-	var env mongodoc.Environment
-	for crit.Next(&env) {
-		envs = append(envs, env)
+	var models []mongodoc.Model
+	var m mongodoc.Model
+	for crit.Next(&m) {
+		models = append(models, m)
 	}
 	c.Assert(crit.Err(), gc.IsNil)
-	c.Assert(envs, jc.DeepEquals, []mongodoc.Environment{
-		testEnvs[0],
-		testEnvs[2],
+	c.Assert(models, jc.DeepEquals, []mongodoc.Model{
+		testModels[0],
+		testModels[2],
 	})
 }
 

@@ -27,8 +27,8 @@ import (
 type createCommand struct {
 	commandBase
 
-	srvPath       entityPathValue
-	envPath       entityPathValue
+	ctlPath       entityPathValue
+	modelPath     entityPathValue
 	templatePaths entityPathsValue
 	configFile    string
 	localName     string
@@ -59,8 +59,8 @@ func (c *createCommand) Info() *cmd.Info {
 
 func (c *createCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.commandBase.SetFlags(f)
-	f.Var(&c.srvPath, "controller", "")
-	f.Var(&c.srvPath, "c", "controller to create the model in")
+	f.Var(&c.ctlPath, "controller", "")
+	f.Var(&c.ctlPath, "c", "controller to create the model in")
 	f.Var(&c.templatePaths, "template", "")
 	f.Var(&c.templatePaths, "t", "comma-separated templates to use for config attributes")
 
@@ -72,14 +72,14 @@ func (c *createCommand) Init(args []string) error {
 	if len(args) != 1 {
 		return errgo.Newf("got %d arguments, want 1", len(args))
 	}
-	if err := c.envPath.Set(args[0]); err != nil {
+	if err := c.modelPath.Set(args[0]); err != nil {
 		return errgo.Mask(err)
 	}
-	if c.srvPath.EntityPath == (params.EntityPath{}) {
+	if c.ctlPath.EntityPath == (params.EntityPath{}) {
 		return errgo.Newf("controller must be specified")
 	}
 	if c.localName == "" {
-		c.localName = string(c.envPath.Name)
+		c.localName = string(c.modelPath.Name)
 	}
 	return nil
 }
@@ -100,18 +100,18 @@ func (c *createCommand) Run(ctxt *cmd.Context) error {
 			return errgo.Notef(err, "cannot unmarshal %q", c.configFile)
 		}
 	}
-	jesInfo, err := client.GetJES(&params.GetJES{
-		EntityPath: c.srvPath.EntityPath,
+	controllerInfo, err := client.GetController(&params.GetController{
+		EntityPath: c.ctlPath.EntityPath,
 	})
 	if err != nil {
-		return errgo.Notef(err, "cannot get JES info")
+		return errgo.Notef(err, "cannot get Controller info")
 	}
 	defaultsCtxt := schemaContext{
-		envName:      c.envPath.Name,
-		providerType: jesInfo.ProviderType,
+		modelName:    c.modelPath.Name,
+		providerType: controllerInfo.ProviderType,
 		knownAttrs:   config,
 	}
-	config, err = defaultsCtxt.generateConfig(jesInfo.Schema)
+	config, err = defaultsCtxt.generateConfig(controllerInfo.Schema)
 	if err != nil {
 		return errgo.Notef(err, "invalid configuration")
 	}
@@ -122,13 +122,13 @@ func (c *createCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Notef(err, "cannot generate password")
 	}
-	return writeEnvironment(c.localName, func() (*params.EnvironmentResponse, error) {
-		return client.NewEnvironment(&params.NewEnvironment{
-			User: c.envPath.User,
-			Info: params.NewEnvironmentInfo{
-				Name:          c.envPath.Name,
+	return writeModel(c.localName, func() (*params.ModelResponse, error) {
+		return client.NewModel(&params.NewModel{
+			User: c.modelPath.User,
+			Info: params.NewModelInfo{
+				Name:          c.modelPath.Name,
 				Password:      password,
-				StateServer:   c.srvPath.EntityPath,
+				Controller:    c.ctlPath.EntityPath,
 				Config:        config,
 				TemplatePaths: c.templatePaths.paths,
 			},
@@ -137,7 +137,7 @@ func (c *createCommand) Run(ctxt *cmd.Context) error {
 }
 
 type schemaContext struct {
-	envName      params.Name
+	modelName    params.Name
 	providerType string
 	knownAttrs   map[string]interface{}
 }
@@ -306,7 +306,7 @@ func rawUUIDValue(schemaContext) (interface{}, error) {
 }
 
 func localProviderNamespaceValue(ctxt schemaContext) (interface{}, error) {
-	if ctxt.envName == "" {
+	if ctxt.modelName == "" {
 		return nil, errgo.Newf("no default value for local provider namespace attribute")
 	}
 	username := os.Getenv("USER")
@@ -317,5 +317,5 @@ func localProviderNamespaceValue(ctxt schemaContext) (interface{}, error) {
 		}
 		username = u.Username
 	}
-	return fmt.Sprintf("%s-%s", username, ctxt.envName), nil
+	return fmt.Sprintf("%s-%s", username, ctxt.modelName), nil
 }
