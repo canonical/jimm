@@ -67,7 +67,7 @@ func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server)
 	s.IDMSrv.AddUser("agent")
 	config := external_jem.ServerParams{
 		DB:               db,
-		StateServerAdmin: "admin",
+		ControllerAdmin:  "admin",
 		IdentityLocation: idmSrv.URL.String(),
 		PublicKeyLocator: idmSrv,
 		AgentUsername:    "agent",
