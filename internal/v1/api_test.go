@@ -38,32 +38,32 @@ var unauthorizedTests = []struct {
 	path   string
 	body   interface{}
 }{{
-	about:  "get env as non-owner",
+	about:  "get model as non-owner",
 	asUser: "other",
 	method: "GET",
-	path:   "/v1/env/bob/private",
+	path:   "/v1/model/bob/private",
 }, {
-	about:  "get server as non-owner",
+	about:  "get controller as non-owner",
 	asUser: "other",
 	method: "GET",
-	path:   "/v1/server/bob/private",
+	path:   "/v1/controller/bob/private",
 }, {
-	about:  "new env as non-owner",
+	about:  "new model as non-owner",
 	asUser: "other",
 	method: "POST",
-	path:   "/v1/env/bob",
-	body: params.NewEnvironmentInfo{
-		Name:        "newenv",
-		StateServer: params.EntityPath{"bob", "open"},
+	path:   "/v1/model/bob",
+	body: params.NewModelInfo{
+		Name:       "newmodel",
+		Controller: params.EntityPath{"bob", "open"},
 	},
 }, {
-	about:  "new env with inaccessible state server",
+	about:  "new model with inaccessible controller",
 	asUser: "alice",
 	method: "POST",
-	path:   "/v1/env/alice",
-	body: params.NewEnvironmentInfo{
-		Name:        "newenv",
-		StateServer: params.EntityPath{"bob", "private"},
+	path:   "/v1/model/alice",
+	body: params.NewModelInfo{
+		Name:       "newmodel",
+		Controller: params.EntityPath{"bob", "private"},
 	},
 }, {
 	about:  "new template as non-owner",
@@ -71,19 +71,19 @@ var unauthorizedTests = []struct {
 	method: "PUT",
 	path:   "/v1/template/bob/something",
 	body: params.AddTemplateInfo{
-		StateServer: params.EntityPath{"bob", "open"},
+		Controller: params.EntityPath{"bob", "open"},
 	},
 }, {
-	about:  "set server perm as non-owner",
+	about:  "set controller perm as non-owner",
 	asUser: "other",
 	method: "PUT",
-	path:   "/v1/server/bob/open/perm",
+	path:   "/v1/controller/bob/open/perm",
 	body:   params.ACL{},
 }, {
-	about:  "set env perm as non-owner",
+	about:  "set model perm as non-owner",
 	asUser: "other",
 	method: "PUT",
-	path:   "/v1/env/bob/open/perm",
+	path:   "/v1/model/bob/open/perm",
 	body:   params.ACL{},
 }, {
 	about:  "set template perm as non-owner",
@@ -92,30 +92,30 @@ var unauthorizedTests = []struct {
 	path:   "/v1/template/bob/open/perm",
 	body:   params.ACL{},
 }, {
-	about:  "get server perm as non-owner",
+	about:  "get controller perm as non-owner",
 	asUser: "other",
 	method: "GET",
-	path:   "/v1/server/bob/private/perm",
+	path:   "/v1/controller/bob/private/perm",
 }, {
-	about:  "get env perm as non-owner",
+	about:  "get model perm as non-owner",
 	asUser: "other",
 	method: "GET",
-	path:   "/v1/env/bob/private/perm",
+	path:   "/v1/model/bob/private/perm",
 }, {
 	about:  "get template perm as non-owner",
 	asUser: "other",
 	method: "GET",
 	path:   "/v1/template/bob/private/perm",
 }, {
-	about:  "get server perm with ACL that allows us",
+	about:  "get controller perm with ACL that allows us",
 	asUser: "other",
 	method: "GET",
-	path:   "/v1/server/bob/open/perm",
+	path:   "/v1/controller/bob/open/perm",
 }, {
-	about:  "get env perm with ACL that allows us",
+	about:  "get model perm with ACL that allows us",
 	asUser: "other",
 	method: "GET",
-	path:   "/v1/env/bob/open/perm",
+	path:   "/v1/model/bob/open/perm",
 }, {
 	about:  "get template perm with ACL that allows us",
 	asUser: "other",
@@ -124,10 +124,10 @@ var unauthorizedTests = []struct {
 }}
 
 func (s *APISuite) TestUnauthorized(c *gc.C) {
-	s.addStateServer(c, params.EntityPath{"bob", "private"})
-	srvId := s.addStateServer(c, params.EntityPath{"bob", "open"})
-	s.addTemplate(c, params.EntityPath{"bob", "open"}, srvId, dummyEnvConfig)
-	s.addTemplate(c, params.EntityPath{"bob", "private"}, srvId, dummyEnvConfig)
+	s.assertAddController(c, params.EntityPath{"bob", "private"})
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "open"})
+	s.addTemplate(c, params.EntityPath{"bob", "open"}, ctlId, dummyEnvConfig)
+	s.addTemplate(c, params.EntityPath{"bob", "private"}, ctlId, dummyEnvConfig)
 
 	s.allowServerAllPerm(c, params.EntityPath{"bob", "open"})
 	s.allowEnvAllPerm(c, params.EntityPath{"bob", "open"})
@@ -150,45 +150,45 @@ func (s *APISuite) TestUnauthorized(c *gc.C) {
 	}
 }
 
-func (s *APISuite) TestAddJES(c *gc.C) {
+func (s *APISuite) TestAddController(c *gc.C) {
 	info := s.APIInfo(c)
-	var addJESTests = []struct {
+	var addControllerTests = []struct {
 		about        string
 		authUser     params.User
 		username     params.User
-		body         params.ServerInfo
+		body         params.ControllerInfo
 		expectStatus int
 		expectBody   interface{}
 	}{{
-		about: "add environment",
-		body: params.ServerInfo{
-			HostPorts:   info.Addrs,
-			CACert:      info.CACert,
-			User:        info.Tag.Id(),
-			Password:    info.Password,
-			EnvironUUID: info.EnvironTag.Id(),
+		about: "add model",
+		body: params.ControllerInfo{
+			HostPorts: info.Addrs,
+			CACert:    info.CACert,
+			User:      info.Tag.Id(),
+			Password:  info.Password,
+			ModelUUID: info.EnvironTag.Id(),
 		},
 	}, {
-		about:    "add environment as part of group",
+		about:    "add model as part of group",
 		username: "beatles",
 		authUser: "alice",
-		body: params.ServerInfo{
-			HostPorts:   info.Addrs,
-			CACert:      info.CACert,
-			User:        info.Tag.Id(),
-			Password:    info.Password,
-			EnvironUUID: info.EnvironTag.Id(),
+		body: params.ControllerInfo{
+			HostPorts: info.Addrs,
+			CACert:    info.CACert,
+			User:      info.Tag.Id(),
+			Password:  info.Password,
+			ModelUUID: info.EnvironTag.Id(),
 		},
 	}, {
 		about:    "incorrect user",
 		authUser: "alice",
 		username: "bob",
-		body: params.ServerInfo{
-			HostPorts:   info.Addrs,
-			CACert:      info.CACert,
-			User:        info.Tag.Id(),
-			Password:    info.Password,
-			EnvironUUID: info.EnvironTag.Id(),
+		body: params.ControllerInfo{
+			HostPorts: info.Addrs,
+			CACert:    info.CACert,
+			User:      info.Tag.Id(),
+			Password:  info.Password,
+			ModelUUID: info.EnvironTag.Id(),
 		},
 		expectStatus: http.StatusUnauthorized,
 		expectBody: params.Error{
@@ -197,11 +197,11 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 		},
 	}, {
 		about: "no hosts",
-		body: params.ServerInfo{
-			CACert:      info.CACert,
-			User:        info.Tag.Id(),
-			Password:    info.Password,
-			EnvironUUID: info.EnvironTag.Id(),
+		body: params.ControllerInfo{
+			CACert:    info.CACert,
+			User:      info.Tag.Id(),
+			Password:  info.Password,
+			ModelUUID: info.EnvironTag.Id(),
 		},
 		expectStatus: http.StatusBadRequest,
 		expectBody: params.Error{
@@ -210,11 +210,11 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 		},
 	}, {
 		about: "no ca-cert",
-		body: params.ServerInfo{
-			HostPorts:   info.Addrs,
-			User:        info.Tag.Id(),
-			Password:    info.Password,
-			EnvironUUID: info.EnvironTag.Id(),
+		body: params.ControllerInfo{
+			HostPorts: info.Addrs,
+			User:      info.Tag.Id(),
+			Password:  info.Password,
+			ModelUUID: info.EnvironTag.Id(),
 		},
 		expectStatus: http.StatusBadRequest,
 		expectBody: params.Error{
@@ -223,11 +223,11 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 		},
 	}, {
 		about: "no user",
-		body: params.ServerInfo{
-			HostPorts:   info.Addrs,
-			CACert:      info.CACert,
-			Password:    info.Password,
-			EnvironUUID: info.EnvironTag.Id(),
+		body: params.ControllerInfo{
+			HostPorts: info.Addrs,
+			CACert:    info.CACert,
+			Password:  info.Password,
+			ModelUUID: info.EnvironTag.Id(),
 		},
 		expectStatus: http.StatusBadRequest,
 		expectBody: params.Error{
@@ -235,8 +235,8 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 			Message: "no user in request",
 		},
 	}, {
-		about: "no environ uuid",
-		body: params.ServerInfo{
+		about: "no model uuid",
+		body: params.ControllerInfo{
 			HostPorts: info.Addrs,
 			CACert:    info.CACert,
 			User:      info.Tag.Id(),
@@ -245,16 +245,16 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 		expectStatus: http.StatusBadRequest,
 		expectBody: params.Error{
 			Code:    "bad request",
-			Message: "bad environment UUID in request",
+			Message: "bad model UUID in request",
 		},
 	}, {
 		about: "cannot connect to evironment",
-		body: params.ServerInfo{
-			HostPorts:   []string{"0.1.2.3:1234"},
-			CACert:      info.CACert,
-			User:        info.Tag.Id(),
-			Password:    info.Password,
-			EnvironUUID: info.EnvironTag.Id(),
+		body: params.ControllerInfo{
+			HostPorts: []string{"0.1.2.3:1234"},
+			CACert:    info.CACert,
+			User:      info.Tag.Id(),
+			Password:  info.Password,
+			ModelUUID: info.EnvironTag.Id(),
 		},
 		expectStatus: http.StatusBadRequest,
 		expectBody: httptesting.BodyAsserter(func(c *gc.C, m json.RawMessage) {
@@ -262,30 +262,30 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 			err := json.Unmarshal(m, &body)
 			c.Assert(err, gc.IsNil)
 			c.Assert(body.Code, gc.Equals, params.ErrBadRequest)
-			c.Assert(body.Message, gc.Matches, `cannot connect to environment: unable to connect to API: .*`)
+			c.Assert(body.Message, gc.Matches, `cannot connect to model: unable to connect to API: .*`)
 		}),
 	}}
 	s.IDMSrv.AddUser("alice", "beatles")
 	s.IDMSrv.AddUser("bob", "beatles")
-	for i, test := range addJESTests {
+	for i, test := range addControllerTests {
 		c.Logf("test %d: %s", i, test.about)
-		envPath := params.EntityPath{
+		modelPath := params.EntityPath{
 			User: test.username,
-			Name: params.Name(fmt.Sprintf("env%d", i)),
+			Name: params.Name(fmt.Sprintf("model%d", i)),
 		}
-		if envPath.User == "" {
-			envPath.User = "testuser"
+		if modelPath.User == "" {
+			modelPath.User = "testuser"
 		}
 		authUser := test.authUser
 		if authUser == "" {
-			authUser = envPath.User
+			authUser = modelPath.User
 		}
 		client := s.IDMSrv.Client(string(authUser))
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Method:       "PUT",
 			Handler:      s.JEMSrv,
 			JSONBody:     test.body,
-			URL:          fmt.Sprintf("/v1/server/%s", envPath),
+			URL:          fmt.Sprintf("/v1/controller/%s", modelPath),
 			Do:           apitest.Do(client),
 			ExpectStatus: test.expectStatus,
 			ExpectBody:   test.expectBody,
@@ -294,93 +294,66 @@ func (s *APISuite) TestAddJES(c *gc.C) {
 			continue
 		}
 		// The server was added successfully. Check that we
-		// can fetch its associated environment and that we
+		// can fetch its associated model and that we
 		// can connect to that.
-		envResp, err := s.NewClient(authUser).GetEnvironment(&params.GetEnvironment{
-			EntityPath: envPath,
+		modelResp, err := s.NewClient(authUser).GetModel(&params.GetModel{
+			EntityPath: modelPath,
 		})
 		c.Assert(err, gc.IsNil)
-		c.Assert(envResp, jc.DeepEquals, &params.EnvironmentResponse{
-			Path:      envPath,
+		c.Assert(modelResp, jc.DeepEquals, &params.ModelResponse{
+			Path:      modelPath,
 			User:      test.body.User,
 			Password:  test.body.Password,
 			HostPorts: test.body.HostPorts,
 			CACert:    test.body.CACert,
-			UUID:      test.body.EnvironUUID,
+			UUID:      test.body.ModelUUID,
 		})
-		st := openAPIFromEnvironmentResponse(c, envResp)
+		st := openAPIFromModelResponse(c, modelResp)
 		st.Close()
 		// Clear the connection pool for the next test.
 		s.JEMSrv.Pool().ClearAPIConnCache()
 	}
 }
 
-func (s *APISuite) TestAddJESDuplicate(c *gc.C) {
-	info := s.APIInfo(c)
-	si := &params.ServerInfo{
-		HostPorts:   info.Addrs,
-		CACert:      info.CACert,
-		User:        info.Tag.Id(),
-		Password:    info.Password,
-		EnvironUUID: info.EnvironTag.Id(),
-	}
-	srvPath := params.EntityPath{"bob", "dupenv"}
-	s.addJES(c, srvPath, si)
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Method:   "PUT",
-		Handler:  s.JEMSrv,
-		URL:      "/v1/server/" + srvPath.String(),
-		JSONBody: si,
-		ExpectBody: &params.Error{
-			Message: "already exists",
-			Code:    "already exists",
-		},
-		ExpectStatus: http.StatusForbidden,
-		Do:           apitest.Do(s.IDMSrv.Client("bob")),
-	})
+func (s *APISuite) TestAddControllerDuplicate(c *gc.C) {
+	ctlPath := s.assertAddController(c, params.EntityPath{"bob", "dupmodel"})
+	err := s.addController(c, ctlPath)
+	c.Assert(err, gc.ErrorMatches, "PUT http://.*: already exists")
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
 }
 
-func (s *APISuite) addJES(c *gc.C, path params.EntityPath, jes *params.ServerInfo) {
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Method:   "PUT",
-		Handler:  s.JEMSrv,
-		URL:      "/v1/server/" + path.String(),
-		JSONBody: jes,
-		Do:       apitest.Do(s.IDMSrv.Client(string(path.User))),
-	})
-}
-func (s *APISuite) TestAddJESUnauthenticated(c *gc.C) {
+func (s *APISuite) TestAddControllerUnauthenticated(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "PUT",
 		Handler: s.JEMSrv,
-		URL:     "/v1/server/user/env",
+		URL:     "/v1/controller/user/model",
 		ExpectBody: httptesting.BodyAsserter(func(c *gc.C, m json.RawMessage) {
-			// Allow any body - TestGetEnvironmentNotFound will check that it's a valid macaroon.
+			// Allow any body - TestGetModelNotFound will check that it's a valid macaroon.
 		}),
 		ExpectStatus: http.StatusProxyAuthRequired,
 	})
 }
 
-func (s *APISuite) TestAddJESUnauthenticatedWithBakeryProtocol(c *gc.C) {
+func (s *APISuite) TestAddControllerUnauthenticatedWithBakeryProtocol(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "PUT",
 		Handler: s.JEMSrv,
 		Header:  map[string][]string{"Bakery-Protocol-Version": []string{"1"}},
-		URL:     "/v1/server/user/env",
+		URL:     "/v1/controller/user/model",
 		ExpectBody: httptesting.BodyAsserter(func(c *gc.C, m json.RawMessage) {
-			// Allow any body - TestGetEnvironmentNotFound will check that it's a valid macaroon.
+			// Allow any body - TestGetModelNotFound will check that it's a valid macaroon.
 		}),
 		ExpectStatus: http.StatusUnauthorized,
 	})
 }
 
-func (s *APISuite) TestGetEnvironmentNotFound(c *gc.C) {
+func (s *APISuite) TestGetModelNotFound(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "GET",
 		Handler: s.JEMSrv,
-		URL:     "/v1/env/user/foo",
+		URL:     "/v1/model/user/foo",
 		ExpectBody: &params.Error{
-			Message: `environment "user/foo" not found`,
+			Message: `model "user/foo" not found`,
 			Code:    params.ErrNotFound,
 		},
 		ExpectStatus: http.StatusNotFound,
@@ -391,7 +364,7 @@ func (s *APISuite) TestGetEnvironmentNotFound(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "GET",
 		Handler: s.JEMSrv,
-		URL:     "/v1/env/user/foo",
+		URL:     "/v1/model/user/foo",
 		ExpectBody: &params.Error{
 			Message: `unauthorized`,
 			Code:    params.ErrUnauthorized,
@@ -401,13 +374,13 @@ func (s *APISuite) TestGetEnvironmentNotFound(c *gc.C) {
 	})
 }
 
-func (s *APISuite) TestDeleteEnvironmentNotFound(c *gc.C) {
+func (s *APISuite) TestDeleteModelNotFound(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "DELETE",
 		Handler: s.JEMSrv,
-		URL:     "/v1/env/user/foo",
+		URL:     "/v1/model/user/foo",
 		ExpectBody: &params.Error{
-			Message: `environment "user/foo" not found`,
+			Message: `model "user/foo" not found`,
 			Code:    params.ErrNotFound,
 		},
 		ExpectStatus: http.StatusNotFound,
@@ -415,81 +388,81 @@ func (s *APISuite) TestDeleteEnvironmentNotFound(c *gc.C) {
 	})
 }
 
-func (s *APISuite) TestDeleteEnvironment(c *gc.C) {
-	srvId := s.addStateServer(c, params.EntityPath{"bob", "who"})
-	envPath := params.EntityPath{"bob", "foobarred"}
-	envId, user, uuid := s.addEnvironment(c, envPath, srvId)
+func (s *APISuite) TestDeleteModel(c *gc.C) {
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "who"})
+	modelPath := params.EntityPath{"bob", "foobarred"}
+	modelId, user, uuid := s.addModel(c, modelPath, ctlId)
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.JEMSrv,
-		URL:     "/v1/env/" + envId.String(),
+		URL:     "/v1/model/" + modelId.String(),
 		Do:      apitest.Do(s.IDMSrv.Client("bob")),
 	})
 	c.Assert(resp.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %s", resp.Body.Bytes()))
 	c.Assert(user, gc.NotNil)
 	c.Assert(uuid, gc.NotNil)
 
-	// Delete environemnt.
+	// Delete model.
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:       "DELETE",
 		Handler:      s.JEMSrv,
-		URL:          "/v1/env/" + envId.String(),
+		URL:          "/v1/model/" + modelId.String(),
 		ExpectStatus: http.StatusOK,
 		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 	})
 	// Check that it doesn't exist anymore.
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      s.JEMSrv,
-		URL:          "/v1/env/" + envId.String(),
+		URL:          "/v1/model/" + modelId.String(),
 		ExpectStatus: http.StatusNotFound,
 		ExpectBody: &params.Error{
-			Message: `environment "bob/foobarred" not found`,
+			Message: `model "bob/foobarred" not found`,
 			Code:    params.ErrNotFound,
 		},
 		Do: apitest.Do(s.IDMSrv.Client("bob")),
 	})
 
-	// Try deleting environment for JES.
+	// Try deleting model for Controller.
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:       "DELETE",
 		Handler:      s.JEMSrv,
-		URL:          "/v1/env/" + srvId.String(),
+		URL:          "/v1/model/" + ctlId.String(),
 		ExpectStatus: http.StatusForbidden,
 		ExpectBody: &params.Error{
-			Message: `cannot remove environment "bob/who" because it is a state server`,
+			Message: `cannot remove model "bob/who" because it is a controller`,
 			Code:    params.ErrForbidden,
 		},
 		Do: apitest.Do(s.IDMSrv.Client("bob")),
 	})
 }
 
-func (s *APISuite) TestGetStateServer(c *gc.C) {
-	srvId := s.addStateServer(c, params.EntityPath{"bob", "foo"})
+func (s *APISuite) TestGetController(c *gc.C) {
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foo"})
 
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.JEMSrv,
-		URL:     "/v1/server/" + srvId.String(),
+		URL:     "/v1/controller/" + ctlId.String(),
 		Do:      apitest.Do(s.IDMSrv.Client("bob")),
 	})
 	c.Assert(resp.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %s", resp.Body.Bytes()))
-	var jesInfo params.JESResponse
-	err := json.Unmarshal(resp.Body.Bytes(), &jesInfo)
+	var controllerInfo params.ControllerResponse
+	err := json.Unmarshal(resp.Body.Bytes(), &controllerInfo)
 	c.Assert(err, gc.IsNil, gc.Commentf("body: %s", resp.Body.String()))
-	c.Assert(jesInfo.ProviderType, gc.Equals, "dummy")
-	c.Assert(jesInfo.Schema, gc.Not(gc.HasLen), 0)
+	c.Assert(controllerInfo.ProviderType, gc.Equals, "dummy")
+	c.Assert(controllerInfo.Schema, gc.Not(gc.HasLen), 0)
 	// Check that all path attributes have been removed.
-	for name := range jesInfo.Schema {
+	for name := range controllerInfo.Schema {
 		c.Assert(strings.HasSuffix(name, "-path"), gc.Equals, false)
 	}
-	c.Logf("%#v", jesInfo.Schema)
+	c.Logf("%#v", controllerInfo.Schema)
 }
 
-func (s *APISuite) TestGetStateServerNotFound(c *gc.C) {
+func (s *APISuite) TestGetControllerNotFound(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "GET",
 		Handler: s.JEMSrv,
-		URL:     "/v1/server/bob/foo",
+		URL:     "/v1/controller/bob/foo",
 		ExpectBody: &params.Error{
-			Message: `cannot open API: cannot get environment: environment "bob/foo" not found`,
+			Message: `cannot open API: cannot get model: model "bob/foo" not found`,
 			Code:    params.ErrNotFound,
 		},
 		ExpectStatus: http.StatusNotFound,
@@ -500,7 +473,7 @@ func (s *APISuite) TestGetStateServerNotFound(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "GET",
 		Handler: s.JEMSrv,
-		URL:     "/v1/server/bob/foo",
+		URL:     "/v1/controller/bob/foo",
 		ExpectBody: &params.Error{
 			Message: `unauthorized`,
 			Code:    params.ErrUnauthorized,
@@ -510,13 +483,13 @@ func (s *APISuite) TestGetStateServerNotFound(c *gc.C) {
 	})
 }
 
-func (s *APISuite) TestDeleteJESNotFound(c *gc.C) {
+func (s *APISuite) TestDeleteControllerNotFound(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "DELETE",
 		Handler: s.JEMSrv,
-		URL:     "/v1/server/bob/foobarred",
+		URL:     "/v1/controller/bob/foobarred",
 		ExpectBody: &params.Error{
-			Message: `state server "bob/foobarred" not found`,
+			Message: `controller "bob/foobarred" not found`,
 			Code:    params.ErrNotFound,
 		},
 		ExpectStatus: http.StatusNotFound,
@@ -524,123 +497,123 @@ func (s *APISuite) TestDeleteJESNotFound(c *gc.C) {
 	})
 }
 
-func (s *APISuite) TestDeleteJES(c *gc.C) {
-	// Define state server.
-	srvId := s.addStateServer(c, params.EntityPath{"bob", "foobarred"})
-	// Add state server to JEM.
+func (s *APISuite) TestDeleteController(c *gc.C) {
+	// Define controller.
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foobarred"})
+	// Add controller to JEM.
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.JEMSrv,
-		URL:     "/v1/server/" + srvId.String(),
+		URL:     "/v1/controller/" + ctlId.String(),
 		Do:      apitest.Do(s.IDMSrv.Client("bob")),
 	})
 	// Assert that it was added.
 	c.Assert(resp.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %s", resp.Body.Bytes()))
-	// Add another environment to it.
-	envId, _, _ := s.addEnvironment(c, params.EntityPath{"bob", "bar"}, srvId)
-	// Delete server.
+	// Add another model to it.
+	modelId, _, _ := s.addModel(c, params.EntityPath{"bob", "bar"}, ctlId)
+	// Delete controller.
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:       "DELETE",
 		Handler:      s.JEMSrv,
-		URL:          "/v1/server/bob/foobarred",
+		URL:          "/v1/controller/bob/foobarred",
 		ExpectStatus: http.StatusOK,
 		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 	})
 	// Check that it doesn't exist anymore.
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      s.JEMSrv,
-		URL:          "/v1/server/" + srvId.String(),
+		URL:          "/v1/controller/" + ctlId.String(),
 		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 		ExpectStatus: http.StatusNotFound,
 		ExpectBody: params.Error{
-			Message: `cannot open API: cannot get environment: environment "bob/foobarred" not found`,
+			Message: `cannot open API: cannot get model: model "bob/foobarred" not found`,
 			Code:    params.ErrNotFound,
 		},
 	})
-	// Check that its environments doesn't exist.
+	// Check that its models doesn't exist.
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      s.JEMSrv,
-		URL:          "/v1/env/" + srvId.String(),
+		URL:          "/v1/model/" + ctlId.String(),
 		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 		ExpectStatus: http.StatusNotFound,
 		ExpectBody: params.Error{
-			Message: `environment "bob/foobarred" not found`,
+			Message: `model "bob/foobarred" not found`,
 			Code:    params.ErrNotFound,
 		},
 	})
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      s.JEMSrv,
-		URL:          "/v1/env/" + envId.String(),
+		URL:          "/v1/model/" + modelId.String(),
 		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 		ExpectStatus: http.StatusNotFound,
 		ExpectBody: params.Error{
-			Message: `environment "bob/bar" not found`,
+			Message: `model "bob/bar" not found`,
 			Code:    params.ErrNotFound,
 		},
 	})
 }
 
-func (s *APISuite) TestNewEnvironment(c *gc.C) {
-	srvId := s.addStateServer(c, params.EntityPath{"bob", "foo"})
+func (s *APISuite) TestNewModel(c *gc.C) {
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foo"})
 
-	var envRespBody json.RawMessage
+	var modelRespBody json.RawMessage
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
-		URL:     "/v1/env/bob",
+		URL:     "/v1/model/bob",
 		Handler: s.JEMSrv,
-		JSONBody: params.NewEnvironmentInfo{
-			Name:        params.Name("bar"),
-			StateServer: srvId,
-			Config:      dummyEnvConfig,
-			Password:    "secret",
+		JSONBody: params.NewModelInfo{
+			Name:       params.Name("bar"),
+			Controller: ctlId,
+			Config:     dummyEnvConfig,
+			Password:   "secret",
 		},
 		ExpectBody: httptesting.BodyAsserter(func(_ *gc.C, body json.RawMessage) {
-			envRespBody = body
+			modelRespBody = body
 		}),
 		Do: apitest.Do(s.IDMSrv.Client("bob")),
 	})
-	var envResp params.EnvironmentResponse
-	err := json.Unmarshal(envRespBody, &envResp)
+	var modelResp params.ModelResponse
+	err := json.Unmarshal(modelRespBody, &modelResp)
 	c.Assert(err, gc.IsNil)
 
-	c.Assert(envResp.ServerUUID, gc.Equals, s.APIInfo(c).EnvironTag.Id())
+	c.Assert(modelResp.ControllerUUID, gc.Equals, s.APIInfo(c).EnvironTag.Id())
 
-	st := openAPIFromEnvironmentResponse(c, &envResp)
+	st := openAPIFromModelResponse(c, &modelResp)
 	st.Close()
 
-	// Ensure that we can connect to the new environment
-	// from the information returned by GetEnvironment.
-	envResp2, err := s.NewClient("bob").GetEnvironment(&params.GetEnvironment{
+	// Ensure that we can connect to the new model
+	// from the information returned by GetModel.
+	modelResp2, err := s.NewClient("bob").GetModel(&params.GetModel{
 		EntityPath: params.EntityPath{
 			User: "bob",
 			Name: "bar",
 		},
 	})
 	c.Assert(err, gc.IsNil)
-	st = openAPIFromEnvironmentResponse(c, envResp2)
+	st = openAPIFromModelResponse(c, modelResp2)
 	st.Close()
 }
 
-func (s *APISuite) TestNewEnvironmentWithTemplates(c *gc.C) {
-	srvId := s.addStateServer(c, params.EntityPath{"bob", "foo"})
+func (s *APISuite) TestNewModelWithTemplates(c *gc.C) {
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foo"})
 
 	// TODO change "admin-secret" to "secret" when we can
 	// make the "secret" configuration attribute marked as secret
 	// in the schema.
-	s.addTemplate(c, params.EntityPath{"bob", "creds"}, srvId, map[string]interface{}{
+	s.addTemplate(c, params.EntityPath{"bob", "creds"}, ctlId, map[string]interface{}{
 		"secret":          "my secret",
 		"authorized-keys": sshKey,
 		"state-server":    false,
 	})
-	s.addTemplate(c, params.EntityPath{"bob", "other"}, srvId, map[string]interface{}{
+	s.addTemplate(c, params.EntityPath{"bob", "other"}, ctlId, map[string]interface{}{
 		"state-server": true,
 	})
 
-	envPath := params.EntityPath{"bob", "env"}
-	resp, err := s.NewClient("bob").NewEnvironment(&params.NewEnvironment{
-		User: envPath.User,
-		Info: params.NewEnvironmentInfo{
-			Name:        envPath.Name,
-			StateServer: srvId,
+	modelPath := params.EntityPath{"bob", "model"}
+	resp, err := s.NewClient("bob").NewModel(&params.NewModel{
+		User: modelPath.User,
+		Info: params.NewModelInfo{
+			Name:       modelPath.Name,
+			Controller: ctlId,
 			Config: map[string]interface{}{
 				"secret": "another secret",
 			},
@@ -650,29 +623,29 @@ func (s *APISuite) TestNewEnvironmentWithTemplates(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 
-	// Check that the environment was actually created with the right
+	// Check that the model was actually created with the right
 	// configuration.
-	env, err := s.State.GetEnvironment(names.NewEnvironTag(resp.UUID))
+	m, err := s.State.GetEnvironment(names.NewEnvironTag(resp.UUID))
 	c.Assert(err, gc.IsNil)
-	cfg, err := env.Config()
+	cfg, err := m.Config()
 	c.Assert(err, gc.IsNil)
 	attrs := cfg.AllAttrs()
 	c.Assert(attrs["state-server"], gc.Equals, true)
 	c.Assert(attrs["secret"], gc.Equals, "another secret")
 	c.Assert(attrs["authorized-keys"], gc.Equals, sshKey)
 
-	st := openAPIFromEnvironmentResponse(c, resp)
+	st := openAPIFromModelResponse(c, resp)
 	st.Close()
 }
 
-func (s *APISuite) TestNewEnvironmentWithTemplateNotFound(c *gc.C) {
-	srvId := s.addStateServer(c, params.EntityPath{"bob", "foo"})
+func (s *APISuite) TestNewModelWithTemplateNotFound(c *gc.C) {
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foo"})
 
-	resp, err := s.NewClient("bob").NewEnvironment(&params.NewEnvironment{
+	resp, err := s.NewClient("bob").NewModel(&params.NewModel{
 		User: "bob",
-		Info: params.NewEnvironmentInfo{
-			Name:        "x",
-			StateServer: srvId,
+		Info: params.NewModelInfo{
+			Name:       "x",
+			Controller: ctlId,
 			Config: map[string]interface{}{
 				"secret": "another secret",
 			},
@@ -680,12 +653,12 @@ func (s *APISuite) TestNewEnvironmentWithTemplateNotFound(c *gc.C) {
 			TemplatePaths: []params.EntityPath{{"bob", "creds"}},
 		},
 	})
-	c.Assert(err, gc.ErrorMatches, `POST .*/v1/env/bob: cannot get template "bob/creds": template "bob/creds" not found`)
+	c.Assert(err, gc.ErrorMatches, `POST .*/v1/model/bob: cannot get template "bob/creds": template "bob/creds" not found`)
 	c.Assert(resp, gc.IsNil)
 }
 
-func openAPIFromEnvironmentResponse(c *gc.C, resp *params.EnvironmentResponse) api.Connection {
-	// Ensure that we can connect to the new environment
+func openAPIFromModelResponse(c *gc.C, resp *params.ModelResponse) api.Connection {
+	// Ensure that we can connect to the new model
 	apiInfo := &api.Info{
 		Tag:        names.NewUserTag(resp.User),
 		Password:   resp.Password,
@@ -698,93 +671,93 @@ func openAPIFromEnvironmentResponse(c *gc.C, resp *params.EnvironmentResponse) a
 	return st
 }
 
-func (s *APISuite) TestNewEnvironmentUnderGroup(c *gc.C) {
-	srvId := s.addStateServer(c, params.EntityPath{"bob", "foo"})
+func (s *APISuite) TestNewModelUnderGroup(c *gc.C) {
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foo"})
 
 	s.IDMSrv.AddUser("bob", "beatles")
-	var envRespBody json.RawMessage
+	var modelRespBody json.RawMessage
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
-		URL:     "/v1/env/beatles",
+		URL:     "/v1/model/beatles",
 		Handler: s.JEMSrv,
-		JSONBody: params.NewEnvironmentInfo{
-			Name:        params.Name("bar"),
-			StateServer: srvId,
-			Config:      dummyEnvConfig,
-			Password:    "secret",
+		JSONBody: params.NewModelInfo{
+			Name:       params.Name("bar"),
+			Controller: ctlId,
+			Config:     dummyEnvConfig,
+			Password:   "secret",
 		},
 		ExpectBody: httptesting.BodyAsserter(func(_ *gc.C, body json.RawMessage) {
-			envRespBody = body
+			modelRespBody = body
 		}),
 		Do: apitest.Do(s.IDMSrv.Client("bob")),
 	})
-	var envResp params.EnvironmentResponse
-	err := json.Unmarshal(envRespBody, &envResp)
+	var modelResp params.ModelResponse
+	err := json.Unmarshal(modelRespBody, &modelResp)
 	c.Assert(err, gc.IsNil)
 
-	c.Assert(envResp.ServerUUID, gc.Equals, s.APIInfo(c).EnvironTag.Id())
+	c.Assert(modelResp.ControllerUUID, gc.Equals, s.APIInfo(c).EnvironTag.Id())
 
-	// Ensure that we can connect to the new environment
+	// Ensure that we can connect to the new model
 	apiInfo := &api.Info{
-		Tag:        names.NewUserTag(string(envResp.User)),
+		Tag:        names.NewUserTag(string(modelResp.User)),
 		Password:   "secret",
-		Addrs:      envResp.HostPorts,
-		CACert:     envResp.CACert,
-		EnvironTag: names.NewEnvironTag(envResp.UUID),
+		Addrs:      modelResp.HostPorts,
+		CACert:     modelResp.CACert,
+		EnvironTag: names.NewEnvironTag(modelResp.UUID),
 	}
 	st, err := api.Open(apiInfo, api.DialOpts{})
 	c.Assert(err, gc.IsNil)
 	defer st.Close()
 }
 
-func (s *APISuite) TestNewEnvironmentWithExistingUser(c *gc.C) {
+func (s *APISuite) TestNewModelWithExistingUser(c *gc.C) {
 	username := "jem-bob--bar"
 
 	_, err := usermanager.NewClient(s.APIState).AddUser(username, "", "old")
 	c.Assert(err, gc.IsNil)
 
-	srvId := s.addStateServer(c, params.EntityPath{"bob", "foo"})
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foo"})
 
-	var envRespBody json.RawMessage
+	var modelRespBody json.RawMessage
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
-		URL:     "/v1/env/bob",
+		URL:     "/v1/model/bob",
 		Handler: s.JEMSrv,
-		JSONBody: params.NewEnvironmentInfo{
-			Name:        params.Name("bar"),
-			StateServer: srvId,
-			Config:      dummyEnvConfig,
-			Password:    "secret",
+		JSONBody: params.NewModelInfo{
+			Name:       params.Name("bar"),
+			Controller: ctlId,
+			Config:     dummyEnvConfig,
+			Password:   "secret",
 		},
 		ExpectBody: httptesting.BodyAsserter(func(_ *gc.C, body json.RawMessage) {
-			envRespBody = body
+			modelRespBody = body
 		}),
 		Do: apitest.Do(s.IDMSrv.Client("bob")),
 	})
-	var envResp params.EnvironmentResponse
-	err = json.Unmarshal(envRespBody, &envResp)
+	var modelResp params.ModelResponse
+	err = json.Unmarshal(modelRespBody, &modelResp)
 	c.Assert(err, gc.IsNil)
 
-	c.Assert(envResp.ServerUUID, gc.Equals, s.APIInfo(c).EnvironTag.Id())
+	c.Assert(modelResp.ControllerUUID, gc.Equals, s.APIInfo(c).EnvironTag.Id())
 
 	// Make sure that we really are reusing the username.
-	c.Assert(envResp.User, gc.Equals, username)
+	c.Assert(modelResp.User, gc.Equals, username)
 
-	// Ensure that we can connect to the new environment with
+	// Ensure that we can connect to the new model with
 	// the new secret
 	apiInfo := &api.Info{
 		Tag:        names.NewUserTag(username),
-		Password:   envResp.Password,
-		Addrs:      envResp.HostPorts,
-		CACert:     envResp.CACert,
-		EnvironTag: names.NewEnvironTag(envResp.UUID),
+		Password:   modelResp.Password,
+		Addrs:      modelResp.HostPorts,
+		CACert:     modelResp.CACert,
+		EnvironTag: names.NewEnvironTag(modelResp.UUID),
 	}
 	st, err := api.Open(apiInfo, api.DialOpts{})
 	c.Assert(err, gc.IsNil)
 	defer st.Close()
 }
 
-var newEnvironmentWithInvalidStateServerPathTests = []struct {
+var newModelWithInvalidControllerPathTests = []struct {
 	path      string
 	expectErr string
 }{{
@@ -798,16 +771,16 @@ var newEnvironmentWithInvalidStateServerPathTests = []struct {
 	expectErr: `invalid name ""`,
 }}
 
-func (s *APISuite) TestNewEnvironmentWithInvalidStateServerPath(c *gc.C) {
-	for i, test := range newEnvironmentWithInvalidStateServerPathTests {
+func (s *APISuite) TestNewModelWithInvalidControllerPath(c *gc.C) {
+	for i, test := range newModelWithInvalidControllerPathTests {
 		c.Logf("test %d", i)
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Method:  "POST",
-			URL:     "/v1/env/bob",
+			URL:     "/v1/model/bob",
 			Handler: s.JEMSrv,
 			JSONBody: map[string]interface{}{
-				"name":         "bar",
-				"state-server": test.path,
+				"name":       "bar",
+				"controller": test.path,
 			},
 			ExpectBody: params.Error{
 				Message: fmt.Sprintf("cannot unmarshal parameters: cannot unmarshal into field: cannot unmarshal request body: %s", test.expectErr),
@@ -819,17 +792,17 @@ func (s *APISuite) TestNewEnvironmentWithInvalidStateServerPath(c *gc.C) {
 	}
 }
 
-func (s *APISuite) TestNewEnvironmentCannotOpenAPI(c *gc.C) {
+func (s *APISuite) TestNewModelCannotOpenAPI(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
-		URL:     "/v1/env/bob",
+		URL:     "/v1/model/bob",
 		Handler: s.JEMSrv,
-		JSONBody: params.NewEnvironmentInfo{
-			Name:        params.Name("bar"),
-			StateServer: params.EntityPath{"bob", "foo"},
+		JSONBody: params.NewModelInfo{
+			Name:       params.Name("bar"),
+			Controller: params.EntityPath{"bob", "foo"},
 		},
 		ExpectBody: params.Error{
-			Message: `cannot connect to state server: cannot get environment: environment "bob/foo" not found`,
+			Message: `cannot connect to controller: cannot get model: model "bob/foo" not found`,
 			Code:    params.ErrNotFound,
 		},
 		ExpectStatus: http.StatusNotFound,
@@ -837,16 +810,16 @@ func (s *APISuite) TestNewEnvironmentCannotOpenAPI(c *gc.C) {
 	})
 }
 
-func (s *APISuite) TestNewEnvironmentInvalidConfig(c *gc.C) {
-	srvId := s.addStateServer(c, params.EntityPath{"bob", "foo"})
+func (s *APISuite) TestNewModelInvalidConfig(c *gc.C) {
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foo"})
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
-		URL:     "/v1/env/bob",
+		URL:     "/v1/model/bob",
 		Handler: s.JEMSrv,
-		JSONBody: params.NewEnvironmentInfo{
-			Name:        params.Name("bar"),
-			StateServer: srvId,
+		JSONBody: params.NewModelInfo{
+			Name:       params.Name("bar"),
+			Controller: ctlId,
 			Config: map[string]interface{}{
 				"authorized-keys": 123,
 			},
@@ -860,18 +833,18 @@ func (s *APISuite) TestNewEnvironmentInvalidConfig(c *gc.C) {
 	})
 }
 
-func (s *APISuite) TestNewEnvironmentTwice(c *gc.C) {
-	srvId := s.addStateServer(c, params.EntityPath{"bob", "foo"})
+func (s *APISuite) TestNewModelTwice(c *gc.C) {
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foo"})
 
-	body := &params.NewEnvironmentInfo{
-		Name:        "bar",
-		Password:    "password",
-		StateServer: srvId,
-		Config:      dummyEnvConfig,
+	body := &params.NewModelInfo{
+		Name:       "bar",
+		Password:   "password",
+		Controller: ctlId,
+		Config:     dummyEnvConfig,
 	}
 	p := httptesting.JSONCallParams{
 		Method:     "POST",
-		URL:        "/v1/env/bob",
+		URL:        "/v1/model/bob",
 		Handler:    s.JEMSrv,
 		JSONBody:   body,
 		ExpectBody: apitest.AnyBody,
@@ -879,7 +852,7 @@ func (s *APISuite) TestNewEnvironmentTwice(c *gc.C) {
 	}
 	httptesting.AssertJSONCall(c, p)
 
-	// Creating the environment the second time may fail because
+	// Creating the model the second time may fail because
 	// the juju user does not need to be created the second time.
 	// This test ensures that this works OK.
 	body.Name = "bar2"
@@ -894,17 +867,17 @@ func (s *APISuite) TestNewEnvironmentTwice(c *gc.C) {
 	httptesting.AssertJSONCall(c, p)
 }
 
-func (s *APISuite) TestNewEnvironmentWithNoPassword(c *gc.C) {
-	srvId := s.addStateServer(c, params.EntityPath{"bob", "foo"})
+func (s *APISuite) TestNewModelWithNoPassword(c *gc.C) {
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foo"})
 
 	// N.B. "state-server" is a required attribute
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
-		URL:     "/v1/env/bob",
+		URL:     "/v1/model/bob",
 		Handler: s.JEMSrv,
-		JSONBody: params.NewEnvironmentInfo{
-			Name:        "bar",
-			StateServer: srvId,
+		JSONBody: params.NewModelInfo{
+			Name:       "bar",
+			Controller: ctlId,
 			Config: map[string]interface{}{
 				"authorized-keys": sshKey,
 			},
@@ -918,36 +891,36 @@ func (s *APISuite) TestNewEnvironmentWithNoPassword(c *gc.C) {
 	})
 }
 
-func (s *APISuite) TestNewEnvironmentCannotCreate(c *gc.C) {
-	srvId := s.addStateServer(c, params.EntityPath{"bob", "foo"})
+func (s *APISuite) TestNewModelCannotCreate(c *gc.C) {
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foo"})
 
 	// N.B. "state-server" is a required attribute
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
-		URL:     "/v1/env/bob",
+		URL:     "/v1/model/bob",
 		Handler: s.JEMSrv,
-		JSONBody: params.NewEnvironmentInfo{
-			Name:        "bar",
-			Password:    "secret",
-			StateServer: srvId,
+		JSONBody: params.NewModelInfo{
+			Name:       "bar",
+			Password:   "secret",
+			Controller: ctlId,
 			Config: map[string]interface{}{
 				"authorized-keys": sshKey,
 			},
 		},
 		ExpectBody: params.Error{
-			Message: `cannot create environment: provider validation failed: state-server: expected bool, got nothing`,
+			Message: `cannot create model: provider validation failed: state-server: expected bool, got nothing`,
 		},
 		ExpectStatus: http.StatusInternalServerError,
 		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 	})
 
-	// Check that the environment is not there (it was added temporarily during the call).
+	// Check that the model is not there (it was added temporarily during the call).
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "GET",
 		Handler: s.JEMSrv,
-		URL:     "/v1/env/bob/bar",
+		URL:     "/v1/model/bob/bar",
 		ExpectBody: &params.Error{
-			Message: `environment "bob/bar" not found`,
+			Message: `model "bob/bar" not found`,
 			Code:    params.ErrNotFound,
 		},
 		ExpectStatus: http.StatusNotFound,
@@ -955,17 +928,17 @@ func (s *APISuite) TestNewEnvironmentCannotCreate(c *gc.C) {
 	})
 }
 
-func (s *APISuite) TestNewEnvironmentUnauthorized(c *gc.C) {
-	srvId := s.addStateServer(c, params.EntityPath{"bob", "foo"})
+func (s *APISuite) TestNewModelUnauthorized(c *gc.C) {
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foo"})
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
-		URL:     "/v1/env/bob",
+		URL:     "/v1/model/bob",
 		Handler: s.JEMSrv,
-		JSONBody: params.NewEnvironmentInfo{
-			Name:        "bar",
-			StateServer: srvId,
-			Config:      dummyEnvConfig,
+		JSONBody: params.NewModelInfo{
+			Name:       "bar",
+			Controller: ctlId,
+			Config:     dummyEnvConfig,
 		},
 		ExpectBody: params.Error{
 			Message: `unauthorized`,
@@ -976,44 +949,44 @@ func (s *APISuite) TestNewEnvironmentUnauthorized(c *gc.C) {
 	})
 }
 
-func (s *APISuite) TestListJES(c *gc.C) {
-	srvId := s.addStateServer(c, params.EntityPath{"bob", "foo"})
-	resp, err := s.NewClient("bob").ListJES(nil)
+func (s *APISuite) TestListController(c *gc.C) {
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foo"})
+	resp, err := s.NewClient("bob").ListController(nil)
 	c.Assert(err, gc.IsNil)
-	c.Assert(resp, jc.DeepEquals, &params.ListJESResponse{
-		StateServers: []params.JESResponse{{
-			Path: srvId,
+	c.Assert(resp, jc.DeepEquals, &params.ListControllerResponse{
+		Controllers: []params.ControllerResponse{{
+			Path: ctlId,
 		}},
 	})
 
 	// Check that the entry doesn't show up when listing
 	// as a different user.
-	resp, err = s.NewClient("alice").ListJES(nil)
+	resp, err = s.NewClient("alice").ListController(nil)
 	c.Assert(err, gc.IsNil)
-	c.Assert(resp, jc.DeepEquals, &params.ListJESResponse{})
+	c.Assert(resp, jc.DeepEquals, &params.ListControllerResponse{})
 }
 
-func (s *APISuite) TestListJESNoServers(c *gc.C) {
-	resp, err := s.NewClient("bob").ListJES(nil)
+func (s *APISuite) TestListControllerNoServers(c *gc.C) {
+	resp, err := s.NewClient("bob").ListController(nil)
 	c.Assert(err, gc.IsNil)
-	c.Assert(resp, jc.DeepEquals, &params.ListJESResponse{})
+	c.Assert(resp, jc.DeepEquals, &params.ListControllerResponse{})
 }
 
 func (s *APISuite) TestListTemplates(c *gc.C) {
-	srvId := s.addStateServer(c, params.EntityPath{"bob", "foo"})
-	s.addTemplate(c, params.EntityPath{"bob", "other"}, srvId, map[string]interface{}{
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foo"})
+	s.addTemplate(c, params.EntityPath{"bob", "other"}, ctlId, map[string]interface{}{
 		"state-server": true,
 	})
-	s.addTemplate(c, params.EntityPath{"bob", "creds"}, srvId, map[string]interface{}{
+	s.addTemplate(c, params.EntityPath{"bob", "creds"}, ctlId, map[string]interface{}{
 		"secret":          "my secret",
 		"authorized-keys": sshKey,
 		"state-server":    false,
 	})
-	s.addTemplate(c, params.EntityPath{"alice", "x"}, srvId, map[string]interface{}{
+	s.addTemplate(c, params.EntityPath{"alice", "x"}, ctlId, map[string]interface{}{
 		"state-server":    false,
 		"authorized-keys": sshKey,
 	})
-	s.addTemplate(c, params.EntityPath{"alice", "y"}, srvId, map[string]interface{}{
+	s.addTemplate(c, params.EntityPath{"alice", "y"}, ctlId, map[string]interface{}{
 		"state-server": false,
 	})
 	s.allowTemplateAllPerm(c, params.EntityPath{"alice", "y"})
@@ -1079,20 +1052,20 @@ func (s *APISuite) TestListTemplates(c *gc.C) {
 	})
 }
 
-func (s *APISuite) TestListEnvironmentsNoServers(c *gc.C) {
-	resp, err := s.NewClient("bob").ListEnvironments(nil)
+func (s *APISuite) TestListModelsNoServers(c *gc.C) {
+	resp, err := s.NewClient("bob").ListModels(nil)
 	c.Assert(err, gc.IsNil)
-	c.Assert(resp, jc.DeepEquals, &params.ListEnvironmentsResponse{})
+	c.Assert(resp, jc.DeepEquals, &params.ListModelsResponse{})
 }
 
-func (s *APISuite) TestListEnvironmentsStateServerOnly(c *gc.C) {
-	srvId := s.addStateServer(c, params.EntityPath{"bob", "foo"})
+func (s *APISuite) TestListModelsControllerOnly(c *gc.C) {
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foo"})
 	info := s.APIInfo(c)
-	resp, err := s.NewClient("bob").ListEnvironments(nil)
+	resp, err := s.NewClient("bob").ListModels(nil)
 	c.Assert(err, gc.IsNil)
-	c.Assert(resp, jc.DeepEquals, &params.ListEnvironmentsResponse{
-		Environments: []params.EnvironmentResponse{{
-			Path:      srvId,
+	c.Assert(resp, jc.DeepEquals, &params.ListModelsResponse{
+		Models: []params.ModelResponse{{
+			Path:      ctlId,
 			User:      info.Tag.Id(),
 			Password:  info.Password,
 			UUID:      info.EnvironTag.Id(),
@@ -1103,7 +1076,7 @@ func (s *APISuite) TestListEnvironmentsStateServerOnly(c *gc.C) {
 }
 
 func (s *APISuite) allowServerAllPerm(c *gc.C, path params.EntityPath) {
-	err := s.NewClient(path.User).SetStateServerPerm(&params.SetStateServerPerm{
+	err := s.NewClient(path.User).SetControllerPerm(&params.SetControllerPerm{
 		EntityPath: path,
 		ACL: params.ACL{
 			Read: []string{"everyone"},
@@ -1113,7 +1086,7 @@ func (s *APISuite) allowServerAllPerm(c *gc.C, path params.EntityPath) {
 }
 
 func (s *APISuite) allowEnvAllPerm(c *gc.C, path params.EntityPath) {
-	err := s.NewClient(path.User).SetEnvironmentPerm(&params.SetEnvironmentPerm{
+	err := s.NewClient(path.User).SetModelPerm(&params.SetModelPerm{
 		EntityPath: path,
 		ACL: params.ACL{
 			Read: []string{"everyone"},
@@ -1132,30 +1105,30 @@ func (s *APISuite) allowTemplateAllPerm(c *gc.C, path params.EntityPath) {
 	c.Assert(err, gc.IsNil)
 }
 
-func (s *APISuite) TestListEnvironments(c *gc.C) {
-	srvId := s.addStateServer(c, params.EntityPath{"alice", "foo"})
-	s.allowEnvAllPerm(c, srvId)
-	s.allowServerAllPerm(c, srvId)
-	envId1, user1, uuid1 := s.addEnvironment(c, params.EntityPath{"bob", "bar"}, srvId)
-	envId2, user2, uuid2 := s.addEnvironment(c, params.EntityPath{"charlie", "bar"}, srvId)
+func (s *APISuite) TestListModels(c *gc.C) {
+	ctlId := s.assertAddController(c, params.EntityPath{"alice", "foo"})
+	s.allowEnvAllPerm(c, ctlId)
+	s.allowServerAllPerm(c, ctlId)
+	modelId1, user1, uuid1 := s.addModel(c, params.EntityPath{"bob", "bar"}, ctlId)
+	modelId2, user2, uuid2 := s.addModel(c, params.EntityPath{"charlie", "bar"}, ctlId)
 	info := s.APIInfo(c)
 
-	resps := []params.EnvironmentResponse{{
-		Path:      srvId,
+	resps := []params.ModelResponse{{
+		Path:      ctlId,
 		User:      info.Tag.Id(),
 		Password:  info.Password,
 		UUID:      info.EnvironTag.Id(),
 		CACert:    info.CACert,
 		HostPorts: info.Addrs,
 	}, {
-		Path:      envId1,
+		Path:      modelId1,
 		User:      user1,
 		Password:  info.Password,
 		UUID:      uuid1,
 		CACert:    info.CACert,
 		HostPorts: info.Addrs,
 	}, {
-		Path:      envId2,
+		Path:      modelId2,
 		User:      user2,
 		Password:  info.Password,
 		UUID:      uuid2,
@@ -1180,37 +1153,37 @@ func (s *APISuite) TestListEnvironments(c *gc.C) {
 	}}
 	for i, test := range tests {
 		c.Logf("test %d: as user %s", i, test.user)
-		expectResp := &params.ListEnvironmentsResponse{
-			Environments: make([]params.EnvironmentResponse, len(test.indexes)),
+		expectResp := &params.ListModelsResponse{
+			Models: make([]params.ModelResponse, len(test.indexes)),
 		}
 		for i, index := range test.indexes {
-			expectResp.Environments[i] = resps[index]
+			expectResp.Models[i] = resps[index]
 		}
 
-		resp, err := s.NewClient(test.user).ListEnvironments(nil)
+		resp, err := s.NewClient(test.user).ListModels(nil)
 		c.Assert(err, gc.IsNil)
 		c.Assert(resp, jc.DeepEquals, expectResp)
 	}
 }
 
-func (s *APISuite) TestGetSetStateServerPerm(c *gc.C) {
-	srvId := s.addStateServer(c, params.EntityPath{"alice", "foo"})
+func (s *APISuite) TestGetSetControllerPerm(c *gc.C) {
+	ctlId := s.assertAddController(c, params.EntityPath{"alice", "foo"})
 
-	acl, err := s.NewClient("alice").GetStateServerPerm(&params.GetStateServerPerm{
-		EntityPath: srvId,
+	acl, err := s.NewClient("alice").GetControllerPerm(&params.GetControllerPerm{
+		EntityPath: ctlId,
 	})
 	c.Assert(err, gc.IsNil)
 	c.Assert(acl, jc.DeepEquals, params.ACL{})
 
-	err = s.NewClient("alice").SetStateServerPerm(&params.SetStateServerPerm{
-		EntityPath: srvId,
+	err = s.NewClient("alice").SetControllerPerm(&params.SetControllerPerm{
+		EntityPath: ctlId,
 		ACL: params.ACL{
 			Read: []string{"a", "b"},
 		},
 	})
 	c.Assert(err, gc.IsNil)
-	acl, err = s.NewClient("alice").GetStateServerPerm(&params.GetStateServerPerm{
-		EntityPath: srvId,
+	acl, err = s.NewClient("alice").GetControllerPerm(&params.GetControllerPerm{
+		EntityPath: ctlId,
 	})
 	c.Assert(err, gc.IsNil)
 	c.Assert(acl, gc.DeepEquals, params.ACL{
@@ -1218,24 +1191,24 @@ func (s *APISuite) TestGetSetStateServerPerm(c *gc.C) {
 	})
 }
 
-func (s *APISuite) TestGetSetEnvironmentPerm(c *gc.C) {
-	srvId := s.addStateServer(c, params.EntityPath{"alice", "foo"})
+func (s *APISuite) TestGetSetModelPerm(c *gc.C) {
+	ctlId := s.assertAddController(c, params.EntityPath{"alice", "foo"})
 
-	acl, err := s.NewClient("alice").GetEnvironmentPerm(&params.GetEnvironmentPerm{
-		EntityPath: srvId,
+	acl, err := s.NewClient("alice").GetModelPerm(&params.GetModelPerm{
+		EntityPath: ctlId,
 	})
 	c.Assert(err, gc.IsNil)
 	c.Assert(acl, jc.DeepEquals, params.ACL{})
 
-	err = s.NewClient("alice").SetEnvironmentPerm(&params.SetEnvironmentPerm{
-		EntityPath: srvId,
+	err = s.NewClient("alice").SetModelPerm(&params.SetModelPerm{
+		EntityPath: ctlId,
 		ACL: params.ACL{
 			Read: []string{"a", "b"},
 		},
 	})
 	c.Assert(err, gc.IsNil)
-	acl, err = s.NewClient("alice").GetEnvironmentPerm(&params.GetEnvironmentPerm{
-		EntityPath: srvId,
+	acl, err = s.NewClient("alice").GetModelPerm(&params.GetModelPerm{
+		EntityPath: ctlId,
 	})
 	c.Assert(err, gc.IsNil)
 	c.Assert(acl, gc.DeepEquals, params.ACL{
@@ -1244,11 +1217,11 @@ func (s *APISuite) TestGetSetEnvironmentPerm(c *gc.C) {
 }
 
 func (s *APISuite) TestAddTemplate(c *gc.C) {
-	srvId := s.addStateServer(c, params.EntityPath{"alice", "foo"})
+	ctlId := s.assertAddController(c, params.EntityPath{"alice", "foo"})
 	err := s.NewClient("alice").AddTemplate(&params.AddTemplate{
 		EntityPath: params.EntityPath{"alice", "creds"},
 		Info: params.AddTemplateInfo{
-			StateServer: srvId,
+			Controller: ctlId,
 			Config: map[string]interface{}{
 				"state-server":      true,
 				"admin-secret":      "my secret",
@@ -1280,7 +1253,7 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 	err = s.NewClient("alice").AddTemplate(&params.AddTemplate{
 		EntityPath: params.EntityPath{"alice", "creds"},
 		Info: params.AddTemplateInfo{
-			StateServer: srvId,
+			Controller: ctlId,
 			Config: map[string]interface{}{
 				"state-server":      false,
 				"admin-secret":      "another secret",
@@ -1307,7 +1280,7 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 	err = s.NewClient("alice").AddTemplate(&params.AddTemplate{
 		EntityPath: params.EntityPath{"alice", "differentcreds"},
 		Info: params.AddTemplateInfo{
-			StateServer: srvId,
+			Controller: ctlId,
 			Config: map[string]interface{}{
 				"state-server":      true,
 				"bootstrap-timeout": 111,
@@ -1351,40 +1324,40 @@ func (s *APISuite) TestGetTemplateNotFound(c *gc.C) {
 var addInvalidTemplateTests = []struct {
 	about       string
 	config      map[string]interface{}
-	srvId       params.EntityPath
+	ctlId       params.EntityPath
 	expectError string
 }{{
 	about: "unknown key",
-	srvId: params.EntityPath{"alice", "foo"},
+	ctlId: params.EntityPath{"alice", "foo"},
 	config: map[string]interface{}{
 		"badkey": 34565,
 	},
 	expectError: `PUT .*/v1/template/alice/creds: configuration not compatible with schema: unknown key "badkey" \(value 34565\)`,
 }, {
 	about: "incompatible type",
-	srvId: params.EntityPath{"alice", "foo"},
+	ctlId: params.EntityPath{"alice", "foo"},
 	config: map[string]interface{}{
 		"admin-secret": 34565,
 	},
 	expectError: `PUT .*/v1/template/alice/creds: configuration not compatible with schema: admin-secret: expected string, got float64\(34565\)`,
 }, {
-	about: "unknown server id",
-	srvId: params.EntityPath{"alice", "bar"},
+	about: "unknown controller id",
+	ctlId: params.EntityPath{"alice", "bar"},
 	config: map[string]interface{}{
 		"admin-secret": 34565,
 	},
-	expectError: `PUT .*/v1/template/alice/creds: cannot get schema for state server: cannot open API: cannot get environment: environment "alice/bar" not found`,
+	expectError: `PUT .*/v1/template/alice/creds: cannot get schema for controller: cannot open API: cannot get model: model "alice/bar" not found`,
 }}
 
 func (s *APISuite) TestAddInvalidTemplate(c *gc.C) {
-	s.addStateServer(c, params.EntityPath{"alice", "foo"})
+	s.assertAddController(c, params.EntityPath{"alice", "foo"})
 	for i, test := range addInvalidTemplateTests {
 		c.Logf("test %d: %s", i, test.about)
 		err := s.NewClient("alice").AddTemplate(&params.AddTemplate{
 			EntityPath: params.EntityPath{"alice", "creds"},
 			Info: params.AddTemplateInfo{
-				StateServer: test.srvId,
-				Config:      test.config,
+				Controller: test.ctlId,
+				Config:     test.config,
 			},
 		})
 		c.Assert(err, gc.ErrorMatches, test.expectError)
@@ -1407,13 +1380,13 @@ func (s *APISuite) TestDeleteTemplateNotFound(c *gc.C) {
 }
 
 func (s *APISuite) TestDeleteTemplate(c *gc.C) {
-	srvId := s.addStateServer(c, params.EntityPath{"alice", "foo"})
+	ctlId := s.assertAddController(c, params.EntityPath{"alice", "foo"})
 	templPath := params.EntityPath{"alice", "foo"}
 
 	err := s.NewClient("alice").AddTemplate(&params.AddTemplate{
 		EntityPath: templPath,
 		Info: params.AddTemplateInfo{
-			StateServer: srvId,
+			Controller: ctlId,
 			Config: map[string]interface{}{
 				"state-server":      true,
 				"admin-secret":      "my secret",
@@ -1447,55 +1420,59 @@ func (s *APISuite) TestWhoAmI(c *gc.C) {
 	c.Assert(resp.User, gc.Equals, "bob")
 }
 
-// addStateServer adds a new stateserver named name under the
-// given user. It returns the state server id.
-func (s *APISuite) addStateServer(c *gc.C, srvPath params.EntityPath) params.EntityPath {
-	// Note that because the cookies acquired in this request don't
-	// persist, the discharge macaroon we get won't affect subsequent
-	// requests in the caller.
-
-	info := s.APIInfo(c)
-	err := s.NewClient(srvPath.User).AddJES(&params.AddJES{
-		EntityPath: srvPath,
-		Info: params.ServerInfo{
-			HostPorts:   info.Addrs,
-			CACert:      info.CACert,
-			User:        info.Tag.Id(),
-			Password:    info.Password,
-			EnvironUUID: info.EnvironTag.Id(),
-		},
-	})
+// addController adds a new stateserver named name under the
+// given user. It returns the controller id.
+func (s *APISuite) assertAddController(c *gc.C, ctlPath params.EntityPath) params.EntityPath {
+	err := s.addController(c, ctlPath)
 	c.Assert(err, gc.IsNil)
-	return srvPath
+	return ctlPath
 }
 
-// addEnvironment adds a new environment in the given state server. It
-// returns the environment id.
-func (s *APISuite) addEnvironment(c *gc.C, envPath, srvPath params.EntityPath) (path params.EntityPath, user, uuid string) {
+func (s *APISuite) addController(c *gc.C, path params.EntityPath) error {
+	// Note that because the cookies acquired in this request don't
+	// persist, the discharge macaroon we get won't affect subsequent
+	// requests in the caller.
+	info := s.APIInfo(c)
+
+	return s.NewClient(path.User).AddController(&params.AddController{
+		EntityPath: path,
+		Info: params.ControllerInfo{
+			HostPorts: info.Addrs,
+			CACert:    info.CACert,
+			User:      info.Tag.Id(),
+			Password:  info.Password,
+			ModelUUID: info.EnvironTag.Id(),
+		},
+	})
+}
+
+// addModel adds a new model in the given controller. It
+// returns the model id.
+func (s *APISuite) addModel(c *gc.C, modelPath, ctlPath params.EntityPath) (path params.EntityPath, user, uuid string) {
 	// Note that because the cookies acquired in this request don't
 	// persist, the discharge macaroon we get won't affect subsequent
 	// requests in the caller.
 
 	info := s.APIInfo(c)
-	resp, err := s.NewClient(envPath.User).NewEnvironment(&params.NewEnvironment{
-		User: envPath.User,
-		Info: params.NewEnvironmentInfo{
-			Name:        envPath.Name,
-			Password:    info.Password,
-			StateServer: srvPath,
-			Config:      dummyEnvConfig,
+	resp, err := s.NewClient(modelPath.User).NewModel(&params.NewModel{
+		User: modelPath.User,
+		Info: params.NewModelInfo{
+			Name:       modelPath.Name,
+			Password:   info.Password,
+			Controller: ctlPath,
+			Config:     dummyEnvConfig,
 		},
 	})
 	c.Assert(err, gc.IsNil)
 	return resp.Path, resp.User, resp.UUID
 }
 
-func (s *APISuite) addTemplate(c *gc.C, tmplPath, srvPath params.EntityPath, cfg map[string]interface{}) {
+func (s *APISuite) addTemplate(c *gc.C, tmplPath, ctlPath params.EntityPath, cfg map[string]interface{}) {
 	err := s.NewClient(tmplPath.User).AddTemplate(&params.AddTemplate{
 		EntityPath: tmplPath,
 		Info: params.AddTemplateInfo{
-			StateServer: srvPath,
-			Config:      cfg,
+			Controller: ctlPath,
+			Config:     cfg,
 		},
 	})
 	c.Assert(err, gc.IsNil)

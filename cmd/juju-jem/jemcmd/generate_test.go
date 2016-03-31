@@ -48,7 +48,7 @@ func (s *generateSuite) TestGenerate(c *gc.C) {
 	// It should have omitted all juju-group attributes,
 	// so check one to be sure.
 	client := s.jemClient("bob")
-	jesInfo, err := client.GetJES(&params.GetJES{
+	controllerInfo, err := client.GetController(&params.GetController{
 		EntityPath: params.EntityPath{
 			User: "bob",
 			Name: "foo",
@@ -56,7 +56,7 @@ func (s *generateSuite) TestGenerate(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 
-	field, ok := jesInfo.Schema["agent-version"]
+	field, ok := controllerInfo.Schema["agent-version"]
 	c.Assert(ok, gc.Equals, true)
 	c.Assert(field.Group, gc.Equals, environschema.JujuGroup)
 

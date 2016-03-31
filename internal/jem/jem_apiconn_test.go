@@ -54,23 +54,23 @@ func (s *jemAPIConnSuite) TearDownTest(c *gc.C) {
 }
 
 func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
-	srvPath := params.EntityPath{"bob", "stateserver"}
+	ctlPath := params.EntityPath{"bob", "controller"}
 	info := s.APIInfo(c)
-	srv := &mongodoc.StateServer{
-		Path:      srvPath,
+	ctl := &mongodoc.Controller{
+		Path:      ctlPath,
 		HostPorts: info.Addrs,
 		CACert:    info.CACert,
 	}
-	env := &mongodoc.Environment{
+	m := &mongodoc.Model{
 		UUID:          info.EnvironTag.Id(),
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
 	}
-	err := s.store.AddStateServer(srv, env)
+	err := s.store.AddController(ctl, m)
 	c.Assert(err, gc.IsNil)
 
 	// Open the API and check that it works.
-	conn, err := s.store.OpenAPI(srvPath)
+	conn, err := s.store.OpenAPI(ctlPath)
 	c.Assert(err, gc.IsNil)
 	c.Assert(conn.Ping(), gc.IsNil)
 
@@ -79,7 +79,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 
 	// Open it again and check that we get the
 	// same cached connection.
-	conn1, err := s.store.OpenAPI(srvPath)
+	conn1, err := s.store.OpenAPI(ctlPath)
 	c.Assert(err, gc.IsNil)
 	c.Assert(conn1.Ping(), gc.IsNil)
 	c.Assert(conn1.Connection, gc.Equals, conn.Connection)
@@ -88,7 +88,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 
 	// Open it with OpenAPIFromDocs and check
 	// that we still get the same connection.
-	conn1, err = s.store.OpenAPIFromDocs(env, srv)
+	conn1, err = s.store.OpenAPIFromDocs(m, ctl)
 	c.Assert(err, gc.IsNil)
 	c.Assert(conn1.Connection, gc.Equals, conn.Connection)
 	err = conn1.Close()
@@ -116,23 +116,21 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 func (s *jemAPIConnSuite) TestPoolOpenAPIError(c *gc.C) {
 
 	conn, err := s.store.OpenAPI(params.EntityPath{"bob", "notthere"})
-	c.Assert(err, gc.ErrorMatches, `cannot get environment: environment "bob/notthere" not found`)
+	c.Assert(err, gc.ErrorMatches, `cannot get model: model "bob/notthere" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	c.Assert(conn, gc.IsNil)
 
-	// Insert an environment with a deliberately missing state server.
-	env := &mongodoc.Environment{
-		Path:          params.EntityPath{"bob", "env"},
-		UUID:          "envuuid",
-		AdminUser:     "admin",
-		AdminPassword: "password",
-		StateServer:   params.EntityPath{"no", "server"},
+	// Insert an model with a deliberately missing controller.
+	m := &mongodoc.Model{
+		Path:       params.EntityPath{"bob", "model"},
+		UUID:       "modeluuid",
+		Controller: params.EntityPath{"no", "controller"},
 	}
-	err = s.store.AddEnvironment(env)
+	err = s.store.AddModel(m)
 	c.Assert(err, gc.IsNil)
 
-	conn, err = s.store.OpenAPI(params.EntityPath{"bob", "env"})
-	c.Assert(err, gc.ErrorMatches, `cannot get state server for environment "envuuid": state server "no/server" not found`)
+	conn, err = s.store.OpenAPI(params.EntityPath{"bob", "model"})
+	c.Assert(err, gc.ErrorMatches, `cannot get controller for model "modeluuid": controller "no/controller" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, err)
 	c.Assert(conn, gc.IsNil)
 }

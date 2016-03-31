@@ -9,17 +9,17 @@ import (
 	"github.com/CanonicalLtd/jem/params"
 )
 
-type addServerSuite struct {
+type addControllerSuite struct {
 	commonSuite
 }
 
-var _ = gc.Suite(&addServerSuite{})
+var _ = gc.Suite(&addControllerSuite{})
 
-func (s *addServerSuite) TestAddServer(c *gc.C) {
+func (s *addControllerSuite) TestAddController(c *gc.C) {
 	s.idmSrv.AddUser("bob")
 	s.idmSrv.SetDefaultUser("bob")
 	client := s.jemClient("bob")
-	_, err := client.GetJES(&params.GetJES{
+	_, err := client.GetController(&params.GetController{
 		EntityPath: params.EntityPath{
 			User: "bob",
 			Name: "foo",
@@ -30,7 +30,7 @@ func (s *addServerSuite) TestAddServer(c *gc.C) {
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
-	_, err = client.GetJES(&params.GetJES{
+	_, err = client.GetController(&params.GetController{
 		EntityPath: params.EntityPath{
 			User: "bob",
 			Name: "foo",
@@ -39,7 +39,7 @@ func (s *addServerSuite) TestAddServer(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 }
 
-var addServerErrorTests = []struct {
+var addControllerErrorTests = []struct {
 	about        string
 	args         []string
 	expectStderr string
@@ -66,8 +66,8 @@ var addServerErrorTests = []struct {
 	expectCode:   2,
 }}
 
-func (s *addServerSuite) TestAddServerError(c *gc.C) {
-	for i, test := range addServerErrorTests {
+func (s *addControllerSuite) TestAddControllerError(c *gc.C) {
+	for i, test := range addControllerErrorTests {
 		c.Logf("test %d: %s", i, test.about)
 		stdout, stderr, code := run(c, c.MkDir(), "add-controller", test.args...)
 		c.Assert(code, gc.Equals, test.expectCode, gc.Commentf("stderr: %s", stderr))

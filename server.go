@@ -26,9 +26,9 @@ type ServerParams struct {
 	// store the JEM information.
 	DB *mgo.Database
 
-	// StateServerAdmin holds the identity of the user
-	// or group that is allowed to create state servers.
-	StateServerAdmin string
+	// ControllerAdmin holds the identity of the user
+	// or group that is allowed to create controllers.
+	ControllerAdmin string
 
 	// IdentityLocation holds the location of the third party identity service.
 	IdentityLocation string
