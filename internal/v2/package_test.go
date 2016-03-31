@@ -1,6 +1,6 @@
 // Copyright 2015 Canonical Ltd.
 
-package v1_test
+package v2_test
 
 import (
 	"testing"

@@ -5,7 +5,7 @@ package jem_test
 import (
 	"time"
 
-	"github.com/CanonicalLtd/blues-identity/idmclient"
+	"github.com/juju/idmclient"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
@@ -57,22 +57,28 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "controller"}
 	info := s.APIInfo(c)
 	ctl := &mongodoc.Controller{
-		Path:      ctlPath,
-		HostPorts: info.Addrs,
-		CACert:    info.CACert,
-	}
-	m := &mongodoc.Model{
-		UUID:          info.EnvironTag.Id(),
+		Path:          ctlPath,
+		HostPorts:     info.Addrs,
+		CACert:        info.CACert,
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
 	}
-	err := s.store.AddController(ctl, m)
+	m := &mongodoc.Model{
+		UUID: info.ModelTag.Id(),
+	}
+
+	// Sanity check that we're really talking to the controller.
+	minfo, err := s.APIState.Client().ModelInfo()
+	c.Assert(err, gc.IsNil)
+	c.Assert(minfo.ControllerUUID, gc.Equals, m.UUID)
+
+	err = s.store.AddController(ctl, m)
 	c.Assert(err, gc.IsNil)
 
 	// Open the API and check that it works.
 	conn, err := s.store.OpenAPI(ctlPath)
 	c.Assert(err, gc.IsNil)
-	c.Assert(conn.Ping(), gc.IsNil)
+	s.assertConnectionAlive(c, conn)
 
 	err = conn.Close()
 	c.Assert(err, gc.IsNil)
@@ -81,7 +87,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 	// same cached connection.
 	conn1, err := s.store.OpenAPI(ctlPath)
 	c.Assert(err, gc.IsNil)
-	c.Assert(conn1.Ping(), gc.IsNil)
+	s.assertConnectionAlive(c, conn1)
 	c.Assert(conn1.Connection, gc.Equals, conn.Connection)
 	err = conn1.Close()
 	c.Assert(err, gc.IsNil)
@@ -97,11 +103,11 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 	// Close the JEM instance and check that the
 	// connection is still alive, held open by the pool.
 	s.store.Close()
-	c.Assert(conn.Ping(), gc.IsNil)
+	s.assertConnectionAlive(c, conn)
 
 	// Make sure the Close call is idempotent.
 	s.store.Close()
-	c.Assert(conn.Ping(), gc.IsNil)
+	s.assertConnectionAlive(c, conn)
 
 	// Close the pool and make sure that the connection
 	// has actually been closed this time.
@@ -141,4 +147,11 @@ func assertConnIsClosed(c *gc.C, conn *apiconn.Conn) {
 	case <-time.After(5 * time.Second):
 		c.Fatalf("timed out waiting for connection close")
 	}
+}
+
+// assertConnectionAlive asserts that the given API
+// connection is responding to requests.
+func (s *jemAPIConnSuite) assertConnectionAlive(c *gc.C, conn *apiconn.Conn) {
+	err := conn.Ping()
+	c.Assert(err, gc.IsNil)
 }

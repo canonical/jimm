@@ -1,11 +1,11 @@
-package v1
+package v2
 
 import (
 	"reflect"
 	"strings"
 
 	"github.com/juju/httprequest"
-	"github.com/juju/juju/api/environmentmanager"
+	"github.com/juju/juju/api/modelmanager"
 	"github.com/juju/juju/api/usermanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/environs"
@@ -77,18 +77,19 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	if arg.Info.User == "" {
 		return badRequestf(nil, "no user in request")
 	}
-	if !names.IsValidEnvironment(arg.Info.ModelUUID) {
+	if !names.IsValidModel(arg.Info.ControllerUUID) {
 		return badRequestf(nil, "bad model UUID in request")
 	}
 	ctl := &mongodoc.Controller{
-		Path:      arg.EntityPath,
-		CACert:    arg.Info.CACert,
-		HostPorts: arg.Info.HostPorts,
-	}
-	m := &mongodoc.Model{
+		Path:          arg.EntityPath,
+		CACert:        arg.Info.CACert,
+		HostPorts:     arg.Info.HostPorts,
 		AdminUser:     arg.Info.User,
 		AdminPassword: arg.Info.Password,
-		UUID:          arg.Info.ModelUUID,
+		UUID:          arg.Info.ControllerUUID,
+	}
+	m := &mongodoc.Model{
+		UUID: arg.Info.ControllerUUID,
 	}
 	logger.Infof("dialling model")
 	// Attempt to connect to the model before accepting it.
@@ -98,6 +99,15 @@ func (h *Handler) AddController(arg *params.AddController) error {
 		return badRequestf(err, "cannot connect to model")
 	}
 	defer conn.Close()
+
+	// Use the controller's UUID even if we've been given the UUID
+	// of some model within it.
+	info, err := conn.Client().ModelInfo()
+	if err != nil {
+		return errgo.Notef(err, "cannot get model information")
+	}
+	m.UUID = info.ControllerUUID
+	ctl.UUID = info.ControllerUUID
 
 	// Update addresses from latest known in controller.
 	// Note that state.APIHostPorts is always guaranteed
@@ -140,11 +150,28 @@ func (h *Handler) DeleteController(arg *params.DeleteController) error {
 	return nil
 }
 
+// isAlreadyGrantedError reports whether the error
+// (as returned from modelmanager.Client.GrantModel)
+// represents the condition that the user has already
+// been granted access.
+//
+// We have to use string comparison because of
+// https://bugs.launchpad.net/juju-core/+bug/1564880.
+func isAlreadyGrantedError(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := err.Error()
+	return strings.HasPrefix(s, "user already has ") &&
+		strings.HasSuffix(s, " access")
+}
+
 // GetModel returns information on a given model.
 func (h *Handler) GetModel(arg *params.GetModel) (*params.ModelResponse, error) {
 	if err := h.jem.CheckReadACL(h.jem.DB.Models(), arg.EntityPath); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
+
 	m, err := h.jem.Model(arg.EntityPath)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
@@ -153,13 +180,58 @@ func (h *Handler) GetModel(arg *params.GetModel) (*params.ModelResponse, error) 
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
+	conn, err := h.jem.OpenAPI(m.Controller)
+	if err != nil {
+		return nil, errgo.NoteMask(err, "cannot connect to controller", errgo.Is(params.ErrNotFound))
+	}
+	defer conn.Close()
+
+	jujuUser := "jem-" + h.jem.Auth.Username
+	password, err := h.ensureUser(conn, jujuUser, m.Controller)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot create user")
+	}
+	if !m.Users[mongodoc.Sanitize(jujuUser)].Granted {
+		// Either we've explicitly removed access from the user
+		// or the user didn't previously exist. Ether way,
+		// make grant the account access to the model.
+		//
+		// Note that we *don't* grant access if we have recorded
+		// that we already granted access. This has an important
+		// security ramification: if someone goes directly to
+		// the controller and revokes access to a particular user,
+		// we won't immediately add access back again.
+		mmClient := modelmanager.NewClient(conn)
+		if err := mmClient.GrantModel(jujuUser, string(jujuparams.ModelWriteAccess), m.UUID); err != nil && !isAlreadyGrantedError(err) {
+			return nil, errgo.Notef(err, "cannot grant access rights to %q", jujuUser)
+		}
+
+		// Add the user to the set of users managed by the model.
+		if err := h.jem.SetModelManagedUser(m.Path, jujuUser, mongodoc.ModelUserInfo{
+			Granted: true,
+		}); err != nil {
+			// We've failed to update the database but the user
+			// has already been granted permission.
+			//
+			// This means we'll need to be careful about removing
+			// user permissions - just because a user is not in the
+			// model users doesn't necessarily mean we don't manage
+			// that user. Being conservative about adding permissions
+			// and less so about removing permissions should
+			// work OK.
+			return nil, errgo.Notef(err, "cannot update model users")
+		}
+	}
+
 	return &params.ModelResponse{
-		Path:      arg.EntityPath,
-		User:      m.AdminUser,
-		Password:  m.AdminPassword,
-		UUID:      m.UUID,
-		CACert:    ctl.CACert,
-		HostPorts: ctl.HostPorts,
+		Path:           arg.EntityPath,
+		User:           jujuUser,
+		Password:       password,
+		UUID:           m.UUID,
+		ControllerUUID: conn.Info.ModelTag.Id(),
+		CACert:         ctl.CACert,
+		HostPorts:      ctl.HostPorts,
+		ControllerPath: m.Controller,
 	}, nil
 }
 
@@ -175,14 +247,18 @@ func (h *Handler) DeleteModel(arg *params.DeleteModel) error {
 }
 
 // ListModels returns all the models stored in JEM.
+// Note that the models returned don't include the username or password.
+// To gain access to a specific model, that model should be retrieved
+// explicitly.
 func (h *Handler) ListModels(arg *params.ListModels) (*params.ListModelsResponse, error) {
 	// TODO provide a way of restricting the results.
 
-	// We get all controllers first, because many models will be
-	// sharing the same controllers.
-	// TODO we could do better than this and avoid gathering all the
-	// controllers into memory. Possiblities include caching
-	// controllers, and gathering results to do only a few
+	// We get all controllers first, because many models
+	// will be sharing the same controllers.
+	// TODO we could do better than this and avoid
+	// gathering all the controllers into memory.
+	// Possiblities include caching controllers, and
+	// gathering results to do only a few
 	// concurrent queries.
 	controllers := make(map[params.EntityPath]mongodoc.Controller)
 	iter := h.jem.DB.Controllers().Find(nil).Sort("_id").Iter()
@@ -202,13 +278,20 @@ func (h *Handler) ListModels(arg *params.ListModels) (*params.ListModelsResponse
 			logger.Errorf("model %s has invalid controller value %s; omitting from result", m.Path, m.Controller)
 			continue
 		}
+		// TODO We could ensure that the currently authenticated user has
+		// access to the model and return their username and password,
+		// but that would mean we'd have to ensure the user in every
+		// returned model which currently we can't do efficiently,
+		// so given that most uses of this endpoint won't actually want
+		// to connect to all of the models, we leave out the username and
+		// password for now.
 		models = append(models, params.ModelResponse{
-			Path:      m.Path,
-			User:      m.AdminUser,
-			Password:  m.AdminPassword,
-			UUID:      m.UUID,
-			CACert:    ctl.CACert,
-			HostPorts: ctl.HostPorts,
+			Path:           m.Path,
+			UUID:           m.UUID,
+			ControllerUUID: ctl.UUID,
+			CACert:         ctl.CACert,
+			HostPorts:      ctl.HostPorts,
+			ControllerPath: m.Controller,
 		})
 	}
 	if err := modelIter.Err(); err != nil {
@@ -294,28 +377,16 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "cannot validate attributes")
 	}
-	// We create a user for the model so that the caller knows
-	// what password to use when accessing their new model.
-	// When juju supports macaroon authorization, we won't need
-	// to do this - we could just inform the controller of the required
-	// user/group (args.User) instead.
-	modelPath := params.EntityPath{args.User, args.Info.Name}
-	jujuUser := userForModel(modelPath)
-	if err := h.createUser(conn, jujuUser, args.Info.Password); err != nil {
-		return nil, errgo.NoteMask(err, "cannot create user", errgo.Is(params.ErrBadRequest))
-	}
-	logger.Infof("created user %q", args.User)
 
+	modelPath := params.EntityPath{args.User, args.Info.Name}
 	// Create the model record in the database before actually
 	// creating the model on the controller. It will have an invalid
 	// UUID because it doesn't exist but that's better than creating
 	// an model that we can't add locally because the name
 	// already exists.
 	modelDoc := &mongodoc.Model{
-		Path:          modelPath,
-		AdminUser:     jujuUser,
-		AdminPassword: args.Info.Password,
-		Controller:    args.Info.Controller,
+		Path:       modelPath,
+		Controller: args.Info.Controller,
 	}
 	if err := h.jem.AddModel(modelDoc); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
@@ -330,8 +401,11 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 	// Note that AddModel has set modelDoc.Id for us.
 	fields["name"] = idToModelName(modelDoc.Id)
 
-	emclient := environmentmanager.NewClient(conn.Connection)
-	m, err := emclient.CreateEnvironment(jujuUser, nil, fields)
+	mmClient := modelmanager.NewClient(conn.Connection)
+	// Always grant access to the user that we use to connect
+	// to the controller.
+	adminUser := conn.Info.Tag.(names.UserTag).Id()
+	m, err := mmClient.CreateModel(adminUser, nil, fields)
 	if err != nil {
 		// Remove the model that was created, because it's no longer valid.
 		if err := h.jem.DB.Models().RemoveId(modelDoc.Id); err != nil {
@@ -343,15 +417,14 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 	if err := h.jem.DB.Models().UpdateId(modelDoc.Id, bson.D{{"$set", bson.D{{"uuid", m.UUID}}}}); err != nil {
 		return nil, errgo.Notef(err, "cannot update model UUID in database, leaked model %s", m.UUID)
 	}
-	return &params.ModelResponse{
-		Path:           modelPath,
-		User:           jujuUser,
-		Password:       args.Info.Password,
-		ControllerUUID: conn.Info.EnvironTag.Id(),
-		UUID:           m.UUID,
-		CACert:         conn.Info.CACert,
-		HostPorts:      conn.Info.Addrs,
-	}, nil
+	// Use GetModel so that we're sure to get exactly
+	// the same semantics, including ensuring that
+	// the user exists. This does a bit more work
+	// than necessary - we could optimize the ACL checking etc
+	// out if it's becoming a bottleneck.
+	return h.GetModel(&params.GetModel{
+		EntityPath: modelPath,
+	})
 }
 
 // AddTemplate adds a new template.
@@ -487,6 +560,9 @@ func (h *Handler) SetControllerPerm(arg *params.SetControllerPerm) error {
 // on an an entity. The owner can always read an entity, even
 // if it has empty ACL.
 func (h *Handler) SetModelPerm(arg *params.SetModelPerm) error {
+	// TODO revoke access from all the users that currently
+	// have access to the model that should not have access
+	// now.
 	return h.setPerm(h.jem.DB.Models(), arg.EntityPath, arg.ACL)
 }
 
@@ -529,38 +605,54 @@ func (h *Handler) getPerm(coll *mgo.Collection, path params.EntityPath) (params.
 	return acl, nil
 }
 
-// userForModel returns the juju user to use for
-// the model with the given path.
-// This should go when juju supports macaroon
-// authorization.
-func userForModel(p params.EntityPath) string {
-	return "jem-" + string(p.User) + "--" + string(p.Name)
-}
-
 func idToModelName(id string) string {
 	return strings.Replace(id, "/", "_", -1)
 }
 
-// createUser creates the given user account with the
-// given password. If the account already exists then it changes
-// the password accordingly.
-func (h *Handler) createUser(conn *apiconn.Conn, user, password string) error {
-	if password == "" {
-		return badRequestf(nil, "no password specified")
-	}
-	uclient := usermanager.NewClient(conn.Connection)
-	_, err := uclient.AddUser(user, "", password)
-	if err == nil {
-		return nil
-	}
-	if err, ok := errgo.Cause(err).(*jujuparams.Error); ok && err.Code != jujuparams.CodeAlreadyExists {
-		return errgo.Notef(err, "cannot add user")
-	}
-	err = uclient.SetPassword(user, password)
+// ensureUser ensures that the given user account exists.
+// If the account does not already exist, then it is created.
+// It returns the password for the account.
+func (h *Handler) ensureUser(conn *apiconn.Conn, user string, ctlName params.EntityPath) (string, error) {
+	password, err := h.jem.EnsureUser(ctlName, user)
 	if err != nil {
-		return errgo.Notef(err, "cannot change password")
+		return "", errgo.Mask(err)
 	}
-	return nil
+	// We have a record of the user account, but it might not
+	// have been created in the controller yet, so check that it really exists.
+	// and if so, set the password appropriately. This should
+	// converge even if we have the same user concurrently creating
+	// models.
+	uclient := usermanager.NewClient(conn.Connection)
+	uinfo, err := uclient.UserInfo([]string{user}, usermanager.AllUsers)
+	if err == nil {
+		if uinfo[0].Disabled {
+			// The user has been explicitly disabled.
+			// Don't override that.
+			return "", errgo.Newf("user %q has been disabled explicitly", user)
+		}
+		// The user exists, but set the password appropriately
+		// anyway in case it aleady existed with the wrong password
+		// (perhaps because JEM lost its database state).
+		if err := uclient.SetPassword(user, password); err != nil {
+			return "", errgo.Notef(err, "cannot set user password")
+		}
+		return password, nil
+	}
+	// Unfortunately there's no way to find out if it's a "not found" error
+	// (see https://bugs.launchpad.net/juju-core/+bug/1561526)
+	// so we assume that any error means the user account doesn't
+	// exist and go ahead with creating the account anyway.
+	_, _, err = uclient.AddUser(user, "", password, "")
+	if err == nil {
+		return password, nil
+	}
+	if err, ok := errgo.Cause(err).(*jujuparams.Error); ok && err.Code == jujuparams.CodeAlreadyExists {
+		// The user's been created a moment ago. Assume that it's
+		// by an instance of the same server and therefore will have the
+		// same password.
+		return password, nil
+	}
+	return "", errgo.Notef(err, "cannot add user")
 }
 
 type schemaForNewModel struct {
@@ -581,7 +673,7 @@ func (h *Handler) schemaForNewModel(ctlPath params.EntityPath) (*schemaForNewMod
 
 	var neSchema schemaForNewModel
 
-	client := environmentmanager.NewClient(st)
+	client := modelmanager.NewClient(st)
 	neSchema.skeleton, err = client.ConfigSkeleton("", "")
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot get base configuration")

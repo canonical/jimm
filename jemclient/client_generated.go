@@ -93,6 +93,9 @@ func (c *client) ListController(p *params.ListController) (*params.ListControlle
 }
 
 // ListModels returns all the models stored in JEM.
+// Note that the models returned don't include the username or password.
+// To gain access to a specific model, that model should be retrieved
+// explicitly.
 func (c *client) ListModels(p *params.ListModels) (*params.ListModelsResponse, error) {
 	var r *params.ListModelsResponse
 	err := c.Client.Call(p, &r)

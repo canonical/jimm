@@ -12,7 +12,7 @@ import (
 // SetControllerPerm holds the parameters for setting the ACL
 // on a controller.
 type SetControllerPerm struct {
-	httprequest.Route `httprequest:"PUT /v1/controller/:User/:Name/perm"`
+	httprequest.Route `httprequest:"PUT /v2/controller/:User/:Name/perm"`
 	EntityPath
 	ACL ACL `httprequest:",body"`
 }
@@ -20,14 +20,14 @@ type SetControllerPerm struct {
 // GetControllerPerm holds the parameters for getting the ACL
 // of a controller.
 type GetControllerPerm struct {
-	httprequest.Route `httprequest:"GET /v1/controller/:User/:Name/perm"`
+	httprequest.Route `httprequest:"GET /v2/controller/:User/:Name/perm"`
 	EntityPath
 }
 
 // SetModelPerm holds the parameters for setting the ACL
 // on an model.
 type SetModelPerm struct {
-	httprequest.Route `httprequest:"PUT /v1/model/:User/:Name/perm"`
+	httprequest.Route `httprequest:"PUT /v2/model/:User/:Name/perm"`
 	EntityPath
 	ACL ACL `httprequest:",body"`
 }
@@ -35,14 +35,14 @@ type SetModelPerm struct {
 // GetModelPerm holds the parameters for getting the ACL
 // of an model.
 type GetModelPerm struct {
-	httprequest.Route `httprequest:"GET /v1/model/:User/:Name/perm"`
+	httprequest.Route `httprequest:"GET /v2/model/:User/:Name/perm"`
 	EntityPath
 }
 
 // SetTemplatePerm holds the parameters for setting the ACL
 // on a template.
 type SetTemplatePerm struct {
-	httprequest.Route `httprequest:"PUT /v1/template/:User/:Name/perm"`
+	httprequest.Route `httprequest:"PUT /v2/template/:User/:Name/perm"`
 	EntityPath
 	ACL ACL `httprequest:",body"`
 }
@@ -50,7 +50,7 @@ type SetTemplatePerm struct {
 // GetTemplatePerm holds the parameters for getting the ACL
 // on a template.
 type GetTemplatePerm struct {
-	httprequest.Route `httprequest:"GET /v1/template/:User/:Name/perm"`
+	httprequest.Route `httprequest:"GET /v2/template/:User/:Name/perm"`
 	EntityPath
 }
 
@@ -63,14 +63,14 @@ type ACL struct {
 
 // AddController holds the parameters for adding a new controller.
 type AddController struct {
-	httprequest.Route `httprequest:"PUT /v1/controller/:User/:Name"`
+	httprequest.Route `httprequest:"PUT /v2/controller/:User/:Name"`
 	EntityPath
 	Info ControllerInfo `httprequest:",body"`
 }
 
 // DeleteController holds the parameters for removing the Controller.
 type DeleteController struct {
-	httprequest.Route `httprequest:"DELETE /v1/controller/:User/:Name"`
+	httprequest.Route `httprequest:"DELETE /v2/controller/:User/:Name"`
 	EntityPath
 }
 
@@ -92,9 +92,9 @@ type ControllerInfo struct {
 	// Password holds the password for the user.
 	Password string `json:"password"`
 
-	// ModelUUID holds the UUID of the model we are
-	// trying to connect to.
-	ModelUUID string `json:"model-uuid"`
+	// ControllerUUID holds the UUID of the admin model
+	// of the controller.
+	ControllerUUID string `json:"controller-uuid"`
 }
 
 // EntityPath holds the path parameters for specifying
@@ -137,20 +137,20 @@ func (p EntityPath) MarshalText() ([]byte, error) {
 // GetModel holds parameters for retrieving
 // an model.
 type GetModel struct {
-	httprequest.Route `httprequest:"GET /v1/model/:User/:Name"`
+	httprequest.Route `httprequest:"GET /v2/model/:User/:Name"`
 	EntityPath
 }
 
 // DeleteModel holds parameters for deletion of
 // an model.
 type DeleteModel struct {
-	httprequest.Route `httprequest:"DELETE /v1/model/:User/:Name"`
+	httprequest.Route `httprequest:"DELETE /v2/model/:User/:Name"`
 	EntityPath
 }
 
 // NewModel holds parameters for creating a new model.
 type NewModel struct {
-	httprequest.Route `httprequest:"POST /v1/model/:User"`
+	httprequest.Route `httprequest:"POST /v2/model/:User"`
 
 	// User holds the User element from the URL path.
 	User User `httprequest:",path"`
@@ -163,7 +163,7 @@ type NewModel struct {
 // ListModels holds parameters for listing
 // current models.
 type ListModels struct {
-	httprequest.Route `httprequest:"GET /v1/model"`
+	httprequest.Route `httprequest:"GET /v2/model"`
 
 	// TODO add parameters for restricting results.
 }
@@ -176,7 +176,7 @@ type ListModelsResponse struct {
 
 // ListController holds parameters for listing all current controllers.
 type ListController struct {
-	httprequest.Route `httprequest:"GET /v1/controller"`
+	httprequest.Route `httprequest:"GET /v2/controller"`
 
 	// TODO add parameters for restricting results.
 }
@@ -191,7 +191,7 @@ type ListControllerResponse struct {
 
 // ListTemplate holds parameters for listing all current templates.
 type ListTemplates struct {
-	httprequest.Route `httprequest:"GET /v1/template"`
+	httprequest.Route `httprequest:"GET /v2/template"`
 
 	// TODO add parameters for restricting results.
 }
@@ -218,19 +218,19 @@ type TemplateResponse struct {
 
 // GetTemplate holds parameters for retrieving information on a template.
 type GetTemplate struct {
-	httprequest.Route `httprequest:"GET /v1/template/:User/:Name"`
+	httprequest.Route `httprequest:"GET /v2/template/:User/:Name"`
 	EntityPath
 }
 
 // DeleteTemplate holds parameters for deletion of a template.
 type DeleteTemplate struct {
-	httprequest.Route `httprequest:"DELETE /v1/template/:User/:Name"`
+	httprequest.Route `httprequest:"DELETE /v2/template/:User/:Name"`
 	EntityPath
 }
 
 // ControllerResponse holds information on a given Controller.
 // Each Controller is also associated with an model
-// at /v1/model/:User/:Name where User and Name
+// at /v2/model/:User/:Name where User and Name
 // are the same as that of the Controller's path.
 type ControllerResponse struct {
 	// Path holds the path of the controller.
@@ -247,7 +247,7 @@ type ControllerResponse struct {
 
 // GetController holds parameters for retrieving information on a Controller.
 type GetController struct {
-	httprequest.Route `httprequest:"GET /v1/controller/:User/:Name"`
+	httprequest.Route `httprequest:"GET /v2/controller/:User/:Name"`
 	EntityPath
 }
 
@@ -257,14 +257,6 @@ type NewModelInfo struct {
 	// Name holds the name to give to the new model
 	// within its user name space.
 	Name Name `json:"name"`
-
-	// Password holds the password to associate with the
-	// creating user if their account does not already
-	// exist on the controller. If the user has already
-	// been created, this is ignored.
-	// TODO when juju-core supports macaroon authorization,
-	// this can be removed.
-	Password string `json:"password"`
 
 	// Controller holds the path to the controller entity
 	// to use to start the model.
@@ -302,8 +294,10 @@ type ModelResponse struct {
 	// UUID holds the UUID of the model.
 	UUID string `json:"uuid"`
 
-	// ControllerUUID holds the UUID of the controller
-	// model containing this model.
+	// ControllerPath holds the path of the controller holding this model.
+	ControllerPath EntityPath `json:"controller-path"`
+
+	// ControllerUUID holds the UUID of the controller's admin UUID.
 	ControllerUUID string `json:"controller-uuid"`
 
 	// CACert holds the CA certificate that will be used
@@ -317,7 +311,7 @@ type ModelResponse struct {
 
 // AddTemplate holds parameters for adding a template.
 type AddTemplate struct {
-	httprequest.Route `httprequest:"PUT /v1/template/:User/:Name"`
+	httprequest.Route `httprequest:"PUT /v2/template/:User/:Name"`
 	EntityPath
 
 	Info AddTemplateInfo `httprequest:",body"`
@@ -337,7 +331,7 @@ type AddTemplateInfo struct {
 
 // WhoAmI holds parameters for requesting the current user name.
 type WhoAmI struct {
-	httprequest.Route `httprequest:"GET /v1/whoami"`
+	httprequest.Route `httprequest:"GET /v2/whoami"`
 }
 
 // WhoAmIResponse holds information on the currently

@@ -39,9 +39,9 @@ func (s *generateSuite) TestGenerate(c *gc.C) {
 #
 # broken: ""
 (.|\n)*
-# Whether the environment should start a state server
+# Whether the model should start a controller
 #
-# state-server: false
+# controller: false
 (.|\n)*`)
 	configData := stdout
 
@@ -84,7 +84,7 @@ func (s *generateSuite) TestGenerateWithTemplates(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	stdout, stderr, code = run(c, c.MkDir(), "create-template", "--controller", "bob/foo", "bob/template", "state-server=false")
+	stdout, stderr, code = run(c, c.MkDir(), "create-template", "--controller", "bob/foo", "bob/template", "controller=false")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
@@ -94,7 +94,7 @@ func (s *generateSuite) TestGenerateWithTemplates(c *gc.C) {
 	c.Assert(stderr, gc.Equals, "")
 
 	// The controller server attribute should be omitted.
-	c.Assert(stdout, gc.Not(gc.Matches), `(.|\n)*state-server:(.|\n)*`)
+	c.Assert(stdout, gc.Not(gc.Matches), `(.|\n)*controller:(.|\n)*`)
 
 	// But the other attributes should still be there.
 	c.Assert(stdout, gc.Matches, `(.|\n)*broken:(.|\n)*`)

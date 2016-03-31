@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/juju/cmd"
-	"github.com/juju/juju/cmd/envcmd"
+	"github.com/juju/juju/cmd/modelcmd"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/params"
@@ -17,7 +17,7 @@ type listServersCommand struct {
 }
 
 func newListServersCommand() cmd.Command {
-	return envcmd.WrapBase(&listServersCommand{})
+	return modelcmd.WrapBase(&listServersCommand{})
 }
 
 var listServersDoc = `

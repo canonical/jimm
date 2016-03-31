@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 
 	"github.com/juju/cmd"
-	"github.com/juju/juju/cmd/envcmd"
+	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/utils/keyvalues"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/yaml.v2"
@@ -25,7 +25,7 @@ type createTemplateCommand struct {
 }
 
 func newCreateTemplateCommand() cmd.Command {
-	return envcmd.WrapBase(&createTemplateCommand{})
+	return modelcmd.WrapBase(&createTemplateCommand{})
 }
 
 var createTemplateDoc = `

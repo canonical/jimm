@@ -4,7 +4,7 @@ package jemcmd
 
 import (
 	"github.com/juju/cmd"
-	"github.com/juju/juju/cmd/envcmd"
+	"github.com/juju/juju/cmd/modelcmd"
 	"gopkg.in/errgo.v1"
 	"launchpad.net/gnuflag"
 
@@ -20,7 +20,7 @@ type getCommand struct {
 }
 
 func newGetCommand() cmd.Command {
-	return envcmd.WrapBase(&getCommand{})
+	return modelcmd.WrapBase(&getCommand{})
 }
 
 var getDoc = `
@@ -63,7 +63,7 @@ func (c *getCommand) Run(ctxt *cmd.Context) error {
 		return errgo.Mask(err)
 	}
 
-	return writeModel(c.localName, func() (*params.ModelResponse, error) {
+	switchName, err := writeModel(c.localName, "", func() (*params.ModelResponse, error) {
 		resp, err := client.GetModel(&params.GetModel{
 			EntityPath: c.modelPath.EntityPath,
 		})
@@ -75,4 +75,9 @@ func (c *getCommand) Run(ctxt *cmd.Context) error {
 		}
 		return resp, nil
 	})
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	ctxt.Infof("%s", switchName)
+	return nil
 }

@@ -12,11 +12,11 @@ import (
 
 	"github.com/CanonicalLtd/jem/internal/debugapi"
 	"github.com/CanonicalLtd/jem/internal/jem"
-	"github.com/CanonicalLtd/jem/internal/v1"
+	"github.com/CanonicalLtd/jem/internal/v2"
 )
 
 var versions = map[string]jem.NewAPIHandlerFunc{
-	"v1":    v1.NewAPIHandler,
+	"v2":    v2.NewAPIHandler,
 	"debug": debugapi.NewAPIHandler,
 }
 

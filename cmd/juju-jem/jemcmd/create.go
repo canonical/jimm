@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 
 	"github.com/juju/cmd"
-	"github.com/juju/juju/cmd/envcmd"
+	"github.com/juju/juju/cmd/modelcmd"
 	jujuconfig "github.com/juju/juju/environs/config"
 	"github.com/juju/juju/juju/osenv"
 	"github.com/juju/schema"
@@ -35,7 +35,7 @@ type createCommand struct {
 }
 
 func newCreateCommand() cmd.Command {
-	return envcmd.WrapBase(&createCommand{})
+	return modelcmd.WrapBase(&createCommand{})
 }
 
 var createDoc = `
@@ -115,25 +115,24 @@ func (c *createCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Notef(err, "invalid configuration")
 	}
-	// Generate a random password for the user.
-	// TODO potentially allow the password to be specified in
-	// the config file or as a command line flag or interactively?
-	password, err := utils.RandomPassword()
-	if err != nil {
-		return errgo.Notef(err, "cannot generate password")
-	}
-	return writeModel(c.localName, func() (*params.ModelResponse, error) {
+
+	localCtlName := jemControllerToLocalControllerName(c.ctlPath.EntityPath)
+	switchName, err := writeModel(c.localName, localCtlName, func() (*params.ModelResponse, error) {
 		return client.NewModel(&params.NewModel{
 			User: c.modelPath.User,
 			Info: params.NewModelInfo{
 				Name:          c.modelPath.Name,
-				Password:      password,
 				Controller:    c.ctlPath.EntityPath,
 				Config:        config,
 				TemplatePaths: c.templatePaths.paths,
 			},
 		})
 	})
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	ctxt.Infof("%s", switchName)
+	return nil
 }
 
 type schemaContext struct {
@@ -219,7 +218,7 @@ func (ctxt schemaContext) getVal1(attr form.NamedAttr, checker schema.Checker) (
 	}
 	// TODO it could be a problem that this potentially
 	// enables a rogue JEM server to retrieve arbitrary
-	// environment variables from a client. Implement
+	// model variables from a client. Implement
 	// some kind of whitelisting scheme?
 	val, _, err = form.DefaultFromEnv(attr, checker)
 	if err != nil {
@@ -250,10 +249,10 @@ func readFile(path string) (val string, finalPath string, err error) {
 		return "", "", err
 	}
 	if !filepath.IsAbs(finalPath) {
-		if !osenv.IsJujuHomeSet() {
+		if !osenv.IsJujuXDGDataHomeSet() {
 			return "", "", errgo.Newf("JUJU_HOME not set, not attempting to read file %q", finalPath)
 		}
-		finalPath = osenv.JujuHomePath(finalPath)
+		finalPath = osenv.JujuXDGDataHomePath(finalPath)
 	}
 	data, err := ioutil.ReadFile(finalPath)
 	if err != nil {

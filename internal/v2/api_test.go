@@ -1,4 +1,4 @@
-package v1_test
+package v2_test
 
 import (
 	"encoding/json"
@@ -7,7 +7,9 @@ import (
 	"strings"
 
 	"github.com/juju/juju/api"
+	"github.com/juju/juju/api/modelmanager"
 	"github.com/juju/juju/api/usermanager"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
@@ -28,7 +30,7 @@ const sshKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDOjaOjVRHchF2RFCKQdgBqrIA5
 
 var dummyEnvConfig = map[string]interface{}{
 	"authorized-keys": sshKey,
-	"state-server":    true,
+	"controller":      true,
 }
 
 var unauthorizedTests = []struct {
@@ -41,17 +43,17 @@ var unauthorizedTests = []struct {
 	about:  "get model as non-owner",
 	asUser: "other",
 	method: "GET",
-	path:   "/v1/model/bob/private",
+	path:   "/v2/model/bob/private",
 }, {
 	about:  "get controller as non-owner",
 	asUser: "other",
 	method: "GET",
-	path:   "/v1/controller/bob/private",
+	path:   "/v2/controller/bob/private",
 }, {
 	about:  "new model as non-owner",
 	asUser: "other",
 	method: "POST",
-	path:   "/v1/model/bob",
+	path:   "/v2/model/bob",
 	body: params.NewModelInfo{
 		Name:       "newmodel",
 		Controller: params.EntityPath{"bob", "open"},
@@ -60,7 +62,7 @@ var unauthorizedTests = []struct {
 	about:  "new model with inaccessible controller",
 	asUser: "alice",
 	method: "POST",
-	path:   "/v1/model/alice",
+	path:   "/v2/model/alice",
 	body: params.NewModelInfo{
 		Name:       "newmodel",
 		Controller: params.EntityPath{"bob", "private"},
@@ -69,7 +71,7 @@ var unauthorizedTests = []struct {
 	about:  "new template as non-owner",
 	asUser: "other",
 	method: "PUT",
-	path:   "/v1/template/bob/something",
+	path:   "/v2/template/bob/something",
 	body: params.AddTemplateInfo{
 		Controller: params.EntityPath{"bob", "open"},
 	},
@@ -77,50 +79,50 @@ var unauthorizedTests = []struct {
 	about:  "set controller perm as non-owner",
 	asUser: "other",
 	method: "PUT",
-	path:   "/v1/controller/bob/open/perm",
+	path:   "/v2/controller/bob/open/perm",
 	body:   params.ACL{},
 }, {
 	about:  "set model perm as non-owner",
 	asUser: "other",
 	method: "PUT",
-	path:   "/v1/model/bob/open/perm",
+	path:   "/v2/model/bob/open/perm",
 	body:   params.ACL{},
 }, {
 	about:  "set template perm as non-owner",
 	asUser: "other",
 	method: "PUT",
-	path:   "/v1/template/bob/open/perm",
+	path:   "/v2/template/bob/open/perm",
 	body:   params.ACL{},
 }, {
 	about:  "get controller perm as non-owner",
 	asUser: "other",
 	method: "GET",
-	path:   "/v1/controller/bob/private/perm",
+	path:   "/v2/controller/bob/private/perm",
 }, {
 	about:  "get model perm as non-owner",
 	asUser: "other",
 	method: "GET",
-	path:   "/v1/model/bob/private/perm",
+	path:   "/v2/model/bob/private/perm",
 }, {
 	about:  "get template perm as non-owner",
 	asUser: "other",
 	method: "GET",
-	path:   "/v1/template/bob/private/perm",
+	path:   "/v2/template/bob/private/perm",
 }, {
 	about:  "get controller perm with ACL that allows us",
 	asUser: "other",
 	method: "GET",
-	path:   "/v1/controller/bob/open/perm",
+	path:   "/v2/controller/bob/open/perm",
 }, {
 	about:  "get model perm with ACL that allows us",
 	asUser: "other",
 	method: "GET",
-	path:   "/v1/model/bob/open/perm",
+	path:   "/v2/model/bob/open/perm",
 }, {
 	about:  "get template perm with ACL that allows us",
 	asUser: "other",
 	method: "GET",
-	path:   "/v1/template/bob/open/perm",
+	path:   "/v2/template/bob/open/perm",
 }}
 
 func (s *APISuite) TestUnauthorized(c *gc.C) {
@@ -162,33 +164,33 @@ func (s *APISuite) TestAddController(c *gc.C) {
 	}{{
 		about: "add model",
 		body: params.ControllerInfo{
-			HostPorts: info.Addrs,
-			CACert:    info.CACert,
-			User:      info.Tag.Id(),
-			Password:  info.Password,
-			ModelUUID: info.EnvironTag.Id(),
+			HostPorts:      info.Addrs,
+			CACert:         info.CACert,
+			User:           info.Tag.Id(),
+			Password:       info.Password,
+			ControllerUUID: info.ModelTag.Id(),
 		},
 	}, {
 		about:    "add model as part of group",
 		username: "beatles",
 		authUser: "alice",
 		body: params.ControllerInfo{
-			HostPorts: info.Addrs,
-			CACert:    info.CACert,
-			User:      info.Tag.Id(),
-			Password:  info.Password,
-			ModelUUID: info.EnvironTag.Id(),
+			HostPorts:      info.Addrs,
+			CACert:         info.CACert,
+			User:           info.Tag.Id(),
+			Password:       info.Password,
+			ControllerUUID: info.ModelTag.Id(),
 		},
 	}, {
 		about:    "incorrect user",
 		authUser: "alice",
 		username: "bob",
 		body: params.ControllerInfo{
-			HostPorts: info.Addrs,
-			CACert:    info.CACert,
-			User:      info.Tag.Id(),
-			Password:  info.Password,
-			ModelUUID: info.EnvironTag.Id(),
+			HostPorts:      info.Addrs,
+			CACert:         info.CACert,
+			User:           info.Tag.Id(),
+			Password:       info.Password,
+			ControllerUUID: info.ModelTag.Id(),
 		},
 		expectStatus: http.StatusUnauthorized,
 		expectBody: params.Error{
@@ -198,10 +200,10 @@ func (s *APISuite) TestAddController(c *gc.C) {
 	}, {
 		about: "no hosts",
 		body: params.ControllerInfo{
-			CACert:    info.CACert,
-			User:      info.Tag.Id(),
-			Password:  info.Password,
-			ModelUUID: info.EnvironTag.Id(),
+			CACert:         info.CACert,
+			User:           info.Tag.Id(),
+			Password:       info.Password,
+			ControllerUUID: info.ModelTag.Id(),
 		},
 		expectStatus: http.StatusBadRequest,
 		expectBody: params.Error{
@@ -211,10 +213,10 @@ func (s *APISuite) TestAddController(c *gc.C) {
 	}, {
 		about: "no ca-cert",
 		body: params.ControllerInfo{
-			HostPorts: info.Addrs,
-			User:      info.Tag.Id(),
-			Password:  info.Password,
-			ModelUUID: info.EnvironTag.Id(),
+			HostPorts:      info.Addrs,
+			User:           info.Tag.Id(),
+			Password:       info.Password,
+			ControllerUUID: info.ModelTag.Id(),
 		},
 		expectStatus: http.StatusBadRequest,
 		expectBody: params.Error{
@@ -224,10 +226,10 @@ func (s *APISuite) TestAddController(c *gc.C) {
 	}, {
 		about: "no user",
 		body: params.ControllerInfo{
-			HostPorts: info.Addrs,
-			CACert:    info.CACert,
-			Password:  info.Password,
-			ModelUUID: info.EnvironTag.Id(),
+			HostPorts:      info.Addrs,
+			CACert:         info.CACert,
+			Password:       info.Password,
+			ControllerUUID: info.ModelTag.Id(),
 		},
 		expectStatus: http.StatusBadRequest,
 		expectBody: params.Error{
@@ -250,11 +252,11 @@ func (s *APISuite) TestAddController(c *gc.C) {
 	}, {
 		about: "cannot connect to evironment",
 		body: params.ControllerInfo{
-			HostPorts: []string{"0.1.2.3:1234"},
-			CACert:    info.CACert,
-			User:      info.Tag.Id(),
-			Password:  info.Password,
-			ModelUUID: info.EnvironTag.Id(),
+			HostPorts:      []string{"0.1.2.3:1234"},
+			CACert:         info.CACert,
+			User:           info.Tag.Id(),
+			Password:       info.Password,
+			ControllerUUID: info.ModelTag.Id(),
 		},
 		expectStatus: http.StatusBadRequest,
 		expectBody: httptesting.BodyAsserter(func(c *gc.C, m json.RawMessage) {
@@ -285,7 +287,7 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			Method:       "PUT",
 			Handler:      s.JEMSrv,
 			JSONBody:     test.body,
-			URL:          fmt.Sprintf("/v1/controller/%s", modelPath),
+			URL:          fmt.Sprintf("/v2/controller/%s", modelPath),
 			Do:           apitest.Do(client),
 			ExpectStatus: test.expectStatus,
 			ExpectBody:   test.expectBody,
@@ -300,16 +302,19 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			EntityPath: modelPath,
 		})
 		c.Assert(err, gc.IsNil)
-		c.Assert(modelResp, jc.DeepEquals, &params.ModelResponse{
-			Path:      modelPath,
-			User:      test.body.User,
-			Password:  test.body.Password,
-			HostPorts: test.body.HostPorts,
-			CACert:    test.body.CACert,
-			UUID:      test.body.ModelUUID,
-		})
 		st := openAPIFromModelResponse(c, modelResp)
 		st.Close()
+		c.Assert(modelResp.Password, gc.Not(gc.Equals), "")
+		modelResp.Password = ""
+		c.Assert(modelResp, jc.DeepEquals, &params.ModelResponse{
+			Path:           modelPath,
+			User:           "jem-" + string(authUser),
+			HostPorts:      test.body.HostPorts,
+			CACert:         test.body.CACert,
+			UUID:           test.body.ControllerUUID,
+			ControllerUUID: test.body.ControllerUUID,
+			ControllerPath: modelPath,
+		})
 		// Clear the connection pool for the next test.
 		s.JEMSrv.Pool().ClearAPIConnCache()
 	}
@@ -326,7 +331,7 @@ func (s *APISuite) TestAddControllerUnauthenticated(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "PUT",
 		Handler: s.JEMSrv,
-		URL:     "/v1/controller/user/model",
+		URL:     "/v2/controller/user/model",
 		ExpectBody: httptesting.BodyAsserter(func(c *gc.C, m json.RawMessage) {
 			// Allow any body - TestGetModelNotFound will check that it's a valid macaroon.
 		}),
@@ -339,7 +344,7 @@ func (s *APISuite) TestAddControllerUnauthenticatedWithBakeryProtocol(c *gc.C) {
 		Method:  "PUT",
 		Handler: s.JEMSrv,
 		Header:  map[string][]string{"Bakery-Protocol-Version": []string{"1"}},
-		URL:     "/v1/controller/user/model",
+		URL:     "/v2/controller/user/model",
 		ExpectBody: httptesting.BodyAsserter(func(c *gc.C, m json.RawMessage) {
 			// Allow any body - TestGetModelNotFound will check that it's a valid macaroon.
 		}),
@@ -351,7 +356,7 @@ func (s *APISuite) TestGetModelNotFound(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "GET",
 		Handler: s.JEMSrv,
-		URL:     "/v1/model/user/foo",
+		URL:     "/v2/model/user/foo",
 		ExpectBody: &params.Error{
 			Message: `model "user/foo" not found`,
 			Code:    params.ErrNotFound,
@@ -364,7 +369,7 @@ func (s *APISuite) TestGetModelNotFound(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "GET",
 		Handler: s.JEMSrv,
-		URL:     "/v1/model/user/foo",
+		URL:     "/v2/model/user/foo",
 		ExpectBody: &params.Error{
 			Message: `unauthorized`,
 			Code:    params.ErrUnauthorized,
@@ -378,7 +383,7 @@ func (s *APISuite) TestDeleteModelNotFound(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "DELETE",
 		Handler: s.JEMSrv,
-		URL:     "/v1/model/user/foo",
+		URL:     "/v2/model/user/foo",
 		ExpectBody: &params.Error{
 			Message: `model "user/foo" not found`,
 			Code:    params.ErrNotFound,
@@ -394,7 +399,7 @@ func (s *APISuite) TestDeleteModel(c *gc.C) {
 	modelId, user, uuid := s.addModel(c, modelPath, ctlId)
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.JEMSrv,
-		URL:     "/v1/model/" + modelId.String(),
+		URL:     "/v2/model/" + modelId.String(),
 		Do:      apitest.Do(s.IDMSrv.Client("bob")),
 	})
 	c.Assert(resp.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %s", resp.Body.Bytes()))
@@ -405,14 +410,14 @@ func (s *APISuite) TestDeleteModel(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:       "DELETE",
 		Handler:      s.JEMSrv,
-		URL:          "/v1/model/" + modelId.String(),
+		URL:          "/v2/model/" + modelId.String(),
 		ExpectStatus: http.StatusOK,
 		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 	})
 	// Check that it doesn't exist anymore.
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      s.JEMSrv,
-		URL:          "/v1/model/" + modelId.String(),
+		URL:          "/v2/model/" + modelId.String(),
 		ExpectStatus: http.StatusNotFound,
 		ExpectBody: &params.Error{
 			Message: `model "bob/foobarred" not found`,
@@ -425,7 +430,7 @@ func (s *APISuite) TestDeleteModel(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:       "DELETE",
 		Handler:      s.JEMSrv,
-		URL:          "/v1/model/" + ctlId.String(),
+		URL:          "/v2/model/" + ctlId.String(),
 		ExpectStatus: http.StatusForbidden,
 		ExpectBody: &params.Error{
 			Message: `cannot remove model "bob/who" because it is a controller`,
@@ -440,7 +445,7 @@ func (s *APISuite) TestGetController(c *gc.C) {
 
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.JEMSrv,
-		URL:     "/v1/controller/" + ctlId.String(),
+		URL:     "/v2/controller/" + ctlId.String(),
 		Do:      apitest.Do(s.IDMSrv.Client("bob")),
 	})
 	c.Assert(resp.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %s", resp.Body.Bytes()))
@@ -460,7 +465,7 @@ func (s *APISuite) TestGetControllerNotFound(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "GET",
 		Handler: s.JEMSrv,
-		URL:     "/v1/controller/bob/foo",
+		URL:     "/v2/controller/bob/foo",
 		ExpectBody: &params.Error{
 			Message: `cannot open API: cannot get model: model "bob/foo" not found`,
 			Code:    params.ErrNotFound,
@@ -473,7 +478,7 @@ func (s *APISuite) TestGetControllerNotFound(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "GET",
 		Handler: s.JEMSrv,
-		URL:     "/v1/controller/bob/foo",
+		URL:     "/v2/controller/bob/foo",
 		ExpectBody: &params.Error{
 			Message: `unauthorized`,
 			Code:    params.ErrUnauthorized,
@@ -487,7 +492,7 @@ func (s *APISuite) TestDeleteControllerNotFound(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "DELETE",
 		Handler: s.JEMSrv,
-		URL:     "/v1/controller/bob/foobarred",
+		URL:     "/v2/controller/bob/foobarred",
 		ExpectBody: &params.Error{
 			Message: `controller "bob/foobarred" not found`,
 			Code:    params.ErrNotFound,
@@ -503,7 +508,7 @@ func (s *APISuite) TestDeleteController(c *gc.C) {
 	// Add controller to JEM.
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.JEMSrv,
-		URL:     "/v1/controller/" + ctlId.String(),
+		URL:     "/v2/controller/" + ctlId.String(),
 		Do:      apitest.Do(s.IDMSrv.Client("bob")),
 	})
 	// Assert that it was added.
@@ -514,14 +519,14 @@ func (s *APISuite) TestDeleteController(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:       "DELETE",
 		Handler:      s.JEMSrv,
-		URL:          "/v1/controller/bob/foobarred",
+		URL:          "/v2/controller/bob/foobarred",
 		ExpectStatus: http.StatusOK,
 		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 	})
 	// Check that it doesn't exist anymore.
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      s.JEMSrv,
-		URL:          "/v1/controller/" + ctlId.String(),
+		URL:          "/v2/controller/" + ctlId.String(),
 		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 		ExpectStatus: http.StatusNotFound,
 		ExpectBody: params.Error{
@@ -532,7 +537,7 @@ func (s *APISuite) TestDeleteController(c *gc.C) {
 	// Check that its models doesn't exist.
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      s.JEMSrv,
-		URL:          "/v1/model/" + ctlId.String(),
+		URL:          "/v2/model/" + ctlId.String(),
 		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 		ExpectStatus: http.StatusNotFound,
 		ExpectBody: params.Error{
@@ -542,7 +547,7 @@ func (s *APISuite) TestDeleteController(c *gc.C) {
 	})
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      s.JEMSrv,
-		URL:          "/v1/model/" + modelId.String(),
+		URL:          "/v2/model/" + modelId.String(),
 		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 		ExpectStatus: http.StatusNotFound,
 		ExpectBody: params.Error{
@@ -558,13 +563,12 @@ func (s *APISuite) TestNewModel(c *gc.C) {
 	var modelRespBody json.RawMessage
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
-		URL:     "/v1/model/bob",
+		URL:     "/v2/model/bob",
 		Handler: s.JEMSrv,
 		JSONBody: params.NewModelInfo{
 			Name:       params.Name("bar"),
 			Controller: ctlId,
 			Config:     dummyEnvConfig,
-			Password:   "secret",
 		},
 		ExpectBody: httptesting.BodyAsserter(func(_ *gc.C, body json.RawMessage) {
 			modelRespBody = body
@@ -575,10 +579,14 @@ func (s *APISuite) TestNewModel(c *gc.C) {
 	err := json.Unmarshal(modelRespBody, &modelResp)
 	c.Assert(err, gc.IsNil)
 
-	c.Assert(modelResp.ControllerUUID, gc.Equals, s.APIInfo(c).EnvironTag.Id())
-
 	st := openAPIFromModelResponse(c, &modelResp)
-	st.Close()
+	defer st.Close()
+
+	minfo, err := st.Client().ModelInfo()
+	c.Assert(err, gc.IsNil)
+	c.Assert(minfo.UUID, gc.Not(gc.Equals), "")
+	c.Assert(minfo.UUID, gc.Not(gc.Equals), s.APIInfo(c).ModelTag.Id())
+	c.Assert(minfo.ControllerUUID, gc.Equals, s.APIInfo(c).ModelTag.Id())
 
 	// Ensure that we can connect to the new model
 	// from the information returned by GetModel.
@@ -590,7 +598,11 @@ func (s *APISuite) TestNewModel(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	st = openAPIFromModelResponse(c, modelResp2)
-	st.Close()
+	defer st.Close()
+	minfo2, err := st.Client().ModelInfo()
+	c.Assert(err, gc.IsNil)
+	c.Assert(minfo2.UUID, gc.Equals, minfo.UUID)
+	c.Assert(minfo2.ControllerUUID, gc.Equals, minfo.ControllerUUID)
 }
 
 func (s *APISuite) TestNewModelWithTemplates(c *gc.C) {
@@ -602,10 +614,11 @@ func (s *APISuite) TestNewModelWithTemplates(c *gc.C) {
 	s.addTemplate(c, params.EntityPath{"bob", "creds"}, ctlId, map[string]interface{}{
 		"secret":          "my secret",
 		"authorized-keys": sshKey,
-		"state-server":    false,
+		"broken":          "something",
+		"controller":      false,
 	})
 	s.addTemplate(c, params.EntityPath{"bob", "other"}, ctlId, map[string]interface{}{
-		"state-server": true,
+		"broken": "nothing",
 	})
 
 	modelPath := params.EntityPath{"bob", "model"}
@@ -617,7 +630,6 @@ func (s *APISuite) TestNewModelWithTemplates(c *gc.C) {
 			Config: map[string]interface{}{
 				"secret": "another secret",
 			},
-			Password:      "user secret",
 			TemplatePaths: []params.EntityPath{{"bob", "creds"}, {"bob", "other"}},
 		},
 	})
@@ -625,13 +637,15 @@ func (s *APISuite) TestNewModelWithTemplates(c *gc.C) {
 
 	// Check that the model was actually created with the right
 	// configuration.
-	m, err := s.State.GetEnvironment(names.NewEnvironTag(resp.UUID))
+	m, err := s.State.GetModel(names.NewModelTag(resp.UUID))
 	c.Assert(err, gc.IsNil)
 	cfg, err := m.Config()
 	c.Assert(err, gc.IsNil)
 	attrs := cfg.AllAttrs()
-	c.Assert(attrs["state-server"], gc.Equals, true)
+	c.Logf("all attributes for uuid %v: %#v", resp.UUID, attrs)
 	c.Assert(attrs["secret"], gc.Equals, "another secret")
+	c.Assert(attrs["controller"], gc.Equals, false)
+	c.Assert(attrs["broken"], gc.Equals, "nothing")
 	c.Assert(attrs["authorized-keys"], gc.Equals, sshKey)
 
 	st := openAPIFromModelResponse(c, resp)
@@ -649,26 +663,74 @@ func (s *APISuite) TestNewModelWithTemplateNotFound(c *gc.C) {
 			Config: map[string]interface{}{
 				"secret": "another secret",
 			},
-			Password:      "user secret",
 			TemplatePaths: []params.EntityPath{{"bob", "creds"}},
 		},
 	})
-	c.Assert(err, gc.ErrorMatches, `POST .*/v1/model/bob: cannot get template "bob/creds": template "bob/creds" not found`)
+	c.Assert(err, gc.ErrorMatches, `POST .*/v2/model/bob: cannot get template "bob/creds": template "bob/creds" not found`)
 	c.Assert(resp, gc.IsNil)
 }
 
+func (s *APISuite) TestGetModelWithExplicitlyRemovedUser(c *gc.C) {
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foo"})
+
+	s.IDMSrv.AddUser("alice", "buddies")
+	s.IDMSrv.AddUser("bob", "buddies")
+	resp, err := s.NewClient("bob").NewModel(&params.NewModel{
+		User: "buddies",
+		Info: params.NewModelInfo{
+			Name:       "bobsmodel",
+			Controller: ctlId,
+			Config:     dummyEnvConfig,
+		},
+	})
+	c.Assert(err, gc.IsNil)
+	modelId := resp.Path
+
+	// Alice is part of the same group, so check that she can get and use
+	// the model.
+	resp, err = s.NewClient("alice").GetModel(&params.GetModel{
+		EntityPath: modelId,
+	})
+	c.Assert(err, gc.IsNil)
+	st := openAPIFromModelResponse(c, resp)
+	st.Close()
+
+	// Explicitly revoke access directly on the controller.
+	mmClient := modelmanager.NewClient(s.APIState)
+	err = mmClient.RevokeModel("jem-alice", string(jujuparams.ModelReadAccess), resp.UUID)
+	c.Assert(err, gc.IsNil)
+
+	// Sanity-check that we really have removed access.
+	st, err = api.Open(apiInfoFromModelResponse(resp), api.DialOpts{})
+	c.Assert(err, jc.Satisfies, jujuparams.IsCodeUnauthorized)
+
+	// Get the model again. Alice should not be added back to the permissions.
+	resp, err = s.NewClient("alice").GetModel(&params.GetModel{
+		EntityPath: modelId,
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Alice should still be denied, despite having access to the model
+	// in JEM.
+	st, err = api.Open(apiInfoFromModelResponse(resp), api.DialOpts{})
+	c.Assert(err, gc.NotNil)
+	c.Assert(err, jc.Satisfies, jujuparams.IsCodeUnauthorized)
+}
+
 func openAPIFromModelResponse(c *gc.C, resp *params.ModelResponse) api.Connection {
-	// Ensure that we can connect to the new model
-	apiInfo := &api.Info{
-		Tag:        names.NewUserTag(resp.User),
-		Password:   resp.Password,
-		Addrs:      resp.HostPorts,
-		CACert:     resp.CACert,
-		EnvironTag: names.NewEnvironTag(resp.UUID),
-	}
-	st, err := api.Open(apiInfo, api.DialOpts{})
+	st, err := api.Open(apiInfoFromModelResponse(resp), api.DialOpts{})
 	c.Assert(err, gc.IsNil, gc.Commentf("user: %q; password: %q", resp.User, resp.Password))
 	return st
+}
+
+func apiInfoFromModelResponse(resp *params.ModelResponse) *api.Info {
+	return &api.Info{
+		Tag:      names.NewUserTag(resp.User),
+		Password: resp.Password,
+		Addrs:    resp.HostPorts,
+		CACert:   resp.CACert,
+		ModelTag: names.NewModelTag(resp.UUID),
+	}
 }
 
 func (s *APISuite) TestNewModelUnderGroup(c *gc.C) {
@@ -678,13 +740,12 @@ func (s *APISuite) TestNewModelUnderGroup(c *gc.C) {
 	var modelRespBody json.RawMessage
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
-		URL:     "/v1/model/beatles",
+		URL:     "/v2/model/beatles",
 		Handler: s.JEMSrv,
 		JSONBody: params.NewModelInfo{
 			Name:       params.Name("bar"),
 			Controller: ctlId,
 			Config:     dummyEnvConfig,
-			Password:   "secret",
 		},
 		ExpectBody: httptesting.BodyAsserter(func(_ *gc.C, body json.RawMessage) {
 			modelRespBody = body
@@ -695,25 +756,15 @@ func (s *APISuite) TestNewModelUnderGroup(c *gc.C) {
 	err := json.Unmarshal(modelRespBody, &modelResp)
 	c.Assert(err, gc.IsNil)
 
-	c.Assert(modelResp.ControllerUUID, gc.Equals, s.APIInfo(c).EnvironTag.Id())
-
 	// Ensure that we can connect to the new model
-	apiInfo := &api.Info{
-		Tag:        names.NewUserTag(string(modelResp.User)),
-		Password:   "secret",
-		Addrs:      modelResp.HostPorts,
-		CACert:     modelResp.CACert,
-		EnvironTag: names.NewEnvironTag(modelResp.UUID),
-	}
-	st, err := api.Open(apiInfo, api.DialOpts{})
-	c.Assert(err, gc.IsNil)
-	defer st.Close()
+	st := openAPIFromModelResponse(c, &modelResp)
+	st.Close()
 }
 
 func (s *APISuite) TestNewModelWithExistingUser(c *gc.C) {
-	username := "jem-bob--bar"
+	username := "jem-bob"
 
-	_, err := usermanager.NewClient(s.APIState).AddUser(username, "", "old")
+	_, _, err := usermanager.NewClient(s.APIState).AddUser(username, "", "old", "")
 	c.Assert(err, gc.IsNil)
 
 	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foo"})
@@ -721,13 +772,12 @@ func (s *APISuite) TestNewModelWithExistingUser(c *gc.C) {
 	var modelRespBody json.RawMessage
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
-		URL:     "/v1/model/bob",
+		URL:     "/v2/model/bob",
 		Handler: s.JEMSrv,
 		JSONBody: params.NewModelInfo{
 			Name:       params.Name("bar"),
 			Controller: ctlId,
 			Config:     dummyEnvConfig,
-			Password:   "secret",
 		},
 		ExpectBody: httptesting.BodyAsserter(func(_ *gc.C, body json.RawMessage) {
 			modelRespBody = body
@@ -738,19 +788,17 @@ func (s *APISuite) TestNewModelWithExistingUser(c *gc.C) {
 	err = json.Unmarshal(modelRespBody, &modelResp)
 	c.Assert(err, gc.IsNil)
 
-	c.Assert(modelResp.ControllerUUID, gc.Equals, s.APIInfo(c).EnvironTag.Id())
-
 	// Make sure that we really are reusing the username.
 	c.Assert(modelResp.User, gc.Equals, username)
 
 	// Ensure that we can connect to the new model with
 	// the new secret
 	apiInfo := &api.Info{
-		Tag:        names.NewUserTag(username),
-		Password:   modelResp.Password,
-		Addrs:      modelResp.HostPorts,
-		CACert:     modelResp.CACert,
-		EnvironTag: names.NewEnvironTag(modelResp.UUID),
+		Tag:      names.NewUserTag(username),
+		Password: modelResp.Password,
+		Addrs:    modelResp.HostPorts,
+		CACert:   modelResp.CACert,
+		ModelTag: names.NewModelTag(modelResp.UUID),
 	}
 	st, err := api.Open(apiInfo, api.DialOpts{})
 	c.Assert(err, gc.IsNil)
@@ -776,7 +824,7 @@ func (s *APISuite) TestNewModelWithInvalidControllerPath(c *gc.C) {
 		c.Logf("test %d", i)
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Method:  "POST",
-			URL:     "/v1/model/bob",
+			URL:     "/v2/model/bob",
 			Handler: s.JEMSrv,
 			JSONBody: map[string]interface{}{
 				"name":       "bar",
@@ -795,7 +843,7 @@ func (s *APISuite) TestNewModelWithInvalidControllerPath(c *gc.C) {
 func (s *APISuite) TestNewModelCannotOpenAPI(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
-		URL:     "/v1/model/bob",
+		URL:     "/v2/model/bob",
 		Handler: s.JEMSrv,
 		JSONBody: params.NewModelInfo{
 			Name:       params.Name("bar"),
@@ -815,7 +863,7 @@ func (s *APISuite) TestNewModelInvalidConfig(c *gc.C) {
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
-		URL:     "/v1/model/bob",
+		URL:     "/v2/model/bob",
 		Handler: s.JEMSrv,
 		JSONBody: params.NewModelInfo{
 			Name:       params.Name("bar"),
@@ -838,13 +886,12 @@ func (s *APISuite) TestNewModelTwice(c *gc.C) {
 
 	body := &params.NewModelInfo{
 		Name:       "bar",
-		Password:   "password",
 		Controller: ctlId,
 		Config:     dummyEnvConfig,
 	}
 	p := httptesting.JSONCallParams{
 		Method:     "POST",
-		URL:        "/v1/model/bob",
+		URL:        "/v2/model/bob",
 		Handler:    s.JEMSrv,
 		JSONBody:   body,
 		ExpectBody: apitest.AnyBody,
@@ -867,48 +914,23 @@ func (s *APISuite) TestNewModelTwice(c *gc.C) {
 	httptesting.AssertJSONCall(c, p)
 }
 
-func (s *APISuite) TestNewModelWithNoPassword(c *gc.C) {
-	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foo"})
-
-	// N.B. "state-server" is a required attribute
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Method:  "POST",
-		URL:     "/v1/model/bob",
-		Handler: s.JEMSrv,
-		JSONBody: params.NewModelInfo{
-			Name:       "bar",
-			Controller: ctlId,
-			Config: map[string]interface{}{
-				"authorized-keys": sshKey,
-			},
-		},
-		ExpectBody: params.Error{
-			Code:    params.ErrBadRequest,
-			Message: `cannot create user: no password specified`,
-		},
-		ExpectStatus: http.StatusBadRequest,
-		Do:           apitest.Do(s.IDMSrv.Client("bob")),
-	})
-}
-
 func (s *APISuite) TestNewModelCannotCreate(c *gc.C) {
 	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foo"})
 
-	// N.B. "state-server" is a required attribute
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
-		URL:     "/v1/model/bob",
+		URL:     "/v2/model/bob",
 		Handler: s.JEMSrv,
 		JSONBody: params.NewModelInfo{
 			Name:       "bar",
-			Password:   "secret",
 			Controller: ctlId,
 			Config: map[string]interface{}{
 				"authorized-keys": sshKey,
+				"logging-config":  "bad>",
 			},
 		},
 		ExpectBody: params.Error{
-			Message: `cannot create model: provider validation failed: state-server: expected bool, got nothing`,
+			Message: `cannot create model: failed to create config: creating config from values failed: logger specification expected '=', found "bad>"`,
 		},
 		ExpectStatus: http.StatusInternalServerError,
 		Do:           apitest.Do(s.IDMSrv.Client("bob")),
@@ -918,7 +940,7 @@ func (s *APISuite) TestNewModelCannotCreate(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "GET",
 		Handler: s.JEMSrv,
-		URL:     "/v1/model/bob/bar",
+		URL:     "/v2/model/bob/bar",
 		ExpectBody: &params.Error{
 			Message: `model "bob/bar" not found`,
 			Code:    params.ErrNotFound,
@@ -933,7 +955,7 @@ func (s *APISuite) TestNewModelUnauthorized(c *gc.C) {
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
-		URL:     "/v1/model/bob",
+		URL:     "/v2/model/bob",
 		Handler: s.JEMSrv,
 		JSONBody: params.NewModelInfo{
 			Name:       "bar",
@@ -975,19 +997,19 @@ func (s *APISuite) TestListControllerNoServers(c *gc.C) {
 func (s *APISuite) TestListTemplates(c *gc.C) {
 	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foo"})
 	s.addTemplate(c, params.EntityPath{"bob", "other"}, ctlId, map[string]interface{}{
-		"state-server": true,
+		"controller": true,
 	})
 	s.addTemplate(c, params.EntityPath{"bob", "creds"}, ctlId, map[string]interface{}{
 		"secret":          "my secret",
 		"authorized-keys": sshKey,
-		"state-server":    false,
+		"controller":      false,
 	})
 	s.addTemplate(c, params.EntityPath{"alice", "x"}, ctlId, map[string]interface{}{
-		"state-server":    false,
+		"controller":      false,
 		"authorized-keys": sshKey,
 	})
 	s.addTemplate(c, params.EntityPath{"alice", "y"}, ctlId, map[string]interface{}{
-		"state-server": false,
+		"controller": false,
 	})
 	s.allowTemplateAllPerm(c, params.EntityPath{"alice", "y"})
 
@@ -1014,19 +1036,19 @@ func (s *APISuite) TestListTemplates(c *gc.C) {
 		Templates: []params.TemplateResponse{{
 			Path: params.EntityPath{"alice", "y"},
 			Config: map[string]interface{}{
-				"state-server": false,
+				"controller": false,
 			},
 		}, {
 			Path: params.EntityPath{"bob", "creds"},
 			Config: map[string]interface{}{
 				"secret":          "my secret",
 				"authorized-keys": sshKey,
-				"state-server":    false,
+				"controller":      false,
 			},
 		}, {
 			Path: params.EntityPath{"bob", "other"},
 			Config: map[string]interface{}{
-				"state-server": true,
+				"controller": true,
 			},
 		}},
 	})
@@ -1040,13 +1062,13 @@ func (s *APISuite) TestListTemplates(c *gc.C) {
 		Templates: []params.TemplateResponse{{
 			Path: params.EntityPath{"alice", "x"},
 			Config: map[string]interface{}{
-				"state-server":    false,
+				"controller":      false,
 				"authorized-keys": sshKey,
 			},
 		}, {
 			Path: params.EntityPath{"alice", "y"},
 			Config: map[string]interface{}{
-				"state-server": false,
+				"controller": false,
 			},
 		}},
 	})
@@ -1059,18 +1081,19 @@ func (s *APISuite) TestListModelsNoServers(c *gc.C) {
 }
 
 func (s *APISuite) TestListModelsControllerOnly(c *gc.C) {
-	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foo"})
+	ctlPath := params.EntityPath{"bob", "foo"}
+	ctlId := s.assertAddController(c, ctlPath)
 	info := s.APIInfo(c)
 	resp, err := s.NewClient("bob").ListModels(nil)
 	c.Assert(err, gc.IsNil)
 	c.Assert(resp, jc.DeepEquals, &params.ListModelsResponse{
 		Models: []params.ModelResponse{{
-			Path:      ctlId,
-			User:      info.Tag.Id(),
-			Password:  info.Password,
-			UUID:      info.EnvironTag.Id(),
-			CACert:    info.CACert,
-			HostPorts: info.Addrs,
+			Path:           ctlId,
+			ControllerUUID: info.ModelTag.Id(),
+			UUID:           info.ModelTag.Id(),
+			CACert:         info.CACert,
+			HostPorts:      info.Addrs,
+			ControllerPath: ctlPath,
 		}},
 	})
 }
@@ -1106,34 +1129,35 @@ func (s *APISuite) allowTemplateAllPerm(c *gc.C, path params.EntityPath) {
 }
 
 func (s *APISuite) TestListModels(c *gc.C) {
-	ctlId := s.assertAddController(c, params.EntityPath{"alice", "foo"})
+	ctlPath := params.EntityPath{"alice", "foo"}
+	ctlId := s.assertAddController(c, ctlPath)
 	s.allowEnvAllPerm(c, ctlId)
 	s.allowServerAllPerm(c, ctlId)
-	modelId1, user1, uuid1 := s.addModel(c, params.EntityPath{"bob", "bar"}, ctlId)
-	modelId2, user2, uuid2 := s.addModel(c, params.EntityPath{"charlie", "bar"}, ctlId)
+	modelId1, _, uuid1 := s.addModel(c, params.EntityPath{"bob", "bar"}, ctlId)
+	modelId2, _, uuid2 := s.addModel(c, params.EntityPath{"charlie", "bar"}, ctlId)
 	info := s.APIInfo(c)
 
 	resps := []params.ModelResponse{{
-		Path:      ctlId,
-		User:      info.Tag.Id(),
-		Password:  info.Password,
-		UUID:      info.EnvironTag.Id(),
-		CACert:    info.CACert,
-		HostPorts: info.Addrs,
+		Path:           ctlId,
+		UUID:           info.ModelTag.Id(),
+		ControllerUUID: info.ModelTag.Id(),
+		CACert:         info.CACert,
+		HostPorts:      info.Addrs,
+		ControllerPath: ctlPath,
 	}, {
-		Path:      modelId1,
-		User:      user1,
-		Password:  info.Password,
-		UUID:      uuid1,
-		CACert:    info.CACert,
-		HostPorts: info.Addrs,
+		Path:           modelId1,
+		UUID:           uuid1,
+		ControllerUUID: info.ModelTag.Id(),
+		CACert:         info.CACert,
+		HostPorts:      info.Addrs,
+		ControllerPath: ctlPath,
 	}, {
-		Path:      modelId2,
-		User:      user2,
-		Password:  info.Password,
-		UUID:      uuid2,
-		CACert:    info.CACert,
-		HostPorts: info.Addrs,
+		Path:           modelId2,
+		UUID:           uuid2,
+		ControllerUUID: info.ModelTag.Id(),
+		CACert:         info.CACert,
+		HostPorts:      info.Addrs,
+		ControllerPath: ctlPath,
 	}}
 	tests := []struct {
 		user    params.User
@@ -1223,7 +1247,7 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 		Info: params.AddTemplateInfo{
 			Controller: ctlId,
 			Config: map[string]interface{}{
-				"state-server":      true,
+				"controller":        true,
 				"admin-secret":      "my secret",
 				"authorized-keys":   sshKey,
 				"bootstrap-timeout": 9999,
@@ -1243,7 +1267,7 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 	c.Assert(tmpl.Schema, gc.Not(gc.HasLen), 0)
 	c.Assert(tmpl.Path, gc.Equals, params.EntityPath{"alice", "creds"})
 	c.Assert(tmpl.Config, jc.DeepEquals, map[string]interface{}{
-		"state-server":      true,
+		"controller":        true,
 		"admin-secret":      "",
 		"authorized-keys":   sshKey,
 		"bootstrap-timeout": 9999.0,
@@ -1255,7 +1279,7 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 		Info: params.AddTemplateInfo{
 			Controller: ctlId,
 			Config: map[string]interface{}{
-				"state-server":      false,
+				"controller":        false,
 				"admin-secret":      "another secret",
 				"bootstrap-timeout": 888,
 			},
@@ -1270,7 +1294,7 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 	c.Assert(tmpl.Schema, gc.Not(gc.HasLen), 0)
 	c.Assert(tmpl.Path, gc.Equals, params.EntityPath{"alice", "creds"})
 	c.Assert(tmpl.Config, jc.DeepEquals, map[string]interface{}{
-		"state-server":      false,
+		"controller":        false,
 		"admin-secret":      "",
 		"bootstrap-timeout": 888.0,
 	})
@@ -1282,7 +1306,7 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 		Info: params.AddTemplateInfo{
 			Controller: ctlId,
 			Config: map[string]interface{}{
-				"state-server":      true,
+				"controller":        true,
 				"bootstrap-timeout": 111,
 			},
 		},
@@ -1296,7 +1320,7 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 	c.Assert(tmpl.Path, gc.Equals, params.EntityPath{"alice", "differentcreds"})
 	c.Assert(tmpl.Schema, gc.Not(gc.HasLen), 0)
 	c.Assert(tmpl.Config, jc.DeepEquals, map[string]interface{}{
-		"state-server":      true,
+		"controller":        true,
 		"bootstrap-timeout": 111.0,
 	})
 
@@ -1306,7 +1330,7 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(tmpl.Schema, gc.Not(gc.HasLen), 0)
 	c.Assert(tmpl.Config, jc.DeepEquals, map[string]interface{}{
-		"state-server":      false,
+		"controller":        false,
 		"admin-secret":      "",
 		"bootstrap-timeout": 888.0,
 	})
@@ -1316,7 +1340,7 @@ func (s *APISuite) TestGetTemplateNotFound(c *gc.C) {
 	tmpl, err := s.NewClient("alice").GetTemplate(&params.GetTemplate{
 		EntityPath: params.EntityPath{"alice", "xxx"},
 	})
-	c.Assert(err, gc.ErrorMatches, `GET .*/v1/template/alice/xxx: template "alice/xxx" not found`)
+	c.Assert(err, gc.ErrorMatches, `GET .*/v2/template/alice/xxx: template "alice/xxx" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	c.Assert(tmpl, gc.IsNil)
 }
@@ -1332,21 +1356,21 @@ var addInvalidTemplateTests = []struct {
 	config: map[string]interface{}{
 		"badkey": 34565,
 	},
-	expectError: `PUT .*/v1/template/alice/creds: configuration not compatible with schema: unknown key "badkey" \(value 34565\)`,
+	expectError: `PUT .*/v2/template/alice/creds: configuration not compatible with schema: unknown key "badkey" \(value 34565\)`,
 }, {
 	about: "incompatible type",
 	ctlId: params.EntityPath{"alice", "foo"},
 	config: map[string]interface{}{
 		"admin-secret": 34565,
 	},
-	expectError: `PUT .*/v1/template/alice/creds: configuration not compatible with schema: admin-secret: expected string, got float64\(34565\)`,
+	expectError: `PUT .*/v2/template/alice/creds: configuration not compatible with schema: admin-secret: expected string, got float64\(34565\)`,
 }, {
 	about: "unknown controller id",
 	ctlId: params.EntityPath{"alice", "bar"},
 	config: map[string]interface{}{
 		"admin-secret": 34565,
 	},
-	expectError: `PUT .*/v1/template/alice/creds: cannot get schema for controller: cannot open API: cannot get model: model "alice/bar" not found`,
+	expectError: `PUT .*/v2/template/alice/creds: cannot get schema for controller: cannot open API: cannot get model: model "alice/bar" not found`,
 }}
 
 func (s *APISuite) TestAddInvalidTemplate(c *gc.C) {
@@ -1369,7 +1393,7 @@ func (s *APISuite) TestDeleteTemplateNotFound(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:       "DELETE",
 		Handler:      s.JEMSrv,
-		URL:          "/v1/template/" + templPath.String(),
+		URL:          "/v2/template/" + templPath.String(),
 		ExpectStatus: http.StatusNotFound,
 		ExpectBody: &params.Error{
 			Message: `template "alice/foo" not found`,
@@ -1388,7 +1412,7 @@ func (s *APISuite) TestDeleteTemplate(c *gc.C) {
 		Info: params.AddTemplateInfo{
 			Controller: ctlId,
 			Config: map[string]interface{}{
-				"state-server":      true,
+				"controller":        true,
 				"admin-secret":      "my secret",
 				"authorized-keys":   sshKey,
 				"bootstrap-timeout": 9999,
@@ -1400,7 +1424,7 @@ func (s *APISuite) TestDeleteTemplate(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:       "DELETE",
 		Handler:      s.JEMSrv,
-		URL:          "/v1/template/" + templPath.String(),
+		URL:          "/v2/template/" + templPath.String(),
 		ExpectStatus: http.StatusOK,
 		Do:           apitest.Do(s.IDMSrv.Client("alice")),
 	})
@@ -1408,7 +1432,7 @@ func (s *APISuite) TestDeleteTemplate(c *gc.C) {
 	// Check that it is no longer available.
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.JEMSrv,
-		URL:     "/v1/template/" + templPath.String(),
+		URL:     "/v2/template/" + templPath.String(),
 		Do:      apitest.Do(s.IDMSrv.Client("alice")),
 	})
 	c.Assert(resp.Code, gc.Equals, http.StatusNotFound, gc.Commentf("body: %s", resp.Body.Bytes()))
@@ -1437,11 +1461,11 @@ func (s *APISuite) addController(c *gc.C, path params.EntityPath) error {
 	return s.NewClient(path.User).AddController(&params.AddController{
 		EntityPath: path,
 		Info: params.ControllerInfo{
-			HostPorts: info.Addrs,
-			CACert:    info.CACert,
-			User:      info.Tag.Id(),
-			Password:  info.Password,
-			ModelUUID: info.EnvironTag.Id(),
+			HostPorts:      info.Addrs,
+			CACert:         info.CACert,
+			User:           info.Tag.Id(),
+			Password:       info.Password,
+			ControllerUUID: info.ModelTag.Id(),
 		},
 	})
 }
@@ -1453,12 +1477,10 @@ func (s *APISuite) addModel(c *gc.C, modelPath, ctlPath params.EntityPath) (path
 	// persist, the discharge macaroon we get won't affect subsequent
 	// requests in the caller.
 
-	info := s.APIInfo(c)
 	resp, err := s.NewClient(modelPath.User).NewModel(&params.NewModel{
 		User: modelPath.User,
 		Info: params.NewModelInfo{
 			Name:       modelPath.Name,
-			Password:   info.Password,
 			Controller: ctlPath,
 			Config:     dummyEnvConfig,
 		},

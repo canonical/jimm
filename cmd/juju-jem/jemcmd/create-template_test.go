@@ -38,7 +38,7 @@ func (s *createTemplateSuite) TestCreateTemplate(c *gc.C) {
 	})
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
-	stdout, stderr, code = run(c, c.MkDir(), "create-template", "--controller", "bob/foo", "bob/mytemplate", "state-server=true", "apt-mirror=0.1.2.3")
+	stdout, stderr, code = run(c, c.MkDir(), "create-template", "--controller", "bob/foo", "bob/mytemplate", "controller=true", "apt-mirror=0.1.2.3")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
@@ -47,8 +47,8 @@ func (s *createTemplateSuite) TestCreateTemplate(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	c.Assert(tmpl.Config, jc.DeepEquals, map[string]interface{}{
-		"state-server": true,
-		"apt-mirror":   "0.1.2.3",
+		"controller": true,
+		"apt-mirror": "0.1.2.3",
 	})
 }
 
@@ -74,8 +74,8 @@ func (s *createTemplateSuite) TestCreateTemplateWithConfigFile(c *gc.C) {
 	configFile := filepath.Join(dir, "test.config")
 
 	data, err := yaml.Marshal(map[string]interface{}{
-		"state-server": true,
-		"apt-mirror":   "0.1.2.3",
+		"controller": true,
+		"apt-mirror": "0.1.2.3",
 	})
 	c.Assert(err, gc.IsNil)
 	err = ioutil.WriteFile(configFile, data, 0666)
@@ -90,8 +90,8 @@ func (s *createTemplateSuite) TestCreateTemplateWithConfigFile(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	c.Assert(tmpl.Config, jc.DeepEquals, map[string]interface{}{
-		"state-server": true,
-		"apt-mirror":   "0.1.2.3",
+		"controller": true,
+		"apt-mirror": "0.1.2.3",
 	})
 }
 
