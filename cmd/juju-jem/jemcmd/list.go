@@ -44,11 +44,11 @@ func (c *listCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	resp, err := client.ListModels(&params.ListModels{})
+	resp, err := client.ListEnvironments(&params.ListEnvironments{})
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	for _, e := range resp.Models {
+	for _, e := range resp.Environments {
 		fmt.Fprintf(ctxt.Stdout, "%s\n", e.Path)
 	}
 	return nil

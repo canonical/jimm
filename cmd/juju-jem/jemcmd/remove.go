@@ -14,9 +14,9 @@ import (
 type removeCommand struct {
 	commandBase
 
-	paths      []entityPathValue
-	controller bool
-	template   bool
+	paths       []entityPathValue
+	stateServer bool
+	template    bool
 }
 
 func newRemoveCommand() cmd.Command {
@@ -48,7 +48,7 @@ func (c *removeCommand) Init(args []string) error {
 }
 
 func (c *removeCommand) SetFlags(f *gnuflag.FlagSet) {
-	f.BoolVar(&c.controller, "controller", false, "remove controllers not models")
+	f.BoolVar(&c.stateServer, "controller", false, "remove controllers not models")
 	f.BoolVar(&c.template, "template", false, "remove templates not models")
 }
 
@@ -59,14 +59,14 @@ func (c *removeCommand) Run(ctxt *cmd.Context) error {
 	}
 	typeString := "models"
 	f := func(path entityPathValue) error {
-		return client.DeleteModel(&params.DeleteModel{
+		return client.DeleteEnvironment(&params.DeleteEnvironment{
 			EntityPath: path.EntityPath,
 		})
 	}
-	if c.controller {
+	if c.stateServer {
 		typeString = "controllers"
 		f = func(path entityPathValue) error {
-			return client.DeleteController(&params.DeleteController{
+			return client.DeleteJES(&params.DeleteJES{
 				EntityPath: path.EntityPath,
 			})
 		}

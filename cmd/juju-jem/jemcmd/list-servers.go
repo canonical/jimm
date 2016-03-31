@@ -44,11 +44,11 @@ func (c *listServersCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	resp, err := client.ListController(&params.ListController{})
+	resp, err := client.ListJES(&params.ListJES{})
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	for _, e := range resp.Controllers {
+	for _, e := range resp.StateServers {
 		fmt.Fprintf(ctxt.Stdout, "%s\n", e.Path)
 	}
 	return nil

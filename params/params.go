@@ -9,33 +9,33 @@ import (
 	"gopkg.in/juju/environschema.v1"
 )
 
-// SetControllerPerm holds the parameters for setting the ACL
-// on a controller.
-type SetControllerPerm struct {
-	httprequest.Route `httprequest:"PUT /v1/controller/:User/:Name/perm"`
+// SetStateServerPerm holds the parameters for setting the ACL
+// on a state server.
+type SetStateServerPerm struct {
+	httprequest.Route `httprequest:"PUT /v1/server/:User/:Name/perm"`
 	EntityPath
 	ACL ACL `httprequest:",body"`
 }
 
-// GetControllerPerm holds the parameters for getting the ACL
-// of a controller.
-type GetControllerPerm struct {
-	httprequest.Route `httprequest:"GET /v1/controller/:User/:Name/perm"`
+// GetStateServerPerm holds the parameters for getting the ACL
+// of a state server.
+type GetStateServerPerm struct {
+	httprequest.Route `httprequest:"GET /v1/server/:User/:Name/perm"`
 	EntityPath
 }
 
-// SetModelPerm holds the parameters for setting the ACL
-// on an model.
-type SetModelPerm struct {
-	httprequest.Route `httprequest:"PUT /v1/model/:User/:Name/perm"`
+// SetEnvironmentPerm holds the parameters for setting the ACL
+// on an environment.
+type SetEnvironmentPerm struct {
+	httprequest.Route `httprequest:"PUT /v1/env/:User/:Name/perm"`
 	EntityPath
 	ACL ACL `httprequest:",body"`
 }
 
-// GetModelPerm holds the parameters for getting the ACL
-// of an model.
-type GetModelPerm struct {
-	httprequest.Route `httprequest:"GET /v1/model/:User/:Name/perm"`
+// GetEnvironmentPerm holds the parameters for getting the ACL
+// of an environment.
+type GetEnvironmentPerm struct {
+	httprequest.Route `httprequest:"GET /v1/env/:User/:Name/perm"`
 	EntityPath
 }
 
@@ -61,40 +61,40 @@ type ACL struct {
 	Read []string `json:"read"`
 }
 
-// AddController holds the parameters for adding a new controller.
-type AddController struct {
-	httprequest.Route `httprequest:"PUT /v1/controller/:User/:Name"`
+// AddJES holds the parameters for adding a new state server.
+type AddJES struct {
+	httprequest.Route `httprequest:"PUT /v1/server/:User/:Name"`
 	EntityPath
-	Info ControllerInfo `httprequest:",body"`
+	Info ServerInfo `httprequest:",body"`
 }
 
-// DeleteController holds the parameters for removing the Controller.
-type DeleteController struct {
-	httprequest.Route `httprequest:"DELETE /v1/controller/:User/:Name"`
+// DeleteJES holds the parameters for removing the JES.
+type DeleteJES struct {
+	httprequest.Route `httprequest:"DELETE /v1/server/:User/:Name"`
 	EntityPath
 }
 
-// ControllerInfo holds information specifying how
-// to connect to an existing controller.
-type ControllerInfo struct {
+// ServerInfo holds information specifying how
+// to connect to an existing state server.
+type ServerInfo struct {
 	// HostPorts holds host/port pairs (in host:port form)
-	// of the controller API endpoints.
+	// of the state server API endpoints.
 	HostPorts []string `json:"host-ports"`
 
 	// CACert holds the CA certificate that will be used
-	// to validate the controller's certificate, in PEM format.
+	// to validate the state server's certificate, in PEM format.
 	CACert string `json:"ca-cert"`
 
 	// User holds the name of user to use when
-	// connecting to the controller.
+	// connecting to the server.
 	User string `json:"user"`
 
 	// Password holds the password for the user.
 	Password string `json:"password"`
 
-	// ModelUUID holds the UUID of the model we are
+	// EnvironUUID holds the environ UUID of the environment we are
 	// trying to connect to.
-	ModelUUID string `json:"model-uuid"`
+	EnvironUUID string `json:"environ-uuid"`
 }
 
 // EntityPath holds the path parameters for specifying
@@ -134,59 +134,59 @@ func (p EntityPath) MarshalText() ([]byte, error) {
 	return data, nil
 }
 
-// GetModel holds parameters for retrieving
-// an model.
-type GetModel struct {
-	httprequest.Route `httprequest:"GET /v1/model/:User/:Name"`
+// GetEnvironment holds parameters for retrieving
+// an environment.
+type GetEnvironment struct {
+	httprequest.Route `httprequest:"GET /v1/env/:User/:Name"`
 	EntityPath
 }
 
-// DeleteModel holds parameters for deletion of
-// an model.
-type DeleteModel struct {
-	httprequest.Route `httprequest:"DELETE /v1/model/:User/:Name"`
+// DeleteEnvironment holds parameters for deletion of
+// an environment.
+type DeleteEnvironment struct {
+	httprequest.Route `httprequest:"DELETE /v1/env/:User/:Name"`
 	EntityPath
 }
 
-// NewModel holds parameters for creating a new model.
-type NewModel struct {
-	httprequest.Route `httprequest:"POST /v1/model/:User"`
+// NewEnvironment holds parameters for creating a new enviromment.
+type NewEnvironment struct {
+	httprequest.Route `httprequest:"POST /v1/env/:User"`
 
 	// User holds the User element from the URL path.
 	User User `httprequest:",path"`
 
 	// Info holds the information required to create
-	// the model.
-	Info NewModelInfo `httprequest:",body"`
+	// the environment.
+	Info NewEnvironmentInfo `httprequest:",body"`
 }
 
-// ListModels holds parameters for listing
-// current models.
-type ListModels struct {
-	httprequest.Route `httprequest:"GET /v1/model"`
+// ListEnvironments holds parameters for listing
+// current environments.
+type ListEnvironments struct {
+	httprequest.Route `httprequest:"GET /v1/env"`
 
 	// TODO add parameters for restricting results.
 }
 
-// ListModelsResponse holds a list of controllers as returned
-// by ListModels.
-type ListModelsResponse struct {
-	Models []ModelResponse `json:"models"`
+// ListEnvironmentsResponse holds a list of state servers as returned
+// by ListEnvironments.
+type ListEnvironmentsResponse struct {
+	Environments []EnvironmentResponse `json:"environments"`
 }
 
-// ListController holds parameters for listing all current controllers.
-type ListController struct {
-	httprequest.Route `httprequest:"GET /v1/controller"`
+// ListJES holds parameters for listing all current state servers.
+type ListJES struct {
+	httprequest.Route `httprequest:"GET /v1/server"`
 
 	// TODO add parameters for restricting results.
 }
 
-// ListControllerResponse holds a list of controllers as returned
-// by ListController.
-type ListControllerResponse struct {
+// ListJESResponse holds a list of state servers as returned
+// by ListJES.
+type ListJESResponse struct {
 	// TODO factor out common items in the templates
 	// into a separate field.
-	Controllers []ControllerResponse `json:"controllers"`
+	StateServers []JESResponse `json:"state-servers"`
 }
 
 // ListTemplate holds parameters for listing all current templates.
@@ -207,7 +207,7 @@ type TemplateResponse struct {
 	// Path holds the path of the template.
 	Path EntityPath `json:"path"`
 
-	// Schema holds the controller schema that was used
+	// Schema holds the state server schema that was used
 	// to create the template.
 	Schema environschema.Fields `json:"schema"`
 
@@ -228,90 +228,90 @@ type DeleteTemplate struct {
 	EntityPath
 }
 
-// ControllerResponse holds information on a given Controller.
-// Each Controller is also associated with an model
-// at /v1/model/:User/:Name where User and Name
-// are the same as that of the Controller's path.
-type ControllerResponse struct {
-	// Path holds the path of the controller.
+// JESResponse holds information on a given JES.
+// Each JES is also associated with an environment
+// at /v1/env/:User/:Name where User and Name
+// are the same as that of the JES's path.
+type JESResponse struct {
+	// Path holds the path of the state server.
 	Path EntityPath `json:"path"`
 
 	// ProviderType holds the kind of provider used
-	// by the Controller.
+	// by the JES.
 	ProviderType string `json:"provider-type,omitempty"`
 
 	// Schema holds the fields required to start
-	// a new model using the Controller.
+	// a new environment using the JES.
 	Schema environschema.Fields `json:"schema,omitempty"`
 }
 
-// GetController holds parameters for retrieving information on a Controller.
-type GetController struct {
-	httprequest.Route `httprequest:"GET /v1/controller/:User/:Name"`
+// GetJES holds parameters for retrieving information on a JES.
+type GetJES struct {
+	httprequest.Route `httprequest:"GET /v1/server/:User/:Name"`
 	EntityPath
 }
 
-// NewModelInfo holds the JSON body parameters
-// for a NewModel request.
-type NewModelInfo struct {
-	// Name holds the name to give to the new model
+// NewEnvironmentInfo holds the JSON body parameters
+// for a NewEnvironment request.
+type NewEnvironmentInfo struct {
+	// Name holds the name to give to the new environment
 	// within its user name space.
 	Name Name `json:"name"`
 
 	// Password holds the password to associate with the
 	// creating user if their account does not already
-	// exist on the controller. If the user has already
+	// exist on the state server. If the user has already
 	// been created, this is ignored.
 	// TODO when juju-core supports macaroon authorization,
 	// this can be removed.
 	Password string `json:"password"`
 
-	// Controller holds the path to the controller entity
-	// to use to start the model.
-	// TODO use attributes to automatically work out which controller to use.
-	Controller EntityPath `json:"controller"`
+	// StateServer holds the path to the state server entity
+	// to use to start the environment.
+	// TODO use attributes to automatically work out which state server to use.
+	StateServer EntityPath `json:"state-server"`
 
 	// TemplatePaths optionally holds a sequence of templates to use
 	// to create the base configuration entry on top of which Config is applied.
 	// Each path must refer to an entry in /template, and overrides attributes in the one before it,
 	// followed finally by Config itself. The resulting configuration
-	// is checked for compatibility with the schema of the above controller.
+	// is checked for compatibility with the schema of the above state server.
 	TemplatePaths []EntityPath `json:"templates,omitempty"`
 
-	// Config holds the configuration attributes to use to create the new model.
+	// Config holds the configuration attributes to use to create the new environment.
 	// It is applied on top of the above templates.
 	Config map[string]interface{} `json:"config"`
 }
 
-// ModelResponse holds the response body from
-// a NewModel call.
-type ModelResponse struct {
-	// Path holds the path of the model.
+// EnvironmentResponse holds the response body from
+// a NewEnvironment call.
+type EnvironmentResponse struct {
+	// Path holds the path of the environment.
 	Path EntityPath `json:"path"`
 
 	// User holds the admin user name associated
-	// with the model.
+	// with the environment.
 	User string `json:"user"`
 
 	// Password holds the admin password associated with the
-	// model. If it is empty, macaroon authentication should
-	// be used to connect to the model (only possible when
+	// environment. If it is empty, macaroon authentication should
+	// be used to connect to the environment (only possible when
 	// macaroon authentication is implemented by Juju).
 	Password string `json:"password"`
 
-	// UUID holds the UUID of the model.
+	// UUID holds the UUID of the environment.
 	UUID string `json:"uuid"`
 
-	// ControllerUUID holds the UUID of the controller
-	// model containing this model.
-	ControllerUUID string `json:"controller-uuid"`
+	// ServerUUID holds the UUID of the state server
+	// environment containing this environment.
+	ServerUUID string `json:"server-uuid"`
 
 	// CACert holds the CA certificate that will be used
-	// to validate the controller's certificate, in PEM format.
+	// to validate the state server's certificate, in PEM format.
 	CACert string `json:"ca-cert"`
 
 	// HostPorts holds host/port pairs (in host:port form)
-	// of the controller API endpoints.
+	// of the state server API endpoints.
 	HostPorts []string `json:"host-ports"`
 }
 
@@ -326,10 +326,11 @@ type AddTemplate struct {
 // AddTemplateInfo holds information on a template to
 // be added.
 type AddTemplateInfo struct {
-	// Controller holds the name of a controller to use
+	// StateServer holds the name of a state server to use
 	// as the base schema for the template. The Config attributes
-	// below will be checked against the schema of this controller.
-	Controller EntityPath `json:"controller"`
+	// below will be checked against the schema of this state
+	// server.
+	StateServer EntityPath `json:"state-server"`
 
 	// Config holds the template's configuration attributes.
 	Config map[string]interface{} `json:"config"`

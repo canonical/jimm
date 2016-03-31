@@ -15,7 +15,7 @@ type removeSuite struct {
 
 var _ = gc.Suite(&removeSuite{})
 
-func (s *removeSuite) TestRemoveModel(c *gc.C) {
+func (s *removeSuite) TestRemoveEnvironment(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 
 	// First add a controller and an model.
@@ -103,7 +103,7 @@ func (s *removeSuite) TestRemoveTemplate(c *gc.C) {
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
-func (s *removeSuite) TestRemoveMultipleModels(c *gc.C) {
+func (s *removeSuite) TestRemoveMultipleEnvironments(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 
 	// First add a controller and an model.
@@ -117,7 +117,7 @@ func (s *removeSuite) TestRemoveMultipleModels(c *gc.C) {
 	stdout, stderr, code = run(c, c.MkDir(), "remove", "bob/foo", "bob/foo-1")
 	c.Assert(code, gc.Equals, 1, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Matches, `cannot remove bob/foo: DELETE http://.*/v1/model/bob/foo: cannot remove model "bob/foo" because it is a controller`+"\nERROR not all models removed successfully\n")
+	c.Assert(stderr, gc.Matches, `cannot remove bob/foo: DELETE http://.*/v1/env/bob/foo: cannot remove environment "bob/foo" because it is a state server`+"\nERROR not all models removed successfully\n")
 
 	stdout, stderr, code = run(c, c.MkDir(), "list")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
