@@ -63,8 +63,8 @@ func (h *Handler) WhoAmI(arg *params.WhoAmI) (params.WhoAmIResponse, error) {
 	}, nil
 }
 
-// AddController adds a new controller.
-func (h *Handler) AddController(arg *params.AddController) error {
+// AddJES adds a new state server.
+func (h *Handler) AddJES(arg *params.AddJES) error {
 	if err := h.jem.CheckIsUser(arg.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
@@ -77,168 +77,169 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	if arg.Info.User == "" {
 		return badRequestf(nil, "no user in request")
 	}
-	if !names.IsValidEnvironment(arg.Info.ModelUUID) {
-		return badRequestf(nil, "bad model UUID in request")
+	if !names.IsValidEnvironment(arg.Info.EnvironUUID) {
+		return badRequestf(nil, "bad environment UUID in request")
 	}
-	ctl := &mongodoc.Controller{
+	srv := &mongodoc.StateServer{
 		Path:      arg.EntityPath,
 		CACert:    arg.Info.CACert,
 		HostPorts: arg.Info.HostPorts,
 	}
-	m := &mongodoc.Model{
+	env := &mongodoc.Environment{
 		AdminUser:     arg.Info.User,
 		AdminPassword: arg.Info.Password,
-		UUID:          arg.Info.ModelUUID,
+		UUID:          arg.Info.EnvironUUID,
 	}
-	logger.Infof("dialling model")
-	// Attempt to connect to the model before accepting it.
-	conn, err := h.jem.OpenAPIFromDocs(m, ctl)
+	logger.Infof("dialling environment")
+	// Attempt to connect to the environment before accepting it.
+	conn, err := h.jem.OpenAPIFromDocs(env, srv)
 	if err != nil {
 		logger.Infof("cannot open API: %v", err)
-		return badRequestf(err, "cannot connect to model")
+		return badRequestf(err, "cannot connect to environment")
 	}
 	defer conn.Close()
 
-	// Update addresses from latest known in controller.
+	// Update addresses from latest known in state server.
 	// Note that state.APIHostPorts is always guaranteed
 	// to include the actual address we succeeded in
 	// connecting to.
-	ctl.HostPorts = collapseHostPorts(conn.APIHostPorts())
+	srv.HostPorts = collapseHostPorts(conn.APIHostPorts())
 
-	err = h.jem.AddController(ctl, m)
+	err = h.jem.AddStateServer(srv, env)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
 	return nil
 }
 
-// GetController returns information on a controller.
-func (h *Handler) GetController(arg *params.GetController) (*params.ControllerResponse, error) {
-	if err := h.jem.CheckReadACL(h.jem.DB.Controllers(), arg.EntityPath); err != nil {
+// GetJES returns information on a state server.
+func (h *Handler) GetJES(arg *params.GetJES) (*params.JESResponse, error) {
+	if err := h.jem.CheckReadACL(h.jem.DB.StateServers(), arg.EntityPath); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	neSchema, err := h.schemaForNewModel(arg.EntityPath)
+	neSchema, err := h.schemaForNewEnv(arg.EntityPath)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	return &params.ControllerResponse{
+	return &params.JESResponse{
 		Path:         arg.EntityPath,
 		ProviderType: neSchema.providerType,
 		Schema:       neSchema.schema,
 	}, nil
 }
 
-// DeleteController removes an existing controller.
-func (h *Handler) DeleteController(arg *params.DeleteController) error {
+// DeleteJES removes an existing state server.
+func (h *Handler) DeleteJES(arg *params.DeleteJES) error {
 	// Check if user has permissions.
 	if err := h.jem.CheckIsUser(arg.EntityPath.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	if err := h.jem.DeleteController(arg.EntityPath); err != nil {
+	if err := h.jem.DeleteStateServer(arg.EntityPath); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	return nil
 }
 
-// GetModel returns information on a given model.
-func (h *Handler) GetModel(arg *params.GetModel) (*params.ModelResponse, error) {
-	if err := h.jem.CheckReadACL(h.jem.DB.Models(), arg.EntityPath); err != nil {
+// GetEnvironment returns information on a given environment.
+func (h *Handler) GetEnvironment(arg *params.GetEnvironment) (*params.EnvironmentResponse, error) {
+	if err := h.jem.CheckReadACL(h.jem.DB.Environments(), arg.EntityPath); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	m, err := h.jem.Model(arg.EntityPath)
+	env, err := h.jem.Environment(arg.EntityPath)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	ctl, err := h.jem.Controller(m.Controller)
+	srv, err := h.jem.StateServer(env.StateServer)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	return &params.ModelResponse{
+	return &params.EnvironmentResponse{
 		Path:      arg.EntityPath,
-		User:      m.AdminUser,
-		Password:  m.AdminPassword,
-		UUID:      m.UUID,
-		CACert:    ctl.CACert,
-		HostPorts: ctl.HostPorts,
+		User:      env.AdminUser,
+		Password:  env.AdminPassword,
+		UUID:      env.UUID,
+		CACert:    srv.CACert,
+		HostPorts: srv.HostPorts,
 	}, nil
 }
 
-// DeleteModel deletes an model from JEM.
-func (h *Handler) DeleteModel(arg *params.DeleteModel) error {
+// DeleteEnvironment deletes an environment from JEM.
+func (h *Handler) DeleteEnvironment(arg *params.DeleteEnvironment) error {
 	if err := h.jem.CheckIsUser(arg.EntityPath.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	if err := h.jem.DeleteModel(arg.EntityPath); err != nil {
+	if err := h.jem.DeleteEnvironment(arg.EntityPath); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrForbidden))
 	}
 	return nil
 }
 
-// ListModels returns all the models stored in JEM.
-func (h *Handler) ListModels(arg *params.ListModels) (*params.ListModelsResponse, error) {
+// ListEnvironments returns all the environments stored in JEM.
+func (h *Handler) ListEnvironments(arg *params.ListEnvironments) (*params.ListEnvironmentsResponse, error) {
 	// TODO provide a way of restricting the results.
 
-	// We get all controllers first, because many models will be
-	// sharing the same controllers.
-	// TODO we could do better than this and avoid gathering all the
-	// controllers into memory. Possiblities include caching
-	// controllers, and gathering results to do only a few
+	// We get all state servers first, because many environments
+	// will be sharing the same state servers.
+	// TODO we could do better than this and avoid
+	// gathering all the state servers into memory.
+	// Possiblities include caching state servers, and
+	// gathering results to do only a few
 	// concurrent queries.
-	controllers := make(map[params.EntityPath]mongodoc.Controller)
-	iter := h.jem.DB.Controllers().Find(nil).Sort("_id").Iter()
-	var ctl mongodoc.Controller
-	for iter.Next(&ctl) {
-		controllers[ctl.Path] = ctl
+	servers := make(map[params.EntityPath]mongodoc.StateServer)
+	iter := h.jem.DB.StateServers().Find(nil).Sort("_id").Iter()
+	var srv mongodoc.StateServer
+	for iter.Next(&srv) {
+		servers[srv.Path] = srv
 	}
 	if err := iter.Err(); err != nil {
-		return nil, errgo.Notef(err, "cannot get controllers")
+		return nil, errgo.Notef(err, "cannot get state servers")
 	}
-	models := make([]params.ModelResponse, 0, len(controllers))
-	modelIter := h.jem.CanReadIter(h.jem.DB.Models().Find(nil).Sort("_id").Iter())
-	var m mongodoc.Model
-	for modelIter.Next(&m) {
-		ctl, ok := controllers[m.Controller]
+	envs := make([]params.EnvironmentResponse, 0, len(servers))
+	envIter := h.jem.CanReadIter(h.jem.DB.Environments().Find(nil).Sort("_id").Iter())
+	var env mongodoc.Environment
+	for envIter.Next(&env) {
+		srv, ok := servers[env.StateServer]
 		if !ok {
-			logger.Errorf("model %s has invalid controller value %s; omitting from result", m.Path, m.Controller)
+			logger.Errorf("environment %s has invalid state server value %s; omitting from result", env.Path, env.StateServer)
 			continue
 		}
-		models = append(models, params.ModelResponse{
-			Path:      m.Path,
-			User:      m.AdminUser,
-			Password:  m.AdminPassword,
-			UUID:      m.UUID,
-			CACert:    ctl.CACert,
-			HostPorts: ctl.HostPorts,
+		envs = append(envs, params.EnvironmentResponse{
+			Path:      env.Path,
+			User:      env.AdminUser,
+			Password:  env.AdminPassword,
+			UUID:      env.UUID,
+			CACert:    srv.CACert,
+			HostPorts: srv.HostPorts,
 		})
 	}
-	if err := modelIter.Err(); err != nil {
-		return nil, errgo.Notef(err, "cannot get models")
+	if err := iter.Err(); err != nil {
+		return nil, errgo.Notef(err, "cannot get environments")
 	}
-	return &params.ListModelsResponse{
-		Models: models,
+	return &params.ListEnvironmentsResponse{
+		Environments: envs,
 	}, nil
 }
 
-// ListController returns all the controllers stored in JEM.
-// Currently the Template  and ProviderType field in each ControllerResponse is not
+// ListJES returns all the state servers stored in JEM.
+// Currently the Template  and ProviderType field in each JESResponse is not
 // populated.
-func (h *Handler) ListController(arg *params.ListController) (*params.ListControllerResponse, error) {
-	var controllers []params.ControllerResponse
+func (h *Handler) ListJES(arg *params.ListJES) (*params.ListJESResponse, error) {
+	var srvs []params.JESResponse
 
 	// TODO populate ProviderType and Schema fields when we have a cache
-	// for the schemaForNewModel results.
-	iter := h.jem.CanReadIter(h.jem.DB.Controllers().Find(nil).Sort("_id").Iter())
-	var ctl mongodoc.Controller
-	for iter.Next(&ctl) {
-		controllers = append(controllers, params.ControllerResponse{
-			Path: ctl.Path,
+	// for the schemaForNewEnv results.
+	iter := h.jem.CanReadIter(h.jem.DB.StateServers().Find(nil).Sort("_id").Iter())
+	var srv mongodoc.StateServer
+	for iter.Next(&srv) {
+		srvs = append(srvs, params.JESResponse{
+			Path: srv.Path,
 		})
 	}
 	if err := iter.Err(); err != nil {
-		return nil, errgo.Notef(err, "cannot get models")
+		return nil, errgo.Notef(err, "cannot get environments")
 	}
-	return &params.ListControllerResponse{
-		Controllers: controllers,
+	return &params.ListJESResponse{
+		StateServers: srvs,
 	}, nil
 }
 
@@ -266,21 +267,21 @@ func (h *Handler) configWithTemplates(config map[string]interface{}, paths []par
 	return result, nil
 }
 
-// NewModel creates a new model inside an existing Controller.
-func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error) {
+// NewEnvironment creates a new environment inside an existing JES.
+func (h *Handler) NewEnvironment(args *params.NewEnvironment) (*params.EnvironmentResponse, error) {
 	if err := h.jem.CheckIsUser(args.User); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	if err := h.jem.CheckReadACL(h.jem.DB.Controllers(), args.Info.Controller); err != nil {
+	if err := h.jem.CheckReadACL(h.jem.DB.StateServers(), args.Info.StateServer); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	conn, err := h.jem.OpenAPI(args.Info.Controller)
+	conn, err := h.jem.OpenAPI(args.Info.StateServer)
 	if err != nil {
-		return nil, errgo.NoteMask(err, "cannot connect to controller", errgo.Is(params.ErrNotFound))
+		return nil, errgo.NoteMask(err, "cannot connect to state server", errgo.Is(params.ErrNotFound))
 	}
 	defer conn.Close()
 
-	neSchema, err := h.schemaForNewModel(args.Info.Controller)
+	neSchema, err := h.schemaForNewEnv(args.Info.StateServer)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -289,35 +290,35 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 		return nil, errgo.Mask(err)
 	}
 	// Ensure that the attributes look reasonably OK before bothering
-	// the controller with them.
+	// the state server with them.
 	attrs, err := neSchema.checker.Coerce(config, nil)
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "cannot validate attributes")
 	}
-	// We create a user for the model so that the caller knows
-	// what password to use when accessing their new model.
+	// We create a user for the environment so that the caller knows
+	// what password to use when accessing their new environment.
 	// When juju supports macaroon authorization, we won't need
-	// to do this - we could just inform the controller of the required
+	// to do this - we could just inform the state server of the required
 	// user/group (args.User) instead.
-	modelPath := params.EntityPath{args.User, args.Info.Name}
-	jujuUser := userForModel(modelPath)
+	envPath := params.EntityPath{args.User, args.Info.Name}
+	jujuUser := userForEnvironment(envPath)
 	if err := h.createUser(conn, jujuUser, args.Info.Password); err != nil {
 		return nil, errgo.NoteMask(err, "cannot create user", errgo.Is(params.ErrBadRequest))
 	}
 	logger.Infof("created user %q", args.User)
 
-	// Create the model record in the database before actually
-	// creating the model on the controller. It will have an invalid
+	// Create the environment record in the database before actually
+	// creating the environment on the state server. It will have an invalid
 	// UUID because it doesn't exist but that's better than creating
-	// an model that we can't add locally because the name
+	// an environment that we can't add locally because the name
 	// already exists.
-	modelDoc := &mongodoc.Model{
-		Path:          modelPath,
+	envDoc := &mongodoc.Environment{
+		Path:          envPath,
 		AdminUser:     jujuUser,
 		AdminPassword: args.Info.Password,
-		Controller:    args.Info.Controller,
+		StateServer:   args.Info.StateServer,
 	}
-	if err := h.jem.AddModel(modelDoc); err != nil {
+	if err := h.jem.AddEnvironment(envDoc); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
 
@@ -326,31 +327,31 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 	for name, field := range neSchema.skeleton {
 		fields[name] = field
 	}
-	// Add the model name.
-	// Note that AddModel has set modelDoc.Id for us.
-	fields["name"] = idToModelName(modelDoc.Id)
+	// Add the environment name.
+	// Note that AddEnvironment has set envdoc.Id for us.
+	fields["name"] = idToEnvName(envDoc.Id)
 
 	emclient := environmentmanager.NewClient(conn.Connection)
-	m, err := emclient.CreateEnvironment(jujuUser, nil, fields)
+	env, err := emclient.CreateEnvironment(jujuUser, nil, fields)
 	if err != nil {
-		// Remove the model that was created, because it's no longer valid.
-		if err := h.jem.DB.Models().RemoveId(modelDoc.Id); err != nil {
-			logger.Errorf("cannot remove model from database after model creation error: %v", err)
+		// Remove the environment that was created, because it's no longer valid.
+		if err := h.jem.DB.Environments().RemoveId(envDoc.Id); err != nil {
+			logger.Errorf("cannot remove environment from database after env creation error: %v", err)
 		}
-		return nil, errgo.Notef(err, "cannot create model")
+		return nil, errgo.Notef(err, "cannot create environment")
 	}
-	// Now set the UUID to that of the actually created model.
-	if err := h.jem.DB.Models().UpdateId(modelDoc.Id, bson.D{{"$set", bson.D{{"uuid", m.UUID}}}}); err != nil {
-		return nil, errgo.Notef(err, "cannot update model UUID in database, leaked model %s", m.UUID)
+	// Now set the UUID to that of the actually created environment.
+	if err := h.jem.DB.Environments().UpdateId(envDoc.Id, bson.D{{"$set", bson.D{{"uuid", env.UUID}}}}); err != nil {
+		return nil, errgo.Notef(err, "cannot update environment UUID in database, leaked environment %s", env.UUID)
 	}
-	return &params.ModelResponse{
-		Path:           modelPath,
-		User:           jujuUser,
-		Password:       args.Info.Password,
-		ControllerUUID: conn.Info.EnvironTag.Id(),
-		UUID:           m.UUID,
-		CACert:         conn.Info.CACert,
-		HostPorts:      conn.Info.Addrs,
+	return &params.EnvironmentResponse{
+		Path:       envPath,
+		User:       jujuUser,
+		Password:   args.Info.Password,
+		ServerUUID: conn.Info.EnvironTag.Id(),
+		UUID:       env.UUID,
+		CACert:     conn.Info.CACert,
+		HostPorts:  conn.Info.Addrs,
 	}, nil
 }
 
@@ -359,9 +360,9 @@ func (h *Handler) AddTemplate(arg *params.AddTemplate) error {
 	if err := h.jem.CheckIsUser(arg.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	neSchema, err := h.schemaForNewModel(arg.Info.Controller)
+	neSchema, err := h.schemaForNewEnv(arg.Info.StateServer)
 	if err != nil {
-		return errgo.Notef(err, "cannot get schema for controller")
+		return errgo.Notef(err, "cannot get schema for state server")
 	}
 
 	fields, defaults, err := neSchema.schema.ValidationSchema()
@@ -474,20 +475,20 @@ func (h *Handler) SetTemplatePerm(arg *params.SetTemplatePerm) error {
 	return h.setPerm(h.jem.DB.Templates(), arg.EntityPath, arg.ACL)
 }
 
-// SetControllerPerm sets the permissions on a controller entity.
+// SetStateServerPerm sets the permissions on a state server entity.
 // Only the owner (arg.EntityPath.User) can change the permissions
 // on an an entity. The owner can always read an entity, even
 // if it has empty ACL.
-func (h *Handler) SetControllerPerm(arg *params.SetControllerPerm) error {
-	return h.setPerm(h.jem.DB.Controllers(), arg.EntityPath, arg.ACL)
+func (h *Handler) SetStateServerPerm(arg *params.SetStateServerPerm) error {
+	return h.setPerm(h.jem.DB.StateServers(), arg.EntityPath, arg.ACL)
 }
 
-// SetModelPerm sets the permissions on a controller entity.
+// SetEnvironmentPerm sets the permissions on a state server entity.
 // Only the owner (arg.EntityPath.User) can change the permissions
 // on an an entity. The owner can always read an entity, even
 // if it has empty ACL.
-func (h *Handler) SetModelPerm(arg *params.SetModelPerm) error {
-	return h.setPerm(h.jem.DB.Models(), arg.EntityPath, arg.ACL)
+func (h *Handler) SetEnvironmentPerm(arg *params.SetEnvironmentPerm) error {
+	return h.setPerm(h.jem.DB.Environments(), arg.EntityPath, arg.ACL)
 }
 
 func (h *Handler) setPerm(coll *mgo.Collection, path params.EntityPath, acl params.ACL) error {
@@ -505,16 +506,16 @@ func (h *Handler) setPerm(coll *mgo.Collection, path params.EntityPath, acl para
 	return nil
 }
 
-// GetControllerPerm returns the ACL for a given controller.
+// GetStateServerPerm returns the ACL for a given state server.
 // Only the owner (arg.EntityPath.User) can read the ACL.
-func (h *Handler) GetControllerPerm(arg *params.GetControllerPerm) (params.ACL, error) {
-	return h.getPerm(h.jem.DB.Controllers(), arg.EntityPath)
+func (h *Handler) GetStateServerPerm(arg *params.GetStateServerPerm) (params.ACL, error) {
+	return h.getPerm(h.jem.DB.StateServers(), arg.EntityPath)
 }
 
-// GetModelPerm returns the ACL for a given model.
+// GetEnvironmentPerm returns the ACL for a given environment.
 // Only the owner (arg.EntityPath.User) can read the ACL.
-func (h *Handler) GetModelPerm(arg *params.GetModelPerm) (params.ACL, error) {
-	return h.getPerm(h.jem.DB.Models(), arg.EntityPath)
+func (h *Handler) GetEnvironmentPerm(arg *params.GetEnvironmentPerm) (params.ACL, error) {
+	return h.getPerm(h.jem.DB.Environments(), arg.EntityPath)
 }
 
 func (h *Handler) getPerm(coll *mgo.Collection, path params.EntityPath) (params.ACL, error) {
@@ -529,15 +530,15 @@ func (h *Handler) getPerm(coll *mgo.Collection, path params.EntityPath) (params.
 	return acl, nil
 }
 
-// userForModel returns the juju user to use for
-// the model with the given path.
+// userForEnvironment returns the juju user to use for
+// the environment with the given path.
 // This should go when juju supports macaroon
 // authorization.
-func userForModel(p params.EntityPath) string {
+func userForEnvironment(p params.EntityPath) string {
 	return "jem-" + string(p.User) + "--" + string(p.Name)
 }
 
-func idToModelName(id string) string {
+func idToEnvName(id string) string {
 	return strings.Replace(id, "/", "_", -1)
 }
 
@@ -563,23 +564,23 @@ func (h *Handler) createUser(conn *apiconn.Conn, user, password string) error {
 	return nil
 }
 
-type schemaForNewModel struct {
+type schemaForNewEnv struct {
 	providerType string
 	schema       environschema.Fields
 	checker      schema.Checker
 	skeleton     map[string]interface{}
 }
 
-// schemaForNewModel returns the schema for the configuration options
-// for creating new models on the controller with the given id.
-func (h *Handler) schemaForNewModel(ctlPath params.EntityPath) (*schemaForNewModel, error) {
-	st, err := h.jem.OpenAPI(ctlPath)
+// schemaForNewEnv returns the schema for the configuration options
+// for creating new environments on the state server with the given id.
+func (h *Handler) schemaForNewEnv(srvPath params.EntityPath) (*schemaForNewEnv, error) {
+	st, err := h.jem.OpenAPI(srvPath)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot open API", errgo.Is(params.ErrNotFound))
 	}
 	defer st.Close()
 
-	var neSchema schemaForNewModel
+	var neSchema schemaForNewEnv
 
 	client := environmentmanager.NewClient(st)
 	neSchema.skeleton, err = client.ConfigSkeleton("", "")
@@ -597,7 +598,7 @@ func (h *Handler) schemaForNewModel(ctlPath params.EntityPath) (*schemaForNewMod
 	if !ok {
 		return nil, errgo.Notef(err, "provider %q does not provide schema", neSchema.providerType)
 	}
-	// TODO get the model schema over the juju API.
+	// TODO get the environment schema over the juju API.
 	neSchema.schema = schp.Schema()
 
 	// Remove everything from the schema that's in the skeleton.
@@ -611,8 +612,8 @@ func (h *Handler) schemaForNewModel(ctlPath params.EntityPath) (*schemaForNewMod
 			delete(neSchema.schema, name)
 		}
 	}
-	// We're going to set the model name from the
-	// JEM model path, so remove it from
+	// We're going to set the environment name from the
+	// JEM environment path, so remove it from
 	// the schema.
 	delete(neSchema.schema, "name")
 	// TODO Delete admin-secret too, because it's never a valid

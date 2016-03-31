@@ -11,21 +11,21 @@ import (
 	"github.com/CanonicalLtd/jem/params"
 )
 
-type addControllerCommand struct {
+type addServerCommand struct {
 	commandBase
 
-	modelName string
-	modelPath entityPathValue
+	envName string
+	envPath entityPathValue
 }
 
-func newAddControllerCommand() cmd.Command {
-	return envcmd.WrapBase(&addControllerCommand{})
+func newAddServerCommand() cmd.Command {
+	return envcmd.WrapBase(&addServerCommand{})
 }
 
-var addControllerDoc = `
-The add-controller command adds an existing Juju controller to the JEM.
-It takes the information from the data stored locally by juju (the
-current model by default).
+var addServerDoc = `
+The add-controller command adds an existing Juju controller (formerly known as
+state server) to the JEM. It takes the information from the
+data stored locally by juju (the current model by default).
 
 The <user>/<name> argument specifies the name
 that will be given to the controller inside JEM.
@@ -34,37 +34,37 @@ JEM commands which refer to a model
 can also use the controller name.
 `
 
-func (c *addControllerCommand) Info() *cmd.Info {
+func (c *addServerCommand) Info() *cmd.Info {
 	return &cmd.Info{
 		Name:    "add-controller",
 		Args:    "<user>/<name>",
 		Purpose: "Add a controller to JEM.",
-		Doc:     addControllerDoc,
+		Doc:     addServerDoc,
 	}
 }
 
-func (c *addControllerCommand) SetFlags(f *gnuflag.FlagSet) {
+func (c *addServerCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.commandBase.SetFlags(f)
-	f.StringVar(&c.modelName, "m", "", "model to add")
-	f.StringVar(&c.modelName, "model", "", "")
+	f.StringVar(&c.envName, "m", "", "model to add")
+	f.StringVar(&c.envName, "model", "", "")
 }
 
-func (c *addControllerCommand) Init(args []string) error {
+func (c *addServerCommand) Init(args []string) error {
 	if len(args) != 1 {
 		return errgo.Newf("got %d arguments, want 1", len(args))
 	}
-	if err := c.modelPath.Set(args[0]); err != nil {
+	if err := c.envPath.Set(args[0]); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil
 }
 
-func (c *addControllerCommand) Run(ctxt *cmd.Context) error {
+func (c *addServerCommand) Run(ctxt *cmd.Context) error {
 	client, err := c.newClient(ctxt)
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	info, err := modelInfo(c.modelName)
+	info, err := environInfo(c.envName)
 	if err != nil {
 		return errgo.Mask(err)
 	}
@@ -79,15 +79,15 @@ func (c *addControllerCommand) Run(ctxt *cmd.Context) error {
 		hostnames = ep.Addresses
 	}
 
-	logger.Infof("adding controller, user %s, name %s", c.modelPath.EntityPath.User, c.modelPath.EntityPath.Name)
-	if err := client.AddController(&params.AddController{
-		EntityPath: c.modelPath.EntityPath,
-		Info: params.ControllerInfo{
-			HostPorts: hostnames,
-			CACert:    ep.CACert,
-			ModelUUID: ep.EnvironUUID,
-			User:      creds.User,
-			Password:  creds.Password,
+	logger.Infof("adding JES, user %s, name %s")
+	if err := client.AddJES(&params.AddJES{
+		EntityPath: c.envPath.EntityPath,
+		Info: params.ServerInfo{
+			HostPorts:   hostnames,
+			CACert:      ep.CACert,
+			EnvironUUID: ep.EnvironUUID,
+			User:        creds.User,
+			Password:    creds.Password,
 		},
 	}); err != nil {
 		return errgo.Notef(err, "cannot add controller")

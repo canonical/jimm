@@ -17,18 +17,18 @@ func (s *listTemplatesSuite) TestChangePerm(c *gc.C) {
 
 	// First add the controller that we're going to use
 	// to create the new templates.
-	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/controller")
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/env")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
 	// Add a couple of templates.
-	stdout, stderr, code = run(c, c.MkDir(), "create-template", "-c", "bob/controller", "bob/foo", "state-server=true")
+	stdout, stderr, code = run(c, c.MkDir(), "create-template", "-c", "bob/env", "bob/foo", "state-server=true")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	stdout, stderr, code = run(c, c.MkDir(), "create-template", "-c", "bob/controller", "bob/bar", "state-server=false")
+	stdout, stderr, code = run(c, c.MkDir(), "create-template", "-c", "bob/env", "bob/bar", "state-server=false")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")

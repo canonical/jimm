@@ -109,12 +109,12 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 	home := utils.Home()
 	jujuHome := osenv.JujuHomePath()
 	tests := []struct {
-		about          string
-		modelName      params.Name
-		controllerInfo params.ControllerResponse
-		config         map[string]interface{}
+		about   string
+		envName params.Name
+		jesInfo params.JESResponse
+		config  map[string]interface{}
 
-		// envVars holds a map from environment variable
+		// envVars holds a map from model variable
 		// name to value. Each entry will be set at the start
 		// of the test.
 		envVars map[string]string
@@ -127,7 +127,7 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 		expectConfig map[string]interface{}
 	}{{
 		about: "one parameter, no defaults",
-		controllerInfo: params.ControllerResponse{
+		jesInfo: params.JESResponse{
 			ProviderType: "something",
 			Schema: environschema.Fields{
 				"attr": {
@@ -142,11 +142,11 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 			"attr": "hello",
 		},
 	}, {
-		about: "environment variable defaults",
+		about: "model variable defaults",
 		envVars: map[string]string{
 			"somevar": "avalue",
 		},
-		controllerInfo: params.ControllerResponse{
+		jesInfo: params.JESResponse{
 			ProviderType: "something",
 			Schema: environschema.Fields{
 				"attr": {
@@ -159,11 +159,11 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 			"attr": "avalue",
 		},
 	}, {
-		about: "fallback environment variable defaults",
+		about: "fallback model variable defaults",
 		envVars: map[string]string{
 			"var3": "var3 value",
 		},
-		controllerInfo: params.ControllerResponse{
+		jesInfo: params.JESResponse{
 			ProviderType: "something",
 			Schema: environschema.Fields{
 				"attr": {
@@ -177,11 +177,11 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 			"attr": "var3 value",
 		},
 	}, {
-		about: "fallback environment variable defaults with empty EnvVar",
+		about: "fallback model variable defaults with empty EnvVar",
 		envVars: map[string]string{
 			"var2": "var2 value",
 		},
-		controllerInfo: params.ControllerResponse{
+		jesInfo: params.JESResponse{
 			ProviderType: "something",
 			Schema: environschema.Fields{
 				"attr": {
@@ -199,7 +199,7 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 		files: map[string]string{
 			filepath.Join(home, ".ssh", "id_rsa.pub"): fakeSSHKey,
 		},
-		controllerInfo: params.ControllerResponse{
+		jesInfo: params.JESResponse{
 			ProviderType: "something",
 			Schema: environschema.Fields{
 				"authorized-keys": {
@@ -215,7 +215,7 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 		files: map[string]string{
 			filepath.Join(home, ".ssh", "another.pub"): fakeSSHKey,
 		},
-		controllerInfo: params.ControllerResponse{
+		jesInfo: params.JESResponse{
 			ProviderType: "something",
 			Schema: environschema.Fields{
 				"authorized-keys": {
@@ -234,7 +234,7 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 		files: map[string]string{
 			filepath.Join(home, "key.pub"): fakeSSHKey,
 		},
-		controllerInfo: params.ControllerResponse{
+		jesInfo: params.JESResponse{
 			ProviderType: "something",
 			Schema: environschema.Fields{
 				"authorized-keys": {
@@ -253,7 +253,7 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 		files: map[string]string{
 			filepath.Join(jujuHome, "x"): "content",
 		},
-		controllerInfo: params.ControllerResponse{
+		jesInfo: params.JESResponse{
 			ProviderType: "something",
 			Schema: environschema.Fields{
 				"attr": {
@@ -272,7 +272,7 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 		files: map[string]string{
 			filepath.Join(home, "x"): "content",
 		},
-		controllerInfo: params.ControllerResponse{
+		jesInfo: params.JESResponse{
 			ProviderType: "something",
 			Schema: environschema.Fields{
 				"attr": {
@@ -291,7 +291,7 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 		files: map[string]string{
 			filepath.Join(home, "x"): "content",
 		},
-		controllerInfo: params.ControllerResponse{
+		jesInfo: params.JESResponse{
 			ProviderType: "something",
 			Schema: environschema.Fields{
 				"attr": {
@@ -310,7 +310,7 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 		files: map[string]string{
 			filepath.Join(jujuHome, "x"): "",
 		},
-		controllerInfo: params.ControllerResponse{
+		jesInfo: params.JESResponse{
 			ProviderType: "something",
 			Schema: environschema.Fields{
 				"attr": {
@@ -324,7 +324,7 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 		expectError: `cannot get value for "attr": file ".*home/ubuntu/.juju/x" is empty`,
 	}, {
 		about: "attribute from path ignored with non-string template entry",
-		controllerInfo: params.ControllerResponse{
+		jesInfo: params.JESResponse{
 			ProviderType: "something",
 			Schema: environschema.Fields{
 				"attr": {
@@ -338,7 +338,7 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 		expectConfig: map[string]interface{}{},
 	}, {
 		about: "provider default",
-		controllerInfo: params.ControllerResponse{
+		jesInfo: params.JESResponse{
 			ProviderType: "test",
 			Schema: environschema.Fields{
 				"testattr": {
@@ -351,7 +351,7 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 		},
 	}, {
 		about: "provider default error",
-		controllerInfo: params.ControllerResponse{
+		jesInfo: params.JESResponse{
 			ProviderType: "test",
 			Schema: environschema.Fields{
 				"testattr-error": {
@@ -362,21 +362,21 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 		expectError: `cannot get value for "testattr-error": an error`,
 	}, {
 		about: "attribute from context",
-		controllerInfo: params.ControllerResponse{
+		jesInfo: params.JESResponse{
 			ProviderType: "test",
 			Schema: environschema.Fields{
-				"testattr-modelname": {
+				"testattr-envname": {
 					Type: environschema.Tstring,
 				},
 			},
 		},
-		modelName: "foo",
+		envName: "foo",
 		expectConfig: map[string]interface{}{
-			"testattr-modelname": "modelname-foo",
+			"testattr-envname": "envname-foo",
 		},
 	}, {
 		about: "no value found for mandatory attribute",
-		controllerInfo: params.ControllerResponse{
+		jesInfo: params.JESResponse{
 			ProviderType: "test",
 			Schema: environschema.Fields{
 				"attr": {
@@ -388,7 +388,7 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 		expectError: `no value found for mandatory attribute "attr"`,
 	}, {
 		about: "mandatory attribute with value",
-		controllerInfo: params.ControllerResponse{
+		jesInfo: params.JESResponse{
 			ProviderType: "test",
 			Schema: environschema.Fields{
 				"attr": {
@@ -405,7 +405,7 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 		},
 	}, {
 		about: "invalid attribute",
-		controllerInfo: params.ControllerResponse{
+		jesInfo: params.JESResponse{
 			ProviderType: "test",
 			Schema: environschema.Fields{
 				"attr": {
@@ -416,7 +416,7 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 		expectError: `invalid attribute "attr": invalid type "bogus"`,
 	}, {
 		about: "invalid value",
-		controllerInfo: params.ControllerResponse{
+		jesInfo: params.JESResponse{
 			ProviderType: "test",
 			Schema: environschema.Fields{
 				"attr": {
@@ -429,8 +429,8 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 		},
 		expectError: `bad value for "attr" in attributes: expected number, got string\("something"\)`,
 	}, {
-		about: "environment variable with bad value",
-		controllerInfo: params.ControllerResponse{
+		about: "model variable with bad value",
+		jesInfo: params.JESResponse{
 			ProviderType: "test",
 			Schema: environschema.Fields{
 				"attr": {
@@ -452,8 +452,8 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 			"testattr-error": func(schemaContext) (interface{}, error) {
 				return "", errgo.New("an error")
 			},
-			"testattr-modelname": func(ctxt schemaContext) (interface{}, error) {
-				return "modelname-" + string(ctxt.modelName), nil
+			"testattr-envname": func(ctxt schemaContext) (interface{}, error) {
+				return "envname-" + string(ctxt.envName), nil
 			},
 		},
 	})
@@ -475,10 +475,10 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 		}
 		ctxt := schemaContext{
 			knownAttrs:   config,
-			modelName:    test.modelName,
-			providerType: test.controllerInfo.ProviderType,
+			envName:      test.envName,
+			providerType: test.jesInfo.ProviderType,
 		}
-		resultConfig, err := ctxt.generateConfig(test.controllerInfo.Schema)
+		resultConfig, err := ctxt.generateConfig(test.jesInfo.Schema)
 		if test.expectError != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectError, gc.Commentf("config: %#v", resultConfig))
 		} else {

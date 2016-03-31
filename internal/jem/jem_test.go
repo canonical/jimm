@@ -52,183 +52,189 @@ func (s *jemSuite) TearDownTest(c *gc.C) {
 	s.IsolatedMgoSuite.TearDownTest(c)
 }
 
-func (s *jemSuite) TestAddController(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "x"}
-	ctl := &mongodoc.Controller{
+func (s *jemSuite) TestAddStateServer(c *gc.C) {
+	srvPath := params.EntityPath{"bob", "x"}
+	srv := &mongodoc.StateServer{
 		Id:        "ignored",
-		Path:      ctlPath,
+		Path:      srvPath,
 		CACert:    "certainly",
 		HostPorts: []string{"host1:1234", "host2:9999"},
 	}
-	m := &mongodoc.Model{
+	env := &mongodoc.Environment{
 		Id:            "ignored",
 		Path:          params.EntityPath{"ignored-user", "ignored-name"},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 	}
-	err := s.store.AddController(ctl, m)
+	err := s.store.AddStateServer(srv, env)
 	c.Assert(err, gc.IsNil)
 
 	// Check that the fields have been mutated as expected.
-	c.Assert(ctl, jc.DeepEquals, &mongodoc.Controller{
+	c.Assert(srv, jc.DeepEquals, &mongodoc.StateServer{
 		Id:        "bob/x",
-		Path:      ctlPath,
+		Path:      srvPath,
 		CACert:    "certainly",
 		HostPorts: []string{"host1:1234", "host2:9999"},
 	})
-	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
+	c.Assert(env, jc.DeepEquals, &mongodoc.Environment{
 		Id:            "bob/x",
-		Path:          ctlPath,
-		Controller:    ctlPath,
+		Path:          srvPath,
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
+		StateServer:   srvPath,
 	})
 
-	ctl1, err := s.store.Controller(ctlPath)
+	srv1, err := s.store.StateServer(srvPath)
 	c.Assert(err, gc.IsNil)
-	c.Assert(ctl1, jc.DeepEquals, &mongodoc.Controller{
+	c.Assert(srv1, jc.DeepEquals, &mongodoc.StateServer{
 		Id:        "bob/x",
-		Path:      ctlPath,
+		Path:      srvPath,
 		CACert:    "certainly",
 		HostPorts: []string{"host1:1234", "host2:9999"},
 	})
-	m1, err := s.store.Model(ctlPath)
+	env1, err := s.store.Environment(srvPath)
 	c.Assert(err, gc.IsNil)
-	c.Assert(m1, jc.DeepEquals, m)
+	c.Assert(env1, jc.DeepEquals, env)
 
-	err = s.store.AddController(ctl, m)
+	err = s.store.AddStateServer(srv, env)
 	c.Assert(err, gc.ErrorMatches, "already exists")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
 
-	ctlPath2 := params.EntityPath{"bob", "y"}
-	ctl2 := &mongodoc.Controller{
+	srvPath2 := params.EntityPath{"bob", "y"}
+	srv2 := &mongodoc.StateServer{
 		Id:        "ignored",
-		Path:      ctlPath2,
+		Path:      srvPath2,
 		CACert:    "certainly",
 		HostPorts: []string{"host1:1234", "host2:9999"},
 	}
-	m2 := &mongodoc.Model{
+	env2 := &mongodoc.Environment{
 		Id:            "bob/noty",
 		Path:          params.EntityPath{"ignored-user", "ignored-name"},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 	}
-	err = s.store.AddController(ctl2, m2)
+	err = s.store.AddStateServer(srv2, env2)
 	c.Assert(err, gc.IsNil)
-	m3, err := s.store.Model(ctlPath2)
+	env3, err := s.store.Environment(srvPath2)
 	c.Assert(err, gc.IsNil)
-	c.Assert(m3, jc.DeepEquals, m2)
+	c.Assert(env3, jc.DeepEquals, env2)
 }
 
-func (s *jemSuite) TestDeleteController(c *gc.C) {
-	ctlPath := params.EntityPath{"dalek", "who"}
-	ctl := &mongodoc.Controller{
+func (s *jemSuite) TestDeleteStateServer(c *gc.C) {
+	srvPath := params.EntityPath{"dalek", "who"}
+	srv := &mongodoc.StateServer{
 		Id:        "ignored",
-		Path:      ctlPath,
+		Path:      srvPath,
 		CACert:    "certainly",
 		HostPorts: []string{"host1:1234", "host2:9999"},
 	}
-	m := &mongodoc.Model{
+	env := &mongodoc.Environment{
 		Id:            "dalek/who",
 		Path:          params.EntityPath{"ignored", "ignored"},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 	}
-	err := s.store.AddController(ctl, m)
+	err := s.store.AddStateServer(srv, env)
 	c.Assert(err, gc.IsNil)
-	err = s.store.DeleteController(ctlPath)
+	err = s.store.DeleteStateServer(srvPath)
 	c.Assert(err, gc.IsNil)
 
-	ctl1, err := s.store.Controller(ctlPath)
-	c.Assert(ctl1, gc.IsNil)
-	m1, err := s.store.Model(ctlPath)
-	c.Assert(m1, gc.IsNil)
+	srv1, err := s.store.StateServer(srvPath)
+	c.Assert(srv1, gc.IsNil)
+	env1, err := s.store.Environment(srvPath)
+	c.Assert(env1, gc.IsNil)
 
-	err = s.store.DeleteController(ctlPath)
-	c.Assert(err, gc.ErrorMatches, "controller \"dalek/who\" not found")
+	err = s.store.DeleteStateServer(srvPath)
+	c.Assert(err, gc.ErrorMatches, "state server \"dalek/who\" not found")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
-	// Test with non-existing model.
-	ctl2 := &mongodoc.Controller{
+	// Test with non-existing environment.
+	srv2 := &mongodoc.StateServer{
 		Id:        "dalek/who",
-		Path:      ctlPath,
+		Path:      srvPath,
 		CACert:    "certainly",
 		HostPorts: []string{"host1:1234", "host2:9999"},
 	}
-	m2 := &mongodoc.Model{
+	env2 := &mongodoc.Environment{
 		Id:            "dalek/exterminated",
 		Path:          params.EntityPath{"ignored", "ignored"},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 	}
-	err = s.store.AddController(ctl2, m2)
+	err = s.store.AddStateServer(srv2, env2)
 	c.Assert(err, gc.IsNil)
 
-	err = s.store.DeleteController(ctlPath)
+	err = s.store.DeleteStateServer(srvPath)
 	c.Assert(err, gc.IsNil)
-	ctl3, err := s.store.Controller(ctlPath)
-	c.Assert(ctl3, gc.IsNil)
-	m3, err := s.store.Model(ctlPath)
-	c.Assert(m3, gc.IsNil)
+	srv3, err := s.store.StateServer(srvPath)
+	c.Assert(srv3, gc.IsNil)
+	env3, err := s.store.Environment(srvPath)
+	c.Assert(env3, gc.IsNil)
 }
 
-func (s *jemSuite) TestDeleteModelemnt(c *gc.C) {
-	ctlPath := params.EntityPath{"dalek", "who"}
-	ctl := &mongodoc.Controller{
+func (s *jemSuite) TestDeleteEnvironemnt(c *gc.C) {
+	srvPath := params.EntityPath{"dalek", "who"}
+	srv := &mongodoc.StateServer{
 		Id:        "ignored",
-		Path:      ctlPath,
+		Path:      srvPath,
 		CACert:    "certainly",
 		HostPorts: []string{"host1:1234", "host2:9999"},
 	}
-	m := &mongodoc.Model{
+	env := &mongodoc.Environment{
 		Id:            "dalek/who",
 		Path:          params.EntityPath{"ignored", "ignored"},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 	}
-	err := s.store.AddController(ctl, m)
+	err := s.store.AddStateServer(srv, env)
 	c.Assert(err, gc.IsNil)
 
-	err = s.store.DeleteModel(m.Path)
-	c.Assert(err, gc.ErrorMatches, `cannot remove model "dalek/who" because it is a controller`)
+	err = s.store.DeleteEnvironment(env.Path)
+	c.Assert(err, gc.ErrorMatches, `cannot remove environment "dalek/who" because it is a state server`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrForbidden)
 
-	modelPath := params.EntityPath{"dalek", "exterminate"}
-	m2 := &mongodoc.Model{
-		Id:   "dalek/exterminate",
-		Path: modelPath,
+	envPath := params.EntityPath{"dalek", "exterminate"}
+	env2 := &mongodoc.Environment{
+		Id:            "dalek/exterminate",
+		Path:          envPath,
+		AdminUser:     "foo-admin",
+		AdminPassword: "foo-password",
 	}
-	err = s.store.AddModel(m2)
+	err = s.store.AddEnvironment(env2)
 	c.Assert(err, gc.IsNil)
 
-	err = s.store.DeleteModel(m2.Path)
+	err = s.store.DeleteEnvironment(env2.Path)
 	c.Assert(err, gc.IsNil)
-	m3, err := s.store.Model(modelPath)
-	c.Assert(m3, gc.IsNil)
+	env3, err := s.store.Environment(envPath)
+	c.Assert(env3, gc.IsNil)
 
-	err = s.store.DeleteModel(m2.Path)
-	c.Assert(err, gc.ErrorMatches, "model \"dalek/exterminate\" not found")
+	err = s.store.DeleteEnvironment(env2.Path)
+	c.Assert(err, gc.ErrorMatches, "environment \"dalek/exterminate\" not found")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
-func (s *jemSuite) TestAddModel(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "x"}
-	m := &mongodoc.Model{
-		Id:   "ignored",
-		Path: ctlPath,
+func (s *jemSuite) TestAddEnvironment(c *gc.C) {
+	srvPath := params.EntityPath{"bob", "x"}
+	env := &mongodoc.Environment{
+		Id:            "ignored",
+		Path:          srvPath,
+		AdminUser:     "foo-admin",
+		AdminPassword: "foo-password",
 	}
-	err := s.store.AddModel(m)
+	err := s.store.AddEnvironment(env)
 	c.Assert(err, gc.IsNil)
-	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
-		Id:   "bob/x",
-		Path: ctlPath,
+	c.Assert(env, jc.DeepEquals, &mongodoc.Environment{
+		Id:            "bob/x",
+		Path:          srvPath,
+		AdminUser:     "foo-admin",
+		AdminPassword: "foo-password",
 	})
 
-	m1, err := s.store.Model(ctlPath)
+	env1, err := s.store.Environment(srvPath)
 	c.Assert(err, gc.IsNil)
-	c.Assert(m1, jc.DeepEquals, m)
+	c.Assert(env1, jc.DeepEquals, env)
 
-	err = s.store.AddModel(m)
+	err = s.store.AddEnvironment(env)
 	c.Assert(err, gc.ErrorMatches, "already exists")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
 }
@@ -240,13 +246,13 @@ func (s *jemSuite) TestAddTemplate(c *gc.C) {
 		Path: path,
 		Schema: environschema.Fields{
 			"name": {
-				Description: "name of model",
+				Description: "name of environment",
 				Type:        environschema.Tstring,
 				Mandatory:   true,
 				Values:      []interface{}{"venus", "pluto"},
 			},
 			"temperature": {
-				Description: "temperature of model",
+				Description: "temperature of environment",
 				Type:        environschema.Tint,
 				Example:     400,
 				Values:      []interface{}{-400, 864.0},
@@ -285,13 +291,13 @@ func (s *jemSuite) TestDeleteTemplate(c *gc.C) {
 		Path: path,
 		Schema: environschema.Fields{
 			"name": {
-				Description: "name of model",
+				Description: "name of environment",
 				Type:        environschema.Tstring,
 				Mandatory:   true,
 				Values:      []interface{}{"venus", "pluto"},
 			},
 			"temperature": {
-				Description: "temperature of model",
+				Description: "temperature of environment",
 				Type:        environschema.Tint,
 				Example:     400,
 				Values:      []interface{}{-400, 864.0},
@@ -334,16 +340,16 @@ func (s *jemSuite) TestSessionIsCopied(c *gc.C) {
 	store := pool.JEM()
 	defer store.Close()
 	// Check that we get an appropriate error when getting
-	// a non-existent model, indicating that database
+	// a non-existent environment, indicating that database
 	// access is going OK.
-	_, err = store.Model(params.EntityPath{"bob", "x"})
+	_, err = store.Environment(params.EntityPath{"bob", "x"})
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
 	// Close the session and check that we still get the
 	// same error.
 	session.Close()
 
-	_, err = store.Model(params.EntityPath{"bob", "x"})
+	_, err = store.Environment(params.EntityPath{"bob", "x"})
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
 	// Also check the macaroon storage as that also has its own session reference.

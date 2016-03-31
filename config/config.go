@@ -16,7 +16,7 @@ import (
 type Config struct {
 	MongoAddr         string            `yaml:"mongo-addr"`
 	APIAddr           string            `yaml:"api-addr"`
-	ControllerAdmin   string            `yaml:"state-server-admin"`
+	StateServerAdmin  string            `yaml:"state-server-admin"`
 	IdentityPublicKey *bakery.PublicKey `yaml:"identity-public-key"`
 	IdentityLocation  string            `yaml:"identity-location"`
 	AgentUsername     string            `yaml:"agent-username"`
@@ -31,7 +31,7 @@ func (c *Config) validate() error {
 	if c.APIAddr == "" {
 		missing = append(missing, "api-addr")
 	}
-	if c.ControllerAdmin == "" {
+	if c.StateServerAdmin == "" {
 		missing = append(missing, "state-server-admin")
 	}
 	if c.IdentityLocation == "" {

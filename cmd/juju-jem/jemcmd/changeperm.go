@@ -21,11 +21,11 @@ type changePermCommand struct {
 
 	path entityPathValue
 
-	controller bool
-	template   bool
-	addRead    userSet
-	removeRead userSet
-	setRead    userSet
+	stateServer bool
+	template    bool
+	addRead     userSet
+	removeRead  userSet
+	setRead     userSet
 }
 
 func newChangePermCommand() cmd.Command {
@@ -38,7 +38,7 @@ The change-perm command changes permissions of an model
 
 For example:
 
-    juju jem change-perm --add-read=alice,bob johndoe/mymodel
+    juju jem change-perm --add-read=alice,bob johndoe/myenv
 `
 
 func (c *changePermCommand) Info() *cmd.Info {
@@ -51,7 +51,7 @@ func (c *changePermCommand) Info() *cmd.Info {
 }
 
 func (c *changePermCommand) SetFlags(f *gnuflag.FlagSet) {
-	f.BoolVar(&c.controller, "controller", false, "change ACL of controller not model")
+	f.BoolVar(&c.stateServer, "controller", false, "change ACL of controller not model")
 	f.BoolVar(&c.template, "template", false, "change ACL of template not model")
 	f.Var(&c.addRead, "add-read", "list of names to add to read ACL")
 	f.Var(&c.removeRead, "remove-read", "list of names to remove from read ACL")
@@ -72,7 +72,7 @@ func (c *changePermCommand) Init(args []string) error {
 	if c.setRead == nil && len(c.addRead) == 0 && len(c.removeRead) == 0 {
 		return errgo.New("no permissions specified")
 	}
-	if c.template && c.controller {
+	if c.template && c.stateServer {
 		return errgo.New("cannot specify both --controller and --template")
 	}
 	return nil
@@ -111,8 +111,8 @@ func (c *changePermCommand) Run(ctxt *cmd.Context) error {
 func (c *changePermCommand) setPerm(client *jemclient.Client, acl params.ACL) error {
 	var err error
 	switch {
-	case c.controller:
-		err = client.SetControllerPerm(&params.SetControllerPerm{
+	case c.stateServer:
+		err = client.SetStateServerPerm(&params.SetStateServerPerm{
 			EntityPath: c.path.EntityPath,
 			ACL:        acl,
 		})
@@ -122,7 +122,7 @@ func (c *changePermCommand) setPerm(client *jemclient.Client, acl params.ACL) er
 			ACL:        acl,
 		})
 	default:
-		err = client.SetModelPerm(&params.SetModelPerm{
+		err = client.SetEnvironmentPerm(&params.SetEnvironmentPerm{
 			EntityPath: c.path.EntityPath,
 			ACL:        acl,
 		})
@@ -134,8 +134,8 @@ func (c *changePermCommand) getPerm(client *jemclient.Client) (params.ACL, error
 	var acl params.ACL
 	var err error
 	switch {
-	case c.controller:
-		acl, err = client.GetControllerPerm(&params.GetControllerPerm{
+	case c.stateServer:
+		acl, err = client.GetStateServerPerm(&params.GetStateServerPerm{
 			EntityPath: c.path.EntityPath,
 		})
 	case c.template:
@@ -143,7 +143,7 @@ func (c *changePermCommand) getPerm(client *jemclient.Client) (params.ACL, error
 			EntityPath: c.path.EntityPath,
 		})
 	default:
-		acl, err = client.GetModelPerm(&params.GetModelPerm{
+		acl, err = client.GetEnvironmentPerm(&params.GetEnvironmentPerm{
 			EntityPath: c.path.EntityPath,
 		})
 	}

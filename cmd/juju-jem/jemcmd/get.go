@@ -14,7 +14,7 @@ import (
 type getCommand struct {
 	commandBase
 
-	modelPath entityPathValue
+	envPath   entityPathValue
 	localName string
 	user      string
 }
@@ -48,11 +48,11 @@ func (c *getCommand) Init(args []string) error {
 	if len(args) != 1 {
 		return errgo.Newf("got %d arguments, want 1", len(args))
 	}
-	if err := c.modelPath.Set(args[0]); err != nil {
+	if err := c.envPath.Set(args[0]); err != nil {
 		return errgo.Mask(err)
 	}
 	if c.localName == "" {
-		c.localName = string(c.modelPath.Name)
+		c.localName = string(c.envPath.Name)
 	}
 	return nil
 }
@@ -63,9 +63,9 @@ func (c *getCommand) Run(ctxt *cmd.Context) error {
 		return errgo.Mask(err)
 	}
 
-	return writeModel(c.localName, func() (*params.ModelResponse, error) {
-		resp, err := client.GetModel(&params.GetModel{
-			EntityPath: c.modelPath.EntityPath,
+	return writeEnvironment(c.localName, func() (*params.EnvironmentResponse, error) {
+		resp, err := client.GetEnvironment(&params.GetEnvironment{
+			EntityPath: c.envPath.EntityPath,
 		})
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot get model info")

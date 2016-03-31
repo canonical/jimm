@@ -180,152 +180,152 @@ func (j *JEM) Close() {
 	j.pool.decRef()
 }
 
-// AddController adds a new controller and its associated model
+// AddStateServer adds a new state server and its associated environment
 // to the database. It returns an error with a params.ErrAlreadyExists
-// cause if there is already a controller with the given name.
-// The Id field in ctl will be set from its Path field,
-// and the Id, Path and Controller fields in m will also be
-// set from ctl.
-func (j *JEM) AddController(ctl *mongodoc.Controller, m *mongodoc.Model) error {
-	// Insert the model before inserting the controller
-	// to avoid races with other clients creating non-controller
-	// models.
-	ctl.Id = ctl.Path.String()
-	m.Path = ctl.Path
-	m.Controller = ctl.Path
-	err := j.AddModel(m)
+// cause if there is already a state server with the given name.
+// The Id field in srv will be set from its Path field,
+// and the Id, Path and StateServer fields in env will also be
+// set from srv.
+func (j *JEM) AddStateServer(srv *mongodoc.StateServer, env *mongodoc.Environment) error {
+	// Insert the environment before inserting the state server
+	// to avoid races with other clients creating non-state-server
+	// environments.
+	srv.Id = srv.Path.String()
+	env.Path = srv.Path
+	env.StateServer = srv.Path
+	err := j.AddEnvironment(env)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
-	err = j.DB.Controllers().Insert(ctl)
+	err = j.DB.StateServers().Insert(srv)
 	if err != nil {
-		// Since we always insert an model of the
+		// Since we always insert an environment of the
 		// same name first, this should never happen,
 		// so we don't preserve the ErrAlreadyExists
 		// error here because failing in that way is
 		// really an internal server error.
-		return errgo.Notef(err, "cannot insert controller")
+		return errgo.Notef(err, "cannot insert state server")
 	}
 	return nil
 }
 
-// DeleteController deletes existing controller and all of its
-// associated models from the database. It returns an error if
-// either deletion fails. If there is no matching controller then the
+// DeleteStateServer deletes existing state server and all of its
+// associated environments from the database. It returns an error if
+// either deletion fails. If there is no matching state server then the
 // error will have the cause params.ErrNotFound.
 //
 // Note that this operation is not atomic.
-func (j *JEM) DeleteController(path params.EntityPath) error {
+func (j *JEM) DeleteStateServer(path params.EntityPath) error {
 	// TODO (urosj) make this operation atomic.
-	logger.Infof("Deleting controller %s", path)
-	// Delete its models first.
-	_, err := j.DB.Models().RemoveAll(bson.D{{"controller", path}})
+	logger.Infof("Deleting state server %s", path)
+	// Delete its environments first.
+	_, err := j.DB.Environments().RemoveAll(bson.D{{"stateserver", path}})
 	if err != nil {
-		return errgo.Notef(err, "error deleting controller models")
+		return errgo.Notef(err, "error deleting state-server environments")
 	}
-	// Then delete the controller.
-	err = j.DB.Controllers().RemoveId(path.String())
+	// Then delete the state server.
+	err = j.DB.StateServers().RemoveId(path.String())
 	if err == mgo.ErrNotFound {
-		return errgo.WithCausef(nil, params.ErrNotFound, "controller %q not found", path)
+		return errgo.WithCausef(nil, params.ErrNotFound, "state server %q not found", path)
 	}
 	if err != nil {
-		return errgo.Notef(err, "cannot delete controller")
+		return errgo.Notef(err, "cannot delete state server")
 	}
 	return nil
 }
 
-// AddModel adds a new model to the database.
+// AddEnvironment adds a new environment to the database.
 // It returns an error with a params.ErrAlreadyExists
-// cause if there is already an model with the given name.
-// The Id field in m will be set from its User and Name fields
+// cause if there is already an environment with the given name.
+// The Id field in env will be set from its User and Name fields
 // before insertion.
-func (j *JEM) AddModel(m *mongodoc.Model) error {
-	m.Id = m.Path.String()
-	err := j.DB.Models().Insert(m)
+func (j *JEM) AddEnvironment(env *mongodoc.Environment) error {
+	env.Id = env.Path.String()
+	err := j.DB.Environments().Insert(env)
 	if mgo.IsDup(err) {
 		return errgo.WithCausef(nil, params.ErrAlreadyExists, "")
 	}
 	if err != nil {
-		return errgo.Notef(err, "cannot insert controller model")
+		return errgo.Notef(err, "cannot insert state server environment")
 	}
 	return nil
 }
 
-// DeleteModel deletes an model from the database. If an
-// model is also a controller it will not be deleted and an error
+// DeleteEnvironment deletes an environment from the database. If an
+// environment is also a state server it will not be deleted and an error
 // with a cause of params.ErrForbidden will be returned. If the
-// model cannot be found then an error with a cause of
+// environment cannot be found then an error with a cause of
 // params.ErrNotFound is returned.
-func (j *JEM) DeleteModel(path params.EntityPath) error {
-	// TODO when we monitor model health, prohibit this method
-	// and delete the model automatically when it is destroyed.
-	logger.Infof("Deleting model %s", path)
-	// Check if model is also a controller.
-	var ctl mongodoc.Controller
-	err := j.DB.Controllers().FindId(path.String()).One(&ctl)
+func (j *JEM) DeleteEnvironment(path params.EntityPath) error {
+	// TODO when we monitor environment health, prohibit this method
+	// and delete the environment automatically when it is destroyed.
+	logger.Infof("Deleting environment %s", path)
+	// Check if env is also a JES.
+	var srv mongodoc.StateServer
+	err := j.DB.StateServers().FindId(path.String()).One(&srv)
 	if err == nil {
-		// Model is a controller, abort delete.
-		return errgo.WithCausef(nil, params.ErrForbidden, "cannot remove model %q because it is a controller", path)
+		// Environment is a state server, abort delete.
+		return errgo.WithCausef(nil, params.ErrForbidden, "cannot remove environment %q because it is a state server", path)
 	}
-	err = j.DB.Models().RemoveId(path.String())
+	err = j.DB.Environments().RemoveId(path.String())
 	if err == mgo.ErrNotFound {
-		return errgo.WithCausef(nil, params.ErrNotFound, "model %q not found", path)
+		return errgo.WithCausef(nil, params.ErrNotFound, "environment %q not found", path)
 	}
 	if err != nil {
-		return errgo.Notef(err, "could not delete model")
+		return errgo.Notef(err, "could not delete environment")
 	}
 	return nil
 }
 
-// Controller returns information on the controller with the given
+// StateServer returns information on the state server with the given
 // path. It returns an error with a params.ErrNotFound cause if the
-// controller was not found.
-func (j *JEM) Controller(path params.EntityPath) (*mongodoc.Controller, error) {
-	var ctl mongodoc.Controller
+// state server was not found.
+func (j *JEM) StateServer(path params.EntityPath) (*mongodoc.StateServer, error) {
+	var srv mongodoc.StateServer
 	id := path.String()
-	err := j.DB.Controllers().FindId(id).One(&ctl)
+	err := j.DB.StateServers().FindId(id).One(&srv)
 	if err == mgo.ErrNotFound {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "controller %q not found", id)
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "state server %q not found", id)
 	}
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot get controller %q", id)
+		return nil, errgo.Notef(err, "cannot get state server %q", id)
 	}
-	return &ctl, nil
+	return &srv, nil
 }
 
-// Model returns information on the model with the given
+// Environment returns information on the environment with the given
 // path. It returns an error with a params.ErrNotFound cause if the
-// controller was not found.
-func (j *JEM) Model(path params.EntityPath) (*mongodoc.Model, error) {
+// state server was not found.
+func (j *JEM) Environment(path params.EntityPath) (*mongodoc.Environment, error) {
 	id := path.String()
-	var m mongodoc.Model
-	err := j.DB.Models().FindId(id).One(&m)
+	var env mongodoc.Environment
+	err := j.DB.Environments().FindId(id).One(&env)
 	if err == mgo.ErrNotFound {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "model %q not found", id)
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "environment %q not found", id)
 	}
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot get model %q", id)
+		return nil, errgo.Notef(err, "cannot get environment %q", id)
 	}
-	return &m, nil
+	return &env, nil
 }
 
-// OpenAPI opens an API connection to the model with the given path
+// OpenAPI opens an API connection to the environment with the given path
 // and returns it along with the information used to connect.
-// If the model does not exist, the error will have a cause
+// If the environment does not exist, the error will have a cause
 // of params.ErrNotFound.
 //
 // The returned connection must be closed when finished with.
 func (j *JEM) OpenAPI(path params.EntityPath) (*apiconn.Conn, error) {
-	m, err := j.Model(path)
+	env, err := j.Environment(path)
 	if err != nil {
-		return nil, errgo.NoteMask(err, "cannot get model", errgo.Is(params.ErrNotFound))
+		return nil, errgo.NoteMask(err, "cannot get environment", errgo.Is(params.ErrNotFound))
 	}
-	return j.pool.connCache.OpenAPI(m.UUID, func() (api.Connection, *api.Info, error) {
-		ctl, err := j.Controller(m.Controller)
+	return j.pool.connCache.OpenAPI(env.UUID, func() (api.Connection, *api.Info, error) {
+		srv, err := j.StateServer(env.StateServer)
 		if err != nil {
-			return nil, nil, errgo.Notef(err, "cannot get controller for model %q", m.UUID)
+			return nil, nil, errgo.Notef(err, "cannot get state server for environment %q", env.UUID)
 		}
-		apiInfo := apiInfoFromDocs(m, ctl)
+		apiInfo := apiInfoFromDocs(env, srv)
 		st, err := api.Open(apiInfo, apiDialOpts())
 		if err != nil {
 			return nil, nil, errgo.Mask(err)
@@ -334,19 +334,19 @@ func (j *JEM) OpenAPI(path params.EntityPath) (*apiconn.Conn, error) {
 	})
 }
 
-// OpenAPIFromDocs returns an API connection to the model
-// and controller held in the given documents. This can
-// be useful when we want to connect to an model
+// OpenAPIFromDocs returns an API connection to the environment
+// and state server held in the given documents. This can
+// be useful when we want to connect to an environment
 // before it's added to the database (for example when adding
-// a new controller). Note that a successful return from this
+// a new state server). Note that a successful return from this
 // function does not necessarily mean that the credentials or
 // API addresses in the docs actually work, as it's possible
-// that there's already a cached connection for the given model.
+// that there's already a cached connection for the given environment.
 //
 // The returned connection must be closed when finished with.
-func (j *JEM) OpenAPIFromDocs(m *mongodoc.Model, ctl *mongodoc.Controller) (*apiconn.Conn, error) {
-	return j.pool.connCache.OpenAPI(m.UUID, func() (api.Connection, *api.Info, error) {
-		stInfo := apiInfoFromDocs(m, ctl)
+func (j *JEM) OpenAPIFromDocs(env *mongodoc.Environment, srv *mongodoc.StateServer) (*apiconn.Conn, error) {
+	return j.pool.connCache.OpenAPI(env.UUID, func() (api.Connection, *api.Info, error) {
+		stInfo := apiInfoFromDocs(env, srv)
 		st, err := api.Open(stInfo, apiDialOpts())
 		if err != nil {
 			return nil, nil, errgo.Mask(err)
@@ -404,13 +404,13 @@ func apiDialOpts() api.DialOpts {
 	}
 }
 
-func apiInfoFromDocs(m *mongodoc.Model, ctl *mongodoc.Controller) *api.Info {
+func apiInfoFromDocs(env *mongodoc.Environment, srv *mongodoc.StateServer) *api.Info {
 	return &api.Info{
-		Addrs:      ctl.HostPorts,
-		CACert:     ctl.CACert,
-		Tag:        names.NewUserTag(m.AdminUser),
-		Password:   m.AdminPassword,
-		EnvironTag: names.NewEnvironTag(m.UUID),
+		Addrs:      srv.HostPorts,
+		CACert:     srv.CACert,
+		Tag:        names.NewUserTag(env.AdminUser),
+		Password:   env.AdminPassword,
+		EnvironTag: names.NewEnvironTag(env.UUID),
 	}
 }
 
@@ -432,8 +432,8 @@ func (s Database) Copy() Database {
 func (db Database) Collections() []*mgo.Collection {
 	return []*mgo.Collection{
 		db.Macaroons(),
-		db.Controllers(),
-		db.Models(),
+		db.StateServers(),
+		db.Environments(),
 		db.Templates(),
 	}
 }
@@ -447,12 +447,12 @@ func (db Database) Macaroons() *mgo.Collection {
 	return db.C("macaroons")
 }
 
-func (db Database) Controllers() *mgo.Collection {
-	return db.C("controllers")
+func (db Database) StateServers() *mgo.Collection {
+	return db.C("stateservers")
 }
 
-func (db Database) Models() *mgo.Collection {
-	return db.C("models")
+func (db Database) Environments() *mgo.Collection {
+	return db.C("environments")
 }
 
 func (db Database) Templates() *mgo.Collection {

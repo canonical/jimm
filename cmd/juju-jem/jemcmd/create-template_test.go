@@ -26,7 +26,7 @@ func (s *createTemplateSuite) TestCreateTemplate(c *gc.C) {
 	client := s.jemClient("bob")
 
 	// First add the controller that we're going to use
-	// to create the new model.
+	// to create the new environment.
 	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
@@ -58,7 +58,7 @@ func (s *createTemplateSuite) TestCreateTemplateWithConfigFile(c *gc.C) {
 	client := s.jemClient("bob")
 
 	// First add the controller that we're going to use
-	// to create the new model.
+	// to create the new environment.
 	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
