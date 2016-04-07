@@ -4,6 +4,7 @@ package jemcmd_test
 
 import (
 	"github.com/juju/juju/juju"
+	"github.com/juju/juju/jujuclient"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 )
@@ -30,11 +31,16 @@ func (s *getSuite) TestGet(c *gc.C) {
 	)
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, "jem-foo:foo\n")
 
 	// Check that we can attach to the new model
 	// through the usual juju connection mechanism.
-	client, err := juju.NewAPIClientFromName("foo", httpbakery.NewClient())
+	store := jujuclient.NewFileClientStore()
+	params, err := newAPIConnectionParams(
+		store, "jem-foo", "", "foo", httpbakery.NewClient(),
+	)
+	c.Assert(err, gc.IsNil)
+	client, err := juju.NewAPIConnection(params)
 	c.Assert(err, gc.IsNil)
 	client.Close()
 }

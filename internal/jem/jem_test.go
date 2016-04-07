@@ -3,7 +3,9 @@
 package jem_test
 
 import (
-	"github.com/CanonicalLtd/blues-identity/idmclient"
+	"fmt"
+
+	"github.com/juju/idmclient"
 	"github.com/juju/schema"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
@@ -55,42 +57,44 @@ func (s *jemSuite) TearDownTest(c *gc.C) {
 func (s *jemSuite) TestAddController(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "x"}
 	ctl := &mongodoc.Controller{
-		Id:        "ignored",
-		Path:      ctlPath,
-		CACert:    "certainly",
-		HostPorts: []string{"host1:1234", "host2:9999"},
-	}
-	m := &mongodoc.Model{
 		Id:            "ignored",
-		Path:          params.EntityPath{"ignored-user", "ignored-name"},
+		Path:          ctlPath,
+		CACert:        "certainly",
+		HostPorts:     []string{"host1:1234", "host2:9999"},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
+	}
+	m := &mongodoc.Model{
+		Id:   "ignored",
+		Path: params.EntityPath{"ignored-user", "ignored-name"},
 	}
 	err := s.store.AddController(ctl, m)
 	c.Assert(err, gc.IsNil)
 
 	// Check that the fields have been mutated as expected.
 	c.Assert(ctl, jc.DeepEquals, &mongodoc.Controller{
-		Id:        "bob/x",
-		Path:      ctlPath,
-		CACert:    "certainly",
-		HostPorts: []string{"host1:1234", "host2:9999"},
-	})
-	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
 		Id:            "bob/x",
 		Path:          ctlPath,
-		Controller:    ctlPath,
+		CACert:        "certainly",
+		HostPorts:     []string{"host1:1234", "host2:9999"},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
+	})
+	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
+		Id:         "bob/x",
+		Path:       ctlPath,
+		Controller: ctlPath,
 	})
 
 	ctl1, err := s.store.Controller(ctlPath)
 	c.Assert(err, gc.IsNil)
 	c.Assert(ctl1, jc.DeepEquals, &mongodoc.Controller{
-		Id:        "bob/x",
-		Path:      ctlPath,
-		CACert:    "certainly",
-		HostPorts: []string{"host1:1234", "host2:9999"},
+		Id:            "bob/x",
+		Path:          ctlPath,
+		CACert:        "certainly",
+		HostPorts:     []string{"host1:1234", "host2:9999"},
+		AdminUser:     "foo-admin",
+		AdminPassword: "foo-password",
 	})
 	m1, err := s.store.Model(ctlPath)
 	c.Assert(err, gc.IsNil)
@@ -102,16 +106,16 @@ func (s *jemSuite) TestAddController(c *gc.C) {
 
 	ctlPath2 := params.EntityPath{"bob", "y"}
 	ctl2 := &mongodoc.Controller{
-		Id:        "ignored",
-		Path:      ctlPath2,
-		CACert:    "certainly",
-		HostPorts: []string{"host1:1234", "host2:9999"},
-	}
-	m2 := &mongodoc.Model{
-		Id:            "bob/noty",
-		Path:          params.EntityPath{"ignored-user", "ignored-name"},
+		Id:            "ignored",
+		Path:          ctlPath2,
+		CACert:        "certainly",
+		HostPorts:     []string{"host1:1234", "host2:9999"},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
+	}
+	m2 := &mongodoc.Model{
+		Id:   "bob/noty",
+		Path: params.EntityPath{"ignored-user", "ignored-name"},
 	}
 	err = s.store.AddController(ctl2, m2)
 	c.Assert(err, gc.IsNil)
@@ -123,16 +127,16 @@ func (s *jemSuite) TestAddController(c *gc.C) {
 func (s *jemSuite) TestDeleteController(c *gc.C) {
 	ctlPath := params.EntityPath{"dalek", "who"}
 	ctl := &mongodoc.Controller{
-		Id:        "ignored",
-		Path:      ctlPath,
-		CACert:    "certainly",
-		HostPorts: []string{"host1:1234", "host2:9999"},
-	}
-	m := &mongodoc.Model{
-		Id:            "dalek/who",
-		Path:          params.EntityPath{"ignored", "ignored"},
+		Id:            "ignored",
+		Path:          ctlPath,
+		CACert:        "certainly",
+		HostPorts:     []string{"host1:1234", "host2:9999"},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
+	}
+	m := &mongodoc.Model{
+		Id:   "dalek/who",
+		Path: params.EntityPath{"ignored", "ignored"},
 	}
 	err := s.store.AddController(ctl, m)
 	c.Assert(err, gc.IsNil)
@@ -150,16 +154,16 @@ func (s *jemSuite) TestDeleteController(c *gc.C) {
 
 	// Test with non-existing model.
 	ctl2 := &mongodoc.Controller{
-		Id:        "dalek/who",
-		Path:      ctlPath,
-		CACert:    "certainly",
-		HostPorts: []string{"host1:1234", "host2:9999"},
-	}
-	m2 := &mongodoc.Model{
-		Id:            "dalek/exterminated",
-		Path:          params.EntityPath{"ignored", "ignored"},
+		Id:            "dalek/who",
+		Path:          ctlPath,
+		CACert:        "certainly",
+		HostPorts:     []string{"host1:1234", "host2:9999"},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
+	}
+	m2 := &mongodoc.Model{
+		Id:   "dalek/exterminated",
+		Path: params.EntityPath{"ignored", "ignored"},
 	}
 	err = s.store.AddController(ctl2, m2)
 	c.Assert(err, gc.IsNil)
@@ -175,16 +179,16 @@ func (s *jemSuite) TestDeleteController(c *gc.C) {
 func (s *jemSuite) TestDeleteModelemnt(c *gc.C) {
 	ctlPath := params.EntityPath{"dalek", "who"}
 	ctl := &mongodoc.Controller{
-		Id:        "ignored",
-		Path:      ctlPath,
-		CACert:    "certainly",
-		HostPorts: []string{"host1:1234", "host2:9999"},
-	}
-	m := &mongodoc.Model{
-		Id:            "dalek/who",
-		Path:          params.EntityPath{"ignored", "ignored"},
+		Id:            "ignored",
+		Path:          ctlPath,
+		CACert:        "certainly",
+		HostPorts:     []string{"host1:1234", "host2:9999"},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
+	}
+	m := &mongodoc.Model{
+		Id:   "dalek/who",
+		Path: params.EntityPath{"ignored", "ignored"},
 	}
 	err := s.store.AddController(ctl, m)
 	c.Assert(err, gc.IsNil)
@@ -351,3 +355,150 @@ func (s *jemSuite) TestSessionIsCopied(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(m, gc.NotNil)
 }
+
+func (s *jemSuite) TestEnsureUserSuccess(c *gc.C) {
+	n := 0
+	s.PatchValue(jem.RandomPassword, func() (string, error) {
+		n++
+		return fmt.Sprintf("random%d", n), nil
+	})
+	ctlPath := params.EntityPath{
+		User: "bob",
+		Name: "bobcontroller",
+	}
+	err := s.store.AddController(&mongodoc.Controller{
+		Id:            "ignored",
+		Path:          ctlPath,
+		CACert:        "certainly",
+		HostPorts:     []string{"host1:1234", "host2:9999"},
+		AdminUser:     "foo-admin",
+		AdminPassword: "foo-password",
+	}, &mongodoc.Model{
+		Id:   "ignored",
+		Path: params.EntityPath{"ignored-user", "ignored-name"},
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Calling EnsureUser should populate the initial user entry.
+	password, err := s.store.EnsureUser(ctlPath, "jem-bob")
+	c.Assert(err, gc.IsNil)
+	c.Assert(password, gc.Equals, "random1")
+
+	ctl, err := s.store.Controller(ctlPath)
+	c.Assert(err, gc.IsNil)
+	c.Assert(ctl.Users, jc.DeepEquals, map[string]mongodoc.UserInfo{
+		mongodoc.Sanitize("jem-bob"): {
+			Password: password,
+		},
+	})
+
+	// Calling EnsureUser again should use the existing entry.
+	password, err = s.store.EnsureUser(ctlPath, "jem-bob")
+	c.Assert(err, gc.IsNil)
+	c.Assert(password, gc.Equals, "random1")
+
+	// Make sure the controller entry hasn't been changed.
+	ctl, err = s.store.Controller(ctlPath)
+	c.Assert(err, gc.IsNil)
+	c.Assert(ctl.Users, jc.DeepEquals, map[string]mongodoc.UserInfo{
+		mongodoc.Sanitize("jem-bob"): {
+			Password: password,
+		},
+	})
+
+	n = 99
+	// Make sure we can add another user OK.
+	password, err = s.store.EnsureUser(ctlPath, "jem-alice")
+	c.Assert(err, gc.IsNil)
+	c.Assert(password, gc.Equals, "random100")
+
+	ctl, err = s.store.Controller(ctlPath)
+	c.Assert(err, gc.IsNil)
+	c.Assert(ctl.Users, jc.DeepEquals, map[string]mongodoc.UserInfo{
+		mongodoc.Sanitize("jem-bob"): {
+			Password: "random1",
+		},
+		mongodoc.Sanitize("jem-alice"): {
+			Password: "random100",
+		},
+	})
+}
+
+func (s *jemSuite) TestEnsureUserNoController(c *gc.C) {
+	ctlPath := params.EntityPath{
+		User: "bob",
+		Name: "bobcontroller",
+	}
+	password, err := s.store.EnsureUser(ctlPath, "jem-bob")
+	c.Assert(err, gc.ErrorMatches, `cannot get controller: controller "bob/bobcontroller" not found`)
+	c.Assert(password, gc.Equals, "")
+}
+
+func (s *jemSuite) TestSetModelManagedUser(c *gc.C) {
+	modelPath := params.EntityPath{"bob", "x"}
+	m := &mongodoc.Model{
+		Id:   "ignored",
+		Path: modelPath,
+	}
+	err := s.store.AddModel(m)
+	c.Assert(err, gc.IsNil)
+	err = s.store.SetModelManagedUser(modelPath, "jem-bob", mongodoc.ModelUserInfo{
+		Granted: true,
+	})
+	c.Assert(err, gc.IsNil)
+
+	m, err = s.store.Model(modelPath)
+	c.Assert(err, gc.IsNil)
+	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
+		Id:   "bob/x",
+		Path: modelPath,
+		Users: map[string]mongodoc.ModelUserInfo{
+			mongodoc.Sanitize("jem-bob"): {
+				Granted: true,
+			},
+		},
+	})
+
+	err = s.store.SetModelManagedUser(modelPath, "jem-alice", mongodoc.ModelUserInfo{
+		Granted: false,
+	})
+	c.Assert(err, gc.IsNil)
+
+	m, err = s.store.Model(modelPath)
+	c.Assert(err, gc.IsNil)
+	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
+		Id:   "bob/x",
+		Path: modelPath,
+		Users: map[string]mongodoc.ModelUserInfo{
+			mongodoc.Sanitize("jem-bob"): {
+				Granted: true,
+			},
+			mongodoc.Sanitize("jem-alice"): {
+				Granted: false,
+			},
+		},
+	})
+
+	err = s.store.SetModelManagedUser(modelPath, "jem-bob", mongodoc.ModelUserInfo{
+		Granted: false,
+	})
+	c.Assert(err, gc.IsNil)
+
+	m, err = s.store.Model(modelPath)
+	c.Assert(err, gc.IsNil)
+	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
+		Id:   "bob/x",
+		Path: modelPath,
+		Users: map[string]mongodoc.ModelUserInfo{
+			mongodoc.Sanitize("jem-bob"): {
+				Granted: false,
+			},
+			mongodoc.Sanitize("jem-alice"): {
+				Granted: false,
+			},
+		},
+	})
+}
+
+//invalid key for mongo
+//user already exists

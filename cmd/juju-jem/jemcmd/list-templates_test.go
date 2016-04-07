@@ -23,12 +23,12 @@ func (s *listTemplatesSuite) TestChangePerm(c *gc.C) {
 	c.Assert(stderr, gc.Equals, "")
 
 	// Add a couple of templates.
-	stdout, stderr, code = run(c, c.MkDir(), "create-template", "-c", "bob/controller", "bob/foo", "state-server=true")
+	stdout, stderr, code = run(c, c.MkDir(), "create-template", "-c", "bob/controller", "bob/foo", "controller=true")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	stdout, stderr, code = run(c, c.MkDir(), "create-template", "-c", "bob/controller", "bob/bar", "state-server=false")
+	stdout, stderr, code = run(c, c.MkDir(), "create-template", "-c", "bob/controller", "bob/bar", "controller=false")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")

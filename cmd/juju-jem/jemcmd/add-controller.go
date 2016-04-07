@@ -4,7 +4,8 @@ package jemcmd
 
 import (
 	"github.com/juju/cmd"
-	"github.com/juju/juju/cmd/envcmd"
+	"github.com/juju/juju/cmd/modelcmd"
+	"github.com/juju/juju/jujuclient"
 	"gopkg.in/errgo.v1"
 	"launchpad.net/gnuflag"
 
@@ -19,7 +20,7 @@ type addControllerCommand struct {
 }
 
 func newAddControllerCommand() cmd.Command {
-	return envcmd.WrapBase(&addControllerCommand{})
+	return modelcmd.WrapBase(&addControllerCommand{})
 }
 
 var addControllerDoc = `
@@ -64,33 +65,75 @@ func (c *addControllerCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	info, err := modelInfo(c.modelName)
+	info, err := getModelInfo(c.modelName)
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	ep := info.APIEndpoint()
-	creds := info.APICredentials()
 	// Use hostnames by preference, as we want the
 	// JEM server to do the DNS lookups, but this
 	// may not be set, so fall back to Addresses if
 	// necessary.
-	hostnames := ep.Hostnames
+	hostnames := info.controller.APIEndpoints
 	if len(hostnames) == 0 {
-		hostnames = ep.Addresses
+		hostnames = info.controller.UnresolvedAPIEndpoints
 	}
 
 	logger.Infof("adding controller, user %s, name %s", c.modelPath.EntityPath.User, c.modelPath.EntityPath.Name)
 	if err := client.AddController(&params.AddController{
 		EntityPath: c.modelPath.EntityPath,
 		Info: params.ControllerInfo{
-			HostPorts: hostnames,
-			CACert:    ep.CACert,
-			ModelUUID: ep.EnvironUUID,
-			User:      creds.User,
-			Password:  creds.Password,
+			HostPorts:      hostnames,
+			CACert:         info.controller.CACert,
+			ControllerUUID: info.controller.ControllerUUID,
+			User:           info.account.User,
+			Password:       info.account.Password,
 		},
 	}); err != nil {
 		return errgo.Notef(err, "cannot add controller")
 	}
 	return nil
+}
+
+type modelInfo struct {
+	model      *jujuclient.ModelDetails
+	controller *jujuclient.ControllerDetails
+	account    *jujuclient.AccountDetails
+}
+
+func getModelInfo(modelName string) (*modelInfo, error) {
+	store := jujuclient.NewFileClientStore()
+	var err error
+	var controllerName string
+	if modelName == "" {
+		modelName, err = modelcmd.GetCurrentModel(store)
+		if err != nil {
+			return nil, errgo.Mask(err)
+		}
+	}
+	controllerName, modelName = modelcmd.SplitModelName(modelName)
+	if controllerName == "" {
+		controllerName, err = modelcmd.ReadCurrentController()
+		if err != nil {
+			return nil, errgo.Mask(err)
+		}
+	}
+	accountName, err := store.CurrentAccount(controllerName)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+
+	var info modelInfo
+	info.model, err = store.ModelByName(controllerName, accountName, modelName)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	info.controller, err = store.ControllerByName(controllerName)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	info.account, err = store.AccountByName(controllerName, accountName)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return &info, nil
 }

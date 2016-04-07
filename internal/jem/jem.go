@@ -6,9 +6,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CanonicalLtd/blues-identity/idmclient"
+	"github.com/juju/idmclient"
 	"github.com/juju/juju/api"
 	"github.com/juju/names"
+	"github.com/juju/utils"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
@@ -184,7 +185,7 @@ func (j *JEM) Close() {
 // to the database. It returns an error with a params.ErrAlreadyExists
 // cause if there is already a controller with the given name.
 // The Id field in ctl will be set from its Path field,
-// and the Id, Path and Controller fields in m will also be
+// and the Id, Path and Controller fields in env will also be
 // set from ctl.
 func (j *JEM) AddController(ctl *mongodoc.Controller, m *mongodoc.Model) error {
 	// Insert the model before inserting the controller
@@ -205,6 +206,65 @@ func (j *JEM) AddController(ctl *mongodoc.Controller, m *mongodoc.Model) error {
 		// error here because failing in that way is
 		// really an internal server error.
 		return errgo.Notef(err, "cannot insert controller")
+	}
+	return nil
+}
+
+// randomPassword is defined as a variable so it can be overridden
+// for testing purposes.
+var randomPassword = utils.RandomPassword
+
+// AddUser ensures that the user exists in the controller with the given
+// name. It returns the password for the user, generating
+// a new one if necessary.
+func (j *JEM) EnsureUser(ctlName params.EntityPath, user string) (string, error) {
+	password, err := randomPassword()
+	if err != nil {
+		return "", errgo.Notef(err, "cannot generate password")
+	}
+	userKey := mongodoc.Sanitize(user)
+	field := "users." + userKey
+	err = j.DB.Controllers().Update(bson.D{{
+		"_id", ctlName.String(),
+	}, {
+		field, bson.D{{"$exists", false}},
+	}}, bson.D{{
+		"$set", bson.D{{
+			field, mongodoc.UserInfo{
+				Password: password,
+			},
+		}},
+	}})
+	if err == nil {
+		return password, nil
+	}
+	if err != mgo.ErrNotFound {
+		return "", errgo.Notef(err, "cannot update user entry")
+	}
+	// The entry wasn't found. This was probably
+	// because the user entry already exists.
+	ctl, err := j.Controller(ctlName)
+	if err != nil {
+		return "", errgo.Notef(err, "cannot get controller")
+	}
+	if info, ok := ctl.Users[userKey]; ok {
+		return info.Password, nil
+	}
+	return "", errgo.Newf("controller exists but password couldn't be updated")
+}
+
+func (j *JEM) SetModelManagedUser(modelName params.EntityPath, user string, info mongodoc.ModelUserInfo) error {
+	userKey := mongodoc.Sanitize(user)
+	field := "users." + userKey
+	err := j.DB.Models().UpdateId(modelName.String(),
+		bson.D{{
+			"$set", bson.D{{
+				field, info,
+			}},
+		}},
+	)
+	if err != nil {
+		return errgo.Mask(err)
 	}
 	return nil
 }
@@ -237,8 +297,7 @@ func (j *JEM) DeleteController(path params.EntityPath) error {
 // AddModel adds a new model to the database.
 // It returns an error with a params.ErrAlreadyExists
 // cause if there is already an model with the given name.
-// The Id field in m will be set from its User and Name fields
-// before insertion.
+// If ignores m.Id and sets it from m.Path.
 func (j *JEM) AddModel(m *mongodoc.Model) error {
 	m.Id = m.Path.String()
 	err := j.DB.Models().Insert(m)
@@ -325,7 +384,7 @@ func (j *JEM) OpenAPI(path params.EntityPath) (*apiconn.Conn, error) {
 		if err != nil {
 			return nil, nil, errgo.Notef(err, "cannot get controller for model %q", m.UUID)
 		}
-		apiInfo := apiInfoFromDocs(m, ctl)
+		apiInfo := apiInfoFromDocs(ctl, m)
 		st, err := api.Open(apiInfo, apiDialOpts())
 		if err != nil {
 			return nil, nil, errgo.Mask(err)
@@ -346,7 +405,7 @@ func (j *JEM) OpenAPI(path params.EntityPath) (*apiconn.Conn, error) {
 // The returned connection must be closed when finished with.
 func (j *JEM) OpenAPIFromDocs(m *mongodoc.Model, ctl *mongodoc.Controller) (*apiconn.Conn, error) {
 	return j.pool.connCache.OpenAPI(m.UUID, func() (api.Connection, *api.Info, error) {
-		stInfo := apiInfoFromDocs(m, ctl)
+		stInfo := apiInfoFromDocs(ctl, m)
 		st, err := api.Open(stInfo, apiDialOpts())
 		if err != nil {
 			return nil, nil, errgo.Mask(err)
@@ -404,13 +463,13 @@ func apiDialOpts() api.DialOpts {
 	}
 }
 
-func apiInfoFromDocs(m *mongodoc.Model, ctl *mongodoc.Controller) *api.Info {
+func apiInfoFromDocs(ctl *mongodoc.Controller, m *mongodoc.Model) *api.Info {
 	return &api.Info{
-		Addrs:      ctl.HostPorts,
-		CACert:     ctl.CACert,
-		Tag:        names.NewUserTag(m.AdminUser),
-		Password:   m.AdminPassword,
-		EnvironTag: names.NewEnvironTag(m.UUID),
+		Addrs:    ctl.HostPorts,
+		CACert:   ctl.CACert,
+		Tag:      names.NewUserTag(ctl.AdminUser),
+		Password: ctl.AdminPassword,
+		ModelTag: names.NewModelTag(m.UUID),
 	}
 }
 

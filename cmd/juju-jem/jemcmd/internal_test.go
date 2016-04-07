@@ -107,7 +107,7 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 	// Note: these values are set up by JujuConnSuite
 	// and are not the actual user's home and juju home.
 	home := utils.Home()
-	jujuHome := osenv.JujuHomePath()
+	jujuHome := osenv.JujuXDGDataHomeDir()
 	tests := []struct {
 		about          string
 		modelName      params.Name
@@ -321,7 +321,7 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 		config: map[string]interface{}{
 			"attr-path": "x",
 		},
-		expectError: `cannot get value for "attr": file ".*home/ubuntu/.juju/x" is empty`,
+		expectError: `cannot get value for "attr": file ".*/x" is empty`,
 	}, {
 		about: "attribute from path ignored with non-string template entry",
 		controllerInfo: params.ControllerResponse{

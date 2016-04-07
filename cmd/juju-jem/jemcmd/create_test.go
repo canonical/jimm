@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 
 	"github.com/juju/juju/juju"
+	"github.com/juju/juju/jujuclient"
+	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/yaml.v1"
@@ -30,7 +32,7 @@ func (s *createSuite) TestCreate(c *gc.C) {
 
 	config := map[string]interface{}{
 		"authorized-keys": fakeSSHKey,
-		"state-server":    true,
+		"controller":      true,
 	}
 	data, err := yaml.Marshal(config)
 	c.Assert(err, gc.IsNil)
@@ -45,12 +47,17 @@ func (s *createSuite) TestCreate(c *gc.C) {
 	)
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, "jem-foo:newmodel\n")
 
 	// Check that we can attach to the new model
 	// through the usual juju connection mechanism.
-	client, err := juju.NewAPIClientFromName("newmodel", httpbakery.NewClient())
+	store := jujuclient.NewFileClientStore()
+	params, err := newAPIConnectionParams(
+		store, "jem-foo", "", "newmodel", httpbakery.NewClient(),
+	)
 	c.Assert(err, gc.IsNil)
+	client, err := juju.NewAPIConnection(params)
+	c.Assert(err, jc.ErrorIsNil)
 	client.Close()
 }
 
@@ -65,7 +72,7 @@ func (s *createSuite) TestCreateWithTemplate(c *gc.C) {
 	c.Assert(stderr, gc.Equals, "")
 
 	// Then add a template containing the mandatory controller parameter.
-	stdout, stderr, code = run(c, c.MkDir(), "create-template", "bob/template", "-c", "bob/foo", "state-server=true")
+	stdout, stderr, code = run(c, c.MkDir(), "create-template", "bob/template", "-c", "bob/foo", "controller=true")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
@@ -90,12 +97,17 @@ func (s *createSuite) TestCreateWithTemplate(c *gc.C) {
 	)
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, "jem-foo:newmodel\n")
 
 	// Check that we can attach to the new model
 	// through the usual juju connection mechanism.
-	client, err := juju.NewAPIClientFromName("newmodel", httpbakery.NewClient())
-	c.Assert(err, gc.IsNil)
+	store := jujuclient.NewFileClientStore()
+	params, err := newAPIConnectionParams(
+		store, "jem-foo", "", "newmodel", httpbakery.NewClient(),
+	)
+	c.Assert(err, jc.ErrorIsNil)
+	client, err := juju.NewAPIConnection(params)
+	c.Assert(err, jc.ErrorIsNil)
 	client.Close()
 }
 

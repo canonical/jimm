@@ -33,14 +33,14 @@ func (s *changepermSuite) TestChangePerm(c *gc.C) {
 			Name: "foo",
 		},
 	})
-	c.Assert(err, gc.ErrorMatches, "GET http://.*/v1/controller/bob/foo: unauthorized")
+	c.Assert(err, gc.ErrorMatches, "GET http://.*/v2/controller/bob/foo: unauthorized")
 	_, err = aliceClient.GetModel(&params.GetModel{
 		EntityPath: params.EntityPath{
 			User: "bob",
 			Name: "foo",
 		},
 	})
-	c.Assert(err, gc.ErrorMatches, "GET http://.*/v1/model/bob/foo: unauthorized")
+	c.Assert(err, gc.ErrorMatches, "GET http://.*/v2/model/bob/foo: unauthorized")
 
 	// Add alice to model permissions list.
 	stdout, stderr, code = run(c, c.MkDir(),
@@ -60,7 +60,7 @@ func (s *changepermSuite) TestChangePerm(c *gc.C) {
 			Name: "foo",
 		},
 	})
-	c.Assert(err, gc.ErrorMatches, "GET http://.*/v1/controller/bob/foo: unauthorized")
+	c.Assert(err, gc.ErrorMatches, "GET http://.*/v2/controller/bob/foo: unauthorized")
 	_, err = aliceClient.GetModel(&params.GetModel{
 		EntityPath: params.EntityPath{
 			User: "bob",
@@ -139,7 +139,7 @@ func (s *changepermSuite) TestChangeTemplatePerm(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	stdout, stderr, code = run(c, c.MkDir(), "create-template", "--controller", "bob/foo", "bob/mytemplate", "state-server=true", "apt-mirror=0.1.2.3")
+	stdout, stderr, code = run(c, c.MkDir(), "create-template", "--controller", "bob/foo", "bob/mytemplate", "controller=true", "apt-mirror=0.1.2.3")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
@@ -150,7 +150,7 @@ func (s *changepermSuite) TestChangeTemplatePerm(c *gc.C) {
 	_, err := aliceClient.GetTemplate(&params.GetTemplate{
 		EntityPath: params.EntityPath{"bob", "mytemplate"},
 	})
-	c.Assert(err, gc.ErrorMatches, "GET http://.*/v1/template/bob/mytemplate: unauthorized")
+	c.Assert(err, gc.ErrorMatches, "GET http://.*/v2/template/bob/mytemplate: unauthorized")
 
 	bobClient := s.jemClient("bob")
 	_, err = bobClient.GetTemplate(&params.GetTemplate{

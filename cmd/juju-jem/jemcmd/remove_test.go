@@ -82,7 +82,7 @@ func (s *removeSuite) TestRemoveTemplate(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	stdout, stderr, code = run(c, c.MkDir(), "create-template", "--controller", "bob/foo", "bob/mytemplate", "state-server=true", "apt-mirror=0.1.2.3")
+	stdout, stderr, code = run(c, c.MkDir(), "create-template", "--controller", "bob/foo", "bob/mytemplate", "controller=true", "apt-mirror=0.1.2.3")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
@@ -117,7 +117,7 @@ func (s *removeSuite) TestRemoveMultipleModels(c *gc.C) {
 	stdout, stderr, code = run(c, c.MkDir(), "remove", "bob/foo", "bob/foo-1")
 	c.Assert(code, gc.Equals, 1, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Matches, `cannot remove bob/foo: DELETE http://.*/v1/model/bob/foo: cannot remove model "bob/foo" because it is a controller`+"\nERROR not all models removed successfully\n")
+	c.Assert(stderr, gc.Matches, `cannot remove bob/foo: DELETE http://.*/v2/model/bob/foo: cannot remove model "bob/foo" because it is a controller`+"\nERROR not all models removed successfully\n")
 
 	stdout, stderr, code = run(c, c.MkDir(), "list")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))

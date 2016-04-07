@@ -10,9 +10,16 @@ import (
 	"strings"
 
 	"github.com/juju/cmd"
+	"github.com/juju/errors"
+	"github.com/juju/juju/api"
+	"github.com/juju/juju/environs/config"
+	"github.com/juju/juju/juju"
 	corejujutesting "github.com/juju/juju/juju/testing"
+	"github.com/juju/juju/jujuclient"
 	"github.com/juju/loggo"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jem"
@@ -105,7 +112,7 @@ const sshKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDOjaOjVRHchF2RFCKQdgBqrIA5
 
 var dummyEnvConfig = map[string]interface{}{
 	"authorized-keys": sshKey,
-	"state-server":    true,
+	"controller":      true,
 }
 
 func (s *commonSuite) addEnv(c *gc.C, pathStr, srvPathStr string) {
@@ -119,7 +126,6 @@ func (s *commonSuite) addEnv(c *gc.C, pathStr, srvPathStr string) {
 		User: path.User,
 		Info: params.NewModelInfo{
 			Name:       path.Name,
-			Password:   "i don't care",
 			Controller: srvPath,
 			Config:     dummyEnvConfig,
 		},
@@ -130,6 +136,49 @@ func (s *commonSuite) addEnv(c *gc.C, pathStr, srvPathStr string) {
 func (s *commonSuite) clearCookies(c *gc.C) {
 	err := os.Remove(s.cookieFile)
 	c.Assert(err, gc.IsNil)
+}
+
+func newAPIConnectionParams(
+	store jujuclient.ClientStore,
+	controllerName,
+	accountName,
+	modelName string,
+	bakery *httpbakery.Client,
+) (juju.NewAPIConnectionParams, error) {
+	if controllerName == "" {
+		return juju.NewAPIConnectionParams{}, errgo.New("no controller name")
+	}
+	if accountName == "" {
+		var err error
+		accountName, err = store.CurrentAccount(controllerName)
+		if err != nil {
+			return juju.NewAPIConnectionParams{}, errors.Mask(err)
+		}
+	}
+	accountDetails, err := store.AccountByName(controllerName, accountName)
+	if err != nil {
+		return juju.NewAPIConnectionParams{}, errors.Mask(err)
+	}
+	var modelUUID string
+	if modelName != "" {
+		modelDetails, err := store.ModelByName(controllerName, accountName, modelName)
+		if err != nil {
+			return juju.NewAPIConnectionParams{}, errors.Trace(err)
+		}
+		modelUUID = modelDetails.ModelUUID
+	}
+	dialOpts := api.DefaultDialOpts()
+	dialOpts.BakeryClient = bakery
+	return juju.NewAPIConnectionParams{
+		Store:          store,
+		ControllerName: controllerName,
+		BootstrapConfig: func(string) (*config.Config, error) {
+			return nil, errors.NotFoundf("bootstrap configuration")
+		},
+		AccountDetails: accountDetails,
+		ModelUUID:      modelUUID,
+		DialOpts:       dialOpts,
+	}, nil
 }
 
 const fakeSSHKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCcEHVJtQyjN0eaNMAQIwhwknKj+8uZCqmzeA6EfnUEsrOHisoKjRVzb3bIRVgbK3SJ2/1yHPpL2WYynt3LtToKgp0Xo7LCsspL2cmUIWNYCbcgNOsT5rFeDsIDr9yQito8A3y31Mf7Ka7Rc0EHtCW4zC5yl/WZjgmMmw930+V1rDa5GjkqivftHE5AvLyRGvZJPOLH8IoO+sl02NjZ7dRhniBO9O5UIwxSkuGA5wvfLV7dyT/LH56gex7C2fkeBkZ7YGqTdssTX6DvFTHjEbBAsdWd8/rqXWtB6Xdi8sb3+aMpg9DRomZfb69Y+JuqWTUaq+q30qG2CTiqFRbgwRpp bob@somewhere"

@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/juju/cmd"
-	"github.com/juju/juju/cmd/envcmd"
+	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/names"
 	"gopkg.in/errgo.v1"
 	"launchpad.net/gnuflag"
@@ -29,7 +29,7 @@ type changePermCommand struct {
 }
 
 func newChangePermCommand() cmd.Command {
-	return envcmd.WrapBase(&changePermCommand{})
+	return modelcmd.WrapBase(&changePermCommand{})
 }
 
 var changePermDoc = `

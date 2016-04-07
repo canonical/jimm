@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/CanonicalLtd/blues-identity/idmclient"
+	"github.com/juju/idmclient"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
@@ -72,6 +72,7 @@ func (s *authSuite) TestNewMacaroon(c *gc.C) {
 func (s *authSuite) TestAuthenticateNoMacaroon(c *gc.C) {
 	req, err := http.NewRequest("GET", "/", nil)
 	c.Assert(err, gc.IsNil)
+	req.RequestURI = "/foo/bar"
 	err = s.jem.Authenticate(req)
 	c.Assert(err, gc.NotNil)
 	berr, ok := err.(*httpbakery.Error)
@@ -79,7 +80,7 @@ func (s *authSuite) TestAuthenticateNoMacaroon(c *gc.C) {
 	c.Assert(berr.Code, gc.Equals, httpbakery.ErrDischargeRequired)
 	c.Assert(berr.Info, gc.NotNil)
 	c.Assert(berr.Info.Macaroon, gc.NotNil)
-	c.Assert(berr.Info.MacaroonPath, gc.Equals, "/")
+	c.Assert(berr.Info.MacaroonPath, gc.Equals, "../")
 }
 
 func (s *authSuite) TestAuthenticate(c *gc.C) {

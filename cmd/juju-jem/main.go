@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	if err := juju.InitJujuHome(); err != nil {
+	if err := juju.InitJujuXDGDataHome(); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %s\n", err)
 		os.Exit(1)
 	}

@@ -11,7 +11,7 @@ import (
 	"github.com/CanonicalLtd/jem/params"
 )
 
-//go:generate httprequest-generate-client github.com/CanonicalLtd/jem/internal/v1 Handler client
+//go:generate httprequest-generate-client github.com/CanonicalLtd/jem/internal/v2 Handler client
 
 // Client represents the client of a JEM server.
 type Client struct {

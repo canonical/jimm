@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/CanonicalLtd/blues-identity/idmclient"
 	"github.com/juju/httprequest"
+	"github.com/juju/idmclient"
 	"github.com/juju/loggo"
 	"github.com/julienschmidt/httprouter"
 	"gopkg.in/errgo.v1"

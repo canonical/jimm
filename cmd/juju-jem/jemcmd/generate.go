@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/juju/cmd"
-	"github.com/juju/juju/cmd/envcmd"
+	"github.com/juju/juju/cmd/modelcmd"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/environschema.v1"
 	"launchpad.net/gnuflag"
@@ -25,7 +25,7 @@ type generateCommand struct {
 }
 
 func newGenerateCommand() cmd.Command {
-	return envcmd.WrapBase(&generateCommand{})
+	return modelcmd.WrapBase(&generateCommand{})
 }
 
 var generateDoc = `

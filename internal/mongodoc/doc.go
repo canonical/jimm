@@ -1,6 +1,8 @@
 package mongodoc
 
 import (
+	"encoding/base64"
+
 	"gopkg.in/juju/environschema.v1"
 
 	"github.com/CanonicalLtd/jem/params"
@@ -29,6 +31,27 @@ type Controller struct {
 	// of host-port addresses for the API servers,
 	// with the most-recently-dialed address at the start.
 	HostPorts []string
+
+	// Users holds a record for each user that JEM has created
+	// in the given controller.
+	// Note that keys are sanitized with the Sanitize function.
+	Users map[string]UserInfo `bson:",omitempty"`
+
+	// AdminUser and AdminPassword hold the admin
+	// credentials presented when the controller was
+	// first created.
+	AdminUser     string
+	AdminPassword string
+
+	// UUID duplicates the controller UUID held in the
+	// model associated with the controller, so
+	// we can return a model's controller UUID by fetching
+	// only the controller document.
+	UUID string
+}
+
+type UserInfo struct {
+	Password string
 }
 
 func (s *Controller) Owner() params.User {
@@ -43,6 +66,10 @@ type Model struct {
 	// Id holds the primary key for an model.
 	// It holds Path.String().
 	Id string `bson:"_id"`
+
+	// Controller holds the path of the model's
+	// controller.
+	Controller params.EntityPath
 
 	// EntityPath holds the local user and name given to the
 	// model, denormalized from Id for convenience
@@ -59,12 +86,16 @@ type Model struct {
 	// when connecting to the controller.
 	AdminUser string
 
-	// AdminPassword holds the password for the admin user.
-	AdminPassword string
+	// Users holds a map holding information about all
+	// the users we have managed on the model.
+	// Note that keys are sanitized with the Sanitize function.
+	Users map[string]ModelUserInfo `bson:",omitempty"`
+}
 
-	// Controller holds the path of the model's
-	// controller.
-	Controller params.EntityPath
+type ModelUserInfo struct {
+	// Granted holds whether we granted the given user
+	// access (if false, we revoked it).
+	Granted bool
 }
 
 func (e *Model) Owner() params.User {
@@ -101,4 +132,13 @@ func (t *Template) Owner() params.User {
 
 func (t *Template) GetACL() params.ACL {
 	return t.ACL
+}
+
+// Sanitize returns a version of key that's suitable
+// for using as a mongo key.
+// TODO base64 encoding is probably overkill - we
+// could probably do something that left keys
+// more readable.
+func Sanitize(key string) string {
+	return base64.StdEncoding.EncodeToString([]byte(key))
 }

@@ -1,8 +1,8 @@
 package idmtest_test
 
 import (
-	"github.com/CanonicalLtd/blues-identity/idmclient"
-	idmparams "github.com/CanonicalLtd/blues-identity/params"
+	"github.com/juju/idmclient"
+	idmparams "github.com/juju/idmclient/params"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"

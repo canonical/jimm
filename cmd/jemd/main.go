@@ -13,7 +13,7 @@ import (
 	// Include any providers known to support JEM.
 	// Avoid including provider/all to reduce build time.
 	_ "github.com/juju/juju/provider/ec2"
-	_ "github.com/juju/juju/provider/local"
+	_ "github.com/juju/juju/provider/lxd"
 	_ "github.com/juju/juju/provider/maas"
 	_ "github.com/juju/juju/provider/openstack"
 	"github.com/juju/loggo"

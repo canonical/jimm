@@ -4,7 +4,7 @@ package jemcmd
 
 import (
 	"github.com/juju/cmd"
-	"github.com/juju/juju/cmd/envcmd"
+	"github.com/juju/juju/cmd/modelcmd"
 	"gopkg.in/errgo.v1"
 	"launchpad.net/gnuflag"
 
@@ -20,7 +20,7 @@ type removeCommand struct {
 }
 
 func newRemoveCommand() cmd.Command {
-	return envcmd.WrapBase(&removeCommand{})
+	return modelcmd.WrapBase(&removeCommand{})
 }
 
 var removeDoc = `
