@@ -16,77 +16,84 @@ import (
 	"github.com/CanonicalLtd/jem/params"
 )
 
-type changePermCommand struct {
+type grantCommand struct {
 	commandBase
 
 	path entityPathValue
 
 	controller bool
 	template   bool
-	addRead    userSet
-	removeRead userSet
-	setRead    userSet
+	set        bool
+	users      userSet
 }
 
-func newChangePermCommand() cmd.Command {
-	return modelcmd.WrapBase(&changePermCommand{})
+func newGrantCommand() cmd.Command {
+	return modelcmd.WrapBase(&grantCommand{})
 }
 
-var changePermDoc = `
-The change-perm command changes permissions of an model
-(default) or controller (with the --controller flag) within JEM.
+var grantDoc = `
+The grant command grants permissions for a set of users or groups
+to read a model (default), controller, or template within JEM.
+Note that if someone can read a model from JEM they can
+access that model and make changes to it.
 
-For example:
+For example, this will allow alice and bob to read the model johndoe/mymodel.
 
-    juju jem change-perm --add-read=alice,bob johndoe/mymodel
+    juju jem grant johndoe/mymodel alice,bob
+
+If the --set flag is provided, the ACLs will be overwritten rather than added.
+
+    juju jem grant johndoe/mymodel --set fred,bob
 `
 
-func (c *changePermCommand) Info() *cmd.Info {
+func (c *grantCommand) Info() *cmd.Info {
 	return &cmd.Info{
-		Name:    "change-perm",
-		Args:    "<user>/<envname|controllername>",
-		Purpose: "set permissions of JEM entity",
-		Doc:     changePermDoc,
+		Name:    "grant",
+		Args:    "<user>/<modelname|controllername> username[,username]",
+		Purpose: "grant permissions of JEM entity",
+		Doc:     grantDoc,
 	}
 }
 
-func (c *changePermCommand) SetFlags(f *gnuflag.FlagSet) {
+func (c *grantCommand) SetFlags(f *gnuflag.FlagSet) {
 	f.BoolVar(&c.controller, "controller", false, "change ACL of controller not model")
 	f.BoolVar(&c.template, "template", false, "change ACL of template not model")
-	f.Var(&c.addRead, "add-read", "list of names to add to read ACL")
-	f.Var(&c.removeRead, "remove-read", "list of names to remove from read ACL")
-	f.Var(&c.setRead, "set-read", "set read ACL to this list")
+	f.BoolVar(&c.set, "set", false, "overwrite the current acl")
 }
 
-func (c *changePermCommand) Init(args []string) error {
+func (c *grantCommand) Init(args []string) error {
 	// Validate and store the entity reference.
-	if len(args) != 1 {
-		return errgo.Newf("got %d arguments, want 1", len(args))
+	if len(args) == 0 {
+		return errgo.Newf("no model or controller specified")
+	}
+	if len(args) == 1 {
+		return errgo.Newf("no users specified")
+	}
+	if len(args) > 2 {
+		return errgo.Newf("too many arguments")
 	}
 	if err := c.path.Set(args[0]); err != nil {
 		return errgo.Mask(err)
 	}
-	if c.setRead != nil && (len(c.addRead) != 0 || len(c.removeRead) != 0) {
-		return errgo.Newf("cannot specify --set-read with either --add-read or --remove-read")
-	}
-	if c.setRead == nil && len(c.addRead) == 0 && len(c.removeRead) == 0 {
-		return errgo.New("no permissions specified")
-	}
 	if c.template && c.controller {
 		return errgo.New("cannot specify both --controller and --template")
+	}
+	c.users = make(userSet)
+	if err := c.users.Set(args[1]); err != nil {
+		return errgo.Notef(err, "invalid value %q", args[1])
 	}
 	return nil
 }
 
-func (c *changePermCommand) Run(ctxt *cmd.Context) error {
+func (c *grantCommand) Run(ctxt *cmd.Context) error {
 	client, err := c.newClient(ctxt)
 	if err != nil {
 		return errgo.Mask(err)
 	}
 
-	if c.setRead != nil {
+	if c.set {
 		return c.setPerm(client, params.ACL{
-			Read: c.setRead.slice(),
+			Read: c.users.slice(),
 		})
 	}
 	currentACL, err := c.getPerm(client)
@@ -97,18 +104,15 @@ func (c *changePermCommand) Run(ctxt *cmd.Context) error {
 	for _, u := range currentACL.Read {
 		newReadPerms[u] = true
 	}
-	for u := range c.addRead {
+	for u := range c.users {
 		newReadPerms[u] = true
-	}
-	for u := range c.removeRead {
-		delete(newReadPerms, u)
 	}
 	return c.setPerm(client, params.ACL{
 		Read: newReadPerms.slice(),
 	})
 }
 
-func (c *changePermCommand) setPerm(client *jemclient.Client, acl params.ACL) error {
+func (c *grantCommand) setPerm(client *jemclient.Client, acl params.ACL) error {
 	var err error
 	switch {
 	case c.controller:
@@ -130,7 +134,7 @@ func (c *changePermCommand) setPerm(client *jemclient.Client, acl params.ACL) er
 	return errgo.Mask(err)
 }
 
-func (c *changePermCommand) getPerm(client *jemclient.Client) (params.ACL, error) {
+func (c *grantCommand) getPerm(client *jemclient.Client) (params.ACL, error) {
 	var acl params.ACL
 	var err error
 	switch {
