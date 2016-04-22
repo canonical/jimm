@@ -56,15 +56,16 @@ func New() cmd.Command {
 		},
 	})
 	supercmd.Register(newAddControllerCommand())
-	supercmd.Register(newChangePermCommand())
 	supercmd.Register(newCreateCommand())
 	supercmd.Register(newCreateTemplateCommand())
 	supercmd.Register(newGetCommand())
 	supercmd.Register(newGenerateCommand())
+	supercmd.Register(newGrantCommand())
 	supercmd.Register(newListCommand())
 	supercmd.Register(newListServersCommand())
 	supercmd.Register(newListTemplatesCommand())
 	supercmd.Register(newRemoveCommand())
+	supercmd.Register(newRevokeCommand())
 
 	return supercmd
 }
