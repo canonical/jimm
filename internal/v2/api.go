@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"math/rand"
 	"reflect"
 	"sort"
 	"strings"
@@ -32,6 +33,9 @@ type Handler struct {
 	jem    *jem.JEM
 	config jem.ServerParams
 }
+
+// randIntn is declared as a variable so that it can be overridden in tests.
+var randIntn = rand.Intn
 
 func NewAPIHandler(jp *jem.Pool, sp jem.ServerParams) ([]httprequest.Handler, error) {
 	return jemerror.Mapper.Handlers(func(p httprequest.Params) (*Handler, error) {
@@ -408,16 +412,20 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 	if err := h.jem.CheckIsUser(args.User); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	if err := h.jem.CheckReadACL(h.jem.DB.Controllers(), args.Info.Controller); err != nil {
+	ctlPath, err := h.selectController(&args.Info)
+	if err != nil {
+		return nil, errgo.NoteMask(err, "cannot select controller", errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound))
+	}
+	if err := h.jem.CheckReadACL(h.jem.DB.Controllers(), ctlPath); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	conn, err := h.jem.OpenAPI(args.Info.Controller)
+	conn, err := h.jem.OpenAPI(ctlPath)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot connect to controller", errgo.Is(params.ErrNotFound))
 	}
 	defer conn.Close()
 
-	neSchema, err := h.schemaForNewModel(args.Info.Controller)
+	neSchema, err := h.schemaForNewModel(ctlPath)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -440,7 +448,7 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 	// already exists.
 	modelDoc := &mongodoc.Model{
 		Path:       modelPath,
-		Controller: args.Info.Controller,
+		Controller: ctlPath,
 	}
 	if err := h.jem.AddModel(modelDoc); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
@@ -479,6 +487,37 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 	return h.GetModel(&params.GetModel{
 		EntityPath: modelPath,
 	})
+}
+
+// selectController selects a controller suitable for starting a new model in,
+// based on the criteria specified in info, and returns its path.
+func (h *Handler) selectController(info *params.NewModelInfo) (params.EntityPath, error) {
+	if info.Controller != nil {
+		return *info.Controller, nil
+	}
+	q, err := h.jem.ControllerLocationQuery(info.Location)
+	if err != nil {
+		return params.EntityPath{}, errgo.WithCausef(err, params.ErrBadRequest, "%s", "")
+	}
+	// Sort by _id so that we can make easily reproducible tests.
+	iter := h.jem.CanReadIter(q.Sort("_id").Iter())
+
+	var controllers []mongodoc.Controller
+	var ctl mongodoc.Controller
+	for iter.Next(&ctl) {
+		controllers = append(controllers, ctl)
+	}
+	if err := iter.Err(); err != nil {
+		return params.EntityPath{}, errgo.Newf("cannot get controllers")
+	}
+	if len(controllers) == 0 {
+		return params.EntityPath{}, errgo.WithCausef(nil, params.ErrNotFound, "no matching controllers found")
+	}
+	// Choose a random controller.
+	// TODO select a controller more intelligently, for example
+	// by choosing the most lightly loaded controller
+	n := randIntn(len(controllers))
+	return controllers[n].Path, nil
 }
 
 // AddTemplate adds a new template.

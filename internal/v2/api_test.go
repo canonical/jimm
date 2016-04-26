@@ -17,6 +17,7 @@ import (
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/internal/apitest"
+	"github.com/CanonicalLtd/jem/internal/v2"
 	"github.com/CanonicalLtd/jem/params"
 )
 
@@ -56,7 +57,7 @@ var unauthorizedTests = []struct {
 	path:   "/v2/model/bob",
 	body: params.NewModelInfo{
 		Name:       "newmodel",
-		Controller: params.EntityPath{"bob", "open"},
+		Controller: &params.EntityPath{"bob", "open"},
 	},
 }, {
 	about:  "new model with inaccessible controller",
@@ -65,7 +66,7 @@ var unauthorizedTests = []struct {
 	path:   "/v2/model/alice",
 	body: params.NewModelInfo{
 		Name:       "newmodel",
-		Controller: params.EntityPath{"bob", "private"},
+		Controller: &params.EntityPath{"bob", "private"},
 	},
 }, {
 	about:  "new template as non-owner",
@@ -589,13 +590,13 @@ func (s *APISuite) TestDeleteController(c *gc.C) {
 var getControllerLocationsTests = []struct {
 	about       string
 	arg         params.GetControllerLocations
-	user params.User
+	user        params.User
 	expect      params.ControllerLocationsResponse
 	expectError string
 	expectCause error
 }{{
 	about: "no filters",
-	user: "bob",
+	user:  "bob",
 	arg: params.GetControllerLocations{
 		Attr: "cloud",
 	},
@@ -604,7 +605,7 @@ var getControllerLocationsTests = []struct {
 	},
 }, {
 	about: "filter to single cloud",
-	user: "bob",
+	user:  "bob",
 	arg: params.GetControllerLocations{
 		Attr: "region",
 		Location: map[string]string{
@@ -616,7 +617,7 @@ var getControllerLocationsTests = []struct {
 	},
 }, {
 	about: "multiple filters",
-	user: "bob",
+	user:  "bob",
 	arg: params.GetControllerLocations{
 		Attr: "region",
 		Location: map[string]string{
@@ -629,7 +630,7 @@ var getControllerLocationsTests = []struct {
 	},
 }, {
 	about: "no matching controllers",
-	user: "bob",
+	user:  "bob",
 	arg: params.GetControllerLocations{
 		Attr: "region",
 		Location: map[string]string{
@@ -640,7 +641,7 @@ var getControllerLocationsTests = []struct {
 	expect: params.ControllerLocationsResponse{},
 }, {
 	about: "no controllers with attribute",
-	user: "bob",
+	user:  "bob",
 	arg: params.GetControllerLocations{
 		Attr: "region",
 		Location: map[string]string{
@@ -650,7 +651,7 @@ var getControllerLocationsTests = []struct {
 	expect: params.ControllerLocationsResponse{},
 }, {
 	about: "invalid filter attribute",
-	user: "bob",
+	user:  "bob",
 	arg: params.GetControllerLocations{
 		Attr: "region",
 		Location: map[string]string{
@@ -662,12 +663,12 @@ var getControllerLocationsTests = []struct {
 	expectCause: params.ErrBadRequest,
 }, {
 	about: "user without access to everything",
-	user: "alice",
+	user:  "alice",
 	arg: params.GetControllerLocations{
 		Attr: "cloud",
 	},
 	expect: params.ControllerLocationsResponse{
-		Values: []string{"azure","gce"},
+		Values: []string{"azure", "gce"},
 	},
 }}
 
@@ -730,7 +731,7 @@ func (s *APISuite) TestNewModel(c *gc.C) {
 		Handler: s.JEMSrv,
 		JSONBody: params.NewModelInfo{
 			Name:       params.Name("bar"),
-			Controller: ctlId,
+			Controller: &ctlId,
 			Config:     dummyModelConfig,
 		},
 		ExpectBody: httptesting.BodyAsserter(func(_ *gc.C, body json.RawMessage) {
@@ -789,7 +790,7 @@ func (s *APISuite) TestNewModelWithTemplates(c *gc.C) {
 		User: modelPath.User,
 		Info: params.NewModelInfo{
 			Name:       modelPath.Name,
-			Controller: ctlId,
+			Controller: &ctlId,
 			Config: map[string]interface{}{
 				"secret": "another secret",
 			},
@@ -822,7 +823,7 @@ func (s *APISuite) TestNewModelWithTemplateNotFound(c *gc.C) {
 		User: "bob",
 		Info: params.NewModelInfo{
 			Name:       "x",
-			Controller: ctlId,
+			Controller: &ctlId,
 			Config: map[string]interface{}{
 				"secret": "another secret",
 			},
@@ -831,6 +832,150 @@ func (s *APISuite) TestNewModelWithTemplateNotFound(c *gc.C) {
 	})
 	c.Assert(err, gc.ErrorMatches, `POST .*/v2/model/bob: cannot get template "bob/creds": template "bob/creds" not found`)
 	c.Assert(resp, gc.IsNil)
+}
+
+func (s *APISuite) TestNewModelWithLocation(c *gc.C) {
+	var nextIndex int
+	s.PatchValue(v2.RandIntn, func(n int) int {
+		return nextIndex % n
+	})
+	// Note: the controllers are ordered alphabetically by id before
+	// the "random" selection is applied.
+	s.assertAddController(c, params.EntityPath{"bob", "aws-eu-west"}, map[string]string{
+		"cloud":  "aws",
+		"region": "eu-west-1",
+	})
+	s.assertAddController(c, params.EntityPath{"bob", "aws-us-east"}, map[string]string{
+		"cloud":  "aws",
+		"region": "us-east-1",
+	})
+	s.assertAddController(c, params.EntityPath{"bob", "aws-us-east-staging"}, map[string]string{
+		"cloud":   "aws",
+		"region":  "us-east-1",
+		"staging": "true",
+	})
+	s.allowControllerPerm(c, params.EntityPath{"bob", "aws-us-east-staging"}, "everyone")
+	s.assertAddController(c, params.EntityPath{"bob", "azure-us"}, map[string]string{
+		"cloud":  "azure",
+		"region": "us",
+	})
+
+	tests := []struct {
+		about            string
+		randIndex        int
+		user             params.User
+		arg              params.NewModel
+		expectController string
+		expectError      string
+		expectCause      error
+	}{{
+		about:     "select aws",
+		randIndex: 1,
+		user:      "bob",
+		arg: params.NewModel{
+			User: "bob",
+			Info: params.NewModelInfo{
+				Location: map[string]string{
+					"cloud": "aws",
+				},
+				Config: map[string]interface{}{
+					"secret": "a secret",
+				},
+			},
+		},
+		expectController: "bob/aws-us-east",
+	}, {
+		about:     "select aws; index 0",
+		randIndex: 0,
+		user:      "bob",
+		arg: params.NewModel{
+			User: "bob",
+			Info: params.NewModelInfo{
+				Location: map[string]string{
+					"cloud": "aws",
+				},
+				Config: map[string]interface{}{
+					"secret": "a secret",
+				},
+			},
+		},
+		expectController: "bob/aws-eu-west",
+	}, {
+		about:     "select staging",
+		randIndex: 0,
+		user:      "bob",
+		arg: params.NewModel{
+			User: "bob",
+			Info: params.NewModelInfo{
+				Location: map[string]string{
+					"staging": "true",
+				},
+				Config: map[string]interface{}{
+					"secret": "a secret",
+				},
+			},
+		},
+		expectController: "bob/aws-us-east-staging",
+	}, {
+		about:     "some other user only gets to see the publicly available controller",
+		randIndex: 0,
+		user:      "alice",
+		arg: params.NewModel{
+			User: "alice",
+			Info: params.NewModelInfo{
+				Config: map[string]interface{}{
+					"secret": "a secret",
+				},
+			},
+		},
+		expectController: "bob/aws-us-east-staging",
+	}, {
+		about: "no matching controller",
+		user:  "alice",
+		arg: params.NewModel{
+			User: "alice",
+			Info: params.NewModelInfo{
+				Location: map[string]string{
+					"cloud": "somewhere",
+				},
+				Config: map[string]interface{}{
+					"secret": "a secret",
+				},
+			},
+		},
+		expectError: `POST .*: cannot select controller: no matching controllers found`,
+		expectCause: params.ErrNotFound,
+	}, {
+		about: "bad location attribute",
+		user:  "bob",
+		arg: params.NewModel{
+			User: "bob",
+			Info: params.NewModelInfo{
+				Location: map[string]string{
+					"$wrong": "somewhere",
+				},
+				Config: map[string]interface{}{
+					"secret": "a secret",
+				},
+			},
+		},
+		expectError: `POST http://.*/v2/model/bob: cannot select controller: bad controller location query: invalid attribute "\$wrong"`,
+		expectCause: params.ErrBadRequest,
+	}}
+	for i, test := range tests {
+		c.Logf("test %d: %d", i, test.about)
+		nextIndex = test.randIndex
+		test.arg.Info.Name = params.Name(fmt.Sprintf("x%d", i))
+		resp, err := s.NewClient(test.user).NewModel(&test.arg)
+		if test.expectError != "" {
+			c.Check(errgo.Cause(err), gc.Equals, test.expectCause)
+			c.Assert(err, gc.ErrorMatches, test.expectError)
+			continue
+		}
+		c.Assert(err, gc.IsNil)
+		c.Assert(resp.Path, jc.DeepEquals, params.EntityPath{test.arg.User, test.arg.Info.Name})
+		c.Assert(resp.ControllerPath.String(), gc.Equals, test.expectController)
+	}
 }
 
 func (s *APISuite) TestGetModelWithExplicitlyRemovedUser(c *gc.C) {
@@ -842,7 +987,7 @@ func (s *APISuite) TestGetModelWithExplicitlyRemovedUser(c *gc.C) {
 		User: "buddies",
 		Info: params.NewModelInfo{
 			Name:       "bobsmodel",
-			Controller: ctlId,
+			Controller: &ctlId,
 			Config:     dummyModelConfig,
 		},
 	})
@@ -907,7 +1052,7 @@ func (s *APISuite) TestNewModelUnderGroup(c *gc.C) {
 		Handler: s.JEMSrv,
 		JSONBody: params.NewModelInfo{
 			Name:       params.Name("bar"),
-			Controller: ctlId,
+			Controller: &ctlId,
 			Config:     dummyModelConfig,
 		},
 		ExpectBody: httptesting.BodyAsserter(func(_ *gc.C, body json.RawMessage) {
@@ -939,7 +1084,7 @@ func (s *APISuite) TestNewModelWithExistingUser(c *gc.C) {
 		Handler: s.JEMSrv,
 		JSONBody: params.NewModelInfo{
 			Name:       params.Name("bar"),
-			Controller: ctlId,
+			Controller: &ctlId,
 			Config:     dummyModelConfig,
 		},
 		ExpectBody: httptesting.BodyAsserter(func(_ *gc.C, body json.RawMessage) {
@@ -1010,7 +1155,7 @@ func (s *APISuite) TestNewModelCannotOpenAPI(c *gc.C) {
 		Handler: s.JEMSrv,
 		JSONBody: params.NewModelInfo{
 			Name:       params.Name("bar"),
-			Controller: params.EntityPath{"bob", "foo"},
+			Controller: &params.EntityPath{"bob", "foo"},
 		},
 		ExpectBody: params.Error{
 			Message: `cannot connect to controller: cannot get model: model "bob/foo" not found`,
@@ -1030,7 +1175,7 @@ func (s *APISuite) TestNewModelInvalidConfig(c *gc.C) {
 		Handler: s.JEMSrv,
 		JSONBody: params.NewModelInfo{
 			Name:       params.Name("bar"),
-			Controller: ctlId,
+			Controller: &ctlId,
 			Config: map[string]interface{}{
 				"authorized-keys": 123,
 			},
@@ -1049,7 +1194,7 @@ func (s *APISuite) TestNewModelTwice(c *gc.C) {
 
 	body := &params.NewModelInfo{
 		Name:       "bar",
-		Controller: ctlId,
+		Controller: &ctlId,
 		Config:     dummyModelConfig,
 	}
 	p := httptesting.JSONCallParams{
@@ -1086,7 +1231,7 @@ func (s *APISuite) TestNewModelCannotCreate(c *gc.C) {
 		Handler: s.JEMSrv,
 		JSONBody: params.NewModelInfo{
 			Name:       "bar",
-			Controller: ctlId,
+			Controller: &ctlId,
 			Config: map[string]interface{}{
 				"authorized-keys": sshKey,
 				"logging-config":  "bad>",
@@ -1122,7 +1267,7 @@ func (s *APISuite) TestNewModelUnauthorized(c *gc.C) {
 		Handler: s.JEMSrv,
 		JSONBody: params.NewModelInfo{
 			Name:       "bar",
-			Controller: ctlId,
+			Controller: &ctlId,
 			Config:     dummyModelConfig,
 		},
 		ExpectBody: params.Error{
@@ -1616,7 +1761,7 @@ func (s *APISuite) addModel(c *gc.C, modelPath, ctlPath params.EntityPath) (path
 		User: modelPath.User,
 		Info: params.NewModelInfo{
 			Name:       modelPath.Name,
-			Controller: ctlPath,
+			Controller: &ctlPath,
 			Config:     dummyModelConfig,
 		},
 	})
