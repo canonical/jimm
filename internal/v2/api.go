@@ -80,6 +80,7 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	if !names.IsValidModel(arg.Info.ControllerUUID) {
 		return badRequestf(nil, "bad model UUID in request")
 	}
+
 	ctl := &mongodoc.Controller{
 		Path:          arg.EntityPath,
 		CACert:        arg.Info.CACert,
@@ -87,6 +88,7 @@ func (h *Handler) AddController(arg *params.AddController) error {
 		AdminUser:     arg.Info.User,
 		AdminPassword: arg.Info.Password,
 		UUID:          arg.Info.ControllerUUID,
+		Location:      arg.Info.Location,
 	}
 	m := &mongodoc.Model{
 		UUID: arg.Info.ControllerUUID,
@@ -127,6 +129,10 @@ func (h *Handler) GetController(arg *params.GetController) (*params.ControllerRe
 	if err := h.jem.CheckReadACL(h.jem.DB.Controllers(), arg.EntityPath); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
+	ctl, err := h.jem.Controller(arg.EntityPath)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
 	neSchema, err := h.schemaForNewModel(arg.EntityPath)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
@@ -135,6 +141,7 @@ func (h *Handler) GetController(arg *params.GetController) (*params.ControllerRe
 		Path:         arg.EntityPath,
 		ProviderType: neSchema.providerType,
 		Schema:       neSchema.schema,
+		Location:     ctl.Location,
 	}, nil
 }
 
@@ -314,7 +321,8 @@ func (h *Handler) ListController(arg *params.ListController) (*params.ListContro
 	var ctl mongodoc.Controller
 	for iter.Next(&ctl) {
 		controllers = append(controllers, params.ControllerResponse{
-			Path: ctl.Path,
+			Path:     ctl.Path,
+			Location: ctl.Location,
 		})
 	}
 	if err := iter.Err(); err != nil {

@@ -246,6 +246,9 @@ type ControllerResponse struct {
 	// Schema holds the fields required to start
 	// a new model using the Controller.
 	Schema environschema.Fields `json:"schema,omitempty"`
+
+	// Location holds location attributes to be associated with the controller.
+	Location map[string]string
 }
 
 // GetController holds parameters for retrieving information on a Controller.
