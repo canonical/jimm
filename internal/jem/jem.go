@@ -449,9 +449,10 @@ func (j *JEM) DeleteTemplate(path params.EntityPath) error {
 
 // ControllerLocationQuery returns a mongo query that iterates through
 // all the controllers matching the given location attributes.
+// It returns an error if the location attribute keys aren't valid.
 func (j *JEM) ControllerLocationQuery(location map[string]string) (*mgo.Query, error) {
 	if err := validateLocationAttrs(location); err != nil {
-		return nil, errgo.WithCausef(err, params.ErrBadRequest, "bad controller location query")
+		return nil, errgo.Notef(err, "bad controller location query")
 	}
 	q := make(bson.D, 0, len(location))
 	for attr, val := range location {
