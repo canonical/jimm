@@ -343,7 +343,7 @@ func (s *APISuite) TestAddControllerUnauthenticatedWithBakeryProtocol(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "PUT",
 		Handler: s.JEMSrv,
-		Header:  map[string][]string{"Bakery-Protocol-Version": []string{"1"}},
+		Header:  map[string][]string{"Bakery-Protocol-Version": {"1"}},
 		URL:     "/v2/controller/user/model",
 		ExpectBody: httptesting.BodyAsserter(func(c *gc.C, m json.RawMessage) {
 			// Allow any body - TestGetModelNotFound will check that it's a valid macaroon.
@@ -461,13 +461,42 @@ func (s *APISuite) TestGetController(c *gc.C) {
 	c.Logf("%#v", controllerInfo.Schema)
 }
 
+func (s *APISuite) TestGetControllerWithLocation(c *gc.C) {
+	ctlId := params.EntityPath{"bob", "foo"}
+	info := s.APIInfo(c)
+
+	err := s.NewClient(ctlId.User).AddController(&params.AddController{
+		EntityPath: ctlId,
+		Info: params.ControllerInfo{
+			HostPorts:      info.Addrs,
+			CACert:         info.CACert,
+			User:           info.Tag.Id(),
+			Password:       info.Password,
+			ControllerUUID: info.ModelTag.Id(),
+			Location:       map[string]string{"cloud": "aws"},
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Handler: s.JEMSrv,
+		URL:     "/v2/controller/" + ctlId.String(),
+		Do:      apitest.Do(s.IDMSrv.Client("bob")),
+	})
+	c.Assert(resp.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %s", resp.Body.Bytes()))
+	var controllerInfo params.ControllerResponse
+	err = json.Unmarshal(resp.Body.Bytes(), &controllerInfo)
+	c.Assert(err, gc.IsNil, gc.Commentf("body: %s", resp.Body.String()))
+	c.Assert(controllerInfo.Location, gc.DeepEquals, map[string]string{"cloud": "aws"})
+}
+
 func (s *APISuite) TestGetControllerNotFound(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "GET",
 		Handler: s.JEMSrv,
 		URL:     "/v2/controller/bob/foo",
 		ExpectBody: &params.Error{
-			Message: `cannot open API: cannot get model: model "bob/foo" not found`,
+			Message: `controller "bob/foo" not found`,
 			Code:    params.ErrNotFound,
 		},
 		ExpectStatus: http.StatusNotFound,
@@ -530,7 +559,7 @@ func (s *APISuite) TestDeleteController(c *gc.C) {
 		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 		ExpectStatus: http.StatusNotFound,
 		ExpectBody: params.Error{
-			Message: `cannot open API: cannot get model: model "bob/foobarred" not found`,
+			Message: `controller "bob/foobarred" not found`,
 			Code:    params.ErrNotFound,
 		},
 	})
@@ -977,7 +1006,8 @@ func (s *APISuite) TestListController(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(resp, jc.DeepEquals, &params.ListControllerResponse{
 		Controllers: []params.ControllerResponse{{
-			Path: ctlId,
+			Path:     ctlId,
+			Location: map[string]string{},
 		}},
 	})
 
