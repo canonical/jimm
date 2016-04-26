@@ -152,6 +152,29 @@ func (*suite) TestEntityPathMarshalText(c *gc.C) {
 	c.Assert(string(data), gc.Equals, "foo/bar")
 }
 
+var isValidLocationAttrTests = []struct {
+	attr     string
+	expectOK bool
+}{
+	{"foo", true},
+	{"x", true},
+	{"", false},
+	{"foo-bar", true},
+	{"foo bar", false},
+	{"foo--bar", false},
+	{"foobar-", false},
+	{"-foobar", false},
+	{"x.y", false},
+	{"$field", false},
+}
+
+func (*suite) TestIsValidLocationAttr(c *gc.C) {
+	for i, test := range isValidLocationAttrTests {
+		c.Logf("test %d: %q", i, test.attr)
+		c.Assert(params.IsValidLocationAttr(test.attr), gc.Equals, test.expectOK)
+	}
+}
+
 func newHTTPRequest(path string, body interface{}) *http.Request {
 	req, err := http.NewRequest("GET", path, nil)
 	if err != nil {

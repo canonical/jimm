@@ -187,7 +187,13 @@ func (j *JEM) Close() {
 // The Id field in ctl will be set from its Path field,
 // and the Id, Path and Controller fields in env will also be
 // set from ctl.
+//
+// If the provided documents aren't valid, AddController with return
+// an error with a params.ErrBadRequest cause.
 func (j *JEM) AddController(ctl *mongodoc.Controller, m *mongodoc.Model) error {
+	if err := validateLocationAttrs(ctl.Location); err != nil {
+		return errgo.WithCausef(err, params.ErrBadRequest, "bad controller location")
+	}
 	// Insert the model before inserting the controller
 	// to avoid races with other clients creating non-controller
 	// models.
@@ -441,6 +447,19 @@ func (j *JEM) DeleteTemplate(path params.EntityPath) error {
 	return nil
 }
 
+// ControllerLocationQuery returns a mongo query that iterates through
+// all the controllers matching the given location attributes.
+func (j *JEM) ControllerLocationQuery(location map[string]string) (*mgo.Query, error) {
+	if err := validateLocationAttrs(location); err != nil {
+		return nil, errgo.WithCausef(err, params.ErrBadRequest, "bad controller location query")
+	}
+	q := make(bson.D, 0, len(location))
+	for attr, val := range location {
+		q = append(q, bson.DocElem{"location." + attr, val})
+	}
+	return j.DB.Controllers().Find(q), nil
+}
+
 // Template returns information on the template with the given path.
 // It returns an error with a params.ErrNotFound cause
 // if the template was not found.
@@ -516,4 +535,13 @@ func (db Database) Models() *mgo.Collection {
 
 func (db Database) Templates() *mgo.Collection {
 	return db.C("templates")
+}
+
+func validateLocationAttrs(attrs map[string]string) error {
+	for attr := range attrs {
+		if !params.IsValidLocationAttr(attr) {
+			return errgo.Newf("invalid attribute %q", attr)
+		}
+	}
+	return nil
 }
