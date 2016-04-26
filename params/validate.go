@@ -39,3 +39,11 @@ func (n *Name) UnmarshalText(t []byte) error {
 	*n = Name(t0)
 	return nil
 }
+
+var validLocationPat = regexp.MustCompile("^[a-z]+(-[a-z0-9]+)*$")
+
+// IsValidLocationAttr reports whether the given value is valid for
+// use as a controller location attribute.
+func IsValidLocationAttr(attr string) bool {
+	return validLocationPat.MatchString(attr)
+}

@@ -4,6 +4,7 @@ package jem_test
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/juju/idmclient"
 	"github.com/juju/schema"
@@ -63,6 +64,10 @@ func (s *jemSuite) TestAddController(c *gc.C) {
 		HostPorts:     []string{"host1:1234", "host2:9999"},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "foo",
+		},
 	}
 	m := &mongodoc.Model{
 		Id:   "ignored",
@@ -79,6 +84,10 @@ func (s *jemSuite) TestAddController(c *gc.C) {
 		HostPorts:     []string{"host1:1234", "host2:9999"},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "foo",
+		},
 	})
 	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
 		Id:         "bob/x",
@@ -95,6 +104,10 @@ func (s *jemSuite) TestAddController(c *gc.C) {
 		HostPorts:     []string{"host1:1234", "host2:9999"},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "foo",
+		},
 	})
 	m1, err := s.store.Model(ctlPath)
 	c.Assert(err, gc.IsNil)
@@ -112,6 +125,9 @@ func (s *jemSuite) TestAddController(c *gc.C) {
 		HostPorts:     []string{"host1:1234", "host2:9999"},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
+		Location: map[string]string{
+			"foo": "bar",
+		},
 	}
 	m2 := &mongodoc.Model{
 		Id:   "bob/noty",
@@ -122,6 +138,103 @@ func (s *jemSuite) TestAddController(c *gc.C) {
 	m3, err := s.store.Model(ctlPath2)
 	c.Assert(err, gc.IsNil)
 	c.Assert(m3, jc.DeepEquals, m2)
+}
+
+func (s *jemSuite) TestAddControllerWithInvalidLocationAttr(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "x"}
+	ctl := &mongodoc.Controller{
+		Path: ctlPath,
+		Location: map[string]string{
+			"foo.bar": "aws",
+		},
+	}
+	err := s.store.AddController(ctl, &mongodoc.Model{})
+	c.Assert(err, gc.ErrorMatches, `bad controller location: invalid attribute "foo.bar"`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrBadRequest)
+}
+
+func (s *jemSuite) TestControllerLocationQuery(c *gc.C) {
+	for _, ctl := range []*mongodoc.Controller{{
+		Path: params.EntityPath{"bob", "aws-us-east-1"},
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "us-east-1",
+		},
+	}, {
+		Path: params.EntityPath{"bob", "aws-eu-west-1"},
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "eu-west-1",
+		},
+	}, {
+		Path: params.EntityPath{"charlie", "other"},
+		Location: map[string]string{
+			"other": "something",
+		},
+	}, {
+		Path: params.EntityPath{"charlie", "noattrs"},
+	}} {
+		err := s.store.AddController(ctl, &mongodoc.Model{})
+		c.Assert(err, gc.IsNil)
+	}
+
+	tests := []struct {
+		about       string
+		location    map[string]string
+		expect      []string
+		expectError string
+	}{{
+		about: "single location attribute",
+		location: map[string]string{
+			"cloud": "aws",
+		},
+		expect: []string{
+			"bob/aws-us-east-1",
+			"bob/aws-eu-west-1",
+		},
+	}, {
+		about:    "no location attributes",
+		location: nil,
+		expect: []string{
+			"bob/aws-us-east-1",
+			"bob/aws-eu-west-1",
+			"charlie/other",
+			"charlie/noattrs",
+		},
+	}, {
+		about: "several location attributes",
+		location: map[string]string{
+			"cloud":  "aws",
+			"region": "us-east-1",
+		},
+		expect: []string{
+			"bob/aws-us-east-1",
+		},
+	}, {
+		about: "invalid location attribute",
+		location: map[string]string{
+			"invalid.attr$": "foo",
+		},
+		expectError: `bad controller location query: invalid attribute "invalid\.attr\$"`,
+	}}
+	for i, test := range tests {
+		c.Logf("test %d: %s", i, test.about)
+		q, err := s.store.ControllerLocationQuery(test.location)
+		if test.expectError != "" {
+			c.Assert(err, gc.ErrorMatches, test.expectError)
+			continue
+		}
+		var ctls []*mongodoc.Controller
+		err = q.All(&ctls)
+		c.Assert(err, gc.IsNil)
+		var paths []string
+		for _, ctl := range ctls {
+			paths = append(paths, ctl.Path.String())
+		}
+		sort.Strings(paths)
+		sort.Strings(test.expect)
+		c.Assert(paths, jc.DeepEquals, test.expect)
+	}
 }
 
 func (s *jemSuite) TestDeleteController(c *gc.C) {
@@ -176,7 +289,7 @@ func (s *jemSuite) TestDeleteController(c *gc.C) {
 	c.Assert(m3, gc.IsNil)
 }
 
-func (s *jemSuite) TestDeleteModelemnt(c *gc.C) {
+func (s *jemSuite) TestDeleteModel(c *gc.C) {
 	ctlPath := params.EntityPath{"dalek", "who"}
 	ctl := &mongodoc.Controller{
 		Id:            "ignored",

@@ -95,6 +95,9 @@ type ControllerInfo struct {
 	// ControllerUUID holds the UUID of the admin model
 	// of the controller.
 	ControllerUUID string `json:"controller-uuid"`
+
+	// Location holds location attributes to be associated with the controller.
+	Location map[string]string
 }
 
 // EntityPath holds the path parameters for specifying
@@ -262,6 +265,10 @@ type NewModelInfo struct {
 	// to use to start the model.
 	// TODO use attributes to automatically work out which controller to use.
 	Controller EntityPath `json:"controller"`
+
+	// Location holds location attributes that narrow down the range
+	// of possible controllers to be used for the model.
+	Location map[string]string
 
 	// TemplatePaths optionally holds a sequence of templates to use
 	// to create the base configuration entry on top of which Config is applied.

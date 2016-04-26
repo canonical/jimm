@@ -48,6 +48,9 @@ type Controller struct {
 	// we can return a model's controller UUID by fetching
 	// only the controller document.
 	UUID string
+
+	// Location holds the location attributes associated with the controller.
+	Location map[string]string
 }
 
 type UserInfo struct {

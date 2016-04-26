@@ -3,12 +3,13 @@
 package jemcmd
 
 import (
+	"fmt"
+
 	"github.com/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
 	"gopkg.in/errgo.v1"
 	"launchpad.net/gnuflag"
 
-	"fmt"
 	"github.com/CanonicalLtd/jem/jemclient"
 	"github.com/CanonicalLtd/jem/params"
 )
