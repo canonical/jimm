@@ -4,9 +4,8 @@
 package jemclient
 
 import (
-	"github.com/juju/httprequest"
-
 	"github.com/CanonicalLtd/jem/params"
+	"github.com/juju/httprequest"
 )
 
 type client struct {
@@ -41,6 +40,15 @@ func (c *client) DeleteTemplate(p *params.DeleteTemplate) error {
 // GetController returns information on a controller.
 func (c *client) GetController(p *params.GetController) (*params.ControllerResponse, error) {
 	var r *params.ControllerResponse
+	err := c.Client.Call(p, &r)
+	return r, err
+}
+
+// GetControllerLocations returns all the available values for a given controller
+// location attribute. The set of controllers is constrained by the URL query
+// parameters.
+func (c *client) GetControllerLocations(p *params.GetControllerLocations) (*params.ControllerLocationsResponse, error) {
+	var r *params.ControllerLocationsResponse
 	err := c.Client.Call(p, &r)
 	return r, err
 }

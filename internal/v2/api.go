@@ -2,6 +2,7 @@ package v2
 
 import (
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/juju/httprequest"
@@ -330,6 +331,51 @@ func (h *Handler) ListController(arg *params.ListController) (*params.ListContro
 	}
 	return &params.ListControllerResponse{
 		Controllers: controllers,
+	}, nil
+}
+
+// GetControllerLocations returns all the available values for a given controller
+// location attribute. The set of controllers is constrained by the URL query
+// parameters.
+func (h *Handler) GetControllerLocations(p httprequest.Params, arg *params.GetControllerLocations) (*params.ControllerLocationsResponse, error) {
+	attr := arg.Attr
+	if !params.IsValidLocationAttr(attr) {
+		return nil, badRequestf(nil, "invalid location %q", attr)
+	}
+	// Make the required attributes from the HTTP URL query parameters.
+	attrs := make(map[string]string)
+	for attr, vals := range p.Request.Form {
+		if len(vals) > 0 {
+			attrs[attr] = vals[0]
+		}
+	}
+	found := make(map[string]bool)
+
+	// Query all the controllers that match the attributes, building
+	// up all the possible values.
+	q, err := h.jem.ControllerLocationQuery(attrs)
+	if err != nil {
+		return nil, errgo.WithCausef(err, params.ErrBadRequest, "%s", "")
+	}
+	iter := h.jem.CanReadIter(q.Iter())
+	var ctl mongodoc.Controller
+	for iter.Next(&ctl) {
+		if val, ok := ctl.Location[attr]; ok {
+			found[val] = true
+		}
+	}
+	if err := iter.Err(); err != nil {
+		return nil, errgo.Notef(err, "cannot query")
+	}
+
+	// Build the result slice and sort it so we get deterministic results.
+	results := make([]string, 0, len(found))
+	for val := range found {
+		results = append(results, val)
+	}
+	sort.Strings(results)
+	return &params.ControllerLocationsResponse{
+		Values: results,
 	}, nil
 }
 

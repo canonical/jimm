@@ -5,6 +5,8 @@
 package jemclient
 
 import (
+	"net/url"
+
 	"github.com/juju/httprequest"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 
@@ -32,4 +34,21 @@ func New(p NewParams) *Client {
 	c.Client.Doer = p.Client
 	c.Client.UnmarshalError = httprequest.ErrorUnmarshaler(new(params.Error))
 	return &c
+}
+
+// GetControllerLocations returns all the available values for a given controller
+// location attribute.
+func (c *Client) GetControllerLocations(p *params.GetControllerLocations) (*params.ControllerLocationsResponse, error) {
+	// We implement this method on Client because the automatically
+	// generated method isn't sufficient to handle the general query parameters.
+	q := make(url.Values)
+	for attr, val := range p.Location {
+		q.Set(attr, val)
+	}
+	var r *params.ControllerLocationsResponse
+	// Technically the base URL could already contain query
+	// parameters, in which case this would be invalid, but
+	// that shouldn't be a problem in practice.
+	err := c.Client.CallURL(c.Client.BaseURL+"?"+q.Encode(), p, &r)
+	return r, err
 }
