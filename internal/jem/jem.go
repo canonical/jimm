@@ -476,6 +476,38 @@ func (j *JEM) Template(path params.EntityPath) (*mongodoc.Template, error) {
 	return &tmpl, nil
 }
 
+// SetControllerLocation updates the attributes associated with the controller's location.
+// Only the owner (arg.EntityPath.User) can change the location attributes
+// on an an entity.
+func (j *JEM) SetControllerLocation(path params.EntityPath, location map[string]string) error {
+	if err := validateLocationAttrs(location); err != nil {
+		return errgo.Notef(err, "bad controller location query")
+	}
+	set := make(bson.D, 0, len(location))
+	unset := make(bson.D, 0, len(location))
+	for k, v := range location {
+		if v == "" {
+			unset = append(unset, bson.DocElem{"location." + k, v})
+			continue
+		}
+		set = append(set, bson.DocElem{"location." + k, v})
+	}
+	update := make(bson.D, 0, 2)
+	if len(set) > 0 {
+		update = append(update, bson.DocElem{"$set", set})
+	}
+	if len(unset) > 0 {
+		update = append(update, bson.DocElem{"$unset", unset})
+	}
+	if err := j.DB.Controllers().UpdateId(path.String(), update); err != nil {
+		if err == mgo.ErrNotFound {
+			return params.ErrNotFound
+		}
+		return errgo.Notef(err, "cannot update %v", path)
+	}
+	return nil
+}
+
 func apiDialOpts() api.DialOpts {
 	return api.DialOpts{
 		Timeout:    APIOpenTimeout,

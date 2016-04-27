@@ -412,6 +412,30 @@ func (h *Handler) GetAllControllerLocations(p httprequest.Params, arg *params.Ge
 	}, nil
 }
 
+// GetControllerLocation returns a map of location attributes for a given controller.
+func (h *Handler) GetControllerLocation(arg *params.GetControllerLocation) (params.ControllerLocation, error) {
+	if err := h.jem.CheckReadACL(h.jem.DB.Controllers(), arg.EntityPath); err != nil {
+		return params.ControllerLocation{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	ctl, err := h.jem.Controller(arg.EntityPath)
+	if err != nil {
+		return params.ControllerLocation{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return params.ControllerLocation{
+		Location: ctl.Location,
+	}, nil
+}
+
+// SetControllerLocation updates the attributes associated with the controller's location.
+// Only the owner (arg.EntityPath.User) can change the location attributes
+// on an an entity.
+func (h *Handler) SetControllerLocation(arg *params.SetControllerLocation) error {
+	if err := h.jem.CheckIsUser(arg.EntityPath.User); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	return h.jem.SetControllerLocation(arg.EntityPath, arg.Location.Location)
+}
+
 // configWithTemplates returns the given configuration applied
 // along with the given templates.
 // Each template is applied in turn, then the configuration
