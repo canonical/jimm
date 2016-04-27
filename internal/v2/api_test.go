@@ -659,7 +659,7 @@ var getControllerLocationsTests = []struct {
 			"staging":    "true",
 		},
 	},
-	expectError: `GET .*: bad controller location query: invalid attribute "cloud\.blah"`,
+	expectError: `GET .*: invalid location attribute "cloud\.blah"`,
 	expectCause: params.ErrBadRequest,
 }, {
 	about: "user without access to everything",
@@ -695,6 +695,7 @@ func (s *APISuite) TestGetControllerLocations(c *gc.C) {
 		"region":  "somewhere",
 		"staging": "true",
 	})
+	s.allowControllerPerm(c, params.EntityPath{"bob", "gce-somewhere-staging"}, "somegroup")
 	s.assertAddController(c, params.EntityPath{"bob", "gce-elsewhere"}, map[string]string{
 		"cloud":  "gce",
 		"region": "elsewhere",
@@ -703,7 +704,6 @@ func (s *APISuite) TestGetControllerLocations(c *gc.C) {
 		"cloud":  "azure",
 		"region": "america",
 	})
-	s.allowControllerPerm(c, params.EntityPath{"bob", "gce-somewhere-staging"}, "somegroup")
 
 	s.IDMSrv.AddUser("alice", "somegroup")
 
@@ -719,6 +719,180 @@ func (s *APISuite) TestGetControllerLocations(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 		c.Assert(resp, jc.DeepEquals, &test.expect)
 	}
+}
+
+var getAllControllerLocationsTests = []struct {
+	about       string
+	arg         params.GetAllControllerLocations
+	user        params.User
+	expect      params.AllControllerLocationsResponse
+	expectError string
+	expectCause error
+}{{
+	about: "no filters",
+	user:  "bob",
+	expect: params.AllControllerLocationsResponse{
+		Locations: []map[string]string{{
+			"cloud":  "aws",
+			"region": "eu-west-1",
+		}, {
+			"cloud":   "aws",
+			"region":  "us-east-1",
+			"staging": "true",
+		}, {
+			"cloud":  "aws",
+			"region": "us-east-1",
+		}, {
+			"cloud":  "gce",
+			"region": "elsewhere",
+		}, {
+			"cloud":   "gce",
+			"region":  "somewhere",
+			"staging": "true",
+		}, {
+			"cloud":  "gce",
+			"region": "somewhere",
+		}},
+	},
+}, {
+	about: "filter to single cloud",
+	user:  "bob",
+	arg: params.GetAllControllerLocations{
+		Location: map[string]string{
+			"cloud": "aws",
+		},
+	},
+	expect: params.AllControllerLocationsResponse{
+		Locations: []map[string]string{{
+			"cloud":  "aws",
+			"region": "eu-west-1",
+		}, {
+			"cloud":   "aws",
+			"region":  "us-east-1",
+			"staging": "true",
+		}, {
+			"cloud":  "aws",
+			"region": "us-east-1",
+		}},
+	},
+}, {
+	about: "multiple filters",
+	user:  "bob",
+	arg: params.GetAllControllerLocations{
+		Location: map[string]string{
+			"cloud":   "aws",
+			"staging": "true",
+		},
+	},
+	expect: params.AllControllerLocationsResponse{
+		Locations: []map[string]string{{
+			"cloud":   "aws",
+			"region":  "us-east-1",
+			"staging": "true",
+		}},
+	},
+}, {
+	about: "no matching controllers",
+	user:  "bob",
+	arg: params.GetAllControllerLocations{
+		Location: map[string]string{
+			"cloud":         "aws",
+			"somethingelse": "blah",
+		},
+	},
+	expect: params.AllControllerLocationsResponse{},
+}, {
+	about: "no controllers with attribute",
+	user:  "bob",
+	arg: params.GetAllControllerLocations{
+		Location: map[string]string{
+			"somethingelse": "blah",
+		},
+	},
+	expect: params.AllControllerLocationsResponse{},
+}, {
+	about: "invalid filter attribute",
+	user:  "bob",
+	arg: params.GetAllControllerLocations{
+		Location: map[string]string{
+			"cloud.blah": "aws",
+			"staging":    "true",
+		},
+	},
+	expectError: `GET .*: invalid location attribute "cloud\.blah"`,
+	expectCause: params.ErrBadRequest,
+}, {
+	about: "user without access to everything",
+	user:  "alice",
+	expect: params.AllControllerLocationsResponse{
+		Locations: []map[string]string{{
+			"cloud":  "azure",
+			"region": "america",
+		}, {
+			"cloud":   "gce",
+			"region":  "somewhere",
+			"staging": "true",
+		}},
+	},
+}}
+
+func (s *APISuite) TestAllControllerLocations(c *gc.C) {
+	s.assertAddController(c, params.EntityPath{"bob", "aws-us-east"}, map[string]string{
+		"cloud":  "aws",
+		"region": "us-east-1",
+	})
+	s.assertAddController(c, params.EntityPath{"bob", "aws-us-east-2"}, map[string]string{
+		"cloud":  "aws",
+		"region": "us-east-1",
+	})
+	s.assertAddController(c, params.EntityPath{"bob", "aws-us-east-staging"}, map[string]string{
+		"cloud":   "aws",
+		"region":  "us-east-1",
+		"staging": "true",
+	})
+	s.assertAddController(c, params.EntityPath{"bob", "aws-us-east-staging-2"}, map[string]string{
+		"cloud":   "aws",
+		"region":  "us-east-1",
+		"staging": "true",
+	})
+	s.assertAddController(c, params.EntityPath{"bob", "aws-eu-west"}, map[string]string{
+		"cloud":  "aws",
+		"region": "eu-west-1",
+	})
+	s.assertAddController(c, params.EntityPath{"bob", "gce-somewhere"}, map[string]string{
+		"cloud":  "gce",
+		"region": "somewhere",
+	})
+	s.assertAddController(c, params.EntityPath{"bob", "gce-somewhere-staging"}, map[string]string{
+		"cloud":   "gce",
+		"region":  "somewhere",
+		"staging": "true",
+	})
+	s.allowControllerPerm(c, params.EntityPath{"bob", "gce-somewhere-staging"}, "somegroup")
+	s.assertAddController(c, params.EntityPath{"bob", "gce-elsewhere"}, map[string]string{
+		"cloud":  "gce",
+		"region": "elsewhere",
+	})
+	s.assertAddController(c, params.EntityPath{"alice", "alice-controller"}, map[string]string{
+		"cloud":  "azure",
+		"region": "america",
+	})
+
+	s.IDMSrv.AddUser("alice", "somegroup")
+
+	for i, test := range getAllControllerLocationsTests {
+		c.Logf("test %d: %v", i, test.about)
+		resp, err := s.NewClient(test.user).GetAllControllerLocations(&test.arg)
+		if test.expectError != "" {
+			c.Check(resp, gc.IsNil)
+			c.Assert(err, gc.ErrorMatches, test.expectError)
+			c.Assert(errgo.Cause(err), gc.Equals, test.expectCause)
+			continue
+		}
+		c.Assert(err, gc.IsNil)
+		c.Assert(resp, jc.DeepEquals, &test.expect)
+	}
+
 }
 
 func (s *APISuite) TestNewModel(c *gc.C) {
