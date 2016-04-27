@@ -6,6 +6,7 @@ import (
 	"github.com/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
+	"github.com/juju/utils/keyvalues"
 	"gopkg.in/errgo.v1"
 	"launchpad.net/gnuflag"
 
@@ -15,8 +16,9 @@ import (
 type addControllerCommand struct {
 	commandBase
 
-	modelName string
-	modelPath entityPathValue
+	modelName  string
+	modelPath  entityPathValue
+	attributes map[string]string
 }
 
 func newAddControllerCommand() cmd.Command {
@@ -33,12 +35,18 @@ that will be given to the controller inside JEM.
 This will also be added as a model, so the
 JEM commands which refer to a model
 can also use the controller name.
+Some key value pair could be specify like cloud=aws be be set directly
+on the location information of the controller.
+
+The location of the controller can be set by providing a set of key=value
+pairs as additional arguments, for example:
+     juju jem add-controller alice/mycontroller cloud=aws region=us-east-1
 `
 
 func (c *addControllerCommand) Info() *cmd.Info {
 	return &cmd.Info{
 		Name:    "add-controller",
-		Args:    "<user>/<name>",
+		Args:    "<user>/<name> key=value [key=value...]",
 		Purpose: "Add a controller to JEM.",
 		Doc:     addControllerDoc,
 	}
@@ -51,12 +59,17 @@ func (c *addControllerCommand) SetFlags(f *gnuflag.FlagSet) {
 }
 
 func (c *addControllerCommand) Init(args []string) error {
-	if len(args) != 1 {
+	if len(args) < 1 {
 		return errgo.Newf("got %d arguments, want 1", len(args))
 	}
 	if err := c.modelPath.Set(args[0]); err != nil {
 		return errgo.Mask(err)
 	}
+	attrs, err := keyvalues.Parse(args[1:], false)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	c.attributes = attrs
 	return nil
 }
 
@@ -87,6 +100,7 @@ func (c *addControllerCommand) Run(ctxt *cmd.Context) error {
 			ControllerUUID: info.controller.ControllerUUID,
 			User:           info.account.User,
 			Password:       info.account.Password,
+			Location:       c.attributes,
 		},
 	}); err != nil {
 		return errgo.Notef(err, "cannot add controller")
