@@ -126,7 +126,7 @@ func (s *commonSuite) addEnv(c *gc.C, pathStr, srvPathStr string) {
 		User: path.User,
 		Info: params.NewModelInfo{
 			Name:       path.Name,
-			Controller: srvPath,
+			Controller: &srvPath,
 			Config:     dummyEnvConfig,
 		},
 	})

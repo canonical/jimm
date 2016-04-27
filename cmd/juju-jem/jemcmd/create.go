@@ -122,7 +122,7 @@ func (c *createCommand) Run(ctxt *cmd.Context) error {
 			User: c.modelPath.User,
 			Info: params.NewModelInfo{
 				Name:          c.modelPath.Name,
-				Controller:    c.ctlPath.EntityPath,
+				Controller:    &c.ctlPath.EntityPath,
 				Config:        config,
 				TemplatePaths: c.templatePaths.paths,
 			},

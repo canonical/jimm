@@ -282,8 +282,8 @@ type NewModelInfo struct {
 
 	// Controller holds the path to the controller entity
 	// to use to start the model.
-	// TODO use attributes to automatically work out which controller to use.
-	Controller EntityPath `json:"controller"`
+	// This is optional and may not be available to all users.
+	Controller *EntityPath `json:"controller,omitempty"`
 
 	// Location holds location attributes that narrow down the range
 	// of possible controllers to be used for the model.
