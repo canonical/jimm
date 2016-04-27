@@ -384,6 +384,10 @@ func (h *Handler) GetAllControllerLocations(p httprequest.Params, arg *params.Ge
 	}
 	locSet := make(map[string]map[string]string)
 	err = h.doControllers(attrs, func(ctl *mongodoc.Controller) error {
+		if len(ctl.Location) == 0 {
+			// Ignore controllers with no location set.
+			return nil
+		}
 		data, err := json.Marshal(ctl.Location)
 		if err != nil {
 			panic(errgo.Notef(err, "can't marshal map for some weird reason"))
