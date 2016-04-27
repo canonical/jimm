@@ -74,6 +74,21 @@ type DeleteController struct {
 	EntityPath
 }
 
+type GetAllControllerLocations struct {
+	httprequest.Route `httprequest:"GET /v2/location"`
+
+	// Location constrains the controllers that the
+	// set of returned values will be returned from
+	// to those with matching location attributes.
+	// Note that the values in this should be passed in the
+	// URL query parameters.
+	Location map[string]string
+}
+
+type AllControllerLocationsResponse struct {
+	Locations []map[string]string
+}
+
 type GetControllerLocations struct {
 	httprequest.Route `httprequest:"GET /v2/location/:Attr"`
 	Attr              string `httprequest:",path"`

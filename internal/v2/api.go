@@ -1,7 +1,9 @@
 package v2
 
 import (
+	"encoding/json"
 	"math/rand"
+	"net/url"
 	"reflect"
 	"sort"
 	"strings"
@@ -346,30 +348,19 @@ func (h *Handler) GetControllerLocations(p httprequest.Params, arg *params.GetCo
 	if !params.IsValidLocationAttr(attr) {
 		return nil, badRequestf(nil, "invalid location %q", attr)
 	}
-	// Make the required attributes from the HTTP URL query parameters.
-	attrs := make(map[string]string)
-	for attr, vals := range p.Request.Form {
-		if len(vals) > 0 {
-			attrs[attr] = vals[0]
-		}
+	attrs, err := formToLocationAttrs(p.Request.Form)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
 	found := make(map[string]bool)
-
-	// Query all the controllers that match the attributes, building
-	// up all the possible values.
-	q, err := h.jem.ControllerLocationQuery(attrs)
-	if err != nil {
-		return nil, errgo.WithCausef(err, params.ErrBadRequest, "%s", "")
-	}
-	iter := h.jem.CanReadIter(q.Iter())
-	var ctl mongodoc.Controller
-	for iter.Next(&ctl) {
+	err = h.doControllers(attrs, func(ctl *mongodoc.Controller) error {
 		if val, ok := ctl.Location[attr]; ok {
 			found[val] = true
 		}
-	}
-	if err := iter.Err(); err != nil {
-		return nil, errgo.Notef(err, "cannot query")
+		return nil
+	})
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
 
 	// Build the result slice and sort it so we get deterministic results.
@@ -380,6 +371,40 @@ func (h *Handler) GetControllerLocations(p httprequest.Params, arg *params.GetCo
 	sort.Strings(results)
 	return &params.ControllerLocationsResponse{
 		Values: results,
+	}, nil
+}
+
+// GetAllControllerLocations returns all the available
+// sets of controller location attributes, restricting
+// the search by any provided location attributes.
+func (h *Handler) GetAllControllerLocations(p httprequest.Params, arg *params.GetAllControllerLocations) (*params.AllControllerLocationsResponse, error) {
+	attrs, err := formToLocationAttrs(p.Request.Form)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
+	}
+	locSet := make(map[string]map[string]string)
+	err = h.doControllers(attrs, func(ctl *mongodoc.Controller) error {
+		data, err := json.Marshal(ctl.Location)
+		if err != nil {
+			panic(errgo.Notef(err, "can't marshal map for some weird reason"))
+		}
+		locSet[string(data)] = ctl.Location
+		return nil
+	})
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
+	}
+	ordered := make([]string, 0, len(locSet))
+	for k := range locSet {
+		ordered = append(ordered, k)
+	}
+	sort.Strings(ordered)
+	result := make([]map[string]string, len(ordered))
+	for i := range ordered {
+		result[i] = locSet[ordered[i]]
+	}
+	return &params.AllControllerLocationsResponse{
+		Locations: result,
 	}, nil
 }
 
@@ -814,6 +839,31 @@ func (h *Handler) schemaForNewModel(ctlPath params.EntityPath) (*schemaForNewMod
 	return &neSchema, nil
 }
 
+// doControllers calls the given function for each controller that
+// can be read by the current user that matches the given attributes.
+// If the function returns an error, the iteration stops and
+// doControllers returns the error with the same cause.
+func (h *Handler) doControllers(attrs map[string]string, do func(c *mongodoc.Controller) error) error {
+	// Query all the controllers that match the attributes, building
+	// up all the possible values.
+	q, err := h.jem.ControllerLocationQuery(attrs)
+	if err != nil {
+		return errgo.WithCausef(err, params.ErrBadRequest, "%s", "")
+	}
+	iter := h.jem.CanReadIter(q.Iter())
+	var ctl mongodoc.Controller
+	for iter.Next(&ctl) {
+		if err := do(&ctl); err != nil {
+			iter.Close()
+			return errgo.Mask(err, errgo.Any)
+		}
+	}
+	if err := iter.Err(); err != nil {
+		return errgo.Notef(err, "cannot query")
+	}
+	return nil
+}
+
 func badRequestf(underlying error, f string, a ...interface{}) error {
 	err := errgo.WithCausef(underlying, params.ErrBadRequest, f, a...)
 	err.(*errgo.Err).SetLocation(1)
@@ -832,4 +882,20 @@ func collapseHostPorts(hpss [][]network.HostPort) []string {
 	hps = network.FilterUnusableHostPorts(hps)
 	hps = network.DropDuplicatedHostPorts(hps)
 	return network.HostPortsToStrings(hps)
+}
+
+// formToLocationAttrs converts a set of location attributes
+// specified as URL query paramerters into the usual
+// location attribute map form.
+func formToLocationAttrs(form url.Values) (map[string]string, error) {
+	attrs := make(map[string]string)
+	for attr, vals := range form {
+		if !params.IsValidLocationAttr(attr) {
+			return nil, badRequestf(nil, "invalid location attribute %q", attr)
+		}
+		if len(vals) > 0 {
+			attrs[attr] = vals[0]
+		}
+	}
+	return attrs, nil
 }

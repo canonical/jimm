@@ -52,3 +52,21 @@ func (c *Client) GetControllerLocations(p *params.GetControllerLocations) (*para
 	err := c.Client.CallURL(c.Client.BaseURL+"?"+q.Encode(), p, &r)
 	return r, err
 }
+
+/// GetAllControllerLocations returns all the available
+// sets of controller location attributes, restricting
+// the search by the provided location attributes.
+func (c *Client) GetAllControllerLocations(p *params.GetAllControllerLocations) (*params.AllControllerLocationsResponse, error) {
+	// We implement this method on Client because the automatically
+	// generated method isn't sufficient to handle the general query parameters.
+	q := make(url.Values)
+	for attr, val := range p.Location {
+		q.Set(attr, val)
+	}
+	var r *params.AllControllerLocationsResponse
+	// Technically the base URL could already contain query
+	// parameters, in which case this would be invalid, but
+	// that shouldn't be a problem in practice.
+	err := c.Client.CallURL(c.Client.BaseURL+"?"+q.Encode(), p, &r)
+	return r, err
+}
