@@ -877,6 +877,7 @@ func (s *APISuite) TestAllControllerLocations(c *gc.C) {
 		"cloud":  "azure",
 		"region": "america",
 	})
+	s.assertAddController(c, params.EntityPath{"alice", "forgotten"}, nil)
 
 	s.IDMSrv.AddUser("alice", "somegroup")
 
