@@ -53,7 +53,7 @@ func (c *Client) GetControllerLocations(p *params.GetControllerLocations) (*para
 	return r, err
 }
 
-/// GetAllControllerLocations returns all the available
+// GetAllControllerLocations returns all the available
 // sets of controller location attributes, restricting
 // the search by the provided location attributes.
 func (c *Client) GetAllControllerLocations(p *params.GetAllControllerLocations) (*params.AllControllerLocationsResponse, error) {

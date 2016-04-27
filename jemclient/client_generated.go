@@ -38,6 +38,15 @@ func (c *client) DeleteTemplate(p *params.DeleteTemplate) error {
 	return c.Client.Call(p, nil)
 }
 
+// GetAllControllerLocations returns all the available
+// sets of controller location attributes, restricting
+// the search by any provided location attributes.
+func (c *client) GetAllControllerLocations(p *params.GetAllControllerLocations) (*params.AllControllerLocationsResponse, error) {
+	var r *params.AllControllerLocationsResponse
+	err := c.Client.Call(p, &r)
+	return r, err
+}
+
 // GetController returns information on a controller.
 func (c *client) GetController(p *params.GetController) (*params.ControllerResponse, error) {
 	var r *params.ControllerResponse
