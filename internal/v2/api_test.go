@@ -491,6 +491,136 @@ func (s *APISuite) TestGetControllerWithLocation(c *gc.C) {
 	c.Assert(controllerInfo.Location, gc.DeepEquals, map[string]string{"cloud": "aws"})
 }
 
+func (s *APISuite) TestGetControllerLocation(c *gc.C) {
+	ctlId := params.EntityPath{"bob", "foo"}
+	info := s.APIInfo(c)
+
+	err := s.NewClient(ctlId.User).AddController(&params.AddController{
+		EntityPath: ctlId,
+		Info: params.ControllerInfo{
+			HostPorts:      info.Addrs,
+			CACert:         info.CACert,
+			User:           info.Tag.Id(),
+			Password:       info.Password,
+			ControllerUUID: info.ModelTag.Id(),
+			Location:       map[string]string{"cloud": "aws"},
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Check the location attributes.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:       "GET",
+		Handler:      s.JEMSrv,
+		URL:          "/v2/controller/" + ctlId.String() + "/meta/location",
+		ExpectStatus: http.StatusOK,
+		ExpectBody: params.ControllerLocation{
+			Location: map[string]string{"cloud": "aws"},
+		},
+		Do: apitest.Do(s.IDMSrv.Client("bob")),
+	})
+
+	// Check alice can't access them.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:       "GET",
+		Handler:      s.JEMSrv,
+		URL:          "/v2/controller/" + ctlId.String() + "/meta/location",
+		ExpectStatus: http.StatusUnauthorized,
+		ExpectBody: &params.Error{
+			Message: `unauthorized`,
+			Code:    params.ErrUnauthorized,
+		},
+		Do: apitest.Do(s.IDMSrv.Client("alice")),
+	})
+
+	// Check alice can't probe controllers througth GET.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:       "GET",
+		Handler:      s.JEMSrv,
+		URL:          "/v2/controller/bob/notexist/meta/location",
+		ExpectStatus: http.StatusUnauthorized,
+		ExpectBody: &params.Error{
+			Message: `unauthorized`,
+			Code:    params.ErrUnauthorized,
+		},
+		Do: apitest.Do(s.IDMSrv.Client("alice")),
+	})
+}
+
+func (s *APISuite) TestSetControllerLocation(c *gc.C) {
+	ctlId := params.EntityPath{"bob", "foo"}
+	info := s.APIInfo(c)
+
+	err := s.NewClient(ctlId.User).AddController(&params.AddController{
+		EntityPath: ctlId,
+		Info: params.ControllerInfo{
+			HostPorts:      info.Addrs,
+			CACert:         info.CACert,
+			User:           info.Tag.Id(),
+			Password:       info.Password,
+			ControllerUUID: info.ModelTag.Id(),
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Check there is no location attributes.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:       "GET",
+		Handler:      s.JEMSrv,
+		URL:          "/v2/controller/" + ctlId.String() + "/meta/location",
+		ExpectStatus: http.StatusOK,
+		ExpectBody:   params.ControllerLocation{Location: map[string]string{}},
+		Do:           apitest.Do(s.IDMSrv.Client("bob")),
+	})
+
+	// Put some location attributes.
+	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Method:  "PUT",
+		Handler: s.JEMSrv,
+		URL:     "/v2/controller/" + ctlId.String() + "/meta/location",
+		Do:      apitest.Do(s.IDMSrv.Client("bob")),
+		JSONBody: params.ControllerLocation{
+			Location: map[string]string{"cloud": "aws"},
+		},
+	})
+
+	c.Assert(resp.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %s", resp.Body.Bytes()))
+
+	// Retrieve the newly put location attributes.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:       "GET",
+		Handler:      s.JEMSrv,
+		URL:          "/v2/controller/" + ctlId.String() + "/meta/location",
+		ExpectStatus: http.StatusOK,
+		ExpectBody: params.ControllerLocation{
+			Location: map[string]string{"cloud": "aws"},
+		},
+		Do: apitest.Do(s.IDMSrv.Client("bob")),
+	})
+
+	// Check that alice can't modify it.
+	resp = httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Method:   "PUT",
+		Handler:  s.JEMSrv,
+		URL:      "/v2/controller/" + ctlId.String() + "/meta/location",
+		Do:       apitest.Do(s.IDMSrv.Client("alice")),
+		JSONBody: map[string]string{"cloud": "aws"},
+	})
+
+	c.Assert(resp.Code, gc.Equals, http.StatusUnauthorized, gc.Commentf("body: %s", resp.Body.Bytes()))
+
+	// Check that alice can't probe controller with PUT.
+	resp = httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Method:   "PUT",
+		Handler:  s.JEMSrv,
+		URL:      "/v2/controller/bob/unknown/meta/location",
+		Do:       apitest.Do(s.IDMSrv.Client("alice")),
+		JSONBody: map[string]string{"cloud": "aws"},
+	})
+
+	c.Assert(resp.Code, gc.Equals, http.StatusUnauthorized, gc.Commentf("body: %s", resp.Body.Bytes()))
+}
+
 func (s *APISuite) TestGetControllerNotFound(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "GET",

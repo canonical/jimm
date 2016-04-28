@@ -67,6 +67,7 @@ func New() cmd.Command {
 	supercmd.Register(newListTemplatesCommand())
 	supercmd.Register(newRemoveCommand())
 	supercmd.Register(newRevokeCommand())
+	supercmd.Register(newSetCommand())
 
 	return supercmd
 }

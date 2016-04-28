@@ -54,6 +54,25 @@ type GetTemplatePerm struct {
 	EntityPath
 }
 
+// SetControllerLocation holds the attributes for setting the Location field
+// on a controller.
+type SetControllerLocation struct {
+	httprequest.Route `httprequest:"PUT /v2/controller/:User/:Name/meta/location"`
+	EntityPath
+	Location ControllerLocation `httprequest:",body"`
+}
+
+// GetControllerLocation holds the parameters for getting the Location field
+// of a controller.
+type GetControllerLocation struct {
+	httprequest.Route `httprequest:"GET /v2/controller/:User/:Name/meta/location"`
+	EntityPath
+}
+
+type ControllerLocation struct {
+	Location map[string]string
+}
+
 // ACL holds an access control list for an entity.
 type ACL struct {
 	// Read holds users and groups that are allowed to read the

@@ -153,6 +153,45 @@ func (s *jemSuite) TestAddControllerWithInvalidLocationAttr(c *gc.C) {
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrBadRequest)
 }
 
+func (s *jemSuite) TestSetControllerWithInvalidLocationAttr(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "x"}
+	ctl := &mongodoc.Controller{
+		Path: ctlPath,
+	}
+	err := s.store.AddController(ctl, &mongodoc.Model{})
+	err = s.store.SetControllerLocation(ctlPath, map[string]string{"foo.bar": "aws"})
+	c.Assert(err, gc.ErrorMatches, `bad controller location query: invalid attribute "foo.bar"`)
+}
+
+func (s *jemSuite) TestSetControllerLocation(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "x"}
+	ctl := &mongodoc.Controller{
+		Path: ctlPath,
+	}
+	err := s.store.AddController(ctl, &mongodoc.Model{})
+
+	// Set cloud on controller.
+	err = s.store.SetControllerLocation(ctlPath, map[string]string{"cloud": "aws"})
+	c.Assert(err, gc.IsNil)
+	ctl, err = s.store.Controller(ctlPath)
+	c.Assert(err, gc.IsNil)
+	c.Assert(ctl.Location, gc.DeepEquals, map[string]string{"cloud": "aws"})
+
+	// Add region later.
+	err = s.store.SetControllerLocation(ctlPath, map[string]string{"region": "us-east1"})
+	c.Assert(err, gc.IsNil)
+	ctl, err = s.store.Controller(ctlPath)
+	c.Assert(err, gc.IsNil)
+	c.Assert(ctl.Location, gc.DeepEquals, map[string]string{"cloud": "aws", "region": "us-east1"})
+
+	// Remove cloud.
+	err = s.store.SetControllerLocation(ctlPath, map[string]string{"cloud": ""})
+	c.Assert(err, gc.IsNil)
+	ctl, err = s.store.Controller(ctlPath)
+	c.Assert(err, gc.IsNil)
+	c.Assert(ctl.Location, gc.DeepEquals, map[string]string{"region": "us-east1"})
+}
+
 func (s *jemSuite) TestControllerLocationQuery(c *gc.C) {
 	for _, ctl := range []*mongodoc.Controller{{
 		Path: params.EntityPath{"bob", "aws-us-east-1"},

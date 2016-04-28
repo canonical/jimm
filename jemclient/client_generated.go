@@ -54,6 +54,13 @@ func (c *client) GetController(p *params.GetController) (*params.ControllerRespo
 	return r, err
 }
 
+// GetControllerLocation returns a map of location attributes for a given controller.
+func (c *client) GetControllerLocation(p *params.GetControllerLocation) (params.ControllerLocation, error) {
+	var r params.ControllerLocation
+	err := c.Client.Call(p, &r)
+	return r, err
+}
+
 // GetControllerLocations returns all the available values for a given controller
 // location attribute. The set of controllers is constrained by the URL query
 // parameters.
@@ -132,6 +139,13 @@ func (c *client) NewModel(p *params.NewModel) (*params.ModelResponse, error) {
 	var r *params.ModelResponse
 	err := c.Client.Call(p, &r)
 	return r, err
+}
+
+// SetControllerLocation updates the attributes associated with the controller's location.
+// Only the owner (arg.EntityPath.User) can change the location attributes
+// on an an entity.
+func (c *client) SetControllerLocation(p *params.SetControllerLocation) error {
+	return c.Client.Call(p, nil)
 }
 
 // SetControllerPerm sets the permissions on a controller entity.
