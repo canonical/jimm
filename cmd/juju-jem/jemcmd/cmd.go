@@ -181,14 +181,12 @@ var _ gnuflag.Value = (*entityPathsValue)(nil)
 func writeModel(localModelName, localControllerName string, getEnv func() (*params.ModelResponse, error)) (string, error) {
 	store := jujuclient.NewFileClientStore()
 
-	if localControllerName != "" {
-		ok, err := modelExists(store, localModelName, localControllerName)
-		if err != nil {
-			return "", errgo.Notef(err, "cannot check whether model exists")
-		}
-		if ok {
-			return "", errgo.Notef(err, "local model %q already exists in controller %q", localModelName, localControllerName)
-		}
+	ctlName, err := modelExists(store, localModelName, localControllerName)
+	if err != nil {
+		return "", errgo.Notef(err, "cannot check whether model exists")
+	}
+	if ctlName != "" {
+		return "", errgo.Notef(err, "local model %q already exists in controller %q", localModelName, ctlName)
 	}
 
 	resp, err := getEnv()
@@ -211,7 +209,7 @@ func writeModel(localModelName, localControllerName string, getEnv func() (*para
 	}
 	st.Close()
 
-	ctlName := jemControllerToLocalControllerName(resp.ControllerPath)
+	ctlName = jemControllerToLocalControllerName(resp.ControllerPath)
 	if localControllerName == "" {
 		localControllerName = ctlName
 	} else if localControllerName != ctlName {
@@ -244,21 +242,6 @@ func writeModel(localModelName, localControllerName string, getEnv func() (*para
 
 	if err := store.SetCurrentAccount(localControllerName, localAcctName); err != nil {
 		return "", errgo.Notef(err, "cannot set %q to current user account", localAcctName)
-	}
-
-	// Check again that the model doesn't exist locally
-	// before overwriting it. If we're creating a new model
-	// this shouldn't happen because we pass in the controller
-	// name and check at the start, but when getting an existing
-	// model we haven't been able to check until now (but in
-	// that case it doesn't matter that we return an error
-	// because getting a model is idempotent).
-	ok, err := modelExists(store, localModelName, localControllerName)
-	if err != nil {
-		return "", errgo.Notef(err, "cannot check whether model exists")
-	}
-	if ok {
-		return "", errgo.Notef(err, "local model %q already exists in controller %q", localModelName, localControllerName)
 	}
 
 	if err := store.UpdateModel(localControllerName, localAcctName, localModelName, jujuclient.ModelDetails{
@@ -317,33 +300,59 @@ func ensureAccount(store jujuclient.ClientStore, controllerName, acctName string
 	return errgo.Newf("account %q already exists with a different user name", acctName)
 }
 
+const jemControllerPrefix = "jem-"
+
 func jemControllerToLocalControllerName(p params.EntityPath) string {
 	// Because we expect all controllers to be created under the
 	// same user name, we'll treat the controller name as if it
 	// were a global name space and ignore the user name.
-	return "jem-" + string(p.Name)
+	return jemControllerPrefix + string(p.Name)
 }
 
-func modelExists(store jujuclient.ClientStore, modelName, controllerName string) (bool, error) {
-	accts, err := store.AllAccounts(controllerName)
-	if errors.IsNotFound(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, errgo.Mask(err)
-	}
-	// Check that none of the existing accounts holds a model
-	// with the desired name. This is somewhat more
-	// conservative than necessary, but we can't pre-guess
-	// the user that's going to be used.
-	for acctName := range accts {
-		_, err := store.ModelByName(controllerName, acctName, modelName)
-		if err == nil {
-			return true, nil
+// modelExists checks if the model with the given name exists.
+// If controllerName is non-empty, it checks only in that controller;
+// otherwise it checks all controllers.
+// If a model is found, it returns the name of its controller
+// otherwise it returns the empty string.
+func modelExists(store jujuclient.ClientStore, modelName, controllerName string) (string, error) {
+	var controllerNames []string
+	if controllerName != "" {
+		controllerNames = []string{controllerName}
+	} else {
+		// We don't know the controller name in advance, so
+		// be conservative and check all jem-prefixed controllers
+		// for the model name.
+		ctls, err := store.AllControllers()
+		if err != nil {
+			return "", errgo.Notef(err, "cannot get local controllers")
 		}
-		if !errors.IsNotFound(err) {
-			return false, errgo.Mask(err)
+		for name := range ctls {
+			if strings.HasPrefix(name, jemControllerPrefix) {
+				controllerNames = append(controllerNames, name)
+			}
 		}
 	}
-	return false, nil
+	for _, controllerName := range controllerNames {
+		accts, err := store.AllAccounts(controllerName)
+		if errors.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
+			return "", errgo.Mask(err)
+		}
+		// Check that none of the existing accounts holds a model
+		// with the desired name. This is somewhat more
+		// conservative than necessary, but we can't pre-guess
+		// the user that's going to be used.
+		for acctName := range accts {
+			_, err := store.ModelByName(controllerName, acctName, modelName)
+			if err == nil {
+				return controllerName, nil
+			}
+			if !errors.IsNotFound(err) {
+				return "", errgo.Mask(err)
+			}
+		}
+	}
+	return "", nil
 }
