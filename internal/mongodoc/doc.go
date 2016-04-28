@@ -51,6 +51,10 @@ type Controller struct {
 
 	// Location holds the location attributes associated with the controller.
 	Location map[string]string
+
+	// ProviderType holds the type of the juju provider that the
+	// controller is using.
+	ProviderType string
 }
 
 type UserInfo struct {

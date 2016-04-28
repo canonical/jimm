@@ -17,6 +17,7 @@ import (
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/internal/apitest"
+	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/internal/v2"
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -1024,6 +1025,76 @@ func (s *APISuite) TestAllControllerLocations(c *gc.C) {
 		c.Assert(resp, jc.DeepEquals, &test.expect)
 	}
 
+}
+
+func (s *APISuite) TestGetSchemaOneProviderType(c *gc.C) {
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "aws-us-east"}, map[string]string{
+		"cloud":  "aws",
+		"region": "us-east-1",
+	})
+	s.assertAddController(c, params.EntityPath{"bob", "aws-eu-west"}, map[string]string{
+		"cloud":  "aws",
+		"region": "eu-west-1",
+	})
+	ctl, err := s.NewClient("bob").GetController(&params.GetController{
+		EntityPath: ctlId,
+	})
+	c.Assert(err, gc.IsNil)
+	resp, err := s.NewClient("bob").GetSchema(&params.GetSchema{
+		Location: map[string]string{
+			"cloud": "aws",
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	c.Assert(resp.ProviderType, gc.Equals, ctl.ProviderType)
+	c.Assert(resp.Schema, jc.DeepEquals, ctl.Schema)
+}
+
+func (s *APISuite) TestGetSchemaNotFound(c *gc.C) {
+	s.assertAddController(c, params.EntityPath{"bob", "aws-us-east"}, map[string]string{
+		"cloud":  "aws",
+		"region": "us-east-1",
+	})
+	resp, err := s.NewClient("bob").GetSchema(&params.GetSchema{
+		Location: map[string]string{
+			"cloud": "ec2",
+		},
+	})
+	c.Check(resp, gc.IsNil)
+	c.Check(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+	c.Assert(err, gc.ErrorMatches, `GET http://.*/schema\?cloud=ec2: no matching controllers`)
+}
+
+func (s *APISuite) TestGetSchemaAmbiguous(c *gc.C) {
+	s.assertAddController(c, params.EntityPath{"bob", "aws-us-east"}, map[string]string{
+		"cloud":  "aws",
+		"region": "us-east-1",
+	})
+	// Add a controller directly to the database because we can only
+	// have dummy provider controllers otherwise and we need one
+	// of a different type.
+	err := s.JEM.AddController(&mongodoc.Controller{
+		Path: params.EntityPath{"bob", "azure"},
+		UUID: "fake-uuid",
+		Location: map[string]string{
+			"cloud": "aws",
+		},
+		ProviderType: "another",
+	}, &mongodoc.Model{
+		Path:       params.EntityPath{"bob", "azure"},
+		Controller: params.EntityPath{"bob", "azure"},
+	})
+	c.Assert(err, gc.IsNil)
+
+	resp, err := s.NewClient("bob").GetSchema(&params.GetSchema{
+		Location: map[string]string{
+			"cloud": "aws",
+		},
+	})
+	c.Check(resp, gc.IsNil)
+	c.Check(errgo.Cause(err), gc.Equals, params.ErrAmbiguousLocation)
+	c.Assert(err, gc.ErrorMatches, `GET http://.*/schema\?cloud=aws: ambiguous location matches controller of more than one type`)
 }
 
 func (s *APISuite) TestNewModel(c *gc.C) {

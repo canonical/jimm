@@ -139,7 +139,6 @@ func newBakery(db Database, bp bakery.NewServiceParams) *bakery.Service {
 }
 
 type JEM struct {
-
 	// DB holds the mongodb-backed identity store.
 	DB Database
 

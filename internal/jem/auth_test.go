@@ -55,6 +55,7 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 
 func (s *authSuite) TearDownTest(c *gc.C) {
 	s.jem.Close()
+	s.pool.Close()
 	s.IsolatedMgoSuite.TearDownTest(c)
 }
 

@@ -50,6 +50,7 @@ func (s *jemAPIConnSuite) SetUpTest(c *gc.C) {
 
 func (s *jemAPIConnSuite) TearDownTest(c *gc.C) {
 	s.store.Close()
+	s.pool.Close()
 	s.JujuConnSuite.TearDownTest(c)
 }
 
