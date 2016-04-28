@@ -12,6 +12,7 @@ import (
 	"github.com/juju/juju/api/modelmanager"
 	"github.com/juju/juju/api/usermanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	controllermodelmanager "github.com/juju/juju/controller/modelmanager"
 	"github.com/juju/juju/environs"
 	"github.com/juju/juju/network"
 	"github.com/juju/loggo"
@@ -118,6 +119,15 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	m.UUID = info.ControllerUUID
 	ctl.UUID = info.ControllerUUID
 
+	// Find out the provider type.
+	// TODO cache all the schemaForNewModel information here
+	// and store it with the controller?
+	skeleton, err := modelmanager.NewClient(conn).ConfigSkeleton("", "")
+	if err != nil {
+		return errgo.Notef(err, "cannot get base configuration")
+	}
+	ctl.ProviderType = skeleton["type"].(string)
+
 	// Update addresses from latest known in controller.
 	// Note that state.APIHostPorts is always guaranteed
 	// to include the actual address we succeeded in
@@ -149,6 +159,52 @@ func (h *Handler) GetController(arg *params.GetController) (*params.ControllerRe
 		ProviderType: neSchema.providerType,
 		Schema:       neSchema.schema,
 		Location:     ctl.Location,
+	}, nil
+}
+
+// GetSchema returns the schema that should be used for
+// the model configuration when starting a controller
+// with a location matching p.Location.
+//
+//
+// If controllers of more than one provider type
+// are matched, it will return an error with a params.ErrAmbiguousLocation
+// cause.
+//
+// If no controllers are matched, it will return an error with
+// a params.ErrNotFound cause.
+func (h *Handler) GetSchema(p httprequest.Params, arg *params.GetSchema) (*params.SchemaResponse, error) {
+	// TODO This will be insufficient when we can have several servers with the
+	// same provider type but different versions that could potentially have
+	// different configuration schemas. In that case, we could return a schema
+	// that's the intersection of all the matched schemas and check that it's
+	// valid for all of them before returning it.
+
+	attrs, err := formToLocationAttrs(p.Request.Form)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
+	}
+	providerType := ""
+	err = h.doControllers(attrs, func(ctl *mongodoc.Controller) error {
+		if providerType != "" && ctl.ProviderType != providerType {
+			return errgo.WithCausef(nil, params.ErrAmbiguousLocation, "ambiguous location matches controller of more than one type")
+		}
+		providerType = ctl.ProviderType
+		return nil
+	})
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrAmbiguousLocation))
+	}
+	if providerType == "" {
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "no matching controllers")
+	}
+	schema, err := schemaForProviderType(providerType)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot get schema for provider type %q", providerType)
+	}
+	return &params.SchemaResponse{
+		ProviderType: providerType,
+		Schema:       schema,
 	}, nil
 }
 
@@ -825,46 +881,63 @@ func (h *Handler) schemaForNewModel(ctlPath params.EntityPath) (*schemaForNewMod
 		return nil, errgo.Notef(err, "cannot get base configuration")
 	}
 	neSchema.providerType = neSchema.skeleton["type"].(string)
-	provider, err := environs.Provider(neSchema.providerType)
+	neSchema.schema, err = schemaForProviderType(neSchema.providerType)
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot get provider type %q", neSchema.providerType)
+		return nil, errgo.Mask(err)
 	}
-	schp, ok := provider.(interface {
-		Schema() environschema.Fields
-	})
-	if !ok {
-		return nil, errgo.Notef(err, "provider %q does not provide schema", neSchema.providerType)
-	}
-	// TODO get the model schema over the juju API.
-	neSchema.schema = schp.Schema()
-
-	// Remove everything from the schema that's in the skeleton.
-	for name := range neSchema.skeleton {
-		delete(neSchema.schema, name)
-	}
-	// Also remove any attributes ending in "-path" because
-	// they're only applicable locally.
-	for name := range neSchema.schema {
-		if strings.HasSuffix(name, "-path") {
-			delete(neSchema.schema, name)
-		}
-	}
-	// We're going to set the model name from the
-	// JEM model path, so remove it from
-	// the schema.
-	delete(neSchema.schema, "name")
-	// TODO Delete admin-secret too, because it's never a valid
-	// attribute for the client to provide. We can't do that right
-	// now because it's the only secret attribute in the dummy
-	// provider and we need it to test secret template attributes.
-	// When Juju provides the schema over its API, that API call
-	// should delete it before returning.
 	fields, defaults, err := neSchema.schema.ValidationSchema()
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot create validation schema for provider %s", neSchema.providerType)
 	}
 	neSchema.checker = schema.FieldMap(fields, defaults)
 	return &neSchema, nil
+}
+
+// schemaForProviderType returns the schema for the given
+// provider type. This works currently because we link in
+// all the provider code so we can do it locally.
+// TODO get the model schema over the juju API. We'll
+// need make GetSchema be cleverer about mapping
+// from provider type to schema in that case.
+func schemaForProviderType(providerType string) (environschema.Fields, error) {
+	provider, err := environs.Provider(providerType)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot get provider type %q", providerType)
+	}
+	schp, ok := provider.(interface {
+		Schema() environschema.Fields
+	})
+	if !ok {
+		return nil, errgo.Notef(err, "provider %q does not provide schema", providerType)
+	}
+	schema := schp.Schema()
+
+	restrictedFields, err := controllermodelmanager.RestrictedProviderFields(providerType)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	// Remove everything from the schema that's restricted.
+	for _, attr := range restrictedFields {
+		delete(schema, attr)
+	}
+	// Also remove any attributes ending in "-path" because
+	// they're only applicable locally.
+	for name := range schema {
+		if strings.HasSuffix(name, "-path") {
+			delete(schema, name)
+		}
+	}
+	// We're going to set the model name from the
+	// JEM model path, so remove it from
+	// the schema.
+	delete(schema, "name")
+	// TODO Delete admin-secret too, because it's never a valid
+	// attribute for the client to provide. We can't do that right
+	// now because it's the only secret attribute in the dummy
+	// provider and we need it to test secret template attributes.
+	// When Juju provides the schema over its API, that API call
+	// should delete it before returning.
+	return schema, nil
 }
 
 // doControllers calls the given function for each controller that

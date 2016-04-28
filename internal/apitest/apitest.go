@@ -8,9 +8,11 @@ import (
 	"net/http/httptest"
 	"time"
 
+	"github.com/juju/idmclient"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/mgo.v2"
 
@@ -34,6 +36,10 @@ type Suite struct {
 
 	// httpSrv holds the running HTTP server that uses IDMSrv.
 	httpSrv *httptest.Server
+
+	// JEM holds an instance of the JEM store, suitable
+	// for invasive testing purposes.
+	JEM *jem.JEM
 }
 
 func (s *Suite) SetUpTest(c *gc.C) {
@@ -42,12 +48,30 @@ func (s *Suite) SetUpTest(c *gc.C) {
 	s.IDMSrv = idmtest.NewServer()
 	s.JEMSrv = s.NewServer(c, s.Session, s.IDMSrv)
 	s.httpSrv = httptest.NewServer(s.JEMSrv)
+
+	pool, err := jem.NewPool(
+		jem.ServerParams{
+			DB: s.Session.DB("jem"),
+		},
+		bakery.NewServiceParams{
+			Location: "here",
+		},
+		idmclient.New(idmclient.NewParams{
+			BaseURL: s.IDMSrv.URL.String(),
+			Client:  s.IDMSrv.Client("agent"),
+		}),
+	)
+	c.Assert(err, gc.IsNil)
+
+	s.JEM = pool.JEM()
+	pool.Close()
 }
 
 func (s *Suite) TearDownTest(c *gc.C) {
 	s.httpSrv.Close()
 	s.JEMSrv.Close()
 	s.IDMSrv.Close()
+	s.JEM.Close()
 	s.JujuConnSuite.TearDownTest(c)
 }
 

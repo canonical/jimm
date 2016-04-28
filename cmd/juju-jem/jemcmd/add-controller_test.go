@@ -5,9 +5,10 @@ package jemcmd_test
 import (
 	"fmt"
 
-	"github.com/CanonicalLtd/jem/params"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
+
+	"github.com/CanonicalLtd/jem/params"
 )
 
 type addControllerSuite struct {

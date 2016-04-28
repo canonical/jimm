@@ -3,8 +3,9 @@
 package jemcmd_test
 
 import (
-	"github.com/CanonicalLtd/jem/params"
 	gc "gopkg.in/check.v1"
+
+	"github.com/CanonicalLtd/jem/params"
 )
 
 type setSuite struct {

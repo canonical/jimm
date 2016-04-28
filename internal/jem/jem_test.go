@@ -52,6 +52,7 @@ func (s *jemSuite) SetUpTest(c *gc.C) {
 
 func (s *jemSuite) TearDownTest(c *gc.C) {
 	s.store.Close()
+	s.pool.Close()
 	s.IsolatedMgoSuite.TearDownTest(c)
 }
 

@@ -289,6 +289,9 @@ type ControllerResponse struct {
 	// Path holds the path of the controller.
 	Path EntityPath `json:"path"`
 
+	// TODO perhaps these two fields should be put
+	// into the same type as returned from GetSchema.
+
 	// ProviderType holds the kind of provider used
 	// by the Controller.
 	ProviderType string `json:"provider-type,omitempty"`
@@ -297,7 +300,7 @@ type ControllerResponse struct {
 	// a new model using the Controller.
 	Schema environschema.Fields `json:"schema,omitempty"`
 
-	// Location holds location attributes to be associated with the controller.
+	// Location holds location attributes associated with the controller.
 	Location map[string]string
 }
 
@@ -305,6 +308,27 @@ type ControllerResponse struct {
 type GetController struct {
 	httprequest.Route `httprequest:"GET /v2/controller/:User/:Name"`
 	EntityPath
+}
+
+// GetSchema holds parameters for getting a schema.
+type GetSchema struct {
+	httprequest.Route `httprequest:"GET /v2/schema"`
+
+	// Location constrains the controllers that will be used to
+	// fetch the schema.
+	//
+	// Note that the values in this should be passed in the
+	// URL query parameters.
+	Location map[string]string
+}
+
+// SchemaResponse holds the information returned by a GetSchema request.
+type SchemaResponse struct {
+	// ProviderType holds the kind of provider associated with the schema.
+	ProviderType string `json:"provider-type,omitempty"`
+
+	// Schema holds the fields required to start a new model.
+	Schema environschema.Fields `json:"schema,omitempty"`
 }
 
 // NewModelInfo holds the JSON body parameters
