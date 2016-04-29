@@ -66,7 +66,7 @@ func (c *generateCommand) Init(args []string) error {
 	if len(args) != 0 {
 		return errgo.Newf("arguments provided but none expected")
 	}
-	if c.srvPath.EntityPath == (params.EntityPath{}) {
+	if c.srvPath.EntityPath.IsZero() {
 		return errgo.Newf("controller must be specified")
 	}
 	return nil

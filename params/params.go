@@ -163,6 +163,11 @@ func (p EntityPath) String() string {
 	return fmt.Sprintf("%s/%s", p.User, p.Name)
 }
 
+// IsZero reports whether the receiver is the empty value.
+func (p EntityPath) IsZero() bool {
+	return p == EntityPath{}
+}
+
 var slash = []byte("/")
 
 func (p *EntityPath) UnmarshalText(data []byte) error {

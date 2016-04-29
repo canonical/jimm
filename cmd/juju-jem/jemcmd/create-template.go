@@ -62,7 +62,7 @@ func (c *createTemplateCommand) Init(args []string) error {
 	if err := c.templatePath.Set(args[0]); err != nil {
 		return errgo.Mask(err)
 	}
-	if c.srvPath.EntityPath == (params.EntityPath{}) {
+	if c.srvPath.EntityPath.IsZero() {
 		return errgo.Newf("--controller flag required but not provided")
 	}
 	if c.configFile != "" {

@@ -15,12 +15,14 @@ import (
 	"github.com/juju/juju/juju/osenv"
 	"github.com/juju/schema"
 	"github.com/juju/utils"
+	"github.com/juju/utils/keyvalues"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/environschema.v1"
 	"gopkg.in/juju/environschema.v1/form"
 	"gopkg.in/yaml.v1"
 	"launchpad.net/gnuflag"
 
+	"github.com/CanonicalLtd/jem/jemclient"
 	"github.com/CanonicalLtd/jem/params"
 )
 
@@ -32,6 +34,7 @@ type createCommand struct {
 	templatePaths entityPathsValue
 	configFile    string
 	localName     string
+	location      map[string]string
 }
 
 func newCreateCommand() cmd.Command {
@@ -46,12 +49,17 @@ When one or more templates paths are specified, the final configuration
 is determined by starting with the first and adding attributes from
 each one in turn, finally adding any attributes specified in
 the configuration file specified by the --config flag.
+
+Any provided key-value arguments are used to select the location
+of the controller that will run the model. For example:
+
+	juju jem create me/mymodel cloud=aws region=us-east-1
 `
 
 func (c *createCommand) Info() *cmd.Info {
 	return &cmd.Info{
 		Name:    "create",
-		Args:    "<user>/<modelname>",
+		Args:    "<user>/<modelname> [<key>=<value> ...]",
 		Purpose: "Create a new model in JEM",
 		Doc:     createDoc,
 	}
@@ -69,18 +77,23 @@ func (c *createCommand) SetFlags(f *gnuflag.FlagSet) {
 }
 
 func (c *createCommand) Init(args []string) error {
-	if len(args) != 1 {
-		return errgo.Newf("got %d arguments, want 1", len(args))
+	if len(args) < 1 {
+		return errgo.Newf("missing model name argument")
 	}
 	if err := c.modelPath.Set(args[0]); err != nil {
 		return errgo.Mask(err)
 	}
-	if c.ctlPath.EntityPath == (params.EntityPath{}) {
-		return errgo.Newf("controller must be specified")
+	if !c.ctlPath.EntityPath.IsZero() && len(args) > 1 {
+		return errgo.Newf("cannot specify explicit controller name with location")
 	}
 	if c.localName == "" {
 		c.localName = string(c.modelPath.Name)
 	}
+	attrs, err := keyvalues.Parse(args[1:], false)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	c.location = attrs
 	return nil
 }
 
@@ -100,31 +113,36 @@ func (c *createCommand) Run(ctxt *cmd.Context) error {
 			return errgo.Notef(err, "cannot unmarshal %q", c.configFile)
 		}
 	}
-	controllerInfo, err := client.GetController(&params.GetController{
-		EntityPath: c.ctlPath.EntityPath,
-	})
+	providerType, schema, err := c.providerSchema(client)
 	if err != nil {
-		return errgo.Notef(err, "cannot get Controller info")
+		return errgo.Mask(err)
 	}
 	defaultsCtxt := schemaContext{
 		modelName:    c.modelPath.Name,
-		providerType: controllerInfo.ProviderType,
+		providerType: providerType,
 		knownAttrs:   config,
 	}
-	config, err = defaultsCtxt.generateConfig(controllerInfo.Schema)
+	config, err = defaultsCtxt.generateConfig(schema)
 	if err != nil {
 		return errgo.Notef(err, "invalid configuration")
 	}
-
-	localCtlName := jemControllerToLocalControllerName(c.ctlPath.EntityPath)
+	var localCtlName string
+	if !c.ctlPath.IsZero() {
+		localCtlName = jemControllerToLocalControllerName(c.ctlPath.EntityPath)
+	}
 	switchName, err := writeModel(c.localName, localCtlName, func() (*params.ModelResponse, error) {
+		var ctlPath *params.EntityPath
+		if !c.ctlPath.EntityPath.IsZero() {
+			ctlPath = &c.ctlPath.EntityPath
+		}
 		return client.NewModel(&params.NewModel{
 			User: c.modelPath.User,
 			Info: params.NewModelInfo{
 				Name:          c.modelPath.Name,
-				Controller:    &c.ctlPath.EntityPath,
+				Controller:    ctlPath,
 				Config:        config,
 				TemplatePaths: c.templatePaths.paths,
+				Location:      c.location,
 			},
 		})
 	})
@@ -133,6 +151,28 @@ func (c *createCommand) Run(ctxt *cmd.Context) error {
 	}
 	ctxt.Infof("%s", switchName)
 	return nil
+}
+
+// providerSchema returns the provider type and schema for the new model.
+func (c *createCommand) providerSchema(client *jemclient.Client) (string, environschema.Fields, error) {
+	if c.ctlPath.IsZero() {
+		// No controller specified - get the schema from the location.
+		info, err := client.GetSchema(&params.GetSchema{
+			Location: c.location,
+		})
+		if err != nil {
+			return "", nil, errgo.Notef(err, "cannot get schema info")
+		}
+		return info.ProviderType, info.Schema, nil
+	}
+
+	info, err := client.GetController(&params.GetController{
+		EntityPath: c.ctlPath.EntityPath,
+	})
+	if err != nil {
+		return "", nil, errgo.Notef(err, "cannot get Controller info")
+	}
+	return info.ProviderType, info.Schema, nil
 }
 
 type schemaContext struct {
