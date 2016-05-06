@@ -26,6 +26,7 @@ const (
 	ErrAlreadyExists     ErrorCode = "already exists"
 	ErrMethodNotAllowed  ErrorCode = "method not allowed"
 	ErrAmbiguousLocation ErrorCode = "ambiguous location"
+	ErrDuplicateUpload   ErrorCode = "ducplicate upload"
 )
 
 // Error represents an error - it is returned for any response that fails.

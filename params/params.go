@@ -398,9 +398,18 @@ type ModelResponse struct {
 	HostPorts []string `json:"host-ports"`
 }
 
-// AddTemplate holds parameters for adding a template.
+// AddTemplate holds parameters for adding or updating a template.
 type AddTemplate struct {
 	httprequest.Route `httprequest:"PUT /v2/template/:User/:Name"`
+	EntityPath
+
+	Info AddTemplateInfo `httprequest:",body"`
+}
+
+// AddNewTemplate holds parameters for adding a new template but not updating
+// an existing one.
+type AddNewTemplate struct {
+	httprequest.Route `httprequest:"POST /v2/template/:User/:Name"`
 	EntityPath
 
 	Info AddTemplateInfo `httprequest:",body"`

@@ -425,13 +425,21 @@ func (j *JEM) OpenAPIFromDocs(m *mongodoc.Model, ctl *mongodoc.Controller) (*api
 // Path field. It is the responsibility of the caller to
 // ensure that the template attributes are compatible
 // with the template schema.
-func (j *JEM) AddTemplate(tmpl *mongodoc.Template) error {
+func (j *JEM) AddTemplate(tmpl *mongodoc.Template, overwrite bool) error {
 	tmpl.Id = tmpl.Path.String()
-	_, err := j.DB.Templates().UpsertId(tmpl.Id, tmpl)
-	if err != nil {
-		return errgo.Notef(err, "cannot add template doc")
+	var err error
+	if overwrite {
+		_, err = j.DB.Templates().UpsertId(tmpl.Id, tmpl)
+	} else {
+		err = j.DB.Templates().Insert(tmpl)
 	}
-	return nil
+	if err == nil {
+		return nil
+	}
+	if mgo.IsDup(err) {
+		return errgo.WithCausef(err, params.ErrDuplicateUpload, "cannot add template doc")
+	}
+	return errgo.Notef(err, "cannot add template doc")
 }
 
 // DeleteTemplate removes existing template from the
