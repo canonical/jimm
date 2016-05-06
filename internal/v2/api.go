@@ -501,7 +501,7 @@ func (h *Handler) configWithTemplates(config map[string]interface{}, paths []par
 	for _, path := range paths {
 		tmpl, err := h.jem.Template(path)
 		if err != nil {
-			return nil, errgo.Notef(err, "cannot get template %q", path)
+			return nil, badRequestf(err, "cannot get template %q", path)
 		}
 		if err := h.jem.CheckCanRead(tmpl); err != nil {
 			return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
@@ -540,7 +540,7 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 	}
 	config, err := h.configWithTemplates(args.Info.Config, args.Info.TemplatePaths)
 	if err != nil {
-		return nil, errgo.Mask(err)
+		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
 	// Ensure that the attributes look reasonably OK before bothering
 	// the controller with them.
