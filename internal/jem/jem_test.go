@@ -424,7 +424,7 @@ func (s *jemSuite) TestAddTemplate(c *gc.C) {
 
 	// Check you can't add the same template when overwrite is false
 	err = s.store.AddTemplate(tmpl, false)
-	c.Check(errgo.Cause(err), gc.Equals, params.ErrDuplicateUpload)
+	c.Check(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
 
 	// Ensure that the schema still works even though some
 	// values may have been transformed to float64 by the

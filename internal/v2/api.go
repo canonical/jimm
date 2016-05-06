@@ -634,7 +634,8 @@ func (h *Handler) AddTemplate(arg *params.AddTemplate) error {
 	return h.addTemplate(arg.EntityPath, arg.Info, true)
 }
 
-// AddNewTemplate adds a new template only if not exists already.
+// AddNewTemplate adds a new template. It fails if a template with the new
+// name already exists.
 func (h *Handler) AddNewTemplate(arg *params.AddNewTemplate) error {
 	return h.addTemplate(arg.EntityPath, arg.Info, false)
 }
@@ -676,8 +677,8 @@ func (h *Handler) addTemplate(path params.EntityPath, info params.AddTemplateInf
 		Schema: neSchema.schema,
 		Config: result.(map[string]interface{}),
 	}, overwrite); err != nil {
-		if errgo.Cause(err) == params.ErrDuplicateUpload {
-			return badRequestf(nil, "cannot add template as already exists")
+		if errgo.Cause(err) == params.ErrAlreadyExists {
+			return badRequestf(err, "%s", "")
 		}
 		return errgo.Notef(err, "cannot add template")
 	}

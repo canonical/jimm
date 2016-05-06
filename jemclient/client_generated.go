@@ -17,12 +17,13 @@ func (c *client) AddController(p *params.AddController) error {
 	return c.Client.Call(p, nil)
 }
 
-// AddNewTemplate adds a new template only if not exists already.
+// AddNewTemplate adds a new template. It fails if a template with the new
+// name already exists.
 func (c *client) AddNewTemplate(p *params.AddNewTemplate) error {
 	return c.Client.Call(p, nil)
 }
 
-// AddTemplate adds or update a new template.
+// AddTemplate adds or updates a new template.
 func (c *client) AddTemplate(p *params.AddTemplate) error {
 	return c.Client.Call(p, nil)
 }

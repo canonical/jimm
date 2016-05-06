@@ -425,10 +425,10 @@ func (j *JEM) OpenAPIFromDocs(m *mongodoc.Model, ctl *mongodoc.Controller) (*api
 // Path field. It is the responsibility of the caller to
 // ensure that the template attributes are compatible
 // with the template schema.
-func (j *JEM) AddTemplate(tmpl *mongodoc.Template, overwrite bool) error {
+func (j *JEM) AddTemplate(tmpl *mongodoc.Template, canOverwrite bool) error {
 	tmpl.Id = tmpl.Path.String()
 	var err error
-	if overwrite {
+	if canOverwrite {
 		_, err = j.DB.Templates().UpsertId(tmpl.Id, tmpl)
 	} else {
 		err = j.DB.Templates().Insert(tmpl)
@@ -437,7 +437,7 @@ func (j *JEM) AddTemplate(tmpl *mongodoc.Template, overwrite bool) error {
 		return nil
 	}
 	if mgo.IsDup(err) {
-		return errgo.WithCausef(err, params.ErrDuplicateUpload, "cannot add template doc")
+		return errgo.WithCausef(nil, params.ErrAlreadyExists, "template %q already exists", tmpl.Path)
 	}
 	return errgo.Notef(err, "cannot add template doc")
 }

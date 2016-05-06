@@ -1980,7 +1980,7 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 			},
 		},
 	})
-	c.Assert(err, gc.ErrorMatches, "POST .*/v2/template/alice/differentcreds: cannot add template as already exists")
+	c.Assert(err, gc.ErrorMatches, "POST .*/v2/template/alice/differentcreds: template \"alice/differentcreds\" already exists")
 	c.Check(errgo.Cause(err), gc.Equals, params.ErrBadRequest)
 
 	tmpl, err = s.NewClient("alice").GetTemplate(&params.GetTemplate{
