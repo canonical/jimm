@@ -155,7 +155,7 @@ var removeErrorTests = []struct {
 }{{
 	about:        "invalid path",
 	args:         []string{"a"},
-	expectStderr: `invalid entity path "a": wrong number of parts in entity path`,
+	expectStderr: `invalid entity path "a": need <user>/<name>`,
 	expectCode:   2,
 }}
 

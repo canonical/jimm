@@ -39,15 +39,15 @@ var entityPathValueTests = []struct {
 }, {
 	about:       "only one part",
 	val:         "a",
-	expectError: `invalid entity path "a": wrong number of parts in entity path`,
+	expectError: `invalid entity path "a": need <user>/<name>`,
 }, {
 	about:       "too many parts",
 	val:         "a/b/c",
-	expectError: `invalid entity path "a/b/c": wrong number of parts in entity path`,
+	expectError: `invalid entity path "a/b/c": need <user>/<name>`,
 }, {
 	about:       "empty string",
 	val:         "",
-	expectError: `invalid entity path "": wrong number of parts in entity path`,
+	expectError: `invalid entity path "": need <user>/<name>`,
 }}
 
 func (s *internalSuite) TestEntityPathValue(c *gc.C) {
@@ -86,7 +86,7 @@ var entityPathsValueTests = []struct {
 }, {
 	about:       "invalid entry",
 	val:         "a/b/c,foo/bar",
-	expectError: `invalid entity path "a/b/c": wrong number of parts in entity path`,
+	expectError: `invalid entity path "a/b/c": need <user>/<name>`,
 }}
 
 func (s *internalSuite) TestEntityPathsValue(c *gc.C) {

@@ -35,7 +35,7 @@ var createErrorTests = []struct {
 }, {
 	about:        "only one part in model id",
 	args:         []string{"a"},
-	expectStderr: `invalid entity path "a": wrong number of parts in entity path`,
+	expectStderr: `invalid entity path "a": need <user>/<name>`,
 	expectCode:   2,
 }, {
 	about:        "controller cannot be specified with location",
