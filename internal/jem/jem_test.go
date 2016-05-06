@@ -414,13 +414,17 @@ func (s *jemSuite) TestAddTemplate(c *gc.C) {
 			"temperature": -400.0,
 		},
 	}
-	err := s.store.AddTemplate(tmpl)
+	err := s.store.AddTemplate(tmpl, true)
 	c.Assert(err, gc.IsNil)
 	c.Assert(tmpl.Id, gc.Equals, "bob/x")
 
 	tmpl1, err := s.store.Template(path)
 	c.Assert(err, gc.IsNil)
 	c.Assert(tmpl1, jc.DeepEquals, tmpl)
+
+	// Check you can't add the same template when overwrite is false
+	err = s.store.AddTemplate(tmpl, false)
+	c.Check(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
 
 	// Ensure that the schema still works even though some
 	// values may have been transformed to float64 by the
@@ -459,7 +463,7 @@ func (s *jemSuite) TestDeleteTemplate(c *gc.C) {
 			"temperature": -400.0,
 		},
 	}
-	err := s.store.AddTemplate(tmpl)
+	err := s.store.AddTemplate(tmpl, true)
 	c.Assert(err, gc.IsNil)
 
 	err = s.store.DeleteTemplate(tmpl.Path)

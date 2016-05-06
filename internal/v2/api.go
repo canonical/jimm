@@ -633,12 +633,23 @@ func (h *Handler) selectController(info *params.NewModelInfo) (params.EntityPath
 	return controllers[n].Path, nil
 }
 
-// AddTemplate adds a new template.
+// AddTemplate adds or updates a new template.
 func (h *Handler) AddTemplate(arg *params.AddTemplate) error {
-	if err := h.jem.CheckIsUser(arg.User); err != nil {
+	return h.addTemplate(arg.EntityPath, arg.Info, true)
+}
+
+// AddNewTemplate adds a new template. It fails if a template with the new
+// name already exists.
+func (h *Handler) AddNewTemplate(arg *params.AddNewTemplate) error {
+	return h.addTemplate(arg.EntityPath, arg.Info, false)
+}
+
+// addTemplate adds or update a new template.
+func (h *Handler) addTemplate(path params.EntityPath, info params.AddTemplateInfo, overwrite bool) error {
+	if err := h.jem.CheckIsUser(path.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	neSchema, err := h.schemaForNewModel(arg.Info.Controller)
+	neSchema, err := h.schemaForNewModel(info.Controller)
 	if err != nil {
 		return errgo.Notef(err, "cannot get schema for controller")
 	}
@@ -652,24 +663,27 @@ func (h *Handler) AddTemplate(arg *params.AddTemplate) error {
 	// check only the provided fields for compatibility
 	// without worrying about other mandatory fields.
 	for name := range fields {
-		if _, ok := arg.Info.Config[name]; !ok {
+		if _, ok := info.Config[name]; !ok {
 			delete(fields, name)
 		}
 	}
 	for name := range defaults {
-		if _, ok := arg.Info.Config[name]; !ok {
+		if _, ok := info.Config[name]; !ok {
 			delete(defaults, name)
 		}
 	}
-	result, err := schema.StrictFieldMap(fields, defaults).Coerce(arg.Info.Config, nil)
+	result, err := schema.StrictFieldMap(fields, defaults).Coerce(info.Config, nil)
 	if err != nil {
 		return badRequestf(err, "configuration not compatible with schema")
 	}
 	if err := h.jem.AddTemplate(&mongodoc.Template{
-		Path:   arg.EntityPath,
+		Path:   path,
 		Schema: neSchema.schema,
 		Config: result.(map[string]interface{}),
-	}); err != nil {
+	}, overwrite); err != nil {
+		if errgo.Cause(err) == params.ErrAlreadyExists {
+			return badRequestf(err, "%s", "")
+		}
 		return errgo.Notef(err, "cannot add template")
 	}
 	return nil

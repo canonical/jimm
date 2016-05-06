@@ -1898,7 +1898,7 @@ func (s *APISuite) TestGetSetModelPerm(c *gc.C) {
 
 func (s *APISuite) TestAddTemplate(c *gc.C) {
 	ctlId := s.assertAddController(c, params.EntityPath{"alice", "foo"}, nil)
-	err := s.NewClient("alice").AddTemplate(&params.AddTemplate{
+	err := s.NewClient("alice").AddNewTemplate(&params.AddNewTemplate{
 		EntityPath: params.EntityPath{"alice", "creds"},
 		Info: params.AddTemplateInfo{
 			Controller: ctlId,
@@ -1968,6 +1968,21 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 		},
 	})
 	c.Assert(err, gc.IsNil)
+
+	// Check that we get an error trying to add a new template which
+	// already exist.
+	err = s.NewClient("alice").AddNewTemplate(&params.AddNewTemplate{
+		EntityPath: params.EntityPath{"alice", "differentcreds"},
+		Info: params.AddTemplateInfo{
+			Controller: ctlId,
+			Config: map[string]interface{}{
+				"controller":        true,
+				"bootstrap-timeout": 111,
+			},
+		},
+	})
+	c.Assert(err, gc.ErrorMatches, "POST .*/v2/template/alice/differentcreds: template \"alice/differentcreds\" already exists")
+	c.Check(errgo.Cause(err), gc.Equals, params.ErrBadRequest)
 
 	tmpl, err = s.NewClient("alice").GetTemplate(&params.GetTemplate{
 		EntityPath: params.EntityPath{"alice", "differentcreds"},

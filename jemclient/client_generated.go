@@ -4,9 +4,8 @@
 package jemclient
 
 import (
-	"github.com/juju/httprequest"
-
 	"github.com/CanonicalLtd/jem/params"
+	"github.com/juju/httprequest"
 )
 
 type client struct {
@@ -18,7 +17,13 @@ func (c *client) AddController(p *params.AddController) error {
 	return c.Client.Call(p, nil)
 }
 
-// AddTemplate adds a new template.
+// AddNewTemplate adds a new template. It fails if a template with the new
+// name already exists.
+func (c *client) AddNewTemplate(p *params.AddNewTemplate) error {
+	return c.Client.Call(p, nil)
+}
+
+// AddTemplate adds or updates a new template.
 func (c *client) AddTemplate(p *params.AddTemplate) error {
 	return c.Client.Call(p, nil)
 }
