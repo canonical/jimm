@@ -1206,7 +1206,8 @@ func (s *APISuite) TestNewModelWithTemplateNotFound(c *gc.C) {
 			TemplatePaths: []params.EntityPath{{"bob", "creds"}},
 		},
 	})
-	c.Assert(err, gc.ErrorMatches, `POST .*/v2/model/bob: cannot get template "bob/creds": template "bob/creds" not found`)
+	c.Assert(err, gc.ErrorMatches, `POST .*/v2/model/bob: invalid template provided: cannot get template "bob/creds": template "bob/creds" not found`)
+	c.Check(errgo.Cause(err), gc.Equals, params.ErrBadRequest)
 	c.Assert(resp, gc.IsNil)
 }
 
