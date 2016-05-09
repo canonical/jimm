@@ -190,7 +190,7 @@ var revokeErrorTests = []struct {
 }, {
 	about:        "only one part in path",
 	args:         []string{"a", "b"},
-	expectStderr: `invalid entity path "a": wrong number of parts in entity path`,
+	expectStderr: `invalid entity path "a": need <user>/<name>`,
 	expectCode:   2,
 }, {
 	about:        "empty user name",

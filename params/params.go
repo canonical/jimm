@@ -173,7 +173,7 @@ var slash = []byte("/")
 func (p *EntityPath) UnmarshalText(data []byte) error {
 	parts := bytes.Split(data, slash)
 	if len(parts) != 2 {
-		return errgo.New("wrong number of parts in entity path")
+		return errgo.New("need <user>/<name>")
 	}
 	if err := p.User.UnmarshalText(parts[0]); err != nil {
 		return errgo.Mask(err)

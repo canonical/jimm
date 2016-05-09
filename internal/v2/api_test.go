@@ -1495,7 +1495,7 @@ var newModelWithInvalidControllerPathTests = []struct {
 	expectErr string
 }{{
 	path:      "x",
-	expectErr: `wrong number of parts in entity path`,
+	expectErr: `need <user>/<name>`,
 }, {
 	path:      "/foo",
 	expectErr: `invalid user name ""`,
