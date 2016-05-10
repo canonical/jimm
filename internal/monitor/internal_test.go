@@ -3,6 +3,7 @@
 package monitor
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/juju/idmclient"
@@ -446,6 +447,324 @@ func (s *internalSuite) TestControllerMonitor(c *gc.C) {
 	s.assertLease(c, ctlPath, time.Time{}, "")
 }
 
+func (s *internalSuite) TestAllMonitorSingleControllerWithAPIError(c *gc.C) {
+	jshim := newJEMShimInMemory()
+	addFakeController(jshim, params.EntityPath{"bob", "foo"})
+	m := newAllMonitor(jshim, "jem1")
+	waitEvent(c, m.tomb.Dead(), "monitor dead")
+	c.Assert(m.tomb.Err(), gc.ErrorMatches, `cannot dial API for controller bob/foo: jemShimInMemory doesn't implement OpenAPI`)
+	c.Assert(jshim.refCount, gc.Equals, 0)
+
+	// Check that the lease has been dropped.
+	ctl := jshim.controllers[params.EntityPath{"bob", "foo"}]
+	c.Assert(ctl.MonitorLeaseOwner, gc.Equals, "")
+	c.Assert(ctl.MonitorLeaseExpiry, jc.Satisfies, time.Time.IsZero)
+}
+
+func (s *internalSuite) TestAllMonitorMultiControllersWithAPIError(c *gc.C) {
+	jshim := newJEMShimInMemory()
+
+	ctlPath := func(i int) params.EntityPath {
+		return params.EntityPath{"bob", params.Name(fmt.Sprintf("x%d", i))}
+	}
+	const ncontrollers = 3
+	for i := 0; i < ncontrollers; i++ {
+		addFakeController(jshim, ctlPath(i))
+	}
+
+	opened := make(map[params.EntityPath]bool)
+	openCh := make(chan params.EntityPath)
+	openReply := make(chan error)
+	m := newAllMonitor(jemShimWithAPIOpener{
+		openAPI: func(path params.EntityPath) (jujuAPI, error) {
+			openCh <- path
+			return nil, <-openReply
+		},
+		jemInterface: jshim,
+	}, "jem1")
+	defer worker.Stop(m)
+
+	for i := 0; i < ncontrollers; i++ {
+		select {
+		case p := <-openCh:
+			if opened[p] {
+				c.Fatalf("controller %v opened twice", p)
+			}
+			opened[p] = true
+		case <-time.After(jujutesting.LongWait):
+			c.Fatalf("timed out waiting for API to be opened")
+		}
+	}
+	// Check that all the controllers are accounted for.
+	for i := 0; i < ncontrollers; i++ {
+		p := ctlPath(i)
+		c.Assert(opened[p], gc.Equals, true, gc.Commentf("controller %v", p))
+	}
+	// All the controllers are now blocked trying to open the
+	// API. Send one of them an error. The allMonitor should
+	// die with that error, leaving the other API opens in progress.
+	openReply <- errgo.New("some error")
+
+	waitEvent(c, m.tomb.Dead(), "monitor dead")
+	c.Assert(m.tomb.Err(), gc.ErrorMatches, `cannot dial API for controller bob/x[0-9]+: some error`)
+
+	// Check that all leases have been dropped.
+	for i := 0; i < ncontrollers; i++ {
+		p := ctlPath(i)
+		ctl := jshim.controllers[p]
+		c.Assert(ctl.MonitorLeaseOwner, gc.Equals, "", gc.Commentf("controller %v", p))
+		c.Assert(ctl.MonitorLeaseExpiry, jc.Satisfies, time.Time.IsZero, gc.Commentf("controller %v", p))
+	}
+
+	// Send errors to the other controller API opens.
+	for i := 0; i < ncontrollers-1; i++ {
+		openReply <- errgo.New("another error")
+	}
+}
+
+func (s *internalSuite) TestAllMonitorMultiControllerMultipleLeases(c *gc.C) {
+	jshim := newJEMShimInMemory()
+	jshim1 := jemShimWithAPIOpener{
+		jemInterface: jshim,
+		openAPI: func(path params.EntityPath) (jujuAPI, error) {
+			return newJEMAPIShim(nil), nil
+		},
+	}
+	type leaseAcquisition struct {
+		path  params.EntityPath
+		owner string
+	}
+	leaseAcquired := make(chan leaseAcquisition, 10)
+	jshim2 := jemShimWithMonitorLeaseAcquirer{
+		jemInterface: jshim1,
+		acquireMonitorLease: func(ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {
+			t, err := jshim1.AcquireMonitorLease(ctlPath, oldExpiry, oldOwner, newExpiry, newOwner)
+			if err != nil {
+				return time.Time{}, err
+			}
+			leaseAcquired <- leaseAcquisition{
+				path:  ctlPath,
+				owner: newOwner,
+			}
+			return t, nil
+		},
+	}
+
+	// Create a controller
+	addFakeController(jshim, params.EntityPath{"bob", "foo"})
+
+	// Start the first monitor.
+	m1 := newAllMonitor(jshim2, "jem1")
+	defer worker.Stop(m1)
+
+	// Wait for it to take out the first lease.
+	select {
+	case a := <-leaseAcquired:
+		c.Assert(a.path.String(), gc.Equals, "bob/foo")
+		c.Assert(a.owner, gc.Equals, "jem1")
+	case <-time.After(jujutesting.LongWait):
+		c.Fatalf("timed out waiting for lease to be acquired")
+	}
+
+	// Wait for it to sleep after starting the monitors, which means
+	// we know that it won't be acquiring any more controllers
+	// until its lease acquire interval is finished, so when we
+	// start the second monitor below, it'll be guaranteed to
+	// acquire the second controller.
+	<-s.clock.Alarms()
+
+	// Create another controller
+	addFakeController(jshim, params.EntityPath{"bob", "bar"})
+
+	// Start another monitor. We can use the same JEM instance.
+	m2 := newAllMonitor(jshim2, "jem2")
+	defer worker.Stop(m2)
+
+	// Wait for it to take out the second lease.
+	select {
+	case a := <-leaseAcquired:
+		c.Assert(a.path.String(), gc.Equals, "bob/bar")
+		c.Assert(a.owner, gc.Equals, "jem2")
+	case <-time.After(jujutesting.LongWait):
+		c.Fatalf("timed out waiting for lease to be acquired")
+	}
+
+	// Advance the clock until both monitors will need to have
+	// their leases renewed.
+	s.clock.Advance(leaseExpiryDuration * 5 / 6)
+
+	renewed := make(map[string]string)
+	timeout := time.After(jujutesting.LongWait)
+	for i := 0; i < 2; i++ {
+		select {
+		case a := <-leaseAcquired:
+			renewed[a.path.String()] = a.owner
+		case <-timeout:
+			c.Fatalf("timed out waiting for lease renewal %d", i+1)
+		}
+	}
+	select {
+	case p := <-leaseAcquired:
+		c.Fatalf("unexpected lease acquired %v", p)
+	case <-time.After(jujutesting.ShortWait):
+	}
+	// Both leases should still have the same owners.
+	c.Assert(renewed, jc.DeepEquals, map[string]string{
+		"bob/foo": "jem1",
+		"bob/bar": "jem2",
+	})
+
+	// Kill one monitor and wait for the old one to take on the new lease.
+	err := worker.Stop(m2)
+	c.Assert(err, gc.IsNil)
+
+	// It should drop its lease when stopped.
+	select {
+	case p := <-leaseAcquired:
+		c.Assert(p.path.String(), gc.Equals, "bob/bar")
+		c.Assert(p.owner, gc.Equals, "")
+	case <-time.After(jujutesting.LongWait):
+		c.Fatalf("timed out waiting for lease drop")
+	}
+
+	// After leaseAcquireInterval, the worker should take notice.
+	s.clock.Advance(leaseAcquireInterval)
+
+	select {
+	case p := <-leaseAcquired:
+		c.Assert(p.path.String(), gc.Equals, "bob/bar")
+		c.Assert(p.owner, gc.Equals, "jem1")
+	case <-time.After(jujutesting.LongWait):
+		c.Fatalf("timed out waiting for lease acquisition")
+	}
+}
+
+func (s *internalSuite) TestAllMonitorWithRaceOnLeaseAcquisition(c *gc.C) {
+	jshim := jemShim{s.jem}
+
+	// Fake the monitor lease acquiry so that it lets us know
+	// when a monitor is trying to acquire the lease and
+	// so we can let it proceed when we want to.
+	wantLease := make(chan struct{}, 10)
+	goforitLease := make(chan struct{})
+	jshim1 := jemShimWithMonitorLeaseAcquirer{
+		jemInterface: jshim,
+		acquireMonitorLease: func(ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {
+			wantLease <- struct{}{}
+			<-goforitLease
+			return jshim.AcquireMonitorLease(ctlPath, oldExpiry, oldOwner, newExpiry, newOwner)
+		},
+	}
+
+	// Fake the API open call so that we know the number
+	// of times the API has been opened. If only one monitor
+	// acquires the lease, this should be only 1 (note that
+	// the monitor sleeps before retrying the API open).
+	apiOpened := make(chan struct{})
+	jshim2 := jemShimWithAPIOpener{
+		jemInterface: jshim1,
+		openAPI: func(path params.EntityPath) (jujuAPI, error) {
+			apiOpened <- struct{}{}
+			<-apiOpened
+			return nil, errgo.New("no API connections in this test")
+		},
+	}
+	ctlPath := params.EntityPath{"bob", "foo"}
+	info := s.APIInfo(c)
+	err := s.jem.AddController(&mongodoc.Controller{
+		Path:      ctlPath,
+		UUID:      "some-uuid",
+		CACert:    jujutesting.CACert,
+		AdminUser: "bob",
+		HostPorts: []string{"0.1.2.3:4567"},
+	}, &mongodoc.Model{
+		UUID: info.ModelTag.Id(),
+	})
+	c.Assert(err, gc.IsNil)
+
+	// On your marks...
+	m1 := newAllMonitor(jshim2, "jem1")
+	defer worker.Stop(m1)
+
+	m2 := newAllMonitor(jshim2, "jem2")
+	defer worker.Stop(m2)
+
+	// ... get set ...
+	timeout := time.After(jujutesting.LongWait)
+	for i := 0; i < 2; i++ {
+		select {
+		case <-wantLease:
+		case <-timeout:
+			c.Fatalf("timeout waiting for both monitors to try acquiring lease")
+		}
+	}
+
+	// ... go!
+	close(goforitLease)
+
+	// Wait for both monitors to go to sleep after the race is over.
+	timeout = time.After(jujutesting.LongWait)
+	for i := 0; i < 2; i++ {
+		select {
+		case <-s.clock.Alarms():
+		case <-timeout:
+			c.Fatalf("timeout waiting for both monitors to sleep")
+		}
+	}
+
+	// Assert that the API is opened only once.
+	waitEvent(c, apiOpened, "api open")
+	assertNoEvent(c, apiOpened, "api open")
+
+	// Sanity check that the lease is actually held by one of the two monitors.
+	ctl, err := s.jem.Controller(ctlPath)
+	c.Assert(err, gc.IsNil)
+	if ctl.MonitorLeaseExpiry.IsZero() {
+		c.Errorf("monitor lease not held")
+	}
+	if ctl.MonitorLeaseOwner != "jem1" && ctl.MonitorLeaseOwner != "jem2" {
+		c.Errorf("unexpected monitor owner %q", ctl.MonitorLeaseOwner)
+	}
+	apiOpened <- struct{}{}
+}
+
+func (s *internalSuite) TestAllMonitorReusesOwnLease(c *gc.C) {
+	jshim := newJEMShimInMemory()
+	ctlPath := params.EntityPath{"bob", "foo"}
+	addFakeController(jshim, ctlPath)
+
+	openedAPI := make(chan params.EntityPath, 10)
+	jshim1 := jemShimWithAPIOpener{
+		jemInterface: jshim,
+		openAPI: func(path params.EntityPath) (jujuAPI, error) {
+			openedAPI <- path
+			// Return an ErrAPIConnection error so that the
+			// monitor will retry rather than tearing down
+			// the connection, so the lease enquiry at the
+			// end of this test won't be racing with the allMonitor
+			// terminating.
+			return nil, errgo.WithCausef(nil, jem.ErrAPIConnection, "no API connection in this test")
+		},
+	}
+
+	expiry, err := jshim.AcquireMonitorLease(ctlPath, time.Time{}, "", epoch.Add(leaseExpiryDuration), "jem1")
+	c.Assert(err, gc.IsNil)
+
+	m1 := newAllMonitor(jshim1, "jem1")
+	defer worker.Stop(m1)
+
+	select {
+	case p := <-openedAPI:
+		c.Check(p, gc.Equals, ctlPath)
+	case <-time.After(jujutesting.LongWait):
+		c.Fatalf("timed out waiting for API open")
+	}
+	ctl := jshim.controllers[ctlPath]
+	c.Assert(ctl, gc.NotNil)
+	c.Assert(ctl.MonitorLeaseOwner, gc.Equals, "jem1")
+	c.Assert(ctl.MonitorLeaseExpiry.UTC(), jc.DeepEquals, expiry.UTC())
+}
+
 func (s *internalSuite) assertControllerStats(c *gc.C, ctlPath params.EntityPath, stats mongodoc.ControllerStats) {
 	ctlDoc, err := s.jem.Controller(ctlPath)
 	c.Assert(err, gc.IsNil)
@@ -463,6 +782,20 @@ func (s *internalSuite) assertLease(c *gc.C, ctlPath params.EntityPath, t time.T
 	c.Assert(err, gc.IsNil)
 	c.Assert(ctl.MonitorLeaseExpiry.UTC(), jc.DeepEquals, mongodoc.Time(t).UTC())
 	c.Assert(ctl.MonitorLeaseOwner, gc.Equals, owner)
+}
+
+func addFakeController(jshim *jemShimInMemory, path params.EntityPath) {
+	jshim.AddController(&mongodoc.Controller{
+		Path:      path,
+		UUID:      fmt.Sprintf("some-uuid-%s", path),
+		CACert:    jujutesting.CACert,
+		AdminUser: "bob",
+		HostPorts: []string{"0.1.2.3:4567"},
+	})
+	jshim.AddModel(&mongodoc.Model{
+		Path:       path,
+		Controller: path,
+	})
 }
 
 func parseTime(s string) time.Time {
