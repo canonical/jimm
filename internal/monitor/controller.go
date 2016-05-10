@@ -89,6 +89,12 @@ func (m *controllerMonitor) Wait() error {
 	return m.tomb.Wait()
 }
 
+// Dead returns a channel which is closed when the controller
+// monitor has terminated.
+func (m *controllerMonitor) Dead() <-chan struct{} {
+	return m.tomb.Dead()
+}
+
 var errMonitoringStopped = errgo.New("monitoring stopped because lease lost or controller removed")
 
 // leaseUpdater is responsible for updating the controller's lease
