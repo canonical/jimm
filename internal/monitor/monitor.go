@@ -17,6 +17,7 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/tomb.v2"
 
+	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -42,6 +43,56 @@ const (
 // Clock holds the clock implementation used by the monitor.
 // This is exported so it can be changed for testing purposes.
 var Clock clock.Clock = clock.WallClock
+
+// Monitor represents the JEM controller monitoring system.
+type Monitor struct {
+	pool    *jem.Pool
+	tomb    tomb.Tomb
+	ownerId string
+}
+
+// New returns a new Monitor that will monitor controllers
+// that JEM knows about. It uses the given JEM pool for
+// accessing the database.
+func New(p *jem.Pool, ownerId string) *Monitor {
+	m := &Monitor{
+		pool:    p,
+		ownerId: ownerId,
+	}
+	m.tomb.Go(m.run)
+	return m
+}
+
+// Kill asks the monitor to shut down but doesn't
+// wait for it to stop.
+func (m *Monitor) Kill() {
+	m.tomb.Kill(nil)
+}
+
+// Wait waits for the monitor to shut down and
+// returns any error encountered while it was running.
+func (m *Monitor) Wait() error {
+	return m.tomb.Wait()
+}
+
+func (m *Monitor) run() error {
+	for {
+		shim := jemShim{m.pool.JEM()}
+		m1 := newAllMonitor(shim, m.ownerId)
+		select {
+		case <-m1.tomb.Dead():
+			logger.Warningf("restarting inner monitor after error: %v", m1.tomb.Err())
+			shim.Close()
+		case <-m.tomb.Dying():
+			m1.Kill()
+			err := m1.Wait()
+			logger.Warningf("inner monitor error during shutdown: %v", err)
+			shim.Close()
+			return tomb.ErrDying
+		}
+	}
+}
+
 
 func newAllMonitor(jem jemInterface, ownerId string) *allMonitor {
 	m := &allMonitor{
