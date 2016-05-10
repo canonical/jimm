@@ -266,7 +266,7 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			err := json.Unmarshal(m, &body)
 			c.Assert(err, gc.IsNil)
 			c.Assert(body.Code, gc.Equals, params.ErrBadRequest)
-			c.Assert(body.Message, gc.Matches, `cannot connect to model: unable to connect to API: .*`)
+			c.Assert(body.Message, gc.Matches, `cannot connect to model: cannot connect to API: unable to connect to API: .*`)
 		}),
 	}}
 	s.IDMSrv.AddUser("alice", "beatles")

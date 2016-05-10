@@ -1,7 +1,10 @@
+// Copyright 2016 Canonical Ltd.
+
 package mongodoc
 
 import (
 	"encoding/base64"
+	"time"
 
 	"gopkg.in/juju/environschema.v1"
 
@@ -55,6 +58,33 @@ type Controller struct {
 	// ProviderType holds the type of the juju provider that the
 	// controller is using.
 	ProviderType string
+
+	// MonitorLeaseOwner holds the name of the agent
+	// currently responsible for monitoring the controller.
+	MonitorLeaseOwner string
+
+	// MonitorLeaseExpiry holds the time at which the
+	// current monitor's lease expires.
+	MonitorLeaseExpiry time.Time
+
+	// Stats holds runtime information about the controller.
+	Stats ControllerStats
+}
+
+// ControllerStats holds statistics about a controller.
+type ControllerStats struct {
+	// UnitCount holds the number of units hosted in the controller.
+	UnitCount int
+
+	// ModelCount holds the number of models hosted in the controller.
+	ModelCount int
+
+	// ServiceCount holds the number of services hosted in the controller.
+	ServiceCount int
+
+	// MachineCount holds the number of machines hosted in the controller.
+	// This includes all machines, not just top level instances.
+	MachineCount int
 }
 
 type UserInfo struct {
@@ -97,6 +127,12 @@ type Model struct {
 	// the users we have managed on the model.
 	// Note that keys are sanitized with the Sanitize function.
 	Users map[string]ModelUserInfo `bson:",omitempty"`
+
+	// Life holds the current life status of the model ("alive", "dying"
+	// or "dead").
+	Life string
+
+	// TODO record last time we saw changes on the model?
 }
 
 type ModelUserInfo struct {

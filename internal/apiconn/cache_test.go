@@ -9,6 +9,7 @@ import (
 	corejujutesting "github.com/juju/juju/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/internal/apiconn"
 )
@@ -104,11 +105,13 @@ type fakeConn struct {
 }
 
 func (s *cacheSuite) TestOpenAPIError(c *gc.C) {
+	apiErr := fmt.Errorf("open error")
 	cache := apiconn.NewCache(apiconn.CacheParams{})
 	conn, err := cache.OpenAPI("uuid", func() (api.Connection, *api.Info, error) {
-		return nil, nil, fmt.Errorf("open error")
+		return nil, nil, apiErr
 	})
 	c.Assert(err, gc.ErrorMatches, "open error")
+	c.Assert(errgo.Cause(err), gc.Equals, apiErr)
 	c.Assert(conn, gc.IsNil)
 }
 

@@ -68,6 +68,9 @@ func (cache *Cache) EvictAll() {
 // connection will be cached.. It is assumed that all
 // connections to a given model UUID are equal. It is the
 // responsibility of the caller to ensure this.
+//
+// The cause of any error returned from dial will be
+// returned intact.
 func (cache *Cache) OpenAPI(
 	envUUID string,
 	dial func() (api.Connection, *api.Info, error),
@@ -90,7 +93,7 @@ func (cache *Cache) OpenAPI(
 	x, err := cache.group.Do(envUUID, func() (interface{}, error) {
 		st, stInfo, err := dial()
 		if err != nil {
-			return nil, errgo.Mask(err)
+			return nil, errgo.Mask(err, errgo.Any)
 		}
 		c := &Conn{
 			// Note that we put the State and Info fields in the outer struct
@@ -112,7 +115,7 @@ func (cache *Cache) OpenAPI(
 		return c, nil
 	})
 	if err != nil {
-		return nil, errgo.Mask(err)
+		return nil, errgo.Mask(err, errgo.Any)
 	}
 	return x.(*Conn).Clone(), nil
 }

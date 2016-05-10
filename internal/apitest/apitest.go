@@ -10,6 +10,7 @@ import (
 
 	"github.com/juju/idmclient"
 	corejujutesting "github.com/juju/juju/juju/testing"
+	"github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -40,6 +41,9 @@ type Suite struct {
 	// JEM holds an instance of the JEM store, suitable
 	// for invasive testing purposes.
 	JEM *jem.JEM
+
+	// Pool holds the pool from which the above JEM was taken.
+	Pool *jem.Pool
 }
 
 func (s *Suite) SetUpTest(c *gc.C) {
@@ -49,9 +53,14 @@ func (s *Suite) SetUpTest(c *gc.C) {
 	s.JEMSrv = s.NewServer(c, s.Session, s.IDMSrv)
 	s.httpSrv = httptest.NewServer(s.JEMSrv)
 
+	s.Pool = s.newPool(c, s.Session)
+	s.JEM = s.Pool.JEM()
+}
+
+func (s *Suite) newPool(c *gc.C, session *mgo.Session) *jem.Pool {
 	pool, err := jem.NewPool(
 		jem.ServerParams{
-			DB: s.Session.DB("jem"),
+			DB: session.DB("jem"),
 		},
 		bakery.NewServiceParams{
 			Location: "here",
@@ -62,9 +71,7 @@ func (s *Suite) SetUpTest(c *gc.C) {
 		}),
 	)
 	c.Assert(err, gc.IsNil)
-
-	s.JEM = pool.JEM()
-	pool.Close()
+	return pool
 }
 
 func (s *Suite) TearDownTest(c *gc.C) {
@@ -72,6 +79,7 @@ func (s *Suite) TearDownTest(c *gc.C) {
 	s.JEMSrv.Close()
 	s.IDMSrv.Close()
 	s.JEM.Close()
+	s.Pool.Close()
 	s.JujuConnSuite.TearDownTest(c)
 }
 
@@ -82,6 +90,23 @@ func (s *Suite) NewClient(username params.User) *jemclient.Client {
 		BaseURL: s.httpSrv.URL,
 		Client:  s.IDMSrv.Client(string(username)),
 	})
+}
+
+// ProxiedPool returns a JEM pool that uses a proxied TCP connection
+// to MongoDB and the proxy that the connections go through.
+// This makes it possible to test what happens when a connection
+// to the database is broken.
+//
+// Both the returned pool and the returned proxy should
+// be closed after use.
+func (s *Suite) ProxiedPool(c *gc.C) (*jem.Pool, *testing.TCPProxy) {
+	mgoInfo := testing.MgoServer.DialInfo()
+	c.Assert(mgoInfo.Addrs, gc.HasLen, 1)
+	proxy := testing.NewTCPProxy(c, mgoInfo.Addrs[0])
+	mgoInfo.Addrs = []string{proxy.Addr()}
+	session, err := mgo.DialWithInfo(mgoInfo)
+	c.Assert(err, gc.IsNil)
+	return s.newPool(c, session), proxy
 }
 
 // NewServer returns a new JEM server that uses the given mongo session and identity

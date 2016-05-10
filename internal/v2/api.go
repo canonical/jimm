@@ -1,3 +1,5 @@
+// Copyright 2016 Canonical Ltd.
+
 package v2
 
 import (
