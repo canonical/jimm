@@ -1,6 +1,6 @@
 // Copyright 2015 Canonical Ltd.
 
-package jem_test
+package jemserver_test
 
 import (
 	"encoding/json"
@@ -13,6 +13,7 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jem/internal/jem"
+	"github.com/CanonicalLtd/jem/internal/jemserver"
 )
 
 type serverSuite struct {
@@ -22,10 +23,10 @@ type serverSuite struct {
 var _ = gc.Suite(&serverSuite{})
 
 func (s *serverSuite) TestNewServerWithNoVersions(c *gc.C) {
-	params := jem.ServerParams{
+	params := jemserver.Params{
 		DB: s.Session.DB("foo"),
 	}
-	h, err := jem.NewServer(params, nil)
+	h, err := jemserver.New(params, nil)
 	c.Assert(err, gc.ErrorMatches, `JEM server must serve at least one version of the API`)
 	c.Assert(h, gc.IsNil)
 }
@@ -36,11 +37,11 @@ type versionResponse struct {
 }
 
 func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
-	serverParams := jem.ServerParams{
+	serverParams := jemserver.Params{
 		DB: s.Session.DB("foo"),
 	}
-	serveVersion := func(vers string) jem.NewAPIHandlerFunc {
-		return func(p *jem.Pool, config jem.ServerParams) ([]httprequest.Handler, error) {
+	serveVersion := func(vers string) jemserver.NewAPIHandlerFunc {
+		return func(p *jem.Pool, config jemserver.Params) ([]httprequest.Handler, error) {
 			versPrefix := ""
 			if vers != "" {
 				versPrefix = "/" + vers
@@ -61,7 +62,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 		}
 	}
 
-	h, err := jem.NewServer(serverParams, map[string]jem.NewAPIHandlerFunc{
+	h, err := jemserver.New(serverParams, map[string]jemserver.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 	})
 	c.Assert(err, gc.IsNil)
@@ -69,7 +70,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	assertDoesNotServeVersion(c, h, "version2")
 	assertDoesNotServeVersion(c, h, "version3")
 
-	h, err = jem.NewServer(serverParams, map[string]jem.NewAPIHandlerFunc{
+	h, err = jemserver.New(serverParams, map[string]jemserver.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 		"version2": serveVersion("version2"),
 	})
@@ -78,7 +79,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	assertServesVersion(c, h, "version2")
 	assertDoesNotServeVersion(c, h, "version3")
 
-	h, err = jem.NewServer(serverParams, map[string]jem.NewAPIHandlerFunc{
+	h, err = jemserver.New(serverParams, map[string]jemserver.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 		"version2": serveVersion("version2"),
 		"version3": serveVersion("version3"),
@@ -113,11 +114,11 @@ func assertDoesNotServeVersion(c *gc.C, h http.Handler, vers string) {
 }
 
 func (s *serverSuite) TestServerHasAccessControlAllowOrigin(c *gc.C) {
-	serverParams := jem.ServerParams{
+	serverParams := jemserver.Params{
 		DB: s.Session.DB("foo"),
 	}
-	impl := map[string]jem.NewAPIHandlerFunc{
-		"/a": func(p *jem.Pool, config jem.ServerParams) ([]httprequest.Handler, error) {
+	impl := map[string]jemserver.NewAPIHandlerFunc{
+		"/a": func(p *jem.Pool, config jemserver.Params) ([]httprequest.Handler, error) {
 			return []httprequest.Handler{{
 				Method: "GET",
 				Path:   "/a",
@@ -126,7 +127,7 @@ func (s *serverSuite) TestServerHasAccessControlAllowOrigin(c *gc.C) {
 			}}, nil
 		},
 	}
-	h, err := jem.NewServer(serverParams, impl)
+	h, err := jemserver.New(serverParams, impl)
 	c.Assert(err, gc.IsNil)
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: h,

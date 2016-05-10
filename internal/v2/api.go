@@ -28,6 +28,7 @@ import (
 
 	"github.com/CanonicalLtd/jem/internal/apiconn"
 	"github.com/CanonicalLtd/jem/internal/jem"
+	"github.com/CanonicalLtd/jem/internal/jemserver"
 	"github.com/CanonicalLtd/jem/internal/jemerror"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
@@ -37,13 +38,13 @@ var logger = loggo.GetLogger("jem.internal.v1")
 
 type Handler struct {
 	jem    *jem.JEM
-	config jem.ServerParams
+	config jemserver.Params
 }
 
 // randIntn is declared as a variable so that it can be overridden in tests.
 var randIntn = rand.Intn
 
-func NewAPIHandler(jp *jem.Pool, sp jem.ServerParams) ([]httprequest.Handler, error) {
+func NewAPIHandler(jp *jem.Pool, sp jemserver.Params) ([]httprequest.Handler, error) {
 	return jemerror.Mapper.Handlers(func(p httprequest.Params) (*Handler, error) {
 		// All requests require an authenticated client.
 		h := &Handler{

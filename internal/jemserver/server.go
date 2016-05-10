@@ -1,6 +1,6 @@
 // Copyright 2015 Canonical Ltd.
 
-package jem
+package jemserver
 
 import (
 	"net/http"
@@ -15,18 +15,20 @@ import (
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/macaroon-bakery.v1/httpbakery/agent"
 	"gopkg.in/mgo.v2"
+
+	"github.com/CanonicalLtd/jem/internal/jem"
 )
 
-var logger = loggo.GetLogger("jem.internal.jem")
+var logger = loggo.GetLogger("jem.internal.jemserver")
 
 // NewAPIHandlerFunc is a function that returns set of httprequest
 // handlers that uses the given JEM pool and server params.
-type NewAPIHandlerFunc func(*Pool, ServerParams) ([]httprequest.Handler, error)
+type NewAPIHandlerFunc func(*jem.Pool, Params) ([]httprequest.Handler, error)
 
-// ServerParams holds configuration for a new API server.
+// Params holds configuration for a new API server.
 // It must be kept in sync with identical definition in the
 // top level jem package.
-type ServerParams struct {
+type Params struct {
 	// DB holds the mongo database that will be used to
 	// store the JEM information.
 	DB *mgo.Database
@@ -48,28 +50,34 @@ type ServerParams struct {
 	AgentKey      *bakery.KeyPair
 }
 
-// NewServer returns a new handler that handles model manager
+// New returns a new handler that handles model manager
 // requests and stores its data in the given database.
 // The returned handler should be closed when finished
 // with.
-func NewServer(config ServerParams, versions map[string]NewAPIHandlerFunc) (*Server, error) {
+func New(config Params, versions map[string]NewAPIHandlerFunc) (*Server, error) {
 	if len(versions) == 0 {
 		return nil, errgo.Newf("JEM server must serve at least one version of the API")
-	}
-	bparams := bakery.NewServiceParams{
-		// TODO The location is attached to any macaroons that we
-		// mint. Currently we don't know the location of the current
-		// service. We potentially provide a way to configure this,
-		// but it probably doesn't matter, as nothing currently uses
-		// the macaroon location for anything.
-		Location: "jem",
-		Locator:  config.PublicKeyLocator,
 	}
 	idmClient, err := newIdentityClient(config)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	p, err := NewPool(config, bparams, idmClient)
+	jconfig := jem.Params{
+		DB: config.DB,
+		BakeryParams: bakery.NewServiceParams{
+			// TODO The location is attached to any macaroons that we
+			// mint. Currently we don't know the location of the current
+			// service. We potentially provide a way to configure this,
+			// but it probably doesn't matter, as nothing currently uses
+			// the macaroon location for anything.
+			Location: "jem",
+			Locator:  config.PublicKeyLocator,
+		},
+		IDMClient:        idmClient,
+		ControllerAdmin:  config.ControllerAdmin,
+		IdentityLocation: config.IdentityLocation,
+	}
+	p, err := jem.NewPool(jconfig)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make store")
 	}
@@ -93,7 +101,7 @@ func NewServer(config ServerParams, versions map[string]NewAPIHandlerFunc) (*Ser
 	return srv, nil
 }
 
-func newIdentityClient(config ServerParams) (*idmclient.Client, error) {
+func newIdentityClient(config Params) (*idmclient.Client, error) {
 	// Note: no need for persistent cookies as we'll
 	// be able to recreate the macaroons on startup.
 	bclient := httpbakery.NewClient()
@@ -111,7 +119,7 @@ func newIdentityClient(config ServerParams) (*idmclient.Client, error) {
 
 type Server struct {
 	router *httprouter.Router
-	pool   *Pool
+	pool   *jem.Pool
 }
 
 // ServeHTTP implements http.Handler.Handle.
@@ -145,6 +153,6 @@ func (srv *Server) Close() error {
 
 // Pool returns the JEM pool used by the server.
 // It is made available for testing purposes.
-func (srv *Server) Pool() *Pool {
+func (srv *Server) Pool() *jem.Pool {
 	return srv.pool
 }

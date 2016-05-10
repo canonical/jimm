@@ -35,18 +35,16 @@ var _ = gc.Suite(&jemSuite{})
 func (s *jemSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	s.idmSrv = idmtest.NewServer()
-	pool, err := jem.NewPool(
-		jem.ServerParams{
-			DB: s.Session.DB("jem"),
-		},
-		bakery.NewServiceParams{
+	pool, err := jem.NewPool(jem.Params{
+		DB: s.Session.DB("jem"),
+		BakeryParams: bakery.NewServiceParams{
 			Location: "here",
 		},
-		idmclient.New(idmclient.NewParams{
+		IDMClient: idmclient.New(idmclient.NewParams{
 			BaseURL: s.idmSrv.URL.String(),
 			Client:  s.idmSrv.Client("agent"),
 		}),
-	)
+	})
 	c.Assert(err, gc.IsNil)
 	s.pool = pool
 	s.store = s.pool.JEM()
@@ -480,18 +478,16 @@ func (s *jemSuite) TestDeleteTemplate(c *gc.C) {
 
 func (s *jemSuite) TestJEMCopiesSession(c *gc.C) {
 	session := s.Session.Copy()
-	pool, err := jem.NewPool(
-		jem.ServerParams{
-			DB: session.DB("jem"),
-		},
-		bakery.NewServiceParams{
+	pool, err := jem.NewPool(jem.Params{
+		DB: session.DB("jem"),
+		BakeryParams: bakery.NewServiceParams{
 			Location: "here",
 		},
-		idmclient.New(idmclient.NewParams{
+		IDMClient: idmclient.New(idmclient.NewParams{
 			BaseURL: s.idmSrv.URL.String(),
 			Client:  s.idmSrv.Client("agent"),
 		}),
-	)
+	})
 	c.Assert(err, gc.IsNil)
 
 	store := pool.JEM()

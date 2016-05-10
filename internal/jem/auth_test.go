@@ -32,22 +32,19 @@ var _ = gc.Suite(&authSuite{})
 func (s *authSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	s.idmSrv = idmtest.NewServer()
-	pool, err := jem.NewPool(
-		jem.ServerParams{
-			DB:               s.Session.DB("jem"),
-			IdentityLocation: s.idmSrv.URL.String(),
-			PublicKeyLocator: s.idmSrv,
-			ControllerAdmin:  "admin",
-		},
-		bakery.NewServiceParams{
+	pool, err := jem.NewPool(jem.Params{
+		DB:               s.Session.DB("jem"),
+		IdentityLocation: s.idmSrv.URL.String(),
+		ControllerAdmin:  "admin",
+		BakeryParams: bakery.NewServiceParams{
 			Location: "here",
 			Locator:  s.idmSrv,
 		},
-		idmclient.New(idmclient.NewParams{
+		IDMClient: idmclient.New(idmclient.NewParams{
 			BaseURL: s.idmSrv.URL.String(),
 			Client:  s.idmSrv.Client("agent"),
 		}),
-	)
+	})
 	c.Assert(err, gc.IsNil)
 	s.pool = pool
 	s.jem = s.pool.JEM()
