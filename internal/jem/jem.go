@@ -3,6 +3,7 @@
 package jem
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -163,6 +164,23 @@ type JEM struct {
 	// closed records whether the JEM instance has
 	// been closed.
 	closed bool
+}
+
+// Clone returns an independent copy of the receiver
+// that uses a cloned database connection. The
+// returned value must be closed after use.
+func (j *JEM) Clone() *JEM {
+	j.pool.mu.Lock()
+	defer j.pool.mu.Unlock()
+	db := j.DB.Clone()
+	j.pool.refCount++
+	return &JEM{
+		DB:          db,
+		config:      &j.pool.config,
+		Bakery:      newBakery(db, j.pool.bakeryParams),
+		PermChecker: j.pool.permChecker,
+		pool:        j.pool,
+	}
 }
 
 // Close closes the JEM instance. This should be called when
@@ -373,10 +391,17 @@ func (j *JEM) Model(path params.EntityPath) (*mongodoc.Model, error) {
 	return &m, nil
 }
 
+// ErrAPIConnection is returned by OpenAPI and OpenAPIFromDocs
+// when the API connection cannot be made.
+var ErrAPIConnection = errgo.New("cannot connect to API")
+
 // OpenAPI opens an API connection to the model with the given path
 // and returns it along with the information used to connect.
 // If the model does not exist, the error will have a cause
 // of params.ErrNotFound.
+//
+// If the model API connection could not be made, the error
+// will have a cause of ErrAPIConnection.
 //
 // The returned connection must be closed when finished with.
 func (j *JEM) OpenAPI(path params.EntityPath) (*apiconn.Conn, error) {
@@ -387,12 +412,12 @@ func (j *JEM) OpenAPI(path params.EntityPath) (*apiconn.Conn, error) {
 	return j.pool.connCache.OpenAPI(m.UUID, func() (api.Connection, *api.Info, error) {
 		ctl, err := j.Controller(m.Controller)
 		if err != nil {
-			return nil, nil, errgo.Notef(err, "cannot get controller for model %q", m.UUID)
+			return nil, nil, errgo.NoteMask(err, fmt.Sprintf("cannot get controller for model %q", m.UUID), errgo.Is(params.ErrNotFound))
 		}
 		apiInfo := apiInfoFromDocs(ctl, m)
 		st, err := api.Open(apiInfo, apiDialOpts())
 		if err != nil {
-			return nil, nil, errgo.Mask(err)
+			return nil, nil, errgo.WithCausef(err, ErrAPIConnection, "")
 		}
 		return st, apiInfo, nil
 	})
@@ -413,7 +438,7 @@ func (j *JEM) OpenAPIFromDocs(m *mongodoc.Model, ctl *mongodoc.Controller) (*api
 		stInfo := apiInfoFromDocs(ctl, m)
 		st, err := api.Open(stInfo, apiDialOpts())
 		if err != nil {
-			return nil, nil, errgo.Mask(err)
+			return nil, nil, errgo.WithCausef(err, ErrAPIConnection, "")
 		}
 		return st, stInfo, nil
 	})
@@ -515,6 +540,85 @@ func (j *JEM) SetControllerLocation(path params.EntityPath, location map[string]
 	return nil
 }
 
+// ErrLeaseUnavailable is the error cause returned by AcquireMonitorLease
+// when it cannot acquire the lease because it is unavailable.
+var ErrLeaseUnavailable = errgo.Newf("cannot acquire lease")
+
+// AcquireMonitorLease acquires or renews the lease on a controller.
+// The lease will only be changed if the lease in the database
+// has the given old expiry time and owner.
+// When acquired, the lease will have the given new owner
+// and expiration time.
+//
+// If newOwner is empty, the lease will be dropped, the
+// returned time will be zero and newExpiry will be ignored.
+//
+// If the controller has been removed, an error with a params.ErrNotFound
+// cause will be returned. If the lease has been obtained by someone else
+// an error with a ErrLeaseUnavailable cause will be returned.
+func (j *JEM) AcquireMonitorLease(ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {
+	if newOwner != "" {
+		newExpiry = mongodoc.Time(newExpiry)
+	} else {
+		newExpiry = time.Time{}
+	}
+	err := j.DB.Controllers().Update(bson.D{
+		{"path", ctlPath},
+		{"monitorleaseexpiry", oldExpiry},
+		{"monitorleaseowner", oldOwner},
+	}, bson.D{
+		{"$set", bson.D{
+			{"monitorleaseexpiry", newExpiry},
+			{"monitorleaseowner", newOwner},
+		}},
+	})
+	if err == mgo.ErrNotFound {
+		// Someone else got there first, or the document has been
+		// removed. Technically don't need to distinguish between the
+		// two cases, but it's useful to see the different error messages.
+		ctl, err := j.Controller(ctlPath)
+		if errgo.Cause(err) == params.ErrNotFound {
+			return time.Time{}, errgo.WithCausef(nil, params.ErrNotFound, "controller removed")
+		}
+		if err != nil {
+			return time.Time{}, errgo.Mask(err)
+		}
+		return time.Time{}, errgo.WithCausef(nil, ErrLeaseUnavailable, "controller has lease taken out by %q expiring at %v", ctl.MonitorLeaseOwner, ctl.MonitorLeaseExpiry.UTC())
+	}
+	if err != nil {
+		return time.Time{}, errgo.Notef(err, "cannot acquire lease")
+	}
+	return newExpiry, nil
+}
+
+// SetControllerStats sets the stats associated with the controller
+// with the given path. It returns an error with a params.ErrNotFound
+// cause if the controller does not exist.
+func (j *JEM) SetControllerStats(ctlPath params.EntityPath, stats *mongodoc.ControllerStats) error {
+	err := j.DB.Controllers().UpdateId(
+		ctlPath.String(),
+		bson.D{{"$set", bson.D{{"stats", stats}}}},
+	)
+	if err == mgo.ErrNotFound {
+		return errgo.WithCausef(nil, params.ErrNotFound, "controller not found")
+	}
+	return errgo.Mask(err)
+}
+
+// SetModelLife sets the Life field of all models controlled
+// by the given controller that have the given UUID.
+// It does not return an error if there are no such models.
+func (j *JEM) SetModelLife(ctlPath params.EntityPath, uuid string, life string) error {
+	_, err := j.DB.Models().UpdateAll(
+		bson.D{{"uuid", uuid}, {"controller", ctlPath}},
+		bson.D{{"$set", bson.D{{"life", life}}}},
+	)
+	if err != nil {
+		return errgo.Notef(err, "cannot update model")
+	}
+	return nil
+}
+
 func apiDialOpts() api.DialOpts {
 	return api.DialOpts{
 		Timeout:    APIOpenTimeout,
@@ -547,6 +651,21 @@ func (s Database) Copy() Database {
 	}
 }
 
+// Clone copies the Database and clones its underlying
+// mgo session. See mgo.Session.Clone and mgo.Session.Copy
+// for information on the distinction between Clone and Copy.
+func (s Database) Clone() Database {
+	if s.Session == nil {
+		panic("nil session in clone!")
+	}
+	return Database{
+		&mgo.Database{
+			Name:    s.Name,
+			Session: s.Session.Clone(),
+		},
+	}
+}
+
 func (db Database) Collections() []*mgo.Collection {
 	return []*mgo.Collection{
 		db.Macaroons(),
@@ -575,6 +694,13 @@ func (db Database) Models() *mgo.Collection {
 
 func (db Database) Templates() *mgo.Collection {
 	return db.C("templates")
+}
+
+func (db Database) C(name string) *mgo.Collection {
+	if db.Database == nil {
+		panic(fmt.Sprintf("cannot get collection %q because JEM closed", name))
+	}
+	return db.Database.C(name)
 }
 
 func validateLocationAttrs(attrs map[string]string) error {

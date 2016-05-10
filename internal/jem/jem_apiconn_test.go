@@ -138,7 +138,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPIError(c *gc.C) {
 
 	conn, err = s.store.OpenAPI(params.EntityPath{"bob", "model"})
 	c.Assert(err, gc.ErrorMatches, `cannot get controller for model "modeluuid": controller "no/controller" not found`)
-	c.Assert(errgo.Cause(err), gc.Equals, err)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	c.Assert(conn, gc.IsNil)
 }
 

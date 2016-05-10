@@ -5,6 +5,7 @@ package jem_test
 import (
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/juju/idmclient"
 	"github.com/juju/schema"
@@ -14,6 +15,7 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/environschema.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
+	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jem/internal/idmtest"
 	"github.com/CanonicalLtd/jem/internal/jem"
@@ -476,11 +478,11 @@ func (s *jemSuite) TestDeleteTemplate(c *gc.C) {
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
-func (s *jemSuite) TestSessionIsCopied(c *gc.C) {
+func (s *jemSuite) TestJEMCopiesSession(c *gc.C) {
 	session := s.Session.Copy()
 	pool, err := jem.NewPool(
 		jem.ServerParams{
-			DB: s.Session.DB("jem"),
+			DB: session.DB("jem"),
 		},
 		bakery.NewServiceParams{
 			Location: "here",
@@ -511,6 +513,13 @@ func (s *jemSuite) TestSessionIsCopied(c *gc.C) {
 	m, err := store.Bakery.NewMacaroon("", nil, nil)
 	c.Assert(err, gc.IsNil)
 	c.Assert(m, gc.NotNil)
+}
+
+func (s *jemSuite) TestClone(c *gc.C) {
+	j := s.store.Clone()
+	j.Close()
+	_, err := s.store.Model(params.EntityPath{"bob", "x"})
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
 func (s *jemSuite) TestEnsureUserSuccess(c *gc.C) {
@@ -659,3 +668,202 @@ func (s *jemSuite) TestSetModelManagedUser(c *gc.C) {
 
 //invalid key for mongo
 //user already exists
+
+var epoch = parseTime("2016-01-01T12:00:00Z")
+
+const leaseExpiryDuration = 15 * time.Second
+
+var acquireLeaseTests = []struct {
+	about           string
+	now             time.Time
+	ctlPath         params.EntityPath
+	oldExpiry       time.Time
+	oldOwner        string
+	newExpiry       time.Time
+	newOwner        string
+	actualOldExpiry time.Time
+	actualOldOwner  string
+	expectExpiry    time.Time
+	expectError     string
+	expectCause     error
+}{{
+	about:           "initial lease acquisition",
+	ctlPath:         params.EntityPath{"bob", "foo"},
+	oldExpiry:       time.Time{},
+	newExpiry:       epoch.Add(leaseExpiryDuration),
+	oldOwner:        "",
+	newOwner:        "jem1",
+	actualOldExpiry: time.Time{},
+	actualOldOwner:  "",
+	expectExpiry:    epoch.Add(leaseExpiryDuration),
+}, {
+	about:           "renewal",
+	ctlPath:         params.EntityPath{"bob", "foo"},
+	oldExpiry:       epoch.Add(leaseExpiryDuration),
+	oldOwner:        "jem1",
+	newExpiry:       epoch.Add(leaseExpiryDuration/2 + leaseExpiryDuration),
+	newOwner:        "jem1",
+	actualOldExpiry: epoch.Add(leaseExpiryDuration),
+	actualOldOwner:  "jem1",
+	expectExpiry:    epoch.Add(leaseExpiryDuration/2 + leaseExpiryDuration),
+}, {
+	about:           "renewal with time mismatch",
+	ctlPath:         params.EntityPath{"bob", "foo"},
+	oldExpiry:       epoch.Add(leaseExpiryDuration),
+	oldOwner:        "jem1",
+	newExpiry:       epoch.Add(leaseExpiryDuration * 3),
+	newOwner:        "jem1",
+	actualOldExpiry: epoch.Add(leaseExpiryDuration * 2),
+	actualOldOwner:  "jem1",
+	expectError:     `controller has lease taken out by "jem1" expiring at 2016-01-01 12:00:30 \+0000 UTC`,
+	expectCause:     jem.ErrLeaseUnavailable,
+}, {
+	about:           "renewal with owner mismatch",
+	ctlPath:         params.EntityPath{"bob", "foo"},
+	oldExpiry:       epoch.Add(leaseExpiryDuration),
+	oldOwner:        "jem1",
+	newOwner:        "jem1",
+	actualOldExpiry: epoch.Add(leaseExpiryDuration),
+	actualOldOwner:  "jem0",
+	expectError:     `controller has lease taken out by "jem0" expiring at 2016-01-01 12:00:15 \+0000 UTC`,
+	expectCause:     jem.ErrLeaseUnavailable,
+}, {
+	about:           "drop lease",
+	now:             epoch.Add(leaseExpiryDuration / 2),
+	ctlPath:         params.EntityPath{"bob", "foo"},
+	oldExpiry:       epoch.Add(leaseExpiryDuration),
+	oldOwner:        "jem1",
+	newOwner:        "",
+	actualOldExpiry: epoch.Add(leaseExpiryDuration),
+	actualOldOwner:  "jem1",
+	expectExpiry:    time.Time{},
+}, {
+	about:           "drop never-acquired lease",
+	now:             epoch,
+	ctlPath:         params.EntityPath{"bob", "foo"},
+	oldOwner:        "",
+	newOwner:        "",
+	actualOldExpiry: time.Time{},
+	actualOldOwner:  "",
+	expectExpiry:    time.Time{},
+}}
+
+func (s *jemSuite) TestAcquireLease(c *gc.C) {
+	for i, test := range acquireLeaseTests {
+		c.Logf("test %d: %v", i, test.about)
+		_, err := s.store.DB.Controllers().RemoveAll(bson.D{{"path", test.ctlPath}})
+		c.Assert(err, gc.IsNil)
+		_, err = s.store.DB.Models().RemoveAll(bson.D{{"path", test.ctlPath}})
+		c.Assert(err, gc.IsNil)
+		err = s.store.AddController(&mongodoc.Controller{
+			Path:               test.ctlPath,
+			UUID:               "fake-uuid",
+			MonitorLeaseOwner:  test.actualOldOwner,
+			MonitorLeaseExpiry: test.actualOldExpiry,
+		}, &mongodoc.Model{})
+		c.Assert(err, gc.IsNil)
+		t, err := s.store.AcquireMonitorLease(test.ctlPath, test.oldExpiry, test.oldOwner, test.newExpiry, test.newOwner)
+		if test.expectError != "" {
+			if test.expectCause != nil {
+				c.Check(errgo.Cause(err), gc.Equals, test.expectCause)
+			}
+			c.Assert(err, gc.ErrorMatches, test.expectError)
+			c.Assert(t, jc.Satisfies, time.Time.IsZero)
+			continue
+		}
+		c.Assert(err, gc.IsNil)
+		c.Assert(t.UTC(), gc.DeepEquals, test.expectExpiry.UTC())
+		ctl, err := s.store.Controller(test.ctlPath)
+		c.Assert(err, gc.IsNil)
+		c.Assert(ctl.MonitorLeaseExpiry.UTC(), gc.DeepEquals, test.expectExpiry.UTC())
+		c.Assert(ctl.MonitorLeaseOwner, gc.Equals, test.newOwner)
+	}
+}
+
+func (s *jemSuite) TestSetControllerStatsNotFound(c *gc.C) {
+	err := s.store.SetControllerStats(params.EntityPath{"bob", "foo"}, &mongodoc.ControllerStats{})
+	c.Assert(err, gc.ErrorMatches, "controller not found")
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}
+
+func (s *jemSuite) TestSetControllerStats(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	err := s.store.AddController(&mongodoc.Controller{
+		Path: ctlPath,
+		UUID: "fake-uuid",
+	}, &mongodoc.Model{})
+	c.Assert(err, gc.IsNil)
+
+	stats := &mongodoc.ControllerStats{
+		UnitCount:    1,
+		ModelCount:   2,
+		ServiceCount: 3,
+		MachineCount: 4,
+	}
+	err = s.store.SetControllerStats(ctlPath, stats)
+	c.Assert(err, gc.IsNil)
+	ctl, err := s.store.Controller(ctlPath)
+	c.Assert(err, gc.IsNil)
+	c.Assert(ctl.Stats, jc.DeepEquals, *stats)
+}
+
+func (s *jemSuite) TestSetModelLifeNotFound(c *gc.C) {
+	err := s.store.SetModelLife(params.EntityPath{"bob", "foo"}, "fake-uuid", "alive")
+	c.Assert(err, gc.IsNil)
+}
+
+func (s *jemSuite) TestSetModelLifeSuccess(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	err := s.store.AddController(&mongodoc.Controller{
+		Path: ctlPath,
+		UUID: "fake-uuid",
+	}, &mongodoc.Model{
+		UUID: "fake-uuid",
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Add another model with the same UUID but a different controller.
+	err = s.store.AddModel(&mongodoc.Model{
+		Path:       params.EntityPath{"bar", "baz"},
+		UUID:       "fake-uuid",
+		Controller: params.EntityPath{"bar", "zzz"},
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Add another model with the same controller but a different UUID.
+	err = s.store.AddModel(&mongodoc.Model{
+		Path:       params.EntityPath{"alice", "baz"},
+		UUID:       "another-uuid",
+		Controller: ctlPath,
+	})
+	c.Assert(err, gc.IsNil)
+
+	err = s.store.SetModelLife(ctlPath, "fake-uuid", "alive")
+	c.Assert(err, gc.IsNil)
+
+	m, err := s.store.Model(ctlPath)
+	c.Assert(err, gc.IsNil)
+	c.Assert(m.Life, gc.Equals, "alive")
+
+	m, err = s.store.Model(params.EntityPath{"bar", "baz"})
+	c.Assert(err, gc.IsNil)
+	c.Assert(m.Life, gc.Equals, "")
+
+	m, err = s.store.Model(params.EntityPath{"alice", "baz"})
+	c.Assert(err, gc.IsNil)
+	c.Assert(m.Life, gc.Equals, "")
+}
+
+func (s *jemSuite) TestAcquireLeaseControllerNotFound(c *gc.C) {
+	_, err := s.store.AcquireMonitorLease(params.EntityPath{"bob", "foo"}, time.Time{}, "", time.Now(), "jem1")
+	c.Assert(err, gc.ErrorMatches, `controller removed`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}
+
+func parseTime(s string) time.Time {
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		panic(err)
+	}
+	return t
+}
