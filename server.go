@@ -11,11 +11,11 @@ import (
 	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jem/internal/debugapi"
-	"github.com/CanonicalLtd/jem/internal/jem"
+	"github.com/CanonicalLtd/jem/internal/jemserver"
 	"github.com/CanonicalLtd/jem/internal/v2"
 )
 
-var versions = map[string]jem.NewAPIHandlerFunc{
+var versions = map[string]jemserver.NewAPIHandlerFunc{
 	"v2":    v2.NewAPIHandler,
 	"debug": debugapi.NewAPIHandler,
 }
@@ -57,7 +57,7 @@ type HandleCloser interface {
 // be closed after use (first ensuring that all outstanding requests have
 // completed).
 func NewServer(config ServerParams) (HandleCloser, error) {
-	srv, err := jem.NewServer(jem.ServerParams(config), versions)
+	srv, err := jemserver.New(jemserver.Params(config), versions)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}

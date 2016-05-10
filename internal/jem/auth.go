@@ -69,7 +69,7 @@ func (j *JEM) NewMacaroon() (*macaroon.Macaroon, error) {
 	return j.Bakery.NewMacaroon("", nil, []checkers.Caveat{
 		checkers.NeedDeclaredCaveat(
 			checkers.Caveat{
-				Location:  j.config.IdentityLocation,
+				Location:  j.pool.config.IdentityLocation,
 				Condition: "is-authenticated-user",
 			},
 			usernameAttr,
@@ -80,7 +80,7 @@ func (j *JEM) NewMacaroon() (*macaroon.Macaroon, error) {
 // CheckIsAdmin checks that the currently authenticated user has
 // administrator privileges.
 func (j *JEM) CheckIsAdmin() error {
-	return j.CheckIsUser(params.User(j.config.ControllerAdmin))
+	return j.CheckIsUser(params.User(j.pool.config.ControllerAdmin))
 }
 
 // CheckIsUser checks whether the currently authenticated user can

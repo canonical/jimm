@@ -1,6 +1,6 @@
-// Copyright 2016 Canonical Ltd.
+// Copyright 2015 Canonical Ltd.
 
-package jem_test
+package jemserver_test
 
 import (
 	"testing"

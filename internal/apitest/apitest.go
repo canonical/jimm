@@ -19,6 +19,7 @@ import (
 
 	external_jem "github.com/CanonicalLtd/jem"
 	"github.com/CanonicalLtd/jem/internal/idmtest"
+	"github.com/CanonicalLtd/jem/internal/jemserver"
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/jemclient"
 	"github.com/CanonicalLtd/jem/params"
@@ -30,7 +31,7 @@ type Suite struct {
 	corejujutesting.JujuConnSuite
 
 	// JEMSrv holds a running instance of JEM.
-	JEMSrv *jem.Server
+	JEMSrv *jemserver.Server
 
 	// IDMSrv holds a running instance of the fake identity server.
 	IDMSrv *idmtest.Server
@@ -58,18 +59,16 @@ func (s *Suite) SetUpTest(c *gc.C) {
 }
 
 func (s *Suite) newPool(c *gc.C, session *mgo.Session) *jem.Pool {
-	pool, err := jem.NewPool(
-		jem.ServerParams{
-			DB: session.DB("jem"),
-		},
-		bakery.NewServiceParams{
+	pool, err := jem.NewPool(jem.Params{
+		DB: session.DB("jem"),
+		BakeryParams: bakery.NewServiceParams{
 			Location: "here",
 		},
-		idmclient.New(idmclient.NewParams{
+		IDMClient: idmclient.New(idmclient.NewParams{
 			BaseURL: s.IDMSrv.URL.String(),
 			Client:  s.IDMSrv.Client("agent"),
 		}),
-	)
+	})
 	c.Assert(err, gc.IsNil)
 	return pool
 }
@@ -111,7 +110,7 @@ func (s *Suite) ProxiedPool(c *gc.C) (*jem.Pool, *testing.TCPProxy) {
 
 // NewServer returns a new JEM server that uses the given mongo session and identity
 // server.
-func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server) *jem.Server {
+func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server) *jemserver.Server {
 	db := session.DB("jem")
 	s.IDMSrv.AddUser("agent")
 	config := external_jem.ServerParams{
@@ -124,7 +123,7 @@ func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server)
 	}
 	srv, err := external_jem.NewServer(config)
 	c.Assert(err, gc.IsNil)
-	return srv.(*jem.Server)
+	return srv.(*jemserver.Server)
 }
 
 // Do returns a Do function appropriate for using in httptesting.AssertJSONCall.Do

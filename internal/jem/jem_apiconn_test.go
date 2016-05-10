@@ -30,18 +30,16 @@ var _ = gc.Suite(&jemAPIConnSuite{})
 func (s *jemAPIConnSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
 	s.idmSrv = idmtest.NewServer()
-	pool, err := jem.NewPool(
-		jem.ServerParams{
-			DB: s.Session.DB("jem"),
-		},
-		bakery.NewServiceParams{
+	pool, err := jem.NewPool(jem.Params{
+		DB: s.Session.DB("jem"),
+		BakeryParams: bakery.NewServiceParams{
 			Location: "here",
 		},
-		idmclient.New(idmclient.NewParams{
+		IDMClient: idmclient.New(idmclient.NewParams{
 			BaseURL: s.idmSrv.URL.String(),
 			Client:  s.idmSrv.Client("agent"),
 		}),
-	)
+	})
 	c.Assert(err, gc.IsNil)
 	s.pool = pool
 	s.store = s.pool.JEM()

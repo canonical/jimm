@@ -9,6 +9,7 @@ import (
 
 	"github.com/juju/idmclient"
 	"github.com/juju/juju/api"
+	"github.com/juju/loggo"
 	"github.com/juju/names"
 	"github.com/juju/utils"
 	"gopkg.in/errgo.v1"
@@ -22,9 +23,33 @@ import (
 	"github.com/CanonicalLtd/jem/params"
 )
 
+var logger = loggo.GetLogger("jem.internal.jem")
+
+// Params holds parameters for the NewPool function.
+type Params struct {
+	// DB holds the mongo database that will be used to
+	// store the JEM information.
+	DB *mgo.Database
+
+	// BakeryParams holds the parameters for creating
+	// a new bakery.Service.
+	BakeryParams bakery.NewServiceParams
+
+	// IDMClient holds the identity-manager client
+	// to use for finding out group membership.
+	IDMClient *idmclient.Client
+
+	// ControllerAdmin holds the identity of the user
+	// or group that is allowed to create controllers.
+	ControllerAdmin string
+
+	// IdentityLocation holds the location of the third party identity service.
+	IdentityLocation string
+}
+
 type Pool struct {
 	db           Database
-	config       ServerParams
+	config       Params
 	bakery       *bakery.Service
 	connCache    *apiconn.Cache
 	bakeryParams bakery.NewServiceParams
@@ -42,15 +67,16 @@ const maxPermCacheDuration = 10 * time.Second
 // NewPool represents a pool of possible JEM instances that use the given
 // database as a store, and use the given bakery parameters to create the
 // bakery.Service.
-func NewPool(config ServerParams, bp bakery.NewServiceParams, idmClient *idmclient.Client) (*Pool, error) {
+func NewPool(p Params) (*Pool, error) {
 	// TODO migrate database
 	pool := &Pool{
-		config:      config,
-		db:          Database{config.DB},
+		config:      p,
+		db:          Database{p.DB},
 		connCache:   apiconn.NewCache(apiconn.CacheParams{}),
-		permChecker: idmclient.NewPermChecker(idmClient, maxPermCacheDuration),
+		permChecker: idmclient.NewPermChecker(p.IDMClient, maxPermCacheDuration),
 		refCount:    1,
 	}
+	bp := p.BakeryParams
 	// Fill out any bakery parameters explicitly here so
 	// that we use the same values when each Store is
 	// created. We don't fill out bp.Store field though, as
@@ -115,7 +141,6 @@ func (p *Pool) JEM() *JEM {
 	p.refCount++
 	return &JEM{
 		DB:          db,
-		config:      &p.config,
 		Bakery:      newBakery(db, p.bakeryParams),
 		PermChecker: p.permChecker,
 		pool:        p,
@@ -153,10 +178,6 @@ type JEM struct {
 
 	PermChecker *idmclient.PermChecker
 
-	// config holds the server parameters used to create
-	// the JEM.
-	config *ServerParams
-
 	// pool holds the Pool from which the JEM instance
 	// was created.
 	pool *Pool
@@ -176,7 +197,6 @@ func (j *JEM) Clone() *JEM {
 	j.pool.refCount++
 	return &JEM{
 		DB:          db,
-		config:      &j.pool.config,
 		Bakery:      newBakery(db, j.pool.bakeryParams),
 		PermChecker: j.pool.permChecker,
 		pool:        j.pool,
