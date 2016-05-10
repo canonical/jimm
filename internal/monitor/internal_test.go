@@ -394,6 +394,58 @@ func (s *internalSuite) TestWatcherDialAPIError(c *gc.C) {
 	c.Assert(m.tomb.Err(), gc.ErrorMatches, "cannot dial API for controller bob/foo: fatal error")
 }
 
+// TestControllerMonitor tests that the controllerMonitor can be run with both the
+// lease updater and the watcher in place.
+func (s *internalSuite) TestControllerMonitor(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	info := s.APIInfo(c)
+	err := s.jem.AddController(&mongodoc.Controller{
+		Path:          ctlPath,
+		HostPorts:     info.Addrs,
+		CACert:        info.CACert,
+		AdminUser:     info.Tag.Id(),
+		AdminPassword: info.Password,
+	}, &mongodoc.Model{
+		UUID: info.ModelTag.Id(),
+	})
+	c.Assert(err, gc.IsNil)
+
+	// The controller monitor assumes that it already has the
+	// lease when started, so acquire the lease.
+	expiry, err := acquireLease(jemShim{s.jem}, ctlPath, time.Time{}, "", "jem1")
+	c.Assert(err, gc.IsNil)
+
+	jshim := newJEMShimWithUpdateNotify(s.jem)
+	m := newControllerMonitor(controllerMonitorParams{
+		ctlPath:     ctlPath,
+		jem:         jshim,
+		ownerId:     "jem1",
+		leaseExpiry: expiry,
+	})
+	defer worker.Stop(m)
+
+	// Advance the clock until the lease updater will need
+	// to renew the lease.
+	s.clock.Advance(leaseExpiryDuration * 5 / 6)
+
+	waitEvent(c, jshim.controllerStatsSet, "controller stats")
+	waitEvent(c, jshim.modelLifeSet, "model life")
+	waitEvent(c, jshim.leaseAcquired, "lease acquisition")
+	jshim.assertNoEvent(c)
+
+	s.assertControllerStats(c, ctlPath, mongodoc.ControllerStats{
+		ModelCount: 1,
+	})
+	s.assertModelLife(c, ctlPath, "alive")
+	s.assertLease(c, ctlPath, epoch.Add(leaseExpiryDuration*5/6+leaseExpiryDuration), "jem1")
+
+	err = worker.Stop(m)
+	c.Assert(err, gc.IsNil)
+
+	// Check that the lease has been dropped.
+	s.assertLease(c, ctlPath, time.Time{}, "")
+}
+
 func (s *internalSuite) assertControllerStats(c *gc.C, ctlPath params.EntityPath, stats mongodoc.ControllerStats) {
 	ctlDoc, err := s.jem.Controller(ctlPath)
 	c.Assert(err, gc.IsNil)

@@ -36,6 +36,48 @@ type controllerMonitor struct {
 	ownerId string
 }
 
+// controllerMonitorParams holds parameters for creating
+// a new controller monitor.
+type controllerMonitorParams struct {
+	jem         jemInterface
+	ctlPath     params.EntityPath
+	ownerId     string
+	leaseExpiry time.Time
+}
+
+// newControllerMonitor starts a new monitor to monitor one controller.
+func newControllerMonitor(p controllerMonitorParams) *controllerMonitor {
+	m := &controllerMonitor{
+		jem:         p.jem,
+		ctlPath:     p.ctlPath,
+		ownerId:     p.ownerId,
+		leaseExpiry: p.leaseExpiry,
+	}
+	// wrapMonitoringStopped turns errors with an errMonitoringStopped
+	// into tomb.ErrDying errors so they'll cause the tomb to exit
+	// without an error so the controller monitor will go away without
+	// taking down all the other controller monitors too.
+	wrapMonitoringStopped := func(f func() error) func() error {
+		return func() error {
+			err := f()
+			if errgo.Cause(err) == errMonitoringStopped {
+				return tomb.ErrDying
+			}
+			return err
+		}
+	}
+	m.tomb.Go(func() error {
+		m.tomb.Go(wrapMonitoringStopped(m.leaseUpdater))
+		m.tomb.Go(wrapMonitoringStopped(m.watcher))
+		m.tomb.Go(func() error {
+			<-m.tomb.Dying()
+			return nil
+		})
+		return nil
+	})
+	return m
+}
+
 // Kill implements worker.Worker.Kill by killing the controller monitor.
 func (m *controllerMonitor) Kill() {
 	m.tomb.Kill(nil)
