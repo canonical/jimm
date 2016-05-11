@@ -273,6 +273,9 @@ type TemplateResponse struct {
 	// Config holds the template's attributes, with all secret attributes
 	// replaced with their zero value.
 	Config map[string]interface{} `json:"config"`
+
+	// Location holds the location associated with the template.
+	Location map[string]string `json:"location,omitempty"`
 }
 
 // GetTemplate holds parameters for retrieving information on a template.
@@ -307,12 +310,12 @@ type ControllerResponse struct {
 	Schema environschema.Fields `json:"schema,omitempty"`
 
 	// Location holds location attributes associated with the controller.
-	Location map[string]string
 
 	// UnavailableSince holds the time that the JEM server
 	// noticed that the model's controller could not be
 	// contacted. It is empty when the model is available.
 	UnavailableSince *time.Time `json:"unavailable-since,omitempty"`
+	Location map[string]string `json:"location,omitempty"`
 }
 
 // GetController holds parameters for retrieving information on a Controller.
@@ -351,12 +354,12 @@ type NewModelInfo struct {
 
 	// Controller holds the path to the controller entity
 	// to use to start the model.
-	// This is optional and may not be available to all users.
+	// This is optional and may not be available to all user.
 	Controller *EntityPath `json:"controller,omitempty"`
 
 	// Location holds location attributes that narrow down the range
 	// of possible controllers to be used for the model.
-	Location map[string]string
+	Location map[string]string `json:"location,omitempty"`
 
 	// TemplatePaths optionally holds a sequence of templates to use
 	// to create the base configuration entry on top of which Config is applied.
@@ -437,7 +440,12 @@ type AddTemplateInfo struct {
 	// Controller holds the name of a controller to use
 	// as the base schema for the template. The Config attributes
 	// below will be checked against the schema of this controller.
-	Controller EntityPath `json:"controller"`
+	Controller *EntityPath `json:"controller,omitempty"`
+
+	// Location holds the location of the set of controllers
+	// that the template will be associated with.
+	// This is optional and may not be available to all user.
+	Location map[string]string `json:"location,omitempty"`
 
 	// Config holds the template's configuration attributes.
 	Config map[string]interface{} `json:"config"`

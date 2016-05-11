@@ -172,6 +172,9 @@ type Template struct {
 
 	// Config holds the configuration attributes associated with template.
 	Config map[string]interface{}
+
+	// Location holds the location attributes associated with the template.
+	Location map[string]string	`bson:",omitempty"`
 }
 
 func (t *Template) Owner() params.User {

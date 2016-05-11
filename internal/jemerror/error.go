@@ -34,14 +34,22 @@ func errToResp(err error) (int, interface{}) {
 	errorBody := errorResponseBody(err)
 	status := http.StatusInternalServerError
 	switch errorBody.Code {
-	case params.ErrNotFound, params.ErrAmbiguousLocation:
+	case params.ErrNotFound,
+		params.ErrAmbiguousLocation:
+
 		status = http.StatusNotFound
-	case params.ErrForbidden, params.ErrAlreadyExists:
+	case params.ErrForbidden,
+		params.ErrAlreadyExists:
+
 		status = http.StatusForbidden
-	case params.ErrBadRequest, httprequest.ErrUnmarshal:
+	case params.ErrBadRequest,
+		httprequest.ErrUnmarshal,
+		params.ErrIncompatibleTemplateLocations:
+
 		status = http.StatusBadRequest
 	case params.ErrUnauthorized:
 		status = http.StatusUnauthorized
+
 	case params.ErrMethodNotAllowed:
 		status = http.StatusMethodNotAllowed
 	}

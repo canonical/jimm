@@ -20,7 +20,7 @@ import (
 	"github.com/juju/juju/network"
 	"github.com/juju/loggo"
 	"github.com/juju/names"
-	"github.com/juju/schema"
+	jujuschema "github.com/juju/schema"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/environschema.v1"
 	"gopkg.in/mgo.v2"
@@ -178,18 +178,27 @@ func (h *Handler) GetController(arg *params.GetController) (*params.ControllerRe
 // If no controllers are matched, it will return an error with
 // a params.ErrNotFound cause.
 func (h *Handler) GetSchema(p httprequest.Params, arg *params.GetSchema) (*params.SchemaResponse, error) {
+	attrs, err := formToLocationAttrs(p.Request.Form)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
+	}
+	return h.schemaForLocation(attrs)
+}
+
+// schemaForLocation returns the schema for the controllers matching
+// the given location as a SchemaResponse.
+// If the controllers selected by the location are not compatible,
+// it returns an error with a params.ErrAmbiguousLocation cause.
+// If there are no controllers selected, it returns an error with a
+// params.ErrNotFound cause.
+func (h *Handler) schemaForLocation(location map[string]string) (*params.SchemaResponse, error) {
 	// TODO This will be insufficient when we can have several servers with the
 	// same provider type but different versions that could potentially have
 	// different configuration schemas. In that case, we could return a schema
 	// that's the intersection of all the matched schemas and check that it's
 	// valid for all of them before returning it.
-
-	attrs, err := formToLocationAttrs(p.Request.Form)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
-	}
 	providerType := ""
-	err = h.doControllers(attrs, func(ctl *mongodoc.Controller) error {
+	err := h.doControllers(location, func(ctl *mongodoc.Controller) error {
 		if providerType != "" && ctl.ProviderType != providerType {
 			return errgo.WithCausef(nil, params.ErrAmbiguousLocation, "ambiguous location matches controller of more than one type")
 		}
@@ -500,16 +509,9 @@ func (h *Handler) SetControllerLocation(arg *params.SetControllerLocation) error
 // along with the given templates.
 // Each template is applied in turn, then the configuration
 // is added on top of that.
-func (h *Handler) configWithTemplates(config map[string]interface{}, paths []params.EntityPath) (map[string]interface{}, error) {
+func (h *Handler) configWithTemplates(config map[string]interface{}, tmpls []*mongodoc.Template) map[string]interface{} {
 	result := make(map[string]interface{})
-	for _, path := range paths {
-		tmpl, err := h.jem.Template(path)
-		if err != nil {
-			return nil, errgo.NoteMask(err, fmt.Sprintf("cannot get template %q", path), errgo.Is(params.ErrNotFound))
-		}
-		if err := h.jem.CheckCanRead(tmpl); err != nil {
-			return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-		}
+	for _, tmpl := range tmpls {
 		for name, val := range tmpl.Config {
 			result[name] = val
 		}
@@ -517,7 +519,7 @@ func (h *Handler) configWithTemplates(config map[string]interface{}, paths []par
 	for name, val := range config {
 		result[name] = val
 	}
-	return result, nil
+	return result
 }
 
 // NewModel creates a new model inside an existing Controller.
@@ -525,9 +527,20 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 	if err := h.jem.CheckIsUser(args.User); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	ctlPath, err := h.selectController(&args.Info)
+	tmpls, err := h.getTemplates(args.Info.TemplatePaths)
 	if err != nil {
-		return nil, errgo.NoteMask(err, "cannot select controller", errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound))
+		if errgo.Cause(err) == params.ErrNotFound {
+			err = errgo.WithCausef(err, params.ErrBadRequest, "%s", "")
+		}
+		return nil, errgo.NoteMask(err, "invalid template provided", errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
+	}
+	tmplLocation, err := h.locationForTemplates(tmpls)
+	if err != nil {
+		return nil, errgo.NoteMask(err, "invalid templates", errgo.Is(params.ErrIncompatibleTemplateLocations))
+	}
+	ctlPath, err := h.selectController(&args.Info, tmplLocation)
+	if err != nil {
+		return nil, errgo.NoteMask(err, "cannot select controller", errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound), errgo.Is(params.ErrIncompatibleTemplateLocations))
 	}
 	if err := h.jem.CheckReadACL(h.jem.DB.Controllers(), ctlPath); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
@@ -542,13 +555,7 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	config, err := h.configWithTemplates(args.Info.Config, args.Info.TemplatePaths)
-	if err != nil {
-		if errgo.Cause(err) == params.ErrNotFound {
-			return nil, badRequestf(err, "invalid template provided")
-		}
-		return nil, err
-	}
+	config := h.configWithTemplates(args.Info.Config, tmpls)
 	// Ensure that the attributes look reasonably OK before bothering
 	// the controller with them.
 	attrs, err := neSchema.checker.Coerce(config, nil)
@@ -607,11 +614,16 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 
 // selectController selects a controller suitable for starting a new model in,
 // based on the criteria specified in info, and returns its path.
-func (h *Handler) selectController(info *params.NewModelInfo) (params.EntityPath, error) {
+func (h *Handler) selectController(info *params.NewModelInfo, tmplLocation map[string]string) (params.EntityPath, error) {
 	if info.Controller != nil {
 		return *info.Controller, nil
 	}
-	q, err := h.jem.ControllerLocationQuery(info.Location)
+	location := make(map[string]string)
+	mergeLocations(location, tmplLocation)
+	if !mergeLocations(location, info.Location) {
+		return params.EntityPath{}, errgo.WithCausef(nil, params.ErrIncompatibleTemplateLocations, "specified location is incompatible with templates")
+	}
+	q, err := h.jem.ControllerLocationQuery(location)
 	if err != nil {
 		return params.EntityPath{}, errgo.WithCausef(err, params.ErrBadRequest, "%s", "")
 	}
@@ -652,14 +664,30 @@ func (h *Handler) addTemplate(path params.EntityPath, info params.AddTemplateInf
 	if err := h.jem.CheckIsUser(path.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	neSchema, err := h.schemaForNewModel(info.Controller)
-	if err != nil {
-		return errgo.Notef(err, "cannot get schema for controller")
+	var schema environschema.Fields
+	var providerType string
+	if info.Controller != nil {
+		if len(info.Location) > 0 {
+			return badRequestf(nil, "cannot specify location with explicit controller")
+		}
+		neSchema, err := h.schemaForNewModel(*info.Controller)
+		if err != nil {
+			return errgo.Notef(err, "cannot get schema for controller")
+		}
+		schema = neSchema.schema
+		providerType = neSchema.providerType
+	} else {
+		r, err := h.schemaForLocation(info.Location)
+		if err != nil {
+			return errgo.NoteMask(err, "cannot get schema for controller", errgo.Is(params.ErrNotFound), errgo.Is(params.ErrAmbiguousLocation))
+		}
+		schema = r.Schema
+		providerType = r.ProviderType
 	}
 
-	fields, defaults, err := neSchema.schema.ValidationSchema()
+	fields, defaults, err := schema.ValidationSchema()
 	if err != nil {
-		return errgo.Notef(err, "cannot create validation schema for provider %s", neSchema.providerType)
+		return errgo.Notef(err, "cannot create validation schema for provider %s", providerType)
 	}
 	// Delete all fields and defaults that are not in the
 	// provided configuration attributes, so that we can
@@ -675,14 +703,15 @@ func (h *Handler) addTemplate(path params.EntityPath, info params.AddTemplateInf
 			delete(defaults, name)
 		}
 	}
-	result, err := schema.StrictFieldMap(fields, defaults).Coerce(info.Config, nil)
+	result, err := jujuschema.StrictFieldMap(fields, defaults).Coerce(info.Config, nil)
 	if err != nil {
 		return badRequestf(err, "configuration not compatible with schema")
 	}
 	if err := h.jem.AddTemplate(&mongodoc.Template{
-		Path:   path,
-		Schema: neSchema.schema,
-		Config: result.(map[string]interface{}),
+		Path:     path,
+		Schema:   schema,
+		Config:   result.(map[string]interface{}),
+		Location: info.Location,
 	}, overwrite); err != nil {
 		if errgo.Cause(err) == params.ErrAlreadyExists {
 			return badRequestf(err, "%s", "")
@@ -703,9 +732,10 @@ func (h *Handler) GetTemplate(arg *params.GetTemplate) (*params.TemplateResponse
 	}
 	hideTemplateSecrets(tmpl)
 	return &params.TemplateResponse{
-		Path:   arg.EntityPath,
-		Schema: tmpl.Schema,
-		Config: tmpl.Config,
+		Path:     arg.EntityPath,
+		Schema:   tmpl.Schema,
+		Config:   tmpl.Config,
+		Location: tmpl.Location,
 	}, nil
 }
 
@@ -743,9 +773,10 @@ func (h *Handler) ListTemplates(arg *params.ListTemplates) (*params.ListTemplate
 	for iter.Next(&tmpl) {
 		hideTemplateSecrets(&tmpl)
 		tmpls = append(tmpls, params.TemplateResponse{
-			Path:   tmpl.Path,
-			Schema: tmpl.Schema,
-			Config: tmpl.Config,
+			Path:     tmpl.Path,
+			Schema:   tmpl.Schema,
+			Config:   tmpl.Config,
+			Location: tmpl.Location,
 		})
 	}
 	if err := iter.Err(); err != nil {
@@ -881,7 +912,7 @@ func (h *Handler) ensureUser(conn *apiconn.Conn, user string, ctlName params.Ent
 type schemaForNewModel struct {
 	providerType string
 	schema       environschema.Fields
-	checker      schema.Checker
+	checker      jujuschema.Checker
 	skeleton     map[string]interface{}
 }
 
@@ -910,7 +941,7 @@ func (h *Handler) schemaForNewModel(ctlPath params.EntityPath) (*schemaForNewMod
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot create validation schema for provider %s", neSchema.providerType)
 	}
-	neSchema.checker = schema.FieldMap(fields, defaults)
+	neSchema.checker = jujuschema.FieldMap(fields, defaults)
 	return &neSchema, nil
 }
 
@@ -1020,4 +1051,52 @@ func formToLocationAttrs(form url.Values) (map[string]string, error) {
 		}
 	}
 	return attrs, nil
+}
+
+// getTemplates gets the templates at all the given paths.
+// It returns a params.ErrNotFound error if any of them
+// aren't found, or params.ErrUnauthorized if the user
+// doesn't have permission to access them.
+func (h *Handler) getTemplates(paths []params.EntityPath) ([]*mongodoc.Template, error) {
+	tmpls := make([]*mongodoc.Template, len(paths))
+	for i, path := range paths {
+		tmpl, err := h.jem.Template(path)
+		if err != nil {
+			return nil, errgo.NoteMask(err, fmt.Sprintf("cannot get template %q", path), errgo.Is(params.ErrNotFound))
+		}
+		if err := h.jem.CheckCanRead(tmpl); err != nil {
+			return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+		}
+		tmpls[i] = tmpl
+	}
+	return tmpls, nil
+}
+
+// locationForTemplates returns the location implied by the given
+// templates. If the locations are not compatible, it returns a
+// params.ErrIncompatibleTemplateLocations error.
+func (h *Handler) locationForTemplates(tmpls []*mongodoc.Template) (map[string]string, error) {
+	loc := make(map[string]string)
+	for _, tmpl := range tmpls {
+		if !mergeLocations(loc, tmpl.Location) {
+			return nil, errgo.WithCausef(nil, params.ErrIncompatibleTemplateLocations, "template %v is incompatible with earlier templates", tmpl.Path)
+		}
+	}
+	return loc, nil
+}
+
+// mergeLocations adds all the attributes in loc1 to loc0;
+// it reports whether the merge succeeded - the merge
+// will fail if the two maps have attributes with the same
+// name but different values.
+// TODO refactor things so that we can produce a nicer
+// error message that says what the incompatiblity was.
+func mergeLocations(loc0, loc1 map[string]string) bool {
+	for attr, val := range loc1 {
+		if v, ok := loc0[attr]; ok && v != val {
+			return false
+		}
+		loc0[attr] = val
+	}
+	return true
 }
