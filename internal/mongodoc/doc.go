@@ -69,6 +69,11 @@ type Controller struct {
 
 	// Stats holds runtime information about the controller.
 	Stats ControllerStats
+
+	// UnavailableSince is empty when the controller is marked
+	// as available; otherwise it holds the time when it became
+	// unavailable.
+	UnavailableSince time.Time `bson:",omitempty"`
 }
 
 // ControllerStats holds statistics about a controller.

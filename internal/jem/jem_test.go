@@ -193,6 +193,57 @@ func (s *jemSuite) TestSetControllerLocation(c *gc.C) {
 	c.Assert(ctl.Location, gc.DeepEquals, map[string]string{"region": "us-east1"})
 }
 
+func (s *jemSuite) TestSetControllerAvailability(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "x"}
+	ctl := &mongodoc.Controller{
+		Path: ctlPath,
+	}
+	err := s.store.AddController(ctl, &mongodoc.Model{})
+
+	// Check that we can mark it as unavailable.
+	t0 := time.Now()
+	err = s.store.SetControllerUnavailableAt(ctlPath, t0)
+	c.Assert(err, gc.IsNil)
+
+	ctl, err = s.store.Controller(ctlPath)
+	c.Assert(err, gc.IsNil)
+	c.Assert(ctl.UnavailableSince.UTC(), jc.DeepEquals, mongodoc.Time(t0).UTC())
+
+	// Check that if we mark it unavailable again, it doesn't
+	// have any affect.
+	err = s.store.SetControllerUnavailableAt(ctlPath, t0.Add(time.Second))
+	c.Assert(err, gc.IsNil)
+
+	ctl, err = s.store.Controller(ctlPath)
+	c.Assert(err, gc.IsNil)
+	c.Assert(ctl.UnavailableSince.UTC(), jc.DeepEquals, mongodoc.Time(t0).UTC())
+
+	// Check that we can mark it as available again.
+	err = s.store.SetControllerAvailable(ctlPath)
+	c.Assert(err, gc.IsNil)
+
+	ctl, err = s.store.Controller(ctlPath)
+	c.Assert(err, gc.IsNil)
+	c.Assert(ctl.UnavailableSince, jc.Satisfies, time.Time.IsZero)
+
+	t1 := t0.Add(3 * time.Second)
+	// ... and that we can mark it as unavailable after that.
+	err = s.store.SetControllerUnavailableAt(ctlPath, t1)
+	c.Assert(err, gc.IsNil)
+
+	ctl, err = s.store.Controller(ctlPath)
+	c.Assert(err, gc.IsNil)
+	c.Assert(ctl.UnavailableSince.UTC(), jc.DeepEquals, mongodoc.Time(t1).UTC())
+}
+
+func (s *jemSuite) TestSetControllerAvailabilityWithNotFoundController(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "x"}
+	err := s.store.SetControllerUnavailableAt(ctlPath, time.Now())
+	c.Assert(err, gc.IsNil)
+	err = s.store.SetControllerAvailable(ctlPath)
+	c.Assert(err, gc.IsNil)
+}
+
 func (s *jemSuite) TestControllerLocationQuery(c *gc.C) {
 	for _, ctl := range []*mongodoc.Controller{{
 		Path: params.EntityPath{"bob", "aws-us-east-1"},

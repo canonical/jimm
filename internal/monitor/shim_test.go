@@ -15,19 +15,21 @@ import (
 	"github.com/CanonicalLtd/jem/params"
 )
 
-func newJEMShimWithUpdateNotify(j *jem.JEM) jemShimWithUpdateNotify {
+func newJEMShimWithUpdateNotify(j jemInterface) jemShimWithUpdateNotify {
 	return jemShimWithUpdateNotify{
-		controllerStatsSet: make(chan struct{}, 10),
-		modelLifeSet:       make(chan struct{}, 10),
-		leaseAcquired:      make(chan struct{}, 10),
-		jemInterface:       jemShim{j},
+		controllerStatsSet:        make(chan struct{}, 10),
+		modelLifeSet:              make(chan struct{}, 10),
+		leaseAcquired:             make(chan struct{}, 10),
+		controllerAvailabilitySet: make(chan struct{}, 10),
+		jemInterface:              j,
 	}
 }
 
 type jemShimWithUpdateNotify struct {
-	controllerStatsSet chan struct{}
-	modelLifeSet       chan struct{}
-	leaseAcquired      chan struct{}
+	controllerStatsSet        chan struct{}
+	modelLifeSet              chan struct{}
+	leaseAcquired             chan struct{}
+	controllerAvailabilitySet chan struct{}
 	jemInterface
 }
 
@@ -53,7 +55,6 @@ func (s jemShimWithUpdateNotify) assertNoEvent(c *gc.C) {
 }
 
 func (s jemShimWithUpdateNotify) SetControllerStats(ctlPath params.EntityPath, stats *mongodoc.ControllerStats) error {
-	logger.Infof("SetControllerStats called %v %#v", ctlPath, stats)
 	if err := s.jemInterface.SetControllerStats(ctlPath, stats); err != nil {
 		return err
 	}
@@ -61,8 +62,23 @@ func (s jemShimWithUpdateNotify) SetControllerStats(ctlPath params.EntityPath, s
 	return nil
 }
 
+func (s jemShimWithUpdateNotify) SetControllerUnavailableAt(ctlPath params.EntityPath, t time.Time) error {
+	if err := s.jemInterface.SetControllerUnavailableAt(ctlPath, t); err != nil {
+		return err
+	}
+	s.controllerAvailabilitySet <- struct{}{}
+	return nil
+}
+
+func (s jemShimWithUpdateNotify) SetControllerAvailable(ctlPath params.EntityPath) error {
+	if err := s.jemInterface.SetControllerAvailable(ctlPath); err != nil {
+		return err
+	}
+	s.controllerAvailabilitySet <- struct{}{}
+	return nil
+}
+
 func (s jemShimWithUpdateNotify) SetModelLife(ctlPath params.EntityPath, uuid string, life string) error {
-	logger.Infof("SetModelLife called %v %v %v", ctlPath, uuid, life)
 	if err := s.jemInterface.SetModelLife(ctlPath, uuid, life); err != nil {
 		return err
 	}
@@ -166,6 +182,26 @@ func (s *jemShimInMemory) SetControllerStats(ctlPath params.EntityPath, stats *m
 		return errgo.WithCausef(nil, params.ErrNotFound, "")
 	}
 	ctl.Stats = *stats
+	return nil
+}
+
+func (s *jemShimInMemory) SetControllerAvailable(ctlPath params.EntityPath) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ctl, ok := s.controllers[ctlPath]
+	if ok {
+		ctl.UnavailableSince = time.Time{}
+	}
+	return nil
+}
+
+func (s *jemShimInMemory) SetControllerUnavailableAt(ctlPath params.EntityPath, t time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ctl, ok := s.controllers[ctlPath]
+	if ok && ctl.UnavailableSince.IsZero() {
+		ctl.UnavailableSince = mongodoc.Time(t)
+	}
 	return nil
 }
 
