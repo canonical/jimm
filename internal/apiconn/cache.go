@@ -70,7 +70,7 @@ func (cache *Cache) EvictAll() {
 // responsibility of the caller to ensure this.
 //
 // The cause of any error returned from dial will be
-// returned intact.
+// returned unmasked.
 func (cache *Cache) OpenAPI(
 	envUUID string,
 	dial func() (api.Connection, *api.Info, error),

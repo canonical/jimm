@@ -15,6 +15,8 @@ import (
 	"github.com/CanonicalLtd/jem/params"
 )
 
+var errControllerRemoved = errgo.New("controller has been removed")
+
 // controllerMonitor is responsible for monitoring a single
 // controller.
 type controllerMonitor struct {
@@ -53,26 +55,9 @@ func newControllerMonitor(p controllerMonitorParams) *controllerMonitor {
 		ownerId:     p.ownerId,
 		leaseExpiry: p.leaseExpiry,
 	}
-	// wrapMonitoringStopped turns errors with an errMonitoringStopped
-	// into tomb.ErrDying errors so they'll cause the tomb to exit
-	// without an error so the controller monitor will go away without
-	// taking down all the other controller monitors too.
-	wrapMonitoringStopped := func(f func() error) func() error {
-		return func() error {
-			err := f()
-			if errgo.Cause(err) == errMonitoringStopped {
-				return tomb.ErrDying
-			}
-			return err
-		}
-	}
 	m.tomb.Go(func() error {
-		m.tomb.Go(wrapMonitoringStopped(m.leaseUpdater))
-		m.tomb.Go(wrapMonitoringStopped(m.watcher))
-		m.tomb.Go(func() error {
-			<-m.tomb.Dying()
-			return nil
-		})
+		m.tomb.Go(m.leaseUpdater)
+		m.tomb.Go(m.watcher)
 		return nil
 	})
 	return m
@@ -95,8 +80,6 @@ func (m *controllerMonitor) Dead() <-chan struct{} {
 	return m.tomb.Dead()
 }
 
-var errMonitoringStopped = errgo.New("monitoring stopped because lease lost or controller removed")
-
 // leaseUpdater is responsible for updating the controller's lease
 // as long as we still have the lease, the controller still exists,
 // and the monitor is still alive.
@@ -110,14 +93,14 @@ func (m *controllerMonitor) leaseUpdater() error {
 			// Try to drop the lease because the monitor might
 			// not be starting again on this JEM instance.
 			if err := m.renewLease(false); err != nil {
-				return errgo.NoteMask(err, "cannot drop lease", errgo.Is(errMonitoringStopped))
+				return errgo.NoteMask(err, "cannot drop lease", isMonitoringStoppedError)
 			}
 			return tomb.ErrDying
 		}
 		// It's time to renew the lease.
 		if err := m.renewLease(true); err != nil {
 			msg := fmt.Sprintf("cannot renew lease on %v", m.ctlPath)
-			return errgo.NoteMask(err, msg, errgo.Is(errMonitoringStopped))
+			return errgo.NoteMask(err, msg, isMonitoringStoppedError)
 		}
 	}
 }
@@ -126,8 +109,8 @@ func (m *controllerMonitor) leaseUpdater() error {
 // and updates the m.leaseExpiry to be the new lease expiry time.
 //
 // If the lease cannot be renewed because someone else
-// has acquired it or the controller has been removed,
-// it returns an error with an errMonitoringStopped cause.
+// has acquired it, it returns an error with a jem.Err or the controller has been removed,
+// it returns an error with a cause that satisfies isMonitoringStoppedError.
 func (m *controllerMonitor) renewLease(renew bool) error {
 	var ownerId string
 	if renew {
@@ -140,28 +123,27 @@ func (m *controllerMonitor) renewLease(renew bool) error {
 		return nil
 	}
 	logger.Infof("controller %v acquire lease failed: %v", m.ctlPath, err)
-	return errgo.Mask(err, errgo.Is(errMonitoringStopped))
+	return errgo.Mask(err, isMonitoringStoppedError)
 }
 
 // acquireLease is like jem.JEM.AcquireMonitorLease except that
-// it returns errMonitoringStopped if the controller has been
-// removed or the lease is unavailable,
+// it returns errControllerRemoved if the controller has been
+// removed or jem.ErrLeaseUnavailable if the lease is unavailable,
 // and it always acquires a lease leaseExpiryDuration from now.
 func acquireLease(j jemInterface, ctlPath params.EntityPath, oldExpiry time.Time, oldOwner, newOwner string) (time.Time, error) {
 	t, err := j.AcquireMonitorLease(ctlPath, oldExpiry, oldOwner, Clock.Now().Add(leaseExpiryDuration), newOwner)
-	switch errgo.Cause(err) {
-	case nil:
+	if err == nil {
 		return t, nil
-	case jem.ErrLeaseUnavailable, params.ErrNotFound:
-		return time.Time{}, errgo.WithCausef(err, errMonitoringStopped, "%s", "")
-	default:
-		return time.Time{}, errgo.Mask(err)
 	}
+	if errgo.Cause(err) == params.ErrNotFound {
+		err = errControllerRemoved
+	}
+	return time.Time{}, errgo.Mask(err, isMonitoringStoppedError)
 }
 
 // watcher runs the controller monitor watcher itself.
-// It returns errMonitoringStopped if m.tomb is killed
-// or the controller is removed.
+// It returns an error satisfying isMonitoringStoppedError if
+// the controller is removed.
 func (m *controllerMonitor) watcher() error {
 	for {
 		logger.Debugf("monitor dialing controller %v", m.ctlPath)
@@ -171,17 +153,14 @@ func (m *controllerMonitor) watcher() error {
 			err := m.watch(conn)
 			conn.Close()
 			if errgo.Cause(err) == tomb.ErrDying {
-				return errMonitoringStopped
+				return tomb.ErrDying
 			}
 			if err != nil {
 				logger.Infof("watch controller %v died: %v", m.ctlPath, err)
 			}
-		case params.ErrNotFound:
-			logger.Infof("watch controller %v terminating because controller was removed", m.ctlPath)
-			return errMonitoringStopped
 		case tomb.ErrDying:
 			// The controller has been removed or we've been explicitly stopped.
-			return errMonitoringStopped
+			return tomb.ErrDying
 		case jem.ErrAPIConnection:
 			// We've failed to connect to the API. Log the error and
 			// try again.
@@ -191,14 +170,14 @@ func (m *controllerMonitor) watcher() error {
 			select {
 			case <-m.tomb.Dying():
 				// The controllerMonitor is dying.
-				return errMonitoringStopped
+				return tomb.ErrDying
 			case <-Clock.After(apiConnectRetryDuration):
 			}
 		default:
-			// Some other error has happened (probably a mongo
-			// failure), so die with an error which will force everything
-			// to tear down.
-			return errgo.Notef(err, "cannot dial API for controller %v", m.ctlPath)
+			// Some other error has happened. Don't mask the monitor-stopped
+			// error that occurs if the controller is removed, because
+			// we want the controller monitor to die quietly in that case.
+			return errgo.NoteMask(err, fmt.Sprintf("cannot dial API for controller %v", m.ctlPath), isMonitoringStoppedError)
 		}
 	}
 }
@@ -206,7 +185,7 @@ func (m *controllerMonitor) watcher() error {
 // dialAPI makes an API connection while also monitoring for shutdown.
 // If the tomb starts dying while dialing, it returns tomb.ErrDying. If
 // we can't make an API connection because the controller has been
-// removed, it returns an error with a params.ErrNotFound cause. If it
+// removed, it returns an error with an errControllerRemoved cause. If it
 // can't make a connection because the dial itself failed, it returns an
 // error with a jem.ErrAPIConnection cause.
 func (m *controllerMonitor) dialAPI() (jujuAPI, error) {
@@ -227,6 +206,7 @@ func (m *controllerMonitor) dialAPI() (jujuAPI, error) {
 		// so that if our reply causes everything to be stopped,
 		// we know that the JEM is closed before that.
 		j.Close()
+		logger.Infof("openAPI returned error %v", err)
 		reply <- apiConnReply{
 			conn: conn,
 			err:  err,
@@ -234,7 +214,10 @@ func (m *controllerMonitor) dialAPI() (jujuAPI, error) {
 	}()
 	select {
 	case r := <-reply:
-		return r.conn, errgo.Mask(r.err, errgo.Is(params.ErrNotFound), errgo.Is(jem.ErrAPIConnection))
+		if errgo.Cause(r.err) == params.ErrNotFound {
+			r.err = errControllerRemoved
+		}
+		return r.conn, errgo.Mask(r.err, isMonitoringStoppedError, errgo.Is(jem.ErrAPIConnection))
 	case <-m.tomb.Dying():
 		return nil, tomb.ErrDying
 	}
@@ -391,4 +374,9 @@ func (w *watcherState) setModelLife(uuid string, life multiwatcher.Life) error {
 	}
 	w.modelLife[uuid] = life
 	return nil
+}
+
+func isMonitoringStoppedError(err error) bool {
+	cause := errgo.Cause(err)
+	return cause == errControllerRemoved || cause == jem.ErrLeaseUnavailable
 }
