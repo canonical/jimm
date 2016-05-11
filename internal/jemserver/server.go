@@ -3,6 +3,8 @@
 package jemserver
 
 import (
+	"crypto/rand"
+	"fmt"
 	"net/http"
 	"net/url"
 
@@ -17,6 +19,7 @@ import (
 	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jem/internal/jem"
+	"github.com/CanonicalLtd/jem/internal/monitor"
 )
 
 var logger = loggo.GetLogger("jem.internal.jemserver")
@@ -50,6 +53,13 @@ type Params struct {
 	AgentKey      *bakery.KeyPair
 }
 
+// Server represents a JEM HTTP server.
+type Server struct {
+	router  *httprouter.Router
+	pool    *jem.Pool
+	monitor *monitor.Monitor
+}
+
 // New returns a new handler that handles model manager
 // requests and stores its data in the given database.
 // The returned handler should be closed when finished
@@ -81,9 +91,14 @@ func New(config Params, versions map[string]NewAPIHandlerFunc) (*Server, error) 
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make store")
 	}
+	owner, err := monitorLeaseOwner(config.AgentUsername)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
 	srv := &Server{
-		router: httprouter.New(),
-		pool:   p,
+		router:  httprouter.New(),
+		pool:    p,
+		monitor: monitor.New(p, owner),
 	}
 	for name, newAPI := range versions {
 		handlers, err := newAPI(p, config)
@@ -98,7 +113,16 @@ func New(config Params, versions map[string]NewAPIHandlerFunc) (*Server, error) 
 			}
 		}
 	}
+
 	return srv, nil
+}
+
+func monitorLeaseOwner(agentName string) (string, error) {
+	var buf [16]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		return "", errgo.Notef(err, "cannot make random owner")
+	}
+	return fmt.Sprintf("%s-%x", agentName, buf), nil
 }
 
 func newIdentityClient(config Params) (*idmclient.Client, error) {
@@ -115,11 +139,6 @@ func newIdentityClient(config Params) (*idmclient.Client, error) {
 		BaseURL: config.IdentityLocation,
 		Client:  bclient,
 	}), nil
-}
-
-type Server struct {
-	router *httprouter.Router
-	pool   *jem.Pool
 }
 
 // ServeHTTP implements http.Handler.Handle.
@@ -147,6 +166,10 @@ func (srv *Server) options(http.ResponseWriter, *http.Request, httprouter.Params
 // Close implements io.Closer.Close. It should not be called
 // until all requests on the handler have completed.
 func (srv *Server) Close() error {
+	srv.monitor.Kill()
+	if err := srv.monitor.Wait(); err != nil {
+		logger.Warningf("error shutting down monitor: %v", err)
+	}
 	srv.pool.Close()
 	return nil
 }
