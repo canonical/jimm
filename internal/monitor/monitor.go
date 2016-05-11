@@ -93,7 +93,6 @@ func (m *Monitor) run() error {
 	}
 }
 
-
 func newAllMonitor(jem jemInterface, ownerId string) *allMonitor {
 	m := &allMonitor{
 		jem:               jem,
@@ -254,7 +253,7 @@ func (m *allMonitor) startMonitors() error {
 			continue
 		}
 		newExpiry, err := acquireLease(m.jem, ctl.Path, ctl.MonitorLeaseExpiry, ctl.MonitorLeaseOwner, m.ownerId)
-		if errgo.Cause(err) == errMonitoringStopped {
+		if isMonitoringStoppedError(err) {
 			logger.Infof("cannot acquire lease on %v: %v", ctl.Path, err)
 			// Someone else got there first.
 			continue
@@ -283,6 +282,9 @@ func (m *allMonitor) startMonitors() error {
 			err := ctlMonitor.Wait()
 			logger.Infof("controller monitor died (path %v): %v", ctl.Path, err)
 			m.controllerRemoved <- ctl.Path
+			if isMonitoringStoppedError(err) {
+				return nil
+			}
 			return errgo.Mask(err)
 		})
 	}

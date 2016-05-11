@@ -157,8 +157,9 @@ func (s *internalSuite) TestLeaseUpdaterWhenControllerRemoved(c *gc.C) {
 	case <-time.After(jujutesting.LongWait):
 		c.Fatalf("lease updater never stopped")
 	}
-	c.Assert(err, gc.ErrorMatches, `cannot renew lease on bob/foo: controller removed`)
-	c.Assert(errgo.Cause(err), gc.Equals, errMonitoringStopped)
+	c.Assert(err, gc.ErrorMatches, `cannot renew lease on bob/foo: controller has been removed`)
+	c.Assert(errgo.Cause(err), gc.Equals, errControllerRemoved)
+	c.Assert(err, jc.Satisfies, isMonitoringStoppedError)
 }
 
 func (s *internalSuite) TestWatcher(c *gc.C) {
@@ -209,14 +210,7 @@ func (s *internalSuite) TestWatcher(c *gc.C) {
 		ownerId: "jem1",
 	}
 	m.tomb.Go(m.watcher)
-	// Ensure we always wait for the watcher to stop, otherwise
-	// it can use the JEM connection after the test returns, with
-	// nasty results.
-	defer func() {
-		m.tomb.Kill(nil)
-		err := m.tomb.Wait()
-		c.Check(errgo.Cause(err), gc.Equals, errMonitoringStopped)
-	}()
+	defer cleanStop(c, m)
 
 	// The watcher should set the model life and the
 	// controller stats. We have two models, so we'll see
@@ -306,14 +300,7 @@ func (s *internalSuite) TestWatcherKilledWhileDialingAPI(c *gc.C) {
 		ownerId: "jem1",
 	}
 	m.tomb.Go(m.watcher)
-	// Ensure we always wait for the watcher to stop, otherwise
-	// it can use the JEM connection after the test returns, with
-	// nasty results.
-	defer func() {
-		m.tomb.Kill(nil)
-		err := m.tomb.Wait()
-		c.Check(errgo.Cause(err), gc.Equals, errMonitoringStopped)
-	}()
+	defer cleanStop(c, m)
 
 	// Wait for the API to be opened.
 	waitEvent(c, openCh, "open API")
@@ -323,7 +310,7 @@ func (s *internalSuite) TestWatcherKilledWhileDialingAPI(c *gc.C) {
 	m.tomb.Kill(nil)
 	waitEvent(c, m.tomb.Dead(), "watcher termination")
 	err = m.tomb.Wait()
-	c.Check(errgo.Cause(err), gc.Equals, errMonitoringStopped)
+	c.Check(err, gc.Equals, nil)
 
 	// Let the asynchronously started API opener terminate.
 	openCh <- struct{}{}
@@ -357,15 +344,12 @@ func (s *internalSuite) TestWatcherDialAPIError(c *gc.C) {
 		ownerId: "jem1",
 	}
 	m.tomb.Go(m.watcher)
-	// Ensure we always wait for the watcher to stop, otherwise
-	// it can use the JEM connection after the test returns, with
-	// nasty results.
 	defer worker.Stop(m)
 
 	// First send a jem.ErrAPIConnection error. This should cause the
 	// watcher to pause for a while and retry.
 	select {
-	case apiErrorCh <- errgo.WithCausef(nil, jem.ErrAPIConnection, ""):
+	case apiErrorCh <- errgo.WithCausef(nil, jem.ErrAPIConnection, "faked api connection error"):
 	case <-time.After(jujutesting.LongWait):
 		c.Fatalf("timed out waiting for API connection")
 	}
@@ -390,7 +374,7 @@ func (s *internalSuite) TestWatcherDialAPIError(c *gc.C) {
 	// watcher to die.
 	waitEvent(c, m.tomb.Dead(), "watcher dead")
 
-	c.Assert(m.tomb.Err(), gc.ErrorMatches, "cannot dial API for controller bob/foo: fatal error")
+	c.Assert(m.Wait(), gc.ErrorMatches, "cannot dial API for controller bob/foo: fatal error")
 }
 
 // TestControllerMonitor tests that the controllerMonitor can be run with both the
@@ -443,6 +427,40 @@ func (s *internalSuite) TestControllerMonitor(c *gc.C) {
 
 	// Check that the lease has been dropped.
 	s.assertLease(c, ctlPath, time.Time{}, "")
+}
+
+func (s *internalSuite) TestControllerMonitorDiesWithMonitoringStoppedErrorWhenControllerIsRemoved(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	info := s.APIInfo(c)
+	err := s.jem.AddController(&mongodoc.Controller{
+		Path:          ctlPath,
+		HostPorts:     info.Addrs,
+		CACert:        info.CACert,
+		AdminUser:     info.Tag.Id(),
+		AdminPassword: info.Password,
+	}, &mongodoc.Model{
+		UUID: info.ModelTag.Id(),
+	})
+	c.Assert(err, gc.IsNil)
+
+	// The controller monitor assumes that it already has the
+	// lease when started, so acquire the lease.
+	expiry, err := acquireLease(jemShim{s.jem}, ctlPath, time.Time{}, "", "jem1")
+	c.Assert(err, gc.IsNil)
+
+	m := newControllerMonitor(controllerMonitorParams{
+		ctlPath:     ctlPath,
+		jem:         jemShim{s.jem},
+		ownerId:     "jem1",
+		leaseExpiry: expiry,
+	})
+	defer worker.Stop(m)
+	err = s.jem.DeleteController(ctlPath)
+	c.Assert(err, gc.IsNil)
+	waitEvent(c, m.Dead(), "monitor dead")
+	err = m.Wait()
+	c.Assert(err, jc.Satisfies, isMonitoringStoppedError)
+	c.Assert(errgo.Cause(err), gc.Equals, errControllerRemoved)
 }
 
 func (s *internalSuite) TestAllMonitorSingleControllerWithAPIError(c *gc.C) {
@@ -808,7 +826,6 @@ func waitEvent(c *gc.C, ch <-chan struct{}, what string) {
 	select {
 	case <-ch:
 	case <-time.After(jujutesting.LongWait):
-		select {}
 		c.Fatalf("timed out waiting for %s", what)
 	}
 }
@@ -819,4 +836,9 @@ func assertNoEvent(c *gc.C, ch <-chan struct{}, what string) {
 		c.Fatalf("unexpected event received: %v", what)
 	case <-time.After(jujutesting.ShortWait):
 	}
+}
+
+func cleanStop(c *gc.C, w worker.Worker) {
+	err := worker.Stop(w)
+	c.Check(err, gc.IsNil)
 }
