@@ -8,7 +8,7 @@ import (
 	"github.com/juju/cmd"
 	"github.com/juju/juju/juju"
 
-	"github.com/CanonicalLtd/jem/cmd/juju-jem/jemcmd"
+	"github.com/CanonicalLtd/jem/cmd/jaas-model/jemcmd"
 )
 
 func main() {
