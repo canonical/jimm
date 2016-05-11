@@ -3,6 +3,7 @@ package params
 import (
 	"bytes"
 	"fmt"
+	"time"
 
 	"github.com/juju/httprequest"
 	"gopkg.in/errgo.v1"
@@ -307,6 +308,11 @@ type ControllerResponse struct {
 
 	// Location holds location attributes associated with the controller.
 	Location map[string]string
+
+	// UnavailableSince holds the time that the JEM server
+	// noticed that the model's controller could not be
+	// contacted. It is empty when the model is available.
+	UnavailableSince *time.Time `json:"unavailable-since,omitempty"`
 }
 
 // GetController holds parameters for retrieving information on a Controller.
@@ -396,6 +402,16 @@ type ModelResponse struct {
 	// HostPorts holds host/port pairs (in host:port form)
 	// of the controller API endpoints.
 	HostPorts []string `json:"host-ports"`
+
+	// Life holds the last reported lifecycle status of the model.
+	// It is omitted when we have no information on the model's
+	// life yet.
+	Life string `json:"life,omitempty"`
+
+	// UnavailableSince holds the time that the JEM server
+	// noticed that the model's controller could not be
+	// contacted. It is empty when the model is available.
+	UnavailableSince *time.Time `json:"unavailable-since,omitempty"`
 }
 
 // AddTemplate holds parameters for adding or updating a template.

@@ -320,9 +320,8 @@ func (j *JEM) SetModelManagedUser(modelName params.EntityPath, user string, info
 // Note that this operation is not atomic.
 func (j *JEM) DeleteController(path params.EntityPath) error {
 	// TODO (urosj) make this operation atomic.
-	logger.Infof("Deleting controller %s", path)
 	// Delete its models first.
-	_, err := j.DB.Models().RemoveAll(bson.D{{"controller", path}})
+	info, err := j.DB.Models().RemoveAll(bson.D{{"controller", path}})
 	if err != nil {
 		return errgo.Notef(err, "error deleting controller models")
 	}
@@ -332,8 +331,10 @@ func (j *JEM) DeleteController(path params.EntityPath) error {
 		return errgo.WithCausef(nil, params.ErrNotFound, "controller %q not found", path)
 	}
 	if err != nil {
+		logger.Errorf("deleted %d controller models for model but could not delete controller: %v", info.Removed, err)
 		return errgo.Notef(err, "cannot delete controller")
 	}
+	logger.Infof("deleted controller %v and %d associated models", path, info.Removed)
 	return nil
 }
 
@@ -361,7 +362,6 @@ func (j *JEM) AddModel(m *mongodoc.Model) error {
 func (j *JEM) DeleteModel(path params.EntityPath) error {
 	// TODO when we monitor model health, prohibit this method
 	// and delete the model automatically when it is destroyed.
-	logger.Infof("Deleting model %s", path)
 	// Check if model is also a controller.
 	var ctl mongodoc.Controller
 	err := j.DB.Controllers().FindId(path.String()).One(&ctl)
@@ -376,6 +376,7 @@ func (j *JEM) DeleteModel(path params.EntityPath) error {
 	if err != nil {
 		return errgo.Notef(err, "could not delete model")
 	}
+	logger.Infof("deleted model %s", path)
 	return nil
 }
 
@@ -491,11 +492,11 @@ func (j *JEM) AddTemplate(tmpl *mongodoc.Template, canOverwrite bool) error {
 // database. It returns an error with a params.ErrNotFound
 // cause if the template was not found.
 func (j *JEM) DeleteTemplate(path params.EntityPath) error {
-	logger.Infof("Deleting template %s", path)
 	err := j.DB.Templates().RemoveId(path.String())
 	if err != nil {
 		return errgo.WithCausef(nil, params.ErrNotFound, "template %q not found", path)
 	}
+	logger.Infof("deleted template %s", path)
 	return nil
 }
 
@@ -558,6 +559,52 @@ func (j *JEM) SetControllerLocation(path params.EntityPath, location map[string]
 		return errgo.Notef(err, "cannot update %v", path)
 	}
 	return nil
+}
+
+// SetControllerAvailable marks the given controller as available.
+// This method does not return an error when the controller doesn't exist.
+func (j *JEM) SetControllerAvailable(ctlPath params.EntityPath) error {
+	if err := j.DB.Controllers().UpdateId(ctlPath.String(), bson.D{{
+		"$unset", bson.D{{"unavailablesince", nil}},
+	}}); err != nil {
+		if err == mgo.ErrNotFound {
+			// For symmetry with SetControllerUnavailableAt.
+			return nil
+		}
+		return errgo.Notef(err, "cannot update %v", ctlPath)
+	}
+	return nil
+}
+
+// SetControllerUnavailableAt marks the controller as having been unavailable
+// since at least the given time. If the controller was already marked
+// as unavailable, its time isn't changed.
+// This method does not return an error when the controller doesn't exist.
+func (j *JEM) SetControllerUnavailableAt(ctlPath params.EntityPath, t time.Time) error {
+	err := j.DB.Controllers().Update(
+		bson.D{
+			{"_id", ctlPath.String()},
+			{"unavailablesince", bson.D{{"$exists", false}}},
+		},
+		bson.D{
+			{"$set", bson.D{{"unavailablesince", t}}},
+		},
+	)
+	if err == nil {
+		return nil
+	}
+	if err == mgo.ErrNotFound {
+		// We don't know whether the not-found error is because there
+		// are no controllers with the given name (in which case we want
+		// to return a params.ErrNotFound error) or because there was
+		// one but it is already unavailable.
+		// We could fetch the controller to decide whether it's actually there
+		// or not, but because in practice we don't care if we're setting
+		// controller-unavailable on a non-existent controller, we'll
+		// save the round trip.
+		return nil
+	}
+	return errgo.Notef(err, "cannot update controller")
 }
 
 // ErrLeaseUnavailable is the error cause returned by AcquireMonitorLease

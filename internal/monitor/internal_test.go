@@ -203,7 +203,7 @@ func (s *internalSuite) TestWatcher(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// Start the watcher.
-	jshim := newJEMShimWithUpdateNotify(s.jem)
+	jshim := newJEMShimWithUpdateNotify(jemShim{s.jem})
 	m := &controllerMonitor{
 		ctlPath: ctlPath,
 		jem:     jshim,
@@ -361,6 +361,11 @@ func (s *internalSuite) TestWatcherDialAPIError(c *gc.C) {
 	case <-time.After(jujutesting.ShortWait):
 	}
 
+	// Check that the controller is marked as unavailable.
+	ctl, err := s.jem.Controller(ctlPath)
+	c.Assert(err, gc.IsNil)
+	c.Assert(ctl.UnavailableSince.UTC(), gc.DeepEquals, s.clock.Now().UTC())
+
 	// Advance the time until past the retry time.
 	s.clock.Advance(apiConnectRetryDuration)
 
@@ -375,6 +380,31 @@ func (s *internalSuite) TestWatcherDialAPIError(c *gc.C) {
 	waitEvent(c, m.tomb.Dead(), "watcher dead")
 
 	c.Assert(m.Wait(), gc.ErrorMatches, "cannot dial API for controller bob/foo: fatal error")
+}
+
+func (s *internalSuite) TestWatcherMarksControllerAvailable(c *gc.C) {
+	jshim := newJEMShimInMemory()
+	jshim1 := newJEMShimWithUpdateNotify(jemShimWithAPIOpener{
+		jemInterface: jshim,
+		openAPI: func(path params.EntityPath) (jujuAPI, error) {
+			return newJEMAPIShim(nil), nil
+		},
+	})
+	// Create a controller
+	ctlPath := params.EntityPath{"bob", "foo"}
+	addFakeController(jshim, ctlPath)
+	err := jshim1.SetControllerUnavailableAt(ctlPath, s.clock.Now())
+	c.Assert(err, gc.IsNil)
+
+	m := &controllerMonitor{
+		ctlPath: ctlPath,
+		jem:     jshim,
+		ownerId: "jem1",
+	}
+	m.tomb.Go(m.watcher)
+	defer worker.Stop(m)
+
+	waitEvent(c, jshim1.controllerAvailabilitySet, "controller available")
 }
 
 // TestControllerMonitor tests that the controllerMonitor can be run with both the
@@ -398,7 +428,7 @@ func (s *internalSuite) TestControllerMonitor(c *gc.C) {
 	expiry, err := acquireLease(jemShim{s.jem}, ctlPath, time.Time{}, "", "jem1")
 	c.Assert(err, gc.IsNil)
 
-	jshim := newJEMShimWithUpdateNotify(s.jem)
+	jshim := newJEMShimWithUpdateNotify(jemShim{s.jem})
 	m := newControllerMonitor(controllerMonitorParams{
 		ctlPath:     ctlPath,
 		jem:         jshim,

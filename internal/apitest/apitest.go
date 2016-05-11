@@ -19,8 +19,8 @@ import (
 
 	external_jem "github.com/CanonicalLtd/jem"
 	"github.com/CanonicalLtd/jem/internal/idmtest"
-	"github.com/CanonicalLtd/jem/internal/jemserver"
 	"github.com/CanonicalLtd/jem/internal/jem"
+	"github.com/CanonicalLtd/jem/internal/jemserver"
 	"github.com/CanonicalLtd/jem/jemclient"
 	"github.com/CanonicalLtd/jem/params"
 )

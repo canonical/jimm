@@ -147,9 +147,13 @@ func acquireLease(j jemInterface, ctlPath params.EntityPath, oldExpiry time.Time
 func (m *controllerMonitor) watcher() error {
 	for {
 		logger.Debugf("monitor dialing controller %v", m.ctlPath)
+		dialStartTime := Clock.Now()
 		conn, err := m.dialAPI()
 		switch errgo.Cause(err) {
 		case nil:
+			if err := m.jem.SetControllerAvailable(m.ctlPath); err != nil {
+				return errgo.Notef(err, "cannot set controller availability")
+			}
 			err := m.watch(conn)
 			conn.Close()
 			if errgo.Cause(err) == tomb.ErrDying {
@@ -162,11 +166,15 @@ func (m *controllerMonitor) watcher() error {
 			// The controller has been removed or we've been explicitly stopped.
 			return tomb.ErrDying
 		case jem.ErrAPIConnection:
+			if err := m.jem.SetControllerUnavailableAt(m.ctlPath, dialStartTime); err != nil {
+				return errgo.Notef(err, "cannot set controller availability")
+			}
 			// We've failed to connect to the API. Log the error and
 			// try again.
 			// TODO update the controller doc with the error?
 			logger.Errorf("cannot connect to controller %v: %v", m.ctlPath, err)
 			// Sleep for a while so we don't batter the network.
+			// TODO exponentially backoff up to some limit.
 			select {
 			case <-m.tomb.Dying():
 				// The controllerMonitor is dying.
