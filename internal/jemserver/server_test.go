@@ -5,19 +5,23 @@ package jemserver_test
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/juju/httprequest"
-	jujutesting "github.com/juju/testing"
+	jujutesting "github.com/juju/juju/testing"
+	"github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
 	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/jemserver"
+	"github.com/CanonicalLtd/jem/internal/mongodoc"
+	"github.com/CanonicalLtd/jem/params"
 )
 
 type serverSuite struct {
-	jujutesting.IsolatedMgoSuite
+	testing.IsolatedMgoSuite
 }
 
 var _ = gc.Suite(&serverSuite{})
@@ -66,6 +70,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 		"version1": serveVersion("version1"),
 	})
 	c.Assert(err, gc.IsNil)
+	defer h.Close()
 	assertServesVersion(c, h, "version1")
 	assertDoesNotServeVersion(c, h, "version2")
 	assertDoesNotServeVersion(c, h, "version3")
@@ -75,6 +80,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 		"version2": serveVersion("version2"),
 	})
 	c.Assert(err, gc.IsNil)
+	defer h.Close()
 	assertServesVersion(c, h, "version1")
 	assertServesVersion(c, h, "version2")
 	assertDoesNotServeVersion(c, h, "version3")
@@ -85,6 +91,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 		"version3": serveVersion("version3"),
 	})
 	c.Assert(err, gc.IsNil)
+	defer h.Close()
 	assertServesVersion(c, h, "version1")
 	assertServesVersion(c, h, "version2")
 	assertServesVersion(c, h, "version3")
@@ -129,6 +136,7 @@ func (s *serverSuite) TestServerHasAccessControlAllowOrigin(c *gc.C) {
 	}
 	h, err := jemserver.New(serverParams, impl)
 	c.Assert(err, gc.IsNil)
+	defer h.Close()
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: h,
 		URL:     "/a",
@@ -157,4 +165,56 @@ func (s *serverSuite) TestServerHasAccessControlAllowOrigin(c *gc.C) {
 	c.Assert(rec.Code, gc.Equals, http.StatusOK)
 	c.Assert(len(rec.HeaderMap["Access-Control-Allow-Origin"]), gc.Equals, 1)
 	c.Assert(rec.HeaderMap["Access-Control-Allow-Origin"][0], gc.Equals, "MyHost")
+}
+
+func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
+	db := s.Session.DB("foo")
+	pool, err := jem.NewPool(jem.Params{
+		DB: db,
+	})
+	c.Assert(err, gc.IsNil)
+	defer pool.Close()
+	j := pool.JEM()
+	defer j.Close()
+
+	ctlPath := params.EntityPath{"bob", "foo"}
+	err = j.AddController(&mongodoc.Controller{
+		Path:      ctlPath,
+		UUID:      "some-uuid",
+		CACert:    jujutesting.CACert,
+		AdminUser: "bob",
+		HostPorts: []string{"0.1.2.3:4567"},
+	}, &mongodoc.Model{})
+	c.Assert(err, gc.IsNil)
+
+	params := jemserver.Params{
+		DB:            db,
+		AgentUsername: "foo",
+	}
+	// Patch the API opening timeout so that it doesn't take the
+	// usual 15 seconds to fail - we don't, it holds on to the
+	// JEM session for that long after the end of the test because
+	// API dialling isn't stopped when the monitor is.
+	s.PatchValue(&jem.APIOpenTimeout, time.Millisecond)
+	h, err := jemserver.New(params, map[string]jemserver.NewAPIHandlerFunc{
+		"/v0": func(p *jem.Pool, config jemserver.Params) ([]httprequest.Handler, error) {
+			return nil, nil
+		},
+	})
+	c.Assert(err, gc.IsNil)
+	defer h.Close()
+
+	// Poll the database to check that the monitor lease is taken out.
+	var ctl *mongodoc.Controller
+	for a := jujutesting.LongAttempt.Start(); a.Next(); {
+		ctl, err = j.Controller(ctlPath)
+		c.Assert(err, gc.IsNil)
+		if ctl.MonitorLeaseOwner != "" {
+			break
+		}
+		if !a.HasNext() {
+			c.Fatalf("lease never acquired")
+		}
+	}
+	c.Assert(ctl.MonitorLeaseOwner, gc.Matches, "foo-[a-z0-9]+")
 }
