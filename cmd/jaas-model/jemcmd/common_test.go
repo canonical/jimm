@@ -23,7 +23,7 @@ import (
 	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jem"
-	"github.com/CanonicalLtd/jem/cmd/juju-jem/jemcmd"
+	"github.com/CanonicalLtd/jem/cmd/jaas-model/jemcmd"
 	"github.com/CanonicalLtd/jem/internal/idmtest"
 	"github.com/CanonicalLtd/jem/jemclient"
 	"github.com/CanonicalLtd/jem/params"

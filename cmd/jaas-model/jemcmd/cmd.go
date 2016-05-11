@@ -43,7 +43,7 @@ or as a command line flag:
 The latter takes precedence over the former.
 `
 
-// New returns a command that can execute juju-jem
+// New returns a command that can execute jaas-model
 // commands.
 func New() cmd.Command {
 	supercmd := cmd.NewSuperCommand(cmd.SuperCommandParams{
