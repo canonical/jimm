@@ -24,7 +24,6 @@ var addControllerTests = []struct {
 }{{
 	about:    "simple",
 	args:     []string{},
-	location: map[string]string{},
 }, {
 	about:    "add cloud",
 	args:     []string{"cloud=aws"},

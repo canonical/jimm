@@ -75,7 +75,7 @@ var unauthorizedTests = []struct {
 	method: "PUT",
 	path:   "/v2/template/bob/something",
 	body: params.AddTemplateInfo{
-		Controller: params.EntityPath{"bob", "open"},
+		Controller: &params.EntityPath{"bob", "open"},
 	},
 }, {
 	about:  "set controller perm as non-owner",
@@ -1211,7 +1211,7 @@ func (s *APISuite) TestNewModelWithTemplateNotFound(c *gc.C) {
 	c.Assert(resp, gc.IsNil)
 }
 
-func (s *APISuite) TestNewModelWithLocation(c *gc.C) {
+func (s *APISuite) TestNewModelWithoutExplicitController(c *gc.C) {
 	var nextIndex int
 	s.PatchValue(v2.RandIntn, func(n int) int {
 		return nextIndex % n
@@ -1237,6 +1237,22 @@ func (s *APISuite) TestNewModelWithLocation(c *gc.C) {
 		"region": "us",
 	})
 
+	s.addTemplateAt(c, params.EntityPath{"bob", "aws-creds"}, map[string]string{
+		"cloud": "aws",
+	}, map[string]interface{}{
+		"secret": "bob's secret",
+	})
+	s.addTemplateAt(c, params.EntityPath{"bob", "east-creds"}, map[string]string{
+		"region": "us-east-1",
+	}, map[string]interface{}{
+		"secret": "us-east-specific secret",
+	})
+	s.addTemplateAt(c, params.EntityPath{"bob", "west-creds"}, map[string]string{
+		"region": "eu-west-1",
+	}, map[string]interface{}{
+		"secret": "eu-west-specific secret",
+	})
+
 	tests := []struct {
 		about            string
 		randIndex        int
@@ -1245,6 +1261,7 @@ func (s *APISuite) TestNewModelWithLocation(c *gc.C) {
 		expectController string
 		expectError      string
 		expectCause      error
+		expectSecret     string
 	}{{
 		about:     "select aws",
 		randIndex: 1,
@@ -1338,9 +1355,103 @@ func (s *APISuite) TestNewModelWithLocation(c *gc.C) {
 		},
 		expectError: `POST http://.*/v2/model/bob: cannot select controller: bad controller location query: invalid attribute "\$wrong"`,
 		expectCause: params.ErrBadRequest,
+	}, {
+		about:     "with template with location",
+		randIndex: 0,
+		user:      "bob",
+		arg: params.NewModel{
+			User: "bob",
+			Info: params.NewModelInfo{
+				TemplatePaths: []params.EntityPath{{"bob", "aws-creds"}},
+			},
+		},
+		expectController: "bob/aws-eu-west",
+		expectSecret:     "bob's secret",
+	}, {
+		about:     "with template with location, different random selection",
+		randIndex: 1,
+		user:      "bob",
+		arg: params.NewModel{
+			User: "bob",
+			Info: params.NewModelInfo{
+				TemplatePaths: []params.EntityPath{{"bob", "aws-creds"}},
+			},
+		},
+		expectController: "bob/aws-us-east",
+		expectSecret:     "bob's secret",
+	}, {
+		about: "with incompatible templates",
+		user:  "bob",
+		arg: params.NewModel{
+			User: "bob",
+			Info: params.NewModelInfo{
+				TemplatePaths: []params.EntityPath{
+					{"bob", "east-creds"},
+					{"bob", "west-creds"},
+				},
+			},
+		},
+		expectError: `POST http://.*/v2/model/bob: invalid templates: template bob/west-creds is incompatible with earlier templates`,
+		expectCause: params.ErrIncompatibleTemplateLocations,
+	}, {
+		about: "with explicit location and template with location",
+		user:  "bob",
+		arg: params.NewModel{
+			User: "bob",
+			Info: params.NewModelInfo{
+				TemplatePaths: []params.EntityPath{{"bob", "aws-creds"}},
+				Location: map[string]string{
+					"staging": "true",
+				},
+			},
+		},
+		expectController: "bob/aws-us-east-staging",
+		expectSecret:     "bob's secret",
+	}, {
+		about: "with explicit location and template with incompatible location",
+		user:  "bob",
+		arg: params.NewModel{
+			User: "bob",
+			Info: params.NewModelInfo{
+				TemplatePaths: []params.EntityPath{{"bob", "west-creds"}},
+				Location: map[string]string{
+					"region": "us-east-1",
+				},
+			},
+		},
+		expectError: `POST http://.*/v2/model/bob: cannot select controller: specified location is incompatible with templates`,
+		expectCause: params.ErrIncompatibleTemplateLocations,
+	}, {
+		about: "with explicit location with compatible location",
+		user:  "bob",
+		arg: params.NewModel{
+			User: "bob",
+			Info: params.NewModelInfo{
+				TemplatePaths: []params.EntityPath{{"bob", "east-creds"}},
+				Location: map[string]string{
+					"region":  "us-east-1",
+					"staging": "true",
+				},
+			},
+		},
+		expectController: "bob/aws-us-east-staging",
+		expectSecret:     "us-east-specific secret",
+	}, {
+		about: "unauthorized template",
+		user:  "alice",
+		arg: params.NewModel{
+			User: "alice",
+			Info: params.NewModelInfo{
+				TemplatePaths: []params.EntityPath{{"bob", "east-creds"}},
+			},
+		},
+		expectCause: params.ErrUnauthorized,
+		// TODO perhaps it would be nice if the template name was mentioned
+		// in the error message here.
+		expectError: `POST http://.*/v2/model/alice: invalid template provided: unauthorized`,
 	}}
 	for i, test := range tests {
-		c.Logf("test %d: %d", i, test.about)
+		c.Logf("test %d: %s", i, test.about)
 		nextIndex = test.randIndex
 		test.arg.Info.Name = params.Name(fmt.Sprintf("x%d", i))
 		resp, err := s.NewClient(test.user).NewModel(&test.arg)
@@ -1352,7 +1463,24 @@ func (s *APISuite) TestNewModelWithLocation(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 		c.Assert(resp.Path, jc.DeepEquals, params.EntityPath{test.arg.User, test.arg.Info.Name})
 		c.Assert(resp.ControllerPath.String(), gc.Equals, test.expectController)
+		if test.expectSecret != "" {
+			s.assertModelConfigAttr(c, resp.Path, "secret", test.expectSecret)
+		}
+
 	}
+}
+
+func (s *APISuite) assertModelConfigAttr(c *gc.C, modelPath params.EntityPath, attr string, val interface{}) {
+	m, err := s.JEM.Model(modelPath)
+	c.Assert(err, gc.IsNil)
+	st, err := s.State.ForModel(names.NewModelTag(m.UUID))
+	c.Assert(err, gc.IsNil)
+	defer st.Close()
+	stm, err := st.Model()
+	c.Assert(err, gc.IsNil)
+	cfg, err := stm.Config()
+	c.Assert(err, gc.IsNil)
+	c.Assert(cfg.AllAttrs()[attr], jc.DeepEquals, val)
 }
 
 func (s *APISuite) TestGetModelWithExplicitlyRemovedUser(c *gc.C) {
@@ -1662,8 +1790,7 @@ func (s *APISuite) TestListController(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(resp, jc.DeepEquals, &params.ListControllerResponse{
 		Controllers: []params.ControllerResponse{{
-			Path:     ctlId,
-			Location: map[string]string{},
+			Path: ctlId,
 		}},
 	})
 
@@ -1901,7 +2028,7 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 	err := s.NewClient("alice").AddNewTemplate(&params.AddNewTemplate{
 		EntityPath: params.EntityPath{"alice", "creds"},
 		Info: params.AddTemplateInfo{
-			Controller: ctlId,
+			Controller: &ctlId,
 			Config: map[string]interface{}{
 				"controller":        true,
 				"admin-secret":      "my secret",
@@ -1933,7 +2060,7 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 	err = s.NewClient("alice").AddTemplate(&params.AddTemplate{
 		EntityPath: params.EntityPath{"alice", "creds"},
 		Info: params.AddTemplateInfo{
-			Controller: ctlId,
+			Controller: &ctlId,
 			Config: map[string]interface{}{
 				"controller":        false,
 				"admin-secret":      "another secret",
@@ -1960,7 +2087,7 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 	err = s.NewClient("alice").AddTemplate(&params.AddTemplate{
 		EntityPath: params.EntityPath{"alice", "differentcreds"},
 		Info: params.AddTemplateInfo{
-			Controller: ctlId,
+			Controller: &ctlId,
 			Config: map[string]interface{}{
 				"controller":        true,
 				"bootstrap-timeout": 111,
@@ -1974,7 +2101,7 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 	err = s.NewClient("alice").AddNewTemplate(&params.AddNewTemplate{
 		EntityPath: params.EntityPath{"alice", "differentcreds"},
 		Info: params.AddTemplateInfo{
-			Controller: ctlId,
+			Controller: &ctlId,
 			Config: map[string]interface{}{
 				"controller":        true,
 				"bootstrap-timeout": 111,
@@ -2005,6 +2132,53 @@ func (s *APISuite) TestAddTemplate(c *gc.C) {
 		"admin-secret":      "",
 		"bootstrap-timeout": 888.0,
 	})
+}
+
+func (s *APISuite) TestAddTemplateWithLocation(c *gc.C) {
+	s.assertAddController(c, params.EntityPath{"alice", "foo"}, map[string]string{
+		"cloud":  "ec2",
+		"region": "us-east-1",
+	})
+	err := s.NewClient("alice").AddNewTemplate(&params.AddNewTemplate{
+		EntityPath: params.EntityPath{"alice", "creds"},
+		Info: params.AddTemplateInfo{
+			Config: map[string]interface{}{
+				"controller":        true,
+				"admin-secret":      "my secret",
+				"authorized-keys":   sshKey,
+				"bootstrap-timeout": 9999,
+			},
+			Location: map[string]string{
+				"cloud": "ec2",
+			},
+		},
+	})
+	c.Assert(err, gc.IsNil)
+	tmpl, err := s.NewClient("alice").GetTemplate(&params.GetTemplate{
+		EntityPath: params.EntityPath{"alice", "creds"},
+	})
+	c.Assert(err, gc.IsNil)
+	c.Assert(tmpl.Location, jc.DeepEquals, map[string]string{
+		"cloud": "ec2",
+	})
+}
+
+func (s *APISuite) TestAddTemplateWithLocationAndTemplate(c *gc.C) {
+	ctlId := s.assertAddController(c, params.EntityPath{"alice", "foo"}, map[string]string{
+		"cloud":  "ec2",
+		"region": "us-east-1",
+	})
+	err := s.NewClient("alice").AddNewTemplate(&params.AddNewTemplate{
+		EntityPath: params.EntityPath{"alice", "creds"},
+		Info: params.AddTemplateInfo{
+			Controller: &ctlId,
+			Location: map[string]string{
+				"cloud": "ec2",
+			},
+		},
+	})
+	c.Check(errgo.Cause(err), gc.Equals, params.ErrBadRequest)
+	c.Assert(err, gc.ErrorMatches, "POST .*/template/alice/creds: cannot specify location with explicit controller")
 }
 
 func (s *APISuite) TestGetTemplateNotFound(c *gc.C) {
@@ -2051,7 +2225,7 @@ func (s *APISuite) TestAddInvalidTemplate(c *gc.C) {
 		err := s.NewClient("alice").AddTemplate(&params.AddTemplate{
 			EntityPath: params.EntityPath{"alice", "creds"},
 			Info: params.AddTemplateInfo{
-				Controller: test.ctlId,
+				Controller: &test.ctlId,
 				Config:     test.config,
 			},
 		})
@@ -2081,7 +2255,7 @@ func (s *APISuite) TestDeleteTemplate(c *gc.C) {
 	err := s.NewClient("alice").AddTemplate(&params.AddTemplate{
 		EntityPath: templPath,
 		Info: params.AddTemplateInfo{
-			Controller: ctlId,
+			Controller: &ctlId,
 			Config: map[string]interface{}{
 				"controller":        true,
 				"admin-secret":      "my secret",
@@ -2165,8 +2339,19 @@ func (s *APISuite) addTemplate(c *gc.C, tmplPath, ctlPath params.EntityPath, cfg
 	err := s.NewClient(tmplPath.User).AddTemplate(&params.AddTemplate{
 		EntityPath: tmplPath,
 		Info: params.AddTemplateInfo{
-			Controller: ctlPath,
+			Controller: &ctlPath,
 			Config:     cfg,
+		},
+	})
+	c.Assert(err, gc.IsNil)
+}
+
+func (s *APISuite) addTemplateAt(c *gc.C, tmplPath params.EntityPath, loc map[string]string, cfg map[string]interface{}) {
+	err := s.NewClient(tmplPath.User).AddTemplate(&params.AddTemplate{
+		EntityPath: tmplPath,
+		Info: params.AddTemplateInfo{
+			Location: loc,
+			Config:   cfg,
 		},
 	})
 	c.Assert(err, gc.IsNil)

@@ -99,10 +99,11 @@ func (c *createTemplateCommand) Run(ctxt *cmd.Context) error {
 			config[name] = val
 		}
 	}
+	// TODO support creating template with location.
 	if err := client.AddTemplate(&params.AddTemplate{
 		EntityPath: c.templatePath.EntityPath,
 		Info: params.AddTemplateInfo{
-			Controller: c.srvPath.EntityPath,
+			Controller: &c.srvPath.EntityPath,
 			Config:     config,
 		},
 	}); err != nil {
