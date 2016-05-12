@@ -92,6 +92,8 @@ type AddController struct {
 type DeleteController struct {
 	httprequest.Route `httprequest:"DELETE /v2/controller/:User/:Name"`
 	EntityPath
+	// Force forces the delete even if the controller is still alive.
+	Force bool `httprequest:"force,form"`
 }
 
 type GetAllControllerLocations struct {
@@ -314,8 +316,8 @@ type ControllerResponse struct {
 	// UnavailableSince holds the time that the JEM server
 	// noticed that the model's controller could not be
 	// contacted. It is empty when the model is available.
-	UnavailableSince *time.Time `json:"unavailable-since,omitempty"`
-	Location map[string]string `json:"location,omitempty"`
+	UnavailableSince *time.Time        `json:"unavailable-since,omitempty"`
+	Location         map[string]string `json:"location,omitempty"`
 }
 
 // GetController holds parameters for retrieving information on a Controller.
@@ -408,7 +410,7 @@ type ModelResponse struct {
 
 	// Life holds the last reported lifecycle status of the model.
 	// It is omitted when we have no information on the model's
-	// life yet.
+	// life yet. Possible values are "alive", "dying" and "dead".
 	Life string `json:"life,omitempty"`
 
 	// UnavailableSince holds the time that the JEM server

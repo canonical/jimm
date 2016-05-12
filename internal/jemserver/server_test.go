@@ -190,6 +190,7 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 	params := jemserver.Params{
 		DB:            db,
 		AgentUsername: "foo",
+		RunMonitor:    true,
 	}
 	// Patch the API opening timeout so that it doesn't take the
 	// usual 15 seconds to fail - we don't, it holds on to the

@@ -25,7 +25,7 @@ func (s *revokeSuite) TestRevoke(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	// Check that alice can't get server or model.
+	// Check that alice can't get controller or model.
 	aliceClient := s.jemClient("alice")
 	_, err := aliceClient.GetController(&params.GetController{
 		EntityPath: params.EntityPath{
@@ -52,7 +52,7 @@ func (s *revokeSuite) TestRevoke(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	// Check that alice can get model but not server.
+	// Check that alice can get model but not controller.
 	_, err = aliceClient.GetController(&params.GetController{
 		EntityPath: params.EntityPath{
 			User: "bob",
@@ -68,7 +68,7 @@ func (s *revokeSuite) TestRevoke(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 
-	// Add alice to server permissions list.
+	// Add alice to controller permissions list.
 	stdout, stderr, code = run(c, c.MkDir(),
 		"grant",
 		"--controller",
@@ -79,7 +79,7 @@ func (s *revokeSuite) TestRevoke(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	// Check that alice can now access the server.
+	// Check that alice can now access the controller.
 	_, err = aliceClient.GetController(&params.GetController{
 		EntityPath: params.EntityPath{
 			User: "bob",

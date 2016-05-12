@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/juju/httprequest"
 	"github.com/juju/juju/api/modelmanager"
@@ -227,6 +228,15 @@ func (h *Handler) DeleteController(arg *params.DeleteController) error {
 	if err := h.jem.CheckIsUser(arg.EntityPath.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
+	if !arg.Force {
+		ctl, err := h.jem.Controller(arg.EntityPath)
+		if err != nil {
+			return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		}
+		if ctl.UnavailableSince.IsZero() {
+			return errgo.WithCausef(nil, params.ErrStillAlive, "cannot delete controller while it is still alive")
+		}
+	}
 	if err := h.jem.DeleteController(arg.EntityPath); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
@@ -306,7 +316,7 @@ func (h *Handler) GetModel(arg *params.GetModel) (*params.ModelResponse, error) 
 		}
 	}
 
-	return &params.ModelResponse{
+	r := &params.ModelResponse{
 		Path:           arg.EntityPath,
 		User:           jujuUser,
 		Password:       password,
@@ -315,7 +325,13 @@ func (h *Handler) GetModel(arg *params.GetModel) (*params.ModelResponse, error) 
 		CACert:         ctl.CACert,
 		HostPorts:      ctl.HostPorts,
 		ControllerPath: m.Controller,
-	}, nil
+		Life:           m.Life,
+	}
+	if !ctl.UnavailableSince.IsZero() {
+		ctl.UnavailableSince = ctl.UnavailableSince.UTC()
+		r.UnavailableSince = &ctl.UnavailableSince
+	}
+	return r, nil
 }
 
 // DeleteModel deletes an model from JEM.
@@ -368,13 +384,20 @@ func (h *Handler) ListModels(arg *params.ListModels) (*params.ListModelsResponse
 		// so given that most uses of this endpoint won't actually want
 		// to connect to all of the models, we leave out the username and
 		// password for now.
+		var uvt *time.Time
+		if !ctl.UnavailableSince.IsZero() {
+			ctl.UnavailableSince = ctl.UnavailableSince.UTC()
+			uvt = &ctl.UnavailableSince
+		}
 		models = append(models, params.ModelResponse{
-			Path:           m.Path,
-			UUID:           m.UUID,
-			ControllerUUID: ctl.UUID,
-			CACert:         ctl.CACert,
-			HostPorts:      ctl.HostPorts,
-			ControllerPath: m.Controller,
+			Path:             m.Path,
+			UUID:             m.UUID,
+			ControllerUUID:   ctl.UUID,
+			CACert:           ctl.CACert,
+			HostPorts:        ctl.HostPorts,
+			ControllerPath:   m.Controller,
+			Life:             m.Life,
+			UnavailableSince: uvt,
 		})
 	}
 	if err := modelIter.Err(); err != nil {
@@ -396,9 +419,15 @@ func (h *Handler) ListController(arg *params.ListController) (*params.ListContro
 	iter := h.jem.CanReadIter(h.jem.DB.Controllers().Find(nil).Sort("_id").Iter())
 	var ctl mongodoc.Controller
 	for iter.Next(&ctl) {
+		var uvt *time.Time
+		if !ctl.UnavailableSince.IsZero() {
+			ctl.UnavailableSince = ctl.UnavailableSince.UTC()
+			uvt = &ctl.UnavailableSince
+		}
 		controllers = append(controllers, params.ControllerResponse{
-			Path:     ctl.Path,
-			Location: ctl.Location,
+			Path:             ctl.Path,
+			Location:         ctl.Location,
+			UnavailableSince: uvt,
 		})
 	}
 	if err := iter.Err(); err != nil {

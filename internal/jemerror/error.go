@@ -39,6 +39,7 @@ func errToResp(err error) (int, interface{}) {
 
 		status = http.StatusNotFound
 	case params.ErrForbidden,
+		params.ErrStillAlive,
 		params.ErrAlreadyExists:
 
 		status = http.StatusForbidden

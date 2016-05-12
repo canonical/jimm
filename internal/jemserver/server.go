@@ -51,6 +51,10 @@ type Params struct {
 	// authentication.
 	AgentUsername string
 	AgentKey      *bakery.KeyPair
+
+	// RunMonitor specifies that the monitor worker should be run.
+	// This should always be set when running the server in production.
+	RunMonitor bool
 }
 
 // Server represents a JEM HTTP server.
@@ -91,14 +95,16 @@ func New(config Params, versions map[string]NewAPIHandlerFunc) (*Server, error) 
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make store")
 	}
-	owner, err := monitorLeaseOwner(config.AgentUsername)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
 	srv := &Server{
-		router:  httprouter.New(),
-		pool:    p,
-		monitor: monitor.New(p, owner),
+		router: httprouter.New(),
+		pool:   p,
+	}
+	if config.RunMonitor {
+		owner, err := monitorLeaseOwner(config.AgentUsername)
+		if err != nil {
+			return nil, errgo.Mask(err)
+		}
+		srv.monitor = monitor.New(p, owner)
 	}
 	for name, newAPI := range versions {
 		handlers, err := newAPI(p, config)
@@ -166,9 +172,11 @@ func (srv *Server) options(http.ResponseWriter, *http.Request, httprouter.Params
 // Close implements io.Closer.Close. It should not be called
 // until all requests on the handler have completed.
 func (srv *Server) Close() error {
-	srv.monitor.Kill()
-	if err := srv.monitor.Wait(); err != nil {
-		logger.Warningf("error shutting down monitor: %v", err)
+	if srv.monitor != nil {
+		srv.monitor.Kill()
+		if err := srv.monitor.Wait(); err != nil {
+			logger.Warningf("error shutting down monitor: %v", err)
+		}
 	}
 	srv.pool.Close()
 	return nil
