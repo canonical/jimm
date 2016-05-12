@@ -174,6 +174,24 @@ func (s *cacheSuite) TestEvictAll(c *gc.C) {
 	c.Assert(called, gc.Equals, 2)
 }
 
+func (s *cacheSuite) TestOpenAPIWithBrokenConnection(c *gc.C) {
+	cache := apiconn.NewCache(apiconn.CacheParams{})
+	c0 := &brokenConn{}
+	conn, err := cache.OpenAPI("uuid0", func() (api.Connection, *api.Info, error) {
+		return c0, &api.Info{}, nil
+	})
+	c.Assert(err, gc.IsNil)
+	c.Assert(conn.Connection, gc.Equals, c0)
+
+	// Because the earlier connection is flagged as broken,
+	// the next API open call will open another one.
+	c1 := &dummyConn{}
+	conn1, err := cache.OpenAPI("uuid0", func() (api.Connection, *api.Info, error) {
+		return c1, &api.Info{}, nil
+	})
+	c.Assert(conn1.Connection, gc.Equals, c1)
+}
+
 type dummyConn struct {
 	api.Connection
 }
@@ -194,4 +212,14 @@ func assertConnIsClosed(c *gc.C, conn api.Connection) {
 	case <-time.After(5 * time.Second):
 		c.Fatalf("timed out waiting for connection close")
 	}
+}
+
+type brokenConn struct {
+	api.Connection
+}
+
+func (brokenConn) Broken() <-chan struct{} {
+	c := make(chan struct{})
+	close(c)
+	return c
 }

@@ -79,8 +79,16 @@ func (cache *Cache) OpenAPI(
 	// is currrently cached.
 	cache.mu.Lock()
 	c := cache.conns[envUUID]
-	// TODO check that the connection is still healthy
-	// and evict if not.
+	if c != nil {
+		select {
+		case <-c.Broken():
+			// The connection is broken. Evict it from the cache
+			// and try dialling again.
+			delete(cache.conns, envUUID)
+			c = nil
+		default:
+		}
+	}
 	cache.mu.Unlock()
 	if c != nil {
 		return c.Clone(), nil

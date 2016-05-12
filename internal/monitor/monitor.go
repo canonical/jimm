@@ -22,7 +22,7 @@ import (
 
 var logger = loggo.GetLogger("jem.internal.monitor")
 
-const (
+var (
 	// leaseAcquireInterval holds the duration the
 	// monitor waits before trying to reacquire new
 	// controller monitor leases.

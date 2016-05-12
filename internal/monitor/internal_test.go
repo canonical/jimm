@@ -384,10 +384,12 @@ func (s *internalSuite) TestWatcherDialAPIError(c *gc.C) {
 
 func (s *internalSuite) TestWatcherMarksControllerAvailable(c *gc.C) {
 	jshim := newJEMShimInMemory()
+	apiShims := newJujuAPIShims()
+	defer apiShims.CheckAllClosed(c)
 	jshim1 := newJEMShimWithUpdateNotify(jemShimWithAPIOpener{
 		jemInterface: jshim,
 		openAPI: func(path params.EntityPath) (jujuAPI, error) {
-			return newJEMAPIShim(nil), nil
+			return apiShims.newJujuAPIShim(nil), nil
 		},
 	})
 	// Create a controller
@@ -570,10 +572,12 @@ func (s *internalSuite) TestAllMonitorMultiControllersWithAPIError(c *gc.C) {
 
 func (s *internalSuite) TestAllMonitorMultiControllerMultipleLeases(c *gc.C) {
 	jshim := newJEMShimInMemory()
+	apiShims := newJujuAPIShims()
+	defer apiShims.CheckAllClosed(c)
 	jshim1 := jemShimWithAPIOpener{
 		jemInterface: jshim,
 		openAPI: func(path params.EntityPath) (jujuAPI, error) {
-			return newJEMAPIShim(nil), nil
+			return apiShims.newJujuAPIShim(nil), nil
 		},
 	}
 	type leaseAcquisition struct {
