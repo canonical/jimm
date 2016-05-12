@@ -1,4 +1,4 @@
-// Copyright 2015 Canonical Ltd.
+// Copyright 2015-2016 Canonical Ltd.
 
 package jemcmd
 
@@ -30,21 +30,21 @@ func newRevokeCommand() cmd.Command {
 
 var revokeDoc = `
 The revoke command removes permissions for a set of users
-or groups to read a model (default), controller, or template within JEM.
+or groups to read a model (default), controller, or template within the managing server.
 Note that if a user access is revoked, that user may still have access
 if they are a member of a group that is still part of the read ACL.
 
 For example, to remove alice and bob from the read ACL of the model johndoe/mymodel,
 assuming they are currently mentioned in the ACL:
 
-    juju jem revoke johndoe/mymodel alice,bob
+    jaas model revoke johndoe/mymodel alice,bob
 `
 
 func (c *revokeCommand) Info() *cmd.Info {
 	return &cmd.Info{
 		Name:    "revoke",
 		Args:    "<user>/<modelname|controllername> username[,username]...",
-		Purpose: "revoke permissions of JEM entity",
+		Purpose: "revoke permissions of the managing server entity",
 		Doc:     revokeDoc,
 	}
 }

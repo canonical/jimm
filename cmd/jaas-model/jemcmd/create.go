@@ -1,4 +1,4 @@
-// Copyright 2015 Canonical Ltd.
+// Copyright 2015-2016 Canonical Ltd.
 
 package jemcmd
 
@@ -43,7 +43,7 @@ func newCreateCommand() cmd.Command {
 
 var createDoc = `
 The create command creates a new model inside the specified controller.
-Its argument specifies the JEM name of the new model.
+Its argument specifies the server name of the new model.
 
 When one or more templates paths are specified, the final configuration
 is determined by starting with the first and adding attributes from
@@ -53,14 +53,14 @@ the configuration file specified by the --config flag.
 Any provided key-value arguments are used to select the location
 of the controller that will run the model. For example:
 
-	juju jem create me/mymodel cloud=aws region=us-east-1
+	jaas model create me/mymodel cloud=aws region=us-east-1
 `
 
 func (c *createCommand) Info() *cmd.Info {
 	return &cmd.Info{
 		Name:    "create",
 		Args:    "<user>/<modelname> [<key>=<value> ...]",
-		Purpose: "Create a new model in JEM",
+		Purpose: "Create a new model on managing server ",
 		Doc:     createDoc,
 	}
 }

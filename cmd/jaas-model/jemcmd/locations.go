@@ -36,7 +36,7 @@ locations.
 
 For example,
 
-	juju jem locations cloud=aws
+	jaas model locations cloud=aws
 
 will print all locations that have the cloud location
 set to "aws".

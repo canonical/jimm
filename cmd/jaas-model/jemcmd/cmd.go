@@ -1,4 +1,4 @@
-// Copyright 2015 Canonical Ltd.
+// Copyright 2015-2016 Canonical Ltd.
 
 package jemcmd
 
@@ -27,18 +27,18 @@ var logger = loggo.GetLogger("jem")
 const jujuLoggingConfigEnvKey = "JUJU_LOGGING_CONFIG"
 
 var cmdDoc = `
-The juju jem command provides access to the JEM server.
+The jaas model command provides access to the managing server.
 The commands are at present for testing purposes only
 and are not stable in any form.
 
-The location of the JEM server can be specified
+The location of the managing server can be specified
 as an environment variable:
 
-	JUJU_JEM=<JEM server URL>
+	JAAS_MODEL=<managing server URL>
 
 or as a command line flag:
 
-	--jem-url <JEM server URL>
+	--jaas-model-url <managing server URL>
 
 The latter takes precedence over the former.
 `
@@ -47,10 +47,10 @@ The latter takes precedence over the former.
 // commands.
 func New() cmd.Command {
 	supercmd := cmd.NewSuperCommand(cmd.SuperCommandParams{
-		Name:        "jem",
-		UsagePrefix: "juju",
+		Name:        "model",
+		UsagePrefix: "jaas",
 		Doc:         cmdDoc,
-		Purpose:     "access the JEM server",
+		Purpose:     "access the managing server",
 		Log: &cmd.Log{
 			DefaultConfig: os.Getenv(jujuLoggingConfigEnvKey),
 		},
@@ -72,14 +72,14 @@ func New() cmd.Command {
 	return supercmd
 }
 
-// commandBase holds the basis for JEM commands.
+// commandBase holds the basis for commands.
 type commandBase struct {
 	modelcmd.JujuCommandBase
 	jemURL string
 }
 
 func (c *commandBase) SetFlags(f *gnuflag.FlagSet) {
-	f.StringVar(&c.jemURL, "jem-url", "", "URL of JEM server (defaults to $JUJU_JEM)")
+	f.StringVar(&c.jemURL, "jaas-model-url", "", "URL of managing server (defaults to $JAAS_MODEL)")
 }
 
 // newClient creates and return a JEM client with access to
@@ -100,13 +100,13 @@ func (c *commandBase) newClient(ctxt *cmd.Context) (*jemclient.Client, error) {
 const jemServerURL = "https://api.jujucharms.com/jem"
 
 // serverURL returns the JEM server URL.
-// The returned value can be overridden by setting the JUJU_JEM
+// The returned value can be overridden by setting the JAAS_MODEL
 // model variable.
 func (c *commandBase) serverURL() string {
 	if c.jemURL != "" {
 		return c.jemURL
 	}
-	if url := os.Getenv("JUJU_JEM"); url != "" {
+	if url := os.Getenv("JAAS_MODEL"); url != "" {
 		return url
 	}
 	return jemServerURL
