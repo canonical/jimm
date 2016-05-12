@@ -70,7 +70,7 @@ type Controller struct {
 	// Stats holds runtime information about the controller.
 	Stats ControllerStats
 
-	// UnavailableSince is empty when the controller is marked
+	// UnavailableSince is zero when the controller is marked
 	// as available; otherwise it holds the time when it became
 	// unavailable.
 	UnavailableSince time.Time `bson:",omitempty"`
@@ -174,7 +174,7 @@ type Template struct {
 	Config map[string]interface{}
 
 	// Location holds the location attributes associated with the template.
-	Location map[string]string	`bson:",omitempty"`
+	Location map[string]string `bson:",omitempty"`
 }
 
 func (t *Template) Owner() params.User {

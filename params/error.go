@@ -27,6 +27,7 @@ const (
 	ErrMethodNotAllowed              ErrorCode = "method not allowed"
 	ErrAmbiguousLocation             ErrorCode = "ambiguous location"
 	ErrIncompatibleTemplateLocations ErrorCode = "incompatible template locations"
+	ErrStillAlive                    ErrorCode = "controller is still alive"
 )
 
 // Error represents an error - it is returned for any response that fails.

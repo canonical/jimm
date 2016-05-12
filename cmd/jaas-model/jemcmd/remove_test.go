@@ -37,7 +37,7 @@ func (s *removeSuite) TestRemoveModel(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "bob/foo\n")
 }
 
-func (s *removeSuite) TestRemoveServer(c *gc.C) {
+func (s *removeSuite) TestRemoveController(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 
 	// First add a controller and an model.
@@ -54,7 +54,15 @@ func (s *removeSuite) TestRemoveServer(c *gc.C) {
 
 	s.addEnv(c, "bob/foo-1", "bob/foo")
 
+	// Without the --force flag, we'll be forbidden because the controller
+	// is live.
 	stdout, stderr, code = run(c, c.MkDir(), "remove", "--controller", "bob/foo")
+	c.Assert(code, gc.Equals, 1, gc.Commentf("stderr: %s", stderr))
+	c.Assert(stdout, gc.Equals, "")
+	c.Assert(stderr, gc.Matches, `cannot remove bob/foo: .*: cannot delete controller while it is still alive\n`)
+
+	// We can use the --force flag to remove it.
+	stdout, stderr, code = run(c, c.MkDir(), "remove", "--force", "--controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
@@ -117,7 +125,7 @@ func (s *removeSuite) TestRemoveMultipleModels(c *gc.C) {
 	stdout, stderr, code = run(c, c.MkDir(), "remove", "bob/foo", "bob/foo-1")
 	c.Assert(code, gc.Equals, 1, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Matches, `cannot remove bob/foo: DELETE http://.*/v2/model/bob/foo: cannot remove model "bob/foo" because it is a controller`+"\nERROR not all models removed successfully\n")
+	c.Assert(stderr, gc.Matches, `cannot remove bob/foo: DELETE http://.*/v2/model/bob/foo: cannot remove model "bob/foo" because it is a controller`+"\n")
 
 	stdout, stderr, code = run(c, c.MkDir(), "list")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))

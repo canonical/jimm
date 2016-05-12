@@ -90,6 +90,7 @@ func serve(confPath string) error {
 		PublicKeyLocator: locator,
 		AgentUsername:    conf.AgentUsername,
 		AgentKey:         conf.AgentKey,
+		RunMonitor:       true,
 	}
 	server, err := jem.NewServer(cfg)
 	if err != nil {

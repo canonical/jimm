@@ -17,6 +17,7 @@ type removeCommand struct {
 	paths      []entityPathValue
 	controller bool
 	template   bool
+	force      bool
 }
 
 func newRemoveCommand() cmd.Command {
@@ -50,6 +51,8 @@ func (c *removeCommand) Init(args []string) error {
 func (c *removeCommand) SetFlags(f *gnuflag.FlagSet) {
 	f.BoolVar(&c.controller, "controller", false, "remove controllers not models")
 	f.BoolVar(&c.template, "template", false, "remove templates not models")
+	f.BoolVar(&c.force, "f", false, "force removal of live controller")
+	f.BoolVar(&c.force, "force", false, "")
 }
 
 func (c *removeCommand) Run(ctxt *cmd.Context) error {
@@ -57,22 +60,20 @@ func (c *removeCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	typeString := "models"
 	f := func(path entityPathValue) error {
 		return client.DeleteModel(&params.DeleteModel{
 			EntityPath: path.EntityPath,
 		})
 	}
 	if c.controller {
-		typeString = "controllers"
 		f = func(path entityPathValue) error {
 			return client.DeleteController(&params.DeleteController{
 				EntityPath: path.EntityPath,
+				Force:      c.force,
 			})
 		}
 	}
 	if c.template {
-		typeString = "templates"
 		f = func(path entityPathValue) error {
 			return client.DeleteTemplate(&params.DeleteTemplate{
 				EntityPath: path.EntityPath,
@@ -88,7 +89,8 @@ func (c *removeCommand) Run(ctxt *cmd.Context) error {
 		}
 	}
 	if failed {
-		return errgo.Newf("not all %s removed successfully", typeString)
+		// We've already printed our error messages.
+		return cmd.ErrSilent
 	}
 	return nil
 }

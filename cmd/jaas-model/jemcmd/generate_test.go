@@ -93,7 +93,7 @@ func (s *generateSuite) TestGenerateWithTemplates(c *gc.C) {
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stderr, gc.Equals, "")
 
-	// The controller server attribute should be omitted.
+	// The controller attribute should be omitted.
 	c.Assert(stdout, gc.Not(gc.Matches), `(.|\n)*controller:(.|\n)*`)
 
 	// But the other attributes should still be there.

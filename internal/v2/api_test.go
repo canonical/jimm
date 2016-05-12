@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/modelmanager"
@@ -664,23 +665,36 @@ func (s *APISuite) TestDeleteControllerNotFound(c *gc.C) {
 }
 
 func (s *APISuite) TestDeleteController(c *gc.C) {
-	// Define controller.
-	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foobarred"}, nil)
 	// Add controller to JEM.
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foobarred"}, nil)
+	// Assert that it was added.
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.JEMSrv,
 		URL:     "/v2/controller/" + ctlId.String(),
 		Do:      apitest.Do(s.IDMSrv.Client("bob")),
 	})
-	// Assert that it was added.
 	c.Assert(resp.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %s", resp.Body.Bytes()))
 	// Add another model to it.
 	modelId, _, _ := s.addModel(c, params.EntityPath{"bob", "bar"}, ctlId)
-	// Delete controller.
+
+	// Check that we can't delete it because it's marked as "available"
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:       "DELETE",
 		Handler:      s.JEMSrv,
 		URL:          "/v2/controller/bob/foobarred",
+		ExpectStatus: http.StatusForbidden,
+		ExpectBody: params.Error{
+			Message: `cannot delete controller while it is still alive`,
+			Code:    params.ErrStillAlive,
+		},
+		Do: apitest.Do(s.IDMSrv.Client("bob")),
+	})
+
+	// Check that we can delete it with force flag.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:       "DELETE",
+		Handler:      s.JEMSrv,
+		URL:          "/v2/controller/bob/foobarred?force=true",
 		ExpectStatus: http.StatusOK,
 		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 	})
@@ -1483,6 +1497,48 @@ func (s *APISuite) assertModelConfigAttr(c *gc.C, modelPath params.EntityPath, a
 	c.Assert(cfg.AllAttrs()[attr], jc.DeepEquals, val)
 }
 
+func (s *APISuite) TestGetModel(c *gc.C) {
+	info := s.APIInfo(c)
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foo"}, nil)
+	err := s.JEM.SetModelLife(ctlId, info.ModelTag.Id(), "dying")
+	c.Assert(err, gc.IsNil)
+	t := time.Now()
+	err = s.JEM.SetControllerUnavailableAt(ctlId, t)
+	c.Assert(err, gc.IsNil)
+
+	var modelRespBody json.RawMessage
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "GET",
+		Handler: s.JEMSrv,
+		URL:     "/v2/model/bob/foo",
+		ExpectBody: httptesting.BodyAsserter(func(_ *gc.C, body json.RawMessage) {
+			modelRespBody = body
+		}),
+		Do: apitest.Do(s.IDMSrv.Client("bob")),
+	})
+	var modelResp params.ModelResponse
+	err = json.Unmarshal(modelRespBody, &modelResp)
+	c.Assert(err, gc.IsNil)
+	// The password is unpredictable and tested elsewhere.
+	c.Assert(modelResp.Password, gc.Not(gc.Equals), "")
+	modelResp.Password = ""
+	c.Assert(modelResp, jc.DeepEquals, params.ModelResponse{
+		Path:             ctlId,
+		User:             "jem-bob",
+		UUID:             info.ModelTag.Id(),
+		ControllerPath:   ctlId,
+		ControllerUUID:   info.ModelTag.Id(),
+		CACert:           info.CACert,
+		HostPorts:        info.Addrs,
+		Life:             "dying",
+		UnavailableSince: newTime(mongodoc.Time(t).UTC()),
+	})
+}
+
+func newTime(t time.Time) *time.Time {
+	return &t
+}
+
 func (s *APISuite) TestGetModelWithExplicitlyRemovedUser(c *gc.C) {
 	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foo"}, nil)
 
@@ -1785,12 +1841,21 @@ func (s *APISuite) TestNewModelUnauthorized(c *gc.C) {
 }
 
 func (s *APISuite) TestListController(c *gc.C) {
-	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foo"}, nil)
+	ctlId0 := s.assertAddController(c, params.EntityPath{"bob", "foo"}, nil)
+
+	ctlId1 := s.assertAddController(c, params.EntityPath{"bob", "lost"}, nil)
+	unavailableTime := time.Now()
+	err := s.JEM.SetControllerUnavailableAt(ctlId1, unavailableTime)
+	c.Assert(err, gc.IsNil)
+
 	resp, err := s.NewClient("bob").ListController(nil)
 	c.Assert(err, gc.IsNil)
 	c.Assert(resp, jc.DeepEquals, &params.ListControllerResponse{
 		Controllers: []params.ControllerResponse{{
-			Path: ctlId,
+			Path: ctlId0,
+		}, {
+			Path:             ctlId1,
+			UnavailableSince: newTime(mongodoc.Time(unavailableTime).UTC()),
 		}},
 	})
 
@@ -1912,51 +1977,70 @@ func (s *APISuite) TestListModelsControllerOnly(c *gc.C) {
 }
 
 func (s *APISuite) TestListModels(c *gc.C) {
-	ctlPath := params.EntityPath{"alice", "foo"}
-	ctlId := s.assertAddController(c, ctlPath, nil)
-	s.allowModelPerm(c, ctlId)
-	s.allowControllerPerm(c, ctlId)
-	modelId1, _, uuid1 := s.addModel(c, params.EntityPath{"bob", "bar"}, ctlId)
-	modelId2, _, uuid2 := s.addModel(c, params.EntityPath{"charlie", "bar"}, ctlId)
+	ctlId0 := s.assertAddController(c, params.EntityPath{"alice", "foo"}, nil)
+	s.allowModelPerm(c, ctlId0)
+	s.allowControllerPerm(c, ctlId0)
+	modelId1, _, uuid1 := s.addModel(c, params.EntityPath{"bob", "bar"}, ctlId0)
+	modelId2, _, uuid2 := s.addModel(c, params.EntityPath{"charlie", "bar"}, ctlId0)
+	err := s.JEM.SetModelLife(ctlId0, uuid2, "alive")
+	c.Assert(err, gc.IsNil)
+
+	// Add an unavailable controller.
+	ctlId1 := s.assertAddController(c, params.EntityPath{"alice", "lost"}, nil)
+	s.allowModelPerm(c, ctlId1)
+	s.allowControllerPerm(c, ctlId1)
+	unavailableTime := time.Now()
+	err = s.JEM.SetControllerUnavailableAt(ctlId1, unavailableTime)
+	c.Assert(err, gc.IsNil)
+
 	info := s.APIInfo(c)
 
 	resps := []params.ModelResponse{{
-		Path:           ctlId,
+		Path:           ctlId0,
 		UUID:           info.ModelTag.Id(),
 		ControllerUUID: info.ModelTag.Id(),
 		CACert:         info.CACert,
 		HostPorts:      info.Addrs,
-		ControllerPath: ctlPath,
+		ControllerPath: ctlId0,
 	}, {
 		Path:           modelId1,
 		UUID:           uuid1,
 		ControllerUUID: info.ModelTag.Id(),
 		CACert:         info.CACert,
 		HostPorts:      info.Addrs,
-		ControllerPath: ctlPath,
+		ControllerPath: ctlId0,
 	}, {
 		Path:           modelId2,
 		UUID:           uuid2,
 		ControllerUUID: info.ModelTag.Id(),
 		CACert:         info.CACert,
 		HostPorts:      info.Addrs,
-		ControllerPath: ctlPath,
+		ControllerPath: ctlId0,
+		Life:           "alive",
+	}, {
+		Path:             ctlId1,
+		UUID:             info.ModelTag.Id(),
+		ControllerUUID:   info.ModelTag.Id(),
+		CACert:           info.CACert,
+		HostPorts:        info.Addrs,
+		ControllerPath:   ctlId1,
+		UnavailableSince: newTime(mongodoc.Time(unavailableTime).UTC()),
 	}}
 	tests := []struct {
 		user    params.User
 		indexes []int
 	}{{
 		user:    "bob",
-		indexes: []int{0, 1},
+		indexes: []int{0, 3, 1},
 	}, {
 		user:    "charlie",
-		indexes: []int{0, 2},
+		indexes: []int{0, 3, 2},
 	}, {
 		user:    "alice",
-		indexes: []int{0},
+		indexes: []int{0, 3},
 	}, {
 		user:    "fred",
-		indexes: []int{0},
+		indexes: []int{0, 3},
 	}}
 	for i, test := range tests {
 		c.Logf("test %d: as user %s", i, test.user)

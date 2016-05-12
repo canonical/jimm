@@ -41,6 +41,10 @@ type ServerParams struct {
 	// authentication.
 	AgentUsername string
 	AgentKey      *bakery.KeyPair
+
+	// RunMonitor specifies that the monitor worker should be run.
+	// This should always be set when running the server in production.
+	RunMonitor bool
 }
 
 // HandleCloser represents an HTTP handler that can

@@ -257,7 +257,7 @@ func (ctxt schemaContext) getVal1(attr form.NamedAttr, checker schema.Checker) (
 		return val, path, nil
 	}
 	// TODO it could be a problem that this potentially
-	// enables a rogue JEM server to retrieve arbitrary
+	// enables a rogue JEM controller to retrieve arbitrary
 	// model variables from a client. Implement
 	// some kind of whitelisting scheme?
 	val, _, err = form.DefaultFromEnv(attr, checker)
