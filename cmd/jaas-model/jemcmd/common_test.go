@@ -1,4 +1,4 @@
-// Copyright 2015 Canonical Ltd.
+// Copyright 2015-2016 Canonical Ltd.
 
 package jemcmd_test
 
@@ -74,7 +74,7 @@ func (s *commonSuite) SetUpTest(c *gc.C) {
 	// Set up the client to act as "testuser" by default.
 	s.idmSrv.SetDefaultUser("testuser")
 
-	os.Setenv("JUJU_JEM", s.httpSrv.URL)
+	os.Setenv("JAAS_MODEL", s.httpSrv.URL)
 
 }
 

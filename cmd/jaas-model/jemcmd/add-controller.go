@@ -1,4 +1,4 @@
-// Copyright 2015 Canonical Ltd.
+// Copyright 2015-2016 Canonical Ltd.
 
 package jemcmd
 
@@ -26,28 +26,28 @@ func newAddControllerCommand() cmd.Command {
 }
 
 var addControllerDoc = `
-The add-controller command adds an existing Juju controller to the JEM.
+The add-controller command adds an existing Juju controller to the managing server.
 It takes the information from the data stored locally by juju (the
 current model by default).
 
 The <user>/<name> argument specifies the name
-that will be given to the controller inside JEM.
+that will be given to the controller inside the managing server.
 This will also be added as a model, so the
-JEM commands which refer to a model
+commands which refer to a model
 can also use the controller name.
 Some key value pair could be specify like cloud=aws be be set directly
 on the location information of the controller.
 
 The location of the controller can be set by providing a set of key=value
 pairs as additional arguments, for example:
-     juju jem add-controller alice/mycontroller cloud=aws region=us-east-1
+     jaas model add-controller alice/mycontroller cloud=aws region=us-east-1
 `
 
 func (c *addControllerCommand) Info() *cmd.Info {
 	return &cmd.Info{
 		Name:    "add-controller",
 		Args:    "<user>/<name> key=value [key=value...]",
-		Purpose: "Add a controller to JEM.",
+		Purpose: "Add a controller to the managing server.",
 		Doc:     addControllerDoc,
 	}
 }

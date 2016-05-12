@@ -1,4 +1,4 @@
-// Copyright 2015 Canonical Ltd.
+// Copyright 2015-2016 Canonical Ltd.
 
 package jemcmd
 
@@ -29,13 +29,13 @@ func newCreateTemplateCommand() cmd.Command {
 }
 
 var createTemplateDoc = `
-The create-template command adds a template for an model to the JEM.
-A template holds some of the configuration attributes required by
-a controller, and may be used when creating a new model.
-Secret attributes may be set but not retrieved.
+The create-template command adds a template for a model to the managing
+server.  A template holds some of the configuration attributes required by a
+controller, and may be used when creating a new model.  Secret attributes may
+be set but not retrieved.
 
 The <user>/<name> argument specifies the name that will be given to the
-template inside JEM.  Note that this exists in a different name space
+template inside the managing server.  Note that this exists in a different name space
 from model and controllers.
 `
 
@@ -43,7 +43,7 @@ func (c *createTemplateCommand) Info() *cmd.Info {
 	return &cmd.Info{
 		Name:    "create-template",
 		Args:    "<user>/<name> attr=val ...",
-		Purpose: "Add a template to JEM.",
+		Purpose: "Add a template to the managing server.",
 		Doc:     createTemplateDoc,
 	}
 }

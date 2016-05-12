@@ -1,4 +1,4 @@
-// Copyright 2015 Canonical Ltd.
+// Copyright 2015-2016 Canonical Ltd.
 
 package jemcmd
 
@@ -24,7 +24,7 @@ func newGetCommand() cmd.Command {
 }
 
 var getDoc = `
-The get command gets information about a JEM model
+The get command gets information about a managed model
 and writes it to a local .jenv file.
 `
 
@@ -32,7 +32,7 @@ func (c *getCommand) Info() *cmd.Info {
 	return &cmd.Info{
 		Name:    "get",
 		Args:    "<user>/<envname>",
-		Purpose: "Make a JEM model available to Juju",
+		Purpose: "Make a managed model available to Juju",
 		Doc:     getDoc,
 	}
 }

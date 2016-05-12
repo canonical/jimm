@@ -1,4 +1,4 @@
-// Copyright 2015 Canonical Ltd.
+// Copyright 2015-2016 Canonical Ltd.
 
 package jemcmd
 
@@ -33,24 +33,24 @@ func newGrantCommand() cmd.Command {
 
 var grantDoc = `
 The grant command grants permissions for a set of users or groups
-to read a model (default), controller, or template within JEM.
-Note that if someone can read a model from JEM they can
+to read a model (default), controller, or template within the managing server.
+Note that if someone can read a model from the managing server they can
 access that model and make changes to it.
 
 For example, this will allow alice and bob to read the model johndoe/mymodel.
 
-    juju jem grant johndoe/mymodel alice,bob
+    jaas model grant johndoe/mymodel alice,bob
 
 If the --set flag is provided, the ACLs will be overwritten rather than added.
 
-    juju jem grant johndoe/mymodel --set fred,bob
+    jaas model grant johndoe/mymodel --set fred,bob
 `
 
 func (c *grantCommand) Info() *cmd.Info {
 	return &cmd.Info{
 		Name:    "grant",
 		Args:    "<user>/<modelname|controllername> username[,username]",
-		Purpose: "grant permissions of JEM entity",
+		Purpose: "grant permissions of managing server entity",
 		Doc:     grantDoc,
 	}
 }
