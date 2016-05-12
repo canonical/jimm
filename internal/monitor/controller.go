@@ -155,13 +155,16 @@ func (m *controllerMonitor) watcher() error {
 				return errgo.Notef(err, "cannot set controller availability")
 			}
 			err := m.watch(conn)
-			conn.Close()
 			if errgo.Cause(err) == tomb.ErrDying {
+				conn.Close()
 				return tomb.ErrDying
 			}
-			if err != nil {
-				logger.Infof("watch controller %v died: %v", m.ctlPath, err)
-			}
+			logger.Infof("watch controller %v died: %v", m.ctlPath, err)
+			// The problem is almost certainly with the controller
+			// API connection, so evict the connection from the API
+			// cache so we'll definitely re-dial the controller rather
+			// than reusing the connection from the cache.
+			conn.Evict()
 		case tomb.ErrDying:
 			// The controller has been removed or we've been explicitly stopped.
 			return tomb.ErrDying
@@ -173,19 +176,19 @@ func (m *controllerMonitor) watcher() error {
 			// try again.
 			// TODO update the controller doc with the error?
 			logger.Errorf("cannot connect to controller %v: %v", m.ctlPath, err)
-			// Sleep for a while so we don't batter the network.
-			// TODO exponentially backoff up to some limit.
-			select {
-			case <-m.tomb.Dying():
-				// The controllerMonitor is dying.
-				return tomb.ErrDying
-			case <-Clock.After(apiConnectRetryDuration):
-			}
 		default:
 			// Some other error has happened. Don't mask the monitor-stopped
 			// error that occurs if the controller is removed, because
 			// we want the controller monitor to die quietly in that case.
 			return errgo.NoteMask(err, fmt.Sprintf("cannot dial API for controller %v", m.ctlPath), isMonitoringStoppedError)
+		}
+		// Sleep for a while so we don't batter the network.
+		// TODO exponentially backoff up to some limit.
+		select {
+		case <-m.tomb.Dying():
+			// The controllerMonitor is dying.
+			return tomb.ErrDying
+		case <-Clock.After(apiConnectRetryDuration):
 		}
 	}
 }
@@ -201,7 +204,7 @@ func (m *controllerMonitor) dialAPI() (jujuAPI, error) {
 		conn jujuAPI
 		err  error
 	}
-	reply := make(chan apiConnReply, 1)
+	reply := make(chan apiConnReply)
 	// Make an independent copy of the JEM instance
 	// because this goroutine might live on beyond
 	// the allMonitor's lifetime.
@@ -215,9 +218,15 @@ func (m *controllerMonitor) dialAPI() (jujuAPI, error) {
 		// we know that the JEM is closed before that.
 		j.Close()
 		logger.Infof("openAPI returned error %v", err)
-		reply <- apiConnReply{
+		select {
+		case reply <- apiConnReply{
 			conn: conn,
 			err:  err,
+		}:
+		case <-m.tomb.Dying():
+			if conn != nil {
+				conn.Close()
+			}
 		}
 	}()
 	select {

@@ -75,6 +75,9 @@ type jemInterface interface {
 
 // jujuAPI represents an API connection to a Juju controller.
 type jujuAPI interface {
+	// Evict closes the connection and removes it from the API connection cache.
+	Evict()
+
 	// WatchAllModels returns an allWatcher, from which you can request
 	// the Next collection of Deltas (for all models).
 	WatchAllModels() (allWatcher, error)

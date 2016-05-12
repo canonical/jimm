@@ -7,6 +7,7 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/state/multiwatcher"
 	jujutesting "github.com/juju/juju/testing"
+	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
@@ -259,67 +260,104 @@ func (s *jemShimInMemory) AcquireMonitorLease(ctlPath params.EntityPath, oldExpi
 	return ctl.MonitorLeaseExpiry, nil
 }
 
-var _ jujuAPI = (*jemAPIShim)(nil)
-
-type jemAPIShim struct {
+type jujuAPIShims struct {
 	mu           sync.Mutex
+	openCount    int
 	watcherCount int
-	closed       bool
-	initial      []multiwatcher.Delta
 }
 
-// newJEMAPIShim returns an implementation of the jujuAPI interface
+func newJujuAPIShims() *jujuAPIShims {
+	return &jujuAPIShims{}
+}
+
+// newJujuAPIShim returns an implementation of the jujuAPI interface
 // that, when WatchAllModels is called, returns the given initial
 // deltas and then nothing.
-func newJEMAPIShim(initial []multiwatcher.Delta) *jemAPIShim {
-	return &jemAPIShim{
+// The
+func (s *jujuAPIShims) newJujuAPIShim(initial []multiwatcher.Delta) *jujuAPIShim {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.openCount++
+	return &jujuAPIShim{
 		initial: initial,
+		shims:   s,
 	}
 }
 
-func (s *jemAPIShim) Close() error {
+var closedAttempt = &utils.AttemptStrategy{
+	Total: time.Second,
+	Delay: time.Millisecond,
+}
+
+// CheckAllClosed checks that all API connections and watchers
+// have been closed.
+func (s *jujuAPIShims) CheckAllClosed(c *gc.C) {
+	// The API connections can be closed asynchronously after
+	// the worker is closed down, so wait for a while to make sure
+	// they are actually closed.
+	for a := closedAttempt.Start(); a.Next(); {
+		s.mu.Lock()
+		n := s.openCount
+		s.mu.Unlock()
+		if n == 0 {
+			break
+		}
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	c.Check(s.openCount, gc.Equals, 0)
+	c.Check(s.watcherCount, gc.Equals, 0)
+}
+
+var _ jujuAPI = (*jujuAPIShim)(nil)
+
+// jujuAPIShim implements the jujuAPI interface.
+type jujuAPIShim struct {
+	shims   *jujuAPIShims
+	closed  bool
+	initial []multiwatcher.Delta
+	stack   string
+}
+
+func (s *jujuAPIShim) Evict() {
+	s.Close()
+}
+
+func (s *jujuAPIShim) Close() error {
+	s.shims.mu.Lock()
+	defer s.shims.mu.Unlock()
+	if s.closed {
+		return nil
+	}
 	s.closed = true
+	s.shims.openCount--
 	return nil
 }
 
-// WatcherCount returns the number of currently open API watchers.
-func (s *jemAPIShim) WatcherCount() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.watcherCount
-}
-
-func (s *jemAPIShim) IsClosed() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.closed
-}
-
-func (s *jemAPIShim) WatchAllModels() (allWatcher, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.watcherCount++
+func (s *jujuAPIShim) WatchAllModels() (allWatcher, error) {
+	s.shims.mu.Lock()
+	defer s.shims.mu.Unlock()
+	s.shims.watcherCount++
 	return &watcherShim{
-		jemAPIShim: s,
-		stopped:    make(chan struct{}),
-		initial:    s.initial,
+		jujuAPIShim: s,
+		stopped:     make(chan struct{}),
+		initial:     s.initial,
 	}, nil
 }
 
 type watcherShim struct {
-	jemAPIShim *jemAPIShim
-	mu         sync.Mutex
-	stopped    chan struct{}
-	initial    []multiwatcher.Delta
+	jujuAPIShim *jujuAPIShim
+	mu          sync.Mutex
+	stopped     chan struct{}
+	initial     []multiwatcher.Delta
 }
 
 func (s *watcherShim) Next() ([]multiwatcher.Delta, error) {
-	s.mu.Lock()
+	s.jujuAPIShim.shims.mu.Lock()
 	d := s.initial
 	s.initial = nil
-	s.mu.Unlock()
+	s.jujuAPIShim.shims.mu.Unlock()
 	if len(d) > 0 {
 		return d, nil
 	}
@@ -332,8 +370,8 @@ func (s *watcherShim) Next() ([]multiwatcher.Delta, error) {
 
 func (s *watcherShim) Stop() error {
 	close(s.stopped)
-	s.jemAPIShim.mu.Lock()
-	s.jemAPIShim.watcherCount--
-	s.jemAPIShim.mu.Unlock()
+	s.jujuAPIShim.shims.mu.Lock()
+	s.jujuAPIShim.shims.watcherCount--
+	s.jujuAPIShim.shims.mu.Unlock()
 	return nil
 }
