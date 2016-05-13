@@ -191,9 +191,6 @@ func (ctxt schemaContext) generateConfig(schema environschema.Fields) (map[strin
 		if err != nil {
 			return nil, errgo.Mask(err)
 		}
-		if val == nil && attr.Mandatory {
-			return nil, errgo.Newf("no value found for mandatory attribute %q", name)
-		}
 		if val != nil {
 			config[name] = val
 		}

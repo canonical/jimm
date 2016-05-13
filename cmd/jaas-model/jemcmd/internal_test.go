@@ -375,18 +375,6 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 			"testattr-modelname": "modelname-foo",
 		},
 	}, {
-		about: "no value found for mandatory attribute",
-		controllerInfo: params.ControllerResponse{
-			ProviderType: "test",
-			Schema: environschema.Fields{
-				"attr": {
-					Type:      environschema.Tstring,
-					Mandatory: true,
-				},
-			},
-		},
-		expectError: `no value found for mandatory attribute "attr"`,
-	}, {
 		about: "mandatory attribute with value",
 		controllerInfo: params.ControllerResponse{
 			ProviderType: "test",
