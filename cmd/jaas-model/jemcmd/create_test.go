@@ -106,6 +106,10 @@ func (s *createSuite) TestCreateWithTemplate(c *gc.C) {
 	c.Assert(stderr, gc.Equals, "")
 
 	// Then add a template containing the mandatory controller parameter.
+	// TODO unfortunately the controller parameter is *not* mandatory.
+	// This means that there are no parameters we can use to test that
+	// this actually works. Unfortunately registering another provider for testing
+	// and using that is not currently feasible.
 	stdout, stderr, code = run(c, c.MkDir(), "create-template", "bob/template", "-c", "bob/foo", "controller=true")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
