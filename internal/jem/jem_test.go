@@ -17,10 +17,10 @@ import (
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/CanonicalLtd/jem/internal/idmtest"
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
+	"github.com/juju/idmclient/idmtest"
 )
 
 type jemSuite struct {
@@ -44,6 +44,7 @@ func (s *jemSuite) SetUpTest(c *gc.C) {
 			BaseURL: s.idmSrv.URL.String(),
 			Client:  s.idmSrv.Client("agent"),
 		}),
+		ControllerAdmin: "controller-admin",
 	})
 	c.Assert(err, gc.IsNil)
 	s.pool = pool
@@ -54,6 +55,21 @@ func (s *jemSuite) TearDownTest(c *gc.C) {
 	s.store.Close()
 	s.pool.Close()
 	s.IsolatedMgoSuite.TearDownTest(c)
+}
+
+func (s *jemSuite) TestPoolRequiresControllerAdmin(c *gc.C) {
+	pool, err := jem.NewPool(jem.Params{
+		DB: s.Session.DB("jem"),
+		BakeryParams: bakery.NewServiceParams{
+			Location: "here",
+		},
+		IDMClient: idmclient.New(idmclient.NewParams{
+			BaseURL: s.idmSrv.URL.String(),
+			Client:  s.idmSrv.Client("agent"),
+		}),
+	})
+	c.Assert(err, gc.ErrorMatches, "no controller admin group specified")
+	c.Assert(pool, gc.IsNil)
 }
 
 func (s *jemSuite) TestAddController(c *gc.C) {
@@ -251,19 +267,29 @@ func (s *jemSuite) TestControllerLocationQuery(c *gc.C) {
 			"cloud":  "aws",
 			"region": "us-east-1",
 		},
+		Public: true,
 	}, {
 		Path: params.EntityPath{"bob", "aws-eu-west-1"},
 		Location: map[string]string{
 			"cloud":  "aws",
 			"region": "eu-west-1",
 		},
+		Public: true,
 	}, {
 		Path: params.EntityPath{"charlie", "other"},
 		Location: map[string]string{
 			"other": "something",
 		},
+		Public: true,
 	}, {
-		Path: params.EntityPath{"charlie", "noattrs"},
+		Path:   params.EntityPath{"charlie", "noattrs"},
+		Public: true,
+	}, {
+		Path: params.EntityPath{"bob", "private"},
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "eu-west-1",
+		},
 	}} {
 		err := s.store.AddController(ctl, &mongodoc.Model{})
 		c.Assert(err, gc.IsNil)
@@ -538,6 +564,7 @@ func (s *jemSuite) TestJEMCopiesSession(c *gc.C) {
 			BaseURL: s.idmSrv.URL.String(),
 			Client:  s.idmSrv.Client("agent"),
 		}),
+		ControllerAdmin: "controller-admin",
 	})
 	c.Assert(err, gc.IsNil)
 

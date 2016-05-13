@@ -52,7 +52,7 @@ func (s *APISuite) TestPprofOKWithAdmin(c *gc.C) {
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.JEMSrv,
 		URL:     "/debug/pprof/",
-		Do:      apitest.Do(s.IDMSrv.Client("admin")),
+		Do:      apitest.Do(s.IDMSrv.Client("controller-admin")),
 	})
 	c.Assert(resp.Code, gc.Equals, http.StatusOK)
 	c.Assert(resp.HeaderMap.Get("Content-Type"), gc.Matches, "text/html.*")

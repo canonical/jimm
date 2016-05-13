@@ -12,10 +12,10 @@ import (
 	"gopkg.in/macaroon-bakery.v1/bakery"
 
 	"github.com/CanonicalLtd/jem/internal/apiconn"
-	"github.com/CanonicalLtd/jem/internal/idmtest"
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
+	"github.com/juju/idmclient/idmtest"
 )
 
 type jemAPIConnSuite struct {
@@ -39,6 +39,7 @@ func (s *jemAPIConnSuite) SetUpTest(c *gc.C) {
 			BaseURL: s.idmSrv.URL.String(),
 			Client:  s.idmSrv.Client("agent"),
 		}),
+		ControllerAdmin: "controller-admin",
 	})
 	c.Assert(err, gc.IsNil)
 	s.pool = pool

@@ -146,10 +146,11 @@ func (s *createSuite) TestCreateWithTemplate(c *gc.C) {
 
 func (s *createSuite) TestCreateWithLocation(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
+	s.idmSrv.AddUser("bob", "admin")
 
 	// First add the controller that we're going to use
 	// to create the new model.
-	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/aws", "cloud=aws")
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "--public", "bob/aws", "cloud=aws")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
@@ -183,8 +184,9 @@ func (s *createSuite) TestCreateWithLocation(c *gc.C) {
 
 func (s *createSuite) TestCreateWithLocationWithExistingModel(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
+	s.idmSrv.AddUser("bob", "admin")
 
-	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/aws", "cloud=aws")
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "--public", "bob/aws", "cloud=aws")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")

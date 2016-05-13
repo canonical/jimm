@@ -38,6 +38,7 @@ func (s *locationsSuite) TestError(c *gc.C) {
 
 func (s *locationsSuite) TestSuccess(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
+	s.idmSrv.AddUser("bob", "admin")
 
 	addController := func(name string, attrs ...string) {
 		args := append([]string{name}, attrs...)
@@ -48,12 +49,12 @@ func (s *locationsSuite) TestSuccess(c *gc.C) {
 	}
 
 	// Add some controllers.
-	addController("bob/c1", "cloud=aws", "region=us-east-1")
-	addController("bob/c2", "cloud=aws", "region=us-east-1")
-	addController("bob/c3", "cloud=aws", "region=us-east-1", "staging=true")
-	addController("bob/c4", "cloud=aws", "region=eu-west-1")
-	addController("bob/c5", "cloud=aws", "region=eu-west-1")
-	addController("bob/c6", "cloud=azure", "region=somewhere")
+	addController("bob/c1", "--public", "cloud=aws", "region=us-east-1")
+	addController("bob/c2", "--public", "cloud=aws", "region=us-east-1")
+	addController("bob/c3", "--public", "cloud=aws", "region=us-east-1", "staging=true")
+	addController("bob/c4", "--public", "cloud=aws", "region=eu-west-1")
+	addController("bob/c5", "--public", "cloud=aws", "region=eu-west-1")
+	addController("bob/c6", "--public", "cloud=azure", "region=somewhere")
 
 	stdout, stderr, code := run(c, c.MkDir(), "locations")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))

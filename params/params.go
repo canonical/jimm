@@ -70,8 +70,12 @@ type GetControllerLocation struct {
 	EntityPath
 }
 
+// ControllerLocation holds details of a controller's location.
 type ControllerLocation struct {
+	// Location holds the location attributes.
 	Location map[string]string
+	// Public holds whether the controller is considered public.
+	Public bool
 }
 
 // ACL holds an access control list for an entity.
@@ -151,6 +155,14 @@ type ControllerInfo struct {
 
 	// Location holds location attributes to be associated with the controller.
 	Location map[string]string
+
+	// Public specifies whether the controller is considered
+	// part of the "pool" of publicly available controllers.
+	// Non-public controllers will be ignored when selecting
+	// controllers by location.
+	//
+	// Only privileged users may create public controllers.
+	Public bool
 }
 
 // EntityPath holds the path parameters for specifying
@@ -312,12 +324,16 @@ type ControllerResponse struct {
 	Schema environschema.Fields `json:"schema,omitempty"`
 
 	// Location holds location attributes associated with the controller.
+	Location map[string]string `json:"location,omitempty"`
+
+	// Public holds whether the controller is part of the public
+	// pool of controllers.
+	Public bool
 
 	// UnavailableSince holds the time that the JEM server
 	// noticed that the model's controller could not be
 	// contacted. It is empty when the model is available.
-	UnavailableSince *time.Time        `json:"unavailable-since,omitempty"`
-	Location         map[string]string `json:"location,omitempty"`
+	UnavailableSince *time.Time `json:"unavailable-since,omitempty"`
 }
 
 // GetController holds parameters for retrieving information on a Controller.

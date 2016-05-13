@@ -81,6 +81,21 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	if err := h.jem.CheckIsUser(arg.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
+	if arg.Info.Public {
+		admin := h.jem.ControllerAdmin()
+		if admin == "" {
+			return errgo.Newf("no controller admin configured")
+		}
+		if err := h.jem.CheckIsUser(admin); err != nil {
+			if errgo.Cause(err) == params.ErrUnauthorized {
+				return errgo.WithCausef(nil, params.ErrUnauthorized, "admin access required to add public controllers")
+			}
+			return errgo.Mask(err)
+		}
+		if len(arg.Info.Location) == 0 {
+			return badRequestf(nil, "cannot add public controller with no location")
+		}
+	}
 	if len(arg.Info.HostPorts) == 0 {
 		return badRequestf(nil, "no host-ports in request")
 	}
@@ -102,6 +117,7 @@ func (h *Handler) AddController(arg *params.AddController) error {
 		AdminPassword: arg.Info.Password,
 		UUID:          arg.Info.ControllerUUID,
 		Location:      arg.Info.Location,
+		Public:        arg.Info.Public,
 	}
 	m := &mongodoc.Model{
 		UUID: arg.Info.ControllerUUID,
@@ -164,6 +180,7 @@ func (h *Handler) GetController(arg *params.GetController) (*params.ControllerRe
 		ProviderType: neSchema.providerType,
 		Schema:       neSchema.schema,
 		Location:     ctl.Location,
+		Public:       ctl.Public,
 	}, nil
 }
 
@@ -427,6 +444,7 @@ func (h *Handler) ListController(arg *params.ListController) (*params.ListContro
 		controllers = append(controllers, params.ControllerResponse{
 			Path:             ctl.Path,
 			Location:         ctl.Location,
+			Public:           ctl.Public,
 			UnavailableSince: uvt,
 		})
 	}

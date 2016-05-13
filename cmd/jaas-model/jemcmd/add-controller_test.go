@@ -18,28 +18,34 @@ type addControllerSuite struct {
 var _ = gc.Suite(&addControllerSuite{})
 
 var addControllerTests = []struct {
-	about    string
-	args     []string
-	location map[string]string
+	about          string
+	args           []string
+	expectLocation map[string]string
+	expectPublic   bool
 }{{
 	about: "simple",
 	args:  []string{},
 }, {
-	about:    "add cloud",
-	args:     []string{"cloud=aws"},
-	location: map[string]string{"cloud": "aws"},
+	about:          "add cloud",
+	args:           []string{"cloud=aws"},
+	expectLocation: map[string]string{"cloud": "aws"},
 }, {
-	about:    "add region",
-	args:     []string{"region=somewhere"},
-	location: map[string]string{"region": "somewhere"},
+	about:          "add region",
+	args:           []string{"region=somewhere"},
+	expectLocation: map[string]string{"region": "somewhere"},
 }, {
-	about:    "add region and cloud",
-	args:     []string{"region=somewhere", "cloud=aws"},
-	location: map[string]string{"cloud": "aws", "region": "somewhere"},
+	about:          "add region and cloud",
+	args:           []string{"region=somewhere", "cloud=aws"},
+	expectLocation: map[string]string{"cloud": "aws", "region": "somewhere"},
+}, {
+	about:          "add public region and cloud",
+	args:           []string{"--public", "region=somewhere", "cloud=aws"},
+	expectLocation: map[string]string{"cloud": "aws", "region": "somewhere"},
+	expectPublic:   true,
 }}
 
 func (s *addControllerSuite) TestAddController(c *gc.C) {
-	s.idmSrv.AddUser("bob")
+	s.idmSrv.AddUser("bob", "admin")
 	s.idmSrv.SetDefaultUser("bob")
 	client := s.jemClient("bob")
 	for i, test := range addControllerTests {
@@ -63,7 +69,8 @@ func (s *addControllerSuite) TestAddController(c *gc.C) {
 			},
 		})
 		c.Assert(err, gc.IsNil)
-		c.Assert(ctl.Location, gc.DeepEquals, test.location)
+		c.Assert(ctl.Location, gc.DeepEquals, test.expectLocation)
+		c.Assert(ctl.Public, gc.DeepEquals, test.expectPublic)
 	}
 
 }

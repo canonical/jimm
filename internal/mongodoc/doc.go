@@ -55,6 +55,12 @@ type Controller struct {
 	// Location holds the location attributes associated with the controller.
 	Location map[string]string
 
+	// Public specifies whether the controller is considered
+	// part of the "pool" of publicly available controllers.
+	// Non-public controllers will be ignored when selecting
+	// controllers by location.
+	Public bool `bson:",omitempty"`
+
 	// ProviderType holds the type of the juju provider that the
 	// controller is using.
 	ProviderType string

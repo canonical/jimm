@@ -18,11 +18,11 @@ import (
 	"gopkg.in/mgo.v2"
 
 	external_jem "github.com/CanonicalLtd/jem"
-	"github.com/CanonicalLtd/jem/internal/idmtest"
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/jemserver"
 	"github.com/CanonicalLtd/jem/jemclient"
 	"github.com/CanonicalLtd/jem/params"
+	"github.com/juju/idmclient/idmtest"
 )
 
 // Suite implements a test fixture that contains a JEM server
@@ -68,6 +68,7 @@ func (s *Suite) newPool(c *gc.C, session *mgo.Session) *jem.Pool {
 			BaseURL: s.IDMSrv.URL.String(),
 			Client:  s.IDMSrv.Client("agent"),
 		}),
+		ControllerAdmin: "controller-admin",
 	})
 	c.Assert(err, gc.IsNil)
 	return pool
@@ -115,7 +116,7 @@ func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server)
 	s.IDMSrv.AddUser("agent")
 	config := external_jem.ServerParams{
 		DB:               db,
-		ControllerAdmin:  "admin",
+		ControllerAdmin:  "controller-admin",
 		IdentityLocation: idmSrv.URL.String(),
 		PublicKeyLocator: idmSrv,
 		AgentUsername:    "agent",
