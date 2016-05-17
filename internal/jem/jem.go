@@ -41,7 +41,7 @@ type Params struct {
 
 	// ControllerAdmin holds the identity of the user
 	// or group that is allowed to create controllers.
-	ControllerAdmin string
+	ControllerAdmin params.User
 
 	// IdentityLocation holds the location of the third party identity service.
 	IdentityLocation string
@@ -69,6 +69,9 @@ const maxPermCacheDuration = 10 * time.Second
 // bakery.Service.
 func NewPool(p Params) (*Pool, error) {
 	// TODO migrate database
+	if p.ControllerAdmin == "" {
+		return nil, errgo.Newf("no controller admin group specified")
+	}
 	pool := &Pool{
 		config:      p,
 		db:          Database{p.DB},
@@ -201,6 +204,10 @@ func (j *JEM) Clone() *JEM {
 		PermChecker: j.pool.permChecker,
 		pool:        j.pool,
 	}
+}
+
+func (j *JEM) ControllerAdmin() params.User {
+	return j.pool.config.ControllerAdmin
 }
 
 // Close closes the JEM instance. This should be called when
@@ -507,10 +514,11 @@ func (j *JEM) ControllerLocationQuery(location map[string]string) (*mgo.Query, e
 	if err := validateLocationAttrs(location); err != nil {
 		return nil, errgo.Notef(err, "bad controller location query")
 	}
-	q := make(bson.D, 0, len(location))
+	q := make(bson.D, 0, len(location)+1)
 	for attr, val := range location {
 		q = append(q, bson.DocElem{"location." + attr, val})
 	}
+	q = append(q, bson.DocElem{"public", true})
 	return j.DB.Controllers().Find(q), nil
 }
 

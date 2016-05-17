@@ -19,6 +19,7 @@ type addControllerCommand struct {
 	modelName  string
 	modelPath  entityPathValue
 	attributes map[string]string
+	public     bool
 }
 
 func newAddControllerCommand() cmd.Command {
@@ -40,7 +41,12 @@ on the location information of the controller.
 
 The location of the controller can be set by providing a set of key=value
 pairs as additional arguments, for example:
-     jaas model add-controller alice/mycontroller cloud=aws region=us-east-1
+ 
+     jaas model add-controller --public alice/mycontroller cloud=aws region=us-east-1
+
+Without the --public flag, the location will not cause the controller
+to be considered a candidate for selection by location - the location
+is for annotation only in this case (this might change).
 `
 
 func (c *addControllerCommand) Info() *cmd.Info {
@@ -56,6 +62,7 @@ func (c *addControllerCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.commandBase.SetFlags(f)
 	f.StringVar(&c.modelName, "m", "", "model to add")
 	f.StringVar(&c.modelName, "model", "", "")
+	f.BoolVar(&c.public, "public", false, "whether it will be part of the public pool of controllers")
 }
 
 func (c *addControllerCommand) Init(args []string) error {
@@ -101,6 +108,7 @@ func (c *addControllerCommand) Run(ctxt *cmd.Context) error {
 			User:           info.account.User,
 			Password:       info.account.Password,
 			Location:       c.attributes,
+			Public:         c.public,
 		},
 	}); err != nil {
 		return errgo.Notef(err, "cannot add controller")

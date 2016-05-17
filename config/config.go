@@ -11,12 +11,15 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/yaml.v2"
+
+	"github.com/CanonicalLtd/jem/params"
 )
 
 type Config struct {
-	MongoAddr         string            `yaml:"mongo-addr"`
-	APIAddr           string            `yaml:"api-addr"`
-	ControllerAdmin   string            `yaml:"state-server-admin"`
+	MongoAddr string `yaml:"mongo-addr"`
+	APIAddr   string `yaml:"api-addr"`
+	// TODO rename state-server-admin to controller-admin.
+	ControllerAdmin   params.User       `yaml:"state-server-admin"`
 	IdentityPublicKey *bakery.PublicKey `yaml:"identity-public-key"`
 	IdentityLocation  string            `yaml:"identity-location"`
 	AgentUsername     string            `yaml:"agent-username"`

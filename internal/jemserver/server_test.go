@@ -28,7 +28,8 @@ var _ = gc.Suite(&serverSuite{})
 
 func (s *serverSuite) TestNewServerWithNoVersions(c *gc.C) {
 	params := jemserver.Params{
-		DB: s.Session.DB("foo"),
+		DB:              s.Session.DB("foo"),
+		ControllerAdmin: "controller-admin",
 	}
 	h, err := jemserver.New(params, nil)
 	c.Assert(err, gc.ErrorMatches, `JEM server must serve at least one version of the API`)
@@ -42,7 +43,8 @@ type versionResponse struct {
 
 func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	serverParams := jemserver.Params{
-		DB: s.Session.DB("foo"),
+		DB:              s.Session.DB("foo"),
+		ControllerAdmin: "controller-admin",
 	}
 	serveVersion := func(vers string) jemserver.NewAPIHandlerFunc {
 		return func(p *jem.Pool, config jemserver.Params) ([]httprequest.Handler, error) {
@@ -122,7 +124,8 @@ func assertDoesNotServeVersion(c *gc.C, h http.Handler, vers string) {
 
 func (s *serverSuite) TestServerHasAccessControlAllowOrigin(c *gc.C) {
 	serverParams := jemserver.Params{
-		DB: s.Session.DB("foo"),
+		DB:              s.Session.DB("foo"),
+		ControllerAdmin: "controller-admin",
 	}
 	impl := map[string]jemserver.NewAPIHandlerFunc{
 		"/a": func(p *jem.Pool, config jemserver.Params) ([]httprequest.Handler, error) {
@@ -170,7 +173,8 @@ func (s *serverSuite) TestServerHasAccessControlAllowOrigin(c *gc.C) {
 func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 	db := s.Session.DB("foo")
 	pool, err := jem.NewPool(jem.Params{
-		DB: db,
+		DB:              db,
+		ControllerAdmin: "controller-admin",
 	})
 	c.Assert(err, gc.IsNil)
 	defer pool.Close()
@@ -188,9 +192,10 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	params := jemserver.Params{
-		DB:            db,
-		AgentUsername: "foo",
-		RunMonitor:    true,
+		DB:              db,
+		AgentUsername:   "foo",
+		RunMonitor:      true,
+		ControllerAdmin: "controller-admin",
 	}
 	// Patch the API opening timeout so that it doesn't take the
 	// usual 15 seconds to fail - we don't, it holds on to the

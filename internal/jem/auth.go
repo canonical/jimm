@@ -98,6 +98,7 @@ func (j *JEM) CheckACL(acl []string) error {
 		return errgo.Notef(err, "cannot check permissions")
 	}
 	if !ok {
+		logger.Infof("%s is not authorized for ACL %s", j.Auth.Username, acl)
 		return params.ErrUnauthorized
 	}
 	return nil

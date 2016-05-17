@@ -165,7 +165,7 @@ func (s *APISuite) TestAddController(c *gc.C) {
 		expectStatus int
 		expectBody   interface{}
 	}{{
-		about: "add model",
+		about: "add controller",
 		body: params.ControllerInfo{
 			HostPorts:      info.Addrs,
 			CACert:         info.CACert,
@@ -174,7 +174,7 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			ControllerUUID: info.ModelTag.Id(),
 		},
 	}, {
-		about:    "add model as part of group",
+		about:    "add controller as part of group",
 		username: "beatles",
 		authUser: "alice",
 		body: params.ControllerInfo{
@@ -183,6 +183,21 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			User:           info.Tag.Id(),
 			Password:       info.Password,
 			ControllerUUID: info.ModelTag.Id(),
+		},
+	}, {
+		about:    "add public controller with location",
+		username: "controller-admin",
+		authUser: "controller-admin",
+		body: params.ControllerInfo{
+			HostPorts:      info.Addrs,
+			CACert:         info.CACert,
+			User:           info.Tag.Id(),
+			Password:       info.Password,
+			ControllerUUID: info.ModelTag.Id(),
+			Location: map[string]string{
+				"cloud": "aws",
+			},
+			Public: true,
 		},
 	}, {
 		about:    "incorrect user",
@@ -253,6 +268,36 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			Message: "bad model UUID in request",
 		},
 	}, {
+		about:    "public with no location",
+		username: "controller-admin",
+		authUser: "controller-admin",
+		body: params.ControllerInfo{
+			HostPorts: info.Addrs,
+			CACert:    info.CACert,
+			User:      info.Tag.Id(),
+			Password:  info.Password,
+			Public:    true,
+		},
+		expectStatus: http.StatusBadRequest,
+		expectBody: params.Error{
+			Code:    "bad request",
+			Message: `cannot add public controller with no location`,
+		},
+	}, {
+		about: "public but no controller-admin access",
+		body: params.ControllerInfo{
+			HostPorts: info.Addrs,
+			CACert:    info.CACert,
+			User:      info.Tag.Id(),
+			Password:  info.Password,
+			Public:    true,
+		},
+		expectStatus: http.StatusUnauthorized,
+		expectBody: params.Error{
+			Code:    params.ErrUnauthorized,
+			Message: `admin access required to add public controllers`,
+		},
+	}, {
 		about: "cannot connect to evironment",
 		body: params.ControllerInfo{
 			HostPorts:      []string{"0.1.2.3:1234"},
@@ -276,7 +321,7 @@ func (s *APISuite) TestAddController(c *gc.C) {
 		c.Logf("test %d: %s", i, test.about)
 		modelPath := params.EntityPath{
 			User: test.username,
-			Name: params.Name(fmt.Sprintf("model%d", i)),
+			Name: params.Name(fmt.Sprintf("controller%d", i)),
 		}
 		if modelPath.User == "" {
 			modelPath.User = "testuser"
@@ -465,6 +510,7 @@ func (s *APISuite) TestGetController(c *gc.C) {
 }
 
 func (s *APISuite) TestGetControllerWithLocation(c *gc.C) {
+	s.IDMSrv.AddUser("bob", "controller-admin")
 	ctlId := params.EntityPath{"bob", "foo"}
 	info := s.APIInfo(c)
 
@@ -477,6 +523,7 @@ func (s *APISuite) TestGetControllerWithLocation(c *gc.C) {
 			Password:       info.Password,
 			ControllerUUID: info.ModelTag.Id(),
 			Location:       map[string]string{"cloud": "aws"},
+			Public:         true,
 		},
 	})
 	c.Assert(err, gc.IsNil)
@@ -491,6 +538,7 @@ func (s *APISuite) TestGetControllerWithLocation(c *gc.C) {
 	err = json.Unmarshal(resp.Body.Bytes(), &controllerInfo)
 	c.Assert(err, gc.IsNil, gc.Commentf("body: %s", resp.Body.String()))
 	c.Assert(controllerInfo.Location, gc.DeepEquals, map[string]string{"cloud": "aws"})
+	c.Assert(controllerInfo.Public, gc.Equals, true)
 }
 
 func (s *APISuite) TestGetControllerLocation(c *gc.C) {
@@ -845,12 +893,11 @@ func (s *APISuite) TestGetControllerLocations(c *gc.C) {
 		"cloud":  "gce",
 		"region": "elsewhere",
 	})
+	s.IDMSrv.AddUser("alice", "somegroup")
 	s.assertAddController(c, params.EntityPath{"alice", "alice-controller"}, map[string]string{
 		"cloud":  "azure",
 		"region": "america",
 	})
-
-	s.IDMSrv.AddUser("alice", "somegroup")
 
 	for i, test := range getControllerLocationsTests {
 		c.Logf("test %d: %v", i, test.about)
@@ -1018,13 +1065,12 @@ func (s *APISuite) TestAllControllerLocations(c *gc.C) {
 		"cloud":  "gce",
 		"region": "elsewhere",
 	})
+	s.IDMSrv.AddUser("alice", "somegroup")
 	s.assertAddController(c, params.EntityPath{"alice", "alice-controller"}, map[string]string{
 		"cloud":  "azure",
 		"region": "america",
 	})
 	s.assertAddController(c, params.EntityPath{"alice", "forgotten"}, nil)
-
-	s.IDMSrv.AddUser("alice", "somegroup")
 
 	for i, test := range getAllControllerLocationsTests {
 		c.Logf("test %d: %v", i, test.about)
@@ -1095,6 +1141,7 @@ func (s *APISuite) TestGetSchemaAmbiguous(c *gc.C) {
 			"cloud": "aws",
 		},
 		ProviderType: "another",
+		Public:       true,
 	}, &mongodoc.Model{
 		Path:       params.EntityPath{"bob", "azure"},
 		Controller: params.EntityPath{"bob", "azure"},
@@ -1841,7 +1888,7 @@ func (s *APISuite) TestNewModelUnauthorized(c *gc.C) {
 }
 
 func (s *APISuite) TestListController(c *gc.C) {
-	ctlId0 := s.assertAddController(c, params.EntityPath{"bob", "foo"}, nil)
+	ctlId0 := s.assertAddController(c, params.EntityPath{"bob", "foo"}, map[string]string{"cloud": "aws"})
 
 	ctlId1 := s.assertAddController(c, params.EntityPath{"bob", "lost"}, nil)
 	unavailableTime := time.Now()
@@ -1852,7 +1899,9 @@ func (s *APISuite) TestListController(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(resp, jc.DeepEquals, &params.ListControllerResponse{
 		Controllers: []params.ControllerResponse{{
-			Path: ctlId0,
+			Path:     ctlId0,
+			Location: map[string]string{"cloud": "aws"},
+			Public:   true,
 		}, {
 			Path:             ctlId1,
 			UnavailableSince: newTime(mongodoc.Time(unavailableTime).UTC()),
@@ -2386,8 +2435,7 @@ func (s *APISuite) addController(c *gc.C, path params.EntityPath, loc map[string
 	// persist, the discharge macaroon we get won't affect subsequent
 	// requests in the caller.
 	info := s.APIInfo(c)
-
-	return s.NewClient(path.User).AddController(&params.AddController{
+	p := &params.AddController{
 		EntityPath: path,
 		Info: params.ControllerInfo{
 			HostPorts:      info.Addrs,
@@ -2397,7 +2445,12 @@ func (s *APISuite) addController(c *gc.C, path params.EntityPath, loc map[string
 			ControllerUUID: info.ModelTag.Id(),
 			Location:       loc,
 		},
-	})
+	}
+	if len(loc) > 0 {
+		p.Info.Public = true
+		s.IDMSrv.AddUser(string(path.User), "controller-admin")
+	}
+	return s.NewClient(path.User).AddController(p)
 }
 
 // addModel adds a new model in the given controller. It

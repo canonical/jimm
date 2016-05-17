@@ -24,9 +24,9 @@ import (
 
 	"github.com/CanonicalLtd/jem"
 	"github.com/CanonicalLtd/jem/cmd/jaas-model/jemcmd"
-	"github.com/CanonicalLtd/jem/internal/idmtest"
 	"github.com/CanonicalLtd/jem/jemclient"
 	"github.com/CanonicalLtd/jem/params"
+	"github.com/juju/idmclient/idmtest"
 )
 
 // run runs a jem plugin subcommand with the given arguments,

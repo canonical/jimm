@@ -13,6 +13,7 @@ import (
 	"github.com/CanonicalLtd/jem/internal/debugapi"
 	"github.com/CanonicalLtd/jem/internal/jemserver"
 	"github.com/CanonicalLtd/jem/internal/v2"
+	"github.com/CanonicalLtd/jem/params"
 )
 
 var versions = map[string]jemserver.NewAPIHandlerFunc{
@@ -28,7 +29,7 @@ type ServerParams struct {
 
 	// ControllerAdmin holds the identity of the user
 	// or group that is allowed to create controllers.
-	ControllerAdmin string
+	ControllerAdmin params.User
 
 	// IdentityLocation holds the location of the third party identity service.
 	IdentityLocation string

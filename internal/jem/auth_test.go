@@ -14,10 +14,10 @@ import (
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 
-	"github.com/CanonicalLtd/jem/internal/idmtest"
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
+	"github.com/juju/idmclient/idmtest"
 )
 
 type authSuite struct {
@@ -35,7 +35,7 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 	pool, err := jem.NewPool(jem.Params{
 		DB:               s.Session.DB("jem"),
 		IdentityLocation: s.idmSrv.URL.String(),
-		ControllerAdmin:  "admin",
+		ControllerAdmin:  "controller-admin",
 		BakeryParams: bakery.NewServiceParams{
 			Location: "here",
 			Locator:  s.idmSrv,
@@ -89,7 +89,7 @@ func (s *authSuite) TestAuthenticate(c *gc.C) {
 }
 
 func (s *authSuite) TestCheckIsAdmin(c *gc.C) {
-	req := s.newRequestForUser(c, "GET", "/", "admin")
+	req := s.newRequestForUser(c, "GET", "/", "controller-admin")
 	err := s.jem.Authenticate(req)
 	c.Assert(err, gc.IsNil)
 	c.Assert(s.jem.CheckIsAdmin(), gc.IsNil)

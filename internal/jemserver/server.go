@@ -20,6 +20,7 @@ import (
 
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/monitor"
+	"github.com/CanonicalLtd/jem/params"
 )
 
 var logger = loggo.GetLogger("jem.internal.jemserver")
@@ -38,7 +39,7 @@ type Params struct {
 
 	// ControllerAdmin holds the identity of the user
 	// or group that is allowed to create controllers.
-	ControllerAdmin string
+	ControllerAdmin params.User
 
 	// IdentityLocation holds the location of the third party identity service.
 	IdentityLocation string
