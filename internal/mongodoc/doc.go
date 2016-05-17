@@ -67,11 +67,11 @@ type Controller struct {
 
 	// MonitorLeaseOwner holds the name of the agent
 	// currently responsible for monitoring the controller.
-	MonitorLeaseOwner string
+	MonitorLeaseOwner string `bson:",omitempty"`
 
 	// MonitorLeaseExpiry holds the time at which the
 	// current monitor's lease expires.
-	MonitorLeaseExpiry time.Time
+	MonitorLeaseExpiry time.Time `bson:",omitempty"`
 
 	// Stats holds runtime information about the controller.
 	Stats ControllerStats
