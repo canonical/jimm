@@ -64,6 +64,8 @@ var APIOpenTimeout = 15 * time.Second
 
 const maxPermCacheDuration = 10 * time.Second
 
+var notExistsQuery = bson.D{{"$exists", false}}
+
 // NewPool represents a pool of possible JEM instances that use the given
 // database as a store, and use the given bakery parameters to create the
 // bakery.Service.
@@ -277,7 +279,7 @@ func (j *JEM) EnsureUser(ctlName params.EntityPath, user string) (string, error)
 	err = j.DB.Controllers().Update(bson.D{{
 		"_id", ctlName.String(),
 	}, {
-		field, bson.D{{"$exists", false}},
+		field, notExistsQuery,
 	}}, bson.D{{
 		"$set", bson.D{{
 			field, mongodoc.UserInfo{
@@ -592,7 +594,7 @@ func (j *JEM) SetControllerUnavailableAt(ctlPath params.EntityPath, t time.Time)
 	err := j.DB.Controllers().Update(
 		bson.D{
 			{"_id", ctlPath.String()},
-			{"unavailablesince", bson.D{{"$exists", false}}},
+			{"unavailablesince", notExistsQuery},
 		},
 		bson.D{
 			{"$set", bson.D{{"unavailablesince", t}}},
@@ -632,21 +634,37 @@ var ErrLeaseUnavailable = errgo.Newf("cannot acquire lease")
 // cause will be returned. If the lease has been obtained by someone else
 // an error with a ErrLeaseUnavailable cause will be returned.
 func (j *JEM) AcquireMonitorLease(ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {
+	var update bson.D
 	if newOwner != "" {
 		newExpiry = mongodoc.Time(newExpiry)
+		update = bson.D{{"$set", bson.D{
+			{"monitorleaseexpiry", newExpiry},
+			{"monitorleaseowner", newOwner},
+		}}}
 	} else {
 		newExpiry = time.Time{}
+		update = bson.D{{"$unset", bson.D{
+			{"monitorleaseexpiry", nil},
+			{"monitorleaseowner", nil},
+		}}}
+	}
+	var oldOwnerQuery interface{}
+	var oldExpiryQuery interface{}
+	if oldOwner == "" {
+		oldOwnerQuery = notExistsQuery
+	} else {
+		oldOwnerQuery = oldOwner
+	}
+	if oldExpiry.IsZero() {
+		oldExpiryQuery = notExistsQuery
+	} else {
+		oldExpiryQuery = oldExpiry
 	}
 	err := j.DB.Controllers().Update(bson.D{
 		{"path", ctlPath},
-		{"monitorleaseexpiry", oldExpiry},
-		{"monitorleaseowner", oldOwner},
-	}, bson.D{
-		{"$set", bson.D{
-			{"monitorleaseexpiry", newExpiry},
-			{"monitorleaseowner", newOwner},
-		}},
-	})
+		{"monitorleaseexpiry", oldExpiryQuery},
+		{"monitorleaseowner", oldOwnerQuery},
+	}, update)
 	if err == mgo.ErrNotFound {
 		// Someone else got there first, or the document has been
 		// removed. Technically don't need to distinguish between the
