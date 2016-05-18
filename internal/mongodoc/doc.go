@@ -144,6 +144,21 @@ type Model struct {
 	Life string
 
 	// TODO record last time we saw changes on the model?
+
+	// Templates holds the paths of the templates that the model was created with.
+	Templates []string `bson:",omitempty"`
+
+	// ExplicitConfigFields holds those configuration options that
+	// were explictly specified when creating the model. These
+	// override all values in the template, so when any of the
+	// templates change, none of these fields will be changed.
+	ExplicitConfigFields []string `bson:",omitempty"`
+
+	// TemplateVersions holds a map from template path (we can't use
+	// params.EntityPath as a BSON map key) to the version number of
+	// the template that has been most recently set in the model
+	// configuration.
+	TemplateVersions map[string]int `bson:",omitempty"`
 }
 
 type ModelUserInfo struct {
@@ -181,6 +196,14 @@ type Template struct {
 
 	// Location holds the location attributes associated with the template.
 	Location map[string]string `bson:",omitempty"`
+
+	// Version holds the version of the template. It is incremented
+	// each time the Config field is set.
+	Version int `bson:",omitempty"`
+
+	// LastUpdated holds when the template configuration was last
+	// updated.
+	LastUpdated time.Time `bson:",omitempty"`
 }
 
 func (t *Template) Owner() params.User {

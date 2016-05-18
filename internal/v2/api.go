@@ -42,8 +42,10 @@ type Handler struct {
 	config jemserver.Params
 }
 
-// randIntn is declared as a variable so that it can be overridden in tests.
-var randIntn = rand.Intn
+// Functions defined as variables so they can be overridden in tests.
+var (
+	randIntn = rand.Intn
+)
 
 func NewAPIHandler(jp *jem.Pool, sp jemserver.Params) ([]httprequest.Handler, error) {
 	return jemerror.Mapper.Handlers(func(p httprequest.Params) (*Handler, error) {
@@ -367,12 +369,11 @@ func (h *Handler) DeleteModel(arg *params.DeleteModel) error {
 func (h *Handler) ListModels(arg *params.ListModels) (*params.ListModelsResponse, error) {
 	// TODO provide a way of restricting the results.
 
-	// We get all controllers first, because many models
-	// will be sharing the same controllers.
-	// TODO we could do better than this and avoid
-	// gathering all the controllers into memory.
-	// Possiblities include caching controllers, and
-	// gathering results to do only a few
+	// We get all controllers first, because many models will be
+	// sharing the same controllers.
+	// TODO we could do better than this and avoid gathering all the
+	// controllers into memory. Possiblities include caching
+	// controllers, and gathering results to do only a few
 	// concurrent queries.
 	controllers := make(map[params.EntityPath]mongodoc.Controller)
 	iter := h.jem.DB.Controllers().Find(nil).Sort("_id").Iter()
@@ -579,10 +580,12 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 		return nil, errgo.NoteMask(err, "invalid template provided", errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
 	}
 	tmplLocation := h.locationForTemplates(tmpls)
+
 	ctlPath, err := h.selectController(&args.Info, tmplLocation)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot select controller", errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound))
 	}
+
 	if err := h.jem.CheckReadACL(h.jem.DB.Controllers(), ctlPath); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
@@ -595,6 +598,15 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 	neSchema, err := h.schemaForNewModel(ctlPath)
 	if err != nil {
 		return nil, errgo.Mask(err)
+	}
+	// Check that schemas for all templates are compatible with selected controller.
+	// This is worth doing even though we sanity check the final
+	// values, because otherwise we wouldn't be sure that
+	// every template is compatible because each one overrides the last.
+	for _, tmpl := range tmpls {
+		if err := checkSchemaCompatible(tmpl.Schema, neSchema.schema); err != nil {
+			return nil, badRequestf(err, "template %q is incompatible with selected controller", tmpl.Path)
+		}
 	}
 	config := h.configWithTemplates(args.Info.Config, tmpls)
 	// Ensure that the attributes look reasonably OK before bothering
@@ -611,8 +623,14 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 	// an model that we can't add locally because the name
 	// already exists.
 	modelDoc := &mongodoc.Model{
-		Path:       modelPath,
-		Controller: ctlPath,
+		Path:             modelPath,
+		Controller:       ctlPath,
+		Templates:        make([]string, 0, len(tmpls)),
+		TemplateVersions: make(map[string]int),
+	}
+	for _, t := range tmpls {
+		modelDoc.Templates = append(modelDoc.Templates, t.Id)
+		modelDoc.TemplateVersions[t.Id] = t.Version
 	}
 	if err := h.jem.AddModel(modelDoc); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
@@ -708,7 +726,7 @@ func (h *Handler) AddNewTemplate(arg *params.AddNewTemplate) error {
 }
 
 // addTemplate adds or update a new template.
-func (h *Handler) addTemplate(path params.EntityPath, info params.AddTemplateInfo, overwrite bool) error {
+func (h *Handler) addTemplate(path params.EntityPath, info params.AddTemplateInfo, canOverwrite bool) error {
 	if err := h.jem.CheckIsUser(path.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
@@ -718,12 +736,15 @@ func (h *Handler) addTemplate(path params.EntityPath, info params.AddTemplateInf
 		if len(info.Location) > 0 {
 			return badRequestf(nil, "cannot specify location with explicit controller")
 		}
-		neSchema, err := h.schemaForNewModel(*info.Controller)
+		ctl, err := h.jem.Controller(*info.Controller)
+		if err != nil {
+			return errgo.NoteMask(err, "cannot get schema for controller", errgo.Is(params.ErrNotFound))
+		}
+		providerType = ctl.ProviderType
+		schema, err = schemaForProviderType(providerType)
 		if err != nil {
 			return errgo.Notef(err, "cannot get schema for controller")
 		}
-		schema = neSchema.schema
-		providerType = neSchema.providerType
 	} else {
 		r, err := h.schemaForLocation(info.Location)
 		if err != nil {
@@ -733,23 +754,73 @@ func (h *Handler) addTemplate(path params.EntityPath, info params.AddTemplateInf
 		providerType = r.ProviderType
 	}
 
-	fields, defaults, err := schema.ValidationSchema()
-	if err != nil {
-		return errgo.Notef(err, "cannot create validation schema for provider %s", providerType)
-	}
 	// Delete all fields and defaults that are not in the
 	// provided configuration attributes, so that we can
 	// check only the provided fields for compatibility
 	// without worrying about other mandatory fields.
-	for name := range fields {
+	//
+	// Note that this will also cause only the reduced schema
+	// to be stored in the template.
+	for name := range schema {
 		if _, ok := info.Config[name]; !ok {
-			delete(fields, name)
+			delete(schema, name)
 		}
 	}
-	for name := range defaults {
-		if _, ok := info.Config[name]; !ok {
-			delete(defaults, name)
+	// controllerProviderTypes holds a short-lived cache of the provider types
+	// for controllers so that we avoid fetching controllers more than
+	// once.
+	// TODO use cache of controller schemas rather than
+	// inferring schema from provider type.
+	ctlSchemas := make(map[params.EntityPath]environschema.Fields)
+
+	// maxVersion holds the maximum version used by any of the
+	// models that refer to the template. We'll create the template
+	// with a version bigger than that.
+	maxVersion := -1
+	pathStr := path.String()
+	iter := h.jem.ModelsWithTemplateQuery(path).Iter()
+	defer iter.Close()
+	var m mongodoc.Model
+	for iter.Next(&m) {
+		if v := m.TemplateVersions[pathStr]; v > maxVersion {
+			maxVersion = v
 		}
+		ctlSchema, ok := ctlSchemas[m.Controller]
+		if !ok {
+			ctl, err := h.jem.Controller(m.Controller)
+			if err != nil {
+				if errgo.Cause(err) == params.ErrNotFound {
+					// Shouldn't happen but don't hold up the
+					// add-template operation for this relational
+					// anomaly.
+					logger.Warningf("model %q refers to non-existent controller %q", m.Path, ctl.Path)
+					ctlSchemas[m.Controller] = nil
+					continue
+				}
+				return errgo.Notef(err, "cannot fetch controller %q", m.Controller)
+			}
+			ctlSchema, err = schemaForProviderType(ctl.ProviderType)
+			if err != nil {
+				logger.Warningf("cannot get schema for provider type %q of controller %q used by model %q using template %q", ctl.ProviderType, ctl.Path, m.Path, path)
+				ctlSchemas[m.Controller] = nil
+			}
+			ctlSchemas[m.Controller] = ctlSchema
+		}
+		if ctlSchema == nil {
+			// We've seen the controller before and it was bad, so
+			// ignore it this time too.
+			continue
+		}
+		if err := checkSchemaCompatible(schema, ctlSchema); err != nil {
+			return badRequestf(err, "new schema is incompatible with an existing model using the template")
+		}
+	}
+	if err := iter.Err(); err != nil {
+		return errgo.Notef(err, "model iteration failed")
+	}
+	fields, defaults, err := schema.ValidationSchema()
+	if err != nil {
+		return errgo.Notef(err, "cannot create validation schema for provider %s", providerType)
 	}
 	result, err := jujuschema.StrictFieldMap(fields, defaults).Coerce(info.Config, nil)
 	if err != nil {
@@ -760,7 +831,8 @@ func (h *Handler) addTemplate(path params.EntityPath, info params.AddTemplateInf
 		Schema:   schema,
 		Config:   result.(map[string]interface{}),
 		Location: info.Location,
-	}, overwrite); err != nil {
+		Version:  maxVersion + 1,
+	}, canOverwrite); err != nil {
 		if errgo.Cause(err) == params.ErrAlreadyExists {
 			return badRequestf(err, "%s", "")
 		}
@@ -791,6 +863,17 @@ func (h *Handler) GetTemplate(arg *params.GetTemplate) (*params.TemplateResponse
 func (h *Handler) DeleteTemplate(arg *params.DeleteTemplate) error {
 	if err := h.jem.CheckIsUser(arg.EntityPath.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	// Racy but usually-sufficient test that no model is using the
+	// template before we delete it.
+	n, err := h.jem.ModelsWithTemplateQuery(arg.EntityPath).Count()
+	if err != nil {
+		return errgo.Notef(err, "cannot count models")
+	}
+	if n > 0 {
+		// TODO We could include the names of (some of?) the models in the error
+		// message if the user has permission to read them.
+		return errgo.WithCausef(nil, params.ErrForbidden, "cannot delete template because one or more models are using it")
 	}
 	if err := h.jem.DeleteTemplate(arg.EntityPath); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
@@ -996,10 +1079,13 @@ func (h *Handler) schemaForNewModel(ctlPath params.EntityPath) (*schemaForNewMod
 // schemaForProviderType returns the schema for the given
 // provider type. This works currently because we link in
 // all the provider code so we can do it locally.
+//
+// It's defined as a variable so it can be overridden in tests.
+//
 // TODO get the model schema over the juju API. We'll
 // need make GetSchema be cleverer about mapping
 // from provider type to schema in that case.
-func schemaForProviderType(providerType string) (environschema.Fields, error) {
+var schemaForProviderType = func(providerType string) (environschema.Fields, error) {
 	provider, err := environs.Provider(providerType)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot get provider type %q", providerType)
@@ -1146,4 +1232,41 @@ func (h *Handler) locationForTemplates(tmpls []*mongodoc.Template) map[string]st
 		}
 	}
 	return loc
+}
+
+// checkSchemaCompatible checks that a is a compatible
+// subset of b.
+func checkSchemaCompatible(a, b environschema.Fields) error {
+	for name, f := range a {
+		f1, ok := b[name]
+		if !ok {
+			return errgo.Newf("field %q not found", name)
+		}
+		if !schemaAttrCompatible(f, f1) {
+			return errgo.Newf("field %q is incompatible", name)
+		}
+	}
+	return nil
+}
+
+// schemaAttrCompatible reports whether f0 is compatible
+// with f1.
+// TODO be somewhat more lenient about compatibility;
+// for example we could allow description changes
+// and mandatory/non-mandatory compatibility.
+func schemaAttrCompatible(a0, a1 environschema.Attr) bool {
+	normalizeSchemaAttr(&a0)
+	normalizeSchemaAttr(&a1)
+	return reflect.DeepEqual(a0, a1)
+}
+
+// normalizeSchemaAttrs normalizes empty slices to nil
+// so that we can use reflect.DeepEquals to compare them.
+func normalizeSchemaAttr(a *environschema.Attr) {
+	if len(a.Values) == 0 {
+		a.Values = nil
+	}
+	if len(a.EnvVars) == 0 {
+		a.EnvVars = nil
+	}
 }

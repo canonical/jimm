@@ -11,6 +11,7 @@ import (
 
 	"github.com/juju/cmd"
 	"github.com/juju/errors"
+	"github.com/juju/idmclient/idmtest"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/environs/config"
 	"github.com/juju/juju/juju"
@@ -26,7 +27,6 @@ import (
 	"github.com/CanonicalLtd/jem/cmd/jaas-model/modelcmd"
 	"github.com/CanonicalLtd/jem/jemclient"
 	"github.com/CanonicalLtd/jem/params"
-	"github.com/juju/idmclient/idmtest"
 )
 
 // run runs a jem plugin subcommand with the given arguments,
