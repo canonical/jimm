@@ -44,8 +44,7 @@ func errToResp(err error) (int, interface{}) {
 
 		status = http.StatusForbidden
 	case params.ErrBadRequest,
-		httprequest.ErrUnmarshal,
-		params.ErrIncompatibleTemplateLocations:
+		httprequest.ErrUnmarshal:
 
 		status = http.StatusBadRequest
 	case params.ErrUnauthorized:

@@ -233,12 +233,19 @@ func (j *JEM) Close() {
 // The Id field in ctl will be set from its Path field,
 // and the Id, Path and Controller fields in env will also be
 // set from ctl.
+// Any empty Location attributes will be removed from ctl.Location.
 //
 // If the provided documents aren't valid, AddController with return
 // an error with a params.ErrBadRequest cause.
 func (j *JEM) AddController(ctl *mongodoc.Controller, m *mongodoc.Model) error {
 	if err := validateLocationAttrs(ctl.Location); err != nil {
 		return errgo.WithCausef(err, params.ErrBadRequest, "bad controller location")
+	}
+	// Remove any empty location attributes.
+	for attr, val := range ctl.Location {
+		if val == "" {
+			delete(ctl.Location, attr)
+		}
 	}
 	// Insert the model before inserting the controller
 	// to avoid races with other clients creating non-controller
@@ -518,7 +525,11 @@ func (j *JEM) ControllerLocationQuery(location map[string]string) (*mgo.Query, e
 	}
 	q := make(bson.D, 0, len(location)+1)
 	for attr, val := range location {
-		q = append(q, bson.DocElem{"location." + attr, val})
+		if val != "" {
+			q = append(q, bson.DocElem{"location." + attr, val})
+		} else {
+			q = append(q, bson.DocElem{"location." + attr, notExistsQuery})
+		}
 	}
 	q = append(q, bson.DocElem{"public", true})
 	return j.DB.Controllers().Find(q), nil
@@ -542,9 +553,11 @@ func (j *JEM) Template(path params.EntityPath) (*mongodoc.Template, error) {
 // SetControllerLocation updates the attributes associated with the controller's location.
 // Only the owner (arg.EntityPath.User) can change the location attributes
 // on an an entity.
+//
+// If the location attributes are invalid, it returns an error with a params.ErrBadRequest cause.
 func (j *JEM) SetControllerLocation(path params.EntityPath, location map[string]string) error {
 	if err := validateLocationAttrs(location); err != nil {
-		return errgo.Notef(err, "bad controller location query")
+		return errgo.WithCausef(err, params.ErrBadRequest, "bad controller location")
 	}
 	set := make(bson.D, 0, len(location))
 	unset := make(bson.D, 0, len(location))

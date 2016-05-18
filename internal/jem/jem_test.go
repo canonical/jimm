@@ -82,8 +82,9 @@ func (s *jemSuite) TestAddController(c *gc.C) {
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 		Location: map[string]string{
-			"cloud":  "aws",
-			"region": "foo",
+			"cloud":   "aws",
+			"region":  "foo",
+			"ignored": "",
 		},
 	}
 	m := &mongodoc.Model{
@@ -166,8 +167,8 @@ func (s *jemSuite) TestAddControllerWithInvalidLocationAttr(c *gc.C) {
 		},
 	}
 	err := s.store.AddController(ctl, &mongodoc.Model{})
+	c.Check(errgo.Cause(err), gc.Equals, params.ErrBadRequest)
 	c.Assert(err, gc.ErrorMatches, `bad controller location: invalid attribute "foo.bar"`)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrBadRequest)
 }
 
 func (s *jemSuite) TestSetControllerWithInvalidLocationAttr(c *gc.C) {
@@ -177,7 +178,8 @@ func (s *jemSuite) TestSetControllerWithInvalidLocationAttr(c *gc.C) {
 	}
 	err := s.store.AddController(ctl, &mongodoc.Model{})
 	err = s.store.SetControllerLocation(ctlPath, map[string]string{"foo.bar": "aws"})
-	c.Assert(err, gc.ErrorMatches, `bad controller location query: invalid attribute "foo.bar"`)
+	c.Check(errgo.Cause(err), gc.Equals, params.ErrBadRequest)
+	c.Assert(err, gc.ErrorMatches, `bad controller location: invalid attribute "foo.bar"`)
 }
 
 func (s *jemSuite) TestSetControllerLocation(c *gc.C) {
@@ -333,6 +335,15 @@ func (s *jemSuite) TestControllerLocationQuery(c *gc.C) {
 			"invalid.attr$": "foo",
 		},
 		expectError: `bad controller location query: invalid attribute "invalid\.attr\$"`,
+	}, {
+		about: "empty location attribute",
+		location: map[string]string{
+			"cloud": "",
+		},
+		expect: []string{
+			"charlie/other",
+			"charlie/noattrs",
+		},
 	}}
 	for i, test := range tests {
 		c.Logf("test %d: %s", i, test.about)
