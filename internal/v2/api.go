@@ -225,7 +225,7 @@ func (h *Handler) schemaForLocation(location map[string]string) (*params.SchemaR
 		return nil
 	})
 	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrAmbiguousLocation))
+		return nil, errgo.Mask(err, errgo.Is(params.ErrAmbiguousLocation), errgo.Is(params.ErrBadRequest))
 	}
 	if providerType == "" {
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "no matching controllers")
@@ -671,20 +671,13 @@ func (h *Handler) selectController(info *params.NewModelInfo, tmplLocation map[s
 			}
 		}
 	}
-	q, err := h.jem.ControllerLocationQuery(info.Location)
-	if err != nil {
-		return params.EntityPath{}, errgo.WithCausef(err, params.ErrBadRequest, "%s", "")
-	}
-	// Sort by _id so that we can make easily reproducible tests.
-	iter := h.jem.CanReadIter(q.Sort("_id").Iter())
-
 	var controllers []mongodoc.Controller
-	var ctl mongodoc.Controller
-	for iter.Next(&ctl) {
-		controllers = append(controllers, ctl)
-	}
-	if err := iter.Err(); err != nil {
-		return params.EntityPath{}, errgo.Newf("cannot get controllers")
+	err := h.doControllers(info.Location, func(c *mongodoc.Controller) error {
+		controllers = append(controllers, *c)
+		return nil
+	})
+	if err != nil {
+		return params.EntityPath{}, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
 	if len(controllers) == 0 {
 		return params.EntityPath{}, errgo.WithCausef(nil, params.ErrNotFound, "no matching controllers found")
@@ -1047,11 +1040,12 @@ func schemaForProviderType(providerType string) (environschema.Fields, error) {
 func (h *Handler) doControllers(attrs map[string]string, do func(c *mongodoc.Controller) error) error {
 	// Query all the controllers that match the attributes, building
 	// up all the possible values.
-	q, err := h.jem.ControllerLocationQuery(attrs)
+	q, err := h.jem.ControllerLocationQuery(attrs, false)
 	if err != nil {
 		return errgo.WithCausef(err, params.ErrBadRequest, "%s", "")
 	}
-	iter := h.jem.CanReadIter(q.Iter())
+	// Sort by _id so that we can make easily reproducible tests.
+	iter := h.jem.CanReadIter(q.Sort("_id").Iter())
 	var ctl mongodoc.Controller
 	for iter.Next(&ctl) {
 		if err := do(&ctl); err != nil {
