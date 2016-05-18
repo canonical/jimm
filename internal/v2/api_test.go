@@ -1304,11 +1304,13 @@ func (s *APISuite) TestNewModelWithoutExplicitController(c *gc.C) {
 		"secret": "bob's secret",
 	})
 	s.addTemplateAt(c, params.EntityPath{"bob", "east-creds"}, map[string]string{
+		"cloud":  "aws",
 		"region": "us-east-1",
 	}, map[string]interface{}{
 		"secret": "us-east-specific secret",
 	})
 	s.addTemplateAt(c, params.EntityPath{"bob", "west-creds"}, map[string]string{
+		"cloud":  "aws",
 		"region": "eu-west-1",
 	}, map[string]interface{}{
 		"secret": "eu-west-specific secret",
@@ -1441,19 +1443,22 @@ func (s *APISuite) TestNewModelWithoutExplicitController(c *gc.C) {
 		expectController: "bob/aws-us-east",
 		expectSecret:     "bob's secret",
 	}, {
-		about: "with incompatible templates",
-		user:  "bob",
+		about:     "mismatched templates remove attribute from consideration",
+		user:      "bob",
+		randIndex: 2,
 		arg: params.NewModel{
 			User: "bob",
 			Info: params.NewModelInfo{
 				TemplatePaths: []params.EntityPath{
+					// Both east-creds and west-creds specify cloud=aws,
+					// but differ on region, so all aws controllers are selected.
 					{"bob", "east-creds"},
 					{"bob", "west-creds"},
 				},
 			},
 		},
-		expectError: `POST http://.*/v2/model/bob: invalid templates: template bob/west-creds is incompatible with earlier templates`,
-		expectCause: params.ErrIncompatibleTemplateLocations,
+		expectController: "bob/aws-us-east-staging",
+		expectSecret:     "eu-west-specific secret",
 	}, {
 		about: "with explicit location and template with location",
 		user:  "bob",
@@ -1469,8 +1474,9 @@ func (s *APISuite) TestNewModelWithoutExplicitController(c *gc.C) {
 		expectController: "bob/aws-us-east-staging",
 		expectSecret:     "bob's secret",
 	}, {
-		about: "with explicit location and template with incompatible location",
-		user:  "bob",
+		about:     "with explicit location and template with overridden location",
+		user:      "bob",
+		randIndex: 1,
 		arg: params.NewModel{
 			User: "bob",
 			Info: params.NewModelInfo{
@@ -1480,10 +1486,10 @@ func (s *APISuite) TestNewModelWithoutExplicitController(c *gc.C) {
 				},
 			},
 		},
-		expectError: `POST http://.*/v2/model/bob: cannot select controller: specified location is incompatible with templates`,
-		expectCause: params.ErrIncompatibleTemplateLocations,
+		expectController: "bob/aws-us-east-staging",
+		expectSecret:     "eu-west-specific secret",
 	}, {
-		about: "with explicit location with compatible location",
+		about: "with explicit location with non-overriding location",
 		user:  "bob",
 		arg: params.NewModel{
 			User: "bob",

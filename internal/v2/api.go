@@ -581,13 +581,10 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 		}
 		return nil, errgo.NoteMask(err, "invalid template provided", errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
 	}
-	tmplLocation, err := h.locationForTemplates(tmpls)
-	if err != nil {
-		return nil, errgo.NoteMask(err, "invalid templates", errgo.Is(params.ErrIncompatibleTemplateLocations))
-	}
+	tmplLocation := h.locationForTemplates(tmpls)
 	ctlPath, err := h.selectController(&args.Info, tmplLocation)
 	if err != nil {
-		return nil, errgo.NoteMask(err, "cannot select controller", errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound), errgo.Is(params.ErrIncompatibleTemplateLocations))
+		return nil, errgo.NoteMask(err, "cannot select controller", errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound))
 	}
 	if err := h.jem.CheckReadACL(h.jem.DB.Controllers(), ctlPath); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
@@ -665,12 +662,19 @@ func (h *Handler) selectController(info *params.NewModelInfo, tmplLocation map[s
 	if info.Controller != nil {
 		return *info.Controller, nil
 	}
-	location := make(map[string]string)
-	mergeLocations(location, tmplLocation)
-	if !mergeLocations(location, info.Location) {
-		return params.EntityPath{}, errgo.WithCausef(nil, params.ErrIncompatibleTemplateLocations, "specified location is incompatible with templates")
+	if info.Location == nil {
+		info.Location = tmplLocation
+	} else {
+		// The location specified in the NewModelInfo overrides any template
+		// location information, so set any location attributes specified by
+		// templates but not mentioned in the NewModelInfo.
+		for attr, val := range tmplLocation {
+			if _, ok := info.Location[attr]; !ok {
+				info.Location[attr] = val
+			}
+		}
 	}
-	q, err := h.jem.ControllerLocationQuery(location)
+	q, err := h.jem.ControllerLocationQuery(info.Location)
 	if err != nil {
 		return params.EntityPath{}, errgo.WithCausef(err, params.ErrBadRequest, "%s", "")
 	}
@@ -1120,30 +1124,29 @@ func (h *Handler) getTemplates(paths []params.EntityPath) ([]*mongodoc.Template,
 }
 
 // locationForTemplates returns the location implied by the given
-// templates. If the locations are not compatible, it returns a
-// params.ErrIncompatibleTemplateLocations error.
-func (h *Handler) locationForTemplates(tmpls []*mongodoc.Template) (map[string]string, error) {
+// templates. If the templates disagree about a location attribute,
+// the resulting location will not include that attribute.
+func (h *Handler) locationForTemplates(tmpls []*mongodoc.Template) map[string]string {
 	loc := make(map[string]string)
 	for _, tmpl := range tmpls {
-		if !mergeLocations(loc, tmpl.Location) {
-			return nil, errgo.WithCausef(nil, params.ErrIncompatibleTemplateLocations, "template %v is incompatible with earlier templates", tmpl.Path)
+		for attr, val := range tmpl.Location {
+			if val == "" {
+				// Should never happen because we should never
+				// put empty location attributes into the database,
+				// but be defensive anyway.
+				continue
+			}
+			if v, ok := loc[attr]; ok && v != val {
+				loc[attr] = ""
+			} else {
+				loc[attr] = val
+			}
 		}
 	}
-	return loc, nil
-}
-
-// mergeLocations adds all the attributes in loc1 to loc0;
-// it reports whether the merge succeeded - the merge
-// will fail if the two maps have attributes with the same
-// name but different values.
-// TODO refactor things so that we can produce a nicer
-// error message that says what the incompatiblity was.
-func mergeLocations(loc0, loc1 map[string]string) bool {
-	for attr, val := range loc1 {
-		if v, ok := loc0[attr]; ok && v != val {
-			return false
+	for attr, val := range loc {
+		if val == "" {
+			delete(loc, attr)
 		}
-		loc0[attr] = val
 	}
-	return true
+	return loc
 }
