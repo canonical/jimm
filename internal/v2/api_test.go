@@ -490,6 +490,9 @@ func (s *APISuite) TestDeleteModel(c *gc.C) {
 
 func (s *APISuite) TestGetController(c *gc.C) {
 	ctlId := s.assertAddController(c, params.EntityPath{"bob", "foo"}, nil)
+	t := time.Now()
+	err := s.JEM.SetControllerUnavailableAt(ctlId, t)
+	c.Assert(err, gc.IsNil)
 
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.JEMSrv,
@@ -498,7 +501,7 @@ func (s *APISuite) TestGetController(c *gc.C) {
 	})
 	c.Assert(resp.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %s", resp.Body.Bytes()))
 	var controllerInfo params.ControllerResponse
-	err := json.Unmarshal(resp.Body.Bytes(), &controllerInfo)
+	err = json.Unmarshal(resp.Body.Bytes(), &controllerInfo)
 	c.Assert(err, gc.IsNil, gc.Commentf("body: %s", resp.Body.String()))
 	c.Assert(controllerInfo.ProviderType, gc.Equals, "dummy")
 	c.Assert(controllerInfo.Schema, gc.Not(gc.HasLen), 0)
@@ -506,6 +509,7 @@ func (s *APISuite) TestGetController(c *gc.C) {
 	for name := range controllerInfo.Schema {
 		c.Assert(strings.HasSuffix(name, "-path"), gc.Equals, false)
 	}
+	c.Assert((*controllerInfo.UnavailableSince).UTC(), jc.DeepEquals, mongodoc.Time(t).UTC())
 	c.Logf("%#v", controllerInfo.Schema)
 }
 
@@ -1895,10 +1899,17 @@ func (s *APISuite) TestListController(c *gc.C) {
 	err := s.JEM.SetControllerUnavailableAt(ctlId1, unavailableTime)
 	c.Assert(err, gc.IsNil)
 
+	ctlId2 := s.assertAddController(c, params.EntityPath{"bob", "another"}, nil)
+	err = s.JEM.SetControllerUnavailableAt(ctlId2, unavailableTime.Add(time.Second))
+	c.Assert(err, gc.IsNil)
+
 	resp, err := s.NewClient("bob").ListController(nil)
 	c.Assert(err, gc.IsNil)
 	c.Assert(resp, jc.DeepEquals, &params.ListControllerResponse{
 		Controllers: []params.ControllerResponse{{
+			Path:             ctlId2,
+			UnavailableSince: newTime(mongodoc.Time(unavailableTime.Add(time.Second)).UTC()),
+		}, {
 			Path:     ctlId0,
 			Location: map[string]string{"cloud": "aws"},
 			Public:   true,
@@ -1908,7 +1919,7 @@ func (s *APISuite) TestListController(c *gc.C) {
 		}},
 	})
 
-	// Check that the entry doesn't show up when listing
+	// Check that the entries don't show up when listing
 	// as a different user.
 	resp, err = s.NewClient("alice").ListController(nil)
 	c.Assert(err, gc.IsNil)

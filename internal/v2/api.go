@@ -176,11 +176,12 @@ func (h *Handler) GetController(arg *params.GetController) (*params.ControllerRe
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	return &params.ControllerResponse{
-		Path:         arg.EntityPath,
-		ProviderType: neSchema.providerType,
-		Schema:       neSchema.schema,
-		Location:     ctl.Location,
-		Public:       ctl.Public,
+		Path:             arg.EntityPath,
+		ProviderType:     neSchema.providerType,
+		Schema:           neSchema.schema,
+		Location:         ctl.Location,
+		Public:           ctl.Public,
+		UnavailableSince: newTime(ctl.UnavailableSince.UTC()),
 	}, nil
 }
 
@@ -334,19 +335,16 @@ func (h *Handler) GetModel(arg *params.GetModel) (*params.ModelResponse, error) 
 	}
 
 	r := &params.ModelResponse{
-		Path:           arg.EntityPath,
-		User:           jujuUser,
-		Password:       password,
-		UUID:           m.UUID,
-		ControllerUUID: conn.Info.ModelTag.Id(),
-		CACert:         ctl.CACert,
-		HostPorts:      ctl.HostPorts,
-		ControllerPath: m.Controller,
-		Life:           m.Life,
-	}
-	if !ctl.UnavailableSince.IsZero() {
-		ctl.UnavailableSince = ctl.UnavailableSince.UTC()
-		r.UnavailableSince = &ctl.UnavailableSince
+		Path:             arg.EntityPath,
+		User:             jujuUser,
+		Password:         password,
+		UUID:             m.UUID,
+		ControllerUUID:   conn.Info.ModelTag.Id(),
+		CACert:           ctl.CACert,
+		HostPorts:        ctl.HostPorts,
+		ControllerPath:   m.Controller,
+		Life:             m.Life,
+		UnavailableSince: newTime(ctl.UnavailableSince.UTC()),
 	}
 	return r, nil
 }
@@ -401,11 +399,6 @@ func (h *Handler) ListModels(arg *params.ListModels) (*params.ListModelsResponse
 		// so given that most uses of this endpoint won't actually want
 		// to connect to all of the models, we leave out the username and
 		// password for now.
-		var uvt *time.Time
-		if !ctl.UnavailableSince.IsZero() {
-			ctl.UnavailableSince = ctl.UnavailableSince.UTC()
-			uvt = &ctl.UnavailableSince
-		}
 		models = append(models, params.ModelResponse{
 			Path:             m.Path,
 			UUID:             m.UUID,
@@ -414,7 +407,7 @@ func (h *Handler) ListModels(arg *params.ListModels) (*params.ListModelsResponse
 			HostPorts:        ctl.HostPorts,
 			ControllerPath:   m.Controller,
 			Life:             m.Life,
-			UnavailableSince: uvt,
+			UnavailableSince: newTime(ctl.UnavailableSince.UTC()),
 		})
 	}
 	if err := modelIter.Err(); err != nil {
@@ -436,16 +429,11 @@ func (h *Handler) ListController(arg *params.ListController) (*params.ListContro
 	iter := h.jem.CanReadIter(h.jem.DB.Controllers().Find(nil).Sort("_id").Iter())
 	var ctl mongodoc.Controller
 	for iter.Next(&ctl) {
-		var uvt *time.Time
-		if !ctl.UnavailableSince.IsZero() {
-			ctl.UnavailableSince = ctl.UnavailableSince.UTC()
-			uvt = &ctl.UnavailableSince
-		}
 		controllers = append(controllers, params.ControllerResponse{
 			Path:             ctl.Path,
 			Location:         ctl.Location,
 			Public:           ctl.Public,
-			UnavailableSince: uvt,
+			UnavailableSince: newTime(ctl.UnavailableSince.UTC()),
 		})
 	}
 	if err := iter.Err(); err != nil {
@@ -454,6 +442,15 @@ func (h *Handler) ListController(arg *params.ListController) (*params.ListContro
 	return &params.ListControllerResponse{
 		Controllers: controllers,
 	}, nil
+}
+
+// newTime returns a pointer to t if it's non-zero,
+// or nil otherwise.
+func newTime(t time.Time) *time.Time {
+	if t.IsZero() {
+		return nil
+	}
+	return &t
 }
 
 // GetControllerLocations returns all the available values for a given controller
