@@ -517,13 +517,14 @@ func (j *JEM) DeleteTemplate(path params.EntityPath) error {
 }
 
 // ControllerLocationQuery returns a mongo query that iterates through
-// all the controllers matching the given location attributes.
+// all the public controllers matching the given location attributes,
+// including unavailable controllers only if includeUnavailable is true.
 // It returns an error if the location attribute keys aren't valid.
-func (j *JEM) ControllerLocationQuery(location map[string]string) (*mgo.Query, error) {
+func (j *JEM) ControllerLocationQuery(location map[string]string, includeUnavailable bool) (*mgo.Query, error) {
 	if err := validateLocationAttrs(location); err != nil {
 		return nil, errgo.Notef(err, "bad controller location query")
 	}
-	q := make(bson.D, 0, len(location)+1)
+	q := make(bson.D, 0, len(location)+2)
 	for attr, val := range location {
 		if val != "" {
 			q = append(q, bson.DocElem{"location." + attr, val})
@@ -532,6 +533,9 @@ func (j *JEM) ControllerLocationQuery(location map[string]string) (*mgo.Query, e
 		}
 	}
 	q = append(q, bson.DocElem{"public", true})
+	if !includeUnavailable {
+		q = append(q, bson.DocElem{"unavailablesince", notExistsQuery})
+	}
 	return j.DB.Controllers().Find(q), nil
 }
 

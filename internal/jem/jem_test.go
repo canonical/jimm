@@ -263,6 +263,7 @@ func (s *jemSuite) TestSetControllerAvailabilityWithNotFoundController(c *gc.C) 
 }
 
 func (s *jemSuite) TestControllerLocationQuery(c *gc.C) {
+	ut := time.Now().UTC()
 	for _, ctl := range []*mongodoc.Controller{{
 		Path: params.EntityPath{"bob", "aws-us-east-1"},
 		Location: map[string]string{
@@ -292,16 +293,25 @@ func (s *jemSuite) TestControllerLocationQuery(c *gc.C) {
 			"cloud":  "aws",
 			"region": "eu-west-1",
 		},
+	}, {
+		Path: params.EntityPath{"bob", "down"},
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "eu-west-1",
+		},
+		UnavailableSince: ut,
+		Public:           true,
 	}} {
 		err := s.store.AddController(ctl, &mongodoc.Model{})
 		c.Assert(err, gc.IsNil)
 	}
 
 	tests := []struct {
-		about       string
-		location    map[string]string
-		expect      []string
-		expectError string
+		about              string
+		location           map[string]string
+		includeUnavailable bool
+		expect             []string
+		expectError        string
 	}{{
 		about: "single location attribute",
 		location: map[string]string{
@@ -330,6 +340,17 @@ func (s *jemSuite) TestControllerLocationQuery(c *gc.C) {
 			"bob/aws-us-east-1",
 		},
 	}, {
+		about: "include unavailable controllers",
+		location: map[string]string{
+			"cloud": "aws",
+		},
+		includeUnavailable: true,
+		expect: []string{
+			"bob/aws-us-east-1",
+			"bob/aws-eu-west-1",
+			"bob/down",
+		},
+	}, {
 		about: "invalid location attribute",
 		location: map[string]string{
 			"invalid.attr$": "foo",
@@ -347,7 +368,7 @@ func (s *jemSuite) TestControllerLocationQuery(c *gc.C) {
 	}}
 	for i, test := range tests {
 		c.Logf("test %d: %s", i, test.about)
-		q, err := s.store.ControllerLocationQuery(test.location)
+		q, err := s.store.ControllerLocationQuery(test.location, test.includeUnavailable)
 		if test.expectError != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
 			continue

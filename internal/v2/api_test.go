@@ -887,6 +887,12 @@ func (s *APISuite) TestGetControllerLocations(c *gc.C) {
 		"cloud":  "gce",
 		"region": "somewhere",
 	})
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "gce-down"}, map[string]string{
+		"cloud":  "gce",
+		"region": "down",
+	})
+	err := s.JEM.SetControllerUnavailableAt(ctlId, time.Now())
+	c.Assert(err, gc.IsNil)
 	s.assertAddController(c, params.EntityPath{"bob", "gce-somewhere-staging"}, map[string]string{
 		"cloud":   "gce",
 		"region":  "somewhere",
@@ -1059,6 +1065,12 @@ func (s *APISuite) TestAllControllerLocations(c *gc.C) {
 		"cloud":  "gce",
 		"region": "somewhere",
 	})
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "gce-down"}, map[string]string{
+		"cloud":  "gce",
+		"region": "down",
+	})
+	err := s.JEM.SetControllerUnavailableAt(ctlId, time.Now())
+	c.Assert(err, gc.IsNil)
 	s.assertAddController(c, params.EntityPath{"bob", "gce-somewhere-staging"}, map[string]string{
 		"cloud":   "gce",
 		"region":  "somewhere",
@@ -1160,6 +1172,17 @@ func (s *APISuite) TestGetSchemaAmbiguous(c *gc.C) {
 	c.Check(resp, gc.IsNil)
 	c.Check(errgo.Cause(err), gc.Equals, params.ErrAmbiguousLocation)
 	c.Assert(err, gc.ErrorMatches, `GET http://.*/schema\?cloud=aws: ambiguous location matches controller of more than one type`)
+}
+
+func (s *APISuite) TestGetSchemaBadLocation(c *gc.C) {
+	resp, err := s.NewClient("bob").GetSchema(&params.GetSchema{
+		Location: map[string]string{
+			"$badlocation": "aws",
+		},
+	})
+	c.Check(resp, gc.IsNil)
+	c.Check(errgo.Cause(err), gc.Equals, params.ErrBadRequest)
+	c.Assert(err, gc.ErrorMatches, `GET .*: invalid location attribute "\$badlocation"`)
 }
 
 func (s *APISuite) TestNewModel(c *gc.C) {
@@ -1296,6 +1319,13 @@ func (s *APISuite) TestNewModelWithoutExplicitController(c *gc.C) {
 		"region":  "us-east-1",
 		"staging": "true",
 	})
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "aws-us-east-staging-down"}, map[string]string{
+		"cloud":   "aws",
+		"region":  "us-east-1",
+		"staging": "true",
+	})
+	err := s.JEM.SetControllerUnavailableAt(ctlId, time.Now())
+	c.Assert(err, gc.IsNil)
 	s.allowControllerPerm(c, params.EntityPath{"bob", "aws-us-east-staging"}, "everyone")
 	s.assertAddController(c, params.EntityPath{"bob", "azure-us"}, map[string]string{
 		"cloud":  "azure",
@@ -1345,6 +1375,42 @@ func (s *APISuite) TestNewModelWithoutExplicitController(c *gc.C) {
 			},
 		},
 		expectController: "bob/aws-us-east",
+	}, {
+		about:     "select with unavailable controller as possible candidate",
+		randIndex: 0,
+		user:      "bob",
+		arg: params.NewModel{
+			User: "bob",
+			Info: params.NewModelInfo{
+				Location: map[string]string{
+					"cloud":   "aws",
+					"region":  "us-east-1",
+					"staging": "true",
+				},
+				Config: map[string]interface{}{
+					"secret": "a secret",
+				},
+			},
+		},
+		expectController: "bob/aws-us-east-staging",
+	}, {
+		about:     "select with unavailable controller as possible candidate, different rand",
+		randIndex: 1,
+		user:      "bob",
+		arg: params.NewModel{
+			User: "bob",
+			Info: params.NewModelInfo{
+				Location: map[string]string{
+					"cloud":   "aws",
+					"region":  "us-east-1",
+					"staging": "true",
+				},
+				Config: map[string]interface{}{
+					"secret": "a secret",
+				},
+			},
+		},
+		expectController: "bob/aws-us-east-staging",
 	}, {
 		about:     "select aws; index 0",
 		randIndex: 0,
