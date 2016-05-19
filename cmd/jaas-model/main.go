@@ -8,7 +8,7 @@ import (
 	"github.com/juju/cmd"
 	"github.com/juju/juju/juju"
 
-	"github.com/CanonicalLtd/jem/cmd/jaas-model/jemcmd"
+	"github.com/CanonicalLtd/jem/cmd/jaas-model/modelcmd"
 )
 
 func main() {
@@ -22,5 +22,5 @@ func main() {
 		Stderr: os.Stderr,
 		Stdin:  os.Stdin,
 	}
-	os.Exit(cmd.Main(jemcmd.New(), ctxt, os.Args[1:]))
+	os.Exit(cmd.Main(modelcmd.New(), ctxt, os.Args[1:]))
 }
