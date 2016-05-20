@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/juju/idmclient"
+	"github.com/juju/idmclient/idmtest"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	"github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
@@ -22,7 +23,6 @@ import (
 	"github.com/CanonicalLtd/jem/internal/jemserver"
 	"github.com/CanonicalLtd/jem/jemclient"
 	"github.com/CanonicalLtd/jem/params"
-	"github.com/juju/idmclient/idmtest"
 )
 
 // Suite implements a test fixture that contains a JEM server

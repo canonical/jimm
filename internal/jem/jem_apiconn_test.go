@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/juju/idmclient"
+	"github.com/juju/idmclient/idmtest"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
@@ -15,7 +16,6 @@ import (
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
-	"github.com/juju/idmclient/idmtest"
 )
 
 type jemAPIConnSuite struct {

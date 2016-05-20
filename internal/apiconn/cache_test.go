@@ -22,7 +22,8 @@ var _ = gc.Suite(&cacheSuite{})
 
 func (s *cacheSuite) TestOpenAPI(c *gc.C) {
 	cache := apiconn.NewCache(apiconn.CacheParams{})
-	uuid := s.APIState.Client().ModelUUID()
+	uuid, err := s.APIState.Client().ModelUUID()
+	c.Assert(err, gc.IsNil)
 	var info *api.Info
 	conn, err := cache.OpenAPI(uuid, func() (api.Connection, *api.Info, error) {
 		info = s.APIInfo(c)

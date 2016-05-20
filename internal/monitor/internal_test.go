@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/juju/idmclient"
+	"github.com/juju/idmclient/idmtest"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	jujuwatcher "github.com/juju/juju/state/watcher"
 	jujutesting "github.com/juju/juju/testing"
@@ -21,7 +22,6 @@ import (
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
-	"github.com/juju/idmclient/idmtest"
 )
 
 type internalSuite struct {

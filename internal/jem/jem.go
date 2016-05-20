@@ -10,6 +10,7 @@ import (
 	"github.com/juju/idmclient"
 	"github.com/juju/juju/api"
 	"github.com/juju/loggo"
+	"github.com/juju/mgoutil"
 	"github.com/juju/names"
 	"github.com/juju/utils"
 	"gopkg.in/errgo.v1"
@@ -483,25 +484,57 @@ func (j *JEM) OpenAPIFromDocs(m *mongodoc.Model, ctl *mongodoc.Controller) (*api
 
 // AddTemplate adds the given template to the database.
 // If there is already an existing template with the same
-// name, it is overwritten. The Id field in template will be set from its
+// name, it is overwritten and its Version field incremented.
+//
+// The Id field in template will be set from its
 // Path field. It is the responsibility of the caller to
 // ensure that the template attributes are compatible
 // with the template schema.
 func (j *JEM) AddTemplate(tmpl *mongodoc.Template, canOverwrite bool) error {
 	tmpl.Id = tmpl.Path.String()
-	var err error
-	if canOverwrite {
-		_, err = j.DB.Templates().UpsertId(tmpl.Id, tmpl)
-	} else {
-		err = j.DB.Templates().Insert(tmpl)
-	}
-	if err == nil {
+	if !canOverwrite {
+		err := j.DB.Templates().Insert(tmpl)
+		if mgo.IsDup(err) {
+			return errgo.WithCausef(nil, params.ErrAlreadyExists, "template %q already exists", tmpl.Path)
+		}
+		if err != nil {
+			return errgo.Notef(err, "cannot insert template doc")
+		}
 		return nil
 	}
-	if mgo.IsDup(err) {
-		return errgo.WithCausef(nil, params.ErrAlreadyExists, "template %q already exists", tmpl.Path)
+	u, err := mgoutil.AsUpdate(tmpl)
+	if err != nil {
+		// Should never happen.
+		return errgo.Mask(err)
 	}
-	return errgo.Notef(err, "cannot add template doc")
+	// We want to increment the version but overwrite all the
+	// other fields.
+	delete(u.Set, "version")
+	delete(u.Unset, "version")
+
+	info, err := j.DB.Templates().UpsertId(tmpl.Id, bson.D{{
+		"$set", u.Set,
+	}, {
+		"$unset", u.Unset,
+	}, {
+		"$inc", bson.D{{"version", 1}},
+	}})
+	if tmpl.Version > 1 && info.Updated == 0 {
+		// We've inserted the document but we require a greater
+		// version number.
+		err := j.DB.Templates().UpdateId(tmpl.Id, bson.D{{
+			"$set", bson.D{{
+				"version", tmpl.Version,
+			}},
+		}})
+		if err != nil {
+			return errgo.Notef(err, "cannot update version after insert")
+		}
+	}
+	if err != nil {
+		return errgo.Notef(err, "cannot add template doc")
+	}
+	return nil
 }
 
 // DeleteTemplate removes existing template from the
@@ -514,6 +547,14 @@ func (j *JEM) DeleteTemplate(path params.EntityPath) error {
 	}
 	logger.Infof("deleted template %s", path)
 	return nil
+}
+
+// ModelsWithTemplateQuery returns a mongo query that iterates through
+// all models that use the template with the given path.
+func (j *JEM) ModelsWithTemplateQuery(path params.EntityPath) *mgo.Query {
+	return j.DB.Models().Find(bson.D{{
+		"templates", path.String(),
+	}})
 }
 
 // ControllerLocationQuery returns a mongo query that iterates through

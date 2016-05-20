@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/juju/idmclient"
+	"github.com/juju/idmclient/idmtest"
 	"github.com/juju/schema"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
@@ -20,7 +21,6 @@ import (
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
-	"github.com/juju/idmclient/idmtest"
 )
 
 type jemSuite struct {
@@ -386,6 +386,36 @@ func (s *jemSuite) TestControllerLocationQuery(c *gc.C) {
 	}
 }
 
+func (s *jemSuite) TestModelsWithTemplateQuery(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "x"}
+	ctl := &mongodoc.Controller{
+		Path: ctlPath,
+	}
+	err := s.store.AddController(ctl, &mongodoc.Model{})
+	c.Assert(err, gc.IsNil)
+
+	models := []mongodoc.Model{{
+		Path:      params.EntityPath{"bob", "t1"},
+		Templates: []string{"alice/t1", "alice/t2"},
+	}, {
+		Path:      params.EntityPath{"bob", "t2"},
+		Templates: []string{"alice/t1"},
+	}}
+	for _, m := range models {
+		err = s.store.AddModel(&m)
+		c.Assert(err, gc.IsNil)
+	}
+	q := s.store.ModelsWithTemplateQuery(params.EntityPath{"alice", "t1"})
+	var all []*mongodoc.Model
+	err = q.Sort("_id").All(&all)
+	c.Assert(err, gc.IsNil)
+	got := make([]string, len(all))
+	for i, m := range all {
+		got[i] = m.Path.String()
+	}
+	c.Assert(got, jc.DeepEquals, []string{"bob/t1", "bob/t2"})
+}
+
 func (s *jemSuite) TestDeleteController(c *gc.C) {
 	ctlPath := params.EntityPath{"dalek", "who"}
 	ctl := &mongodoc.Controller{
@@ -522,6 +552,7 @@ func (s *jemSuite) TestAddTemplate(c *gc.C) {
 			"name":        "pluto",
 			"temperature": -400.0,
 		},
+		Version: 3,
 	}
 	err := s.store.AddTemplate(tmpl, true)
 	c.Assert(err, gc.IsNil)
@@ -546,6 +577,22 @@ func (s *jemSuite) TestAddTemplate(c *gc.C) {
 		"name":        "pluto",
 		"temperature": -400,
 	})
+
+	// Update the template and check that the version is incremented.
+	tmpl.Schema = environschema.Fields{
+		"name": {
+			Description: "name of something else",
+			Type:        environschema.Tstring,
+			Mandatory:   true,
+		},
+	}
+	err = s.store.AddTemplate(tmpl, true)
+	c.Assert(err, gc.IsNil)
+
+	tmpl.Version = 4
+	tmpl1, err = s.store.Template(path)
+	c.Assert(err, gc.IsNil)
+	c.Assert(tmpl1, jc.DeepEquals, tmpl)
 }
 
 func (s *jemSuite) TestDeleteTemplate(c *gc.C) {

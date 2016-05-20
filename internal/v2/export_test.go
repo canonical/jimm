@@ -1,3 +1,6 @@
 package v2
 
-var RandIntn = &randIntn
+var (
+	RandIntn              = &randIntn
+	SchemaForProviderType = &schemaForProviderType
+)
