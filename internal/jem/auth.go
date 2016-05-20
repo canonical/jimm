@@ -171,6 +171,7 @@ type CanReadIter struct {
 	jem  *JEM
 	iter *mgo.Iter
 	err  error
+	n    int
 }
 
 // ACLEntity represents a mongo entity with access permissions.
@@ -186,6 +187,7 @@ func (iter *CanReadIter) Next(item ACLEntity) bool {
 		return false
 	}
 	for iter.iter.Next(item) {
+		iter.n++
 		if err := iter.jem.CheckCanRead(item); err != nil {
 			if errgo.Cause(err) == params.ErrUnauthorized {
 				// No permissions to look at the entity, so don't include
@@ -212,4 +214,11 @@ func (iter *CanReadIter) Err() error {
 		return iter.err
 	}
 	return iter.iter.Err()
+}
+
+// Count returns the total number of items traversed
+// by the iterator, including items that were not returned
+// because they were unauthorized.
+func (iter *CanReadIter) Count() int {
+	return iter.n
 }

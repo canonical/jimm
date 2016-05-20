@@ -298,6 +298,23 @@ type GetTemplate struct {
 	EntityPath
 }
 
+// GetTemplate holds parameters for retrieving the models that are
+// using a template.
+type GetTemplateModels struct {
+	httprequest.Route `httprequest:"GET /v2/template/:User/:Name/models"`
+	EntityPath
+}
+
+// TemplateModelsResponse holds the paths of models that are using
+// a template.
+type TemplateModelsResponse struct {
+	ModelPaths []EntityPath
+	// Total holds the total number of models using the template.
+	// This can be greater than len(Models) when some of those
+	// models are not readable by the user.
+	Total int
+}
+
 // DeleteTemplate holds parameters for deletion of a template.
 type DeleteTemplate struct {
 	httprequest.Route `httprequest:"DELETE /v2/template/:User/:Name"`
@@ -433,6 +450,9 @@ type ModelResponse struct {
 	// noticed that the model's controller could not be
 	// contacted. It is empty when the model is available.
 	UnavailableSince *time.Time `json:"unavailable-since,omitempty"`
+
+	// Templates holds the paths of the templates that this model uses.
+	Templates []EntityPath
 }
 
 // AddTemplate holds parameters for adding or updating a template.

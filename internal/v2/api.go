@@ -336,6 +336,10 @@ func (h *Handler) GetModel(arg *params.GetModel) (*params.ModelResponse, error) 
 		}
 	}
 
+	tmplPaths, err := stringsToEntityPaths(m.Templates)
+	if err != nil {
+		return nil, errgo.Notef(err, "invalid entity paths found in model %q", arg.EntityPath)
+	}
 	r := &params.ModelResponse{
 		Path:             arg.EntityPath,
 		User:             jujuUser,
@@ -347,6 +351,18 @@ func (h *Handler) GetModel(arg *params.GetModel) (*params.ModelResponse, error) 
 		ControllerPath:   m.Controller,
 		Life:             m.Life,
 		UnavailableSince: newTime(ctl.UnavailableSince.UTC()),
+		Templates:        tmplPaths,
+	}
+	return r, nil
+}
+
+// stringsToEntityPaths returns the given strings as entity paths.
+func stringsToEntityPaths(ss []string) ([]params.EntityPath, error) {
+	r := make([]params.EntityPath, len(ss))
+	for i, s := range ss {
+		if err := r[i].UnmarshalText([]byte(s)); err != nil {
+			return nil, errgo.Notef(err, "invalid entity path %q", s)
+		}
 	}
 	return r, nil
 }
@@ -393,6 +409,10 @@ func (h *Handler) ListModels(arg *params.ListModels) (*params.ListModelsResponse
 			logger.Errorf("model %s has invalid controller value %s; omitting from result", m.Path, m.Controller)
 			continue
 		}
+		tmplPaths, err := stringsToEntityPaths(m.Templates)
+		if err != nil {
+			return nil, errgo.Notef(err, "invalid entity paths found in model %q", m.Path)
+		}
 		// TODO We could ensure that the currently authenticated user has
 		// access to the model and return their username and password,
 		// but that would mean we'd have to ensure the user in every
@@ -409,6 +429,7 @@ func (h *Handler) ListModels(arg *params.ListModels) (*params.ListModelsResponse
 			ControllerPath:   m.Controller,
 			Life:             m.Life,
 			UnavailableSince: newTime(ctl.UnavailableSince.UTC()),
+			Templates:        tmplPaths,
 		})
 	}
 	if err := modelIter.Err(); err != nil {
@@ -850,6 +871,29 @@ func (h *Handler) GetTemplate(arg *params.GetTemplate) (*params.TemplateResponse
 		Config:   tmpl.Config,
 		Location: tmpl.Location,
 	}, nil
+}
+
+// GetTemplate returns the models using the template.
+// It only returns names for the models that the user has read permission for.
+func (h *Handler) GetTemplateModels(arg *params.GetTemplateModels) (*params.TemplateModelsResponse, error) {
+	tmpl, err := h.jem.Template(arg.EntityPath)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	if err := h.jem.CheckCanRead(tmpl); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	var resp params.TemplateModelsResponse
+	var m mongodoc.Model
+	iter := h.jem.CanReadIter(h.jem.ModelsWithTemplateQuery(arg.EntityPath).Sort("_id").Iter())
+	for iter.Next(&m) {
+		resp.ModelPaths = append(resp.ModelPaths, m.Path)
+	}
+	if err := iter.Err(); err != nil {
+		return nil, errgo.Notef(err, "cannot get models")
+	}
+	resp.Total = iter.Count()
+	return &resp, nil
 }
 
 // DeleteTemplate deletes a template.

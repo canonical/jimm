@@ -54,6 +54,16 @@ var unauthorizedTests = []struct {
 	method: "GET",
 	path:   "/v2/controller/bob/private",
 }, {
+	about:  "get template as non-owner",
+	asUser: "other",
+	method: "GET",
+	path:   "/v2/template/bob/private",
+}, {
+	about:  "get template models as non-owner",
+	asUser: "other",
+	method: "GET",
+	path:   "/v2/template/bob/private/models",
+}, {
 	about:  "new model as non-owner",
 	asUser: "other",
 	method: "POST",
@@ -137,7 +147,7 @@ func (s *APISuite) TestUnauthorized(c *gc.C) {
 
 	s.allowControllerPerm(c, params.EntityPath{"bob", "open"})
 	s.allowModelPerm(c, params.EntityPath{"bob", "open"})
-	s.allowTemplatePerm(c, params.EntityPath{"bob", "private"})
+	s.allowTemplatePerm(c, params.EntityPath{"bob", "open"})
 
 	for i, test := range unauthorizedTests {
 		c.Logf("test %d: %s", i, test.about)
@@ -2564,6 +2574,63 @@ func (s *APISuite) TestGetTemplateNotFound(c *gc.C) {
 	c.Assert(tmpl, gc.IsNil)
 }
 
+func (s *APISuite) TestGetTemplateModelsTemplateNotFound(c *gc.C) {
+	resp, err := s.NewClient("alice").GetTemplateModels(&params.GetTemplateModels{
+		EntityPath: params.EntityPath{"alice", "xxx"},
+	})
+	c.Assert(err, gc.ErrorMatches, `GET .*/v2/template/alice/xxx/models: template "alice/xxx" not found`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+	c.Assert(resp, gc.IsNil)
+}
+
+func (s *APISuite) TestGetTemplateModels(c *gc.C) {
+	ctlId := s.assertAddController(c, params.EntityPath{"bob", "ctl"}, nil)
+	s.allowControllerPerm(c, ctlId)
+	t1 := params.EntityPath{"bob", "t1"}
+	t2 := params.EntityPath{"bob", "t2"}
+	s.addTemplate(c, t1, ctlId, dummyModelConfig)
+	s.addTemplate(c, t2, ctlId, dummyModelConfig)
+	s.allowTemplatePerm(c, t1)
+	s.allowTemplatePerm(c, t2)
+
+	bobModel1 := params.EntityPath{"bob", "model1"}
+	s.addModel(c, bobModel1, ctlId, t1, t2)
+	s.allowModelPerm(c, bobModel1, "superduper")
+
+	bobModel2 := params.EntityPath{"bob", "model2"}
+	s.addModel(c, bobModel2, ctlId, t1)
+	s.allowModelPerm(c, bobModel2, "superduper")
+
+	aliceModel := params.EntityPath{"alice", "model"}
+	s.addModel(c, aliceModel, ctlId, t1)
+	s.allowModelPerm(c, aliceModel, "superduper")
+
+	resp, err := s.NewClient("bob").GetTemplateModels(&params.GetTemplateModels{
+		EntityPath: t1,
+	})
+	c.Assert(err, gc.IsNil)
+	c.Assert(resp, jc.DeepEquals, &params.TemplateModelsResponse{
+		ModelPaths: []params.EntityPath{bobModel1, bobModel2},
+		Total:      3,
+	})
+	resp, err = s.NewClient("alice").GetTemplateModels(&params.GetTemplateModels{
+		EntityPath: t1,
+	})
+	c.Assert(err, gc.IsNil)
+	c.Assert(resp, jc.DeepEquals, &params.TemplateModelsResponse{
+		ModelPaths: []params.EntityPath{aliceModel},
+		Total:      3,
+	})
+	resp, err = s.NewClient("superduper").GetTemplateModels(&params.GetTemplateModels{
+		EntityPath: t1,
+	})
+	c.Assert(err, gc.IsNil)
+	c.Assert(resp, jc.DeepEquals, &params.TemplateModelsResponse{
+		ModelPaths: []params.EntityPath{aliceModel, bobModel1, bobModel2},
+		Total:      3,
+	})
+}
+
 var addInvalidTemplateTests = []struct {
 	about       string
 	config      map[string]interface{}
@@ -2729,7 +2796,7 @@ func (s *APISuite) addController(c *gc.C, path params.EntityPath, loc map[string
 
 // addModel adds a new model in the given controller. It
 // returns the model id.
-func (s *APISuite) addModel(c *gc.C, modelPath, ctlPath params.EntityPath) (path params.EntityPath, user, uuid string) {
+func (s *APISuite) addModel(c *gc.C, modelPath, ctlPath params.EntityPath, templates ...params.EntityPath) (path params.EntityPath, user, uuid string) {
 	// Note that because the cookies acquired in this request don't
 	// persist, the discharge macaroon we get won't affect subsequent
 	// requests in the caller.
@@ -2737,9 +2804,10 @@ func (s *APISuite) addModel(c *gc.C, modelPath, ctlPath params.EntityPath) (path
 	resp, err := s.NewClient(modelPath.User).NewModel(&params.NewModel{
 		User: modelPath.User,
 		Info: params.NewModelInfo{
-			Name:       modelPath.Name,
-			Controller: &ctlPath,
-			Config:     dummyModelConfig,
+			Name:          modelPath.Name,
+			Controller:    &ctlPath,
+			Config:        dummyModelConfig,
+			TemplatePaths: templates,
 		},
 	})
 	c.Assert(err, gc.IsNil)
