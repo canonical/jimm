@@ -319,6 +319,7 @@ func (s *authSuite) TestCanReadIter(c *gc.C) {
 		testModels[0],
 		testModels[2],
 	})
+	c.Assert(crit.Count(), gc.Equals, 3)
 }
 
 // newRequestForUser builds a new *http.Request for method at path which

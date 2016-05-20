@@ -123,6 +123,14 @@ func (c *client) GetTemplate(p *params.GetTemplate) (*params.TemplateResponse, e
 	return r, err
 }
 
+// GetTemplate returns the models using the template.
+// It only returns names for the models that the user has read permission for.
+func (c *client) GetTemplateModels(p *params.GetTemplateModels) (*params.TemplateModelsResponse, error) {
+	var r *params.TemplateModelsResponse
+	err := c.Client.Call(p, &r)
+	return r, err
+}
+
 // GetTemplatePerm returns the ACL for a given template.
 // Only the owner (arg.EntityPath.User) can read the ACL.
 func (c *client) GetTemplatePerm(p *params.GetTemplatePerm) (params.ACL, error) {
