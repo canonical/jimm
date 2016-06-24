@@ -14,6 +14,7 @@ import (
 	"github.com/juju/loggo"
 	"github.com/juju/names"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"launchpad.net/gnuflag"
 
 	"github.com/CanonicalLtd/jem/jemclient"
@@ -93,6 +94,7 @@ func (c *commandBase) newClient(ctxt *cmd.Context) (*jemclient.Client, error) {
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
+	bakeryClient.VisitWebPage = httpbakery.OpenWebBrowser
 	return jemclient.New(jemclient.NewParams{
 		BaseURL: c.serverURL(),
 		Client:  bakeryClient,
