@@ -337,7 +337,7 @@ func (w *watcherState) addDelta(d multiwatcher.Delta) error {
 		}
 	case *multiwatcher.UnitInfo:
 		w.adjustCount(&w.stats.UnitCount, d)
-	case *multiwatcher.ServiceInfo:
+	case *multiwatcher.ApplicationInfo:
 		w.adjustCount(&w.stats.ServiceCount, d)
 	case *multiwatcher.MachineInfo:
 		// TODO for top level machines, increment instance count?

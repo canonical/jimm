@@ -5,6 +5,7 @@ package modelcmd
 import (
 	"github.com/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
+	"github.com/juju/juju/environs"
 	"github.com/juju/juju/jujuclient"
 	"github.com/juju/utils/keyvalues"
 	"gopkg.in/errgo.v1"
@@ -16,10 +17,10 @@ import (
 type addControllerCommand struct {
 	commandBase
 
-	modelName  string
-	modelPath  entityPathValue
-	attributes map[string]string
-	public     bool
+	controllerName string
+	controllerPath entityPathValue
+	attributes     map[string]string
+	public         bool
 }
 
 func newAddControllerCommand() cmd.Command {
@@ -60,8 +61,8 @@ func (c *addControllerCommand) Info() *cmd.Info {
 
 func (c *addControllerCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.commandBase.SetFlags(f)
-	f.StringVar(&c.modelName, "m", "", "model to add")
-	f.StringVar(&c.modelName, "model", "", "")
+	f.StringVar(&c.controllerName, "c", "", "controller to add")
+	f.StringVar(&c.controllerName, "controller", "", "")
 	f.BoolVar(&c.public, "public", false, "whether it will be part of the public pool of controllers")
 }
 
@@ -69,7 +70,7 @@ func (c *addControllerCommand) Init(args []string) error {
 	if len(args) < 1 {
 		return errgo.Newf("got %d arguments, want 1", len(args))
 	}
-	if err := c.modelPath.Set(args[0]); err != nil {
+	if err := c.controllerPath.Set(args[0]); err != nil {
 		return errgo.Mask(err)
 	}
 	attrs, err := keyvalues.Parse(args[1:], false)
@@ -85,7 +86,8 @@ func (c *addControllerCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	info, err := getModelInfo(c.modelName)
+	logger.Debugf("client: %#v\n", client)
+	info, err := getControllerInfo(c.controllerName)
 	if err != nil {
 		return errgo.Mask(err)
 	}
@@ -98,9 +100,9 @@ func (c *addControllerCommand) Run(ctxt *cmd.Context) error {
 		hostnames = info.controller.UnresolvedAPIEndpoints
 	}
 
-	logger.Infof("adding controller, user %s, name %s", c.modelPath.EntityPath.User, c.modelPath.EntityPath.Name)
+	logger.Infof("adding controller, user %s, name %s", c.controllerPath.EntityPath.User, c.controllerPath.EntityPath.Name)
 	if err := client.AddController(&params.AddController{
-		EntityPath: c.modelPath.EntityPath,
+		EntityPath: c.controllerPath.EntityPath,
 		Info: params.ControllerInfo{
 			HostPorts:      hostnames,
 			CACert:         info.controller.CACert,
@@ -116,25 +118,17 @@ func (c *addControllerCommand) Run(ctxt *cmd.Context) error {
 	return nil
 }
 
-type modelInfo struct {
+type controllerInfo struct {
 	model      *jujuclient.ModelDetails
 	controller *jujuclient.ControllerDetails
 	account    *jujuclient.AccountDetails
 }
 
-func getModelInfo(modelName string) (*modelInfo, error) {
+func getControllerInfo(controllerName string) (*controllerInfo, error) {
 	store := jujuclient.NewFileClientStore()
 	var err error
-	var controllerName string
-	if modelName == "" {
-		modelName, err = modelcmd.GetCurrentModel(store)
-		if err != nil {
-			return nil, errgo.Mask(err)
-		}
-	}
-	controllerName, modelName = modelcmd.SplitModelName(modelName)
 	if controllerName == "" {
-		controllerName, err = modelcmd.ReadCurrentController()
+		controllerName, err = store.CurrentController()
 		if err != nil {
 			return nil, errgo.Mask(err)
 		}
@@ -144,8 +138,8 @@ func getModelInfo(modelName string) (*modelInfo, error) {
 		return nil, errgo.Mask(err)
 	}
 
-	var info modelInfo
-	info.model, err = store.ModelByName(controllerName, accountName, modelName)
+	var info controllerInfo
+	info.model, err = store.ModelByName(controllerName, accountName, environs.ControllerModelName)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}

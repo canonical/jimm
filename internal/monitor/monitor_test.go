@@ -102,7 +102,7 @@ func (s *monitorSuite) TestMonitorWithBrokenMongoConnection(c *gc.C) {
 	proxy.CloseConns()
 
 	f := factory.NewFactory(s.State)
-	f.MakeService(c, &factory.ServiceParams{
+	f.MakeApplication(c, &factory.ApplicationParams{
 		Name: "wordpress",
 	})
 
@@ -150,7 +150,7 @@ func (s *monitorSuite) TestMonitorWithBrokenJujuAPIConnection(c *gc.C) {
 	proxy.CloseConns()
 
 	f := factory.NewFactory(s.State)
-	f.MakeService(c, &factory.ServiceParams{
+	f.MakeApplication(c, &factory.ApplicationParams{
 		Name: "wordpress",
 	})
 
