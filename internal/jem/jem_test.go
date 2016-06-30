@@ -9,12 +9,10 @@ import (
 
 	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/idmtest"
-	"github.com/juju/schema"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/environschema.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/mgo.v2/bson"
 
@@ -386,36 +384,6 @@ func (s *jemSuite) TestControllerLocationQuery(c *gc.C) {
 	}
 }
 
-func (s *jemSuite) TestModelsWithTemplateQuery(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "x"}
-	ctl := &mongodoc.Controller{
-		Path: ctlPath,
-	}
-	err := s.store.AddController(ctl, &mongodoc.Model{})
-	c.Assert(err, gc.IsNil)
-
-	models := []mongodoc.Model{{
-		Path:      params.EntityPath{"bob", "t1"},
-		Templates: []string{"alice/t1", "alice/t2"},
-	}, {
-		Path:      params.EntityPath{"bob", "t2"},
-		Templates: []string{"alice/t1"},
-	}}
-	for _, m := range models {
-		err = s.store.AddModel(&m)
-		c.Assert(err, gc.IsNil)
-	}
-	q := s.store.ModelsWithTemplateQuery(params.EntityPath{"alice", "t1"})
-	var all []*mongodoc.Model
-	err = q.Sort("_id").All(&all)
-	c.Assert(err, gc.IsNil)
-	got := make([]string, len(all))
-	for i, m := range all {
-		got[i] = m.Path.String()
-	}
-	c.Assert(got, jc.DeepEquals, []string{"bob/t1", "bob/t2"})
-}
-
 func (s *jemSuite) TestDeleteController(c *gc.C) {
 	ctlPath := params.EntityPath{"dalek", "who"}
 	ctl := &mongodoc.Controller{
@@ -553,109 +521,6 @@ func (s *jemSuite) TestModelFromUUID(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `model "no-such-uuid" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	c.Assert(m2, gc.IsNil)
-}
-
-func (s *jemSuite) TestAddTemplate(c *gc.C) {
-	path := params.EntityPath{"bob", "x"}
-	tmpl := &mongodoc.Template{
-		Id:   "ignored",
-		Path: path,
-		Schema: environschema.Fields{
-			"name": {
-				Description: "name of model",
-				Type:        environschema.Tstring,
-				Mandatory:   true,
-				Values:      []interface{}{"venus", "pluto"},
-			},
-			"temperature": {
-				Description: "temperature of model",
-				Type:        environschema.Tint,
-				Example:     400,
-				Values:      []interface{}{-400, 864.0},
-			},
-		},
-		Config: map[string]interface{}{
-			"name":        "pluto",
-			"temperature": -400.0,
-		},
-		Version: 3,
-	}
-	err := s.store.AddTemplate(tmpl, true)
-	c.Assert(err, gc.IsNil)
-	c.Assert(tmpl.Id, gc.Equals, "bob/x")
-
-	tmpl1, err := s.store.Template(path)
-	c.Assert(err, gc.IsNil)
-	c.Assert(tmpl1, jc.DeepEquals, tmpl)
-
-	// Check you can't add the same template when overwrite is false
-	err = s.store.AddTemplate(tmpl, false)
-	c.Check(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
-
-	// Ensure that the schema still works even though some
-	// values may have been transformed to float64 by the
-	// JSON unmarshaler.
-	fields, defaults, err := tmpl.Schema.ValidationSchema()
-	c.Assert(err, gc.IsNil)
-	config, err := schema.FieldMap(fields, defaults).Coerce(tmpl.Config, nil)
-	c.Assert(err, gc.IsNil)
-	c.Assert(config, jc.DeepEquals, map[string]interface{}{
-		"name":        "pluto",
-		"temperature": -400,
-	})
-
-	// Update the template and check that the version is incremented.
-	tmpl.Schema = environschema.Fields{
-		"name": {
-			Description: "name of something else",
-			Type:        environschema.Tstring,
-			Mandatory:   true,
-		},
-	}
-	err = s.store.AddTemplate(tmpl, true)
-	c.Assert(err, gc.IsNil)
-
-	tmpl.Version = 4
-	tmpl1, err = s.store.Template(path)
-	c.Assert(err, gc.IsNil)
-	c.Assert(tmpl1, jc.DeepEquals, tmpl)
-}
-
-func (s *jemSuite) TestDeleteTemplate(c *gc.C) {
-	path := params.EntityPath{"bob", "x"}
-	tmpl := &mongodoc.Template{
-		Id:   "ignored",
-		Path: path,
-		Schema: environschema.Fields{
-			"name": {
-				Description: "name of model",
-				Type:        environschema.Tstring,
-				Mandatory:   true,
-				Values:      []interface{}{"venus", "pluto"},
-			},
-			"temperature": {
-				Description: "temperature of model",
-				Type:        environschema.Tint,
-				Example:     400,
-				Values:      []interface{}{-400, 864.0},
-			},
-		},
-		Config: map[string]interface{}{
-			"name":        "pluto",
-			"temperature": -400.0,
-		},
-	}
-	err := s.store.AddTemplate(tmpl, true)
-	c.Assert(err, gc.IsNil)
-
-	err = s.store.DeleteTemplate(tmpl.Path)
-	c.Assert(err, gc.IsNil)
-	tmpl1, err := s.store.Template(path)
-	c.Assert(tmpl1, gc.IsNil)
-
-	err = s.store.DeleteTemplate(tmpl.Path)
-	c.Assert(err, gc.ErrorMatches, "template \"bob/x\" not found")
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
 func (s *jemSuite) TestJEMCopiesSession(c *gc.C) {
