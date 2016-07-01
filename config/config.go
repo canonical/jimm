@@ -24,6 +24,7 @@ type Config struct {
 	IdentityLocation  string            `yaml:"identity-location"`
 	AgentUsername     string            `yaml:"agent-username"`
 	AgentKey          *bakery.KeyPair   `yaml:"agent-key"`
+	AccessLog         string            `yaml:"access-log"`
 }
 
 func (c *Config) validate() error {

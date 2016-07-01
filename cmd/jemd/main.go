@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/gorilla/handlers"
 	// Include any providers known to support JEM.
 	// Avoid including provider/all to reduce build time.
 	_ "github.com/juju/juju/provider/ec2"
@@ -21,6 +22,7 @@ import (
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/mgo.v2"
+	"gopkg.in/natefinch/lumberjack.v2"
 
 	"github.com/CanonicalLtd/jem"
 	"github.com/CanonicalLtd/jem/config"
@@ -96,7 +98,17 @@ func serve(confPath string) error {
 	if err != nil {
 		return errgo.Notef(err, "cannot create new server at %q", conf.APIAddr)
 	}
+	handler := server.(http.Handler)
+	if conf.AccessLog != "" {
+		accesslog := &lumberjack.Logger{
+			Filename:   conf.AccessLog,
+			MaxSize:    500, // megabytes
+			MaxBackups: 3,
+			MaxAge:     28, //days
+		}
+		handler = handlers.CombinedLoggingHandler(accesslog, handler)
+	}
 
 	logger.Infof("starting the API server")
-	return http.ListenAndServe(conf.APIAddr, server)
+	return http.ListenAndServe(conf.APIAddr, handler)
 }

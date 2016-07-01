@@ -9,3 +9,4 @@ identity-location: http://localhost:8081/
 # agent-key: {private: VnTcdjEOBBBjHNJ9knRtMA0I1PCATNySJXhW4PGE5hY=, public: MusIzFaXa7ImSMcQ9wgGpaDrgRQhbtsjsyawTvmXh1c=}
 # For production identity manager (jemd will collect the correct public key on startup).
 #identity-location: https://api.jujucharms.com/identity
+access-log: /var/log/jem/access.log
