@@ -166,14 +166,14 @@ func (s *internalSuite) TestLeaseUpdaterWhenControllerRemoved(c *gc.C) {
 func (s *internalSuite) TestWatcher(c *gc.C) {
 	// Add some entities to the admin model.
 	f := factory.NewFactory(s.State)
-	svc := f.MakeService(c, &factory.ServiceParams{
+	svc := f.MakeApplication(c, &factory.ApplicationParams{
 		Name: "wordpress",
 	})
 	f.MakeUnit(c, &factory.UnitParams{
-		Service: svc,
+		Application: svc,
 	})
 	f.MakeUnit(c, &factory.UnitParams{
-		Service: svc,
+		Application: svc,
 	})
 	modelSt := f.MakeModel(c, &factory.ModelParams{
 		Name: "jem-somemodel",
@@ -231,7 +231,7 @@ func (s *internalSuite) TestWatcher(c *gc.C) {
 	s.assertModelLife(c, modelPath, "alive")
 
 	// Add another service and check that the service count is maintained.
-	f.MakeService(c, &factory.ServiceParams{
+	f.MakeApplication(c, &factory.ApplicationParams{
 		Name: "mysql",
 	})
 

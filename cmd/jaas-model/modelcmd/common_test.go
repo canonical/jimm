@@ -75,7 +75,6 @@ func (s *commonSuite) SetUpTest(c *gc.C) {
 	s.idmSrv.SetDefaultUser("testuser")
 
 	os.Setenv("JAAS_MODEL", s.httpSrv.URL)
-
 }
 
 // jemClient returns a new JEM client that will act as the given user.
@@ -178,6 +177,7 @@ func newAPIConnectionParams(
 		AccountDetails: accountDetails,
 		ModelUUID:      modelUUID,
 		DialOpts:       dialOpts,
+		OpenAPI:        api.Open,
 	}, nil
 }
 

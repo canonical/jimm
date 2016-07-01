@@ -13,17 +13,19 @@ import (
 	"time"
 
 	"github.com/juju/httprequest"
+	"github.com/juju/juju/api/cloud"
 	"github.com/juju/juju/api/modelmanager"
 	"github.com/juju/juju/api/usermanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	jujucloud "github.com/juju/juju/cloud"
 	controllermodelmanager "github.com/juju/juju/controller/modelmanager"
 	"github.com/juju/juju/environs"
 	"github.com/juju/juju/network"
 	"github.com/juju/loggo"
-	"github.com/juju/names"
 	jujuschema "github.com/juju/schema"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/environschema.v1"
+	"gopkg.in/juju/names.v2"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
@@ -143,13 +145,11 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	ctl.UUID = info.ControllerUUID
 
 	// Find out the provider type.
-	// TODO cache all the schemaForNewModel information here
-	// and store it with the controller?
-	skeleton, err := modelmanager.NewClient(conn).ConfigSkeleton("", "")
+	cloudInfo, err := cloud.NewClient(conn).Cloud()
 	if err != nil {
 		return errgo.Notef(err, "cannot get base configuration")
 	}
-	ctl.ProviderType = skeleton["type"].(string)
+	ctl.ProviderType = cloudInfo.Type
 
 	// Update addresses from latest known in controller.
 	// Note that state.APIHostPorts is always guaranteed
@@ -610,6 +610,7 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 	if err := h.jem.CheckReadACL(h.jem.DB.Controllers(), ctlPath); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
+
 	conn, err := h.jem.OpenAPI(ctlPath)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot connect to controller", errgo.Is(params.ErrNotFound))
@@ -664,13 +665,51 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 	}
 	// Add the model name.
 	// Note that AddModel has set modelDoc.Id for us.
-	fields["name"] = idToModelName(modelDoc.Id)
+	modelName := idToModelName(modelDoc.Id)
 
-	mmClient := modelmanager.NewClient(conn.Connection)
 	// Always grant access to the user that we use to connect
 	// to the controller.
 	adminUser := conn.Info.Tag.(names.UserTag).Id()
-	m, err := mmClient.CreateModel(adminUser, nil, fields)
+
+	cloudClient := cloud.NewClient(conn.Connection)
+	cloudInfo, err := cloudClient.Cloud()
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+
+	// Copy the credentials out of the fields.
+	// TODO(mhilton) handle credentials as a jem concept.
+	cred, err := credentialsFromFields(cloudInfo.Type, cloudInfo.AuthTypes, fields)
+	if err != nil {
+		// Remove the model that was created, because it's no longer valid.
+		if err := h.jem.DB.Models().RemoveId(modelDoc.Id); err != nil {
+			logger.Errorf("cannot remove model from database after model creation error: %v", err)
+		}
+		return nil, errgo.Notef(err, "no suitable credentials for %s", ctlPath)
+	}
+	credentialName := modelName
+	creds := map[string]jujucloud.Credential{
+		credentialName: cred,
+	}
+
+	// Upload the credentials to the controller with the model's name
+	// that way they will be unique.
+	if err := cloudClient.UpdateCredentials(conn.Info.Tag.(names.UserTag), creds); err != nil {
+		// Remove the model that was created, because it's no longer valid.
+		if err := h.jem.DB.Models().RemoveId(modelDoc.Id); err != nil {
+			logger.Errorf("cannot remove model from database after model creation error: %v", err)
+		}
+		return nil, errgo.Notef(err, "cannot set credentials")
+	}
+
+	mmClient := modelmanager.NewClient(conn.Connection)
+
+	cloudRegion := ""
+	if v, ok := fields["region"]; ok {
+		cloudRegion = v.(string)
+	}
+
+	m, err := mmClient.CreateModel(modelName, adminUser, cloudRegion, credentialName, fields)
 	if err != nil {
 		// Remove the model that was created, because it's no longer valid.
 		if err := h.jem.DB.Models().RemoveId(modelDoc.Id); err != nil {
@@ -1028,7 +1067,7 @@ func (h *Handler) getPerm(coll *mgo.Collection, path params.EntityPath) (params.
 }
 
 func idToModelName(id string) string {
-	return strings.Replace(id, "/", "_", -1)
+	return strings.Replace(id, "/", "-", -1)
 }
 
 // ensureUser ensures that the given user account exists.
@@ -1095,12 +1134,12 @@ func (h *Handler) schemaForNewModel(ctlPath params.EntityPath) (*schemaForNewMod
 
 	var neSchema schemaForNewModel
 
-	client := modelmanager.NewClient(st)
-	neSchema.skeleton, err = client.ConfigSkeleton("", "")
+	client := cloud.NewClient(st)
+	cloudInfo, err := client.Cloud()
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot get base configuration")
 	}
-	neSchema.providerType = neSchema.skeleton["type"].(string)
+	neSchema.providerType = cloudInfo.Type
 	neSchema.schema, err = schemaForProviderType(neSchema.providerType)
 	if err != nil {
 		return nil, errgo.Mask(err)
@@ -1307,4 +1346,36 @@ func normalizeSchemaAttr(a *environschema.Attr) {
 	if len(a.EnvVars) == 0 {
 		a.EnvVars = nil
 	}
+}
+
+// credentialsFromFields finds a set of credentials taken from fields.
+// For each authType it retireves the schema for using authType with
+// providerType and returns a matching credential if all required
+// parameters are found in fields.
+func credentialsFromFields(providerType string, authTypes []jujucloud.AuthType, fields map[string]interface{}) (jujucloud.Credential, error) {
+	provider, err := environs.Provider(providerType)
+	if err != nil {
+		return jujucloud.NewEmptyCredential(), errgo.Notef(err, "cannot get provider type %q", providerType)
+	}
+	schemas := provider.CredentialSchemas()
+
+OUTER:
+	for _, at := range authTypes {
+		if _, ok := schemas[at]; !ok {
+			continue
+		}
+		attr := make(map[string]string)
+		for _, ca := range schemas[at] {
+			if v, ok := fields[ca.Name]; ok {
+				attr[ca.Name] = v.(string)
+				continue
+			}
+			if !ca.CredentialAttr.Optional {
+				continue OUTER
+			}
+		}
+		return jujucloud.NewCredential(at, attr), nil
+
+	}
+	return jujucloud.NewEmptyCredential(), errgo.New("no suitable credentials found")
 }
