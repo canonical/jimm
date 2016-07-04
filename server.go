@@ -12,6 +12,7 @@ import (
 
 	"github.com/CanonicalLtd/jem/internal/debugapi"
 	"github.com/CanonicalLtd/jem/internal/jemserver"
+	"github.com/CanonicalLtd/jem/internal/jujuapi"
 	"github.com/CanonicalLtd/jem/internal/v2"
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -19,6 +20,7 @@ import (
 var versions = map[string]jemserver.NewAPIHandlerFunc{
 	"v2":    v2.NewAPIHandler,
 	"debug": debugapi.NewAPIHandler,
+	"juju":  jujuapi.NewAPIHandler,
 }
 
 // ServerParams holds configuration for a new API server.
