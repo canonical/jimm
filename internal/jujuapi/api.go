@@ -13,7 +13,7 @@ import (
 	"github.com/CanonicalLtd/jem/internal/jemserver"
 )
 
-func NewAPIHandler(jp *jem.Pool, sp jemserver.Params) ([]httprequest.Handler, error) {
+func NewAPIHandler(jp *jem.Pool, _ jemserver.Params) ([]httprequest.Handler, error) {
 	return []httprequest.Handler{
 		newWebSocketHandler(jp),
 	}, nil
