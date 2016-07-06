@@ -185,7 +185,7 @@ type Template struct {
 	// and ease of indexing. Its string value is used as the Id value.
 	Path params.EntityPath
 
-	// ACL holds permissions for the model.
+	// ACL holds permissions for the template.
 	ACL params.ACL
 
 	// Schema holds the schema used to create the template.
@@ -212,6 +212,37 @@ func (t *Template) Owner() params.User {
 
 func (t *Template) GetACL() params.ACL {
 	return t.ACL
+}
+
+type Credential struct {
+	// Id holds the primary key for a credential.
+	// It holds Path.String().
+	Id string `bson:"_id"`
+
+	// Path holds the local user and name given to the
+	// credential, denormalized from Id for convenience
+	// and ease of indexing. Its string value is used as the Id value.
+	Path params.EntityPath
+
+	// ACL holds permissions for the credential.
+	ACL params.ACL
+
+	// Type holds the type of credential.
+	Type string
+
+	// Label holds an optional label for the credentials.
+	Label string
+
+	// Attributes holds the credential attributes.
+	Attributes map[string]string
+}
+
+func (c *Credential) Owner() params.User {
+	return c.Path.User
+}
+
+func (c *Credential) GetACL() params.ACL {
+	return c.ACL
 }
 
 // Sanitize returns a version of key that's suitable
