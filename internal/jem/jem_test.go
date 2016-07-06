@@ -529,6 +529,32 @@ func (s *jemSuite) TestAddModel(c *gc.C) {
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
 }
 
+func (s *jemSuite) TestModelFromUUID(c *gc.C) {
+	uuid := "99999999-9999-9999-9999-999999999999"
+	path := params.EntityPath{"bob", "x"}
+	m := &mongodoc.Model{
+		Id:   "ignored",
+		Path: path,
+		UUID: uuid,
+	}
+	err := s.store.AddModel(m)
+	c.Assert(err, gc.IsNil)
+	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
+		Id:   "bob/x",
+		Path: path,
+		UUID: uuid,
+	})
+
+	m1, err := s.store.ModelFromUUID(uuid)
+	c.Assert(err, gc.IsNil)
+	c.Assert(m1, jc.DeepEquals, m)
+
+	m2, err := s.store.ModelFromUUID("no-such-uuid")
+	c.Assert(err, gc.ErrorMatches, `model "no-such-uuid" not found`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+	c.Assert(m2, gc.IsNil)
+}
+
 func (s *jemSuite) TestAddTemplate(c *gc.C) {
 	path := params.EntityPath{"bob", "x"}
 	tmpl := &mongodoc.Template{

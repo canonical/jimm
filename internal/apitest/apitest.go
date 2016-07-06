@@ -12,6 +12,7 @@ import (
 	"github.com/juju/idmclient/idmtest"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	"github.com/juju/testing"
+	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -125,6 +126,68 @@ func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server)
 	srv, err := external_jem.NewServer(config)
 	c.Assert(err, gc.IsNil)
 	return srv.(*jemserver.Server)
+}
+
+// AssertAddController adds the specified controller using AddController
+// and checks that id succeeds. It returns the controller id.
+func (s *Suite) AssertAddController(c *gc.C, path params.EntityPath, loc map[string]string) params.EntityPath {
+	err := s.AddController(c, path, loc)
+	c.Assert(err, jc.ErrorIsNil)
+	return path
+}
+
+// AddController adds a new controller with the provided path and any
+// specified location parameters.
+func (s *Suite) AddController(c *gc.C, path params.EntityPath, loc map[string]string) error {
+	// Note that because the cookies acquired in this request don't
+	// persist, the discharge macaroon we get won't affect subsequent
+	// requests in the caller.
+	info := s.APIInfo(c)
+	p := &params.AddController{
+		EntityPath: path,
+		Info: params.ControllerInfo{
+			HostPorts:      info.Addrs,
+			CACert:         info.CACert,
+			User:           info.Tag.Id(),
+			Password:       info.Password,
+			ControllerUUID: info.ModelTag.Id(),
+			Location:       loc,
+		},
+	}
+	// If locations are specified then make the controller public so
+	// that it can be found by seraching on those locations.
+	if len(loc) > 0 {
+		p.Info.Public = true
+		s.IDMSrv.AddUser(string(path.User), "controller-admin")
+	}
+	return s.NewClient(path.User).AddController(p)
+}
+
+const dummySSHKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDOjaOjVRHchF2RFCKQdgBqrIA5nOoqSprLK47l2th5I675jw+QYMIihXQaITss3hjrh3+5ITyBO41PS5rHLNGtlYUHX78p9CHNZsJqHl/z1Ub1tuMe+/5SY2MkDYzgfPtQtVsLasAIiht/5g78AMMXH3HeCKb9V9cP6/lPPq6mCMvg8TDLrPp/P2vlyukAsJYUvVgoaPDUBpedHbkMj07pDJqe4D7c0yEJ8hQo/6nS+3bh9Q1NvmVNsB1pbtk3RKONIiTAXYcjclmOljxxJnl1O50F5sOIi38vyl7Q63f6a3bXMvJEf1lnPNJKAxspIfEu8gRasny3FEsbHfrxEwVj rog@rog-x220"
+
+var dummyModelConfig = map[string]interface{}{
+	"authorized-keys": dummySSHKey,
+	"controller":      true,
+}
+
+// CreateModel creates a new model with the specified path on the
+// specified controller, using the specified templates. It returns the
+// new model's path, user and uuid.
+func (s *Suite) CreateModel(c *gc.C, path, ctlPath params.EntityPath, templates ...params.EntityPath) (modelPath params.EntityPath, user, uuid string) {
+	// Note that because the cookies acquired in this request don't
+	// persist, the discharge macaroon we get won't affect subsequent
+	// requests in the caller.
+	resp, err := s.NewClient(path.User).NewModel(&params.NewModel{
+		User: path.User,
+		Info: params.NewModelInfo{
+			Name:          path.Name,
+			Controller:    &ctlPath,
+			Config:        dummyModelConfig,
+			TemplatePaths: templates,
+		},
+	})
+	c.Assert(err, gc.IsNil)
+	return resp.Path, resp.User, resp.UUID
 }
 
 // Do returns a Do function appropriate for using in httptesting.AssertJSONCall.Do

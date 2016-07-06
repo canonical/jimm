@@ -429,6 +429,21 @@ func (j *JEM) Model(path params.EntityPath) (*mongodoc.Model, error) {
 	return &m, nil
 }
 
+// ModelFromUUID returns the document representing the model with the
+// given UUID. It returns an error with a params.ErrNotFound cause if the
+// controller was not found.
+func (j *JEM) ModelFromUUID(uuid string) (*mongodoc.Model, error) {
+	var m mongodoc.Model
+	err := j.DB.Models().Find(bson.D{{"uuid", uuid}}).One(&m)
+	if err == mgo.ErrNotFound {
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "model %q not found", uuid)
+	}
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot get model %q", uuid)
+	}
+	return &m, nil
+}
+
 // ErrAPIConnection is returned by OpenAPI and OpenAPIFromDocs
 // when the API connection cannot be made.
 var ErrAPIConnection = errgo.New("cannot connect to API")
