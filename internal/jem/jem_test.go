@@ -1039,6 +1039,54 @@ func (s *jemSuite) TestAcquireLeaseControllerNotFound(c *gc.C) {
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
+func (s *jemSuite) TestAddAndGetCredential(c *gc.C) {
+	path := params.EntityPath{"test-user", "test-credential"}
+	cred, err := s.store.Credential(path)
+	c.Assert(cred, gc.IsNil)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+	c.Assert(err, gc.ErrorMatches, `credential "test-user/test-credential" not found`)
+
+	attrs := map[string]string{
+		"attr1": "val1",
+		"attr2": "val2",
+	}
+	err = s.store.AddCredential(&mongodoc.Credential{
+		Path:       path,
+		Type:       "credtype",
+		Label:      "Test Label",
+		Attributes: attrs,
+	})
+	c.Assert(err, gc.IsNil)
+
+	cred, err = s.store.Credential(path)
+	c.Assert(err, gc.IsNil)
+	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
+		Id:         path.String(),
+		Path:       path,
+		Type:       "credtype",
+		Label:      "Test Label",
+		Attributes: attrs,
+	})
+
+	err = s.store.AddCredential(&mongodoc.Credential{
+		Path:       path,
+		Type:       "credtype",
+		Label:      "Test Label 2",
+		Attributes: attrs,
+	})
+	c.Assert(err, gc.IsNil)
+
+	cred, err = s.store.Credential(path)
+	c.Assert(err, gc.IsNil)
+	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
+		Id:         path.String(),
+		Path:       path,
+		Type:       "credtype",
+		Label:      "Test Label 2",
+		Attributes: attrs,
+	})
+}
+
 func parseTime(s string) time.Time {
 	t, err := time.Parse(time.RFC3339, s)
 	if err != nil {

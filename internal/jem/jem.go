@@ -802,6 +802,45 @@ func apiInfoFromDocs(ctl *mongodoc.Controller, m *mongodoc.Model) *api.Info {
 	}
 }
 
+// AddCredential stores the given credential in the database. If a
+// credential with the same name exists it is overwritten.
+func (j *JEM) AddCredential(cred *mongodoc.Credential) error {
+	id := cred.Path.String()
+	_, err := j.DB.Credentials().UpsertId(id, bson.D{{
+		"$set", bson.D{{
+			"type", cred.Type,
+		}, {
+			"label", cred.Label,
+		}, {
+			"attributes", cred.Attributes,
+		}},
+	}, {
+		"$setOnInsert", bson.D{{
+			"path", cred.Path,
+		}},
+	}})
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
+// Credential gets the credential with the specified path. If the
+// credential cannot be found the returned error will have a cause of
+// params.ErrNotFound.
+func (j *JEM) Credential(path params.EntityPath) (*mongodoc.Credential, error) {
+	var cred mongodoc.Credential
+	id := path.String()
+	err := j.DB.Credentials().FindId(id).One(&cred)
+	if err == mgo.ErrNotFound {
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", id)
+	}
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot get credential %q", id)
+	}
+	return &cred, nil
+}
+
 // Database wraps an mgo.DB ands adds a few convenience methods.
 type Database struct {
 	*mgo.Database
@@ -838,6 +877,7 @@ func (db Database) Collections() []*mgo.Collection {
 		db.Controllers(),
 		db.Models(),
 		db.Templates(),
+		db.Credentials(),
 	}
 }
 
@@ -860,6 +900,10 @@ func (db Database) Models() *mgo.Collection {
 
 func (db Database) Templates() *mgo.Collection {
 	return db.C("templates")
+}
+
+func (db Database) Credentials() *mgo.Collection {
+	return db.C("credentials")
 }
 
 func (db Database) C(name string) *mgo.Collection {
