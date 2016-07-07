@@ -10,3 +10,33 @@ identity-location: http://localhost:8081/
 # For production identity manager (jemd will collect the correct public key on startup).
 #identity-location: https://api.jujucharms.com/identity
 access-log: /var/log/jem/access.log
+# The following certificate may be used for testing purposes.
+# It can be copied as the root certificate for use by the juju client
+# and can be imported into your machines certificate chain for use
+# by the jaas-model command. The certificate identifies itself as:
+#   /CN=juju-apiserver
+#  localhost
+#  127.0.0.1
+#  ::1
+#tls-cert: |
+#  -----BEGIN CERTIFICATE-----
+#  MIIBhjCCATCgAwIBAgIJANhq61mq+ugsMA0GCSqGSIb3DQEBCwUAMBkxFzAVBgNV
+#  BAMMDmp1anUtYXBpc2VydmVyMB4XDTE2MDcwODA2MjIzOFoXDTM2MDcwODA2MjIz
+#  OFowGTEXMBUGA1UEAwwOanVqdS1hcGlzZXJ2ZXIwXDANBgkqhkiG9w0BAQEFAANL
+#  ADBIAkEAuuNErYZeHLWJ1qsUakyRQx2Fzoj2SYTNPe6Kgft5mE9ZVZuvQ8JLi3Jo
+#  FJxU/jZm5Kv3+wpaP09Idt15SllsvwIDAQABo1swWTAMBgNVHRMBAf8EAjAAMEkG
+#  A1UdEQRCMECHBH8AAAGHEAAAAAAAAAAAAAAAAAAAAAGCCWxvY2FsaG9zdKQbMBkx
+#  FzAVBgNVBAMMDmp1anUtYXBpc2VydmVyMA0GCSqGSIb3DQEBCwUAA0EAjR0Pi0YH
+#  Oe6mvRl93qZGdGymII9KeLbhG/qqEZr9yymKJdr0+pXWayEQki1ZA0FD+ofzqa1v
+#  3tN54QuitH+dfQ==
+#  -----END CERTIFICATE-----
+#tls-key: |
+#  -----BEGIN RSA PRIVATE KEY-----
+#  MIIBOgIBAAJBALrjRK2GXhy1idarFGpMkUMdhc6I9kmEzT3uioH7eZhPWVWbr0PC
+#  S4tyaBScVP42ZuSr9/sKWj9PSHbdeUpZbL8CAwEAAQJAXyRcTkrdlpgE+DhYSFV6
+#  jkR1XlPzrjHhmunZsZqoqJS8/kktbXNGkVDc3QTImAb/wezlqvI0N0eyGcEUA0RL
+#  IQIhAPHFVjSlzo18A53FUBvNrdB363Q7aLU7ei3LpWYEA61VAiEAxeMHym0V3xxb
+#  vqHoR1UPU3qeolGaOT6rUnSQNV7i0cMCIDUQSstjWOJUxbZrCBoSGoQWzebE40Zj
+#  t301pSeu2d/BAiAK1Xcjuf0sjdzn/u08moeQRnJQ6K7M24V9qiwK//rjCQIhAJt0
+#  RmSbYKRTgEyN9KXSreFEMjfJWdIyjVREGOKhHY92
+#  -----END RSA PRIVATE KEY-----

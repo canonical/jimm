@@ -110,5 +110,13 @@ func serve(confPath string) error {
 	}
 
 	logger.Infof("starting the API server")
-	return http.ListenAndServe(conf.APIAddr, handler)
+	httpServer := &http.Server{
+		Addr:      conf.APIAddr,
+		Handler:   handler,
+		TLSConfig: conf.TLSConfig(),
+	}
+	if httpServer.TLSConfig != nil {
+		return httpServer.ListenAndServeTLS("", "")
+	}
+	return httpServer.ListenAndServe()
 }
