@@ -805,15 +805,21 @@ func apiInfoFromDocs(ctl *mongodoc.Controller, m *mongodoc.Model) *api.Info {
 // AddCredential stores the given credential in the database. If a
 // credential with the same name exists it is overwritten.
 func (j *JEM) AddCredential(cred *mongodoc.Credential) error {
+	update := bson.D{{
+		"providertype", cred.ProviderType,
+	}, {
+		"type", cred.Type,
+	}, {
+		"label", cred.Label,
+	}, {
+		"attributes", cred.Attributes,
+	}}
+	if len(cred.ACL.Read) > 0 {
+		update = append(update, bson.DocElem{"acl", cred.ACL})
+	}
 	id := cred.Path.String()
 	_, err := j.DB.Credentials().UpsertId(id, bson.D{{
-		"$set", bson.D{{
-			"type", cred.Type,
-		}, {
-			"label", cred.Label,
-		}, {
-			"attributes", cred.Attributes,
-		}},
+		"$set", update,
 	}, {
 		"$setOnInsert", bson.D{{
 			"path", cred.Path,

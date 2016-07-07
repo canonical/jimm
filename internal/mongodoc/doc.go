@@ -227,6 +227,9 @@ type Credential struct {
 	// ACL holds permissions for the credential.
 	ACL params.ACL
 
+	// ProviderType holds the provider type the credential is for.
+	ProviderType string
+
 	// Type holds the type of credential.
 	Type string
 
