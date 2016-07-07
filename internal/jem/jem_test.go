@@ -1051,39 +1051,43 @@ func (s *jemSuite) TestAddAndGetCredential(c *gc.C) {
 		"attr2": "val2",
 	}
 	err = s.store.AddCredential(&mongodoc.Credential{
-		Path:       path,
-		Type:       "credtype",
-		Label:      "Test Label",
-		Attributes: attrs,
+		Path:         path,
+		ProviderType: "provtype",
+		Type:         "credtype",
+		Label:        "Test Label",
+		Attributes:   attrs,
 	})
 	c.Assert(err, gc.IsNil)
 
 	cred, err = s.store.Credential(path)
 	c.Assert(err, gc.IsNil)
 	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
-		Id:         path.String(),
-		Path:       path,
-		Type:       "credtype",
-		Label:      "Test Label",
-		Attributes: attrs,
+		Id:           path.String(),
+		Path:         path,
+		ProviderType: "provtype",
+		Type:         "credtype",
+		Label:        "Test Label",
+		Attributes:   attrs,
 	})
 
 	err = s.store.AddCredential(&mongodoc.Credential{
-		Path:       path,
-		Type:       "credtype",
-		Label:      "Test Label 2",
-		Attributes: attrs,
+		Path:         path,
+		ProviderType: "provtype",
+		Type:         "credtype",
+		Label:        "Test Label 2",
+		Attributes:   attrs,
 	})
 	c.Assert(err, gc.IsNil)
 
 	cred, err = s.store.Credential(path)
 	c.Assert(err, gc.IsNil)
 	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
-		Id:         path.String(),
-		Path:       path,
-		Type:       "credtype",
-		Label:      "Test Label 2",
-		Attributes: attrs,
+		Id:           path.String(),
+		Path:         path,
+		ProviderType: "provtype",
+		Type:         "credtype",
+		Label:        "Test Label 2",
+		Attributes:   attrs,
 	})
 }
 

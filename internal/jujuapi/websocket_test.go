@@ -9,13 +9,16 @@ import (
 	"net/url"
 
 	"github.com/juju/juju/api"
+	cloudapi "github.com/juju/juju/api/cloud"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/network"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/names.v2"
 
 	"github.com/CanonicalLtd/jem/internal/apitest"
+	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
 
@@ -43,7 +46,7 @@ func (s *websocketSuite) TestUnknownModel(c *gc.C) {
 	}, "bob")
 	defer conn.Close()
 	err := conn.Login(nil, "", "", nil)
-	c.Assert(err, gc.ErrorMatches, `model "00000000-0000-0000-0000-000000000000" not found \(not found\)`)
+	c.Assert(err, gc.ErrorMatches, `model "00000000-0000-0000-0000-000000000000" not found`)
 }
 
 func (s *websocketSuite) TestLoginToModel(c *gc.C) {
@@ -145,6 +148,207 @@ func (s *websocketSuite) TestUnimplementedMethodFails(c *gc.C) {
 	var resp jujuparams.RedirectInfoResult
 	err := conn.APICall("Admin", 3, "", "Logout", nil, &resp)
 	c.Assert(err, gc.ErrorMatches, `no such request - method Admin.Logout is not implemented \(not implemented\)`)
+}
+
+func (s *websocketSuite) TestUnimplementedRootFails(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
+	conn := s.open(c, &api.Info{
+		ModelTag: s.APIInfo(c).ModelTag,
+	}, "test")
+	defer conn.Close()
+	var resp jujuparams.RedirectInfoResult
+	err := conn.APICall("NoSuch", 1, "", "Method", nil, &resp)
+	c.Assert(err, gc.ErrorMatches, `unknown version \(1\) of interface "NoSuch" \(not implemented\)`)
+}
+
+func (s *websocketSuite) TestCloudCall(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
+	conn := s.open(c, &api.Info{
+		ModelTag: s.APIInfo(c).ModelTag,
+	}, "test")
+	defer conn.Close()
+	client := cloudapi.NewClient(conn)
+	info, err := client.Cloud()
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(info, jc.DeepEquals, cloud.Cloud{
+		Type:      "dummy",
+		AuthTypes: []cloud.AuthType{"empty"},
+	})
+}
+
+func (s *websocketSuite) TestCloudCredentials(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
+	s.JEM.AddCredential(&mongodoc.Credential{
+		Path:         params.EntityPath{"test", "cred1"},
+		ProviderType: "dummy",
+		Type:         "credtype",
+		Label:        "Credentials 1",
+		Attributes: map[string]string{
+			"attr1": "val1",
+			"attr2": "val2",
+		},
+	})
+	conn := s.open(c, &api.Info{
+		ModelTag: s.APIInfo(c).ModelTag,
+	}, "test")
+	defer conn.Close()
+	client := cloudapi.NewClient(conn)
+	creds, err := client.Credentials(names.NewUserTag("test"))
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(creds, jc.DeepEquals, map[string]cloud.Credential{
+		"cred1": cloud.NewCredential(
+			"credtype", map[string]string{
+				"attr1": "val1",
+				"attr2": "val2",
+			},
+		),
+	})
+}
+
+func (s *websocketSuite) TestCloudCredentialsACL(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
+	s.JEM.AddCredential(&mongodoc.Credential{
+		Path:         params.EntityPath{"test2", "cred1"},
+		ProviderType: "dummy",
+		Type:         "credtype",
+		Label:        "Credentials 1",
+		Attributes: map[string]string{
+			"attr1": "val1",
+			"attr2": "val2",
+		},
+	})
+	s.JEM.AddCredential(&mongodoc.Credential{
+		Path: params.EntityPath{"test2", "cred2"},
+		ACL: params.ACL{
+			Read: []string{"test"},
+		},
+		ProviderType: "dummy",
+		Type:         "credtype",
+		Label:        "Credentials 2",
+		Attributes: map[string]string{
+			"attr1": "val3",
+			"attr2": "val4",
+		},
+	})
+	conn := s.open(c, &api.Info{
+		ModelTag: s.APIInfo(c).ModelTag,
+	}, "test")
+	defer conn.Close()
+	client := cloudapi.NewClient(conn)
+	creds, err := client.Credentials(names.NewUserTag("test2"))
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(creds, jc.DeepEquals, map[string]cloud.Credential{
+		"cred2": cloud.NewCredential(
+			"credtype", map[string]string{
+				"attr1": "val3",
+				"attr2": "val4",
+			},
+		),
+	})
+}
+
+func (s *websocketSuite) TestCloudCredentialsErrors(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
+	conn := s.open(c, &api.Info{
+		ModelTag: s.APIInfo(c).ModelTag,
+	}, "test")
+	defer conn.Close()
+	req := jujuparams.Entities{
+		Entities: []jujuparams.Entity{{
+			Tag: "not-a-user-tag",
+		}},
+	}
+	var resp jujuparams.CloudCredentialsResults
+	err := conn.APICall("Cloud", 1, "", "Credentials", req, &resp)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `bad request: "not-a-user-tag" is not a valid tag`)
+	c.Assert(resp.Results, gc.HasLen, 1)
+}
+
+func (s *websocketSuite) TestUpdateCloudCredentials(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
+	conn := s.open(c, &api.Info{
+		ModelTag: s.APIInfo(c).ModelTag,
+	}, "test")
+	defer conn.Close()
+	client := cloudapi.NewClient(conn)
+	credsMap := map[string]cloud.Credential{
+		"cred3": cloud.NewCredential("credtype", map[string]string{"attr1": "val31", "attr2": "val32"}),
+		"cred4": cloud.NewCredential("credtype2", map[string]string{"attr1": "val41", "attr2": "val42"}),
+	}
+	err := client.UpdateCredentials(names.NewUserTag("test"), credsMap)
+	c.Assert(err, jc.ErrorIsNil)
+	creds, err := client.Credentials(names.NewUserTag("test"))
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(creds, jc.DeepEquals, credsMap)
+	updateMap := map[string]cloud.Credential{
+		"cred3": cloud.NewCredential("credtype", map[string]string{"attr1": "val33", "attr2": "val34"}),
+	}
+	err = client.UpdateCredentials(names.NewUserTag("test"), updateMap)
+	c.Assert(err, jc.ErrorIsNil)
+	credsMap["cred3"] = updateMap["cred3"]
+	creds, err = client.Credentials(names.NewUserTag("test"))
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(creds, jc.DeepEquals, credsMap)
+}
+
+func (s *websocketSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
+	conn := s.open(c, &api.Info{
+		ModelTag: s.APIInfo(c).ModelTag,
+	}, "test")
+	defer conn.Close()
+	req := jujuparams.UsersCloudCredentials{
+		Users: []jujuparams.UserCloudCredentials{{
+			UserTag: "not-a-user-tag",
+			Credentials: map[string]jujuparams.CloudCredential{
+				"cred1": jujuparams.CloudCredential{
+					AuthType: "credtype",
+					Attributes: map[string]string{
+						"attr1": "val1",
+					},
+				},
+			},
+		}, {
+			UserTag: names.NewUserTag("invalid--user").String(),
+			Credentials: map[string]jujuparams.CloudCredential{
+				"cred1": jujuparams.CloudCredential{
+					AuthType: "credtype",
+					Attributes: map[string]string{
+						"attr1": "val1",
+					},
+				},
+			},
+		}, {
+			UserTag: names.NewUserTag("test2").String(),
+			Credentials: map[string]jujuparams.CloudCredential{
+				"cred1": jujuparams.CloudCredential{
+					AuthType: "credtype",
+					Attributes: map[string]string{
+						"attr1": "val1",
+					},
+				},
+			},
+		}, {
+			UserTag: names.NewUserTag("test").String(),
+			Credentials: map[string]jujuparams.CloudCredential{
+				"bad--name": jujuparams.CloudCredential{
+					AuthType: "credtype",
+					Attributes: map[string]string{
+						"attr1": "val1",
+					},
+				},
+			},
+		}},
+	}
+	var resp jujuparams.ErrorResults
+	err := conn.APICall("Cloud", 1, "", "UpdateCredentials", req, &resp)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `bad request: "not-a-user-tag" is not a valid tag`)
+	c.Assert(resp.Results[1].Error, gc.ErrorMatches, `bad request: invalid user name "invalid--user"`)
+	c.Assert(resp.Results[2].Error, gc.ErrorMatches, `unauthorized`)
+	c.Assert(resp.Results[3].Error, gc.ErrorMatches, `bad request: invalid name "bad--name"`)
+	c.Assert(resp.Results, gc.HasLen, 4)
 }
 
 func (s *websocketSuite) open(c *gc.C, info *api.Info, username string) api.Connection {
