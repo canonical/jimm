@@ -82,6 +82,9 @@ func (h *wsHandler) handle(wsConn *websocket.Conn) {
 }
 
 func (h *wsHandler) resolveUUID() error {
+	if h.modelUUID == "" {
+		return nil
+	}
 	var err error
 	h.model, err = h.jem.ModelFromUUID(h.modelUUID)
 	if err != nil {
@@ -157,25 +160,30 @@ func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResultV1, err
 		return jujuparams.LoginResultV1{}, errgo.Mask(err)
 	}
 	a.h.jem.Auth.Username = attr["username"]
-	if err := a.h.jem.CheckCanRead(a.h.model); err != nil {
-		return jujuparams.LoginResultV1{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
 
-	// Login successful
-	a.h.jem.Auth = jem.Authorization{attr["username"]}
-
-	// If the UUID is for a model send a redirect error.
-	if a.h.model.Id != a.h.controller.Id {
-		return jujuparams.LoginResultV1{}, &jujuparams.Error{
-			Code:    jujuparams.CodeRedirect,
-			Message: "redirect required",
+	modelTag := ""
+	controllerTag := ""
+	if a.h.modelUUID != "" {
+		if err := a.h.jem.CheckCanRead(a.h.model); err != nil {
+			return jujuparams.LoginResultV1{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 		}
+
+		// If the UUID is for a model send a redirect error.
+		if a.h.model.Id != a.h.controller.Id {
+			return jujuparams.LoginResultV1{}, &jujuparams.Error{
+				Code:    jujuparams.CodeRedirect,
+				Message: "redirect required",
+			}
+		}
+
+		modelTag = names.NewModelTag(a.h.model.UUID).String()
+		controllerTag = names.NewModelTag(a.h.controller.UUID).String()
 	}
 
 	return jujuparams.LoginResultV1{
 		// TODO(mhilton) Add user info
-		ModelTag:      names.NewModelTag(a.h.model.UUID).String(),
-		ControllerTag: names.NewModelTag(a.h.controller.UUID).String(),
+		ModelTag:      modelTag,
+		ControllerTag: controllerTag,
 		Facades: []jujuparams.FacadeVersions{{
 			Name:     "Cloud",
 			Versions: []int{1},
@@ -188,6 +196,9 @@ func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResultV1, err
 func (a admin) RedirectInfo() (jujuparams.RedirectInfoResult, error) {
 	if a.h.jem.Auth.Username == "" {
 		return jujuparams.RedirectInfoResult{}, params.ErrUnauthorized
+	}
+	if a.h.modelUUID == "" {
+		return jujuparams.RedirectInfoResult{}, errgo.New("not redirected")
 	}
 	if err := a.h.jem.CheckCanRead(a.h.model); err != nil {
 		return jujuparams.RedirectInfoResult{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))

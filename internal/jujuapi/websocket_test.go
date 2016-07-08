@@ -351,6 +351,18 @@ func (s *websocketSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
 	c.Assert(resp.Results, gc.HasLen, 4)
 }
 
+func (s *websocketSuite) TestLoginToRoot(c *gc.C) {
+	conn := s.open(c, &api.Info{
+		SkipLogin: true,
+	}, "test")
+	defer conn.Close()
+	err := conn.Login(nil, "", "", nil)
+	c.Assert(err, jc.ErrorIsNil)
+	var resp jujuparams.RedirectInfoResult
+	err = conn.APICall("Admin", 3, "", "RedirectInfo", nil, &resp)
+	c.Assert(err, gc.ErrorMatches, "not redirected")
+}
+
 func (s *websocketSuite) open(c *gc.C, info *api.Info, username string) api.Connection {
 	inf := *info
 	u, err := url.Parse(s.wsServer.URL)
