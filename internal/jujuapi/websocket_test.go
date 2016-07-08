@@ -9,10 +9,13 @@ import (
 	"net/url"
 
 	"github.com/juju/juju/api"
+	"github.com/juju/juju/api/base"
 	cloudapi "github.com/juju/juju/api/cloud"
+	"github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/network"
+	"github.com/juju/juju/status"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/names.v2"
@@ -363,8 +366,109 @@ func (s *websocketSuite) TestLoginToRoot(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, "not redirected")
 }
 
+func (s *websocketSuite) TestListModels(c *gc.C) {
+	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
+	err := s.JEM.SetACL(s.JEM.DB.Controllers(), ctlPath, params.ACL{
+		Read: []string{"test2"},
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	_, _, modelUUID1 := s.CreateModel(c, params.EntityPath{User: "test", Name: "model-1"}, ctlPath)
+	s.CreateModel(c, params.EntityPath{User: "test2", Name: "model-2"}, ctlPath)
+	_, _, modelUUID3 := s.CreateModel(c, params.EntityPath{User: "test2", Name: "model-3"}, ctlPath)
+	err = s.JEM.SetACL(s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
+		Read: []string{"test"},
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := modelmanager.NewClient(conn)
+	models, err := client.ListModels("test")
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(models, jc.DeepEquals, []base.UserModel{{
+		Name:  "controller-1",
+		UUID:  "deadbeef-0bad-400d-8000-4b1d0d06f00d",
+		Owner: "test@local",
+	}, {
+		Name:  "model-1",
+		UUID:  modelUUID1,
+		Owner: "test@local",
+	}, {
+		Name:  "model-3",
+		UUID:  modelUUID3,
+		Owner: "test2@local",
+	}})
+}
+
+func (s *websocketSuite) TestModelInfo(c *gc.C) {
+	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
+	err := s.JEM.SetACL(s.JEM.DB.Controllers(), ctlPath, params.ACL{
+		Read: []string{"test2"},
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	_, _, modelUUID1 := s.CreateModel(c, params.EntityPath{User: "test", Name: "model-1"}, ctlPath)
+	_, _, modelUUID2 := s.CreateModel(c, params.EntityPath{User: "test2", Name: "model-2"}, ctlPath)
+	_, _, modelUUID3 := s.CreateModel(c, params.EntityPath{User: "test2", Name: "model-3"}, ctlPath)
+	err = s.JEM.SetACL(s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
+		Read: []string{"test"},
+	})
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := modelmanager.NewClient(conn)
+	models, err := client.ModelInfo([]names.ModelTag{
+		names.NewModelTag(modelUUID1),
+		names.NewModelTag(modelUUID2),
+		names.NewModelTag(modelUUID3),
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	for i := range models {
+		if models[i].Result == nil {
+			continue
+		}
+		models[i].Result.Status.Since = nil
+	}
+	c.Assert(models, jc.DeepEquals, []jujuparams.ModelInfoResult{{
+		Result: &jujuparams.ModelInfo{
+			Name:            "model-1",
+			UUID:            modelUUID1,
+			ControllerUUID:  "deadbeef-0bad-400d-8000-4b1d0d06f00d",
+			ProviderType:    "dummy",
+			DefaultSeries:   "xenial",
+			CloudCredential: "test-model-1",
+			OwnerTag:        names.NewUserTag("test").String(),
+			Life:            jujuparams.Alive,
+			Status: jujuparams.EntityStatus{
+				Status: status.StatusAvailable,
+			},
+		},
+	}, {
+		Error: &jujuparams.Error{
+			Message: "unauthorized",
+		},
+	}, {
+		Result: &jujuparams.ModelInfo{
+			Name:            "model-3",
+			UUID:            modelUUID3,
+			ControllerUUID:  "deadbeef-0bad-400d-8000-4b1d0d06f00d",
+			ProviderType:    "dummy",
+			DefaultSeries:   "xenial",
+			CloudCredential: "test2-model-3",
+			OwnerTag:        names.NewUserTag("test2").String(),
+			Life:            jujuparams.Alive,
+			Status: jujuparams.EntityStatus{
+				Status: status.StatusAvailable,
+			},
+		},
+	}})
+}
+
+// open creates a new websockec connection to the test server, using the
+// connection info specified in info. If info is nil then default values
+// will be used.
 func (s *websocketSuite) open(c *gc.C, info *api.Info, username string) api.Connection {
-	inf := *info
+	var inf api.Info
+	if info != nil {
+		inf = *info
+	}
 	u, err := url.Parse(s.wsServer.URL)
 	c.Assert(err, jc.ErrorIsNil)
 	inf.Addrs = []string{

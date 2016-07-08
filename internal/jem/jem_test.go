@@ -956,6 +956,33 @@ func (s *jemSuite) TestAddAndGetCredential(c *gc.C) {
 	})
 }
 
+func (s *jemSuite) TestSetACL(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	err := s.store.AddController(&mongodoc.Controller{
+		Path: ctlPath,
+		UUID: "fake-uuid",
+	}, &mongodoc.Model{
+		UUID: "fake-uuid",
+	})
+	c.Assert(err, gc.IsNil)
+
+	err = s.store.SetACL(s.store.DB.Controllers(), ctlPath, params.ACL{
+		Read: []string{"t1", "t2"},
+	})
+	c.Assert(err, gc.IsNil)
+	var cnt mongodoc.Controller
+	err = s.store.DB.Controllers().FindId(ctlPath.String()).One(&cnt)
+	c.Assert(err, gc.IsNil)
+	c.Assert(cnt.ACL, jc.DeepEquals, params.ACL{
+		Read: []string{"t1", "t2"},
+	})
+
+	err = s.store.SetACL(s.store.DB.Controllers(), params.EntityPath{"bob", "bar"}, params.ACL{
+		Read: []string{"t2", "t1"},
+	})
+	c.Assert(err, gc.ErrorMatches, `"bob/bar" not found`)
+}
+
 func parseTime(s string) time.Time {
 	t, err := time.Parse(time.RFC3339, s)
 	if err != nil {
