@@ -3,6 +3,7 @@
 package config
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -13,7 +14,10 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/jem/params"
+	"github.com/juju/loggo"
 )
+
+var logger = loggo.GetLogger("jem.config")
 
 type Config struct {
 	MongoAddr string `yaml:"mongo-addr"`
@@ -25,6 +29,8 @@ type Config struct {
 	AgentUsername     string            `yaml:"agent-username"`
 	AgentKey          *bakery.KeyPair   `yaml:"agent-key"`
 	AccessLog         string            `yaml:"access-log"`
+	TLSCert           string            `yaml:"tls-cert"`
+	TLSKey            string            `yaml:"tls-key"`
 }
 
 func (c *Config) validate() error {
@@ -45,6 +51,23 @@ func (c *Config) validate() error {
 		return fmt.Errorf("missing fields %s in config file", strings.Join(missing, ", "))
 	}
 	return nil
+}
+
+func (c *Config) TLSConfig() *tls.Config {
+	if c.TLSCert == "" || c.TLSKey == "" {
+		return nil
+	}
+
+	cert, err := tls.X509KeyPair([]byte(c.TLSCert), []byte(c.TLSKey))
+	if err != nil {
+		logger.Errorf("cannot create certificate: %s", err)
+		return nil
+	}
+	return &tls.Config{
+		Certificates: []tls.Certificate{
+			cert,
+		},
+	}
 }
 
 // Read reads a jem configuration file from the
