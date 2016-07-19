@@ -12,6 +12,7 @@ import (
 	"github.com/juju/idmclient"
 	"github.com/juju/loggo"
 	"github.com/julienschmidt/httprouter"
+	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
@@ -107,6 +108,7 @@ func New(config Params, versions map[string]NewAPIHandlerFunc) (*Server, error) 
 		}
 		srv.monitor = monitor.New(p, owner)
 	}
+	srv.router.Handler("GET", "/metrics", prometheus.Handler())
 	for name, newAPI := range versions {
 		handlers, err := newAPI(p, config)
 		if err != nil {
