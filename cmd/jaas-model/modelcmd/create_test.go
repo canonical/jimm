@@ -95,55 +95,6 @@ func (s *createSuite) TestCreate(c *gc.C) {
 	client.Close()
 }
 
-func (s *createSuite) TestCreateWithTemplate(c *gc.C) {
-	s.idmSrv.SetDefaultUser("bob")
-
-	// First add the controller that we're going to use
-	// to create the new model.
-	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
-	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
-	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "")
-
-	// Then add a template containing the mandatory controller parameter.
-	// TODO unfortunately the controller parameter is *not* mandatory.
-	// This means that there are no parameters we can use to test that
-	// this actually works. Unfortunately registering another provider for testing
-	// and using that is not currently feasible.
-	stdout, stderr, code = run(c, c.MkDir(), "create-template", "bob/template", "-c", "bob/foo", "controller=true")
-	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
-	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "")
-
-	// Then create an model that uses the template as additional config.
-	// Note that because the controller attribute is mandatory, this
-	// will fail if the template logic is not working correctly.
-	configPath := writeConfig(c, map[string]interface{}{
-		"authorized-keys": fakeSSHKey,
-	})
-	stdout, stderr, code = run(c, c.MkDir(),
-		"create",
-		"-c", "bob/foo",
-		"--config", configPath,
-		"-t", "bob/template",
-		"bob/newmodel",
-	)
-	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
-	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "jem-foo:newmodel\n")
-
-	// Check that we can attach to the new model
-	// through the usual juju connection mechanism.
-	store := jujuclient.NewFileClientStore()
-	params, err := newAPIConnectionParams(
-		store, "jem-foo", "", "newmodel", httpbakery.NewClient(),
-	)
-	c.Assert(err, jc.ErrorIsNil)
-	client, err := juju.NewAPIConnection(params)
-	c.Assert(err, jc.ErrorIsNil)
-	client.Close()
-}
-
 func (s *createSuite) TestCreateWithLocation(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 	s.idmSrv.AddUser("bob", "admin")

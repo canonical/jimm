@@ -31,7 +31,6 @@ type createCommand struct {
 
 	ctlPath       entityPathValue
 	modelPath     entityPathValue
-	templatePaths entityPathsValue
 	configFile    string
 	localName     string
 	location      map[string]string
@@ -44,11 +43,6 @@ func newCreateCommand() cmd.Command {
 var createDoc = `
 The create command creates a new model inside the specified controller.
 Its argument specifies the server name of the new model.
-
-When one or more templates paths are specified, the final configuration
-is determined by starting with the first and adding attributes from
-each one in turn, finally adding any attributes specified in
-the configuration file specified by the --config flag.
 
 Any provided key-value arguments are used to select the location
 of the controller that will run the model. For example:
@@ -69,9 +63,6 @@ func (c *createCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.commandBase.SetFlags(f)
 	f.Var(&c.ctlPath, "controller", "")
 	f.Var(&c.ctlPath, "c", "controller to create the model in")
-	f.Var(&c.templatePaths, "template", "")
-	f.Var(&c.templatePaths, "t", "comma-separated templates to use for config attributes")
-
 	f.StringVar(&c.configFile, "config", "", "YAML config file containing model configuration")
 	f.StringVar(&c.localName, "local", "", "local name for model (as used for juju switch). Defaults to <modelname>")
 }
@@ -141,7 +132,6 @@ func (c *createCommand) Run(ctxt *cmd.Context) error {
 				Name:          c.modelPath.Name,
 				Controller:    ctlPath,
 				Config:        config,
-				TemplatePaths: c.templatePaths.paths,
 				Location:      c.location,
 			},
 		})

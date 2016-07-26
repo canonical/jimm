@@ -4,7 +4,6 @@ package v2
 
 import (
 	"encoding/json"
-	"fmt"
 	"math/rand"
 	"net/url"
 	"reflect"
@@ -335,11 +334,6 @@ func (h *Handler) GetModel(arg *params.GetModel) (*params.ModelResponse, error) 
 			return nil, errgo.Notef(err, "cannot update model users")
 		}
 	}
-
-	tmplPaths, err := stringsToEntityPaths(m.Templates)
-	if err != nil {
-		return nil, errgo.Notef(err, "invalid entity paths found in model %q", arg.EntityPath)
-	}
 	r := &params.ModelResponse{
 		Path:             arg.EntityPath,
 		User:             jujuUser,
@@ -351,7 +345,6 @@ func (h *Handler) GetModel(arg *params.GetModel) (*params.ModelResponse, error) 
 		ControllerPath:   m.Controller,
 		Life:             m.Life,
 		UnavailableSince: newTime(ctl.UnavailableSince.UTC()),
-		Templates:        tmplPaths,
 	}
 	return r, nil
 }
@@ -409,10 +402,6 @@ func (h *Handler) ListModels(arg *params.ListModels) (*params.ListModelsResponse
 			logger.Errorf("model %s has invalid controller value %s; omitting from result", m.Path, m.Controller)
 			continue
 		}
-		tmplPaths, err := stringsToEntityPaths(m.Templates)
-		if err != nil {
-			return nil, errgo.Notef(err, "invalid entity paths found in model %q", m.Path)
-		}
 		// TODO We could ensure that the currently authenticated user has
 		// access to the model and return their username and password,
 		// but that would mean we'd have to ensure the user in every
@@ -429,7 +418,6 @@ func (h *Handler) ListModels(arg *params.ListModels) (*params.ListModelsResponse
 			ControllerPath:   m.Controller,
 			Life:             m.Life,
 			UnavailableSince: newTime(ctl.UnavailableSince.UTC()),
-			Templates:        tmplPaths,
 		})
 	}
 	if err := modelIter.Err(); err != nil {
@@ -441,7 +429,7 @@ func (h *Handler) ListModels(arg *params.ListModels) (*params.ListModelsResponse
 }
 
 // ListController returns all the controllers stored in JEM.
-// Currently the Template  and ProviderType field in each ControllerResponse is not
+// Currently the ProviderType field in each ControllerResponse is not
 // populated.
 func (h *Handler) ListController(arg *params.ListController) (*params.ListControllerResponse, error) {
 	var controllers []params.ControllerResponse
@@ -571,38 +559,13 @@ func (h *Handler) SetControllerLocation(arg *params.SetControllerLocation) error
 	return h.jem.SetControllerLocation(arg.EntityPath, arg.Location.Location)
 }
 
-// configWithTemplates returns the given configuration applied
-// along with the given templates.
-// Each template is applied in turn, then the configuration
-// is added on top of that.
-func (h *Handler) configWithTemplates(config map[string]interface{}, tmpls []*mongodoc.Template) map[string]interface{} {
-	result := make(map[string]interface{})
-	for _, tmpl := range tmpls {
-		for name, val := range tmpl.Config {
-			result[name] = val
-		}
-	}
-	for name, val := range config {
-		result[name] = val
-	}
-	return result
-}
-
 // NewModel creates a new model inside an existing Controller.
 func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error) {
 	if err := h.jem.CheckIsUser(args.User); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	tmpls, err := h.getTemplates(args.Info.TemplatePaths)
-	if err != nil {
-		if errgo.Cause(err) == params.ErrNotFound {
-			err = errgo.WithCausef(err, params.ErrBadRequest, "%s", "")
-		}
-		return nil, errgo.NoteMask(err, "invalid template provided", errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
-	}
-	tmplLocation := h.locationForTemplates(tmpls)
 
-	ctlPath, err := h.selectController(&args.Info, tmplLocation)
+	ctlPath, err := h.selectController(&args.Info)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot select controller", errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound))
 	}
@@ -621,16 +584,7 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	// Check that schemas for all templates are compatible with selected controller.
-	// This is worth doing even though we sanity check the final
-	// values, because otherwise we wouldn't be sure that
-	// every template is compatible because each one overrides the last.
-	for _, tmpl := range tmpls {
-		if err := checkSchemaCompatible(tmpl.Schema, neSchema.schema); err != nil {
-			return nil, badRequestf(err, "template %q is incompatible with selected controller", tmpl.Path)
-		}
-	}
-	config := h.configWithTemplates(args.Info.Config, tmpls)
+	config := args.Info.Config
 	// Ensure that the attributes look reasonably OK before bothering
 	// the controller with them.
 	attrs, err := neSchema.checker.Coerce(config, nil)
@@ -647,12 +601,6 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 	modelDoc := &mongodoc.Model{
 		Path:             modelPath,
 		Controller:       ctlPath,
-		Templates:        make([]string, 0, len(tmpls)),
-		TemplateVersions: make(map[string]int),
-	}
-	for _, t := range tmpls {
-		modelDoc.Templates = append(modelDoc.Templates, t.Id)
-		modelDoc.TemplateVersions[t.Id] = t.Version
 	}
 	if err := h.jem.AddModel(modelDoc); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
@@ -733,21 +681,9 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 
 // selectController selects a controller suitable for starting a new model in,
 // based on the criteria specified in info, and returns its path.
-func (h *Handler) selectController(info *params.NewModelInfo, tmplLocation map[string]string) (params.EntityPath, error) {
+func (h *Handler) selectController(info *params.NewModelInfo) (params.EntityPath, error) {
 	if info.Controller != nil {
 		return *info.Controller, nil
-	}
-	if info.Location == nil {
-		info.Location = tmplLocation
-	} else {
-		// The location specified in the NewModelInfo overrides any template
-		// location information, so set any location attributes specified by
-		// templates but not mentioned in the NewModelInfo.
-		for attr, val := range tmplLocation {
-			if _, ok := info.Location[attr]; !ok {
-				info.Location[attr] = val
-			}
-		}
 	}
 	var controllers []mongodoc.Controller
 	err := h.doControllers(info.Location, func(c *mongodoc.Controller) error {
@@ -765,247 +701,6 @@ func (h *Handler) selectController(info *params.NewModelInfo, tmplLocation map[s
 	// by choosing the most lightly loaded controller
 	n := randIntn(len(controllers))
 	return controllers[n].Path, nil
-}
-
-// AddTemplate adds or updates a new template.
-func (h *Handler) AddTemplate(arg *params.AddTemplate) error {
-	return h.addTemplate(arg.EntityPath, arg.Info, true)
-}
-
-// AddNewTemplate adds a new template. It fails if a template with the new
-// name already exists.
-func (h *Handler) AddNewTemplate(arg *params.AddNewTemplate) error {
-	return h.addTemplate(arg.EntityPath, arg.Info, false)
-}
-
-// addTemplate adds or update a new template.
-func (h *Handler) addTemplate(path params.EntityPath, info params.AddTemplateInfo, canOverwrite bool) error {
-	if err := h.jem.CheckIsUser(path.User); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	var schema environschema.Fields
-	var providerType string
-	if info.Controller != nil {
-		if len(info.Location) > 0 {
-			return badRequestf(nil, "cannot specify location with explicit controller")
-		}
-		ctl, err := h.jem.Controller(*info.Controller)
-		if err != nil {
-			return errgo.NoteMask(err, "cannot get schema for controller", errgo.Is(params.ErrNotFound))
-		}
-		providerType = ctl.ProviderType
-		schema, err = schemaForProviderType(providerType)
-		if err != nil {
-			return errgo.Notef(err, "cannot get schema for controller")
-		}
-	} else {
-		r, err := h.schemaForLocation(info.Location)
-		if err != nil {
-			return errgo.NoteMask(err, "cannot get schema for controller", errgo.Is(params.ErrNotFound), errgo.Is(params.ErrAmbiguousLocation))
-		}
-		schema = r.Schema
-		providerType = r.ProviderType
-	}
-
-	// Delete all fields and defaults that are not in the
-	// provided configuration attributes, so that we can
-	// check only the provided fields for compatibility
-	// without worrying about other mandatory fields.
-	//
-	// Note that this will also cause only the reduced schema
-	// to be stored in the template.
-	for name := range schema {
-		if _, ok := info.Config[name]; !ok {
-			delete(schema, name)
-		}
-	}
-	// controllerProviderTypes holds a short-lived cache of the provider types
-	// for controllers so that we avoid fetching controllers more than
-	// once.
-	// TODO use cache of controller schemas rather than
-	// inferring schema from provider type.
-	ctlSchemas := make(map[params.EntityPath]environschema.Fields)
-
-	// maxVersion holds the maximum version used by any of the
-	// models that refer to the template. We'll create the template
-	// with a version bigger than that.
-	maxVersion := -1
-	pathStr := path.String()
-	iter := h.jem.ModelsWithTemplateQuery(path).Iter()
-	defer iter.Close()
-	var m mongodoc.Model
-	for iter.Next(&m) {
-		if v := m.TemplateVersions[pathStr]; v > maxVersion {
-			maxVersion = v
-		}
-		ctlSchema, ok := ctlSchemas[m.Controller]
-		if !ok {
-			ctl, err := h.jem.Controller(m.Controller)
-			if err != nil {
-				if errgo.Cause(err) == params.ErrNotFound {
-					// Shouldn't happen but don't hold up the
-					// add-template operation for this relational
-					// anomaly.
-					logger.Warningf("model %q refers to non-existent controller %q", m.Path, ctl.Path)
-					ctlSchemas[m.Controller] = nil
-					continue
-				}
-				return errgo.Notef(err, "cannot fetch controller %q", m.Controller)
-			}
-			ctlSchema, err = schemaForProviderType(ctl.ProviderType)
-			if err != nil {
-				logger.Warningf("cannot get schema for provider type %q of controller %q used by model %q using template %q", ctl.ProviderType, ctl.Path, m.Path, path)
-				ctlSchemas[m.Controller] = nil
-			}
-			ctlSchemas[m.Controller] = ctlSchema
-		}
-		if ctlSchema == nil {
-			// We've seen the controller before and it was bad, so
-			// ignore it this time too.
-			continue
-		}
-		if err := checkSchemaCompatible(schema, ctlSchema); err != nil {
-			return badRequestf(err, "new schema is incompatible with an existing model using the template")
-		}
-	}
-	if err := iter.Err(); err != nil {
-		return errgo.Notef(err, "model iteration failed")
-	}
-	fields, defaults, err := schema.ValidationSchema()
-	if err != nil {
-		return errgo.Notef(err, "cannot create validation schema for provider %s", providerType)
-	}
-	result, err := jujuschema.StrictFieldMap(fields, defaults).Coerce(info.Config, nil)
-	if err != nil {
-		return badRequestf(err, "configuration not compatible with schema")
-	}
-	if err := h.jem.AddTemplate(&mongodoc.Template{
-		Path:     path,
-		Schema:   schema,
-		Config:   result.(map[string]interface{}),
-		Location: info.Location,
-		Version:  maxVersion + 1,
-	}, canOverwrite); err != nil {
-		if errgo.Cause(err) == params.ErrAlreadyExists {
-			return badRequestf(err, "%s", "")
-		}
-		return errgo.Notef(err, "cannot add template")
-	}
-	return nil
-}
-
-// GetTemplate returns information on a single template.
-func (h *Handler) GetTemplate(arg *params.GetTemplate) (*params.TemplateResponse, error) {
-	tmpl, err := h.jem.Template(arg.EntityPath)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-	if err := h.jem.CheckCanRead(tmpl); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	hideTemplateSecrets(tmpl)
-	return &params.TemplateResponse{
-		Path:     arg.EntityPath,
-		Schema:   tmpl.Schema,
-		Config:   tmpl.Config,
-		Location: tmpl.Location,
-	}, nil
-}
-
-// GetTemplate returns the models using the template.
-// It only returns names for the models that the user has read permission for.
-func (h *Handler) GetTemplateModels(arg *params.GetTemplateModels) (*params.TemplateModelsResponse, error) {
-	tmpl, err := h.jem.Template(arg.EntityPath)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-	if err := h.jem.CheckCanRead(tmpl); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	var resp params.TemplateModelsResponse
-	var m mongodoc.Model
-	iter := h.jem.CanReadIter(h.jem.ModelsWithTemplateQuery(arg.EntityPath).Sort("_id").Iter())
-	for iter.Next(&m) {
-		resp.ModelPaths = append(resp.ModelPaths, m.Path)
-	}
-	if err := iter.Err(); err != nil {
-		return nil, errgo.Notef(err, "cannot get models")
-	}
-	resp.Total = iter.Count()
-	return &resp, nil
-}
-
-// DeleteTemplate deletes a template.
-func (h *Handler) DeleteTemplate(arg *params.DeleteTemplate) error {
-	if err := h.jem.CheckIsUser(arg.EntityPath.User); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	// Racy but usually-sufficient test that no model is using the
-	// template before we delete it.
-	n, err := h.jem.ModelsWithTemplateQuery(arg.EntityPath).Count()
-	if err != nil {
-		return errgo.Notef(err, "cannot count models")
-	}
-	if n > 0 {
-		// TODO We could include the names of (some of?) the models in the error
-		// message if the user has permission to read them.
-		return errgo.WithCausef(nil, params.ErrForbidden, "cannot delete template because one or more models are using it")
-	}
-	if err := h.jem.DeleteTemplate(arg.EntityPath); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-	return nil
-}
-
-// hideTemplateSecrets zeros all secret fields in the
-// given template.
-func hideTemplateSecrets(tmpl *mongodoc.Template) {
-	for name, attr := range tmpl.Config {
-		if tmpl.Schema[name].Secret {
-			tmpl.Config[name] = zeroValueOf(attr)
-		}
-	}
-}
-
-func zeroValueOf(x interface{}) interface{} {
-	return reflect.Zero(reflect.TypeOf(x)).Interface()
-}
-
-// ListTemplates returns information on all accessible templates.
-func (h *Handler) ListTemplates(arg *params.ListTemplates) (*params.ListTemplatesResponse, error) {
-	// TODO provide a way of restricting the results.
-	iter := h.jem.CanReadIter(h.jem.DB.Templates().Find(nil).Sort("_id").Iter())
-	var tmpls []params.TemplateResponse
-	var tmpl mongodoc.Template
-	for iter.Next(&tmpl) {
-		hideTemplateSecrets(&tmpl)
-		tmpls = append(tmpls, params.TemplateResponse{
-			Path:     tmpl.Path,
-			Schema:   tmpl.Schema,
-			Config:   tmpl.Config,
-			Location: tmpl.Location,
-		})
-	}
-	if err := iter.Err(); err != nil {
-		return nil, errgo.Notef(err, "cannot get templates")
-	}
-	return &params.ListTemplatesResponse{
-		Templates: tmpls,
-	}, nil
-}
-
-// GetTemplatePerm returns the ACL for a given template.
-// Only the owner (arg.EntityPath.User) can read the ACL.
-func (h *Handler) GetTemplatePerm(arg *params.GetTemplatePerm) (params.ACL, error) {
-	return h.getPerm(h.jem.DB.Templates(), arg.EntityPath)
-}
-
-// SetTemplatePerm sets the permissions on a template entity.
-// Only the owner (arg.EntityPath.User) can change the permissions
-// on an entity. The owner can always read an entity, even
-// if it has an empty ACL.
-func (h *Handler) SetTemplatePerm(arg *params.SetTemplatePerm) error {
-	return h.setPerm(h.jem.DB.Templates(), arg.EntityPath, arg.ACL)
 }
 
 // SetControllerPerm sets the permissions on a controller entity.
@@ -1262,53 +957,6 @@ func formToLocationAttrs(form url.Values) (map[string]string, error) {
 		}
 	}
 	return attrs, nil
-}
-
-// getTemplates gets the templates at all the given paths.
-// It returns a params.ErrNotFound error if any of them
-// aren't found, or params.ErrUnauthorized if the user
-// doesn't have permission to access them.
-func (h *Handler) getTemplates(paths []params.EntityPath) ([]*mongodoc.Template, error) {
-	tmpls := make([]*mongodoc.Template, len(paths))
-	for i, path := range paths {
-		tmpl, err := h.jem.Template(path)
-		if err != nil {
-			return nil, errgo.NoteMask(err, fmt.Sprintf("cannot get template %q", path), errgo.Is(params.ErrNotFound))
-		}
-		if err := h.jem.CheckCanRead(tmpl); err != nil {
-			return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-		}
-		tmpls[i] = tmpl
-	}
-	return tmpls, nil
-}
-
-// locationForTemplates returns the location implied by the given
-// templates. If the templates disagree about a location attribute,
-// the resulting location will not include that attribute.
-func (h *Handler) locationForTemplates(tmpls []*mongodoc.Template) map[string]string {
-	loc := make(map[string]string)
-	for _, tmpl := range tmpls {
-		for attr, val := range tmpl.Location {
-			if val == "" {
-				// Should never happen because we should never
-				// put empty location attributes into the database,
-				// but be defensive anyway.
-				continue
-			}
-			if v, ok := loc[attr]; ok && v != val {
-				loc[attr] = ""
-			} else {
-				loc[attr] = val
-			}
-		}
-	}
-	for attr, val := range loc {
-		if val == "" {
-			delete(loc, attr)
-		}
-	}
-	return loc
 }
 
 // checkSchemaCompatible checks that a is a compatible

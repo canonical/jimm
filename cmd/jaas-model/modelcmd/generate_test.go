@@ -74,32 +74,6 @@ func (s *generateSuite) TestGenerate(c *gc.C) {
 	c.Assert(string(data), gc.Equals, configData)
 }
 
-func (s *generateSuite) TestGenerateWithTemplates(c *gc.C) {
-	s.idmSrv.SetDefaultUser("bob")
-
-	// First add the controller that we're going to use
-	// to generate the config data.
-	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
-	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
-	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "")
-
-	stdout, stderr, code = run(c, c.MkDir(), "create-template", "--controller", "bob/foo", "bob/template", "controller=false")
-	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
-	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "")
-
-	stdout, stderr, code = run(c, c.MkDir(), "generate", "-c", "bob/foo", "-t", "bob/template")
-	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
-	c.Assert(stderr, gc.Equals, "")
-
-	// The controller attribute should be omitted.
-	c.Assert(stdout, gc.Not(gc.Matches), `(.|\n)*controller:(.|\n)*`)
-
-	// But the other attributes should still be there.
-	c.Assert(stdout, gc.Matches, `(.|\n)*broken:(.|\n)*`)
-}
-
 var generateErrorTests = []struct {
 	about        string
 	args         []string

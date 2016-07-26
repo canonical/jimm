@@ -15,7 +15,6 @@ import (
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/environschema.v1"
 	"gopkg.in/juju/names.v2"
 
 	"github.com/CanonicalLtd/jem/internal/apitest"
@@ -54,16 +53,6 @@ var unauthorizedTests = []struct {
 	method: "GET",
 	path:   "/v2/controller/bob/private",
 }, {
-	about:  "get template as non-owner",
-	asUser: "other",
-	method: "GET",
-	path:   "/v2/template/bob/private",
-}, {
-	about:  "get template models as non-owner",
-	asUser: "other",
-	method: "GET",
-	path:   "/v2/template/bob/private/models",
-}, {
 	about:  "new model as non-owner",
 	asUser: "other",
 	method: "POST",
@@ -82,14 +71,6 @@ var unauthorizedTests = []struct {
 		Controller: &params.EntityPath{"bob", "private"},
 	},
 }, {
-	about:  "new template as non-owner",
-	asUser: "other",
-	method: "PUT",
-	path:   "/v2/template/bob/something",
-	body: params.AddTemplateInfo{
-		Controller: &params.EntityPath{"bob", "open"},
-	},
-}, {
 	about:  "set controller perm as non-owner",
 	asUser: "other",
 	method: "PUT",
@@ -102,12 +83,6 @@ var unauthorizedTests = []struct {
 	path:   "/v2/model/bob/open/perm",
 	body:   params.ACL{},
 }, {
-	about:  "set template perm as non-owner",
-	asUser: "other",
-	method: "PUT",
-	path:   "/v2/template/bob/open/perm",
-	body:   params.ACL{},
-}, {
 	about:  "get controller perm as non-owner",
 	asUser: "other",
 	method: "GET",
@@ -118,11 +93,6 @@ var unauthorizedTests = []struct {
 	method: "GET",
 	path:   "/v2/model/bob/private/perm",
 }, {
-	about:  "get template perm as non-owner",
-	asUser: "other",
-	method: "GET",
-	path:   "/v2/template/bob/private/perm",
-}, {
 	about:  "get controller perm with ACL that allows us",
 	asUser: "other",
 	method: "GET",
@@ -132,22 +102,14 @@ var unauthorizedTests = []struct {
 	asUser: "other",
 	method: "GET",
 	path:   "/v2/model/bob/open/perm",
-}, {
-	about:  "get template perm with ACL that allows us",
-	asUser: "other",
-	method: "GET",
-	path:   "/v2/template/bob/open/perm",
 }}
 
 func (s *APISuite) TestUnauthorized(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{"bob", "private"}, nil)
-	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "open"}, nil)
-	s.addTemplate(c, params.EntityPath{"bob", "open"}, ctlId, dummyModelConfig)
-	s.addTemplate(c, params.EntityPath{"bob", "private"}, ctlId, dummyModelConfig)
+	s.assertAddController(c, params.EntityPath{"bob", "private"}, nil)
+	s.assertAddController(c, params.EntityPath{"bob", "open"}, nil)
 
 	s.allowControllerPerm(c, params.EntityPath{"bob", "open"})
 	s.allowModelPerm(c, params.EntityPath{"bob", "open"})
-	s.allowTemplatePerm(c, params.EntityPath{"bob", "open"})
 
 	for i, test := range unauthorizedTests {
 		c.Logf("test %d: %s", i, test.about)
@@ -1244,89 +1206,6 @@ func (s *APISuite) TestNewModel(c *gc.C) {
 	c.Assert(minfo2.ControllerUUID, gc.Equals, minfo.ControllerUUID)
 }
 
-func (s *APISuite) TestNewModelWithTemplates(c *gc.C) {
-	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, nil)
-
-	// TODO change "admin-secret" to "secret" when we can
-	// make the "secret" configuration attribute marked as secret
-	// in the schema.
-	s.addTemplate(c, params.EntityPath{"bob", "creds"}, ctlId, map[string]interface{}{
-		"secret":          "my secret",
-		"authorized-keys": sshKey,
-		"broken":          "something",
-		"controller":      false,
-	})
-	s.addTemplate(c, params.EntityPath{"bob", "other"}, ctlId, map[string]interface{}{
-		"broken": "oldvalue",
-	})
-	// Write the template again so that it has a different version number.
-	s.addTemplate(c, params.EntityPath{"bob", "other"}, ctlId, map[string]interface{}{
-		"broken": "nothing",
-	})
-
-	modelPath := params.EntityPath{"bob", "model"}
-	resp, err := s.NewClient("bob").NewModel(&params.NewModel{
-		User: modelPath.User,
-		Info: params.NewModelInfo{
-			Name:       modelPath.Name,
-			Controller: &ctlId,
-			Config: map[string]interface{}{
-				"secret": "another secret",
-			},
-			TemplatePaths: []params.EntityPath{{"bob", "creds"}, {"bob", "other"}},
-		},
-	})
-	c.Assert(err, gc.IsNil)
-
-	// Check that the model was actually created with the right
-	// configuration.
-	stm, err := s.State.GetModel(names.NewModelTag(resp.UUID))
-	c.Assert(err, gc.IsNil)
-	cfg, err := stm.Config()
-	c.Assert(err, gc.IsNil)
-	attrs := cfg.AllAttrs()
-	c.Logf("all attributes for uuid %v: %#v", resp.UUID, attrs)
-	c.Assert(attrs["secret"], gc.Equals, "another secret")
-	c.Assert(attrs["controller"], gc.Equals, false)
-	c.Assert(attrs["broken"], gc.Equals, "nothing")
-	c.Assert(attrs["authorized-keys"], gc.Equals, sshKey)
-
-	st := openAPIFromModelResponse(c, resp)
-	st.Close()
-
-	m, err := s.JEM.Model(modelPath)
-	c.Assert(err, gc.IsNil)
-
-	// Check that the model is marked as using the templates.
-	c.Assert(m.Templates, jc.DeepEquals, []string{
-		"bob/creds",
-		"bob/other",
-	})
-	c.Assert(m.TemplateVersions, jc.DeepEquals, map[string]int{
-		"bob/creds": 1,
-		"bob/other": 2,
-	})
-}
-
-func (s *APISuite) TestNewModelWithTemplateNotFound(c *gc.C) {
-	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, nil)
-
-	resp, err := s.NewClient("bob").NewModel(&params.NewModel{
-		User: "bob",
-		Info: params.NewModelInfo{
-			Name:       "x",
-			Controller: &ctlId,
-			Config: map[string]interface{}{
-				"secret": "another secret",
-			},
-			TemplatePaths: []params.EntityPath{{"bob", "creds"}},
-		},
-	})
-	c.Assert(err, gc.ErrorMatches, `POST .*/v2/model/bob: invalid template provided: cannot get template "bob/creds": template "bob/creds" not found`)
-	c.Check(errgo.Cause(err), gc.Equals, params.ErrBadRequest)
-	c.Assert(resp, gc.IsNil)
-}
-
 func (s *APISuite) TestNewModelWithoutExplicitController(c *gc.C) {
 	var nextIndex int
 	s.PatchValue(v2.RandIntn, func(n int) int {
@@ -1358,24 +1237,6 @@ func (s *APISuite) TestNewModelWithoutExplicitController(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{"bob", "azure-us"}, map[string]string{
 		"cloud":  "azure",
 		"region": "us",
-	})
-
-	s.addTemplateAt(c, params.EntityPath{"bob", "aws-creds"}, map[string]string{
-		"cloud": "aws",
-	}, map[string]interface{}{
-		"secret": "bob's secret",
-	})
-	s.addTemplateAt(c, params.EntityPath{"bob", "east-creds"}, map[string]string{
-		"cloud":  "aws",
-		"region": "us-east-1",
-	}, map[string]interface{}{
-		"secret": "us-east-specific secret",
-	})
-	s.addTemplateAt(c, params.EntityPath{"bob", "west-creds"}, map[string]string{
-		"cloud":  "aws",
-		"region": "eu-west-1",
-	}, map[string]interface{}{
-		"secret": "eu-west-specific secret",
 	})
 
 	tests := []struct {
@@ -1516,104 +1377,6 @@ func (s *APISuite) TestNewModelWithoutExplicitController(c *gc.C) {
 		},
 		expectError: `POST http://.*/v2/model/bob: cannot select controller: bad controller location query: invalid attribute "\$wrong"`,
 		expectCause: params.ErrBadRequest,
-	}, {
-		about:     "with template with location",
-		randIndex: 0,
-		user:      "bob",
-		arg: params.NewModel{
-			User: "bob",
-			Info: params.NewModelInfo{
-				TemplatePaths: []params.EntityPath{{"bob", "aws-creds"}},
-			},
-		},
-		expectController: "bob/aws-eu-west",
-		expectSecret:     "bob's secret",
-	}, {
-		about:     "with template with location, different random selection",
-		randIndex: 1,
-		user:      "bob",
-		arg: params.NewModel{
-			User: "bob",
-			Info: params.NewModelInfo{
-				TemplatePaths: []params.EntityPath{{"bob", "aws-creds"}},
-			},
-		},
-		expectController: "bob/aws-us-east",
-		expectSecret:     "bob's secret",
-	}, {
-		about:     "mismatched templates remove attribute from consideration",
-		user:      "bob",
-		randIndex: 2,
-		arg: params.NewModel{
-			User: "bob",
-			Info: params.NewModelInfo{
-				TemplatePaths: []params.EntityPath{
-					// Both east-creds and west-creds specify cloud=aws,
-					// but differ on region, so all aws controllers are selected.
-					{"bob", "east-creds"},
-					{"bob", "west-creds"},
-				},
-			},
-		},
-		expectController: "bob/aws-us-east-staging",
-		expectSecret:     "eu-west-specific secret",
-	}, {
-		about: "with explicit location and template with location",
-		user:  "bob",
-		arg: params.NewModel{
-			User: "bob",
-			Info: params.NewModelInfo{
-				TemplatePaths: []params.EntityPath{{"bob", "aws-creds"}},
-				Location: map[string]string{
-					"staging": "true",
-				},
-			},
-		},
-		expectController: "bob/aws-us-east-staging",
-		expectSecret:     "bob's secret",
-	}, {
-		about:     "with explicit location and template with overridden location",
-		user:      "bob",
-		randIndex: 1,
-		arg: params.NewModel{
-			User: "bob",
-			Info: params.NewModelInfo{
-				TemplatePaths: []params.EntityPath{{"bob", "west-creds"}},
-				Location: map[string]string{
-					"region": "us-east-1",
-				},
-			},
-		},
-		expectController: "bob/aws-us-east-staging",
-		expectSecret:     "eu-west-specific secret",
-	}, {
-		about: "with explicit location with non-overriding location",
-		user:  "bob",
-		arg: params.NewModel{
-			User: "bob",
-			Info: params.NewModelInfo{
-				TemplatePaths: []params.EntityPath{{"bob", "east-creds"}},
-				Location: map[string]string{
-					"region":  "us-east-1",
-					"staging": "true",
-				},
-			},
-		},
-		expectController: "bob/aws-us-east-staging",
-		expectSecret:     "us-east-specific secret",
-	}, {
-		about: "unauthorized template",
-		user:  "alice",
-		arg: params.NewModel{
-			User: "alice",
-			Info: params.NewModelInfo{
-				TemplatePaths: []params.EntityPath{{"bob", "east-creds"}},
-			},
-		},
-		expectCause: params.ErrUnauthorized,
-		// TODO perhaps it would be nice if the template name was mentioned
-		// in the error message here.
-		expectError: `POST http://.*/v2/model/alice: invalid template provided: unauthorized`,
 	}}
 	for i, test := range tests {
 		c.Logf("test %d: %s", i, test.about)
@@ -2032,91 +1795,6 @@ func (s *APISuite) TestListControllerNoServers(c *gc.C) {
 	c.Assert(resp, jc.DeepEquals, &params.ListControllerResponse{})
 }
 
-func (s *APISuite) TestListTemplates(c *gc.C) {
-	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, nil)
-	ctl, err := s.NewClient("bob").GetController(&params.GetController{
-		EntityPath: ctlId,
-	})
-	c.Assert(err, gc.IsNil)
-	s.addTemplate(c, params.EntityPath{"bob", "other"}, ctlId, map[string]interface{}{
-		"controller": true,
-	})
-	s.addTemplate(c, params.EntityPath{"bob", "creds"}, ctlId, map[string]interface{}{
-		"secret":          "my secret",
-		"authorized-keys": sshKey,
-		"controller":      false,
-	})
-	s.addTemplate(c, params.EntityPath{"alice", "x"}, ctlId, map[string]interface{}{
-		"controller":      false,
-		"authorized-keys": sshKey,
-	})
-	s.addTemplate(c, params.EntityPath{"alice", "y"}, ctlId, map[string]interface{}{
-		"controller": false,
-	})
-	s.allowTemplatePerm(c, params.EntityPath{"alice", "y"})
-
-	resp, err := s.NewClient("bob").ListTemplates(&params.ListTemplates{})
-	c.Assert(err, gc.IsNil)
-
-	c.Assert(resp, jc.DeepEquals, &params.ListTemplatesResponse{
-		Templates: []params.TemplateResponse{{
-			Path: params.EntityPath{"alice", "y"},
-			Config: map[string]interface{}{
-				"controller": false,
-			},
-			Schema: environschema.Fields{
-				"controller": ctl.Schema["controller"],
-			},
-		}, {
-			Path: params.EntityPath{"bob", "creds"},
-			Config: map[string]interface{}{
-				"secret":          "my secret",
-				"authorized-keys": sshKey,
-				"controller":      false,
-			},
-			Schema: environschema.Fields{
-				"secret":          ctl.Schema["secret"],
-				"authorized-keys": ctl.Schema["authorized-keys"],
-				"controller":      ctl.Schema["controller"],
-			},
-		}, {
-			Path: params.EntityPath{"bob", "other"},
-			Config: map[string]interface{}{
-				"controller": true,
-			},
-			Schema: environschema.Fields{
-				"controller": ctl.Schema["controller"],
-			},
-		}},
-	})
-
-	// Try a similar thing as alice
-	resp, err = s.NewClient("alice").ListTemplates(&params.ListTemplates{})
-	c.Assert(err, gc.IsNil)
-
-	c.Assert(resp, jc.DeepEquals, &params.ListTemplatesResponse{
-		Templates: []params.TemplateResponse{{
-			Path: params.EntityPath{"alice", "x"},
-			Config: map[string]interface{}{
-				"controller":      false,
-				"authorized-keys": sshKey,
-			},
-			Schema: environschema.Fields{
-				"authorized-keys": ctl.Schema["authorized-keys"],
-				"controller":      ctl.Schema["controller"],
-			},
-		}, {
-			Path: params.EntityPath{"alice", "y"},
-			Config: map[string]interface{}{
-				"controller": false,
-			},
-			Schema: environschema.Fields{
-				"controller": ctl.Schema["controller"],
-			},
-		}},
-	})
-}
-
 func (s *APISuite) TestListModelsNoServers(c *gc.C) {
 	resp, err := s.NewClient("bob").ListModels(nil)
 	c.Assert(err, gc.IsNil)
@@ -2272,517 +1950,60 @@ func (s *APISuite) TestGetSetModelPerm(c *gc.C) {
 	})
 }
 
-func (s *APISuite) TestAddTemplateWithOldModelReferences(c *gc.C) {
-	ctlId := s.AssertAddController(c, params.EntityPath{"alice", "foo"}, nil)
-	tmplPath := params.EntityPath{"bob", "mytemplate"}
-	// This tests the case we're creating a template when there are models
-	// already referring to it.In this case, the template
-	// should be created with a version of one more than all the models.
-	// This can happen  when a template was successfully deleted even
-	// though there are models referring to it because the existence-before-delete
-	// test is racy.
-	err := s.JEM.AddModel(&mongodoc.Model{
-		Path:       params.EntityPath{"bob", "model1"},
-		Controller: params.EntityPath{"alice", "foo"},
-		Templates:  []string{"alice/other", tmplPath.String()},
-		TemplateVersions: map[string]int{
-			tmplPath.String(): 2,
-			"alice/other":     99,
-		},
-	})
-	c.Assert(err, gc.IsNil)
-
-	err = s.JEM.AddModel(&mongodoc.Model{
-		Path:       params.EntityPath{"bob", "model2"},
-		Controller: params.EntityPath{"alice", "foo"},
-		Templates:  []string{tmplPath.String()},
-		TemplateVersions: map[string]int{
-			tmplPath.String(): 5,
-		},
-	})
-	c.Assert(err, gc.IsNil)
-
-	err = s.NewClient("bob").AddTemplate(&params.AddTemplate{
-		EntityPath: tmplPath,
-		Info: params.AddTemplateInfo{
-			Controller: &ctlId,
-			Config: map[string]interface{}{
-				"controller":        true,
-				"admin-secret":      "my secret",
-				"authorized-keys":   sshKey,
-				"bootstrap-timeout": 9999,
-			},
-		},
-	})
-	c.Assert(err, gc.IsNil)
-
-	tmpl, err := s.JEM.Template(tmplPath)
-	c.Assert(err, gc.IsNil)
-	c.Assert(tmpl.Version, gc.Equals, 6)
-}
-
-func (s *APISuite) TestAddTemplate(c *gc.C) {
-	ctlId := s.AssertAddController(c, params.EntityPath{"alice", "foo"}, nil)
-	err := s.NewClient("alice").AddNewTemplate(&params.AddNewTemplate{
-		EntityPath: params.EntityPath{"alice", "creds"},
-		Info: params.AddTemplateInfo{
-			Controller: &ctlId,
-			Config: map[string]interface{}{
-				"controller":        true,
-				"admin-secret":      "my secret",
-				"authorized-keys":   sshKey,
-				"bootstrap-timeout": 9999,
-			},
-		},
-	})
-	c.Assert(err, gc.IsNil)
-
-	// Check that we can get the template and that its secret fields
-	// are zeroed out. Note that because we round-trip through
-	// JSON, any int fields arrive as float64, but that should be
-	// fine in practice.
-	tmpl, err := s.NewClient("alice").GetTemplate(&params.GetTemplate{
-		EntityPath: params.EntityPath{"alice", "creds"},
-	})
-	c.Assert(err, gc.IsNil)
-	c.Assert(tmpl.Schema, gc.Not(gc.HasLen), 0)
-	c.Assert(tmpl.Path, gc.Equals, params.EntityPath{"alice", "creds"})
-	c.Assert(tmpl.Config, jc.DeepEquals, map[string]interface{}{
-		"controller":        true,
-		"admin-secret":      "",
-		"authorized-keys":   sshKey,
-		"bootstrap-timeout": 9999.0,
-	})
-
-	// Check that we can overwrite the template with a new one.
-	err = s.NewClient("alice").AddTemplate(&params.AddTemplate{
-		EntityPath: params.EntityPath{"alice", "creds"},
-		Info: params.AddTemplateInfo{
-			Controller: &ctlId,
-			Config: map[string]interface{}{
-				"controller":        false,
-				"admin-secret":      "another secret",
-				"bootstrap-timeout": 888,
-			},
-		},
-	})
-	c.Assert(err, gc.IsNil)
-
-	tmpl, err = s.NewClient("alice").GetTemplate(&params.GetTemplate{
-		EntityPath: params.EntityPath{"alice", "creds"},
-	})
-	c.Assert(err, gc.IsNil)
-	c.Assert(tmpl.Schema, gc.Not(gc.HasLen), 0)
-	c.Assert(tmpl.Path, gc.Equals, params.EntityPath{"alice", "creds"})
-	c.Assert(tmpl.Config, jc.DeepEquals, map[string]interface{}{
-		"controller":        false,
-		"admin-secret":      "",
-		"bootstrap-timeout": 888.0,
-	})
-
-	// Check that we can write to another template without affecting
-	// the original.
-	err = s.NewClient("alice").AddTemplate(&params.AddTemplate{
-		EntityPath: params.EntityPath{"alice", "differentcreds"},
-		Info: params.AddTemplateInfo{
-			Controller: &ctlId,
-			Config: map[string]interface{}{
-				"controller":        true,
-				"bootstrap-timeout": 111,
-			},
-		},
-	})
-	c.Assert(err, gc.IsNil)
-
-	// Check that we get an error trying to add a new template which
-	// already exist.
-	err = s.NewClient("alice").AddNewTemplate(&params.AddNewTemplate{
-		EntityPath: params.EntityPath{"alice", "differentcreds"},
-		Info: params.AddTemplateInfo{
-			Controller: &ctlId,
-			Config: map[string]interface{}{
-				"controller":        true,
-				"bootstrap-timeout": 111,
-			},
-		},
-	})
-	c.Assert(err, gc.ErrorMatches, "POST .*/v2/template/alice/differentcreds: template \"alice/differentcreds\" already exists")
-	c.Check(errgo.Cause(err), gc.Equals, params.ErrBadRequest)
-
-	tmpl, err = s.NewClient("alice").GetTemplate(&params.GetTemplate{
-		EntityPath: params.EntityPath{"alice", "differentcreds"},
-	})
-	c.Assert(err, gc.IsNil)
-	c.Assert(tmpl.Path, gc.Equals, params.EntityPath{"alice", "differentcreds"})
-	c.Assert(tmpl.Schema, gc.Not(gc.HasLen), 0)
-	c.Assert(tmpl.Config, jc.DeepEquals, map[string]interface{}{
-		"controller":        true,
-		"bootstrap-timeout": 111.0,
-	})
-
-	tmpl, err = s.NewClient("alice").GetTemplate(&params.GetTemplate{
-		EntityPath: params.EntityPath{"alice", "creds"},
-	})
-	c.Assert(err, gc.IsNil)
-	c.Assert(tmpl.Schema, gc.Not(gc.HasLen), 0)
-	c.Assert(tmpl.Config, jc.DeepEquals, map[string]interface{}{
-		"controller":        false,
-		"admin-secret":      "",
-		"bootstrap-timeout": 888.0,
-	})
-}
-
-func (s *APISuite) TestAddTemplateWithLocation(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{"alice", "foo"}, map[string]string{
-		"cloud":  "ec2",
-		"region": "us-east-1",
-	})
-	err := s.NewClient("alice").AddNewTemplate(&params.AddNewTemplate{
-		EntityPath: params.EntityPath{"alice", "creds"},
-		Info: params.AddTemplateInfo{
-			Config: map[string]interface{}{
-				"controller":        true,
-				"admin-secret":      "my secret",
-				"authorized-keys":   sshKey,
-				"bootstrap-timeout": 9999,
-			},
-			Location: map[string]string{
-				"cloud": "ec2",
-			},
-		},
-	})
-	c.Assert(err, gc.IsNil)
-	tmpl, err := s.NewClient("alice").GetTemplate(&params.GetTemplate{
-		EntityPath: params.EntityPath{"alice", "creds"},
-	})
-	c.Assert(err, gc.IsNil)
-	c.Assert(tmpl.Location, jc.DeepEquals, map[string]string{
-		"cloud": "ec2",
-	})
-}
-
-func (s *APISuite) TestAddTemplateWithLocationAndTemplate(c *gc.C) {
-	ctlId := s.AssertAddController(c, params.EntityPath{"alice", "foo"}, map[string]string{
-		"cloud":  "ec2",
-		"region": "us-east-1",
-	})
-	err := s.NewClient("alice").AddNewTemplate(&params.AddNewTemplate{
-		EntityPath: params.EntityPath{"alice", "creds"},
-		Info: params.AddTemplateInfo{
-			Controller: &ctlId,
-			Location: map[string]string{
-				"cloud": "ec2",
-			},
-		},
-	})
-	c.Check(errgo.Cause(err), gc.Equals, params.ErrBadRequest)
-	c.Assert(err, gc.ErrorMatches, "POST .*/template/alice/creds: cannot specify location with explicit controller")
-}
-
-func (s *APISuite) TestAddTemplateIncompatibleWithModels(c *gc.C) {
-	schemas := map[string]environschema.Fields{
-		"provider1": {
-			"attr1": {
-				Type: environschema.Tbool,
-			},
-			"attr2": {
-				Type: environschema.Tint,
-			},
-		},
-		"provider2": {
-			"attr1": {
-				Type: environschema.Tbool,
-			},
-			"attr2": {
-				Type: environschema.Tstring,
-			},
-		},
-	}
-	s.PatchValue(v2.SchemaForProviderType, func(providerType string) (environschema.Fields, error) {
-		if s, ok := schemas[providerType]; ok {
-			return s, nil
-		}
-		return nil, errgo.Newf("provider %q not found", providerType)
-	})
-	err := s.JEM.AddController(&mongodoc.Controller{
-		Path:         params.EntityPath{"bob", "controller1"},
-		UUID:         "fake-uuid",
-		ProviderType: "provider1",
-	}, &mongodoc.Model{})
-	c.Assert(err, gc.IsNil)
-
-	err = s.JEM.AddController(&mongodoc.Controller{
-		Path:         params.EntityPath{"bob", "controller2"},
-		UUID:         "fake-uuid",
-		ProviderType: "provider2",
-	}, &mongodoc.Model{})
-	c.Assert(err, gc.IsNil)
-
-	err = s.NewClient("bob").AddTemplate(&params.AddTemplate{
-		EntityPath: params.EntityPath{"bob", "mytemplate"},
-		Info: params.AddTemplateInfo{
-			Controller: &params.EntityPath{"bob", "controller1"},
-			Config: map[string]interface{}{
-				"attr1": false,
-				"attr2": 99,
-			},
-		},
-	})
-	c.Assert(err, gc.IsNil)
-
-	err = s.JEM.AddModel(&mongodoc.Model{
-		Path:       params.EntityPath{"bob", "model"},
-		Controller: params.EntityPath{"bob", "controller1"},
-		Templates:  []string{"bob/mytemplate"},
-	})
-	c.Assert(err, gc.IsNil)
-
-	// Now there's a model using the template, change the template
-	// to something that's incompatible with the model's use.
-	err = s.NewClient("bob").AddTemplate(&params.AddTemplate{
-		EntityPath: params.EntityPath{"bob", "mytemplate"},
-		Info: params.AddTemplateInfo{
-			Controller: &params.EntityPath{"bob", "controller2"},
-			Config: map[string]interface{}{
-				"attr1": false,
-				"attr2": "hello",
-			},
-		},
-	})
-	c.Assert(err, gc.ErrorMatches, `PUT http://.*template/bob/mytemplate: new schema is incompatible with an existing model using the template: field "attr2" is incompatible`)
-
-	// Now change to something with a different controller but
-	// that only uses a subset of compatible attributes.
-	err = s.NewClient("bob").AddTemplate(&params.AddTemplate{
-		EntityPath: params.EntityPath{"bob", "mytemplate"},
-		Info: params.AddTemplateInfo{
-			Controller: &params.EntityPath{"bob", "controller2"},
-			Config: map[string]interface{}{
-				"attr1": true,
-			},
-		},
-	})
-	c.Assert(err, gc.IsNil)
-}
-
-func (s *APISuite) TestGetTemplateNotFound(c *gc.C) {
-	tmpl, err := s.NewClient("alice").GetTemplate(&params.GetTemplate{
-		EntityPath: params.EntityPath{"alice", "xxx"},
-	})
-	c.Assert(err, gc.ErrorMatches, `GET .*/v2/template/alice/xxx: template "alice/xxx" not found`)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	c.Assert(tmpl, gc.IsNil)
-}
-
-func (s *APISuite) TestGetTemplateModelsTemplateNotFound(c *gc.C) {
-	resp, err := s.NewClient("alice").GetTemplateModels(&params.GetTemplateModels{
-		EntityPath: params.EntityPath{"alice", "xxx"},
-	})
-	c.Assert(err, gc.ErrorMatches, `GET .*/v2/template/alice/xxx/models: template "alice/xxx" not found`)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	c.Assert(resp, gc.IsNil)
-}
-
-func (s *APISuite) TestGetTemplateModels(c *gc.C) {
-	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "ctl"}, nil)
-	s.allowControllerPerm(c, ctlId)
-	t1 := params.EntityPath{"bob", "t1"}
-	t2 := params.EntityPath{"bob", "t2"}
-	s.addTemplate(c, t1, ctlId, dummyModelConfig)
-	s.addTemplate(c, t2, ctlId, dummyModelConfig)
-	s.allowTemplatePerm(c, t1)
-	s.allowTemplatePerm(c, t2)
-
-	bobModel1 := params.EntityPath{"bob", "model1"}
-	s.CreateModel(c, bobModel1, ctlId, t1, t2)
-	s.allowModelPerm(c, bobModel1, "superduper")
-
-	bobModel2 := params.EntityPath{"bob", "model2"}
-	s.CreateModel(c, bobModel2, ctlId, t1)
-	s.allowModelPerm(c, bobModel2, "superduper")
-
-	aliceModel := params.EntityPath{"alice", "model"}
-	s.CreateModel(c, aliceModel, ctlId, t1)
-	s.allowModelPerm(c, aliceModel, "superduper")
-
-	resp, err := s.NewClient("bob").GetTemplateModels(&params.GetTemplateModels{
-		EntityPath: t1,
-	})
-	c.Assert(err, gc.IsNil)
-	c.Assert(resp, jc.DeepEquals, &params.TemplateModelsResponse{
-		ModelPaths: []params.EntityPath{bobModel1, bobModel2},
-		Total:      3,
-	})
-	resp, err = s.NewClient("alice").GetTemplateModels(&params.GetTemplateModels{
-		EntityPath: t1,
-	})
-	c.Assert(err, gc.IsNil)
-	c.Assert(resp, jc.DeepEquals, &params.TemplateModelsResponse{
-		ModelPaths: []params.EntityPath{aliceModel},
-		Total:      3,
-	})
-	resp, err = s.NewClient("superduper").GetTemplateModels(&params.GetTemplateModels{
-		EntityPath: t1,
-	})
-	c.Assert(err, gc.IsNil)
-	c.Assert(resp, jc.DeepEquals, &params.TemplateModelsResponse{
-		ModelPaths: []params.EntityPath{aliceModel, bobModel1, bobModel2},
-		Total:      3,
-	})
-}
-
-var addInvalidTemplateTests = []struct {
-	about       string
-	config      map[string]interface{}
-	ctlId       params.EntityPath
-	expectError string
-}{{
-	about: "unknown key",
-	ctlId: params.EntityPath{"alice", "foo"},
-	config: map[string]interface{}{
-		"badkey": 34565,
-	},
-	expectError: `PUT .*/v2/template/alice/creds: configuration not compatible with schema: unknown key "badkey" \(value 34565\)`,
-}, {
-	about: "incompatible type",
-	ctlId: params.EntityPath{"alice", "foo"},
-	config: map[string]interface{}{
-		"admin-secret": 34565,
-	},
-	expectError: `PUT .*/v2/template/alice/creds: configuration not compatible with schema: admin-secret: expected string, got float64\(34565\)`,
-}, {
-	about: "unknown controller id",
-	ctlId: params.EntityPath{"alice", "bar"},
-	config: map[string]interface{}{
-		"admin-secret": 34565,
-	},
-	expectError: `PUT .*/v2/template/alice/creds: cannot get schema for controller: controller "alice/bar" not found`,
-}}
-
-func (s *APISuite) TestAddInvalidTemplate(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{"alice", "foo"}, nil)
-	for i, test := range addInvalidTemplateTests {
-		c.Logf("test %d: %s", i, test.about)
-		err := s.NewClient("alice").AddTemplate(&params.AddTemplate{
-			EntityPath: params.EntityPath{"alice", "creds"},
-			Info: params.AddTemplateInfo{
-				Controller: &test.ctlId,
-				Config:     test.config,
-			},
-		})
-		c.Assert(err, gc.ErrorMatches, test.expectError)
-	}
-}
-
-func (s *APISuite) TestDeleteTemplateNotFound(c *gc.C) {
-	templPath := params.EntityPath{"alice", "foo"}
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Method:       "DELETE",
-		Handler:      s.JEMSrv,
-		URL:          "/v2/template/" + templPath.String(),
-		ExpectStatus: http.StatusNotFound,
-		ExpectBody: &params.Error{
-			Message: `template "alice/foo" not found`,
-			Code:    params.ErrNotFound,
-		},
-		Do: apitest.Do(s.IDMSrv.Client("alice")),
-	})
-}
-
-func (s *APISuite) TestDeleteTemplateInUse(c *gc.C) {
-	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, nil)
-
-	templPath := params.EntityPath{"bob", "other"}
-	s.addTemplate(c, templPath, ctlId, map[string]interface{}{
-		"broken": "nothing",
-	})
-	_, err := s.NewClient("bob").NewModel(&params.NewModel{
-		User: "bob",
-		Info: params.NewModelInfo{
-			Name:       "model",
-			Controller: &ctlId,
-			Config: map[string]interface{}{
-				"secret": "another secret",
-			},
-			TemplatePaths: []params.EntityPath{{"bob", "other"}},
-		},
-	})
-	c.Assert(err, gc.IsNil)
-
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Method:       "DELETE",
-		Handler:      s.JEMSrv,
-		URL:          "/v2/template/" + templPath.String(),
-		ExpectStatus: http.StatusForbidden,
-		ExpectBody: &params.Error{
-			Message: `cannot delete template because one or more models are using it`,
-			Code:    params.ErrForbidden,
-		},
-		Do: apitest.Do(s.IDMSrv.Client("bob")),
-	})
-}
-
-func (s *APISuite) TestDeleteTemplate(c *gc.C) {
-	ctlId := s.AssertAddController(c, params.EntityPath{"alice", "foo"}, nil)
-	templPath := params.EntityPath{"alice", "foo"}
-
-	err := s.NewClient("alice").AddTemplate(&params.AddTemplate{
-		EntityPath: templPath,
-		Info: params.AddTemplateInfo{
-			Controller: &ctlId,
-			Config: map[string]interface{}{
-				"controller":        true,
-				"admin-secret":      "my secret",
-				"authorized-keys":   sshKey,
-				"bootstrap-timeout": 9999,
-			},
-		},
-	})
-	c.Assert(err, gc.IsNil)
-
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Method:       "DELETE",
-		Handler:      s.JEMSrv,
-		URL:          "/v2/template/" + templPath.String(),
-		ExpectStatus: http.StatusOK,
-		Do:           apitest.Do(s.IDMSrv.Client("alice")),
-	})
-
-	// Check that it is no longer available.
-	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
-		Handler: s.JEMSrv,
-		URL:     "/v2/template/" + templPath.String(),
-		Do:      apitest.Do(s.IDMSrv.Client("alice")),
-	})
-	c.Assert(resp.Code, gc.Equals, http.StatusNotFound, gc.Commentf("body: %s", resp.Body.Bytes()))
-}
-
 func (s *APISuite) TestWhoAmI(c *gc.C) {
 	resp, err := s.NewClient("bob").WhoAmI(nil)
 	c.Assert(err, gc.IsNil)
 	c.Assert(resp.User, gc.Equals, "bob")
 }
 
-func (s *APISuite) addTemplate(c *gc.C, tmplPath, ctlPath params.EntityPath, cfg map[string]interface{}) {
-	err := s.NewClient(tmplPath.User).AddTemplate(&params.AddTemplate{
-		EntityPath: tmplPath,
-		Info: params.AddTemplateInfo{
-			Controller: &ctlPath,
-			Config:     cfg,
-		},
-	})
+// addController adds a new controller named name under the
+// given user. It returns the controller id.
+func (s *APISuite) assertAddController(c *gc.C, ctlPath params.EntityPath, loc map[string]string) params.EntityPath {
+	err := s.addController(c, ctlPath, loc)
 	c.Assert(err, gc.IsNil)
+	return ctlPath
 }
 
-func (s *APISuite) addTemplateAt(c *gc.C, tmplPath params.EntityPath, loc map[string]string, cfg map[string]interface{}) {
-	err := s.NewClient(tmplPath.User).AddTemplate(&params.AddTemplate{
-		EntityPath: tmplPath,
-		Info: params.AddTemplateInfo{
-			Location: loc,
-			Config:   cfg,
+func (s *APISuite) addController(c *gc.C, path params.EntityPath, loc map[string]string) error {
+	// Note that because the cookies acquired in this request don't
+	// persist, the discharge macaroon we get won't affect subsequent
+	// requests in the caller.
+	info := s.APIInfo(c)
+	p := &params.AddController{
+		EntityPath: path,
+		Info: params.ControllerInfo{
+			HostPorts:      info.Addrs,
+			CACert:         info.CACert,
+			User:           info.Tag.Id(),
+			Password:       info.Password,
+			ControllerUUID: info.ModelTag.Id(),
+			Location:       loc,
+		},
+	}
+	if len(loc) > 0 {
+		p.Info.Public = true
+		s.IDMSrv.AddUser(string(path.User), "controller-admin")
+	}
+	return s.NewClient(path.User).AddController(p)
+}
+
+// addModel adds a new model in the given controller. It
+// returns the model id.
+func (s *APISuite) addModel(c *gc.C, modelPath, ctlPath params.EntityPath) (path params.EntityPath, user, uuid string) {
+	// Note that because the cookies acquired in this request don't
+	// persist, the discharge macaroon we get won't affect subsequent
+	// requests in the caller.
+
+	resp, err := s.NewClient(modelPath.User).NewModel(&params.NewModel{
+		User: modelPath.User,
+		Info: params.NewModelInfo{
+			Name:          modelPath.Name,
+			Controller:    &ctlPath,
+			Config:        dummyModelConfig,
 		},
 	})
 	c.Assert(err, gc.IsNil)
+	return resp.Path, resp.User, resp.UUID
 }
 
 func (s *APISuite) allowControllerPerm(c *gc.C, path params.EntityPath, acl ...string) {
@@ -2803,19 +2024,6 @@ func (s *APISuite) allowModelPerm(c *gc.C, path params.EntityPath, acl ...string
 		acl = []string{"everyone"}
 	}
 	err := s.NewClient(path.User).SetModelPerm(&params.SetModelPerm{
-		EntityPath: path,
-		ACL: params.ACL{
-			Read: acl,
-		},
-	})
-	c.Assert(err, gc.IsNil)
-}
-
-func (s *APISuite) allowTemplatePerm(c *gc.C, path params.EntityPath, acl ...string) {
-	if len(acl) == 0 {
-		acl = []string{"everyone"}
-	}
-	err := s.NewClient(path.User).SetTemplatePerm(&params.SetTemplatePerm{
 		EntityPath: path,
 		ACL: params.ACL{
 			Read: acl,

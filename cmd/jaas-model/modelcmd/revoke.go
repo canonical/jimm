@@ -20,7 +20,6 @@ type revokeCommand struct {
 	path entityPathValue
 
 	controller bool
-	template   bool
 	users      userSet
 }
 
@@ -30,7 +29,7 @@ func newRevokeCommand() cmd.Command {
 
 var revokeDoc = `
 The revoke command removes permissions for a set of users
-or groups to read a model (default), controller, or template within the managing server.
+or groups to read a model (default) or controller within the managing server.
 Note that if a user access is revoked, that user may still have access
 if they are a member of a group that is still part of the read ACL.
 
@@ -51,7 +50,6 @@ func (c *revokeCommand) Info() *cmd.Info {
 
 func (c *revokeCommand) SetFlags(f *gnuflag.FlagSet) {
 	f.BoolVar(&c.controller, "controller", false, "change ACL of controller not model")
-	f.BoolVar(&c.template, "template", false, "change ACL of template not model")
 }
 
 func (c *revokeCommand) Init(args []string) error {
@@ -67,9 +65,6 @@ func (c *revokeCommand) Init(args []string) error {
 	}
 	if err := c.path.Set(args[0]); err != nil {
 		return errgo.Mask(err)
-	}
-	if c.template && c.controller {
-		return errgo.New("cannot specify both --controller and --template")
 	}
 	c.users = make(userSet)
 	if err := c.users.Set(args[1]); err != nil {
@@ -111,11 +106,6 @@ func (c *revokeCommand) setPerm(client *jemclient.Client, acl params.ACL) error 
 			EntityPath: c.path.EntityPath,
 			ACL:        acl,
 		})
-	case c.template:
-		err = client.SetTemplatePerm(&params.SetTemplatePerm{
-			EntityPath: c.path.EntityPath,
-			ACL:        acl,
-		})
 	default:
 		err = client.SetModelPerm(&params.SetModelPerm{
 			EntityPath: c.path.EntityPath,
@@ -131,10 +121,6 @@ func (c *revokeCommand) getPerm(client *jemclient.Client) (params.ACL, error) {
 	switch {
 	case c.controller:
 		acl, err = client.GetControllerPerm(&params.GetControllerPerm{
-			EntityPath: c.path.EntityPath,
-		})
-	case c.template:
-		acl, err = client.GetTemplatePerm(&params.GetTemplatePerm{
 			EntityPath: c.path.EntityPath,
 		})
 	default:

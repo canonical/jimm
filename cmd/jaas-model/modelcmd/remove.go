@@ -16,7 +16,6 @@ type removeCommand struct {
 
 	paths      []entityPathValue
 	controller bool
-	template   bool
 	force      bool
 }
 
@@ -25,7 +24,7 @@ func newRemoveCommand() cmd.Command {
 }
 
 var removeDoc = `
-The remove command removes models, controllers or templates.
+The remove command removes models or controllers.
 `
 
 func (c *removeCommand) Info() *cmd.Info {
@@ -50,7 +49,6 @@ func (c *removeCommand) Init(args []string) error {
 
 func (c *removeCommand) SetFlags(f *gnuflag.FlagSet) {
 	f.BoolVar(&c.controller, "controller", false, "remove controllers not models")
-	f.BoolVar(&c.template, "template", false, "remove templates not models")
 	f.BoolVar(&c.force, "f", false, "force removal of live controller")
 	f.BoolVar(&c.force, "force", false, "")
 }
@@ -70,13 +68,6 @@ func (c *removeCommand) Run(ctxt *cmd.Context) error {
 			return client.DeleteController(&params.DeleteController{
 				EntityPath: path.EntityPath,
 				Force:      c.force,
-			})
-		}
-	}
-	if c.template {
-		f = func(path entityPathValue) error {
-			return client.DeleteTemplate(&params.DeleteTemplate{
-				EntityPath: path.EntityPath,
 			})
 		}
 	}

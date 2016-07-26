@@ -4,9 +4,8 @@
 package jemclient
 
 import (
-	"github.com/juju/httprequest"
-
 	"github.com/CanonicalLtd/jem/params"
+	"github.com/juju/httprequest"
 )
 
 type client struct {
@@ -18,17 +17,6 @@ func (c *client) AddController(p *params.AddController) error {
 	return c.Client.Call(p, nil)
 }
 
-// AddNewTemplate adds a new template. It fails if a template with the new
-// name already exists.
-func (c *client) AddNewTemplate(p *params.AddNewTemplate) error {
-	return c.Client.Call(p, nil)
-}
-
-// AddTemplate adds or updates a new template.
-func (c *client) AddTemplate(p *params.AddTemplate) error {
-	return c.Client.Call(p, nil)
-}
-
 // DeleteController removes an existing controller.
 func (c *client) DeleteController(p *params.DeleteController) error {
 	return c.Client.Call(p, nil)
@@ -36,11 +24,6 @@ func (c *client) DeleteController(p *params.DeleteController) error {
 
 // DeleteModel deletes an model from JEM.
 func (c *client) DeleteModel(p *params.DeleteModel) error {
-	return c.Client.Call(p, nil)
-}
-
-// DeleteTemplate deletes a template.
-func (c *client) DeleteTemplate(p *params.DeleteTemplate) error {
 	return c.Client.Call(p, nil)
 }
 
@@ -116,31 +99,8 @@ func (c *client) GetSchema(p *params.GetSchema) (*params.SchemaResponse, error) 
 	return r, err
 }
 
-// GetTemplate returns information on a single template.
-func (c *client) GetTemplate(p *params.GetTemplate) (*params.TemplateResponse, error) {
-	var r *params.TemplateResponse
-	err := c.Client.Call(p, &r)
-	return r, err
-}
-
-// GetTemplate returns the models using the template.
-// It only returns names for the models that the user has read permission for.
-func (c *client) GetTemplateModels(p *params.GetTemplateModels) (*params.TemplateModelsResponse, error) {
-	var r *params.TemplateModelsResponse
-	err := c.Client.Call(p, &r)
-	return r, err
-}
-
-// GetTemplatePerm returns the ACL for a given template.
-// Only the owner (arg.EntityPath.User) can read the ACL.
-func (c *client) GetTemplatePerm(p *params.GetTemplatePerm) (params.ACL, error) {
-	var r params.ACL
-	err := c.Client.Call(p, &r)
-	return r, err
-}
-
 // ListController returns all the controllers stored in JEM.
-// Currently the Template  and ProviderType field in each ControllerResponse is not
+// Currently the ProviderType field in each ControllerResponse is not
 // populated.
 func (c *client) ListController(p *params.ListController) (*params.ListControllerResponse, error) {
 	var r *params.ListControllerResponse
@@ -154,13 +114,6 @@ func (c *client) ListController(p *params.ListController) (*params.ListControlle
 // explicitly.
 func (c *client) ListModels(p *params.ListModels) (*params.ListModelsResponse, error) {
 	var r *params.ListModelsResponse
-	err := c.Client.Call(p, &r)
-	return r, err
-}
-
-// ListTemplates returns information on all accessible templates.
-func (c *client) ListTemplates(p *params.ListTemplates) (*params.ListTemplatesResponse, error) {
-	var r *params.ListTemplatesResponse
 	err := c.Client.Call(p, &r)
 	return r, err
 }
@@ -192,14 +145,6 @@ func (c *client) SetControllerPerm(p *params.SetControllerPerm) error {
 // on an an entity. The owner can always read an entity, even
 // if it has empty ACL.
 func (c *client) SetModelPerm(p *params.SetModelPerm) error {
-	return c.Client.Call(p, nil)
-}
-
-// SetTemplatePerm sets the permissions on a template entity.
-// Only the owner (arg.EntityPath.User) can change the permissions
-// on an entity. The owner can always read an entity, even
-// if it has an empty ACL.
-func (c *client) SetTemplatePerm(p *params.SetTemplatePerm) error {
 	return c.Client.Call(p, nil)
 }
 

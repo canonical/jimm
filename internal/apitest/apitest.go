@@ -173,7 +173,7 @@ var dummyModelConfig = map[string]interface{}{
 // CreateModel creates a new model with the specified path on the
 // specified controller, using the specified templates. It returns the
 // new model's path, user and uuid.
-func (s *Suite) CreateModel(c *gc.C, path, ctlPath params.EntityPath, templates ...params.EntityPath) (modelPath params.EntityPath, user, uuid string) {
+func (s *Suite) CreateModel(c *gc.C, path, ctlPath params.EntityPath) (modelPath params.EntityPath, user, uuid string) {
 	// Note that because the cookies acquired in this request don't
 	// persist, the discharge macaroon we get won't affect subsequent
 	// requests in the caller.
@@ -183,7 +183,6 @@ func (s *Suite) CreateModel(c *gc.C, path, ctlPath params.EntityPath, templates 
 			Name:          path.Name,
 			Controller:    &ctlPath,
 			Config:        dummyModelConfig,
-			TemplatePaths: templates,
 		},
 	})
 	c.Assert(err, gc.IsNil)
