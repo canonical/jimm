@@ -4,6 +4,7 @@ package jujuapi
 
 import (
 	"reflect"
+	"sort"
 
 	"github.com/juju/juju/apiserver/common"
 	"github.com/juju/juju/apiserver/observer"
@@ -28,13 +29,13 @@ import (
 var logger = loggo.GetLogger("jem.internal.jujuapi")
 
 // mapError maps JEM errors to errors suitable for use with the juju API.
-func mapError(err error) error {
+func mapError(err error) *jujuparams.Error {
 	if err == nil {
 		return nil
 	}
 	logger.Debugf("error: %s\n details: %s", err.Error(), errgo.Details(err))
-	if _, ok := err.(*jujuparams.Error); ok {
-		return err
+	if perr, ok := err.(*jujuparams.Error); ok {
+		return perr
 	}
 	msg := err.Error()
 	code := ""
@@ -46,6 +47,18 @@ func mapError(err error) error {
 		Message: msg,
 		Code:    code,
 	}
+}
+
+type facade struct {
+	name    string
+	version int
+}
+
+// facades contains the list of facade versions supported by this API.
+var facades = map[facade]string{
+	facade{"Admin", 3}:        "Admin",
+	facade{"Cloud", 1}:        "Cloud",
+	facade{"ModelManager", 2}: "ModelManager",
 }
 
 // newWSServer creates a new WebSocket server suitible for handling the API for modelUUID.
@@ -73,7 +86,9 @@ func (h *wsHandler) handle(wsConn *websocket.Conn) {
 	codec := jsoncodec.NewWebsocket(wsConn)
 	h.conn = rpc.NewConn(codec, observer.None())
 
-	h.conn.ServeFinder(h, mapError)
+	h.conn.ServeFinder(h, func(err error) error {
+		return mapError(err)
+	})
 	h.conn.Start()
 	select {
 	case <-h.conn.Dead():
@@ -81,6 +96,9 @@ func (h *wsHandler) handle(wsConn *websocket.Conn) {
 	h.conn.Close()
 }
 
+// resolveUUID finds the JEM model from the UUID that was specified in
+// the URL path and sets h.model and h.controller appropriately from
+// that.
 func (h *wsHandler) resolveUUID() error {
 	if h.modelUUID == "" {
 		return nil
@@ -94,6 +112,7 @@ func (h *wsHandler) resolveUUID() error {
 	return errgo.Mask(err)
 }
 
+// FindMethod implements rpcreflect.MethodFinder.
 func (h *wsHandler) FindMethod(rootName string, version int, methodName string) (rpcreflect.MethodCaller, error) {
 	if h.model == nil || h.controller == nil {
 		if err := h.resolveUUID(); err != nil {
@@ -113,11 +132,9 @@ func (h *wsHandler) FindMethod(rootName string, version int, methodName string) 
 		}
 	}
 
-	switch {
-	case rootName == "Admin" && version == 3:
-		return rpcreflect.ValueOf(reflect.ValueOf(adminRoot{h})).FindMethod("Admin", 0, methodName)
-	case rootName == "Cloud" && version == 1:
-		return rpcreflect.ValueOf(reflect.ValueOf(cloudRoot{h})).FindMethod("Cloud", 0, methodName)
+	if rn := facades[facade{rootName, version}]; rn != "" {
+		// TODO(rogpeppe) avoid doing all this reflect code on every RPC call.
+		return rpcreflect.ValueOf(reflect.ValueOf(root{h})).FindMethod(rn, 0, methodName)
 	}
 
 	return nil, &rpcreflect.CallNotImplementedError{
@@ -126,18 +143,40 @@ func (h *wsHandler) FindMethod(rootName string, version int, methodName string) 
 	}
 }
 
-type adminRoot struct {
+// root contains the root of the api handlers.
+type root struct {
 	h *wsHandler
 }
 
-func (a adminRoot) Admin(id string) (admin, error) {
+// Admin returns an implementation of the Admin facade (version 3).
+func (r root) Admin(id string) (admin, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
 		return admin{}, common.ErrBadId
 	}
-	return admin{a.h}, nil
+	return admin{r.h}, nil
 }
 
+// Cloud returns an implementation of the Cloud facade (version 1).
+func (r root) Cloud(id string) (cloud, error) {
+	if id != "" {
+		// Safeguard id for possible future use.
+		return cloud{}, common.ErrBadId
+	}
+	return cloud{r.h}, nil
+}
+
+// ModelManager returns an implementation of the ModelManager facade
+// (version 2).
+func (r root) ModelManager(id string) (modelManager, error) {
+	if id != "" {
+		// Safeguard id for possible future use.
+		return modelManager{}, common.ErrBadId
+	}
+	return modelManager{r.h}, nil
+}
+
+// admin implements the Admin facade.
 type admin struct {
 	h *wsHandler
 }
@@ -184,18 +223,40 @@ func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResultV1, err
 		// TODO(mhilton) Add user info
 		ModelTag:      modelTag,
 		ControllerTag: controllerTag,
-		Facades: []jujuparams.FacadeVersions{{
-			Name:     "Cloud",
-			Versions: []int{1},
-		}},
+		Facades:       facadeVersions(),
 		ServerVersion: "2.0.0",
 	}, nil
+}
+
+// facadeVersions creates a list of facadeVersions as specified in
+// facades.
+func facadeVersions() []jujuparams.FacadeVersions {
+	names := make([]string, 0, len(facades))
+	versions := make(map[string][]int, len(facades))
+	for k := range facades {
+		vs, ok := versions[k.name]
+		if !ok {
+			names = append(names, k.name)
+		}
+		versions[k.name] = append(vs, k.version)
+	}
+	sort.Strings(names)
+	fvs := make([]jujuparams.FacadeVersions, len(names))
+	for i, name := range names {
+		vs := versions[name]
+		sort.Ints(vs)
+		fvs[i] = jujuparams.FacadeVersions{
+			Name:     name,
+			Versions: vs,
+		}
+	}
+	return fvs
 }
 
 // RedirectInfo implements the RedirectInfo method on the Admin facade.
 func (a admin) RedirectInfo() (jujuparams.RedirectInfoResult, error) {
 	if a.h.jem.Auth.Username == "" {
-		return jujuparams.RedirectInfoResult{}, params.ErrUnauthorized
+		return jujuparams.RedirectInfoResult{}, errgo.WithCausef(nil, params.ErrUnauthorized, "")
 	}
 	if a.h.modelUUID == "" {
 		return jujuparams.RedirectInfoResult{}, errgo.New("not redirected")
@@ -217,23 +278,12 @@ func (a admin) RedirectInfo() (jujuparams.RedirectInfoResult, error) {
 	}, nil
 }
 
-type cloudRoot struct {
-	h *wsHandler
-}
-
-func (c cloudRoot) Cloud(id string) (cloud, error) {
-	if id != "" {
-		// Safeguard id for possible future use.
-		return cloud{}, common.ErrBadId
-	}
-	return cloud{c.h}, nil
-}
-
 // cloud implements the Cloud facade.
 type cloud struct {
 	h *wsHandler
 }
 
+// Cloud implements the Cloud method of the Cloud facade.
 func (c cloud) Cloud() (jujuparams.Cloud, error) {
 	conn, err := c.h.jem.OpenAPI(c.h.model.Path)
 	if err != nil {
@@ -248,6 +298,7 @@ func (c cloud) Cloud() (jujuparams.Cloud, error) {
 	return resp, nil
 }
 
+// Credentials implements the Credentials method of the Cloud facade.
 func (c cloud) Credentials(entities jujuparams.Entities) (jujuparams.CloudCredentialsResults, error) {
 	results := make([]jujuparams.CloudCredentialsResult, len(entities.Entities))
 	for i, ent := range entities.Entities {
@@ -255,14 +306,14 @@ func (c cloud) Credentials(entities jujuparams.Entities) (jujuparams.CloudCreden
 		if err != nil {
 			err = errgo.WithCausef(err, params.ErrBadRequest, "")
 			results[i] = jujuparams.CloudCredentialsResult{
-				Error: mapError(err).(*jujuparams.Error),
+				Error: mapError(err),
 			}
 			continue
 		}
 		creds, err := c.credentials(owner.Id())
 		if err != nil {
 			results[i] = jujuparams.CloudCredentialsResult{
-				Error: mapError(err).(*jujuparams.Error),
+				Error: mapError(err),
 			}
 			continue
 		}
@@ -282,6 +333,7 @@ func (c cloud) Credentials(entities jujuparams.Entities) (jujuparams.CloudCreden
 	}, nil
 }
 
+// credentials retrieves the credentials stored for owner.
 func (c cloud) credentials(owner string) ([]mongodoc.Credential, error) {
 	it := c.h.jem.CanReadIter(c.h.jem.DB.Credentials().Find(bson.D{{"path.user", owner}}).Iter())
 	defer it.Close()
@@ -293,25 +345,27 @@ func (c cloud) credentials(owner string) ([]mongodoc.Credential, error) {
 	return creds, it.Close()
 }
 
+// UpdateCredentials implements the UpdateCredentials method of the Cloud
+// facade.
 func (c cloud) UpdateCredentials(args jujuparams.UsersCloudCredentials) (jujuparams.ErrorResults, error) {
 	results := make([]jujuparams.ErrorResult, len(args.Users))
 	for i, ucc := range args.Users {
 		username, creds, err := c.parseCredentials(ucc)
 		if err != nil {
 			results[i] = jujuparams.ErrorResult{
-				Error: mapError(err).(*jujuparams.Error),
+				Error: mapError(err),
 			}
 			continue
 		}
 		if err := c.h.jem.CheckACL([]string{username}); err != nil {
 			results[i] = jujuparams.ErrorResult{
-				Error: mapError(err).(*jujuparams.Error),
+				Error: mapError(err),
 			}
 			continue
 		}
 		if err := c.updateCredentials(creds); err != nil {
 			results[i] = jujuparams.ErrorResult{
-				Error: mapError(err).(*jujuparams.Error),
+				Error: mapError(err),
 			}
 		}
 	}
@@ -354,4 +408,98 @@ func (c cloud) updateCredentials(creds []mongodoc.Credential) error {
 		}
 	}
 	return nil
+}
+
+// modelManager implements the ModelManager facade.
+type modelManager struct {
+	h *wsHandler
+}
+
+// ListModels returns the models that the authenticated user
+// has access to. The user parameter is ignored.
+func (m modelManager) ListModels(_ jujuparams.Entity) (jujuparams.UserModelList, error) {
+	var models []jujuparams.UserModel
+
+	it := m.h.jem.CanReadIter(m.h.jem.DB.Models().Find(nil).Sort("_id").Iter())
+
+	var model mongodoc.Model
+	for it.Next(&model) {
+		models = append(models, jujuparams.UserModel{
+			Model: jujuparams.Model{
+				Name:     string(model.Path.Name),
+				UUID:     model.UUID,
+				OwnerTag: names.NewUserTag(string(model.Path.User)).String(),
+			},
+			LastConnection: nil, // TODO (mhilton) work out how to record and set this.
+		})
+	}
+	if err := it.Err(); err != nil {
+		return jujuparams.UserModelList{}, errgo.Mask(err)
+	}
+	return jujuparams.UserModelList{
+		UserModels: models,
+	}, nil
+}
+
+// ModelInfo implements the ModelManager facade's ModelInfo method.
+func (m modelManager) ModelInfo(args jujuparams.Entities) (jujuparams.ModelInfoResults, error) {
+	results := make([]jujuparams.ModelInfoResult, len(args.Entities))
+
+	// TODO (mhilton) get information for all of the models connected
+	// to a single controller in one go.
+	for i, arg := range args.Entities {
+		mi, err := m.modelInfo(arg)
+		if err != nil {
+			results[i].Error = mapError(err)
+			continue
+		}
+		results[i].Result = mi
+	}
+
+	return jujuparams.ModelInfoResults{
+		Results: results,
+	}, nil
+}
+
+// modelInfo retrieves the model information for the specified entity.
+func (m modelManager) modelInfo(arg jujuparams.Entity) (*jujuparams.ModelInfo, error) {
+	tag, err := names.ParseModelTag(arg.Tag)
+	if err != nil {
+		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
+	}
+	model, err := m.h.jem.ModelFromUUID(tag.Id())
+	if err != nil {
+		if errgo.Cause(err) == params.ErrNotFound {
+			return nil, errgo.WithCausef(err, params.ErrUnauthorized, "")
+		}
+		return nil, errgo.Mask(err)
+	}
+	if err := m.h.jem.CheckCanRead(model); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	conn, err := m.h.jem.OpenAPI(model.Path)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	req := jujuparams.Entities{
+		Entities: []jujuparams.Entity{arg},
+	}
+	var resp jujuparams.ModelInfoResults
+	if err := conn.APICall("ModelManager", 2, "", "ModelInfo", req, &resp); err != nil {
+		return nil, errgo.Mask(err)
+	}
+	if len(resp.Results) != 1 {
+		logger.Infof("unexpectedly got %d results from controller", len(resp.Results))
+		return nil, errgo.New("unexpected number of resuts from controller")
+	}
+	mi, jerr := resp.Results[0].Result, resp.Results[0].Error
+	if jerr != nil {
+		return nil, errgo.Mask(err, errgo.Any)
+	}
+	mi.Name = string(model.Path.Name)
+	// TODO (mhilton) set the controller UUID to be the UUID of jimm.
+	// TODO (mhilton) set the Cloud credential to be the name stored locally.
+	mi.OwnerTag = names.NewUserTag(string(model.Path.User)).String()
+	mi.Users = nil //TODO (mhilton) set this as appropriate
+	return mi, nil
 }

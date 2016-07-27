@@ -496,7 +496,6 @@ func (j *JEM) OpenAPIFromDocs(m *mongodoc.Model, ctl *mongodoc.Controller) (*api
 	})
 }
 
-
 // ControllerLocationQuery returns a mongo query that iterates through
 // all the public controllers matching the given location attributes,
 // including unavailable controllers only if includeUnavailable is true.
@@ -757,6 +756,18 @@ func (j *JEM) Credential(path params.EntityPath) (*mongodoc.Credential, error) {
 	return &cred, nil
 }
 
+// SetACL sets the ACL for the path document in c to be equal to acl.
+func (j *JEM) SetACL(c *mgo.Collection, path params.EntityPath, acl params.ACL) error {
+	err := c.UpdateId(path.String(), bson.D{{"$set", bson.D{{"acl", acl}}}})
+	if err == nil {
+		return nil
+	}
+	if err == mgo.ErrNotFound {
+		return errgo.WithCausef(nil, params.ErrNotFound, "%q not found", path)
+	}
+	return errgo.Notef(err, "cannot update ACL on %q", path)
+}
+
 // Database wraps an mgo.DB ands adds a few convenience methods.
 type Database struct {
 	*mgo.Database
@@ -831,4 +842,9 @@ func validateLocationAttrs(attrs map[string]string) error {
 		}
 	}
 	return nil
+}
+
+// ModelName creates a valid model name for the model specified by path.
+func ModelName(path params.EntityPath) string {
+	return fmt.Sprintf("%s--%s", path.User, path.Name)
 }
