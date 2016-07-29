@@ -48,33 +48,26 @@ func (s *locationsSuite) TestSuccess(c *gc.C) {
 		c.Assert(stderr, gc.Equals, "")
 	}
 
-	// Add some controllers.
-	addController("bob/c1", "--public", "cloud=aws", "region=us-east-1")
-	addController("bob/c2", "--public", "cloud=aws", "region=us-east-1")
-	addController("bob/c3", "--public", "cloud=aws", "region=us-east-1", "staging=true")
-	addController("bob/c4", "--public", "cloud=aws", "region=eu-west-1")
-	addController("bob/c5", "--public", "cloud=aws", "region=eu-west-1")
-	addController("bob/c6", "--public", "cloud=azure", "region=somewhere")
+	// Add a controller.
+	addController("bob/c1", "--public")
 
 	stdout, stderr, code := run(c, c.MkDir(), "locations")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stderr, gc.Equals, "")
 
+	c.Logf("stdout: %q", stdout)
 	c.Assert(sanitizeTable(stdout), gc.Equals, `
-CLOUD REGION STAGING
-aws eu-west-1
-aws us-east-1
-aws us-east-1 true
-azure somewhere
+CLOUD
+dummy
 `[1:])
 
 	// Check it works with filters.
-	stdout, stderr, code = run(c, c.MkDir(), "locations", "cloud=azure")
+	stdout, stderr, code = run(c, c.MkDir(), "locations", "cloud=dummy")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stderr, gc.Equals, "")
 	c.Assert(sanitizeTable(stdout), gc.Equals, `
-CLOUD REGION
-azure somewhere
+CLOUD
+dummy
 `[1:])
 
 	// Check it's ok with a filter that doesn't match anything.

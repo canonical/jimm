@@ -13,7 +13,6 @@ import (
 	"github.com/juju/errors"
 	"github.com/juju/idmclient/idmtest"
 	"github.com/juju/juju/api"
-	"github.com/juju/juju/environs/config"
 	"github.com/juju/juju/juju"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	"github.com/juju/juju/jujuclient"
@@ -114,11 +113,20 @@ var dummyEnvConfig = map[string]interface{}{
 	"controller":      true,
 }
 
-func (s *commonSuite) addEnv(c *gc.C, pathStr, srvPathStr string) {
+func (s *commonSuite) addEnv(c *gc.C, pathStr, srvPathStr, credName string) {
 	var path, srvPath params.EntityPath
 	err := path.UnmarshalText([]byte(pathStr))
 	c.Assert(err, gc.IsNil)
 	err = srvPath.UnmarshalText([]byte(srvPathStr))
+	c.Assert(err, gc.IsNil)
+
+	err = s.jemClient(string(path.User)).UpdateCredential(&params.UpdateCredential{
+		EntityPath: params.EntityPath{path.User, params.Name(credName)},
+		Cloud:      "dummy",
+		Credential: params.Credential{
+			AuthType: "empty",
+		},
+	})
 	c.Assert(err, gc.IsNil)
 
 	_, err = s.jemClient(string(path.User)).NewModel(&params.NewModel{
@@ -126,6 +134,7 @@ func (s *commonSuite) addEnv(c *gc.C, pathStr, srvPathStr string) {
 		Info: params.NewModelInfo{
 			Name:       path.Name,
 			Controller: &srvPath,
+			Credential: params.Name(credName),
 			Config:     dummyEnvConfig,
 		},
 	})
@@ -140,27 +149,19 @@ func (s *commonSuite) clearCookies(c *gc.C) {
 func newAPIConnectionParams(
 	store jujuclient.ClientStore,
 	controllerName,
-	accountName,
 	modelName string,
 	bakery *httpbakery.Client,
 ) (juju.NewAPIConnectionParams, error) {
 	if controllerName == "" {
 		return juju.NewAPIConnectionParams{}, errgo.New("no controller name")
 	}
-	if accountName == "" {
-		var err error
-		accountName, err = store.CurrentAccount(controllerName)
-		if err != nil {
-			return juju.NewAPIConnectionParams{}, errors.Mask(err)
-		}
-	}
-	accountDetails, err := store.AccountByName(controllerName, accountName)
+	accountDetails, err := store.AccountDetails(controllerName)
 	if err != nil {
 		return juju.NewAPIConnectionParams{}, errors.Mask(err)
 	}
 	var modelUUID string
 	if modelName != "" {
-		modelDetails, err := store.ModelByName(controllerName, accountName, modelName)
+		modelDetails, err := store.ModelByName(controllerName, modelName)
 		if err != nil {
 			return juju.NewAPIConnectionParams{}, errors.Trace(err)
 		}
@@ -171,9 +172,6 @@ func newAPIConnectionParams(
 	return juju.NewAPIConnectionParams{
 		Store:          store,
 		ControllerName: controllerName,
-		BootstrapConfig: func(string) (*config.Config, error) {
-			return nil, errors.NotFoundf("bootstrap configuration")
-		},
 		AccountDetails: accountDetails,
 		ModelUUID:      modelUUID,
 		DialOpts:       dialOpts,

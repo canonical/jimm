@@ -238,15 +238,6 @@ func (j *JEM) Close() {
 // If the provided documents aren't valid, AddController with return
 // an error with a params.ErrBadRequest cause.
 func (j *JEM) AddController(ctl *mongodoc.Controller, m *mongodoc.Model) error {
-	if err := validateLocationAttrs(ctl.Location); err != nil {
-		return errgo.WithCausef(err, params.ErrBadRequest, "bad controller location")
-	}
-	// Remove any empty location attributes.
-	for attr, val := range ctl.Location {
-		if val == "" {
-			delete(ctl.Location, attr)
-		}
-	}
 	// Insert the model before inserting the controller
 	// to avoid races with other clients creating non-controller
 	// models.
@@ -500,57 +491,19 @@ func (j *JEM) OpenAPIFromDocs(m *mongodoc.Model, ctl *mongodoc.Controller) (*api
 // all the public controllers matching the given location attributes,
 // including unavailable controllers only if includeUnavailable is true.
 // It returns an error if the location attribute keys aren't valid.
-func (j *JEM) ControllerLocationQuery(location map[string]string, includeUnavailable bool) (*mgo.Query, error) {
-	if err := validateLocationAttrs(location); err != nil {
-		return nil, errgo.Notef(err, "bad controller location query")
+func (j *JEM) ControllerLocationQuery(cloud params.Cloud, region string, includeUnavailable bool) (*mgo.Query, error) {
+	q := make(bson.D, 0, 4)
+	if cloud != "" {
+		q = append(q, bson.DocElem{"cloud.name", cloud})
 	}
-	q := make(bson.D, 0, len(location)+2)
-	for attr, val := range location {
-		if val != "" {
-			q = append(q, bson.DocElem{"location." + attr, val})
-		} else {
-			q = append(q, bson.DocElem{"location." + attr, notExistsQuery})
-		}
+	if region != "" {
+		q = append(q, bson.DocElem{"cloud.regions", bson.D{{"$elemMatch", bson.D{{"name", region}}}}})
 	}
 	q = append(q, bson.DocElem{"public", true})
 	if !includeUnavailable {
 		q = append(q, bson.DocElem{"unavailablesince", notExistsQuery})
 	}
 	return j.DB.Controllers().Find(q), nil
-}
-
-// SetControllerLocation updates the attributes associated with the controller's location.
-// Only the owner (arg.EntityPath.User) can change the location attributes
-// on an an entity.
-//
-// If the location attributes are invalid, it returns an error with a params.ErrBadRequest cause.
-func (j *JEM) SetControllerLocation(path params.EntityPath, location map[string]string) error {
-	if err := validateLocationAttrs(location); err != nil {
-		return errgo.WithCausef(err, params.ErrBadRequest, "bad controller location")
-	}
-	set := make(bson.D, 0, len(location))
-	unset := make(bson.D, 0, len(location))
-	for k, v := range location {
-		if v == "" {
-			unset = append(unset, bson.DocElem{"location." + k, v})
-			continue
-		}
-		set = append(set, bson.DocElem{"location." + k, v})
-	}
-	update := make(bson.D, 0, 2)
-	if len(set) > 0 {
-		update = append(update, bson.DocElem{"$set", set})
-	}
-	if len(unset) > 0 {
-		update = append(update, bson.DocElem{"$unset", unset})
-	}
-	if err := j.DB.Controllers().UpdateId(path.String(), update); err != nil {
-		if err == mgo.ErrNotFound {
-			return params.ErrNotFound
-		}
-		return errgo.Notef(err, "cannot update %v", path)
-	}
-	return nil
 }
 
 // SetControllerAvailable marks the given controller as available.
@@ -711,12 +664,10 @@ func apiInfoFromDocs(ctl *mongodoc.Controller, m *mongodoc.Model) *api.Info {
 	}
 }
 
-// AddCredential stores the given credential in the database. If a
+// UpdateCredential stores the given credential in the database. If a
 // credential with the same name exists it is overwritten.
-func (j *JEM) AddCredential(cred *mongodoc.Credential) error {
+func (j *JEM) UpdateCredential(cred *mongodoc.Credential) error {
 	update := bson.D{{
-		"providertype", cred.ProviderType,
-	}, {
 		"type", cred.Type,
 	}, {
 		"label", cred.Label,
@@ -726,12 +677,16 @@ func (j *JEM) AddCredential(cred *mongodoc.Credential) error {
 	if len(cred.ACL.Read) > 0 {
 		update = append(update, bson.DocElem{"acl", cred.ACL})
 	}
-	id := cred.Path.String()
+	id := credentialId(cred.User, cred.Cloud, cred.Name)
 	_, err := j.DB.Credentials().UpsertId(id, bson.D{{
 		"$set", update,
 	}, {
 		"$setOnInsert", bson.D{{
-			"path", cred.Path,
+			"user", cred.User,
+		}, {
+			"cloud", cred.Cloud,
+		}, {
+			"name", cred.Name,
 		}},
 	}})
 	if err != nil {
@@ -740,12 +695,11 @@ func (j *JEM) AddCredential(cred *mongodoc.Credential) error {
 	return nil
 }
 
-// Credential gets the credential with the specified path. If the
-// credential cannot be found the returned error will have a cause of
-// params.ErrNotFound.
-func (j *JEM) Credential(path params.EntityPath) (*mongodoc.Credential, error) {
+// Credential gets the specified credential. If the credential cannot be
+// found the returned error will have a cause of params.ErrNotFound.
+func (j *JEM) Credential(user params.User, cloud params.Cloud, name params.Name) (*mongodoc.Credential, error) {
 	var cred mongodoc.Credential
-	id := path.String()
+	id := credentialId(user, cloud, name)
 	err := j.DB.Credentials().FindId(id).One(&cred)
 	if err == mgo.ErrNotFound {
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", id)
@@ -754,6 +708,12 @@ func (j *JEM) Credential(path params.EntityPath) (*mongodoc.Credential, error) {
 		return nil, errgo.Notef(err, "cannot get credential %q", id)
 	}
 	return &cred, nil
+}
+
+// credentialId calculates the id for a credential with the specified
+// user, cloud and name.
+func credentialId(user params.User, cloud params.Cloud, name params.Name) string {
+	return fmt.Sprintf("%s/%s/%s", user, cloud, name)
 }
 
 // SetACL sets the ACL for the path document in c to be equal to acl.
@@ -766,6 +726,19 @@ func (j *JEM) SetACL(c *mgo.Collection, path params.EntityPath, acl params.ACL) 
 		return errgo.WithCausef(nil, params.ErrNotFound, "%q not found", path)
 	}
 	return errgo.Notef(err, "cannot update ACL on %q", path)
+}
+
+type NewModelParams struct {
+	Path            params.EntityPath
+	ControllerPath  params.EntityPath
+	CredentialsPath params.EntityPath
+	Cloud           string
+	CloudRegion     string
+}
+
+// NewModel creates a new model based on params.
+func (j *JEM) NewModel(params NewModelParams) (*mongodoc.Model, error) {
+	return nil, nil
 }
 
 // Database wraps an mgo.DB ands adds a few convenience methods.

@@ -5,9 +5,8 @@ package modelcmd
 import (
 	"github.com/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
-	"github.com/juju/juju/environs"
+	"github.com/juju/juju/environs/bootstrap"
 	"github.com/juju/juju/jujuclient"
-	"github.com/juju/utils/keyvalues"
 	"gopkg.in/errgo.v1"
 	"launchpad.net/gnuflag"
 
@@ -19,7 +18,6 @@ type addControllerCommand struct {
 
 	controllerName string
 	controllerPath entityPathValue
-	attributes     map[string]string
 	public         bool
 }
 
@@ -37,23 +35,12 @@ that will be given to the controller inside the managing server.
 This will also be added as a model, so the
 commands which refer to a model
 can also use the controller name.
-Some key value pair could be specify like cloud=aws be be set directly
-on the location information of the controller.
-
-The location of the controller can be set by providing a set of key=value
-pairs as additional arguments, for example:
- 
-     jaas model add-controller --public alice/mycontroller cloud=aws region=us-east-1
-
-Without the --public flag, the location will not cause the controller
-to be considered a candidate for selection by location - the location
-is for annotation only in this case (this might change).
 `
 
 func (c *addControllerCommand) Info() *cmd.Info {
 	return &cmd.Info{
 		Name:    "add-controller",
-		Args:    "<user>/<name> key=value [key=value...]",
+		Args:    "<user>/<name>",
 		Purpose: "Add a controller to the managing server.",
 		Doc:     addControllerDoc,
 	}
@@ -67,17 +54,12 @@ func (c *addControllerCommand) SetFlags(f *gnuflag.FlagSet) {
 }
 
 func (c *addControllerCommand) Init(args []string) error {
-	if len(args) < 1 {
+	if len(args) != 1 {
 		return errgo.Newf("got %d arguments, want 1", len(args))
 	}
 	if err := c.controllerPath.Set(args[0]); err != nil {
 		return errgo.Mask(err)
 	}
-	attrs, err := keyvalues.Parse(args[1:], false)
-	if err != nil {
-		return errgo.Mask(err)
-	}
-	c.attributes = attrs
 	return nil
 }
 
@@ -109,7 +91,6 @@ func (c *addControllerCommand) Run(ctxt *cmd.Context) error {
 			ControllerUUID: info.controller.ControllerUUID,
 			User:           info.account.User,
 			Password:       info.account.Password,
-			Location:       c.attributes,
 			Public:         c.public,
 		},
 	}); err != nil {
@@ -133,13 +114,9 @@ func getControllerInfo(controllerName string) (*controllerInfo, error) {
 			return nil, errgo.Mask(err)
 		}
 	}
-	accountName, err := store.CurrentAccount(controllerName)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
 
 	var info controllerInfo
-	info.model, err = store.ModelByName(controllerName, accountName, environs.ControllerModelName)
+	info.model, err = store.ModelByName(controllerName, bootstrap.ControllerModelName)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -147,7 +124,7 @@ func getControllerInfo(controllerName string) (*controllerInfo, error) {
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	info.account, err = store.AccountByName(controllerName, accountName)
+	info.account, err = store.AccountDetails(controllerName)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}

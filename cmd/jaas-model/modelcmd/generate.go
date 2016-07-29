@@ -17,9 +17,9 @@ import (
 type generateCommand struct {
 	commandBase
 
-	srvPath       entityPathValue
-	attrs         map[string]string
-	output        string
+	srvPath entityPathValue
+	attrs   map[string]string
+	output  string
 }
 
 func newGenerateCommand() cmd.Command {
@@ -77,6 +77,7 @@ func (c *generateCommand) Run(ctxt *cmd.Context) error {
 	rootSchema := controllerInfo.Schema
 	scCtxt := schemaContext{
 		providerType: controllerInfo.ProviderType,
+		cmdContext:   ctxt,
 	}
 	if scCtxt.providerType == "local" {
 		// We have no way of deciding on the default value

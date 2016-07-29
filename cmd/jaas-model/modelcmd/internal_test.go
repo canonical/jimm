@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/juju/cmd"
 	"github.com/juju/juju/juju/osenv"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	jc "github.com/juju/testing/checkers"
@@ -465,6 +466,10 @@ func (s *internalSuite) TestGenerateConfig(c *gc.C) {
 			knownAttrs:   config,
 			modelName:    test.modelName,
 			providerType: test.controllerInfo.ProviderType,
+			cmdContext: &cmd.Context{
+				Stdout: ioutil.Discard,
+				Stderr: ioutil.Discard,
+			},
 		}
 		resultConfig, err := ctxt.generateConfig(test.controllerInfo.Schema)
 		if test.expectError != "" {

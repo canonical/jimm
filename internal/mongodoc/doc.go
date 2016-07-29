@@ -6,8 +6,6 @@ import (
 	"encoding/base64"
 	"time"
 
-	"gopkg.in/juju/environschema.v1"
-
 	"github.com/CanonicalLtd/jem/params"
 )
 
@@ -52,18 +50,14 @@ type Controller struct {
 	// only the controller document.
 	UUID string
 
-	// Location holds the location attributes associated with the controller.
-	Location map[string]string
-
 	// Public specifies whether the controller is considered
 	// part of the "pool" of publicly available controllers.
 	// Non-public controllers will be ignored when selecting
 	// controllers by location.
 	Public bool `bson:",omitempty"`
 
-	// ProviderType holds the type of the juju provider that the
-	// controller is using.
-	ProviderType string
+	// Cloud holds the details of the cloud provided by this controller.
+	Cloud Cloud
 
 	// MonitorLeaseOwner holds the name of the agent
 	// currently responsible for monitoring the controller.
@@ -80,6 +74,14 @@ type Controller struct {
 	// as available; otherwise it holds the time when it became
 	// unavailable.
 	UnavailableSince time.Time `bson:",omitempty"`
+}
+
+func (s *Controller) Owner() params.User {
+	return s.Path.User
+}
+
+func (s *Controller) GetACL() params.ACL {
+	return s.ACL
 }
 
 // ControllerStats holds statistics about a controller.
@@ -102,14 +104,46 @@ type UserInfo struct {
 	Password string
 }
 
-func (s *Controller) Owner() params.User {
-	return s.Path.User
+// Cloud holds the details of a cloud provided by a controller.
+type Cloud struct {
+	// Name holds the name of the cloud.
+	Name params.Cloud
+
+	// ProviderType holds the type of cloud.
+	ProviderType string
+
+	// Authtypes holds the set of allowed authtypes for use with this
+	// cloud.
+	AuthTypes []string
+
+	// Endpoint contains the endpoint paramter specified by the
+	// controller.
+	Endpoint string
+
+	// StorageEndpoint contains the stroage endpoint paramter
+	// specified by the controller.
+	StorageEndpoint string
+
+	// Regions contains the details of the set of regions supported
+	// by the controller. Note: some providers do not use regions.
+	Regions []Region
 }
 
-func (s *Controller) GetACL() params.ACL {
-	return s.ACL
+// Region holds details of a cloud region supported by a controller.
+type Region struct {
+	// Name holds the name of the region.
+	Name string
+
+	// Endpoint contains the endpoint paramter specified by the
+	// controller.
+	Endpoint string
+
+	// StorageEndpoint contains the stroage endpoint paramter
+	// specified by the controller.
+	StorageEndpoint string
 }
 
+// Model holds information on a given model.
 type Model struct {
 	// Id holds the primary key for an model.
 	// It holds Path.String().
@@ -175,60 +209,22 @@ func (e *Model) GetACL() params.ACL {
 	return e.ACL
 }
 
-type Template struct {
-	// Id holds the primary key for a template.
-	// It holds Path.String().
-	Id string `bson:"_id"`
-
-	// EntityPath holds the local user and name given to the
-	// template, denormalized from Id for convenience
-	// and ease of indexing. Its string value is used as the Id value.
-	Path params.EntityPath
-
-	// ACL holds permissions for the template.
-	ACL params.ACL
-
-	// Schema holds the schema used to create the template.
-	Schema environschema.Fields
-
-	// Config holds the configuration attributes associated with template.
-	Config map[string]interface{}
-
-	// Location holds the location attributes associated with the template.
-	Location map[string]string `bson:",omitempty"`
-
-	// Version holds the version of the template. It is incremented
-	// each time the Config field is set.
-	Version int `bson:",omitempty"`
-
-	// LastUpdated holds when the template configuration was last
-	// updated.
-	LastUpdated time.Time `bson:",omitempty"`
-}
-
-func (t *Template) Owner() params.User {
-	return t.Path.User
-}
-
-func (t *Template) GetACL() params.ACL {
-	return t.ACL
-}
-
 type Credential struct {
 	// Id holds the primary key for a credential.
-	// It holds Path.String().
+	// It holds "<User>/<Cloud>/<Name>"
 	Id string `bson:"_id"`
 
-	// Path holds the local user and name given to the
-	// credential, denormalized from Id for convenience
-	// and ease of indexing. Its string value is used as the Id value.
-	Path params.EntityPath
+	// User holds the username associated with the credential.
+	User params.User
+
+	// Cloud holds the name of the cloud to which this credential belongs.
+	Cloud params.Cloud
+
+	// Name holds the name associated with the credential.
+	Name params.Name
 
 	// ACL holds permissions for the credential.
 	ACL params.ACL
-
-	// ProviderType holds the provider type the credential is for.
-	ProviderType string
 
 	// Type holds the type of credential.
 	Type string
@@ -241,7 +237,7 @@ type Credential struct {
 }
 
 func (c *Credential) Owner() params.User {
-	return c.Path.User
+	return c.User
 }
 
 func (c *Credential) GetACL() params.ACL {

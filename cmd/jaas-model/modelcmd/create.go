@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 
 	"github.com/juju/cmd"
+	"github.com/juju/juju/cmd/juju/common"
 	"github.com/juju/juju/cmd/modelcmd"
-	jujuconfig "github.com/juju/juju/environs/config"
 	"github.com/juju/juju/juju/osenv"
 	"github.com/juju/schema"
 	"github.com/juju/utils"
@@ -29,11 +29,12 @@ import (
 type createCommand struct {
 	commandBase
 
-	ctlPath       entityPathValue
-	modelPath     entityPathValue
-	configFile    string
-	localName     string
-	location      map[string]string
+	ctlPath        entityPathValue
+	modelPath      entityPathValue
+	configFile     string
+	localName      string
+	location       map[string]string
+	credentialName string
 }
 
 func newCreateCommand() cmd.Command {
@@ -65,6 +66,7 @@ func (c *createCommand) SetFlags(f *gnuflag.FlagSet) {
 	f.Var(&c.ctlPath, "c", "controller to create the model in")
 	f.StringVar(&c.configFile, "config", "", "YAML config file containing model configuration")
 	f.StringVar(&c.localName, "local", "", "local name for model (as used for juju switch). Defaults to <modelname>")
+	f.StringVar(&c.credentialName, "credential", "", "name of the credential to use to create the model")
 }
 
 func (c *createCommand) Init(args []string) error {
@@ -112,6 +114,7 @@ func (c *createCommand) Run(ctxt *cmd.Context) error {
 		modelName:    c.modelPath.Name,
 		providerType: providerType,
 		knownAttrs:   config,
+		cmdContext:   ctxt,
 	}
 	config, err = defaultsCtxt.generateConfig(schema)
 	if err != nil {
@@ -129,10 +132,11 @@ func (c *createCommand) Run(ctxt *cmd.Context) error {
 		return client.NewModel(&params.NewModel{
 			User: c.modelPath.User,
 			Info: params.NewModelInfo{
-				Name:          c.modelPath.Name,
-				Controller:    ctlPath,
-				Config:        config,
-				Location:      c.location,
+				Name:       c.modelPath.Name,
+				Controller: ctlPath,
+				Credential: params.Name(c.credentialName),
+				Config:     config,
+				Location:   c.location,
 			},
 		})
 	})
@@ -169,6 +173,7 @@ type schemaContext struct {
 	modelName    params.Name
 	providerType string
 	knownAttrs   map[string]interface{}
+	cmdContext   *cmd.Context
 }
 
 func (ctxt schemaContext) generateConfig(schema environschema.Fields) (map[string]interface{}, error) {
@@ -220,9 +225,9 @@ func (ctxt schemaContext) getVal1(attr form.NamedAttr, checker schema.Checker) (
 	}
 	if attr.Name == "authorized-keys" {
 		path, _ := ctxt.knownAttrs["authorized-keys-path"].(string)
-		keys, err := jujuconfig.ReadAuthorizedKeys(path)
+		keys, err := common.ReadAuthorizedKeys(ctxt.cmdContext, path)
 		if err != nil {
-			if errgo.Cause(err) == jujuconfig.ErrNoAuthorizedKeys {
+			if errgo.Cause(err) == common.ErrNoAuthorizedKeys {
 				return nil, "", nil
 			}
 			return nil, "", errgo.Notef(err, "cannot read authorized keys")

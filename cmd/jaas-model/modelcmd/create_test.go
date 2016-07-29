@@ -69,6 +69,15 @@ func (s *createSuite) TestCreate(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
+	err := s.jemClient("bob").UpdateCredential(&params.UpdateCredential{
+		EntityPath: params.EntityPath{"bob", "cred"},
+		Cloud:      "dummy",
+		Credential: params.Credential{
+			AuthType: "empty",
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
 	configPath := writeConfig(c, map[string]interface{}{
 		"authorized-keys": fakeSSHKey,
 		"controller":      true,
@@ -76,6 +85,7 @@ func (s *createSuite) TestCreate(c *gc.C) {
 	stdout, stderr, code = run(c, c.MkDir(),
 		"create",
 		"-c", "bob/foo",
+		"--credential", "cred",
 		"--config", configPath,
 		"bob/newmodel",
 	)
@@ -87,7 +97,7 @@ func (s *createSuite) TestCreate(c *gc.C) {
 	// through the usual juju connection mechanism.
 	store := jujuclient.NewFileClientStore()
 	params, err := newAPIConnectionParams(
-		store, "jem-foo", "", "newmodel", httpbakery.NewClient(),
+		store, "jem-foo", "newmodel", httpbakery.NewClient(),
 	)
 	c.Assert(err, gc.IsNil)
 	client, err := juju.NewAPIConnection(params)
@@ -101,15 +111,24 @@ func (s *createSuite) TestCreateWithLocation(c *gc.C) {
 
 	// First add the controller that we're going to use
 	// to create the new model.
-	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "--public", "bob/aws", "cloud=aws")
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "--public", "bob/aws")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	stdout, stderr, code = run(c, c.MkDir(), "add-controller", "bob/azure", "cloud=azure")
+	stdout, stderr, code = run(c, c.MkDir(), "add-controller", "bob/azure")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
+
+	err := s.jemClient("bob").UpdateCredential(&params.UpdateCredential{
+		EntityPath: params.EntityPath{"bob", "cred"},
+		Cloud:      "dummy",
+		Credential: params.Credential{
+			AuthType: "empty",
+		},
+	})
+	c.Assert(err, gc.IsNil)
 
 	configPath := writeConfig(c, map[string]interface{}{
 		"authorized-keys": fakeSSHKey,
@@ -118,8 +137,9 @@ func (s *createSuite) TestCreateWithLocation(c *gc.C) {
 	stdout, stderr, code = run(c, c.MkDir(),
 		"create",
 		"--config", configPath,
+		"--credential", "cred",
 		"bob/newmodel",
-		"cloud=aws",
+		"cloud=dummy",
 	)
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
@@ -137,10 +157,19 @@ func (s *createSuite) TestCreateWithLocationWithExistingModel(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 	s.idmSrv.AddUser("bob", "admin")
 
-	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "--public", "bob/aws", "cloud=aws")
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "--public", "bob/aws")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
+
+	err := s.jemClient("bob").UpdateCredential(&params.UpdateCredential{
+		EntityPath: params.EntityPath{"bob", "cred"},
+		Cloud:      "dummy",
+		Credential: params.Credential{
+			AuthType: "empty",
+		},
+	})
+	c.Assert(err, gc.IsNil)
 
 	configPath := writeConfig(c, map[string]interface{}{
 		"authorized-keys": fakeSSHKey,
@@ -149,8 +178,9 @@ func (s *createSuite) TestCreateWithLocationWithExistingModel(c *gc.C) {
 	stdout, stderr, code = run(c, c.MkDir(),
 		"create",
 		"--config", configPath,
+		"--credential", "cred",
 		"bob/newmodel",
-		"cloud=aws",
+		"cloud=dummy",
 	)
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
@@ -163,9 +193,10 @@ func (s *createSuite) TestCreateWithLocationWithExistingModel(c *gc.C) {
 	stdout, stderr, code = run(c, c.MkDir(),
 		"create",
 		"--config", configPath,
+		"--credential", "cred",
 		"--local", "newmodel",
 		"bob/anothermodel",
-		"cloud=aws",
+		"cloud=dummy",
 	)
 	c.Assert(code, gc.Equals, 1, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")

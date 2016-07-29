@@ -1,6 +1,7 @@
 package jem
 
 import (
+	"math/rand"
 	"net/http"
 
 	"github.com/juju/utils"
@@ -12,11 +13,17 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
+	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
 
 const (
 	usernameAttr = "username"
+)
+
+// Functions defined as variables so they can be overridden in tests.
+var (
+	randIntn = rand.Intn
 )
 
 // Authorization contains authorization information extracted from an HTTP request.
@@ -221,4 +228,50 @@ func (iter *CanReadIter) Err() error {
 // because they were unauthorized.
 func (iter *CanReadIter) Count() int {
 	return iter.n
+}
+
+// DoControllers calls the given function for each controller that
+// can be read by the current user that matches the given attributes.
+// If the function returns an error, the iteration stops and
+// DoControllers returns the error with the same cause.
+func (j *JEM) DoControllers(cloud params.Cloud, region string, do func(c *mongodoc.Controller) error) error {
+	// Query all the controllers that match the attributes, building
+	// up all the possible values.
+	q, err := j.ControllerLocationQuery(cloud, region, false)
+	if err != nil {
+		return errgo.WithCausef(err, params.ErrBadRequest, "%s", "")
+	}
+	// Sort by _id so that we can make easily reproducible tests.
+	iter := j.CanReadIter(q.Sort("_id").Iter())
+	var ctl mongodoc.Controller
+	for iter.Next(&ctl) {
+		if err := do(&ctl); err != nil {
+			iter.Close()
+			return errgo.Mask(err, errgo.Any)
+		}
+	}
+	if err := iter.Err(); err != nil {
+		return errgo.Notef(err, "cannot query")
+	}
+	return nil
+}
+
+// SelectController chooses a controller that matches the cloud and region criteria, if specified.
+func (j *JEM) SelectController(cloud params.Cloud, region string) (params.EntityPath, params.Cloud, string, error) {
+	var controllers []mongodoc.Controller
+	err := j.DoControllers(cloud, region, func(c *mongodoc.Controller) error {
+		controllers = append(controllers, *c)
+		return nil
+	})
+	if err != nil {
+		return params.EntityPath{}, "", "", errgo.Mask(err, errgo.Is(params.ErrBadRequest))
+	}
+	if len(controllers) == 0 {
+		return params.EntityPath{}, "", "", errgo.WithCausef(nil, params.ErrNotFound, "no matching controllers found")
+	}
+	// Choose a random controller.
+	// TODO select a controller more intelligently, for example
+	// by choosing the most lightly loaded controller
+	n := randIntn(len(controllers))
+	return controllers[n].Path, params.Cloud(controllers[n].Cloud.Name), region, nil
 }

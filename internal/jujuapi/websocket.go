@@ -284,25 +284,55 @@ type cloud struct {
 }
 
 // Cloud implements the Cloud method of the Cloud facade.
-func (c cloud) Cloud() (jujuparams.Cloud, error) {
-	conn, err := c.h.jem.OpenAPI(c.h.model.Path)
+func (c cloud) Cloud(ents jujuparams.Entities) (jujuparams.CloudResults, error) {
+	cloudResults := make([]jujuparams.CloudResult, len(ents.Entities))
+	for i, ent := range ents.Entities {
+		cloudTag, err := names.ParseCloudTag(ent.Tag)
+		if err != nil {
+			cloudResults[i].Error = mapError(err)
+			continue
+		}
+		cloudInfo, err := c.cloud(cloudTag)
+		if err != nil {
+			cloudResults[i].Error = mapError(err)
+			continue
+		}
+		cloudResults[i].Cloud = cloudInfo
+	}
+	return jujuparams.CloudResults{
+		Results: cloudResults,
+	}, nil
+}
+
+func (c cloud) cloud(cloudTag names.CloudTag) (*jujuparams.Cloud, error) {
+	// TODO(mhilton) maybe do something different when connected to a controller model
+	var cloudInfo jujuparams.Cloud
+	err := c.h.jem.DoControllers(params.Cloud(cloudTag.Id()), "", func(cnt *mongodoc.Controller) error {
+		cloudInfo.Type = cnt.Cloud.ProviderType
+		cloudInfo.AuthTypes = cnt.Cloud.AuthTypes
+		// TODO (mhilton) fill out other fields
+		for _, reg := range cnt.Cloud.Regions {
+			cloudInfo.Regions = append(cloudInfo.Regions, jujuparams.CloudRegion{
+				Name: reg.Name,
+			})
+		}
+		return nil
+	})
 	if err != nil {
-		return jujuparams.Cloud{}, errgo.Mask(err)
+		return nil, errgo.Mask(err)
 	}
-	defer conn.Close()
-	var resp jujuparams.Cloud
-	if err := conn.APICall("Cloud", 1, "", "Cloud", nil, &resp); err != nil {
-		return jujuparams.Cloud{}, errgo.Mask(err, errgo.Any)
+	if cloudInfo.Type == "" {
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "cloud %q not available", cloudTag.Id())
 	}
-	// TODO (mhilton) manipulate the result as required.
-	return resp, nil
+	// TODO (mhilton) ensure list of regions is deterministic.
+	return &cloudInfo, nil
 }
 
 // Credentials implements the Credentials method of the Cloud facade.
-func (c cloud) Credentials(entities jujuparams.Entities) (jujuparams.CloudCredentialsResults, error) {
-	results := make([]jujuparams.CloudCredentialsResult, len(entities.Entities))
-	for i, ent := range entities.Entities {
-		owner, err := names.ParseUserTag(ent.Tag)
+func (c cloud) Credentials(userclouds jujuparams.UserClouds) (jujuparams.CloudCredentialsResults, error) {
+	results := make([]jujuparams.CloudCredentialsResult, len(userclouds.UserClouds))
+	for i, ent := range userclouds.UserClouds {
+		owner, err := names.ParseUserTag(ent.UserTag)
 		if err != nil {
 			err = errgo.WithCausef(err, params.ErrBadRequest, "")
 			results[i] = jujuparams.CloudCredentialsResult{
@@ -310,7 +340,15 @@ func (c cloud) Credentials(entities jujuparams.Entities) (jujuparams.CloudCreden
 			}
 			continue
 		}
-		creds, err := c.credentials(owner.Id())
+		cld, err := names.ParseCloudTag(ent.CloudTag)
+		if err != nil {
+			err = errgo.WithCausef(err, params.ErrBadRequest, "")
+			results[i] = jujuparams.CloudCredentialsResult{
+				Error: mapError(err),
+			}
+			continue
+		}
+		creds, err := c.credentials(owner.Id(), cld.Id())
 		if err != nil {
 			results[i] = jujuparams.CloudCredentialsResult{
 				Error: mapError(err),
@@ -319,8 +357,8 @@ func (c cloud) Credentials(entities jujuparams.Entities) (jujuparams.CloudCreden
 		}
 		cloudCreds := make(map[string]jujuparams.CloudCredential, len(creds))
 		for _, c := range creds {
-			cloudCreds[string(c.Path.Name)] = jujuparams.CloudCredential{
-				AuthType:   c.Type,
+			cloudCreds[string(c.Name)] = jujuparams.CloudCredential{
+				AuthType:   string(c.Type),
 				Attributes: c.Attributes,
 			}
 		}
@@ -333,16 +371,15 @@ func (c cloud) Credentials(entities jujuparams.Entities) (jujuparams.CloudCreden
 	}, nil
 }
 
-// credentials retrieves the credentials stored for owner.
-func (c cloud) credentials(owner string) ([]mongodoc.Credential, error) {
-	it := c.h.jem.CanReadIter(c.h.jem.DB.Credentials().Find(bson.D{{"path.user", owner}}).Iter())
-	defer it.Close()
+// credentials retrieves the credentials stored for given owner and cloud.
+func (c cloud) credentials(owner, cld string) ([]mongodoc.Credential, error) {
+	it := c.h.jem.CanReadIter(c.h.jem.DB.Credentials().Find(bson.D{{"user", owner}, {"cloud", cld}}).Iter())
 	var creds []mongodoc.Credential
 	var cred mongodoc.Credential
 	for it.Next(&cred) {
 		creds = append(creds, cred)
 	}
-	return creds, it.Close()
+	return creds, it.Err()
 }
 
 // UpdateCredentials implements the UpdateCredentials method of the Cloud
@@ -383,6 +420,11 @@ func (c cloud) parseCredentials(ucc jujuparams.UserCloudCredentials) (string, []
 	if err := user.UnmarshalText([]byte(userTag.Id())); err != nil {
 		return "", nil, errgo.WithCausef(err, params.ErrBadRequest, "")
 	}
+	cloudTag, err := names.ParseCloudTag(ucc.CloudTag)
+	if err != nil {
+		return "", nil, errgo.WithCausef(err, params.ErrBadRequest, "")
+	}
+	cld := params.Cloud(cloudTag.Id())
 	creds := make([]mongodoc.Credential, 0, len(ucc.Credentials))
 	for name, cred := range ucc.Credentials {
 		var n params.Name
@@ -391,10 +433,11 @@ func (c cloud) parseCredentials(ucc jujuparams.UserCloudCredentials) (string, []
 			return "", nil, errgo.WithCausef(err, params.ErrBadRequest, "")
 		}
 		creds = append(creds, mongodoc.Credential{
-			Path:         params.EntityPath{user, n},
-			ProviderType: c.h.controller.ProviderType,
-			Type:         cred.AuthType,
-			Attributes:   cred.Attributes,
+			User:       user,
+			Cloud:      cld,
+			Name:       n,
+			Type:       cred.AuthType,
+			Attributes: cred.Attributes,
 		})
 	}
 	return string(user), creds, nil
@@ -402,7 +445,7 @@ func (c cloud) parseCredentials(ucc jujuparams.UserCloudCredentials) (string, []
 
 func (c cloud) updateCredentials(creds []mongodoc.Credential) error {
 	for _, cred := range creds {
-		err := c.h.jem.AddCredential(&cred)
+		err := c.h.jem.UpdateCredential(&cred)
 		if err != nil {
 			return errgo.Mask(err)
 		}

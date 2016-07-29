@@ -125,13 +125,6 @@ func (c *client) NewModel(p *params.NewModel) (*params.ModelResponse, error) {
 	return r, err
 }
 
-// SetControllerLocation updates the attributes associated with the controller's location.
-// Only the owner (arg.EntityPath.User) can change the location attributes
-// on an an entity.
-func (c *client) SetControllerLocation(p *params.SetControllerLocation) error {
-	return c.Client.Call(p, nil)
-}
-
 // SetControllerPerm sets the permissions on a controller entity.
 // Only the owner (arg.EntityPath.User) can change the permissions
 // on an an entity. The owner can always read an entity, even
@@ -145,6 +138,13 @@ func (c *client) SetControllerPerm(p *params.SetControllerPerm) error {
 // on an an entity. The owner can always read an entity, even
 // if it has empty ACL.
 func (c *client) SetModelPerm(p *params.SetModelPerm) error {
+	return c.Client.Call(p, nil)
+}
+
+// UpdateCredential stores the provided credential under the provided,
+// user, cloud and name. If there is already a credential with that name
+// it is overwritten.
+func (c *client) UpdateCredential(p *params.UpdateCredential) error {
 	return c.Client.Call(p, nil)
 }
 

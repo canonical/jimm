@@ -53,8 +53,9 @@ func (s *websocketSuite) TestUnknownModel(c *gc.C) {
 }
 
 func (s *websocketSuite) TestLoginToModel(c *gc.C) {
-	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
-	_, _, modelUUID := s.CreateModel(c, params.EntityPath{User: "test", Name: "model-1"}, ctlPath)
+	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
+	_, _, modelUUID := s.CreateModel(c, params.EntityPath{User: "test", Name: "model-1"}, ctlPath, cred)
 	conn := s.open(c, &api.Info{
 		ModelTag:  names.NewModelTag(modelUUID),
 		SkipLogin: true,
@@ -75,8 +76,9 @@ func (s *websocketSuite) TestLoginToModel(c *gc.C) {
 }
 
 func (s *websocketSuite) TestIncorrectUserFails(c *gc.C) {
-	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
-	_, _, modelUUID := s.CreateModel(c, params.EntityPath{User: "test", Name: "model-1"}, ctlPath)
+	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
+	_, _, modelUUID := s.CreateModel(c, params.EntityPath{User: "test", Name: "model-1"}, ctlPath, cred)
 	conn := s.open(c, &api.Info{
 		ModelTag:  names.NewModelTag(modelUUID),
 		SkipLogin: true,
@@ -87,8 +89,9 @@ func (s *websocketSuite) TestIncorrectUserFails(c *gc.C) {
 }
 
 func (s *websocketSuite) TestRedirectInfoFailsWithoutLogin(c *gc.C) {
-	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
-	_, _, modelUUID := s.CreateModel(c, params.EntityPath{User: "test", Name: "model-1"}, ctlPath)
+	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
+	_, _, modelUUID := s.CreateModel(c, params.EntityPath{User: "test", Name: "model-1"}, ctlPath, cred)
 	conn := s.open(c, &api.Info{
 		ModelTag:  names.NewModelTag(modelUUID),
 		SkipLogin: true,
@@ -100,8 +103,9 @@ func (s *websocketSuite) TestRedirectInfoFailsWithoutLogin(c *gc.C) {
 }
 
 func (s *websocketSuite) TestOldAdminVersionFails(c *gc.C) {
-	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
-	_, _, modelUUID := s.CreateModel(c, params.EntityPath{User: "test", Name: "model-1"}, ctlPath)
+	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
+	_, _, modelUUID := s.CreateModel(c, params.EntityPath{User: "test", Name: "model-1"}, ctlPath, cred)
 	conn := s.open(c, &api.Info{
 		ModelTag:  names.NewModelTag(modelUUID),
 		SkipLogin: true,
@@ -114,8 +118,9 @@ func (s *websocketSuite) TestOldAdminVersionFails(c *gc.C) {
 }
 
 func (s *websocketSuite) TestAdminIDFails(c *gc.C) {
-	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
-	_, _, modelUUID := s.CreateModel(c, params.EntityPath{User: "test", Name: "model-1"}, ctlPath)
+	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
+	_, _, modelUUID := s.CreateModel(c, params.EntityPath{User: "test", Name: "model-1"}, ctlPath, cred)
 	conn := s.open(c, &api.Info{
 		ModelTag:  names.NewModelTag(modelUUID),
 		SkipLogin: true,
@@ -127,7 +132,7 @@ func (s *websocketSuite) TestAdminIDFails(c *gc.C) {
 }
 
 func (s *websocketSuite) TestLoginToController(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, &api.Info{
 		ModelTag:  s.APIInfo(c).ModelTag,
 		SkipLogin: true,
@@ -141,8 +146,9 @@ func (s *websocketSuite) TestLoginToController(c *gc.C) {
 }
 
 func (s *websocketSuite) TestUnimplementedMethodFails(c *gc.C) {
-	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
-	_, _, modelUUID := s.CreateModel(c, params.EntityPath{User: "test", Name: "model-1"}, ctlPath)
+	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
+	_, _, modelUUID := s.CreateModel(c, params.EntityPath{User: "test", Name: "model-1"}, ctlPath, cred)
 	conn := s.open(c, &api.Info{
 		ModelTag:  names.NewModelTag(modelUUID),
 		SkipLogin: true,
@@ -154,7 +160,7 @@ func (s *websocketSuite) TestUnimplementedMethodFails(c *gc.C) {
 }
 
 func (s *websocketSuite) TestUnimplementedRootFails(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, &api.Info{
 		ModelTag: s.APIInfo(c).ModelTag,
 	}, "test")
@@ -165,13 +171,13 @@ func (s *websocketSuite) TestUnimplementedRootFails(c *gc.C) {
 }
 
 func (s *websocketSuite) TestCloudCall(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, &api.Info{
 		ModelTag: s.APIInfo(c).ModelTag,
 	}, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
-	info, err := client.Cloud()
+	info, err := client.Cloud(names.NewCloudTag("dummy"))
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(info, jc.DeepEquals, cloud.Cloud{
 		Type:      "dummy",
@@ -180,12 +186,13 @@ func (s *websocketSuite) TestCloudCall(c *gc.C) {
 }
 
 func (s *websocketSuite) TestCloudCredentials(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
-	s.JEM.AddCredential(&mongodoc.Credential{
-		Path:         params.EntityPath{"test", "cred1"},
-		ProviderType: "dummy",
-		Type:         "credtype",
-		Label:        "Credentials 1",
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	s.JEM.UpdateCredential(&mongodoc.Credential{
+		User:  "test",
+		Cloud: "dummy",
+		Name:  "cred1",
+		Type:  "credtype",
+		Label: "Credentials 1",
 		Attributes: map[string]string{
 			"attr1": "val1",
 			"attr2": "val2",
@@ -196,7 +203,7 @@ func (s *websocketSuite) TestCloudCredentials(c *gc.C) {
 	}, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
-	creds, err := client.Credentials(names.NewUserTag("test"))
+	creds, err := client.Credentials(names.NewUserTag("test"), names.NewCloudTag("dummy"))
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(creds, jc.DeepEquals, map[string]cloud.Credential{
 		"cred1": cloud.NewCredential(
@@ -209,25 +216,27 @@ func (s *websocketSuite) TestCloudCredentials(c *gc.C) {
 }
 
 func (s *websocketSuite) TestCloudCredentialsACL(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
-	s.JEM.AddCredential(&mongodoc.Credential{
-		Path:         params.EntityPath{"test2", "cred1"},
-		ProviderType: "dummy",
-		Type:         "credtype",
-		Label:        "Credentials 1",
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	s.JEM.UpdateCredential(&mongodoc.Credential{
+		User:  "test",
+		Cloud: "dummy",
+		Name:  "cred1",
+		Type:  "credtype",
+		Label: "Credentials 1",
 		Attributes: map[string]string{
 			"attr1": "val1",
 			"attr2": "val2",
 		},
 	})
-	s.JEM.AddCredential(&mongodoc.Credential{
-		Path: params.EntityPath{"test2", "cred2"},
+	s.JEM.UpdateCredential(&mongodoc.Credential{
+		User:  "test2",
+		Cloud: "dummy",
+		Name:  "cred2",
 		ACL: params.ACL{
 			Read: []string{"test"},
 		},
-		ProviderType: "dummy",
-		Type:         "credtype",
-		Label:        "Credentials 2",
+		Type:  "credtype",
+		Label: "Credentials 2",
 		Attributes: map[string]string{
 			"attr1": "val3",
 			"attr2": "val4",
@@ -238,7 +247,7 @@ func (s *websocketSuite) TestCloudCredentialsACL(c *gc.C) {
 	}, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
-	creds, err := client.Credentials(names.NewUserTag("test2"))
+	creds, err := client.Credentials(names.NewUserTag("test2"), names.NewCloudTag("dummy"))
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(creds, jc.DeepEquals, map[string]cloud.Credential{
 		"cred2": cloud.NewCredential(
@@ -251,14 +260,15 @@ func (s *websocketSuite) TestCloudCredentialsACL(c *gc.C) {
 }
 
 func (s *websocketSuite) TestCloudCredentialsErrors(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, &api.Info{
 		ModelTag: s.APIInfo(c).ModelTag,
 	}, "test")
 	defer conn.Close()
-	req := jujuparams.Entities{
-		Entities: []jujuparams.Entity{{
-			Tag: "not-a-user-tag",
+	req := jujuparams.UserClouds{
+		UserClouds: []jujuparams.UserCloud{{
+			UserTag:  "not-a-user-tag",
+			CloudTag: "dummy",
 		}},
 	}
 	var resp jujuparams.CloudCredentialsResults
@@ -269,7 +279,7 @@ func (s *websocketSuite) TestCloudCredentialsErrors(c *gc.C) {
 }
 
 func (s *websocketSuite) TestUpdateCloudCredentials(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, &api.Info{
 		ModelTag: s.APIInfo(c).ModelTag,
 	}, "test")
@@ -279,31 +289,32 @@ func (s *websocketSuite) TestUpdateCloudCredentials(c *gc.C) {
 		"cred3": cloud.NewCredential("credtype", map[string]string{"attr1": "val31", "attr2": "val32"}),
 		"cred4": cloud.NewCredential("credtype2", map[string]string{"attr1": "val41", "attr2": "val42"}),
 	}
-	err := client.UpdateCredentials(names.NewUserTag("test"), credsMap)
+	err := client.UpdateCredentials(names.NewUserTag("test"), names.NewCloudTag("dummy"), credsMap)
 	c.Assert(err, jc.ErrorIsNil)
-	creds, err := client.Credentials(names.NewUserTag("test"))
+	creds, err := client.Credentials(names.NewUserTag("test"), names.NewCloudTag("dummy"))
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(creds, jc.DeepEquals, credsMap)
 	updateMap := map[string]cloud.Credential{
 		"cred3": cloud.NewCredential("credtype", map[string]string{"attr1": "val33", "attr2": "val34"}),
 	}
-	err = client.UpdateCredentials(names.NewUserTag("test"), updateMap)
+	err = client.UpdateCredentials(names.NewUserTag("test"), names.NewCloudTag("dummy"), updateMap)
 	c.Assert(err, jc.ErrorIsNil)
 	credsMap["cred3"] = updateMap["cred3"]
-	creds, err = client.Credentials(names.NewUserTag("test"))
+	creds, err = client.Credentials(names.NewUserTag("test"), names.NewCloudTag("dummy"))
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(creds, jc.DeepEquals, credsMap)
 }
 
 func (s *websocketSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, &api.Info{
 		ModelTag: s.APIInfo(c).ModelTag,
 	}, "test")
 	defer conn.Close()
 	req := jujuparams.UsersCloudCredentials{
 		Users: []jujuparams.UserCloudCredentials{{
-			UserTag: "not-a-user-tag",
+			UserTag:  "not-a-user-tag",
+			CloudTag: names.NewCloudTag("dummy").String(),
 			Credentials: map[string]jujuparams.CloudCredential{
 				"cred1": jujuparams.CloudCredential{
 					AuthType: "credtype",
@@ -313,7 +324,8 @@ func (s *websocketSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
 				},
 			},
 		}, {
-			UserTag: names.NewUserTag("invalid--user").String(),
+			UserTag:  names.NewUserTag("invalid--user").String(),
+			CloudTag: names.NewCloudTag("dummy").String(),
 			Credentials: map[string]jujuparams.CloudCredential{
 				"cred1": jujuparams.CloudCredential{
 					AuthType: "credtype",
@@ -323,7 +335,8 @@ func (s *websocketSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
 				},
 			},
 		}, {
-			UserTag: names.NewUserTag("test2").String(),
+			UserTag:  names.NewUserTag("test2").String(),
+			CloudTag: names.NewCloudTag("dummy").String(),
 			Credentials: map[string]jujuparams.CloudCredential{
 				"cred1": jujuparams.CloudCredential{
 					AuthType: "credtype",
@@ -333,7 +346,8 @@ func (s *websocketSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
 				},
 			},
 		}, {
-			UserTag: names.NewUserTag("test").String(),
+			UserTag:  names.NewUserTag("test").String(),
+			CloudTag: names.NewCloudTag("dummy").String(),
 			Credentials: map[string]jujuparams.CloudCredential{
 				"bad--name": jujuparams.CloudCredential{
 					AuthType: "credtype",
@@ -367,14 +381,16 @@ func (s *websocketSuite) TestLoginToRoot(c *gc.C) {
 }
 
 func (s *websocketSuite) TestListModels(c *gc.C) {
-	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
+	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
+	cred2 := s.AssertUpdateCredential(c, "test2", "dummy", "cred1", "empty")
 	err := s.JEM.SetACL(s.JEM.DB.Controllers(), ctlPath, params.ACL{
 		Read: []string{"test2"},
 	})
 	c.Assert(err, jc.ErrorIsNil)
-	_, _, modelUUID1 := s.CreateModel(c, params.EntityPath{User: "test", Name: "model-1"}, ctlPath)
-	s.CreateModel(c, params.EntityPath{User: "test2", Name: "model-2"}, ctlPath)
-	_, _, modelUUID3 := s.CreateModel(c, params.EntityPath{User: "test2", Name: "model-3"}, ctlPath)
+	_, _, modelUUID1 := s.CreateModel(c, params.EntityPath{User: "test", Name: "model-1"}, ctlPath, cred)
+	s.CreateModel(c, params.EntityPath{User: "test2", Name: "model-2"}, ctlPath, cred2)
+	_, _, modelUUID3 := s.CreateModel(c, params.EntityPath{User: "test2", Name: "model-3"}, ctlPath, cred2)
 	err = s.JEM.SetACL(s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
 		Read: []string{"test"},
 	})
@@ -400,14 +416,16 @@ func (s *websocketSuite) TestListModels(c *gc.C) {
 }
 
 func (s *websocketSuite) TestModelInfo(c *gc.C) {
-	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, nil)
+	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	cred1 := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
+	cred2 := s.AssertUpdateCredential(c, "test2", "dummy", "cred1", "empty")
 	err := s.JEM.SetACL(s.JEM.DB.Controllers(), ctlPath, params.ACL{
 		Read: []string{"test2"},
 	})
 	c.Assert(err, jc.ErrorIsNil)
-	_, _, modelUUID1 := s.CreateModel(c, params.EntityPath{User: "test", Name: "model-1"}, ctlPath)
-	_, _, modelUUID2 := s.CreateModel(c, params.EntityPath{User: "test2", Name: "model-2"}, ctlPath)
-	_, _, modelUUID3 := s.CreateModel(c, params.EntityPath{User: "test2", Name: "model-3"}, ctlPath)
+	_, _, modelUUID1 := s.CreateModel(c, params.EntityPath{User: "test", Name: "model-1"}, ctlPath, cred1)
+	_, _, modelUUID2 := s.CreateModel(c, params.EntityPath{User: "test2", Name: "model-2"}, ctlPath, cred2)
+	_, _, modelUUID3 := s.CreateModel(c, params.EntityPath{User: "test2", Name: "model-3"}, ctlPath, cred2)
 	err = s.JEM.SetACL(s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
 		Read: []string{"test"},
 	})
@@ -433,7 +451,8 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 			ControllerUUID:  "deadbeef-0bad-400d-8000-4b1d0d06f00d",
 			ProviderType:    "dummy",
 			DefaultSeries:   "xenial",
-			CloudCredential: "test-model-1",
+			Cloud:           "dummy",
+			CloudCredential: string(cred1),
 			OwnerTag:        names.NewUserTag("test").String(),
 			Life:            jujuparams.Alive,
 			Status: jujuparams.EntityStatus{
@@ -451,7 +470,8 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 			ControllerUUID:  "deadbeef-0bad-400d-8000-4b1d0d06f00d",
 			ProviderType:    "dummy",
 			DefaultSeries:   "xenial",
-			CloudCredential: "test2-model-3",
+			Cloud:           "dummy",
+			CloudCredential: string(cred2),
 			OwnerTag:        names.NewUserTag("test2").String(),
 			Life:            jujuparams.Alive,
 			Status: jujuparams.EntityStatus{

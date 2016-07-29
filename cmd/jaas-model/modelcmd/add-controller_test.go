@@ -23,24 +23,13 @@ var addControllerTests = []struct {
 	expectLocation map[string]string
 	expectPublic   bool
 }{{
-	about: "simple",
-	args:  []string{},
+	about:          "simple",
+	args:           []string{},
+	expectLocation: map[string]string{"cloud": "dummy"},
 }, {
-	about:          "add cloud",
-	args:           []string{"cloud=aws"},
-	expectLocation: map[string]string{"cloud": "aws"},
-}, {
-	about:          "add region",
-	args:           []string{"region=somewhere"},
-	expectLocation: map[string]string{"region": "somewhere"},
-}, {
-	about:          "add region and cloud",
-	args:           []string{"region=somewhere", "cloud=aws"},
-	expectLocation: map[string]string{"cloud": "aws", "region": "somewhere"},
-}, {
-	about:          "add public region and cloud",
-	args:           []string{"--public", "region=somewhere", "cloud=aws"},
-	expectLocation: map[string]string{"cloud": "aws", "region": "somewhere"},
+	about:          "add public",
+	args:           []string{"--public"},
+	expectLocation: map[string]string{"cloud": "dummy"},
 	expectPublic:   true,
 }}
 
@@ -94,11 +83,6 @@ var addControllerErrorTests = []struct {
 	about:        "invalid name checked by controller",
 	args:         []string{"bad!name/foo"},
 	expectStderr: `invalid entity path "bad!name/foo": invalid user name "bad!name"`,
-	expectCode:   2,
-}, {
-	about:        "invalid key",
-	args:         []string{"bob/foo", "something"},
-	expectStderr: `expected "key=value", got "something"`,
 	expectCode:   2,
 }}
 
