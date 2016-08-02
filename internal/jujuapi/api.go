@@ -13,34 +13,34 @@ import (
 	"github.com/CanonicalLtd/jem/internal/jemserver"
 )
 
-func NewAPIHandler(jp *jem.Pool, _ jemserver.Params) ([]httprequest.Handler, error) {
+func NewAPIHandler(jp *jem.Pool, params jemserver.Params) ([]httprequest.Handler, error) {
 	return []httprequest.Handler{
-		newWebSocketHandler(jp),
-		newRootWebSocketHandler(jp),
+		newWebSocketHandler(jp, params),
+		newRootWebSocketHandler(jp, params),
 	}, nil
 }
 
-func newWebSocketHandler(jp *jem.Pool) httprequest.Handler {
+func newWebSocketHandler(jp *jem.Pool, params jemserver.Params) httprequest.Handler {
 	return httprequest.Handler{
 		Method: "GET",
 		Path:   "/model/:modeluuid/api",
 		Handle: func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 			j := jp.JEM()
 			defer j.Close()
-			wsServer := newWSServer(j, p.ByName("modeluuid"))
+			wsServer := newWSServer(j, params, p.ByName("modeluuid"))
 			wsServer.ServeHTTP(w, r)
 		},
 	}
 }
 
-func newRootWebSocketHandler(jp *jem.Pool) httprequest.Handler {
+func newRootWebSocketHandler(jp *jem.Pool, params jemserver.Params) httprequest.Handler {
 	return httprequest.Handler{
 		Method: "GET",
 		Path:   "/",
 		Handle: func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 			j := jp.JEM()
 			defer j.Close()
-			wsServer := newWSServer(j, "")
+			wsServer := newWSServer(j, params, "")
 			wsServer.ServeHTTP(w, r)
 		},
 	}

@@ -134,7 +134,7 @@ func (s *jujuSuite) TestCreateModel(c *gc.C) {
 		if test.params.Path.Name == "" {
 			test.params.Path.Name = params.Name(fmt.Sprintf("test-%d", i))
 		}
-		m, err := s.store.CreateModel(conn, test.params)
+		m, _, err := s.store.CreateModel(conn, test.params)
 		if test.expectError != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
 			if test.expectErrorCause != nil {

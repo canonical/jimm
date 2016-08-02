@@ -50,3 +50,5 @@ access-log: /var/log/jem/access.log
 #  t301pSeu2d/BAiAK1Xcjuf0sjdzn/u08moeQRnJQ6K7M24V9qiwK//rjCQIhAJt0
 #  RmSbYKRTgEyN9KXSreFEMjfJWdIyjVREGOKhHY92
 #  -----END RSA PRIVATE KEY-----
+controller-uuid: 00000000-0000-0000-0000-000000000001
+default-cloud: aws

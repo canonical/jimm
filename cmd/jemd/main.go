@@ -93,6 +93,8 @@ func serve(confPath string) error {
 		AgentUsername:    conf.AgentUsername,
 		AgentKey:         conf.AgentKey,
 		RunMonitor:       true,
+		ControllerUUID:   conf.ControllerUUID,
+		DefaultCloud:     conf.DefaultCloud,
 	}
 	server, err := jem.NewServer(cfg)
 	if err != nil {

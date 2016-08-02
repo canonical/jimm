@@ -643,7 +643,7 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 	}
 
 	modelPath := params.EntityPath{args.User, args.Info.Name}
-	_, err = h.jem.CreateModel(conn, jem.CreateModelParams{
+	_, _, err = h.jem.CreateModel(conn, jem.CreateModelParams{
 		Path:           modelPath,
 		ControllerPath: ctlPath,
 		Credential:     args.Info.Credential,
