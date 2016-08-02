@@ -1,3 +1,6 @@
 package jem
 
-var RandomPassword = &randomPassword
+var (
+	RandomPassword = &randomPassword
+	RandIntn       = &randIntn
+)

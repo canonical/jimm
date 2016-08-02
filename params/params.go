@@ -10,46 +10,36 @@ import (
 	"gopkg.in/juju/environschema.v1"
 )
 
-// SetControllerPerm holds the parameters for setting the ACL
-// on a controller.
+// SetControllerPerm holds the parameters for setting the ACL on a
+// controller.
 type SetControllerPerm struct {
 	httprequest.Route `httprequest:"PUT /v2/controller/:User/:Name/perm"`
 	EntityPath
 	ACL ACL `httprequest:",body"`
 }
 
-// GetControllerPerm holds the parameters for getting the ACL
-// of a controller.
+// GetControllerPerm holds the parameters for getting the ACL of a
+// controller.
 type GetControllerPerm struct {
 	httprequest.Route `httprequest:"GET /v2/controller/:User/:Name/perm"`
 	EntityPath
 }
 
-// SetModelPerm holds the parameters for setting the ACL
-// on an model.
+// SetModelPerm holds the parameters for setting the ACL on an model.
 type SetModelPerm struct {
 	httprequest.Route `httprequest:"PUT /v2/model/:User/:Name/perm"`
 	EntityPath
 	ACL ACL `httprequest:",body"`
 }
 
-// GetModelPerm holds the parameters for getting the ACL
-// of an model.
+// GetModelPerm holds the parameters for getting the ACL of an model.
 type GetModelPerm struct {
 	httprequest.Route `httprequest:"GET /v2/model/:User/:Name/perm"`
 	EntityPath
 }
 
-// SetControllerLocation holds the attributes for setting the Location field
-// on a controller.
-type SetControllerLocation struct {
-	httprequest.Route `httprequest:"PUT /v2/controller/:User/:Name/meta/location"`
-	EntityPath
-	Location ControllerLocation `httprequest:",body"`
-}
-
-// GetControllerLocation holds the parameters for getting the Location field
-// of a controller.
+// GetControllerLocation holds the parameters for getting the Location
+// field of a controller.
 type GetControllerLocation struct {
 	httprequest.Route `httprequest:"GET /v2/controller/:User/:Name/meta/location"`
 	EntityPath
@@ -77,7 +67,7 @@ type AddController struct {
 	Info ControllerInfo `httprequest:",body"`
 }
 
-// DeleteController holds the parameters for removing the Controller.
+// DeleteController holds the parameters for removing the controller.
 type DeleteController struct {
 	httprequest.Route `httprequest:"DELETE /v2/controller/:User/:Name"`
 	EntityPath
@@ -138,9 +128,6 @@ type ControllerInfo struct {
 	// of the controller.
 	ControllerUUID string `json:"controller-uuid"`
 
-	// Location holds location attributes to be associated with the controller.
-	Location map[string]string
-
 	// Public specifies whether the controller is considered
 	// part of the "pool" of publicly available controllers.
 	// Non-public controllers will be ignored when selecting
@@ -192,15 +179,13 @@ func (p EntityPath) MarshalText() ([]byte, error) {
 	return data, nil
 }
 
-// GetModel holds parameters for retrieving
-// an model.
+// GetModel holds parameters for retrieving a model.
 type GetModel struct {
 	httprequest.Route `httprequest:"GET /v2/model/:User/:Name"`
 	EntityPath
 }
 
-// DeleteModel holds parameters for deletion of
-// an model.
+// DeleteModel holds parameters for deletion of a model.
 type DeleteModel struct {
 	httprequest.Route `httprequest:"DELETE /v2/model/:User/:Name"`
 	EntityPath
@@ -320,12 +305,15 @@ type NewModelInfo struct {
 	// of possible controllers to be used for the model.
 	Location map[string]string `json:"location,omitempty"`
 
+	// Credential holds the name of the provider credential that will
+	// be used to provision machines in the new model.
+	Credential Name `json:"credential"`
+
 	// Config holds the configuration attributes to use to create the new model.
 	Config map[string]interface{} `json:"config"`
 }
 
-// ModelResponse holds the response body from
-// a NewModel call.
+// ModelResponse holds the response body from a NewModel call.
 type ModelResponse struct {
 	// Path holds the path of the model.
 	Path EntityPath `json:"path"`
@@ -377,4 +365,23 @@ type WhoAmI struct {
 // authenticated user.
 type WhoAmIResponse struct {
 	User string `json:"user"`
+}
+
+// UpdateCredential holds parameters for adding or updating a credential.
+type UpdateCredential struct {
+	httprequest.Route `httprequest:"PUT /v2/credential/:User/:Cloud/:Name"`
+	EntityPath
+	Cloud      Cloud      `httprequest:",path"`
+	Credential Credential `httprequest:",body"`
+}
+
+// Credential holds the details of a credential.
+type Credential struct {
+	// AuthType holds the authentiction type of the credential. Valid
+	// AuthTypes are listed in github.com/juju/juju/cloud/clouds.go.
+	AuthType string `json:"auth-type"`
+
+	// Attributes holds the map of attributes that form the
+	// credential.
+	Attributes map[string]string `json:"attrs,omitempty"`
 }

@@ -37,7 +37,7 @@ func (s *getSuite) TestGet(c *gc.C) {
 	// through the usual juju connection mechanism.
 	store := jujuclient.NewFileClientStore()
 	params, err := newAPIConnectionParams(
-		store, "jem-foo", "", "foo", httpbakery.NewClient(),
+		store, "jem-foo", "foo", httpbakery.NewClient(),
 	)
 	c.Assert(err, gc.IsNil)
 	client, err := juju.NewAPIConnection(params)

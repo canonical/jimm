@@ -3,6 +3,7 @@ package apitest
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +15,7 @@ import (
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
+	"github.com/rogpeppe/fastuuid"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
@@ -22,6 +24,7 @@ import (
 	external_jem "github.com/CanonicalLtd/jem"
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/jemserver"
+	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/jemclient"
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -130,15 +133,15 @@ func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server)
 
 // AssertAddController adds the specified controller using AddController
 // and checks that id succeeds. It returns the controller id.
-func (s *Suite) AssertAddController(c *gc.C, path params.EntityPath, loc map[string]string) params.EntityPath {
-	err := s.AddController(c, path, loc)
+func (s *Suite) AssertAddController(c *gc.C, path params.EntityPath, public bool) params.EntityPath {
+	err := s.AddController(c, path, public)
 	c.Assert(err, jc.ErrorIsNil)
 	return path
 }
 
 // AddController adds a new controller with the provided path and any
 // specified location parameters.
-func (s *Suite) AddController(c *gc.C, path params.EntityPath, loc map[string]string) error {
+func (s *Suite) AddController(c *gc.C, path params.EntityPath, public bool) error {
 	// Note that because the cookies acquired in this request don't
 	// persist, the discharge macaroon we get won't affect subsequent
 	// requests in the caller.
@@ -151,16 +154,29 @@ func (s *Suite) AddController(c *gc.C, path params.EntityPath, loc map[string]st
 			User:           info.Tag.Id(),
 			Password:       info.Password,
 			ControllerUUID: info.ModelTag.Id(),
-			Location:       loc,
+			Public:         public,
 		},
 	}
-	// If locations are specified then make the controller public so
-	// that it can be found by seraching on those locations.
-	if len(loc) > 0 {
-		p.Info.Public = true
+	if public {
 		s.IDMSrv.AddUser(string(path.User), "controller-admin")
 	}
 	return s.NewClient(path.User).AddController(p)
+}
+
+var uuidGenerator = fastuuid.MustNewGenerator()
+
+// AssertAddControllerDoc adds a controller document to the database.
+// Tests cannot connect to a controller added by this function.
+func (s *Suite) AssertAddControllerDoc(c *gc.C, cnt *mongodoc.Controller) *mongodoc.Controller {
+	if cnt.UUID == "" {
+		cnt.UUID = fmt.Sprintf("%x", uuidGenerator.Next())
+	}
+	err := s.JEM.AddController(cnt, &mongodoc.Model{
+		Path:       cnt.Path,
+		Controller: cnt.Path,
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	return cnt
 }
 
 const dummySSHKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDOjaOjVRHchF2RFCKQdgBqrIA5nOoqSprLK47l2th5I675jw+QYMIihXQaITss3hjrh3+5ITyBO41PS5rHLNGtlYUHX78p9CHNZsJqHl/z1Ub1tuMe+/5SY2MkDYzgfPtQtVsLasAIiht/5g78AMMXH3HeCKb9V9cP6/lPPq6mCMvg8TDLrPp/P2vlyukAsJYUvVgoaPDUBpedHbkMj07pDJqe4D7c0yEJ8hQo/6nS+3bh9Q1NvmVNsB1pbtk3RKONIiTAXYcjclmOljxxJnl1O50F5sOIi38vyl7Q63f6a3bXMvJEf1lnPNJKAxspIfEu8gRasny3FEsbHfrxEwVj rog@rog-x220"
@@ -171,22 +187,47 @@ var dummyModelConfig = map[string]interface{}{
 }
 
 // CreateModel creates a new model with the specified path on the
-// specified controller, using the specified templates. It returns the
+// specified controller, using the specified credentialss. It returns the
 // new model's path, user and uuid.
-func (s *Suite) CreateModel(c *gc.C, path, ctlPath params.EntityPath) (modelPath params.EntityPath, user, uuid string) {
+func (s *Suite) CreateModel(c *gc.C, path, ctlPath params.EntityPath, cred params.Name) (modelPath params.EntityPath, user, uuid string) {
 	// Note that because the cookies acquired in this request don't
 	// persist, the discharge macaroon we get won't affect subsequent
 	// requests in the caller.
 	resp, err := s.NewClient(path.User).NewModel(&params.NewModel{
 		User: path.User,
 		Info: params.NewModelInfo{
-			Name:          path.Name,
-			Controller:    &ctlPath,
-			Config:        dummyModelConfig,
+			Name:       path.Name,
+			Controller: &ctlPath,
+			Credential: cred,
+			Location: map[string]string{
+				"cloud": "dummy",
+			},
+			Config: dummyModelConfig,
 		},
 	})
 	c.Assert(err, gc.IsNil)
 	return resp.Path, resp.User, resp.UUID
+}
+
+func (s *Suite) AssertUpdateCredential(c *gc.C, user params.User, cloud params.Cloud, name params.Name, authType string) params.Name {
+	err := s.UpdateCredential(user, cloud, name, authType)
+	c.Assert(err, jc.ErrorIsNil)
+	return name
+}
+
+// UpdateCredential sets a  credential with the provided path and authType.
+func (s *Suite) UpdateCredential(user params.User, cloud params.Cloud, name params.Name, authType string) error {
+	// Note that because the cookies acquired in this request don't
+	// persist, the discharge macaroon we get won't affect subsequent
+	// requests in the caller.
+	p := &params.UpdateCredential{
+		EntityPath: params.EntityPath{User: user, Name: name},
+		Cloud:      cloud,
+		Credential: params.Credential{
+			AuthType: authType,
+		},
+	}
+	return s.NewClient(user).UpdateCredential(p)
 }
 
 // Do returns a Do function appropriate for using in httptesting.AssertJSONCall.Do
