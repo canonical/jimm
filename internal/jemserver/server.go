@@ -56,6 +56,14 @@ type Params struct {
 	// RunMonitor specifies that the monitor worker should be run.
 	// This should always be set when running the server in production.
 	RunMonitor bool
+
+	// ControllerUUID holds the UUID the JIMM controller uses to
+	// identify itself.
+	ControllerUUID string
+
+	// DefaultCloud is the name of the cloud to use when it is not
+	// specified by the client.
+	DefaultCloud string
 }
 
 // Server represents a JEM HTTP server.

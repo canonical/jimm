@@ -5,6 +5,7 @@ package jem
 import (
 	cloudapi "github.com/juju/juju/api/cloud"
 	"github.com/juju/juju/api/modelmanager"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	jujucloud "github.com/juju/juju/cloud"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
@@ -43,9 +44,9 @@ type CreateModelParams struct {
 }
 
 // CreateModel creates a new model as specified by p using conn.
-func (j *JEM) CreateModel(conn *apiconn.Conn, p CreateModelParams) (*mongodoc.Model, error) {
+func (j *JEM) CreateModel(conn *apiconn.Conn, p CreateModelParams) (*mongodoc.Model, *jujuparams.ModelInfo, error) {
 	if err := j.UpdateControllerCredential(conn, p.Path.User, p.Cloud, p.Credential); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		return nil, nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	// Create the model record in the database before actually
 	// creating the model on the controller. It will have an invalid
@@ -57,7 +58,7 @@ func (j *JEM) CreateModel(conn *apiconn.Conn, p CreateModelParams) (*mongodoc.Mo
 		Controller: p.ControllerPath,
 	}
 	if err := j.AddModel(modelDoc); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
+		return nil, nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
 	mmClient := modelmanager.NewClient(conn.Connection)
 	m, err := mmClient.CreateModel(
@@ -72,19 +73,19 @@ func (j *JEM) CreateModel(conn *apiconn.Conn, p CreateModelParams) (*mongodoc.Mo
 		if err := j.DB.Models().RemoveId(modelDoc.Id); err != nil {
 			logger.Errorf("cannot remove model from database after model creation error: %v", err)
 		}
-		return nil, errgo.Notef(err, "cannot create model")
+		return nil, nil, errgo.Notef(err, "cannot create model")
 	}
 	if err := mmClient.GrantModel(conn.Info.Tag.(names.UserTag).Id(), "admin", m.UUID); err != nil {
 		// TODO (mhilton) destroy the model?
-		return nil, errgo.Notef(err, "cannot grant admin access")
+		return nil, nil, errgo.Notef(err, "cannot grant admin access")
 	}
 	// Now set the UUID to that of the actually created model.
 	if err := j.DB.Models().UpdateId(modelDoc.Id, bson.D{{"$set", bson.D{{"uuid", m.UUID}}}}); err != nil {
 		// TODO (mhilton) destroy the model?
-		return nil, errgo.Notef(err, "cannot update model UUID in database, leaked model %s", m.UUID)
+		return nil, nil, errgo.Notef(err, "cannot update model UUID in database, leaked model %s", m.UUID)
 	}
 	modelDoc.UUID = m.UUID
-	return modelDoc, nil
+	return modelDoc, &m, nil
 }
 
 // UpdateControllerCredential uploads the specified credential to conn.

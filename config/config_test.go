@@ -85,6 +85,8 @@ tls-key: |
   ORfedwfVln37uivduCeyBLMhaYWiW6CN4Di/d8LsI1hwe1MlNHuV2EptaFDzfjx8
   FWQQKAkL5KolhJye0Kz/X8CT3UMmhOK73UkUaOvMvdSjxLFgIruxWQ==
   -----END RSA PRIVATE KEY-----
+controller-uuid: 00000000-0000-0000-0000-000000000000
+default-cloud: aws
 `
 
 func (s *ConfigSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
@@ -125,6 +127,8 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 				mustParseKey("lsvcDkapKoFxIyjX9/eQgb3s41KVwPMISFwAJdVCZ70="),
 			},
 		},
+		ControllerUUID: "00000000-0000-0000-0000-000000000000",
+		DefaultCloud:   "aws",
 	})
 }
 
@@ -136,7 +140,7 @@ func (s *ConfigSuite) TestReadConfigError(c *gc.C) {
 
 func (s *ConfigSuite) TestValidateConfigError(c *gc.C) {
 	cfg, err := s.readConfig(c, "")
-	c.Assert(err, gc.ErrorMatches, "missing fields mongo-addr, api-addr, state-server-admin, identity-location in config file")
+	c.Assert(err, gc.ErrorMatches, "missing fields mongo-addr, api-addr, state-server-admin, identity-location, controller-uuid, default-cloud in config file")
 	c.Assert(cfg, gc.IsNil)
 }
 

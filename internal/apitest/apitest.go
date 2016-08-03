@@ -125,6 +125,8 @@ func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server)
 		PublicKeyLocator: idmSrv,
 		AgentUsername:    "agent",
 		AgentKey:         s.IDMSrv.UserPublicKey("agent"),
+		DefaultCloud:     "dummy",
+		ControllerUUID:   "controller-uuid",
 	}
 	srv, err := external_jem.NewServer(config)
 	c.Assert(err, gc.IsNil)
