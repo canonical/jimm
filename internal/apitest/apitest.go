@@ -119,14 +119,15 @@ func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server)
 	db := session.DB("jem")
 	s.IDMSrv.AddUser("agent")
 	config := external_jem.ServerParams{
-		DB:               db,
-		ControllerAdmin:  "controller-admin",
-		IdentityLocation: idmSrv.URL.String(),
-		PublicKeyLocator: idmSrv,
-		AgentUsername:    "agent",
-		AgentKey:         s.IDMSrv.UserPublicKey("agent"),
-		DefaultCloud:     "dummy",
-		ControllerUUID:   "controller-uuid",
+		DB:                   db,
+		ControllerAdmin:      "controller-admin",
+		IdentityLocation:     idmSrv.URL.String(),
+		PublicKeyLocator:     idmSrv,
+		AgentUsername:        "agent",
+		AgentKey:             s.IDMSrv.UserPublicKey("agent"),
+		DefaultCloud:         "dummy",
+		ControllerUUID:       "controller-uuid",
+		WebsocketPingTimeout: 3 * time.Minute,
 	}
 	srv, err := external_jem.NewServer(config)
 	c.Assert(err, gc.IsNil)

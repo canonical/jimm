@@ -5,6 +5,7 @@ package jem
 import (
 	"io"
 	"net/http"
+	"time"
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -56,6 +57,10 @@ type ServerParams struct {
 	// DefaultCloud is the name of the cloud to use when it is not
 	// specified by the client.
 	DefaultCloud string
+
+	// WebsocketPingTimeout is the time to wait before failing a
+	// connection because the server has not received a ping.
+	WebsocketPingTimeout time.Duration
 }
 
 // HandleCloser represents an HTTP handler that can
