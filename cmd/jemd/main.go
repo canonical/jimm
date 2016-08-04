@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/gorilla/handlers"
 	// Include any providers known to support JEM.
@@ -27,6 +28,11 @@ import (
 	"github.com/CanonicalLtd/jem"
 	"github.com/CanonicalLtd/jem/config"
 )
+
+// websocketPingTimeout is the amount of time a webseocket connection
+// will wait for a ping before failing the connections. It is hardcoded
+// in juju so I see no reason why it can't be here also.
+const websocketPingTimeout = 3 * time.Minute
 
 var (
 	logger        = loggo.GetLogger("jemd")
@@ -86,15 +92,16 @@ func serve(confPath string) error {
 		}
 	}
 	cfg := jem.ServerParams{
-		DB:               db,
-		ControllerAdmin:  conf.ControllerAdmin,
-		IdentityLocation: conf.IdentityLocation,
-		PublicKeyLocator: locator,
-		AgentUsername:    conf.AgentUsername,
-		AgentKey:         conf.AgentKey,
-		RunMonitor:       true,
-		ControllerUUID:   conf.ControllerUUID,
-		DefaultCloud:     conf.DefaultCloud,
+		DB:                   db,
+		ControllerAdmin:      conf.ControllerAdmin,
+		IdentityLocation:     conf.IdentityLocation,
+		PublicKeyLocator:     locator,
+		AgentUsername:        conf.AgentUsername,
+		AgentKey:             conf.AgentKey,
+		RunMonitor:           true,
+		ControllerUUID:       conf.ControllerUUID,
+		DefaultCloud:         conf.DefaultCloud,
+		WebsocketPingTimeout: websocketPingTimeout,
 	}
 	server, err := jem.NewServer(cfg)
 	if err != nil {

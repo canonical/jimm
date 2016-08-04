@@ -7,6 +7,8 @@ import (
 	"encoding/pem"
 	"net/http/httptest"
 	"net/url"
+	"sync"
+	"time"
 
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/base"
@@ -21,6 +23,7 @@ import (
 	"gopkg.in/juju/names.v2"
 
 	"github.com/CanonicalLtd/jem/internal/apitest"
+	"github.com/CanonicalLtd/jem/internal/jujuapi"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -587,6 +590,91 @@ func (s *websocketSuite) TestCreateModel(c *gc.C) {
 			Access:      "admin",
 		}})
 	}
+}
+
+type testHeartMonitor struct {
+	c         chan time.Time
+	firstBeat chan struct{}
+
+	// mu protects the fields below.
+	mu              sync.Mutex
+	_beats          int
+	dead            bool
+	firstBeatClosed bool
+}
+
+func newTestHeartMonitor() *testHeartMonitor {
+	return &testHeartMonitor{
+		c:         make(chan time.Time, 1),
+		firstBeat: make(chan struct{}),
+	}
+}
+
+func (m *testHeartMonitor) Heartbeat() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m._beats++
+	if !m.firstBeatClosed {
+		close(m.firstBeat)
+		m.firstBeatClosed = true
+	}
+
+}
+
+func (m *testHeartMonitor) Dead() <-chan time.Time {
+	return m.c
+}
+
+func (m *testHeartMonitor) Stop() bool {
+	return m.dead
+}
+
+func (m *testHeartMonitor) kill(t time.Time) {
+	m.mu.Lock()
+	m.dead = true
+	m.mu.Unlock()
+	m.c <- t
+}
+
+func (m *testHeartMonitor) beats() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m._beats
+}
+
+func (m *testHeartMonitor) waitForFirstPing(c *gc.C, d time.Duration) {
+	select {
+	case <-m.firstBeat:
+	case <-time.After(d):
+		c.Fatalf("timeout waiting for first ping")
+	}
+}
+
+func (s *websocketSuite) TestConnectionClosesWhenHeartMonitorDies(c *gc.C) {
+	hm := newTestHeartMonitor()
+	s.PatchValue(jujuapi.NewHeartMonitor, jujuapi.InternalHeartMonitor(func(time.Duration) jujuapi.HeartMonitor {
+		return hm
+	}))
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	hm.waitForFirstPing(c, time.Second)
+	hm.kill(time.Now())
+	err := conn.Ping()
+	c.Assert(err, gc.ErrorMatches, `connection is shut down`)
+	c.Assert(hm.beats(), gc.Equals, 1)
+}
+
+func (s *websocketSuite) TestPingerupdatesHeartMonitor(c *gc.C) {
+	hm := newTestHeartMonitor()
+	s.PatchValue(jujuapi.NewHeartMonitor, jujuapi.InternalHeartMonitor(func(time.Duration) jujuapi.HeartMonitor {
+		return hm
+	}))
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	hm.waitForFirstPing(c, time.Second)
+	err := conn.Ping()
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(hm.beats(), gc.Equals, 2)
 }
 
 // open creates a new websockec connection to the test server, using the

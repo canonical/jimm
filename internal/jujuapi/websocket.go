@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
 	"github.com/juju/juju/apiserver/common"
@@ -57,11 +58,51 @@ type facade struct {
 	version int
 }
 
+// heartMonitor is a interface that will monitor a connection and fail it
+// if a heartbeat is not received within a certain time.
+type heartMonitor interface {
+	// Heartbeat signals to the HeartMonitor that the connection is still alive.
+	Heartbeat()
+
+	// Dead returns a channel that will be signalled if the heartbeat
+	// is not detected quickly enough.
+	Dead() <-chan time.Time
+
+	// Stop stops the HeartMonitor from monitoring. It return true if
+	// the connection is already dead when Stop was called.
+	Stop() bool
+}
+
+// timerHeartMonitor implements heartMonitor using a standard time.Timer.
+type timerHeartMonitor struct {
+	*time.Timer
+	duration time.Duration
+}
+
+// Heartbeat implements HeartMonitor.Heartbeat.
+func (h timerHeartMonitor) Heartbeat() {
+	h.Timer.Reset(h.duration)
+}
+
+// Dead implements HeartMonitor.Dead.
+func (h timerHeartMonitor) Dead() <-chan time.Time {
+	return h.Timer.C
+}
+
+// newHeartMonitor is defined as a variable so that it can be overriden in tests.
+var newHeartMonitor = func(d time.Duration) heartMonitor {
+	return timerHeartMonitor{
+		Timer:    time.NewTimer(d),
+		duration: d,
+	}
+}
+
 // facades contains the list of facade versions supported by this API.
 var facades = map[facade]string{
 	facade{"Admin", 3}:        "Admin",
 	facade{"Cloud", 1}:        "Cloud",
 	facade{"ModelManager", 2}: "ModelManager",
+	facade{"Pinger", 1}:       "Pinger",
 }
 
 // newWSServer creates a new WebSocket server suitible for handling the API for modelUUID.
@@ -78,12 +119,13 @@ func newWSServer(jem *jem.JEM, params jemserver.Params, modelUUID string) websoc
 
 // wsHandler is a handler for a particular WebSocket connection.
 type wsHandler struct {
-	jem        *jem.JEM
-	params     jemserver.Params
-	modelUUID  string
-	conn       *rpc.Conn
-	model      *mongodoc.Model
-	controller *mongodoc.Controller
+	jem          *jem.JEM
+	params       jemserver.Params
+	heartMonitor heartMonitor
+	modelUUID    string
+	conn         *rpc.Conn
+	model        *mongodoc.Model
+	controller   *mongodoc.Controller
 }
 
 // handle handles the connection.
@@ -94,9 +136,13 @@ func (h *wsHandler) handle(wsConn *websocket.Conn) {
 	h.conn.ServeFinder(h, func(err error) error {
 		return mapError(err)
 	})
+	h.heartMonitor = newHeartMonitor(h.params.WebsocketPingTimeout)
 	h.conn.Start()
 	select {
+	case <-h.heartMonitor.Dead():
+		logger.Infof("PING Timeout")
 	case <-h.conn.Dead():
+		h.heartMonitor.Stop()
 	}
 	h.conn.Close()
 }
@@ -179,6 +225,16 @@ func (r root) ModelManager(id string) (modelManager, error) {
 		return modelManager{}, common.ErrBadId
 	}
 	return modelManager{r.h}, nil
+}
+
+// Pinger returns an implementation of the Pinger facade
+// (version 1).
+func (r root) Pinger(id string) (pinger, error) {
+	if id != "" {
+		// Safeguard id for possible future use.
+		return pinger{}, common.ErrBadId
+	}
+	return pinger{r.h}, nil
 }
 
 // admin implements the Admin facade.
@@ -620,4 +676,14 @@ func (m modelManager) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.M
 		return jujuparams.ModelInfo{}, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound))
 	}
 	return m.massageModelInfo(*mi), nil
+}
+
+// pinger implements the Pinger facade.
+type pinger struct {
+	h *wsHandler
+}
+
+// Ping implements the Pinger facade's Ping method.
+func (p pinger) Ping() {
+	p.h.heartMonitor.Heartbeat()
 }
