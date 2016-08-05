@@ -13,6 +13,7 @@ import (
 
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
+	"github.com/CanonicalLtd/jem/internal/servermon"
 	"github.com/CanonicalLtd/jem/params"
 )
 
@@ -61,6 +62,7 @@ func newControllerMonitor(p controllerMonitorParams) *controllerMonitor {
 		m.tomb.Go(m.watcher)
 		return nil
 	})
+	servermon.ControllersRunning.Inc()
 	return m
 }
 
@@ -330,6 +332,7 @@ func (w *watcherState) addDelta(d multiwatcher.Delta) error {
 			logger.Debugf("controller %v saw change %s", w.ctlPath, data)
 		}
 	}
+	ctlpathstr := string(w.ctlPath.Name) + ":" + string(w.ctlPath.User)
 	switch e := d.Entity.(type) {
 	case *multiwatcher.ModelInfo:
 		w.adjustCount(&w.stats.ModelCount, d)
@@ -343,13 +346,17 @@ func (w *watcherState) addDelta(d multiwatcher.Delta) error {
 		if err := w.modelChanged(e); err != nil {
 			return errgo.Mask(err)
 		}
+		servermon.ModelsRunning.WithLabelValues(ctlpathstr).Set(float64(w.stats.ModelCount))
 	case *multiwatcher.UnitInfo:
 		w.adjustCount(&w.stats.UnitCount, d)
+		servermon.UnitsRunning.WithLabelValues(ctlpathstr).Set(float64(w.stats.UnitCount))
 	case *multiwatcher.ApplicationInfo:
 		w.adjustCount(&w.stats.ServiceCount, d)
+		servermon.ApplicationsRunning.WithLabelValues(ctlpathstr).Set(float64(w.stats.ServiceCount))
 	case *multiwatcher.MachineInfo:
 		// TODO for top level machines, increment instance count?
 		w.adjustCount(&w.stats.MachineCount, d)
+		servermon.MachinesRunning.WithLabelValues(ctlpathstr).Set(float64(w.stats.MachineCount))
 	}
 	return nil
 }
