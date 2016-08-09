@@ -29,6 +29,7 @@ import (
 	"github.com/CanonicalLtd/jem/internal/jemerror"
 	"github.com/CanonicalLtd/jem/internal/jemserver"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
+	"github.com/CanonicalLtd/jem/internal/monitoring"
 	"github.com/CanonicalLtd/jem/params"
 )
 
@@ -37,6 +38,7 @@ var logger = loggo.GetLogger("jem.internal.v1")
 type Handler struct {
 	jem    *jem.JEM
 	config jemserver.Params
+	monReq monitoring.Request
 }
 
 func NewAPIHandler(jp *jem.Pool, sp jemserver.Params) ([]httprequest.Handler, error) {
@@ -46,6 +48,7 @@ func NewAPIHandler(jp *jem.Pool, sp jemserver.Params) ([]httprequest.Handler, er
 			jem:    jp.JEM(),
 			config: sp,
 		}
+		h.monReq.Reset(p.PathPattern)
 		if err := h.jem.Authenticate(p.Request); err != nil {
 			h.Close()
 			return nil, errgo.Mask(err, errgo.Any)
@@ -59,6 +62,7 @@ func NewAPIHandler(jp *jem.Pool, sp jemserver.Params) ([]httprequest.Handler, er
 func (h *Handler) Close() error {
 	h.jem.Close()
 	h.jem = nil
+	h.monReq.ObserveMetric()
 	return nil
 }
 
