@@ -5,6 +5,7 @@ package jem
 import (
 	"io"
 	"net/http"
+	"time"
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/CanonicalLtd/jem/internal/debugapi"
 	"github.com/CanonicalLtd/jem/internal/jemserver"
+	"github.com/CanonicalLtd/jem/internal/jujuapi"
 	"github.com/CanonicalLtd/jem/internal/v2"
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -19,6 +21,7 @@ import (
 var versions = map[string]jemserver.NewAPIHandlerFunc{
 	"v2":    v2.NewAPIHandler,
 	"debug": debugapi.NewAPIHandler,
+	"juju":  jujuapi.NewAPIHandler,
 }
 
 // ServerParams holds configuration for a new API server.
@@ -46,6 +49,18 @@ type ServerParams struct {
 	// RunMonitor specifies that the monitor worker should be run.
 	// This should always be set when running the server in production.
 	RunMonitor bool
+
+	// ControllerUUID holds the UUID the JIMM controller uses to
+	// identify itself.
+	ControllerUUID string
+
+	// DefaultCloud is the name of the cloud to use when it is not
+	// specified by the client.
+	DefaultCloud string
+
+	// WebsocketPingTimeout is the time to wait before failing a
+	// connection because the server has not received a ping.
+	WebsocketPingTimeout time.Duration
 }
 
 // HandleCloser represents an HTTP handler that can

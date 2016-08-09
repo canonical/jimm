@@ -10,7 +10,6 @@ import (
 	"github.com/juju/idmclient"
 	"github.com/juju/juju/api"
 	"github.com/juju/loggo"
-	"github.com/juju/mgoutil"
 	"github.com/juju/utils"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
@@ -239,15 +238,6 @@ func (j *JEM) Close() {
 // If the provided documents aren't valid, AddController with return
 // an error with a params.ErrBadRequest cause.
 func (j *JEM) AddController(ctl *mongodoc.Controller, m *mongodoc.Model) error {
-	if err := validateLocationAttrs(ctl.Location); err != nil {
-		return errgo.WithCausef(err, params.ErrBadRequest, "bad controller location")
-	}
-	// Remove any empty location attributes.
-	for attr, val := range ctl.Location {
-		if val == "" {
-			delete(ctl.Location, attr)
-		}
-	}
 	// Insert the model before inserting the controller
 	// to avoid races with other clients creating non-controller
 	// models.
@@ -429,6 +419,21 @@ func (j *JEM) Model(path params.EntityPath) (*mongodoc.Model, error) {
 	return &m, nil
 }
 
+// ModelFromUUID returns the document representing the model with the
+// given UUID. It returns an error with a params.ErrNotFound cause if the
+// controller was not found.
+func (j *JEM) ModelFromUUID(uuid string) (*mongodoc.Model, error) {
+	var m mongodoc.Model
+	err := j.DB.Models().Find(bson.D{{"uuid", uuid}}).One(&m)
+	if err == mgo.ErrNotFound {
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "model %q not found", uuid)
+	}
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot get model %q", uuid)
+	}
+	return &m, nil
+}
+
 // ErrAPIConnection is returned by OpenAPI and OpenAPIFromDocs
 // when the API connection cannot be made.
 var ErrAPIConnection = errgo.New("cannot connect to API")
@@ -482,151 +487,23 @@ func (j *JEM) OpenAPIFromDocs(m *mongodoc.Model, ctl *mongodoc.Controller) (*api
 	})
 }
 
-// AddTemplate adds the given template to the database.
-// If there is already an existing template with the same
-// name, it is overwritten and its Version field incremented.
-//
-// The Id field in template will be set from its
-// Path field. It is the responsibility of the caller to
-// ensure that the template attributes are compatible
-// with the template schema.
-func (j *JEM) AddTemplate(tmpl *mongodoc.Template, canOverwrite bool) error {
-	tmpl.Id = tmpl.Path.String()
-	if !canOverwrite {
-		err := j.DB.Templates().Insert(tmpl)
-		if mgo.IsDup(err) {
-			return errgo.WithCausef(nil, params.ErrAlreadyExists, "template %q already exists", tmpl.Path)
-		}
-		if err != nil {
-			return errgo.Notef(err, "cannot insert template doc")
-		}
-		return nil
-	}
-	u, err := mgoutil.AsUpdate(tmpl)
-	if err != nil {
-		// Should never happen.
-		return errgo.Mask(err)
-	}
-	// We want to increment the version but overwrite all the
-	// other fields.
-	delete(u.Set, "version")
-	delete(u.Unset, "version")
-
-	info, err := j.DB.Templates().UpsertId(tmpl.Id, bson.D{{
-		"$set", u.Set,
-	}, {
-		"$unset", u.Unset,
-	}, {
-		"$inc", bson.D{{"version", 1}},
-	}})
-	if tmpl.Version > 1 && info.Updated == 0 {
-		// We've inserted the document but we require a greater
-		// version number.
-		err := j.DB.Templates().UpdateId(tmpl.Id, bson.D{{
-			"$set", bson.D{{
-				"version", tmpl.Version,
-			}},
-		}})
-		if err != nil {
-			return errgo.Notef(err, "cannot update version after insert")
-		}
-	}
-	if err != nil {
-		return errgo.Notef(err, "cannot add template doc")
-	}
-	return nil
-}
-
-// DeleteTemplate removes existing template from the
-// database. It returns an error with a params.ErrNotFound
-// cause if the template was not found.
-func (j *JEM) DeleteTemplate(path params.EntityPath) error {
-	err := j.DB.Templates().RemoveId(path.String())
-	if err != nil {
-		return errgo.WithCausef(nil, params.ErrNotFound, "template %q not found", path)
-	}
-	logger.Infof("deleted template %s", path)
-	return nil
-}
-
-// ModelsWithTemplateQuery returns a mongo query that iterates through
-// all models that use the template with the given path.
-func (j *JEM) ModelsWithTemplateQuery(path params.EntityPath) *mgo.Query {
-	return j.DB.Models().Find(bson.D{{
-		"templates", path.String(),
-	}})
-}
-
 // ControllerLocationQuery returns a mongo query that iterates through
 // all the public controllers matching the given location attributes,
 // including unavailable controllers only if includeUnavailable is true.
 // It returns an error if the location attribute keys aren't valid.
-func (j *JEM) ControllerLocationQuery(location map[string]string, includeUnavailable bool) (*mgo.Query, error) {
-	if err := validateLocationAttrs(location); err != nil {
-		return nil, errgo.Notef(err, "bad controller location query")
+func (j *JEM) ControllerLocationQuery(cloud params.Cloud, region string, includeUnavailable bool) (*mgo.Query, error) {
+	q := make(bson.D, 0, 4)
+	if cloud != "" {
+		q = append(q, bson.DocElem{"cloud.name", cloud})
 	}
-	q := make(bson.D, 0, len(location)+2)
-	for attr, val := range location {
-		if val != "" {
-			q = append(q, bson.DocElem{"location." + attr, val})
-		} else {
-			q = append(q, bson.DocElem{"location." + attr, notExistsQuery})
-		}
+	if region != "" {
+		q = append(q, bson.DocElem{"cloud.regions", bson.D{{"$elemMatch", bson.D{{"name", region}}}}})
 	}
 	q = append(q, bson.DocElem{"public", true})
 	if !includeUnavailable {
 		q = append(q, bson.DocElem{"unavailablesince", notExistsQuery})
 	}
 	return j.DB.Controllers().Find(q), nil
-}
-
-// Template returns information on the template with the given path.
-// It returns an error with a params.ErrNotFound cause
-// if the template was not found.
-func (j *JEM) Template(path params.EntityPath) (*mongodoc.Template, error) {
-	var tmpl mongodoc.Template
-	err := j.DB.Templates().FindId(path.String()).One(&tmpl)
-	if err == mgo.ErrNotFound {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "template %q not found", path)
-	}
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot get template %q", path)
-	}
-	return &tmpl, nil
-}
-
-// SetControllerLocation updates the attributes associated with the controller's location.
-// Only the owner (arg.EntityPath.User) can change the location attributes
-// on an an entity.
-//
-// If the location attributes are invalid, it returns an error with a params.ErrBadRequest cause.
-func (j *JEM) SetControllerLocation(path params.EntityPath, location map[string]string) error {
-	if err := validateLocationAttrs(location); err != nil {
-		return errgo.WithCausef(err, params.ErrBadRequest, "bad controller location")
-	}
-	set := make(bson.D, 0, len(location))
-	unset := make(bson.D, 0, len(location))
-	for k, v := range location {
-		if v == "" {
-			unset = append(unset, bson.DocElem{"location." + k, v})
-			continue
-		}
-		set = append(set, bson.DocElem{"location." + k, v})
-	}
-	update := make(bson.D, 0, 2)
-	if len(set) > 0 {
-		update = append(update, bson.DocElem{"$set", set})
-	}
-	if len(unset) > 0 {
-		update = append(update, bson.DocElem{"$unset", unset})
-	}
-	if err := j.DB.Controllers().UpdateId(path.String(), update); err != nil {
-		if err == mgo.ErrNotFound {
-			return params.ErrNotFound
-		}
-		return errgo.Notef(err, "cannot update %v", path)
-	}
-	return nil
 }
 
 // SetControllerAvailable marks the given controller as available.
@@ -787,6 +664,83 @@ func apiInfoFromDocs(ctl *mongodoc.Controller, m *mongodoc.Model) *api.Info {
 	}
 }
 
+// UpdateCredential stores the given credential in the database. If a
+// credential with the same name exists it is overwritten.
+func (j *JEM) UpdateCredential(cred *mongodoc.Credential) error {
+	update := bson.D{{
+		"type", cred.Type,
+	}, {
+		"label", cred.Label,
+	}, {
+		"attributes", cred.Attributes,
+	}}
+	if len(cred.ACL.Read) > 0 {
+		update = append(update, bson.DocElem{"acl", cred.ACL})
+	}
+	id := credentialId(cred.User, cred.Cloud, cred.Name)
+	_, err := j.DB.Credentials().UpsertId(id, bson.D{{
+		"$set", update,
+	}, {
+		"$setOnInsert", bson.D{{
+			"user", cred.User,
+		}, {
+			"cloud", cred.Cloud,
+		}, {
+			"name", cred.Name,
+		}},
+	}})
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
+// Credential gets the specified credential. If the credential cannot be
+// found the returned error will have a cause of params.ErrNotFound.
+func (j *JEM) Credential(user params.User, cloud params.Cloud, name params.Name) (*mongodoc.Credential, error) {
+	var cred mongodoc.Credential
+	id := credentialId(user, cloud, name)
+	err := j.DB.Credentials().FindId(id).One(&cred)
+	if err == mgo.ErrNotFound {
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", id)
+	}
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot get credential %q", id)
+	}
+	return &cred, nil
+}
+
+// credentialId calculates the id for a credential with the specified
+// user, cloud and name.
+func credentialId(user params.User, cloud params.Cloud, name params.Name) string {
+	return fmt.Sprintf("%s/%s/%s", user, cloud, name)
+}
+
+// SetACL sets the ACL for the path document in c to be equal to acl.
+func (j *JEM) SetACL(c *mgo.Collection, path params.EntityPath, acl params.ACL) error {
+	err := c.UpdateId(path.String(), bson.D{{"$set", bson.D{{"acl", acl}}}})
+	if err == nil {
+		return nil
+	}
+	if err == mgo.ErrNotFound {
+		return errgo.WithCausef(nil, params.ErrNotFound, "%q not found", path)
+	}
+	return errgo.Notef(err, "cannot update ACL on %q", path)
+}
+
+type NewModelParams struct {
+	Path            params.EntityPath
+	ControllerPath  params.EntityPath
+	CredentialsPath params.EntityPath
+	Cloud           string
+	CloudRegion     string
+}
+
+// NewModel creates a new model based on params.
+func (j *JEM) NewModel(params NewModelParams) (*mongodoc.Model, error) {
+	return nil, nil
+}
+
 // Database wraps an mgo.DB ands adds a few convenience methods.
 type Database struct {
 	*mgo.Database
@@ -822,7 +776,7 @@ func (db Database) Collections() []*mgo.Collection {
 		db.Macaroons(),
 		db.Controllers(),
 		db.Models(),
-		db.Templates(),
+		db.Credentials(),
 	}
 }
 
@@ -843,8 +797,8 @@ func (db Database) Models() *mgo.Collection {
 	return db.C("models")
 }
 
-func (db Database) Templates() *mgo.Collection {
-	return db.C("templates")
+func (db Database) Credentials() *mgo.Collection {
+	return db.C("credentials")
 }
 
 func (db Database) C(name string) *mgo.Collection {
@@ -861,4 +815,9 @@ func validateLocationAttrs(attrs map[string]string) error {
 		}
 	}
 	return nil
+}
+
+// ModelName creates a valid model name for the model specified by path.
+func ModelName(path params.EntityPath) string {
+	return fmt.Sprintf("%s--%s", path.User, path.Name)
 }

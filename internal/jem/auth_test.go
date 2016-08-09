@@ -322,6 +322,462 @@ func (s *authSuite) TestCanReadIter(c *gc.C) {
 	c.Assert(crit.Count(), gc.Equals, 3)
 }
 
+var doContollerTests = []struct {
+	about             string
+	cloud             params.Cloud
+	region            string
+	expectControllers []params.EntityPath
+}{{
+	about: "no parameters",
+	expectControllers: []params.EntityPath{{
+		User: "alice",
+		Name: "aws-eu-west-1",
+	}, {
+		User: "alice",
+		Name: "aws-us-east-1",
+	}, {
+		User: "bob",
+		Name: "aws-eu-west-1",
+	}, {
+		User: "bob",
+		Name: "aws-us-east-1",
+	}, {
+		User: "bob",
+		Name: "gce-us-east-1",
+	}},
+}, {
+	about: "aws",
+	cloud: "aws",
+	expectControllers: []params.EntityPath{{
+		User: "alice",
+		Name: "aws-eu-west-1",
+	}, {
+		User: "alice",
+		Name: "aws-us-east-1",
+	}, {
+		User: "bob",
+		Name: "aws-eu-west-1",
+	}, {
+		User: "bob",
+		Name: "aws-us-east-1",
+	}},
+}, {
+	about:  "aws-us-east-1",
+	cloud:  "aws",
+	region: "us-east-1",
+	expectControllers: []params.EntityPath{{
+		User: "alice",
+		Name: "aws-us-east-1",
+	}, {
+		User: "bob",
+		Name: "aws-us-east-1",
+	}},
+}, {
+	about:             "aws-us-east-1",
+	cloud:             "aws",
+	region:            "us-east-2",
+	expectControllers: []params.EntityPath{},
+}}
+
+func (s *authSuite) TestDoControllers(c *gc.C) {
+	testControllers := []mongodoc.Controller{{
+		Path: params.EntityPath{
+			User: params.User("bob"),
+			Name: "aws-us-east-1",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("bob"),
+			Name: "aws-eu-west-1",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "eu-west-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("alice"),
+			Name: "aws-us-east-1",
+		},
+		ACL: params.ACL{
+			Read: []string{"bob-group"},
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("alice"),
+			Name: "aws-eu-west-1",
+		},
+		ACL: params.ACL{
+			Read: []string{"bob"},
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "eu-west-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("alice"),
+			Name: "aws-us-east-2",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("bob"),
+			Name: "gce-us-east-1",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "gce",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("alice"),
+			Name: "gce-us-east-1",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "gce",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}}
+	for i := range testControllers {
+		err := s.jem.AddController(&testControllers[i], &mongodoc.Model{
+			Path: testControllers[i].Path,
+		})
+		c.Assert(err, gc.IsNil)
+	}
+	req := s.newRequestForUser(c, "GET", "/", "bob", "bob-group")
+	err := s.jem.Authenticate(req)
+	c.Assert(err, gc.IsNil)
+	for i, test := range doContollerTests {
+		c.Logf("test %d. %s", i, test.about)
+		var obtainedControllers []params.EntityPath
+		err := s.jem.DoControllers(test.cloud, test.region, func(ctl *mongodoc.Controller) error {
+			obtainedControllers = append(obtainedControllers, ctl.Path)
+			return nil
+		})
+		c.Assert(err, gc.IsNil)
+		c.Assert(obtainedControllers, jc.DeepEquals, test.expectControllers)
+	}
+}
+
+func (s *authSuite) TestDoControllersErrorResponse(c *gc.C) {
+	testControllers := []mongodoc.Controller{{
+		Path: params.EntityPath{
+			User: params.User("bob"),
+			Name: "aws-us-east-1",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("bob"),
+			Name: "aws-eu-west-1",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "eu-west-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("alice"),
+			Name: "aws-us-east-1",
+		},
+		ACL: params.ACL{
+			Read: []string{"bob-group"},
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("alice"),
+			Name: "aws-eu-west-1",
+		},
+		ACL: params.ACL{
+			Read: []string{"bob"},
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "eu-west-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("alice"),
+			Name: "aws-us-east-2",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("bob"),
+			Name: "gce-us-east-1",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "gce",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("alice"),
+			Name: "gce-us-east-1",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "gce",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}}
+	for i := range testControllers {
+		err := s.jem.AddController(&testControllers[i], &mongodoc.Model{
+			Path: testControllers[i].Path,
+		})
+		c.Assert(err, gc.IsNil)
+	}
+	req := s.newRequestForUser(c, "GET", "/", "bob", "bob-group")
+	err := s.jem.Authenticate(req)
+	c.Assert(err, gc.IsNil)
+	testCause := errgo.New("test-cause")
+	err = s.jem.DoControllers("", "", func(ctl *mongodoc.Controller) error {
+		return errgo.WithCausef(nil, testCause, "test error")
+	})
+	c.Assert(errgo.Cause(err), gc.Equals, testCause)
+}
+
+var selectContollerTests = []struct {
+	about            string
+	cloud            params.Cloud
+	region           string
+	randIntn         func(int) int
+	expectController params.EntityPath
+	expectCloud      params.Cloud
+	expectRegion     string
+	expectError      string
+	expectErrorCause error
+}{{
+	about: "no parameters",
+	randIntn: func(n int) int {
+		return 4
+	},
+	expectController: params.EntityPath{
+		User: "bob",
+		Name: "gce-us-east-1",
+	},
+	expectCloud: "gce",
+}, {
+	about: "aws",
+	cloud: "aws",
+	randIntn: func(n int) int {
+		return 1
+	},
+	expectController: params.EntityPath{
+		User: "alice",
+		Name: "aws-us-east-1",
+	},
+	expectCloud: "aws",
+}, {
+	about:  "aws-us-east-1",
+	cloud:  "aws",
+	region: "us-east-1",
+	randIntn: func(n int) int {
+		return 1
+	},
+	expectController: params.EntityPath{
+		User: "bob",
+		Name: "aws-us-east-1",
+	},
+	expectCloud:  "aws",
+	expectRegion: "us-east-1",
+}, {
+	about:  "no match",
+	cloud:  "aws",
+	region: "us-east-2",
+	randIntn: func(n int) int {
+		return 1
+	},
+	expectError:      `no matching controllers found`,
+	expectErrorCause: params.ErrNotFound,
+}}
+
+func (s *authSuite) TestSelectController(c *gc.C) {
+	var randIntn *func(int) int
+	s.PatchValue(jem.RandIntn, func(n int) int {
+		return (*randIntn)(n)
+	})
+	testControllers := []mongodoc.Controller{{
+		Path: params.EntityPath{
+			User: params.User("bob"),
+			Name: "aws-us-east-1",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("bob"),
+			Name: "aws-eu-west-1",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "eu-west-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("alice"),
+			Name: "aws-us-east-1",
+		},
+		ACL: params.ACL{
+			Read: []string{"bob-group"},
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("alice"),
+			Name: "aws-eu-west-1",
+		},
+		ACL: params.ACL{
+			Read: []string{"bob"},
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "eu-west-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("alice"),
+			Name: "aws-us-east-2",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("bob"),
+			Name: "gce-us-east-1",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "gce",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("alice"),
+			Name: "gce-us-east-1",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "gce",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}}
+	for i := range testControllers {
+		err := s.jem.AddController(&testControllers[i], &mongodoc.Model{
+			Path: testControllers[i].Path,
+		})
+		c.Assert(err, gc.IsNil)
+	}
+	req := s.newRequestForUser(c, "GET", "/", "bob", "bob-group")
+	err := s.jem.Authenticate(req)
+	c.Assert(err, gc.IsNil)
+	for i, test := range selectContollerTests {
+		c.Logf("test %d. %s", i, test.about)
+		randIntn = &test.randIntn
+		ctl, cloud, region, err := s.jem.SelectController(test.cloud, test.region)
+		if test.expectError != "" {
+			c.Assert(err, gc.ErrorMatches, test.expectError)
+			if test.expectErrorCause != nil {
+				c.Assert(errgo.Cause(err), gc.Equals, test.expectErrorCause)
+			}
+			continue
+		}
+		c.Assert(err, gc.IsNil)
+		c.Assert(ctl, jc.DeepEquals, test.expectController)
+		c.Assert(cloud, gc.Equals, test.expectCloud)
+		c.Assert(region, gc.Equals, test.expectRegion)
+	}
+}
+
 // newRequestForUser builds a new *http.Request for method at path which
 // includes a macaroon authenticating username who will be placed in the
 // specified groups.

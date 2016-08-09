@@ -9,12 +9,10 @@ import (
 
 	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/idmtest"
-	"github.com/juju/schema"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/environschema.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/mgo.v2/bson"
 
@@ -81,10 +79,11 @@ func (s *jemSuite) TestAddController(c *gc.C) {
 		HostPorts:     []string{"host1:1234", "host2:9999"},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
-		Location: map[string]string{
-			"cloud":   "aws",
-			"region":  "foo",
-			"ignored": "",
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "foo",
+			}},
 		},
 	}
 	m := &mongodoc.Model{
@@ -102,9 +101,11 @@ func (s *jemSuite) TestAddController(c *gc.C) {
 		HostPorts:     []string{"host1:1234", "host2:9999"},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
-		Location: map[string]string{
-			"cloud":  "aws",
-			"region": "foo",
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "foo",
+			}},
 		},
 	})
 	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
@@ -122,9 +123,11 @@ func (s *jemSuite) TestAddController(c *gc.C) {
 		HostPorts:     []string{"host1:1234", "host2:9999"},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
-		Location: map[string]string{
-			"cloud":  "aws",
-			"region": "foo",
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "foo",
+			}},
 		},
 	})
 	m1, err := s.store.Model(ctlPath)
@@ -143,8 +146,11 @@ func (s *jemSuite) TestAddController(c *gc.C) {
 		HostPorts:     []string{"host1:1234", "host2:9999"},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
-		Location: map[string]string{
-			"foo": "bar",
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "foo",
+			}},
 		},
 	}
 	m2 := &mongodoc.Model{
@@ -156,59 +162,6 @@ func (s *jemSuite) TestAddController(c *gc.C) {
 	m3, err := s.store.Model(ctlPath2)
 	c.Assert(err, gc.IsNil)
 	c.Assert(m3, jc.DeepEquals, m2)
-}
-
-func (s *jemSuite) TestAddControllerWithInvalidLocationAttr(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "x"}
-	ctl := &mongodoc.Controller{
-		Path: ctlPath,
-		Location: map[string]string{
-			"foo.bar": "aws",
-		},
-	}
-	err := s.store.AddController(ctl, &mongodoc.Model{})
-	c.Check(errgo.Cause(err), gc.Equals, params.ErrBadRequest)
-	c.Assert(err, gc.ErrorMatches, `bad controller location: invalid attribute "foo.bar"`)
-}
-
-func (s *jemSuite) TestSetControllerWithInvalidLocationAttr(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "x"}
-	ctl := &mongodoc.Controller{
-		Path: ctlPath,
-	}
-	err := s.store.AddController(ctl, &mongodoc.Model{})
-	err = s.store.SetControllerLocation(ctlPath, map[string]string{"foo.bar": "aws"})
-	c.Check(errgo.Cause(err), gc.Equals, params.ErrBadRequest)
-	c.Assert(err, gc.ErrorMatches, `bad controller location: invalid attribute "foo.bar"`)
-}
-
-func (s *jemSuite) TestSetControllerLocation(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "x"}
-	ctl := &mongodoc.Controller{
-		Path: ctlPath,
-	}
-	err := s.store.AddController(ctl, &mongodoc.Model{})
-
-	// Set cloud on controller.
-	err = s.store.SetControllerLocation(ctlPath, map[string]string{"cloud": "aws"})
-	c.Assert(err, gc.IsNil)
-	ctl, err = s.store.Controller(ctlPath)
-	c.Assert(err, gc.IsNil)
-	c.Assert(ctl.Location, gc.DeepEquals, map[string]string{"cloud": "aws"})
-
-	// Add region later.
-	err = s.store.SetControllerLocation(ctlPath, map[string]string{"region": "us-east1"})
-	c.Assert(err, gc.IsNil)
-	ctl, err = s.store.Controller(ctlPath)
-	c.Assert(err, gc.IsNil)
-	c.Assert(ctl.Location, gc.DeepEquals, map[string]string{"cloud": "aws", "region": "us-east1"})
-
-	// Remove cloud.
-	err = s.store.SetControllerLocation(ctlPath, map[string]string{"cloud": ""})
-	c.Assert(err, gc.IsNil)
-	ctl, err = s.store.Controller(ctlPath)
-	c.Assert(err, gc.IsNil)
-	c.Assert(ctl.Location, gc.DeepEquals, map[string]string{"region": "us-east1"})
 }
 
 func (s *jemSuite) TestSetControllerAvailability(c *gc.C) {
@@ -266,38 +219,43 @@ func (s *jemSuite) TestControllerLocationQuery(c *gc.C) {
 	ut := time.Now().UTC()
 	for _, ctl := range []*mongodoc.Controller{{
 		Path: params.EntityPath{"bob", "aws-us-east-1"},
-		Location: map[string]string{
-			"cloud":  "aws",
-			"region": "us-east-1",
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
 		},
 		Public: true,
 	}, {
 		Path: params.EntityPath{"bob", "aws-eu-west-1"},
-		Location: map[string]string{
-			"cloud":  "aws",
-			"region": "eu-west-1",
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "eu-west-1",
+			}},
 		},
 		Public: true,
 	}, {
-		Path: params.EntityPath{"charlie", "other"},
-		Location: map[string]string{
-			"other": "something",
-		},
+		Path:   params.EntityPath{"charlie", "other"},
 		Public: true,
 	}, {
 		Path:   params.EntityPath{"charlie", "noattrs"},
 		Public: true,
 	}, {
 		Path: params.EntityPath{"bob", "private"},
-		Location: map[string]string{
-			"cloud":  "aws",
-			"region": "eu-west-1",
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "eu-west-1",
+			}},
 		},
 	}, {
 		Path: params.EntityPath{"bob", "down"},
-		Location: map[string]string{
-			"cloud":  "aws",
-			"region": "eu-west-1",
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "eu-west-1",
+			}},
 		},
 		UnavailableSince: ut,
 		Public:           true,
@@ -308,67 +266,38 @@ func (s *jemSuite) TestControllerLocationQuery(c *gc.C) {
 
 	tests := []struct {
 		about              string
-		location           map[string]string
+		cloud              params.Cloud
+		region             string
 		includeUnavailable bool
 		expect             []string
 		expectError        string
 	}{{
 		about: "single location attribute",
-		location: map[string]string{
-			"cloud": "aws",
-		},
+		cloud: "aws",
 		expect: []string{
 			"bob/aws-us-east-1",
 			"bob/aws-eu-west-1",
 		},
 	}, {
-		about:    "no location attributes",
-		location: nil,
-		expect: []string{
-			"bob/aws-us-east-1",
-			"bob/aws-eu-west-1",
-			"charlie/other",
-			"charlie/noattrs",
-		},
-	}, {
-		about: "several location attributes",
-		location: map[string]string{
-			"cloud":  "aws",
-			"region": "us-east-1",
-		},
+		about:  "several location attributes",
+		cloud:  "aws",
+		region: "us-east-1",
 		expect: []string{
 			"bob/aws-us-east-1",
 		},
 	}, {
-		about: "include unavailable controllers",
-		location: map[string]string{
-			"cloud": "aws",
-		},
+		about:              "include unavailable controllers",
+		cloud:              "aws",
 		includeUnavailable: true,
 		expect: []string{
 			"bob/aws-us-east-1",
 			"bob/aws-eu-west-1",
 			"bob/down",
 		},
-	}, {
-		about: "invalid location attribute",
-		location: map[string]string{
-			"invalid.attr$": "foo",
-		},
-		expectError: `bad controller location query: invalid attribute "invalid\.attr\$"`,
-	}, {
-		about: "empty location attribute",
-		location: map[string]string{
-			"cloud": "",
-		},
-		expect: []string{
-			"charlie/other",
-			"charlie/noattrs",
-		},
 	}}
 	for i, test := range tests {
 		c.Logf("test %d: %s", i, test.about)
-		q, err := s.store.ControllerLocationQuery(test.location, test.includeUnavailable)
+		q, err := s.store.ControllerLocationQuery(test.cloud, test.region, test.includeUnavailable)
 		if test.expectError != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
 			continue
@@ -384,36 +313,6 @@ func (s *jemSuite) TestControllerLocationQuery(c *gc.C) {
 		sort.Strings(test.expect)
 		c.Assert(paths, jc.DeepEquals, test.expect)
 	}
-}
-
-func (s *jemSuite) TestModelsWithTemplateQuery(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "x"}
-	ctl := &mongodoc.Controller{
-		Path: ctlPath,
-	}
-	err := s.store.AddController(ctl, &mongodoc.Model{})
-	c.Assert(err, gc.IsNil)
-
-	models := []mongodoc.Model{{
-		Path:      params.EntityPath{"bob", "t1"},
-		Templates: []string{"alice/t1", "alice/t2"},
-	}, {
-		Path:      params.EntityPath{"bob", "t2"},
-		Templates: []string{"alice/t1"},
-	}}
-	for _, m := range models {
-		err = s.store.AddModel(&m)
-		c.Assert(err, gc.IsNil)
-	}
-	q := s.store.ModelsWithTemplateQuery(params.EntityPath{"alice", "t1"})
-	var all []*mongodoc.Model
-	err = q.Sort("_id").All(&all)
-	c.Assert(err, gc.IsNil)
-	got := make([]string, len(all))
-	for i, m := range all {
-		got[i] = m.Path.String()
-	}
-	c.Assert(got, jc.DeepEquals, []string{"bob/t1", "bob/t2"})
 }
 
 func (s *jemSuite) TestDeleteController(c *gc.C) {
@@ -529,107 +428,30 @@ func (s *jemSuite) TestAddModel(c *gc.C) {
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
 }
 
-func (s *jemSuite) TestAddTemplate(c *gc.C) {
+func (s *jemSuite) TestModelFromUUID(c *gc.C) {
+	uuid := "99999999-9999-9999-9999-999999999999"
 	path := params.EntityPath{"bob", "x"}
-	tmpl := &mongodoc.Template{
+	m := &mongodoc.Model{
 		Id:   "ignored",
 		Path: path,
-		Schema: environschema.Fields{
-			"name": {
-				Description: "name of model",
-				Type:        environschema.Tstring,
-				Mandatory:   true,
-				Values:      []interface{}{"venus", "pluto"},
-			},
-			"temperature": {
-				Description: "temperature of model",
-				Type:        environschema.Tint,
-				Example:     400,
-				Values:      []interface{}{-400, 864.0},
-			},
-		},
-		Config: map[string]interface{}{
-			"name":        "pluto",
-			"temperature": -400.0,
-		},
-		Version: 3,
+		UUID: uuid,
 	}
-	err := s.store.AddTemplate(tmpl, true)
+	err := s.store.AddModel(m)
 	c.Assert(err, gc.IsNil)
-	c.Assert(tmpl.Id, gc.Equals, "bob/x")
-
-	tmpl1, err := s.store.Template(path)
-	c.Assert(err, gc.IsNil)
-	c.Assert(tmpl1, jc.DeepEquals, tmpl)
-
-	// Check you can't add the same template when overwrite is false
-	err = s.store.AddTemplate(tmpl, false)
-	c.Check(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
-
-	// Ensure that the schema still works even though some
-	// values may have been transformed to float64 by the
-	// JSON unmarshaler.
-	fields, defaults, err := tmpl.Schema.ValidationSchema()
-	c.Assert(err, gc.IsNil)
-	config, err := schema.FieldMap(fields, defaults).Coerce(tmpl.Config, nil)
-	c.Assert(err, gc.IsNil)
-	c.Assert(config, jc.DeepEquals, map[string]interface{}{
-		"name":        "pluto",
-		"temperature": -400,
+	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
+		Id:   "bob/x",
+		Path: path,
+		UUID: uuid,
 	})
 
-	// Update the template and check that the version is incremented.
-	tmpl.Schema = environschema.Fields{
-		"name": {
-			Description: "name of something else",
-			Type:        environschema.Tstring,
-			Mandatory:   true,
-		},
-	}
-	err = s.store.AddTemplate(tmpl, true)
+	m1, err := s.store.ModelFromUUID(uuid)
 	c.Assert(err, gc.IsNil)
+	c.Assert(m1, jc.DeepEquals, m)
 
-	tmpl.Version = 4
-	tmpl1, err = s.store.Template(path)
-	c.Assert(err, gc.IsNil)
-	c.Assert(tmpl1, jc.DeepEquals, tmpl)
-}
-
-func (s *jemSuite) TestDeleteTemplate(c *gc.C) {
-	path := params.EntityPath{"bob", "x"}
-	tmpl := &mongodoc.Template{
-		Id:   "ignored",
-		Path: path,
-		Schema: environschema.Fields{
-			"name": {
-				Description: "name of model",
-				Type:        environschema.Tstring,
-				Mandatory:   true,
-				Values:      []interface{}{"venus", "pluto"},
-			},
-			"temperature": {
-				Description: "temperature of model",
-				Type:        environschema.Tint,
-				Example:     400,
-				Values:      []interface{}{-400, 864.0},
-			},
-		},
-		Config: map[string]interface{}{
-			"name":        "pluto",
-			"temperature": -400.0,
-		},
-	}
-	err := s.store.AddTemplate(tmpl, true)
-	c.Assert(err, gc.IsNil)
-
-	err = s.store.DeleteTemplate(tmpl.Path)
-	c.Assert(err, gc.IsNil)
-	tmpl1, err := s.store.Template(path)
-	c.Assert(tmpl1, gc.IsNil)
-
-	err = s.store.DeleteTemplate(tmpl.Path)
-	c.Assert(err, gc.ErrorMatches, "template \"bob/x\" not found")
+	m2, err := s.store.ModelFromUUID("no-such-uuid")
+	c.Assert(err, gc.ErrorMatches, `model "no-such-uuid" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+	c.Assert(m2, gc.IsNil)
 }
 
 func (s *jemSuite) TestJEMCopiesSession(c *gc.C) {
@@ -1011,6 +833,92 @@ func (s *jemSuite) TestAcquireLeaseControllerNotFound(c *gc.C) {
 	_, err := s.store.AcquireMonitorLease(params.EntityPath{"bob", "foo"}, time.Time{}, "", time.Now(), "jem1")
 	c.Assert(err, gc.ErrorMatches, `controller removed`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}
+
+func (s *jemSuite) TestAddAndGetCredential(c *gc.C) {
+	user := params.User("test-user")
+	cloud := params.Cloud("test-cloud")
+	name := params.Name("test-credential")
+	expectId := fmt.Sprintf("%s/%s/%s", user, cloud, name)
+	cred, err := s.store.Credential(user, cloud, name)
+	c.Assert(cred, gc.IsNil)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+	c.Assert(err, gc.ErrorMatches, `credential "test-user/test-cloud/test-credential" not found`)
+
+	attrs := map[string]string{
+		"attr1": "val1",
+		"attr2": "val2",
+	}
+	err = s.store.UpdateCredential(&mongodoc.Credential{
+		User:       user,
+		Cloud:      cloud,
+		Name:       name,
+		Type:       "credtype",
+		Label:      "Test Label",
+		Attributes: attrs,
+	})
+	c.Assert(err, gc.IsNil)
+
+	cred, err = s.store.Credential(user, cloud, name)
+	c.Assert(err, gc.IsNil)
+	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
+		Id:         expectId,
+		User:       user,
+		Cloud:      cloud,
+		Name:       name,
+		Type:       "credtype",
+		Label:      "Test Label",
+		Attributes: attrs,
+	})
+
+	err = s.store.UpdateCredential(&mongodoc.Credential{
+		User:       user,
+		Cloud:      cloud,
+		Name:       name,
+		Type:       "credtype",
+		Label:      "Test Label 2",
+		Attributes: attrs,
+	})
+	c.Assert(err, gc.IsNil)
+
+	cred, err = s.store.Credential(user, cloud, name)
+	c.Assert(err, gc.IsNil)
+	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
+		Id:         expectId,
+		User:       user,
+		Cloud:      cloud,
+		Name:       name,
+		Type:       "credtype",
+		Label:      "Test Label 2",
+		Attributes: attrs,
+	})
+}
+
+func (s *jemSuite) TestSetACL(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	err := s.store.AddController(&mongodoc.Controller{
+		Path: ctlPath,
+		UUID: "fake-uuid",
+	}, &mongodoc.Model{
+		UUID: "fake-uuid",
+	})
+	c.Assert(err, gc.IsNil)
+
+	err = s.store.SetACL(s.store.DB.Controllers(), ctlPath, params.ACL{
+		Read: []string{"t1", "t2"},
+	})
+	c.Assert(err, gc.IsNil)
+	var cnt mongodoc.Controller
+	err = s.store.DB.Controllers().FindId(ctlPath.String()).One(&cnt)
+	c.Assert(err, gc.IsNil)
+	c.Assert(cnt.ACL, jc.DeepEquals, params.ACL{
+		Read: []string{"t1", "t2"},
+	})
+
+	err = s.store.SetACL(s.store.DB.Controllers(), params.EntityPath{"bob", "bar"}, params.ACL{
+		Read: []string{"t2", "t1"},
+	})
+	c.Assert(err, gc.ErrorMatches, `"bob/bar" not found`)
 }
 
 func parseTime(s string) time.Time {

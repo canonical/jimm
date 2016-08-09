@@ -40,6 +40,19 @@ func (n *Name) UnmarshalText(t []byte) error {
 	return nil
 }
 
+// Cloud represents the name of a cloud.
+type Cloud string
+
+// UnmarshaText implements encoding.TextUnmarshaler.
+func (c *Cloud) UnmarshalText(t []byte) error {
+	c0 := string(t)
+	if !names.IsValidCloud(c0) {
+		return errgo.WithCausef(nil, ErrBadRequest, "invalid cloud %q", t)
+	}
+	*c = Cloud(c0)
+	return nil
+}
+
 var validLocationPat = regexp.MustCompile("^[a-z]+(-[a-z0-9]+)*$")
 
 // IsValidLocationAttr reports whether the given value is valid for

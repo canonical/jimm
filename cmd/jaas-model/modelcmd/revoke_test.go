@@ -112,61 +112,6 @@ func (s *revokeSuite) TestRevoke(c *gc.C) {
 	})
 }
 
-func (s *revokeSuite) TestRevokeChangeTemplatePerm(c *gc.C) {
-	s.idmSrv.AddUser("bob")
-	s.idmSrv.SetDefaultUser("bob")
-
-	// First add the controller that we're going to use
-	// to create the new template.
-	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
-	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
-	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "")
-
-	stdout, stderr, code = run(c, c.MkDir(), "create-template", "--controller", "bob/foo", "bob/mytemplate", "controller=true", "apt-mirror=0.1.2.3")
-	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
-	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "")
-
-	// Check that we can't read the template as another user
-	// but we can as bob.
-	aliceClient := s.jemClient("alice")
-	_, err := aliceClient.GetTemplate(&params.GetTemplate{
-		EntityPath: params.EntityPath{"bob", "mytemplate"},
-	})
-	c.Assert(err, gc.ErrorMatches, "GET http://.*/v2/template/bob/mytemplate: unauthorized")
-
-	bobClient := s.jemClient("bob")
-	_, err = bobClient.GetTemplate(&params.GetTemplate{
-		EntityPath: params.EntityPath{"bob", "mytemplate"},
-	})
-	c.Assert(err, gc.IsNil)
-
-	// Change the permissions of the template to allow alice.
-	stdout, stderr, code = run(c, c.MkDir(), "grant", "--template", "bob/mytemplate", "alice")
-	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
-	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "")
-
-	// Check that alice can now read the template.
-	_, err = aliceClient.GetTemplate(&params.GetTemplate{
-		EntityPath: params.EntityPath{"bob", "mytemplate"},
-	})
-	c.Assert(err, gc.IsNil)
-
-	// Change the permissions of the template to revoke alice.
-	stdout, stderr, code = run(c, c.MkDir(), "revoke", "--template", "bob/mytemplate", "alice")
-	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
-	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "")
-
-	// Check that alice cannot now read the template.
-	_, err = aliceClient.GetTemplate(&params.GetTemplate{
-		EntityPath: params.EntityPath{"bob", "mytemplate"},
-	})
-	c.Assert(err, gc.ErrorMatches, "GET http://.*/v2/template/bob/mytemplate: unauthorized")
-}
-
 var revokeErrorTests = []struct {
 	about        string
 	args         []string
@@ -201,11 +146,6 @@ var revokeErrorTests = []struct {
 	about:        "invalid user name",
 	args:         []string{"bob/b", "bob,!kung"},
 	expectStderr: `invalid value "bob,!kung": invalid user name "!kung"`,
-	expectCode:   2,
-}, {
-	about:        "--controller not allowed with --template",
-	args:         []string{"--controller", "--template", "foo/bar", "bob"},
-	expectStderr: `cannot specify both --controller and --template`,
 	expectCode:   2,
 }}
 

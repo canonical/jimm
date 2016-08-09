@@ -4,9 +4,6 @@ package modelcmd_test
 
 import (
 	gc "gopkg.in/check.v1"
-	"gopkg.in/errgo.v1"
-
-	"github.com/CanonicalLtd/jem/params"
 )
 
 type removeSuite struct {
@@ -24,7 +21,7 @@ func (s *removeSuite) TestRemoveModel(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	s.addEnv(c, "bob/foo-1", "bob/foo")
+	s.addEnv(c, "bob/foo-1", "bob/foo", "cred1")
 
 	stdout, stderr, code = run(c, c.MkDir(), "remove", "bob/foo-1")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
@@ -52,7 +49,7 @@ func (s *removeSuite) TestRemoveController(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	s.addEnv(c, "bob/foo-1", "bob/foo")
+	s.addEnv(c, "bob/foo-1", "bob/foo", "cred1")
 
 	// Without the --force flag, we'll be forbidden because the controller
 	// is live.
@@ -78,39 +75,6 @@ func (s *removeSuite) TestRemoveController(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "bob/bar\n")
 }
 
-func (s *removeSuite) TestRemoveTemplate(c *gc.C) {
-	s.idmSrv.AddUser("bob")
-	s.idmSrv.SetDefaultUser("bob")
-	client := s.jemClient("bob")
-
-	// First add the controller that we're going to use
-	// to create the new model.
-	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
-	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
-	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "")
-
-	stdout, stderr, code = run(c, c.MkDir(), "create-template", "--controller", "bob/foo", "bob/mytemplate", "controller=true", "apt-mirror=0.1.2.3")
-	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
-	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "")
-
-	_, err := client.GetTemplate(&params.GetTemplate{
-		EntityPath: params.EntityPath{"bob", "mytemplate"},
-	})
-	c.Assert(err, gc.IsNil)
-
-	stdout, stderr, code = run(c, c.MkDir(), "remove", "--template", "bob/mytemplate")
-	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
-	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "")
-
-	_, err = client.GetTemplate(&params.GetTemplate{
-		EntityPath: params.EntityPath{"bob", "mytemplate"},
-	})
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-}
-
 func (s *removeSuite) TestRemoveMultipleModels(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 
@@ -120,7 +84,7 @@ func (s *removeSuite) TestRemoveMultipleModels(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	s.addEnv(c, "bob/foo-1", "bob/foo")
+	s.addEnv(c, "bob/foo-1", "bob/foo", "cred1")
 
 	stdout, stderr, code = run(c, c.MkDir(), "remove", "bob/foo", "bob/foo-1")
 	c.Assert(code, gc.Equals, 1, gc.Commentf("stderr: %s", stderr))
@@ -142,7 +106,7 @@ func (s *removeSuite) TestRemoveVerbose(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	s.addEnv(c, "bob/foo-1", "bob/foo")
+	s.addEnv(c, "bob/foo-1", "bob/foo", "cred1")
 
 	stdout, stderr, code = run(c, c.MkDir(), "remove", "--verbose", "bob/foo-1")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))

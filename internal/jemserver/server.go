@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient"
@@ -57,6 +58,18 @@ type Params struct {
 	// RunMonitor specifies that the monitor worker should be run.
 	// This should always be set when running the server in production.
 	RunMonitor bool
+
+	// ControllerUUID holds the UUID the JIMM controller uses to
+	// identify itself.
+	ControllerUUID string
+
+	// DefaultCloud is the name of the cloud to use when it is not
+	// specified by the client.
+	DefaultCloud string
+
+	// WebsocketPingTimeout is the time to wait before failing a
+	// connection because the server has not received a ping.
+	WebsocketPingTimeout time.Duration
 }
 
 // Server represents a JEM HTTP server.

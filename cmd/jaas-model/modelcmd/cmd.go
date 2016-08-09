@@ -60,17 +60,14 @@ func New() cmd.Command {
 	})
 	supercmd.Register(newAddControllerCommand())
 	supercmd.Register(newCreateCommand())
-	supercmd.Register(newCreateTemplateCommand())
 	supercmd.Register(newGetCommand())
 	supercmd.Register(newGenerateCommand())
 	supercmd.Register(newGrantCommand())
 	supercmd.Register(newListCommand())
 	supercmd.Register(newListControllersCommand())
 	supercmd.Register(newLocationsCommand())
-	supercmd.Register(newListTemplatesCommand())
 	supercmd.Register(newRemoveCommand())
 	supercmd.Register(newRevokeCommand())
-	supercmd.Register(newSetCommand())
 
 	return supercmd
 }
@@ -238,18 +235,14 @@ func writeModel(localModelName, localControllerName string, getEnv func() (*para
 	// that the user account also exists.
 	// TODO is every possible Juju user name also a valid
 	// account name?
-	if err := ensureAccount(store, localControllerName, localAcctName, jujuclient.AccountDetails{
+	if err := ensureAccount(store, localControllerName, jujuclient.AccountDetails{
 		User:     localAcctName,
 		Password: resp.Password,
 	}); err != nil {
 		return "", errgo.Mask(err)
 	}
 
-	if err := store.SetCurrentAccount(localControllerName, localAcctName); err != nil {
-		return "", errgo.Notef(err, "cannot set %q to current user account", localAcctName)
-	}
-
-	if err := store.UpdateModel(localControllerName, localAcctName, localModelName, jujuclient.ModelDetails{
+	if err := store.UpdateModel(localControllerName, localModelName, jujuclient.ModelDetails{
 		ModelUUID: resp.UUID,
 	}); err != nil {
 		return "", errgo.Notef(err, "cannot update model %q", localModelName)
@@ -282,11 +275,10 @@ func ensureController(store jujuclient.ClientStore, controllerName string, ctl j
 	return errgo.Newf("controller %q already exists with a different UUID (old %s; new %s)", controllerName, oldCtl.ControllerUUID, ctl.ControllerUUID)
 }
 
-// ensureAccount ensures that the given named account exists in
-// the given store with the given name under the given controller.
-// creating one if necessary.
-func ensureAccount(store jujuclient.ClientStore, controllerName, acctName string, acct jujuclient.AccountDetails) error {
-	oldAcct, err := store.AccountByName(controllerName, acctName)
+// ensureAccount ensures that the given named account exists in the given
+// store under the given controller. creating one if necessary.
+func ensureAccount(store jujuclient.ClientStore, controllerName string, acct jujuclient.AccountDetails) error {
+	oldAcct, err := store.AccountDetails(controllerName)
 	if err != nil && !errors.IsNotFound(err) {
 		return errgo.Mask(err)
 	}
@@ -294,15 +286,15 @@ func ensureAccount(store jujuclient.ClientStore, controllerName, acctName string
 		// The controller doesn't exist or it exists with the same UUID.
 		// In both these cases, update its details which will create
 		// it if needed.
-		if err := store.UpdateAccount(controllerName, acctName, acct); err != nil {
-			return errgo.Notef(err, "cannot update account %q in controller %q", acctName, controllerName)
+		if err := store.UpdateAccount(controllerName, acct); err != nil {
+			return errgo.Notef(err, "cannot update account in controller %q", controllerName)
 		}
 		return nil
 	}
 	// The account already exists with a different user name.
 	// This is a problem. Return an error and get the user
 	// to sort it out.
-	return errgo.Newf("account %q already exists with a different user name", acctName)
+	return errgo.Newf("account in controller %q already exists with a different user name", controllerName)
 }
 
 const jemControllerPrefix = "jem-"
@@ -338,25 +330,12 @@ func modelExists(store jujuclient.ClientStore, modelName, controllerName string)
 		}
 	}
 	for _, controllerName := range controllerNames {
-		accts, err := store.AllAccounts(controllerName)
-		if errors.IsNotFound(err) {
-			continue
+		_, err := store.ModelByName(controllerName, modelName)
+		if err == nil {
+			return controllerName, nil
 		}
-		if err != nil {
+		if !errors.IsNotFound(err) {
 			return "", errgo.Mask(err)
-		}
-		// Check that none of the existing accounts holds a model
-		// with the desired name. This is somewhat more
-		// conservative than necessary, but we can't pre-guess
-		// the user that's going to be used.
-		for acctName := range accts {
-			_, err := store.ModelByName(controllerName, acctName, modelName)
-			if err == nil {
-				return controllerName, nil
-			}
-			if !errors.IsNotFound(err) {
-				return "", errgo.Mask(err)
-			}
 		}
 	}
 	return "", nil

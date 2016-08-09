@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 
 	"github.com/juju/cmd"
+	"github.com/juju/juju/cmd/juju/common"
 	"github.com/juju/juju/cmd/modelcmd"
-	jujuconfig "github.com/juju/juju/environs/config"
 	"github.com/juju/juju/juju/osenv"
 	"github.com/juju/schema"
 	"github.com/juju/utils"
@@ -29,12 +29,12 @@ import (
 type createCommand struct {
 	commandBase
 
-	ctlPath       entityPathValue
-	modelPath     entityPathValue
-	templatePaths entityPathsValue
-	configFile    string
-	localName     string
-	location      map[string]string
+	ctlPath        entityPathValue
+	modelPath      entityPathValue
+	configFile     string
+	localName      string
+	location       map[string]string
+	credentialName string
 }
 
 func newCreateCommand() cmd.Command {
@@ -44,11 +44,6 @@ func newCreateCommand() cmd.Command {
 var createDoc = `
 The create command creates a new model inside the specified controller.
 Its argument specifies the server name of the new model.
-
-When one or more templates paths are specified, the final configuration
-is determined by starting with the first and adding attributes from
-each one in turn, finally adding any attributes specified in
-the configuration file specified by the --config flag.
 
 Any provided key-value arguments are used to select the location
 of the controller that will run the model. For example:
@@ -69,11 +64,9 @@ func (c *createCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.commandBase.SetFlags(f)
 	f.Var(&c.ctlPath, "controller", "")
 	f.Var(&c.ctlPath, "c", "controller to create the model in")
-	f.Var(&c.templatePaths, "template", "")
-	f.Var(&c.templatePaths, "t", "comma-separated templates to use for config attributes")
-
 	f.StringVar(&c.configFile, "config", "", "YAML config file containing model configuration")
 	f.StringVar(&c.localName, "local", "", "local name for model (as used for juju switch). Defaults to <modelname>")
+	f.StringVar(&c.credentialName, "credential", "", "name of the credential to use to create the model")
 }
 
 func (c *createCommand) Init(args []string) error {
@@ -121,6 +114,7 @@ func (c *createCommand) Run(ctxt *cmd.Context) error {
 		modelName:    c.modelPath.Name,
 		providerType: providerType,
 		knownAttrs:   config,
+		cmdContext:   ctxt,
 	}
 	config, err = defaultsCtxt.generateConfig(schema)
 	if err != nil {
@@ -138,11 +132,11 @@ func (c *createCommand) Run(ctxt *cmd.Context) error {
 		return client.NewModel(&params.NewModel{
 			User: c.modelPath.User,
 			Info: params.NewModelInfo{
-				Name:          c.modelPath.Name,
-				Controller:    ctlPath,
-				Config:        config,
-				TemplatePaths: c.templatePaths.paths,
-				Location:      c.location,
+				Name:       c.modelPath.Name,
+				Controller: ctlPath,
+				Credential: params.Name(c.credentialName),
+				Config:     config,
+				Location:   c.location,
 			},
 		})
 	})
@@ -179,6 +173,7 @@ type schemaContext struct {
 	modelName    params.Name
 	providerType string
 	knownAttrs   map[string]interface{}
+	cmdContext   *cmd.Context
 }
 
 func (ctxt schemaContext) generateConfig(schema environschema.Fields) (map[string]interface{}, error) {
@@ -230,9 +225,9 @@ func (ctxt schemaContext) getVal1(attr form.NamedAttr, checker schema.Checker) (
 	}
 	if attr.Name == "authorized-keys" {
 		path, _ := ctxt.knownAttrs["authorized-keys-path"].(string)
-		keys, err := jujuconfig.ReadAuthorizedKeys(path)
+		keys, err := common.ReadAuthorizedKeys(ctxt.cmdContext, path)
 		if err != nil {
-			if errgo.Cause(err) == jujuconfig.ErrNoAuthorizedKeys {
+			if errgo.Cause(err) == common.ErrNoAuthorizedKeys {
 				return nil, "", nil
 			}
 			return nil, "", errgo.Notef(err, "cannot read authorized keys")

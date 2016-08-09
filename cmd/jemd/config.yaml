@@ -10,3 +10,45 @@ identity-location: http://localhost:8081/
 # For production identity manager (jemd will collect the correct public key on startup).
 #identity-location: https://api.jujucharms.com/identity
 access-log: /var/log/jem/access.log
+# The following certificate may be used for testing purposes. The second
+# certificate in the chain is a root certificate. This can be used
+# a ca-cert parameter in juju configuration and also installed in
+# /usr/local/share/ca-certificates/jem.cnf for use with jaas-model.
+# The certificate identifies itself as:
+#  juju-apiserver
+#  localhost
+#  127.0.0.1
+#  ::1
+#tls-cert: |
+#  -----BEGIN CERTIFICATE-----
+#  MIIBkzCCAT2gAwIBAgIJAMVTnA96tT9oMA0GCSqGSIb3DQEBCwUAMBYxFDASBgNV
+#  BAMMC0pFTSBURVNUIENBMB4XDTE2MDcwODExMDUwMFoXDTE2MDgwNzExMDUwMFow
+#  GTEXMBUGA1UEAwwOanVqdS1hcGlzZXJ2ZXIwXDANBgkqhkiG9w0BAQEFAANLADBI
+#  AkEAuuNErYZeHLWJ1qsUakyRQx2Fzoj2SYTNPe6Kgft5mE9ZVZuvQ8JLi3JoFJxU
+#  /jZm5Kv3+wpaP09Idt15SllsvwIDAQABo2swaTAMBgNVHRMBAf8EAjAAMFkGA1Ud
+#  EQRSMFCHBH8AAAGHEAAAAAAAAAAAAAAAAAAAAAGCDmp1anUtYXBpc2VydmVyggls
+#  b2NhbGhvc3SkGzAZMRcwFQYDVQQDDA5qdWp1LWFwaXNlcnZlcjANBgkqhkiG9w0B
+#  AQsFAANBADcR3jtw3jXTSCn8W6dAspSb521nBM/YTMeq8fWqQR4qq38CCY0Z3bVf
+#  aoYSqawpgwmYMevL8snKBdOZcxSDKzM=
+#  -----END CERTIFICATE-----
+#  -----BEGIN CERTIFICATE-----
+#  MIIBOjCB5aADAgECAgkApu7awoWA9MswDQYJKoZIhvcNAQELBQAwFjEUMBIGA1UE
+#  AwwLSkVNIFRFU1QgQ0EwHhcNMTYwNzA4MTA0MDAwWhcNMzYwNzA4MTA0MDAwWjAW
+#  MRQwEgYDVQQDDAtKRU0gVEVTVCBDQTBcMA0GCSqGSIb3DQEBAQUAA0sAMEgCQQDe
+#  /NOC2aN2dzNp6Y7HH04jpI8TIPKo6T+yZ0f0JcV8R+Q87ZwYMi3t9g0AKYUf40UM
+#  CK+kPmft3WEB1W7qM3AZAgMBAAGjFjAUMBIGA1UdEwEB/wQIMAYBAf8CAQAwDQYJ
+#  KoZIhvcNAQELBQADQQATw5Yp1CxpwiXcLFqHVvNk/mcLJeDcbvaFC041CVvBroe2
+#  x8KNAEC96RlhZbUPM6cvclxia1AvW62uK8o3/sZ8
+#  -----END CERTIFICATE-----
+#tls-key: |
+#  -----BEGIN RSA PRIVATE KEY-----
+#  MIIBOgIBAAJBALrjRK2GXhy1idarFGpMkUMdhc6I9kmEzT3uioH7eZhPWVWbr0PC
+#  S4tyaBScVP42ZuSr9/sKWj9PSHbdeUpZbL8CAwEAAQJAXyRcTkrdlpgE+DhYSFV6
+#  jkR1XlPzrjHhmunZsZqoqJS8/kktbXNGkVDc3QTImAb/wezlqvI0N0eyGcEUA0RL
+#  IQIhAPHFVjSlzo18A53FUBvNrdB363Q7aLU7ei3LpWYEA61VAiEAxeMHym0V3xxb
+#  vqHoR1UPU3qeolGaOT6rUnSQNV7i0cMCIDUQSstjWOJUxbZrCBoSGoQWzebE40Zj
+#  t301pSeu2d/BAiAK1Xcjuf0sjdzn/u08moeQRnJQ6K7M24V9qiwK//rjCQIhAJt0
+#  RmSbYKRTgEyN9KXSreFEMjfJWdIyjVREGOKhHY92
+#  -----END RSA PRIVATE KEY-----
+controller-uuid: 00000000-0000-0000-0000-000000000001
+default-cloud: aws

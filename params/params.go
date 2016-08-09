@@ -10,61 +10,36 @@ import (
 	"gopkg.in/juju/environschema.v1"
 )
 
-// SetControllerPerm holds the parameters for setting the ACL
-// on a controller.
+// SetControllerPerm holds the parameters for setting the ACL on a
+// controller.
 type SetControllerPerm struct {
 	httprequest.Route `httprequest:"PUT /v2/controller/:User/:Name/perm"`
 	EntityPath
 	ACL ACL `httprequest:",body"`
 }
 
-// GetControllerPerm holds the parameters for getting the ACL
-// of a controller.
+// GetControllerPerm holds the parameters for getting the ACL of a
+// controller.
 type GetControllerPerm struct {
 	httprequest.Route `httprequest:"GET /v2/controller/:User/:Name/perm"`
 	EntityPath
 }
 
-// SetModelPerm holds the parameters for setting the ACL
-// on an model.
+// SetModelPerm holds the parameters for setting the ACL on an model.
 type SetModelPerm struct {
 	httprequest.Route `httprequest:"PUT /v2/model/:User/:Name/perm"`
 	EntityPath
 	ACL ACL `httprequest:",body"`
 }
 
-// GetModelPerm holds the parameters for getting the ACL
-// of an model.
+// GetModelPerm holds the parameters for getting the ACL of an model.
 type GetModelPerm struct {
 	httprequest.Route `httprequest:"GET /v2/model/:User/:Name/perm"`
 	EntityPath
 }
 
-// SetTemplatePerm holds the parameters for setting the ACL
-// on a template.
-type SetTemplatePerm struct {
-	httprequest.Route `httprequest:"PUT /v2/template/:User/:Name/perm"`
-	EntityPath
-	ACL ACL `httprequest:",body"`
-}
-
-// GetTemplatePerm holds the parameters for getting the ACL
-// on a template.
-type GetTemplatePerm struct {
-	httprequest.Route `httprequest:"GET /v2/template/:User/:Name/perm"`
-	EntityPath
-}
-
-// SetControllerLocation holds the attributes for setting the Location field
-// on a controller.
-type SetControllerLocation struct {
-	httprequest.Route `httprequest:"PUT /v2/controller/:User/:Name/meta/location"`
-	EntityPath
-	Location ControllerLocation `httprequest:",body"`
-}
-
-// GetControllerLocation holds the parameters for getting the Location field
-// of a controller.
+// GetControllerLocation holds the parameters for getting the Location
+// field of a controller.
 type GetControllerLocation struct {
 	httprequest.Route `httprequest:"GET /v2/controller/:User/:Name/meta/location"`
 	EntityPath
@@ -92,7 +67,7 @@ type AddController struct {
 	Info ControllerInfo `httprequest:",body"`
 }
 
-// DeleteController holds the parameters for removing the Controller.
+// DeleteController holds the parameters for removing the controller.
 type DeleteController struct {
 	httprequest.Route `httprequest:"DELETE /v2/controller/:User/:Name"`
 	EntityPath
@@ -153,9 +128,6 @@ type ControllerInfo struct {
 	// of the controller.
 	ControllerUUID string `json:"controller-uuid"`
 
-	// Location holds location attributes to be associated with the controller.
-	Location map[string]string
-
 	// Public specifies whether the controller is considered
 	// part of the "pool" of publicly available controllers.
 	// Non-public controllers will be ignored when selecting
@@ -207,15 +179,13 @@ func (p EntityPath) MarshalText() ([]byte, error) {
 	return data, nil
 }
 
-// GetModel holds parameters for retrieving
-// an model.
+// GetModel holds parameters for retrieving a model.
 type GetModel struct {
 	httprequest.Route `httprequest:"GET /v2/model/:User/:Name"`
 	EntityPath
 }
 
-// DeleteModel holds parameters for deletion of
-// an model.
+// DeleteModel holds parameters for deletion of a model.
 type DeleteModel struct {
 	httprequest.Route `httprequest:"DELETE /v2/model/:User/:Name"`
 	EntityPath
@@ -257,68 +227,7 @@ type ListController struct {
 // ListControllerResponse holds a list of controllers as returned
 // by ListController.
 type ListControllerResponse struct {
-	// TODO factor out common items in the templates
-	// into a separate field.
 	Controllers []ControllerResponse `json:"controllers"`
-}
-
-// ListTemplate holds parameters for listing all current templates.
-type ListTemplates struct {
-	httprequest.Route `httprequest:"GET /v2/template"`
-
-	// TODO add parameters for restricting results.
-}
-
-// ListTemplatesResponse holds a list of templates as returned
-// by ListTemplates.
-type ListTemplatesResponse struct {
-	Templates []TemplateResponse `json:"templates"`
-}
-
-// TemplateResponse holds information on a template
-type TemplateResponse struct {
-	// Path holds the path of the template.
-	Path EntityPath `json:"path"`
-
-	// Schema holds the controller schema that was used
-	// to create the template.
-	Schema environschema.Fields `json:"schema"`
-
-	// Config holds the template's attributes, with all secret attributes
-	// replaced with their zero value.
-	Config map[string]interface{} `json:"config"`
-
-	// Location holds the location associated with the template.
-	Location map[string]string `json:"location,omitempty"`
-}
-
-// GetTemplate holds parameters for retrieving information on a template.
-type GetTemplate struct {
-	httprequest.Route `httprequest:"GET /v2/template/:User/:Name"`
-	EntityPath
-}
-
-// GetTemplate holds parameters for retrieving the models that are
-// using a template.
-type GetTemplateModels struct {
-	httprequest.Route `httprequest:"GET /v2/template/:User/:Name/models"`
-	EntityPath
-}
-
-// TemplateModelsResponse holds the paths of models that are using
-// a template.
-type TemplateModelsResponse struct {
-	ModelPaths []EntityPath
-	// Total holds the total number of models using the template.
-	// This can be greater than len(Models) when some of those
-	// models are not readable by the user.
-	Total int
-}
-
-// DeleteTemplate holds parameters for deletion of a template.
-type DeleteTemplate struct {
-	httprequest.Route `httprequest:"DELETE /v2/template/:User/:Name"`
-	EntityPath
 }
 
 // ControllerResponse holds information on a given Controller.
@@ -396,20 +305,15 @@ type NewModelInfo struct {
 	// of possible controllers to be used for the model.
 	Location map[string]string `json:"location,omitempty"`
 
-	// TemplatePaths optionally holds a sequence of templates to use
-	// to create the base configuration entry on top of which Config is applied.
-	// Each path must refer to an entry in /template, and overrides attributes in the one before it,
-	// followed finally by Config itself. The resulting configuration
-	// is checked for compatibility with the schema of the above controller.
-	TemplatePaths []EntityPath `json:"templates,omitempty"`
+	// Credential holds the name of the provider credential that will
+	// be used to provision machines in the new model.
+	Credential Name `json:"credential"`
 
 	// Config holds the configuration attributes to use to create the new model.
-	// It is applied on top of the above templates.
 	Config map[string]interface{} `json:"config"`
 }
 
-// ModelResponse holds the response body from
-// a NewModel call.
+// ModelResponse holds the response body from a NewModel call.
 type ModelResponse struct {
 	// Path holds the path of the model.
 	Path EntityPath `json:"path"`
@@ -450,43 +354,6 @@ type ModelResponse struct {
 	// noticed that the model's controller could not be
 	// contacted. It is empty when the model is available.
 	UnavailableSince *time.Time `json:"unavailable-since,omitempty"`
-
-	// Templates holds the paths of the templates that this model uses.
-	Templates []EntityPath
-}
-
-// AddTemplate holds parameters for adding or updating a template.
-type AddTemplate struct {
-	httprequest.Route `httprequest:"PUT /v2/template/:User/:Name"`
-	EntityPath
-
-	Info AddTemplateInfo `httprequest:",body"`
-}
-
-// AddNewTemplate holds parameters for adding a new template but not updating
-// an existing one.
-type AddNewTemplate struct {
-	httprequest.Route `httprequest:"POST /v2/template/:User/:Name"`
-	EntityPath
-
-	Info AddTemplateInfo `httprequest:",body"`
-}
-
-// AddTemplateInfo holds information on a template to
-// be added.
-type AddTemplateInfo struct {
-	// Controller holds the name of a controller to use
-	// as the base schema for the template. The Config attributes
-	// below will be checked against the schema of this controller.
-	Controller *EntityPath `json:"controller,omitempty"`
-
-	// Location holds the location of the set of controllers
-	// that the template will be associated with.
-	// This is optional and may not be available to all user.
-	Location map[string]string `json:"location,omitempty"`
-
-	// Config holds the template's configuration attributes.
-	Config map[string]interface{} `json:"config"`
 }
 
 // WhoAmI holds parameters for requesting the current user name.
@@ -498,4 +365,23 @@ type WhoAmI struct {
 // authenticated user.
 type WhoAmIResponse struct {
 	User string `json:"user"`
+}
+
+// UpdateCredential holds parameters for adding or updating a credential.
+type UpdateCredential struct {
+	httprequest.Route `httprequest:"PUT /v2/credential/:User/:Cloud/:Name"`
+	EntityPath
+	Cloud      Cloud      `httprequest:",path"`
+	Credential Credential `httprequest:",body"`
+}
+
+// Credential holds the details of a credential.
+type Credential struct {
+	// AuthType holds the authentiction type of the credential. Valid
+	// AuthTypes are listed in github.com/juju/juju/cloud/clouds.go.
+	AuthType string `json:"auth-type"`
+
+	// Attributes holds the map of attributes that form the
+	// credential.
+	Attributes map[string]string `json:"attrs,omitempty"`
 }
