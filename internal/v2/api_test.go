@@ -1584,7 +1584,7 @@ func (s *APISuite) TestNewModelCannotCreate(c *gc.C) {
 			},
 		},
 		ExpectBody: params.Error{
-			Message: `cannot create model: failed to create config: creating config from values failed: logger specification expected '=', found "bad>"`,
+			Message: `cannot create model: failed to create config: creating config from values failed: config value expected '=', found "bad>"`,
 		},
 		ExpectStatus: http.StatusInternalServerError,
 		Do:           apitest.Do(s.IDMSrv.Client("bob")),

@@ -91,13 +91,13 @@ func (s *createSuite) TestCreate(c *gc.C) {
 	)
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "jem-foo:newmodel\n")
+	c.Assert(stderr, gc.Equals, "jem-foo:bob@external/newmodel\n")
 
 	// Check that we can attach to the new model
 	// through the usual juju connection mechanism.
 	store := jujuclient.NewFileClientStore()
 	params, err := newAPIConnectionParams(
-		store, "jem-foo", "newmodel", httpbakery.NewClient(),
+		store, "jem-foo", "bob@external/newmodel", httpbakery.NewClient(),
 	)
 	c.Assert(err, gc.IsNil)
 	client, err := juju.NewAPIConnection(params)
@@ -143,7 +143,7 @@ func (s *createSuite) TestCreateWithLocation(c *gc.C) {
 	)
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "jem-aws:newmodel\n")
+	c.Assert(stderr, gc.Equals, "jem-aws:bob@external/newmodel\n")
 
 	client := s.jemClient("bob")
 	m, err := client.GetModel(&params.GetModel{
@@ -184,7 +184,7 @@ func (s *createSuite) TestCreateWithLocationWithExistingModel(c *gc.C) {
 	)
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "jem-aws:newmodel\n")
+	c.Assert(stderr, gc.Equals, "jem-aws:bob@external/newmodel\n")
 
 	// Create a second model with the same local name.
 	// This should be rejected even though we haven't
@@ -194,13 +194,13 @@ func (s *createSuite) TestCreateWithLocationWithExistingModel(c *gc.C) {
 		"create",
 		"--config", configPath,
 		"--credential", "cred",
-		"--local", "newmodel",
+		"--local", "bob@external/newmodel",
 		"bob/anothermodel",
 		"cloud=dummy",
 	)
 	c.Assert(code, gc.Equals, 1, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Matches, `ERROR local model "newmodel" already exists in controller "jem-aws"\n`)
+	c.Assert(stderr, gc.Matches, `ERROR local model "bob@external/newmodel" already exists in controller "jem-aws"\n`)
 }
 
 func (s *createSuite) TestCreateWithLocationNoMatch(c *gc.C) {

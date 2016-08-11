@@ -96,7 +96,7 @@ var createModelTests = []struct {
 		Cloud:          "dummy",
 		Region:         "not-a-region",
 	},
-	expectError: `cannot create model: failed to create new model: region "not-a-region" not found \(expected one of \[\]\) \(not found\)`,
+	expectError: `cannot create model: getting cloud region definition: region "not-a-region" not found \(expected one of \[\]\) \(not found\)`,
 }}
 
 func (s *jujuSuite) TestCreateModel(c *gc.C) {

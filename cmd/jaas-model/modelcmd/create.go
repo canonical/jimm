@@ -65,7 +65,7 @@ func (c *createCommand) SetFlags(f *gnuflag.FlagSet) {
 	f.Var(&c.ctlPath, "controller", "")
 	f.Var(&c.ctlPath, "c", "controller to create the model in")
 	f.StringVar(&c.configFile, "config", "", "YAML config file containing model configuration")
-	f.StringVar(&c.localName, "local", "", "local name for model (as used for juju switch). Defaults to <modelname>")
+	f.StringVar(&c.localName, "local", "", "local name for model (as used for juju switch). Defaults to <user>@external/<modelname>")
 	f.StringVar(&c.credentialName, "credential", "", "name of the credential to use to create the model")
 }
 
@@ -80,7 +80,7 @@ func (c *createCommand) Init(args []string) error {
 		return errgo.Newf("cannot specify explicit controller name with location")
 	}
 	if c.localName == "" {
-		c.localName = string(c.modelPath.Name)
+		c.localName = fmt.Sprintf("%s@external/%s", c.modelPath.User, c.modelPath.Name)
 	}
 	attrs, err := keyvalues.Parse(args[1:], false)
 	if err != nil {

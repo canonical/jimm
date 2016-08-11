@@ -5,6 +5,7 @@ package modelcmd
 import (
 	"github.com/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
+	"github.com/juju/juju/environs"
 	"github.com/juju/juju/environs/bootstrap"
 	"github.com/juju/juju/jujuclient"
 	"gopkg.in/errgo.v1"
@@ -116,7 +117,7 @@ func getControllerInfo(controllerName string) (*controllerInfo, error) {
 	}
 
 	var info controllerInfo
-	info.model, err = store.ModelByName(controllerName, bootstrap.ControllerModelName)
+	info.model, err = store.ModelByName(controllerName, environs.AdminUser+"/"+bootstrap.ControllerModelName)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}

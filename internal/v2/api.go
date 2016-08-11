@@ -881,7 +881,7 @@ var schemaForProviderType = func(providerType string) (environschema.Fields, err
 	}
 	schema := schp.Schema()
 
-	restrictedFields, err := modelmanager.RestrictedProviderFields(providerType)
+	restrictedFields, err := modelmanager.RestrictedProviderFields(provider)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}

@@ -143,7 +143,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPIError(c *gc.C) {
 
 func assertConnIsClosed(c *gc.C, conn *apiconn.Conn) {
 	select {
-	case <-conn.RPCClient().Dead():
+	case <-conn.Broken():
 	case <-time.After(5 * time.Second):
 		c.Fatalf("timed out waiting for connection close")
 	}

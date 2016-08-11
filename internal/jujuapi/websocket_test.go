@@ -20,6 +20,7 @@ import (
 	"github.com/juju/juju/status"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
 
 	"github.com/CanonicalLtd/jem/internal/apitest"
@@ -65,47 +66,13 @@ func (s *websocketSuite) TestLoginToModel(c *gc.C) {
 		SkipLogin: true,
 	}, "test")
 	defer conn.Close()
-	err := conn.Login(nil, "", "", nil)
-	c.Assert(jujuparams.IsRedirect(err), gc.Equals, true)
-	var resp jujuparams.RedirectInfoResult
-	err = conn.APICall("Admin", 3, "", "RedirectInfo", nil, &resp)
-	c.Assert(err, jc.ErrorIsNil)
 	nhps, err := network.ParseHostPorts(s.APIInfo(c).Addrs...)
 	c.Assert(err, jc.ErrorIsNil)
-	hps := jujuparams.FromNetworkHostPorts(nhps)
-	c.Assert(resp, jc.DeepEquals, jujuparams.RedirectInfoResult{
-		Servers: [][]jujuparams.HostPort{hps},
+	err = conn.Login(nil, "", "", nil)
+	c.Assert(errgo.Cause(err), jc.DeepEquals, &api.RedirectError{
+		Servers: [][]network.HostPort{nhps},
 		CACert:  s.APIInfo(c).CACert,
 	})
-}
-
-func (s *websocketSuite) TestIncorrectUserFails(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
-	mi := s.assertCreateModel(c, "model-1", "test", "", string(cred), nil)
-	modelUUID := mi.UUID
-	conn := s.open(c, &api.Info{
-		ModelTag:  names.NewModelTag(modelUUID),
-		SkipLogin: true,
-	}, "bob")
-	defer conn.Close()
-	err := conn.Login(nil, "", "", nil)
-	c.Assert(err, gc.ErrorMatches, "unauthorized")
-}
-
-func (s *websocketSuite) TestRedirectInfoFailsWithoutLogin(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
-	mi := s.assertCreateModel(c, "model-1", "test", "", string(cred), nil)
-	modelUUID := mi.UUID
-	conn := s.open(c, &api.Info{
-		ModelTag:  names.NewModelTag(modelUUID),
-		SkipLogin: true,
-	}, "test")
-	defer conn.Close()
-	var resp jujuparams.RedirectInfoResult
-	err := conn.APICall("Admin", 3, "", "RedirectInfo", nil, &resp)
-	c.Assert(err, gc.ErrorMatches, "unauthorized")
 }
 
 func (s *websocketSuite) TestOldAdminVersionFails(c *gc.C) {
@@ -414,15 +381,15 @@ func (s *websocketSuite) TestListModels(c *gc.C) {
 	c.Assert(models, jc.DeepEquals, []base.UserModel{{
 		Name:  "controller-1",
 		UUID:  "deadbeef-0bad-400d-8000-4b1d0d06f00d",
-		Owner: "test@local",
+		Owner: "test@external",
 	}, {
 		Name:  "model-1",
 		UUID:  modelUUID1,
-		Owner: "test@local",
+		Owner: "test@external",
 	}, {
 		Name:  "model-3",
 		UUID:  modelUUID3,
-		Owner: "test2@local",
+		Owner: "test2@external",
 	}})
 }
 
@@ -605,7 +572,7 @@ type testHeartMonitor struct {
 
 func newTestHeartMonitor() *testHeartMonitor {
 	return &testHeartMonitor{
-		c:         make(chan time.Time, 1),
+		c:         make(chan time.Time),
 		firstBeat: make(chan struct{}),
 	}
 }
@@ -659,7 +626,16 @@ func (s *websocketSuite) TestConnectionClosesWhenHeartMonitorDies(c *gc.C) {
 	defer conn.Close()
 	hm.waitForFirstPing(c, time.Second)
 	hm.kill(time.Now())
-	err := conn.Ping()
+	beats := 1
+	var err error
+	for beats < 10 {
+		time.Sleep(10 * time.Millisecond)
+		err = conn.Ping()
+		if err != nil {
+			break
+		}
+		beats++
+	}
 	c.Assert(err, gc.ErrorMatches, `connection is shut down`)
 	c.Assert(hm.beats(), gc.Equals, 1)
 }

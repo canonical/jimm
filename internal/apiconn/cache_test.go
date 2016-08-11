@@ -209,7 +209,7 @@ func apiOpen(info *api.Info, opts api.DialOpts) (api.Connection, *api.Info, erro
 
 func assertConnIsClosed(c *gc.C, conn api.Connection) {
 	select {
-	case <-conn.RPCClient().Dead():
+	case <-conn.Broken():
 	case <-time.After(5 * time.Second):
 		c.Fatalf("timed out waiting for connection close")
 	}
