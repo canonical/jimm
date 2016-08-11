@@ -3,6 +3,8 @@
 package modelcmd
 
 import (
+	"fmt"
+
 	"github.com/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
 	"gopkg.in/errgo.v1"
@@ -39,7 +41,7 @@ func (c *getCommand) Info() *cmd.Info {
 
 func (c *getCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.commandBase.SetFlags(f)
-	f.StringVar(&c.localName, "local", "", "local name for model (as used for juju switch). Defaults to <envname>")
+	f.StringVar(&c.localName, "local", "", "local name for model (as used for juju switch). Defaults to <user>@external/<envname>")
 	f.StringVar(&c.user, "u", "", "user name to use when accessing the model (defaults to user name created for model)")
 	f.StringVar(&c.user, "user", "", "")
 }
@@ -52,7 +54,7 @@ func (c *getCommand) Init(args []string) error {
 		return errgo.Mask(err)
 	}
 	if c.localName == "" {
-		c.localName = string(c.modelPath.Name)
+		c.localName = fmt.Sprintf("%s@external/%s", c.modelPath.User, c.modelPath.Name)
 	}
 	return nil
 }

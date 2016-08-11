@@ -31,13 +31,13 @@ func (s *getSuite) TestGet(c *gc.C) {
 	)
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "jem-foo:foo\n")
+	c.Assert(stderr, gc.Equals, "jem-foo:bob@external/foo\n")
 
 	// Check that we can attach to the new model
 	// through the usual juju connection mechanism.
 	store := jujuclient.NewFileClientStore()
 	params, err := newAPIConnectionParams(
-		store, "jem-foo", "foo", httpbakery.NewClient(),
+		store, "jem-foo", "bob@external/foo", httpbakery.NewClient(),
 	)
 	c.Assert(err, gc.IsNil)
 	client, err := juju.NewAPIConnection(params)

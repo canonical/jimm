@@ -244,6 +244,16 @@ type admin struct {
 
 // Login implements the Login method on the Admin facade.
 func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResultV1, error) {
+	if a.h.modelUUID != "" {
+		// If the UUID is for a model send a redirect error.
+		if a.h.model.Id != a.h.controller.Id {
+			return jujuparams.LoginResultV1{}, &jujuparams.Error{
+				Code:    jujuparams.CodeRedirect,
+				Message: "redirection required",
+			}
+		}
+	}
+
 	// JAAS only supports macaroon login, ignore all the other fields.
 	attr, err := a.h.jem.Bakery.CheckAny(req.Macaroons, nil, checkers.TimeBefore)
 	if err != nil {
@@ -266,14 +276,6 @@ func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResultV1, err
 	if a.h.modelUUID != "" {
 		if err := a.h.jem.CheckCanRead(a.h.model); err != nil {
 			return jujuparams.LoginResultV1{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-		}
-
-		// If the UUID is for a model send a redirect error.
-		if a.h.model.Id != a.h.controller.Id {
-			return jujuparams.LoginResultV1{}, &jujuparams.Error{
-				Code:    jujuparams.CodeRedirect,
-				Message: "redirect required",
-			}
 		}
 
 		modelTag = names.NewModelTag(a.h.model.UUID).String()
@@ -319,16 +321,7 @@ func facadeVersions() []jujuparams.FacadeVersions {
 
 // RedirectInfo implements the RedirectInfo method on the Admin facade.
 func (a admin) RedirectInfo() (jujuparams.RedirectInfoResult, error) {
-	if a.h.jem.Auth.Username == "" {
-		return jujuparams.RedirectInfoResult{}, errgo.WithCausef(nil, params.ErrUnauthorized, "")
-	}
-	if a.h.modelUUID == "" {
-		return jujuparams.RedirectInfoResult{}, errgo.New("not redirected")
-	}
-	if err := a.h.jem.CheckCanRead(a.h.model); err != nil {
-		return jujuparams.RedirectInfoResult{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	if a.h.model.Id == a.h.controller.Id {
+	if a.h.modelUUID == "" || a.h.model.Id == a.h.controller.Id {
 		return jujuparams.RedirectInfoResult{}, errgo.New("not redirected")
 	}
 	nhps, err := network.ParseHostPorts(a.h.controller.HostPorts...)
@@ -559,7 +552,7 @@ func (m modelManager) ListModels(_ jujuparams.Entity) (jujuparams.UserModelList,
 			Model: jujuparams.Model{
 				Name:     string(model.Path.Name),
 				UUID:     model.UUID,
-				OwnerTag: names.NewUserTag(string(model.Path.User)).String(),
+				OwnerTag: jem.UserTag(model.Path.User).String(),
 			},
 			LastConnection: nil, // TODO (mhilton) work out how to record and set this.
 		})
@@ -646,6 +639,7 @@ func (m modelManager) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.M
 	if err != nil {
 		return jujuparams.ModelInfo{}, errgo.WithCausef(err, params.ErrBadRequest, "invalid owner tag")
 	}
+	logger.Debugf("Attempting to create %s/%s", owner, args.Name)
 	if owner.Domain() != "external" {
 		return jujuparams.ModelInfo{}, params.ErrUnauthorized
 	}
