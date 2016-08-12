@@ -437,9 +437,7 @@ func (c cloud) credentials(ownerTag, cloudTag string) (map[string]jujuparams.Clo
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
 
 	}
-	// TODO (mhilton) When we support tenents we will need to
-	// support additional domains.
-	if owner.Domain() != "external" {
+	if owner.IsLocal() {
 		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "unsupported domain %q", owner.Domain())
 	}
 	cld, err := names.ParseCloudTag(cloudTag)
@@ -494,7 +492,7 @@ func (c cloud) parseCredentials(ucc jujuparams.UserCloudCredentials) (string, []
 	if err != nil {
 		return "", nil, errgo.WithCausef(err, params.ErrBadRequest, "")
 	}
-	if userTag.Domain() != "external" {
+	if userTag.IsLocal() {
 		return "", nil, errgo.WithCausef(nil, params.ErrBadRequest, "unsupported domain %q", userTag.Domain())
 	}
 	var user params.User
@@ -640,7 +638,7 @@ func (m modelManager) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.M
 		return jujuparams.ModelInfo{}, errgo.WithCausef(err, params.ErrBadRequest, "invalid owner tag")
 	}
 	logger.Debugf("Attempting to create %s/%s", owner, args.Name)
-	if owner.Domain() != "external" {
+	if owner.IsLocal() {
 		return jujuparams.ModelInfo{}, params.ErrUnauthorized
 	}
 	if err := m.h.jem.CheckIsUser(params.User(owner.Name())); err != nil {
@@ -670,6 +668,62 @@ func (m modelManager) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.M
 		return jujuparams.ModelInfo{}, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound))
 	}
 	return m.massageModelInfo(*mi), nil
+}
+
+// ModifyModelAccess implements the ModelManager facade's ModifyModelAccess method.
+func (m modelManager) ModifyModelAccess(args jujuparams.ModifyModelAccessRequest) (jujuparams.ErrorResults, error) {
+	results := make([]jujuparams.ErrorResult, len(args.Changes))
+	for i, change := range args.Changes {
+		err := m.modifyModelAccess(change)
+		if err != nil {
+			results[i].Error = mapError(err)
+		}
+	}
+	return jujuparams.ErrorResults{
+		Results: results,
+	}, nil
+}
+
+func (m modelManager) modifyModelAccess(change jujuparams.ModifyModelAccess) error {
+	modelTag, err := names.ParseModelTag(change.ModelTag)
+	if err != nil {
+		return errgo.WithCausef(err, params.ErrBadRequest, "invalid model tag")
+	}
+	model, err := m.h.jem.ModelFromUUID(modelTag.Id())
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	if err := m.h.jem.CheckIsUser(model.Path.User); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	userTag, err := names.ParseUserTag(change.UserTag)
+	if err != nil {
+		return errgo.WithCausef(err, params.ErrBadRequest, "invalid user tag")
+	}
+	if userTag.IsLocal() {
+		return errgo.WithCausef(nil, params.ErrBadRequest, "unsupported domain %q", userTag.Domain())
+	}
+	controller, err := m.h.jem.Controller(model.Controller)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	conn, err := m.h.jem.OpenAPIFromDocs(model, controller)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	defer conn.Close()
+	switch change.Action {
+	case jujuparams.GrantModelAccess:
+		err = m.h.jem.GrantModel(conn, model, params.User(userTag.Name()), string(change.Access))
+	case jujuparams.RevokeModelAccess:
+		err = m.h.jem.RevokeModel(conn, model, params.User(userTag.Name()), string(change.Access))
+	default:
+		return errgo.WithCausef(err, params.ErrBadRequest, "invalid action %q", change.Action)
+	}
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
 }
 
 // pinger implements the Pinger facade.

@@ -120,6 +120,32 @@ func (j *JEM) UpdateControllerCredential(conn *apiconn.Conn, user params.User, c
 	return nil
 }
 
+// GrantModel grants the given access for the given user on the given model and updates the JEM database.
+func (j *JEM) GrantModel(conn *apiconn.Conn, model *mongodoc.Model, user params.User, access string) error {
+	client := modelmanager.NewClient(conn)
+	if err := client.GrantModel(UserTag(user).Id(), access, model.UUID); err != nil {
+		return errgo.Mask(err)
+	}
+	if err := j.Grant(j.DB.Models(), model.Path, user); err != nil {
+		// TODO (mhilton) What should be done with the changes already made to the controller.
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
+// RevokeModel revokes the given access for the given user on the given model and updates the JEM database.
+func (j *JEM) RevokeModel(conn *apiconn.Conn, model *mongodoc.Model, user params.User, access string) error {
+	if err := j.Revoke(j.DB.Models(), model.Path, user); err != nil {
+		return errgo.Mask(err)
+	}
+	client := modelmanager.NewClient(conn)
+	if err := client.RevokeModel(UserTag(user).Id(), access, model.UUID); err != nil {
+		// TODO (mhilton) What should be done with the changes already made to JEM.
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
 // UserTag creates a juju user tag from a params.User
 func UserTag(u params.User) names.UserTag {
 	return names.NewUserTag(string(u) + "@external")
