@@ -728,6 +728,30 @@ func (j *JEM) SetACL(c *mgo.Collection, path params.EntityPath, acl params.ACL) 
 	return errgo.Notef(err, "cannot update ACL on %q", path)
 }
 
+// Grant updates the ACL for the path document in c to include user.
+func (j *JEM) Grant(c *mgo.Collection, path params.EntityPath, user params.User) error {
+	err := c.UpdateId(path.String(), bson.D{{"$addToSet", bson.D{{"acl.read", user}}}})
+	if err == nil {
+		return nil
+	}
+	if err == mgo.ErrNotFound {
+		return errgo.WithCausef(nil, params.ErrNotFound, "%q not found", path)
+	}
+	return errgo.Notef(err, "cannot update ACL on %q", path)
+}
+
+// Revoke updates the ACL for the path document in c to not include user.
+func (j *JEM) Revoke(c *mgo.Collection, path params.EntityPath, user params.User) error {
+	err := c.UpdateId(path.String(), bson.D{{"$pull", bson.D{{"acl.read", user}}}})
+	if err == nil {
+		return nil
+	}
+	if err == mgo.ErrNotFound {
+		return errgo.WithCausef(nil, params.ErrNotFound, "%q not found", path)
+	}
+	return errgo.Notef(err, "cannot update ACL on %q", path)
+}
+
 type NewModelParams struct {
 	Path            params.EntityPath
 	ControllerPath  params.EntityPath

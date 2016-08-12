@@ -147,3 +147,189 @@ func (s *jujuSuite) TestCreateModel(c *gc.C) {
 		c.Assert(m.UUID, gc.Not(gc.Equals), "")
 	}
 }
+
+func (s *jujuSuite) TestGrantModel(c *gc.C) {
+	info := s.APIInfo(c)
+	ctlId := params.EntityPath{"bob", "controller"}
+	ctl := &mongodoc.Controller{
+		Path:          ctlId,
+		HostPorts:     info.Addrs,
+		CACert:        info.CACert,
+		AdminUser:     info.Tag.Id(),
+		AdminPassword: info.Password,
+	}
+	m := &mongodoc.Model{
+		UUID: info.ModelTag.Id(),
+	}
+	// Sanity check that we're really talking to the controller.
+	minfo, err := s.APIState.Client().ModelInfo()
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(minfo.ControllerUUID, gc.Equals, m.UUID)
+
+	err = s.store.AddController(ctl, m)
+	c.Assert(err, jc.ErrorIsNil)
+	err = s.store.UpdateCredential(&mongodoc.Credential{
+		User:  "bob",
+		Cloud: "dummy",
+		Name:  "cred1",
+		Type:  "empty",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	conn, err := s.store.OpenAPI(ctlId)
+	c.Assert(err, jc.ErrorIsNil)
+	defer conn.Close()
+	model, _, err := s.store.CreateModel(conn, jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", "model-1"},
+		ControllerPath: params.EntityPath{"bob", "controller"},
+		Credential:     "cred1",
+		Cloud:          "dummy",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	err = s.store.GrantModel(conn, model, "alice", "write")
+	c.Assert(err, jc.ErrorIsNil)
+	model1, err := s.store.Model(model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{"alice"}})
+}
+
+func (s *jujuSuite) TestGrantModelControllerFailure(c *gc.C) {
+	info := s.APIInfo(c)
+	ctlId := params.EntityPath{"bob", "controller"}
+	ctl := &mongodoc.Controller{
+		Path:          ctlId,
+		HostPorts:     info.Addrs,
+		CACert:        info.CACert,
+		AdminUser:     info.Tag.Id(),
+		AdminPassword: info.Password,
+	}
+	m := &mongodoc.Model{
+		UUID: info.ModelTag.Id(),
+	}
+	// Sanity check that we're really talking to the controller.
+	minfo, err := s.APIState.Client().ModelInfo()
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(minfo.ControllerUUID, gc.Equals, m.UUID)
+
+	err = s.store.AddController(ctl, m)
+	c.Assert(err, jc.ErrorIsNil)
+	err = s.store.UpdateCredential(&mongodoc.Credential{
+		User:  "bob",
+		Cloud: "dummy",
+		Name:  "cred1",
+		Type:  "empty",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	conn, err := s.store.OpenAPI(ctlId)
+	c.Assert(err, jc.ErrorIsNil)
+	defer conn.Close()
+	model, _, err := s.store.CreateModel(conn, jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", "model-1"},
+		ControllerPath: params.EntityPath{"bob", "controller"},
+		Credential:     "cred1",
+		Cloud:          "dummy",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	err = s.store.GrantModel(conn, model, "alice", "superpowers")
+	c.Assert(err, gc.ErrorMatches, `invalid model access permission "superpowers"`)
+	model1, err := s.store.Model(model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{}})
+}
+
+func (s *jujuSuite) TestRevokeModel(c *gc.C) {
+	info := s.APIInfo(c)
+	ctlId := params.EntityPath{"bob", "controller"}
+	ctl := &mongodoc.Controller{
+		Path:          ctlId,
+		HostPorts:     info.Addrs,
+		CACert:        info.CACert,
+		AdminUser:     info.Tag.Id(),
+		AdminPassword: info.Password,
+	}
+	m := &mongodoc.Model{
+		UUID: info.ModelTag.Id(),
+	}
+	// Sanity check that we're really talking to the controller.
+	minfo, err := s.APIState.Client().ModelInfo()
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(minfo.ControllerUUID, gc.Equals, m.UUID)
+
+	err = s.store.AddController(ctl, m)
+	c.Assert(err, jc.ErrorIsNil)
+	err = s.store.UpdateCredential(&mongodoc.Credential{
+		User:  "bob",
+		Cloud: "dummy",
+		Name:  "cred1",
+		Type:  "empty",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	conn, err := s.store.OpenAPI(ctlId)
+	c.Assert(err, jc.ErrorIsNil)
+	defer conn.Close()
+	model, _, err := s.store.CreateModel(conn, jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", "model-1"},
+		ControllerPath: params.EntityPath{"bob", "controller"},
+		Credential:     "cred1",
+		Cloud:          "dummy",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	err = s.store.GrantModel(conn, model, "alice", "write")
+	c.Assert(err, jc.ErrorIsNil)
+	model1, err := s.store.Model(model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{"alice"}})
+	err = s.store.RevokeModel(conn, model, "alice", "write")
+	c.Assert(err, jc.ErrorIsNil)
+	model1, err = s.store.Model(model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{}})
+}
+
+func (s *jujuSuite) TestRevokeModelControllerFailure(c *gc.C) {
+	info := s.APIInfo(c)
+	ctlId := params.EntityPath{"bob", "controller"}
+	ctl := &mongodoc.Controller{
+		Path:          ctlId,
+		HostPorts:     info.Addrs,
+		CACert:        info.CACert,
+		AdminUser:     info.Tag.Id(),
+		AdminPassword: info.Password,
+	}
+	m := &mongodoc.Model{
+		UUID: info.ModelTag.Id(),
+	}
+	// Sanity check that we're really talking to the controller.
+	minfo, err := s.APIState.Client().ModelInfo()
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(minfo.ControllerUUID, gc.Equals, m.UUID)
+
+	err = s.store.AddController(ctl, m)
+	c.Assert(err, jc.ErrorIsNil)
+	err = s.store.UpdateCredential(&mongodoc.Credential{
+		User:  "bob",
+		Cloud: "dummy",
+		Name:  "cred1",
+		Type:  "empty",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	conn, err := s.store.OpenAPI(ctlId)
+	c.Assert(err, jc.ErrorIsNil)
+	defer conn.Close()
+	model, _, err := s.store.CreateModel(conn, jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", "model-1"},
+		ControllerPath: params.EntityPath{"bob", "controller"},
+		Credential:     "cred1",
+		Cloud:          "dummy",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	err = s.store.GrantModel(conn, model, "alice", "write")
+	c.Assert(err, jc.ErrorIsNil)
+	model1, err := s.store.Model(model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{"alice"}})
+	err = s.store.RevokeModel(conn, model, "alice", "superpowers")
+	c.Assert(err, gc.ErrorMatches, `invalid model access permission "superpowers"`)
+	model1, err = s.store.Model(model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{}})
+}

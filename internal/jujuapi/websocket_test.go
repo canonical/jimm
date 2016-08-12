@@ -559,6 +559,137 @@ func (s *websocketSuite) TestCreateModel(c *gc.C) {
 	}
 }
 
+func (s *websocketSuite) TestGrantAndRevokeModel(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
+	mi := s.assertCreateModel(c, "test-model", "test", "", "cred1", nil)
+
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := modelmanager.NewClient(conn)
+
+	conn2 := s.open(c, nil, "bob")
+	defer conn2.Close()
+	client2 := modelmanager.NewClient(conn2)
+
+	res, err := client2.ModelInfo([]names.ModelTag{names.NewModelTag(mi.UUID)})
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(res, gc.HasLen, 1)
+	c.Assert(res[0].Error, gc.ErrorMatches, "unauthorized")
+
+	err = client.GrantModel("bob@external", "write", mi.UUID)
+	c.Assert(err, jc.ErrorIsNil)
+
+	res, err = client2.ModelInfo([]names.ModelTag{names.NewModelTag(mi.UUID)})
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(res, gc.HasLen, 1)
+	c.Assert(res[0].Error, gc.IsNil)
+	c.Assert(res[0].Result.UUID, gc.Equals, mi.UUID)
+
+	err = client.RevokeModel("bob@external", "write", mi.UUID)
+	c.Assert(err, jc.ErrorIsNil)
+
+	res, err = client2.ModelInfo([]names.ModelTag{names.NewModelTag(mi.UUID)})
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(res, gc.HasLen, 1)
+	c.Assert(res[0].Error, gc.ErrorMatches, "unauthorized")
+}
+
+func (s *websocketSuite) TestModifyModelErrors(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "alice", Name: "controller-1"}, true)
+	s.AssertAddController(c, params.EntityPath{User: "bob", Name: "controller-1"}, true)
+	s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
+	s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
+	mi := s.assertCreateModel(c, "test-model", "alice", "", "cred1", nil)
+	mi2 := s.assertCreateModel(c, "test-model", "bob", "", "cred1", nil)
+
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	modifyModelAccessErrorTests := []struct {
+		about             string
+		modifyModelAccess jujuparams.ModifyModelAccess
+		expectError       string
+	}{{
+		about: "unauthorized",
+		modifyModelAccess: jujuparams.ModifyModelAccess{
+			UserTag:  names.NewUserTag("eve@external").String(),
+			Action:   jujuparams.GrantModelAccess,
+			Access:   jujuparams.ModelReadAccess,
+			ModelTag: names.NewModelTag(mi2.UUID).String(),
+		},
+		expectError: "unauthorized",
+	}, {
+		about: "bad user domain",
+		modifyModelAccess: jujuparams.ModifyModelAccess{
+			UserTag:  names.NewUserTag("eve@local").String(),
+			Action:   jujuparams.GrantModelAccess,
+			Access:   jujuparams.ModelReadAccess,
+			ModelTag: names.NewModelTag(mi.UUID).String(),
+		},
+		expectError: `unsupported domain "local"`,
+	}, {
+		about: "no such model",
+		modifyModelAccess: jujuparams.ModifyModelAccess{
+			UserTag:  names.NewUserTag("eve@external").String(),
+			Action:   jujuparams.GrantModelAccess,
+			Access:   jujuparams.ModelReadAccess,
+			ModelTag: names.NewModelTag("00000000-0000-0000-0000-000000000000").String(),
+		},
+		expectError: `model "00000000-0000-0000-0000-000000000000" not found`,
+	}, {
+		about: "invalid model tag",
+		modifyModelAccess: jujuparams.ModifyModelAccess{
+			UserTag:  names.NewUserTag("eve@external").String(),
+			Action:   jujuparams.GrantModelAccess,
+			Access:   jujuparams.ModelReadAccess,
+			ModelTag: "not-a-model-tag",
+		},
+		expectError: `invalid model tag: "not-a-model-tag" is not a valid tag`,
+	}, {
+		about: "invalid user tag",
+		modifyModelAccess: jujuparams.ModifyModelAccess{
+			UserTag:  "not-a-user-tag",
+			Action:   jujuparams.GrantModelAccess,
+			Access:   jujuparams.ModelReadAccess,
+			ModelTag: names.NewModelTag(mi.UUID).String(),
+		},
+		expectError: `invalid user tag: "not-a-user-tag" is not a valid tag`,
+	}, {
+		about: "unknown action",
+		modifyModelAccess: jujuparams.ModifyModelAccess{
+			UserTag:  names.NewUserTag("eve@external").String(),
+			Action:   "not-an-action",
+			Access:   jujuparams.ModelReadAccess,
+			ModelTag: names.NewModelTag(mi.UUID).String(),
+		},
+		expectError: `invalid action "not-an-action"`,
+	}, {
+		about: "invalid access",
+		modifyModelAccess: jujuparams.ModifyModelAccess{
+			UserTag:  names.NewUserTag("eve@external").String(),
+			Action:   jujuparams.GrantModelAccess,
+			Access:   "not-an-access",
+			ModelTag: names.NewModelTag(mi.UUID).String(),
+		},
+		expectError: `invalid model access permission "not-an-access"`,
+	}}
+
+	for i, test := range modifyModelAccessErrorTests {
+		c.Logf("%d. %s", i, test.about)
+		var res jujuparams.ErrorResults
+		req := jujuparams.ModifyModelAccessRequest{
+			Changes: []jujuparams.ModifyModelAccess{
+				test.modifyModelAccess,
+			},
+		}
+		err := conn.APICall("ModelManager", 2, "", "ModifyModelAccess", req, &res)
+		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(res.Results, gc.HasLen, 1)
+		c.Assert(res.Results[0].Error, gc.ErrorMatches, test.expectError)
+	}
+}
+
 type testHeartMonitor struct {
 	c         chan time.Time
 	firstBeat chan struct{}

@@ -919,6 +919,59 @@ func (s *jemSuite) TestSetACL(c *gc.C) {
 		Read: []string{"t2", "t1"},
 	})
 	c.Assert(err, gc.ErrorMatches, `"bob/bar" not found`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}
+
+func (s *jemSuite) TestGrant(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	err := s.store.AddController(&mongodoc.Controller{
+		Path: ctlPath,
+		UUID: "fake-uuid",
+	}, &mongodoc.Model{
+		UUID: "fake-uuid",
+	})
+	c.Assert(err, gc.IsNil)
+
+	err = s.store.Grant(s.store.DB.Controllers(), ctlPath, "t1")
+	c.Assert(err, gc.IsNil)
+	var cnt mongodoc.Controller
+	err = s.store.DB.Controllers().FindId(ctlPath.String()).One(&cnt)
+	c.Assert(err, gc.IsNil)
+	c.Assert(cnt.ACL, jc.DeepEquals, params.ACL{
+		Read: []string{"t1"},
+	})
+
+	err = s.store.Grant(s.store.DB.Controllers(), params.EntityPath{"bob", "bar"}, "t1")
+	c.Assert(err, gc.ErrorMatches, `"bob/bar" not found`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}
+
+func (s *jemSuite) TestRevoke(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	err := s.store.AddController(&mongodoc.Controller{
+		Path: ctlPath,
+		UUID: "fake-uuid",
+	}, &mongodoc.Model{
+		UUID: "fake-uuid",
+	})
+	c.Assert(err, gc.IsNil)
+
+	err = s.store.SetACL(s.store.DB.Controllers(), ctlPath, params.ACL{
+		Read: []string{"t1", "t2"},
+	})
+	c.Assert(err, gc.IsNil)
+	err = s.store.Revoke(s.store.DB.Controllers(), ctlPath, "t2")
+	c.Assert(err, gc.IsNil)
+	var cnt mongodoc.Controller
+	err = s.store.DB.Controllers().FindId(ctlPath.String()).One(&cnt)
+	c.Assert(err, gc.IsNil)
+	c.Assert(cnt.ACL, jc.DeepEquals, params.ACL{
+		Read: []string{"t1"},
+	})
+
+	err = s.store.Revoke(s.store.DB.Controllers(), params.EntityPath{"bob", "bar"}, "t2")
+	c.Assert(err, gc.ErrorMatches, `"bob/bar" not found`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
 func parseTime(s string) time.Time {
