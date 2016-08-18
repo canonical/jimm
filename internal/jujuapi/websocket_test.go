@@ -5,6 +5,7 @@ package jujuapi_test
 import (
 	"bytes"
 	"encoding/pem"
+	"fmt"
 	"net/http/httptest"
 	"net/url"
 	"sync"
@@ -109,7 +110,6 @@ func (s *websocketSuite) TestAdminIDFails(c *gc.C) {
 func (s *websocketSuite) TestLoginToController(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, &api.Info{
-		ModelTag:  s.APIInfo(c).ModelTag,
 		SkipLogin: true,
 	}, "test")
 	defer conn.Close()
@@ -137,20 +137,26 @@ func (s *websocketSuite) TestUnimplementedMethodFails(c *gc.C) {
 
 func (s *websocketSuite) TestUnimplementedRootFails(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	conn := s.open(c, &api.Info{
-		ModelTag: s.APIInfo(c).ModelTag,
-	}, "test")
+	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	var resp jujuparams.RedirectInfoResult
 	err := conn.APICall("NoSuch", 1, "", "Method", nil, &resp)
 	c.Assert(err, gc.ErrorMatches, `unknown version \(1\) of interface "NoSuch" \(not implemented\)`)
 }
 
+func (s *websocketSuite) TestDefaultCloud(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := cloudapi.NewClient(conn)
+	cloud, err := client.DefaultCloud()
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(cloud, gc.Equals, names.NewCloudTag("dummy"))
+}
+
 func (s *websocketSuite) TestCloudCall(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	conn := s.open(c, &api.Info{
-		ModelTag: s.APIInfo(c).ModelTag,
-	}, "test")
+	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
 	info, err := client.Cloud(names.NewCloudTag("dummy"))
@@ -158,6 +164,9 @@ func (s *websocketSuite) TestCloudCall(c *gc.C) {
 	c.Assert(info, jc.DeepEquals, cloud.Cloud{
 		Type:      "dummy",
 		AuthTypes: []cloud.AuthType{"empty"},
+		Regions: []cloud.Region{{
+			Name: "dummy-region",
+		}},
 	})
 }
 
@@ -174,20 +183,13 @@ func (s *websocketSuite) TestCloudCredentials(c *gc.C) {
 			"attr2": "val2",
 		},
 	})
-	conn := s.open(c, &api.Info{
-		ModelTag: s.APIInfo(c).ModelTag,
-	}, "test")
+	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
 	creds, err := client.Credentials(names.NewUserTag("test@external"), names.NewCloudTag("dummy"))
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(creds, jc.DeepEquals, map[string]cloud.Credential{
-		"cred1": cloud.NewCredential(
-			"credtype", map[string]string{
-				"attr1": "val1",
-				"attr2": "val2",
-			},
-		),
+	c.Assert(creds, jc.DeepEquals, []names.CloudCredentialTag{
+		names.NewCloudCredentialTag("dummy/test@external/cred1"),
 	})
 }
 
@@ -218,28 +220,19 @@ func (s *websocketSuite) TestCloudCredentialsACL(c *gc.C) {
 			"attr2": "val4",
 		},
 	})
-	conn := s.open(c, &api.Info{
-		ModelTag: s.APIInfo(c).ModelTag,
-	}, "test")
+	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
 	creds, err := client.Credentials(names.NewUserTag("test2@external"), names.NewCloudTag("dummy"))
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(creds, jc.DeepEquals, map[string]cloud.Credential{
-		"cred2": cloud.NewCredential(
-			"credtype", map[string]string{
-				"attr1": "val3",
-				"attr2": "val4",
-			},
-		),
+	c.Assert(creds, jc.DeepEquals, []names.CloudCredentialTag{
+		names.NewCloudCredentialTag("dummy/test2@external/cred2"),
 	})
 }
 
 func (s *websocketSuite) TestCloudCredentialsErrors(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	conn := s.open(c, &api.Info{
-		ModelTag: s.APIInfo(c).ModelTag,
-	}, "test")
+	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	req := jujuparams.UserClouds{
 		UserClouds: []jujuparams.UserCloud{{
@@ -247,7 +240,7 @@ func (s *websocketSuite) TestCloudCredentialsErrors(c *gc.C) {
 			CloudTag: "dummy",
 		}},
 	}
-	var resp jujuparams.CloudCredentialsResults
+	var resp jujuparams.StringsResults
 	err := conn.APICall("Cloud", 1, "", "Credentials", req, &resp)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `bad request: "not-a-user-tag" is not a valid tag`)
@@ -256,80 +249,57 @@ func (s *websocketSuite) TestCloudCredentialsErrors(c *gc.C) {
 
 func (s *websocketSuite) TestUpdateCloudCredentials(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	conn := s.open(c, &api.Info{
-		ModelTag: s.APIInfo(c).ModelTag,
-	}, "test")
+	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
-	credsMap := map[string]cloud.Credential{
-		"cred3": cloud.NewCredential("credtype", map[string]string{"attr1": "val31", "attr2": "val32"}),
-		"cred4": cloud.NewCredential("credtype2", map[string]string{"attr1": "val41", "attr2": "val42"}),
-	}
-	err := client.UpdateCredentials(names.NewUserTag("test@external"), names.NewCloudTag("dummy"), credsMap)
+	credentialTag := names.NewCloudCredentialTag(fmt.Sprintf("dummy/test@external/cred3"))
+	err := client.UpdateCredential(credentialTag, cloud.NewCredential("credtype", map[string]string{"attr1": "val31", "attr2": "val32"}))
 	c.Assert(err, jc.ErrorIsNil)
 	creds, err := client.Credentials(names.NewUserTag("test@external"), names.NewCloudTag("dummy"))
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(creds, jc.DeepEquals, credsMap)
-	updateMap := map[string]cloud.Credential{
-		"cred3": cloud.NewCredential("credtype", map[string]string{"attr1": "val33", "attr2": "val34"}),
-	}
-	err = client.UpdateCredentials(names.NewUserTag("test@external"), names.NewCloudTag("dummy"), updateMap)
+	c.Assert(creds, jc.DeepEquals, []names.CloudCredentialTag{credentialTag})
+	err = client.UpdateCredential(credentialTag, cloud.NewCredential("credtype", map[string]string{"attr1": "val33", "attr2": "val34"}))
 	c.Assert(err, jc.ErrorIsNil)
-	credsMap["cred3"] = updateMap["cred3"]
 	creds, err = client.Credentials(names.NewUserTag("test@external"), names.NewCloudTag("dummy"))
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(creds, jc.DeepEquals, credsMap)
+	var _ = creds
 }
 
 func (s *websocketSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	conn := s.open(c, &api.Info{
-		ModelTag: s.APIInfo(c).ModelTag,
-	}, "test")
+	conn := s.open(c, nil, "test")
 	defer conn.Close()
-	req := jujuparams.UsersCloudCredentials{
-		Users: []jujuparams.UserCloudCredentials{{
-			UserTag:  "not-a-user-tag",
-			CloudTag: names.NewCloudTag("dummy").String(),
-			Credentials: map[string]jujuparams.CloudCredential{
-				"cred1": jujuparams.CloudCredential{
-					AuthType: "credtype",
-					Attributes: map[string]string{
-						"attr1": "val1",
-					},
+	req := jujuparams.UpdateCloudCredentials{
+		Credentials: []jujuparams.UpdateCloudCredential{{
+			Tag: "not-a-cloud-credentials-tag",
+			Credential: jujuparams.CloudCredential{
+				AuthType: "credtype",
+				Attributes: map[string]string{
+					"attr1": "val1",
 				},
 			},
 		}, {
-			UserTag:  names.NewUserTag("invalid--user@external").String(),
-			CloudTag: names.NewCloudTag("dummy").String(),
-			Credentials: map[string]jujuparams.CloudCredential{
-				"cred1": jujuparams.CloudCredential{
-					AuthType: "credtype",
-					Attributes: map[string]string{
-						"attr1": "val1",
-					},
+			Tag: names.NewCloudCredentialTag("dummy/invalid--user@external/cred1").String(),
+			Credential: jujuparams.CloudCredential{
+				AuthType: "credtype",
+				Attributes: map[string]string{
+					"attr1": "val1",
 				},
 			},
 		}, {
-			UserTag:  names.NewUserTag("test2@external").String(),
-			CloudTag: names.NewCloudTag("dummy").String(),
-			Credentials: map[string]jujuparams.CloudCredential{
-				"cred1": jujuparams.CloudCredential{
-					AuthType: "credtype",
-					Attributes: map[string]string{
-						"attr1": "val1",
-					},
+			Tag: names.NewCloudCredentialTag("dummy/test2@external/cred1").String(),
+			Credential: jujuparams.CloudCredential{
+				AuthType: "credtype",
+				Attributes: map[string]string{
+					"attr1": "val1",
 				},
 			},
 		}, {
-			UserTag:  names.NewUserTag("test@external").String(),
-			CloudTag: names.NewCloudTag("dummy").String(),
-			Credentials: map[string]jujuparams.CloudCredential{
-				"bad--name": jujuparams.CloudCredential{
-					AuthType: "credtype",
-					Attributes: map[string]string{
-						"attr1": "val1",
-					},
+			Tag: names.NewCloudCredentialTag("dummy/test@external/bad--name").String(),
+			Credential: jujuparams.CloudCredential{
+				AuthType: "credtype",
+				Attributes: map[string]string{
+					"attr1": "val1",
 				},
 			},
 		}},
@@ -337,10 +307,10 @@ func (s *websocketSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
 	var resp jujuparams.ErrorResults
 	err := conn.APICall("Cloud", 1, "", "UpdateCredentials", req, &resp)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `bad request: "not-a-user-tag" is not a valid tag`)
-	c.Assert(resp.Results[1].Error, gc.ErrorMatches, `bad request: invalid user name "invalid--user"`)
+	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `bad request: "not-a-cloud-credentials-tag" is not a valid tag`)
+	c.Assert(resp.Results[1].Error, gc.ErrorMatches, `invalid user name "invalid--user"`)
 	c.Assert(resp.Results[2].Error, gc.ErrorMatches, `unauthorized`)
-	c.Assert(resp.Results[3].Error, gc.ErrorMatches, `bad request: invalid name "bad--name"`)
+	c.Assert(resp.Results[3].Error, gc.ErrorMatches, `invalid name "bad--name"`)
 	c.Assert(resp.Results, gc.HasLen, 4)
 }
 
@@ -395,8 +365,8 @@ func (s *websocketSuite) TestListModels(c *gc.C) {
 
 func (s *websocketSuite) TestModelInfo(c *gc.C) {
 	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	cred1 := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
-	cred2 := s.AssertUpdateCredential(c, "test2", "dummy", "cred1", "empty")
+	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
+	s.AssertUpdateCredential(c, "test2", "dummy", "cred1", "empty")
 	err := s.JEM.SetACL(s.JEM.DB.Controllers(), ctlPath, params.ACL{
 		Read: []string{"test2"},
 	})
@@ -432,15 +402,16 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 	}
 	c.Assert(models, jc.DeepEquals, []jujuparams.ModelInfoResult{{
 		Result: &jujuparams.ModelInfo{
-			Name:            "model-1",
-			UUID:            modelUUID1,
-			ControllerUUID:  "controller-uuid",
-			ProviderType:    "dummy",
-			DefaultSeries:   "xenial",
-			Cloud:           "dummy",
-			CloudCredential: string(cred1),
-			OwnerTag:        names.NewUserTag("test@external").String(),
-			Life:            jujuparams.Alive,
+			Name:               "model-1",
+			UUID:               modelUUID1,
+			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+			ProviderType:       "dummy",
+			DefaultSeries:      "xenial",
+			Cloud:              "dummy",
+			CloudRegion:        "dummy-region",
+			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test@external/cred1").String(),
+			OwnerTag:           names.NewUserTag("test@external").String(),
+			Life:               jujuparams.Alive,
 			Status: jujuparams.EntityStatus{
 				Status: status.StatusAvailable,
 			},
@@ -456,15 +427,16 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 		},
 	}, {
 		Result: &jujuparams.ModelInfo{
-			Name:            "model-3",
-			UUID:            modelUUID3,
-			ControllerUUID:  "controller-uuid",
-			ProviderType:    "dummy",
-			DefaultSeries:   "xenial",
-			Cloud:           "dummy",
-			CloudCredential: string(cred2),
-			OwnerTag:        names.NewUserTag("test2@external").String(),
-			Life:            jujuparams.Alive,
+			Name:               "model-3",
+			UUID:               modelUUID3,
+			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+			ProviderType:       "dummy",
+			DefaultSeries:      "xenial",
+			Cloud:              "dummy",
+			CloudRegion:        "dummy-region",
+			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test2@external/cred1").String(),
+			OwnerTag:           names.NewUserTag("test2@external").String(),
+			Life:               jujuparams.Alive,
 			Status: jujuparams.EntityStatus{
 				Status: status.StatusAvailable,
 			},
@@ -489,37 +461,37 @@ var createModelTests = []struct {
 	about:      "success",
 	name:       "model",
 	owner:      "test@external",
-	credential: "cred1",
+	credential: "dummy_test@external_cred1",
 }, {
 	about:       "unauthorized user",
 	name:        "model-2",
 	owner:       "not-test@external",
-	credential:  "cred1",
+	credential:  "dummy_test@external_cred1",
 	expectError: "unauthorized",
 }, {
 	about:       "existing model name",
 	name:        "existing-model",
 	owner:       "test@external",
-	credential:  "cred1",
+	credential:  "dummy_test@external_cred1",
 	expectError: "already exists",
 }, {
 	about:       "no controller",
 	name:        "model-3",
 	owner:       "test@external",
 	region:      "no-such-region",
-	credential:  "cred1",
+	credential:  "dummy_test@external_cred1",
 	expectError: `no matching controllers found \(not found\)`,
 }, {
 	about:       "local user",
 	name:        "model-4",
 	owner:       "test@local",
-	credential:  "cred1",
+	credential:  "dummy_test@external_cred1",
 	expectError: `unauthorized`,
 }, {
 	about:       "invalid user",
 	name:        "model-5",
 	owner:       "test/test@external",
-	credential:  "cred1",
+	credential:  "dummy_test@external_cred1",
 	expectError: `invalid owner tag: "user-test/test@external" is not a valid user tag`,
 }}
 
@@ -535,11 +507,11 @@ func (s *websocketSuite) TestCreateModel(c *gc.C) {
 		c.Logf("test %d. %s", i, test.about)
 		var mi jujuparams.ModelInfo
 		err := conn.APICall("ModelManager", 2, "", "CreateModel", jujuparams.ModelCreateArgs{
-			Name:            test.name,
-			OwnerTag:        "user-" + test.owner,
-			Config:          test.config,
-			CloudRegion:     test.region,
-			CloudCredential: test.credential,
+			Name:               test.name,
+			OwnerTag:           "user-" + test.owner,
+			Config:             test.config,
+			CloudRegion:        test.region,
+			CloudCredentialTag: "cloudcred-" + test.credential,
 		}, &mi)
 		if test.expectError != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
@@ -550,7 +522,7 @@ func (s *websocketSuite) TestCreateModel(c *gc.C) {
 		c.Assert(mi.UUID, gc.Not(gc.Equals), "")
 		ownerTag := names.NewUserTag(test.owner)
 		c.Assert(mi.OwnerTag, gc.Equals, ownerTag.String())
-		c.Assert(mi.ControllerUUID, gc.Equals, "controller-uuid")
+		c.Assert(mi.ControllerUUID, gc.Equals, "914487b5-60e7-42bb-bd63-1adc3fd3a388")
 		c.Assert(mi.Users, jc.DeepEquals, []jujuparams.ModelUserInfo{{
 			UserName:    test.owner,
 			DisplayName: ownerTag.Name(),
@@ -817,7 +789,8 @@ func (s *websocketSuite) assertCreateModel(c *gc.C, name, username, region, cred
 	conn := s.open(c, nil, username)
 	defer conn.Close()
 	client := modelmanager.NewClient(conn)
-	mi, err := client.CreateModel(name, username+"@external", region, credential, config)
+	credentialTag := names.NewCloudCredentialTag(fmt.Sprintf("dummy/%s@external/%s", username, credential))
+	mi, err := client.CreateModel(name, username+"@external", region, credentialTag, config)
 	c.Assert(err, jc.ErrorIsNil)
 	return mi
 }

@@ -458,6 +458,7 @@ func (j *JEM) OpenAPI(path params.EntityPath) (*apiconn.Conn, error) {
 			return nil, nil, errgo.NoteMask(err, fmt.Sprintf("cannot get controller for model %q", m.UUID), errgo.Is(params.ErrNotFound))
 		}
 		apiInfo := apiInfoFromDocs(ctl, m)
+		logger.Infof("%#v", apiInfo)
 		st, err := api.Open(apiInfo, apiDialOpts())
 		if err != nil {
 			return nil, nil, errgo.WithCausef(err, ErrAPIConnection, "")
@@ -660,7 +661,6 @@ func apiInfoFromDocs(ctl *mongodoc.Controller, m *mongodoc.Model) *api.Info {
 		CACert:   ctl.CACert,
 		Tag:      names.NewUserTag(ctl.AdminUser),
 		Password: ctl.AdminPassword,
-		ModelTag: names.NewModelTag(m.UUID),
 	}
 }
 

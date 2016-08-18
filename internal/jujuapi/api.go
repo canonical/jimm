@@ -16,7 +16,8 @@ import (
 func NewAPIHandler(jp *jem.Pool, params jemserver.Params) ([]httprequest.Handler, error) {
 	return []httprequest.Handler{
 		newWebSocketHandler(jp, params),
-		newRootWebSocketHandler(jp, params),
+		newRootWebSocketHandler(jp, params, "/"),
+		newRootWebSocketHandler(jp, params, "/api"),
 	}, nil
 }
 
@@ -33,10 +34,10 @@ func newWebSocketHandler(jp *jem.Pool, params jemserver.Params) httprequest.Hand
 	}
 }
 
-func newRootWebSocketHandler(jp *jem.Pool, params jemserver.Params) httprequest.Handler {
+func newRootWebSocketHandler(jp *jem.Pool, params jemserver.Params, path string) httprequest.Handler {
 	return httprequest.Handler{
 		Method: "GET",
-		Path:   "/",
+		Path:   path,
 		Handle: func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 			j := jp.JEM()
 			defer j.Close()
