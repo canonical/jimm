@@ -4,12 +4,12 @@ package modelcmd
 
 import (
 	"github.com/juju/cmd"
+	"github.com/juju/gnuflag"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/environs"
 	"github.com/juju/juju/environs/bootstrap"
 	"github.com/juju/juju/jujuclient"
 	"gopkg.in/errgo.v1"
-	"launchpad.net/gnuflag"
 
 	"github.com/CanonicalLtd/jem/params"
 )

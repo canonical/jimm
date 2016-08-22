@@ -7,6 +7,7 @@ import (
 
 	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/idmtest"
+	cloudapi "github.com/juju/juju/api/cloud"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
@@ -152,6 +153,6 @@ func assertConnIsClosed(c *gc.C, conn *apiconn.Conn) {
 // assertConnectionAlive asserts that the given API
 // connection is responding to requests.
 func (s *jemAPIConnSuite) assertConnectionAlive(c *gc.C, conn *apiconn.Conn) {
-	err := conn.Ping()
+	_, err := cloudapi.NewClient(conn).DefaultCloud()
 	c.Assert(err, gc.IsNil)
 }

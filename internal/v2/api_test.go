@@ -8,9 +8,6 @@ import (
 	"time"
 
 	"github.com/juju/juju/api"
-	"github.com/juju/juju/api/modelmanager"
-	"github.com/juju/juju/api/usermanager"
-	jujuparams "github.com/juju/juju/apiserver/params"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
@@ -305,13 +302,10 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			EntityPath: modelPath,
 		})
 		c.Assert(err, gc.IsNil)
-		st := openAPIFromModelResponse(c, modelResp)
+		st := s.openAPIFromModelResponse(c, modelResp, string(modelPath.User))
 		st.Close()
-		c.Assert(modelResp.Password, gc.Not(gc.Equals), "")
-		modelResp.Password = ""
 		c.Assert(modelResp, jc.DeepEquals, &params.ModelResponse{
 			Path:           modelPath,
-			User:           "jem-" + string(authUser),
 			HostPorts:      test.body.HostPorts,
 			CACert:         test.body.CACert,
 			UUID:           test.body.ControllerUUID,
@@ -400,14 +394,13 @@ func (s *APISuite) TestDeleteModel(c *gc.C) {
 	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "who"}, false)
 	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
 	modelPath := params.EntityPath{"bob", "foobarred"}
-	modelId, user, uuid := s.CreateModel(c, modelPath, ctlId, cred)
+	modelId, uuid := s.CreateModel(c, modelPath, ctlId, cred)
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.JEMSrv,
 		URL:     "/v2/model/" + modelId.String(),
 		Do:      apitest.Do(s.IDMSrv.Client("bob")),
 	})
 	c.Assert(resp.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %s", resp.Body.Bytes()))
-	c.Assert(user, gc.NotNil)
 	c.Assert(uuid, gc.NotNil)
 
 	// Delete model.
@@ -522,7 +515,7 @@ func (s *APISuite) TestGetControllerLocation(c *gc.C) {
 		URL:          "/v2/controller/" + ctlId.String() + "/meta/location",
 		ExpectStatus: http.StatusOK,
 		ExpectBody: params.ControllerLocation{
-			Location: map[string]string{"cloud": "dummy"},
+			Location: map[string]string{"cloud": "dummy", "region": "dummy-region"},
 		},
 		Do: apitest.Do(s.IDMSrv.Client("bob")),
 	})
@@ -607,7 +600,7 @@ func (s *APISuite) TestDeleteController(c *gc.C) {
 	c.Assert(resp.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %s", resp.Body.Bytes()))
 	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
 	// Add another model to it.
-	modelId, _, _ := s.CreateModel(c, params.EntityPath{"bob", "bar"}, ctlId, cred)
+	modelId, _ := s.CreateModel(c, params.EntityPath{"bob", "bar"}, ctlId, cred)
 
 	// Check that we can't delete it because it's marked as "available"
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -1099,7 +1092,7 @@ func (s *APISuite) TestNewModel(c *gc.C) {
 	err := json.Unmarshal(modelRespBody, &modelResp)
 	c.Assert(err, gc.IsNil)
 
-	st := openAPIFromModelResponse(c, &modelResp)
+	st := s.openAPIFromModelResponse(c, &modelResp, "bob")
 	defer st.Close()
 
 	minfo, err := st.Client().ModelInfo()
@@ -1117,7 +1110,7 @@ func (s *APISuite) TestNewModel(c *gc.C) {
 		},
 	})
 	c.Assert(err, gc.IsNil)
-	st = openAPIFromModelResponse(c, modelResp2)
+	st = s.openAPIFromModelResponse(c, modelResp2, "bob")
 	defer st.Close()
 	minfo2, err := st.Client().ModelInfo()
 	c.Assert(err, gc.IsNil)
@@ -1279,12 +1272,8 @@ func (s *APISuite) TestGetModel(c *gc.C) {
 	var modelResp params.ModelResponse
 	err = json.Unmarshal(modelRespBody, &modelResp)
 	c.Assert(err, gc.IsNil)
-	// The password is unpredictable and tested elsewhere.
-	c.Assert(modelResp.Password, gc.Not(gc.Equals), "")
-	modelResp.Password = ""
 	c.Assert(modelResp, jc.DeepEquals, params.ModelResponse{
 		Path:             ctlId,
-		User:             "jem-bob",
 		UUID:             info.ModelTag.Id(),
 		ControllerPath:   ctlId,
 		ControllerUUID:   info.ModelTag.Id(),
@@ -1299,68 +1288,16 @@ func newTime(t time.Time) *time.Time {
 	return &t
 }
 
-func (s *APISuite) TestGetModelWithExplicitlyRemovedUser(c *gc.C) {
-	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, false)
-	cred := s.AssertUpdateCredential(c, "buddies", "dummy", "cred1", "empty")
-
-	s.IDMSrv.AddUser("alice", "buddies")
-	s.IDMSrv.AddUser("bob", "buddies")
-	resp, err := s.NewClient("bob").NewModel(&params.NewModel{
-		User: "buddies",
-		Info: params.NewModelInfo{
-			Name:       "bobsmodel",
-			Controller: &ctlId,
-			Credential: cred,
-			Location: map[string]string{
-				"cloud": "dummy",
-			},
-			Config: dummyModelConfig,
-		},
+func (s *APISuite) openAPIFromModelResponse(c *gc.C, resp *params.ModelResponse, username string) api.Connection {
+	st, err := api.Open(apiInfoFromModelResponse(resp), api.DialOpts{
+		BakeryClient: s.IDMSrv.Client(username),
 	})
 	c.Assert(err, gc.IsNil)
-	modelId := resp.Path
-
-	// Alice is part of the same group, so check that she can get and use
-	// the model.
-	resp, err = s.NewClient("alice").GetModel(&params.GetModel{
-		EntityPath: modelId,
-	})
-	c.Assert(err, gc.IsNil)
-	st := openAPIFromModelResponse(c, resp)
-	st.Close()
-
-	// Explicitly revoke access directly on the controller.
-	mmClient := modelmanager.NewClient(s.APIState)
-	err = mmClient.RevokeModel("jem-alice", string(jujuparams.ModelReadAccess), resp.UUID)
-	c.Assert(err, gc.IsNil)
-
-	// Sanity-check that we really have removed access.
-	st, err = api.Open(apiInfoFromModelResponse(resp), api.DialOpts{})
-	c.Assert(err, jc.Satisfies, jujuparams.IsCodeUnauthorized)
-
-	// Get the model again. Alice should not be added back to the permissions.
-	resp, err = s.NewClient("alice").GetModel(&params.GetModel{
-		EntityPath: modelId,
-	})
-	c.Assert(err, gc.IsNil)
-
-	// Alice should still be denied, despite having access to the model
-	// in JEM.
-	st, err = api.Open(apiInfoFromModelResponse(resp), api.DialOpts{})
-	c.Assert(err, gc.NotNil)
-	c.Assert(err, jc.Satisfies, jujuparams.IsCodeUnauthorized)
-}
-
-func openAPIFromModelResponse(c *gc.C, resp *params.ModelResponse) api.Connection {
-	st, err := api.Open(apiInfoFromModelResponse(resp), api.DialOpts{})
-	c.Assert(err, gc.IsNil, gc.Commentf("user: %q; password: %q", resp.User, resp.Password))
 	return st
 }
 
 func apiInfoFromModelResponse(resp *params.ModelResponse) *api.Info {
 	return &api.Info{
-		Tag:      names.NewUserTag(resp.User),
-		Password: resp.Password,
 		Addrs:    resp.HostPorts,
 		CACert:   resp.CACert,
 		ModelTag: names.NewModelTag(resp.UUID),
@@ -1396,57 +1333,10 @@ func (s *APISuite) TestNewModelUnderGroup(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// Ensure that we can connect to the new model
-	st := openAPIFromModelResponse(c, &modelResp)
+	// Note: juju controllers cannot check groups yet, so we connect
+	// directly with a username that is the group name.
+	st := s.openAPIFromModelResponse(c, &modelResp, "beatles")
 	st.Close()
-}
-
-func (s *APISuite) TestNewModelWithExistingUser(c *gc.C) {
-	username := "jem-bob"
-
-	_, _, err := usermanager.NewClient(s.APIState).AddUser(username, "", "old", "")
-	c.Assert(err, gc.IsNil)
-
-	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, false)
-	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
-
-	var modelRespBody json.RawMessage
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Method:  "POST",
-		URL:     "/v2/model/bob",
-		Handler: s.JEMSrv,
-		JSONBody: params.NewModelInfo{
-			Name:       params.Name("bar"),
-			Controller: &ctlId,
-			Credential: cred,
-			Location: map[string]string{
-				"cloud": "dummy",
-			},
-			Config: dummyModelConfig,
-		},
-		ExpectBody: httptesting.BodyAsserter(func(_ *gc.C, body json.RawMessage) {
-			modelRespBody = body
-		}),
-		Do: apitest.Do(s.IDMSrv.Client("bob")),
-	})
-	var modelResp params.ModelResponse
-	err = json.Unmarshal(modelRespBody, &modelResp)
-	c.Assert(err, gc.IsNil)
-
-	// Make sure that we really are reusing the username.
-	c.Assert(modelResp.User, gc.Equals, username)
-
-	// Ensure that we can connect to the new model with
-	// the new secret
-	apiInfo := &api.Info{
-		Tag:      names.NewUserTag(username),
-		Password: modelResp.Password,
-		Addrs:    modelResp.HostPorts,
-		CACert:   modelResp.CACert,
-		ModelTag: names.NewModelTag(modelResp.UUID),
-	}
-	st, err := api.Open(apiInfo, api.DialOpts{})
-	c.Assert(err, gc.IsNil)
-	defer st.Close()
 }
 
 var newModelWithInvalidControllerPathTests = []struct {
@@ -1644,15 +1534,15 @@ func (s *APISuite) TestListController(c *gc.C) {
 	c.Assert(resp, jc.DeepEquals, &params.ListControllerResponse{
 		Controllers: []params.ControllerResponse{{
 			Path:             ctlId2,
-			Location:         map[string]string{"cloud": "dummy"},
+			Location:         map[string]string{"cloud": "dummy", "region": "dummy-region"},
 			UnavailableSince: newTime(mongodoc.Time(unavailableTime.Add(time.Second)).UTC()),
 		}, {
 			Path:     ctlId0,
-			Location: map[string]string{"cloud": "dummy"},
+			Location: map[string]string{"cloud": "dummy", "region": "dummy-region"},
 			Public:   true,
 		}, {
 			Path:             ctlId1,
-			Location:         map[string]string{"cloud": "dummy"},
+			Location:         map[string]string{"cloud": "dummy", "region": "dummy-region"},
 			UnavailableSince: newTime(mongodoc.Time(unavailableTime).UTC()),
 		}},
 	})
@@ -1700,8 +1590,8 @@ func (s *APISuite) TestListModels(c *gc.C) {
 	cCred := s.AssertUpdateCredential(c, "charlie", "dummy", "cred1", "empty")
 	s.allowModelPerm(c, ctlId0)
 	s.allowControllerPerm(c, ctlId0)
-	modelId1, _, uuid1 := s.CreateModel(c, params.EntityPath{"bob", "bar"}, ctlId0, bCred)
-	modelId2, _, uuid2 := s.CreateModel(c, params.EntityPath{"charlie", "bar"}, ctlId0, cCred)
+	modelId1, uuid1 := s.CreateModel(c, params.EntityPath{"bob", "bar"}, ctlId0, bCred)
+	modelId2, uuid2 := s.CreateModel(c, params.EntityPath{"charlie", "bar"}, ctlId0, cCred)
 	err := s.JEM.SetModelLife(ctlId0, uuid2, "alive")
 	c.Assert(err, gc.IsNil)
 

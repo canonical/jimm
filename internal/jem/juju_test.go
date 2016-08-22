@@ -96,7 +96,16 @@ var createModelTests = []struct {
 		Cloud:          "dummy",
 		Region:         "not-a-region",
 	},
-	expectError: `cannot create model: getting cloud region definition: region "not-a-region" not found \(expected one of \[\]\) \(not found\)`,
+	expectError: `cannot create model: getting cloud region definition: region "not-a-region" not found \(expected one of \["dummy-region"\]\) \(not found\)`,
+}, {
+	about: "with region",
+	params: jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", ""},
+		ControllerPath: params.EntityPath{"bob", "controller"},
+		Credential:     "cred1",
+		Cloud:          "dummy",
+		Region:         "dummy-region",
+	},
 }}
 
 func (s *jujuSuite) TestCreateModel(c *gc.C) {

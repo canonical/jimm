@@ -57,8 +57,8 @@ func (s *locationsSuite) TestSuccess(c *gc.C) {
 
 	c.Logf("stdout: %q", stdout)
 	c.Assert(sanitizeTable(stdout), gc.Equals, `
-CLOUD
-dummy
+CLOUD REGION
+dummy dummy-region
 `[1:])
 
 	// Check it works with filters.
@@ -66,8 +66,8 @@ dummy
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stderr, gc.Equals, "")
 	c.Assert(sanitizeTable(stdout), gc.Equals, `
-CLOUD
-dummy
+CLOUD REGION
+dummy dummy-region
 `[1:])
 
 	// Check it's ok with a filter that doesn't match anything.

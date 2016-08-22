@@ -318,16 +318,6 @@ type ModelResponse struct {
 	// Path holds the path of the model.
 	Path EntityPath `json:"path"`
 
-	// User holds the admin user name associated
-	// with the model.
-	User string `json:"user"`
-
-	// Password holds the admin password associated with the
-	// model. If it is empty, macaroon authentication should
-	// be used to connect to the model (only possible when
-	// macaroon authentication is implemented by Juju).
-	Password string `json:"password"`
-
 	// UUID holds the UUID of the model.
 	UUID string `json:"uuid"`
 

@@ -3,6 +3,8 @@
 package jem
 
 import (
+	"fmt"
+
 	cloudapi "github.com/juju/juju/api/cloud"
 	"github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
@@ -65,7 +67,7 @@ func (j *JEM) CreateModel(conn *apiconn.Conn, p CreateModelParams) (*mongodoc.Mo
 		string(p.Path.Name),
 		UserTag(p.Path.User).Id(),
 		p.Region,
-		string(p.Credential),
+		CloudCredentialTag(p.Cloud, p.Path.User, p.Credential),
 		p.Attributes,
 	)
 	if err != nil {
@@ -92,6 +94,7 @@ func (j *JEM) CreateModel(conn *apiconn.Conn, p CreateModelParams) (*mongodoc.Mo
 func (j *JEM) UpdateControllerCredential(conn *apiconn.Conn, user params.User, cloud params.Cloud, name params.Name) error {
 	userTag := UserTag(user)
 	cloudTag := CloudTag(cloud)
+	cloudCredentialTag := CloudCredentialTag(cloud, user, name)
 	cred, err := j.Credential(user, cloud, name)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
@@ -105,15 +108,16 @@ func (j *JEM) UpdateControllerCredential(conn *apiconn.Conn, user params.User, c
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	for k := range controllerCreds {
-		if k == string(name) {
+	for _, credTag := range controllerCreds {
+		if credTag == cloudCredentialTag {
 			return nil
 		}
 	}
 
-	err = cloudClient.UpdateCredentials(userTag, cloudTag, map[string]jujucloud.Credential{
-		string(name): jujucloud.NewCredential(jujucloud.AuthType(cred.Type), cred.Attributes),
-	})
+	err = cloudClient.UpdateCredential(
+		cloudCredentialTag,
+		jujucloud.NewCredential(jujucloud.AuthType(cred.Type), cred.Attributes),
+	)
 	if err != nil {
 		return errgo.Notef(err, "cannot upload credentials")
 	}
@@ -154,4 +158,10 @@ func UserTag(u params.User) names.UserTag {
 // CloudTag creates a juju cloud tag from a params.Cloud
 func CloudTag(c params.Cloud) names.CloudTag {
 	return names.NewCloudTag(string(c))
+}
+
+// CloudCredentialTag creates a juju cloud credential tag from the given
+// cloud, user and name.
+func CloudCredentialTag(cloud params.Cloud, user params.User, name params.Name) names.CloudCredentialTag {
+	return names.NewCloudCredentialTag(fmt.Sprintf("%s/%s@external/%s", cloud, user, name))
 }

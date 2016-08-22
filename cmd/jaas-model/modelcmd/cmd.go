@@ -8,14 +8,12 @@ import (
 
 	"github.com/juju/cmd"
 	"github.com/juju/errors"
-	"github.com/juju/juju/api"
+	"github.com/juju/gnuflag"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/names.v2"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	"launchpad.net/gnuflag"
 
 	"github.com/CanonicalLtd/jem/jemclient"
 	"github.com/CanonicalLtd/jem/params"
@@ -59,9 +57,6 @@ func New() cmd.Command {
 		},
 	})
 	supercmd.Register(newAddControllerCommand())
-	supercmd.Register(newCreateCommand())
-	supercmd.Register(newGetCommand())
-	supercmd.Register(newGenerateCommand())
 	supercmd.Register(newGrantCommand())
 	supercmd.Register(newListCommand())
 	supercmd.Register(newListControllersCommand())
@@ -167,88 +162,6 @@ func (v *entityPathsValue) String() string {
 }
 
 var _ gnuflag.Value = (*entityPathsValue)(nil)
-
-// writeModel runs the given getEnv function and writes the result
-// into the local controller/account/model cache
-// using the given local model name and controller
-// name. The controller name may be empty if unknown,
-// in which case a new controller will be created
-// when necessary.
-//
-// It returns the a string suitable for passing to "juju switch"
-// to change to the new model.
-//
-// TODO(rog) re-use an old controller even if it does not fit
-// the jem naming convention.
-func writeModel(localModelName, localControllerName string, getEnv func() (*params.ModelResponse, error)) (string, error) {
-	store := jujuclient.NewFileClientStore()
-
-	ctlName, err := modelExists(store, localModelName, localControllerName)
-	if err != nil {
-		return "", errgo.Notef(err, "cannot check whether model exists")
-	}
-	if ctlName != "" {
-		return "", errgo.Notef(err, "local model %q already exists in controller %q", localModelName, ctlName)
-	}
-
-	resp, err := getEnv()
-	if err != nil {
-		return "", errgo.Mask(err)
-	}
-
-	// First try to connect to the model to ensure
-	// that the response is somewhat sane.
-	apiInfo := &api.Info{
-		Tag:      names.NewUserTag(resp.User),
-		Password: resp.Password,
-		Addrs:    resp.HostPorts,
-		CACert:   resp.CACert,
-		ModelTag: names.NewModelTag(resp.UUID),
-	}
-	st, err := api.Open(apiInfo, api.DialOpts{})
-	if err != nil {
-		return "", errgo.Notef(err, "cannot open model")
-	}
-	st.Close()
-
-	ctlName = jemControllerToLocalControllerName(resp.ControllerPath)
-	if localControllerName == "" {
-		localControllerName = ctlName
-	} else if localControllerName != ctlName {
-		return "", errgo.Newf("controller path %q in model response does not match expected controller %q", ctlName, localControllerName)
-	}
-
-	if err := ensureController(store, localControllerName, jujuclient.ControllerDetails{
-		UnresolvedAPIEndpoints: resp.HostPorts,
-		// We set APIEndpoints as well as UnresolvedAPIEndpoints because
-		// it seems the the juju API connection code ignores UnresolvedAPIEndpoints.
-		// See https://bugs.launchpad.net/juju-core/+bug/1566893.
-		APIEndpoints:   resp.HostPorts,
-		ControllerUUID: resp.ControllerUUID,
-		CACert:         resp.CACert,
-	}); err != nil {
-		return "", errgo.Mask(err)
-	}
-
-	localAcctName := resp.User + "@local"
-	// Now we've ensured that the controller exists, ensure
-	// that the user account also exists.
-	// TODO is every possible Juju user name also a valid
-	// account name?
-	if err := ensureAccount(store, localControllerName, jujuclient.AccountDetails{
-		User:     localAcctName,
-		Password: resp.Password,
-	}); err != nil {
-		return "", errgo.Mask(err)
-	}
-
-	if err := store.UpdateModel(localControllerName, localModelName, jujuclient.ModelDetails{
-		ModelUUID: resp.UUID,
-	}); err != nil {
-		return "", errgo.Notef(err, "cannot update model %q", localModelName)
-	}
-	return localControllerName + ":" + localModelName, nil
-}
 
 // ensureController ensures that the given named controller exists in
 // the store with the given details, creating one if necessary.

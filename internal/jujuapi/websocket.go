@@ -133,7 +133,7 @@ func (h *wsHandler) handle(wsConn *websocket.Conn) {
 	codec := jsoncodec.NewWebsocket(wsConn)
 	h.conn = rpc.NewConn(codec, observer.None())
 
-	h.conn.ServeFinder(h, func(err error) error {
+	h.conn.ServeRoot(h, func(err error) error {
 		return mapError(err)
 	})
 	h.heartMonitor = newHeartMonitor(h.params.WebsocketPingTimeout)
@@ -194,6 +194,12 @@ func (h *wsHandler) FindMethod(rootName string, version int, methodName string) 
 	}
 }
 
+// Kill implements rpcreflect.Root.Kill; it does nothing because there
+// are no long-running requests that need to be killed. If we add a
+// watcher, this will need to be changed.
+func (h *wsHandler) Kill() {
+}
+
 // root contains the root of the api handlers.
 type root struct {
 	h *wsHandler
@@ -245,12 +251,14 @@ type admin struct {
 // Login implements the Login method on the Admin facade.
 func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResultV1, error) {
 	if a.h.modelUUID != "" {
-		// If the UUID is for a model send a redirect error.
-		if a.h.model.Id != a.h.controller.Id {
-			return jujuparams.LoginResultV1{}, &jujuparams.Error{
-				Code:    jujuparams.CodeRedirect,
-				Message: "redirection required",
-			}
+		if a.h.model.Id == a.h.controller.Id {
+			// The client cannot log in to a controller model via JIMM.
+			return jujuparams.LoginResultV1{}, errgo.WithCausef(nil, params.ErrNotFound, "model %q not found", a.h.modelUUID)
+		}
+		// If the connection specifies a model then redirection is required.
+		return jujuparams.LoginResultV1{}, &jujuparams.Error{
+			Code:    jujuparams.CodeRedirect,
+			Message: "redirection required",
 		}
 	}
 
@@ -271,24 +279,12 @@ func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResultV1, err
 	}
 	a.h.jem.Auth.Username = attr["username"]
 
-	modelTag := ""
-	controllerTag := ""
-	if a.h.modelUUID != "" {
-		if err := a.h.jem.CheckCanRead(a.h.model); err != nil {
-			return jujuparams.LoginResultV1{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-		}
-
-		modelTag = names.NewModelTag(a.h.model.UUID).String()
-		controllerTag = names.NewModelTag(a.h.controller.UUID).String()
-	}
-
 	return jujuparams.LoginResultV1{
 		UserInfo: &jujuparams.AuthUserInfo{
 			DisplayName: a.h.jem.Auth.Username,
 			Identity:    names.NewUserTag(a.h.jem.Auth.Username).WithDomain("external").String(),
 		},
-		ModelTag:      modelTag,
-		ControllerTag: controllerTag,
+		ControllerTag: names.NewModelTag(a.h.params.ControllerUUID).String(),
 		Facades:       facadeVersions(),
 		ServerVersion: "2.0.0",
 	}, nil
@@ -321,7 +317,7 @@ func facadeVersions() []jujuparams.FacadeVersions {
 
 // RedirectInfo implements the RedirectInfo method on the Admin facade.
 func (a admin) RedirectInfo() (jujuparams.RedirectInfoResult, error) {
-	if a.h.modelUUID == "" || a.h.model.Id == a.h.controller.Id {
+	if a.h.modelUUID == "" {
 		return jujuparams.RedirectInfoResult{}, errgo.New("not redirected")
 	}
 	nhps, err := network.ParseHostPorts(a.h.controller.HostPorts...)
@@ -385,53 +381,32 @@ func (c cloud) cloud(cloudTag names.CloudTag) (*jujuparams.Cloud, error) {
 	return &cloudInfo, nil
 }
 
-// CloudDefaults implements the CloudDefaults method of the Cloud facade.
-func (c cloud) CloudDefaults(ents jujuparams.Entities) (jujuparams.CloudDefaultsResults, error) {
-	var res jujuparams.CloudDefaultsResults
-	res.Results = make([]jujuparams.CloudDefaultsResult, len(ents.Entities))
-	for i, e := range ents.Entities {
-		defs, err := c.cloudDefaults(e.Tag)
-		if err != nil {
-			res.Results[i].Error = mapError(err)
-			continue
-		}
-		res.Results[i] = jujuparams.CloudDefaultsResult{
-			Result: &defs,
-		}
-	}
-	return res, nil
-}
-
-// cloudDefaults generates CloudDefaults from the service configuration.
-func (c cloud) cloudDefaults(tag string) (jujuparams.CloudDefaults, error) {
-	_, err := names.ParseUserTag(tag)
-	if err != nil {
-		return jujuparams.CloudDefaults{}, errgo.WithCausef(err, params.ErrBadRequest, "")
-	}
-	return jujuparams.CloudDefaults{
-		CloudTag: names.NewCloudTag(c.h.params.DefaultCloud).String(),
+// DefaultCloud implements the DefaultCloud method of the Cloud facade.
+func (c cloud) DefaultCloud() (jujuparams.StringResult, error) {
+	return jujuparams.StringResult{
+		Result: names.NewCloudTag(c.h.params.DefaultCloud).String(),
 	}, nil
 }
 
 // Credentials implements the Credentials method of the Cloud facade.
-func (c cloud) Credentials(userclouds jujuparams.UserClouds) (jujuparams.CloudCredentialsResults, error) {
-	results := make([]jujuparams.CloudCredentialsResult, len(userclouds.UserClouds))
+func (c cloud) Credentials(userclouds jujuparams.UserClouds) (jujuparams.StringsResults, error) {
+	results := make([]jujuparams.StringsResult, len(userclouds.UserClouds))
 	for i, ent := range userclouds.UserClouds {
 		creds, err := c.credentials(ent.UserTag, ent.CloudTag)
 		if err != nil {
 			results[i].Error = mapError(err)
 			continue
 		}
-		results[i].Credentials = creds
+		results[i].Result = creds
 	}
 
-	return jujuparams.CloudCredentialsResults{
+	return jujuparams.StringsResults{
 		Results: results,
 	}, nil
 }
 
 // credentials retrieves the credentials stored for given owner and cloud.
-func (c cloud) credentials(ownerTag, cloudTag string) (map[string]jujuparams.CloudCredential, error) {
+func (c cloud) credentials(ownerTag, cloudTag string) ([]string, error) {
 	owner, err := names.ParseUserTag(ownerTag)
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
@@ -445,14 +420,11 @@ func (c cloud) credentials(ownerTag, cloudTag string) (map[string]jujuparams.Clo
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
 
 	}
-	cloudCreds := make(map[string]jujuparams.CloudCredential)
+	var cloudCreds []string
 	it := c.h.jem.CanReadIter(c.h.jem.DB.Credentials().Find(bson.D{{"user", owner.Name()}, {"cloud", cld.Id()}}).Iter())
 	var cred mongodoc.Credential
 	for it.Next(&cred) {
-		cloudCreds[string(cred.Name)] = jujuparams.CloudCredential{
-			AuthType:   string(cred.Type),
-			Attributes: cred.Attributes,
-		}
+		cloudCreds = append(cloudCreds, jem.CloudCredentialTag(cred.Cloud, cred.User, cred.Name).String())
 	}
 
 	return cloudCreds, errgo.Mask(it.Err())
@@ -460,26 +432,11 @@ func (c cloud) credentials(ownerTag, cloudTag string) (map[string]jujuparams.Clo
 
 // UpdateCredentials implements the UpdateCredentials method of the Cloud
 // facade.
-func (c cloud) UpdateCredentials(args jujuparams.UsersCloudCredentials) (jujuparams.ErrorResults, error) {
-	results := make([]jujuparams.ErrorResult, len(args.Users))
-	for i, ucc := range args.Users {
-		username, creds, err := c.parseCredentials(ucc)
-		if err != nil {
-			results[i] = jujuparams.ErrorResult{
-				Error: mapError(err),
-			}
-			continue
-		}
-		if err := c.h.jem.CheckACL([]string{username}); err != nil {
-			results[i] = jujuparams.ErrorResult{
-				Error: mapError(err),
-			}
-			continue
-		}
-		if err := c.updateCredentials(creds); err != nil {
-			results[i] = jujuparams.ErrorResult{
-				Error: mapError(err),
-			}
+func (c cloud) UpdateCredentials(args jujuparams.UpdateCloudCredentials) (jujuparams.ErrorResults, error) {
+	results := make([]jujuparams.ErrorResult, len(args.Credentials))
+	for i, ucc := range args.Credentials {
+		if err := c.updateCredential(ucc); err != nil {
+			results[i].Error = mapError(err)
 		}
 	}
 	return jujuparams.ErrorResults{
@@ -487,47 +444,36 @@ func (c cloud) UpdateCredentials(args jujuparams.UsersCloudCredentials) (jujupar
 	}, nil
 }
 
-func (c cloud) parseCredentials(ucc jujuparams.UserCloudCredentials) (string, []mongodoc.Credential, error) {
-	userTag, err := names.ParseUserTag(ucc.UserTag)
+// updateCredential adds a single credential to the database.
+func (c cloud) updateCredential(arg jujuparams.UpdateCloudCredential) error {
+	tag, err := names.ParseCloudCredentialTag(arg.Tag)
 	if err != nil {
-		return "", nil, errgo.WithCausef(err, params.ErrBadRequest, "")
+		return errgo.WithCausef(err, params.ErrBadRequest, "")
 	}
-	if userTag.IsLocal() {
-		return "", nil, errgo.WithCausef(nil, params.ErrBadRequest, "unsupported domain %q", userTag.Domain())
+	ownerTag := tag.Owner()
+	if ownerTag.IsLocal() {
+		return errgo.WithCausef(nil, params.ErrBadRequest, "unsupported domain %q", ownerTag.Domain())
 	}
-	var user params.User
-	if err := user.UnmarshalText([]byte(userTag.Name())); err != nil {
-		return "", nil, errgo.WithCausef(err, params.ErrBadRequest, "")
+	var owner params.User
+	if err := owner.UnmarshalText([]byte(ownerTag.Name())); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
-	cloudTag, err := names.ParseCloudTag(ucc.CloudTag)
-	if err != nil {
-		return "", nil, errgo.WithCausef(err, params.ErrBadRequest, "")
+	if err := c.h.jem.CheckIsUser(owner); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	cld := params.Cloud(cloudTag.Id())
-	creds := make([]mongodoc.Credential, 0, len(ucc.Credentials))
-	for name, cred := range ucc.Credentials {
-		var n params.Name
-		err := n.UnmarshalText([]byte(name))
-		if err != nil {
-			return "", nil, errgo.WithCausef(err, params.ErrBadRequest, "")
-		}
-		creds = append(creds, mongodoc.Credential{
-			User:       user,
-			Cloud:      cld,
-			Name:       n,
-			Type:       cred.AuthType,
-			Attributes: cred.Attributes,
-		})
+	var name params.Name
+	if err := name.UnmarshalText([]byte(tag.Name())); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
-	return string(user), creds, nil
-}
-
-func (c cloud) updateCredentials(creds []mongodoc.Credential) error {
-	for _, cred := range creds {
-		err := c.h.jem.UpdateCredential(&cred)
-		if err != nil {
-			return errgo.Mask(err)
-		}
+	credential := mongodoc.Credential{
+		User:       owner,
+		Cloud:      params.Cloud(tag.Cloud().Id()),
+		Name:       params.Name(tag.Name()),
+		Type:       arg.Credential.AuthType,
+		Attributes: arg.Credential.Attributes,
+	}
+	if err := c.h.jem.UpdateCredential(&credential); err != nil {
+		return errgo.Mask(err)
 	}
 	return nil
 }
@@ -644,6 +590,10 @@ func (m modelManager) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.M
 	if err := m.h.jem.CheckIsUser(params.User(owner.Name())); err != nil {
 		return jujuparams.ModelInfo{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
+	cloudCredentialTag, err := names.ParseCloudCredentialTag(args.CloudCredentialTag)
+	if err != nil {
+		return jujuparams.ModelInfo{}, errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud credential tag")
+	}
 
 	ctlPath, cloud, region, err := m.h.jem.SelectController(params.Cloud(m.h.params.DefaultCloud), args.CloudRegion)
 	if err != nil {
@@ -659,7 +609,7 @@ func (m modelManager) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.M
 	_, mi, err := m.h.jem.CreateModel(conn, jem.CreateModelParams{
 		Path:           params.EntityPath{User: params.User(owner.Name()), Name: params.Name(args.Name)},
 		ControllerPath: ctlPath,
-		Credential:     params.Name(args.CloudCredential),
+		Credential:     params.Name(cloudCredentialTag.Name()),
 		Cloud:          cloud,
 		Region:         region,
 		Attributes:     args.Config,

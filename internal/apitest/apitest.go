@@ -11,6 +11,7 @@ import (
 
 	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/idmtest"
+	"github.com/juju/juju/controller"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
@@ -52,9 +53,13 @@ type Suite struct {
 }
 
 func (s *Suite) SetUpTest(c *gc.C) {
+	s.IDMSrv = idmtest.NewServer()
+	s.JujuConnSuite.ControllerConfigAttrs = map[string]interface{}{
+		controller.IdentityURL:       s.IDMSrv.URL,
+		controller.IdentityPublicKey: s.IDMSrv.PublicKey,
+	}
 	s.JujuConnSuite.SetUpTest(c)
 	s.PatchValue(&jem.APIOpenTimeout, time.Duration(0))
-	s.IDMSrv = idmtest.NewServer()
 	s.JEMSrv = s.NewServer(c, s.Session, s.IDMSrv)
 	s.httpSrv = httptest.NewServer(s.JEMSrv)
 
@@ -126,7 +131,7 @@ func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server)
 		AgentUsername:        "agent",
 		AgentKey:             s.IDMSrv.UserPublicKey("agent"),
 		DefaultCloud:         "dummy",
-		ControllerUUID:       "controller-uuid",
+		ControllerUUID:       "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		WebsocketPingTimeout: 3 * time.Minute,
 	}
 	srv, err := external_jem.NewServer(config)
@@ -192,7 +197,7 @@ var dummyModelConfig = map[string]interface{}{
 // CreateModel creates a new model with the specified path on the
 // specified controller, using the specified credentialss. It returns the
 // new model's path, user and uuid.
-func (s *Suite) CreateModel(c *gc.C, path, ctlPath params.EntityPath, cred params.Name) (modelPath params.EntityPath, user, uuid string) {
+func (s *Suite) CreateModel(c *gc.C, path, ctlPath params.EntityPath, cred params.Name) (modelPath params.EntityPath, uuid string) {
 	// Note that because the cookies acquired in this request don't
 	// persist, the discharge macaroon we get won't affect subsequent
 	// requests in the caller.
@@ -209,7 +214,7 @@ func (s *Suite) CreateModel(c *gc.C, path, ctlPath params.EntityPath, cred param
 		},
 	})
 	c.Assert(err, gc.IsNil)
-	return resp.Path, resp.User, resp.UUID
+	return resp.Path, resp.UUID
 }
 
 func (s *Suite) AssertUpdateCredential(c *gc.C, user params.User, cloud params.Cloud, name params.Name, authType string) params.Name {

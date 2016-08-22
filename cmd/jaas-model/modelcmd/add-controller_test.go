@@ -25,11 +25,11 @@ var addControllerTests = []struct {
 }{{
 	about:          "simple",
 	args:           []string{},
-	expectLocation: map[string]string{"cloud": "dummy"},
+	expectLocation: map[string]string{"cloud": "dummy", "region": "dummy-region"},
 }, {
 	about:          "add public",
 	args:           []string{"--public"},
-	expectLocation: map[string]string{"cloud": "dummy"},
+	expectLocation: map[string]string{"cloud": "dummy", "region": "dummy-region"},
 	expectPublic:   true,
 }}
 
