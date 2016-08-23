@@ -150,6 +150,23 @@ func (j *JEM) RevokeModel(conn *apiconn.Conn, model *mongodoc.Model, user params
 	return nil
 }
 
+// DestroyModel destroys the specified model and removes it from the
+// database.
+//
+// Note that if the model is destroyed in its controller but
+// j.DeleteModel fails, a subsequent DestroyModel can can still succeed
+// because client.DestroyModel will succeed when the model doesn't exist.
+func (j *JEM) DestroyModel(conn *apiconn.Conn, model *mongodoc.Model) error {
+	client := modelmanager.NewClient(conn)
+	if err := client.DestroyModel(names.NewModelTag(model.UUID)); err != nil {
+		return errgo.Mask(err)
+	}
+	if err := j.DeleteModel(model.Path); err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
 // UserTag creates a juju user tag from a params.User
 func UserTag(u params.User) names.UserTag {
 	return names.NewUserTag(string(u) + "@external")
