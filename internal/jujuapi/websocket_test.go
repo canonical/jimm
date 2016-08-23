@@ -454,6 +454,7 @@ var createModelTests = []struct {
 	name        string
 	owner       string
 	region      string
+	cloudTag    string
 	credential  string
 	config      map[string]interface{}
 	expectError string
@@ -493,6 +494,26 @@ var createModelTests = []struct {
 	owner:       "test/test@external",
 	credential:  "dummy_test@external_cred1",
 	expectError: `invalid owner tag: "user-test/test@external" is not a valid user tag`,
+}, {
+	about:      "specific cloud",
+	name:       "model-6",
+	owner:      "test@external",
+	cloudTag:   names.NewCloudTag("dummy").String(),
+	credential: "dummy_test@external_cred1",
+}, {
+	about:      "specific cloud and region",
+	name:       "model-7",
+	owner:      "test@external",
+	cloudTag:   names.NewCloudTag("dummy").String(),
+	region:     "dummy-region",
+	credential: "dummy_test@external_cred1",
+}, {
+	about:       "bad cloud tag",
+	name:        "model-8",
+	owner:       "test@external",
+	cloudTag:    "not-a-cloud-tag",
+	credential:  "dummy_test@external_cred1",
+	expectError: `invalid cloud tag: "not-a-cloud-tag" is not a valid tag`,
 }}
 
 func (s *websocketSuite) TestCreateModel(c *gc.C) {
@@ -510,6 +531,7 @@ func (s *websocketSuite) TestCreateModel(c *gc.C) {
 			Name:               test.name,
 			OwnerTag:           "user-" + test.owner,
 			Config:             test.config,
+			CloudTag:           test.cloudTag,
 			CloudRegion:        test.region,
 			CloudCredentialTag: "cloudcred-" + test.credential,
 		}, &mi)
@@ -528,6 +550,13 @@ func (s *websocketSuite) TestCreateModel(c *gc.C) {
 			DisplayName: ownerTag.Name(),
 			Access:      "admin",
 		}})
+		if test.cloudTag == "" {
+			c.Assert(mi.Cloud, gc.Equals, "dummy")
+		} else {
+			ct, err := names.ParseCloudTag(test.cloudTag)
+			c.Assert(err, jc.ErrorIsNil)
+			c.Assert(mi.Cloud, gc.Equals, ct.Id())
+		}
 	}
 }
 

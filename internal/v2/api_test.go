@@ -1099,7 +1099,6 @@ func (s *APISuite) TestNewModel(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(minfo.UUID, gc.Not(gc.Equals), "")
 	c.Assert(minfo.UUID, gc.Not(gc.Equals), s.APIInfo(c).ModelTag.Id())
-	c.Assert(minfo.ControllerUUID, gc.Equals, s.APIInfo(c).ModelTag.Id())
 
 	// Ensure that we can connect to the new model
 	// from the information returned by GetModel.

@@ -580,12 +580,20 @@ func (m modelManager) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.M
 	if err := m.h.jem.CheckIsUser(params.User(owner.Name())); err != nil {
 		return jujuparams.ModelInfo{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
+	cloud := params.Cloud(m.h.params.DefaultCloud)
+	if args.CloudTag != "" {
+		cloudTag, err := names.ParseCloudTag(args.CloudTag)
+		if err != nil {
+			return jujuparams.ModelInfo{}, errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud tag")
+		}
+		cloud = params.Cloud(cloudTag.Id())
+	}
 	cloudCredentialTag, err := names.ParseCloudCredentialTag(args.CloudCredentialTag)
 	if err != nil {
 		return jujuparams.ModelInfo{}, errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud credential tag")
 	}
 
-	ctlPath, cloud, region, err := m.h.jem.SelectController(params.Cloud(m.h.params.DefaultCloud), args.CloudRegion)
+	ctlPath, cloud, region, err := m.h.jem.SelectController(cloud, args.CloudRegion)
 	if err != nil {
 		return jujuparams.ModelInfo{}, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound))
 	}
