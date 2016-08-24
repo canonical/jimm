@@ -1,6 +1,8 @@
 // Copyright 2016 Canonical Ltd.
 
-package monitoring
+// The servermon package is used to update statistics used
+// for monitoring the API server.
+package servermon
 
 import (
 	"github.com/prometheus/client_golang/prometheus"

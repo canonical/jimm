@@ -3,6 +3,7 @@
 package monitor
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -321,7 +322,14 @@ func newWatcherState(j jemInterface, ctlPath params.EntityPath) *watcherState {
 }
 
 func (w *watcherState) addDelta(d multiwatcher.Delta) error {
-	logger.Debugf("controller %v saw change %#v", w.ctlPath, d)
+	if logger.IsDebugEnabled() {
+		data, err := json.Marshal(d)
+		if err != nil {
+			logger.Errorf("controller %v cannot marshal delta %#v", w.ctlPath, d)
+		} else {
+			logger.Debugf("controller %v saw change %s", w.ctlPath, data)
+		}
+	}
 	switch e := d.Entity.(type) {
 	case *multiwatcher.ModelInfo:
 		w.adjustCount(&w.stats.ModelCount, d)
