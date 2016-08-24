@@ -170,6 +170,22 @@ func (s *websocketSuite) TestCloudCall(c *gc.C) {
 	})
 }
 
+func (s *websocketSuite) TestClouds(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test-group", Name: "controller-1"}, true)
+	s.IDMSrv.AddUser("test", "test-group")
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+
+	var clouds jujuparams.StringsResult
+	err := conn.APICall("Cloud", 1, "", "Clouds", nil, &clouds)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(clouds, jc.DeepEquals, jujuparams.StringsResult{
+		Result: []string{
+			names.NewCloudTag("dummy").String(),
+		},
+	})
+}
+
 func (s *websocketSuite) TestCloudCredentials(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	s.JEM.UpdateCredential(&mongodoc.Credential{

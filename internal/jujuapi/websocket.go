@@ -358,7 +358,6 @@ func (c cloud) Cloud(ents jujuparams.Entities) (jujuparams.CloudResults, error) 
 }
 
 func (c cloud) cloud(cloudTag names.CloudTag) (*jujuparams.Cloud, error) {
-	// TODO(mhilton) maybe do something different when connected to a controller model
 	var cloudInfo jujuparams.Cloud
 	err := c.h.jem.DoControllers(params.Cloud(cloudTag.Id()), "", func(cnt *mongodoc.Controller) error {
 		cloudInfo.Type = cnt.Cloud.ProviderType
@@ -379,6 +378,36 @@ func (c cloud) cloud(cloudTag names.CloudTag) (*jujuparams.Cloud, error) {
 	}
 	// TODO (mhilton) ensure list of regions is deterministic.
 	return &cloudInfo, nil
+}
+
+// Clouds implements the Clouds method on the Cloud facade.
+func (c cloud) Clouds() (jujuparams.StringsResult, error) {
+	var res jujuparams.StringsResult
+	clouds, err := c.clouds()
+	if err != nil {
+		res.Error = mapError(err)
+	} else {
+		res.Result = clouds
+	}
+	return res, nil
+}
+
+func (c cloud) clouds() ([]string, error) {
+	var clouds []string
+	seen := make(map[string]bool)
+	err := c.h.jem.DoControllers("", "", func(ctl *mongodoc.Controller) error {
+		name := jem.CloudTag(ctl.Cloud.Name).String()
+		if !seen[name] {
+			seen[name] = true
+			clouds = append(clouds, name)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	sort.Strings(clouds)
+	return clouds, nil
 }
 
 // DefaultCloud implements the DefaultCloud method of the Cloud facade.
