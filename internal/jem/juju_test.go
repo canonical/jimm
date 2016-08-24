@@ -283,7 +283,7 @@ func (s *jujuSuite) addController(c *gc.C, path params.EntityPath) params.Entity
 	// Sanity check that we're really talking to the controller.
 	minfo, err := s.APIState.Client().ModelInfo()
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(minfo.ControllerUUID, gc.Equals, m.UUID)
+	c.Assert(minfo.UUID, gc.Equals, s.ControllerConfig.ControllerUUID())
 
 	err = s.store.AddController(ctl, m)
 	c.Assert(err, jc.ErrorIsNil)

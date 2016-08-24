@@ -71,7 +71,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 	// Sanity check that we're really talking to the controller.
 	minfo, err := s.APIState.Client().ModelInfo()
 	c.Assert(err, gc.IsNil)
-	c.Assert(minfo.ControllerUUID, gc.Equals, m.UUID)
+	c.Assert(minfo.UUID, gc.Equals, s.ControllerConfig.ControllerUUID())
 
 	err = s.store.AddController(ctl, m)
 	c.Assert(err, gc.IsNil)
