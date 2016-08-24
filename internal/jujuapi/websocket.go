@@ -531,21 +531,11 @@ func (m modelManager) ModelInfo(args jujuparams.Entities) (jujuparams.ModelInfoR
 
 // modelInfo retrieves the model information for the specified entity.
 func (m modelManager) modelInfo(arg jujuparams.Entity) (*jujuparams.ModelInfo, error) {
-	tag, err := names.ParseModelTag(arg.Tag)
+	tag, model, err := m.getModel(arg.Tag, m.h.jem.CheckCanRead)
 	if err != nil {
-		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
+		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
 	}
-	model, err := m.h.jem.ModelFromUUID(tag.Id())
-	if err != nil {
-		if errgo.Cause(err) == params.ErrNotFound {
-			return nil, errgo.WithCausef(err, params.ErrUnauthorized, "")
-		}
-		return nil, errgo.Mask(err)
-	}
-	if err := m.h.jem.CheckCanRead(model); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	conn, err := m.h.jem.OpenAPI(model.Path)
+	conn, err := m.h.jem.OpenAPI(model.Controller)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -620,6 +610,41 @@ func (m modelManager) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.M
 	return m.massageModelInfo(*mi), nil
 }
 
+// DestroyModels implements the ModelManager facade's DestroyModels method.
+func (m modelManager) DestroyModels(args jujuparams.Entities) (jujuparams.ErrorResults, error) {
+	results := make([]jujuparams.ErrorResult, len(args.Entities))
+
+	for i, arg := range args.Entities {
+		if err := m.destroyModel(arg); err != nil {
+			results[i].Error = mapError(err)
+		}
+	}
+
+	return jujuparams.ErrorResults{
+		Results: results,
+	}, nil
+}
+
+// destroyModel destroys the specified model.
+func (m modelManager) destroyModel(arg jujuparams.Entity) error {
+	_, model, err := m.getModel(arg.Tag, m.checkIsOwner)
+	if err != nil {
+		if errgo.Cause(err) == params.ErrNotFound {
+			// Juju doesn't treat removing a model that isn't there as an error, and neither should we.
+			return nil
+		}
+		return errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
+	}
+	conn, err := m.h.jem.OpenAPI(model.Controller)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	if err := m.h.jem.DestroyModel(conn, model); err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
 // ModifyModelAccess implements the ModelManager facade's ModifyModelAccess method.
 func (m modelManager) ModifyModelAccess(args jujuparams.ModifyModelAccessRequest) (jujuparams.ErrorResults, error) {
 	results := make([]jujuparams.ErrorResult, len(args.Changes))
@@ -635,16 +660,12 @@ func (m modelManager) ModifyModelAccess(args jujuparams.ModifyModelAccessRequest
 }
 
 func (m modelManager) modifyModelAccess(change jujuparams.ModifyModelAccess) error {
-	modelTag, err := names.ParseModelTag(change.ModelTag)
+	_, model, err := m.getModel(change.ModelTag, m.checkIsOwner)
 	if err != nil {
-		return errgo.WithCausef(err, params.ErrBadRequest, "invalid model tag")
-	}
-	model, err := m.h.jem.ModelFromUUID(modelTag.Id())
-	if err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-	if err := m.h.jem.CheckIsUser(model.Path.User); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+		if errgo.Cause(err) == params.ErrNotFound {
+			err = params.ErrUnauthorized
+		}
+		return errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
 	}
 	userTag, err := names.ParseUserTag(change.UserTag)
 	if err != nil {
@@ -653,11 +674,7 @@ func (m modelManager) modifyModelAccess(change jujuparams.ModifyModelAccess) err
 	if userTag.IsLocal() {
 		return errgo.WithCausef(nil, params.ErrBadRequest, "unsupported domain %q", userTag.Domain())
 	}
-	controller, err := m.h.jem.Controller(model.Controller)
-	if err != nil {
-		return errgo.Mask(err)
-	}
-	conn, err := m.h.jem.OpenAPIFromDocs(model, controller)
+	conn, err := m.h.jem.OpenAPI(model.Controller)
 	if err != nil {
 		return errgo.Mask(err)
 	}
@@ -674,6 +691,38 @@ func (m modelManager) modifyModelAccess(change jujuparams.ModifyModelAccess) err
 		return errgo.Mask(err)
 	}
 	return nil
+}
+
+// checkIsOwner checks if the current user is the owner of the specified
+// document.
+func (m modelManager) checkIsOwner(e jem.ACLEntity) error {
+	return errgo.Mask(m.h.jem.CheckIsUser(e.Owner()), errgo.Is(params.ErrUnauthorized))
+}
+
+// getModel attempts to get the specified model from jem. If the model
+// tag is not valid then the error cause will be params.ErrBadRequest. If
+// the model cannot be found then the error cause will be
+// params.ErrNotFound. If authf is non-nil then it will be called with
+// the found model. authf is used to authenticate access to the model, if
+// access is denied authf should return an error with the cause
+// params.ErrUnauthorized. The cause of any error returned by authf will
+// not be masked.
+func (m modelManager) getModel(modelTag string, authf func(jem.ACLEntity) error) (names.ModelTag, *mongodoc.Model, error) {
+	tag, err := names.ParseModelTag(modelTag)
+	if err != nil {
+		return names.ModelTag{}, nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid model tag")
+	}
+	model, err := m.h.jem.ModelFromUUID(tag.Id())
+	if err != nil {
+		return names.ModelTag{}, nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	if authf == nil {
+		return names.ModelTag{}, model, nil
+	}
+	if err := authf(model); err != nil {
+		return names.ModelTag{}, nil, errgo.Mask(err, errgo.Any)
+	}
+	return tag, model, nil
 }
 
 // pinger implements the Pinger facade.

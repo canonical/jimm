@@ -567,7 +567,7 @@ func (s *websocketSuite) TestGrantAndRevokeModel(c *gc.C) {
 	c.Assert(res[0].Error, gc.ErrorMatches, "unauthorized")
 }
 
-func (s *websocketSuite) TestModifyModelErrors(c *gc.C) {
+func (s *websocketSuite) TestModifyModelAccessErrors(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "alice", Name: "controller-1"}, true)
 	s.AssertAddController(c, params.EntityPath{User: "bob", Name: "controller-1"}, true)
 	s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
@@ -608,7 +608,7 @@ func (s *websocketSuite) TestModifyModelErrors(c *gc.C) {
 			Access:   jujuparams.ModelReadAccess,
 			ModelTag: names.NewModelTag("00000000-0000-0000-0000-000000000000").String(),
 		},
-		expectError: `model "00000000-0000-0000-0000-000000000000" not found`,
+		expectError: `unauthorized`,
 	}, {
 		about: "invalid model tag",
 		modifyModelAccess: jujuparams.ModifyModelAccess{
@@ -660,6 +660,35 @@ func (s *websocketSuite) TestModifyModelErrors(c *gc.C) {
 		c.Assert(res.Results, gc.HasLen, 1)
 		c.Assert(res.Results[0].Error, gc.ErrorMatches, test.expectError)
 	}
+}
+
+func (s *websocketSuite) TestDestroyModel(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "alice", Name: "controller-1"}, true)
+	s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
+	mi := s.assertCreateModel(c, "test-model", "alice", "", "cred1", nil)
+
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := modelmanager.NewClient(conn)
+	err := client.DestroyModel(names.NewModelTag(mi.UUID))
+	c.Assert(err, jc.ErrorIsNil)
+
+	// Check the model has been deleted
+	models, err := client.ListModels("alice@external")
+	c.Assert(err, jc.ErrorIsNil)
+	var found bool
+	for _, m := range models {
+		if m.UUID == mi.UUID {
+			found = true
+			break
+		}
+	}
+	c.Assert(found, gc.Equals, false)
+
+	// Make sure it's not an error if you destroy a model that't not there.
+	err = client.DestroyModel(names.NewModelTag(mi.UUID))
+	c.Assert(err, jc.ErrorIsNil)
 }
 
 type testHeartMonitor struct {
