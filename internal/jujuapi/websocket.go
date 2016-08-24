@@ -265,7 +265,7 @@ func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResultV1, err
 	// JAAS only supports macaroon login, ignore all the other fields.
 	attr, err := a.h.jem.Bakery.CheckAny(req.Macaroons, nil, checkers.TimeBefore)
 	if err != nil {
-		if verr, ok := err.(*bakery.VerificationError); ok {
+		if verr, ok := errgo.Cause(err).(*bakery.VerificationError); ok {
 			m, err := a.h.jem.NewMacaroon()
 			if err != nil {
 				return jujuparams.LoginResultV1{}, errgo.Notef(err, "cannot create macaroon")
