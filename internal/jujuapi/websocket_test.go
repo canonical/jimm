@@ -23,6 +23,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
+	"gopkg.in/macaroon.v1"
 
 	"github.com/CanonicalLtd/jem/internal/apitest"
 	"github.com/CanonicalLtd/jem/internal/jujuapi"
@@ -118,6 +119,16 @@ func (s *websocketSuite) TestLoginToController(c *gc.C) {
 	var resp jujuparams.RedirectInfoResult
 	err = conn.APICall("Admin", 3, "", "RedirectInfo", nil, &resp)
 	c.Assert(err, gc.ErrorMatches, "not redirected")
+}
+
+func (s *websocketSuite) TestLoginToControllerWithInvalidMacaroon(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	invalidMacaroon, err := macaroon.New(nil, "", "")
+	c.Assert(err, gc.IsNil)
+	conn := s.open(c, &api.Info{
+		Macaroons: []macaroon.Slice{{invalidMacaroon}},
+	}, "test")
+	conn.Close()
 }
 
 func (s *websocketSuite) TestUnimplementedMethodFails(c *gc.C) {
