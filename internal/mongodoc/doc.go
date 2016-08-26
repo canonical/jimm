@@ -116,11 +116,15 @@ type Cloud struct {
 	// cloud.
 	AuthTypes []string
 
-	// Endpoint contains the endpoint paramter specified by the
+	// Endpoint contains the endpoint parameter specified by the
 	// controller.
 	Endpoint string
 
-	// StorageEndpoint contains the stroage endpoint paramter
+	// IdentityEndpoint contains the identity endpoint parameter
+	// specified by the controller.
+	IdentityEndpoint string
+
+	// StorageEndpoint contains the stroage endpoint parameter
 	// specified by the controller.
 	StorageEndpoint string
 
@@ -134,11 +138,15 @@ type Region struct {
 	// Name holds the name of the region.
 	Name string
 
-	// Endpoint contains the endpoint paramter specified by the
+	// Endpoint contains the endpoint parameter specified by the
 	// controller.
 	Endpoint string
 
-	// StorageEndpoint contains the stroage endpoint paramter
+	// IdentityEndpoint contains the identity endpoint parameter
+	// specified by the controller.
+	IdentityEndpoint string
+
+	// StorageEndpoint contains the storage endpoint parameter
 	// specified by the controller.
 	StorageEndpoint string
 }
