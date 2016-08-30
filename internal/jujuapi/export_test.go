@@ -6,7 +6,13 @@ import "time"
 
 type HeartMonitor heartMonitor
 
-var NewHeartMonitor = &newHeartMonitor
+var (
+	MakeCloud       = makeCloud
+	MakeRegions     = makeRegions
+	MergeRegions    = mergeRegions
+	MergeStrings    = mergeStrings
+	NewHeartMonitor = &newHeartMonitor
+)
 
 func InternalHeartMonitor(f func(time.Duration) HeartMonitor) func(time.Duration) heartMonitor {
 	return func(d time.Duration) heartMonitor {

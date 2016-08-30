@@ -339,74 +339,56 @@ type cloud struct {
 // Cloud implements the Cloud method of the Cloud facade.
 func (c cloud) Cloud(ents jujuparams.Entities) (jujuparams.CloudResults, error) {
 	cloudResults := make([]jujuparams.CloudResult, len(ents.Entities))
+	clouds, err := c.clouds()
+	if err != nil {
+		return jujuparams.CloudResults{}, mapError(err)
+	}
 	for i, ent := range ents.Entities {
-		cloudTag, err := names.ParseCloudTag(ent.Tag)
+		cloud, err := c.cloud(ent.Tag, clouds)
 		if err != nil {
 			cloudResults[i].Error = mapError(err)
 			continue
 		}
-		cloudInfo, err := c.cloud(cloudTag)
-		if err != nil {
-			cloudResults[i].Error = mapError(err)
-			continue
-		}
-		cloudResults[i].Cloud = cloudInfo
+		cloudResults[i].Cloud = cloud
 	}
 	return jujuparams.CloudResults{
 		Results: cloudResults,
 	}, nil
 }
 
-func (c cloud) cloud(cloudTag names.CloudTag) (*jujuparams.Cloud, error) {
-	var cloudInfo jujuparams.Cloud
-	err := c.h.jem.DoControllers(params.Cloud(cloudTag.Id()), "", func(cnt *mongodoc.Controller) error {
-		cloudInfo.Type = cnt.Cloud.ProviderType
-		cloudInfo.AuthTypes = cnt.Cloud.AuthTypes
-		// TODO (mhilton) fill out other fields
-		for _, reg := range cnt.Cloud.Regions {
-			cloudInfo.Regions = append(cloudInfo.Regions, jujuparams.CloudRegion{
-				Name: reg.Name,
-			})
-		}
-		return nil
-	})
+// cloud finds and returns the cloud ideentified by cloudTag in clouds.
+func (c cloud) cloud(cloudTag string, clouds map[string]jujuparams.Cloud) (*jujuparams.Cloud, error) {
+	if cloud, ok := clouds[cloudTag]; ok {
+		return &cloud, nil
+	}
+	ct, err := names.ParseCloudTag(cloudTag)
 	if err != nil {
-		return nil, errgo.Mask(err)
+		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
 	}
-	if cloudInfo.Type == "" {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "cloud %q not available", cloudTag.Id())
-	}
-	// TODO (mhilton) ensure list of regions is deterministic.
-	return &cloudInfo, nil
+	return nil, errgo.WithCausef(nil, params.ErrNotFound, "cloud %q not available", ct.Id())
 }
 
 // Clouds implements the Clouds method on the Cloud facade.
-func (c cloud) Clouds() (jujuparams.StringsResult, error) {
-	var res jujuparams.StringsResult
-	clouds, err := c.clouds()
-	if err != nil {
-		res.Error = mapError(err)
-	} else {
-		res.Result = clouds
-	}
-	return res, nil
+func (c cloud) Clouds() (jujuparams.CloudsResult, error) {
+	var res jujuparams.CloudsResult
+	var err error
+	res.Clouds, err = c.clouds()
+	return res, errgo.Mask(err)
 }
 
-func (c cloud) clouds() ([]string, error) {
-	var clouds []string
-	seen := make(map[string]bool)
+func (c cloud) clouds() (map[string]jujuparams.Cloud, error) {
+	clouds := make(map[string]jujuparams.Cloud)
+
 	err := c.h.jem.DoControllers("", "", func(ctl *mongodoc.Controller) error {
-		name := jem.CloudTag(ctl.Cloud.Name).String()
-		if !seen[name] {
-			seen[name] = true
-			clouds = append(clouds, name)
-		}
+		cloudTag := jem.CloudTag(ctl.Cloud.Name).String()
+		// TODO consider caching this result because it will be often called and
+		// the result will change very rarely.
+		clouds[cloudTag] = mergeClouds(clouds[cloudTag], makeCloud(ctl.Cloud))
 		return nil
 	})
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	sort.Strings(clouds)
 	return clouds, nil
 }
 

@@ -149,12 +149,14 @@ func (h *Handler) AddController(arg *params.AddController) error {
 		ctl.Cloud.AuthTypes = append(ctl.Cloud.AuthTypes, string(at))
 	}
 	ctl.Cloud.Endpoint = cloudInfo.Endpoint
+	ctl.Cloud.IdentityEndpoint = cloudInfo.IdentityEndpoint
 	ctl.Cloud.StorageEndpoint = cloudInfo.StorageEndpoint
 	for _, reg := range cloudInfo.Regions {
 		ctl.Cloud.Regions = append(ctl.Cloud.Regions, mongodoc.Region{
-			Name:            reg.Name,
-			Endpoint:        reg.Endpoint,
-			StorageEndpoint: reg.StorageEndpoint,
+			Name:             reg.Name,
+			Endpoint:         reg.Endpoint,
+			IdentityEndpoint: reg.IdentityEndpoint,
+			StorageEndpoint:  reg.StorageEndpoint,
 		})
 	}
 

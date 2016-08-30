@@ -66,6 +66,7 @@ func (j *JEM) CreateModel(conn *apiconn.Conn, p CreateModelParams) (*mongodoc.Mo
 	m, err := mmClient.CreateModel(
 		string(p.Path.Name),
 		UserTag(p.Path.User).Id(),
+		string(p.Cloud),
 		p.Region,
 		CloudCredentialTag(p.Cloud, p.Path.User, p.Credential),
 		p.Attributes,
