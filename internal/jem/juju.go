@@ -47,8 +47,15 @@ type CreateModelParams struct {
 
 // CreateModel creates a new model as specified by p using conn.
 func (j *JEM) CreateModel(conn *apiconn.Conn, p CreateModelParams) (*mongodoc.Model, *jujuparams.ModelInfo, error) {
-	if err := j.UpdateControllerCredential(conn, p.Path.User, p.Cloud, p.Credential); err != nil {
+	cred, err := j.Credential(p.Path.User, p.Cloud, p.Credential)
+	if err != nil {
 		return nil, nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	if err := j.updateControllerCredential(conn, cred); err != nil {
+		return nil, nil, errgo.Mask(err)
+	}
+	if err := j.credentialAddController(p.Path.User, p.Cloud, p.Credential, p.ControllerPath); err != nil {
+		return nil, nil, errgo.Mask(err)
 	}
 	// Create the model record in the database before actually
 	// creating the model on the controller. It will have an invalid
@@ -91,31 +98,45 @@ func (j *JEM) CreateModel(conn *apiconn.Conn, p CreateModelParams) (*mongodoc.Mo
 	return modelDoc, &m, nil
 }
 
-// UpdateControllerCredential uploads the specified credential to conn.
-func (j *JEM) UpdateControllerCredential(conn *apiconn.Conn, user params.User, cloud params.Cloud, name params.Name) error {
-	userTag := UserTag(user)
-	cloudTag := CloudTag(cloud)
-	cloudCredentialTag := CloudCredentialTag(cloud, user, name)
-	cred, err := j.Credential(user, cloud, name)
-	if err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+// UpdateAndDeployCredential updates the specified credential in the
+// local database and then updates it on all controllers to which it is
+// deployed.
+func (j *JEM) UpdateCredential(cred *mongodoc.Credential) error {
+	if err := j.updateCredential(cred); err != nil {
+		return errgo.Notef(err, "cannot update local database")
 	}
-	cloudClient := cloudapi.NewClient(conn)
-
-	// Currently juju does not support updating existing credentials,
-	// bug 1608421. For now we will only upload them if they don't
-	// exist.
-	controllerCreds, err := cloudClient.Credentials(userTag, cloudTag)
+	c, err := j.Credential(cred.User, cred.Cloud, cred.Name)
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	for _, credTag := range controllerCreds {
-		if credTag == cloudCredentialTag {
-			return nil
+	// TODO(mhilton) consider how to handle and recover from errors
+	// updating credentials in controllers better.
+	var firstError error
+	for _, ctl := range c.Controllers {
+		conn, err := j.OpenAPI(ctl)
+		if err != nil {
+			logger.Errorf("cannot open controller connection to %s: %s", ctl, err)
+			if firstError != nil {
+				firstError = err
+			}
+			continue
 		}
+		if err := j.updateControllerCredential(conn, cred); err != nil {
+			logger.Errorf("cannot update credential %s on %s: %s", cred.Id, ctl, err)
+			if firstError != nil {
+				firstError = err
+			}
+		}
+		conn.Close()
 	}
+	return errgo.Mask(firstError)
+}
 
-	err = cloudClient.UpdateCredential(
+// updateControllerCredential uploads the given credential to conn.
+func (j *JEM) updateControllerCredential(conn *apiconn.Conn, cred *mongodoc.Credential) error {
+	cloudCredentialTag := CloudCredentialTag(cred.Cloud, cred.User, cred.Name)
+	cloudClient := cloudapi.NewClient(conn)
+	err := cloudClient.UpdateCredential(
 		cloudCredentialTag,
 		jujucloud.NewCredential(jujucloud.AuthType(cred.Type), cred.Attributes),
 	)

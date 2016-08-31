@@ -664,9 +664,9 @@ func apiInfoFromDocs(ctl *mongodoc.Controller, m *mongodoc.Model) *api.Info {
 	}
 }
 
-// UpdateCredential stores the given credential in the database. If a
+// updateCredential stores the given credential in the database. If a
 // credential with the same name exists it is overwritten.
-func (j *JEM) UpdateCredential(cred *mongodoc.Credential) error {
+func (j *JEM) updateCredential(cred *mongodoc.Credential) error {
 	update := bson.D{{
 		"type", cred.Type,
 	}, {
@@ -714,6 +714,55 @@ func (j *JEM) Credential(user params.User, cloud params.Cloud, name params.Name)
 // user, cloud and name.
 func credentialId(user params.User, cloud params.Cloud, name params.Name) string {
 	return fmt.Sprintf("%s/%s/%s", user, cloud, name)
+}
+
+// credentialAddController stores the fact that the credential with the
+// given user, cloud and name is present on the given controller.
+func (j *JEM) credentialAddController(user params.User, cloud params.Cloud, name params.Name, controller params.EntityPath) error {
+	id := credentialId(user, cloud, name)
+	err := j.DB.Credentials().UpdateId(id, bson.D{{
+		"$addToSet", bson.D{{"controllers", controller}},
+	}})
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			return errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", id)
+		}
+		return errgo.Notef(err, "cannot update credential %q", id)
+	}
+	return nil
+}
+
+// credentialRemoveController stores the fact that the credential with
+// the given user, cloud and name is not present on the given controller.
+func (j *JEM) credentialRemoveController(user params.User, cloud params.Cloud, name params.Name, controller params.EntityPath) error {
+	id := credentialId(user, cloud, name)
+	err := j.DB.Credentials().UpdateId(id, bson.D{{
+		"$pull", bson.D{{"controllers", controller}},
+	}})
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			return errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", id)
+		}
+		return errgo.Notef(err, "cannot update credential %q", id)
+	}
+	return nil
+}
+
+// Cloud gets the details of the given cloud.
+//
+// Note that there may be many controllers with the given cloud name. We
+// return an arbitrary choice, assuming that cloud definitions are the
+// same across all possible controllers.
+func (j *JEM) Cloud(cloud params.Cloud) (*mongodoc.Cloud, error) {
+	var ctl mongodoc.Controller
+	err := j.DB.Controllers().Find(bson.D{{"cloud.name", cloud}}).One(&ctl)
+	if err == mgo.ErrNotFound {
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "cloud %q not found", cloud)
+	}
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot get cloud %q", cloud)
+	}
+	return &ctl.Cloud, nil
 }
 
 // SetACL sets the ACL for the path document in c to be equal to acl.

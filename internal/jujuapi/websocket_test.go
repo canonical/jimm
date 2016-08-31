@@ -173,7 +173,7 @@ func (s *websocketSuite) TestCloudCall(c *gc.C) {
 	info, err := client.Cloud(names.NewCloudTag("dummy"))
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(info, jc.DeepEquals, cloud.Cloud{
-		AuthTypes: cloud.AuthTypes{"empty"},
+		AuthTypes: cloud.AuthTypes{"empty", "userpass"},
 		Regions: []cloud.Region{{
 			Name:             "dummy-region",
 			Endpoint:         "dummy-endpoint",
@@ -195,7 +195,7 @@ func (s *websocketSuite) TestClouds(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(clouds, jc.DeepEquals, map[names.CloudTag]cloud.Cloud{
 		names.NewCloudTag("dummy"): {
-			AuthTypes: cloud.AuthTypes{"empty"},
+			AuthTypes: cloud.AuthTypes{"empty", "userpass"},
 			Regions: []cloud.Region{{
 				Name:             "dummy-region",
 				Endpoint:         "dummy-endpoint",
@@ -207,7 +207,7 @@ func (s *websocketSuite) TestClouds(c *gc.C) {
 	})
 }
 
-func (s *websocketSuite) TestCloudCredentials(c *gc.C) {
+func (s *websocketSuite) TestUserCredentials(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	s.JEM.UpdateCredential(&mongodoc.Credential{
 		User:  "test",
@@ -223,14 +223,14 @@ func (s *websocketSuite) TestCloudCredentials(c *gc.C) {
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
-	creds, err := client.Credentials(names.NewUserTag("test@external"), names.NewCloudTag("dummy"))
+	creds, err := client.UserCredentials(names.NewUserTag("test@external"), names.NewCloudTag("dummy"))
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(creds, jc.DeepEquals, []names.CloudCredentialTag{
 		names.NewCloudCredentialTag("dummy/test@external/cred1"),
 	})
 }
 
-func (s *websocketSuite) TestCloudCredentialsACL(c *gc.C) {
+func (s *websocketSuite) TestUserCredentialsACL(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	s.JEM.UpdateCredential(&mongodoc.Credential{
 		User:  "test",
@@ -260,14 +260,14 @@ func (s *websocketSuite) TestCloudCredentialsACL(c *gc.C) {
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
-	creds, err := client.Credentials(names.NewUserTag("test2@external"), names.NewCloudTag("dummy"))
+	creds, err := client.UserCredentials(names.NewUserTag("test2@external"), names.NewCloudTag("dummy"))
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(creds, jc.DeepEquals, []names.CloudCredentialTag{
 		names.NewCloudCredentialTag("dummy/test2@external/cred2"),
 	})
 }
 
-func (s *websocketSuite) TestCloudCredentialsErrors(c *gc.C) {
+func (s *websocketSuite) TestUserCredentialsErrors(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
@@ -278,7 +278,7 @@ func (s *websocketSuite) TestCloudCredentialsErrors(c *gc.C) {
 		}},
 	}
 	var resp jujuparams.StringsResults
-	err := conn.APICall("Cloud", 1, "", "Credentials", req, &resp)
+	err := conn.APICall("Cloud", 1, "", "UserCredentials", req, &resp)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `bad request: "not-a-user-tag" is not a valid tag`)
 	c.Assert(resp.Results, gc.HasLen, 1)
@@ -292,12 +292,12 @@ func (s *websocketSuite) TestUpdateCloudCredentials(c *gc.C) {
 	credentialTag := names.NewCloudCredentialTag(fmt.Sprintf("dummy/test@external/cred3"))
 	err := client.UpdateCredential(credentialTag, cloud.NewCredential("credtype", map[string]string{"attr1": "val31", "attr2": "val32"}))
 	c.Assert(err, jc.ErrorIsNil)
-	creds, err := client.Credentials(names.NewUserTag("test@external"), names.NewCloudTag("dummy"))
+	creds, err := client.UserCredentials(names.NewUserTag("test@external"), names.NewCloudTag("dummy"))
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(creds, jc.DeepEquals, []names.CloudCredentialTag{credentialTag})
 	err = client.UpdateCredential(credentialTag, cloud.NewCredential("credtype", map[string]string{"attr1": "val33", "attr2": "val34"}))
 	c.Assert(err, jc.ErrorIsNil)
-	creds, err = client.Credentials(names.NewUserTag("test@external"), names.NewCloudTag("dummy"))
+	creds, err = client.UserCredentials(names.NewUserTag("test@external"), names.NewCloudTag("dummy"))
 	c.Assert(err, jc.ErrorIsNil)
 	var _ = creds
 }
@@ -349,6 +349,75 @@ func (s *websocketSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
 	c.Assert(resp.Results[2].Error, gc.ErrorMatches, `unauthorized`)
 	c.Assert(resp.Results[3].Error, gc.ErrorMatches, `invalid name "bad--name"`)
 	c.Assert(resp.Results, gc.HasLen, 4)
+}
+
+func (s *websocketSuite) TestCredential(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+
+	cred1Tag := names.NewCloudCredentialTag("dummy/test@external/cred1")
+	cred1 := cloud.NewCredential("userpass", map[string]string{
+		"username": "cloud-user",
+		"password": "cloud-pass",
+	})
+	cred2Tag := names.NewCloudCredentialTag("dummy/test@external/cred2")
+	cred2 := cloud.NewCredential("empty", nil)
+
+	cred5Tag := names.NewCloudCredentialTag("no-such-cloud/test@external/cred5")
+	cred5 := cloud.NewCredential("empty", nil)
+
+	client := cloudapi.NewClient(conn)
+	err := client.UpdateCredential(cred1Tag, cred1)
+	c.Assert(err, jc.ErrorIsNil)
+	err = client.UpdateCredential(cred2Tag, cred2)
+	c.Assert(err, jc.ErrorIsNil)
+	err = client.UpdateCredential(cred5Tag, cred5)
+	c.Assert(err, jc.ErrorIsNil)
+
+	creds, err := client.Credentials(
+		cred1Tag,
+		cred2Tag,
+		names.NewCloudCredentialTag("dummy/test@external/cred3"),
+		names.NewCloudCredentialTag("dummy/no-test@external/cred4"),
+		cred5Tag,
+		names.NewCloudCredentialTag("dummy/admin@local/cred6"),
+	)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
+		Result: &jujuparams.CloudCredential{
+			AuthType: "userpass",
+			Attributes: map[string]string{
+				"username": "cloud-user",
+			},
+			Redacted: []string{
+				"password",
+			},
+		},
+	}, {
+		Result: &jujuparams.CloudCredential{
+			AuthType: "empty",
+		},
+	}, {
+		Error: &jujuparams.Error{
+			Message: `credential "test/dummy/cred3" not found`,
+			Code:    "not found",
+		},
+	}, {
+		Error: &jujuparams.Error{
+			Message: `unauthorized`,
+		},
+	}, {
+		Error: &jujuparams.Error{
+			Message: `cloud "no-such-cloud" not found`,
+			Code:    "not found",
+		},
+	}, {
+		Error: &jujuparams.Error{
+			Message: `credential "dummy/admin@local/cred6" not found`,
+			Code:    "not found",
+		},
+	}})
 }
 
 func (s *websocketSuite) TestLoginToRoot(c *gc.C) {

@@ -242,6 +242,10 @@ type Credential struct {
 
 	// Attributes holds the credential attributes.
 	Attributes map[string]string
+
+	// Controllers holds the controllers to which this credential has
+	// been uploaded.
+	Controllers []params.EntityPath
 }
 
 func (c *Credential) Owner() params.User {

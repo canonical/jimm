@@ -849,7 +849,7 @@ func (s *jemSuite) TestAddAndGetCredential(c *gc.C) {
 		"attr1": "val1",
 		"attr2": "val2",
 	}
-	err = s.store.UpdateCredential(&mongodoc.Credential{
+	err = jem.UpdateCredential(s.store, &mongodoc.Credential{
 		User:       user,
 		Cloud:      cloud,
 		Name:       name,
@@ -871,7 +871,7 @@ func (s *jemSuite) TestAddAndGetCredential(c *gc.C) {
 		Attributes: attrs,
 	})
 
-	err = s.store.UpdateCredential(&mongodoc.Credential{
+	err = jem.UpdateCredential(s.store, &mongodoc.Credential{
 		User:       user,
 		Cloud:      cloud,
 		Name:       name,
@@ -892,6 +892,140 @@ func (s *jemSuite) TestAddAndGetCredential(c *gc.C) {
 		Label:      "Test Label 2",
 		Attributes: attrs,
 	})
+}
+
+func (s *jemSuite) TestCredentialAddController(c *gc.C) {
+	user := params.User("test-user")
+	cloud := params.Cloud("test-cloud")
+	name := params.Name("test-credential")
+	expectId := fmt.Sprintf("%s/%s/%s", user, cloud, name)
+	err := jem.UpdateCredential(s.store, &mongodoc.Credential{
+		User:  user,
+		Cloud: cloud,
+		Name:  name,
+		Type:  "empty",
+	})
+	c.Assert(err, gc.IsNil)
+
+	ctlPath := params.EntityPath{"bob", "x"}
+	ctl := &mongodoc.Controller{
+		Path: ctlPath,
+	}
+	err = s.store.AddController(ctl, &mongodoc.Model{})
+	c.Assert(err, gc.IsNil)
+
+	err = jem.CredentialAddController(s.store, user, cloud, name, ctlPath)
+	c.Assert(err, gc.IsNil)
+
+	cred, err := s.store.Credential(user, cloud, name)
+	c.Assert(err, gc.IsNil)
+	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
+		Id:         expectId,
+		User:       user,
+		Cloud:      cloud,
+		Name:       name,
+		Type:       "empty",
+		Attributes: map[string]string{},
+		Controllers: []params.EntityPath{
+			ctlPath,
+		},
+	})
+
+	// Add a second time
+	err = jem.CredentialAddController(s.store, user, cloud, name, ctlPath)
+	c.Assert(err, gc.IsNil)
+
+	cred, err = s.store.Credential(user, cloud, name)
+	c.Assert(err, gc.IsNil)
+	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
+		Id:         expectId,
+		User:       user,
+		Cloud:      cloud,
+		Name:       name,
+		Type:       "empty",
+		Attributes: map[string]string{},
+		Controllers: []params.EntityPath{
+			ctlPath,
+		},
+	})
+
+	// Add to a non-existant credential
+	err = jem.CredentialAddController(s.store, user, cloud, "no-such-cred", ctlPath)
+	c.Assert(err, gc.ErrorMatches, `credential "test-user/test-cloud/no-such-cred" not found`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}
+
+func (s *jemSuite) TestCredentialRemoveController(c *gc.C) {
+	user := params.User("test-user")
+	cloud := params.Cloud("test-cloud")
+	name := params.Name("test-credential")
+	expectId := fmt.Sprintf("%s/%s/%s", user, cloud, name)
+	err := jem.UpdateCredential(s.store, &mongodoc.Credential{
+		User:  user,
+		Cloud: cloud,
+		Name:  name,
+		Type:  "empty",
+	})
+	c.Assert(err, gc.IsNil)
+
+	ctlPath := params.EntityPath{"bob", "x"}
+	ctl := &mongodoc.Controller{
+		Path: ctlPath,
+	}
+	err = s.store.AddController(ctl, &mongodoc.Model{})
+	c.Assert(err, gc.IsNil)
+
+	err = jem.CredentialAddController(s.store, user, cloud, name, ctlPath)
+	c.Assert(err, gc.IsNil)
+
+	// sanity check the controller is there.
+	cred, err := s.store.Credential(user, cloud, name)
+	c.Assert(err, gc.IsNil)
+	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
+		Id:         expectId,
+		User:       user,
+		Cloud:      cloud,
+		Name:       name,
+		Type:       "empty",
+		Attributes: map[string]string{},
+		Controllers: []params.EntityPath{
+			ctlPath,
+		},
+	})
+
+	err = jem.CredentialRemoveController(s.store, user, cloud, name, ctlPath)
+	c.Assert(err, gc.IsNil)
+
+	cred, err = s.store.Credential(user, cloud, name)
+	c.Assert(err, gc.IsNil)
+	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
+		Id:         expectId,
+		User:       user,
+		Cloud:      cloud,
+		Name:       name,
+		Type:       "empty",
+		Attributes: map[string]string{},
+	})
+
+	// Remove again
+	err = jem.CredentialRemoveController(s.store, user, cloud, name, ctlPath)
+	c.Assert(err, gc.IsNil)
+
+	cred, err = s.store.Credential(user, cloud, name)
+	c.Assert(err, gc.IsNil)
+	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
+		Id:         expectId,
+		User:       user,
+		Cloud:      cloud,
+		Name:       name,
+		Type:       "empty",
+		Attributes: map[string]string{},
+	})
+
+	// remove from a non-existant credential
+	err = jem.CredentialRemoveController(s.store, user, cloud, "no-such-cred", ctlPath)
+	c.Assert(err, gc.ErrorMatches, `credential "test-user/test-cloud/no-such-cred" not found`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
 func (s *jemSuite) TestSetACL(c *gc.C) {
@@ -971,6 +1105,30 @@ func (s *jemSuite) TestRevoke(c *gc.C) {
 
 	err = s.store.Revoke(s.store.DB.Controllers(), params.EntityPath{"bob", "bar"}, "t2")
 	c.Assert(err, gc.ErrorMatches, `"bob/bar" not found`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}
+
+func (s *jemSuite) TestCloud(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	err := s.store.AddController(&mongodoc.Controller{
+		Path: ctlPath,
+		UUID: "fake-uuid",
+		Cloud: mongodoc.Cloud{
+			Name:         "my-cloud",
+			ProviderType: "ec2",
+		},
+	}, &mongodoc.Model{
+		UUID: "fake-uuid",
+	})
+	c.Assert(err, gc.IsNil)
+	cld, err := s.store.Cloud("my-cloud")
+	c.Assert(err, gc.IsNil)
+	c.Assert(cld, jc.DeepEquals, &mongodoc.Cloud{
+		Name:         "my-cloud",
+		ProviderType: "ec2",
+	})
+	cld, err = s.store.Cloud("not-my-cloud")
+	c.Assert(err, gc.ErrorMatches, `cloud "not-my-cloud" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
