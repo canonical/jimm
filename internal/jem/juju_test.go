@@ -8,14 +8,17 @@ import (
 
 	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/idmtest"
+	cloudapi "github.com/juju/juju/api/cloud"
 	"github.com/juju/juju/api/controller"
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	"github.com/juju/juju/state/multiwatcher"
 	jujutesting "github.com/juju/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/juju/names.v2"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 
 	"github.com/CanonicalLtd/jem/internal/apiconn"
@@ -115,7 +118,7 @@ var createModelTests = []struct {
 
 func (s *jujuSuite) TestCreateModel(c *gc.C) {
 	ctlId := s.addController(c, params.EntityPath{"bob", "controller"})
-	err := s.store.UpdateCredential(&mongodoc.Credential{
+	err := jem.UpdateCredential(s.store, &mongodoc.Credential{
 		User:  "bob",
 		Cloud: "dummy",
 		Name:  "cred1",
@@ -268,6 +271,63 @@ func waitForDestruction(conn *apiconn.Conn, c *gc.C, uuid string) <-chan struct{
 	return ch
 }
 
+func (s *jujuSuite) TestUpdateCredential(c *gc.C) {
+	ctlPath := s.addController(c, params.EntityPath{User: "bob", Name: "controller"})
+	cred := &mongodoc.Credential{
+		User:  "bob",
+		Cloud: "dummy",
+		Name:  "cred",
+		Type:  "empty",
+	}
+	err := jem.UpdateCredential(s.store, cred)
+	conn, err := s.store.OpenAPI(ctlPath)
+	c.Assert(err, jc.ErrorIsNil)
+	defer conn.Close()
+
+	err = jem.UpdateControllerCredential(s.store, conn, cred)
+	c.Assert(err, jc.ErrorIsNil)
+	err = jem.CredentialAddController(s.store, "bob", "dummy", "cred", ctlPath)
+	c.Assert(err, jc.ErrorIsNil)
+
+	// Sanity check it was deployed
+	client := cloudapi.NewClient(conn)
+	credTag := names.NewCloudCredentialTag("dummy/bob@external/cred")
+	creds, err := client.Credentials(credTag)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
+		Result: &jujuparams.CloudCredential{
+			AuthType: "empty",
+		},
+	}})
+
+	err = s.store.UpdateCredential(&mongodoc.Credential{
+		User:  "bob",
+		Cloud: "dummy",
+		Name:  "cred",
+		Type:  "userpass",
+		Attributes: map[string]string{
+			"username": "cloud-user",
+			"password": "cloud-pass",
+		},
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	// check it was updated on the controller.
+	creds, err = client.Credentials(credTag)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
+		Result: &jujuparams.CloudCredential{
+			AuthType: "userpass",
+			Attributes: map[string]string{
+				"username": "cloud-user",
+			},
+			Redacted: []string{
+				"password",
+			},
+		},
+	}})
+}
+
 func (s *jujuSuite) addController(c *gc.C, path params.EntityPath) params.EntityPath {
 	info := s.APIInfo(c)
 	ctl := &mongodoc.Controller{
@@ -292,7 +352,7 @@ func (s *jujuSuite) addController(c *gc.C, path params.EntityPath) params.Entity
 
 func (s *jujuSuite) bootstrapModel(c *gc.C, path params.EntityPath) (*apiconn.Conn, *mongodoc.Model) {
 	ctlPath := s.addController(c, params.EntityPath{User: path.User, Name: "controller"})
-	err := s.store.UpdateCredential(&mongodoc.Credential{
+	err := jem.UpdateCredential(s.store, &mongodoc.Credential{
 		User:  path.User,
 		Cloud: "dummy",
 		Name:  "cred",

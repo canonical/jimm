@@ -12,6 +12,8 @@ import (
 	"github.com/juju/juju/apiserver/common"
 	"github.com/juju/juju/apiserver/observer"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	jujucloud "github.com/juju/juju/cloud"
+	"github.com/juju/juju/environs"
 	"github.com/juju/juju/network"
 	"github.com/juju/juju/rpc"
 	"github.com/juju/juju/rpc/jsoncodec"
@@ -106,11 +108,12 @@ var facades = map[facade]string{
 }
 
 // newWSServer creates a new WebSocket server suitible for handling the API for modelUUID.
-func newWSServer(jem *jem.JEM, params jemserver.Params, modelUUID string) websocket.Server {
+func newWSServer(jem *jem.JEM, jsParams jemserver.Params, modelUUID string) websocket.Server {
 	hnd := wsHandler{
-		jem:       jem,
-		params:    params,
-		modelUUID: modelUUID,
+		jem:           jem,
+		params:        jsParams,
+		modelUUID:     modelUUID,
+		schemataCache: make(map[params.Cloud]map[jujucloud.AuthType]jujucloud.CredentialSchema),
 	}
 	return websocket.Server{
 		Handler: hnd.handle,
@@ -119,13 +122,14 @@ func newWSServer(jem *jem.JEM, params jemserver.Params, modelUUID string) websoc
 
 // wsHandler is a handler for a particular WebSocket connection.
 type wsHandler struct {
-	jem          *jem.JEM
-	params       jemserver.Params
-	heartMonitor heartMonitor
-	modelUUID    string
-	conn         *rpc.Conn
-	model        *mongodoc.Model
-	controller   *mongodoc.Controller
+	jem           *jem.JEM
+	params        jemserver.Params
+	heartMonitor  heartMonitor
+	modelUUID     string
+	conn          *rpc.Conn
+	model         *mongodoc.Model
+	controller    *mongodoc.Controller
+	schemataCache map[params.Cloud]map[jujucloud.AuthType]jujucloud.CredentialSchema
 }
 
 // handle handles the connection.
@@ -161,6 +165,24 @@ func (h *wsHandler) resolveUUID() error {
 	}
 	h.controller, err = h.jem.Controller(h.model.Controller)
 	return errgo.Mask(err)
+}
+
+// credentialSchema gets the schema for the credential identified by the
+// given cloud and authType.
+func (h *wsHandler) credentialSchema(cloud params.Cloud, authType string) (jujucloud.CredentialSchema, error) {
+	if cs, ok := h.schemataCache[cloud]; ok {
+		return cs[jujucloud.AuthType(authType)], nil
+	}
+	cloudInfo, err := h.jem.Cloud(cloud)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	provider, err := environs.Provider(cloudInfo.ProviderType)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	h.schemataCache[cloud] = provider.CredentialSchemas()
+	return h.schemataCache[cloud][jujucloud.AuthType(authType)], nil
 }
 
 // FindMethod implements rpcreflect.MethodFinder.
@@ -399,11 +421,11 @@ func (c cloud) DefaultCloud() (jujuparams.StringResult, error) {
 	}, nil
 }
 
-// Credentials implements the Credentials method of the Cloud facade.
-func (c cloud) Credentials(userclouds jujuparams.UserClouds) (jujuparams.StringsResults, error) {
+// UserCredentials implements the UserCredentials method of the Cloud facade.
+func (c cloud) UserCredentials(userclouds jujuparams.UserClouds) (jujuparams.StringsResults, error) {
 	results := make([]jujuparams.StringsResult, len(userclouds.UserClouds))
 	for i, ent := range userclouds.UserClouds {
-		creds, err := c.credentials(ent.UserTag, ent.CloudTag)
+		creds, err := c.userCredentials(ent.UserTag, ent.CloudTag)
 		if err != nil {
 			results[i].Error = mapError(err)
 			continue
@@ -416,8 +438,8 @@ func (c cloud) Credentials(userclouds jujuparams.UserClouds) (jujuparams.Strings
 	}, nil
 }
 
-// credentials retrieves the credentials stored for given owner and cloud.
-func (c cloud) credentials(ownerTag, cloudTag string) ([]string, error) {
+// userCredentials retrieves the credentials stored for given owner and cloud.
+func (c cloud) userCredentials(ownerTag, cloudTag string) ([]string, error) {
 	owner, err := names.ParseUserTag(ownerTag)
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
@@ -487,6 +509,58 @@ func (c cloud) updateCredential(arg jujuparams.UpdateCloudCredential) error {
 		return errgo.Mask(err)
 	}
 	return nil
+}
+
+// Credential implements the Credential method of the Cloud facade.
+func (c cloud) Credential(args jujuparams.Entities) (jujuparams.CloudCredentialResults, error) {
+	results := make([]jujuparams.CloudCredentialResult, len(args.Entities))
+	for i, e := range args.Entities {
+		cred, err := c.credential(e.Tag)
+		if err != nil {
+			results[i].Error = mapError(err)
+			continue
+		}
+		results[i].Result = cred
+	}
+	return jujuparams.CloudCredentialResults{
+		Results: results,
+	}, nil
+}
+
+// credential retrieves the given credential.
+func (c cloud) credential(cloudCredentialTag string) (*jujuparams.CloudCredential, error) {
+	cct, err := names.ParseCloudCredentialTag(cloudCredentialTag)
+	if err != nil {
+		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
+
+	}
+	owner := cct.Owner()
+	if owner.IsLocal() {
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", cct.Id())
+	}
+	if err := c.h.jem.CheckIsUser(params.User(owner.Name())); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	cred, err := c.h.jem.Credential(params.User(owner.Name()), params.Cloud(cct.Cloud().Id()), params.Name(cct.Name()))
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	schema, err := c.h.credentialSchema(cred.Cloud, cred.Type)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	cc := jujuparams.CloudCredential{
+		AuthType:   cred.Type,
+		Attributes: make(map[string]string),
+	}
+	for k, v := range cred.Attributes {
+		if ca, ok := schema.Attribute(k); ok && !ca.Hidden {
+			cc.Attributes[k] = v
+		} else {
+			cc.Redacted = append(cc.Redacted, k)
+		}
+	}
+	return &cc, nil
 }
 
 // modelManager implements the ModelManager facade.
