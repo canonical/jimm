@@ -10,9 +10,10 @@ import (
 	"github.com/juju/idmclient/idmtest"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	jujuwatcher "github.com/juju/juju/state/watcher"
-	jujutesting "github.com/juju/juju/testing"
+	jujujujutesting "github.com/juju/juju/testing"
 	"github.com/juju/juju/testing/factory"
 	"github.com/juju/juju/worker"
+	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
@@ -105,7 +106,7 @@ func (s *internalSuite) TestLeaseUpdater(c *gc.C) {
 
 	// Wait for the lease to actually be renewed.
 	var ctl *mongodoc.Controller
-	for a := jujutesting.LongAttempt.Start(); a.Next(); {
+	for a := jujujujutesting.LongAttempt.Start(); a.Next(); {
 		ctl, err = s.jem.Controller(ctlPath)
 		c.Assert(err, gc.IsNil)
 		if !ctl.MonitorLeaseExpiry.Equal(expiry) {
@@ -123,7 +124,7 @@ func (s *internalSuite) TestLeaseUpdater(c *gc.C) {
 
 	select {
 	case err = <-done:
-	case <-time.After(jujutesting.LongWait):
+	case <-time.After(jujujujutesting.LongWait):
 		c.Fatalf("lease updater never stopped")
 	}
 	c.Assert(err, gc.Equals, tomb.ErrDying)
@@ -155,7 +156,7 @@ func (s *internalSuite) TestLeaseUpdaterWhenControllerRemoved(c *gc.C) {
 	var err error
 	select {
 	case err = <-done:
-	case <-time.After(jujutesting.LongWait):
+	case <-time.After(jujujujutesting.LongWait):
 		c.Fatalf("lease updater never stopped")
 	}
 	c.Assert(err, gc.ErrorMatches, `cannot renew lease on bob/foo: controller has been removed`)
@@ -322,7 +323,7 @@ func (s *internalSuite) TestWatcherDialAPIError(c *gc.C) {
 	err := s.jem.AddController(&mongodoc.Controller{
 		Path:      ctlPath,
 		UUID:      "some-uuid",
-		CACert:    jujutesting.CACert,
+		CACert:    jujujujutesting.CACert,
 		AdminUser: "bob",
 		HostPorts: []string{"0.1.2.3:4567"},
 	}, &mongodoc.Model{
@@ -351,7 +352,7 @@ func (s *internalSuite) TestWatcherDialAPIError(c *gc.C) {
 	// watcher to pause for a while and retry.
 	select {
 	case apiErrorCh <- errgo.WithCausef(nil, jem.ErrAPIConnection, "faked api connection error"):
-	case <-time.After(jujutesting.LongWait):
+	case <-time.After(jujujujutesting.LongWait):
 		c.Fatalf("timed out waiting for API connection")
 	}
 
@@ -359,7 +360,7 @@ func (s *internalSuite) TestWatcherDialAPIError(c *gc.C) {
 	select {
 	case apiErrorCh <- errgo.New("oh no you don't"):
 		c.Fatalf("watcher did not wait before retrying")
-	case <-time.After(jujutesting.ShortWait):
+	case <-time.After(jujujujutesting.ShortWait):
 	}
 
 	// Check that the controller is marked as unavailable.
@@ -372,7 +373,7 @@ func (s *internalSuite) TestWatcherDialAPIError(c *gc.C) {
 
 	select {
 	case apiErrorCh <- errgo.New("fatal error"):
-	case <-time.After(jujutesting.LongWait):
+	case <-time.After(jujujujutesting.LongWait):
 		c.Fatalf("timed out waiting for retried API connection")
 	}
 
@@ -540,7 +541,7 @@ func (s *internalSuite) TestAllMonitorMultiControllersWithAPIError(c *gc.C) {
 				c.Fatalf("controller %v opened twice", p)
 			}
 			opened[p] = true
-		case <-time.After(jujutesting.LongWait):
+		case <-time.After(jujujujutesting.LongWait):
 			c.Fatalf("timed out waiting for API to be opened")
 		}
 	}
@@ -613,7 +614,7 @@ func (s *internalSuite) TestAllMonitorMultiControllerMultipleLeases(c *gc.C) {
 	case a := <-leaseAcquired:
 		c.Assert(a.path.String(), gc.Equals, "bob/foo")
 		c.Assert(a.owner, gc.Equals, "jem1")
-	case <-time.After(jujutesting.LongWait):
+	case <-time.After(jujujujutesting.LongWait):
 		c.Fatalf("timed out waiting for lease to be acquired")
 	}
 
@@ -636,7 +637,7 @@ func (s *internalSuite) TestAllMonitorMultiControllerMultipleLeases(c *gc.C) {
 	case a := <-leaseAcquired:
 		c.Assert(a.path.String(), gc.Equals, "bob/bar")
 		c.Assert(a.owner, gc.Equals, "jem2")
-	case <-time.After(jujutesting.LongWait):
+	case <-time.After(jujujujutesting.LongWait):
 		c.Fatalf("timed out waiting for lease to be acquired")
 	}
 
@@ -645,7 +646,7 @@ func (s *internalSuite) TestAllMonitorMultiControllerMultipleLeases(c *gc.C) {
 	s.clock.Advance(leaseExpiryDuration * 5 / 6)
 
 	renewed := make(map[string]string)
-	timeout := time.After(jujutesting.LongWait)
+	timeout := time.After(jujujujutesting.LongWait)
 	for i := 0; i < 2; i++ {
 		select {
 		case a := <-leaseAcquired:
@@ -657,7 +658,7 @@ func (s *internalSuite) TestAllMonitorMultiControllerMultipleLeases(c *gc.C) {
 	select {
 	case p := <-leaseAcquired:
 		c.Fatalf("unexpected lease acquired %v", p)
-	case <-time.After(jujutesting.ShortWait):
+	case <-time.After(jujujujutesting.ShortWait):
 	}
 	// Both leases should still have the same owners.
 	c.Assert(renewed, jc.DeepEquals, map[string]string{
@@ -674,7 +675,7 @@ func (s *internalSuite) TestAllMonitorMultiControllerMultipleLeases(c *gc.C) {
 	case p := <-leaseAcquired:
 		c.Assert(p.path.String(), gc.Equals, "bob/bar")
 		c.Assert(p.owner, gc.Equals, "")
-	case <-time.After(jujutesting.LongWait):
+	case <-time.After(jujujujutesting.LongWait):
 		c.Fatalf("timed out waiting for lease drop")
 	}
 
@@ -685,7 +686,7 @@ func (s *internalSuite) TestAllMonitorMultiControllerMultipleLeases(c *gc.C) {
 	case p := <-leaseAcquired:
 		c.Assert(p.path.String(), gc.Equals, "bob/bar")
 		c.Assert(p.owner, gc.Equals, "jem1")
-	case <-time.After(jujutesting.LongWait):
+	case <-time.After(jujujujutesting.LongWait):
 		c.Fatalf("timed out waiting for lease acquisition")
 	}
 }
@@ -725,7 +726,7 @@ func (s *internalSuite) TestAllMonitorWithRaceOnLeaseAcquisition(c *gc.C) {
 	err := s.jem.AddController(&mongodoc.Controller{
 		Path:      ctlPath,
 		UUID:      "some-uuid",
-		CACert:    jujutesting.CACert,
+		CACert:    jujujujutesting.CACert,
 		AdminUser: "bob",
 		HostPorts: []string{"0.1.2.3:4567"},
 	}, &mongodoc.Model{
@@ -741,7 +742,7 @@ func (s *internalSuite) TestAllMonitorWithRaceOnLeaseAcquisition(c *gc.C) {
 	defer worker.Stop(m2)
 
 	// ... get set ...
-	timeout := time.After(jujutesting.LongWait)
+	timeout := time.After(jujujujutesting.LongWait)
 	for i := 0; i < 2; i++ {
 		select {
 		case <-wantLease:
@@ -754,7 +755,7 @@ func (s *internalSuite) TestAllMonitorWithRaceOnLeaseAcquisition(c *gc.C) {
 	close(goforitLease)
 
 	// Wait for both monitors to go to sleep after the race is over.
-	timeout = time.After(jujutesting.LongWait)
+	timeout = time.After(jujujujutesting.LongWait)
 	for i := 0; i < 2; i++ {
 		select {
 		case <-s.clock.Alarms():
@@ -807,7 +808,7 @@ func (s *internalSuite) TestAllMonitorReusesOwnLease(c *gc.C) {
 	select {
 	case p := <-openedAPI:
 		c.Check(p, gc.Equals, ctlPath)
-	case <-time.After(jujutesting.LongWait):
+	case <-time.After(jujujujutesting.LongWait):
 		c.Fatalf("timed out waiting for API open")
 	}
 	ctl := jshim.controllers[ctlPath]
@@ -839,7 +840,7 @@ func addFakeController(jshim *jemShimInMemory, path params.EntityPath) {
 	jshim.AddController(&mongodoc.Controller{
 		Path:      path,
 		UUID:      fmt.Sprintf("some-uuid-%s", path),
-		CACert:    jujutesting.CACert,
+		CACert:    jujujujutesting.CACert,
 		AdminUser: "bob",
 		HostPorts: []string{"0.1.2.3:4567"},
 	})
@@ -860,7 +861,7 @@ func parseTime(s string) time.Time {
 func waitEvent(c *gc.C, ch <-chan struct{}, what string) {
 	select {
 	case <-ch:
-	case <-time.After(jujutesting.LongWait):
+	case <-time.After(jujujujutesting.LongWait):
 		c.Fatalf("timed out waiting for %s", what)
 	}
 }
@@ -869,7 +870,7 @@ func assertNoEvent(c *gc.C, ch <-chan struct{}, what string) {
 	select {
 	case <-ch:
 		c.Fatalf("unexpected event received: %v", what)
-	case <-time.After(jujutesting.ShortWait):
+	case <-time.After(jujujujutesting.ShortWait):
 	}
 }
 
