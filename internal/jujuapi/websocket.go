@@ -271,14 +271,14 @@ type admin struct {
 }
 
 // Login implements the Login method on the Admin facade.
-func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResultV1, error) {
+func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResult, error) {
 	if a.h.modelUUID != "" {
 		if a.h.model.Id == a.h.controller.Id {
 			// The client cannot log in to a controller model via JIMM.
-			return jujuparams.LoginResultV1{}, errgo.WithCausef(nil, params.ErrNotFound, "model %q not found", a.h.modelUUID)
+			return jujuparams.LoginResult{}, errgo.WithCausef(nil, params.ErrNotFound, "model %q not found", a.h.modelUUID)
 		}
 		// If the connection specifies a model then redirection is required.
-		return jujuparams.LoginResultV1{}, &jujuparams.Error{
+		return jujuparams.LoginResult{}, &jujuparams.Error{
 			Code:    jujuparams.CodeRedirect,
 			Message: "redirection required",
 		}
@@ -290,18 +290,18 @@ func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResultV1, err
 		if verr, ok := errgo.Cause(err).(*bakery.VerificationError); ok {
 			m, err := a.h.jem.NewMacaroon()
 			if err != nil {
-				return jujuparams.LoginResultV1{}, errgo.Notef(err, "cannot create macaroon")
+				return jujuparams.LoginResult{}, errgo.Notef(err, "cannot create macaroon")
 			}
-			return jujuparams.LoginResultV1{
+			return jujuparams.LoginResult{
 				DischargeRequired:       m,
 				DischargeRequiredReason: verr.Error(),
 			}, nil
 		}
-		return jujuparams.LoginResultV1{}, errgo.Mask(err)
+		return jujuparams.LoginResult{}, errgo.Mask(err)
 	}
 	a.h.jem.Auth.Username = attr["username"]
 
-	return jujuparams.LoginResultV1{
+	return jujuparams.LoginResult{
 		UserInfo: &jujuparams.AuthUserInfo{
 			DisplayName: a.h.jem.Auth.Username,
 			Identity:    names.NewUserTag(a.h.jem.Auth.Username).WithDomain("external").String(),
