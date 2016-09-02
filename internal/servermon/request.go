@@ -25,5 +25,5 @@ func (r *Request) Start(path string) {
 // The Request value may then be reused for another
 // API request.
 func (r *Request) End() {
-	requestDuration.WithLabelValues(r.label).Observe(float64(time.Since(r.startTime)) / float64(time.Microsecond))
+	requestDuration.WithLabelValues(r.label).Observe(float64(time.Since(r.startTime)) / float64(time.Second))
 }
