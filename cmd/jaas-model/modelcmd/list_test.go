@@ -27,7 +27,7 @@ func (s *listSuite) TestList(c *gc.C) {
 	stdout, stderr, code = run(c, c.MkDir(), "list")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stderr, gc.Equals, "")
-	c.Assert(stdout, gc.Equals, "bob/foo\nbob/foo-1\nbob/foo-2\n")
+	c.Assert(stdout, gc.Equals, "bob/foo-1\nbob/foo-2\n")
 }
 
 var listErrorTests = []struct {

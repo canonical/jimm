@@ -82,23 +82,6 @@ func (c *client) GetModelPerm(p *params.GetModelPerm) (params.ACL, error) {
 	return r, err
 }
 
-// GetSchema returns the schema that should be used for
-// the model configuration when starting a controller
-// with a location matching p.Location.
-//
-//
-// If controllers of more than one provider type
-// are matched, it will return an error with a params.ErrAmbiguousLocation
-// cause.
-//
-// If no controllers are matched, it will return an error with
-// a params.ErrNotFound cause.
-func (c *client) GetSchema(p *params.GetSchema) (*params.SchemaResponse, error) {
-	var r *params.SchemaResponse
-	err := c.Client.Call(p, &r)
-	return r, err
-}
-
 // ListController returns all the controllers stored in JEM.
 // Currently the ProviderType field in each ControllerResponse is not
 // populated.

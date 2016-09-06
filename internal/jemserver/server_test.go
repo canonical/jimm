@@ -182,13 +182,13 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 	defer j.Close()
 
 	ctlPath := params.EntityPath{"bob", "foo"}
-	err = j.AddController(&mongodoc.Controller{
+	err = j.DB.AddController(&mongodoc.Controller{
 		Path:      ctlPath,
 		UUID:      "some-uuid",
 		CACert:    jujutesting.CACert,
 		AdminUser: "bob",
 		HostPorts: []string{"0.1.2.3:4567"},
-	}, &mongodoc.Model{})
+	})
 	c.Assert(err, gc.IsNil)
 
 	params := jemserver.Params{
@@ -213,7 +213,7 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 	// Poll the database to check that the monitor lease is taken out.
 	var ctl *mongodoc.Controller
 	for a := jujutesting.LongAttempt.Start(); a.Next(); {
-		ctl, err = j.Controller(ctlPath)
+		ctl, err = j.DB.Controller(ctlPath)
 		c.Assert(err, gc.IsNil)
 		if ctl.MonitorLeaseOwner != "" {
 			break
