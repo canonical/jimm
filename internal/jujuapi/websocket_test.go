@@ -26,6 +26,7 @@ import (
 	"gopkg.in/macaroon.v1"
 
 	"github.com/CanonicalLtd/jem/internal/apitest"
+	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/jujuapi"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
@@ -209,6 +210,7 @@ func (s *websocketSuite) TestClouds(c *gc.C) {
 
 func (s *websocketSuite) TestUserCredentials(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	s.JEM.Auth.Username = "test"
 	s.JEM.UpdateCredential(&mongodoc.Credential{
 		User:  "test",
 		Cloud: "dummy",
@@ -232,7 +234,8 @@ func (s *websocketSuite) TestUserCredentials(c *gc.C) {
 
 func (s *websocketSuite) TestUserCredentialsACL(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	s.JEM.UpdateCredential(&mongodoc.Credential{
+	s.JEM.Auth.Username = "test"
+	err := s.JEM.UpdateCredential(&mongodoc.Credential{
 		User:  "test",
 		Cloud: "dummy",
 		Name:  "cred1",
@@ -243,7 +246,9 @@ func (s *websocketSuite) TestUserCredentialsACL(c *gc.C) {
 			"attr2": "val2",
 		},
 	})
-	s.JEM.UpdateCredential(&mongodoc.Credential{
+	c.Assert(err, jc.ErrorIsNil)
+	s.JEM.Auth.Username = "test2"
+	err = s.JEM.UpdateCredential(&mongodoc.Credential{
 		User:  "test2",
 		Cloud: "dummy",
 		Name:  "cred2",
@@ -257,6 +262,7 @@ func (s *websocketSuite) TestUserCredentialsACL(c *gc.C) {
 			"attr2": "val4",
 		},
 	})
+	c.Assert(err, jc.ErrorIsNil)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -436,7 +442,7 @@ func (s *websocketSuite) TestListModels(c *gc.C) {
 	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
 	cred2 := s.AssertUpdateCredential(c, "test2", "dummy", "cred1", "empty")
-	err := s.JEM.SetACL(s.JEM.DB.Controllers(), ctlPath, params.ACL{
+	err := jem.SetACL(s.JEM.DB.Controllers(), ctlPath, params.ACL{
 		Read: []string{"test2"},
 	})
 	c.Assert(err, jc.ErrorIsNil)
@@ -445,7 +451,7 @@ func (s *websocketSuite) TestListModels(c *gc.C) {
 	s.assertCreateModel(c, "model-2", "test2", "", "", string(cred2), nil)
 	mi = s.assertCreateModel(c, "model-3", "test2", "", "", string(cred2), nil)
 	modelUUID3 := mi.UUID
-	err = s.JEM.SetACL(s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
+	err = jem.SetACL(s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
 		Read: []string{"test"},
 	})
 	c.Assert(err, jc.ErrorIsNil)
@@ -455,10 +461,6 @@ func (s *websocketSuite) TestListModels(c *gc.C) {
 	models, err := client.ListModels("test")
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(models, jc.DeepEquals, []base.UserModel{{
-		Name:  "controller-1",
-		UUID:  "deadbeef-0bad-400d-8000-4b1d0d06f00d",
-		Owner: "test@external",
-	}, {
 		Name:  "model-1",
 		UUID:  modelUUID1,
 		Owner: "test@external",
@@ -473,7 +475,7 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
 	s.AssertUpdateCredential(c, "test2", "dummy", "cred1", "empty")
-	err := s.JEM.SetACL(s.JEM.DB.Controllers(), ctlPath, params.ACL{
+	err := jem.SetACL(s.JEM.DB.Controllers(), ctlPath, params.ACL{
 		Read: []string{"test2"},
 	})
 	c.Assert(err, jc.ErrorIsNil)
@@ -489,7 +491,7 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 	defer conn.Close()
 	client := modelmanager.NewClient(conn)
 
-	err = s.JEM.SetACL(s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
+	err = jem.SetACL(s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
 		Read: []string{"test"},
 	})
 	c.Assert(err, jc.ErrorIsNil)

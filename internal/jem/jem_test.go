@@ -4,34 +4,40 @@ package jem_test
 
 import (
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/idmtest"
-	jujutesting "github.com/juju/testing"
+	cloudapi "github.com/juju/juju/api/cloud"
+	"github.com/juju/juju/api/controller"
+	modelmanagerapi "github.com/juju/juju/api/modelmanager"
+	jujuparams "github.com/juju/juju/apiserver/params"
+	corejujutesting "github.com/juju/juju/juju/testing"
+	"github.com/juju/juju/state/multiwatcher"
+	jujutesting "github.com/juju/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/juju/names.v2"
 	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/mgo.v2/bson"
 
+	"github.com/CanonicalLtd/jem/internal/apiconn"
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
 
 type jemSuite struct {
-	jujutesting.IsolatedMgoSuite
+	corejujutesting.JujuConnSuite
 	idmSrv *idmtest.Server
 	pool   *jem.Pool
-	store  *jem.JEM
+	jem    *jem.JEM
 }
 
 var _ = gc.Suite(&jemSuite{})
 
 func (s *jemSuite) SetUpTest(c *gc.C) {
-	s.IsolatedMgoSuite.SetUpTest(c)
+	s.JujuConnSuite.SetUpTest(c)
 	s.idmSrv = idmtest.NewServer()
 	pool, err := jem.NewPool(jem.Params{
 		DB: s.Session.DB("jem"),
@@ -46,13 +52,13 @@ func (s *jemSuite) SetUpTest(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	s.pool = pool
-	s.store = s.pool.JEM()
+	s.jem = s.pool.JEM()
 }
 
 func (s *jemSuite) TearDownTest(c *gc.C) {
-	s.store.Close()
+	s.jem.Close()
 	s.pool.Close()
-	s.IsolatedMgoSuite.TearDownTest(c)
+	s.JujuConnSuite.TearDownTest(c)
 }
 
 func (s *jemSuite) TestPoolRequiresControllerAdmin(c *gc.C) {
@@ -71,247 +77,155 @@ func (s *jemSuite) TestPoolRequiresControllerAdmin(c *gc.C) {
 }
 
 func (s *jemSuite) TestAddController(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "x"}
-	ctl := &mongodoc.Controller{
-		Id:            "ignored",
-		Path:          ctlPath,
-		CACert:        "certainly",
-		HostPorts:     []string{"host1:1234", "host2:9999"},
-		AdminUser:     "foo-admin",
-		AdminPassword: "foo-password",
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "foo",
-			}},
-		},
-	}
-	m := &mongodoc.Model{
-		Id:   "ignored",
-		Path: params.EntityPath{"ignored-user", "ignored-name"},
-	}
-	err := s.store.AddController(ctl, m)
-	c.Assert(err, gc.IsNil)
-
-	// Check that the fields have been mutated as expected.
-	c.Assert(ctl, jc.DeepEquals, &mongodoc.Controller{
-		Id:            "bob/x",
-		Path:          ctlPath,
-		CACert:        "certainly",
-		HostPorts:     []string{"host1:1234", "host2:9999"},
-		AdminUser:     "foo-admin",
-		AdminPassword: "foo-password",
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "foo",
-			}},
-		},
-	})
-	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
-		Id:         "bob/x",
-		Path:       ctlPath,
-		Controller: ctlPath,
-	})
-
-	ctl1, err := s.store.Controller(ctlPath)
-	c.Assert(err, gc.IsNil)
-	c.Assert(ctl1, jc.DeepEquals, &mongodoc.Controller{
-		Id:            "bob/x",
-		Path:          ctlPath,
-		CACert:        "certainly",
-		HostPorts:     []string{"host1:1234", "host2:9999"},
-		AdminUser:     "foo-admin",
-		AdminPassword: "foo-password",
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "foo",
-			}},
-		},
-	})
-	m1, err := s.store.Model(ctlPath)
-	c.Assert(err, gc.IsNil)
-	c.Assert(m1, jc.DeepEquals, m)
-
-	err = s.store.AddController(ctl, m)
-	c.Assert(err, gc.ErrorMatches, "already exists")
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
-
-	ctlPath2 := params.EntityPath{"bob", "y"}
-	ctl2 := &mongodoc.Controller{
-		Id:            "ignored",
-		Path:          ctlPath2,
-		CACert:        "certainly",
-		HostPorts:     []string{"host1:1234", "host2:9999"},
-		AdminUser:     "foo-admin",
-		AdminPassword: "foo-password",
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "foo",
-			}},
-		},
-	}
-	m2 := &mongodoc.Model{
-		Id:   "bob/noty",
-		Path: params.EntityPath{"ignored-user", "ignored-name"},
-	}
-	err = s.store.AddController(ctl2, m2)
-	c.Assert(err, gc.IsNil)
-	m3, err := s.store.Model(ctlPath2)
-	c.Assert(err, gc.IsNil)
-	c.Assert(m3, jc.DeepEquals, m2)
-}
-
-func (s *jemSuite) TestSetControllerAvailability(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "x"}
-	ctl := &mongodoc.Controller{
-		Path: ctlPath,
-	}
-	err := s.store.AddController(ctl, &mongodoc.Model{})
-
-	// Check that we can mark it as unavailable.
-	t0 := time.Now()
-	err = s.store.SetControllerUnavailableAt(ctlPath, t0)
-	c.Assert(err, gc.IsNil)
-
-	ctl, err = s.store.Controller(ctlPath)
-	c.Assert(err, gc.IsNil)
-	c.Assert(ctl.UnavailableSince.UTC(), jc.DeepEquals, mongodoc.Time(t0).UTC())
-
-	// Check that if we mark it unavailable again, it doesn't
-	// have any affect.
-	err = s.store.SetControllerUnavailableAt(ctlPath, t0.Add(time.Second))
-	c.Assert(err, gc.IsNil)
-
-	ctl, err = s.store.Controller(ctlPath)
-	c.Assert(err, gc.IsNil)
-	c.Assert(ctl.UnavailableSince.UTC(), jc.DeepEquals, mongodoc.Time(t0).UTC())
-
-	// Check that we can mark it as available again.
-	err = s.store.SetControllerAvailable(ctlPath)
-	c.Assert(err, gc.IsNil)
-
-	ctl, err = s.store.Controller(ctlPath)
-	c.Assert(err, gc.IsNil)
-	c.Assert(ctl.UnavailableSince, jc.Satisfies, time.Time.IsZero)
-
-	t1 := t0.Add(3 * time.Second)
-	// ... and that we can mark it as unavailable after that.
-	err = s.store.SetControllerUnavailableAt(ctlPath, t1)
-	c.Assert(err, gc.IsNil)
-
-	ctl, err = s.store.Controller(ctlPath)
-	c.Assert(err, gc.IsNil)
-	c.Assert(ctl.UnavailableSince.UTC(), jc.DeepEquals, mongodoc.Time(t1).UTC())
-}
-
-func (s *jemSuite) TestSetControllerAvailabilityWithNotFoundController(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "x"}
-	err := s.store.SetControllerUnavailableAt(ctlPath, time.Now())
-	c.Assert(err, gc.IsNil)
-	err = s.store.SetControllerAvailable(ctlPath)
-	c.Assert(err, gc.IsNil)
-}
-
-func (s *jemSuite) TestControllerLocationQuery(c *gc.C) {
-	ut := time.Now().UTC()
-	for _, ctl := range []*mongodoc.Controller{{
-		Path: params.EntityPath{"bob", "aws-us-east-1"},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "us-east-1",
-			}},
-		},
-		Public: true,
-	}, {
-		Path: params.EntityPath{"bob", "aws-eu-west-1"},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "eu-west-1",
-			}},
-		},
-		Public: true,
-	}, {
-		Path:   params.EntityPath{"charlie", "other"},
-		Public: true,
-	}, {
-		Path:   params.EntityPath{"charlie", "noattrs"},
-		Public: true,
-	}, {
-		Path: params.EntityPath{"bob", "private"},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "eu-west-1",
-			}},
-		},
-	}, {
-		Path: params.EntityPath{"bob", "down"},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "eu-west-1",
-			}},
-		},
-		UnavailableSince: ut,
-		Public:           true,
-	}} {
-		err := s.store.AddController(ctl, &mongodoc.Model{})
-		c.Assert(err, gc.IsNil)
-	}
-
-	tests := []struct {
-		about              string
-		cloud              params.Cloud
-		region             string
-		includeUnavailable bool
-		expect             []string
-		expectError        string
+	info := s.APIInfo(c)
+	var addControllerTests = []struct {
+		about            string
+		authUser         params.User
+		ctl              mongodoc.Controller
+		expectError      string
+		expectErrorCause error
 	}{{
-		about: "single location attribute",
-		cloud: "aws",
-		expect: []string{
-			"bob/aws-us-east-1",
-			"bob/aws-eu-west-1",
+		about: "add controller",
+		ctl: mongodoc.Controller{
+			HostPorts:     info.Addrs,
+			CACert:        info.CACert,
+			AdminUser:     info.Tag.Id(),
+			AdminPassword: info.Password,
+			UUID:          info.ModelTag.Id(),
 		},
 	}, {
-		about:  "several location attributes",
-		cloud:  "aws",
-		region: "us-east-1",
-		expect: []string{
-			"bob/aws-us-east-1",
+		about:    "add controller as part of group",
+		authUser: "alice",
+		ctl: mongodoc.Controller{
+			Path: params.EntityPath{
+				User: "beatles",
+			},
+			HostPorts:     info.Addrs,
+			CACert:        info.CACert,
+			AdminUser:     info.Tag.Id(),
+			AdminPassword: info.Password,
+			UUID:          info.ModelTag.Id(),
 		},
 	}, {
-		about:              "include unavailable controllers",
-		cloud:              "aws",
-		includeUnavailable: true,
-		expect: []string{
-			"bob/aws-us-east-1",
-			"bob/aws-eu-west-1",
-			"bob/down",
+		about:    "add public controller",
+		authUser: "controller-admin",
+		ctl: mongodoc.Controller{
+			HostPorts:     info.Addrs,
+			CACert:        info.CACert,
+			AdminUser:     info.Tag.Id(),
+			AdminPassword: info.Password,
+			UUID:          info.ModelTag.Id(),
+			Public:        true,
 		},
+	}, {
+		about:    "incorrect user",
+		authUser: "alice",
+		ctl: mongodoc.Controller{
+			Path: params.EntityPath{
+				User: "bob",
+			},
+			HostPorts:     info.Addrs,
+			CACert:        info.CACert,
+			AdminUser:     info.Tag.Id(),
+			AdminPassword: info.Password,
+			UUID:          info.ModelTag.Id(),
+		},
+		expectError:      "unauthorized",
+		expectErrorCause: params.ErrUnauthorized,
+	}, {
+		about: "no hosts",
+		ctl: mongodoc.Controller{
+			CACert:        info.CACert,
+			AdminUser:     info.Tag.Id(),
+			AdminPassword: info.Password,
+			UUID:          info.ModelTag.Id(),
+		},
+		expectError:      `no host-ports in request`,
+		expectErrorCause: params.ErrBadRequest,
+	}, {
+		about: "no ca-cert",
+		ctl: mongodoc.Controller{
+			HostPorts:     info.Addrs,
+			AdminUser:     info.Tag.Id(),
+			AdminPassword: info.Password,
+			UUID:          info.ModelTag.Id(),
+		},
+		expectError:      `no ca-cert in request`,
+		expectErrorCause: params.ErrBadRequest,
+	}, {
+		about: "no user",
+		ctl: mongodoc.Controller{
+			HostPorts:     info.Addrs,
+			CACert:        info.CACert,
+			AdminPassword: info.Password,
+			UUID:          info.ModelTag.Id(),
+		},
+		expectError:      `no user in request`,
+		expectErrorCause: params.ErrBadRequest,
+	}, {
+		about: "no model uuid",
+		ctl: mongodoc.Controller{
+			HostPorts:     info.Addrs,
+			CACert:        info.CACert,
+			AdminUser:     info.Tag.Id(),
+			AdminPassword: info.Password,
+		},
+		expectError:      `bad model UUID in request`,
+		expectErrorCause: params.ErrBadRequest,
+	}, {
+		about: "public but no controller-admin access",
+		ctl: mongodoc.Controller{
+			HostPorts:     info.Addrs,
+			CACert:        info.CACert,
+			AdminUser:     info.Tag.Id(),
+			AdminPassword: info.Password,
+			UUID:          info.ModelTag.Id(),
+			Public:        true,
+		},
+		expectError:      `admin access required to add public controllers`,
+		expectErrorCause: params.ErrUnauthorized,
+	}, {
+		about: "cannot connect to environment",
+		ctl: mongodoc.Controller{
+			HostPorts:     []string{"0.1.2.3:1234"},
+			CACert:        info.CACert,
+			AdminUser:     info.Tag.Id(),
+			AdminPassword: info.Password,
+			UUID:          info.ModelTag.Id(),
+		},
+		expectError:      `cannot connect to controller: cannot connect to API: unable to connect to API: websocket.Dial wss://0.1.2.3:1234/api: dial tcp 0.1.2.3:1234: connect: invalid argument`,
+		expectErrorCause: params.ErrBadRequest,
 	}}
-	for i, test := range tests {
+	s.idmSrv.AddUser("alice", "beatles")
+	s.idmSrv.AddUser("bob", "beatles")
+	for i, test := range addControllerTests {
 		c.Logf("test %d: %s", i, test.about)
-		q, err := s.store.ControllerLocationQuery(test.cloud, test.region, test.includeUnavailable)
+		if test.authUser == "" {
+			test.authUser = "testuser"
+		}
+		if test.ctl.Path.User == "" {
+			test.ctl.Path.User = test.authUser
+		}
+		if test.ctl.Path.Name == "" {
+			test.ctl.Path.Name = params.Name(fmt.Sprintf("controller%d", i))
+		}
+		s.authenticate(string(test.authUser))
+		err := s.jem.AddController(&test.ctl)
 		if test.expectError != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
+			if test.expectErrorCause != nil {
+				c.Assert(errgo.Cause(err), gc.Equals, test.expectErrorCause)
+			}
 			continue
 		}
-		var ctls []*mongodoc.Controller
-		err = q.All(&ctls)
 		c.Assert(err, gc.IsNil)
-		var paths []string
-		for _, ctl := range ctls {
-			paths = append(paths, ctl.Path.String())
-		}
-		sort.Strings(paths)
-		sort.Strings(test.expect)
-		c.Assert(paths, jc.DeepEquals, test.expect)
+		// The controller was added successfully. Check that we
+		// can connect to it.
+		conn, err := s.jem.OpenAPI(&test.ctl)
+		c.Assert(err, gc.IsNil)
+		conn.Close()
+		// Clear the connection pool for the next test.
+		s.pool.ClearAPIConnCache()
 	}
 }
 
@@ -325,107 +239,49 @@ func (s *jemSuite) TestDeleteController(c *gc.C) {
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 	}
-	m := &mongodoc.Model{
-		Id:   "dalek/who",
-		Path: params.EntityPath{"ignored", "ignored"},
-	}
-	err := s.store.AddController(ctl, m)
-	c.Assert(err, gc.IsNil)
-	err = s.store.DeleteController(ctlPath)
+	err := s.jem.DB.AddController(ctl)
 	c.Assert(err, gc.IsNil)
 
-	ctl1, err := s.store.Controller(ctlPath)
-	c.Assert(ctl1, gc.IsNil)
-	m1, err := s.store.Model(ctlPath)
-	c.Assert(m1, gc.IsNil)
+	s.authenticate("who")
+	err = s.jem.DeleteController(ctlPath)
+	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
 
-	err = s.store.DeleteController(ctlPath)
-	c.Assert(err, gc.ErrorMatches, "controller \"dalek/who\" not found")
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-
-	// Test with non-existing model.
-	ctl2 := &mongodoc.Controller{
-		Id:            "dalek/who",
-		Path:          ctlPath,
-		CACert:        "certainly",
-		HostPorts:     []string{"host1:1234", "host2:9999"},
-		AdminUser:     "foo-admin",
-		AdminPassword: "foo-password",
-	}
-	m2 := &mongodoc.Model{
-		Id:   "dalek/exterminated",
-		Path: params.EntityPath{"ignored", "ignored"},
-	}
-	err = s.store.AddController(ctl2, m2)
+	s.authenticate("dalek")
+	err = s.jem.DeleteController(ctlPath)
 	c.Assert(err, gc.IsNil)
 
-	err = s.store.DeleteController(ctlPath)
-	c.Assert(err, gc.IsNil)
-	ctl3, err := s.store.Controller(ctlPath)
-	c.Assert(ctl3, gc.IsNil)
-	m3, err := s.store.Model(ctlPath)
-	c.Assert(m3, gc.IsNil)
-}
-
-func (s *jemSuite) TestDeleteModel(c *gc.C) {
-	ctlPath := params.EntityPath{"dalek", "who"}
-	ctl := &mongodoc.Controller{
-		Id:            "ignored",
-		Path:          ctlPath,
-		CACert:        "certainly",
-		HostPorts:     []string{"host1:1234", "host2:9999"},
-		AdminUser:     "foo-admin",
-		AdminPassword: "foo-password",
-	}
-	m := &mongodoc.Model{
-		Id:   "dalek/who",
-		Path: params.EntityPath{"ignored", "ignored"},
-	}
-	err := s.store.AddController(ctl, m)
-	c.Assert(err, gc.IsNil)
-
-	err = s.store.DeleteModel(m.Path)
-	c.Assert(err, gc.ErrorMatches, `cannot remove model "dalek/who" because it is a controller`)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrForbidden)
-
-	modelPath := params.EntityPath{"dalek", "exterminate"}
-	m2 := &mongodoc.Model{
-		Id:   "dalek/exterminate",
-		Path: modelPath,
-	}
-	err = s.store.AddModel(m2)
-	c.Assert(err, gc.IsNil)
-
-	err = s.store.DeleteModel(m2.Path)
-	c.Assert(err, gc.IsNil)
-	m3, err := s.store.Model(modelPath)
-	c.Assert(m3, gc.IsNil)
-
-	err = s.store.DeleteModel(m2.Path)
-	c.Assert(err, gc.ErrorMatches, "model \"dalek/exterminate\" not found")
+	err = s.jem.DeleteController(ctlPath)
+	c.Assert(err, gc.ErrorMatches, `controller "dalek/who" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
-func (s *jemSuite) TestAddModel(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "x"}
-	m := &mongodoc.Model{
-		Id:   "ignored",
-		Path: ctlPath,
-	}
-	err := s.store.AddModel(m)
-	c.Assert(err, gc.IsNil)
-	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
-		Id:   "bob/x",
-		Path: ctlPath,
-	})
+func (s *jemSuite) TestController(c *gc.C) {
+	path := s.addController(c, params.EntityPath{"bob", "controller"}, false)
 
-	m1, err := s.store.Model(ctlPath)
-	c.Assert(err, gc.IsNil)
-	c.Assert(m1, jc.DeepEquals, m)
+	ctl, err := s.jem.Controller(path)
+	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
+	c.Assert(ctl, gc.IsNil)
 
-	err = s.store.AddModel(m)
-	c.Assert(err, gc.ErrorMatches, "already exists")
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
+	s.authenticate("bob")
+	ctl, err = s.jem.Controller(path)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(ctl.Path, gc.Equals, path)
+}
+
+func (s *jemSuite) TestModel(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{"bob", "model"})
+
+	m, err := s.jem.Model(model.Path)
+	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
+	c.Assert(m, gc.IsNil)
+
+	s.authenticate("bob")
+	m, err = s.jem.Model(model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(m, jc.DeepEquals, model)
 }
 
 func (s *jemSuite) TestModelFromUUID(c *gc.C) {
@@ -436,7 +292,7 @@ func (s *jemSuite) TestModelFromUUID(c *gc.C) {
 		Path: path,
 		UUID: uuid,
 	}
-	err := s.store.AddModel(m)
+	err := s.jem.DB.AddModel(m)
 	c.Assert(err, gc.IsNil)
 	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
 		Id:   "bob/x",
@@ -444,11 +300,15 @@ func (s *jemSuite) TestModelFromUUID(c *gc.C) {
 		UUID: uuid,
 	})
 
-	m1, err := s.store.ModelFromUUID(uuid)
+	_, err = s.jem.ModelFromUUID(uuid)
+	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+
+	s.authenticate("bob")
+	m1, err := s.jem.ModelFromUUID(uuid)
 	c.Assert(err, gc.IsNil)
 	c.Assert(m1, jc.DeepEquals, m)
 
-	m2, err := s.store.ModelFromUUID("no-such-uuid")
+	m2, err := s.jem.ModelFromUUID("no-such-uuid")
 	c.Assert(err, gc.ErrorMatches, `model "no-such-uuid" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	c.Assert(m2, gc.IsNil)
@@ -469,369 +329,31 @@ func (s *jemSuite) TestJEMCopiesSession(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 
-	store := pool.JEM()
-	defer store.Close()
+	jem := pool.JEM()
+	defer jem.Close()
 	// Check that we get an appropriate error when getting
 	// a non-existent model, indicating that database
 	// access is going OK.
-	_, err = store.Model(params.EntityPath{"bob", "x"})
+	_, err = jem.DB.Model(params.EntityPath{"bob", "x"})
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
 	// Close the session and check that we still get the
 	// same error.
 	session.Close()
 
-	_, err = store.Model(params.EntityPath{"bob", "x"})
+	_, err = jem.DB.Model(params.EntityPath{"bob", "x"})
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
 	// Also check the macaroon storage as that also has its own session reference.
-	m, err := store.Bakery.NewMacaroon("", nil, nil)
+	m, err := jem.Bakery.NewMacaroon("", nil, nil)
 	c.Assert(err, gc.IsNil)
 	c.Assert(m, gc.NotNil)
 }
 
 func (s *jemSuite) TestClone(c *gc.C) {
-	j := s.store.Clone()
+	j := s.jem.Clone()
 	j.Close()
-	_, err := s.store.Model(params.EntityPath{"bob", "x"})
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-}
-
-func (s *jemSuite) TestEnsureUserSuccess(c *gc.C) {
-	n := 0
-	s.PatchValue(jem.RandomPassword, func() (string, error) {
-		n++
-		return fmt.Sprintf("random%d", n), nil
-	})
-	ctlPath := params.EntityPath{
-		User: "bob",
-		Name: "bobcontroller",
-	}
-	err := s.store.AddController(&mongodoc.Controller{
-		Id:            "ignored",
-		Path:          ctlPath,
-		CACert:        "certainly",
-		HostPorts:     []string{"host1:1234", "host2:9999"},
-		AdminUser:     "foo-admin",
-		AdminPassword: "foo-password",
-	}, &mongodoc.Model{
-		Id:   "ignored",
-		Path: params.EntityPath{"ignored-user", "ignored-name"},
-	})
-	c.Assert(err, gc.IsNil)
-
-	// Calling EnsureUser should populate the initial user entry.
-	password, err := s.store.EnsureUser(ctlPath, "jem-bob")
-	c.Assert(err, gc.IsNil)
-	c.Assert(password, gc.Equals, "random1")
-
-	ctl, err := s.store.Controller(ctlPath)
-	c.Assert(err, gc.IsNil)
-	c.Assert(ctl.Users, jc.DeepEquals, map[string]mongodoc.UserInfo{
-		mongodoc.Sanitize("jem-bob"): {
-			Password: password,
-		},
-	})
-
-	// Calling EnsureUser again should use the existing entry.
-	password, err = s.store.EnsureUser(ctlPath, "jem-bob")
-	c.Assert(err, gc.IsNil)
-	c.Assert(password, gc.Equals, "random1")
-
-	// Make sure the controller entry hasn't been changed.
-	ctl, err = s.store.Controller(ctlPath)
-	c.Assert(err, gc.IsNil)
-	c.Assert(ctl.Users, jc.DeepEquals, map[string]mongodoc.UserInfo{
-		mongodoc.Sanitize("jem-bob"): {
-			Password: password,
-		},
-	})
-
-	n = 99
-	// Make sure we can add another user OK.
-	password, err = s.store.EnsureUser(ctlPath, "jem-alice")
-	c.Assert(err, gc.IsNil)
-	c.Assert(password, gc.Equals, "random100")
-
-	ctl, err = s.store.Controller(ctlPath)
-	c.Assert(err, gc.IsNil)
-	c.Assert(ctl.Users, jc.DeepEquals, map[string]mongodoc.UserInfo{
-		mongodoc.Sanitize("jem-bob"): {
-			Password: "random1",
-		},
-		mongodoc.Sanitize("jem-alice"): {
-			Password: "random100",
-		},
-	})
-}
-
-func (s *jemSuite) TestEnsureUserNoController(c *gc.C) {
-	ctlPath := params.EntityPath{
-		User: "bob",
-		Name: "bobcontroller",
-	}
-	password, err := s.store.EnsureUser(ctlPath, "jem-bob")
-	c.Assert(err, gc.ErrorMatches, `cannot get controller: controller "bob/bobcontroller" not found`)
-	c.Assert(password, gc.Equals, "")
-}
-
-func (s *jemSuite) TestSetModelManagedUser(c *gc.C) {
-	modelPath := params.EntityPath{"bob", "x"}
-	m := &mongodoc.Model{
-		Id:   "ignored",
-		Path: modelPath,
-	}
-	err := s.store.AddModel(m)
-	c.Assert(err, gc.IsNil)
-	err = s.store.SetModelManagedUser(modelPath, "jem-bob", mongodoc.ModelUserInfo{
-		Granted: true,
-	})
-	c.Assert(err, gc.IsNil)
-
-	m, err = s.store.Model(modelPath)
-	c.Assert(err, gc.IsNil)
-	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
-		Id:   "bob/x",
-		Path: modelPath,
-		Users: map[string]mongodoc.ModelUserInfo{
-			mongodoc.Sanitize("jem-bob"): {
-				Granted: true,
-			},
-		},
-	})
-
-	err = s.store.SetModelManagedUser(modelPath, "jem-alice", mongodoc.ModelUserInfo{
-		Granted: false,
-	})
-	c.Assert(err, gc.IsNil)
-
-	m, err = s.store.Model(modelPath)
-	c.Assert(err, gc.IsNil)
-	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
-		Id:   "bob/x",
-		Path: modelPath,
-		Users: map[string]mongodoc.ModelUserInfo{
-			mongodoc.Sanitize("jem-bob"): {
-				Granted: true,
-			},
-			mongodoc.Sanitize("jem-alice"): {
-				Granted: false,
-			},
-		},
-	})
-
-	err = s.store.SetModelManagedUser(modelPath, "jem-bob", mongodoc.ModelUserInfo{
-		Granted: false,
-	})
-	c.Assert(err, gc.IsNil)
-
-	m, err = s.store.Model(modelPath)
-	c.Assert(err, gc.IsNil)
-	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
-		Id:   "bob/x",
-		Path: modelPath,
-		Users: map[string]mongodoc.ModelUserInfo{
-			mongodoc.Sanitize("jem-bob"): {
-				Granted: false,
-			},
-			mongodoc.Sanitize("jem-alice"): {
-				Granted: false,
-			},
-		},
-	})
-}
-
-//invalid key for mongo
-//user already exists
-
-var epoch = parseTime("2016-01-01T12:00:00Z")
-
-const leaseExpiryDuration = 15 * time.Second
-
-var acquireLeaseTests = []struct {
-	about           string
-	now             time.Time
-	ctlPath         params.EntityPath
-	oldExpiry       time.Time
-	oldOwner        string
-	newExpiry       time.Time
-	newOwner        string
-	actualOldExpiry time.Time
-	actualOldOwner  string
-	expectExpiry    time.Time
-	expectError     string
-	expectCause     error
-}{{
-	about:           "initial lease acquisition",
-	ctlPath:         params.EntityPath{"bob", "foo"},
-	oldExpiry:       time.Time{},
-	newExpiry:       epoch.Add(leaseExpiryDuration),
-	oldOwner:        "",
-	newOwner:        "jem1",
-	actualOldExpiry: time.Time{},
-	actualOldOwner:  "",
-	expectExpiry:    epoch.Add(leaseExpiryDuration),
-}, {
-	about:           "renewal",
-	ctlPath:         params.EntityPath{"bob", "foo"},
-	oldExpiry:       epoch.Add(leaseExpiryDuration),
-	oldOwner:        "jem1",
-	newExpiry:       epoch.Add(leaseExpiryDuration/2 + leaseExpiryDuration),
-	newOwner:        "jem1",
-	actualOldExpiry: epoch.Add(leaseExpiryDuration),
-	actualOldOwner:  "jem1",
-	expectExpiry:    epoch.Add(leaseExpiryDuration/2 + leaseExpiryDuration),
-}, {
-	about:           "renewal with time mismatch",
-	ctlPath:         params.EntityPath{"bob", "foo"},
-	oldExpiry:       epoch.Add(leaseExpiryDuration),
-	oldOwner:        "jem1",
-	newExpiry:       epoch.Add(leaseExpiryDuration * 3),
-	newOwner:        "jem1",
-	actualOldExpiry: epoch.Add(leaseExpiryDuration * 2),
-	actualOldOwner:  "jem1",
-	expectError:     `controller has lease taken out by "jem1" expiring at 2016-01-01 12:00:30 \+0000 UTC`,
-	expectCause:     jem.ErrLeaseUnavailable,
-}, {
-	about:           "renewal with owner mismatch",
-	ctlPath:         params.EntityPath{"bob", "foo"},
-	oldExpiry:       epoch.Add(leaseExpiryDuration),
-	oldOwner:        "jem1",
-	newOwner:        "jem1",
-	actualOldExpiry: epoch.Add(leaseExpiryDuration),
-	actualOldOwner:  "jem0",
-	expectError:     `controller has lease taken out by "jem0" expiring at 2016-01-01 12:00:15 \+0000 UTC`,
-	expectCause:     jem.ErrLeaseUnavailable,
-}, {
-	about:           "drop lease",
-	now:             epoch.Add(leaseExpiryDuration / 2),
-	ctlPath:         params.EntityPath{"bob", "foo"},
-	oldExpiry:       epoch.Add(leaseExpiryDuration),
-	oldOwner:        "jem1",
-	newOwner:        "",
-	actualOldExpiry: epoch.Add(leaseExpiryDuration),
-	actualOldOwner:  "jem1",
-	expectExpiry:    time.Time{},
-}, {
-	about:           "drop never-acquired lease",
-	now:             epoch,
-	ctlPath:         params.EntityPath{"bob", "foo"},
-	oldOwner:        "",
-	newOwner:        "",
-	actualOldExpiry: time.Time{},
-	actualOldOwner:  "",
-	expectExpiry:    time.Time{},
-}}
-
-func (s *jemSuite) TestAcquireLease(c *gc.C) {
-	for i, test := range acquireLeaseTests {
-		c.Logf("test %d: %v", i, test.about)
-		_, err := s.store.DB.Controllers().RemoveAll(bson.D{{"path", test.ctlPath}})
-		c.Assert(err, gc.IsNil)
-		_, err = s.store.DB.Models().RemoveAll(bson.D{{"path", test.ctlPath}})
-		c.Assert(err, gc.IsNil)
-		err = s.store.AddController(&mongodoc.Controller{
-			Path:               test.ctlPath,
-			UUID:               "fake-uuid",
-			MonitorLeaseOwner:  test.actualOldOwner,
-			MonitorLeaseExpiry: test.actualOldExpiry,
-		}, &mongodoc.Model{})
-		c.Assert(err, gc.IsNil)
-		t, err := s.store.AcquireMonitorLease(test.ctlPath, test.oldExpiry, test.oldOwner, test.newExpiry, test.newOwner)
-		if test.expectError != "" {
-			if test.expectCause != nil {
-				c.Check(errgo.Cause(err), gc.Equals, test.expectCause)
-			}
-			c.Assert(err, gc.ErrorMatches, test.expectError)
-			c.Assert(t, jc.Satisfies, time.Time.IsZero)
-			continue
-		}
-		c.Assert(err, gc.IsNil)
-		c.Assert(t.UTC(), gc.DeepEquals, test.expectExpiry.UTC())
-		ctl, err := s.store.Controller(test.ctlPath)
-		c.Assert(err, gc.IsNil)
-		c.Assert(ctl.MonitorLeaseExpiry.UTC(), gc.DeepEquals, test.expectExpiry.UTC())
-		c.Assert(ctl.MonitorLeaseOwner, gc.Equals, test.newOwner)
-	}
-}
-
-func (s *jemSuite) TestSetControllerStatsNotFound(c *gc.C) {
-	err := s.store.SetControllerStats(params.EntityPath{"bob", "foo"}, &mongodoc.ControllerStats{})
-	c.Assert(err, gc.ErrorMatches, "controller not found")
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-}
-
-func (s *jemSuite) TestSetControllerStats(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.store.AddController(&mongodoc.Controller{
-		Path: ctlPath,
-		UUID: "fake-uuid",
-	}, &mongodoc.Model{})
-	c.Assert(err, gc.IsNil)
-
-	stats := &mongodoc.ControllerStats{
-		UnitCount:    1,
-		ModelCount:   2,
-		ServiceCount: 3,
-		MachineCount: 4,
-	}
-	err = s.store.SetControllerStats(ctlPath, stats)
-	c.Assert(err, gc.IsNil)
-	ctl, err := s.store.Controller(ctlPath)
-	c.Assert(err, gc.IsNil)
-	c.Assert(ctl.Stats, jc.DeepEquals, *stats)
-}
-
-func (s *jemSuite) TestSetModelLifeNotFound(c *gc.C) {
-	err := s.store.SetModelLife(params.EntityPath{"bob", "foo"}, "fake-uuid", "alive")
-	c.Assert(err, gc.IsNil)
-}
-
-func (s *jemSuite) TestSetModelLifeSuccess(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.store.AddController(&mongodoc.Controller{
-		Path: ctlPath,
-		UUID: "fake-uuid",
-	}, &mongodoc.Model{
-		UUID: "fake-uuid",
-	})
-	c.Assert(err, gc.IsNil)
-
-	// Add another model with the same UUID but a different controller.
-	err = s.store.AddModel(&mongodoc.Model{
-		Path:       params.EntityPath{"bar", "baz"},
-		UUID:       "fake-uuid",
-		Controller: params.EntityPath{"bar", "zzz"},
-	})
-	c.Assert(err, gc.IsNil)
-
-	// Add another model with the same controller but a different UUID.
-	err = s.store.AddModel(&mongodoc.Model{
-		Path:       params.EntityPath{"alice", "baz"},
-		UUID:       "another-uuid",
-		Controller: ctlPath,
-	})
-	c.Assert(err, gc.IsNil)
-
-	err = s.store.SetModelLife(ctlPath, "fake-uuid", "alive")
-	c.Assert(err, gc.IsNil)
-
-	m, err := s.store.Model(ctlPath)
-	c.Assert(err, gc.IsNil)
-	c.Assert(m.Life, gc.Equals, "alive")
-
-	m, err = s.store.Model(params.EntityPath{"bar", "baz"})
-	c.Assert(err, gc.IsNil)
-	c.Assert(m.Life, gc.Equals, "")
-
-	m, err = s.store.Model(params.EntityPath{"alice", "baz"})
-	c.Assert(err, gc.IsNil)
-	c.Assert(m.Life, gc.Equals, "")
-}
-
-func (s *jemSuite) TestAcquireLeaseControllerNotFound(c *gc.C) {
-	_, err := s.store.AcquireMonitorLease(params.EntityPath{"bob", "foo"}, time.Time{}, "", time.Now(), "jem1")
-	c.Assert(err, gc.ErrorMatches, `controller removed`)
+	_, err := s.jem.DB.Model(params.EntityPath{"bob", "x"})
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
@@ -840,7 +362,7 @@ func (s *jemSuite) TestAddAndGetCredential(c *gc.C) {
 	cloud := params.Cloud("test-cloud")
 	name := params.Name("test-credential")
 	expectId := fmt.Sprintf("%s/%s/%s", user, cloud, name)
-	cred, err := s.store.Credential(user, cloud, name)
+	cred, err := s.jem.Credential(user, cloud, name)
 	c.Assert(cred, gc.IsNil)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	c.Assert(err, gc.ErrorMatches, `credential "test-user/test-cloud/test-credential" not found`)
@@ -849,7 +371,7 @@ func (s *jemSuite) TestAddAndGetCredential(c *gc.C) {
 		"attr1": "val1",
 		"attr2": "val2",
 	}
-	err = jem.UpdateCredential(s.store, &mongodoc.Credential{
+	err = jem.UpdateCredential(s.jem.DB, &mongodoc.Credential{
 		User:       user,
 		Cloud:      cloud,
 		Name:       name,
@@ -859,7 +381,8 @@ func (s *jemSuite) TestAddAndGetCredential(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 
-	cred, err = s.store.Credential(user, cloud, name)
+	s.authenticate(string(user))
+	cred, err = s.jem.Credential(user, cloud, name)
 	c.Assert(err, gc.IsNil)
 	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
 		Id:         expectId,
@@ -871,7 +394,7 @@ func (s *jemSuite) TestAddAndGetCredential(c *gc.C) {
 		Attributes: attrs,
 	})
 
-	err = jem.UpdateCredential(s.store, &mongodoc.Credential{
+	err = jem.UpdateCredential(s.jem.DB, &mongodoc.Credential{
 		User:       user,
 		Cloud:      cloud,
 		Name:       name,
@@ -881,7 +404,7 @@ func (s *jemSuite) TestAddAndGetCredential(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 
-	cred, err = s.store.Credential(user, cloud, name)
+	cred, err = s.jem.Credential(user, cloud, name)
 	c.Assert(err, gc.IsNil)
 	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
 		Id:         expectId,
@@ -892,250 +415,796 @@ func (s *jemSuite) TestAddAndGetCredential(c *gc.C) {
 		Label:      "Test Label 2",
 		Attributes: attrs,
 	})
+
+	s.authenticate("")
+	cred, err = s.jem.Credential(user, cloud, name)
+	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
+	c.Assert(cred, gc.IsNil)
 }
 
-func (s *jemSuite) TestCredentialAddController(c *gc.C) {
-	user := params.User("test-user")
-	cloud := params.Cloud("test-cloud")
-	name := params.Name("test-credential")
-	expectId := fmt.Sprintf("%s/%s/%s", user, cloud, name)
-	err := jem.UpdateCredential(s.store, &mongodoc.Credential{
-		User:  user,
-		Cloud: cloud,
-		Name:  name,
-		Type:  "empty",
-	})
-	c.Assert(err, gc.IsNil)
-
-	ctlPath := params.EntityPath{"bob", "x"}
-	ctl := &mongodoc.Controller{
-		Path: ctlPath,
-	}
-	err = s.store.AddController(ctl, &mongodoc.Model{})
-	c.Assert(err, gc.IsNil)
-
-	err = jem.CredentialAddController(s.store, user, cloud, name, ctlPath)
-	c.Assert(err, gc.IsNil)
-
-	cred, err := s.store.Credential(user, cloud, name)
-	c.Assert(err, gc.IsNil)
-	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
-		Id:         expectId,
-		User:       user,
-		Cloud:      cloud,
-		Name:       name,
-		Type:       "empty",
-		Attributes: map[string]string{},
-		Controllers: []params.EntityPath{
-			ctlPath,
+func (s *jemSuite) TestDoControllers(c *gc.C) {
+	testControllers := []mongodoc.Controller{{
+		Path: params.EntityPath{
+			User: params.User("bob"),
+			Name: "aws-us-east-1",
 		},
-	})
-
-	// Add a second time
-	err = jem.CredentialAddController(s.store, user, cloud, name, ctlPath)
-	c.Assert(err, gc.IsNil)
-
-	cred, err = s.store.Credential(user, cloud, name)
-	c.Assert(err, gc.IsNil)
-	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
-		Id:         expectId,
-		User:       user,
-		Cloud:      cloud,
-		Name:       name,
-		Type:       "empty",
-		Attributes: map[string]string{},
-		Controllers: []params.EntityPath{
-			ctlPath,
-		},
-	})
-
-	// Add to a non-existant credential
-	err = jem.CredentialAddController(s.store, user, cloud, "no-such-cred", ctlPath)
-	c.Assert(err, gc.ErrorMatches, `credential "test-user/test-cloud/no-such-cred" not found`)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-}
-
-func (s *jemSuite) TestCredentialRemoveController(c *gc.C) {
-	user := params.User("test-user")
-	cloud := params.Cloud("test-cloud")
-	name := params.Name("test-credential")
-	expectId := fmt.Sprintf("%s/%s/%s", user, cloud, name)
-	err := jem.UpdateCredential(s.store, &mongodoc.Credential{
-		User:  user,
-		Cloud: cloud,
-		Name:  name,
-		Type:  "empty",
-	})
-	c.Assert(err, gc.IsNil)
-
-	ctlPath := params.EntityPath{"bob", "x"}
-	ctl := &mongodoc.Controller{
-		Path: ctlPath,
-	}
-	err = s.store.AddController(ctl, &mongodoc.Model{})
-	c.Assert(err, gc.IsNil)
-
-	err = jem.CredentialAddController(s.store, user, cloud, name, ctlPath)
-	c.Assert(err, gc.IsNil)
-
-	// sanity check the controller is there.
-	cred, err := s.store.Credential(user, cloud, name)
-	c.Assert(err, gc.IsNil)
-	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
-		Id:         expectId,
-		User:       user,
-		Cloud:      cloud,
-		Name:       name,
-		Type:       "empty",
-		Attributes: map[string]string{},
-		Controllers: []params.EntityPath{
-			ctlPath,
-		},
-	})
-
-	err = jem.CredentialRemoveController(s.store, user, cloud, name, ctlPath)
-	c.Assert(err, gc.IsNil)
-
-	cred, err = s.store.Credential(user, cloud, name)
-	c.Assert(err, gc.IsNil)
-	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
-		Id:         expectId,
-		User:       user,
-		Cloud:      cloud,
-		Name:       name,
-		Type:       "empty",
-		Attributes: map[string]string{},
-	})
-
-	// Remove again
-	err = jem.CredentialRemoveController(s.store, user, cloud, name, ctlPath)
-	c.Assert(err, gc.IsNil)
-
-	cred, err = s.store.Credential(user, cloud, name)
-	c.Assert(err, gc.IsNil)
-	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
-		Id:         expectId,
-		User:       user,
-		Cloud:      cloud,
-		Name:       name,
-		Type:       "empty",
-		Attributes: map[string]string{},
-	})
-
-	// remove from a non-existant credential
-	err = jem.CredentialRemoveController(s.store, user, cloud, "no-such-cred", ctlPath)
-	c.Assert(err, gc.ErrorMatches, `credential "test-user/test-cloud/no-such-cred" not found`)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-}
-
-func (s *jemSuite) TestSetACL(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.store.AddController(&mongodoc.Controller{
-		Path: ctlPath,
-		UUID: "fake-uuid",
-	}, &mongodoc.Model{
-		UUID: "fake-uuid",
-	})
-	c.Assert(err, gc.IsNil)
-
-	err = s.store.SetACL(s.store.DB.Controllers(), ctlPath, params.ACL{
-		Read: []string{"t1", "t2"},
-	})
-	c.Assert(err, gc.IsNil)
-	var cnt mongodoc.Controller
-	err = s.store.DB.Controllers().FindId(ctlPath.String()).One(&cnt)
-	c.Assert(err, gc.IsNil)
-	c.Assert(cnt.ACL, jc.DeepEquals, params.ACL{
-		Read: []string{"t1", "t2"},
-	})
-
-	err = s.store.SetACL(s.store.DB.Controllers(), params.EntityPath{"bob", "bar"}, params.ACL{
-		Read: []string{"t2", "t1"},
-	})
-	c.Assert(err, gc.ErrorMatches, `"bob/bar" not found`)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-}
-
-func (s *jemSuite) TestGrant(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.store.AddController(&mongodoc.Controller{
-		Path: ctlPath,
-		UUID: "fake-uuid",
-	}, &mongodoc.Model{
-		UUID: "fake-uuid",
-	})
-	c.Assert(err, gc.IsNil)
-
-	err = s.store.Grant(s.store.DB.Controllers(), ctlPath, "t1")
-	c.Assert(err, gc.IsNil)
-	var cnt mongodoc.Controller
-	err = s.store.DB.Controllers().FindId(ctlPath.String()).One(&cnt)
-	c.Assert(err, gc.IsNil)
-	c.Assert(cnt.ACL, jc.DeepEquals, params.ACL{
-		Read: []string{"t1"},
-	})
-
-	err = s.store.Grant(s.store.DB.Controllers(), params.EntityPath{"bob", "bar"}, "t1")
-	c.Assert(err, gc.ErrorMatches, `"bob/bar" not found`)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-}
-
-func (s *jemSuite) TestRevoke(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.store.AddController(&mongodoc.Controller{
-		Path: ctlPath,
-		UUID: "fake-uuid",
-	}, &mongodoc.Model{
-		UUID: "fake-uuid",
-	})
-	c.Assert(err, gc.IsNil)
-
-	err = s.store.SetACL(s.store.DB.Controllers(), ctlPath, params.ACL{
-		Read: []string{"t1", "t2"},
-	})
-	c.Assert(err, gc.IsNil)
-	err = s.store.Revoke(s.store.DB.Controllers(), ctlPath, "t2")
-	c.Assert(err, gc.IsNil)
-	var cnt mongodoc.Controller
-	err = s.store.DB.Controllers().FindId(ctlPath.String()).One(&cnt)
-	c.Assert(err, gc.IsNil)
-	c.Assert(cnt.ACL, jc.DeepEquals, params.ACL{
-		Read: []string{"t1"},
-	})
-
-	err = s.store.Revoke(s.store.DB.Controllers(), params.EntityPath{"bob", "bar"}, "t2")
-	c.Assert(err, gc.ErrorMatches, `"bob/bar" not found`)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-}
-
-func (s *jemSuite) TestCloud(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.store.AddController(&mongodoc.Controller{
-		Path: ctlPath,
-		UUID: "fake-uuid",
 		Cloud: mongodoc.Cloud{
-			Name:         "my-cloud",
-			ProviderType: "ec2",
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
 		},
-	}, &mongodoc.Model{
-		UUID: "fake-uuid",
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("bob"),
+			Name: "aws-eu-west-1",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "eu-west-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("alice"),
+			Name: "aws-us-east-1",
+		},
+		ACL: params.ACL{
+			Read: []string{"bob-group"},
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("alice"),
+			Name: "aws-eu-west-1",
+		},
+		ACL: params.ACL{
+			Read: []string{"bob"},
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "eu-west-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("alice"),
+			Name: "aws-us-east-2",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("bob"),
+			Name: "gce-us-east-1",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "gce",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("alice"),
+			Name: "gce-us-east-1",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "gce",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}}
+	for i := range testControllers {
+		err := s.jem.DB.AddController(&testControllers[i])
+		c.Assert(err, gc.IsNil)
+	}
+	s.authenticate("bob", "bob-group")
+	for i, test := range doContollerTests {
+		c.Logf("test %d. %s", i, test.about)
+		var obtainedControllers []params.EntityPath
+		err := s.jem.DoControllers(test.cloud, test.region, func(ctl *mongodoc.Controller) error {
+			obtainedControllers = append(obtainedControllers, ctl.Path)
+			return nil
+		})
+		c.Assert(err, gc.IsNil)
+		c.Assert(obtainedControllers, jc.DeepEquals, test.expectControllers)
+	}
+}
+
+func (s *jemSuite) TestDoControllersErrorResponse(c *gc.C) {
+	testControllers := []mongodoc.Controller{{
+		Path: params.EntityPath{
+			User: params.User("bob"),
+			Name: "aws-us-east-1",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("bob"),
+			Name: "aws-eu-west-1",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "eu-west-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("alice"),
+			Name: "aws-us-east-1",
+		},
+		ACL: params.ACL{
+			Read: []string{"bob-group"},
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("alice"),
+			Name: "aws-eu-west-1",
+		},
+		ACL: params.ACL{
+			Read: []string{"bob"},
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "eu-west-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("alice"),
+			Name: "aws-us-east-2",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("bob"),
+			Name: "gce-us-east-1",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "gce",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("alice"),
+			Name: "gce-us-east-1",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "gce",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}}
+	for i := range testControllers {
+		err := s.jem.DB.AddController(&testControllers[i])
+		c.Assert(err, gc.IsNil)
+	}
+	s.authenticate("bob", "bob-group")
+	testCause := errgo.New("test-cause")
+	err := s.jem.DoControllers("", "", func(ctl *mongodoc.Controller) error {
+		return errgo.WithCausef(nil, testCause, "test error")
 	})
-	c.Assert(err, gc.IsNil)
-	cld, err := s.store.Cloud("my-cloud")
-	c.Assert(err, gc.IsNil)
-	c.Assert(cld, jc.DeepEquals, &mongodoc.Cloud{
-		Name:         "my-cloud",
-		ProviderType: "ec2",
+	c.Assert(errgo.Cause(err), gc.Equals, testCause)
+}
+
+var selectContollerTests = []struct {
+	about            string
+	cloud            params.Cloud
+	region           string
+	randIntn         func(int) int
+	expectController params.EntityPath
+	expectError      string
+	expectErrorCause error
+}{{
+	about: "no parameters",
+	randIntn: func(n int) int {
+		return 4
+	},
+	expectController: params.EntityPath{
+		User: "bob",
+		Name: "gce-us-east-1",
+	},
+}, {
+	about: "aws",
+	cloud: "aws",
+	randIntn: func(n int) int {
+		return 1
+	},
+	expectController: params.EntityPath{
+		User: "alice",
+		Name: "aws-us-east-1",
+	},
+}, {
+	about:  "aws-us-east-1",
+	cloud:  "aws",
+	region: "us-east-1",
+	randIntn: func(n int) int {
+		return 1
+	},
+	expectController: params.EntityPath{
+		User: "bob",
+		Name: "aws-us-east-1",
+	},
+}, {
+	about:  "no match",
+	cloud:  "aws",
+	region: "us-east-2",
+	randIntn: func(n int) int {
+		return 1
+	},
+	expectError:      `no matching controllers found`,
+	expectErrorCause: params.ErrNotFound,
+}}
+
+func (s *jemSuite) TestSelectController(c *gc.C) {
+	var randIntn *func(int) int
+	s.PatchValue(jem.RandIntn, func(n int) int {
+		return (*randIntn)(n)
 	})
-	cld, err = s.store.Cloud("not-my-cloud")
-	c.Assert(err, gc.ErrorMatches, `cloud "not-my-cloud" not found`)
+	testControllers := []mongodoc.Controller{{
+		Path: params.EntityPath{
+			User: params.User("bob"),
+			Name: "aws-us-east-1",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("bob"),
+			Name: "aws-eu-west-1",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "eu-west-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("alice"),
+			Name: "aws-us-east-1",
+		},
+		ACL: params.ACL{
+			Read: []string{"bob-group"},
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("alice"),
+			Name: "aws-eu-west-1",
+		},
+		ACL: params.ACL{
+			Read: []string{"bob"},
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "eu-west-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("alice"),
+			Name: "aws-us-east-2",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("bob"),
+			Name: "gce-us-east-1",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "gce",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}, {
+		Path: params.EntityPath{
+			User: params.User("alice"),
+			Name: "gce-us-east-1",
+		},
+		Cloud: mongodoc.Cloud{
+			Name: "gce",
+			Regions: []mongodoc.Region{{
+				Name: "us-east-1",
+			}},
+		},
+		Public: true,
+	}}
+	for i := range testControllers {
+		err := s.jem.DB.AddController(&testControllers[i])
+		c.Assert(err, gc.IsNil)
+	}
+	s.authenticate("bob", "bob-group")
+	for i, test := range selectContollerTests {
+		c.Logf("test %d. %s", i, test.about)
+		randIntn = &test.randIntn
+		ctl, err := jem.SelectController(s.jem, test.cloud, test.region)
+		if test.expectError != "" {
+			c.Assert(err, gc.ErrorMatches, test.expectError)
+			if test.expectErrorCause != nil {
+				c.Assert(errgo.Cause(err), gc.Equals, test.expectErrorCause)
+			}
+			continue
+		}
+		c.Assert(err, gc.IsNil)
+		c.Assert(ctl.Path, jc.DeepEquals, test.expectController)
+	}
+}
+
+var createModelTests = []struct {
+	about            string
+	params           jem.CreateModelParams
+	expectError      string
+	expectErrorCause error
+}{{
+	about: "success",
+	params: jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", ""},
+		ControllerPath: params.EntityPath{"bob", "controller"},
+		Credential:     "cred1",
+		Cloud:          "dummy",
+	},
+}, {
+	about: "unknown credential",
+	params: jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", ""},
+		ControllerPath: params.EntityPath{"bob", "controller"},
+		Credential:     "cred2",
+		Cloud:          "dummy",
+	},
+	expectError:      `credential "bob/dummy/cred2" not found`,
+	expectErrorCause: params.ErrNotFound,
+}, {
+	about: "model exists",
+	params: jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", "existing"},
+		ControllerPath: params.EntityPath{"bob", "controller"},
+		Credential:     "cred1",
+		Cloud:          "dummy",
+	},
+	expectError:      `already exists`,
+	expectErrorCause: params.ErrAlreadyExists,
+}, {
+	about: "unrecognised region",
+	params: jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", ""},
+		ControllerPath: params.EntityPath{"bob", "controller"},
+		Credential:     "cred1",
+		Cloud:          "dummy",
+		Region:         "not-a-region",
+	},
+	expectError: `cannot create model: getting cloud region definition: region "not-a-region" not found \(expected one of \["dummy-region"\]\) \(not found\)`,
+}, {
+	about: "with region",
+	params: jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", ""},
+		ControllerPath: params.EntityPath{"bob", "controller"},
+		Credential:     "cred1",
+		Cloud:          "dummy",
+		Region:         "dummy-region",
+	},
+}, {
+	about: "unauthorized",
+	params: jem.CreateModelParams{
+		Path:           params.EntityPath{"alice", ""},
+		ControllerPath: params.EntityPath{"bob", "controller"},
+		Credential:     "cred1",
+		Cloud:          "dummy",
+		Region:         "dummy-region",
+	},
+	expectError:      `unauthorized`,
+	expectErrorCause: params.ErrUnauthorized,
+}, {
+	about: "choose controller",
+	params: jem.CreateModelParams{
+		Path:       params.EntityPath{"bob", ""},
+		Credential: "cred1",
+		Cloud:      "dummy",
+	},
+}, {
+	about: "choose controller - not found",
+	params: jem.CreateModelParams{
+		Path:       params.EntityPath{"bob", ""},
+		Credential: "cred1",
+		Cloud:      "dummy",
+		Region:     "dummy-region-2",
+	},
+	expectError:      `no matching controllers found`,
+	expectErrorCause: params.ErrNotFound,
+}, {
+	about: "unknown controller",
+	params: jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", ""},
+		ControllerPath: params.EntityPath{"bob", "no-such-controller"},
+		Credential:     "cred1",
+		Cloud:          "dummy",
+	},
+	expectError:      `controller "bob/no-such-controller" not found`,
+	expectErrorCause: params.ErrNotFound,
+}}
+
+func (s *jemSuite) TestCreateModel(c *gc.C) {
+	s.addController(c, params.EntityPath{"bob", "controller"}, true)
+	err := jem.UpdateCredential(s.jem.DB, &mongodoc.Credential{
+		User:  "bob",
+		Cloud: "dummy",
+		Name:  "cred1",
+		Type:  "empty",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	s.authenticate("bob")
+	_, _, err = s.jem.CreateModel(jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", "existing"},
+		ControllerPath: params.EntityPath{"bob", "controller"},
+		Credential:     "cred1",
+		Cloud:          "dummy",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	for i, test := range createModelTests {
+		c.Logf("test %d. %s", i, test.about)
+		if test.params.Path.Name == "" {
+			test.params.Path.Name = params.Name(fmt.Sprintf("test-%d", i))
+		}
+		m, _, err := s.jem.CreateModel(test.params)
+		if test.expectError != "" {
+			c.Assert(err, gc.ErrorMatches, test.expectError)
+			if test.expectErrorCause != nil {
+				c.Assert(errgo.Cause(err), gc.Equals, test.expectErrorCause)
+			}
+			continue
+		}
+		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(m.Path, jc.DeepEquals, test.params.Path)
+		c.Assert(m.UUID, gc.Not(gc.Equals), "")
+	}
+}
+
+func (s *jemSuite) TestGrantModel(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	s.authenticate("bob")
+	err := s.jem.GrantModel(model.Path, "alice", "write")
+	c.Assert(err, jc.ErrorIsNil)
+	model1, err := s.jem.Model(model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{"alice"}})
+}
+
+func (s *jemSuite) TestGrantModelNotOwner(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	s.authenticate("alice")
+	err := s.jem.GrantModel(model.Path, "alice", "write")
+	c.Assert(err, gc.ErrorMatches, "unauthorized")
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
+	model1, err := s.jem.DB.Model(model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{}})
+}
+
+func (s *jemSuite) TestGrantModelControllerFailure(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	s.authenticate("bob")
+	err := s.jem.GrantModel(model.Path, "alice", "superpowers")
+	c.Assert(err, gc.ErrorMatches, `invalid model access permission "superpowers"`)
+	model1, err := s.jem.Model(model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{}})
+}
+
+func (s *jemSuite) TestRevokeModel(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	s.authenticate("bob")
+	err := s.jem.GrantModel(model.Path, "alice", "write")
+	c.Assert(err, jc.ErrorIsNil)
+	model1, err := s.jem.Model(model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{"alice"}})
+	err = s.jem.RevokeModel(model.Path, "alice", "write")
+	c.Assert(err, jc.ErrorIsNil)
+	model1, err = s.jem.Model(model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{}})
+}
+
+func (s *jemSuite) TestRevokeModelNotOwner(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	s.authenticate("bob")
+	err := s.jem.GrantModel(model.Path, "alice", "write")
+	c.Assert(err, jc.ErrorIsNil)
+	model1, err := s.jem.Model(model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{"alice"}})
+	s.authenticate("alice")
+	err = s.jem.RevokeModel(model.Path, "alice", "write")
+	c.Assert(err, gc.ErrorMatches, "unauthorized")
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
+	model1, err = s.jem.DB.Model(model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{"alice"}})
+}
+
+func (s *jemSuite) TestRevokeModelControllerFailure(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	s.authenticate("bob")
+	err := s.jem.GrantModel(model.Path, "alice", "write")
+	c.Assert(err, jc.ErrorIsNil)
+	model1, err := s.jem.Model(model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{"alice"}})
+	err = s.jem.RevokeModel(model.Path, "alice", "superpowers")
+	c.Assert(err, gc.ErrorMatches, `invalid model access permission "superpowers"`)
+	model1, err = s.jem.Model(model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{}})
+}
+
+func (s *jemSuite) TestDestroyModel(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	s.authenticate("bob")
+	conn, err := jem.OpenAPIPath(s.jem, model.Controller)
+	c.Assert(err, jc.ErrorIsNil)
+	defer conn.Close()
+
+	// Sanity check the model exists
+	client := modelmanagerapi.NewClient(conn)
+	models, err := client.ListModels("bob@external")
+	c.Assert(err, jc.ErrorIsNil)
+	var found bool
+	for _, m := range models {
+		if m.UUID == model.UUID {
+			c.Logf("found %#v", m)
+			found = true
+			break
+		}
+	}
+	c.Assert(found, gc.Equals, true)
+
+	ch := waitForDestruction(conn, c, model.UUID)
+
+	s.authenticate("alice")
+	err = s.jem.DestroyModel(model.Path)
+	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
+
+	s.authenticate("bob")
+	err = s.jem.DestroyModel(model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+
+	select {
+	case <-ch:
+	case <-time.After(jujutesting.LongWait):
+		c.Fatalf("model not destroyed")
+	}
+
+	// Check the model is removed.
+	_, err = s.jem.Model(model.Path)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+
+	// Check that it cannot be destroyed twice
+	err = s.jem.DestroyModel(model.Path)
+	c.Assert(err, gc.ErrorMatches, `model "bob/model" not found`)
+
+	// Put the model back in the database
+	err = s.jem.DB.AddModel(model)
+	c.Assert(err, jc.ErrorIsNil)
+
+	// Check that it can still be removed even if the contoller has no model.
+	err = s.jem.DestroyModel(model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+
+	// Ensure the model is removed.
+	_, err = s.jem.Model(model.Path)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
-func parseTime(s string) time.Time {
-	t, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		panic(err)
+func waitForDestruction(conn *apiconn.Conn, c *gc.C, uuid string) <-chan struct{} {
+	ch := make(chan struct{})
+	watcher, err := controller.NewClient(conn).WatchAllModels()
+	go func() {
+		defer close(ch)
+		if !c.Check(err, jc.ErrorIsNil) {
+			return
+		}
+		for {
+			deltas, err := watcher.Next()
+			if !c.Check(err, jc.ErrorIsNil) {
+				return
+			}
+			for _, d := range deltas {
+				d, ok := d.Entity.(*multiwatcher.ModelInfo)
+				if ok && d.ModelUUID == uuid && d.Life == "dead" {
+					return
+				}
+			}
+		}
+	}()
+	return ch
+}
+
+func (s *jemSuite) TestUpdateCredential(c *gc.C) {
+	ctlPath := s.addController(c, params.EntityPath{User: "bob", Name: "controller"}, false)
+	cred := &mongodoc.Credential{
+		User:  "bob",
+		Cloud: "dummy",
+		Name:  "cred",
+		Type:  "empty",
 	}
-	return t
+
+	err := s.jem.UpdateCredential(cred)
+	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
+
+	s.authenticate("bob")
+	err = s.jem.UpdateCredential(cred)
+	c.Assert(err, jc.ErrorIsNil)
+
+	_, _, err = s.jem.CreateModel(jem.CreateModelParams{
+		Path:           params.EntityPath{User: "bob", Name: "model"},
+		ControllerPath: ctlPath,
+		Cloud:          cred.Cloud,
+		Credential:     cred.Name,
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	conn, err := jem.OpenAPIPath(s.jem, ctlPath)
+	c.Assert(err, jc.ErrorIsNil)
+	defer conn.Close()
+
+	// Check it was deployed
+	client := cloudapi.NewClient(conn)
+	credTag := names.NewCloudCredentialTag("dummy/bob@external/cred")
+	creds, err := client.Credentials(credTag)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
+		Result: &jujuparams.CloudCredential{
+			AuthType: "empty",
+		},
+	}})
+
+	err = s.jem.UpdateCredential(&mongodoc.Credential{
+		User:  "bob",
+		Cloud: "dummy",
+		Name:  "cred",
+		Type:  "userpass",
+		Attributes: map[string]string{
+			"username": "cloud-user",
+			"password": "cloud-pass",
+		},
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	// check it was updated on the controller.
+	creds, err = client.Credentials(credTag)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
+		Result: &jujuparams.CloudCredential{
+			AuthType: "userpass",
+			Attributes: map[string]string{
+				"username": "cloud-user",
+			},
+			Redacted: []string{
+				"password",
+			},
+		},
+	}})
+}
+
+func (s *jemSuite) addController(c *gc.C, path params.EntityPath, public bool) params.EntityPath {
+	info := s.APIInfo(c)
+	ctl := &mongodoc.Controller{
+		Path:          path,
+		HostPorts:     info.Addrs,
+		CACert:        info.CACert,
+		AdminUser:     info.Tag.Id(),
+		AdminPassword: info.Password,
+		Public:        public,
+		UUID:          "fake-uuid",
+	}
+	// Sanity check that we're really talking to the controller.
+	minfo, err := s.APIState.Client().ModelInfo()
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(minfo.UUID, gc.Equals, s.ControllerConfig.ControllerUUID())
+
+	s.authenticate(string(path.User), "controller-admin")
+	err = s.jem.AddController(ctl)
+	c.Assert(err, jc.ErrorIsNil)
+	s.authenticate("")
+	return path
+}
+
+func (s *jemSuite) bootstrapModel(c *gc.C, path params.EntityPath) *mongodoc.Model {
+	ctlPath := s.addController(c, params.EntityPath{User: path.User, Name: "controller"}, false)
+	err := jem.UpdateCredential(s.jem.DB, &mongodoc.Credential{
+		User:  path.User,
+		Cloud: "dummy",
+		Name:  "cred",
+		Type:  "empty",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	s.authenticate(string(path.User))
+	model, _, err := s.jem.CreateModel(jem.CreateModelParams{
+		Path:           path,
+		ControllerPath: ctlPath,
+		Credential:     "cred",
+		Cloud:          "dummy",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	s.authenticate("")
+	return model
+}
+
+func (s *jemSuite) authenticate(username string, groups ...string) {
+	s.idmSrv.AddUser(username, groups...)
+	s.jem.Auth = jem.Authorization{Username: username}
 }

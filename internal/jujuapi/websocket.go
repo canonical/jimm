@@ -159,11 +159,11 @@ func (h *wsHandler) resolveUUID() error {
 		return nil
 	}
 	var err error
-	h.model, err = h.jem.ModelFromUUID(h.modelUUID)
+	h.model, err = h.jem.DB.ModelFromUUID(h.modelUUID)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	h.controller, err = h.jem.Controller(h.model.Controller)
+	h.controller, err = h.jem.DB.Controller(h.model.Controller)
 	return errgo.Mask(err)
 }
 
@@ -173,7 +173,7 @@ func (h *wsHandler) credentialSchema(cloud params.Cloud, authType string) (jujuc
 	if cs, ok := h.schemataCache[cloud]; ok {
 		return cs[jujucloud.AuthType(authType)], nil
 	}
-	cloudInfo, err := h.jem.Cloud(cloud)
+	cloudInfo, err := h.jem.DB.Cloud(cloud)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
@@ -616,11 +616,19 @@ func (m modelManager) ModelInfo(args jujuparams.Entities) (jujuparams.ModelInfoR
 
 // modelInfo retrieves the model information for the specified entity.
 func (m modelManager) modelInfo(arg jujuparams.Entity) (*jujuparams.ModelInfo, error) {
-	tag, model, err := m.getModel(arg.Tag, m.h.jem.CheckCanRead)
+	tag, err := names.ParseModelTag(arg.Tag)
 	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
+		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid model tag")
 	}
-	conn, err := m.h.jem.OpenAPI(model.Controller)
+	model, err := m.h.jem.ModelFromUUID(tag.Id())
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+	}
+	ctl, err := m.h.jem.Controller(model.Controller)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	conn, err := m.h.jem.OpenAPI(ctl)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -677,25 +685,12 @@ func (m modelManager) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.M
 	if err != nil {
 		return jujuparams.ModelInfo{}, errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud credential tag")
 	}
-
-	ctlPath, cloud, region, err := m.h.jem.SelectController(cloud, args.CloudRegion)
-	if err != nil {
-		return jujuparams.ModelInfo{}, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound))
-	}
-
-	conn, err := m.h.jem.OpenAPI(ctlPath)
-	if err != nil {
-		return jujuparams.ModelInfo{}, errgo.Mask(err)
-	}
-	defer conn.Close()
-
-	_, mi, err := m.h.jem.CreateModel(conn, jem.CreateModelParams{
-		Path:           params.EntityPath{User: params.User(owner.Name()), Name: params.Name(args.Name)},
-		ControllerPath: ctlPath,
-		Credential:     params.Name(cloudCredentialTag.Name()),
-		Cloud:          cloud,
-		Region:         region,
-		Attributes:     args.Config,
+	_, mi, err := m.h.jem.CreateModel(jem.CreateModelParams{
+		Path:       params.EntityPath{User: params.User(owner.Name()), Name: params.Name(args.Name)},
+		Credential: params.Name(cloudCredentialTag.Name()),
+		Cloud:      cloud,
+		Region:     args.CloudRegion,
+		Attributes: args.Config,
 	})
 	if err != nil {
 		return jujuparams.ModelInfo{}, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound))
@@ -720,20 +715,16 @@ func (m modelManager) DestroyModels(args jujuparams.Entities) (jujuparams.ErrorR
 
 // destroyModel destroys the specified model.
 func (m modelManager) destroyModel(arg jujuparams.Entity) error {
-	_, model, err := m.getModel(arg.Tag, m.checkIsOwner)
+	mt, err := names.ParseModelTag(arg.Tag)
 	if err != nil {
+		return errgo.WithCausef(err, params.ErrBadRequest, "invalid model tag")
+	}
+	if err := m.h.jem.DestroyModelFromUUID(mt.Id()); err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
-			// Juju doesn't treat removing a model that isn't there as an error, and neither should we.
+			// Juju doesn't treat removing a non-existant model as an error so neither should we.
 			return nil
 		}
-		return errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
-	}
-	conn, err := m.h.jem.OpenAPI(model.Controller)
-	if err != nil {
-		return errgo.Mask(err)
-	}
-	if err := m.h.jem.DestroyModel(conn, model); err != nil {
-		return errgo.Mask(err)
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	return nil
 }
@@ -753,12 +744,9 @@ func (m modelManager) ModifyModelAccess(args jujuparams.ModifyModelAccessRequest
 }
 
 func (m modelManager) modifyModelAccess(change jujuparams.ModifyModelAccess) error {
-	_, model, err := m.getModel(change.ModelTag, m.checkIsOwner)
+	mt, err := names.ParseModelTag(change.ModelTag)
 	if err != nil {
-		if errgo.Cause(err) == params.ErrNotFound {
-			err = params.ErrUnauthorized
-		}
-		return errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
+		return errgo.WithCausef(err, params.ErrBadRequest, "invalid model tag")
 	}
 	userTag, err := names.ParseUserTag(change.UserTag)
 	if err != nil {
@@ -767,20 +755,18 @@ func (m modelManager) modifyModelAccess(change jujuparams.ModifyModelAccess) err
 	if userTag.IsLocal() {
 		return errgo.WithCausef(nil, params.ErrBadRequest, "unsupported domain %q", userTag.Domain())
 	}
-	conn, err := m.h.jem.OpenAPI(model.Controller)
-	if err != nil {
-		return errgo.Mask(err)
-	}
-	defer conn.Close()
 	switch change.Action {
 	case jujuparams.GrantModelAccess:
-		err = m.h.jem.GrantModel(conn, model, params.User(userTag.Name()), string(change.Access))
+		err = m.h.jem.GrantModelFromUUID(mt.Id(), params.User(userTag.Name()), string(change.Access))
 	case jujuparams.RevokeModelAccess:
-		err = m.h.jem.RevokeModel(conn, model, params.User(userTag.Name()), string(change.Access))
+		err = m.h.jem.RevokeModelFromUUID(mt.Id(), params.User(userTag.Name()), string(change.Access))
 	default:
 		return errgo.WithCausef(err, params.ErrBadRequest, "invalid action %q", change.Action)
 	}
 	if err != nil {
+		if errgo.Cause(err) == params.ErrNotFound {
+			err = params.ErrUnauthorized
+		}
 		return errgo.Mask(err)
 	}
 	return nil

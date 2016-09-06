@@ -9,8 +9,12 @@ import (
 
 	"github.com/juju/idmclient"
 	"github.com/juju/juju/api"
+	cloudapi "github.com/juju/juju/api/cloud"
+	modelmanagerapi "github.com/juju/juju/api/modelmanager"
+	jujuparams "github.com/juju/juju/apiserver/params"
+	jujucloud "github.com/juju/juju/cloud"
+	"github.com/juju/juju/network"
 	"github.com/juju/loggo"
-	"github.com/juju/utils"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -237,86 +241,101 @@ func (j *JEM) Close() {
 //
 // If the provided documents aren't valid, AddController with return
 // an error with a params.ErrBadRequest cause.
-func (j *JEM) AddController(ctl *mongodoc.Controller, m *mongodoc.Model) error {
-	// Insert the model before inserting the controller
-	// to avoid races with other clients creating non-controller
-	// models.
-	ctl.Id = ctl.Path.String()
-	m.Path = ctl.Path
-	m.Controller = ctl.Path
-	err := j.AddModel(m)
-	if err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
+func (j *JEM) AddController(ctl *mongodoc.Controller) error {
+	if err := j.CheckIsUser(ctl.Path.User); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	err = j.DB.Controllers().Insert(ctl)
-	if err != nil {
-		// Since we always insert an model of the
-		// same name first, this should never happen,
-		// so we don't preserve the ErrAlreadyExists
-		// error here because failing in that way is
-		// really an internal server error.
-		return errgo.Notef(err, "cannot insert controller")
+	if ctl.Public {
+		if err := j.CheckIsAdmin(); err != nil {
+			if errgo.Cause(err) == params.ErrUnauthorized {
+				return errgo.WithCausef(nil, params.ErrUnauthorized, "admin access required to add public controllers")
+			}
+			return errgo.Mask(err)
+		}
 	}
-	return nil
-}
+	if err := validateController(ctl); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrBadRequest))
+	}
+	// connect to the controller.
+	conn, err := j.OpenAPI(ctl)
+	if err != nil {
+		logger.Infof("cannot open API: %v", err)
+		return errgo.WithCausef(err, params.ErrBadRequest, "cannot connect to controller")
+	}
+	defer conn.Close()
 
-// randomPassword is defined as a variable so it can be overridden
-// for testing purposes.
-var randomPassword = utils.RandomPassword
-
-// AddUser ensures that the user exists in the controller with the given
-// name. It returns the password for the user, generating
-// a new one if necessary.
-func (j *JEM) EnsureUser(ctlName params.EntityPath, user string) (string, error) {
-	password, err := randomPassword()
-	if err != nil {
-		return "", errgo.Notef(err, "cannot generate password")
-	}
-	userKey := mongodoc.Sanitize(user)
-	field := "users." + userKey
-	err = j.DB.Controllers().Update(bson.D{{
-		"_id", ctlName.String(),
-	}, {
-		field, notExistsQuery,
-	}}, bson.D{{
-		"$set", bson.D{{
-			field, mongodoc.UserInfo{
-				Password: password,
-			},
-		}},
-	}})
-	if err == nil {
-		return password, nil
-	}
-	if err != mgo.ErrNotFound {
-		return "", errgo.Notef(err, "cannot update user entry")
-	}
-	// The entry wasn't found. This was probably
-	// because the user entry already exists.
-	ctl, err := j.Controller(ctlName)
-	if err != nil {
-		return "", errgo.Notef(err, "cannot get controller")
-	}
-	if info, ok := ctl.Users[userKey]; ok {
-		return info.Password, nil
-	}
-	return "", errgo.Newf("controller exists but password couldn't be updated")
-}
-
-func (j *JEM) SetModelManagedUser(modelName params.EntityPath, user string, info mongodoc.ModelUserInfo) error {
-	userKey := mongodoc.Sanitize(user)
-	field := "users." + userKey
-	err := j.DB.Models().UpdateId(modelName.String(),
-		bson.D{{
-			"$set", bson.D{{
-				field, info,
-			}},
-		}},
-	)
-	if err != nil {
+	if err := updateControllerInfo(conn, ctl); err != nil {
 		return errgo.Mask(err)
 	}
+
+	return errgo.Mask(j.DB.AddController(ctl), errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrAlreadyExists))
+}
+
+func validateController(ctl *mongodoc.Controller) error {
+	if len(ctl.HostPorts) == 0 {
+		return errgo.WithCausef(nil, params.ErrBadRequest, "no host-ports in request")
+	}
+	if ctl.CACert == "" {
+		return errgo.WithCausef(nil, params.ErrBadRequest, "no ca-cert in request")
+	}
+	if ctl.AdminUser == "" {
+		return errgo.WithCausef(nil, params.ErrBadRequest, "no user in request")
+	}
+	if ctl.UUID == "" {
+		return errgo.WithCausef(nil, params.ErrBadRequest, "bad model UUID in request")
+	}
 	return nil
+}
+
+func updateControllerInfo(conn *apiconn.Conn, ctl *mongodoc.Controller) error {
+	// Find out the cloud information.
+	client := cloudapi.NewClient(conn)
+	clouds, err := client.Clouds()
+	if err != nil {
+		return errgo.Notef(err, "cannot get cloud information")
+	}
+	for tag, cloudInfo := range clouds {
+		// Take the cloud info from the first cloud reported. There should only be one.
+		ctl.Cloud.Name = params.Cloud(tag.Id())
+		ctl.Cloud.ProviderType = cloudInfo.Type
+		for _, at := range cloudInfo.AuthTypes {
+			ctl.Cloud.AuthTypes = append(ctl.Cloud.AuthTypes, string(at))
+		}
+		ctl.Cloud.Endpoint = cloudInfo.Endpoint
+		ctl.Cloud.IdentityEndpoint = cloudInfo.IdentityEndpoint
+		ctl.Cloud.StorageEndpoint = cloudInfo.StorageEndpoint
+		for _, reg := range cloudInfo.Regions {
+			ctl.Cloud.Regions = append(ctl.Cloud.Regions, mongodoc.Region{
+				Name:             reg.Name,
+				Endpoint:         reg.Endpoint,
+				IdentityEndpoint: reg.IdentityEndpoint,
+				StorageEndpoint:  reg.StorageEndpoint,
+			})
+		}
+		break
+	}
+
+	// Update addresses from latest known in controller.
+	// Note that state.APIHostPorts is always guaranteed
+	// to include the actual address we succeeded in
+	// connecting to.
+	ctl.HostPorts = collapseHostPorts(conn.APIHostPorts())
+
+	return nil
+}
+
+// collapseHostPorts collapses a list of host-port lists
+// into a single list suitable for passing to api.Open.
+// It preserves ordering because api.State.APIHostPorts
+// makes sure to return the first-connected address
+// first in the slice.
+// See juju.PrepareEndpointsForCaching for a more
+// comprehensive version of this function.
+func collapseHostPorts(hpss [][]network.HostPort) []string {
+	hps := network.CollapseHostPorts(hpss)
+	hps = network.FilterUnusableHostPorts(hps)
+	hps = network.DropDuplicatedHostPorts(hps)
+	return network.HostPortsToStrings(hps)
 }
 
 // DeleteController deletes existing controller and all of its
@@ -326,326 +345,87 @@ func (j *JEM) SetModelManagedUser(modelName params.EntityPath, user string, info
 //
 // Note that this operation is not atomic.
 func (j *JEM) DeleteController(path params.EntityPath) error {
-	// TODO (urosj) make this operation atomic.
-	// Delete its models first.
-	info, err := j.DB.Models().RemoveAll(bson.D{{"controller", path}})
-	if err != nil {
-		return errgo.Notef(err, "error deleting controller models")
+	if err := j.CheckIsUser(path.User); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	// Then delete the controller.
-	err = j.DB.Controllers().RemoveId(path.String())
-	if err == mgo.ErrNotFound {
-		return errgo.WithCausef(nil, params.ErrNotFound, "controller %q not found", path)
-	}
-	if err != nil {
-		logger.Errorf("deleted %d controller models for model but could not delete controller: %v", info.Removed, err)
-		return errgo.Notef(err, "cannot delete controller")
-	}
-	logger.Infof("deleted controller %v and %d associated models", path, info.Removed)
-	return nil
-}
-
-// AddModel adds a new model to the database.
-// It returns an error with a params.ErrAlreadyExists
-// cause if there is already an model with the given name.
-// If ignores m.Id and sets it from m.Path.
-func (j *JEM) AddModel(m *mongodoc.Model) error {
-	m.Id = m.Path.String()
-	err := j.DB.Models().Insert(m)
-	if mgo.IsDup(err) {
-		return errgo.WithCausef(nil, params.ErrAlreadyExists, "")
-	}
-	if err != nil {
-		return errgo.Notef(err, "cannot insert controller model")
-	}
-	return nil
-}
-
-// DeleteModel deletes an model from the database. If an
-// model is also a controller it will not be deleted and an error
-// with a cause of params.ErrForbidden will be returned. If the
-// model cannot be found then an error with a cause of
-// params.ErrNotFound is returned.
-func (j *JEM) DeleteModel(path params.EntityPath) error {
-	// TODO when we monitor model health, prohibit this method
-	// and delete the model automatically when it is destroyed.
-	// Check if model is also a controller.
-	var ctl mongodoc.Controller
-	err := j.DB.Controllers().FindId(path.String()).One(&ctl)
-	if err == nil {
-		// Model is a controller, abort delete.
-		return errgo.WithCausef(nil, params.ErrForbidden, "cannot remove model %q because it is a controller", path)
-	}
-	err = j.DB.Models().RemoveId(path.String())
-	if err == mgo.ErrNotFound {
-		return errgo.WithCausef(nil, params.ErrNotFound, "model %q not found", path)
-	}
-	if err != nil {
-		return errgo.Notef(err, "could not delete model")
-	}
-	logger.Infof("deleted model %s", path)
-	return nil
+	return errgo.Mask(j.DB.DeleteController(path), errgo.Is(params.ErrNotFound))
 }
 
 // Controller returns information on the controller with the given
 // path. It returns an error with a params.ErrNotFound cause if the
 // controller was not found.
 func (j *JEM) Controller(path params.EntityPath) (*mongodoc.Controller, error) {
-	var ctl mongodoc.Controller
-	id := path.String()
-	err := j.DB.Controllers().FindId(id).One(&ctl)
-	if err == mgo.ErrNotFound {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "controller %q not found", id)
-	}
+	ctl, err := j.DB.Controller(path)
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot get controller %q", id)
+		if errgo.Cause(err) == params.ErrNotFound {
+			if uerr := j.CheckIsUser(path.User); uerr != nil {
+				err = uerr
+			}
+		}
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	return &ctl, nil
+	if ctl.Public {
+		return ctl, nil
+	}
+	if err := j.CheckCanRead(ctl); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	return ctl, nil
 }
 
 // Model returns information on the model with the given
 // path. It returns an error with a params.ErrNotFound cause if the
 // controller was not found.
 func (j *JEM) Model(path params.EntityPath) (*mongodoc.Model, error) {
-	id := path.String()
-	var m mongodoc.Model
-	err := j.DB.Models().FindId(id).One(&m)
-	if err == mgo.ErrNotFound {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "model %q not found", id)
-	}
+	m, err := j.DB.Model(path)
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot get model %q", id)
+		if errgo.Cause(err) == params.ErrNotFound {
+			if uerr := j.CheckIsUser(path.User); uerr != nil {
+				err = uerr
+			}
+		}
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	return &m, nil
+	if err := j.CheckCanRead(m); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	return m, nil
 }
 
 // ModelFromUUID returns the document representing the model with the
 // given UUID. It returns an error with a params.ErrNotFound cause if the
 // controller was not found.
 func (j *JEM) ModelFromUUID(uuid string) (*mongodoc.Model, error) {
-	var m mongodoc.Model
-	err := j.DB.Models().Find(bson.D{{"uuid", uuid}}).One(&m)
-	if err == mgo.ErrNotFound {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "model %q not found", uuid)
-	}
+	m, err := j.DB.ModelFromUUID(uuid)
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot get model %q", uuid)
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	return &m, nil
+	if err := j.CheckCanRead(m); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	return m, nil
 }
 
 // ErrAPIConnection is returned by OpenAPI and OpenAPIFromDocs
 // when the API connection cannot be made.
 var ErrAPIConnection = errgo.New("cannot connect to API")
 
-// OpenAPI opens an API connection to the model with the given path
-// and returns it along with the information used to connect.
-// If the model does not exist, the error will have a cause
-// of params.ErrNotFound.
+// OpenAPI opens an API connection to the given Controller.
 //
 // If the model API connection could not be made, the error
 // will have a cause of ErrAPIConnection.
 //
 // The returned connection must be closed when finished with.
-func (j *JEM) OpenAPI(path params.EntityPath) (*apiconn.Conn, error) {
-	m, err := j.Model(path)
-	if err != nil {
-		return nil, errgo.NoteMask(err, "cannot get model", errgo.Is(params.ErrNotFound))
-	}
-	return j.pool.connCache.OpenAPI(m.UUID, func() (api.Connection, *api.Info, error) {
-		ctl, err := j.Controller(m.Controller)
-		if err != nil {
-			return nil, nil, errgo.NoteMask(err, fmt.Sprintf("cannot get controller for model %q", m.UUID), errgo.Is(params.ErrNotFound))
-		}
-		apiInfo := apiInfoFromDocs(ctl, m)
-		logger.Infof("%#v", apiInfo)
+func (j *JEM) OpenAPI(ctl *mongodoc.Controller) (*apiconn.Conn, error) {
+	return j.pool.connCache.OpenAPI(ctl.UUID, func() (api.Connection, *api.Info, error) {
+		apiInfo := apiInfo(ctl)
+		logger.Debugf("%#v", apiInfo)
 		st, err := api.Open(apiInfo, apiDialOpts())
 		if err != nil {
 			return nil, nil, errgo.WithCausef(err, ErrAPIConnection, "")
 		}
 		return st, apiInfo, nil
 	})
-}
-
-// OpenAPIFromDocs returns an API connection to the model
-// and controller held in the given documents. This can
-// be useful when we want to connect to an model
-// before it's added to the database (for example when adding
-// a new controller). Note that a successful return from this
-// function does not necessarily mean that the credentials or
-// API addresses in the docs actually work, as it's possible
-// that there's already a cached connection for the given model.
-//
-// The returned connection must be closed when finished with.
-func (j *JEM) OpenAPIFromDocs(m *mongodoc.Model, ctl *mongodoc.Controller) (*apiconn.Conn, error) {
-	return j.pool.connCache.OpenAPI(m.UUID, func() (api.Connection, *api.Info, error) {
-		stInfo := apiInfoFromDocs(ctl, m)
-		st, err := api.Open(stInfo, apiDialOpts())
-		if err != nil {
-			return nil, nil, errgo.WithCausef(err, ErrAPIConnection, "")
-		}
-		return st, stInfo, nil
-	})
-}
-
-// ControllerLocationQuery returns a mongo query that iterates through
-// all the public controllers matching the given location attributes,
-// including unavailable controllers only if includeUnavailable is true.
-// It returns an error if the location attribute keys aren't valid.
-func (j *JEM) ControllerLocationQuery(cloud params.Cloud, region string, includeUnavailable bool) (*mgo.Query, error) {
-	q := make(bson.D, 0, 4)
-	if cloud != "" {
-		q = append(q, bson.DocElem{"cloud.name", cloud})
-	}
-	if region != "" {
-		q = append(q, bson.DocElem{"cloud.regions", bson.D{{"$elemMatch", bson.D{{"name", region}}}}})
-	}
-	q = append(q, bson.DocElem{"public", true})
-	if !includeUnavailable {
-		q = append(q, bson.DocElem{"unavailablesince", notExistsQuery})
-	}
-	return j.DB.Controllers().Find(q), nil
-}
-
-// SetControllerAvailable marks the given controller as available.
-// This method does not return an error when the controller doesn't exist.
-func (j *JEM) SetControllerAvailable(ctlPath params.EntityPath) error {
-	if err := j.DB.Controllers().UpdateId(ctlPath.String(), bson.D{{
-		"$unset", bson.D{{"unavailablesince", nil}},
-	}}); err != nil {
-		if err == mgo.ErrNotFound {
-			// For symmetry with SetControllerUnavailableAt.
-			return nil
-		}
-		return errgo.Notef(err, "cannot update %v", ctlPath)
-	}
-	return nil
-}
-
-// SetControllerUnavailableAt marks the controller as having been unavailable
-// since at least the given time. If the controller was already marked
-// as unavailable, its time isn't changed.
-// This method does not return an error when the controller doesn't exist.
-func (j *JEM) SetControllerUnavailableAt(ctlPath params.EntityPath, t time.Time) error {
-	err := j.DB.Controllers().Update(
-		bson.D{
-			{"_id", ctlPath.String()},
-			{"unavailablesince", notExistsQuery},
-		},
-		bson.D{
-			{"$set", bson.D{{"unavailablesince", t}}},
-		},
-	)
-	if err == nil {
-		return nil
-	}
-	if err == mgo.ErrNotFound {
-		// We don't know whether the not-found error is because there
-		// are no controllers with the given name (in which case we want
-		// to return a params.ErrNotFound error) or because there was
-		// one but it is already unavailable.
-		// We could fetch the controller to decide whether it's actually there
-		// or not, but because in practice we don't care if we're setting
-		// controller-unavailable on a non-existent controller, we'll
-		// save the round trip.
-		return nil
-	}
-	return errgo.Notef(err, "cannot update controller")
-}
-
-// ErrLeaseUnavailable is the error cause returned by AcquireMonitorLease
-// when it cannot acquire the lease because it is unavailable.
-var ErrLeaseUnavailable = errgo.Newf("cannot acquire lease")
-
-// AcquireMonitorLease acquires or renews the lease on a controller.
-// The lease will only be changed if the lease in the database
-// has the given old expiry time and owner.
-// When acquired, the lease will have the given new owner
-// and expiration time.
-//
-// If newOwner is empty, the lease will be dropped, the
-// returned time will be zero and newExpiry will be ignored.
-//
-// If the controller has been removed, an error with a params.ErrNotFound
-// cause will be returned. If the lease has been obtained by someone else
-// an error with a ErrLeaseUnavailable cause will be returned.
-func (j *JEM) AcquireMonitorLease(ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {
-	var update bson.D
-	if newOwner != "" {
-		newExpiry = mongodoc.Time(newExpiry)
-		update = bson.D{{"$set", bson.D{
-			{"monitorleaseexpiry", newExpiry},
-			{"monitorleaseowner", newOwner},
-		}}}
-	} else {
-		newExpiry = time.Time{}
-		update = bson.D{{"$unset", bson.D{
-			{"monitorleaseexpiry", nil},
-			{"monitorleaseowner", nil},
-		}}}
-	}
-	var oldOwnerQuery interface{}
-	var oldExpiryQuery interface{}
-	if oldOwner == "" {
-		oldOwnerQuery = notExistsQuery
-	} else {
-		oldOwnerQuery = oldOwner
-	}
-	if oldExpiry.IsZero() {
-		oldExpiryQuery = notExistsQuery
-	} else {
-		oldExpiryQuery = oldExpiry
-	}
-	err := j.DB.Controllers().Update(bson.D{
-		{"path", ctlPath},
-		{"monitorleaseexpiry", oldExpiryQuery},
-		{"monitorleaseowner", oldOwnerQuery},
-	}, update)
-	if err == mgo.ErrNotFound {
-		// Someone else got there first, or the document has been
-		// removed. Technically don't need to distinguish between the
-		// two cases, but it's useful to see the different error messages.
-		ctl, err := j.Controller(ctlPath)
-		if errgo.Cause(err) == params.ErrNotFound {
-			return time.Time{}, errgo.WithCausef(nil, params.ErrNotFound, "controller removed")
-		}
-		if err != nil {
-			return time.Time{}, errgo.Mask(err)
-		}
-		return time.Time{}, errgo.WithCausef(nil, ErrLeaseUnavailable, "controller has lease taken out by %q expiring at %v", ctl.MonitorLeaseOwner, ctl.MonitorLeaseExpiry.UTC())
-	}
-	if err != nil {
-		return time.Time{}, errgo.Notef(err, "cannot acquire lease")
-	}
-	return newExpiry, nil
-}
-
-// SetControllerStats sets the stats associated with the controller
-// with the given path. It returns an error with a params.ErrNotFound
-// cause if the controller does not exist.
-func (j *JEM) SetControllerStats(ctlPath params.EntityPath, stats *mongodoc.ControllerStats) error {
-	err := j.DB.Controllers().UpdateId(
-		ctlPath.String(),
-		bson.D{{"$set", bson.D{{"stats", stats}}}},
-	)
-	if err == mgo.ErrNotFound {
-		return errgo.WithCausef(nil, params.ErrNotFound, "controller not found")
-	}
-	return errgo.Mask(err)
-}
-
-// SetModelLife sets the Life field of all models controlled
-// by the given controller that have the given UUID.
-// It does not return an error if there are no such models.
-func (j *JEM) SetModelLife(ctlPath params.EntityPath, uuid string, life string) error {
-	_, err := j.DB.Models().UpdateAll(
-		bson.D{{"uuid", uuid}, {"controller", ctlPath}},
-		bson.D{{"$set", bson.D{{"life", life}}}},
-	)
-	if err != nil {
-		return errgo.Notef(err, "cannot update model")
-	}
-	return nil
 }
 
 func apiDialOpts() api.DialOpts {
@@ -655,7 +435,7 @@ func apiDialOpts() api.DialOpts {
 	}
 }
 
-func apiInfoFromDocs(ctl *mongodoc.Controller, m *mongodoc.Model) *api.Info {
+func apiInfo(ctl *mongodoc.Controller) *api.Info {
 	return &api.Info{
 		Addrs:    ctl.HostPorts,
 		CACert:   ctl.CACert,
@@ -664,233 +444,416 @@ func apiInfoFromDocs(ctl *mongodoc.Controller, m *mongodoc.Model) *api.Info {
 	}
 }
 
-// updateCredential stores the given credential in the database. If a
-// credential with the same name exists it is overwritten.
-func (j *JEM) updateCredential(cred *mongodoc.Credential) error {
-	update := bson.D{{
-		"type", cred.Type,
-	}, {
-		"label", cred.Label,
-	}, {
-		"attributes", cred.Attributes,
-	}}
-	if len(cred.ACL.Read) > 0 {
-		update = append(update, bson.DocElem{"acl", cred.ACL})
-	}
-	id := credentialId(cred.User, cred.Cloud, cred.Name)
-	_, err := j.DB.Credentials().UpsertId(id, bson.D{{
-		"$set", update,
-	}, {
-		"$setOnInsert", bson.D{{
-			"user", cred.User,
-		}, {
-			"cloud", cred.Cloud,
-		}, {
-			"name", cred.Name,
-		}},
-	}})
+func (j *JEM) openAPIPath(path params.EntityPath) (*apiconn.Conn, error) {
+	ctl, err := j.Controller(path)
 	if err != nil {
-		return errgo.Mask(err)
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	return nil
+	return j.OpenAPI(ctl)
 }
 
 // Credential gets the specified credential. If the credential cannot be
 // found the returned error will have a cause of params.ErrNotFound.
 func (j *JEM) Credential(user params.User, cloud params.Cloud, name params.Name) (*mongodoc.Credential, error) {
-	var cred mongodoc.Credential
-	id := credentialId(user, cloud, name)
-	err := j.DB.Credentials().FindId(id).One(&cred)
-	if err == mgo.ErrNotFound {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", id)
-	}
+	cred, err := j.DB.Credential(user, cloud, name)
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot get credential %q", id)
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	return &cred, nil
+	if err := j.CheckCanRead(cred); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	return cred, nil
 }
 
-// credentialId calculates the id for a credential with the specified
-// user, cloud and name.
-func credentialId(user params.User, cloud params.Cloud, name params.Name) string {
-	return fmt.Sprintf("%s/%s/%s", user, cloud, name)
-}
-
-// credentialAddController stores the fact that the credential with the
-// given user, cloud and name is present on the given controller.
-func (j *JEM) credentialAddController(user params.User, cloud params.Cloud, name params.Name, controller params.EntityPath) error {
-	id := credentialId(user, cloud, name)
-	err := j.DB.Credentials().UpdateId(id, bson.D{{
-		"$addToSet", bson.D{{"controllers", controller}},
-	}})
+// DoControllers calls the given function for each controller that
+// can be read by the current user that matches the given attributes.
+// If the function returns an error, the iteration stops and
+// DoControllers returns the error with the same cause.
+func (j *JEM) DoControllers(cloud params.Cloud, region string, do func(c *mongodoc.Controller) error) error {
+	// Query all the controllers that match the attributes, building
+	// up all the possible values.
+	q, err := j.DB.controllerLocationQuery(cloud, region, false)
 	if err != nil {
-		if err == mgo.ErrNotFound {
-			return errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", id)
-		}
-		return errgo.Notef(err, "cannot update credential %q", id)
+		return errgo.WithCausef(err, params.ErrBadRequest, "%s", "")
 	}
-	return nil
-}
-
-// credentialRemoveController stores the fact that the credential with
-// the given user, cloud and name is not present on the given controller.
-func (j *JEM) credentialRemoveController(user params.User, cloud params.Cloud, name params.Name, controller params.EntityPath) error {
-	id := credentialId(user, cloud, name)
-	err := j.DB.Credentials().UpdateId(id, bson.D{{
-		"$pull", bson.D{{"controllers", controller}},
-	}})
-	if err != nil {
-		if err == mgo.ErrNotFound {
-			return errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", id)
-		}
-		return errgo.Notef(err, "cannot update credential %q", id)
-	}
-	return nil
-}
-
-// Cloud gets the details of the given cloud.
-//
-// Note that there may be many controllers with the given cloud name. We
-// return an arbitrary choice, assuming that cloud definitions are the
-// same across all possible controllers.
-func (j *JEM) Cloud(cloud params.Cloud) (*mongodoc.Cloud, error) {
+	// Sort by _id so that we can make easily reproducible tests.
+	iter := j.CanReadIter(q.Sort("_id").Iter())
 	var ctl mongodoc.Controller
-	err := j.DB.Controllers().Find(bson.D{{"cloud.name", cloud}}).One(&ctl)
-	if err == mgo.ErrNotFound {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "cloud %q not found", cloud)
+	for iter.Next(&ctl) {
+		if err := do(&ctl); err != nil {
+			iter.Close()
+			return errgo.Mask(err, errgo.Any)
+		}
 	}
+	if err := iter.Err(); err != nil {
+		return errgo.Notef(err, "cannot query")
+	}
+	return nil
+}
+
+// selectController chooses a controller that matches the cloud and region criteria, if specified.
+func (j *JEM) selectController(cloud params.Cloud, region string) (*mongodoc.Controller, error) {
+	var controllers []mongodoc.Controller
+	err := j.DoControllers(cloud, region, func(c *mongodoc.Controller) error {
+		controllers = append(controllers, *c)
+		return nil
+	})
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot get cloud %q", cloud)
+		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
-	return &ctl.Cloud, nil
-}
-
-// SetACL sets the ACL for the path document in c to be equal to acl.
-func (j *JEM) SetACL(c *mgo.Collection, path params.EntityPath, acl params.ACL) error {
-	err := c.UpdateId(path.String(), bson.D{{"$set", bson.D{{"acl", acl}}}})
-	if err == nil {
-		return nil
+	if len(controllers) == 0 {
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "no matching controllers found")
 	}
-	if err == mgo.ErrNotFound {
-		return errgo.WithCausef(nil, params.ErrNotFound, "%q not found", path)
+	// Choose a random controller.
+	// TODO select a controller more intelligently, for example
+	// by choosing the most lightly loaded controller
+	n := randIntn(len(controllers))
+	return &controllers[n], nil
+}
+
+// CreateModelParams specifies the parameters needed to create a new
+// model using CreateModel.
+type CreateModelParams struct {
+	// Path contains the path of the new model.
+	Path params.EntityPath
+
+	// ControllerPath contains the path of the owning
+	// controller.
+	ControllerPath params.EntityPath
+
+	// Credential contains the name of the credential to use to
+	// create the model.
+	Credential params.Name
+
+	// Cloud contains the name of the cloud in which the
+	// model will be created.
+	Cloud params.Cloud
+
+	// Region contains the name of the region in which the model will
+	// be created. This may be empty if the cloud does not support
+	// regions.
+	Region string
+
+	// Attributes contains the attributes to assign to the new model.
+	Attributes map[string]interface{}
+}
+
+// CreateModel creates a new model as specified by p using conn.
+func (j *JEM) CreateModel(p CreateModelParams) (*mongodoc.Model, *jujuparams.ModelInfo, error) {
+	if err := j.CheckIsUser(p.Path.User); err != nil {
+		return nil, nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	return errgo.Notef(err, "cannot update ACL on %q", path)
-}
-
-// Grant updates the ACL for the path document in c to include user.
-func (j *JEM) Grant(c *mgo.Collection, path params.EntityPath, user params.User) error {
-	err := c.UpdateId(path.String(), bson.D{{"$addToSet", bson.D{{"acl.read", user}}}})
-	if err == nil {
-		return nil
+	var ctl *mongodoc.Controller
+	if p.ControllerPath.Name == "" {
+		var err error
+		ctl, err = j.selectController(p.Cloud, p.Region)
+		if err != nil {
+			return nil, nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrBadRequest))
+		}
+		p.ControllerPath = ctl.Path
+	} else {
+		var err error
+		ctl, err = j.Controller(p.ControllerPath)
+		if err != nil {
+			return nil, nil, errgo.Mask(err,
+				errgo.Is(params.ErrNotFound),
+				errgo.Is(params.ErrBadRequest),
+				errgo.Is(params.ErrUnauthorized),
+			)
+		}
 	}
-	if err == mgo.ErrNotFound {
-		return errgo.WithCausef(nil, params.ErrNotFound, "%q not found", path)
+	if p.Cloud == "" {
+		p.Cloud = ctl.Cloud.Name
 	}
-	return errgo.Notef(err, "cannot update ACL on %q", path)
-}
-
-// Revoke updates the ACL for the path document in c to not include user.
-func (j *JEM) Revoke(c *mgo.Collection, path params.EntityPath, user params.User) error {
-	err := c.UpdateId(path.String(), bson.D{{"$pull", bson.D{{"acl.read", user}}}})
-	if err == nil {
-		return nil
+	cred, err := j.Credential(p.Path.User, p.Cloud, p.Credential)
+	if err != nil {
+		return nil, nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	if err == mgo.ErrNotFound {
-		return errgo.WithCausef(nil, params.ErrNotFound, "%q not found", path)
+	conn, err := j.OpenAPI(ctl)
+	if err != nil {
+		return nil, nil, errgo.NoteMask(err, "cannot connect to controller", errgo.Is(params.ErrUnauthorized), errgo.Is(params.ErrNotFound))
 	}
-	return errgo.Notef(err, "cannot update ACL on %q", path)
-}
-
-type NewModelParams struct {
-	Path            params.EntityPath
-	ControllerPath  params.EntityPath
-	CredentialsPath params.EntityPath
-	Cloud           string
-	CloudRegion     string
-}
-
-// NewModel creates a new model based on params.
-func (j *JEM) NewModel(params NewModelParams) (*mongodoc.Model, error) {
-	return nil, nil
-}
-
-// Database wraps an mgo.DB ands adds a few convenience methods.
-type Database struct {
-	*mgo.Database
-}
-
-// Copy copies the Database and its underlying mgo session.
-func (s Database) Copy() Database {
-	return Database{
-		&mgo.Database{
-			Name:    s.Name,
-			Session: s.Session.Copy(),
-		},
+	defer conn.Close()
+	if err := j.updateControllerCredential(conn, cred); err != nil {
+		return nil, nil, errgo.Mask(err)
 	}
-}
-
-// Clone copies the Database and clones its underlying
-// mgo session. See mgo.Session.Clone and mgo.Session.Copy
-// for information on the distinction between Clone and Copy.
-func (s Database) Clone() Database {
-	if s.Session == nil {
-		panic("nil session in clone!")
+	if err := j.DB.credentialAddController(p.Path.User, p.Cloud, p.Credential, p.ControllerPath); err != nil {
+		return nil, nil, errgo.Mask(err)
 	}
-	return Database{
-		&mgo.Database{
-			Name:    s.Name,
-			Session: s.Session.Clone(),
-		},
+	// Create the model record in the database before actually
+	// creating the model on the controller. It will have an invalid
+	// UUID because it doesn't exist but that's better than creating
+	// an model that we can't add locally because the name
+	// already exists.
+	modelDoc := &mongodoc.Model{
+		Path:       p.Path,
+		Controller: p.ControllerPath,
 	}
-}
-
-func (db Database) Collections() []*mgo.Collection {
-	return []*mgo.Collection{
-		db.Macaroons(),
-		db.Controllers(),
-		db.Models(),
-		db.Credentials(),
+	if err := j.DB.AddModel(modelDoc); err != nil {
+		return nil, nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
-}
-
-// Close closes the database's underlying session.
-func (db Database) Close() {
-	db.Session.Close()
-}
-
-func (db Database) Macaroons() *mgo.Collection {
-	return db.C("macaroons")
-}
-
-func (db Database) Controllers() *mgo.Collection {
-	return db.C("controllers")
-}
-
-func (db Database) Models() *mgo.Collection {
-	return db.C("models")
-}
-
-func (db Database) Credentials() *mgo.Collection {
-	return db.C("credentials")
-}
-
-func (db Database) C(name string) *mgo.Collection {
-	if db.Database == nil {
-		panic(fmt.Sprintf("cannot get collection %q because JEM closed", name))
+	mmClient := modelmanagerapi.NewClient(conn.Connection)
+	m, err := mmClient.CreateModel(
+		string(p.Path.Name),
+		UserTag(p.Path.User).Id(),
+		string(p.Cloud),
+		p.Region,
+		CloudCredentialTag(p.Cloud, p.Path.User, p.Credential),
+		p.Attributes,
+	)
+	if err != nil {
+		// Remove the model that was created, because it's no longer valid.
+		if err := j.DB.Models().RemoveId(modelDoc.Id); err != nil {
+			logger.Errorf("cannot remove model from database after model creation error: %v", err)
+		}
+		return nil, nil, errgo.Notef(err, "cannot create model")
 	}
-	return db.Database.C(name)
+	if err := mmClient.GrantModel(conn.Info.Tag.(names.UserTag).Id(), "admin", m.UUID); err != nil {
+		// TODO (mhilton) destroy the model?
+		return nil, nil, errgo.Notef(err, "cannot grant admin access")
+	}
+	// Now set the UUID to that of the actually created model.
+	if err := j.DB.Models().UpdateId(modelDoc.Id, bson.D{{"$set", bson.D{{"uuid", m.UUID}}}}); err != nil {
+		// TODO (mhilton) destroy the model?
+		return nil, nil, errgo.Notef(err, "cannot update model UUID in database, leaked model %s", m.UUID)
+	}
+	modelDoc.UUID = m.UUID
+	return modelDoc, &m, nil
 }
 
-func validateLocationAttrs(attrs map[string]string) error {
-	for attr := range attrs {
-		if !params.IsValidLocationAttr(attr) {
-			return errgo.Newf("invalid attribute %q", attr)
+// DestroyModel destroys the specified model and removes it from the
+// database.
+//
+// Note that if the model is destroyed in its controller but
+// j.DeleteModel fails, a subsequent DestroyModel can can still succeed
+// because client.DestroyModel will succeed when the model doesn't exist.
+func (j *JEM) DestroyModel(path params.EntityPath) error {
+	if err := j.CheckIsUser(path.User); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	model, err := j.Model(path)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return errgo.Mask(j.destroyModel(model))
+}
+
+// DestroyModelFromUUID destroys the specified model and removes it from
+// the database.
+//
+// Note that if the model is destroyed in its controller but
+// j.DeleteModel fails, a subsequent DestroyModel can can still succeed
+// because client.DestroyModel will succeed when the model doesn't exist.
+func (j *JEM) DestroyModelFromUUID(uuid string) error {
+	model, err := j.DB.ModelFromUUID(uuid)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+	}
+	if err := j.CheckIsUser(model.Path.User); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	return errgo.Mask(j.destroyModel(model))
+}
+
+func (j *JEM) destroyModel(model *mongodoc.Model) error {
+	conn, err := j.openAPIPath(model.Controller)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	defer conn.Close()
+	client := modelmanagerapi.NewClient(conn)
+	if err := client.DestroyModel(names.NewModelTag(model.UUID)); err != nil {
+		return errgo.Mask(err)
+	}
+	if err := j.DB.DeleteModel(model.Path); err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
+// UpdateCredential updates the specified credential in the
+// local database and then updates it on all controllers to which it is
+// deployed.
+func (j *JEM) UpdateCredential(cred *mongodoc.Credential) error {
+	if err := j.CheckIsUser(cred.User); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	if err := j.DB.updateCredential(cred); err != nil {
+		return errgo.Notef(err, "cannot update local database")
+	}
+	c, err := j.Credential(cred.User, cred.Cloud, cred.Name)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	// TODO(mhilton) consider how to handle and recover from errors
+	// updating credentials in controllers better.
+	var firstError error
+	for _, ctlPath := range c.Controllers {
+		conn, err := j.openAPIPath(ctlPath)
+		if err != nil {
+			logger.Errorf("cannot open controller connection to %s: %s", ctlPath, err)
+			if firstError != nil {
+				firstError = err
+			}
+			continue
+		}
+		if err := j.updateControllerCredential(conn, cred); err != nil {
+			logger.Errorf("cannot update credential %s on %s: %s", cred.Id, ctlPath, err)
+			if firstError != nil {
+				firstError = err
+			}
+		}
+		conn.Close()
+	}
+	return errgo.Mask(firstError)
+}
+
+// updateControllerCredential uploads the given credential to conn.
+func (j *JEM) updateControllerCredential(conn *apiconn.Conn, cred *mongodoc.Credential) error {
+	cloudCredentialTag := CloudCredentialTag(cred.Cloud, cred.User, cred.Name)
+	cloudClient := cloudapi.NewClient(conn)
+	err := cloudClient.UpdateCredential(
+		cloudCredentialTag,
+		jujucloud.NewCredential(jujucloud.AuthType(cred.Type), cred.Attributes),
+	)
+	if err != nil {
+		return errgo.Notef(err, "cannot upload credentials")
+	}
+	return nil
+}
+
+// GrantModel grants the given access for the given user on the given model and updates the JEM database.
+func (j *JEM) GrantModel(path params.EntityPath, user params.User, access string) error {
+	if err := j.CheckIsUser(path.User); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	model, err := j.Model(path)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return errgo.Mask(j.grantModel(model, user, access))
+}
+
+// GrantModelFromUUID grants the given access for the given user on the given model and updates the JEM database.
+func (j *JEM) GrantModelFromUUID(uuid string, user params.User, access string) error {
+	model, err := j.ModelFromUUID(uuid)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	if err := j.CheckIsUser(model.Path.User); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	return errgo.Mask(j.grantModel(model, user, access))
+}
+
+func (j *JEM) grantModel(model *mongodoc.Model, user params.User, access string) error {
+	conn, err := j.openAPIPath(model.Controller)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	defer conn.Close()
+	client := modelmanagerapi.NewClient(conn)
+	if err := client.GrantModel(UserTag(user).Id(), access, model.UUID); err != nil {
+		return errgo.Mask(err)
+	}
+	if err := Grant(j.DB.Models(), model.Path, user); err != nil {
+		// TODO (mhilton) What should be done with the changes already made to the controller.
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
+// RevokeModel revokes the given access for the given user on the given model and updates the JEM database.
+func (j *JEM) RevokeModel(path params.EntityPath, user params.User, access string) error {
+	if err := j.CheckIsUser(path.User); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	model, err := j.Model(path)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return errgo.Mask(j.revokeModel(model, user, access))
+}
+
+// RevokeModelFromUUID revokes the given access for the given user on the given model and updates the JEM database.
+func (j *JEM) RevokeModelFromUUID(uuid string, user params.User, access string) error {
+	model, err := j.ModelFromUUID(uuid)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	if err := j.CheckIsUser(model.Path.User); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	return errgo.Mask(j.revokeModel(model, user, access))
+}
+
+// RevokeModel revokes the given access for the given user on the given model and updates the JEM database.
+func (j *JEM) revokeModel(model *mongodoc.Model, user params.User, access string) error {
+	conn, err := j.openAPIPath(model.Controller)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	defer conn.Close()
+	if err := Revoke(j.DB.Models(), model.Path, user); err != nil {
+		return errgo.Mask(err)
+	}
+	client := modelmanagerapi.NewClient(conn)
+	if err := client.RevokeModel(UserTag(user).Id(), access, model.UUID); err != nil {
+		// TODO (mhilton) What should be done with the changes already made to JEM.
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
+// SetModelACL sets the ACL for the given model to the given value.
+func (j *JEM) SetModelACL(path params.EntityPath, acl params.ACL) error {
+	if err := j.CheckIsUser(path.User); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	model, err := j.Model(path)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	grant := make(map[string]bool, len(acl.Read))
+	for _, n := range acl.Read {
+		grant[n] = true
+	}
+	revoke := make([]string, 0, len(model.ACL.Read))
+	for _, n := range model.ACL.Read {
+		if !grant[n] && n != string(model.Path.User) {
+			revoke = append(revoke, n)
+			continue
+		}
+		grant[n] = false
+	}
+	for _, n := range revoke {
+		if err := j.revokeModel(model, params.User(n), "write"); err != nil {
+			return errgo.Mask(err)
+		}
+	}
+	for n, g := range grant {
+		if !g {
+			continue
+		}
+		if err := j.grantModel(model, params.User(n), "write"); err != nil {
+			return errgo.Mask(err)
 		}
 	}
 	return nil
 }
 
-// ModelName creates a valid model name for the model specified by path.
-func ModelName(path params.EntityPath) string {
-	return fmt.Sprintf("%s--%s", path.User, path.Name)
+// UserTag creates a juju user tag from a params.User
+func UserTag(u params.User) names.UserTag {
+	return names.NewUserTag(string(u) + "@external")
+}
+
+// CloudTag creates a juju cloud tag from a params.Cloud
+func CloudTag(c params.Cloud) names.CloudTag {
+	return names.NewCloudTag(string(c))
+}
+
+// CloudCredentialTag creates a juju cloud credential tag from the given
+// cloud, user and name.
+func CloudCredentialTag(cloud params.Cloud, user params.User, name params.Name) names.CloudCredentialTag {
+	return names.NewCloudCredentialTag(fmt.Sprintf("%s/%s@external/%s", cloud, user, name))
 }

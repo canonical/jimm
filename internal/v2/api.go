@@ -5,21 +5,11 @@ package v2
 import (
 	"net/url"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/juju/httprequest"
-	cloudapi "github.com/juju/juju/api/cloud"
-	modelmanagerapi "github.com/juju/juju/api/modelmanager"
-	jujuparams "github.com/juju/juju/apiserver/params"
-	modelmanager "github.com/juju/juju/controller/modelmanager"
-	"github.com/juju/juju/environs"
-	"github.com/juju/juju/network"
 	"github.com/juju/loggo"
-	jujuschema "github.com/juju/schema"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/environschema.v1"
-	"gopkg.in/juju/names.v2"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
@@ -74,35 +64,7 @@ func (h *Handler) WhoAmI(arg *params.WhoAmI) (params.WhoAmIResponse, error) {
 
 // AddController adds a new controller.
 func (h *Handler) AddController(arg *params.AddController) error {
-	if err := h.jem.CheckIsUser(arg.User); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	if arg.Info.Public {
-		admin := h.jem.ControllerAdmin()
-		if admin == "" {
-			return errgo.Newf("no controller admin configured")
-		}
-		if err := h.jem.CheckIsUser(admin); err != nil {
-			if errgo.Cause(err) == params.ErrUnauthorized {
-				return errgo.WithCausef(nil, params.ErrUnauthorized, "admin access required to add public controllers")
-			}
-			return errgo.Mask(err)
-		}
-	}
-	if len(arg.Info.HostPorts) == 0 {
-		return badRequestf(nil, "no host-ports in request")
-	}
-	if arg.Info.CACert == "" {
-		return badRequestf(nil, "no ca-cert in request")
-	}
-	if arg.Info.User == "" {
-		return badRequestf(nil, "no user in request")
-	}
-	if !names.IsValidModel(arg.Info.ControllerUUID) {
-		return badRequestf(nil, "bad model UUID in request")
-	}
-
-	ctl := &mongodoc.Controller{
+	err := h.jem.AddController(&mongodoc.Controller{
 		Path:          arg.EntityPath,
 		CACert:        arg.Info.CACert,
 		HostPorts:     arg.Info.HostPorts,
@@ -110,88 +72,18 @@ func (h *Handler) AddController(arg *params.AddController) error {
 		AdminPassword: arg.Info.Password,
 		UUID:          arg.Info.ControllerUUID,
 		Public:        arg.Info.Public,
-	}
-	m := &mongodoc.Model{
-		UUID: arg.Info.ControllerUUID,
-	}
-	logger.Infof("dialling model")
-	// Attempt to connect to the model before accepting it.
-	conn, err := h.jem.OpenAPIFromDocs(m, ctl)
-	if err != nil {
-		logger.Infof("cannot open API: %v", err)
-		return badRequestf(err, "cannot connect to model")
-	}
-	defer conn.Close()
-
-	// Use the controller's UUID even if we've been given the UUID
-	// of some model within it.
-	mmClient := modelmanagerapi.NewClient(conn)
-	res, err := mmClient.ModelInfo([]names.ModelTag{names.NewModelTag(arg.Info.ControllerUUID)})
-	if err == nil && res[0].Error != nil {
-		err = res[0].Error
-	}
-	if err != nil {
-		return errgo.Notef(err, "cannot get model information")
-	}
-	info := res[0].Result
-	m.UUID = info.ControllerUUID
-	ctl.UUID = info.ControllerUUID
-
-	// Find out the cloud information.
-	cloudInfo, err := cloudapi.NewClient(conn).Cloud(names.NewCloudTag(info.Cloud))
-	if err != nil {
-		return errgo.Notef(err, "cannot get base configuration")
-	}
-
-	ctl.Cloud.Name = params.Cloud(info.Cloud)
-	ctl.Cloud.ProviderType = cloudInfo.Type
-	for _, at := range cloudInfo.AuthTypes {
-		ctl.Cloud.AuthTypes = append(ctl.Cloud.AuthTypes, string(at))
-	}
-	ctl.Cloud.Endpoint = cloudInfo.Endpoint
-	ctl.Cloud.IdentityEndpoint = cloudInfo.IdentityEndpoint
-	ctl.Cloud.StorageEndpoint = cloudInfo.StorageEndpoint
-	for _, reg := range cloudInfo.Regions {
-		ctl.Cloud.Regions = append(ctl.Cloud.Regions, mongodoc.Region{
-			Name:             reg.Name,
-			Endpoint:         reg.Endpoint,
-			IdentityEndpoint: reg.IdentityEndpoint,
-			StorageEndpoint:  reg.StorageEndpoint,
-		})
-	}
-
-	// Ensure the current user has access to the controller model.
-	if err := mmClient.GrantModel(string(arg.EntityPath.User)+"@external", string(jujuparams.ModelAdminAccess), info.ControllerUUID); err != nil {
-		if !isAlreadyGrantedError(err) {
-			return errgo.Notef(err, "cannot grant access to external owner")
-		}
-	}
-
-	// Update addresses from latest known in controller.
-	// Note that state.APIHostPorts is always guaranteed
-	// to include the actual address we succeeded in
-	// connecting to.
-	ctl.HostPorts = collapseHostPorts(conn.APIHostPorts())
-
-	err = h.jem.AddController(ctl, m)
-	if err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
-	}
-	return nil
+	})
+	return errgo.Mask(err, errgo.Is(params.ErrUnauthorized), errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrAlreadyExists))
 }
 
 // GetController returns information on a controller.
 func (h *Handler) GetController(arg *params.GetController) (*params.ControllerResponse, error) {
-	if err := h.jem.CheckReadACL(h.jem.DB.Controllers(), arg.EntityPath); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
 	ctl, err := h.jem.Controller(arg.EntityPath)
 	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-	neSchema, err := h.schemaForNewModel(arg.EntityPath, params.User(h.jem.Auth.Username))
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		if errgo.Cause(err) == params.ErrNotFound && h.jem.Auth.Username != string(arg.EntityPath.User) {
+			err = params.ErrUnauthorized
+		}
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized), errgo.Is(params.ErrNotFound))
 	}
 	loc := make(map[string]string, 2)
 	loc["cloud"] = string(ctl.Cloud.Name)
@@ -200,79 +92,15 @@ func (h *Handler) GetController(arg *params.GetController) (*params.ControllerRe
 	}
 	return &params.ControllerResponse{
 		Path:             arg.EntityPath,
-		ProviderType:     neSchema.providerType,
-		Schema:           neSchema.schema,
+		ProviderType:     ctl.Cloud.ProviderType,
 		Location:         loc,
 		Public:           ctl.Public,
 		UnavailableSince: newTime(ctl.UnavailableSince.UTC()),
 	}, nil
 }
 
-// GetSchema returns the schema that should be used for
-// the model configuration when starting a controller
-// with a location matching p.Location.
-//
-//
-// If controllers of more than one provider type
-// are matched, it will return an error with a params.ErrAmbiguousLocation
-// cause.
-//
-// If no controllers are matched, it will return an error with
-// a params.ErrNotFound cause.
-func (h *Handler) GetSchema(p httprequest.Params, arg *params.GetSchema) (*params.SchemaResponse, error) {
-	lp, err := parseFormLocations(p.Request.Form)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
-	}
-	if len(lp.other) > 0 {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "no matching controllers")
-	}
-	return h.schemaForLocation(lp.cloud, lp.region)
-}
-
-// schemaForLocation returns the schema for the controllers matching
-// the given location as a SchemaResponse.
-// If the controllers selected by the location are not compatible,
-// it returns an error with a params.ErrAmbiguousLocation cause.
-// If there are no controllers selected, it returns an error with a
-// params.ErrNotFound cause.
-func (h *Handler) schemaForLocation(cloud params.Cloud, region string) (*params.SchemaResponse, error) {
-	// TODO This will be insufficient when we can have several servers with the
-	// same provider type but different versions that could potentially have
-	// different configuration schemas. In that case, we could return a schema
-	// that's the intersection of all the matched schemas and check that it's
-	// valid for all of them before returning it.
-	providerType := ""
-	err := h.jem.DoControllers(cloud, region, func(ctl *mongodoc.Controller) error {
-
-		if providerType != "" && ctl.Cloud.ProviderType != providerType {
-			return errgo.WithCausef(nil, params.ErrAmbiguousLocation, "ambiguous location matches controller of more than one type")
-		}
-		providerType = ctl.Cloud.ProviderType
-		return nil
-	})
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrAmbiguousLocation), errgo.Is(params.ErrBadRequest))
-	}
-	if providerType == "" {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "no matching controllers")
-	}
-	schema, err := schemaForProviderType(providerType)
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot get schema for provider type %q", providerType)
-	}
-	return &params.SchemaResponse{
-		ProviderType: providerType,
-		Schema:       schema,
-	}, nil
-}
-
 // DeleteController removes an existing controller.
 func (h *Handler) DeleteController(arg *params.DeleteController) error {
-	// Check if user has permissions.
-	if err := h.jem.CheckIsUser(arg.EntityPath.User); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
 	if !arg.Force {
 		ctl, err := h.jem.Controller(arg.EntityPath)
 		if err != nil {
@@ -288,33 +116,13 @@ func (h *Handler) DeleteController(arg *params.DeleteController) error {
 	return nil
 }
 
-// isAlreadyGrantedError reports whether the error
-// (as returned from modelmanager.Client.GrantModel)
-// represents the condition that the user has already
-// been granted access.
-//
-// We have to use string comparison because of
-// https://bugs.launchpad.net/juju-core/+bug/1564880.
-func isAlreadyGrantedError(err error) bool {
-	if err == nil {
-		return false
-	}
-	s := err.Error()
-	return strings.HasPrefix(s, "user already has ") &&
-		strings.HasSuffix(s, " access or greater")
-}
-
 // GetModel returns information on a given model.
 func (h *Handler) GetModel(arg *params.GetModel) (*params.ModelResponse, error) {
-	if err := h.jem.CheckReadACL(h.jem.DB.Models(), arg.EntityPath); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-
 	m, err := h.jem.Model(arg.EntityPath)
 	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	ctl, err := h.jem.Controller(m.Controller)
+	ctl, err := h.jem.DB.Controller(m.Controller)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -334,11 +142,8 @@ func (h *Handler) GetModel(arg *params.GetModel) (*params.ModelResponse, error) 
 
 // DeleteModel deletes an model from JEM.
 func (h *Handler) DeleteModel(arg *params.DeleteModel) error {
-	if err := h.jem.CheckIsUser(arg.EntityPath.User); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	if err := h.jem.DeleteModel(arg.EntityPath); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrForbidden))
+	if err := h.jem.DestroyModel(arg.EntityPath); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrForbidden), errgo.Is(params.ErrUnauthorized))
 	}
 	return nil
 }
@@ -406,8 +211,6 @@ func (h *Handler) ListModels(arg *params.ListModels) (*params.ListModelsResponse
 func (h *Handler) ListController(arg *params.ListController) (*params.ListControllerResponse, error) {
 	var controllers []params.ControllerResponse
 
-	// TODO populate ProviderType and Schema fields when we have a cache
-	// for the schemaForNewModel results.
 	iter := h.jem.CanReadIter(h.jem.DB.Controllers().Find(nil).Sort("_id").Iter())
 	var ctl mongodoc.Controller
 	for iter.Next(&ctl) {
@@ -420,6 +223,7 @@ func (h *Handler) ListController(arg *params.ListController) (*params.ListContro
 			Public:           ctl.Public,
 			UnavailableSince: newTime(ctl.UnavailableSince.UTC()),
 			Location:         loc,
+			ProviderType:     ctl.Cloud.ProviderType,
 		})
 	}
 	if err := iter.Err(); err != nil {
@@ -564,12 +368,9 @@ func (c cloudRegions) locations() []map[string]string {
 
 // GetControllerLocation returns a map of location attributes for a given controller.
 func (h *Handler) GetControllerLocation(arg *params.GetControllerLocation) (params.ControllerLocation, error) {
-	if err := h.jem.CheckReadACL(h.jem.DB.Controllers(), arg.EntityPath); err != nil {
-		return params.ControllerLocation{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
 	ctl, err := h.jem.Controller(arg.EntityPath)
 	if err != nil {
-		return params.ControllerLocation{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		return params.ControllerLocation{}, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	loc := map[string]string{
 		"cloud": string(ctl.Cloud.Name),
@@ -584,48 +385,33 @@ func (h *Handler) GetControllerLocation(arg *params.GetControllerLocation) (para
 
 // NewModel creates a new model inside an existing Controller.
 func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error) {
-	if err := h.jem.CheckIsUser(args.User); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-
-	ctlPath, cloud, region, err := h.selectController(&args.Info)
-	if err != nil {
-		return nil, errgo.NoteMask(err, "cannot select controller", errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound))
-	}
-
-	if err := h.jem.CheckReadACL(h.jem.DB.Controllers(), ctlPath); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-
-	conn, err := h.jem.OpenAPI(ctlPath)
-	if err != nil {
-		return nil, errgo.NoteMask(err, "cannot connect to controller", errgo.Is(params.ErrNotFound))
-	}
-	defer conn.Close()
-
-	neSchema, err := h.schemaForNewModel(ctlPath, args.User)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	config := args.Info.Config
-	// Ensure that the attributes look reasonably OK before bothering
-	// the controller with them.
-	attrs, err := neSchema.checker.Coerce(config, nil)
-	if err != nil {
-		return nil, errgo.WithCausef(err, params.ErrBadRequest, "cannot validate attributes")
-	}
-
 	modelPath := params.EntityPath{args.User, args.Info.Name}
-	_, _, err = h.jem.CreateModel(conn, jem.CreateModelParams{
+	loc, err := cloudAndRegion(args.Info.Location)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
+	}
+	if len(loc.other) > 0 {
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "no matching controllers found")
+	}
+	var controllerPath params.EntityPath
+	if args.Info.Controller != nil {
+		controllerPath = *args.Info.Controller
+	}
+	_, _, err = h.jem.CreateModel(jem.CreateModelParams{
 		Path:           modelPath,
-		ControllerPath: ctlPath,
+		ControllerPath: controllerPath,
 		Credential:     args.Info.Credential,
-		Cloud:          cloud,
-		Region:         region,
-		Attributes:     attrs.(map[string]interface{}),
+		Cloud:          loc.cloud,
+		Region:         loc.region,
+		Attributes:     args.Info.Config,
 	})
 	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrAlreadyExists))
+		return nil, errgo.Mask(err,
+			errgo.Is(params.ErrNotFound),
+			errgo.Is(params.ErrBadRequest),
+			errgo.Is(params.ErrAlreadyExists),
+			errgo.Is(params.ErrUnauthorized),
+		)
 	}
 
 	// Use GetModel so that we're sure to get exactly
@@ -638,30 +424,6 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 	})
 }
 
-// selectController selects a controller suitable for starting a new model in,
-// based on the criteria specified in info, and returns its path.
-func (h *Handler) selectController(info *params.NewModelInfo) (params.EntityPath, params.Cloud, string, error) {
-	if info.Controller == nil {
-		lp, err := cloudAndRegion(info.Location)
-		if err != nil {
-			return params.EntityPath{}, "", "", errgo.Mask(err, errgo.Is(params.ErrBadRequest))
-		}
-		if len(lp.other) > 0 {
-			return params.EntityPath{}, "", "", errgo.WithCausef(nil, params.ErrNotFound, "no matching controllers found")
-		}
-		return h.jem.SelectController(lp.cloud, lp.region)
-	}
-	ctl, err := h.jem.Controller(*info.Controller)
-	if err != nil {
-		return params.EntityPath{}, "", "", errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-	var region string
-	if len(ctl.Cloud.Regions) > 0 {
-		region = ctl.Cloud.Regions[0].Name
-	}
-	return *info.Controller, ctl.Cloud.Name, region, nil
-}
-
 // SetControllerPerm sets the permissions on a controller entity.
 // Only the owner (arg.EntityPath.User) can change the permissions
 // on an an entity. The owner can always read an entity, even
@@ -670,15 +432,16 @@ func (h *Handler) SetControllerPerm(arg *params.SetControllerPerm) error {
 	return h.setPerm(h.jem.DB.Controllers(), arg.EntityPath, arg.ACL)
 }
 
-// SetModelPerm sets the permissions on a controller entity.
+// SetModelPerm sets the permissions on a model entity.
 // Only the owner (arg.EntityPath.User) can change the permissions
 // on an an entity. The owner can always read an entity, even
 // if it has empty ACL.
 func (h *Handler) SetModelPerm(arg *params.SetModelPerm) error {
-	// TODO revoke access from all the users that currently
-	// have access to the model that should not have access
-	// now.
-	return h.setPerm(h.jem.DB.Models(), arg.EntityPath, arg.ACL)
+	return errgo.Mask(
+		h.jem.SetModelACL(arg.EntityPath, arg.ACL),
+		errgo.Is(params.ErrNotFound),
+		errgo.Is(params.ErrUnauthorized),
+	)
 }
 
 func (h *Handler) setPerm(coll *mgo.Collection, path params.EntityPath, acl params.ACL) error {
@@ -717,6 +480,7 @@ func (h *Handler) getPerm(coll *mgo.Collection, path params.EntityPath) (params.
 	if err != nil {
 		return params.ACL{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
+	sort.Strings(acl.Read)
 	return acl, nil
 }
 
@@ -724,10 +488,6 @@ func (h *Handler) getPerm(coll *mgo.Collection, path params.EntityPath) (params.
 // user, cloud and name. If there is already a credential with that name
 // it is overwritten.
 func (h *Handler) UpdateCredential(arg *params.UpdateCredential) error {
-	// Only the owner can set credentials.
-	if err := h.jem.CheckIsUser(arg.EntityPath.User); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
 	// TODO(mhilton) validate the credentials.
 	err := h.jem.UpdateCredential(&mongodoc.Credential{
 		User:       arg.EntityPath.User,
@@ -742,114 +502,10 @@ func (h *Handler) UpdateCredential(arg *params.UpdateCredential) error {
 	return nil
 }
 
-type schemaForNewModel struct {
-	providerType string
-	schema       environschema.Fields
-	checker      jujuschema.Checker
-	skeleton     map[string]interface{}
-}
-
-// schemaForNewModel returns the schema for the configuration options
-// for creating new models on the controller with the given id.
-func (h *Handler) schemaForNewModel(ctlPath params.EntityPath, user params.User) (*schemaForNewModel, error) {
-	st, err := h.jem.OpenAPI(ctlPath)
-	if err != nil {
-		return nil, errgo.NoteMask(err, "cannot open API", errgo.Is(params.ErrNotFound))
-	}
-	defer st.Close()
-
-	var neSchema schemaForNewModel
-
-	client := cloudapi.NewClient(st)
-	defaultCloud, err := client.DefaultCloud()
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot get base configuration")
-	}
-	cloudInfo, err := client.Cloud(defaultCloud)
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot get base configuration")
-	}
-	neSchema.providerType = cloudInfo.Type
-	neSchema.schema, err = schemaForProviderType(neSchema.providerType)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	fields, defaults, err := neSchema.schema.ValidationSchema()
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot create validation schema for provider %s", neSchema.providerType)
-	}
-	neSchema.checker = jujuschema.FieldMap(fields, defaults)
-	return &neSchema, nil
-}
-
-// schemaForProviderType returns the schema for the given
-// provider type. This works currently because we link in
-// all the provider code so we can do it locally.
-//
-// It's defined as a variable so it can be overridden in tests.
-//
-// TODO get the model schema over the juju API. We'll
-// need make GetSchema be cleverer about mapping
-// from provider type to schema in that case.
-var schemaForProviderType = func(providerType string) (environschema.Fields, error) {
-	provider, err := environs.Provider(providerType)
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot get provider type %q", providerType)
-	}
-	schp, ok := provider.(interface {
-		Schema() environschema.Fields
-	})
-	if !ok {
-		return nil, errgo.Notef(err, "provider %q does not provide schema", providerType)
-	}
-	schema := schp.Schema()
-
-	restrictedFields, err := modelmanager.RestrictedProviderFields(provider)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	// Remove everything from the schema that's restricted.
-	for _, attr := range restrictedFields {
-		delete(schema, attr)
-	}
-	// Also remove any attributes ending in "-path" because
-	// they're only applicable locally.
-	for name := range schema {
-		if strings.HasSuffix(name, "-path") {
-			delete(schema, name)
-		}
-	}
-	// We're going to set the model name from the
-	// JEM model path, so remove it from
-	// the schema.
-	delete(schema, "name")
-	// TODO Delete admin-secret too, because it's never a valid
-	// attribute for the client to provide. We can't do that right
-	// now because it's the only secret attribute in the dummy
-	// provider and we need it to test secret template attributes.
-	// When Juju provides the schema over its API, that API call
-	// should delete it before returning.
-	return schema, nil
-}
-
 func badRequestf(underlying error, f string, a ...interface{}) error {
 	err := errgo.WithCausef(underlying, params.ErrBadRequest, f, a...)
 	err.(*errgo.Err).SetLocation(1)
 	return err
-}
-
-// collapseHostPorts collapses a list of host-port lists
-// into a single list suitable for passing to api.Open.
-// It preserves ordering because api.State.APIHostPorts
-// makes sure to return the first-connected address
-// first in the slice.
-// See juju.PrepareEndpointsForCaching for a more
-// comprehensive version of this function.
-func collapseHostPorts(hpss [][]network.HostPort) []string {
-	hps := network.CollapseHostPorts(hpss)
-	hps = network.FilterUnusableHostPorts(hps)
-	hps = network.DropDuplicatedHostPorts(hps)
-	return network.HostPortsToStrings(hps)
 }
 
 // formToLocationAttrs converts a set of location attributes
