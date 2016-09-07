@@ -415,7 +415,7 @@ func (s *APISuite) TestDeleteModel(c *gc.C) {
 func (s *APISuite) TestGetController(c *gc.C) {
 	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, false)
 	t := time.Now()
-	err := s.JEM.SetControllerUnavailableAt(ctlId, t)
+	err := s.JEM.DB.SetControllerUnavailableAt(ctlId, t)
 	c.Assert(err, gc.IsNil)
 
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
@@ -744,7 +744,7 @@ func (s *APISuite) TestGetControllerLocations(c *gc.C) {
 		},
 		Public: true,
 	})
-	err := s.JEM.SetControllerUnavailableAt(ctlId, time.Now())
+	err := s.JEM.DB.SetControllerUnavailableAt(ctlId, time.Now())
 	c.Assert(err, gc.IsNil)
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
 		Path: params.EntityPath{"bob", "gce-elsewhere"},
@@ -926,7 +926,7 @@ func (s *APISuite) TestAllControllerLocations(c *gc.C) {
 		},
 		Public: true,
 	})
-	err := s.JEM.SetControllerUnavailableAt(ctlId, time.Now())
+	err := s.JEM.DB.SetControllerUnavailableAt(ctlId, time.Now())
 	c.Assert(err, gc.IsNil)
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
 		Path: params.EntityPath{"bob", "gce-elsewhere"},
@@ -1212,7 +1212,7 @@ func (s *APISuite) TestNewModelWithoutExplicitController(c *gc.C) {
 }
 
 func (s *APISuite) assertModelConfigAttr(c *gc.C, modelPath params.EntityPath, attr string, val interface{}) {
-	m, err := s.JEM.Model(modelPath)
+	m, err := s.JEM.DB.Model(modelPath)
 	c.Assert(err, gc.IsNil)
 	st, err := s.State.ForModel(names.NewModelTag(m.UUID))
 	c.Assert(err, gc.IsNil)
@@ -1227,10 +1227,10 @@ func (s *APISuite) assertModelConfigAttr(c *gc.C, modelPath params.EntityPath, a
 func (s *APISuite) TestGetModel(c *gc.C) {
 	info := s.APIInfo(c)
 	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, false)
-	err := s.JEM.SetModelLife(ctlId, info.ModelTag.Id(), "dying")
+	err := s.JEM.DB.SetModelLife(ctlId, info.ModelTag.Id(), "dying")
 	c.Assert(err, gc.IsNil)
 	t := time.Now()
-	err = s.JEM.SetControllerUnavailableAt(ctlId, t)
+	err = s.JEM.DB.SetControllerUnavailableAt(ctlId, t)
 	c.Assert(err, gc.IsNil)
 
 	var modelRespBody json.RawMessage
@@ -1496,11 +1496,11 @@ func (s *APISuite) TestListController(c *gc.C) {
 
 	ctlId1 := s.AssertAddController(c, params.EntityPath{"bob", "lost"}, false)
 	unavailableTime := time.Now()
-	err := s.JEM.SetControllerUnavailableAt(ctlId1, unavailableTime)
+	err := s.JEM.DB.SetControllerUnavailableAt(ctlId1, unavailableTime)
 	c.Assert(err, gc.IsNil)
 
 	ctlId2 := s.AssertAddController(c, params.EntityPath{"bob", "another"}, false)
-	err = s.JEM.SetControllerUnavailableAt(ctlId2, unavailableTime.Add(time.Second))
+	err = s.JEM.DB.SetControllerUnavailableAt(ctlId2, unavailableTime.Add(time.Second))
 	c.Assert(err, gc.IsNil)
 
 	resp, err := s.NewClient("bob").ListController(nil)
@@ -1549,7 +1549,7 @@ func (s *APISuite) TestListModels(c *gc.C) {
 	s.allowControllerPerm(c, ctlId0)
 	modelId1, uuid1 := s.CreateModel(c, params.EntityPath{"bob", "bar"}, ctlId0, bCred)
 	modelId2, uuid2 := s.CreateModel(c, params.EntityPath{"charlie", "bar"}, ctlId0, cCred)
-	err := s.JEM.SetModelLife(ctlId0, uuid2, "alive")
+	err := s.JEM.DB.SetModelLife(ctlId0, uuid2, "alive")
 	c.Assert(err, gc.IsNil)
 
 	// Add an unavailable controller.
@@ -1558,7 +1558,7 @@ func (s *APISuite) TestListModels(c *gc.C) {
 	s.allowModelPerm(c, ctlId1)
 	s.allowControllerPerm(c, ctlId1)
 	unavailableTime := time.Now()
-	err = s.JEM.SetControllerUnavailableAt(ctlId1, unavailableTime)
+	err = s.JEM.DB.SetControllerUnavailableAt(ctlId1, unavailableTime)
 	c.Assert(err, gc.IsNil)
 
 	resps := []params.ModelResponse{{

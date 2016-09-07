@@ -3,6 +3,8 @@
 package monitor
 
 import (
+	"time"
+
 	apicontroller "github.com/juju/juju/api/controller"
 	"gopkg.in/errgo.v1"
 
@@ -13,7 +15,7 @@ import (
 )
 
 // jemShim implements the jemInterface interface
-// by using a *jem.JEM directly.
+// by using a *jem.Database directly.
 type jemShim struct {
 	*jem.JEM
 }
@@ -37,6 +39,30 @@ func (j jemShim) AllControllers() ([]*mongodoc.Controller, error) {
 		return nil, errgo.Mask(err)
 	}
 	return ctls, nil
+}
+
+func (j jemShim) SetControllerStats(ctlPath params.EntityPath, stats *mongodoc.ControllerStats) error {
+	return errgo.Mask(j.DB.SetControllerStats(ctlPath, stats), errgo.Any)
+}
+
+func (j jemShim) SetControllerUnavailableAt(ctlPath params.EntityPath, t time.Time) error {
+	return errgo.Mask(j.DB.SetControllerUnavailableAt(ctlPath, t), errgo.Any)
+}
+
+func (j jemShim) SetControllerAvailable(ctlPath params.EntityPath) error {
+	return errgo.Mask(j.DB.SetControllerAvailable(ctlPath), errgo.Any)
+}
+
+func (j jemShim) SetModelLife(ctlPath params.EntityPath, uuid string, life string) error {
+	return errgo.Mask(j.DB.SetModelLife(ctlPath, uuid, life), errgo.Any)
+}
+
+func (j jemShim) AcquireMonitorLease(ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {
+	t, err := j.DB.AcquireMonitorLease(ctlPath, oldExpiry, oldOwner, newExpiry, newOwner)
+	if err != nil {
+		return time.Time{}, errgo.Mask(err, errgo.Any)
+	}
+	return t, nil
 }
 
 type apiShim struct {

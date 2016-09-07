@@ -227,7 +227,7 @@ func (s *authSuite) TestCheckReadACL(c *gc.C) {
 				Name: params.Name(fmt.Sprintf("test%d", i)),
 			}
 			if !test.skipCreateEntity {
-				err := jem.AddModel(&mongodoc.Model{
+				err := jem.DB.AddModel(&mongodoc.Model{
 					Path: entity,
 					ACL: params.ACL{
 						Read: test.acl,
@@ -260,7 +260,7 @@ func (s *authSuite) TestCheckGetACL(c *gc.C) {
 			Read: []string{"fred", "jim"},
 		},
 	}
-	err := s.jem.AddModel(m)
+	err := s.jem.DB.AddModel(m)
 	c.Assert(err, gc.IsNil)
 	acl, err := s.jem.GetACL(s.jem.DB.Models(), m.Path)
 	c.Assert(err, gc.IsNil)
@@ -301,7 +301,7 @@ func (s *authSuite) TestCanReadIter(c *gc.C) {
 		},
 	}}
 	for i := range testModels {
-		err := s.jem.AddModel(&testModels[i])
+		err := s.jem.DB.AddModel(&testModels[i])
 		c.Assert(err, gc.IsNil)
 	}
 	req := s.newRequestForUser(c, "GET", "/", "bob", "bob-group")
@@ -472,7 +472,7 @@ func (s *authSuite) TestDoControllers(c *gc.C) {
 		Public: true,
 	}}
 	for i := range testControllers {
-		err := s.jem.AddController(&testControllers[i])
+		err := s.jem.DB.AddController(&testControllers[i])
 
 		c.Assert(err, gc.IsNil)
 	}
@@ -584,7 +584,7 @@ func (s *authSuite) TestDoControllersErrorResponse(c *gc.C) {
 		Public: true,
 	}}
 	for i := range testControllers {
-		err := s.jem.AddController(&testControllers[i])
+		err := s.jem.DB.AddController(&testControllers[i])
 
 		c.Assert(err, gc.IsNil)
 	}
@@ -750,7 +750,7 @@ func (s *authSuite) TestSelectController(c *gc.C) {
 		Public: true,
 	}}
 	for i := range testControllers {
-		err := s.jem.AddController(&testControllers[i])
+		err := s.jem.DB.AddController(&testControllers[i])
 
 		c.Assert(err, gc.IsNil)
 	}

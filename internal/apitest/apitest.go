@@ -172,7 +172,7 @@ func (s *Suite) AddController(c *gc.C, path params.EntityPath, public bool) erro
 		return err
 	}
 	// Add a model as most tests often expect it to be there.
-	err := s.JEM.AddModel(&mongodoc.Model{
+	err := s.JEM.DB.AddModel(&mongodoc.Model{
 		Path:       path,
 		Controller: path,
 		UUID:       info.ModelTag.Id(),
@@ -189,7 +189,7 @@ func (s *Suite) AssertAddControllerDoc(c *gc.C, cnt *mongodoc.Controller) *mongo
 	if cnt.UUID == "" {
 		cnt.UUID = fmt.Sprintf("%x", uuidGenerator.Next())
 	}
-	err := s.JEM.AddController(cnt)
+	err := s.JEM.DB.AddController(cnt)
 
 	c.Assert(err, jc.ErrorIsNil)
 	return cnt

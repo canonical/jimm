@@ -70,7 +70,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(minfo.UUID, gc.Equals, s.ControllerConfig.ControllerUUID())
 
-	err = s.store.AddController(ctl)
+	err = s.store.DB.AddController(ctl)
 	c.Assert(err, gc.IsNil)
 
 	// Open the API and check that it works.

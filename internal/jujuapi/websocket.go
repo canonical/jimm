@@ -159,11 +159,11 @@ func (h *wsHandler) resolveUUID() error {
 		return nil
 	}
 	var err error
-	h.model, err = h.jem.ModelFromUUID(h.modelUUID)
+	h.model, err = h.jem.DB.ModelFromUUID(h.modelUUID)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	h.controller, err = h.jem.Controller(h.model.Controller)
+	h.controller, err = h.jem.DB.Controller(h.model.Controller)
 	return errgo.Mask(err)
 }
 
@@ -173,7 +173,7 @@ func (h *wsHandler) credentialSchema(cloud params.Cloud, authType string) (jujuc
 	if cs, ok := h.schemataCache[cloud]; ok {
 		return cs[jujucloud.AuthType(authType)], nil
 	}
-	cloudInfo, err := h.jem.Cloud(cloud)
+	cloudInfo, err := h.jem.DB.Cloud(cloud)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
@@ -541,7 +541,7 @@ func (c cloud) credential(cloudCredentialTag string) (*jujuparams.CloudCredentia
 	if err := c.h.jem.CheckIsUser(params.User(owner.Name())); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	cred, err := c.h.jem.Credential(params.User(owner.Name()), params.Cloud(cct.Cloud().Id()), params.Name(cct.Name()))
+	cred, err := c.h.jem.DB.Credential(params.User(owner.Name()), params.Cloud(cct.Cloud().Id()), params.Name(cct.Name()))
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
@@ -805,7 +805,7 @@ func (m modelManager) getModel(modelTag string, authf func(jem.ACLEntity) error)
 	if err != nil {
 		return names.ModelTag{}, nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid model tag")
 	}
-	model, err := m.h.jem.ModelFromUUID(tag.Id())
+	model, err := m.h.jem.DB.ModelFromUUID(tag.Id())
 	if err != nil {
 		return names.ModelTag{}, nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}

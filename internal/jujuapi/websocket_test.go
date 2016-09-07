@@ -26,6 +26,7 @@ import (
 	"gopkg.in/macaroon.v1"
 
 	"github.com/CanonicalLtd/jem/internal/apitest"
+	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/jujuapi"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
@@ -436,7 +437,7 @@ func (s *websocketSuite) TestListModels(c *gc.C) {
 	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
 	cred2 := s.AssertUpdateCredential(c, "test2", "dummy", "cred1", "empty")
-	err := s.JEM.SetACL(s.JEM.DB.Controllers(), ctlPath, params.ACL{
+	err := jem.SetACL(s.JEM.DB.Controllers(), ctlPath, params.ACL{
 		Read: []string{"test2"},
 	})
 	c.Assert(err, jc.ErrorIsNil)
@@ -445,7 +446,7 @@ func (s *websocketSuite) TestListModels(c *gc.C) {
 	s.assertCreateModel(c, "model-2", "test2", "", "", string(cred2), nil)
 	mi = s.assertCreateModel(c, "model-3", "test2", "", "", string(cred2), nil)
 	modelUUID3 := mi.UUID
-	err = s.JEM.SetACL(s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
+	err = jem.SetACL(s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
 		Read: []string{"test"},
 	})
 	c.Assert(err, jc.ErrorIsNil)
@@ -473,7 +474,7 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
 	s.AssertUpdateCredential(c, "test2", "dummy", "cred1", "empty")
-	err := s.JEM.SetACL(s.JEM.DB.Controllers(), ctlPath, params.ACL{
+	err := jem.SetACL(s.JEM.DB.Controllers(), ctlPath, params.ACL{
 		Read: []string{"test2"},
 	})
 	c.Assert(err, jc.ErrorIsNil)
@@ -489,7 +490,7 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 	defer conn.Close()
 	client := modelmanager.NewClient(conn)
 
-	err = s.JEM.SetACL(s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
+	err = jem.SetACL(s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
 		Read: []string{"test"},
 	})
 	c.Assert(err, jc.ErrorIsNil)
