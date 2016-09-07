@@ -237,7 +237,7 @@ func (iter *CanReadIter) Count() int {
 func (j *JEM) DoControllers(cloud params.Cloud, region string, do func(c *mongodoc.Controller) error) error {
 	// Query all the controllers that match the attributes, building
 	// up all the possible values.
-	q, err := j.ControllerLocationQuery(cloud, region, false)
+	q, err := j.DB.controllerLocationQuery(cloud, region, false)
 	if err != nil {
 		return errgo.WithCausef(err, params.ErrBadRequest, "%s", "")
 	}

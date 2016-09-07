@@ -169,7 +169,7 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	// connecting to.
 	ctl.HostPorts = collapseHostPorts(conn.APIHostPorts())
 
-	err = h.jem.AddController(ctl)
+	err = h.jem.DB.AddController(ctl)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
@@ -181,7 +181,7 @@ func (h *Handler) GetController(arg *params.GetController) (*params.ControllerRe
 	if err := h.jem.CheckReadACL(h.jem.DB.Controllers(), arg.EntityPath); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	ctl, err := h.jem.Controller(arg.EntityPath)
+	ctl, err := h.jem.DB.Controller(arg.EntityPath)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
@@ -270,7 +270,7 @@ func (h *Handler) DeleteController(arg *params.DeleteController) error {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	if !arg.Force {
-		ctl, err := h.jem.Controller(arg.EntityPath)
+		ctl, err := h.jem.DB.Controller(arg.EntityPath)
 		if err != nil {
 			return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 		}
@@ -278,7 +278,7 @@ func (h *Handler) DeleteController(arg *params.DeleteController) error {
 			return errgo.WithCausef(nil, params.ErrStillAlive, "cannot delete controller while it is still alive")
 		}
 	}
-	if err := h.jem.DeleteController(arg.EntityPath); err != nil {
+	if err := h.jem.DB.DeleteController(arg.EntityPath); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	return nil
@@ -306,11 +306,11 @@ func (h *Handler) GetModel(arg *params.GetModel) (*params.ModelResponse, error) 
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 
-	m, err := h.jem.Model(arg.EntityPath)
+	m, err := h.jem.DB.Model(arg.EntityPath)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	ctl, err := h.jem.Controller(m.Controller)
+	ctl, err := h.jem.DB.Controller(m.Controller)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -333,7 +333,7 @@ func (h *Handler) DeleteModel(arg *params.DeleteModel) error {
 	if err := h.jem.CheckIsUser(arg.EntityPath.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	if err := h.jem.DeleteModel(arg.EntityPath); err != nil {
+	if err := h.jem.DB.DeleteModel(arg.EntityPath); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrForbidden))
 	}
 	return nil
@@ -563,7 +563,7 @@ func (h *Handler) GetControllerLocation(arg *params.GetControllerLocation) (para
 	if err := h.jem.CheckReadACL(h.jem.DB.Controllers(), arg.EntityPath); err != nil {
 		return params.ControllerLocation{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	ctl, err := h.jem.Controller(arg.EntityPath)
+	ctl, err := h.jem.DB.Controller(arg.EntityPath)
 	if err != nil {
 		return params.ControllerLocation{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
@@ -647,7 +647,7 @@ func (h *Handler) selectController(info *params.NewModelInfo) (params.EntityPath
 		}
 		return h.jem.SelectController(lp.cloud, lp.region)
 	}
-	ctl, err := h.jem.Controller(*info.Controller)
+	ctl, err := h.jem.DB.Controller(*info.Controller)
 	if err != nil {
 		return params.EntityPath{}, "", "", errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}

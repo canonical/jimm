@@ -159,7 +159,7 @@ func (s *jujuSuite) TestGrantModel(c *gc.C) {
 	defer conn.Close()
 	err := s.store.GrantModel(conn, model, "alice", "write")
 	c.Assert(err, jc.ErrorIsNil)
-	model1, err := s.store.Model(model.Path)
+	model1, err := s.store.DB.Model(model.Path)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{"alice"}})
 }
@@ -169,7 +169,7 @@ func (s *jujuSuite) TestGrantModelControllerFailure(c *gc.C) {
 	defer conn.Close()
 	err := s.store.GrantModel(conn, model, "alice", "superpowers")
 	c.Assert(err, gc.ErrorMatches, `invalid model access permission "superpowers"`)
-	model1, err := s.store.Model(model.Path)
+	model1, err := s.store.DB.Model(model.Path)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{}})
 }
@@ -179,12 +179,12 @@ func (s *jujuSuite) TestRevokeModel(c *gc.C) {
 	defer conn.Close()
 	err := s.store.GrantModel(conn, model, "alice", "write")
 	c.Assert(err, jc.ErrorIsNil)
-	model1, err := s.store.Model(model.Path)
+	model1, err := s.store.DB.Model(model.Path)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{"alice"}})
 	err = s.store.RevokeModel(conn, model, "alice", "write")
 	c.Assert(err, jc.ErrorIsNil)
-	model1, err = s.store.Model(model.Path)
+	model1, err = s.store.DB.Model(model.Path)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{}})
 }
@@ -194,12 +194,12 @@ func (s *jujuSuite) TestRevokeModelControllerFailure(c *gc.C) {
 	defer conn.Close()
 	err := s.store.GrantModel(conn, model, "alice", "write")
 	c.Assert(err, jc.ErrorIsNil)
-	model1, err := s.store.Model(model.Path)
+	model1, err := s.store.DB.Model(model.Path)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{"alice"}})
 	err = s.store.RevokeModel(conn, model, "alice", "superpowers")
 	c.Assert(err, gc.ErrorMatches, `invalid model access permission "superpowers"`)
-	model1, err = s.store.Model(model.Path)
+	model1, err = s.store.DB.Model(model.Path)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{}})
 }
@@ -234,7 +234,7 @@ func (s *jujuSuite) TestDestroyModel(c *gc.C) {
 	}
 
 	// Check the model is removed.
-	_, err = s.store.Model(model.Path)
+	_, err = s.store.DB.Model(model.Path)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
 	// Check that it cannot be destroyed twice
@@ -242,7 +242,7 @@ func (s *jujuSuite) TestDestroyModel(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `model "bob/model" not found`)
 
 	// Put the model back in the database
-	err = s.store.AddModel(model)
+	err = s.store.DB.AddModel(model)
 	c.Assert(err, jc.ErrorIsNil)
 
 	// Check that it can still be removed even if the contoller has no model.
@@ -250,7 +250,7 @@ func (s *jujuSuite) TestDestroyModel(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 
 	// Ensure the model is removed.
-	_, err = s.store.Model(model.Path)
+	_, err = s.store.DB.Model(model.Path)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
@@ -349,7 +349,7 @@ func (s *jujuSuite) addController(c *gc.C, path params.EntityPath) params.Entity
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(minfo.UUID, gc.Equals, s.ControllerConfig.ControllerUUID())
 
-	err = s.store.AddController(ctl)
+	err = s.store.DB.AddController(ctl)
 	c.Assert(err, jc.ErrorIsNil)
 	return path
 }

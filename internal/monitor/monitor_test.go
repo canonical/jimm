@@ -28,7 +28,7 @@ func (s *monitorSuite) TestMonitor(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	info := s.APIInfo(c)
 
-	err := s.JEM.AddController(&mongodoc.Controller{
+	err := s.JEM.DB.AddController(&mongodoc.Controller{
 		Path:          ctlPath,
 		HostPorts:     info.Addrs,
 		CACert:        info.CACert,
@@ -45,7 +45,7 @@ func (s *monitorSuite) TestMonitor(c *gc.C) {
 	// Wait for the stats to be updated.
 	var ctl *mongodoc.Controller
 	for a := jujutesting.LongAttempt.Start(); a.Next(); {
-		ctl, err = s.JEM.Controller(ctlPath)
+		ctl, err = s.JEM.DB.Controller(ctlPath)
 		c.Assert(err, gc.IsNil)
 		if ctl.Stats != (mongodoc.ControllerStats{}) {
 			break
@@ -74,7 +74,7 @@ func (s *monitorSuite) TestMonitorWithBrokenMongoConnection(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	jem := pool.JEM()
 	defer jem.Close()
-	err := jem.AddController(&mongodoc.Controller{
+	err := jem.DB.AddController(&mongodoc.Controller{
 		Path:          ctlPath,
 		HostPorts:     apiInfo.Addrs,
 		CACert:        apiInfo.CACert,
@@ -122,7 +122,7 @@ func (s *monitorSuite) TestMonitorWithBrokenJujuAPIConnection(c *gc.C) {
 	apiInfo := s.APIInfo(c)
 	proxy := testing.NewTCPProxy(c, apiInfo.Addrs[0])
 	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.JEM.AddController(&mongodoc.Controller{
+	err := s.JEM.DB.AddController(&mongodoc.Controller{
 		Path:          ctlPath,
 		HostPorts:     []string{proxy.Addr()},
 		CACert:        apiInfo.CACert,
@@ -160,7 +160,7 @@ func (s *monitorSuite) TestMonitorWithBrokenJujuAPIConnection(c *gc.C) {
 
 func (s *monitorSuite) waitControllerStats(c *gc.C, ctlPath params.EntityPath, oldStats mongodoc.ControllerStats) mongodoc.ControllerStats {
 	for a := jujutesting.LongAttempt.Start(); a.Next(); {
-		ctl, err := s.JEM.Controller(ctlPath)
+		ctl, err := s.JEM.DB.Controller(ctlPath)
 		c.Assert(err, gc.IsNil)
 		if ctl.Stats != oldStats {
 			return ctl.Stats

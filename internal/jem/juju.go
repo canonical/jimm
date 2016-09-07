@@ -47,7 +47,7 @@ type CreateModelParams struct {
 
 // CreateModel creates a new model as specified by p using conn.
 func (j *JEM) CreateModel(conn *apiconn.Conn, p CreateModelParams) (*mongodoc.Model, *jujuparams.ModelInfo, error) {
-	cred, err := j.Credential(p.Path.User, p.Cloud, p.Credential)
+	cred, err := j.DB.Credential(p.Path.User, p.Cloud, p.Credential)
 	if err != nil {
 		return nil, nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
@@ -66,7 +66,7 @@ func (j *JEM) CreateModel(conn *apiconn.Conn, p CreateModelParams) (*mongodoc.Mo
 		Path:       p.Path,
 		Controller: p.ControllerPath,
 	}
-	if err := j.AddModel(modelDoc); err != nil {
+	if err := j.DB.AddModel(modelDoc); err != nil {
 		return nil, nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
 	mmClient := modelmanager.NewClient(conn.Connection)
@@ -105,7 +105,7 @@ func (j *JEM) UpdateCredential(cred *mongodoc.Credential) error {
 	if err := j.DB.updateCredential(cred); err != nil {
 		return errgo.Notef(err, "cannot update local database")
 	}
-	c, err := j.Credential(cred.User, cred.Cloud, cred.Name)
+	c, err := j.DB.Credential(cred.User, cred.Cloud, cred.Name)
 	if err != nil {
 		return errgo.Mask(err)
 	}
@@ -152,7 +152,7 @@ func (j *JEM) GrantModel(conn *apiconn.Conn, model *mongodoc.Model, user params.
 	if err := client.GrantModel(UserTag(user).Id(), access, model.UUID); err != nil {
 		return errgo.Mask(err)
 	}
-	if err := j.Grant(j.DB.Models(), model.Path, user); err != nil {
+	if err := Grant(j.DB.Models(), model.Path, user); err != nil {
 		// TODO (mhilton) What should be done with the changes already made to the controller.
 		return errgo.Mask(err)
 	}
@@ -161,7 +161,7 @@ func (j *JEM) GrantModel(conn *apiconn.Conn, model *mongodoc.Model, user params.
 
 // RevokeModel revokes the given access for the given user on the given model and updates the JEM database.
 func (j *JEM) RevokeModel(conn *apiconn.Conn, model *mongodoc.Model, user params.User, access string) error {
-	if err := j.Revoke(j.DB.Models(), model.Path, user); err != nil {
+	if err := Revoke(j.DB.Models(), model.Path, user); err != nil {
 		return errgo.Mask(err)
 	}
 	client := modelmanager.NewClient(conn)
@@ -183,7 +183,7 @@ func (j *JEM) DestroyModel(conn *apiconn.Conn, model *mongodoc.Model) error {
 	if err := client.DestroyModel(names.NewModelTag(model.UUID)); err != nil {
 		return errgo.Mask(err)
 	}
-	if err := j.DeleteModel(model.Path); err != nil {
+	if err := j.DB.DeleteModel(model.Path); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil
