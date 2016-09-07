@@ -168,7 +168,17 @@ func (s *Suite) AddController(c *gc.C, path params.EntityPath, public bool) erro
 	if public {
 		s.IDMSrv.AddUser(string(path.User), "controller-admin")
 	}
-	return s.NewClient(path.User).AddController(p)
+	if err := s.NewClient(path.User).AddController(p); err != nil {
+		return err
+	}
+	// Add a model as most tests often expect it to be there.
+	err := s.JEM.AddModel(&mongodoc.Model{
+		Path:       path,
+		Controller: path,
+		UUID:       info.ModelTag.Id(),
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	return nil
 }
 
 var uuidGenerator = fastuuid.MustNewGenerator()
@@ -179,10 +189,8 @@ func (s *Suite) AssertAddControllerDoc(c *gc.C, cnt *mongodoc.Controller) *mongo
 	if cnt.UUID == "" {
 		cnt.UUID = fmt.Sprintf("%x", uuidGenerator.Next())
 	}
-	err := s.JEM.AddController(cnt, &mongodoc.Model{
-		Path:       cnt.Path,
-		Controller: cnt.Path,
-	})
+	err := s.JEM.AddController(cnt)
+
 	c.Assert(err, jc.ErrorIsNil)
 	return cnt
 }

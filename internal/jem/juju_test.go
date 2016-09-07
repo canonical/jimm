@@ -124,10 +124,17 @@ func (s *jujuSuite) TestCreateModel(c *gc.C) {
 		Name:  "cred1",
 		Type:  "empty",
 	})
-	c.Assert(err, jc.ErrorIsNil)
 	conn, err := s.store.OpenAPI(ctlId)
 	c.Assert(err, jc.ErrorIsNil)
 	defer conn.Close()
+	c.Assert(err, jc.ErrorIsNil)
+	_, _, err = s.store.CreateModel(conn, jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", "controller"},
+		ControllerPath: params.EntityPath{"bob", "controller"},
+		Credential:     "cred1",
+		Cloud:          "dummy",
+	})
+	c.Assert(err, jc.ErrorIsNil)
 	for i, test := range createModelTests {
 		c.Logf("test %d. %s", i, test.about)
 		if test.params.Path.Name == "" {
@@ -337,15 +344,12 @@ func (s *jujuSuite) addController(c *gc.C, path params.EntityPath) params.Entity
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
 	}
-	m := &mongodoc.Model{
-		UUID: info.ModelTag.Id(),
-	}
 	// Sanity check that we're really talking to the controller.
 	minfo, err := s.APIState.Client().ModelInfo()
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(minfo.UUID, gc.Equals, s.ControllerConfig.ControllerUUID())
 
-	err = s.store.AddController(ctl, m)
+	err = s.store.AddController(ctl)
 	c.Assert(err, jc.ErrorIsNil)
 	return path
 }

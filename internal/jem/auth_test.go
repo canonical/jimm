@@ -472,9 +472,8 @@ func (s *authSuite) TestDoControllers(c *gc.C) {
 		Public: true,
 	}}
 	for i := range testControllers {
-		err := s.jem.AddController(&testControllers[i], &mongodoc.Model{
-			Path: testControllers[i].Path,
-		})
+		err := s.jem.AddController(&testControllers[i])
+
 		c.Assert(err, gc.IsNil)
 	}
 	req := s.newRequestForUser(c, "GET", "/", "bob", "bob-group")
@@ -585,9 +584,8 @@ func (s *authSuite) TestDoControllersErrorResponse(c *gc.C) {
 		Public: true,
 	}}
 	for i := range testControllers {
-		err := s.jem.AddController(&testControllers[i], &mongodoc.Model{
-			Path: testControllers[i].Path,
-		})
+		err := s.jem.AddController(&testControllers[i])
+
 		c.Assert(err, gc.IsNil)
 	}
 	req := s.newRequestForUser(c, "GET", "/", "bob", "bob-group")
@@ -752,9 +750,8 @@ func (s *authSuite) TestSelectController(c *gc.C) {
 		Public: true,
 	}}
 	for i := range testControllers {
-		err := s.jem.AddController(&testControllers[i], &mongodoc.Model{
-			Path: testControllers[i].Path,
-		})
+		err := s.jem.AddController(&testControllers[i])
+
 		c.Assert(err, gc.IsNil)
 	}
 	req := s.newRequestForUser(c, "GET", "/", "bob", "bob-group")
