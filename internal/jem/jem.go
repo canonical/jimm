@@ -227,35 +227,22 @@ func (j *JEM) Close() {
 	j.pool.decRef()
 }
 
-// AddController adds a new controller and its associated model
-// to the database. It returns an error with a params.ErrAlreadyExists
-// cause if there is already a controller with the given name.
-// The Id field in ctl will be set from its Path field,
-// and the Id, Path and Controller fields in env will also be
-// set from ctl.
-// Any empty Location attributes will be removed from ctl.Location.
+// AddController adds a new controller to the database. It returns an
+// error with a params.ErrAlreadyExists cause if there is already a
+// controller with the given name. The Id field in ctl will be set from
+// its Path field, and the Id, Path and Controller fields in env will
+// also be set from ctl. Any empty Location attributes will be removed
+// from ctl.Location.
 //
-// If the provided documents aren't valid, AddController with return
-// an error with a params.ErrBadRequest cause.
-func (j *JEM) AddController(ctl *mongodoc.Controller, m *mongodoc.Model) error {
-	// Insert the model before inserting the controller
-	// to avoid races with other clients creating non-controller
-	// models.
+// If the provided document isn't valid, AddController with return an
+// error with a params.ErrBadRequest cause.
+func (j *JEM) AddController(ctl *mongodoc.Controller) error {
 	ctl.Id = ctl.Path.String()
-	m.Path = ctl.Path
-	m.Controller = ctl.Path
-	err := j.AddModel(m)
-	if err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
-	}
-	err = j.DB.Controllers().Insert(ctl)
-	if err != nil {
-		// Since we always insert an model of the
-		// same name first, this should never happen,
-		// so we don't preserve the ErrAlreadyExists
-		// error here because failing in that way is
-		// really an internal server error.
-		return errgo.Notef(err, "cannot insert controller")
+	if err := j.DB.Controllers().Insert(ctl); err != nil {
+		if mgo.IsDup(errgo.Cause(err)) {
+			return params.ErrAlreadyExists
+		}
+		return errgo.NoteMask(err, "cannot insert controller")
 	}
 	return nil
 }
@@ -370,13 +357,7 @@ func (j *JEM) DeleteModel(path params.EntityPath) error {
 	// TODO when we monitor model health, prohibit this method
 	// and delete the model automatically when it is destroyed.
 	// Check if model is also a controller.
-	var ctl mongodoc.Controller
-	err := j.DB.Controllers().FindId(path.String()).One(&ctl)
-	if err == nil {
-		// Model is a controller, abort delete.
-		return errgo.WithCausef(nil, params.ErrForbidden, "cannot remove model %q because it is a controller", path)
-	}
-	err = j.DB.Models().RemoveId(path.String())
+	err := j.DB.Models().RemoveId(path.String())
 	if err == mgo.ErrNotFound {
 		return errgo.WithCausef(nil, params.ErrNotFound, "model %q not found", path)
 	}
@@ -448,17 +429,13 @@ var ErrAPIConnection = errgo.New("cannot connect to API")
 //
 // The returned connection must be closed when finished with.
 func (j *JEM) OpenAPI(path params.EntityPath) (*apiconn.Conn, error) {
-	m, err := j.Model(path)
+	ctl, err := j.Controller(path)
 	if err != nil {
-		return nil, errgo.NoteMask(err, "cannot get model", errgo.Is(params.ErrNotFound))
+		return nil, errgo.NoteMask(err, "cannot get controller", errgo.Is(params.ErrNotFound))
 	}
-	return j.pool.connCache.OpenAPI(m.UUID, func() (api.Connection, *api.Info, error) {
-		ctl, err := j.Controller(m.Controller)
-		if err != nil {
-			return nil, nil, errgo.NoteMask(err, fmt.Sprintf("cannot get controller for model %q", m.UUID), errgo.Is(params.ErrNotFound))
-		}
-		apiInfo := apiInfoFromDocs(ctl, m)
-		logger.Infof("%#v", apiInfo)
+	return j.pool.connCache.OpenAPI(ctl.UUID, func() (api.Connection, *api.Info, error) {
+		apiInfo := apiInfoFromDoc(ctl)
+		logger.Debugf("%#v", apiInfo)
 		st, err := api.Open(apiInfo, apiDialOpts())
 		if err != nil {
 			return nil, nil, errgo.WithCausef(err, ErrAPIConnection, "")
@@ -467,25 +444,40 @@ func (j *JEM) OpenAPI(path params.EntityPath) (*apiconn.Conn, error) {
 	})
 }
 
-// OpenAPIFromDocs returns an API connection to the model
-// and controller held in the given documents. This can
-// be useful when we want to connect to an model
-// before it's added to the database (for example when adding
-// a new controller). Note that a successful return from this
-// function does not necessarily mean that the credentials or
-// API addresses in the docs actually work, as it's possible
-// that there's already a cached connection for the given model.
+// OpenAPIFromDoc returns an API connection to the controller held in the
+// given document. This can be useful when we want to connect to a
+// controller before it's added to the database. Note that a successful
+// return from this function does not necessarily mean that the
+// credentials or API addresses in the docs actually work, as it's
+// possible that there's already a cached connection for the given
+// controller.
 //
 // The returned connection must be closed when finished with.
-func (j *JEM) OpenAPIFromDocs(m *mongodoc.Model, ctl *mongodoc.Controller) (*apiconn.Conn, error) {
-	return j.pool.connCache.OpenAPI(m.UUID, func() (api.Connection, *api.Info, error) {
-		stInfo := apiInfoFromDocs(ctl, m)
+func (j *JEM) OpenAPIFromDoc(ctl *mongodoc.Controller) (*apiconn.Conn, error) {
+	return j.pool.connCache.OpenAPI(ctl.UUID, func() (api.Connection, *api.Info, error) {
+		stInfo := apiInfoFromDoc(ctl)
 		st, err := api.Open(stInfo, apiDialOpts())
 		if err != nil {
 			return nil, nil, errgo.WithCausef(err, ErrAPIConnection, "")
 		}
 		return st, stInfo, nil
 	})
+}
+
+func apiDialOpts() api.DialOpts {
+	return api.DialOpts{
+		Timeout:    APIOpenTimeout,
+		RetryDelay: 500 * time.Millisecond,
+	}
+}
+
+func apiInfoFromDoc(ctl *mongodoc.Controller) *api.Info {
+	return &api.Info{
+		Addrs:    ctl.HostPorts,
+		CACert:   ctl.CACert,
+		Tag:      names.NewUserTag(ctl.AdminUser),
+		Password: ctl.AdminPassword,
+	}
 }
 
 // ControllerLocationQuery returns a mongo query that iterates through
@@ -646,22 +638,6 @@ func (j *JEM) SetModelLife(ctlPath params.EntityPath, uuid string, life string) 
 		return errgo.Notef(err, "cannot update model")
 	}
 	return nil
-}
-
-func apiDialOpts() api.DialOpts {
-	return api.DialOpts{
-		Timeout:    APIOpenTimeout,
-		RetryDelay: 500 * time.Millisecond,
-	}
-}
-
-func apiInfoFromDocs(ctl *mongodoc.Controller, m *mongodoc.Model) *api.Info {
-	return &api.Info{
-		Addrs:    ctl.HostPorts,
-		CACert:   ctl.CACert,
-		Tag:      names.NewUserTag(ctl.AdminUser),
-		Password: ctl.AdminPassword,
-	}
 }
 
 // updateCredential stores the given credential in the database. If a

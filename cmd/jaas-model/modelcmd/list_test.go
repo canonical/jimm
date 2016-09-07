@@ -21,6 +21,7 @@ func (s *listSuite) TestList(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
+	s.addEnv(c, "bob/foo", "bob/foo", "cred1")
 	s.addEnv(c, "bob/foo-1", "bob/foo", "cred1")
 	s.addEnv(c, "bob/foo-2", "bob/foo", "cred1")
 

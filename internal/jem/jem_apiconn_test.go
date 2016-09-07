@@ -64,16 +64,13 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
 	}
-	m := &mongodoc.Model{
-		UUID: info.ModelTag.Id(),
-	}
 
 	// Sanity check that we're really talking to the controller.
 	minfo, err := s.APIState.Client().ModelInfo()
 	c.Assert(err, gc.IsNil)
 	c.Assert(minfo.UUID, gc.Equals, s.ControllerConfig.ControllerUUID())
 
-	err = s.store.AddController(ctl, m)
+	err = s.store.AddController(ctl)
 	c.Assert(err, gc.IsNil)
 
 	// Open the API and check that it works.
@@ -95,7 +92,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 
 	// Open it with OpenAPIFromDocs and check
 	// that we still get the same connection.
-	conn1, err = s.store.OpenAPIFromDocs(m, ctl)
+	conn1, err = s.store.OpenAPIFromDoc(ctl)
 	c.Assert(err, gc.IsNil)
 	c.Assert(conn1.Connection, gc.Equals, conn.Connection)
 	err = conn1.Close()
@@ -123,21 +120,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 func (s *jemAPIConnSuite) TestPoolOpenAPIError(c *gc.C) {
 
 	conn, err := s.store.OpenAPI(params.EntityPath{"bob", "notthere"})
-	c.Assert(err, gc.ErrorMatches, `cannot get model: model "bob/notthere" not found`)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	c.Assert(conn, gc.IsNil)
-
-	// Insert an model with a deliberately missing controller.
-	m := &mongodoc.Model{
-		Path:       params.EntityPath{"bob", "model"},
-		UUID:       "modeluuid",
-		Controller: params.EntityPath{"no", "controller"},
-	}
-	err = s.store.AddModel(m)
-	c.Assert(err, gc.IsNil)
-
-	conn, err = s.store.OpenAPI(params.EntityPath{"bob", "model"})
-	c.Assert(err, gc.ErrorMatches, `cannot get controller for model "modeluuid": controller "no/controller" not found`)
+	c.Assert(err, gc.ErrorMatches, `cannot get controller: controller "bob/notthere" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	c.Assert(conn, gc.IsNil)
 }

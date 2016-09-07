@@ -24,6 +24,7 @@ func (s *grantSuite) TestGrant(c *gc.C) {
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
+	s.addEnv(c, "bob/foo", "bob/foo", "cred")
 
 	// Check that alice can't get controller or model.
 	aliceClient := s.jemClient("alice")

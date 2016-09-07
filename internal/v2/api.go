@@ -111,15 +111,12 @@ func (h *Handler) AddController(arg *params.AddController) error {
 		UUID:          arg.Info.ControllerUUID,
 		Public:        arg.Info.Public,
 	}
-	m := &mongodoc.Model{
-		UUID: arg.Info.ControllerUUID,
-	}
 	logger.Infof("dialling model")
-	// Attempt to connect to the model before accepting it.
-	conn, err := h.jem.OpenAPIFromDocs(m, ctl)
+	// Attempt to connect to the controller before accepting it.
+	conn, err := h.jem.OpenAPIFromDoc(ctl)
 	if err != nil {
 		logger.Infof("cannot open API: %v", err)
-		return badRequestf(err, "cannot connect to model")
+		return badRequestf(err, "cannot connect to controller")
 	}
 	defer conn.Close()
 
@@ -134,7 +131,6 @@ func (h *Handler) AddController(arg *params.AddController) error {
 		return errgo.Notef(err, "cannot get model information")
 	}
 	info := res[0].Result
-	m.UUID = info.ControllerUUID
 	ctl.UUID = info.ControllerUUID
 
 	// Find out the cloud information.
@@ -173,7 +169,7 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	// connecting to.
 	ctl.HostPorts = collapseHostPorts(conn.APIHostPorts())
 
-	err = h.jem.AddController(ctl, m)
+	err = h.jem.AddController(ctl)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}

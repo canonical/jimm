@@ -86,11 +86,7 @@ func (s *jemSuite) TestAddController(c *gc.C) {
 			}},
 		},
 	}
-	m := &mongodoc.Model{
-		Id:   "ignored",
-		Path: params.EntityPath{"ignored-user", "ignored-name"},
-	}
-	err := s.store.AddController(ctl, m)
+	err := s.store.AddController(ctl)
 	c.Assert(err, gc.IsNil)
 
 	// Check that the fields have been mutated as expected.
@@ -107,11 +103,6 @@ func (s *jemSuite) TestAddController(c *gc.C) {
 				Name: "foo",
 			}},
 		},
-	})
-	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
-		Id:         "bob/x",
-		Path:       ctlPath,
-		Controller: ctlPath,
 	})
 
 	ctl1, err := s.store.Controller(ctlPath)
@@ -130,11 +121,8 @@ func (s *jemSuite) TestAddController(c *gc.C) {
 			}},
 		},
 	})
-	m1, err := s.store.Model(ctlPath)
-	c.Assert(err, gc.IsNil)
-	c.Assert(m1, jc.DeepEquals, m)
 
-	err = s.store.AddController(ctl, m)
+	err = s.store.AddController(ctl)
 	c.Assert(err, gc.ErrorMatches, "already exists")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
 
@@ -153,15 +141,8 @@ func (s *jemSuite) TestAddController(c *gc.C) {
 			}},
 		},
 	}
-	m2 := &mongodoc.Model{
-		Id:   "bob/noty",
-		Path: params.EntityPath{"ignored-user", "ignored-name"},
-	}
-	err = s.store.AddController(ctl2, m2)
+	err = s.store.AddController(ctl2)
 	c.Assert(err, gc.IsNil)
-	m3, err := s.store.Model(ctlPath2)
-	c.Assert(err, gc.IsNil)
-	c.Assert(m3, jc.DeepEquals, m2)
 }
 
 func (s *jemSuite) TestSetControllerAvailability(c *gc.C) {
@@ -169,7 +150,7 @@ func (s *jemSuite) TestSetControllerAvailability(c *gc.C) {
 	ctl := &mongodoc.Controller{
 		Path: ctlPath,
 	}
-	err := s.store.AddController(ctl, &mongodoc.Model{})
+	err := s.store.AddController(ctl)
 
 	// Check that we can mark it as unavailable.
 	t0 := time.Now()
@@ -260,7 +241,7 @@ func (s *jemSuite) TestControllerLocationQuery(c *gc.C) {
 		UnavailableSince: ut,
 		Public:           true,
 	}} {
-		err := s.store.AddController(ctl, &mongodoc.Model{})
+		err := s.store.AddController(ctl)
 		c.Assert(err, gc.IsNil)
 	}
 
@@ -325,11 +306,7 @@ func (s *jemSuite) TestDeleteController(c *gc.C) {
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 	}
-	m := &mongodoc.Model{
-		Id:   "dalek/who",
-		Path: params.EntityPath{"ignored", "ignored"},
-	}
-	err := s.store.AddController(ctl, m)
+	err := s.store.AddController(ctl)
 	c.Assert(err, gc.IsNil)
 	err = s.store.DeleteController(ctlPath)
 	c.Assert(err, gc.IsNil)
@@ -352,11 +329,7 @@ func (s *jemSuite) TestDeleteController(c *gc.C) {
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 	}
-	m2 := &mongodoc.Model{
-		Id:   "dalek/exterminated",
-		Path: params.EntityPath{"ignored", "ignored"},
-	}
-	err = s.store.AddController(ctl2, m2)
+	err = s.store.AddController(ctl2)
 	c.Assert(err, gc.IsNil)
 
 	err = s.store.DeleteController(ctlPath)
@@ -377,16 +350,8 @@ func (s *jemSuite) TestDeleteModel(c *gc.C) {
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 	}
-	m := &mongodoc.Model{
-		Id:   "dalek/who",
-		Path: params.EntityPath{"ignored", "ignored"},
-	}
-	err := s.store.AddController(ctl, m)
+	err := s.store.AddController(ctl)
 	c.Assert(err, gc.IsNil)
-
-	err = s.store.DeleteModel(m.Path)
-	c.Assert(err, gc.ErrorMatches, `cannot remove model "dalek/who" because it is a controller`)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrForbidden)
 
 	modelPath := params.EntityPath{"dalek", "exterminate"}
 	m2 := &mongodoc.Model{
@@ -514,10 +479,8 @@ func (s *jemSuite) TestEnsureUserSuccess(c *gc.C) {
 		HostPorts:     []string{"host1:1234", "host2:9999"},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
-	}, &mongodoc.Model{
-		Id:   "ignored",
-		Path: params.EntityPath{"ignored-user", "ignored-name"},
 	})
+
 	c.Assert(err, gc.IsNil)
 
 	// Calling EnsureUser should populate the initial user entry.
@@ -735,7 +698,8 @@ func (s *jemSuite) TestAcquireLease(c *gc.C) {
 			UUID:               "fake-uuid",
 			MonitorLeaseOwner:  test.actualOldOwner,
 			MonitorLeaseExpiry: test.actualOldExpiry,
-		}, &mongodoc.Model{})
+		})
+
 		c.Assert(err, gc.IsNil)
 		t, err := s.store.AcquireMonitorLease(test.ctlPath, test.oldExpiry, test.oldOwner, test.newExpiry, test.newOwner)
 		if test.expectError != "" {
@@ -766,7 +730,8 @@ func (s *jemSuite) TestSetControllerStats(c *gc.C) {
 	err := s.store.AddController(&mongodoc.Controller{
 		Path: ctlPath,
 		UUID: "fake-uuid",
-	}, &mongodoc.Model{})
+	})
+
 	c.Assert(err, gc.IsNil)
 
 	stats := &mongodoc.ControllerStats{
@@ -792,8 +757,14 @@ func (s *jemSuite) TestSetModelLifeSuccess(c *gc.C) {
 	err := s.store.AddController(&mongodoc.Controller{
 		Path: ctlPath,
 		UUID: "fake-uuid",
-	}, &mongodoc.Model{
-		UUID: "fake-uuid",
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Add a model to the controller.
+	err = s.store.AddModel(&mongodoc.Model{
+		Path:       params.EntityPath{"bob", "foo"},
+		UUID:       "fake-uuid",
+		Controller: params.EntityPath{"bob", "foo"},
 	})
 	c.Assert(err, gc.IsNil)
 
@@ -911,7 +882,7 @@ func (s *jemSuite) TestCredentialAddController(c *gc.C) {
 	ctl := &mongodoc.Controller{
 		Path: ctlPath,
 	}
-	err = s.store.AddController(ctl, &mongodoc.Model{})
+	err = s.store.AddController(ctl)
 	c.Assert(err, gc.IsNil)
 
 	err = jem.CredentialAddController(s.store, user, cloud, name, ctlPath)
@@ -972,7 +943,7 @@ func (s *jemSuite) TestCredentialRemoveController(c *gc.C) {
 	ctl := &mongodoc.Controller{
 		Path: ctlPath,
 	}
-	err = s.store.AddController(ctl, &mongodoc.Model{})
+	err = s.store.AddController(ctl)
 	c.Assert(err, gc.IsNil)
 
 	err = jem.CredentialAddController(s.store, user, cloud, name, ctlPath)
@@ -1033,9 +1004,8 @@ func (s *jemSuite) TestSetACL(c *gc.C) {
 	err := s.store.AddController(&mongodoc.Controller{
 		Path: ctlPath,
 		UUID: "fake-uuid",
-	}, &mongodoc.Model{
-		UUID: "fake-uuid",
 	})
+
 	c.Assert(err, gc.IsNil)
 
 	err = s.store.SetACL(s.store.DB.Controllers(), ctlPath, params.ACL{
@@ -1061,9 +1031,8 @@ func (s *jemSuite) TestGrant(c *gc.C) {
 	err := s.store.AddController(&mongodoc.Controller{
 		Path: ctlPath,
 		UUID: "fake-uuid",
-	}, &mongodoc.Model{
-		UUID: "fake-uuid",
 	})
+
 	c.Assert(err, gc.IsNil)
 
 	err = s.store.Grant(s.store.DB.Controllers(), ctlPath, "t1")
@@ -1085,9 +1054,8 @@ func (s *jemSuite) TestRevoke(c *gc.C) {
 	err := s.store.AddController(&mongodoc.Controller{
 		Path: ctlPath,
 		UUID: "fake-uuid",
-	}, &mongodoc.Model{
-		UUID: "fake-uuid",
 	})
+
 	c.Assert(err, gc.IsNil)
 
 	err = s.store.SetACL(s.store.DB.Controllers(), ctlPath, params.ACL{
@@ -1117,9 +1085,8 @@ func (s *jemSuite) TestCloud(c *gc.C) {
 			Name:         "my-cloud",
 			ProviderType: "ec2",
 		},
-	}, &mongodoc.Model{
-		UUID: "fake-uuid",
 	})
+
 	c.Assert(err, gc.IsNil)
 	cld, err := s.store.Cloud("my-cloud")
 	c.Assert(err, gc.IsNil)
