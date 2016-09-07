@@ -118,7 +118,7 @@ var createModelTests = []struct {
 
 func (s *jujuSuite) TestCreateModel(c *gc.C) {
 	ctlId := s.addController(c, params.EntityPath{"bob", "controller"})
-	err := jem.UpdateCredential(s.store, &mongodoc.Credential{
+	err := jem.UpdateCredential(s.store.DB, &mongodoc.Credential{
 		User:  "bob",
 		Cloud: "dummy",
 		Name:  "cred1",
@@ -286,14 +286,14 @@ func (s *jujuSuite) TestUpdateCredential(c *gc.C) {
 		Name:  "cred",
 		Type:  "empty",
 	}
-	err := jem.UpdateCredential(s.store, cred)
+	err := jem.UpdateCredential(s.store.DB, cred)
 	conn, err := s.store.OpenAPI(ctlPath)
 	c.Assert(err, jc.ErrorIsNil)
 	defer conn.Close()
 
 	err = jem.UpdateControllerCredential(s.store, conn, cred)
 	c.Assert(err, jc.ErrorIsNil)
-	err = jem.CredentialAddController(s.store, "bob", "dummy", "cred", ctlPath)
+	err = jem.CredentialAddController(s.store.DB, "bob", "dummy", "cred", ctlPath)
 	c.Assert(err, jc.ErrorIsNil)
 
 	// Sanity check it was deployed
@@ -356,7 +356,7 @@ func (s *jujuSuite) addController(c *gc.C, path params.EntityPath) params.Entity
 
 func (s *jujuSuite) bootstrapModel(c *gc.C, path params.EntityPath) (*apiconn.Conn, *mongodoc.Model) {
 	ctlPath := s.addController(c, params.EntityPath{User: path.User, Name: "controller"})
-	err := jem.UpdateCredential(s.store, &mongodoc.Credential{
+	err := jem.UpdateCredential(s.store.DB, &mongodoc.Credential{
 		User:  path.User,
 		Cloud: "dummy",
 		Name:  "cred",

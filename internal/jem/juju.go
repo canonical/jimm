@@ -54,7 +54,7 @@ func (j *JEM) CreateModel(conn *apiconn.Conn, p CreateModelParams) (*mongodoc.Mo
 	if err := j.updateControllerCredential(conn, cred); err != nil {
 		return nil, nil, errgo.Mask(err)
 	}
-	if err := j.credentialAddController(p.Path.User, p.Cloud, p.Credential, p.ControllerPath); err != nil {
+	if err := j.DB.credentialAddController(p.Path.User, p.Cloud, p.Credential, p.ControllerPath); err != nil {
 		return nil, nil, errgo.Mask(err)
 	}
 	// Create the model record in the database before actually
@@ -102,7 +102,7 @@ func (j *JEM) CreateModel(conn *apiconn.Conn, p CreateModelParams) (*mongodoc.Mo
 // local database and then updates it on all controllers to which it is
 // deployed.
 func (j *JEM) UpdateCredential(cred *mongodoc.Credential) error {
-	if err := j.updateCredential(cred); err != nil {
+	if err := j.DB.updateCredential(cred); err != nil {
 		return errgo.Notef(err, "cannot update local database")
 	}
 	c, err := j.Credential(cred.User, cred.Cloud, cred.Name)
