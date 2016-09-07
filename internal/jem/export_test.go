@@ -1,10 +1,10 @@
 package jem
 
 var (
-	RandomPassword             = &randomPassword
+	ControllerLocationQuery    = (Database).controllerLocationQuery
 	RandIntn                   = &randIntn
-	CredentialAddController    = (*JEM).credentialAddController
-	CredentialRemoveController = (*JEM).credentialRemoveController
-	UpdateCredential           = (*JEM).updateCredential
+	CredentialAddController    = (Database).credentialAddController
+	CredentialRemoveController = (Database).credentialRemoveController
+	UpdateCredential           = (Database).updateCredential
 	UpdateControllerCredential = (*JEM).updateControllerCredential
 )
