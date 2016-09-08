@@ -10,8 +10,6 @@ import (
 
 	"github.com/juju/httprequest"
 	cloudapi "github.com/juju/juju/api/cloud"
-	modelmanagerapi "github.com/juju/juju/api/modelmanager"
-	jujuparams "github.com/juju/juju/apiserver/params"
 	modelmanager "github.com/juju/juju/controller/modelmanager"
 	"github.com/juju/juju/environs"
 	"github.com/juju/juju/network"
@@ -119,48 +117,31 @@ func (h *Handler) AddController(arg *params.AddController) error {
 		return badRequestf(err, "cannot connect to controller")
 	}
 	defer conn.Close()
-
-	// Use the controller's UUID even if we've been given the UUID
-	// of some model within it.
-	mmClient := modelmanagerapi.NewClient(conn)
-	res, err := mmClient.ModelInfo([]names.ModelTag{names.NewModelTag(arg.Info.ControllerUUID)})
-	if err == nil && res[0].Error != nil {
-		err = res[0].Error
-	}
-	if err != nil {
-		return errgo.Notef(err, "cannot get model information")
-	}
-	info := res[0].Result
-	ctl.UUID = info.ControllerUUID
+	ctl.UUID = conn.ControllerTag().Id()
 
 	// Find out the cloud information.
-	cloudInfo, err := cloudapi.NewClient(conn).Cloud(names.NewCloudTag(info.Cloud))
+	clouds, err := cloudapi.NewClient(conn).Clouds()
 	if err != nil {
-		return errgo.Notef(err, "cannot get base configuration")
+		return errgo.Notef(err, "cannot get clouds")
 	}
-
-	ctl.Cloud.Name = params.Cloud(info.Cloud)
-	ctl.Cloud.ProviderType = cloudInfo.Type
-	for _, at := range cloudInfo.AuthTypes {
-		ctl.Cloud.AuthTypes = append(ctl.Cloud.AuthTypes, string(at))
-	}
-	ctl.Cloud.Endpoint = cloudInfo.Endpoint
-	ctl.Cloud.IdentityEndpoint = cloudInfo.IdentityEndpoint
-	ctl.Cloud.StorageEndpoint = cloudInfo.StorageEndpoint
-	for _, reg := range cloudInfo.Regions {
-		ctl.Cloud.Regions = append(ctl.Cloud.Regions, mongodoc.Region{
-			Name:             reg.Name,
-			Endpoint:         reg.Endpoint,
-			IdentityEndpoint: reg.IdentityEndpoint,
-			StorageEndpoint:  reg.StorageEndpoint,
-		})
-	}
-
-	// Ensure the current user has access to the controller model.
-	if err := mmClient.GrantModel(string(arg.EntityPath.User)+"@external", string(jujuparams.ModelAdminAccess), info.ControllerUUID); err != nil {
-		if !isAlreadyGrantedError(err) {
-			return errgo.Notef(err, "cannot grant access to external owner")
+	for k, v := range clouds {
+		ctl.Cloud.Name = params.Cloud(k.Id())
+		ctl.Cloud.ProviderType = v.Type
+		for _, at := range v.AuthTypes {
+			ctl.Cloud.AuthTypes = append(ctl.Cloud.AuthTypes, string(at))
 		}
+		ctl.Cloud.Endpoint = v.Endpoint
+		ctl.Cloud.IdentityEndpoint = v.IdentityEndpoint
+		ctl.Cloud.StorageEndpoint = v.StorageEndpoint
+		for _, reg := range v.Regions {
+			ctl.Cloud.Regions = append(ctl.Cloud.Regions, mongodoc.Region{
+				Name:             reg.Name,
+				Endpoint:         reg.Endpoint,
+				IdentityEndpoint: reg.IdentityEndpoint,
+				StorageEndpoint:  reg.StorageEndpoint,
+			})
+		}
+		break
 	}
 
 	// Update addresses from latest known in controller.

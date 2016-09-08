@@ -65,12 +65,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 		AdminPassword: info.Password,
 	}
 
-	// Sanity check that we're really talking to the controller.
-	minfo, err := s.APIState.Client().ModelInfo()
-	c.Assert(err, gc.IsNil)
-	c.Assert(minfo.UUID, gc.Equals, s.ControllerConfig.ControllerUUID())
-
-	err = s.store.DB.AddController(ctl)
+	err := s.store.DB.AddController(ctl)
 	c.Assert(err, gc.IsNil)
 
 	// Open the API and check that it works.

@@ -306,7 +306,7 @@ func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResult, error
 			DisplayName: a.h.jem.Auth.Username,
 			Identity:    names.NewUserTag(a.h.jem.Auth.Username).WithDomain("external").String(),
 		},
-		ControllerTag: names.NewModelTag(a.h.params.ControllerUUID).String(),
+		ControllerTag: names.NewControllerTag(a.h.params.ControllerUUID).String(),
 		Facades:       facadeVersions(),
 		ServerVersion: "2.0.0",
 	}, nil

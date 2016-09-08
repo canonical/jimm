@@ -401,12 +401,7 @@ func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityP
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
 	}
-	// Sanity check that we're really talking to the controller.
-	minfo, err := s.APIState.Client().ModelInfo()
-	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(minfo.UUID, gc.Equals, s.ControllerConfig.ControllerUUID())
-
-	err = s.store.DB.AddController(ctl)
+	err := s.store.DB.AddController(ctl)
 	c.Assert(err, jc.ErrorIsNil)
 	return path
 }

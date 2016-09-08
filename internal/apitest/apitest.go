@@ -161,7 +161,7 @@ func (s *Suite) AddController(c *gc.C, path params.EntityPath, public bool) erro
 			CACert:         info.CACert,
 			User:           info.Tag.Id(),
 			Password:       info.Password,
-			ControllerUUID: info.ModelTag.Id(),
+			ControllerUUID: s.ControllerConfig.ControllerUUID(),
 			Public:         public,
 		},
 	}
