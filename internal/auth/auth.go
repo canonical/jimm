@@ -171,11 +171,13 @@ func (a *Authenticator) with(c *collection) *Authenticator {
 func (a *Authenticator) Authenticate(ctx context.Context, mss []macaroon.Slice, checker checkers.Checker) (context.Context, *macaroon.Macaroon, error) {
 	attrMap, verr := a.bakery.CheckAny(mss, nil, checkers.New(checker, checkers.TimeBefore))
 	if verr == nil {
+		servermon.AuthenticationSuccessCount.Inc()
 		return context.WithValue(ctx, authKey, authentication{
 			username:    attrMap[usernameAttr],
 			permChecker: a.params.PermChecker,
 		}), nil, nil
 	}
+	servermon.AuthenticationFailCount.Inc()
 	if _, ok := errgo.Cause(verr).(*bakery.VerificationError); !ok {
 		return ctx, nil, errgo.Mask(verr, errgo.Is(params.ErrUnauthorized))
 	}
