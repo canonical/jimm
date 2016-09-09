@@ -19,6 +19,7 @@ import (
 	"github.com/juju/juju/rpc/jsoncodec"
 	"github.com/juju/juju/rpc/rpcreflect"
 	"github.com/juju/loggo"
+	"golang.org/x/net/context"
 	"golang.org/x/net/websocket"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
@@ -454,10 +455,18 @@ func (c cloud) userCredentials(ownerTag, cloudTag string) ([]string, error) {
 
 	}
 	var cloudCreds []string
-	it := c.h.jem.CanReadIter(c.h.jem.DB.Credentials().Find(bson.D{{"user", owner.Name()}, {"cloud", cld.Id()}}).Iter())
+	it := c.h.jem.CanReadIter(c.h.jem.DB.Credentials().Find(
+		bson.D{{
+			"path.entitypath.user", owner.Name(),
+		}, {
+			"path.cloud", cld.Id(),
+		}, {
+			"revoked", false,
+		}},
+	).Iter())
 	var cred mongodoc.Credential
 	for it.Next(&cred) {
-		cloudCreds = append(cloudCreds, jem.CloudCredentialTag(cred.Cloud, cred.User, cred.Name).String())
+		cloudCreds = append(cloudCreds, jem.CloudCredentialTag(cred.Path).String())
 	}
 
 	return cloudCreds, errgo.Mask(it.Err())
@@ -466,9 +475,11 @@ func (c cloud) userCredentials(ownerTag, cloudTag string) ([]string, error) {
 // UpdateCredentials implements the UpdateCredentials method of the Cloud
 // facade.
 func (c cloud) UpdateCredentials(args jujuparams.UpdateCloudCredentials) (jujuparams.ErrorResults, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	results := make([]jujuparams.ErrorResult, len(args.Credentials))
 	for i, ucc := range args.Credentials {
-		if err := c.updateCredential(ucc); err != nil {
+		if err := c.updateCredential(ctx, ucc); err != nil {
 			results[i].Error = mapError(err)
 		}
 	}
@@ -478,7 +489,7 @@ func (c cloud) UpdateCredentials(args jujuparams.UpdateCloudCredentials) (jujupa
 }
 
 // updateCredential adds a single credential to the database.
-func (c cloud) updateCredential(arg jujuparams.UpdateCloudCredential) error {
+func (c cloud) updateCredential(ctx context.Context, arg jujuparams.UpdateCloudCredential) error {
 	tag, err := names.ParseCloudCredentialTag(arg.Tag)
 	if err != nil {
 		return errgo.WithCausef(err, params.ErrBadRequest, "")
@@ -499,13 +510,61 @@ func (c cloud) updateCredential(arg jujuparams.UpdateCloudCredential) error {
 		return errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
 	credential := mongodoc.Credential{
-		User:       owner,
-		Cloud:      params.Cloud(tag.Cloud().Id()),
-		Name:       params.Name(tag.Name()),
+		Path: params.CredentialPath{
+			Cloud: params.Cloud(tag.Cloud().Id()),
+			EntityPath: params.EntityPath{
+				User: owner,
+				Name: params.Name(tag.Name()),
+			},
+		},
 		Type:       arg.Credential.AuthType,
 		Attributes: arg.Credential.Attributes,
 	}
-	if err := c.h.jem.UpdateCredential(&credential); err != nil {
+	if err := c.h.jem.UpdateCredential(ctx, &credential); err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
+// RevokeCredentials revokes a set of cloud credentials.
+func (c cloud) RevokeCredentials(args jujuparams.Entities) (jujuparams.ErrorResults, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	results := make([]jujuparams.ErrorResult, len(args.Entities))
+	for i, ent := range args.Entities {
+		if err := c.revokeCredential(ctx, ent.Tag); err != nil {
+			results[i].Error = mapError(err)
+		}
+	}
+	return jujuparams.ErrorResults{
+		Results: results,
+	}, nil
+}
+
+// RevokeCredentials revokes a set of cloud credentials.
+func (c cloud) revokeCredential(ctx context.Context, tag string) error {
+	ct, err := names.ParseCloudCredentialTag(tag)
+	if err != nil {
+		return errgo.WithCausef(err, params.ErrBadRequest, "cannot parse %q", tag)
+	}
+	if ct.Owner().Domain() == "local" {
+		// such a credential will not have been uploaded, so it exists
+		return nil
+	}
+	if err := c.h.jem.CheckIsUser(params.User(ct.Owner().Name())); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	credential := mongodoc.Credential{
+		Path: params.CredentialPath{
+			Cloud: params.Cloud(ct.Cloud().Id()),
+			EntityPath: params.EntityPath{
+				User: params.User(ct.Owner().Name()),
+				Name: params.Name(ct.Name()),
+			},
+		},
+		Revoked: true,
+	}
+	if err := c.h.jem.UpdateCredential(ctx, &credential); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil
@@ -541,11 +600,21 @@ func (c cloud) credential(cloudCredentialTag string) (*jujuparams.CloudCredentia
 	if err := c.h.jem.CheckIsUser(params.User(owner.Name())); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	cred, err := c.h.jem.DB.Credential(params.User(owner.Name()), params.Cloud(cct.Cloud().Id()), params.Name(cct.Name()))
+	credPath := params.CredentialPath{
+		Cloud: params.Cloud(cct.Cloud().Id()),
+		EntityPath: params.EntityPath{
+			User: params.User(owner.Name()),
+			Name: params.Name(cct.Name()),
+		},
+	}
+	cred, err := c.h.jem.DB.Credential(credPath)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	schema, err := c.h.credentialSchema(cred.Cloud, cred.Type)
+	if cred.Revoked {
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", cct.Id())
+	}
+	schema, err := c.h.credentialSchema(cred.Path.Cloud, cred.Type)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}

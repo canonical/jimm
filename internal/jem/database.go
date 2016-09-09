@@ -344,20 +344,18 @@ func (db Database) updateCredential(cred *mongodoc.Credential) error {
 		"label", cred.Label,
 	}, {
 		"attributes", cred.Attributes,
+	}, {
+		"revoked", cred.Revoked,
 	}}
 	if len(cred.ACL.Read) > 0 {
 		update = append(update, bson.DocElem{"acl", cred.ACL})
 	}
-	id := credentialId(cred.User, cred.Cloud, cred.Name)
+	id := cred.Path.String()
 	_, err := db.Credentials().UpsertId(id, bson.D{{
 		"$set", update,
 	}, {
 		"$setOnInsert", bson.D{{
-			"user", cred.User,
-		}, {
-			"cloud", cred.Cloud,
-		}, {
-			"name", cred.Name,
+			"path", cred.Path,
 		}},
 	}})
 	if err != nil {
@@ -368,53 +366,44 @@ func (db Database) updateCredential(cred *mongodoc.Credential) error {
 
 // Credential gets the specified credential. If the credential cannot be
 // found the returned error will have a cause of params.ErrNotFound.
-func (db Database) Credential(user params.User, cloud params.Cloud, name params.Name) (*mongodoc.Credential, error) {
+func (db Database) Credential(path params.CredentialPath) (*mongodoc.Credential, error) {
 	var cred mongodoc.Credential
-	id := credentialId(user, cloud, name)
-	err := db.Credentials().FindId(id).One(&cred)
+	err := db.Credentials().FindId(path.String()).One(&cred)
 	if err == mgo.ErrNotFound {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", id)
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", path)
 	}
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot get credential %q", id)
+		return nil, errgo.Notef(err, "cannot get credential %q", path)
 	}
 	return &cred, nil
 }
 
-// credentialId calculates the id for a credential with the specified
-// user, cloud and name.
-func credentialId(user params.User, cloud params.Cloud, name params.Name) string {
-	return fmt.Sprintf("%s/%s/%s", user, cloud, name)
-}
-
 // credentialAddController stores the fact that the credential with the
 // given user, cloud and name is present on the given controller.
-func (db Database) credentialAddController(user params.User, cloud params.Cloud, name params.Name, controller params.EntityPath) error {
-	id := credentialId(user, cloud, name)
-	err := db.Credentials().UpdateId(id, bson.D{{
+func (db Database) credentialAddController(credential params.CredentialPath, controller params.EntityPath) error {
+	err := db.Credentials().UpdateId(credential.String(), bson.D{{
 		"$addToSet", bson.D{{"controllers", controller}},
 	}})
 	if err != nil {
 		if err == mgo.ErrNotFound {
-			return errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", id)
+			return errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", credential)
 		}
-		return errgo.Notef(err, "cannot update credential %q", id)
+		return errgo.Notef(err, "cannot update credential %q", credential)
 	}
 	return nil
 }
 
 // credentialRemoveController stores the fact that the credential with
 // the given user, cloud and name is not present on the given controller.
-func (db Database) credentialRemoveController(user params.User, cloud params.Cloud, name params.Name, controller params.EntityPath) error {
-	id := credentialId(user, cloud, name)
-	err := db.Credentials().UpdateId(id, bson.D{{
+func (db Database) credentialRemoveController(credential params.CredentialPath, controller params.EntityPath) error {
+	err := db.Credentials().UpdateId(credential.String(), bson.D{{
 		"$pull", bson.D{{"controllers", controller}},
 	}})
 	if err != nil {
 		if err == mgo.ErrNotFound {
-			return errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", id)
+			return errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", credential)
 		}
-		return errgo.Notef(err, "cannot update credential %q", id)
+		return errgo.Notef(err, "cannot update credential %q", credential)
 	}
 	return nil
 }
@@ -434,6 +423,42 @@ func (db Database) Cloud(cloud params.Cloud) (*mongodoc.Cloud, error) {
 		return nil, errgo.Notef(err, "cannot get cloud %q", cloud)
 	}
 	return &ctl.Cloud, nil
+}
+
+func (db Database) setCredentialUpdates(ctlPaths []params.EntityPath, credPath params.CredentialPath) error {
+	_, err := db.Controllers().UpdateAll(bson.D{{
+		"path", bson.D{{
+			"$in", ctlPaths,
+		}},
+	}}, bson.D{{
+		"$addToSet", bson.D{{
+			"updatecredentials", credPath}},
+	}})
+	if err != nil {
+		return errgo.Mask(err)
+
+	}
+	return nil
+}
+
+func (db Database) clearCredentialUpdate(ctlPath params.EntityPath, credPath params.CredentialPath) error {
+	err := db.Controllers().UpdateId(
+		ctlPath.String(),
+		bson.D{{
+			"$pull",
+			bson.D{{
+				"updatecredentials",
+				credPath,
+			}},
+		}},
+	)
+	if err != nil {
+		if errgo.Cause(err) == mgo.ErrNotFound {
+			return errgo.WithCausef(nil, params.ErrNotFound, "controller %q not found", ctlPath)
+		}
+		return errgo.Mask(err)
+	}
+	return nil
 }
 
 func (db Database) Collections() []*mgo.Collection {

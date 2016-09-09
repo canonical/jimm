@@ -74,6 +74,10 @@ type Controller struct {
 	// as available; otherwise it holds the time when it became
 	// unavailable.
 	UnavailableSince time.Time `bson:",omitempty"`
+
+	// UpdateCredentials holds a list of credentials which require
+	// updates on this controller.
+	UpdateCredentials []params.CredentialPath `bson:",omitempty"`
 }
 
 func (s *Controller) Owner() params.User {
@@ -222,14 +226,10 @@ type Credential struct {
 	// It holds "<User>/<Cloud>/<Name>"
 	Id string `bson:"_id"`
 
-	// User holds the username associated with the credential.
-	User params.User
-
-	// Cloud holds the name of the cloud to which this credential belongs.
-	Cloud params.Cloud
-
-	// Name holds the name associated with the credential.
-	Name params.Name
+	// Path holds the local cloud, user and name given to the
+	// credential, denormalized from Id for convenience and ease of
+	// indexing. Its string value is used as the Id value.
+	Path params.CredentialPath
 
 	// ACL holds permissions for the credential.
 	ACL params.ACL
@@ -246,10 +246,13 @@ type Credential struct {
 	// Controllers holds the controllers to which this credential has
 	// been uploaded.
 	Controllers []params.EntityPath
+
+	// Revoked records that the credential has been revoked.
+	Revoked bool
 }
 
 func (c *Credential) Owner() params.User {
-	return c.User
+	return c.Path.User
 }
 
 func (c *Credential) GetACL() params.ACL {

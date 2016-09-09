@@ -71,6 +71,10 @@ type jemInterface interface {
 	// cause will be returned. If the lease has been obtained by someone else
 	// an error with a jem.ErrLeaseUnavailable cause will be returned.
 	AcquireMonitorLease(ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error)
+
+	// ControllerUpdateCredentials updates the given controller by updating
+	// all credentials listed in ctl.UpdateCredentials.
+	ControllerUpdateCredentials(ctlPath params.EntityPath) error
 }
 
 // jujuAPI represents an API connection to a Juju controller.

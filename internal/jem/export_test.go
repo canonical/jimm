@@ -7,4 +7,5 @@ var (
 	CredentialRemoveController = (Database).credentialRemoveController
 	UpdateCredential           = (Database).updateCredential
 	UpdateControllerCredential = (*JEM).updateControllerCredential
+	SetCredentialUpdates       = (Database).setCredentialUpdates
 )

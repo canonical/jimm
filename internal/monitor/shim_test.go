@@ -237,6 +237,10 @@ func (s *jemShimInMemory) AllControllers() ([]*mongodoc.Controller, error) {
 	return r, nil
 }
 
+func (s *jemShimInMemory) ControllerUpdateCredentials(ctlPath params.EntityPath) error {
+	return nil
+}
+
 func (s *jemShimInMemory) OpenAPI(params.EntityPath) (jujuAPI, error) {
 	return nil, errgo.New("jemShimInMemory doesn't implement OpenAPI")
 }

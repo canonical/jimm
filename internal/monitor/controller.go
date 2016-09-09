@@ -157,7 +157,12 @@ func (m *controllerMonitor) watcher() error {
 			if err := m.jem.SetControllerAvailable(m.ctlPath); err != nil {
 				return errgo.Notef(err, "cannot set controller availability")
 			}
-			err := m.watch(conn)
+
+			if err := m.jem.ControllerUpdateCredentials(m.ctlPath); err != nil {
+				return errgo.Notef(err, "cannot update credentials")
+			}
+
+			err = m.watch(conn)
 			if errgo.Cause(err) == tomb.ErrDying {
 				conn.Close()
 				return tomb.ErrDying
