@@ -21,7 +21,7 @@ github.com/juju/gomaasapi	git	0d72ac79f9a32e98262ac529fa5184e18213f447	2016-08-2
 github.com/juju/httpprof	git	14bf14c307672fd2456bdbf35d19cf0ccd3cf565	2014-12-17T16:00:36Z
 github.com/juju/httprequest	git	796aaafaf712f666df58d31a482c51233038bf9f	2016-05-03T15:03:27Z
 github.com/juju/idmclient	git	3dda079a75cccb85083d4c3877e638f5d6ab79c2	2016-05-26T05:00:34Z
-github.com/juju/juju	git	38ca68eefcd5ff0a48eb8f897bf3a15a3d38d9e2	2016-09-08T10:17:15Z
+github.com/juju/juju	git	0c9dba080d15e945debdb9646747cb7ed5d08bbc	2016-09-09T11:59:10Z
 github.com/juju/loggo	git	3b7ece48644d35850f4ced4c2cbc2cf8413f58e0	2016-08-18T02:57:24Z
 github.com/juju/mutex	git	59c26ee163447c5c57f63ff71610d433862013de	2016-06-17T01:09:07Z
 github.com/juju/names	git	8a0aa0963bbacdc790914892e9ff942e94d6f795	2016-03-30T15:05:33Z
