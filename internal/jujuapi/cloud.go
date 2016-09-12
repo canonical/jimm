@@ -56,6 +56,11 @@ func (r regions) Swap(i, j int) {
 
 func mergeClouds(c1, c2 jujuparams.Cloud) jujuparams.Cloud {
 	c := c1
+	// If c1 is the zero value then all the fields will be empty.
+	// Only fill out the scalar fields if they are currently empty.
+	if c.Type == "" {
+		c.Type = c2.Type
+	}
 	c.AuthTypes = mergeStrings(c.AuthTypes, c2.AuthTypes)
 	if c.Endpoint == "" {
 		c.Endpoint = c2.Endpoint

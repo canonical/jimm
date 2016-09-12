@@ -378,7 +378,7 @@ func (c cloud) Cloud(ents jujuparams.Entities) (jujuparams.CloudResults, error) 
 	}, nil
 }
 
-// cloud finds and returns the cloud ideentified by cloudTag in clouds.
+// cloud finds and returns the cloud identified by cloudTag in clouds.
 func (c cloud) cloud(cloudTag string, clouds map[string]jujuparams.Cloud) (*jujuparams.Cloud, error) {
 	if cloud, ok := clouds[cloudTag]; ok {
 		return &cloud, nil
