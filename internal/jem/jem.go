@@ -416,7 +416,7 @@ func (j *JEM) UpdateCredential(ctx context.Context, cred *mongodoc.Credential) e
 			}
 		}(j.Clone(), ctlPath)
 	}
-	// Only wait until the deadline for the updates to finish.
+	// Only wait for as along as the context allows for the updates to finish.
 	for n > 0 {
 		select {
 		case <-ch:

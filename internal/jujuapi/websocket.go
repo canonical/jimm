@@ -543,23 +543,23 @@ func (c cloud) RevokeCredentials(args jujuparams.Entities) (jujuparams.ErrorResu
 
 // RevokeCredentials revokes a set of cloud credentials.
 func (c cloud) revokeCredential(ctx context.Context, tag string) error {
-	ct, err := names.ParseCloudCredentialTag(tag)
+	credtag, err := names.ParseCloudCredentialTag(tag)
 	if err != nil {
 		return errgo.WithCausef(err, params.ErrBadRequest, "cannot parse %q", tag)
 	}
-	if ct.Owner().Domain() == "local" {
+	if credtag.Owner().Domain() == "local" {
 		// such a credential will not have been uploaded, so it exists
 		return nil
 	}
-	if err := c.h.jem.CheckIsUser(params.User(ct.Owner().Name())); err != nil {
+	if err := c.h.jem.CheckIsUser(params.User(credtag.Owner().Name())); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	credential := mongodoc.Credential{
 		Path: params.CredentialPath{
-			Cloud: params.Cloud(ct.Cloud().Id()),
+			Cloud: params.Cloud(credtag.Cloud().Id()),
 			EntityPath: params.EntityPath{
-				User: params.User(ct.Owner().Name()),
-				Name: params.Name(ct.Name()),
+				User: params.User(credtag.Owner().Name()),
+				Name: params.Name(credtag.Name()),
 			},
 		},
 		Revoked: true,

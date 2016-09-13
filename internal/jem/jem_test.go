@@ -393,6 +393,7 @@ func (s *jemSuite) TestUpdateCredential(c *gc.C) {
 		Path:    credPath,
 		Revoked: true,
 	})
+	c.Assert(err, jc.ErrorIsNil)
 
 	// check it was removed on the controller.
 	creds, err = client.Credentials(credTag)

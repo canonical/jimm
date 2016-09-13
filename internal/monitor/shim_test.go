@@ -128,10 +128,11 @@ func (s jemShimWithMonitorLeaseAcquirer) Clone() jemInterface {
 }
 
 type jemShimInMemory struct {
-	mu          sync.Mutex
-	refCount    int
-	controllers map[params.EntityPath]*mongodoc.Controller
-	models      map[params.EntityPath]*mongodoc.Model
+	mu                          sync.Mutex
+	refCount                    int
+	controllers                 map[params.EntityPath]*mongodoc.Controller
+	models                      map[params.EntityPath]*mongodoc.Model
+	controllerUpdateCredentials map[params.EntityPath]bool
 }
 
 var _ jemInterface = (*jemShimInMemory)(nil)
@@ -140,6 +141,7 @@ func newJEMShimInMemory() *jemShimInMemory {
 	return &jemShimInMemory{
 		controllers: make(map[params.EntityPath]*mongodoc.Controller),
 		models:      make(map[params.EntityPath]*mongodoc.Model),
+		controllerUpdateCredentials: make(map[params.EntityPath]bool),
 	}
 }
 
@@ -238,6 +240,9 @@ func (s *jemShimInMemory) AllControllers() ([]*mongodoc.Controller, error) {
 }
 
 func (s *jemShimInMemory) ControllerUpdateCredentials(ctlPath params.EntityPath) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.controllerUpdateCredentials[ctlPath] = true
 	return nil
 }
 

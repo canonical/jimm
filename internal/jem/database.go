@@ -425,6 +425,8 @@ func (db Database) Cloud(cloud params.Cloud) (*mongodoc.Cloud, error) {
 	return &ctl.Cloud, nil
 }
 
+// setCredentialUpdates marks all the controllers in the given ctlPaths
+// as requiring an update to the credential with the given credPath.
 func (db Database) setCredentialUpdates(ctlPaths []params.EntityPath, credPath params.CredentialPath) error {
 	_, err := db.Controllers().UpdateAll(bson.D{{
 		"path", bson.D{{
@@ -441,6 +443,8 @@ func (db Database) setCredentialUpdates(ctlPaths []params.EntityPath, credPath p
 	return nil
 }
 
+// clearCredentialUpdate removes the record indicating that the given
+// controller needs to update the given credential.
 func (db Database) clearCredentialUpdate(ctlPath params.EntityPath, credPath params.CredentialPath) error {
 	err := db.Controllers().UpdateId(
 		ctlPath.String(),
