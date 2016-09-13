@@ -237,8 +237,10 @@ func (s *Suite) UpdateCredential(user params.User, cloud params.Cloud, name para
 	// persist, the discharge macaroon we get won't affect subsequent
 	// requests in the caller.
 	p := &params.UpdateCredential{
-		EntityPath: params.EntityPath{User: user, Name: name},
-		Cloud:      cloud,
+		CredentialPath: params.CredentialPath{
+			Cloud:      cloud,
+			EntityPath: params.EntityPath{User: user, Name: name},
+		},
 		Credential: params.Credential{
 			AuthType: authType,
 		},

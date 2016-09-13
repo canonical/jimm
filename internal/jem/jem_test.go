@@ -16,6 +16,7 @@ import (
 	"github.com/juju/juju/state/multiwatcher"
 	jujujujutesting "github.com/juju/juju/testing"
 	jc "github.com/juju/testing/checkers"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
@@ -140,7 +141,7 @@ var createModelTests = []struct {
 		Credential:     "cred2",
 		Cloud:          "dummy",
 	},
-	expectError:      `credential "bob/dummy/cred2" not found`,
+	expectError:      `credential "dummy/bob/cred2" not found`,
 	expectErrorCause: params.ErrNotFound,
 }, {
 	about: "model exists",
@@ -176,10 +177,8 @@ var createModelTests = []struct {
 func (s *jemSuite) TestCreateModel(c *gc.C) {
 	ctlId := s.addController(c, params.EntityPath{"bob", "controller"})
 	err := jem.UpdateCredential(s.store.DB, &mongodoc.Credential{
-		User:  "bob",
-		Cloud: "dummy",
-		Name:  "cred1",
-		Type:  "empty",
+		Path: credentialPath("dummy", "bob", "cred1"),
+		Type: "empty",
 	})
 	conn, err := s.store.OpenAPI(ctlId)
 	c.Assert(err, jc.ErrorIsNil)
@@ -337,20 +336,20 @@ func waitForDestruction(conn *apiconn.Conn, c *gc.C, uuid string) <-chan struct{
 
 func (s *jemSuite) TestUpdateCredential(c *gc.C) {
 	ctlPath := s.addController(c, params.EntityPath{User: "bob", Name: "controller"})
+	credPath := credentialPath("dummy", "bob", "cred")
 	cred := &mongodoc.Credential{
-		User:  "bob",
-		Cloud: "dummy",
-		Name:  "cred",
-		Type:  "empty",
+		Path: credPath,
+		Type: "empty",
 	}
 	err := jem.UpdateCredential(s.store.DB, cred)
+	c.Assert(err, jc.ErrorIsNil)
 	conn, err := s.store.OpenAPI(ctlPath)
 	c.Assert(err, jc.ErrorIsNil)
 	defer conn.Close()
 
-	err = jem.UpdateControllerCredential(s.store, conn, cred)
+	err = jem.UpdateControllerCredential(s.store, ctlPath, cred.Path, conn, cred)
 	c.Assert(err, jc.ErrorIsNil)
-	err = jem.CredentialAddController(s.store.DB, "bob", "dummy", "cred", ctlPath)
+	err = jem.CredentialAddController(s.store.DB, credPath, ctlPath)
 	c.Assert(err, jc.ErrorIsNil)
 
 	// Sanity check it was deployed
@@ -364,11 +363,9 @@ func (s *jemSuite) TestUpdateCredential(c *gc.C) {
 		},
 	}})
 
-	err = s.store.UpdateCredential(&mongodoc.Credential{
-		User:  "bob",
-		Cloud: "dummy",
-		Name:  "cred",
-		Type:  "userpass",
+	err = s.store.UpdateCredential(context.Background(), &mongodoc.Credential{
+		Path: credPath,
+		Type: "userpass",
 		Attributes: map[string]string{
 			"username": "cloud-user",
 			"password": "cloud-pass",
@@ -390,6 +387,57 @@ func (s *jemSuite) TestUpdateCredential(c *gc.C) {
 			},
 		},
 	}})
+
+	// Revoke the credential
+	err = s.store.UpdateCredential(context.Background(), &mongodoc.Credential{
+		Path:    credPath,
+		Revoked: true,
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	// check it was removed on the controller.
+	creds, err = client.Credentials(credTag)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
+		Error: &jujuparams.Error{
+			Code:    "not found",
+			Message: `credential "cred" not found`,
+		},
+	}})
+}
+
+func (s *jemSuite) TestControllerUpdateCredentials(c *gc.C) {
+	ctlPath := s.addController(c, params.EntityPath{User: "bob", Name: "controller"})
+	credPath := credentialPath("dummy", "bob", "cred")
+	credTag := names.NewCloudCredentialTag("dummy/bob@external/cred")
+	cred := &mongodoc.Credential{
+		Path: credPath,
+		Type: "empty",
+	}
+	err := jem.UpdateCredential(s.store.DB, cred)
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = jem.SetCredentialUpdates(s.store.DB, []params.EntityPath{ctlPath}, credPath)
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = s.store.ControllerUpdateCredentials(ctlPath)
+	c.Assert(err, jc.ErrorIsNil)
+
+	// check it was updated on the controller.
+	conn, err := s.store.OpenAPI(ctlPath)
+	c.Assert(err, jc.ErrorIsNil)
+	defer conn.Close()
+
+	client := cloudapi.NewClient(conn)
+	creds, err := client.Credentials(credTag)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
+		Result: &jujuparams.CloudCredential{
+			AuthType:   "empty",
+			Attributes: nil,
+			Redacted:   nil,
+		},
+	}})
 }
 
 func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityPath {
@@ -408,11 +456,10 @@ func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityP
 
 func (s *jemSuite) bootstrapModel(c *gc.C, path params.EntityPath) (*apiconn.Conn, *mongodoc.Model) {
 	ctlPath := s.addController(c, params.EntityPath{User: path.User, Name: "controller"})
+	credPath := credentialPath("dummy", string(path.User), "cred")
 	err := jem.UpdateCredential(s.store.DB, &mongodoc.Credential{
-		User:  path.User,
-		Cloud: "dummy",
-		Name:  "cred",
-		Type:  "empty",
+		Path: credPath,
+		Type: "empty",
 	})
 	c.Assert(err, jc.ErrorIsNil)
 	conn, err := s.store.OpenAPI(ctlPath)

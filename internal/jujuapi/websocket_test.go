@@ -20,6 +20,7 @@ import (
 	"github.com/juju/juju/network"
 	"github.com/juju/juju/status"
 	jc "github.com/juju/testing/checkers"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
@@ -212,10 +213,11 @@ func (s *websocketSuite) TestClouds(c *gc.C) {
 
 func (s *websocketSuite) TestUserCredentials(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	s.JEM.UpdateCredential(&mongodoc.Credential{
-		User:  "test",
-		Cloud: "dummy",
-		Name:  "cred1",
+	s.JEM.UpdateCredential(context.Background(), &mongodoc.Credential{
+		Path: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{User: "test", Name: "cred1"},
+		},
 		Type:  "credtype",
 		Label: "Credentials 1",
 		Attributes: map[string]string{
@@ -235,10 +237,11 @@ func (s *websocketSuite) TestUserCredentials(c *gc.C) {
 
 func (s *websocketSuite) TestUserCredentialsACL(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	s.JEM.UpdateCredential(&mongodoc.Credential{
-		User:  "test",
-		Cloud: "dummy",
-		Name:  "cred1",
+	s.JEM.UpdateCredential(context.Background(), &mongodoc.Credential{
+		Path: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{User: "test", Name: "cred1"},
+		},
 		Type:  "credtype",
 		Label: "Credentials 1",
 		Attributes: map[string]string{
@@ -246,10 +249,11 @@ func (s *websocketSuite) TestUserCredentialsACL(c *gc.C) {
 			"attr2": "val2",
 		},
 	})
-	s.JEM.UpdateCredential(&mongodoc.Credential{
-		User:  "test2",
-		Cloud: "dummy",
-		Name:  "cred2",
+	s.JEM.UpdateCredential(context.Background(), &mongodoc.Credential{
+		Path: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{User: "test2", Name: "cred2"},
+		},
 		ACL: params.ACL{
 			Read: []string{"test"},
 		},
@@ -403,7 +407,7 @@ func (s *websocketSuite) TestCredential(c *gc.C) {
 		},
 	}, {
 		Error: &jujuparams.Error{
-			Message: `credential "test/dummy/cred3" not found`,
+			Message: `credential "dummy/test/cred3" not found`,
 			Code:    "not found",
 		},
 	}, {
@@ -421,6 +425,49 @@ func (s *websocketSuite) TestCredential(c *gc.C) {
 			Code:    "not found",
 		},
 	}})
+}
+
+func (s *websocketSuite) TestRevokeCredential(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller"}, true)
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := cloudapi.NewClient(conn)
+	credTag := names.NewCloudCredentialTag("dummy/test@external/cred")
+	err := client.UpdateCredential(
+		credTag,
+		cloud.NewCredential("empty", nil),
+	)
+	c.Assert(err, jc.ErrorIsNil)
+
+	tags, err := client.UserCredentials(credTag.Owner(), credTag.Cloud())
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(tags, jc.DeepEquals, []names.CloudCredentialTag{
+		credTag,
+	})
+
+	ccr, err := client.Credentials(credTag)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(ccr, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
+		Result: &jujuparams.CloudCredential{
+			AuthType: "empty",
+		},
+	}})
+
+	err = client.RevokeCredential(credTag)
+	c.Assert(err, jc.ErrorIsNil)
+
+	ccr, err = client.Credentials(credTag)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(ccr, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
+		Error: &jujuparams.Error{
+			Code:    "not found",
+			Message: `credential "dummy/test@external/cred" not found`,
+		},
+	}})
+
+	tags, err = client.UserCredentials(credTag.Owner(), credTag.Cloud())
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(tags, jc.DeepEquals, []names.CloudCredentialTag{})
 }
 
 func (s *websocketSuite) TestLoginToRoot(c *gc.C) {

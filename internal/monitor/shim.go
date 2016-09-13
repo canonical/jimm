@@ -65,6 +65,11 @@ func (j jemShim) AcquireMonitorLease(ctlPath params.EntityPath, oldExpiry time.T
 	return t, nil
 }
 
+func (j jemShim) Controller(ctlPath params.EntityPath) (*mongodoc.Controller, error) {
+	ctl, err := j.DB.Controller(ctlPath)
+	return ctl, errgo.Mask(err, errgo.Any)
+}
+
 type apiShim struct {
 	*apiconn.Conn
 }

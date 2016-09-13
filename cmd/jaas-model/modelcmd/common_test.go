@@ -121,8 +121,10 @@ func (s *commonSuite) addEnv(c *gc.C, pathStr, srvPathStr, credName string) {
 	c.Assert(err, gc.IsNil)
 
 	err = s.jemClient(string(path.User)).UpdateCredential(&params.UpdateCredential{
-		EntityPath: params.EntityPath{path.User, params.Name(credName)},
-		Cloud:      "dummy",
+		CredentialPath: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{path.User, params.Name(credName)},
+		},
 		Credential: params.Credential{
 			AuthType: "empty",
 		},

@@ -179,6 +179,50 @@ func (p EntityPath) MarshalText() ([]byte, error) {
 	return data, nil
 }
 
+// CredentialPath holds the path parameters for specifying a credential
+// in the API. It can also be used as a value in its own right, because
+// it implements TextMarshaler and TextUnmarshaler.
+type CredentialPath struct {
+	Cloud Cloud `httprequest:",path"`
+	EntityPath
+}
+
+func (p CredentialPath) String() string {
+	return fmt.Sprintf("%s/%s", p.Cloud, p.EntityPath)
+}
+
+// IsZero reports whether the receiver is the empty value.
+func (p CredentialPath) IsZero() bool {
+	return p.Cloud == "" && p.EntityPath.IsZero()
+}
+
+func (p *CredentialPath) UnmarshalText(data []byte) error {
+	parts := bytes.Split(data, slash)
+	if len(parts) != 3 {
+		return errgo.New("need <cloud>/<user>/<name>")
+	}
+	if err := p.Cloud.UnmarshalText(parts[0]); err != nil {
+		return errgo.Mask(err)
+	}
+	if err := p.EntityPath.User.UnmarshalText(parts[1]); err != nil {
+		return errgo.Mask(err)
+	}
+	if err := p.EntityPath.Name.UnmarshalText(parts[2]); err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
+func (p CredentialPath) MarshalText() ([]byte, error) {
+	data := make([]byte, 0, len(p.Cloud)+1+len(p.User)+1+len(p.Name))
+	data = append(data, p.Cloud...)
+	data = append(data, '/')
+	data = append(data, p.User...)
+	data = append(data, '/')
+	data = append(data, p.Name...)
+	return data, nil
+}
+
 // GetModel holds parameters for retrieving a model.
 type GetModel struct {
 	httprequest.Route `httprequest:"GET /v2/model/:User/:Name"`
@@ -360,8 +404,7 @@ type WhoAmIResponse struct {
 // UpdateCredential holds parameters for adding or updating a credential.
 type UpdateCredential struct {
 	httprequest.Route `httprequest:"PUT /v2/credential/:User/:Cloud/:Name"`
-	EntityPath
-	Cloud      Cloud      `httprequest:",path"`
+	CredentialPath
 	Credential Credential `httprequest:",body"`
 }
 

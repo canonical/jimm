@@ -15,6 +15,7 @@ import (
 	"github.com/juju/juju/network"
 	"github.com/juju/loggo"
 	jujuschema "github.com/juju/schema"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/environschema.v1"
 	"gopkg.in/juju/names.v2"
@@ -706,10 +707,8 @@ func (h *Handler) UpdateCredential(arg *params.UpdateCredential) error {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	// TODO(mhilton) validate the credentials.
-	err := h.jem.UpdateCredential(&mongodoc.Credential{
-		User:       arg.EntityPath.User,
-		Cloud:      arg.Cloud,
-		Name:       arg.EntityPath.Name,
+	err := h.jem.UpdateCredential(context.TODO(), &mongodoc.Credential{
+		Path:       arg.CredentialPath,
 		Type:       arg.Credential.AuthType,
 		Attributes: arg.Credential.Attributes,
 	})
