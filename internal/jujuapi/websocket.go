@@ -30,6 +30,7 @@ import (
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/jemserver"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
+	"github.com/CanonicalLtd/jem/internal/servermon"
 	"github.com/CanonicalLtd/jem/params"
 )
 
@@ -274,6 +275,7 @@ type admin struct {
 // Login implements the Login method on the Admin facade.
 func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResult, error) {
 	if a.h.modelUUID != "" {
+		servermon.LoginFailCount.Inc()
 		if a.h.model.Id == a.h.controller.Id {
 			// The client cannot log in to a controller model via JIMM.
 			return jujuparams.LoginResult{}, errgo.WithCausef(nil, params.ErrNotFound, "model %q not found", a.h.modelUUID)
@@ -288,6 +290,7 @@ func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResult, error
 	// JAAS only supports macaroon login, ignore all the other fields.
 	attr, err := a.h.jem.Bakery.CheckAny(req.Macaroons, nil, checkers.TimeBefore)
 	if err != nil {
+		servermon.LoginFailCount.Inc()
 		if verr, ok := errgo.Cause(err).(*bakery.VerificationError); ok {
 			m, err := a.h.jem.NewMacaroon()
 			if err != nil {
@@ -301,6 +304,7 @@ func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResult, error
 		return jujuparams.LoginResult{}, errgo.Mask(err)
 	}
 	a.h.jem.Auth.Username = attr["username"]
+	servermon.LoginSuccessCount.Inc()
 
 	return jujuparams.LoginResult{
 		UserInfo: &jujuparams.AuthUserInfo{
@@ -725,30 +729,36 @@ func (m modelManager) massageModelInfo(mi jujuparams.ModelInfo) jujuparams.Model
 func (m modelManager) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.ModelInfo, error) {
 	owner, err := names.ParseUserTag(args.OwnerTag)
 	if err != nil {
+		servermon.ModelsCreatedFailCount.Inc()
 		return jujuparams.ModelInfo{}, errgo.WithCausef(err, params.ErrBadRequest, "invalid owner tag")
 	}
 	logger.Debugf("Attempting to create %s/%s", owner, args.Name)
 	if owner.IsLocal() {
+		servermon.ModelsCreatedFailCount.Inc()
 		return jujuparams.ModelInfo{}, params.ErrUnauthorized
 	}
 	if err := m.h.jem.CheckIsUser(params.User(owner.Name())); err != nil {
+		servermon.ModelsCreatedFailCount.Inc()
 		return jujuparams.ModelInfo{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	cloud := params.Cloud(m.h.params.DefaultCloud)
 	if args.CloudTag != "" {
 		cloudTag, err := names.ParseCloudTag(args.CloudTag)
 		if err != nil {
+			servermon.ModelsCreatedFailCount.Inc()
 			return jujuparams.ModelInfo{}, errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud tag")
 		}
 		cloud = params.Cloud(cloudTag.Id())
 	}
 	cloudCredentialTag, err := names.ParseCloudCredentialTag(args.CloudCredentialTag)
 	if err != nil {
+		servermon.ModelsCreatedFailCount.Inc()
 		return jujuparams.ModelInfo{}, errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud credential tag")
 	}
 
 	ctlPath, cloud, region, err := m.h.jem.SelectController(cloud, args.CloudRegion)
 	if err != nil {
+		servermon.ModelsCreatedFailCount.Inc()
 		return jujuparams.ModelInfo{}, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound))
 	}
 
@@ -767,8 +777,10 @@ func (m modelManager) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.M
 		Attributes:     args.Config,
 	})
 	if err != nil {
+		servermon.ModelsCreatedFailCount.Inc()
 		return jujuparams.ModelInfo{}, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound))
 	}
+	servermon.ModelsCreatedCount.Inc()
 	return m.massageModelInfo(*mi), nil
 }
 
@@ -804,6 +816,7 @@ func (m modelManager) destroyModel(arg jujuparams.Entity) error {
 	if err := m.h.jem.DestroyModel(conn, model); err != nil {
 		return errgo.Mask(err)
 	}
+	servermon.ModelsDestroyedCount.Inc()
 	return nil
 }
 
