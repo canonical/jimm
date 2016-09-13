@@ -65,7 +65,8 @@ func (s *monitorSuite) TestMonitor(c *gc.C) {
 
 func (s *monitorSuite) TestMonitorWithBrokenMongoConnection(c *gc.C) {
 	s.PatchValue(monitor.APIConnectRetryDuration, 10*time.Millisecond)
-	pool, proxy := s.ProxiedPool(c)
+	pool, dbPool, proxy := s.ProxiedPool(c)
+	defer dbPool.Close()
 	defer pool.Close()
 	defer proxy.Close()
 

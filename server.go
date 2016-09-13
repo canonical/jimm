@@ -30,6 +30,10 @@ type ServerParams struct {
 	// store the JEM information.
 	DB *mgo.Database
 
+	// DBSessionLimit holds the limit on the number of concurrent
+	// database sessions.
+	DBSessionLimit int64
+
 	// ControllerAdmin holds the identity of the user
 	// or group that is allowed to create controllers.
 	ControllerAdmin params.User

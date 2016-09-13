@@ -23,6 +23,7 @@ import (
 
 	"github.com/CanonicalLtd/jem/internal/apiconn"
 	"github.com/CanonicalLtd/jem/internal/jem"
+	"github.com/CanonicalLtd/jem/internal/limitpool"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -30,8 +31,9 @@ import (
 type jemSuite struct {
 	corejujutesting.JujuConnSuite
 	idmSrv *idmtest.Server
+	dbPool *limitpool.Pool
 	pool   *jem.Pool
-	store  *jem.JEM
+	jem    *jem.JEM
 }
 
 var _ = gc.Suite(&jemSuite{})
@@ -39,8 +41,8 @@ var _ = gc.Suite(&jemSuite{})
 func (s *jemSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
 	s.idmSrv = idmtest.NewServer()
-	pool, err := jem.NewPool(jem.Params{
-		DB: s.Session.DB("jem"),
+	s.dbPool = jem.NewDatabasePool(100, s.Session.DB("jem"))
+	pool, err := jem.NewPool(s.dbPool, jem.Params{
 		BakeryParams: bakery.NewServiceParams{
 			Location: "here",
 		},
@@ -52,18 +54,18 @@ func (s *jemSuite) SetUpTest(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	s.pool = pool
-	s.store = s.pool.JEM()
+	s.jem = s.pool.JEM()
 }
 
 func (s *jemSuite) TearDownTest(c *gc.C) {
-	s.store.Close()
+	s.jem.Close()
 	s.pool.Close()
+	s.dbPool.Close()
 	s.JujuConnSuite.TearDownTest(c)
 }
 
 func (s *jemSuite) TestPoolRequiresControllerAdmin(c *gc.C) {
-	pool, err := jem.NewPool(jem.Params{
-		DB: s.Session.DB("jem"),
+	pool, err := jem.NewPool(s.dbPool, jem.Params{
 		BakeryParams: bakery.NewServiceParams{
 			Location: "here",
 		},
@@ -76,46 +78,18 @@ func (s *jemSuite) TestPoolRequiresControllerAdmin(c *gc.C) {
 	c.Assert(pool, gc.IsNil)
 }
 
-func (s *jemSuite) TestJEMCopiesSession(c *gc.C) {
-	session := s.Session.Copy()
-	pool, err := jem.NewPool(jem.Params{
-		DB: session.DB("jem"),
-		BakeryParams: bakery.NewServiceParams{
-			Location: "here",
-		},
-		IDMClient: idmclient.New(idmclient.NewParams{
-			BaseURL: s.idmSrv.URL.String(),
-			Client:  s.idmSrv.Client("agent"),
-		}),
-		ControllerAdmin: "controller-admin",
-	})
-	c.Assert(err, gc.IsNil)
-
-	store := pool.JEM()
-	defer store.Close()
-	// Check that we get an appropriate error when getting
-	// a non-existent model, indicating that database
-	// access is going OK.
-	_, err = store.DB.Model(params.EntityPath{"bob", "x"})
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-
-	// Close the session and check that we still get the
-	// same error.
-	session.Close()
-
-	_, err = store.DB.Model(params.EntityPath{"bob", "x"})
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-
-	// Also check the macaroon storage as that also has its own session reference.
-	m, err := store.Bakery.NewMacaroon("", nil, nil)
-	c.Assert(err, gc.IsNil)
-	c.Assert(m, gc.NotNil)
+func (s *jemSuite) TestJEMGetsDatabaseFromPool(c *gc.C) {
+	db := s.dbPool.GetNoLimit().(jem.Database)
+	s.dbPool.Put(db)
+	jem := s.pool.JEM()
+	defer jem.Close()
+	c.Assert(jem.DB, jc.DeepEquals, db)
 }
 
 func (s *jemSuite) TestClone(c *gc.C) {
-	j := s.store.Clone()
+	j := s.jem.Clone()
 	j.Close()
-	_, err := s.store.DB.Model(params.EntityPath{"bob", "x"})
+	_, err := s.jem.DB.Model(params.EntityPath{"bob", "x"})
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
@@ -175,17 +149,17 @@ var createModelTests = []struct {
 
 func (s *jemSuite) TestCreateModel(c *gc.C) {
 	ctlId := s.addController(c, params.EntityPath{"bob", "controller"})
-	err := jem.UpdateCredential(s.store.DB, &mongodoc.Credential{
+	err := jem.UpdateCredential(s.jem.DB, &mongodoc.Credential{
 		User:  "bob",
 		Cloud: "dummy",
 		Name:  "cred1",
 		Type:  "empty",
 	})
-	conn, err := s.store.OpenAPI(ctlId)
+	conn, err := s.jem.OpenAPI(ctlId)
 	c.Assert(err, jc.ErrorIsNil)
 	defer conn.Close()
 	c.Assert(err, jc.ErrorIsNil)
-	_, _, err = s.store.CreateModel(conn, jem.CreateModelParams{
+	_, _, err = s.jem.CreateModel(conn, jem.CreateModelParams{
 		Path:           params.EntityPath{"bob", "controller"},
 		ControllerPath: params.EntityPath{"bob", "controller"},
 		Credential:     "cred1",
@@ -197,7 +171,7 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 		if test.params.Path.Name == "" {
 			test.params.Path.Name = params.Name(fmt.Sprintf("test-%d", i))
 		}
-		m, _, err := s.store.CreateModel(conn, test.params)
+		m, _, err := s.jem.CreateModel(conn, test.params)
 		if test.expectError != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
 			if test.expectErrorCause != nil {
@@ -214,9 +188,9 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 func (s *jemSuite) TestGrantModel(c *gc.C) {
 	conn, model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
 	defer conn.Close()
-	err := s.store.GrantModel(conn, model, "alice", "write")
+	err := s.jem.GrantModel(conn, model, "alice", "write")
 	c.Assert(err, jc.ErrorIsNil)
-	model1, err := s.store.DB.Model(model.Path)
+	model1, err := s.jem.DB.Model(model.Path)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{"alice"}})
 }
@@ -224,9 +198,9 @@ func (s *jemSuite) TestGrantModel(c *gc.C) {
 func (s *jemSuite) TestGrantModelControllerFailure(c *gc.C) {
 	conn, model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
 	defer conn.Close()
-	err := s.store.GrantModel(conn, model, "alice", "superpowers")
+	err := s.jem.GrantModel(conn, model, "alice", "superpowers")
 	c.Assert(err, gc.ErrorMatches, `invalid model access permission "superpowers"`)
-	model1, err := s.store.DB.Model(model.Path)
+	model1, err := s.jem.DB.Model(model.Path)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{}})
 }
@@ -234,14 +208,14 @@ func (s *jemSuite) TestGrantModelControllerFailure(c *gc.C) {
 func (s *jemSuite) TestRevokeModel(c *gc.C) {
 	conn, model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
 	defer conn.Close()
-	err := s.store.GrantModel(conn, model, "alice", "write")
+	err := s.jem.GrantModel(conn, model, "alice", "write")
 	c.Assert(err, jc.ErrorIsNil)
-	model1, err := s.store.DB.Model(model.Path)
+	model1, err := s.jem.DB.Model(model.Path)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{"alice"}})
-	err = s.store.RevokeModel(conn, model, "alice", "write")
+	err = s.jem.RevokeModel(conn, model, "alice", "write")
 	c.Assert(err, jc.ErrorIsNil)
-	model1, err = s.store.DB.Model(model.Path)
+	model1, err = s.jem.DB.Model(model.Path)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{}})
 }
@@ -249,14 +223,14 @@ func (s *jemSuite) TestRevokeModel(c *gc.C) {
 func (s *jemSuite) TestRevokeModelControllerFailure(c *gc.C) {
 	conn, model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
 	defer conn.Close()
-	err := s.store.GrantModel(conn, model, "alice", "write")
+	err := s.jem.GrantModel(conn, model, "alice", "write")
 	c.Assert(err, jc.ErrorIsNil)
-	model1, err := s.store.DB.Model(model.Path)
+	model1, err := s.jem.DB.Model(model.Path)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{"alice"}})
-	err = s.store.RevokeModel(conn, model, "alice", "superpowers")
+	err = s.jem.RevokeModel(conn, model, "alice", "superpowers")
 	c.Assert(err, gc.ErrorMatches, `invalid model access permission "superpowers"`)
-	model1, err = s.store.DB.Model(model.Path)
+	model1, err = s.jem.DB.Model(model.Path)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{}})
 }
@@ -281,7 +255,7 @@ func (s *jemSuite) TestDestroyModel(c *gc.C) {
 
 	ch := waitForDestruction(conn, c, model.UUID)
 
-	err = s.store.DestroyModel(conn, model)
+	err = s.jem.DestroyModel(conn, model)
 	c.Assert(err, jc.ErrorIsNil)
 
 	select {
@@ -291,23 +265,23 @@ func (s *jemSuite) TestDestroyModel(c *gc.C) {
 	}
 
 	// Check the model is removed.
-	_, err = s.store.DB.Model(model.Path)
+	_, err = s.jem.DB.Model(model.Path)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
 	// Check that it cannot be destroyed twice
-	err = s.store.DestroyModel(conn, model)
+	err = s.jem.DestroyModel(conn, model)
 	c.Assert(err, gc.ErrorMatches, `model "bob/model" not found`)
 
 	// Put the model back in the database
-	err = s.store.DB.AddModel(model)
+	err = s.jem.DB.AddModel(model)
 	c.Assert(err, jc.ErrorIsNil)
 
 	// Check that it can still be removed even if the contoller has no model.
-	err = s.store.DestroyModel(conn, model)
+	err = s.jem.DestroyModel(conn, model)
 	c.Assert(err, jc.ErrorIsNil)
 
 	// Ensure the model is removed.
-	_, err = s.store.DB.Model(model.Path)
+	_, err = s.jem.DB.Model(model.Path)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
@@ -343,14 +317,14 @@ func (s *jemSuite) TestUpdateCredential(c *gc.C) {
 		Name:  "cred",
 		Type:  "empty",
 	}
-	err := jem.UpdateCredential(s.store.DB, cred)
-	conn, err := s.store.OpenAPI(ctlPath)
+	err := jem.UpdateCredential(s.jem.DB, cred)
+	conn, err := s.jem.OpenAPI(ctlPath)
 	c.Assert(err, jc.ErrorIsNil)
 	defer conn.Close()
 
-	err = jem.UpdateControllerCredential(s.store, conn, cred)
+	err = jem.UpdateControllerCredential(s.jem, conn, cred)
 	c.Assert(err, jc.ErrorIsNil)
-	err = jem.CredentialAddController(s.store.DB, "bob", "dummy", "cred", ctlPath)
+	err = jem.CredentialAddController(s.jem.DB, "bob", "dummy", "cred", ctlPath)
 	c.Assert(err, jc.ErrorIsNil)
 
 	// Sanity check it was deployed
@@ -364,7 +338,7 @@ func (s *jemSuite) TestUpdateCredential(c *gc.C) {
 		},
 	}})
 
-	err = s.store.UpdateCredential(&mongodoc.Credential{
+	err = s.jem.UpdateCredential(&mongodoc.Credential{
 		User:  "bob",
 		Cloud: "dummy",
 		Name:  "cred",
@@ -401,23 +375,23 @@ func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityP
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
 	}
-	err := s.store.DB.AddController(ctl)
+	err := s.jem.DB.AddController(ctl)
 	c.Assert(err, jc.ErrorIsNil)
 	return path
 }
 
 func (s *jemSuite) bootstrapModel(c *gc.C, path params.EntityPath) (*apiconn.Conn, *mongodoc.Model) {
 	ctlPath := s.addController(c, params.EntityPath{User: path.User, Name: "controller"})
-	err := jem.UpdateCredential(s.store.DB, &mongodoc.Credential{
+	err := jem.UpdateCredential(s.jem.DB, &mongodoc.Credential{
 		User:  path.User,
 		Cloud: "dummy",
 		Name:  "cred",
 		Type:  "empty",
 	})
 	c.Assert(err, jc.ErrorIsNil)
-	conn, err := s.store.OpenAPI(ctlPath)
+	conn, err := s.jem.OpenAPI(ctlPath)
 	c.Assert(err, jc.ErrorIsNil)
-	model, _, err := s.store.CreateModel(conn, jem.CreateModelParams{
+	model, _, err := s.jem.CreateModel(conn, jem.CreateModelParams{
 		Path:           path,
 		ControllerPath: ctlPath,
 		Credential:     "cred",

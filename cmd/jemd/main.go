@@ -92,7 +92,9 @@ func serve(confPath string) error {
 		}
 	}
 	cfg := jem.ServerParams{
-		DB:                   db,
+		DB: db,
+		//TODO(mhilton) make DBSessionLimit configurable.
+		DBSessionLimit:       500,
 		ControllerAdmin:      conf.ControllerAdmin,
 		IdentityLocation:     conf.IdentityLocation,
 		PublicKeyLocator:     locator,
