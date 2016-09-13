@@ -172,8 +172,9 @@ func (s *serverSuite) TestServerHasAccessControlAllowOrigin(c *gc.C) {
 
 func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 	db := s.Session.DB("foo")
-	pool, err := jem.NewPool(jem.Params{
-		DB:              db,
+	dbPool := jem.NewDatabasePool(100, db)
+	defer dbPool.Close()
+	pool, err := jem.NewPool(dbPool, jem.Params{
 		ControllerAdmin: "controller-admin",
 	})
 	c.Assert(err, gc.IsNil)

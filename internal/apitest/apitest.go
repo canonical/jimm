@@ -25,6 +25,7 @@ import (
 	external_jem "github.com/CanonicalLtd/jem"
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/jemserver"
+	"github.com/CanonicalLtd/jem/internal/limitpool"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/jemclient"
 	"github.com/CanonicalLtd/jem/params"
@@ -44,12 +45,16 @@ type Suite struct {
 	// httpSrv holds the running HTTP server that uses IDMSrv.
 	httpSrv *httptest.Server
 
-	// JEM holds an instance of the JEM store, suitable
-	// for invasive testing purposes.
+	// JEM holds an instance of the JEM, suitable for invasive
+	// testing purposes.
 	JEM *jem.JEM
 
 	// Pool holds the pool from which the above JEM was taken.
 	Pool *jem.Pool
+
+	// DBPool holds the limitpool from which the above pool takes
+	// it's Database instances.
+	DBPool *limitpool.Pool
 }
 
 func (s *Suite) SetUpTest(c *gc.C) {
@@ -63,13 +68,13 @@ func (s *Suite) SetUpTest(c *gc.C) {
 	s.JEMSrv = s.NewServer(c, s.Session, s.IDMSrv)
 	s.httpSrv = httptest.NewServer(s.JEMSrv)
 
-	s.Pool = s.newPool(c, s.Session)
+	s.DBPool = jem.NewDatabasePool(1, s.Session.DB("jem"))
+	s.Pool = s.newPool(c, s.DBPool)
 	s.JEM = s.Pool.JEM()
 }
 
-func (s *Suite) newPool(c *gc.C, session *mgo.Session) *jem.Pool {
-	pool, err := jem.NewPool(jem.Params{
-		DB: session.DB("jem"),
+func (s *Suite) newPool(c *gc.C, dbPool *limitpool.Pool) *jem.Pool {
+	pool, err := jem.NewPool(dbPool, jem.Params{
 		BakeryParams: bakery.NewServiceParams{
 			Location: "here",
 		},
@@ -89,6 +94,7 @@ func (s *Suite) TearDownTest(c *gc.C) {
 	s.IDMSrv.Close()
 	s.JEM.Close()
 	s.Pool.Close()
+	s.DBPool.Close()
 	s.JujuConnSuite.TearDownTest(c)
 }
 
@@ -101,21 +107,22 @@ func (s *Suite) NewClient(username params.User) *jemclient.Client {
 	})
 }
 
-// ProxiedPool returns a JEM pool that uses a proxied TCP connection
-// to MongoDB and the proxy that the connections go through.
-// This makes it possible to test what happens when a connection
-// to the database is broken.
+// ProxiedPool returns a JEM pool that uses a proxied TCP connection to
+// MongoDB and the proxy that the connections go through. This makes it
+// possible to test what happens when a connection to the database is
+// broken.
 //
-// Both the returned pool and the returned proxy should
-// be closed after use.
-func (s *Suite) ProxiedPool(c *gc.C) (*jem.Pool, *testing.TCPProxy) {
+// The returned pool, the retruned limitpool.Pool and the returned proxy
+// should all be closed after use.
+func (s *Suite) ProxiedPool(c *gc.C) (*jem.Pool, *limitpool.Pool, *testing.TCPProxy) {
 	mgoInfo := testing.MgoServer.DialInfo()
 	c.Assert(mgoInfo.Addrs, gc.HasLen, 1)
 	proxy := testing.NewTCPProxy(c, mgoInfo.Addrs[0])
 	mgoInfo.Addrs = []string{proxy.Addr()}
 	session, err := mgo.DialWithInfo(mgoInfo)
 	c.Assert(err, gc.IsNil)
-	return s.newPool(c, session), proxy
+	dbPool := jem.NewDatabasePool(1, session.DB("jem"))
+	return s.newPool(c, dbPool), dbPool, proxy
 }
 
 // NewServer returns a new JEM server that uses the given mongo session and identity

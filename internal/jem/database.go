@@ -10,43 +10,56 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
+	"github.com/CanonicalLtd/jem/internal/limitpool"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
+	"github.com/CanonicalLtd/jem/internal/servermon"
 	"github.com/CanonicalLtd/jem/params"
 )
+
+func NewDatabasePool(limit int64, db *mgo.Database) *limitpool.Pool {
+	return limitpool.New(limitpool.Params{
+		Limit: limit,
+		New: func(g limitpool.Gauge) limitpool.Item {
+			return Database{
+				Database: db.With(db.Session.Copy()),
+				g:        g,
+			}
+		},
+		Allocated: servermon.DatabaseConnections,
+		Pooled:    servermon.IdleDatabaseConnections,
+	})
+}
 
 // Database wraps an mgo.DB ands adds a number of methods for
 // manipulating the database.
 type Database struct {
 	*mgo.Database
+	g limitpool.Gauge
 }
 
 // Copy copies the Database and its underlying mgo session.
-func (s Database) Copy() Database {
+func (db Database) Copy() Database {
+	db.g.Inc()
 	return Database{
-		&mgo.Database{
-			Name:    s.Name,
-			Session: s.Session.Copy(),
-		},
+		Database: db.Database.With(db.Database.Session.Copy()),
+		g:        db.g,
 	}
 }
 
 // Clone copies the Database and clones its underlying
 // mgo session. See mgo.Session.Clone and mgo.Session.Copy
 // for information on the distinction between Clone and Copy.
-func (s Database) Clone() Database {
-	if s.Session == nil {
-		panic("nil session in clone!")
-	}
+func (db Database) Clone() Database {
+	db.g.Inc()
 	return Database{
-		&mgo.Database{
-			Name:    s.Name,
-			Session: s.Session.Clone(),
-		},
+		Database: db.Database.With(db.Database.Session.Clone()),
+		g:        db.g,
 	}
 }
 
 // Close closes the database's underlying session.
 func (db Database) Close() {
+	db.g.Dec()
 	db.Session.Close()
 }
 

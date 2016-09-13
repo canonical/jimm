@@ -4,6 +4,7 @@ package jem_test
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	jujutesting "github.com/juju/testing"
@@ -20,13 +21,15 @@ import (
 type databaseSuite struct {
 	jujutesting.IsolatedMgoSuite
 	database jem.Database
+	gauge    gauge
 }
 
 var _ = gc.Suite(&databaseSuite{})
 
 func (s *databaseSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
-	s.database = jem.Database{s.Session.DB("jem")}
+	s.gauge.n = 1
+	s.database = jem.MakeDatabase(s.Session.DB("jem"), &s.gauge)
 }
 
 func (s *databaseSuite) TestAddController(c *gc.C) {
@@ -278,45 +281,20 @@ func (s *databaseSuite) TestModelFromUUID(c *gc.C) {
 	c.Assert(m2, gc.IsNil)
 }
 
-func (s *databaseSuite) TestDatabaseCopiesSession(c *gc.C) {
-	//	session := s.Session.Copy()
-	//	pool, err := jem.NewPool(jem.Params{
-	//		 session."jem"),
-	//		BakeryParams: bakery.NewServiceParams{
-	//			Location: "here",
-	//		},
-	//		IDMClient: idmclient.New(idmclient.NewParams{
-	//			BaseURL: s.idmSrv.URL.String(),
-	//			Client:  s.idmSrv.Client("agent"),
-	//		}),
-	//		ControllerAdmin: "controller-admin",
-	//	})
-	//	c.Assert(err, gc.IsNil)
-	//
-	//	store := pool.JEM()
-	//	defer store.Close()
-	//	// Check that we get an appropriate error when getting
-	//	// a non-existent model, indicating that database
-	//	// access is going OK.
-	//	_, err = store.Model(params.EntityPath{"bob", "x"})
-	//	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	//
-	//	// Close the session and check that we still get the
-	//	// same error.
-	//	session.Close()
-	//
-	//	_, err = store.Model(params.EntityPath{"bob", "x"})
-	//	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	//
-	//	// Also check the macaroon storage as that also has its own session reference.
-	//	m, err := store.Bakery.NewMacaroon("", nil, nil)
-	//	c.Assert(err, gc.IsNil)
-	//	c.Assert(m, gc.NotNil)
+func (s *databaseSuite) TestCopy(c *gc.C) {
+	db := s.database.Copy()
+	c.Assert(s.gauge.n, gc.Equals, 2)
+	db.Close()
+	c.Assert(s.gauge.n, gc.Equals, 1)
+	_, err := s.database.Model(params.EntityPath{"bob", "x"})
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
 func (s *databaseSuite) TestClone(c *gc.C) {
-	j := s.database.Clone()
-	j.Close()
+	db := s.database.Clone()
+	c.Assert(s.gauge.n, gc.Equals, 2)
+	db.Close()
+	c.Assert(s.gauge.n, gc.Equals, 1)
 	_, err := s.database.Model(params.EntityPath{"bob", "x"})
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
@@ -813,4 +791,21 @@ func parseTime(s string) time.Time {
 		panic(err)
 	}
 	return t
+}
+
+type gauge struct {
+	mu sync.Mutex
+	n  int
+}
+
+func (g *gauge) Inc() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.n++
+}
+
+func (g *gauge) Dec() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.n--
 }

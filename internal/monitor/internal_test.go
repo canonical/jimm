@@ -21,6 +21,7 @@ import (
 	"gopkg.in/tomb.v2"
 
 	"github.com/CanonicalLtd/jem/internal/jem"
+	"github.com/CanonicalLtd/jem/internal/limitpool"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -28,6 +29,7 @@ import (
 type internalSuite struct {
 	corejujutesting.JujuConnSuite
 	idmSrv *idmtest.Server
+	dbPool *limitpool.Pool
 	pool   *jem.Pool
 	jem    *jem.JEM
 
@@ -49,8 +51,8 @@ var _ = gc.Suite(&internalSuite{})
 func (s *internalSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
 	s.idmSrv = idmtest.NewServer()
-	pool, err := jem.NewPool(jem.Params{
-		DB: s.Session.DB("jem"),
+	s.dbPool = jem.NewDatabasePool(1, s.Session.DB("jem"))
+	pool, err := jem.NewPool(s.dbPool, jem.Params{
 		BakeryParams: bakery.NewServiceParams{
 			Location: "here",
 		},
@@ -72,6 +74,7 @@ func (s *internalSuite) SetUpTest(c *gc.C) {
 func (s *internalSuite) TearDownTest(c *gc.C) {
 	s.jem.Close()
 	s.pool.Close()
+	s.dbPool.Close()
 	s.JujuConnSuite.TearDownTest(c)
 }
 

@@ -18,10 +18,10 @@ import (
 	"gopkg.in/juju/names.v2"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
-	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jem/internal/apiconn"
+	"github.com/CanonicalLtd/jem/internal/limitpool"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -30,10 +30,6 @@ var logger = loggo.GetLogger("jem.internal.jem")
 
 // Params holds parameters for the NewPool function.
 type Params struct {
-	// DB holds the mongo database that will be used to
-	// store the JEM information.
-	DB *mgo.Database
-
 	// BakeryParams holds the parameters for creating
 	// a new bakery.Service.
 	BakeryParams bakery.NewServiceParams
@@ -51,7 +47,7 @@ type Params struct {
 }
 
 type Pool struct {
-	db           Database
+	dbPool       *limitpool.Pool
 	config       Params
 	bakery       *bakery.Service
 	connCache    *apiconn.Cache
@@ -72,14 +68,14 @@ var notExistsQuery = bson.D{{"$exists", false}}
 // NewPool represents a pool of possible JEM instances that use the given
 // database as a store, and use the given bakery parameters to create the
 // bakery.Service.
-func NewPool(p Params) (*Pool, error) {
+func NewPool(dbPool *limitpool.Pool, p Params) (*Pool, error) {
 	// TODO migrate database
 	if p.ControllerAdmin == "" {
 		return nil, errgo.Newf("no controller admin group specified")
 	}
 	pool := &Pool{
 		config:      p,
-		db:          Database{p.DB},
+		dbPool:      dbPool,
 		connCache:   apiconn.NewCache(apiconn.CacheParams{}),
 		permChecker: idmclient.NewPermChecker(p.IDMClient, maxPermCacheDuration),
 		refCount:    1,
@@ -145,7 +141,7 @@ func (p *Pool) JEM() *JEM {
 	if p.closed {
 		panic("JEM call on closed pool")
 	}
-	db := p.db.Copy()
+	db := p.dbPool.GetNoLimit().(Database)
 	p.refCount++
 	return &JEM{
 		DB:          db,
@@ -223,9 +219,9 @@ func (j *JEM) Close() {
 	if j.closed {
 		return
 	}
-	j.Auth = Authorization{}
 	j.closed = true
-	j.DB.Close()
+	j.Auth = Authorization{}
+	j.pool.dbPool.Put(j.DB)
 	j.DB = Database{}
 	j.pool.decRef()
 }

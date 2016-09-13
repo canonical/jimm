@@ -21,6 +21,7 @@ import (
 	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jem/internal/jem"
+	"github.com/CanonicalLtd/jem/internal/limitpool"
 	"github.com/CanonicalLtd/jem/internal/monitor"
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -38,6 +39,10 @@ type Params struct {
 	// DB holds the mongo database that will be used to
 	// store the JEM information.
 	DB *mgo.Database
+
+	// DBSessionLimit holds the limit on the number of concurrent
+	// database sessions.
+	DBSessionLimit int64
 
 	// ControllerAdmin holds the identity of the user
 	// or group that is allowed to create controllers.
@@ -75,6 +80,7 @@ type Params struct {
 // Server represents a JEM HTTP server.
 type Server struct {
 	router  *httprouter.Router
+	dbPool  *limitpool.Pool
 	pool    *jem.Pool
 	monitor *monitor.Monitor
 }
@@ -91,8 +97,8 @@ func New(config Params, versions map[string]NewAPIHandlerFunc) (*Server, error) 
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
+	dbPool := jem.NewDatabasePool(config.DBSessionLimit, config.DB)
 	jconfig := jem.Params{
-		DB: config.DB,
 		BakeryParams: bakery.NewServiceParams{
 			// TODO The location is attached to any macaroons that we
 			// mint. Currently we don't know the location of the current
@@ -106,12 +112,13 @@ func New(config Params, versions map[string]NewAPIHandlerFunc) (*Server, error) 
 		ControllerAdmin:  config.ControllerAdmin,
 		IdentityLocation: config.IdentityLocation,
 	}
-	p, err := jem.NewPool(jconfig)
+	p, err := jem.NewPool(dbPool, jconfig)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make store")
 	}
 	srv := &Server{
 		router: httprouter.New(),
+		dbPool: dbPool,
 		pool:   p,
 	}
 	if config.RunMonitor {
@@ -195,6 +202,7 @@ func (srv *Server) Close() error {
 		}
 	}
 	srv.pool.Close()
+	srv.dbPool.Close()
 	return nil
 }
 

@@ -15,6 +15,7 @@ import (
 
 	"github.com/CanonicalLtd/jem/internal/apiconn"
 	"github.com/CanonicalLtd/jem/internal/jem"
+	"github.com/CanonicalLtd/jem/internal/limitpool"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -22,6 +23,7 @@ import (
 type jemAPIConnSuite struct {
 	corejujutesting.JujuConnSuite
 	idmSrv *idmtest.Server
+	dbPool *limitpool.Pool
 	pool   *jem.Pool
 	store  *jem.JEM
 }
@@ -31,8 +33,8 @@ var _ = gc.Suite(&jemAPIConnSuite{})
 func (s *jemAPIConnSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
 	s.idmSrv = idmtest.NewServer()
-	pool, err := jem.NewPool(jem.Params{
-		DB: s.Session.DB("jem"),
+	s.dbPool = jem.NewDatabasePool(100, s.Session.DB("jem"))
+	pool, err := jem.NewPool(s.dbPool, jem.Params{
 		BakeryParams: bakery.NewServiceParams{
 			Location: "here",
 		},
@@ -51,6 +53,7 @@ func (s *jemAPIConnSuite) SetUpTest(c *gc.C) {
 func (s *jemAPIConnSuite) TearDownTest(c *gc.C) {
 	s.store.Close()
 	s.pool.Close()
+	s.dbPool.Close()
 	s.JujuConnSuite.TearDownTest(c)
 }
 
