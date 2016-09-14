@@ -21,6 +21,18 @@ var (
 		Name:      "controllers_running",
 		Help:      "The current number of running controllers.",
 	})
+	DatabaseConnections = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "jem",
+		Subsystem: "database",
+		Name:      "database_connections",
+		Help:      "The number of database connections in use, these are shared between database sessions.",
+	})
+	DatabaseSessions = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "jem",
+		Subsystem: "database",
+		Name:      "database_sessions",
+		Help:      "The number of database session objects, some of these will be sharing connections.",
+	})
 	MachinesRunning = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "jem",
 		Subsystem: "health",
@@ -50,6 +62,8 @@ var (
 func init() {
 	prometheus.MustRegister(ApplicationsRunning)
 	prometheus.MustRegister(ControllersRunning)
+	prometheus.MustRegister(DatabaseConnections)
+	prometheus.MustRegister(DatabaseSessions)
 	prometheus.MustRegister(MachinesRunning)
 	prometheus.MustRegister(ModelsRunning)
 	prometheus.MustRegister(requestDuration)

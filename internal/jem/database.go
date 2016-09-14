@@ -4,6 +4,7 @@ package jem
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"gopkg.in/errgo.v1"
@@ -11,6 +12,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
+	"github.com/CanonicalLtd/jem/internal/servermon"
 	"github.com/CanonicalLtd/jem/params"
 )
 
@@ -18,36 +20,54 @@ import (
 // manipulating the database.
 type Database struct {
 	*mgo.Database
+	cnt *refCount
+}
+
+type refCount struct {
+	sync.Mutex
+	count int
+}
+
+func newDatabase(db *mgo.Database) Database {
+	servermon.DatabaseSessions.Inc()
+	servermon.DatabaseConnections.Inc()
+	return Database{
+		Database: db,
+		cnt: &refCount{
+			count: 1,
+		},
+	}
 }
 
 // Copy copies the Database and its underlying mgo session.
-func (s Database) Copy() Database {
-	return Database{
-		&mgo.Database{
-			Name:    s.Name,
-			Session: s.Session.Copy(),
-		},
-	}
+func (db Database) Copy() Database {
+	return newDatabase(db.Database.With(db.Database.Session.Copy()))
 }
 
 // Clone copies the Database and clones its underlying
 // mgo session. See mgo.Session.Clone and mgo.Session.Copy
 // for information on the distinction between Clone and Copy.
-func (s Database) Clone() Database {
-	if s.Session == nil {
-		panic("nil session in clone!")
-	}
+func (db Database) Clone() Database {
+	servermon.DatabaseSessions.Inc()
+	db.cnt.Lock()
+	db.cnt.count++
+	db.cnt.Unlock()
 	return Database{
-		&mgo.Database{
-			Name:    s.Name,
-			Session: s.Session.Clone(),
-		},
+		Database: db.Database.With(db.Database.Session.Clone()),
+		cnt:      db.cnt,
 	}
 }
 
 // Close closes the database's underlying session.
 func (db Database) Close() {
 	db.Session.Close()
+	servermon.DatabaseSessions.Dec()
+	db.cnt.Lock()
+	db.cnt.count--
+	if db.cnt.count == 0 {
+		servermon.DatabaseConnections.Dec()
+	}
+	db.cnt.Unlock()
 }
 
 // AddController adds a new controller to the database. It returns an

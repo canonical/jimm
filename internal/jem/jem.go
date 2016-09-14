@@ -14,6 +14,7 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/loggo"
+	"github.com/juju/utils/clock"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
@@ -29,11 +30,24 @@ import (
 
 var logger = loggo.GetLogger("jem.internal.jem")
 
+// wallClock provides access to the current time. It is a variable so
+// that it can be overridden in tests.
+var wallClock clock.Clock = clock.WallClock
+
 // Params holds parameters for the NewPool function.
 type Params struct {
 	// DB holds the mongo database that will be used to
 	// store the JEM information.
 	DB *mgo.Database
+
+	// MaxDBClones holds the maximum number of clones of a Database
+	// copy that the pool will make before creating a new Database
+	// copy.
+	MaxDBClones int
+
+	// MaxDBAge holds the maximum age of a Database copy that the pool
+	// will keep cloning before creating a new Database copy.
+	MaxDBAge time.Duration
 
 	// BakeryParams holds the parameters for creating
 	// a new bakery.Service.
@@ -52,7 +66,6 @@ type Params struct {
 }
 
 type Pool struct {
-	db           Database
 	config       Params
 	bakery       *bakery.Service
 	connCache    *apiconn.Cache
@@ -60,6 +73,9 @@ type Pool struct {
 	permChecker  *idmclient.PermChecker
 
 	mu       sync.Mutex
+	db       Database
+	clones   int
+	copyTime time.Time
 	closed   bool
 	refCount int
 }
@@ -78,9 +94,11 @@ func NewPool(p Params) (*Pool, error) {
 	if p.ControllerAdmin == "" {
 		return nil, errgo.Newf("no controller admin group specified")
 	}
+	db := newDatabase(p.DB.With(p.DB.Session.Copy()))
 	pool := &Pool{
 		config:      p,
-		db:          Database{p.DB},
+		db:          db,
+		copyTime:    wallClock.Now(),
 		connCache:   apiconn.NewCache(apiconn.CacheParams{}),
 		permChecker: idmclient.NewPermChecker(p.IDMClient, maxPermCacheDuration),
 		refCount:    1,
@@ -121,6 +139,7 @@ func (p *Pool) Close() {
 func (p *Pool) decRef() {
 	// called with p.mu held.
 	if p.refCount--; p.refCount == 0 {
+		p.db.Close()
 		p.connCache.Close()
 	}
 	if p.refCount < 0 {
@@ -132,6 +151,28 @@ func (p *Pool) decRef() {
 // This is useful for testing purposes.
 func (p *Pool) ClearAPIConnCache() {
 	p.connCache.EvictAll()
+}
+
+// database returns a database suitable for use in a new JEM. The
+// returned database must be closed when finished with. The lock must be
+// held before calling database.
+//
+// The returned database will normally be a clone of the current pool
+// database. Periodically, as determined by MaxDBClones and MaxDBAge, a
+// copy will be made to avoid problems with connections expiring. This
+// ensures that the number of database connections remains below the
+// connection pool size.
+func (p *Pool) database() Database {
+	now := wallClock.Now()
+	if p.clones >= p.config.MaxDBClones || now.After(p.copyTime.Add(p.config.MaxDBAge)) {
+		db := p.db
+		p.db = p.db.Copy()
+		db.Close()
+		p.clones = 0
+		p.copyTime = now
+	}
+	p.clones++
+	return p.db.Clone()
 }
 
 // JEM returns a new JEM instance from the pool, suitable
@@ -146,8 +187,8 @@ func (p *Pool) JEM() *JEM {
 	if p.closed {
 		panic("JEM call on closed pool")
 	}
-	db := p.db.Copy()
 	p.refCount++
+	db := p.database()
 	return &JEM{
 		DB:          db,
 		Bakery:      newBakery(db, p.bakeryParams),
