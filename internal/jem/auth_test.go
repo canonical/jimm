@@ -5,6 +5,7 @@ package jem_test
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/idmtest"
@@ -34,6 +35,8 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 	s.idmSrv = idmtest.NewServer()
 	pool, err := jem.NewPool(jem.Params{
 		DB:               s.Session.DB("jem"),
+		MaxDBClones:      1000,
+		MaxDBAge:         time.Minute,
 		IdentityLocation: s.idmSrv.URL.String(),
 		ControllerAdmin:  "controller-admin",
 		BakeryParams: bakery.NewServiceParams{

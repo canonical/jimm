@@ -25,7 +25,7 @@ var _ = gc.Suite(&databaseSuite{})
 
 func (s *databaseSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
-	s.database = jem.Database{s.Session.DB("jem")}
+	s.database = jem.NewDatabase(s.Session.DB("jem"))
 }
 
 func (s *databaseSuite) TestAddController(c *gc.C) {
@@ -277,40 +277,11 @@ func (s *databaseSuite) TestModelFromUUID(c *gc.C) {
 	c.Assert(m2, gc.IsNil)
 }
 
-func (s *databaseSuite) TestDatabaseCopiesSession(c *gc.C) {
-	//	session := s.Session.Copy()
-	//	pool, err := jem.NewPool(jem.Params{
-	//		 session."jem"),
-	//		BakeryParams: bakery.NewServiceParams{
-	//			Location: "here",
-	//		},
-	//		IDMClient: idmclient.New(idmclient.NewParams{
-	//			BaseURL: s.idmSrv.URL.String(),
-	//			Client:  s.idmSrv.Client("agent"),
-	//		}),
-	//		ControllerAdmin: "controller-admin",
-	//	})
-	//	c.Assert(err, gc.IsNil)
-	//
-	//	store := pool.JEM()
-	//	defer store.Close()
-	//	// Check that we get an appropriate error when getting
-	//	// a non-existent model, indicating that database
-	//	// access is going OK.
-	//	_, err = store.Model(params.EntityPath{"bob", "x"})
-	//	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	//
-	//	// Close the session and check that we still get the
-	//	// same error.
-	//	session.Close()
-	//
-	//	_, err = store.Model(params.EntityPath{"bob", "x"})
-	//	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	//
-	//	// Also check the macaroon storage as that also has its own session reference.
-	//	m, err := store.Bakery.NewMacaroon("", nil, nil)
-	//	c.Assert(err, gc.IsNil)
-	//	c.Assert(m, gc.NotNil)
+func (s *databaseSuite) TestCopy(c *gc.C) {
+	j := s.database.Copy()
+	j.Close()
+	_, err := s.database.Model(params.EntityPath{"bob", "x"})
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
 func (s *databaseSuite) TestClone(c *gc.C) {

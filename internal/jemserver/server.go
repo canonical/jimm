@@ -39,6 +39,15 @@ type Params struct {
 	// store the JEM information.
 	DB *mgo.Database
 
+	// MaxDBClones holds the maximum number of clones of a Database
+	// copy that the server will make before creating a new Database
+	// copy.
+	MaxDBClones int
+
+	// MaxDBAge holds the maximum age of a Database copy that the server
+	// will keep cloning before creating a new Database copy.
+	MaxDBAge time.Duration
+
 	// ControllerAdmin holds the identity of the user
 	// or group that is allowed to create controllers.
 	ControllerAdmin params.User
@@ -92,7 +101,9 @@ func New(config Params, versions map[string]NewAPIHandlerFunc) (*Server, error) 
 		return nil, errgo.Mask(err)
 	}
 	jconfig := jem.Params{
-		DB: config.DB,
+		DB:          config.DB,
+		MaxDBClones: config.MaxDBClones,
+		MaxDBAge:    config.MaxDBAge,
 		BakeryParams: bakery.NewServiceParams{
 			// TODO The location is attached to any macaroons that we
 			// mint. Currently we don't know the location of the current

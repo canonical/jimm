@@ -15,6 +15,7 @@ import (
 	corejujutesting "github.com/juju/juju/juju/testing"
 	"github.com/juju/juju/state/multiwatcher"
 	jujujujutesting "github.com/juju/juju/testing"
+	jt "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
@@ -41,7 +42,9 @@ func (s *jemSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
 	s.idmSrv = idmtest.NewServer()
 	pool, err := jem.NewPool(jem.Params{
-		DB: s.Session.DB("jem"),
+		DB:          s.Session.DB("jem"),
+		MaxDBClones: 1000,
+		MaxDBAge:    time.Minute,
 		BakeryParams: bakery.NewServiceParams{
 			Location: "here",
 		},
@@ -64,7 +67,9 @@ func (s *jemSuite) TearDownTest(c *gc.C) {
 
 func (s *jemSuite) TestPoolRequiresControllerAdmin(c *gc.C) {
 	pool, err := jem.NewPool(jem.Params{
-		DB: s.Session.DB("jem"),
+		DB:          s.Session.DB("jem"),
+		MaxDBClones: 1000,
+		MaxDBAge:    time.Minute,
 		BakeryParams: bakery.NewServiceParams{
 			Location: "here",
 		},
@@ -77,10 +82,11 @@ func (s *jemSuite) TestPoolRequiresControllerAdmin(c *gc.C) {
 	c.Assert(pool, gc.IsNil)
 }
 
-func (s *jemSuite) TestJEMCopiesSession(c *gc.C) {
-	session := s.Session.Copy()
+func (s *jemSuite) TestPoolCopiesOnSize(c *gc.C) {
 	pool, err := jem.NewPool(jem.Params{
-		DB: session.DB("jem"),
+		DB:          s.Session.DB("jem"),
+		MaxDBClones: 1,
+		MaxDBAge:    time.Minute,
 		BakeryParams: bakery.NewServiceParams{
 			Location: "here",
 		},
@@ -90,27 +96,39 @@ func (s *jemSuite) TestJEMCopiesSession(c *gc.C) {
 		}),
 		ControllerAdmin: "controller-admin",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, jc.ErrorIsNil)
+	defer pool.Close()
+	j1 := pool.JEM()
+	defer j1.Close()
+	j2 := pool.JEM()
+	defer j2.Close()
+	c.Assert(jem.RefCount(j1.DB), gc.Not(gc.Equals), jem.RefCount(j2.DB))
+}
 
-	store := pool.JEM()
-	defer store.Close()
-	// Check that we get an appropriate error when getting
-	// a non-existent model, indicating that database
-	// access is going OK.
-	_, err = store.DB.Model(params.EntityPath{"bob", "x"})
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-
-	// Close the session and check that we still get the
-	// same error.
-	session.Close()
-
-	_, err = store.DB.Model(params.EntityPath{"bob", "x"})
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-
-	// Also check the macaroon storage as that also has its own session reference.
-	m, err := store.Bakery.NewMacaroon("", nil, nil)
-	c.Assert(err, gc.IsNil)
-	c.Assert(m, gc.NotNil)
+func (s *jemSuite) TestPoolCopiesOnAge(c *gc.C) {
+	cl := jt.NewClock(time.Now())
+	s.PatchValue(jem.WallClock, cl)
+	pool, err := jem.NewPool(jem.Params{
+		DB:          s.Session.DB("jem"),
+		MaxDBClones: 1000,
+		MaxDBAge:    time.Minute,
+		BakeryParams: bakery.NewServiceParams{
+			Location: "here",
+		},
+		IDMClient: idmclient.New(idmclient.NewParams{
+			BaseURL: s.idmSrv.URL.String(),
+			Client:  s.idmSrv.Client("agent"),
+		}),
+		ControllerAdmin: "controller-admin",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	defer pool.Close()
+	j1 := pool.JEM()
+	defer j1.Close()
+	cl.Advance(61 * time.Second)
+	j2 := pool.JEM()
+	defer j2.Close()
+	c.Assert(jem.RefCount(j1.DB), gc.Not(gc.Equals), jem.RefCount(j2.DB))
 }
 
 func (s *jemSuite) TestClone(c *gc.C) {

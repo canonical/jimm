@@ -30,6 +30,15 @@ type ServerParams struct {
 	// store the JEM information.
 	DB *mgo.Database
 
+	// MaxDBClones holds the maximum number of clones of a Database
+	// copy that the server will make before creating a new Database
+	// copy.
+	MaxDBClones int
+
+	// MaxDBAge holds the maximum age of a Database copy that the server
+	// will keep cloning before creating a new Database copy.
+	MaxDBAge time.Duration
+
 	// ControllerAdmin holds the identity of the user
 	// or group that is allowed to create controllers.
 	ControllerAdmin params.User
