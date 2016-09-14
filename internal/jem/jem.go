@@ -9,9 +9,9 @@ import (
 
 	"github.com/juju/idmclient"
 	"github.com/juju/juju/api"
+	"github.com/juju/juju/api/base"
 	cloudapi "github.com/juju/juju/api/cloud"
 	"github.com/juju/juju/api/modelmanager"
-	jujuparams "github.com/juju/juju/apiserver/params"
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/loggo"
 	"golang.org/x/net/context"
@@ -324,7 +324,7 @@ type CreateModelParams struct {
 }
 
 // CreateModel creates a new model as specified by p using conn.
-func (j *JEM) CreateModel(conn *apiconn.Conn, p CreateModelParams) (*mongodoc.Model, *jujuparams.ModelInfo, error) {
+func (j *JEM) CreateModel(conn *apiconn.Conn, p CreateModelParams) (*mongodoc.Model, *base.ModelInfo, error) {
 	credPath := params.CredentialPath{
 		Cloud: p.Cloud,
 		EntityPath: params.EntityPath{

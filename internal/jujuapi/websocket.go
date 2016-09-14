@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/juju/juju/api/base"
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
 	"github.com/juju/juju/apiserver/common"
 	"github.com/juju/juju/apiserver/observer"
@@ -769,7 +770,63 @@ func (m modelManager) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.M
 	if err != nil {
 		return jujuparams.ModelInfo{}, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound))
 	}
-	return m.massageModelInfo(*mi), nil
+	return m.massageModelInfo(convertJujuParamsModelInfo(mi)), nil
+}
+
+func convertJujuParamsModelInfo(modelInfo *base.ModelInfo) jujuparams.ModelInfo {
+	result := jujuparams.ModelInfo{
+		Name:               modelInfo.Name,
+		UUID:               modelInfo.UUID,
+		ControllerUUID:     modelInfo.ControllerUUID,
+		ProviderType:       modelInfo.ProviderType,
+		DefaultSeries:      modelInfo.DefaultSeries,
+		CloudTag:           names.NewCloudTag(modelInfo.Cloud).String(),
+		CloudRegion:        modelInfo.CloudRegion,
+		CloudCredentialTag: names.NewCloudCredentialTag(modelInfo.CloudCredential).String(),
+		OwnerTag:           names.NewUserTag(modelInfo.Owner).String(),
+		Life:               jujuparams.Life(modelInfo.Life),
+	}
+	result.Status = jujuparams.EntityStatus{
+		Status: modelInfo.Status.Status,
+		Info:   modelInfo.Status.Info,
+		Data:   make(map[string]interface{}),
+		Since:  modelInfo.Status.Since,
+	}
+	for k, v := range modelInfo.Status.Data {
+		result.Status.Data[k] = v
+	}
+	result.Users = make([]jujuparams.ModelUserInfo, len(modelInfo.Users))
+	for i, u := range modelInfo.Users {
+		result.Users[i] = jujuparams.ModelUserInfo{
+			UserName:       u.UserName,
+			DisplayName:    u.DisplayName,
+			Access:         jujuparams.UserAccessPermission(u.Access),
+			LastConnection: u.LastConnection,
+		}
+	}
+	result.Machines = make([]jujuparams.ModelMachineInfo, len(modelInfo.Machines))
+	for i, m := range modelInfo.Machines {
+		machine := jujuparams.ModelMachineInfo{
+			Id:         m.Id,
+			InstanceId: m.InstanceId,
+			HasVote:    m.HasVote,
+			WantsVote:  m.WantsVote,
+			Status:     m.Status,
+		}
+		if m.Hardware != nil {
+			machine.Hardware = &jujuparams.MachineHardware{
+				Arch:             m.Hardware.Arch,
+				Mem:              m.Hardware.Mem,
+				RootDisk:         m.Hardware.RootDisk,
+				Cores:            m.Hardware.CpuCores,
+				CpuPower:         m.Hardware.CpuPower,
+				Tags:             m.Hardware.Tags,
+				AvailabilityZone: m.Hardware.AvailabilityZone,
+			}
+		}
+		result.Machines[i] = machine
+	}
+	return result
 }
 
 // DestroyModels implements the ModelManager facade's DestroyModels method.
