@@ -329,8 +329,9 @@ func (j *JEM) CreateModel(conn *apiconn.Conn, p CreateModelParams) (*mongodoc.Mo
 	// an model that we can't add locally because the name
 	// already exists.
 	modelDoc := &mongodoc.Model{
-		Path:       p.Path,
-		Controller: p.ControllerPath,
+		Path:         p.Path,
+		Controller:   p.ControllerPath,
+		CreationTime: wallClock.Now(),
 	}
 	if err := j.DB.AddModel(modelDoc); err != nil {
 		return nil, nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))

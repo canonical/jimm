@@ -205,6 +205,9 @@ type Model struct {
 	// the template that has been most recently set in the model
 	// configuration.
 	TemplateVersions map[string]int `bson:",omitempty"`
+
+	// CreationTime holds the time the model was created.
+	CreationTime time.Time
 }
 
 type ModelUserInfo struct {

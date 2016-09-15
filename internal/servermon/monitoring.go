@@ -93,6 +93,26 @@ var (
 		Name:      "machines_running",
 		Help:      "The current number of running machines.",
 	}, []string{"ctl_path"})
+	ModelLifetime = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: "jem",
+		Subsystem: "health",
+		Name:      "model_lifetime",
+		Help:      "The length of time (in hours) models had existed at the point they are destroyed.",
+		// Buckets are in hours for this histogram.
+		Buckets: []float64{
+			1.0 / 6,
+			1.0 / 2,
+			1,
+			6,
+			24,
+			7 * 24,
+			28 * 24,
+			6 * 28 * 24,
+			365 * 24,
+			2 * 365 * 24,
+			5 * 365 * 24,
+		},
+	})
 	ModelsCreatedCount = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: "jem",
 		Subsystem: "websocket",
@@ -146,6 +166,7 @@ func init() {
 	prometheus.MustRegister(LoginRedirectCount)
 	prometheus.MustRegister(LoginSuccessCount)
 	prometheus.MustRegister(MachinesRunning)
+	prometheus.MustRegister(ModelLifetime)
 	prometheus.MustRegister(ModelsCreatedCount)
 	prometheus.MustRegister(ModelsCreatedFailCount)
 	prometheus.MustRegister(ModelsRunning)
