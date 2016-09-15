@@ -1070,10 +1070,10 @@ func (s *APISuite) TestNewModel(c *gc.C) {
 	st := s.openAPIFromModelResponse(c, &modelResp, "bob")
 	defer st.Close()
 
-	minfo, err := st.Client().ModelInfo()
-	c.Assert(err, gc.IsNil)
-	c.Assert(minfo.UUID, gc.Not(gc.Equals), "")
-	c.Assert(minfo.UUID, gc.Not(gc.Equals), s.APIInfo(c).ModelTag.Id())
+	muuid, valid := st.Client().ModelUUID()
+	c.Assert(muuid, gc.Not(gc.Equals), "")
+	c.Assert(valid, gc.Equals, true)
+	c.Assert(muuid, gc.Not(gc.Equals), s.APIInfo(c).ModelTag.Id())
 
 	// Ensure that we can connect to the new model
 	// from the information returned by GetModel.
@@ -1086,10 +1086,9 @@ func (s *APISuite) TestNewModel(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	st = s.openAPIFromModelResponse(c, modelResp2, "bob")
 	defer st.Close()
-	minfo2, err := st.Client().ModelInfo()
-	c.Assert(err, gc.IsNil)
-	c.Assert(minfo2.UUID, gc.Equals, minfo.UUID)
-	c.Assert(minfo2.ControllerUUID, gc.Equals, minfo.ControllerUUID)
+	muuid2, valid2 := st.Client().ModelUUID()
+	c.Assert(valid2, gc.Equals, true)
+	c.Assert(muuid2, gc.Equals, muuid)
 }
 
 var newModelWithoutExplicitControllerTests = []struct {

@@ -563,13 +563,13 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 			ProviderType:       "dummy",
 			DefaultSeries:      "xenial",
-			Cloud:              "dummy",
+			CloudTag:           "cloud-dummy",
 			CloudRegion:        "dummy-region",
 			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test@external/cred1").String(),
 			OwnerTag:           names.NewUserTag("test@external").String(),
 			Life:               jujuparams.Alive,
 			Status: jujuparams.EntityStatus{
-				Status: status.StatusAvailable,
+				Status: status.Available,
 			},
 			Users: []jujuparams.ModelUserInfo{{
 				UserName:    "test@external",
@@ -588,13 +588,13 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 			ProviderType:       "dummy",
 			DefaultSeries:      "xenial",
-			Cloud:              "dummy",
+			CloudTag:           "cloud-dummy",
 			CloudRegion:        "dummy-region",
 			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test2@external/cred1").String(),
 			OwnerTag:           names.NewUserTag("test2@external").String(),
 			Life:               jujuparams.Alive,
 			Status: jujuparams.EntityStatus{
-				Status: status.StatusAvailable,
+				Status: status.Available,
 			},
 			Users: []jujuparams.ModelUserInfo{{
 				UserName:    "test2@external",
@@ -707,11 +707,11 @@ func (s *websocketSuite) TestCreateModel(c *gc.C) {
 			Access:      "admin",
 		}})
 		if test.cloudTag == "" {
-			c.Assert(mi.Cloud, gc.Equals, "dummy")
+			c.Assert(mi.CloudTag, gc.Equals, "cloud-dummy")
 		} else {
 			ct, err := names.ParseCloudTag(test.cloudTag)
 			c.Assert(err, jc.ErrorIsNil)
-			c.Assert(mi.Cloud, gc.Equals, ct.Id())
+			c.Assert(mi.CloudTag, gc.Equals, names.NewCloudTag(ct.Id()).String())
 		}
 	}
 }
@@ -829,7 +829,7 @@ func (s *websocketSuite) TestModifyModelAccessErrors(c *gc.C) {
 			Access:   "not-an-access",
 			ModelTag: names.NewModelTag(mi.UUID).String(),
 		},
-		expectError: `invalid model access permission "not-an-access"`,
+		expectError: `"not-an-access" model access not valid`,
 	}}
 
 	for i, test := range modifyModelAccessErrorTests {
@@ -1006,5 +1006,5 @@ func (s *websocketSuite) assertCreateModel(c *gc.C, name, username, cloud, regio
 	credentialTag := names.NewCloudCredentialTag(fmt.Sprintf("dummy/%s@external/%s", username, credential))
 	mi, err := client.CreateModel(name, username+"@external", cloud, region, credentialTag, config)
 	c.Assert(err, jc.ErrorIsNil)
-	return mi
+	return jujuapi.ConvertJujuParamsModelInfo(&mi)
 }
