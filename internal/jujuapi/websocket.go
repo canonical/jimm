@@ -24,10 +24,10 @@ import (
 	"golang.org/x/net/websocket"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
-	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 	"gopkg.in/mgo.v2/bson"
 
+	"github.com/CanonicalLtd/jem/internal/auth"
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/jemserver"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
@@ -110,10 +110,12 @@ var facades = map[facade]string{
 }
 
 // newWSServer creates a new WebSocket server suitible for handling the API for modelUUID.
-func newWSServer(jem *jem.JEM, jsParams jemserver.Params, modelUUID string) websocket.Server {
+func newWSServer(jem *jem.JEM, ap *auth.Pool, jsParams jemserver.Params, modelUUID string) websocket.Server {
 	hnd := wsHandler{
 		jem:           jem,
+		authPool:      ap,
 		params:        jsParams,
+		context:       context.Background(),
 		modelUUID:     modelUUID,
 		schemataCache: make(map[params.Cloud]map[jujucloud.AuthType]jujucloud.CredentialSchema),
 	}
@@ -125,7 +127,9 @@ func newWSServer(jem *jem.JEM, jsParams jemserver.Params, modelUUID string) webs
 // wsHandler is a handler for a particular WebSocket connection.
 type wsHandler struct {
 	jem           *jem.JEM
+	authPool      *auth.Pool
 	params        jemserver.Params
+	context       context.Context
 	heartMonitor  heartMonitor
 	modelUUID     string
 	conn          *rpc.Conn
@@ -194,7 +198,7 @@ func (h *wsHandler) FindMethod(rootName string, version int, methodName string) 
 			return nil, errgo.Mask(err)
 		}
 	}
-	if h.jem.Auth.Username == "" && rootName != "Admin" {
+	if auth.Username(h.context) == "" && rootName != "Admin" {
 		return nil, &rpcreflect.CallNotImplementedError{
 			RootMethod: rootName,
 			Version:    version,
@@ -285,28 +289,26 @@ func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResult, error
 			Message: "redirection required",
 		}
 	}
-
 	// JAAS only supports macaroon login, ignore all the other fields.
-	attr, err := a.h.jem.Bakery.CheckAny(req.Macaroons, nil, checkers.TimeBefore)
+	authenticator := a.h.authPool.Get()
+	defer a.h.authPool.Put(authenticator)
+	ctx, m, err := authenticator.Authenticate(a.h.context, req.Macaroons, checkers.TimeBefore)
 	if err != nil {
-		if verr, ok := errgo.Cause(err).(*bakery.VerificationError); ok {
-			m, err := a.h.jem.NewMacaroon()
-			if err != nil {
-				return jujuparams.LoginResult{}, errgo.Notef(err, "cannot create macaroon")
-			}
+		if m != nil {
 			return jujuparams.LoginResult{
 				DischargeRequired:       m,
-				DischargeRequiredReason: verr.Error(),
+				DischargeRequiredReason: err.Error(),
 			}, nil
 		}
 		return jujuparams.LoginResult{}, errgo.Mask(err)
 	}
-	a.h.jem.Auth.Username = attr["username"]
+	a.h.context = ctx
+	username := auth.Username(a.h.context)
 
 	return jujuparams.LoginResult{
 		UserInfo: &jujuparams.AuthUserInfo{
-			DisplayName: a.h.jem.Auth.Username,
-			Identity:    names.NewUserTag(a.h.jem.Auth.Username).WithDomain("external").String(),
+			DisplayName: username,
+			Identity:    names.NewUserTag(username).WithDomain("external").String(),
 		},
 		ControllerTag: names.NewControllerTag(a.h.params.ControllerUUID).String(),
 		Facades:       facadeVersions(),
@@ -403,7 +405,7 @@ func (c cloud) Clouds() (jujuparams.CloudsResult, error) {
 func (c cloud) clouds() (map[string]jujuparams.Cloud, error) {
 	clouds := make(map[string]jujuparams.Cloud)
 
-	err := c.h.jem.DoControllers("", "", func(ctl *mongodoc.Controller) error {
+	err := c.h.jem.DoControllers(c.h.context, "", "", func(ctl *mongodoc.Controller) error {
 		cloudTag := jem.CloudTag(ctl.Cloud.Name).String()
 		// TODO consider caching this result because it will be often called and
 		// the result will change very rarely.
@@ -456,7 +458,7 @@ func (c cloud) userCredentials(ownerTag, cloudTag string) ([]string, error) {
 
 	}
 	var cloudCreds []string
-	it := c.h.jem.CanReadIter(c.h.jem.DB.Credentials().Find(
+	it := jem.NewCanReadIter(c.h.context, c.h.jem.DB.Credentials().Find(
 		bson.D{{
 			"path.entitypath.user", owner.Name(),
 		}, {
@@ -476,7 +478,7 @@ func (c cloud) userCredentials(ownerTag, cloudTag string) ([]string, error) {
 // UpdateCredentials implements the UpdateCredentials method of the Cloud
 // facade.
 func (c cloud) UpdateCredentials(args jujuparams.UpdateCloudCredentials) (jujuparams.ErrorResults, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.h.context, 10*time.Second)
 	defer cancel()
 	results := make([]jujuparams.ErrorResult, len(args.Credentials))
 	for i, ucc := range args.Credentials {
@@ -503,7 +505,7 @@ func (c cloud) updateCredential(ctx context.Context, arg jujuparams.UpdateCloudC
 	if err := owner.UnmarshalText([]byte(ownerTag.Name())); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
-	if err := c.h.jem.CheckIsUser(owner); err != nil {
+	if err := auth.CheckIsUser(c.h.context, owner); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	var name params.Name
@@ -529,7 +531,7 @@ func (c cloud) updateCredential(ctx context.Context, arg jujuparams.UpdateCloudC
 
 // RevokeCredentials revokes a set of cloud credentials.
 func (c cloud) RevokeCredentials(args jujuparams.Entities) (jujuparams.ErrorResults, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.h.context, 10*time.Second)
 	defer cancel()
 	results := make([]jujuparams.ErrorResult, len(args.Entities))
 	for i, ent := range args.Entities {
@@ -552,7 +554,7 @@ func (c cloud) revokeCredential(ctx context.Context, tag string) error {
 		// such a credential will not have been uploaded, so it exists
 		return nil
 	}
-	if err := c.h.jem.CheckIsUser(params.User(credtag.Owner().Name())); err != nil {
+	if err := auth.CheckIsUser(c.h.context, params.User(credtag.Owner().Name())); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	credential := mongodoc.Credential{
@@ -598,7 +600,7 @@ func (c cloud) credential(cloudCredentialTag string) (*jujuparams.CloudCredentia
 	if owner.IsLocal() {
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", cct.Id())
 	}
-	if err := c.h.jem.CheckIsUser(params.User(owner.Name())); err != nil {
+	if err := auth.CheckIsUser(c.h.context, params.User(owner.Name())); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	credPath := params.CredentialPath{
@@ -643,7 +645,7 @@ type modelManager struct {
 func (m modelManager) ListModels(_ jujuparams.Entity) (jujuparams.UserModelList, error) {
 	var models []jujuparams.UserModel
 
-	it := m.h.jem.CanReadIter(m.h.jem.DB.Models().Find(nil).Sort("_id").Iter())
+	it := jem.NewCanReadIter(m.h.context, m.h.jem.DB.Models().Find(nil).Sort("_id").Iter())
 
 	var model mongodoc.Model
 	for it.Next(&model) {
@@ -686,7 +688,7 @@ func (m modelManager) ModelInfo(args jujuparams.Entities) (jujuparams.ModelInfoR
 
 // modelInfo retrieves the model information for the specified entity.
 func (m modelManager) modelInfo(arg jujuparams.Entity) (*jujuparams.ModelInfo, error) {
-	tag, model, err := m.getModel(arg.Tag, m.h.jem.CheckCanRead)
+	tag, model, err := m.getModel(arg.Tag, auth.CheckCanRead)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
 	}
@@ -732,7 +734,7 @@ func (m modelManager) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.M
 	if owner.IsLocal() {
 		return jujuparams.ModelInfo{}, params.ErrUnauthorized
 	}
-	if err := m.h.jem.CheckIsUser(params.User(owner.Name())); err != nil {
+	if err := auth.CheckIsUser(m.h.context, params.User(owner.Name())); err != nil {
 		return jujuparams.ModelInfo{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	cloud := params.Cloud(m.h.params.DefaultCloud)
@@ -748,7 +750,7 @@ func (m modelManager) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.M
 		return jujuparams.ModelInfo{}, errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud credential tag")
 	}
 
-	ctlPath, cloud, region, err := m.h.jem.SelectController(cloud, args.CloudRegion)
+	ctlPath, cloud, region, err := m.h.jem.SelectController(m.h.context, cloud, args.CloudRegion)
 	if err != nil {
 		return jujuparams.ModelInfo{}, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound))
 	}
@@ -846,7 +848,7 @@ func (m modelManager) DestroyModels(args jujuparams.Entities) (jujuparams.ErrorR
 
 // destroyModel destroys the specified model.
 func (m modelManager) destroyModel(arg jujuparams.Entity) error {
-	_, model, err := m.getModel(arg.Tag, m.checkIsOwner)
+	_, model, err := m.getModel(arg.Tag, checkIsOwner)
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			// Juju doesn't treat removing a model that isn't there as an error, and neither should we.
@@ -879,7 +881,7 @@ func (m modelManager) ModifyModelAccess(args jujuparams.ModifyModelAccessRequest
 }
 
 func (m modelManager) modifyModelAccess(change jujuparams.ModifyModelAccess) error {
-	_, model, err := m.getModel(change.ModelTag, m.checkIsOwner)
+	_, model, err := m.getModel(change.ModelTag, checkIsOwner)
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			err = params.ErrUnauthorized
@@ -914,8 +916,8 @@ func (m modelManager) modifyModelAccess(change jujuparams.ModifyModelAccess) err
 
 // checkIsOwner checks if the current user is the owner of the specified
 // document.
-func (m modelManager) checkIsOwner(e jem.ACLEntity) error {
-	return errgo.Mask(m.h.jem.CheckIsUser(e.Owner()), errgo.Is(params.ErrUnauthorized))
+func checkIsOwner(ctx context.Context, e auth.ACLEntity) error {
+	return errgo.Mask(auth.CheckIsUser(ctx, e.Owner()), errgo.Is(params.ErrUnauthorized))
 }
 
 // getModel attempts to get the specified model from jem. If the model
@@ -926,7 +928,7 @@ func (m modelManager) checkIsOwner(e jem.ACLEntity) error {
 // access is denied authf should return an error with the cause
 // params.ErrUnauthorized. The cause of any error returned by authf will
 // not be masked.
-func (m modelManager) getModel(modelTag string, authf func(jem.ACLEntity) error) (names.ModelTag, *mongodoc.Model, error) {
+func (m modelManager) getModel(modelTag string, authf func(context.Context, auth.ACLEntity) error) (names.ModelTag, *mongodoc.Model, error) {
 	tag, err := names.ParseModelTag(modelTag)
 	if err != nil {
 		return names.ModelTag{}, nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid model tag")
@@ -938,7 +940,7 @@ func (m modelManager) getModel(modelTag string, authf func(jem.ACLEntity) error)
 	if authf == nil {
 		return names.ModelTag{}, model, nil
 	}
-	if err := authf(model); err != nil {
+	if err := authf(m.h.context, model); err != nil {
 		return names.ModelTag{}, nil, errgo.Mask(err, errgo.Any)
 	}
 	return tag, model, nil

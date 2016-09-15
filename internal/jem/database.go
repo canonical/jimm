@@ -517,6 +517,24 @@ func (db Database) C(name string) *mgo.Collection {
 	return db.Database.C(name)
 }
 
+var selectACL = bson.D{{"acl", 1}}
+
+// GetACL retrieves the ACL for the document at path in coll. If the
+// document is not found, the returned error will have the cause
+// params.ErrNotFound.
+func GetACL(coll *mgo.Collection, path params.EntityPath) (params.ACL, error) {
+	var doc struct {
+		ACL params.ACL
+	}
+	if err := coll.FindId(path.String()).Select(selectACL).One(&doc); err != nil {
+		if err == mgo.ErrNotFound {
+			err = params.ErrNotFound
+		}
+		return params.ACL{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return doc.ACL, nil
+}
+
 // SetACL sets the ACL for the path document in c to be equal to acl.
 func SetACL(c *mgo.Collection, path params.EntityPath, acl params.ACL) error {
 	err := c.UpdateId(path.String(), bson.D{{"$set", bson.D{{"acl", acl}}}})

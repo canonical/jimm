@@ -9,7 +9,6 @@ import (
 	"net/http/httptest"
 	"time"
 
-	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/idmtest"
 	"github.com/juju/juju/controller"
 	corejujutesting "github.com/juju/juju/juju/testing"
@@ -18,7 +17,6 @@ import (
 	"github.com/juju/testing/httptesting"
 	"github.com/rogpeppe/fastuuid"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/mgo.v2"
 
@@ -69,14 +67,7 @@ func (s *Suite) SetUpTest(c *gc.C) {
 
 func (s *Suite) newPool(c *gc.C, session *mgo.Session) *jem.Pool {
 	pool, err := jem.NewPool(jem.Params{
-		DB: session.DB("jem"),
-		BakeryParams: bakery.NewServiceParams{
-			Location: "here",
-		},
-		IDMClient: idmclient.New(idmclient.NewParams{
-			BaseURL: s.IDMSrv.URL.String(),
-			Client:  s.IDMSrv.Client("agent"),
-		}),
+		DB:              session.DB("jem"),
 		ControllerAdmin: "controller-admin",
 	})
 	c.Assert(err, gc.IsNil)
