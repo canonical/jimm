@@ -15,6 +15,24 @@ var (
 		Name:      "applications_running",
 		Help:      "The current number of running applications.",
 	}, []string{"ctl_path"})
+	AuthenticatorPoolGet = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: "jem",
+		Subsystem: "auth",
+		Name:      "pool_get",
+		Help:      "The number of times an Authenticator has been retrieved from the pool",
+	})
+	AuthenticatorPoolNew = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: "jem",
+		Subsystem: "auth",
+		Name:      "pool_new",
+		Help:      "The number of times a new Authenticator has been created by the pool",
+	})
+	AuthenticatorPoolPut = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: "jem",
+		Subsystem: "auth",
+		Name:      "pool_put",
+		Help:      "The number of times an Authenticator has been replaced into the pool",
+	})
 	ControllersRunning = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "jem",
 		Subsystem: "health",
@@ -61,6 +79,9 @@ var (
 
 func init() {
 	prometheus.MustRegister(ApplicationsRunning)
+	prometheus.MustRegister(AuthenticatorPoolGet)
+	prometheus.MustRegister(AuthenticatorPoolNew)
+	prometheus.MustRegister(AuthenticatorPoolPut)
 	prometheus.MustRegister(ControllersRunning)
 	prometheus.MustRegister(DatabaseConnections)
 	prometheus.MustRegister(DatabaseSessions)

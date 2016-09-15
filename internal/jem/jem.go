@@ -4,10 +4,10 @@ package jem
 
 import (
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
-	"github.com/juju/idmclient"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/base"
 	cloudapi "github.com/juju/juju/api/cloud"
@@ -18,12 +18,11 @@ import (
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jem/internal/apiconn"
+	"github.com/CanonicalLtd/jem/internal/auth"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -33,6 +32,11 @@ var logger = loggo.GetLogger("jem.internal.jem")
 // wallClock provides access to the current time. It is a variable so
 // that it can be overridden in tests.
 var wallClock clock.Clock = clock.WallClock
+
+// Functions defined as variables so they can be overridden in tests.
+var (
+	randIntn = rand.Intn
+)
 
 // Params holds parameters for the NewPool function.
 type Params struct {
@@ -49,28 +53,14 @@ type Params struct {
 	// will keep cloning before creating a new Database copy.
 	MaxDBAge time.Duration
 
-	// BakeryParams holds the parameters for creating
-	// a new bakery.Service.
-	BakeryParams bakery.NewServiceParams
-
-	// IDMClient holds the identity-manager client
-	// to use for finding out group membership.
-	IDMClient *idmclient.Client
-
 	// ControllerAdmin holds the identity of the user
 	// or group that is allowed to create controllers.
 	ControllerAdmin params.User
-
-	// IdentityLocation holds the location of the third party identity service.
-	IdentityLocation string
 }
 
 type Pool struct {
-	config       Params
-	bakery       *bakery.Service
-	connCache    *apiconn.Cache
-	bakeryParams bakery.NewServiceParams
-	permChecker  *idmclient.PermChecker
+	config    Params
+	connCache *apiconn.Cache
 
 	mu       sync.Mutex
 	db       Database
@@ -96,30 +86,12 @@ func NewPool(p Params) (*Pool, error) {
 	}
 	db := newDatabase(p.DB.With(p.DB.Session.Copy()))
 	pool := &Pool{
-		config:      p,
-		db:          db,
-		copyTime:    wallClock.Now(),
-		connCache:   apiconn.NewCache(apiconn.CacheParams{}),
-		permChecker: idmclient.NewPermChecker(p.IDMClient, maxPermCacheDuration),
-		refCount:    1,
+		config:    p,
+		db:        db,
+		copyTime:  wallClock.Now(),
+		connCache: apiconn.NewCache(apiconn.CacheParams{}),
+		refCount:  1,
 	}
-	bp := p.BakeryParams
-	// Fill out any bakery parameters explicitly here so
-	// that we use the same values when each Store is
-	// created. We don't fill out bp.Store field though, as
-	// that needs to hold the correct mongo session which we
-	// only know when the Store is created from the Pool.
-	if bp.Key == nil {
-		var err error
-		bp.Key, err = bakery.GenerateKey()
-		if err != nil {
-			return nil, errgo.Notef(err, "cannot generate bakery key")
-		}
-	}
-	if bp.Locator == nil {
-		bp.Locator = bakery.PublicKeyLocatorMap(nil)
-	}
-	pool.bakeryParams = bp
 	return pool, nil
 }
 
@@ -190,43 +162,14 @@ func (p *Pool) JEM() *JEM {
 	p.refCount++
 	db := p.database()
 	return &JEM{
-		DB:          db,
-		Bakery:      newBakery(db, p.bakeryParams),
-		PermChecker: p.permChecker,
-		pool:        p,
+		DB:   db,
+		pool: p,
 	}
-}
-
-func newBakery(db Database, bp bakery.NewServiceParams) *bakery.Service {
-	macStore, err := mgostorage.New(db.Macaroons())
-	if err != nil {
-		// Should never happen.
-		panic(errgo.Newf("unexpected error from mgostorage.New: %v", err))
-	}
-	bp.Store = macStore
-	bsvc, err := bakery.NewService(bp)
-	if err != nil {
-		// This should never happen because the only reason bakery.NewService
-		// can fail is if it can't generate a key, and we have already made
-		// sure that the key is generated.
-		panic(errgo.Notef(err, "cannot make bakery service"))
-	}
-	return bsvc
 }
 
 type JEM struct {
 	// DB holds the mongodb-backed identity store.
 	DB Database
-
-	// Auth holds any authorization credentials as set by
-	// JEM.Authenticate. If Authenticate has not been called, this
-	// will be zero.
-	Auth Authorization
-
-	// Bakery holds the JEM bakery service.
-	Bakery *bakery.Service
-
-	PermChecker *idmclient.PermChecker
 
 	// pool holds the Pool from which the JEM instance
 	// was created.
@@ -246,10 +189,8 @@ func (j *JEM) Clone() *JEM {
 	db := j.DB.Clone()
 	j.pool.refCount++
 	return &JEM{
-		DB:          db,
-		Bakery:      newBakery(db, j.pool.bakeryParams),
-		PermChecker: j.pool.permChecker,
-		pool:        j.pool,
+		DB:   db,
+		pool: j.pool,
 	}
 }
 
@@ -265,7 +206,6 @@ func (j *JEM) Close() {
 	if j.closed {
 		return
 	}
-	j.Auth = Authorization{}
 	j.closed = true
 	j.DB.Close()
 	j.DB = Database{}
@@ -571,6 +511,138 @@ func (j *JEM) DestroyModel(conn *apiconn.Conn, model *mongodoc.Model) error {
 		return errgo.Mask(err)
 	}
 	return nil
+}
+
+// CheckReadACL checks that the entity with the given path in the
+// given collection can be read by the currently authenticated user.
+func CheckReadACL(ctx context.Context, coll *mgo.Collection, path params.EntityPath) error {
+	// The user can always access their own entities.
+	if err := auth.CheckIsUser(ctx, path.User); err == nil {
+		return nil
+	}
+	acl, err := GetACL(coll, path)
+	if errgo.Cause(err) == params.ErrNotFound {
+		// The document is not found - and we've already checked
+		// that the currently authenticated user cannot speak for
+		// path.User, so return an unauthorized error to stop
+		// people probing for the existence of other people's entities.
+		return params.ErrUnauthorized
+	}
+	if err := auth.CheckACL(ctx, acl.Read); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	return nil
+}
+
+// CanReadIter returns an iterator that iterates over items
+// in the given iterator, returning only those
+// that  the currently logged in user has permission
+// to see.
+//
+// The API matches that of mgo.Iter.
+func NewCanReadIter(ctx context.Context, iter *mgo.Iter) *CanReadIter {
+	return &CanReadIter{
+		ctx:  ctx,
+		iter: iter,
+	}
+}
+
+// CanReadIter represents an iterator that returns only items
+// that the currently authenticated user has read access to.
+type CanReadIter struct {
+	ctx  context.Context
+	iter *mgo.Iter
+	err  error
+	n    int
+}
+
+// Next reads the next item from the iterator into the given
+// item and returns whether it has done so.
+func (iter *CanReadIter) Next(item auth.ACLEntity) bool {
+	if iter.err != nil {
+		return false
+	}
+	for iter.iter.Next(item) {
+		iter.n++
+		if err := auth.CheckCanRead(iter.ctx, item); err != nil {
+			if errgo.Cause(err) == params.ErrUnauthorized {
+				// No permissions to look at the entity, so don't include
+				// it in the results.
+				continue
+			}
+			iter.err = errgo.Mask(err)
+			iter.iter.Close()
+			return false
+		}
+		return true
+	}
+	return false
+}
+
+func (iter *CanReadIter) Close() error {
+	iter.iter.Close()
+	return iter.Err()
+}
+
+// Err returns any error encountered when iterating.
+func (iter *CanReadIter) Err() error {
+	if iter.err != nil {
+		return iter.err
+	}
+	return iter.iter.Err()
+}
+
+// Count returns the total number of items traversed
+// by the iterator, including items that were not returned
+// because they were unauthorized.
+func (iter *CanReadIter) Count() int {
+	return iter.n
+}
+
+// DoControllers calls the given function for each controller that
+// can be read by the current user that matches the given attributes.
+// If the function returns an error, the iteration stops and
+// DoControllers returns the error with the same cause.
+func (j *JEM) DoControllers(ctx context.Context, cloud params.Cloud, region string, do func(c *mongodoc.Controller) error) error {
+	// Query all the controllers that match the attributes, building
+	// up all the possible values.
+	q, err := j.DB.controllerLocationQuery(cloud, region, false)
+	if err != nil {
+		return errgo.WithCausef(err, params.ErrBadRequest, "%s", "")
+	}
+	// Sort by _id so that we can make easily reproducible tests.
+	iter := NewCanReadIter(ctx, q.Sort("_id").Iter())
+	var ctl mongodoc.Controller
+	for iter.Next(&ctl) {
+		if err := do(&ctl); err != nil {
+			iter.Close()
+			return errgo.Mask(err, errgo.Any)
+		}
+	}
+	if err := iter.Err(); err != nil {
+		return errgo.Notef(err, "cannot query")
+	}
+	return nil
+}
+
+// SelectController chooses a controller that matches the cloud and region criteria, if specified.
+func (j *JEM) SelectController(ctx context.Context, cloud params.Cloud, region string) (params.EntityPath, params.Cloud, string, error) {
+	var controllers []mongodoc.Controller
+	err := j.DoControllers(ctx, cloud, region, func(c *mongodoc.Controller) error {
+		controllers = append(controllers, *c)
+		return nil
+	})
+	if err != nil {
+		return params.EntityPath{}, "", "", errgo.Mask(err, errgo.Is(params.ErrBadRequest))
+	}
+	if len(controllers) == 0 {
+		return params.EntityPath{}, "", "", errgo.WithCausef(nil, params.ErrNotFound, "no matching controllers found")
+	}
+	// Choose a random controller.
+	// TODO select a controller more intelligently, for example
+	// by choosing the most lightly loaded controller
+	n := randIntn(len(controllers))
+	return controllers[n].Path, params.Cloud(controllers[n].Cloud.Name), region, nil
 }
 
 // UserTag creates a juju user tag from a params.User

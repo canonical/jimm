@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/idmtest"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	jujuwatcher "github.com/juju/juju/state/watcher"
@@ -17,7 +16,6 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/tomb.v2"
 
 	"github.com/CanonicalLtd/jem/internal/jem"
@@ -50,14 +48,7 @@ func (s *internalSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
 	s.idmSrv = idmtest.NewServer()
 	pool, err := jem.NewPool(jem.Params{
-		DB: s.Session.DB("jem"),
-		BakeryParams: bakery.NewServiceParams{
-			Location: "here",
-		},
-		IDMClient: idmclient.New(idmclient.NewParams{
-			BaseURL: s.idmSrv.URL.String(),
-			Client:  s.idmSrv.Client("agent"),
-		}),
+		DB:              s.Session.DB("jem"),
 		ControllerAdmin: "controller-admin",
 	})
 	c.Assert(err, gc.IsNil)

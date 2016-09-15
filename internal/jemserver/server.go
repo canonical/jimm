@@ -16,10 +16,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
+	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/macaroon-bakery.v1/httpbakery/agent"
 	"gopkg.in/mgo.v2"
 
+	"github.com/CanonicalLtd/jem/internal/auth"
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/monitor"
 	"github.com/CanonicalLtd/jem/params"
@@ -29,7 +31,7 @@ var logger = loggo.GetLogger("jem.internal.jemserver")
 
 // NewAPIHandlerFunc is a function that returns set of httprequest
 // handlers that uses the given JEM pool and server params.
-type NewAPIHandlerFunc func(*jem.Pool, Params) ([]httprequest.Handler, error)
+type NewAPIHandlerFunc func(*jem.Pool, *auth.Pool, Params) ([]httprequest.Handler, error)
 
 // Params holds configuration for a new API server.
 // It must be kept in sync with identical definition in the
@@ -83,9 +85,10 @@ type Params struct {
 
 // Server represents a JEM HTTP server.
 type Server struct {
-	router  *httprouter.Router
-	pool    *jem.Pool
-	monitor *monitor.Monitor
+	router   *httprouter.Router
+	pool     *jem.Pool
+	authPool *auth.Pool
+	monitor  *monitor.Monitor
 }
 
 // New returns a new handler that handles model manager
@@ -100,30 +103,46 @@ func New(config Params, versions map[string]NewAPIHandlerFunc) (*Server, error) 
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
+	bakery, err := bakery.NewService(bakery.NewServiceParams{
+		// TODO The location is attached to any macaroons that we
+		// mint. Currently we don't know the location of the current
+		// service. We potentially provide a way to configure this,
+		// but it probably doesn't matter, as nothing currently uses
+		// the macaroon location for anything.
+		Location: "jimm",
+		Locator:  config.PublicKeyLocator,
+	})
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot create bakery")
+	}
 	jconfig := jem.Params{
-		DB:          config.DB,
-		MaxDBClones: config.MaxDBClones,
-		MaxDBAge:    config.MaxDBAge,
-		BakeryParams: bakery.NewServiceParams{
-			// TODO The location is attached to any macaroons that we
-			// mint. Currently we don't know the location of the current
-			// service. We potentially provide a way to configure this,
-			// but it probably doesn't matter, as nothing currently uses
-			// the macaroon location for anything.
-			Location: "jem",
-			Locator:  config.PublicKeyLocator,
-		},
-		IDMClient:        idmClient,
-		ControllerAdmin:  config.ControllerAdmin,
-		IdentityLocation: config.IdentityLocation,
+		DB:              config.DB,
+		MaxDBClones:     config.MaxDBClones,
+		MaxDBAge:        config.MaxDBAge,
+		ControllerAdmin: config.ControllerAdmin,
 	}
 	p, err := jem.NewPool(jconfig)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make store")
 	}
+	jem := p.JEM()
+	defer jem.Close()
+	authPool := auth.NewPool(auth.Params{
+		Bakery:   bakery,
+		RootKeys: mgostorage.NewRootKeys(100),
+		RootKeysPolicy: mgostorage.Policy{
+			ExpiryDuration: 24 * time.Hour,
+		},
+		MacaroonCollection:  jem.DB.Macaroons(),
+		MaxCollectionClones: config.MaxDBClones,
+		MaxCollectionAge:    config.MaxDBAge,
+		PermChecker:         idmclient.NewPermChecker(idmClient, time.Hour),
+		IdentityLocation:    config.IdentityLocation,
+	})
 	srv := &Server{
-		router: httprouter.New(),
-		pool:   p,
+		router:   httprouter.New(),
+		pool:     p,
+		authPool: authPool,
 	}
 	if config.RunMonitor {
 		owner, err := monitorLeaseOwner(config.AgentUsername)
@@ -134,7 +153,7 @@ func New(config Params, versions map[string]NewAPIHandlerFunc) (*Server, error) 
 	}
 	srv.router.Handler("GET", "/metrics", prometheus.Handler())
 	for name, newAPI := range versions {
-		handlers, err := newAPI(p, config)
+		handlers, err := newAPI(p, authPool, config)
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot create API %s", name)
 		}
@@ -205,6 +224,7 @@ func (srv *Server) Close() error {
 			logger.Warningf("error shutting down monitor: %v", err)
 		}
 	}
+	srv.authPool.Close()
 	srv.pool.Close()
 	return nil
 }

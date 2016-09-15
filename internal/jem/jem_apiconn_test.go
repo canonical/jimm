@@ -5,13 +5,10 @@ package jem_test
 import (
 	"time"
 
-	"github.com/juju/idmclient"
-	"github.com/juju/idmclient/idmtest"
 	cloudapi "github.com/juju/juju/api/cloud"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
 
 	"github.com/CanonicalLtd/jem/internal/apiconn"
 	"github.com/CanonicalLtd/jem/internal/jem"
@@ -21,37 +18,28 @@ import (
 
 type jemAPIConnSuite struct {
 	corejujutesting.JujuConnSuite
-	idmSrv *idmtest.Server
-	pool   *jem.Pool
-	store  *jem.JEM
+	pool *jem.Pool
+	jem  *jem.JEM
 }
 
 var _ = gc.Suite(&jemAPIConnSuite{})
 
 func (s *jemAPIConnSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
-	s.idmSrv = idmtest.NewServer()
 	pool, err := jem.NewPool(jem.Params{
-		DB:          s.Session.DB("jem"),
-		MaxDBClones: 1000,
-		MaxDBAge:    time.Minute,
-		BakeryParams: bakery.NewServiceParams{
-			Location: "here",
-		},
-		IDMClient: idmclient.New(idmclient.NewParams{
-			BaseURL: s.idmSrv.URL.String(),
-			Client:  s.idmSrv.Client("agent"),
-		}),
+		DB:              s.Session.DB("jem"),
+		MaxDBClones:     1000,
+		MaxDBAge:        time.Minute,
 		ControllerAdmin: "controller-admin",
 	})
 	c.Assert(err, gc.IsNil)
 	s.pool = pool
-	s.store = s.pool.JEM()
+	s.jem = s.pool.JEM()
 	s.PatchValue(&jem.APIOpenTimeout, time.Duration(0))
 }
 
 func (s *jemAPIConnSuite) TearDownTest(c *gc.C) {
-	s.store.Close()
+	s.jem.Close()
 	s.pool.Close()
 	s.JujuConnSuite.TearDownTest(c)
 }
@@ -67,11 +55,11 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 		AdminPassword: info.Password,
 	}
 
-	err := s.store.DB.AddController(ctl)
+	err := s.jem.DB.AddController(ctl)
 	c.Assert(err, gc.IsNil)
 
 	// Open the API and check that it works.
-	conn, err := s.store.OpenAPI(ctlPath)
+	conn, err := s.jem.OpenAPI(ctlPath)
 	c.Assert(err, gc.IsNil)
 	s.assertConnectionAlive(c, conn)
 
@@ -80,7 +68,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 
 	// Open it again and check that we get the
 	// same cached connection.
-	conn1, err := s.store.OpenAPI(ctlPath)
+	conn1, err := s.jem.OpenAPI(ctlPath)
 	c.Assert(err, gc.IsNil)
 	s.assertConnectionAlive(c, conn1)
 	c.Assert(conn1.Connection, gc.Equals, conn.Connection)
@@ -89,7 +77,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 
 	// Open it with OpenAPIFromDocs and check
 	// that we still get the same connection.
-	conn1, err = s.store.OpenAPIFromDoc(ctl)
+	conn1, err = s.jem.OpenAPIFromDoc(ctl)
 	c.Assert(err, gc.IsNil)
 	c.Assert(conn1.Connection, gc.Equals, conn.Connection)
 	err = conn1.Close()
@@ -97,11 +85,11 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 
 	// Close the JEM instance and check that the
 	// connection is still alive, held open by the pool.
-	s.store.Close()
+	s.jem.Close()
 	s.assertConnectionAlive(c, conn)
 
 	// Make sure the Close call is idempotent.
-	s.store.Close()
+	s.jem.Close()
 	s.assertConnectionAlive(c, conn)
 
 	// Close the pool and make sure that the connection
@@ -116,7 +104,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 
 func (s *jemAPIConnSuite) TestPoolOpenAPIError(c *gc.C) {
 
-	conn, err := s.store.OpenAPI(params.EntityPath{"bob", "notthere"})
+	conn, err := s.jem.OpenAPI(params.EntityPath{"bob", "notthere"})
 	c.Assert(err, gc.ErrorMatches, `cannot get controller: controller "bob/notthere" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	c.Assert(conn, gc.IsNil)
