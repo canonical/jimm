@@ -106,6 +106,7 @@ var newHeartMonitor = func(d time.Duration) heartMonitor {
 var facades = map[facade]string{
 	facade{"Admin", 3}:        "Admin",
 	facade{"Cloud", 1}:        "Cloud",
+	facade{"Controller", 3}:   "Controller",
 	facade{"ModelManager", 2}: "ModelManager",
 	facade{"Pinger", 1}:       "Pinger",
 }
@@ -250,6 +251,15 @@ func (r root) Cloud(id string) (cloud, error) {
 		return cloud{}, common.ErrBadId
 	}
 	return cloud{r.h}, nil
+}
+
+// Controller returns an implementation of the Controller facade (version 1).
+func (r root) Controller(id string) (controller, error) {
+	if id != "" {
+		// Safeguard id for possible future use.
+		return controller{}, common.ErrBadId
+	}
+	return controller{r.h}, nil
 }
 
 // ModelManager returns an implementation of the ModelManager facade
@@ -639,6 +649,49 @@ func (c cloud) credential(cloudCredentialTag string) (*jujuparams.CloudCredentia
 	return &cc, nil
 }
 
+// controller implements the Controller facade.
+type controller struct {
+	h *wsHandler
+}
+
+func (c controller) AllModels() (jujuparams.UserModelList, error) {
+	return allModels(c.h)
+}
+
+func (c controller) ModelStatus(args jujuparams.Entities) (jujuparams.ModelStatusResults, error) {
+	results := make([]jujuparams.ModelStatus, len(args.Entities))
+	// TODO (fabricematrat) get status for all of the models connected
+	// to a single controller in one go.
+	for i, arg := range args.Entities {
+		mi, err := c.modelStatus(arg)
+		if err != nil {
+			return jujuparams.ModelStatusResults{}, errgo.Mask(err)
+			continue
+		}
+		results[i] = *mi
+	}
+
+	return jujuparams.ModelStatusResults{
+		Results: results,
+	}, nil
+}
+
+// modelStatus retrieves the model status for the specified entity.
+func (c controller) modelStatus(arg jujuparams.Entity) (*jujuparams.ModelStatus, error) {
+	mi, err := modelInfo(c.h, arg)
+	if err != nil {
+		return &jujuparams.ModelStatus{}, errgo.Mask(err)
+	}
+	return &jujuparams.ModelStatus{
+		ModelTag:           names.NewModelTag(mi.UUID).String(),
+		Life:               mi.Life,
+		HostedMachineCount: len(mi.Machines),
+		ApplicationCount:   0,
+		OwnerTag:           mi.OwnerTag,
+		Machines:           mi.Machines,
+	}, nil
+}
+
 // modelManager implements the ModelManager facade.
 type modelManager struct {
 	h *wsHandler
@@ -647,9 +700,13 @@ type modelManager struct {
 // ListModels returns the models that the authenticated user
 // has access to. The user parameter is ignored.
 func (m modelManager) ListModels(_ jujuparams.Entity) (jujuparams.UserModelList, error) {
+	return allModels(m.h)
+}
+
+func allModels(h *wsHandler) (jujuparams.UserModelList, error) {
 	var models []jujuparams.UserModel
 
-	it := jem.NewCanReadIter(m.h.context, m.h.jem.DB.Models().Find(nil).Sort("_id").Iter())
+	it := jem.NewCanReadIter(h.context, h.jem.DB.Models().Find(nil).Sort("_id").Iter())
 
 	var model mongodoc.Model
 	for it.Next(&model) {
@@ -668,6 +725,7 @@ func (m modelManager) ListModels(_ jujuparams.Entity) (jujuparams.UserModelList,
 	return jujuparams.UserModelList{
 		UserModels: models,
 	}, nil
+
 }
 
 // ModelInfo implements the ModelManager facade's ModelInfo method.
@@ -677,7 +735,7 @@ func (m modelManager) ModelInfo(args jujuparams.Entities) (jujuparams.ModelInfoR
 	// TODO (mhilton) get information for all of the models connected
 	// to a single controller in one go.
 	for i, arg := range args.Entities {
-		mi, err := m.modelInfo(arg)
+		mi, err := modelInfo(m.h, arg)
 		if err != nil {
 			results[i].Error = mapError(err)
 			continue
@@ -691,12 +749,12 @@ func (m modelManager) ModelInfo(args jujuparams.Entities) (jujuparams.ModelInfoR
 }
 
 // modelInfo retrieves the model information for the specified entity.
-func (m modelManager) modelInfo(arg jujuparams.Entity) (*jujuparams.ModelInfo, error) {
-	tag, model, err := m.getModel(arg.Tag, auth.CheckCanRead)
+func modelInfo(h *wsHandler, arg jujuparams.Entity) (*jujuparams.ModelInfo, error) {
+	tag, model, err := getModel(h, arg.Tag, auth.CheckCanRead)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
 	}
-	conn, err := m.h.jem.OpenAPI(model.Controller)
+	conn, err := h.jem.OpenAPI(model.Controller)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -709,15 +767,15 @@ func (m modelManager) modelInfo(arg jujuparams.Entity) (*jujuparams.ModelInfo, e
 	if mirs[0].Error != nil {
 		return nil, errgo.Mask(mirs[0].Error)
 	}
-	mi1 := m.massageModelInfo(*mirs[0].Result)
+	mi1 := massageModelInfo(h, *mirs[0].Result)
 	return &mi1, nil
 }
 
 // massageModelInfo modifies the modelInfo returned from a controller as
 // if it was returned from the jimm controller.
-func (m modelManager) massageModelInfo(mi jujuparams.ModelInfo) jujuparams.ModelInfo {
+func massageModelInfo(h *wsHandler, mi jujuparams.ModelInfo) jujuparams.ModelInfo {
 	mi1 := mi
-	mi1.ControllerUUID = m.h.params.ControllerUUID
+	mi1.ControllerUUID = h.params.ControllerUUID
 	mi1.Users = make([]jujuparams.ModelUserInfo, 0, len(mi.Users))
 	for _, u := range mi.Users {
 		if strings.HasSuffix(u.UserName, "@local") {
@@ -784,7 +842,7 @@ func (m modelManager) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.M
 		return jujuparams.ModelInfo{}, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound))
 	}
 	servermon.ModelsCreatedCount.Inc()
-	return m.massageModelInfo(convertJujuParamsModelInfo(mi)), nil
+	return massageModelInfo(m.h, convertJujuParamsModelInfo(mi)), nil
 }
 
 func convertJujuParamsModelInfo(modelInfo *base.ModelInfo) jujuparams.ModelInfo {
@@ -860,7 +918,7 @@ func (m modelManager) DestroyModels(args jujuparams.Entities) (jujuparams.ErrorR
 
 // destroyModel destroys the specified model.
 func (m modelManager) destroyModel(arg jujuparams.Entity) error {
-	_, model, err := m.getModel(arg.Tag, checkIsOwner)
+	_, model, err := getModel(m.h, arg.Tag, checkIsOwner)
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			// Juju doesn't treat removing a model that isn't there as an error, and neither should we.
@@ -896,7 +954,7 @@ func (m modelManager) ModifyModelAccess(args jujuparams.ModifyModelAccessRequest
 }
 
 func (m modelManager) modifyModelAccess(change jujuparams.ModifyModelAccess) error {
-	_, model, err := m.getModel(change.ModelTag, checkIsOwner)
+	_, model, err := getModel(m.h, change.ModelTag, checkIsOwner)
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			err = params.ErrUnauthorized
@@ -943,19 +1001,19 @@ func checkIsOwner(ctx context.Context, e auth.ACLEntity) error {
 // access is denied authf should return an error with the cause
 // params.ErrUnauthorized. The cause of any error returned by authf will
 // not be masked.
-func (m modelManager) getModel(modelTag string, authf func(context.Context, auth.ACLEntity) error) (names.ModelTag, *mongodoc.Model, error) {
+func getModel(h *wsHandler, modelTag string, authf func(context.Context, auth.ACLEntity) error) (names.ModelTag, *mongodoc.Model, error) {
 	tag, err := names.ParseModelTag(modelTag)
 	if err != nil {
 		return names.ModelTag{}, nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid model tag")
 	}
-	model, err := m.h.jem.DB.ModelFromUUID(tag.Id())
+	model, err := h.jem.DB.ModelFromUUID(tag.Id())
 	if err != nil {
 		return names.ModelTag{}, nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	if authf == nil {
 		return names.ModelTag{}, model, nil
 	}
-	if err := authf(m.h.context, model); err != nil {
+	if err := authf(h.context, model); err != nil {
 		return names.ModelTag{}, nil, errgo.Mask(err, errgo.Any)
 	}
 	return tag, model, nil
