@@ -19,6 +19,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
+	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jem/internal/apiconn"
 	"github.com/CanonicalLtd/jem/internal/auth"
@@ -161,6 +162,8 @@ var createModelTests = []struct {
 }}
 
 func (s *jemSuite) TestCreateModel(c *gc.C) {
+	now := bson.Now()
+	s.PatchValue(jem.WallClock, jt.NewClock(now))
 	ctlId := s.addController(c, params.EntityPath{"bob", "controller"})
 	err := jem.UpdateCredential(s.jem.DB, &mongodoc.Credential{
 		Path: credentialPath("dummy", "bob", "cred1"),
@@ -193,6 +196,7 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 		c.Assert(err, jc.ErrorIsNil)
 		c.Assert(m.Path, jc.DeepEquals, test.params.Path)
 		c.Assert(m.UUID, gc.Not(gc.Equals), "")
+		c.Assert(m.CreationTime.Equal(now), gc.Equals, true)
 	}
 }
 

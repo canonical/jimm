@@ -875,6 +875,8 @@ func (m modelManager) destroyModel(arg jujuparams.Entity) error {
 	if err := m.h.jem.DestroyModel(conn, model); err != nil {
 		return errgo.Mask(err)
 	}
+	age := float64(time.Now().Sub(model.CreationTime)) / float64(time.Hour)
+	servermon.ModelLifetime.Observe(age)
 	servermon.ModelsDestroyedCount.Inc()
 	return nil
 }
