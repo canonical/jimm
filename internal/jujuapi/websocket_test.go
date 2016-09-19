@@ -14,6 +14,7 @@ import (
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/base"
 	cloudapi "github.com/juju/juju/api/cloud"
+	"github.com/juju/juju/api/controller"
 	"github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
@@ -605,6 +606,100 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 			}},
 		},
 	}})
+}
+
+func (s *websocketSuite) TestAllModels(c *gc.C) {
+	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
+	s.AssertUpdateCredential(c, "test2", "dummy", "cred1", "empty")
+	err := jem.SetACL(s.JEM.DB.Controllers(), ctlPath, params.ACL{
+		Read: []string{"test2"},
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	mi := s.assertCreateModel(c, "model-1", "test", "", "", "cred1", nil)
+	modelUUID1 := mi.UUID
+	s.assertCreateModel(c, "model-2", "test2", "", "", "cred1", nil)
+	mi = s.assertCreateModel(c, "model-3", "test2", "", "", "cred1", nil)
+	modelUUID3 := mi.UUID
+
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := controller.NewClient(conn)
+
+	err = jem.SetACL(s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
+		Read: []string{"test"},
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	models, err := client.AllModels()
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(models, jc.DeepEquals, []base.UserModel{{
+		Name:           "controller-1",
+		UUID:           s.State.ModelUUID(),
+		Owner:          "test@external",
+		LastConnection: nil,
+	}, {
+		Name:           "model-1",
+		UUID:           modelUUID1,
+		Owner:          "test@external",
+		LastConnection: nil,
+	}, {
+		Name:           "model-3",
+		UUID:           modelUUID3,
+		Owner:          "test2@external",
+		LastConnection: nil,
+	}})
+}
+
+func (s *websocketSuite) TestModelStatus(c *gc.C) {
+	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
+	s.AssertUpdateCredential(c, "test2", "dummy", "cred1", "empty")
+	err := jem.SetACL(s.JEM.DB.Controllers(), ctlPath, params.ACL{
+		Read: []string{"test2"},
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	mi := s.assertCreateModel(c, "model-1", "test", "", "", "cred1", nil)
+	modelUUID1 := mi.UUID
+	mi = s.assertCreateModel(c, "model-2", "test2", "", "", "cred1", nil)
+	modelUUID2 := mi.UUID
+	mi = s.assertCreateModel(c, "model-3", "test2", "", "", "cred1", nil)
+	modelUUID3 := mi.UUID
+
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := controller.NewClient(conn)
+
+	err = jem.SetACL(s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
+		Read: []string{"test"},
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	models, err := client.ModelStatus(names.NewModelTag(modelUUID1),
+		names.NewModelTag(modelUUID3))
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(models, jc.DeepEquals, []base.ModelStatus{{
+		UUID:               modelUUID1,
+		Life:               "alive",
+		Owner:              "test@external",
+		TotalMachineCount:  0,
+		CoreCount:          0,
+		HostedMachineCount: 0,
+		ServiceCount:       0,
+		Machines:           []base.Machine{},
+	}, {
+		UUID:               modelUUID3,
+		Life:               "alive",
+		Owner:              "test2@external",
+		TotalMachineCount:  0,
+		CoreCount:          0,
+		HostedMachineCount: 0,
+		ServiceCount:       0,
+		Machines:           []base.Machine{},
+	}})
+	_, err = client.ModelStatus(names.NewModelTag(modelUUID2))
+	c.Assert(err, gc.ErrorMatches, `unauthorized`)
 }
 
 var createModelTests = []struct {
