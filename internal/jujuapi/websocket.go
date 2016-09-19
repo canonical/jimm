@@ -37,6 +37,15 @@ import (
 
 var logger = loggo.GetLogger("jem.internal.jujuapi")
 
+var errorCodes = map[error]string{
+	params.ErrAlreadyExists:    jujuparams.CodeAlreadyExists,
+	params.ErrBadRequest:       jujuparams.CodeBadRequest,
+	params.ErrForbidden:        jujuparams.CodeForbidden,
+	params.ErrMethodNotAllowed: jujuparams.CodeMethodNotAllowed,
+	params.ErrNotFound:         jujuparams.CodeNotFound,
+	params.ErrUnauthorized:     jujuparams.CodeUnauthorized,
+}
+
 // mapError maps JEM errors to errors suitable for use with the juju API.
 func mapError(err error) *jujuparams.Error {
 	if err == nil {
@@ -46,15 +55,9 @@ func mapError(err error) *jujuparams.Error {
 	if perr, ok := err.(*jujuparams.Error); ok {
 		return perr
 	}
-	msg := err.Error()
-	code := ""
-	switch errgo.Cause(err) {
-	case params.ErrNotFound:
-		code = jujuparams.CodeNotFound
-	}
 	return &jujuparams.Error{
-		Message: msg,
-		Code:    code,
+		Message: err.Error(),
+		Code:    errorCodes[errgo.Cause(err)],
 	}
 }
 

@@ -408,21 +408,22 @@ func (s *websocketSuite) TestCredential(c *gc.C) {
 	}, {
 		Error: &jujuparams.Error{
 			Message: `credential "dummy/test/cred3" not found`,
-			Code:    "not found",
+			Code:    jujuparams.CodeNotFound,
 		},
 	}, {
 		Error: &jujuparams.Error{
 			Message: `unauthorized`,
+			Code:    jujuparams.CodeUnauthorized,
 		},
 	}, {
 		Error: &jujuparams.Error{
 			Message: `cloud "no-such-cloud" not found`,
-			Code:    "not found",
+			Code:    jujuparams.CodeNotFound,
 		},
 	}, {
 		Error: &jujuparams.Error{
 			Message: `credential "dummy/admin@local/cred6" not found`,
-			Code:    "not found",
+			Code:    jujuparams.CodeNotFound,
 		},
 	}})
 }
@@ -460,7 +461,7 @@ func (s *websocketSuite) TestRevokeCredential(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(ccr, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Error: &jujuparams.Error{
-			Code:    "not found",
+			Code:    jujuparams.CodeNotFound,
 			Message: `credential "dummy/test@external/cred" not found`,
 		},
 	}})
@@ -580,6 +581,7 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 	}, {
 		Error: &jujuparams.Error{
 			Message: "unauthorized",
+			Code:    jujuparams.CodeUnauthorized,
 		},
 	}, {
 		Result: &jujuparams.ModelInfo{
@@ -624,7 +626,7 @@ var createModelTests = []struct {
 	name:        "model-2",
 	owner:       "not-test@external",
 	credential:  "dummy_test@external_cred1",
-	expectError: "unauthorized",
+	expectError: `unauthorized \(unauthorized access\)`,
 }, {
 	about:       "existing model name",
 	name:        "existing-model",
@@ -643,13 +645,13 @@ var createModelTests = []struct {
 	name:        "model-4",
 	owner:       "test@local",
 	credential:  "dummy_test@external_cred1",
-	expectError: `unauthorized`,
+	expectError: `unauthorized \(unauthorized access\)`,
 }, {
 	about:       "invalid user",
 	name:        "model-5",
 	owner:       "test/test@external",
 	credential:  "dummy_test@external_cred1",
-	expectError: `invalid owner tag: "user-test/test@external" is not a valid user tag`,
+	expectError: `invalid owner tag: "user-test/test@external" is not a valid user tag \(bad request\)`,
 }, {
 	about:      "specific cloud",
 	name:       "model-6",
@@ -669,7 +671,7 @@ var createModelTests = []struct {
 	owner:       "test@external",
 	cloudTag:    "not-a-cloud-tag",
 	credential:  "dummy_test@external_cred1",
-	expectError: `invalid cloud tag: "not-a-cloud-tag" is not a valid tag`,
+	expectError: `invalid cloud tag: "not-a-cloud-tag" is not a valid tag \(bad request\)`,
 }}
 
 func (s *websocketSuite) TestCreateModel(c *gc.C) {
@@ -775,7 +777,7 @@ func (s *websocketSuite) TestModifyModelAccessErrors(c *gc.C) {
 			Access:   jujuparams.ModelReadAccess,
 			ModelTag: names.NewModelTag(mi2.UUID).String(),
 		},
-		expectError: "unauthorized",
+		expectError: `unauthorized`,
 	}, {
 		about: "bad user domain",
 		modifyModelAccess: jujuparams.ModifyModelAccess{
