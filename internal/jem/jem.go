@@ -22,7 +22,6 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jem/internal/apiconn"
-	"github.com/CanonicalLtd/jem/internal/auth"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -44,14 +43,10 @@ type Params struct {
 	// store the JEM information.
 	DB *mgo.Database
 
-	// MaxDBClones holds the maximum number of clones of a Database
-	// copy that the pool will make before creating a new Database
-	// copy.
-	MaxDBClones int
-
-	// MaxDBAge holds the maximum age of a Database copy that the pool
-	// will keep cloning before creating a new Database copy.
-	MaxDBAge time.Duration
+	// MaxMgoSessions holds the maximum number of sessions
+	// that will be held in the pool. The actual number of sessions
+	// may temporarily go above this.
+	MaxMgoSessions int
 
 	// ControllerAdmin holds the identity of the user
 	// or group that is allowed to create controllers.
@@ -62,11 +57,28 @@ type Pool struct {
 	config    Params
 	connCache *apiconn.Cache
 
-	mu       sync.Mutex
-	db       Database
-	clones   int
-	copyTime time.Time
-	closed   bool
+	// mu guards the fields below it.
+	mu sync.Mutex
+
+	// dbIndex is incremented each time a JEM instance
+	// is created from the pool, so the database sessions
+	// are allocated in round-robin fashion.
+	dbIndex int
+
+	// dbs holds all the database connections that are in use.
+	dbs []*Database
+
+	// db holds the Database from which all other connections
+	// are copied.
+	db *Database
+
+	// closed holds whether the Pool has been closed.
+	closed bool
+
+	// refCount holds the number of JEM instances that
+	// currently refer to the pool. The pool is finally
+	// closed when all JEM instances are closed and the
+	// pool itself has been closed.
 	refCount int
 }
 
@@ -84,11 +96,13 @@ func NewPool(p Params) (*Pool, error) {
 	if p.ControllerAdmin == "" {
 		return nil, errgo.Newf("no controller admin group specified")
 	}
-	db := newDatabase(p.DB.With(p.DB.Session.Copy()))
+	if p.MaxMgoSessions <= 0 {
+		p.MaxMgoSessions = 5
+	}
 	pool := &Pool{
 		config:    p,
-		db:        db,
-		copyTime:  wallClock.Now(),
+		dbs:       make([]*Database, p.MaxMgoSessions),
+		db:        newDatabase(p.DB),
 		connCache: apiconn.NewCache(apiconn.CacheParams{}),
 		refCount:  1,
 	}
@@ -111,7 +125,12 @@ func (p *Pool) Close() {
 func (p *Pool) decRef() {
 	// called with p.mu held.
 	if p.refCount--; p.refCount == 0 {
-		p.db.Close()
+		p.db.decRef()
+		for _, db := range p.dbs {
+			if db != nil {
+				db.decRef()
+			}
+		}
 		p.connCache.Close()
 	}
 	if p.refCount < 0 {
@@ -134,17 +153,21 @@ func (p *Pool) ClearAPIConnCache() {
 // copy will be made to avoid problems with connections expiring. This
 // ensures that the number of database connections remains below the
 // connection pool size.
-func (p *Pool) database() Database {
-	now := wallClock.Now()
-	if p.clones >= p.config.MaxDBClones || now.After(p.copyTime.Add(p.config.MaxDBAge)) {
-		db := p.db
-		p.db = p.db.Copy()
-		db.Close()
-		p.clones = 0
-		p.copyTime = now
+func (p *Pool) database() *Database {
+	db := p.dbs[p.dbIndex]
+	if db == nil || db.status.isDead() {
+		if db != nil {
+			// The session is marked as dead so close it.
+			logger.Debugf("closing dead session %d", p.dbIndex)
+			db.decRef()
+		} else {
+			logger.Debugf("creating new session %d", p.dbIndex)
+		}
+		db = p.db.copy()
+		p.dbs[p.dbIndex] = db
 	}
-	p.clones++
-	return p.db.Clone()
+	p.dbIndex = (p.dbIndex + 1) % len(p.dbs)
+	return db
 }
 
 // JEM returns a new JEM instance from the pool, suitable
@@ -161,6 +184,7 @@ func (p *Pool) JEM() *JEM {
 	}
 	p.refCount++
 	db := p.database()
+	db.incRef()
 	return &JEM{
 		DB:   db,
 		pool: p,
@@ -169,7 +193,7 @@ func (p *Pool) JEM() *JEM {
 
 type JEM struct {
 	// DB holds the mongodb-backed identity store.
-	DB Database
+	DB *Database
 
 	// pool holds the Pool from which the JEM instance
 	// was created.
@@ -186,10 +210,10 @@ type JEM struct {
 func (j *JEM) Clone() *JEM {
 	j.pool.mu.Lock()
 	defer j.pool.mu.Unlock()
-	db := j.DB.Clone()
+	j.DB.incRef()
 	j.pool.refCount++
 	return &JEM{
-		DB:   db,
+		DB:   j.DB,
 		pool: j.pool,
 	}
 }
@@ -207,8 +231,8 @@ func (j *JEM) Close() {
 		return
 	}
 	j.closed = true
-	j.DB.Close()
-	j.DB = Database{}
+	j.DB.decRef()
+	j.DB = nil
 	j.pool.decRef()
 }
 
@@ -225,7 +249,8 @@ var ErrAPIConnection = errgo.New("cannot connect to API")
 // have a cause of ErrAPIConnection.
 //
 // The returned connection must be closed when finished with.
-func (j *JEM) OpenAPI(path params.EntityPath) (*apiconn.Conn, error) {
+func (j *JEM) OpenAPI(path params.EntityPath) (_ *apiconn.Conn, err error) {
+	defer j.DB.checkError(&err)
 	ctl, err := j.DB.Controller(path)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot get controller", errgo.Is(params.ErrNotFound))
@@ -368,7 +393,7 @@ func (j *JEM) CreateModel(conn *apiconn.Conn, p CreateModelParams) (*mongodoc.Mo
 // UpdateCredential updates the specified credential in the
 // local database and then updates it on all controllers to which it is
 // deployed.
-func (j *JEM) UpdateCredential(ctx context.Context, cred *mongodoc.Credential) error {
+func (j *JEM) UpdateCredential(ctx context.Context, cred *mongodoc.Credential) (err error) {
 	if err := j.DB.updateCredential(cred); err != nil {
 		return errgo.Notef(err, "cannot update local database")
 	}
@@ -477,7 +502,7 @@ func (j *JEM) GrantModel(conn *apiconn.Conn, model *mongodoc.Model, user params.
 	if err := client.GrantModel(UserTag(user).Id(), access, model.UUID); err != nil {
 		return errgo.Mask(err)
 	}
-	if err := Grant(j.DB.Models(), model.Path, user); err != nil {
+	if err := j.DB.Grant(j.DB.Models(), model.Path, user); err != nil {
 		// TODO (mhilton) What should be done with the changes already made to the controller.
 		return errgo.Mask(err)
 	}
@@ -486,7 +511,7 @@ func (j *JEM) GrantModel(conn *apiconn.Conn, model *mongodoc.Model, user params.
 
 // RevokeModel revokes the given access for the given user on the given model and updates the JEM database.
 func (j *JEM) RevokeModel(conn *apiconn.Conn, model *mongodoc.Model, user params.User, access string) error {
-	if err := Revoke(j.DB.Models(), model.Path, user); err != nil {
+	if err := j.DB.Revoke(j.DB.Models(), model.Path, user); err != nil {
 		return errgo.Mask(err)
 	}
 	client := modelmanager.NewClient(conn)
@@ -514,92 +539,6 @@ func (j *JEM) DestroyModel(conn *apiconn.Conn, model *mongodoc.Model) error {
 	return nil
 }
 
-// CheckReadACL checks that the entity with the given path in the
-// given collection can be read by the currently authenticated user.
-func CheckReadACL(ctx context.Context, coll *mgo.Collection, path params.EntityPath) error {
-	// The user can always access their own entities.
-	if err := auth.CheckIsUser(ctx, path.User); err == nil {
-		return nil
-	}
-	acl, err := GetACL(coll, path)
-	if errgo.Cause(err) == params.ErrNotFound {
-		// The document is not found - and we've already checked
-		// that the currently authenticated user cannot speak for
-		// path.User, so return an unauthorized error to stop
-		// people probing for the existence of other people's entities.
-		return params.ErrUnauthorized
-	}
-	if err := auth.CheckACL(ctx, acl.Read); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	return nil
-}
-
-// CanReadIter returns an iterator that iterates over items
-// in the given iterator, returning only those
-// that  the currently logged in user has permission
-// to see.
-//
-// The API matches that of mgo.Iter.
-func NewCanReadIter(ctx context.Context, iter *mgo.Iter) *CanReadIter {
-	return &CanReadIter{
-		ctx:  ctx,
-		iter: iter,
-	}
-}
-
-// CanReadIter represents an iterator that returns only items
-// that the currently authenticated user has read access to.
-type CanReadIter struct {
-	ctx  context.Context
-	iter *mgo.Iter
-	err  error
-	n    int
-}
-
-// Next reads the next item from the iterator into the given
-// item and returns whether it has done so.
-func (iter *CanReadIter) Next(item auth.ACLEntity) bool {
-	if iter.err != nil {
-		return false
-	}
-	for iter.iter.Next(item) {
-		iter.n++
-		if err := auth.CheckCanRead(iter.ctx, item); err != nil {
-			if errgo.Cause(err) == params.ErrUnauthorized {
-				// No permissions to look at the entity, so don't include
-				// it in the results.
-				continue
-			}
-			iter.err = errgo.Mask(err)
-			iter.iter.Close()
-			return false
-		}
-		return true
-	}
-	return false
-}
-
-func (iter *CanReadIter) Close() error {
-	iter.iter.Close()
-	return iter.Err()
-}
-
-// Err returns any error encountered when iterating.
-func (iter *CanReadIter) Err() error {
-	if iter.err != nil {
-		return iter.err
-	}
-	return iter.iter.Err()
-}
-
-// Count returns the total number of items traversed
-// by the iterator, including items that were not returned
-// because they were unauthorized.
-func (iter *CanReadIter) Count() int {
-	return iter.n
-}
-
 // DoControllers calls the given function for each controller that
 // can be read by the current user that matches the given attributes.
 // If the function returns an error, the iteration stops and
@@ -607,12 +546,9 @@ func (iter *CanReadIter) Count() int {
 func (j *JEM) DoControllers(ctx context.Context, cloud params.Cloud, region string, do func(c *mongodoc.Controller) error) error {
 	// Query all the controllers that match the attributes, building
 	// up all the possible values.
-	q, err := j.DB.controllerLocationQuery(cloud, region, false)
-	if err != nil {
-		return errgo.WithCausef(err, params.ErrBadRequest, "%s", "")
-	}
+	q := j.DB.controllerLocationQuery(cloud, region, false)
 	// Sort by _id so that we can make easily reproducible tests.
-	iter := NewCanReadIter(ctx, q.Sort("_id").Iter())
+	iter := j.DB.NewCanReadIter(ctx, q.Sort("_id").Iter())
 	var ctl mongodoc.Controller
 	for iter.Next(&ctl) {
 		if err := do(&ctl); err != nil {

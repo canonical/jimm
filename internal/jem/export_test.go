@@ -1,19 +1,23 @@
 package jem
 
-import "unsafe"
-
 var (
-	ControllerLocationQuery    = (Database).controllerLocationQuery
+	ControllerLocationQuery    = (*Database).controllerLocationQuery
 	RandIntn                   = &randIntn
-	CredentialAddController    = (Database).credentialAddController
-	CredentialRemoveController = (Database).credentialRemoveController
-	UpdateCredential           = (Database).updateCredential
+	CredentialAddController    = (*Database).credentialAddController
+	CredentialRemoveController = (*Database).credentialRemoveController
+	UpdateCredential           = (*Database).updateCredential
 	UpdateControllerCredential = (*JEM).updateControllerCredential
-	SetCredentialUpdates       = (Database).setCredentialUpdates
+	SetCredentialUpdates       = (*Database).setCredentialUpdates
+	ClearCredentialUpdate      = (*Database).clearCredentialUpdate
 	NewDatabase                = newDatabase
 	WallClock                  = &wallClock
+	DatabaseDecRef             = (*Database).decRef
 )
 
-func RefCount(db Database) uintptr {
-	return uintptr(unsafe.Pointer(db.cnt))
+func DatabaseSessionIsDead(db *Database) bool {
+	return db.status.isDead()
+}
+
+func DatabaseSetAlive(db *Database) {
+	db.status = 0
 }

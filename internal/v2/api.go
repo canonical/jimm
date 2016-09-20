@@ -165,7 +165,7 @@ func (h *Handler) AddController(arg *params.AddController) error {
 
 // GetController returns information on a controller.
 func (h *Handler) GetController(arg *params.GetController) (*params.ControllerResponse, error) {
-	if err := jem.CheckReadACL(h.context, h.jem.DB.Controllers(), arg.EntityPath); err != nil {
+	if err := h.jem.DB.CheckReadACL(h.context, h.jem.DB.Controllers(), arg.EntityPath); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	ctl, err := h.jem.DB.Controller(arg.EntityPath)
@@ -289,7 +289,7 @@ func isAlreadyGrantedError(err error) bool {
 
 // GetModel returns information on a given model.
 func (h *Handler) GetModel(arg *params.GetModel) (*params.ModelResponse, error) {
-	if err := jem.CheckReadACL(h.context, h.jem.DB.Models(), arg.EntityPath); err != nil {
+	if err := h.jem.DB.CheckReadACL(h.context, h.jem.DB.Models(), arg.EntityPath); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 
@@ -349,7 +349,7 @@ func (h *Handler) ListModels(arg *params.ListModels) (*params.ListModelsResponse
 		return nil, errgo.Notef(err, "cannot get controllers")
 	}
 	models := make([]params.ModelResponse, 0, len(controllers))
-	modelIter := jem.NewCanReadIter(h.context, h.jem.DB.Models().Find(nil).Sort("_id").Iter())
+	modelIter := h.jem.DB.NewCanReadIter(h.context, h.jem.DB.Models().Find(nil).Sort("_id").Iter())
 	var m mongodoc.Model
 	for modelIter.Next(&m) {
 		ctl, ok := controllers[m.Controller]
@@ -391,7 +391,7 @@ func (h *Handler) ListController(arg *params.ListController) (*params.ListContro
 
 	// TODO populate ProviderType and Schema fields when we have a cache
 	// for the schemaForNewModel results.
-	iter := jem.NewCanReadIter(h.context, h.jem.DB.Controllers().Find(nil).Sort("_id").Iter())
+	iter := h.jem.DB.NewCanReadIter(h.context, h.jem.DB.Controllers().Find(nil).Sort("_id").Iter())
 	var ctl mongodoc.Controller
 	for iter.Next(&ctl) {
 		loc := map[string]string{"cloud": string(ctl.Cloud.Name)}
@@ -547,7 +547,7 @@ func (c cloudRegions) locations() []map[string]string {
 
 // GetControllerLocation returns a map of location attributes for a given controller.
 func (h *Handler) GetControllerLocation(arg *params.GetControllerLocation) (params.ControllerLocation, error) {
-	if err := jem.CheckReadACL(h.context, h.jem.DB.Controllers(), arg.EntityPath); err != nil {
+	if err := h.jem.DB.CheckReadACL(h.context, h.jem.DB.Controllers(), arg.EntityPath); err != nil {
 		return params.ControllerLocation{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	ctl, err := h.jem.DB.Controller(arg.EntityPath)
@@ -576,7 +576,7 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 		return nil, errgo.NoteMask(err, "cannot select controller", errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound))
 	}
 
-	if err := jem.CheckReadACL(h.context, h.jem.DB.Controllers(), ctlPath); err != nil {
+	if err := h.jem.DB.CheckReadACL(h.context, h.jem.DB.Controllers(), ctlPath); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 
@@ -696,7 +696,7 @@ func (h *Handler) getPerm(coll *mgo.Collection, path params.EntityPath) (params.
 	if err := auth.CheckIsUser(h.context, path.User); err != nil {
 		return params.ACL{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	acl, err := jem.GetACL(coll, path)
+	acl, err := h.jem.DB.GetACL(coll, path)
 	if err != nil {
 		return params.ACL{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}

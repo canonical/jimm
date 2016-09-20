@@ -475,7 +475,7 @@ func (c cloud) userCredentials(ownerTag, cloudTag string) ([]string, error) {
 
 	}
 	var cloudCreds []string
-	it := jem.NewCanReadIter(c.h.context, c.h.jem.DB.Credentials().Find(
+	it := c.h.jem.DB.NewCanReadIter(c.h.context, c.h.jem.DB.Credentials().Find(
 		bson.D{{
 			"path.entitypath.user", owner.Name(),
 		}, {
@@ -709,7 +709,7 @@ func (m modelManager) ListModels(_ jujuparams.Entity) (jujuparams.UserModelList,
 func allModels(h *wsHandler) (jujuparams.UserModelList, error) {
 	var models []jujuparams.UserModel
 
-	it := jem.NewCanReadIter(h.context, h.jem.DB.Models().Find(nil).Sort("_id").Iter())
+	it := h.jem.DB.NewCanReadIter(h.context, h.jem.DB.Models().Find(nil).Sort("_id").Iter())
 
 	var model mongodoc.Model
 	for it.Next(&model) {
