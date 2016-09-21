@@ -41,14 +41,10 @@ type Params struct {
 	// store the JEM information.
 	DB *mgo.Database
 
-	// MaxDBClones holds the maximum number of clones of a Database
-	// copy that the server will make before creating a new Database
-	// copy.
-	MaxDBClones int
-
-	// MaxDBAge holds the maximum age of a Database copy that the server
-	// will keep cloning before creating a new Database copy.
-	MaxDBAge time.Duration
+	// MaxMgoSessions holds the maximum number of sessions
+	// that will be held in the pool. The actual number of sessions
+	// may temporarily go above this.
+	MaxMgoSessions int
 
 	// ControllerAdmin holds the identity of the user
 	// or group that is allowed to create controllers.
@@ -117,8 +113,7 @@ func New(config Params, versions map[string]NewAPIHandlerFunc) (*Server, error) 
 	}
 	jconfig := jem.Params{
 		DB:              config.DB,
-		MaxDBClones:     config.MaxDBClones,
-		MaxDBAge:        config.MaxDBAge,
+		MaxMgoSessions:  config.MaxMgoSessions,
 		ControllerAdmin: config.ControllerAdmin,
 	}
 	p, err := jem.NewPool(jconfig)
@@ -134,8 +129,8 @@ func New(config Params, versions map[string]NewAPIHandlerFunc) (*Server, error) 
 			ExpiryDuration: 24 * time.Hour,
 		},
 		MacaroonCollection:  jem.DB.Macaroons(),
-		MaxCollectionClones: config.MaxDBClones,
-		MaxCollectionAge:    config.MaxDBAge,
+		MaxCollectionClones: 100,             // TODO remove me!
+		MaxCollectionAge:    5 * time.Minute, // TODO remove me!
 		PermChecker:         idmclient.NewPermChecker(idmClient, time.Hour),
 		IdentityLocation:    config.IdentityLocation,
 	})

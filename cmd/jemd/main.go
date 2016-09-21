@@ -93,9 +93,8 @@ func serve(confPath string) error {
 	}
 	cfg := jem.ServerParams{
 		DB: db,
-		// TODO(mhilton): make these configurable.
-		MaxDBClones:          1000,
-		MaxDBAge:             time.Minute,
+		// TODO(mhilton): make this configurable.
+		MaxMgoSessions:       100,
 		ControllerAdmin:      conf.ControllerAdmin,
 		IdentityLocation:     conf.IdentityLocation,
 		PublicKeyLocator:     locator,

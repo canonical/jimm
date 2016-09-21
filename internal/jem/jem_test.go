@@ -40,8 +40,6 @@ func (s *jemSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
 	pool, err := jem.NewPool(jem.Params{
 		DB:              s.Session.DB("jem"),
-		MaxDBClones:     1000,
-		MaxDBAge:        time.Minute,
 		ControllerAdmin: "controller-admin",
 	})
 	c.Assert(err, gc.IsNil)
@@ -57,47 +55,79 @@ func (s *jemSuite) TearDownTest(c *gc.C) {
 
 func (s *jemSuite) TestPoolRequiresControllerAdmin(c *gc.C) {
 	pool, err := jem.NewPool(jem.Params{
-		DB:          s.Session.DB("jem"),
-		MaxDBClones: 1000,
-		MaxDBAge:    time.Minute,
+		DB: s.Session.DB("jem"),
 	})
 	c.Assert(err, gc.ErrorMatches, "no controller admin group specified")
 	c.Assert(pool, gc.IsNil)
 }
 
-func (s *jemSuite) TestPoolCopiesOnSize(c *gc.C) {
+func (s *jemSuite) TestPoolDoesNotReuseDeadConnection(c *gc.C) {
+	session, proxy := proxiedSession(c)
+	defer session.Close()
+	defer proxy.Close()
 	pool, err := jem.NewPool(jem.Params{
-		DB:              s.Session.DB("jem"),
-		MaxDBClones:     1,
-		MaxDBAge:        time.Minute,
+		DB:              session.DB("jem"),
 		ControllerAdmin: "controller-admin",
+		MaxMgoSessions:  2,
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.IsNil)
 	defer pool.Close()
-	j1 := pool.JEM()
-	defer j1.Close()
-	j2 := pool.JEM()
-	defer j2.Close()
-	c.Assert(jem.RefCount(j1.DB), gc.Not(gc.Equals), jem.RefCount(j2.DB))
-}
 
-func (s *jemSuite) TestPoolCopiesOnAge(c *gc.C) {
-	cl := jt.NewClock(time.Now())
-	s.PatchValue(jem.WallClock, cl)
-	pool, err := jem.NewPool(jem.Params{
-		DB:              s.Session.DB("jem"),
-		MaxDBClones:     1000,
-		MaxDBAge:        time.Minute,
-		ControllerAdmin: "controller-admin",
-	})
-	c.Assert(err, jc.ErrorIsNil)
-	defer pool.Close()
-	j1 := pool.JEM()
-	defer j1.Close()
-	cl.Advance(61 * time.Second)
-	j2 := pool.JEM()
-	defer j2.Close()
-	c.Assert(jem.RefCount(j1.DB), gc.Not(gc.Equals), jem.RefCount(j2.DB))
+	assertOK := func(j *jem.JEM) {
+		_, err := j.DB.Model(params.EntityPath{"bob", "x"})
+		c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+	}
+	assertBroken := func(j *jem.JEM) {
+		_, err := j.DB.Model(params.EntityPath{"bob", "x"})
+		c.Assert(err, gc.ErrorMatches, `cannot get model "bob/x": EOF`)
+	}
+
+	// Get a JEM instance and perform a single operation so that the session used by the
+	// JEM instance obtains a mongo socket.
+	c.Logf("make jem0")
+	jem0 := pool.JEM()
+	defer jem0.Close()
+	assertOK(jem0)
+
+	// Close all current connections to the mongo instance,
+	// which should cause subsequent operations on jem1 to fail.
+	proxy.CloseConns()
+
+	// Get another JEM instance, which should be a new session,
+	// so operations on it should not fail.
+	jem1 := pool.JEM()
+	defer jem1.Close()
+	assertOK(jem1)
+
+	// Get another JEM instance which should clone the same session
+	// used by jem0 because only two sessions are available.
+	jem2 := pool.JEM()
+	defer jem2.Close()
+	c.Assert(jem2.DB, gc.Equals, jem0.DB)
+
+	// Perform another operation on jem0, which should fail and
+	// cause its session not to be reused.
+	assertBroken(jem0)
+
+	// The jem1 connection should still be working because it
+	// was created after the connections were broken.
+	assertOK(jem1)
+
+	// The jem2 connection should also be broken because it
+	// reused the same sessions as jem0
+	assertBroken(jem2)
+
+	// Get another instance, which should reuse the jem3 connection
+	// and work OK.
+	jem3 := pool.JEM()
+	defer jem3.Close()
+	assertOK(jem3)
+
+	// When getting the next instance, we should see that the connection
+	// that we would have used is broken and create another one.
+	jem4 := pool.JEM()
+	defer jem4.Close()
+	assertOK(jem4)
 }
 
 func (s *jemSuite) TestClone(c *gc.C) {
@@ -428,153 +458,6 @@ func (s *jemSuite) TestControllerUpdateCredentials(c *gc.C) {
 			Redacted:   nil,
 		},
 	}})
-}
-
-var checkReadACLTests = []struct {
-	about            string
-	owner            string
-	acl              []string
-	user             string
-	groups           []string
-	skipCreateEntity bool
-	expectError      string
-	expectCause      error
-}{{
-	about: "user is owner",
-	owner: "bob",
-	user:  "bob",
-}, {
-	about:  "owner is user group",
-	owner:  "bobgroup",
-	user:   "bob",
-	groups: []string{"bobgroup"},
-}, {
-	about: "acl contains user",
-	owner: "fred",
-	acl:   []string{"bob"},
-	user:  "bob",
-}, {
-	about:  "acl contains user's group",
-	owner:  "fred",
-	acl:    []string{"bobgroup"},
-	user:   "bob",
-	groups: []string{"bobgroup"},
-}, {
-	about:       "user not in acl",
-	owner:       "fred",
-	acl:         []string{"fredgroup"},
-	user:        "bob",
-	expectError: "unauthorized",
-	expectCause: params.ErrUnauthorized,
-}, {
-	about:            "no entity and not owner",
-	owner:            "fred",
-	user:             "bob",
-	skipCreateEntity: true,
-	expectError:      "unauthorized",
-	expectCause:      params.ErrUnauthorized,
-}}
-
-func (s *jemSuite) TestCheckReadACL(c *gc.C) {
-	for i, test := range checkReadACLTests {
-		c.Logf("%d. %s", i, test.about)
-		gs := append(test.groups, test.user)
-		ctx := auth.AuthenticateForTest(context.Background(), gs...)
-		entity := params.EntityPath{
-			User: params.User(test.owner),
-			Name: params.Name(fmt.Sprintf("test%d", i)),
-		}
-		if !test.skipCreateEntity {
-			err := s.jem.DB.AddModel(&mongodoc.Model{
-				Path: entity,
-				ACL: params.ACL{
-					Read: test.acl,
-				},
-			})
-			c.Assert(err, gc.IsNil)
-		}
-		err := jem.CheckReadACL(ctx, s.jem.DB.Models(), entity)
-		if test.expectError != "" {
-			c.Assert(err, gc.ErrorMatches, test.expectError)
-			if test.expectCause != nil {
-				c.Assert(errgo.Cause(err), gc.Equals, test.expectCause)
-			} else {
-				c.Assert(errgo.Cause(err), gc.Equals, err)
-			}
-		} else {
-			c.Assert(err, gc.IsNil)
-		}
-	}
-}
-
-func (s *jemSuite) TestCheckGetACL(c *gc.C) {
-	m := &mongodoc.Model{
-		Path: params.EntityPath{
-			User: params.User("bob"),
-			Name: "model",
-		},
-		ACL: params.ACL{
-			Read: []string{"fred", "jim"},
-		},
-	}
-	err := s.jem.DB.AddModel(m)
-	c.Assert(err, gc.IsNil)
-	acl, err := jem.GetACL(s.jem.DB.Models(), m.Path)
-	c.Assert(err, gc.IsNil)
-	c.Assert(acl, jc.DeepEquals, m.ACL)
-}
-
-func (s *jemSuite) TestCheckGetACLNotFound(c *gc.C) {
-	m := &mongodoc.Model{
-		Path: params.EntityPath{
-			User: params.User("bob"),
-			Name: "model",
-		},
-	}
-	acl, err := jem.GetACL(s.jem.DB.Models(), m.Path)
-	c.Assert(err, gc.ErrorMatches, "not found")
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	c.Assert(acl, jc.DeepEquals, m.ACL)
-}
-
-func (s *jemSuite) TestCanReadIter(c *gc.C) {
-	testModels := []mongodoc.Model{{
-		Path: params.EntityPath{
-			User: params.User("bob"),
-			Name: "m1",
-		},
-	}, {
-		Path: params.EntityPath{
-			User: params.User("fred"),
-			Name: "m2",
-		},
-	}, {
-		Path: params.EntityPath{
-			User: params.User("fred"),
-			Name: "m3",
-		},
-		ACL: params.ACL{
-			Read: []string{"bob"},
-		},
-	}}
-	for i := range testModels {
-		err := s.jem.DB.AddModel(&testModels[i])
-		c.Assert(err, gc.IsNil)
-	}
-	ctx := auth.AuthenticateForTest(context.Background(), "bob", "bob-group")
-	it := s.jem.DB.Models().Find(nil).Sort("_id").Iter()
-	crit := jem.NewCanReadIter(ctx, it)
-	var models []mongodoc.Model
-	var m mongodoc.Model
-	for crit.Next(&m) {
-		models = append(models, m)
-	}
-	c.Assert(crit.Err(), gc.IsNil)
-	c.Assert(models, jc.DeepEquals, []mongodoc.Model{
-		testModels[0],
-		testModels[2],
-	})
-	c.Assert(crit.Count(), gc.Equals, 3)
 }
 
 var doContollerTests = []struct {

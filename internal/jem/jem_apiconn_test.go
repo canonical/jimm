@@ -28,8 +28,6 @@ func (s *jemAPIConnSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
 	pool, err := jem.NewPool(jem.Params{
 		DB:              s.Session.DB("jem"),
-		MaxDBClones:     1000,
-		MaxDBAge:        time.Minute,
 		ControllerAdmin: "controller-admin",
 	})
 	c.Assert(err, gc.IsNil)

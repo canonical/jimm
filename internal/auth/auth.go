@@ -80,7 +80,6 @@ type Pool struct {
 // NewPool creates a new Pool from which Authenticator objects may be
 // retrieved.
 func NewPool(p Params) *Pool {
-	servermon.DatabaseConnections.Inc()
 	servermon.DatabaseSessions.Inc()
 	pool := &Pool{
 		params: p,
@@ -143,7 +142,7 @@ func (p *Pool) Close() {
 	p.collection = nil
 }
 
-// An Authentciator can be used to authenticate a connection.
+// An Authenticator can be used to authenticate a connection.
 type Authenticator struct {
 	params     Params
 	bakery     *bakery.Service
@@ -243,7 +242,6 @@ type collection struct {
 // Copy creates a new collection with a copied underlaying database
 // connection.
 func (c *collection) Copy() *collection {
-	servermon.DatabaseConnections.Inc()
 	servermon.DatabaseSessions.Inc()
 	return &collection{
 		Collection: c.Collection.With(c.Collection.Database.Session.Copy()),
@@ -261,7 +259,6 @@ func (c *collection) Close() {
 		c.Collection.Database.Session.Close()
 		c.Collection = nil
 		servermon.DatabaseSessions.Dec()
-		servermon.DatabaseConnections.Dec()
 	}
 }
 

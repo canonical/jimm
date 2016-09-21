@@ -52,17 +52,17 @@ var (
 		Name:      "controllers_running",
 		Help:      "The current number of running controllers.",
 	})
-	DatabaseConnections = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "jem",
-		Subsystem: "database",
-		Name:      "database_connections",
-		Help:      "The number of database connections in use, these are shared between database sessions.",
-	})
 	DatabaseSessions = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "jem",
 		Subsystem: "database",
 		Name:      "database_sessions",
-		Help:      "The number of database session objects, some of these will be sharing connections.",
+		Help:      "The number of database sessions.",
+	})
+	DatabaseFailCount = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: "jem",
+		Subsystem: "database",
+		Name:      "fail_count",
+		Help:      "The number of times a database error was considered fatal.",
 	})
 	DeployedUnitCount = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: "jem",
@@ -160,8 +160,8 @@ func init() {
 	prometheus.MustRegister(AuthenticatorPoolNew)
 	prometheus.MustRegister(AuthenticatorPoolPut)
 	prometheus.MustRegister(ControllersRunning)
-	prometheus.MustRegister(DatabaseConnections)
 	prometheus.MustRegister(DatabaseSessions)
+	prometheus.MustRegister(DatabaseFailCount)
 	prometheus.MustRegister(DeployedUnitCount)
 	prometheus.MustRegister(LoginFailCount)
 	prometheus.MustRegister(LoginRedirectCount)
