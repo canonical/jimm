@@ -5,6 +5,7 @@
 package servermon
 
 import (
+	"github.com/cloud-green/monitoring"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -172,4 +173,5 @@ func init() {
 	prometheus.MustRegister(ModelsRunning)
 	prometheus.MustRegister(requestDuration)
 	prometheus.MustRegister(UnitsRunning)
+	prometheus.MustRegister(monitoring.NewMgoStatsCollector("jem"))
 }
