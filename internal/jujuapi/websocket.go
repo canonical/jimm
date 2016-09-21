@@ -294,10 +294,6 @@ type admin struct {
 func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResult, error) {
 	if a.h.modelUUID != "" {
 		servermon.LoginRedirectCount.Inc()
-		if a.h.model.Id == a.h.controller.Id {
-			// The client cannot log in to a controller model via JIMM.
-			return jujuparams.LoginResult{}, errgo.WithCausef(nil, params.ErrNotFound, "model %q not found", a.h.modelUUID)
-		}
 		// If the connection specifies a model then redirection is required.
 		return jujuparams.LoginResult{}, &jujuparams.Error{
 			Code:    jujuparams.CodeRedirect,
