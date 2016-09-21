@@ -16,6 +16,7 @@ import (
 
 	"github.com/CanonicalLtd/jem/internal/auth"
 	"github.com/CanonicalLtd/jem/internal/jem"
+	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -29,11 +30,13 @@ var _ = gc.Suite(&databaseSuite{})
 
 func (s *databaseSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
-	s.database = jem.NewDatabase(s.Session.DB("jem"))
+	pool := mgosession.NewPool(s.Session, 1)
+	s.database = jem.NewDatabase(pool.Session(), "jem")
+	pool.Close()
 }
 
 func (s *databaseSuite) TearDownTest(c *gc.C) {
-	jem.DatabaseDecRef(s.database)
+	jem.DatabaseClose(s.database)
 	s.IsolatedMgoSuite.TearDownTest(c)
 }
 
@@ -1090,18 +1093,27 @@ var setDeadTests = []struct {
 func (s *databaseSuite) TestSetDead(c *gc.C) {
 	session, proxy := proxiedSession(c)
 	defer session.Close()
-	proxy.Close() // Close the proxy so that no more connections can be made.
-	db := jem.NewDatabase(session.DB("jem"))
-	defer jem.DatabaseDecRef(db)
 
+	pool := mgosession.NewPool(session, 1)
+	defer pool.Close()
 	for i, test := range setDeadTests {
 		c.Logf("test %d: %s", i, test.about)
-		test.run(db)
-		c.Check(jem.DatabaseSessionIsDead(db), gc.Equals, true)
-		jem.DatabaseSetAlive(db)
-		// Sanity check that it really is marked as alive again.
-		c.Assert(jem.DatabaseSessionIsDead(db), gc.Equals, false)
+		testSetDead(c, proxy, pool, test.run)
 	}
+}
+
+func testSetDead(c *gc.C, proxy *jujutesting.TCPProxy, pool *mgosession.Pool, run func(db *jem.Database)) {
+	session := pool.Session()
+	defer session.Close()
+	// Use the session so that it's bound to the socket.
+	err := session.Ping()
+	c.Assert(err, gc.IsNil)
+	proxy.CloseConns() // Close the existing socket so that the connection is broken.
+
+	c.Check(session.MayReuse(), gc.Equals, true) // Sanity check.
+	db := jem.NewDatabase(session, "jem")
+	run(db)
+	c.Check(session.MayReuse(), gc.Equals, false)
 }
 
 // proxiedSession returns a session that uses a proxied TCP connection

@@ -1,7 +1,6 @@
 package jem
 
 var (
-	ControllerLocationQuery    = (*Database).controllerLocationQuery
 	RandIntn                   = &randIntn
 	CredentialAddController    = (*Database).credentialAddController
 	CredentialRemoveController = (*Database).credentialRemoveController
@@ -11,13 +10,12 @@ var (
 	ClearCredentialUpdate      = (*Database).clearCredentialUpdate
 	NewDatabase                = newDatabase
 	WallClock                  = &wallClock
-	DatabaseDecRef             = (*Database).decRef
 )
 
-func DatabaseSessionIsDead(db *Database) bool {
-	return db.status.isDead()
+func DatabaseClose(db *Database) {
+	db.session.Close()
 }
 
-func DatabaseSetAlive(db *Database) {
-	db.status = 0
+func DatabaseSessionIsDead(db *Database) bool {
+	return !db.session.MayReuse()
 }

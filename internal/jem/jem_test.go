@@ -103,7 +103,7 @@ func (s *jemSuite) TestPoolDoesNotReuseDeadConnection(c *gc.C) {
 	// used by jem0 because only two sessions are available.
 	jem2 := pool.JEM()
 	defer jem2.Close()
-	c.Assert(jem2.DB, gc.Equals, jem0.DB)
+	c.Assert(jem2.DB.Session, gc.Equals, jem0.DB.Session)
 
 	// Perform another operation on jem0, which should fail and
 	// cause its session not to be reused.
