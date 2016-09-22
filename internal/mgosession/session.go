@@ -129,7 +129,7 @@ func (s *Session) Clone() *Session {
 	}
 	s.s.incRef()
 	return &Session{
-		s:       s.s,
+		s: s.s,
 		// Use s.s.session instead of s.Session because there's no
 		// possibility that someone might have changed it.
 		Session: s.s.session,

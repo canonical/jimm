@@ -87,6 +87,7 @@ tls-key: |
   -----END RSA PRIVATE KEY-----
 controller-uuid: 00000000-0000-0000-0000-000000000000
 default-cloud: aws
+max-mgo-sessions: 200
 `
 
 func (s *ConfigSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
@@ -129,6 +130,7 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 		},
 		ControllerUUID: "00000000-0000-0000-0000-000000000000",
 		DefaultCloud:   "aws",
+		MaxMgoSessions: 200,
 	})
 }
 
