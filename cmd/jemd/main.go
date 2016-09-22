@@ -91,10 +91,12 @@ func serve(confPath string) error {
 			conf.IdentityLocation: conf.IdentityPublicKey,
 		}
 	}
+	if conf.MaxMgoSessions == 0 {
+		conf.MaxMgoSessions = 100
+	}
 	cfg := jem.ServerParams{
-		DB: db,
-		// TODO(mhilton): make this configurable.
-		MaxMgoSessions:       100,
+		DB:                   db,
+		MaxMgoSessions:       conf.MaxMgoSessions,
 		ControllerAdmin:      conf.ControllerAdmin,
 		IdentityLocation:     conf.IdentityLocation,
 		PublicKeyLocator:     locator,

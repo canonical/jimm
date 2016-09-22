@@ -33,6 +33,7 @@ type Config struct {
 	TLSKey            string            `yaml:"tls-key"`
 	ControllerUUID    string            `yaml:"controller-uuid"`
 	DefaultCloud      string            `yaml:"default-cloud"`
+	MaxMgoSessions    int               `yaml:"max-mgo-sessions"`
 }
 
 func (c *Config) validate() error {
