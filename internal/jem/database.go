@@ -13,6 +13,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jem/internal/auth"
+	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/internal/servermon"
 	"github.com/CanonicalLtd/jem/params"
@@ -21,8 +22,7 @@ import (
 // Database wraps an mgo.DB ands adds a number of methods for
 // manipulating the database.
 type Database struct {
-	status   sessionStatus
-	refCount int32
+	session *mgosession.Session
 	*mgo.Database
 }
 
@@ -42,45 +42,27 @@ func (db *Database) checkError(err *error) {
 	if ok {
 		return
 	}
-	// Mark the connection as dead. This may not actually be
-	// the case but the consequences of doing an extra Copy
-	// are small, and it avoids locking things out until
-	// we do a Ping, which would be a possible alternative approach.
-	db.status.setDead()
+	db.session.DoNotReuse()
 
 	servermon.DatabaseFailCount.Inc()
 	logger.Errorf("discarding mongo session because of error: %v", *err)
 	logger.Debugf("discarded mongo session error details: %#v", *err)
 }
 
-// newDatabase returns a new Database instance using
-// db with a Copied session.
-func newDatabase(db *mgo.Database) *Database {
+// newDatabase returns a new Database named dbName using
+// the given session.
+func newDatabase(session *mgosession.Session, dbName string) *Database {
 	return &Database{
-		Database: db.With(db.Session.Copy()),
-		refCount: 1,
+		session:  session,
+		Database: session.DB(dbName),
 	}
 }
 
-// copy copies the Database and its underlying mgo session.
-func (db *Database) copy() *Database {
-	return newDatabase(db.Database)
-}
-
-// incRef increments the reference count of the database.
-func (db *Database) incRef() {
-	atomic.AddInt32(&db.refCount, 1)
-}
-
-// decRef decrements the reference count of the database.
-// When the reference count drops to zero, its session will be
-// closed.
-func (db *Database) decRef() {
-	if atomic.AddInt32(&db.refCount, -1) != 0 {
-		return
+func (db *Database) clone() *Database {
+	return &Database{
+		session:  db.session.Clone(),
+		Database: db.Database,
 	}
-	servermon.DatabaseSessions.Dec()
-	db.Session.Close()
 }
 
 // AddController adds a new controller to the database. It returns an

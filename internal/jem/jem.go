@@ -22,6 +22,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jem/internal/apiconn"
+	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -54,23 +55,15 @@ type Params struct {
 }
 
 type Pool struct {
-	config    Params
-	connCache *apiconn.Cache
+	config      Params
+	connCache   *apiconn.Cache
+	sessionPool *mgosession.Pool
+
+	// dbName holds the name of the database to use.
+	dbName string
 
 	// mu guards the fields below it.
 	mu sync.Mutex
-
-	// dbIndex is incremented each time a JEM instance
-	// is created from the pool, so the database sessions
-	// are allocated in round-robin fashion.
-	dbIndex int
-
-	// dbs holds all the database connections that are in use.
-	dbs []*Database
-
-	// db holds the Database from which all other connections
-	// are copied.
-	db *Database
 
 	// closed holds whether the Pool has been closed.
 	closed bool
@@ -83,8 +76,6 @@ type Pool struct {
 }
 
 var APIOpenTimeout = 15 * time.Second
-
-const maxPermCacheDuration = 10 * time.Second
 
 var notExistsQuery = bson.D{{"$exists", false}}
 
@@ -100,11 +91,11 @@ func NewPool(p Params) (*Pool, error) {
 		p.MaxMgoSessions = 5
 	}
 	pool := &Pool{
-		config:    p,
-		dbs:       make([]*Database, p.MaxMgoSessions),
-		db:        newDatabase(p.DB),
-		connCache: apiconn.NewCache(apiconn.CacheParams{}),
-		refCount:  1,
+		config:      p,
+		sessionPool: mgosession.NewPool(p.DB.Session, p.MaxMgoSessions),
+		dbName:      p.DB.Name,
+		connCache:   apiconn.NewCache(apiconn.CacheParams{}),
+		refCount:    1,
 	}
 	return pool, nil
 }
@@ -125,12 +116,7 @@ func (p *Pool) Close() {
 func (p *Pool) decRef() {
 	// called with p.mu held.
 	if p.refCount--; p.refCount == 0 {
-		p.db.decRef()
-		for _, db := range p.dbs {
-			if db != nil {
-				db.decRef()
-			}
-		}
+		p.sessionPool.Close()
 		p.connCache.Close()
 	}
 	if p.refCount < 0 {
@@ -142,32 +128,6 @@ func (p *Pool) decRef() {
 // This is useful for testing purposes.
 func (p *Pool) ClearAPIConnCache() {
 	p.connCache.EvictAll()
-}
-
-// database returns a database suitable for use in a new JEM. The
-// returned database must be closed when finished with. The lock must be
-// held before calling database.
-//
-// The returned database will normally be a clone of the current pool
-// database. Periodically, as determined by MaxDBClones and MaxDBAge, a
-// copy will be made to avoid problems with connections expiring. This
-// ensures that the number of database connections remains below the
-// connection pool size.
-func (p *Pool) database() *Database {
-	db := p.dbs[p.dbIndex]
-	if db == nil || db.status.isDead() {
-		if db != nil {
-			// The session is marked as dead so close it.
-			logger.Debugf("closing dead session %d", p.dbIndex)
-			db.decRef()
-		} else {
-			logger.Debugf("creating new session %d", p.dbIndex)
-		}
-		db = p.db.copy()
-		p.dbs[p.dbIndex] = db
-	}
-	p.dbIndex = (p.dbIndex + 1) % len(p.dbs)
-	return db
 }
 
 // JEM returns a new JEM instance from the pool, suitable
@@ -183,10 +143,9 @@ func (p *Pool) JEM() *JEM {
 		panic("JEM call on closed pool")
 	}
 	p.refCount++
-	db := p.database()
-	db.incRef()
+	session := p.sessionPool.Session()
 	return &JEM{
-		DB:   db,
+		DB:   newDatabase(session, p.dbName),
 		pool: p,
 	}
 }
@@ -210,10 +169,10 @@ type JEM struct {
 func (j *JEM) Clone() *JEM {
 	j.pool.mu.Lock()
 	defer j.pool.mu.Unlock()
-	j.DB.incRef()
+
 	j.pool.refCount++
 	return &JEM{
-		DB:   j.DB,
+		DB:   j.DB.clone(),
 		pool: j.pool,
 	}
 }
@@ -231,7 +190,7 @@ func (j *JEM) Close() {
 		return
 	}
 	j.closed = true
-	j.DB.decRef()
+	j.DB.session.Close()
 	j.DB = nil
 	j.pool.decRef()
 }
