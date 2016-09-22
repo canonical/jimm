@@ -43,8 +43,8 @@ type handler struct {
 
 func (h *handler) checkIsAdmin(req *http.Request) error {
 	if h.ctx == nil {
-		a := h.authPool.Get()
-		defer h.authPool.Put(a)
+		a := h.authPool.Authenticator()
+		defer a.Close()
 		ctx, err := a.AuthenticateRequest(context.Background(), req)
 		if err != nil {
 			return errgo.Mask(err, errgo.Any)

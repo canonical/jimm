@@ -24,23 +24,27 @@ import (
 	"github.com/CanonicalLtd/jem/internal/apiconn"
 	"github.com/CanonicalLtd/jem/internal/auth"
 	"github.com/CanonicalLtd/jem/internal/jem"
+	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
 
 type jemSuite struct {
 	corejujutesting.JujuConnSuite
-	pool *jem.Pool
-	jem  *jem.JEM
+	pool        *jem.Pool
+	sessionPool *mgosession.Pool
+	jem         *jem.JEM
 }
 
 var _ = gc.Suite(&jemSuite{})
 
 func (s *jemSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
+	s.sessionPool = mgosession.NewPool(s.Session, 5)
 	pool, err := jem.NewPool(jem.Params{
 		DB:              s.Session.DB("jem"),
 		ControllerAdmin: "controller-admin",
+		SessionPool:     s.sessionPool,
 	})
 	c.Assert(err, gc.IsNil)
 	s.pool = pool
@@ -50,6 +54,7 @@ func (s *jemSuite) SetUpTest(c *gc.C) {
 func (s *jemSuite) TearDownTest(c *gc.C) {
 	s.jem.Close()
 	s.pool.Close()
+	s.sessionPool.Close()
 	s.JujuConnSuite.TearDownTest(c)
 }
 
@@ -62,13 +67,14 @@ func (s *jemSuite) TestPoolRequiresControllerAdmin(c *gc.C) {
 }
 
 func (s *jemSuite) TestPoolDoesNotReuseDeadConnection(c *gc.C) {
-	session, proxy := proxiedSession(c)
+	session := jt.NewProxiedSession(c)
 	defer session.Close()
-	defer proxy.Close()
+	sessionPool := mgosession.NewPool(session.Session, 2)
+	defer sessionPool.Close()
 	pool, err := jem.NewPool(jem.Params{
 		DB:              session.DB("jem"),
 		ControllerAdmin: "controller-admin",
-		MaxMgoSessions:  2,
+		SessionPool:     sessionPool,
 	})
 	c.Assert(err, gc.IsNil)
 	defer pool.Close()
@@ -91,7 +97,7 @@ func (s *jemSuite) TestPoolDoesNotReuseDeadConnection(c *gc.C) {
 
 	// Close all current connections to the mongo instance,
 	// which should cause subsequent operations on jem1 to fail.
-	proxy.CloseConns()
+	session.CloseConns()
 
 	// Get another JEM instance, which should be a new session,
 	// so operations on it should not fail.

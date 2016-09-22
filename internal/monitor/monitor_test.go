@@ -12,6 +12,7 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jem/internal/apitest"
+	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/internal/monitor"
 	"github.com/CanonicalLtd/jem/params"
@@ -65,9 +66,14 @@ func (s *monitorSuite) TestMonitor(c *gc.C) {
 
 func (s *monitorSuite) TestMonitorWithBrokenMongoConnection(c *gc.C) {
 	s.PatchValue(monitor.APIConnectRetryDuration, 10*time.Millisecond)
-	pool, proxy := s.ProxiedPool(c)
+	session := testing.NewProxiedSession(c)
+	defer session.Close()
+
+	sessionPool := mgosession.NewPool(session.Session, 2)
+	defer sessionPool.Close()
+
+	pool := s.NewJEMPool(c, sessionPool)
 	defer pool.Close()
-	defer proxy.Close()
 
 	// Create a controller.
 	apiInfo := s.APIInfo(c)
@@ -97,7 +103,7 @@ func (s *monitorSuite) TestMonitorWithBrokenMongoConnection(c *gc.C) {
 
 	// Tear down the mongo connection and check that
 	// the monitoring continues.
-	proxy.CloseConns()
+	session.CloseConns()
 
 	f := factory.NewFactory(s.State)
 	f.MakeApplication(c, &factory.ApplicationParams{

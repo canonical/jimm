@@ -5,13 +5,10 @@ package auth
 import (
 	"net/http"
 	"sort"
-	"sync"
-	"time"
 
 	"github.com/juju/idmclient"
 	"github.com/juju/loggo"
 	"github.com/juju/utils"
-	"github.com/juju/utils/clock"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -21,18 +18,14 @@ import (
 	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2"
 
+	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/servermon"
 	"github.com/CanonicalLtd/jem/params"
 )
 
 var logger = loggo.GetLogger("jem.internal.auth")
 
-// wallclock provides access to the current time. It is defined as a variable so that it can be overridden in tests.
-var wallclock clock.Clock = clock.WallClock
-
-const (
-	usernameAttr = "username"
-)
+const usernameAttr = "username"
 
 // Params holds parameters for the NewPool function.
 type Params struct {
@@ -48,17 +41,8 @@ type Params struct {
 	RootKeysPolicy mgostorage.Policy
 
 	// MacaroonCollection holds a mgo.Collection which can be used
-	// with RootKeys to store and retrive macaroons.
+	// with RootKeys to store and retrieve macaroons.
 	MacaroonCollection *mgo.Collection
-
-	// MaxCollectionClones holds the maximum number of clones sharing
-	// a database connection before a new copy is created.
-	MaxCollectionClones int
-
-	// MaxCollectionAge holds the maximum number amount of time for
-	// which a database connection will be shared before a new copy
-	// is created.
-	MaxCollectionAge time.Duration
 
 	// PermChecker holds a PermChecker that will be used to check if
 	// the current user is a member of an ACL.
@@ -66,100 +50,59 @@ type Params struct {
 
 	// IdentityLocation holds the location of the third party identity service.
 	IdentityLocation string
+
+	// SessionPool holds a pool from which session objects are
+	// taken to be used in database operations.
+	SessionPool *mgosession.Pool
 }
 
 // A Pool contains a pool of authenticator objects.
 type Pool struct {
-	params     Params
-	pool       sync.Pool
-	mu         sync.Mutex
-	collection *collection
-	closed     bool
+	params Params
 }
 
 // NewPool creates a new Pool from which Authenticator objects may be
 // retrieved.
 func NewPool(p Params) *Pool {
-	servermon.DatabaseSessions.Inc()
-	pool := &Pool{
+	return &Pool{
 		params: p,
-		collection: &collection{
-			Collection: p.MacaroonCollection.With(p.MacaroonCollection.Database.Session.Copy()),
-			created:    wallclock.Now(),
-			n:          1,
-		},
 	}
-	pool.pool = sync.Pool{
-		New: pool.new,
-	}
-	return pool
 }
 
-// Get retrieves an Authenticator object from the pool.
-func (p *Pool) Get() *Authenticator {
+// Authenticator retrieves an Authenticator object from the pool, which
+// must be closed after use.
+func (p *Pool) Authenticator() *Authenticator {
 	servermon.AuthenticatorPoolGet.Inc()
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.closed {
-		panic("Get called on closed pool")
-	}
-	p.collection.mu.Lock()
-	if p.collection.n > p.params.MaxCollectionClones || p.collection.created.Add(p.params.MaxCollectionAge).Before(wallclock.Now()) {
-		c := p.collection
-		p.collection = c.Copy()
-		p.collection.mu.Lock()
-		c.mu.Unlock()
-		c.Close()
-	}
-	p.collection.n++
-	p.collection.mu.Unlock()
-	return p.pool.Get().(*Authenticator).with(p.collection)
-}
-
-// Put returns an Authenticator object to the pool.
-func (p *Pool) Put(a *Authenticator) {
-	servermon.AuthenticatorPoolPut.Inc()
-	a.bakery = nil
-	a.collection.Close()
-	a.collection = nil
-	p.pool.Put(a)
-}
-
-// new creates a new authenticator instance.
-func (p *Pool) new() interface{} {
-	servermon.AuthenticatorPoolNew.Inc()
+	session := p.params.SessionPool.Session()
 	return &Authenticator{
-		params: p.params,
+		pool: p,
+		bakery: p.params.Bakery.WithRootKeyStore(
+			p.params.RootKeys.NewStorage(
+				p.params.MacaroonCollection.With(session.Session),
+				p.params.RootKeysPolicy,
+			),
+		),
+		session: session,
 	}
-}
-
-// Close closes the pool and frees it's resources.
-func (p *Pool) Close() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.closed = true
-	p.collection.Close()
-	p.collection = nil
 }
 
 // An Authenticator can be used to authenticate a connection.
 type Authenticator struct {
-	params     Params
-	bakery     *bakery.Service
-	collection *collection
+	closed  bool
+	pool    *Pool
+	bakery  *bakery.Service
+	session *mgosession.Session
 }
 
-// with prepares this authenticator instance for use with the given
-// collection.
-func (a *Authenticator) with(c *collection) *Authenticator {
-	a.collection = c
-	a.bakery = a.params.Bakery.WithRootKeyStore(
-		a.params.RootKeys.NewStorage(
-			a.params.MacaroonCollection.With(c.Database.Session),
-			a.params.RootKeysPolicy,
-		),
-	)
-	return a
+// Close closes the authenticator instance.
+func (a *Authenticator) Close() {
+	if a.closed {
+		return
+	}
+	a.closed = true
+	servermon.AuthenticatorPoolPut.Inc()
+	a.bakery = nil
+	a.session.Close()
 }
 
 // Authenticate checks all macaroons in mss. If any are valid then the
@@ -173,7 +116,7 @@ func (a *Authenticator) Authenticate(ctx context.Context, mss []macaroon.Slice, 
 		servermon.AuthenticationSuccessCount.Inc()
 		return context.WithValue(ctx, authKey, authentication{
 			username:    attrMap[usernameAttr],
-			permChecker: a.params.PermChecker,
+			permChecker: a.pool.params.PermChecker,
 		}), nil, nil
 	}
 	servermon.AuthenticationFailCount.Inc()
@@ -222,44 +165,12 @@ func (a *Authenticator) newMacaroon() (*macaroon.Macaroon, error) {
 	return a.bakery.NewMacaroon("", nil, []checkers.Caveat{
 		checkers.NeedDeclaredCaveat(
 			checkers.Caveat{
-				Location:  a.params.IdentityLocation,
+				Location:  a.pool.params.IdentityLocation,
 				Condition: "is-authenticated-user",
 			},
 			usernameAttr,
 		),
 	})
-}
-
-// A collection represents a mgo.Collection that an Authenticator can use
-// to look up macaroon information.
-type collection struct {
-	*mgo.Collection
-	created time.Time
-	mu      sync.Mutex
-	n       int
-}
-
-// Copy creates a new collection with a copied underlaying database
-// connection.
-func (c *collection) Copy() *collection {
-	servermon.DatabaseSessions.Inc()
-	return &collection{
-		Collection: c.Collection.With(c.Collection.Database.Session.Copy()),
-		created:    wallclock.Now(),
-		n:          1,
-	}
-}
-
-// Closes closes this collection.
-func (c *collection) Close() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.n--
-	if c.n == 0 {
-		c.Collection.Database.Session.Close()
-		c.Collection = nil
-		servermon.DatabaseSessions.Dec()
-	}
 }
 
 type contextKey int

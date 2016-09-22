@@ -43,8 +43,8 @@ type Handler struct {
 func NewAPIHandler(jp *jem.Pool, ap *auth.Pool, sp jemserver.Params) ([]httprequest.Handler, error) {
 	return jemerror.Mapper.Handlers(func(p httprequest.Params) (*Handler, error) {
 		// All requests require an authenticated client.
-		a := ap.Get()
-		defer ap.Put(a)
+		a := ap.Authenticator()
+		defer a.Close()
 		ctx, err := a.AuthenticateRequest(context.Background(), p.Request)
 		if err != nil {
 			return nil, errgo.Mask(err, errgo.Any)

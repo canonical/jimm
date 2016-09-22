@@ -301,8 +301,8 @@ func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResult, error
 		}
 	}
 	// JAAS only supports macaroon login, ignore all the other fields.
-	authenticator := a.h.authPool.Get()
-	defer a.h.authPool.Put(authenticator)
+	authenticator := a.h.authPool.Authenticator()
+	defer authenticator.Close()
 	ctx, m, err := authenticator.Authenticate(a.h.context, req.Macaroons, checkers.TimeBefore)
 	if err != nil {
 		servermon.LoginFailCount.Inc()
