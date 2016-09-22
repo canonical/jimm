@@ -23,6 +23,7 @@ import (
 
 	"github.com/CanonicalLtd/jem/internal/auth"
 	"github.com/CanonicalLtd/jem/internal/jem"
+	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/monitor"
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -81,10 +82,11 @@ type Params struct {
 
 // Server represents a JEM HTTP server.
 type Server struct {
-	router   *httprouter.Router
-	pool     *jem.Pool
-	authPool *auth.Pool
-	monitor  *monitor.Monitor
+	router      *httprouter.Router
+	pool        *jem.Pool
+	authPool    *auth.Pool
+	sessionPool *mgosession.Pool
+	monitor     *monitor.Monitor
 }
 
 // New returns a new handler that handles model manager
@@ -94,6 +96,9 @@ type Server struct {
 func New(config Params, versions map[string]NewAPIHandlerFunc) (*Server, error) {
 	if len(versions) == 0 {
 		return nil, errgo.Newf("JEM server must serve at least one version of the API")
+	}
+	if config.MaxMgoSessions <= 0 {
+		config.MaxMgoSessions = 1
 	}
 	idmClient, err := newIdentityClient(config)
 	if err != nil {
@@ -111,9 +116,10 @@ func New(config Params, versions map[string]NewAPIHandlerFunc) (*Server, error) 
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot create bakery")
 	}
+	sessionPool := mgosession.NewPool(config.DB.Session, config.MaxMgoSessions)
 	jconfig := jem.Params{
 		DB:              config.DB,
-		MaxMgoSessions:  config.MaxMgoSessions,
+		SessionPool:     sessionPool,
 		ControllerAdmin: config.ControllerAdmin,
 	}
 	p, err := jem.NewPool(jconfig)
@@ -128,16 +134,15 @@ func New(config Params, versions map[string]NewAPIHandlerFunc) (*Server, error) 
 		RootKeysPolicy: mgostorage.Policy{
 			ExpiryDuration: 24 * time.Hour,
 		},
-		MacaroonCollection:  jem.DB.Macaroons(),
-		MaxCollectionClones: 100,             // TODO remove me!
-		MaxCollectionAge:    5 * time.Minute, // TODO remove me!
-		PermChecker:         idmclient.NewPermChecker(idmClient, time.Hour),
-		IdentityLocation:    config.IdentityLocation,
+		MacaroonCollection: jem.DB.Macaroons(),
+		SessionPool:        sessionPool,
+		PermChecker:        idmclient.NewPermChecker(idmClient, time.Hour),
+		IdentityLocation:   config.IdentityLocation,
 	})
 	srv := &Server{
-		router:   httprouter.New(),
-		pool:     p,
-		authPool: authPool,
+		router:      httprouter.New(),
+		pool:        p,
+		sessionPool: sessionPool,
 	}
 	if config.RunMonitor {
 		owner, err := monitorLeaseOwner(config.AgentUsername)
@@ -219,8 +224,8 @@ func (srv *Server) Close() error {
 			logger.Warningf("error shutting down monitor: %v", err)
 		}
 	}
-	srv.authPool.Close()
 	srv.pool.Close()
+	srv.sessionPool.Close()
 	return nil
 }
 

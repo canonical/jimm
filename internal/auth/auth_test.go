@@ -20,13 +20,15 @@ import (
 	"gopkg.in/macaroon.v1"
 
 	"github.com/CanonicalLtd/jem/internal/auth"
+	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/params"
 )
 
 type authSuite struct {
 	jujutesting.IsolatedMgoSuite
-	idmSrv *idmtest.Server
-	pool   *auth.Pool
+	idmSrv      *idmtest.Server
+	pool        *auth.Pool
+	sessionPool *mgosession.Pool
 }
 
 var _ = gc.Suite(&authSuite{})
@@ -40,15 +42,15 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 		Locator:  s.idmSrv,
 	})
 	c.Assert(err, jc.ErrorIsNil)
+	s.sessionPool = mgosession.NewPool(s.Session, 5)
 	s.pool = auth.NewPool(auth.Params{
 		Bakery:   bakery,
 		RootKeys: mgostorage.NewRootKeys(100),
 		RootKeysPolicy: mgostorage.Policy{
 			ExpiryDuration: 1 * time.Second,
 		},
-		MacaroonCollection:  db.C("macaroons"),
-		MaxCollectionClones: 1000,
-		MaxCollectionAge:    time.Minute,
+		MacaroonCollection: db.C("macaroons"),
+		SessionPool:        s.sessionPool,
 		PermChecker: idmclient.NewPermChecker(
 			idmclient.New(idmclient.NewParams{
 				BaseURL: s.idmSrv.URL.String(),
@@ -61,95 +63,23 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *authSuite) TearDownTest(c *gc.C) {
-	s.pool.Close()
+	s.sessionPool.Close()
 	s.IsolatedMgoSuite.TearDownTest(c)
 }
 
-func (s authSuite) TestGet(c *gc.C) {
-	a1 := s.pool.Get()
+func (s authSuite) TestAuthenticator(c *gc.C) {
+	a1 := s.pool.Authenticator()
 	c.Assert(a1, gc.Not(gc.IsNil))
-	defer s.pool.Put(a1)
-	a2 := s.pool.Get()
+	defer a1.Close()
+	a2 := s.pool.Authenticator()
 	c.Assert(a2, gc.Not(gc.IsNil))
-	defer s.pool.Put(a2)
+	defer a2.Close()
 	c.Assert(a1, gc.DeepEquals, a2)
 }
 
-func (s authSuite) TestGetChangeAfterNumberOfInstances(c *gc.C) {
-	session := s.Session.Clone()
-	defer session.Close()
-	bakery, err := bakery.NewService(bakery.NewServiceParams{
-		Location: "here",
-		Locator:  s.idmSrv,
-	})
-	c.Assert(err, jc.ErrorIsNil)
-	pool := auth.NewPool(auth.Params{
-		Bakery:   bakery,
-		RootKeys: mgostorage.NewRootKeys(100),
-		RootKeysPolicy: mgostorage.Policy{
-			ExpiryDuration: 1 * time.Second,
-		},
-		MacaroonCollection:  session.DB("auth").C("macaroons"),
-		MaxCollectionClones: 1,
-		MaxCollectionAge:    time.Minute,
-		PermChecker: idmclient.NewPermChecker(
-			idmclient.New(idmclient.NewParams{
-				BaseURL: s.idmSrv.URL.String(),
-				Client:  s.idmSrv.Client("test-user"),
-			}),
-			time.Second,
-		),
-		IdentityLocation: s.idmSrv.URL.String(),
-	})
-	defer pool.Close()
-	a1 := pool.Get()
-	c.Assert(a1, gc.Not(gc.IsNil))
-	defer pool.Put(a1)
-	a2 := pool.Get()
-	c.Assert(a2, gc.Not(gc.IsNil))
-	defer pool.Put(a2)
-	c.Assert(a1, gc.Not(gc.DeepEquals), a2)
-}
-
-func (s authSuite) TestGetChangeAfterTime(c *gc.C) {
-	session := s.Session.Clone()
-	defer session.Close()
-	bakery, err := bakery.NewService(bakery.NewServiceParams{
-		Location: "here",
-		Locator:  s.idmSrv,
-	})
-	c.Assert(err, jc.ErrorIsNil)
-	pool := auth.NewPool(auth.Params{
-		Bakery:   bakery,
-		RootKeys: mgostorage.NewRootKeys(100),
-		RootKeysPolicy: mgostorage.Policy{
-			ExpiryDuration: 1 * time.Second,
-		},
-		MacaroonCollection:  session.DB("auth").C("macaroons"),
-		MaxCollectionClones: 1,
-		MaxCollectionAge:    time.Nanosecond,
-		PermChecker: idmclient.NewPermChecker(
-			idmclient.New(idmclient.NewParams{
-				BaseURL: s.idmSrv.URL.String(),
-				Client:  s.idmSrv.Client("test-user"),
-			}),
-			time.Second,
-		),
-		IdentityLocation: s.idmSrv.URL.String(),
-	})
-	defer pool.Close()
-	a1 := pool.Get()
-	c.Assert(a1, gc.Not(gc.IsNil))
-	defer pool.Put(a1)
-	a2 := pool.Get()
-	c.Assert(a2, gc.Not(gc.IsNil))
-	defer pool.Put(a2)
-	c.Assert(a1, gc.Not(gc.DeepEquals), a2)
-}
-
 func (s *authSuite) TestAuthenticateNoMacaroon(c *gc.C) {
-	a := s.pool.Get()
-	defer s.pool.Put(a)
+	a := s.pool.Authenticator()
+	defer a.Close()
 	ctx := context.Background()
 	ctx2, m, err := a.Authenticate(ctx, nil, checkers.New())
 	c.Assert(ctx, jc.DeepEquals, ctx2)
@@ -158,8 +88,8 @@ func (s *authSuite) TestAuthenticateNoMacaroon(c *gc.C) {
 }
 
 func (s *authSuite) TestAuthenticate(c *gc.C) {
-	a := s.pool.Get()
-	defer s.pool.Put(a)
+	a := s.pool.Authenticator()
+	defer a.Close()
 	ctx := context.Background()
 	_, m, _ := a.Authenticate(ctx, nil, checkers.New())
 	ms := s.discharge(c, m, "bob")
@@ -174,8 +104,8 @@ func (s *authSuite) TestAuthenticate(c *gc.C) {
 }
 
 func (s *authSuite) TestAuthenticateRequest(c *gc.C) {
-	a := s.pool.Get()
-	defer s.pool.Put(a)
+	a := s.pool.Authenticator()
+	defer a.Close()
 	ctx := context.Background()
 	req, err := http.NewRequest("GET", "/", nil)
 	req.RequestURI = "/"
@@ -270,8 +200,8 @@ func (s *authSuite) TestCheckCanRead(c *gc.C) {
 
 func (s *authSuite) TestUsername(c *gc.C) {
 	c.Assert(auth.Username(context.Background()), gc.Equals, "")
-	a := s.pool.Get()
-	defer s.pool.Put(a)
+	a := s.pool.Authenticator()
+	defer a.Close()
 	_, m, _ := a.Authenticate(nil, nil, checkers.New())
 	ms := s.discharge(c, m, "bob")
 	ctx, _, err := a.Authenticate(context.Background(), []macaroon.Slice{ms}, checkers.New())

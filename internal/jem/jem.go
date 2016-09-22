@@ -44,10 +44,9 @@ type Params struct {
 	// store the JEM information.
 	DB *mgo.Database
 
-	// MaxMgoSessions holds the maximum number of sessions
-	// that will be held in the pool. The actual number of sessions
-	// may temporarily go above this.
-	MaxMgoSessions int
+	// SessionPool holds a pool from which session objects are
+	// taken to be used in database operations.
+	SessionPool *mgosession.Pool
 
 	// ControllerAdmin holds the identity of the user
 	// or group that is allowed to create controllers.
@@ -55,9 +54,8 @@ type Params struct {
 }
 
 type Pool struct {
-	config      Params
-	connCache   *apiconn.Cache
-	sessionPool *mgosession.Pool
+	config    Params
+	connCache *apiconn.Cache
 
 	// dbName holds the name of the database to use.
 	dbName string
@@ -87,15 +85,14 @@ func NewPool(p Params) (*Pool, error) {
 	if p.ControllerAdmin == "" {
 		return nil, errgo.Newf("no controller admin group specified")
 	}
-	if p.MaxMgoSessions <= 0 {
-		p.MaxMgoSessions = 5
+	if p.SessionPool == nil {
+		return nil, errgo.Newf("no session pool provided")
 	}
 	pool := &Pool{
-		config:      p,
-		sessionPool: mgosession.NewPool(p.DB.Session, p.MaxMgoSessions),
-		dbName:      p.DB.Name,
-		connCache:   apiconn.NewCache(apiconn.CacheParams{}),
-		refCount:    1,
+		config:    p,
+		dbName:    p.DB.Name,
+		connCache: apiconn.NewCache(apiconn.CacheParams{}),
+		refCount:  1,
 	}
 	return pool, nil
 }
@@ -116,7 +113,6 @@ func (p *Pool) Close() {
 func (p *Pool) decRef() {
 	// called with p.mu held.
 	if p.refCount--; p.refCount == 0 {
-		p.sessionPool.Close()
 		p.connCache.Close()
 	}
 	if p.refCount < 0 {
@@ -143,9 +139,8 @@ func (p *Pool) JEM() *JEM {
 		panic("JEM call on closed pool")
 	}
 	p.refCount++
-	session := p.sessionPool.Session()
 	return &JEM{
-		DB:   newDatabase(session, p.dbName),
+		DB:   newDatabase(p.config.SessionPool.Session(), p.dbName),
 		pool: p,
 	}
 }

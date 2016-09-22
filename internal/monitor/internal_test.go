@@ -19,15 +19,17 @@ import (
 	"gopkg.in/tomb.v2"
 
 	"github.com/CanonicalLtd/jem/internal/jem"
+	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
 
 type internalSuite struct {
 	corejujutesting.JujuConnSuite
-	idmSrv *idmtest.Server
-	pool   *jem.Pool
-	jem    *jem.JEM
+	idmSrv      *idmtest.Server
+	sessionPool *mgosession.Pool
+	pool        *jem.Pool
+	jem         *jem.JEM
 
 	// startTime holds the time that the testing clock is initially
 	// set to.
@@ -47,7 +49,9 @@ var _ = gc.Suite(&internalSuite{})
 func (s *internalSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
 	s.idmSrv = idmtest.NewServer()
+	s.sessionPool = mgosession.NewPool(s.Session, 1)
 	pool, err := jem.NewPool(jem.Params{
+		SessionPool:     s.sessionPool,
 		DB:              s.Session.DB("jem"),
 		ControllerAdmin: "controller-admin",
 	})
@@ -63,6 +67,7 @@ func (s *internalSuite) SetUpTest(c *gc.C) {
 func (s *internalSuite) TearDownTest(c *gc.C) {
 	s.jem.Close()
 	s.pool.Close()
+	s.sessionPool.Close()
 	s.JujuConnSuite.TearDownTest(c)
 }
 

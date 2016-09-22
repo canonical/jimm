@@ -12,7 +12,6 @@ import (
 	"github.com/juju/idmclient/idmtest"
 	"github.com/juju/juju/controller"
 	corejujutesting "github.com/juju/juju/juju/testing"
-	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"github.com/rogpeppe/fastuuid"
@@ -23,6 +22,7 @@ import (
 	external_jem "github.com/CanonicalLtd/jem"
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/jemserver"
+	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/jemclient"
 	"github.com/CanonicalLtd/jem/params"
@@ -48,6 +48,10 @@ type Suite struct {
 
 	// Pool holds the pool from which the above JEM was taken.
 	Pool *jem.Pool
+
+	// SessionPool holds the session pool used to create new
+	// JEM instances.
+	SessionPool *mgosession.Pool
 }
 
 func (s *Suite) SetUpTest(c *gc.C) {
@@ -61,16 +65,23 @@ func (s *Suite) SetUpTest(c *gc.C) {
 	s.JEMSrv = s.NewServer(c, s.Session, s.IDMSrv)
 	s.httpSrv = httptest.NewServer(s.JEMSrv)
 
-	s.Pool = s.newPool(c, s.Session)
+	s.SessionPool = mgosession.NewPool(s.Session, 1)
+	s.Pool = s.NewJEMPool(c, s.SessionPool)
 	s.JEM = s.Pool.JEM()
 }
 
-func (s *Suite) newPool(c *gc.C, session *mgo.Session) *jem.Pool {
+// NewJEMPool returns a jem.Pool that uses the given
+// mgosession.Pool, enabling a custom session pool
+// to be used.
+func (s *Suite) NewJEMPool(c *gc.C, sessionPool *mgosession.Pool) *jem.Pool {
+	session := sessionPool.Session()
 	pool, err := jem.NewPool(jem.Params{
 		DB:              session.DB("jem"),
 		ControllerAdmin: "controller-admin",
+		SessionPool:     sessionPool,
 	})
 	c.Assert(err, gc.IsNil)
+	session.Close()
 	return pool
 }
 
@@ -80,6 +91,8 @@ func (s *Suite) TearDownTest(c *gc.C) {
 	s.IDMSrv.Close()
 	s.JEM.Close()
 	s.Pool.Close()
+	s.SessionPool.Close()
+	c.Logf("calling JujuConnSuite.TearDownTest")
 	s.JujuConnSuite.TearDownTest(c)
 }
 
@@ -90,23 +103,6 @@ func (s *Suite) NewClient(username params.User) *jemclient.Client {
 		BaseURL: s.httpSrv.URL,
 		Client:  s.IDMSrv.Client(string(username)),
 	})
-}
-
-// ProxiedPool returns a JEM pool that uses a proxied TCP connection
-// to MongoDB and the proxy that the connections go through.
-// This makes it possible to test what happens when a connection
-// to the database is broken.
-//
-// Both the returned pool and the returned proxy should
-// be closed after use.
-func (s *Suite) ProxiedPool(c *gc.C) (*jem.Pool, *testing.TCPProxy) {
-	mgoInfo := testing.MgoServer.DialInfo()
-	c.Assert(mgoInfo.Addrs, gc.HasLen, 1)
-	proxy := testing.NewTCPProxy(c, mgoInfo.Addrs[0])
-	mgoInfo.Addrs = []string{proxy.Addr()}
-	session, err := mgo.DialWithInfo(mgoInfo)
-	c.Assert(err, gc.IsNil)
-	return s.newPool(c, session), proxy
 }
 
 // NewServer returns a new JEM server that uses the given mongo session and identity

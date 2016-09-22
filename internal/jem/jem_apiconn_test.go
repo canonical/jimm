@@ -12,23 +12,27 @@ import (
 
 	"github.com/CanonicalLtd/jem/internal/apiconn"
 	"github.com/CanonicalLtd/jem/internal/jem"
+	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
 
 type jemAPIConnSuite struct {
 	corejujutesting.JujuConnSuite
-	pool *jem.Pool
-	jem  *jem.JEM
+	pool        *jem.Pool
+	sessionPool *mgosession.Pool
+	jem         *jem.JEM
 }
 
 var _ = gc.Suite(&jemAPIConnSuite{})
 
 func (s *jemAPIConnSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
+	s.sessionPool = mgosession.NewPool(s.Session, 5)
 	pool, err := jem.NewPool(jem.Params{
 		DB:              s.Session.DB("jem"),
 		ControllerAdmin: "controller-admin",
+		SessionPool:     s.sessionPool,
 	})
 	c.Assert(err, gc.IsNil)
 	s.pool = pool
@@ -39,6 +43,7 @@ func (s *jemAPIConnSuite) SetUpTest(c *gc.C) {
 func (s *jemAPIConnSuite) TearDownTest(c *gc.C) {
 	s.jem.Close()
 	s.pool.Close()
+	s.sessionPool.Close()
 	s.JujuConnSuite.TearDownTest(c)
 }
 

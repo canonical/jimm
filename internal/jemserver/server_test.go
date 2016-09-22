@@ -17,6 +17,7 @@ import (
 	"github.com/CanonicalLtd/jem/internal/auth"
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/jemserver"
+	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -173,9 +174,12 @@ func (s *serverSuite) TestServerHasAccessControlAllowOrigin(c *gc.C) {
 
 func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 	db := s.Session.DB("foo")
+	sessionPool := mgosession.NewPool(s.Session, 1)
+	defer sessionPool.Close()
 	pool, err := jem.NewPool(jem.Params{
 		DB:              db,
 		ControllerAdmin: "controller-admin",
+		SessionPool:     sessionPool,
 	})
 	c.Assert(err, gc.IsNil)
 	defer pool.Close()

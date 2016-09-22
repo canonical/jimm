@@ -11,7 +11,6 @@ import (
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jem/internal/auth"
@@ -1091,14 +1090,14 @@ var setDeadTests = []struct {
 }}
 
 func (s *databaseSuite) TestSetDead(c *gc.C) {
-	session, proxy := proxiedSession(c)
+	session := jujutesting.NewProxiedSession(c)
 	defer session.Close()
 
-	pool := mgosession.NewPool(session, 1)
+	pool := mgosession.NewPool(session.Session, 1)
 	defer pool.Close()
 	for i, test := range setDeadTests {
 		c.Logf("test %d: %s", i, test.about)
-		testSetDead(c, proxy, pool, test.run)
+		testSetDead(c, session.TCPProxy, pool, test.run)
 	}
 }
 
@@ -1114,25 +1113,6 @@ func testSetDead(c *gc.C, proxy *jujutesting.TCPProxy, pool *mgosession.Pool, ru
 	db := jem.NewDatabase(session, "jem")
 	run(db)
 	c.Check(session.MayReuse(), gc.Equals, false)
-}
-
-// proxiedSession returns a session that uses a proxied TCP connection
-// to MongoDB and the proxy that the connections go through.
-// This makes it possible to test what happens when a connection
-// to the database is broken.
-//
-// Both the returned session and the returned proxy should
-// be closed after use.
-//
-// TODO factor out shared logic between this and apitest.Suite.ProxiedPool.
-func proxiedSession(c *gc.C) (*mgo.Session, *jujutesting.TCPProxy) {
-	mgoInfo := jujutesting.MgoServer.DialInfo()
-	c.Assert(mgoInfo.Addrs, gc.HasLen, 1)
-	proxy := jujutesting.NewTCPProxy(c, mgoInfo.Addrs[0])
-	mgoInfo.Addrs = []string{proxy.Addr()}
-	session, err := mgo.DialWithInfo(mgoInfo)
-	c.Assert(err, gc.IsNil)
-	return session, proxy
 }
 
 func parseTime(s string) time.Time {
