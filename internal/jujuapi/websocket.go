@@ -11,7 +11,6 @@ import (
 	"github.com/juju/juju/api/base"
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
 	"github.com/juju/juju/apiserver/common"
-	"github.com/juju/juju/apiserver/observer"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/juju/environs"
@@ -146,7 +145,7 @@ type wsHandler struct {
 // handle handles the connection.
 func (h *wsHandler) handle(wsConn *websocket.Conn) {
 	codec := jsoncodec.NewWebsocket(wsConn)
-	h.conn = rpc.NewConn(codec, observer.None())
+	h.conn = rpc.NewConn(codec, observerFactory{})
 
 	h.conn.ServeRoot(h, func(err error) error {
 		return mapError(err)
@@ -1026,4 +1025,29 @@ type pinger struct {
 // Ping implements the Pinger facade's Ping method.
 func (p pinger) Ping() {
 	p.h.heartMonitor.Heartbeat()
+}
+
+// observerFactory implemnts an rpc.ObserverFactory.
+type observerFactory struct{}
+
+// RPCObserver implements rpc.ObserverFactory.RPCObserver.
+func (observerFactory) RPCObserver() rpc.Observer {
+	return observer{
+		start: time.Now(),
+	}
+}
+
+// observer implements an rpc.Observer.
+type observer struct {
+	start time.Time
+}
+
+// ServerRequest implements rpc.Observer.ServerRequest.
+func (o observer) ServerRequest(*rpc.Header, interface{}) {
+}
+
+// ServerReply implements rpc.Observer.ServerReply.
+func (o observer) ServerReply(r rpc.Request, _ *rpc.Header, _ interface{}) {
+	d := time.Since(o.start)
+	servermon.WebsocketRequestDuration.WithLabelValues(r.Type, r.Action).Observe(float64(d) / float64(time.Second))
 }

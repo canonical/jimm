@@ -150,6 +150,12 @@ var (
 		Name:      "units_running",
 		Help:      "The current number of running units.",
 	}, []string{"ctl_path"})
+	WebsocketRequestDuration = prometheus.NewSummaryVec(prometheus.SummaryOpts{
+		Namespace: "jem",
+		Subsystem: "websocket",
+		Name:      "request_duration",
+		Help:      "The duration of a websocket request in seconds.",
+	}, []string{"type", "action"})
 )
 
 func init() {
@@ -173,5 +179,6 @@ func init() {
 	prometheus.MustRegister(ModelsRunning)
 	prometheus.MustRegister(requestDuration)
 	prometheus.MustRegister(UnitsRunning)
+	prometheus.MustRegister(WebsocketRequestDuration)
 	prometheus.MustRegister(monitoring.NewMgoStatsCollector("jem"))
 }
