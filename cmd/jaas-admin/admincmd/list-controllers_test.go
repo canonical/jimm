@@ -1,6 +1,6 @@
 // Copyright 2015 Canonical Ltd.
 
-package modelcmd_test
+package admincmd_test
 
 import (
 	gc "gopkg.in/check.v1"

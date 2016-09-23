@@ -1,6 +1,4 @@
-// Copyright 2015-2016 Canonical Ltd.
-
-package modelcmd
+package admincmd
 
 import (
 	"sort"
@@ -38,11 +36,11 @@ access that model and make changes to it.
 
 For example, this will allow alice and bob to read the model johndoe/mymodel.
 
-    jaas model grant johndoe/mymodel alice,bob
+    jaas admin grant johndoe/mymodel alice,bob
 
 If the --set flag is provided, the ACLs will be overwritten rather than added.
 
-    jaas model grant johndoe/mymodel --set fred,bob
+    jaas admin grant johndoe/mymodel --set fred,bob
 `
 
 func (c *grantCommand) Info() *cmd.Info {

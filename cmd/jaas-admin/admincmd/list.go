@@ -1,6 +1,6 @@
 // Copyright 2015 Canonical Ltd.
 
-package modelcmd
+package admincmd
 
 import (
 	"fmt"

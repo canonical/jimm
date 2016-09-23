@@ -1,6 +1,6 @@
 // Copyright 2015 Canonical Ltd.
 
-package modelcmd
+package admincmd
 
 import (
 	corejujutesting "github.com/juju/juju/juju/testing"
