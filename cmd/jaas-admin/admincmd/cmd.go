@@ -1,6 +1,6 @@
 // Copyright 2015-2016 Canonical Ltd.
 
-package modelcmd
+package admincmd
 
 import (
 	"os"
@@ -26,29 +26,29 @@ var logger = loggo.GetLogger("jem")
 const jujuLoggingConfigEnvKey = "JUJU_LOGGING_CONFIG"
 
 var cmdDoc = `
-The jaas model command provides access to the managing server.
+The jaas admin command provides access to the managing server.
 The commands are at present for testing purposes only
 and are not stable in any form.
 
 The location of the managing server can be specified
 as an environment variable:
 
-	JAAS_MODEL=<managing server URL>
+	JIMM_URL=<managing server URL>
 
-or as a command line flag on the model subcommands
+or as a command line flag on the admin subcommands
 (note that this does not work when used on the jaas
-model command itself).
+admin command itself).
 
-	--jaas-model-url <managing server URL>
+	--jimm-url <managing server URL>
 
 The latter takes precedence over the former.
 `
 
-// New returns a command that can execute jaas-model
+// New returns a command that can execute jaas-admin
 // commands.
 func New() cmd.Command {
 	supercmd := cmd.NewSuperCommand(cmd.SuperCommandParams{
-		Name:        "model",
+		Name:        "admin",
 		UsagePrefix: "jaas",
 		Doc:         cmdDoc,
 		Purpose:     "access the managing server",
@@ -74,7 +74,7 @@ type commandBase struct {
 }
 
 func (c *commandBase) SetFlags(f *gnuflag.FlagSet) {
-	f.StringVar(&c.jemURL, "jaas-model-url", "", "URL of managing server (defaults to $JAAS_MODEL)")
+	f.StringVar(&c.jemURL, "jaas-admin-url", "", "URL of managing server (defaults to $JIMM_URL)")
 }
 
 // newClient creates and return a JEM client with access to
@@ -97,13 +97,12 @@ func (c *commandBase) newClient(ctxt *cmd.Context) (*jemclient.Client, error) {
 const jemServerURL = "https://api.jujucharms.com/jem"
 
 // serverURL returns the JEM server URL.
-// The returned value can be overridden by setting the JAAS_MODEL
-// model variable.
+// The returned value can be overridden by setting the JIMM_URL variable.
 func (c *commandBase) serverURL() string {
 	if c.jemURL != "" {
 		return c.jemURL
 	}
-	if url := os.Getenv("JAAS_MODEL"); url != "" {
+	if url := os.Getenv("JIMM_URL"); url != "" {
 		return url
 	}
 	return jemServerURL

@@ -91,7 +91,7 @@ func (s *websocketSuite) TestOldAdminVersionFails(c *gc.C) {
 	defer conn.Close()
 	var resp jujuparams.RedirectInfoResult
 	err := conn.APICall("Admin", 2, "", "Login", nil, &resp)
-	c.Assert(err, gc.ErrorMatches, `JAAS does not support login from old clients \(not supported\)`)
+	c.Assert(err, gc.ErrorMatches, `JIMM does not support login from old clients \(not supported\)`)
 	c.Assert(resp, jc.DeepEquals, jujuparams.RedirectInfoResult{})
 }
 

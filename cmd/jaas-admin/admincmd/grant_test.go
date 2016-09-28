@@ -1,6 +1,6 @@
 // Copyright 2015 Canonical Ltd.
 
-package modelcmd_test
+package admincmd_test
 
 import (
 	jc "github.com/juju/testing/checkers"
@@ -9,13 +9,13 @@ import (
 	"github.com/CanonicalLtd/jem/params"
 )
 
-type revokeSuite struct {
+type grantSuite struct {
 	commonSuite
 }
 
-var _ = gc.Suite(&revokeSuite{})
+var _ = gc.Suite(&grantSuite{})
 
-func (s *revokeSuite) TestRevoke(c *gc.C) {
+func (s *grantSuite) TestGrant(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 
 	// First add a controller. This also adds an model that we can
@@ -24,7 +24,7 @@ func (s *revokeSuite) TestRevoke(c *gc.C) {
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
-	s.addEnv(c, "bob/foo", "bob/foo", "cred1")
+	s.addEnv(c, "bob/foo", "bob/foo", "cred")
 
 	// Check that alice can't get controller or model.
 	aliceClient := s.jemClient("alice")
@@ -89,17 +89,18 @@ func (s *revokeSuite) TestRevoke(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 
-	// Remove alice.
+	bobClient := s.jemClient("bob")
+
+	// Set the users to a new set.
 	stdout, stderr, code = run(c, c.MkDir(),
-		"revoke",
+		"grant",
+		"--set",
 		"bob/foo",
-		"alice",
+		"daisy,chloe,emily",
 	)
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
-
-	bobClient := s.jemClient("bob")
 
 	acl, err := bobClient.GetModelPerm(&params.GetModelPerm{
 		EntityPath: params.EntityPath{
@@ -109,11 +110,11 @@ func (s *revokeSuite) TestRevoke(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	c.Assert(acl, jc.DeepEquals, params.ACL{
-		Read: []string{},
+		Read: []string{"chloe", "daisy", "emily"},
 	})
 }
 
-var revokeErrorTests = []struct {
+var grantErrorTests = []struct {
 	about        string
 	args         []string
 	expectStderr string
@@ -140,20 +141,20 @@ var revokeErrorTests = []struct {
 	expectCode:   2,
 }, {
 	about:        "empty user name",
-	args:         []string{"bob/b", "bob,"},
+	args:         []string{"bob/foo", "bob,"},
 	expectStderr: `invalid value "bob,": empty user found`,
 	expectCode:   2,
 }, {
 	about:        "invalid user name",
-	args:         []string{"bob/b", "bob,!kung"},
+	args:         []string{"bob/foo", "bob,!kung"},
 	expectStderr: `invalid value "bob,!kung": invalid user name "!kung"`,
 	expectCode:   2,
 }}
 
-func (s *revokeSuite) TestRevokeGetError(c *gc.C) {
-	for i, test := range revokeErrorTests {
+func (s *grantSuite) TestGetError(c *gc.C) {
+	for i, test := range grantErrorTests {
 		c.Logf("test %d: %s", i, test.about)
-		stdout, stderr, code := run(c, c.MkDir(), "revoke", test.args...)
+		stdout, stderr, code := run(c, c.MkDir(), "grant", test.args...)
 		c.Assert(code, gc.Equals, test.expectCode, gc.Commentf("stderr: %s", stderr))
 		c.Assert(stderr, gc.Matches, "(error:|ERROR) "+test.expectStderr+"\n")
 		c.Assert(stdout, gc.Equals, "")

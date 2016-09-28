@@ -1,6 +1,6 @@
 // Copyright 2016 Canonical Ltd.
 
-package modelcmd
+package admincmd
 
 import (
 	"fmt"
@@ -36,7 +36,7 @@ locations.
 
 For example,
 
-	jaas model locations cloud=aws
+	jaas admin locations cloud=aws
 
 will print all locations that have the cloud location
 set to "aws".

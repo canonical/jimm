@@ -1,6 +1,6 @@
 // Copyright 2015-2016 Canonical Ltd.
 
-package modelcmd_test
+package admincmd_test
 
 import (
 	"bytes"
@@ -23,7 +23,7 @@ import (
 	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jem"
-	"github.com/CanonicalLtd/jem/cmd/jaas-model/modelcmd"
+	"github.com/CanonicalLtd/jem/cmd/jaas-admin/admincmd"
 	"github.com/CanonicalLtd/jem/jemclient"
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -45,7 +45,7 @@ func run(c *gc.C, dir string, cmdName string, args ...string) (stdout, stderr st
 		Stderr: &stderrBuf,
 	}
 	allArgs := append([]string{cmdName}, args...)
-	exitCode = cmd.Main(modelcmd.New(), ctxt, allArgs)
+	exitCode = cmd.Main(admincmd.New(), ctxt, allArgs)
 	return stdoutBuf.String(), stderrBuf.String(), exitCode
 }
 
@@ -73,7 +73,7 @@ func (s *commonSuite) SetUpTest(c *gc.C) {
 	// Set up the client to act as "testuser" by default.
 	s.idmSrv.SetDefaultUser("testuser")
 
-	os.Setenv("JAAS_MODEL", s.httpSrv.URL)
+	os.Setenv("JIMM_URL", s.httpSrv.URL)
 }
 
 // jemClient returns a new JEM client that will act as the given user.

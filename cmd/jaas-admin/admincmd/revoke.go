@@ -1,6 +1,6 @@
 // Copyright 2015-2016 Canonical Ltd.
 
-package modelcmd
+package admincmd
 
 import (
 	"fmt"
@@ -36,7 +36,7 @@ if they are a member of a group that is still part of the read ACL.
 For example, to remove alice and bob from the read ACL of the model johndoe/mymodel,
 assuming they are currently mentioned in the ACL:
 
-    jaas model revoke johndoe/mymodel alice,bob
+    jaas admin revoke johndoe/mymodel alice,bob
 `
 
 func (c *revokeCommand) Info() *cmd.Info {

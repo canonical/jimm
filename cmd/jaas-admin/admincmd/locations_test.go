@@ -1,6 +1,6 @@
 // Copyright 2016 Canonical Ltd.
 
-package modelcmd_test
+package admincmd_test
 
 import (
 	"strings"

@@ -211,7 +211,7 @@ func (h *wsHandler) FindMethod(rootName string, version int, methodName string) 
 	if rootName == "Admin" && version < 3 {
 		return nil, &rpc.RequestError{
 			Code:    jujuparams.CodeNotSupported,
-			Message: "JAAS does not support login from old clients",
+			Message: "JIMM does not support login from old clients",
 		}
 	}
 
@@ -299,7 +299,7 @@ func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResult, error
 			Message: "redirection required",
 		}
 	}
-	// JAAS only supports macaroon login, ignore all the other fields.
+	// JIMM only supports macaroon login, ignore all the other fields.
 	authenticator := a.h.authPool.Authenticator()
 	defer authenticator.Close()
 	ctx, m, err := authenticator.Authenticate(a.h.context, req.Macaroons, checkers.TimeBefore)

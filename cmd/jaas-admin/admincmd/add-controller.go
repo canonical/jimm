@@ -1,6 +1,6 @@
 // Copyright 2015-2016 Canonical Ltd.
 
-package modelcmd
+package admincmd
 
 import (
 	"github.com/juju/cmd"
