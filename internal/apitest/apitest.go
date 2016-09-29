@@ -117,7 +117,6 @@ func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server)
 		PublicKeyLocator:     idmSrv,
 		AgentUsername:        "agent",
 		AgentKey:             s.IDMSrv.UserPublicKey("agent"),
-		DefaultCloud:         "dummy",
 		ControllerUUID:       "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		WebsocketPingTimeout: 3 * time.Minute,
 	}

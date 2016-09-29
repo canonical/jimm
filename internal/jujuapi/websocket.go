@@ -433,7 +433,7 @@ func (c cloud) clouds() (map[string]jujuparams.Cloud, error) {
 // DefaultCloud implements the DefaultCloud method of the Cloud facade.
 func (c cloud) DefaultCloud() (jujuparams.StringResult, error) {
 	return jujuparams.StringResult{
-		Result: names.NewCloudTag(c.h.params.DefaultCloud).String(),
+		Error: mapError(errgo.WithCausef(nil, params.ErrNotFound, "no default cloud")),
 	}, nil
 }
 
@@ -800,15 +800,15 @@ func (m modelManager) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.M
 		servermon.ModelsCreatedFailCount.Inc()
 		return jujuparams.ModelInfo{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	cloud := params.Cloud(m.h.params.DefaultCloud)
-	if args.CloudTag != "" {
-		cloudTag, err := names.ParseCloudTag(args.CloudTag)
-		if err != nil {
-			servermon.ModelsCreatedFailCount.Inc()
-			return jujuparams.ModelInfo{}, errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud tag")
-		}
-		cloud = params.Cloud(cloudTag.Id())
+	if args.CloudTag == "" {
+		return jujuparams.ModelInfo{}, errgo.New("no cloud specified for model; please specify one")
 	}
+	cloudTag, err := names.ParseCloudTag(args.CloudTag)
+	if err != nil {
+		servermon.ModelsCreatedFailCount.Inc()
+		return jujuparams.ModelInfo{}, errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud tag")
+	}
+	cloud := params.Cloud(cloudTag.Id())
 	cloudCredentialTag, err := names.ParseCloudCredentialTag(args.CloudCredentialTag)
 	if err != nil {
 		servermon.ModelsCreatedFailCount.Inc()

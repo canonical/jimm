@@ -59,10 +59,6 @@ type ServerParams struct {
 	// identify itself.
 	ControllerUUID string
 
-	// DefaultCloud is the name of the cloud to use when it is not
-	// specified by the client.
-	DefaultCloud string
-
 	// WebsocketPingTimeout is the time to wait before failing a
 	// connection because the server has not received a ping.
 	WebsocketPingTimeout time.Duration
