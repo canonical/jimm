@@ -197,19 +197,6 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			Message: "no host-ports in request",
 		},
 	}, {
-		about: "no ca-cert",
-		body: params.ControllerInfo{
-			HostPorts:      info.Addrs,
-			User:           info.Tag.Id(),
-			Password:       info.Password,
-			ControllerUUID: info.ModelTag.Id(),
-		},
-		expectStatus: http.StatusBadRequest,
-		expectBody: params.Error{
-			Code:    "bad request",
-			Message: "no ca-cert in request",
-		},
-	}, {
 		about: "no user",
 		body: params.ControllerInfo{
 			HostPorts:      info.Addrs,

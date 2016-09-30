@@ -96,9 +96,6 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	if len(arg.Info.HostPorts) == 0 {
 		return badRequestf(nil, "no host-ports in request")
 	}
-	if arg.Info.CACert == "" {
-		return badRequestf(nil, "no ca-cert in request")
-	}
 	if arg.Info.User == "" {
 		return badRequestf(nil, "no user in request")
 	}
