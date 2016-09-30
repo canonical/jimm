@@ -32,7 +32,6 @@ type Config struct {
 	TLSCert           string            `yaml:"tls-cert"`
 	TLSKey            string            `yaml:"tls-key"`
 	ControllerUUID    string            `yaml:"controller-uuid"`
-	DefaultCloud      string            `yaml:"default-cloud"`
 	MaxMgoSessions    int               `yaml:"max-mgo-sessions"`
 }
 
@@ -52,9 +51,6 @@ func (c *Config) validate() error {
 	}
 	if c.ControllerUUID == "" {
 		missing = append(missing, "controller-uuid")
-	}
-	if c.DefaultCloud == "" {
-		missing = append(missing, "default-cloud")
 	}
 	if len(missing) != 0 {
 		return fmt.Errorf("missing fields %s in config file", strings.Join(missing, ", "))

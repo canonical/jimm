@@ -162,9 +162,8 @@ func (s *websocketSuite) TestDefaultCloud(c *gc.C) {
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
-	cloud, err := client.DefaultCloud()
-	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(cloud, gc.Equals, names.NewCloudTag("dummy"))
+	_, err := client.DefaultCloud()
+	c.Assert(err, gc.ErrorMatches, "no default cloud")
 }
 
 func (s *websocketSuite) TestCloudCall(c *gc.C) {
@@ -714,17 +713,20 @@ var createModelTests = []struct {
 	about:      "success",
 	name:       "model",
 	owner:      "test@external",
+	cloudTag:   names.NewCloudTag("dummy").String(),
 	credential: "dummy_test@external_cred1",
 }, {
 	about:       "unauthorized user",
 	name:        "model-2",
 	owner:       "not-test@external",
+	cloudTag:    names.NewCloudTag("dummy").String(),
 	credential:  "dummy_test@external_cred1",
 	expectError: `unauthorized \(unauthorized access\)`,
 }, {
 	about:       "existing model name",
 	name:        "existing-model",
 	owner:       "test@external",
+	cloudTag:    names.NewCloudTag("dummy").String(),
 	credential:  "dummy_test@external_cred1",
 	expectError: "already exists",
 }, {
@@ -732,18 +734,21 @@ var createModelTests = []struct {
 	name:        "model-3",
 	owner:       "test@external",
 	region:      "no-such-region",
+	cloudTag:    names.NewCloudTag("dummy").String(),
 	credential:  "dummy_test@external_cred1",
 	expectError: `no matching controllers found \(not found\)`,
 }, {
 	about:       "local user",
 	name:        "model-4",
 	owner:       "test@local",
+	cloudTag:    names.NewCloudTag("dummy").String(),
 	credential:  "dummy_test@external_cred1",
 	expectError: `unauthorized \(unauthorized access\)`,
 }, {
 	about:       "invalid user",
 	name:        "model-5",
 	owner:       "test/test@external",
+	cloudTag:    names.NewCloudTag("dummy").String(),
 	credential:  "dummy_test@external_cred1",
 	expectError: `invalid owner tag: "user-test/test@external" is not a valid user tag \(bad request\)`,
 }, {
@@ -766,6 +771,13 @@ var createModelTests = []struct {
 	cloudTag:    "not-a-cloud-tag",
 	credential:  "dummy_test@external_cred1",
 	expectError: `invalid cloud tag: "not-a-cloud-tag" is not a valid tag \(bad request\)`,
+}, {
+	about:       "no cloud tag",
+	name:        "model-8",
+	owner:       "test@external",
+	cloudTag:    "",
+	credential:  "dummy_test@external_cred1",
+	expectError: `no cloud specified for model; please specify one`,
 }}
 
 func (s *websocketSuite) TestCreateModel(c *gc.C) {
@@ -1099,6 +1111,9 @@ func (s *websocketSuite) assertCreateModel(c *gc.C, name, username, cloud, regio
 	conn := s.open(c, nil, username)
 	defer conn.Close()
 	client := modelmanager.NewClient(conn)
+	if cloud == "" {
+		cloud = "dummy"
+	}
 	credentialTag := names.NewCloudCredentialTag(fmt.Sprintf("dummy/%s@external/%s", username, credential))
 	mi, err := client.CreateModel(name, username+"@external", cloud, region, credentialTag, config)
 	c.Assert(err, jc.ErrorIsNil)

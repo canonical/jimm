@@ -104,7 +104,6 @@ func serve(confPath string) error {
 		AgentKey:             conf.AgentKey,
 		RunMonitor:           true,
 		ControllerUUID:       conf.ControllerUUID,
-		DefaultCloud:         conf.DefaultCloud,
 		WebsocketPingTimeout: websocketPingTimeout,
 	}
 	server, err := jem.NewServer(cfg)
