@@ -18,7 +18,6 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 
 	external_jem "github.com/CanonicalLtd/jem"
 	"github.com/CanonicalLtd/jem/internal/jem"
@@ -158,16 +157,6 @@ func (s *Suite) AddController(c *gc.C, path params.EntityPath, public bool) erro
 	s.IDMSrv.AddUser(string(path.User), "controller-admin")
 	if err := s.NewClient(path.User).AddController(p); err != nil {
 		return err
-	}
-	if !public {
-		err := s.JEM.DB.Controllers().UpdateId(path.String(), bson.D{{
-			"$unset", bson.D{{"public", ""}},
-		}, {
-			"$pull", bson.D{{"acl.read", "everyone"}},
-		}})
-		if err != nil {
-			return err
-		}
 	}
 	// Add a model as most tests often expect it to be there.
 	err := s.JEM.DB.AddModel(&mongodoc.Model{

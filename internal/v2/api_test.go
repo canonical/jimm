@@ -1498,6 +1498,7 @@ func (s *APISuite) TestListController(c *gc.C) {
 			Path:             ctlId2,
 			Location:         map[string]string{"cloud": "dummy", "region": "dummy-region"},
 			UnavailableSince: newTime(mongodoc.Time(unavailableTime.Add(time.Second)).UTC()),
+			Public:           true,
 		}, {
 			Path:     ctlId0,
 			Location: map[string]string{"cloud": "dummy", "region": "dummy-region"},
@@ -1506,6 +1507,7 @@ func (s *APISuite) TestListController(c *gc.C) {
 			Path:             ctlId1,
 			Location:         map[string]string{"cloud": "dummy", "region": "dummy-region"},
 			UnavailableSince: newTime(mongodoc.Time(unavailableTime).UTC()),
+			Public:           true,
 		}},
 	})
 
@@ -1513,13 +1515,7 @@ func (s *APISuite) TestListController(c *gc.C) {
 	// as a different user.
 	resp, err = s.NewClient("alice").ListController(nil)
 	c.Assert(err, gc.IsNil)
-	c.Assert(resp, jc.DeepEquals, &params.ListControllerResponse{
-		Controllers: []params.ControllerResponse{{
-			Path:     ctlId0,
-			Location: map[string]string{"cloud": "dummy", "region": "dummy-region"},
-			Public:   true,
-		}},
-	})
+	c.Assert(resp, jc.DeepEquals, &params.ListControllerResponse{})
 }
 
 func (s *APISuite) TestListControllerNoServers(c *gc.C) {

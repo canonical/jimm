@@ -84,11 +84,7 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	if !arg.Info.Public {
 		return errgo.WithCausef(nil, params.ErrForbidden, "cannot add private controller")
 	}
-	admin := h.jem.ControllerAdmin()
-	if admin == "" {
-		return errgo.Newf("no controller admin configured")
-	}
-	if err := auth.CheckIsUser(h.context, admin); err != nil {
+	if err := auth.CheckIsUser(h.context, h.jem.ControllerAdmin()); err != nil {
 		if errgo.Cause(err) == params.ErrUnauthorized {
 			return errgo.WithCausef(nil, params.ErrUnauthorized, "admin access required to add public controllers")
 		}
@@ -112,9 +108,6 @@ func (h *Handler) AddController(arg *params.AddController) error {
 		AdminPassword: arg.Info.Password,
 		UUID:          arg.Info.ControllerUUID,
 		Public:        arg.Info.Public,
-		ACL: params.ACL{
-			Read: []string{"everyone"},
-		},
 	}
 	logger.Infof("dialling model")
 	// Attempt to connect to the controller before accepting it.

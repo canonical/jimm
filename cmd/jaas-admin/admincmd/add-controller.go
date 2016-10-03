@@ -97,6 +97,14 @@ func (c *addControllerCommand) Run(ctxt *cmd.Context) error {
 	}); err != nil {
 		return errgo.Notef(err, "cannot add controller")
 	}
+	if err := client.SetControllerPerm(&params.SetControllerPerm{
+		EntityPath: c.controllerPath.EntityPath,
+		ACL: params.ACL{
+			Read: []string{"everyone"},
+		},
+	}); err != nil {
+		return errgo.Notef(err, "cannot set controller permissions")
+	}
 	return nil
 }
 
