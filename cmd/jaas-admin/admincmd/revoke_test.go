@@ -16,15 +16,21 @@ type revokeSuite struct {
 var _ = gc.Suite(&revokeSuite{})
 
 func (s *revokeSuite) TestRevoke(c *gc.C) {
+	s.idmSrv.AddUser("bob", adminUser)
 	s.idmSrv.SetDefaultUser("bob")
 
 	// First add a controller. This also adds an model that we can
 	// alter for our test.
-	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "--public", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 	s.addEnv(c, "bob/foo", "bob/foo", "cred1")
+
+	stdout, stderr, code = run(c, c.MkDir(), "revoke", "--controller", "bob/foo", "everyone")
+	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
+	c.Assert(stdout, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, "")
 
 	// Check that alice can't get controller or model.
 	aliceClient := s.jemClient("alice")

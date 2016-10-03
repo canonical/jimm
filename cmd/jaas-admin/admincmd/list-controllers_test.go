@@ -35,15 +35,16 @@ func (s *listControllersSuite) TestError(c *gc.C) {
 }
 
 func (s *listControllersSuite) TestSuccess(c *gc.C) {
+	s.idmSrv.AddUser("bob", adminUser)
 	s.idmSrv.SetDefaultUser("bob")
 
 	// Add a couple of controllers.
-	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "--public", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	stdout, stderr, code = run(c, c.MkDir(), "add-controller", "bob/bar")
+	stdout, stderr, code = run(c, c.MkDir(), "add-controller", "--public", "bob/bar")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")

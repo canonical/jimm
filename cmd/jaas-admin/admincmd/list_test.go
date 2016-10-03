@@ -13,10 +13,11 @@ type listSuite struct {
 var _ = gc.Suite(&listSuite{})
 
 func (s *listSuite) TestList(c *gc.C) {
+	s.idmSrv.AddUser("bob", adminUser)
 	s.idmSrv.SetDefaultUser("bob")
 
 	// First add a controller and some models.
-	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "--public", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
