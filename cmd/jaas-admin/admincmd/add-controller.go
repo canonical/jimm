@@ -27,15 +27,15 @@ func newAddControllerCommand() cmd.Command {
 }
 
 var addControllerDoc = `
-The add-controller command adds an existing Juju controller to the managing server.
-It takes the information from the data stored locally by juju (the
-current model by default).
+The add-controller command adds an existing Juju controller to the
+managing server.  It takes the information from the data stored locally
+by juju (the current model by default).
 
-The <user>/<name> argument specifies the name
-that will be given to the controller inside the managing server.
-This will also be added as a model, so the
-commands which refer to a model
-can also use the controller name.
+The <user>/<name> argument specifies the name that will be given to
+the controller inside the managing server.
+
+If a public controller is added every user will have permission to create
+models using that controller.
 `
 
 func (c *addControllerCommand) Info() *cmd.Info {
@@ -97,13 +97,15 @@ func (c *addControllerCommand) Run(ctxt *cmd.Context) error {
 	}); err != nil {
 		return errgo.Notef(err, "cannot add controller")
 	}
-	if err := client.SetControllerPerm(&params.SetControllerPerm{
-		EntityPath: c.controllerPath.EntityPath,
-		ACL: params.ACL{
-			Read: []string{"everyone"},
-		},
-	}); err != nil {
-		return errgo.Notef(err, "cannot set controller permissions")
+	if c.public {
+		if err := client.SetControllerPerm(&params.SetControllerPerm{
+			EntityPath: c.controllerPath.EntityPath,
+			ACL: params.ACL{
+				Read: []string{"everyone"},
+			},
+		}); err != nil {
+			return errgo.Notef(err, "cannot set controller permissions")
+		}
 	}
 	return nil
 }
