@@ -21,7 +21,7 @@ func (s *revokeSuite) TestRevoke(c *gc.C) {
 
 	// First add a controller. This also adds an model that we can
 	// alter for our test.
-	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "--public", "bob/foo")
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")

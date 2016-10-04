@@ -23,16 +23,9 @@ var addControllerTests = []struct {
 	args           []string
 	expectLocation map[string]string
 	expectPublic   bool
-	expectStderr   string
-	expectCode     int
 }{{
-	about:        "simple",
-	args:         []string{},
-	expectCode:   1,
-	expectStderr: "cannot add controller: PUT http://.*/v2/controller/bob/foo-0: cannot add private controller",
-}, {
-	about:          "add public",
-	args:           []string{"--public"},
+	about:          "simple",
+	args:           []string{},
 	expectLocation: map[string]string{"cloud": "dummy", "region": "dummy-region"},
 	expectPublic:   true,
 }}
@@ -52,12 +45,6 @@ func (s *addControllerSuite) TestAddController(c *gc.C) {
 		c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 		test.args = append([]string{fmt.Sprintf("bob/foo-%v", i)}, test.args...)
 		stdout, stderr, code := run(c, c.MkDir(), "add-controller", test.args...)
-		if test.expectCode != 0 {
-			c.Assert(code, gc.Equals, test.expectCode)
-			c.Assert(stdout, gc.Equals, "")
-			c.Assert(stderr, gc.Matches, "(ERROR|error) "+test.expectStderr+"\n")
-			continue
-		}
 		c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 		c.Assert(stdout, gc.Equals, "")
 		c.Assert(stderr, gc.Equals, "")

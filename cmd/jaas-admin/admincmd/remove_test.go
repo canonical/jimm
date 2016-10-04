@@ -17,7 +17,7 @@ func (s *removeSuite) TestRemoveModel(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 
 	// First add a controller and an model.
-	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "--public", "bob/foo")
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
@@ -41,14 +41,14 @@ func (s *removeSuite) TestRemoveController(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 
 	// First add a controller and an model.
-	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "--public", "bob/foo")
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 	s.addEnv(c, "bob/foo", "bob/foo", "cred1")
 
 	// Add a second controller, that won't be deleted.
-	stdout, stderr, code = run(c, c.MkDir(), "add-controller", "--public", "bob/bar")
+	stdout, stderr, code = run(c, c.MkDir(), "add-controller", "bob/bar")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
@@ -85,7 +85,7 @@ func (s *removeSuite) TestRemoveMultipleModels(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 
 	// First add a controller and an model.
-	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "--public", "bob/foo")
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
@@ -108,7 +108,7 @@ func (s *removeSuite) TestRemoveVerbose(c *gc.C) {
 	s.idmSrv.SetDefaultUser("bob")
 
 	// First add a controller and an model.
-	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "--public", "bob/foo")
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")

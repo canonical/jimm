@@ -19,7 +19,6 @@ type addControllerCommand struct {
 
 	controllerName string
 	controllerPath entityPathValue
-	public         bool
 }
 
 func newAddControllerCommand() cmd.Command {
@@ -34,8 +33,8 @@ by juju (the current model by default).
 The <user>/<name> argument specifies the name that will be given to
 the controller inside the managing server.
 
-If a public controller is added every user will have permission to create
-models using that controller.
+The controller that is added will be made available to all logged
+in users.
 `
 
 func (c *addControllerCommand) Info() *cmd.Info {
@@ -51,7 +50,6 @@ func (c *addControllerCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.commandBase.SetFlags(f)
 	f.StringVar(&c.controllerName, "c", "", "controller to add")
 	f.StringVar(&c.controllerName, "controller", "", "")
-	f.BoolVar(&c.public, "public", false, "whether it will be part of the public pool of controllers")
 }
 
 func (c *addControllerCommand) Init(args []string) error {
@@ -92,20 +90,18 @@ func (c *addControllerCommand) Run(ctxt *cmd.Context) error {
 			ControllerUUID: info.controller.ControllerUUID,
 			User:           info.account.User,
 			Password:       info.account.Password,
-			Public:         c.public,
+			Public:         true,
 		},
 	}); err != nil {
 		return errgo.Notef(err, "cannot add controller")
 	}
-	if c.public {
-		if err := client.SetControllerPerm(&params.SetControllerPerm{
-			EntityPath: c.controllerPath.EntityPath,
-			ACL: params.ACL{
-				Read: []string{"everyone"},
-			},
-		}); err != nil {
-			return errgo.Notef(err, "cannot set controller permissions")
-		}
+	if err := client.SetControllerPerm(&params.SetControllerPerm{
+		EntityPath: c.controllerPath.EntityPath,
+		ACL: params.ACL{
+			Read: []string{"everyone"},
+		},
+	}); err != nil {
+		return errgo.Notef(err, "cannot set controller permissions")
 	}
 	return nil
 }
