@@ -19,7 +19,7 @@ import (
 	"github.com/CanonicalLtd/jem/params"
 )
 
-var logger = loggo.GetLogger("jem")
+var logger = loggo.GetLogger("jaas-admin")
 
 // jujuLoggingConfigEnvKey matches osenv.JujuLoggingConfigEnvKey
 // in the Juju project.
@@ -70,11 +70,11 @@ func New() cmd.Command {
 // commandBase holds the basis for commands.
 type commandBase struct {
 	modelcmd.JujuCommandBase
-	jemURL string
+	jimmURL string
 }
 
 func (c *commandBase) SetFlags(f *gnuflag.FlagSet) {
-	f.StringVar(&c.jemURL, "jaas-admin-url", "", "URL of managing server (defaults to $JIMM_URL)")
+	f.StringVar(&c.jimmURL, "jimm-url", "", "URL of managing server (defaults to $JIMM_URL)")
 }
 
 // newClient creates and return a JEM client with access to
@@ -94,18 +94,18 @@ func (c *commandBase) newClient(ctxt *cmd.Context) (*jemclient.Client, error) {
 	}), nil
 }
 
-const jemServerURL = "https://api.jujucharms.com/jem"
+const jimmServerURL = "https://jimm.jujucharms.com"
 
-// serverURL returns the JEM server URL.
+// serverURL returns the JIMM server URL.
 // The returned value can be overridden by setting the JIMM_URL variable.
 func (c *commandBase) serverURL() string {
-	if c.jemURL != "" {
-		return c.jemURL
+	if c.jimmURL != "" {
+		return c.jimmURL
 	}
 	if url := os.Getenv("JIMM_URL"); url != "" {
 		return url
 	}
-	return jemServerURL
+	return jimmServerURL
 }
 
 // entityPathValue holds an EntityPath that
