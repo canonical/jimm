@@ -13,6 +13,7 @@ type removeSuite struct {
 var _ = gc.Suite(&removeSuite{})
 
 func (s *removeSuite) TestRemoveModel(c *gc.C) {
+	s.idmSrv.AddUser("bob", adminUser)
 	s.idmSrv.SetDefaultUser("bob")
 
 	// First add a controller and an model.
@@ -36,6 +37,7 @@ func (s *removeSuite) TestRemoveModel(c *gc.C) {
 }
 
 func (s *removeSuite) TestRemoveController(c *gc.C) {
+	s.idmSrv.AddUser("bob", adminUser)
 	s.idmSrv.SetDefaultUser("bob")
 
 	// First add a controller and an model.
@@ -79,6 +81,7 @@ func (s *removeSuite) TestRemoveController(c *gc.C) {
 }
 
 func (s *removeSuite) TestRemoveMultipleModels(c *gc.C) {
+	s.idmSrv.AddUser("bob", adminUser)
 	s.idmSrv.SetDefaultUser("bob")
 
 	// First add a controller and an model.
@@ -101,6 +104,7 @@ func (s *removeSuite) TestRemoveMultipleModels(c *gc.C) {
 }
 
 func (s *removeSuite) TestRemoveVerbose(c *gc.C) {
+	s.idmSrv.AddUser("bob", adminUser)
 	s.idmSrv.SetDefaultUser("bob")
 
 	// First add a controller and an model.

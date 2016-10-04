@@ -35,6 +35,7 @@ func (s *listControllersSuite) TestError(c *gc.C) {
 }
 
 func (s *listControllersSuite) TestSuccess(c *gc.C) {
+	s.idmSrv.AddUser("bob", adminUser)
 	s.idmSrv.SetDefaultUser("bob")
 
 	// Add a couple of controllers.

@@ -5,6 +5,7 @@ package admincmd_test
 import (
 	"fmt"
 
+	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
@@ -25,10 +26,6 @@ var addControllerTests = []struct {
 }{{
 	about:          "simple",
 	args:           []string{},
-	expectLocation: map[string]string{"cloud": "dummy", "region": "dummy-region"},
-}, {
-	about:          "add public",
-	args:           []string{"--public"},
 	expectLocation: map[string]string{"cloud": "dummy", "region": "dummy-region"},
 	expectPublic:   true,
 }}
@@ -60,6 +57,18 @@ func (s *addControllerSuite) TestAddController(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 		c.Assert(ctl.Location, gc.DeepEquals, test.expectLocation)
 		c.Assert(ctl.Public, gc.DeepEquals, test.expectPublic)
+		if test.expectPublic {
+			perm, err := client.GetControllerPerm(&params.GetControllerPerm{
+				EntityPath: params.EntityPath{
+					User: "bob",
+					Name: params.Name(fmt.Sprintf("foo-%v", i)),
+				},
+			})
+			c.Assert(err, gc.IsNil)
+			c.Assert(perm, jc.DeepEquals, params.ACL{
+				Read: []string{"everyone"},
+			})
+		}
 	}
 
 }

@@ -148,12 +148,13 @@ func (s *Suite) AddController(c *gc.C, path params.EntityPath, public bool) erro
 			User:           info.Tag.Id(),
 			Password:       info.Password,
 			ControllerUUID: s.ControllerConfig.ControllerUUID(),
-			Public:         public,
+			// We only support creating public controllers
+			// for now, but we can update them afterwards to
+			// tests that require private ones.
+			Public: true,
 		},
 	}
-	if public {
-		s.IDMSrv.AddUser(string(path.User), "controller-admin")
-	}
+	s.IDMSrv.AddUser(string(path.User), "controller-admin")
 	if err := s.NewClient(path.User).AddController(p); err != nil {
 		return err
 	}

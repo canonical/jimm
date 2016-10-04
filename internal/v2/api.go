@@ -81,17 +81,14 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	if err := auth.CheckIsUser(h.context, arg.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	if arg.Info.Public {
-		admin := h.jem.ControllerAdmin()
-		if admin == "" {
-			return errgo.Newf("no controller admin configured")
+	if !arg.Info.Public {
+		return errgo.WithCausef(nil, params.ErrForbidden, "cannot add private controller")
+	}
+	if err := auth.CheckIsUser(h.context, h.jem.ControllerAdmin()); err != nil {
+		if errgo.Cause(err) == params.ErrUnauthorized {
+			return errgo.WithCausef(nil, params.ErrUnauthorized, "admin access required to add public controllers")
 		}
-		if err := auth.CheckIsUser(h.context, admin); err != nil {
-			if errgo.Cause(err) == params.ErrUnauthorized {
-				return errgo.WithCausef(nil, params.ErrUnauthorized, "admin access required to add public controllers")
-			}
-			return errgo.Mask(err)
-		}
+		return errgo.Mask(err)
 	}
 	if len(arg.Info.HostPorts) == 0 {
 		return badRequestf(nil, "no host-ports in request")

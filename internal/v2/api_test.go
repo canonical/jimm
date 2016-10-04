@@ -136,13 +136,18 @@ func (s *APISuite) TestAddController(c *gc.C) {
 		expectStatus int
 		expectBody   interface{}
 	}{{
-		about: "add controller",
+		about: "add private controller",
 		body: params.ControllerInfo{
 			HostPorts:      info.Addrs,
 			CACert:         info.CACert,
 			User:           info.Tag.Id(),
 			Password:       info.Password,
 			ControllerUUID: info.ModelTag.Id(),
+		},
+		expectStatus: http.StatusForbidden,
+		expectBody: &params.Error{
+			Message: "cannot add private controller",
+			Code:    params.ErrForbidden,
 		},
 	}, {
 		about:    "add controller as part of group",
@@ -154,6 +159,7 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			User:           info.Tag.Id(),
 			Password:       info.Password,
 			ControllerUUID: info.ModelTag.Id(),
+			Public:         true,
 		},
 	}, {
 		about:    "add public controller",
@@ -190,6 +196,7 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			User:           info.Tag.Id(),
 			Password:       info.Password,
 			ControllerUUID: info.ModelTag.Id(),
+			Public:         true,
 		},
 		expectStatus: http.StatusBadRequest,
 		expectBody: params.Error{
@@ -203,6 +210,7 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			CACert:         info.CACert,
 			Password:       info.Password,
 			ControllerUUID: info.ModelTag.Id(),
+			Public:         true,
 		},
 		expectStatus: http.StatusBadRequest,
 		expectBody: params.Error{
@@ -216,6 +224,7 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			CACert:    info.CACert,
 			User:      info.Tag.Id(),
 			Password:  info.Password,
+			Public:    true,
 		},
 		expectStatus: http.StatusBadRequest,
 		expectBody: params.Error{
@@ -223,7 +232,9 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			Message: "bad model UUID in request",
 		},
 	}, {
-		about: "public but no controller-admin access",
+		about:    "public but no controller-admin access",
+		username: "bob",
+		authUser: "bob",
 		body: params.ControllerInfo{
 			HostPorts: info.Addrs,
 			CACert:    info.CACert,
@@ -244,6 +255,7 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			User:           info.Tag.Id(),
 			Password:       info.Password,
 			ControllerUUID: info.ModelTag.Id(),
+			Public:         true,
 		},
 		expectStatus: http.StatusBadRequest,
 		expectBody: httptesting.BodyAsserter(func(c *gc.C, m json.RawMessage) {
@@ -254,8 +266,9 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			c.Assert(body.Message, gc.Matches, `cannot connect to controller: cannot connect to API: unable to connect to API: .*`)
 		}),
 	}}
-	s.IDMSrv.AddUser("alice", "beatles")
+	s.IDMSrv.AddUser("alice", "beatles", "controller-admin")
 	s.IDMSrv.AddUser("bob", "beatles")
+	s.IDMSrv.AddUser("testuser", "controller-admin")
 	for i, test := range addControllerTests {
 		c.Logf("test %d: %s", i, test.about)
 		controllerPath := params.EntityPath{
@@ -456,19 +469,8 @@ func (s *APISuite) TestGetControllerWithLocation(c *gc.C) {
 
 func (s *APISuite) TestGetControllerLocation(c *gc.C) {
 	ctlId := params.EntityPath{"bob", "foo"}
-	info := s.APIInfo(c)
 
-	err := s.NewClient(ctlId.User).AddController(&params.AddController{
-		EntityPath: ctlId,
-		Info: params.ControllerInfo{
-			HostPorts:      info.Addrs,
-			CACert:         info.CACert,
-			User:           info.Tag.Id(),
-			Password:       info.Password,
-			ControllerUUID: info.ModelTag.Id(),
-		},
-	})
-	c.Assert(err, gc.IsNil)
+	s.AssertAddController(c, ctlId, false)
 
 	// Check the location attributes.
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -1265,10 +1267,10 @@ func apiInfoFromModelResponse(resp *params.ModelResponse) *api.Info {
 }
 
 func (s *APISuite) TestNewModelUnderGroup(c *gc.C) {
+	s.IDMSrv.AddUser("bob", "beatles")
 	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, false)
 	cred := s.AssertUpdateCredential(c, "beatles", "dummy", "cred1", "empty")
 
-	s.IDMSrv.AddUser("bob", "beatles")
 	var modelRespBody json.RawMessage
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
@@ -1496,6 +1498,7 @@ func (s *APISuite) TestListController(c *gc.C) {
 			Path:             ctlId2,
 			Location:         map[string]string{"cloud": "dummy", "region": "dummy-region"},
 			UnavailableSince: newTime(mongodoc.Time(unavailableTime.Add(time.Second)).UTC()),
+			Public:           true,
 		}, {
 			Path:     ctlId0,
 			Location: map[string]string{"cloud": "dummy", "region": "dummy-region"},
@@ -1504,10 +1507,11 @@ func (s *APISuite) TestListController(c *gc.C) {
 			Path:             ctlId1,
 			Location:         map[string]string{"cloud": "dummy", "region": "dummy-region"},
 			UnavailableSince: newTime(mongodoc.Time(unavailableTime).UTC()),
+			Public:           true,
 		}},
 	})
 
-	// Check that the entries don't show up when listing
+	// Check that the private entries don't show up when listing
 	// as a different user.
 	resp, err = s.NewClient("alice").ListController(nil)
 	c.Assert(err, gc.IsNil)

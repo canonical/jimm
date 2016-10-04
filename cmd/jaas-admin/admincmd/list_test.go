@@ -13,6 +13,7 @@ type listSuite struct {
 var _ = gc.Suite(&listSuite{})
 
 func (s *listSuite) TestList(c *gc.C) {
+	s.idmSrv.AddUser("bob", adminUser)
 	s.idmSrv.SetDefaultUser("bob")
 
 	// First add a controller and some models.

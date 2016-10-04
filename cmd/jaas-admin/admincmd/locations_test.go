@@ -49,7 +49,7 @@ func (s *locationsSuite) TestSuccess(c *gc.C) {
 	}
 
 	// Add a controller.
-	addController("bob/c1", "--public")
+	addController("bob/c1")
 
 	stdout, stderr, code := run(c, c.MkDir(), "locations")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
