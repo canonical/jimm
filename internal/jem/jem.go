@@ -22,6 +22,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jem/internal/apiconn"
+	"github.com/CanonicalLtd/jem/internal/auth"
 	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
@@ -256,6 +257,36 @@ func apiInfoFromDoc(ctl *mongodoc.Controller) *api.Info {
 	}
 }
 
+// Controller retrieves the given controller from the database,
+// validating that the current user is allowed to read the controller.
+func (j *JEM) Controller(ctx context.Context, path params.EntityPath) (*mongodoc.Controller, error) {
+	if err := j.DB.CheckReadACL(ctx, j.DB.Controllers(), path); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	ctl, err := j.DB.Controller(path)
+	return ctl, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+}
+
+// Credential retrieves the given credential from the database,
+// validating that the current user is allowed to read the credential.
+func (j *JEM) Credential(ctx context.Context, path params.CredentialPath) (*mongodoc.Credential, error) {
+	cred, err := j.DB.Credential(path)
+	if err != nil {
+		if errgo.Cause(err) == params.ErrNotFound {
+			// We return an authorization error for all attempts to retrieve credentials
+			// from any other user's space.
+			if aerr := auth.CheckIsUser(ctx, path.User); aerr != nil {
+				err = aerr
+			}
+		}
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+	}
+	if err := auth.CheckCanRead(ctx, cred); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	return cred, nil
+}
+
 // CreateModelParams specifies the parameters needed to create a new
 // model using CreateModel.
 type CreateModelParams struct {
@@ -268,7 +299,7 @@ type CreateModelParams struct {
 
 	// Credential contains the name of the credential to use to
 	// create the model.
-	Credential params.Name
+	Credential params.CredentialPath
 
 	// Cloud contains the name of the cloud in which the
 	// model will be created.
@@ -283,23 +314,36 @@ type CreateModelParams struct {
 	Attributes map[string]interface{}
 }
 
-// CreateModel creates a new model as specified by p using conn.
-func (j *JEM) CreateModel(conn *apiconn.Conn, p CreateModelParams) (*mongodoc.Model, *base.ModelInfo, error) {
-	credPath := params.CredentialPath{
-		Cloud: p.Cloud,
-		EntityPath: params.EntityPath{
-			User: p.Path.User,
-			Name: p.Credential,
-		},
+// CreateModel creates a new model as specified by p.
+func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.Model, *base.ModelInfo, error) {
+	// Only the owner can create a new model in their namespace.
+	if err := auth.CheckIsUser(ctx, p.Path.User); err != nil {
+		return nil, nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	cred, err := j.DB.Credential(credPath)
+	if p.ControllerPath.Name == "" {
+		var err error
+		p.ControllerPath, err = j.selectController(ctx, p.Cloud, p.Region)
+		if err != nil {
+			return nil, nil, errgo.NoteMask(err, "cannot select controller", errgo.Is(params.ErrNotFound))
+		}
+	}
+	ctl, err := j.Controller(ctx, p.ControllerPath)
 	if err != nil {
-		return nil, nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		return nil, nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	if err := j.updateControllerCredential(p.ControllerPath, credPath, conn, cred); err != nil {
+	cred, err := j.Credential(ctx, p.Credential)
+	if err != nil {
+		return nil, nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+	}
+	conn, err := j.OpenAPIFromDoc(ctl)
+	if err != nil {
+		return nil, nil, errgo.NoteMask(err, "cannot connect to controller", errgo.Is(ErrAPIConnection))
+	}
+	defer conn.Close()
+	if err := j.updateControllerCredential(p.ControllerPath, p.Credential, conn, cred); err != nil {
 		return nil, nil, errgo.Mask(err)
 	}
-	if err := j.DB.credentialAddController(credPath, p.ControllerPath); err != nil {
+	if err := j.DB.credentialAddController(p.Credential, p.ControllerPath); err != nil {
 		return nil, nil, errgo.Mask(err)
 	}
 	// Create the model record in the database before actually
@@ -315,13 +359,17 @@ func (j *JEM) CreateModel(conn *apiconn.Conn, p CreateModelParams) (*mongodoc.Mo
 	if err := j.DB.AddModel(modelDoc); err != nil {
 		return nil, nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
+	region := p.Region
+	if region == "" {
+		region = ctl.Location["region"]
+	}
 	mmClient := modelmanager.NewClient(conn.Connection)
 	m, err := mmClient.CreateModel(
 		string(p.Path.Name),
 		UserTag(p.Path.User).Id(),
-		string(p.Cloud),
-		p.Region,
-		CloudCredentialTag(credPath),
+		ctl.Location["cloud"],
+		region,
+		CloudCredentialTag(p.Credential),
 		p.Attributes,
 	)
 	if err != nil {
@@ -516,24 +564,33 @@ func (j *JEM) DoControllers(ctx context.Context, cloud params.Cloud, region stri
 	return nil
 }
 
-// SelectController chooses a controller that matches the cloud and region criteria, if specified.
-func (j *JEM) SelectController(ctx context.Context, cloud params.Cloud, region string) (params.EntityPath, params.Cloud, string, error) {
+// selectController chooses a controller that matches the cloud and region criteria, if specified.
+func (j *JEM) selectController(ctx context.Context, cloud params.Cloud, region string) (params.EntityPath, error) {
 	var controllers []mongodoc.Controller
+	var otherControllers []mongodoc.Controller
 	err := j.DoControllers(ctx, cloud, region, func(c *mongodoc.Controller) error {
-		controllers = append(controllers, *c)
+		if region != "" && c.Location["region"] == region {
+			controllers = append(controllers, *c)
+		} else {
+			otherControllers = append(otherControllers, *c)
+		}
+
 		return nil
 	})
 	if err != nil {
-		return params.EntityPath{}, "", "", errgo.Mask(err, errgo.Is(params.ErrBadRequest))
+		return params.EntityPath{}, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
 	if len(controllers) == 0 {
-		return params.EntityPath{}, "", "", errgo.WithCausef(nil, params.ErrNotFound, "no matching controllers found")
+		controllers = otherControllers
+	}
+	if len(controllers) == 0 {
+		return params.EntityPath{}, errgo.WithCausef(nil, params.ErrNotFound, "no matching controllers found")
 	}
 	// Choose a random controller.
 	// TODO select a controller more intelligently, for example
 	// by choosing the most lightly loaded controller
 	n := randIntn(len(controllers))
-	return controllers[n].Path, params.Cloud(controllers[n].Cloud.Name), region, nil
+	return controllers[n].Path, nil
 }
 
 // UserTag creates a juju user tag from a params.User

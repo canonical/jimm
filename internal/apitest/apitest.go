@@ -208,7 +208,10 @@ func (s *Suite) CreateModel(c *gc.C, path, ctlPath params.EntityPath, cred param
 		Info: params.NewModelInfo{
 			Name:       path.Name,
 			Controller: &ctlPath,
-			Credential: cred,
+			Credential: params.CredentialPath{
+				Cloud:      "dummy",
+				EntityPath: params.EntityPath{path.User, cred},
+			},
 			Location: map[string]string{
 				"cloud": "dummy",
 			},

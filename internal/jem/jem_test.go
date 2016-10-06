@@ -151,50 +151,71 @@ var createModelTests = []struct {
 }{{
 	about: "success",
 	params: jem.CreateModelParams{
+		Path: params.EntityPath{"bob", ""},
+		Credential: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{"bob", "cred1"},
+		},
+		Cloud: "dummy",
+	},
+}, {
+	about: "success specified controller",
+	params: jem.CreateModelParams{
 		Path:           params.EntityPath{"bob", ""},
 		ControllerPath: params.EntityPath{"bob", "controller"},
-		Credential:     "cred1",
-		Cloud:          "dummy",
+		Credential: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{"bob", "cred1"},
+		},
+		Cloud: "dummy",
+	},
+}, {
+	about: "success with region",
+	params: jem.CreateModelParams{
+		Path: params.EntityPath{"bob", ""},
+		Credential: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{"bob", "cred1"},
+		},
+		Cloud:  "dummy",
+		Region: "dummy-region",
 	},
 }, {
 	about: "unknown credential",
 	params: jem.CreateModelParams{
-		Path:           params.EntityPath{"bob", ""},
-		ControllerPath: params.EntityPath{"bob", "controller"},
-		Credential:     "cred2",
-		Cloud:          "dummy",
+		Path: params.EntityPath{"bob", ""},
+		Credential: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{"bob", "cred2"},
+		},
+		Cloud: "dummy",
 	},
 	expectError:      `credential "dummy/bob/cred2" not found`,
 	expectErrorCause: params.ErrNotFound,
 }, {
 	about: "model exists",
 	params: jem.CreateModelParams{
-		Path:           params.EntityPath{"bob", "controller"},
-		ControllerPath: params.EntityPath{"bob", "controller"},
-		Credential:     "cred1",
-		Cloud:          "dummy",
+		Path: params.EntityPath{"bob", "controller"},
+		Credential: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{"bob", "cred1"},
+		},
+		Cloud: "dummy",
 	},
 	expectError:      `already exists`,
 	expectErrorCause: params.ErrAlreadyExists,
 }, {
 	about: "unrecognised region",
 	params: jem.CreateModelParams{
-		Path:           params.EntityPath{"bob", ""},
-		ControllerPath: params.EntityPath{"bob", "controller"},
-		Credential:     "cred1",
-		Cloud:          "dummy",
-		Region:         "not-a-region",
+		Path: params.EntityPath{"bob", ""},
+		Credential: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{"bob", "cred1"},
+		},
+		Cloud:  "dummy",
+		Region: "not-a-region",
 	},
-	expectError: `cannot create model: getting cloud region definition: region "not-a-region" not found \(expected one of \["dummy-region"\]\) \(not found\)`,
-}, {
-	about: "with region",
-	params: jem.CreateModelParams{
-		Path:           params.EntityPath{"bob", ""},
-		ControllerPath: params.EntityPath{"bob", "controller"},
-		Credential:     "cred1",
-		Cloud:          "dummy",
-		Region:         "dummy-region",
-	},
+	expectError: `cannot select controller: no matching controllers found`,
 }}
 
 func (s *jemSuite) TestCreateModel(c *gc.C) {
@@ -205,15 +226,16 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 		Path: credentialPath("dummy", "bob", "cred1"),
 		Type: "empty",
 	})
-	conn, err := s.jem.OpenAPI(ctlId)
 	c.Assert(err, jc.ErrorIsNil)
-	defer conn.Close()
-	c.Assert(err, jc.ErrorIsNil)
-	_, _, err = s.jem.CreateModel(conn, jem.CreateModelParams{
-		Path:           params.EntityPath{"bob", "controller"},
-		ControllerPath: params.EntityPath{"bob", "controller"},
-		Credential:     "cred1",
-		Cloud:          "dummy",
+	ctx := auth.AuthenticateForTest(context.Background(), "bob", "bob-group")
+	_, _, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
+		Path:           ctlId,
+		ControllerPath: ctlId,
+		Credential: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{"bob", "cred1"},
+		},
+		Cloud: "dummy",
 	})
 	c.Assert(err, jc.ErrorIsNil)
 	for i, test := range createModelTests {
@@ -221,7 +243,7 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 		if test.params.Path.Name == "" {
 			test.params.Path.Name = params.Name(fmt.Sprintf("test-%d", i))
 		}
-		m, _, err := s.jem.CreateModel(conn, test.params)
+		m, _, err := s.jem.CreateModel(ctx, test.params)
 		if test.expectError != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
 			if test.expectErrorCause != nil {
@@ -237,9 +259,11 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 }
 
 func (s *jemSuite) TestGrantModel(c *gc.C) {
-	conn, model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	conn, err := s.jem.OpenAPI(model.Controller)
+	c.Assert(err, jc.ErrorIsNil)
 	defer conn.Close()
-	err := s.jem.GrantModel(conn, model, "alice", "write")
+	err = s.jem.GrantModel(conn, model, "alice", "write")
 	c.Assert(err, jc.ErrorIsNil)
 	model1, err := s.jem.DB.Model(model.Path)
 	c.Assert(err, jc.ErrorIsNil)
@@ -247,9 +271,11 @@ func (s *jemSuite) TestGrantModel(c *gc.C) {
 }
 
 func (s *jemSuite) TestGrantModelControllerFailure(c *gc.C) {
-	conn, model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	conn, err := s.jem.OpenAPI(model.Controller)
+	c.Assert(err, jc.ErrorIsNil)
 	defer conn.Close()
-	err := s.jem.GrantModel(conn, model, "alice", "superpowers")
+	err = s.jem.GrantModel(conn, model, "alice", "superpowers")
 	c.Assert(err, gc.ErrorMatches, `"superpowers" model access not valid`)
 	model1, err := s.jem.DB.Model(model.Path)
 	c.Assert(err, jc.ErrorIsNil)
@@ -257,9 +283,11 @@ func (s *jemSuite) TestGrantModelControllerFailure(c *gc.C) {
 }
 
 func (s *jemSuite) TestRevokeModel(c *gc.C) {
-	conn, model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	conn, err := s.jem.OpenAPI(model.Controller)
+	c.Assert(err, jc.ErrorIsNil)
 	defer conn.Close()
-	err := s.jem.GrantModel(conn, model, "alice", "write")
+	err = s.jem.GrantModel(conn, model, "alice", "write")
 	c.Assert(err, jc.ErrorIsNil)
 	model1, err := s.jem.DB.Model(model.Path)
 	c.Assert(err, jc.ErrorIsNil)
@@ -272,9 +300,11 @@ func (s *jemSuite) TestRevokeModel(c *gc.C) {
 }
 
 func (s *jemSuite) TestRevokeModelControllerFailure(c *gc.C) {
-	conn, model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	conn, err := s.jem.OpenAPI(model.Controller)
+	c.Assert(err, jc.ErrorIsNil)
 	defer conn.Close()
-	err := s.jem.GrantModel(conn, model, "alice", "write")
+	err = s.jem.GrantModel(conn, model, "alice", "write")
 	c.Assert(err, jc.ErrorIsNil)
 	model1, err := s.jem.DB.Model(model.Path)
 	c.Assert(err, jc.ErrorIsNil)
@@ -287,7 +317,9 @@ func (s *jemSuite) TestRevokeModelControllerFailure(c *gc.C) {
 }
 
 func (s *jemSuite) TestDestroyModel(c *gc.C) {
-	conn, model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	conn, err := s.jem.OpenAPI(model.Controller)
+	c.Assert(err, jc.ErrorIsNil)
 	defer conn.Close()
 
 	// Sanity check the model exists
@@ -535,6 +567,10 @@ func (s *jemSuite) TestDoControllers(c *gc.C) {
 				Name: "us-east-1",
 			}},
 		},
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "us-east-1",
+		},
 		Public: true,
 	}, {
 		Path: params.EntityPath{
@@ -546,6 +582,10 @@ func (s *jemSuite) TestDoControllers(c *gc.C) {
 			Regions: []mongodoc.Region{{
 				Name: "eu-west-1",
 			}},
+		},
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "us-west-1",
 		},
 		Public: true,
 	}, {
@@ -562,6 +602,10 @@ func (s *jemSuite) TestDoControllers(c *gc.C) {
 				Name: "us-east-1",
 			}},
 		},
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "us-east-1",
+		},
 		Public: true,
 	}, {
 		Path: params.EntityPath{
@@ -577,6 +621,10 @@ func (s *jemSuite) TestDoControllers(c *gc.C) {
 				Name: "eu-west-1",
 			}},
 		},
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "eu-west-1",
+		},
 		Public: true,
 	}, {
 		Path: params.EntityPath{
@@ -588,6 +636,10 @@ func (s *jemSuite) TestDoControllers(c *gc.C) {
 			Regions: []mongodoc.Region{{
 				Name: "us-east-1",
 			}},
+		},
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "us-east-1",
 		},
 		Public: true,
 	}, {
@@ -601,6 +653,10 @@ func (s *jemSuite) TestDoControllers(c *gc.C) {
 				Name: "us-east-1",
 			}},
 		},
+		Location: map[string]string{
+			"cloud":  "gce",
+			"region": "us-east-1",
+		},
 		Public: true,
 	}, {
 		Path: params.EntityPath{
@@ -612,6 +668,10 @@ func (s *jemSuite) TestDoControllers(c *gc.C) {
 			Regions: []mongodoc.Region{{
 				Name: "us-east-1",
 			}},
+		},
+		Location: map[string]string{
+			"cloud":  "gce",
+			"region": "us-east-1",
 		},
 		Public: true,
 	}}
@@ -744,8 +804,6 @@ var selectContollerTests = []struct {
 	region           string
 	randIntn         func(int) int
 	expectController params.EntityPath
-	expectCloud      params.Cloud
-	expectRegion     string
 	expectError      string
 	expectErrorCause error
 }{{
@@ -757,7 +815,6 @@ var selectContollerTests = []struct {
 		User: "bob",
 		Name: "gce-us-east-1",
 	},
-	expectCloud: "gce",
 }, {
 	about: "aws",
 	cloud: "aws",
@@ -768,7 +825,6 @@ var selectContollerTests = []struct {
 		User: "alice",
 		Name: "aws-us-east-1",
 	},
-	expectCloud: "aws",
 }, {
 	about:  "aws-us-east-1",
 	cloud:  "aws",
@@ -780,8 +836,6 @@ var selectContollerTests = []struct {
 		User: "bob",
 		Name: "aws-us-east-1",
 	},
-	expectCloud:  "aws",
-	expectRegion: "us-east-1",
 }, {
 	about:  "no match",
 	cloud:  "aws",
@@ -809,6 +863,10 @@ func (s *jemSuite) TestSelectController(c *gc.C) {
 				Name: "us-east-1",
 			}},
 		},
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "us-east-1",
+		},
 		Public: true,
 	}, {
 		Path: params.EntityPath{
@@ -820,6 +878,10 @@ func (s *jemSuite) TestSelectController(c *gc.C) {
 			Regions: []mongodoc.Region{{
 				Name: "eu-west-1",
 			}},
+		},
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "eu-west-1",
 		},
 		Public: true,
 	}, {
@@ -836,6 +898,10 @@ func (s *jemSuite) TestSelectController(c *gc.C) {
 				Name: "us-east-1",
 			}},
 		},
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "us-east-1",
+		},
 		Public: true,
 	}, {
 		Path: params.EntityPath{
@@ -851,6 +917,10 @@ func (s *jemSuite) TestSelectController(c *gc.C) {
 				Name: "eu-west-1",
 			}},
 		},
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "eu-west-1",
+		},
 		Public: true,
 	}, {
 		Path: params.EntityPath{
@@ -862,6 +932,10 @@ func (s *jemSuite) TestSelectController(c *gc.C) {
 			Regions: []mongodoc.Region{{
 				Name: "us-east-1",
 			}},
+		},
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "us-east-1",
 		},
 		Public: true,
 	}, {
@@ -875,6 +949,10 @@ func (s *jemSuite) TestSelectController(c *gc.C) {
 				Name: "us-east-1",
 			}},
 		},
+		Location: map[string]string{
+			"cloud":  "gce",
+			"region": "us-east-1",
+		},
 		Public: true,
 	}, {
 		Path: params.EntityPath{
@@ -887,6 +965,10 @@ func (s *jemSuite) TestSelectController(c *gc.C) {
 				Name: "us-east-1",
 			}},
 		},
+		Location: map[string]string{
+			"cloud":  "gce",
+			"region": "us-east-1",
+		},
 		Public: true,
 	}}
 	for i := range testControllers {
@@ -898,7 +980,7 @@ func (s *jemSuite) TestSelectController(c *gc.C) {
 	for i, test := range selectContollerTests {
 		c.Logf("test %d. %s", i, test.about)
 		randIntn = &test.randIntn
-		ctl, cloud, region, err := s.jem.SelectController(ctx, test.cloud, test.region)
+		ctl, err := jem.SelectController(s.jem, ctx, test.cloud, test.region)
 		if test.expectError != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
 			if test.expectErrorCause != nil {
@@ -908,8 +990,119 @@ func (s *jemSuite) TestSelectController(c *gc.C) {
 		}
 		c.Assert(err, gc.IsNil)
 		c.Assert(ctl, jc.DeepEquals, test.expectController)
-		c.Assert(cloud, gc.Equals, test.expectCloud)
-		c.Assert(region, gc.Equals, test.expectRegion)
+	}
+}
+
+var controllerTests = []struct {
+	path             params.EntityPath
+	expectErrorCause error
+}{{
+	path: params.EntityPath{"bob", "controller"},
+}, {
+	path: params.EntityPath{"bob-group", "controller"},
+}, {
+	path:             params.EntityPath{"alice", "controller"},
+	expectErrorCause: params.ErrUnauthorized,
+}, {
+	path:             params.EntityPath{"bob", "controller2"},
+	expectErrorCause: params.ErrNotFound,
+}, {
+	path:             params.EntityPath{"bob-group", "controller2"},
+	expectErrorCause: params.ErrNotFound,
+}, {
+	path:             params.EntityPath{"alice", "controller2"},
+	expectErrorCause: params.ErrUnauthorized,
+}}
+
+func (s *jemSuite) TestController(c *gc.C) {
+	s.addController(c, params.EntityPath{"alice", "controller"})
+	s.addController(c, params.EntityPath{"bob", "controller"})
+	s.addController(c, params.EntityPath{"bob-group", "controller"})
+	ctx := auth.AuthenticateForTest(context.Background(), "bob", "bob-group")
+
+	for i, test := range controllerTests {
+		c.Logf("tes %d. %s", i, test.path)
+		ctl, err := s.jem.Controller(ctx, test.path)
+		if test.expectErrorCause != nil {
+			c.Assert(errgo.Cause(err), gc.Equals, test.expectErrorCause)
+			continue
+		}
+		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(ctl.Path, jc.DeepEquals, test.path)
+	}
+}
+
+var credentialTests = []struct {
+	path             params.CredentialPath
+	expectErrorCause error
+}{{
+	path: params.CredentialPath{
+		Cloud:      "dummy",
+		EntityPath: params.EntityPath{"bob", "credential"},
+	},
+}, {
+	path: params.CredentialPath{
+		Cloud:      "dummy",
+		EntityPath: params.EntityPath{"bob-group", "credential"},
+	},
+}, {
+	path: params.CredentialPath{
+		Cloud:      "dummy",
+		EntityPath: params.EntityPath{"alice", "credential"},
+	},
+	expectErrorCause: params.ErrUnauthorized,
+}, {
+	path: params.CredentialPath{
+		Cloud:      "dummy",
+		EntityPath: params.EntityPath{"bob", "credential2"},
+	},
+	expectErrorCause: params.ErrNotFound,
+}, {
+	path: params.CredentialPath{
+		Cloud:      "dummy",
+		EntityPath: params.EntityPath{"bob-group", "credential2"},
+	},
+	expectErrorCause: params.ErrNotFound,
+}, {
+	path: params.CredentialPath{
+		Cloud:      "dummy",
+		EntityPath: params.EntityPath{"alice", "credential2"},
+	},
+	expectErrorCause: params.ErrUnauthorized,
+}}
+
+func (s *jemSuite) TestCredential(c *gc.C) {
+	creds := []mongodoc.Credential{{
+		Path: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{"alice", "credential"},
+		},
+	}, {
+		Path: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{"bob", "credential"},
+		},
+	}, {
+		Path: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{"bob-group", "credential"},
+		},
+	}}
+	for _, cred := range creds {
+		cred.Id = cred.Path.String()
+		jem.UpdateCredential(s.jem.DB, &cred)
+	}
+	ctx := auth.AuthenticateForTest(context.Background(), "bob", "bob-group")
+
+	for i, test := range credentialTests {
+		c.Logf("tes %d. %s", i, test.path)
+		ctl, err := s.jem.Credential(ctx, test.path)
+		if test.expectErrorCause != nil {
+			c.Assert(errgo.Cause(err), gc.Equals, test.expectErrorCause)
+			continue
+		}
+		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(ctl.Path, jc.DeepEquals, test.path)
 	}
 }
 
@@ -921,13 +1114,24 @@ func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityP
 		CACert:        info.CACert,
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
+		Cloud: mongodoc.Cloud{
+			Name: "dummy",
+			Regions: []mongodoc.Region{{
+				Name: "dummy-region",
+			}},
+		},
+		Location: map[string]string{
+			"cloud":  "dummy",
+			"region": "dummy-region",
+		},
+		Public: true,
 	}
 	err := s.jem.DB.AddController(ctl)
 	c.Assert(err, jc.ErrorIsNil)
 	return path
 }
 
-func (s *jemSuite) bootstrapModel(c *gc.C, path params.EntityPath) (*apiconn.Conn, *mongodoc.Model) {
+func (s *jemSuite) bootstrapModel(c *gc.C, path params.EntityPath) *mongodoc.Model {
 	ctlPath := s.addController(c, params.EntityPath{User: path.User, Name: "controller"})
 	credPath := credentialPath("dummy", string(path.User), "cred")
 	err := jem.UpdateCredential(s.jem.DB, &mongodoc.Credential{
@@ -935,14 +1139,16 @@ func (s *jemSuite) bootstrapModel(c *gc.C, path params.EntityPath) (*apiconn.Con
 		Type: "empty",
 	})
 	c.Assert(err, jc.ErrorIsNil)
-	conn, err := s.jem.OpenAPI(ctlPath)
-	c.Assert(err, jc.ErrorIsNil)
-	model, _, err := s.jem.CreateModel(conn, jem.CreateModelParams{
+	ctx := auth.AuthenticateForTest(context.Background(), string(path.User))
+	model, _, err := s.jem.CreateModel(ctx, jem.CreateModelParams{
 		Path:           path,
 		ControllerPath: ctlPath,
-		Credential:     "cred",
-		Cloud:          "dummy",
+		Credential: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{"bob", "cred"},
+		},
+		Cloud: "dummy",
 	})
 	c.Assert(err, jc.ErrorIsNil)
-	return conn, model
+	return model
 }
