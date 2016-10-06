@@ -78,6 +78,12 @@ type Controller struct {
 	// UpdateCredentials holds a list of credentials which require
 	// updates on this controller.
 	UpdateCredentials []params.CredentialPath `bson:",omitempty"`
+
+	// Location holds the location of the controller. The only key
+	// values currently supported are "cloud" and "region". All
+	// controllers should have an associated cloud, but not clouds
+	// have regions.
+	Location map[string]string
 }
 
 func (s *Controller) Owner() params.User {

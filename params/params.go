@@ -134,7 +134,13 @@ type ControllerInfo struct {
 	// controllers by location.
 	//
 	// Only privileged users may create public controllers.
-	Public bool
+	Public bool `json:"public"`
+
+	// Cloud holds the cloud where the controller is located.
+	Cloud Cloud `json:"cloud"`
+
+	// Region holds the region where the controller is located.
+	Region string `json:"region"`
 }
 
 // EntityPath holds the path parameters for specifying

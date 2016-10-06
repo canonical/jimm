@@ -143,6 +143,8 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			User:           info.Tag.Id(),
 			Password:       info.Password,
 			ControllerUUID: info.ModelTag.Id(),
+			Cloud:          "dummy",
+			Region:         "dummy-region",
 		},
 		expectStatus: http.StatusForbidden,
 		expectBody: &params.Error{
@@ -160,6 +162,8 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			Password:       info.Password,
 			ControllerUUID: info.ModelTag.Id(),
 			Public:         true,
+			Cloud:          "dummy",
+			Region:         "dummy-region",
 		},
 	}, {
 		about:    "add public controller",
@@ -172,6 +176,8 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			Password:       info.Password,
 			ControllerUUID: info.ModelTag.Id(),
 			Public:         true,
+			Cloud:          "dummy",
+			Region:         "dummy-region",
 		},
 	}, {
 		about:    "incorrect user",
@@ -183,6 +189,8 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			User:           info.Tag.Id(),
 			Password:       info.Password,
 			ControllerUUID: info.ModelTag.Id(),
+			Cloud:          "dummy",
+			Region:         "dummy-region",
 		},
 		expectStatus: http.StatusUnauthorized,
 		expectBody: params.Error{
@@ -197,6 +205,8 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			Password:       info.Password,
 			ControllerUUID: info.ModelTag.Id(),
 			Public:         true,
+			Cloud:          "dummy",
+			Region:         "dummy-region",
 		},
 		expectStatus: http.StatusBadRequest,
 		expectBody: params.Error{
@@ -211,6 +221,8 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			Password:       info.Password,
 			ControllerUUID: info.ModelTag.Id(),
 			Public:         true,
+			Cloud:          "dummy",
+			Region:         "dummy-region",
 		},
 		expectStatus: http.StatusBadRequest,
 		expectBody: params.Error{
@@ -225,6 +237,8 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			User:      info.Tag.Id(),
 			Password:  info.Password,
 			Public:    true,
+			Cloud:     "dummy",
+			Region:    "dummy-region",
 		},
 		expectStatus: http.StatusBadRequest,
 		expectBody: params.Error{
@@ -241,6 +255,8 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			User:      info.Tag.Id(),
 			Password:  info.Password,
 			Public:    true,
+			Cloud:     "dummy",
+			Region:    "dummy-region",
 		},
 		expectStatus: http.StatusUnauthorized,
 		expectBody: params.Error{
@@ -256,6 +272,8 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			Password:       info.Password,
 			ControllerUUID: info.ModelTag.Id(),
 			Public:         true,
+			Cloud:          "dummy",
+			Region:         "dummy-region",
 		},
 		expectStatus: http.StatusBadRequest,
 		expectBody: httptesting.BodyAsserter(func(c *gc.C, m json.RawMessage) {
@@ -265,6 +283,34 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			c.Assert(body.Code, gc.Equals, params.ErrBadRequest)
 			c.Assert(body.Message, gc.Matches, `cannot connect to controller: cannot connect to API: unable to connect to API: .*`)
 		}),
+	}, {
+		about: "no cloud",
+		body: params.ControllerInfo{
+			HostPorts:      []string{"0.1.2.3:1234"},
+			CACert:         info.CACert,
+			User:           info.Tag.Id(),
+			Password:       info.Password,
+			ControllerUUID: info.ModelTag.Id(),
+			Public:         true,
+		},
+		expectStatus: http.StatusBadRequest,
+		expectBody: params.Error{
+			Code:    params.ErrBadRequest,
+			Message: `cannot unmarshal parameters: cannot unmarshal into field: cannot unmarshal request body: invalid cloud ""`,
+		},
+	}, {
+		about:    "no region",
+		username: "controller-admin",
+		authUser: "controller-admin",
+		body: params.ControllerInfo{
+			HostPorts:      info.Addrs,
+			CACert:         info.CACert,
+			User:           info.Tag.Id(),
+			Password:       info.Password,
+			ControllerUUID: info.ModelTag.Id(),
+			Public:         true,
+			Cloud:          "dummy",
+		},
 	}}
 	s.IDMSrv.AddUser("alice", "beatles", "controller-admin")
 	s.IDMSrv.AddUser("bob", "beatles")
@@ -451,6 +497,8 @@ func (s *APISuite) TestGetControllerWithLocation(c *gc.C) {
 			Password:       info.Password,
 			ControllerUUID: info.ModelTag.Id(),
 			Public:         true,
+			Cloud:          "dummy",
+			Region:         "dummy-region",
 		},
 	})
 	c.Assert(err, gc.IsNil)
