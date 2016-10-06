@@ -152,6 +152,8 @@ func (s *Suite) AddController(c *gc.C, path params.EntityPath, public bool) erro
 			// for now, but we can update them afterwards to
 			// tests that require private ones.
 			Public: true,
+			Cloud:  params.Cloud("dummy"),
+			Region: "dummy-region",
 		},
 	}
 	s.IDMSrv.AddUser(string(path.User), "controller-admin")

@@ -100,6 +100,14 @@ func (h *Handler) AddController(arg *params.AddController) error {
 		return badRequestf(nil, "bad model UUID in request")
 	}
 
+	location := make(map[string]string, 2)
+	if arg.Info.Cloud != "" {
+		location["cloud"] = string(arg.Info.Cloud)
+	}
+	if arg.Info.Region != "" {
+		location["region"] = arg.Info.Region
+	}
+
 	ctl := &mongodoc.Controller{
 		Path:          arg.EntityPath,
 		CACert:        arg.Info.CACert,
@@ -108,6 +116,7 @@ func (h *Handler) AddController(arg *params.AddController) error {
 		AdminPassword: arg.Info.Password,
 		UUID:          arg.Info.ControllerUUID,
 		Public:        arg.Info.Public,
+		Location:      location,
 	}
 	logger.Infof("dialling model")
 	// Attempt to connect to the controller before accepting it.
@@ -170,16 +179,11 @@ func (h *Handler) GetController(arg *params.GetController) (*params.ControllerRe
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	loc := make(map[string]string, 2)
-	loc["cloud"] = string(ctl.Cloud.Name)
-	if len(ctl.Cloud.Regions) > 0 {
-		loc["region"] = ctl.Cloud.Regions[0].Name
-	}
 	return &params.ControllerResponse{
 		Path:             arg.EntityPath,
 		ProviderType:     neSchema.providerType,
 		Schema:           neSchema.schema,
-		Location:         loc,
+		Location:         ctl.Location,
 		Public:           ctl.Public,
 		UnavailableSince: newTime(ctl.UnavailableSince.UTC()),
 	}, nil
@@ -388,15 +392,11 @@ func (h *Handler) ListController(arg *params.ListController) (*params.ListContro
 	iter := h.jem.DB.NewCanReadIter(h.context, h.jem.DB.Controllers().Find(nil).Sort("_id").Iter())
 	var ctl mongodoc.Controller
 	for iter.Next(&ctl) {
-		loc := map[string]string{"cloud": string(ctl.Cloud.Name)}
-		if len(ctl.Cloud.Regions) > 0 {
-			loc["region"] = ctl.Cloud.Regions[0].Name
-		}
 		controllers = append(controllers, params.ControllerResponse{
 			Path:             ctl.Path,
 			Public:           ctl.Public,
 			UnavailableSince: newTime(ctl.UnavailableSince.UTC()),
-			Location:         loc,
+			Location:         ctl.Location,
 		})
 	}
 	if err := iter.Err(); err != nil {

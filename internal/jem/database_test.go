@@ -58,6 +58,10 @@ func (s *databaseSuite) TestAddController(c *gc.C) {
 				Name: "foo",
 			}},
 		},
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "foo",
+		},
 	}
 	err := s.database.AddController(ctl)
 	c.Assert(err, gc.IsNil)
@@ -76,6 +80,10 @@ func (s *databaseSuite) TestAddController(c *gc.C) {
 				Name: "foo",
 			}},
 		},
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "foo",
+		},
 	})
 
 	ctl1, err := s.database.Controller(ctlPath)
@@ -92,6 +100,10 @@ func (s *databaseSuite) TestAddController(c *gc.C) {
 			Regions: []mongodoc.Region{{
 				Name: "foo",
 			}},
+		},
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "foo",
 		},
 	})
 

@@ -91,6 +91,8 @@ func (c *addControllerCommand) Run(ctxt *cmd.Context) error {
 			User:           info.account.User,
 			Password:       info.account.Password,
 			Public:         true,
+			Cloud:          params.Cloud(info.controller.Cloud),
+			Region:         info.controller.CloudRegion,
 		},
 	}); err != nil {
 		return errgo.Notef(err, "cannot add controller")
