@@ -61,7 +61,7 @@ func (s *removeSuite) TestRemoveController(c *gc.C) {
 	stdout, stderr, code = run(c, c.MkDir(), "remove", "--controller", "bob/foo")
 	c.Assert(code, gc.Equals, 1, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Matches, `cannot remove bob/foo: .*: cannot delete controller while it is still alive\n`)
+	c.Assert(stderr, gc.Matches, `cannot remove bob/foo: cannot delete controller while it is still alive\n`)
 
 	// We can use the --force flag to remove it.
 	stdout, stderr, code = run(c, c.MkDir(), "remove", "--force", "--controller", "bob/foo")
@@ -95,7 +95,7 @@ func (s *removeSuite) TestRemoveMultipleModels(c *gc.C) {
 	stdout, stderr, code = run(c, c.MkDir(), "remove", "bob/foo", "bob/foo-1")
 	c.Assert(code, gc.Equals, 1, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Matches, `cannot remove bob/foo: DELETE http://.*/v2/model/bob/foo: model "bob/foo" not found`+"\n")
+	c.Assert(stderr, gc.Matches, `cannot remove bob/foo: model "bob/foo" not found`+"\n")
 
 	stdout, stderr, code = run(c, c.MkDir(), "list")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))

@@ -421,7 +421,7 @@ func (s *websocketSuite) TestCredential(c *gc.C) {
 		},
 	}, {
 		Error: &jujuparams.Error{
-			Message: `credential "dummy/admin@local/cred6" not found`,
+			Message: `credential "dummy/admin/cred6" not found`,
 			Code:    jujuparams.CodeNotFound,
 		},
 	}})
@@ -892,7 +892,7 @@ func (s *websocketSuite) TestModifyModelAccessErrors(c *gc.C) {
 			Access:   jujuparams.ModelReadAccess,
 			ModelTag: names.NewModelTag(mi.UUID).String(),
 		},
-		expectError: `unsupported domain "local"`,
+		expectError: `unsupported domain ""`,
 	}, {
 		about: "no such model",
 		modifyModelAccess: jujuparams.ModifyModelAccess{
@@ -1049,20 +1049,19 @@ func (s *websocketSuite) TestConnectionClosesWhenHeartMonitorDies(c *gc.C) {
 	}))
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
-	hm.waitForFirstPing(c, time.Second)
 	hm.kill(time.Now())
-	beats := 1
+	beats := 0
 	var err error
 	for beats < 10 {
 		time.Sleep(10 * time.Millisecond)
-		err = conn.Ping()
+		err = conn.APICall("Pinger", 1, "", "Ping", nil, nil)
 		if err != nil {
 			break
 		}
 		beats++
 	}
 	c.Assert(err, gc.ErrorMatches, `connection is shut down`)
-	c.Assert(hm.beats(), gc.Equals, 1)
+	c.Assert(hm.beats(), gc.Equals, 0)
 }
 
 func (s *websocketSuite) TestPingerupdatesHeartMonitor(c *gc.C) {
@@ -1072,10 +1071,9 @@ func (s *websocketSuite) TestPingerupdatesHeartMonitor(c *gc.C) {
 	}))
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
-	hm.waitForFirstPing(c, time.Second)
-	err := conn.Ping()
+	err := conn.APICall("Pinger", 1, "", "Ping", nil, nil)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(hm.beats(), gc.Equals, 2)
+	c.Assert(hm.beats(), gc.Equals, 1)
 }
 
 // open creates a new websockec connection to the test server, using the

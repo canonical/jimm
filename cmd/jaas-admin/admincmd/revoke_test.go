@@ -40,14 +40,14 @@ func (s *revokeSuite) TestRevoke(c *gc.C) {
 			Name: "foo",
 		},
 	})
-	c.Assert(err, gc.ErrorMatches, "GET http://.*/v2/controller/bob/foo: unauthorized")
+	c.Assert(err, gc.ErrorMatches, "unauthorized")
 	_, err = aliceClient.GetModel(&params.GetModel{
 		EntityPath: params.EntityPath{
 			User: "bob",
 			Name: "foo",
 		},
 	})
-	c.Assert(err, gc.ErrorMatches, "GET http://.*/v2/model/bob/foo: unauthorized")
+	c.Assert(err, gc.ErrorMatches, "unauthorized")
 
 	// Add alice to model permissions list.
 	stdout, stderr, code = run(c, c.MkDir(),
@@ -66,7 +66,7 @@ func (s *revokeSuite) TestRevoke(c *gc.C) {
 			Name: "foo",
 		},
 	})
-	c.Assert(err, gc.ErrorMatches, "GET http://.*/v2/controller/bob/foo: unauthorized")
+	c.Assert(err, gc.ErrorMatches, "unauthorized")
 	_, err = aliceClient.GetModel(&params.GetModel{
 		EntityPath: params.EntityPath{
 			User: "bob",
