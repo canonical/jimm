@@ -838,7 +838,11 @@ func massageModelInfo(h *wsHandler, mi jujuparams.ModelInfo) jujuparams.ModelInf
 	mi1.ControllerUUID = h.params.ControllerUUID
 	mi1.Users = make([]jujuparams.ModelUserInfo, 0, len(mi.Users))
 	for _, u := range mi.Users {
-		if strings.HasSuffix(u.UserName, "@local") {
+		if !names.IsValidUser(u.UserName) {
+			continue
+		}
+		tag := names.NewUserTag(u.UserName)
+		if tag.IsLocal() {
 			continue
 		}
 		mi1.Users = append(mi1.Users, u)

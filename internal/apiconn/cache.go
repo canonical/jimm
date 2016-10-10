@@ -200,3 +200,8 @@ func (c *Conn) Evict() {
 		conn1.Close()
 	}
 }
+
+// Ping implements the erstwhile api.Connection.Ping() method.
+func (c *Conn) Ping() error {
+	return errgo.Mask(c.Connection.APICall("Pinger", 1, "", "Ping", nil, nil))
+}

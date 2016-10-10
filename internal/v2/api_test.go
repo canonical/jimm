@@ -354,7 +354,7 @@ func (s *APISuite) TestAddController(c *gc.C) {
 func (s *APISuite) TestAddControllerDuplicate(c *gc.C) {
 	ctlPath := s.AssertAddController(c, params.EntityPath{"bob", "dupmodel"}, false)
 	err := s.AddController(c, ctlPath, false)
-	c.Assert(err, gc.ErrorMatches, "PUT http://.*: already exists")
+	c.Assert(err, gc.ErrorMatches, "already exists")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
 }
 
@@ -716,7 +716,7 @@ var getControllerLocationsTests = []struct {
 			"cloud.blah": "aws",
 		},
 	},
-	expectError: `GET .*: invalid location attribute "cloud\.blah"`,
+	expectError: `invalid location attribute "cloud\.blah"`,
 	expectCause: params.ErrBadRequest,
 }, {
 	about: "user without access to everything",
@@ -898,7 +898,7 @@ var getAllControllerLocationsTests = []struct {
 			"cloud.blah": "aws",
 		},
 	},
-	expectError: `GET .*: invalid location attribute "cloud\.blah"`,
+	expectError: `invalid location attribute "cloud\.blah"`,
 	expectCause: params.ErrBadRequest,
 }, {
 	about: "user without access to everything",
@@ -1039,7 +1039,7 @@ func (s *APISuite) TestGetSchemaNotFound(c *gc.C) {
 	})
 	c.Check(resp, gc.IsNil)
 	c.Check(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	c.Assert(err, gc.ErrorMatches, `GET http://.*/schema\?cloud=ec2: no matching controllers`)
+	c.Assert(err, gc.ErrorMatches, `no matching controllers`)
 }
 
 func (s *APISuite) TestGetSchemaAmbiguous(c *gc.C) {
@@ -1063,7 +1063,7 @@ func (s *APISuite) TestGetSchemaAmbiguous(c *gc.C) {
 	})
 	c.Check(resp, gc.IsNil)
 	c.Check(errgo.Cause(err), gc.Equals, params.ErrAmbiguousLocation)
-	c.Assert(err, gc.ErrorMatches, `GET http://.*/schema\?cloud=dummy: ambiguous location matches controller of more than one type`)
+	c.Assert(err, gc.ErrorMatches, `ambiguous location matches controller of more than one type`)
 }
 
 func (s *APISuite) TestGetSchemaBadLocation(c *gc.C) {
@@ -1074,7 +1074,7 @@ func (s *APISuite) TestGetSchemaBadLocation(c *gc.C) {
 	})
 	c.Check(resp, gc.IsNil)
 	c.Check(errgo.Cause(err), gc.Equals, params.ErrBadRequest)
-	c.Assert(err, gc.ErrorMatches, `GET .*: invalid location attribute "\$badlocation"`)
+	c.Assert(err, gc.ErrorMatches, `invalid location attribute "\$badlocation"`)
 }
 
 func (s *APISuite) TestNewModel(c *gc.C) {
@@ -1160,7 +1160,7 @@ var newModelWithoutExplicitControllerTests = []struct {
 			"secret": "a secret",
 		},
 	},
-	expectError:      `POST http://.*/v2/model/alice: cannot select controller: no matching controllers found`,
+	expectError:      `cannot select controller: no matching controllers found`,
 	expectErrorCause: params.ErrNotFound,
 }, {
 	about: "no matching region",
@@ -1175,7 +1175,7 @@ var newModelWithoutExplicitControllerTests = []struct {
 			"secret": "a secret",
 		},
 	},
-	expectError:      `POST http://.*/v2/model/alice: cannot select controller: no matching controllers found`,
+	expectError:      `cannot select controller: no matching controllers found`,
 	expectErrorCause: params.ErrNotFound,
 }, {
 	about: "unrecognised location parameter",
@@ -1190,7 +1190,7 @@ var newModelWithoutExplicitControllerTests = []struct {
 			"secret": "a secret",
 		},
 	},
-	expectError:      `POST http://.*/v2/model/alice: cannot select controller: no matching controllers found`,
+	expectError:      `cannot select controller: no matching controllers found`,
 	expectErrorCause: params.ErrNotFound,
 }, {
 	about: "invalid location parameter",
@@ -1205,7 +1205,7 @@ var newModelWithoutExplicitControllerTests = []struct {
 			"secret": "a secret",
 		},
 	},
-	expectError:      `POST http://.*/v2/model/alice: cannot select controller: no matching controllers found`,
+	expectError:      `cannot select controller: no matching controllers found`,
 	expectErrorCause: params.ErrNotFound,
 }, {
 	about: "invalid cloud name",
@@ -1220,7 +1220,7 @@ var newModelWithoutExplicitControllerTests = []struct {
 			"secret": "a secret",
 		},
 	},
-	expectError:      `POST http://.*/v2/model/alice: cannot select controller: invalid cloud "bad/name"`,
+	expectError:      `cannot select controller: invalid cloud "bad/name"`,
 	expectErrorCause: params.ErrBadRequest,
 }}
 

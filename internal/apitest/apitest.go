@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/juju/idmclient/idmtest"
+	controllerapi "github.com/juju/juju/api/controller"
 	"github.com/juju/juju/controller"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	jc "github.com/juju/testing/checkers"
@@ -61,6 +62,10 @@ func (s *Suite) SetUpTest(c *gc.C) {
 		controller.IdentityPublicKey: s.IDMSrv.PublicKey,
 	}
 	s.JujuConnSuite.SetUpTest(c)
+	conn := s.OpenControllerAPI(c)
+	defer conn.Close()
+	err := controllerapi.NewClient(conn).GrantController("everyone@external", "login")
+	c.Assert(err, jc.ErrorIsNil)
 	s.PatchValue(&jem.APIOpenTimeout, time.Duration(0))
 	s.JEMSrv = s.NewServer(c, s.Session, s.IDMSrv)
 	s.httpSrv = httptest.NewServer(s.JEMSrv)
