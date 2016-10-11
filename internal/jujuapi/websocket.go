@@ -372,9 +372,15 @@ func (a admin) RedirectInfo() (jujuparams.RedirectInfoResult, error) {
 	if a.h.modelUUID == "" {
 		return jujuparams.RedirectInfoResult{}, errgo.New("not redirected")
 	}
-	nhps, err := network.ParseHostPorts(a.h.controller.HostPorts...)
-	if err != nil {
-		return jujuparams.RedirectInfoResult{}, errgo.Mask(err)
+	nhps := make([]network.HostPort, len(a.h.controller.HostPorts))
+	for i, hp := range a.h.controller.HostPorts {
+		nhp, err := network.ParseHostPort(hp)
+		if err != nil {
+			return jujuparams.RedirectInfoResult{}, errgo.Mask(err)
+		}
+		nhps[i] = *nhp
+		// TODO(mhilton) The scope should be stored in the database.
+		nhps[i].Scope = "public"
 	}
 	hps := jujuparams.FromNetworkHostPorts(nhps)
 	return jujuparams.RedirectInfoResult{
