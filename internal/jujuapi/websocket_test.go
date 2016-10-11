@@ -72,6 +72,9 @@ func (s *websocketSuite) TestLoginToModel(c *gc.C) {
 	defer conn.Close()
 	nhps, err := network.ParseHostPorts(s.APIInfo(c).Addrs...)
 	c.Assert(err, jc.ErrorIsNil)
+	for i := range nhps {
+		nhps[i].Scope = "public"
+	}
 	err = conn.Login(nil, "", "", nil)
 	c.Assert(errgo.Cause(err), jc.DeepEquals, &api.RedirectError{
 		Servers: [][]network.HostPort{nhps},
