@@ -204,7 +204,7 @@ func (db *Database) ModelFromUUID(uuid string) (_ *mongodoc.Model, err error) {
 func (db *Database) controllerLocationQuery(cloud params.Cloud, region string, includeUnavailable bool) *mgo.Query {
 	q := make(bson.D, 0, 4)
 	if cloud != "" {
-		q = append(q, bson.DocElem{"cloud.name", cloud})
+		q = append(q, bson.DocElem{"location.cloud", cloud})
 	}
 	if region != "" {
 		q = append(q, bson.DocElem{"cloud.regions", bson.D{{"$elemMatch", bson.D{{"name", region}}}}})

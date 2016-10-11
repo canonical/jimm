@@ -357,7 +357,7 @@ type NewModelInfo struct {
 
 	// Credential holds the name of the provider credential that will
 	// be used to provision machines in the new model.
-	Credential Name `json:"credential"`
+	Credential CredentialPath `json:"credential"`
 
 	// Config holds the configuration attributes to use to create the new model.
 	Config map[string]interface{} `json:"config"`

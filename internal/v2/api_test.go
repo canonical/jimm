@@ -56,7 +56,10 @@ var unauthorizedTests = []struct {
 	body: params.NewModelInfo{
 		Name:       "newmodel",
 		Controller: &params.EntityPath{"bob", "open"},
-		Credential: "cred1",
+		Credential: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{"bob", "cred1"},
+		},
 	},
 }, {
 	about:  "new model with inaccessible controller",
@@ -66,7 +69,10 @@ var unauthorizedTests = []struct {
 	body: params.NewModelInfo{
 		Name:       "newmodel",
 		Controller: &params.EntityPath{"bob", "private"},
-		Credential: "cred1",
+		Credential: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{"bob", "cred1"},
+		},
 	},
 }, {
 	about:  "set controller perm as non-owner",
@@ -739,6 +745,10 @@ func (s *APISuite) TestGetControllerLocations(c *gc.C) {
 			}},
 		},
 		Public: true,
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "us-east-1",
+		},
 	})
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
 		Path: params.EntityPath{"bob", "aws-us-east2"},
@@ -749,6 +759,10 @@ func (s *APISuite) TestGetControllerLocations(c *gc.C) {
 			}},
 		},
 		Public: true,
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "us-east-1",
+		},
 	})
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
 		Path: params.EntityPath{"bob", "aws-eu-west"},
@@ -759,6 +773,10 @@ func (s *APISuite) TestGetControllerLocations(c *gc.C) {
 			}},
 		},
 		Public: true,
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "eu-west-1",
+		},
 	})
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
 		Path: params.EntityPath{"bob", "gce-somewhere"},
@@ -769,6 +787,10 @@ func (s *APISuite) TestGetControllerLocations(c *gc.C) {
 			}},
 		},
 		Public: true,
+		Location: map[string]string{
+			"cloud":  "gce",
+			"region": "somewhere",
+		},
 	})
 	ctlId := params.EntityPath{"bob", "gce-down"}
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
@@ -780,6 +802,10 @@ func (s *APISuite) TestGetControllerLocations(c *gc.C) {
 			}},
 		},
 		Public: true,
+		Location: map[string]string{
+			"cloud":  "gce",
+			"region": "down",
+		},
 	})
 	err := s.JEM.DB.SetControllerUnavailableAt(ctlId, time.Now())
 	c.Assert(err, gc.IsNil)
@@ -792,6 +818,10 @@ func (s *APISuite) TestGetControllerLocations(c *gc.C) {
 			}},
 		},
 		Public: true,
+		Location: map[string]string{
+			"cloud":  "gce",
+			"region": "elsewhere",
+		},
 	})
 	s.IDMSrv.AddUser("alice", "somegroup")
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
@@ -803,6 +833,10 @@ func (s *APISuite) TestGetControllerLocations(c *gc.C) {
 			}},
 		},
 		Public: true,
+		Location: map[string]string{
+			"cloud":  "gce",
+			"region": "america",
+		},
 	})
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
 		Path: params.EntityPath{"alice", "controller"},
@@ -813,6 +847,10 @@ func (s *APISuite) TestGetControllerLocations(c *gc.C) {
 			}},
 		},
 		Public: true,
+		Location: map[string]string{
+			"cloud":  "azure",
+			"region": "america",
+		},
 	})
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
 		Path: params.EntityPath{"alice", "forgotten"},
@@ -823,6 +861,10 @@ func (s *APISuite) TestGetControllerLocations(c *gc.C) {
 			}},
 		},
 		Public: false,
+		Location: map[string]string{
+			"cloud":  "azure",
+			"region": "america",
+		},
 	})
 
 	for i, test := range getControllerLocationsTests {
@@ -921,6 +963,10 @@ func (s *APISuite) TestAllControllerLocations(c *gc.C) {
 			}},
 		},
 		Public: true,
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "us-east-1",
+		},
 	})
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
 		Path: params.EntityPath{"bob", "aws-us-east2"},
@@ -931,6 +977,10 @@ func (s *APISuite) TestAllControllerLocations(c *gc.C) {
 			}},
 		},
 		Public: true,
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "us-east-1",
+		},
 	})
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
 		Path: params.EntityPath{"bob", "aws-eu-west"},
@@ -941,6 +991,10 @@ func (s *APISuite) TestAllControllerLocations(c *gc.C) {
 			}},
 		},
 		Public: true,
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "eu-west-1",
+		},
 	})
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
 		Path: params.EntityPath{"bob", "gce-somewhere"},
@@ -951,6 +1005,10 @@ func (s *APISuite) TestAllControllerLocations(c *gc.C) {
 			}},
 		},
 		Public: true,
+		Location: map[string]string{
+			"cloud":  "gce",
+			"region": "somewhere",
+		},
 	})
 	ctlId := params.EntityPath{"bob", "gce-down"}
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
@@ -962,6 +1020,10 @@ func (s *APISuite) TestAllControllerLocations(c *gc.C) {
 			}},
 		},
 		Public: true,
+		Location: map[string]string{
+			"cloud":  "gce",
+			"region": "down",
+		},
 	})
 	err := s.JEM.DB.SetControllerUnavailableAt(ctlId, time.Now())
 	c.Assert(err, gc.IsNil)
@@ -974,6 +1036,10 @@ func (s *APISuite) TestAllControllerLocations(c *gc.C) {
 			}},
 		},
 		Public: true,
+		Location: map[string]string{
+			"cloud":  "gce",
+			"region": "elsewhere",
+		},
 	})
 	s.IDMSrv.AddUser("alice", "somegroup")
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
@@ -985,6 +1051,10 @@ func (s *APISuite) TestAllControllerLocations(c *gc.C) {
 			}},
 		},
 		Public: true,
+		Location: map[string]string{
+			"cloud":  "azure",
+			"region": "america",
+		},
 	})
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
 		Path: params.EntityPath{"alice", "forgotten"},
@@ -995,6 +1065,10 @@ func (s *APISuite) TestAllControllerLocations(c *gc.C) {
 			}},
 		},
 		Public: false,
+		Location: map[string]string{
+			"cloud":  "azure",
+			"region": "america",
+		},
 	})
 
 	for i, test := range getAllControllerLocationsTests {
@@ -1054,6 +1128,9 @@ func (s *APISuite) TestGetSchemaAmbiguous(c *gc.C) {
 			ProviderType: "another",
 		},
 		Public: true,
+		Location: map[string]string{
+			"cloud": "dummy",
+		},
 	})
 
 	resp, err := s.NewClient("bob").GetSchema(&params.GetSchema{
@@ -1089,7 +1166,10 @@ func (s *APISuite) TestNewModel(c *gc.C) {
 		JSONBody: params.NewModelInfo{
 			Name:       params.Name("bar"),
 			Controller: &ctlId,
-			Credential: cred,
+			Credential: params.CredentialPath{
+				Cloud:      "dummy",
+				EntityPath: params.EntityPath{"bob", cred},
+			},
 			Location: map[string]string{
 				"cloud": "dummy",
 			},
@@ -1138,8 +1218,11 @@ var newModelWithoutExplicitControllerTests = []struct {
 	about: "success",
 	user:  "alice",
 	info: params.NewModelInfo{
-		Name:       "test-model",
-		Credential: "cred1",
+		Name: "test-model",
+		Credential: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{"alice", "cred1"},
+		},
 		Location: map[string]string{
 			"cloud": "dummy",
 		},
@@ -1151,8 +1234,11 @@ var newModelWithoutExplicitControllerTests = []struct {
 	about: "no matching cloud",
 	user:  "alice",
 	info: params.NewModelInfo{
-		Name:       "test-model",
-		Credential: "cred1",
+		Name: "test-model",
+		Credential: params.CredentialPath{
+			Cloud:      "aws",
+			EntityPath: params.EntityPath{"alice", "cred1"},
+		},
 		Location: map[string]string{
 			"cloud": "aws",
 		},
@@ -1166,8 +1252,11 @@ var newModelWithoutExplicitControllerTests = []struct {
 	about: "no matching region",
 	user:  "alice",
 	info: params.NewModelInfo{
-		Name:       "test-model",
-		Credential: "cred1",
+		Name: "test-model",
+		Credential: params.CredentialPath{
+			Cloud:      "aws",
+			EntityPath: params.EntityPath{"alice", "cred1"},
+		},
 		Location: map[string]string{
 			"region": "us-east-1",
 		},
@@ -1181,8 +1270,11 @@ var newModelWithoutExplicitControllerTests = []struct {
 	about: "unrecognised location parameter",
 	user:  "alice",
 	info: params.NewModelInfo{
-		Name:       "test-model",
-		Credential: "cred1",
+		Name: "test-model",
+		Credential: params.CredentialPath{
+			Cloud:      "aws",
+			EntityPath: params.EntityPath{"alice", "cred1"},
+		},
 		Location: map[string]string{
 			"dimension": "5th",
 		},
@@ -1196,8 +1288,11 @@ var newModelWithoutExplicitControllerTests = []struct {
 	about: "invalid location parameter",
 	user:  "alice",
 	info: params.NewModelInfo{
-		Name:       "test-model",
-		Credential: "cred1",
+		Name: "test-model",
+		Credential: params.CredentialPath{
+			Cloud:      "aws",
+			EntityPath: params.EntityPath{"alice", "cred1"},
+		},
 		Location: map[string]string{
 			"cloud.blah": "dummy",
 		},
@@ -1211,8 +1306,11 @@ var newModelWithoutExplicitControllerTests = []struct {
 	about: "invalid cloud name",
 	user:  "alice",
 	info: params.NewModelInfo{
-		Name:       "test-model",
-		Credential: "cred1",
+		Name: "test-model",
+		Credential: params.CredentialPath{
+			Cloud:      "aws",
+			EntityPath: params.EntityPath{"alice", "cred1"},
+		},
 		Location: map[string]string{
 			"cloud": "bad/name",
 		},
@@ -1220,7 +1318,7 @@ var newModelWithoutExplicitControllerTests = []struct {
 			"secret": "a secret",
 		},
 	},
-	expectError:      `cannot select controller: invalid cloud "bad/name"`,
+	expectError:      `invalid cloud "bad/name"`,
 	expectErrorCause: params.ErrBadRequest,
 }}
 
@@ -1327,7 +1425,10 @@ func (s *APISuite) TestNewModelUnderGroup(c *gc.C) {
 		JSONBody: params.NewModelInfo{
 			Name:       params.Name("bar"),
 			Controller: &ctlId,
-			Credential: cred,
+			Credential: params.CredentialPath{
+				Cloud:      "dummy",
+				EntityPath: params.EntityPath{"beatles", cred},
+			},
 			Location: map[string]string{
 				"cloud": "dummy",
 			},
@@ -1389,6 +1490,8 @@ func (s *APISuite) TestNewModelCannotOpenAPI(c *gc.C) {
 		Path:      params.EntityPath{"bob", "foo"},
 		AdminUser: "admin",
 	})
+	s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
+
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Method:  "POST",
 		URL:     "/v2/model/bob",
@@ -1396,37 +1499,15 @@ func (s *APISuite) TestNewModelCannotOpenAPI(c *gc.C) {
 		JSONBody: params.NewModelInfo{
 			Name:       params.Name("bar"),
 			Controller: &params.EntityPath{"bob", "foo"},
-			Credential: "cred1",
+			Credential: params.CredentialPath{
+				Cloud:      "dummy",
+				EntityPath: params.EntityPath{"bob", "cred1"},
+			},
 		},
 		ExpectBody: params.Error{
 			Message: `cannot connect to controller: cannot connect to API: validating info for opening an API connection: missing addresses not valid`,
 		},
 		ExpectStatus: http.StatusInternalServerError,
-		Do:           apitest.Do(s.IDMSrv.Client("bob")),
-	})
-}
-
-func (s *APISuite) TestNewModelInvalidConfig(c *gc.C) {
-	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, false)
-	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
-
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Method:  "POST",
-		URL:     "/v2/model/bob",
-		Handler: s.JEMSrv,
-		JSONBody: params.NewModelInfo{
-			Name:       params.Name("bar"),
-			Controller: &ctlId,
-			Credential: cred,
-			Config: map[string]interface{}{
-				"authorized-keys": 123,
-			},
-		},
-		ExpectBody: params.Error{
-			Message: `cannot validate attributes: authorized-keys: expected string, got float64(123)`,
-			Code:    params.ErrBadRequest,
-		},
-		ExpectStatus: http.StatusBadRequest,
 		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 	})
 }
@@ -1438,8 +1519,11 @@ func (s *APISuite) TestNewModelTwice(c *gc.C) {
 	body := &params.NewModelInfo{
 		Name:       "bar",
 		Controller: &ctlId,
-		Credential: cred,
-		Config:     dummyModelConfig,
+		Credential: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{"bob", cred},
+		},
+		Config: dummyModelConfig,
 	}
 	p := httptesting.JSONCallParams{
 		Method:     "POST",
@@ -1477,7 +1561,10 @@ func (s *APISuite) TestNewModelCannotCreate(c *gc.C) {
 		JSONBody: params.NewModelInfo{
 			Name:       "bar",
 			Controller: &ctlId,
-			Credential: cred,
+			Credential: params.CredentialPath{
+				Cloud:      "dummy",
+				EntityPath: params.EntityPath{"bob", cred},
+			},
 			Config: map[string]interface{}{
 				"authorized-keys": sshKey,
 				"logging-config":  "bad>",
@@ -1515,8 +1602,11 @@ func (s *APISuite) TestNewModelUnauthorized(c *gc.C) {
 		JSONBody: params.NewModelInfo{
 			Name:       "bar",
 			Controller: &ctlId,
-			Credential: cred,
-			Config:     dummyModelConfig,
+			Credential: params.CredentialPath{
+				Cloud:      "dummy",
+				EntityPath: params.EntityPath{"bob", cred},
+			},
+			Config: dummyModelConfig,
 		},
 		ExpectBody: params.Error{
 			Message: `unauthorized`,

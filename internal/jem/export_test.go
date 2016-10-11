@@ -2,14 +2,15 @@ package jem
 
 var (
 	RandIntn                   = &randIntn
+	WallClock                  = &wallClock
+	NewDatabase                = newDatabase
+	ClearCredentialUpdate      = (*Database).clearCredentialUpdate
 	CredentialAddController    = (*Database).credentialAddController
 	CredentialRemoveController = (*Database).credentialRemoveController
-	UpdateCredential           = (*Database).updateCredential
-	UpdateControllerCredential = (*JEM).updateControllerCredential
 	SetCredentialUpdates       = (*Database).setCredentialUpdates
-	ClearCredentialUpdate      = (*Database).clearCredentialUpdate
-	NewDatabase                = newDatabase
-	WallClock                  = &wallClock
+	UpdateCredential           = (*Database).updateCredential
+	SelectController           = (*JEM).selectController
+	UpdateControllerCredential = (*JEM).updateControllerCredential
 )
 
 func DatabaseClose(db *Database) {

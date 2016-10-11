@@ -674,9 +674,6 @@ func (c cloud) credential(cloudCredentialTag string) (*jujuparams.CloudCredentia
 	if owner.IsLocal() {
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", cct.Id())
 	}
-	if err := auth.CheckIsUser(c.h.context, params.User(owner.Name())); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
 	credPath := params.CredentialPath{
 		Cloud: params.Cloud(cct.Cloud().Id()),
 		EntityPath: params.EntityPath{
@@ -684,9 +681,9 @@ func (c cloud) credential(cloudCredentialTag string) (*jujuparams.CloudCredentia
 			Name: params.Name(cct.Name()),
 		},
 	}
-	cred, err := c.h.jem.DB.Credential(credPath)
+	cred, err := c.h.jem.Credential(c.h.context, credPath)
 	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	if cred.Revoked {
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", cct.Id())
@@ -852,60 +849,56 @@ func massageModelInfo(h *wsHandler, mi jujuparams.ModelInfo) jujuparams.ModelInf
 
 // CreateModel implements the ModelManager facade's CreateModel method.
 func (m modelManager) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.ModelInfo, error) {
+	mi, err := m.createModel(args)
+	if err == nil {
+		servermon.ModelsCreatedCount.Inc()
+	} else {
+		servermon.ModelsCreatedFailCount.Inc()
+	}
+	return mi, errgo.Mask(err,
+		errgo.Is(params.ErrUnauthorized),
+		errgo.Is(params.ErrNotFound),
+		errgo.Is(params.ErrBadRequest),
+	)
+}
+
+func (m modelManager) createModel(args jujuparams.ModelCreateArgs) (jujuparams.ModelInfo, error) {
 	owner, err := names.ParseUserTag(args.OwnerTag)
 	if err != nil {
-		servermon.ModelsCreatedFailCount.Inc()
 		return jujuparams.ModelInfo{}, errgo.WithCausef(err, params.ErrBadRequest, "invalid owner tag")
 	}
 	logger.Debugf("Attempting to create %s/%s", owner, args.Name)
 	if owner.IsLocal() {
-		servermon.ModelsCreatedFailCount.Inc()
 		return jujuparams.ModelInfo{}, params.ErrUnauthorized
-	}
-	if err := auth.CheckIsUser(m.h.context, params.User(owner.Name())); err != nil {
-		servermon.ModelsCreatedFailCount.Inc()
-		return jujuparams.ModelInfo{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	if args.CloudTag == "" {
 		return jujuparams.ModelInfo{}, errgo.New("no cloud specified for model; please specify one")
 	}
 	cloudTag, err := names.ParseCloudTag(args.CloudTag)
 	if err != nil {
-		servermon.ModelsCreatedFailCount.Inc()
 		return jujuparams.ModelInfo{}, errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud tag")
 	}
 	cloud := params.Cloud(cloudTag.Id())
 	cloudCredentialTag, err := names.ParseCloudCredentialTag(args.CloudCredentialTag)
 	if err != nil {
-		servermon.ModelsCreatedFailCount.Inc()
 		return jujuparams.ModelInfo{}, errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud credential tag")
 	}
-
-	ctlPath, cloud, region, err := m.h.jem.SelectController(m.h.context, cloud, args.CloudRegion)
-	if err != nil {
-		servermon.ModelsCreatedFailCount.Inc()
-		return jujuparams.ModelInfo{}, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound))
-	}
-
-	conn, err := m.h.jem.OpenAPI(ctlPath)
-	if err != nil {
-		return jujuparams.ModelInfo{}, errgo.Mask(err)
-	}
-	defer conn.Close()
-
-	_, mi, err := m.h.jem.CreateModel(conn, jem.CreateModelParams{
-		Path:           params.EntityPath{User: params.User(owner.Name()), Name: params.Name(args.Name)},
-		ControllerPath: ctlPath,
-		Credential:     params.Name(cloudCredentialTag.Name()),
-		Cloud:          cloud,
-		Region:         region,
-		Attributes:     args.Config,
+	_, mi, err := m.h.jem.CreateModel(m.h.context, jem.CreateModelParams{
+		Path: params.EntityPath{User: params.User(owner.Name()), Name: params.Name(args.Name)},
+		Credential: params.CredentialPath{
+			Cloud: params.Cloud(cloudCredentialTag.Cloud().Id()),
+			EntityPath: params.EntityPath{
+				User: params.User(cloudCredentialTag.Owner().Name()),
+				Name: params.Name(cloudCredentialTag.Name()),
+			},
+		},
+		Cloud:      cloud,
+		Region:     args.CloudRegion,
+		Attributes: args.Config,
 	})
 	if err != nil {
-		servermon.ModelsCreatedFailCount.Inc()
-		return jujuparams.ModelInfo{}, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound))
+		return jujuparams.ModelInfo{}, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	servermon.ModelsCreatedCount.Inc()
 	return massageModelInfo(m.h, convertJujuParamsModelInfo(mi)), nil
 }
 

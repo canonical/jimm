@@ -168,12 +168,9 @@ func (h *Handler) AddController(arg *params.AddController) error {
 
 // GetController returns information on a controller.
 func (h *Handler) GetController(arg *params.GetController) (*params.ControllerResponse, error) {
-	if err := h.jem.DB.CheckReadACL(h.context, h.jem.DB.Controllers(), arg.EntityPath); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	ctl, err := h.jem.DB.Controller(arg.EntityPath)
+	ctl, err := h.jem.Controller(h.context, arg.EntityPath)
 	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	neSchema, err := h.schemaForNewModel(arg.EntityPath, params.User(auth.Username(h.context)))
 	if err != nil {
@@ -541,12 +538,9 @@ func (c cloudRegions) locations() []map[string]string {
 
 // GetControllerLocation returns a map of location attributes for a given controller.
 func (h *Handler) GetControllerLocation(arg *params.GetControllerLocation) (params.ControllerLocation, error) {
-	if err := h.jem.DB.CheckReadACL(h.context, h.jem.DB.Controllers(), arg.EntityPath); err != nil {
-		return params.ControllerLocation{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	ctl, err := h.jem.DB.Controller(arg.EntityPath)
+	ctl, err := h.jem.Controller(h.context, arg.EntityPath)
 	if err != nil {
-		return params.ControllerLocation{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		return params.ControllerLocation{}, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	loc := map[string]string{
 		"cloud": string(ctl.Cloud.Name),
@@ -561,48 +555,33 @@ func (h *Handler) GetControllerLocation(arg *params.GetControllerLocation) (para
 
 // NewModel creates a new model inside an existing Controller.
 func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error) {
-	if err := auth.CheckIsUser(h.context, args.User); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	var ctlPath params.EntityPath
+	if args.Info.Controller != nil {
+		ctlPath = *args.Info.Controller
 	}
-
-	ctlPath, cloud, region, err := h.selectController(&args.Info)
+	lp, err := cloudAndRegion(args.Info.Location)
 	if err != nil {
-		return nil, errgo.NoteMask(err, "cannot select controller", errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound))
+		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
-
-	if err := h.jem.DB.CheckReadACL(h.context, h.jem.DB.Controllers(), ctlPath); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	if len(lp.other) > 0 {
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "cannot select controller: no matching controllers found")
 	}
-
-	conn, err := h.jem.OpenAPI(ctlPath)
-	if err != nil {
-		return nil, errgo.NoteMask(err, "cannot connect to controller", errgo.Is(params.ErrNotFound))
-	}
-	defer conn.Close()
-
-	neSchema, err := h.schemaForNewModel(ctlPath, args.User)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	config := args.Info.Config
-	// Ensure that the attributes look reasonably OK before bothering
-	// the controller with them.
-	attrs, err := neSchema.checker.Coerce(config, nil)
-	if err != nil {
-		return nil, errgo.WithCausef(err, params.ErrBadRequest, "cannot validate attributes")
-	}
-
 	modelPath := params.EntityPath{args.User, args.Info.Name}
-	_, _, err = h.jem.CreateModel(conn, jem.CreateModelParams{
+	_, _, err = h.jem.CreateModel(h.context, jem.CreateModelParams{
 		Path:           modelPath,
 		ControllerPath: ctlPath,
 		Credential:     args.Info.Credential,
-		Cloud:          cloud,
-		Region:         region,
-		Attributes:     attrs.(map[string]interface{}),
+		Cloud:          lp.cloud,
+		Region:         lp.region,
+		Attributes:     args.Info.Config,
 	})
 	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrAlreadyExists))
+		return nil, errgo.Mask(err,
+			errgo.Is(params.ErrNotFound),
+			errgo.Is(params.ErrBadRequest),
+			errgo.Is(params.ErrAlreadyExists),
+			errgo.Is(params.ErrUnauthorized),
+		)
 	}
 
 	// Use GetModel so that we're sure to get exactly
@@ -613,30 +592,6 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 	return h.GetModel(&params.GetModel{
 		EntityPath: modelPath,
 	})
-}
-
-// selectController selects a controller suitable for starting a new model in,
-// based on the criteria specified in info, and returns its path.
-func (h *Handler) selectController(info *params.NewModelInfo) (params.EntityPath, params.Cloud, string, error) {
-	if info.Controller == nil {
-		lp, err := cloudAndRegion(info.Location)
-		if err != nil {
-			return params.EntityPath{}, "", "", errgo.Mask(err, errgo.Is(params.ErrBadRequest))
-		}
-		if len(lp.other) > 0 {
-			return params.EntityPath{}, "", "", errgo.WithCausef(nil, params.ErrNotFound, "no matching controllers found")
-		}
-		return h.jem.SelectController(h.context, lp.cloud, lp.region)
-	}
-	ctl, err := h.jem.DB.Controller(*info.Controller)
-	if err != nil {
-		return params.EntityPath{}, "", "", errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-	var region string
-	if len(ctl.Cloud.Regions) > 0 {
-		region = ctl.Cloud.Regions[0].Name
-	}
-	return *info.Controller, ctl.Cloud.Name, region, nil
 }
 
 // SetControllerPerm sets the permissions on a controller entity.

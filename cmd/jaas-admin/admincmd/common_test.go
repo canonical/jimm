@@ -120,11 +120,12 @@ func (s *commonSuite) addEnv(c *gc.C, pathStr, srvPathStr, credName string) {
 	err = srvPath.UnmarshalText([]byte(srvPathStr))
 	c.Assert(err, gc.IsNil)
 
+	credPath := params.CredentialPath{
+		Cloud:      "dummy",
+		EntityPath: params.EntityPath{path.User, params.Name(credName)},
+	}
 	err = s.jemClient(string(path.User)).UpdateCredential(&params.UpdateCredential{
-		CredentialPath: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{path.User, params.Name(credName)},
-		},
+		CredentialPath: credPath,
 		Credential: params.Credential{
 			AuthType: "empty",
 		},
@@ -136,7 +137,7 @@ func (s *commonSuite) addEnv(c *gc.C, pathStr, srvPathStr, credName string) {
 		Info: params.NewModelInfo{
 			Name:       path.Name,
 			Controller: &srvPath,
-			Credential: params.Name(credName),
+			Credential: credPath,
 			Config:     dummyEnvConfig,
 		},
 	})
