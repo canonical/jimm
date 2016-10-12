@@ -192,7 +192,7 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 		UUID:      "some-uuid",
 		CACert:    jujutesting.CACert,
 		AdminUser: "bob",
-		HostPorts: []string{"0.1.2.3:4567"},
+		HostPorts: [][]mongodoc.HostPort{{{Host: "0.1.2.3", Port: 4567}}},
 	})
 	c.Assert(err, gc.IsNil)
 

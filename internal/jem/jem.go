@@ -250,7 +250,7 @@ func apiDialOpts() api.DialOpts {
 
 func apiInfoFromDoc(ctl *mongodoc.Controller) *api.Info {
 	return &api.Info{
-		Addrs:    ctl.HostPorts,
+		Addrs:    mongodoc.Addresses(ctl.HostPorts),
 		CACert:   ctl.CACert,
 		Tag:      names.NewUserTag(ctl.AdminUser),
 		Password: ctl.AdminPassword,

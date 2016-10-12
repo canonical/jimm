@@ -29,9 +29,12 @@ func (s *monitorSuite) TestMonitor(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	info := s.APIInfo(c)
 
-	err := s.JEM.DB.AddController(&mongodoc.Controller{
+	hps, err := mongodoc.ParseAddresses(info.Addrs)
+	c.Assert(err, gc.IsNil)
+
+	err = s.JEM.DB.AddController(&mongodoc.Controller{
 		Path:          ctlPath,
-		HostPorts:     info.Addrs,
+		HostPorts:     [][]mongodoc.HostPort{hps},
 		CACert:        info.CACert,
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
@@ -80,9 +83,13 @@ func (s *monitorSuite) TestMonitorWithBrokenMongoConnection(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	jem := pool.JEM()
 	defer jem.Close()
-	err := jem.DB.AddController(&mongodoc.Controller{
+
+	hps, err := mongodoc.ParseAddresses(apiInfo.Addrs)
+	c.Assert(err, gc.IsNil)
+
+	err = jem.DB.AddController(&mongodoc.Controller{
 		Path:          ctlPath,
-		HostPorts:     apiInfo.Addrs,
+		HostPorts:     [][]mongodoc.HostPort{hps},
 		CACert:        apiInfo.CACert,
 		AdminUser:     apiInfo.Tag.Id(),
 		AdminPassword: apiInfo.Password,
@@ -128,9 +135,13 @@ func (s *monitorSuite) TestMonitorWithBrokenJujuAPIConnection(c *gc.C) {
 	apiInfo := s.APIInfo(c)
 	proxy := testing.NewTCPProxy(c, apiInfo.Addrs[0])
 	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.JEM.DB.AddController(&mongodoc.Controller{
+
+	hps, err := mongodoc.ParseAddresses([]string{proxy.Addr()})
+	c.Assert(err, gc.IsNil)
+
+	err = s.JEM.DB.AddController(&mongodoc.Controller{
 		Path:          ctlPath,
-		HostPorts:     []string{proxy.Addr()},
+		HostPorts:     [][]mongodoc.HostPort{hps},
 		CACert:        apiInfo.CACert,
 		AdminUser:     apiInfo.Tag.Id(),
 		AdminPassword: apiInfo.Password,

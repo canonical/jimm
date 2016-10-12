@@ -1108,9 +1108,13 @@ func (s *jemSuite) TestCredential(c *gc.C) {
 
 func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityPath {
 	info := s.APIInfo(c)
+
+	hps, err := mongodoc.ParseAddresses(info.Addrs)
+	c.Assert(err, jc.ErrorIsNil)
+
 	ctl := &mongodoc.Controller{
 		Path:          path,
-		HostPorts:     info.Addrs,
+		HostPorts:     [][]mongodoc.HostPort{hps},
 		CACert:        info.CACert,
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
@@ -1126,7 +1130,7 @@ func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityP
 		},
 		Public: true,
 	}
-	err := s.jem.DB.AddController(ctl)
+	err = s.jem.DB.AddController(ctl)
 	c.Assert(err, jc.ErrorIsNil)
 	return path
 }

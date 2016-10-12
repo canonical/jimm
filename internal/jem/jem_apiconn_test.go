@@ -50,15 +50,19 @@ func (s *jemAPIConnSuite) TearDownTest(c *gc.C) {
 func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "controller"}
 	info := s.APIInfo(c)
+
+	hps, err := mongodoc.ParseAddresses(info.Addrs)
+	c.Assert(err, gc.IsNil)
+
 	ctl := &mongodoc.Controller{
 		Path:          ctlPath,
-		HostPorts:     info.Addrs,
+		HostPorts:     [][]mongodoc.HostPort{hps},
 		CACert:        info.CACert,
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
 	}
 
-	err := s.jem.DB.AddController(ctl)
+	err = s.jem.DB.AddController(ctl)
 	c.Assert(err, gc.IsNil)
 
 	// Open the API and check that it works.
