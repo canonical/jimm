@@ -4,11 +4,11 @@ package mongodoc
 
 import (
 	"encoding/base64"
-	"fmt"
+	"net"
 	"strconv"
-	"strings"
 	"time"
 
+	"github.com/juju/juju/network"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/params"
@@ -283,7 +283,13 @@ type HostPort struct {
 }
 
 func (hp HostPort) Address() string {
-	return fmt.Sprintf("%s:%d", hp.Host, hp.Port)
+	return net.JoinHostPort(hp.Host, strconv.Itoa(hp.Port))
+}
+
+func (hp *HostPort) SetJujuHostPort(hp1 network.HostPort) {
+	hp.Host = hp1.Value
+	hp.Port = hp1.Port
+	hp.Scope = string(hp1.Scope)
 }
 
 // Addresses collapses a slice of slices of HostPorts to a single list of
@@ -306,18 +312,13 @@ func Addresses(hpss [][]HostPort) []string {
 
 // ParseAddresses parses the given addresses into a HostPort slice.
 func ParseAddresses(addresses []string) ([]HostPort, error) {
-	hps := make([]HostPort, len(addresses))
-	for i, hp := range addresses {
-		j := strings.LastIndex(hp, ":")
-		if j == -1 || j > len(hp)-1 {
-			return nil, errgo.Newf("invalid host-port %q", hp)
-		}
-		hps[i].Host = hp[:j]
-		port, err := strconv.ParseUint(hp[j+1:], 10, 16)
-		if err != nil {
-			return nil, errgo.Notef(err, "invalid host-port %q", hp)
-		}
-		hps[i].Port = int(port)
+	nhps, err := network.ParseHostPorts(addresses...)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	hps := make([]HostPort, len(nhps))
+	for i, nhp := range nhps {
+		hps[i].SetJujuHostPort(nhp)
 	}
 	return hps, nil
 }
