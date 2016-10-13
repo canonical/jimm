@@ -93,6 +93,12 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	if len(arg.Info.HostPorts) == 0 {
 		return badRequestf(nil, "no host-ports in request")
 	}
+
+	hps, err := mongodoc.ParseAddresses(arg.Info.HostPorts)
+	if err != nil {
+		return errgo.WithCausef(err, params.ErrBadRequest, "")
+	}
+
 	if arg.Info.User == "" {
 		return badRequestf(nil, "no user in request")
 	}
@@ -111,7 +117,7 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	ctl := &mongodoc.Controller{
 		Path:          arg.EntityPath,
 		CACert:        arg.Info.CACert,
-		HostPorts:     arg.Info.HostPorts,
+		HostPorts:     [][]mongodoc.HostPort{hps},
 		AdminUser:     arg.Info.User,
 		AdminPassword: arg.Info.Password,
 		UUID:          arg.Info.ControllerUUID,
@@ -153,11 +159,27 @@ func (h *Handler) AddController(arg *params.AddController) error {
 		break
 	}
 
+	ctl.HostPorts = nil
 	// Update addresses from latest known in controller.
 	// Note that state.APIHostPorts is always guaranteed
 	// to include the actual address we succeeded in
 	// connecting to.
-	ctl.HostPorts = collapseHostPorts(conn.APIHostPorts())
+	for _, hps := range conn.APIHostPorts() {
+		hostPorts := make([]mongodoc.HostPort, 0, len(hps))
+		for _, hp := range hps {
+			if hp.Scope == network.ScopeLinkLocal {
+				continue
+			}
+			hostPorts = append(hostPorts, mongodoc.HostPort{
+				Host:  hp.Value,
+				Port:  hp.Port,
+				Scope: string(hp.Scope),
+			})
+		}
+		if len(hostPorts) > 0 {
+			ctl.HostPorts = append(ctl.HostPorts, hostPorts)
+		}
+	}
 
 	err = h.jem.DB.AddController(ctl)
 	if err != nil {
@@ -302,7 +324,7 @@ func (h *Handler) GetModel(arg *params.GetModel) (*params.ModelResponse, error) 
 		UUID:             m.UUID,
 		ControllerUUID:   ctl.UUID,
 		CACert:           ctl.CACert,
-		HostPorts:        ctl.HostPorts,
+		HostPorts:        mongodoc.Addresses(ctl.HostPorts),
 		ControllerPath:   m.Controller,
 		Life:             m.Life,
 		UnavailableSince: newTime(ctl.UnavailableSince.UTC()),
@@ -364,7 +386,7 @@ func (h *Handler) ListModels(arg *params.ListModels) (*params.ListModelsResponse
 			UUID:             m.UUID,
 			ControllerUUID:   ctl.UUID,
 			CACert:           ctl.CACert,
-			HostPorts:        ctl.HostPorts,
+			HostPorts:        mongodoc.Addresses(ctl.HostPorts),
 			ControllerPath:   m.Controller,
 			Life:             m.Life,
 			UnavailableSince: newTime(ctl.UnavailableSince.UTC()),

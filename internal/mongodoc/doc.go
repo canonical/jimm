@@ -4,7 +4,12 @@ package mongodoc
 
 import (
 	"encoding/base64"
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
+
+	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -28,10 +33,8 @@ type Controller struct {
 	// CACert holds the CA certificate of the controller.
 	CACert string
 
-	// HostPorts holds the most recently known set
-	// of host-port addresses for the API servers,
-	// with the most-recently-dialed address at the start.
-	HostPorts []string
+	// HostPorts holds all the known HostPorts for the for the controller.
+	HostPorts [][]HostPort
 
 	// Users holds a record for each user that JEM has created
 	// in the given controller.
@@ -266,6 +269,57 @@ func (c *Credential) Owner() params.User {
 
 func (c *Credential) GetACL() params.ACL {
 	return c.ACL
+}
+
+type HostPort struct {
+	// Host holds the name or address of the host.
+	Host string
+
+	// Port holds the port number.
+	Port int
+
+	// Scope holds the scope of the host
+	Scope string
+}
+
+func (hp HostPort) Address() string {
+	return fmt.Sprintf("%s:%d", hp.Host, hp.Port)
+}
+
+// Addresses collapses a slice of slices of HostPorts to a single list of
+// unique addresses.
+func Addresses(hpss [][]HostPort) []string {
+	var addrs []string
+	seen := make(map[string]bool)
+	for _, hps := range hpss {
+		for _, hp := range hps {
+			addr := hp.Address()
+			if seen[addr] {
+				continue
+			}
+			seen[addr] = true
+			addrs = append(addrs, addr)
+		}
+	}
+	return addrs
+}
+
+// ParseAddresses parses the given addresses into a HostPort slice.
+func ParseAddresses(addresses []string) ([]HostPort, error) {
+	hps := make([]HostPort, len(addresses))
+	for i, hp := range addresses {
+		j := strings.LastIndex(hp, ":")
+		if j == -1 || j > len(hp)-1 {
+			return nil, errgo.Newf("invalid host-port %q", hp)
+		}
+		hps[i].Host = hp[:j]
+		port, err := strconv.ParseUint(hp[j+1:], 10, 16)
+		if err != nil {
+			return nil, errgo.Notef(err, "invalid host-port %q", hp)
+		}
+		hps[i].Port = int(port)
+	}
+	return hps, nil
 }
 
 // Sanitize returns a version of key that's suitable

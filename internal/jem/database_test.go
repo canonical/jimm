@@ -46,10 +46,16 @@ func (s *databaseSuite) checkDBOK(c *gc.C) {
 func (s *databaseSuite) TestAddController(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "x"}
 	ctl := &mongodoc.Controller{
-		Id:            "ignored",
-		Path:          ctlPath,
-		CACert:        "certainly",
-		HostPorts:     []string{"host1:1234", "host2:9999"},
+		Id:     "ignored",
+		Path:   ctlPath,
+		CACert: "certainly",
+		HostPorts: [][]mongodoc.HostPort{{{
+			Host: "host1",
+			Port: 1234,
+		}}, {{
+			Host: "host2",
+			Port: 9999,
+		}}},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 		Cloud: mongodoc.Cloud{
@@ -68,10 +74,16 @@ func (s *databaseSuite) TestAddController(c *gc.C) {
 
 	// Check that the fields have been mutated as expected.
 	c.Assert(ctl, jc.DeepEquals, &mongodoc.Controller{
-		Id:            "bob/x",
-		Path:          ctlPath,
-		CACert:        "certainly",
-		HostPorts:     []string{"host1:1234", "host2:9999"},
+		Id:     "bob/x",
+		Path:   ctlPath,
+		CACert: "certainly",
+		HostPorts: [][]mongodoc.HostPort{{{
+			Host: "host1",
+			Port: 1234,
+		}}, {{
+			Host: "host2",
+			Port: 9999,
+		}}},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 		Cloud: mongodoc.Cloud{
@@ -89,10 +101,16 @@ func (s *databaseSuite) TestAddController(c *gc.C) {
 	ctl1, err := s.database.Controller(ctlPath)
 	c.Assert(err, gc.IsNil)
 	c.Assert(ctl1, jc.DeepEquals, &mongodoc.Controller{
-		Id:            "bob/x",
-		Path:          ctlPath,
-		CACert:        "certainly",
-		HostPorts:     []string{"host1:1234", "host2:9999"},
+		Id:     "bob/x",
+		Path:   ctlPath,
+		CACert: "certainly",
+		HostPorts: [][]mongodoc.HostPort{{{
+			Host: "host1",
+			Port: 1234,
+		}}, {{
+			Host: "host2",
+			Port: 9999,
+		}}},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 		Cloud: mongodoc.Cloud{
@@ -113,10 +131,16 @@ func (s *databaseSuite) TestAddController(c *gc.C) {
 
 	ctlPath2 := params.EntityPath{"bob", "y"}
 	ctl2 := &mongodoc.Controller{
-		Id:            "ignored",
-		Path:          ctlPath2,
-		CACert:        "certainly",
-		HostPorts:     []string{"host1:1234", "host2:9999"},
+		Id:     "ignored",
+		Path:   ctlPath2,
+		CACert: "certainly",
+		HostPorts: [][]mongodoc.HostPort{{{
+			Host: "host1",
+			Port: 1234,
+		}}, {{
+			Host: "host2",
+			Port: 9999,
+		}}},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 		Cloud: mongodoc.Cloud{
@@ -187,10 +211,16 @@ func (s *databaseSuite) TestSetControllerAvailabilityWithNotFoundController(c *g
 func (s *databaseSuite) TestDeleteController(c *gc.C) {
 	ctlPath := params.EntityPath{"dalek", "who"}
 	ctl := &mongodoc.Controller{
-		Id:            "ignored",
-		Path:          ctlPath,
-		CACert:        "certainly",
-		HostPorts:     []string{"host1:1234", "host2:9999"},
+		Id:     "ignored",
+		Path:   ctlPath,
+		CACert: "certainly",
+		HostPorts: [][]mongodoc.HostPort{{{
+			Host: "host1",
+			Port: 1234,
+		}}, {{
+			Host: "host2",
+			Port: 9999,
+		}}},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 	}
@@ -210,10 +240,16 @@ func (s *databaseSuite) TestDeleteController(c *gc.C) {
 
 	// Test with non-existing model.
 	ctl2 := &mongodoc.Controller{
-		Id:            "dalek/who",
-		Path:          ctlPath,
-		CACert:        "certainly",
-		HostPorts:     []string{"host1:1234", "host2:9999"},
+		Id:     "dalek/who",
+		Path:   ctlPath,
+		CACert: "certainly",
+		HostPorts: [][]mongodoc.HostPort{{{
+			Host: "host1",
+			Port: 1234,
+		}}, {{
+			Host: "host2",
+			Port: 9999,
+		}}},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 	}
@@ -232,10 +268,16 @@ func (s *databaseSuite) TestDeleteController(c *gc.C) {
 func (s *databaseSuite) TestDeleteModel(c *gc.C) {
 	ctlPath := params.EntityPath{"dalek", "who"}
 	ctl := &mongodoc.Controller{
-		Id:            "ignored",
-		Path:          ctlPath,
-		CACert:        "certainly",
-		HostPorts:     []string{"host1:1234", "host2:9999"},
+		Id:     "ignored",
+		Path:   ctlPath,
+		CACert: "certainly",
+		HostPorts: [][]mongodoc.HostPort{{{
+			Host: "host1",
+			Port: 1234,
+		}}, {{
+			Host: "host2",
+			Port: 9999,
+		}}},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 	}

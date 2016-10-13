@@ -180,9 +180,11 @@ func (s *internalSuite) TestWatcher(c *gc.C) {
 	// Add some JEM entities.
 	ctlPath := params.EntityPath{"bob", "foo"}
 	info := s.APIInfo(c)
-	err := s.jem.DB.AddController(&mongodoc.Controller{
+	hps, err := mongodoc.ParseAddresses(info.Addrs)
+	c.Assert(err, gc.IsNil)
+	err = s.jem.DB.AddController(&mongodoc.Controller{
 		Path:          ctlPath,
-		HostPorts:     info.Addrs,
+		HostPorts:     [][]mongodoc.HostPort{hps},
 		CACert:        info.CACert,
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
@@ -278,7 +280,7 @@ func (s *internalSuite) TestWatcherKilledWhileDialingAPI(c *gc.C) {
 		UUID:      "some-uuid",
 		CACert:    info.CACert,
 		AdminUser: "bob",
-		HostPorts: []string{"0.1.2.3:4567"},
+		HostPorts: [][]mongodoc.HostPort{{{Host: "0.1.2.3", Port: 4567}}},
 	})
 
 	c.Assert(err, gc.IsNil)
@@ -323,7 +325,7 @@ func (s *internalSuite) TestWatcherDialAPIError(c *gc.C) {
 		UUID:      "some-uuid",
 		CACert:    jujujujutesting.CACert,
 		AdminUser: "bob",
-		HostPorts: []string{"0.1.2.3:4567"},
+		HostPorts: [][]mongodoc.HostPort{{{Host: "0.1.2.3", Port: 4567}}},
 	})
 
 	c.Assert(err, gc.IsNil)
@@ -413,9 +415,13 @@ func (s *internalSuite) TestWatcherMarksControllerAvailable(c *gc.C) {
 func (s *internalSuite) TestControllerMonitor(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	info := s.APIInfo(c)
-	err := s.jem.DB.AddController(&mongodoc.Controller{
+
+	hps, err := mongodoc.ParseAddresses(info.Addrs)
+	c.Assert(err, gc.IsNil)
+
+	err = s.jem.DB.AddController(&mongodoc.Controller{
 		Path:          ctlPath,
-		HostPorts:     info.Addrs,
+		HostPorts:     [][]mongodoc.HostPort{hps},
 		CACert:        info.CACert,
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
@@ -468,9 +474,13 @@ func (s *internalSuite) TestControllerMonitor(c *gc.C) {
 func (s *internalSuite) TestControllerMonitorDiesWithMonitoringStoppedErrorWhenControllerIsRemoved(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	info := s.APIInfo(c)
-	err := s.jem.DB.AddController(&mongodoc.Controller{
+
+	hps, err := mongodoc.ParseAddresses(info.Addrs)
+	c.Assert(err, gc.IsNil)
+
+	err = s.jem.DB.AddController(&mongodoc.Controller{
 		Path:          ctlPath,
-		HostPorts:     info.Addrs,
+		HostPorts:     [][]mongodoc.HostPort{hps},
 		CACert:        info.CACert,
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
@@ -727,7 +737,7 @@ func (s *internalSuite) TestAllMonitorWithRaceOnLeaseAcquisition(c *gc.C) {
 		UUID:      "some-uuid",
 		CACert:    jujujujutesting.CACert,
 		AdminUser: "bob",
-		HostPorts: []string{"0.1.2.3:4567"},
+		HostPorts: [][]mongodoc.HostPort{{{Host: "0.1.2.3", Port: 4567}}},
 	})
 
 	c.Assert(err, gc.IsNil)
@@ -840,7 +850,7 @@ func addFakeController(jshim *jemShimInMemory, path params.EntityPath) {
 		UUID:      fmt.Sprintf("some-uuid-%s", path),
 		CACert:    jujujujutesting.CACert,
 		AdminUser: "bob",
-		HostPorts: []string{"0.1.2.3:4567"},
+		HostPorts: [][]mongodoc.HostPort{{{Host: "0.1.2.3", Port: 4567}}},
 	})
 	jshim.AddModel(&mongodoc.Model{
 		Path:       path,
