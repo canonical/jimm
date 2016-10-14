@@ -1085,6 +1085,11 @@ func getModel(h *wsHandler, modelTag string, authf func(context.Context, auth.AC
 	return tag, model, nil
 }
 
+// ModelStatus implements the ModelManager facade's ModelStatus method.
+func (m modelManager) ModelStatus(req jujuparams.Entities) (jujuparams.ModelStatusResults, error) {
+	return controller{m.h}.ModelStatus(req)
+}
+
 // pinger implements the Pinger facade.
 type pinger struct {
 	h *wsHandler
