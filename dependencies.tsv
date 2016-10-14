@@ -22,11 +22,11 @@ github.com/juju/gomaasapi	git	8c484173e0870fc49c9214c56c6ae8dc9c26463d	2016-09-1
 github.com/juju/httpprof	git	14bf14c307672fd2456bdbf35d19cf0ccd3cf565	2014-12-17T16:00:36Z
 github.com/juju/httprequest	git	266fd1e9debf09c037a63f074d099a2da4559ece	2016-10-06T15:09:09Z
 github.com/juju/idmclient	git	3dda079a75cccb85083d4c3877e638f5d6ab79c2	2016-05-26T05:00:34Z
-github.com/juju/juju	git	ffd6121ebb87133af939d03b4632d09eeb94ef43	2016-10-07T06:32:29Z
+github.com/juju/juju	git	6cf1bc9d917a4c56d0034fd6e0d6f394d6eddb6e	2016-10-13T12:59:18Z
 github.com/juju/loggo	git	3b7ece48644d35850f4ced4c2cbc2cf8413f58e0	2016-08-18T02:57:24Z
 github.com/juju/mutex	git	59c26ee163447c5c57f63ff71610d433862013de	2016-06-17T01:09:07Z
 github.com/juju/names	git	8a0aa0963bbacdc790914892e9ff942e94d6f795	2016-03-30T15:05:33Z
-github.com/juju/persistent-cookiejar	git	e710b897c13ca52828ca2fc9769465186fd6d15c	2016-03-31T17:12:27Z
+github.com/juju/persistent-cookiejar	git	b48f5b9290d63455d10de0c0e4c26e06e6e74842	2016-10-07T16:41:21Z
 github.com/juju/replicaset	git	fb7294cf57a1e2f08a57691f1246d129a87ab7e8	2015-05-08T02:21:43Z
 github.com/juju/retry	git	62c62032529169c7ec02fa48f93349604c345e1f	2015-10-29T02:48:21Z
 github.com/juju/rfc	git	ebdbbdb950cd039a531d15cdc2ac2cbd94f068ee	2016-07-11T02:42:13Z
@@ -40,7 +40,7 @@ github.com/juju/version	git	4ae6172c00626779a5a462c3e3d22fc0e889431a	2016-06-03T
 github.com/juju/webbrowser	git	54b8c57083b4afb7dc75da7f13e2967b2606a507	2016-03-09T14:36:29Z
 github.com/julienschmidt/httprouter	git	77a895ad01ebc98a4dc95d8355bc825ce80a56f6	2015-10-13T22:55:20Z
 github.com/lunixbochs/vtclean	git	4fbf7632a2c6d3fbdb9931439bdbbeded02cbe36	2016-01-25T03:51:06Z
-github.com/lxc/lxd	git	18b9ab963052d020c8accd10c64c13780140ced3	2016-10-05T07:54:22Z
+github.com/lxc/lxd	git	95a324a23696e937c466996d57554e3677b3c84a	2016-10-11T20:54:09Z
 github.com/mattn/go-colorable	git	ed8eb9e318d7a84ce5915b495b7d35e0cfe7b5a8	2016-07-31T23:54:17Z
 github.com/mattn/go-isatty	git	66b8e73f3f5cda9f96b69efd03dd3d7fc4a5cdb8	2016-08-06T12:27:52Z
 github.com/matttproud/golang_protobuf_extensions	git	c12348ce28de40eed0136aa2b644d0ee0650e56c	2016-04-24T11:30:07Z
