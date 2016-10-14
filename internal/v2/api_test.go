@@ -317,6 +317,18 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			Public:         true,
 			Cloud:          "dummy",
 		},
+	}, {
+		about: "controller with additional host address",
+		body: params.ControllerInfo{
+			HostPorts:      append(info.Addrs, "example.com:443"),
+			CACert:         info.CACert,
+			User:           info.Tag.Id(),
+			Password:       info.Password,
+			ControllerUUID: info.ModelTag.Id(),
+			Cloud:          "dummy",
+			Region:         "dummy-region",
+			Public:         true,
+		},
 	}}
 	s.IDMSrv.AddUser("alice", "beatles", "controller-admin")
 	s.IDMSrv.AddUser("bob", "beatles")

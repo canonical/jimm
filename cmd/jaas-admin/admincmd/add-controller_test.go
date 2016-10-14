@@ -28,6 +28,11 @@ var addControllerTests = []struct {
 	args:           []string{},
 	expectLocation: map[string]string{"cloud": "dummy", "region": "dummy-region"},
 	expectPublic:   true,
+}, {
+	about:          "with api endpoint",
+	args:           []string{"--public-hostname=localhost"},
+	expectLocation: map[string]string{"cloud": "dummy", "region": "dummy-region"},
+	expectPublic:   true,
 }}
 
 func (s *addControllerSuite) TestAddController(c *gc.C) {
@@ -43,7 +48,7 @@ func (s *addControllerSuite) TestAddController(c *gc.C) {
 			},
 		})
 		c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-		test.args = append([]string{fmt.Sprintf("bob/foo-%v", i)}, test.args...)
+		test.args = append(test.args, fmt.Sprintf("bob/foo-%v", i))
 		stdout, stderr, code := run(c, c.MkDir(), "add-controller", test.args...)
 		c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 		c.Assert(stdout, gc.Equals, "")
@@ -70,7 +75,6 @@ func (s *addControllerSuite) TestAddController(c *gc.C) {
 			})
 		}
 	}
-
 }
 
 var addControllerErrorTests = []struct {

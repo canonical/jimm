@@ -98,6 +98,16 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	if err != nil {
 		return errgo.WithCausef(err, params.ErrBadRequest, "")
 	}
+	for i, hp := range hps {
+		if network.DeriveAddressType(hp.Host) != network.HostName {
+			continue
+		}
+		if hp.Host != "localhost" {
+			// As it won't have been specified we'll assume that any DNS name, except
+			// localhost, is public.
+			hps[i].Scope = string(network.ScopePublic)
+		}
+	}
 
 	if arg.Info.User == "" {
 		return badRequestf(nil, "no user in request")
@@ -159,33 +169,41 @@ func (h *Handler) AddController(arg *params.AddController) error {
 		break
 	}
 
-	ctl.HostPorts = nil
-	// Update addresses from latest known in controller.
-	// Note that state.APIHostPorts is always guaranteed
-	// to include the actual address we succeeded in
-	// connecting to.
-	for _, hps := range conn.APIHostPorts() {
-		hostPorts := make([]mongodoc.HostPort, 0, len(hps))
-		for _, hp := range hps {
-			if hp.Scope == network.ScopeLinkLocal {
-				continue
-			}
-			hostPorts = append(hostPorts, mongodoc.HostPort{
-				Host:  hp.Value,
-				Port:  hp.Port,
-				Scope: string(hp.Scope),
-			})
-		}
-		if len(hostPorts) > 0 {
-			ctl.HostPorts = append(ctl.HostPorts, hostPorts)
-		}
-	}
+	// Update addresses from latest known in controller. Note that
+	// conn.APIHostPorts is always guaranteed to include the actual
+	// address we succeeded in connecting to. We also keep any
+	// hostname based addresses specified as the controller may not
+	// know its hostname.
+	ctl.HostPorts = removeUnusableAddresses(conn.APIHostPorts())
 
 	err = h.jem.DB.AddController(ctl)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
 	return nil
+}
+
+// removeUnusableAddresses filters the given hostports and converts them
+// for storing in the database..
+func removeUnusableAddresses(nhpss [][]network.HostPort) [][]mongodoc.HostPort {
+	hpss := make([][]mongodoc.HostPort, 0, len(nhpss))
+	for _, nhps := range nhpss {
+		hps := make([]mongodoc.HostPort, 0, len(nhps))
+		for _, nhp := range nhps {
+			if nhp.Scope == network.ScopeLinkLocal {
+				continue
+			}
+			hps = append(hps, mongodoc.HostPort{
+				Host:  nhp.Value,
+				Port:  nhp.Port,
+				Scope: string(nhp.Scope),
+			})
+		}
+		if len(hps) > 0 {
+			hpss = append(hpss, hps)
+		}
+	}
+	return hpss
 }
 
 // GetController returns information on a controller.

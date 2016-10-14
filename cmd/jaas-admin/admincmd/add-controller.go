@@ -3,6 +3,8 @@
 package admincmd
 
 import (
+	"net"
+
 	"github.com/juju/cmd"
 	"github.com/juju/gnuflag"
 	"github.com/juju/juju/cmd/modelcmd"
@@ -17,6 +19,7 @@ import (
 type addControllerCommand struct {
 	commandBase
 
+	publicHostname string
 	controllerName string
 	controllerPath entityPathValue
 }
@@ -50,6 +53,7 @@ func (c *addControllerCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.commandBase.SetFlags(f)
 	f.StringVar(&c.controllerName, "c", "", "controller to add")
 	f.StringVar(&c.controllerName, "controller", "", "")
+	f.StringVar(&c.publicHostname, "public-hostname", "", "public hostname for the controller.")
 }
 
 func (c *addControllerCommand) Init(args []string) error {
@@ -80,7 +84,14 @@ func (c *addControllerCommand) Run(ctxt *cmd.Context) error {
 	if len(hostnames) == 0 {
 		hostnames = info.controller.UnresolvedAPIEndpoints
 	}
-
+	if c.publicHostname != "" && len(hostnames) > 0 {
+		_, port, err := net.SplitHostPort(hostnames[0])
+		if err != nil {
+			// This should never happen with data written by juju.
+			return errgo.Mask(err)
+		}
+		hostnames = []string{net.JoinHostPort(c.publicHostname, port)}
+	}
 	logger.Infof("adding controller, user %s, name %s", c.controllerPath.EntityPath.User, c.controllerPath.EntityPath.Name)
 	if err := client.AddController(&params.AddController{
 		EntityPath: c.controllerPath.EntityPath,
