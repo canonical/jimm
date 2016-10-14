@@ -171,10 +171,8 @@ func (h *Handler) AddController(arg *params.AddController) error {
 
 	// Update addresses from latest known in controller. Note that
 	// conn.APIHostPorts is always guaranteed to include the actual
-	// address we succeeded in connecting to. We also keep any
-	// hostname based addresses specified as the controller may not
-	// know its hostname.
-	ctl.HostPorts = removeUnusableAddresses(conn.APIHostPorts())
+	// address we succeeded in connecting to.
+	ctl.HostPorts = mongodocAPIHostPorts(conn.APIHostPorts())
 
 	err = h.jem.DB.AddController(ctl)
 	if err != nil {
@@ -183,25 +181,29 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	return nil
 }
 
-// removeUnusableAddresses filters the given hostports and converts them
-// for storing in the database..
-func removeUnusableAddresses(nhpss [][]network.HostPort) [][]mongodoc.HostPort {
+// mongodocAPIHostPorts returns the given API addresses prepared
+// for storage in the database.
+//
+// It removes unusable addresses and marks any scope-unknown
+// addresses as public so that the clients using only public-scoped
+// addresses will use them.
+func mongodocAPIHostPorts(nhpss [][]network.HostPort) [][]mongodoc.HostPort {
 	hpss := make([][]mongodoc.HostPort, 0, len(nhpss))
 	for _, nhps := range nhpss {
-		hps := make([]mongodoc.HostPort, 0, len(nhps))
-		for _, nhp := range nhps {
-			if nhp.Scope == network.ScopeLinkLocal {
-				continue
+		nhps = network.FilterUnusableHostPorts(nhps)
+		if len(nhps) == 0 {
+			continue
+		}
+		hps := make([]mongodoc.HostPort, len(nhps))
+		for i, nhp := range nhps {
+			if nhp.Scope == network.ScopeUnknown {
+				// This is needed because network.NewHostPort returns
+				// scope unknown for DNS names.
+				nhp.Scope = network.ScopePublic
 			}
-			hps = append(hps, mongodoc.HostPort{
-				Host:  nhp.Value,
-				Port:  nhp.Port,
-				Scope: string(nhp.Scope),
-			})
+			hps[i].SetJujuHostPort(nhp)
 		}
-		if len(hps) > 0 {
-			hpss = append(hpss, hps)
-		}
+		hpss = append(hpss, hps)
 	}
 	return hpss
 }
