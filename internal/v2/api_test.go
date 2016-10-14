@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/juju/juju/api"
+	"github.com/juju/juju/network"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/CanonicalLtd/jem/internal/apitest"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
+	"github.com/CanonicalLtd/jem/internal/v2"
 	"github.com/CanonicalLtd/jem/params"
 )
 
@@ -1816,6 +1818,37 @@ func (s *APISuite) TestWhoAmI(c *gc.C) {
 	resp, err := s.NewClient("bob").WhoAmI(nil)
 	c.Assert(err, gc.IsNil)
 	c.Assert(resp.User, gc.Equals, "bob")
+}
+
+var mongodocAPIHostPortsTests = []struct {
+	about  string
+	hps    [][]network.HostPort
+	expect [][]mongodoc.HostPort
+}{{
+	about:  "one address",
+	hps:    [][]network.HostPort{{{Address: network.Address{Value: "0.1.2.3", Scope: network.ScopePublic}, Port: 1234}}},
+	expect: [][]mongodoc.HostPort{{{Host: "0.1.2.3", Port: 1234, Scope: "public"}}},
+}, {
+	about:  "unknown scope changed to public",
+	hps:    [][]network.HostPort{{{Address: network.Address{Value: "0.1.2.3", Scope: network.ScopeUnknown}, Port: 1234}}},
+	expect: [][]mongodoc.HostPort{{{Host: "0.1.2.3", Port: 1234, Scope: "public"}}},
+}, {
+	about: "unusable addresses removed",
+	hps: [][]network.HostPort{{
+		{Address: network.Address{Value: "0.1.2.3", Scope: network.ScopeMachineLocal}, Port: 1234},
+	}, {
+		{Address: network.Address{Value: "0.1.2.4", Scope: network.ScopeLinkLocal}, Port: 1234},
+		{Address: network.Address{Value: "0.1.2.5", Scope: network.ScopePublic}, Port: 1234},
+	}},
+	expect: [][]mongodoc.HostPort{{{Host: "0.1.2.5", Port: 1234, Scope: "public"}}},
+}}
+
+func (s *APISuite) TestMongodocAPIHostPorts(c *gc.C) {
+	for i, test := range mongodocAPIHostPortsTests {
+		c.Logf("test %d: %v", i, test.about)
+		got := v2.MongodocAPIHostPorts(test.hps)
+		c.Assert(got, jc.DeepEquals, test.expect)
+	}
 }
 
 func (s *APISuite) allowControllerPerm(c *gc.C, path params.EntityPath, acl ...string) {
