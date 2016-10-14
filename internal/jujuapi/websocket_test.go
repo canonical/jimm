@@ -666,38 +666,44 @@ func (s *websocketSuite) TestModelStatus(c *gc.C) {
 	mi = s.assertCreateModel(c, "model-3", "test2", "", "", "cred1", nil)
 	modelUUID3 := mi.UUID
 
-	conn := s.open(c, nil, "test")
-	defer conn.Close()
-	client := controller.NewClient(conn)
-
 	err = s.JEM.DB.SetACL(s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
 		Read: []string{"test"},
 	})
 	c.Assert(err, jc.ErrorIsNil)
-	models, err := client.ModelStatus(names.NewModelTag(modelUUID1),
-		names.NewModelTag(modelUUID3))
-	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(models, jc.DeepEquals, []base.ModelStatus{{
-		UUID:               modelUUID1,
-		Life:               "alive",
-		Owner:              "test@external",
-		TotalMachineCount:  0,
-		CoreCount:          0,
-		HostedMachineCount: 0,
-		ServiceCount:       0,
-		Machines:           []base.Machine{},
-	}, {
-		UUID:               modelUUID3,
-		Life:               "alive",
-		Owner:              "test2@external",
-		TotalMachineCount:  0,
-		CoreCount:          0,
-		HostedMachineCount: 0,
-		ServiceCount:       0,
-		Machines:           []base.Machine{},
-	}})
-	_, err = client.ModelStatus(names.NewModelTag(modelUUID2))
-	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+
+	type modelStatuser interface {
+		ModelStatus(tags ...names.ModelTag) ([]base.ModelStatus, error)
+	}
+	doTest := func(client modelStatuser) {
+		models, err := client.ModelStatus(names.NewModelTag(modelUUID1), names.NewModelTag(modelUUID3))
+		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(models, jc.DeepEquals, []base.ModelStatus{{
+			UUID:               modelUUID1,
+			Life:               "alive",
+			Owner:              "test@external",
+			TotalMachineCount:  0,
+			CoreCount:          0,
+			HostedMachineCount: 0,
+			ServiceCount:       0,
+			Machines:           []base.Machine{},
+		}, {
+			UUID:               modelUUID3,
+			Life:               "alive",
+			Owner:              "test2@external",
+			TotalMachineCount:  0,
+			CoreCount:          0,
+			HostedMachineCount: 0,
+			ServiceCount:       0,
+			Machines:           []base.Machine{},
+		}})
+		_, err = client.ModelStatus(names.NewModelTag(modelUUID2))
+		c.Assert(err, gc.ErrorMatches, `unauthorized`)
+	}
+
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	doTest(controller.NewClient(conn))
+	doTest(modelmanager.NewClient(conn))
 }
 
 var createModelTests = []struct {
