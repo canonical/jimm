@@ -43,7 +43,7 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 	})
 	c.Assert(err, jc.ErrorIsNil)
 	s.sessionPool = mgosession.NewPool(s.Session, 5)
-	s.pool = auth.NewPool(auth.Params{
+	s.pool, err = auth.NewPool(auth.Params{
 		Bakery:   bakery,
 		RootKeys: mgostorage.NewRootKeys(100),
 		RootKeysPolicy: mgostorage.Policy{
@@ -60,6 +60,7 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 		),
 		IdentityLocation: s.idmSrv.URL.String(),
 	})
+	c.Assert(err, jc.ErrorIsNil)
 }
 
 func (s *authSuite) TearDownTest(c *gc.C) {

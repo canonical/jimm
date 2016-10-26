@@ -114,6 +114,9 @@ func (s *APISuite) TestUnauthorized(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{"bob", "private"}, false)
 	s.AssertAddController(c, params.EntityPath{"bob", "open"}, false)
 
+	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
+	s.CreateModel(c, params.EntityPath{"bob", "open"}, params.EntityPath{"bob", "open"}, cred)
+
 	s.allowControllerPerm(c, params.EntityPath{"bob", "open"})
 	s.allowModelPerm(c, params.EntityPath{"bob", "open"})
 
@@ -1372,10 +1375,13 @@ func (s *APISuite) assertModelConfigAttr(c *gc.C, modelPath params.EntityPath, a
 	c.Assert(cfg.AllAttrs()[attr], jc.DeepEquals, val)
 }
 
-func (s *APISuite) TestGetModel(c *gc.C) {
+func (s *APISuite) TestGetModelWhenControllerUnavailable(c *gc.C) {
 	info := s.APIInfo(c)
 	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, false)
-	err := s.JEM.DB.SetModelLife(ctlId, info.ModelTag.Id(), "dying")
+	aCred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
+	aModel, aUUID := s.CreateModel(c, params.EntityPath{"bob", "foo"}, ctlId, aCred)
+
+	err := s.JEM.DB.SetModelLife(aModel, aUUID, "dying")
 	c.Assert(err, gc.IsNil)
 	t := time.Now()
 	err = s.JEM.DB.SetControllerUnavailableAt(ctlId, t)
@@ -1395,8 +1401,8 @@ func (s *APISuite) TestGetModel(c *gc.C) {
 	err = json.Unmarshal(modelRespBody, &modelResp)
 	c.Assert(err, gc.IsNil)
 	c.Assert(modelResp, jc.DeepEquals, params.ModelResponse{
-		Path:             ctlId,
-		UUID:             info.ModelTag.Id(),
+		Path:             aModel,
+		UUID:             aUUID,
 		ControllerPath:   ctlId,
 		ControllerUUID:   s.ControllerConfig.ControllerUUID(),
 		CACert:           info.CACert,
@@ -1685,27 +1691,20 @@ func (s *APISuite) TestListModelsNoServers(c *gc.C) {
 func (s *APISuite) TestListModels(c *gc.C) {
 	info := s.APIInfo(c)
 	ctlId0 := s.AssertAddController(c, params.EntityPath{"alice", "foo"}, false)
+	aCred := s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
 	bCred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
 	cCred := s.AssertUpdateCredential(c, "charlie", "dummy", "cred1", "empty")
-	s.allowModelPerm(c, ctlId0)
 	s.allowControllerPerm(c, ctlId0)
+	modelId0, uuid0 := s.CreateModel(c, params.EntityPath{"alice", "foo"}, ctlId0, aCred)
+	s.allowModelPerm(c, modelId0)
 	modelId1, uuid1 := s.CreateModel(c, params.EntityPath{"bob", "bar"}, ctlId0, bCred)
 	modelId2, uuid2 := s.CreateModel(c, params.EntityPath{"charlie", "bar"}, ctlId0, cCred)
 	err := s.JEM.DB.SetModelLife(ctlId0, uuid2, "alive")
 	c.Assert(err, gc.IsNil)
 
-	// Add an unavailable controller.
-	ctlId1 := s.AssertAddController(c, params.EntityPath{"alice", "lost"}, false)
-	c.Assert(err, gc.IsNil)
-	s.allowModelPerm(c, ctlId1)
-	s.allowControllerPerm(c, ctlId1)
-	unavailableTime := time.Now()
-	err = s.JEM.DB.SetControllerUnavailableAt(ctlId1, unavailableTime)
-	c.Assert(err, gc.IsNil)
-
 	resps := []params.ModelResponse{{
-		Path:           ctlId0,
-		UUID:           info.ModelTag.Id(),
+		Path:           modelId0,
+		UUID:           uuid0,
 		ControllerUUID: s.ControllerConfig.ControllerUUID(),
 		CACert:         info.CACert,
 		HostPorts:      info.Addrs,
@@ -1725,30 +1724,22 @@ func (s *APISuite) TestListModels(c *gc.C) {
 		HostPorts:      info.Addrs,
 		ControllerPath: ctlId0,
 		Life:           "alive",
-	}, {
-		Path:             ctlId1,
-		UUID:             info.ModelTag.Id(),
-		ControllerUUID:   s.ControllerConfig.ControllerUUID(),
-		CACert:           info.CACert,
-		HostPorts:        info.Addrs,
-		ControllerPath:   ctlId1,
-		UnavailableSince: newTime(mongodoc.Time(unavailableTime).UTC()),
 	}}
 	tests := []struct {
 		user    params.User
 		indexes []int
 	}{{
 		user:    "bob",
-		indexes: []int{0, 3, 1},
+		indexes: []int{0, 1},
 	}, {
 		user:    "charlie",
-		indexes: []int{0, 3, 2},
+		indexes: []int{0, 2},
 	}, {
 		user:    "alice",
-		indexes: []int{0, 3},
+		indexes: []int{0},
 	}, {
 		user:    "fred",
-		indexes: []int{0, 3},
+		indexes: []int{0},
 	}}
 	for i, test := range tests {
 		c.Logf("test %d: as user %s", i, test.user)
@@ -1792,6 +1783,9 @@ func (s *APISuite) TestGetSetControllerPerm(c *gc.C) {
 
 func (s *APISuite) TestGetSetModelPerm(c *gc.C) {
 	ctlId := s.AssertAddController(c, params.EntityPath{"alice", "foo"}, false)
+	aCred := s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
+	aModel, _ := s.CreateModel(c, params.EntityPath{"alice", "foo"}, ctlId, aCred)
+
 	acl, err := s.NewClient("alice").GetModelPerm(&params.GetModelPerm{
 		EntityPath: ctlId,
 	})
@@ -1799,14 +1793,14 @@ func (s *APISuite) TestGetSetModelPerm(c *gc.C) {
 	c.Assert(acl, jc.DeepEquals, params.ACL{})
 
 	err = s.NewClient("alice").SetModelPerm(&params.SetModelPerm{
-		EntityPath: ctlId,
+		EntityPath: aModel,
 		ACL: params.ACL{
 			Read: []string{"a", "b"},
 		},
 	})
 	c.Assert(err, gc.IsNil)
 	acl, err = s.NewClient("alice").GetModelPerm(&params.GetModelPerm{
-		EntityPath: ctlId,
+		EntityPath: aModel,
 	})
 	c.Assert(err, gc.IsNil)
 	c.Assert(acl, gc.DeepEquals, params.ACL{

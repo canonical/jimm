@@ -512,10 +512,6 @@ func (s *websocketSuite) TestListModels(c *gc.C) {
 	models, err := client.ListModels("test")
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(models, jc.DeepEquals, []base.UserModel{{
-		Name:  "controller-1",
-		UUID:  "deadbeef-0bad-400d-8000-4b1d0d06f00d",
-		Owner: "test@external",
-	}, {
 		Name:  "model-1",
 		UUID:  modelUUID1,
 		Owner: "test@external",
@@ -640,11 +636,6 @@ func (s *websocketSuite) TestAllModels(c *gc.C) {
 	models, err := client.AllModels()
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(models, jc.DeepEquals, []base.UserModel{{
-		Name:           "controller-1",
-		UUID:           s.State.ModelUUID(),
-		Owner:          "test@external",
-		LastConnection: nil,
-	}, {
 		Name:           "model-1",
 		UUID:           modelUUID1,
 		Owner:          "test@external",

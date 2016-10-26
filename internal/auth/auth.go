@@ -63,10 +63,16 @@ type Pool struct {
 
 // NewPool creates a new Pool from which Authenticator objects may be
 // retrieved.
-func NewPool(p Params) *Pool {
-	return &Pool{
-		params: p,
+func NewPool(params Params) (*Pool, error) {
+	p := &Pool{
+		params: params,
 	}
+	auth := p.Authenticator()
+	defer auth.Close()
+	if err := params.RootKeys.EnsureIndex(p.rootKeyCollection(auth.session)); err != nil {
+		return nil, errgo.Notef(err, "cannot ensure index on root key store")
+	}
+	return p, nil
 }
 
 // Authenticator retrieves an Authenticator object from the pool, which
@@ -76,14 +82,16 @@ func (p *Pool) Authenticator() *Authenticator {
 	session := p.params.SessionPool.Session()
 	return &Authenticator{
 		pool: p,
-		bakery: p.params.Bakery.WithRootKeyStore(
-			p.params.RootKeys.NewStorage(
-				p.params.MacaroonCollection.With(session.Session),
-				p.params.RootKeysPolicy,
-			),
-		),
+		bakery: p.params.Bakery.WithRootKeyStore(p.params.RootKeys.NewStorage(
+			p.rootKeyCollection(session),
+			p.params.RootKeysPolicy,
+		)),
 		session: session,
 	}
+}
+
+func (p *Pool) rootKeyCollection(session *mgosession.Session) *mgo.Collection {
+	return p.params.MacaroonCollection.With(session.Session)
 }
 
 // An Authenticator can be used to authenticate a connection.

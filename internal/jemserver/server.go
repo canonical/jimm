@@ -124,7 +124,7 @@ func New(config Params, versions map[string]NewAPIHandlerFunc) (*Server, error) 
 	}
 	jem := p.JEM()
 	defer jem.Close()
-	authPool := auth.NewPool(auth.Params{
+	authPool, err := auth.NewPool(auth.Params{
 		Bakery:   bakery,
 		RootKeys: mgostorage.NewRootKeys(100),
 		RootKeysPolicy: mgostorage.Policy{
@@ -135,6 +135,9 @@ func New(config Params, versions map[string]NewAPIHandlerFunc) (*Server, error) 
 		PermChecker:        idmclient.NewPermChecker(idmClient, time.Hour),
 		IdentityLocation:   config.IdentityLocation,
 	})
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot make auth pool")
+	}
 	srv := &Server{
 		router:      httprouter.New(),
 		pool:        p,
