@@ -44,6 +44,11 @@ type jemInterface interface {
 	// It does not return an error if there are no such models.
 	SetModelLife(ctlPath params.EntityPath, uuid string, life string) error
 
+	// SetModelUnitCount sets the number of units running on all models controlled
+	// by the given controller that have the given UUID.
+	// It does not return an error if there are no such models.
+	SetModelUnitCount(ctlPath params.EntityPath, uuid string, n int) error
+
 	// AllControllers returns all the controllers in the system.
 	AllControllers() ([]*mongodoc.Controller, error)
 

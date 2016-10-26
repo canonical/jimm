@@ -198,6 +198,9 @@ type Model struct {
 	// or "dead").
 	Life string
 
+	// UnitCount holds the current number of units in the model.
+	UnitCount int
+
 	// TODO record last time we saw changes on the model?
 
 	// Templates holds the paths of the templates that the model was created with.

@@ -493,6 +493,61 @@ func (s *databaseSuite) TestSetControllerStats(c *gc.C) {
 	s.checkDBOK(c)
 }
 
+func (s *databaseSuite) TestSetUnitCountNotFound(c *gc.C) {
+	err := s.database.SetModelUnitCount(params.EntityPath{"bob", "foo"}, "fake-uuid", 1)
+	c.Assert(err, gc.IsNil)
+	s.checkDBOK(c)
+}
+
+func (s *databaseSuite) TestSetUnitCountSuccess(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	err := s.database.AddController(&mongodoc.Controller{
+		Path: ctlPath,
+		UUID: "fake-uuid",
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Add the controller model.
+	err = s.database.AddModel(&mongodoc.Model{
+		Path:       params.EntityPath{"bob", "foo"},
+		UUID:       "fake-uuid",
+		Controller: params.EntityPath{"bob", "foo"},
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Add another model with the same UUID but a different controller.
+	err = s.database.AddModel(&mongodoc.Model{
+		Path:       params.EntityPath{"bar", "baz"},
+		UUID:       "fake-uuid",
+		Controller: params.EntityPath{"bar", "zzz"},
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Add another model with the same controller but a different UUID.
+	err = s.database.AddModel(&mongodoc.Model{
+		Path:       params.EntityPath{"alice", "baz"},
+		UUID:       "another-uuid",
+		Controller: ctlPath,
+	})
+	c.Assert(err, gc.IsNil)
+
+	err = s.database.SetModelUnitCount(ctlPath, "fake-uuid", 99)
+	c.Assert(err, gc.IsNil)
+
+	m, err := s.database.Model(ctlPath)
+	c.Assert(err, gc.IsNil)
+	c.Assert(m.UnitCount, gc.Equals, 99)
+
+	m, err = s.database.Model(params.EntityPath{"bar", "baz"})
+	c.Assert(err, gc.IsNil)
+	c.Assert(m.UnitCount, gc.Equals, 0)
+
+	m, err = s.database.Model(params.EntityPath{"alice", "baz"})
+	c.Assert(err, gc.IsNil)
+	c.Assert(m.UnitCount, gc.Equals, 0)
+	s.checkDBOK(c)
+}
+
 func (s *databaseSuite) TestSetModelLifeNotFound(c *gc.C) {
 	err := s.database.SetModelLife(params.EntityPath{"bob", "foo"}, "fake-uuid", "alive")
 	c.Assert(err, gc.IsNil)
@@ -1061,6 +1116,11 @@ var setDeadTests = []struct {
 	about: "SetModelLife",
 	run: func(db *jem.Database) {
 		db.SetModelLife(fakeEntityPath, "fake-uuid", "alive")
+	},
+}, {
+	about: "SetModelUnitCount",
+	run: func(db *jem.Database) {
+		db.SetModelUnitCount(fakeEntityPath, "fake-uuid", 0)
 	},
 }, {
 	about: "UpdateCredential",

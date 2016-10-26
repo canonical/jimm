@@ -293,6 +293,22 @@ func (m *controllerMonitor) watch(conn jujuAPI) error {
 				return errgo.Notef(err, "cannot set controller stats")
 			}
 		}
+		// TODO perform all these updates concurrently?
+		for uuid, info := range w.models {
+			// TODO(rogpeppe) When both unit count and life change, we could
+			// combine them into a single database update.
+			if info.changed&lifeChange != 0 {
+				if err := w.jem.SetModelLife(w.ctlPath, uuid, string(info.life)); err != nil {
+					return errgo.Notef(err, "cannot update model life")
+				}
+			}
+			if info.changed&unitCountChange != 0 {
+				if err := m.jem.SetModelUnitCount(w.ctlPath, uuid, info.unitCount); err != nil {
+					return errgo.Notef(err, "cannot update model unit count")
+				}
+			}
+			info.changed = 0
+		}
 	}
 }
 
@@ -314,46 +330,88 @@ type watcherState struct {
 	// stats holds the current known statistics about the controller.
 	stats mongodoc.ControllerStats
 
-	// modelLife holds the currently known lifecycle status
-	// of all the models in the controller.
-	modelLife map[string]multiwatcher.Life
+	// models holds information about the models hosted by the controller.
+	models map[string]*modelInfo
+}
+
+type modelChange int
+
+const (
+	lifeChange modelChange = 1 << iota
+	unitCountChange
+)
+
+// modelInfo holds information on a model.
+type modelInfo struct {
+	uuid string
+
+	// life holds the lifecycle status of the model.
+	life multiwatcher.Life
+
+	// unitCount holds the total number of units on the model.
+	unitCount int
+
+	// changed holds information about what's changed
+	// in the model since the last set of deltas.
+	changed modelChange
+}
+
+func (info *modelInfo) addUnits(n int) {
+	if n != 0 {
+		info.unitCount += n
+		info.changed |= unitCountChange
+	}
+}
+
+func (info *modelInfo) setLife(life multiwatcher.Life) {
+	if life != info.life {
+		info.life = life
+		info.changed |= lifeChange
+	}
 }
 
 func newWatcherState(j jemInterface, ctlPath params.EntityPath) *watcherState {
 	return &watcherState{
-		jem:       j,
-		ctlPath:   ctlPath,
-		modelLife: make(map[string]multiwatcher.Life),
-		entities:  make(map[multiwatcher.EntityId]bool),
+		jem:     j,
+		ctlPath: ctlPath,
+
+		// models maps from model UUID to information about that model.
+		models: make(map[string]*modelInfo),
+
+		// entities holds an entry for each entity in the controller
+		// so that we can tell the difference between change and
+		// creation.
+		entities: make(map[multiwatcher.EntityId]bool),
 	}
 }
 
 func (w *watcherState) addDelta(d multiwatcher.Delta) error {
 	if logger.IsDebugEnabled() {
-		data, err := json.Marshal(d)
-		if err != nil {
-			logger.Errorf("controller %v cannot marshal delta %#v", w.ctlPath, d)
+		id := d.Entity.EntityId()
+		if d.Removed {
+			logger.Debugf("monitor event %v %v - removed %s-%s", w.ctlPath, id.ModelUUID, id.Kind, id.Id)
 		} else {
-			logger.Debugf("controller %v saw change %s", w.ctlPath, data)
+			data, err := json.Marshal(d.Entity)
+			if err != nil {
+				data = []byte("cannot marshal")
+			}
+			logger.Debugf("monitor event %v %v - changed %s-%s: %s", w.ctlPath, id.ModelUUID, id.Kind, id.Id, data)
 		}
 	}
 	ctlpathstr := string(w.ctlPath.Name) + ":" + string(w.ctlPath.User)
 	switch e := d.Entity.(type) {
 	case *multiwatcher.ModelInfo:
+		// Ensure there's always a model entry.
 		w.adjustCount(&w.stats.ModelCount, d)
-		// TODO update the model information concurrently?
-		if d.Removed {
-			if err := w.modelRemoved(e.ModelUUID); err != nil {
-				return errgo.Notef(err, "cannot mark model as removed")
-			}
-			break
+		life := multiwatcher.Life("dead")
+		if !d.Removed {
+			life = e.Life
 		}
-		if err := w.modelChanged(e); err != nil {
-			return errgo.Mask(err)
-		}
+		w.modelInfo(e.ModelUUID).setLife(life)
 		servermon.ModelsRunning.WithLabelValues(ctlpathstr).Set(float64(w.stats.ModelCount))
 	case *multiwatcher.UnitInfo:
-		w.adjustCount(&w.stats.UnitCount, d)
+		delta := w.adjustCount(&w.stats.UnitCount, d)
+		w.modelInfo(e.ModelUUID).addUnits(delta)
 		servermon.UnitsRunning.WithLabelValues(ctlpathstr).Set(float64(w.stats.UnitCount))
 	case *multiwatcher.ApplicationInfo:
 		w.adjustCount(&w.stats.ServiceCount, d)
@@ -366,51 +424,49 @@ func (w *watcherState) addDelta(d multiwatcher.Delta) error {
 	return nil
 }
 
+// modelInfo returns the info value for the model with the given UUID,
+// creating it if needed. The creation is needed because we
+// may receive information on a unit before we receive information
+// on its model but we still want the model to be updated appropriately.
+func (w watcherState) modelInfo(uuid string) *modelInfo {
+	info := w.models[uuid]
+	if info == nil {
+		info = &modelInfo{
+			uuid: uuid,
+			// Always create with everything changed so that we will
+			// update the count even if no units are created.
+			changed: ^0,
+		}
+		w.models[uuid] = info
+	}
+	return info
+}
+
 // adjustCount increments or decrements the value pointed
 // to by n depending on whether delta.Removed is true.
 // It sets w.changed to true to indicate that something has
 // changed and keeps track of whether the entity id exists.
-func (w *watcherState) adjustCount(n *int, delta multiwatcher.Delta) {
+//
+// It returns the actual delta the count has been adjusted by.
+func (w *watcherState) adjustCount(n *int, delta multiwatcher.Delta) int {
 	id := delta.Entity.EntityId()
+	diff := 0
 	if delta.Removed {
 		// Technically there's no need for the test here as we shouldn't
 		// get two Removes in a row, but let's be defensive.
 		if w.entities[id] {
-			w.changed = true
 			delete(w.entities, id)
-			*n -= 1
+			diff = -1
 		}
-		return
-	}
-	if !w.entities[id] {
+	} else if !w.entities[id] {
 		w.entities[id] = true
+		diff = 1
+	}
+	if diff != 0 {
+		*n += diff
 		w.changed = true
-		*n += 1
 	}
-}
-
-// modelRemoved is called when we know that the model with the
-// given UUID has been removed.
-func (w *watcherState) modelRemoved(uuid string) error {
-	return w.setModelLife(uuid, "dead")
-}
-
-// modelChanged is called when we're given new information about
-// a model.
-func (w *watcherState) modelChanged(m *multiwatcher.ModelInfo) error {
-	// TODO set other info about the model here too?
-	return w.setModelLife(m.ModelUUID, m.Life)
-}
-
-func (w *watcherState) setModelLife(uuid string, life multiwatcher.Life) error {
-	if life == w.modelLife[uuid] {
-		return nil
-	}
-	if err := w.jem.SetModelLife(w.ctlPath, uuid, string(life)); err != nil {
-		return errgo.Notef(err, "cannot update model")
-	}
-	w.modelLife[uuid] = life
-	return nil
+	return diff
 }
 
 func isMonitoringStoppedError(err error) bool {
