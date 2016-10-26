@@ -1156,3 +1156,8 @@ func (s *jemSuite) bootstrapModel(c *gc.C, path params.EntityPath) *mongodoc.Mod
 	c.Assert(err, jc.ErrorIsNil)
 	return model
 }
+
+// fakeUUID returns something that looks like a UUID but actually uses n.
+func fakeUUID(n int) string {
+	return fmt.Sprintf("00000000-0000-0000-0000-00000000%.04x", n)
+}

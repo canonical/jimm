@@ -65,6 +65,26 @@ func (db *Database) clone() *Database {
 	}
 }
 
+func (db *Database) ensureIndexes() error {
+	indexes := []struct {
+		c *mgo.Collection
+		i mgo.Index
+	}{{
+		db.Controllers(),
+		mgo.Index{Key: []string{"uuid"}},
+	}, {
+		db.Models(),
+		mgo.Index{Key: []string{"uuid"}, Unique: true},
+	}}
+	for _, idx := range indexes {
+		err := idx.c.EnsureIndex(idx.i)
+		if err != nil {
+			return errgo.Notef(err, "cannot ensure index with keys %v on collection %s", idx.i, idx.c.Name)
+		}
+	}
+	return nil
+}
+
 // AddController adds a new controller to the database. It returns an
 // error with a params.ErrAlreadyExists cause if there is already a
 // controller with the given name. The Id field in ctl will be set from

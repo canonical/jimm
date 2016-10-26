@@ -165,13 +165,6 @@ func (s *Suite) AddController(c *gc.C, path params.EntityPath, public bool) erro
 	if err := s.NewClient(path.User).AddController(p); err != nil {
 		return err
 	}
-	// Add a model as most tests often expect it to be there.
-	err := s.JEM.DB.AddModel(&mongodoc.Model{
-		Path:       path,
-		Controller: path,
-		UUID:       info.ModelTag.Id(),
-	})
-	c.Assert(err, jc.ErrorIsNil)
 	return nil
 }
 

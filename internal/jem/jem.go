@@ -95,6 +95,11 @@ func NewPool(p Params) (*Pool, error) {
 		connCache: apiconn.NewCache(apiconn.CacheParams{}),
 		refCount:  1,
 	}
+	jem := pool.JEM()
+	defer jem.Close()
+	if err := jem.DB.ensureIndexes(); err != nil {
+		return nil, errgo.Notef(err, "cannot ensure indexes")
+	}
 	return pool, nil
 }
 
