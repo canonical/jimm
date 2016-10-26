@@ -30,7 +30,7 @@ var addControllerTests = []struct {
 	expectPublic:   true,
 }, {
 	about:          "with api endpoint",
-	args:           []string{"--public-hostname=localhost"},
+	args:           []string{"--public-address=localhost"},
 	expectLocation: map[string]string{"cloud": "dummy", "region": "dummy-region"},
 	expectPublic:   true,
 }}
