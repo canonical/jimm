@@ -19,7 +19,7 @@ import (
 type addControllerCommand struct {
 	commandBase
 
-	publicHostname string
+	publicAddress  string
 	controllerName string
 	controllerPath entityPathValue
 }
@@ -53,7 +53,7 @@ func (c *addControllerCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.commandBase.SetFlags(f)
 	f.StringVar(&c.controllerName, "c", "", "controller to add")
 	f.StringVar(&c.controllerName, "controller", "", "")
-	f.StringVar(&c.publicHostname, "public-hostname", "", "public hostname for the controller.")
+	f.StringVar(&c.publicAddress, "public-address", "", "public address for the controller.")
 }
 
 func (c *addControllerCommand) Init(args []string) error {
@@ -76,28 +76,25 @@ func (c *addControllerCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	// Use hostnames by preference, as we want the
-	// JEM server to do the DNS lookups, but this
-	// may not be set, so fall back to Addresses if
-	// necessary.
-	hostnames := info.controller.APIEndpoints
-	if len(hostnames) == 0 {
+	var hostnames []string
+	cacert := info.controller.CACert
+	if c.publicAddress != "" {
+		hostnames = []string{addressWithPort(c.publicAddress, "443")}
+		cacert = ""
+	} else {
+		// Use hostnames by preference, as we want the JEM server
+		// to do the DNS lookups, but this may not be set, so
+		// fall back to APIEndpoints if necessary.
 		hostnames = info.controller.UnresolvedAPIEndpoints
-	}
-	if c.publicHostname != "" && len(hostnames) > 0 {
-		_, port, err := net.SplitHostPort(hostnames[0])
-		if err != nil {
-			// This should never happen with data written by juju.
-			return errgo.Mask(err)
+		if len(hostnames) == 0 {
+			hostnames = info.controller.APIEndpoints
 		}
-		hostnames = []string{net.JoinHostPort(c.publicHostname, port)}
 	}
-	logger.Infof("adding controller, user %s, name %s", c.controllerPath.EntityPath.User, c.controllerPath.EntityPath.Name)
 	if err := client.AddController(&params.AddController{
 		EntityPath: c.controllerPath.EntityPath,
 		Info: params.ControllerInfo{
 			HostPorts:      hostnames,
-			CACert:         info.controller.CACert,
+			CACert:         cacert,
 			ControllerUUID: info.controller.ControllerUUID,
 			User:           info.account.User,
 			Password:       info.account.Password,
@@ -117,6 +114,15 @@ func (c *addControllerCommand) Run(ctxt *cmd.Context) error {
 		return errgo.Notef(err, "cannot set controller permissions")
 	}
 	return nil
+}
+
+// addressWithPort ensures that address contains a port, appending
+// defaultPort if required.
+func addressWithPort(addr, defaultPort string) string {
+	if _, _, err := net.SplitHostPort(addr); err == nil {
+		return addr
+	}
+	return net.JoinHostPort(addr, defaultPort)
 }
 
 type controllerInfo struct {
