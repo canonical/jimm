@@ -6,7 +6,9 @@ import (
 
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/state/multiwatcher"
+	jujujujutesting "github.com/juju/juju/testing"
 	jujutesting "github.com/juju/juju/testing"
+	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
@@ -20,6 +22,7 @@ func newJEMShimWithUpdateNotify(j jemInterface) jemShimWithUpdateNotify {
 	return jemShimWithUpdateNotify{
 		controllerStatsSet:        make(chan struct{}, 10),
 		modelLifeSet:              make(chan struct{}, 10),
+		modelUnitCountSet:         make(chan struct{}, 10),
 		leaseAcquired:             make(chan struct{}, 10),
 		controllerAvailabilitySet: make(chan struct{}, 10),
 		jemInterface:              j,
@@ -29,9 +32,42 @@ func newJEMShimWithUpdateNotify(j jemInterface) jemShimWithUpdateNotify {
 type jemShimWithUpdateNotify struct {
 	controllerStatsSet        chan struct{}
 	modelLifeSet              chan struct{}
+	modelUnitCountSet         chan struct{}
 	leaseAcquired             chan struct{}
 	controllerAvailabilitySet chan struct{}
 	jemInterface
+}
+
+// await waits for the given function to return the expected value,
+// retrying after any of the shim notification channels have
+// received a value.
+func (s jemShimWithUpdateNotify) await(c *gc.C, f func() interface{}, want interface{}) {
+	timeout := time.After(jujujujutesting.LongWait)
+	for {
+		got := f()
+		ok, _ := jc.DeepEqual(got, want)
+		if ok {
+			break
+		}
+		select {
+		case <-s.controllerStatsSet:
+		case <-s.modelLifeSet:
+		case <-s.modelUnitCountSet:
+		case <-s.leaseAcquired:
+		case <-timeout:
+			c.Assert(got, jc.DeepEquals, want, gc.Commentf("timed out waiting for value"))
+		}
+	}
+	// We've got the expected value; now check that it remains stable
+	// as long as events continue to arrive.
+	for {
+		event := s.waitAny(jujujujutesting.ShortWait)
+		got := f()
+		c.Assert(got, jc.DeepEquals, want, gc.Commentf("value changed after waiting (last event %q)", event))
+		if event == "" {
+			return
+		}
+	}
 }
 
 func (s jemShimWithUpdateNotify) Clone() jemInterface {
@@ -40,19 +76,27 @@ func (s jemShimWithUpdateNotify) Clone() jemInterface {
 }
 
 func (s jemShimWithUpdateNotify) assertNoEvent(c *gc.C) {
-	var event string
+	if event := s.waitAny(jujutesting.ShortWait); event != "" {
+		c.Fatalf("unexpected event received: %v", event)
+	}
+}
+
+// waitAny waits for any update to happen, waiting for a maximum
+// of the given time. If nothing happens, it returns the empty string,
+// otherwise it returns the name of the event that happened.
+func (s jemShimWithUpdateNotify) waitAny(maxWait time.Duration) string {
 	select {
 	case <-s.controllerStatsSet:
-		event = "controller stats"
+		return "controller stats"
 	case <-s.modelLifeSet:
-		event = "model life"
+		return "model life"
+	case <-s.modelUnitCountSet:
+		return "model unit count"
 	case <-s.leaseAcquired:
-		event = "lease acquired"
-
+		return "lease acquired"
 	case <-time.After(jujutesting.ShortWait):
-		return
+		return ""
 	}
-	c.Fatalf("unexpected event received: %v", event)
 }
 
 func (s jemShimWithUpdateNotify) SetControllerStats(ctlPath params.EntityPath, stats *mongodoc.ControllerStats) error {
@@ -84,6 +128,14 @@ func (s jemShimWithUpdateNotify) SetModelLife(ctlPath params.EntityPath, uuid st
 		return err
 	}
 	s.modelLifeSet <- struct{}{}
+	return nil
+}
+
+func (s jemShimWithUpdateNotify) SetModelUnitCount(ctlPath params.EntityPath, uuid string, n int) error {
+	if err := s.jemInterface.SetModelUnitCount(ctlPath, uuid, n); err != nil {
+		return err
+	}
+	s.modelUnitCountSet <- struct{}{}
 	return nil
 }
 
@@ -214,6 +266,17 @@ func (s *jemShimInMemory) SetModelLife(ctlPath params.EntityPath, uuid string, l
 	for _, m := range s.models {
 		if m.Controller == ctlPath && m.UUID == uuid {
 			m.Life = life
+		}
+	}
+	return nil
+}
+
+func (s jemShimInMemory) SetModelUnitCount(ctlPath params.EntityPath, uuid string, n int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, m := range s.models {
+		if m.Controller == ctlPath && m.UUID == uuid {
+			m.UnitCount = n
 		}
 	}
 	return nil

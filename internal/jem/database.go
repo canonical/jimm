@@ -362,6 +362,21 @@ func (db *Database) SetModelLife(ctlPath params.EntityPath, uuid string, life st
 	return nil
 }
 
+// SetModelUnitCount sets the number of units running on all models controlled
+// by the given controller that have the given UUID.
+// It does not return an error if there are no such models.
+func (db *Database) SetModelUnitCount(ctlPath params.EntityPath, uuid string, n int) (err error) {
+	defer db.checkError(&err)
+	_, err = db.Models().UpdateAll(
+		bson.D{{"uuid", uuid}, {"controller", ctlPath}},
+		bson.D{{"$set", bson.D{{"unitcount", n}}}},
+	)
+	if err != nil {
+		return errgo.Notef(err, "cannot update model")
+	}
+	return nil
+}
+
 // updateCredential stores the given credential in the database. If a
 // credential with the same name exists it is overwritten.
 func (db *Database) updateCredential(cred *mongodoc.Credential) (err error) {

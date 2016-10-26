@@ -8,6 +8,7 @@ import (
 
 	"github.com/juju/idmclient/idmtest"
 	corejujutesting "github.com/juju/juju/juju/testing"
+	"github.com/juju/juju/state"
 	jujuwatcher "github.com/juju/juju/state/watcher"
 	jujujujutesting "github.com/juju/juju/testing"
 	"github.com/juju/juju/testing/factory"
@@ -161,47 +162,31 @@ func (s *internalSuite) TestLeaseUpdaterWhenControllerRemoved(c *gc.C) {
 }
 
 func (s *internalSuite) TestWatcher(c *gc.C) {
-	// Add some entities to the admin model.
-	f := factory.NewFactory(s.State)
-	svc := f.MakeApplication(c, &factory.ApplicationParams{
-		Name: "wordpress",
-	})
-	f.MakeUnit(c, &factory.UnitParams{
-		Application: svc,
-	})
-	f.MakeUnit(c, &factory.UnitParams{
-		Application: svc,
-	})
-	modelSt := f.MakeModel(c, &factory.ModelParams{
-		Name: "jem-somemodel",
-	})
-	defer modelSt.Close()
+	// Add a couple of models and applications with units to watch.
+	model1State := newModel(c, s.State, "model1")
+	newApplication(c, model1State, "model1-app", 2)
+	defer model1State.Close()
 
-	// Add some JEM entities.
+	model2State := newModel(c, s.State, "model2")
+	newApplication(c, model2State, "model1-app", 3)
+	defer model2State.Close()
+
 	ctlPath := params.EntityPath{"bob", "foo"}
-	info := s.APIInfo(c)
-	hps, err := mongodoc.ParseAddresses(info.Addrs)
-	c.Assert(err, gc.IsNil)
-	err = s.jem.DB.AddController(&mongodoc.Controller{
-		Path:          ctlPath,
-		HostPorts:     [][]mongodoc.HostPort{hps},
-		CACert:        info.CACert,
-		AdminUser:     info.Tag.Id(),
-		AdminPassword: info.Password,
+	s.addJEMController(c, ctlPath)
+
+	// Add the JEM model entries
+	model1Path := params.EntityPath{"bob", "model1"}
+	model2Path := params.EntityPath{"bob", "model2"}
+	err := s.jem.DB.AddModel(&mongodoc.Model{
+		Path:       model1Path,
+		Controller: ctlPath,
+		UUID:       model1State.ModelUUID(),
 	})
 	c.Assert(err, gc.IsNil)
 	err = s.jem.DB.AddModel(&mongodoc.Model{
-		Path:       ctlPath,
+		Path:       model2Path,
 		Controller: ctlPath,
-		UUID:       info.ModelTag.Id(),
-	})
-	c.Assert(err, gc.IsNil)
-	// Make a JEM model that refers to the juju model.
-	modelPath := params.EntityPath{"alice", "bar"}
-	err = s.jem.DB.AddModel(&mongodoc.Model{
-		Path:       modelPath,
-		Controller: ctlPath,
-		UUID:       modelSt.ModelUUID(),
+		UUID:       model2State.ModelUUID(),
 	})
 	c.Assert(err, gc.IsNil)
 
@@ -215,61 +200,142 @@ func (s *internalSuite) TestWatcher(c *gc.C) {
 	m.tomb.Go(m.watcher)
 	defer cleanStop(c, m)
 
+	type allStats struct {
+		stats          mongodoc.ControllerStats
+		model1, model2 modelStats
+	}
+	getAllStats := func() interface{} {
+		return allStats{
+			stats:  s.controllerStats(c, ctlPath),
+			model1: s.modelStats(c, model1Path),
+			model2: s.modelStats(c, model2Path),
+		}
+	}
 	// The watcher should set the model life and the
-	// controller stats. We have two models, so we'll see
-	// two set.
-	waitEvent(c, jshim.modelLifeSet, "model life")
-	waitEvent(c, jshim.modelLifeSet, "model life")
-	waitEvent(c, jshim.controllerStatsSet, "controller stats")
-	jshim.assertNoEvent(c)
+	// controller stats. We have three models (the controller
+	// has a model too, even though it's not in JEM), so we'll see
+	// three set.
 
-	s.assertControllerStats(c, ctlPath, mongodoc.ControllerStats{
-		ModelCount:   2,
-		ServiceCount: 1,
-		UnitCount:    2,
-		MachineCount: 2,
-	})
-	s.assertModelLife(c, ctlPath, "alive")
-	s.assertModelLife(c, modelPath, "alive")
-
-	// Add another service and check that the service count is maintained.
-	f.MakeApplication(c, &factory.ApplicationParams{
-		Name: "mysql",
-	})
-
-	waitEvent(c, jshim.controllerStatsSet, "controller stats")
-	s.assertControllerStats(c, ctlPath, mongodoc.ControllerStats{
-		ModelCount:   2,
-		ServiceCount: 2,
-		UnitCount:    2,
-		MachineCount: 2,
+	jshim.await(c, getAllStats, allStats{
+		stats: mongodoc.ControllerStats{
+			ModelCount:   3,
+			ServiceCount: 2,
+			UnitCount:    5,
+			MachineCount: 5,
+		},
+		model1: modelStats{
+			life:      "alive",
+			unitCount: 2,
+		},
+		model2: modelStats{
+			life:      "alive",
+			unitCount: 3,
+		},
 	})
 
-	stm, err := modelSt.Model()
+	c.Logf("making model2-app2")
+
+	// Add another application and check that the service count and unit counts
+	// are maintained.
+	newApplication(c, model2State, "model2-app2", 2)
+
+	jshim.await(c, getAllStats, allStats{
+		stats: mongodoc.ControllerStats{
+			ModelCount:   3,
+			ServiceCount: 3,
+			UnitCount:    7,
+			MachineCount: 7,
+		},
+		model1: modelStats{
+			life:      "alive",
+			unitCount: 2,
+		},
+		model2: modelStats{
+			life:      "alive",
+			unitCount: 5,
+		},
+	})
+
+	// Destroy model1 and check that its life status, but the rest stays the same.
+	model1, err := model1State.Model()
 	c.Assert(err, gc.IsNil)
-	err = stm.Destroy()
+	err = model1.Destroy()
 	c.Assert(err, gc.IsNil)
 
-	// Destroy the model and check that its life status changes.
-	waitEvent(c, jshim.modelLifeSet, "model life")
-	jshim.assertNoEvent(c)
-
-	s.assertModelLife(c, modelPath, "dead")
-
-	err = modelSt.RemoveAllModelDocs()
-	c.Assert(err, gc.IsNil)
-
-	// We won't see the model life set because it's still the same as before.
-	waitEvent(c, jshim.controllerStatsSet, "controller stats")
-	jshim.assertNoEvent(c)
-
-	s.assertControllerStats(c, ctlPath, mongodoc.ControllerStats{
-		ModelCount:   1,
-		ServiceCount: 2,
-		UnitCount:    2,
-		MachineCount: 2,
+	jshim.await(c, getAllStats, allStats{
+		stats: mongodoc.ControllerStats{
+			ModelCount:   3,
+			ServiceCount: 3,
+			UnitCount:    7,
+			MachineCount: 7,
+		},
+		model1: modelStats{
+			life:      "dying",
+			unitCount: 2,
+		},
+		model2: modelStats{
+			life:      "alive",
+			unitCount: 5,
+		},
 	})
-	s.assertModelLife(c, modelPath, "dead")
+
+	// Destroy a model and check that the model life, model, service and unit counts
+	// are maintained correctly.
+	removeModel(c, model1State)
+
+	jshim.await(c, getAllStats, allStats{
+		stats: mongodoc.ControllerStats{
+			ModelCount:   2,
+			ServiceCount: 2,
+			UnitCount:    5,
+			MachineCount: 5,
+		},
+		model1: modelStats{
+			life:      "dead",
+			unitCount: 0,
+		},
+		model2: modelStats{
+			life:      "alive",
+			unitCount: 5,
+		},
+	})
+}
+
+func removeModel(c *gc.C, st *state.State) {
+	apps, err := st.AllApplications()
+	c.Assert(err, gc.IsNil)
+	for _, app := range apps {
+		units, err := app.AllUnits()
+		c.Assert(err, gc.IsNil)
+		for _, unit := range units {
+			err := unit.Destroy()
+			c.Assert(err, gc.IsNil)
+			err = unit.EnsureDead()
+			c.Assert(err, gc.IsNil)
+			err = unit.Remove()
+			c.Assert(err, gc.IsNil)
+		}
+		err = app.Destroy()
+		c.Assert(err, gc.IsNil)
+	}
+	machines, err := st.AllMachines()
+	c.Assert(err, gc.IsNil)
+	for _, machine := range machines {
+		err = machine.Destroy()
+		c.Assert(err, gc.IsNil)
+		err = machine.EnsureDead()
+		c.Assert(err, gc.IsNil)
+		err = machine.Remove()
+		c.Assert(err, gc.IsNil)
+	}
+	model, err := st.Model()
+	c.Assert(err, gc.IsNil)
+	err = model.Destroy()
+	c.Assert(err, gc.IsNil)
+	err = st.ProcessDyingModel()
+	c.Assert(err, gc.IsNil)
+	err = st.RemoveAllModelDocs()
+	c.Assert(err, gc.IsNil)
 }
 
 func (s *internalSuite) TestWatcherKilledWhileDialingAPI(c *gc.C) {
@@ -455,13 +521,15 @@ func (s *internalSuite) TestControllerMonitor(c *gc.C) {
 
 	waitEvent(c, jshim.controllerStatsSet, "controller stats")
 	waitEvent(c, jshim.modelLifeSet, "model life")
+	waitEvent(c, jshim.modelUnitCountSet, "model life")
 	waitEvent(c, jshim.leaseAcquired, "lease acquisition")
 	jshim.assertNoEvent(c)
 
-	s.assertControllerStats(c, ctlPath, mongodoc.ControllerStats{
+	c.Assert(s.controllerStats(c, ctlPath), jc.DeepEquals, mongodoc.ControllerStats{
 		ModelCount: 1,
 	})
-	s.assertModelLife(c, ctlPath, "alive")
+
+	c.Assert(s.modelLife(c, ctlPath), gc.Equals, "alive")
 	s.assertLease(c, ctlPath, epoch.Add(leaseExpiryDuration*5/6+leaseExpiryDuration), "jem1")
 
 	err = worker.Stop(m)
@@ -825,16 +893,33 @@ func (s *internalSuite) TestAllMonitorReusesOwnLease(c *gc.C) {
 	c.Assert(ctl.MonitorLeaseExpiry.UTC(), jc.DeepEquals, expiry.UTC())
 }
 
-func (s *internalSuite) assertControllerStats(c *gc.C, ctlPath params.EntityPath, stats mongodoc.ControllerStats) {
+func (s *internalSuite) controllerStats(c *gc.C, ctlPath params.EntityPath) mongodoc.ControllerStats {
 	ctlDoc, err := s.jem.DB.Controller(ctlPath)
 	c.Assert(err, gc.IsNil)
-	c.Assert(ctlDoc.Stats, jc.DeepEquals, stats)
+	return ctlDoc.Stats
 }
 
-func (s *internalSuite) assertModelLife(c *gc.C, modelPath params.EntityPath, life string) {
+// modelStats holds the aspects of a model updated by the monitor.
+type modelStats struct {
+	life      string
+	unitCount int
+}
+
+func (s *internalSuite) modelStats(c *gc.C, modelPath params.EntityPath) modelStats {
 	modelDoc, err := s.jem.DB.Model(modelPath)
 	c.Assert(err, gc.IsNil)
-	c.Assert(modelDoc.Life, gc.Equals, life)
+	return modelStats{
+		life:      modelDoc.Life,
+		unitCount: modelDoc.UnitCount,
+	}
+}
+
+func (s *internalSuite) modelLife(c *gc.C, modelPath params.EntityPath) string {
+	return s.modelStats(c, modelPath).life
+}
+
+func (s *internalSuite) modelUnitCount(c *gc.C, modelPath params.EntityPath) int {
+	return s.modelStats(c, modelPath).unitCount
 }
 
 func (s *internalSuite) assertLease(c *gc.C, ctlPath params.EntityPath, t time.Time, owner string) {
@@ -842,6 +927,39 @@ func (s *internalSuite) assertLease(c *gc.C, ctlPath params.EntityPath, t time.T
 	c.Assert(err, gc.IsNil)
 	c.Assert(ctl.MonitorLeaseExpiry.UTC(), jc.DeepEquals, mongodoc.Time(t).UTC())
 	c.Assert(ctl.MonitorLeaseOwner, gc.Equals, owner)
+}
+
+func (s *internalSuite) addJEMController(c *gc.C, ctlPath params.EntityPath) {
+	info := s.APIInfo(c)
+	hps, err := mongodoc.ParseAddresses(info.Addrs)
+	c.Assert(err, gc.IsNil)
+	err = s.jem.DB.AddController(&mongodoc.Controller{
+		Path:          ctlPath,
+		HostPorts:     [][]mongodoc.HostPort{hps},
+		CACert:        info.CACert,
+		AdminUser:     info.Tag.Id(),
+		AdminPassword: info.Password,
+	})
+	c.Assert(err, gc.IsNil)
+}
+
+func newModel(c *gc.C, st *state.State, name string) *state.State {
+	f := factory.NewFactory(st)
+	return f.MakeModel(c, &factory.ModelParams{
+		Name: name,
+	})
+}
+
+func newApplication(c *gc.C, st *state.State, name string, numUnits int) {
+	f := factory.NewFactory(st)
+	svc := f.MakeApplication(c, &factory.ApplicationParams{
+		Name: name,
+	})
+	for i := 0; i < numUnits; i++ {
+		f.MakeUnit(c, &factory.UnitParams{
+			Application: svc,
+		})
+	}
 }
 
 func addFakeController(jshim *jemShimInMemory, path params.EntityPath) {
