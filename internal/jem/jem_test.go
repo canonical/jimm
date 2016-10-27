@@ -227,7 +227,7 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 		Type: "empty",
 	})
 	c.Assert(err, jc.ErrorIsNil)
-	ctx := auth.AuthenticateForTest(context.Background(), "bob", "bob-group")
+	ctx := auth.ContextWithUser(context.Background(), "bob", "bob-group")
 	_, _, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
 		Path:           ctlId,
 		ControllerPath: ctlId,
@@ -238,6 +238,7 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 		Cloud: "dummy",
 	})
 	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(auth.Username(ctx), gc.Equals, "bob")
 	for i, test := range createModelTests {
 		c.Logf("test %d. %s", i, test.about)
 		if test.params.Path.Name == "" {
@@ -255,6 +256,7 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 		c.Assert(m.Path, jc.DeepEquals, test.params.Path)
 		c.Assert(m.UUID, gc.Not(gc.Equals), "")
 		c.Assert(m.CreationTime.Equal(now), gc.Equals, true)
+		c.Assert(m.Creator, gc.Equals, "bob")
 	}
 }
 
@@ -680,7 +682,7 @@ func (s *jemSuite) TestDoControllers(c *gc.C) {
 
 		c.Assert(err, gc.IsNil)
 	}
-	ctx := auth.AuthenticateForTest(context.Background(), "bob", "bob-group")
+	ctx := auth.ContextWithUser(context.Background(), "bob", "bob-group")
 	for i, test := range doContollerTests {
 		c.Logf("test %d. %s", i, test.about)
 		var obtainedControllers []params.EntityPath
@@ -790,7 +792,7 @@ func (s *jemSuite) TestDoControllersErrorResponse(c *gc.C) {
 
 		c.Assert(err, gc.IsNil)
 	}
-	ctx := auth.AuthenticateForTest(context.Background(), "bob", "bob-group")
+	ctx := auth.ContextWithUser(context.Background(), "bob", "bob-group")
 	testCause := errgo.New("test-cause")
 	err := s.jem.DoControllers(ctx, "", "", func(ctl *mongodoc.Controller) error {
 		return errgo.WithCausef(nil, testCause, "test error")
@@ -976,7 +978,7 @@ func (s *jemSuite) TestSelectController(c *gc.C) {
 
 		c.Assert(err, gc.IsNil)
 	}
-	ctx := auth.AuthenticateForTest(context.Background(), "bob", "bob-group")
+	ctx := auth.ContextWithUser(context.Background(), "bob", "bob-group")
 	for i, test := range selectContollerTests {
 		c.Logf("test %d. %s", i, test.about)
 		randIntn = &test.randIntn
@@ -1018,7 +1020,7 @@ func (s *jemSuite) TestController(c *gc.C) {
 	s.addController(c, params.EntityPath{"alice", "controller"})
 	s.addController(c, params.EntityPath{"bob", "controller"})
 	s.addController(c, params.EntityPath{"bob-group", "controller"})
-	ctx := auth.AuthenticateForTest(context.Background(), "bob", "bob-group")
+	ctx := auth.ContextWithUser(context.Background(), "bob", "bob-group")
 
 	for i, test := range controllerTests {
 		c.Logf("tes %d. %s", i, test.path)
@@ -1092,7 +1094,7 @@ func (s *jemSuite) TestCredential(c *gc.C) {
 		cred.Id = cred.Path.String()
 		jem.UpdateCredential(s.jem.DB, &cred)
 	}
-	ctx := auth.AuthenticateForTest(context.Background(), "bob", "bob-group")
+	ctx := auth.ContextWithUser(context.Background(), "bob", "bob-group")
 
 	for i, test := range credentialTests {
 		c.Logf("tes %d. %s", i, test.path)
@@ -1143,7 +1145,7 @@ func (s *jemSuite) bootstrapModel(c *gc.C, path params.EntityPath) *mongodoc.Mod
 		Type: "empty",
 	})
 	c.Assert(err, jc.ErrorIsNil)
-	ctx := auth.AuthenticateForTest(context.Background(), string(path.User))
+	ctx := auth.ContextWithUser(context.Background(), string(path.User))
 	model, _, err := s.jem.CreateModel(ctx, jem.CreateModelParams{
 		Path:           path,
 		ControllerPath: ctlPath,

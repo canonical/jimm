@@ -130,7 +130,7 @@ func (s *authSuite) TestAuthenticateRequest(c *gc.C) {
 }
 
 func (s *authSuite) TestCheckIsUser(c *gc.C) {
-	ctx := auth.AuthenticateForTest(context.Background(), "bob")
+	ctx := auth.ContextWithUser(context.Background(), "bob")
 	err := auth.CheckIsUser(ctx, "bob")
 	c.Assert(err, jc.ErrorIsNil)
 	err = auth.CheckIsUser(ctx, "alice")
@@ -139,7 +139,7 @@ func (s *authSuite) TestCheckIsUser(c *gc.C) {
 }
 
 func (s *authSuite) TestCheckACL(c *gc.C) {
-	ctx := auth.AuthenticateForTest(context.Background(), "bob")
+	ctx := auth.ContextWithUser(context.Background(), "bob")
 	err := auth.CheckACL(ctx, []string{"bob", "charlie"})
 	c.Assert(err, jc.ErrorIsNil)
 	err = auth.CheckACL(ctx, []string{"alice", "charlie"})
@@ -183,7 +183,7 @@ var canReadTests = []struct {
 }}
 
 func (s *authSuite) TestCheckCanRead(c *gc.C) {
-	ctx := auth.AuthenticateForTest(context.Background(), "bob", "bob-group")
+	ctx := auth.ContextWithUser(context.Background(), "bob", "bob-group")
 	for i, test := range canReadTests {
 		c.Logf("%d. %q %#v", i, test.owner, test.readers)
 		err := auth.CheckCanRead(ctx, testEntity{

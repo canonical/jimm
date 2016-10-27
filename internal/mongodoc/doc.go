@@ -220,6 +220,10 @@ type Model struct {
 
 	// CreationTime holds the time the model was created.
 	CreationTime time.Time
+
+	// Creator holds the name of the user that issued the model creation
+	// request.
+	Creator string
 }
 
 type ModelUserInfo struct {
