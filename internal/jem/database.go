@@ -370,6 +370,7 @@ func (db *Database) SetControllerStats(ctlPath params.EntityPath, stats *mongodo
 // SetModelLife sets the Life field of all models controlled
 // by the given controller that have the given UUID.
 // It does not return an error if there are no such models.
+// TODO remove the ctlPath argument.
 func (db *Database) SetModelLife(ctlPath params.EntityPath, uuid string, life string) (err error) {
 	defer db.checkError(&err)
 	_, err = db.Models().UpdateAll(
@@ -382,17 +383,56 @@ func (db *Database) SetModelLife(ctlPath params.EntityPath, uuid string, life st
 	return nil
 }
 
-// SetModelUnitCount sets the number of units running on all models controlled
-// by the given controller that have the given UUID.
-// It does not return an error if there are no such models.
-func (db *Database) SetModelUnitCount(ctlPath params.EntityPath, uuid string, n int) (err error) {
+// UpdateModelCounts updates the count statistics associated with the
+// model with the given UUID recording them at the given current time.
+// Each counts map entry holds the current count for its key. Counts not
+// mentioned in the counts argument will not be affected.
+func (db *Database) UpdateModelCounts(uuid string, counts map[mongodoc.EntityCount]int, now time.Time) error {
+	if err := db.updateCounts(
+		db.Models(),
+		bson.D{{"uuid", uuid}},
+		counts,
+		now,
+	); err != nil {
+		return errgo.NoteMask(err, "cannot update model counts", errgo.Is(params.ErrNotFound))
+	}
+	return nil
+}
+
+// updateCounts updates the count statistics for an document in the given collection
+// which should be uniquely specified  by the query.
+// Each counts map entry holds the current count for its key.
+// Counts not mentioned in the counts argument will not be affected.
+func (db *Database) updateCounts(c *mgo.Collection, query bson.D, values map[mongodoc.EntityCount]int, now time.Time) (err error) {
 	defer db.checkError(&err)
-	_, err = db.Models().UpdateAll(
-		bson.D{{"uuid", uuid}, {"controller", ctlPath}},
-		bson.D{{"$set", bson.D{{"unitcount", n}}}},
-	)
+
+	// This looks racy but it's actually not too bad. Assuming that
+	// two concurrent updates are actually looking at the same
+	// controller and hence are setting valid information, they will
+	// both be working from a valid set of count values (we
+	// only update them all at the same time), so each one will
+	// update them to a new valid set. They might each ignore
+	// the other's updates but because they're working from the
+	// same state information, they should converge correctly.
+	var oldCounts struct {
+		Counts map[mongodoc.EntityCount]mongodoc.Count
+	}
+	err = c.Find(query).Select(bson.D{{"counts", 1}}).One(&oldCounts)
 	if err != nil {
-		return errgo.Notef(err, "cannot update model")
+		if err == mgo.ErrNotFound {
+			return params.ErrNotFound
+		}
+		return errgo.Mask(err)
+	}
+	newCounts := make(bson.D, 0, len(values))
+	for name, val := range values {
+		count := oldCounts.Counts[name]
+		count.Update(val, now)
+		newCounts = append(newCounts, bson.DocElem{string("counts." + name), count})
+	}
+	err = c.Update(query, bson.D{{"$set", newCounts}})
+	if err != nil {
+		return errgo.Notef(err, "cannot update count")
 	}
 	return nil
 }

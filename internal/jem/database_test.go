@@ -354,6 +354,10 @@ func (s *databaseSuite) TestModelFromUUID(c *gc.C) {
 
 var epoch = parseTime("2016-01-01T12:00:00Z")
 
+func T(n int) time.Time {
+	return epoch.Add(time.Duration(n) * time.Millisecond)
+}
+
 const leaseExpiryDuration = 15 * time.Second
 
 var acquireLeaseTests = []struct {
@@ -493,59 +497,114 @@ func (s *databaseSuite) TestSetControllerStats(c *gc.C) {
 	s.checkDBOK(c)
 }
 
-func (s *databaseSuite) TestSetUnitCountNotFound(c *gc.C) {
-	err := s.database.SetModelUnitCount(params.EntityPath{"bob", "foo"}, "fake-uuid", 1)
-	c.Assert(err, gc.IsNil)
-	s.checkDBOK(c)
+var updateModelCountsTests = []struct {
+	about      string
+	before     map[mongodoc.EntityCount]mongodoc.Count
+	update     map[mongodoc.EntityCount]int
+	updateTime time.Time
+	expect     map[mongodoc.EntityCount]mongodoc.Count
+}{{
+	about: "empty counts",
+	update: map[mongodoc.EntityCount]int{
+		"foo": 5,
+		"bar": 20,
+	},
+	updateTime: T(1000),
+	expect: map[mongodoc.EntityCount]mongodoc.Count{
+		"foo": {
+			Time:    T(1000),
+			Current: 5,
+			Max:     5,
+			Total:   5,
+		},
+		"bar": {
+			Time:    T(1000),
+			Current: 20,
+			Max:     20,
+			Total:   20,
+		},
+	},
+}, {
+	about: "existing counts",
+	before: map[mongodoc.EntityCount]mongodoc.Count{
+		"foo": {
+			Time:    T(1000),
+			Current: 5,
+			Max:     5,
+			Total:   5,
+		},
+		"bar": {
+			Time:      T(1000),
+			Current:   20,
+			Max:       20,
+			Total:     100,
+			TotalTime: 9000,
+		},
+		"baz": {
+			Time:    T(500),
+			Current: 2,
+			Max:     3,
+			Total:   200,
+		},
+	},
+	updateTime: T(5000),
+	update: map[mongodoc.EntityCount]int{
+		"foo": 2,
+		"bar": 50,
+	},
+	expect: map[mongodoc.EntityCount]mongodoc.Count{
+		"foo": {
+			Time:      T(5000),
+			Current:   2,
+			Max:       5,
+			Total:     5,
+			TotalTime: (5000 - 1000) * 5,
+		},
+		"bar": {
+			Time:      T(5000),
+			Current:   50,
+			Max:       50,
+			Total:     130,
+			TotalTime: 9000 + (5000-1000)*20,
+		},
+		"baz": {
+			Time:    T(500),
+			Current: 2,
+			Max:     3,
+			Total:   200,
+		},
+	},
+}}
+
+func (s *databaseSuite) TestModelUpdateCounts(c *gc.C) {
+	for i, test := range updateModelCountsTests {
+		c.Logf("test %d: %v", i, test.about)
+		modelId := params.EntityPath{"bob", params.Name(fmt.Sprintf("model-%d", i))}
+		uuid := fmt.Sprintf("uuid-%d", i)
+		err := s.database.AddModel(&mongodoc.Model{
+			Path:       modelId,
+			Controller: params.EntityPath{"bob", "controller"},
+			UUID:       uuid,
+			Counts:     test.before,
+		})
+		c.Assert(err, gc.IsNil)
+		err = s.database.UpdateModelCounts(uuid, test.update, test.updateTime)
+		c.Assert(err, gc.IsNil)
+		model, err := s.database.Model(modelId)
+		c.Assert(err, gc.IsNil)
+		// Change all times to UTC for straightforward comparison.
+		for name, count := range model.Counts {
+			count.Time = count.Time.UTC()
+			model.Counts[name] = count
+		}
+		c.Assert(model.Counts, jc.DeepEquals, test.expect)
+	}
 }
 
-func (s *databaseSuite) TestSetUnitCountSuccess(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.database.AddController(&mongodoc.Controller{
-		Path: ctlPath,
-		UUID: "fake-uuid",
-	})
-	c.Assert(err, gc.IsNil)
-
-	// Add the controller model.
-	err = s.database.AddModel(&mongodoc.Model{
-		Path:       params.EntityPath{"bob", "foo"},
-		UUID:       "fake-uuid",
-		Controller: params.EntityPath{"bob", "foo"},
-	})
-	c.Assert(err, gc.IsNil)
-
-	// Add another model with the same UUID but a different controller.
-	err = s.database.AddModel(&mongodoc.Model{
-		Path:       params.EntityPath{"bar", "baz"},
-		UUID:       "fake-uuid",
-		Controller: params.EntityPath{"bar", "zzz"},
-	})
-	c.Assert(err, gc.IsNil)
-
-	// Add another model with the same controller but a different UUID.
-	err = s.database.AddModel(&mongodoc.Model{
-		Path:       params.EntityPath{"alice", "baz"},
-		UUID:       "another-uuid",
-		Controller: ctlPath,
-	})
-	c.Assert(err, gc.IsNil)
-
-	err = s.database.SetModelUnitCount(ctlPath, "fake-uuid", 99)
-	c.Assert(err, gc.IsNil)
-
-	m, err := s.database.Model(ctlPath)
-	c.Assert(err, gc.IsNil)
-	c.Assert(m.UnitCount, gc.Equals, 99)
-
-	m, err = s.database.Model(params.EntityPath{"bar", "baz"})
-	c.Assert(err, gc.IsNil)
-	c.Assert(m.UnitCount, gc.Equals, 0)
-
-	m, err = s.database.Model(params.EntityPath{"alice", "baz"})
-	c.Assert(err, gc.IsNil)
-	c.Assert(m.UnitCount, gc.Equals, 0)
-	s.checkDBOK(c)
+func (s *databaseSuite) TestModelUpdateCountsNotFound(c *gc.C) {
+	err := s.database.UpdateModelCounts("fake-uuid", nil, T(0))
+	c.Assert(err, gc.ErrorMatches, `cannot update model counts: not found`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
 func (s *databaseSuite) TestSetModelLifeNotFound(c *gc.C) {
@@ -1118,9 +1177,9 @@ var setDeadTests = []struct {
 		db.SetModelLife(fakeEntityPath, "fake-uuid", "alive")
 	},
 }, {
-	about: "SetModelUnitCount",
+	about: "UpdateModelCounts",
 	run: func(db *jem.Database) {
-		db.SetModelUnitCount(fakeEntityPath, "fake-uuid", 0)
+		db.UpdateModelCounts("fake-uuid", nil, T(0))
 	},
 }, {
 	about: "UpdateCredential",

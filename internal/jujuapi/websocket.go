@@ -732,7 +732,6 @@ func (c controller) ModelStatus(args jujuparams.Entities) (jujuparams.ModelStatu
 		mi, err := c.modelStatus(arg)
 		if err != nil {
 			return jujuparams.ModelStatusResults{}, errgo.Mask(err)
-			continue
 		}
 		results[i] = *mi
 	}

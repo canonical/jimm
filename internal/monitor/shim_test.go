@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"log"
 	"sync"
 	"time"
 
@@ -22,7 +23,7 @@ func newJEMShimWithUpdateNotify(j jemInterface) jemShimWithUpdateNotify {
 	return jemShimWithUpdateNotify{
 		controllerStatsSet:        make(chan struct{}, 10),
 		modelLifeSet:              make(chan struct{}, 10),
-		modelUnitCountSet:         make(chan struct{}, 10),
+		modelCountsSet:            make(chan struct{}, 10),
 		leaseAcquired:             make(chan struct{}, 10),
 		controllerAvailabilitySet: make(chan struct{}, 10),
 		jemInterface:              j,
@@ -32,7 +33,7 @@ func newJEMShimWithUpdateNotify(j jemInterface) jemShimWithUpdateNotify {
 type jemShimWithUpdateNotify struct {
 	controllerStatsSet        chan struct{}
 	modelLifeSet              chan struct{}
-	modelUnitCountSet         chan struct{}
+	modelCountsSet            chan struct{}
 	leaseAcquired             chan struct{}
 	controllerAvailabilitySet chan struct{}
 	jemInterface
@@ -52,7 +53,7 @@ func (s jemShimWithUpdateNotify) await(c *gc.C, f func() interface{}, want inter
 		select {
 		case <-s.controllerStatsSet:
 		case <-s.modelLifeSet:
-		case <-s.modelUnitCountSet:
+		case <-s.modelCountsSet:
 		case <-s.leaseAcquired:
 		case <-timeout:
 			c.Assert(got, jc.DeepEquals, want, gc.Commentf("timed out waiting for value"))
@@ -90,8 +91,8 @@ func (s jemShimWithUpdateNotify) waitAny(maxWait time.Duration) string {
 		return "controller stats"
 	case <-s.modelLifeSet:
 		return "model life"
-	case <-s.modelUnitCountSet:
-		return "model unit count"
+	case <-s.modelCountsSet:
+		return "model counts"
 	case <-s.leaseAcquired:
 		return "lease acquired"
 	case <-time.After(jujutesting.ShortWait):
@@ -131,11 +132,11 @@ func (s jemShimWithUpdateNotify) SetModelLife(ctlPath params.EntityPath, uuid st
 	return nil
 }
 
-func (s jemShimWithUpdateNotify) SetModelUnitCount(ctlPath params.EntityPath, uuid string, n int) error {
-	if err := s.jemInterface.SetModelUnitCount(ctlPath, uuid, n); err != nil {
+func (s jemShimWithUpdateNotify) UpdateModelCounts(uuid string, counts map[mongodoc.EntityCount]int, now time.Time) error {
+	if err := s.jemInterface.UpdateModelCounts(uuid, counts, now); err != nil {
 		return err
 	}
-	s.modelUnitCountSet <- struct{}{}
+	s.modelCountsSet <- struct{}{}
 	return nil
 }
 
@@ -265,19 +266,33 @@ func (s *jemShimInMemory) SetModelLife(ctlPath params.EntityPath, uuid string, l
 	defer s.mu.Unlock()
 	for _, m := range s.models {
 		if m.Controller == ctlPath && m.UUID == uuid {
+			log.Printf("setting model life of %v to %v", uuid, life)
 			m.Life = life
 		}
 	}
 	return nil
 }
 
-func (s jemShimInMemory) SetModelUnitCount(ctlPath params.EntityPath, uuid string, n int) error {
+func (s *jemShimInMemory) UpdateModelCounts(uuid string, counts map[mongodoc.EntityCount]int, now time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	var model *mongodoc.Model
 	for _, m := range s.models {
-		if m.Controller == ctlPath && m.UUID == uuid {
-			m.UnitCount = n
+		if m.UUID == uuid {
+			model = m
+			break
 		}
+	}
+	if model == nil {
+		return params.ErrNotFound
+	}
+	if model.Counts == nil {
+		model.Counts = make(map[mongodoc.EntityCount]mongodoc.Count)
+	}
+	for name, n := range counts {
+		count := model.Counts[name]
+		count.Update(n, now)
+		model.Counts[name] = count
 	}
 	return nil
 }
