@@ -19,11 +19,10 @@ else
 	INSTALL_FLAGS := -gccgoflags=-static-libgo
 endif
 
+# bzr and git are installed so that 'go get' will work with those VCS.
 define DEPENDENCIES
-  build-essential
   bzr
-  juju-mongodb
-  mongodb-server
+  git
   $(GO_C)
 endef
 
@@ -36,7 +35,7 @@ endif
 default: build
 
 $(GOPATH)/bin/godeps:
-	go get -v launchpad.net/godeps
+	go get -v github.com/rogpeppe/godeps
 
 # Start of GOPATH-dependent targets. Some targets only make sense -
 # and will only work - when this tree is found on the GOPATH.
@@ -106,9 +105,9 @@ ifeq ($(shell lsb_release -cs|sed -r 's/precise|quantal|raring/old/'),old)
 	@sudo apt-add-repository --yes ppa:juju/stable
 endif
 	@echo Installing dependencies
-	sudo apt-get update
-	@sudo apt-get --force-yes install $(strip $(DEPENDENCIES)) \
-	$(shell apt-cache madison juju-mongodb mongodb-server | head -1 | cut -d '|' -f1)
+	@sudo apt-get update
+	@sudo apt-get --yes install $(strip $(DEPENDENCIES)) \
+	  $(shell apt-cache madison juju-mongodb mongodb-server | head -1 | cut -d '|' -f1)
 else
 	@echo sysdeps runs only on systems with apt-get
 	@echo on OS X with homebrew try: brew install bazaar mongodb
