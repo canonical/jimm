@@ -387,7 +387,7 @@ func (db *Database) SetModelLife(ctlPath params.EntityPath, uuid string, life st
 // model with the given UUID recording them at the given current time.
 // Each counts map entry holds the current count for its key. Counts not
 // mentioned in the counts argument will not be affected.
-func (db *Database) UpdateModelCounts(uuid string, counts map[mongodoc.EntityCount]int, now time.Time) error {
+func (db *Database) UpdateModelCounts(uuid string, counts map[params.EntityCount]int, now time.Time) error {
 	if err := db.updateCounts(
 		db.Models(),
 		bson.D{{"uuid", uuid}},
@@ -403,7 +403,7 @@ func (db *Database) UpdateModelCounts(uuid string, counts map[mongodoc.EntityCou
 // which should be uniquely specified  by the query.
 // Each counts map entry holds the current count for its key.
 // Counts not mentioned in the counts argument will not be affected.
-func (db *Database) updateCounts(c *mgo.Collection, query bson.D, values map[mongodoc.EntityCount]int, now time.Time) (err error) {
+func (db *Database) updateCounts(c *mgo.Collection, query bson.D, values map[params.EntityCount]int, now time.Time) (err error) {
 	defer db.checkError(&err)
 
 	// This looks racy but it's actually not too bad. Assuming that
@@ -415,7 +415,7 @@ func (db *Database) updateCounts(c *mgo.Collection, query bson.D, values map[mon
 	// the other's updates but because they're working from the
 	// same state information, they should converge correctly.
 	var oldCounts struct {
-		Counts map[mongodoc.EntityCount]mongodoc.Count
+		Counts map[params.EntityCount]params.Count
 	}
 	err = c.Find(query).Select(bson.D{{"counts", 1}}).One(&oldCounts)
 	if err != nil {
@@ -427,7 +427,7 @@ func (db *Database) updateCounts(c *mgo.Collection, query bson.D, values map[mon
 	newCounts := make(bson.D, 0, len(values))
 	for name, val := range values {
 		count := oldCounts.Counts[name]
-		count.Update(val, now)
+		UpdateCount(&count, val, now)
 		newCounts = append(newCounts, bson.DocElem{string("counts." + name), count})
 	}
 	err = c.Update(query, bson.D{{"$set", newCounts}})

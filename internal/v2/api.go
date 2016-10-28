@@ -348,6 +348,7 @@ func (h *Handler) GetModel(arg *params.GetModel) (*params.ModelResponse, error) 
 		ControllerPath:   m.Controller,
 		Life:             m.Life,
 		UnavailableSince: newTime(ctl.UnavailableSince.UTC()),
+		Counts:           m.Counts,
 	}
 	return r, nil
 }

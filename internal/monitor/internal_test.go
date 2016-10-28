@@ -923,15 +923,15 @@ type modelStats struct {
 func (s *internalSuite) modelStats(c *gc.C, modelPath params.EntityPath) modelStats {
 	modelDoc, err := s.jem.DB.Model(modelPath)
 	c.Assert(err, gc.IsNil)
-	counts := make(map[mongodoc.EntityCount]int)
+	counts := make(map[params.EntityCount]int)
 	for name, count := range modelDoc.Counts {
 		counts[name] = count.Current
 	}
 	return modelStats{
 		life:             modelDoc.Life,
-		unitCount:        modelDoc.Counts[mongodoc.UnitCount].Current,
-		machineCount:     modelDoc.Counts[mongodoc.MachineCount].Current,
-		applicationCount: modelDoc.Counts[mongodoc.ApplicationCount].Current,
+		unitCount:        modelDoc.Counts[params.UnitCount].Current,
+		machineCount:     modelDoc.Counts[params.MachineCount].Current,
+		applicationCount: modelDoc.Counts[params.ApplicationCount].Current,
 	}
 }
 

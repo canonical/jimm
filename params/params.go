@@ -394,6 +394,10 @@ type ModelResponse struct {
 	// noticed that the model's controller could not be
 	// contacted. It is empty when the model is available.
 	UnavailableSince *time.Time `json:"unavailable-since,omitempty"`
+
+	// Counts holds information about the number of various kinds
+	// of entities in the model.
+	Counts map[EntityCount]Count
 }
 
 // WhoAmI holds parameters for requesting the current user name.
@@ -423,4 +427,38 @@ type Credential struct {
 	// Attributes holds the map of attributes that form the
 	// credential.
 	Attributes map[string]string `json:"attrs,omitempty"`
+}
+
+// EntityCount represents some kind of entity we
+// want count over time.
+type EntityCount string
+
+const (
+	UnitCount        EntityCount = "units"
+	ApplicationCount EntityCount = "applications"
+	MachineCount     EntityCount = "machines"
+)
+
+// Count records information about a changing count of
+// of entities over time.
+type Count struct {
+	// Time holds the time when the count record was recorded.
+	Time time.Time `json:"time"`
+
+	// Current holds the most recent count value,
+	// recorded at the above time.
+	Current int `json:"current"`
+
+	// MaxCount holds the maximum count recorded.
+	Max int `json:"max"`
+
+	// Total holds the total number created over time.
+	// This may be approximate if creation events are missed.
+	Total int64 `json:"total"`
+
+	// TotalTime holds the total time in milliseconds that any
+	// entities have existed for. That is, if two entities have
+	// existed for two seconds, this metric will record four
+	// seconds.
+	TotalTime int64 `json:"total-time"`
 }

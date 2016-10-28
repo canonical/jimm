@@ -499,18 +499,18 @@ func (s *databaseSuite) TestSetControllerStats(c *gc.C) {
 
 var updateModelCountsTests = []struct {
 	about      string
-	before     map[mongodoc.EntityCount]mongodoc.Count
-	update     map[mongodoc.EntityCount]int
+	before     map[params.EntityCount]params.Count
+	update     map[params.EntityCount]int
 	updateTime time.Time
-	expect     map[mongodoc.EntityCount]mongodoc.Count
+	expect     map[params.EntityCount]params.Count
 }{{
 	about: "empty counts",
-	update: map[mongodoc.EntityCount]int{
+	update: map[params.EntityCount]int{
 		"foo": 5,
 		"bar": 20,
 	},
 	updateTime: T(1000),
-	expect: map[mongodoc.EntityCount]mongodoc.Count{
+	expect: map[params.EntityCount]params.Count{
 		"foo": {
 			Time:    T(1000),
 			Current: 5,
@@ -526,7 +526,7 @@ var updateModelCountsTests = []struct {
 	},
 }, {
 	about: "existing counts",
-	before: map[mongodoc.EntityCount]mongodoc.Count{
+	before: map[params.EntityCount]params.Count{
 		"foo": {
 			Time:    T(1000),
 			Current: 5,
@@ -548,11 +548,11 @@ var updateModelCountsTests = []struct {
 		},
 	},
 	updateTime: T(5000),
-	update: map[mongodoc.EntityCount]int{
+	update: map[params.EntityCount]int{
 		"foo": 2,
 		"bar": 50,
 	},
-	expect: map[mongodoc.EntityCount]mongodoc.Count{
+	expect: map[params.EntityCount]params.Count{
 		"foo": {
 			Time:      T(5000),
 			Current:   2,

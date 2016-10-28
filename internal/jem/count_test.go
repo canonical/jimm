@@ -1,6 +1,6 @@
 // Copyright 2016 Canonical Ltd.
 
-package mongodoc_test
+package jem_test
 
 import (
 	"time"
@@ -8,7 +8,8 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jem/internal/mongodoc"
+	"github.com/CanonicalLtd/jem/internal/jem"
+	"github.com/CanonicalLtd/jem/params"
 )
 
 type countSuite struct{}
@@ -17,15 +18,15 @@ var _ = gc.Suite(&countSuite{})
 
 var countTests = []struct {
 	about  string
-	doc    mongodoc.Count
+	doc    params.Count
 	n      int
 	when   time.Time
-	expect mongodoc.Count
+	expect params.Count
 }{{
 	about: "from zero value",
 	n:     5,
 	when:  T(1000),
-	expect: mongodoc.Count{
+	expect: params.Count{
 		Time:    T(1000),
 		Current: 5,
 		Max:     5,
@@ -33,7 +34,7 @@ var countTests = []struct {
 	},
 }, {
 	about: "second time",
-	doc: mongodoc.Count{
+	doc: params.Count{
 		Time:    T(1000),
 		Current: 5,
 		Max:     5,
@@ -41,7 +42,7 @@ var countTests = []struct {
 	},
 	n:    2,
 	when: T(1500),
-	expect: mongodoc.Count{
+	expect: params.Count{
 		Time:      T(1500),
 		Current:   2,
 		Max:       5,
@@ -50,7 +51,7 @@ var countTests = []struct {
 	},
 }, {
 	about: "count grows",
-	doc: mongodoc.Count{
+	doc: params.Count{
 		Time:    T(1000),
 		Current: 5,
 		Max:     5,
@@ -58,7 +59,7 @@ var countTests = []struct {
 	},
 	n:    7,
 	when: T(1500),
-	expect: mongodoc.Count{
+	expect: params.Count{
 		Time:      T(1500),
 		Current:   7,
 		Max:       7,
@@ -67,7 +68,7 @@ var countTests = []struct {
 	},
 }, {
 	about: "total continues to grow",
-	doc: mongodoc.Count{
+	doc: params.Count{
 		Time:    T(1000),
 		Current: 5,
 		Max:     10,
@@ -75,7 +76,7 @@ var countTests = []struct {
 	},
 	n:    7,
 	when: T(1500),
-	expect: mongodoc.Count{
+	expect: params.Count{
 		Time:      T(1500),
 		Current:   7,
 		Max:       10,
@@ -84,7 +85,7 @@ var countTests = []struct {
 	},
 }, {
 	about: "total time stays constant within a millisecond",
-	doc: mongodoc.Count{
+	doc: params.Count{
 		Time:      T(1500),
 		Current:   5,
 		Max:       10,
@@ -93,7 +94,7 @@ var countTests = []struct {
 	},
 	n:    5,
 	when: T(1500).Add(time.Microsecond),
-	expect: mongodoc.Count{
+	expect: params.Count{
 		Time:      T(1500),
 		Current:   5,
 		Max:       10,
@@ -102,7 +103,7 @@ var countTests = []struct {
 	},
 }, {
 	about: "total time continues to grow",
-	doc: mongodoc.Count{
+	doc: params.Count{
 		Time:      T(1000),
 		Current:   10,
 		Max:       10,
@@ -111,7 +112,7 @@ var countTests = []struct {
 	},
 	n:    20,
 	when: T(5000),
-	expect: mongodoc.Count{
+	expect: params.Count{
 		Time:      T(5000),
 		Current:   20,
 		Max:       20,
@@ -124,14 +125,8 @@ func (*countSuite) TestCount(c *gc.C) {
 	for i, test := range countTests {
 		c.Logf("test %d: %v", i, test.about)
 		count := test.doc
-		count.Update(test.n, test.when)
+		jem.UpdateCount(&count, test.n, test.when)
 		count.Time = count.Time.UTC()
 		c.Assert(count, jc.DeepEquals, test.expect)
 	}
-}
-
-var epoch = time.Unix(0, 0).UTC()
-
-func T(n int) time.Time {
-	return epoch.Add(time.Duration(n) * time.Millisecond)
 }

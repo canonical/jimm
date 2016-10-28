@@ -353,14 +353,14 @@ type modelInfo struct {
 	life multiwatcher.Life
 
 	// counts holds current counts for entities in the model.
-	counts map[mongodoc.EntityCount]int
+	counts map[params.EntityCount]int
 
 	// changed holds information about what's changed
 	// in the model since the last set of deltas.
 	changed modelChange
 }
 
-func (info *modelInfo) adjustCount(kind mongodoc.EntityCount, n int) {
+func (info *modelInfo) adjustCount(kind params.EntityCount, n int) {
 	if n != 0 {
 		info.counts[kind] += n
 		info.changed |= countsChange
@@ -415,16 +415,16 @@ func (w *watcherState) addDelta(d multiwatcher.Delta) error {
 		servermon.ModelsRunning.WithLabelValues(ctlpathstr).Set(float64(w.stats.ModelCount))
 	case *multiwatcher.UnitInfo:
 		delta := w.adjustCount(&w.stats.UnitCount, d)
-		w.modelInfo(e.ModelUUID).adjustCount(mongodoc.UnitCount, delta)
+		w.modelInfo(e.ModelUUID).adjustCount(params.UnitCount, delta)
 		servermon.UnitsRunning.WithLabelValues(ctlpathstr).Set(float64(w.stats.UnitCount))
 	case *multiwatcher.ApplicationInfo:
 		delta := w.adjustCount(&w.stats.ServiceCount, d)
-		w.modelInfo(e.ModelUUID).adjustCount(mongodoc.ApplicationCount, delta)
+		w.modelInfo(e.ModelUUID).adjustCount(params.ApplicationCount, delta)
 		servermon.ApplicationsRunning.WithLabelValues(ctlpathstr).Set(float64(w.stats.ServiceCount))
 	case *multiwatcher.MachineInfo:
 		// TODO for top level machines, increment instance count?
 		delta := w.adjustCount(&w.stats.MachineCount, d)
-		w.modelInfo(e.ModelUUID).adjustCount(mongodoc.MachineCount, delta)
+		w.modelInfo(e.ModelUUID).adjustCount(params.MachineCount, delta)
 		servermon.MachinesRunning.WithLabelValues(ctlpathstr).Set(float64(w.stats.MachineCount))
 	}
 	return nil
@@ -442,10 +442,10 @@ func (w watcherState) modelInfo(uuid string) *modelInfo {
 			// Always create with everything changed so that we will
 			// update the counts even if no entities are created.
 			changed: ^0,
-			counts: map[mongodoc.EntityCount]int{
-				mongodoc.UnitCount:        0,
-				mongodoc.MachineCount:     0,
-				mongodoc.ApplicationCount: 0,
+			counts: map[params.EntityCount]int{
+				params.UnitCount:        0,
+				params.MachineCount:     0,
+				params.ApplicationCount: 0,
 			},
 		}
 		w.models[uuid] = info

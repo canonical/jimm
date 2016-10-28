@@ -198,8 +198,9 @@ type Model struct {
 	// or "dead").
 	Life string
 
-	// Counts stores information about aspects of the model.
-	Counts map[EntityCount]Count `bson:",omitempty"`
+	// Counts holds information about the number of various kinds
+	// of entities in the model.
+	Counts map[params.EntityCount]params.Count `bson:",omitempty"`
 
 	// TODO record last time we saw changes on the model?
 
