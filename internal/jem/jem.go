@@ -360,6 +360,7 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.M
 		Path:         p.Path,
 		Controller:   p.ControllerPath,
 		CreationTime: wallClock.Now(),
+		Creator:      auth.Username(ctx),
 	}
 	if err := j.DB.AddModel(modelDoc); err != nil {
 		return nil, nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))

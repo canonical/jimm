@@ -4,7 +4,6 @@ package auth
 
 import (
 	"net/http"
-	"sort"
 
 	"github.com/juju/idmclient"
 	"github.com/juju/loggo"
@@ -122,8 +121,8 @@ func (a *Authenticator) Authenticate(ctx context.Context, mss []macaroon.Slice, 
 	attrMap, verr := a.bakery.CheckAny(mss, nil, checkers.New(checker, checkers.TimeBefore))
 	if verr == nil {
 		servermon.AuthenticationSuccessCount.Inc()
-		return context.WithValue(ctx, authKey, authentication{
-			username:    attrMap[usernameAttr],
+		return context.WithValue(ctx, authKey{}, authentication{
+			username_:   attrMap[usernameAttr],
 			permChecker: a.pool.params.PermChecker,
 		}), nil, nil
 	}
@@ -181,28 +180,38 @@ func (a *Authenticator) newMacaroon() (*macaroon.Macaroon, error) {
 	})
 }
 
-type contextKey int
+type authKey struct{}
 
-var authKey contextKey = 0
+func fromContext(ctx context.Context) authInfo {
+	if info, _ := ctx.Value(authKey{}).(authInfo); info != nil {
+		return info
+	}
+	return noAuth{}
+}
 
-type allower interface {
+type authInfo interface {
 	allow(acl []string) (bool, error)
+	username() string
 }
 
 type authentication struct {
-	username    string
+	username_   string
 	permChecker *idmclient.PermChecker
 }
 
 func (a authentication) allow(acl []string) (bool, error) {
-	ok, err := a.permChecker.Allow(a.username, acl)
+	ok, err := a.permChecker.Allow(a.username_, acl)
 	if err != nil {
 		return false, errgo.Mask(err)
 	} else if ok {
 		return true, nil
 	}
-	logger.Infof("%s is not authorized for ACL %s", a.username, acl)
+	logger.Infof("%s is not authorized for ACL %s", a.username_, acl)
 	return false, nil
+}
+
+func (a authentication) username() string {
+	return a.username_
 }
 
 // CheckIsUser checks whether the currently authenticated user can
@@ -215,13 +224,7 @@ func CheckIsUser(ctx context.Context, user params.User) error {
 // allowed to access an entity with the given ACL.
 // It returns params.ErrUnauthorized if not.
 func CheckACL(ctx context.Context, acl []string) error {
-	v := ctx.Value(authKey)
-	if v == nil {
-		return params.ErrUnauthorized
-	}
-	a := v.(allower)
-
-	ok, err := a.allow(acl)
+	ok, err := fromContext(ctx).allow(acl)
 	if err != nil {
 		return errgo.Notef(err, "cannot check permissions")
 	}
@@ -249,37 +252,43 @@ func CheckCanRead(ctx context.Context, e ACLEntity) error {
 // Username returns the name of the user authenticated on the given
 // context. If no user is authenticated then an empty string is returned.
 func Username(ctx context.Context) string {
-	v := ctx.Value(authKey)
-	if v == nil {
-		return ""
-	}
-	a, ok := v.(authentication)
-	if !ok {
-		return ""
-	}
-	return a.username
+	return fromContext(ctx).username()
 }
 
 type testAuthentication []string
 
 func (a testAuthentication) allow(acl []string) (bool, error) {
-	for _, s := range acl {
-		if s == "everyone" {
+	for _, g := range acl {
+		if g == "everyone" {
 			return true, nil
 		}
-		i := sort.SearchStrings(a, s)
-		if i == len(a) || a[i] != s {
-			continue
+		for _, allowg := range a {
+			if allowg == g {
+				return true, nil
+			}
 		}
-		return true, nil
 	}
 	return false, nil
 }
 
-// AuthenticateForTest authenticates the given context as if it was for a
-// user that is a member of all the given groups. As the name implies it
-// is expected to be used in tests.
-func AuthenticateForTest(ctx context.Context, groups ...string) context.Context {
-	sort.Strings(groups)
-	return context.WithValue(ctx, authKey, testAuthentication(groups))
+func (a testAuthentication) username() string {
+	return a[0]
+}
+
+// ContextWithUser returns the given context as if it had been returned
+// from Authenticate with the given authenticated user
+// and as if the user was a member of all the given groups.
+func ContextWithUser(ctx context.Context, username string, groups ...string) context.Context {
+	groups = append([]string{username}, groups...)
+	return context.WithValue(ctx, authKey{}, testAuthentication(groups))
+}
+
+type noAuth struct{}
+
+func (noAuth) username() string {
+	return ""
+}
+
+func (noAuth) allow([]string) (bool, error) {
+	return false, nil
 }

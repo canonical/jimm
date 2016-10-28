@@ -1035,8 +1035,7 @@ var checkReadACLTests = []struct {
 func (s *databaseSuite) TestCheckReadACL(c *gc.C) {
 	for i, test := range checkReadACLTests {
 		c.Logf("%d. %s", i, test.about)
-		gs := append(test.groups, test.user)
-		ctx := auth.AuthenticateForTest(context.Background(), gs...)
+		ctx := auth.ContextWithUser(context.Background(), test.user, test.groups...)
 		entity := params.EntityPath{
 			User: params.User(test.owner),
 			Name: params.Name(fmt.Sprintf("test%d", i)),
@@ -1088,7 +1087,7 @@ func (s *databaseSuite) TestCanReadIter(c *gc.C) {
 		err := s.database.AddModel(&testModels[i])
 		c.Assert(err, gc.IsNil)
 	}
-	ctx := auth.AuthenticateForTest(context.Background(), "bob", "bob-group")
+	ctx := auth.ContextWithUser(context.Background(), "bob", "bob-group")
 	it := s.database.Models().Find(nil).Sort("_id").Iter()
 	crit := s.database.NewCanReadIter(ctx, it)
 	var models []mongodoc.Model
@@ -1246,7 +1245,7 @@ var setDeadTests = []struct {
 	about: "CanReadIter",
 	run: func(db *jem.Database) {
 		it := db.Models().Find(nil).Sort("_id").Iter()
-		ctx := auth.AuthenticateForTest(context.Background(), "bob", "bob-group")
+		ctx := auth.ContextWithUser(context.Background(), "bob", "bob-group")
 		crit := db.NewCanReadIter(ctx, it)
 		crit.Next(&mongodoc.Model{})
 		crit.Err()
@@ -1255,7 +1254,7 @@ var setDeadTests = []struct {
 	about: "CanReadIter with Close",
 	run: func(db *jem.Database) {
 		it := db.Models().Find(nil).Sort("_id").Iter()
-		ctx := auth.AuthenticateForTest(context.Background(), "bob", "bob-group")
+		ctx := auth.ContextWithUser(context.Background(), "bob", "bob-group")
 		crit := db.NewCanReadIter(ctx, it)
 		crit.Next(&mongodoc.Model{})
 		crit.Close()
