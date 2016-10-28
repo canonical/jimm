@@ -132,7 +132,7 @@ func (s jemShimWithUpdateNotify) SetModelLife(ctlPath params.EntityPath, uuid st
 	return nil
 }
 
-func (s jemShimWithUpdateNotify) UpdateModelCounts(uuid string, counts map[mongodoc.EntityCount]int, now time.Time) error {
+func (s jemShimWithUpdateNotify) UpdateModelCounts(uuid string, counts map[params.EntityCount]int, now time.Time) error {
 	if err := s.jemInterface.UpdateModelCounts(uuid, counts, now); err != nil {
 		return err
 	}
@@ -273,7 +273,7 @@ func (s *jemShimInMemory) SetModelLife(ctlPath params.EntityPath, uuid string, l
 	return nil
 }
 
-func (s *jemShimInMemory) UpdateModelCounts(uuid string, counts map[mongodoc.EntityCount]int, now time.Time) error {
+func (s *jemShimInMemory) UpdateModelCounts(uuid string, counts map[params.EntityCount]int, now time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var model *mongodoc.Model
@@ -287,11 +287,11 @@ func (s *jemShimInMemory) UpdateModelCounts(uuid string, counts map[mongodoc.Ent
 		return params.ErrNotFound
 	}
 	if model.Counts == nil {
-		model.Counts = make(map[mongodoc.EntityCount]mongodoc.Count)
+		model.Counts = make(map[params.EntityCount]params.Count)
 	}
 	for name, n := range counts {
 		count := model.Counts[name]
-		count.Update(n, now)
+		jem.UpdateCount(&count, n, now)
 		model.Counts[name] = count
 	}
 	return nil

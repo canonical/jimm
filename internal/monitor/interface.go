@@ -48,7 +48,7 @@ type jemInterface interface {
 	// model with the given UUID recording them at the given current time.
 	// Each counts map entry holds the current count for its key. Counts not
 	// mentioned in the counts argument will not be affected.
-	UpdateModelCounts(uuid string, counts map[mongodoc.EntityCount]int, now time.Time) error
+	UpdateModelCounts(uuid string, counts map[params.EntityCount]int, now time.Time) error
 
 	// AllControllers returns all the controllers in the system.
 	AllControllers() ([]*mongodoc.Controller, error)

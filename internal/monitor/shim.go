@@ -57,7 +57,7 @@ func (j jemShim) SetModelLife(ctlPath params.EntityPath, uuid string, life strin
 	return errgo.Mask(j.DB.SetModelLife(ctlPath, uuid, life), errgo.Any)
 }
 
-func (j jemShim) UpdateModelCounts(uuid string, counts map[mongodoc.EntityCount]int, now time.Time) (err error) {
+func (j jemShim) UpdateModelCounts(uuid string, counts map[params.EntityCount]int, now time.Time) (err error) {
 	return errgo.Mask(j.DB.UpdateModelCounts(uuid, counts, now), errgo.Any)
 }
 
