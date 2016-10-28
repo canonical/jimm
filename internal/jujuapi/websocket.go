@@ -114,6 +114,7 @@ var facades = map[facade]string{
 	facade{"Bundle", 1}:       "Bundle",
 	facade{"Cloud", 1}:        "Cloud",
 	facade{"Controller", 3}:   "Controller",
+	facade{"JIMM", 1}:         "JIMM",
 	facade{"ModelManager", 2}: "ModelManager",
 	facade{"Pinger", 1}:       "Pinger",
 }
@@ -276,6 +277,16 @@ func (r root) Controller(id string) (controller, error) {
 		return controller{}, common.ErrBadId
 	}
 	return controller{r.h}, nil
+}
+
+// JIMM returns an implementation of the JIMM-specific
+// API facade.
+func (r root) JIMM(id string) (jimm, error) {
+	if id != "" {
+		// Safeguard id for possible future use.
+		return jimm{}, common.ErrBadId
+	}
+	return jimm{r.h}, nil
 }
 
 // ModelManager returns an implementation of the ModelManager facade
@@ -776,11 +787,7 @@ func allModels(h *wsHandler) (jujuparams.UserModelList, error) {
 	var model mongodoc.Model
 	for it.Next(&model) {
 		models = append(models, jujuparams.UserModel{
-			Model: jujuparams.Model{
-				Name:     string(model.Path.Name),
-				UUID:     model.UUID,
-				OwnerTag: jem.UserTag(model.Path.User).String(),
-			},
+			Model:          userModelForModelDoc(&model),
 			LastConnection: nil, // TODO (mhilton) work out how to record and set this.
 		})
 	}
@@ -791,6 +798,14 @@ func allModels(h *wsHandler) (jujuparams.UserModelList, error) {
 		UserModels: models,
 	}, nil
 
+}
+
+func userModelForModelDoc(m *mongodoc.Model) jujuparams.Model {
+	return jujuparams.Model{
+		Name:     string(m.Path.Name),
+		UUID:     m.UUID,
+		OwnerTag: jem.UserTag(m.Path.User).String(),
+	}
 }
 
 // ModelInfo implements the ModelManager facade's ModelInfo method.
@@ -1050,6 +1065,37 @@ func (m modelManager) modifyModelAccess(change jujuparams.ModifyModelAccess) err
 		return errgo.Mask(err)
 	}
 	return nil
+}
+
+// jimm implements a facade containing JIMM-specific API calls.
+type jimm struct {
+	h *wsHandler
+}
+
+// UserModelStats returns statistics about all the models that were created
+// by the currently authenticated user.
+func (j jimm) UserModelStats() (params.UserModelStatsResponse, error) {
+	models := make(map[string]params.ModelStats)
+
+	user := auth.Username(j.h.context)
+	it := j.h.jem.DB.NewCanReadIter(j.h.context,
+		j.h.jem.DB.Models().
+			Find(bson.D{{"creator", user}}).
+			Select(bson.D{{"uuid", 1}, {"path", 1}, {"creator", 1}, {"counts", 1}}).
+			Iter())
+	var model mongodoc.Model
+	for it.Next(&model) {
+		models[model.UUID] = params.ModelStats{
+			Model:  userModelForModelDoc(&model),
+			Counts: model.Counts,
+		}
+	}
+	if err := it.Err(); err != nil {
+		return params.UserModelStatsResponse{}, errgo.Mask(err)
+	}
+	return params.UserModelStatsResponse{
+		Models: models,
+	}, nil
 }
 
 // checkIsOwner checks if the current user is the owner of the specified

@@ -1412,6 +1412,38 @@ func (s *APISuite) TestGetModelWhenControllerUnavailable(c *gc.C) {
 	})
 }
 
+func (s *APISuite) TestGetModelWithCounts(c *gc.C) {
+	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, false)
+	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
+	modelId, uuid := s.CreateModel(c, params.EntityPath{"bob", "foo"}, ctlId, cred)
+
+	t0 := time.Unix(0, 0)
+	err := s.JEM.DB.UpdateModelCounts(uuid, map[params.EntityCount]int{
+		params.MachineCount: 3,
+		params.UnitCount:    99,
+	}, t0)
+	c.Assert(err, gc.IsNil)
+
+	m, err := s.NewClient("bob").GetModel(&params.GetModel{
+		EntityPath: modelId,
+	})
+	c.Assert(err, gc.IsNil)
+	c.Assert(m.Counts, jc.DeepEquals, map[params.EntityCount]params.Count{
+		params.MachineCount: {
+			Time:    t0,
+			Current: 3,
+			Max:     3,
+			Total:   3,
+		},
+		params.UnitCount: {
+			Time:    t0,
+			Current: 99,
+			Max:     99,
+			Total:   99,
+		},
+	})
+}
+
 func newTime(t time.Time) *time.Time {
 	return &t
 }
@@ -1702,6 +1734,13 @@ func (s *APISuite) TestListModels(c *gc.C) {
 	err := s.JEM.DB.SetModelLife(ctlId0, uuid2, "alive")
 	c.Assert(err, gc.IsNil)
 
+	// Give one of the models some counts.
+	t0 := time.Unix(0, 0)
+	err = s.JEM.DB.UpdateModelCounts(uuid1, map[params.EntityCount]int{
+		params.MachineCount: 3,
+	}, t0)
+	c.Assert(err, gc.IsNil)
+
 	resps := []params.ModelResponse{{
 		Path:           modelId0,
 		UUID:           uuid0,
@@ -1716,6 +1755,14 @@ func (s *APISuite) TestListModels(c *gc.C) {
 		CACert:         info.CACert,
 		HostPorts:      info.Addrs,
 		ControllerPath: ctlId0,
+		Counts: map[params.EntityCount]params.Count{
+			params.MachineCount: {
+				Time:    t0,
+				Current: 3,
+				Max:     3,
+				Total:   3,
+			},
+		},
 	}, {
 		Path:           modelId2,
 		UUID:           uuid2,

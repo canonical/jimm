@@ -411,6 +411,7 @@ func (h *Handler) ListModels(arg *params.ListModels) (*params.ListModelsResponse
 			ControllerPath:   m.Controller,
 			Life:             m.Life,
 			UnavailableSince: newTime(ctl.UnavailableSince.UTC()),
+			Counts:           m.Counts,
 		})
 	}
 	if err := modelIter.Err(); err != nil {

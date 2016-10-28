@@ -398,6 +398,9 @@ type ModelResponse struct {
 	// Counts holds information about the number of various kinds
 	// of entities in the model.
 	Counts map[EntityCount]Count
+
+	// Creator holds the name of the user that created the model.
+	Creator string
 }
 
 // WhoAmI holds parameters for requesting the current user name.
@@ -427,6 +430,19 @@ type Credential struct {
 	// Attributes holds the map of attributes that form the
 	// credential.
 	Attributes map[string]string `json:"attrs,omitempty"`
+}
+
+// GetUserStats returns statistics related to the requested user.
+type GetUserStats struct {
+	httprequest.Route `httprequest:"GET /v2/user/:User/stats"`
+	User              string `httprequest:",path"`
+}
+
+// UserStats holds per-user statistics as requested by GetUserStats.
+type UserStatsResponse struct {
+	// Counts holds counts for model entities in models created by
+	// the user.
+	Counts map[EntityCount]Count
 }
 
 // EntityCount represents some kind of entity we

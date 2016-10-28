@@ -63,7 +63,7 @@ func (s *websocketSuite) TestUnknownModel(c *gc.C) {
 func (s *websocketSuite) TestLoginToModel(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
-	mi := s.assertCreateModel(c, "model-1", "test", "", "", string(cred), nil)
+	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
 	modelUUID := mi.UUID
 	conn := s.open(c, &api.Info{
 		ModelTag:  names.NewModelTag(modelUUID),
@@ -89,7 +89,7 @@ func (s *websocketSuite) TestLoginToModel(c *gc.C) {
 func (s *websocketSuite) TestOldAdminVersionFails(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
-	mi := s.assertCreateModel(c, "model-1", "test", "", "", string(cred), nil)
+	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
 	modelUUID := mi.UUID
 	conn := s.open(c, &api.Info{
 		ModelTag:  names.NewModelTag(modelUUID),
@@ -105,7 +105,7 @@ func (s *websocketSuite) TestOldAdminVersionFails(c *gc.C) {
 func (s *websocketSuite) TestAdminIDFails(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
-	mi := s.assertCreateModel(c, "model-1", "test", "", "", string(cred), nil)
+	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
 	modelUUID := mi.UUID
 	conn := s.open(c, &api.Info{
 		ModelTag:  names.NewModelTag(modelUUID),
@@ -143,7 +143,7 @@ func (s *websocketSuite) TestLoginToControllerWithInvalidMacaroon(c *gc.C) {
 func (s *websocketSuite) TestUnimplementedMethodFails(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
-	mi := s.assertCreateModel(c, "model-1", "test", "", "", string(cred), nil)
+	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
 	modelUUID := mi.UUID
 	conn := s.open(c, &api.Info{
 		ModelTag:  names.NewModelTag(modelUUID),
@@ -497,10 +497,10 @@ func (s *websocketSuite) TestListModels(c *gc.C) {
 		Read: []string{"test2"},
 	})
 	c.Assert(err, jc.ErrorIsNil)
-	mi := s.assertCreateModel(c, "model-1", "test", "", "", string(cred), nil)
+	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
 	modelUUID1 := mi.UUID
-	s.assertCreateModel(c, "model-2", "test2", "", "", string(cred2), nil)
-	mi = s.assertCreateModel(c, "model-3", "test2", "", "", string(cred2), nil)
+	s.assertCreateModel(c, createModelParams{name: "model-2", username: "test2", cred: cred2})
+	mi = s.assertCreateModel(c, createModelParams{name: "model-3", username: "test2", cred: cred2})
 	modelUUID3 := mi.UUID
 	err = s.JEM.DB.SetACL(s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
 		Read: []string{"test"},
@@ -522,6 +522,117 @@ func (s *websocketSuite) TestListModels(c *gc.C) {
 	}})
 }
 
+func (s *websocketSuite) TestJIMMFacadeVersion(c *gc.C) {
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	c.Assert(conn.AllFacadeVersions()["JIMM"], jc.DeepEquals, []int{1})
+}
+
+func (s *websocketSuite) TestUserModelStats(c *gc.C) {
+	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
+	cred2 := s.AssertUpdateCredential(c, "test2", "dummy", "cred1", "empty")
+	err := s.JEM.DB.SetACL(s.JEM.DB.Controllers(), ctlPath, params.ACL{
+		Read: []string{"test2"},
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	model1 := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
+	model2 := s.assertCreateModel(c, createModelParams{name: "model-2", username: "test2", cred: cred2})
+	model3 := s.assertCreateModel(c, createModelParams{name: "model-3", username: "test2", cred: cred2})
+
+	// Update some stats for the models we've just created'
+	t0 := time.Unix(0, 0)
+
+	err = s.JEM.DB.UpdateModelCounts(model1.UUID, map[params.EntityCount]int{
+		params.UnitCount: 99,
+	}, t0)
+	c.Assert(err, gc.IsNil)
+	err = s.JEM.DB.UpdateModelCounts(model2.UUID, map[params.EntityCount]int{
+		params.MachineCount: 10,
+	}, t0)
+	c.Assert(err, gc.IsNil)
+	err = s.JEM.DB.UpdateModelCounts(model3.UUID, map[params.EntityCount]int{
+		params.ApplicationCount: 1,
+	}, t0)
+	c.Assert(err, gc.IsNil)
+
+	// Allow test2/model-3 access to everyone, so that we can be sure we're
+	// not seeing models that we have access to but aren't the creator of.
+	err = s.JEM.DB.SetACL(s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
+		Read: []string{"test"},
+	})
+
+	// Open the API connection as user "test". We should only see the one model.
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	var resp params.UserModelStatsResponse
+	err = conn.APICall("JIMM", 1, "", "UserModelStats", nil, &resp)
+	c.Assert(err, gc.IsNil)
+
+	c.Assert(resp, jc.DeepEquals, params.UserModelStatsResponse{
+		Models: map[string]params.ModelStats{
+			model1.UUID: {
+				Model: jujuparams.Model{
+					Name:     "model-1",
+					UUID:     model1.UUID,
+					OwnerTag: model1.OwnerTag,
+				},
+				Counts: map[params.EntityCount]params.Count{
+					params.UnitCount: {
+						Time:    t0,
+						Current: 99,
+						Max:     99,
+						Total:   99,
+					},
+				},
+			},
+		},
+	})
+
+	// As test2, we should see the other two models.
+	conn = s.open(c, nil, "test2")
+	defer conn.Close()
+	resp = params.UserModelStatsResponse{}
+	err = conn.APICall("JIMM", 1, "", "UserModelStats", nil, &resp)
+	c.Assert(err, gc.IsNil)
+
+	c.Assert(resp, jc.DeepEquals, params.UserModelStatsResponse{
+		Models: map[string]params.ModelStats{
+			model2.UUID: {
+				Model: jujuparams.Model{
+					Name:     "model-2",
+					UUID:     model2.UUID,
+					OwnerTag: model2.OwnerTag,
+				},
+				Counts: map[params.EntityCount]params.Count{
+					params.MachineCount: {
+						Time:    t0,
+						Current: 10,
+						Max:     10,
+						Total:   10,
+					},
+				},
+			},
+			model3.UUID: {
+				Model: jujuparams.Model{
+					Name:     "model-3",
+					UUID:     model3.UUID,
+					OwnerTag: model3.OwnerTag,
+				},
+				Counts: map[params.EntityCount]params.Count{
+					params.ApplicationCount: {
+						Time:    t0,
+						Current: 1,
+						Max:     1,
+						Total:   1,
+					},
+				},
+			},
+		},
+	})
+}
+
 func (s *websocketSuite) TestModelInfo(c *gc.C) {
 	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
@@ -531,11 +642,11 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 	})
 	c.Assert(err, jc.ErrorIsNil)
 
-	mi := s.assertCreateModel(c, "model-1", "test", "", "", "cred1", nil)
+	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: "cred1"})
 	modelUUID1 := mi.UUID
-	mi = s.assertCreateModel(c, "model-2", "test2", "", "", "cred1", nil)
+	mi = s.assertCreateModel(c, createModelParams{name: "model-2", username: "test2", cred: "cred1"})
 	modelUUID2 := mi.UUID
-	mi = s.assertCreateModel(c, "model-3", "test2", "", "", "cred1", nil)
+	mi = s.assertCreateModel(c, createModelParams{name: "model-3", username: "test2", cred: "cred1"})
 	modelUUID3 := mi.UUID
 
 	conn := s.open(c, nil, "test")
@@ -618,10 +729,10 @@ func (s *websocketSuite) TestAllModels(c *gc.C) {
 	})
 	c.Assert(err, jc.ErrorIsNil)
 
-	mi := s.assertCreateModel(c, "model-1", "test", "", "", "cred1", nil)
+	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: "cred1"})
 	modelUUID1 := mi.UUID
-	s.assertCreateModel(c, "model-2", "test2", "", "", "cred1", nil)
-	mi = s.assertCreateModel(c, "model-3", "test2", "", "", "cred1", nil)
+	s.assertCreateModel(c, createModelParams{name: "model-2", username: "test2", cred: "cred1"})
+	mi = s.assertCreateModel(c, createModelParams{name: "model-3", username: "test2", cred: "cred1"})
 	modelUUID3 := mi.UUID
 
 	conn := s.open(c, nil, "test")
@@ -657,11 +768,11 @@ func (s *websocketSuite) TestModelStatus(c *gc.C) {
 	})
 	c.Assert(err, jc.ErrorIsNil)
 
-	mi := s.assertCreateModel(c, "model-1", "test", "", "", "cred1", nil)
+	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: "cred1"})
 	modelUUID1 := mi.UUID
-	mi = s.assertCreateModel(c, "model-2", "test2", "", "", "cred1", nil)
+	mi = s.assertCreateModel(c, createModelParams{name: "model-2", username: "test2", cred: "cred1"})
 	modelUUID2 := mi.UUID
-	mi = s.assertCreateModel(c, "model-3", "test2", "", "", "cred1", nil)
+	mi = s.assertCreateModel(c, createModelParams{name: "model-3", username: "test2", cred: "cred1"})
 	modelUUID3 := mi.UUID
 
 	err = s.JEM.DB.SetACL(s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
@@ -787,7 +898,7 @@ var createModelTests = []struct {
 func (s *websocketSuite) TestCreateModel(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
-	s.assertCreateModel(c, "existing-model", "test", "", "", "cred1", nil)
+	s.assertCreateModel(c, createModelParams{name: "existing-model", username: "test", cred: "cred1"})
 
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
@@ -831,7 +942,7 @@ func (s *websocketSuite) TestCreateModel(c *gc.C) {
 func (s *websocketSuite) TestGrantAndRevokeModel(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
-	mi := s.assertCreateModel(c, "test-model", "test", "", "", "cred1", nil)
+	mi := s.assertCreateModel(c, createModelParams{name: "test-model", username: "test", cred: "cred1"})
 
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
@@ -869,8 +980,8 @@ func (s *websocketSuite) TestModifyModelAccessErrors(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "bob", Name: "controller-1"}, true)
 	s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
 	s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
-	mi := s.assertCreateModel(c, "test-model", "alice", "", "", "cred1", nil)
-	mi2 := s.assertCreateModel(c, "test-model", "bob", "", "", "cred1", nil)
+	mi := s.assertCreateModel(c, createModelParams{name: "test-model", username: "alice", cred: "cred1"})
+	mi2 := s.assertCreateModel(c, createModelParams{name: "test-model", username: "bob", cred: "cred1"})
 
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
@@ -962,7 +1073,7 @@ func (s *websocketSuite) TestModifyModelAccessErrors(c *gc.C) {
 func (s *websocketSuite) TestDestroyModel(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "alice", Name: "controller-1"}, true)
 	s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
-	mi := s.assertCreateModel(c, "test-model", "alice", "", "", "cred1", nil)
+	mi := s.assertCreateModel(c, createModelParams{name: "test-model", username: "alice", cred: "cred1"})
 
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
@@ -1081,8 +1192,8 @@ func (s *websocketSuite) TestPingerupdatesHeartMonitor(c *gc.C) {
 }
 
 // open creates a new websockec connection to the test server, using the
-// connection info specified in info. If info is nil then default values
-// will be used.
+// connection info specified in info, authenticating as the given user.
+// If info is nil then default values will be used.
 func (s *websocketSuite) open(c *gc.C, info *api.Info, username string) api.Connection {
 	var inf api.Info
 	if info != nil {
@@ -1108,16 +1219,27 @@ func (s *websocketSuite) open(c *gc.C, info *api.Info, username string) api.Conn
 	return conn
 }
 
-// assertCreateModel creates a model for use in tests. The model info for the newly created model is returned.
-func (s *websocketSuite) assertCreateModel(c *gc.C, name, username, cloud, region, credential string, config map[string]interface{}) jujuparams.ModelInfo {
-	conn := s.open(c, nil, username)
+type createModelParams struct {
+	name     string
+	username string
+	cloud    string
+	region   string
+	cred     params.Name
+	config   map[string]interface{}
+}
+
+// assertCreateModel creates a model for use in tests, using a
+// connection authenticated as the given user. The model info for the
+// newly created model is returned.
+func (s *websocketSuite) assertCreateModel(c *gc.C, p createModelParams) jujuparams.ModelInfo {
+	conn := s.open(c, nil, p.username)
 	defer conn.Close()
 	client := modelmanager.NewClient(conn)
-	if cloud == "" {
-		cloud = "dummy"
+	if p.cloud == "" {
+		p.cloud = "dummy"
 	}
-	credentialTag := names.NewCloudCredentialTag(fmt.Sprintf("dummy/%s@external/%s", username, credential))
-	mi, err := client.CreateModel(name, username+"@external", cloud, region, credentialTag, config)
+	credentialTag := names.NewCloudCredentialTag(fmt.Sprintf("dummy/%s@external/%s", p.username, p.cred))
+	mi, err := client.CreateModel(p.name, p.username+"@external", p.cloud, p.region, credentialTag, p.config)
 	c.Assert(err, jc.ErrorIsNil)
 	return jujuapi.ConvertJujuParamsModelInfo(&mi)
 }
