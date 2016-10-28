@@ -57,8 +57,8 @@ func (j jemShim) SetModelLife(ctlPath params.EntityPath, uuid string, life strin
 	return errgo.Mask(j.DB.SetModelLife(ctlPath, uuid, life), errgo.Any)
 }
 
-func (j jemShim) SetModelUnitCount(ctlPath params.EntityPath, uuid string, n int) (err error) {
-	return errgo.Mask(j.DB.SetModelUnitCount(ctlPath, uuid, n), errgo.Any)
+func (j jemShim) UpdateModelCounts(uuid string, counts map[mongodoc.EntityCount]int, now time.Time) (err error) {
+	return errgo.Mask(j.DB.UpdateModelCounts(uuid, counts, now), errgo.Any)
 }
 
 func (j jemShim) AcquireMonitorLease(ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {

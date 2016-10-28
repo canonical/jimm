@@ -288,6 +288,7 @@ func (m *controllerMonitor) watch(conn jujuAPI) error {
 				return errgo.Mask(err)
 			}
 		}
+		logger.Infof("controller %v: all deltas processed", w.ctlPath)
 		if w.changed {
 			if err := m.jem.SetControllerStats(m.ctlPath, &w.stats); err != nil {
 				return errgo.Notef(err, "cannot set controller stats")
@@ -302,9 +303,12 @@ func (m *controllerMonitor) watch(conn jujuAPI) error {
 					return errgo.Notef(err, "cannot update model life")
 				}
 			}
-			if info.changed&unitCountChange != 0 {
-				if err := m.jem.SetModelUnitCount(w.ctlPath, uuid, info.unitCount); err != nil {
-					return errgo.Notef(err, "cannot update model unit count")
+			if info.changed&countsChange != 0 {
+				// Note: if we get a "not found" error, ignore it because it is expected that
+				// some models (e.g. the controller model) will not have a record in the
+				// database.
+				if err := m.jem.UpdateModelCounts(uuid, info.counts, time.Now()); err != nil && errgo.Cause(err) != params.ErrNotFound {
+					return errgo.Notef(err, "cannot update model counts")
 				}
 			}
 			info.changed = 0
@@ -338,7 +342,7 @@ type modelChange int
 
 const (
 	lifeChange modelChange = 1 << iota
-	unitCountChange
+	countsChange
 )
 
 // modelInfo holds information on a model.
@@ -348,18 +352,18 @@ type modelInfo struct {
 	// life holds the lifecycle status of the model.
 	life multiwatcher.Life
 
-	// unitCount holds the total number of units on the model.
-	unitCount int
+	// counts holds current counts for entities in the model.
+	counts map[mongodoc.EntityCount]int
 
 	// changed holds information about what's changed
 	// in the model since the last set of deltas.
 	changed modelChange
 }
 
-func (info *modelInfo) addUnits(n int) {
+func (info *modelInfo) adjustCount(kind mongodoc.EntityCount, n int) {
 	if n != 0 {
-		info.unitCount += n
-		info.changed |= unitCountChange
+		info.counts[kind] += n
+		info.changed |= countsChange
 	}
 }
 
@@ -389,13 +393,13 @@ func (w *watcherState) addDelta(d multiwatcher.Delta) error {
 	if logger.IsDebugEnabled() {
 		id := d.Entity.EntityId()
 		if d.Removed {
-			logger.Debugf("monitor event %v %v - removed %s-%s", w.ctlPath, id.ModelUUID, id.Kind, id.Id)
+			logger.Infof("controller %v got delta %v - removed %s-%s", w.ctlPath, id.ModelUUID, id.Kind, id.Id)
 		} else {
 			data, err := json.Marshal(d.Entity)
 			if err != nil {
 				data = []byte("cannot marshal")
 			}
-			logger.Debugf("monitor event %v %v - changed %s-%s: %s", w.ctlPath, id.ModelUUID, id.Kind, id.Id, data)
+			logger.Infof("controller %v got delta %v - changed %s-%s: %s", w.ctlPath, id.ModelUUID, id.Kind, id.Id, data)
 		}
 	}
 	ctlpathstr := string(w.ctlPath.Name) + ":" + string(w.ctlPath.User)
@@ -411,14 +415,16 @@ func (w *watcherState) addDelta(d multiwatcher.Delta) error {
 		servermon.ModelsRunning.WithLabelValues(ctlpathstr).Set(float64(w.stats.ModelCount))
 	case *multiwatcher.UnitInfo:
 		delta := w.adjustCount(&w.stats.UnitCount, d)
-		w.modelInfo(e.ModelUUID).addUnits(delta)
+		w.modelInfo(e.ModelUUID).adjustCount(mongodoc.UnitCount, delta)
 		servermon.UnitsRunning.WithLabelValues(ctlpathstr).Set(float64(w.stats.UnitCount))
 	case *multiwatcher.ApplicationInfo:
-		w.adjustCount(&w.stats.ServiceCount, d)
+		delta := w.adjustCount(&w.stats.ServiceCount, d)
+		w.modelInfo(e.ModelUUID).adjustCount(mongodoc.ApplicationCount, delta)
 		servermon.ApplicationsRunning.WithLabelValues(ctlpathstr).Set(float64(w.stats.ServiceCount))
 	case *multiwatcher.MachineInfo:
 		// TODO for top level machines, increment instance count?
-		w.adjustCount(&w.stats.MachineCount, d)
+		delta := w.adjustCount(&w.stats.MachineCount, d)
+		w.modelInfo(e.ModelUUID).adjustCount(mongodoc.MachineCount, delta)
 		servermon.MachinesRunning.WithLabelValues(ctlpathstr).Set(float64(w.stats.MachineCount))
 	}
 	return nil
@@ -434,8 +440,13 @@ func (w watcherState) modelInfo(uuid string) *modelInfo {
 		info = &modelInfo{
 			uuid: uuid,
 			// Always create with everything changed so that we will
-			// update the count even if no units are created.
+			// update the counts even if no entities are created.
 			changed: ^0,
+			counts: map[mongodoc.EntityCount]int{
+				mongodoc.UnitCount:        0,
+				mongodoc.MachineCount:     0,
+				mongodoc.ApplicationCount: 0,
+			},
 		}
 		w.models[uuid] = info
 	}

@@ -168,7 +168,9 @@ func (s *internalSuite) TestWatcher(c *gc.C) {
 	defer model1State.Close()
 
 	model2State := newModel(c, s.State, "model2")
-	newApplication(c, model2State, "model1-app", 3)
+	newApplication(c, model2State, "model1-app", 2)
+	// Add a co-hosted unit so that we can see a different between units and machines.
+	addUnitOnMachine(c, model2State, "model1-app", "0")
 	defer model2State.Close()
 
 	ctlPath := params.EntityPath{"bob", "foo"}
@@ -221,15 +223,19 @@ func (s *internalSuite) TestWatcher(c *gc.C) {
 			ModelCount:   3,
 			ServiceCount: 2,
 			UnitCount:    5,
-			MachineCount: 5,
+			MachineCount: 4,
 		},
 		model1: modelStats{
-			life:      "alive",
-			unitCount: 2,
+			life:             "alive",
+			unitCount:        2,
+			machineCount:     2,
+			applicationCount: 1,
 		},
 		model2: modelStats{
-			life:      "alive",
-			unitCount: 3,
+			life:             "alive",
+			unitCount:        3,
+			machineCount:     2,
+			applicationCount: 1,
 		},
 	})
 
@@ -244,19 +250,23 @@ func (s *internalSuite) TestWatcher(c *gc.C) {
 			ModelCount:   3,
 			ServiceCount: 3,
 			UnitCount:    7,
-			MachineCount: 7,
+			MachineCount: 6,
 		},
 		model1: modelStats{
-			life:      "alive",
-			unitCount: 2,
+			life:             "alive",
+			unitCount:        2,
+			machineCount:     2,
+			applicationCount: 1,
 		},
 		model2: modelStats{
-			life:      "alive",
-			unitCount: 5,
+			life:             "alive",
+			unitCount:        5,
+			machineCount:     4,
+			applicationCount: 2,
 		},
 	})
 
-	// Destroy model1 and check that its life status, but the rest stays the same.
+	// Destroy model1 and check that its life status moves to dying, but the rest stays the same.
 	model1, err := model1State.Model()
 	c.Assert(err, gc.IsNil)
 	err = model1.Destroy()
@@ -267,15 +277,19 @@ func (s *internalSuite) TestWatcher(c *gc.C) {
 			ModelCount:   3,
 			ServiceCount: 3,
 			UnitCount:    7,
-			MachineCount: 7,
+			MachineCount: 6,
 		},
 		model1: modelStats{
-			life:      "dying",
-			unitCount: 2,
+			life:             "dying",
+			unitCount:        2,
+			machineCount:     2,
+			applicationCount: 1,
 		},
 		model2: modelStats{
-			life:      "alive",
-			unitCount: 5,
+			life:             "alive",
+			unitCount:        5,
+			machineCount:     4,
+			applicationCount: 2,
 		},
 	})
 
@@ -288,15 +302,16 @@ func (s *internalSuite) TestWatcher(c *gc.C) {
 			ModelCount:   2,
 			ServiceCount: 2,
 			UnitCount:    5,
-			MachineCount: 5,
+			MachineCount: 4,
 		},
 		model1: modelStats{
-			life:      "dead",
-			unitCount: 0,
+			life: "dead",
 		},
 		model2: modelStats{
-			life:      "alive",
-			unitCount: 5,
+			life:             "alive",
+			unitCount:        5,
+			machineCount:     4,
+			applicationCount: 2,
 		},
 	})
 }
@@ -521,7 +536,7 @@ func (s *internalSuite) TestControllerMonitor(c *gc.C) {
 
 	waitEvent(c, jshim.controllerStatsSet, "controller stats")
 	waitEvent(c, jshim.modelLifeSet, "model life")
-	waitEvent(c, jshim.modelUnitCountSet, "model life")
+	waitEvent(c, jshim.modelCountsSet, "model life")
 	waitEvent(c, jshim.leaseAcquired, "lease acquisition")
 	jshim.assertNoEvent(c)
 
@@ -901,16 +916,22 @@ func (s *internalSuite) controllerStats(c *gc.C, ctlPath params.EntityPath) mong
 
 // modelStats holds the aspects of a model updated by the monitor.
 type modelStats struct {
-	life      string
-	unitCount int
+	life                                      string
+	unitCount, machineCount, applicationCount int
 }
 
 func (s *internalSuite) modelStats(c *gc.C, modelPath params.EntityPath) modelStats {
 	modelDoc, err := s.jem.DB.Model(modelPath)
 	c.Assert(err, gc.IsNil)
+	counts := make(map[mongodoc.EntityCount]int)
+	for name, count := range modelDoc.Counts {
+		counts[name] = count.Current
+	}
 	return modelStats{
-		life:      modelDoc.Life,
-		unitCount: modelDoc.UnitCount,
+		life:             modelDoc.Life,
+		unitCount:        modelDoc.Counts[mongodoc.UnitCount].Current,
+		machineCount:     modelDoc.Counts[mongodoc.MachineCount].Current,
+		applicationCount: modelDoc.Counts[mongodoc.ApplicationCount].Current,
 	}
 }
 
@@ -960,6 +981,18 @@ func newApplication(c *gc.C, st *state.State, name string, numUnits int) {
 			Application: svc,
 		})
 	}
+}
+
+func addUnitOnMachine(c *gc.C, st *state.State, appId, machineId string) {
+	app, err := st.Application(appId)
+	c.Assert(err, gc.IsNil)
+	machine, err := st.Machine(machineId)
+	c.Assert(err, gc.IsNil)
+	f := factory.NewFactory(st)
+	f.MakeUnit(c, &factory.UnitParams{
+		Application: app,
+		Machine:     machine,
+	})
 }
 
 func addFakeController(jshim *jemShimInMemory, path params.EntityPath) {
