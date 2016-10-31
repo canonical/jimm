@@ -74,6 +74,10 @@ type Params struct {
 	// WebsocketPingTimeout is the time to wait before failing a
 	// connection because the server has not received a ping.
 	WebsocketPingTimeout time.Duration
+
+	// GUILocation holds the address that serves the GUI that will be
+	// used with this controller.
+	GUILocation string
 }
 
 // Server represents a JEM HTTP server.
