@@ -21,21 +21,13 @@ import (
 
 func newJEMShimWithUpdateNotify(j jemInterface) jemShimWithUpdateNotify {
 	return jemShimWithUpdateNotify{
-		controllerStatsSet:        make(chan struct{}, 10),
-		modelLifeSet:              make(chan struct{}, 10),
-		modelCountsSet:            make(chan struct{}, 10),
-		leaseAcquired:             make(chan struct{}, 10),
-		controllerAvailabilitySet: make(chan struct{}, 10),
-		jemInterface:              j,
+		changed:      make(chan string, 100),
+		jemInterface: j,
 	}
 }
 
 type jemShimWithUpdateNotify struct {
-	controllerStatsSet        chan struct{}
-	modelLifeSet              chan struct{}
-	modelCountsSet            chan struct{}
-	leaseAcquired             chan struct{}
-	controllerAvailabilitySet chan struct{}
+	changed chan string
 	jemInterface
 }
 
@@ -51,10 +43,7 @@ func (s jemShimWithUpdateNotify) await(c *gc.C, f func() interface{}, want inter
 			break
 		}
 		select {
-		case <-s.controllerStatsSet:
-		case <-s.modelLifeSet:
-		case <-s.modelCountsSet:
-		case <-s.leaseAcquired:
+		case <-s.changed:
 		case <-timeout:
 			c.Assert(got, jc.DeepEquals, want, gc.Commentf("timed out waiting for value"))
 		}
@@ -87,14 +76,8 @@ func (s jemShimWithUpdateNotify) assertNoEvent(c *gc.C) {
 // otherwise it returns the name of the event that happened.
 func (s jemShimWithUpdateNotify) waitAny(maxWait time.Duration) string {
 	select {
-	case <-s.controllerStatsSet:
-		return "controller stats"
-	case <-s.modelLifeSet:
-		return "model life"
-	case <-s.modelCountsSet:
-		return "model counts"
-	case <-s.leaseAcquired:
-		return "lease acquired"
+	case what := <-s.changed:
+		return what
 	case <-time.After(jujutesting.ShortWait):
 		return ""
 	}
@@ -104,7 +87,7 @@ func (s jemShimWithUpdateNotify) SetControllerStats(ctlPath params.EntityPath, s
 	if err := s.jemInterface.SetControllerStats(ctlPath, stats); err != nil {
 		return err
 	}
-	s.controllerStatsSet <- struct{}{}
+	s.changed <- "controller stats"
 	return nil
 }
 
@@ -112,7 +95,7 @@ func (s jemShimWithUpdateNotify) SetControllerUnavailableAt(ctlPath params.Entit
 	if err := s.jemInterface.SetControllerUnavailableAt(ctlPath, t); err != nil {
 		return err
 	}
-	s.controllerAvailabilitySet <- struct{}{}
+	s.changed <- "controller availability"
 	return nil
 }
 
@@ -120,7 +103,7 @@ func (s jemShimWithUpdateNotify) SetControllerAvailable(ctlPath params.EntityPat
 	if err := s.jemInterface.SetControllerAvailable(ctlPath); err != nil {
 		return err
 	}
-	s.controllerAvailabilitySet <- struct{}{}
+	s.changed <- "controller availability"
 	return nil
 }
 
@@ -128,7 +111,7 @@ func (s jemShimWithUpdateNotify) SetModelLife(ctlPath params.EntityPath, uuid st
 	if err := s.jemInterface.SetModelLife(ctlPath, uuid, life); err != nil {
 		return err
 	}
-	s.modelLifeSet <- struct{}{}
+	s.changed <- "model life"
 	return nil
 }
 
@@ -136,7 +119,7 @@ func (s jemShimWithUpdateNotify) UpdateModelCounts(uuid string, counts map[param
 	if err := s.jemInterface.UpdateModelCounts(uuid, counts, now); err != nil {
 		return err
 	}
-	s.modelCountsSet <- struct{}{}
+	s.changed <- "model counts"
 	return nil
 }
 
@@ -145,7 +128,7 @@ func (s jemShimWithUpdateNotify) AcquireMonitorLease(ctlPath params.EntityPath, 
 	if err != nil {
 		return time.Time{}, err
 	}
-	s.leaseAcquired <- struct{}{}
+	s.changed <- "lease acquired"
 	return t, err
 }
 
@@ -196,6 +179,13 @@ func newJEMShimInMemory() *jemShimInMemory {
 		models:      make(map[params.EntityPath]*mongodoc.Model),
 		controllerUpdateCredentials: make(map[params.EntityPath]bool),
 	}
+}
+
+func (s *jemShimInMemory) controller(p params.EntityPath) *mongodoc.Controller {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	c := *s.controllers[p]
+	return &c
 }
 
 func (s *jemShimInMemory) AddController(ctl *mongodoc.Controller) {
@@ -360,7 +350,6 @@ func newJujuAPIShims() *jujuAPIShims {
 // newJujuAPIShim returns an implementation of the jujuAPI interface
 // that, when WatchAllModels is called, returns the given initial
 // deltas and then nothing.
-// The
 func (s *jujuAPIShims) newJujuAPIShim(initial []multiwatcher.Delta) *jujuAPIShim {
 	s.mu.Lock()
 	defer s.mu.Unlock()
