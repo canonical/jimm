@@ -10,7 +10,6 @@ import (
 
 	"github.com/juju/bundlechanges"
 	"github.com/juju/juju/api/base"
-	modelmanagerapi "github.com/juju/juju/api/modelmanager"
 	"github.com/juju/juju/apiserver/common"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	jujucloud "github.com/juju/juju/cloud"
@@ -20,6 +19,7 @@ import (
 	"github.com/juju/juju/rpc"
 	"github.com/juju/juju/rpc/jsoncodec"
 	"github.com/juju/juju/rpc/rpcreflect"
+	"github.com/juju/juju/status"
 	"github.com/juju/juju/storage"
 	"github.com/juju/loggo"
 	"golang.org/x/net/context"
@@ -811,9 +811,6 @@ func userModelForModelDoc(m *mongodoc.Model) jujuparams.Model {
 // ModelInfo implements the ModelManager facade's ModelInfo method.
 func (m modelManager) ModelInfo(args jujuparams.Entities) (jujuparams.ModelInfoResults, error) {
 	results := make([]jujuparams.ModelInfoResult, len(args.Entities))
-
-	// TODO (mhilton) get information for all of the models connected
-	// to a single controller in one go.
 	for i, arg := range args.Entities {
 		mi, err := modelInfo(m.h, arg)
 		if err != nil {
@@ -830,25 +827,67 @@ func (m modelManager) ModelInfo(args jujuparams.Entities) (jujuparams.ModelInfoR
 
 // modelInfo retrieves the model information for the specified entity.
 func modelInfo(h *wsHandler, arg jujuparams.Entity) (*jujuparams.ModelInfo, error) {
-	tag, model, err := getModel(h, arg.Tag, auth.CheckCanRead)
+	model, err := getModel(h, arg.Tag, auth.CheckCanRead)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
 	}
-	conn, err := h.jem.OpenAPI(model.Controller)
+	machines, err := h.jem.DB.MachinesForModel(model.UUID)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	defer conn.Close()
-	client := modelmanagerapi.NewClient(conn)
-	mirs, err := client.ModelInfo([]names.ModelTag{tag})
+	cloud, err := h.jem.DB.Cloud(model.Cloud)
 	if err != nil {
-		return nil, errgo.Mask(err)
+		return nil, errgo.Notef(err, "cannot get cloud %q", model.Cloud)
 	}
-	if mirs[0].Error != nil {
-		return nil, errgo.Mask(mirs[0].Error)
+	info := &jujuparams.ModelInfo{
+		Name:               string(model.Path.Name),
+		UUID:               model.UUID,
+		ControllerUUID:     h.params.ControllerUUID,
+		ProviderType:       cloud.ProviderType,
+		DefaultSeries:      model.DefaultSeries,
+		CloudTag:           jem.CloudTag(model.Cloud).String(),
+		CloudRegion:        model.CloudRegion,
+		CloudCredentialTag: jem.CloudCredentialTag(model.Credential).String(),
+		OwnerTag:           jem.UserTag(model.Path.User).String(),
+		Life:               jujuparams.Life(model.Life),
+		// TODO if the multiwatcher returned updates to model
+		// status, we could do better here, but the model status doesn't
+		// reflect much anyway.
+		Status: jujuparams.EntityStatus{
+			Status: status.Available,
+		},
+		// TODO we could add user information here, but
+		// it's only visible to admins, so leave it for the time being.
+		Machines: jemMachinesToModelMachineInfo(machines),
 	}
-	mi1 := massageModelInfo(h, *mirs[0].Result)
-	return &mi1, nil
+	return info, nil
+}
+
+func jemMachinesToModelMachineInfo(machines []mongodoc.Machine) []jujuparams.ModelMachineInfo {
+	infos := make([]jujuparams.ModelMachineInfo, len(machines))
+	for i := range machines {
+		infos[i] = jemMachineToModelMachineInfo(&machines[i])
+	}
+	return infos
+}
+
+func jemMachineToModelMachineInfo(m *mongodoc.Machine) jujuparams.ModelMachineInfo {
+	return jujuparams.ModelMachineInfo{
+		Id:         m.Info.Id,
+		InstanceId: m.Info.InstanceId,
+		Status:     string(m.Info.AgentStatus.Current),
+		HasVote:    m.Info.HasVote,
+		WantsVote:  m.Info.WantsVote,
+		Hardware: &jujuparams.MachineHardware{
+			Arch:             m.Info.HardwareCharacteristics.Arch,
+			Mem:              m.Info.HardwareCharacteristics.Mem,
+			RootDisk:         m.Info.HardwareCharacteristics.RootDisk,
+			Cores:            m.Info.HardwareCharacteristics.CpuCores,
+			CpuPower:         m.Info.HardwareCharacteristics.CpuPower,
+			Tags:             m.Info.HardwareCharacteristics.Tags,
+			AvailabilityZone: m.Info.HardwareCharacteristics.AvailabilityZone,
+		},
+	}
 }
 
 // massageModelInfo modifies the modelInfo returned from a controller as
@@ -998,7 +1037,7 @@ func (m modelManager) DestroyModels(args jujuparams.Entities) (jujuparams.ErrorR
 
 // destroyModel destroys the specified model.
 func (m modelManager) destroyModel(arg jujuparams.Entity) error {
-	_, model, err := getModel(m.h, arg.Tag, checkIsOwner)
+	model, err := getModel(m.h, arg.Tag, checkIsOwner)
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			// Juju doesn't treat removing a model that isn't there as an error, and neither should we.
@@ -1034,7 +1073,7 @@ func (m modelManager) ModifyModelAccess(args jujuparams.ModifyModelAccessRequest
 }
 
 func (m modelManager) modifyModelAccess(change jujuparams.ModifyModelAccess) error {
-	_, model, err := getModel(m.h, change.ModelTag, checkIsOwner)
+	model, err := getModel(m.h, change.ModelTag, checkIsOwner)
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			err = params.ErrUnauthorized
@@ -1112,22 +1151,22 @@ func checkIsOwner(ctx context.Context, e auth.ACLEntity) error {
 // access is denied authf should return an error with the cause
 // params.ErrUnauthorized. The cause of any error returned by authf will
 // not be masked.
-func getModel(h *wsHandler, modelTag string, authf func(context.Context, auth.ACLEntity) error) (names.ModelTag, *mongodoc.Model, error) {
+func getModel(h *wsHandler, modelTag string, authf func(context.Context, auth.ACLEntity) error) (*mongodoc.Model, error) {
 	tag, err := names.ParseModelTag(modelTag)
 	if err != nil {
-		return names.ModelTag{}, nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid model tag")
+		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid model tag")
 	}
 	model, err := h.jem.DB.ModelFromUUID(tag.Id())
 	if err != nil {
-		return names.ModelTag{}, nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	if authf == nil {
-		return names.ModelTag{}, model, nil
+		return model, nil
 	}
 	if err := authf(h.context, model); err != nil {
-		return names.ModelTag{}, nil, errgo.Mask(err, errgo.Any)
+		return nil, errgo.Mask(err, errgo.Any)
 	}
-	return tag, model, nil
+	return model, nil
 }
 
 // ModelStatus implements the ModelManager facade's ModelStatus method.

@@ -1731,12 +1731,10 @@ func (s *APISuite) TestListModels(c *gc.C) {
 	s.allowModelPerm(c, modelId0)
 	modelId1, uuid1 := s.CreateModel(c, params.EntityPath{"bob", "bar"}, ctlId0, bCred)
 	modelId2, uuid2 := s.CreateModel(c, params.EntityPath{"charlie", "bar"}, ctlId0, cCred)
-	err := s.JEM.DB.SetModelLife(ctlId0, uuid2, "alive")
-	c.Assert(err, gc.IsNil)
 
 	// Give one of the models some counts.
 	t0 := time.Unix(0, 0)
-	err = s.JEM.DB.UpdateModelCounts(uuid1, map[params.EntityCount]int{
+	err := s.JEM.DB.UpdateModelCounts(uuid1, map[params.EntityCount]int{
 		params.MachineCount: 3,
 	}, t0)
 	c.Assert(err, gc.IsNil)
@@ -1748,6 +1746,7 @@ func (s *APISuite) TestListModels(c *gc.C) {
 		CACert:         info.CACert,
 		HostPorts:      info.Addrs,
 		ControllerPath: ctlId0,
+		Life:           "alive",
 	}, {
 		Path:           modelId1,
 		UUID:           uuid1,
@@ -1763,6 +1762,7 @@ func (s *APISuite) TestListModels(c *gc.C) {
 				Total:   3,
 			},
 		},
+		Life: "alive",
 	}, {
 		Path:           modelId2,
 		UUID:           uuid2,
