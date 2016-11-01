@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/juju/juju/state/multiwatcher"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
@@ -576,7 +577,7 @@ var updateModelCountsTests = []struct {
 	},
 }}
 
-func (s *databaseSuite) TestModelUpdateCounts(c *gc.C) {
+func (s *databaseSuite) TestUpdateModelCounts(c *gc.C) {
 	for i, test := range updateModelCountsTests {
 		c.Logf("test %d: %v", i, test.about)
 		modelId := params.EntityPath{"bob", params.Name(fmt.Sprintf("model-%d", i))}
@@ -601,10 +602,95 @@ func (s *databaseSuite) TestModelUpdateCounts(c *gc.C) {
 	}
 }
 
-func (s *databaseSuite) TestModelUpdateCountsNotFound(c *gc.C) {
+func (s *databaseSuite) TestUpdateModelCountsNotFound(c *gc.C) {
 	err := s.database.UpdateModelCounts("fake-uuid", nil, T(0))
 	c.Assert(err, gc.ErrorMatches, `cannot update model counts: not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}
+
+func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
+	err := s.database.UpdateMachineInfo(&multiwatcher.MachineInfo{
+		ModelUUID: "fake-uuid",
+		Id:        "0",
+		Series:    "quantal",
+	})
+	c.Assert(err, gc.IsNil)
+	err = s.database.UpdateMachineInfo(&multiwatcher.MachineInfo{
+		ModelUUID: "another-uuid",
+		Id:        "0",
+		Series:    "blah",
+	})
+	c.Assert(err, gc.IsNil)
+	err = s.database.UpdateMachineInfo(&multiwatcher.MachineInfo{
+		ModelUUID: "fake-uuid",
+		Id:        "1",
+		Series:    "precise",
+	})
+	c.Assert(err, gc.IsNil)
+
+	docs, err := s.database.MachinesForModel("fake-uuid")
+	c.Assert(err, gc.IsNil)
+	for i := range docs {
+		cleanMachineDoc(&docs[i])
+	}
+	c.Assert(docs, jc.DeepEquals, []mongodoc.Machine{{
+		Id: "fake-uuid 0",
+		Info: &multiwatcher.MachineInfo{
+			ModelUUID: "fake-uuid",
+			Id:        "0",
+			Series:    "quantal",
+		},
+	}, {
+		Id: "fake-uuid 1",
+		Info: &multiwatcher.MachineInfo{
+			ModelUUID: "fake-uuid",
+			Id:        "1",
+			Series:    "precise",
+		},
+	}})
+
+	// Check that we can update one of the documents.
+	err = s.database.UpdateMachineInfo(&multiwatcher.MachineInfo{
+		ModelUUID: "fake-uuid",
+		Id:        "0",
+		Series:    "foo",
+		Life:      "dead",
+	})
+	c.Assert(err, gc.IsNil)
+
+	docs, err = s.database.MachinesForModel("fake-uuid")
+	c.Assert(err, gc.IsNil)
+	for i := range docs {
+		cleanMachineDoc(&docs[i])
+	}
+	c.Assert(docs, jc.DeepEquals, []mongodoc.Machine{{
+		Id: "fake-uuid 0",
+		Info: &multiwatcher.MachineInfo{
+			ModelUUID: "fake-uuid",
+			Id:        "0",
+			Series:    "foo",
+			Life:      "dead",
+		},
+	}, {
+		Id: "fake-uuid 1",
+		Info: &multiwatcher.MachineInfo{
+			ModelUUID: "fake-uuid",
+			Id:        "1",
+			Series:    "precise",
+		},
+	}})
+}
+
+// cleanMachineDoc cleans up the machine document so
+// that we can use a DeepEqual comparison without worrying
+// about non-nil vs nil map comparisons.
+func cleanMachineDoc(doc *mongodoc.Machine) {
+	if len(doc.Info.AgentStatus.Data) == 0 {
+		doc.Info.AgentStatus.Data = nil
+	}
+	if len(doc.Info.InstanceStatus.Data) == 0 {
+		doc.Info.InstanceStatus.Data = nil
+	}
 }
 
 func (s *databaseSuite) TestSetModelLifeNotFound(c *gc.C) {

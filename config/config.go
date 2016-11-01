@@ -9,12 +9,12 @@ import (
 	"os"
 	"strings"
 
+	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/jem/params"
-	"github.com/juju/loggo"
 )
 
 var logger = loggo.GetLogger("jem.config")

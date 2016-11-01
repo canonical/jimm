@@ -551,6 +551,10 @@ func (j *JEM) DestroyModel(conn *apiconn.Conn, model *mongodoc.Model) error {
 // can be read by the current user that matches the given attributes.
 // If the function returns an error, the iteration stops and
 // DoControllers returns the error with the same cause.
+//
+// Note that the same pointer is passed to the do function on
+// each iteration. It is the responsibility of the do function to
+// copy it if needed.
 func (j *JEM) DoControllers(ctx context.Context, cloud params.Cloud, region string, do func(c *mongodoc.Controller) error) error {
 	// Query all the controllers that match the attributes, building
 	// up all the possible values.
