@@ -361,6 +361,7 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.M
 		Controller:   p.ControllerPath,
 		CreationTime: wallClock.Now(),
 		Creator:      auth.Username(ctx),
+		Credential:   p.Credential,
 	}
 	if err := j.DB.AddModel(modelDoc); err != nil {
 		return nil, nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
@@ -389,12 +390,26 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.M
 		// TODO (mhilton) destroy the model?
 		return nil, nil, errgo.Notef(err, "cannot grant admin access")
 	}
-	// Now set the UUID to that of the actually created model.
-	if err := j.DB.Models().UpdateId(modelDoc.Id, bson.D{{"$set", bson.D{{"uuid", m.UUID}}}}); err != nil {
+	// Now set the UUID to that of the actually created model,
+	// and update other attributes from the response too.
+	// TODO update life and other things if need be.
+	if err := j.DB.Models().UpdateId(modelDoc.Id, bson.D{{"$set", bson.D{
+		{"uuid", m.UUID},
+		{"cloud", m.Cloud},
+		{"cloudregion", m.CloudRegion},
+		{"defaultseries", m.DefaultSeries},
+	}}}); err != nil {
 		// TODO (mhilton) destroy the model?
 		return nil, nil, errgo.Notef(err, "cannot update model UUID in database, leaked model %s", m.UUID)
 	}
-	modelDoc.UUID = m.UUID
+	// Fetch the model doc so we can be sure we're returning a consistent
+	// result. Technically this incurs an unnecessary round trip to mongo but
+	// models aren't created *that* often.
+	modelDoc, err = j.DB.Model(p.Path)
+	if err != nil {
+		return nil, nil, errgo.Notef(err, "cannot retrieve model after update")
+	}
+	// TODO just return the model doc.
 	return modelDoc, &m, nil
 }
 

@@ -257,6 +257,10 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 		c.Assert(m.UUID, gc.Not(gc.Equals), "")
 		c.Assert(m.CreationTime.Equal(now), gc.Equals, true)
 		c.Assert(m.Creator, gc.Equals, "bob")
+		c.Assert(m.Cloud, gc.Equals, string(test.params.Cloud))
+		c.Assert(m.CloudRegion, gc.Equals, "dummy-region")
+		c.Assert(m.Credential, jc.DeepEquals, test.params.Credential)
+		c.Assert(m.DefaultSeries, gc.Equals, "xenial")
 	}
 }
 
