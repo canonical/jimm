@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/juju/juju/state/multiwatcher"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2"
@@ -72,6 +73,9 @@ func (db *Database) ensureIndexes() error {
 	}{{
 		db.Controllers(),
 		mgo.Index{Key: []string{"uuid"}},
+	}, {
+		db.Machines(),
+		mgo.Index{Key: []string{"info.uuid"}},
 	}, {
 		db.Models(),
 		mgo.Index{Key: []string{"uuid"}, Unique: true},
@@ -397,6 +401,26 @@ func (db *Database) UpdateModelCounts(uuid string, counts map[params.EntityCount
 		return errgo.NoteMask(err, "cannot update model counts", errgo.Is(params.ErrNotFound))
 	}
 	return nil
+}
+
+// UpdateMachineInfo updates the information associated with a machine.
+func (db *Database) UpdateMachineInfo(info *multiwatcher.MachineInfo) error {
+	id := info.ModelUUID + " " + info.Id
+	if _, err := db.Machines().UpsertId(id, bson.D{{"$set", bson.D{{"info", info}}}}); err != nil {
+		return errgo.Notef(err, "cannot update machine %v in model %v", info.Id, info.ModelUUID)
+	}
+	return nil
+}
+
+// MachinesForModel returns information on all the machines in the model with
+// the given UUID.
+func (db *Database) MachinesForModel(modelUUID string) ([]mongodoc.Machine, error) {
+	var docs []mongodoc.Machine
+	err := db.Machines().Find(bson.D{{"info.modeluuid", modelUUID}}).Sort("_id").All(&docs)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return docs, nil
 }
 
 // updateCounts updates the count statistics for an document in the given collection
@@ -731,27 +755,32 @@ func (iter *CanReadIter) Count() int {
 
 func (db *Database) Collections() []*mgo.Collection {
 	return []*mgo.Collection{
-		db.Macaroons(),
 		db.Controllers(),
-		db.Models(),
 		db.Credentials(),
+		db.Macaroons(),
+		db.Machines(),
+		db.Models(),
 	}
-}
-
-func (db *Database) Macaroons() *mgo.Collection {
-	return db.C("macaroons")
 }
 
 func (db *Database) Controllers() *mgo.Collection {
 	return db.C("controllers")
 }
 
-func (db *Database) Models() *mgo.Collection {
-	return db.C("models")
-}
-
 func (db *Database) Credentials() *mgo.Collection {
 	return db.C("credentials")
+}
+
+func (db *Database) Macaroons() *mgo.Collection {
+	return db.C("macaroons")
+}
+
+func (db *Database) Machines() *mgo.Collection {
+	return db.C("machines")
+}
+
+func (db *Database) Models() *mgo.Collection {
+	return db.C("models")
 }
 
 func (db *Database) C(name string) *mgo.Collection {

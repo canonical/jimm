@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/juju/juju/state/multiwatcher"
+	"github.com/juju/utils/parallel"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/tomb.v2"
 
@@ -18,6 +19,11 @@ import (
 )
 
 var errControllerRemoved = errgo.New("controller has been removed")
+
+// maxConcurrentUpdates holds the maximum number of
+// concurrent database operations that a given
+// controller monitor may make.
+const maxConcurrentUpdates = 10
 
 // controllerMonitor is responsible for monitoring a single
 // controller.
@@ -283,6 +289,7 @@ func (m *controllerMonitor) watch(conn jujuAPI) error {
 			return errgo.Notef(r.err, "watcher error waiting for next event")
 		}
 		w.changed = false
+		w.runner = parallel.NewRun(maxConcurrentUpdates)
 		for _, d := range r.deltas {
 			if err := w.addDelta(d); err != nil {
 				return errgo.Mask(err)
@@ -290,29 +297,44 @@ func (m *controllerMonitor) watch(conn jujuAPI) error {
 		}
 		logger.Infof("controller %v: all deltas processed", w.ctlPath)
 		if w.changed {
-			if err := m.jem.SetControllerStats(m.ctlPath, &w.stats); err != nil {
-				return errgo.Notef(err, "cannot set controller stats")
-			}
+			w.runner.Do(func() error {
+				if err := m.jem.SetControllerStats(m.ctlPath, &w.stats); err != nil {
+					return errgo.Notef(err, "cannot set controller stats")
+				}
+				return nil
+			})
 		}
 		// TODO perform all these updates concurrently?
 		for uuid, info := range w.models {
+			uuid, info := uuid, info
 			// TODO(rogpeppe) When both unit count and life change, we could
 			// combine them into a single database update.
 			if info.changed&lifeChange != 0 {
-				if err := w.jem.SetModelLife(w.ctlPath, uuid, string(info.life)); err != nil {
-					return errgo.Notef(err, "cannot update model life")
-				}
+				w.runner.Do(func() error {
+					if err := w.jem.SetModelLife(w.ctlPath, uuid, string(info.life)); err != nil {
+						return errgo.Notef(err, "cannot update model life")
+					}
+					return nil
+				})
 			}
 			if info.changed&countsChange != 0 {
-				// Note: if we get a "not found" error, ignore it because it is expected that
-				// some models (e.g. the controller model) will not have a record in the
-				// database.
-				if err := m.jem.UpdateModelCounts(uuid, info.counts, time.Now()); err != nil && errgo.Cause(err) != params.ErrNotFound {
-					return errgo.Notef(err, "cannot update model counts")
-				}
+				w.runner.Do(func() error {
+					// Note: if we get a "not found" error, ignore it because it is expected that
+					// some models (e.g. the controller model) will not have a record in the
+					// database.
+					if err := m.jem.UpdateModelCounts(uuid, info.counts, time.Now()); err != nil && errgo.Cause(err) != params.ErrNotFound {
+						return errgo.Notef(err, "cannot update model counts")
+					}
+					return nil
+				})
 			}
 			info.changed = 0
 		}
+		// Wait for all the database updates to complete.
+		if err := w.runner.Wait(); err != nil {
+			return errgo.Mask(err)
+		}
+		w.runner = nil
 	}
 }
 
@@ -320,6 +342,10 @@ func (m *controllerMonitor) watch(conn jujuAPI) error {
 // a controller.
 type watcherState struct {
 	jem jemInterface
+
+	// runner is used to start concurrent operations
+	// while updating deltas.
+	runner *parallel.Run
 
 	// entities holds a map from entity tag to whether it exists.
 	entities map[multiwatcher.EntityId]bool
@@ -426,6 +452,9 @@ func (w *watcherState) addDelta(d multiwatcher.Delta) error {
 		delta := w.adjustCount(&w.stats.MachineCount, d)
 		w.modelInfo(e.ModelUUID).adjustCount(params.MachineCount, delta)
 		servermon.MachinesRunning.WithLabelValues(ctlpathstr).Set(float64(w.stats.MachineCount))
+		w.runner.Do(func() error {
+			return w.jem.UpdateMachineInfo(e)
+		})
 	}
 	return nil
 }

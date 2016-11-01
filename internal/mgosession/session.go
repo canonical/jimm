@@ -10,7 +10,6 @@ import (
 	"sync/atomic"
 
 	"github.com/juju/loggo"
-
 	mgo "gopkg.in/mgo.v2"
 )
 

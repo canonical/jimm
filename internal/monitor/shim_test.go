@@ -123,6 +123,14 @@ func (s jemShimWithUpdateNotify) UpdateModelCounts(uuid string, counts map[param
 	return nil
 }
 
+func (s jemShimWithUpdateNotify) UpdateMachineInfo(info *multiwatcher.MachineInfo) error {
+	if err := s.jemInterface.UpdateMachineInfo(info); err != nil {
+		return err
+	}
+	s.changed <- "machine info"
+	return nil
+}
+
 func (s jemShimWithUpdateNotify) AcquireMonitorLease(ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {
 	t, err := s.jemInterface.AcquireMonitorLease(ctlPath, oldExpiry, oldOwner, newExpiry, newOwner)
 	if err != nil {
@@ -163,11 +171,17 @@ func (s jemShimWithMonitorLeaseAcquirer) Clone() jemInterface {
 	return s
 }
 
+type machineId struct {
+	modelUUID string
+	id        string
+}
+
 type jemShimInMemory struct {
 	mu                          sync.Mutex
 	refCount                    int
 	controllers                 map[params.EntityPath]*mongodoc.Controller
 	models                      map[params.EntityPath]*mongodoc.Model
+	machines                    map[machineId]*mongodoc.Machine
 	controllerUpdateCredentials map[params.EntityPath]bool
 }
 
@@ -178,6 +192,7 @@ func newJEMShimInMemory() *jemShimInMemory {
 		controllers: make(map[params.EntityPath]*mongodoc.Controller),
 		models:      make(map[params.EntityPath]*mongodoc.Model),
 		controllerUpdateCredentials: make(map[params.EntityPath]bool),
+		machines:                    make(map[machineId]*mongodoc.Machine),
 	}
 }
 
@@ -283,6 +298,17 @@ func (s *jemShimInMemory) UpdateModelCounts(uuid string, counts map[params.Entit
 		count := model.Counts[name]
 		jem.UpdateCount(&count, n, now)
 		model.Counts[name] = count
+	}
+	return nil
+}
+
+func (s *jemShimInMemory) UpdateMachineInfo(info *multiwatcher.MachineInfo) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	info1 := *info
+	s.machines[machineId{info1.ModelUUID, info1.Id}] = &mongodoc.Machine{
+		Id:   info1.ModelUUID + " " + info1.Id,
+		Info: &info1,
 	}
 	return nil
 }

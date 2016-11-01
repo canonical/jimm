@@ -9,6 +9,7 @@ import (
 	"github.com/juju/idmclient/idmtest"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	"github.com/juju/juju/state"
+	"github.com/juju/juju/state/multiwatcher"
 	jujuwatcher "github.com/juju/juju/state/watcher"
 	jujujujutesting "github.com/juju/juju/testing"
 	"github.com/juju/juju/testing/factory"
@@ -314,6 +315,64 @@ func (s *internalSuite) TestWatcher(c *gc.C) {
 			applicationCount: 2,
 		},
 	})
+}
+
+func (s *internalSuite) TestWatcherUpdatesMachineInfo(c *gc.C) {
+	// Add a couple of models and applications with units to watch.
+	modelState := newModel(c, s.State, "model")
+	newApplication(c, modelState, "model-app", 1)
+	defer modelState.Close()
+
+	ctlPath := params.EntityPath{"bob", "foo"}
+	s.addJEMController(c, ctlPath)
+
+	// Add the JEM model entries
+	modelPath := params.EntityPath{"bob", "model"}
+	err := s.jem.DB.AddModel(&mongodoc.Model{
+		Path:       modelPath,
+		Controller: ctlPath,
+		UUID:       modelState.ModelUUID(),
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Start the watcher.
+	jshim := newJEMShimWithUpdateNotify(jemShim{s.jem})
+	m := &controllerMonitor{
+		ctlPath: ctlPath,
+		jem:     jshim,
+		ownerId: "jem1",
+	}
+	m.tomb.Go(m.watcher)
+	defer cleanStop(c, m)
+
+	// Wait for just a subset of the entire information so that
+	// we don't depend on loads of unrelated details - we
+	// care that the information is updated, not the specifics of
+	// what all the details are.
+	type machineInfo struct {
+		modelUUID string
+		id        string
+		life      multiwatcher.Life
+	}
+
+	getMachineInfo := func() interface{} {
+		ms, err := s.jem.DB.MachinesForModel(modelState.ModelUUID())
+		c.Assert(err, gc.IsNil)
+		infos := make([]machineInfo, len(ms))
+		for i, m := range ms {
+			infos[i] = machineInfo{
+				modelUUID: m.Info.ModelUUID,
+				id:        m.Info.Id,
+				life:      m.Info.Life,
+			}
+		}
+		return infos
+	}
+	jshim.await(c, getMachineInfo, []machineInfo{{
+		modelUUID: modelState.ModelUUID(),
+		id:        "0",
+		life:      "alive",
+	}})
 }
 
 func removeModel(c *gc.C, st *state.State) {

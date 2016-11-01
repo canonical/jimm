@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/juju/juju/network"
+	"github.com/juju/juju/state/multiwatcher"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/params"
@@ -225,6 +226,14 @@ type Model struct {
 	// Creator holds the name of the user that issued the model creation
 	// request.
 	Creator string
+}
+
+// Machine holds information on a machine in a model, as discovered by the
+// controller monitor.
+type Machine struct {
+	// Id holds the combination of the model UUID and machine id.
+	Id   string `bson:"_id"`
+	Info *multiwatcher.MachineInfo
 }
 
 type ModelUserInfo struct {

@@ -50,6 +50,9 @@ type jemInterface interface {
 	// mentioned in the counts argument will not be affected.
 	UpdateModelCounts(uuid string, counts map[params.EntityCount]int, now time.Time) error
 
+	// UpdateMachineInfo updates the information associated with a machine.
+	UpdateMachineInfo(machine *multiwatcher.MachineInfo) error
+
 	// AllControllers returns all the controllers in the system.
 	AllControllers() ([]*mongodoc.Controller, error)
 
