@@ -226,6 +226,18 @@ type Model struct {
 	// Creator holds the name of the user that issued the model creation
 	// request.
 	Creator string
+
+	// Cloud holds the name of the cloud that the model was created in.
+	Cloud string
+
+	// CloudRegion holds the region of the cloud that the model was created in.
+	CloudRegion string `bson:",omitempty"`
+
+	// Credential holds a reference to the credential used to create the model.
+	Credential params.CredentialPath
+
+	// DefaultSeries holds the default series for the model.
+	DefaultSeries string
 }
 
 // Machine holds information on a machine in a model, as discovered by the
