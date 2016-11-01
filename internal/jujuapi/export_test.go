@@ -7,12 +7,11 @@ import "time"
 type HeartMonitor heartMonitor
 
 var (
-	MakeCloud                  = makeCloud
-	MakeRegions                = makeRegions
-	MergeRegions               = mergeRegions
-	MergeStrings               = mergeStrings
-	NewHeartMonitor            = &newHeartMonitor
-	ConvertJujuParamsModelInfo = convertJujuParamsModelInfo
+	MakeCloud       = makeCloud
+	MakeRegions     = makeRegions
+	MergeRegions    = mergeRegions
+	MergeStrings    = mergeStrings
+	NewHeartMonitor = &newHeartMonitor
 )
 
 func InternalHeartMonitor(f func(time.Duration) HeartMonitor) func(time.Duration) heartMonitor {

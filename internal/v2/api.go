@@ -611,7 +611,7 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "cannot select controller: no matching controllers found")
 	}
 	modelPath := params.EntityPath{args.User, args.Info.Name}
-	_, _, err = h.jem.CreateModel(h.context, jem.CreateModelParams{
+	_, err = h.jem.CreateModel(h.context, jem.CreateModelParams{
 		Path:           modelPath,
 		ControllerPath: ctlPath,
 		Credential:     args.Info.Credential,

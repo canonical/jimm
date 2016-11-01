@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/juju/bundlechanges"
-	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/apiserver/common"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	jujucloud "github.com/juju/juju/cloud"
@@ -831,6 +830,14 @@ func modelInfo(h *wsHandler, arg jujuparams.Entity) (*jujuparams.ModelInfo, erro
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
 	}
+	info, err := modelDocToModelInfo(h, model)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return info, nil
+}
+
+func modelDocToModelInfo(h *wsHandler, model *mongodoc.Model) (*jujuparams.ModelInfo, error) {
 	machines, err := h.jem.DB.MachinesForModel(model.UUID)
 	if err != nil {
 		return nil, errgo.Mask(err)
@@ -839,7 +846,7 @@ func modelInfo(h *wsHandler, arg jujuparams.Entity) (*jujuparams.ModelInfo, erro
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot get cloud %q", model.Cloud)
 	}
-	info := &jujuparams.ModelInfo{
+	return &jujuparams.ModelInfo{
 		Name:               string(model.Path.Name),
 		UUID:               model.UUID,
 		ControllerUUID:     h.params.ControllerUUID,
@@ -859,8 +866,7 @@ func modelInfo(h *wsHandler, arg jujuparams.Entity) (*jujuparams.ModelInfo, erro
 		// TODO we could add user information here, but
 		// it's only visible to admins, so leave it for the time being.
 		Machines: jemMachinesToModelMachineInfo(machines),
-	}
-	return info, nil
+	}, nil
 }
 
 func jemMachinesToModelMachineInfo(machines []mongodoc.Machine) []jujuparams.ModelMachineInfo {
@@ -917,35 +923,38 @@ func (m modelManager) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.M
 	} else {
 		servermon.ModelsCreatedFailCount.Inc()
 	}
-	return mi, errgo.Mask(err,
-		errgo.Is(params.ErrUnauthorized),
-		errgo.Is(params.ErrNotFound),
-		errgo.Is(params.ErrBadRequest),
-	)
+	if err != nil {
+		return jujuparams.ModelInfo{}, errgo.Mask(err,
+			errgo.Is(params.ErrUnauthorized),
+			errgo.Is(params.ErrNotFound),
+			errgo.Is(params.ErrBadRequest),
+		)
+	}
+	return *mi, nil
 }
 
-func (m modelManager) createModel(args jujuparams.ModelCreateArgs) (jujuparams.ModelInfo, error) {
+func (m modelManager) createModel(args jujuparams.ModelCreateArgs) (*jujuparams.ModelInfo, error) {
 	owner, err := names.ParseUserTag(args.OwnerTag)
 	if err != nil {
-		return jujuparams.ModelInfo{}, errgo.WithCausef(err, params.ErrBadRequest, "invalid owner tag")
+		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid owner tag")
 	}
 	logger.Debugf("Attempting to create %s/%s", owner, args.Name)
 	if owner.IsLocal() {
-		return jujuparams.ModelInfo{}, params.ErrUnauthorized
+		return nil, params.ErrUnauthorized
 	}
 	if args.CloudTag == "" {
-		return jujuparams.ModelInfo{}, errgo.New("no cloud specified for model; please specify one")
+		return nil, errgo.New("no cloud specified for model; please specify one")
 	}
 	cloudTag, err := names.ParseCloudTag(args.CloudTag)
 	if err != nil {
-		return jujuparams.ModelInfo{}, errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud tag")
+		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud tag")
 	}
 	cloud := params.Cloud(cloudTag.Id())
 	cloudCredentialTag, err := names.ParseCloudCredentialTag(args.CloudCredentialTag)
 	if err != nil {
-		return jujuparams.ModelInfo{}, errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud credential tag")
+		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud credential tag")
 	}
-	_, mi, err := m.h.jem.CreateModel(m.h.context, jem.CreateModelParams{
+	model, err := m.h.jem.CreateModel(m.h.context, jem.CreateModelParams{
 		Path: params.EntityPath{User: params.User(owner.Name()), Name: params.Name(args.Name)},
 		Credential: params.CredentialPath{
 			Cloud: params.Cloud(cloudCredentialTag.Cloud().Id()),
@@ -959,65 +968,13 @@ func (m modelManager) createModel(args jujuparams.ModelCreateArgs) (jujuparams.M
 		Attributes: args.Config,
 	})
 	if err != nil {
-		return jujuparams.ModelInfo{}, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	return massageModelInfo(m.h, convertJujuParamsModelInfo(mi)), nil
-}
-
-func convertJujuParamsModelInfo(modelInfo *base.ModelInfo) jujuparams.ModelInfo {
-	result := jujuparams.ModelInfo{
-		Name:               modelInfo.Name,
-		UUID:               modelInfo.UUID,
-		ControllerUUID:     modelInfo.ControllerUUID,
-		ProviderType:       modelInfo.ProviderType,
-		DefaultSeries:      modelInfo.DefaultSeries,
-		CloudTag:           names.NewCloudTag(modelInfo.Cloud).String(),
-		CloudRegion:        modelInfo.CloudRegion,
-		CloudCredentialTag: names.NewCloudCredentialTag(modelInfo.CloudCredential).String(),
-		OwnerTag:           names.NewUserTag(modelInfo.Owner).String(),
-		Life:               jujuparams.Life(modelInfo.Life),
+	info, err := modelDocToModelInfo(m.h, model)
+	if err != nil {
+		return nil, errgo.Mask(err)
 	}
-	result.Status = jujuparams.EntityStatus{
-		Status: modelInfo.Status.Status,
-		Info:   modelInfo.Status.Info,
-		Data:   make(map[string]interface{}),
-		Since:  modelInfo.Status.Since,
-	}
-	for k, v := range modelInfo.Status.Data {
-		result.Status.Data[k] = v
-	}
-	result.Users = make([]jujuparams.ModelUserInfo, len(modelInfo.Users))
-	for i, u := range modelInfo.Users {
-		result.Users[i] = jujuparams.ModelUserInfo{
-			UserName:       u.UserName,
-			DisplayName:    u.DisplayName,
-			Access:         jujuparams.UserAccessPermission(u.Access),
-			LastConnection: u.LastConnection,
-		}
-	}
-	result.Machines = make([]jujuparams.ModelMachineInfo, len(modelInfo.Machines))
-	for i, m := range modelInfo.Machines {
-		machine := jujuparams.ModelMachineInfo{
-			Id:         m.Id,
-			InstanceId: m.InstanceId,
-			HasVote:    m.HasVote,
-			WantsVote:  m.WantsVote,
-			Status:     m.Status,
-		}
-		if m.Hardware != nil {
-			machine.Hardware = &jujuparams.MachineHardware{
-				Arch:             m.Hardware.Arch,
-				Mem:              m.Hardware.Mem,
-				RootDisk:         m.Hardware.RootDisk,
-				Cores:            m.Hardware.CpuCores,
-				CpuPower:         m.Hardware.CpuPower,
-				Tags:             m.Hardware.Tags,
-				AvailabilityZone: m.Hardware.AvailabilityZone,
-			}
-		}
-		result.Machines[i] = machine
-	}
-	return result
+	return info, nil
 }
 
 // DestroyModels implements the ModelManager facade's DestroyModels method.

@@ -228,7 +228,7 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 	})
 	c.Assert(err, jc.ErrorIsNil)
 	ctx := auth.ContextWithUser(context.Background(), "bob", "bob-group")
-	_, _, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
+	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
 		Path:           ctlId,
 		ControllerPath: ctlId,
 		Credential: params.CredentialPath{
@@ -244,7 +244,7 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 		if test.params.Path.Name == "" {
 			test.params.Path.Name = params.Name(fmt.Sprintf("test-%d", i))
 		}
-		m, _, err := s.jem.CreateModel(ctx, test.params)
+		m, err := s.jem.CreateModel(ctx, test.params)
 		if test.expectError != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
 			if test.expectErrorCause != nil {
@@ -1151,7 +1151,7 @@ func (s *jemSuite) bootstrapModel(c *gc.C, path params.EntityPath) *mongodoc.Mod
 	})
 	c.Assert(err, jc.ErrorIsNil)
 	ctx := auth.ContextWithUser(context.Background(), string(path.User))
-	model, _, err := s.jem.CreateModel(ctx, jem.CreateModelParams{
+	model, err := s.jem.CreateModel(ctx, jem.CreateModelParams{
 		Path:           path,
 		ControllerPath: ctlPath,
 		Credential: params.CredentialPath{

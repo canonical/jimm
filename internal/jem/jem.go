@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/juju/juju/api"
-	"github.com/juju/juju/api/base"
 	cloudapi "github.com/juju/juju/api/cloud"
 	"github.com/juju/juju/api/modelmanager"
 	jujucloud "github.com/juju/juju/cloud"
@@ -320,36 +319,36 @@ type CreateModelParams struct {
 }
 
 // CreateModel creates a new model as specified by p.
-func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.Model, *base.ModelInfo, error) {
+func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.Model, error) {
 	// Only the owner can create a new model in their namespace.
 	if err := auth.CheckIsUser(ctx, p.Path.User); err != nil {
-		return nil, nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	if p.ControllerPath.Name == "" {
 		var err error
 		p.ControllerPath, err = j.selectController(ctx, p.Cloud, p.Region)
 		if err != nil {
-			return nil, nil, errgo.NoteMask(err, "cannot select controller", errgo.Is(params.ErrNotFound))
+			return nil, errgo.NoteMask(err, "cannot select controller", errgo.Is(params.ErrNotFound))
 		}
 	}
 	ctl, err := j.Controller(ctx, p.ControllerPath)
 	if err != nil {
-		return nil, nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	cred, err := j.Credential(ctx, p.Credential)
 	if err != nil {
-		return nil, nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	conn, err := j.OpenAPIFromDoc(ctl)
 	if err != nil {
-		return nil, nil, errgo.NoteMask(err, "cannot connect to controller", errgo.Is(ErrAPIConnection))
+		return nil, errgo.NoteMask(err, "cannot connect to controller", errgo.Is(ErrAPIConnection))
 	}
 	defer conn.Close()
 	if err := j.updateControllerCredential(p.ControllerPath, p.Credential, conn, cred); err != nil {
-		return nil, nil, errgo.Mask(err)
+		return nil, errgo.Mask(err)
 	}
 	if err := j.DB.credentialAddController(p.Credential, p.ControllerPath); err != nil {
-		return nil, nil, errgo.Mask(err)
+		return nil, errgo.Mask(err)
 	}
 	// Create the model record in the database before actually
 	// creating the model on the controller. It will have an invalid
@@ -364,7 +363,7 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.M
 		Credential:   p.Credential,
 	}
 	if err := j.DB.AddModel(modelDoc); err != nil {
-		return nil, nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
+		return nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
 	region := p.Region
 	if region == "" {
@@ -384,11 +383,11 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.M
 		if err := j.DB.Models().RemoveId(modelDoc.Id); err != nil {
 			logger.Errorf("cannot remove model from database after model creation error: %v", err)
 		}
-		return nil, nil, errgo.Notef(err, "cannot create model")
+		return nil, errgo.Notef(err, "cannot create model")
 	}
 	if err := mmClient.GrantModel(conn.Info.Tag.(names.UserTag).Id(), "admin", m.UUID); err != nil {
 		// TODO (mhilton) destroy the model?
-		return nil, nil, errgo.Notef(err, "cannot grant admin access")
+		return nil, errgo.Notef(err, "cannot grant admin access")
 	}
 	// Now set the UUID to that of the actually created model,
 	// and update other attributes from the response too.
@@ -401,17 +400,16 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.M
 		{"life", m.Life},
 	}}}); err != nil {
 		// TODO (mhilton) destroy the model?
-		return nil, nil, errgo.Notef(err, "cannot update model UUID in database, leaked model %s", m.UUID)
+		return nil, errgo.Notef(err, "cannot update model UUID in database, leaked model %s", m.UUID)
 	}
 	// Fetch the model doc so we can be sure we're returning a consistent
 	// result. Technically this incurs an unnecessary round trip to mongo but
 	// models aren't created *that* often.
 	modelDoc, err = j.DB.Model(p.Path)
 	if err != nil {
-		return nil, nil, errgo.Notef(err, "cannot retrieve model after update")
+		return nil, errgo.Notef(err, "cannot retrieve model after update")
 	}
-	// TODO just return the model doc.
-	return modelDoc, &m, nil
+	return modelDoc, nil
 }
 
 // UpdateCredential updates the specified credential in the
