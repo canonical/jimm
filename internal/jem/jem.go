@@ -398,6 +398,7 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.M
 		{"cloud", m.Cloud},
 		{"cloudregion", m.CloudRegion},
 		{"defaultseries", m.DefaultSeries},
+		{"life", m.Life},
 	}}}); err != nil {
 		// TODO (mhilton) destroy the model?
 		return nil, nil, errgo.Notef(err, "cannot update model UUID in database, leaked model %s", m.UUID)
@@ -526,7 +527,7 @@ func (j *JEM) GrantModel(conn *apiconn.Conn, model *mongodoc.Model, user params.
 		return errgo.Mask(err)
 	}
 	if err := j.DB.Grant(j.DB.Models(), model.Path, user); err != nil {
-		// TODO (mhilton) What should be done with the changes already made to the controller.
+		// TODO (mhilton) What should be done with the changes already made to the controller?
 		return errgo.Mask(err)
 	}
 	return nil

@@ -685,11 +685,6 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 			Status: jujuparams.EntityStatus{
 				Status: status.Available,
 			},
-			Users: []jujuparams.ModelUserInfo{{
-				UserName:    "test@external",
-				DisplayName: "test",
-				Access:      "admin",
-			}},
 		},
 	}, {
 		Error: &jujuparams.Error{
@@ -711,11 +706,6 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 			Status: jujuparams.EntityStatus{
 				Status: status.Available,
 			},
-			Users: []jujuparams.ModelUserInfo{{
-				UserName:    "test2@external",
-				DisplayName: "test2",
-				Access:      "admin",
-			}},
 		},
 	}})
 }

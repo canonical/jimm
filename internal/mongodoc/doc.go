@@ -228,7 +228,7 @@ type Model struct {
 	Creator string
 
 	// Cloud holds the name of the cloud that the model was created in.
-	Cloud string
+	Cloud params.Cloud
 
 	// CloudRegion holds the region of the cloud that the model was created in.
 	CloudRegion string `bson:",omitempty"`
