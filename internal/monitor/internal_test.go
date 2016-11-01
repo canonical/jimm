@@ -482,13 +482,16 @@ func (s *internalSuite) TestWatcherMarksControllerAvailable(c *gc.C) {
 
 	m := &controllerMonitor{
 		ctlPath: ctlPath,
-		jem:     jshim,
+		jem:     jshim1,
 		ownerId: "jem1",
 	}
 	m.tomb.Go(m.watcher)
 	defer worker.Stop(m)
 
-	waitEvent(c, jshim1.controllerAvailabilitySet, "controller available")
+	unavailableSince := func() interface{} {
+		return jshim.controller(ctlPath).UnavailableSince
+	}
+	jshim1.await(c, unavailableSince, time.Time{})
 }
 
 // TestControllerMonitor tests that the controllerMonitor can be run with both the
@@ -534,18 +537,31 @@ func (s *internalSuite) TestControllerMonitor(c *gc.C) {
 	// to renew the lease.
 	s.clock.Advance(leaseExpiryDuration * 5 / 6)
 
-	waitEvent(c, jshim.controllerStatsSet, "controller stats")
-	waitEvent(c, jshim.modelLifeSet, "model life")
-	waitEvent(c, jshim.modelCountsSet, "model life")
-	waitEvent(c, jshim.leaseAcquired, "lease acquisition")
-	jshim.assertNoEvent(c)
+	type statsLifeLease struct {
+		Stats       mongodoc.ControllerStats
+		ModelLife   string
+		LeaseExpiry time.Time
+		LeaseOwner  string
+	}
+	getInfo := func() interface{} {
+		ctl, err := s.jem.DB.Controller(ctlPath)
+		c.Assert(err, gc.IsNil)
+		return statsLifeLease{
+			Stats:       ctl.Stats,
+			ModelLife:   s.modelLife(c, ctlPath),
+			LeaseExpiry: ctl.MonitorLeaseExpiry,
+			LeaseOwner:  ctl.MonitorLeaseOwner,
+		}
+	}
 
-	c.Assert(s.controllerStats(c, ctlPath), jc.DeepEquals, mongodoc.ControllerStats{
-		ModelCount: 1,
+	jshim.await(c, getInfo, statsLifeLease{
+		Stats: mongodoc.ControllerStats{
+			ModelCount: 1,
+		},
+		ModelLife:   "alive",
+		LeaseExpiry: epoch.Add(leaseExpiryDuration*5/6 + leaseExpiryDuration),
+		LeaseOwner:  "jem1",
 	})
-
-	c.Assert(s.modelLife(c, ctlPath), gc.Equals, "alive")
-	s.assertLease(c, ctlPath, epoch.Add(leaseExpiryDuration*5/6+leaseExpiryDuration), "jem1")
 
 	err = worker.Stop(m)
 	c.Assert(err, gc.IsNil)
