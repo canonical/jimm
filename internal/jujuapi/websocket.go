@@ -950,19 +950,23 @@ func (m modelManager) createModel(args jujuparams.ModelCreateArgs) (*jujuparams.
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud tag")
 	}
 	cloud := params.Cloud(cloudTag.Id())
-	cloudCredentialTag, err := names.ParseCloudCredentialTag(args.CloudCredentialTag)
-	if err != nil {
-		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud credential tag")
+	var credPath params.CredentialPath
+	if args.CloudCredentialTag != "" {
+		tag, err := names.ParseCloudCredentialTag(args.CloudCredentialTag)
+		if err != nil {
+			return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud credential tag")
+		}
+		credPath = params.CredentialPath{
+			Cloud: params.Cloud(tag.Cloud().Id()),
+			EntityPath: params.EntityPath{
+				User: params.User(tag.Owner().Name()),
+				Name: params.Name(tag.Name()),
+			},
+		}
 	}
 	model, err := m.h.jem.CreateModel(m.h.context, jem.CreateModelParams{
-		Path: params.EntityPath{User: params.User(owner.Name()), Name: params.Name(args.Name)},
-		Credential: params.CredentialPath{
-			Cloud: params.Cloud(cloudCredentialTag.Cloud().Id()),
-			EntityPath: params.EntityPath{
-				User: params.User(cloudCredentialTag.Owner().Name()),
-				Name: params.Name(cloudCredentialTag.Name()),
-			},
-		},
+		Path:       params.EntityPath{User: params.User(owner.Name()), Name: params.Name(args.Name)},
+		Credential: credPath,
 		Cloud:      cloud,
 		Region:     args.CloudRegion,
 		Attributes: args.Config,

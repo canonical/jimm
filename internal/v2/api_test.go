@@ -1409,6 +1409,7 @@ func (s *APISuite) TestGetModelWhenControllerUnavailable(c *gc.C) {
 		HostPorts:        info.Addrs,
 		Life:             "dying",
 		UnavailableSince: newTime(mongodoc.Time(t).UTC()),
+		Creator:          "bob",
 	})
 }
 
@@ -1747,6 +1748,7 @@ func (s *APISuite) TestListModels(c *gc.C) {
 		HostPorts:      info.Addrs,
 		ControllerPath: ctlId0,
 		Life:           "alive",
+		Creator:        "alice",
 	}, {
 		Path:           modelId1,
 		UUID:           uuid1,
@@ -1762,7 +1764,8 @@ func (s *APISuite) TestListModels(c *gc.C) {
 				Total:   3,
 			},
 		},
-		Life: "alive",
+		Life:    "alive",
+		Creator: "bob",
 	}, {
 		Path:           modelId2,
 		UUID:           uuid2,
@@ -1771,6 +1774,7 @@ func (s *APISuite) TestListModels(c *gc.C) {
 		HostPorts:      info.Addrs,
 		ControllerPath: ctlId0,
 		Life:           "alive",
+		Creator:        "charlie",
 	}}
 	tests := []struct {
 		user    params.User

@@ -216,6 +216,12 @@ var createModelTests = []struct {
 		Region: "not-a-region",
 	},
 	expectError: `cannot select controller: no matching controllers found`,
+}, {
+	about: "empty cloud credentials",
+	params: jem.CreateModelParams{
+		Path:  params.EntityPath{"bob", ""},
+		Cloud: "dummy",
+	},
 }}
 
 func (s *jemSuite) TestCreateModel(c *gc.C) {

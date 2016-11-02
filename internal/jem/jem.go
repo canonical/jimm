@@ -335,21 +335,26 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.M
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	cred, err := j.Credential(ctx, p.Credential)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
-	}
 	conn, err := j.OpenAPIFromDoc(ctl)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot connect to controller", errgo.Is(ErrAPIConnection))
 	}
 	defer conn.Close()
-	if err := j.updateControllerCredential(p.ControllerPath, p.Credential, conn, cred); err != nil {
-		return nil, errgo.Mask(err)
+	if !p.Credential.IsZero() {
+		cred, err := j.Credential(ctx, p.Credential)
+		if err != nil {
+			return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+		}
+		if err := j.updateControllerCredential(p.ControllerPath, p.Credential, conn, cred); err != nil {
+			return nil, errgo.Mask(err)
+		}
+		if err := j.DB.credentialAddController(p.Credential, p.ControllerPath); err != nil {
+			return nil, errgo.Mask(err)
+		}
 	}
-	if err := j.DB.credentialAddController(p.Credential, p.ControllerPath); err != nil {
-		return nil, errgo.Mask(err)
-	}
+	// TODO if there is no credential provided, search for an appropriate
+	// one for the current user.
+
 	// Create the model record in the database before actually
 	// creating the model on the controller. It will have an invalid
 	// UUID because it doesn't exist but that's better than creating
@@ -630,5 +635,8 @@ func CloudTag(c params.Cloud) names.CloudTag {
 // CloudCredentialTag creates a juju cloud credential tag from the given
 // CredentialPath.
 func CloudCredentialTag(p params.CredentialPath) names.CloudCredentialTag {
+	if p.IsZero() {
+		return names.CloudCredentialTag{}
+	}
 	return names.NewCloudCredentialTag(fmt.Sprintf("%s/%s@external/%s", p.Cloud, p.User, p.Name))
 }

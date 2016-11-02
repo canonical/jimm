@@ -806,83 +806,90 @@ func (s *websocketSuite) TestModelStatus(c *gc.C) {
 }
 
 var createModelTests = []struct {
-	about       string
-	name        string
-	ownerTag    string
-	region      string
-	cloudTag    string
-	credential  string
-	config      map[string]interface{}
-	expectError string
+	about         string
+	name          string
+	ownerTag      string
+	region        string
+	cloudTag      string
+	credentialTag string
+	config        map[string]interface{}
+	expectError   string
 }{{
-	about:      "success",
-	name:       "model",
-	ownerTag:   "user-test@external",
-	cloudTag:   names.NewCloudTag("dummy").String(),
-	credential: "dummy_test@external_cred1",
+	about:         "success",
+	name:          "model",
+	ownerTag:      "user-test@external",
+	cloudTag:      names.NewCloudTag("dummy").String(),
+	credentialTag: "cloudcred-dummy_test@external_cred1",
 }, {
-	about:       "unauthorized user",
-	name:        "model-2",
-	ownerTag:    "user-not-test@external",
-	cloudTag:    names.NewCloudTag("dummy").String(),
-	credential:  "dummy_test@external_cred1",
-	expectError: `unauthorized \(unauthorized access\)`,
+	about:         "unauthorized user",
+	name:          "model-2",
+	ownerTag:      "user-not-test@external",
+	cloudTag:      names.NewCloudTag("dummy").String(),
+	credentialTag: "cloudcred-dummy_test@external_cred1",
+	expectError:   `unauthorized \(unauthorized access\)`,
 }, {
-	about:       "existing model name",
-	name:        "existing-model",
-	ownerTag:    "user-test@external",
-	cloudTag:    names.NewCloudTag("dummy").String(),
-	credential:  "dummy_test@external_cred1",
-	expectError: "already exists",
+	about:         "existing model name",
+	name:          "existing-model",
+	ownerTag:      "user-test@external",
+	cloudTag:      names.NewCloudTag("dummy").String(),
+	credentialTag: "cloudcred-dummy_test@external_cred1",
+	expectError:   "already exists",
 }, {
-	about:       "no controller",
-	name:        "model-3",
-	ownerTag:    "user-test@external",
-	region:      "no-such-region",
-	cloudTag:    names.NewCloudTag("dummy").String(),
-	credential:  "dummy_test@external_cred1",
-	expectError: `cannot select controller: no matching controllers found \(not found\)`,
+	about:         "no controller",
+	name:          "model-3",
+	ownerTag:      "user-test@external",
+	region:        "no-such-region",
+	cloudTag:      names.NewCloudTag("dummy").String(),
+	credentialTag: "cloudcred-dummy_test@external_cred1",
+	expectError:   `cannot select controller: no matching controllers found \(not found\)`,
 }, {
-	about:       "local user",
-	name:        "model-4",
-	ownerTag:    "user-test@local",
-	cloudTag:    names.NewCloudTag("dummy").String(),
-	credential:  "dummy_test@external_cred1",
-	expectError: `unauthorized \(unauthorized access\)`,
+	about:         "local user",
+	name:          "model-4",
+	ownerTag:      "user-test@local",
+	cloudTag:      names.NewCloudTag("dummy").String(),
+	credentialTag: "cloudcred-dummy_test@external_cred1",
+	expectError:   `unauthorized \(unauthorized access\)`,
 }, {
-	about:       "invalid user",
-	name:        "model-5",
-	ownerTag:    "user-test/test@external",
-	cloudTag:    names.NewCloudTag("dummy").String(),
-	credential:  "dummy_test@external_cred1",
-	expectError: `invalid owner tag: "user-test/test@external" is not a valid user tag \(bad request\)`,
+	about:         "invalid user",
+	name:          "model-5",
+	ownerTag:      "user-test/test@external",
+	cloudTag:      names.NewCloudTag("dummy").String(),
+	credentialTag: "cloudcred-dummy_test@external_cred1",
+	expectError:   `invalid owner tag: "user-test/test@external" is not a valid user tag \(bad request\)`,
 }, {
-	about:      "specific cloud",
-	name:       "model-6",
-	ownerTag:   "user-test@external",
-	cloudTag:   names.NewCloudTag("dummy").String(),
-	credential: "dummy_test@external_cred1",
+	about:         "specific cloud",
+	name:          "model-6",
+	ownerTag:      "user-test@external",
+	cloudTag:      names.NewCloudTag("dummy").String(),
+	credentialTag: "cloudcred-dummy_test@external_cred1",
 }, {
-	about:      "specific cloud and region",
-	name:       "model-7",
-	ownerTag:   "user-test@external",
-	cloudTag:   names.NewCloudTag("dummy").String(),
-	region:     "dummy-region",
-	credential: "dummy_test@external_cred1",
+	about:         "specific cloud and region",
+	name:          "model-7",
+	ownerTag:      "user-test@external",
+	cloudTag:      names.NewCloudTag("dummy").String(),
+	region:        "dummy-region",
+	credentialTag: "cloudcred-dummy_test@external_cred1",
 }, {
-	about:       "bad cloud tag",
-	name:        "model-8",
-	ownerTag:    "user-test@external",
-	cloudTag:    "not-a-cloud-tag",
-	credential:  "dummy_test@external_cred1",
-	expectError: `invalid cloud tag: "not-a-cloud-tag" is not a valid tag \(bad request\)`,
+	about:         "bad cloud tag",
+	name:          "model-8",
+	ownerTag:      "user-test@external",
+	cloudTag:      "not-a-cloud-tag",
+	credentialTag: "cloudcred-dummy_test@external_cred1",
+	expectError:   `invalid cloud tag: "not-a-cloud-tag" is not a valid tag \(bad request\)`,
 }, {
-	about:       "no cloud tag",
-	name:        "model-8",
-	ownerTag:    "user-test@external",
-	cloudTag:    "",
-	credential:  "dummy_test@external_cred1",
-	expectError: `no cloud specified for model; please specify one`,
+	about:         "no cloud tag",
+	name:          "model-8",
+	ownerTag:      "user-test@external",
+	cloudTag:      "",
+	credentialTag: "cloudcred-dummy_test@external_cred1",
+	expectError:   `no cloud specified for model; please specify one`,
+}, {
+	about:         "no credential tag",
+	name:          "model-8",
+	ownerTag:      "user-test@external",
+	cloudTag:      names.NewCloudTag("dummy").String(),
+	region:        "dummy-region",
+	credentialTag: "",
 }}
 
 func (s *websocketSuite) TestCreateModel(c *gc.C) {
@@ -902,7 +909,7 @@ func (s *websocketSuite) TestCreateModel(c *gc.C) {
 			Config:             test.config,
 			CloudTag:           test.cloudTag,
 			CloudRegion:        test.region,
-			CloudCredentialTag: "cloudcred-" + test.credential,
+			CloudCredentialTag: test.credentialTag,
 		}, &mi)
 		if test.expectError != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
@@ -914,6 +921,13 @@ func (s *websocketSuite) TestCreateModel(c *gc.C) {
 		c.Assert(mi.OwnerTag, gc.Equals, test.ownerTag)
 		c.Assert(mi.ControllerUUID, gc.Equals, "914487b5-60e7-42bb-bd63-1adc3fd3a388")
 		c.Assert(mi.Users, gc.HasLen, 0)
+		if test.credentialTag == "" {
+			c.Assert(mi.CloudCredentialTag, gc.Equals, "")
+		} else {
+			tag, err := names.ParseCloudCredentialTag(mi.CloudCredentialTag)
+			c.Assert(err, gc.IsNil)
+			c.Assert(tag.String(), gc.Equals, test.credentialTag)
+		}
 		if test.cloudTag == "" {
 			c.Assert(mi.CloudTag, gc.Equals, "cloud-dummy")
 		} else {
