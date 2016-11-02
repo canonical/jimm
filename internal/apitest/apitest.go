@@ -67,7 +67,7 @@ func (s *Suite) SetUpTest(c *gc.C) {
 	err := controllerapi.NewClient(conn).GrantController("everyone@external", "login")
 	c.Assert(err, jc.ErrorIsNil)
 	s.PatchValue(&jem.APIOpenTimeout, time.Duration(0))
-	s.JEMSrv = s.NewServer(c, s.Session, s.IDMSrv)
+	s.JEMSrv = s.NewServer(c, s.Session, s.IDMSrv, external_jem.ServerParams{})
 	s.httpSrv = httptest.NewServer(s.JEMSrv)
 
 	s.SessionPool = mgosession.NewPool(s.Session, 1)
@@ -110,9 +110,10 @@ func (s *Suite) NewClient(username params.User) *jemclient.Client {
 	})
 }
 
-// NewServer returns a new JEM server that uses the given mongo session and identity
-// server.
-func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server) *jemserver.Server {
+// NewServer returns a new JEM server that uses the given mongo session
+// and identity server. If GUILocation is specified in params then that
+// will be used instead of the default value.
+func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server, params external_jem.ServerParams) *jemserver.Server {
 	db := session.DB("jem")
 	s.IDMSrv.AddUser("agent")
 	config := external_jem.ServerParams{
@@ -124,6 +125,9 @@ func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server)
 		AgentKey:             s.IDMSrv.UserPublicKey("agent"),
 		ControllerUUID:       "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		WebsocketPingTimeout: 3 * time.Minute,
+	}
+	if params.GUILocation != "" {
+		config.GUILocation = params.GUILocation
 	}
 	srv, err := external_jem.NewServer(config)
 	c.Assert(err, gc.IsNil)
