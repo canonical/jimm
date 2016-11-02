@@ -576,7 +576,7 @@ func (s *websocketSuite) TestUserModelStats(c *gc.C) {
 				Model: jujuparams.Model{
 					Name:     "model-1",
 					UUID:     model1.UUID,
-					OwnerTag: model1.OwnerTag,
+					OwnerTag: names.NewUserTag(model1.Owner).String(),
 				},
 				Counts: map[params.EntityCount]params.Count{
 					params.UnitCount: {
@@ -603,7 +603,7 @@ func (s *websocketSuite) TestUserModelStats(c *gc.C) {
 				Model: jujuparams.Model{
 					Name:     "model-2",
 					UUID:     model2.UUID,
-					OwnerTag: model2.OwnerTag,
+					OwnerTag: names.NewUserTag(model2.Owner).String(),
 				},
 				Counts: map[params.EntityCount]params.Count{
 					params.MachineCount: {
@@ -618,7 +618,7 @@ func (s *websocketSuite) TestUserModelStats(c *gc.C) {
 				Model: jujuparams.Model{
 					Name:     "model-3",
 					UUID:     model3.UUID,
-					OwnerTag: model3.OwnerTag,
+					OwnerTag: names.NewUserTag(model3.Owner).String(),
 				},
 				Counts: map[params.EntityCount]params.Count{
 					params.ApplicationCount: {
@@ -808,7 +808,7 @@ func (s *websocketSuite) TestModelStatus(c *gc.C) {
 var createModelTests = []struct {
 	about       string
 	name        string
-	owner       string
+	ownerTag    string
 	region      string
 	cloudTag    string
 	credential  string
@@ -817,27 +817,27 @@ var createModelTests = []struct {
 }{{
 	about:      "success",
 	name:       "model",
-	owner:      "test@external",
+	ownerTag:   "user-test@external",
 	cloudTag:   names.NewCloudTag("dummy").String(),
 	credential: "dummy_test@external_cred1",
 }, {
 	about:       "unauthorized user",
 	name:        "model-2",
-	owner:       "not-test@external",
+	ownerTag:    "user-not-test@external",
 	cloudTag:    names.NewCloudTag("dummy").String(),
 	credential:  "dummy_test@external_cred1",
 	expectError: `unauthorized \(unauthorized access\)`,
 }, {
 	about:       "existing model name",
 	name:        "existing-model",
-	owner:       "test@external",
+	ownerTag:    "user-test@external",
 	cloudTag:    names.NewCloudTag("dummy").String(),
 	credential:  "dummy_test@external_cred1",
 	expectError: "already exists",
 }, {
 	about:       "no controller",
 	name:        "model-3",
-	owner:       "test@external",
+	ownerTag:    "user-test@external",
 	region:      "no-such-region",
 	cloudTag:    names.NewCloudTag("dummy").String(),
 	credential:  "dummy_test@external_cred1",
@@ -845,41 +845,41 @@ var createModelTests = []struct {
 }, {
 	about:       "local user",
 	name:        "model-4",
-	owner:       "test@local",
+	ownerTag:    "user-test@local",
 	cloudTag:    names.NewCloudTag("dummy").String(),
 	credential:  "dummy_test@external_cred1",
 	expectError: `unauthorized \(unauthorized access\)`,
 }, {
 	about:       "invalid user",
 	name:        "model-5",
-	owner:       "test/test@external",
+	ownerTag:    "user-test/test@external",
 	cloudTag:    names.NewCloudTag("dummy").String(),
 	credential:  "dummy_test@external_cred1",
 	expectError: `invalid owner tag: "user-test/test@external" is not a valid user tag \(bad request\)`,
 }, {
 	about:      "specific cloud",
 	name:       "model-6",
-	owner:      "test@external",
+	ownerTag:   "user-test@external",
 	cloudTag:   names.NewCloudTag("dummy").String(),
 	credential: "dummy_test@external_cred1",
 }, {
 	about:      "specific cloud and region",
 	name:       "model-7",
-	owner:      "test@external",
+	ownerTag:   "user-test@external",
 	cloudTag:   names.NewCloudTag("dummy").String(),
 	region:     "dummy-region",
 	credential: "dummy_test@external_cred1",
 }, {
 	about:       "bad cloud tag",
 	name:        "model-8",
-	owner:       "test@external",
+	ownerTag:    "user-test@external",
 	cloudTag:    "not-a-cloud-tag",
 	credential:  "dummy_test@external_cred1",
 	expectError: `invalid cloud tag: "not-a-cloud-tag" is not a valid tag \(bad request\)`,
 }, {
 	about:       "no cloud tag",
 	name:        "model-8",
-	owner:       "test@external",
+	ownerTag:    "user-test@external",
 	cloudTag:    "",
 	credential:  "dummy_test@external_cred1",
 	expectError: `no cloud specified for model; please specify one`,
@@ -898,7 +898,7 @@ func (s *websocketSuite) TestCreateModel(c *gc.C) {
 		var mi jujuparams.ModelInfo
 		err := conn.APICall("ModelManager", 2, "", "CreateModel", jujuparams.ModelCreateArgs{
 			Name:               test.name,
-			OwnerTag:           "user-" + test.owner,
+			OwnerTag:           test.ownerTag,
 			Config:             test.config,
 			CloudTag:           test.cloudTag,
 			CloudRegion:        test.region,
@@ -911,14 +911,9 @@ func (s *websocketSuite) TestCreateModel(c *gc.C) {
 		c.Assert(err, jc.ErrorIsNil)
 		c.Assert(mi.Name, gc.Equals, test.name)
 		c.Assert(mi.UUID, gc.Not(gc.Equals), "")
-		ownerTag := names.NewUserTag(test.owner)
-		c.Assert(mi.OwnerTag, gc.Equals, ownerTag.String())
+		c.Assert(mi.OwnerTag, gc.Equals, test.ownerTag)
 		c.Assert(mi.ControllerUUID, gc.Equals, "914487b5-60e7-42bb-bd63-1adc3fd3a388")
-		c.Assert(mi.Users, jc.DeepEquals, []jujuparams.ModelUserInfo{{
-			UserName:    test.owner,
-			DisplayName: ownerTag.Name(),
-			Access:      "admin",
-		}})
+		c.Assert(mi.Users, gc.HasLen, 0)
 		if test.cloudTag == "" {
 			c.Assert(mi.CloudTag, gc.Equals, "cloud-dummy")
 		} else {
@@ -1221,7 +1216,7 @@ type createModelParams struct {
 // assertCreateModel creates a model for use in tests, using a
 // connection authenticated as the given user. The model info for the
 // newly created model is returned.
-func (s *websocketSuite) assertCreateModel(c *gc.C, p createModelParams) jujuparams.ModelInfo {
+func (s *websocketSuite) assertCreateModel(c *gc.C, p createModelParams) base.ModelInfo {
 	conn := s.open(c, nil, p.username)
 	defer conn.Close()
 	client := modelmanager.NewClient(conn)
@@ -1231,5 +1226,5 @@ func (s *websocketSuite) assertCreateModel(c *gc.C, p createModelParams) jujupar
 	credentialTag := names.NewCloudCredentialTag(fmt.Sprintf("dummy/%s@external/%s", p.username, p.cred))
 	mi, err := client.CreateModel(p.name, p.username+"@external", p.cloud, p.region, credentialTag, p.config)
 	c.Assert(err, jc.ErrorIsNil)
-	return jujuapi.ConvertJujuParamsModelInfo(&mi)
+	return mi
 }
