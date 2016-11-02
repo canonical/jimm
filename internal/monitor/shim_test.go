@@ -11,6 +11,7 @@ import (
 	jujutesting "github.com/juju/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
@@ -333,7 +334,7 @@ func (s *jemShimInMemory) AllControllers() ([]*mongodoc.Controller, error) {
 	return r, nil
 }
 
-func (s *jemShimInMemory) ControllerUpdateCredentials(ctlPath params.EntityPath) error {
+func (s *jemShimInMemory) ControllerUpdateCredentials(_ context.Context, ctlPath params.EntityPath) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.controllerUpdateCredentials[ctlPath] = true
