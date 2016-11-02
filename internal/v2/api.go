@@ -349,6 +349,7 @@ func (h *Handler) GetModel(arg *params.GetModel) (*params.ModelResponse, error) 
 		Life:             m.Life,
 		UnavailableSince: newTime(ctl.UnavailableSince.UTC()),
 		Counts:           m.Counts,
+		Creator:          m.Creator,
 	}
 	return r, nil
 }
@@ -412,6 +413,7 @@ func (h *Handler) ListModels(arg *params.ListModels) (*params.ListModelsResponse
 			Life:             m.Life,
 			UnavailableSince: newTime(ctl.UnavailableSince.UTC()),
 			Counts:           m.Counts,
+			Creator:          m.Creator,
 		})
 	}
 	if err := modelIter.Err(); err != nil {
