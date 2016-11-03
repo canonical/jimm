@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/juju/juju/state/multiwatcher"
+	"golang.org/x/net/context"
 
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
@@ -83,7 +84,7 @@ type jemInterface interface {
 
 	// ControllerUpdateCredentials updates the given controller by updating
 	// all credentials listed in ctl.UpdateCredentials.
-	ControllerUpdateCredentials(ctlPath params.EntityPath) error
+	ControllerUpdateCredentials(ctx context.Context, ctlPath params.EntityPath) error
 }
 
 // jujuAPI represents an API connection to a Juju controller.

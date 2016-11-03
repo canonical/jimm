@@ -36,16 +36,19 @@ var logger = loggo.GetLogger("jem.internal.v1")
 type Handler struct {
 	jem     *jem.JEM
 	context context.Context
+	cancel  context.CancelFunc
 	config  jemserver.Params
 	monReq  servermon.Request
 }
 
 func NewAPIHandler(jp *jem.Pool, ap *auth.Pool, sp jemserver.Params) ([]httprequest.Handler, error) {
 	return jemerror.Mapper.Handlers(func(p httprequest.Params) (*Handler, error) {
+		// Time out all requests after 30s
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		// All requests require an authenticated client.
 		a := ap.Authenticator()
 		defer a.Close()
-		ctx, err := a.AuthenticateRequest(context.Background(), p.Request)
+		ctx, err := a.AuthenticateRequest(ctx, p.Request)
 		if err != nil {
 			return nil, errgo.Mask(err, errgo.Any)
 		}
@@ -53,6 +56,7 @@ func NewAPIHandler(jp *jem.Pool, ap *auth.Pool, sp jemserver.Params) ([]httprequ
 			jem:     jp.JEM(),
 			context: ctx,
 			config:  sp,
+			cancel:  cancel,
 		}
 		h.monReq.Start(p.PathPattern)
 		return h, nil
@@ -62,6 +66,7 @@ func NewAPIHandler(jp *jem.Pool, ap *auth.Pool, sp jemserver.Params) ([]httprequ
 // Close implements io.Closer and is called by httprequest
 // when the request is complete.
 func (h *Handler) Close() error {
+	h.cancel()
 	h.jem.Close()
 	h.jem = nil
 	h.monReq.End()
@@ -134,9 +139,9 @@ func (h *Handler) AddController(arg *params.AddController) error {
 		Public:        arg.Info.Public,
 		Location:      location,
 	}
-	logger.Infof("dialling model")
+	logger.Infof("dialling controller")
 	// Attempt to connect to the controller before accepting it.
-	conn, err := h.jem.OpenAPIFromDoc(ctl)
+	conn, err := h.jem.OpenAPIFromDoc(h.context, ctl)
 	if err != nil {
 		logger.Infof("cannot open API: %v", err)
 		return badRequestf(err, "cannot connect to controller")

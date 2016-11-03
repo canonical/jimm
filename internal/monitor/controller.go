@@ -9,6 +9,7 @@ import (
 
 	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/utils/parallel"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/tomb.v2"
 
@@ -89,6 +90,12 @@ func (m *controllerMonitor) Dead() <-chan struct{} {
 	return m.tomb.Dead()
 }
 
+// context returns a new context which will be cancelled when the monitor
+// is killed.
+func (m *controllerMonitor) context() context.Context {
+	return newTombContext(&m.tomb)
+}
+
 // leaseUpdater is responsible for updating the controller's lease
 // as long as we still have the lease, the controller still exists,
 // and the monitor is still alive.
@@ -164,7 +171,7 @@ func (m *controllerMonitor) watcher() error {
 				return errgo.Notef(err, "cannot set controller availability")
 			}
 
-			if err := m.jem.ControllerUpdateCredentials(m.ctlPath); err != nil {
+			if err := m.jem.ControllerUpdateCredentials(m.context(), m.ctlPath); err != nil {
 				return errgo.Notef(err, "cannot update credentials")
 			}
 

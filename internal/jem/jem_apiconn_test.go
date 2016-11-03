@@ -7,6 +7,7 @@ import (
 
 	cloudapi "github.com/juju/juju/api/cloud"
 	corejujutesting "github.com/juju/juju/juju/testing"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
@@ -84,7 +85,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 
 	// Open it with OpenAPIFromDocs and check
 	// that we still get the same connection.
-	conn1, err = s.jem.OpenAPIFromDoc(ctl)
+	conn1, err = s.jem.OpenAPIFromDoc(context.Background(), ctl)
 	c.Assert(err, gc.IsNil)
 	c.Assert(conn1.Connection, gc.Equals, conn.Connection)
 	err = conn1.Close()
@@ -107,6 +108,31 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 	// Check the close works again (we're just ensuring
 	// that it doesn't panic here)
 	s.pool.Close()
+}
+
+func (s *jemAPIConnSuite) TestOpenAPIFromDocsCancel(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "controller"}
+	info := s.APIInfo(c)
+
+	hps, err := mongodoc.ParseAddresses(info.Addrs)
+	c.Assert(err, gc.IsNil)
+
+	ctl := &mongodoc.Controller{
+		Path:          ctlPath,
+		HostPorts:     [][]mongodoc.HostPort{hps},
+		CACert:        info.CACert,
+		AdminUser:     info.Tag.Id(),
+		AdminPassword: info.Password,
+	}
+
+	err = s.jem.DB.AddController(ctl)
+	c.Assert(err, gc.IsNil)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	conn, err := s.jem.OpenAPIFromDoc(ctx, ctl)
+	c.Assert(errgo.Cause(err), gc.Equals, jem.ErrCanceled)
+	c.Assert(conn, gc.IsNil)
 }
 
 func (s *jemAPIConnSuite) TestPoolOpenAPIError(c *gc.C) {

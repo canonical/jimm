@@ -4,6 +4,7 @@ package jem
 
 import (
 	"fmt"
+	"io"
 	"math/rand"
 	"sync"
 	"time"
@@ -234,14 +235,20 @@ func (j *JEM) OpenAPI(path params.EntityPath) (_ *apiconn.Conn, err error) {
 // controller.
 //
 // The returned connection must be closed when finished with.
-func (j *JEM) OpenAPIFromDoc(ctl *mongodoc.Controller) (*apiconn.Conn, error) {
+func (j *JEM) OpenAPIFromDoc(ctx context.Context, ctl *mongodoc.Controller) (*apiconn.Conn, error) {
 	return j.pool.connCache.OpenAPI(ctl.UUID, func() (api.Connection, *api.Info, error) {
-		stInfo := apiInfoFromDoc(ctl)
-		st, err := api.Open(stInfo, apiDialOpts())
+		info := apiInfoFromDoc(ctl)
+		cl, err := runWithContext(ctx, func() (io.Closer, error) {
+			conn, err := api.Open(info, apiDialOpts())
+			if err != nil {
+				return nil, errgo.WithCausef(err, ErrAPIConnection, "")
+			}
+			return conn, nil
+		})
 		if err != nil {
-			return nil, nil, errgo.WithCausef(err, ErrAPIConnection, "")
+			return nil, nil, errgo.Mask(err, errgo.Is(errCanceled), errgo.Is(ErrAPIConnection))
 		}
-		return st, stInfo, nil
+		return cl.(api.Connection), info, nil
 	})
 }
 
@@ -335,7 +342,7 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.M
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	conn, err := j.OpenAPIFromDoc(ctl)
+	conn, err := j.OpenAPIFromDoc(ctx, ctl)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot connect to controller", errgo.Is(ErrAPIConnection))
 	}
@@ -463,12 +470,12 @@ func (j *JEM) UpdateCredential(ctx context.Context, cred *mongodoc.Credential) (
 
 // ControllerUpdateCredentials updates the given controller by updating
 // all outstanding UpdateCredentials.
-func (j *JEM) ControllerUpdateCredentials(ctlPath params.EntityPath) error {
+func (j *JEM) ControllerUpdateCredentials(ctx context.Context, ctlPath params.EntityPath) error {
 	ctl, err := j.DB.Controller(ctlPath)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	conn, err := j.OpenAPIFromDoc(ctl)
+	conn, err := j.OpenAPIFromDoc(ctx, ctl)
 	if err != nil {
 		return errgo.Notef(err, "cannot connect to controller")
 	}

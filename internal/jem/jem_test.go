@@ -491,7 +491,7 @@ func (s *jemSuite) TestControllerUpdateCredentials(c *gc.C) {
 	err = jem.SetCredentialUpdates(s.jem.DB, []params.EntityPath{ctlPath}, credPath)
 	c.Assert(err, jc.ErrorIsNil)
 
-	err = s.jem.ControllerUpdateCredentials(ctlPath)
+	err = s.jem.ControllerUpdateCredentials(context.Background(), ctlPath)
 	c.Assert(err, jc.ErrorIsNil)
 
 	// check it was updated on the controller.
