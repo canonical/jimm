@@ -830,7 +830,7 @@ func badRequestf(underlying error, f string, a ...interface{}) error {
 func collapseHostPorts(hpss [][]network.HostPort) []string {
 	hps := network.CollapseHostPorts(hpss)
 	hps = network.FilterUnusableHostPorts(hps)
-	hps = network.DropDuplicatedHostPorts(hps)
+	hps = network.UniqueHostPorts(hps)
 	return network.HostPortsToStrings(hps)
 }
 
