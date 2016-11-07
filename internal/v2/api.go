@@ -44,7 +44,7 @@ type Handler struct {
 func NewAPIHandler(jp *jem.Pool, ap *auth.Pool, sp jemserver.Params) ([]httprequest.Handler, error) {
 	return jemerror.Mapper.Handlers(func(p httprequest.Params) (*Handler, error) {
 		// Time out all requests after 30s
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(p.Context, 30*time.Second)
 		// All requests require an authenticated client.
 		a := ap.Authenticator()
 		defer a.Close()
