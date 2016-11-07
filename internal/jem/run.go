@@ -6,12 +6,7 @@ import (
 	"io"
 
 	"golang.org/x/net/context"
-	errgo "gopkg.in/errgo.v1"
 )
-
-// errCancelled is the error returned when a context is cancelled before
-// a Runner completes.
-var errCanceled = errgo.New("canceled")
 
 // runWithContext runs the given function and completes either when the
 // runner completes, or when the given context is canceled. If Run
@@ -39,6 +34,6 @@ func runWithContext(ctx context.Context, f func() (io.Closer, error)) (io.Closer
 	case r := <-ch:
 		return r.closer, r.err
 	case <-ctx.Done():
-		return nil, errCanceled
+		return nil, ctx.Err()
 	}
 }

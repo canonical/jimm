@@ -246,7 +246,7 @@ func (j *JEM) OpenAPIFromDoc(ctx context.Context, ctl *mongodoc.Controller) (*ap
 			return conn, nil
 		})
 		if err != nil {
-			return nil, nil, errgo.Mask(err, errgo.Is(errCanceled), errgo.Is(ErrAPIConnection))
+			return nil, nil, errgo.Mask(err, errgo.Is(context.Canceled), errgo.Is(ErrAPIConnection))
 		}
 		return cl.(api.Connection), info, nil
 	})
