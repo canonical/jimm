@@ -11,7 +11,6 @@ var (
 	UpdateCredential           = (*Database).updateCredential
 	SelectController           = (*JEM).selectController
 	UpdateControllerCredential = (*JEM).updateControllerCredential
-	ErrCanceled                = errCanceled
 	RunWithContext             = runWithContext
 )
 

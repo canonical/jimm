@@ -56,7 +56,7 @@ func (s *runSuite) TestRunSuccessCanceled(c *gc.C) {
 			<-ch
 			return cl1, nil
 		})
-		c.Check(err, gc.Equals, jem.ErrCanceled)
+		c.Check(err, gc.Equals, context.Canceled)
 		c.Check(cl, gc.Equals, nil)
 	}()
 	<-ch
@@ -84,7 +84,7 @@ func (s *runSuite) TestRunSuccessError(c *gc.C) {
 			<-ch
 			return nil, err1
 		})
-		c.Check(err, gc.Equals, jem.ErrCanceled)
+		c.Check(err, gc.Equals, context.Canceled)
 		c.Check(cl, gc.Equals, nil)
 	}()
 	<-ch

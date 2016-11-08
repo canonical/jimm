@@ -131,7 +131,7 @@ func (s *jemAPIConnSuite) TestOpenAPIFromDocsCancel(c *gc.C) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	conn, err := s.jem.OpenAPIFromDoc(ctx, ctl)
-	c.Assert(errgo.Cause(err), gc.Equals, jem.ErrCanceled)
+	c.Assert(errgo.Cause(err), gc.Equals, context.Canceled)
 	c.Assert(conn, gc.IsNil)
 }
 
