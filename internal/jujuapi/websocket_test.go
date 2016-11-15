@@ -662,6 +662,7 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 		names.NewModelTag(modelUUID1),
 		names.NewModelTag(modelUUID2),
 		names.NewModelTag(modelUUID3),
+		names.NewModelTag("00000000-0000-0000-0000-000000000007"),
 	})
 	c.Assert(err, jc.ErrorIsNil)
 	for i := range models {
@@ -706,6 +707,11 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 			Status: jujuparams.EntityStatus{
 				Status: status.Available,
 			},
+		},
+	}, {
+		Error: &jujuparams.Error{
+			Message: `model "00000000-0000-0000-0000-000000000007" not found`,
+			Code:    jujuparams.CodeNotFound,
 		},
 	}})
 }
