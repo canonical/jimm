@@ -828,7 +828,11 @@ func (m modelManager) ModelInfo(args jujuparams.Entities) (jujuparams.ModelInfoR
 func modelInfo(h *wsHandler, arg jujuparams.Entity) (*jujuparams.ModelInfo, error) {
 	model, err := getModel(h, arg.Tag, auth.CheckCanRead)
 	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
+		return nil, errgo.Mask(err,
+			errgo.Is(params.ErrBadRequest),
+			errgo.Is(params.ErrUnauthorized),
+			errgo.Is(params.ErrNotFound),
+		)
 	}
 	info, err := modelDocToModelInfo(h, model)
 	if err != nil {
