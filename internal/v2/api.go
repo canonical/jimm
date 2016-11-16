@@ -200,7 +200,6 @@ func (h *Handler) AddController(arg *params.AddController) error {
 // controllerModelInfo returns the model info for the controller model.
 func controllerModelInfo(conn *apiconn.Conn, user string) (*jujuparams.ModelInfo, error) {
 	client := modelmanagerapi.NewClient(conn)
-	defer client.Close()
 	models, err := client.ListModels(user)
 	if err != nil {
 		return nil, errgo.Mask(err)
