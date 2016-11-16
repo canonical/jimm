@@ -377,16 +377,12 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.M
 	if err := j.DB.AddModel(modelDoc); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
-	region := p.Region
-	if region == "" {
-		region = ctl.Location["region"]
-	}
 	mmClient := modelmanager.NewClient(conn.Connection)
 	m, err := mmClient.CreateModel(
 		string(p.Path.Name),
 		UserTag(p.Path.User).Id(),
 		ctl.Location["cloud"],
-		region,
+		p.Region,
 		CloudCredentialTag(p.Credential),
 		p.Attributes,
 	)
