@@ -16,6 +16,7 @@ import (
 	"github.com/juju/juju/worker"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/tomb.v2"
@@ -92,6 +93,7 @@ func (s *internalSuite) TestLeaseUpdater(c *gc.C) {
 		leaseExpiry: expiry,
 		jem:         jemShim{s.jem},
 		ownerId:     "jem1",
+		context:     context.TODO(),
 	}
 	done := make(chan error)
 	go func() {
@@ -140,6 +142,7 @@ func (s *internalSuite) TestLeaseUpdaterWhenControllerRemoved(c *gc.C) {
 		leaseExpiry: epoch.Add(leaseExpiryDuration),
 		jem:         jemShim{s.jem},
 		ownerId:     "jem1",
+		context:     context.TODO(),
 	}
 	defer m.tomb.Kill(nil)
 	done := make(chan error)
@@ -199,6 +202,7 @@ func (s *internalSuite) TestWatcher(c *gc.C) {
 		ctlPath: ctlPath,
 		jem:     jshim,
 		ownerId: "jem1",
+		context: context.TODO(),
 	}
 	m.tomb.Go(m.watcher)
 	defer cleanStop(c, m)
@@ -341,6 +345,7 @@ func (s *internalSuite) TestWatcherUpdatesMachineInfo(c *gc.C) {
 		ctlPath: ctlPath,
 		jem:     jshim,
 		ownerId: "jem1",
+		context: context.TODO(),
 	}
 	m.tomb.Go(m.watcher)
 	defer cleanStop(c, m)
@@ -440,6 +445,7 @@ func (s *internalSuite) TestWatcherKilledWhileDialingAPI(c *gc.C) {
 		ctlPath: ctlPath,
 		jem:     jshim,
 		ownerId: "jem1",
+		context: context.TODO(),
 	}
 	m.tomb.Go(m.watcher)
 	defer cleanStop(c, m)
@@ -483,6 +489,7 @@ func (s *internalSuite) TestWatcherDialAPIError(c *gc.C) {
 		ctlPath: ctlPath,
 		jem:     jshim,
 		ownerId: "jem1",
+		context: context.TODO(),
 	}
 	m.tomb.Go(m.watcher)
 	defer worker.Stop(m)
@@ -543,6 +550,7 @@ func (s *internalSuite) TestWatcherMarksControllerAvailable(c *gc.C) {
 		ctlPath: ctlPath,
 		jem:     jshim1,
 		ownerId: "jem1",
+		context: context.TODO(),
 	}
 	m.tomb.Go(m.watcher)
 	defer worker.Stop(m)
@@ -585,6 +593,7 @@ func (s *internalSuite) TestControllerMonitor(c *gc.C) {
 
 	jshim := newJEMShimWithUpdateNotify(jemShim{s.jem})
 	m := newControllerMonitor(controllerMonitorParams{
+		context:     context.TODO(),
 		ctlPath:     ctlPath,
 		jem:         jshim,
 		ownerId:     "jem1",
@@ -650,9 +659,10 @@ func (s *internalSuite) TestControllerMonitorDiesWithMonitoringStoppedErrorWhenC
 	// lease when started, so acquire the lease.
 	expiry, err := acquireLease(jemShim{s.jem}, ctlPath, time.Time{}, "", "jem1")
 	c.Assert(err, gc.IsNil)
-	err = s.jem.DB.DeleteController(ctlPath)
+	err = s.jem.DB.DeleteController(context.TODO(), ctlPath)
 	c.Assert(err, gc.IsNil)
 	m := newControllerMonitor(controllerMonitorParams{
+		context:     context.TODO(),
 		ctlPath:     ctlPath,
 		jem:         jemShim{s.jem},
 		ownerId:     "jem1",
@@ -668,7 +678,7 @@ func (s *internalSuite) TestControllerMonitorDiesWithMonitoringStoppedErrorWhenC
 func (s *internalSuite) TestAllMonitorSingleControllerWithAPIError(c *gc.C) {
 	jshim := newJEMShimInMemory()
 	addFakeController(jshim, params.EntityPath{"bob", "foo"})
-	m := newAllMonitor(jshim, "jem1")
+	m := newAllMonitor(context.TODO(), jshim, "jem1")
 	waitEvent(c, m.tomb.Dead(), "monitor dead")
 	c.Assert(m.tomb.Err(), gc.ErrorMatches, `cannot dial API for controller bob/foo: jemShimInMemory doesn't implement OpenAPI`)
 	c.Assert(jshim.refCount, gc.Equals, 0)
@@ -693,13 +703,15 @@ func (s *internalSuite) TestAllMonitorMultiControllersWithAPIError(c *gc.C) {
 	opened := make(map[params.EntityPath]bool)
 	openCh := make(chan params.EntityPath)
 	openReply := make(chan error)
-	m := newAllMonitor(jemShimWithAPIOpener{
-		openAPI: func(path params.EntityPath) (jujuAPI, error) {
-			openCh <- path
-			return nil, <-openReply
-		},
-		jemInterface: jshim,
-	}, "jem1")
+	m := newAllMonitor(
+		context.TODO(),
+		jemShimWithAPIOpener{
+			openAPI: func(path params.EntityPath) (jujuAPI, error) {
+				openCh <- path
+				return nil, <-openReply
+			},
+			jemInterface: jshim,
+		}, "jem1")
 	defer worker.Stop(m)
 
 	for i := 0; i < ncontrollers; i++ {
@@ -774,7 +786,7 @@ func (s *internalSuite) TestAllMonitorMultiControllerMultipleLeases(c *gc.C) {
 	addFakeController(jshim, params.EntityPath{"bob", "foo"})
 
 	// Start the first monitor.
-	m1 := newAllMonitor(jshim2, "jem1")
+	m1 := newAllMonitor(context.TODO(), jshim2, "jem1")
 	defer worker.Stop(m1)
 
 	// Wait for it to take out the first lease.
@@ -797,7 +809,7 @@ func (s *internalSuite) TestAllMonitorMultiControllerMultipleLeases(c *gc.C) {
 	addFakeController(jshim, params.EntityPath{"bob", "bar"})
 
 	// Start another monitor. We can use the same JEM instance.
-	m2 := newAllMonitor(jshim2, "jem2")
+	m2 := newAllMonitor(context.TODO(), jshim2, "jem2")
 	defer worker.Stop(m2)
 
 	// Wait for it to take out the second lease.
@@ -901,10 +913,10 @@ func (s *internalSuite) TestAllMonitorWithRaceOnLeaseAcquisition(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// On your marks...
-	m1 := newAllMonitor(jshim2, "jem1")
+	m1 := newAllMonitor(context.TODO(), jshim2, "jem1")
 	defer worker.Stop(m1)
 
-	m2 := newAllMonitor(jshim2, "jem2")
+	m2 := newAllMonitor(context.TODO(), jshim2, "jem2")
 	defer worker.Stop(m2)
 
 	// ... get set ...
@@ -968,7 +980,7 @@ func (s *internalSuite) TestAllMonitorReusesOwnLease(c *gc.C) {
 	expiry, err := jshim.AcquireMonitorLease(ctlPath, time.Time{}, "", epoch.Add(leaseExpiryDuration), "jem1")
 	c.Assert(err, gc.IsNil)
 
-	m1 := newAllMonitor(jshim1, "jem1")
+	m1 := newAllMonitor(context.TODO(), jshim1, "jem1")
 	defer worker.Stop(m1)
 
 	select {

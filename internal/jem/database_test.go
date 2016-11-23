@@ -227,7 +227,7 @@ func (s *databaseSuite) TestDeleteController(c *gc.C) {
 	}
 	err := s.database.AddController(ctl)
 	c.Assert(err, gc.IsNil)
-	err = s.database.DeleteController(ctlPath)
+	err = s.database.DeleteController(context.Background(), ctlPath)
 	c.Assert(err, gc.IsNil)
 
 	ctl1, err := s.database.Controller(ctlPath)
@@ -235,7 +235,7 @@ func (s *databaseSuite) TestDeleteController(c *gc.C) {
 	m1, err := s.database.Model(ctlPath)
 	c.Assert(m1, gc.IsNil)
 
-	err = s.database.DeleteController(ctlPath)
+	err = s.database.DeleteController(context.Background(), ctlPath)
 	c.Assert(err, gc.ErrorMatches, "controller \"dalek/who\" not found")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
@@ -257,7 +257,7 @@ func (s *databaseSuite) TestDeleteController(c *gc.C) {
 	err = s.database.AddController(ctl2)
 	c.Assert(err, gc.IsNil)
 
-	err = s.database.DeleteController(ctlPath)
+	err = s.database.DeleteController(context.Background(), ctlPath)
 	c.Assert(err, gc.IsNil)
 	ctl3, err := s.database.Controller(ctlPath)
 	c.Assert(ctl3, gc.IsNil)
@@ -292,12 +292,12 @@ func (s *databaseSuite) TestDeleteModel(c *gc.C) {
 	err = s.database.AddModel(m2)
 	c.Assert(err, gc.IsNil)
 
-	err = s.database.DeleteModel(m2.Path)
+	err = s.database.DeleteModel(context.Background(), m2.Path)
 	c.Assert(err, gc.IsNil)
 	m3, err := s.database.Model(modelPath)
 	c.Assert(m3, gc.IsNil)
 
-	err = s.database.DeleteModel(m2.Path)
+	err = s.database.DeleteModel(context.Background(), m2.Path)
 	c.Assert(err, gc.ErrorMatches, "model \"dalek/exterminate\" not found")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	s.checkDBOK(c)
@@ -1219,7 +1219,7 @@ var setDeadTests = []struct {
 }, {
 	about: "DeleteModel",
 	run: func(db *jem.Database) {
-		db.DeleteModel(fakeEntityPath)
+		db.DeleteModel(context.Background(), fakeEntityPath)
 	},
 }, {
 	about: "Model",

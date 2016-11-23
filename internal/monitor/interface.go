@@ -66,7 +66,7 @@ type jemInterface interface {
 	// will have a cause of jem.ErrAPIConnection.
 	//
 	// The returned connection must be closed when finished with.
-	OpenAPI(params.EntityPath) (jujuAPI, error)
+	OpenAPI(context.Context, params.EntityPath) (jujuAPI, error)
 
 	// AcquireMonitorLease acquires or renews the lease on a controller.
 	// The lease will only be changed if the lease in the database

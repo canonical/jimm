@@ -11,10 +11,10 @@ import (
 
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient"
-	"github.com/juju/loggo"
 	"github.com/julienschmidt/httprouter"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/uber-go/zap"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
@@ -26,10 +26,10 @@ import (
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/monitor"
+	"github.com/CanonicalLtd/jem/internal/zapctx"
+	"github.com/CanonicalLtd/jem/internal/zaputil"
 	"github.com/CanonicalLtd/jem/params"
 )
-
-var logger = loggo.GetLogger("jem.internal.jemserver")
 
 // NewAPIHandlerFunc is a function that returns set of httprequest
 // handlers that uses the given JEM pool and server params.
@@ -88,6 +88,7 @@ type Params struct {
 // Server represents a JEM HTTP server.
 type Server struct {
 	router      *httprouter.Router
+	context     context.Context
 	pool        *jem.Pool
 	authPool    *auth.Pool
 	sessionPool *mgosession.Pool
@@ -102,6 +103,8 @@ func New(config Params, versions map[string]NewAPIHandlerFunc) (*Server, error) 
 	if len(versions) == 0 {
 		return nil, errgo.Newf("JEM server must serve at least one version of the API")
 	}
+
+	ctx := zapctx.WithLogger(context.Background(), config.Logger)
 	if config.MaxMgoSessions <= 0 {
 		config.MaxMgoSessions = 1
 	}
@@ -151,13 +154,14 @@ func New(config Params, versions map[string]NewAPIHandlerFunc) (*Server, error) 
 		router:      httprouter.New(),
 		pool:        p,
 		sessionPool: sessionPool,
+		context:     ctx,
 	}
 	if config.RunMonitor {
 		owner, err := monitorLeaseOwner(config.AgentUsername)
 		if err != nil {
 			return nil, errgo.Mask(err)
 		}
-		srv.monitor = monitor.New(p, owner)
+		srv.monitor = monitor.New(ctx, p, owner)
 	}
 	srv.router.Handler("GET", "/metrics", prometheus.Handler())
 	for name, newAPI := range versions {
@@ -229,7 +233,7 @@ func (srv *Server) Close() error {
 	if srv.monitor != nil {
 		srv.monitor.Kill()
 		if err := srv.monitor.Wait(); err != nil {
-			logger.Warningf("error shutting down monitor: %v", err)
+			zapctx.Warn(srv.context, "error shutting down monitor", zaputil.Error(err))
 		}
 	}
 	srv.pool.Close()

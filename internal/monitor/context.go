@@ -11,14 +11,24 @@ import (
 
 // newTombContext returns a context whose Done channel
 // is closed when the tomb is killed.
-func newTombContext(tomb *tomb.Tomb) context.Context {
+//
+// It includes values from the parent context but otherwise
+// ignores its cancelable properties.
+//
+// TODO It would be nice to do better, but we've got a clash
+// cultures between tombs and contexts here. Perhaps
+// we should consider using golang.org/x/sync/errgroup
+// instead of tombs.
+func newTombContext(parent context.Context, tomb *tomb.Tomb) context.Context {
 	return tombContext{
-		done: tomb.Dying(),
+		parent: parent,
+		done:   tomb.Dying(),
 	}
 }
 
 type tombContext struct {
-	done <-chan struct{}
+	parent context.Context
+	done   <-chan struct{}
 }
 
 func (ctxt tombContext) Deadline() (deadline time.Time, ok bool) {
@@ -26,7 +36,7 @@ func (ctxt tombContext) Deadline() (deadline time.Time, ok bool) {
 }
 
 func (ctxt tombContext) Value(key interface{}) interface{} {
-	return nil
+	return ctxt.parent.Value(key)
 }
 
 func (ctxt tombContext) Done() <-chan struct{} {

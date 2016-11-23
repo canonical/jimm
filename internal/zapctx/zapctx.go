@@ -27,8 +27,31 @@ func WithLogger(ctx context.Context, logger zap.Logger) context.Context {
 // Logger returns the logger associated with the given
 // context. If there is no logger, it will return Default.
 func Logger(ctx context.Context) zap.Logger {
+	if ctx == nil {
+		panic("nil context passed to Logger")
+	}
 	if logger, _ := ctx.Value(loggerKey{}).(zap.Logger); logger != nil {
 		return logger
 	}
 	return Default
+}
+
+// Debug calls Logger(ctx).Debug(msg, fields...).
+func Debug(ctx context.Context, msg string, fields ...zap.Field) {
+	Logger(ctx).Debug(msg, fields...)
+}
+
+// Info calls Logger(ctx).Info(msg, fields...).
+func Info(ctx context.Context, msg string, fields ...zap.Field) {
+	Logger(ctx).Info(msg, fields...)
+}
+
+// Warn calls Logger(ctx).Warn(msg, fields...).
+func Warn(ctx context.Context, msg string, fields ...zap.Field) {
+	Logger(ctx).Warn(msg, fields...)
+}
+
+// Error calls Logger(ctx).Error(msg, fields...).
+func Error(ctx context.Context, msg string, fields ...zap.Field) {
+	Logger(ctx).Error(msg, fields...)
 }

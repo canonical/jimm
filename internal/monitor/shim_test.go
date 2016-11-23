@@ -147,7 +147,7 @@ type jemShimWithAPIOpener struct {
 	jemInterface
 }
 
-func (s jemShimWithAPIOpener) OpenAPI(path params.EntityPath) (jujuAPI, error) {
+func (s jemShimWithAPIOpener) OpenAPI(ctx context.Context, path params.EntityPath) (jujuAPI, error) {
 	return s.openAPI(path)
 }
 
@@ -341,7 +341,7 @@ func (s *jemShimInMemory) ControllerUpdateCredentials(_ context.Context, ctlPath
 	return nil
 }
 
-func (s *jemShimInMemory) OpenAPI(params.EntityPath) (jujuAPI, error) {
+func (s *jemShimInMemory) OpenAPI(context.Context, params.EntityPath) (jujuAPI, error) {
 	return nil, errgo.New("jemShimInMemory doesn't implement OpenAPI")
 }
 

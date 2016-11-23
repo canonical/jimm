@@ -9,6 +9,7 @@ import (
 	"github.com/juju/juju/worker"
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jem/internal/apitest"
@@ -43,7 +44,7 @@ func (s *monitorSuite) TestMonitor(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// Start a monitor.
-	m := monitor.New(s.Pool, "jem1")
+	m := monitor.New(context.TODO(), s.Pool, "jem1")
 	defer worker.Stop(m)
 
 	// Wait for the stats to be updated.
@@ -98,7 +99,7 @@ func (s *monitorSuite) TestMonitorWithBrokenMongoConnection(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// Start a monitor.
-	m := monitor.New(pool, "jem1")
+	m := monitor.New(context.TODO(), pool, "jem1")
 	defer worker.Stop(m)
 
 	// Wait for the stats to be updated.
@@ -150,7 +151,7 @@ func (s *monitorSuite) TestMonitorWithBrokenJujuAPIConnection(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// Start a monitor.
-	m := monitor.New(s.Pool, "jem1")
+	m := monitor.New(context.TODO(), s.Pool, "jem1")
 	defer worker.Stop(m)
 
 	// Wait for the stats to be updated.
