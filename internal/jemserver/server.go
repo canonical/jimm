@@ -14,6 +14,7 @@ import (
 	"github.com/juju/loggo"
 	"github.com/julienschmidt/httprouter"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/uber-go/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
@@ -38,6 +39,10 @@ type NewAPIHandlerFunc func(*jem.Pool, *auth.Pool, Params) ([]httprequest.Handle
 // It must be kept in sync with identical definition in the
 // top level jem package.
 type Params struct {
+	// Logger holds the logger that will be used to log
+	// server messages.
+	Logger zap.Logger
+
 	// DB holds the mongo database that will be used to
 	// store the JEM information.
 	DB *mgo.Database
