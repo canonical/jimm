@@ -19,6 +19,7 @@ import (
 	_ "github.com/juju/juju/provider/maas"
 	_ "github.com/juju/juju/provider/openstack"
 	"github.com/juju/loggo"
+	"github.com/uber-go/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
@@ -27,6 +28,7 @@ import (
 
 	"github.com/CanonicalLtd/jem"
 	"github.com/CanonicalLtd/jem/config"
+	"github.com/CanonicalLtd/jem/internal/zapctx"
 )
 
 // websocketPingTimeout is the amount of time a webseocket connection
@@ -35,7 +37,9 @@ import (
 const websocketPingTimeout = 3 * time.Minute
 
 var (
-	logger        = loggo.GetLogger("jemd")
+	logger = loggo.GetLogger("jemd")
+	// The logging-config flag is present for backward compatibility
+	// only and will probably be removed in the future.
 	loggingConfig = flag.String("logging-config", "", "specify log levels for modules e.g. <root>=TRACE")
 )
 
@@ -49,11 +53,8 @@ func main() {
 	if flag.NArg() != 1 {
 		flag.Usage()
 	}
-	if *loggingConfig != "" {
-		if err := loggo.ConfigureLoggers(*loggingConfig); err != nil {
-			fmt.Fprintf(os.Stderr, "cannot configure loggers: %v", err)
-			os.Exit(1)
-		}
+	if *loggingConfig != "" && strings.ToUpper(*loggingConfig) != "INFO" {
+		fmt.Fprintln(os.Stderr, "warning: ignoring --logging-config flag; use logging-level in configuration file instead")
 	}
 	if err := serve(flag.Arg(0)); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
@@ -74,7 +75,9 @@ func serve(confPath string) error {
 		return errgo.Notef(err, "identity location must not contain discharge path")
 	}
 
-	logger.Debugf("connecting to mongo")
+	logger := setUpLogging(conf.LoggingLevel)
+
+	logger.Debug("connecting to mongo")
 	session, err := mgo.Dial(conf.MongoAddr)
 	if err != nil {
 		return errgo.Notef(err, "cannot dial mongo at %q", conf.MongoAddr)
@@ -82,7 +85,7 @@ func serve(confPath string) error {
 	defer session.Close()
 	db := session.DB("jem")
 
-	logger.Debugf("setting up the API server")
+	logger.Debug("setting up the API server")
 	var locator bakery.PublicKeyLocator
 	if conf.IdentityPublicKey == nil {
 		locator = httpbakery.NewPublicKeyRing(nil, nil)
@@ -95,6 +98,7 @@ func serve(confPath string) error {
 		conf.MaxMgoSessions = 100
 	}
 	cfg := jem.ServerParams{
+		Logger:               logger,
 		DB:                   db,
 		MaxMgoSessions:       conf.MaxMgoSessions,
 		ControllerAdmin:      conf.ControllerAdmin,
@@ -122,7 +126,7 @@ func serve(confPath string) error {
 		handler = handlers.CombinedLoggingHandler(accesslog, handler)
 	}
 
-	logger.Infof("starting the API server")
+	logger.Info("starting the API server")
 	httpServer := &http.Server{
 		Addr:      conf.APIAddr,
 		Handler:   handler,
@@ -132,4 +136,46 @@ func serve(confPath string) error {
 		return httpServer.ListenAndServeTLS("", "")
 	}
 	return httpServer.ListenAndServe()
+}
+
+var loggoToZap = map[loggo.Level]zap.Level{
+	loggo.TRACE:    zap.DebugLevel, // There's no zap equivalent to TRACE.
+	loggo.DEBUG:    zap.DebugLevel,
+	loggo.INFO:     zap.InfoLevel,
+	loggo.WARNING:  zap.WarnLevel,
+	loggo.ERROR:    zap.ErrorLevel,
+	loggo.CRITICAL: zap.ErrorLevel, // There's no zap equivalent to CRITICAL.
+}
+
+var zapToLoggo = map[zap.Level]loggo.Level{
+	zap.DebugLevel: loggo.TRACE, // Include trace and debug level messages.
+	zap.InfoLevel:  loggo.INFO,
+	zap.WarnLevel:  loggo.WARNING,
+	zap.ErrorLevel: loggo.ERROR,
+}
+
+func setUpLogging(level zap.Level) zap.Logger {
+	// Set up the root zap logger.
+	logger := zap.New(zap.NewJSONEncoder(), zap.Output(os.Stderr), level)
+	zapctx.Default = logger
+
+	// Set up loggo so that it will write to the root zap logger.
+	loggo.ReplaceDefaultWriter(zapLoggoWriter{logger})
+
+	// Configure loggo so that it will log at the right level.
+	loggo.DefaultContext().ApplyConfig(map[string]loggo.Level{
+		"<root>": zapToLoggo[level],
+	})
+	return logger
+}
+
+type zapLoggoWriter struct {
+	logger zap.Logger
+}
+
+// zapLoggoWriter implements loggo.Writer.Write by writing the entry
+// to w.logger. It ignores entry.Timestamp because zap will affix its
+// own timestamp.
+func (w zapLoggoWriter) Write(entry loggo.Entry) {
+	w.logger.Log(loggoToZap[entry.Level], entry.Message, zap.String("module", entry.Module), zap.String("file", entry.Filename), zap.Int("line", entry.Line))
 }
