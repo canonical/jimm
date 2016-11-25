@@ -16,20 +16,35 @@ import (
 
 	"github.com/CanonicalLtd/jem/internal/auth"
 	"github.com/CanonicalLtd/jem/internal/jem"
+	"github.com/CanonicalLtd/jem/internal/jemtest"
 	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
 
+var testContext = context.Background()
+
 type databaseSuite struct {
 	jujutesting.IsolatedMgoSuite
+	jemtest.LoggingSuite
 	database *jem.Database
 }
 
 var _ = gc.Suite(&databaseSuite{})
 
+func (s *databaseSuite) SetUpSuite(c *gc.C) {
+	s.IsolatedMgoSuite.SetUpSuite(c)
+	s.LoggingSuite.SetUpSuite(c)
+}
+
+func (s *databaseSuite) TearDownSuite(c *gc.C) {
+	s.IsolatedMgoSuite.TearDownSuite(c)
+	s.LoggingSuite.TearDownSuite(c)
+}
+
 func (s *databaseSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
+	s.LoggingSuite.SetUpTest(c)
 	pool := mgosession.NewPool(s.Session, 1)
 	s.database = jem.NewDatabase(pool.Session(), "jem")
 	pool.Close()
@@ -37,6 +52,7 @@ func (s *databaseSuite) SetUpTest(c *gc.C) {
 
 func (s *databaseSuite) TearDownTest(c *gc.C) {
 	jem.DatabaseClose(s.database)
+	s.LoggingSuite.TearDownTest(c)
 	s.IsolatedMgoSuite.TearDownTest(c)
 }
 
@@ -70,7 +86,7 @@ func (s *databaseSuite) TestAddController(c *gc.C) {
 			"region": "foo",
 		},
 	}
-	err := s.database.AddController(ctl)
+	err := s.database.AddController(testContext, ctl)
 	c.Assert(err, gc.IsNil)
 
 	// Check that the fields have been mutated as expected.
@@ -99,7 +115,7 @@ func (s *databaseSuite) TestAddController(c *gc.C) {
 		},
 	})
 
-	ctl1, err := s.database.Controller(ctlPath)
+	ctl1, err := s.database.Controller(testContext, ctlPath)
 	c.Assert(err, gc.IsNil)
 	c.Assert(ctl1, jc.DeepEquals, &mongodoc.Controller{
 		Id:     "bob/x",
@@ -126,7 +142,7 @@ func (s *databaseSuite) TestAddController(c *gc.C) {
 		},
 	})
 
-	err = s.database.AddController(ctl)
+	err = s.database.AddController(testContext, ctl)
 	c.Assert(err, gc.ErrorMatches, "already exists")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
 
@@ -151,7 +167,7 @@ func (s *databaseSuite) TestAddController(c *gc.C) {
 			}},
 		},
 	}
-	err = s.database.AddController(ctl2)
+	err = s.database.AddController(testContext, ctl2)
 	c.Assert(err, gc.IsNil)
 	s.checkDBOK(c)
 }
@@ -161,40 +177,40 @@ func (s *databaseSuite) TestSetControllerAvailability(c *gc.C) {
 	ctl := &mongodoc.Controller{
 		Path: ctlPath,
 	}
-	err := s.database.AddController(ctl)
+	err := s.database.AddController(testContext, ctl)
 
 	// Check that we can mark it as unavailable.
 	t0 := time.Now()
-	err = s.database.SetControllerUnavailableAt(ctlPath, t0)
+	err = s.database.SetControllerUnavailableAt(testContext, ctlPath, t0)
 	c.Assert(err, gc.IsNil)
 
-	ctl, err = s.database.Controller(ctlPath)
+	ctl, err = s.database.Controller(testContext, ctlPath)
 	c.Assert(err, gc.IsNil)
 	c.Assert(ctl.UnavailableSince.UTC(), jc.DeepEquals, mongodoc.Time(t0).UTC())
 
 	// Check that if we mark it unavailable again, it doesn't
 	// have any affect.
-	err = s.database.SetControllerUnavailableAt(ctlPath, t0.Add(time.Second))
+	err = s.database.SetControllerUnavailableAt(testContext, ctlPath, t0.Add(time.Second))
 	c.Assert(err, gc.IsNil)
 
-	ctl, err = s.database.Controller(ctlPath)
+	ctl, err = s.database.Controller(testContext, ctlPath)
 	c.Assert(err, gc.IsNil)
 	c.Assert(ctl.UnavailableSince.UTC(), jc.DeepEquals, mongodoc.Time(t0).UTC())
 
 	// Check that we can mark it as available again.
-	err = s.database.SetControllerAvailable(ctlPath)
+	err = s.database.SetControllerAvailable(testContext, ctlPath)
 	c.Assert(err, gc.IsNil)
 
-	ctl, err = s.database.Controller(ctlPath)
+	ctl, err = s.database.Controller(testContext, ctlPath)
 	c.Assert(err, gc.IsNil)
 	c.Assert(ctl.UnavailableSince, jc.Satisfies, time.Time.IsZero)
 
 	t1 := t0.Add(3 * time.Second)
 	// ... and that we can mark it as unavailable after that.
-	err = s.database.SetControllerUnavailableAt(ctlPath, t1)
+	err = s.database.SetControllerUnavailableAt(testContext, ctlPath, t1)
 	c.Assert(err, gc.IsNil)
 
-	ctl, err = s.database.Controller(ctlPath)
+	ctl, err = s.database.Controller(testContext, ctlPath)
 	c.Assert(err, gc.IsNil)
 	c.Assert(ctl.UnavailableSince.UTC(), jc.DeepEquals, mongodoc.Time(t1).UTC())
 	s.checkDBOK(c)
@@ -202,9 +218,9 @@ func (s *databaseSuite) TestSetControllerAvailability(c *gc.C) {
 
 func (s *databaseSuite) TestSetControllerAvailabilityWithNotFoundController(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "x"}
-	err := s.database.SetControllerUnavailableAt(ctlPath, time.Now())
+	err := s.database.SetControllerUnavailableAt(testContext, ctlPath, time.Now())
 	c.Assert(err, gc.IsNil)
-	err = s.database.SetControllerAvailable(ctlPath)
+	err = s.database.SetControllerAvailable(testContext, ctlPath)
 	c.Assert(err, gc.IsNil)
 	s.checkDBOK(c)
 }
@@ -225,17 +241,17 @@ func (s *databaseSuite) TestDeleteController(c *gc.C) {
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 	}
-	err := s.database.AddController(ctl)
+	err := s.database.AddController(testContext, ctl)
 	c.Assert(err, gc.IsNil)
-	err = s.database.DeleteController(context.Background(), ctlPath)
+	err = s.database.DeleteController(testContext, ctlPath)
 	c.Assert(err, gc.IsNil)
 
-	ctl1, err := s.database.Controller(ctlPath)
+	ctl1, err := s.database.Controller(testContext, ctlPath)
 	c.Assert(ctl1, gc.IsNil)
-	m1, err := s.database.Model(ctlPath)
+	m1, err := s.database.Model(testContext, ctlPath)
 	c.Assert(m1, gc.IsNil)
 
-	err = s.database.DeleteController(context.Background(), ctlPath)
+	err = s.database.DeleteController(testContext, ctlPath)
 	c.Assert(err, gc.ErrorMatches, "controller \"dalek/who\" not found")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
@@ -254,14 +270,14 @@ func (s *databaseSuite) TestDeleteController(c *gc.C) {
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 	}
-	err = s.database.AddController(ctl2)
+	err = s.database.AddController(testContext, ctl2)
 	c.Assert(err, gc.IsNil)
 
-	err = s.database.DeleteController(context.Background(), ctlPath)
+	err = s.database.DeleteController(testContext, ctlPath)
 	c.Assert(err, gc.IsNil)
-	ctl3, err := s.database.Controller(ctlPath)
+	ctl3, err := s.database.Controller(testContext, ctlPath)
 	c.Assert(ctl3, gc.IsNil)
-	m3, err := s.database.Model(ctlPath)
+	m3, err := s.database.Model(testContext, ctlPath)
 	c.Assert(m3, gc.IsNil)
 	s.checkDBOK(c)
 }
@@ -282,22 +298,22 @@ func (s *databaseSuite) TestDeleteModel(c *gc.C) {
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 	}
-	err := s.database.AddController(ctl)
+	err := s.database.AddController(testContext, ctl)
 	c.Assert(err, gc.IsNil)
 
 	modelPath := params.EntityPath{"dalek", "exterminate"}
 	m2 := &mongodoc.Model{
 		Path: modelPath,
 	}
-	err = s.database.AddModel(m2)
+	err = s.database.AddModel(testContext, m2)
 	c.Assert(err, gc.IsNil)
 
-	err = s.database.DeleteModel(context.Background(), m2.Path)
+	err = s.database.DeleteModel(testContext, m2.Path)
 	c.Assert(err, gc.IsNil)
-	m3, err := s.database.Model(modelPath)
+	m3, err := s.database.Model(testContext, modelPath)
 	c.Assert(m3, gc.IsNil)
 
-	err = s.database.DeleteModel(context.Background(), m2.Path)
+	err = s.database.DeleteModel(testContext, m2.Path)
 	c.Assert(err, gc.ErrorMatches, "model \"dalek/exterminate\" not found")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	s.checkDBOK(c)
@@ -309,18 +325,18 @@ func (s *databaseSuite) TestAddModel(c *gc.C) {
 		Id:   "ignored",
 		Path: ctlPath,
 	}
-	err := s.database.AddModel(m)
+	err := s.database.AddModel(testContext, m)
 	c.Assert(err, gc.IsNil)
 	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
 		Id:   "bob/x",
 		Path: ctlPath,
 	})
 
-	m1, err := s.database.Model(ctlPath)
+	m1, err := s.database.Model(testContext, ctlPath)
 	c.Assert(err, gc.IsNil)
 	c.Assert(m1, jc.DeepEquals, m)
 
-	err = s.database.AddModel(m)
+	err = s.database.AddModel(testContext, m)
 	c.Assert(err, gc.ErrorMatches, "already exists")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
 	s.checkDBOK(c)
@@ -334,7 +350,7 @@ func (s *databaseSuite) TestModelFromUUID(c *gc.C) {
 		Path: path,
 		UUID: uuid,
 	}
-	err := s.database.AddModel(m)
+	err := s.database.AddModel(testContext, m)
 	c.Assert(err, gc.IsNil)
 	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
 		Id:   "bob/x",
@@ -342,11 +358,11 @@ func (s *databaseSuite) TestModelFromUUID(c *gc.C) {
 		UUID: uuid,
 	})
 
-	m1, err := s.database.ModelFromUUID(uuid)
+	m1, err := s.database.ModelFromUUID(testContext, uuid)
 	c.Assert(err, gc.IsNil)
 	c.Assert(m1, jc.DeepEquals, m)
 
-	m2, err := s.database.ModelFromUUID("no-such-uuid")
+	m2, err := s.database.ModelFromUUID(testContext, "no-such-uuid")
 	c.Assert(err, gc.ErrorMatches, `model "no-such-uuid" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	c.Assert(m2, gc.IsNil)
@@ -443,14 +459,14 @@ func (s *databaseSuite) TestAcquireLease(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 		_, err = s.database.Models().RemoveAll(bson.D{{"path", test.ctlPath}})
 		c.Assert(err, gc.IsNil)
-		err = s.database.AddController(&mongodoc.Controller{
+		err = s.database.AddController(testContext, &mongodoc.Controller{
 			Path:               test.ctlPath,
 			UUID:               "fake-uuid",
 			MonitorLeaseOwner:  test.actualOldOwner,
 			MonitorLeaseExpiry: test.actualOldExpiry,
 		})
 		c.Assert(err, gc.IsNil)
-		t, err := s.database.AcquireMonitorLease(test.ctlPath, test.oldExpiry, test.oldOwner, test.newExpiry, test.newOwner)
+		t, err := s.database.AcquireMonitorLease(testContext, test.ctlPath, test.oldExpiry, test.oldOwner, test.newExpiry, test.newOwner)
 		if test.expectError != "" {
 			if test.expectCause != nil {
 				c.Check(errgo.Cause(err), gc.Equals, test.expectCause)
@@ -461,7 +477,7 @@ func (s *databaseSuite) TestAcquireLease(c *gc.C) {
 		}
 		c.Assert(err, gc.IsNil)
 		c.Assert(t.UTC(), gc.DeepEquals, test.expectExpiry.UTC())
-		ctl, err := s.database.Controller(test.ctlPath)
+		ctl, err := s.database.Controller(testContext, test.ctlPath)
 		c.Assert(err, gc.IsNil)
 		c.Assert(ctl.MonitorLeaseExpiry.UTC(), gc.DeepEquals, test.expectExpiry.UTC())
 		c.Assert(ctl.MonitorLeaseOwner, gc.Equals, test.newOwner)
@@ -470,7 +486,7 @@ func (s *databaseSuite) TestAcquireLease(c *gc.C) {
 }
 
 func (s *databaseSuite) TestSetControllerStatsNotFound(c *gc.C) {
-	err := s.database.SetControllerStats(params.EntityPath{"bob", "foo"}, &mongodoc.ControllerStats{})
+	err := s.database.SetControllerStats(testContext, params.EntityPath{"bob", "foo"}, &mongodoc.ControllerStats{})
 	c.Assert(err, gc.ErrorMatches, "controller not found")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	s.checkDBOK(c)
@@ -478,7 +494,7 @@ func (s *databaseSuite) TestSetControllerStatsNotFound(c *gc.C) {
 
 func (s *databaseSuite) TestSetControllerStats(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.database.AddController(&mongodoc.Controller{
+	err := s.database.AddController(testContext, &mongodoc.Controller{
 		Path: ctlPath,
 		UUID: "fake-uuid",
 	})
@@ -490,9 +506,9 @@ func (s *databaseSuite) TestSetControllerStats(c *gc.C) {
 		ServiceCount: 3,
 		MachineCount: 4,
 	}
-	err = s.database.SetControllerStats(ctlPath, stats)
+	err = s.database.SetControllerStats(testContext, ctlPath, stats)
 	c.Assert(err, gc.IsNil)
-	ctl, err := s.database.Controller(ctlPath)
+	ctl, err := s.database.Controller(testContext, ctlPath)
 	c.Assert(err, gc.IsNil)
 	c.Assert(ctl.Stats, jc.DeepEquals, *stats)
 	s.checkDBOK(c)
@@ -582,16 +598,16 @@ func (s *databaseSuite) TestUpdateModelCounts(c *gc.C) {
 		c.Logf("test %d: %v", i, test.about)
 		modelId := params.EntityPath{"bob", params.Name(fmt.Sprintf("model-%d", i))}
 		uuid := fmt.Sprintf("uuid-%d", i)
-		err := s.database.AddModel(&mongodoc.Model{
+		err := s.database.AddModel(testContext, &mongodoc.Model{
 			Path:       modelId,
 			Controller: params.EntityPath{"bob", "controller"},
 			UUID:       uuid,
 			Counts:     test.before,
 		})
 		c.Assert(err, gc.IsNil)
-		err = s.database.UpdateModelCounts(uuid, test.update, test.updateTime)
+		err = s.database.UpdateModelCounts(testContext, uuid, test.update, test.updateTime)
 		c.Assert(err, gc.IsNil)
-		model, err := s.database.Model(modelId)
+		model, err := s.database.Model(testContext, modelId)
 		c.Assert(err, gc.IsNil)
 		// Change all times to UTC for straightforward comparison.
 		for name, count := range model.Counts {
@@ -603,32 +619,32 @@ func (s *databaseSuite) TestUpdateModelCounts(c *gc.C) {
 }
 
 func (s *databaseSuite) TestUpdateModelCountsNotFound(c *gc.C) {
-	err := s.database.UpdateModelCounts("fake-uuid", nil, T(0))
+	err := s.database.UpdateModelCounts(testContext, "fake-uuid", nil, T(0))
 	c.Assert(err, gc.ErrorMatches, `cannot update model counts: not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
 func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
-	err := s.database.UpdateMachineInfo(&multiwatcher.MachineInfo{
+	err := s.database.UpdateMachineInfo(testContext, &multiwatcher.MachineInfo{
 		ModelUUID: "fake-uuid",
 		Id:        "0",
 		Series:    "quantal",
 	})
 	c.Assert(err, gc.IsNil)
-	err = s.database.UpdateMachineInfo(&multiwatcher.MachineInfo{
+	err = s.database.UpdateMachineInfo(testContext, &multiwatcher.MachineInfo{
 		ModelUUID: "another-uuid",
 		Id:        "0",
 		Series:    "blah",
 	})
 	c.Assert(err, gc.IsNil)
-	err = s.database.UpdateMachineInfo(&multiwatcher.MachineInfo{
+	err = s.database.UpdateMachineInfo(testContext, &multiwatcher.MachineInfo{
 		ModelUUID: "fake-uuid",
 		Id:        "1",
 		Series:    "precise",
 	})
 	c.Assert(err, gc.IsNil)
 
-	docs, err := s.database.MachinesForModel("fake-uuid")
+	docs, err := s.database.MachinesForModel(testContext, "fake-uuid")
 	c.Assert(err, gc.IsNil)
 	for i := range docs {
 		cleanMachineDoc(&docs[i])
@@ -650,7 +666,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 	}})
 
 	// Check that we can update one of the documents.
-	err = s.database.UpdateMachineInfo(&multiwatcher.MachineInfo{
+	err = s.database.UpdateMachineInfo(testContext, &multiwatcher.MachineInfo{
 		ModelUUID: "fake-uuid",
 		Id:        "0",
 		Series:    "foo",
@@ -658,7 +674,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 
-	docs, err = s.database.MachinesForModel("fake-uuid")
+	docs, err = s.database.MachinesForModel(testContext, "fake-uuid")
 	c.Assert(err, gc.IsNil)
 	for i := range docs {
 		cleanMachineDoc(&docs[i])
@@ -694,21 +710,21 @@ func cleanMachineDoc(doc *mongodoc.Machine) {
 }
 
 func (s *databaseSuite) TestSetModelLifeNotFound(c *gc.C) {
-	err := s.database.SetModelLife(params.EntityPath{"bob", "foo"}, "fake-uuid", "alive")
+	err := s.database.SetModelLife(testContext, params.EntityPath{"bob", "foo"}, "fake-uuid", "alive")
 	c.Assert(err, gc.IsNil)
 	s.checkDBOK(c)
 }
 
 func (s *databaseSuite) TestSetModelLifeSuccess(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.database.AddController(&mongodoc.Controller{
+	err := s.database.AddController(testContext, &mongodoc.Controller{
 		Path: ctlPath,
 		UUID: "fake-uuid",
 	})
 	c.Assert(err, gc.IsNil)
 
 	// Add the controller model.
-	err = s.database.AddModel(&mongodoc.Model{
+	err = s.database.AddModel(testContext, &mongodoc.Model{
 		Path:       params.EntityPath{"bob", "foo"},
 		UUID:       "fake-uuid",
 		Controller: params.EntityPath{"bob", "foo"},
@@ -716,7 +732,7 @@ func (s *databaseSuite) TestSetModelLifeSuccess(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// Add another model with the same UUID but a different controller.
-	err = s.database.AddModel(&mongodoc.Model{
+	err = s.database.AddModel(testContext, &mongodoc.Model{
 		Path:       params.EntityPath{"bar", "baz"},
 		UUID:       "fake-uuid",
 		Controller: params.EntityPath{"bar", "zzz"},
@@ -724,32 +740,32 @@ func (s *databaseSuite) TestSetModelLifeSuccess(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// Add another model with the same controller but a different UUID.
-	err = s.database.AddModel(&mongodoc.Model{
+	err = s.database.AddModel(testContext, &mongodoc.Model{
 		Path:       params.EntityPath{"alice", "baz"},
 		UUID:       "another-uuid",
 		Controller: ctlPath,
 	})
 	c.Assert(err, gc.IsNil)
 
-	err = s.database.SetModelLife(ctlPath, "fake-uuid", "alive")
+	err = s.database.SetModelLife(testContext, ctlPath, "fake-uuid", "alive")
 	c.Assert(err, gc.IsNil)
 
-	m, err := s.database.Model(ctlPath)
+	m, err := s.database.Model(testContext, ctlPath)
 	c.Assert(err, gc.IsNil)
 	c.Assert(m.Life, gc.Equals, "alive")
 
-	m, err = s.database.Model(params.EntityPath{"bar", "baz"})
+	m, err = s.database.Model(testContext, params.EntityPath{"bar", "baz"})
 	c.Assert(err, gc.IsNil)
 	c.Assert(m.Life, gc.Equals, "")
 
-	m, err = s.database.Model(params.EntityPath{"alice", "baz"})
+	m, err = s.database.Model(testContext, params.EntityPath{"alice", "baz"})
 	c.Assert(err, gc.IsNil)
 	c.Assert(m.Life, gc.Equals, "")
 	s.checkDBOK(c)
 }
 
 func (s *databaseSuite) TestAcquireLeaseControllerNotFound(c *gc.C) {
-	_, err := s.database.AcquireMonitorLease(params.EntityPath{"bob", "foo"}, time.Time{}, "", time.Now(), "jem1")
+	_, err := s.database.AcquireMonitorLease(testContext, params.EntityPath{"bob", "foo"}, time.Time{}, "", time.Now(), "jem1")
 	c.Assert(err, gc.ErrorMatches, `controller removed`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	s.checkDBOK(c)
@@ -758,7 +774,7 @@ func (s *databaseSuite) TestAcquireLeaseControllerNotFound(c *gc.C) {
 func (s *databaseSuite) TestAddAndGetCredential(c *gc.C) {
 	path := credentialPath("test-cloud", "test-user", "test-credential")
 	expectId := path.String()
-	cred, err := s.database.Credential(path)
+	cred, err := s.database.Credential(testContext, path)
 	c.Assert(cred, gc.IsNil)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	c.Assert(err, gc.ErrorMatches, `credential "test-cloud/test-user/test-credential" not found`)
@@ -767,7 +783,7 @@ func (s *databaseSuite) TestAddAndGetCredential(c *gc.C) {
 		"attr1": "val1",
 		"attr2": "val2",
 	}
-	err = jem.UpdateCredential(s.database, &mongodoc.Credential{
+	err = jem.UpdateCredential(s.database, testContext, &mongodoc.Credential{
 		Path:       path,
 		Type:       "credtype",
 		Label:      "Test Label",
@@ -775,7 +791,7 @@ func (s *databaseSuite) TestAddAndGetCredential(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 
-	cred, err = s.database.Credential(path)
+	cred, err = s.database.Credential(testContext, path)
 	c.Assert(err, gc.IsNil)
 	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
 		Id:         expectId,
@@ -785,7 +801,7 @@ func (s *databaseSuite) TestAddAndGetCredential(c *gc.C) {
 		Attributes: attrs,
 	})
 
-	err = jem.UpdateCredential(s.database, &mongodoc.Credential{
+	err = jem.UpdateCredential(s.database, testContext, &mongodoc.Credential{
 		Path:       path,
 		Type:       "credtype",
 		Label:      "Test Label 2",
@@ -793,7 +809,7 @@ func (s *databaseSuite) TestAddAndGetCredential(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 
-	cred, err = s.database.Credential(path)
+	cred, err = s.database.Credential(testContext, path)
 	c.Assert(err, gc.IsNil)
 	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
 		Id:         expectId,
@@ -803,12 +819,12 @@ func (s *databaseSuite) TestAddAndGetCredential(c *gc.C) {
 		Attributes: attrs,
 	})
 
-	err = jem.UpdateCredential(s.database, &mongodoc.Credential{
+	err = jem.UpdateCredential(s.database, testContext, &mongodoc.Credential{
 		Path:    path,
 		Revoked: true,
 	})
 	c.Assert(err, gc.IsNil)
-	cred, err = s.database.Credential(path)
+	cred, err = s.database.Credential(testContext, path)
 	c.Assert(err, gc.IsNil)
 	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
 		Id:         expectId,
@@ -822,7 +838,7 @@ func (s *databaseSuite) TestAddAndGetCredential(c *gc.C) {
 func (s *databaseSuite) TestCredentialAddController(c *gc.C) {
 	path := credentialPath("test-cloud", "test-user", "test-credential")
 	expectId := path.String()
-	err := jem.UpdateCredential(s.database, &mongodoc.Credential{
+	err := jem.UpdateCredential(s.database, testContext, &mongodoc.Credential{
 		Path: path,
 		Type: "empty",
 	})
@@ -832,13 +848,13 @@ func (s *databaseSuite) TestCredentialAddController(c *gc.C) {
 	ctl := &mongodoc.Controller{
 		Path: ctlPath,
 	}
-	err = s.database.AddController(ctl)
+	err = s.database.AddController(testContext, ctl)
 	c.Assert(err, gc.IsNil)
 
-	err = jem.CredentialAddController(s.database, path, ctlPath)
+	err = jem.CredentialAddController(s.database, testContext, path, ctlPath)
 	c.Assert(err, gc.IsNil)
 
-	cred, err := s.database.Credential(path)
+	cred, err := s.database.Credential(testContext, path)
 	c.Assert(err, gc.IsNil)
 	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
 		Id:         expectId,
@@ -851,10 +867,10 @@ func (s *databaseSuite) TestCredentialAddController(c *gc.C) {
 	})
 
 	// Add a second time
-	err = jem.CredentialAddController(s.database, path, ctlPath)
+	err = jem.CredentialAddController(s.database, testContext, path, ctlPath)
 	c.Assert(err, gc.IsNil)
 
-	cred, err = s.database.Credential(path)
+	cred, err = s.database.Credential(testContext, path)
 	c.Assert(err, gc.IsNil)
 	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
 		Id:         expectId,
@@ -873,7 +889,7 @@ func (s *databaseSuite) TestCredentialAddController(c *gc.C) {
 		},
 	}
 	// Add to a non-existant credential
-	err = jem.CredentialAddController(s.database, path2, ctlPath)
+	err = jem.CredentialAddController(s.database, testContext, path2, ctlPath)
 	c.Assert(err, gc.ErrorMatches, `credential "test-cloud/test-user/no-such-cred" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	s.checkDBOK(c)
@@ -882,7 +898,7 @@ func (s *databaseSuite) TestCredentialAddController(c *gc.C) {
 func (s *databaseSuite) TestCredentialRemoveController(c *gc.C) {
 	path := credentialPath("test-cloud", "test-user", "test-credential")
 	expectId := path.String()
-	err := jem.UpdateCredential(s.database, &mongodoc.Credential{
+	err := jem.UpdateCredential(s.database, testContext, &mongodoc.Credential{
 		Path: path,
 		Type: "empty",
 	})
@@ -892,14 +908,14 @@ func (s *databaseSuite) TestCredentialRemoveController(c *gc.C) {
 	ctl := &mongodoc.Controller{
 		Path: ctlPath,
 	}
-	err = s.database.AddController(ctl)
+	err = s.database.AddController(testContext, ctl)
 	c.Assert(err, gc.IsNil)
 
-	err = jem.CredentialAddController(s.database, path, ctlPath)
+	err = jem.CredentialAddController(s.database, testContext, path, ctlPath)
 	c.Assert(err, gc.IsNil)
 
 	// sanity check the controller is there.
-	cred, err := s.database.Credential(path)
+	cred, err := s.database.Credential(testContext, path)
 	c.Assert(err, gc.IsNil)
 	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
 		Id:         expectId,
@@ -911,10 +927,10 @@ func (s *databaseSuite) TestCredentialRemoveController(c *gc.C) {
 		},
 	})
 
-	err = jem.CredentialRemoveController(s.database, path, ctlPath)
+	err = jem.CredentialRemoveController(s.database, testContext, path, ctlPath)
 	c.Assert(err, gc.IsNil)
 
-	cred, err = s.database.Credential(path)
+	cred, err = s.database.Credential(testContext, path)
 	c.Assert(err, gc.IsNil)
 	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
 		Id:         expectId,
@@ -924,10 +940,10 @@ func (s *databaseSuite) TestCredentialRemoveController(c *gc.C) {
 	})
 
 	// Remove again
-	err = jem.CredentialRemoveController(s.database, path, ctlPath)
+	err = jem.CredentialRemoveController(s.database, testContext, path, ctlPath)
 	c.Assert(err, gc.IsNil)
 
-	cred, err = s.database.Credential(path)
+	cred, err = s.database.Credential(testContext, path)
 	c.Assert(err, gc.IsNil)
 	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
 		Id:         expectId,
@@ -937,7 +953,7 @@ func (s *databaseSuite) TestCredentialRemoveController(c *gc.C) {
 	})
 	path2 := credentialPath("test-cloud", "test-user", "no-such-cred")
 	// remove from a non-existant credential
-	err = jem.CredentialRemoveController(s.database, path2, ctlPath)
+	err = jem.CredentialRemoveController(s.database, testContext, path2, ctlPath)
 	c.Assert(err, gc.ErrorMatches, `credential "test-cloud/test-user/no-such-cred" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	s.checkDBOK(c)
@@ -945,13 +961,13 @@ func (s *databaseSuite) TestCredentialRemoveController(c *gc.C) {
 
 func (s *databaseSuite) TestSetACL(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.database.AddController(&mongodoc.Controller{
+	err := s.database.AddController(testContext, &mongodoc.Controller{
 		Path: ctlPath,
 		UUID: "fake-uuid",
 	})
 	c.Assert(err, gc.IsNil)
 
-	err = s.database.SetACL(s.database.Controllers(), ctlPath, params.ACL{
+	err = s.database.SetACL(testContext, s.database.Controllers(), ctlPath, params.ACL{
 		Read: []string{"t1", "t2"},
 	})
 	c.Assert(err, gc.IsNil)
@@ -962,7 +978,7 @@ func (s *databaseSuite) TestSetACL(c *gc.C) {
 		Read: []string{"t1", "t2"},
 	})
 
-	err = s.database.SetACL(s.database.Controllers(), params.EntityPath{"bob", "bar"}, params.ACL{
+	err = s.database.SetACL(testContext, s.database.Controllers(), params.EntityPath{"bob", "bar"}, params.ACL{
 		Read: []string{"t2", "t1"},
 	})
 	c.Assert(err, gc.ErrorMatches, `"bob/bar" not found`)
@@ -972,13 +988,13 @@ func (s *databaseSuite) TestSetACL(c *gc.C) {
 
 func (s *databaseSuite) TestGrant(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.database.AddController(&mongodoc.Controller{
+	err := s.database.AddController(testContext, &mongodoc.Controller{
 		Path: ctlPath,
 		UUID: "fake-uuid",
 	})
 	c.Assert(err, gc.IsNil)
 
-	err = s.database.Grant(s.database.Controllers(), ctlPath, "t1")
+	err = s.database.Grant(testContext, s.database.Controllers(), ctlPath, "t1")
 	c.Assert(err, gc.IsNil)
 	var cnt mongodoc.Controller
 	err = s.database.Controllers().FindId(ctlPath.String()).One(&cnt)
@@ -987,7 +1003,7 @@ func (s *databaseSuite) TestGrant(c *gc.C) {
 		Read: []string{"t1"},
 	})
 
-	err = s.database.Grant(s.database.Controllers(), params.EntityPath{"bob", "bar"}, "t1")
+	err = s.database.Grant(testContext, s.database.Controllers(), params.EntityPath{"bob", "bar"}, "t1")
 	c.Assert(err, gc.ErrorMatches, `"bob/bar" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	s.checkDBOK(c)
@@ -995,17 +1011,17 @@ func (s *databaseSuite) TestGrant(c *gc.C) {
 
 func (s *databaseSuite) TestRevoke(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.database.AddController(&mongodoc.Controller{
+	err := s.database.AddController(testContext, &mongodoc.Controller{
 		Path: ctlPath,
 		UUID: "fake-uuid",
 	})
 	c.Assert(err, gc.IsNil)
 
-	err = s.database.SetACL(s.database.Controllers(), ctlPath, params.ACL{
+	err = s.database.SetACL(testContext, s.database.Controllers(), ctlPath, params.ACL{
 		Read: []string{"t1", "t2"},
 	})
 	c.Assert(err, gc.IsNil)
-	err = s.database.Revoke(s.database.Controllers(), ctlPath, "t2")
+	err = s.database.Revoke(testContext, s.database.Controllers(), ctlPath, "t2")
 	c.Assert(err, gc.IsNil)
 	var cnt mongodoc.Controller
 	err = s.database.Controllers().FindId(ctlPath.String()).One(&cnt)
@@ -1014,7 +1030,7 @@ func (s *databaseSuite) TestRevoke(c *gc.C) {
 		Read: []string{"t1"},
 	})
 
-	err = s.database.Revoke(s.database.Controllers(), params.EntityPath{"bob", "bar"}, "t2")
+	err = s.database.Revoke(testContext, s.database.Controllers(), params.EntityPath{"bob", "bar"}, "t2")
 	c.Assert(err, gc.ErrorMatches, `"bob/bar" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	s.checkDBOK(c)
@@ -1022,7 +1038,7 @@ func (s *databaseSuite) TestRevoke(c *gc.C) {
 
 func (s *databaseSuite) TestCloud(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.database.AddController(&mongodoc.Controller{
+	err := s.database.AddController(testContext, &mongodoc.Controller{
 		Path: ctlPath,
 		UUID: "fake-uuid",
 		Cloud: mongodoc.Cloud{
@@ -1031,13 +1047,13 @@ func (s *databaseSuite) TestCloud(c *gc.C) {
 		},
 	})
 	c.Assert(err, gc.IsNil)
-	cld, err := s.database.Cloud("my-cloud")
+	cld, err := s.database.Cloud(testContext, "my-cloud")
 	c.Assert(err, gc.IsNil)
 	c.Assert(cld, jc.DeepEquals, &mongodoc.Cloud{
 		Name:         "my-cloud",
 		ProviderType: "ec2",
 	})
-	cld, err = s.database.Cloud("not-my-cloud")
+	cld, err = s.database.Cloud(testContext, "not-my-cloud")
 	c.Assert(err, gc.ErrorMatches, `cloud "not-my-cloud" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	s.checkDBOK(c)
@@ -1053,9 +1069,9 @@ func (s *databaseSuite) TestGetACL(c *gc.C) {
 			Read: []string{"fred", "jim"},
 		},
 	}
-	err := s.database.AddModel(m)
+	err := s.database.AddModel(testContext, m)
 	c.Assert(err, gc.IsNil)
-	acl, err := s.database.GetACL(s.database.Models(), m.Path)
+	acl, err := s.database.GetACL(testContext, s.database.Models(), m.Path)
 	c.Assert(err, gc.IsNil)
 	c.Assert(acl, jc.DeepEquals, m.ACL)
 }
@@ -1067,7 +1083,7 @@ func (s *databaseSuite) TestGetACLNotFound(c *gc.C) {
 			Name: "model",
 		},
 	}
-	acl, err := s.database.GetACL(s.database.Models(), m.Path)
+	acl, err := s.database.GetACL(testContext, s.database.Models(), m.Path)
 	c.Assert(err, gc.ErrorMatches, "not found")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	c.Assert(acl, jc.DeepEquals, m.ACL)
@@ -1121,13 +1137,13 @@ var checkReadACLTests = []struct {
 func (s *databaseSuite) TestCheckReadACL(c *gc.C) {
 	for i, test := range checkReadACLTests {
 		c.Logf("%d. %s", i, test.about)
-		ctx := auth.ContextWithUser(context.Background(), test.user, test.groups...)
+		ctx := auth.ContextWithUser(testContext, test.user, test.groups...)
 		entity := params.EntityPath{
 			User: params.User(test.owner),
 			Name: params.Name(fmt.Sprintf("test%d", i)),
 		}
 		if !test.skipCreateEntity {
-			err := s.database.AddModel(&mongodoc.Model{
+			err := s.database.AddModel(ctx, &mongodoc.Model{
 				Path: entity,
 				ACL: params.ACL{
 					Read: test.acl,
@@ -1170,10 +1186,10 @@ func (s *databaseSuite) TestCanReadIter(c *gc.C) {
 		},
 	}}
 	for i := range testModels {
-		err := s.database.AddModel(&testModels[i])
+		err := s.database.AddModel(testContext, &testModels[i])
 		c.Assert(err, gc.IsNil)
 	}
-	ctx := auth.ContextWithUser(context.Background(), "bob", "bob-group")
+	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
 	it := s.database.Models().Find(nil).Sort("_id").Iter()
 	crit := s.database.NewCanReadIter(ctx, it)
 	var models []mongodoc.Model
@@ -1200,7 +1216,7 @@ var setDeadTests = []struct {
 }{{
 	about: "AddController",
 	run: func(db *jem.Database) {
-		db.AddController(&mongodoc.Controller{
+		db.AddController(testContext, &mongodoc.Controller{
 			Path: params.EntityPath{"bob", "foo"},
 			UUID: "fake-uuid",
 			Cloud: mongodoc.Cloud{
@@ -1212,126 +1228,20 @@ var setDeadTests = []struct {
 }, {
 	about: "AddModel",
 	run: func(db *jem.Database) {
-		db.AddModel(&mongodoc.Model{
+		db.AddModel(testContext, &mongodoc.Model{
 			Path: fakeEntityPath,
 		})
 	},
 }, {
-	about: "DeleteModel",
-	run: func(db *jem.Database) {
-		db.DeleteModel(context.Background(), fakeEntityPath)
-	},
-}, {
-	about: "Model",
-	run: func(db *jem.Database) {
-		db.Model(fakeEntityPath)
-	},
-}, {
-	about: "Controller",
-	run: func(db *jem.Database) {
-		db.Controller(fakeEntityPath)
-	},
-}, {
-	about: "ModelFromUUID",
-	run: func(db *jem.Database) {
-		db.ModelFromUUID("99999999-9999-9999-9999-999999999999")
-	},
-}, {
-	about: "SetControllerAvailable",
-	run: func(db *jem.Database) {
-		db.SetControllerAvailable(fakeEntityPath)
-	},
-}, {
-	about: "SetControllerUnavailableAt",
-	run: func(db *jem.Database) {
-		db.SetControllerUnavailableAt(fakeEntityPath, time.Now())
-	},
-}, {
 	about: "AcquireMonitorLease",
 	run: func(db *jem.Database) {
-		db.AcquireMonitorLease(fakeEntityPath, time.Now(), "foo", time.Now(), "bar")
-	},
-}, {
-	about: "SetControllerStats",
-	run: func(db *jem.Database) {
-		db.SetModelLife(fakeEntityPath, "fake-uuid", "alive")
-	},
-}, {
-	about: "SetModelLife",
-	run: func(db *jem.Database) {
-		db.SetModelLife(fakeEntityPath, "fake-uuid", "alive")
-	},
-}, {
-	about: "UpdateModelCounts",
-	run: func(db *jem.Database) {
-		db.UpdateModelCounts("fake-uuid", nil, T(0))
-	},
-}, {
-	about: "UpdateCredential",
-	run: func(db *jem.Database) {
-		jem.UpdateCredential(db, &mongodoc.Credential{
-			Path:  fakeCredPath,
-			Type:  "credtype",
-			Label: "Test Label",
-		})
-	},
-}, {
-	about: "Credential",
-	run: func(db *jem.Database) {
-		db.Credential(fakeCredPath)
-	},
-}, {
-	about: "credentialAddController",
-	run: func(db *jem.Database) {
-		jem.CredentialAddController(db, fakeCredPath, fakeEntityPath)
-	},
-}, {
-	about: "credentialRemoveController",
-	run: func(db *jem.Database) {
-		jem.CredentialRemoveController(db, fakeCredPath, fakeEntityPath)
-	},
-}, {
-	about: "Cloud",
-	run: func(db *jem.Database) {
-		db.Cloud("my-cloud")
-	},
-}, {
-	about: "setCredentialUpdates",
-	run: func(db *jem.Database) {
-		jem.SetCredentialUpdates(db, []params.EntityPath{fakeEntityPath}, fakeCredPath)
-	},
-}, {
-	about: "clearCredentialUpdate",
-	run: func(db *jem.Database) {
-		jem.ClearCredentialUpdate(db, fakeEntityPath, fakeCredPath)
-	},
-}, {
-	about: "GetACL",
-	run: func(db *jem.Database) {
-		db.GetACL(db.Models(), fakeEntityPath)
-	},
-}, {
-	about: "SetACL",
-	run: func(db *jem.Database) {
-		db.SetACL(db.Models(), fakeEntityPath, params.ACL{
-			Read: []string{"t1", "t2"},
-		})
-	},
-}, {
-	about: "Grant",
-	run: func(db *jem.Database) {
-		db.Grant(db.Controllers(), fakeEntityPath, "t1")
-	},
-}, {
-	about: "Revoke",
-	run: func(db *jem.Database) {
-		db.Revoke(db.Controllers(), fakeEntityPath, "t1")
+		db.AcquireMonitorLease(testContext, fakeEntityPath, time.Now(), "foo", time.Now(), "bar")
 	},
 }, {
 	about: "CanReadIter",
 	run: func(db *jem.Database) {
 		it := db.Models().Find(nil).Sort("_id").Iter()
-		ctx := auth.ContextWithUser(context.Background(), "bob", "bob-group")
+		ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
 		crit := db.NewCanReadIter(ctx, it)
 		crit.Next(&mongodoc.Model{})
 		crit.Err()
@@ -1340,10 +1250,129 @@ var setDeadTests = []struct {
 	about: "CanReadIter with Close",
 	run: func(db *jem.Database) {
 		it := db.Models().Find(nil).Sort("_id").Iter()
-		ctx := auth.ContextWithUser(context.Background(), "bob", "bob-group")
+		ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
 		crit := db.NewCanReadIter(ctx, it)
 		crit.Next(&mongodoc.Model{})
 		crit.Close()
+	},
+}, {
+	about: "clearCredentialUpdate",
+	run: func(db *jem.Database) {
+		jem.ClearCredentialUpdate(db, testContext, fakeEntityPath, fakeCredPath)
+	},
+}, {
+	about: "Cloud",
+	run: func(db *jem.Database) {
+		db.Cloud(testContext, "my-cloud")
+	},
+}, {
+	about: "Controller",
+	run: func(db *jem.Database) {
+		db.Controller(testContext, fakeEntityPath)
+	},
+}, {
+	about: "Credential",
+	run: func(db *jem.Database) {
+		db.Credential(testContext, fakeCredPath)
+	},
+}, {
+	about: "credentialAddController",
+	run: func(db *jem.Database) {
+		jem.CredentialAddController(db, testContext, fakeCredPath, fakeEntityPath)
+	},
+}, {
+	about: "credentialRemoveController",
+	run: func(db *jem.Database) {
+		jem.CredentialRemoveController(db, testContext, fakeCredPath, fakeEntityPath)
+	},
+}, {
+	about: "DeleteModel",
+	run: func(db *jem.Database) {
+		db.DeleteModel(testContext, fakeEntityPath)
+	},
+}, {
+	about: "GetACL",
+	run: func(db *jem.Database) {
+		db.GetACL(testContext, db.Models(), fakeEntityPath)
+	},
+}, {
+	about: "Grant",
+	run: func(db *jem.Database) {
+		db.Grant(testContext, db.Controllers(), fakeEntityPath, "t1")
+	},
+}, {
+	about: "Model",
+	run: func(db *jem.Database) {
+		db.Model(testContext, fakeEntityPath)
+	},
+}, {
+	about: "MachinesForModel",
+	run: func(db *jem.Database) {
+		db.Model(testContext, fakeEntityPath)
+	},
+}, {
+	about: "ModelFromUUID",
+	run: func(db *jem.Database) {
+		db.ModelFromUUID(testContext, "99999999-9999-9999-9999-999999999999")
+	},
+}, {
+	about: "Revoke",
+	run: func(db *jem.Database) {
+		db.Revoke(testContext, db.Controllers(), fakeEntityPath, "t1")
+	},
+}, {
+	about: "SetACL",
+	run: func(db *jem.Database) {
+		db.SetACL(testContext, db.Models(), fakeEntityPath, params.ACL{
+			Read: []string{"t1", "t2"},
+		})
+	},
+}, {
+	about: "SetControllerAvailable",
+	run: func(db *jem.Database) {
+		db.SetControllerAvailable(testContext, fakeEntityPath)
+	},
+}, {
+	about: "SetControllerStats",
+	run: func(db *jem.Database) {
+		db.SetModelLife(testContext, fakeEntityPath, "fake-uuid", "alive")
+	},
+}, {
+	about: "SetControllerUnavailableAt",
+	run: func(db *jem.Database) {
+		db.SetControllerUnavailableAt(testContext, fakeEntityPath, time.Now())
+	},
+}, {
+	about: "setCredentialUpdates",
+	run: func(db *jem.Database) {
+		jem.SetCredentialUpdates(db, testContext, []params.EntityPath{fakeEntityPath}, fakeCredPath)
+	},
+}, {
+	about: "SetModelLife",
+	run: func(db *jem.Database) {
+		db.SetModelLife(testContext, fakeEntityPath, "fake-uuid", "alive")
+	},
+}, {
+	about: "UpdateCredential",
+	run: func(db *jem.Database) {
+		jem.UpdateCredential(db, testContext, &mongodoc.Credential{
+			Path:  fakeCredPath,
+			Type:  "credtype",
+			Label: "Test Label",
+		})
+	},
+}, {
+	about: "UpdateMachineInfo",
+	run: func(db *jem.Database) {
+		db.UpdateMachineInfo(testContext, &multiwatcher.MachineInfo{
+			ModelUUID: "xxx",
+			Id: "yyy",
+		})
+	},
+}, {
+	about: "UpdateModelCounts",
+	run: func(db *jem.Database) {
+		db.UpdateModelCounts(testContext, "fake-uuid", nil, T(0))
 	},
 }}
 

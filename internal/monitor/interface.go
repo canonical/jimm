@@ -28,34 +28,34 @@ type jemInterface interface {
 	// SetControllerStats sets the stats associated with the controller
 	// with the given path. It returns an error with a params.ErrNotFound
 	// cause if the controller does not exist.
-	SetControllerStats(ctlPath params.EntityPath, stats *mongodoc.ControllerStats) error
+	SetControllerStats(ctx context.Context, ctlPath params.EntityPath, stats *mongodoc.ControllerStats) error
 
 	// SetControllerUnavailableAt marks the controller as having been unavailable
 	// since at least the given time. If the controller was already marked
 	// as unavailable, its time isn't changed.
 	// This method does not return an error when the controller doesn't exist.
-	SetControllerUnavailableAt(ctlPath params.EntityPath, t time.Time) error
+	SetControllerUnavailableAt(ctx context.Context, ctlPath params.EntityPath, t time.Time) error
 
 	// SetControllerAvailable marks the given controller as available.
 	// This method does not return an error when the controller doesn't exist.
-	SetControllerAvailable(ctlPath params.EntityPath) error
+	SetControllerAvailable(ctx context.Context, ctlPath params.EntityPath) error
 
 	// SetModelLife sets the Life field of all models controlled
 	// by the given controller that have the given UUID.
 	// It does not return an error if there are no such models.
-	SetModelLife(ctlPath params.EntityPath, uuid string, life string) error
+	SetModelLife(ctx context.Context, ctlPath params.EntityPath, uuid string, life string) error
 
 	// UpdateModelCounts updates the count statistics associated with the
 	// model with the given UUID recording them at the given current time.
 	// Each counts map entry holds the current count for its key. Counts not
 	// mentioned in the counts argument will not be affected.
-	UpdateModelCounts(uuid string, counts map[params.EntityCount]int, now time.Time) error
+	UpdateModelCounts(ctx context.Context, uuid string, counts map[params.EntityCount]int, now time.Time) error
 
 	// UpdateMachineInfo updates the information associated with a machine.
-	UpdateMachineInfo(machine *multiwatcher.MachineInfo) error
+	UpdateMachineInfo(ctx context.Context, machine *multiwatcher.MachineInfo) error
 
 	// AllControllers returns all the controllers in the system.
-	AllControllers() ([]*mongodoc.Controller, error)
+	AllControllers(ctx context.Context) ([]*mongodoc.Controller, error)
 
 	// OpenAPI opens an API connection to the model with the given path
 	// and returns it along with the information used to connect.
@@ -80,7 +80,7 @@ type jemInterface interface {
 	// If the controller has been removed, an error with a params.ErrNotFound
 	// cause will be returned. If the lease has been obtained by someone else
 	// an error with a jem.ErrLeaseUnavailable cause will be returned.
-	AcquireMonitorLease(ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error)
+	AcquireMonitorLease(ctx context.Context, ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error)
 
 	// ControllerUpdateCredentials updates the given controller by updating
 	// all credentials listed in ctl.UpdateCredentials.

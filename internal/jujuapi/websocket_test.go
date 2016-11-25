@@ -33,6 +33,8 @@ import (
 	"github.com/CanonicalLtd/jem/params"
 )
 
+var testContext = context.Background()
+
 type websocketSuite struct {
 	apitest.Suite
 	wsServer *httptest.Server
@@ -493,18 +495,20 @@ func (s *websocketSuite) TestListModels(c *gc.C) {
 	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
 	cred2 := s.AssertUpdateCredential(c, "test2", "dummy", "cred1", "empty")
-	err := s.JEM.DB.SetACL(s.JEM.DB.Controllers(), ctlPath, params.ACL{
+	err := s.JEM.DB.SetACL(testContext, s.JEM.DB.Controllers(), ctlPath, params.ACL{
 		Read: []string{"test2"},
 	})
+
 	c.Assert(err, jc.ErrorIsNil)
 	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
 	modelUUID1 := mi.UUID
 	s.assertCreateModel(c, createModelParams{name: "model-2", username: "test2", cred: cred2})
 	mi = s.assertCreateModel(c, createModelParams{name: "model-3", username: "test2", cred: cred2})
 	modelUUID3 := mi.UUID
-	err = s.JEM.DB.SetACL(s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
+	err = s.JEM.DB.SetACL(testContext, s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
 		Read: []string{"test"},
 	})
+
 	c.Assert(err, jc.ErrorIsNil)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
@@ -532,9 +536,10 @@ func (s *websocketSuite) TestUserModelStats(c *gc.C) {
 	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
 	cred2 := s.AssertUpdateCredential(c, "test2", "dummy", "cred1", "empty")
-	err := s.JEM.DB.SetACL(s.JEM.DB.Controllers(), ctlPath, params.ACL{
+	err := s.JEM.DB.SetACL(testContext, s.JEM.DB.Controllers(), ctlPath, params.ACL{
 		Read: []string{"test2"},
 	})
+
 	c.Assert(err, jc.ErrorIsNil)
 
 	model1 := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
@@ -544,22 +549,25 @@ func (s *websocketSuite) TestUserModelStats(c *gc.C) {
 	// Update some stats for the models we've just created'
 	t0 := time.Unix(0, 0)
 
-	err = s.JEM.DB.UpdateModelCounts(model1.UUID, map[params.EntityCount]int{
+	err = s.JEM.DB.UpdateModelCounts(testContext, model1.UUID, map[params.EntityCount]int{
 		params.UnitCount: 99,
 	}, t0)
+
 	c.Assert(err, gc.IsNil)
-	err = s.JEM.DB.UpdateModelCounts(model2.UUID, map[params.EntityCount]int{
+	err = s.JEM.DB.UpdateModelCounts(testContext, model2.UUID, map[params.EntityCount]int{
 		params.MachineCount: 10,
 	}, t0)
+
 	c.Assert(err, gc.IsNil)
-	err = s.JEM.DB.UpdateModelCounts(model3.UUID, map[params.EntityCount]int{
+	err = s.JEM.DB.UpdateModelCounts(testContext, model3.UUID, map[params.EntityCount]int{
 		params.ApplicationCount: 1,
 	}, t0)
+
 	c.Assert(err, gc.IsNil)
 
 	// Allow test2/model-3 access to everyone, so that we can be sure we're
 	// not seeing models that we have access to but aren't the creator of.
-	err = s.JEM.DB.SetACL(s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
+	err = s.JEM.DB.SetACL(testContext, s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
 		Read: []string{"test"},
 	})
 
@@ -637,9 +645,10 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
 	s.AssertUpdateCredential(c, "test2", "dummy", "cred1", "empty")
-	err := s.JEM.DB.SetACL(s.JEM.DB.Controllers(), ctlPath, params.ACL{
+	err := s.JEM.DB.SetACL(testContext, s.JEM.DB.Controllers(), ctlPath, params.ACL{
 		Read: []string{"test2"},
 	})
+
 	c.Assert(err, jc.ErrorIsNil)
 
 	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: "cred1"})
@@ -653,9 +662,10 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 	defer conn.Close()
 	client := modelmanager.NewClient(conn)
 
-	err = s.JEM.DB.SetACL(s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
+	err = s.JEM.DB.SetACL(testContext, s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
 		Read: []string{"test"},
 	})
+
 	c.Assert(err, jc.ErrorIsNil)
 
 	models, err := client.ModelInfo([]names.ModelTag{
@@ -720,9 +730,10 @@ func (s *websocketSuite) TestAllModels(c *gc.C) {
 	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
 	s.AssertUpdateCredential(c, "test2", "dummy", "cred1", "empty")
-	err := s.JEM.DB.SetACL(s.JEM.DB.Controllers(), ctlPath, params.ACL{
+	err := s.JEM.DB.SetACL(testContext, s.JEM.DB.Controllers(), ctlPath, params.ACL{
 		Read: []string{"test2"},
 	})
+
 	c.Assert(err, jc.ErrorIsNil)
 
 	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: "cred1"})
@@ -735,9 +746,10 @@ func (s *websocketSuite) TestAllModels(c *gc.C) {
 	defer conn.Close()
 	client := controller.NewClient(conn)
 
-	err = s.JEM.DB.SetACL(s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
+	err = s.JEM.DB.SetACL(testContext, s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
 		Read: []string{"test"},
 	})
+
 	c.Assert(err, jc.ErrorIsNil)
 
 	models, err := client.AllModels()
@@ -759,9 +771,10 @@ func (s *websocketSuite) TestModelStatus(c *gc.C) {
 	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
 	s.AssertUpdateCredential(c, "test2", "dummy", "cred1", "empty")
-	err := s.JEM.DB.SetACL(s.JEM.DB.Controllers(), ctlPath, params.ACL{
+	err := s.JEM.DB.SetACL(testContext, s.JEM.DB.Controllers(), ctlPath, params.ACL{
 		Read: []string{"test2"},
 	})
+
 	c.Assert(err, jc.ErrorIsNil)
 
 	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: "cred1"})
@@ -771,9 +784,10 @@ func (s *websocketSuite) TestModelStatus(c *gc.C) {
 	mi = s.assertCreateModel(c, createModelParams{name: "model-3", username: "test2", cred: "cred1"})
 	modelUUID3 := mi.UUID
 
-	err = s.JEM.DB.SetACL(s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
+	err = s.JEM.DB.SetACL(testContext, s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
 		Read: []string{"test"},
 	})
+
 	c.Assert(err, jc.ErrorIsNil)
 
 	type modelStatuser interface {

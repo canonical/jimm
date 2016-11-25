@@ -20,6 +20,7 @@ import (
 	_ "github.com/juju/juju/provider/openstack"
 	"github.com/juju/loggo"
 	"github.com/uber-go/zap"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
@@ -38,7 +39,6 @@ import (
 const websocketPingTimeout = 3 * time.Minute
 
 var (
-	logger = loggo.GetLogger("jemd")
 	// The logging-config flag is present for backward compatibility
 	// only and will probably be removed in the future.
 	loggingConfig = flag.String("logging-config", "", "specify log levels for modules e.g. <root>=TRACE")
@@ -64,7 +64,6 @@ func main() {
 }
 
 func serve(confPath string) error {
-	logger.Debugf("reading configuration")
 	conf, err := config.Read(confPath)
 	if err != nil {
 		return errgo.Notef(err, "cannot read config file %q", confPath)
@@ -76,9 +75,9 @@ func serve(confPath string) error {
 		return errgo.Notef(err, "identity location must not contain discharge path")
 	}
 
-	logger := setUpLogging(conf.LoggingLevel)
+	ctx := setUpLogging(context.Background(), conf.LoggingLevel)
 
-	logger.Debug("connecting to mongo")
+	zapctx.Debug(ctx, "connecting to mongo")
 	session, err := mgo.Dial(conf.MongoAddr)
 	if err != nil {
 		return errgo.Notef(err, "cannot dial mongo at %q", conf.MongoAddr)
@@ -86,7 +85,7 @@ func serve(confPath string) error {
 	defer session.Close()
 	db := session.DB("jem")
 
-	logger.Debug("setting up the API server")
+	zapctx.Debug(ctx, "setting up the API server")
 	var locator bakery.PublicKeyLocator
 	if conf.IdentityPublicKey == nil {
 		locator = httpbakery.NewPublicKeyRing(nil, nil)
@@ -99,7 +98,6 @@ func serve(confPath string) error {
 		conf.MaxMgoSessions = 100
 	}
 	cfg := jem.ServerParams{
-		Logger:               logger,
 		DB:                   db,
 		MaxMgoSessions:       conf.MaxMgoSessions,
 		ControllerAdmin:      conf.ControllerAdmin,
@@ -112,7 +110,7 @@ func serve(confPath string) error {
 		WebsocketPingTimeout: websocketPingTimeout,
 		GUILocation:          conf.GUILocation,
 	}
-	server, err := jem.NewServer(cfg)
+	server, err := jem.NewServer(ctx, cfg)
 	if err != nil {
 		return errgo.Notef(err, "cannot create new server at %q", conf.APIAddr)
 	}
@@ -127,7 +125,7 @@ func serve(confPath string) error {
 		handler = handlers.CombinedLoggingHandler(accesslog, handler)
 	}
 
-	logger.Info("starting the API server")
+	zapctx.Info(ctx, "starting the API server")
 	httpServer := &http.Server{
 		Addr:      conf.APIAddr,
 		Handler:   handler,
@@ -146,7 +144,7 @@ var zapToLoggo = map[zap.Level]loggo.Level{
 	zap.ErrorLevel: loggo.ERROR, // Include error and critical level messages.
 }
 
-func setUpLogging(level zap.Level) zap.Logger {
+func setUpLogging(ctx context.Context, level zap.Level) context.Context {
 	// Set up the root zap logger.
 	logger := zap.New(zap.NewJSONEncoder(), zap.Output(os.Stderr), level)
 	zapctx.Default = logger
@@ -158,5 +156,5 @@ func setUpLogging(level zap.Level) zap.Logger {
 	loggo.DefaultContext().ApplyConfig(map[string]loggo.Level{
 		"<root>": zapToLoggo[level],
 	})
-	return logger
+	return zapctx.WithLogger(ctx, logger)
 }

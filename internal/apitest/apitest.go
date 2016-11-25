@@ -15,6 +15,7 @@ import (
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"github.com/rogpeppe/fastuuid"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/mgo.v2"
@@ -129,7 +130,7 @@ func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server,
 	if params.GUILocation != "" {
 		config.GUILocation = params.GUILocation
 	}
-	srv, err := external_jem.NewServer(config)
+	srv, err := external_jem.NewServer(context.TODO(), config)
 	c.Assert(err, gc.IsNil)
 	return srv.(*jemserver.Server)
 }
@@ -178,7 +179,7 @@ func (s *Suite) AssertAddControllerDoc(c *gc.C, cnt *mongodoc.Controller) *mongo
 	if cnt.UUID == "" {
 		cnt.UUID = fmt.Sprintf("%x", uuidGenerator.Next())
 	}
-	err := s.JEM.DB.AddController(cnt)
+	err := s.JEM.DB.AddController(context.Background(), cnt)
 
 	c.Assert(err, jc.ErrorIsNil)
 	return cnt

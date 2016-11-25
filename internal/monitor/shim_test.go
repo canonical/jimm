@@ -84,56 +84,56 @@ func (s jemShimWithUpdateNotify) waitAny(maxWait time.Duration) string {
 	}
 }
 
-func (s jemShimWithUpdateNotify) SetControllerStats(ctlPath params.EntityPath, stats *mongodoc.ControllerStats) error {
-	if err := s.jemInterface.SetControllerStats(ctlPath, stats); err != nil {
+func (s jemShimWithUpdateNotify) SetControllerStats(ctx context.Context, ctlPath params.EntityPath, stats *mongodoc.ControllerStats) error {
+	if err := s.jemInterface.SetControllerStats(ctx, ctlPath, stats); err != nil {
 		return err
 	}
 	s.changed <- "controller stats"
 	return nil
 }
 
-func (s jemShimWithUpdateNotify) SetControllerUnavailableAt(ctlPath params.EntityPath, t time.Time) error {
-	if err := s.jemInterface.SetControllerUnavailableAt(ctlPath, t); err != nil {
+func (s jemShimWithUpdateNotify) SetControllerUnavailableAt(ctx context.Context, ctlPath params.EntityPath, t time.Time) error {
+	if err := s.jemInterface.SetControllerUnavailableAt(ctx, ctlPath, t); err != nil {
 		return err
 	}
 	s.changed <- "controller availability"
 	return nil
 }
 
-func (s jemShimWithUpdateNotify) SetControllerAvailable(ctlPath params.EntityPath) error {
-	if err := s.jemInterface.SetControllerAvailable(ctlPath); err != nil {
+func (s jemShimWithUpdateNotify) SetControllerAvailable(ctx context.Context, ctlPath params.EntityPath) error {
+	if err := s.jemInterface.SetControllerAvailable(ctx, ctlPath); err != nil {
 		return err
 	}
 	s.changed <- "controller availability"
 	return nil
 }
 
-func (s jemShimWithUpdateNotify) SetModelLife(ctlPath params.EntityPath, uuid string, life string) error {
-	if err := s.jemInterface.SetModelLife(ctlPath, uuid, life); err != nil {
+func (s jemShimWithUpdateNotify) SetModelLife(ctx context.Context, ctlPath params.EntityPath, uuid string, life string) error {
+	if err := s.jemInterface.SetModelLife(ctx, ctlPath, uuid, life); err != nil {
 		return err
 	}
 	s.changed <- "model life"
 	return nil
 }
 
-func (s jemShimWithUpdateNotify) UpdateModelCounts(uuid string, counts map[params.EntityCount]int, now time.Time) error {
-	if err := s.jemInterface.UpdateModelCounts(uuid, counts, now); err != nil {
+func (s jemShimWithUpdateNotify) UpdateModelCounts(ctx context.Context, uuid string, counts map[params.EntityCount]int, now time.Time) error {
+	if err := s.jemInterface.UpdateModelCounts(ctx, uuid, counts, now); err != nil {
 		return err
 	}
 	s.changed <- "model counts"
 	return nil
 }
 
-func (s jemShimWithUpdateNotify) UpdateMachineInfo(info *multiwatcher.MachineInfo) error {
-	if err := s.jemInterface.UpdateMachineInfo(info); err != nil {
+func (s jemShimWithUpdateNotify) UpdateMachineInfo(ctx context.Context, info *multiwatcher.MachineInfo) error {
+	if err := s.jemInterface.UpdateMachineInfo(ctx, info); err != nil {
 		return err
 	}
 	s.changed <- "machine info"
 	return nil
 }
 
-func (s jemShimWithUpdateNotify) AcquireMonitorLease(ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {
-	t, err := s.jemInterface.AcquireMonitorLease(ctlPath, oldExpiry, oldOwner, newExpiry, newOwner)
+func (s jemShimWithUpdateNotify) AcquireMonitorLease(ctx context.Context, ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {
+	t, err := s.jemInterface.AcquireMonitorLease(ctx, ctlPath, oldExpiry, oldOwner, newExpiry, newOwner)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -159,12 +159,12 @@ func (s jemShimWithAPIOpener) Clone() jemInterface {
 type jemShimWithMonitorLeaseAcquirer struct {
 	// acquireMonitorLease is called when the AcquireMonitorLease
 	// method is called.
-	acquireMonitorLease func(ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error)
+	acquireMonitorLease func(ctxt context.Context, ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error)
 	jemInterface
 }
 
-func (s jemShimWithMonitorLeaseAcquirer) AcquireMonitorLease(ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {
-	return s.acquireMonitorLease(ctlPath, oldExpiry, oldOwner, newExpiry, newOwner)
+func (s jemShimWithMonitorLeaseAcquirer) AcquireMonitorLease(ctx context.Context, ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {
+	return s.acquireMonitorLease(ctx, ctlPath, oldExpiry, oldOwner, newExpiry, newOwner)
 }
 
 func (s jemShimWithMonitorLeaseAcquirer) Clone() jemInterface {
@@ -204,7 +204,7 @@ func (s *jemShimInMemory) controller(p params.EntityPath) *mongodoc.Controller {
 	return &c
 }
 
-func (s *jemShimInMemory) AddController(ctl *mongodoc.Controller) {
+func (s *jemShimInMemory) AddController(ctx context.Context, ctl *mongodoc.Controller) {
 	if ctl.Path == (params.EntityPath{}) {
 		panic("no path in controller")
 	}
@@ -215,7 +215,7 @@ func (s *jemShimInMemory) AddController(ctl *mongodoc.Controller) {
 	s.controllers[ctl.Path] = &ctl1
 }
 
-func (s *jemShimInMemory) AddModel(m *mongodoc.Model) {
+func (s *jemShimInMemory) AddModel(ctx context.Context, m *mongodoc.Model) {
 	if m.Path.IsZero() {
 		panic("no path in model")
 	}
@@ -236,7 +236,7 @@ func (s *jemShimInMemory) Clone() jemInterface {
 	return s
 }
 
-func (s *jemShimInMemory) SetControllerStats(ctlPath params.EntityPath, stats *mongodoc.ControllerStats) error {
+func (s *jemShimInMemory) SetControllerStats(ctx context.Context, ctlPath params.EntityPath, stats *mongodoc.ControllerStats) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	ctl, ok := s.controllers[ctlPath]
@@ -247,7 +247,7 @@ func (s *jemShimInMemory) SetControllerStats(ctlPath params.EntityPath, stats *m
 	return nil
 }
 
-func (s *jemShimInMemory) SetControllerAvailable(ctlPath params.EntityPath) error {
+func (s *jemShimInMemory) SetControllerAvailable(ctx context.Context, ctlPath params.EntityPath) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	ctl, ok := s.controllers[ctlPath]
@@ -257,7 +257,7 @@ func (s *jemShimInMemory) SetControllerAvailable(ctlPath params.EntityPath) erro
 	return nil
 }
 
-func (s *jemShimInMemory) SetControllerUnavailableAt(ctlPath params.EntityPath, t time.Time) error {
+func (s *jemShimInMemory) SetControllerUnavailableAt(ctx context.Context, ctlPath params.EntityPath, t time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	ctl, ok := s.controllers[ctlPath]
@@ -267,7 +267,7 @@ func (s *jemShimInMemory) SetControllerUnavailableAt(ctlPath params.EntityPath, 
 	return nil
 }
 
-func (s *jemShimInMemory) SetModelLife(ctlPath params.EntityPath, uuid string, life string) error {
+func (s *jemShimInMemory) SetModelLife(ctx context.Context, ctlPath params.EntityPath, uuid string, life string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, m := range s.models {
@@ -279,7 +279,7 @@ func (s *jemShimInMemory) SetModelLife(ctlPath params.EntityPath, uuid string, l
 	return nil
 }
 
-func (s *jemShimInMemory) UpdateModelCounts(uuid string, counts map[params.EntityCount]int, now time.Time) error {
+func (s *jemShimInMemory) UpdateModelCounts(ctx context.Context, uuid string, counts map[params.EntityCount]int, now time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var model *mongodoc.Model
@@ -303,7 +303,7 @@ func (s *jemShimInMemory) UpdateModelCounts(uuid string, counts map[params.Entit
 	return nil
 }
 
-func (s *jemShimInMemory) UpdateMachineInfo(info *multiwatcher.MachineInfo) error {
+func (s *jemShimInMemory) UpdateMachineInfo(ctx context.Context, info *multiwatcher.MachineInfo) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	info1 := *info
@@ -323,7 +323,7 @@ func (s *jemShimInMemory) Close() {
 	}
 }
 
-func (s *jemShimInMemory) AllControllers() ([]*mongodoc.Controller, error) {
+func (s *jemShimInMemory) AllControllers(ctx context.Context) ([]*mongodoc.Controller, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var r []*mongodoc.Controller
@@ -345,7 +345,7 @@ func (s *jemShimInMemory) OpenAPI(context.Context, params.EntityPath) (jujuAPI, 
 	return nil, errgo.New("jemShimInMemory doesn't implement OpenAPI")
 }
 
-func (s *jemShimInMemory) AcquireMonitorLease(ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {
+func (s *jemShimInMemory) AcquireMonitorLease(ctx context.Context, ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	ctl, ok := s.controllers[ctlPath]

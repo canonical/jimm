@@ -23,6 +23,8 @@ type monitorSuite struct {
 	apitest.Suite
 }
 
+var testContext = context.Background()
+
 var _ = gc.Suite(&monitorSuite{})
 
 func (s *monitorSuite) TestMonitor(c *gc.C) {
@@ -33,7 +35,7 @@ func (s *monitorSuite) TestMonitor(c *gc.C) {
 	hps, err := mongodoc.ParseAddresses(info.Addrs)
 	c.Assert(err, gc.IsNil)
 
-	err = s.JEM.DB.AddController(&mongodoc.Controller{
+	err = s.JEM.DB.AddController(testContext, &mongodoc.Controller{
 		Path:          ctlPath,
 		HostPorts:     [][]mongodoc.HostPort{hps},
 		CACert:        info.CACert,
@@ -50,7 +52,7 @@ func (s *monitorSuite) TestMonitor(c *gc.C) {
 	// Wait for the stats to be updated.
 	var ctl *mongodoc.Controller
 	for a := jujutesting.LongAttempt.Start(); a.Next(); {
-		ctl, err = s.JEM.DB.Controller(ctlPath)
+		ctl, err = s.JEM.DB.Controller(testContext, ctlPath)
 		c.Assert(err, gc.IsNil)
 		if ctl.Stats != (mongodoc.ControllerStats{}) {
 			break
@@ -88,7 +90,7 @@ func (s *monitorSuite) TestMonitorWithBrokenMongoConnection(c *gc.C) {
 	hps, err := mongodoc.ParseAddresses(apiInfo.Addrs)
 	c.Assert(err, gc.IsNil)
 
-	err = jem.DB.AddController(&mongodoc.Controller{
+	err = jem.DB.AddController(testContext, &mongodoc.Controller{
 		Path:          ctlPath,
 		HostPorts:     [][]mongodoc.HostPort{hps},
 		CACert:        apiInfo.CACert,
@@ -140,7 +142,7 @@ func (s *monitorSuite) TestMonitorWithBrokenJujuAPIConnection(c *gc.C) {
 	hps, err := mongodoc.ParseAddresses([]string{proxy.Addr()})
 	c.Assert(err, gc.IsNil)
 
-	err = s.JEM.DB.AddController(&mongodoc.Controller{
+	err = s.JEM.DB.AddController(testContext, &mongodoc.Controller{
 		Path:          ctlPath,
 		HostPorts:     [][]mongodoc.HostPort{hps},
 		CACert:        apiInfo.CACert,
@@ -178,7 +180,7 @@ func (s *monitorSuite) TestMonitorWithBrokenJujuAPIConnection(c *gc.C) {
 
 func (s *monitorSuite) waitControllerStats(c *gc.C, ctlPath params.EntityPath, oldStats mongodoc.ControllerStats) mongodoc.ControllerStats {
 	for a := jujutesting.LongAttempt.Start(); a.Next(); {
-		ctl, err := s.JEM.DB.Controller(ctlPath)
+		ctl, err := s.JEM.DB.Controller(testContext, ctlPath)
 		c.Assert(err, gc.IsNil)
 		if ctl.Stats != oldStats {
 			return ctl.Stats

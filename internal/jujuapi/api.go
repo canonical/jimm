@@ -9,58 +9,62 @@ import (
 
 	"github.com/juju/httprequest"
 	"github.com/julienschmidt/httprouter"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/internal/auth"
+	"github.com/CanonicalLtd/jem/internal/ctxutil"
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/jemerror"
 	"github.com/CanonicalLtd/jem/internal/jemserver"
 	"github.com/CanonicalLtd/jem/params"
 )
 
-func NewAPIHandler(jp *jem.Pool, ap *auth.Pool, params jemserver.Params) ([]httprequest.Handler, error) {
+func NewAPIHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, params jemserver.Params) ([]httprequest.Handler, error) {
 	return append(
 		jemerror.Mapper.Handlers(func(p httprequest.Params) (*handler, error) {
 			return &handler{
-				params: params,
-				jem:    jp.JEM(),
+				context: ctxutil.Join(ctx, p.Context),
+				params:  params,
+				jem:     jp.JEM(),
 			}, nil
 		}),
-		newWebSocketHandler(jp, ap, params),
-		newRootWebSocketHandler(jp, ap, params, "/"),
-		newRootWebSocketHandler(jp, ap, params, "/api"),
+		newWebSocketHandler(ctx, jp, ap, params),
+		newRootWebSocketHandler(ctx, jp, ap, params, "/"),
+		newRootWebSocketHandler(ctx, jp, ap, params, "/api"),
 	), nil
 }
 
-func newWebSocketHandler(jp *jem.Pool, ap *auth.Pool, params jemserver.Params) httprequest.Handler {
+func newWebSocketHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, params jemserver.Params) httprequest.Handler {
 	return httprequest.Handler{
 		Method: "GET",
 		Path:   "/model/:modeluuid/api",
 		Handle: func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 			j := jp.JEM()
 			defer j.Close()
-			wsServer := newWSServer(j, ap, params, p.ByName("modeluuid"))
+			wsServer := newWSServer(ctx, j, ap, params, p.ByName("modeluuid"))
 			wsServer.ServeHTTP(w, r)
 		},
 	}
 }
 
-func newRootWebSocketHandler(jp *jem.Pool, ap *auth.Pool, params jemserver.Params, path string) httprequest.Handler {
+func newRootWebSocketHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, params jemserver.Params, path string) httprequest.Handler {
 	return httprequest.Handler{
 		Method: "GET",
 		Path:   path,
 		Handle: func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 			j := jp.JEM()
 			defer j.Close()
-			wsServer := newWSServer(j, ap, params, "")
+			wsServer := newWSServer(ctx, j, ap, params, "")
 			wsServer.ServeHTTP(w, r)
 		},
 	}
 }
 
 type handler struct {
-	params jemserver.Params
-	jem    *jem.JEM
+	context context.Context
+	params  jemserver.Params
+	jem     *jem.JEM
 }
 
 func (h *handler) Close() error {
@@ -78,7 +82,7 @@ func (h *handler) GUI(p httprequest.Params, arg *guiRequest) error {
 	if h.params.GUILocation == "" {
 		return errgo.WithCausef(nil, params.ErrNotFound, "no GUI location specified")
 	}
-	m, err := h.jem.DB.ModelFromUUID(arg.UUID)
+	m, err := h.jem.DB.ModelFromUUID(h.context, arg.UUID)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}

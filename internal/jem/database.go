@@ -95,8 +95,8 @@ func (db *Database) ensureIndexes() error {
 // error with a params.ErrAlreadyExists cause if there is already a
 // controller with the given name. The Id field in ctl will be set from
 // its Path field.
-func (db *Database) AddController(ctl *mongodoc.Controller) (err error) {
-	defer db.checkError(context.TODO(), &err)
+func (db *Database) AddController(ctx context.Context, ctl *mongodoc.Controller) (err error) {
+	defer db.checkError(ctx, &err)
 	ctl.Id = ctl.Path.String()
 	err = db.Controllers().Insert(ctl)
 	if err != nil {
@@ -145,8 +145,8 @@ func (db *Database) DeleteController(ctx context.Context, path params.EntityPath
 // It returns an error with a params.ErrAlreadyExists
 // cause if there is already an model with the given name.
 // If ignores m.Id and sets it from m.Path.
-func (db *Database) AddModel(m *mongodoc.Model) (err error) {
-	defer db.checkError(context.TODO(), &err)
+func (db *Database) AddModel(ctx context.Context, m *mongodoc.Model) (err error) {
+	defer db.checkError(ctx, &err)
 	m.Id = m.Path.String()
 	err = db.Models().Insert(m)
 	if mgo.IsDup(err) {
@@ -182,8 +182,8 @@ func (db *Database) DeleteModel(ctx context.Context, path params.EntityPath) (er
 // Controller returns information on the controller with the given
 // path. It returns an error with a params.ErrNotFound cause if the
 // controller was not found.
-func (db *Database) Controller(path params.EntityPath) (_ *mongodoc.Controller, err error) {
-	defer db.checkError(context.TODO(), &err)
+func (db *Database) Controller(ctx context.Context, path params.EntityPath) (_ *mongodoc.Controller, err error) {
+	defer db.checkError(ctx, &err)
 	var ctl mongodoc.Controller
 	id := path.String()
 	err = db.Controllers().FindId(id).One(&ctl)
@@ -199,8 +199,8 @@ func (db *Database) Controller(path params.EntityPath) (_ *mongodoc.Controller, 
 // Model returns information on the model with the given
 // path. It returns an error with a params.ErrNotFound cause if the
 // controller was not found.
-func (db *Database) Model(path params.EntityPath) (_ *mongodoc.Model, err error) {
-	defer db.checkError(context.TODO(), &err)
+func (db *Database) Model(ctx context.Context, path params.EntityPath) (_ *mongodoc.Model, err error) {
+	defer db.checkError(ctx, &err)
 	id := path.String()
 	var m mongodoc.Model
 	err = db.Models().FindId(id).One(&m)
@@ -216,8 +216,8 @@ func (db *Database) Model(path params.EntityPath) (_ *mongodoc.Model, err error)
 // ModelFromUUID returns the document representing the model with the
 // given UUID. It returns an error with a params.ErrNotFound cause if the
 // controller was not found.
-func (db *Database) ModelFromUUID(uuid string) (_ *mongodoc.Model, err error) {
-	defer db.checkError(context.TODO(), &err)
+func (db *Database) ModelFromUUID(ctx context.Context, uuid string) (_ *mongodoc.Model, err error) {
+	defer db.checkError(ctx, &err)
 	var m mongodoc.Model
 	err = db.Models().Find(bson.D{{"uuid", uuid}}).One(&m)
 	if err == mgo.ErrNotFound {
@@ -250,8 +250,8 @@ func (db *Database) controllerLocationQuery(cloud params.Cloud, region string, i
 
 // SetControllerAvailable marks the given controller as available.
 // This method does not return an error when the controller doesn't exist.
-func (db *Database) SetControllerAvailable(ctlPath params.EntityPath) (err error) {
-	defer db.checkError(context.TODO(), &err)
+func (db *Database) SetControllerAvailable(ctx context.Context, ctlPath params.EntityPath) (err error) {
+	defer db.checkError(ctx, &err)
 	if err = db.Controllers().UpdateId(ctlPath.String(), bson.D{{
 		"$unset", bson.D{{"unavailablesince", nil}},
 	}}); err != nil {
@@ -268,8 +268,8 @@ func (db *Database) SetControllerAvailable(ctlPath params.EntityPath) (err error
 // since at least the given time. If the controller was already marked
 // as unavailable, its time isn't changed.
 // This method does not return an error when the controller doesn't exist.
-func (db *Database) SetControllerUnavailableAt(ctlPath params.EntityPath, t time.Time) (err error) {
-	defer db.checkError(context.TODO(), &err)
+func (db *Database) SetControllerUnavailableAt(ctx context.Context, ctlPath params.EntityPath, t time.Time) (err error) {
+	defer db.checkError(ctx, &err)
 	err = db.Controllers().Update(
 		bson.D{
 			{"_id", ctlPath.String()},
@@ -312,8 +312,8 @@ var ErrLeaseUnavailable params.ErrorCode = "cannot acquire lease"
 // If the controller has been removed, an error with a params.ErrNotFound
 // cause will be returned. If the lease has been obtained by someone else
 // an error with a ErrLeaseUnavailable cause will be returned.
-func (db *Database) AcquireMonitorLease(ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (_ time.Time, err error) {
-	defer db.checkError(context.TODO(), &err)
+func (db *Database) AcquireMonitorLease(ctx context.Context, ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (_ time.Time, err error) {
+	defer db.checkError(ctx, &err)
 	var update bson.D
 	if newOwner != "" {
 		newExpiry = mongodoc.Time(newExpiry)
@@ -349,7 +349,7 @@ func (db *Database) AcquireMonitorLease(ctlPath params.EntityPath, oldExpiry tim
 		// Someone else got there first, or the document has been
 		// removed. Technically don't need to distinguish between the
 		// two cases, but it's useful to see the different error messages.
-		ctl, err := db.Controller(ctlPath)
+		ctl, err := db.Controller(ctx, ctlPath)
 		if errgo.Cause(err) == params.ErrNotFound {
 			return time.Time{}, errgo.WithCausef(nil, params.ErrNotFound, "controller removed")
 		}
@@ -367,8 +367,8 @@ func (db *Database) AcquireMonitorLease(ctlPath params.EntityPath, oldExpiry tim
 // SetControllerStats sets the stats associated with the controller
 // with the given path. It returns an error with a params.ErrNotFound
 // cause if the controller does not exist.
-func (db *Database) SetControllerStats(ctlPath params.EntityPath, stats *mongodoc.ControllerStats) (err error) {
-	defer db.checkError(context.TODO(), &err)
+func (db *Database) SetControllerStats(ctx context.Context, ctlPath params.EntityPath, stats *mongodoc.ControllerStats) (err error) {
+	defer db.checkError(ctx, &err)
 	err = db.Controllers().UpdateId(
 		ctlPath.String(),
 		bson.D{{"$set", bson.D{{"stats", stats}}}},
@@ -383,8 +383,8 @@ func (db *Database) SetControllerStats(ctlPath params.EntityPath, stats *mongodo
 // by the given controller that have the given UUID.
 // It does not return an error if there are no such models.
 // TODO remove the ctlPath argument.
-func (db *Database) SetModelLife(ctlPath params.EntityPath, uuid string, life string) (err error) {
-	defer db.checkError(context.TODO(), &err)
+func (db *Database) SetModelLife(ctx context.Context, ctlPath params.EntityPath, uuid string, life string) (err error) {
+	defer db.checkError(ctx, &err)
 	_, err = db.Models().UpdateAll(
 		bson.D{{"uuid", uuid}, {"controller", ctlPath}},
 		bson.D{{"$set", bson.D{{"life", life}}}},
@@ -399,8 +399,9 @@ func (db *Database) SetModelLife(ctlPath params.EntityPath, uuid string, life st
 // model with the given UUID recording them at the given current time.
 // Each counts map entry holds the current count for its key. Counts not
 // mentioned in the counts argument will not be affected.
-func (db *Database) UpdateModelCounts(uuid string, counts map[params.EntityCount]int, now time.Time) error {
+func (db *Database) UpdateModelCounts(ctx context.Context, uuid string, counts map[params.EntityCount]int, now time.Time) error {
 	if err := db.updateCounts(
+		ctx,
 		db.Models(),
 		bson.D{{"uuid", uuid}},
 		counts,
@@ -412,7 +413,8 @@ func (db *Database) UpdateModelCounts(uuid string, counts map[params.EntityCount
 }
 
 // UpdateMachineInfo updates the information associated with a machine.
-func (db *Database) UpdateMachineInfo(info *multiwatcher.MachineInfo) error {
+func (db *Database) UpdateMachineInfo(ctx context.Context, info *multiwatcher.MachineInfo) (err error) {
+	defer db.checkError(ctx, &err)
 	id := info.ModelUUID + " " + info.Id
 	if _, err := db.Machines().UpsertId(id, bson.D{{"$set", bson.D{{"info", info}}}}); err != nil {
 		return errgo.Notef(err, "cannot update machine %v in model %v", info.Id, info.ModelUUID)
@@ -422,9 +424,9 @@ func (db *Database) UpdateMachineInfo(info *multiwatcher.MachineInfo) error {
 
 // MachinesForModel returns information on all the machines in the model with
 // the given UUID.
-func (db *Database) MachinesForModel(modelUUID string) ([]mongodoc.Machine, error) {
-	var docs []mongodoc.Machine
-	err := db.Machines().Find(bson.D{{"info.modeluuid", modelUUID}}).Sort("_id").All(&docs)
+func (db *Database) MachinesForModel(ctx context.Context, modelUUID string) (docs []mongodoc.Machine, err error) {
+	defer db.checkError(ctx, &err)
+	err = db.Machines().Find(bson.D{{"info.modeluuid", modelUUID}}).Sort("_id").All(&docs)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -435,8 +437,8 @@ func (db *Database) MachinesForModel(modelUUID string) ([]mongodoc.Machine, erro
 // which should be uniquely specified  by the query.
 // Each counts map entry holds the current count for its key.
 // Counts not mentioned in the counts argument will not be affected.
-func (db *Database) updateCounts(c *mgo.Collection, query bson.D, values map[params.EntityCount]int, now time.Time) (err error) {
-	defer db.checkError(context.TODO(), &err)
+func (db *Database) updateCounts(ctx context.Context, c *mgo.Collection, query bson.D, values map[params.EntityCount]int, now time.Time) (err error) {
+	defer db.checkError(ctx, &err)
 
 	// This looks racy but it's actually not too bad. Assuming that
 	// two concurrent updates are actually looking at the same
@@ -471,8 +473,8 @@ func (db *Database) updateCounts(c *mgo.Collection, query bson.D, values map[par
 
 // updateCredential stores the given credential in the database. If a
 // credential with the same name exists it is overwritten.
-func (db *Database) updateCredential(cred *mongodoc.Credential) (err error) {
-	defer db.checkError(context.TODO(), &err)
+func (db *Database) updateCredential(ctx context.Context, cred *mongodoc.Credential) (err error) {
+	defer db.checkError(ctx, &err)
 	update := bson.D{{
 		"type", cred.Type,
 	}, {
@@ -501,8 +503,8 @@ func (db *Database) updateCredential(cred *mongodoc.Credential) (err error) {
 
 // Credential gets the specified credential. If the credential cannot be
 // found the returned error will have a cause of params.ErrNotFound.
-func (db *Database) Credential(path params.CredentialPath) (_ *mongodoc.Credential, err error) {
-	defer db.checkError(context.TODO(), &err)
+func (db *Database) Credential(ctx context.Context, path params.CredentialPath) (_ *mongodoc.Credential, err error) {
+	defer db.checkError(ctx, &err)
 	var cred mongodoc.Credential
 	err = db.Credentials().FindId(path.String()).One(&cred)
 	if err == mgo.ErrNotFound {
@@ -516,8 +518,8 @@ func (db *Database) Credential(path params.CredentialPath) (_ *mongodoc.Credenti
 
 // credentialAddController stores the fact that the credential with the
 // given user, cloud and name is present on the given controller.
-func (db *Database) credentialAddController(credential params.CredentialPath, controller params.EntityPath) (err error) {
-	defer db.checkError(context.TODO(), &err)
+func (db *Database) credentialAddController(ctx context.Context, credential params.CredentialPath, controller params.EntityPath) (err error) {
+	defer db.checkError(ctx, &err)
 	err = db.Credentials().UpdateId(credential.String(), bson.D{{
 		"$addToSet", bson.D{{"controllers", controller}},
 	}})
@@ -532,8 +534,8 @@ func (db *Database) credentialAddController(credential params.CredentialPath, co
 
 // credentialRemoveController stores the fact that the credential with
 // the given user, cloud and name is not present on the given controller.
-func (db *Database) credentialRemoveController(credential params.CredentialPath, controller params.EntityPath) (err error) {
-	defer db.checkError(context.TODO(), &err)
+func (db *Database) credentialRemoveController(ctx context.Context, credential params.CredentialPath, controller params.EntityPath) (err error) {
+	defer db.checkError(ctx, &err)
 	err = db.Credentials().UpdateId(credential.String(), bson.D{{
 		"$pull", bson.D{{"controllers", controller}},
 	}})
@@ -551,8 +553,8 @@ func (db *Database) credentialRemoveController(credential params.CredentialPath,
 // Note that there may be many controllers with the given cloud name. We
 // return an arbitrary choice, assuming that cloud definitions are the
 // same across all possible controllers.
-func (db *Database) Cloud(cloud params.Cloud) (_ *mongodoc.Cloud, err error) {
-	defer db.checkError(context.TODO(), &err)
+func (db *Database) Cloud(ctx context.Context, cloud params.Cloud) (_ *mongodoc.Cloud, err error) {
+	defer db.checkError(ctx, &err)
 	var ctl mongodoc.Controller
 	err = db.Controllers().Find(bson.D{{"cloud.name", cloud}}).One(&ctl)
 	if err == mgo.ErrNotFound {
@@ -566,8 +568,8 @@ func (db *Database) Cloud(cloud params.Cloud) (_ *mongodoc.Cloud, err error) {
 
 // setCredentialUpdates marks all the controllers in the given ctlPaths
 // as requiring an update to the credential with the given credPath.
-func (db *Database) setCredentialUpdates(ctlPaths []params.EntityPath, credPath params.CredentialPath) (err error) {
-	defer db.checkError(context.TODO(), &err)
+func (db *Database) setCredentialUpdates(ctx context.Context, ctlPaths []params.EntityPath, credPath params.CredentialPath) (err error) {
+	defer db.checkError(ctx, &err)
 	_, err = db.Controllers().UpdateAll(bson.D{{
 		"path", bson.D{{
 			"$in", ctlPaths,
@@ -585,8 +587,8 @@ func (db *Database) setCredentialUpdates(ctlPaths []params.EntityPath, credPath 
 
 // clearCredentialUpdate removes the record indicating that the given
 // controller needs to update the given credential.
-func (db *Database) clearCredentialUpdate(ctlPath params.EntityPath, credPath params.CredentialPath) (err error) {
-	defer db.checkError(context.TODO(), &err)
+func (db *Database) clearCredentialUpdate(ctx context.Context, ctlPath params.EntityPath, credPath params.CredentialPath) (err error) {
+	defer db.checkError(ctx, &err)
 	err = db.Controllers().UpdateId(
 		ctlPath.String(),
 		bson.D{{
@@ -611,8 +613,8 @@ var selectACL = bson.D{{"acl", 1}}
 // GetACL retrieves the ACL for the document at path in coll, which must
 // have been obtained from db. If the document is not found, the
 // returned error will have the cause params.ErrNotFound.
-func (db *Database) GetACL(coll *mgo.Collection, path params.EntityPath) (_ params.ACL, err error) {
-	defer db.checkError(context.TODO(), &err)
+func (db *Database) GetACL(ctx context.Context, coll *mgo.Collection, path params.EntityPath) (_ params.ACL, err error) {
+	defer db.checkError(ctx, &err)
 	var doc struct {
 		ACL params.ACL
 	}
@@ -627,8 +629,8 @@ func (db *Database) GetACL(coll *mgo.Collection, path params.EntityPath) (_ para
 
 // SetACL sets the ACL for the path document in c (which must
 // have been obtained from db) to be equal to acl.
-func (db *Database) SetACL(c *mgo.Collection, path params.EntityPath, acl params.ACL) (err error) {
-	defer db.checkError(context.TODO(), &err)
+func (db *Database) SetACL(ctx context.Context, c *mgo.Collection, path params.EntityPath, acl params.ACL) (err error) {
+	defer db.checkError(ctx, &err)
 	err = c.UpdateId(path.String(), bson.D{{"$set", bson.D{{"acl", acl}}}})
 	if err == nil {
 		return nil
@@ -641,8 +643,8 @@ func (db *Database) SetACL(c *mgo.Collection, path params.EntityPath, acl params
 
 // Grant updates the ACL for the path document in c (which must
 // have been obtained from db) to include user.
-func (db *Database) Grant(c *mgo.Collection, path params.EntityPath, user params.User) (err error) {
-	defer db.checkError(context.TODO(), &err)
+func (db *Database) Grant(ctx context.Context, c *mgo.Collection, path params.EntityPath, user params.User) (err error) {
+	defer db.checkError(ctx, &err)
 	err = c.UpdateId(path.String(), bson.D{{"$addToSet", bson.D{{"acl.read", user}}}})
 	if err == nil {
 		return nil
@@ -655,8 +657,8 @@ func (db *Database) Grant(c *mgo.Collection, path params.EntityPath, user params
 
 // Revoke updates the ACL for the path document in c (which must
 // have been obtained from db) to not include user.
-func (db *Database) Revoke(c *mgo.Collection, path params.EntityPath, user params.User) (err error) {
-	defer db.checkError(context.TODO(), &err)
+func (db *Database) Revoke(ctx context.Context, c *mgo.Collection, path params.EntityPath, user params.User) (err error) {
+	defer db.checkError(ctx, &err)
 	err = c.UpdateId(path.String(), bson.D{{"$pull", bson.D{{"acl.read", user}}}})
 	if err == nil {
 		return nil
@@ -671,12 +673,12 @@ func (db *Database) Revoke(c *mgo.Collection, path params.EntityPath, user param
 // collection (which must have been obtained from db) can be read by the
 // currently authenticated user.
 func (db *Database) CheckReadACL(ctx context.Context, c *mgo.Collection, path params.EntityPath) (err error) {
-	defer db.checkError(context.TODO(), &err)
+	defer db.checkError(ctx, &err)
 	// The user can always access their own entities.
 	if err := auth.CheckIsUser(ctx, path.User); err == nil {
 		return nil
 	}
-	acl, err := db.GetACL(c, path)
+	acl, err := db.GetACL(ctx, c, path)
 	if errgo.Cause(err) == params.ErrNotFound {
 		// The document is not found - and we've already checked
 		// that the currently authenticated user cannot speak for
@@ -750,7 +752,7 @@ func (iter *CanReadIter) Err() error {
 		return iter.err
 	}
 	err := iter.iter.Err()
-	iter.db.checkError(context.TODO(), &err)
+	iter.db.checkError(iter.ctx, &err)
 	return err
 }
 

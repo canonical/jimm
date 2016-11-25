@@ -16,6 +16,7 @@ import (
 	"github.com/juju/juju/juju"
 	"github.com/juju/juju/jujuclient"
 	"github.com/juju/loggo"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
@@ -101,7 +102,7 @@ func (s *commonSuite) newServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.S
 		IdentityLocation: idmSrv.URL.String(),
 		PublicKeyLocator: idmSrv,
 	}
-	srv, err := jem.NewServer(config)
+	srv, err := jem.NewServer(context.TODO(), config)
 	c.Assert(err, gc.IsNil)
 	return srv
 }

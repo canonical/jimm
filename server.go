@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/uber-go/zap"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/mgo.v2"
@@ -27,10 +27,6 @@ var versions = map[string]jemserver.NewAPIHandlerFunc{
 
 // ServerParams holds configuration for a new API server.
 type ServerParams struct {
-	// Logger holds the logger that will be used to log
-	// server messages.
-	Logger zap.Logger
-
 	// DB holds the mongo database that will be used to
 	// store the JEM information.
 	DB *mgo.Database
@@ -86,8 +82,8 @@ type HandleCloser interface {
 // its data in the given database. The returned handler should
 // be closed after use (first ensuring that all outstanding requests have
 // completed).
-func NewServer(config ServerParams) (HandleCloser, error) {
-	srv, err := jemserver.New(jemserver.Params(config), versions)
+func NewServer(ctx context.Context, config ServerParams) (HandleCloser, error) {
+	srv, err := jemserver.New(ctx, jemserver.Params(config), versions)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}

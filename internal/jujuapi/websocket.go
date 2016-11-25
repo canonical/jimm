@@ -119,12 +119,12 @@ var facades = map[facade]string{
 }
 
 // newWSServer creates a new WebSocket server suitible for handling the API for modelUUID.
-func newWSServer(jem *jem.JEM, ap *auth.Pool, jsParams jemserver.Params, modelUUID string) websocket.Server {
+func newWSServer(ctx context.Context, jem *jem.JEM, ap *auth.Pool, jsParams jemserver.Params, modelUUID string) websocket.Server {
 	hnd := wsHandler{
 		jem:           jem,
 		authPool:      ap,
 		params:        jsParams,
-		context:       context.Background(),
+		context:       ctx,
 		modelUUID:     modelUUID,
 		schemataCache: make(map[params.Cloud]map[jujucloud.AuthType]jujucloud.CredentialSchema),
 	}
@@ -135,9 +135,10 @@ func newWSServer(jem *jem.JEM, ap *auth.Pool, jsParams jemserver.Params, modelUU
 
 // wsHandler is a handler for a particular WebSocket connection.
 type wsHandler struct {
-	jem           *jem.JEM
-	authPool      *auth.Pool
-	params        jemserver.Params
+	jem      *jem.JEM
+	authPool *auth.Pool
+	params   jemserver.Params
+	// TODO Make the context per-RPC-call instead of global across the handler.
 	context       context.Context
 	heartMonitor  heartMonitor
 	modelUUID     string
@@ -174,11 +175,11 @@ func (h *wsHandler) resolveUUID() error {
 		return nil
 	}
 	var err error
-	h.model, err = h.jem.DB.ModelFromUUID(h.modelUUID)
+	h.model, err = h.jem.DB.ModelFromUUID(h.context, h.modelUUID)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	h.controller, err = h.jem.DB.Controller(h.model.Controller)
+	h.controller, err = h.jem.DB.Controller(h.context, h.model.Controller)
 	return errgo.Mask(err)
 }
 
@@ -188,7 +189,7 @@ func (h *wsHandler) credentialSchema(cloud params.Cloud, authType string) (jujuc
 	if cs, ok := h.schemataCache[cloud]; ok {
 		return cs[jujucloud.AuthType(authType)], nil
 	}
-	cloudInfo, err := h.jem.DB.Cloud(cloud)
+	cloudInfo, err := h.jem.DB.Cloud(h.context, cloud)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
@@ -842,11 +843,11 @@ func modelInfo(h *wsHandler, arg jujuparams.Entity) (*jujuparams.ModelInfo, erro
 }
 
 func modelDocToModelInfo(h *wsHandler, model *mongodoc.Model) (*jujuparams.ModelInfo, error) {
-	machines, err := h.jem.DB.MachinesForModel(model.UUID)
+	machines, err := h.jem.DB.MachinesForModel(h.context, model.UUID)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	cloud, err := h.jem.DB.Cloud(model.Cloud)
+	cloud, err := h.jem.DB.Cloud(h.context, model.Cloud)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot get cloud %q", model.Cloud)
 	}
@@ -1059,9 +1060,9 @@ func (m modelManager) modifyModelAccess(change jujuparams.ModifyModelAccess) err
 	defer conn.Close()
 	switch change.Action {
 	case jujuparams.GrantModelAccess:
-		err = m.h.jem.GrantModel(conn, model, params.User(userTag.Name()), string(change.Access))
+		err = m.h.jem.GrantModel(m.h.context, conn, model, params.User(userTag.Name()), string(change.Access))
 	case jujuparams.RevokeModelAccess:
-		err = m.h.jem.RevokeModel(conn, model, params.User(userTag.Name()), string(change.Access))
+		err = m.h.jem.RevokeModel(m.h.context, conn, model, params.User(userTag.Name()), string(change.Access))
 	default:
 		return errgo.WithCausef(err, params.ErrBadRequest, "invalid action %q", change.Action)
 	}
@@ -1121,7 +1122,7 @@ func getModel(h *wsHandler, modelTag string, authf func(context.Context, auth.AC
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid model tag")
 	}
-	model, err := h.jem.DB.ModelFromUUID(tag.Id())
+	model, err := h.jem.DB.ModelFromUUID(h.context, tag.Id())
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}

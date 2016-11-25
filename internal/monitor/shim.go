@@ -34,7 +34,7 @@ func (j jemShim) OpenAPI(ctx context.Context, path params.EntityPath) (jujuAPI, 
 	return apiShim{conn}, nil
 }
 
-func (j jemShim) AllControllers() ([]*mongodoc.Controller, error) {
+func (j jemShim) AllControllers(ctx context.Context) ([]*mongodoc.Controller, error) {
 	var ctls []*mongodoc.Controller
 	err := j.DB.Controllers().Find(nil).All(&ctls)
 	if err != nil {
@@ -43,40 +43,40 @@ func (j jemShim) AllControllers() ([]*mongodoc.Controller, error) {
 	return ctls, nil
 }
 
-func (j jemShim) SetControllerStats(ctlPath params.EntityPath, stats *mongodoc.ControllerStats) error {
-	return errgo.Mask(j.DB.SetControllerStats(ctlPath, stats), errgo.Any)
+func (j jemShim) SetControllerStats(ctx context.Context, ctlPath params.EntityPath, stats *mongodoc.ControllerStats) error {
+	return errgo.Mask(j.DB.SetControllerStats(ctx, ctlPath, stats), errgo.Any)
 }
 
-func (j jemShim) SetControllerUnavailableAt(ctlPath params.EntityPath, t time.Time) error {
-	return errgo.Mask(j.DB.SetControllerUnavailableAt(ctlPath, t), errgo.Any)
+func (j jemShim) SetControllerUnavailableAt(ctx context.Context, ctlPath params.EntityPath, t time.Time) error {
+	return errgo.Mask(j.DB.SetControllerUnavailableAt(ctx, ctlPath, t), errgo.Any)
 }
 
-func (j jemShim) SetControllerAvailable(ctlPath params.EntityPath) error {
-	return errgo.Mask(j.DB.SetControllerAvailable(ctlPath), errgo.Any)
+func (j jemShim) SetControllerAvailable(ctx context.Context, ctlPath params.EntityPath) error {
+	return errgo.Mask(j.DB.SetControllerAvailable(ctx, ctlPath), errgo.Any)
 }
 
-func (j jemShim) SetModelLife(ctlPath params.EntityPath, uuid string, life string) error {
-	return errgo.Mask(j.DB.SetModelLife(ctlPath, uuid, life), errgo.Any)
+func (j jemShim) SetModelLife(ctx context.Context, ctlPath params.EntityPath, uuid string, life string) error {
+	return errgo.Mask(j.DB.SetModelLife(ctx, ctlPath, uuid, life), errgo.Any)
 }
 
-func (j jemShim) UpdateModelCounts(uuid string, counts map[params.EntityCount]int, now time.Time) (err error) {
-	return errgo.Mask(j.DB.UpdateModelCounts(uuid, counts, now), errgo.Any)
+func (j jemShim) UpdateModelCounts(ctx context.Context, uuid string, counts map[params.EntityCount]int, now time.Time) (err error) {
+	return errgo.Mask(j.DB.UpdateModelCounts(ctx, uuid, counts, now), errgo.Any)
 }
 
-func (j jemShim) UpdateMachineInfo(info *multiwatcher.MachineInfo) error {
-	return errgo.Mask(j.DB.UpdateMachineInfo(info), errgo.Any)
+func (j jemShim) UpdateMachineInfo(ctx context.Context, info *multiwatcher.MachineInfo) error {
+	return errgo.Mask(j.DB.UpdateMachineInfo(ctx, info), errgo.Any)
 }
 
-func (j jemShim) AcquireMonitorLease(ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {
-	t, err := j.DB.AcquireMonitorLease(ctlPath, oldExpiry, oldOwner, newExpiry, newOwner)
+func (j jemShim) AcquireMonitorLease(ctx context.Context, ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {
+	t, err := j.DB.AcquireMonitorLease(ctx, ctlPath, oldExpiry, oldOwner, newExpiry, newOwner)
 	if err != nil {
 		return time.Time{}, errgo.Mask(err, errgo.Any)
 	}
 	return t, nil
 }
 
-func (j jemShim) Controller(ctlPath params.EntityPath) (*mongodoc.Controller, error) {
-	ctl, err := j.DB.Controller(ctlPath)
+func (j jemShim) Controller(ctx context.Context, ctlPath params.EntityPath) (*mongodoc.Controller, error) {
+	ctl, err := j.DB.Controller(ctx, ctlPath)
 	return ctl, errgo.Mask(err, errgo.Any)
 }
 

@@ -33,9 +33,6 @@ type controllerMonitor struct {
 	// has been removed.
 	tomb tomb.Tomb
 
-	// context holds the monitor's context.
-	context context.Context
-
 	// leaseExpiry holds the time that the currently held lease
 	// will expire. It is maintained by the leaseUpdater goroutine.
 	leaseExpiry time.Time
@@ -67,10 +64,14 @@ func newControllerMonitor(ctx context.Context, p controllerMonitorParams) *contr
 		ownerId:     p.ownerId,
 		leaseExpiry: p.leaseExpiry,
 	}
-	m.context = newTombContext(ctx, &m.tomb)
+	ctx = newTombContext(ctx, &m.tomb)
 	m.tomb.Go(func() error {
-		m.tomb.Go(m.leaseUpdater)
-		m.tomb.Go(m.watcher)
+		m.tomb.Go(func() error {
+			return m.leaseUpdater(ctx)
+		})
+		m.tomb.Go(func() error {
+			return m.watcher(ctx)
+		})
 		return nil
 	})
 	servermon.ControllersRunning.Inc()
@@ -97,7 +98,7 @@ func (m *controllerMonitor) Dead() <-chan struct{} {
 // leaseUpdater is responsible for updating the controller's lease
 // as long as we still have the lease, the controller still exists,
 // and the monitor is still alive.
-func (m *controllerMonitor) leaseUpdater() error {
+func (m *controllerMonitor) leaseUpdater(ctx context.Context) error {
 	for {
 		// Renew after ¾ of the lease time has passed.
 		renewTime := m.leaseExpiry.Add(-leaseExpiryDuration / 4)
@@ -106,13 +107,13 @@ func (m *controllerMonitor) leaseUpdater() error {
 		case <-m.tomb.Dying():
 			// Try to drop the lease because the monitor might
 			// not be starting again on this JEM instance.
-			if err := m.renewLease(false); err != nil {
+			if err := m.renewLease(ctx, false); err != nil {
 				return errgo.NoteMask(err, "cannot drop lease", isMonitoringStoppedError)
 			}
 			return tomb.ErrDying
 		}
 		// It's time to renew the lease.
-		if err := m.renewLease(true); err != nil {
+		if err := m.renewLease(ctx, true); err != nil {
 			msg := fmt.Sprintf("cannot renew lease on %v", m.ctlPath)
 			return errgo.NoteMask(err, msg, isMonitoringStoppedError)
 		}
@@ -125,12 +126,12 @@ func (m *controllerMonitor) leaseUpdater() error {
 // If the lease cannot be renewed because someone else
 // has acquired it, it returns an error with a jem.Err or the controller has been removed,
 // it returns an error with a cause that satisfies isMonitoringStoppedError.
-func (m *controllerMonitor) renewLease(renew bool) error {
+func (m *controllerMonitor) renewLease(ctx context.Context, renew bool) error {
 	var ownerId string
 	if renew {
 		ownerId = m.ownerId
 	}
-	t, err := acquireLease(m.jem, m.ctlPath, m.leaseExpiry, m.ownerId, ownerId)
+	t, err := acquireLease(ctx, m.jem, m.ctlPath, m.leaseExpiry, m.ownerId, ownerId)
 	if err == nil {
 		logger.Debugf("controller %v acquired lease successfully (new time %v)", m.ctlPath, t)
 		m.leaseExpiry = t
@@ -144,8 +145,8 @@ func (m *controllerMonitor) renewLease(renew bool) error {
 // it returns errControllerRemoved if the controller has been
 // removed or jem.ErrLeaseUnavailable if the lease is unavailable,
 // and it always acquires a lease leaseExpiryDuration from now.
-func acquireLease(j jemInterface, ctlPath params.EntityPath, oldExpiry time.Time, oldOwner, newOwner string) (time.Time, error) {
-	t, err := j.AcquireMonitorLease(ctlPath, oldExpiry, oldOwner, Clock.Now().Add(leaseExpiryDuration), newOwner)
+func acquireLease(ctx context.Context, j jemInterface, ctlPath params.EntityPath, oldExpiry time.Time, oldOwner, newOwner string) (time.Time, error) {
+	t, err := j.AcquireMonitorLease(ctx, ctlPath, oldExpiry, oldOwner, Clock.Now().Add(leaseExpiryDuration), newOwner)
 	if err == nil {
 		return t, nil
 	}
@@ -158,22 +159,22 @@ func acquireLease(j jemInterface, ctlPath params.EntityPath, oldExpiry time.Time
 // watcher runs the controller monitor watcher itself.
 // It returns an error satisfying isMonitoringStoppedError if
 // the controller is removed.
-func (m *controllerMonitor) watcher() error {
+func (m *controllerMonitor) watcher(ctx context.Context) error {
 	for {
 		logger.Debugf("monitor dialing controller %v", m.ctlPath)
 		dialStartTime := Clock.Now()
-		conn, err := m.dialAPI()
+		conn, err := m.dialAPI(ctx)
 		switch errgo.Cause(err) {
 		case nil:
-			if err := m.jem.SetControllerAvailable(m.ctlPath); err != nil {
+			if err := m.jem.SetControllerAvailable(ctx, m.ctlPath); err != nil {
 				return errgo.Notef(err, "cannot set controller availability")
 			}
 
-			if err := m.jem.ControllerUpdateCredentials(m.context, m.ctlPath); err != nil {
+			if err := m.jem.ControllerUpdateCredentials(ctx, m.ctlPath); err != nil {
 				return errgo.Notef(err, "cannot update credentials")
 			}
 
-			err = m.watch(conn)
+			err = m.watch(ctx, conn)
 			if errgo.Cause(err) == tomb.ErrDying {
 				conn.Close()
 				return tomb.ErrDying
@@ -188,7 +189,7 @@ func (m *controllerMonitor) watcher() error {
 			// The controller has been removed or we've been explicitly stopped.
 			return tomb.ErrDying
 		case jem.ErrAPIConnection:
-			if err := m.jem.SetControllerUnavailableAt(m.ctlPath, dialStartTime); err != nil {
+			if err := m.jem.SetControllerUnavailableAt(ctx, m.ctlPath, dialStartTime); err != nil {
 				return errgo.Notef(err, "cannot set controller availability")
 			}
 			// We've failed to connect to the API. Log the error and
@@ -218,7 +219,7 @@ func (m *controllerMonitor) watcher() error {
 // removed, it returns an error with an errControllerRemoved cause. If it
 // can't make a connection because the dial itself failed, it returns an
 // error with a jem.ErrAPIConnection cause.
-func (m *controllerMonitor) dialAPI() (jujuAPI, error) {
+func (m *controllerMonitor) dialAPI(ctx context.Context) (jujuAPI, error) {
 	type apiConnReply struct {
 		conn jujuAPI
 		err  error
@@ -230,7 +231,7 @@ func (m *controllerMonitor) dialAPI() (jujuAPI, error) {
 	j := m.jem.Clone()
 	go func() {
 		// Open the API to the controller's admin model.
-		conn, err := j.OpenAPI(m.context, m.ctlPath)
+		conn, err := j.OpenAPI(ctx, m.ctlPath)
 
 		// Close before sending the reply rather than deferring
 		// so that if our reply causes everything to be stopped,
@@ -262,14 +263,14 @@ func (m *controllerMonitor) dialAPI() (jujuAPI, error) {
 // watch reads events from the API megawatcher and
 // updates runtime stats in the controller document in response
 // to those.
-func (m *controllerMonitor) watch(conn jujuAPI) error {
+func (m *controllerMonitor) watch(ctx context.Context, conn jujuAPI) error {
 	apiw, err := conn.WatchAllModels()
 	if err != nil {
 		return errgo.Notef(err, "cannot watch all models")
 	}
 	defer apiw.Stop()
 
-	w := newWatcherState(m.jem, m.ctlPath)
+	w := newWatcherState(ctx, m.jem, m.ctlPath)
 	type reply struct {
 		deltas []multiwatcher.Delta
 		err    error
@@ -296,14 +297,14 @@ func (m *controllerMonitor) watch(conn jujuAPI) error {
 		w.changed = false
 		w.runner = parallel.NewRun(maxConcurrentUpdates)
 		for _, d := range r.deltas {
-			if err := w.addDelta(d); err != nil {
+			if err := w.addDelta(ctx, d); err != nil {
 				return errgo.Mask(err)
 			}
 		}
 		logger.Infof("controller %v: all deltas processed", w.ctlPath)
 		if w.changed {
 			w.runner.Do(func() error {
-				if err := m.jem.SetControllerStats(m.ctlPath, &w.stats); err != nil {
+				if err := m.jem.SetControllerStats(ctx, m.ctlPath, &w.stats); err != nil {
 					return errgo.Notef(err, "cannot set controller stats")
 				}
 				return nil
@@ -316,7 +317,7 @@ func (m *controllerMonitor) watch(conn jujuAPI) error {
 			// combine them into a single database update.
 			if info.changed&lifeChange != 0 {
 				w.runner.Do(func() error {
-					if err := w.jem.SetModelLife(w.ctlPath, uuid, string(info.life)); err != nil {
+					if err := w.jem.SetModelLife(ctx, w.ctlPath, uuid, string(info.life)); err != nil {
 						return errgo.Notef(err, "cannot update model life")
 					}
 					return nil
@@ -327,7 +328,7 @@ func (m *controllerMonitor) watch(conn jujuAPI) error {
 					// Note: if we get a "not found" error, ignore it because it is expected that
 					// some models (e.g. the controller model) will not have a record in the
 					// database.
-					if err := m.jem.UpdateModelCounts(uuid, info.counts, time.Now()); err != nil && errgo.Cause(err) != params.ErrNotFound {
+					if err := m.jem.UpdateModelCounts(ctx, uuid, info.counts, time.Now()); err != nil && errgo.Cause(err) != params.ErrNotFound {
 						return errgo.Notef(err, "cannot update model counts")
 					}
 					return nil
@@ -405,7 +406,7 @@ func (info *modelInfo) setLife(life multiwatcher.Life) {
 	}
 }
 
-func newWatcherState(j jemInterface, ctlPath params.EntityPath) *watcherState {
+func newWatcherState(ctx context.Context, j jemInterface, ctlPath params.EntityPath) *watcherState {
 	return &watcherState{
 		jem:     j,
 		ctlPath: ctlPath,
@@ -420,7 +421,7 @@ func newWatcherState(j jemInterface, ctlPath params.EntityPath) *watcherState {
 	}
 }
 
-func (w *watcherState) addDelta(d multiwatcher.Delta) error {
+func (w *watcherState) addDelta(ctx context.Context, d multiwatcher.Delta) error {
 	if logger.IsDebugEnabled() {
 		id := d.Entity.EntityId()
 		if d.Removed {
@@ -458,7 +459,7 @@ func (w *watcherState) addDelta(d multiwatcher.Delta) error {
 		w.modelInfo(e.ModelUUID).adjustCount(params.MachineCount, delta)
 		servermon.MachinesRunning.WithLabelValues(ctlpathstr).Set(float64(w.stats.MachineCount))
 		w.runner.Do(func() error {
-			return w.jem.UpdateMachineInfo(e)
+			return w.jem.UpdateMachineInfo(ctx, e)
 		})
 	}
 	return nil

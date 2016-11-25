@@ -211,7 +211,7 @@ var ErrAPIConnection = errgo.New("cannot connect to API")
 // The returned connection must be closed when finished with.
 func (j *JEM) OpenAPI(ctx context.Context, path params.EntityPath) (_ *apiconn.Conn, err error) {
 	defer j.DB.checkError(ctx, &err)
-	ctl, err := j.DB.Controller(path)
+	ctl, err := j.DB.Controller(ctx, path)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot get controller", errgo.Is(params.ErrNotFound))
 	}
@@ -274,14 +274,14 @@ func (j *JEM) Controller(ctx context.Context, path params.EntityPath) (*mongodoc
 	if err := j.DB.CheckReadACL(ctx, j.DB.Controllers(), path); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	ctl, err := j.DB.Controller(path)
+	ctl, err := j.DB.Controller(ctx, path)
 	return ctl, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 }
 
 // Credential retrieves the given credential from the database,
 // validating that the current user is allowed to read the credential.
 func (j *JEM) Credential(ctx context.Context, path params.CredentialPath) (*mongodoc.Credential, error) {
-	cred, err := j.DB.Credential(path)
+	cred, err := j.DB.Credential(ctx, path)
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			// We return an authorization error for all attempts to retrieve credentials
@@ -355,7 +355,7 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.M
 		if err := j.updateControllerCredential(ctx, p.ControllerPath, p.Credential, conn, cred); err != nil {
 			return nil, errgo.Mask(err)
 		}
-		if err := j.DB.credentialAddController(p.Credential, p.ControllerPath); err != nil {
+		if err := j.DB.credentialAddController(ctx, p.Credential, p.ControllerPath); err != nil {
 			return nil, errgo.Mask(err)
 		}
 	}
@@ -374,7 +374,7 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.M
 		Creator:      auth.Username(ctx),
 		Credential:   p.Credential,
 	}
-	if err := j.DB.AddModel(modelDoc); err != nil {
+	if err := j.DB.AddModel(ctx, modelDoc); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
 	mmClient := modelmanager.NewClient(conn.Connection)
@@ -389,6 +389,7 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.M
 	if err != nil {
 		// Remove the model that was created, because it's no longer valid.
 		if err := j.DB.Models().RemoveId(modelDoc.Id); err != nil {
+			j.DB.checkError(ctx, &err)
 			zapctx.Error(ctx, "cannot remove model from database after model creation error", zaputil.Error(err))
 		}
 		return nil, errgo.Notef(err, "cannot create model")
@@ -407,13 +408,14 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.M
 		{"defaultseries", m.DefaultSeries},
 		{"life", m.Life},
 	}}}); err != nil {
+		j.DB.checkError(ctx, &err)
 		// TODO (mhilton) destroy the model?
 		return nil, errgo.Notef(err, "cannot update model UUID in database, leaked model %s", m.UUID)
 	}
 	// Fetch the model doc so we can be sure we're returning a consistent
 	// result. Technically this incurs an unnecessary round trip to mongo but
 	// models aren't created *that* often.
-	modelDoc, err = j.DB.Model(p.Path)
+	modelDoc, err = j.DB.Model(ctx, p.Path)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot retrieve model after update")
 	}
@@ -424,15 +426,15 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.M
 // local database and then updates it on all controllers to which it is
 // deployed.
 func (j *JEM) UpdateCredential(ctx context.Context, cred *mongodoc.Credential) (err error) {
-	if err := j.DB.updateCredential(cred); err != nil {
+	if err := j.DB.updateCredential(ctx, cred); err != nil {
 		return errgo.Notef(err, "cannot update local database")
 	}
-	c, err := j.DB.Credential(cred.Path)
+	c, err := j.DB.Credential(ctx, cred.Path)
 	if err != nil {
 		return errgo.Mask(err)
 	}
 	// Mark in the local database that an update is required for all controllers
-	if err := j.DB.setCredentialUpdates(cred.Controllers, cred.Path); err != nil {
+	if err := j.DB.setCredentialUpdates(ctx, cred.Controllers, cred.Path); err != nil {
 		// Log the error, but press on hoping to update the controllers anyway.
 		zapctx.Error(ctx,
 			"cannot update controllers with updated credential",
@@ -476,7 +478,7 @@ func (j *JEM) UpdateCredential(ctx context.Context, cred *mongodoc.Credential) (
 // ControllerUpdateCredentials updates the given controller by updating
 // all outstanding UpdateCredentials.
 func (j *JEM) ControllerUpdateCredentials(ctx context.Context, ctlPath params.EntityPath) error {
-	ctl, err := j.DB.Controller(ctlPath)
+	ctl, err := j.DB.Controller(ctx, ctlPath)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
@@ -517,7 +519,7 @@ func (j *JEM) updateControllerCredential(
 		defer conn.Close()
 	}
 	if cred == nil {
-		cred, err = j.DB.Credential(credPath)
+		cred, err = j.DB.Credential(ctx, credPath)
 		if err != nil {
 			return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 		}
@@ -535,7 +537,7 @@ func (j *JEM) updateControllerCredential(
 	if err != nil {
 		return errgo.Notef(err, "cannot update credentials")
 	}
-	if err := j.DB.clearCredentialUpdate(ctlPath, credPath); err != nil {
+	if err := j.DB.clearCredentialUpdate(ctx, ctlPath, credPath); err != nil {
 		zapctx.Error(ctx,
 			"failed to update controller after successfully updating credential",
 			zap.Stringer("cred", credPath),
@@ -547,12 +549,12 @@ func (j *JEM) updateControllerCredential(
 }
 
 // GrantModel grants the given access for the given user on the given model and updates the JEM database.
-func (j *JEM) GrantModel(conn *apiconn.Conn, model *mongodoc.Model, user params.User, access string) error {
+func (j *JEM) GrantModel(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model, user params.User, access string) error {
 	client := modelmanager.NewClient(conn)
 	if err := client.GrantModel(UserTag(user).Id(), access, model.UUID); err != nil {
 		return errgo.Mask(err)
 	}
-	if err := j.DB.Grant(j.DB.Models(), model.Path, user); err != nil {
+	if err := j.DB.Grant(ctx, j.DB.Models(), model.Path, user); err != nil {
 		// TODO (mhilton) What should be done with the changes already made to the controller?
 		return errgo.Mask(err)
 	}
@@ -560,8 +562,8 @@ func (j *JEM) GrantModel(conn *apiconn.Conn, model *mongodoc.Model, user params.
 }
 
 // RevokeModel revokes the given access for the given user on the given model and updates the JEM database.
-func (j *JEM) RevokeModel(conn *apiconn.Conn, model *mongodoc.Model, user params.User, access string) error {
-	if err := j.DB.Revoke(j.DB.Models(), model.Path, user); err != nil {
+func (j *JEM) RevokeModel(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model, user params.User, access string) error {
+	if err := j.DB.Revoke(ctx, j.DB.Models(), model.Path, user); err != nil {
 		return errgo.Mask(err)
 	}
 	client := modelmanager.NewClient(conn)

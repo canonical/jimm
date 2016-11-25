@@ -26,6 +26,7 @@ import (
 
 	"github.com/CanonicalLtd/jem/internal/apiconn"
 	"github.com/CanonicalLtd/jem/internal/auth"
+	"github.com/CanonicalLtd/jem/internal/ctxutil"
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/jemerror"
 	"github.com/CanonicalLtd/jem/internal/jemserver"
@@ -44,10 +45,16 @@ type Handler struct {
 	monReq  servermon.Request
 }
 
-func NewAPIHandler(jp *jem.Pool, ap *auth.Pool, sp jemserver.Params) ([]httprequest.Handler, error) {
+func NewAPIHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, sp jemserver.Params) ([]httprequest.Handler, error) {
 	return jemerror.Mapper.Handlers(func(p httprequest.Params) (*Handler, error) {
-		// Time out all requests after 30s
+		// Time out all requests after 30s. Do this before joining
+		// the contexts because p.Context is likely to have a done
+		// channel already and context.WithTimeout will be more efficient
+		// in that case than working on the custom context type returned
+		// from ctxutil.Join.
 		ctx, cancel := context.WithTimeout(p.Context, 30*time.Second)
+		ctx = ctxutil.Join(ctx, p.Context)
+
 		// All requests require an authenticated client.
 		a := ap.Authenticator()
 		defer a.Close()
@@ -190,7 +197,7 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	// address we succeeded in connecting to.
 	ctl.HostPorts = mongodocAPIHostPorts(conn.APIHostPorts())
 
-	err = h.jem.DB.AddController(ctl)
+	err = h.jem.DB.AddController(h.context, ctl)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
@@ -333,7 +340,7 @@ func (h *Handler) DeleteController(arg *params.DeleteController) error {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	if !arg.Force {
-		ctl, err := h.jem.DB.Controller(arg.EntityPath)
+		ctl, err := h.jem.DB.Controller(h.context, arg.EntityPath)
 		if err != nil {
 			return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 		}
@@ -369,11 +376,11 @@ func (h *Handler) GetModel(arg *params.GetModel) (*params.ModelResponse, error) 
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 
-	m, err := h.jem.DB.Model(arg.EntityPath)
+	m, err := h.jem.DB.Model(h.context, arg.EntityPath)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	ctl, err := h.jem.DB.Controller(m.Controller)
+	ctl, err := h.jem.DB.Controller(h.context, m.Controller)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -731,7 +738,7 @@ func (h *Handler) getPerm(coll *mgo.Collection, path params.EntityPath) (params.
 	if err := auth.CheckIsUser(h.context, path.User); err != nil {
 		return params.ACL{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	acl, err := h.jem.DB.GetACL(coll, path)
+	acl, err := h.jem.DB.GetACL(h.context, coll, path)
 	if err != nil {
 		return params.ACL{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}

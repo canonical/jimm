@@ -28,6 +28,8 @@ type APISuite struct {
 
 var _ = gc.Suite(&APISuite{})
 
+var testContext = context.Background()
+
 const sshKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDOjaOjVRHchF2RFCKQdgBqrIA5nOoqSprLK47l2th5I675jw+QYMIihXQaITss3hjrh3+5ITyBO41PS5rHLNGtlYUHX78p9CHNZsJqHl/z1Ub1tuMe+/5SY2MkDYzgfPtQtVsLasAIiht/5g78AMMXH3HeCKb9V9cP6/lPPq6mCMvg8TDLrPp/P2vlyukAsJYUvVgoaPDUBpedHbkMj07pDJqe4D7c0yEJ8hQo/6nS+3bh9Q1NvmVNsB1pbtk3RKONIiTAXYcjclmOljxxJnl1O50F5sOIi38vyl7Q63f6a3bXMvJEf1lnPNJKAxspIfEu8gRasny3FEsbHfrxEwVj rog@rog-x220"
 
 var dummyModelConfig = map[string]interface{}{
@@ -437,7 +439,7 @@ func (s *APISuite) TestDeleteModel(c *gc.C) {
 func (s *APISuite) TestGetController(c *gc.C) {
 	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, false)
 	t := time.Now()
-	err := s.JEM.DB.SetControllerUnavailableAt(ctlId, t)
+	err := s.JEM.DB.SetControllerUnavailableAt(testContext, ctlId, t)
 	c.Assert(err, gc.IsNil)
 
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
@@ -779,7 +781,7 @@ func (s *APISuite) TestGetControllerLocations(c *gc.C) {
 			"region": "down",
 		},
 	})
-	err := s.JEM.DB.SetControllerUnavailableAt(ctlId, time.Now())
+	err := s.JEM.DB.SetControllerUnavailableAt(testContext, ctlId, time.Now())
 	c.Assert(err, gc.IsNil)
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
 		Path: params.EntityPath{"bob", "gce-elsewhere"},
@@ -997,7 +999,7 @@ func (s *APISuite) TestAllControllerLocations(c *gc.C) {
 			"region": "down",
 		},
 	})
-	err := s.JEM.DB.SetControllerUnavailableAt(ctlId, time.Now())
+	err := s.JEM.DB.SetControllerUnavailableAt(testContext, ctlId, time.Now())
 	c.Assert(err, gc.IsNil)
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
 		Path: params.EntityPath{"bob", "gce-elsewhere"},
@@ -1318,7 +1320,7 @@ func (s *APISuite) TestNewModelWithoutExplicitController(c *gc.C) {
 }
 
 func (s *APISuite) assertModelConfigAttr(c *gc.C, modelPath params.EntityPath, attr string, val interface{}) {
-	m, err := s.JEM.DB.Model(modelPath)
+	m, err := s.JEM.DB.Model(testContext, modelPath)
 	c.Assert(err, gc.IsNil)
 	st, err := s.State.ForModel(names.NewModelTag(m.UUID))
 	c.Assert(err, gc.IsNil)
@@ -1336,10 +1338,10 @@ func (s *APISuite) TestGetModelWhenControllerUnavailable(c *gc.C) {
 	aCred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
 	aModel, aUUID := s.CreateModel(c, params.EntityPath{"bob", "foo"}, ctlId, aCred)
 
-	err := s.JEM.DB.SetModelLife(aModel, aUUID, "dying")
+	err := s.JEM.DB.SetModelLife(testContext, aModel, aUUID, "dying")
 	c.Assert(err, gc.IsNil)
 	t := time.Now()
-	err = s.JEM.DB.SetControllerUnavailableAt(ctlId, t)
+	err = s.JEM.DB.SetControllerUnavailableAt(testContext, ctlId, t)
 	c.Assert(err, gc.IsNil)
 
 	var modelRespBody json.RawMessage
@@ -1374,10 +1376,11 @@ func (s *APISuite) TestGetModelWithCounts(c *gc.C) {
 	modelId, uuid := s.CreateModel(c, params.EntityPath{"bob", "foo"}, ctlId, cred)
 
 	t0 := time.Unix(0, 0)
-	err := s.JEM.DB.UpdateModelCounts(uuid, map[params.EntityCount]int{
+	err := s.JEM.DB.UpdateModelCounts(testContext, uuid, map[params.EntityCount]int{
 		params.MachineCount: 3,
 		params.UnitCount:    99,
 	}, t0)
+
 	c.Assert(err, gc.IsNil)
 
 	m, err := s.NewClient("bob").GetModel(&params.GetModel{
@@ -1630,11 +1633,11 @@ func (s *APISuite) TestListController(c *gc.C) {
 
 	ctlId1 := s.AssertAddController(c, params.EntityPath{"bob", "lost"}, false)
 	unavailableTime := time.Now()
-	err := s.JEM.DB.SetControllerUnavailableAt(ctlId1, unavailableTime)
+	err := s.JEM.DB.SetControllerUnavailableAt(testContext, ctlId1, unavailableTime)
 	c.Assert(err, gc.IsNil)
 
 	ctlId2 := s.AssertAddController(c, params.EntityPath{"bob", "another"}, false)
-	err = s.JEM.DB.SetControllerUnavailableAt(ctlId2, unavailableTime.Add(time.Second))
+	err = s.JEM.DB.SetControllerUnavailableAt(testContext, ctlId2, unavailableTime.Add(time.Second))
 	c.Assert(err, gc.IsNil)
 
 	resp, err := s.NewClient("bob").ListController(nil)
@@ -1690,9 +1693,10 @@ func (s *APISuite) TestListModels(c *gc.C) {
 
 	// Give one of the models some counts.
 	t0 := time.Unix(0, 0)
-	err := s.JEM.DB.UpdateModelCounts(uuid1, map[params.EntityCount]int{
+	err := s.JEM.DB.UpdateModelCounts(testContext, uuid1, map[params.EntityCount]int{
 		params.MachineCount: 3,
 	}, t0)
+
 	c.Assert(err, gc.IsNil)
 
 	resps := []params.ModelResponse{{
