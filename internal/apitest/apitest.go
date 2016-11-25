@@ -1,4 +1,4 @@
-// Package apitest provides a test fixture for testing JEM APIs.
+// Package apitest provides test fixtures for testing JEM.
 package apitest
 
 import (
@@ -12,7 +12,6 @@ import (
 	"github.com/juju/idmclient/idmtest"
 	controllerapi "github.com/juju/juju/api/controller"
 	"github.com/juju/juju/controller"
-	corejujutesting "github.com/juju/juju/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"github.com/rogpeppe/fastuuid"
@@ -23,6 +22,7 @@ import (
 	external_jem "github.com/CanonicalLtd/jem"
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/jemserver"
+	"github.com/CanonicalLtd/jem/internal/jemtest"
 	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/jemclient"
@@ -32,7 +32,7 @@ import (
 // Suite implements a test fixture that contains a JEM server
 // and an identity discharging server.
 type Suite struct {
-	corejujutesting.JujuConnSuite
+	jemtest.JujuConnSuite
 
 	// JEMSrv holds a running instance of JEM.
 	JEMSrv *jemserver.Server

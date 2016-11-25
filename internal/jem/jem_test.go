@@ -10,7 +10,6 @@ import (
 	"github.com/juju/juju/api/controller"
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
-	corejujutesting "github.com/juju/juju/juju/testing"
 	"github.com/juju/juju/state/multiwatcher"
 	jujujujutesting "github.com/juju/juju/testing"
 	jt "github.com/juju/testing"
@@ -24,13 +23,14 @@ import (
 	"github.com/CanonicalLtd/jem/internal/apiconn"
 	"github.com/CanonicalLtd/jem/internal/auth"
 	"github.com/CanonicalLtd/jem/internal/jem"
+	"github.com/CanonicalLtd/jem/internal/jemtest"
 	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
 
 type jemSuite struct {
-	corejujutesting.JujuConnSuite
+	jemtest.JujuConnSuite
 	pool        *jem.Pool
 	sessionPool *mgosession.Pool
 	jem         *jem.JEM

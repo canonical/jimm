@@ -14,7 +14,6 @@ import (
 	"github.com/juju/idmclient/idmtest"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/juju"
-	corejujutesting "github.com/juju/juju/juju/testing"
 	"github.com/juju/juju/jujuclient"
 	"github.com/juju/loggo"
 	gc "gopkg.in/check.v1"
@@ -24,6 +23,7 @@ import (
 
 	"github.com/CanonicalLtd/jem"
 	"github.com/CanonicalLtd/jem/cmd/jaas-admin/admincmd"
+	"github.com/CanonicalLtd/jem/internal/jemtest"
 	"github.com/CanonicalLtd/jem/jemclient"
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -50,7 +50,7 @@ func run(c *gc.C, dir string, cmdName string, args ...string) (stdout, stderr st
 }
 
 type commonSuite struct {
-	corejujutesting.JujuConnSuite
+	jemtest.JujuConnSuite
 
 	jemSrv  jem.HandleCloser
 	idmSrv  *idmtest.Server

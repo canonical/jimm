@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/juju/idmclient/idmtest"
-	corejujutesting "github.com/juju/juju/juju/testing"
 	"github.com/juju/juju/state"
 	"github.com/juju/juju/state/multiwatcher"
 	jujuwatcher "github.com/juju/juju/state/watcher"
@@ -22,13 +21,14 @@ import (
 	"gopkg.in/tomb.v2"
 
 	"github.com/CanonicalLtd/jem/internal/jem"
+	"github.com/CanonicalLtd/jem/internal/jemtest"
 	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
 
 type internalSuite struct {
-	corejujutesting.JujuConnSuite
+	jemtest.JujuConnSuite
 	idmSrv      *idmtest.Server
 	sessionPool *mgosession.Pool
 	pool        *jem.Pool
@@ -592,8 +592,7 @@ func (s *internalSuite) TestControllerMonitor(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	jshim := newJEMShimWithUpdateNotify(jemShim{s.jem})
-	m := newControllerMonitor(controllerMonitorParams{
-		context:     context.TODO(),
+	m := newControllerMonitor(context.TODO(), controllerMonitorParams{
 		ctlPath:     ctlPath,
 		jem:         jshim,
 		ownerId:     "jem1",
@@ -661,8 +660,7 @@ func (s *internalSuite) TestControllerMonitorDiesWithMonitoringStoppedErrorWhenC
 	c.Assert(err, gc.IsNil)
 	err = s.jem.DB.DeleteController(context.TODO(), ctlPath)
 	c.Assert(err, gc.IsNil)
-	m := newControllerMonitor(controllerMonitorParams{
-		context:     context.TODO(),
+	m := newControllerMonitor(context.TODO(), controllerMonitorParams{
 		ctlPath:     ctlPath,
 		jem:         jemShim{s.jem},
 		ownerId:     "jem1",

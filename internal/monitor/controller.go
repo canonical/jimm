@@ -53,7 +53,6 @@ type controllerMonitor struct {
 // controllerMonitorParams holds parameters for creating
 // a new controller monitor.
 type controllerMonitorParams struct {
-	context     context.Context
 	jem         jemInterface
 	ctlPath     params.EntityPath
 	ownerId     string
@@ -61,20 +60,14 @@ type controllerMonitorParams struct {
 }
 
 // newControllerMonitor starts a new monitor to monitor one controller.
-func newControllerMonitor(p controllerMonitorParams) *controllerMonitor {
-	if p.context == nil {
-		panic("nil context")
-	}
+func newControllerMonitor(ctx context.Context, p controllerMonitorParams) *controllerMonitor {
 	m := &controllerMonitor{
 		jem:         p.jem,
 		ctlPath:     p.ctlPath,
 		ownerId:     p.ownerId,
 		leaseExpiry: p.leaseExpiry,
 	}
-	m.context = newTombContext(p.context, &m.tomb)
-	if m.context == nil {
-		panic("made nil context")
-	}
+	m.context = newTombContext(ctx, &m.tomb)
 	m.tomb.Go(func() error {
 		m.tomb.Go(m.leaseUpdater)
 		m.tomb.Go(m.watcher)
@@ -226,9 +219,6 @@ func (m *controllerMonitor) watcher() error {
 // can't make a connection because the dial itself failed, it returns an
 // error with a jem.ErrAPIConnection cause.
 func (m *controllerMonitor) dialAPI() (jujuAPI, error) {
-	if m.context == nil {
-		panic("nil context")
-	}
 	type apiConnReply struct {
 		conn jujuAPI
 		err  error

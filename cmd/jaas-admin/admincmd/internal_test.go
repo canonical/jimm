@@ -3,15 +3,15 @@
 package admincmd
 
 import (
-	corejujutesting "github.com/juju/juju/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
+	"github.com/CanonicalLtd/jem/internal/jemtest"
 	"github.com/CanonicalLtd/jem/params"
 )
 
 type internalSuite struct {
-	corejujutesting.JujuConnSuite
+	jemtest.JujuConnSuite
 }
 
 var _ = gc.Suite(&internalSuite{})
