@@ -29,6 +29,7 @@ import (
 	"github.com/CanonicalLtd/jem"
 	"github.com/CanonicalLtd/jem/config"
 	"github.com/CanonicalLtd/jem/internal/zapctx"
+	"github.com/CanonicalLtd/jem/internal/zaputil"
 )
 
 // websocketPingTimeout is the amount of time a webseocket connection
@@ -138,15 +139,6 @@ func serve(confPath string) error {
 	return httpServer.ListenAndServe()
 }
 
-var loggoToZap = map[loggo.Level]zap.Level{
-	loggo.TRACE:    zap.DebugLevel, // There's no zap equivalent to TRACE.
-	loggo.DEBUG:    zap.DebugLevel,
-	loggo.INFO:     zap.InfoLevel,
-	loggo.WARNING:  zap.WarnLevel,
-	loggo.ERROR:    zap.ErrorLevel,
-	loggo.CRITICAL: zap.ErrorLevel, // There's no zap equivalent to CRITICAL.
-}
-
 var zapToLoggo = map[zap.Level]loggo.Level{
 	zap.DebugLevel: loggo.TRACE, // Include trace and debug level messages.
 	zap.InfoLevel:  loggo.INFO,
@@ -160,22 +152,11 @@ func setUpLogging(level zap.Level) zap.Logger {
 	zapctx.Default = logger
 
 	// Set up loggo so that it will write to the root zap logger.
-	loggo.ReplaceDefaultWriter(zapLoggoWriter{logger})
+	loggo.ReplaceDefaultWriter(zaputil.NewLoggoWriter(logger))
 
 	// Configure loggo so that it will log at the right level.
 	loggo.DefaultContext().ApplyConfig(map[string]loggo.Level{
 		"<root>": zapToLoggo[level],
 	})
 	return logger
-}
-
-type zapLoggoWriter struct {
-	logger zap.Logger
-}
-
-// zapLoggoWriter implements loggo.Writer.Write by writing the entry
-// to w.logger. It ignores entry.Timestamp because zap will affix its
-// own timestamp.
-func (w zapLoggoWriter) Write(entry loggo.Entry) {
-	w.logger.Log(loggoToZap[entry.Level], entry.Message, zap.String("module", entry.Module), zap.String("file", entry.Filename), zap.Int("line", entry.Line))
 }

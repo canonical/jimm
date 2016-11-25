@@ -6,20 +6,20 @@ import (
 	"time"
 
 	cloudapi "github.com/juju/juju/api/cloud"
-	corejujutesting "github.com/juju/juju/juju/testing"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/internal/apiconn"
 	"github.com/CanonicalLtd/jem/internal/jem"
+	"github.com/CanonicalLtd/jem/internal/jemtest"
 	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
 
 type jemAPIConnSuite struct {
-	corejujutesting.JujuConnSuite
+	jemtest.JujuConnSuite
 	pool        *jem.Pool
 	sessionPool *mgosession.Pool
 	jem         *jem.JEM

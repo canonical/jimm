@@ -195,9 +195,9 @@ func (m *allMonitor) startMonitors() error {
 		}
 		// We've acquired the lease.
 		m.monitoring[ctl.Path] = true
-
-		ctlMonitor := newControllerMonitor(controllerMonitorParams{
-			context:     m.context, // TODO add logging context here.
+		// TODO add controller-specific logging context to context
+		// here before passing it to newControllerMonitor.
+		ctlMonitor := newControllerMonitor(m.context, controllerMonitorParams{
 			ctlPath:     ctl.Path,
 			jem:         m.jem,
 			ownerId:     m.ownerId,

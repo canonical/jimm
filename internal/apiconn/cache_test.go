@@ -6,16 +6,16 @@ import (
 	"time"
 
 	"github.com/juju/juju/api"
-	corejujutesting "github.com/juju/juju/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/internal/apiconn"
+	"github.com/CanonicalLtd/jem/internal/jemtest"
 )
 
 type cacheSuite struct {
-	corejujutesting.JujuConnSuite
+	jemtest.JujuConnSuite
 }
 
 var _ = gc.Suite(&cacheSuite{})
