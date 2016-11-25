@@ -3,12 +3,12 @@
 package monitor
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/utils/parallel"
+	"github.com/uber-go/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/tomb.v2"
@@ -16,6 +16,8 @@ import (
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/internal/servermon"
+	"github.com/CanonicalLtd/jem/internal/zapctx"
+	"github.com/CanonicalLtd/jem/internal/zaputil"
 	"github.com/CanonicalLtd/jem/params"
 )
 
@@ -133,11 +135,11 @@ func (m *controllerMonitor) renewLease(ctx context.Context, renew bool) error {
 	}
 	t, err := acquireLease(ctx, m.jem, m.ctlPath, m.leaseExpiry, m.ownerId, ownerId)
 	if err == nil {
-		logger.Debugf("controller %v acquired lease successfully (new time %v)", m.ctlPath, t)
+		zapctx.Debug(ctx, "acquired lease successfully", zap.Time("new-time", t))
 		m.leaseExpiry = t
 		return nil
 	}
-	logger.Infof("controller %v acquire lease failed: %v", m.ctlPath, err)
+	zapctx.Info(ctx, "acquire lease failed", zaputil.Error(err))
 	return errgo.Mask(err, isMonitoringStoppedError)
 }
 
@@ -161,7 +163,7 @@ func acquireLease(ctx context.Context, j jemInterface, ctlPath params.EntityPath
 // the controller is removed.
 func (m *controllerMonitor) watcher(ctx context.Context) error {
 	for {
-		logger.Debugf("monitor dialing controller %v", m.ctlPath)
+		zapctx.Debug(ctx, "dialing controller")
 		dialStartTime := Clock.Now()
 		conn, err := m.dialAPI(ctx)
 		switch errgo.Cause(err) {
@@ -179,7 +181,7 @@ func (m *controllerMonitor) watcher(ctx context.Context) error {
 				conn.Close()
 				return tomb.ErrDying
 			}
-			logger.Infof("watch controller %v died: %v", m.ctlPath, err)
+			zapctx.Info(ctx, "watch died", zaputil.Error(err))
 			// The problem is almost certainly with the controller
 			// API connection, so evict the connection from the API
 			// cache so we'll definitely re-dial the controller rather
@@ -195,7 +197,7 @@ func (m *controllerMonitor) watcher(ctx context.Context) error {
 			// We've failed to connect to the API. Log the error and
 			// try again.
 			// TODO update the controller doc with the error?
-			logger.Errorf("cannot connect to controller %v: %v", m.ctlPath, err)
+			zapctx.Error(ctx, "cannot connect", zaputil.Error(err))
 		default:
 			// Some other error has happened. Don't mask the monitor-stopped
 			// error that occurs if the controller is removed, because
@@ -237,7 +239,7 @@ func (m *controllerMonitor) dialAPI(ctx context.Context) (jujuAPI, error) {
 		// so that if our reply causes everything to be stopped,
 		// we know that the JEM is closed before that.
 		j.Close()
-		logger.Infof("openAPI returned error %v", err)
+		zapctx.Info(ctx, "openAPI failed", zaputil.Error(err))
 		select {
 		case reply <- apiConnReply{
 			conn: conn,
@@ -301,7 +303,7 @@ func (m *controllerMonitor) watch(ctx context.Context, conn jujuAPI) error {
 				return errgo.Mask(err)
 			}
 		}
-		logger.Infof("controller %v: all deltas processed", w.ctlPath)
+		zapctx.Info(ctx, "all deltas processed")
 		if w.changed {
 			w.runner.Do(func() error {
 				if err := m.jem.SetControllerStats(ctx, m.ctlPath, &w.stats); err != nil {
@@ -422,16 +424,12 @@ func newWatcherState(ctx context.Context, j jemInterface, ctlPath params.EntityP
 }
 
 func (w *watcherState) addDelta(ctx context.Context, d multiwatcher.Delta) error {
-	if logger.IsDebugEnabled() {
+	if m := zapctx.Logger(ctx).Check(zap.DebugLevel, "got delta"); m.OK() {
 		id := d.Entity.EntityId()
 		if d.Removed {
-			logger.Infof("controller %v got delta %v - removed %s-%s", w.ctlPath, id.ModelUUID, id.Kind, id.Id)
+			m.Write(zap.String("kind", "-"), zap.String("id", id.Id))
 		} else {
-			data, err := json.Marshal(d.Entity)
-			if err != nil {
-				data = []byte("cannot marshal")
-			}
-			logger.Infof("controller %v got delta %v - changed %s-%s: %s", w.ctlPath, id.ModelUUID, id.Kind, id.Id, data)
+			m.Write(zap.String("kind", "+"), zap.String("id", id.Id), zap.Object("entity", d.Entity))
 		}
 	}
 	ctlpathstr := string(w.ctlPath.Name) + ":" + string(w.ctlPath.User)

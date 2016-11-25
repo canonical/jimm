@@ -6,8 +6,8 @@ import (
 	"net/http"
 
 	"github.com/juju/idmclient"
-	"github.com/juju/loggo"
 	"github.com/juju/utils"
+	"github.com/uber-go/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -19,10 +19,10 @@ import (
 
 	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/servermon"
+	"github.com/CanonicalLtd/jem/internal/zapctx"
+	"github.com/CanonicalLtd/jem/internal/zaputil"
 	"github.com/CanonicalLtd/jem/params"
 )
-
-var logger = loggo.GetLogger("jem.internal.auth")
 
 const usernameAttr = "username"
 
@@ -157,7 +157,7 @@ func (a *Authenticator) AuthenticateRequest(ctx context.Context, req *http.Reque
 	cookiePath := "/"
 	if p, err := utils.RelativeURLPath(req.RequestURI, "/"); err != nil {
 		// Should never happen, as RequestURI should always be absolute.
-		logger.Infof("cannot make relative URL from %v", req.RequestURI)
+		zapctx.Error(ctx, "cannot make relative URL", zap.String("request-uri", req.RequestURI), zaputil.Error(err))
 	} else {
 		cookiePath = p
 	}
@@ -206,7 +206,6 @@ func (a authentication) allow(acl []string) (bool, error) {
 	} else if ok {
 		return true, nil
 	}
-	logger.Infof("%s is not authorized for ACL %s", a.username_, acl)
 	return false, nil
 }
 
@@ -224,11 +223,16 @@ func CheckIsUser(ctx context.Context, user params.User) error {
 // allowed to access an entity with the given ACL.
 // It returns params.ErrUnauthorized if not.
 func CheckACL(ctx context.Context, acl []string) error {
-	ok, err := fromContext(ctx).allow(acl)
+	auth := fromContext(ctx)
+	ok, err := auth.allow(acl)
 	if err != nil {
 		return errgo.Notef(err, "cannot check permissions")
 	}
 	if !ok {
+		zapctx.Info(ctx, "user not authorized",
+			zap.String("user", auth.username()),
+			zap.Object("acl", acl),
+		)
 		return params.ErrUnauthorized
 	}
 	return nil

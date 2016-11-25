@@ -1369,7 +1369,7 @@ var setDeadTests = []struct {
 	run: func(db *jem.Database) {
 		db.UpdateMachineInfo(testContext, &multiwatcher.MachineInfo{
 			ModelUUID: "xxx",
-			Id: "yyy",
+			Id:        "yyy",
 		})
 	},
 }, {
