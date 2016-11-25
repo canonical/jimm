@@ -341,7 +341,7 @@ func (h *Handler) DeleteController(arg *params.DeleteController) error {
 			return errgo.WithCausef(nil, params.ErrStillAlive, "cannot delete controller while it is still alive")
 		}
 	}
-	if err := h.jem.DB.DeleteController(arg.EntityPath); err != nil {
+	if err := h.jem.DB.DeleteController(context.TODO(), arg.EntityPath); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	return nil
@@ -398,7 +398,7 @@ func (h *Handler) DeleteModel(arg *params.DeleteModel) error {
 	if err := auth.CheckIsUser(h.context, arg.EntityPath.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	if err := h.jem.DB.DeleteModel(arg.EntityPath); err != nil {
+	if err := h.jem.DB.DeleteModel(context.TODO(), arg.EntityPath); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrForbidden))
 	}
 	return nil
@@ -768,7 +768,7 @@ type schemaForNewModel struct {
 // schemaForNewModel returns the schema for the configuration options
 // for creating new models on the controller with the given id.
 func (h *Handler) schemaForNewModel(ctlPath params.EntityPath, user params.User) (*schemaForNewModel, error) {
-	st, err := h.jem.OpenAPI(ctlPath)
+	st, err := h.jem.OpenAPI(context.TODO(), ctlPath)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot open API", errgo.Is(params.ErrNotFound))
 	}

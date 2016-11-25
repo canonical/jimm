@@ -151,7 +151,7 @@ var zapToLoggo = map[zap.Level]loggo.Level{
 	zap.DebugLevel: loggo.TRACE, // Include trace and debug level messages.
 	zap.InfoLevel:  loggo.INFO,
 	zap.WarnLevel:  loggo.WARNING,
-	zap.ErrorLevel: loggo.ERROR,
+	zap.ErrorLevel: loggo.ERROR, // Include error and critical level messages.
 }
 
 func setUpLogging(level zap.Level) zap.Logger {

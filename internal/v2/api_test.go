@@ -11,6 +11,7 @@ import (
 	"github.com/juju/juju/network"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
@@ -318,7 +319,7 @@ func (s *APISuite) TestAddController(c *gc.C) {
 		}
 		// The controller was added successfully. Check that we
 		// can connect to it.
-		conn, err := s.JEM.OpenAPI(controllerPath)
+		conn, err := s.JEM.OpenAPI(context.TODO(), controllerPath)
 		c.Assert(err, gc.IsNil)
 		conn.Close()
 		// Clear the connection pool for the next test.

@@ -1010,11 +1010,11 @@ func (m modelManager) destroyModel(arg jujuparams.Entity) error {
 		}
 		return errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
 	}
-	conn, err := m.h.jem.OpenAPI(model.Controller)
+	conn, err := m.h.jem.OpenAPI(context.TODO(), model.Controller)
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	if err := m.h.jem.DestroyModel(conn, model); err != nil {
+	if err := m.h.jem.DestroyModel(context.TODO(), conn, model); err != nil {
 		return errgo.Mask(err)
 	}
 	age := float64(time.Now().Sub(model.CreationTime)) / float64(time.Hour)
@@ -1052,7 +1052,7 @@ func (m modelManager) modifyModelAccess(change jujuparams.ModifyModelAccess) err
 	if userTag.IsLocal() {
 		return errgo.WithCausef(nil, params.ErrBadRequest, "unsupported domain %q", userTag.Domain())
 	}
-	conn, err := m.h.jem.OpenAPI(model.Controller)
+	conn, err := m.h.jem.OpenAPI(context.TODO(), model.Controller)
 	if err != nil {
 		return errgo.Mask(err)
 	}

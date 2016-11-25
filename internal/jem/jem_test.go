@@ -273,7 +273,7 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 
 func (s *jemSuite) TestGrantModel(c *gc.C) {
 	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
-	conn, err := s.jem.OpenAPI(model.Controller)
+	conn, err := s.jem.OpenAPI(context.Background(), model.Controller)
 	c.Assert(err, jc.ErrorIsNil)
 	defer conn.Close()
 	err = s.jem.GrantModel(conn, model, "alice", "write")
@@ -285,7 +285,7 @@ func (s *jemSuite) TestGrantModel(c *gc.C) {
 
 func (s *jemSuite) TestGrantModelControllerFailure(c *gc.C) {
 	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
-	conn, err := s.jem.OpenAPI(model.Controller)
+	conn, err := s.jem.OpenAPI(context.Background(), model.Controller)
 	c.Assert(err, jc.ErrorIsNil)
 	defer conn.Close()
 	err = s.jem.GrantModel(conn, model, "alice", "superpowers")
@@ -297,7 +297,7 @@ func (s *jemSuite) TestGrantModelControllerFailure(c *gc.C) {
 
 func (s *jemSuite) TestRevokeModel(c *gc.C) {
 	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
-	conn, err := s.jem.OpenAPI(model.Controller)
+	conn, err := s.jem.OpenAPI(context.Background(), model.Controller)
 	c.Assert(err, jc.ErrorIsNil)
 	defer conn.Close()
 	err = s.jem.GrantModel(conn, model, "alice", "write")
@@ -314,7 +314,7 @@ func (s *jemSuite) TestRevokeModel(c *gc.C) {
 
 func (s *jemSuite) TestRevokeModelControllerFailure(c *gc.C) {
 	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
-	conn, err := s.jem.OpenAPI(model.Controller)
+	conn, err := s.jem.OpenAPI(context.Background(), model.Controller)
 	c.Assert(err, jc.ErrorIsNil)
 	defer conn.Close()
 	err = s.jem.GrantModel(conn, model, "alice", "write")
@@ -331,7 +331,7 @@ func (s *jemSuite) TestRevokeModelControllerFailure(c *gc.C) {
 
 func (s *jemSuite) TestDestroyModel(c *gc.C) {
 	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
-	conn, err := s.jem.OpenAPI(model.Controller)
+	conn, err := s.jem.OpenAPI(context.Background(), model.Controller)
 	c.Assert(err, jc.ErrorIsNil)
 	defer conn.Close()
 
@@ -351,7 +351,7 @@ func (s *jemSuite) TestDestroyModel(c *gc.C) {
 
 	ch := waitForDestruction(conn, c, model.UUID)
 
-	err = s.jem.DestroyModel(conn, model)
+	err = s.jem.DestroyModel(context.Background(), conn, model)
 	c.Assert(err, jc.ErrorIsNil)
 
 	select {
@@ -365,7 +365,7 @@ func (s *jemSuite) TestDestroyModel(c *gc.C) {
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
 	// Check that it cannot be destroyed twice
-	err = s.jem.DestroyModel(conn, model)
+	err = s.jem.DestroyModel(context.Background(), conn, model)
 	c.Assert(err, gc.ErrorMatches, `model "bob/model" not found`)
 
 	// Put the model back in the database
@@ -373,7 +373,7 @@ func (s *jemSuite) TestDestroyModel(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 
 	// Check that it can still be removed even if the contoller has no model.
-	err = s.jem.DestroyModel(conn, model)
+	err = s.jem.DestroyModel(context.Background(), conn, model)
 	c.Assert(err, jc.ErrorIsNil)
 
 	// Ensure the model is removed.
@@ -414,11 +414,11 @@ func (s *jemSuite) TestUpdateCredential(c *gc.C) {
 	}
 	err := jem.UpdateCredential(s.jem.DB, cred)
 	c.Assert(err, jc.ErrorIsNil)
-	conn, err := s.jem.OpenAPI(ctlPath)
+	conn, err := s.jem.OpenAPI(context.Background(), ctlPath)
 	c.Assert(err, jc.ErrorIsNil)
 	defer conn.Close()
 
-	err = jem.UpdateControllerCredential(s.jem, ctlPath, cred.Path, conn, cred)
+	err = jem.UpdateControllerCredential(s.jem, context.Background(), ctlPath, cred.Path, conn, cred)
 	c.Assert(err, jc.ErrorIsNil)
 	err = jem.CredentialAddController(s.jem.DB, credPath, ctlPath)
 	c.Assert(err, jc.ErrorIsNil)
@@ -495,7 +495,7 @@ func (s *jemSuite) TestControllerUpdateCredentials(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 
 	// check it was updated on the controller.
-	conn, err := s.jem.OpenAPI(ctlPath)
+	conn, err := s.jem.OpenAPI(context.Background(), ctlPath)
 	c.Assert(err, jc.ErrorIsNil)
 	defer conn.Close()
 

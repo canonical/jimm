@@ -33,6 +33,9 @@ type controllerMonitor struct {
 	// has been removed.
 	tomb tomb.Tomb
 
+	// context holds the monitor's context.
+	context context.Context
+
 	// leaseExpiry holds the time that the currently held lease
 	// will expire. It is maintained by the leaseUpdater goroutine.
 	leaseExpiry time.Time
@@ -50,6 +53,7 @@ type controllerMonitor struct {
 // controllerMonitorParams holds parameters for creating
 // a new controller monitor.
 type controllerMonitorParams struct {
+	context     context.Context
 	jem         jemInterface
 	ctlPath     params.EntityPath
 	ownerId     string
@@ -58,11 +62,18 @@ type controllerMonitorParams struct {
 
 // newControllerMonitor starts a new monitor to monitor one controller.
 func newControllerMonitor(p controllerMonitorParams) *controllerMonitor {
+	if p.context == nil {
+		panic("nil context")
+	}
 	m := &controllerMonitor{
 		jem:         p.jem,
 		ctlPath:     p.ctlPath,
 		ownerId:     p.ownerId,
 		leaseExpiry: p.leaseExpiry,
+	}
+	m.context = newTombContext(p.context, &m.tomb)
+	if m.context == nil {
+		panic("made nil context")
 	}
 	m.tomb.Go(func() error {
 		m.tomb.Go(m.leaseUpdater)
@@ -88,12 +99,6 @@ func (m *controllerMonitor) Wait() error {
 // monitor has terminated.
 func (m *controllerMonitor) Dead() <-chan struct{} {
 	return m.tomb.Dead()
-}
-
-// context returns a new context which will be cancelled when the monitor
-// is killed.
-func (m *controllerMonitor) context() context.Context {
-	return newTombContext(&m.tomb)
 }
 
 // leaseUpdater is responsible for updating the controller's lease
@@ -171,7 +176,7 @@ func (m *controllerMonitor) watcher() error {
 				return errgo.Notef(err, "cannot set controller availability")
 			}
 
-			if err := m.jem.ControllerUpdateCredentials(m.context(), m.ctlPath); err != nil {
+			if err := m.jem.ControllerUpdateCredentials(m.context, m.ctlPath); err != nil {
 				return errgo.Notef(err, "cannot update credentials")
 			}
 
@@ -221,6 +226,9 @@ func (m *controllerMonitor) watcher() error {
 // can't make a connection because the dial itself failed, it returns an
 // error with a jem.ErrAPIConnection cause.
 func (m *controllerMonitor) dialAPI() (jujuAPI, error) {
+	if m.context == nil {
+		panic("nil context")
+	}
 	type apiConnReply struct {
 		conn jujuAPI
 		err  error
@@ -232,7 +240,7 @@ func (m *controllerMonitor) dialAPI() (jujuAPI, error) {
 	j := m.jem.Clone()
 	go func() {
 		// Open the API to the controller's admin model.
-		conn, err := j.OpenAPI(m.ctlPath)
+		conn, err := j.OpenAPI(m.context, m.ctlPath)
 
 		// Close before sending the reply rather than deferring
 		// so that if our reply causes everything to be stopped,

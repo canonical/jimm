@@ -13,8 +13,8 @@ import (
 	cloudapi "github.com/juju/juju/api/cloud"
 	"github.com/juju/juju/api/modelmanager"
 	jujucloud "github.com/juju/juju/cloud"
-	"github.com/juju/loggo"
 	"github.com/juju/utils/clock"
+	"github.com/uber-go/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
@@ -25,10 +25,10 @@ import (
 	"github.com/CanonicalLtd/jem/internal/auth"
 	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
+	"github.com/CanonicalLtd/jem/internal/zapctx"
+	"github.com/CanonicalLtd/jem/internal/zaputil"
 	"github.com/CanonicalLtd/jem/params"
 )
-
-var logger = loggo.GetLogger("jem.internal.jem")
 
 // wallClock provides access to the current time. It is a variable so
 // that it can be overridden in tests.
@@ -209,15 +209,15 @@ var ErrAPIConnection = errgo.New("cannot connect to API")
 // have a cause of ErrAPIConnection.
 //
 // The returned connection must be closed when finished with.
-func (j *JEM) OpenAPI(path params.EntityPath) (_ *apiconn.Conn, err error) {
-	defer j.DB.checkError(&err)
+func (j *JEM) OpenAPI(ctx context.Context, path params.EntityPath) (_ *apiconn.Conn, err error) {
+	defer j.DB.checkError(ctx, &err)
 	ctl, err := j.DB.Controller(path)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot get controller", errgo.Is(params.ErrNotFound))
 	}
 	return j.pool.connCache.OpenAPI(ctl.UUID, func() (api.Connection, *api.Info, error) {
 		apiInfo := apiInfoFromDoc(ctl)
-		logger.Debugf("%#v", apiInfo)
+		zapctx.Debug(ctx, "open API", zap.Object("api-info", apiInfo))
 		st, err := api.Open(apiInfo, apiDialOpts())
 		if err != nil {
 			return nil, nil, errgo.WithCausef(err, ErrAPIConnection, "")
@@ -352,7 +352,7 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.M
 		if err != nil {
 			return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 		}
-		if err := j.updateControllerCredential(p.ControllerPath, p.Credential, conn, cred); err != nil {
+		if err := j.updateControllerCredential(ctx, p.ControllerPath, p.Credential, conn, cred); err != nil {
 			return nil, errgo.Mask(err)
 		}
 		if err := j.DB.credentialAddController(p.Credential, p.ControllerPath); err != nil {
@@ -389,7 +389,7 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.M
 	if err != nil {
 		// Remove the model that was created, because it's no longer valid.
 		if err := j.DB.Models().RemoveId(modelDoc.Id); err != nil {
-			logger.Errorf("cannot remove model from database after model creation error: %v", err)
+			zapctx.Error(ctx, "cannot remove model from database after model creation error", zaputil.Error(err))
 		}
 		return nil, errgo.Notef(err, "cannot create model")
 	}
@@ -434,7 +434,11 @@ func (j *JEM) UpdateCredential(ctx context.Context, cred *mongodoc.Credential) (
 	// Mark in the local database that an update is required for all controllers
 	if err := j.DB.setCredentialUpdates(cred.Controllers, cred.Path); err != nil {
 		// Log the error, but press on hoping to update the controllers anyway.
-		logger.Errorf("cannot update controllers with updated credential %q: %s", c.Path, err)
+		zapctx.Error(ctx,
+			"cannot update controllers with updated credential",
+			zap.String("cred", c.Path.String()),
+			zaputil.Error(err),
+		)
 	}
 	// Attempt to update all controllers to which the credential is
 	// deployed. If these fail they will be updated by the monitor.
@@ -447,8 +451,13 @@ func (j *JEM) UpdateCredential(ctx context.Context, cred *mongodoc.Credential) (
 				ch <- struct{}{}
 			}()
 			defer j.Close()
-			if err := j.updateControllerCredential(ctlPath, cred.Path, nil, c); err != nil {
-				logger.Warningf("cannot update credential %q on controller %q: %s", c.Path, ctlPath, err)
+			if err := j.updateControllerCredential(ctx, ctlPath, cred.Path, nil, c); err != nil {
+				zapctx.Warn(ctx,
+					"cannot update credential",
+					zap.String("cred", c.Path.String()),
+					zap.String("controller", ctlPath.String()),
+					zaputil.Error(err),
+				)
 				return
 			}
 		}(j.Clone(), ctlPath)
@@ -476,8 +485,13 @@ func (j *JEM) ControllerUpdateCredentials(ctx context.Context, ctlPath params.En
 		return errgo.Notef(err, "cannot connect to controller")
 	}
 	for _, credPath := range ctl.UpdateCredentials {
-		if err := j.updateControllerCredential(ctl.Path, credPath, conn, nil); err != nil {
-			logger.Warningf("cannot update credential %q on controller %q: %s", credPath, ctl.Path, err)
+		if err := j.updateControllerCredential(ctx, ctl.Path, credPath, conn, nil); err != nil {
+			zapctx.Warn(ctx,
+				"cannot update credential",
+				zap.Stringer("cred", credPath),
+				zap.Stringer("controller", ctl.Path),
+				zaputil.Error(err),
+			)
 		}
 	}
 	return nil
@@ -488,6 +502,7 @@ func (j *JEM) ControllerUpdateCredentials(ctx context.Context, ctlPath params.En
 // with the controller. If cred is non-nil then those credentials will be
 // updated on the controller.
 func (j *JEM) updateControllerCredential(
+	ctx context.Context,
 	ctlPath params.EntityPath,
 	credPath params.CredentialPath,
 	conn *apiconn.Conn,
@@ -495,7 +510,7 @@ func (j *JEM) updateControllerCredential(
 ) error {
 	var err error
 	if conn == nil {
-		conn, err = j.OpenAPI(ctlPath)
+		conn, err = j.OpenAPI(ctx, ctlPath)
 		if err != nil {
 			return errgo.Mask(err)
 		}
@@ -521,7 +536,12 @@ func (j *JEM) updateControllerCredential(
 		return errgo.Notef(err, "cannot update credentials")
 	}
 	if err := j.DB.clearCredentialUpdate(ctlPath, credPath); err != nil {
-		logger.Warningf("Failed updating controller %q after successfully updating credential %q: %s", ctlPath, credPath, err)
+		zapctx.Error(ctx,
+			"failed to update controller after successfully updating credential",
+			zap.Stringer("cred", credPath),
+			zap.Stringer("controller", ctlPath),
+			zaputil.Error(err),
+		)
 	}
 	return nil
 }
@@ -558,12 +578,12 @@ func (j *JEM) RevokeModel(conn *apiconn.Conn, model *mongodoc.Model, user params
 // Note that if the model is destroyed in its controller but
 // j.DeleteModel fails, a subsequent DestroyModel can can still succeed
 // because client.DestroyModel will succeed when the model doesn't exist.
-func (j *JEM) DestroyModel(conn *apiconn.Conn, model *mongodoc.Model) error {
+func (j *JEM) DestroyModel(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model) error {
 	client := modelmanager.NewClient(conn)
 	if err := client.DestroyModel(names.NewModelTag(model.UUID)); err != nil {
 		return errgo.Mask(err)
 	}
-	if err := j.DB.DeleteModel(model.Path); err != nil {
+	if err := j.DB.DeleteModel(ctx, model.Path); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil

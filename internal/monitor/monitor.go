@@ -13,6 +13,7 @@ import (
 
 	"github.com/juju/loggo"
 	"github.com/juju/utils/clock"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/tomb.v2"
 
@@ -47,15 +48,17 @@ type Monitor struct {
 	pool    *jem.Pool
 	tomb    tomb.Tomb
 	ownerId string
+	context context.Context
 }
 
 // New returns a new Monitor that will monitor controllers
 // that JEM knows about. It uses the given JEM pool for
 // accessing the database.
-func New(p *jem.Pool, ownerId string) *Monitor {
+func New(ctx context.Context, p *jem.Pool, ownerId string) *Monitor {
 	m := &Monitor{
 		pool:    p,
 		ownerId: ownerId,
+		context: ctx,
 	}
 	m.tomb.Go(m.run)
 	return m
@@ -76,7 +79,7 @@ func (m *Monitor) Wait() error {
 func (m *Monitor) run() error {
 	for {
 		shim := jemShim{m.pool.JEM()}
-		m1 := newAllMonitor(shim, m.ownerId)
+		m1 := newAllMonitor(m.context, shim, m.ownerId) // TODO add logging value here?
 		select {
 		case <-m1.tomb.Dead():
 			logger.Warningf("restarting inner monitor after error: %v", m1.tomb.Err())
@@ -91,12 +94,13 @@ func (m *Monitor) run() error {
 	}
 }
 
-func newAllMonitor(jem jemInterface, ownerId string) *allMonitor {
+func newAllMonitor(ctx context.Context, jem jemInterface, ownerId string) *allMonitor {
 	m := &allMonitor{
 		jem:               jem,
 		monitoring:        make(map[params.EntityPath]bool),
 		ownerId:           ownerId,
 		controllerRemoved: make(chan params.EntityPath),
+		context:           ctx,
 	}
 	m.tomb.Go(m.run)
 	return m
@@ -134,6 +138,9 @@ type allMonitor struct {
 	// we are currently monitoring. This field is accessed
 	// only by the allMonitor.run goroutine.
 	monitoring map[params.EntityPath]bool
+
+	// context holds the context for the monitor.
+	context context.Context
 }
 
 func (m *allMonitor) run() error {
@@ -190,6 +197,7 @@ func (m *allMonitor) startMonitors() error {
 		m.monitoring[ctl.Path] = true
 
 		ctlMonitor := newControllerMonitor(controllerMonitorParams{
+			context:     m.context, // TODO add logging context here.
 			ctlPath:     ctl.Path,
 			jem:         m.jem,
 			ownerId:     m.ownerId,

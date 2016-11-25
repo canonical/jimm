@@ -5,6 +5,8 @@ package jem
 import (
 	"io"
 
+	"github.com/CanonicalLtd/jem/internal/zapctx"
+	"github.com/CanonicalLtd/jem/internal/zaputil"
 	"golang.org/x/net/context"
 )
 
@@ -26,7 +28,9 @@ func runWithContext(ctx context.Context, f func() (io.Closer, error)) (io.Closer
 			if err == nil {
 				c.Close()
 			} else {
-				logger.Debugf("ignoring error in canceled task: %s", err)
+				zapctx.Debug(ctx, "ignoring error in canceled task",
+					zaputil.Error(err),
+				)
 			}
 		}
 	}()

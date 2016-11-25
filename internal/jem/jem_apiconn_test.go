@@ -67,7 +67,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// Open the API and check that it works.
-	conn, err := s.jem.OpenAPI(ctlPath)
+	conn, err := s.jem.OpenAPI(context.TODO(), ctlPath)
 	c.Assert(err, gc.IsNil)
 	s.assertConnectionAlive(c, conn)
 
@@ -76,7 +76,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 
 	// Open it again and check that we get the
 	// same cached connection.
-	conn1, err := s.jem.OpenAPI(ctlPath)
+	conn1, err := s.jem.OpenAPI(context.Background(), ctlPath)
 	c.Assert(err, gc.IsNil)
 	s.assertConnectionAlive(c, conn1)
 	c.Assert(conn1.Connection, gc.Equals, conn.Connection)
@@ -136,8 +136,7 @@ func (s *jemAPIConnSuite) TestOpenAPIFromDocsCancel(c *gc.C) {
 }
 
 func (s *jemAPIConnSuite) TestPoolOpenAPIError(c *gc.C) {
-
-	conn, err := s.jem.OpenAPI(params.EntityPath{"bob", "notthere"})
+	conn, err := s.jem.OpenAPI(context.Background(), params.EntityPath{"bob", "notthere"})
 	c.Assert(err, gc.ErrorMatches, `cannot get controller: controller "bob/notthere" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	c.Assert(conn, gc.IsNil)

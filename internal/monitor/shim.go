@@ -7,6 +7,7 @@ import (
 
 	apicontroller "github.com/juju/juju/api/controller"
 	"github.com/juju/juju/state/multiwatcher"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/internal/apiconn"
@@ -25,8 +26,8 @@ func (j jemShim) Clone() jemInterface {
 	return jemShim{j.JEM.Clone()}
 }
 
-func (j jemShim) OpenAPI(path params.EntityPath) (jujuAPI, error) {
-	conn, err := j.JEM.OpenAPI(path)
+func (j jemShim) OpenAPI(ctx context.Context, path params.EntityPath) (jujuAPI, error) {
+	conn, err := j.JEM.OpenAPI(ctx, path)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
