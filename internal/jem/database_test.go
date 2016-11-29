@@ -46,18 +46,21 @@ func (s *databaseSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	s.LoggingSuite.SetUpTest(c)
 	pool := mgosession.NewPool(s.Session, 1)
-	s.database = jem.NewDatabase(pool.Session(), "jem")
+	s.database = jem.NewDatabase(pool, "jem")
+	c.Assert(s.database.Session.Ping(), gc.Equals, nil)
 	pool.Close()
+	c.Assert(s.database.Session.Ping(), gc.Equals, nil)
 }
 
 func (s *databaseSuite) TearDownTest(c *gc.C) {
-	jem.DatabaseClose(s.database)
 	s.LoggingSuite.TearDownTest(c)
+	s.database.Session.Close()
+	s.database = nil
 	s.IsolatedMgoSuite.TearDownTest(c)
 }
 
 func (s *databaseSuite) checkDBOK(c *gc.C) {
-	c.Check(jem.DatabaseSessionIsDead(s.database), gc.Equals, false)
+	c.Check(s.database.Session.Ping(), gc.Equals, nil)
 }
 
 func (s *databaseSuite) TestAddController(c *gc.C) {
@@ -1389,17 +1392,27 @@ func (s *databaseSuite) TestSetDead(c *gc.C) {
 }
 
 func testSetDead(c *gc.C, proxy *jujutesting.TCPProxy, pool *mgosession.Pool, run func(db *jem.Database)) {
-	session := pool.Session()
-	defer session.Close()
+	db := jem.NewDatabase(pool, "jem")
+	defer db.Session.Close()
 	// Use the session so that it's bound to the socket.
-	err := session.Ping()
+	err := db.Session.Ping()
 	c.Assert(err, gc.IsNil)
 	proxy.CloseConns() // Close the existing socket so that the connection is broken.
 
-	c.Check(session.MayReuse(), gc.Equals, true) // Sanity check.
-	db := jem.NewDatabase(session, "jem")
+	// Sanity check that getting another session from the pool also
+	// gives us a broken session (note that we know that the
+	// pool only contains one session).
+	s1 := pool.Session()
+	defer s1.Close()
+	c.Assert(s1.Ping(), gc.NotNil)
+
 	run(db)
-	c.Check(session.MayReuse(), gc.Equals, false)
+
+	// Check that another session from the pool is OK to use now
+	// because the operation has reset the pool.
+	s2 := pool.Session()
+	defer s2.Close()
+	c.Assert(s2.Ping(), gc.Equals, nil)
 }
 
 func parseTime(s string) time.Time {

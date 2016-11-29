@@ -3,9 +3,10 @@
 package mgosession_test
 
 import (
+	"time"
+
 	jujutesting "github.com/juju/testing"
 	gc "gopkg.in/check.v1"
-	mgo "gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jem/internal/mgosession"
 )
@@ -17,98 +18,99 @@ type suite struct {
 var _ = gc.Suite(&suite{})
 
 func (s *suite) TestSession(c *gc.C) {
-	pool := mgosession.NewPool(s.Session, 2)
+	psession := jujutesting.NewProxiedSession(c)
+	defer psession.Close()
+	pool := mgosession.NewPool(psession.Session, 2)
 	defer pool.Close()
 
+	// Obtain a session from the pool, then kill its connection
+	// so we can be sure that the next session is using a different
+	// connection
 	s0 := pool.Session()
 	defer s0.Close()
-	// The second session should be different because
-	// two sessions are allowed.
+	c.Assert(s0.Ping(), gc.IsNil)
+	psession.CloseConns()
+	c.Assert(s0.Ping(), gc.NotNil)
+
+	// The next session should still work.
 	s1 := pool.Session()
 	defer s1.Close()
-	c.Assert(s1.Session, gc.Not(gc.Equals), s0.Session)
-
-	// The third session should be reused.
-	s2 := pool.Session()
-	defer s2.Close()
-	c.Assert(s2.Session, gc.Equals, s0.Session)
-	c.Assert(s2, gc.Not(gc.Equals), s0)
-
-	// Closing the first session should not affect the
-	// third even though they're shared.
-	s0.Close()
-	c.Assert(s2.Ping(), gc.IsNil)
-
-	// Closing is idempotent.
-	s0.Close()
-	c.Assert(s2.Ping(), gc.IsNil)
-
-	// Closing the third session shouldn't actually
-	// close the session because the pool still holds a reference
-	// to it.
-	s2.Close()
-	c.Assert(s2.Ping(), gc.IsNil)
-
-	// Closing the pool should finally close the
-	// sessions that have no references (s0 and s2).
-	pool.Close()
-
-	assertClosed(c, s2.Session)
-
-	// s1 has still not been closed, so still works.
 	c.Assert(s1.Ping(), gc.IsNil)
-	// After closing it, it will finally close down.
-	s1.Close()
-	assertClosed(c, s1.Session)
-}
 
-func (s *suite) TestDoNotReuse(c *gc.C) {
-	pool := mgosession.NewPool(s.Session, 2)
-	defer pool.Close()
-
-	s0 := pool.Session()
-	defer s0.Close()
-	s0.DoNotReuse()
-
-	s1 := pool.Session()
-	defer s1.Close()
-
-	// s0 was marked as DoNotReuse, so it should not
-	// be handed out again.
+	// The third session should cycle back to the first
+	// and fail.
 	s2 := pool.Session()
 	defer s2.Close()
-	c.Assert(s2.Session, gc.Not(gc.Equals), s0.Session)
+	c.Assert(s2.Ping(), gc.NotNil)
 
-	// The next session wasn't marked as DoNotReuse,
-	// so it will reuse s1.
+	// Kill the connections again so that we
+	// can be sure that the next session has been
+	// copied.
+	psession.CloseConns()
+	c.Assert(s1.Ping(), gc.NotNil)
+
+	// Resetting the pool should cause new sessions
+	// to work again.
+	pool.Reset()
 	s3 := pool.Session()
 	defer s3.Close()
-
-	c.Assert(s3.Session, gc.Equals, s1.Session)
+	c.Assert(s3.Ping(), gc.IsNil)
+	s4 := pool.Session()
+	defer s4.Close()
+	c.Assert(s4.Ping(), gc.IsNil)
 }
 
-func (s *suite) TestClone(c *gc.C) {
+func (s *suite) TestClosingPoolDoesNotClosePreviousSessions(c *gc.C) {
 	pool := mgosession.NewPool(s.Session, 2)
+	session := pool.Session()
+	defer session.Close()
+	pool.Close()
+	c.Assert(session.Ping(), gc.Equals, nil)
+}
+
+func (s *suite) TestSessionPinger(c *gc.C) {
+	t0 := time.Now()
+	clock := jujutesting.NewClock(t0)
+	s.PatchValue(&mgosession.Clock, clock)
+
+	psession := jujutesting.NewProxiedSession(c)
+	defer psession.Close()
+	pool := mgosession.NewPool(psession.Session, 1)
 	defer pool.Close()
 
+	// Obtain a session from the pool, then kill its connection
+	// so we tell whether the next session from the pool uses
+	// the same connection.
 	s0 := pool.Session()
-	s1 := s0.Clone()
+	defer s0.Close()
+	c.Assert(s0.Ping(), gc.IsNil)
+	psession.CloseConns()
+	c.Assert(s0.Ping(), gc.NotNil)
+
+	// Sanity check that getting another session
+	// also gives us one that fails.
+	s1 := pool.Session()
 	defer s1.Close()
-	s0.Close()
-	pool.Close()
+	c.Assert(s0.Ping(), gc.NotNil)
 
-	// Check that it still works - if we hadn't cloned s0, it would have been
-	// closed when we closed it and the pool.
-	c.Assert(s1.Ping(), gc.IsNil)
+	// Wait for the pinger to sleep.
+	select {
+	case <-clock.Alarms():
+	case <-time.After(time.Second):
+		c.Fatalf("timed out waiting for pinger to sleep")
+	}
+	clock.Advance(mgosession.PingInterval)
 
-	// Check that when we finally close it, it is actually closed.
-	s1.Close()
-	assertClosed(c, s1.Session)
-	assertClosed(c, s0.Session)
-}
+	// Wait for the pinger to sleep again after it's pinged
+	// the session and found it wanting.
+	select {
+	case <-clock.Alarms():
+	case <-time.After(time.Second):
+		c.Fatalf("timed out waiting for pinger to sleep")
+	}
 
-func assertClosed(c *gc.C, s *mgo.Session) {
-	c.Assert(func() {
-		s.Ping()
-	}, gc.PanicMatches, `Session already closed`)
+	// Now the next session should be all fresh and lovely.
+	s2 := pool.Session()
+	defer s2.Close()
+	c.Assert(s2.Ping(), gc.IsNil)
 }

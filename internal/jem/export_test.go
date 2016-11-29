@@ -13,11 +13,3 @@ var (
 	UpdateControllerCredential = (*JEM).updateControllerCredential
 	RunWithContext             = runWithContext
 )
-
-func DatabaseClose(db *Database) {
-	db.session.Close()
-}
-
-func DatabaseSessionIsDead(db *Database) bool {
-	return !db.session.MayReuse()
-}

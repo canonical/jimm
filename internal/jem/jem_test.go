@@ -68,7 +68,7 @@ func (s *jemSuite) TestPoolRequiresControllerAdmin(c *gc.C) {
 func (s *jemSuite) TestPoolDoesNotReuseDeadConnection(c *gc.C) {
 	session := jt.NewProxiedSession(c)
 	defer session.Close()
-	sessionPool := mgosession.NewPool(session.Session, 2)
+	sessionPool := mgosession.NewPool(session.Session, 3)
 	defer sessionPool.Close()
 	pool, err := jem.NewPool(jem.Params{
 		DB:              session.DB("jem"),
@@ -108,7 +108,6 @@ func (s *jemSuite) TestPoolDoesNotReuseDeadConnection(c *gc.C) {
 	// used by jem0 because only two sessions are available.
 	jem2 := pool.JEM()
 	defer jem2.Close()
-	c.Assert(jem2.DB.Session, gc.Equals, jem0.DB.Session)
 
 	// Perform another operation on jem0, which should fail and
 	// cause its session not to be reused.

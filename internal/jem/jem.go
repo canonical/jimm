@@ -146,7 +146,7 @@ func (p *Pool) JEM() *JEM {
 	}
 	p.refCount++
 	return &JEM{
-		DB:   newDatabase(p.config.SessionPool.Session(), p.dbName),
+		DB:   newDatabase(p.config.SessionPool, p.dbName),
 		pool: p,
 	}
 }
@@ -191,7 +191,7 @@ func (j *JEM) Close() {
 		return
 	}
 	j.closed = true
-	j.DB.session.Close()
+	j.DB.Session.Close()
 	j.DB = nil
 	j.pool.decRef()
 }

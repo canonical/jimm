@@ -89,8 +89,8 @@ func (p *Pool) Authenticator() *Authenticator {
 	}
 }
 
-func (p *Pool) rootKeyCollection(session *mgosession.Session) *mgo.Collection {
-	return p.params.MacaroonCollection.With(session.Session)
+func (p *Pool) rootKeyCollection(session *mgo.Session) *mgo.Collection {
+	return p.params.MacaroonCollection.With(session)
 }
 
 // An Authenticator can be used to authenticate a connection.
@@ -98,7 +98,7 @@ type Authenticator struct {
 	closed  bool
 	pool    *Pool
 	bakery  *bakery.Service
-	session *mgosession.Session
+	session *mgo.Session
 }
 
 // Close closes the authenticator instance.
