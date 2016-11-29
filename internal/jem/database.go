@@ -26,7 +26,9 @@ import (
 // Database wraps an mgo.DB ands adds a number of methods for
 // manipulating the database.
 type Database struct {
-	session *mgosession.Session
+	// sessionPool holds the session pool. This will be
+	// reset if there's an unexpected mongodb error.
+	sessionPool *mgosession.Pool
 	*mgo.Database
 }
 
@@ -46,25 +48,26 @@ func (db *Database) checkError(ctx context.Context, err *error) {
 	if ok {
 		return
 	}
-	db.session.DoNotReuse()
+	db.sessionPool.Reset()
 
 	servermon.DatabaseFailCount.Inc()
 	zapctx.Warn(ctx, "discarding mongo session", zaputil.Error(*err))
 }
 
 // newDatabase returns a new Database named dbName using
-// the given session.
-func newDatabase(session *mgosession.Session, dbName string) *Database {
+// a session taken from the given pool. The database session
+// should be closed after the database is finished with.
+func newDatabase(pool *mgosession.Pool, dbName string) *Database {
 	return &Database{
-		session:  session,
-		Database: session.DB(dbName),
+		sessionPool: pool,
+		Database:    pool.Session().DB(dbName),
 	}
 }
 
 func (db *Database) clone() *Database {
 	return &Database{
-		session:  db.session.Clone(),
-		Database: db.Database,
+		sessionPool: db.sessionPool,
+		Database:    db.Database.With(db.Database.Session.Clone()),
 	}
 }
 

@@ -68,16 +68,6 @@ func (s *authSuite) TearDownTest(c *gc.C) {
 	s.IsolatedMgoSuite.TearDownTest(c)
 }
 
-func (s authSuite) TestAuthenticator(c *gc.C) {
-	a1 := s.pool.Authenticator()
-	c.Assert(a1, gc.Not(gc.IsNil))
-	defer a1.Close()
-	a2 := s.pool.Authenticator()
-	c.Assert(a2, gc.Not(gc.IsNil))
-	defer a2.Close()
-	c.Assert(a1, gc.DeepEquals, a2)
-}
-
 func (s *authSuite) TestAuthenticateNoMacaroon(c *gc.C) {
 	a := s.pool.Authenticator()
 	defer a.Close()
