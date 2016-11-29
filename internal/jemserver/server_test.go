@@ -12,28 +12,53 @@ import (
 	"github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
 	"github.com/julienschmidt/httprouter"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jem/internal/auth"
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/jemserver"
+	"github.com/CanonicalLtd/jem/internal/jemtest"
 	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
 
+var testContext = context.Background()
+
 type serverSuite struct {
 	testing.IsolatedMgoSuite
+	jemtest.LoggingSuite
 }
 
 var _ = gc.Suite(&serverSuite{})
+
+func (s *serverSuite) SetUpSuite(c *gc.C) {
+	s.IsolatedMgoSuite.SetUpSuite(c)
+	s.LoggingSuite.SetUpSuite(c)
+}
+
+func (s *serverSuite) TearDownSuite(c *gc.C) {
+	s.LoggingSuite.TearDownSuite(c)
+	s.IsolatedMgoSuite.TearDownSuite(c)
+}
+
+func (s *serverSuite) SetUpTest(c *gc.C) {
+	s.IsolatedMgoSuite.SetUpTest(c)
+	s.LoggingSuite.SetUpTest(c)
+}
+
+func (s *serverSuite) TearDownTest(c *gc.C) {
+	s.LoggingSuite.TearDownTest(c)
+	s.IsolatedMgoSuite.TearDownTest(c)
+}
 
 func (s *serverSuite) TestNewServerWithNoVersions(c *gc.C) {
 	params := jemserver.Params{
 		DB:              s.Session.DB("foo"),
 		ControllerAdmin: "controller-admin",
 	}
-	h, err := jemserver.New(params, nil)
+	h, err := jemserver.New(testContext, params, nil)
 	c.Assert(err, gc.ErrorMatches, `JEM server must serve at least one version of the API`)
 	c.Assert(h, gc.IsNil)
 }
@@ -49,7 +74,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 		ControllerAdmin: "controller-admin",
 	}
 	serveVersion := func(vers string) jemserver.NewAPIHandlerFunc {
-		return func(p *jem.Pool, _ *auth.Pool, config jemserver.Params) ([]httprequest.Handler, error) {
+		return func(_ context.Context, p *jem.Pool, _ *auth.Pool, config jemserver.Params) ([]httprequest.Handler, error) {
 			versPrefix := ""
 			if vers != "" {
 				versPrefix = "/" + vers
@@ -70,7 +95,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 		}
 	}
 
-	h, err := jemserver.New(serverParams, map[string]jemserver.NewAPIHandlerFunc{
+	h, err := jemserver.New(testContext, serverParams, map[string]jemserver.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 	})
 	c.Assert(err, gc.IsNil)
@@ -79,7 +104,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	assertDoesNotServeVersion(c, h, "version2")
 	assertDoesNotServeVersion(c, h, "version3")
 
-	h, err = jemserver.New(serverParams, map[string]jemserver.NewAPIHandlerFunc{
+	h, err = jemserver.New(testContext, serverParams, map[string]jemserver.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 		"version2": serveVersion("version2"),
 	})
@@ -89,7 +114,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	assertServesVersion(c, h, "version2")
 	assertDoesNotServeVersion(c, h, "version3")
 
-	h, err = jemserver.New(serverParams, map[string]jemserver.NewAPIHandlerFunc{
+	h, err = jemserver.New(testContext, serverParams, map[string]jemserver.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 		"version2": serveVersion("version2"),
 		"version3": serveVersion("version3"),
@@ -130,7 +155,7 @@ func (s *serverSuite) TestServerHasAccessControlAllowOrigin(c *gc.C) {
 		ControllerAdmin: "controller-admin",
 	}
 	impl := map[string]jemserver.NewAPIHandlerFunc{
-		"/a": func(p *jem.Pool, _ *auth.Pool, config jemserver.Params) ([]httprequest.Handler, error) {
+		"/a": func(ctx context.Context, p *jem.Pool, _ *auth.Pool, config jemserver.Params) ([]httprequest.Handler, error) {
 			return []httprequest.Handler{{
 				Method: "GET",
 				Path:   "/a",
@@ -139,7 +164,7 @@ func (s *serverSuite) TestServerHasAccessControlAllowOrigin(c *gc.C) {
 			}}, nil
 		},
 	}
-	h, err := jemserver.New(serverParams, impl)
+	h, err := jemserver.New(testContext, serverParams, impl)
 	c.Assert(err, gc.IsNil)
 	defer h.Close()
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
@@ -187,7 +212,7 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 	defer j.Close()
 
 	ctlPath := params.EntityPath{"bob", "foo"}
-	err = j.DB.AddController(&mongodoc.Controller{
+	err = j.DB.AddController(testContext, &mongodoc.Controller{
 		Path:      ctlPath,
 		UUID:      "some-uuid",
 		CACert:    jujutesting.CACert,
@@ -207,8 +232,8 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 	// JEM session for that long after the end of the test because
 	// API dialling isn't stopped when the monitor is.
 	s.PatchValue(&jem.APIOpenTimeout, time.Millisecond)
-	h, err := jemserver.New(params, map[string]jemserver.NewAPIHandlerFunc{
-		"/v0": func(p *jem.Pool, _ *auth.Pool, config jemserver.Params) ([]httprequest.Handler, error) {
+	h, err := jemserver.New(testContext, params, map[string]jemserver.NewAPIHandlerFunc{
+		"/v0": func(ctx context.Context, p *jem.Pool, _ *auth.Pool, config jemserver.Params) ([]httprequest.Handler, error) {
 			return nil, nil
 		},
 	})
@@ -218,7 +243,7 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 	// Poll the database to check that the monitor lease is taken out.
 	var ctl *mongodoc.Controller
 	for a := jujutesting.LongAttempt.Start(); a.Next(); {
-		ctl, err = j.DB.Controller(ctlPath)
+		ctl, err = j.DB.Controller(testContext, ctlPath)
 		c.Assert(err, gc.IsNil)
 		if ctl.MonitorLeaseOwner != "" {
 			break

@@ -75,17 +75,18 @@ func (s *internalSuite) TearDownTest(c *gc.C) {
 }
 
 var epoch = parseTime("2016-01-01T12:00:00Z")
+var testContext = context.Background()
 
 func (s *internalSuite) TestLeaseUpdater(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.jem.DB.AddController(&mongodoc.Controller{
+	err := s.jem.DB.AddController(testContext, &mongodoc.Controller{
 		Path: ctlPath,
 		UUID: "fake-uuid",
 	})
 
 	// The controller monitor assumes that it already has the
 	// lease when started, so acquire the lease.
-	expiry, err := acquireLease(jemShim{s.jem}, ctlPath, time.Time{}, "", "jem1")
+	expiry, err := acquireLease(testContext, jemShim{s.jem}, ctlPath, time.Time{}, "", "jem1")
 	c.Assert(err, gc.IsNil)
 
 	m := &controllerMonitor{
@@ -93,11 +94,10 @@ func (s *internalSuite) TestLeaseUpdater(c *gc.C) {
 		leaseExpiry: expiry,
 		jem:         jemShim{s.jem},
 		ownerId:     "jem1",
-		context:     context.TODO(),
 	}
 	done := make(chan error)
 	go func() {
-		done <- m.leaseUpdater()
+		done <- m.leaseUpdater(testContext)
 	}()
 
 	// Advance the clock until the lease updater will need
@@ -107,7 +107,7 @@ func (s *internalSuite) TestLeaseUpdater(c *gc.C) {
 	// Wait for the lease to actually be renewed.
 	var ctl *mongodoc.Controller
 	for a := jujujujutesting.LongAttempt.Start(); a.Next(); {
-		ctl, err = s.jem.DB.Controller(ctlPath)
+		ctl, err = s.jem.DB.Controller(testContext, ctlPath)
 		c.Assert(err, gc.IsNil)
 		if !ctl.MonitorLeaseExpiry.Equal(expiry) {
 			break
@@ -142,12 +142,11 @@ func (s *internalSuite) TestLeaseUpdaterWhenControllerRemoved(c *gc.C) {
 		leaseExpiry: epoch.Add(leaseExpiryDuration),
 		jem:         jemShim{s.jem},
 		ownerId:     "jem1",
-		context:     context.TODO(),
 	}
 	defer m.tomb.Kill(nil)
 	done := make(chan error)
 	go func() {
-		done <- m.leaseUpdater()
+		done <- m.leaseUpdater(testContext)
 	}()
 
 	// Advance the clock until the lease updater will need
@@ -183,13 +182,13 @@ func (s *internalSuite) TestWatcher(c *gc.C) {
 	// Add the JEM model entries
 	model1Path := params.EntityPath{"bob", "model1"}
 	model2Path := params.EntityPath{"bob", "model2"}
-	err := s.jem.DB.AddModel(&mongodoc.Model{
+	err := s.jem.DB.AddModel(testContext, &mongodoc.Model{
 		Path:       model1Path,
 		Controller: ctlPath,
 		UUID:       model1State.ModelUUID(),
 	})
 	c.Assert(err, gc.IsNil)
-	err = s.jem.DB.AddModel(&mongodoc.Model{
+	err = s.jem.DB.AddModel(testContext, &mongodoc.Model{
 		Path:       model2Path,
 		Controller: ctlPath,
 		UUID:       model2State.ModelUUID(),
@@ -202,9 +201,10 @@ func (s *internalSuite) TestWatcher(c *gc.C) {
 		ctlPath: ctlPath,
 		jem:     jshim,
 		ownerId: "jem1",
-		context: context.TODO(),
 	}
-	m.tomb.Go(m.watcher)
+	m.tomb.Go(func() error {
+		return m.watcher(testContext)
+	})
 	defer cleanStop(c, m)
 
 	type allStats struct {
@@ -332,7 +332,7 @@ func (s *internalSuite) TestWatcherUpdatesMachineInfo(c *gc.C) {
 
 	// Add the JEM model entries
 	modelPath := params.EntityPath{"bob", "model"}
-	err := s.jem.DB.AddModel(&mongodoc.Model{
+	err := s.jem.DB.AddModel(testContext, &mongodoc.Model{
 		Path:       modelPath,
 		Controller: ctlPath,
 		UUID:       modelState.ModelUUID(),
@@ -345,9 +345,10 @@ func (s *internalSuite) TestWatcherUpdatesMachineInfo(c *gc.C) {
 		ctlPath: ctlPath,
 		jem:     jshim,
 		ownerId: "jem1",
-		context: context.TODO(),
 	}
-	m.tomb.Go(m.watcher)
+	m.tomb.Go(func() error {
+		return m.watcher(testContext)
+	})
 	defer cleanStop(c, m)
 
 	// Wait for just a subset of the entire information so that
@@ -361,7 +362,7 @@ func (s *internalSuite) TestWatcherUpdatesMachineInfo(c *gc.C) {
 	}
 
 	getMachineInfo := func() interface{} {
-		ms, err := s.jem.DB.MachinesForModel(modelState.ModelUUID())
+		ms, err := s.jem.DB.MachinesForModel(testContext, modelState.ModelUUID())
 		c.Assert(err, gc.IsNil)
 		infos := make([]machineInfo, len(ms))
 		for i, m := range ms {
@@ -420,7 +421,7 @@ func removeModel(c *gc.C, st *state.State) {
 func (s *internalSuite) TestWatcherKilledWhileDialingAPI(c *gc.C) {
 	info := s.APIInfo(c)
 	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.jem.DB.AddController(&mongodoc.Controller{
+	err := s.jem.DB.AddController(testContext, &mongodoc.Controller{
 		Path:      ctlPath,
 		UUID:      "some-uuid",
 		CACert:    info.CACert,
@@ -445,9 +446,10 @@ func (s *internalSuite) TestWatcherKilledWhileDialingAPI(c *gc.C) {
 		ctlPath: ctlPath,
 		jem:     jshim,
 		ownerId: "jem1",
-		context: context.TODO(),
 	}
-	m.tomb.Go(m.watcher)
+	m.tomb.Go(func() error {
+		return m.watcher(testContext)
+	})
 	defer cleanStop(c, m)
 
 	// Wait for the API to be opened.
@@ -466,7 +468,7 @@ func (s *internalSuite) TestWatcherKilledWhileDialingAPI(c *gc.C) {
 
 func (s *internalSuite) TestWatcherDialAPIError(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.jem.DB.AddController(&mongodoc.Controller{
+	err := s.jem.DB.AddController(testContext, &mongodoc.Controller{
 		Path:      ctlPath,
 		UUID:      "some-uuid",
 		CACert:    jujujujutesting.CACert,
@@ -489,9 +491,10 @@ func (s *internalSuite) TestWatcherDialAPIError(c *gc.C) {
 		ctlPath: ctlPath,
 		jem:     jshim,
 		ownerId: "jem1",
-		context: context.TODO(),
 	}
-	m.tomb.Go(m.watcher)
+	m.tomb.Go(func() error {
+		return m.watcher(testContext)
+	})
 	defer worker.Stop(m)
 
 	// First send a jem.ErrAPIConnection error. This should cause the
@@ -510,7 +513,7 @@ func (s *internalSuite) TestWatcherDialAPIError(c *gc.C) {
 	}
 
 	// Check that the controller is marked as unavailable.
-	ctl, err := s.jem.DB.Controller(ctlPath)
+	ctl, err := s.jem.DB.Controller(testContext, ctlPath)
 	c.Assert(err, gc.IsNil)
 	c.Assert(ctl.UnavailableSince.UTC(), gc.DeepEquals, s.clock.Now().UTC())
 
@@ -543,16 +546,17 @@ func (s *internalSuite) TestWatcherMarksControllerAvailable(c *gc.C) {
 	// Create a controller
 	ctlPath := params.EntityPath{"bob", "foo"}
 	addFakeController(jshim, ctlPath)
-	err := jshim1.SetControllerUnavailableAt(ctlPath, s.clock.Now())
+	err := jshim1.SetControllerUnavailableAt(testContext, ctlPath, s.clock.Now())
 	c.Assert(err, gc.IsNil)
 
 	m := &controllerMonitor{
 		ctlPath: ctlPath,
 		jem:     jshim1,
 		ownerId: "jem1",
-		context: context.TODO(),
 	}
-	m.tomb.Go(m.watcher)
+	m.tomb.Go(func() error {
+		return m.watcher(testContext)
+	})
 	defer worker.Stop(m)
 
 	unavailableSince := func() interface{} {
@@ -570,7 +574,7 @@ func (s *internalSuite) TestControllerMonitor(c *gc.C) {
 	hps, err := mongodoc.ParseAddresses(info.Addrs)
 	c.Assert(err, gc.IsNil)
 
-	err = s.jem.DB.AddController(&mongodoc.Controller{
+	err = s.jem.DB.AddController(testContext, &mongodoc.Controller{
 		Path:          ctlPath,
 		HostPorts:     [][]mongodoc.HostPort{hps},
 		CACert:        info.CACert,
@@ -579,16 +583,17 @@ func (s *internalSuite) TestControllerMonitor(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 
-	err = s.jem.DB.AddModel(&mongodoc.Model{
+	err = s.jem.DB.AddModel(testContext, &mongodoc.Model{
 		Path:       ctlPath,
 		Controller: ctlPath,
 		UUID:       info.ModelTag.Id(),
 	})
+
 	c.Assert(err, gc.IsNil)
 
 	// The controller monitor assumes that it already has the
 	// lease when started, so acquire the lease.
-	expiry, err := acquireLease(jemShim{s.jem}, ctlPath, time.Time{}, "", "jem1")
+	expiry, err := acquireLease(testContext, jemShim{s.jem}, ctlPath, time.Time{}, "", "jem1")
 	c.Assert(err, gc.IsNil)
 
 	jshim := newJEMShimWithUpdateNotify(jemShim{s.jem})
@@ -611,7 +616,7 @@ func (s *internalSuite) TestControllerMonitor(c *gc.C) {
 		LeaseOwner  string
 	}
 	getInfo := func() interface{} {
-		ctl, err := s.jem.DB.Controller(ctlPath)
+		ctl, err := s.jem.DB.Controller(testContext, ctlPath)
 		c.Assert(err, gc.IsNil)
 		return statsLifeLease{
 			Stats:       ctl.Stats,
@@ -644,7 +649,7 @@ func (s *internalSuite) TestControllerMonitorDiesWithMonitoringStoppedErrorWhenC
 	hps, err := mongodoc.ParseAddresses(info.Addrs)
 	c.Assert(err, gc.IsNil)
 
-	err = s.jem.DB.AddController(&mongodoc.Controller{
+	err = s.jem.DB.AddController(testContext, &mongodoc.Controller{
 		Path:          ctlPath,
 		HostPorts:     [][]mongodoc.HostPort{hps},
 		CACert:        info.CACert,
@@ -656,7 +661,7 @@ func (s *internalSuite) TestControllerMonitorDiesWithMonitoringStoppedErrorWhenC
 
 	// The controller monitor assumes that it already has the
 	// lease when started, so acquire the lease.
-	expiry, err := acquireLease(jemShim{s.jem}, ctlPath, time.Time{}, "", "jem1")
+	expiry, err := acquireLease(testContext, jemShim{s.jem}, ctlPath, time.Time{}, "", "jem1")
 	c.Assert(err, gc.IsNil)
 	err = s.jem.DB.DeleteController(context.TODO(), ctlPath)
 	c.Assert(err, gc.IsNil)
@@ -767,8 +772,8 @@ func (s *internalSuite) TestAllMonitorMultiControllerMultipleLeases(c *gc.C) {
 	leaseAcquired := make(chan leaseAcquisition, 10)
 	jshim2 := jemShimWithMonitorLeaseAcquirer{
 		jemInterface: jshim1,
-		acquireMonitorLease: func(ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {
-			t, err := jshim1.AcquireMonitorLease(ctlPath, oldExpiry, oldOwner, newExpiry, newOwner)
+		acquireMonitorLease: func(ctx context.Context, ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {
+			t, err := jshim1.AcquireMonitorLease(ctx, ctlPath, oldExpiry, oldOwner, newExpiry, newOwner)
 			if err != nil {
 				return time.Time{}, err
 			}
@@ -879,10 +884,10 @@ func (s *internalSuite) TestAllMonitorWithRaceOnLeaseAcquisition(c *gc.C) {
 	goforitLease := make(chan struct{})
 	jshim1 := jemShimWithMonitorLeaseAcquirer{
 		jemInterface: jshim,
-		acquireMonitorLease: func(ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {
+		acquireMonitorLease: func(ctx context.Context, ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {
 			wantLease <- struct{}{}
 			<-goforitLease
-			return jshim.AcquireMonitorLease(ctlPath, oldExpiry, oldOwner, newExpiry, newOwner)
+			return jshim.AcquireMonitorLease(ctx, ctlPath, oldExpiry, oldOwner, newExpiry, newOwner)
 		},
 	}
 
@@ -900,7 +905,7 @@ func (s *internalSuite) TestAllMonitorWithRaceOnLeaseAcquisition(c *gc.C) {
 		},
 	}
 	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.jem.DB.AddController(&mongodoc.Controller{
+	err := s.jem.DB.AddController(testContext, &mongodoc.Controller{
 		Path:      ctlPath,
 		UUID:      "some-uuid",
 		CACert:    jujujujutesting.CACert,
@@ -945,7 +950,7 @@ func (s *internalSuite) TestAllMonitorWithRaceOnLeaseAcquisition(c *gc.C) {
 	assertNoEvent(c, apiOpened, "api open")
 
 	// Sanity check that the lease is actually held by one of the two monitors.
-	ctl, err := s.jem.DB.Controller(ctlPath)
+	ctl, err := s.jem.DB.Controller(testContext, ctlPath)
 	c.Assert(err, gc.IsNil)
 	if ctl.MonitorLeaseExpiry.IsZero() {
 		c.Errorf("monitor lease not held")
@@ -975,7 +980,7 @@ func (s *internalSuite) TestAllMonitorReusesOwnLease(c *gc.C) {
 		},
 	}
 
-	expiry, err := jshim.AcquireMonitorLease(ctlPath, time.Time{}, "", epoch.Add(leaseExpiryDuration), "jem1")
+	expiry, err := jshim.AcquireMonitorLease(testContext, ctlPath, time.Time{}, "", epoch.Add(leaseExpiryDuration), "jem1")
 	c.Assert(err, gc.IsNil)
 
 	m1 := newAllMonitor(context.TODO(), jshim1, "jem1")
@@ -994,7 +999,7 @@ func (s *internalSuite) TestAllMonitorReusesOwnLease(c *gc.C) {
 }
 
 func (s *internalSuite) controllerStats(c *gc.C, ctlPath params.EntityPath) mongodoc.ControllerStats {
-	ctlDoc, err := s.jem.DB.Controller(ctlPath)
+	ctlDoc, err := s.jem.DB.Controller(testContext, ctlPath)
 	c.Assert(err, gc.IsNil)
 	return ctlDoc.Stats
 }
@@ -1006,7 +1011,7 @@ type modelStats struct {
 }
 
 func (s *internalSuite) modelStats(c *gc.C, modelPath params.EntityPath) modelStats {
-	modelDoc, err := s.jem.DB.Model(modelPath)
+	modelDoc, err := s.jem.DB.Model(testContext, modelPath)
 	c.Assert(err, gc.IsNil)
 	counts := make(map[params.EntityCount]int)
 	for name, count := range modelDoc.Counts {
@@ -1029,7 +1034,7 @@ func (s *internalSuite) modelUnitCount(c *gc.C, modelPath params.EntityPath) int
 }
 
 func (s *internalSuite) assertLease(c *gc.C, ctlPath params.EntityPath, t time.Time, owner string) {
-	ctl, err := s.jem.DB.Controller(ctlPath)
+	ctl, err := s.jem.DB.Controller(testContext, ctlPath)
 	c.Assert(err, gc.IsNil)
 	c.Assert(ctl.MonitorLeaseExpiry.UTC(), jc.DeepEquals, mongodoc.Time(t).UTC())
 	c.Assert(ctl.MonitorLeaseOwner, gc.Equals, owner)
@@ -1039,7 +1044,7 @@ func (s *internalSuite) addJEMController(c *gc.C, ctlPath params.EntityPath) {
 	info := s.APIInfo(c)
 	hps, err := mongodoc.ParseAddresses(info.Addrs)
 	c.Assert(err, gc.IsNil)
-	err = s.jem.DB.AddController(&mongodoc.Controller{
+	err = s.jem.DB.AddController(testContext, &mongodoc.Controller{
 		Path:          ctlPath,
 		HostPorts:     [][]mongodoc.HostPort{hps},
 		CACert:        info.CACert,
@@ -1081,17 +1086,18 @@ func addUnitOnMachine(c *gc.C, st *state.State, appId, machineId string) {
 }
 
 func addFakeController(jshim *jemShimInMemory, path params.EntityPath) {
-	jshim.AddController(&mongodoc.Controller{
+	jshim.AddController(testContext, &mongodoc.Controller{
 		Path:      path,
 		UUID:      fmt.Sprintf("some-uuid-%s", path),
 		CACert:    jujujujutesting.CACert,
 		AdminUser: "bob",
 		HostPorts: [][]mongodoc.HostPort{{{Host: "0.1.2.3", Port: 4567}}},
 	})
-	jshim.AddModel(&mongodoc.Model{
+	jshim.AddModel(testContext, &mongodoc.Model{
 		Path:       path,
 		Controller: path,
 	})
+
 }
 
 func parseTime(s string) time.Time {

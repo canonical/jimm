@@ -48,7 +48,6 @@ type Monitor struct {
 	pool    *jem.Pool
 	tomb    tomb.Tomb
 	ownerId string
-	context context.Context
 }
 
 // New returns a new Monitor that will monitor controllers
@@ -58,9 +57,10 @@ func New(ctx context.Context, p *jem.Pool, ownerId string) *Monitor {
 	m := &Monitor{
 		pool:    p,
 		ownerId: ownerId,
-		context: ctx,
 	}
-	m.tomb.Go(m.run)
+	m.tomb.Go(func() error {
+		return m.run(ctx)
+	})
 	return m
 }
 
@@ -76,10 +76,10 @@ func (m *Monitor) Wait() error {
 	return m.tomb.Wait()
 }
 
-func (m *Monitor) run() error {
+func (m *Monitor) run(ctx context.Context) error {
 	for {
 		shim := jemShim{m.pool.JEM()}
-		m1 := newAllMonitor(m.context, shim, m.ownerId) // TODO add logging value here?
+		m1 := newAllMonitor(ctx, shim, m.ownerId) // TODO add logging value here?
 		select {
 		case <-m1.tomb.Dead():
 			logger.Warningf("restarting inner monitor after error: %v", m1.tomb.Err())
@@ -100,9 +100,10 @@ func newAllMonitor(ctx context.Context, jem jemInterface, ownerId string) *allMo
 		monitoring:        make(map[params.EntityPath]bool),
 		ownerId:           ownerId,
 		controllerRemoved: make(chan params.EntityPath),
-		context:           ctx,
 	}
-	m.tomb.Go(m.run)
+	m.tomb.Go(func() error {
+		return m.run(ctx)
+	})
 	return m
 }
 
@@ -138,14 +139,11 @@ type allMonitor struct {
 	// we are currently monitoring. This field is accessed
 	// only by the allMonitor.run goroutine.
 	monitoring map[params.EntityPath]bool
-
-	// context holds the context for the monitor.
-	context context.Context
 }
 
-func (m *allMonitor) run() error {
+func (m *allMonitor) run(ctx context.Context) error {
 	for {
-		if err := m.startMonitors(); err != nil {
+		if err := m.startMonitors(ctx); err != nil {
 			return errgo.Notef(err, "cannot start monitors")
 		}
 	waitLoop:
@@ -168,8 +166,8 @@ func (m *allMonitor) run() error {
 
 // startMonitors starts monitoring all controllers that are
 // not currently being monitored.
-func (m *allMonitor) startMonitors() error {
-	ctls, err := m.jem.AllControllers()
+func (m *allMonitor) startMonitors(ctx context.Context) error {
+	ctls, err := m.jem.AllControllers(ctx)
 	if err != nil {
 		return errgo.Notef(err, "cannot get controllers")
 	}
@@ -184,7 +182,7 @@ func (m *allMonitor) startMonitors() error {
 			// Someone else already holds the lease.
 			continue
 		}
-		newExpiry, err := acquireLease(m.jem, ctl.Path, ctl.MonitorLeaseExpiry, ctl.MonitorLeaseOwner, m.ownerId)
+		newExpiry, err := acquireLease(ctx, m.jem, ctl.Path, ctl.MonitorLeaseExpiry, ctl.MonitorLeaseOwner, m.ownerId)
 		if isMonitoringStoppedError(err) {
 			logger.Infof("cannot acquire lease on %v: %v", ctl.Path, err)
 			// Someone else got there first.
@@ -197,7 +195,7 @@ func (m *allMonitor) startMonitors() error {
 		m.monitoring[ctl.Path] = true
 		// TODO add controller-specific logging context to context
 		// here before passing it to newControllerMonitor.
-		ctlMonitor := newControllerMonitor(m.context, controllerMonitorParams{
+		ctlMonitor := newControllerMonitor(ctx, controllerMonitorParams{
 			ctlPath:     ctl.Path,
 			jem:         m.jem,
 			ownerId:     m.ownerId,

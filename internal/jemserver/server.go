@@ -13,7 +13,6 @@ import (
 	"github.com/juju/idmclient"
 	"github.com/julienschmidt/httprouter"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/uber-go/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -33,16 +32,12 @@ import (
 
 // NewAPIHandlerFunc is a function that returns set of httprequest
 // handlers that uses the given JEM pool and server params.
-type NewAPIHandlerFunc func(*jem.Pool, *auth.Pool, Params) ([]httprequest.Handler, error)
+type NewAPIHandlerFunc func(context.Context, *jem.Pool, *auth.Pool, Params) ([]httprequest.Handler, error)
 
 // Params holds configuration for a new API server.
 // It must be kept in sync with identical definition in the
 // top level jem package.
 type Params struct {
-	// Logger holds the logger that will be used to log
-	// server messages.
-	Logger zap.Logger
-
 	// DB holds the mongo database that will be used to
 	// store the JEM information.
 	DB *mgo.Database
@@ -99,12 +94,10 @@ type Server struct {
 // requests and stores its data in the given database.
 // The returned handler should be closed when finished
 // with.
-func New(config Params, versions map[string]NewAPIHandlerFunc) (*Server, error) {
+func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFunc) (*Server, error) {
 	if len(versions) == 0 {
 		return nil, errgo.Newf("JEM server must serve at least one version of the API")
 	}
-
-	ctx := zapctx.WithLogger(context.Background(), config.Logger)
 	if config.MaxMgoSessions <= 0 {
 		config.MaxMgoSessions = 1
 	}
@@ -165,7 +158,7 @@ func New(config Params, versions map[string]NewAPIHandlerFunc) (*Server, error) 
 	}
 	srv.router.Handler("GET", "/metrics", prometheus.Handler())
 	for name, newAPI := range versions {
-		handlers, err := newAPI(p, authPool, config)
+		handlers, err := newAPI(ctx, p, authPool, config)
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot create API %s", name)
 		}
