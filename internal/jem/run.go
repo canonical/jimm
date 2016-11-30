@@ -5,9 +5,10 @@ package jem
 import (
 	"io"
 
+	"golang.org/x/net/context"
+
 	"github.com/CanonicalLtd/jem/internal/zapctx"
 	"github.com/CanonicalLtd/jem/internal/zaputil"
-	"golang.org/x/net/context"
 )
 
 // runWithContext runs the given function and completes either when the

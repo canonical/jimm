@@ -6,14 +6,14 @@ import (
 	"net/http"
 
 	"github.com/juju/httprequest"
-	"github.com/juju/loggo"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 
+	"github.com/CanonicalLtd/jem/internal/zapctx"
+	"github.com/CanonicalLtd/jem/internal/zaputil"
 	"github.com/CanonicalLtd/jem/params"
 )
-
-var logger = loggo.GetLogger("jem.internal.jemerror")
 
 // Mapper holds an ErrorMapper that can
 // translate from Go errors to standard JEM
@@ -25,7 +25,7 @@ type errorCoder interface {
 }
 
 func errToResp(err error) (int, interface{}) {
-	logger.Infof("returning error %#v", err)
+	zapctx.Info(context.TODO(), "HTTP error response", zaputil.Error(err))
 	// Allow bakery errors to be returned as the bakery would
 	// like them, so that httpbakery.Client.Do will work.
 	if err, ok := errgo.Cause(err).(*httpbakery.Error); ok {

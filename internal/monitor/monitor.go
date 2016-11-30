@@ -78,7 +78,7 @@ func (m *Monitor) Wait() error {
 
 func (m *Monitor) run(ctx context.Context) error {
 	for {
-		shim := jemShim{m.pool.JEM()}
+		shim := jemShim{m.pool.JEM(ctx)}
 		m1 := newAllMonitor(ctx, shim, m.ownerId) // TODO add logging value here?
 		select {
 		case <-m1.tomb.Dead():
@@ -173,9 +173,10 @@ func (m *allMonitor) startMonitors(ctx context.Context) error {
 	}
 	for _, ctl := range ctls {
 		ctl := ctl
+		ctx := zapctx.WithFields(ctx, zap.Stringer("controller", ctl.Path))
 		if m.monitoring[ctl.Path] {
 			// We're already monitoring this controller; no need to do anything.
-			zapctx.Debug(ctx, "already monitoring")
+			zapctx.Debug(ctx, "not starting: already monitoring")
 			continue
 		}
 		if ctl.MonitorLeaseOwner != m.ownerId && Clock.Now().Before(ctl.MonitorLeaseExpiry) {
@@ -184,7 +185,7 @@ func (m *allMonitor) startMonitors(ctx context.Context) error {
 		}
 		newExpiry, err := acquireLease(ctx, m.jem, ctl.Path, ctl.MonitorLeaseExpiry, ctl.MonitorLeaseOwner, m.ownerId)
 		if isMonitoringStoppedError(err) {
-			zapctx.Info(ctx, "cannot acquire lease", zaputil.Error(err))
+			zapctx.Info(ctx, "not starting: cannot acquire lease", zaputil.Error(err))
 			// Someone else got there first.
 			continue
 		}
@@ -193,8 +194,6 @@ func (m *allMonitor) startMonitors(ctx context.Context) error {
 		}
 		// We've acquired the lease.
 		m.monitoring[ctl.Path] = true
-		// TODO add controller-specific logging context to context
-		// here before passing it to newControllerMonitor.
 		ctlMonitor := newControllerMonitor(ctx, controllerMonitorParams{
 			ctlPath:     ctl.Path,
 			jem:         m.jem,

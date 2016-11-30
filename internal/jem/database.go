@@ -57,10 +57,10 @@ func (db *Database) checkError(ctx context.Context, err *error) {
 // newDatabase returns a new Database named dbName using
 // a session taken from the given pool. The database session
 // should be closed after the database is finished with.
-func newDatabase(pool *mgosession.Pool, dbName string) *Database {
+func newDatabase(ctx context.Context, pool *mgosession.Pool, dbName string) *Database {
 	return &Database{
 		sessionPool: pool,
-		Database:    pool.Session().DB(dbName),
+		Database:    pool.Session(ctx).DB(dbName),
 	}
 }
 

@@ -75,7 +75,7 @@ func (s *monitorSuite) TestMonitorWithBrokenMongoConnection(c *gc.C) {
 	session := testing.NewProxiedSession(c)
 	defer session.Close()
 
-	sessionPool := mgosession.NewPool(session.Session, 2)
+	sessionPool := mgosession.NewPool(context.TODO(), session.Session, 2)
 	defer sessionPool.Close()
 
 	pool := s.NewJEMPool(c, sessionPool)
@@ -84,7 +84,7 @@ func (s *monitorSuite) TestMonitorWithBrokenMongoConnection(c *gc.C) {
 	// Create a controller.
 	apiInfo := s.APIInfo(c)
 	ctlPath := params.EntityPath{"bob", "foo"}
-	jem := pool.JEM()
+	jem := pool.JEM(context.TODO())
 	defer jem.Close()
 
 	hps, err := mongodoc.ParseAddresses(apiInfo.Addrs)

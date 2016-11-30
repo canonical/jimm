@@ -25,35 +25,22 @@ import (
 var testContext = context.Background()
 
 type databaseSuite struct {
-	jujutesting.IsolatedMgoSuite
-	jemtest.LoggingSuite
+	jemtest.IsolatedMgoSuite
 	database *jem.Database
 }
 
 var _ = gc.Suite(&databaseSuite{})
 
-func (s *databaseSuite) SetUpSuite(c *gc.C) {
-	s.IsolatedMgoSuite.SetUpSuite(c)
-	s.LoggingSuite.SetUpSuite(c)
-}
-
-func (s *databaseSuite) TearDownSuite(c *gc.C) {
-	s.IsolatedMgoSuite.TearDownSuite(c)
-	s.LoggingSuite.TearDownSuite(c)
-}
-
 func (s *databaseSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
-	s.LoggingSuite.SetUpTest(c)
-	pool := mgosession.NewPool(s.Session, 1)
-	s.database = jem.NewDatabase(pool, "jem")
+	pool := mgosession.NewPool(context.TODO(), s.Session, 1)
+	s.database = jem.NewDatabase(context.TODO(), pool, "jem")
 	c.Assert(s.database.Session.Ping(), gc.Equals, nil)
 	pool.Close()
 	c.Assert(s.database.Session.Ping(), gc.Equals, nil)
 }
 
 func (s *databaseSuite) TearDownTest(c *gc.C) {
-	s.LoggingSuite.TearDownTest(c)
 	s.database.Session.Close()
 	s.database = nil
 	s.IsolatedMgoSuite.TearDownTest(c)
@@ -1422,7 +1409,7 @@ func (s *databaseSuite) TestSetDead(c *gc.C) {
 	session := jujutesting.NewProxiedSession(c)
 	defer session.Close()
 
-	pool := mgosession.NewPool(session.Session, 1)
+	pool := mgosession.NewPool(context.TODO(), session.Session, 1)
 	defer pool.Close()
 	for i, test := range setDeadTests {
 		c.Logf("test %d: %s", i, test.about)
@@ -1431,7 +1418,7 @@ func (s *databaseSuite) TestSetDead(c *gc.C) {
 }
 
 func testSetDead(c *gc.C, proxy *jujutesting.TCPProxy, pool *mgosession.Pool, run func(db *jem.Database)) {
-	db := jem.NewDatabase(pool, "jem")
+	db := jem.NewDatabase(context.TODO(), pool, "jem")
 	defer db.Session.Close()
 	// Use the session so that it's bound to the socket.
 	err := db.Session.Ping()
@@ -1441,7 +1428,7 @@ func testSetDead(c *gc.C, proxy *jujutesting.TCPProxy, pool *mgosession.Pool, ru
 	// Sanity check that getting another session from the pool also
 	// gives us a broken session (note that we know that the
 	// pool only contains one session).
-	s1 := pool.Session()
+	s1 := pool.Session(context.TODO())
 	defer s1.Close()
 	c.Assert(s1.Ping(), gc.NotNil)
 
@@ -1449,7 +1436,7 @@ func testSetDead(c *gc.C, proxy *jujutesting.TCPProxy, pool *mgosession.Pool, ru
 
 	// Check that another session from the pool is OK to use now
 	// because the operation has reset the pool.
-	s2 := pool.Session()
+	s2 := pool.Session(context.TODO())
 	defer s2.Close()
 	c.Assert(s2.Ping(), gc.Equals, nil)
 }

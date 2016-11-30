@@ -9,6 +9,7 @@ import (
 
 	"github.com/juju/httprequest"
 	"github.com/julienschmidt/httprouter"
+	"github.com/uber-go/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
@@ -17,16 +18,19 @@ import (
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/jemerror"
 	"github.com/CanonicalLtd/jem/internal/jemserver"
+	"github.com/CanonicalLtd/jem/internal/zapctx"
 	"github.com/CanonicalLtd/jem/params"
 )
 
 func NewAPIHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, params jemserver.Params) ([]httprequest.Handler, error) {
 	return append(
 		jemerror.Mapper.Handlers(func(p httprequest.Params) (*handler, error) {
+			ctx := ctxutil.Join(ctx, p.Context)
+			ctx = zapctx.WithFields(ctx, zap.String("req-id", httprequest.RequestUUID(ctx)))
 			return &handler{
-				context: ctxutil.Join(ctx, p.Context),
+				context: ctx,
 				params:  params,
-				jem:     jp.JEM(),
+				jem:     jp.JEM(ctx),
 			}, nil
 		}),
 		newWebSocketHandler(ctx, jp, ap, params),
@@ -40,7 +44,7 @@ func newWebSocketHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, param
 		Method: "GET",
 		Path:   "/model/:modeluuid/api",
 		Handle: func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-			j := jp.JEM()
+			j := jp.JEM(ctx)
 			defer j.Close()
 			wsServer := newWSServer(ctx, j, ap, params, p.ByName("modeluuid"))
 			wsServer.ServeHTTP(w, r)
@@ -53,7 +57,9 @@ func newRootWebSocketHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, p
 		Method: "GET",
 		Path:   path,
 		Handle: func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-			j := jp.JEM()
+			// TODO add unique id to context or derive it from http request.
+			ctx := zapctx.WithFields(ctx, zap.Bool("websocket", true))
+			j := jp.JEM(ctx)
 			defer j.Close()
 			wsServer := newWSServer(ctx, j, ap, params, "")
 			wsServer.ServeHTTP(w, r)
@@ -79,10 +85,11 @@ type guiRequest struct {
 
 // GUI provides a GUI by redirecting to the store front.
 func (h *handler) GUI(p httprequest.Params, arg *guiRequest) error {
+	ctx := ctxutil.Join(h.context, p.Context)
 	if h.params.GUILocation == "" {
 		return errgo.WithCausef(nil, params.ErrNotFound, "no GUI location specified")
 	}
-	m, err := h.jem.DB.ModelFromUUID(h.context, arg.UUID)
+	m, err := h.jem.DB.ModelFromUUID(ctx, arg.UUID)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}

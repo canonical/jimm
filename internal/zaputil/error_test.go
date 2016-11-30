@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/CanonicalLtd/jem/internal/zaputil"
 	"github.com/uber-go/zap"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
+
+	"github.com/CanonicalLtd/jem/internal/zaputil"
 )
 
 type zaputilSuite struct{}

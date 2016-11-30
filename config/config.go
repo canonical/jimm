@@ -9,7 +9,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/juju/loggo"
 	"github.com/uber-go/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -17,8 +16,6 @@ import (
 
 	"github.com/CanonicalLtd/jem/params"
 )
-
-var logger = loggo.GetLogger("jem.config")
 
 type Config struct {
 	MongoAddr string `yaml:"mongo-addr"`
@@ -61,21 +58,20 @@ func (c *Config) validate() error {
 	return nil
 }
 
-func (c *Config) TLSConfig() *tls.Config {
+func (c *Config) TLSConfig() (*tls.Config, error) {
 	if c.TLSCert == "" || c.TLSKey == "" {
-		return nil
+		return nil, nil
 	}
 
 	cert, err := tls.X509KeyPair([]byte(c.TLSCert), []byte(c.TLSKey))
 	if err != nil {
-		logger.Errorf("cannot create certificate: %s", err)
-		return nil
+		return nil, errgo.Notef(err, "cannot create certificate")
 	}
 	return &tls.Config{
 		Certificates: []tls.Certificate{
 			cert,
 		},
-	}
+	}, nil
 }
 
 // Read reads a jem configuration file from the

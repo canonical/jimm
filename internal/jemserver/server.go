@@ -117,19 +117,19 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot create bakery")
 	}
-	sessionPool := mgosession.NewPool(config.DB.Session, config.MaxMgoSessions)
+	sessionPool := mgosession.NewPool(ctx, config.DB.Session, config.MaxMgoSessions)
 	jconfig := jem.Params{
 		DB:              config.DB,
 		SessionPool:     sessionPool,
 		ControllerAdmin: config.ControllerAdmin,
 	}
-	p, err := jem.NewPool(jconfig)
+	p, err := jem.NewPool(ctx, jconfig)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make store")
 	}
-	jem := p.JEM()
+	jem := p.JEM(ctx)
 	defer jem.Close()
-	authPool, err := auth.NewPool(auth.Params{
+	authPool, err := auth.NewPool(ctx, auth.Params{
 		Bakery:   bakery,
 		RootKeys: mgostorage.NewRootKeys(100),
 		RootKeysPolicy: mgostorage.Policy{

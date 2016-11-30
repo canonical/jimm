@@ -5,13 +5,16 @@ import (
 
 	"github.com/juju/httprequest"
 	"github.com/juju/utils/debugstatus"
+	"github.com/uber-go/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/internal/auth"
+	"github.com/CanonicalLtd/jem/internal/ctxutil"
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/jemerror"
 	"github.com/CanonicalLtd/jem/internal/jemserver"
+	"github.com/CanonicalLtd/jem/internal/zapctx"
 	"github.com/CanonicalLtd/jem/version"
 )
 
@@ -19,9 +22,11 @@ import (
 // endpoints.
 func NewAPIHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, sp jemserver.Params) ([]httprequest.Handler, error) {
 	return jemerror.Mapper.Handlers(func(p httprequest.Params) (*handler, error) {
+		ctx := ctxutil.Join(ctx, p.Context)
+		ctx = zapctx.WithFields(ctx, zap.String("req-id", httprequest.RequestUUID(ctx)))
 		h := &handler{
 			params:   sp,
-			jem:      jp.JEM(),
+			jem:      jp.JEM(ctx),
 			authPool: ap,
 		}
 		h.Handler = debugstatus.Handler{
@@ -43,9 +48,9 @@ type handler struct {
 
 func (h *handler) checkIsAdmin(req *http.Request) error {
 	if h.ctx == nil {
-		a := h.authPool.Authenticator()
+		a := h.authPool.Authenticator(context.TODO())
 		defer a.Close()
-		ctx, err := a.AuthenticateRequest(context.Background(), req)
+		ctx, err := a.AuthenticateRequest(context.TODO(), req)
 		if err != nil {
 			return errgo.Mask(err, errgo.Any)
 		}

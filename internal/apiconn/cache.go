@@ -5,15 +5,12 @@ import (
 
 	"github.com/golang/groupcache/singleflight"
 	"github.com/juju/juju/api"
-	"github.com/juju/loggo"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/internal/zapctx"
 	"github.com/CanonicalLtd/jem/internal/zaputil"
 )
-
-var logger = loggo.GetLogger("jem.internal.apiconn")
 
 // Cache holds a cache of connections to API servers.
 //
