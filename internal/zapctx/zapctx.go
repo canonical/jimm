@@ -24,6 +24,12 @@ func WithLogger(ctx context.Context, logger zap.Logger) context.Context {
 	return context.WithValue(ctx, loggerKey{}, logger)
 }
 
+// WithFields returns a new context derived from ctx
+// that has a logger that always logs the given fields.
+func WithFields(ctx context.Context, fields ...zap.Field) context.Context {
+	return WithLogger(ctx, Logger(ctx).With(fields...))
+}
+
 // Logger returns the logger associated with the given
 // context. If there is no logger, it will return Default.
 func Logger(ctx context.Context) zap.Logger {

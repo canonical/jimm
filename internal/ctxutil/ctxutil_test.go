@@ -3,12 +3,12 @@
 package ctxutil_test
 
 import (
-	"context"
 	"time"
 
-	"github.com/CanonicalLtd/jem/internal/ctxutil"
-
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
+
+	"github.com/CanonicalLtd/jem/internal/ctxutil"
 )
 
 type ctxutilSuite struct {

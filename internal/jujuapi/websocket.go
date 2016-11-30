@@ -327,7 +327,7 @@ func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResult, error
 		}
 	}
 	// JIMM only supports macaroon login, ignore all the other fields.
-	authenticator := a.h.authPool.Authenticator()
+	authenticator := a.h.authPool.Authenticator(a.h.context)
 	defer authenticator.Close()
 	ctx, m, err := authenticator.Authenticate(a.h.context, req.Macaroons, checkers.TimeBefore)
 	if err != nil {

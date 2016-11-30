@@ -239,7 +239,6 @@ func (m *controllerMonitor) dialAPI(ctx context.Context) (jujuAPI, error) {
 		// so that if our reply causes everything to be stopped,
 		// we know that the JEM is closed before that.
 		j.Close()
-		zapctx.Info(ctx, "openAPI failed", zaputil.Error(err))
 		select {
 		case reply <- apiConnReply{
 			conn: conn,

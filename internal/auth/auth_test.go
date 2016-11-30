@@ -8,7 +8,6 @@ import (
 
 	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/idmtest"
-	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
@@ -26,8 +25,7 @@ import (
 )
 
 type authSuite struct {
-	jujutesting.IsolatedMgoSuite
-	jemtest.LoggingSuite
+	jemtest.IsolatedMgoSuite
 	idmSrv      *idmtest.Server
 	pool        *auth.Pool
 	sessionPool *mgosession.Pool
@@ -35,19 +33,8 @@ type authSuite struct {
 
 var _ = gc.Suite(&authSuite{})
 
-func (s *authSuite) SetUpSuite(c *gc.C) {
-	s.IsolatedMgoSuite.SetUpSuite(c)
-	s.LoggingSuite.SetUpSuite(c)
-}
-
-func (s *authSuite) TearDownSuite(c *gc.C) {
-	s.LoggingSuite.TearDownSuite(c)
-	s.IsolatedMgoSuite.TearDownSuite(c)
-}
-
 func (s *authSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
-	s.LoggingSuite.SetUpTest(c)
 	s.idmSrv = idmtest.NewServer()
 	db := s.Session.DB("auth")
 	bakery, err := bakery.NewService(bakery.NewServiceParams{
@@ -55,8 +42,8 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 		Locator:  s.idmSrv,
 	})
 	c.Assert(err, jc.ErrorIsNil)
-	s.sessionPool = mgosession.NewPool(s.Session, 5)
-	s.pool, err = auth.NewPool(auth.Params{
+	s.sessionPool = mgosession.NewPool(context.TODO(), s.Session, 5)
+	s.pool, err = auth.NewPool(context.TODO(), auth.Params{
 		Bakery:   bakery,
 		RootKeys: mgostorage.NewRootKeys(100),
 		RootKeysPolicy: mgostorage.Policy{
@@ -78,12 +65,11 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 
 func (s *authSuite) TearDownTest(c *gc.C) {
 	s.sessionPool.Close()
-	s.LoggingSuite.TearDownTest(c)
 	s.IsolatedMgoSuite.TearDownTest(c)
 }
 
 func (s *authSuite) TestAuthenticateNoMacaroon(c *gc.C) {
-	a := s.pool.Authenticator()
+	a := s.pool.Authenticator(context.TODO())
 	defer a.Close()
 	ctx := context.Background()
 	ctx2, m, err := a.Authenticate(ctx, nil, checkers.New())
@@ -93,7 +79,7 @@ func (s *authSuite) TestAuthenticateNoMacaroon(c *gc.C) {
 }
 
 func (s *authSuite) TestAuthenticate(c *gc.C) {
-	a := s.pool.Authenticator()
+	a := s.pool.Authenticator(context.TODO())
 	defer a.Close()
 	ctx := context.Background()
 	_, m, _ := a.Authenticate(ctx, nil, checkers.New())
@@ -109,7 +95,7 @@ func (s *authSuite) TestAuthenticate(c *gc.C) {
 }
 
 func (s *authSuite) TestAuthenticateRequest(c *gc.C) {
-	a := s.pool.Authenticator()
+	a := s.pool.Authenticator(context.TODO())
 	defer a.Close()
 	ctx := context.Background()
 	req, err := http.NewRequest("GET", "/", nil)
@@ -205,7 +191,7 @@ func (s *authSuite) TestCheckCanRead(c *gc.C) {
 
 func (s *authSuite) TestUsername(c *gc.C) {
 	c.Assert(auth.Username(context.Background()), gc.Equals, "")
-	a := s.pool.Authenticator()
+	a := s.pool.Authenticator(context.TODO())
 	defer a.Close()
 	_, m, _ := a.Authenticate(nil, nil, checkers.New())
 	ms := s.discharge(c, m, "bob")

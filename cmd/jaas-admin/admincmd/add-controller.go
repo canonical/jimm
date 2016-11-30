@@ -71,7 +71,6 @@ func (c *addControllerCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	logger.Debugf("client: %#v\n", client)
 	info, err := getControllerInfo(c.controllerName)
 	if err != nil {
 		return errgo.Mask(err)

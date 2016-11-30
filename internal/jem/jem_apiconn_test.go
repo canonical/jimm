@@ -29,15 +29,15 @@ var _ = gc.Suite(&jemAPIConnSuite{})
 
 func (s *jemAPIConnSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
-	s.sessionPool = mgosession.NewPool(s.Session, 5)
-	pool, err := jem.NewPool(jem.Params{
+	s.sessionPool = mgosession.NewPool(context.TODO(), s.Session, 5)
+	pool, err := jem.NewPool(context.TODO(), jem.Params{
 		DB:              s.Session.DB("jem"),
 		ControllerAdmin: "controller-admin",
 		SessionPool:     s.sessionPool,
 	})
 	c.Assert(err, gc.IsNil)
 	s.pool = pool
-	s.jem = s.pool.JEM()
+	s.jem = s.pool.JEM(context.TODO())
 	s.PatchValue(&jem.APIOpenTimeout, time.Duration(0))
 }
 

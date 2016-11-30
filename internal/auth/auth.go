@@ -62,11 +62,11 @@ type Pool struct {
 
 // NewPool creates a new Pool from which Authenticator objects may be
 // retrieved.
-func NewPool(params Params) (*Pool, error) {
+func NewPool(ctx context.Context, params Params) (*Pool, error) {
 	p := &Pool{
 		params: params,
 	}
-	auth := p.Authenticator()
+	auth := p.Authenticator(ctx)
 	defer auth.Close()
 	if err := params.RootKeys.EnsureIndex(p.rootKeyCollection(auth.session)); err != nil {
 		return nil, errgo.Notef(err, "cannot ensure index on root key store")
@@ -76,9 +76,9 @@ func NewPool(params Params) (*Pool, error) {
 
 // Authenticator retrieves an Authenticator object from the pool, which
 // must be closed after use.
-func (p *Pool) Authenticator() *Authenticator {
+func (p *Pool) Authenticator(ctx context.Context) *Authenticator {
 	servermon.AuthenticatorPoolGet.Inc()
-	session := p.params.SessionPool.Session()
+	session := p.params.SessionPool.Session(ctx)
 	return &Authenticator{
 		pool: p,
 		bakery: p.params.Bakery.WithRootKeyStore(p.params.RootKeys.NewStorage(

@@ -105,7 +105,8 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// Check that the TLS configuration creates a valid *tls.Config
-	tlsConfig := conf.TLSConfig()
+	tlsConfig, err := conf.TLSConfig()
+	c.Assert(err, gc.IsNil)
 	c.Assert(tlsConfig, gc.Not(gc.IsNil))
 	conf.TLSCert = ""
 	conf.TLSKey = ""

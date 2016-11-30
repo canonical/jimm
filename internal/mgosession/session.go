@@ -9,13 +9,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/juju/loggo"
 	"github.com/juju/utils/clock"
+	"github.com/uber-go/zap"
+	"golang.org/x/net/context"
 	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/tomb.v2"
-)
 
-var logger = loggo.GetLogger("jem.internal.mgosession")
+	"github.com/CanonicalLtd/jem/internal/zapctx"
+)
 
 const pingInterval = 1 * time.Second
 
@@ -45,12 +46,14 @@ type Pool struct {
 
 // NewPool returns a session pool that maintains a maximum
 // of maxSessions sessions available for reuse.
-func NewPool(s *mgo.Session, maxSessions int) *Pool {
+func NewPool(ctx context.Context, s *mgo.Session, maxSessions int) *Pool {
 	p := &Pool{
 		sessions: make([]*mgo.Session, maxSessions),
 		session:  s.Copy(),
 	}
-	p.tomb.Go(p.pinger)
+	p.tomb.Go(func() error {
+		return p.pinger(ctx)
+	})
 	return p
 }
 
@@ -63,14 +66,14 @@ func NewPool(s *mgo.Session, maxSessions int) *Pool {
 // If there was an IsDead method on mgo.Session,
 // this would be unnecessary (as would Reset).
 // See https://github.com/go-mgo/mgo/issues/124.
-func (p *Pool) pinger() error {
+func (p *Pool) pinger(ctx context.Context) error {
 	for {
 		select {
 		case <-p.tomb.Dying():
 			return nil
 		case <-Clock.After(pingInterval):
 		}
-		session := p.Session()
+		session := p.Session(ctx)
 		if session.Ping() != nil {
 			p.Reset()
 		}
@@ -83,7 +86,7 @@ func (p *Pool) pinger() error {
 // with DoNotReuse.
 //
 // Session may be called concurrently.
-func (p *Pool) Session() *mgo.Session {
+func (p *Pool) Session(ctx context.Context) *mgo.Session {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.closed {
@@ -91,7 +94,7 @@ func (p *Pool) Session() *mgo.Session {
 	}
 	s := p.sessions[p.sessionIndex]
 	if s == nil {
-		logger.Debugf("creating new session %d", p.sessionIndex)
+		zapctx.Info(ctx, "creating new session", zap.Int("index", p.sessionIndex))
 		s = p.session.Copy()
 		// Ping the session so that we're sure that the returned session
 		// is attached to a mongodb socket otherwise we won't
@@ -100,6 +103,8 @@ func (p *Pool) Session() *mgo.Session {
 		// an error or not.
 		s.Ping()
 		p.sessions[p.sessionIndex] = s
+	} else {
+		zapctx.Debug(ctx, "reusing session", zap.Int("index", p.sessionIndex))
 	}
 	p.sessionIndex = (p.sessionIndex + 1) % len(p.sessions)
 	return s.Clone()

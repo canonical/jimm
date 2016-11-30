@@ -126,10 +126,14 @@ func serve(confPath string) error {
 	}
 
 	zapctx.Info(ctx, "starting the API server")
+	tlsConfig, err := conf.TLSConfig()
+	if err != nil {
+		return errgo.Mask(err)
+	}
 	httpServer := &http.Server{
 		Addr:      conf.APIAddr,
 		Handler:   handler,
-		TLSConfig: conf.TLSConfig(),
+		TLSConfig: tlsConfig,
 	}
 	if httpServer.TLSConfig != nil {
 		return httpServer.ListenAndServeTLS("", "")
@@ -146,7 +150,8 @@ var zapToLoggo = map[zap.Level]loggo.Level{
 
 func setUpLogging(ctx context.Context, level zap.Level) context.Context {
 	// Set up the root zap logger.
-	logger := zap.New(zap.NewJSONEncoder(), zap.Output(os.Stderr), level)
+	// TODO use zap.AddCaller when it works OK with log wrappers.
+	logger := zap.New(zap.NewJSONEncoder(timestampFormatter()), zap.Output(os.Stderr), level)
 	zapctx.Default = logger
 
 	// Set up loggo so that it will write to the root zap logger.
@@ -157,4 +162,14 @@ func setUpLogging(ctx context.Context, level zap.Level) context.Context {
 		"<root>": zapToLoggo[level],
 	})
 	return zapctx.WithLogger(ctx, logger)
+}
+
+const rfc3339Milli = "2006-01-02T15:04:05.000Z"
+
+// timestampFormatter formats logging timestamps
+// in RFC3339 format with millisecond precision.
+func timestampFormatter() zap.TimeFormatter {
+	return zap.TimeFormatter(func(t time.Time) zap.Field {
+		return zap.String("ts", t.UTC().Format(rfc3339Milli))
+	})
 }

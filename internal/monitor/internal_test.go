@@ -52,15 +52,15 @@ var _ = gc.Suite(&internalSuite{})
 func (s *internalSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
 	s.idmSrv = idmtest.NewServer()
-	s.sessionPool = mgosession.NewPool(s.Session, 1)
-	pool, err := jem.NewPool(jem.Params{
+	s.sessionPool = mgosession.NewPool(context.TODO(), s.Session, 1)
+	pool, err := jem.NewPool(context.TODO(), jem.Params{
 		SessionPool:     s.sessionPool,
 		DB:              s.Session.DB("jem"),
 		ControllerAdmin: "controller-admin",
 	})
 	c.Assert(err, gc.IsNil)
 	s.pool = pool
-	s.jem = pool.JEM()
+	s.jem = pool.JEM(context.TODO())
 
 	// Set up the clock mockery.
 	s.clock = jujutesting.NewClock(epoch)

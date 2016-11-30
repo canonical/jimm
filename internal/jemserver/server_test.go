@@ -9,7 +9,6 @@ import (
 
 	"github.com/juju/httprequest"
 	jujutesting "github.com/juju/juju/testing"
-	"github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/net/context"
@@ -27,31 +26,10 @@ import (
 var testContext = context.Background()
 
 type serverSuite struct {
-	testing.IsolatedMgoSuite
-	jemtest.LoggingSuite
+	jemtest.IsolatedMgoSuite
 }
 
 var _ = gc.Suite(&serverSuite{})
-
-func (s *serverSuite) SetUpSuite(c *gc.C) {
-	s.IsolatedMgoSuite.SetUpSuite(c)
-	s.LoggingSuite.SetUpSuite(c)
-}
-
-func (s *serverSuite) TearDownSuite(c *gc.C) {
-	s.LoggingSuite.TearDownSuite(c)
-	s.IsolatedMgoSuite.TearDownSuite(c)
-}
-
-func (s *serverSuite) SetUpTest(c *gc.C) {
-	s.IsolatedMgoSuite.SetUpTest(c)
-	s.LoggingSuite.SetUpTest(c)
-}
-
-func (s *serverSuite) TearDownTest(c *gc.C) {
-	s.LoggingSuite.TearDownTest(c)
-	s.IsolatedMgoSuite.TearDownTest(c)
-}
 
 func (s *serverSuite) TestNewServerWithNoVersions(c *gc.C) {
 	params := jemserver.Params{
@@ -199,16 +177,16 @@ func (s *serverSuite) TestServerHasAccessControlAllowOrigin(c *gc.C) {
 
 func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 	db := s.Session.DB("foo")
-	sessionPool := mgosession.NewPool(s.Session, 1)
+	sessionPool := mgosession.NewPool(context.TODO(), s.Session, 1)
 	defer sessionPool.Close()
-	pool, err := jem.NewPool(jem.Params{
+	pool, err := jem.NewPool(context.TODO(), jem.Params{
 		DB:              db,
 		ControllerAdmin: "controller-admin",
 		SessionPool:     sessionPool,
 	})
 	c.Assert(err, gc.IsNil)
 	defer pool.Close()
-	j := pool.JEM()
+	j := pool.JEM(context.TODO())
 	defer j.Close()
 
 	ctlPath := params.EntityPath{"bob", "foo"}

@@ -11,15 +11,12 @@ import (
 	"github.com/juju/gnuflag"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
-	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 
 	"github.com/CanonicalLtd/jem/jemclient"
 	"github.com/CanonicalLtd/jem/params"
 )
-
-var logger = loggo.GetLogger("jaas-admin")
 
 // jujuLoggingConfigEnvKey matches osenv.JujuLoggingConfigEnvKey
 // in the Juju project.

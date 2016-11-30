@@ -81,7 +81,7 @@ var notExistsQuery = bson.D{{"$exists", false}}
 // NewPool represents a pool of possible JEM instances that use the given
 // database as a store, and use the given bakery parameters to create the
 // bakery.Service.
-func NewPool(p Params) (*Pool, error) {
+func NewPool(ctx context.Context, p Params) (*Pool, error) {
 	// TODO migrate database
 	if p.ControllerAdmin == "" {
 		return nil, errgo.Newf("no controller admin group specified")
@@ -95,7 +95,7 @@ func NewPool(p Params) (*Pool, error) {
 		connCache: apiconn.NewCache(apiconn.CacheParams{}),
 		refCount:  1,
 	}
-	jem := pool.JEM()
+	jem := pool.JEM(ctx)
 	defer jem.Close()
 	if err := jem.DB.ensureIndexes(); err != nil {
 		return nil, errgo.Notef(err, "cannot ensure indexes")
@@ -138,7 +138,7 @@ func (p *Pool) ClearAPIConnCache() {
 //
 // This method will panic if called after the pool has been
 // closed.
-func (p *Pool) JEM() *JEM {
+func (p *Pool) JEM(ctx context.Context) *JEM {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.closed {
@@ -146,7 +146,7 @@ func (p *Pool) JEM() *JEM {
 	}
 	p.refCount++
 	return &JEM{
-		DB:   newDatabase(p.config.SessionPool, p.dbName),
+		DB:   newDatabase(ctx, p.config.SessionPool, p.dbName),
 		pool: p,
 	}
 }
@@ -198,7 +198,9 @@ func (j *JEM) Close() {
 
 // ErrAPIConnection is returned by OpenAPI and OpenAPIFromDocs
 // when the API connection cannot be made.
-var ErrAPIConnection = errgo.New("cannot connect to API")
+// Note that it is defined as an ErrorCode so that Database.checkError
+// does not treat it as a mongo-connection-broken error.
+var ErrAPIConnection params.ErrorCode = "cannot connect to API"
 
 // OpenAPI opens an API connection to the controller with the given path
 // and returns it along with the information used to connect. If the

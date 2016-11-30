@@ -71,17 +71,17 @@ func (s *Suite) SetUpTest(c *gc.C) {
 	s.JEMSrv = s.NewServer(c, s.Session, s.IDMSrv, external_jem.ServerParams{})
 	s.httpSrv = httptest.NewServer(s.JEMSrv)
 
-	s.SessionPool = mgosession.NewPool(s.Session, 1)
+	s.SessionPool = mgosession.NewPool(context.TODO(), s.Session, 1)
 	s.Pool = s.NewJEMPool(c, s.SessionPool)
-	s.JEM = s.Pool.JEM()
+	s.JEM = s.Pool.JEM(context.TODO())
 }
 
 // NewJEMPool returns a jem.Pool that uses the given
 // mgosession.Pool, enabling a custom session pool
 // to be used.
 func (s *Suite) NewJEMPool(c *gc.C, sessionPool *mgosession.Pool) *jem.Pool {
-	session := sessionPool.Session()
-	pool, err := jem.NewPool(jem.Params{
+	session := sessionPool.Session(context.TODO())
+	pool, err := jem.NewPool(context.TODO(), jem.Params{
 		DB:              session.DB("jem"),
 		ControllerAdmin: "controller-admin",
 		SessionPool:     sessionPool,
