@@ -20,12 +20,14 @@ import (
 	"gopkg.in/macaroon.v1"
 
 	"github.com/CanonicalLtd/jem/internal/auth"
+	"github.com/CanonicalLtd/jem/internal/jemtest"
 	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/params"
 )
 
 type authSuite struct {
 	jujutesting.IsolatedMgoSuite
+	jemtest.LoggingSuite
 	idmSrv      *idmtest.Server
 	pool        *auth.Pool
 	sessionPool *mgosession.Pool
@@ -33,8 +35,19 @@ type authSuite struct {
 
 var _ = gc.Suite(&authSuite{})
 
+func (s *authSuite) SetUpSuite(c *gc.C) {
+	s.IsolatedMgoSuite.SetUpSuite(c)
+	s.LoggingSuite.SetUpSuite(c)
+}
+
+func (s *authSuite) TearDownSuite(c *gc.C) {
+	s.LoggingSuite.TearDownSuite(c)
+	s.IsolatedMgoSuite.TearDownSuite(c)
+}
+
 func (s *authSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
+	s.LoggingSuite.SetUpTest(c)
 	s.idmSrv = idmtest.NewServer()
 	db := s.Session.DB("auth")
 	bakery, err := bakery.NewService(bakery.NewServiceParams{
@@ -65,6 +78,7 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 
 func (s *authSuite) TearDownTest(c *gc.C) {
 	s.sessionPool.Close()
+	s.LoggingSuite.TearDownTest(c)
 	s.IsolatedMgoSuite.TearDownTest(c)
 }
 

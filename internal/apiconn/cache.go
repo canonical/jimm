@@ -6,7 +6,11 @@ import (
 	"github.com/golang/groupcache/singleflight"
 	"github.com/juju/juju/api"
 	"github.com/juju/loggo"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
+
+	"github.com/CanonicalLtd/jem/internal/zapctx"
+	"github.com/CanonicalLtd/jem/internal/zaputil"
 )
 
 var logger = loggo.GetLogger("jem.internal.apiconn")
@@ -46,7 +50,7 @@ func (c *Cache) Close() error {
 		// an error on a closed API connection shouldn't
 		// cause anything to fail. Just log the error instead.
 		if err := st.Close(); err != nil {
-			logger.Warningf("cannot close API connection: %v", err)
+			zapctx.Warn(context.TODO(), "cannot close API connection", zaputil.Error(err))
 		}
 	}
 	return nil

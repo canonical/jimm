@@ -20,7 +20,6 @@ import (
 	"github.com/juju/juju/rpc/rpcreflect"
 	"github.com/juju/juju/status"
 	"github.com/juju/juju/storage"
-	"github.com/juju/loggo"
 	"golang.org/x/net/context"
 	"golang.org/x/net/websocket"
 	"gopkg.in/errgo.v1"
@@ -34,10 +33,10 @@ import (
 	"github.com/CanonicalLtd/jem/internal/jemserver"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/internal/servermon"
+	"github.com/CanonicalLtd/jem/internal/zapctx"
+	"github.com/CanonicalLtd/jem/internal/zaputil"
 	"github.com/CanonicalLtd/jem/params"
 )
-
-var logger = loggo.GetLogger("jem.internal.jujuapi")
 
 var errorCodes = map[error]string{
 	params.ErrAlreadyExists:    jujuparams.CodeAlreadyExists,
@@ -53,7 +52,8 @@ func mapError(err error) *jujuparams.Error {
 	if err == nil {
 		return nil
 	}
-	logger.Debugf("error: %s\n details: %s", err.Error(), errgo.Details(err))
+	// TODO the error mapper should really accept a context from the RPC package.
+	zapctx.Debug(context.TODO(), "rpc error", zaputil.Error(err))
 	if perr, ok := err.(*jujuparams.Error); ok {
 		return perr
 	}
@@ -121,10 +121,10 @@ var facades = map[facade]string{
 // newWSServer creates a new WebSocket server suitible for handling the API for modelUUID.
 func newWSServer(ctx context.Context, jem *jem.JEM, ap *auth.Pool, jsParams jemserver.Params, modelUUID string) websocket.Server {
 	hnd := wsHandler{
+		context:       ctx,
 		jem:           jem,
 		authPool:      ap,
 		params:        jsParams,
-		context:       ctx,
 		modelUUID:     modelUUID,
 		schemataCache: make(map[params.Cloud]map[jujucloud.AuthType]jujucloud.CredentialSchema),
 	}
@@ -160,7 +160,7 @@ func (h *wsHandler) handle(wsConn *websocket.Conn) {
 	h.conn.Start()
 	select {
 	case <-h.heartMonitor.Dead():
-		logger.Infof("PING Timeout")
+		zapctx.Info(h.context, "ping timeout")
 	case <-h.conn.Dead():
 		h.heartMonitor.Stop()
 	}
@@ -943,7 +943,6 @@ func (m modelManager) createModel(args jujuparams.ModelCreateArgs) (*jujuparams.
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid owner tag")
 	}
-	logger.Debugf("Attempting to create %s/%s", owner, args.Name)
 	if owner.IsLocal() {
 		return nil, params.ErrUnauthorized
 	}

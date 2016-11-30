@@ -11,17 +11,17 @@ package monitor
 import (
 	"time"
 
-	"github.com/juju/loggo"
 	"github.com/juju/utils/clock"
+	"github.com/uber-go/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/tomb.v2"
 
 	"github.com/CanonicalLtd/jem/internal/jem"
+	"github.com/CanonicalLtd/jem/internal/zapctx"
+	"github.com/CanonicalLtd/jem/internal/zaputil"
 	"github.com/CanonicalLtd/jem/params"
 )
-
-var logger = loggo.GetLogger("jem.internal.monitor")
 
 var (
 	// leaseAcquireInterval holds the duration the
@@ -82,12 +82,12 @@ func (m *Monitor) run(ctx context.Context) error {
 		m1 := newAllMonitor(ctx, shim, m.ownerId) // TODO add logging value here?
 		select {
 		case <-m1.tomb.Dead():
-			logger.Warningf("restarting inner monitor after error: %v", m1.tomb.Err())
+			zapctx.Warn(ctx, "restarting inner monitor after error", zaputil.Error(m1.tomb.Err()))
 			shim.Close()
 		case <-m.tomb.Dying():
 			m1.Kill()
 			err := m1.Wait()
-			logger.Warningf("inner monitor error during shutdown: %v", err)
+			zapctx.Warn(ctx, "inner monitor error during shutdown", zaputil.Error(err))
 			shim.Close()
 			return tomb.ErrDying
 		}
@@ -175,7 +175,7 @@ func (m *allMonitor) startMonitors(ctx context.Context) error {
 		ctl := ctl
 		if m.monitoring[ctl.Path] {
 			// We're already monitoring this controller; no need to do anything.
-			logger.Debugf("already monitoring %v", ctl.Path)
+			zapctx.Debug(ctx, "already monitoring")
 			continue
 		}
 		if ctl.MonitorLeaseOwner != m.ownerId && Clock.Now().Before(ctl.MonitorLeaseExpiry) {
@@ -184,7 +184,7 @@ func (m *allMonitor) startMonitors(ctx context.Context) error {
 		}
 		newExpiry, err := acquireLease(ctx, m.jem, ctl.Path, ctl.MonitorLeaseExpiry, ctl.MonitorLeaseOwner, m.ownerId)
 		if isMonitoringStoppedError(err) {
-			logger.Infof("cannot acquire lease on %v: %v", ctl.Path, err)
+			zapctx.Info(ctx, "cannot acquire lease", zaputil.Error(err))
 			// Someone else got there first.
 			continue
 		}
@@ -211,7 +211,7 @@ func (m *allMonitor) startMonitors(ctx context.Context) error {
 				ctlMonitor.Kill()
 			}
 			err := ctlMonitor.Wait()
-			logger.Infof("controller monitor died (path %v): %v", ctl.Path, err)
+			zapctx.Info(ctx, "monitor died", zap.Stringer("path", ctl.Path), zaputil.Error(err))
 			m.controllerRemoved <- ctl.Path
 			if isMonitoringStoppedError(err) {
 				return nil
