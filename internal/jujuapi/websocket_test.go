@@ -26,6 +26,7 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
 	"gopkg.in/macaroon.v1"
+	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jem/internal/apitest"
 	"github.com/CanonicalLtd/jem/internal/jujuapi"
@@ -724,6 +725,64 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 			Code:    jujuparams.CodeNotFound,
 		},
 	}})
+}
+
+func (s *websocketSuite) TestModelInfoForLegacyModel(c *gc.C) {
+	ctx := context.Background()
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
+	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: "cred1"})
+	modelUUID1 := mi.UUID
+
+	err := s.JEM.DB.Models().UpdateId("test/model-1", bson.D{{
+		"$unset",
+		bson.D{{
+			"cloud", 1,
+		}, {
+			"cloudregion", 1,
+		}, {
+			"credential", 1,
+		}, {
+			"defaultseries", 1,
+		}},
+	}})
+	c.Assert(err, jc.ErrorIsNil)
+
+	// Sanity check the required fields aren't present.
+	model, err := s.JEM.DB.Model(ctx, params.EntityPath{"test", "model-1"})
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(model.Cloud, gc.Equals, params.Cloud(""))
+
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := modelmanager.NewClient(conn)
+	models, err := client.ModelInfo([]names.ModelTag{names.NewModelTag(modelUUID1)})
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(models, jc.DeepEquals, []jujuparams.ModelInfoResult{{
+		Result: &jujuparams.ModelInfo{
+			Name:               "model-1",
+			UUID:               modelUUID1,
+			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+			ProviderType:       "dummy",
+			DefaultSeries:      "xenial",
+			CloudTag:           "cloud-dummy",
+			CloudRegion:        "dummy-region",
+			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test@external/cred1").String(),
+			OwnerTag:           names.NewUserTag("test@external").String(),
+			Life:               jujuparams.Alive,
+			Status: jujuparams.EntityStatus{
+				Status: status.Available,
+			},
+		},
+	}})
+
+	// Ensure the values in the database have been updated.
+	model, err = s.JEM.DB.Model(ctx, params.EntityPath{"test", "model-1"})
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(model.Cloud, gc.Equals, params.Cloud("dummy"))
+	c.Assert(model.CloudRegion, gc.Equals, "dummy-region")
+	c.Assert(model.Credential.String(), gc.Equals, "dummy/test/cred1")
+	c.Assert(model.DefaultSeries, gc.Equals, "xenial")
 }
 
 func (s *websocketSuite) TestAllModels(c *gc.C) {
