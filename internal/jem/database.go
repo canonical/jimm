@@ -161,6 +161,28 @@ func (db *Database) AddModel(ctx context.Context, m *mongodoc.Model) (err error)
 	return nil
 }
 
+// UpdateLegacyModel updates the given model by adding the Cloud,
+// CloudRegion, Credential and DefaultSeries values from the given model
+// document. All other values will be ignored.
+func (db *Database) UpdateLegacyModel(ctx context.Context, model *mongodoc.Model) (err error) {
+	defer db.checkError(ctx, &err)
+	update := make(bson.D, 3, 4)
+	update[0] = bson.DocElem{"cloud", model.Cloud}
+	update[1] = bson.DocElem{"credential", model.Credential}
+	update[2] = bson.DocElem{"defaultseries", model.DefaultSeries}
+	if model.CloudRegion != "" {
+		update = append(update, bson.DocElem{"cloudregion", model.CloudRegion})
+	}
+	err = db.Models().UpdateId(model.Path.String(), bson.D{{"$set", update}})
+	if err == nil {
+		return nil
+	}
+	if errgo.Cause(err) == mgo.ErrNotFound {
+		return errgo.WithCausef(err, params.ErrNotFound, "cannot update %s", model.Path.String())
+	}
+	return errgo.Notef(err, "cannot update %s", model.Path.String())
+}
+
 // DeleteModel deletes an model from the database. If an
 // model is also a controller it will not be deleted and an error
 // with a cause of params.ErrForbidden will be returned. If the

@@ -345,6 +345,45 @@ func (s *databaseSuite) TestAddModel(c *gc.C) {
 	s.checkDBOK(c)
 }
 
+func (s *databaseSuite) TestUpdateLegacyModel(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "x"}
+	m := &mongodoc.Model{
+		Id:   "ignored",
+		Path: ctlPath,
+	}
+	err := s.database.AddModel(testContext, m)
+	c.Assert(err, gc.IsNil)
+	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
+		Id:   "bob/x",
+		Path: ctlPath,
+	})
+
+	m.Cloud = "bob-cloud"
+	m.CloudRegion = "bob-region"
+	m.DefaultSeries = "trusty"
+	m.Credential = params.CredentialPath{
+		Cloud: "bob-cloud",
+		EntityPath: params.EntityPath{
+			User: "bob",
+			Name: "cred",
+		},
+	}
+	err = s.database.UpdateLegacyModel(testContext, m)
+	c.Assert(err, gc.IsNil)
+
+	m1, err := s.database.Model(testContext, ctlPath)
+	c.Assert(m1, jc.DeepEquals, m)
+
+	m2 := &mongodoc.Model{
+		Id:   "ignored",
+		Path: params.EntityPath{"bob", "y"},
+	}
+	err = s.database.UpdateLegacyModel(testContext, m2)
+	c.Assert(err, gc.ErrorMatches, "cannot update bob/y: not found")
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+	s.checkDBOK(c)
+}
+
 func (s *databaseSuite) TestModelFromUUID(c *gc.C) {
 	uuid := "99999999-9999-9999-9999-999999999999"
 	path := params.EntityPath{"bob", "x"}

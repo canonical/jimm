@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/juju/bundlechanges"
+	modelmanagerapi "github.com/juju/juju/api/modelmanager"
 	"github.com/juju/juju/apiserver/common"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	jujucloud "github.com/juju/juju/cloud"
@@ -20,6 +21,7 @@ import (
 	"github.com/juju/juju/rpc/rpcreflect"
 	"github.com/juju/juju/status"
 	"github.com/juju/juju/storage"
+	"github.com/uber-go/zap"
 	"golang.org/x/net/context"
 	"golang.org/x/net/websocket"
 	"gopkg.in/errgo.v1"
@@ -1131,7 +1133,64 @@ func getModel(h *wsHandler, modelTag string, authf func(context.Context, auth.AC
 	if err := authf(h.context, model); err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
+	if model.Cloud != "" {
+		return model, nil
+	}
+	// The model does not currently store its cloud information so go
+	// and fetch it from the model itself. This happens if the model
+	// was created with a JIMM version older than 0.9.5.
+	info, err := fetchModelInfo(h, model)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	cloudTag, err := names.ParseCloudTag(info.CloudTag)
+	if err != nil {
+		return nil, errgo.Notef(err, "bad data from controller")
+	}
+	credentialTag, err := names.ParseCloudCredentialTag(info.CloudCredentialTag)
+	if err != nil {
+		return nil, errgo.Notef(err, "bad data from controller")
+	}
+	model.Cloud = params.Cloud(cloudTag.Id())
+	model.CloudRegion = info.CloudRegion
+	credOwner := credentialTag.Owner()
+	user := credOwner.Id()
+	if credOwner.Domain() == "external" {
+		user = credOwner.Name()
+	}
+	model.Credential = params.CredentialPath{
+		Cloud: params.Cloud(credentialTag.Cloud().Id()),
+		EntityPath: params.EntityPath{
+			User: params.User(user),
+			Name: params.Name(credentialTag.Name()),
+		},
+	}
+	model.DefaultSeries = info.DefaultSeries
+
+	if err := h.jem.DB.UpdateLegacyModel(h.context, model); err != nil {
+		zapctx.Warn(h.context, "cannot update %s with cloud details", zap.String("model", model.Path.String()), zaputil.Error(err))
+	}
 	return model, nil
+}
+
+func fetchModelInfo(h *wsHandler, model *mongodoc.Model) (*jujuparams.ModelInfo, error) {
+	conn, err := h.jem.OpenAPI(h.context, model.Controller)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	defer conn.Close()
+	client := modelmanagerapi.NewClient(conn)
+	infos, err := client.ModelInfo([]names.ModelTag{names.NewModelTag(model.UUID)})
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	if len(infos) != 1 {
+		return nil, errgo.Newf("unexpected number of ModelInfo results")
+	}
+	if infos[0].Error != nil {
+		return nil, infos[0].Error
+	}
+	return infos[0].Result, nil
 }
 
 // ModelStatus implements the ModelManager facade's ModelStatus method.
