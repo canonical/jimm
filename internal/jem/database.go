@@ -84,6 +84,9 @@ func (db *Database) ensureIndexes() error {
 	}, {
 		db.Models(),
 		mgo.Index{Key: []string{"uuid"}, Unique: true},
+	}, {
+		db.Credentials(),
+		mgo.Index{Key: []string{"path.entitypath.user", "path.cloud"}},
 	}}
 	for _, idx := range indexes {
 		err := idx.c.EnsureIndex(idx.i)

@@ -144,11 +144,14 @@ func (s *jemSuite) TestClone(c *gc.C) {
 
 var createModelTests = []struct {
 	about            string
+	user             string
 	params           jem.CreateModelParams
+	expectCredential params.CredentialPath
 	expectError      string
 	expectErrorCause error
 }{{
 	about: "success",
+	user:  "bob",
 	params: jem.CreateModelParams{
 		Path: params.EntityPath{"bob", ""},
 		Credential: params.CredentialPath{
@@ -159,6 +162,7 @@ var createModelTests = []struct {
 	},
 }, {
 	about: "success specified controller",
+	user:  "bob",
 	params: jem.CreateModelParams{
 		Path:           params.EntityPath{"bob", ""},
 		ControllerPath: params.EntityPath{"bob", "controller"},
@@ -170,6 +174,7 @@ var createModelTests = []struct {
 	},
 }, {
 	about: "success with region",
+	user:  "bob",
 	params: jem.CreateModelParams{
 		Path: params.EntityPath{"bob", ""},
 		Credential: params.CredentialPath{
@@ -181,6 +186,7 @@ var createModelTests = []struct {
 	},
 }, {
 	about: "unknown credential",
+	user:  "bob",
 	params: jem.CreateModelParams{
 		Path: params.EntityPath{"bob", ""},
 		Credential: params.CredentialPath{
@@ -193,8 +199,9 @@ var createModelTests = []struct {
 	expectErrorCause: params.ErrNotFound,
 }, {
 	about: "model exists",
+	user:  "bob",
 	params: jem.CreateModelParams{
-		Path: params.EntityPath{"bob", "controller"},
+		Path: params.EntityPath{"bob", "oldmodel"},
 		Credential: params.CredentialPath{
 			Cloud:      "dummy",
 			EntityPath: params.EntityPath{"bob", "cred1"},
@@ -205,6 +212,7 @@ var createModelTests = []struct {
 	expectErrorCause: params.ErrAlreadyExists,
 }, {
 	about: "unrecognised region",
+	user:  "bob",
 	params: jem.CreateModelParams{
 		Path: params.EntityPath{"bob", ""},
 		Credential: params.CredentialPath{
@@ -216,9 +224,30 @@ var createModelTests = []struct {
 	},
 	expectError: `cannot select controller: no matching controllers found`,
 }, {
-	about: "empty cloud credentials",
+	about: "empty cloud credentials selects single choice",
+	user:  "bob",
 	params: jem.CreateModelParams{
 		Path:  params.EntityPath{"bob", ""},
+		Cloud: "dummy",
+	},
+	expectCredential: params.CredentialPath{
+		Cloud:      "dummy",
+		EntityPath: params.EntityPath{"bob", "cred1"},
+	},
+}, {
+	about: "empty cloud credentials fails with more than one choice",
+	user:  "alice",
+	params: jem.CreateModelParams{
+		Path:  params.EntityPath{"alice", ""},
+		Cloud: "dummy",
+	},
+	expectError:      `more than one possible credential to use`,
+	expectErrorCause: params.ErrAmbiguousChoice,
+}, {
+	about: "empty cloud credentials passed through if no credentials found",
+	user:  "charlie",
+	params: jem.CreateModelParams{
+		Path:  params.EntityPath{"charlie", ""},
 		Cloud: "dummy",
 	},
 }}
@@ -227,14 +256,32 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 	now := bson.Now()
 	s.PatchValue(jem.WallClock, jt.NewClock(now))
 	ctlId := s.addController(c, params.EntityPath{"bob", "controller"})
-	err := jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
+	err := s.jem.DB.SetACL(testContext, s.jem.DB.Controllers(), ctlId, params.ACL{
+		Read: []string{"everyone"},
+	})
+	c.Assert(err, gc.IsNil)
+	// Bob has a single credential.
+	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
 		Path: credentialPath("dummy", "bob", "cred1"),
 		Type: "empty",
 	})
 	c.Assert(err, jc.ErrorIsNil)
-	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	// Alice has two credentials.
+	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
+		Path: credentialPath("dummy", "alice", "cred1"),
+		Type: "empty",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
+		Path: credentialPath("dummy", "alice", "cred2"),
+		Type: "empty",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	ctx := auth.ContextWithUser(testContext, "bob")
+	// Create a model so that we can have a test case for an already-existing model
 	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
-		Path:           ctlId,
+		Path:           params.EntityPath{"bob", "oldmodel"},
 		ControllerPath: ctlId,
 		Credential: params.CredentialPath{
 			Cloud:      "dummy",
@@ -243,13 +290,12 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 		Cloud: "dummy",
 	})
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(auth.Username(ctx), gc.Equals, "bob")
 	for i, test := range createModelTests {
 		c.Logf("test %d. %s", i, test.about)
 		if test.params.Path.Name == "" {
 			test.params.Path.Name = params.Name(fmt.Sprintf("test-%d", i))
 		}
-		m, err := s.jem.CreateModel(ctx, test.params)
+		m, err := s.jem.CreateModel(auth.ContextWithUser(testContext, test.user), test.params)
 		if test.expectError != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
 			if test.expectErrorCause != nil {
@@ -261,10 +307,14 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 		c.Assert(m.Path, jc.DeepEquals, test.params.Path)
 		c.Assert(m.UUID, gc.Not(gc.Equals), "")
 		c.Assert(m.CreationTime.Equal(now), gc.Equals, true)
-		c.Assert(m.Creator, gc.Equals, "bob")
+		c.Assert(m.Creator, gc.Equals, test.user)
 		c.Assert(m.Cloud, gc.Equals, test.params.Cloud)
 		c.Assert(m.CloudRegion, gc.Equals, "dummy-region")
-		c.Assert(m.Credential, jc.DeepEquals, test.params.Credential)
+		if !test.expectCredential.IsZero() {
+			c.Assert(m.Credential, jc.DeepEquals, test.expectCredential)
+		} else {
+			c.Assert(m.Credential, jc.DeepEquals, test.params.Credential)
+		}
 		c.Assert(m.DefaultSeries, gc.Equals, "xenial")
 		c.Assert(m.Life, gc.Equals, "alive")
 	}

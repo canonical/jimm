@@ -349,6 +349,13 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.M
 		return nil, errgo.NoteMask(err, "cannot connect to controller", errgo.Is(ErrAPIConnection))
 	}
 	defer conn.Close()
+	if p.Credential.IsZero() {
+		cred, err := j.selectCredential(ctx, p.Path.User, p.Cloud)
+		if err != nil {
+			return nil, errgo.Mask(err, errgo.Is(params.ErrAmbiguousChoice))
+		}
+		p.Credential = cred
+	}
 	if !p.Credential.IsZero() {
 		cred, err := j.Credential(ctx, p.Credential)
 		if err != nil {
@@ -361,8 +368,6 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.M
 			return nil, errgo.Mask(err)
 		}
 	}
-	// TODO if there is no credential provided, search for an appropriate
-	// one for the current user.
 
 	// Create the model record in the database before actually
 	// creating the model on the controller. It will have an invalid
@@ -618,6 +623,33 @@ func (j *JEM) DoControllers(ctx context.Context, cloud params.Cloud, region stri
 		return errgo.Notef(err, "cannot query")
 	}
 	return nil
+}
+
+// selectCredential chooses a credential appropriate for the given user that can
+// be used when starting a model in the given cloud.
+//
+// If there's more than one such credential, it returns a params.ErrAmbiguousChoice error.
+//
+// If there are no credentials found, a zero credential path is returned.
+func (j *JEM) selectCredential(ctx context.Context, user params.User, cloud params.Cloud) (params.CredentialPath, error) {
+	q := j.DB.Credentials().Find(bson.D{
+		{"path.entitypath.user", user},
+		{"path.cloud", cloud},
+	}).Select(bson.D{{"path", 1}})
+	iter := j.DB.NewCanReadIter(ctx, q.Iter())
+	var path params.CredentialPath
+	var cred mongodoc.Credential
+	for iter.Next(&cred) {
+		if !path.IsZero() {
+			iter.Close()
+			return params.CredentialPath{}, errgo.WithCausef(nil, params.ErrAmbiguousChoice, "more than one possible credential to use")
+		}
+		path = cred.Path
+	}
+	if err := iter.Err(); err != nil {
+		return params.CredentialPath{}, errgo.Notef(err, "cannot query credentials")
+	}
+	return path, nil
 }
 
 // selectController chooses a controller that matches the cloud and region criteria, if specified.
