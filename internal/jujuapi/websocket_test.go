@@ -18,7 +18,9 @@ import (
 	"github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
+	"github.com/juju/juju/instance"
 	"github.com/juju/juju/network"
+	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/juju/status"
 	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
@@ -659,6 +661,22 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 	mi = s.assertCreateModel(c, createModelParams{name: "model-3", username: "test2", cred: "cred1"})
 	modelUUID3 := mi.UUID
 
+	// Add some machines to one of the models
+	err = s.JEM.DB.UpdateMachineInfo(testContext, &multiwatcher.MachineInfo{
+		ModelUUID: modelUUID3,
+		Id:        "machine-0",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	machineArch := "bbc-micro"
+	err = s.JEM.DB.UpdateMachineInfo(testContext, &multiwatcher.MachineInfo{
+		ModelUUID: modelUUID3,
+		Id:        "machine-1",
+		HardwareCharacteristics: &instance.HardwareCharacteristics{
+			Arch: &machineArch,
+		},
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := modelmanager.NewClient(conn)
@@ -718,6 +736,14 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 			Status: jujuparams.EntityStatus{
 				Status: status.Available,
 			},
+			Machines: []jujuparams.ModelMachineInfo{{
+				Id: "machine-0",
+			}, {
+				Id: "machine-1",
+				Hardware: &jujuparams.MachineHardware{
+					Arch: &machineArch,
+				},
+			}},
 		},
 	}, {
 		Error: &jujuparams.Error{
