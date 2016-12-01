@@ -910,6 +910,17 @@ func (s *websocketSuite) TestModelStatus(c *gc.C) {
 	doTest(modelmanager.NewClient(conn))
 }
 
+func (s *websocketSuite) TestModelStatusNotFound(c *gc.C) {
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	cclient := controller.NewClient(conn)
+	mmclient := modelmanager.NewClient(conn)
+	_, err := cclient.ModelStatus(names.NewModelTag("11111111-1111-1111-1111-111111111111"))
+	c.Assert(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
+	_, err = mmclient.ModelStatus(names.NewModelTag("11111111-1111-1111-1111-111111111111"))
+	c.Assert(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
+}
+
 var createModelTests = []struct {
 	about         string
 	name          string
