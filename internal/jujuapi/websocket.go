@@ -885,13 +885,9 @@ func jemMachinesToModelMachineInfo(machines []mongodoc.Machine) []jujuparams.Mod
 }
 
 func jemMachineToModelMachineInfo(m *mongodoc.Machine) jujuparams.ModelMachineInfo {
-	return jujuparams.ModelMachineInfo{
-		Id:         m.Info.Id,
-		InstanceId: m.Info.InstanceId,
-		Status:     string(m.Info.AgentStatus.Current),
-		HasVote:    m.Info.HasVote,
-		WantsVote:  m.Info.WantsVote,
-		Hardware: &jujuparams.MachineHardware{
+	var hardware *jujuparams.MachineHardware
+	if m.Info.HardwareCharacteristics != nil {
+		hardware = &jujuparams.MachineHardware{
 			Arch:             m.Info.HardwareCharacteristics.Arch,
 			Mem:              m.Info.HardwareCharacteristics.Mem,
 			RootDisk:         m.Info.HardwareCharacteristics.RootDisk,
@@ -899,7 +895,15 @@ func jemMachineToModelMachineInfo(m *mongodoc.Machine) jujuparams.ModelMachineIn
 			CpuPower:         m.Info.HardwareCharacteristics.CpuPower,
 			Tags:             m.Info.HardwareCharacteristics.Tags,
 			AvailabilityZone: m.Info.HardwareCharacteristics.AvailabilityZone,
-		},
+		}
+	}
+	return jujuparams.ModelMachineInfo{
+		Id:         m.Info.Id,
+		InstanceId: m.Info.InstanceId,
+		Status:     string(m.Info.AgentStatus.Current),
+		HasVote:    m.Info.HasVote,
+		WantsVote:  m.Info.WantsVote,
+		Hardware:   hardware,
 	}
 }
 
