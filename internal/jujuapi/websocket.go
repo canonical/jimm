@@ -744,7 +744,7 @@ func (c controller) ModelStatus(args jujuparams.Entities) (jujuparams.ModelStatu
 	for i, arg := range args.Entities {
 		mi, err := c.modelStatus(arg)
 		if err != nil {
-			return jujuparams.ModelStatusResults{}, errgo.Mask(err)
+			return jujuparams.ModelStatusResults{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 		}
 		results[i] = *mi
 	}
@@ -758,7 +758,7 @@ func (c controller) ModelStatus(args jujuparams.Entities) (jujuparams.ModelStatu
 func (c controller) modelStatus(arg jujuparams.Entity) (*jujuparams.ModelStatus, error) {
 	mi, err := modelInfo(c.h, arg)
 	if err != nil {
-		return &jujuparams.ModelStatus{}, errgo.Mask(err)
+		return &jujuparams.ModelStatus{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	return &jujuparams.ModelStatus{
 		ModelTag:           names.NewModelTag(mi.UUID).String(),
