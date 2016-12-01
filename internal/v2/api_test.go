@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/juju/juju/api"
@@ -451,12 +450,6 @@ func (s *APISuite) TestGetController(c *gc.C) {
 	var controllerInfo params.ControllerResponse
 	err = json.Unmarshal(resp.Body.Bytes(), &controllerInfo)
 	c.Assert(err, gc.IsNil, gc.Commentf("body: %s", resp.Body.String()))
-	c.Assert(controllerInfo.ProviderType, gc.Equals, "dummy")
-	c.Assert(controllerInfo.Schema, gc.Not(gc.HasLen), 0)
-	// Check that all path attributes have been removed.
-	for name := range controllerInfo.Schema {
-		c.Assert(strings.HasSuffix(name, "-path"), gc.Equals, false)
-	}
 	c.Assert((*controllerInfo.UnavailableSince).UTC(), jc.DeepEquals, mongodoc.Time(t).UTC())
 	c.Assert(controllerInfo.Location, jc.DeepEquals, map[string]string{
 		"cloud":  "dummy",
@@ -1058,74 +1051,6 @@ func (s *APISuite) TestAllControllerLocations(c *gc.C) {
 		c.Assert(resp, jc.DeepEquals, &test.expect)
 	}
 
-}
-
-func (s *APISuite) TestGetSchemaOneProviderType(c *gc.C) {
-	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "aws-us-east"}, true)
-	s.AssertAddController(c, params.EntityPath{"bob", "aws-eu-west"}, true)
-	ctl, err := s.NewClient("bob").GetController(&params.GetController{
-		EntityPath: ctlId,
-	})
-	c.Assert(err, gc.IsNil)
-	resp, err := s.NewClient("bob").GetSchema(&params.GetSchema{
-		Location: map[string]string{
-			"cloud": "dummy",
-		},
-	})
-	c.Assert(err, gc.IsNil)
-
-	c.Assert(resp.ProviderType, gc.Equals, ctl.ProviderType)
-	c.Assert(resp.Schema, jc.DeepEquals, ctl.Schema)
-}
-
-func (s *APISuite) TestGetSchemaNotFound(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{"bob", "aws-us-east"}, true)
-	resp, err := s.NewClient("bob").GetSchema(&params.GetSchema{
-		Location: map[string]string{
-			"cloud": "ec2",
-		},
-	})
-	c.Check(resp, gc.IsNil)
-	c.Check(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	c.Assert(err, gc.ErrorMatches, `no matching controllers`)
-}
-
-func (s *APISuite) TestGetSchemaAmbiguous(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{"bob", "aws-us-east"}, true)
-	// Add a controller directly to the database because we can only
-	// have dummy provider controllers otherwise and we need one
-	// of a different type.
-	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"bob", "azure"},
-		Cloud: mongodoc.Cloud{
-			Name:         "dummy",
-			ProviderType: "another",
-		},
-		Public: true,
-		Location: map[string]string{
-			"cloud": "dummy",
-		},
-	})
-
-	resp, err := s.NewClient("bob").GetSchema(&params.GetSchema{
-		Location: map[string]string{
-			"cloud": "dummy",
-		},
-	})
-	c.Check(resp, gc.IsNil)
-	c.Check(errgo.Cause(err), gc.Equals, params.ErrAmbiguousLocation)
-	c.Assert(err, gc.ErrorMatches, `ambiguous location matches controller of more than one type`)
-}
-
-func (s *APISuite) TestGetSchemaBadLocation(c *gc.C) {
-	resp, err := s.NewClient("bob").GetSchema(&params.GetSchema{
-		Location: map[string]string{
-			"$badlocation": "aws",
-		},
-	})
-	c.Check(resp, gc.IsNil)
-	c.Check(errgo.Cause(err), gc.Equals, params.ErrBadRequest)
-	c.Assert(err, gc.ErrorMatches, `invalid location attribute "\$badlocation"`)
 }
 
 func (s *APISuite) TestNewModel(c *gc.C) {

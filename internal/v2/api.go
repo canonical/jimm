@@ -12,14 +12,10 @@ import (
 	cloudapi "github.com/juju/juju/api/cloud"
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
-	modelmanager "github.com/juju/juju/controller/modelmanager"
-	"github.com/juju/juju/environs"
 	"github.com/juju/juju/network"
-	jujuschema "github.com/juju/schema"
 	"github.com/uber-go/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/environschema.v1"
 	"gopkg.in/juju/names.v2"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -266,77 +262,11 @@ func (h *Handler) GetController(arg *params.GetController) (*params.ControllerRe
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	neSchema, err := h.schemaForNewModel(arg.EntityPath, params.User(auth.Username(ctx)))
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
 	return &params.ControllerResponse{
 		Path:             arg.EntityPath,
-		ProviderType:     neSchema.providerType,
-		Schema:           neSchema.schema,
 		Location:         ctl.Location,
 		Public:           ctl.Public,
 		UnavailableSince: newTime(ctl.UnavailableSince.UTC()),
-	}, nil
-}
-
-// GetSchema returns the schema that should be used for
-// the model configuration when starting a controller
-// with a location matching p.Location.
-//
-//
-// If controllers of more than one provider type
-// are matched, it will return an error with a params.ErrAmbiguousLocation
-// cause.
-//
-// If no controllers are matched, it will return an error with
-// a params.ErrNotFound cause.
-func (h *Handler) GetSchema(p httprequest.Params, arg *params.GetSchema) (*params.SchemaResponse, error) {
-	lp, err := parseFormLocations(p.Request.Form)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
-	}
-	if len(lp.other) > 0 {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "no matching controllers")
-	}
-	return h.schemaForLocation(lp.cloud, lp.region)
-}
-
-// schemaForLocation returns the schema for the controllers matching
-// the given location as a SchemaResponse.
-// If the controllers selected by the location are not compatible,
-// it returns an error with a params.ErrAmbiguousLocation cause.
-// If there are no controllers selected, it returns an error with a
-// params.ErrNotFound cause.
-func (h *Handler) schemaForLocation(cloud params.Cloud, region string) (*params.SchemaResponse, error) {
-	ctx := h.context
-	// TODO This will be insufficient when we can have several servers with the
-	// same provider type but different versions that could potentially have
-	// different configuration schemas. In that case, we could return a schema
-	// that's the intersection of all the matched schemas and check that it's
-	// valid for all of them before returning it.
-	providerType := ""
-	err := h.jem.DoControllers(ctx, cloud, region, func(ctl *mongodoc.Controller) error {
-
-		if providerType != "" && ctl.Cloud.ProviderType != providerType {
-			return errgo.WithCausef(nil, params.ErrAmbiguousLocation, "ambiguous location matches controller of more than one type")
-		}
-		providerType = ctl.Cloud.ProviderType
-		return nil
-	})
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrAmbiguousLocation), errgo.Is(params.ErrBadRequest))
-	}
-	if providerType == "" {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "no matching controllers")
-	}
-	schema, err := schemaForProviderType(providerType)
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot get schema for provider type %q", providerType)
-	}
-	return &params.SchemaResponse{
-		ProviderType: providerType,
-		Schema:       schema,
 	}, nil
 }
 
@@ -488,8 +418,6 @@ func (h *Handler) ListController(arg *params.ListController) (*params.ListContro
 	ctx := h.context
 	var controllers []params.ControllerResponse
 
-	// TODO populate ProviderType and Schema fields when we have a cache
-	// for the schemaForNewModel results.
 	iter := h.jem.DB.NewCanReadIter(ctx, h.jem.DB.Controllers().Find(nil).Sort("_id").Iter())
 	var ctl mongodoc.Controller
 	for iter.Next(&ctl) {
@@ -782,97 +710,6 @@ func (h *Handler) UpdateCredential(arg *params.UpdateCredential) error {
 		return errgo.Mask(err)
 	}
 	return nil
-}
-
-type schemaForNewModel struct {
-	providerType string
-	schema       environschema.Fields
-	checker      jujuschema.Checker
-	skeleton     map[string]interface{}
-}
-
-// schemaForNewModel returns the schema for the configuration options
-// for creating new models on the controller with the given id.
-func (h *Handler) schemaForNewModel(ctlPath params.EntityPath, user params.User) (*schemaForNewModel, error) {
-	ctx := h.context
-	st, err := h.jem.OpenAPI(ctx, ctlPath)
-	if err != nil {
-		return nil, errgo.NoteMask(err, "cannot open API", errgo.Is(params.ErrNotFound))
-	}
-	defer st.Close()
-
-	var neSchema schemaForNewModel
-
-	client := cloudapi.NewClient(st)
-	defaultCloud, err := client.DefaultCloud()
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot get base configuration")
-	}
-	cloudInfo, err := client.Cloud(defaultCloud)
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot get base configuration")
-	}
-	neSchema.providerType = cloudInfo.Type
-	neSchema.schema, err = schemaForProviderType(neSchema.providerType)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	fields, defaults, err := neSchema.schema.ValidationSchema()
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot create validation schema for provider %s", neSchema.providerType)
-	}
-	neSchema.checker = jujuschema.FieldMap(fields, defaults)
-	return &neSchema, nil
-}
-
-// schemaForProviderType returns the schema for the given
-// provider type. This works currently because we link in
-// all the provider code so we can do it locally.
-//
-// It's defined as a variable so it can be overridden in tests.
-//
-// TODO get the model schema over the juju API. We'll
-// need make GetSchema be cleverer about mapping
-// from provider type to schema in that case.
-var schemaForProviderType = func(providerType string) (environschema.Fields, error) {
-	provider, err := environs.Provider(providerType)
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot get provider type %q", providerType)
-	}
-	schp, ok := provider.(interface {
-		Schema() environschema.Fields
-	})
-	if !ok {
-		return nil, errgo.Notef(err, "provider %q does not provide schema", providerType)
-	}
-	schema := schp.Schema()
-
-	restrictedFields, err := modelmanager.RestrictedProviderFields(provider)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	// Remove everything from the schema that's restricted.
-	for _, attr := range restrictedFields {
-		delete(schema, attr)
-	}
-	// Also remove any attributes ending in "-path" because
-	// they're only applicable locally.
-	for name := range schema {
-		if strings.HasSuffix(name, "-path") {
-			delete(schema, name)
-		}
-	}
-	// We're going to set the model name from the
-	// JEM model path, so remove it from
-	// the schema.
-	delete(schema, "name")
-	// TODO Delete admin-secret too, because it's never a valid
-	// attribute for the client to provide. We can't do that right
-	// now because it's the only secret attribute in the dummy
-	// provider and we need it to test secret template attributes.
-	// When Juju provides the schema over its API, that API call
-	// should delete it before returning.
-	return schema, nil
 }
 
 func badRequestf(underlying error, f string, a ...interface{}) error {
