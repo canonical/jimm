@@ -35,7 +35,7 @@ func errToResp(err error) (int, interface{}) {
 	status := http.StatusInternalServerError
 	switch errorBody.Code {
 	case params.ErrNotFound,
-		params.ErrAmbiguousLocation:
+		params.ErrAmbiguousChoice:
 
 		status = http.StatusNotFound
 	case params.ErrForbidden,

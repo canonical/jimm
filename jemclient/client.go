@@ -56,23 +56,6 @@ func (c *Client) GetAllControllerLocations(p *params.GetAllControllerLocations) 
 	return r, err
 }
 
-// GetSchema returns the schema that should be used for
-// the model configuration when starting a controller
-// with a location matching p.Location.
-//
-//
-// If controllers of more than one provider type
-// are matched, it will return an error with a params.ErrAmbiguousLocation
-// cause.
-//
-// If no controllers are matched, it will return an error with
-// a params.ErrNotFound cause.
-func (c *Client) GetSchema(p *params.GetSchema) (*params.SchemaResponse, error) {
-	var r *params.SchemaResponse
-	err := c.callWithLocationAttrs(p.Location, p, &r)
-	return r, err
-}
-
 // callWithLocationAttrs makes an API call to the endpoint implied
 // by p, attaching the given location attributes as URL query parameters,
 // and storing the result into the value pointed to by the value in r.

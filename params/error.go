@@ -19,14 +19,14 @@ func (code ErrorCode) ErrorCode() ErrorCode {
 }
 
 const (
-	ErrNotFound          ErrorCode = "not found"
-	ErrForbidden         ErrorCode = "forbidden"
-	ErrBadRequest        ErrorCode = "bad request"
-	ErrUnauthorized      ErrorCode = "unauthorized"
-	ErrAlreadyExists     ErrorCode = "already exists"
-	ErrMethodNotAllowed  ErrorCode = "method not allowed"
-	ErrAmbiguousLocation ErrorCode = "ambiguous location"
-	ErrStillAlive        ErrorCode = "controller is still alive"
+	ErrNotFound         ErrorCode = "not found"
+	ErrForbidden        ErrorCode = "forbidden"
+	ErrBadRequest       ErrorCode = "bad request"
+	ErrUnauthorized     ErrorCode = "unauthorized"
+	ErrAlreadyExists    ErrorCode = "already exists"
+	ErrMethodNotAllowed ErrorCode = "method not allowed"
+	ErrAmbiguousChoice  ErrorCode = "ambiguous choice"
+	ErrStillAlive       ErrorCode = "controller is still alive"
 )
 
 // Error represents an error - it is returned for any response that fails.
