@@ -1000,12 +1000,12 @@ var createModelTests = []struct {
 	credentialTag: "cloudcred-dummy_test@external_cred1",
 	expectError:   `no cloud specified for model; please specify one`,
 }, {
-	about:         "no credential tag",
+	about:         "no credential tag selects unambigous creds",
 	name:          "model-8",
 	ownerTag:      "user-test@external",
 	cloudTag:      names.NewCloudTag("dummy").String(),
 	region:        "dummy-region",
-	credentialTag: "",
+	credentialTag: "cloudcred-dummy_test@external_cred1",
 }}
 
 func (s *websocketSuite) TestCreateModel(c *gc.C) {
