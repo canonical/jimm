@@ -107,6 +107,7 @@ type ControllerStats struct {
 	ModelCount int
 
 	// ServiceCount holds the number of services hosted in the controller.
+	// TODO this should be named ApplicationCount.
 	ServiceCount int
 
 	// MachineCount holds the number of machines hosted in the controller.

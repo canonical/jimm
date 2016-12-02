@@ -88,6 +88,7 @@ type Server struct {
 	authPool    *auth.Pool
 	sessionPool *mgosession.Pool
 	monitor     *monitor.Monitor
+	jemStats    *jem.Stats
 }
 
 // New returns a new handler that handles model manager
@@ -171,6 +172,16 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 		}
 	}
 
+	srv.jemStats = p.Stats(ctx)
+	if err := prometheus.Register(srv.jemStats); err != nil {
+		// This happens when the stats have already been registered. In
+		// this case, we don't care much - just let the first one work.
+		// This is useful to enable tests that use more than one Server
+		// at the same time.
+		zapctx.Error(ctx, "cannot register JEM prometheus stats", zaputil.Error(err))
+		srv.jemStats = nil
+	}
+
 	return srv, nil
 }
 
@@ -223,6 +234,9 @@ func (srv *Server) options(http.ResponseWriter, *http.Request, httprouter.Params
 // Close implements io.Closer.Close. It should not be called
 // until all requests on the handler have completed.
 func (srv *Server) Close() error {
+	if srv.jemStats != nil {
+		prometheus.Unregister(srv.jemStats)
+	}
 	if srv.monitor != nil {
 		srv.monitor.Kill()
 		if err := srv.monitor.Wait(); err != nil {
