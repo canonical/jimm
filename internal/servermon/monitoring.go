@@ -10,12 +10,6 @@ import (
 )
 
 var (
-	ApplicationsRunning = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: "jem",
-		Subsystem: "health",
-		Name:      "applications_running",
-		Help:      "The current number of running applications.",
-	}, []string{"ctl_path"})
 	AuthenticationFailCount = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: "jem",
 		Subsystem: "auth",
@@ -45,12 +39,6 @@ var (
 		Subsystem: "auth",
 		Name:      "pool_put",
 		Help:      "The number of times an Authenticator has been replaced into the pool.",
-	})
-	ControllersRunning = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "jem",
-		Subsystem: "health",
-		Name:      "controllers_running",
-		Help:      "The current number of running controllers.",
 	})
 	DatabaseSessions = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "jem",
@@ -88,12 +76,12 @@ var (
 		Name:      "login_success_count",
 		Help:      "The number of successful logins completed.",
 	})
-	MachinesRunning = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	StatsCollectFailCount = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: "jem",
 		Subsystem: "health",
-		Name:      "machines_running",
-		Help:      "The current number of running machines.",
-	}, []string{"ctl_path"})
+		Name:      "stats_collect_fail_count",
+		Help:      "The number of times we failed to collect stats from mongo.",
+	})
 	ModelLifetime = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: "jem",
 		Subsystem: "health",
@@ -132,24 +120,12 @@ var (
 		Name:      "models_destroyed_count",
 		Help:      "The number of models destroyed.",
 	})
-	ModelsRunning = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: "jem",
-		Subsystem: "health",
-		Name:      "models_running",
-		Help:      "The current number of running models.",
-	}, []string{"ctl_path"})
 	requestDuration = prometheus.NewSummaryVec(prometheus.SummaryOpts{
 		Namespace: "jem",
 		Subsystem: "handler",
 		Name:      "request_duration",
 		Help:      "The duration of a web request in seconds.",
 	}, []string{"path_pattern"})
-	UnitsRunning = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: "jem",
-		Subsystem: "health",
-		Name:      "units_running",
-		Help:      "The current number of running units.",
-	}, []string{"ctl_path"})
 	WebsocketRequestDuration = prometheus.NewSummaryVec(prometheus.SummaryOpts{
 		Namespace: "jem",
 		Subsystem: "websocket",
@@ -159,26 +135,21 @@ var (
 )
 
 func init() {
-	prometheus.MustRegister(ApplicationsRunning)
 	prometheus.MustRegister(AuthenticationFailCount)
 	prometheus.MustRegister(AuthenticationSuccessCount)
 	prometheus.MustRegister(AuthenticatorPoolGet)
 	prometheus.MustRegister(AuthenticatorPoolNew)
 	prometheus.MustRegister(AuthenticatorPoolPut)
-	prometheus.MustRegister(ControllersRunning)
 	prometheus.MustRegister(DatabaseSessions)
 	prometheus.MustRegister(DatabaseFailCount)
 	prometheus.MustRegister(DeployedUnitCount)
 	prometheus.MustRegister(LoginFailCount)
 	prometheus.MustRegister(LoginRedirectCount)
 	prometheus.MustRegister(LoginSuccessCount)
-	prometheus.MustRegister(MachinesRunning)
 	prometheus.MustRegister(ModelLifetime)
 	prometheus.MustRegister(ModelsCreatedCount)
 	prometheus.MustRegister(ModelsCreatedFailCount)
-	prometheus.MustRegister(ModelsRunning)
 	prometheus.MustRegister(requestDuration)
-	prometheus.MustRegister(UnitsRunning)
 	prometheus.MustRegister(WebsocketRequestDuration)
 	prometheus.MustRegister(monitoring.NewMgoStatsCollector("jem"))
 }

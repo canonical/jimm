@@ -95,41 +95,49 @@ func (s *jemSuite) TestPoolDoesNotReuseDeadConnection(c *gc.C) {
 	defer jem0.Close()
 	assertOK(jem0)
 
+	c.Logf("close connections")
 	// Close all current connections to the mongo instance,
 	// which should cause subsequent operations on jem1 to fail.
 	session.CloseConns()
 
 	// Get another JEM instance, which should be a new session,
 	// so operations on it should not fail.
+	c.Logf("make jem1")
 	jem1 := pool.JEM(context.TODO())
 	defer jem1.Close()
 	assertOK(jem1)
 
 	// Get another JEM instance which should clone the same session
 	// used by jem0 because only two sessions are available.
+	c.Logf("make jem2")
 	jem2 := pool.JEM(context.TODO())
 	defer jem2.Close()
 
 	// Perform another operation on jem0, which should fail and
 	// cause its session not to be reused.
+	c.Logf("check jem0 is broken")
 	assertBroken(jem0)
 
 	// The jem1 connection should still be working because it
 	// was created after the connections were broken.
+	c.Logf("check jem1 is ok")
 	assertOK(jem1)
 
+	c.Logf("check jem2 is ok")
 	// The jem2 connection should also be broken because it
 	// reused the same sessions as jem0
 	assertBroken(jem2)
 
 	// Get another instance, which should reuse the jem3 connection
 	// and work OK.
+	c.Logf("make jem3")
 	jem3 := pool.JEM(context.TODO())
 	defer jem3.Close()
 	assertOK(jem3)
 
 	// When getting the next instance, we should see that the connection
 	// that we would have used is broken and create another one.
+	c.Logf("make jem4")
 	jem4 := pool.JEM(context.TODO())
 	defer jem4.Close()
 	assertOK(jem4)

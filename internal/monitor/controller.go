@@ -15,7 +15,6 @@ import (
 
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
-	"github.com/CanonicalLtd/jem/internal/servermon"
 	"github.com/CanonicalLtd/jem/internal/zapctx"
 	"github.com/CanonicalLtd/jem/internal/zaputil"
 	"github.com/CanonicalLtd/jem/params"
@@ -76,7 +75,6 @@ func newControllerMonitor(ctx context.Context, p controllerMonitorParams) *contr
 		})
 		return nil
 	})
-	servermon.ControllersRunning.Inc()
 	return m
 }
 
@@ -431,7 +429,6 @@ func (w *watcherState) addDelta(ctx context.Context, d multiwatcher.Delta) error
 			m.Write(zap.String("kind", "+"), zap.String("id", id.Id), zap.Object("entity", d.Entity))
 		}
 	}
-	ctlpathstr := string(w.ctlPath.Name) + ":" + string(w.ctlPath.User)
 	switch e := d.Entity.(type) {
 	case *multiwatcher.ModelInfo:
 		// Ensure there's always a model entry.
@@ -441,20 +438,16 @@ func (w *watcherState) addDelta(ctx context.Context, d multiwatcher.Delta) error
 			life = e.Life
 		}
 		w.modelInfo(e.ModelUUID).setLife(life)
-		servermon.ModelsRunning.WithLabelValues(ctlpathstr).Set(float64(w.stats.ModelCount))
 	case *multiwatcher.UnitInfo:
 		delta := w.adjustCount(&w.stats.UnitCount, d)
 		w.modelInfo(e.ModelUUID).adjustCount(params.UnitCount, delta)
-		servermon.UnitsRunning.WithLabelValues(ctlpathstr).Set(float64(w.stats.UnitCount))
 	case *multiwatcher.ApplicationInfo:
 		delta := w.adjustCount(&w.stats.ServiceCount, d)
 		w.modelInfo(e.ModelUUID).adjustCount(params.ApplicationCount, delta)
-		servermon.ApplicationsRunning.WithLabelValues(ctlpathstr).Set(float64(w.stats.ServiceCount))
 	case *multiwatcher.MachineInfo:
 		// TODO for top level machines, increment instance count?
 		delta := w.adjustCount(&w.stats.MachineCount, d)
 		w.modelInfo(e.ModelUUID).adjustCount(params.MachineCount, delta)
-		servermon.MachinesRunning.WithLabelValues(ctlpathstr).Set(float64(w.stats.MachineCount))
 		w.runner.Do(func() error {
 			return w.jem.UpdateMachineInfo(ctx, e)
 		})
