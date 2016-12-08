@@ -58,6 +58,7 @@ func (db *Database) checkError(ctx context.Context, err *error) {
 // a session taken from the given pool. The database session
 // should be closed after the database is finished with.
 func newDatabase(ctx context.Context, pool *mgosession.Pool, dbName string) *Database {
+	servermon.DatabaseSessions.Inc()
 	return &Database{
 		sessionPool: pool,
 		Database:    pool.Session(ctx).DB(dbName),
@@ -65,6 +66,7 @@ func newDatabase(ctx context.Context, pool *mgosession.Pool, dbName string) *Dat
 }
 
 func (db *Database) clone() *Database {
+	servermon.DatabaseSessions.Inc()
 	return &Database{
 		sessionPool: db.sessionPool,
 		Database:    db.Database.With(db.Database.Session.Clone()),
