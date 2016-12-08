@@ -18,6 +18,7 @@ import (
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/jemerror"
 	"github.com/CanonicalLtd/jem/internal/jemserver"
+	"github.com/CanonicalLtd/jem/internal/servermon"
 	"github.com/CanonicalLtd/jem/internal/zapctx"
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -44,6 +45,8 @@ func newWebSocketHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, param
 		Method: "GET",
 		Path:   "/model/:modeluuid/api",
 		Handle: func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+			servermon.ConcurrentWebsocketConnections.Inc()
+			defer servermon.ConcurrentWebsocketConnections.Dec()
 			j := jp.JEM(ctx)
 			defer j.Close()
 			wsServer := newWSServer(ctx, j, ap, params, p.ByName("modeluuid"))

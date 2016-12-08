@@ -40,11 +40,11 @@ var (
 		Name:      "pool_put",
 		Help:      "The number of times an Authenticator has been replaced into the pool.",
 	})
-	DatabaseSessions = prometheus.NewGauge(prometheus.GaugeOpts{
+	ConcurrentWebsocketConnections = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "jem",
-		Subsystem: "database",
-		Name:      "database_sessions",
-		Help:      "The number of database sessions.",
+		Subsystem: "websocket",
+		Name:      "concurrent_connections",
+		Help:      "The number of concurrent websocket connections",
 	})
 	DatabaseFailCount = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: "jem",
@@ -140,7 +140,7 @@ func init() {
 	prometheus.MustRegister(AuthenticatorPoolGet)
 	prometheus.MustRegister(AuthenticatorPoolNew)
 	prometheus.MustRegister(AuthenticatorPoolPut)
-	prometheus.MustRegister(DatabaseSessions)
+	prometheus.MustRegister(ConcurrentWebsocketConnections)
 	prometheus.MustRegister(DatabaseFailCount)
 	prometheus.MustRegister(DeployedUnitCount)
 	prometheus.MustRegister(LoginFailCount)
