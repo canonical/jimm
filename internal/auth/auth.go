@@ -79,7 +79,6 @@ func NewPool(ctx context.Context, params Params) (*Pool, error) {
 func (p *Pool) Authenticator(ctx context.Context) *Authenticator {
 	servermon.AuthenticatorPoolGet.Inc()
 	session := p.params.SessionPool.Session(ctx)
-	servermon.DatabaseSessions.Inc()
 	return &Authenticator{
 		pool: p,
 		bakery: p.params.Bakery.WithRootKeyStore(p.params.RootKeys.NewStorage(
@@ -110,7 +109,6 @@ func (a *Authenticator) Close() {
 	a.closed = true
 	servermon.AuthenticatorPoolPut.Inc()
 	a.bakery = nil
-	servermon.DatabaseSessions.Dec()
 	a.session.Close()
 }
 

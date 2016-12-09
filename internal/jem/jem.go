@@ -25,7 +25,6 @@ import (
 	"github.com/CanonicalLtd/jem/internal/auth"
 	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
-	"github.com/CanonicalLtd/jem/internal/servermon"
 	"github.com/CanonicalLtd/jem/internal/zapctx"
 	"github.com/CanonicalLtd/jem/internal/zaputil"
 	"github.com/CanonicalLtd/jem/params"
@@ -192,7 +191,6 @@ func (j *JEM) Close() {
 		return
 	}
 	j.closed = true
-	servermon.DatabaseSessions.Dec()
 	j.DB.Session.Close()
 	j.DB = nil
 	j.pool.decRef()
