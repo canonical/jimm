@@ -12,12 +12,14 @@ import (
 	"github.com/juju/idmclient/idmtest"
 	controllerapi "github.com/juju/juju/api/controller"
 	"github.com/juju/juju/controller"
+	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"github.com/rogpeppe/fastuuid"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2"
 
 	external_jem "github.com/CanonicalLtd/jem"
@@ -26,6 +28,7 @@ import (
 	"github.com/CanonicalLtd/jem/internal/jemtest"
 	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
+	"github.com/CanonicalLtd/jem/internal/v2"
 	"github.com/CanonicalLtd/jem/jemclient"
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -54,6 +57,8 @@ type Suite struct {
 	// SessionPool holds the session pool used to create new
 	// JEM instances.
 	SessionPool *mgosession.Pool
+
+	MetricsRegistrationClient *stubMetricsRegistrationClient
 }
 
 func (s *Suite) SetUpTest(c *gc.C) {
@@ -74,6 +79,11 @@ func (s *Suite) SetUpTest(c *gc.C) {
 	s.SessionPool = mgosession.NewPool(context.TODO(), s.Session, 1)
 	s.Pool = s.NewJEMPool(c, s.SessionPool)
 	s.JEM = s.Pool.JEM(context.TODO())
+
+	s.MetricsRegistrationClient = &stubMetricsRegistrationClient{}
+	s.PatchValue(&v2.NewAuthorizationClient, func(_ string) (v2.MetricsRegistrationClient, error) {
+		return s.MetricsRegistrationClient, nil
+	})
 }
 
 // NewJEMPool returns a jem.Pool that uses the given
@@ -126,6 +136,11 @@ func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server,
 		AgentKey:             s.IDMSrv.UserPublicKey("agent"),
 		ControllerUUID:       "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		WebsocketPingTimeout: 3 * time.Minute,
+		OmnibusURL:           "http://api.jujucharms.com/omnibus/v2",
+		ApplicationName:      "jimm",
+		ApplicationOwner:     "canonical",
+		ApplicationPlan:      "canonical/jimm",
+		ApplicationCharm:     "cs:~canonical/jimm-0",
 	}
 	if params.GUILocation != "" {
 		config.GUILocation = params.GUILocation
@@ -215,6 +230,18 @@ func (s *Suite) CreateModel(c *gc.C, path, ctlPath params.EntityPath, cred param
 		},
 	})
 	c.Assert(err, gc.IsNil)
+
+	s.MetricsRegistrationClient.CheckCalls(c, []testing.StubCall{{
+		FuncName: "AuthorizeReseller",
+		Args: []interface{}{
+			"canonical/jimm",
+			"cs:~canonical/jimm-0",
+			"jimm",
+			"canonical",
+			string(path.User),
+		},
+	}})
+	s.MetricsRegistrationClient.ResetCalls()
 	return resp.Path, resp.UUID
 }
 
@@ -265,3 +292,12 @@ func Do(client *httpbakery.Client) func(*http.Request) (*http.Response, error) {
 // httptesting.AssertJSONCall.ExpectBody to cause
 // AssertJSONCall to ignore the contents of the response body.
 var AnyBody = httptesting.BodyAsserter(func(*gc.C, json.RawMessage) {})
+
+type stubMetricsRegistrationClient struct {
+	testing.Stub
+}
+
+func (c *stubMetricsRegistrationClient) AuthorizeReseller(plan, charm, application, applicationOwner, applicationUser string) (*macaroon.Macaroon, error) {
+	c.MethodCall(c, "AuthorizeReseller", plan, charm, application, applicationOwner, applicationUser)
+	return macaroon.New(nil, "", "jem")
+}

@@ -78,6 +78,14 @@ type Params struct {
 	// GUILocation holds the address that serves the GUI that will be
 	// used with this controller.
 	GUILocation string
+
+	// OmnibusURL and Application fields hold data needed to obtain
+	// metrics registration from omnibus.
+	OmnibusURL       string
+	ApplicationOwner string
+	ApplicationPlan  string
+	ApplicationCharm string
+	ApplicationName  string
 }
 
 // Server represents a JEM HTTP server.

@@ -88,6 +88,12 @@ tls-key: |
 controller-uuid: 00000000-0000-0000-0000-000000000000
 max-mgo-sessions: 200
 gui-location: https://jujucharms.com
+metrics:
+  name: jimm
+  omnibus-url: https://jujucharms.com/omnibus/v2
+  owner: canonical
+  plan: canonical/jimm
+  charm: cs:~canonical/jimm
 `
 
 func (s *ConfigSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
@@ -132,6 +138,13 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 		ControllerUUID: "00000000-0000-0000-0000-000000000000",
 		MaxMgoSessions: 200,
 		GUILocation:    "https://jujucharms.com",
+		Metrics: &config.MetricsConfiguration{
+			Name:       "jimm",
+			OmnibusURL: "https://jujucharms.com/omnibus/v2",
+			Owner:      "canonical",
+			Plan:       "canonical/jimm",
+			Charm:      "cs:~canonical/jimm",
+		},
 	})
 }
 

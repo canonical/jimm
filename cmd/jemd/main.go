@@ -110,6 +110,13 @@ func serve(confPath string) error {
 		WebsocketPingTimeout: websocketPingTimeout,
 		GUILocation:          conf.GUILocation,
 	}
+	if conf.Metrics != nil {
+		cfg.OmnibusURL = conf.Metrics.OmnibusURL
+		cfg.ApplicationOwner = conf.Metrics.Owner
+		cfg.ApplicationPlan = conf.Metrics.Plan
+		cfg.ApplicationCharm = conf.Metrics.Charm
+		cfg.ApplicationName = conf.Metrics.Name
+	}
 	server, err := jem.NewServer(ctx, cfg)
 	if err != nil {
 		return errgo.Notef(err, "cannot create new server at %q", conf.APIAddr)

@@ -325,6 +325,10 @@ type CreateModelParams struct {
 
 	// Attributes contains the attributes to assign to the new model.
 	Attributes map[string]interface{}
+
+	// MetricCredentials holds credentials proving that we are
+	// authorized to collect metrics for this model.
+	MetricsCredentials []byte
 }
 
 // CreateModel creates a new model as specified by p.
@@ -375,11 +379,12 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.M
 	// an model that we can't add locally because the name
 	// already exists.
 	modelDoc := &mongodoc.Model{
-		Path:         p.Path,
-		Controller:   p.ControllerPath,
-		CreationTime: wallClock.Now(),
-		Creator:      auth.Username(ctx),
-		Credential:   p.Credential,
+		Path:              p.Path,
+		Controller:        p.ControllerPath,
+		CreationTime:      wallClock.Now(),
+		Creator:           auth.Username(ctx),
+		Credential:        p.Credential,
+		MetricCredentials: p.MetricsCredentials,
 	}
 	if err := j.DB.AddModel(ctx, modelDoc); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))

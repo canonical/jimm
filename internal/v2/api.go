@@ -3,11 +3,13 @@
 package v2
 
 import (
+	"encoding/json"
 	"net/url"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/CanonicalLtd/omnibus/plans/api"
 	"github.com/juju/httprequest"
 	cloudapi "github.com/juju/juju/api/cloud"
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
@@ -17,6 +19,7 @@ import (
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
+	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
@@ -33,12 +36,25 @@ import (
 	"github.com/CanonicalLtd/jem/params"
 )
 
+var (
+	NewAuthorizationClient = func(url string) (MetricsRegistrationClient, error) {
+		return api.NewAuthorizationClient(url)
+	}
+)
+
+type MetricsRegistrationClient interface {
+	AuthorizeReseller(plan, charm, application, applicationOwner, applicationUser string) (*macaroon.Macaroon, error)
+}
+
+type metricsRegistrationFnc func(string) ([]byte, error)
+
 type Handler struct {
-	jem     *jem.JEM
-	context context.Context
-	cancel  context.CancelFunc
-	config  jemserver.Params
-	monReq  servermon.Request
+	jem                 *jem.JEM
+	context             context.Context
+	cancel              context.CancelFunc
+	config              jemserver.Params
+	monReq              servermon.Request
+	metricsRegistration metricsRegistrationFnc
 }
 
 func NewAPIHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, sp jemserver.Params) ([]httprequest.Handler, error) {
@@ -66,6 +82,28 @@ func NewAPIHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, sp jemserve
 			config:  sp,
 			cancel:  cancel,
 		}
+		if sp.OmnibusURL != "" {
+			client, err := NewAuthorizationClient(sp.OmnibusURL)
+			if err != nil {
+				return nil, errgo.Notef(err, "cannot make omnibus authorization client")
+			}
+
+			h.metricsRegistration = func(applicationUser string) ([]byte, error) {
+				macaroon, err := client.AuthorizeReseller(
+					sp.ApplicationPlan,
+					sp.ApplicationCharm,
+					sp.ApplicationName,
+					sp.ApplicationOwner,
+					applicationUser,
+				)
+				data, err := json.Marshal(macaroon)
+				if err != nil {
+					return nil, errgo.Notef(err, "cannot marshal the metrics authorization credentials")
+				}
+				return data, nil
+			}
+		}
+
 		h.monReq.Start(p.PathPattern)
 		return h, nil
 	}), nil
@@ -602,14 +640,23 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 	if len(lp.other) > 0 {
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "cannot select controller: no matching controllers found")
 	}
+	var credentials []byte
+	if h.metricsRegistration != nil {
+		credentials, err = h.metricsRegistration(string(args.User))
+		if err != nil {
+			return nil, errgo.Notef(err, "failed to obtain metrics credentials for user: %v", args.User)
+		}
+	}
+
 	modelPath := params.EntityPath{args.User, args.Info.Name}
 	_, err = h.jem.CreateModel(ctx, jem.CreateModelParams{
-		Path:           modelPath,
-		ControllerPath: ctlPath,
-		Credential:     args.Info.Credential,
-		Cloud:          lp.cloud,
-		Region:         lp.region,
-		Attributes:     args.Info.Config,
+		Path:               modelPath,
+		ControllerPath:     ctlPath,
+		Credential:         args.Info.Credential,
+		Cloud:              lp.cloud,
+		Region:             lp.region,
+		Attributes:         args.Info.Config,
+		MetricsCredentials: credentials,
 	})
 	if err != nil {
 		return nil, errgo.Mask(err,

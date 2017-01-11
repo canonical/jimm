@@ -21,18 +21,19 @@ type Config struct {
 	MongoAddr string `yaml:"mongo-addr"`
 	APIAddr   string `yaml:"api-addr"`
 	// TODO rename state-server-admin to controller-admin.
-	ControllerAdmin   params.User       `yaml:"state-server-admin"`
-	IdentityPublicKey *bakery.PublicKey `yaml:"identity-public-key"`
-	IdentityLocation  string            `yaml:"identity-location"`
-	AgentUsername     string            `yaml:"agent-username"`
-	AgentKey          *bakery.KeyPair   `yaml:"agent-key"`
-	AccessLog         string            `yaml:"access-log"`
-	TLSCert           string            `yaml:"tls-cert"`
-	TLSKey            string            `yaml:"tls-key"`
-	ControllerUUID    string            `yaml:"controller-uuid"`
-	MaxMgoSessions    int               `yaml:"max-mgo-sessions"`
-	GUILocation       string            `yaml:"gui-location"`
-	LoggingLevel      zap.Level         `yaml:"logging-level"`
+	ControllerAdmin   params.User           `yaml:"state-server-admin"`
+	IdentityPublicKey *bakery.PublicKey     `yaml:"identity-public-key"`
+	IdentityLocation  string                `yaml:"identity-location"`
+	AgentUsername     string                `yaml:"agent-username"`
+	AgentKey          *bakery.KeyPair       `yaml:"agent-key"`
+	AccessLog         string                `yaml:"access-log"`
+	TLSCert           string                `yaml:"tls-cert"`
+	TLSKey            string                `yaml:"tls-key"`
+	ControllerUUID    string                `yaml:"controller-uuid"`
+	MaxMgoSessions    int                   `yaml:"max-mgo-sessions"`
+	GUILocation       string                `yaml:"gui-location"`
+	LoggingLevel      zap.Level             `yaml:"logging-level"`
+	Metrics           *MetricsConfiguration `yaml:"metrics,omitempty"`
 }
 
 func (c *Config) validate() error {
@@ -51,6 +52,9 @@ func (c *Config) validate() error {
 	}
 	if c.ControllerUUID == "" {
 		missing = append(missing, "controller-uuid")
+	}
+	if c.Metrics != nil {
+		missing = append(missing, c.Metrics.validate()...)
 	}
 	if len(missing) != 0 {
 		return fmt.Errorf("missing fields %s in config file", strings.Join(missing, ", "))
@@ -95,4 +99,34 @@ func Read(path string) (*Config, error) {
 		return nil, errgo.Mask(err)
 	}
 	return &conf, nil
+}
+
+// MetricsConfiguration holds information needed to get
+// metrics authorizations form omnibus.
+type MetricsConfiguration struct {
+	OmnibusURL string `yaml:"omnibus-url"`
+	Owner      string `yaml:"owner"`
+	Plan       string `yaml:"plan"`
+	Charm      string `yaml:"charm"`
+	Name       string `yaml:"name"`
+}
+
+func (c *MetricsConfiguration) validate() []string {
+	var missing []string
+	if c.OmnibusURL == "" {
+		missing = append(missing, "omnibus-url")
+	}
+	if c.Owner == "" {
+		missing = append(missing, "owner")
+	}
+	if c.Plan == "" {
+		missing = append(missing, "plan")
+	}
+	if c.Charm == "" {
+		missing = append(missing, "charm")
+	}
+	if c.Name == "" {
+		missing = append(missing, "name")
+	}
+	return missing
 }
