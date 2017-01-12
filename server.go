@@ -68,13 +68,9 @@ type ServerParams struct {
 	// used with this controller.
 	GUILocation string
 
-	// OmnibusURL and Application fields hold data needed to obtain
-	// metrics registration from omnibus.
-	OmnibusURL       string
-	ApplicationOwner string
-	ApplicationPlan  string
-	ApplicationCharm string
-	ApplicationName  string
+	// UsageSenderURL holds the URL where we obtain authorization
+	// to collect and report usage metrics.
+	UsageSenderURL string
 }
 
 // HandleCloser represents an HTTP handler that can

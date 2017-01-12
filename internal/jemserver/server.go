@@ -79,13 +79,9 @@ type Params struct {
 	// used with this controller.
 	GUILocation string
 
-	// OmnibusURL and Application fields hold data needed to obtain
-	// metrics registration from omnibus.
-	OmnibusURL       string
-	ApplicationOwner string
-	ApplicationPlan  string
-	ApplicationCharm string
-	ApplicationName  string
+	// UsageSenderURL holds the URL where we obtain authorization
+	// to collect and report usage metrics.
+	UsageSenderURL string
 }
 
 // Server represents a JEM HTTP server.
@@ -131,6 +127,7 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 		DB:              config.DB,
 		SessionPool:     sessionPool,
 		ControllerAdmin: config.ControllerAdmin,
+		UsageSenderURL:  config.UsageSenderURL,
 	}
 	p, err := jem.NewPool(ctx, jconfig)
 	if err != nil {

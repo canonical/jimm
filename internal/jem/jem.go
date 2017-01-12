@@ -3,12 +3,14 @@
 package jem
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
 	"sync"
 	"time"
 
+	omnibusapi "github.com/CanonicalLtd/omnibus/plans/api"
 	"github.com/juju/juju/api"
 	cloudapi "github.com/juju/juju/api/cloud"
 	"github.com/juju/juju/api/modelmanager"
@@ -18,6 +20,7 @@ import (
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
+	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
@@ -37,7 +40,17 @@ var wallClock clock.Clock = clock.WallClock
 // Functions defined as variables so they can be overridden in tests.
 var (
 	randIntn = rand.Intn
+
+	NewUsageSenderAuthorizationClient = func(url string) (UsageSenderAuthorizationClient, error) {
+		return omnibusapi.NewAuthorizationClient(url)
+	}
 )
+
+// UsageSenderAuthorizationClient is used to obtain authorization to
+// collect and report usage metrics.
+type UsageSenderAuthorizationClient interface {
+	AuthorizeReseller(plan, charm, application, applicationOwner, applicationUser string) (*macaroon.Macaroon, error)
+}
 
 // Params holds parameters for the NewPool function.
 type Params struct {
@@ -52,6 +65,10 @@ type Params struct {
 	// ControllerAdmin holds the identity of the user
 	// or group that is allowed to create controllers.
 	ControllerAdmin params.User
+
+	// UsageSender holds the URL where we obtain authorization
+	// to collect and report usage metrics.
+	UsageSenderURL string
 }
 
 type Pool struct {
@@ -72,11 +89,20 @@ type Pool struct {
 	// closed when all JEM instances are closed and the
 	// pool itself has been closed.
 	refCount int
+
+	usageSenderAuthorizationFunction func(string) ([]byte, error)
 }
 
 var APIOpenTimeout = 15 * time.Second
 
 var notExistsQuery = bson.D{{"$exists", false}}
+
+const (
+	defaultJIMMPlan  = "canonical/jimm"
+	defaultJIMMCharm = "cs:~canonical/jimm-0"
+	defaultJIMMName  = "jimm"
+	defaultJIMMOwner = "canonical"
+)
 
 // NewPool represents a pool of possible JEM instances that use the given
 // database as a store, and use the given bakery parameters to create the
@@ -94,6 +120,29 @@ func NewPool(ctx context.Context, p Params) (*Pool, error) {
 		dbName:    p.DB.Name,
 		connCache: apiconn.NewCache(apiconn.CacheParams{}),
 		refCount:  1,
+	}
+	if pool.config.UsageSenderURL != "" {
+		client, err := NewUsageSenderAuthorizationClient(p.UsageSenderURL)
+		if err != nil {
+			return nil, errgo.Notef(err, "cannot make omnibus authorization client")
+		}
+		pool.usageSenderAuthorizationFunction = func(applicationUser string) ([]byte, error) {
+			macaroon, err := client.AuthorizeReseller(
+				defaultJIMMPlan,
+				defaultJIMMCharm,
+				defaultJIMMName,
+				defaultJIMMOwner,
+				applicationUser,
+			)
+			if err != nil {
+				return nil, errgo.Notef(err, "cannot obtain authorization to collect usage metrics")
+			}
+			data, err := json.Marshal(macaroon)
+			if err != nil {
+				return nil, errgo.Notef(err, "cannot marshal metrics authorization credentials")
+			}
+			return data, nil
+		}
 	}
 	jem := pool.JEM(ctx)
 	defer jem.Close()
@@ -149,6 +198,13 @@ func (p *Pool) JEM(ctx context.Context) *JEM {
 		DB:   newDatabase(ctx, p.config.SessionPool, p.dbName),
 		pool: p,
 	}
+}
+
+func (p *Pool) UsageSenderAuthorization(applicationUser string) ([]byte, error) {
+	if p.usageSenderAuthorizationFunction == nil {
+		return []byte{}, nil
+	}
+	return p.usageSenderAuthorizationFunction(applicationUser)
 }
 
 type JEM struct {
