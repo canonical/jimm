@@ -18,6 +18,7 @@ import (
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2"
 
 	external_jem "github.com/CanonicalLtd/jem"
@@ -54,6 +55,8 @@ type Suite struct {
 	// SessionPool holds the session pool used to create new
 	// JEM instances.
 	SessionPool *mgosession.Pool
+
+	metricsRegistrationClient *stubMetricsRegistrationClient
 }
 
 func (s *Suite) SetUpTest(c *gc.C) {
@@ -68,9 +71,12 @@ func (s *Suite) SetUpTest(c *gc.C) {
 	err := controllerapi.NewClient(conn).GrantController("everyone@external", "login")
 	c.Assert(err, jc.ErrorIsNil)
 	s.PatchValue(&jem.APIOpenTimeout, time.Duration(0))
+	s.metricsRegistrationClient = &stubMetricsRegistrationClient{}
+	s.PatchValue(&jem.NewUsageSenderAuthorizationClient, func(_ string) (jem.UsageSenderAuthorizationClient, error) {
+		return s.metricsRegistrationClient, nil
+	})
 	s.JEMSrv = s.NewServer(c, s.Session, s.IDMSrv, external_jem.ServerParams{})
 	s.httpSrv = httptest.NewServer(s.JEMSrv)
-
 	s.SessionPool = mgosession.NewPool(context.TODO(), s.Session, 1)
 	s.Pool = s.NewJEMPool(c, s.SessionPool)
 	s.JEM = s.Pool.JEM(context.TODO())
@@ -126,6 +132,7 @@ func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server,
 		AgentKey:             s.IDMSrv.UserPublicKey("agent"),
 		ControllerUUID:       "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		WebsocketPingTimeout: 3 * time.Minute,
+		UsageSenderURL:       "https://0.1.2.3/omnibus/v2",
 	}
 	if params.GUILocation != "" {
 		config.GUILocation = params.GUILocation
@@ -215,6 +222,17 @@ func (s *Suite) CreateModel(c *gc.C, path, ctlPath params.EntityPath, cred param
 		},
 	})
 	c.Assert(err, gc.IsNil)
+
+	c.Assert(s.metricsRegistrationClient, jc.DeepEquals, &stubMetricsRegistrationClient{
+		calls:            1,
+		plan:             "canonical/jimm",
+		charm:            "cs:~canonical/jimm-0",
+		application:      "jimm",
+		applicationOwner: "canonical",
+		applicationUser:  string(path.User),
+	})
+	*s.metricsRegistrationClient = stubMetricsRegistrationClient{}
+
 	return resp.Path, resp.UUID
 }
 
@@ -265,3 +283,18 @@ func Do(client *httpbakery.Client) func(*http.Request) (*http.Response, error) {
 // httptesting.AssertJSONCall.ExpectBody to cause
 // AssertJSONCall to ignore the contents of the response body.
 var AnyBody = httptesting.BodyAsserter(func(*gc.C, json.RawMessage) {})
+
+type stubMetricsRegistrationClient struct {
+	plan             string
+	charm            string
+	application      string
+	applicationOwner string
+	applicationUser  string
+	calls            int
+}
+
+func (c *stubMetricsRegistrationClient) AuthorizeReseller(plan, charm, application, applicationOwner, applicationUser string) (*macaroon.Macaroon, error) {
+	c.plan, c.charm, c.application, c.applicationOwner, c.applicationUser = plan, charm, application, applicationOwner, applicationUser
+	c.calls++
+	return macaroon.New(nil, "", "jem")
+}

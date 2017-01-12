@@ -34,12 +34,11 @@ import (
 )
 
 type Handler struct {
-	jem                      *jem.JEM
-	context                  context.Context
-	cancel                   context.CancelFunc
-	config                   jemserver.Params
-	monReq                   servermon.Request
-	usageSenderAuthorization func(applicationUser string) ([]byte, error)
+	jem     *jem.JEM
+	context context.Context
+	cancel  context.CancelFunc
+	config  jemserver.Params
+	monReq  servermon.Request
 }
 
 func NewAPIHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, sp jemserver.Params) ([]httprequest.Handler, error) {
@@ -66,7 +65,6 @@ func NewAPIHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, sp jemserve
 			context: ctx,
 			config:  sp,
 			cancel:  cancel,
-			usageSenderAuthorization: jp.UsageSenderAuthorization,
 		}
 
 		h.monReq.Start(p.PathPattern)
@@ -605,23 +603,15 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 	if len(lp.other) > 0 {
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "cannot select controller: no matching controllers found")
 	}
-	var credentials []byte
-	if h.usageSenderAuthorization != nil {
-		credentials, err = h.usageSenderAuthorization(string(args.User))
-		if err != nil {
-			return nil, errgo.Notef(err, "failed to obtain metrics credentials for user: %v", args.User)
-		}
-	}
 
 	modelPath := params.EntityPath{args.User, args.Info.Name}
 	_, err = h.jem.CreateModel(ctx, jem.CreateModelParams{
-		Path:               modelPath,
-		ControllerPath:     ctlPath,
-		Credential:         args.Info.Credential,
-		Cloud:              lp.cloud,
-		Region:             lp.region,
-		Attributes:         args.Info.Config,
-		MetricsCredentials: credentials,
+		Path:           modelPath,
+		ControllerPath: ctlPath,
+		Credential:     args.Info.Credential,
+		Cloud:          lp.cloud,
+		Region:         lp.region,
+		Attributes:     args.Info.Config,
 	})
 	if err != nil {
 		return nil, errgo.Mask(err,

@@ -1,3 +1,7 @@
+github.com/CanonicalLtd/decimal	git	1c633b93a29a0cc843f79d28d11ed53d2c172b26	2016-05-09T11:36:20Z
+github.com/CanonicalLtd/omnibus	git	36507beb422b90b2c248982aa75310c571c0f036	2017-01-12T14:56:38Z
+github.com/CanonicalLtd/omniutils	git	1d54425f4254eb441743838ff8508cbadf5143bc	2016-12-06T19:43:55Z
+github.com/CanonicalLtd/plans-client	git	64c444922c8d6f9aee2d06b836e2d6b7597a860e	2016-11-29T04:56:22Z
 github.com/beorn7/perks	git	3ac7bf7a47d159a033b107610db8a1b6575507a4	2016-02-29T21:34:45Z
 github.com/bmizerany/pat	git	c068ca2f0aacee5ac3681d68e4d0a003b7d1fd2c	2016-02-17T10:32:42Z
 github.com/cloud-green/monitoring	git	8f8e14f05a36c83d87f8ec4467b0198094ec11ab	2016-09-21T12:18:12Z
@@ -6,7 +10,9 @@ github.com/dustin/go-humanize	git	145fabdb1ab757076a70a886d092a3af27f66f4c	2014-
 github.com/godbus/dbus	git	32c6cc29c14570de4cf6d7e7737d68fb2d01ad15	2016-05-06T22:25:50Z
 github.com/golang/groupcache	git	604ed5785183e59ae2789449d89e73f3a2a77987	2015-01-25T18:08:32Z
 github.com/golang/protobuf	git	34a5f244f1c01cdfee8e60324258cfbb97a42aec	2015-05-26T01:21:09Z
+github.com/gorilla/context	git	215affda49addc4c8ef7e2534915df2c8c35c6cd	2014-12-17T16:02:51Z
 github.com/gorilla/handlers	git	a24b39a6a2c8a7af2fe664dd4573205c99904035	2015-04-12T18:40:04Z
+github.com/gorilla/mux	git	e444e69cbd2e2e3e0749a2f3c717cec491552bbf	2014-09-26T15:38:14Z
 github.com/gorilla/schema	git	08023a0215e7fc27a9aecd8b8c50913c40019478	2016-04-26T23:15:12Z
 github.com/gorilla/websocket	git	13e4d0621caa4d77fd9aa470ef6d7ab63d1a5e41	2015-09-23T22:29:30Z
 github.com/juju/ansiterm	git	b99631de12cf04a906c1d4e4ec54fb86eae5863d	2016-09-07T23:45:32Z

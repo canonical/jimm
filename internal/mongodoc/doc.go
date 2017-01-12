@@ -88,10 +88,6 @@ type Controller struct {
 	// controllers should have an associated cloud, but not clouds
 	// have regions.
 	Location map[string]string
-
-	// MetricCredentials holds the authorization credentials we
-	// obtained when the user created the model.
-	MetricCredentials []byte
 }
 
 func (s *Controller) Owner() params.User {
@@ -244,9 +240,9 @@ type Model struct {
 	// DefaultSeries holds the default series for the model.
 	DefaultSeries string
 
-	// MetricCredentials prove that we are authorized to collect metrics
-	// for this model.
-	MetricCredentials []byte
+	// UsageSenderCredentials prove that we are authorized to send usage
+	// information for this model.
+	UsageSenderCredentials []byte
 }
 
 // Machine holds information on a machine in a model, as discovered by the
