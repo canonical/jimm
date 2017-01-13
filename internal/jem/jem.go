@@ -98,8 +98,10 @@ var APIOpenTimeout = 15 * time.Second
 var notExistsQuery = bson.D{{"$exists", false}}
 
 const (
+	// OmnibusJIMMCharm specifies the charm url to be used when
+	// obtaining autorization for model usage collection.
+	OmnibusJIMMCharm = "cs:~canonical/jimm-0"
 	omnibusJIMMPlan  = "canonical/jimm"
-	omnibusJIMMCharm = "cs:~canonical/jimm-0"
 	omnibusJIMMName  = "jimm"
 	omnibusJIMMOwner = "canonical"
 )
@@ -729,7 +731,7 @@ func (j *JEM) UsageSenderAuthorization(applicationUser string) ([]byte, error) {
 	}
 	macaroon, err := j.usageSenderAuthorizationClient.AuthorizeReseller(
 		omnibusJIMMPlan,
-		omnibusJIMMCharm,
+		OmnibusJIMMCharm,
 		omnibusJIMMName,
 		omnibusJIMMOwner,
 		applicationUser,

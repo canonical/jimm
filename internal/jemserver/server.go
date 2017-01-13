@@ -25,6 +25,7 @@ import (
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/monitor"
+	"github.com/CanonicalLtd/jem/internal/usagesender"
 	"github.com/CanonicalLtd/jem/internal/zapctx"
 	"github.com/CanonicalLtd/jem/internal/zaputil"
 	"github.com/CanonicalLtd/jem/params"
@@ -84,6 +85,14 @@ type Params struct {
 	UsageSenderURL string
 }
 
+type worker interface {
+	// Kill asks the worker to stop and returns immediately.
+	Kill()
+	// Wait waits for the worker to complete and returns any
+	// error encountered when it was running or stopping.
+	Wait() error
+}
+
 // Server represents a JEM HTTP server.
 type Server struct {
 	router      *httprouter.Router
@@ -92,6 +101,7 @@ type Server struct {
 	authPool    *auth.Pool
 	sessionPool *mgosession.Pool
 	monitor     *monitor.Monitor
+	usageSender worker
 	jemStats    *jem.Stats
 }
 
@@ -161,6 +171,18 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 			return nil, errgo.Mask(err)
 		}
 		srv.monitor = monitor.New(ctx, p, owner)
+	}
+	if config.UsageSenderURL != "" {
+		worker, err := usagesender.NewSendModelUsageWorker(usagesender.SendModelUsageWorkerConfig{
+			OmnibusURL: config.UsageSenderURL,
+			JEM:        p.JEM(ctx),
+			Period:     5 * time.Minute,
+			Context:    ctx,
+		})
+		if err != nil {
+			return nil, errgo.Mask(err)
+		}
+		srv.usageSender = worker
 	}
 	srv.router.Handler("GET", "/metrics", prometheus.Handler())
 	for name, newAPI := range versions {
@@ -246,6 +268,12 @@ func (srv *Server) Close() error {
 		srv.monitor.Kill()
 		if err := srv.monitor.Wait(); err != nil {
 			zapctx.Warn(srv.context, "error shutting down monitor", zaputil.Error(err))
+		}
+	}
+	if srv.usageSender != nil {
+		srv.usageSender.Kill()
+		if err := srv.usageSender.Wait(); err != nil {
+			zapctx.Warn(srv.context, "error shutting down usage sender", zaputil.Error(err))
 		}
 	}
 	srv.pool.Close()
