@@ -109,6 +109,7 @@ func serve(confPath string) error {
 		ControllerUUID:       conf.ControllerUUID,
 		WebsocketPingTimeout: websocketPingTimeout,
 		GUILocation:          conf.GUILocation,
+		UsageSenderURL:       conf.UsageSenderURL,
 	}
 	server, err := jem.NewServer(ctx, cfg)
 	if err != nil {

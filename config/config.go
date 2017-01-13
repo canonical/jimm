@@ -33,6 +33,7 @@ type Config struct {
 	MaxMgoSessions    int               `yaml:"max-mgo-sessions"`
 	GUILocation       string            `yaml:"gui-location"`
 	LoggingLevel      zap.Level         `yaml:"logging-level"`
+	UsageSenderURL    string            `yaml:"usage-sender-url,omitempty"`
 }
 
 func (c *Config) validate() error {

@@ -66,6 +66,7 @@ func NewAPIHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, sp jemserve
 			config:  sp,
 			cancel:  cancel,
 		}
+
 		h.monReq.Start(p.PathPattern)
 		return h, nil
 	}), nil
@@ -602,6 +603,7 @@ func (h *Handler) NewModel(args *params.NewModel) (*params.ModelResponse, error)
 	if len(lp.other) > 0 {
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "cannot select controller: no matching controllers found")
 	}
+
 	modelPath := params.EntityPath{args.User, args.Info.Name}
 	_, err = h.jem.CreateModel(ctx, jem.CreateModelParams{
 		Path:           modelPath,

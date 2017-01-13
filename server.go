@@ -67,6 +67,10 @@ type ServerParams struct {
 	// GUILocation holds the address that serves the GUI that will be
 	// used with this controller.
 	GUILocation string
+
+	// UsageSenderURL holds the URL where we obtain authorization
+	// to collect and report usage metrics.
+	UsageSenderURL string
 }
 
 // HandleCloser represents an HTTP handler that can

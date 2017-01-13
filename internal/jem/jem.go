@@ -3,12 +3,14 @@
 package jem
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
 	"sync"
 	"time"
 
+	omnibusapi "github.com/CanonicalLtd/omnibus/plans/api"
 	"github.com/juju/juju/api"
 	cloudapi "github.com/juju/juju/api/cloud"
 	"github.com/juju/juju/api/modelmanager"
@@ -18,6 +20,7 @@ import (
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
+	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
@@ -37,7 +40,17 @@ var wallClock clock.Clock = clock.WallClock
 // Functions defined as variables so they can be overridden in tests.
 var (
 	randIntn = rand.Intn
+
+	NewUsageSenderAuthorizationClient = func(url string) (UsageSenderAuthorizationClient, error) {
+		return omnibusapi.NewAuthorizationClient(url)
+	}
 )
+
+// UsageSenderAuthorizationClient is used to obtain authorization to
+// collect and report usage metrics.
+type UsageSenderAuthorizationClient interface {
+	AuthorizeReseller(plan, charm, application, applicationOwner, applicationUser string) (*macaroon.Macaroon, error)
+}
 
 // Params holds parameters for the NewPool function.
 type Params struct {
@@ -52,6 +65,10 @@ type Params struct {
 	// ControllerAdmin holds the identity of the user
 	// or group that is allowed to create controllers.
 	ControllerAdmin params.User
+
+	// UsageSenderURL holds the URL where we obtain authorization
+	// to collect and report usage metrics.
+	UsageSenderURL string
 }
 
 type Pool struct {
@@ -72,11 +89,20 @@ type Pool struct {
 	// closed when all JEM instances are closed and the
 	// pool itself has been closed.
 	refCount int
+
+	usageSenderAuthorizationClient UsageSenderAuthorizationClient
 }
 
 var APIOpenTimeout = 15 * time.Second
 
 var notExistsQuery = bson.D{{"$exists", false}}
+
+const (
+	omnibusJIMMPlan  = "canonical/jimm"
+	omnibusJIMMCharm = "cs:~canonical/jimm-0"
+	omnibusJIMMName  = "jimm"
+	omnibusJIMMOwner = "canonical"
+)
 
 // NewPool represents a pool of possible JEM instances that use the given
 // database as a store, and use the given bakery parameters to create the
@@ -94,6 +120,13 @@ func NewPool(ctx context.Context, p Params) (*Pool, error) {
 		dbName:    p.DB.Name,
 		connCache: apiconn.NewCache(apiconn.CacheParams{}),
 		refCount:  1,
+	}
+	if pool.config.UsageSenderURL != "" {
+		client, err := NewUsageSenderAuthorizationClient(p.UsageSenderURL)
+		if err != nil {
+			return nil, errgo.Notef(err, "cannot make omnibus authorization client")
+		}
+		pool.usageSenderAuthorizationClient = client
 	}
 	jem := pool.JEM(ctx)
 	defer jem.Close()
@@ -148,6 +181,7 @@ func (p *Pool) JEM(ctx context.Context) *JEM {
 	return &JEM{
 		DB:   newDatabase(ctx, p.config.SessionPool, p.dbName),
 		pool: p,
+		usageSenderAuthorizationClient: p.usageSenderAuthorizationClient,
 	}
 }
 
@@ -162,6 +196,8 @@ type JEM struct {
 	// closed records whether the JEM instance has
 	// been closed.
 	closed bool
+
+	usageSenderAuthorizationClient UsageSenderAuthorizationClient
 }
 
 // Clone returns an independent copy of the receiver
@@ -369,17 +405,23 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.M
 		}
 	}
 
+	usageSenderCredentials, err := j.UsageSenderAuthorization(string(p.Path.User))
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+
 	// Create the model record in the database before actually
 	// creating the model on the controller. It will have an invalid
 	// UUID because it doesn't exist but that's better than creating
 	// an model that we can't add locally because the name
 	// already exists.
 	modelDoc := &mongodoc.Model{
-		Path:         p.Path,
-		Controller:   p.ControllerPath,
-		CreationTime: wallClock.Now(),
-		Creator:      auth.Username(ctx),
-		Credential:   p.Credential,
+		Path:                   p.Path,
+		Controller:             p.ControllerPath,
+		CreationTime:           wallClock.Now(),
+		Creator:                auth.Username(ctx),
+		Credential:             p.Credential,
+		UsageSenderCredentials: usageSenderCredentials,
 	}
 	if err := j.DB.AddModel(ctx, modelDoc); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
@@ -679,6 +721,27 @@ func (j *JEM) selectController(ctx context.Context, cloud params.Cloud, region s
 	// by choosing the most lightly loaded controller
 	n := randIntn(len(controllers))
 	return controllers[n].Path, nil
+}
+
+func (j *JEM) UsageSenderAuthorization(applicationUser string) ([]byte, error) {
+	if j.usageSenderAuthorizationClient == nil {
+		return nil, nil
+	}
+	macaroon, err := j.usageSenderAuthorizationClient.AuthorizeReseller(
+		omnibusJIMMPlan,
+		omnibusJIMMCharm,
+		omnibusJIMMName,
+		omnibusJIMMOwner,
+		applicationUser,
+	)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot obtain authorization to collect usage metrics")
+	}
+	data, err := json.Marshal(macaroon)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot marshal metrics authorization credentials")
+	}
+	return data, nil
 }
 
 // UserTag creates a juju user tag from a params.User
