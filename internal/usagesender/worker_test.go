@@ -3,23 +3,22 @@
 package usagesender_test
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"net/http"
+	"net/http/httptest"
 	"time"
 
+	"github.com/juju/httprequest"
 	jujujujutesting "github.com/juju/juju/testing"
 	wireformat "github.com/juju/romulus/wireformat/metrics"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
+	"github.com/julienschmidt/httprouter"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/errgo.v1"
 
+	external_jem "github.com/CanonicalLtd/jem"
 	"github.com/CanonicalLtd/jem/internal/apitest"
+	"github.com/CanonicalLtd/jem/internal/jemerror"
 	"github.com/CanonicalLtd/jem/internal/usagesender"
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -27,27 +26,41 @@ import (
 type usageSenderSuite struct {
 	apitest.Suite
 
-	client *stubHTTPClient
 	// clock holds the mock clock used by the monitor package.
-	clock *jujutesting.Clock
+	clock   *jujutesting.Clock
+	handler *testHandler
+	server  *httptest.Server
 }
 
 var _ = gc.Suite(&usageSenderSuite{})
 
 var (
 	testContext = context.Background()
-	epoch       = parseTime("2016-01-01T12:00:00Z")
+	epoch       = mustParseTime("2016-01-01T12:00:00Z")
 )
 
 func (s *usageSenderSuite) SetUpTest(c *gc.C) {
-	s.client = &stubHTTPClient{}
-	s.PatchValue(usagesender.NewHTTPClient, func() usagesender.HTTPClient {
-		return s.client
+	s.handler = &testHandler{receivedMetrics: make(chan string, 1)}
+
+	router := httprouter.New()
+	handlers := jemerror.Mapper.Handlers(func(_ httprequest.Params) (*testHandler, error) {
+		return s.handler, nil
 	})
+	for _, h := range handlers {
+		router.Handle(h.Method, h.Path, h.Handle)
+	}
+	s.server = httptest.NewServer(router)
+	s.ServerParams = external_jem.ServerParams{UsageSenderURL: s.server.URL}
+
 	// Set up the clock mockery.
 	s.clock = jujutesting.NewClock(epoch)
 	s.PatchValue(usagesender.SenderClock, s.clock)
 	s.Suite.SetUpTest(c)
+}
+
+func (s *usageSenderSuite) TearDownTest(c *gc.C) {
+	s.server.Close()
+	s.Suite.TearDownTest(c)
 }
 
 func (s *usageSenderSuite) TestUsageSenderWorker(c *gc.C) {
@@ -73,42 +86,33 @@ func (s *usageSenderSuite) setUnitNumberAndCheckSentMetrics(c *gc.C, modelUUID s
 
 	unitCountString := fmt.Sprintf("%d", unitCount)
 
-	for a := jujujujutesting.LongAttempt.Start(); a.Next(); {
-		if s.client.URL == "https://0.1.2.3/omnibus/v2" &&
-			s.client.BodyType == "application/json" &&
-			len(s.client.Batches) == 1 &&
-			len(s.client.Batches[0].Metrics) == 1 &&
-			s.client.Batches[0].Metrics[0].Value == unitCountString {
-			break
-		}
-		c.Logf("http client %#v", s.client)
-		if !a.HasNext() {
-			c.Fatalf("expected metrics not sent")
-		}
+	select {
+	case receivedUnitCount := <-s.handler.receivedMetrics:
+		c.Assert(receivedUnitCount, gc.Equals, unitCountString)
+	case <-time.After(jujujujutesting.LongWait):
+		c.Fail()
 	}
 }
 
-type stubHTTPClient struct {
-	URL      string
-	BodyType string
-	Batches  []wireformat.MetricBatch
+type usagePost struct {
+	httprequest.Route `httprequest:"POST /metrics"`
+	Body              []wireformat.MetricBatch `httprequest:",body"`
 }
 
-func (c *stubHTTPClient) Post(url string, bodyType string, body io.Reader) (*http.Response, error) {
-	c.URL, c.BodyType = url, bodyType
-	decoder := json.NewDecoder(body)
-	err := decoder.Decode(&c.Batches)
-	if err != nil {
-		return nil, errgo.Mask(err)
+type testHandler struct {
+	receivedMetrics chan string
+}
+
+func (c *testHandler) Metrics(arg *usagePost) error {
+	if len(arg.Body) == 1 && len(arg.Body[0].Metrics) == 1 {
+		c.receivedMetrics <- arg.Body[0].Metrics[0].Value
+	} else {
+		c.receivedMetrics <- "-1"
 	}
-	return &http.Response{
-		Status:     "200 OK",
-		StatusCode: http.StatusOK,
-		Body:       ioutil.NopCloser(bytes.NewBufferString("{}")),
-	}, nil
+	return nil
 }
 
-func parseTime(s string) time.Time {
+func mustParseTime(s string) time.Time {
 	t, err := time.Parse(time.RFC3339, s)
 	if err != nil {
 		panic(err)

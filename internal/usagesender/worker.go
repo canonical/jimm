@@ -5,18 +5,13 @@
 package usagesender
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"time"
 
-	"github.com/juju/errors"
+	"github.com/juju/httprequest"
 	wireformat "github.com/juju/romulus/wireformat/metrics"
 	"github.com/juju/utils"
 	"github.com/juju/utils/clock"
-	"github.com/uber-go/zap"
 	"golang.org/x/net/context"
 
 	"github.com/CanonicalLtd/jem/internal/jem"
@@ -28,17 +23,6 @@ import (
 	"gopkg.in/tomb.v2"
 )
 
-var (
-	newHTTPClient = func() HTTPClient {
-		return &http.Client{}
-	}
-)
-
-// HTTPClient defines the http client interface for posting metrics.
-type HTTPClient interface {
-	Post(url string, bodyType string, body io.Reader) (*http.Response, error)
-}
-
 // senderClock holds the clock implementation used by the worker.
 var senderClock clock.Clock = clock.WallClock
 
@@ -46,7 +30,7 @@ var senderClock clock.Clock = clock.WallClock
 // that reports model usage.
 type SendModelUsageWorkerConfig struct {
 	OmnibusURL string
-	JEM        *jem.JEM
+	Pool       *jem.Pool
 	Period     time.Duration
 	Context    context.Context
 }
@@ -55,8 +39,8 @@ func (c *SendModelUsageWorkerConfig) validate() error {
 	if c.OmnibusURL == "" {
 		return errgo.New("omnibus url not specified")
 	}
-	if c.JEM == nil {
-		return errgo.New("jem not specified")
+	if c.Pool == nil {
+		return errgo.New("pool not specified")
 	}
 	if c.Period == 0 {
 		return errgo.New("period not specified")
@@ -75,9 +59,7 @@ func NewSendModelUsageWorker(config SendModelUsageWorkerConfig) (*sendModelUsage
 	w := &sendModelUsageWorker{
 		config: config,
 	}
-	w.tomb.Go(func() error {
-		return w.run()
-	})
+	w.tomb.Go(w.run)
 	return w, nil
 }
 
@@ -93,7 +75,6 @@ func (w *sendModelUsageWorker) Kill() {
 
 // Wait implements worker.Worker.Wait.
 func (w *sendModelUsageWorker) Wait() error {
-	defer w.config.JEM.Close()
 	return w.tomb.Wait()
 }
 
@@ -112,13 +93,14 @@ func (w *sendModelUsageWorker) run() error {
 }
 
 func (w *sendModelUsageWorker) execute() error {
+	j := w.config.Pool.JEM(w.config.Context)
+	defer j.Close()
 	batches := []wireformat.MetricBatch{}
-	iter := w.config.JEM.DB.Models().Find(nil).Sort("_id").Iter()
+	iter := j.DB.Models().Find(nil).Sort("_id").Iter()
 	var model mongodoc.Model
 	for iter.Next(&model) {
 		unitCount, ok := model.Counts[params.UnitCount]
 		if !ok {
-			zapctx.Error(w.config.Context, "failed to get current unit count for model", zap.String("model", model.Path.String()))
 			continue
 		}
 		batches = append(batches, wireformat.MetricBatch{
@@ -130,7 +112,7 @@ func (w *sendModelUsageWorker) execute() error {
 			Credentials: model.UsageSenderCredentials,
 			Metrics: []wireformat.Metric{{
 				Key:   "juju-model-units",
-				Value: fmt.Sprintf("%d", unitCount.Current),
+				Value: fmt.Sprint(unitCount.Current),
 				Time:  senderClock.Now().UTC(),
 			}},
 		})
@@ -146,28 +128,21 @@ func (w *sendModelUsageWorker) execute() error {
 	return nil
 }
 
-// Send sends the given metrics to omnibus.
-func (w *sendModelUsageWorker) send(metrics []wireformat.MetricBatch) (*wireformat.Response, error) {
-	b, err := json.Marshal(metrics)
-	if err != nil {
-		return nil, errors.Trace(err)
-	}
-	r := bytes.NewBuffer(b)
-	client := newHTTPClient()
-	resp, err := client.Post(w.config.OmnibusURL, "application/json", r)
-	if err != nil {
-		return nil, errors.Trace(err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.Errorf("failed to send usage data %v", resp.StatusCode)
-	}
+type sendUsageRequest struct {
+	httprequest.Route `httprequest:"POST"`
+	Body              []wireformat.MetricBatch `httprequest:",body"`
+}
 
-	defer resp.Body.Close()
-	respReader := json.NewDecoder(resp.Body)
-	metricsResponse := wireformat.Response{}
-	err = respReader.Decode(&metricsResponse)
-	if err != nil {
-		return nil, errors.Trace(err)
+// Send sends the given metrics to omnibus.
+func (w *sendModelUsageWorker) send(usage []wireformat.MetricBatch) (*wireformat.Response, error) {
+	client := httprequest.Client{}
+	var resp wireformat.Response
+	if err := client.CallURL(
+		w.config.OmnibusURL+"/metrics",
+		&sendUsageRequest{Body: usage},
+		&resp,
+	); err != nil {
+		return nil, errgo.Mask(err)
 	}
-	return &metricsResponse, nil
+	return &resp, nil
 }

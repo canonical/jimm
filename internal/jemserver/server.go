@@ -11,6 +11,7 @@ import (
 
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient"
+	"github.com/juju/juju/worker"
 	"github.com/julienschmidt/httprouter"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/context"
@@ -85,14 +86,6 @@ type Params struct {
 	UsageSenderURL string
 }
 
-type worker interface {
-	// Kill asks the worker to stop and returns immediately.
-	Kill()
-	// Wait waits for the worker to complete and returns any
-	// error encountered when it was running or stopping.
-	Wait() error
-}
-
 // Server represents a JEM HTTP server.
 type Server struct {
 	router      *httprouter.Router
@@ -101,7 +94,7 @@ type Server struct {
 	authPool    *auth.Pool
 	sessionPool *mgosession.Pool
 	monitor     *monitor.Monitor
-	usageSender worker
+	usageSender worker.Worker
 	jemStats    *jem.Stats
 }
 
@@ -175,7 +168,7 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	if config.UsageSenderURL != "" {
 		worker, err := usagesender.NewSendModelUsageWorker(usagesender.SendModelUsageWorkerConfig{
 			OmnibusURL: config.UsageSenderURL,
-			JEM:        p.JEM(ctx),
+			Pool:       p,
 			Period:     5 * time.Minute,
 			Context:    ctx,
 		})
@@ -271,8 +264,7 @@ func (srv *Server) Close() error {
 		}
 	}
 	if srv.usageSender != nil {
-		srv.usageSender.Kill()
-		if err := srv.usageSender.Wait(); err != nil {
+		if err := worker.Stop(srv.usageSender); err != nil {
 			zapctx.Warn(srv.context, "error shutting down usage sender", zaputil.Error(err))
 		}
 	}

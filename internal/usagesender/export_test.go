@@ -3,6 +3,5 @@
 package usagesender
 
 var (
-	NewHTTPClient = &newHTTPClient
-	SenderClock   = &senderClock
+	SenderClock = &senderClock
 )
