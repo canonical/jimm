@@ -5,13 +5,16 @@ package usagesender_test
 import (
 	"fmt"
 	"net/http/httptest"
+	"sync"
 	"time"
 
+	omniapi "github.com/CanonicalLtd/omnibus/metrics-collector/api"
 	"github.com/juju/httprequest"
 	jujujujutesting "github.com/juju/juju/testing"
 	wireformat "github.com/juju/romulus/wireformat/metrics"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
+	"github.com/juju/utils"
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
@@ -68,14 +71,22 @@ func (s *usageSenderSuite) TestUsageSenderWorker(c *gc.C) {
 	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
 	_, uuid := s.CreateModel(c, params.EntityPath{"bob", "foo"}, ctlId, cred)
 
-	s.setUnitNumberAndCheckSentMetrics(c, uuid, 0)
+	s.setUnitNumberAndCheckSentMetrics(c, uuid, 0, true)
+	s.setUnitNumberAndCheckSentMetrics(c, uuid, 0, false)
 
-	s.setUnitNumberAndCheckSentMetrics(c, uuid, 99)
+	s.setUnitNumberAndCheckSentMetrics(c, uuid, 99, true)
+	s.setUnitNumberAndCheckSentMetrics(c, uuid, 99, false)
 
-	s.setUnitNumberAndCheckSentMetrics(c, uuid, 42)
+	s.setUnitNumberAndCheckSentMetrics(c, uuid, 42, true)
+	s.setUnitNumberAndCheckSentMetrics(c, uuid, 42, false)
 }
 
-func (s *usageSenderSuite) setUnitNumberAndCheckSentMetrics(c *gc.C, modelUUID string, unitCount int) {
+func (s *usageSenderSuite) setUnitNumberAndCheckSentMetrics(c *gc.C, modelUUID string, unitCount int, acknowledge bool) {
+	m := &testMonitor{failed: make(chan int)}
+	s.PatchValue(usagesender.MonitorFailure, m.set)
+
+	s.handler.setAcknowledge(acknowledge)
+
 	err := s.JEM.DB.UpdateModelCounts(testContext, modelUUID, map[params.EntityCount]int{
 		params.MachineCount: 0,
 		params.UnitCount:    unitCount,
@@ -92,6 +103,22 @@ func (s *usageSenderSuite) setUnitNumberAndCheckSentMetrics(c *gc.C, modelUUID s
 	case <-time.After(jujujujutesting.LongWait):
 		c.Fail()
 	}
+	if !acknowledge {
+		select {
+		case failed := <-m.failed:
+			c.Assert(failed, gc.Equals, 1)
+		case <-time.After(jujujujutesting.LongWait):
+			c.Fail()
+		}
+	}
+}
+
+type testMonitor struct {
+	failed chan int
+}
+
+func (m *testMonitor) set(value float64) {
+	m.failed <- int(value)
 }
 
 type usagePost struct {
@@ -100,16 +127,40 @@ type usagePost struct {
 }
 
 type testHandler struct {
+	mutex           sync.Mutex
+	acknowledge     bool
 	receivedMetrics chan string
 }
 
-func (c *testHandler) Metrics(arg *usagePost) error {
+func (c *testHandler) Metrics(arg *usagePost) (*omniapi.Response, error) {
 	if len(arg.Body) == 1 && len(arg.Body[0].Metrics) == 1 {
 		c.receivedMetrics <- arg.Body[0].Metrics[0].Value
 	} else {
 		c.receivedMetrics <- "-1"
 	}
-	return nil
+
+	uuids := make([]string, len(arg.Body))
+	for i, b := range arg.Body {
+		uuids[i] = b.UUID
+	}
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	if c.acknowledge {
+		return &omniapi.Response{
+			UUID: utils.MustNewUUID().String(),
+			UserResponses: map[string]omniapi.UserResponse{
+				"bob": omniapi.UserResponse{AcknowledgedBatches: uuids},
+			},
+		}, nil
+	}
+	return &omniapi.Response{}, nil
+}
+
+func (c *testHandler) setAcknowledge(value bool) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	c.acknowledge = value
 }
 
 func mustParseTime(s string) time.Time {

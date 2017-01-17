@@ -20,6 +20,7 @@ import (
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
+	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -41,8 +42,8 @@ var wallClock clock.Clock = clock.WallClock
 var (
 	randIntn = rand.Intn
 
-	NewUsageSenderAuthorizationClient = func(url string) (UsageSenderAuthorizationClient, error) {
-		return omnibusapi.NewAuthorizationClient(url)
+	NewUsageSenderAuthorizationClient = func(url string, client *httpbakery.Client) (UsageSenderAuthorizationClient, error) {
+		return omnibusapi.NewAuthorizationClient(url, omnibusapi.HTTPClient(client))
 	}
 )
 
@@ -69,6 +70,9 @@ type Params struct {
 	// UsageSenderURL holds the URL where we obtain authorization
 	// to collect and report usage metrics.
 	UsageSenderURL string
+
+	// Client is used to make the request for usage metrics authorization
+	Client *httpbakery.Client
 }
 
 type Pool struct {
@@ -124,7 +128,7 @@ func NewPool(ctx context.Context, p Params) (*Pool, error) {
 		refCount:  1,
 	}
 	if pool.config.UsageSenderURL != "" {
-		client, err := NewUsageSenderAuthorizationClient(p.UsageSenderURL)
+		client, err := NewUsageSenderAuthorizationClient(p.UsageSenderURL, p.Client)
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot make omnibus authorization client")
 		}

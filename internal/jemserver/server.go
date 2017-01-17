@@ -32,6 +32,10 @@ import (
 	"github.com/CanonicalLtd/jem/params"
 )
 
+var (
+	usageSenderPeriod = 5 * time.Minute
+)
+
 // NewAPIHandlerFunc is a function that returns set of httprequest
 // handlers that uses the given JEM pool and server params.
 type NewAPIHandlerFunc func(context.Context, *jem.Pool, *auth.Pool, Params) ([]httprequest.Handler, error)
@@ -109,7 +113,7 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	if config.MaxMgoSessions <= 0 {
 		config.MaxMgoSessions = 1
 	}
-	idmClient, err := newIdentityClient(config)
+	idmClient, bclient, err := newIdentityClient(config)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -131,6 +135,7 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 		SessionPool:     sessionPool,
 		ControllerAdmin: config.ControllerAdmin,
 		UsageSenderURL:  config.UsageSenderURL,
+		Client:          bclient,
 	}
 	p, err := jem.NewPool(ctx, jconfig)
 	if err != nil {
@@ -169,7 +174,7 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 		worker, err := usagesender.NewSendModelUsageWorker(usagesender.SendModelUsageWorkerConfig{
 			OmnibusURL: config.UsageSenderURL,
 			Pool:       p,
-			Period:     5 * time.Minute,
+			Period:     usageSenderPeriod,
 			Context:    ctx,
 		})
 		if err != nil {
@@ -213,20 +218,20 @@ func monitorLeaseOwner(agentName string) (string, error) {
 	return fmt.Sprintf("%s-%x", agentName, buf), nil
 }
 
-func newIdentityClient(config Params) (*idmclient.Client, error) {
+func newIdentityClient(config Params) (*idmclient.Client, *httpbakery.Client, error) {
 	// Note: no need for persistent cookies as we'll
 	// be able to recreate the macaroons on startup.
 	bclient := httpbakery.NewClient()
 	bclient.Key = config.AgentKey
 	idmURL, err := url.Parse(config.IdentityLocation)
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot parse identity location URL %q", config.IdentityLocation)
+		return nil, nil, errgo.Notef(err, "cannot parse identity location URL %q", config.IdentityLocation)
 	}
 	agent.SetUpAuth(bclient, idmURL, config.AgentUsername)
 	return idmclient.New(idmclient.NewParams{
 		BaseURL: config.IdentityLocation,
 		Client:  bclient,
-	}), nil
+	}), bclient, nil
 }
 
 // ServeHTTP implements http.Handler.Handle.

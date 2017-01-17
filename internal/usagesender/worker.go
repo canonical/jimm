@@ -1,6 +1,6 @@
 // Copyright 2017 Canonical Ltd.
 
-// UsageSender package contains the implementation of the usage sender worker,
+// package usagesender contains the implementation of the usage sender worker,
 // which reports usage information for each model in the database.
 package usagesender
 
@@ -8,23 +8,46 @@ import (
 	"fmt"
 	"time"
 
+	omniapi "github.com/CanonicalLtd/omnibus/metrics-collector/api"
 	"github.com/juju/httprequest"
 	wireformat "github.com/juju/romulus/wireformat/metrics"
 	"github.com/juju/utils"
 	"github.com/juju/utils/clock"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/uber-go/zap"
 	"golang.org/x/net/context"
+	"gopkg.in/errgo.v1"
+	"gopkg.in/tomb.v2"
 
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/internal/zapctx"
 	"github.com/CanonicalLtd/jem/internal/zaputil"
 	"github.com/CanonicalLtd/jem/params"
-	"gopkg.in/errgo.v1"
-	"gopkg.in/tomb.v2"
 )
 
-// senderClock holds the clock implementation used by the worker.
-var senderClock clock.Clock = clock.WallClock
+const (
+	unitName  = "jimm/0"
+	metricKey = "juju-model-units"
+)
+
+var (
+	// senderClock holds the clock implementation used by the worker.
+	senderClock clock.Clock = clock.WallClock
+
+	UnacknowledgedMetricBatchesCount = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "jem",
+		Subsystem: "usagesender",
+		Name:      "unacknowledged_batches",
+		Help:      "The number of unacknowledged batches.",
+	})
+
+	monitorFailure = UnacknowledgedMetricBatchesCount.Set
+)
+
+func init() {
+	prometheus.MustRegister(UnacknowledgedMetricBatchesCount)
+}
 
 // SendModelUsageWorkerConfig contains configuration values for the worker
 // that reports model usage.
@@ -96,6 +119,7 @@ func (w *sendModelUsageWorker) execute() error {
 	j := w.config.Pool.JEM(w.config.Context)
 	defer j.Close()
 	batches := []wireformat.MetricBatch{}
+	acknowledgedBatches := make(map[string]bool)
 	iter := j.DB.Models().Find(nil).Sort("_id").Iter()
 	var model mongodoc.Model
 	for iter.Next(&model) {
@@ -103,27 +127,51 @@ func (w *sendModelUsageWorker) execute() error {
 		if !ok {
 			continue
 		}
+		uuid, err := utils.NewUUID()
+		if err != nil {
+			zapctx.Error(w.config.Context, "failed to create uuid", zaputil.Error(err))
+			continue
+		}
+		t := senderClock.Now().UTC()
 		batches = append(batches, wireformat.MetricBatch{
-			UUID:        utils.MustNewUUID().String(),
+			UUID:        uuid.String(),
 			ModelUUID:   model.UUID,
 			CharmUrl:    jem.OmnibusJIMMCharm,
-			Created:     senderClock.Now().UTC(),
-			UnitName:    "jimm/0",
+			Created:     t,
+			UnitName:    unitName,
 			Credentials: model.UsageSenderCredentials,
 			Metrics: []wireformat.Metric{{
-				Key:   "juju-model-units",
+				Key:   metricKey,
 				Value: fmt.Sprint(unitCount.Current),
-				Time:  senderClock.Now().UTC(),
+				Time:  t,
 			}},
 		})
+		acknowledgedBatches[uuid.String()] = false
 	}
 	if err := iter.Err(); err != nil {
 		return errgo.Notef(err, "cannot query")
 	}
 
-	_, err := w.send(batches)
+	response, err := w.send(batches)
 	if err != nil {
+		zapctx.Error(w.config.Context, "failed to send model usage", zaputil.Error(err))
 		return errgo.Mask(err)
+	}
+	for _, userResponse := range response.UserResponses {
+		for _, ackBatchUUID := range userResponse.AcknowledgedBatches {
+			acknowledgedBatches[ackBatchUUID] = true
+		}
+	}
+	// check if all batches were acknowledged
+	numberOfUnacknowledgedBatches := 0
+	for _, acknowledged := range acknowledgedBatches {
+		if !acknowledged {
+			numberOfUnacknowledgedBatches += 1
+		}
+	}
+	if numberOfUnacknowledgedBatches > 0 {
+		zapctx.Debug(w.config.Context, "model usage receipt was not acknowledged", zap.Object("unacknowledged-batches", numberOfUnacknowledgedBatches))
+		monitorFailure(float64(numberOfUnacknowledgedBatches))
 	}
 	return nil
 }
@@ -134,9 +182,9 @@ type sendUsageRequest struct {
 }
 
 // Send sends the given metrics to omnibus.
-func (w *sendModelUsageWorker) send(usage []wireformat.MetricBatch) (*wireformat.Response, error) {
+func (w *sendModelUsageWorker) send(usage []wireformat.MetricBatch) (*omniapi.Response, error) {
 	client := httprequest.Client{}
-	var resp wireformat.Response
+	var resp omniapi.Response
 	if err := client.CallURL(
 		w.config.OmnibusURL+"/metrics",
 		&sendUsageRequest{Body: usage},

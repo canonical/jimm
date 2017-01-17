@@ -3,5 +3,6 @@
 package usagesender
 
 var (
-	SenderClock = &senderClock
+	SenderClock    = &senderClock
+	MonitorFailure = &monitorFailure
 )
