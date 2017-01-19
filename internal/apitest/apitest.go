@@ -56,6 +56,7 @@ type Suite struct {
 	// JEM instances.
 	SessionPool *mgosession.Pool
 
+	ServerParams              external_jem.ServerParams
 	metricsRegistrationClient *stubMetricsRegistrationClient
 }
 
@@ -72,10 +73,10 @@ func (s *Suite) SetUpTest(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 	s.PatchValue(&jem.APIOpenTimeout, time.Duration(0))
 	s.metricsRegistrationClient = &stubMetricsRegistrationClient{}
-	s.PatchValue(&jem.NewUsageSenderAuthorizationClient, func(_ string) (jem.UsageSenderAuthorizationClient, error) {
+	s.PatchValue(&jem.NewUsageSenderAuthorizationClient, func(_ string, _ *httpbakery.Client) (jem.UsageSenderAuthorizationClient, error) {
 		return s.metricsRegistrationClient, nil
 	})
-	s.JEMSrv = s.NewServer(c, s.Session, s.IDMSrv, external_jem.ServerParams{})
+	s.JEMSrv = s.NewServer(c, s.Session, s.IDMSrv, s.ServerParams)
 	s.httpSrv = httptest.NewServer(s.JEMSrv)
 	s.SessionPool = mgosession.NewPool(context.TODO(), s.Session, 1)
 	s.Pool = s.NewJEMPool(c, s.SessionPool)
@@ -133,6 +134,9 @@ func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server,
 		ControllerUUID:       "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		WebsocketPingTimeout: 3 * time.Minute,
 		UsageSenderURL:       "https://0.1.2.3/omnibus/v2",
+	}
+	if params.UsageSenderURL != "" {
+		config.UsageSenderURL = params.UsageSenderURL
 	}
 	if params.GUILocation != "" {
 		config.GUILocation = params.GUILocation

@@ -11,6 +11,7 @@ import (
 
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient"
+	"github.com/juju/juju/worker"
 	"github.com/julienschmidt/httprouter"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/context"
@@ -25,9 +26,14 @@ import (
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/monitor"
+	"github.com/CanonicalLtd/jem/internal/usagesender"
 	"github.com/CanonicalLtd/jem/internal/zapctx"
 	"github.com/CanonicalLtd/jem/internal/zaputil"
 	"github.com/CanonicalLtd/jem/params"
+)
+
+var (
+	usageSenderPeriod = 5 * time.Minute
 )
 
 // NewAPIHandlerFunc is a function that returns set of httprequest
@@ -92,6 +98,7 @@ type Server struct {
 	authPool    *auth.Pool
 	sessionPool *mgosession.Pool
 	monitor     *monitor.Monitor
+	usageSender worker.Worker
 	jemStats    *jem.Stats
 }
 
@@ -106,7 +113,7 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	if config.MaxMgoSessions <= 0 {
 		config.MaxMgoSessions = 1
 	}
-	idmClient, err := newIdentityClient(config)
+	idmClient, bclient, err := newIdentityClient(config)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -128,6 +135,7 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 		SessionPool:     sessionPool,
 		ControllerAdmin: config.ControllerAdmin,
 		UsageSenderURL:  config.UsageSenderURL,
+		Client:          bclient,
 	}
 	p, err := jem.NewPool(ctx, jconfig)
 	if err != nil {
@@ -161,6 +169,18 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 			return nil, errgo.Mask(err)
 		}
 		srv.monitor = monitor.New(ctx, p, owner)
+	}
+	if config.UsageSenderURL != "" {
+		worker, err := usagesender.NewSendModelUsageWorker(usagesender.SendModelUsageWorkerConfig{
+			OmnibusURL: config.UsageSenderURL,
+			Pool:       p,
+			Period:     usageSenderPeriod,
+			Context:    ctx,
+		})
+		if err != nil {
+			return nil, errgo.Mask(err)
+		}
+		srv.usageSender = worker
 	}
 	srv.router.Handler("GET", "/metrics", prometheus.Handler())
 	for name, newAPI := range versions {
@@ -198,20 +218,20 @@ func monitorLeaseOwner(agentName string) (string, error) {
 	return fmt.Sprintf("%s-%x", agentName, buf), nil
 }
 
-func newIdentityClient(config Params) (*idmclient.Client, error) {
+func newIdentityClient(config Params) (*idmclient.Client, *httpbakery.Client, error) {
 	// Note: no need for persistent cookies as we'll
 	// be able to recreate the macaroons on startup.
 	bclient := httpbakery.NewClient()
 	bclient.Key = config.AgentKey
 	idmURL, err := url.Parse(config.IdentityLocation)
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot parse identity location URL %q", config.IdentityLocation)
+		return nil, nil, errgo.Notef(err, "cannot parse identity location URL %q", config.IdentityLocation)
 	}
 	agent.SetUpAuth(bclient, idmURL, config.AgentUsername)
 	return idmclient.New(idmclient.NewParams{
 		BaseURL: config.IdentityLocation,
 		Client:  bclient,
-	}), nil
+	}), bclient, nil
 }
 
 // ServeHTTP implements http.Handler.Handle.
@@ -246,6 +266,11 @@ func (srv *Server) Close() error {
 		srv.monitor.Kill()
 		if err := srv.monitor.Wait(); err != nil {
 			zapctx.Warn(srv.context, "error shutting down monitor", zaputil.Error(err))
+		}
+	}
+	if srv.usageSender != nil {
+		if err := worker.Stop(srv.usageSender); err != nil {
+			zapctx.Warn(srv.context, "error shutting down usage sender", zaputil.Error(err))
 		}
 	}
 	srv.pool.Close()
