@@ -16,6 +16,7 @@ import (
 	cloudapi "github.com/juju/juju/api/cloud"
 	"github.com/juju/juju/api/controller"
 	"github.com/juju/juju/api/modelmanager"
+	"github.com/juju/juju/api/usermanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/instance"
@@ -334,14 +335,6 @@ func (s *websocketSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
 				},
 			},
 		}, {
-			Tag: names.NewCloudCredentialTag("dummy/invalid--user@external/cred1").String(),
-			Credential: jujuparams.CloudCredential{
-				AuthType: "credtype",
-				Attributes: map[string]string{
-					"attr1": "val1",
-				},
-			},
-		}, {
 			Tag: names.NewCloudCredentialTag("dummy/test2@external/cred1").String(),
 			Credential: jujuparams.CloudCredential{
 				AuthType: "credtype",
@@ -350,7 +343,7 @@ func (s *websocketSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
 				},
 			},
 		}, {
-			Tag: names.NewCloudCredentialTag("dummy/test@external/bad--name").String(),
+			Tag: names.NewCloudCredentialTag("dummy/test@external/bad-name-").String(),
 			Credential: jujuparams.CloudCredential{
 				AuthType: "credtype",
 				Attributes: map[string]string{
@@ -362,11 +355,10 @@ func (s *websocketSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
 	var resp jujuparams.ErrorResults
 	err := conn.APICall("Cloud", 1, "", "UpdateCredentials", req, &resp)
 	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(resp.Results, gc.HasLen, 3)
 	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `bad request: "not-a-cloud-credentials-tag" is not a valid tag`)
-	c.Assert(resp.Results[1].Error, gc.ErrorMatches, `invalid user name "invalid--user"`)
-	c.Assert(resp.Results[2].Error, gc.ErrorMatches, `unauthorized`)
-	c.Assert(resp.Results[3].Error, gc.ErrorMatches, `invalid name "bad--name"`)
-	c.Assert(resp.Results, gc.HasLen, 4)
+	c.Assert(resp.Results[1].Error, gc.ErrorMatches, `unauthorized`)
+	c.Assert(resp.Results[2].Error, gc.ErrorMatches, `invalid name "bad-name-"`)
 }
 
 func (s *websocketSuite) TestCredential(c *gc.C) {
@@ -433,8 +425,8 @@ func (s *websocketSuite) TestCredential(c *gc.C) {
 		},
 	}, {
 		Error: &jujuparams.Error{
-			Message: `credential "dummy/admin/cred6" not found`,
-			Code:    jujuparams.CodeNotFound,
+			Message: `unsupported domain ""`,
+			Code:    jujuparams.CodeBadRequest,
 		},
 	}})
 }
@@ -964,7 +956,7 @@ var createModelTests = []struct {
 	ownerTag:      "user-test@local",
 	cloudTag:      names.NewCloudTag("dummy").String(),
 	credentialTag: "cloudcred-dummy_test@external_cred1",
-	expectError:   `unauthorized \(unauthorized access\)`,
+	expectError:   `unsupported domain "" \(bad request\)`,
 }, {
 	about:         "invalid user",
 	name:          "model-5",
@@ -1304,6 +1296,121 @@ func (s *websocketSuite) TestPingerupdatesHeartMonitor(c *gc.C) {
 	err := conn.APICall("Pinger", 1, "", "Ping", nil, nil)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(hm.beats(), gc.Equals, 1)
+}
+
+func (s *websocketSuite) TestAddUser(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := usermanager.NewClient(conn)
+	_, _, err := client.AddUser("bob", "Bob", "bob's super secret password")
+	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+}
+
+func (s *websocketSuite) TestRemoveUser(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := usermanager.NewClient(conn)
+	err := client.RemoveUser("bob")
+	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+}
+
+func (s *websocketSuite) TestEnableUser(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := usermanager.NewClient(conn)
+	err := client.EnableUser("bob")
+	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+}
+
+func (s *websocketSuite) TestDisableUser(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := usermanager.NewClient(conn)
+	err := client.DisableUser("bob")
+	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+}
+
+func (s *websocketSuite) TestUserInfoAllUsers(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := usermanager.NewClient(conn)
+	users, err := client.UserInfo(nil, usermanager.AllUsers)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(len(users), gc.Equals, 0)
+}
+
+func (s *websocketSuite) TestUserInfoSpecifiedUser(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := usermanager.NewClient(conn)
+	users, err := client.UserInfo([]string{"alice@external"}, usermanager.AllUsers)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(len(users), gc.Equals, 1)
+	c.Assert(users[0], jc.DeepEquals, jujuparams.UserInfo{
+		Username:    "alice@external",
+		DisplayName: "alice@external",
+		Access:      "add-model",
+	})
+}
+
+func (s *websocketSuite) TestUserInfoSpecifiedUsers(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := usermanager.NewClient(conn)
+	users, err := client.UserInfo([]string{"alice@external", "bob@external"}, usermanager.AllUsers)
+	c.Assert(err, gc.ErrorMatches, "bob@external: unauthorized")
+	c.Assert(users, gc.HasLen, 0)
+}
+
+func (s *websocketSuite) TestUserInfoWithDomain(c *gc.C) {
+	conn := s.open(c, nil, "alice@mydomain")
+	defer conn.Close()
+
+	client := usermanager.NewClient(conn)
+	users, err := client.UserInfo([]string{"alice@mydomain"}, usermanager.AllUsers)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(len(users), gc.Equals, 1)
+	c.Assert(users[0], jc.DeepEquals, jujuparams.UserInfo{
+		Username:    "alice@mydomain",
+		DisplayName: "alice@mydomain",
+		Access:      "add-model",
+	})
+}
+
+func (s *websocketSuite) TestUserInfoInvalidUsername(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := usermanager.NewClient(conn)
+	users, err := client.UserInfo([]string{"alice-@external"}, usermanager.AllUsers)
+	c.Assert(err, gc.ErrorMatches, `"alice-@external" is not a valid username`)
+	c.Assert(users, gc.HasLen, 0)
+}
+
+func (s *websocketSuite) TestUserInfoLocalUsername(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := usermanager.NewClient(conn)
+	users, err := client.UserInfo([]string{"alice"}, usermanager.AllUsers)
+	c.Assert(err, gc.ErrorMatches, `alice: unsupported domain ""`)
+	c.Assert(users, gc.HasLen, 0)
+}
+
+func (s *websocketSuite) TestSetPassword(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := usermanager.NewClient(conn)
+	err := client.SetPassword("bob", "bob's new super secret password")
+	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
 // open creates a new websockec connection to the test server, using the
