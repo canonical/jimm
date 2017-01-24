@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	omnibusapi "github.com/CanonicalLtd/omnibus/plans/api"
+	plansapi "github.com/CanonicalLtd/plans-client/api"
 	"github.com/juju/juju/api"
 	cloudapi "github.com/juju/juju/api/cloud"
 	"github.com/juju/juju/api/modelmanager"
@@ -43,7 +43,7 @@ var (
 	randIntn = rand.Intn
 
 	NewUsageSenderAuthorizationClient = func(url string, client *httpbakery.Client) (UsageSenderAuthorizationClient, error) {
-		return omnibusapi.NewAuthorizationClient(url, omnibusapi.HTTPClient(client))
+		return plansapi.NewPlanClient(url, plansapi.HTTPClient(client))
 	}
 )
 
