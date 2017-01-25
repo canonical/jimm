@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,10 +21,11 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/macaroon-bakery.v1/httpbakery/agent"
 	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"gopkg.in/yaml.v1"
+	"gopkg.in/yaml.v2"
 
 	"github.com/juju/loggo"
 	"github.com/uber-go/zap"
@@ -70,9 +72,6 @@ func (c *Config) validate() error {
 	if c.UsageSenderURL == "" {
 		missing = append(missing, "usage-sender-url")
 	}
-	if len(missing) != 0 {
-		return fmt.Errorf("missing fields %s in config file", strings.Join(missing, ", "))
-	}
 	if c.JIMMPlan == "" {
 		missing = append(missing, "jimm-plan")
 	}
@@ -85,6 +84,10 @@ func (c *Config) validate() error {
 	if c.JIMMName == "" {
 		missing = append(missing, "jimm-name")
 	}
+	if len(missing) != 0 {
+		return fmt.Errorf("missing fields %s in config file", strings.Join(missing, ", "))
+	}
+
 	return nil
 }
 
@@ -110,6 +113,7 @@ func main() {
 		gnuflag.PrintDefaults()
 		os.Exit(2)
 	}
+	gnuflag.Parse(false)
 	args := gnuflag.Args()
 	if len(args) == 0 {
 		gnuflag.Usage()
@@ -154,7 +158,15 @@ func updateModels(ctx context.Context, collection *mgo.Collection, conf *Config)
 		}
 		if client == nil {
 			bclient := httpbakery.NewClient()
+			if conf.AgentKey == nil {
+				return errgo.New("agent key not set")
+			}
 			bclient.Key = conf.AgentKey
+			idmURL, err := url.Parse(conf.IdentityLocation)
+			if err != nil {
+				return errgo.Notef(err, "cannot parse identity location URL %q", conf.IdentityLocation)
+			}
+			agent.SetUpAuth(bclient, idmURL, conf.AgentUsername)
 			client, err = NewUsageSenderAuthorizationClient(conf.UsageSenderURL, bclient)
 			if err != nil {
 				return errgo.Notef(err, "cannot make omnibus authorization client")
