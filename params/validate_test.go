@@ -87,26 +87,28 @@ var validatorsTests = []struct {
 		Request: newHTTPRequest("", nil),
 		PathVar: httprouter.Params{{
 			Key:   "User",
-			Value: "foo--invalid",
+			Value: "foo--valid",
 		}},
 	},
-	val: new(struct {
+	val: &struct {
 		User params.User `httprequest:",path"`
-	}),
-	expectError: `cannot unmarshal into field: invalid user name "foo--invalid"`,
+	}{
+		User: "foo--valid",
+	},
 }, {
 	about: "double hyphen in name",
 	params: httprequest.Params{
 		Request: newHTTPRequest("", nil),
 		PathVar: httprouter.Params{{
 			Key:   "Name",
-			Value: "foo--invalid",
+			Value: "foo--valid",
 		}},
 	},
-	val: new(struct {
+	val: &struct {
 		Name params.Name `httprequest:",path"`
-	}),
-	expectError: `cannot unmarshal into field: invalid name "foo--invalid"`,
+	}{
+		Name: "foo--valid",
+	},
 }, {
 	about: "bad user in entity path",
 	params: httprequest.Params{

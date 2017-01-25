@@ -16,6 +16,7 @@ import (
 	"github.com/juju/juju/constraints"
 	"github.com/juju/juju/environs"
 	"github.com/juju/juju/network"
+	"github.com/juju/juju/permission"
 	"github.com/juju/juju/rpc"
 	"github.com/juju/juju/rpc/jsoncodec"
 	"github.com/juju/juju/rpc/rpcreflect"
@@ -118,6 +119,7 @@ var facades = map[facade]string{
 	facade{"JIMM", 1}:         "JIMM",
 	facade{"ModelManager", 2}: "ModelManager",
 	facade{"Pinger", 1}:       "Pinger",
+	facade{"UserManager", 1}:  "UserManager",
 }
 
 // newWSServer creates a new WebSocket server suitible for handling the API for modelUUID.
@@ -301,14 +303,23 @@ func (r root) ModelManager(id string) (modelManager, error) {
 	return modelManager{r.h}, nil
 }
 
-// Pinger returns an implementation of the Pinger facade
-// (version 1).
+// Pinger returns an implementation of the Pinger facade (version 1).
 func (r root) Pinger(id string) (pinger, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
 		return pinger{}, common.ErrBadId
 	}
 	return pinger{r.h}, nil
+}
+
+// UserManager returns an implementation of the UserManager facade
+// (version 1).
+func (r root) UserManager(id string) (userManager, error) {
+	if id != "" {
+		// Safeguard id for possible future use.
+		return userManager{}, common.ErrBadId
+	}
+	return userManager{r.h}, nil
 }
 
 // admin implements the Admin facade.
@@ -341,13 +352,13 @@ func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResult, error
 		return jujuparams.LoginResult{}, errgo.Mask(err)
 	}
 	a.h.context = ctx
-	username := auth.Username(a.h.context)
 	servermon.LoginSuccessCount.Inc()
-
+	username := auth.Username(a.h.context)
 	return jujuparams.LoginResult{
 		UserInfo: &jujuparams.AuthUserInfo{
+			// TODO(mhilton) get a better display name from the identity manager.
 			DisplayName: username,
-			Identity:    names.NewUserTag(username).WithDomain("external").String(),
+			Identity:    userTag(username).String(),
 		},
 		ControllerTag: names.NewControllerTag(a.h.params.ControllerUUID).String(),
 		Facades:       facadeVersions(),
@@ -540,13 +551,13 @@ func (c cloud) UserCredentials(userclouds jujuparams.UserClouds) (jujuparams.Str
 
 // userCredentials retrieves the credentials stored for given owner and cloud.
 func (c cloud) userCredentials(ownerTag, cloudTag string) ([]string, error) {
-	owner, err := names.ParseUserTag(ownerTag)
+	ot, err := names.ParseUserTag(ownerTag)
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
-
 	}
-	if owner.IsLocal() {
-		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "unsupported domain %q", owner.Domain())
+	owner, err := user(ot)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
 	cld, err := names.ParseCloudTag(cloudTag)
 	if err != nil {
@@ -556,7 +567,7 @@ func (c cloud) userCredentials(ownerTag, cloudTag string) ([]string, error) {
 	var cloudCreds []string
 	it := c.h.jem.DB.NewCanReadIter(c.h.context, c.h.jem.DB.Credentials().Find(
 		bson.D{{
-			"path.entitypath.user", owner.Name(),
+			"path.entitypath.user", owner,
 		}, {
 			"path.cloud", cld.Id(),
 		}, {
@@ -594,11 +605,8 @@ func (c cloud) updateCredential(ctx context.Context, arg jujuparams.UpdateCloudC
 		return errgo.WithCausef(err, params.ErrBadRequest, "")
 	}
 	ownerTag := tag.Owner()
-	if ownerTag.IsLocal() {
-		return errgo.WithCausef(nil, params.ErrBadRequest, "unsupported domain %q", ownerTag.Domain())
-	}
-	var owner params.User
-	if err := owner.UnmarshalText([]byte(ownerTag.Name())); err != nil {
+	owner, err := user(ownerTag)
+	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
 	if err := auth.CheckIsUser(c.h.context, owner); err != nil {
@@ -692,14 +700,15 @@ func (c cloud) credential(cloudCredentialTag string) (*jujuparams.CloudCredentia
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
 
 	}
-	owner := cct.Owner()
-	if owner.IsLocal() {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", cct.Id())
+	ownerTag := cct.Owner()
+	owner, err := user(ownerTag)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
 	credPath := params.CredentialPath{
 		Cloud: params.Cloud(cct.Cloud().Id()),
 		EntityPath: params.EntityPath{
-			User: params.User(owner.Name()),
+			User: owner,
 			Name: params.Name(cct.Name()),
 		},
 	}
@@ -907,25 +916,6 @@ func jemMachineToModelMachineInfo(m *mongodoc.Machine) jujuparams.ModelMachineIn
 	}
 }
 
-// massageModelInfo modifies the modelInfo returned from a controller as
-// if it was returned from the jimm controller.
-func massageModelInfo(h *wsHandler, mi jujuparams.ModelInfo) jujuparams.ModelInfo {
-	mi1 := mi
-	mi1.ControllerUUID = h.params.ControllerUUID
-	mi1.Users = make([]jujuparams.ModelUserInfo, 0, len(mi.Users))
-	for _, u := range mi.Users {
-		if !names.IsValidUser(u.UserName) {
-			continue
-		}
-		tag := names.NewUserTag(u.UserName)
-		if tag.IsLocal() {
-			continue
-		}
-		mi1.Users = append(mi1.Users, u)
-	}
-	return mi1
-}
-
 // CreateModel implements the ModelManager facade's CreateModel method.
 func (m modelManager) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.ModelInfo, error) {
 	mi, err := m.createModel(args)
@@ -945,12 +935,13 @@ func (m modelManager) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.M
 }
 
 func (m modelManager) createModel(args jujuparams.ModelCreateArgs) (*jujuparams.ModelInfo, error) {
-	owner, err := names.ParseUserTag(args.OwnerTag)
+	ownerTag, err := names.ParseUserTag(args.OwnerTag)
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid owner tag")
 	}
-	if owner.IsLocal() {
-		return nil, params.ErrUnauthorized
+	owner, err := user(ownerTag)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
 	if args.CloudTag == "" {
 		return nil, errgo.New("no cloud specified for model; please specify one")
@@ -969,13 +960,13 @@ func (m modelManager) createModel(args jujuparams.ModelCreateArgs) (*jujuparams.
 		credPath = params.CredentialPath{
 			Cloud: params.Cloud(tag.Cloud().Id()),
 			EntityPath: params.EntityPath{
-				User: params.User(tag.Owner().Name()),
+				User: owner,
 				Name: params.Name(tag.Name()),
 			},
 		}
 	}
 	model, err := m.h.jem.CreateModel(m.h.context, jem.CreateModelParams{
-		Path:       params.EntityPath{User: params.User(owner.Name()), Name: params.Name(args.Name)},
+		Path:       params.EntityPath{User: owner, Name: params.Name(args.Name)},
 		Credential: credPath,
 		Cloud:      cloud,
 		Region:     args.CloudRegion,
@@ -1055,8 +1046,9 @@ func (m modelManager) modifyModelAccess(change jujuparams.ModifyModelAccess) err
 	if err != nil {
 		return errgo.WithCausef(err, params.ErrBadRequest, "invalid user tag")
 	}
-	if userTag.IsLocal() {
-		return errgo.WithCausef(nil, params.ErrBadRequest, "unsupported domain %q", userTag.Domain())
+	user, err := user(userTag)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
 	conn, err := m.h.jem.OpenAPI(context.TODO(), model.Controller)
 	if err != nil {
@@ -1065,9 +1057,9 @@ func (m modelManager) modifyModelAccess(change jujuparams.ModifyModelAccess) err
 	defer conn.Close()
 	switch change.Action {
 	case jujuparams.GrantModelAccess:
-		err = m.h.jem.GrantModel(m.h.context, conn, model, params.User(userTag.Name()), string(change.Access))
+		err = m.h.jem.GrantModel(m.h.context, conn, model, user, string(change.Access))
 	case jujuparams.RevokeModelAccess:
-		err = m.h.jem.RevokeModel(m.h.context, conn, model, params.User(userTag.Name()), string(change.Access))
+		err = m.h.jem.RevokeModel(m.h.context, conn, model, user, string(change.Access))
 	default:
 		return errgo.WithCausef(err, params.ErrBadRequest, "invalid action %q", change.Action)
 	}
@@ -1157,15 +1149,14 @@ func getModel(h *wsHandler, modelTag string, authf func(context.Context, auth.AC
 	}
 	model.Cloud = params.Cloud(cloudTag.Id())
 	model.CloudRegion = info.CloudRegion
-	credOwner := credentialTag.Owner()
-	user := credOwner.Id()
-	if credOwner.Domain() == "external" {
-		user = credOwner.Name()
+	owner, err := user(credentialTag.Owner())
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
 	model.Credential = params.CredentialPath{
 		Cloud: params.Cloud(credentialTag.Cloud().Id()),
 		EntityPath: params.EntityPath{
-			User: params.User(user),
+			User: owner,
 			Name: params.Name(credentialTag.Name()),
 		},
 	}
@@ -1212,6 +1203,80 @@ func (p pinger) Ping() {
 	p.h.heartMonitor.Heartbeat()
 }
 
+// userManager implements the UserManager facade.
+type userManager struct {
+	h *wsHandler
+}
+
+// AddUser implements the UserManager facade's AddUser method.
+func (u userManager) AddUser(args jujuparams.AddUsers) (jujuparams.AddUserResults, error) {
+	return jujuparams.AddUserResults{}, params.ErrUnauthorized
+}
+
+// RemoveUser implements the UserManager facade's RemoveUser method.
+func (u userManager) RemoveUser(jujuparams.Entities) (jujuparams.ErrorResults, error) {
+	return jujuparams.ErrorResults{}, params.ErrUnauthorized
+}
+
+// EnableUser implements the UserManager facade's EnableUser method.
+func (u userManager) EnableUser(jujuparams.Entities) (jujuparams.ErrorResults, error) {
+	return jujuparams.ErrorResults{}, params.ErrUnauthorized
+}
+
+// DisableUser implements the UserManager facade's DisableUser method.
+func (u userManager) DisableUser(jujuparams.Entities) (jujuparams.ErrorResults, error) {
+	return jujuparams.ErrorResults{}, params.ErrUnauthorized
+}
+
+// UserInfo implements the UserManager facade's UserInfo method.
+func (u userManager) UserInfo(req jujuparams.UserInfoRequest) (jujuparams.UserInfoResults, error) {
+	res := jujuparams.UserInfoResults{
+		Results: make([]jujuparams.UserInfoResult, len(req.Entities)),
+	}
+	for i, ent := range req.Entities {
+		ui, err := u.userInfo(ent.Tag)
+		if err != nil {
+			res.Results[i].Error = mapError(err)
+			continue
+		}
+		res.Results[i].Result = ui
+	}
+	return res, nil
+}
+
+func (u userManager) userInfo(entity string) (*jujuparams.UserInfo, error) {
+	userTag, err := names.ParseUserTag(entity)
+	if err != nil {
+		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid user tag")
+	}
+	user, err := user(userTag)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
+	}
+	if auth.Username(u.h.context) != string(user) {
+		return nil, params.ErrUnauthorized
+	}
+	return u.currentUser()
+}
+
+func (u userManager) currentUser() (*jujuparams.UserInfo, error) {
+	userTag := userTag(auth.Username(u.h.context))
+	return &jujuparams.UserInfo{
+		// TODO(mhilton) a number of these fields should
+		// be fetched from the identity manager, but that
+		// will have to change to support getting them.
+		Username:    userTag.Id(),
+		DisplayName: userTag.Id(),
+		Access:      string(permission.AddModelAccess),
+		Disabled:    false,
+	}, nil
+}
+
+// SetPassword implements the UserManager facade's SetPassword method.
+func (u userManager) SetPassword(jujuparams.EntityPasswords) (jujuparams.ErrorResults, error) {
+	return jujuparams.ErrorResults{}, params.ErrUnauthorized
+}
+
 // observerFactory implemnts an rpc.ObserverFactory.
 type observerFactory struct{}
 
@@ -1235,4 +1300,32 @@ func (o observer) ServerRequest(*rpc.Header, interface{}) {
 func (o observer) ServerReply(r rpc.Request, _ *rpc.Header, _ interface{}) {
 	d := time.Since(o.start)
 	servermon.WebsocketRequestDuration.WithLabelValues(r.Type, r.Action).Observe(float64(d) / float64(time.Second))
+}
+
+// userTag creates a UserTag from the given username. The returned
+// UserTag will always have a domain set. If username has no domain then
+// @external will be used.
+func userTag(username string) names.UserTag {
+	tag := names.NewUserTag(username)
+	if tag.Domain() == "" {
+		tag = tag.WithDomain("external")
+	}
+	return tag
+}
+
+// user creates a params.User from the given UserTag. If the UserTag is
+// for a local user then an error will be returned. If the UserTag has
+// the domain "external" then the returned User will only contain the
+// name part.
+func user(tag names.UserTag) (params.User, error) {
+	if tag.IsLocal() {
+		return "", errgo.WithCausef(nil, params.ErrBadRequest, "unsupported domain %q", tag.Domain())
+	}
+	var username string
+	if tag.Domain() == "external" {
+		username = tag.Name()
+	} else {
+		username = tag.Id()
+	}
+	return params.User(username), nil
 }
