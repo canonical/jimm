@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	omnibusapi "github.com/CanonicalLtd/omnibus/plans/api"
+	plansapi "github.com/CanonicalLtd/plans-client/api"
 	"github.com/juju/gnuflag"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
@@ -37,7 +37,7 @@ import (
 
 var (
 	NewUsageSenderAuthorizationClient = func(url string, client *httpbakery.Client) (UsageSenderAuthorizationClient, error) {
-		return omnibusapi.NewAuthorizationClient(url, omnibusapi.HTTPClient(client))
+		return plansapi.NewPlanClient(url, plansapi.HTTPClient(client))
 	}
 )
 

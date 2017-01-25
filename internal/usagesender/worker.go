@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	omniapi "github.com/CanonicalLtd/omnibus/metrics-collector/api"
 	"github.com/juju/httprequest"
+	romulus "github.com/juju/romulus/wireformat/metrics"
 	wireformat "github.com/juju/romulus/wireformat/metrics"
 	"github.com/juju/utils"
 	"github.com/juju/utils/clock"
@@ -182,9 +182,9 @@ type sendUsageRequest struct {
 }
 
 // Send sends the given metrics to omnibus.
-func (w *sendModelUsageWorker) send(usage []wireformat.MetricBatch) (*omniapi.Response, error) {
+func (w *sendModelUsageWorker) send(usage []wireformat.MetricBatch) (*romulus.UserStatusResponse, error) {
 	client := httprequest.Client{}
-	var resp omniapi.Response
+	var resp romulus.UserStatusResponse
 	if err := client.CallURL(
 		w.config.OmnibusURL+"/metrics",
 		&sendUsageRequest{Body: usage},

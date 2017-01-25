@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	omniapi "github.com/CanonicalLtd/omnibus/metrics-collector/api"
 	"github.com/juju/httprequest"
 	jujujujutesting "github.com/juju/juju/testing"
+	romulus "github.com/juju/romulus/wireformat/metrics"
 	wireformat "github.com/juju/romulus/wireformat/metrics"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
@@ -101,14 +101,14 @@ func (s *usageSenderSuite) setUnitNumberAndCheckSentMetrics(c *gc.C, modelUUID s
 	case receivedUnitCount := <-s.handler.receivedMetrics:
 		c.Assert(receivedUnitCount, gc.Equals, unitCountString)
 	case <-time.After(jujujujutesting.LongWait):
-		c.Fail()
+		c.Fatal("timed out waiting for metrics to be received")
 	}
 	if !acknowledge {
 		select {
 		case failed := <-m.failed:
 			c.Assert(failed, gc.Equals, 1)
 		case <-time.After(jujujujutesting.LongWait):
-			c.Fail()
+			c.Fatal("timed out waiting for metrics batch to be acknowledged")
 		}
 	}
 }
@@ -132,7 +132,7 @@ type testHandler struct {
 	receivedMetrics chan string
 }
 
-func (c *testHandler) Metrics(arg *usagePost) (*omniapi.Response, error) {
+func (c *testHandler) Metrics(arg *usagePost) (*romulus.UserStatusResponse, error) {
 	if len(arg.Body) == 1 && len(arg.Body[0].Metrics) == 1 {
 		c.receivedMetrics <- arg.Body[0].Metrics[0].Value
 	} else {
@@ -147,14 +147,14 @@ func (c *testHandler) Metrics(arg *usagePost) (*omniapi.Response, error) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	if c.acknowledge {
-		return &omniapi.Response{
+		return &romulus.UserStatusResponse{
 			UUID: utils.MustNewUUID().String(),
-			UserResponses: map[string]omniapi.UserResponse{
-				"bob": omniapi.UserResponse{AcknowledgedBatches: uuids},
+			UserResponses: map[string]romulus.UserResponse{
+				"bob": romulus.UserResponse{AcknowledgedBatches: uuids},
 			},
 		}, nil
 	}
-	return &omniapi.Response{}, nil
+	return &romulus.UserStatusResponse{}, nil
 }
 
 func (c *testHandler) setAcknowledge(value bool) {
