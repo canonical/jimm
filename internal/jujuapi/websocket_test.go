@@ -247,6 +247,30 @@ func (s *websocketSuite) TestUserCredentials(c *gc.C) {
 	})
 }
 
+func (s *websocketSuite) TestUserCredentialsWithDomain(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	s.JEM.UpdateCredential(context.Background(), &mongodoc.Credential{
+		Path: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{User: "test@domain", Name: "cred1"},
+		},
+		Type:  "credtype",
+		Label: "Credentials 1",
+		Attributes: map[string]string{
+			"attr1": "val1",
+			"attr2": "val2",
+		},
+	})
+	conn := s.open(c, nil, "test@domain")
+	defer conn.Close()
+	client := cloudapi.NewClient(conn)
+	creds, err := client.UserCredentials(names.NewUserTag("test@domain"), names.NewCloudTag("dummy"))
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(creds, jc.DeepEquals, []names.CloudCredentialTag{
+		names.NewCloudCredentialTag("dummy/test@domain/cred1"),
+	})
+}
+
 func (s *websocketSuite) TestUserCredentialsACL(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	s.JEM.UpdateCredential(context.Background(), &mongodoc.Credential{
