@@ -752,7 +752,11 @@ func (j *JEM) UsageSenderAuthorization(applicationUser string) ([]byte, error) {
 
 // UserTag creates a juju user tag from a params.User
 func UserTag(u params.User) names.UserTag {
-	return names.NewUserTag(string(u) + "@external")
+	tag := names.NewUserTag(string(u))
+	if tag.IsLocal() {
+		tag = tag.WithDomain("external")
+	}
+	return tag
 }
 
 // CloudTag creates a juju cloud tag from a params.Cloud
@@ -766,5 +770,6 @@ func CloudCredentialTag(p params.CredentialPath) names.CloudCredentialTag {
 	if p.IsZero() {
 		return names.CloudCredentialTag{}
 	}
-	return names.NewCloudCredentialTag(fmt.Sprintf("%s/%s@external/%s", p.Cloud, p.User, p.Name))
+	user := UserTag(p.User)
+	return names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", p.Cloud, user.Id(), p.Name))
 }

@@ -1176,6 +1176,30 @@ func (s *jemSuite) TestCredential(c *gc.C) {
 	}
 }
 
+func (s *jemSuite) TestUserTag(c *gc.C) {
+	c.Assert(jem.UserTag(params.User("alice")).String(), gc.Equals, "user-alice@external")
+	c.Assert(jem.UserTag(params.User("alice@domain")).String(), gc.Equals, "user-alice@domain")
+}
+
+func (s *jemSuite) TestCloudCredentialTag(c *gc.C) {
+	cp1 := params.CredentialPath{
+		Cloud: "dummy",
+		EntityPath: params.EntityPath{
+			User: "alice",
+			Name: "cred",
+		},
+	}
+	cp2 := params.CredentialPath{
+		Cloud: "dummy",
+		EntityPath: params.EntityPath{
+			User: "alice@domain",
+			Name: "cred",
+		},
+	}
+	c.Assert(jem.CloudCredentialTag(cp1).String(), gc.Equals, "cloudcred-dummy_alice@external_cred")
+	c.Assert(jem.CloudCredentialTag(cp2).String(), gc.Equals, "cloudcred-dummy_alice@domain_cred")
+}
+
 func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityPath {
 	info := s.APIInfo(c)
 
