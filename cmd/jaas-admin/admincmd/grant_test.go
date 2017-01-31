@@ -102,7 +102,7 @@ func (s *grantSuite) TestGrant(c *gc.C) {
 		"grant",
 		"--set",
 		"bob/foo",
-		"daisy,chloe,emily",
+		"daisy,chloe,emily@bar",
 	)
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
@@ -116,7 +116,7 @@ func (s *grantSuite) TestGrant(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	c.Assert(acl, jc.DeepEquals, params.ACL{
-		Read: []string{"chloe", "daisy", "emily"},
+		Read: []string{"chloe", "daisy", "emily@bar"},
 	})
 }
 
