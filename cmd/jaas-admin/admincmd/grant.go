@@ -168,7 +168,7 @@ func (us *userSet) Set(s string) error {
 		if u == "" {
 			return errgo.Newf("empty user found")
 		}
-		if !names.IsValidUserName(u) {
+		if !names.IsValidUser(u) {
 			return errgo.Newf("invalid user name %q", u)
 		}
 		m[u] = true
