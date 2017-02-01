@@ -43,7 +43,7 @@ var (
 )
 
 func (s *usageSenderSuite) SetUpTest(c *gc.C) {
-	s.handler = &testHandler{receivedMetrics: make(chan string, 1)}
+	s.handler = &testHandler{receivedMetrics: make(chan string)}
 
 	router := httprouter.New()
 	handlers := jemerror.Mapper.Handlers(func(_ httprequest.Params) (*testHandler, error) {
@@ -93,7 +93,7 @@ func (s *usageSenderSuite) setUnitNumberAndCheckSentMetrics(c *gc.C, modelUUID s
 	}, s.clock.Now())
 	c.Assert(err, jc.ErrorIsNil)
 
-	s.clock.Advance(6 * time.Minute)
+	s.clock.WaitAdvance(6*time.Minute, jujujujutesting.LongWait, 1)
 
 	unitCountString := fmt.Sprintf("%d", unitCount)
 
