@@ -19,10 +19,10 @@ import (
 	"github.com/juju/juju/api/usermanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
-	"github.com/juju/juju/instance"
 	"github.com/juju/juju/network"
-	"github.com/juju/juju/state/multiwatcher"
+	"github.com/juju/juju/state"
 	"github.com/juju/juju/status"
+	"github.com/juju/juju/testing/factory"
 	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
@@ -676,47 +676,49 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 	modelUUID2 := mi.UUID
 	mi = s.assertCreateModel(c, createModelParams{name: "model-3", username: "test2", cred: "cred1"})
 	modelUUID3 := mi.UUID
+	mi = s.assertCreateModel(c, createModelParams{name: "model-4", username: "test2", cred: "cred1"})
+	modelUUID4 := mi.UUID
+	mi = s.assertCreateModel(c, createModelParams{name: "model-5", username: "test2", cred: "cred1"})
+	modelUUID5 := mi.UUID
 
-	// Add some machines to one of the models
-	err = s.JEM.DB.UpdateMachineInfo(testContext, &multiwatcher.MachineInfo{
-		ModelUUID: modelUUID3,
-		Id:        "machine-0",
-	})
+	s.grant(c, params.EntityPath{User: "test2", Name: "model-3"}, params.User("test"), "read")
+	s.grant(c, params.EntityPath{User: "test2", Name: "model-4"}, params.User("test"), "write")
+	s.grant(c, params.EntityPath{User: "test2", Name: "model-5"}, params.User("test"), "admin")
+
+	// Add some machines to the models
+	state3, err := s.State.ForModel(names.NewModelTag(modelUUID3))
 	c.Assert(err, jc.ErrorIsNil)
-	machineArch := "bbc-micro"
-	err = s.JEM.DB.UpdateMachineInfo(testContext, &multiwatcher.MachineInfo{
-		ModelUUID: modelUUID3,
-		Id:        "machine-1",
-		HardwareCharacteristics: &instance.HardwareCharacteristics{
-			Arch: &machineArch,
-		},
-	})
+	defer state3.Close()
+	f := factory.NewFactory(state3)
+	machine0 := f.MakeMachine(c, nil)
+
+	state4, err := s.State.ForModel(names.NewModelTag(modelUUID4))
 	c.Assert(err, jc.ErrorIsNil)
+	defer state4.Close()
+	f = factory.NewFactory(state4)
+	machine1 := f.MakeMachine(c, nil)
+
+	state5, err := s.State.ForModel(names.NewModelTag(modelUUID5))
+	c.Assert(err, jc.ErrorIsNil)
+	defer state5.Close()
+	f = factory.NewFactory(state5)
+	machine2 := f.MakeMachine(c, nil)
 
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := modelmanager.NewClient(conn)
 
-	err = s.JEM.DB.SetACL(testContext, s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
-		Read: []string{"test"},
-	})
-
-	c.Assert(err, jc.ErrorIsNil)
-
 	models, err := client.ModelInfo([]names.ModelTag{
 		names.NewModelTag(modelUUID1),
 		names.NewModelTag(modelUUID2),
 		names.NewModelTag(modelUUID3),
+		names.NewModelTag(modelUUID4),
+		names.NewModelTag(modelUUID5),
 		names.NewModelTag("00000000-0000-0000-0000-000000000007"),
 	})
 	c.Assert(err, jc.ErrorIsNil)
-	for i := range models {
-		if models[i].Result == nil {
-			continue
-		}
-		models[i].Result.Status.Since = nil
-	}
-	c.Assert(models, jc.DeepEquals, []jujuparams.ModelInfoResult{{
+
+	assertModelInfo(c, models, []jujuparams.ModelInfoResult{{
 		Result: &jujuparams.ModelInfo{
 			Name:               "model-1",
 			UUID:               modelUUID1,
@@ -731,6 +733,11 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 			Status: jujuparams.EntityStatus{
 				Status: status.Available,
 			},
+			Users: []jujuparams.ModelUserInfo{{
+				UserName:    "test@external",
+				DisplayName: "test",
+				Access:      jujuparams.ModelAdminAccess,
+			}},
 		},
 	}, {
 		Error: &jujuparams.Error{
@@ -752,14 +759,63 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 			Status: jujuparams.EntityStatus{
 				Status: status.Available,
 			},
-			Machines: []jujuparams.ModelMachineInfo{{
-				Id: "machine-0",
-			}, {
-				Id: "machine-1",
-				Hardware: &jujuparams.MachineHardware{
-					Arch: &machineArch,
-				},
+			Users: []jujuparams.ModelUserInfo{{
+				UserName: "test@external",
+				Access:   jujuparams.ModelReadAccess,
 			}},
+			Machines: []jujuparams.ModelMachineInfo{
+				machineInfo(c, machine0),
+			},
+		},
+	}, {
+		Result: &jujuparams.ModelInfo{
+			Name:               "model-4",
+			UUID:               modelUUID4,
+			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+			ProviderType:       "dummy",
+			DefaultSeries:      "xenial",
+			CloudTag:           "cloud-dummy",
+			CloudRegion:        "dummy-region",
+			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test2@external/cred1").String(),
+			OwnerTag:           names.NewUserTag("test2@external").String(),
+			Life:               jujuparams.Alive,
+			Status: jujuparams.EntityStatus{
+				Status: status.Available,
+			},
+			Users: []jujuparams.ModelUserInfo{{
+				UserName: "test@external",
+				Access:   jujuparams.ModelWriteAccess,
+			}},
+			Machines: []jujuparams.ModelMachineInfo{
+				machineInfo(c, machine1),
+			},
+		},
+	}, {
+		Result: &jujuparams.ModelInfo{
+			Name:               "model-5",
+			UUID:               modelUUID5,
+			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+			ProviderType:       "dummy",
+			DefaultSeries:      "xenial",
+			CloudTag:           "cloud-dummy",
+			CloudRegion:        "dummy-region",
+			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test2@external/cred1").String(),
+			OwnerTag:           names.NewUserTag("test2@external").String(),
+			Life:               jujuparams.Alive,
+			Status: jujuparams.EntityStatus{
+				Status: status.Available,
+			},
+			Users: []jujuparams.ModelUserInfo{{
+				UserName:    "test2@external",
+				DisplayName: "test2",
+				Access:      jujuparams.ModelAdminAccess,
+			}, {
+				UserName: "test@external",
+				Access:   jujuparams.ModelAdminAccess,
+			}},
+			Machines: []jujuparams.ModelMachineInfo{
+				machineInfo(c, machine2),
+			},
 		},
 	}, {
 		Error: &jujuparams.Error{
@@ -800,7 +856,7 @@ func (s *websocketSuite) TestModelInfoForLegacyModel(c *gc.C) {
 	client := modelmanager.NewClient(conn)
 	models, err := client.ModelInfo([]names.ModelTag{names.NewModelTag(modelUUID1)})
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(models, jc.DeepEquals, []jujuparams.ModelInfoResult{{
+	assertModelInfo(c, models, []jujuparams.ModelInfoResult{{
 		Result: &jujuparams.ModelInfo{
 			Name:               "model-1",
 			UUID:               modelUUID1,
@@ -815,6 +871,11 @@ func (s *websocketSuite) TestModelInfoForLegacyModel(c *gc.C) {
 			Status: jujuparams.EntityStatus{
 				Status: status.Available,
 			},
+			Users: []jujuparams.ModelUserInfo{{
+				UserName:    "test@external",
+				DisplayName: "test",
+				Access:      jujuparams.ModelAdminAccess,
+			}},
 		},
 	}})
 
@@ -1052,7 +1113,7 @@ func (s *websocketSuite) TestCreateModel(c *gc.C) {
 		c.Assert(mi.UUID, gc.Not(gc.Equals), "")
 		c.Assert(mi.OwnerTag, gc.Equals, test.ownerTag)
 		c.Assert(mi.ControllerUUID, gc.Equals, "914487b5-60e7-42bb-bd63-1adc3fd3a388")
-		c.Assert(mi.Users, gc.HasLen, 0)
+		c.Assert(mi.Users, gc.Not(gc.HasLen), 0)
 		if test.credentialTag == "" {
 			c.Assert(mi.CloudCredentialTag, gc.Equals, "")
 		} else {
@@ -1487,5 +1548,53 @@ func (s *websocketSuite) assertCreateModel(c *gc.C, p createModelParams) base.Mo
 	credentialTag := names.NewCloudCredentialTag(fmt.Sprintf("dummy/%s@external/%s", p.username, p.cred))
 	mi, err := client.CreateModel(p.name, p.username+"@external", p.cloud, p.region, credentialTag, p.config)
 	c.Assert(err, jc.ErrorIsNil)
+	return mi
+}
+
+func (s *websocketSuite) grant(c *gc.C, path params.EntityPath, user params.User, access string) {
+	m, err := s.JEM.DB.Model(testContext, path)
+	c.Assert(err, jc.ErrorIsNil)
+	conn, err := s.JEM.OpenAPI(testContext, m.Controller)
+	c.Assert(err, jc.ErrorIsNil)
+	err = s.JEM.GrantModel(testContext, conn, m, user, access)
+	c.Assert(err, jc.ErrorIsNil)
+}
+
+func assertModelInfo(c *gc.C, obtained, expected []jujuparams.ModelInfoResult) {
+	for i := range obtained {
+		if obtained[i].Result == nil {
+			continue
+		}
+		obtained[i].Result.Status.Since = nil
+		for j := range obtained[i].Result.Users {
+			obtained[i].Result.Users[j].LastConnection = nil
+		}
+	}
+	c.Assert(obtained, jc.DeepEquals, expected)
+}
+
+func machineInfo(c *gc.C, m *state.Machine) jujuparams.ModelMachineInfo {
+	mi := jujuparams.ModelMachineInfo{
+		Id:        m.Id(),
+		HasVote:   m.HasVote(),
+		WantsVote: m.WantsVote(),
+	}
+	hc, err := m.HardwareCharacteristics()
+	c.Assert(err, jc.ErrorIsNil)
+	mi.Hardware = &jujuparams.MachineHardware{
+		Arch:             hc.Arch,
+		Mem:              hc.Mem,
+		RootDisk:         hc.RootDisk,
+		Cores:            hc.CpuCores,
+		CpuPower:         hc.CpuPower,
+		Tags:             hc.Tags,
+		AvailabilityZone: hc.AvailabilityZone,
+	}
+	id, err := m.InstanceId()
+	c.Assert(err, jc.ErrorIsNil)
+	mi.InstanceId = string(id)
+	st, err := m.Status()
+	c.Assert(err, jc.ErrorIsNil)
+	mi.Status = string(st.Status)
 	return mi
 }

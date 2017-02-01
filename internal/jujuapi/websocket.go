@@ -20,7 +20,6 @@ import (
 	"github.com/juju/juju/rpc"
 	"github.com/juju/juju/rpc/jsoncodec"
 	"github.com/juju/juju/rpc/rpcreflect"
-	"github.com/juju/juju/status"
 	"github.com/juju/juju/storage"
 	"github.com/uber-go/zap"
 	"golang.org/x/net/context"
@@ -854,65 +853,57 @@ func modelInfo(h *wsHandler, arg jujuparams.Entity) (*jujuparams.ModelInfo, erro
 }
 
 func modelDocToModelInfo(h *wsHandler, model *mongodoc.Model) (*jujuparams.ModelInfo, error) {
-	machines, err := h.jem.DB.MachinesForModel(h.context, model.UUID)
+	info, err := fetchModelInfo(h, model)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	cloud, err := h.jem.DB.Cloud(h.context, model.Cloud)
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot get cloud %q", model.Cloud)
-	}
-	return &jujuparams.ModelInfo{
-		Name:               string(model.Path.Name),
-		UUID:               model.UUID,
-		ControllerUUID:     h.params.ControllerUUID,
-		ProviderType:       cloud.ProviderType,
-		DefaultSeries:      model.DefaultSeries,
-		CloudTag:           jem.CloudTag(model.Cloud).String(),
-		CloudRegion:        model.CloudRegion,
-		CloudCredentialTag: jem.CloudCredentialTag(model.Credential).String(),
-		OwnerTag:           jem.UserTag(model.Path.User).String(),
-		Life:               jujuparams.Life(model.Life),
-		// TODO if the multiwatcher returned updates to model
-		// status, we could do better here, but the model status doesn't
-		// reflect much anyway.
-		Status: jujuparams.EntityStatus{
-			Status: status.Available,
-		},
-		// TODO we could add user information here, but
-		// it's only visible to admins, so leave it for the time being.
-		Machines: jemMachinesToModelMachineInfo(machines),
-	}, nil
+	info.Name = string(model.Path.Name)
+	info.ControllerUUID = h.params.ControllerUUID
+	info.CloudCredentialTag = jem.CloudCredentialTag(model.Credential).String()
+	info.OwnerTag = jem.UserTag(model.Path.User).String()
+	info.Users = filterUsers(h.context, info.Users, modelAdmin(h.context, info))
+	return info, nil
 }
 
-func jemMachinesToModelMachineInfo(machines []mongodoc.Machine) []jujuparams.ModelMachineInfo {
-	infos := make([]jujuparams.ModelMachineInfo, len(machines))
-	for i := range machines {
-		infos[i] = jemMachineToModelMachineInfo(&machines[i])
-	}
-	return infos
+// modelAdmin determines if the current user is an admin on the given model.
+func modelAdmin(ctx context.Context, info *jujuparams.ModelInfo) bool {
+	var admin bool
+	iterUsers(ctx, info.Users, func(u params.User, ui jujuparams.ModelUserInfo) {
+		admin = admin || ui.Access == jujuparams.ModelAdminAccess && auth.CheckIsUser(ctx, u) == nil
+	})
+	return admin
 }
 
-func jemMachineToModelMachineInfo(m *mongodoc.Machine) jujuparams.ModelMachineInfo {
-	var hardware *jujuparams.MachineHardware
-	if m.Info.HardwareCharacteristics != nil {
-		hardware = &jujuparams.MachineHardware{
-			Arch:             m.Info.HardwareCharacteristics.Arch,
-			Mem:              m.Info.HardwareCharacteristics.Mem,
-			RootDisk:         m.Info.HardwareCharacteristics.RootDisk,
-			Cores:            m.Info.HardwareCharacteristics.CpuCores,
-			CpuPower:         m.Info.HardwareCharacteristics.CpuPower,
-			Tags:             m.Info.HardwareCharacteristics.Tags,
-			AvailabilityZone: m.Info.HardwareCharacteristics.AvailabilityZone,
+// filterUsers returns a slice holding all of the given users that the
+// current user should be able to see. Admin users can see everyone;
+// other users can only see users and groups they're a member of. Users
+// local to the controller are always removed.
+func filterUsers(ctx context.Context, users []jujuparams.ModelUserInfo, admin bool) []jujuparams.ModelUserInfo {
+	filtered := make([]jujuparams.ModelUserInfo, 0, len(users))
+	iterUsers(ctx, users, func(u params.User, ui jujuparams.ModelUserInfo) {
+		if admin || auth.CheckIsUser(ctx, u) == nil {
+			filtered = append(filtered, ui)
 		}
-	}
-	return jujuparams.ModelMachineInfo{
-		Id:         m.Info.Id,
-		InstanceId: m.Info.InstanceId,
-		Status:     string(m.Info.AgentStatus.Current),
-		HasVote:    m.Info.HasVote,
-		WantsVote:  m.Info.WantsVote,
-		Hardware:   hardware,
+	})
+	return filtered
+}
+
+// iterUsers iterates through all the non-local users in users and calls
+// f with each in turn.
+func iterUsers(ctx context.Context, users []jujuparams.ModelUserInfo, f func(params.User, jujuparams.ModelUserInfo)) {
+	for _, u := range users {
+		if !names.IsValidUser(u.UserName) {
+			zapctx.Info(ctx, "controller sent invalid username, skipping", zap.String("username", u.UserName))
+			continue
+		}
+		tag := names.NewUserTag(u.UserName)
+		user, err := user(tag)
+		if err != nil {
+			// This error will occur if the user is local to
+			// the controller, it can be safely ignored.
+			continue
+		}
+		f(user, u)
 	}
 }
 
