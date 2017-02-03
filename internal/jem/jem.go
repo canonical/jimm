@@ -259,15 +259,7 @@ func (j *JEM) OpenAPI(ctx context.Context, path params.EntityPath) (_ *apiconn.C
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot get controller", errgo.Is(params.ErrNotFound))
 	}
-	return j.pool.connCache.OpenAPI(ctl.UUID, func() (api.Connection, *api.Info, error) {
-		apiInfo := apiInfoFromDoc(ctl)
-		zapctx.Debug(ctx, "open API", zap.Object("api-info", apiInfo))
-		st, err := api.Open(apiInfo, apiDialOpts())
-		if err != nil {
-			return nil, nil, errgo.WithCausef(err, ErrAPIConnection, "")
-		}
-		return st, apiInfo, nil
-	})
+	return j.OpenAPIFromDoc(ctx, ctl)
 }
 
 // OpenAPIFromDoc returns an API connection to the controller held in the
@@ -282,6 +274,7 @@ func (j *JEM) OpenAPI(ctx context.Context, path params.EntityPath) (_ *apiconn.C
 func (j *JEM) OpenAPIFromDoc(ctx context.Context, ctl *mongodoc.Controller) (*apiconn.Conn, error) {
 	return j.pool.connCache.OpenAPI(ctl.UUID, func() (api.Connection, *api.Info, error) {
 		info := apiInfoFromDoc(ctl)
+		zapctx.Debug(ctx, "open API", zap.Object("api-info", info))
 		cl, err := runWithContext(ctx, func() (io.Closer, error) {
 			conn, err := api.Open(info, apiDialOpts())
 			if err != nil {

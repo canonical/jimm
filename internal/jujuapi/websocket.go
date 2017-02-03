@@ -20,7 +20,9 @@ import (
 	"github.com/juju/juju/rpc"
 	"github.com/juju/juju/rpc/jsoncodec"
 	"github.com/juju/juju/rpc/rpcreflect"
+	"github.com/juju/juju/status"
 	"github.com/juju/juju/storage"
+	"github.com/juju/utils/parallel"
 	"github.com/uber-go/zap"
 	"golang.org/x/net/context"
 	"golang.org/x/net/websocket"
@@ -38,6 +40,11 @@ import (
 	"github.com/CanonicalLtd/jem/internal/zapctx"
 	"github.com/CanonicalLtd/jem/internal/zaputil"
 	"github.com/CanonicalLtd/jem/params"
+)
+
+const (
+	requestTimeout        = 10 * time.Second
+	maxRequestConcurrency = 10
 )
 
 var errorCodes = map[error]string{
@@ -584,7 +591,7 @@ func (c cloud) userCredentials(ownerTag, cloudTag string) ([]string, error) {
 // UpdateCredentials implements the UpdateCredentials method of the Cloud
 // facade.
 func (c cloud) UpdateCredentials(args jujuparams.UpdateCloudCredentials) (jujuparams.ErrorResults, error) {
-	ctx, cancel := context.WithTimeout(c.h.context, 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.h.context, requestTimeout)
 	defer cancel()
 	results := make([]jujuparams.ErrorResult, len(args.Credentials))
 	for i, ucc := range args.Credentials {
@@ -634,7 +641,7 @@ func (c cloud) updateCredential(ctx context.Context, arg jujuparams.UpdateCloudC
 
 // RevokeCredentials revokes a set of cloud credentials.
 func (c cloud) RevokeCredentials(args jujuparams.Entities) (jujuparams.ErrorResults, error) {
-	ctx, cancel := context.WithTimeout(c.h.context, 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.h.context, requestTimeout)
 	defer cancel()
 	results := make([]jujuparams.ErrorResult, len(args.Entities))
 	for i, ent := range args.Entities {
@@ -746,11 +753,13 @@ func (c controller) AllModels() (jujuparams.UserModelList, error) {
 }
 
 func (c controller) ModelStatus(args jujuparams.Entities) (jujuparams.ModelStatusResults, error) {
+	ctx, cancel := context.WithTimeout(c.h.context, requestTimeout)
+	defer cancel()
 	results := make([]jujuparams.ModelStatus, len(args.Entities))
 	// TODO (fabricematrat) get status for all of the models connected
 	// to a single controller in one go.
 	for i, arg := range args.Entities {
-		mi, err := c.modelStatus(arg)
+		mi, err := c.modelStatus(ctx, arg)
 		if err != nil {
 			return jujuparams.ModelStatusResults{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 		}
@@ -763,8 +772,8 @@ func (c controller) ModelStatus(args jujuparams.Entities) (jujuparams.ModelStatu
 }
 
 // modelStatus retrieves the model status for the specified entity.
-func (c controller) modelStatus(arg jujuparams.Entity) (*jujuparams.ModelStatus, error) {
-	mi, err := modelInfo(c.h, arg)
+func (c controller) modelStatus(ctx context.Context, arg jujuparams.Entity) (*jujuparams.ModelStatus, error) {
+	mi, err := modelInfo(ctx, c.h, arg)
 	if err != nil {
 		return &jujuparams.ModelStatus{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
@@ -820,24 +829,31 @@ func userModelForModelDoc(m *mongodoc.Model) jujuparams.Model {
 
 // ModelInfo implements the ModelManager facade's ModelInfo method.
 func (m modelManager) ModelInfo(args jujuparams.Entities) (jujuparams.ModelInfoResults, error) {
+	ctx, cancel := context.WithTimeout(m.h.context, requestTimeout)
+	defer cancel()
 	results := make([]jujuparams.ModelInfoResult, len(args.Entities))
+	run := parallel.NewRun(maxRequestConcurrency)
 	for i, arg := range args.Entities {
-		mi, err := modelInfo(m.h, arg)
-		if err != nil {
-			results[i].Error = mapError(err)
-			continue
-		}
-		results[i].Result = mi
+		i, arg := i, arg
+		run.Do(func() error {
+			mi, err := modelInfo(ctx, m.h, arg)
+			if err != nil {
+				results[i].Error = mapError(err)
+			} else {
+				results[i].Result = mi
+			}
+			return nil
+		})
 	}
-
+	run.Wait()
 	return jujuparams.ModelInfoResults{
 		Results: results,
 	}, nil
 }
 
 // modelInfo retrieves the model information for the specified entity.
-func modelInfo(h *wsHandler, arg jujuparams.Entity) (*jujuparams.ModelInfo, error) {
-	model, err := getModel(h, arg.Tag, auth.CheckCanRead)
+func modelInfo(ctx context.Context, h *wsHandler, arg jujuparams.Entity) (*jujuparams.ModelInfo, error) {
+	model, err := getModel(ctx, h.jem, arg.Tag, auth.CheckCanRead)
 	if err != nil {
 		return nil, errgo.Mask(err,
 			errgo.Is(params.ErrBadRequest),
@@ -845,24 +861,83 @@ func modelInfo(h *wsHandler, arg jujuparams.Entity) (*jujuparams.ModelInfo, erro
 			errgo.Is(params.ErrNotFound),
 		)
 	}
-	info, err := modelDocToModelInfo(h, model)
+	ctx = zapctx.WithFields(ctx, zap.String("model-uuid", model.UUID))
+	info, err := modelDocToModelInfo(ctx, h, model)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
+	// Query the model itself for user information.
+	infoFromController, err := fetchModelInfo(ctx, h.jem, model)
+	if err != nil {
+		// We have most of the information we want already so return that.
+		zapctx.Error(ctx, "failed to get ModelInfo from controller", zap.String("controller", model.Controller.String()), zaputil.Error(err))
+		return info, nil
+	}
+	info.Users = filterUsers(ctx, infoFromController.Users, modelAdmin(ctx, infoFromController))
 	return info, nil
 }
 
-func modelDocToModelInfo(h *wsHandler, model *mongodoc.Model) (*jujuparams.ModelInfo, error) {
-	info, err := fetchModelInfo(h, model)
+func modelDocToModelInfo(ctx context.Context, h *wsHandler, model *mongodoc.Model) (*jujuparams.ModelInfo, error) {
+	machines, err := h.jem.DB.MachinesForModel(ctx, model.UUID)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	info.Name = string(model.Path.Name)
-	info.ControllerUUID = h.params.ControllerUUID
-	info.CloudCredentialTag = jem.CloudCredentialTag(model.Credential).String()
-	info.OwnerTag = jem.UserTag(model.Path.User).String()
-	info.Users = filterUsers(h.context, info.Users, modelAdmin(h.context, info))
-	return info, nil
+	cloud, err := h.jem.DB.Cloud(ctx, model.Cloud)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot get cloud %q", model.Cloud)
+	}
+	return &jujuparams.ModelInfo{
+		Name:               string(model.Path.Name),
+		UUID:               model.UUID,
+		ControllerUUID:     h.params.ControllerUUID,
+		ProviderType:       cloud.ProviderType,
+		DefaultSeries:      model.DefaultSeries,
+		CloudTag:           jem.CloudTag(model.Cloud).String(),
+		CloudRegion:        model.CloudRegion,
+		CloudCredentialTag: jem.CloudCredentialTag(model.Credential).String(),
+		OwnerTag:           jem.UserTag(model.Path.User).String(),
+		Life:               jujuparams.Life(model.Life),
+		// TODO if the multiwatcher returned updates to model
+		// status, we could do better here, but the model status doesn't
+		// reflect much anyway.
+		Status: jujuparams.EntityStatus{
+			Status: status.Available,
+		},
+		// TODO we could add user information here, but
+		// it's only visible to admins, so leave it for the time being.
+		Machines: jemMachinesToModelMachineInfo(machines),
+	}, nil
+}
+
+func jemMachinesToModelMachineInfo(machines []mongodoc.Machine) []jujuparams.ModelMachineInfo {
+	infos := make([]jujuparams.ModelMachineInfo, len(machines))
+	for i := range machines {
+		infos[i] = jemMachineToModelMachineInfo(&machines[i])
+	}
+	return infos
+}
+
+func jemMachineToModelMachineInfo(m *mongodoc.Machine) jujuparams.ModelMachineInfo {
+	var hardware *jujuparams.MachineHardware
+	if m.Info.HardwareCharacteristics != nil {
+		hardware = &jujuparams.MachineHardware{
+			Arch:             m.Info.HardwareCharacteristics.Arch,
+			Mem:              m.Info.HardwareCharacteristics.Mem,
+			RootDisk:         m.Info.HardwareCharacteristics.RootDisk,
+			Cores:            m.Info.HardwareCharacteristics.CpuCores,
+			CpuPower:         m.Info.HardwareCharacteristics.CpuPower,
+			Tags:             m.Info.HardwareCharacteristics.Tags,
+			AvailabilityZone: m.Info.HardwareCharacteristics.AvailabilityZone,
+		}
+	}
+	return jujuparams.ModelMachineInfo{
+		Id:         m.Info.Id,
+		InstanceId: m.Info.InstanceId,
+		Status:     string(m.Info.AgentStatus.Current),
+		HasVote:    m.Info.HasVote,
+		WantsVote:  m.Info.WantsVote,
+		Hardware:   hardware,
+	}
 }
 
 // modelAdmin determines if the current user is an admin on the given model.
@@ -909,7 +984,9 @@ func iterUsers(ctx context.Context, users []jujuparams.ModelUserInfo, f func(par
 
 // CreateModel implements the ModelManager facade's CreateModel method.
 func (m modelManager) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.ModelInfo, error) {
-	mi, err := m.createModel(args)
+	ctx, cancel := context.WithTimeout(m.h.context, requestTimeout)
+	defer cancel()
+	mi, err := m.createModel(ctx, args)
 	if err == nil {
 		servermon.ModelsCreatedCount.Inc()
 	} else {
@@ -925,7 +1002,7 @@ func (m modelManager) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.M
 	return *mi, nil
 }
 
-func (m modelManager) createModel(args jujuparams.ModelCreateArgs) (*jujuparams.ModelInfo, error) {
+func (m modelManager) createModel(ctx context.Context, args jujuparams.ModelCreateArgs) (*jujuparams.ModelInfo, error) {
 	ownerTag, err := names.ParseUserTag(args.OwnerTag)
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid owner tag")
@@ -956,7 +1033,7 @@ func (m modelManager) createModel(args jujuparams.ModelCreateArgs) (*jujuparams.
 			},
 		}
 	}
-	model, err := m.h.jem.CreateModel(m.h.context, jem.CreateModelParams{
+	model, err := m.h.jem.CreateModel(ctx, jem.CreateModelParams{
 		Path:       params.EntityPath{User: owner, Name: params.Name(args.Name)},
 		Credential: credPath,
 		Cloud:      cloud,
@@ -966,19 +1043,25 @@ func (m modelManager) createModel(args jujuparams.ModelCreateArgs) (*jujuparams.
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	info, err := modelDocToModelInfo(m.h, model)
+	info, err := modelDocToModelInfo(ctx, m.h, model)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
+	info.Users = []jujuparams.ModelUserInfo{{
+		UserName: ownerTag.Id(),
+		Access:   jujuparams.ModelAdminAccess,
+	}}
 	return info, nil
 }
 
 // DestroyModels implements the ModelManager facade's DestroyModels method.
 func (m modelManager) DestroyModels(args jujuparams.Entities) (jujuparams.ErrorResults, error) {
+	ctx, cancel := context.WithTimeout(m.h.context, requestTimeout)
+	defer cancel()
 	results := make([]jujuparams.ErrorResult, len(args.Entities))
 
 	for i, arg := range args.Entities {
-		if err := m.destroyModel(arg); err != nil {
+		if err := m.destroyModel(ctx, arg); err != nil {
 			results[i].Error = mapError(err)
 		}
 	}
@@ -989,8 +1072,8 @@ func (m modelManager) DestroyModels(args jujuparams.Entities) (jujuparams.ErrorR
 }
 
 // destroyModel destroys the specified model.
-func (m modelManager) destroyModel(arg jujuparams.Entity) error {
-	model, err := getModel(m.h, arg.Tag, checkIsOwner)
+func (m modelManager) destroyModel(ctx context.Context, arg jujuparams.Entity) error {
+	model, err := getModel(ctx, m.h.jem, arg.Tag, checkIsOwner)
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			// Juju doesn't treat removing a model that isn't there as an error, and neither should we.
@@ -998,11 +1081,11 @@ func (m modelManager) destroyModel(arg jujuparams.Entity) error {
 		}
 		return errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
 	}
-	conn, err := m.h.jem.OpenAPI(context.TODO(), model.Controller)
+	conn, err := m.h.jem.OpenAPI(ctx, model.Controller)
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	if err := m.h.jem.DestroyModel(context.TODO(), conn, model); err != nil {
+	if err := m.h.jem.DestroyModel(ctx, conn, model); err != nil {
 		return errgo.Mask(err)
 	}
 	age := float64(time.Now().Sub(model.CreationTime)) / float64(time.Hour)
@@ -1013,9 +1096,11 @@ func (m modelManager) destroyModel(arg jujuparams.Entity) error {
 
 // ModifyModelAccess implements the ModelManager facade's ModifyModelAccess method.
 func (m modelManager) ModifyModelAccess(args jujuparams.ModifyModelAccessRequest) (jujuparams.ErrorResults, error) {
+	ctx, cancel := context.WithTimeout(m.h.context, requestTimeout)
+	defer cancel()
 	results := make([]jujuparams.ErrorResult, len(args.Changes))
 	for i, change := range args.Changes {
-		err := m.modifyModelAccess(change)
+		err := m.modifyModelAccess(ctx, change)
 		if err != nil {
 			results[i].Error = mapError(err)
 		}
@@ -1025,8 +1110,8 @@ func (m modelManager) ModifyModelAccess(args jujuparams.ModifyModelAccessRequest
 	}, nil
 }
 
-func (m modelManager) modifyModelAccess(change jujuparams.ModifyModelAccess) error {
-	model, err := getModel(m.h, change.ModelTag, checkIsOwner)
+func (m modelManager) modifyModelAccess(ctx context.Context, change jujuparams.ModifyModelAccess) error {
+	model, err := getModel(ctx, m.h.jem, change.ModelTag, checkIsOwner)
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			err = params.ErrUnauthorized
@@ -1041,16 +1126,16 @@ func (m modelManager) modifyModelAccess(change jujuparams.ModifyModelAccess) err
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
-	conn, err := m.h.jem.OpenAPI(context.TODO(), model.Controller)
+	conn, err := m.h.jem.OpenAPI(ctx, model.Controller)
 	if err != nil {
 		return errgo.Mask(err)
 	}
 	defer conn.Close()
 	switch change.Action {
 	case jujuparams.GrantModelAccess:
-		err = m.h.jem.GrantModel(m.h.context, conn, model, user, string(change.Access))
+		err = m.h.jem.GrantModel(ctx, conn, model, user, string(change.Access))
 	case jujuparams.RevokeModelAccess:
-		err = m.h.jem.RevokeModel(m.h.context, conn, model, user, string(change.Access))
+		err = m.h.jem.RevokeModel(ctx, conn, model, user, string(change.Access))
 	default:
 		return errgo.WithCausef(err, params.ErrBadRequest, "invalid action %q", change.Action)
 	}
@@ -1105,19 +1190,19 @@ func checkIsOwner(ctx context.Context, e auth.ACLEntity) error {
 // access is denied authf should return an error with the cause
 // params.ErrUnauthorized. The cause of any error returned by authf will
 // not be masked.
-func getModel(h *wsHandler, modelTag string, authf func(context.Context, auth.ACLEntity) error) (*mongodoc.Model, error) {
+func getModel(ctx context.Context, jem *jem.JEM, modelTag string, authf func(context.Context, auth.ACLEntity) error) (*mongodoc.Model, error) {
 	tag, err := names.ParseModelTag(modelTag)
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid model tag")
 	}
-	model, err := h.jem.DB.ModelFromUUID(h.context, tag.Id())
+	model, err := jem.DB.ModelFromUUID(ctx, tag.Id())
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	if authf == nil {
 		return model, nil
 	}
-	if err := authf(h.context, model); err != nil {
+	if err := authf(ctx, model); err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
 	if model.Cloud != "" {
@@ -1126,7 +1211,7 @@ func getModel(h *wsHandler, modelTag string, authf func(context.Context, auth.AC
 	// The model does not currently store its cloud information so go
 	// and fetch it from the model itself. This happens if the model
 	// was created with a JIMM version older than 0.9.5.
-	info, err := fetchModelInfo(h, model)
+	info, err := fetchModelInfo(ctx, jem, model)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -1153,22 +1238,27 @@ func getModel(h *wsHandler, modelTag string, authf func(context.Context, auth.AC
 	}
 	model.DefaultSeries = info.DefaultSeries
 
-	if err := h.jem.DB.UpdateLegacyModel(h.context, model); err != nil {
-		zapctx.Warn(h.context, "cannot update %s with cloud details", zap.String("model", model.Path.String()), zaputil.Error(err))
+	if err := jem.DB.UpdateLegacyModel(ctx, model); err != nil {
+		zapctx.Warn(ctx, "cannot update %s with cloud details", zap.String("model", model.Path.String()), zaputil.Error(err))
 	}
 	return model, nil
 }
 
-func fetchModelInfo(h *wsHandler, model *mongodoc.Model) (*jujuparams.ModelInfo, error) {
-	conn, err := h.jem.OpenAPI(h.context, model.Controller)
+func fetchModelInfo(ctx context.Context, jem *jem.JEM, model *mongodoc.Model) (*jujuparams.ModelInfo, error) {
+	conn, err := jem.OpenAPI(ctx, model.Controller)
 	if err != nil {
-		return nil, errgo.Mask(err)
+		return nil, errgo.Mask(err, errgo.Is(context.DeadlineExceeded))
 	}
 	defer conn.Close()
 	client := modelmanagerapi.NewClient(conn)
-	infos, err := client.ModelInfo([]names.ModelTag{names.NewModelTag(model.UUID)})
+	var infos []jujuparams.ModelInfoResult
+	err = runWithContext(ctx, func() error {
+		var err error
+		infos, err = client.ModelInfo([]names.ModelTag{names.NewModelTag(model.UUID)})
+		return err
+	})
 	if err != nil {
-		return nil, errgo.Mask(err)
+		return nil, errgo.Mask(err, errgo.Is(context.DeadlineExceeded))
 	}
 	if len(infos) != 1 {
 		return nil, errgo.Newf("unexpected number of ModelInfo results")
@@ -1319,4 +1409,28 @@ func user(tag names.UserTag) (params.User, error) {
 		username = tag.Id()
 	}
 	return params.User(username), nil
+}
+
+// runWithContext runs the given function and completes either when the
+// function completes, or when the given context is canceled. If the
+// function returns because the context was cancelled then the returned
+// error will have the value of ctx.Err().
+func runWithContext(ctx context.Context, f func() error) error {
+	c := make(chan error)
+	go func() {
+		err := f()
+		select {
+		case c <- err:
+		case <-ctx.Done():
+			if err != nil {
+				zapctx.Debug(ctx, "ignoring error in canceled task", zaputil.Error(err))
+			}
+		}
+	}()
+	select {
+	case err := <-c:
+		return errgo.Mask(err, errgo.Any)
+	case <-ctx.Done():
+		return errgo.Mask(ctx.Err(), errgo.Any)
+	}
 }

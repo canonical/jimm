@@ -19,10 +19,12 @@ import (
 	"github.com/juju/juju/api/usermanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
+	"github.com/juju/juju/instance"
 	"github.com/juju/juju/network"
 	"github.com/juju/juju/state"
+	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/juju/status"
-	"github.com/juju/juju/testing/factory"
+	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
@@ -685,24 +687,21 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 	s.grant(c, params.EntityPath{User: "test2", Name: "model-4"}, params.User("test"), "write")
 	s.grant(c, params.EntityPath{User: "test2", Name: "model-5"}, params.User("test"), "admin")
 
-	// Add some machines to the models
-	state3, err := s.State.ForModel(names.NewModelTag(modelUUID3))
+	// Add some machines to one of the models
+	err = s.JEM.DB.UpdateMachineInfo(testContext, &multiwatcher.MachineInfo{
+		ModelUUID: modelUUID3,
+		Id:        "machine-0",
+	})
 	c.Assert(err, jc.ErrorIsNil)
-	defer state3.Close()
-	f := factory.NewFactory(state3)
-	machine0 := f.MakeMachine(c, nil)
-
-	state4, err := s.State.ForModel(names.NewModelTag(modelUUID4))
+	machineArch := "bbc-micro"
+	err = s.JEM.DB.UpdateMachineInfo(testContext, &multiwatcher.MachineInfo{
+		ModelUUID: modelUUID3,
+		Id:        "machine-1",
+		HardwareCharacteristics: &instance.HardwareCharacteristics{
+			Arch: &machineArch,
+		},
+	})
 	c.Assert(err, jc.ErrorIsNil)
-	defer state4.Close()
-	f = factory.NewFactory(state4)
-	machine1 := f.MakeMachine(c, nil)
-
-	state5, err := s.State.ForModel(names.NewModelTag(modelUUID5))
-	c.Assert(err, jc.ErrorIsNil)
-	defer state5.Close()
-	f = factory.NewFactory(state5)
-	machine2 := f.MakeMachine(c, nil)
 
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
@@ -763,9 +762,14 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 				UserName: "test@external",
 				Access:   jujuparams.ModelReadAccess,
 			}},
-			Machines: []jujuparams.ModelMachineInfo{
-				machineInfo(c, machine0),
-			},
+			Machines: []jujuparams.ModelMachineInfo{{
+				Id: "machine-0",
+			}, {
+				Id: "machine-1",
+				Hardware: &jujuparams.MachineHardware{
+					Arch: &machineArch,
+				},
+			}},
 		},
 	}, {
 		Result: &jujuparams.ModelInfo{
@@ -786,9 +790,6 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 				UserName: "test@external",
 				Access:   jujuparams.ModelWriteAccess,
 			}},
-			Machines: []jujuparams.ModelMachineInfo{
-				machineInfo(c, machine1),
-			},
 		},
 	}, {
 		Result: &jujuparams.ModelInfo{
@@ -813,9 +814,6 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 				UserName: "test@external",
 				Access:   jujuparams.ModelAdminAccess,
 			}},
-			Machines: []jujuparams.ModelMachineInfo{
-				machineInfo(c, machine2),
-			},
 		},
 	}, {
 		Error: &jujuparams.Error{
@@ -886,6 +884,114 @@ func (s *websocketSuite) TestModelInfoForLegacyModel(c *gc.C) {
 	c.Assert(model.CloudRegion, gc.Equals, "dummy-region")
 	c.Assert(model.Credential.String(), gc.Equals, "dummy/test/cred1")
 	c.Assert(model.DefaultSeries, gc.Equals, "xenial")
+}
+
+func (s *websocketSuite) TestModelInfoRequestTimeout(c *gc.C) {
+	info := s.APIInfo(c)
+	proxy := testing.NewTCPProxy(c, info.Addrs[0])
+	p := &params.AddController{
+		EntityPath: params.EntityPath{User: "test", Name: "controller-1"},
+		Info: params.ControllerInfo{
+			HostPorts:      []string{proxy.Addr()},
+			CACert:         info.CACert,
+			User:           info.Tag.Id(),
+			Password:       info.Password,
+			ControllerUUID: s.ControllerConfig.ControllerUUID(),
+			Public:         true,
+		},
+	}
+	s.IDMSrv.AddUser("test", "controller-admin")
+	err := s.NewClient("test").AddController(p)
+	c.Assert(err, jc.ErrorIsNil)
+	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
+
+	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: "cred1"})
+
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := modelmanager.NewClient(conn)
+
+	models, err := client.ModelInfo([]names.ModelTag{
+		names.NewModelTag(mi.UUID),
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	assertModelInfo(c, models, []jujuparams.ModelInfoResult{{
+		Result: &jujuparams.ModelInfo{
+			Name:               "model-1",
+			UUID:               mi.UUID,
+			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+			ProviderType:       "dummy",
+			DefaultSeries:      "xenial",
+			CloudTag:           "cloud-dummy",
+			CloudRegion:        "dummy-region",
+			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test@external/cred1").String(),
+			OwnerTag:           names.NewUserTag("test@external").String(),
+			Life:               jujuparams.Alive,
+			Status: jujuparams.EntityStatus{
+				Status: status.Available,
+			},
+			Users: []jujuparams.ModelUserInfo{{
+				UserName:    "test@external",
+				DisplayName: "test",
+				Access:      jujuparams.ModelAdminAccess,
+			}},
+		},
+	}})
+
+	proxy.PauseConns()
+	models, err = client.ModelInfo([]names.ModelTag{
+		names.NewModelTag(mi.UUID),
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	assertModelInfo(c, models, []jujuparams.ModelInfoResult{{
+		Result: &jujuparams.ModelInfo{
+			Name:               "model-1",
+			UUID:               mi.UUID,
+			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+			ProviderType:       "dummy",
+			DefaultSeries:      "xenial",
+			CloudTag:           "cloud-dummy",
+			CloudRegion:        "dummy-region",
+			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test@external/cred1").String(),
+			OwnerTag:           names.NewUserTag("test@external").String(),
+			Life:               jujuparams.Alive,
+			Status: jujuparams.EntityStatus{
+				Status: status.Available,
+			},
+		},
+	}})
+
+	proxy.ResumeConns()
+
+	models, err = client.ModelInfo([]names.ModelTag{
+		names.NewModelTag(mi.UUID),
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	assertModelInfo(c, models, []jujuparams.ModelInfoResult{{
+		Result: &jujuparams.ModelInfo{
+			Name:               "model-1",
+			UUID:               mi.UUID,
+			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+			ProviderType:       "dummy",
+			DefaultSeries:      "xenial",
+			CloudTag:           "cloud-dummy",
+			CloudRegion:        "dummy-region",
+			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test@external/cred1").String(),
+			OwnerTag:           names.NewUserTag("test@external").String(),
+			Life:               jujuparams.Alive,
+			Status: jujuparams.EntityStatus{
+				Status: status.Available,
+			},
+			Users: []jujuparams.ModelUserInfo{{
+				UserName:    "test@external",
+				DisplayName: "test",
+				Access:      jujuparams.ModelAdminAccess,
+			}},
+		},
+	}})
 }
 
 func (s *websocketSuite) TestAllModels(c *gc.C) {
