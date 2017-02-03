@@ -14,7 +14,7 @@ import (
 // runWithContext runs the given function and completes either when the
 // runner completes, or when the given context is canceled. If Run
 // returns because the context was cancelled then the returned error will
-// have a cause of errCanceled.
+// have the value of ctx.Err().
 func runWithContext(ctx context.Context, f func() (io.Closer, error)) (io.Closer, error) {
 	type result struct {
 		closer io.Closer
