@@ -34,6 +34,7 @@ type Config struct {
 	GUILocation       string            `yaml:"gui-location"`
 	LoggingLevel      zap.Level         `yaml:"logging-level"`
 	UsageSenderURL    string            `yaml:"usage-sender-url,omitempty"`
+	Domain            string            `yaml:"domain"`
 }
 
 func (c *Config) validate() error {

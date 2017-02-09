@@ -71,6 +71,11 @@ type ServerParams struct {
 	// UsageSenderURL holds the URL where we obtain authorization
 	// to collect and report usage metrics.
 	UsageSenderURL string
+
+	// Domain holds the domain to which users must belong, not
+	// including the leading "@". If this is empty, users may be in
+	// any domain.
+	Domain string
 }
 
 // HandleCloser represents an HTTP handler that can

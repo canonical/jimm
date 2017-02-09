@@ -88,6 +88,11 @@ type Params struct {
 	// UsageSenderURL holds the URL where we obtain authorization
 	// to collect and report usage metrics.
 	UsageSenderURL string
+
+	// Domain holds the domain to which users must belong, not
+	// including the leading "@". If this is empty, users may be in
+	// any domain.
+	Domain string
 }
 
 // Server represents a JEM HTTP server.
@@ -153,6 +158,7 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 		SessionPool:        sessionPool,
 		PermChecker:        idmclient.NewPermChecker(idmClient, time.Hour),
 		IdentityLocation:   config.IdentityLocation,
+		Domain:             config.Domain,
 	})
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make auth pool")

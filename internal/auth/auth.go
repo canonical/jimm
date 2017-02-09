@@ -4,6 +4,7 @@ package auth
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/juju/idmclient"
 	"github.com/juju/utils"
@@ -53,6 +54,11 @@ type Params struct {
 	// SessionPool holds a pool from which session objects are
 	// taken to be used in database operations.
 	SessionPool *mgosession.Pool
+
+	// Domain holds the domain to which users must belong, not
+	// including the leading "@". If this is empty, users may be in
+	// any domain.
+	Domain string
 }
 
 // A Pool contains a pool of authenticator objects.
@@ -86,6 +92,7 @@ func (p *Pool) Authenticator(ctx context.Context) *Authenticator {
 			p.params.RootKeysPolicy,
 		)),
 		session: session,
+		domain:  p.params.Domain,
 	}
 }
 
@@ -99,6 +106,7 @@ type Authenticator struct {
 	pool    *Pool
 	bakery  *bakery.Service
 	session *mgo.Session
+	domain  string
 }
 
 // Close closes the authenticator instance.
@@ -118,13 +126,21 @@ func (a *Authenticator) Close() {
 // macaroon is non-nil then it should be sent to the client and if
 // discharged can be used to gain access.
 func (a *Authenticator) Authenticate(ctx context.Context, mss []macaroon.Slice, checker checkers.Checker) (context.Context, *macaroon.Macaroon, error) {
-	attrMap, verr := a.bakery.CheckAny(mss, nil, checkers.New(checker, checkers.TimeBefore))
+	attrMap, verr := a.bakery.CheckAny(mss, nil, checkers.New(
+		checker,
+		checkers.TimeBefore,
+	))
 	if verr == nil {
-		servermon.AuthenticationSuccessCount.Inc()
-		return context.WithValue(ctx, authKey{}, authentication{
-			username_:   attrMap[usernameAttr],
-			permChecker: a.pool.params.PermChecker,
-		}), nil, nil
+		if a.domain == "" || strings.HasSuffix(attrMap[usernameAttr], "@"+a.domain) {
+			servermon.AuthenticationSuccessCount.Inc()
+			return context.WithValue(ctx, authKey{}, authentication{
+				username_:   attrMap[usernameAttr],
+				permChecker: a.pool.params.PermChecker,
+			}), nil, nil
+		}
+		verr = &bakery.VerificationError{
+			Reason: errgo.Newf("user not in %q domain", a.domain),
+		}
 	}
 	servermon.AuthenticationFailCount.Inc()
 	if _, ok := errgo.Cause(verr).(*bakery.VerificationError); !ok {
@@ -169,11 +185,15 @@ func (a *Authenticator) AuthenticateRequest(ctx context.Context, req *http.Reque
 // newMacaroon returns a macaroon that, when discharged, will allow
 // access to JIMM.
 func (a *Authenticator) newMacaroon() (*macaroon.Macaroon, error) {
+	condition := "is-authenticated-user"
+	if a.domain != "" {
+		condition += " @" + a.domain
+	}
 	return a.bakery.NewMacaroon("", nil, []checkers.Caveat{
 		checkers.NeedDeclaredCaveat(
 			checkers.Caveat{
 				Location:  a.pool.params.IdentityLocation,
-				Condition: "is-authenticated-user",
+				Condition: condition,
 			},
 			usernameAttr,
 		),
