@@ -49,6 +49,7 @@ type UsageSenderAuthorizationClient interface {
 
 type Config struct {
 	MongoAddr         string            `yaml:"mongo-addr"`
+	DBName            string            `yaml:"dbname"`
 	IdentityPublicKey *bakery.PublicKey `yaml:"identity-public-key"`
 	IdentityLocation  string            `yaml:"identity-location"`
 	AgentUsername     string            `yaml:"agent-username"`
@@ -128,6 +129,9 @@ func main() {
 		fmt.Fprintf(os.Stderr, "failed to read the config file: %v\n", err)
 		os.Exit(2)
 	}
+	if conf.DBName == "" {
+		conf.DBName = "jem"
+	}
 
 	ctx := setUpLogging(context.Background(), conf.LoggingLevel)
 	zapctx.Debug(ctx, "connecting to mongo")
@@ -138,7 +142,7 @@ func main() {
 	}
 	defer session.Close()
 
-	err = updateModels(ctx, session.DB("jem").C("models"), conf)
+	err = updateModels(ctx, session.DB(conf.DBName).C("models"), conf)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
