@@ -200,6 +200,44 @@ func (s *authSuite) TestUsername(c *gc.C) {
 	c.Assert(auth.Username(ctx), gc.Equals, "bob")
 }
 
+func (s *authSuite) TestAuthenticateWithDomain(c *gc.C) {
+	bakery, err := bakery.NewService(bakery.NewServiceParams{
+		Location: "here",
+		Locator:  s.idmSrv,
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	pool, err := auth.NewPool(context.TODO(), auth.Params{
+		Bakery:   bakery,
+		RootKeys: mgostorage.NewRootKeys(100),
+		RootKeysPolicy: mgostorage.Policy{
+			ExpiryDuration: 1 * time.Second,
+		},
+		MacaroonCollection: s.Session.DB("auth").C("macaroons"),
+		SessionPool:        s.sessionPool,
+		PermChecker: idmclient.NewPermChecker(
+			idmclient.New(idmclient.NewParams{
+				BaseURL: s.idmSrv.URL.String(),
+				Client:  s.idmSrv.Client("test-user"),
+			}),
+			time.Second,
+		),
+		IdentityLocation: s.idmSrv.URL.String(),
+		Domain:           "test-domain",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	a := pool.Authenticator(context.TODO())
+	defer a.Close()
+	_, m, _ := a.Authenticate(nil, nil, checkers.New())
+	ms := s.discharge(c, m, "bob")
+	_, m, err = a.Authenticate(context.Background(), []macaroon.Slice{ms}, checkers.New())
+	c.Assert(err, gc.ErrorMatches, `verification failed: user not in "test-domain" domain`)
+	c.Assert(m, gc.Not(gc.IsNil))
+	ms = s.discharge(c, m, "bob@test-domain")
+	ctx, _, err := a.Authenticate(context.Background(), []macaroon.Slice{ms}, checkers.New())
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(auth.Username(ctx), gc.Equals, "bob@test-domain")
+}
+
 func (s *authSuite) discharge(c *gc.C, m *macaroon.Macaroon, username string, groups ...string) macaroon.Slice {
 	s.idmSrv.AddUser(username, groups...)
 	s.idmSrv.SetDefaultUser(username)

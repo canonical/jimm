@@ -110,6 +110,7 @@ func serve(confPath string) error {
 		WebsocketPingTimeout: websocketPingTimeout,
 		GUILocation:          conf.GUILocation,
 		UsageSenderURL:       conf.UsageSenderURL,
+		Domain:               conf.Domain,
 	}
 	server, err := jem.NewServer(ctx, cfg)
 	if err != nil {
