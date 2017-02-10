@@ -68,6 +68,9 @@ func serve(confPath string) error {
 	if err != nil {
 		return errgo.Notef(err, "cannot read config file %q", confPath)
 	}
+	if conf.DBName == "" {
+		conf.DBName = "jem"
+	}
 	conf.IdentityLocation = strings.TrimSuffix(conf.IdentityLocation, "/")
 	if strings.HasSuffix(conf.IdentityLocation, "v1/discharger") {
 		// It's probably some old code that uses the old IdentityLocation
@@ -83,7 +86,7 @@ func serve(confPath string) error {
 		return errgo.Notef(err, "cannot dial mongo at %q", conf.MongoAddr)
 	}
 	defer session.Close()
-	db := session.DB("jem")
+	db := session.DB(conf.DBName)
 
 	zapctx.Debug(ctx, "setting up the API server")
 	var locator bakery.PublicKeyLocator

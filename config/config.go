@@ -19,6 +19,7 @@ import (
 
 type Config struct {
 	MongoAddr string `yaml:"mongo-addr"`
+	DBName    string `yaml:"dbname"`
 	APIAddr   string `yaml:"api-addr"`
 	// TODO rename state-server-admin to controller-admin.
 	ControllerAdmin   params.User       `yaml:"state-server-admin"`
