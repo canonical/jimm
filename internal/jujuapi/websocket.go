@@ -1085,6 +1085,7 @@ func (m modelManager) destroyModel(ctx context.Context, arg jujuparams.Entity) e
 	if err != nil {
 		return errgo.Mask(err)
 	}
+	defer conn.Close()
 	if err := m.h.jem.DestroyModel(ctx, conn, model); err != nil {
 		return errgo.Mask(err)
 	}
