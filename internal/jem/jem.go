@@ -534,6 +534,7 @@ func (j *JEM) ControllerUpdateCredentials(ctx context.Context, ctlPath params.En
 	if err != nil {
 		return errgo.Notef(err, "cannot connect to controller")
 	}
+	defer conn.Close()
 	for _, credPath := range ctl.UpdateCredentials {
 		if err := j.updateControllerCredential(ctx, ctl.Path, credPath, conn, nil); err != nil {
 			zapctx.Warn(ctx,
