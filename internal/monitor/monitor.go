@@ -141,7 +141,17 @@ type allMonitor struct {
 	monitoring map[params.EntityPath]bool
 }
 
-func (m *allMonitor) run(ctx context.Context) error {
+func (m *allMonitor) run(ctx context.Context) (err error) {
+	defer func() {
+		zapctx.Info(ctx, "allMonitor exiting", zaputil.Error(err))
+		// Make sure the tomb is dying before we wait for
+		// the controller monitors to exit, because otherwise
+		// they don't know that they are supposed to die.
+		m.tomb.Kill(err)
+		for len(m.monitoring) > 0 {
+			delete(m.monitoring, <-m.controllerRemoved)
+		}
+	}()
 	for {
 		if err := m.startMonitors(ctx); err != nil {
 			return errgo.Notef(err, "cannot start monitors")
@@ -155,9 +165,6 @@ func (m *allMonitor) run(ctx context.Context) error {
 				break waitLoop
 			case <-m.tomb.Dying():
 				// Wait for all the controller monitors to terminate.
-				for len(m.monitoring) > 0 {
-					delete(m.monitoring, <-m.controllerRemoved)
-				}
 				return tomb.ErrDying
 			}
 		}
@@ -192,6 +199,7 @@ func (m *allMonitor) startMonitors(ctx context.Context) error {
 		if err != nil {
 			return errgo.Notef(err, "cannot acquire lease")
 		}
+		zapctx.Info(ctx, "acquired new lease", zap.Stringer("path", ctl.Path))
 		// We've acquired the lease.
 		m.monitoring[ctl.Path] = true
 		ctlMonitor := newControllerMonitor(ctx, controllerMonitorParams{
