@@ -204,7 +204,7 @@ func (s *jemShimInMemory) controller(p params.EntityPath) *mongodoc.Controller {
 	return &c
 }
 
-func (s *jemShimInMemory) AddController(ctx context.Context, ctl *mongodoc.Controller) {
+func (s *jemShimInMemory) AddController(ctl *mongodoc.Controller) {
 	if ctl.Path == (params.EntityPath{}) {
 		panic("no path in controller")
 	}
@@ -215,7 +215,7 @@ func (s *jemShimInMemory) AddController(ctx context.Context, ctl *mongodoc.Contr
 	s.controllers[ctl.Path] = &ctl1
 }
 
-func (s *jemShimInMemory) AddModel(ctx context.Context, m *mongodoc.Model) {
+func (s *jemShimInMemory) AddModel(m *mongodoc.Model) {
 	if m.Path.IsZero() {
 		panic("no path in model")
 	}
