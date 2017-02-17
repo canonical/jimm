@@ -910,14 +910,16 @@ func modelDocToModelInfo(ctx context.Context, h *wsHandler, model *mongodoc.Mode
 }
 
 func jemMachinesToModelMachineInfo(machines []mongodoc.Machine) []jujuparams.ModelMachineInfo {
-	infos := make([]jujuparams.ModelMachineInfo, len(machines))
-	for i := range machines {
-		infos[i] = jemMachineToModelMachineInfo(&machines[i])
+	infos := make([]jujuparams.ModelMachineInfo, 0, len(machines))
+	for _, m := range machines {
+		if m.Info.Life != "dead" {
+			infos = append(infos, jemMachineToModelMachineInfo(m))
+		}
 	}
 	return infos
 }
 
-func jemMachineToModelMachineInfo(m *mongodoc.Machine) jujuparams.ModelMachineInfo {
+func jemMachineToModelMachineInfo(m mongodoc.Machine) jujuparams.ModelMachineInfo {
 	var hardware *jujuparams.MachineHardware
 	if m.Info.HardwareCharacteristics != nil {
 		hardware = &jujuparams.MachineHardware{
