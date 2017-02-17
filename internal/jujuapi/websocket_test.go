@@ -704,6 +704,12 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 		},
 	})
 	c.Assert(err, jc.ErrorIsNil)
+	err = s.JEM.DB.UpdateMachineInfo(testContext, &multiwatcher.MachineInfo{
+		ModelUUID: modelUUID3,
+		Id:        "machine-2",
+		Life:      "dead",
+	})
+	c.Assert(err, jc.ErrorIsNil)
 
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
