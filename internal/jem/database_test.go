@@ -684,6 +684,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 			ModelUUID: "fake-uuid",
 			Id:        "0",
 			Series:    "quantal",
+			Config:    map[string]interface{}{},
 		},
 	}, {
 		Id: "fake-uuid 1",
@@ -691,6 +692,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 			ModelUUID: "fake-uuid",
 			Id:        "1",
 			Series:    "precise",
+			Config:    map[string]interface{}{},
 		},
 	}})
 
@@ -715,6 +717,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 			Id:        "0",
 			Series:    "foo",
 			Life:      "dead",
+			Config:    map[string]interface{}{},
 		},
 	}, {
 		Id: "fake-uuid 1",
@@ -722,6 +725,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 			ModelUUID: "fake-uuid",
 			Id:        "1",
 			Series:    "precise",
+			Config:    map[string]interface{}{},
 		},
 	}})
 }
