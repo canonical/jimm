@@ -189,6 +189,7 @@ func (s *websocketSuite) TestCloudCall(c *gc.C) {
 	info, err := client.Cloud(names.NewCloudTag("dummy"))
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(info, jc.DeepEquals, cloud.Cloud{
+		Name:      "dummy",
 		Type:      "dummy",
 		AuthTypes: cloud.AuthTypes{"empty", "userpass"},
 		Regions: []cloud.Region{{
@@ -212,6 +213,7 @@ func (s *websocketSuite) TestClouds(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(clouds, jc.DeepEquals, map[names.CloudTag]cloud.Cloud{
 		names.NewCloudTag("dummy"): {
+			Name:      "dummy",
 			Type:      "dummy",
 			AuthTypes: cloud.AuthTypes{"empty", "userpass"},
 			Regions: []cloud.Region{{
