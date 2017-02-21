@@ -1272,12 +1272,13 @@ func (s *websocketSuite) TestGrantAndRevokeModel(c *gc.C) {
 	c.Assert(res[0].Error, gc.IsNil)
 	c.Assert(res[0].Result.UUID, gc.Equals, mi.UUID)
 
-	err = client.RevokeModel("bob@external", "write", mi.UUID)
+	err = client.RevokeModel("bob@external", "read", mi.UUID)
 	c.Assert(err, jc.ErrorIsNil)
 
 	res, err = client2.ModelInfo([]names.ModelTag{names.NewModelTag(mi.UUID)})
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(res, gc.HasLen, 1)
+	c.Assert(res[0].Error, gc.Not(gc.IsNil))
 	c.Assert(res[0].Error, gc.ErrorMatches, "unauthorized")
 }
 

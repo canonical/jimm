@@ -599,12 +599,11 @@ func (j *JEM) updateControllerCredential(
 
 // GrantModel grants the given access for the given user on the given model and updates the JEM database.
 func (j *JEM) GrantModel(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model, user params.User, access string) error {
-	client := modelmanager.NewClient(conn)
-	if err := client.GrantModel(UserTag(user).Id(), access, model.UUID); err != nil {
+	if err := j.DB.GrantModel(ctx, model.Path, user, access); err != nil {
 		return errgo.Mask(err)
 	}
-	if err := j.DB.Grant(ctx, j.DB.Models(), model.Path, user); err != nil {
-		// TODO (mhilton) What should be done with the changes already made to the controller?
+	client := modelmanager.NewClient(conn)
+	if err := client.GrantModel(UserTag(user).Id(), access, model.UUID); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil
@@ -612,7 +611,7 @@ func (j *JEM) GrantModel(ctx context.Context, conn *apiconn.Conn, model *mongodo
 
 // RevokeModel revokes the given access for the given user on the given model and updates the JEM database.
 func (j *JEM) RevokeModel(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model, user params.User, access string) error {
-	if err := j.DB.Revoke(ctx, j.DB.Models(), model.Path, user); err != nil {
+	if err := j.DB.RevokeModel(ctx, model.Path, user, access); err != nil {
 		return errgo.Mask(err)
 	}
 	client := modelmanager.NewClient(conn)

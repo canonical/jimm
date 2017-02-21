@@ -333,14 +333,47 @@ func (s *jemSuite) TestGrantModel(c *gc.C) {
 	conn, err := s.jem.OpenAPI(testContext, model.Controller)
 	c.Assert(err, jc.ErrorIsNil)
 	defer conn.Close()
+	err = s.jem.GrantModel(testContext, conn, model, "alice", "admin")
+	c.Assert(err, jc.ErrorIsNil)
+	model1, err := s.jem.DB.Model(testContext, model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
+		Read:  []string{"alice"},
+		Write: []string{"alice"},
+		Admin: []string{"alice"},
+	})
+}
+
+func (s *jemSuite) TestGrantModelWrite(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	conn, err := s.jem.OpenAPI(testContext, model.Controller)
+	c.Assert(err, jc.ErrorIsNil)
+	defer conn.Close()
 	err = s.jem.GrantModel(testContext, conn, model, "alice", "write")
 	c.Assert(err, jc.ErrorIsNil)
 	model1, err := s.jem.DB.Model(testContext, model.Path)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{"alice"}})
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
+		Read:  []string{"alice"},
+		Write: []string{"alice"},
+	})
 }
 
-func (s *jemSuite) TestGrantModelControllerFailure(c *gc.C) {
+func (s *jemSuite) TestGrantModelRead(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	conn, err := s.jem.OpenAPI(testContext, model.Controller)
+	c.Assert(err, jc.ErrorIsNil)
+	defer conn.Close()
+	err = s.jem.GrantModel(testContext, conn, model, "alice", "read")
+	c.Assert(err, jc.ErrorIsNil)
+	model1, err := s.jem.DB.Model(testContext, model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
+		Read: []string{"alice"},
+	})
+}
+
+func (s *jemSuite) TestGrantModelBadLevel(c *gc.C) {
 	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
 	conn, err := s.jem.OpenAPI(testContext, model.Controller)
 	c.Assert(err, jc.ErrorIsNil)
@@ -349,7 +382,7 @@ func (s *jemSuite) TestGrantModelControllerFailure(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `"superpowers" model access not valid`)
 	model1, err := s.jem.DB.Model(testContext, model.Path)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{}})
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{})
 }
 
 func (s *jemSuite) TestRevokeModel(c *gc.C) {
@@ -357,16 +390,67 @@ func (s *jemSuite) TestRevokeModel(c *gc.C) {
 	conn, err := s.jem.OpenAPI(testContext, model.Controller)
 	c.Assert(err, jc.ErrorIsNil)
 	defer conn.Close()
-	err = s.jem.GrantModel(testContext, conn, model, "alice", "write")
+	err = s.jem.GrantModel(testContext, conn, model, "alice", "admin")
 	c.Assert(err, jc.ErrorIsNil)
 	model1, err := s.jem.DB.Model(testContext, model.Path)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{"alice"}})
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
+		Read:  []string{"alice"},
+		Write: []string{"alice"},
+		Admin: []string{"alice"},
+	})
+	err = s.jem.RevokeModel(testContext, conn, model, "alice", "read")
+	c.Assert(err, jc.ErrorIsNil)
+	model1, err = s.jem.DB.Model(testContext, model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{})
+}
+
+func (s *jemSuite) TestRevokeModelAdmin(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	conn, err := s.jem.OpenAPI(testContext, model.Controller)
+	c.Assert(err, jc.ErrorIsNil)
+	defer conn.Close()
+	err = s.jem.GrantModel(testContext, conn, model, "alice", "admin")
+	c.Assert(err, jc.ErrorIsNil)
+	model1, err := s.jem.DB.Model(testContext, model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
+		Read:  []string{"alice"},
+		Write: []string{"alice"},
+		Admin: []string{"alice"},
+	})
+	err = s.jem.RevokeModel(testContext, conn, model, "alice", "admin")
+	c.Assert(err, jc.ErrorIsNil)
+	model1, err = s.jem.DB.Model(testContext, model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
+		Read:  []string{"alice"},
+		Write: []string{"alice"},
+	})
+}
+
+func (s *jemSuite) TestRevokeModelWrite(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	conn, err := s.jem.OpenAPI(testContext, model.Controller)
+	c.Assert(err, jc.ErrorIsNil)
+	defer conn.Close()
+	err = s.jem.GrantModel(testContext, conn, model, "alice", "admin")
+	c.Assert(err, jc.ErrorIsNil)
+	model1, err := s.jem.DB.Model(testContext, model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
+		Read:  []string{"alice"},
+		Write: []string{"alice"},
+		Admin: []string{"alice"},
+	})
 	err = s.jem.RevokeModel(testContext, conn, model, "alice", "write")
 	c.Assert(err, jc.ErrorIsNil)
 	model1, err = s.jem.DB.Model(testContext, model.Path)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{}})
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
+		Read: []string{"alice"},
+	})
 }
 
 func (s *jemSuite) TestRevokeModelControllerFailure(c *gc.C) {
@@ -378,12 +462,18 @@ func (s *jemSuite) TestRevokeModelControllerFailure(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 	model1, err := s.jem.DB.Model(testContext, model.Path)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{"alice"}})
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
+		Read:  []string{"alice"},
+		Write: []string{"alice"},
+	})
 	err = s.jem.RevokeModel(testContext, conn, model, "alice", "superpowers")
 	c.Assert(err, gc.ErrorMatches, `"superpowers" model access not valid`)
 	model1, err = s.jem.DB.Model(testContext, model.Path)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{Read: []string{}})
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
+		Read:  []string{"alice"},
+		Write: []string{"alice"},
+	})
 }
 
 func (s *jemSuite) TestDestroyModel(c *gc.C) {

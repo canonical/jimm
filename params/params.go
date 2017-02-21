@@ -58,6 +58,14 @@ type ACL struct {
 	// Read holds users and groups that are allowed to read the
 	// entity.
 	Read []string `json:"read"`
+
+	// Write holds users and groups that are allowed to write to the
+	// entity.
+	Write []string `json:"write,omitempty"`
+
+	// Admin holds users and groups that are allowed to act as
+	// administrators on the entity.
+	Admin []string `json:"admin,omitempty"`
 }
 
 // AddController holds the parameters for adding a new controller.

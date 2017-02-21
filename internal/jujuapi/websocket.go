@@ -1075,7 +1075,7 @@ func (m modelManager) DestroyModels(args jujuparams.Entities) (jujuparams.ErrorR
 
 // destroyModel destroys the specified model.
 func (m modelManager) destroyModel(ctx context.Context, arg jujuparams.Entity) error {
-	model, err := getModel(ctx, m.h.jem, arg.Tag, checkIsOwner)
+	model, err := getModel(ctx, m.h.jem, arg.Tag, auth.CheckIsAdmin)
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			// Juju doesn't treat removing a model that isn't there as an error, and neither should we.
@@ -1114,7 +1114,7 @@ func (m modelManager) ModifyModelAccess(args jujuparams.ModifyModelAccessRequest
 }
 
 func (m modelManager) modifyModelAccess(ctx context.Context, change jujuparams.ModifyModelAccess) error {
-	model, err := getModel(ctx, m.h.jem, change.ModelTag, checkIsOwner)
+	model, err := getModel(ctx, m.h.jem, change.ModelTag, auth.CheckIsAdmin)
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			err = params.ErrUnauthorized
@@ -1177,12 +1177,6 @@ func (j jimm) UserModelStats() (params.UserModelStatsResponse, error) {
 	return params.UserModelStatsResponse{
 		Models: models,
 	}, nil
-}
-
-// checkIsOwner checks if the current user is the owner of the specified
-// document.
-func checkIsOwner(ctx context.Context, e auth.ACLEntity) error {
-	return errgo.Mask(auth.CheckIsUser(ctx, e.Owner()), errgo.Is(params.ErrUnauthorized))
 }
 
 // getModel attempts to get the specified model from jem. If the model
