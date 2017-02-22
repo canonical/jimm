@@ -3,11 +3,11 @@ package apiconn
 import (
 	"sync"
 
-	"github.com/golang/groupcache/singleflight"
 	"github.com/juju/juju/api"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
+	"github.com/CanonicalLtd/jem/internal/singleflight"
 	"github.com/CanonicalLtd/jem/internal/zapctx"
 	"github.com/CanonicalLtd/jem/internal/zaputil"
 )
@@ -73,6 +73,7 @@ func (cache *Cache) EvictAll() {
 // The cause of any error returned from dial will be
 // returned unmasked.
 func (cache *Cache) OpenAPI(
+	ctx context.Context,
 	envUUID string,
 	dial func() (api.Connection, *api.Info, error),
 ) (*Conn, error) {
@@ -86,6 +87,7 @@ func (cache *Cache) OpenAPI(
 			// The connection is broken. Evict it from the cache
 			// and try dialling again.
 			delete(cache.conns, envUUID)
+			c.Close()
 			c = nil
 		default:
 		}
@@ -99,7 +101,7 @@ func (cache *Cache) OpenAPI(
 	// server with the same model UUID at the same time,
 	// we only dial the controller once. The group is
 	// keyed by the model UUID.
-	x, err := cache.group.Do(envUUID, func() (interface{}, error) {
+	x, err := cache.group.Do(ctx, envUUID, func() (interface{}, error) {
 		st, stInfo, err := dial()
 		if err != nil {
 			return nil, errgo.Mask(err, errgo.Any)

@@ -5,7 +5,6 @@ package jem
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"math/rand"
 	"sync"
 	"time"
@@ -272,20 +271,14 @@ func (j *JEM) OpenAPI(ctx context.Context, path params.EntityPath) (_ *apiconn.C
 //
 // The returned connection must be closed when finished with.
 func (j *JEM) OpenAPIFromDoc(ctx context.Context, ctl *mongodoc.Controller) (*apiconn.Conn, error) {
-	return j.pool.connCache.OpenAPI(ctl.UUID, func() (api.Connection, *api.Info, error) {
+	return j.pool.connCache.OpenAPI(ctx, ctl.UUID, func() (api.Connection, *api.Info, error) {
 		info := apiInfoFromDoc(ctl)
 		zapctx.Debug(ctx, "open API", zap.Object("api-info", info))
-		cl, err := runWithContext(ctx, func() (io.Closer, error) {
-			conn, err := api.Open(info, apiDialOpts())
-			if err != nil {
-				return nil, errgo.WithCausef(err, ErrAPIConnection, "")
-			}
-			return conn, nil
-		})
+		conn, err := api.Open(info, apiDialOpts())
 		if err != nil {
-			return nil, nil, errgo.Mask(err, errgo.Is(context.Canceled), errgo.Is(ErrAPIConnection))
+			return nil, nil, errgo.WithCausef(err, ErrAPIConnection, "")
 		}
-		return cl.(api.Connection), info, nil
+		return conn, info, nil
 	})
 }
 
