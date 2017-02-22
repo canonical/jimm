@@ -264,12 +264,19 @@ type ACLEntity interface {
 	Owner() params.User
 }
 
-// CheckCanRead checks whether the current user is
-// allowed to read the given entity. The owner
-// is always allowed to access an entity, regardless
-// of its ACL.
+// CheckCanRead checks whether the current user is allowed to read the
+// given entity. The owner is always allowed to access an entity,
+// regardless of its ACL.
 func CheckCanRead(ctx context.Context, e ACLEntity) error {
 	acl := append([]string{string(e.Owner())}, e.GetACL().Read...)
+	return CheckACL(ctx, acl)
+}
+
+// CheckIsAdmin checks whether the current user is an admin on the given
+// entity. The owner is always allowed to access an entity, regardless of
+// its ACL.
+func CheckIsAdmin(ctx context.Context, e ACLEntity) error {
+	acl := append([]string{string(e.Owner())}, e.GetACL().Admin...)
 	return CheckACL(ctx, acl)
 }
 

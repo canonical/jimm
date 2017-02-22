@@ -697,6 +697,62 @@ func (db *Database) Revoke(ctx context.Context, c *mgo.Collection, path params.E
 	return errgo.Notef(err, "cannot update ACL on %q", path)
 }
 
+// GrantModel updates the ACL for the document with the given path in the
+// model collection. Permission is granted to the given access level and
+// all lower levels.
+func (db *Database) GrantModel(ctx context.Context, path params.EntityPath, user params.User, access string) (err error) {
+	defer db.checkError(ctx, &err)
+	aclUpdates := make(bson.D, 0, 3)
+	switch access {
+	case "admin":
+		aclUpdates = append(aclUpdates, bson.DocElem{"acl.admin", user})
+		fallthrough
+	case "write":
+		aclUpdates = append(aclUpdates, bson.DocElem{"acl.write", user})
+		fallthrough
+	case "read":
+		aclUpdates = append(aclUpdates, bson.DocElem{"acl.read", user})
+	default:
+		return errgo.Newf("%q model access not valid", access)
+	}
+	err = db.Models().UpdateId(path.String(), bson.D{{"$addToSet", aclUpdates}})
+	if err == nil {
+		return nil
+	}
+	if err == mgo.ErrNotFound {
+		return errgo.WithCausef(nil, params.ErrNotFound, "%q not found", path)
+	}
+	return errgo.Notef(err, "cannot update ACL on %q", path)
+}
+
+// RevokeModel updates the ACL for the document with the given path in
+// the model collection. Permission is revoked from the given access
+// level and all higher levels.
+func (db *Database) RevokeModel(ctx context.Context, path params.EntityPath, user params.User, access string) (err error) {
+	defer db.checkError(ctx, &err)
+	aclUpdates := make(bson.D, 0, 3)
+	switch access {
+	case "read":
+		aclUpdates = append(aclUpdates, bson.DocElem{"acl.read", user})
+		fallthrough
+	case "write":
+		aclUpdates = append(aclUpdates, bson.DocElem{"acl.write", user})
+		fallthrough
+	case "admin":
+		aclUpdates = append(aclUpdates, bson.DocElem{"acl.admin", user})
+	default:
+		return errgo.Newf("%q model access not valid", access)
+	}
+	err = db.Models().UpdateId(path.String(), bson.D{{"$pull", aclUpdates}})
+	if err == nil {
+		return nil
+	}
+	if err == mgo.ErrNotFound {
+		return errgo.WithCausef(nil, params.ErrNotFound, "%q not found", path)
+	}
+	return errgo.Notef(err, "cannot update ACL on %q", path)
+}
+
 // CheckReadACL checks that the entity with the given path in the given
 // collection (which must have been obtained from db) can be read by the
 // currently authenticated user.
