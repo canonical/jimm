@@ -116,8 +116,16 @@ var newHeartMonitor = func(d time.Duration) heartMonitor {
 	}
 }
 
-// facades contains the list of facade versions supported by this API.
-var facades = map[facade]string{
+// unauthenticatedFacades contains the list of facade versions supported
+// by this API, before the user is authenticated.
+var unauthenticatedFacades = map[facade]string{
+	facade{"Admin", 3}:  "Admin",
+	facade{"Pinger", 1}: "Pinger",
+}
+
+// authenticatedFacades contains the list of facade versions supported by
+// this API, once the user is authenticated.
+var authenticatedFacades = map[facade]string{
 	facade{"Admin", 3}:        "Admin",
 	facade{"Bundle", 1}:       "Bundle",
 	facade{"Cloud", 1}:        "Cloud",
@@ -132,6 +140,7 @@ var facades = map[facade]string{
 func newWSServer(ctx context.Context, jem *jem.JEM, ap *auth.Pool, jsParams jemserver.Params, modelUUID string) websocket.Server {
 	hnd := wsHandler{
 		context:       ctx,
+		facades:       unauthenticatedFacades,
 		jem:           jem,
 		authPool:      ap,
 		params:        jsParams,
@@ -150,6 +159,7 @@ type wsHandler struct {
 	params   jemserver.Params
 	// TODO Make the context per-RPC-call instead of global across the handler.
 	context       context.Context
+	facades       map[facade]string
 	heartMonitor  heartMonitor
 	modelUUID     string
 	conn          *rpc.Conn
@@ -218,28 +228,21 @@ func (h *wsHandler) FindMethod(rootName string, version int, methodName string) 
 			return nil, errgo.Mask(err)
 		}
 	}
-	if auth.Username(h.context) == "" && rootName != "Admin" {
+	rn := h.facades[facade{rootName, version}]
+	if rn == "" {
+		if rootName == "Admin" && version < 3 {
+			return nil, &rpc.RequestError{
+				Code:    jujuparams.CodeNotSupported,
+				Message: "JIMM does not support login from old clients",
+			}
+		}
 		return nil, &rpcreflect.CallNotImplementedError{
 			RootMethod: rootName,
 			Version:    version,
 		}
 	}
-	if rootName == "Admin" && version < 3 {
-		return nil, &rpc.RequestError{
-			Code:    jujuparams.CodeNotSupported,
-			Message: "JIMM does not support login from old clients",
-		}
-	}
-
-	if rn := facades[facade{rootName, version}]; rn != "" {
-		// TODO(rogpeppe) avoid doing all this reflect code on every RPC call.
-		return rpcreflect.ValueOf(reflect.ValueOf(root{h})).FindMethod(rn, 0, methodName)
-	}
-
-	return nil, &rpcreflect.CallNotImplementedError{
-		RootMethod: rootName,
-		Version:    version,
-	}
+	// TODO(rogpeppe) avoid doing all this reflect code on every RPC call.
+	return rpcreflect.ValueOf(reflect.ValueOf(root{h})).FindMethod(rn, 0, methodName)
 }
 
 // Kill implements rpcreflect.Root.Kill; it does nothing because there
@@ -358,6 +361,7 @@ func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResult, error
 		return jujuparams.LoginResult{}, errgo.Mask(err)
 	}
 	a.h.context = ctx
+	a.h.facades = authenticatedFacades
 	servermon.LoginSuccessCount.Inc()
 	username := auth.Username(a.h.context)
 	return jujuparams.LoginResult{
@@ -367,14 +371,14 @@ func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResult, error
 			Identity:    userTag(username).String(),
 		},
 		ControllerTag: names.NewControllerTag(a.h.params.ControllerUUID).String(),
-		Facades:       facadeVersions(),
+		Facades:       facadeVersions(a.h.facades),
 		ServerVersion: "2.0.0",
 	}, nil
 }
 
 // facadeVersions creates a list of facadeVersions as specified in
 // facades.
-func facadeVersions() []jujuparams.FacadeVersions {
+func facadeVersions(facades map[facade]string) []jujuparams.FacadeVersions {
 	names := make([]string, 0, len(facades))
 	versions := make(map[string][]int, len(facades))
 	for k := range facades {

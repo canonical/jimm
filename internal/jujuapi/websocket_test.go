@@ -1486,12 +1486,24 @@ func (s *websocketSuite) TestConnectionClosesWhenHeartMonitorDies(c *gc.C) {
 	c.Assert(hm.beats(), gc.Equals, 0)
 }
 
-func (s *websocketSuite) TestPingerupdatesHeartMonitor(c *gc.C) {
+func (s *websocketSuite) TestPingerUpdatesHeartMonitor(c *gc.C) {
 	hm := newTestHeartMonitor()
 	s.PatchValue(jujuapi.NewHeartMonitor, jujuapi.InternalHeartMonitor(func(time.Duration) jujuapi.HeartMonitor {
 		return hm
 	}))
 	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	err := conn.APICall("Pinger", 1, "", "Ping", nil, nil)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(hm.beats(), gc.Equals, 1)
+}
+
+func (s *websocketSuite) TestUnauthenticatedPinger(c *gc.C) {
+	hm := newTestHeartMonitor()
+	s.PatchValue(jujuapi.NewHeartMonitor, jujuapi.InternalHeartMonitor(func(time.Duration) jujuapi.HeartMonitor {
+		return hm
+	}))
+	conn := s.open(c, &api.Info{SkipLogin: true}, "test")
 	defer conn.Close()
 	err := conn.APICall("Pinger", 1, "", "Ping", nil, nil)
 	c.Assert(err, jc.ErrorIsNil)
