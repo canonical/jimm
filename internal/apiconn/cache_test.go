@@ -7,6 +7,7 @@ import (
 
 	"github.com/juju/juju/api"
 	jc "github.com/juju/testing/checkers"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
@@ -25,7 +26,7 @@ func (s *cacheSuite) TestOpenAPI(c *gc.C) {
 	uuid, ok := s.APIState.Client().ModelUUID()
 	c.Assert(ok, gc.Equals, true)
 	var info *api.Info
-	conn, err := cache.OpenAPI(uuid, func() (api.Connection, *api.Info, error) {
+	conn, err := cache.OpenAPI(context.Background(), uuid, func() (api.Connection, *api.Info, error) {
 		info = s.APIInfo(c)
 		return apiOpen(info, api.DialOpts{})
 	})
@@ -42,7 +43,7 @@ func (s *cacheSuite) TestOpenAPI(c *gc.C) {
 	// If we open the same uuid, we should get
 	// the same connection without the dial
 	// function being called.
-	conn1, err := cache.OpenAPI(uuid, func() (api.Connection, *api.Info, error) {
+	conn1, err := cache.OpenAPI(context.Background(), uuid, func() (api.Connection, *api.Info, error) {
 		c.Error("dial function called unexpectedly")
 		return nil, nil, fmt.Errorf("no")
 	})
@@ -88,7 +89,7 @@ func (s *cacheSuite) TestConcurrentOpenAPI(c *gc.C) {
 			id := i % len(fakes)
 			uuid := fmt.Sprint("uuid-", id)
 			st := fakes[id%len(fakes)]
-			conn, err := cache.OpenAPI(uuid, dialFunc(uuid, st))
+			conn, err := cache.OpenAPI(context.Background(), uuid, dialFunc(uuid, st))
 			c.Check(err, gc.IsNil)
 			c.Check(conn.Connection, gc.Equals, st)
 		}()
@@ -105,10 +106,14 @@ type fakeConn struct {
 	api.Connection
 }
 
+func (fakeConn) Broken() <-chan struct{} {
+	return nil
+}
+
 func (s *cacheSuite) TestOpenAPIError(c *gc.C) {
 	apiErr := fmt.Errorf("open error")
 	cache := apiconn.NewCache(apiconn.CacheParams{})
-	conn, err := cache.OpenAPI("uuid", func() (api.Connection, *api.Info, error) {
+	conn, err := cache.OpenAPI(context.Background(), "uuid", func() (api.Connection, *api.Info, error) {
 		return nil, nil, apiErr
 	})
 	c.Assert(err, gc.ErrorMatches, "open error")
@@ -124,12 +129,12 @@ func (s *cacheSuite) TestEvict(c *gc.C) {
 		return apiOpen(s.APIInfo(c), api.DialOpts{})
 	}
 
-	conn, err := cache.OpenAPI("uuid", dial)
+	conn, err := cache.OpenAPI(context.Background(), "uuid", dial)
 	c.Assert(err, gc.IsNil)
 	c.Assert(dialCount, gc.Equals, 1)
 
 	// Try again just to sanity check that we're caching it.
-	conn1, err := cache.OpenAPI("uuid", dial)
+	conn1, err := cache.OpenAPI(context.Background(), "uuid", dial)
 	c.Assert(err, gc.IsNil)
 	c.Assert(dialCount, gc.Equals, 1)
 	conn1.Close()
@@ -141,7 +146,7 @@ func (s *cacheSuite) TestEvict(c *gc.C) {
 
 	assertConnIsClosed(c, conn)
 
-	conn, err = cache.OpenAPI("uuid", dial)
+	conn, err = cache.OpenAPI(context.Background(), "uuid", dial)
 	c.Assert(err, gc.IsNil)
 	conn.Close()
 	c.Assert(dialCount, gc.Equals, 2)
@@ -149,14 +154,14 @@ func (s *cacheSuite) TestEvict(c *gc.C) {
 
 func (s *cacheSuite) TestEvictAll(c *gc.C) {
 	cache := apiconn.NewCache(apiconn.CacheParams{})
-	conn, err := cache.OpenAPI("uuid0", func() (api.Connection, *api.Info, error) {
+	conn, err := cache.OpenAPI(context.Background(), "uuid0", func() (api.Connection, *api.Info, error) {
 		return apiOpen(s.APIInfo(c), api.DialOpts{})
 	})
 	c.Assert(err, gc.IsNil)
 	conn.Close()
 
-	_, err = cache.OpenAPI("uuid1", func() (api.Connection, *api.Info, error) {
-		return dummyConn{}, &api.Info{}, nil
+	_, err = cache.OpenAPI(context.Background(), "uuid1", func() (api.Connection, *api.Info, error) {
+		return fakeConn{}, &api.Info{}, nil
 	})
 	cache.EvictAll()
 
@@ -166,9 +171,9 @@ func (s *cacheSuite) TestEvictAll(c *gc.C) {
 	// Make sure both connections have actually been evicted.
 	called := 0
 	for i := 0; i < 2; i++ {
-		_, err := cache.OpenAPI(fmt.Sprintf("uuid%d", i), func() (api.Connection, *api.Info, error) {
+		_, err := cache.OpenAPI(context.Background(), fmt.Sprintf("uuid%d", i), func() (api.Connection, *api.Info, error) {
 			called++
-			return dummyConn{}, &api.Info{}, nil
+			return fakeConn{}, &api.Info{}, nil
 		})
 		c.Assert(err, gc.IsNil)
 	}
@@ -178,7 +183,7 @@ func (s *cacheSuite) TestEvictAll(c *gc.C) {
 func (s *cacheSuite) TestOpenAPIWithBrokenConnection(c *gc.C) {
 	cache := apiconn.NewCache(apiconn.CacheParams{})
 	c0 := &brokenConn{}
-	conn, err := cache.OpenAPI("uuid0", func() (api.Connection, *api.Info, error) {
+	conn, err := cache.OpenAPI(context.Background(), "uuid0", func() (api.Connection, *api.Info, error) {
 		return c0, &api.Info{}, nil
 	})
 	c.Assert(err, gc.IsNil)
@@ -186,15 +191,35 @@ func (s *cacheSuite) TestOpenAPIWithBrokenConnection(c *gc.C) {
 
 	// Because the earlier connection is flagged as broken,
 	// the next API open call will open another one.
-	c1 := &dummyConn{}
-	conn1, err := cache.OpenAPI("uuid0", func() (api.Connection, *api.Info, error) {
+	c1 := &fakeConn{}
+	conn1, err := cache.OpenAPI(context.Background(), "uuid0", func() (api.Connection, *api.Info, error) {
 		return c1, &api.Info{}, nil
 	})
 	c.Assert(conn1.Connection, gc.Equals, c1)
 }
 
-type dummyConn struct {
-	api.Connection
+func (s *cacheSuite) TestContextCancel(c *gc.C) {
+	cache := apiconn.NewCache(apiconn.CacheParams{})
+	c0 := &fakeConn{}
+	ctx, cancel := context.WithCancel(context.Background())
+	ch := make(chan struct{})
+	conn, err := cache.OpenAPI(ctx, "uuid0", func() (api.Connection, *api.Info, error) {
+		cancel()
+		<-ch
+		return c0, &api.Info{}, nil
+	})
+	c.Assert(errgo.Cause(err), gc.Equals, context.Canceled)
+	c.Assert(conn, gc.IsNil)
+	close(ch)
+
+	c1 := &fakeConn{}
+	conn, err = cache.OpenAPI(context.Background(), "uuid0", func() (api.Connection, *api.Info, error) {
+		cancel()
+		<-ch
+		return c1, &api.Info{}, nil
+	})
+	c.Assert(err, gc.IsNil)
+	c.Assert(conn.Connection, gc.Equals, c0)
 }
 
 // apiOpen is like api.Open except that it also returns its
