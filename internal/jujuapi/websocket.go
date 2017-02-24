@@ -176,7 +176,7 @@ func (h *wsHandler) handle(wsConn *websocket.Conn) {
 	h.conn.ServeRoot(h, func(err error) error {
 		return mapError(err)
 	})
-	h.heartMonitor = newHeartMonitor(h.params.WebsocketPingTimeout)
+	h.heartMonitor = newHeartMonitor(h.params.WebsocketRequestTimeout)
 	h.conn.Start()
 	select {
 	case <-h.heartMonitor.Dead():
@@ -223,6 +223,9 @@ func (h *wsHandler) credentialSchema(cloud params.Cloud, authType string) (jujuc
 
 // FindMethod implements rpcreflect.MethodFinder.
 func (h *wsHandler) FindMethod(rootName string, version int, methodName string) (rpcreflect.MethodCaller, error) {
+	// update the heart monitor for every request received.
+	h.heartMonitor.Heartbeat()
+
 	if h.model == nil || h.controller == nil {
 		if err := h.resolveUUID(); err != nil {
 			return nil, errgo.Mask(err)
@@ -1280,10 +1283,9 @@ type pinger struct {
 	h *wsHandler
 }
 
-// Ping implements the Pinger facade's Ping method.
-func (p pinger) Ping() {
-	p.h.heartMonitor.Heartbeat()
-}
+// Ping implements the Pinger facade's Ping method. It doesn't do
+// anything.
+func (p pinger) Ping() {}
 
 // userManager implements the UserManager facade.
 type userManager struct {

@@ -60,9 +60,9 @@ type ServerParams struct {
 	// identify itself.
 	ControllerUUID string
 
-	// WebsocketPingTimeout is the time to wait before failing a
-	// connection because the server has not received a ping.
-	WebsocketPingTimeout time.Duration
+	// WebsocketRequestTimeout is the time to wait before failing a
+	// connection because the server has not received a request.
+	WebsocketRequestTimeout time.Duration
 
 	// GUILocation holds the address that serves the GUI that will be
 	// used with this controller.
