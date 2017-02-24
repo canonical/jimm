@@ -33,10 +33,10 @@ import (
 	"github.com/CanonicalLtd/jem/internal/zaputil"
 )
 
-// websocketPingTimeout is the amount of time a webseocket connection
-// will wait for a ping before failing the connections. It is hardcoded
-// in juju so I see no reason why it can't be here also.
-const websocketPingTimeout = 3 * time.Minute
+// websocketRequestTimeout is the amount of time a webseocket connection
+// will wait for a request before failing the connections. It is
+// hardcoded in juju so I see no reason why it can't be here also.
+const websocketRequestTimeout = 5 * time.Minute
 
 var (
 	// The logging-config flag is present for backward compatibility
@@ -101,19 +101,19 @@ func serve(confPath string) error {
 		conf.MaxMgoSessions = 100
 	}
 	cfg := jem.ServerParams{
-		DB:                   db,
-		MaxMgoSessions:       conf.MaxMgoSessions,
-		ControllerAdmin:      conf.ControllerAdmin,
-		IdentityLocation:     conf.IdentityLocation,
-		PublicKeyLocator:     locator,
-		AgentUsername:        conf.AgentUsername,
-		AgentKey:             conf.AgentKey,
-		RunMonitor:           true,
-		ControllerUUID:       conf.ControllerUUID,
-		WebsocketPingTimeout: websocketPingTimeout,
-		GUILocation:          conf.GUILocation,
-		UsageSenderURL:       conf.UsageSenderURL,
-		Domain:               conf.Domain,
+		DB:                      db,
+		MaxMgoSessions:          conf.MaxMgoSessions,
+		ControllerAdmin:         conf.ControllerAdmin,
+		IdentityLocation:        conf.IdentityLocation,
+		PublicKeyLocator:        locator,
+		AgentUsername:           conf.AgentUsername,
+		AgentKey:                conf.AgentKey,
+		RunMonitor:              true,
+		ControllerUUID:          conf.ControllerUUID,
+		WebsocketRequestTimeout: websocketRequestTimeout,
+		GUILocation:             conf.GUILocation,
+		UsageSenderURL:          conf.UsageSenderURL,
+		Domain:                  conf.Domain,
 	}
 	server, err := jem.NewServer(ctx, cfg)
 	if err != nil {

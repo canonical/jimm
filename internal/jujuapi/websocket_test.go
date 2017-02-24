@@ -1472,7 +1472,7 @@ func (s *websocketSuite) TestConnectionClosesWhenHeartMonitorDies(c *gc.C) {
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	hm.kill(time.Now())
-	beats := 0
+	beats := hm.beats()
 	var err error
 	for beats < 10 {
 		time.Sleep(10 * time.Millisecond)
@@ -1483,7 +1483,7 @@ func (s *websocketSuite) TestConnectionClosesWhenHeartMonitorDies(c *gc.C) {
 		beats++
 	}
 	c.Assert(err, gc.ErrorMatches, `connection is shut down`)
-	c.Assert(hm.beats(), gc.Equals, 0)
+	c.Assert(hm.beats(), gc.Equals, beats)
 }
 
 func (s *websocketSuite) TestPingerUpdatesHeartMonitor(c *gc.C) {
@@ -1493,9 +1493,10 @@ func (s *websocketSuite) TestPingerUpdatesHeartMonitor(c *gc.C) {
 	}))
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
+	beats := hm.beats()
 	err := conn.APICall("Pinger", 1, "", "Ping", nil, nil)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(hm.beats(), gc.Equals, 1)
+	c.Assert(hm.beats(), gc.Equals, beats+1)
 }
 
 func (s *websocketSuite) TestUnauthenticatedPinger(c *gc.C) {
