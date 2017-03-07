@@ -119,21 +119,21 @@ var newHeartMonitor = func(d time.Duration) heartMonitor {
 // unauthenticatedFacades contains the list of facade versions supported
 // by this API, before the user is authenticated.
 var unauthenticatedFacades = map[facade]string{
-	facade{"Admin", 3}:  "Admin",
-	facade{"Pinger", 1}: "Pinger",
+	{"Admin", 3}:  "Admin",
+	{"Pinger", 1}: "Pinger",
 }
 
 // authenticatedFacades contains the list of facade versions supported by
 // this API, once the user is authenticated.
 var authenticatedFacades = map[facade]string{
-	facade{"Admin", 3}:        "Admin",
-	facade{"Bundle", 1}:       "Bundle",
-	facade{"Cloud", 1}:        "Cloud",
-	facade{"Controller", 3}:   "Controller",
-	facade{"JIMM", 1}:         "JIMM",
-	facade{"ModelManager", 2}: "ModelManager",
-	facade{"Pinger", 1}:       "Pinger",
-	facade{"UserManager", 1}:  "UserManager",
+	{"Admin", 3}:        "Admin",
+	{"Bundle", 1}:       "Bundle",
+	{"Cloud", 1}:        "Cloud",
+	{"Controller", 3}:   "Controller",
+	{"JIMM", 1}:         "JIMM",
+	{"ModelManager", 2}: "ModelManager",
+	{"Pinger", 1}:       "Pinger",
+	{"UserManager", 1}:  "UserManager",
 }
 
 // newWSServer creates a new WebSocket server suitible for handling the API for modelUUID.
@@ -1403,7 +1403,7 @@ func userTag(username string) names.UserTag {
 // name part.
 func user(tag names.UserTag) (params.User, error) {
 	if tag.IsLocal() {
-		return "", errgo.WithCausef(nil, params.ErrBadRequest, "unsupported domain %q", tag.Domain())
+		return "", errgo.WithCausef(nil, params.ErrBadRequest, "unsupported local user")
 	}
 	var username string
 	if tag.Domain() == "external" {
