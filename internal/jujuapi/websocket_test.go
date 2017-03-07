@@ -453,7 +453,7 @@ func (s *websocketSuite) TestCredential(c *gc.C) {
 		},
 	}, {
 		Error: &jujuparams.Error{
-			Message: `unsupported domain ""`,
+			Message: `unsupported local user`,
 			Code:    jujuparams.CodeBadRequest,
 		},
 	}})
@@ -1155,7 +1155,7 @@ var createModelTests = []struct {
 	ownerTag:      "user-test@local",
 	cloudTag:      names.NewCloudTag("dummy").String(),
 	credentialTag: "cloudcred-dummy_test@external_cred1",
-	expectError:   `unsupported domain "" \(bad request\)`,
+	expectError:   `unsupported local user \(bad request\)`,
 }, {
 	about:         "invalid user",
 	name:          "model-5",
@@ -1314,7 +1314,7 @@ func (s *websocketSuite) TestModifyModelAccessErrors(c *gc.C) {
 			Access:   jujuparams.ModelReadAccess,
 			ModelTag: names.NewModelTag(mi.UUID).String(),
 		},
-		expectError: `unsupported domain ""`,
+		expectError: `unsupported local user`,
 	}, {
 		about: "no such model",
 		modifyModelAccess: jujuparams.ModifyModelAccess{
@@ -1613,7 +1613,7 @@ func (s *websocketSuite) TestUserInfoLocalUsername(c *gc.C) {
 
 	client := usermanager.NewClient(conn)
 	users, err := client.UserInfo([]string{"alice"}, usermanager.AllUsers)
-	c.Assert(err, gc.ErrorMatches, `alice: unsupported domain ""`)
+	c.Assert(err, gc.ErrorMatches, `alice: unsupported local user`)
 	c.Assert(users, gc.HasLen, 0)
 }
 
