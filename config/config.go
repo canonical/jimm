@@ -7,8 +7,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 
+	"golang.org/x/crypto/acme"
+	"golang.org/x/crypto/acme/autocert"
+
+	"github.com/juju/loggo"
 	"github.com/uber-go/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -16,6 +21,8 @@ import (
 
 	"github.com/CanonicalLtd/jem/params"
 )
+
+var logger = loggo.GetLogger("jem.config")
 
 type Config struct {
 	MongoAddr string `yaml:"mongo-addr"`
@@ -28,6 +35,8 @@ type Config struct {
 	AgentUsername     string            `yaml:"agent-username"`
 	AgentKey          *bakery.KeyPair   `yaml:"agent-key"`
 	AccessLog         string            `yaml:"access-log"`
+	Autocert          bool              `yaml:"autocert"`
+	AutocertURL       string            `yaml:"autocert-url"`
 	TLSCert           string            `yaml:"tls-cert"`
 	TLSKey            string            `yaml:"tls-key"`
 	ControllerUUID    string            `yaml:"controller-uuid"`
@@ -62,8 +71,47 @@ func (c *Config) validate() error {
 }
 
 func (c *Config) TLSConfig() (*tls.Config, error) {
-	if c.TLSCert == "" || c.TLSKey == "" {
+	if c.TLSCert == "" && c.TLSKey == "" && !c.Autocert {
 		return nil, nil
+	}
+	if c.Autocert {
+		autocertURL := acme.LetsEncryptURL
+		if c.AutocertURL != "" {
+			autocertURL = c.AutocertURL
+		}
+		if autocertURL == "staging" {
+			autocertURL = "https://acme-staging.api.letsencrypt.org/directory"
+		}
+		logger.Infof("configuring autocert at %v", autocertURL)
+		cacheDir := filepath.Join(os.TempDir(), "acme-cache")
+		if err := os.MkdirAll(cacheDir, 0700); err != nil {
+			return nil, errgo.Mask(err)
+		}
+		// TODO whitelist only some hosts (HostPolicy: autocert.HostWhitelist)
+		m := autocert.Manager{
+			Prompt: autocert.AcceptTOS,
+			Cache:  autocert.DirCache(cacheDir),
+			Client: &acme.Client{
+				DirectoryURL: autocertURL,
+			},
+		}
+		return &tls.Config{
+			GetCertificate: func(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+				logger.Infof("getting certificate for server name %q", clientHello.ServerName)
+				// Get the locally created certificate and whether it's appropriate
+				// for the SNI name. If not, we'll try to get an acme cert and
+				// fall back to the local certificate if that fails.
+				if !strings.HasSuffix(clientHello.ServerName, ".acme.invalid") {
+					// Allow all hosts currently.
+				}
+				acmeCert, err := m.GetCertificate(clientHello)
+				if err == nil {
+					return acmeCert, nil
+				}
+				logger.Infof("cannot get autocert certificate for %q: %v", clientHello.ServerName, err)
+				return nil, err
+			},
+		}, nil
 	}
 
 	cert, err := tls.X509KeyPair([]byte(c.TLSCert), []byte(c.TLSKey))
