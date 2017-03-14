@@ -4,6 +4,7 @@ state-server-admin: admin
 # For locally running services.
 identity-public-key: CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk=
 identity-location: http://localhost:8081/
+autocert: true
 # An agent is required for communicating with identity.
 # agent-username: jem-0@admin@idm
 # agent-key: {private: VnTcdjEOBBBjHNJ9knRtMA0I1PCATNySJXhW4PGE5hY=, public: MusIzFaXa7ImSMcQ9wgGpaDrgRQhbtsjsyawTvmXh1c=}
