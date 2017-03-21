@@ -3,11 +3,7 @@
 package jujuapi_test
 
 import (
-	"bytes"
-	"encoding/pem"
 	"fmt"
-	"net/http/httptest"
-	"net/url"
 	"sync"
 	"time"
 
@@ -20,7 +16,6 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/instance"
-	"github.com/juju/juju/network"
 	"github.com/juju/juju/state"
 	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/juju/status"
@@ -28,73 +23,22 @@ import (
 	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
 	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/CanonicalLtd/jem/internal/apitest"
 	"github.com/CanonicalLtd/jem/internal/jujuapi"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
 )
 
-var testContext = context.Background()
-
-type websocketSuite struct {
-	apitest.Suite
-	wsServer *httptest.Server
+type controllerSuite struct {
+	websocketSuite
 }
 
-var _ = gc.Suite(&websocketSuite{})
+var _ = gc.Suite(&controllerSuite{})
 
-func (s *websocketSuite) SetUpTest(c *gc.C) {
-	s.Suite.SetUpTest(c)
-	s.wsServer = httptest.NewTLSServer(s.JEMSrv)
-}
-
-func (s *websocketSuite) TearDownTest(c *gc.C) {
-	s.wsServer.Close()
-	s.Suite.TearDownTest(c)
-}
-
-func (s *websocketSuite) TestUnknownModel(c *gc.C) {
-	conn := s.open(c, &api.Info{
-		ModelTag:  names.NewModelTag("00000000-0000-0000-0000-000000000000"),
-		SkipLogin: true,
-	}, "bob")
-	defer conn.Close()
-	err := conn.Login(nil, "", "", nil)
-	c.Assert(err, gc.ErrorMatches, `model "00000000-0000-0000-0000-000000000000" not found`)
-}
-
-func (s *websocketSuite) TestLoginToModel(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
-	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
-	modelUUID := mi.UUID
-	conn := s.open(c, &api.Info{
-		ModelTag:  names.NewModelTag(modelUUID),
-		SkipLogin: true,
-	}, "test")
-	defer conn.Close()
-	nhps, err := network.ParseHostPorts(s.APIInfo(c).Addrs...)
-	c.Assert(err, jc.ErrorIsNil)
-	// Change all unknown scopes to public.
-	for i := range nhps {
-		nhp := &nhps[i]
-		if nhp.Scope == network.ScopeUnknown {
-			nhp.Scope = network.ScopePublic
-		}
-	}
-	err = conn.Login(nil, "", "", nil)
-	c.Assert(errgo.Cause(err), jc.DeepEquals, &api.RedirectError{
-		Servers: [][]network.HostPort{nhps},
-		CACert:  s.APIInfo(c).CACert,
-	})
-}
-
-func (s *websocketSuite) TestOldAdminVersionFails(c *gc.C) {
+func (s *controllerSuite) TestOldAdminVersionFails(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
 	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
@@ -110,7 +54,7 @@ func (s *websocketSuite) TestOldAdminVersionFails(c *gc.C) {
 	c.Assert(resp, jc.DeepEquals, jujuparams.RedirectInfoResult{})
 }
 
-func (s *websocketSuite) TestAdminIDFails(c *gc.C) {
+func (s *controllerSuite) TestAdminIDFails(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
 	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
@@ -125,7 +69,7 @@ func (s *websocketSuite) TestAdminIDFails(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, "id not found")
 }
 
-func (s *websocketSuite) TestLoginToController(c *gc.C) {
+func (s *controllerSuite) TestLoginToController(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, &api.Info{
 		SkipLogin: true,
@@ -135,10 +79,10 @@ func (s *websocketSuite) TestLoginToController(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 	var resp jujuparams.RedirectInfoResult
 	err = conn.APICall("Admin", 3, "", "RedirectInfo", nil, &resp)
-	c.Assert(err, gc.ErrorMatches, "not redirected")
+	c.Assert(err, gc.ErrorMatches, `no such request - method Admin.RedirectInfo is not implemented \(not implemented\)`)
 }
 
-func (s *websocketSuite) TestLoginToControllerWithInvalidMacaroon(c *gc.C) {
+func (s *controllerSuite) TestLoginToControllerWithInvalidMacaroon(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	invalidMacaroon, err := macaroon.New(nil, "", "")
 	c.Assert(err, gc.IsNil)
@@ -148,7 +92,7 @@ func (s *websocketSuite) TestLoginToControllerWithInvalidMacaroon(c *gc.C) {
 	conn.Close()
 }
 
-func (s *websocketSuite) TestUnimplementedMethodFails(c *gc.C) {
+func (s *controllerSuite) TestUnimplementedMethodFails(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
 	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
@@ -163,7 +107,7 @@ func (s *websocketSuite) TestUnimplementedMethodFails(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `no such request - method Admin.Logout is not implemented \(not implemented\)`)
 }
 
-func (s *websocketSuite) TestUnimplementedRootFails(c *gc.C) {
+func (s *controllerSuite) TestUnimplementedRootFails(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
@@ -172,7 +116,7 @@ func (s *websocketSuite) TestUnimplementedRootFails(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `unknown version \(1\) of interface "NoSuch" \(not implemented\)`)
 }
 
-func (s *websocketSuite) TestDefaultCloud(c *gc.C) {
+func (s *controllerSuite) TestDefaultCloud(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
@@ -181,7 +125,7 @@ func (s *websocketSuite) TestDefaultCloud(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, "no default cloud")
 }
 
-func (s *websocketSuite) TestCloudCall(c *gc.C) {
+func (s *controllerSuite) TestCloudCall(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
@@ -202,7 +146,7 @@ func (s *websocketSuite) TestCloudCall(c *gc.C) {
 	})
 }
 
-func (s *websocketSuite) TestClouds(c *gc.C) {
+func (s *controllerSuite) TestClouds(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test-group", Name: "controller-1"}, true)
 	s.IDMSrv.AddUser("test", "test-group")
 	conn := s.open(c, nil, "test")
@@ -227,7 +171,7 @@ func (s *websocketSuite) TestClouds(c *gc.C) {
 	})
 }
 
-func (s *websocketSuite) TestUserCredentials(c *gc.C) {
+func (s *controllerSuite) TestUserCredentials(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	s.JEM.UpdateCredential(context.Background(), &mongodoc.Credential{
 		Path: params.CredentialPath{
@@ -251,7 +195,7 @@ func (s *websocketSuite) TestUserCredentials(c *gc.C) {
 	})
 }
 
-func (s *websocketSuite) TestUserCredentialsWithDomain(c *gc.C) {
+func (s *controllerSuite) TestUserCredentialsWithDomain(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	s.JEM.UpdateCredential(context.Background(), &mongodoc.Credential{
 		Path: params.CredentialPath{
@@ -275,7 +219,7 @@ func (s *websocketSuite) TestUserCredentialsWithDomain(c *gc.C) {
 	})
 }
 
-func (s *websocketSuite) TestUserCredentialsACL(c *gc.C) {
+func (s *controllerSuite) TestUserCredentialsACL(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	s.JEM.UpdateCredential(context.Background(), &mongodoc.Credential{
 		Path: params.CredentialPath{
@@ -314,7 +258,7 @@ func (s *websocketSuite) TestUserCredentialsACL(c *gc.C) {
 	})
 }
 
-func (s *websocketSuite) TestUserCredentialsErrors(c *gc.C) {
+func (s *controllerSuite) TestUserCredentialsErrors(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
@@ -331,7 +275,7 @@ func (s *websocketSuite) TestUserCredentialsErrors(c *gc.C) {
 	c.Assert(resp.Results, gc.HasLen, 1)
 }
 
-func (s *websocketSuite) TestUpdateCloudCredentials(c *gc.C) {
+func (s *controllerSuite) TestUpdateCloudCredentials(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
@@ -349,7 +293,7 @@ func (s *websocketSuite) TestUpdateCloudCredentials(c *gc.C) {
 	var _ = creds
 }
 
-func (s *websocketSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
+func (s *controllerSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
@@ -389,7 +333,7 @@ func (s *websocketSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
 	c.Assert(resp.Results[2].Error, gc.ErrorMatches, `invalid name "bad-name-"`)
 }
 
-func (s *websocketSuite) TestCredential(c *gc.C) {
+func (s *controllerSuite) TestCredential(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
@@ -459,7 +403,7 @@ func (s *websocketSuite) TestCredential(c *gc.C) {
 	}})
 }
 
-func (s *websocketSuite) TestRevokeCredential(c *gc.C) {
+func (s *controllerSuite) TestRevokeCredential(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
@@ -502,7 +446,7 @@ func (s *websocketSuite) TestRevokeCredential(c *gc.C) {
 	c.Assert(tags, jc.DeepEquals, []names.CloudCredentialTag{})
 }
 
-func (s *websocketSuite) TestLoginToRoot(c *gc.C) {
+func (s *controllerSuite) TestLoginToRoot(c *gc.C) {
 	conn := s.open(c, &api.Info{
 		SkipLogin: true,
 	}, "test")
@@ -511,10 +455,10 @@ func (s *websocketSuite) TestLoginToRoot(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 	var resp jujuparams.RedirectInfoResult
 	err = conn.APICall("Admin", 3, "", "RedirectInfo", nil, &resp)
-	c.Assert(err, gc.ErrorMatches, "not redirected")
+	c.Assert(err, gc.ErrorMatches, `no such request - method Admin.RedirectInfo is not implemented \(not implemented\)`)
 }
 
-func (s *websocketSuite) TestListModels(c *gc.C) {
+func (s *controllerSuite) TestListModels(c *gc.C) {
 	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
 	cred2 := s.AssertUpdateCredential(c, "test2", "dummy", "cred1", "empty")
@@ -549,13 +493,13 @@ func (s *websocketSuite) TestListModels(c *gc.C) {
 	}})
 }
 
-func (s *websocketSuite) TestJIMMFacadeVersion(c *gc.C) {
+func (s *controllerSuite) TestJIMMFacadeVersion(c *gc.C) {
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	c.Assert(conn.AllFacadeVersions()["JIMM"], jc.DeepEquals, []int{1})
 }
 
-func (s *websocketSuite) TestUserModelStats(c *gc.C) {
+func (s *controllerSuite) TestUserModelStats(c *gc.C) {
 	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
 	cred2 := s.AssertUpdateCredential(c, "test2", "dummy", "cred1", "empty")
@@ -664,7 +608,7 @@ func (s *websocketSuite) TestUserModelStats(c *gc.C) {
 	})
 }
 
-func (s *websocketSuite) TestModelInfo(c *gc.C) {
+func (s *controllerSuite) TestModelInfo(c *gc.C) {
 	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
 	s.AssertUpdateCredential(c, "test2", "dummy", "cred1", "empty")
@@ -831,7 +775,7 @@ func (s *websocketSuite) TestModelInfo(c *gc.C) {
 	}})
 }
 
-func (s *websocketSuite) TestModelInfoForLegacyModel(c *gc.C) {
+func (s *controllerSuite) TestModelInfoForLegacyModel(c *gc.C) {
 	ctx := context.Background()
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
@@ -894,7 +838,7 @@ func (s *websocketSuite) TestModelInfoForLegacyModel(c *gc.C) {
 	c.Assert(model.DefaultSeries, gc.Equals, "xenial")
 }
 
-func (s *websocketSuite) TestModelInfoRequestTimeout(c *gc.C) {
+func (s *controllerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 	info := s.APIInfo(c)
 	proxy := testing.NewTCPProxy(c, info.Addrs[0])
 	p := &params.AddController{
@@ -1002,7 +946,7 @@ func (s *websocketSuite) TestModelInfoRequestTimeout(c *gc.C) {
 	}})
 }
 
-func (s *websocketSuite) TestAllModels(c *gc.C) {
+func (s *controllerSuite) TestAllModels(c *gc.C) {
 	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
 	s.AssertUpdateCredential(c, "test2", "dummy", "cred1", "empty")
@@ -1043,7 +987,7 @@ func (s *websocketSuite) TestAllModels(c *gc.C) {
 	}})
 }
 
-func (s *websocketSuite) TestModelStatus(c *gc.C) {
+func (s *controllerSuite) TestModelStatus(c *gc.C) {
 	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
 	s.AssertUpdateCredential(c, "test2", "dummy", "cred1", "empty")
@@ -1101,7 +1045,7 @@ func (s *websocketSuite) TestModelStatus(c *gc.C) {
 	doTest(modelmanager.NewClient(conn))
 }
 
-func (s *websocketSuite) TestModelStatusNotFound(c *gc.C) {
+func (s *controllerSuite) TestModelStatusNotFound(c *gc.C) {
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	cclient := controller.NewClient(conn)
@@ -1199,7 +1143,7 @@ var createModelTests = []struct {
 	credentialTag: "cloudcred-dummy_test@external_cred1",
 }}
 
-func (s *websocketSuite) TestCreateModel(c *gc.C) {
+func (s *controllerSuite) TestCreateModel(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
 	s.assertCreateModel(c, createModelParams{name: "existing-model", username: "test", cred: "cred1"})
@@ -1245,7 +1189,7 @@ func (s *websocketSuite) TestCreateModel(c *gc.C) {
 	}
 }
 
-func (s *websocketSuite) TestGrantAndRevokeModel(c *gc.C) {
+func (s *controllerSuite) TestGrantAndRevokeModel(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
 	mi := s.assertCreateModel(c, createModelParams{name: "test-model", username: "test", cred: "cred1"})
@@ -1282,7 +1226,7 @@ func (s *websocketSuite) TestGrantAndRevokeModel(c *gc.C) {
 	c.Assert(res[0].Error, gc.ErrorMatches, "unauthorized")
 }
 
-func (s *websocketSuite) TestModifyModelAccessErrors(c *gc.C) {
+func (s *controllerSuite) TestModifyModelAccessErrors(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "alice", Name: "controller-1"}, true)
 	s.AssertAddController(c, params.EntityPath{User: "bob", Name: "controller-1"}, true)
 	s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
@@ -1377,7 +1321,7 @@ func (s *websocketSuite) TestModifyModelAccessErrors(c *gc.C) {
 	}
 }
 
-func (s *websocketSuite) TestDestroyModel(c *gc.C) {
+func (s *controllerSuite) TestDestroyModel(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "alice", Name: "controller-1"}, true)
 	s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
 	mi := s.assertCreateModel(c, createModelParams{name: "test-model", username: "alice", cred: "cred1"})
@@ -1464,7 +1408,7 @@ func (m *testHeartMonitor) waitForFirstPing(c *gc.C, d time.Duration) {
 	}
 }
 
-func (s *websocketSuite) TestConnectionClosesWhenHeartMonitorDies(c *gc.C) {
+func (s *controllerSuite) TestConnectionClosesWhenHeartMonitorDies(c *gc.C) {
 	hm := newTestHeartMonitor()
 	s.PatchValue(jujuapi.NewHeartMonitor, jujuapi.InternalHeartMonitor(func(time.Duration) jujuapi.HeartMonitor {
 		return hm
@@ -1486,7 +1430,7 @@ func (s *websocketSuite) TestConnectionClosesWhenHeartMonitorDies(c *gc.C) {
 	c.Assert(hm.beats(), gc.Equals, beats)
 }
 
-func (s *websocketSuite) TestPingerUpdatesHeartMonitor(c *gc.C) {
+func (s *controllerSuite) TestPingerUpdatesHeartMonitor(c *gc.C) {
 	hm := newTestHeartMonitor()
 	s.PatchValue(jujuapi.NewHeartMonitor, jujuapi.InternalHeartMonitor(func(time.Duration) jujuapi.HeartMonitor {
 		return hm
@@ -1499,7 +1443,7 @@ func (s *websocketSuite) TestPingerUpdatesHeartMonitor(c *gc.C) {
 	c.Assert(hm.beats(), gc.Equals, beats+1)
 }
 
-func (s *websocketSuite) TestUnauthenticatedPinger(c *gc.C) {
+func (s *controllerSuite) TestUnauthenticatedPinger(c *gc.C) {
 	hm := newTestHeartMonitor()
 	s.PatchValue(jujuapi.NewHeartMonitor, jujuapi.InternalHeartMonitor(func(time.Duration) jujuapi.HeartMonitor {
 		return hm
@@ -1511,7 +1455,7 @@ func (s *websocketSuite) TestUnauthenticatedPinger(c *gc.C) {
 	c.Assert(hm.beats(), gc.Equals, 1)
 }
 
-func (s *websocketSuite) TestAddUser(c *gc.C) {
+func (s *controllerSuite) TestAddUser(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -1520,7 +1464,7 @@ func (s *websocketSuite) TestAddUser(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
-func (s *websocketSuite) TestRemoveUser(c *gc.C) {
+func (s *controllerSuite) TestRemoveUser(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -1529,7 +1473,7 @@ func (s *websocketSuite) TestRemoveUser(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
-func (s *websocketSuite) TestEnableUser(c *gc.C) {
+func (s *controllerSuite) TestEnableUser(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -1538,7 +1482,7 @@ func (s *websocketSuite) TestEnableUser(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
-func (s *websocketSuite) TestDisableUser(c *gc.C) {
+func (s *controllerSuite) TestDisableUser(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -1547,7 +1491,7 @@ func (s *websocketSuite) TestDisableUser(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
-func (s *websocketSuite) TestUserInfoAllUsers(c *gc.C) {
+func (s *controllerSuite) TestUserInfoAllUsers(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -1557,7 +1501,7 @@ func (s *websocketSuite) TestUserInfoAllUsers(c *gc.C) {
 	c.Assert(len(users), gc.Equals, 0)
 }
 
-func (s *websocketSuite) TestUserInfoSpecifiedUser(c *gc.C) {
+func (s *controllerSuite) TestUserInfoSpecifiedUser(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -1572,7 +1516,7 @@ func (s *websocketSuite) TestUserInfoSpecifiedUser(c *gc.C) {
 	})
 }
 
-func (s *websocketSuite) TestUserInfoSpecifiedUsers(c *gc.C) {
+func (s *controllerSuite) TestUserInfoSpecifiedUsers(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -1582,7 +1526,7 @@ func (s *websocketSuite) TestUserInfoSpecifiedUsers(c *gc.C) {
 	c.Assert(users, gc.HasLen, 0)
 }
 
-func (s *websocketSuite) TestUserInfoWithDomain(c *gc.C) {
+func (s *controllerSuite) TestUserInfoWithDomain(c *gc.C) {
 	conn := s.open(c, nil, "alice@mydomain")
 	defer conn.Close()
 
@@ -1597,7 +1541,7 @@ func (s *websocketSuite) TestUserInfoWithDomain(c *gc.C) {
 	})
 }
 
-func (s *websocketSuite) TestUserInfoInvalidUsername(c *gc.C) {
+func (s *controllerSuite) TestUserInfoInvalidUsername(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -1607,7 +1551,7 @@ func (s *websocketSuite) TestUserInfoInvalidUsername(c *gc.C) {
 	c.Assert(users, gc.HasLen, 0)
 }
 
-func (s *websocketSuite) TestUserInfoLocalUsername(c *gc.C) {
+func (s *controllerSuite) TestUserInfoLocalUsername(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -1617,75 +1561,13 @@ func (s *websocketSuite) TestUserInfoLocalUsername(c *gc.C) {
 	c.Assert(users, gc.HasLen, 0)
 }
 
-func (s *websocketSuite) TestSetPassword(c *gc.C) {
+func (s *controllerSuite) TestSetPassword(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
 	client := usermanager.NewClient(conn)
 	err := client.SetPassword("bob", "bob's new super secret password")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
-}
-
-// open creates a new websockec connection to the test server, using the
-// connection info specified in info, authenticating as the given user.
-// If info is nil then default values will be used.
-func (s *websocketSuite) open(c *gc.C, info *api.Info, username string) api.Connection {
-	var inf api.Info
-	if info != nil {
-		inf = *info
-	}
-	u, err := url.Parse(s.wsServer.URL)
-	c.Assert(err, jc.ErrorIsNil)
-	inf.Addrs = []string{
-		u.Host,
-	}
-	w := new(bytes.Buffer)
-	err = pem.Encode(w, &pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: s.wsServer.TLS.Certificates[0].Certificate[0],
-	})
-	c.Assert(err, jc.ErrorIsNil)
-	inf.CACert = w.String()
-	conn, err := api.Open(&inf, api.DialOpts{
-		InsecureSkipVerify: true,
-		BakeryClient:       s.IDMSrv.Client(username),
-	})
-	c.Assert(err, jc.ErrorIsNil)
-	return conn
-}
-
-type createModelParams struct {
-	name     string
-	username string
-	cloud    string
-	region   string
-	cred     params.Name
-	config   map[string]interface{}
-}
-
-// assertCreateModel creates a model for use in tests, using a
-// connection authenticated as the given user. The model info for the
-// newly created model is returned.
-func (s *websocketSuite) assertCreateModel(c *gc.C, p createModelParams) base.ModelInfo {
-	conn := s.open(c, nil, p.username)
-	defer conn.Close()
-	client := modelmanager.NewClient(conn)
-	if p.cloud == "" {
-		p.cloud = "dummy"
-	}
-	credentialTag := names.NewCloudCredentialTag(fmt.Sprintf("dummy/%s@external/%s", p.username, p.cred))
-	mi, err := client.CreateModel(p.name, p.username+"@external", p.cloud, p.region, credentialTag, p.config)
-	c.Assert(err, jc.ErrorIsNil)
-	return mi
-}
-
-func (s *websocketSuite) grant(c *gc.C, path params.EntityPath, user params.User, access string) {
-	m, err := s.JEM.DB.Model(testContext, path)
-	c.Assert(err, jc.ErrorIsNil)
-	conn, err := s.JEM.OpenAPI(testContext, m.Controller)
-	c.Assert(err, jc.ErrorIsNil)
-	err = s.JEM.GrantModel(testContext, conn, m, user, access)
-	c.Assert(err, jc.ErrorIsNil)
 }
 
 func assertModelInfo(c *gc.C, obtained, expected []jujuparams.ModelInfoResult) {
