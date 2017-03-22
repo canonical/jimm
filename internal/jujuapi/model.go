@@ -87,8 +87,11 @@ func (r *modelRoot) modelInfo(ctx context.Context) (*mongodoc.Model, *mongodoc.C
 	if r.model == nil {
 		var err error
 		r.model, err = r.jem.DB.ModelFromUUID(ctx, r.uuid)
+		if errgo.Cause(err) == params.ErrNotFound {
+			return nil, nil, errgo.WithCausef(err, params.ErrModelNotFound, "%s", "")
+		}
 		if err != nil {
-			return nil, nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+			return nil, nil, errgo.Mask(err)
 		}
 		r.controller, err = r.jem.DB.Controller(ctx, r.model.Controller)
 		if err != nil {
@@ -106,7 +109,7 @@ type modelAdmin struct {
 func (a modelAdmin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResult, error) {
 	_, _, err := a.root.modelInfo(a.root.context)
 	if err != nil {
-		return jujuparams.LoginResult{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		return jujuparams.LoginResult{}, errgo.Mask(err, errgo.Is(params.ErrModelNotFound))
 	}
 	// If the model was found then we'll need to redirect to it.
 	servermon.LoginRedirectCount.Inc()
@@ -120,7 +123,7 @@ func (a modelAdmin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResult, 
 func (a modelAdmin) RedirectInfo() (jujuparams.RedirectInfoResult, error) {
 	_, controller, err := a.root.modelInfo(a.root.context)
 	if err != nil {
-		return jujuparams.RedirectInfoResult{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		return jujuparams.RedirectInfoResult{}, errgo.Mask(err, errgo.Is(params.ErrModelNotFound))
 	}
 	servers := make([][]jujuparams.HostPort, len(controller.HostPorts))
 	for i, hps := range controller.HostPorts {
