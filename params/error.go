@@ -20,6 +20,7 @@ func (code ErrorCode) ErrorCode() ErrorCode {
 
 const (
 	ErrNotFound         ErrorCode = "not found"
+	ErrModelNotFound    ErrorCode = "model not found"
 	ErrForbidden        ErrorCode = "forbidden"
 	ErrBadRequest       ErrorCode = "bad request"
 	ErrUnauthorized     ErrorCode = "unauthorized"

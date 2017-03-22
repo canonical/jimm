@@ -32,6 +32,7 @@ var errorCodes = map[error]string{
 	params.ErrForbidden:        jujuparams.CodeForbidden,
 	params.ErrMethodNotAllowed: jujuparams.CodeMethodNotAllowed,
 	params.ErrNotFound:         jujuparams.CodeNotFound,
+	params.ErrModelNotFound:    jujuparams.CodeModelNotFound,
 	params.ErrUnauthorized:     jujuparams.CodeUnauthorized,
 }
 
