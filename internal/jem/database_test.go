@@ -797,6 +797,29 @@ func (s *databaseSuite) TestSetModelLifeSuccess(c *gc.C) {
 	s.checkDBOK(c)
 }
 
+func (s *databaseSuite) TestSetModelLifeRemoveDead(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	err := s.database.AddController(testContext, &mongodoc.Controller{
+		Path: ctlPath,
+		UUID: "fake-uuid",
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Add the controller model.
+	err = s.database.AddModel(testContext, &mongodoc.Model{
+		Path:       params.EntityPath{"bob", "foo"},
+		UUID:       "fake-uuid",
+		Controller: params.EntityPath{"bob", "foo"},
+	})
+	c.Assert(err, gc.IsNil)
+
+	err = s.database.SetModelLife(testContext, ctlPath, "fake-uuid", "dead")
+	c.Assert(err, gc.IsNil)
+
+	_, err = s.database.Model(testContext, ctlPath)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}
+
 func (s *databaseSuite) TestAcquireLeaseControllerNotFound(c *gc.C) {
 	_, err := s.database.AcquireMonitorLease(testContext, params.EntityPath{"bob", "foo"}, time.Time{}, "", time.Now(), "jem1")
 	c.Assert(err, gc.ErrorMatches, `controller removed`)

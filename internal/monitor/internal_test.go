@@ -1070,6 +1070,13 @@ type modelStats struct {
 
 func (s *internalSuite) modelStats(c *gc.C, modelPath params.EntityPath) modelStats {
 	modelDoc, err := s.jem.DB.Model(testContext, modelPath)
+	// The database now deletes any models set to "dead", if the
+	// model cannot be found then return that it is "dead".
+	if errgo.Cause(err) == params.ErrNotFound {
+		return modelStats{
+			life: "dead",
+		}
+	}
 	c.Assert(err, gc.IsNil)
 	counts := make(map[params.EntityCount]int)
 	for name, count := range modelDoc.Counts {

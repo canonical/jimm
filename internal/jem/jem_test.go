@@ -507,25 +507,19 @@ func (s *jemSuite) TestDestroyModel(c *gc.C) {
 		c.Fatalf("model not destroyed")
 	}
 
-	// Check the model is removed.
-	_, err = s.jem.DB.Model(testContext, model.Path)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-
-	// Check that it cannot be destroyed twice
-	err = s.jem.DestroyModel(testContext, conn, model)
-	c.Assert(err, gc.ErrorMatches, `model "bob/model" not found`)
-
-	// Put the model back in the database
-	err = s.jem.DB.AddModel(testContext, model)
+	// Check the model is dying.
+	m, err := s.jem.DB.Model(testContext, model.Path)
 	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(m.Life, gc.Equals, "dying")
 
-	// Check that it can still be removed even if the contoller has no model.
+	// Check that it can be destroyed twice.
 	err = s.jem.DestroyModel(testContext, conn, model)
 	c.Assert(err, jc.ErrorIsNil)
 
-	// Ensure the model is removed.
-	_, err = s.jem.DB.Model(testContext, model.Path)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+	// Check the model is still dying.
+	m, err = s.jem.DB.Model(testContext, model.Path)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(m.Life, gc.Equals, "dying")
 }
 
 func waitForDestruction(conn *apiconn.Conn, c *gc.C, uuid string) <-chan struct{} {

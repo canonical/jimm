@@ -1322,7 +1322,8 @@ func (s *controllerSuite) TestModifyModelAccessErrors(c *gc.C) {
 }
 
 func (s *controllerSuite) TestDestroyModel(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "alice", Name: "controller-1"}, true)
+	ctlPath := params.EntityPath{User: "alice", Name: "controller-1"}
+	s.AssertAddController(c, ctlPath, true)
 	s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
 	mi := s.assertCreateModel(c, createModelParams{name: "test-model", username: "alice", cred: "cred1"})
 
@@ -1330,20 +1331,20 @@ func (s *controllerSuite) TestDestroyModel(c *gc.C) {
 	defer conn.Close()
 
 	client := modelmanager.NewClient(conn)
-	err := client.DestroyModel(names.NewModelTag(mi.UUID))
+	tag := names.NewModelTag(mi.UUID)
+	err := client.DestroyModel(tag)
 	c.Assert(err, jc.ErrorIsNil)
 
-	// Check the model has been deleted
-	models, err := client.ListModels("alice@external")
+	// Check the model is now dying.
+	mis, err := client.ModelInfo([]names.ModelTag{tag})
 	c.Assert(err, jc.ErrorIsNil)
-	var found bool
-	for _, m := range models {
-		if m.UUID == mi.UUID {
-			found = true
-			break
-		}
-	}
-	c.Assert(found, gc.Equals, false)
+	c.Assert(mis, gc.HasLen, 1)
+	c.Assert(mis[0].Error, gc.Equals, (*jujuparams.Error)(nil))
+	c.Assert(mis[0].Result.Life, gc.Equals, jujuparams.Dying)
+
+	// Kill the model.
+	err = s.JEM.DB.SetModelLife(testContext, ctlPath, mi.UUID, "dead")
+	c.Assert(err, jc.ErrorIsNil)
 
 	// Make sure it's not an error if you destroy a model that't not there.
 	err = client.DestroyModel(names.NewModelTag(mi.UUID))
