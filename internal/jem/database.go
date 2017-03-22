@@ -407,9 +407,10 @@ func (db *Database) SetControllerStats(ctx context.Context, ctlPath params.Entit
 	return errgo.Mask(err)
 }
 
-// SetModelLife sets the Life field of all models controlled
-// by the given controller that have the given UUID.
-// It does not return an error if there are no such models.
+// SetModelLife sets the Life field of all models controlled by the given
+// controller that have the given UUID. It does not return an error if
+// there are no such models. If life is "dead" then the model will also
+// be removed from the database.
 // TODO remove the ctlPath argument.
 func (db *Database) SetModelLife(ctx context.Context, ctlPath params.EntityPath, uuid string, life string) (err error) {
 	defer db.checkError(ctx, &err)
@@ -419,6 +420,13 @@ func (db *Database) SetModelLife(ctx context.Context, ctlPath params.EntityPath,
 	)
 	if err != nil {
 		return errgo.Notef(err, "cannot update model")
+	}
+	if life != "dead" {
+		return nil
+	}
+	_, err = db.Models().RemoveAll(bson.D{{"uuid", uuid}, {"controller", ctlPath}})
+	if err != nil {
+		return errgo.Notef(err, "cannot remove model")
 	}
 	return nil
 }

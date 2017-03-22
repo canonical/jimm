@@ -615,19 +615,18 @@ func (j *JEM) RevokeModel(ctx context.Context, conn *apiconn.Conn, model *mongod
 	return nil
 }
 
-// DestroyModel destroys the specified model and removes it from the
-// database.
-//
-// Note that if the model is destroyed in its controller but
-// j.DeleteModel fails, a subsequent DestroyModel can can still succeed
-// because client.DestroyModel will succeed when the model doesn't exist.
+// DestroyModel destroys the specified model. The model will have its
+// Life set to dying, but won't be removed until it is removed from the
+// controller.
 func (j *JEM) DestroyModel(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model) error {
 	client := modelmanager.NewClient(conn)
 	if err := client.DestroyModel(names.NewModelTag(model.UUID)); err != nil {
 		return errgo.Mask(err)
 	}
-	if err := j.DB.DeleteModel(ctx, model.Path); err != nil {
-		return errgo.Mask(err)
+	if err := j.DB.SetModelLife(ctx, model.Controller, model.UUID, "dying"); err != nil {
+		// If this update fails then don't worry as the watcher
+		// will detect the state change and update as appropriate.
+		zapctx.Warn(ctx, "error updating model life", zap.Error(err), zap.String("model", model.UUID))
 	}
 	return nil
 }
