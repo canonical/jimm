@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 
+	jujuparams "github.com/juju/juju/apiserver/params"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
@@ -64,6 +65,16 @@ func (s *apiSuite) TestGUIModelNotFound(c *gc.C) {
 			Code:    params.ErrNotFound,
 			Message: `model "000000000000-0000-0000-0000-00000000" not found`,
 		},
+	})
+}
+
+func (s *apiSuite) TestGUIArchive(c *gc.C) {
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.JEMSrv,
+		Method:       "GET",
+		URL:          "/gui-archive",
+		ExpectStatus: http.StatusOK,
+		ExpectBody:   jujuparams.GUIArchiveResponse{},
 	})
 }
 
