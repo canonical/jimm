@@ -14,7 +14,9 @@ import (
 	"github.com/gorilla/handlers"
 	// Include any providers known to support JEM.
 	// Avoid including provider/all to reduce build time.
+	_ "github.com/juju/juju/provider/azure"
 	_ "github.com/juju/juju/provider/ec2"
+	_ "github.com/juju/juju/provider/gce"
 	_ "github.com/juju/juju/provider/lxd"
 	_ "github.com/juju/juju/provider/maas"
 	_ "github.com/juju/juju/provider/openstack"
