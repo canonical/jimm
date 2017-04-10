@@ -375,8 +375,21 @@ func (h *Handler) ListModels(arg *params.ListModels) (*params.ListModelsResponse
 	if err := iter.Err(); err != nil {
 		return nil, errgo.Notef(err, "cannot get controllers")
 	}
-	models := make([]params.ModelResponse, 0, len(controllers))
-	modelIter := h.jem.DB.NewCanReadIter(ctx, h.jem.DB.Models().Find(nil).Sort("_id").Iter())
+
+	iter = h.jem.DB.Models().Find(nil).Sort("_id").Iter()
+	var modelIter entityIter
+	if arg.All {
+		if err := auth.CheckIsUser(ctx, h.jem.ControllerAdmin()); err != nil {
+			if errgo.Cause(err) == params.ErrUnauthorized {
+				return nil, errgo.WithCausef(nil, params.ErrUnauthorized, "admin access required to list all models")
+			}
+			return nil, errgo.Mask(err)
+		}
+		modelIter = mgoIter{iter}
+	} else {
+		modelIter = h.jem.DB.NewCanReadIter(ctx, iter)
+	}
+	var models []params.ModelResponse
 	var m mongodoc.Model
 	for modelIter.Next(&m) {
 		ctl, ok := controllers[m.Controller]
@@ -384,13 +397,6 @@ func (h *Handler) ListModels(arg *params.ListModels) (*params.ListModelsResponse
 			zapctx.Error(ctx, "model has invalid controller value", zap.Stringer("model", m.Path), zap.Stringer("controller", m.Controller))
 			continue
 		}
-		// TODO We could ensure that the currently authenticated user has
-		// access to the model and return their username and password,
-		// but that would mean we'd have to ensure the user in every
-		// returned model which currently we can't do efficiently,
-		// so given that most uses of this endpoint won't actually want
-		// to connect to all of the models, we leave out the username and
-		// password for now.
 		models = append(models, params.ModelResponse{
 			Path:             m.Path,
 			UUID:             m.UUID,
@@ -784,4 +790,22 @@ func parseFormLocations(form url.Values) (locationParams, error) {
 		return locationParams{}, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
 	return cloudAndRegion(loc)
+}
+
+// entityIter is an iterator over a set of entities.
+type entityIter interface {
+	Next(item auth.ACLEntity) bool
+	Close() error
+	Err() error
+}
+
+// mgoIter is an adapter to convert a *mgo.Iter into an entityIter.
+type mgoIter struct {
+	*mgo.Iter
+}
+
+// Next implements entityIter.Next by wrapping *mgo.Next using the
+// auth.ACLEntity type.
+func (it mgoIter) Next(item auth.ACLEntity) bool {
+	return it.Iter.Next(item)
 }
