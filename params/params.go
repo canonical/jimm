@@ -260,6 +260,10 @@ type NewModel struct {
 type ListModels struct {
 	httprequest.Route `httprequest:"GET /v2/model"`
 
+	// All requests the list of models for all users. This is only
+	// available to admin users.
+	All bool `httprequest:"all,form"`
+
 	// TODO add parameters for restricting results.
 }
 

@@ -1599,7 +1599,7 @@ func (s *APISuite) TestListControllerNoServers(c *gc.C) {
 }
 
 func (s *APISuite) TestListModelsNoServers(c *gc.C) {
-	resp, err := s.NewClient("bob").ListModels(nil)
+	resp, err := s.NewClient("bob").ListModels(&params.ListModels{})
 	c.Assert(err, gc.IsNil)
 	c.Assert(resp, jc.DeepEquals, &params.ListModelsResponse{})
 }
@@ -1662,6 +1662,7 @@ func (s *APISuite) TestListModels(c *gc.C) {
 	}}
 	tests := []struct {
 		user    params.User
+		all     bool
 		indexes []int
 	}{{
 		user:    "bob",
@@ -1675,6 +1676,10 @@ func (s *APISuite) TestListModels(c *gc.C) {
 	}, {
 		user:    "fred",
 		indexes: []int{0},
+	}, {
+		user:    "controller-admin",
+		all:     true,
+		indexes: []int{0, 1, 2},
 	}}
 	for i, test := range tests {
 		c.Logf("test %d: as user %s", i, test.user)
@@ -1685,10 +1690,16 @@ func (s *APISuite) TestListModels(c *gc.C) {
 			expectResp.Models[i] = resps[index]
 		}
 
-		resp, err := s.NewClient(test.user).ListModels(nil)
+		resp, err := s.NewClient(test.user).ListModels(&params.ListModels{All: test.all})
 		c.Assert(err, gc.IsNil)
 		c.Assert(resp, jc.DeepEquals, expectResp)
 	}
+}
+
+func (s *APISuite) TestListAllModelsFailsIfNotAdmin(c *gc.C) {
+	resp, err := s.NewClient("bob").ListModels(&params.ListModels{All: true})
+	c.Assert(err, gc.ErrorMatches, "admin access required to list all models")
+	c.Assert(resp, gc.IsNil)
 }
 
 func (s *APISuite) TestGetSetControllerPerm(c *gc.C) {
