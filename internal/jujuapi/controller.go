@@ -20,6 +20,7 @@ import (
 	"github.com/juju/juju/rpc/rpcreflect"
 	"github.com/juju/juju/status"
 	"github.com/juju/juju/storage"
+	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/utils/parallel"
 	"github.com/uber-go/zap"
 	"golang.org/x/net/context"
@@ -246,7 +247,7 @@ func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResult, error
 		},
 		ControllerTag: names.NewControllerTag(a.root.params.ControllerUUID).String(),
 		Facades:       facadeVersions(a.root.facades),
-		ServerVersion: "2.0.0",
+		ServerVersion: jujuversion.Current.String(),
 	}, nil
 }
 
