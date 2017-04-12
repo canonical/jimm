@@ -4,9 +4,8 @@
 package jemclient
 
 import (
-	"github.com/juju/httprequest"
-
 	"github.com/CanonicalLtd/jem/params"
+	"github.com/juju/httprequest"
 )
 
 type client struct {
@@ -79,6 +78,13 @@ func (c *client) GetModel(p *params.GetModel) (*params.ModelResponse, error) {
 // Only the owner (arg.EntityPath.User) can read the ACL.
 func (c *client) GetModelPerm(p *params.GetModelPerm) (params.ACL, error) {
 	var r params.ACL
+	err := c.Client.Call(p, &r)
+	return r, err
+}
+
+// JujuStatus retrieves and returns the status of the specifed model.
+func (c *client) JujuStatus(p *params.JujuStatus) (*params.JujuStatusResponse, error) {
+	var r *params.JujuStatusResponse
 	err := c.Client.Call(p, &r)
 	return r, err
 }

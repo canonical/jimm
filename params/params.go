@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/juju/httprequest"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/environschema.v1"
 )
@@ -483,4 +484,15 @@ type Count struct {
 	// existed for two seconds, this metric will record four
 	// seconds.
 	TotalTime int64 `json:"total-time"`
+}
+
+// JujuStatus requests the status of the specified model.
+type JujuStatus struct {
+	httprequest.Route `httprequest:"GET /v2/model/:User/:Name/status"`
+	EntityPath
+}
+
+// JujuStatusResponse contains the full status of a juju model.
+type JujuStatusResponse struct {
+	Status jujuparams.FullStatus `json:"status"`
 }

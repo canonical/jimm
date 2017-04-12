@@ -720,6 +720,29 @@ func (h *Handler) UpdateCredential(arg *params.UpdateCredential) error {
 	return nil
 }
 
+// JujuStatus retrieves and returns the status of the specifed model.
+func (h *Handler) JujuStatus(arg *params.JujuStatus) (*params.JujuStatusResponse, error) {
+	ctx := h.context
+	if err := auth.CheckIsUser(ctx, h.config.ControllerAdmin); err != nil {
+		if err := h.jem.DB.CheckReadACL(ctx, h.jem.DB.Models(), arg.EntityPath); err != nil {
+			return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+		}
+	}
+	conn, err := h.jem.OpenModelAPI(ctx, arg.EntityPath)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	defer conn.Close()
+	client := conn.Client()
+	status, err := client.Status(nil)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return &params.JujuStatusResponse{
+		Status: *status,
+	}, nil
+}
+
 func badRequestf(underlying error, f string, a ...interface{}) error {
 	err := errgo.WithCausef(underlying, params.ErrBadRequest, f, a...)
 	err.(*errgo.Err).SetLocation(1)
