@@ -30,7 +30,7 @@ func (s *removeSuite) TestRemoveModel(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	stdout, stderr, code = run(c, c.MkDir(), "list")
+	stdout, stderr, code = run(c, c.MkDir(), "models")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stderr, gc.Equals, "")
 	c.Assert(stdout, gc.Equals, "bob/foo\n")
@@ -74,7 +74,7 @@ func (s *removeSuite) TestRemoveController(c *gc.C) {
 	c.Assert(stderr, gc.Equals, "")
 	c.Assert(stdout, gc.Equals, "bob/bar\n")
 
-	stdout, stderr, code = run(c, c.MkDir(), "list")
+	stdout, stderr, code = run(c, c.MkDir(), "models")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stderr, gc.Equals, "")
 	c.Assert(stdout, gc.Equals, "bob/bar\n")
@@ -97,7 +97,7 @@ func (s *removeSuite) TestRemoveMultipleModels(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Matches, `cannot remove bob/foo: model "bob/foo" not found`+"\n")
 
-	stdout, stderr, code = run(c, c.MkDir(), "list")
+	stdout, stderr, code = run(c, c.MkDir(), "models")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stderr, gc.Equals, "")
 	c.Assert(stdout, gc.Equals, "")
@@ -121,7 +121,7 @@ func (s *removeSuite) TestRemoveVerbose(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "removing bob/foo-1\n")
 
-	stdout, stderr, code = run(c, c.MkDir(), "list")
+	stdout, stderr, code = run(c, c.MkDir(), "models")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stderr, gc.Equals, "")
 	c.Assert(stdout, gc.Equals, "bob/foo\n")

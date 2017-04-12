@@ -6,13 +6,13 @@ import (
 	gc "gopkg.in/check.v1"
 )
 
-type listControllersSuite struct {
+type controllersSuite struct {
 	commonSuite
 }
 
-var _ = gc.Suite(&listControllersSuite{})
+var _ = gc.Suite(&controllersSuite{})
 
-var listControllersErrorTests = []struct {
+var controllersErrorTests = []struct {
 	about        string
 	args         []string
 	expectStderr string
@@ -24,17 +24,17 @@ var listControllersErrorTests = []struct {
 	expectCode:   2,
 }}
 
-func (s *listControllersSuite) TestError(c *gc.C) {
-	for i, test := range listControllersErrorTests {
+func (s *controllersSuite) TestError(c *gc.C) {
+	for i, test := range controllersErrorTests {
 		c.Logf("test %d: %s", i, test.about)
-		stdout, stderr, code := run(c, c.MkDir(), "list-controllers", test.args...)
+		stdout, stderr, code := run(c, c.MkDir(), "controllers", test.args...)
 		c.Assert(code, gc.Equals, test.expectCode, gc.Commentf("stderr: %s", stderr))
 		c.Assert(stderr, gc.Matches, "(error:|ERROR) "+test.expectStderr+"\n")
 		c.Assert(stdout, gc.Equals, "")
 	}
 }
 
-func (s *listControllersSuite) TestSuccess(c *gc.C) {
+func (s *controllersSuite) TestSuccess(c *gc.C) {
 	s.idmSrv.AddUser("bob", adminUser)
 	s.idmSrv.SetDefaultUser("bob")
 
@@ -49,6 +49,12 @@ func (s *listControllersSuite) TestSuccess(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
+	stdout, stderr, code = run(c, c.MkDir(), "controllers")
+	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
+	c.Assert(stderr, gc.Equals, "")
+	c.Assert(stdout, gc.Equals, "bob/bar\nbob/foo\n")
+
+	// Check that the alias works
 	stdout, stderr, code = run(c, c.MkDir(), "list-controllers")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stderr, gc.Equals, "")

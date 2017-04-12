@@ -12,34 +12,34 @@ import (
 	"github.com/CanonicalLtd/jem/params"
 )
 
-type listControllersCommand struct {
+type controllersCommand struct {
 	commandBase
 }
 
-func newListControllersCommand() cmd.Command {
-	return modelcmd.WrapBase(&listControllersCommand{})
+func newControllersCommand() cmd.Command {
+	return modelcmd.WrapBase(&controllersCommand{})
 }
 
-var listControllersDoc = `
-The list-controllers command lists available controllers.
+var controllersDoc = `
+The controllers command lists available controllers.
 `
 
-func (c *listControllersCommand) Info() *cmd.Info {
+func (c *controllersCommand) Info() *cmd.Info {
 	return &cmd.Info{
-		Name:    "list-controllers",
+		Name:    "controllers",
 		Purpose: "list controllers",
-		Doc:     listControllersDoc,
+		Doc:     controllersDoc,
 	}
 }
 
-func (c *listControllersCommand) Init(args []string) error {
+func (c *controllersCommand) Init(args []string) error {
 	if len(args) != 0 {
 		return errgo.Newf("got %d arguments, want none", len(args))
 	}
 	return nil
 }
 
-func (c *listControllersCommand) Run(ctxt *cmd.Context) error {
+func (c *controllersCommand) Run(ctxt *cmd.Context) error {
 	client, err := c.newClient(ctxt)
 	if err != nil {
 		return errgo.Mask(err)
