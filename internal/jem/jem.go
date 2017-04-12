@@ -237,8 +237,9 @@ func (j *JEM) Close() {
 	j.pool.decRef()
 }
 
-// ErrAPIConnection is returned by OpenAPI and OpenAPIFromDocs
-// when the API connection cannot be made.
+// ErrAPIConnection is returned by OpenAPI, OpenAPIFromDoc and
+// OpenModelAPI when the API connection cannot be made.
+//
 // Note that it is defined as an ErrorCode so that Database.checkError
 // does not treat it as a mongo-connection-broken error.
 var ErrAPIConnection params.ErrorCode = "cannot connect to API"
@@ -293,6 +294,54 @@ func apiInfoFromDoc(ctl *mongodoc.Controller) *api.Info {
 	return &api.Info{
 		Addrs:    mongodoc.Addresses(ctl.HostPorts),
 		CACert:   ctl.CACert,
+		Tag:      names.NewUserTag(ctl.AdminUser),
+		Password: ctl.AdminPassword,
+	}
+}
+
+// OpenModelAPI opens an API connection to the model with the given path
+// and returns it along with the information used to connect. If the
+// model does not exist, the error will have a cause of
+// params.ErrNotFound.
+//
+// If the model API connection could not be made, the error will have a
+// cause of ErrAPIConnection.
+//
+// The returned connection must be closed when finished with.
+func (j *JEM) OpenModelAPI(ctx context.Context, path params.EntityPath) (_ *apiconn.Conn, err error) {
+	defer j.DB.checkError(ctx, &err)
+	m, err := j.DB.Model(ctx, path)
+	if err != nil {
+		return nil, errgo.NoteMask(err, "cannot get model", errgo.Is(params.ErrNotFound))
+	}
+	ctl, err := j.DB.Controller(ctx, m.Controller)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot get controller")
+	}
+	return j.openModelAPIFromDocs(ctx, ctl, m)
+}
+
+// openModelAPIFromDocs returns an API connection to the model held in the
+// given documents.
+//
+// The returned connection must be closed when finished with.
+func (j *JEM) openModelAPIFromDocs(ctx context.Context, ctl *mongodoc.Controller, m *mongodoc.Model) (*apiconn.Conn, error) {
+	return j.pool.connCache.OpenAPI(ctx, m.UUID, func() (api.Connection, *api.Info, error) {
+		info := apiInfoFromDocs(ctl, m)
+		zapctx.Debug(ctx, "open API", zap.Object("api-info", info))
+		conn, err := api.Open(info, apiDialOpts())
+		if err != nil {
+			return nil, nil, errgo.WithCausef(err, ErrAPIConnection, "")
+		}
+		return conn, info, nil
+	})
+}
+
+func apiInfoFromDocs(ctl *mongodoc.Controller, m *mongodoc.Model) *api.Info {
+	return &api.Info{
+		Addrs:    mongodoc.Addresses(ctl.HostPorts),
+		CACert:   ctl.CACert,
+		ModelTag: names.NewModelTag(m.UUID),
 		Tag:      names.NewUserTag(ctl.AdminUser),
 		Password: ctl.AdminPassword,
 	}

@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/juju/juju/api"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/network"
+	jujuversion "github.com/juju/juju/version"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"golang.org/x/net/context"
@@ -1789,6 +1791,69 @@ func (s *APISuite) TestMongodocAPIHostPorts(c *gc.C) {
 		got := v2.MongodocAPIHostPorts(test.hps)
 		c.Assert(got, jc.DeepEquals, test.expect)
 	}
+}
+
+func (s *APISuite) TestJujuStatus(c *gc.C) {
+	ctlId := s.AssertAddController(c, params.EntityPath{"alice", "foo"}, false)
+	s.allowControllerPerm(c, ctlId)
+	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
+	modelId, _ := s.CreateModel(c, params.EntityPath{"bob", "bar"}, ctlId, cred)
+
+	resp, err := s.NewClient("bob").JujuStatus(&params.JujuStatus{
+		EntityPath: modelId,
+	})
+	c.Assert(err, gc.IsNil)
+	c.Assert(resp, jc.DeepEquals, &params.JujuStatusResponse{
+		Status: jujuparams.FullStatus{
+			Model: jujuparams.ModelStatusInfo{
+				Name:        string(modelId.Name),
+				CloudTag:    names.NewCloudTag("dummy").String(),
+				CloudRegion: "dummy-region",
+				Version:     jujuversion.Current.String(),
+			},
+			Machines:           map[string]jujuparams.MachineStatus{},
+			Applications:       map[string]jujuparams.ApplicationStatus{},
+			RemoteApplications: map[string]jujuparams.RemoteApplicationStatus{},
+			Relations:          nil,
+		},
+	})
+
+	// Check that an admin can also get the status.
+	resp, err = s.NewClient("alice").JujuStatus(&params.JujuStatus{
+		EntityPath: modelId,
+	})
+	c.Assert(err, gc.IsNil)
+	c.Assert(resp, jc.DeepEquals, &params.JujuStatusResponse{
+		Status: jujuparams.FullStatus{
+			Model: jujuparams.ModelStatusInfo{
+				Name:        string(modelId.Name),
+				CloudTag:    names.NewCloudTag("dummy").String(),
+				CloudRegion: "dummy-region",
+				Version:     jujuversion.Current.String(),
+			},
+			Machines:           map[string]jujuparams.MachineStatus{},
+			Applications:       map[string]jujuparams.ApplicationStatus{},
+			RemoteApplications: map[string]jujuparams.RemoteApplicationStatus{},
+			Relations:          nil,
+		},
+	})
+
+	// Make sure another user cannot get access.
+	resp, err = s.NewClient("charlie").JujuStatus(&params.JujuStatus{
+		EntityPath: modelId,
+	})
+	c.Assert(err, gc.ErrorMatches, "unauthorized")
+
+	// Model not found
+	resp, err = s.NewClient("alice").JujuStatus(&params.JujuStatus{
+		EntityPath: params.EntityPath{User: "bob", Name: "no-such-model"},
+	})
+	c.Assert(err, gc.ErrorMatches, `cannot get model: model "bob/no-such-model" not found`)
+
+	resp, err = s.NewClient("bob").JujuStatus(&params.JujuStatus{
+		EntityPath: params.EntityPath{User: "bob", Name: "no-such-model"},
+	})
+	c.Assert(err, gc.ErrorMatches, `cannot get model: model "bob/no-such-model" not found`)
 }
 
 func (s *APISuite) allowControllerPerm(c *gc.C, path params.EntityPath, acl ...string) {

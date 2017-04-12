@@ -103,7 +103,69 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 	// Close the pool and make sure that the connection
 	// has actually been closed this time.
 	s.pool.Close()
-	assertConnIsClosed(c, conn)
+	assertConnClosed(c, conn)
+
+	// Check the close works again (we're just ensuring
+	// that it doesn't panic here)
+	s.pool.Close()
+}
+
+func (s *jemAPIConnSuite) TestPoolOpenModelAPI(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "controller"}
+	info := s.APIInfo(c)
+
+	hps, err := mongodoc.ParseAddresses(info.Addrs)
+	c.Assert(err, gc.IsNil)
+
+	ctl := &mongodoc.Controller{
+		Path:          ctlPath,
+		HostPorts:     [][]mongodoc.HostPort{hps},
+		CACert:        info.CACert,
+		AdminUser:     info.Tag.Id(),
+		AdminPassword: info.Password,
+	}
+	err = s.jem.DB.AddController(testContext, ctl)
+	c.Assert(err, gc.IsNil)
+
+	mPath := params.EntityPath{"bob", "model"}
+	m := &mongodoc.Model{
+		Path:       mPath,
+		UUID:       info.ModelTag.Id(),
+		Controller: ctlPath,
+	}
+	err = s.jem.DB.AddModel(testContext, m)
+	c.Assert(err, gc.IsNil)
+
+	// Open the API and check that it works.
+	conn, err := s.jem.OpenModelAPI(testContext, mPath)
+	c.Assert(err, gc.IsNil)
+	s.assertModelConnectionAlive(c, conn)
+
+	err = conn.Close()
+	c.Assert(err, gc.IsNil)
+
+	// Open it again and check that we get the
+	// same cached connection.
+	conn1, err := s.jem.OpenModelAPI(testContext, mPath)
+	c.Assert(err, gc.IsNil)
+	s.assertModelConnectionAlive(c, conn1)
+	c.Assert(conn1.Connection, gc.Equals, conn.Connection)
+	err = conn1.Close()
+	c.Assert(err, gc.IsNil)
+
+	// Close the JEM instance and check that the
+	// connection is still alive, held open by the pool.
+	s.jem.Close()
+	s.assertModelConnectionAlive(c, conn)
+
+	// Make sure the Close call is idempotent.
+	s.jem.Close()
+	s.assertModelConnectionAlive(c, conn)
+
+	// Close the pool and make sure that the connection
+	// has actually been closed this time.
+	s.pool.Close()
+	assertConnClosed(c, conn)
 
 	// Check the close works again (we're just ensuring
 	// that it doesn't panic here)
@@ -142,7 +204,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPIError(c *gc.C) {
 	c.Assert(conn, gc.IsNil)
 }
 
-func assertConnIsClosed(c *gc.C, conn *apiconn.Conn) {
+func assertConnClosed(c *gc.C, conn *apiconn.Conn) {
 	select {
 	case <-conn.Broken():
 	case <-time.After(5 * time.Second):
@@ -154,5 +216,12 @@ func assertConnIsClosed(c *gc.C, conn *apiconn.Conn) {
 // connection is responding to requests.
 func (s *jemAPIConnSuite) assertConnectionAlive(c *gc.C, conn *apiconn.Conn) {
 	_, err := cloudapi.NewClient(conn).DefaultCloud()
+	c.Assert(err, gc.IsNil)
+}
+
+// assertModelConnectionAlive asserts that the given model API
+// connection is responding to requests.
+func (s *jemAPIConnSuite) assertModelConnectionAlive(c *gc.C, conn *apiconn.Conn) {
+	_, err := conn.Client().ModelUserInfo()
 	c.Assert(err, gc.IsNil)
 }
