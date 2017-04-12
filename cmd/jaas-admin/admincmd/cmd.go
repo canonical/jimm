@@ -54,9 +54,11 @@ func New() cmd.Command {
 		},
 	})
 	supercmd.Register(newAddControllerCommand())
+	supercmd.Register(newControllersCommand())
+	supercmd.RegisterAlias("list-controllers", "controllers", nil)
 	supercmd.Register(newGrantCommand())
-	supercmd.Register(newListCommand())
-	supercmd.Register(newListControllersCommand())
+	supercmd.Register(newModelsCommand())
+	supercmd.RegisterAlias("list-models", "models", nil)
 	supercmd.Register(newLocationsCommand())
 	supercmd.Register(newRemoveCommand())
 	supercmd.Register(newRevokeCommand())
