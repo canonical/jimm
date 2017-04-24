@@ -23,6 +23,7 @@ import (
 	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
+	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
 	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2/bson"
@@ -944,6 +945,40 @@ func (s *controllerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 			}},
 		},
 	}})
+}
+
+func (s *controllerSuite) TestModelInfoDyingModelNotFound(c *gc.C) {
+	ctlPath := s.AssertAddController(c, params.EntityPath{User: "alice", Name: "controller-1"}, true)
+	s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
+
+	err := s.JEM.DB.AddModel(testContext, &mongodoc.Model{
+		Controller:  ctlPath,
+		Path:        params.EntityPath{User: "alice", Name: "model-1"},
+		UUID:        "00000000-0000-0000-0000-000000000007",
+		Life:        string(jujuparams.Dying),
+		Cloud:       params.Cloud("dummy"),
+		CloudRegion: "dummy-region",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+	client := modelmanager.NewClient(conn)
+
+	models, err := client.ModelInfo([]names.ModelTag{
+		names.NewModelTag("00000000-0000-0000-0000-000000000007"),
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	assertModelInfo(c, models, []jujuparams.ModelInfoResult{{
+		Error: &jujuparams.Error{
+			Message: `permission denied`,
+			Code:    jujuparams.CodeUnauthorized,
+		},
+	}})
+
+	_, err = s.JEM.DB.Model(testContext, params.EntityPath{User: "alice", Name: "model-1"})
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
 func (s *controllerSuite) TestAllModels(c *gc.C) {

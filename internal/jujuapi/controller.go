@@ -721,6 +721,19 @@ func (r *controllerRoot) modelInfo(ctx context.Context, arg jujuparams.Entity) (
 	// Query the model itself for user information.
 	infoFromController, err := fetchModelInfo(ctx, r.jem, model)
 	if err != nil {
+		code := jujuparams.ErrCode(err)
+		if model.Life == string(jujuparams.Dying) && code == jujuparams.CodeUnauthorized {
+			zapctx.Info(ctx, "could not get ModelInfo for dying model, marking dead", zap.Error(err))
+			// The model was dying and now cannot be accessed, assume it is now dead.
+			if err := r.jem.DB.SetModelLife(ctx, model.Controller, model.UUID, string(jujuparams.Dead)); err != nil {
+				// If this update fails then don't worry as the watcher
+				// will detect the state change and update as appropriate.
+				zapctx.Warn(ctx, "error updating model life", zap.Error(err))
+			}
+			// return the error with the an appropriate cause.
+			return nil, errgo.WithCausef(err, params.ErrUnauthorized, "%s", "")
+		}
+
 		// We have most of the information we want already so return that.
 		zapctx.Error(ctx, "failed to get ModelInfo from controller", zap.String("controller", model.Controller.String()), zaputil.Error(err))
 		return info, nil
