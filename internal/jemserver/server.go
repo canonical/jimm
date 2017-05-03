@@ -11,11 +11,11 @@ import (
 
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient"
-	"github.com/juju/juju/worker"
 	"github.com/julienschmidt/httprouter"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/juju/worker.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"

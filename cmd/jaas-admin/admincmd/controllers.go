@@ -44,6 +44,7 @@ func (c *controllersCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
+	defer client.Close()
 	resp, err := client.ListController(&params.ListController{})
 	if err != nil {
 		return errgo.Mask(err)

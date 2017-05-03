@@ -272,7 +272,7 @@ func (s *controllerSuite) TestUserCredentialsErrors(c *gc.C) {
 	var resp jujuparams.StringsResults
 	err := conn.APICall("Cloud", 1, "", "UserCredentials", req, &resp)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `bad request: "not-a-user-tag" is not a valid tag`)
+	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `"not-a-user-tag" is not a valid tag`)
 	c.Assert(resp.Results, gc.HasLen, 1)
 }
 
@@ -329,7 +329,7 @@ func (s *controllerSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
 	err := conn.APICall("Cloud", 1, "", "UpdateCredentials", req, &resp)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(resp.Results, gc.HasLen, 3)
-	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `bad request: "not-a-cloud-credentials-tag" is not a valid tag`)
+	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `"not-a-cloud-credentials-tag" is not a valid tag`)
 	c.Assert(resp.Results[1].Error, gc.ErrorMatches, `unauthorized`)
 	c.Assert(resp.Results[2].Error, gc.ErrorMatches, `invalid name "bad-name-"`)
 }

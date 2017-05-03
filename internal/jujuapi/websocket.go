@@ -3,13 +3,14 @@
 package jujuapi
 
 import (
+	"net/http"
 	"time"
 
+	"github.com/gorilla/websocket"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/rpc"
 	"github.com/juju/juju/rpc/jsoncodec"
 	"golang.org/x/net/context"
-	"golang.org/x/net/websocket"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/internal/auth"
@@ -91,8 +92,21 @@ var newHeartMonitor = func(d time.Duration) heartMonitor {
 	}
 }
 
+// Use a 64k frame size for the websockets while we need to deal
+// with x/net/websocket connections that don't deal with recieving
+// fragmented messages.
+const websocketFrameSize = 65536
+
+var websocketUpgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool { return true },
+	// In order to deal with the remote side not handling message
+	// fragmentation, we default to largeish frames.
+	ReadBufferSize:  websocketFrameSize,
+	WriteBufferSize: websocketFrameSize,
+}
+
 // newWSServer creates a new WebSocket server suitible for handling the API for modelUUID.
-func newWSServer(ctx context.Context, jem *jem.JEM, ap *auth.Pool, jsParams jemserver.Params, modelUUID string) websocket.Server {
+func newWSServer(ctx context.Context, jem *jem.JEM, ap *auth.Pool, jsParams jemserver.Params, modelUUID string) http.Handler {
 	hnd := &wsHandler{
 		context:   ctx,
 		jem:       jem,
@@ -100,9 +114,15 @@ func newWSServer(ctx context.Context, jem *jem.JEM, ap *auth.Pool, jsParams jems
 		params:    jsParams,
 		modelUUID: modelUUID,
 	}
-	return websocket.Server{
-		Handler: hnd.handle,
+	h := func(w http.ResponseWriter, req *http.Request) {
+		conn, err := websocketUpgrader.Upgrade(w, req, nil)
+		if err != nil {
+			zapctx.Error(ctx, "cannot upgrade websocket", zaputil.Error(err))
+			return
+		}
+		hnd.handle(conn)
 	}
+	return http.HandlerFunc(h)
 }
 
 // wsHandler is a handler for a particular WebSocket connection.

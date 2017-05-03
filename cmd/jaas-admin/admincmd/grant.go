@@ -10,7 +10,6 @@ import (
 	"github.com/juju/names"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jem/jemclient"
 	"github.com/CanonicalLtd/jem/params"
 )
 
@@ -83,6 +82,7 @@ func (c *grantCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
+	defer client.Close()
 
 	if c.set {
 		return c.setPerm(client, params.ACL{
@@ -105,7 +105,7 @@ func (c *grantCommand) Run(ctxt *cmd.Context) error {
 	})
 }
 
-func (c *grantCommand) setPerm(client *jemclient.Client, acl params.ACL) error {
+func (c *grantCommand) setPerm(client *client, acl params.ACL) error {
 	var err error
 	switch {
 	case c.controller:
@@ -122,7 +122,7 @@ func (c *grantCommand) setPerm(client *jemclient.Client, acl params.ACL) error {
 	return errgo.Mask(err)
 }
 
-func (c *grantCommand) getPerm(client *jemclient.Client) (params.ACL, error) {
+func (c *grantCommand) getPerm(client *client) (params.ACL, error) {
 	var acl params.ACL
 	var err error
 	switch {

@@ -52,6 +52,7 @@ func (c *modelsCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
+	defer client.Close()
 	resp, err := client.ListModels(&params.ListModels{
 		All: c.all,
 	})

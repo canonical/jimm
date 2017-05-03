@@ -3,6 +3,7 @@
 package admincmd
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/juju/gnuflag"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
+	"github.com/juju/persistent-cookiejar"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 
@@ -68,7 +70,7 @@ func New() cmd.Command {
 
 // commandBase holds the basis for commands.
 type commandBase struct {
-	modelcmd.JujuCommandBase
+	modelcmd.CommandBase
 	jimmURL string
 }
 
@@ -76,21 +78,39 @@ func (c *commandBase) SetFlags(f *gnuflag.FlagSet) {
 	f.StringVar(&c.jimmURL, "jimm-url", "", "URL of managing server (defaults to $JIMM_URL)")
 }
 
+type client struct {
+	*jemclient.Client
+	jar  *cookiejar.Jar
+	ctxt *cmd.Context
+}
+
+func (c *client) Close() {
+	if err := c.jar.Save(); err != nil {
+		fmt.Fprintf(c.ctxt.Stderr, "cannot save cookies: %v", err)
+	}
+}
+
 // newClient creates and return a JEM client with access to
 // the associated cookie jar used to save authorization
 // macaroons. If authUsername and authPassword are provided, the resulting
 // client will use HTTP basic auth with the given credentials.
-func (c *commandBase) newClient(ctxt *cmd.Context) (*jemclient.Client, error) {
-	bakeryClient, err := c.BakeryClient()
+// The returned client should be closed after use.
+func (c *commandBase) newClient(ctxt *cmd.Context) (*client, error) {
+	jar, err := cookiejar.New(nil)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
+	bakeryClient := httpbakery.NewClient()
+	bakeryClient.Client.Jar = jar
 	bakeryClient.VisitWebPage = httpbakery.OpenWebBrowser
-	bakeryClient.WebPageVisitor = nil
-	return jemclient.New(jemclient.NewParams{
-		BaseURL: c.serverURL(),
-		Client:  bakeryClient,
-	}), nil
+	return &client{
+		Client: jemclient.New(jemclient.NewParams{
+			BaseURL: c.serverURL(),
+			Client:  bakeryClient,
+		}),
+		jar:  jar,
+		ctxt: ctxt,
+	}, nil
 }
 
 const jimmServerURL = "https://jimm.jujucharms.com"

@@ -58,6 +58,7 @@ func (c *removeCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
+	defer client.Close()
 	f := func(path entityPathValue) error {
 		return client.DeleteModel(&params.DeleteModel{
 			EntityPath: path.EntityPath,
