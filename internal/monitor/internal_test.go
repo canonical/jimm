@@ -12,12 +12,12 @@ import (
 	jujuwatcher "github.com/juju/juju/state/watcher"
 	jujujujutesting "github.com/juju/juju/testing"
 	"github.com/juju/juju/testing/factory"
-	"github.com/juju/juju/worker"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/juju/worker.v1"
 	"gopkg.in/tomb.v2"
 
 	"github.com/CanonicalLtd/jem/internal/jem"

@@ -10,7 +10,6 @@ import (
 	"github.com/juju/juju/cmd/modelcmd"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jem/jemclient"
 	"github.com/CanonicalLtd/jem/params"
 )
 
@@ -78,6 +77,7 @@ func (c *revokeCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
+	defer client.Close()
 	currentACL, err := c.getPerm(client)
 	if err != nil {
 		return errgo.Mask(err)
@@ -98,7 +98,7 @@ func (c *revokeCommand) Run(ctxt *cmd.Context) error {
 	})
 }
 
-func (c *revokeCommand) setPerm(client *jemclient.Client, acl params.ACL) error {
+func (c *revokeCommand) setPerm(client *client, acl params.ACL) error {
 	var err error
 	switch {
 	case c.controller:
@@ -115,7 +115,7 @@ func (c *revokeCommand) setPerm(client *jemclient.Client, acl params.ACL) error 
 	return errgo.Mask(err)
 }
 
-func (c *revokeCommand) getPerm(client *jemclient.Client) (params.ACL, error) {
+func (c *revokeCommand) getPerm(client *client) (params.ACL, error) {
 	var acl params.ACL
 	var err error
 	switch {

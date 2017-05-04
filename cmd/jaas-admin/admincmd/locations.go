@@ -65,6 +65,7 @@ func (c *locationsCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
+	defer client.Close()
 	resp, err := client.GetAllControllerLocations(&params.GetAllControllerLocations{
 		Location: c.attributes,
 	})

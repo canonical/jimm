@@ -6,11 +6,11 @@ import (
 	jujuwatcher "github.com/juju/juju/state/watcher"
 	jujutesting "github.com/juju/juju/testing"
 	"github.com/juju/juju/testing/factory"
-	"github.com/juju/juju/worker"
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/juju/worker.v1"
 
 	"github.com/CanonicalLtd/jem/internal/apitest"
 	"github.com/CanonicalLtd/jem/internal/mgosession"

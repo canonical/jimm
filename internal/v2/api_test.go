@@ -278,7 +278,7 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			err := json.Unmarshal(m, &body)
 			c.Assert(err, gc.IsNil)
 			c.Assert(body.Code, gc.Equals, params.ErrBadRequest)
-			c.Assert(body.Message, gc.Matches, `cannot connect to controller: cannot connect to API: unable to connect to API: .*`)
+			c.Assert(body.Message, gc.Matches, `cannot connect to controller: unable to connect to API: .*`)
 		}),
 	}, {
 		about: "controller with additional host address",
@@ -1443,7 +1443,7 @@ func (s *APISuite) TestNewModelCannotOpenAPI(c *gc.C) {
 			},
 		},
 		ExpectBody: params.Error{
-			Message: `cannot connect to controller: cannot connect to API: validating info for opening an API connection: missing addresses not valid`,
+			Message: `cannot connect to controller: validating info for opening an API connection: missing addresses not valid`,
 		},
 		ExpectStatus: http.StatusInternalServerError,
 		Do:           apitest.Do(s.IDMSrv.Client("bob")),
@@ -1803,6 +1803,7 @@ func (s *APISuite) TestJujuStatus(c *gc.C) {
 		EntityPath: modelId,
 	})
 	c.Assert(err, gc.IsNil)
+	resp.Status.Model.ModelStatus.Since = nil
 	c.Assert(resp, jc.DeepEquals, &params.JujuStatusResponse{
 		Status: jujuparams.FullStatus{
 			Model: jujuparams.ModelStatusInfo{
@@ -1810,6 +1811,11 @@ func (s *APISuite) TestJujuStatus(c *gc.C) {
 				CloudTag:    names.NewCloudTag("dummy").String(),
 				CloudRegion: "dummy-region",
 				Version:     jujuversion.Current.String(),
+				ModelStatus: jujuparams.DetailedStatus{
+					Status: "available",
+					Data:   make(map[string]interface{}),
+				},
+				SLA: "unsupported",
 			},
 			Machines:           map[string]jujuparams.MachineStatus{},
 			Applications:       map[string]jujuparams.ApplicationStatus{},
@@ -1823,6 +1829,7 @@ func (s *APISuite) TestJujuStatus(c *gc.C) {
 		EntityPath: modelId,
 	})
 	c.Assert(err, gc.IsNil)
+	resp.Status.Model.ModelStatus.Since = nil
 	c.Assert(resp, jc.DeepEquals, &params.JujuStatusResponse{
 		Status: jujuparams.FullStatus{
 			Model: jujuparams.ModelStatusInfo{
@@ -1830,6 +1837,11 @@ func (s *APISuite) TestJujuStatus(c *gc.C) {
 				CloudTag:    names.NewCloudTag("dummy").String(),
 				CloudRegion: "dummy-region",
 				Version:     jujuversion.Current.String(),
+				ModelStatus: jujuparams.DetailedStatus{
+					Status: "available",
+					Data:   make(map[string]interface{}),
+				},
+				SLA: "unsupported",
 			},
 			Machines:           map[string]jujuparams.MachineStatus{},
 			Applications:       map[string]jujuparams.ApplicationStatus{},
