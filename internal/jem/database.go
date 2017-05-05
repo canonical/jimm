@@ -181,9 +181,24 @@ func (db *Database) UpdateLegacyModel(ctx context.Context, model *mongodoc.Model
 		return nil
 	}
 	if errgo.Cause(err) == mgo.ErrNotFound {
-		return errgo.WithCausef(err, params.ErrNotFound, "cannot update %s", model.Path.String())
+		return errgo.WithCausef(err, params.ErrNotFound, "cannot update %s", model.Path)
 	}
 	return errgo.Notef(err, "cannot update %s", model.Path.String())
+}
+
+// SetModelController updates the given model so that it's associated
+// with the given controller. This should only be called when migration
+// has been initiated for the model and the new controller has been
+// verified to exist.
+func (db *Database) SetModelController(ctx context.Context, model params.EntityPath, newController params.EntityPath) (err error) {
+	defer db.checkError(ctx, &err)
+	err = db.Models().UpdateId(model.String(), bson.D{{
+		"controller", newController,
+	}})
+	if errgo.Cause(err) == mgo.ErrNotFound {
+		return errgo.WithCausef(err, params.ErrNotFound, "cannot update %s", model)
+	}
+	return errgo.Mask(err)
 }
 
 // DeleteModel deletes an model from the database. If an

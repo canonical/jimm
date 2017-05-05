@@ -1,6 +1,7 @@
 package jemtest
 
 import (
+	"os"
 	"strings"
 
 	"github.com/juju/loggo"
@@ -42,7 +43,11 @@ func (s *LoggingSuite) setUp(c *gc.C) {
 	// replace the default writer.
 	loggo.RegisterWriter(loggo.DefaultWriterName, discardWriter{})
 	loggo.RegisterWriter("loggingsuite", zaputil.NewLoggoWriter(logger))
-	err := loggo.ConfigureLoggers("DEBUG")
+	level := "DEBUG"
+	if envLevel := os.Getenv("TEST_LOGGING_CONFIG"); envLevel != "" {
+		level = envLevel
+	}
+	err := loggo.ConfigureLoggers(level)
 	c.Assert(err, gc.IsNil)
 }
 

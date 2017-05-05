@@ -1,5 +1,6 @@
 package v2
 
 var (
-	MongodocAPIHostPorts = mongodocAPIHostPorts
+	MongodocAPIHostPorts              = mongodocAPIHostPorts
+	ControllerClientInitiateMigration = &controllerClientInitiateMigration
 )

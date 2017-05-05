@@ -4,8 +4,9 @@
 package jemclient
 
 import (
-	"github.com/CanonicalLtd/jem/params"
 	"github.com/juju/httprequest"
+
+	"github.com/CanonicalLtd/jem/params"
 )
 
 type client struct {
@@ -106,6 +107,10 @@ func (c *client) ListModels(p *params.ListModels) (*params.ListModelsResponse, e
 	var r *params.ListModelsResponse
 	err := c.Client.Call(p, &r)
 	return r, err
+}
+
+func (c *client) Migrate(p *params.Migrate) error {
+	return c.Client.Call(p, nil)
 }
 
 // NewModel creates a new model inside an existing Controller.

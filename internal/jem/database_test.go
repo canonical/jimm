@@ -742,6 +742,35 @@ func cleanMachineDoc(doc *mongodoc.Machine) {
 	}
 }
 
+func (s *databaseSuite) TestSetModelControllerNotFound(c *gc.C) {
+	err := s.database.SetModelController(testContext, params.EntityPath{"bob", "foo"}, params.EntityPath{"x", "y"})
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}
+
+func (s *databaseSuite) TestSetModelControllerSuccess(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	err := s.database.AddController(testContext, &mongodoc.Controller{
+		Path: ctlPath,
+		UUID: "fake-uuid",
+	})
+	c.Assert(err, gc.IsNil)
+
+	modelPath := params.EntityPath{"bob", "foo"}
+	err = s.database.AddModel(testContext, &mongodoc.Model{
+		Path:       modelPath,
+		UUID:       "fake-uuid",
+		Controller: params.EntityPath{"bob", "foo"},
+	})
+	c.Assert(err, gc.IsNil)
+
+	err = s.database.SetModelController(testContext, params.EntityPath{"bob", "foo"}, params.EntityPath{"x", "y"})
+	c.Assert(err, gc.Equals, nil)
+
+	m, err := s.database.Model(testContext, modelPath)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(m.Controller, jc.DeepEquals, params.EntityPath{"x", "y"})
+}
+
 func (s *databaseSuite) TestSetModelLifeNotFound(c *gc.C) {
 	err := s.database.SetModelLife(testContext, params.EntityPath{"bob", "foo"}, "fake-uuid", "alive")
 	c.Assert(err, gc.IsNil)
@@ -1407,6 +1436,11 @@ var setDeadTests = []struct {
 	about: "SetModelLife",
 	run: func(db *jem.Database) {
 		db.SetModelLife(testContext, fakeEntityPath, "fake-uuid", "alive")
+	},
+}, {
+	about: "SetModelController",
+	run: func(db *jem.Database) {
+		db.SetModelController(testContext, fakeEntityPath, fakeEntityPath)
 	},
 }, {
 	about: "UpdateCredential",

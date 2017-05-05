@@ -496,3 +496,11 @@ type JujuStatus struct {
 type JujuStatusResponse struct {
 	Status jujuparams.FullStatus `json:"status"`
 }
+
+// Migrate holds a request to migrate a model to a different controller.
+type Migrate struct {
+	httprequest.Route `httprequest:"POST /v2/model/:User/:Name/migrate"`
+	EntityPath
+	// Controller holds the name of the controller.
+	Controller EntityPath `httprequest:"controller,form"`
+}
