@@ -502,6 +502,14 @@ func (db *Database) updateCounts(ctx context.Context, c *mgo.Collection, query b
 	}
 	err = c.Update(query, bson.D{{"$set", newCounts}})
 	if err != nil {
+		if err == mgo.ErrNotFound {
+			// This can happen if the document has been
+			// removed since we retrieved it. The error
+			// should be the same in this case (and we want
+			// to prevent the mongo session being discarded
+			// if it happens).
+			return params.ErrNotFound
+		}
 		return errgo.Notef(err, "cannot update count")
 	}
 	return nil
