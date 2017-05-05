@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/juju/juju/api"
+	controllerapi "github.com/juju/juju/api/controller"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/component/all"
 	"github.com/juju/juju/network"
 	jujuversion "github.com/juju/juju/version"
 	jc "github.com/juju/testing/checkers"
@@ -22,6 +24,10 @@ import (
 	"github.com/CanonicalLtd/jem/internal/v2"
 	"github.com/CanonicalLtd/jem/params"
 )
+
+func init() {
+	all.RegisterForServer()
+}
 
 type APISuite struct {
 	apitest.Suite
@@ -1866,6 +1872,45 @@ func (s *APISuite) TestJujuStatus(c *gc.C) {
 		EntityPath: params.EntityPath{User: "bob", Name: "no-such-model"},
 	})
 	c.Assert(err, gc.ErrorMatches, `cannot get model: model "bob/no-such-model" not found`)
+}
+
+func (s *APISuite) TestMigrate(c *gc.C) {
+	ctlId1 := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, true)
+	ctlId2 := s.AssertAddController(c, params.EntityPath{"bob", "bar"}, true)
+	s.allowControllerPerm(c, ctlId1)
+	s.allowControllerPerm(c, ctlId2)
+
+	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
+	modelId, _ := s.CreateModel(c, params.EntityPath{"bob", "model"}, ctlId1, cred)
+
+	client := s.NewClient("controller-admin")
+
+	// First check how far we get with the real InitiateMigration implementation.
+	// The error signifies that we've got far enough into the migration
+	// that it's contacted the target controller and found that it has
+	// the same model (because it's actually the same controller
+	// under the hood). This is about as decent an assurance as we
+	// can get that it works without changing the juju test machinery
+	// so that it can start up two controllers at the same time.
+	err := client.Migrate(&params.Migrate{
+		EntityPath: modelId,
+		Controller: ctlId2,
+	})
+	c.Assert(err, gc.ErrorMatches, `cannot initiate migration: target prechecks failed: model with same UUID already exists \(.*\)`)
+
+	// Patch out the API call and check that the controller gets changed.
+	s.PatchValue(v2.ControllerClientInitiateMigration, func(*controllerapi.Client, controllerapi.MigrationSpec) (string, error) {
+		return "id", nil
+	})
+	err = client.Migrate(&params.Migrate{
+		EntityPath: modelId,
+		Controller: ctlId2,
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	m, err := s.JEM.DB.Model(testContext, modelId)
+	c.Assert(err, gc.IsNil)
+	c.Assert(m.Controller, jc.DeepEquals, params.EntityPath{"bob", "bar"})
 }
 
 func (s *APISuite) allowControllerPerm(c *gc.C, path params.EntityPath, acl ...string) {

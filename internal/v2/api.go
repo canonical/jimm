@@ -10,6 +10,7 @@ import (
 
 	"github.com/juju/httprequest"
 	cloudapi "github.com/juju/juju/api/cloud"
+	controllerapi "github.com/juju/juju/api/controller"
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/network"
@@ -32,6 +33,10 @@ import (
 	"github.com/CanonicalLtd/jem/internal/zaputil"
 	"github.com/CanonicalLtd/jem/params"
 )
+
+// controllerClientInitiateMigration is defined as a variable so that
+// it can be overridden for tests.
+var controllerClientInitiateMigration = (*controllerapi.Client).InitiateMigration
 
 type Handler struct {
 	jem     *jem.JEM
@@ -741,6 +746,51 @@ func (h *Handler) JujuStatus(arg *params.JujuStatus) (*params.JujuStatusResponse
 	return &params.JujuStatusResponse{
 		Status: *status,
 	}, nil
+}
+
+// Migrate starts a migration of a model from its current
+// controller to a different one. The migration will not have
+// completed by the time the Migrate call returns.
+func (h *Handler) Migrate(arg *params.Migrate) error {
+	ctx := h.context
+	if err := auth.CheckIsUser(ctx, h.config.ControllerAdmin); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	model, err := h.jem.DB.Model(ctx, arg.EntityPath)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	ctl, err := h.jem.Controller(ctx, arg.Controller)
+	if err != nil {
+		return errgo.NoteMask(err, "cannot access destination controller", errgo.Is(params.ErrNotFound))
+	}
+	conn, err := h.jem.OpenAPIFromDoc(ctx, ctl)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	defer conn.Close()
+	zapctx.Info(ctx, "about to call InitiateMigration")
+	api := controllerapi.NewClient(conn)
+	_, err = controllerClientInitiateMigration(api, controllerapi.MigrationSpec{
+		ModelUUID:            model.UUID,
+		TargetControllerUUID: ctl.UUID,
+		TargetAddrs:          mongodoc.Addresses(ctl.HostPorts),
+		TargetCACert:         ctl.CACert,
+		TargetUser:           ctl.AdminUser,
+		TargetPassword:       ctl.AdminPassword,
+	})
+	if err != nil {
+		return errgo.Notef(err, "cannot initiate migration")
+	}
+	if err := h.jem.DB.SetModelController(ctx, arg.EntityPath, arg.Controller); err != nil {
+		// This is a problem, because we can't undo the migration now,
+		// so just shout about it.
+		zapctx.Error(ctx, "cannot update model database entry", zap.Stringer("model", arg.EntityPath), zap.Stringer("controller", arg.Controller))
+		return errgo.Notef(err, "cannot update model database entry (manual intervention required!)")
+	}
+
+	// TODO return the migration id?
+	return nil
 }
 
 func badRequestf(underlying error, f string, a ...interface{}) error {

@@ -34,7 +34,7 @@ type Controller struct {
 	// CACert holds the CA certificate of the controller.
 	CACert string
 
-	// HostPorts holds all the known HostPorts for the for the controller.
+	// HostPorts holds all the known HostPorts for the controller.
 	HostPorts [][]HostPort
 
 	// Users holds a record for each user that JEM has created
