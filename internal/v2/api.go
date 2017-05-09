@@ -765,15 +765,15 @@ func (h *Handler) Migrate(arg *params.Migrate) error {
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	ctl, err := h.jem.Controller(ctx, arg.Controller)
-	if err != nil {
-		return errgo.NoteMask(err, "cannot access destination controller", errgo.Is(params.ErrNotFound))
-	}
-	conn, err := h.jem.OpenAPIFromDoc(ctx, ctl)
+	conn, err := h.jem.OpenAPI(ctx, model.Controller)
 	if err != nil {
 		return errgo.Mask(err)
 	}
 	defer conn.Close()
+	ctl, err := h.jem.Controller(ctx, arg.Controller)
+	if err != nil {
+		return errgo.NoteMask(err, "cannot access destination controller", errgo.Is(params.ErrNotFound))
+	}
 	zapctx.Info(ctx, "about to call InitiateMigration")
 	api := controllerapi.NewClient(conn)
 	_, err = controllerClientInitiateMigration(api, controllerapi.MigrationSpec{

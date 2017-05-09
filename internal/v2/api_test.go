@@ -16,6 +16,7 @@ import (
 	jujuversion "github.com/juju/juju/version"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
+	"github.com/juju/utils"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
@@ -1893,7 +1894,25 @@ func (s *APISuite) TestJujuStatus(c *gc.C) {
 
 func (s *APISuite) TestMigrate(c *gc.C) {
 	ctlId1 := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, true)
-	ctlId2 := s.AssertAddController(c, params.EntityPath{"bob", "bar"}, true)
+	// Add the controller explicitly so that we can add it
+	// with an empty CACert as that matches most likely
+	// production scenario.
+	ctlId2 := params.EntityPath{"bob", "bar"}
+	info := s.APIInfo(c)
+	p := &params.AddController{
+		EntityPath: ctlId2,
+		Info: params.ControllerInfo{
+			HostPorts:      info.Addrs,
+			CACert:         info.CACert,
+			User:           info.Tag.Id(),
+			Password:       info.Password,
+			ControllerUUID: utils.MustNewUUID().String(),
+			Public:         true,
+		},
+	}
+	err := s.NewClient("bob").AddController(p)
+	c.Assert(err, gc.Equals, nil)
+
 	s.allowControllerPerm(c, ctlId1)
 	s.allowControllerPerm(c, ctlId2)
 
@@ -1909,7 +1928,7 @@ func (s *APISuite) TestMigrate(c *gc.C) {
 	// under the hood). This is about as decent an assurance as we
 	// can get that it works without changing the juju test machinery
 	// so that it can start up two controllers at the same time.
-	err := client.Migrate(&params.Migrate{
+	err = client.Migrate(&params.Migrate{
 		EntityPath: modelId,
 		Controller: ctlId2,
 	})
