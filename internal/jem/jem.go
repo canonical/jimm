@@ -15,6 +15,7 @@ import (
 	"github.com/juju/juju/api/modelmanager"
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/utils/clock"
+	"github.com/juju/version"
 	"github.com/uber-go/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
@@ -678,6 +679,33 @@ func (j *JEM) DestroyModel(ctx context.Context, conn *apiconn.Conn, model *mongo
 		zapctx.Warn(ctx, "error updating model life", zap.Error(err), zap.String("model", model.UUID))
 	}
 	return nil
+}
+
+// EarliestControllerVersion returns the earliest agent version
+// that any of the available public controllers is known to be running.
+// If there are no available controllers or none of their versions are
+// known, it returns the zero version.
+func (j *JEM) EarliestControllerVersion(ctx context.Context) (version.Number, error) {
+	// TOD(rog) cache the result of this for a while, as it changes only rarely
+	// and we don't really need to make this extra round trip every
+	// time a user connects to the API?
+	var v *version.Number
+	if err := j.DoControllers(ctx, "", "", func(c *mongodoc.Controller) error {
+		zapctx.Info(ctx, "in EarliestControllerVersion", zap.Object("controller", c.Path), zap.Object("version", c.Version))
+		if c.Version == nil {
+			return nil
+		}
+		if v == nil || c.Version.Compare(*v) < 0 {
+			v = c.Version
+		}
+		return nil
+	}); err != nil {
+		return version.Number{}, errgo.Mask(err)
+	}
+	if v == nil {
+		return version.Number{}, nil
+	}
+	return *v, nil
 }
 
 // DoControllers calls the given function for each controller that

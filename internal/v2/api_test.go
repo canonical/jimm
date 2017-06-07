@@ -331,6 +331,14 @@ func (s *APISuite) TestAddController(c *gc.C) {
 		conn, err := s.JEM.OpenAPI(context.TODO(), controllerPath)
 		c.Assert(err, gc.IsNil)
 		conn.Close()
+
+		// Check that the version has been set correctly.
+		ctl, err := s.JEM.DB.Controller(context.TODO(), controllerPath)
+		c.Assert(err, gc.IsNil)
+		v, ok := conn.ServerVersion()
+		c.Assert(ok, gc.Equals, true)
+		c.Assert(ctl.Version, jc.DeepEquals, &v)
+
 		// Clear the connection pool for the next test.
 		s.JEMSrv.Pool().ClearAPIConnCache()
 	}

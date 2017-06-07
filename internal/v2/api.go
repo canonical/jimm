@@ -156,7 +156,9 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	}
 	defer conn.Close()
 	ctl.UUID = conn.ControllerTag().Id()
-
+	if v, ok := conn.ServerVersion(); ok {
+		ctl.Version = &v
+	}
 	// Find out where the controller model is.
 	mi, err := controllerModelInfo(conn, arg.Info.User)
 	if err != nil {

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/juju/juju/state/multiwatcher"
+	"github.com/juju/version"
 	"github.com/uber-go/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
@@ -289,6 +290,22 @@ func (db *Database) controllerLocationQuery(cloud params.Cloud, region string, i
 		q = append(q, bson.DocElem{"unavailablesince", notExistsQuery})
 	}
 	return db.Controllers().Find(q)
+}
+
+// SetControllerVersion sets the agent version of the given controller.
+// This method does not return an error when the controller doesn't exist.
+func (db *Database) SetControllerVersion(ctx context.Context, ctlPath params.EntityPath, v version.Number) (err error) {
+	defer db.checkError(ctx, &err)
+	if err = db.Controllers().UpdateId(ctlPath.String(), bson.D{{
+		"$set", bson.D{{"version", v}},
+	}}); err != nil {
+		if err == mgo.ErrNotFound {
+			// For symmetry with SetControllerUnavailableAt.
+			return nil
+		}
+		return errgo.Notef(err, "cannot update %v", ctlPath)
+	}
+	return nil
 }
 
 // SetControllerAvailable marks the given controller as available.

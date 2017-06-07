@@ -9,6 +9,7 @@ import (
 	"github.com/juju/juju/state/multiwatcher"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
+	"github.com/juju/version"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
@@ -213,6 +214,29 @@ func (s *databaseSuite) TestSetControllerAvailabilityWithNotFoundController(c *g
 	err = s.database.SetControllerAvailable(testContext, ctlPath)
 	c.Assert(err, gc.IsNil)
 	s.checkDBOK(c)
+}
+
+func (s *databaseSuite) TestSetControllerVersion(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "x"}
+	ctl := &mongodoc.Controller{
+		Path: ctlPath,
+	}
+	err := s.database.AddController(testContext, ctl)
+	c.Assert(err, gc.IsNil)
+
+	testVersion := version.Number{Minor: 1}
+	err = s.database.SetControllerVersion(testContext, ctlPath, testVersion)
+	c.Assert(err, gc.IsNil)
+
+	ctl, err = s.database.Controller(testContext, ctlPath)
+	c.Assert(err, gc.IsNil)
+	c.Assert(ctl.Version, jc.DeepEquals, &testVersion)
+}
+
+func (s *databaseSuite) TestSetControllerVersionWithNotFoundController(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "x"}
+	err := s.database.SetControllerVersion(testContext, ctlPath, version.Number{Minor: 1})
+	c.Assert(err, gc.IsNil)
 }
 
 func (s *databaseSuite) TestDeleteController(c *gc.C) {
@@ -1426,6 +1450,11 @@ var setDeadTests = []struct {
 	about: "SetControllerUnavailableAt",
 	run: func(db *jem.Database) {
 		db.SetControllerUnavailableAt(testContext, fakeEntityPath, time.Now())
+	},
+}, {
+	about: "SetControllerVersion",
+	run: func(db *jem.Database) {
+		db.SetControllerVersion(testContext, fakeEntityPath, version.Number{})
 	},
 }, {
 	about: "setCredentialUpdates",

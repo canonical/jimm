@@ -81,13 +81,7 @@ func (c *addControllerCommand) Run(ctxt *cmd.Context) error {
 		hostnames = []string{addressWithPort(c.publicAddress, "443")}
 		cacert = ""
 	} else {
-		// Use hostnames by preference, as we want the JEM server
-		// to do the DNS lookups, but this may not be set, so
-		// fall back to APIEndpoints if necessary.
-		hostnames = info.controller.UnresolvedAPIEndpoints
-		if len(hostnames) == 0 {
-			hostnames = info.controller.APIEndpoints
-		}
+		hostnames = info.controller.APIEndpoints
 	}
 	if err := client.AddController(&params.AddController{
 		EntityPath: c.controllerPath.EntityPath,

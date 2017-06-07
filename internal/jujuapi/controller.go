@@ -20,7 +20,6 @@ import (
 	"github.com/juju/juju/rpc/rpcreflect"
 	"github.com/juju/juju/status"
 	"github.com/juju/juju/storage"
-	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/utils/parallel"
 	"github.com/uber-go/zap"
 	"golang.org/x/net/context"
@@ -239,6 +238,10 @@ func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResult, error
 	a.root.facades = facades
 	servermon.LoginSuccessCount.Inc()
 	username := auth.Username(a.root.context)
+	srvVersion, err := a.root.jem.EarliestControllerVersion(ctx)
+	if err != nil {
+		return jujuparams.LoginResult{}, errgo.Mask(err)
+	}
 	return jujuparams.LoginResult{
 		UserInfo: &jujuparams.AuthUserInfo{
 			// TODO(mhilton) get a better display name from the identity manager.
@@ -247,7 +250,7 @@ func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResult, error
 		},
 		ControllerTag: names.NewControllerTag(a.root.params.ControllerUUID).String(),
 		Facades:       facadeVersions(a.root.facades),
-		ServerVersion: jujuversion.Current.String(),
+		ServerVersion: srvVersion.String(),
 	}, nil
 }
 
