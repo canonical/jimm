@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/juju/juju/state/multiwatcher"
+	"github.com/juju/version"
 	"golang.org/x/net/context"
 
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
@@ -39,6 +40,9 @@ type jemInterface interface {
 	// SetControllerAvailable marks the given controller as available.
 	// This method does not return an error when the controller doesn't exist.
 	SetControllerAvailable(ctx context.Context, ctlPath params.EntityPath) error
+
+	// SetControllerVersion sets the controller version of the given controller.
+	SetControllerVersion(ctx context.Context, ctlPath params.EntityPath, v version.Number) error
 
 	// SetModelLife sets the Life field of all models controlled
 	// by the given controller that have the given UUID.
@@ -98,6 +102,9 @@ type jujuAPI interface {
 
 	// Close closes the API connection.
 	Close() error
+
+	// ServerVersion holds the version of the API server that we are connected to.
+	ServerVersion() (version.Number, bool)
 }
 
 // allWatcher represents a watcher of all events on a controller.

@@ -7,6 +7,7 @@ import (
 
 	apicontroller "github.com/juju/juju/api/controller"
 	"github.com/juju/juju/state/multiwatcher"
+	"github.com/juju/version"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
@@ -65,6 +66,10 @@ func (j jemShim) UpdateModelCounts(ctx context.Context, uuid string, counts map[
 
 func (j jemShim) UpdateMachineInfo(ctx context.Context, info *multiwatcher.MachineInfo) error {
 	return errgo.Mask(j.DB.UpdateMachineInfo(ctx, info), errgo.Any)
+}
+
+func (j jemShim) SetControllerVersion(ctx context.Context, ctlPath params.EntityPath, v version.Number) error {
+	return errgo.Mask(j.DB.SetControllerVersion(ctx, ctlPath, v), errgo.Any)
 }
 
 func (j jemShim) AcquireMonitorLease(ctx context.Context, ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {

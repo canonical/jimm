@@ -11,6 +11,7 @@ import (
 	jujutesting "github.com/juju/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
+	"github.com/juju/version"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
@@ -105,6 +106,14 @@ func (s jemShimWithUpdateNotify) SetControllerAvailable(ctx context.Context, ctl
 		return err
 	}
 	s.changed <- "controller availability"
+	return nil
+}
+
+func (s jemShimWithUpdateNotify) SetControllerVersion(ctx context.Context, ctlPath params.EntityPath, v version.Number) error {
+	if err := s.jemInterface.SetControllerVersion(ctx, ctlPath, v); err != nil {
+		return err
+	}
+	s.changed <- "controller version"
 	return nil
 }
 
@@ -267,6 +276,16 @@ func (s *jemShimInMemory) SetControllerUnavailableAt(ctx context.Context, ctlPat
 	return nil
 }
 
+func (s *jemShimInMemory) SetControllerVersion(ctx context.Context, ctlPath params.EntityPath, v version.Number) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ctl, ok := s.controllers[ctlPath]
+	if ok {
+		ctl.Version = &v
+	}
+	return nil
+}
+
 func (s *jemShimInMemory) SetModelLife(ctx context.Context, ctlPath params.EntityPath, uuid string, life string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -417,10 +436,11 @@ var _ jujuAPI = (*jujuAPIShim)(nil)
 
 // jujuAPIShim implements the jujuAPI interface.
 type jujuAPIShim struct {
-	shims   *jujuAPIShims
-	closed  bool
-	initial []multiwatcher.Delta
-	stack   string
+	shims         *jujuAPIShims
+	closed        bool
+	initial       []multiwatcher.Delta
+	stack         string
+	serverVersion version.Number
 }
 
 func (s *jujuAPIShim) Evict() {
@@ -447,6 +467,10 @@ func (s *jujuAPIShim) WatchAllModels() (allWatcher, error) {
 		stopped:     make(chan struct{}),
 		initial:     s.initial,
 	}, nil
+}
+
+func (s *jujuAPIShim) ServerVersion() (version.Number, bool) {
+	return s.serverVersion, true
 }
 
 type watcherShim struct {

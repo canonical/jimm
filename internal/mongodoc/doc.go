@@ -10,6 +10,7 @@ import (
 
 	"github.com/juju/juju/network"
 	"github.com/juju/juju/state/multiwatcher"
+	"github.com/juju/version"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/params"
@@ -88,6 +89,10 @@ type Controller struct {
 	// controllers should have an associated cloud, but not clouds
 	// have regions.
 	Location map[string]string
+
+	// Version holds the latest known agent version
+	// of the controller.
+	Version *version.Number `bson:",omitempty"`
 }
 
 func (s *Controller) Owner() params.User {

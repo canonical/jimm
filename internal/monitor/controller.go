@@ -169,11 +169,17 @@ func (m *controllerMonitor) watcher(ctx context.Context) error {
 			if err := m.jem.SetControllerAvailable(ctx, m.ctlPath); err != nil {
 				return errgo.Notef(err, "cannot set controller availability")
 			}
-
 			if err := m.jem.ControllerUpdateCredentials(ctx, m.ctlPath); err != nil {
 				return errgo.Notef(err, "cannot update credentials")
 			}
-
+			// It's sufficient to update the server version only when we connect
+			// because if the server version changes, the API connection
+			// will be broken.
+			if v, ok := conn.ServerVersion(); ok {
+				if err := m.jem.SetControllerVersion(ctx, m.ctlPath, v); err != nil {
+					return errgo.Notef(err, "cannot set controller verision")
+				}
+			}
 			err = m.watch(ctx, conn)
 			if errgo.Cause(err) == tomb.ErrDying {
 				conn.Close()

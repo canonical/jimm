@@ -14,6 +14,7 @@ import (
 	"github.com/juju/juju/testing/factory"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
+	"github.com/juju/version"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
@@ -563,6 +564,39 @@ func (s *internalSuite) TestWatcherMarksControllerAvailable(c *gc.C) {
 		return jshim.controller(ctlPath).UnavailableSince
 	}
 	jshim1.await(c, unavailableSince, time.Time{})
+}
+
+func (s *internalSuite) TestAPIConnectionSetsControllerVersion(c *gc.C) {
+	jshim := newJEMShimInMemory()
+	apiShims := newJujuAPIShims()
+	defer apiShims.CheckAllClosed(c)
+
+	testVersion := version.MustParse("7.8.9")
+	jshim1 := newJEMShimWithUpdateNotify(jemShimWithAPIOpener{
+		jemInterface: jshim,
+		openAPI: func(path params.EntityPath) (jujuAPI, error) {
+			conn := apiShims.newJujuAPIShim(nil)
+			conn.serverVersion = testVersion
+			return conn, nil
+		},
+	})
+	ctlPath := params.EntityPath{"bob", "foo"}
+	addFakeController(jshim, ctlPath)
+
+	m := &controllerMonitor{
+		ctlPath: ctlPath,
+		jem:     jshim1,
+		ownerId: "jem1",
+	}
+	m.tomb.Go(func() error {
+		return m.watcher(testContext)
+	})
+	defer worker.Stop(m)
+
+	controllerVersion := func() interface{} {
+		return jshim.controller(ctlPath).Version
+	}
+	jshim1.await(c, controllerVersion, &testVersion)
 }
 
 // TestControllerMonitor tests that the controllerMonitor can be run with both the

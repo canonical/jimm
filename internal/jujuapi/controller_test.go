@@ -21,6 +21,7 @@ import (
 	"github.com/juju/juju/status"
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
+	"github.com/juju/version"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
@@ -38,6 +39,21 @@ type controllerSuite struct {
 }
 
 var _ = gc.Suite(&controllerSuite{})
+
+func (s *controllerSuite) TestServerVersion(c *gc.C) {
+	ctlPath := params.EntityPath{"test", "controller-1"}
+	s.AssertAddController(c, ctlPath, true)
+	testVersion := version.MustParse("5.4.3")
+	err := s.JEM.DB.SetControllerVersion(testContext, ctlPath, testVersion)
+	c.Assert(err, jc.ErrorIsNil)
+
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+
+	v, ok := conn.ServerVersion()
+	c.Assert(ok, gc.Equals, true)
+	c.Assert(v, jc.DeepEquals, testVersion)
+}
 
 func (s *controllerSuite) TestOldAdminVersionFails(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)

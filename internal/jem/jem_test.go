@@ -14,6 +14,7 @@ import (
 	jujujujutesting "github.com/juju/juju/testing"
 	jt "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
+	"github.com/juju/version"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
@@ -1263,6 +1264,81 @@ func (s *jemSuite) TestCredential(c *gc.C) {
 func (s *jemSuite) TestUserTag(c *gc.C) {
 	c.Assert(jem.UserTag(params.User("alice")).String(), gc.Equals, "user-alice@external")
 	c.Assert(jem.UserTag(params.User("alice@domain")).String(), gc.Equals, "user-alice@domain")
+}
+
+var earliestControllerVersionTests = []struct {
+	about       string
+	controllers []mongodoc.Controller
+	expect      version.Number
+}{{
+	about:  "no controllers",
+	expect: version.Number{},
+}, {
+	about: "one controller",
+	controllers: []mongodoc.Controller{{
+		Path:    params.EntityPath{"bob", "c1"},
+		Public:  true,
+		Version: &version.Number{Minor: 1},
+		ACL: params.ACL{
+			Read: []string{"everyone"},
+		},
+	}},
+	expect: version.Number{Minor: 1},
+}, {
+	about: "multiple controllers",
+	controllers: []mongodoc.Controller{{
+		Path:    params.EntityPath{"bob", "c1"},
+		Public:  true,
+		Version: &version.Number{Minor: 1},
+		ACL: params.ACL{
+			Read: []string{"everyone"},
+		},
+	}, {
+		Path:    params.EntityPath{"bob", "c2"},
+		Public:  true,
+		Version: &version.Number{Minor: 2},
+		ACL: params.ACL{
+			Read: []string{"everyone"},
+		},
+	}, {
+		Path:    params.EntityPath{"bob", "c3"},
+		Public:  true,
+		Version: &version.Number{Minor: 3},
+		ACL: params.ACL{
+			Read: []string{"everyone"},
+		},
+	}},
+	expect: version.Number{Minor: 1},
+}, {
+	about: "non-public controllers ignored",
+	controllers: []mongodoc.Controller{{
+		Path:    params.EntityPath{"bob", "c1"},
+		Version: &version.Number{Minor: 1},
+	}, {
+		Path:   params.EntityPath{"bob", "c2"},
+		Public: true,
+		ACL: params.ACL{
+			Read: []string{"everyone"},
+		},
+		Version: &version.Number{Minor: 2},
+	}},
+	expect: version.Number{Minor: 2},
+}}
+
+func (s *jemSuite) TestEarliestControllerVersion(c *gc.C) {
+	ctx := auth.ContextWithUser(testContext, "someone")
+	for i, test := range earliestControllerVersionTests {
+		c.Logf("test %d: %v", i, test.about)
+		_, err := s.jem.DB.Controllers().RemoveAll(nil)
+		c.Assert(err, jc.ErrorIsNil)
+		for _, ctl := range test.controllers {
+			err := s.jem.DB.AddController(ctx, &ctl)
+			c.Assert(err, jc.ErrorIsNil)
+		}
+		v, err := s.jem.EarliestControllerVersion(ctx)
+		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(v, jc.DeepEquals, test.expect)
+	}
 }
 
 func (s *jemSuite) TestCloudCredentialTag(c *gc.C) {
