@@ -383,10 +383,31 @@ func (c cloud) clouds() (map[string]jujuparams.Cloud, error) {
 	return clouds, nil
 }
 
+var errMoreThanOneCloud = errgo.Newf("more than one cloud")
+
 // DefaultCloud implements the DefaultCloud method of the Cloud facade.
+// It returns a default cloud only if all the registered controllers
+// use the same cloud.
 func (c cloud) DefaultCloud() (jujuparams.StringResult, error) {
+	var defaultCloud params.Cloud
+	if err := c.root.jem.DoControllers(c.root.context, "", "", func(c *mongodoc.Controller) error {
+		switch {
+		case defaultCloud == "":
+			defaultCloud = c.Cloud.Name
+		case c.Cloud.Name != defaultCloud:
+			defaultCloud = ""
+			return errMoreThanOneCloud
+		}
+		return nil
+	}); err != nil && errgo.Cause(err) != errMoreThanOneCloud {
+		return jujuparams.StringResult{}, errgo.Mask(err)
+	}
+	if defaultCloud == "" {
+		// No controllers or more than one possible cloud, so don't choose a default.
+		return jujuparams.StringResult{}, errgo.WithCausef(nil, params.ErrNotFound, "no default cloud")
+	}
 	return jujuparams.StringResult{
-		Error: mapError(errgo.WithCausef(nil, params.ErrNotFound, "no default cloud")),
+		Result: names.NewCloudTag(string(defaultCloud)).String(),
 	}, nil
 }
 
@@ -420,7 +441,6 @@ func (c cloud) userCredentials(ctx context.Context, ownerTag, cloudTag string) (
 	cld, err := names.ParseCloudTag(cloudTag)
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
-
 	}
 	var cloudCreds []string
 	it := c.root.jem.DB.NewCanReadIter(ctx, c.root.jem.DB.Credentials().Find(
