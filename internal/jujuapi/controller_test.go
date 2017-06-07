@@ -117,13 +117,59 @@ func (s *controllerSuite) TestUnimplementedRootFails(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `unknown version \(1\) of interface "NoSuch" \(not implemented\)`)
 }
 
+var defaultCloudTests = []struct {
+	about      string
+	cloudNames []string
+	expect     string
+}{{
+	about: "no controllers",
+}, {
+	about:      "one controller",
+	cloudNames: []string{"cloudname"},
+	expect:     "cloudname",
+}, {
+	about:      "two controllers, same cloud",
+	cloudNames: []string{"cloudname", "cloudname"},
+	expect:     "cloudname",
+}, {
+	about:      "two controllers, different cloud",
+	cloudNames: []string{"cloud1", "cloud2"},
+}, {
+	about:      "three controllers, some same",
+	cloudNames: []string{"cloud1", "cloud1", "cloud2"},
+}}
+
 func (s *controllerSuite) TestDefaultCloud(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
-	_, err := client.DefaultCloud()
-	c.Assert(err, gc.ErrorMatches, "no default cloud")
+	for i, test := range defaultCloudTests {
+		c.Logf("test %d: %s", i, test.about)
+		_, err := s.JEM.DB.Controllers().RemoveAll(nil)
+		c.Assert(err, jc.ErrorIsNil)
+		for j, cloud := range test.cloudNames {
+			err := s.JEM.DB.AddController(testContext, &mongodoc.Controller{
+				Path:   params.EntityPath{User: "test", Name: params.Name(fmt.Sprintf("controller-%d", j))},
+				ACL:    params.ACL{Read: []string{"everyone"}},
+				CACert: "cacert",
+				UUID:   fmt.Sprintf("uuid%d", j),
+				Public: true,
+				Cloud: mongodoc.Cloud{
+					Name: params.Cloud(cloud),
+				},
+			})
+			c.Assert(err, jc.ErrorIsNil)
+		}
+		cloud, err := client.DefaultCloud()
+		if test.expect == "" {
+			c.Check(err, gc.ErrorMatches, `no default cloud \(not found\)`)
+			c.Assert(jujuparams.IsCodeNotFound(err), gc.Equals, true)
+			c.Check(cloud, gc.Equals, names.CloudTag{})
+			continue
+		}
+		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(cloud, gc.Equals, names.NewCloudTag(test.expect))
+	}
 }
 
 func (s *controllerSuite) TestCloudCall(c *gc.C) {

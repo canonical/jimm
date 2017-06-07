@@ -685,6 +685,9 @@ func (j *JEM) DestroyModel(ctx context.Context, conn *apiconn.Conn, model *mongo
 // If the function returns an error, the iteration stops and
 // DoControllers returns the error with the same cause.
 //
+// If cloud is empty, all clouds are selected. If region is empty,
+// all regions are selected.
+//
 // Note that the same pointer is passed to the do function on
 // each iteration. It is the responsibility of the do function to
 // copy it if needed.

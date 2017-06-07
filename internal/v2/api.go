@@ -179,6 +179,8 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	if err != nil {
 		return errgo.Notef(err, "cannot get clouds")
 	}
+	// Note: currently juju controllers only ever have exactly one
+	// cloud. This code will need to change if that changes.
 	for k, v := range clouds {
 		ctl.Cloud.Name = params.Cloud(k.Id())
 		ctl.Cloud.ProviderType = v.Type
