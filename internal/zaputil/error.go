@@ -1,17 +1,17 @@
 package zaputil
 
 import (
-	"encoding/json"
 	"fmt"
 
-	"github.com/uber-go/zap"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"gopkg.in/errgo.v1"
 )
 
 // Error returns a field suitable for logging an error
 // to a zap Logger along with its error trace.
 // If err is nil, the field is a no-op.
-func Error(err error) zap.Field {
+func Error(err error) zapcore.Field {
 	if err == nil {
 		return zap.Skip()
 	}
@@ -25,55 +25,67 @@ type errObject struct {
 	error
 }
 
-// MarshalJSON implements json.Marshaler.MarshalJSON to show the details
-// of the error.
-func (e errObject) MarshalJSON() ([]byte, error) {
+func (e errObject) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	if e.error == nil {
-		return []byte("null"), nil
+		return nil
 	}
-	return json.Marshal(jsonErr{
-		Message: e.error.Error(),
-		Trace:   errorTrace(e.error),
-	})
+	enc.AddString("msg", e.error.Error())
+	switch e.error.(type) {
+	case errgo.Locationer:
+	case errgo.Wrapper:
+	default:
+		// if this is not an errgo.Wrapper, or an
+		// errgo.Locationer then there is no information to add.
+		return nil
+	}
+	return errgo.Mask(enc.AddArray("trace", errorTrace{e.error}), errgo.Any)
 }
 
-// jsonErr is the actual type used for JSON-marshaling errors.
-type jsonErr struct {
-	Message string           `json:"msg"`
-	Trace   []jsonTraceLevel `json:"trace,omitempty"`
+type errorTrace struct {
+	error error
 }
 
-// jsonTraceLevel represents one level of an error trace.
-type jsonTraceLevel struct {
-	Location string `json:"loc,omitempty"`
-	Message  string `json:"msg,omitempty"`
-}
-
-// errorTrace returns the error's trace suitable for
-// marshaling as JSON.
-func errorTrace(err error) []jsonTraceLevel {
-	trace := make([]jsonTraceLevel, 0, 10)
+func (t errorTrace) MarshalLogArray(enc zapcore.ArrayEncoder) error {
+	err := t.error
 	for err != nil {
-		var t jsonTraceLevel
-		if err, ok := err.(errgo.Locationer); ok {
-			if file, line := err.Location(); file != "" {
-				t.Location = fmt.Sprintf("%s:%d", file, line)
-			}
+		if eerr := enc.AppendObject(traceLevel{err}); eerr != nil {
+			return errgo.Mask(eerr, errgo.Any)
 		}
 		if werr, ok := err.(errgo.Wrapper); ok {
-			t.Message = werr.Message()
 			err = werr.Underlying()
 		} else {
-			if len(trace) == 0 && t.Location == "" {
-				// There's no location or underlying error,
-				// so the trace isn't adding anything we
-				// won't already see.
-				return nil
-			}
-			t.Message = err.Error()
-			err = nil
+			break
 		}
-		trace = append(trace, t)
 	}
-	return trace
+	return nil
+}
+
+type traceLevel struct {
+	error error
+}
+
+func (l traceLevel) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	if loc := l.location(); loc != "" {
+		enc.AddString("loc", loc)
+	}
+	if msg := l.message(); msg != "" {
+		enc.AddString("msg", msg)
+	}
+	return nil
+}
+
+func (l traceLevel) message() string {
+	if werr, ok := l.error.(errgo.Wrapper); ok {
+		return werr.Message()
+	}
+	return l.error.Error()
+}
+
+func (l traceLevel) location() string {
+	if lerr, ok := l.error.(errgo.Locationer); ok {
+		if file, line := lerr.Location(); file != "" {
+			return fmt.Sprintf("%s:%d", file, line)
+		}
+	}
+	return ""
 }

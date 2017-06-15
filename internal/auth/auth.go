@@ -8,7 +8,7 @@ import (
 
 	"github.com/juju/idmclient"
 	"github.com/juju/utils"
-	"github.com/uber-go/zap"
+	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -251,7 +251,7 @@ func CheckACL(ctx context.Context, acl []string) error {
 	if !ok {
 		zapctx.Info(ctx, "user not authorized",
 			zap.String("user", auth.username()),
-			zap.Object("acl", acl),
+			zap.Strings("acl", acl),
 		)
 		return params.ErrUnauthorized
 	}

@@ -10,11 +10,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/juju/loggo"
+	"go.uber.org/zap/zapcore"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
-
-	"github.com/juju/loggo"
-	"github.com/uber-go/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/yaml.v2"
@@ -42,7 +41,7 @@ type Config struct {
 	ControllerUUID    string            `yaml:"controller-uuid"`
 	MaxMgoSessions    int               `yaml:"max-mgo-sessions"`
 	GUILocation       string            `yaml:"gui-location"`
-	LoggingLevel      zap.Level         `yaml:"logging-level"`
+	LoggingLevel      zapcore.Level     `yaml:"logging-level"`
 	UsageSenderURL    string            `yaml:"usage-sender-url,omitempty"`
 	Domain            string            `yaml:"domain"`
 }

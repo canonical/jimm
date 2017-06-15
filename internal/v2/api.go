@@ -14,7 +14,7 @@ import (
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/network"
-	"github.com/uber-go/zap"
+	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
@@ -673,7 +673,7 @@ func (h *Handler) setPerm(coll *mgo.Collection, path params.EntityPath, acl para
 	if err := auth.CheckIsUser(ctx, path.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	zapctx.Info(ctx, "set perm", zap.String("collection", coll.Name), zap.Stringer("entity", path), zap.Object("acl", acl))
+	zapctx.Info(ctx, "set perm", zap.String("collection", coll.Name), zap.Stringer("entity", path), zap.Any("acl", acl))
 	if err := coll.UpdateId(path.String(), bson.D{{"$set", bson.D{{"acl", acl}}}}); err != nil {
 		if err == mgo.ErrNotFound {
 			return params.ErrNotFound

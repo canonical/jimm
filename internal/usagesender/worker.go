@@ -14,7 +14,7 @@ import (
 	"github.com/juju/utils"
 	"github.com/juju/utils/clock"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/uber-go/zap"
+	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/tomb.v2"
@@ -170,7 +170,7 @@ func (w *sendModelUsageWorker) execute() error {
 		}
 	}
 	if numberOfUnacknowledgedBatches > 0 {
-		zapctx.Debug(w.config.Context, "model usage receipt was not acknowledged", zap.Object("unacknowledged-batches", numberOfUnacknowledgedBatches))
+		zapctx.Debug(w.config.Context, "model usage receipt was not acknowledged", zap.Int("unacknowledged-batches", numberOfUnacknowledgedBatches))
 		monitorFailure(float64(numberOfUnacknowledgedBatches))
 	}
 	return nil

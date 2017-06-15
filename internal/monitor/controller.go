@@ -8,7 +8,7 @@ import (
 
 	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/utils/parallel"
-	"github.com/uber-go/zap"
+	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/tomb.v2"
@@ -427,12 +427,12 @@ func newWatcherState(ctx context.Context, j jemInterface, ctlPath params.EntityP
 }
 
 func (w *watcherState) addDelta(ctx context.Context, d multiwatcher.Delta) error {
-	if m := zapctx.Logger(ctx).Check(zap.DebugLevel, "got delta"); m.OK() {
+	if m := zapctx.Logger(ctx).Check(zap.DebugLevel, "got delta"); m != nil {
 		id := d.Entity.EntityId()
 		if d.Removed {
 			m.Write(zap.String("kind", "-"), zap.String("id", id.Id))
 		} else {
-			m.Write(zap.String("kind", "+"), zap.String("id", id.Id), zap.Object("entity", d.Entity))
+			m.Write(zap.String("kind", "+"), zap.String("id", id.Id), zap.Any("entity", d.Entity))
 		}
 	}
 	switch e := d.Entity.(type) {
