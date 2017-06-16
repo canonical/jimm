@@ -20,8 +20,6 @@ import (
 	_ "github.com/juju/juju/provider/lxd"
 	_ "github.com/juju/juju/provider/maas"
 	_ "github.com/juju/juju/provider/openstack"
-	"github.com/juju/loggo"
-	"github.com/uber-go/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -80,7 +78,9 @@ func serve(confPath string) error {
 		return errgo.Notef(err, "identity location must not contain discharge path")
 	}
 
-	ctx := setUpLogging(context.Background(), conf.LoggingLevel)
+	ctx := context.Background()
+	zapctx.LogLevel.SetLevel(conf.LoggingLevel)
+	zaputil.InitLoggo(zapctx.Default, conf.LoggingLevel)
 
 	zapctx.Debug(ctx, "connecting to mongo")
 	session, err := mgo.Dial(conf.MongoAddr)
@@ -146,37 +146,4 @@ func serve(confPath string) error {
 		return httpServer.ListenAndServeTLS("", "")
 	}
 	return httpServer.ListenAndServe()
-}
-
-var zapToLoggo = map[zap.Level]loggo.Level{
-	zap.DebugLevel: loggo.TRACE, // Include trace and debug level messages.
-	zap.InfoLevel:  loggo.INFO,
-	zap.WarnLevel:  loggo.WARNING,
-	zap.ErrorLevel: loggo.ERROR, // Include error and critical level messages.
-}
-
-func setUpLogging(ctx context.Context, level zap.Level) context.Context {
-	// Set up the root zap logger.
-	// TODO use zap.AddCaller when it works OK with log wrappers.
-	logger := zap.New(zap.NewJSONEncoder(timestampFormatter()), zap.Output(os.Stderr), level)
-	zapctx.Default = logger
-
-	// Set up loggo so that it will write to the root zap logger.
-	loggo.ReplaceDefaultWriter(zaputil.NewLoggoWriter(logger))
-
-	// Configure loggo so that it will log at the right level.
-	loggo.DefaultContext().ApplyConfig(map[string]loggo.Level{
-		"<root>": zapToLoggo[level],
-	})
-	return zapctx.WithLogger(ctx, logger)
-}
-
-const rfc3339Milli = "2006-01-02T15:04:05.000Z"
-
-// timestampFormatter formats logging timestamps
-// in RFC3339 format with millisecond precision.
-func timestampFormatter() zap.TimeFormatter {
-	return zap.TimeFormatter(func(t time.Time) zap.Field {
-		return zap.String("ts", t.UTC().Format(rfc3339Milli))
-	})
 }

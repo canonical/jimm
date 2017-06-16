@@ -21,7 +21,7 @@ import (
 	"github.com/juju/juju/status"
 	"github.com/juju/juju/storage"
 	"github.com/juju/utils/parallel"
-	"github.com/uber-go/zap"
+	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
@@ -1280,7 +1280,7 @@ func runWithContext(ctx context.Context, f func() error) error {
 		case c <- err:
 		case <-ctx.Done():
 			if err != nil {
-				zapctx.Debug(ctx, "ignoring error in canceled task", zaputil.Error(err))
+				zapctx.Info(ctx, "error in canceled task", zaputil.Error(err))
 			}
 		}
 	}()

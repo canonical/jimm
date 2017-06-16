@@ -5,7 +5,8 @@ import (
 	"strings"
 
 	"github.com/juju/loggo"
-	"github.com/uber-go/zap"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jem/internal/zapctx"
@@ -34,7 +35,16 @@ func (s *LoggingSuite) TearDownTest(c *gc.C) {
 
 func (s *LoggingSuite) setUp(c *gc.C) {
 	output := gocheckZapWriter{c}
-	logger := zap.New(zap.NewTextEncoder(zap.TextNoTime()), zap.Output(output), zap.DebugLevel)
+	logger := zap.New(zapcore.NewCore(
+		zapcore.NewConsoleEncoder(zapcore.EncoderConfig{
+			LevelKey:    "level",
+			EncodeLevel: zapcore.CapitalLevelEncoder,
+			EncodeTime:  zapcore.ISO8601TimeEncoder,
+		}),
+		output,
+		zap.DebugLevel,
+	))
+
 	zapctx.Default = logger
 
 	loggo.ResetLogging()

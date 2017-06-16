@@ -16,7 +16,7 @@ import (
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/utils/clock"
 	"github.com/juju/version"
-	"github.com/uber-go/zap"
+	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
@@ -275,7 +275,7 @@ func (j *JEM) OpenAPI(ctx context.Context, path params.EntityPath) (_ *apiconn.C
 func (j *JEM) OpenAPIFromDoc(ctx context.Context, ctl *mongodoc.Controller) (*apiconn.Conn, error) {
 	return j.pool.connCache.OpenAPI(ctx, ctl.UUID, func() (api.Connection, *api.Info, error) {
 		info := apiInfoFromDoc(ctl)
-		zapctx.Debug(ctx, "open API", zap.Object("api-info", info))
+		zapctx.Debug(ctx, "open API", zap.Any("api-info", info))
 		conn, err := api.Open(info, apiDialOpts())
 		if err != nil {
 			return nil, nil, errgo.WithCausef(err, ErrAPIConnection, "")
@@ -329,7 +329,7 @@ func (j *JEM) OpenModelAPI(ctx context.Context, path params.EntityPath) (_ *apic
 func (j *JEM) openModelAPIFromDocs(ctx context.Context, ctl *mongodoc.Controller, m *mongodoc.Model) (*apiconn.Conn, error) {
 	return j.pool.connCache.OpenAPI(ctx, m.UUID, func() (api.Connection, *api.Info, error) {
 		info := apiInfoFromDocs(ctl, m)
-		zapctx.Debug(ctx, "open API", zap.Object("api-info", info))
+		zapctx.Debug(ctx, "open API", zap.Any("api-info", info))
 		conn, err := api.Open(info, apiDialOpts())
 		if err != nil {
 			return nil, nil, errgo.WithCausef(err, ErrAPIConnection, "")
@@ -691,7 +691,7 @@ func (j *JEM) EarliestControllerVersion(ctx context.Context) (version.Number, er
 	// time a user connects to the API?
 	var v *version.Number
 	if err := j.DoControllers(ctx, "", "", func(c *mongodoc.Controller) error {
-		zapctx.Info(ctx, "in EarliestControllerVersion", zap.Object("controller", c.Path), zap.Object("version", c.Version))
+		zapctx.Info(ctx, "in EarliestControllerVersion", zap.Stringer("controller", c.Path), zap.Stringer("version", c.Version))
 		if c.Version == nil {
 			return nil
 		}

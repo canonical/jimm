@@ -9,7 +9,7 @@ import (
 
 	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/version"
-	"github.com/uber-go/zap"
+	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2"

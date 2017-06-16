@@ -5,7 +5,7 @@ import (
 
 	"github.com/juju/httprequest"
 	"github.com/juju/utils/debugstatus"
-	"github.com/uber-go/zap"
+	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 

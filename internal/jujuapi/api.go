@@ -10,7 +10,7 @@ import (
 	"github.com/juju/httprequest"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/julienschmidt/httprouter"
-	"github.com/uber-go/zap"
+	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
