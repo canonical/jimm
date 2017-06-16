@@ -14,7 +14,7 @@ import (
 
 // LogLevel holds an AtomicLevel that can be used to change the logging
 // level of Default.
-var LogLevel zap.AtomicLevel
+var LogLevel = zap.NewAtomicLevel()
 
 // Default holds the logger returned by Logger when there is no logger in
 // the context. If replacing Default with a new Logger then consider

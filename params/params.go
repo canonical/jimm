@@ -504,3 +504,20 @@ type Migrate struct {
 	// Controller holds the name of the controller.
 	Controller EntityPath `httprequest:"controller,form"`
 }
+
+// LogLevel holds a request to get the current logging level of the
+// server.
+type LogLevel struct {
+	httprequest.Route `httprequest:"GET /v2/log-level"`
+}
+
+// SetLogLevel holds a request to set the logging level of the server.
+type SetLogLevel struct {
+	httprequest.Route `httprequest:"PUT /v2/log-level"`
+	Level             Level `httprequest:",body"`
+}
+
+// Level holds a logging level name.
+type Level struct {
+	Level string `json:"level"`
+}
