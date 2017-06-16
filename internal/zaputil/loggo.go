@@ -49,6 +49,12 @@ func (w zapLoggoWriter) Write(entry loggo.Entry) {
 // output at the given level.
 func InitLoggo(logger *zap.Logger, level zapcore.Level) {
 	loggo.ReplaceDefaultWriter(NewLoggoWriter(logger))
+	SetLoggoLogLevel(level)
+}
+
+// SetLogLevel configures the root loggo logger to use the equivalent of
+// the given zap Level.
+func SetLoggoLogLevel(level zapcore.Level) {
 	l := loggo.GetLogger("")
 	l.SetLogLevel(zapToLoggo[level])
 }

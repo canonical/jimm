@@ -4,9 +4,8 @@
 package jemclient
 
 import (
-	"github.com/juju/httprequest"
-
 	"github.com/CanonicalLtd/jem/params"
+	"github.com/juju/httprequest"
 )
 
 type client struct {
@@ -109,6 +108,16 @@ func (c *client) ListModels(p *params.ListModels) (*params.ListModelsResponse, e
 	return r, err
 }
 
+// LogLevel returns the current logging level of the running service.
+func (c *client) LogLevel(p *params.LogLevel) (params.Level, error) {
+	var r params.Level
+	err := c.Client.Call(p, &r)
+	return r, err
+}
+
+// Migrate starts a migration of a model from its current
+// controller to a different one. The migration will not have
+// completed by the time the Migrate call returns.
 func (c *client) Migrate(p *params.Migrate) error {
 	return c.Client.Call(p, nil)
 }
@@ -125,6 +134,11 @@ func (c *client) NewModel(p *params.NewModel) (*params.ModelResponse, error) {
 // on an an entity. The owner can always read an entity, even
 // if it has empty ACL.
 func (c *client) SetControllerPerm(p *params.SetControllerPerm) error {
+	return c.Client.Call(p, nil)
+}
+
+// SetLogLevel configures the logging level of the running service.
+func (c *client) SetLogLevel(p *params.SetLogLevel) error {
 	return c.Client.Call(p, nil)
 }
 

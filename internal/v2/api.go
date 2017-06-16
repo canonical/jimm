@@ -15,6 +15,7 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/network"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
@@ -794,6 +795,32 @@ func (h *Handler) Migrate(arg *params.Migrate) error {
 	}
 
 	// TODO return the migration id?
+	return nil
+}
+
+// LogLevel returns the current logging level of the running service.
+func (h *Handler) LogLevel(*params.LogLevel) (params.Level, error) {
+	ctx := h.context
+	if err := auth.CheckIsUser(ctx, h.config.ControllerAdmin); err != nil {
+		return params.Level{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	return params.Level{
+		Level: zapctx.LogLevel.String(),
+	}, nil
+}
+
+// SetLogLevel configures the logging level of the running service.
+func (h *Handler) SetLogLevel(req *params.SetLogLevel) error {
+	ctx := h.context
+	if err := auth.CheckIsUser(ctx, h.config.ControllerAdmin); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	var level zapcore.Level
+	if err := level.UnmarshalText([]byte(req.Level.Level)); err != nil {
+		return badRequestf(err, "")
+	}
+	zapctx.LogLevel.SetLevel(level)
+	zaputil.SetLoggoLogLevel(level)
 	return nil
 }
 

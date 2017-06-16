@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"go.uber.org/zap/zapcore"
+
 	"github.com/juju/juju/api"
 	controllerapi "github.com/juju/juju/api/controller"
 	jujuparams "github.com/juju/juju/apiserver/params"
@@ -22,6 +24,7 @@ import (
 	"github.com/CanonicalLtd/jem/internal/apitest"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/internal/v2"
+	"github.com/CanonicalLtd/jem/internal/zapctx"
 	"github.com/CanonicalLtd/jem/params"
 )
 
@@ -1919,6 +1922,33 @@ func (s *APISuite) TestMigrate(c *gc.C) {
 	m, err := s.JEM.DB.Model(testContext, modelId)
 	c.Assert(err, gc.IsNil)
 	c.Assert(m.Controller, jc.DeepEquals, params.EntityPath{"bob", "bar"})
+}
+
+func (s *APISuite) TestLogLevel(c *gc.C) {
+	c.Assert(zapctx.LogLevel.Level(), gc.Equals, zapcore.InfoLevel)
+	client := s.NewClient("controller-admin")
+	level, err := client.LogLevel(nil)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(level, jc.DeepEquals, params.Level{
+		Level: "info",
+	})
+	err = client.SetLogLevel(&params.SetLogLevel{
+		Level: params.Level{Level: "debug"},
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(zapctx.LogLevel.Level(), gc.Equals, zapcore.DebugLevel)
+	level, err = client.LogLevel(nil)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(level, jc.DeepEquals, params.Level{
+		Level: "debug",
+	})
+	err = client.SetLogLevel(&params.SetLogLevel{
+		Level: params.Level{Level: "not-a-level"},
+	})
+	c.Assert(err, gc.ErrorMatches, `unrecognized level: "not-a-level"`)
+	client.SetLogLevel(&params.SetLogLevel{
+		Level: params.Level{Level: "info"},
+	})
 }
 
 func (s *APISuite) allowControllerPerm(c *gc.C, path params.EntityPath, acl ...string) {
