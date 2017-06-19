@@ -332,6 +332,7 @@ func (j *JEM) openModelAPIFromDocs(ctx context.Context, ctl *mongodoc.Controller
 		zapctx.Debug(ctx, "open API", zap.Any("api-info", info))
 		conn, err := api.Open(info, apiDialOpts())
 		if err != nil {
+			zapctx.Info(ctx, "failed to open connection", zaputil.Error(err), zap.Any("api-info", info))
 			return nil, nil, errgo.WithCausef(err, ErrAPIConnection, "")
 		}
 		return conn, info, nil
