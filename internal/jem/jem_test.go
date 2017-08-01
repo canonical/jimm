@@ -365,20 +365,26 @@ func (s *jemSuite) TestCreateModelWithPartiallyCreatedModel(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 }
 
-func (s *jemSuite) TestGrantModel(c *gc.C) {
+func (s *jemSuite) TestCreateModelWithExistingModelInControllerOnly(c *gc.C) {
+	// Create a model and then delete its entry in the JIMM database
+	// as if the controller model had been created but something
+	// had failed in CreateModel after that.
 	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
-	conn, err := s.jem.OpenAPI(testContext, model.Controller)
-	c.Assert(err, jc.ErrorIsNil)
-	defer conn.Close()
-	err = s.jem.GrantModel(testContext, conn, model, "alice", "admin")
-	c.Assert(err, jc.ErrorIsNil)
-	model1, err := s.jem.DB.Model(testContext, model.Path)
-	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
-		Read:  []string{"alice"},
-		Write: []string{"alice"},
-		Admin: []string{"alice"},
+	ctx := auth.ContextWithUser(testContext, string(model.Path.User))
+	err := s.jem.DB.DeleteModel(ctx, model.Path)
+	c.Assert(err, gc.Equals, nil)
+
+	// Now try to create the model again.
+	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
+		Path:           model.Path,
+		ControllerPath: model.Controller,
+		Credential: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{"bob", "cred"},
+		},
+		Cloud: "dummy",
 	})
+	c.Assert(err, gc.ErrorMatches, `cannot create model "bob/model" because it already exists in the backend controller; please contact an administrator to resolve this issue`)
 }
 
 func (s *jemSuite) TestGrantModelWrite(c *gc.C) {

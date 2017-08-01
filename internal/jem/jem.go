@@ -13,6 +13,7 @@ import (
 	"github.com/juju/juju/api"
 	cloudapi "github.com/juju/juju/api/cloud"
 	"github.com/juju/juju/api/modelmanager"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/utils/clock"
 	"github.com/juju/version"
@@ -418,7 +419,7 @@ type CreateModelParams struct {
 }
 
 // CreateModel creates a new model as specified by p.
-func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.Model, error) {
+func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc.Model, err error) {
 	// Only the owner can create a new model in their namespace.
 	if err := auth.CheckIsUser(ctx, p.Path.User); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
@@ -484,6 +485,18 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.M
 	if err := j.DB.AddModel(ctx, modelDoc); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
+	defer func() {
+		if err == nil {
+			return
+		}
+		// We're returning an error, so remove the model from the
+		// database. Note that this might leave the model around
+		// in the controller, but this should be rare and we can
+		// deal with it at model creation time later (see TODO below).
+		if err := j.DB.DeleteModel(ctx, modelDoc.Path); err != nil {
+			zapctx.Error(ctx, "cannot remove model from database after error; leaked model", zaputil.Error(err))
+		}
+	}()
 	mmClient := modelmanager.NewClient(conn.Connection)
 	m, err := mmClient.CreateModel(
 		string(p.Path.Name),
@@ -494,37 +507,52 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (*mongodoc.M
 		p.Attributes,
 	)
 	if err != nil {
-		// Remove the model that was created, because it's no longer valid.
-		if err := j.DB.Models().RemoveId(modelDoc.Id); err != nil {
-			j.DB.checkError(ctx, &err)
-			zapctx.Error(ctx, "cannot remove model from database after model creation error", zaputil.Error(err))
+		if err := j.DB.DeleteModel(ctx, modelDoc.Path); err != nil {
+			zapctx.Error(ctx, "cannot remove model from database after error; leaked model", zaputil.Error(err))
+		}
+		if jujuparams.IsCodeAlreadyExists(err) {
+			// The model already exists in the controller but it didn't
+			// exist in the database. This probably means that it's
+			// been abortively created previously, but left around because
+			// of connection failure.
+			// TODO initiate cleanup of the model, first checking that
+			// it's empty, but return an error to the user because
+			// the operation to delete a model isn't synchronous even
+			// for empty models. We could also have a worker that deletes
+			// empty models that don't appear in the database.
+			return nil, errgo.Newf("cannot create model %q because it already exists in the backend controller; please contact an administrator to resolve this issue", modelDoc.Path)
 		}
 		return nil, errgo.Notef(err, "cannot create model")
 	}
+	// TODO should we try to delete the model from the controller
+	// on error here?
+
+	// Grant JIMM admin access to the model. Note that if this fails,
+	// the local database entry will be deleted but the model
+	// will remain on the controller and will trigger the "already exists
+	// in the backend controller" message above when the user
+	// attempts to create a model with the same name again.
 	if err := mmClient.GrantModel(conn.Info.Tag.(names.UserTag).Id(), "admin", m.UUID); err != nil {
-		// TODO (mhilton) destroy the model?
 		return nil, errgo.Notef(err, "cannot grant admin access")
 	}
+
 	// Now set the UUID to that of the actually created model,
 	// and update other attributes from the response too.
+	// Use Apply so that we can return a result that's consistent
+	// with Database.Model.
 	// TODO update life and other things if need be.
-	if err := j.DB.Models().UpdateId(modelDoc.Id, bson.D{{"$set", bson.D{
-		{"uuid", m.UUID},
-		{"cloud", m.Cloud},
-		{"cloudregion", m.CloudRegion},
-		{"defaultseries", m.DefaultSeries},
-		{"life", m.Life},
-	}}}); err != nil {
+	if _, err := j.DB.Models().FindId(modelDoc.Id).Apply(mgo.Change{
+		Update: bson.D{{"$set", bson.D{
+			{"uuid", m.UUID},
+			{"cloud", m.Cloud},
+			{"cloudregion", m.CloudRegion},
+			{"defaultseries", m.DefaultSeries},
+			{"life", m.Life},
+		}}},
+		ReturnNew: true,
+	}, &modelDoc); err != nil {
 		j.DB.checkError(ctx, &err)
-		// TODO (mhilton) destroy the model?
-		return nil, errgo.Notef(err, "cannot update model UUID in database, leaked model %s", m.UUID)
-	}
-	// Fetch the model doc so we can be sure we're returning a consistent
-	// result. Technically this incurs an unnecessary round trip to mongo but
-	// models aren't created *that* often.
-	modelDoc, err = j.DB.Model(ctx, p.Path)
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot retrieve model after update")
+		return nil, errgo.Notef(err, "cannot update model UUID in database", m.UUID)
 	}
 	return modelDoc, nil
 }
