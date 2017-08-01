@@ -329,6 +329,42 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 	}
 }
 
+func (s *jemSuite) TestCreateModelWithPartiallyCreatedModel(c *gc.C) {
+	now := bson.Now()
+	s.PatchValue(jem.WallClock, jt.NewClock(now))
+	ctlId := s.addController(c, params.EntityPath{"bob", "controller"})
+	err := s.jem.DB.SetACL(testContext, s.jem.DB.Controllers(), ctlId, params.ACL{
+		Read: []string{"everyone"},
+	})
+	c.Assert(err, gc.IsNil)
+	// Bob has a single credential.
+	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
+		Path: credentialPath("dummy", "bob", "cred1"),
+		Type: "empty",
+	})
+	ctx := auth.ContextWithUser(testContext, "bob")
+	// Create a partial model in the database.
+	err = s.jem.DB.AddModel(ctx, &mongodoc.Model{
+		Path:         params.EntityPath{"bob", "oldmodel"},
+		Controller:   ctlId,
+		CreationTime: now,
+		Creator:      "bob",
+		Credential:   credentialPath("dummy", "bob", "cred1"),
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	// Create a new model
+	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", "model"},
+		ControllerPath: ctlId,
+		Credential: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{"bob", "cred1"},
+		},
+		Cloud: "dummy",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+}
+
 func (s *jemSuite) TestGrantModel(c *gc.C) {
 	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
 	conn, err := s.jem.OpenAPI(testContext, model.Controller)
