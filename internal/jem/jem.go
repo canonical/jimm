@@ -112,9 +112,9 @@ const (
 	// OmnibusJIMMCharm specifies the charm url to be used when
 	// obtaining autorization for model usage collection.
 	OmnibusJIMMCharm = "cs:~canonical/jimm-0"
-	omnibusJIMMPlan  = "canonical/jimm"
-	omnibusJIMMName  = "jimm"
-	omnibusJIMMOwner = "canonical"
+	OmnibusJIMMPlan  = "canonical/jimm"
+	OmnibusJIMMName  = "jimm"
+	OmnibusJIMMOwner = "canonical"
 )
 
 // NewPool represents a pool of possible JEM instances that use the given
@@ -201,6 +201,11 @@ func (p *Pool) JEM(ctx context.Context) *JEM {
 		pool: p,
 		usageSenderAuthorizationClient: p.usageSenderAuthorizationClient,
 	}
+}
+
+// UsageAuthorizationClient returns the UsageSenderAuthorizationClient.
+func (p *Pool) UsageAuthorizationClient() UsageSenderAuthorizationClient {
+	return p.usageSenderAuthorizationClient
 }
 
 type JEM struct {
@@ -843,10 +848,10 @@ func (j *JEM) UsageSenderAuthorization(applicationUser string) ([]byte, error) {
 		return nil, nil
 	}
 	macaroon, err := j.usageSenderAuthorizationClient.AuthorizeReseller(
-		omnibusJIMMPlan,
+		OmnibusJIMMPlan,
 		OmnibusJIMMCharm,
-		omnibusJIMMName,
-		omnibusJIMMOwner,
+		OmnibusJIMMName,
+		OmnibusJIMMOwner,
 		applicationUser,
 	)
 	if err != nil {

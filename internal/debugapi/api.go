@@ -25,9 +25,10 @@ func NewAPIHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, sp jemserve
 		ctx := ctxutil.Join(ctx, p.Context)
 		ctx = zapctx.WithFields(ctx, zap.String("req-id", httprequest.RequestUUID(ctx)))
 		h := &handler{
-			params:   sp,
-			jem:      jp.JEM(ctx),
-			authPool: ap,
+			params:                         sp,
+			jem:                            jp.JEM(ctx),
+			authPool:                       ap,
+			usageSenderAuthorizationClient: jp.UsageAuthorizationClient(),
 		}
 		h.Handler = debugstatus.Handler{
 			Version:           debugstatus.Version(version.VersionInfo),
@@ -40,10 +41,11 @@ func NewAPIHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, sp jemserve
 
 type handler struct {
 	debugstatus.Handler
-	params   jemserver.Params
-	jem      *jem.JEM
-	authPool *auth.Pool
-	ctx      context.Context
+	params                         jemserver.Params
+	jem                            *jem.JEM
+	authPool                       *auth.Pool
+	ctx                            context.Context
+	usageSenderAuthorizationClient jem.UsageSenderAuthorizationClient
 }
 
 func (h *handler) checkIsAdmin(req *http.Request) error {
@@ -72,5 +74,36 @@ func (h *handler) check() map[string]debugstatus.CheckResult {
 func (h *handler) Close() error {
 	h.jem.Close()
 	h.jem = nil
+	return nil
+}
+
+// DebugOmnibusCheckRequest defines the request structure for the
+// omnibus usage sender authorization check.
+type DebugUsageSenderCheckRequest struct {
+	httprequest.Route `httprequest:"GET /debug/usage/:username"`
+	Username          string `httprequest:"username,path"`
+}
+
+// DebugUsageSenderCheck implements a check that verifies that jem is able
+// to perform usage sender authorization.
+func (h *handler) DebugUsageSenderCheck(p httprequest.Params, r *DebugUsageSenderCheckRequest) error {
+	if err := h.checkIsAdmin(p.Request); err != nil {
+		return errgo.Mask(err, errgo.Any)
+	}
+
+	if h.usageSenderAuthorizationClient == nil {
+		return errgo.New("cannot perform the check")
+	}
+
+	_, err := h.usageSenderAuthorizationClient.AuthorizeReseller(
+		jem.OmnibusJIMMPlan,
+		jem.OmnibusJIMMCharm,
+		jem.OmnibusJIMMName,
+		jem.OmnibusJIMMOwner,
+		r.Username,
+	)
+	if err != nil {
+		return errgo.Notef(err, "check failed")
+	}
 	return nil
 }

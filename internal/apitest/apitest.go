@@ -12,6 +12,7 @@ import (
 	"github.com/juju/idmclient/idmtest"
 	controllerapi "github.com/juju/juju/api/controller"
 	"github.com/juju/juju/controller"
+	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"github.com/rogpeppe/fastuuid"
@@ -57,7 +58,7 @@ type Suite struct {
 	SessionPool *mgosession.Pool
 
 	ServerParams              external_jem.ServerParams
-	metricsRegistrationClient *stubMetricsRegistrationClient
+	MetricsRegistrationClient *stubMetricsRegistrationClient
 }
 
 func (s *Suite) SetUpTest(c *gc.C) {
@@ -72,9 +73,9 @@ func (s *Suite) SetUpTest(c *gc.C) {
 	err := controllerapi.NewClient(conn).GrantController("everyone@external", "login")
 	c.Assert(err, jc.ErrorIsNil)
 	s.PatchValue(&jem.APIOpenTimeout, time.Duration(0))
-	s.metricsRegistrationClient = &stubMetricsRegistrationClient{}
+	s.MetricsRegistrationClient = &stubMetricsRegistrationClient{}
 	s.PatchValue(&jem.NewUsageSenderAuthorizationClient, func(_ string, _ *httpbakery.Client) (jem.UsageSenderAuthorizationClient, error) {
-		return s.metricsRegistrationClient, nil
+		return s.MetricsRegistrationClient, nil
 	})
 	s.JEMSrv = s.NewServer(c, s.Session, s.IDMSrv, s.ServerParams)
 	s.httpSrv = httptest.NewServer(s.JEMSrv)
@@ -227,15 +228,17 @@ func (s *Suite) CreateModel(c *gc.C, path, ctlPath params.EntityPath, cred param
 	})
 	c.Assert(err, gc.IsNil)
 
-	c.Assert(s.metricsRegistrationClient, jc.DeepEquals, &stubMetricsRegistrationClient{
-		calls:            1,
-		plan:             "canonical/jimm",
-		charm:            "cs:~canonical/jimm-0",
-		application:      "jimm",
-		applicationOwner: "canonical",
-		applicationUser:  string(path.User),
-	})
-	*s.metricsRegistrationClient = stubMetricsRegistrationClient{}
+	s.MetricsRegistrationClient.CheckCalls(c, []testing.StubCall{{
+		FuncName: "AuthorizeReseller",
+		Args: []interface{}{
+			"canonical/jimm",
+			"cs:~canonical/jimm-0",
+			"jimm",
+			"canonical",
+			string(path.User),
+		},
+	}})
+	s.MetricsRegistrationClient.ResetCalls()
 
 	return resp.Path, resp.UUID
 }
@@ -289,16 +292,14 @@ func Do(client *httpbakery.Client) func(*http.Request) (*http.Response, error) {
 var AnyBody = httptesting.BodyAsserter(func(*gc.C, json.RawMessage) {})
 
 type stubMetricsRegistrationClient struct {
-	plan             string
-	charm            string
-	application      string
-	applicationOwner string
-	applicationUser  string
-	calls            int
+	testing.Stub
 }
 
 func (c *stubMetricsRegistrationClient) AuthorizeReseller(plan, charm, application, applicationOwner, applicationUser string) (*macaroon.Macaroon, error) {
-	c.plan, c.charm, c.application, c.applicationOwner, c.applicationUser = plan, charm, application, applicationOwner, applicationUser
-	c.calls++
-	return macaroon.New(nil, "", "jem")
+	c.MethodCall(c, "AuthorizeReseller", plan, charm, application, applicationOwner, applicationUser)
+	m, err := macaroon.New(nil, "", "jem")
+	if err != nil {
+		return nil, err
+	}
+	return m, c.NextErr()
 }
