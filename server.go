@@ -72,6 +72,10 @@ type ServerParams struct {
 	// to collect and report usage metrics.
 	UsageSenderURL string
 
+	// UsageSenderSpoolPath holds the path to a directory where the usage
+	// send worker will store metrics.
+	UsageSenderSpoolPath string
+
 	// Domain holds the domain to which users must belong, not
 	// including the leading "@". If this is empty, users may be in
 	// any domain.

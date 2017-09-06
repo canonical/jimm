@@ -5,6 +5,7 @@ package usagesender_test
 import (
 	"fmt"
 	"net/http/httptest"
+	"os"
 	"sync"
 	"time"
 
@@ -26,21 +27,37 @@ import (
 	"github.com/CanonicalLtd/jem/params"
 )
 
-type usageSenderSuite struct {
-	apitest.Suite
-
-	// clock holds the mock clock used by the monitor package.
-	clock   *jujutesting.Clock
-	handler *testHandler
-	server  *httptest.Server
-}
-
-var _ = gc.Suite(&usageSenderSuite{})
-
 var (
 	testContext = context.Background()
 	epoch       = mustParseTime("2016-01-01T12:00:00Z")
 )
+
+var _ = gc.Suite(&spoolDirMetricRecorderSuite{})
+
+type spoolDirMetricRecorderSuite struct {
+	usageSenderSuite
+}
+
+func (s *spoolDirMetricRecorderSuite) SetUpTest(c *gc.C) {
+	s.MetricsSpoolPath = c.MkDir()
+	s.ServerParams = external_jem.ServerParams{
+		UsageSenderSpoolPath: s.MetricsSpoolPath,
+	}
+	s.usageSenderSuite.SetUpTest(c)
+}
+
+var _ = gc.Suite(&sliceMetricRecorderSuite{})
+
+type sliceMetricRecorderSuite struct {
+	usageSenderSuite
+}
+
+type usageSenderSuite struct {
+	apitest.Suite
+
+	handler *testHandler
+	server  *httptest.Server
+}
 
 func (s *usageSenderSuite) SetUpTest(c *gc.C) {
 	s.handler = &testHandler{receivedMetrics: make(chan string)}
@@ -52,12 +69,14 @@ func (s *usageSenderSuite) SetUpTest(c *gc.C) {
 	for _, h := range handlers {
 		router.Handle(h.Method, h.Path, h.Handle)
 	}
+
 	s.server = httptest.NewServer(router)
-	s.ServerParams = external_jem.ServerParams{UsageSenderURL: s.server.URL}
 
 	// Set up the clock mockery.
-	s.clock = jujutesting.NewClock(epoch)
-	s.PatchValue(usagesender.SenderClock, s.clock)
+	s.Clock = jujutesting.NewClock(epoch)
+
+	s.ServerParams.UsageSenderURL = s.server.URL
+
 	s.Suite.SetUpTest(c)
 }
 
@@ -81,6 +100,65 @@ func (s *usageSenderSuite) TestUsageSenderWorker(c *gc.C) {
 	s.setUnitNumberAndCheckSentMetrics(c, uuid, 42, false)
 }
 
+func (s *spoolDirMetricRecorderSuite) TestSpool(c *gc.C) {
+	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, false)
+	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
+	_, model := s.CreateModel(c, params.EntityPath{"bob", "foo"}, ctlId, cred)
+
+	m := &testMonitor{failed: make(chan int, 10)}
+	s.PatchValue(usagesender.MonitorFailure, m.set)
+
+	// on first attempt the metrics will not be acknowledged - will
+	// remain stored in the spool directory and should be resent on the
+	// next attempt
+	s.handler.setAcknowledge(false)
+
+	err := s.JEM.DB.UpdateModelCounts(testContext, model, map[params.EntityCount]int{
+		params.MachineCount: 0,
+		params.UnitCount:    17,
+	}, s.Clock.Now())
+	c.Assert(err, jc.ErrorIsNil)
+
+	s.Clock.WaitAdvance(6*time.Minute, jujujujutesting.LongWait, 1)
+
+	select {
+	case receivedUnitCount := <-s.handler.receivedMetrics:
+		c.Assert(receivedUnitCount, gc.Equals, "17")
+	case <-time.After(jujujujutesting.LongWait):
+		c.Fatal("timed out waiting for metrics to be received")
+	}
+
+	// on the second attempt all metrics will be acknowledged
+	s.handler.setAcknowledge(true)
+
+	err = s.JEM.DB.UpdateModelCounts(testContext, model, map[params.EntityCount]int{
+		params.MachineCount: 0,
+		params.UnitCount:    42,
+	}, s.Clock.Now())
+	c.Assert(err, jc.ErrorIsNil)
+
+	s.Clock.WaitAdvance(6*time.Minute, jujujujutesting.LongWait, 1)
+
+	// we expect both metrics to be sent this time
+	a := "17"
+	select {
+	case receivedUnitCount := <-s.handler.receivedMetrics:
+		c.Logf("received %v", receivedUnitCount)
+		if receivedUnitCount == a {
+			a = "42"
+		}
+	case <-time.After(jujujujutesting.LongWait):
+		c.Fatal("timed out waiting for metrics to be received")
+	}
+	select {
+	case receivedUnitCount := <-s.handler.receivedMetrics:
+		c.Logf("received %v", receivedUnitCount)
+		c.Assert(receivedUnitCount, gc.Equals, a)
+	case <-time.After(jujujujutesting.LongWait):
+		c.Fatal("timed out waiting for metrics to be received")
+	}
+}
+
 func (s *usageSenderSuite) setUnitNumberAndCheckSentMetrics(c *gc.C, modelUUID string, unitCount int, acknowledge bool) {
 	m := &testMonitor{failed: make(chan int)}
 	s.PatchValue(usagesender.MonitorFailure, m.set)
@@ -90,10 +168,10 @@ func (s *usageSenderSuite) setUnitNumberAndCheckSentMetrics(c *gc.C, modelUUID s
 	err := s.JEM.DB.UpdateModelCounts(testContext, modelUUID, map[params.EntityCount]int{
 		params.MachineCount: 0,
 		params.UnitCount:    unitCount,
-	}, s.clock.Now())
+	}, s.Clock.Now())
 	c.Assert(err, jc.ErrorIsNil)
 
-	s.clock.WaitAdvance(6*time.Minute, jujujujutesting.LongWait, 1)
+	s.Clock.WaitAdvance(6*time.Minute, jujujujutesting.LongWait, 1)
 
 	unitCountString := fmt.Sprintf("%d", unitCount)
 
@@ -110,6 +188,8 @@ func (s *usageSenderSuite) setUnitNumberAndCheckSentMetrics(c *gc.C, modelUUID s
 		case <-time.After(jujujujutesting.LongWait):
 			c.Fatal("timed out waiting for metrics batch to be acknowledged")
 		}
+		err = os.RemoveAll(s.MetricsSpoolPath)
+		c.Assert(err, jc.ErrorIsNil)
 	}
 }
 
@@ -133,10 +213,8 @@ type testHandler struct {
 }
 
 func (c *testHandler) Metrics(arg *usagePost) (*romulus.UserStatusResponse, error) {
-	if len(arg.Body) == 1 && len(arg.Body[0].Metrics) == 1 {
-		c.receivedMetrics <- arg.Body[0].Metrics[0].Value
-	} else {
-		c.receivedMetrics <- "-1"
+	for _, b := range arg.Body {
+		c.receivedMetrics <- b.Metrics[0].Value
 	}
 
 	uuids := make([]string, len(arg.Body))

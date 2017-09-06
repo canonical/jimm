@@ -11,7 +11,6 @@ import (
 	"github.com/juju/httprequest"
 	romulus "github.com/juju/romulus/wireformat/metrics"
 	wireformat "github.com/juju/romulus/wireformat/metrics"
-	"github.com/juju/utils"
 	"github.com/juju/utils/clock"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
@@ -26,14 +25,9 @@ import (
 	"github.com/CanonicalLtd/jem/params"
 )
 
-const (
-	unitName  = "jimm/0"
-	metricKey = "juju-model-units"
-)
-
 var (
-	// senderClock holds the clock implementation used by the worker.
-	senderClock clock.Clock = clock.WallClock
+	// SenderClock holds the clock implementation used by the worker.
+	SenderClock clock.Clock = clock.WallClock
 
 	UnacknowledgedMetricBatchesCount = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "jem",
@@ -52,10 +46,11 @@ func init() {
 // SendModelUsageWorkerConfig contains configuration values for the worker
 // that reports model usage.
 type SendModelUsageWorkerConfig struct {
-	OmnibusURL string
-	Pool       *jem.Pool
-	Period     time.Duration
-	Context    context.Context
+	OmnibusURL     string
+	Pool           *jem.Pool
+	Period         time.Duration
+	Context        context.Context
+	SpoolDirectory string
 }
 
 func (c *SendModelUsageWorkerConfig) validate() error {
@@ -106,7 +101,7 @@ func (w *sendModelUsageWorker) run() error {
 		select {
 		case <-w.tomb.Dying():
 			return tomb.ErrDying
-		case <-senderClock.After(w.config.Period):
+		case <-SenderClock.After(w.config.Period):
 			err := w.execute()
 			if err != nil {
 				zapctx.Error(w.config.Context, "failed to send usage information", zaputil.Error(err))
@@ -118,38 +113,49 @@ func (w *sendModelUsageWorker) run() error {
 func (w *sendModelUsageWorker) execute() error {
 	j := w.config.Pool.JEM(w.config.Context)
 	defer j.Close()
-	batches := []wireformat.MetricBatch{}
 	acknowledgedBatches := make(map[string]bool)
 	iter := j.DB.Models().Find(nil).Sort("_id").Iter()
+
+	recorder, err := newSliceMetricRecorder(w.config.SpoolDirectory)
+	if err != nil {
+		zapctx.Error(w.config.Context, "failed to create a metric recorder", zaputil.Error(err))
+		return errgo.Mask(err)
+	}
+	if w.config.SpoolDirectory != "" {
+		recorder, err = newSpoolDirMetricRecorder(w.config.SpoolDirectory)
+		if err != nil {
+			zapctx.Error(w.config.Context, "failed to create a metric recorder", zaputil.Error(err))
+			return errgo.Notef(err, "failed to create a metric recorder")
+		}
+
+	}
+
 	var model mongodoc.Model
 	for iter.Next(&model) {
 		unitCount, ok := model.Counts[params.UnitCount]
 		if !ok {
+			zapctx.Debug(w.config.Context, "model unit count not found", zap.String("model-uuid", model.UUID))
 			continue
 		}
-		uuid, err := utils.NewUUID()
+		t := SenderClock.Now().UTC()
+		err = recorder.AddMetric(w.config.Context, model.UUID, fmt.Sprintf("%d", unitCount.Current), model.UsageSenderCredentials, t)
 		if err != nil {
-			zapctx.Error(w.config.Context, "failed to create uuid", zaputil.Error(err))
+			zapctx.Error(w.config.Context, "failed to record a metric", zaputil.Error(err))
 			continue
 		}
-		t := senderClock.Now().UTC()
-		batches = append(batches, wireformat.MetricBatch{
-			UUID:        uuid.String(),
-			ModelUUID:   model.UUID,
-			CharmUrl:    jem.OmnibusJIMMCharm,
-			Created:     t,
-			UnitName:    unitName,
-			Credentials: model.UsageSenderCredentials,
-			Metrics: []wireformat.Metric{{
-				Key:   metricKey,
-				Value: fmt.Sprint(unitCount.Current),
-				Time:  t,
-			}},
-		})
-		acknowledgedBatches[uuid.String()] = false
 	}
 	if err := iter.Err(); err != nil {
-		return errgo.Notef(err, "cannot query")
+		zapctx.Error(w.config.Context, "model query failed", zaputil.Error(err))
+		return errgo.Notef(err, "model query failed")
+	}
+
+	batches, err := recorder.BatchesToSend(w.config.Context)
+	if err != nil {
+		zapctx.Error(w.config.Context, "failed to read recorded metrics", zaputil.Error(err))
+		return errgo.Notef(err, "failed to read recorded metrics")
+	}
+	for _, b := range batches {
+		acknowledgedBatches[b.UUID] = false
 	}
 
 	response, err := w.send(batches)
@@ -160,6 +166,10 @@ func (w *sendModelUsageWorker) execute() error {
 	for _, userResponse := range response.UserResponses {
 		for _, ackBatchUUID := range userResponse.AcknowledgedBatches {
 			acknowledgedBatches[ackBatchUUID] = true
+			err = recorder.Remove(w.config.Context, ackBatchUUID)
+			if err != nil {
+				zapctx.Warn(w.config.Context, "failed to remove recorded metric")
+			}
 		}
 	}
 	// check if all batches were acknowledged
