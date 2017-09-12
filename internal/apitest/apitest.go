@@ -28,6 +28,7 @@ import (
 	"github.com/CanonicalLtd/jem/internal/jemtest"
 	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
+	"github.com/CanonicalLtd/jem/internal/usagesender"
 	"github.com/CanonicalLtd/jem/jemclient"
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -59,6 +60,8 @@ type Suite struct {
 
 	ServerParams              external_jem.ServerParams
 	MetricsRegistrationClient *stubMetricsRegistrationClient
+	MetricsSpoolPath          string
+	Clock                     *testing.Clock
 }
 
 func (s *Suite) SetUpTest(c *gc.C) {
@@ -77,6 +80,9 @@ func (s *Suite) SetUpTest(c *gc.C) {
 	s.PatchValue(&jem.NewUsageSenderAuthorizationClient, func(_ string, _ *httpbakery.Client) (jem.UsageSenderAuthorizationClient, error) {
 		return s.MetricsRegistrationClient, nil
 	})
+	if s.Clock != nil {
+		s.PatchValue(&usagesender.SenderClock, s.Clock)
+	}
 	s.JEMSrv = s.NewServer(c, s.Session, s.IDMSrv, s.ServerParams)
 	s.httpSrv = httptest.NewServer(s.JEMSrv)
 	s.SessionPool = mgosession.NewPool(context.TODO(), s.Session, 1)
@@ -135,6 +141,7 @@ func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server,
 		ControllerUUID:          "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		WebsocketRequestTimeout: 3 * time.Minute,
 		UsageSenderURL:          "https://0.1.2.3/omnibus/v2",
+		UsageSenderSpoolPath:    s.MetricsSpoolPath,
 	}
 	if params.UsageSenderURL != "" {
 		config.UsageSenderURL = params.UsageSenderURL
