@@ -114,7 +114,7 @@ func (w *sendModelUsageWorker) execute() error {
 	j := w.config.Pool.JEM(w.config.Context)
 	defer j.Close()
 	acknowledgedBatches := make(map[string]bool)
-	iter := j.DB.Models().Find(nil).Sort("_id").Iter()
+	iter := j.DB.Models().Find(nil).Iter()
 
 	recorder, err := newSliceMetricRecorder(w.config.SpoolDirectory)
 	if err != nil {
