@@ -648,7 +648,7 @@ func (c controller) ModelStatus(args jujuparams.Entities) (jujuparams.ModelStatu
 
 // modelStatus retrieves the model status for the specified entity.
 func (c controller) modelStatus(ctx context.Context, arg jujuparams.Entity) (*jujuparams.ModelStatus, error) {
-	mi, err := c.root.modelInfo(ctx, arg)
+	mi, err := c.root.modelInfo(ctx, arg, false)
 	if err != nil {
 		return &jujuparams.ModelStatus{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
@@ -711,7 +711,7 @@ func (m modelManager) ModelInfo(args jujuparams.Entities) (jujuparams.ModelInfoR
 	for i, arg := range args.Entities {
 		i, arg := i, arg
 		run.Do(func() error {
-			mi, err := m.root.modelInfo(ctx, arg)
+			mi, err := m.root.modelInfo(ctx, arg, len(args.Entities) != 1)
 			if err != nil {
 				results[i].Error = mapError(err)
 			} else {
@@ -727,7 +727,7 @@ func (m modelManager) ModelInfo(args jujuparams.Entities) (jujuparams.ModelInfoR
 }
 
 // modelInfo retrieves the model information for the specified entity.
-func (r *controllerRoot) modelInfo(ctx context.Context, arg jujuparams.Entity) (*jujuparams.ModelInfo, error) {
+func (r *controllerRoot) modelInfo(ctx context.Context, arg jujuparams.Entity, localOnly bool) (*jujuparams.ModelInfo, error) {
 	model, err := getModel(ctx, r.jem, arg.Tag, auth.CheckCanRead)
 	if err != nil {
 		return nil, errgo.Mask(err,
@@ -740,6 +740,9 @@ func (r *controllerRoot) modelInfo(ctx context.Context, arg jujuparams.Entity) (
 	info, err := r.modelDocToModelInfo(ctx, model)
 	if err != nil {
 		return nil, errgo.Mask(err)
+	}
+	if localOnly {
+		return info, nil
 	}
 	// Query the model itself for user information.
 	infoFromController, err := fetchModelInfo(ctx, r.jem, model)
@@ -774,6 +777,43 @@ func (r *controllerRoot) modelDocToModelInfo(ctx context.Context, model *mongodo
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot get cloud %q", model.Cloud)
 	}
+
+	userLevels := make(map[string]jujuparams.UserAccessPermission)
+	for _, user := range model.ACL.Read {
+		userLevels[user] = jujuparams.ModelReadAccess
+	}
+	for _, user := range model.ACL.Write {
+		userLevels[user] = jujuparams.ModelWriteAccess
+	}
+	for _, user := range model.ACL.Admin {
+		userLevels[user] = jujuparams.ModelAdminAccess
+	}
+	userLevels[string(model.Path.User)] = jujuparams.ModelAdminAccess
+
+	var users []jujuparams.ModelUserInfo
+	if auth.CheckIsAdmin(ctx, model) == nil {
+		usernames := make([]string, 0, len(userLevels))
+		for user := range userLevels {
+			usernames = append(usernames, user)
+		}
+		sort.Strings(usernames)
+		for _, user := range usernames {
+			ut := userTag(user)
+			users = append(users, jujuparams.ModelUserInfo{
+				UserName:    ut.Id(),
+				DisplayName: ut.Name(),
+				Access:      userLevels[user],
+			})
+		}
+	} else {
+		ut := userTag(auth.Username(ctx))
+		users = append(users, jujuparams.ModelUserInfo{
+			UserName:    ut.Id(),
+			DisplayName: ut.Name(),
+			Access:      userLevels[auth.Username(ctx)],
+		})
+	}
+
 	return &jujuparams.ModelInfo{
 		Name:               string(model.Path.Name),
 		UUID:               model.UUID,
@@ -791,8 +831,7 @@ func (r *controllerRoot) modelDocToModelInfo(ctx context.Context, model *mongodo
 		Status: jujuparams.EntityStatus{
 			Status: status.Available,
 		},
-		// TODO we could add user information here, but
-		// it's only visible to admins, so leave it for the time being.
+		Users:    users,
 		Machines: jemMachinesToModelMachineInfo(machines),
 	}, nil
 }
@@ -937,10 +976,7 @@ func (m modelManager) createModel(ctx context.Context, args jujuparams.ModelCrea
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	info.Users = []jujuparams.ModelUserInfo{{
-		UserName: ownerTag.Id(),
-		Access:   jujuparams.ModelAdminAccess,
-	}}
+
 	return info, nil
 }
 
