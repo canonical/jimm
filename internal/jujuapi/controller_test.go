@@ -774,8 +774,9 @@ func (s *controllerSuite) TestModelInfo(c *gc.C) {
 				Status: status.Available,
 			},
 			Users: []jujuparams.ModelUserInfo{{
-				UserName: "test@external",
-				Access:   jujuparams.ModelReadAccess,
+				UserName:    "test@external",
+				DisplayName: "test",
+				Access:      jujuparams.ModelReadAccess,
 			}},
 			Machines: []jujuparams.ModelMachineInfo{{
 				Id: "machine-0",
@@ -802,8 +803,9 @@ func (s *controllerSuite) TestModelInfo(c *gc.C) {
 				Status: status.Available,
 			},
 			Users: []jujuparams.ModelUserInfo{{
-				UserName: "test@external",
-				Access:   jujuparams.ModelWriteAccess,
+				UserName:    "test@external",
+				DisplayName: "test",
+				Access:      jujuparams.ModelWriteAccess,
 			}},
 		},
 	}, {
@@ -822,12 +824,13 @@ func (s *controllerSuite) TestModelInfo(c *gc.C) {
 				Status: status.Available,
 			},
 			Users: []jujuparams.ModelUserInfo{{
+				UserName:    "test@external",
+				DisplayName: "test",
+				Access:      jujuparams.ModelAdminAccess,
+			}, {
 				UserName:    "test2@external",
 				DisplayName: "test2",
 				Access:      jujuparams.ModelAdminAccess,
-			}, {
-				UserName: "test@external",
-				Access:   jujuparams.ModelAdminAccess,
 			}},
 		},
 	}, {
@@ -975,6 +978,11 @@ func (s *controllerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 			Status: jujuparams.EntityStatus{
 				Status: status.Available,
 			},
+			Users: []jujuparams.ModelUserInfo{{
+				UserName:    "test@external",
+				DisplayName: "test",
+				Access:      jujuparams.ModelAdminAccess,
+			}},
 		},
 	}})
 
