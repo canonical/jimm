@@ -11,6 +11,7 @@ import (
 	"github.com/CanonicalLtd/jem/internal/servermon"
 	"github.com/CanonicalLtd/jem/internal/zapctx"
 	"github.com/CanonicalLtd/jem/internal/zaputil"
+	"github.com/CanonicalLtd/jem/params"
 )
 
 // Stats implements a Prometheus collector that provides information
@@ -34,6 +35,7 @@ const (
 	statMachinesRunning
 	statModelsRunning
 	statUnitsRunning
+	statActiveModelsRunning
 	numStats
 )
 
@@ -69,6 +71,10 @@ var statsDescs = []struct {
 	// of the current stats.
 	get func(*currentStats) metric
 }{{
+	name: "active_models_running",
+	help: "The current number of running models with at least one machine.",
+	get:  getStatsGauge(statActiveModelsRunning),
+}, {
 	name: "applications_running",
 	help: "The current number of running applications.",
 	get:  getStatsGauge(statApplicationsRunning),
@@ -138,16 +144,24 @@ func (s *Stats) Collect(c chan<- prometheus.Metric) {
 // collectStats returns a snapshot of the current statistics from JIMM.
 func (s *Stats) collectStats(jem *JEM) (*currentStats, error) {
 	var cs currentStats
-	iter := jem.DB.Controllers().Find(nil).Iter()
-	var ctl mongodoc.Controller
-	for iter.Next(&ctl) {
-		cs.values[statControllersRunning]++
-		cs.values[statApplicationsRunning] += ctl.Stats.ServiceCount
-		cs.values[statMachinesRunning] += ctl.Stats.MachineCount
-		cs.values[statModelsRunning] += ctl.Stats.ModelCount
-		cs.values[statUnitsRunning] += ctl.Stats.UnitCount
+	iter := jem.DB.Models().Find(nil).Iter()
+	var m mongodoc.Model
+	for iter.Next(&m) {
+		cs.values[statModelsRunning]++
+		machineCount := m.Counts[params.MachineCount].Current
+		if machineCount > 0 {
+			cs.values[statActiveModelsRunning]++
+			cs.values[statMachinesRunning] += machineCount
+		}
+		cs.values[statApplicationsRunning] += m.Counts[params.ApplicationCount].Current
+		cs.values[statUnitsRunning] += m.Counts[params.UnitCount].Current
 	}
 	if err := iter.Err(); err != nil {
+		return nil, errgo.Notef(err, "cannot gather stats")
+	}
+	var err error
+	cs.values[statControllersRunning], err = jem.DB.Controllers().Count()
+	if err != nil {
 		return nil, errgo.Notef(err, "cannot gather stats")
 	}
 	return &cs, nil

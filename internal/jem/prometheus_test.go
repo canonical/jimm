@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 
-	jc "github.com/juju/testing/checkers"
 	"github.com/prometheus/client_golang/prometheus"
 	gc "gopkg.in/check.v1"
 
@@ -23,21 +22,79 @@ func (s *jemSuite) TestStats(c *gc.C) {
 	ctx := auth.ContextWithUser(testContext, "bob")
 
 	ctl1Id := s.addController(c, params.EntityPath{"bob", "controller1"})
-	err := s.jem.DB.SetControllerStats(ctx, ctl1Id, &mongodoc.ControllerStats{
-		UnitCount:    35,
-		ModelCount:   23,
-		ServiceCount: 5,
-		MachineCount: 500,
-	})
-	c.Assert(err, jc.ErrorIsNil)
 	ctl2Id := s.addController(c, params.EntityPath{"bob", "controller2"})
-	err = s.jem.DB.SetControllerStats(ctx, ctl2Id, &mongodoc.ControllerStats{
-		UnitCount:    1,
-		ModelCount:   1,
-		ServiceCount: 1,
-		MachineCount: 1,
+	s.addController(c, params.EntityPath{"bob", "controller3"})
+	err := s.jem.DB.AddModel(ctx, &mongodoc.Model{
+		Path: params.EntityPath{
+			User: "bob",
+			Name: "model1",
+		},
+		UUID:       "201852f4-022d-4f98-9b63-a6ff52c0798e",
+		Controller: ctl1Id,
+		Counts: map[params.EntityCount]params.Count{
+			params.ApplicationCount: {
+				Current: 20,
+				Max:     20,
+			},
+			params.MachineCount: {
+				Current: 12,
+				Max:     12,
+			},
+			params.UnitCount: {
+				Current: 40,
+				Max:     40,
+			},
+		},
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.jem.DB.AddModel(ctx, &mongodoc.Model{
+		Path: params.EntityPath{
+			User: "bob",
+			Name: "model2",
+		},
+		UUID:       "4cb1030f-d59d-4c8c-bac7-eb8166c54eb0",
+		Controller: ctl1Id,
+		Counts: map[params.EntityCount]params.Count{
+			params.ApplicationCount: {
+				Current: 0,
+				Max:     0,
+			},
+			params.MachineCount: {
+				Current: 0,
+				Max:     0,
+			},
+			params.UnitCount: {
+				Current: 0,
+				Max:     0,
+			},
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.jem.DB.AddModel(ctx, &mongodoc.Model{
+		Path: params.EntityPath{
+			User: "bob",
+			Name: "model3",
+		},
+		UUID:       "05d96523-4f3c-48f8-aab7-43aafb12bbc7",
+		Controller: ctl2Id,
+		Counts: map[params.EntityCount]params.Count{
+			params.ApplicationCount: {
+				Current: 10,
+				Max:     10,
+			},
+			params.MachineCount: {
+				Current: 10,
+				Max:     10,
+			},
+			params.UnitCount: {
+				Current: 10,
+				Max:     10,
+			},
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
 
 	stats := s.pool.Stats(testContext)
 	err = prometheus.Register(stats)
@@ -73,11 +130,12 @@ func (s *jemSuite) TestStats(c *gc.C) {
 	}
 
 	expectCounts := map[string]int{
-		"applications_running": 6,
-		"controllers_running":  2,
-		"models_running":       24,
-		"units_running":        36,
-		"machines_running":     501,
+		"applications_running":  30,
+		"controllers_running":   3,
+		"models_running":        3,
+		"active_models_running": 2,
+		"units_running":         50,
+		"machines_running":      22,
 	}
 	for name, count := range expectCounts {
 		name = "jem_health_" + name
