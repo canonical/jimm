@@ -89,9 +89,9 @@ type Params struct {
 	// to collect and report usage metrics.
 	UsageSenderURL string
 
-	// UsageSenderSpoolPath holds the path to a directory where the usage
-	// send worker will store metrics.
-	UsageSenderSpoolPath string
+	// UsageSenderCollection holds the name of the mgo collection where
+	// the usage send worker will store metrics.
+	UsageSenderCollection string
 
 	// Domain holds the domain to which users must belong, not
 	// including the leading "@". If this is empty, users may be in
@@ -181,13 +181,19 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 		srv.monitor = monitor.New(ctx, p, owner)
 	}
 	if config.UsageSenderURL != "" {
-		worker, err := usagesender.NewSendModelUsageWorker(usagesender.SendModelUsageWorkerConfig{
-			OmnibusURL:     config.UsageSenderURL,
-			Pool:           p,
-			Period:         usageSenderPeriod,
-			Context:        ctx,
-			SpoolDirectory: config.UsageSenderSpoolPath,
-		})
+		usageSenderConfig := usagesender.SendModelUsageWorkerConfig{
+			OmnibusURL:  config.UsageSenderURL,
+			Pool:        p,
+			Period:      usageSenderPeriod,
+			Context:     ctx,
+			SessionPool: sessionPool,
+			DB:          config.DB.Name,
+		}
+		if config.UsageSenderCollection != "" {
+			usageSenderConfig.Collection = config.UsageSenderCollection
+		}
+
+		worker, err := usagesender.NewSendModelUsageWorker(usageSenderConfig)
 		if err != nil {
 			return nil, errgo.Mask(err)
 		}

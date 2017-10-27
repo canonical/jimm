@@ -5,7 +5,6 @@ package usagesender_test
 import (
 	"fmt"
 	"net/http/httptest"
-	"os"
 	"sync"
 	"time"
 
@@ -32,24 +31,17 @@ var (
 	epoch       = mustParseTime("2016-01-01T12:00:00Z")
 )
 
-var _ = gc.Suite(&spoolDirMetricRecorderSuite{})
+var _ = gc.Suite(&mgoMetricRecorderSuite{})
 
-type spoolDirMetricRecorderSuite struct {
+type mgoMetricRecorderSuite struct {
 	usageSenderSuite
 }
 
-func (s *spoolDirMetricRecorderSuite) SetUpTest(c *gc.C) {
-	s.MetricsSpoolPath = c.MkDir()
+func (s *mgoMetricRecorderSuite) SetUpTest(c *gc.C) {
 	s.ServerParams = external_jem.ServerParams{
-		UsageSenderSpoolPath: s.MetricsSpoolPath,
+		UsageSenderCollection: "usagetest",
 	}
 	s.usageSenderSuite.SetUpTest(c)
-}
-
-var _ = gc.Suite(&sliceMetricRecorderSuite{})
-
-type sliceMetricRecorderSuite struct {
-	usageSenderSuite
 }
 
 type usageSenderSuite struct {
@@ -60,7 +52,7 @@ type usageSenderSuite struct {
 }
 
 func (s *usageSenderSuite) SetUpTest(c *gc.C) {
-	s.handler = &testHandler{receivedMetrics: make(chan string)}
+	s.handler = &testHandler{receivedMetrics: make(chan string, 1)}
 
 	router := httprouter.New()
 	handlers := jemerror.Mapper.Handlers(func(_ httprequest.Params) (*testHandler, error) {
@@ -78,6 +70,9 @@ func (s *usageSenderSuite) SetUpTest(c *gc.C) {
 	s.ServerParams.UsageSenderURL = s.server.URL
 
 	s.Suite.SetUpTest(c)
+
+	err := s.Session.DB("jem").DropDatabase()
+	c.Assert(err, jc.ErrorIsNil)
 }
 
 func (s *usageSenderSuite) TearDownTest(c *gc.C) {
@@ -100,7 +95,7 @@ func (s *usageSenderSuite) TestUsageSenderWorker(c *gc.C) {
 	s.setUnitNumberAndCheckSentMetrics(c, uuid, 42, false)
 }
 
-func (s *spoolDirMetricRecorderSuite) TestSpool(c *gc.C) {
+func (s *mgoMetricRecorderSuite) TestSpool(c *gc.C) {
 	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, false)
 	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
 	_, model := s.CreateModel(c, params.EntityPath{"bob", "foo"}, ctlId, cred)
@@ -188,7 +183,8 @@ func (s *usageSenderSuite) setUnitNumberAndCheckSentMetrics(c *gc.C, modelUUID s
 		case <-time.After(jujujujutesting.LongWait):
 			c.Fatal("timed out waiting for metrics batch to be acknowledged")
 		}
-		err = os.RemoveAll(s.MetricsSpoolPath)
+
+		_, err = s.Session.DB("jem").C("usagetest").RemoveAll(nil)
 		c.Assert(err, jc.ErrorIsNil)
 	}
 }
@@ -213,13 +209,10 @@ type testHandler struct {
 }
 
 func (c *testHandler) Metrics(arg *usagePost) (*romulus.UserStatusResponse, error) {
-	for _, b := range arg.Body {
-		c.receivedMetrics <- b.Metrics[0].Value
-	}
-
 	uuids := make([]string, len(arg.Body))
 	for i, b := range arg.Body {
 		uuids[i] = b.UUID
+		c.receivedMetrics <- b.Metrics[0].Value
 	}
 
 	c.mutex.Lock()

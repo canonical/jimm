@@ -28,23 +28,23 @@ type Config struct {
 	DBName    string `yaml:"dbname"`
 	APIAddr   string `yaml:"api-addr"`
 	// TODO rename state-server-admin to controller-admin.
-	ControllerAdmin     params.User       `yaml:"state-server-admin"`
-	IdentityPublicKey   *bakery.PublicKey `yaml:"identity-public-key"`
-	IdentityLocation    string            `yaml:"identity-location"`
-	AgentUsername       string            `yaml:"agent-username"`
-	AgentKey            *bakery.KeyPair   `yaml:"agent-key"`
-	AccessLog           string            `yaml:"access-log"`
-	Autocert            bool              `yaml:"autocert"`
-	AutocertURL         string            `yaml:"autocert-url"`
-	TLSCert             string            `yaml:"tls-cert"`
-	TLSKey              string            `yaml:"tls-key"`
-	ControllerUUID      string            `yaml:"controller-uuid"`
-	MaxMgoSessions      int               `yaml:"max-mgo-sessions"`
-	GUILocation         string            `yaml:"gui-location"`
-	LoggingLevel        zapcore.Level     `yaml:"logging-level"`
-	UsageSenderURL      string            `yaml:"usage-sender-url,omitempty"`
-	UsageSenderSpoolDir string            `yaml:"usage-sender-spool-dir,omitempty"`
-	Domain              string            `yaml:"domain"`
+	ControllerAdmin       params.User       `yaml:"state-server-admin"`
+	IdentityPublicKey     *bakery.PublicKey `yaml:"identity-public-key"`
+	IdentityLocation      string            `yaml:"identity-location"`
+	AgentUsername         string            `yaml:"agent-username"`
+	AgentKey              *bakery.KeyPair   `yaml:"agent-key"`
+	AccessLog             string            `yaml:"access-log"`
+	Autocert              bool              `yaml:"autocert"`
+	AutocertURL           string            `yaml:"autocert-url"`
+	TLSCert               string            `yaml:"tls-cert"`
+	TLSKey                string            `yaml:"tls-key"`
+	ControllerUUID        string            `yaml:"controller-uuid"`
+	MaxMgoSessions        int               `yaml:"max-mgo-sessions"`
+	GUILocation           string            `yaml:"gui-location"`
+	LoggingLevel          zapcore.Level     `yaml:"logging-level"`
+	UsageSenderURL        string            `yaml:"usage-sender-url,omitempty"`
+	UsageSenderCollection string            `yaml:"usage-sender-collection,omitempty"`
+	Domain                string            `yaml:"domain"`
 }
 
 func (c *Config) validate() error {

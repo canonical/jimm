@@ -60,7 +60,6 @@ type Suite struct {
 
 	ServerParams              external_jem.ServerParams
 	MetricsRegistrationClient *stubMetricsRegistrationClient
-	MetricsSpoolPath          string
 	Clock                     *testing.Clock
 }
 
@@ -141,7 +140,7 @@ func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server,
 		ControllerUUID:          "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		WebsocketRequestTimeout: 3 * time.Minute,
 		UsageSenderURL:          "https://0.1.2.3/omnibus/v2",
-		UsageSenderSpoolPath:    s.MetricsSpoolPath,
+		UsageSenderCollection:   params.UsageSenderCollection,
 	}
 	if params.UsageSenderURL != "" {
 		config.UsageSenderURL = params.UsageSenderURL

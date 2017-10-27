@@ -16,9 +16,11 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/juju/worker.v1"
 	"gopkg.in/tomb.v2"
 
 	"github.com/CanonicalLtd/jem/internal/jem"
+	"github.com/CanonicalLtd/jem/internal/mgosession"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/internal/zapctx"
 	"github.com/CanonicalLtd/jem/internal/zaputil"
@@ -36,6 +38,8 @@ var (
 		Help:      "The number of unacknowledged batches.",
 	})
 
+	defaultSpoolCollection = "usagesender"
+
 	monitorFailure = UnacknowledgedMetricBatchesCount.Set
 )
 
@@ -46,11 +50,13 @@ func init() {
 // SendModelUsageWorkerConfig contains configuration values for the worker
 // that reports model usage.
 type SendModelUsageWorkerConfig struct {
-	OmnibusURL     string
-	Pool           *jem.Pool
-	Period         time.Duration
-	Context        context.Context
-	SpoolDirectory string
+	OmnibusURL  string
+	Pool        *jem.Pool
+	Period      time.Duration
+	Context     context.Context
+	DB          string
+	Collection  string
+	SessionPool *mgosession.Pool
 }
 
 func (c *SendModelUsageWorkerConfig) validate() error {
@@ -66,11 +72,17 @@ func (c *SendModelUsageWorkerConfig) validate() error {
 	if c.Context == nil {
 		return errgo.New("context not specified")
 	}
+	if c.DB == "" {
+		return errgo.Newf("database not specified")
+	}
+	if c.SessionPool == nil {
+		return errgo.Newf("session pool not specified")
+	}
 	return nil
 }
 
 // NewSendModelUsageWorker starts and returns a new worker that reports model usage.
-func NewSendModelUsageWorker(config SendModelUsageWorkerConfig) (*sendModelUsageWorker, error) {
+func NewSendModelUsageWorker(config SendModelUsageWorkerConfig) (worker.Worker, error) {
 	if err := config.validate(); err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -110,24 +122,30 @@ func (w *sendModelUsageWorker) run() error {
 	}
 }
 
-func (w *sendModelUsageWorker) execute() error {
+func (w *sendModelUsageWorker) execute() (err error) {
 	j := w.config.Pool.JEM(w.config.Context)
 	defer j.Close()
+
 	acknowledgedBatches := make(map[string]bool)
 	iter := j.DB.Models().Find(nil).Sort("_id").Iter()
+	defer func() {
+		err := iter.Close()
+		if err != nil {
+			zapctx.Error(w.config.Context, "failed to close the iterator", zaputil.Error(err))
+		}
+	}()
 
-	recorder, err := newSliceMetricRecorder(w.config.SpoolDirectory)
+	if w.config.Collection == "" {
+		w.config.Collection = defaultSpoolCollection
+	}
+	session := w.config.SessionPool.Session(w.config.Context)
+	defer func() {
+		session.Close()
+	}()
+	recorder, err := newMetricRecorder(session.DB(w.config.DB).C(w.config.Collection))
 	if err != nil {
 		zapctx.Error(w.config.Context, "failed to create a metric recorder", zaputil.Error(err))
-		return errgo.Mask(err)
-	}
-	if w.config.SpoolDirectory != "" {
-		recorder, err = newSpoolDirMetricRecorder(w.config.SpoolDirectory)
-		if err != nil {
-			zapctx.Error(w.config.Context, "failed to create a metric recorder", zaputil.Error(err))
-			return errgo.Notef(err, "failed to create a metric recorder")
-		}
-
+		return errgo.Notef(err, "failed to create a metric recorder")
 	}
 
 	var model mongodoc.Model
@@ -138,7 +156,7 @@ func (w *sendModelUsageWorker) execute() error {
 			continue
 		}
 		t := SenderClock.Now().UTC()
-		err = recorder.AddMetric(w.config.Context, model.UUID, fmt.Sprintf("%d", unitCount.Current), model.UsageSenderCredentials, t)
+		err = recorder.AddMetric(model.UUID, fmt.Sprintf("%d", unitCount.Current), model.UsageSenderCredentials, t)
 		if err != nil {
 			zapctx.Error(w.config.Context, "failed to record a metric", zaputil.Error(err))
 			continue
@@ -149,7 +167,7 @@ func (w *sendModelUsageWorker) execute() error {
 		return errgo.Notef(err, "model query failed")
 	}
 
-	batches, err := recorder.BatchesToSend(w.config.Context)
+	batches, err := recorder.BatchesToSend()
 	if err != nil {
 		zapctx.Error(w.config.Context, "failed to read recorded metrics", zaputil.Error(err))
 		return errgo.Notef(err, "failed to read recorded metrics")
@@ -166,12 +184,18 @@ func (w *sendModelUsageWorker) execute() error {
 	for _, userResponse := range response.UserResponses {
 		for _, ackBatchUUID := range userResponse.AcknowledgedBatches {
 			acknowledgedBatches[ackBatchUUID] = true
-			err = recorder.Remove(w.config.Context, ackBatchUUID)
+			err = recorder.Remove(ackBatchUUID)
 			if err != nil {
 				zapctx.Warn(w.config.Context, "failed to remove recorded metric")
 			}
 		}
 	}
+
+	err = recorder.Finalize()
+	if err != nil {
+		return errgo.Mask(err)
+	}
+
 	// check if all batches were acknowledged
 	numberOfUnacknowledgedBatches := 0
 	for _, acknowledged := range acknowledgedBatches {
@@ -179,6 +203,7 @@ func (w *sendModelUsageWorker) execute() error {
 			numberOfUnacknowledgedBatches += 1
 		}
 	}
+
 	if numberOfUnacknowledgedBatches > 0 {
 		zapctx.Debug(w.config.Context, "model usage receipt was not acknowledged", zap.Int("unacknowledged-batches", numberOfUnacknowledgedBatches))
 		monitorFailure(float64(numberOfUnacknowledgedBatches))
