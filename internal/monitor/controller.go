@@ -15,6 +15,7 @@ import (
 
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
+	"github.com/CanonicalLtd/jem/internal/servermon"
 	"github.com/CanonicalLtd/jem/internal/zapctx"
 	"github.com/CanonicalLtd/jem/internal/zaputil"
 	"github.com/CanonicalLtd/jem/params"
@@ -195,6 +196,7 @@ func (m *controllerMonitor) watcher(ctx context.Context) error {
 			// The controller has been removed or we've been explicitly stopped.
 			return tomb.ErrDying
 		case jem.ErrAPIConnection:
+			incControllerErrorsMetric(m.ctlPath)
 			if err := m.jem.SetControllerUnavailableAt(ctx, m.ctlPath, dialStartTime); err != nil {
 				return errgo.Notef(err, "cannot set controller availability")
 			}
@@ -271,6 +273,7 @@ func (m *controllerMonitor) dialAPI(ctx context.Context) (jujuAPI, error) {
 func (m *controllerMonitor) watch(ctx context.Context, conn jujuAPI) error {
 	apiw, err := conn.WatchAllModels()
 	if err != nil {
+		incControllerErrorsMetric(m.ctlPath)
 		return errgo.Notef(err, "cannot watch all models")
 	}
 	defer apiw.Stop()
@@ -281,6 +284,11 @@ func (m *controllerMonitor) watch(ctx context.Context, conn jujuAPI) error {
 		err    error
 	}
 	replyc := make(chan reply, 1)
+	deltaMetric := servermon.MonitorDeltasReceivedCount.WithLabelValues(m.ctlPath.String())
+	deltaBatchMetric := servermon.MonitorDeltaBatchesReceivedCount.WithLabelValues(m.ctlPath.String())
+	if err != nil {
+		panic(err)
+	}
 	for {
 		go func() {
 			// Ideally rpc.Client would have a Go method
@@ -297,11 +305,14 @@ func (m *controllerMonitor) watch(ctx context.Context, conn jujuAPI) error {
 			return tomb.ErrDying
 		}
 		if r.err != nil {
+			incControllerErrorsMetric(m.ctlPath)
 			return errgo.Notef(r.err, "watcher error waiting for next event")
 		}
 		w.changed = false
 		w.runner = parallel.NewRun(maxConcurrentUpdates)
+		deltaBatchMetric.Inc()
 		for _, d := range r.deltas {
+			deltaMetric.Inc()
 			if err := w.addDelta(ctx, d); err != nil {
 				return errgo.Mask(err)
 			}
@@ -514,4 +525,8 @@ func (w *watcherState) adjustCount(n *int, delta multiwatcher.Delta) int {
 func isMonitoringStoppedError(err error) bool {
 	cause := errgo.Cause(err)
 	return cause == errControllerRemoved || cause == jem.ErrLeaseUnavailable
+}
+
+func incControllerErrorsMetric(ctlPath params.EntityPath) {
+	servermon.MonitorErrorsCount.WithLabelValues(ctlPath.String()).Inc()
 }

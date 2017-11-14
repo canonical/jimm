@@ -76,12 +76,6 @@ var (
 		Name:      "login_success_count",
 		Help:      "The number of successful logins completed.",
 	})
-	StatsCollectFailCount = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: "jem",
-		Subsystem: "health",
-		Name:      "stats_collect_fail_count",
-		Help:      "The number of times we failed to collect stats from mongo.",
-	})
 	ModelLifetime = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: "jem",
 		Subsystem: "health",
@@ -120,12 +114,42 @@ var (
 		Name:      "models_destroyed_count",
 		Help:      "The number of models destroyed.",
 	})
+	MonitorDeltasReceivedCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "jem",
+		Subsystem: "monitor",
+		Name:      "deltas_received_count",
+		Help:      "The number of watcher deltas received.",
+	}, []string{"controller"})
+	MonitorDeltaBatchesReceivedCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "jem",
+		Subsystem: "monitor",
+		Name:      "delta_batches_received_count",
+		Help:      "The number of watcher delta batches received.",
+	}, []string{"controller"})
+	MonitorErrorsCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "jem",
+		Subsystem: "monitor",
+		Name:      "errors_count",
+		Help:      "The number of monitoring errors found.",
+	}, []string{"controller"})
+	MonitorLeaseGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "jem",
+		Subsystem: "monitor",
+		Name:      "lease_gauge",
+		Help:      "The number of current monitor leases held",
+	}, []string{"controller"})
 	requestDuration = prometheus.NewSummaryVec(prometheus.SummaryOpts{
 		Namespace: "jem",
 		Subsystem: "handler",
 		Name:      "request_duration",
 		Help:      "The duration of a web request in seconds.",
 	}, []string{"path_pattern"})
+	StatsCollectFailCount = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: "jem",
+		Subsystem: "health",
+		Name:      "stats_collect_fail_count",
+		Help:      "The number of times we failed to collect stats from mongo.",
+	})
 	WebsocketRequestDuration = prometheus.NewSummaryVec(prometheus.SummaryOpts{
 		Namespace: "jem",
 		Subsystem: "websocket",
@@ -149,7 +173,12 @@ func init() {
 	prometheus.MustRegister(ModelLifetime)
 	prometheus.MustRegister(ModelsCreatedCount)
 	prometheus.MustRegister(ModelsCreatedFailCount)
+	prometheus.MustRegister(MonitorDeltasReceivedCount)
+	prometheus.MustRegister(MonitorDeltaBatchesReceivedCount)
+	prometheus.MustRegister(MonitorErrorsCount)
+	prometheus.MustRegister(MonitorLeaseGauge)
 	prometheus.MustRegister(requestDuration)
+	prometheus.MustRegister(StatsCollectFailCount)
 	prometheus.MustRegister(WebsocketRequestDuration)
 	prometheus.MustRegister(monitoring.NewMgoStatsCollector("jem"))
 }
