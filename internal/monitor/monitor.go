@@ -18,6 +18,7 @@ import (
 	"gopkg.in/tomb.v2"
 
 	"github.com/CanonicalLtd/jem/internal/jem"
+	"github.com/CanonicalLtd/jem/internal/servermon"
 	"github.com/CanonicalLtd/jem/internal/zapctx"
 	"github.com/CanonicalLtd/jem/internal/zaputil"
 	"github.com/CanonicalLtd/jem/params"
@@ -161,6 +162,7 @@ func (m *allMonitor) run(ctx context.Context) (err error) {
 			select {
 			case ctlId := <-m.controllerRemoved:
 				delete(m.monitoring, ctlId)
+				servermon.MonitorLeaseGauge.WithLabelValues(ctlId.String()).Dec()
 			case <-Clock.After(leaseAcquireInterval):
 				break waitLoop
 			case <-m.tomb.Dying():
@@ -202,6 +204,7 @@ func (m *allMonitor) startMonitors(ctx context.Context) error {
 		zapctx.Info(ctx, "acquired new lease", zap.Stringer("path", ctl.Path))
 		// We've acquired the lease.
 		m.monitoring[ctl.Path] = true
+		servermon.MonitorLeaseGauge.WithLabelValues(ctl.Path.String()).Inc()
 		ctlMonitor := newControllerMonitor(ctx, controllerMonitorParams{
 			ctlPath:     ctl.Path,
 			jem:         m.jem,
