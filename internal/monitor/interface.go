@@ -61,6 +61,10 @@ type jemInterface interface {
 	// AllControllers returns all the controllers in the system.
 	AllControllers(ctx context.Context) ([]*mongodoc.Controller, error)
 
+	// ModelUUIDsForController returns the model UUIDs of all the models in the given
+	// controller.
+	ModelUUIDsForController(ctx context.Context, ctlPath params.EntityPath) ([]string, error)
+
 	// OpenAPI opens an API connection to the model with the given path
 	// and returns it along with the information used to connect.
 	// If the model does not exist, the error will have a cause
@@ -102,6 +106,10 @@ type jujuAPI interface {
 
 	// Close closes the API connection.
 	Close() error
+
+	// ModelExists reports whether the model with the given UUID
+	// exists on the controller.
+	ModelExists(uuid string) (bool, error)
 
 	// ServerVersion holds the version of the API server that we are connected to.
 	ServerVersion() (version.Number, bool)

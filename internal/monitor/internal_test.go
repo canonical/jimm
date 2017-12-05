@@ -322,6 +322,52 @@ func (s *internalSuite) TestWatcher(c *gc.C) {
 	})
 }
 
+func (s *internalSuite) TestModelRemovedWithFailedWatcher(c *gc.C) {
+	// We want to test this scenario:
+	// 	- A model is deleted, which calls DestroyModel on the
+	//	juju controller but doesn't remove it from jimm.
+	//	- Before the watcher update arrives which would tell jimm
+	//	to remove the model (perhaps because the
+	// 	watcher isn't currently working), the watcher is restarted.
+	//	- The model should then be removed from jimm,
+	//	even though it doesn't exist in the controller.
+	//
+	// To simulate this, we add a model to the jimm database but don't
+	// add it to the underlying Juju state. It should be removed when we
+	// find that the model doesn't exist.
+
+	// Add the controller.
+	ctlPath := params.EntityPath{"bob", "foo"}
+	s.addJEMController(c, ctlPath)
+
+	// Add the JEM model entry.
+	modelPath := params.EntityPath{"bob", "mode"}
+	err := s.jem.DB.AddModel(testContext, &mongodoc.Model{
+		Path:       modelPath,
+		Controller: ctlPath,
+		UUID:       "acf6cf9d-c758-45aa-83ad-923731853fdd",
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Start the watcher.
+	jshim := newJEMShimWithUpdateNotify(jemShim{s.jem})
+	m := &controllerMonitor{
+		ctlPath: ctlPath,
+		jem:     jshim,
+		ownerId: "jem1",
+	}
+	m.tomb.Go(func() error {
+		return m.watcher(testContext)
+	})
+	defer cleanStop(c, m)
+
+	jshim.await(c, func() interface{} {
+		return s.modelStats(c, modelPath)
+	}, modelStats{
+		life: "dead",
+	})
+}
+
 func (s *internalSuite) TestWatcherUpdatesMachineInfo(c *gc.C) {
 	// Add a couple of models and applications with units to watch.
 	modelState := newModel(c, s.State, "model")

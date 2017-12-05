@@ -279,6 +279,20 @@ func (m *controllerMonitor) watch(ctx context.Context, conn jujuAPI) error {
 	defer apiw.Stop()
 
 	w := newWatcherState(ctx, m.jem, m.ctlPath)
+
+	// Ensure an entry exists for every model UUID already in the database,
+	// with life set to dead. This means that when we get to the end of the first
+	// delta (which contains all entries for everything in the model), any
+	// models that haven't been updated will have their life updated to "dead"
+	// which will result in their entries being deleted from the jimm database.
+	uuids, err := m.jem.ModelUUIDsForController(ctx, m.ctlPath)
+	if err != nil {
+		return errgo.Notef(err, "cannot get existing model UUIDs")
+	}
+	for _, uuid := range uuids {
+		w.modelInfo(uuid)
+	}
+
 	type reply struct {
 		deltas []multiwatcher.Delta
 		err    error
@@ -333,6 +347,27 @@ func (m *controllerMonitor) watch(ctx context.Context, conn jujuAPI) error {
 			// combine them into a single database update.
 			if info.changed&lifeChange != 0 {
 				w.runner.Do(func() error {
+					if info.life == "" {
+						// We haven't received any updates for this model
+						// since the watcher started, but we don't necessarily
+						// trust that the watcher has actually provided all
+						// updates in the first delta, so check that the model
+						// really doesn't exist before setting its life to dead
+						// (which will remove it from the database).
+						ok, err := conn.ModelExists(uuid)
+						if err != nil {
+							return errgo.Mask(err)
+						}
+						if ok {
+							zapctx.Warn(
+								ctx,
+								"model exists but did not appear in first watcher delta",
+								zap.String("uuid", uuid),
+							)
+							return nil
+						}
+						info.life = "dead"
+					}
 					if err := w.jem.SetModelLife(ctx, w.ctlPath, uuid, string(info.life)); err != nil {
 						return errgo.Notef(err, "cannot update model life")
 					}

@@ -4,6 +4,7 @@ package jem_test
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/juju/juju/state/multiwatcher"
@@ -354,6 +355,47 @@ func (s *databaseSuite) TestAddModel(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, "already exists")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
 	s.checkDBOK(c)
+}
+
+func (s *databaseSuite) TestModelUUIDsForController(c *gc.C) {
+	models := []struct {
+		path    params.EntityPath
+		ctlPath params.EntityPath
+		uuid    string
+	}{{
+		path:    params.EntityPath{"bob", "m1"},
+		ctlPath: params.EntityPath{"admin", "ctl1"},
+		uuid:    "11111111-1111-1111-1111-111111111111",
+	}, {
+		path:    params.EntityPath{"bob", "m2"},
+		ctlPath: params.EntityPath{"admin", "ctl1"},
+		uuid:    "22222222-2222-2222-2222-222222222222",
+	}, {
+		path:    params.EntityPath{"bob", "m3"},
+		ctlPath: params.EntityPath{"admin", "ctl2"},
+		uuid:    "33333333-3333-3333-3333-333333333333",
+	}}
+	for _, m := range models {
+		err := s.database.AddModel(testContext, &mongodoc.Model{
+			Path:       m.path,
+			Controller: m.ctlPath,
+			UUID:       m.uuid,
+		})
+		c.Assert(err, gc.Equals, nil)
+	}
+	uuids, err := s.database.ModelUUIDsForController(testContext, params.EntityPath{"admin", "ctl1"})
+	c.Assert(err, gc.Equals, nil)
+	sort.Strings(uuids)
+	c.Assert(uuids, jc.DeepEquals, []string{
+		"11111111-1111-1111-1111-111111111111",
+		"22222222-2222-2222-2222-222222222222",
+	})
+	uuids, err = s.database.ModelUUIDsForController(testContext, params.EntityPath{"admin", "ctl2"})
+	c.Assert(err, gc.Equals, nil)
+	sort.Strings(uuids)
+	c.Assert(uuids, jc.DeepEquals, []string{
+		"33333333-3333-3333-3333-333333333333",
+	})
 }
 
 func (s *databaseSuite) TestUpdateLegacyModel(c *gc.C) {
