@@ -38,6 +38,7 @@ func (s *LoggingSuite) setUp(c *gc.C) {
 	logger := zap.New(zapcore.NewCore(
 		zapcore.NewConsoleEncoder(zapcore.EncoderConfig{
 			LevelKey:    "level",
+			MessageKey:  "msg",
 			EncodeLevel: zapcore.CapitalLevelEncoder,
 			EncodeTime:  zapcore.ISO8601TimeEncoder,
 		}),
