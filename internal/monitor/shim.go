@@ -6,10 +6,12 @@ import (
 	"time"
 
 	apicontroller "github.com/juju/juju/api/controller"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/version"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/juju/names.v2"
 
 	"github.com/CanonicalLtd/jem/internal/apiconn"
 	"github.com/CanonicalLtd/jem/internal/jem"
@@ -42,6 +44,14 @@ func (j jemShim) AllControllers(ctx context.Context) ([]*mongodoc.Controller, er
 		return nil, errgo.Mask(err)
 	}
 	return ctls, nil
+}
+
+func (j jemShim) ModelUUIDsForController(ctx context.Context, ctlPath params.EntityPath) ([]string, error) {
+	uuids, err := j.DB.ModelUUIDsForController(ctx, ctlPath)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return uuids, nil
 }
 
 func (j jemShim) SetControllerStats(ctx context.Context, ctlPath params.EntityPath, stats *mongodoc.ControllerStats) error {
@@ -87,6 +97,26 @@ func (j jemShim) Controller(ctx context.Context, ctlPath params.EntityPath) (*mo
 
 type apiShim struct {
 	*apiconn.Conn
+}
+
+func (a apiShim) ModelExists(uuid string) (bool, error) {
+	if !names.IsValidModel(uuid) {
+		return false, nil
+	}
+	results, err := apicontroller.NewClient(a.Conn).ModelStatus(names.NewModelTag(uuid))
+	if err != nil {
+		if jujuparams.IsCodeNotFound(err) {
+			return false, nil
+		}
+		return false, errgo.Mask(err)
+	}
+
+	if len(results) != 1 {
+		return false, errgo.Notef(err, "unexpected result count, %d, from ModelStatus call", len(results))
+	}
+	// A later version of the API adds an Error parameter, but we
+	// can't use that yet, so rely on UUID as a proxy for "is found".
+	return results[0].UUID != "", nil
 }
 
 func (a apiShim) WatchAllModels() (allWatcher, error) {

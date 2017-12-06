@@ -148,6 +148,21 @@ func (db *Database) DeleteController(ctx context.Context, path params.EntityPath
 	return nil
 }
 
+// ModelUUIDsForController returns the model UUIDs of all the models in the given
+// controller.
+func (db *Database) ModelUUIDsForController(ctx context.Context, ctlPath params.EntityPath) (uuids []string, err error) {
+	defer db.checkError(ctx, &err)
+	iter := db.Models().Find(bson.D{{"controller", ctlPath}}).Select(bson.D{{"uuid", 1}}).Iter()
+	var m mongodoc.Model
+	for iter.Next(&m) {
+		uuids = append(uuids, m.UUID)
+	}
+	if err := iter.Err(); err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return uuids, nil
+}
+
 // AddModel adds a new model to the database.
 // It returns an error with a params.ErrAlreadyExists
 // cause if there is already an model with the given name.

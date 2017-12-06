@@ -353,6 +353,15 @@ func (s *jemShimInMemory) AllControllers(ctx context.Context) ([]*mongodoc.Contr
 	return r, nil
 }
 
+func (s *jemShimInMemory) ModelUUIDsForController(ctx context.Context, ctlPath params.EntityPath) (uuids []string, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, m := range s.models {
+		uuids = append(uuids, m.UUID)
+	}
+	return uuids, nil
+}
+
 func (s *jemShimInMemory) ControllerUpdateCredentials(_ context.Context, ctlPath params.EntityPath) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -467,6 +476,10 @@ func (s *jujuAPIShim) WatchAllModels() (allWatcher, error) {
 		stopped:     make(chan struct{}),
 		initial:     s.initial,
 	}, nil
+}
+
+func (s *jujuAPIShim) ModelExists(uuid string) (bool, error) {
+	panic("unexpected call to ModelExists")
 }
 
 func (s *jujuAPIShim) ServerVersion() (version.Number, bool) {
