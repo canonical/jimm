@@ -43,6 +43,12 @@ func (c *client) GetController(p *params.GetController) (*params.ControllerRespo
 	return r, err
 }
 
+func (c *client) GetControllerDeprecated(p *params.GetControllerDeprecated) (*params.DeprecatedBody, error) {
+	var r *params.DeprecatedBody
+	err := c.Client.Call(p, &r)
+	return r, err
+}
+
 // GetControllerLocation returns a map of location attributes for a given controller.
 func (c *client) GetControllerLocation(p *params.GetControllerLocation) (params.ControllerLocation, error) {
 	var r params.ControllerLocation
@@ -127,6 +133,10 @@ func (c *client) NewModel(p *params.NewModel) (*params.ModelResponse, error) {
 	var r *params.ModelResponse
 	err := c.Client.Call(p, &r)
 	return r, err
+}
+
+func (c *client) SetControllerDeprecated(p *params.SetControllerDeprecated) error {
+	return c.Client.Call(p, nil)
 }
 
 // SetControllerPerm sets the permissions on a controller entity.

@@ -387,6 +387,33 @@ func (s *jemSuite) TestCreateModelWithExistingModelInControllerOnly(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `cannot create model "bob/model" because it already exists in the backend controller; please contact an administrator to resolve this issue`)
 }
 
+func (s *jemSuite) TestCreateModelWithDeprecatedController(c *gc.C) {
+	ctlId := s.addController(c, params.EntityPath{"bob", "controller"})
+	err := s.jem.DB.SetACL(testContext, s.jem.DB.Controllers(), ctlId, params.ACL{
+		Read: []string{"everyone"},
+	})
+	c.Assert(err, gc.IsNil)
+	ctx := auth.ContextWithUser(testContext, "bob")
+	// Sanity check that we can create the model while the controller is not deprecated.
+	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
+		Path:   params.EntityPath{"bob", "model1"},
+		Cloud:  "dummy",
+		Region: "dummy-region",
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Deprecate it and make sure it's not chosen again.
+	err = s.jem.DB.SetControllerDeprecated(testContext, ctlId, true)
+	c.Assert(err, gc.IsNil)
+
+	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
+		Path:   params.EntityPath{"bob", "model2"},
+		Cloud:  "dummy",
+		Region: "dummy-region",
+	})
+	c.Assert(err, gc.ErrorMatches, `cannot select controller: no matching controllers found`)
+}
+
 func (s *jemSuite) TestGrantModelWrite(c *gc.C) {
 	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
 	conn, err := s.jem.OpenAPI(testContext, model.Controller)

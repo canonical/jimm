@@ -25,7 +25,7 @@ func (s *grantSuite) TestGrant(c *gc.C) {
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
-	s.addEnv(c, "bob/foo", "bob/foo", "cred")
+	s.addModel(c, "bob/foo", "bob/foo", "cred")
 
 	stdout, stderr, code = run(c, c.MkDir(), "revoke", "--controller", "bob/foo", "everyone")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))

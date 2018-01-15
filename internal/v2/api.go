@@ -809,6 +809,28 @@ func (h *Handler) LogLevel(*params.LogLevel) (params.Level, error) {
 	}, nil
 }
 
+func (h *Handler) SetControllerDeprecated(req *params.SetControllerDeprecated) error {
+	ctx := h.context
+	if err := auth.CheckIsUser(ctx, req.EntityPath.User); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	if err := h.jem.DB.SetControllerDeprecated(ctx, req.EntityPath, req.Body.Deprecated); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return nil
+}
+
+func (h *Handler) GetControllerDeprecated(req *params.GetControllerDeprecated) (*params.DeprecatedBody, error) {
+	ctx := h.context
+	ctl, err := h.jem.Controller(ctx, req.EntityPath)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+	}
+	return &params.DeprecatedBody{
+		Deprecated: ctl.Deprecated,
+	}, nil
+}
+
 // SetLogLevel configures the logging level of the running service.
 func (h *Handler) SetLogLevel(req *params.SetLogLevel) error {
 	ctx := h.context
