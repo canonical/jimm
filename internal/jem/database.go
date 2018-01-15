@@ -238,6 +238,26 @@ func (db *Database) DeleteModel(ctx context.Context, path params.EntityPath) (er
 	return nil
 }
 
+// SetControllerDeprecated sets whether the given controller is deprecated.
+func (db *Database) SetControllerDeprecated(ctx context.Context, ctlPath params.EntityPath, deprecated bool) (err error) {
+	defer db.checkError(ctx, &err)
+	if deprecated {
+		err = db.Controllers().UpdateId(ctlPath.String(), bson.D{{
+			"$set", bson.D{{"deprecated", true}},
+		}})
+	} else {
+		// A controller that's not deprecated is stored with no deprecated
+		// field for backward compatibility and consistency.
+		err = db.Controllers().UpdateId(ctlPath.String(), bson.D{{
+			"$unset", bson.D{{"deprecated", nil}},
+		}})
+	}
+	if errgo.Cause(err) == mgo.ErrNotFound {
+		return errgo.WithCausef(err, params.ErrNotFound, "cannot update %s", ctlPath)
+	}
+	return errgo.Mask(err)
+}
+
 // Controller returns information on the controller with the given
 // path. It returns an error with a params.ErrNotFound cause if the
 // controller was not found.

@@ -121,6 +121,12 @@ var unauthorizedTests = []struct {
 	asUser: "other",
 	method: "GET",
 	path:   "/v2/model/bob/open/perm",
+}, {
+	about:  "set deprecated status as non-owner",
+	asUser: "other",
+	method: "PUT",
+	path:   "/v2/controller/bob/open",
+	body:   params.DeprecatedBody{},
 }}
 
 func (s *APISuite) TestUnauthorized(c *gc.C) {
@@ -1948,6 +1954,34 @@ func (s *APISuite) TestLogLevel(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `unrecognized level: "not-a-level"`)
 	client.SetLogLevel(&params.SetLogLevel{
 		Level: params.Level{Level: "info"},
+	})
+}
+
+func (s *APISuite) TestGetSetControllerDeprecated(c *gc.C) {
+	ctlId := s.AssertAddController(c, params.EntityPath{"alice", "foo"}, false)
+
+	d, err := s.NewClient("alice").GetControllerDeprecated(&params.GetControllerDeprecated{
+		EntityPath: ctlId,
+	})
+	c.Assert(err, gc.IsNil)
+	c.Assert(d, jc.DeepEquals, &params.DeprecatedBody{
+		Deprecated: false,
+	})
+
+	err = s.NewClient("alice").SetControllerDeprecated(&params.SetControllerDeprecated{
+		EntityPath: ctlId,
+		Body: params.DeprecatedBody{
+			Deprecated: true,
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	d, err = s.NewClient("alice").GetControllerDeprecated(&params.GetControllerDeprecated{
+		EntityPath: ctlId,
+	})
+	c.Assert(err, gc.IsNil)
+	c.Assert(d, jc.DeepEquals, &params.DeprecatedBody{
+		Deprecated: true,
 	})
 }
 

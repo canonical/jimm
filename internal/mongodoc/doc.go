@@ -61,6 +61,10 @@ type Controller struct {
 	// controllers by location.
 	Public bool `bson:",omitempty"`
 
+	// Deprecated specifies whether a public controller is considered
+	// deprecated for the purposes of adding new models.
+	Deprecated bool `bson:",omitempty"`
+
 	// Cloud holds the details of the cloud provided by this controller.
 	Cloud Cloud
 

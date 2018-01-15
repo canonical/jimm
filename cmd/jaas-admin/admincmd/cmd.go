@@ -58,6 +58,7 @@ func New() cmd.Command {
 	supercmd.Register(newAddControllerCommand())
 	supercmd.Register(newControllersCommand())
 	supercmd.RegisterAlias("list-controllers", "controllers", nil)
+	supercmd.Register(newDeprecateControllerCommand())
 	supercmd.Register(newGrantCommand())
 	supercmd.Register(newModelsCommand())
 	supercmd.RegisterAlias("list-models", "models", nil)

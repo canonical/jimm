@@ -26,6 +26,23 @@ type GetControllerPerm struct {
 	EntityPath
 }
 
+type SetControllerDeprecated struct {
+	httprequest.Route `httprequest:"PUT /v2/controller/:User/:Name/deprecated"`
+	EntityPath
+	Body DeprecatedBody `httprequest:",body"`
+}
+
+type GetControllerDeprecated struct {
+	httprequest.Route `httprequest:"GET /v2/controller/:User/:Name/deprecated"`
+	EntityPath
+}
+
+// DeprecatedBody holds the body of a SetControllerDeprecated request
+// or a GetControllerDeprecated response.
+type DeprecatedBody struct {
+	Deprecated bool `json:"deprecated"`
+}
+
 // SetModelPerm holds the parameters for setting the ACL on an model.
 type SetModelPerm struct {
 	httprequest.Route `httprequest:"PUT /v2/model/:User/:Name/perm"`
@@ -144,6 +161,10 @@ type ControllerInfo struct {
 	//
 	// Only privileged users may create public controllers.
 	Public bool `json:"public"`
+
+	// Deprecated holds whether the controller is considered deprecated
+	// for adding new models.
+	Deprecated bool `json:"deprecated"`
 }
 
 // EntityPath holds the path parameters for specifying

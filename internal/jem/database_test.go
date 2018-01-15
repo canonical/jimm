@@ -843,6 +843,54 @@ func (s *databaseSuite) TestSetModelLifeNotFound(c *gc.C) {
 	s.checkDBOK(c)
 }
 
+func (s *databaseSuite) TestSetControllerDeprecated(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+
+	err := s.database.SetControllerDeprecated(testContext, ctlPath, true)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+	err = s.database.SetControllerDeprecated(testContext, ctlPath, false)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+
+	err = s.database.AddController(testContext, &mongodoc.Controller{
+		Path: ctlPath,
+		UUID: "fake-uuid",
+	})
+	c.Assert(err, gc.IsNil)
+
+	// When first added, the deprecated field is not present.
+	var doc map[string]interface{}
+	err = s.database.Controllers().FindId(ctlPath.String()).One(&doc)
+	c.Assert(err, gc.Equals, nil)
+	_, ok := doc["deprecated"]
+	c.Assert(ok, gc.Equals, false)
+
+	// Set the controller to deprecated and check that the field
+	// is set to true.
+	err = s.database.SetControllerDeprecated(testContext, ctlPath, true)
+	c.Assert(err, gc.Equals, nil)
+
+	doc = nil
+	err = s.database.Controllers().FindId(ctlPath.String()).One(&doc)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(doc["deprecated"], gc.Equals, true)
+
+	// Check that we've used the right field name by unmarshaling into
+	// the usual document.
+	ctl, err := s.database.Controller(testContext, ctlPath)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(ctl.Deprecated, gc.Equals, true)
+
+	// Set it back to non-deprecated and check that the field is removed.
+	err = s.database.SetControllerDeprecated(testContext, ctlPath, false)
+	c.Assert(err, gc.Equals, nil)
+
+	doc = nil
+	err = s.database.Controllers().FindId(ctlPath.String()).One(&doc)
+	c.Assert(err, gc.Equals, nil)
+	_, ok = doc["deprecated"]
+	c.Assert(ok, gc.Equals, false)
+}
+
 func (s *databaseSuite) TestSetModelLifeSuccess(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	err := s.database.AddController(testContext, &mongodoc.Controller{

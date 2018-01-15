@@ -114,7 +114,7 @@ var dummyEnvConfig = map[string]interface{}{
 	"controller":      true,
 }
 
-func (s *commonSuite) addEnv(c *gc.C, pathStr, srvPathStr, credName string) {
+func (s *commonSuite) addModel(c *gc.C, pathStr, srvPathStr, credName string) {
 	var path, srvPath params.EntityPath
 	err := path.UnmarshalText([]byte(pathStr))
 	c.Assert(err, gc.IsNil)

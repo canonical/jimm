@@ -819,6 +819,10 @@ func (j *JEM) selectController(ctx context.Context, cloud params.Cloud, region s
 	var controllers []mongodoc.Controller
 	var otherControllers []mongodoc.Controller
 	err := j.DoControllers(ctx, cloud, region, func(c *mongodoc.Controller) error {
+		if c.Deprecated {
+			// Never add a model to deprecated controller.
+			return nil
+		}
 		if region != "" && c.Location["region"] == region {
 			controllers = append(controllers, *c)
 		} else {
