@@ -209,7 +209,9 @@ func (db *Database) UpdateLegacyModel(ctx context.Context, model *mongodoc.Model
 func (db *Database) SetModelController(ctx context.Context, model params.EntityPath, newController params.EntityPath) (err error) {
 	defer db.checkError(ctx, &err)
 	err = db.Models().UpdateId(model.String(), bson.D{{
-		"controller", newController,
+		"$set", bson.D{{
+			"controller", newController,
+		}},
 	}})
 	if errgo.Cause(err) == mgo.ErrNotFound {
 		return errgo.WithCausef(err, params.ErrNotFound, "cannot update %s", model)

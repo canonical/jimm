@@ -828,13 +828,18 @@ func (s *databaseSuite) TestSetModelControllerSuccess(c *gc.C) {
 		Controller: params.EntityPath{"bob", "foo"},
 	})
 	c.Assert(err, gc.IsNil)
+	origDoc, err := s.database.Model(testContext, modelPath)
+	c.Assert(err, gc.IsNil)
 
 	err = s.database.SetModelController(testContext, params.EntityPath{"bob", "foo"}, params.EntityPath{"x", "y"})
 	c.Assert(err, gc.Equals, nil)
 
-	m, err := s.database.Model(testContext, modelPath)
+	newDoc, err := s.database.Model(testContext, modelPath)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(m.Controller, jc.DeepEquals, params.EntityPath{"x", "y"})
+
+	origDoc.Controller = params.EntityPath{"x", "y"}
+
+	c.Assert(newDoc, gc.DeepEquals, origDoc)
 }
 
 func (s *databaseSuite) TestSetModelLifeNotFound(c *gc.C) {
