@@ -3,7 +3,6 @@
 package v2
 
 import (
-	"fmt"
 	"net/url"
 	"sort"
 	"strings"
@@ -675,16 +674,12 @@ func (h *Handler) setPerm(coll *mgo.Collection, path params.EntityPath, acl para
 	if err := auth.CheckIsUser(ctx, path.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	return errgo.Mask(h.setEntityPerm(ctx, coll, path, acl))
-}
-
-func (h *Handler) setEntityPerm(ctx context.Context, coll *mgo.Collection, id fmt.Stringer, acl params.ACL) error {
-	zapctx.Info(ctx, "set perm", zap.String("collection", coll.Name), zap.Stringer("entity", id), zap.Any("acl", acl))
-	if _, err := coll.UpsertId(id.String(), bson.D{{"$set", bson.D{{"acl", acl}}}}); err != nil {
+	zapctx.Info(ctx, "set perm", zap.String("collection", coll.Name), zap.Stringer("entity", path), zap.Any("acl", acl))
+	if err := coll.UpdateId(path.String(), bson.D{{"$set", bson.D{{"acl", acl}}}}); err != nil {
 		if err == mgo.ErrNotFound {
 			return params.ErrNotFound
 		}
-		return errgo.Notef(err, "cannot update %v", id.String())
+		return errgo.Notef(err, "cannot update %v", path.String())
 	}
 	return nil
 }
@@ -707,15 +702,7 @@ func (h *Handler) getPerm(coll *mgo.Collection, path params.EntityPath) (params.
 	if err := auth.CheckIsUser(ctx, path.User); err != nil {
 		return params.ACL{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	acl, err := h.getEntityPerm(ctx, coll, path)
-	if err != nil {
-		return params.ACL{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-	return acl, nil
-}
-
-func (h *Handler) getEntityPerm(ctx context.Context, coll *mgo.Collection, id fmt.Stringer) (params.ACL, error) {
-	acl, err := h.jem.DB.GetACL(ctx, coll, id)
+	acl, err := h.jem.DB.GetACL(ctx, coll, path)
 	if err != nil {
 		return params.ACL{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
@@ -949,62 +936,14 @@ func (it mgoIter) Next(item auth.ACLEntity) bool {
 	return it.Iter.Next(item)
 }
 
-type id string
-
-func (i id) String() string {
-	return string(i)
-}
-
-const modelNamesID = id("model-names")
-
 // GetModelName returns the name of the model identified by the provided uuid.
 func (h *Handler) GetModelName(arg *params.ModelNameRequest) (params.ModelNameResponse, error) {
-	ctx := h.context
-
-	acl, err := h.getEntityPerm(ctx, h.jem.DB.ModelNames(), modelNamesID)
+	m, err := h.jem.DB.ModelFromUUID(h.context, arg.UUID)
 	if err != nil {
-		return params.ModelNameResponse{}, params.ErrUnauthorized
-	}
-	err = auth.CheckACL(ctx, acl.Read)
-	if err != nil {
-		return params.ModelNameResponse{}, errgo.Mask(err)
-	}
-
-	m, err := h.jem.DB.ModelFromUUID(ctx, arg.UUID)
-	if err != nil {
-		return params.ModelNameResponse{}, errgo.Mask(err)
+		return params.ModelNameResponse{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 
 	return params.ModelNameResponse{
 		Name: string(m.Path.Name),
-	}, nil
-}
-
-// SetModelNameACL sets the ACL for the endpoint that returns model names based
-// on model uuid.
-func (h *Handler) SetModelNamePerm(arg *params.SetModelNamePerm) error {
-	ctx := h.context
-	if err := auth.CheckIsUser(ctx, h.jem.ControllerAdmin()); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	zapctx.Debug(ctx, "model name perm", zap.Strings("read acl", arg.ACL.Read))
-
-	return h.setEntityPerm(ctx, h.jem.DB.ModelNames(), modelNamesID, arg.ACL)
-}
-
-// GetModelNameACL returns the ACL for the endpoint that returns model names based
-// on model uuid.
-func (h *Handler) GetModelNamePerm(_ *params.ModelNamePerm) (*params.ModelNamePerm, error) {
-	ctx := h.context
-	if err := auth.CheckIsUser(ctx, h.jem.ControllerAdmin()); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-
-	acl, err := h.getEntityPerm(ctx, h.jem.DB.ModelNames(), modelNamesID)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	return &params.ModelNamePerm{
-		ACL: acl,
 	}, nil
 }
