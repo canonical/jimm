@@ -2029,3 +2029,39 @@ func (s *APISuite) allowModelPerm(c *gc.C, path params.EntityPath, acl ...string
 	})
 	c.Assert(err, gc.IsNil)
 }
+
+func (s *APISuite) TestGetModelName(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{"bob", "open"}, false)
+
+	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
+	_, uuid := s.CreateModel(c, params.EntityPath{"bob", "open"}, params.EntityPath{"bob", "open"}, cred)
+
+	s.allowControllerPerm(c, params.EntityPath{"bob", "open"})
+	s.allowModelPerm(c, params.EntityPath{"bob", "open"})
+
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "GET",
+		Handler: s.JEMSrv,
+		URL:     fmt.Sprintf("/v2/model-uuid/%v/name", uuid),
+		ExpectBody: params.ModelNameResponse{
+			Name: "open",
+		},
+		ExpectStatus: http.StatusOK,
+		Do:           apitest.Do(s.IDMSrv.Client("bob")),
+	})
+
+	uuid1 := utils.MustNewUUID().String()
+
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:       "GET",
+		Handler:      s.JEMSrv,
+		URL:          fmt.Sprintf("/v2/model-uuid/%v/name", uuid1),
+		ExpectStatus: http.StatusNotFound,
+		Do:           apitest.Do(s.IDMSrv.Client("bob")),
+		ExpectBody: params.Error{
+			Code:    "not found",
+			Message: fmt.Sprintf("model %q not found", uuid1),
+		},
+	})
+
+}

@@ -738,7 +738,6 @@ func (s *controllerSuite) TestModelInfo(c *gc.C) {
 			UUID:               modelUUID1,
 			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 			ProviderType:       "dummy",
-			DefaultSeries:      "xenial",
 			CloudTag:           "cloud-dummy",
 			CloudRegion:        "dummy-region",
 			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test@external/cred1").String(),
@@ -764,7 +763,6 @@ func (s *controllerSuite) TestModelInfo(c *gc.C) {
 			UUID:               modelUUID3,
 			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 			ProviderType:       "dummy",
-			DefaultSeries:      "xenial",
 			CloudTag:           "cloud-dummy",
 			CloudRegion:        "dummy-region",
 			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test2@external/cred1").String(),
@@ -793,7 +791,6 @@ func (s *controllerSuite) TestModelInfo(c *gc.C) {
 			UUID:               modelUUID4,
 			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 			ProviderType:       "dummy",
-			DefaultSeries:      "xenial",
 			CloudTag:           "cloud-dummy",
 			CloudRegion:        "dummy-region",
 			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test2@external/cred1").String(),
@@ -814,7 +811,6 @@ func (s *controllerSuite) TestModelInfo(c *gc.C) {
 			UUID:               modelUUID5,
 			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 			ProviderType:       "dummy",
-			DefaultSeries:      "xenial",
 			CloudTag:           "cloud-dummy",
 			CloudRegion:        "dummy-region",
 			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test2@external/cred1").String(),
@@ -878,7 +874,6 @@ func (s *controllerSuite) TestModelInfoForLegacyModel(c *gc.C) {
 			UUID:               modelUUID1,
 			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 			ProviderType:       "dummy",
-			DefaultSeries:      "xenial",
 			CloudTag:           "cloud-dummy",
 			CloudRegion:        "dummy-region",
 			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test@external/cred1").String(),
@@ -901,7 +896,7 @@ func (s *controllerSuite) TestModelInfoForLegacyModel(c *gc.C) {
 	c.Assert(model.Cloud, gc.Equals, params.Cloud("dummy"))
 	c.Assert(model.CloudRegion, gc.Equals, "dummy-region")
 	c.Assert(model.Credential.String(), gc.Equals, "dummy/test/cred1")
-	c.Assert(model.DefaultSeries, gc.Equals, "xenial")
+	c.Assert(model.DefaultSeries, gc.Not(gc.Equals), "")
 }
 
 func (s *controllerSuite) TestModelInfoRequestTimeout(c *gc.C) {
@@ -940,7 +935,6 @@ func (s *controllerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 			UUID:               mi.UUID,
 			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 			ProviderType:       "dummy",
-			DefaultSeries:      "xenial",
 			CloudTag:           "cloud-dummy",
 			CloudRegion:        "dummy-region",
 			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test@external/cred1").String(),
@@ -969,7 +963,6 @@ func (s *controllerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 			UUID:               mi.UUID,
 			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 			ProviderType:       "dummy",
-			DefaultSeries:      "xenial",
 			CloudTag:           "cloud-dummy",
 			CloudRegion:        "dummy-region",
 			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test@external/cred1").String(),
@@ -999,7 +992,6 @@ func (s *controllerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 			UUID:               mi.UUID,
 			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 			ProviderType:       "dummy",
-			DefaultSeries:      "xenial",
 			CloudTag:           "cloud-dummy",
 			CloudRegion:        "dummy-region",
 			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test@external/cred1").String(),
@@ -1677,6 +1669,13 @@ func (s *controllerSuite) TestSetPassword(c *gc.C) {
 }
 
 func assertModelInfo(c *gc.C, obtained, expected []jujuparams.ModelInfoResult) {
+	for i := range obtained {
+		// DefaultSeries changes between juju versions and
+		// we don't care about its specific value.
+		if obtained[i].Result != nil {
+			obtained[i].Result.DefaultSeries = ""
+		}
+	}
 	for i := range obtained {
 		if obtained[i].Result == nil {
 			continue

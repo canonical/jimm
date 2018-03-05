@@ -679,7 +679,7 @@ func (h *Handler) setPerm(coll *mgo.Collection, path params.EntityPath, acl para
 		if err == mgo.ErrNotFound {
 			return params.ErrNotFound
 		}
-		return errgo.Notef(err, "cannot update %v", path)
+		return errgo.Notef(err, "cannot update %v", path.String())
 	}
 	return nil
 }
@@ -934,4 +934,16 @@ type mgoIter struct {
 // auth.ACLEntity type.
 func (it mgoIter) Next(item auth.ACLEntity) bool {
 	return it.Iter.Next(item)
+}
+
+// GetModelName returns the name of the model identified by the provided uuid.
+func (h *Handler) GetModelName(arg *params.ModelNameRequest) (params.ModelNameResponse, error) {
+	m, err := h.jem.DB.ModelFromUUID(h.context, arg.UUID)
+	if err != nil {
+		return params.ModelNameResponse{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+
+	return params.ModelNameResponse{
+		Name: string(m.Path.Name),
+	}, nil
 }

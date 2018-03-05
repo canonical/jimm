@@ -542,3 +542,15 @@ type SetLogLevel struct {
 type Level struct {
 	Level string `json:"level"`
 }
+
+// ModelNameRequest holds a request to get the model UUID based on the
+// UUID.
+type ModelNameRequest struct {
+	httprequest.Route `httprequest:"GET /v2/model-uuid/:UUID/name"`
+	UUID              string `httprequest:",path"`
+}
+
+// ModelNameResponse holds the model name.
+type ModelNameResponse struct {
+	Name string `json:"name"`
+}
