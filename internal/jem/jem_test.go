@@ -324,7 +324,7 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 		} else {
 			c.Assert(m.Credential, jc.DeepEquals, test.params.Credential)
 		}
-		c.Assert(m.DefaultSeries, gc.Equals, "xenial")
+		c.Assert(m.DefaultSeries, gc.Not(gc.Equals), "")
 		c.Assert(m.Life, gc.Equals, "alive")
 	}
 }
