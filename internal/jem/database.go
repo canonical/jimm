@@ -726,7 +726,7 @@ var selectACL = bson.D{{"acl", 1}}
 // GetACL retrieves the ACL for the document at path in coll, which must
 // have been obtained from db. If the document is not found, the
 // returned error will have the cause params.ErrNotFound.
-func (db *Database) GetACL(ctx context.Context, coll *mgo.Collection, path params.EntityPath) (_ params.ACL, err error) {
+func (db *Database) GetACL(ctx context.Context, coll *mgo.Collection, path fmt.Stringer) (_ params.ACL, err error) {
 	defer db.checkError(ctx, &err)
 	var doc struct {
 		ACL params.ACL
@@ -960,6 +960,10 @@ func (db *Database) Machines() *mgo.Collection {
 
 func (db *Database) Models() *mgo.Collection {
 	return db.C("models")
+}
+
+func (db *Database) ModelNames() *mgo.Collection {
+	return db.C("model-name")
 }
 
 func (db *Database) C(name string) *mgo.Collection {

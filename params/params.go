@@ -542,3 +542,28 @@ type SetLogLevel struct {
 type Level struct {
 	Level string `json:"level"`
 }
+
+// ModelNameRequerst holds a request to get the model UUID based on the
+// UUID.
+type ModelNameRequest struct {
+	httprequest.Route `httprequest:"GET /v2/model-uuid/:UUID/name"`
+	UUID              string `httprequest:",path"`
+}
+
+// ModelNameResponse holds the model name.
+type ModelNameResponse struct {
+	Name string `json:"name"`
+}
+
+// SetModelNamePerm holds the parameters for setting the ACL on
+// model names.
+type SetModelNamePerm struct {
+	httprequest.Route `httprequest:"PUT /v2/model-uuid-perm"`
+	ACL               ACL `httprequest:",body"`
+}
+
+// ModelNamePerm holds the ACL for the model name endpoint.
+type ModelNamePerm struct {
+	httprequest.Route `httprequest:"GET /v2/model-uuid-perm"`
+	ACL               ACL `json:"acl"`
+}

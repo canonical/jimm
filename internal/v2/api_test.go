@@ -21,6 +21,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
+	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jem/internal/apitest"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
@@ -2028,4 +2029,133 @@ func (s *APISuite) allowModelPerm(c *gc.C, path params.EntityPath, acl ...string
 		},
 	})
 	c.Assert(err, gc.IsNil)
+}
+
+func (s *APISuite) TestGetModelName(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{"bob", "open"}, false)
+
+	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
+	_, uuid := s.CreateModel(c, params.EntityPath{"bob", "open"}, params.EntityPath{"bob", "open"}, cred)
+
+	s.allowControllerPerm(c, params.EntityPath{"bob", "open"})
+	s.allowModelPerm(c, params.EntityPath{"bob", "open"})
+
+	// not allowed to get model name because
+	// bob is not in the read acl
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "GET",
+		Handler: s.JEMSrv,
+		URL:     fmt.Sprintf("/v2/model-uuid/%v/name", uuid),
+		ExpectBody: params.Error{
+			Code:    "unauthorized",
+			Message: "unauthorized",
+		},
+		ExpectStatus: http.StatusUnauthorized,
+		Do:           apitest.Do(s.IDMSrv.Client("bob")),
+	})
+
+	// adding bob to the read ACL
+	session := s.SessionPool.Session(context.TODO())
+	defer session.Close()
+
+	coll := session.DB("jem").C("model-name")
+	_, err := coll.UpsertId("model-names", bson.D{{
+		"$set", bson.D{{
+			"acl", params.ACL{
+				Read: []string{"bob"},
+			},
+		}},
+	}},
+	)
+	c.Assert(err, jc.ErrorIsNil)
+
+	// bob is now allowed to get the model name
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "GET",
+		Handler: s.JEMSrv,
+		URL:     fmt.Sprintf("/v2/model-uuid/%v/name", uuid),
+		ExpectBody: params.ModelNameResponse{
+			Name: "open",
+		},
+		ExpectStatus: http.StatusOK,
+		Do:           apitest.Do(s.IDMSrv.Client("bob")),
+	})
+}
+
+func (s *APISuite) TestSetModelNamePerm(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{"bob", "open"}, false)
+
+	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
+	_, uuid := s.CreateModel(c, params.EntityPath{"bob", "open"}, params.EntityPath{"bob", "open"}, cred)
+
+	s.allowControllerPerm(c, params.EntityPath{"bob", "open"})
+	s.allowModelPerm(c, params.EntityPath{"bob", "open"})
+
+	// not allowed to get model name because not in ACL
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "GET",
+		Handler: s.JEMSrv,
+		URL:     fmt.Sprintf("/v2/model-uuid/%v/name", uuid),
+		ExpectBody: params.Error{
+			Code:    "unauthorized",
+			Message: "unauthorized",
+		},
+		ExpectStatus: http.StatusUnauthorized,
+		Do:           apitest.Do(s.IDMSrv.Client("bob")),
+	})
+
+	// not allowed to set perm if not admin
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "PUT",
+		Handler: s.JEMSrv,
+		URL:     "/v2/model-uuid-perm",
+		JSONBody: params.ACL{
+			Read: []string{"bob"},
+		},
+		ExpectBody: params.Error{
+			Code:    "unauthorized",
+			Message: "unauthorized",
+		},
+		ExpectStatus: http.StatusUnauthorized,
+		Do:           apitest.Do(s.IDMSrv.Client("eve")),
+	})
+
+	// can set perm as an admin
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "PUT",
+		Handler: s.JEMSrv,
+		URL:     "/v2/model-uuid-perm",
+		JSONBody: params.ACL{
+			Read: []string{"bob"},
+		},
+		ExpectStatus: http.StatusOK,
+		Do:           apitest.Do(s.IDMSrv.Client(string(s.JEM.ControllerAdmin()))),
+	})
+
+	// getting the ACL as an admin
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:       "GET",
+		Handler:      s.JEMSrv,
+		URL:          "/v2/model-uuid-perm",
+		ExpectStatus: http.StatusOK,
+		ExpectBody: params.ModelNamePerm{
+			ACL: params.ACL{
+				Read: []string{"bob"},
+			},
+		},
+		Do: apitest.Do(s.IDMSrv.Client(string(s.JEM.ControllerAdmin()))),
+	})
+
+	// allowed to get model name because bob is not
+	// in the read ACL.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "GET",
+		Handler: s.JEMSrv,
+		URL:     fmt.Sprintf("/v2/model-uuid/%v/name", uuid),
+		ExpectBody: params.ModelNameResponse{
+			Name: "open",
+		},
+		ExpectStatus: http.StatusOK,
+		Do:           apitest.Do(s.IDMSrv.Client("bob")),
+	})
 }
