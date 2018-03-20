@@ -57,27 +57,32 @@ func main() {
 	if *loggingConfig != "" && strings.ToUpper(*loggingConfig) != "INFO" {
 		fmt.Fprintln(os.Stderr, "warning: ignoring --logging-config flag; use logging-level in configuration file instead")
 	}
-	if err := serve(flag.Arg(0)); err != nil {
+	conf, err := readConfig(flag.Arg(0))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "config error: %s\n", err)
+		os.Exit(2)
+	}
+	if err := serve(conf); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 }
 
-func serve(confPath string) error {
-	conf, err := config.Read(confPath)
+func readConfig(path string) (*config.Config, error) {
+	conf, err := config.Read(path)
 	if err != nil {
-		return errgo.Notef(err, "cannot read config file %q", confPath)
-	}
-	if conf.DBName == "" {
-		conf.DBName = "jem"
+		return nil, errgo.Mask(err)
 	}
 	conf.IdentityLocation = strings.TrimSuffix(conf.IdentityLocation, "/")
 	if strings.HasSuffix(conf.IdentityLocation, "v1/discharger") {
 		// It's probably some old code that uses the old IdentityLocation
 		// meaning.
-		return errgo.Notef(err, "identity location must not contain discharge path")
+		return nil, errgo.Newf("identity location must not contain discharge path")
 	}
+	return conf, nil
+}
 
+func serve(conf *config.Config) error {
 	ctx := context.Background()
 	zapctx.LogLevel.SetLevel(conf.LoggingLevel)
 	zaputil.InitLoggo(zapctx.Default, conf.LoggingLevel)
@@ -88,6 +93,9 @@ func serve(confPath string) error {
 		return errgo.Notef(err, "cannot dial mongo at %q", conf.MongoAddr)
 	}
 	defer session.Close()
+	if conf.DBName == "" {
+		conf.DBName = "jem"
+	}
 	db := session.DB(conf.DBName)
 
 	zapctx.Debug(ctx, "setting up the API server")
