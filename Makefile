@@ -50,9 +50,14 @@ check: $(VERSIONDEPS)
 install: $(VERSIONDEPS)
 	go install $(INSTALL_FLAGS) -v $(PROJECT)/...
 
+release: jimm-$(GIT_VERSION).tar.xz
+
 clean:
 	go clean $(PROJECT)/...
 	-$(RM) version/init.go
+	-$(RM) jemd
+	-$(RM) -r jimm-*/
+	-$(RM) jimm-*.tar.xz
 
 else
 
@@ -63,6 +68,9 @@ check:
 	$(error Cannot $@; $(CURDIR) is not on GOPATH)
 
 install:
+	$(error Cannot $@; $(CURDIR) is not on GOPATH)
+
+release:
 	$(error Cannot $@; $(CURDIR) is not on GOPATH)
 
 clean:
@@ -95,6 +103,16 @@ create-deps: $(GOPATH)/bin/godeps
 version/init.go: version/init.go.tmpl FORCE
 	gofmt -r "unknownVersion -> Version{GitCommit: \"${GIT_COMMIT}\", Version: \"${GIT_VERSION}\",}" $< > $@
 
+jemd: version/init.go
+	go build -v $(PROJECT)/cmd/jemd
+
+jimm-$(GIT_VERSION).tar.xz: jimm-$(GIT_VERSION)/bin/jemd
+	tar c jimm-$(GIT_VERSION) | xz > $@
+
+jimm-$(GIT_VERSION)/bin/jemd: jemd
+	mkdir -p jimm-$(GIT_VERSION)/bin
+	cp jemd jimm-$(GIT_VERSION)/bin
+
 # Install packages required to develop JEM and run tests.
 APT_BASED := $(shell command -v apt-get >/dev/null; echo $$?)
 sysdeps:
@@ -126,6 +144,6 @@ help:
 	@echo 'make format - Format the source files.'
 	@echo 'make simplify - Format and simplify the source files.'
 
-.PHONY: build check install clean format server simplify sysdeps help FORCE
+.PHONY: build check install release clean format server simplify sysdeps help FORCE
 
 FORCE:

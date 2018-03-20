@@ -1,0 +1,46 @@
+#!/usr/bin/python3
+
+from charmhelpers.core import (
+    hookenv,
+)
+from jaascharm import (
+    port_changed,
+    update_config_and_restart,
+    update_status,
+)
+
+
+def config_changed():
+    config = hookenv.config()
+    if config.changed('port'):
+        port_changed(config['port'], config.previous('port'))
+
+    keys = [
+        "agent-username",
+        "controller-uuid",
+        "dbname",
+        "domain",
+        "gui-location",
+        "identity-location",
+        "logging-level",
+        "max-mgo-sessions",
+        "usage-sender-url",
+    ]
+    app_config = {
+        'api-addr': ':{}'.format(config['port']),
+        'state-server-admin': config['controller-admin']
+    }
+    if config['agent-private-key'] and config['agent-public-key']:
+        app_config['agent-key'] = {
+            'private': config['agent-private-key'],
+            'public': config['agent-public-key'],
+        }
+    for key in keys:
+        app_config[key] = config[key]
+
+    update_config_and_restart(app_config)
+
+
+if __name__ == '__main__':
+    config_changed()
+    update_status()

@@ -59,11 +59,12 @@ func main() {
 	}
 	conf, err := readConfig(flag.Arg(0))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "config error: %s\n", err)
+		fmt.Fprintf(os.Stderr, "STOP %s\n", err)
 		os.Exit(2)
 	}
+	fmt.Fprintln(os.Stderr, "START")
 	if err := serve(conf); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+		fmt.Fprintf(os.Stderr, "STOP %s\n", err)
 		os.Exit(1)
 	}
 }
