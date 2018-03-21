@@ -1,0 +1,12 @@
+#!/usr/bin/python3
+
+from charmhelpers.core import hookenv
+
+
+def relation_joined():
+    hookenv.relation_set(port=hookenv.config('port'))
+
+
+if __name__ == '__main__':
+    hookenv.log('website-relation-joined')
+    relation_joined()

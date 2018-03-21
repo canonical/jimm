@@ -1,0 +1,17 @@
+[Unit]
+Description=JAAS Intelligent Model Manager
+Requires=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=jimm
+Group=jimm
+WorkingDirectory={{dst_path}}
+ExecStart={{bin_path}} {{config_path}}
+Restart=on-failure
+RestartSec=5s
+RestartPreventExitStatus=2
+
+[Install]
+WantedBy=multi-user.target
