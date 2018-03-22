@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 from charmhelpers.core import hookenv
-from nrpe import update_nrpe_config
+from jaascharm import update_nrpe_config
 
 
 def relation_changed():
