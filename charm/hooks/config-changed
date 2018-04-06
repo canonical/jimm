@@ -8,6 +8,7 @@ from jaascharm import (
     update_config_and_restart,
     update_status,
 )
+from status import jimm_status
 
 
 def config_changed():
@@ -43,4 +44,4 @@ def config_changed():
 
 if __name__ == '__main__':
     config_changed()
-    update_status()
+    update_status(failed_status=jimm_status)

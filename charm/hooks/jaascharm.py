@@ -174,13 +174,18 @@ def update_nrpe_config(service=None, nrpe=NRPE(), config=hookenv.config()):
     nrpe.write()
 
 
-def update_status(service=None):
-    """Update the status message for the specified service."""
+def update_status(service=None, failed_status=None):
+    """Update the status message for the specified service.
+       If failed_status is specified it will be called when the service is
+       determined to have failed. failed_status should return a tuple
+       containing the status set and the message."""
     service = _service(service)
     if host.service_running(service):
         _set_active_status()
     if _service_failed(service):
-        _set_blocked_status(service)
+        failed_status = failed_status or _default_failed_status
+        status, msg = failed_status(_failed_msg(service))
+        hookenv.status_set(status, msg)
 
 
 def _set_active_status():
@@ -197,13 +202,7 @@ def _set_active_status():
     hookenv.application_version_set(data.get('Version', ''))
 
 
-def _set_blocked_status(service):
-    """Set the status for the given service that has been detected as
-       failed."""
-    hookenv.status_set('blocked', _blocked_msg(service))
-
-
-def _blocked_msg(service):
+def _failed_msg(service):
     """Determine the reason the given service is failed by checking the
        service logs."""
     cmd = ('journalctl', '-u', service, '-o', 'cat', '-n', '20')
@@ -219,6 +218,10 @@ def _blocked_msg(service):
     except subprocess.CalledProcessError:
         pass
     return msg
+
+
+def _default_failed_status(msg):
+    return 'blocked', msg
 
 
 def _service(service):
