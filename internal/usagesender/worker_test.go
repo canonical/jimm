@@ -12,7 +12,6 @@ import (
 	"github.com/juju/httprequest"
 	jujujujutesting "github.com/juju/juju/testing"
 	romulus "github.com/juju/romulus/wireformat/metrics"
-	wireformat "github.com/juju/romulus/wireformat/metrics"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
@@ -60,7 +59,7 @@ type usageSenderSuite struct {
 }
 
 func (s *usageSenderSuite) SetUpTest(c *gc.C) {
-	s.handler = &testHandler{receivedMetrics: make(chan string)}
+	s.handler = &testHandler{receivedMetrics: make(chan receivedMetric)}
 
 	router := httprouter.New()
 	handlers := jemerror.Mapper.Handlers(func(_ httprequest.Params) (*testHandler, error) {
@@ -103,7 +102,7 @@ func (s *usageSenderSuite) TestUsageSenderWorker(c *gc.C) {
 func (s *spoolDirMetricRecorderSuite) TestSpool(c *gc.C) {
 	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, false)
 	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
-	_, model := s.CreateModel(c, params.EntityPath{"bob", "foo"}, ctlId, cred)
+	_, model := s.CreateModel(c, params.EntityPath{"bob", "test-model"}, ctlId, cred)
 
 	m := &testMonitor{failed: make(chan int, 10)}
 	s.PatchValue(usagesender.MonitorFailure, m.set)
@@ -122,8 +121,8 @@ func (s *spoolDirMetricRecorderSuite) TestSpool(c *gc.C) {
 	s.Clock.WaitAdvance(6*time.Minute, jujujujutesting.LongWait, 1)
 
 	select {
-	case receivedUnitCount := <-s.handler.receivedMetrics:
-		c.Assert(receivedUnitCount, gc.Equals, "17")
+	case receivedMetric := <-s.handler.receivedMetrics:
+		c.Assert(receivedMetric.value, gc.Equals, "17")
 	case <-time.After(jujujujutesting.LongWait):
 		c.Fatal("timed out waiting for metrics to be received")
 	}
@@ -142,18 +141,19 @@ func (s *spoolDirMetricRecorderSuite) TestSpool(c *gc.C) {
 	// we expect both metrics to be sent this time
 	a := "17"
 	select {
-	case receivedUnitCount := <-s.handler.receivedMetrics:
-		c.Logf("received %v", receivedUnitCount)
-		if receivedUnitCount == a {
+	case receivedMetric := <-s.handler.receivedMetrics:
+		c.Logf("received %v", receivedMetric)
+		if receivedMetric.value == a {
 			a = "42"
 		}
 	case <-time.After(jujujujutesting.LongWait):
 		c.Fatal("timed out waiting for metrics to be received")
 	}
 	select {
-	case receivedUnitCount := <-s.handler.receivedMetrics:
-		c.Logf("received %v", receivedUnitCount)
-		c.Assert(receivedUnitCount, gc.Equals, a)
+	case receivedMetric := <-s.handler.receivedMetrics:
+		c.Logf("received %v", receivedMetric)
+		c.Assert(receivedMetric.value, gc.Equals, a)
+		c.Assert(receivedMetric.modelName, gc.Equals, "bob/test-model")
 	case <-time.After(jujujujutesting.LongWait):
 		c.Fatal("timed out waiting for metrics to be received")
 	}
@@ -176,8 +176,9 @@ func (s *usageSenderSuite) setUnitNumberAndCheckSentMetrics(c *gc.C, modelUUID s
 	unitCountString := fmt.Sprintf("%d", unitCount)
 
 	select {
-	case receivedUnitCount := <-s.handler.receivedMetrics:
-		c.Assert(receivedUnitCount, gc.Equals, unitCountString)
+	case receivedMetric := <-s.handler.receivedMetrics:
+		c.Assert(receivedMetric.value, gc.Equals, unitCountString)
+		c.Assert(receivedMetric.modelName, gc.Equals, "bob/foo")
 	case <-time.After(jujujujutesting.LongWait):
 		c.Fatal("timed out waiting for metrics to be received")
 	}
@@ -201,20 +202,34 @@ func (m *testMonitor) set(value float64) {
 	m.failed <- int(value)
 }
 
+type metricBatch struct {
+	romulus.MetricBatch
+
+	ModelName string `json:"model-name"`
+}
+
 type usagePost struct {
 	httprequest.Route `httprequest:"POST /metrics"`
-	Body              []wireformat.MetricBatch `httprequest:",body"`
+	Body              []metricBatch `httprequest:",body"`
 }
 
 type testHandler struct {
 	mutex           sync.Mutex
 	acknowledge     bool
-	receivedMetrics chan string
+	receivedMetrics chan receivedMetric
+}
+
+type receivedMetric struct {
+	value     string
+	modelName string
 }
 
 func (c *testHandler) Metrics(arg *usagePost) (*romulus.UserStatusResponse, error) {
 	for _, b := range arg.Body {
-		c.receivedMetrics <- b.Metrics[0].Value
+		c.receivedMetrics <- receivedMetric{
+			value:     b.Metrics[0].Value,
+			modelName: b.ModelName,
+		}
 	}
 
 	uuids := make([]string, len(arg.Body))

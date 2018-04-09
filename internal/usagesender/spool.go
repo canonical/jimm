@@ -29,14 +29,15 @@ const (
 // to record and retrieve recorded metrics.
 type MetricRecorder interface {
 	// AddMetric records the reported metric.
-	AddMetric(ctx context.Context, model, value string, credentials []byte, created time.Time) error
+	AddMetric(ctx context.Context, modelName, model, value string, credentials []byte, created time.Time) error
 	// BatchesToSend returns all recorded metric batches.
-	BatchesToSend(ctx context.Context) ([]wireformat.MetricBatch, error)
+	BatchesToSend(ctx context.Context) ([]metricBatch, error)
 	// Remove removes the metric.
 	Remove(ctx context.Context, uuid string) error
 }
 
 type metric struct {
+	ModelName   string    `json:"model-name"`
 	Model       string    `json:"model"`
 	Value       string    `json:"value"`
 	Time        time.Time `json:"time"`
@@ -64,7 +65,7 @@ func newSpoolDirMetricRecorder(spoolDir string) (MetricRecorder, error) {
 }
 
 // AddMetric implements the MetricsRecorder interface.
-func (m *spoolDirMetricRecorder) AddMetric(ctx context.Context, model, value string, credentials []byte, created time.Time) error {
+func (m *spoolDirMetricRecorder) AddMetric(ctx context.Context, modelName, model, value string, credentials []byte, created time.Time) error {
 	uuid, err := utils.NewUUID()
 	if err != nil {
 		return errgo.Mask(err)
@@ -75,6 +76,7 @@ func (m *spoolDirMetricRecorder) AddMetric(ctx context.Context, model, value str
 		return errgo.Mask(err)
 	}
 	mm := metric{
+		ModelName:   modelName,
 		Model:       model,
 		Value:       value,
 		Time:        created,
@@ -94,8 +96,8 @@ func (m *spoolDirMetricRecorder) AddMetric(ctx context.Context, model, value str
 }
 
 // BatchesToSend implements the MetricRecorder interface.
-func (r *spoolDirMetricRecorder) BatchesToSend(ctx context.Context) ([]wireformat.MetricBatch, error) {
-	var batches []wireformat.MetricBatch
+func (r *spoolDirMetricRecorder) BatchesToSend(ctx context.Context) ([]metricBatch, error) {
+	var batches []metricBatch
 
 	walker := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -114,18 +116,21 @@ func (r *spoolDirMetricRecorder) BatchesToSend(ctx context.Context) ([]wireforma
 			return nil
 		}
 		for _, m := range metrics {
-			batches = append(batches, wireformat.MetricBatch{
-				UUID:        info.Name(),
-				ModelUUID:   m.Model,
-				CharmUrl:    jem.OmnibusJIMMCharm,
-				UnitName:    unitName,
-				Created:     m.Time,
-				Credentials: m.Credentials,
-				Metrics: []wireformat.Metric{{
-					Key:   metricKey,
-					Value: m.Value,
-					Time:  m.Time,
-				}},
+			batches = append(batches, metricBatch{
+				ModelName: m.ModelName,
+				MetricBatch: wireformat.MetricBatch{
+					UUID:        info.Name(),
+					ModelUUID:   m.Model,
+					CharmUrl:    jem.OmnibusJIMMCharm,
+					UnitName:    unitName,
+					Created:     m.Time,
+					Credentials: m.Credentials,
+					Metrics: []wireformat.Metric{{
+						Key:   metricKey,
+						Value: m.Value,
+						Time:  m.Time,
+					}},
+				},
 			})
 		}
 		return nil
@@ -190,36 +195,39 @@ func newSliceMetricRecorder(_ string) (MetricRecorder, error) {
 var _ MetricRecorder = (*sliceMetricRecorder)(nil)
 
 type sliceMetricRecorder struct {
-	batches []wireformat.MetricBatch
+	batches []metricBatch
 	m       sync.Mutex
 }
 
 // AddMetric implements the MetricRecorder interface.
-func (r *sliceMetricRecorder) AddMetric(_ context.Context, model, value string, credentials []byte, created time.Time) error {
+func (r *sliceMetricRecorder) AddMetric(_ context.Context, modelName, model, value string, credentials []byte, created time.Time) error {
 	r.m.Lock()
 	defer r.m.Unlock()
 	uuid, err := utils.NewUUID()
 	if err != nil {
 		return errgo.Notef(err, "failed to create a metric uuid")
 	}
-	r.batches = append(r.batches, wireformat.MetricBatch{
-		UUID:        uuid.String(),
-		ModelUUID:   model,
-		CharmUrl:    jem.OmnibusJIMMCharm,
-		UnitName:    unitName,
-		Created:     created,
-		Credentials: credentials,
-		Metrics: []wireformat.Metric{{
-			Key:   metricKey,
-			Value: value,
-			Time:  created,
-		}},
+	r.batches = append(r.batches, metricBatch{
+		ModelName: modelName,
+		MetricBatch: wireformat.MetricBatch{
+			UUID:        uuid.String(),
+			ModelUUID:   model,
+			CharmUrl:    jem.OmnibusJIMMCharm,
+			UnitName:    unitName,
+			Created:     created,
+			Credentials: credentials,
+			Metrics: []wireformat.Metric{{
+				Key:   metricKey,
+				Value: value,
+				Time:  created,
+			}},
+		},
 	})
 	return nil
 }
 
 // BatchesToSend implements the MetricRecorder interface.
-func (r *sliceMetricRecorder) BatchesToSend(_ context.Context) ([]wireformat.MetricBatch, error) {
+func (r *sliceMetricRecorder) BatchesToSend(_ context.Context) ([]metricBatch, error) {
 	r.m.Lock()
 	defer r.m.Unlock()
 	return r.batches, nil
