@@ -2,7 +2,7 @@
 
 from charmhelpers.core import hookenv
 import jaascharm
-from status import jimm_status
+from status import charm_status
 
 
 def relation_changed():
@@ -15,7 +15,7 @@ def relation_changed():
         'mongo-addr': '{}:{}'.format(hostname, port),
     }
     jaascharm.update_config_and_restart(config)
-    jaascharm.update_status(failed_status=jimm_status)
+    jaascharm.update_status(failed_status=charm_status)
 
 
 if __name__ == '__main__':
