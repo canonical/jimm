@@ -7,4 +7,7 @@ from status import jimm_status
 
 if __name__ == '__main__':
     hookenv.log('update-status')
+    status, _ = hookenv.status_get()
+    if status == 'waiting':
+        return
     jaascharm.update_status(failed_status=jimm_status)
