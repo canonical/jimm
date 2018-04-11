@@ -17,7 +17,7 @@ requires:
   db:
     interface: mongodb
 resources:
-  jimm:
+  service:
     type: file
     filename: jimm.tar.xz
     description: "jimm release tarball."

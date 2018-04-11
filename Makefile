@@ -56,7 +56,7 @@ clean:
 	go clean $(PROJECT)/...
 	-$(RM) version/init.go
 	-$(RM) jemd
-	-$(RM) -r jimm-*/
+	-$(RM) -r jimm-release/
 	-$(RM) jimm-*.tar.xz
 
 else
@@ -106,12 +106,12 @@ version/init.go: version/init.go.tmpl FORCE
 jemd: version/init.go
 	go build -v $(PROJECT)/cmd/jemd
 
-jimm-$(GIT_VERSION).tar.xz: jimm-$(GIT_VERSION)/bin/jemd
-	tar c jimm-$(GIT_VERSION) | xz > $@
+jimm-$(GIT_VERSION).tar.xz: jimm-release/bin/jemd
+	tar c -C jimm-release . | xz > $@
 
-jimm-$(GIT_VERSION)/bin/jemd: jemd
-	mkdir -p jimm-$(GIT_VERSION)/bin
-	cp jemd jimm-$(GIT_VERSION)/bin
+jimm-release/bin/jemd: jemd
+	mkdir -p jimm-release/bin
+	cp jemd jimm-release/bin
 
 # Install packages required to develop JEM and run tests.
 APT_BASED := $(shell command -v apt-get >/dev/null; echo $$?)

@@ -2,12 +2,16 @@
 
 from charmhelpers.core import hookenv
 import jaascharm
-from status import jimm_status
+from status import charm_status
+
+
+def update_status():
+    status, _ = hookenv.status_get()
+    if status == 'waiting' or status == 'blocked':
+        return
+    jaascharm.update_status(failed_status=charm_status)
 
 
 if __name__ == '__main__':
     hookenv.log('update-status')
-    status, _ = hookenv.status_get()
-    if status == 'waiting':
-        return
-    jaascharm.update_status(failed_status=jimm_status)
+    update_status()

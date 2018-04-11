@@ -4,17 +4,15 @@ from charmhelpers.core import (
     hookenv,
 )
 from jaascharm import (
-    port_changed,
+    HTTP_LISTEN_PORT,
     update_config_and_restart,
     update_status,
 )
-from status import jimm_status
+from status import charm_status
 
 
 def config_changed():
     config = hookenv.config()
-    if config.changed('port'):
-        port_changed(config['port'], config.previous('port'))
 
     keys = [
         "agent-username",
@@ -28,7 +26,7 @@ def config_changed():
         "usage-sender-url",
     ]
     app_config = {
-        'api-addr': ':{}'.format(config['port']),
+        'api-addr': ':{}'.format(HTTP_LISTEN_PORT),
         'state-server-admin': config['controller-admin']
     }
     if config['agent-private-key'] and config['agent-public-key']:
@@ -44,4 +42,4 @@ def config_changed():
 
 if __name__ == '__main__':
     config_changed()
-    update_status(failed_status=jimm_status)
+    update_status(failed_status=charm_status)

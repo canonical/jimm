@@ -1,7 +1,7 @@
 from charmhelpers.core import hookenv
 
 
-def jimm_status(msg):
+def charm_status(msg):
     if not msg:
         return 'blocked', 'unknown error'
     if msg.find('mongo-addr') == -1:

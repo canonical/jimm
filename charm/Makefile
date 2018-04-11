@@ -1,11 +1,8 @@
-CHARM?=/snap/bin/charm
-CHARM_HELPERS_SYNC?=$(HOME)/src/github.com/juju/charm-helpers/tools/charm_helpers_sync/charm_helpers_sync.py
-
 .PHONY: build
 build: hooks/charmhelpers
 
 hooks/charmhelpers: charm-helpers.yaml
-	$(CHARM_HELPERS_SYNC) -c charm-helpers.yaml
+	./charm_helpers_sync.py -c charm-helpers.yaml
 
 .PHONY: lint
 lint:

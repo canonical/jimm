@@ -1,8 +1,4 @@
 options:
-  port:
-    type: int
-    description: port that JIMM will listen on.
-    default: 8080
   logging-level:
     type: string
     description: "logging level (debug, info, warn, error)"
