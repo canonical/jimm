@@ -1,10 +1,11 @@
 #!/usr/bin/python3
 
 from charmhelpers.core import hookenv
+from jaascharm import HTTP_LISTEN_PORT
 
 
 def relation_joined():
-    hookenv.relation_set(port=hookenv.config('port'))
+    hookenv.relation_set(port=HTTP_LISTEN_PORT)
 
 
 if __name__ == '__main__':
