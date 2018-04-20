@@ -1845,6 +1845,7 @@ func (s *APISuite) TestJujuStatus(c *gc.C) {
 			Applications:       map[string]jujuparams.ApplicationStatus{},
 			RemoteApplications: map[string]jujuparams.RemoteApplicationStatus{},
 			Relations:          nil,
+			Offers:             map[string]jujuparams.ApplicationOfferStatus{},
 		},
 	})
 
@@ -1871,6 +1872,7 @@ func (s *APISuite) TestJujuStatus(c *gc.C) {
 			Applications:       map[string]jujuparams.ApplicationStatus{},
 			RemoteApplications: map[string]jujuparams.RemoteApplicationStatus{},
 			Relations:          nil,
+			Offers:             map[string]jujuparams.ApplicationOfferStatus{},
 		},
 	})
 

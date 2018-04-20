@@ -275,7 +275,7 @@ func (s *internalSuite) TestWatcher(c *gc.C) {
 	// Destroy model1 and check that its life status moves to dying, but the rest stays the same.
 	model1, err := model1State.Model()
 	c.Assert(err, gc.IsNil)
-	err = model1.Destroy()
+	err = model1.Destroy(state.DestroyModelParams{})
 	c.Assert(err, gc.IsNil)
 
 	jshim.await(c, getAllStats, allStats{
@@ -457,7 +457,7 @@ func removeModel(c *gc.C, st *state.State) {
 	}
 	model, err := st.Model()
 	c.Assert(err, gc.IsNil)
-	err = model.Destroy()
+	err = model.Destroy(state.DestroyModelParams{})
 	c.Assert(err, gc.IsNil)
 	err = st.ProcessDyingModel()
 	c.Assert(err, gc.IsNil)
