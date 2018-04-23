@@ -345,6 +345,22 @@ func (db *Database) SetControllerVersion(ctx context.Context, ctlPath params.Ent
 	return nil
 }
 
+// SetControllerRegions sets the cloud regions for the given controller.
+// This method does not return an error when the controller doesn't exist.
+func (db *Database) SetControllerRegions(ctx context.Context, ctlPath params.EntityPath, regions []mongodoc.Region) (err error) {
+	defer db.checkError(ctx, &err)
+	if err = db.Controllers().UpdateId(ctlPath.String(), bson.D{{
+		"$set", bson.D{{"cloud.regions", regions}},
+	}}); err != nil {
+		if err == mgo.ErrNotFound {
+			// For symmetry with SetControllerUnavailableAt.
+			return nil
+		}
+		return errgo.Notef(err, "cannot update %v", ctlPath)
+	}
+	return nil
+}
+
 // SetControllerAvailable marks the given controller as available.
 // This method does not return an error when the controller doesn't exist.
 func (db *Database) SetControllerAvailable(ctx context.Context, ctlPath params.EntityPath) (err error) {

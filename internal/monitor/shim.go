@@ -5,8 +5,10 @@ package monitor
 import (
 	"time"
 
+	cloudapi "github.com/juju/juju/api/cloud"
 	apicontroller "github.com/juju/juju/api/controller"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/version"
 	"golang.org/x/net/context"
@@ -82,6 +84,10 @@ func (j jemShim) SetControllerVersion(ctx context.Context, ctlPath params.Entity
 	return errgo.Mask(j.DB.SetControllerVersion(ctx, ctlPath, v), errgo.Any)
 }
 
+func (j jemShim) SetControllerRegions(ctx context.Context, ctlPath params.EntityPath, regions []mongodoc.Region) error {
+	return errgo.Mask(j.DB.SetControllerRegions(ctx, ctlPath, regions), errgo.Any)
+}
+
 func (j jemShim) AcquireMonitorLease(ctx context.Context, ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {
 	t, err := j.DB.AcquireMonitorLease(ctx, ctlPath, oldExpiry, oldOwner, newExpiry, newOwner)
 	if err != nil {
@@ -125,4 +131,12 @@ func (a apiShim) WatchAllModels() (allWatcher, error) {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
 	return w, nil
+}
+
+func (a apiShim) Clouds() (map[names.CloudTag]cloud.Cloud, error) {
+	clouds, err := cloudapi.NewClient(a.Conn).Clouds()
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Any)
+	}
+	return clouds, nil
 }

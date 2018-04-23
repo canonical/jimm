@@ -240,6 +240,42 @@ func (s *databaseSuite) TestSetControllerVersionWithNotFoundController(c *gc.C) 
 	c.Assert(err, gc.IsNil)
 }
 
+func (s *databaseSuite) TestSetControllerRegions(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "x"}
+	ctl := &mongodoc.Controller{
+		Path: ctlPath,
+		Cloud: mongodoc.Cloud{
+			Regions: []mongodoc.Region{{
+				Name:             "test1",
+				Endpoint:         "https://example.com/test1",
+				IdentityEndpoint: "https://example.com/test1/identity",
+				StorageEndpoint:  "https://example.com/test1/storage",
+			}},
+		},
+	}
+	err := s.database.AddController(testContext, ctl)
+	c.Assert(err, gc.IsNil)
+
+	testRegions := []mongodoc.Region{{
+		Name:             "test2",
+		Endpoint:         "https://example.com/test2",
+		IdentityEndpoint: "https://example.com/test2/identity",
+		StorageEndpoint:  "https://example.com/test2/storage",
+	}}
+	err = s.database.SetControllerRegions(testContext, ctlPath, testRegions)
+	c.Assert(err, gc.IsNil)
+
+	ctl, err = s.database.Controller(testContext, ctlPath)
+	c.Assert(err, gc.IsNil)
+	c.Assert(ctl.Cloud.Regions, jc.DeepEquals, testRegions)
+}
+
+func (s *databaseSuite) TestSetControllerRegionsWithNotFoundController(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "x"}
+	err := s.database.SetControllerRegions(testContext, ctlPath, nil)
+	c.Assert(err, gc.IsNil)
+}
+
 func (s *databaseSuite) TestDeleteController(c *gc.C) {
 	ctlPath := params.EntityPath{"dalek", "who"}
 	ctl := &mongodoc.Controller{

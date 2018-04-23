@@ -6,6 +6,7 @@ import (
 	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/state/multiwatcher"
 	jujujujutesting "github.com/juju/juju/testing"
 	jujutesting "github.com/juju/juju/testing"
@@ -15,6 +16,7 @@ import (
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
+	names "gopkg.in/juju/names.v2"
 
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
@@ -114,6 +116,14 @@ func (s jemShimWithUpdateNotify) SetControllerVersion(ctx context.Context, ctlPa
 		return err
 	}
 	s.changed <- "controller version"
+	return nil
+}
+
+func (s jemShimWithUpdateNotify) SetControllerRegions(ctx context.Context, ctlPath params.EntityPath, regions []mongodoc.Region) error {
+	if err := s.jemInterface.SetControllerRegions(ctx, ctlPath, regions); err != nil {
+		return err
+	}
+	s.changed <- "controller regions"
 	return nil
 }
 
@@ -286,6 +296,16 @@ func (s *jemShimInMemory) SetControllerVersion(ctx context.Context, ctlPath para
 	return nil
 }
 
+func (s *jemShimInMemory) SetControllerRegions(ctx context.Context, ctlPath params.EntityPath, regions []mongodoc.Region) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ctl, ok := s.controllers[ctlPath]
+	if ok {
+		ctl.Cloud.Regions = regions
+	}
+	return nil
+}
+
 func (s *jemShimInMemory) SetModelLife(ctx context.Context, ctlPath params.EntityPath, uuid string, life string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -450,6 +470,7 @@ type jujuAPIShim struct {
 	initial       []multiwatcher.Delta
 	stack         string
 	serverVersion version.Number
+	clouds        map[names.CloudTag]cloud.Cloud
 }
 
 func (s *jujuAPIShim) Evict() {
@@ -484,6 +505,10 @@ func (s *jujuAPIShim) ModelExists(uuid string) (bool, error) {
 
 func (s *jujuAPIShim) ServerVersion() (version.Number, bool) {
 	return s.serverVersion, true
+}
+
+func (s *jujuAPIShim) Clouds() (map[names.CloudTag]cloud.Cloud, error) {
+	return s.clouds, nil
 }
 
 type watcherShim struct {

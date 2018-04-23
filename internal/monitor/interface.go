@@ -5,9 +5,11 @@ package monitor
 import (
 	"time"
 
+	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/version"
 	"golang.org/x/net/context"
+	names "gopkg.in/juju/names.v2"
 
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
@@ -43,6 +45,9 @@ type jemInterface interface {
 
 	// SetControllerVersion sets the controller version of the given controller.
 	SetControllerVersion(ctx context.Context, ctlPath params.EntityPath, v version.Number) error
+
+	// SetControllerRegions sets the regions supported by the given controller.
+	SetControllerRegions(ctx context.Context, ctlPath params.EntityPath, regions []mongodoc.Region) error
 
 	// SetModelLife sets the Life field of all models controlled
 	// by the given controller that have the given UUID.
@@ -113,6 +118,9 @@ type jujuAPI interface {
 
 	// ServerVersion holds the version of the API server that we are connected to.
 	ServerVersion() (version.Number, bool)
+
+	// Clouds gets the clouds supported by the controller.
+	Clouds() (map[names.CloudTag]cloud.Cloud, error)
 }
 
 // allWatcher represents a watcher of all events on a controller.

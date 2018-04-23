@@ -167,19 +167,8 @@ func (m *controllerMonitor) watcher(ctx context.Context) error {
 		conn, err := m.dialAPI(ctx)
 		switch errgo.Cause(err) {
 		case nil:
-			if err := m.jem.SetControllerAvailable(ctx, m.ctlPath); err != nil {
-				return errgo.Notef(err, "cannot set controller availability")
-			}
-			if err := m.jem.ControllerUpdateCredentials(ctx, m.ctlPath); err != nil {
-				return errgo.Notef(err, "cannot update credentials")
-			}
-			// It's sufficient to update the server version only when we connect
-			// because if the server version changes, the API connection
-			// will be broken.
-			if v, ok := conn.ServerVersion(); ok {
-				if err := m.jem.SetControllerVersion(ctx, m.ctlPath, v); err != nil {
-					return errgo.Notef(err, "cannot set controller verision")
-				}
+			if err := m.connected(ctx, conn); err != nil {
+				return errgo.Mask(err)
 			}
 			err = m.watch(ctx, conn)
 			if errgo.Cause(err) == tomb.ErrDying {
@@ -265,6 +254,56 @@ func (m *controllerMonitor) dialAPI(ctx context.Context) (jujuAPI, error) {
 	case <-m.tomb.Dying():
 		return nil, tomb.ErrDying
 	}
+}
+
+// connected performs the required updates that only need to happen when
+// the controller first connects.
+func (m *controllerMonitor) connected(ctx context.Context, conn jujuAPI) error {
+	if err := m.jem.SetControllerAvailable(ctx, m.ctlPath); err != nil {
+		return errgo.Notef(err, "cannot set controller availability")
+	}
+	if err := m.jem.ControllerUpdateCredentials(ctx, m.ctlPath); err != nil {
+		return errgo.Notef(err, "cannot update credentials")
+	}
+	// It's sufficient to update the server version only when we connect
+	// because if the server version changes, the API connection
+	// will be broken.
+	if v, ok := conn.ServerVersion(); ok {
+		if err := m.jem.SetControllerVersion(ctx, m.ctlPath, v); err != nil {
+			return errgo.Notef(err, "cannot set controller verision")
+		}
+	}
+	// Get the controller's supported regions, again this only needs
+	// to be done at connection time as we assume that a controller's
+	// supported regions won't change without an upgrade.
+
+	// Find out the cloud information.
+	clouds, err := conn.Clouds()
+	if err != nil {
+		return errgo.Notef(err, "cannot get clouds")
+	}
+	if len(clouds) > 1 {
+		zapctx.Warn(ctx, "controller reports more than one cloud", zap.String("controller", m.ctlPath.String()))
+	}
+
+	var regions []mongodoc.Region
+	// Note: currently juju controllers only ever have exactly one
+	// cloud. This code will need to change if that changes.
+	for _, v := range clouds {
+		for _, reg := range v.Regions {
+			regions = append(regions, mongodoc.Region{
+				Name:             reg.Name,
+				Endpoint:         reg.Endpoint,
+				IdentityEndpoint: reg.IdentityEndpoint,
+				StorageEndpoint:  reg.StorageEndpoint,
+			})
+		}
+		break
+	}
+	if err := m.jem.SetControllerRegions(ctx, m.ctlPath, regions); err != nil {
+		return errgo.Notef(err, "cannot set controller regions")
+	}
+	return nil
 }
 
 // watch reads events from the API megawatcher and
