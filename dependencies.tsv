@@ -36,7 +36,7 @@ github.com/juju/httpprof	git	14bf14c307672fd2456bdbf35d19cf0ccd3cf565	2014-12-17
 github.com/juju/httprequest	git	e4f0b769c8aeb2155281339360c4a7693bb26530	2016-11-07T14:39:25Z
 github.com/juju/idmclient	git	4dc25171f675da4206b71695d3fd80e519ad05c1	2017-02-09T16:27:49Z
 github.com/juju/jsonschema	git	a0ef8b74ebcffeeff9fc374854deb4af388f037e	2016-11-02T18:19:19Z
-github.com/juju/juju	git	1bb41c13d28c8dabbf74cff4f5ba2caf548df015	2018-04-13T13:24:33Z
+github.com/juju/juju	git	ac28813fcd5990b45d6a720233a43c2ea4b927c4	2018-04-23T05:02:11Z
 github.com/juju/loggo	git	8232ab8918d91c72af1a9fb94d3edbe31d88b790	2017-06-05T01:46:07Z
 github.com/juju/mutex	git	1fe2a4bf0a3a2c10881501233ff7c6aed7790082	2017-11-10T02:00:13Z
 github.com/juju/names	git	8a0aa0963bbacdc790914892e9ff942e94d6f795	2016-03-30T15:05:33Z
