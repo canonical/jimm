@@ -360,8 +360,8 @@ func (s *controllerSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
-	req := jujuparams.UpdateCloudCredentials{
-		Credentials: []jujuparams.UpdateCloudCredential{{
+	req := jujuparams.TaggedCredentials{
+		Credentials: []jujuparams.TaggedCredential{{
 			Tag: "not-a-cloud-credentials-tag",
 			Credential: jujuparams.CloudCredential{
 				AuthType: "credtype",
@@ -1429,7 +1429,7 @@ func (s *controllerSuite) TestDestroyModel(c *gc.C) {
 
 	client := modelmanager.NewClient(conn)
 	tag := names.NewModelTag(mi.UUID)
-	err := client.DestroyModel(tag)
+	err := client.DestroyModel(tag, newBool(true))
 	c.Assert(err, jc.ErrorIsNil)
 
 	// Check the model is now dying.
@@ -1444,7 +1444,7 @@ func (s *controllerSuite) TestDestroyModel(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 
 	// Make sure it's not an error if you destroy a model that't not there.
-	err = client.DestroyModel(names.NewModelTag(mi.UUID))
+	err = client.DestroyModel(names.NewModelTag(mi.UUID), newBool(true))
 	c.Assert(err, jc.ErrorIsNil)
 }
 
@@ -1712,4 +1712,8 @@ func machineInfo(c *gc.C, m *state.Machine) jujuparams.ModelMachineInfo {
 	c.Assert(err, jc.ErrorIsNil)
 	mi.Status = string(st.Status)
 	return mi
+}
+
+func newBool(b bool) *bool {
+	return &b
 }

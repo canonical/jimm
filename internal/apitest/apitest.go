@@ -68,7 +68,7 @@ func (s *Suite) SetUpTest(c *gc.C) {
 	s.IDMSrv = idmtest.NewServer()
 	s.JujuConnSuite.ControllerConfigAttrs = map[string]interface{}{
 		controller.IdentityURL:       s.IDMSrv.URL,
-		controller.IdentityPublicKey: s.IDMSrv.PublicKey,
+		controller.IdentityPublicKey: s.IDMSrv.PublicKey.String(),
 	}
 	s.JujuConnSuite.SetUpTest(c)
 	conn := s.OpenControllerAPI(c)

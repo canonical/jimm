@@ -24,7 +24,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charm.v6"
 	"gopkg.in/juju/names.v2"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 	"gopkg.in/mgo.v2/bson"
@@ -285,8 +285,8 @@ type bundle struct{}
 // GetChanges implements the GetChanges method on the Bundle facade.
 //
 // Note: This is copied from
-// github.com/juju/juju/apiserver/bundle/bundle.go and should be kept in
-// sync with that.
+// github.com/juju/juju/apiserver/facades/clientbundle/bundle.go and
+// should be kept in sync with that.
 func (b bundle) GetChanges(args jujuparams.BundleChangesParams) (jujuparams.BundleChangesResults, error) {
 	var results jujuparams.BundleChangesResults
 	data, err := charm.ReadBundleData(strings.NewReader(args.BundleDataYAML))
@@ -312,7 +312,10 @@ func (b bundle) GetChanges(args jujuparams.BundleChangesParams) (jujuparams.Bund
 		// This should never happen as Verify only returns verification errors.
 		return results, errgo.Notef(err, "cannot verify bundle")
 	}
-	changes := bundlechanges.FromData(data)
+	changes, err := bundlechanges.FromData(data, nil)
+	if err != nil {
+		return results, err
+	}
 	results.Changes = make([]*jujuparams.BundleChange, len(changes))
 	for i, c := range changes {
 		results.Changes[i] = &jujuparams.BundleChange{
@@ -465,7 +468,7 @@ func (c cloud) userCredentials(ctx context.Context, ownerTag, cloudTag string) (
 
 // UpdateCredentials implements the UpdateCredentials method of the Cloud
 // facade.
-func (c cloud) UpdateCredentials(args jujuparams.UpdateCloudCredentials) (jujuparams.ErrorResults, error) {
+func (c cloud) UpdateCredentials(args jujuparams.TaggedCredentials) (jujuparams.ErrorResults, error) {
 	ctx, cancel := context.WithTimeout(c.root.context, requestTimeout)
 	defer cancel()
 	results := make([]jujuparams.ErrorResult, len(args.Credentials))
@@ -480,7 +483,7 @@ func (c cloud) UpdateCredentials(args jujuparams.UpdateCloudCredentials) (jujupa
 }
 
 // updateCredential adds a single credential to the database.
-func (c cloud) updateCredential(ctx context.Context, arg jujuparams.UpdateCloudCredential) error {
+func (c cloud) updateCredential(ctx context.Context, arg jujuparams.TaggedCredential) error {
 	tag, err := names.ParseCloudCredentialTag(arg.Tag)
 	if err != nil {
 		return errgo.WithCausef(err, params.ErrBadRequest, "")
@@ -1012,7 +1015,7 @@ func (m modelManager) destroyModel(ctx context.Context, arg jujuparams.Entity) e
 		return errgo.Mask(err)
 	}
 	defer conn.Close()
-	if err := m.root.jem.DestroyModel(ctx, conn, model); err != nil {
+	if err := m.root.jem.DestroyModel(ctx, conn, model, nil); err != nil {
 		return errgo.Mask(err)
 	}
 	age := float64(time.Now().Sub(model.CreationTime)) / float64(time.Hour)

@@ -554,21 +554,14 @@ func (s *jemSuite) TestDestroyModel(c *gc.C) {
 
 	// Sanity check the model exists
 	client := modelmanagerapi.NewClient(conn)
-	models, err := client.ListModels("bob@external")
+	_, err = client.ModelInfo([]names.ModelTag{
+		names.NewModelTag(model.UUID),
+	})
 	c.Assert(err, jc.ErrorIsNil)
-	var found bool
-	for _, m := range models {
-		if m.UUID == model.UUID {
-			c.Logf("found %#v", m)
-			found = true
-			break
-		}
-	}
-	c.Assert(found, gc.Equals, true)
 
 	ch := waitForDestruction(conn, c, model.UUID)
 
-	err = s.jem.DestroyModel(testContext, conn, model)
+	err = s.jem.DestroyModel(testContext, conn, model, nil)
 	c.Assert(err, jc.ErrorIsNil)
 
 	select {
@@ -583,7 +576,7 @@ func (s *jemSuite) TestDestroyModel(c *gc.C) {
 	c.Assert(m.Life, gc.Equals, "dying")
 
 	// Check that it can be destroyed twice.
-	err = s.jem.DestroyModel(testContext, conn, model)
+	err = s.jem.DestroyModel(testContext, conn, model, nil)
 	c.Assert(err, jc.ErrorIsNil)
 
 	// Check the model is still dying.

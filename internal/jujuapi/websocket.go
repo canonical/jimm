@@ -138,7 +138,11 @@ type wsHandler struct {
 // handle handles the connection.
 func (h *wsHandler) handle(wsConn *websocket.Conn) {
 	codec := jsoncodec.NewWebsocket(wsConn)
-	conn := rpc.NewConn(codec, observerFactory{})
+	conn := rpc.NewConn(codec, func() rpc.Recorder {
+		return recorder{
+			start: time.Now(),
+		}
+	})
 	hm := newHeartMonitor(h.params.WebsocketRequestTimeout)
 	var root rpc.Root
 	if h.modelUUID == "" {
@@ -147,7 +151,7 @@ func (h *wsHandler) handle(wsConn *websocket.Conn) {
 		root = newModelRoot(h.context, h.jem, hm, h.modelUUID)
 	}
 	defer root.Kill()
-	conn.ServeRoot(root, func(err error) error {
+	conn.ServeRoot(root, nil, func(err error) error {
 		return mapError(err)
 	})
 	defer conn.Close()
@@ -160,27 +164,19 @@ func (h *wsHandler) handle(wsConn *websocket.Conn) {
 	}
 }
 
-// observerFactory implemnts an rpc.ObserverFactory.
-type observerFactory struct{}
-
-// RPCObserver implements rpc.ObserverFactory.RPCObserver.
-func (observerFactory) RPCObserver() rpc.Observer {
-	return observer{
-		start: time.Now(),
-	}
-}
-
-// observer implements an rpc.Observer.
-type observer struct {
+// recorder implements an rpc.Recorder.
+type recorder struct {
 	start time.Time
 }
 
-// ServerRequest implements rpc.Observer.ServerRequest.
-func (o observer) ServerRequest(*rpc.Header, interface{}) {
+// HandleRequest implements rpc.Recorder.
+func (recorder) HandleRequest(*rpc.Header, interface{}) error {
+	return nil
 }
 
-// ServerReply implements rpc.Observer.ServerReply.
-func (o observer) ServerReply(r rpc.Request, _ *rpc.Header, _ interface{}) {
+// HandleReply implements rpc.Recorder.
+func (o recorder) HandleReply(r rpc.Request, _ *rpc.Header, _ interface{}) error {
 	d := time.Since(o.start)
 	servermon.WebsocketRequestDuration.WithLabelValues(r.Type, r.Action).Observe(float64(d) / float64(time.Second))
+	return nil
 }
