@@ -44,7 +44,7 @@ func mapError(err error) *jujuparams.Error {
 	}
 	// TODO the error mapper should really accept a context from the RPC package.
 	zapctx.Debug(context.TODO(), "rpc error", zaputil.Error(err))
-	if perr, ok := err.(*jujuparams.Error); ok {
+	if perr, ok := errgo.Cause(err).(*jujuparams.Error); ok {
 		return perr
 	}
 	return &jujuparams.Error{

@@ -720,7 +720,7 @@ func (j *JEM) RevokeModel(ctx context.Context, conn *apiconn.Conn, model *mongod
 func (j *JEM) DestroyModel(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model, destroyStorage *bool) error {
 	client := modelmanager.NewClient(conn)
 	if err := client.DestroyModel(names.NewModelTag(model.UUID), destroyStorage); err != nil {
-		return errgo.Mask(err)
+		return errgo.Mask(err, jujuparams.IsCodeHasPersistentStorage)
 	}
 	if err := j.DB.SetModelLife(ctx, model.Controller, model.UUID, "dying"); err != nil {
 		// If this update fails then don't worry as the watcher
