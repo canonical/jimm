@@ -19,6 +19,7 @@ import (
 	"github.com/juju/juju/state"
 	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/juju/status"
+	"github.com/juju/juju/testing/factory"
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/version"
@@ -1429,7 +1430,7 @@ func (s *controllerSuite) TestDestroyModel(c *gc.C) {
 
 	client := modelmanager.NewClient(conn)
 	tag := names.NewModelTag(mi.UUID)
-	err := client.DestroyModel(tag, newBool(true))
+	err := client.DestroyModel(tag, nil)
 	c.Assert(err, jc.ErrorIsNil)
 
 	// Check the model is now dying.
@@ -1444,8 +1445,119 @@ func (s *controllerSuite) TestDestroyModel(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 
 	// Make sure it's not an error if you destroy a model that't not there.
-	err = client.DestroyModel(names.NewModelTag(mi.UUID), newBool(true))
+	err = client.DestroyModel(names.NewModelTag(mi.UUID), nil)
 	c.Assert(err, jc.ErrorIsNil)
+}
+
+func (s *controllerSuite) TestDestroyModelWithStorageError(c *gc.C) {
+	ctlPath := params.EntityPath{User: "alice", Name: "controller-1"}
+	s.AssertAddController(c, ctlPath, true)
+	s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
+	mi := s.assertCreateModel(c, createModelParams{name: "test-model", username: "alice", cred: "cred1"})
+
+	tag := names.NewModelTag(mi.UUID)
+	modelState, err := s.State.ForModel(tag)
+	c.Assert(err, jc.ErrorIsNil)
+	defer modelState.Close()
+	f := factory.NewFactory(modelState)
+	f.MakeUnit(c, &factory.UnitParams{
+		Application: f.MakeApplication(c, &factory.ApplicationParams{
+			Charm: f.MakeCharm(c, &factory.CharmParams{
+				Name: "storage-block",
+			}),
+			Storage: map[string]state.StorageConstraints{
+				"data": {Pool: "modelscoped"},
+			},
+		}),
+	})
+
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := modelmanager.NewClient(conn)
+	err = client.DestroyModel(tag, nil)
+	c.Assert(errgo.Cause(err), jc.Satisfies, jujuparams.IsCodeHasPersistentStorage)
+
+	// Check the model is not now dying.
+	mis, err := client.ModelInfo([]names.ModelTag{tag})
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(mis, gc.HasLen, 1)
+	c.Assert(mis[0].Error, gc.Equals, (*jujuparams.Error)(nil))
+	c.Assert(mis[0].Result.Life, gc.Equals, jujuparams.Alive)
+}
+
+func (s *controllerSuite) TestDestroyModelWithStorageDestroyStorageTrue(c *gc.C) {
+	ctlPath := params.EntityPath{User: "alice", Name: "controller-1"}
+	s.AssertAddController(c, ctlPath, true)
+	s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
+	mi := s.assertCreateModel(c, createModelParams{name: "test-model", username: "alice", cred: "cred1"})
+
+	tag := names.NewModelTag(mi.UUID)
+	modelState, err := s.State.ForModel(tag)
+	c.Assert(err, jc.ErrorIsNil)
+	defer modelState.Close()
+	f := factory.NewFactory(modelState)
+	f.MakeUnit(c, &factory.UnitParams{
+		Application: f.MakeApplication(c, &factory.ApplicationParams{
+			Charm: f.MakeCharm(c, &factory.CharmParams{
+				Name: "storage-block",
+			}),
+			Storage: map[string]state.StorageConstraints{
+				"data": {Pool: "modelscoped"},
+			},
+		}),
+	})
+
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := modelmanager.NewClient(conn)
+	err = client.DestroyModel(tag, newBool(true))
+	c.Assert(err, gc.Equals, nil)
+
+	// Check the model is not now dying.
+	mis, err := client.ModelInfo([]names.ModelTag{tag})
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(mis, gc.HasLen, 1)
+	c.Assert(mis[0].Error, gc.Equals, (*jujuparams.Error)(nil))
+	c.Assert(mis[0].Result.Life, gc.Equals, jujuparams.Dying)
+}
+
+func (s *controllerSuite) TestDestroyModelWithStorageDestroyStorageFalse(c *gc.C) {
+	ctlPath := params.EntityPath{User: "alice", Name: "controller-1"}
+	s.AssertAddController(c, ctlPath, true)
+	s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
+	mi := s.assertCreateModel(c, createModelParams{name: "test-model", username: "alice", cred: "cred1"})
+
+	tag := names.NewModelTag(mi.UUID)
+	modelState, err := s.State.ForModel(tag)
+	c.Assert(err, jc.ErrorIsNil)
+	defer modelState.Close()
+	f := factory.NewFactory(modelState)
+	f.MakeUnit(c, &factory.UnitParams{
+		Application: f.MakeApplication(c, &factory.ApplicationParams{
+			Charm: f.MakeCharm(c, &factory.CharmParams{
+				Name: "storage-block",
+			}),
+			Storage: map[string]state.StorageConstraints{
+				"data": {Pool: "modelscoped"},
+			},
+		}),
+	})
+
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := modelmanager.NewClient(conn)
+	err = client.DestroyModel(tag, newBool(false))
+	c.Assert(err, gc.Equals, nil)
+
+	// Check the model is not now dying.
+	mis, err := client.ModelInfo([]names.ModelTag{tag})
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(mis, gc.HasLen, 1)
+	c.Assert(mis[0].Error, gc.Equals, (*jujuparams.Error)(nil))
+	c.Assert(mis[0].Result.Life, gc.Equals, jujuparams.Dying)
 }
 
 type testHeartMonitor struct {

@@ -59,7 +59,9 @@ var facades = map[facade]string{
 	facade{"Cloud", 1}:        "Cloud",
 	facade{"Controller", 3}:   "Controller",
 	facade{"JIMM", 1}:         "JIMM",
-	facade{"ModelManager", 2}: "ModelManager",
+	facade{"ModelManager", 2}: "ModelManagerV2",
+	facade{"ModelManager", 3}: "ModelManagerV3",
+	facade{"ModelManager", 4}: "ModelManagerV4",
 	facade{"Pinger", 1}:       "Pinger",
 	facade{"UserManager", 1}:  "UserManager",
 }
@@ -139,14 +141,28 @@ func (r *controllerRoot) JIMM(id string) (jimm, error) {
 	return jimm{r}, nil
 }
 
-// ModelManager returns an implementation of the ModelManager facade
+// ModelManagerV2 returns an implementation of the ModelManager facade
 // (version 2).
-func (r *controllerRoot) ModelManager(id string) (modelManager, error) {
+func (r *controllerRoot) ModelManagerV2(id string) (modelManagerV2, error) {
+	mm, err := r.ModelManagerV3(id)
+	return modelManagerV2{mm}, err
+}
+
+// ModelManagerV3 returns an implementation of the ModelManager facade
+// (version 3).
+func (r *controllerRoot) ModelManagerV3(id string) (modelManagerV3, error) {
+	mm, err := r.ModelManagerV4(id)
+	return modelManagerV3{mm}, err
+}
+
+// ModelManagerV4 returns an implementation of the ModelManager facade
+// (version 4).
+func (r *controllerRoot) ModelManagerV4(id string) (modelManagerV4, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return modelManager{}, common.ErrBadId
+		return modelManagerV4{}, common.ErrBadId
 	}
-	return modelManager{r}, nil
+	return modelManagerV4{r}, nil
 }
 
 // Pinger returns an implementation of the Pinger facade (version 1).
@@ -205,7 +221,7 @@ func (r *controllerRoot) FindMethod(rootName string, version int, methodName str
 			Version:    version,
 		}
 	}
-	return r.findMethod(rootName, 0, methodName)
+	return r.findMethod(rn, 0, methodName)
 }
 
 // Kill implements rpcreflect.Root.Kill.
@@ -665,14 +681,14 @@ func (c controller) modelStatus(ctx context.Context, arg jujuparams.Entity) (*ju
 	}, nil
 }
 
-// modelManager implements the ModelManager facade.
-type modelManager struct {
+// modelManagerV4 implements the ModelManager (version 4) facade.
+type modelManagerV4 struct {
 	root *controllerRoot
 }
 
 // ListModels returns the models that the authenticated user
 // has access to. The user parameter is ignored.
-func (m modelManager) ListModels(_ jujuparams.Entity) (jujuparams.UserModelList, error) {
+func (m modelManagerV4) ListModels(_ jujuparams.Entity) (jujuparams.UserModelList, error) {
 	return m.root.allModels(m.root.context)
 }
 
@@ -706,7 +722,7 @@ func userModelForModelDoc(m *mongodoc.Model) jujuparams.Model {
 }
 
 // ModelInfo implements the ModelManager facade's ModelInfo method.
-func (m modelManager) ModelInfo(args jujuparams.Entities) (jujuparams.ModelInfoResults, error) {
+func (m modelManagerV4) ModelInfo(args jujuparams.Entities) (jujuparams.ModelInfoResults, error) {
 	ctx, cancel := context.WithTimeout(m.root.context, requestTimeout)
 	defer cancel()
 	results := make([]jujuparams.ModelInfoResult, len(args.Entities))
@@ -915,7 +931,7 @@ func iterUsers(ctx context.Context, users []jujuparams.ModelUserInfo, f func(par
 }
 
 // CreateModel implements the ModelManager facade's CreateModel method.
-func (m modelManager) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.ModelInfo, error) {
+func (m modelManagerV4) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.ModelInfo, error) {
 	ctx, cancel := context.WithTimeout(m.root.context, requestTimeout)
 	defer cancel()
 	mi, err := m.createModel(ctx, args)
@@ -934,7 +950,7 @@ func (m modelManager) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.M
 	return *mi, nil
 }
 
-func (m modelManager) createModel(ctx context.Context, args jujuparams.ModelCreateArgs) (*jujuparams.ModelInfo, error) {
+func (m modelManagerV4) createModel(ctx context.Context, args jujuparams.ModelCreateArgs) (*jujuparams.ModelInfo, error) {
 	ownerTag, err := names.ParseUserTag(args.OwnerTag)
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid owner tag")
@@ -984,13 +1000,13 @@ func (m modelManager) createModel(ctx context.Context, args jujuparams.ModelCrea
 }
 
 // DestroyModels implements the ModelManager facade's DestroyModels method.
-func (m modelManager) DestroyModels(args jujuparams.Entities) (jujuparams.ErrorResults, error) {
+func (m modelManagerV4) DestroyModels(args jujuparams.DestroyModelsParams) (jujuparams.ErrorResults, error) {
 	ctx, cancel := context.WithTimeout(m.root.context, requestTimeout)
 	defer cancel()
-	results := make([]jujuparams.ErrorResult, len(args.Entities))
+	results := make([]jujuparams.ErrorResult, len(args.Models))
 
-	for i, arg := range args.Entities {
-		if err := m.destroyModel(ctx, arg); err != nil {
+	for i, model := range args.Models {
+		if err := m.destroyModel(ctx, model); err != nil {
 			results[i].Error = mapError(err)
 		}
 	}
@@ -1001,8 +1017,8 @@ func (m modelManager) DestroyModels(args jujuparams.Entities) (jujuparams.ErrorR
 }
 
 // destroyModel destroys the specified model.
-func (m modelManager) destroyModel(ctx context.Context, arg jujuparams.Entity) error {
-	model, err := getModel(ctx, m.root.jem, arg.Tag, auth.CheckIsAdmin)
+func (m modelManagerV4) destroyModel(ctx context.Context, arg jujuparams.DestroyModelParams) error {
+	model, err := getModel(ctx, m.root.jem, arg.ModelTag, auth.CheckIsAdmin)
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			// Juju doesn't treat removing a model that isn't there as an error, and neither should we.
@@ -1015,8 +1031,8 @@ func (m modelManager) destroyModel(ctx context.Context, arg jujuparams.Entity) e
 		return errgo.Mask(err)
 	}
 	defer conn.Close()
-	if err := m.root.jem.DestroyModel(ctx, conn, model, nil); err != nil {
-		return errgo.Mask(err)
+	if err := m.root.jem.DestroyModel(ctx, conn, model, arg.DestroyStorage); err != nil {
+		return errgo.Mask(err, jujuparams.IsCodeHasPersistentStorage)
 	}
 	age := float64(time.Now().Sub(model.CreationTime)) / float64(time.Hour)
 	servermon.ModelLifetime.Observe(age)
@@ -1025,7 +1041,7 @@ func (m modelManager) destroyModel(ctx context.Context, arg jujuparams.Entity) e
 }
 
 // ModifyModelAccess implements the ModelManager facade's ModifyModelAccess method.
-func (m modelManager) ModifyModelAccess(args jujuparams.ModifyModelAccessRequest) (jujuparams.ErrorResults, error) {
+func (m modelManagerV4) ModifyModelAccess(args jujuparams.ModifyModelAccessRequest) (jujuparams.ErrorResults, error) {
 	ctx, cancel := context.WithTimeout(m.root.context, requestTimeout)
 	defer cancel()
 	results := make([]jujuparams.ErrorResult, len(args.Changes))
@@ -1040,7 +1056,7 @@ func (m modelManager) ModifyModelAccess(args jujuparams.ModifyModelAccessRequest
 	}, nil
 }
 
-func (m modelManager) modifyModelAccess(ctx context.Context, change jujuparams.ModifyModelAccess) error {
+func (m modelManagerV4) modifyModelAccess(ctx context.Context, change jujuparams.ModifyModelAccess) error {
 	model, err := getModel(ctx, m.root.jem, change.ModelTag, auth.CheckIsAdmin)
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
@@ -1073,6 +1089,27 @@ func (m modelManager) modifyModelAccess(ctx context.Context, change jujuparams.M
 		return errgo.Mask(err)
 	}
 	return nil
+}
+
+type modelManagerV3 struct {
+	modelManagerV4
+}
+
+func (m modelManagerV3) DestroyModels(args jujuparams.Entities) (jujuparams.ErrorResults, error) {
+	// This is the default behviour for model manager V3 and below.
+	destroyStorage := true
+	models := make([]jujuparams.DestroyModelParams, len(args.Entities))
+	for i, ent := range args.Entities {
+		models[i] = jujuparams.DestroyModelParams{
+			ModelTag:       ent.Tag,
+			DestroyStorage: &destroyStorage,
+		}
+	}
+	return m.modelManagerV4.DestroyModels(jujuparams.DestroyModelsParams{models})
+}
+
+type modelManagerV2 struct {
+	modelManagerV3
 }
 
 // jimm implements a facade containing JIMM-specific API calls.
@@ -1194,7 +1231,7 @@ func fetchModelInfo(ctx context.Context, jem *jem.JEM, model *mongodoc.Model) (*
 }
 
 // ModelStatus implements the ModelManager facade's ModelStatus method.
-func (m modelManager) ModelStatus(req jujuparams.Entities) (jujuparams.ModelStatusResults, error) {
+func (m modelManagerV4) ModelStatus(req jujuparams.Entities) (jujuparams.ModelStatusResults, error) {
 	return controller{m.root}.ModelStatus(req)
 }
 

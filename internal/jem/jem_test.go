@@ -10,8 +10,10 @@ import (
 	"github.com/juju/juju/api/controller"
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/state"
 	"github.com/juju/juju/state/multiwatcher"
 	jujujujutesting "github.com/juju/juju/testing"
+	"github.com/juju/juju/testing/factory"
 	jt "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/version"
@@ -607,6 +609,37 @@ func waitForDestruction(conn *apiconn.Conn, c *gc.C, uuid string) <-chan struct{
 		}
 	}()
 	return ch
+}
+
+func (s *jemSuite) TestDestroyModelWithStorage(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	conn, err := s.jem.OpenAPI(testContext, model.Controller)
+	c.Assert(err, jc.ErrorIsNil)
+	defer conn.Close()
+
+	// Sanity check the model exists
+	tag := names.NewModelTag(model.UUID)
+	client := modelmanagerapi.NewClient(conn)
+	_, err = client.ModelInfo([]names.ModelTag{tag})
+	c.Assert(err, jc.ErrorIsNil)
+
+	modelState, err := s.State.ForModel(tag)
+	c.Assert(err, jc.ErrorIsNil)
+	defer modelState.Close()
+	f := factory.NewFactory(modelState)
+	f.MakeUnit(c, &factory.UnitParams{
+		Application: f.MakeApplication(c, &factory.ApplicationParams{
+			Charm: f.MakeCharm(c, &factory.CharmParams{
+				Name: "storage-block",
+			}),
+			Storage: map[string]state.StorageConstraints{
+				"data": {Pool: "modelscoped"},
+			},
+		}),
+	})
+
+	err = s.jem.DestroyModel(testContext, conn, model, nil)
+	c.Assert(err, jc.Satisfies, jujuparams.IsCodeHasPersistentStorage)
 }
 
 func (s *jemSuite) TestUpdateCredential(c *gc.C) {
