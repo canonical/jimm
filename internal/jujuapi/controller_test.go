@@ -522,6 +522,79 @@ func (s *controllerSuite) TestLoginToRoot(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `no such request - method Admin.RedirectInfo is not implemented \(not implemented\)`)
 }
 
+func (s *controllerSuite) TestListModelSummaries(c *gc.C) {
+	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
+	cred2 := s.AssertUpdateCredential(c, "test2", "dummy", "cred1", "empty")
+	err := s.JEM.DB.SetACL(testContext, s.JEM.DB.Controllers(), ctlPath, params.ACL{
+		Read: []string{"test2"},
+	})
+
+	c.Assert(err, jc.ErrorIsNil)
+	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
+	modelUUID1 := mi.UUID
+	s.assertCreateModel(c, createModelParams{name: "model-2", username: "test2", cred: cred2})
+	mi = s.assertCreateModel(c, createModelParams{name: "model-3", username: "test2", cred: cred2})
+	modelUUID3 := mi.UUID
+	err = s.JEM.DB.SetACL(testContext, s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
+		Read: []string{"test"},
+	})
+
+	c.Assert(err, jc.ErrorIsNil)
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := modelmanager.NewClient(conn)
+	models, err := client.ListModelSummaries("test", false)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(models, jc.DeepEquals, []base.UserModelSummary{{
+		Name:            "model-1",
+		UUID:            modelUUID1,
+		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+		ProviderType:    "dummy",
+		DefaultSeries:   "xenial",
+		Cloud:           "dummy",
+		CloudRegion:     "dummy-region",
+		CloudCredential: "dummy/test@external/cred1",
+		Owner:           "test@external",
+		Life:            "alive",
+		Status: base.Status{
+			Status: status.Available,
+			Data:   map[string]interface{}{},
+		},
+		ModelUserAccess: "admin",
+		Counts: []base.EntityCount{{
+			Entity: "machines",
+			Count:  0,
+		}, {
+			Entity: "cores",
+			Count:  0,
+		}},
+	}, {
+		Name:            "model-3",
+		UUID:            modelUUID3,
+		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+		ProviderType:    "dummy",
+		DefaultSeries:   "xenial",
+		Cloud:           "dummy",
+		CloudRegion:     "dummy-region",
+		CloudCredential: "dummy/test2@external/cred1",
+		Owner:           "test2@external",
+		Life:            "alive",
+		Status: base.Status{
+			Status: status.Available,
+			Data:   map[string]interface{}{},
+		},
+		ModelUserAccess: "read",
+		Counts: []base.EntityCount{{
+			Entity: "machines",
+			Count:  0,
+		}, {
+			Entity: "cores",
+			Count:  0,
+		}},
+	}})
+}
+
 func (s *controllerSuite) TestListModels(c *gc.C) {
 	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
