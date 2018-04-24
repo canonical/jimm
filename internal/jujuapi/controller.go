@@ -202,6 +202,25 @@ func (r *controllerRoot) credentialSchema(ctx context.Context, cloud params.Clou
 	return r.schemataCache[cloud][jujucloud.AuthType(authType)], nil
 }
 
+// doModels calls the given function for each model that the
+// authenticated user has access to. If f returns an error, the iteration
+// will be stopped and the returned error will have the same cause.
+func (r *controllerRoot) doModels(ctx context.Context, f func(context.Context, *mongodoc.Model) error) error {
+	it := r.jem.DB.NewCanReadIter(ctx, r.jem.DB.Models().Find(nil).Sort("_id").Iter())
+	defer it.Close()
+
+	for {
+		var model mongodoc.Model
+		if !it.Next(&model) {
+			break
+		}
+		if err := f(ctx, &model); err != nil {
+			return errgo.Mask(err, errgo.Any)
+		}
+	}
+	return errgo.Mask(it.Err())
+}
+
 // FindMethod implements rpcreflect.MethodFinder.
 func (r *controllerRoot) FindMethod(rootName string, version int, methodName string) (rpcreflect.MethodCaller, error) {
 	// update the heart monitor for every request received.
@@ -686,6 +705,92 @@ type modelManagerV4 struct {
 	root *controllerRoot
 }
 
+// ListModelSummaries returns summaries for all the models that that
+// authenticated user has access to. The request parameter is ignored.
+func (m modelManagerV4) ListModelSummaries(jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error) {
+	var results []jujuparams.ModelSummaryResult
+	err := m.root.doModels(m.root.context, func(ctx context.Context, model *mongodoc.Model) error {
+		cloud, err := m.root.jem.DB.Cloud(ctx, model.Cloud)
+		if err != nil {
+			results = append(results, jujuparams.ModelSummaryResult{
+				Error: mapError(errgo.Notef(err, "cannot get cloud %q", model.Cloud)),
+			})
+			return nil
+		}
+		// If we get this far the user must have at least read access.
+		access := jujuparams.ModelReadAccess
+		switch {
+		case params.User(auth.Username(ctx)) == model.Path.User:
+			access = jujuparams.ModelAdminAccess
+		case auth.CheckACL(ctx, model.ACL.Admin) == nil:
+			access = jujuparams.ModelAdminAccess
+		case auth.CheckACL(ctx, model.ACL.Write) == nil:
+			access = jujuparams.ModelWriteAccess
+		}
+		machines, err := m.root.jem.DB.MachinesForModel(ctx, model.UUID)
+		if err != nil {
+			results = append(results, jujuparams.ModelSummaryResult{
+				Error: mapError(errgo.Notef(err, "cannot get machines for model %q", model.UUID)),
+			})
+			return nil
+		}
+		machineCount := int64(len(machines))
+		var coreCount int64
+		for _, machine := range machines {
+			if machine.Info != nil &&
+				machine.Info.HardwareCharacteristics != nil &&
+				machine.Info.HardwareCharacteristics.CpuCores != nil {
+				coreCount += int64(*machine.Info.HardwareCharacteristics.CpuCores)
+			}
+		}
+
+		results = append(results, jujuparams.ModelSummaryResult{
+			Result: &jujuparams.ModelSummary{
+				Name:               string(model.Path.Name),
+				UUID:               model.UUID,
+				ControllerUUID:     m.root.params.ControllerUUID,
+				ProviderType:       cloud.ProviderType,
+				DefaultSeries:      model.DefaultSeries,
+				CloudTag:           jem.CloudTag(model.Cloud).String(),
+				CloudRegion:        model.CloudRegion,
+				CloudCredentialTag: jem.CloudCredentialTag(model.Credential).String(),
+				OwnerTag:           jem.UserTag(model.Path.User).String(),
+				Life:               jujuparams.Life(model.Life),
+				// TODO if the multiwatcher returned updates to model
+				// status, we could do better here, but the model status doesn't
+				// reflect much anyway.
+				Status: jujuparams.EntityStatus{
+					Status: status.Available,
+				},
+				UserAccess: access,
+				// TODO currently user logins aren't communicated by the multiwatcher
+				// so the UserLastConnection time is not known.
+				UserLastConnection: nil,
+				Counts: []jujuparams.ModelEntityCount{{
+					Entity: jujuparams.Machines,
+					Count:  machineCount,
+				}, {
+					Entity: jujuparams.Cores,
+					Count:  coreCount,
+				}},
+				// TODO currently we don't store any migration information about models.
+				Migration: nil,
+				// TODO currently we don't store any SLA information.
+				SLA: nil,
+				// TODO currently we don't store the model agent version.
+				AgentVersion: nil,
+			},
+		})
+		return nil
+	})
+	if err != nil {
+		return jujuparams.ModelSummaryResults{}, errgo.Mask(err)
+	}
+	return jujuparams.ModelSummaryResults{
+		Results: results,
+	}, nil
+}
+
 // ListModels returns the models that the authenticated user
 // has access to. The user parameter is ignored.
 func (m modelManagerV4) ListModels(_ jujuparams.Entity) (jujuparams.UserModelList, error) {
@@ -695,17 +800,14 @@ func (m modelManagerV4) ListModels(_ jujuparams.Entity) (jujuparams.UserModelLis
 // allModels returns all the models the logged in user has access to.
 func (r *controllerRoot) allModels(ctx context.Context) (jujuparams.UserModelList, error) {
 	var models []jujuparams.UserModel
-
-	it := r.jem.DB.NewCanReadIter(ctx, r.jem.DB.Models().Find(nil).Sort("_id").Iter())
-
-	var model mongodoc.Model
-	for it.Next(&model) {
+	err := r.doModels(ctx, func(ctx context.Context, model *mongodoc.Model) error {
 		models = append(models, jujuparams.UserModel{
-			Model:          userModelForModelDoc(&model),
+			Model:          userModelForModelDoc(model),
 			LastConnection: nil, // TODO (mhilton) work out how to record and set this.
 		})
-	}
-	if err := it.Err(); err != nil {
+		return nil
+	})
+	if err != nil {
 		return jujuparams.UserModelList{}, errgo.Mask(err)
 	}
 	return jujuparams.UserModelList{
