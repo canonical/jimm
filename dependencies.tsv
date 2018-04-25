@@ -11,6 +11,7 @@ github.com/dgrijalva/jwt-go	git	01aeca54ebda6e0fbfafd0a524d234159c05ec20	2016-07
 github.com/dustin/go-humanize	git	145fabdb1ab757076a70a886d092a3af27f66f4c	2014-12-28T07:11:48Z
 github.com/godbus/dbus	git	32c6cc29c14570de4cf6d7e7737d68fb2d01ad15	2016-05-06T22:25:50Z
 github.com/golang/protobuf	git	4bd1920723d7b7c925de087aa32e2187708897f7	2016-11-09T07:27:36Z
+github.com/google/go-cmp	git	5411ab924f9ffa6566244a9e504bc347edacffd3	2018-03-28T20:15:12Z
 github.com/gorilla/context	git	215affda49addc4c8ef7e2534915df2c8c35c6cd	2014-12-17T16:02:51Z
 github.com/gorilla/handlers	git	13d73096a474cac93275c679c7b8a2dc17ddba82	2017-02-24T19:39:55Z
 github.com/gorilla/mux	git	e444e69cbd2e2e3e0749a2f3c717cec491552bbf	2014-09-26T15:38:14Z

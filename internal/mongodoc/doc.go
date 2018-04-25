@@ -207,7 +207,7 @@ type Model struct {
 
 	// Life holds the current life status of the model ("alive", "dying"
 	// or "dead").
-	Life string
+	Life_ string `bson:"life"`
 
 	// Counts holds information about the number of various kinds
 	// of entities in the model.
@@ -252,6 +252,42 @@ type Model struct {
 	// UsageSenderCredentials prove that we are authorized to send usage
 	// information for this model.
 	UsageSenderCredentials []byte
+
+	// Status holds the current status of the model
+	Info *ModelInfo `bson:",omitempty"`
+}
+
+type ModelInfo struct {
+	// Life holds the life of the model
+	Life string
+
+	// Config holds the model configuration
+	Config map[string]interface{} `bson:",omitempty"`
+
+	// Status holds the current status of the model.
+	Status ModelStatus
+}
+
+type ModelStatus struct {
+	// Status holds the actual status value.
+	Status string
+
+	// Message holds a message associated with the status.
+	Message string
+
+	// Since contains the time this status has been valid since.
+	Since time.Time `bson:",omitempty"`
+
+	// Data contains data associated with the status.
+	Data map[string]interface{} `bson:",omitempty"`
+}
+
+// Life determines the current life of a model object.
+func (m *Model) Life() string {
+	if m.Info != nil {
+		return m.Info.Life
+	}
+	return m.Life_
 }
 
 // Machine holds information on a machine in a model, as discovered by the

@@ -235,12 +235,18 @@ func (s *internalSuite) TestWatcher(c *gc.C) {
 		},
 		model1: modelStats{
 			life:             "alive",
+			status:           "available",
+			hasConfig:        true,
+			hasStatusSince:   true,
 			unitCount:        2,
 			machineCount:     2,
 			applicationCount: 1,
 		},
 		model2: modelStats{
 			life:             "alive",
+			status:           "available",
+			hasConfig:        true,
+			hasStatusSince:   true,
 			unitCount:        3,
 			machineCount:     2,
 			applicationCount: 1,
@@ -262,12 +268,18 @@ func (s *internalSuite) TestWatcher(c *gc.C) {
 		},
 		model1: modelStats{
 			life:             "alive",
+			status:           "available",
+			hasConfig:        true,
+			hasStatusSince:   true,
 			unitCount:        2,
 			machineCount:     2,
 			applicationCount: 1,
 		},
 		model2: modelStats{
 			life:             "alive",
+			status:           "available",
+			hasConfig:        true,
+			hasStatusSince:   true,
 			unitCount:        5,
 			machineCount:     4,
 			applicationCount: 2,
@@ -289,12 +301,18 @@ func (s *internalSuite) TestWatcher(c *gc.C) {
 		},
 		model1: modelStats{
 			life:             "dying",
+			status:           "available",
+			hasConfig:        true,
+			hasStatusSince:   true,
 			unitCount:        2,
 			machineCount:     2,
 			applicationCount: 1,
 		},
 		model2: modelStats{
 			life:             "alive",
+			status:           "available",
+			hasConfig:        true,
+			hasStatusSince:   true,
 			unitCount:        5,
 			machineCount:     4,
 			applicationCount: 2,
@@ -312,11 +330,12 @@ func (s *internalSuite) TestWatcher(c *gc.C) {
 			UnitCount:    5,
 			MachineCount: 4,
 		},
-		model1: modelStats{
-			life: "dead",
-		},
+		model1: modelStats{},
 		model2: modelStats{
 			life:             "alive",
+			status:           "available",
+			hasConfig:        true,
+			hasStatusSince:   true,
 			unitCount:        5,
 			machineCount:     4,
 			applicationCount: 2,
@@ -365,9 +384,7 @@ func (s *internalSuite) TestModelRemovedWithFailedWatcher(c *gc.C) {
 
 	jshim.await(c, func() interface{} {
 		return s.modelStats(c, modelPath)
-	}, modelStats{
-		life: "dead",
-	})
+	}, modelStats{})
 }
 
 func (s *internalSuite) TestWatcherUpdatesMachineInfo(c *gc.C) {
@@ -1204,6 +1221,10 @@ func (s *internalSuite) controllerStats(c *gc.C, ctlPath params.EntityPath) mong
 // modelStats holds the aspects of a model updated by the monitor.
 type modelStats struct {
 	life                                      string
+	status                                    string
+	message                                   string
+	hasConfig                                 bool
+	hasStatusSince                            bool
 	unitCount, machineCount, applicationCount int
 }
 
@@ -1212,21 +1233,28 @@ func (s *internalSuite) modelStats(c *gc.C, modelPath params.EntityPath) modelSt
 	// The database now deletes any models set to "dead", if the
 	// model cannot be found then return that it is "dead".
 	if errgo.Cause(err) == params.ErrNotFound {
-		return modelStats{
-			life: "dead",
-		}
+		return modelStats{}
 	}
 	c.Assert(err, gc.IsNil)
 	counts := make(map[params.EntityCount]int)
 	for name, count := range modelDoc.Counts {
 		counts[name] = count.Current
 	}
-	return modelStats{
-		life:             modelDoc.Life,
+
+	ms := modelStats{
 		unitCount:        modelDoc.Counts[params.UnitCount].Current,
 		machineCount:     modelDoc.Counts[params.MachineCount].Current,
 		applicationCount: modelDoc.Counts[params.ApplicationCount].Current,
 	}
+	if modelDoc.Info == nil {
+		return ms
+	}
+	ms.life = modelDoc.Info.Life
+	ms.status = modelDoc.Info.Status.Status
+	ms.message = modelDoc.Info.Status.Message
+	ms.hasConfig = len(modelDoc.Info.Config) > 0
+	ms.hasStatusSince = !modelDoc.Info.Status.Since.IsZero()
+	return ms
 }
 
 func (s *internalSuite) modelLife(c *gc.C, modelPath params.EntityPath) string {

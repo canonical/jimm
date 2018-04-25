@@ -327,7 +327,7 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 			c.Assert(m.Credential, jc.DeepEquals, test.params.Credential)
 		}
 		c.Assert(m.DefaultSeries, gc.Not(gc.Equals), "")
-		c.Assert(m.Life, gc.Equals, "alive")
+		c.Assert(m.Life(), gc.Equals, "alive")
 	}
 }
 
@@ -573,18 +573,16 @@ func (s *jemSuite) TestDestroyModel(c *gc.C) {
 	}
 
 	// Check the model is dying.
-	m, err := s.jem.DB.Model(testContext, model.Path)
+	_, err = s.jem.DB.Model(testContext, model.Path)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(m.Life, gc.Equals, "dying")
 
 	// Check that it can be destroyed twice.
 	err = s.jem.DestroyModel(testContext, conn, model, nil)
 	c.Assert(err, jc.ErrorIsNil)
 
 	// Check the model is still dying.
-	m, err = s.jem.DB.Model(testContext, model.Path)
+	_, err = s.jem.DB.Model(testContext, model.Path)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(m.Life, gc.Equals, "dying")
 }
 
 func waitForDestruction(conn *apiconn.Conn, c *gc.C, uuid string) <-chan struct{} {

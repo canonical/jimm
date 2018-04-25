@@ -127,11 +127,19 @@ func (s jemShimWithUpdateNotify) SetControllerRegions(ctx context.Context, ctlPa
 	return nil
 }
 
-func (s jemShimWithUpdateNotify) SetModelLife(ctx context.Context, ctlPath params.EntityPath, uuid string, life string) error {
-	if err := s.jemInterface.SetModelLife(ctx, ctlPath, uuid, life); err != nil {
+func (s jemShimWithUpdateNotify) SetModelInfo(ctx context.Context, ctlPath params.EntityPath, uuid string, info *mongodoc.ModelInfo) error {
+	if err := s.jemInterface.SetModelInfo(ctx, ctlPath, uuid, info); err != nil {
 		return err
 	}
-	s.changed <- "model life"
+	s.changed <- "model info"
+	return nil
+}
+
+func (s jemShimWithUpdateNotify) DeleteModelWithUUID(ctx context.Context, ctlPath params.EntityPath, uuid string) error {
+	if err := s.jemInterface.DeleteModelWithUUID(ctx, ctlPath, uuid); err != nil {
+		return err
+	}
+	s.changed <- "delete model"
 	return nil
 }
 
@@ -306,13 +314,25 @@ func (s *jemShimInMemory) SetControllerRegions(ctx context.Context, ctlPath para
 	return nil
 }
 
-func (s *jemShimInMemory) SetModelLife(ctx context.Context, ctlPath params.EntityPath, uuid string, life string) error {
+func (s *jemShimInMemory) SetModelInfo(ctx context.Context, ctlPath params.EntityPath, uuid string, info *mongodoc.ModelInfo) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, m := range s.models {
 		if m.Controller == ctlPath && m.UUID == uuid {
-			log.Printf("setting model life of %v to %v", uuid, life)
-			m.Life = life
+			log.Printf("setting model info of %v to %v", uuid, info)
+			m.Info = info
+		}
+	}
+	return nil
+}
+
+func (s *jemShimInMemory) DeleteModelWithUUID(ctx context.Context, ctlPath params.EntityPath, uuid string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for k, m := range s.models {
+		if m.Controller == ctlPath && m.UUID == uuid {
+			log.Printf("delete model %v (%s)", uuid, k)
+			delete(s.models, k)
 		}
 	}
 	return nil

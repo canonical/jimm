@@ -68,8 +68,12 @@ func (j jemShim) SetControllerAvailable(ctx context.Context, ctlPath params.Enti
 	return errgo.Mask(j.DB.SetControllerAvailable(ctx, ctlPath), errgo.Any)
 }
 
-func (j jemShim) SetModelLife(ctx context.Context, ctlPath params.EntityPath, uuid string, life string) error {
-	return errgo.Mask(j.DB.SetModelLife(ctx, ctlPath, uuid, life), errgo.Any)
+func (j jemShim) SetModelInfo(ctx context.Context, ctlPath params.EntityPath, uuid string, info *mongodoc.ModelInfo) error {
+	return errgo.Mask(j.DB.SetModelInfo(ctx, ctlPath, uuid, info), errgo.Any)
+}
+
+func (j jemShim) DeleteModelWithUUID(ctx context.Context, ctlPath params.EntityPath, uuid string) error {
+	return errgo.Mask(j.DB.DeleteModelWithUUID(ctx, ctlPath, uuid), errgo.Any)
 }
 
 func (j jemShim) UpdateModelCounts(ctx context.Context, uuid string, counts map[params.EntityCount]int, now time.Time) (err error) {

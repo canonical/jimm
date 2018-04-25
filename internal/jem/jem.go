@@ -545,14 +545,24 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 	// and update other attributes from the response too.
 	// Use Apply so that we can return a result that's consistent
 	// with Database.Model.
-	// TODO update life and other things if need be.
+	info := mongodoc.ModelInfo{
+		Life: string(m.Life),
+		Status: mongodoc.ModelStatus{
+			Status:  string(m.Status.Status),
+			Message: m.Status.Info,
+			Data:    m.Status.Data,
+		},
+	}
+	if m.Status.Since != nil {
+		info.Status.Since = *m.Status.Since
+	}
 	if _, err := j.DB.Models().FindId(modelDoc.Id).Apply(mgo.Change{
 		Update: bson.D{{"$set", bson.D{
 			{"uuid", m.UUID},
 			{"cloud", m.Cloud},
 			{"cloudregion", m.CloudRegion},
 			{"defaultseries", m.DefaultSeries},
-			{"life", m.Life},
+			{"info", info},
 		}}},
 		ReturnNew: true,
 	}, &modelDoc); err != nil {

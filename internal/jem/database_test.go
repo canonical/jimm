@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/juju/state/multiwatcher"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
@@ -362,6 +363,7 @@ func (s *databaseSuite) TestDeleteModel(c *gc.C) {
 	err = s.database.DeleteModel(testContext, m2.Path)
 	c.Assert(err, gc.IsNil)
 	m3, err := s.database.Model(testContext, modelPath)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	c.Assert(m3, gc.IsNil)
 
 	err = s.database.DeleteModel(testContext, m2.Path)
@@ -385,7 +387,7 @@ func (s *databaseSuite) TestAddModel(c *gc.C) {
 
 	m1, err := s.database.Model(testContext, ctlPath)
 	c.Assert(err, gc.IsNil)
-	c.Assert(m1, jc.DeepEquals, m)
+	c.Assert(m1, jemtest.CmpEquals(cmpopts.EquateEmpty()), m)
 
 	err = s.database.AddModel(testContext, m)
 	c.Assert(err, gc.ErrorMatches, "already exists")
@@ -461,7 +463,7 @@ func (s *databaseSuite) TestUpdateLegacyModel(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	m1, err := s.database.Model(testContext, ctlPath)
-	c.Assert(m1, jc.DeepEquals, m)
+	c.Assert(m1, jemtest.CmpEquals(cmpopts.EquateEmpty()), m)
 
 	m2 := &mongodoc.Model{
 		Id:   "ignored",
@@ -491,7 +493,7 @@ func (s *databaseSuite) TestModelFromUUID(c *gc.C) {
 
 	m1, err := s.database.ModelFromUUID(testContext, uuid)
 	c.Assert(err, gc.IsNil)
-	c.Assert(m1, jc.DeepEquals, m)
+	c.Assert(m1, jemtest.CmpEquals(cmpopts.EquateEmpty()), m)
 
 	m2, err := s.database.ModelFromUUID(testContext, "no-such-uuid")
 	c.Assert(err, gc.ErrorMatches, `model "no-such-uuid" not found`)
@@ -884,6 +886,12 @@ func (s *databaseSuite) TestSetModelLifeNotFound(c *gc.C) {
 	s.checkDBOK(c)
 }
 
+func (s *databaseSuite) TestSetModelInfoNotFound(c *gc.C) {
+	err := s.database.SetModelInfo(testContext, params.EntityPath{"bob", "foo"}, "fake-uuid", &mongodoc.ModelInfo{})
+	c.Assert(err, gc.IsNil)
+	s.checkDBOK(c)
+}
+
 func (s *databaseSuite) TestSetControllerDeprecated(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 
@@ -969,19 +977,19 @@ func (s *databaseSuite) TestSetModelLifeSuccess(c *gc.C) {
 
 	m, err := s.database.Model(testContext, ctlPath)
 	c.Assert(err, gc.IsNil)
-	c.Assert(m.Life, gc.Equals, "alive")
+	c.Assert(m.Life(), gc.Equals, "alive")
 
 	m, err = s.database.Model(testContext, params.EntityPath{"bar", "baz"})
 	c.Assert(err, gc.IsNil)
-	c.Assert(m.Life, gc.Equals, "")
+	c.Assert(m.Life(), gc.Equals, "")
 
 	m, err = s.database.Model(testContext, params.EntityPath{"alice", "baz"})
 	c.Assert(err, gc.IsNil)
-	c.Assert(m.Life, gc.Equals, "")
+	c.Assert(m.Life(), gc.Equals, "")
 	s.checkDBOK(c)
 }
 
-func (s *databaseSuite) TestSetModelLifeRemoveDead(c *gc.C) {
+func (s *databaseSuite) TestSetModelInfoSuccess(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	err := s.database.AddController(testContext, &mongodoc.Controller{
 		Path: ctlPath,
@@ -997,7 +1005,58 @@ func (s *databaseSuite) TestSetModelLifeRemoveDead(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 
-	err = s.database.SetModelLife(testContext, ctlPath, "fake-uuid", "dead")
+	// Add another model with the same UUID but a different controller.
+	err = s.database.AddModel(testContext, &mongodoc.Model{
+		Path:       params.EntityPath{"bar", "baz"},
+		UUID:       "fake-uuid",
+		Controller: params.EntityPath{"bar", "zzz"},
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Add another model with the same controller but a different UUID.
+	err = s.database.AddModel(testContext, &mongodoc.Model{
+		Path:       params.EntityPath{"alice", "baz"},
+		UUID:       "another-uuid",
+		Controller: ctlPath,
+	})
+	c.Assert(err, gc.IsNil)
+
+	err = s.database.SetModelInfo(testContext, ctlPath, "fake-uuid", &mongodoc.ModelInfo{
+		Life: "alive",
+	})
+	c.Assert(err, gc.IsNil)
+
+	m, err := s.database.Model(testContext, ctlPath)
+	c.Assert(err, gc.IsNil)
+	c.Assert(m.Life(), gc.Equals, "alive")
+
+	m, err = s.database.Model(testContext, params.EntityPath{"bar", "baz"})
+	c.Assert(err, gc.IsNil)
+	c.Assert(m.Life(), gc.Equals, "")
+
+	m, err = s.database.Model(testContext, params.EntityPath{"alice", "baz"})
+	c.Assert(err, gc.IsNil)
+	c.Assert(m.Life(), gc.Equals, "")
+	s.checkDBOK(c)
+}
+
+func (s *databaseSuite) TestDeleteModelWithUUID(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	err := s.database.AddController(testContext, &mongodoc.Controller{
+		Path: ctlPath,
+		UUID: "fake-uuid",
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Add the controller model.
+	err = s.database.AddModel(testContext, &mongodoc.Model{
+		Path:       params.EntityPath{"bob", "foo"},
+		UUID:       "fake-uuid",
+		Controller: params.EntityPath{"bob", "foo"},
+	})
+	c.Assert(err, gc.IsNil)
+
+	err = s.database.DeleteModelWithUUID(testContext, ctlPath, "fake-uuid")
 	c.Assert(err, gc.IsNil)
 
 	_, err = s.database.Model(testContext, ctlPath)
@@ -1438,11 +1497,10 @@ func (s *databaseSuite) TestCanReadIter(c *gc.C) {
 		models = append(models, m)
 	}
 	c.Assert(crit.Err(), gc.IsNil)
-	c.Assert(models, jc.DeepEquals, []mongodoc.Model{
+	c.Assert(models, jemtest.CmpEquals(cmpopts.EquateEmpty()), []mongodoc.Model{
 		testModels[0],
 		testModels[2],
 	})
-	c.Assert(crit.Count(), gc.Equals, 3)
 }
 
 var (
@@ -1575,7 +1633,7 @@ var setDeadTests = []struct {
 }, {
 	about: "SetControllerStats",
 	run: func(db *jem.Database) {
-		db.SetModelLife(testContext, fakeEntityPath, "fake-uuid", "alive")
+		db.SetControllerStats(testContext, fakeEntityPath, &mongodoc.ControllerStats{})
 	},
 }, {
 	about: "SetControllerUnavailableAt",
@@ -1593,9 +1651,14 @@ var setDeadTests = []struct {
 		jem.SetCredentialUpdates(db, testContext, []params.EntityPath{fakeEntityPath}, fakeCredPath)
 	},
 }, {
+	about: "SetModelInfo",
+	run: func(db *jem.Database) {
+		db.SetModelInfo(testContext, fakeEntityPath, "fake-uuid", &mongodoc.ModelInfo{})
+	},
+}, {
 	about: "SetModelLife",
 	run: func(db *jem.Database) {
-		db.SetModelLife(testContext, fakeEntityPath, "fake-uuid", "alive")
+		db.SetModelLife(testContext, fakeEntityPath, "fake-uuid", "fake-life")
 	},
 }, {
 	about: "SetModelController",

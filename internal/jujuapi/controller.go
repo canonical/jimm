@@ -18,7 +18,7 @@ import (
 	"github.com/juju/juju/permission"
 	"github.com/juju/juju/rpc"
 	"github.com/juju/juju/rpc/rpcreflect"
-	"github.com/juju/juju/status"
+	jujustatus "github.com/juju/juju/status"
 	"github.com/juju/juju/storage"
 	"github.com/juju/utils/parallel"
 	"go.uber.org/zap"
@@ -743,7 +743,15 @@ func (m modelManagerV4) ListModelSummaries(jujuparams.ModelSummariesRequest) (ju
 				coreCount += int64(*machine.Info.HardwareCharacteristics.CpuCores)
 			}
 		}
-
+		var status jujuparams.EntityStatus
+		if model.Info != nil {
+			status.Status = jujustatus.Status(model.Info.Status.Status)
+			status.Info = model.Info.Status.Message
+			status.Data = model.Info.Status.Data
+			if !model.Info.Status.Since.IsZero() {
+				status.Since = &model.Info.Status.Since
+			}
+		}
 		results = append(results, jujuparams.ModelSummaryResult{
 			Result: &jujuparams.ModelSummary{
 				Name:               string(model.Path.Name),
@@ -755,14 +763,9 @@ func (m modelManagerV4) ListModelSummaries(jujuparams.ModelSummariesRequest) (ju
 				CloudRegion:        model.CloudRegion,
 				CloudCredentialTag: jem.CloudCredentialTag(model.Credential).String(),
 				OwnerTag:           jem.UserTag(model.Path.User).String(),
-				Life:               jujuparams.Life(model.Life),
-				// TODO if the multiwatcher returned updates to model
-				// status, we could do better here, but the model status doesn't
-				// reflect much anyway.
-				Status: jujuparams.EntityStatus{
-					Status: status.Available,
-				},
-				UserAccess: access,
+				Life:               jujuparams.Life(model.Life()),
+				Status:             status,
+				UserAccess:         access,
 				// TODO currently user logins aren't communicated by the multiwatcher
 				// so the UserLastConnection time is not known.
 				UserLastConnection: nil,
@@ -869,13 +872,13 @@ func (r *controllerRoot) modelInfo(ctx context.Context, arg jujuparams.Entity, l
 	infoFromController, err := fetchModelInfo(ctx, r.jem, model)
 	if err != nil {
 		code := jujuparams.ErrCode(err)
-		if model.Life == string(jujuparams.Dying) && code == jujuparams.CodeUnauthorized {
+		if model.Life() == string(jujuparams.Dying) && code == jujuparams.CodeUnauthorized {
 			zapctx.Info(ctx, "could not get ModelInfo for dying model, marking dead", zap.Error(err))
 			// The model was dying and now cannot be accessed, assume it is now dead.
-			if err := r.jem.DB.SetModelLife(ctx, model.Controller, model.UUID, string(jujuparams.Dead)); err != nil {
+			if err := r.jem.DB.DeleteModelWithUUID(ctx, model.Controller, model.UUID); err != nil {
 				// If this update fails then don't worry as the watcher
 				// will detect the state change and update as appropriate.
-				zapctx.Warn(ctx, "error updating model life", zap.Error(err))
+				zapctx.Warn(ctx, "error deleting model", zap.Error(err))
 			}
 			// return the error with the an appropriate cause.
 			return nil, errgo.WithCausef(err, params.ErrUnauthorized, "%s", "")
@@ -934,7 +937,15 @@ func (r *controllerRoot) modelDocToModelInfo(ctx context.Context, model *mongodo
 			Access:      userLevels[auth.Username(ctx)],
 		})
 	}
-
+	var status jujuparams.EntityStatus
+	if model.Info != nil {
+		status.Status = jujustatus.Status(model.Info.Status.Status)
+		status.Info = model.Info.Status.Message
+		status.Data = model.Info.Status.Data
+		if !model.Info.Status.Since.IsZero() {
+			status.Since = &model.Info.Status.Since
+		}
+	}
 	return &jujuparams.ModelInfo{
 		Name:               string(model.Path.Name),
 		UUID:               model.UUID,
@@ -945,15 +956,10 @@ func (r *controllerRoot) modelDocToModelInfo(ctx context.Context, model *mongodo
 		CloudRegion:        model.CloudRegion,
 		CloudCredentialTag: jem.CloudCredentialTag(model.Credential).String(),
 		OwnerTag:           jem.UserTag(model.Path.User).String(),
-		Life:               jujuparams.Life(model.Life),
-		// TODO if the multiwatcher returned updates to model
-		// status, we could do better here, but the model status doesn't
-		// reflect much anyway.
-		Status: jujuparams.EntityStatus{
-			Status: status.Available,
-		},
-		Users:    users,
-		Machines: jemMachinesToModelMachineInfo(machines),
+		Life:               jujuparams.Life(model.Life()),
+		Status:             status,
+		Users:              users,
+		Machines:           jemMachinesToModelMachineInfo(machines),
 	}, nil
 }
 
