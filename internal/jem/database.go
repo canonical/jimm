@@ -240,6 +240,17 @@ func (db *Database) DeleteModel(ctx context.Context, path params.EntityPath) (er
 	return nil
 }
 
+// DeleteModelWithUUID deletes any model from the database that has the
+// given controller and UUID. No error is returned if no such model
+// exists.
+func (db *Database) DeleteModelWithUUID(ctx context.Context, ctlPath params.EntityPath, uuid string) (err error) {
+	defer db.checkError(ctx, &err)
+	if _, err := db.Models().RemoveAll(bson.D{{"uuid", uuid}, {"controller", ctlPath}}); err != nil {
+		return errgo.Notef(err, "cannot remove model")
+	}
+	return nil
+}
+
 // SetControllerDeprecated sets whether the given controller is deprecated.
 func (db *Database) SetControllerDeprecated(ctx context.Context, ctlPath params.EntityPath, deprecated bool) (err error) {
 	defer db.checkError(ctx, &err)
@@ -492,26 +503,32 @@ func (db *Database) SetControllerStats(ctx context.Context, ctlPath params.Entit
 	return errgo.Mask(err)
 }
 
-// SetModelLife sets the Life field of all models controlled by the given
-// controller that have the given UUID. It does not return an error if
-// there are no such models. If life is "dead" then the model will also
-// be removed from the database.
-// TODO remove the ctlPath argument.
+// SetModelLife sets the Info.Life field of all models controlled by the
+// given controller that have the given UUID. It does not return an error
+// if there are no such models.
 func (db *Database) SetModelLife(ctx context.Context, ctlPath params.EntityPath, uuid string, life string) (err error) {
 	defer db.checkError(ctx, &err)
 	_, err = db.Models().UpdateAll(
 		bson.D{{"uuid", uuid}, {"controller", ctlPath}},
-		bson.D{{"$set", bson.D{{"life", life}}}},
+		bson.D{{"$set", bson.D{{"info.life", life}}}},
 	)
 	if err != nil {
 		return errgo.Notef(err, "cannot update model")
 	}
-	if life != "dead" {
-		return nil
-	}
-	_, err = db.Models().RemoveAll(bson.D{{"uuid", uuid}, {"controller", ctlPath}})
+	return nil
+}
+
+// SetModelInfo sets the Info field of all models controlled by the given
+// controller that have the given UUID. It does not return an error if
+// there are no such models.
+func (db *Database) SetModelInfo(ctx context.Context, ctlPath params.EntityPath, uuid string, info *mongodoc.ModelInfo) (err error) {
+	defer db.checkError(ctx, &err)
+	_, err = db.Models().UpdateAll(
+		bson.D{{"uuid", uuid}, {"controller", ctlPath}},
+		bson.D{{"$set", bson.D{{"info", info}}}},
+	)
 	if err != nil {
-		return errgo.Notef(err, "cannot remove model")
+		return errgo.Notef(err, "cannot update model")
 	}
 	return nil
 }

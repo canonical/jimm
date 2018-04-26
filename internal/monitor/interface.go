@@ -52,7 +52,12 @@ type jemInterface interface {
 	// SetModelLife sets the Life field of all models controlled
 	// by the given controller that have the given UUID.
 	// It does not return an error if there are no such models.
-	SetModelLife(ctx context.Context, ctlPath params.EntityPath, uuid string, life string) error
+	SetModelInfo(ctx context.Context, ctlPath params.EntityPath, uuid string, info *mongodoc.ModelInfo) error
+
+	// DeleteModelWithUUID deletes any model from the database that has the
+	// given controller and UUID. No error is returned if no such model
+	// exists.
+	DeleteModelWithUUID(ctx context.Context, ctlPath params.EntityPath, uuid string) error
 
 	// UpdateModelCounts updates the count statistics associated with the
 	// model with the given UUID recording them at the given current time.

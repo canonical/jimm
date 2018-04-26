@@ -382,11 +382,11 @@ func (m *controllerMonitor) watch(ctx context.Context, conn jujuAPI) error {
 		// TODO perform all these updates concurrently?
 		for uuid, info := range w.models {
 			uuid, info := uuid, info
-			// TODO(rogpeppe) When both unit count and life change, we could
+			// TODO(rogpeppe) When both unit count and info change, we could
 			// combine them into a single database update.
-			if info.changed&lifeChange != 0 {
+			if info.changed&infoChange != 0 {
 				w.runner.Do(func() error {
-					if info.life == "" {
+					if info.info == nil {
 						// We haven't received any updates for this model
 						// since the watcher started, but we don't necessarily
 						// trust that the watcher has actually provided all
@@ -405,10 +405,15 @@ func (m *controllerMonitor) watch(ctx context.Context, conn jujuAPI) error {
 							)
 							return nil
 						}
-						info.life = "dead"
 					}
-					if err := w.jem.SetModelLife(ctx, w.ctlPath, uuid, string(info.life)); err != nil {
-						return errgo.Notef(err, "cannot update model life")
+					if info.info == nil || info.info.Life == "dead" {
+						if err := w.jem.DeleteModelWithUUID(ctx, w.ctlPath, uuid); err != nil {
+							return errgo.Notef(err, "cannot delete model")
+						}
+					} else {
+						if err := w.jem.SetModelInfo(ctx, w.ctlPath, uuid, mongodocModelInfo(info.info)); err != nil {
+							return errgo.Notef(err, "cannot update model info")
+						}
 					}
 					return nil
 				})
@@ -463,7 +468,7 @@ type watcherState struct {
 type modelChange int
 
 const (
-	lifeChange modelChange = 1 << iota
+	infoChange modelChange = 1 << iota
 	countsChange
 )
 
@@ -471,8 +476,8 @@ const (
 type modelInfo struct {
 	uuid string
 
-	// life holds the lifecycle status of the model.
-	life multiwatcher.Life
+	// info contains the received watcher info for the model.
+	info *multiwatcher.ModelInfo
 
 	// counts holds current counts for entities in the model.
 	counts map[params.EntityCount]int
@@ -489,11 +494,9 @@ func (info *modelInfo) adjustCount(kind params.EntityCount, n int) {
 	}
 }
 
-func (info *modelInfo) setLife(life multiwatcher.Life) {
-	if life != info.life {
-		info.life = life
-		info.changed |= lifeChange
-	}
+func (info *modelInfo) setInfo(modelInfo *multiwatcher.ModelInfo) {
+	info.changed |= infoChange
+	info.info = modelInfo
 }
 
 func newWatcherState(ctx context.Context, j jemInterface, ctlPath params.EntityPath) *watcherState {
@@ -524,11 +527,10 @@ func (w *watcherState) addDelta(ctx context.Context, d multiwatcher.Delta) error
 	case *multiwatcher.ModelInfo:
 		// Ensure there's always a model entry.
 		w.adjustCount(&w.stats.ModelCount, d)
-		life := multiwatcher.Life("dead")
-		if !d.Removed {
-			life = e.Life
+		if d.Removed {
+			e.Life = "dead"
 		}
-		w.modelInfo(e.ModelUUID).setLife(life)
+		w.modelInfo(e.ModelUUID).setInfo(e)
 	case *multiwatcher.UnitInfo:
 		delta := w.adjustCount(&w.stats.UnitCount, d)
 		w.modelInfo(e.ModelUUID).adjustCount(params.UnitCount, delta)
@@ -603,4 +605,21 @@ func isMonitoringStoppedError(err error) bool {
 
 func incControllerErrorsMetric(ctlPath params.EntityPath) {
 	servermon.MonitorErrorsCount.WithLabelValues(ctlPath.String()).Inc()
+}
+
+func mongodocModelInfo(info *multiwatcher.ModelInfo) *mongodoc.ModelInfo {
+	since := time.Time{}
+	if info.Status.Since != nil {
+		since = *info.Status.Since
+	}
+	return &mongodoc.ModelInfo{
+		Life:   string(info.Life),
+		Config: info.Config,
+		Status: mongodoc.ModelStatus{
+			Status:  string(info.Status.Current),
+			Message: string(info.Status.Message),
+			Since:   since,
+			Data:    info.Status.Data,
+		},
+	}
 }

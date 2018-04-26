@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/base"
 	cloudapi "github.com/juju/juju/api/cloud"
@@ -30,6 +31,7 @@ import (
 	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2/bson"
 
+	"github.com/CanonicalLtd/jem/internal/jemtest"
 	"github.com/CanonicalLtd/jem/internal/jujuapi"
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/params"
@@ -546,7 +548,7 @@ func (s *controllerSuite) TestListModelSummaries(c *gc.C) {
 	client := modelmanager.NewClient(conn)
 	models, err := client.ListModelSummaries("test", false)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(models, jc.DeepEquals, []base.UserModelSummary{{
+	c.Assert(models, jemtest.CmpEquals(cmpopts.IgnoreTypes(&time.Time{})), []base.UserModelSummary{{
 		Name:            "model-1",
 		UUID:            modelUUID1,
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
@@ -1091,9 +1093,11 @@ func (s *controllerSuite) TestModelInfoDyingModelNotFound(c *gc.C) {
 		Controller:  ctlPath,
 		Path:        params.EntityPath{User: "alice", Name: "model-1"},
 		UUID:        "00000000-0000-0000-0000-000000000007",
-		Life:        string(jujuparams.Dying),
 		Cloud:       params.Cloud("dummy"),
 		CloudRegion: "dummy-region",
+		Info: &mongodoc.ModelInfo{
+			Life: string(jujuparams.Dying),
+		},
 	})
 	c.Assert(err, jc.ErrorIsNil)
 
@@ -1514,7 +1518,7 @@ func (s *controllerSuite) TestDestroyModel(c *gc.C) {
 	c.Assert(mis[0].Result.Life, gc.Equals, jujuparams.Dying)
 
 	// Kill the model.
-	err = s.JEM.DB.SetModelLife(testContext, ctlPath, mi.UUID, "dead")
+	err = s.JEM.DB.DeleteModelWithUUID(testContext, ctlPath, mi.UUID)
 	c.Assert(err, jc.ErrorIsNil)
 
 	// Make sure it's not an error if you destroy a model that't not there.
