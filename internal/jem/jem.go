@@ -15,6 +15,7 @@ import (
 	"github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	jujucloud "github.com/juju/juju/cloud"
+	"github.com/juju/juju/environs/config"
 	"github.com/juju/utils/clock"
 	"github.com/juju/version"
 	"github.com/rogpeppe/fastuuid"
@@ -197,8 +198,8 @@ func (p *Pool) JEM(ctx context.Context) *JEM {
 	}
 	p.refCount++
 	return &JEM{
-		DB:   newDatabase(ctx, p.config.SessionPool, p.dbName),
-		pool: p,
+		DB:                             newDatabase(ctx, p.config.SessionPool, p.dbName),
+		pool:                           p,
 		usageSenderAuthorizationClient: p.usageSenderAuthorizationClient,
 	}
 }
@@ -555,6 +556,11 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 	}
 	if m.Status.Since != nil {
 		info.Status.Since = *m.Status.Since
+	}
+	if m.AgentVersion != nil {
+		info.Config = map[string]interface{}{
+			config.AgentVersionKey: m.AgentVersion.String(),
+		}
 	}
 	if _, err := j.DB.Models().FindId(modelDoc.Id).Apply(mgo.Change{
 		Update: bson.D{{"$set", bson.D{
