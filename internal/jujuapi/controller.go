@@ -15,12 +15,14 @@ import (
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/juju/constraints"
 	"github.com/juju/juju/environs"
+	"github.com/juju/juju/environs/config"
 	"github.com/juju/juju/permission"
 	"github.com/juju/juju/rpc"
 	"github.com/juju/juju/rpc/rpcreflect"
 	jujustatus "github.com/juju/juju/status"
 	"github.com/juju/juju/storage"
 	"github.com/juju/utils/parallel"
+	"github.com/juju/version"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
@@ -743,15 +745,6 @@ func (m modelManagerV4) ListModelSummaries(jujuparams.ModelSummariesRequest) (ju
 				coreCount += int64(*machine.Info.HardwareCharacteristics.CpuCores)
 			}
 		}
-		var status jujuparams.EntityStatus
-		if model.Info != nil {
-			status.Status = jujustatus.Status(model.Info.Status.Status)
-			status.Info = model.Info.Status.Message
-			status.Data = model.Info.Status.Data
-			if !model.Info.Status.Since.IsZero() {
-				status.Since = &model.Info.Status.Since
-			}
-		}
 		results = append(results, jujuparams.ModelSummaryResult{
 			Result: &jujuparams.ModelSummary{
 				Name:               string(model.Path.Name),
@@ -764,7 +757,7 @@ func (m modelManagerV4) ListModelSummaries(jujuparams.ModelSummariesRequest) (ju
 				CloudCredentialTag: jem.CloudCredentialTag(model.Credential).String(),
 				OwnerTag:           jem.UserTag(model.Path.User).String(),
 				Life:               jujuparams.Life(model.Life()),
-				Status:             status,
+				Status:             modelStatus(model.Info),
 				UserAccess:         access,
 				// TODO currently user logins aren't communicated by the multiwatcher
 				// so the UserLastConnection time is not known.
@@ -779,9 +772,8 @@ func (m modelManagerV4) ListModelSummaries(jujuparams.ModelSummariesRequest) (ju
 				// TODO currently we don't store any migration information about models.
 				Migration: nil,
 				// TODO currently we don't store any SLA information.
-				SLA: nil,
-				// TODO currently we don't store the model agent version.
-				AgentVersion: nil,
+				SLA:          nil,
+				AgentVersion: modelVersion(ctx, model.Info),
 			},
 		})
 		return nil
@@ -937,15 +929,6 @@ func (r *controllerRoot) modelDocToModelInfo(ctx context.Context, model *mongodo
 			Access:      userLevels[auth.Username(ctx)],
 		})
 	}
-	var status jujuparams.EntityStatus
-	if model.Info != nil {
-		status.Status = jujustatus.Status(model.Info.Status.Status)
-		status.Info = model.Info.Status.Message
-		status.Data = model.Info.Status.Data
-		if !model.Info.Status.Since.IsZero() {
-			status.Since = &model.Info.Status.Since
-		}
-	}
 	return &jujuparams.ModelInfo{
 		Name:               string(model.Path.Name),
 		UUID:               model.UUID,
@@ -957,9 +940,10 @@ func (r *controllerRoot) modelDocToModelInfo(ctx context.Context, model *mongodo
 		CloudCredentialTag: jem.CloudCredentialTag(model.Credential).String(),
 		OwnerTag:           jem.UserTag(model.Path.User).String(),
 		Life:               jujuparams.Life(model.Life()),
-		Status:             status,
+		Status:             modelStatus(model.Info),
 		Users:              users,
 		Machines:           jemMachinesToModelMachineInfo(machines),
+		AgentVersion:       modelVersion(ctx, model.Info),
 	}, nil
 }
 
@@ -1474,4 +1458,34 @@ func runWithContext(ctx context.Context, f func() error) error {
 	case <-ctx.Done():
 		return errgo.Mask(ctx.Err(), errgo.Any)
 	}
+}
+
+func modelStatus(info *mongodoc.ModelInfo) jujuparams.EntityStatus {
+	var status jujuparams.EntityStatus
+	if info == nil {
+		return status
+	}
+	status.Status = jujustatus.Status(info.Status.Status)
+	status.Info = info.Status.Message
+	status.Data = info.Status.Data
+	if !info.Status.Since.IsZero() {
+		status.Since = &info.Status.Since
+	}
+	return status
+}
+
+func modelVersion(ctx context.Context, info *mongodoc.ModelInfo) *version.Number {
+	if info == nil {
+		return nil
+	}
+	versionString, _ := info.Config[config.AgentVersionKey].(string)
+	if versionString == "" {
+		return nil
+	}
+	v, err := version.Parse(versionString)
+	if err != nil {
+		zapctx.Warn(ctx, "cannot parse agent-version", zap.String("agent-version", versionString), zap.Error(err))
+		return nil
+	}
+	return &v
 }

@@ -21,6 +21,7 @@ import (
 	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/juju/status"
 	"github.com/juju/juju/testing/factory"
+	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/version"
@@ -571,6 +572,7 @@ func (s *controllerSuite) TestListModelSummaries(c *gc.C) {
 			Entity: "cores",
 			Count:  0,
 		}},
+		AgentVersion: &jujuversion.Current,
 	}, {
 		Name:            "model-3",
 		UUID:            modelUUID3,
@@ -594,6 +596,7 @@ func (s *controllerSuite) TestListModelSummaries(c *gc.C) {
 			Entity: "cores",
 			Count:  0,
 		}},
+		AgentVersion: &jujuversion.Current,
 	}})
 }
 
@@ -827,6 +830,7 @@ func (s *controllerSuite) TestModelInfo(c *gc.C) {
 				DisplayName: "test",
 				Access:      jujuparams.ModelAdminAccess,
 			}},
+			AgentVersion: &jujuversion.Current,
 		},
 	}, {
 		Error: &jujuparams.Error{
@@ -860,6 +864,7 @@ func (s *controllerSuite) TestModelInfo(c *gc.C) {
 					Arch: &machineArch,
 				},
 			}},
+			AgentVersion: &jujuversion.Current,
 		},
 	}, {
 		Result: &jujuparams.ModelInfo{
@@ -880,6 +885,7 @@ func (s *controllerSuite) TestModelInfo(c *gc.C) {
 				DisplayName: "test",
 				Access:      jujuparams.ModelWriteAccess,
 			}},
+			AgentVersion: &jujuversion.Current,
 		},
 	}, {
 		Result: &jujuparams.ModelInfo{
@@ -904,6 +910,7 @@ func (s *controllerSuite) TestModelInfo(c *gc.C) {
 				DisplayName: "test2",
 				Access:      jujuparams.ModelAdminAccess,
 			}},
+			AgentVersion: &jujuversion.Current,
 		},
 	}, {
 		Error: &jujuparams.Error{
@@ -963,6 +970,7 @@ func (s *controllerSuite) TestModelInfoForLegacyModel(c *gc.C) {
 				DisplayName: "test",
 				Access:      jujuparams.ModelAdminAccess,
 			}},
+			AgentVersion: &jujuversion.Current,
 		},
 	}})
 
@@ -1024,6 +1032,7 @@ func (s *controllerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 				DisplayName: "test",
 				Access:      jujuparams.ModelAdminAccess,
 			}},
+			AgentVersion: &jujuversion.Current,
 		},
 	}})
 
@@ -1052,6 +1061,7 @@ func (s *controllerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 				DisplayName: "test",
 				Access:      jujuparams.ModelAdminAccess,
 			}},
+			AgentVersion: &jujuversion.Current,
 		},
 	}})
 
@@ -1081,6 +1091,7 @@ func (s *controllerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 				DisplayName: "test",
 				Access:      jujuparams.ModelAdminAccess,
 			}},
+			AgentVersion: &jujuversion.Current,
 		},
 	}})
 }
