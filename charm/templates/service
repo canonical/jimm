@@ -1,13 +1,13 @@
 [Unit]
-Description=JAAS Intelligent Model Manager
+Description={{description}}
 Requires=network-online.target
 After=network-online.target
 
 [Service]
 Type=simple
-User=jimm
-Group=jimm
-WorkingDirectory={{dst_path}}
+User={{service}}
+Group={{service}}
+WorkingDirectory={{resource_path}}
 ExecStart={{bin_path}} {{config_path}}
 Restart=on-failure
 RestartSec=5s
