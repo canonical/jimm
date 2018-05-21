@@ -2,14 +2,25 @@ package apiconn_test
 
 import (
 	"fmt"
+	"net"
 	"sync"
 	"time"
 
 	"github.com/juju/juju/api"
+	"github.com/juju/juju/api/modelmanager"
+	"github.com/juju/juju/apiserver"
+	"github.com/juju/juju/apiserver/observer"
+	"github.com/juju/juju/apiserver/observer/fakeobserver"
+	"github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/state"
+	"github.com/juju/juju/testing"
+	"github.com/juju/pubsub"
 	jc "github.com/juju/testing/checkers"
+	"github.com/juju/utils/clock"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/juju/names.v2"
 
 	"github.com/CanonicalLtd/jem/internal/apiconn"
 	"github.com/CanonicalLtd/jem/internal/jemtest"
@@ -220,6 +231,82 @@ func (s *cacheSuite) TestContextCancel(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	c.Assert(conn.Connection, gc.Equals, c0)
+}
+
+func (s *cacheSuite) TestEvictOnUpgradeInProgress(c *gc.C) {
+	// Start a new API server so we control its upgrade-in-progress status.
+	upgraded := make(chan struct{})
+	lis, err := net.Listen("tcp", "localhost:0")
+	c.Assert(err, gc.Equals, nil)
+	srv, err := apiserver.NewServer(s.StatePool, lis, apiserver.ServerConfig{
+		Clock:           clock.WallClock,
+		Cert:            testing.ServerCert,
+		Key:             testing.ServerKey,
+		Tag:             names.NewMachineTag("0"),
+		Hub:             pubsub.NewStructuredHub(nil),
+		DataDir:         c.MkDir(),
+		LogDir:          c.MkDir(),
+		NewObserver:     func() observer.Observer { return &fakeobserver.Instance{} },
+		AutocertURL:     "https://0.1.2.3/no-autocert-here",
+		RateLimitConfig: apiserver.DefaultRateLimitConfig(),
+		UpgradeComplete: func() bool {
+			select {
+			case <-upgraded:
+				return true
+			default:
+				return false
+			}
+		},
+		RestoreStatus: func() state.RestoreStatus { return state.RestoreNotActive },
+	})
+	c.Assert(err, gc.Equals, nil)
+	defer srv.Stop()
+
+	apiInfo := s.APIInfo(c)
+	apiInfo.ModelTag = names.ModelTag{}
+	apiInfo.Addrs = []string{lis.Addr().String()}
+
+	uuid := s.State.ControllerUUID()
+	cache := apiconn.NewCache(apiconn.CacheParams{})
+	dial := func() (api.Connection, *api.Info, error) {
+		return apiOpen(apiInfo, api.DialOpts{})
+	}
+
+	callAPI := func(conn api.Connection) error {
+		_, err = modelmanager.NewClient(conn).CreateModel(
+			"name",
+			apiInfo.Tag.Id(),
+			"dummy",
+			"",
+			names.CloudCredentialTag{},
+			nil,
+		)
+		return err
+	}
+
+	conn, err := cache.OpenAPI(context.Background(), uuid, dial)
+	c.Assert(err, gc.IsNil)
+	defer conn.Close()
+	err = callAPI(conn)
+	c.Check(params.ErrCode(err), gc.Equals, params.CodeUpgradeInProgress)
+
+	// Try once again before upgrading, for luck.
+	conn, err = cache.OpenAPI(context.Background(), uuid, dial)
+	c.Assert(err, gc.IsNil)
+	defer conn.Close()
+	err = callAPI(conn)
+	c.Check(params.ErrCode(err), gc.Equals, params.CodeUpgradeInProgress)
+
+	// Close the upgraded channel, which will cause UpgradeComplete
+	// to return true, which should mean that the next API connection
+	// gets an unrestricted API, which should cause the API call to work.
+	close(upgraded)
+
+	conn, err = cache.OpenAPI(context.Background(), uuid, dial)
+	c.Assert(err, gc.Equals, nil)
+	defer conn.Close()
+	err = callAPI(conn)
+	c.Check(err, gc.Equals, nil)
 }
 
 // apiOpen is like api.Open except that it also returns its
