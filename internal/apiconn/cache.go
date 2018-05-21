@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/juju/juju/api"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
@@ -167,6 +168,18 @@ func (c *Conn) Clone() *Conn {
 	c.shared.refCount++
 	c1 := *c
 	return &c1
+}
+
+// APICall implements api.Connection.APICall by calling the underlying
+// connection's APICall method and evicting the connection if the
+// result indicates that there's a persistent upgrade-in-progress error.
+// See https://bugs.launchpad.net/juju/+bug/1772381.
+func (c *Conn) APICall(objType string, version int, id, request string, params, response interface{}) error {
+	err := c.Connection.APICall(objType, version, id, request, params, response)
+	if jujuparams.ErrCode(err) == jujuparams.CodeUpgradeInProgress {
+		c.Evict()
+	}
+	return errgo.Mask(err, errgo.Any)
 }
 
 // Close closes the API connection. This method is idempotent.

@@ -36,7 +36,12 @@ var (
 		Help:      "The number of unacknowledged batches.",
 	})
 
-	monitorFailure = UnacknowledgedMetricBatchesCount.Set
+	// TODO avoid the unnecessary function by using
+	// a method expression when https://golang.org/issue/25101
+	// is fixed.
+	monitorFailure = func(f float64) {
+		UnacknowledgedMetricBatchesCount.Set(f)
+	}
 )
 
 func init() {
