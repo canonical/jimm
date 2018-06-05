@@ -198,8 +198,8 @@ func (p *Pool) JEM(ctx context.Context) *JEM {
 	}
 	p.refCount++
 	return &JEM{
-		DB:                             newDatabase(ctx, p.config.SessionPool, p.dbName),
-		pool:                           p,
+		DB:   newDatabase(ctx, p.config.SessionPool, p.dbName),
+		pool: p,
 		usageSenderAuthorizationClient: p.usageSenderAuthorizationClient,
 	}
 }
@@ -493,6 +493,21 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 	}
 	defer func() {
 		if err == nil {
+			if err := j.DB.AppendAudit(ctx, params.AuditModelCreated{
+				ID:             modelDoc.Id,
+				UUID:           modelDoc.UUID,
+				Owner:          string(modelDoc.Owner()),
+				Creator:        modelDoc.Creator,
+				ControllerPath: modelDoc.Controller.String(),
+				Cloud:          string(modelDoc.Cloud),
+				Region:         modelDoc.CloudRegion,
+				AuditEntryCommon: params.AuditEntryCommon{
+					Type_:    params.AuditLogType(params.AuditModelCreated{}),
+					Created_: time.Now(),
+				},
+			}); err != nil {
+				zapctx.Error(ctx, "cannot add audit log for model creation", zaputil.Error(err))
+			}
 			return
 		}
 		// We're returning an error, so remove the model from the
@@ -742,6 +757,16 @@ func (j *JEM) DestroyModel(ctx context.Context, conn *apiconn.Conn, model *mongo
 		// If this update fails then don't worry as the watcher
 		// will detect the state change and update as appropriate.
 		zapctx.Warn(ctx, "error updating model life", zap.Error(err), zap.String("model", model.UUID))
+	}
+	if err := j.DB.AppendAudit(ctx, params.AuditModelDestroyed{
+		ID:   model.Id,
+		UUID: model.UUID,
+		AuditEntryCommon: params.AuditEntryCommon{
+			Type_:    params.AuditLogType(params.AuditModelDestroyed{}),
+			Created_: time.Now(),
+		},
+	}); err != nil {
+		zapctx.Error(ctx, "cannot add audit log for model destruction", zaputil.Error(err))
 	}
 	return nil
 }

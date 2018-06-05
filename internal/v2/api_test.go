@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"go.uber.org/zap/zapcore"
-
 	"github.com/juju/juju/api"
 	controllerapi "github.com/juju/juju/api/controller"
 	jujuparams "github.com/juju/juju/apiserver/params"
@@ -17,6 +15,7 @@ import (
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"github.com/juju/utils"
+	"go.uber.org/zap/zapcore"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
@@ -2066,4 +2065,46 @@ func (s *APISuite) TestGetModelName(c *gc.C) {
 		},
 	})
 
+}
+
+func (s *APISuite) TestGetAuditEntries(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{"bob", "open"}, false)
+	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
+	_, uuid := s.CreateModel(c, params.EntityPath{"bob", "open"}, params.EntityPath{"bob", "open"}, cred)
+
+	s.allowControllerPerm(c, params.EntityPath{"bob", "open"})
+	s.allowModelPerm(c, params.EntityPath{"bob", "open"})
+	res, err := s.NewClient("bob").GetAuditEntries(&params.AuditLogRequest{})
+	c.Assert(err, gc.IsNil)
+	c.Assert(res, gc.HasLen, 1)
+	created := res[0].Content.(params.AuditModelCreated)
+	c.Assert(res, gc.DeepEquals, params.AuditLogEntries{{
+		Content: params.AuditModelCreated{
+			ID:             "bob/open",
+			UUID:           uuid,
+			Owner:          "bob",
+			Creator:        "bob",
+			Cloud:          "dummy",
+			Region:         "dummy-region",
+			ControllerPath: "bob/open",
+			AuditEntryCommon: params.AuditEntryCommon{
+				Type_:    params.AuditLogType(params.AuditModelCreated{}),
+				Created_: created.Created_,
+			},
+		},
+	}})
+}
+
+func (s *APISuite) TestGetAuditEntriesNotAuthorized(c *gc.C) {
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "GET",
+		Handler: s.JEMSrv,
+		URL:     "/v2/audit",
+		ExpectBody: &params.Error{
+			Message: `unauthorized`,
+			Code:    params.ErrUnauthorized,
+		},
+		ExpectStatus: http.StatusUnauthorized,
+		Do:           apitest.Do(s.IDMSrv.Client("alice")),
+	})
 }

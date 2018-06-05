@@ -16,6 +16,7 @@ import (
 
 	plansapi "github.com/CanonicalLtd/plans-client/api"
 	"github.com/juju/gnuflag"
+	"go.uber.org/zap/zapcore"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -25,8 +26,6 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"gopkg.in/yaml.v2"
-
-	"go.uber.org/zap/zapcore"
 
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/internal/zapctx"
