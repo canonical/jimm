@@ -48,6 +48,14 @@ func init() {
 	prometheus.MustRegister(UnacknowledgedMetricBatchesCount)
 }
 
+// metricBatch extends the romulus metric batch wireformat with a model name.
+// NOTE: stop-gap solution until we upgrade juju dependency.
+type metricBatch struct {
+	wireformat.MetricBatch
+
+	ModelName string `json:"model-name"`
+}
+
 // SendModelUsageWorkerConfig contains configuration values for the worker
 // that reports model usage.
 type SendModelUsageWorkerConfig struct {
@@ -143,7 +151,7 @@ func (w *sendModelUsageWorker) execute() error {
 			continue
 		}
 		t := SenderClock.Now().UTC()
-		err = recorder.AddMetric(w.config.Context, model.UUID, fmt.Sprintf("%d", unitCount.Current), model.UsageSenderCredentials, t)
+		err = recorder.AddMetric(w.config.Context, string(model.Path.String()), model.UUID, fmt.Sprintf("%d", unitCount.Current), model.UsageSenderCredentials, t)
 		if err != nil {
 			zapctx.Error(w.config.Context, "failed to record a metric", zaputil.Error(err))
 			continue
@@ -193,11 +201,11 @@ func (w *sendModelUsageWorker) execute() error {
 
 type sendUsageRequest struct {
 	httprequest.Route `httprequest:"POST"`
-	Body              []wireformat.MetricBatch `httprequest:",body"`
+	Body              []metricBatch `httprequest:",body"`
 }
 
 // Send sends the given metrics to omnibus.
-func (w *sendModelUsageWorker) send(usage []wireformat.MetricBatch) (*romulus.UserStatusResponse, error) {
+func (w *sendModelUsageWorker) send(usage []metricBatch) (*romulus.UserStatusResponse, error) {
 	client := httprequest.Client{}
 	var resp romulus.UserStatusResponse
 	if err := client.CallURL(
