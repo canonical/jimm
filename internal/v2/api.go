@@ -959,3 +959,15 @@ func (h *Handler) GetAuditEntries(arg *params.AuditLogRequest) (params.AuditLogE
 	}
 	return entries, nil
 }
+
+// GetModelStatuses return the list of all models created between 2 dates (or all).
+func (h *Handler) GetModelStatuses(arg *params.ModelStatusesRequest) (params.ModelStatuses, error) {
+	if err := auth.CheckIsUser(h.context, h.config.ControllerAdmin); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	entries, err := h.jem.DB.GetModelStatuses(h.context)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return entries, nil
+}
