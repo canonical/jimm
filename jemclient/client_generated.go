@@ -4,8 +4,9 @@
 package jemclient
 
 import (
-	"github.com/CanonicalLtd/jem/params"
 	"github.com/juju/httprequest"
+
+	"github.com/CanonicalLtd/jem/params"
 )
 
 type client struct {
@@ -32,6 +33,13 @@ func (c *client) DeleteModel(p *params.DeleteModel) error {
 // the search by any provided location attributes.
 func (c *client) GetAllControllerLocations(p *params.GetAllControllerLocations) (*params.AllControllerLocationsResponse, error) {
 	var r *params.AllControllerLocationsResponse
+	err := c.Client.Call(p, &r)
+	return r, err
+}
+
+// GetAuditEntries return the list of audit log entries based on the requested query.
+func (c *client) GetAuditEntries(p *params.AuditLogRequest) (params.AuditLogEntries, error) {
+	var r params.AuditLogEntries
 	err := c.Client.Call(p, &r)
 	return r, err
 }
@@ -76,6 +84,13 @@ func (c *client) GetControllerPerm(p *params.GetControllerPerm) (params.ACL, err
 // GetModel returns information on a given model.
 func (c *client) GetModel(p *params.GetModel) (*params.ModelResponse, error) {
 	var r *params.ModelResponse
+	err := c.Client.Call(p, &r)
+	return r, err
+}
+
+// GetModelName returns the name of the model identified by the provided uuid.
+func (c *client) GetModelName(p *params.ModelNameRequest) (params.ModelNameResponse, error) {
+	var r params.ModelNameResponse
 	err := c.Client.Call(p, &r)
 	return r, err
 }

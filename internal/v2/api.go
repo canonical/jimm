@@ -947,3 +947,15 @@ func (h *Handler) GetModelName(arg *params.ModelNameRequest) (params.ModelNameRe
 		Name: string(m.Path.Name),
 	}, nil
 }
+
+// GetAuditEntries return the list of audit log entries based on the requested query.
+func (h *Handler) GetAuditEntries(arg *params.AuditLogRequest) (params.AuditLogEntries, error) {
+	if err := auth.CheckIsUser(h.context, h.config.ControllerAdmin); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	entries, err := h.jem.DB.GetAuditEntries(h.context, arg.Start.Time, arg.End.Time, arg.Type)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return entries, nil
+}

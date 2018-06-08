@@ -2,13 +2,17 @@ package params
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"reflect"
+	"strings"
 	"time"
 
 	"github.com/juju/httprequest"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/environschema.v1"
+	"gopkg.in/mgo.v2/bson"
 )
 
 // SetControllerPerm holds the parameters for setting the ACL on a
@@ -553,4 +557,162 @@ type ModelNameRequest struct {
 // ModelNameResponse holds the model name.
 type ModelNameResponse struct {
 	Name string `json:"name"`
+}
+
+// AuditLogRequest represents the http request for audit logs.
+type AuditLogRequest struct {
+	httprequest.Route `httprequest:"GET /v2/audit"`
+	Start             QueryTime `httprequest:"start,form"`
+	End               QueryTime `httprequest:"end,form"`
+	Limit             int64     `httprequest:"limit,form"`
+	Type              string    `httprequest:"type,form"`
+}
+
+// AuditLogEntry represents a single line in the audit log and contains
+// information on the specific entry as content.
+type AuditLogEntry struct {
+	Content AuditEntry
+}
+
+// AuditEntry represents an entry in the audit log.
+type AuditEntry interface {
+	// Type returns the type information of the concrete type.
+	Type() string
+	// Created returns the creation time of the entry.
+	Created() time.Time
+	// isAuditEntry to specify that this this an audit entry log.
+	isAuditEntry()
+}
+
+// AuditLogEntries represents a list of audit log entry.
+type AuditLogEntries []AuditLogEntry
+
+// AuditEntryCommon holds the type information so SetBSON can work for an AuditEntry and the Created field.
+type AuditEntryCommon struct {
+	// Type is used for GetBSON and SetBSON to store the concrete type.
+	Type_ string `bson:"type" json:"type"`
+
+	// Created represents the ceation time of the entry.
+	Created_ time.Time `bson:"created" json:"created"`
+}
+
+// AuditModelCreated represents an audit log when a model is created.
+type AuditModelCreated struct {
+	// ID holds the id for a model.
+	ID string `bson:"modelid" json:"id"`
+	// UUID holds the UUID of the model.
+	UUID string `bson:"uuid" json:"uuid"`
+	// ControllerPath holds the controller path normalized as string.
+	ControllerPath string `bson:"controller-path" json:"controller_path"`
+	// Owner holds the name of the user who owns the model.
+	Owner string `bson:"owner" json:"owner"`
+	// Creator holds the name of the user that issued the model creation request.
+	Creator string `bson:"creator" json:"creator"`
+	// Cloud holds the name of the cloud of the model.
+	Cloud string `bson:"cloud" json:"cloud"`
+	// Region holds the name of the cloud region of the model.
+	Region string `bson:"region" json:"region"`
+	// holds the common part for any entry.
+	AuditEntryCommon `bson:",inline"`
+}
+
+// isAuditEntry implements AuditEntry.isAuditEntry.
+func (AuditModelCreated) isAuditEntry() {}
+
+// AuditModelDestroyed represents an audit log when a model is destroyed.
+type AuditModelDestroyed struct {
+	// ID holds the id for a model.
+	ID string `bson:"modelid" json:"id"`
+	// UUID holds the UUID of the model.
+	UUID string `bson:"uuid" json:"uuid"`
+	// holds the common part for any entry.
+	AuditEntryCommon `bson:",inline"`
+}
+
+// isAuditEntry implements AuditEntry.isAuditEntry.
+func (AuditModelDestroyed) isAuditEntry() {}
+
+// Type implements AuditEntry.Type.
+func (e AuditEntryCommon) Type() string {
+	return e.Type_
+}
+
+// Created implements AuditEntry.Created.
+func (e AuditEntryCommon) Created() time.Time {
+	return e.Created_
+}
+
+// auditLogTypes holds a list of the possible audit logs type.
+var auditLogTypes = []AuditEntry{
+	AuditModelCreated{},
+	AuditModelDestroyed{},
+}
+
+var validAuditLogTypes = func() map[string]AuditEntry {
+	m := make(map[string]AuditEntry)
+	for _, v := range auditLogTypes {
+		m[AuditLogType(v)] = v
+	}
+	return m
+}()
+
+// AuditLogType gives the type name of an audit log.
+func AuditLogType(v interface{}) string {
+	t := reflect.TypeOf(v)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	return strings.TrimPrefix(t.Name(), "Audit")
+}
+
+// SetBSON implements the bson.Setter interface.
+func (e *AuditLogEntry) SetBSON(raw bson.Raw) error {
+	var t struct {
+		Type string `bson:"type"`
+	}
+	if err := raw.Unmarshal(&t); err != nil {
+		return errgo.Mask(err)
+	}
+	v, ok := validAuditLogTypes[t.Type]
+	if !ok {
+		return errgo.Notef(nil, "cannot unmarshal unknown type %q", t.Type)
+	}
+	content := reflect.New(reflect.TypeOf(v))
+	if err := raw.Unmarshal(content.Interface()); err != nil {
+		return errgo.Mask(err)
+	}
+	e.Content = content.Elem().Interface().(AuditEntry)
+	return nil
+}
+
+// GetBSON implements the bson.Getter interface.
+func (e *AuditLogEntry) GetBSON() (interface{}, error) {
+	return e.Content, nil
+}
+
+func (e *AuditLogEntry) MarshalJSON() ([]byte, error) {
+	out, err := json.Marshal(e.Content)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return out, err
+}
+
+func (e *AuditLogEntry) UnmarshalJSON(b []byte) error {
+	var t struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(b, &t); err != nil {
+		return errgo.Mask(err)
+	}
+	v, ok := validAuditLogTypes[t.Type]
+	if !ok {
+		return errgo.Notef(nil, "cannot unmarshal unknown type %q", t.Type)
+	}
+	content := reflect.New(reflect.TypeOf(v))
+	if err := json.Unmarshal(b, content.Interface()); err != nil {
+		return errgo.Mask(err)
+	}
+	e.Content = content.Elem().Interface().(AuditEntry)
+	return nil
 }

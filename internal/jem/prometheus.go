@@ -1,11 +1,10 @@
 package jem
 
 import (
-	"golang.org/x/net/context"
-	"gopkg.in/errgo.v1"
-
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	"golang.org/x/net/context"
+	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/internal/servermon"

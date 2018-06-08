@@ -49,23 +49,23 @@ type facade struct {
 // unauthenticatedfacades contains the list of facade versions supported by
 // this API before the user has authenticated.
 var unauthenticatedFacades = map[facade]string{
-	facade{"Admin", 3}:  "Admin",
-	facade{"Pinger", 1}: "Pinger",
+	{"Admin", 3}:  "Admin",
+	{"Pinger", 1}: "Pinger",
 }
 
 // facades contains the list of facade versions supported by
 // this API.
 var facades = map[facade]string{
-	facade{"Admin", 3}:        "Admin",
-	facade{"Bundle", 1}:       "Bundle",
-	facade{"Cloud", 1}:        "Cloud",
-	facade{"Controller", 3}:   "Controller",
-	facade{"JIMM", 1}:         "JIMM",
-	facade{"ModelManager", 2}: "ModelManagerV2",
-	facade{"ModelManager", 3}: "ModelManagerV3",
-	facade{"ModelManager", 4}: "ModelManagerV4",
-	facade{"Pinger", 1}:       "Pinger",
-	facade{"UserManager", 1}:  "UserManager",
+	{"Admin", 3}:        "Admin",
+	{"Bundle", 1}:       "Bundle",
+	{"Cloud", 1}:        "Cloud",
+	{"Controller", 3}:   "Controller",
+	{"JIMM", 1}:         "JIMM",
+	{"ModelManager", 2}: "ModelManagerV2",
+	{"ModelManager", 3}: "ModelManagerV3",
+	{"ModelManager", 4}: "ModelManagerV4",
+	{"Pinger", 1}:       "Pinger",
+	{"UserManager", 1}:  "UserManager",
 }
 
 // controllerRoot is the root for endpoints served on controller connections.

@@ -243,7 +243,7 @@ func (c *testHandler) Metrics(arg *usagePost) (*romulus.UserStatusResponse, erro
 		return &romulus.UserStatusResponse{
 			UUID: utils.MustNewUUID().String(),
 			UserResponses: map[string]romulus.UserResponse{
-				"bob": romulus.UserResponse{AcknowledgedBatches: uuids},
+				"bob": {AcknowledgedBatches: uuids},
 			},
 		}, nil
 	}

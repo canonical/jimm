@@ -967,12 +967,17 @@ func (iter *CanReadIter) Count() int {
 
 func (db *Database) Collections() []*mgo.Collection {
 	return []*mgo.Collection{
+		db.Audits(),
 		db.Controllers(),
 		db.Credentials(),
 		db.Macaroons(),
 		db.Machines(),
 		db.Models(),
 	}
+}
+
+func (db *Database) Audits() *mgo.Collection {
+	return db.C("audits")
 }
 
 func (db *Database) Controllers() *mgo.Collection {
