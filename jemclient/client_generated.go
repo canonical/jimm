@@ -103,6 +103,13 @@ func (c *client) GetModelPerm(p *params.GetModelPerm) (params.ACL, error) {
 	return r, err
 }
 
+// GetModelStatuses return the list of all models created between 2 dates (or all).
+func (c *client) GetModelStatuses(p *params.ModelStatusesRequest) (params.ModelStatuses, error) {
+	var r params.ModelStatuses
+	err := c.Client.Call(p, &r)
+	return r, err
+}
+
 // JujuStatus retrieves and returns the status of the specifed model.
 func (c *client) JujuStatus(p *params.JujuStatus) (*params.JujuStatusResponse, error) {
 	var r *params.JujuStatusResponse

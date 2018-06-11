@@ -550,6 +550,33 @@ func (db *Database) UpdateModelCounts(ctx context.Context, uuid string, counts m
 	return nil
 }
 
+// GetModelStatuses retrieves the model status from all models.
+func (db *Database) GetModelStatuses(ctx context.Context) (statuses params.ModelStatuses, err error) {
+	defer db.checkError(ctx, &err)
+	query := make(bson.D, 0)
+	var models []mongodoc.Model
+	if err = db.Models().Find(query).Sort("-CreationTime").All(&models); err != nil {
+		return nil, errgo.Mask(err)
+	}
+	statuses = make([]params.ModelStatus, 0)
+	for _, model := range models {
+		status := params.ModelStatus{
+			ID:         model.Id,
+			UUID:       model.UUID,
+			Cloud:      string(model.Cloud),
+			Region:     model.CloudRegion,
+			Created:    model.CreationTime,
+			Controller: model.Controller.String(),
+			Status:     "unknown",
+		}
+		if model.Info != nil {
+			status.Status = model.Info.Status.Status
+		}
+		statuses = append(statuses, status)
+	}
+	return statuses, nil
+}
+
 // UpdateMachineInfo updates the information associated with a machine.
 func (db *Database) UpdateMachineInfo(ctx context.Context, info *multiwatcher.MachineInfo) (err error) {
 	defer db.checkError(ctx, &err)

@@ -716,3 +716,29 @@ func (e *AuditLogEntry) UnmarshalJSON(b []byte) error {
 	e.Content = content.Elem().Interface().(AuditEntry)
 	return nil
 }
+
+// ModelStatusRequest represents the http request for model statuses.
+type ModelStatusesRequest struct {
+	httprequest.Route `httprequest:"GET /v2/modelstatus"`
+}
+
+// ModelStatus represent the status of a model with its description.
+type ModelStatus struct {
+	// ID holds the id for a model.
+	ID string `json:"id"`
+	// UUID holds the UUID of the model.
+	UUID string `json:"uuid"`
+	// Cloud holds the name of the cloud of the model.
+	Cloud string `json:"cloud"`
+	// Region holds the name of the cloud region of the model.
+	Region string `json:"region"`
+	// Created represents the creation time of the model.
+	Created time.Time `json:"created"`
+	// Status holds the status of the model.
+	Status string `json:"status"`
+	// Controller holds the controller name of the model.
+	Controller string `json:"controller"`
+}
+
+// ModelStatuses holds the list of model statuses.
+type ModelStatuses []ModelStatus

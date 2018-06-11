@@ -1742,3 +1742,30 @@ func credentialPath(cloud, user, name string) params.CredentialPath {
 		},
 	}
 }
+
+func (s *databaseSuite) TestGetModelStatuses(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "x"}
+	m := &mongodoc.Model{
+		Id:   "ignored",
+		Path: ctlPath,
+	}
+	err := s.database.AddModel(testContext, m)
+	c.Assert(err, gc.IsNil)
+	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
+		Id:   "bob/x",
+		Path: ctlPath,
+	})
+
+	m1, err := s.database.Model(testContext, ctlPath)
+	c.Assert(err, gc.IsNil)
+	c.Assert(m1, jemtest.CmpEquals(cmpopts.EquateEmpty()), m)
+	s.checkDBOK(c)
+
+	st, err := s.database.GetModelStatuses(testContext)
+	c.Assert(err, gc.IsNil)
+	c.Assert(st, gc.DeepEquals, params.ModelStatuses{{
+		Status:     "unknown",
+		ID:         "bob/x",
+		Controller: "/",
+	}})
+}

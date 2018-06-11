@@ -2108,3 +2108,38 @@ func (s *APISuite) TestGetAuditEntriesNotAuthorized(c *gc.C) {
 		Do:           apitest.Do(s.IDMSrv.Client("alice")),
 	})
 }
+
+func (s *APISuite) TestGetModelStatuses(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{"bob", "open"}, false)
+	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
+	_, uuid := s.CreateModel(c, params.EntityPath{"bob", "open"}, params.EntityPath{"bob", "open"}, cred)
+
+	s.allowControllerPerm(c, params.EntityPath{"bob", "open"})
+	s.allowModelPerm(c, params.EntityPath{"bob", "open"})
+	res, err := s.NewClient("bob").GetModelStatuses(&params.ModelStatusesRequest{})
+	c.Assert(err, gc.IsNil)
+	c.Assert(res, gc.HasLen, 1)
+	c.Assert(res, gc.DeepEquals, params.ModelStatuses{{
+		ID:         "bob/open",
+		UUID:       uuid,
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Status:     "available",
+		Created:    res[0].Created,
+		Controller: "bob/open",
+	}})
+}
+
+func (s *APISuite) TestGetModelStatusesNotAuthorized(c *gc.C) {
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "GET",
+		Handler: s.JEMSrv,
+		URL:     "/v2/modelstatus",
+		ExpectBody: &params.Error{
+			Message: `unauthorized`,
+			Code:    params.ErrUnauthorized,
+		},
+		ExpectStatus: http.StatusUnauthorized,
+		Do:           apitest.Do(s.IDMSrv.Client("alice")),
+	})
+}
