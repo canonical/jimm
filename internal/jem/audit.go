@@ -34,7 +34,7 @@ func (db *Database) GetAuditEntries(ctx context.Context, start time.Time, end ti
 	if len(logType) > 0 {
 		query = append(query, bson.DocElem{"type", logType})
 	}
-	if err = db.Audits().Find(query).Sort("-created", "type").All(&entries); err != nil {
+	if err = db.Audits().Find(query).Sort("created", "type").All(&entries); err != nil {
 		return nil, errgo.Mask(err)
 	}
 	return entries, nil
