@@ -588,7 +588,7 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 		ReturnNew: true,
 	}, &modelDoc); err != nil {
 		j.DB.checkError(ctx, &err)
-		return nil, errgo.Notef(err, "cannot update model UUID in database", m.UUID)
+		return nil, errgo.Notef(err, "cannot update model %s in database", m.UUID)
 	}
 	return modelDoc, nil
 }

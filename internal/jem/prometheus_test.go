@@ -96,7 +96,7 @@ func (s *jemSuite) TestStats(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	stats := s.pool.Stats(testContext)
+	stats := s.pool.ModelStats(testContext)
 	err = prometheus.Register(stats)
 	c.Assert(err, gc.IsNil)
 	defer prometheus.Unregister(stats)

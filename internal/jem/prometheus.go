@@ -2,9 +2,8 @@ package jem
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	dto "github.com/prometheus/client_model/go"
 	"golang.org/x/net/context"
-	"gopkg.in/errgo.v1"
+	errgo "gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/internal/servermon"
@@ -13,21 +12,19 @@ import (
 	"github.com/CanonicalLtd/jem/params"
 )
 
-// Stats implements a Prometheus collector that provides information
+// ModelStats implements a Prometheus collector that provides information
 // about JIMM statistics.
-type Stats struct {
+type ModelStats struct {
 	pool    *Pool
 	context context.Context
 	descs   []*prometheus.Desc
 }
 
-// statItem represents a single metric result from the Stats
-// collector.
+// statItem represents a single metric result from the Stats collector.
 type statItem int
 
-// These constants each represent a single integer metric
-// result. See statsDescs for a description of what each one
-// means.
+// These constants each represent a single integer metric result. See
+// statsDescs for a description of what each one means.
 const (
 	statApplicationsRunning statItem = iota
 	statControllersRunning
@@ -38,71 +35,66 @@ const (
 	numStats
 )
 
-// currentStats holds a snapshot of the statistics gathers
-// for a single Stats.Collect call.
-type currentStats struct {
+// currentModelStats holds a snapshot of the statistics gathers for a
+// single Stats.Collect call.
+type currentModelStats struct {
 	// values holds a value for each statItem constant,
 	// indexed by that constant.
 	values [numStats]int
 }
 
-// getStatsGauge returns a function that returns a metric
-// for the given stat item from a snapshot of the current
-// statistics.
-func getStatsGauge(c statItem) func(*currentStats) metric {
-	return func(s *currentStats) metric {
-		return metric{
-			kind:  dto.MetricType_GAUGE,
-			value: s.values[c],
-		}
+// getModelStat returns a function that returns a metric for the given
+// stat item from a snapshot of the current statistics.
+func getModelStat(c statItem) func(*currentModelStats) float64 {
+	return func(s *currentModelStats) float64 {
+		return float64(s.values[c])
 	}
 }
 
-// statsDescs holds information about all the stats
-// suitable for making *prometheus.Desc and prometheus.Metric
-// instances from.
-var statsDescs = []struct {
+// modelStatsDescs holds information about all the stats suitable for
+// making *prometheus.Desc and prometheus.Metric instances from.
+var modelStatsDescs = []struct {
 	// name holds the name of the metric as seen by prometheus.
 	name string
 	// help holds the help text for the metric.
 	help string
 	// get returns the actual metric value from a snapshot
 	// of the current stats.
-	get func(*currentStats) metric
+	get func(*currentModelStats) float64
 }{{
 	name: "active_models_running",
 	help: "The current number of running models with at least one machine.",
-	get:  getStatsGauge(statActiveModelsRunning),
+	get:  getModelStat(statActiveModelsRunning),
 }, {
 	name: "applications_running",
 	help: "The current number of running applications.",
-	get:  getStatsGauge(statApplicationsRunning),
+	get:  getModelStat(statApplicationsRunning),
 }, {
 	name: "controllers_running",
 	help: "The current number of running controllers.",
-	get:  getStatsGauge(statControllersRunning),
+	get:  getModelStat(statControllersRunning),
 }, {
 	name: "machines_running",
 	help: "The current number of running machines.",
-	get:  getStatsGauge(statMachinesRunning),
+	get:  getModelStat(statMachinesRunning),
 }, {
 	name: "models_running",
 	help: "The current number of running models.",
-	get:  getStatsGauge(statModelsRunning),
+	get:  getModelStat(statModelsRunning),
 }, {
 	name: "units_running",
 	help: "The current number of running units.",
-	get:  getStatsGauge(statUnitsRunning),
+	get:  getModelStat(statUnitsRunning),
 }}
 
-// Stats returns an implementation of prometheus.Collector
-// that returns information on statistics obtained from the pool.
-func (p *Pool) Stats(ctx context.Context) *Stats {
-	s := &Stats{
+// ModelStats returns an implementation of prometheus.Collector that
+// returns information on statistics obtained from the pool.
+func (p *Pool) ModelStats(ctx context.Context) *ModelStats {
+	s := &ModelStats{
 		context: ctx,
 		pool:    p,
 	}
-	for _, d := range statsDescs {
+	for _, d := range modelStatsDescs {
 		s.descs = append(s.descs, prometheus.NewDesc(
 			prometheus.BuildFQName("jem", "health", d.name),
 			d.help,
@@ -113,17 +105,17 @@ func (p *Pool) Stats(ctx context.Context) *Stats {
 	return s
 }
 
-// Collect implements prometheus.Collector.Describe by describing all
+// Describe implements prometheus.Collector.Describe by describing all
 // the statistics that can be obtained from JIMM.
-func (s *Stats) Describe(c chan<- *prometheus.Desc) {
+func (s *ModelStats) Describe(c chan<- *prometheus.Desc) {
 	for _, d := range s.descs {
 		c <- d
 	}
 }
 
-// Collect implements prometheus.Collector.Collect by collecting
-// all the statistic from JIMM.
-func (s *Stats) Collect(c chan<- prometheus.Metric) {
+// Collect implements prometheus.Collector.Collect by collecting all the
+// model statistics from JIMM.
+func (s *ModelStats) Collect(c chan<- prometheus.Metric) {
 	jem := s.pool.JEM(s.context)
 	defer jem.Close()
 	current, err := s.collectStats(jem)
@@ -132,17 +124,14 @@ func (s *Stats) Collect(c chan<- prometheus.Metric) {
 		servermon.StatsCollectFailCount.Inc()
 		return
 	}
-	for i, d := range statsDescs {
-		c <- &metricWithDesc{
-			metric: d.get(current),
-			desc:   s.descs[i],
-		}
+	for i, d := range modelStatsDescs {
+		c <- prometheus.MustNewConstMetric(s.descs[i], prometheus.GaugeValue, d.get(current))
 	}
 }
 
 // collectStats returns a snapshot of the current statistics from JIMM.
-func (s *Stats) collectStats(jem *JEM) (*currentStats, error) {
-	var cs currentStats
+func (s *ModelStats) collectStats(jem *JEM) (*currentModelStats, error) {
+	var cs currentModelStats
 	iter := jem.DB.Models().Find(nil).Iter()
 	var m mongodoc.Model
 	for iter.Next(&m) {
@@ -164,43 +153,4 @@ func (s *Stats) collectStats(jem *JEM) (*currentStats, error) {
 		return nil, errgo.Notef(err, "cannot gather stats")
 	}
 	return &cs, nil
-}
-
-// metricWithDesc implements prometheus.Metric
-// by combining a metric value with a description.
-type metricWithDesc struct {
-	metric
-	desc *prometheus.Desc
-}
-
-// Desc implements prometheus.Metric.Desc.
-func (m *metricWithDesc) Desc() *prometheus.Desc {
-	return m.desc
-}
-
-// metric implements half of the prometheus.Metric interface.
-type metric struct {
-	kind  dto.MetricType
-	value int
-}
-
-// Write implements prometheus.Metric.Write.
-func (m metric) Write(wm *dto.Metric) error {
-	switch m.kind {
-	case dto.MetricType_COUNTER:
-		wm.Counter = &dto.Counter{
-			Value: newFloat64(float64(m.value)),
-		}
-	case dto.MetricType_GAUGE:
-		wm.Gauge = &dto.Gauge{
-			Value: newFloat64(float64(m.value)),
-		}
-	default:
-		panic("unexpected metric type")
-	}
-	return nil
-}
-
-func newFloat64(f float64) *float64 {
-	return &f
 }
