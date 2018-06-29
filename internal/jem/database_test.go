@@ -760,7 +760,7 @@ func (s *databaseSuite) TestUpdateModelCountsNotFound(c *gc.C) {
 func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "x"}
 	err := s.database.UpdateMachineInfo(testContext, &mongodoc.Machine{
-		Controller: ctlPath,
+		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
 		Info: &multiwatcher.MachineInfo{
@@ -771,7 +771,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	err = s.database.UpdateMachineInfo(testContext, &mongodoc.Machine{
-		Controller: ctlPath,
+		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
 		Info: &multiwatcher.MachineInfo{
@@ -782,7 +782,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	err = s.database.UpdateMachineInfo(testContext, &mongodoc.Machine{
-		Controller: ctlPath,
+		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
 		Info: &multiwatcher.MachineInfo{
@@ -800,7 +800,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 	}
 	c.Assert(docs, jc.DeepEquals, []mongodoc.Machine{{
 		Id:         ctlPath.String() + " fake-uuid 0",
-		Controller: ctlPath,
+		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
 		Info: &multiwatcher.MachineInfo{
@@ -811,7 +811,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 		},
 	}, {
 		Id:         ctlPath.String() + " fake-uuid 1",
-		Controller: ctlPath,
+		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
 		Info: &multiwatcher.MachineInfo{
@@ -824,7 +824,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 
 	// Check that we can update one of the documents.
 	err = s.database.UpdateMachineInfo(testContext, &mongodoc.Machine{
-		Controller: ctlPath,
+		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
 		Info: &multiwatcher.MachineInfo{
@@ -838,7 +838,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 
 	// Check that setting a machine dead removes it.
 	err = s.database.UpdateMachineInfo(testContext, &mongodoc.Machine{
-		Controller: ctlPath,
+		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
 		Info: &multiwatcher.MachineInfo{
@@ -857,7 +857,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 	}
 	c.Assert(docs, jc.DeepEquals, []mongodoc.Machine{{
 		Id:         ctlPath.String() + " fake-uuid 0",
-		Controller: ctlPath,
+		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
 		Info: &multiwatcher.MachineInfo{
@@ -1714,7 +1714,7 @@ var setDeadTests = []struct {
 	about: "UpdateMachineInfo",
 	run: func(db *jem.Database) {
 		db.UpdateMachineInfo(testContext, &mongodoc.Machine{
-			Controller: params.EntityPath{"test", "test"},
+			Controller: "test/test",
 			Info: &multiwatcher.MachineInfo{
 				ModelUUID: "xxx",
 				Id:        "yyy",

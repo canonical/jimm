@@ -101,14 +101,15 @@ type Params struct {
 
 // Server represents a JEM HTTP server.
 type Server struct {
-	router        *httprouter.Router
-	context       context.Context
-	pool          *jem.Pool
-	authPool      *auth.Pool
-	sessionPool   *mgosession.Pool
-	monitor       *monitor.Monitor
-	usageSender   worker.Worker
-	jemModelStats *jem.ModelStats
+	router          *httprouter.Router
+	context         context.Context
+	pool            *jem.Pool
+	authPool        *auth.Pool
+	sessionPool     *mgosession.Pool
+	monitor         *monitor.Monitor
+	usageSender     worker.Worker
+	jemModelStats   *jem.ModelStats
+	jemMachineStats *jem.MachineStats
 }
 
 // New returns a new handler that handles model manager
@@ -214,8 +215,18 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 		// this case, we don't care much - just let the first one work.
 		// This is useful to enable tests that use more than one Server
 		// at the same time.
-		zapctx.Error(ctx, "cannot register JEM prometheus stats", zaputil.Error(err))
+		zapctx.Error(ctx, "cannot register JEM model prometheus stats", zaputil.Error(err))
 		srv.jemModelStats = nil
+	}
+
+	srv.jemMachineStats = p.MachineStats(ctx)
+	if err := prometheus.Register(srv.jemMachineStats); err != nil {
+		// This happens when the stats have already been registered. In
+		// this case, we don't care much - just let the first one work.
+		// This is useful to enable tests that use more than one Server
+		// at the same time.
+		zapctx.Error(ctx, "cannot register JEM machine prometheus stats", zaputil.Error(err))
+		srv.jemMachineStats = nil
 	}
 
 	return srv, nil
@@ -272,6 +283,9 @@ func (srv *Server) options(http.ResponseWriter, *http.Request, httprouter.Params
 func (srv *Server) Close() error {
 	if srv.jemModelStats != nil {
 		prometheus.Unregister(srv.jemModelStats)
+	}
+	if srv.jemMachineStats != nil {
+		prometheus.Unregister(srv.jemMachineStats)
 	}
 	if srv.monitor != nil {
 		srv.monitor.Kill()

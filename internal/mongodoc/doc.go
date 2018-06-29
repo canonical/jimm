@@ -295,7 +295,7 @@ func (m *Model) Life() string {
 type Machine struct {
 	// Id holds the combination of the controller path, model UUID and machine id.
 	Id         string `bson:"_id"`
-	Controller params.EntityPath
+	Controller string
 	Cloud      params.Cloud
 	Region     string
 	Info       *multiwatcher.MachineInfo

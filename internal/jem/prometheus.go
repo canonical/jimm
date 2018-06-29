@@ -1,9 +1,13 @@
 package jem
 
 import (
+	"strings"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
+	mgo "gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jem/internal/mongodoc"
 	"github.com/CanonicalLtd/jem/internal/servermon"
@@ -153,4 +157,68 @@ func (s *ModelStats) collectStats(jem *JEM) (*currentModelStats, error) {
 		return nil, errgo.Notef(err, "cannot gather stats")
 	}
 	return &cs, nil
+}
+
+// MachineStats implements a Prometheus collector that provides information
+// about machine statistics.
+type MachineStats struct {
+	pool    *Pool
+	context context.Context
+}
+
+// MachineStats returns an implementation of prometheus.Collector that
+// returns information on machine statistics obtained from the pool.
+func (p *Pool) MachineStats(ctx context.Context) *MachineStats {
+	return &MachineStats{
+		context: ctx,
+		pool:    p,
+	}
+}
+
+var machineDesc = prometheus.NewDesc(
+	prometheus.BuildFQName("jem", "health", "machines"),
+	"The number of running machines in a given state.",
+	[]string{"controller", "cloud", "region", "status"},
+	nil,
+)
+
+// Describe implements prometheus.Collector.Describe by describing all
+// the machine statistics that can be obtained from JIMM.
+func (s *MachineStats) Describe(c chan<- *prometheus.Desc) {
+	c <- machineDesc
+}
+
+var machineStatsJob = &mgo.MapReduce{
+	Map:    `function() {emit (this.controller + " " + this.cloud + " " + this.region + " " + this.info.agentstatus.current, 1)}`,
+	Reduce: `function (key, values) {return values.length}`,
+}
+
+var machinesQuery = bson.D{
+	{"controller", bson.D{{"$exists", true}}},
+	{"info.agentstatus.current", bson.D{{"$exists", true}}},
+}
+
+// Collect implements prometheus.Collector.Collect by collecting all the
+// model statistics from JIMM.
+func (s *MachineStats) Collect(c chan<- prometheus.Metric) {
+	jem := s.pool.JEM(s.context)
+	defer jem.Close()
+	var results []struct {
+		ID    string  `bson:"_id"`
+		Count float64 `bson:"value"`
+	}
+	if _, err := jem.DB.Machines().Find(machinesQuery).MapReduce(machineStatsJob, &results); err != nil {
+		zapctx.Error(s.context, "cannot collect statistics", zaputil.Error(err))
+		servermon.StatsCollectFailCount.Inc()
+		return
+	}
+	for _, r := range results {
+		ss := strings.SplitN(r.ID, " ", 4)
+		m, err := prometheus.NewConstMetric(machineDesc, prometheus.GaugeValue, r.Count, ss...)
+		if err != nil {
+			zapctx.Error(s.context, "error creating metric", zaputil.Error(err))
+			continue
+		}
+		c <- m
+	}
 }
