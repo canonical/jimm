@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/version"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
@@ -307,7 +306,7 @@ func (db *Database) Model(ctx context.Context, path params.EntityPath) (_ *mongo
 
 // ModelFromUUID returns the document representing the model with the
 // given UUID. It returns an error with a params.ErrNotFound cause if the
-// controller was not found.
+// model was not found.
 func (db *Database) ModelFromUUID(ctx context.Context, uuid string) (_ *mongodoc.Model, err error) {
 	defer db.checkError(ctx, &err)
 	var m mongodoc.Model
@@ -577,12 +576,39 @@ func (db *Database) GetModelStatuses(ctx context.Context) (statuses params.Model
 	return statuses, nil
 }
 
-// UpdateMachineInfo updates the information associated with a machine.
-func (db *Database) UpdateMachineInfo(ctx context.Context, info *multiwatcher.MachineInfo) (err error) {
+// RemoveControllerMachines removes all of the machine information for
+// the given controller.
+func (db *Database) RemoveControllerMachines(ctx context.Context, ctlPath params.EntityPath) (err error) {
 	defer db.checkError(ctx, &err)
-	id := info.ModelUUID + " " + info.Id
-	if _, err := db.Machines().UpsertId(id, bson.D{{"$set", bson.D{{"info", info}}}}); err != nil {
-		return errgo.Notef(err, "cannot update machine %v in model %v", info.Id, info.ModelUUID)
+	if _, err := db.Machines().RemoveAll(bson.D{{"controller", ctlPath}}); err != nil {
+		return errgo.Notef(err, "cannot remove machines for controller %v", ctlPath)
+	}
+	return nil
+}
+
+// UpdateMachineInfo updates the information associated with a machine.
+func (db *Database) UpdateMachineInfo(ctx context.Context, m *mongodoc.Machine) (err error) {
+	defer db.checkError(ctx, &err)
+	m.Id = m.Controller.String() + " " + m.Info.ModelUUID + " " + m.Info.Id
+	if m.Info.Life == "dead" {
+		if err := db.Machines().RemoveId(m.Id); err != nil {
+			if errgo.Cause(err) == mgo.ErrNotFound {
+				return nil
+			}
+			return errgo.Notef(err, "cannot update machine %v in model %v", m.Info.Id, m.Info.ModelUUID)
+		}
+	} else {
+		update := bson.D{{
+			"$set", bson.D{
+				{"info", m.Info},
+				{"controller", m.Controller},
+				{"cloud", m.Cloud},
+				{"region", m.Region},
+			},
+		}}
+		if _, err := db.Machines().UpsertId(m.Id, update); err != nil {
+			return errgo.Notef(err, "cannot update machine %v in model %v", m.Info.Id, m.Info.ModelUUID)
+		}
 	}
 	return nil
 }

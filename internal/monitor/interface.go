@@ -65,8 +65,11 @@ type jemInterface interface {
 	// mentioned in the counts argument will not be affected.
 	UpdateModelCounts(ctx context.Context, uuid string, counts map[params.EntityCount]int, now time.Time) error
 
+	// RemoveControllerMachines removes all machines for a controller.
+	RemoveControllerMachines(ctx context.Context, ctlPath params.EntityPath) error
+
 	// UpdateMachineInfo updates the information associated with a machine.
-	UpdateMachineInfo(ctx context.Context, machine *multiwatcher.MachineInfo) error
+	UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, machine *multiwatcher.MachineInfo) error
 
 	// AllControllers returns all the controllers in the system.
 	AllControllers(ctx context.Context) ([]*mongodoc.Controller, error)

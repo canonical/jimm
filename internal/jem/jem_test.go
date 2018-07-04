@@ -1453,6 +1453,90 @@ func (s *jemSuite) TestCloudCredentialTag(c *gc.C) {
 	c.Assert(jem.CloudCredentialTag(cp2).String(), gc.Equals, "cloudcred-dummy_alice@domain_cred")
 }
 
+func (s *jemSuite) TestUpdateMachineInfo(c *gc.C) {
+	m := s.bootstrapModel(c, params.EntityPath{"bob", "model-1"})
+	ctlPath := params.EntityPath{"bob", "controller"}
+
+	err := s.jem.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
+		ModelUUID: m.UUID,
+		Id:        "0",
+		Series:    "quantal",
+	})
+	c.Assert(err, gc.IsNil)
+	err = s.jem.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
+		ModelUUID: m.UUID,
+		Id:        "1",
+		Series:    "precise",
+	})
+	c.Assert(err, gc.IsNil)
+
+	docs, err := s.jem.DB.MachinesForModel(testContext, m.UUID)
+	c.Assert(err, gc.IsNil)
+	for i := range docs {
+		cleanMachineDoc(&docs[i])
+	}
+	c.Assert(docs, jc.DeepEquals, []mongodoc.Machine{{
+		Id:         ctlPath.String() + " " + m.UUID + " 0",
+		Controller: ctlPath,
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &multiwatcher.MachineInfo{
+			ModelUUID: m.UUID,
+			Id:        "0",
+			Series:    "quantal",
+			Config:    map[string]interface{}{},
+		},
+	}, {
+		Id:         ctlPath.String() + " " + m.UUID + " 1",
+		Controller: ctlPath,
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &multiwatcher.MachineInfo{
+			ModelUUID: m.UUID,
+			Id:        "1",
+			Series:    "precise",
+			Config:    map[string]interface{}{},
+		},
+	}})
+
+	// Check that we can update one of the documents.
+	err = s.jem.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
+		ModelUUID: m.UUID,
+		Id:        "0",
+		Series:    "quantal",
+		Life:      "dying",
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Check that setting a machine dead removes it.
+	err = s.jem.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
+		ModelUUID: m.UUID,
+		Id:        "1",
+		Series:    "precise",
+		Life:      "dead",
+	})
+	c.Assert(err, gc.IsNil)
+
+	docs, err = s.jem.DB.MachinesForModel(testContext, m.UUID)
+	c.Assert(err, gc.IsNil)
+	for i := range docs {
+		cleanMachineDoc(&docs[i])
+	}
+	c.Assert(docs, jc.DeepEquals, []mongodoc.Machine{{
+		Id:         ctlPath.String() + " " + m.UUID + " 0",
+		Controller: ctlPath,
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &multiwatcher.MachineInfo{
+			ModelUUID: m.UUID,
+			Id:        "0",
+			Series:    "quantal",
+			Config:    map[string]interface{}{},
+			Life:      "dying",
+		},
+	}})
+}
+
 func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityPath {
 	info := s.APIInfo(c)
 

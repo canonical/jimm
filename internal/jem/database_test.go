@@ -758,22 +758,38 @@ func (s *databaseSuite) TestUpdateModelCountsNotFound(c *gc.C) {
 }
 
 func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
-	err := s.database.UpdateMachineInfo(testContext, &multiwatcher.MachineInfo{
-		ModelUUID: "fake-uuid",
-		Id:        "0",
-		Series:    "quantal",
+	ctlPath := params.EntityPath{"bob", "x"}
+	err := s.database.UpdateMachineInfo(testContext, &mongodoc.Machine{
+		Controller: ctlPath,
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &multiwatcher.MachineInfo{
+			ModelUUID: "fake-uuid",
+			Id:        "0",
+			Series:    "quantal",
+		},
 	})
 	c.Assert(err, gc.IsNil)
-	err = s.database.UpdateMachineInfo(testContext, &multiwatcher.MachineInfo{
-		ModelUUID: "another-uuid",
-		Id:        "0",
-		Series:    "blah",
+	err = s.database.UpdateMachineInfo(testContext, &mongodoc.Machine{
+		Controller: ctlPath,
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &multiwatcher.MachineInfo{
+			ModelUUID: "another-uuid",
+			Id:        "0",
+			Series:    "blah",
+		},
 	})
 	c.Assert(err, gc.IsNil)
-	err = s.database.UpdateMachineInfo(testContext, &multiwatcher.MachineInfo{
-		ModelUUID: "fake-uuid",
-		Id:        "1",
-		Series:    "precise",
+	err = s.database.UpdateMachineInfo(testContext, &mongodoc.Machine{
+		Controller: ctlPath,
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &multiwatcher.MachineInfo{
+			ModelUUID: "fake-uuid",
+			Id:        "1",
+			Series:    "precise",
+		},
 	})
 	c.Assert(err, gc.IsNil)
 
@@ -783,7 +799,10 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 		cleanMachineDoc(&docs[i])
 	}
 	c.Assert(docs, jc.DeepEquals, []mongodoc.Machine{{
-		Id: "fake-uuid 0",
+		Id:         ctlPath.String() + " fake-uuid 0",
+		Controller: ctlPath,
+		Cloud:      "dummy",
+		Region:     "dummy-region",
 		Info: &multiwatcher.MachineInfo{
 			ModelUUID: "fake-uuid",
 			Id:        "0",
@@ -791,7 +810,10 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 			Config:    map[string]interface{}{},
 		},
 	}, {
-		Id: "fake-uuid 1",
+		Id:         ctlPath.String() + " fake-uuid 1",
+		Controller: ctlPath,
+		Cloud:      "dummy",
+		Region:     "dummy-region",
 		Info: &multiwatcher.MachineInfo{
 			ModelUUID: "fake-uuid",
 			Id:        "1",
@@ -801,11 +823,30 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 	}})
 
 	// Check that we can update one of the documents.
-	err = s.database.UpdateMachineInfo(testContext, &multiwatcher.MachineInfo{
-		ModelUUID: "fake-uuid",
-		Id:        "0",
-		Series:    "foo",
-		Life:      "dead",
+	err = s.database.UpdateMachineInfo(testContext, &mongodoc.Machine{
+		Controller: ctlPath,
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &multiwatcher.MachineInfo{
+			ModelUUID: "fake-uuid",
+			Id:        "0",
+			Series:    "foo",
+			Life:      "dying",
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Check that setting a machine dead removes it.
+	err = s.database.UpdateMachineInfo(testContext, &mongodoc.Machine{
+		Controller: ctlPath,
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &multiwatcher.MachineInfo{
+			ModelUUID: "fake-uuid",
+			Id:        "1",
+			Series:    "foo",
+			Life:      "dead",
+		},
 	})
 	c.Assert(err, gc.IsNil)
 
@@ -815,21 +856,16 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 		cleanMachineDoc(&docs[i])
 	}
 	c.Assert(docs, jc.DeepEquals, []mongodoc.Machine{{
-		Id: "fake-uuid 0",
+		Id:         ctlPath.String() + " fake-uuid 0",
+		Controller: ctlPath,
+		Cloud:      "dummy",
+		Region:     "dummy-region",
 		Info: &multiwatcher.MachineInfo{
 			ModelUUID: "fake-uuid",
 			Id:        "0",
 			Series:    "foo",
-			Life:      "dead",
 			Config:    map[string]interface{}{},
-		},
-	}, {
-		Id: "fake-uuid 1",
-		Info: &multiwatcher.MachineInfo{
-			ModelUUID: "fake-uuid",
-			Id:        "1",
-			Series:    "precise",
-			Config:    map[string]interface{}{},
+			Life:      "dying",
 		},
 	}})
 }
@@ -1677,9 +1713,12 @@ var setDeadTests = []struct {
 }, {
 	about: "UpdateMachineInfo",
 	run: func(db *jem.Database) {
-		db.UpdateMachineInfo(testContext, &multiwatcher.MachineInfo{
-			ModelUUID: "xxx",
-			Id:        "yyy",
+		db.UpdateMachineInfo(testContext, &mongodoc.Machine{
+			Controller: params.EntityPath{"test", "test"},
+			Info: &multiwatcher.MachineInfo{
+				ModelUUID: "xxx",
+				Id:        "yyy",
+			},
 		})
 	},
 }, {

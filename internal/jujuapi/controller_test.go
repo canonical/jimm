@@ -776,13 +776,13 @@ func (s *controllerSuite) TestModelInfo(c *gc.C) {
 	s.grant(c, params.EntityPath{User: "test2", Name: "model-5"}, params.User("test"), "admin")
 
 	// Add some machines to one of the models
-	err = s.JEM.DB.UpdateMachineInfo(testContext, &multiwatcher.MachineInfo{
+	err = s.JEM.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
 		ModelUUID: modelUUID3,
 		Id:        "machine-0",
 	})
 	c.Assert(err, jc.ErrorIsNil)
 	machineArch := "bbc-micro"
-	err = s.JEM.DB.UpdateMachineInfo(testContext, &multiwatcher.MachineInfo{
+	err = s.JEM.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
 		ModelUUID: modelUUID3,
 		Id:        "machine-1",
 		HardwareCharacteristics: &instance.HardwareCharacteristics{
@@ -790,7 +790,7 @@ func (s *controllerSuite) TestModelInfo(c *gc.C) {
 		},
 	})
 	c.Assert(err, jc.ErrorIsNil)
-	err = s.JEM.DB.UpdateMachineInfo(testContext, &multiwatcher.MachineInfo{
+	err = s.JEM.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
 		ModelUUID: modelUUID3,
 		Id:        "machine-2",
 		Life:      "dead",
