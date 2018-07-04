@@ -922,7 +922,7 @@ func (j *JEM) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, 
 		return errgo.Notef(err, "cannot find region for model %s:%s", ctlPath, info.ModelUUID)
 	}
 	return errgo.Mask(j.DB.UpdateMachineInfo(ctx, &mongodoc.Machine{
-		Controller: ctlPath,
+		Controller: ctlPath.String(),
 		Cloud:      cloud,
 		Region:     region,
 		Info:       info,

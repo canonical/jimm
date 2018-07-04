@@ -589,7 +589,7 @@ func (db *Database) RemoveControllerMachines(ctx context.Context, ctlPath params
 // UpdateMachineInfo updates the information associated with a machine.
 func (db *Database) UpdateMachineInfo(ctx context.Context, m *mongodoc.Machine) (err error) {
 	defer db.checkError(ctx, &err)
-	m.Id = m.Controller.String() + " " + m.Info.ModelUUID + " " + m.Info.Id
+	m.Id = m.Controller + " " + m.Info.ModelUUID + " " + m.Info.Id
 	if m.Info.Life == "dead" {
 		if err := db.Machines().RemoveId(m.Id); err != nil {
 			if errgo.Cause(err) == mgo.ErrNotFound {

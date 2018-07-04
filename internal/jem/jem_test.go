@@ -1477,7 +1477,7 @@ func (s *jemSuite) TestUpdateMachineInfo(c *gc.C) {
 	}
 	c.Assert(docs, jc.DeepEquals, []mongodoc.Machine{{
 		Id:         ctlPath.String() + " " + m.UUID + " 0",
-		Controller: ctlPath,
+		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
 		Info: &multiwatcher.MachineInfo{
@@ -1488,7 +1488,7 @@ func (s *jemSuite) TestUpdateMachineInfo(c *gc.C) {
 		},
 	}, {
 		Id:         ctlPath.String() + " " + m.UUID + " 1",
-		Controller: ctlPath,
+		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
 		Info: &multiwatcher.MachineInfo{
@@ -1524,7 +1524,7 @@ func (s *jemSuite) TestUpdateMachineInfo(c *gc.C) {
 	}
 	c.Assert(docs, jc.DeepEquals, []mongodoc.Machine{{
 		Id:         ctlPath.String() + " " + m.UUID + " 0",
-		Controller: ctlPath,
+		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
 		Info: &multiwatcher.MachineInfo{
