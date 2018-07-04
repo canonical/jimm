@@ -151,8 +151,8 @@ func (s jemShimWithUpdateNotify) UpdateModelCounts(ctx context.Context, uuid str
 	return nil
 }
 
-func (s jemShimWithUpdateNotify) UpdateMachineInfo(ctx context.Context, info *multiwatcher.MachineInfo) error {
-	if err := s.jemInterface.UpdateMachineInfo(ctx, info); err != nil {
+func (s jemShimWithUpdateNotify) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, info *multiwatcher.MachineInfo) error {
+	if err := s.jemInterface.UpdateMachineInfo(ctx, ctlPath, info); err != nil {
 		return err
 	}
 	s.changed <- "machine info"
@@ -209,7 +209,7 @@ type jemShimInMemory struct {
 	refCount                    int
 	controllers                 map[params.EntityPath]*mongodoc.Controller
 	models                      map[params.EntityPath]*mongodoc.Model
-	machines                    map[machineId]*mongodoc.Machine
+	machines                    map[string]map[machineId]*mongodoc.Machine
 	controllerUpdateCredentials map[params.EntityPath]bool
 }
 
@@ -217,10 +217,10 @@ var _ jemInterface = (*jemShimInMemory)(nil)
 
 func newJEMShimInMemory() *jemShimInMemory {
 	return &jemShimInMemory{
-		controllers: make(map[params.EntityPath]*mongodoc.Controller),
-		models:      make(map[params.EntityPath]*mongodoc.Model),
+		controllers:                 make(map[params.EntityPath]*mongodoc.Controller),
+		models:                      make(map[params.EntityPath]*mongodoc.Model),
 		controllerUpdateCredentials: make(map[params.EntityPath]bool),
-		machines:                    make(map[machineId]*mongodoc.Machine),
+		machines:                    make(map[string]map[machineId]*mongodoc.Machine),
 	}
 }
 
@@ -362,11 +362,18 @@ func (s *jemShimInMemory) UpdateModelCounts(ctx context.Context, uuid string, co
 	return nil
 }
 
-func (s *jemShimInMemory) UpdateMachineInfo(ctx context.Context, info *multiwatcher.MachineInfo) error {
+func (s *jemShimInMemory) RemoveControllerMachines(ctx context.Context, ctlPath params.EntityPath) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.machines[ctlPath.String()] = make(map[machineId]*mongodoc.Machine)
+	return nil
+}
+
+func (s *jemShimInMemory) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, info *multiwatcher.MachineInfo) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	info1 := *info
-	s.machines[machineId{info1.ModelUUID, info1.Id}] = &mongodoc.Machine{
+	s.machines[ctlPath.String()][machineId{info1.ModelUUID, info1.Id}] = &mongodoc.Machine{
 		Id:   info1.ModelUUID + " " + info1.Id,
 		Info: &info1,
 	}

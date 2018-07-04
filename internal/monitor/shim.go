@@ -80,8 +80,12 @@ func (j jemShim) UpdateModelCounts(ctx context.Context, uuid string, counts map[
 	return errgo.Mask(j.DB.UpdateModelCounts(ctx, uuid, counts, now), errgo.Any)
 }
 
-func (j jemShim) UpdateMachineInfo(ctx context.Context, info *multiwatcher.MachineInfo) error {
-	return errgo.Mask(j.DB.UpdateMachineInfo(ctx, info), errgo.Any)
+func (j jemShim) RemoveControllerMachines(ctx context.Context, ctlPath params.EntityPath) error {
+	return errgo.Mask(j.DB.RemoveControllerMachines(ctx, ctlPath), errgo.Any)
+}
+
+func (j jemShim) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, info *multiwatcher.MachineInfo) error {
+	return errgo.Mask(j.JEM.UpdateMachineInfo(ctx, ctlPath, info), errgo.Any)
 }
 
 func (j jemShim) SetControllerVersion(ctx context.Context, ctlPath params.EntityPath, v version.Number) error {

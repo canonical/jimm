@@ -16,6 +16,8 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/juju/environs/config"
+	"github.com/juju/juju/state/multiwatcher"
+	"github.com/juju/utils/cache"
 	"github.com/juju/utils/clock"
 	"github.com/juju/version"
 	"github.com/rogpeppe/fastuuid"
@@ -85,6 +87,9 @@ type Pool struct {
 	// dbName holds the name of the database to use.
 	dbName string
 
+	// regionCache caches region information about models
+	regionCache *cache.Cache
+
 	// mu guards the fields below it.
 	mu sync.Mutex
 
@@ -137,6 +142,7 @@ func NewPool(ctx context.Context, p Params) (*Pool, error) {
 		config:        p,
 		dbName:        p.DB.Name,
 		connCache:     apiconn.NewCache(apiconn.CacheParams{}),
+		regionCache:   cache.New(24 * time.Hour),
 		refCount:      1,
 		uuidGenerator: uuidGen,
 	}
@@ -198,8 +204,8 @@ func (p *Pool) JEM(ctx context.Context) *JEM {
 	}
 	p.refCount++
 	return &JEM{
-		DB:   newDatabase(ctx, p.config.SessionPool, p.dbName),
-		pool: p,
+		DB:                             newDatabase(ctx, p.config.SessionPool, p.dbName),
+		pool:                           p,
 		usageSenderAuthorizationClient: p.usageSenderAuthorizationClient,
 	}
 }
@@ -907,6 +913,47 @@ func (j *JEM) UsageSenderAuthorization(applicationUser string) ([]byte, error) {
 		return nil, errgo.Notef(err, "cannot marshal metrics authorization credentials")
 	}
 	return data, nil
+}
+
+// UpdateMachineInfo updates the information associated with a machine.
+func (j *JEM) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, info *multiwatcher.MachineInfo) error {
+	cloud, region, err := j.modelRegion(ctx, ctlPath, info.ModelUUID)
+	if err != nil {
+		return errgo.Notef(err, "cannot find region for model %s:%s", ctlPath, info.ModelUUID)
+	}
+	return errgo.Mask(j.DB.UpdateMachineInfo(ctx, &mongodoc.Machine{
+		Controller: ctlPath,
+		Cloud:      cloud,
+		Region:     region,
+		Info:       info,
+	}))
+}
+
+// modelRegion determines the cloud and region in which a model is contained.
+func (j *JEM) modelRegion(ctx context.Context, ctlPath params.EntityPath, uuid string) (params.Cloud, string, error) {
+	type cloudRegion struct {
+		cloud  params.Cloud
+		region string
+	}
+	key := fmt.Sprintf("%s %s", ctlPath, uuid)
+	r, err := j.pool.regionCache.Get(key, func() (interface{}, error) {
+		m, err := j.DB.ModelFromUUID(ctx, uuid)
+		if err != nil {
+			return nil, errgo.Mask(err)
+		}
+		if m.Controller != ctlPath {
+			return nil, errgo.Newf("model %s not known on controller %s", uuid, ctlPath)
+		}
+		return cloudRegion{
+			cloud:  m.Cloud,
+			region: m.CloudRegion,
+		}, nil
+	})
+	if err != nil {
+		return "", "", errgo.Mask(err)
+	}
+	cr := r.(cloudRegion)
+	return cr.cloud, cr.region, nil
 }
 
 // UserTag creates a juju user tag from a params.User

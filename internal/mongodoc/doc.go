@@ -293,9 +293,12 @@ func (m *Model) Life() string {
 // Machine holds information on a machine in a model, as discovered by the
 // controller monitor.
 type Machine struct {
-	// Id holds the combination of the model UUID and machine id.
-	Id   string `bson:"_id"`
-	Info *multiwatcher.MachineInfo
+	// Id holds the combination of the controller path, model UUID and machine id.
+	Id         string `bson:"_id"`
+	Controller params.EntityPath
+	Cloud      params.Cloud
+	Region     string
+	Info       *multiwatcher.MachineInfo
 }
 
 type ModelUserInfo struct {

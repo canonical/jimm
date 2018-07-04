@@ -303,6 +303,12 @@ func (m *controllerMonitor) connected(ctx context.Context, conn jujuAPI) error {
 	if err := m.jem.SetControllerRegions(ctx, m.ctlPath, regions); err != nil {
 		return errgo.Notef(err, "cannot set controller regions")
 	}
+
+	// Remove all the known machines for the controller. The ones
+	// that still exist will be updated in the first deltas.
+	if err := m.jem.RemoveControllerMachines(ctx, m.ctlPath); err != nil {
+		return errgo.Notef(err, "cannot remove controller machines")
+	}
 	return nil
 }
 
@@ -542,7 +548,7 @@ func (w *watcherState) addDelta(ctx context.Context, d multiwatcher.Delta) error
 		delta := w.adjustCount(&w.stats.MachineCount, d)
 		w.modelInfo(e.ModelUUID).adjustCount(params.MachineCount, delta)
 		w.runner.Do(func() error {
-			return w.jem.UpdateMachineInfo(ctx, e)
+			return w.jem.UpdateMachineInfo(ctx, w.ctlPath, e)
 		})
 	}
 	return nil
