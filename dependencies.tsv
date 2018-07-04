@@ -39,6 +39,7 @@ github.com/juju/idmclient	git	4dc25171f675da4206b71695d3fd80e519ad05c1	2017-02-0
 github.com/juju/jsonschema	git	a0ef8b74ebcffeeff9fc374854deb4af388f037e	2016-11-02T18:19:19Z
 github.com/juju/juju	git	ac28813fcd5990b45d6a720233a43c2ea4b927c4	2018-04-23T05:02:11Z
 github.com/juju/loggo	git	8232ab8918d91c72af1a9fb94d3edbe31d88b790	2017-06-05T01:46:07Z
+github.com/juju/mgosession	git	9ae6df2882cd783cf81d3315dca3b64707f6d675	2017-02-06T15:02:31Z
 github.com/juju/mutex	git	1fe2a4bf0a3a2c10881501233ff7c6aed7790082	2017-11-10T02:00:13Z
 github.com/juju/names	git	8a0aa0963bbacdc790914892e9ff942e94d6f795	2016-03-30T15:05:33Z
 github.com/juju/persistent-cookiejar	git	d67418f14c93a698e37b52468958d5d4dcf8a7dd	2017-04-28T16:15:59Z
@@ -87,7 +88,7 @@ github.com/vmware/govmomi	git	05504416e95561e1478196d7058721c827a7bb8c	2018-03-0
 go.uber.org/atomic	git	0506d69f5564c56e25797bf7183c28921d4c6360	2017-06-09T00:20:07Z
 go.uber.org/zap	git	300d56ffb8cc64ae052901970de2220411d201f7	2017-06-10T22:39:01Z
 golang.org/x/crypto	git	96846453c37f0876340a66a47f3f75b1f3a6cd2d	2017-04-21T04:31:20Z
-golang.org/x/net	git	ea47fc708ee3e20177f3ca3716217c4ab75942cb	2015-08-29T23:03:18Z
+golang.org/x/net	git	d25186b37f34ebdbbea8f488ef055638dfab272d	2018-03-06T06:01:52Z
 golang.org/x/oauth2	git	11c60b6f71a6ad48ed6f93c65fa4c6f9b1b5b46a	2015-03-25T02:00:22Z
 golang.org/x/sys	git	7a6e5648d140666db5d920909e082ca00a87ba2c	2017-02-01T05:12:45Z
 golang.org/x/text	git	2910a502d2bf9e43193af9d68ca516529614eed3	2016-07-26T16:48:57Z
