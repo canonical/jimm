@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/juju/aclstore"
 	"github.com/juju/httprequest"
 	cloudapi "github.com/juju/juju/api/cloud"
 	controllerapi "github.com/juju/juju/api/controller"
@@ -35,19 +36,37 @@ import (
 	"github.com/CanonicalLtd/jem/params"
 )
 
+const (
+	// ACL Names
+	auditLogACL = "audit-log"
+)
+
 // controllerClientInitiateMigration is defined as a variable so that
 // it can be overridden for tests.
 var controllerClientInitiateMigration = (*controllerapi.Client).InitiateMigration
 
 type Handler struct {
-	jem     *jem.JEM
-	context context.Context
-	cancel  context.CancelFunc
-	config  jemserver.Params
-	monReq  servermon.Request
+	jem      *jem.JEM
+	context  context.Context
+	cancel   context.CancelFunc
+	config   jemserver.Params
+	monReq   servermon.Request
+	aclstore aclstore.ACLStore
 }
 
 func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httprequest.Handler, error) {
+	// Ensure the required ACLs exist.
+	aclManager, err := aclstore.NewManager(ctx, aclstore.Params{
+		Store:             params.ACLStore,
+		InitialAdminUsers: []string{string(params.ControllerAdmin)},
+	})
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	if err := aclManager.CreateACL(ctx, auditLogACL, string(params.ControllerAdmin)); err != nil {
+		return nil, errgo.Mask(err)
+	}
+
 	return jemerror.Mapper.Handlers(func(p httprequest.Params) (*Handler, error) {
 		// Time out all requests after 30s. Do this before joining
 		// the contexts because p.Context is likely to have a done
@@ -67,10 +86,11 @@ func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httpr
 			return nil, errgo.Mask(err, errgo.Any)
 		}
 		h := &Handler{
-			jem:     params.JEMPool.JEM(ctx),
-			context: ctx,
-			config:  params.Params,
-			cancel:  cancel,
+			jem:      params.JEMPool.JEM(ctx),
+			context:  ctx,
+			config:   params.Params,
+			cancel:   cancel,
+			aclstore: params.ACLStore,
 		}
 
 		h.monReq.Start(p.PathPattern)
@@ -950,7 +970,7 @@ func (h *Handler) GetModelName(arg *params.ModelNameRequest) (params.ModelNameRe
 
 // GetAuditEntries return the list of audit log entries based on the requested query.
 func (h *Handler) GetAuditEntries(arg *params.AuditLogRequest) (params.AuditLogEntries, error) {
-	if err := auth.CheckIsUser(h.context, h.config.ControllerAdmin); err != nil {
+	if err := h.checkACL(h.context, auditLogACL); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	entries, err := h.jem.DB.GetAuditEntries(h.context, arg.Start.Time, arg.End.Time, arg.Type)
@@ -970,4 +990,12 @@ func (h *Handler) GetModelStatuses(arg *params.ModelStatusesRequest) (params.Mod
 		return nil, errgo.Mask(err)
 	}
 	return entries, nil
+}
+
+func (h *Handler) checkACL(ctx context.Context, aclName string) error {
+	acl, err := h.aclstore.Get(ctx, aclName)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	return errgo.Mask(auth.CheckACL(ctx, acl), errgo.Is(params.ErrUnauthorized))
 }

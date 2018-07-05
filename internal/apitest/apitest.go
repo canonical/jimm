@@ -10,9 +10,11 @@ import (
 	"net/http/httptest"
 	"time"
 
+	"github.com/juju/aclstore"
 	"github.com/juju/idmclient/idmtest"
 	controllerapi "github.com/juju/juju/api/controller"
 	"github.com/juju/juju/controller"
+	"github.com/juju/simplekv/mgosimplekv"
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
@@ -62,6 +64,7 @@ type Suite struct {
 	MetricsRegistrationClient *stubMetricsRegistrationClient
 	MetricsSpoolPath          string
 	Clock                     *testing.Clock
+	ACLStore                  aclstore.ACLStore
 }
 
 func (s *Suite) SetUpTest(c *gc.C) {
@@ -88,6 +91,9 @@ func (s *Suite) SetUpTest(c *gc.C) {
 	s.SessionPool = mgosession.NewPool(context.TODO(), s.Session, 1)
 	s.Pool = s.NewJEMPool(c, s.SessionPool)
 	s.JEM = s.Pool.JEM(context.TODO())
+	kvstore, err := mgosimplekv.NewStore(s.JEM.DB.C("acls"))
+	c.Assert(err, gc.Equals, nil)
+	s.ACLStore = aclstore.NewACLStore(kvstore)
 }
 
 // NewJEMPool returns a jem.Pool that uses the given
