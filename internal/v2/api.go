@@ -3,6 +3,7 @@
 package v2
 
 import (
+	"context"
 	"net/url"
 	"sort"
 	"strings"
@@ -16,7 +17,6 @@ import (
 	"github.com/juju/juju/network"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
 	"gopkg.in/mgo.v2"

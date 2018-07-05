@@ -3,6 +3,7 @@
 package jujuapi
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -10,7 +11,6 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/rpc"
 	"github.com/juju/juju/rpc/jsoncodec"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/internal/auth"

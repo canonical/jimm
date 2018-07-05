@@ -3,6 +3,7 @@
 package usagesender_test
 
 import (
+	"context"
 	"fmt"
 	"net/http/httptest"
 	"os"
@@ -16,7 +17,6 @@ import (
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
 	"github.com/julienschmidt/httprouter"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 
 	external_jem "github.com/CanonicalLtd/jem"

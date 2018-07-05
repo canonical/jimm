@@ -1,6 +1,7 @@
 package apiconn_test
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"sync"
@@ -17,7 +18,6 @@ import (
 	"github.com/juju/pubsub"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils/clock"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"

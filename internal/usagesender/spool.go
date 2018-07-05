@@ -3,6 +3,7 @@
 package usagesender
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"os"
@@ -12,7 +13,6 @@ import (
 
 	wireformat "github.com/juju/romulus/wireformat/metrics"
 	"github.com/juju/utils"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/internal/jem"

@@ -3,13 +3,13 @@
 package monitor
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/utils/parallel"
 	"go.uber.org/zap"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/tomb.v2"
 

@@ -3,6 +3,7 @@
 package jemserver_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -11,7 +12,6 @@ import (
 	jujutesting "github.com/juju/juju/testing"
 	"github.com/juju/testing/httptesting"
 	"github.com/julienschmidt/httprouter"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jem/internal/jem"

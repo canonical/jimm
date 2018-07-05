@@ -3,6 +3,7 @@
 package jem
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -22,7 +23,6 @@ import (
 	"github.com/juju/version"
 	"github.com/rogpeppe/fastuuid"
 	"go.uber.org/zap"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
@@ -204,8 +204,8 @@ func (p *Pool) JEM(ctx context.Context) *JEM {
 	}
 	p.refCount++
 	return &JEM{
-		DB:                             newDatabase(ctx, p.config.SessionPool, p.dbName),
-		pool:                           p,
+		DB:   newDatabase(ctx, p.config.SessionPool, p.dbName),
+		pool: p,
 		usageSenderAuthorizationClient: p.usageSenderAuthorizationClient,
 	}
 }

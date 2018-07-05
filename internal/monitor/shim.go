@@ -3,6 +3,7 @@
 package monitor
 
 import (
+	"context"
 	"time"
 
 	cloudapi "github.com/juju/juju/api/cloud"
@@ -11,7 +12,6 @@ import (
 	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/version"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
 

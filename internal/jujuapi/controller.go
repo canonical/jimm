@@ -3,6 +3,7 @@
 package jujuapi
 
 import (
+	"context"
 	"reflect"
 	"sort"
 	"strings"
@@ -24,7 +25,6 @@ import (
 	"github.com/juju/utils/parallel"
 	"github.com/juju/version"
 	"go.uber.org/zap"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6"
 	"gopkg.in/juju/names.v2"

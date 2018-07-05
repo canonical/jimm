@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"context"
 	"log"
 	"sync"
 	"time"
@@ -13,7 +14,6 @@ import (
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
 	"github.com/juju/version"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	names "gopkg.in/juju/names.v2"
@@ -217,8 +217,8 @@ var _ jemInterface = (*jemShimInMemory)(nil)
 
 func newJEMShimInMemory() *jemShimInMemory {
 	return &jemShimInMemory{
-		controllers:                 make(map[params.EntityPath]*mongodoc.Controller),
-		models:                      make(map[params.EntityPath]*mongodoc.Model),
+		controllers: make(map[params.EntityPath]*mongodoc.Controller),
+		models:      make(map[params.EntityPath]*mongodoc.Model),
 		controllerUpdateCredentials: make(map[params.EntityPath]bool),
 		machines:                    make(map[string]map[machineId]*mongodoc.Machine),
 	}

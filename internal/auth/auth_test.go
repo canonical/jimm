@@ -3,13 +3,13 @@
 package auth_test
 
 import (
+	"context"
 	"net/http"
 	"time"
 
 	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/idmtest"
 	jc "github.com/juju/testing/checkers"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"

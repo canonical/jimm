@@ -1,6 +1,7 @@
 package v2_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -16,7 +17,6 @@ import (
 	"github.com/juju/testing/httptesting"
 	"github.com/juju/utils"
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
