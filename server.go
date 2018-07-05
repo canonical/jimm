@@ -12,6 +12,7 @@ import (
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/mgo.v2"
 
+	"github.com/CanonicalLtd/jem/internal/admin"
 	"github.com/CanonicalLtd/jem/internal/debugapi"
 	"github.com/CanonicalLtd/jem/internal/jemserver"
 	"github.com/CanonicalLtd/jem/internal/jujuapi"
@@ -23,6 +24,7 @@ var versions = map[string]jemserver.NewAPIHandlerFunc{
 	"v2":    v2.NewAPIHandler,
 	"debug": debugapi.NewAPIHandler,
 	"juju":  jujuapi.NewAPIHandler,
+	"admin": admin.NewAPIHandler,
 }
 
 // ServerParams holds configuration for a new API server.

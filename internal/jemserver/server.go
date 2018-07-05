@@ -9,8 +9,10 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/juju/aclstore"
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient"
+	"github.com/juju/simplekv/mgosimplekv"
 	"github.com/julienschmidt/httprouter"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/context"
@@ -111,6 +113,9 @@ type HandlerParams struct {
 
 	// AuthenticatorPool contains the pool of Authenticators.
 	AuthenticatorPool *auth.Pool
+
+	// ACLStore contains the store for the ACLs.
+	ACLStore aclstore.ACLStore
 }
 
 // Server represents a JEM HTTP server.
@@ -154,6 +159,11 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 		return nil, errgo.Notef(err, "cannot create bakery")
 	}
 	sessionPool := mgosession.NewPool(ctx, config.DB.Session, config.MaxMgoSessions)
+	kvstore, err := mgosimplekv.NewStore(config.DB.C("acls"))
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot create ACL store")
+	}
+	aclStore := aclstore.NewACLStore(kvstore)
 	jconfig := jem.Params{
 		DB:              config.DB,
 		SessionPool:     sessionPool,
@@ -215,6 +225,7 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 			SessionPool:       sessionPool,
 			JEMPool:           p,
 			AuthenticatorPool: authPool,
+			ACLStore:          aclStore,
 		})
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot create API %s", name)
