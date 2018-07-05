@@ -3,6 +3,7 @@
 package jujuapi_test
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -25,7 +26,6 @@ import (
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/version"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"

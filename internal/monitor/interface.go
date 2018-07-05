@@ -3,12 +3,12 @@
 package monitor
 
 import (
+	"context"
 	"time"
 
 	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/version"
-	"golang.org/x/net/context"
 	names "gopkg.in/juju/names.v2"
 
 	"github.com/CanonicalLtd/jem/internal/mongodoc"

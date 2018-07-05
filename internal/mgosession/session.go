@@ -6,8 +6,9 @@
 package mgosession
 
 import (
+	"context"
+
 	"github.com/juju/mgosession"
-	"golang.org/x/net/context"
 	mgo "gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jem/internal/zapctx"

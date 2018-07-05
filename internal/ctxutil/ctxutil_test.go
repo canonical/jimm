@@ -3,9 +3,9 @@
 package ctxutil_test
 
 import (
+	"context"
 	"time"
 
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jem/internal/ctxutil"

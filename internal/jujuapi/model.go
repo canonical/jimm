@@ -3,6 +3,7 @@
 package jujuapi
 
 import (
+	"context"
 	"reflect"
 
 	"github.com/juju/juju/apiserver/common"
@@ -10,7 +11,6 @@ import (
 	"github.com/juju/juju/network"
 	"github.com/juju/juju/rpc"
 	"github.com/juju/juju/rpc/rpcreflect"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/internal/jem"

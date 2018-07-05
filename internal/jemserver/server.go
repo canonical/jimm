@@ -3,6 +3,7 @@
 package jemserver
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"net/http"
@@ -15,7 +16,6 @@ import (
 	"github.com/juju/simplekv/mgosimplekv"
 	"github.com/julienschmidt/httprouter"
 	"github.com/prometheus/client_golang/prometheus"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/worker.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"

@@ -3,6 +3,7 @@
 package jem_test
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -17,7 +18,6 @@ import (
 	jt "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/version"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"

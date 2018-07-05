@@ -3,6 +3,7 @@
 package admin_test
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,7 +12,6 @@ import (
 	"github.com/juju/aclstore/params"
 	"github.com/juju/httprequest"
 	jc "github.com/juju/testing/checkers"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
 

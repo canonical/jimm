@@ -5,11 +5,11 @@
 package zapctx
 
 import (
+	"context"
 	"os"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/net/context"
 )
 
 // LogLevel holds an AtomicLevel that can be used to change the logging

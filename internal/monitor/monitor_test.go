@@ -1,6 +1,7 @@
 package monitor_test
 
 import (
+	"context"
 	"time"
 
 	jujuwatcher "github.com/juju/juju/state/watcher"
@@ -8,7 +9,6 @@ import (
 	"github.com/juju/juju/testing/factory"
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/worker.v1"
 

@@ -1,11 +1,11 @@
 package apiconn
 
 import (
+	"context"
 	"sync"
 
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/internal/singleflight"

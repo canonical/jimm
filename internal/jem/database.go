@@ -3,13 +3,13 @@
 package jem
 
 import (
+	"context"
 	"fmt"
 	"sync/atomic"
 	"time"
 
 	"github.com/juju/version"
 	"go.uber.org/zap"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"

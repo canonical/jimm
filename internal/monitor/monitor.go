@@ -9,11 +9,11 @@
 package monitor
 
 import (
+	"context"
 	"time"
 
 	"github.com/juju/utils/clock"
 	"go.uber.org/zap"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/tomb.v2"
 

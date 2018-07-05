@@ -1,12 +1,12 @@
 package debugapi
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/juju/httprequest"
 	"github.com/juju/utils/debugstatus"
 	"go.uber.org/zap"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/internal/auth"

@@ -3,8 +3,9 @@
 package mgosession_test
 
 import (
+	"context"
+
 	jujutesting "github.com/juju/testing"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jem/internal/jemtest"

@@ -3,13 +3,13 @@
 package admin
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/juju/aclstore"
 	"github.com/juju/httprequest"
 	"github.com/juju/simplekv/mgosimplekv"
 	"github.com/julienschmidt/httprouter"
-	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/internal/auth"

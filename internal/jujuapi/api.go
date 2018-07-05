@@ -4,6 +4,7 @@
 package jujuapi
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -11,7 +12,6 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/julienschmidt/httprouter"
 	"go.uber.org/zap"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jem/internal/ctxutil"

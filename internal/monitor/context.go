@@ -3,9 +3,9 @@
 package monitor
 
 import (
+	"context"
 	"time"
 
-	"golang.org/x/net/context"
 	tomb "gopkg.in/tomb.v2"
 )
 

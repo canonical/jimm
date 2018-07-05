@@ -4,6 +4,7 @@ package jujuapi_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/pem"
 	"fmt"
 	"net/http/httptest"
@@ -13,7 +14,6 @@ import (
 	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/api/modelmanager"
 	jc "github.com/juju/testing/checkers"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/names.v2"
 

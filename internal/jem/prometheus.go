@@ -1,10 +1,10 @@
 package jem
 
 import (
+	"context"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"

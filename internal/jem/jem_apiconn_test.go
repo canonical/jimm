@@ -3,10 +3,10 @@
 package jem_test
 
 import (
+	"context"
 	"time"
 
 	cloudapi "github.com/juju/juju/api/cloud"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
