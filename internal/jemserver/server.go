@@ -38,7 +38,7 @@ var (
 
 // NewAPIHandlerFunc is a function that returns set of httprequest
 // handlers that uses the given JEM pool and server params.
-type NewAPIHandlerFunc func(context.Context, *jem.Pool, *auth.Pool, Params) ([]httprequest.Handler, error)
+type NewAPIHandlerFunc func(context.Context, HandlerParams) ([]httprequest.Handler, error)
 
 // Params holds configuration for a new API server.
 // It must be kept in sync with identical definition in the
@@ -97,6 +97,20 @@ type Params struct {
 	// including the leading "@". If this is empty, users may be in
 	// any domain.
 	Domain string
+}
+
+// HandlerParams are the parameters used to initialize a handler.
+type HandlerParams struct {
+	Params
+
+	// SessionPool contains the pool of mgo sessions.
+	SessionPool *mgosession.Pool
+
+	// JEMPool contains the pool of JEM instances.
+	JEMPool *jem.Pool
+
+	// AuthenticatorPool contains the pool of Authenticators.
+	AuthenticatorPool *auth.Pool
 }
 
 // Server represents a JEM HTTP server.
@@ -196,7 +210,12 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	}
 	srv.router.Handler("GET", "/metrics", prometheus.Handler())
 	for name, newAPI := range versions {
-		handlers, err := newAPI(ctx, p, authPool, config)
+		handlers, err := newAPI(ctx, HandlerParams{
+			Params:            config,
+			SessionPool:       sessionPool,
+			JEMPool:           p,
+			AuthenticatorPool: authPool,
+		})
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot create API %s", name)
 		}

@@ -14,7 +14,6 @@ import (
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jem/internal/auth"
 	"github.com/CanonicalLtd/jem/internal/ctxutil"
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/jemerror"
@@ -24,48 +23,48 @@ import (
 	"github.com/CanonicalLtd/jem/params"
 )
 
-func NewAPIHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, params jemserver.Params) ([]httprequest.Handler, error) {
+func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httprequest.Handler, error) {
 	return append(
 		jemerror.Mapper.Handlers(func(p httprequest.Params) (*handler, error) {
 			ctx := ctxutil.Join(ctx, p.Context)
 			ctx = zapctx.WithFields(ctx, zap.String("req-id", httprequest.RequestUUID(ctx)))
 			return &handler{
 				context: ctx,
-				params:  params,
-				jem:     jp.JEM(ctx),
+				params:  params.Params,
+				jem:     params.JEMPool.JEM(ctx),
 			}, nil
 		}),
-		newWebSocketHandler(ctx, jp, ap, params),
-		newRootWebSocketHandler(ctx, jp, ap, params, "/"),
-		newRootWebSocketHandler(ctx, jp, ap, params, "/api"),
+		newWebSocketHandler(ctx, params),
+		newRootWebSocketHandler(ctx, params, "/"),
+		newRootWebSocketHandler(ctx, params, "/api"),
 	), nil
 }
 
-func newWebSocketHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, params jemserver.Params) httprequest.Handler {
+func newWebSocketHandler(ctx context.Context, params jemserver.HandlerParams) httprequest.Handler {
 	return httprequest.Handler{
 		Method: "GET",
 		Path:   "/model/:modeluuid/api",
 		Handle: func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 			servermon.ConcurrentWebsocketConnections.Inc()
 			defer servermon.ConcurrentWebsocketConnections.Dec()
-			j := jp.JEM(ctx)
+			j := params.JEMPool.JEM(ctx)
 			defer j.Close()
-			wsServer := newWSServer(ctx, j, ap, params, p.ByName("modeluuid"))
+			wsServer := newWSServer(ctx, j, params.AuthenticatorPool, params.Params, p.ByName("modeluuid"))
 			wsServer.ServeHTTP(w, r)
 		},
 	}
 }
 
-func newRootWebSocketHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, params jemserver.Params, path string) httprequest.Handler {
+func newRootWebSocketHandler(ctx context.Context, params jemserver.HandlerParams, path string) httprequest.Handler {
 	return httprequest.Handler{
 		Method: "GET",
 		Path:   path,
 		Handle: func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 			// TODO add unique id to context or derive it from http request.
 			ctx := zapctx.WithFields(ctx, zap.Bool("websocket", true))
-			j := jp.JEM(ctx)
+			j := params.JEMPool.JEM(ctx)
 			defer j.Close()
-			wsServer := newWSServer(ctx, j, ap, params, "")
+			wsServer := newWSServer(ctx, j, params.AuthenticatorPool, params.Params, "")
 			wsServer.ServeHTTP(w, r)
 		},
 	}

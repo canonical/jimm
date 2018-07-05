@@ -20,15 +20,15 @@ import (
 
 // NewAPIHandler returns a new API handler that serves the /debug
 // endpoints.
-func NewAPIHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, sp jemserver.Params) ([]httprequest.Handler, error) {
+func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httprequest.Handler, error) {
 	return jemerror.Mapper.Handlers(func(p httprequest.Params) (*handler, error) {
 		ctx := ctxutil.Join(ctx, p.Context)
 		ctx = zapctx.WithFields(ctx, zap.String("req-id", httprequest.RequestUUID(ctx)))
 		h := &handler{
-			params:                         sp,
-			jem:                            jp.JEM(ctx),
-			authPool:                       ap,
-			usageSenderAuthorizationClient: jp.UsageAuthorizationClient(),
+			params:                         params.Params,
+			jem:                            params.JEMPool.JEM(ctx),
+			authPool:                       params.AuthenticatorPool,
+			usageSenderAuthorizationClient: params.JEMPool.UsageAuthorizationClient(),
 		}
 		h.Handler = debugstatus.Handler{
 			Version:           debugstatus.Version(version.VersionInfo),
