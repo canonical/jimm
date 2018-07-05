@@ -14,7 +14,6 @@ import (
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jem/internal/auth"
 	"github.com/CanonicalLtd/jem/internal/jem"
 	"github.com/CanonicalLtd/jem/internal/jemserver"
 	"github.com/CanonicalLtd/jem/internal/jemtest"
@@ -52,7 +51,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 		ControllerAdmin: "controller-admin",
 	}
 	serveVersion := func(vers string) jemserver.NewAPIHandlerFunc {
-		return func(_ context.Context, p *jem.Pool, _ *auth.Pool, config jemserver.Params) ([]httprequest.Handler, error) {
+		return func(_ context.Context, params jemserver.HandlerParams) ([]httprequest.Handler, error) {
 			versPrefix := ""
 			if vers != "" {
 				versPrefix = "/" + vers
@@ -133,7 +132,7 @@ func (s *serverSuite) TestServerHasAccessControlAllowOrigin(c *gc.C) {
 		ControllerAdmin: "controller-admin",
 	}
 	impl := map[string]jemserver.NewAPIHandlerFunc{
-		"/a": func(ctx context.Context, p *jem.Pool, _ *auth.Pool, config jemserver.Params) ([]httprequest.Handler, error) {
+		"/a": func(ctx context.Context, p jemserver.HandlerParams) ([]httprequest.Handler, error) {
 			return []httprequest.Handler{{
 				Method: "GET",
 				Path:   "/a",
@@ -211,7 +210,7 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 	// API dialling isn't stopped when the monitor is.
 	s.PatchValue(&jem.APIOpenTimeout, time.Millisecond)
 	h, err := jemserver.New(testContext, params, map[string]jemserver.NewAPIHandlerFunc{
-		"/v0": func(ctx context.Context, p *jem.Pool, _ *auth.Pool, config jemserver.Params) ([]httprequest.Handler, error) {
+		"/v0": func(ctx context.Context, p jemserver.HandlerParams) ([]httprequest.Handler, error) {
 			return nil, nil
 		},
 	})

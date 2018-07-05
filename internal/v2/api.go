@@ -47,7 +47,7 @@ type Handler struct {
 	monReq  servermon.Request
 }
 
-func NewAPIHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, sp jemserver.Params) ([]httprequest.Handler, error) {
+func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httprequest.Handler, error) {
 	return jemerror.Mapper.Handlers(func(p httprequest.Params) (*Handler, error) {
 		// Time out all requests after 30s. Do this before joining
 		// the contexts because p.Context is likely to have a done
@@ -60,16 +60,16 @@ func NewAPIHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, sp jemserve
 		zapctx.Debug(ctx, "HTTP request", zap.String("method", p.Request.Method), zap.Stringer("url", p.Request.URL))
 
 		// All requests require an authenticated client.
-		a := ap.Authenticator(ctx)
+		a := params.AuthenticatorPool.Authenticator(ctx)
 		defer a.Close()
 		ctx, err := a.AuthenticateRequest(ctx, p.Request)
 		if err != nil {
 			return nil, errgo.Mask(err, errgo.Any)
 		}
 		h := &Handler{
-			jem:     jp.JEM(ctx),
+			jem:     params.JEMPool.JEM(ctx),
 			context: ctx,
-			config:  sp,
+			config:  params.Params,
 			cancel:  cancel,
 		}
 
