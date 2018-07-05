@@ -21,6 +21,7 @@ github.com/gosuri/uitable	git	36ee7e946282a3fb1cfecd476ddc9b35d8847e42	2016-04-0
 github.com/joyent/gocommon	git	ade826b8b54e81a779ccb29d358a45ba24b7809c	2016-03-20T19:31:33Z
 github.com/joyent/gosdc	git	2f11feadd2d9891e92296a1077c3e2e56939547d	2014-05-24T00:08:15Z
 github.com/joyent/gosign	git	0da0d5f1342065321c97812b1f4ac0c2b0bab56c	2014-05-24T00:07:34Z
+github.com/juju/aclstore	git	b8abc9e5626fe0530ad92dee1717b3df064e2bf2	2018-06-28T15:01:45Z
 github.com/juju/ansiterm	git	b99631de12cf04a906c1d4e4ec54fb86eae5863d	2016-09-07T23:45:32Z
 github.com/juju/bundlechanges	git	1a6490253bea4ce78594db114d787ca97ee9f527	2018-01-09T11:21:21Z
 github.com/juju/cmd	git	e74f39857ca013cf63947ba2843806f7afdd380d	2017-11-07T07:04:56Z
@@ -50,6 +51,7 @@ github.com/juju/retry	git	62c62032529169c7ec02fa48f93349604c345e1f	2015-10-29T02
 github.com/juju/rfc	git	ebdbbdb950cd039a531d15cdc2ac2cbd94f068ee	2016-07-11T02:42:13Z
 github.com/juju/romulus	git	624b9e2be59f28601b29652ca710e21d51e51949	2018-01-03T14:24:45Z
 github.com/juju/schema	git	075de04f9b7d7580d60a1e12a0b3f50bb18e6998	2016-04-20T04:42:03Z
+github.com/juju/simplekv	git	dac8ed1f3b9349c8c5f03cc8911ebd996bc0e68d	2018-06-27T15:40:58Z
 github.com/juju/terms-client	git	9b925afd677234e4146dde3cb1a11e187cbed64e	2016-08-09T13:19:00Z
 github.com/juju/testing	git	44801989f0f7f280bd16b58e898ba9337807f147	2018-04-02T13:06:37Z
 github.com/juju/txn	git	f50b17d1ff3c31b7ea1c70e0d38a83f19af6d334	2018-04-06T04:58:51Z
@@ -98,6 +100,7 @@ gopkg.in/amz.v3	git	8c3190dff075bf5442c9eedbf8f8ed6144a099e7	2016-12-15T13:08:49
 gopkg.in/check.v1	git	4f90aeace3a26ad7021961c297b22c42160c7b25	2016-01-05T16:49:36Z
 gopkg.in/errgo.v1	git	442357a80af5c6bf9b6d51ae791a39c3421004f3	2016-12-22T12:58:16Z
 gopkg.in/goose.v2	git	36df5d12fc6d0ef1c102e1c18a22ddf345b18821	2018-03-22T12:54:45Z
+gopkg.in/httprequest.v1	git	a1015531595ff2ed1a0c126b55da352e6923eaac	2018-06-25T11:31:07Z
 gopkg.in/ini.v1	git	776aa739ce9373377cd16f526cdf06cb4c89b40f	2016-02-22T23:24:41Z
 gopkg.in/juju/blobstore.v2	git	51fa6e26128d74e445c72d3a91af555151cc3654	2016-01-25T02:37:03Z
 gopkg.in/juju/charm.v6	git	d93cf8b75cf4017ace4b3bf6af3bd03003e11cfa	2017-11-14T08:46:58Z
@@ -110,7 +113,7 @@ gopkg.in/macaroon.v1	git	ab3940c6c16510a850e1c2dd628b919f0f3f1464	2015-01-21T11:
 gopkg.in/mgo.v2	git	f2b6f6c918c452ad107eec89615f074e3bd80e33	2016-08-18T01:52:18Z
 gopkg.in/natefinch/lumberjack.v2	git	df99d62fd42d8b3752c8a42c6723555372c02a03	2017-05-31T18:08:50Z
 gopkg.in/natefinch/npipe.v2	git	c1b8fa8bdccecb0b8db834ee0b92fdbcfa606dd6	2016-06-21T03:49:01Z
-gopkg.in/retry.v1	git	01631078ef2fdce601e38cfe5f527fab24c9a6d2	2017-05-31T09:12:38Z
+gopkg.in/retry.v1	git	2d7c7c65cc71d024968d9ff4385d5e7ad3a83fcc	2018-01-16T15:34:15Z
 gopkg.in/tomb.v1	git	dd632973f1e7218eb1089048e0798ec9ae7dceb8	2014-10-24T13:56:13Z
 gopkg.in/tomb.v2	git	14b3d72120e8d10ea6e6b7f87f7175734b1faab8	2014-06-26T14:46:23Z
 gopkg.in/yaml.v2	git	1be3d31502d6eabc0dd7ce5b0daab022e14a5538	2017-07-12T05:45:46Z
