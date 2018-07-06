@@ -8,11 +8,10 @@ import (
 	"net/http"
 
 	"github.com/juju/aclstore/aclclient"
-	"github.com/juju/aclstore/params"
-	"github.com/juju/httprequest"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v1/httpbakery"
 
 	"github.com/CanonicalLtd/jem/internal/apitest"
 )
@@ -24,77 +23,55 @@ type APISuite struct {
 var _ = gc.Suite(&APISuite{})
 
 func (s *APISuite) TestGetACL(c *gc.C) {
-	acls, err := s.client("controller-admin").GetACL(context.Background(), &params.GetACLRequest{
-		Name: "admin",
-	})
+	users, err := s.client("controller-admin").Get(context.Background(), "admin")
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(acls, jc.DeepEquals, &params.GetACLResponse{Users: []string{"controller-admin"}})
+	c.Assert(users, jc.DeepEquals, []string{"controller-admin"})
 }
 
 func (s *APISuite) TestUnauthorized(c *gc.C) {
-	acls, err := s.client("bob").GetACL(context.Background(), &params.GetACLRequest{
-		Name: "admin",
-	})
+	users, err := s.client("bob").Get(context.Background(), "admin")
 	c.Assert(err, gc.ErrorMatches, `Get http.*/admin/acls/admin: forbidden`)
-	c.Assert(acls, gc.IsNil)
+	c.Assert(users, gc.IsNil)
 }
 
 func (s *APISuite) TestSetACL(c *gc.C) {
 	client := s.client("controller-admin")
-	err := client.SetACL(context.Background(), &params.SetACLRequest{
-		Name: "admin",
-		Body: params.SetACLRequestBody{
-			Users: []string{"controller-admin", "bob"},
-		},
-	})
+	err := client.Set(context.Background(), "admin", []string{"controller-admin", "bob"})
 	c.Assert(err, gc.Equals, nil)
-	acls, err := client.GetACL(context.Background(), &params.GetACLRequest{
-		Name: "admin",
-	})
+	users, err := client.Get(context.Background(), "admin")
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(acls, jc.DeepEquals, &params.GetACLResponse{Users: []string{"bob", "controller-admin"}})
+	c.Assert(users, jc.DeepEquals, []string{"bob", "controller-admin"})
 }
 
 func (s *APISuite) TestModifyACL(c *gc.C) {
 	client := s.client("controller-admin")
-	err := client.ModifyACL(context.Background(), &params.ModifyACLRequest{
-		Name: "admin",
-		Body: params.ModifyACLRequestBody{
-			Add: []string{"alice"},
-		},
-	})
+	err := client.Add(context.Background(), "admin", []string{"alice"})
 	c.Assert(err, gc.Equals, nil)
-	acls, err := client.GetACL(context.Background(), &params.GetACLRequest{
-		Name: "admin",
-	})
+	users, err := client.Get(context.Background(), "admin")
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(acls, jc.DeepEquals, &params.GetACLResponse{Users: []string{"alice", "controller-admin"}})
+	c.Assert(users, jc.DeepEquals, []string{"alice", "controller-admin"})
 }
 
 func (s *APISuite) client(user string) *aclclient.Client {
 	return aclclient.New(aclclient.NewParams{
 		BaseURL: s.HTTPSrv.URL + "/admin/acls",
-		Doer:    doadaptor{s.IDMSrv.Client(user)},
+		Doer:    bakeryDoer{s.IDMSrv.Client(user)},
 	})
 }
 
-type doer interface {
-	httprequest.Doer
-	httprequest.DoerWithBody
+type bakeryDoer struct {
+	client *httpbakery.Client
 }
 
-type doadaptor struct {
-	doer
-}
-
-func (d doadaptor) Do(req *http.Request) (*http.Response, error) {
+func (d bakeryDoer) Do(req *http.Request) (*http.Response, error) {
 	if req.Body == nil {
-		return d.doer.Do(req)
+		return d.client.Do(req)
 	}
 	body, ok := req.Body.(io.ReadSeeker)
 	if !ok {
-		return nil, errgo.Newf("invalid body")
+		return nil, errgo.Newf("unsupported body type")
 	}
-	req.Body = nil
-	return d.doer.DoWithBody(req, body)
+	req1 := *req
+	req1.Body = nil
+	return d.client.DoWithBody(&req1, body)
 }
