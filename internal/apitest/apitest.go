@@ -44,8 +44,8 @@ type Suite struct {
 	// IDMSrv holds a running instance of the fake identity server.
 	IDMSrv *idmtest.Server
 
-	// httpSrv holds the running HTTP server that uses IDMSrv.
-	httpSrv *httptest.Server
+	// HTTPSrv holds the running HTTP server that uses IDMSrv.
+	HTTPSrv *httptest.Server
 
 	// JEM holds an instance of the JEM store, suitable
 	// for invasive testing purposes.
@@ -84,7 +84,7 @@ func (s *Suite) SetUpTest(c *gc.C) {
 		s.PatchValue(&usagesender.SenderClock, s.Clock)
 	}
 	s.JEMSrv = s.NewServer(c, s.Session, s.IDMSrv, s.ServerParams)
-	s.httpSrv = httptest.NewServer(s.JEMSrv)
+	s.HTTPSrv = httptest.NewServer(s.JEMSrv)
 	s.SessionPool = mgosession.NewPool(context.TODO(), s.Session, 1)
 	s.Pool = s.NewJEMPool(c, s.SessionPool)
 	s.JEM = s.Pool.JEM(context.TODO())
@@ -106,7 +106,7 @@ func (s *Suite) NewJEMPool(c *gc.C, sessionPool *mgosession.Pool) *jem.Pool {
 }
 
 func (s *Suite) TearDownTest(c *gc.C) {
-	s.httpSrv.Close()
+	s.HTTPSrv.Close()
 	s.JEMSrv.Close()
 	s.IDMSrv.Close()
 	s.JEM.Close()
@@ -120,7 +120,7 @@ func (s *Suite) TearDownTest(c *gc.C) {
 // s.JEMSrv.
 func (s *Suite) NewClient(username params.User) *jemclient.Client {
 	return jemclient.New(jemclient.NewParams{
-		BaseURL: s.httpSrv.URL,
+		BaseURL: s.HTTPSrv.URL,
 		Client:  s.IDMSrv.Client(string(username)),
 	})
 }

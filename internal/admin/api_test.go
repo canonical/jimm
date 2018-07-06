@@ -6,7 +6,6 @@ import (
 	"context"
 	"io"
 	"net/http"
-	"net/http/httptest"
 
 	"github.com/juju/aclstore/aclclient"
 	"github.com/juju/aclstore/params"
@@ -20,32 +19,12 @@ import (
 
 type APISuite struct {
 	apitest.Suite
-
-	baseURL string
-	srv     *httptest.Server
 }
 
 var _ = gc.Suite(&APISuite{})
 
-func (s *APISuite) SetUpTest(c *gc.C) {
-	s.Suite.SetUpTest(c)
-	s.srv = httptest.NewServer(s.JEMSrv)
-	s.baseURL = s.srv.URL + "/admin/acls"
-}
-
-func (s *APISuite) TearDownTest(c *gc.C) {
-	if s.srv != nil {
-		s.srv.Close()
-	}
-	s.Suite.TearDownTest(c)
-}
-
 func (s *APISuite) TestGetACL(c *gc.C) {
-	client := aclclient.New(aclclient.NewParams{
-		BaseURL: s.baseURL,
-		Doer:    doadaptor{s.IDMSrv.Client("controller-admin")},
-	})
-	acls, err := client.GetACL(context.Background(), &params.GetACLRequest{
+	acls, err := s.client("controller-admin").GetACL(context.Background(), &params.GetACLRequest{
 		Name: "admin",
 	})
 	c.Assert(err, gc.Equals, nil)
@@ -53,11 +32,7 @@ func (s *APISuite) TestGetACL(c *gc.C) {
 }
 
 func (s *APISuite) TestUnauthorized(c *gc.C) {
-	client := aclclient.New(aclclient.NewParams{
-		BaseURL: s.baseURL,
-		Doer:    doadaptor{s.IDMSrv.Client("bob")},
-	})
-	acls, err := client.GetACL(context.Background(), &params.GetACLRequest{
+	acls, err := s.client("bob").GetACL(context.Background(), &params.GetACLRequest{
 		Name: "admin",
 	})
 	c.Assert(err, gc.ErrorMatches, `Get http.*/admin/acls/admin: forbidden`)
@@ -65,10 +40,7 @@ func (s *APISuite) TestUnauthorized(c *gc.C) {
 }
 
 func (s *APISuite) TestSetACL(c *gc.C) {
-	client := aclclient.New(aclclient.NewParams{
-		BaseURL: s.baseURL,
-		Doer:    doadaptor{s.IDMSrv.Client("controller-admin")},
-	})
+	client := s.client("controller-admin")
 	err := client.SetACL(context.Background(), &params.SetACLRequest{
 		Name: "admin",
 		Body: params.SetACLRequestBody{
@@ -84,10 +56,7 @@ func (s *APISuite) TestSetACL(c *gc.C) {
 }
 
 func (s *APISuite) TestModifyACL(c *gc.C) {
-	client := aclclient.New(aclclient.NewParams{
-		BaseURL: s.baseURL,
-		Doer:    doadaptor{s.IDMSrv.Client("controller-admin")},
-	})
+	client := s.client("controller-admin")
 	err := client.ModifyACL(context.Background(), &params.ModifyACLRequest{
 		Name: "admin",
 		Body: params.ModifyACLRequestBody{
@@ -100,6 +69,13 @@ func (s *APISuite) TestModifyACL(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(acls, jc.DeepEquals, &params.GetACLResponse{Users: []string{"alice", "controller-admin"}})
+}
+
+func (s *APISuite) client(user string) *aclclient.Client {
+	return aclclient.New(aclclient.NewParams{
+		BaseURL: s.HTTPSrv.URL + "/admin/acls",
+		Doer:    doadaptor{s.IDMSrv.Client(user)},
+	})
 }
 
 type doer interface {
