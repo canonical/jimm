@@ -8,7 +8,6 @@ import (
 	"net/url"
 
 	"github.com/juju/httprequest"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
 
 	"github.com/CanonicalLtd/jem/params"
 )
@@ -24,7 +23,7 @@ type Client struct {
 // a new client.
 type NewParams struct {
 	BaseURL string
-	Client  *httpbakery.Client
+	Client  httprequest.Doer
 }
 
 // New returns a new client.

@@ -4,9 +4,12 @@ package admincmd
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"strings"
 
+	"github.com/juju/aclstore/aclclient"
 	"github.com/juju/cmd"
 	"github.com/juju/errors"
 	"github.com/juju/gnuflag"
@@ -97,13 +100,10 @@ func (c *client) Close() {
 // client will use HTTP basic auth with the given credentials.
 // The returned client should be closed after use.
 func (c *commandBase) newClient(ctxt *cmd.Context) (*client, error) {
-	jar, err := cookiejar.New(nil)
+	jar, bakeryClient, err := c.newBakeryClient()
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	bakeryClient := httpbakery.NewClient()
-	bakeryClient.Client.Jar = jar
-	bakeryClient.VisitWebPage = httpbakery.OpenWebBrowser
 	return &client{
 		Client: jemclient.New(jemclient.NewParams{
 			BaseURL: c.serverURL(),
@@ -112,6 +112,68 @@ func (c *commandBase) newClient(ctxt *cmd.Context) (*client, error) {
 		jar:  jar,
 		ctxt: ctxt,
 	}, nil
+}
+
+func (c *commandBase) newBakeryClient() (*cookiejar.Jar, *httpbakery.Client, error) {
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		return nil, nil, errgo.Mask(err)
+	}
+	bakeryClient := httpbakery.NewClient()
+	bakeryClient.Client.Jar = jar
+	bakeryClient.VisitWebPage = httpbakery.OpenWebBrowser
+	return jar, bakeryClient, nil
+}
+
+type aclClient struct {
+	*aclclient.Client
+	jar  *cookiejar.Jar
+	ctxt *cmd.Context
+}
+
+func (c *aclClient) Close() {
+	if err := c.jar.Save(); err != nil {
+		fmt.Fprintf(c.ctxt.Stderr, "cannot save cookies: %v", err)
+	}
+}
+
+// newACLClient creates and return a aclClient with access to
+// the associated cookie jar used to save authorization
+// macaroons. If authUsername and authPassword are provided, the resulting
+// client will use HTTP basic auth with the given credentials.
+// The returned client should be closed after use.
+func (c *commandBase) newACLClient(ctxt *cmd.Context) (*aclClient, error) {
+	jar, bakeryClient, err := c.newBakeryClient()
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return &aclClient{
+		Client: aclclient.New(aclclient.NewParams{
+			BaseURL: c.serverURL() + "/admin/acls",
+			Doer:    bakeryDoer{bakeryClient},
+		}),
+		jar:  jar,
+		ctxt: ctxt,
+	}, nil
+}
+
+// bakeryDoer wraps a gopkg.in/macaroon-bakery.v1/httpbakey.Client so
+// that it behaves correctly as a gopkg.in/httprequest.v1.Doer.
+type bakeryDoer struct {
+	client *httpbakery.Client
+}
+
+func (d bakeryDoer) Do(req *http.Request) (*http.Response, error) {
+	if req.Body == nil {
+		return d.client.Do(req)
+	}
+	body, ok := req.Body.(io.ReadSeeker)
+	if !ok {
+		return nil, errgo.New("unsupported request body type")
+	}
+	req1 := *req
+	req1.Body = nil
+	return d.client.DoWithBody(&req1, body)
 }
 
 const jimmServerURL = "https://jimm.jujucharms.com"

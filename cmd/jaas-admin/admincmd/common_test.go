@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/juju/aclstore/aclclient"
 	"github.com/juju/cmd"
 	"github.com/juju/errors"
 	"github.com/juju/idmclient/idmtest"
@@ -82,6 +83,14 @@ func (s *commonSuite) jemClient(username string) *jemclient.Client {
 	return jemclient.New(jemclient.NewParams{
 		BaseURL: s.httpSrv.URL,
 		Client:  s.idmSrv.Client(username),
+	})
+}
+
+// aclClient returns a new aclclient.Client that will act as the given user.
+func (s *commonSuite) aclClient(username string) *aclclient.Client {
+	return aclclient.New(aclclient.NewParams{
+		BaseURL: s.httpSrv.URL + "/admin/acls",
+		Doer:    admincmd.BakeryDoer(s.idmSrv.Client(username)),
 	})
 }
 
