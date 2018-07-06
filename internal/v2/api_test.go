@@ -2068,13 +2068,14 @@ func (s *APISuite) TestGetModelName(c *gc.C) {
 }
 
 func (s *APISuite) TestGetAuditEntries(c *gc.C) {
+	s.ACLStore.Set(testContext, "audit-log", []string{"charlie"})
 	s.AssertAddController(c, params.EntityPath{"bob", "open"}, false)
 	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
 	_, uuid := s.CreateModel(c, params.EntityPath{"bob", "open"}, params.EntityPath{"bob", "open"}, cred)
 
 	s.allowControllerPerm(c, params.EntityPath{"bob", "open"})
 	s.allowModelPerm(c, params.EntityPath{"bob", "open"})
-	res, err := s.NewClient("bob").GetAuditEntries(&params.AuditLogRequest{})
+	res, err := s.NewClient("charlie").GetAuditEntries(&params.AuditLogRequest{})
 	c.Assert(err, gc.IsNil)
 	c.Assert(res, gc.HasLen, 1)
 	created := res[0].Content.(params.AuditModelCreated)
