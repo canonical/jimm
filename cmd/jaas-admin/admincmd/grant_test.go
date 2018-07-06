@@ -3,6 +3,8 @@
 package admincmd_test
 
 import (
+	"context"
+
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
@@ -165,4 +167,66 @@ func (s *grantSuite) TestGetError(c *gc.C) {
 		c.Assert(stderr, gc.Matches, "(error:|ERROR) "+test.expectStderr+"\n")
 		c.Assert(stdout, gc.Equals, "")
 	}
+}
+
+func (s *grantSuite) TestGrantAdminACL(c *gc.C) {
+	s.idmSrv.AddUser("bob", adminUser)
+	s.idmSrv.AddUser("alice")
+	s.idmSrv.SetDefaultUser("bob")
+
+	client := s.aclClient("bob")
+	users, err := client.Get(context.Background(), "admin")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(users, gc.DeepEquals, []string{adminUser})
+
+	// Update the admin ACL
+	stdout, stderr, code := run(c, c.MkDir(), "grant", "--admin", "admin", "alice")
+	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
+	c.Assert(stdout, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, "")
+
+	users, err = client.Get(context.Background(), "admin")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(users, gc.DeepEquals, []string{adminUser, "alice"})
+}
+
+func (s *grantSuite) TestGrantAdminACLError(c *gc.C) {
+	s.idmSrv.AddUser("bob", adminUser)
+	s.idmSrv.SetDefaultUser("bob")
+
+	stdout, stderr, code := run(c, c.MkDir(), "grant", "--admin", "no-such-acl", "alice")
+	c.Assert(code, gc.Equals, 1, gc.Commentf("stderr: %s", stderr))
+	c.Assert(stdout, gc.Equals, "")
+	c.Assert(stderr, gc.Matches, `(ERROR|error) .*: ACL not found`+"\n")
+}
+
+func (s *grantSuite) TestGrantAdminACLSet(c *gc.C) {
+	s.idmSrv.AddUser("bob", adminUser)
+	s.idmSrv.AddUser("alice")
+	s.idmSrv.SetDefaultUser("bob")
+
+	client := s.aclClient("bob")
+	users, err := client.Get(context.Background(), "admin")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(users, gc.DeepEquals, []string{adminUser})
+
+	// Update the admin ACL
+	stdout, stderr, code := run(c, c.MkDir(), "grant", "--admin", "--set", "admin", "alice,bob")
+	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
+	c.Assert(stdout, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, "")
+
+	users, err = client.Get(context.Background(), "admin")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(users, gc.DeepEquals, []string{"alice", "bob"})
+}
+
+func (s *grantSuite) TestGrantAdminACLSetError(c *gc.C) {
+	s.idmSrv.AddUser("bob", adminUser)
+	s.idmSrv.SetDefaultUser("bob")
+
+	stdout, stderr, code := run(c, c.MkDir(), "grant", "--admin", "--set", "no-such-acl", "alice")
+	c.Assert(code, gc.Equals, 1, gc.Commentf("stderr: %s", stderr))
+	c.Assert(stdout, gc.Equals, "")
+	c.Assert(stderr, gc.Matches, `(ERROR|error) .*: ACL not found`+"\n")
 }

@@ -3,6 +3,7 @@
 package admincmd
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/juju/cmd"
@@ -16,9 +17,11 @@ import (
 type revokeCommand struct {
 	commandBase
 
-	path entityPathValue
+	path    entityPathValue
+	aclName string
 
 	controller bool
+	admin      bool
 	users      userSet
 }
 
@@ -36,12 +39,17 @@ For example, to remove alice and bob from the read ACL of the model johndoe/mymo
 assuming they are currently mentioned in the ACL:
 
     jaas admin revoke johndoe/mymodel alice,bob
+
+If the --admin flag is provided, the ACL that is changed will be for
+accessing an administrative function.
+
+    jaas admin grant --admin audit-log alice,bob
 `
 
 func (c *revokeCommand) Info() *cmd.Info {
 	return &cmd.Info{
 		Name:    "revoke",
-		Args:    "<user>/<modelname|controllername> username[,username]...",
+		Args:    "<name> username[,username]...",
 		Purpose: "revoke permissions of the managing server entity",
 		Doc:     revokeDoc,
 	}
@@ -49,6 +57,7 @@ func (c *revokeCommand) Info() *cmd.Info {
 
 func (c *revokeCommand) SetFlags(f *gnuflag.FlagSet) {
 	f.BoolVar(&c.controller, "controller", false, "change ACL of controller not model")
+	f.BoolVar(&c.admin, "admin", false, "change an admin ACL")
 }
 
 func (c *revokeCommand) Init(args []string) error {
@@ -62,8 +71,12 @@ func (c *revokeCommand) Init(args []string) error {
 	if len(args) > 2 {
 		return errgo.Newf("too many arguments")
 	}
-	if err := c.path.Set(args[0]); err != nil {
-		return errgo.Mask(err)
+	if c.admin {
+		c.aclName = args[0]
+	} else {
+		if err := c.path.Set(args[0]); err != nil {
+			return errgo.Mask(err)
+		}
 	}
 	c.users = make(userSet)
 	if err := c.users.Set(args[1]); err != nil {
@@ -73,6 +86,13 @@ func (c *revokeCommand) Init(args []string) error {
 }
 
 func (c *revokeCommand) Run(ctxt *cmd.Context) error {
+	if c.admin {
+		return c.runAdmin(ctxt)
+	}
+	return c.run(ctxt)
+}
+
+func (c *revokeCommand) run(ctxt *cmd.Context) error {
 	client, err := c.newClient(ctxt)
 	if err != nil {
 		return errgo.Mask(err)
@@ -129,4 +149,13 @@ func (c *revokeCommand) getPerm(client *client) (params.ACL, error) {
 		})
 	}
 	return acl, errgo.Mask(err)
+}
+
+func (c *revokeCommand) runAdmin(ctxt *cmd.Context) error {
+	client, err := c.newACLClient(ctxt)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	defer client.Close()
+	return errgo.Mask(client.Remove(context.Background(), c.aclName, c.users.slice()))
 }

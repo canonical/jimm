@@ -3,6 +3,8 @@
 package admincmd_test
 
 import (
+	"context"
+
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
@@ -164,4 +166,34 @@ func (s *revokeSuite) TestRevokeGetError(c *gc.C) {
 		c.Assert(stderr, gc.Matches, "(error:|ERROR) "+test.expectStderr+"\n")
 		c.Assert(stdout, gc.Equals, "")
 	}
+}
+
+func (s *revokeSuite) TestRevokeAdminACL(c *gc.C) {
+	s.idmSrv.AddUser("bob", adminUser)
+	s.idmSrv.AddUser("alice")
+	s.idmSrv.SetDefaultUser("bob")
+
+	client := s.aclClient("bob")
+	err := client.Set(context.Background(), "admin", []string{adminUser, "alice", "charlie"})
+	c.Assert(err, gc.Equals, nil)
+
+	// Update the admin ACL
+	stdout, stderr, code := run(c, c.MkDir(), "revoke", "--admin", "admin", "alice")
+	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
+	c.Assert(stdout, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, "")
+
+	users, err := client.Get(context.Background(), "admin")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(users, gc.DeepEquals, []string{adminUser, "charlie"})
+}
+
+func (s *revokeSuite) TestRevokeAdminACLError(c *gc.C) {
+	s.idmSrv.AddUser("bob", adminUser)
+	s.idmSrv.SetDefaultUser("bob")
+
+	stdout, stderr, code := run(c, c.MkDir(), "revoke", "--admin", "no-such-acl", "alice")
+	c.Assert(code, gc.Equals, 1, gc.Commentf("stderr: %s", stderr))
+	c.Assert(stdout, gc.Equals, "")
+	c.Assert(stderr, gc.Matches, `(ERROR|error) .*: ACL not found`+"\n")
 }
