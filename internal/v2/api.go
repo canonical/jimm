@@ -39,6 +39,7 @@ import (
 const (
 	// ACL Names
 	auditLogACL = "audit-log"
+	logLevelACL = "log-level"
 )
 
 // controllerClientInitiateMigration is defined as a variable so that
@@ -64,6 +65,9 @@ func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httpr
 		return nil, errgo.Mask(err)
 	}
 	if err := aclManager.CreateACL(ctx, auditLogACL, string(params.ControllerAdmin)); err != nil {
+		return nil, errgo.Mask(err)
+	}
+	if err := aclManager.CreateACL(ctx, logLevelACL, string(params.ControllerAdmin)); err != nil {
 		return nil, errgo.Mask(err)
 	}
 
@@ -820,8 +824,7 @@ func (h *Handler) Migrate(arg *params.Migrate) error {
 
 // LogLevel returns the current logging level of the running service.
 func (h *Handler) LogLevel(*params.LogLevel) (params.Level, error) {
-	ctx := h.context
-	if err := auth.CheckIsUser(ctx, h.config.ControllerAdmin); err != nil {
+	if err := h.checkACL(h.context, logLevelACL); err != nil {
 		return params.Level{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	return params.Level{
@@ -853,8 +856,7 @@ func (h *Handler) GetControllerDeprecated(req *params.GetControllerDeprecated) (
 
 // SetLogLevel configures the logging level of the running service.
 func (h *Handler) SetLogLevel(req *params.SetLogLevel) error {
-	ctx := h.context
-	if err := auth.CheckIsUser(ctx, h.config.ControllerAdmin); err != nil {
+	if err := h.checkACL(h.context, logLevelACL); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	var level zapcore.Level
