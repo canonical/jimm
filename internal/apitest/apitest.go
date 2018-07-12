@@ -20,7 +20,7 @@ import (
 	"github.com/juju/testing/httptesting"
 	"github.com/rogpeppe/fastuuid"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2"
 

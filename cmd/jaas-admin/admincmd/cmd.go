@@ -17,7 +17,7 @@ import (
 	"github.com/juju/juju/jujuclient"
 	"github.com/juju/persistent-cookiejar"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"github.com/CanonicalLtd/jem/jemclient"
 	"github.com/CanonicalLtd/jem/params"
@@ -157,7 +157,7 @@ func (c *commandBase) newACLClient(ctxt *cmd.Context) (*aclClient, error) {
 	}, nil
 }
 
-// bakeryDoer wraps a gopkg.in/macaroon-bakery.v1/httpbakey.Client so
+// bakeryDoer wraps a gopkg.in/macaroon-bakery.v2-unstable/httpbakey.Client so
 // that it behaves correctly as a gopkg.in/httprequest.v1.Doer.
 type bakeryDoer struct {
 	client *httpbakery.Client

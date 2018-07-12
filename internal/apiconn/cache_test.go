@@ -3,21 +3,14 @@ package apiconn_test
 import (
 	"context"
 	"fmt"
-	"net"
 	"sync"
 	"time"
 
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/modelmanager"
-	"github.com/juju/juju/apiserver"
-	"github.com/juju/juju/apiserver/observer"
-	"github.com/juju/juju/apiserver/observer/fakeobserver"
 	"github.com/juju/juju/apiserver/params"
-	"github.com/juju/juju/state"
-	"github.com/juju/juju/testing"
-	"github.com/juju/pubsub"
+	"github.com/juju/juju/apiserver/testserver"
 	jc "github.com/juju/testing/checkers"
-	"github.com/juju/utils/clock"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
@@ -236,35 +229,22 @@ func (s *cacheSuite) TestContextCancel(c *gc.C) {
 func (s *cacheSuite) TestEvictOnUpgradeInProgress(c *gc.C) {
 	// Start a new API server so we control its upgrade-in-progress status.
 	upgraded := make(chan struct{})
-	lis, err := net.Listen("tcp", "localhost:0")
-	c.Assert(err, gc.Equals, nil)
-	srv, err := apiserver.NewServer(s.StatePool, lis, apiserver.ServerConfig{
-		Clock:           clock.WallClock,
-		Cert:            testing.ServerCert,
-		Key:             testing.ServerKey,
-		Tag:             names.NewMachineTag("0"),
-		Hub:             pubsub.NewStructuredHub(nil),
-		DataDir:         c.MkDir(),
-		LogDir:          c.MkDir(),
-		NewObserver:     func() observer.Observer { return &fakeobserver.Instance{} },
-		AutocertURL:     "https://0.1.2.3/no-autocert-here",
-		RateLimitConfig: apiserver.DefaultRateLimitConfig(),
-		UpgradeComplete: func() bool {
-			select {
-			case <-upgraded:
-				return true
-			default:
-				return false
-			}
-		},
-		RestoreStatus: func() state.RestoreStatus { return state.RestoreNotActive },
-	})
-	c.Assert(err, gc.Equals, nil)
+
+	config := testserver.DefaultServerConfig(c)
+	config.UpgradeComplete = func() bool {
+		select {
+		case <-upgraded:
+			return true
+		default:
+			return false
+		}
+	}
+	srv := testserver.NewServerWithConfig(c, s.StatePool, config)
 	defer srv.Stop()
 
 	apiInfo := s.APIInfo(c)
 	apiInfo.ModelTag = names.ModelTag{}
-	apiInfo.Addrs = []string{lis.Addr().String()}
+	apiInfo.Addrs = srv.Info.Addrs
 
 	uuid := s.State.ControllerUUID()
 	cache := apiconn.NewCache(apiconn.CacheParams{})
@@ -273,7 +253,7 @@ func (s *cacheSuite) TestEvictOnUpgradeInProgress(c *gc.C) {
 	}
 
 	callAPI := func(conn api.Connection) error {
-		_, err = modelmanager.NewClient(conn).CreateModel(
+		_, err := modelmanager.NewClient(conn).CreateModel(
 			"name",
 			apiInfo.Tag.Id(),
 			"dummy",
@@ -285,7 +265,7 @@ func (s *cacheSuite) TestEvictOnUpgradeInProgress(c *gc.C) {
 	}
 
 	conn, err := cache.OpenAPI(context.Background(), uuid, dial)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
 	err = callAPI(conn)
 	c.Check(params.ErrCode(err), gc.Equals, params.CodeUpgradeInProgress)
@@ -303,7 +283,7 @@ func (s *cacheSuite) TestEvictOnUpgradeInProgress(c *gc.C) {
 	close(upgraded)
 
 	conn, err = cache.OpenAPI(context.Background(), uuid, dial)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, gc.IsNil)
 	defer conn.Close()
 	err = callAPI(conn)
 	c.Check(err, gc.Equals, nil)

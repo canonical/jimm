@@ -155,7 +155,7 @@ func (h *wsHandler) handle(wsConn *websocket.Conn) {
 		return mapError(err)
 	})
 	defer conn.Close()
-	conn.Start()
+	conn.Start(h.context)
 	select {
 	case <-hm.Dead():
 		zapctx.Info(h.context, "ping timeout")

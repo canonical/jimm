@@ -15,7 +15,7 @@ import (
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/jem/params"

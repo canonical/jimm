@@ -45,6 +45,7 @@ func newWebSocketHandler(ctx context.Context, params jemserver.HandlerParams) ht
 		Method: "GET",
 		Path:   "/model/:modeluuid/api",
 		Handle: func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+			ctx := ctxutil.Join(r.Context(), ctx)
 			servermon.ConcurrentWebsocketConnections.Inc()
 			defer servermon.ConcurrentWebsocketConnections.Dec()
 			j := params.JEMPool.JEM(ctx)

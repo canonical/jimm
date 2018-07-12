@@ -6,29 +6,24 @@ import (
 	"context"
 	"reflect"
 	"sort"
-	"strings"
 	"time"
 
-	"github.com/juju/bundlechanges"
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
 	"github.com/juju/juju/apiserver/common"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	jujucloud "github.com/juju/juju/cloud"
-	"github.com/juju/juju/constraints"
 	"github.com/juju/juju/environs"
 	"github.com/juju/juju/environs/config"
 	"github.com/juju/juju/permission"
 	"github.com/juju/juju/rpc"
 	"github.com/juju/juju/rpc/rpcreflect"
 	jujustatus "github.com/juju/juju/status"
-	"github.com/juju/juju/storage"
 	"github.com/juju/utils/parallel"
 	"github.com/juju/version"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6"
 	"gopkg.in/juju/names.v2"
-	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jem/internal/auth"
@@ -107,12 +102,12 @@ func (r *controllerRoot) Admin(id string) (admin, error) {
 }
 
 // Bundle returns an implementation of the Bundle facade (version 1).
-func (r *controllerRoot) Bundle(id string) (bundle, error) {
+func (r *controllerRoot) Bundle(id string) (bundleAPI, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return bundle{}, common.ErrBadId
+		return bundleAPI{}, common.ErrBadId
 	}
-	return bundle{}, nil
+	return bundleAPI{r}, nil
 }
 
 // Cloud returns an implementation of the Cloud facade (version 1).
@@ -314,55 +309,6 @@ func facadeVersions(facades map[facade]string) []jujuparams.FacadeVersions {
 		}
 	}
 	return fvs
-}
-
-// bundle implements the Bundle facade.
-type bundle struct{}
-
-// GetChanges implements the GetChanges method on the Bundle facade.
-//
-// Note: This is copied from
-// github.com/juju/juju/apiserver/facades/clientbundle/bundle.go and
-// should be kept in sync with that.
-func (b bundle) GetChanges(args jujuparams.BundleChangesParams) (jujuparams.BundleChangesResults, error) {
-	var results jujuparams.BundleChangesResults
-	data, err := charm.ReadBundleData(strings.NewReader(args.BundleDataYAML))
-	if err != nil {
-		return results, errgo.Notef(err, "cannot read bundle YAML")
-	}
-	verifyConstraints := func(s string) error {
-		_, err := constraints.Parse(s)
-		return err
-	}
-	verifyStorage := func(s string) error {
-		_, err := storage.ParseConstraints(s)
-		return err
-	}
-	if err := data.Verify(verifyConstraints, verifyStorage); err != nil {
-		if err, ok := err.(*charm.VerificationError); ok {
-			results.Errors = make([]string, len(err.Errors))
-			for i, e := range err.Errors {
-				results.Errors[i] = e.Error()
-			}
-			return results, nil
-		}
-		// This should never happen as Verify only returns verification errors.
-		return results, errgo.Notef(err, "cannot verify bundle")
-	}
-	changes, err := bundlechanges.FromData(data, nil)
-	if err != nil {
-		return results, err
-	}
-	results.Changes = make([]*jujuparams.BundleChange, len(changes))
-	for i, c := range changes {
-		results.Changes[i] = &jujuparams.BundleChange{
-			Id:       c.Id(),
-			Method:   c.Method(),
-			Args:     c.GUIArgs(),
-			Requires: c.Requires(),
-		}
-	}
-	return results, nil
 }
 
 // cloud implements the Cloud facade.

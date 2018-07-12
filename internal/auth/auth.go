@@ -11,11 +11,11 @@ import (
 	"github.com/juju/utils"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	"gopkg.in/macaroon.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgostorage"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jem/internal/mgosession"
@@ -87,7 +87,7 @@ func (p *Pool) Authenticator(ctx context.Context) *Authenticator {
 	session := p.params.SessionPool.Session(ctx)
 	return &Authenticator{
 		pool: p,
-		bakery: p.params.Bakery.WithRootKeyStore(p.params.RootKeys.NewStorage(
+		bakery: p.params.Bakery.WithStore(p.params.RootKeys.NewStorage(
 			p.rootKeyCollection(session),
 			p.params.RootKeysPolicy,
 		)),
@@ -189,7 +189,7 @@ func (a *Authenticator) newMacaroon() (*macaroon.Macaroon, error) {
 	if a.domain != "" {
 		condition += " @" + a.domain
 	}
-	return a.bakery.NewMacaroon("", nil, []checkers.Caveat{
+	return a.bakery.NewMacaroon([]checkers.Caveat{
 		checkers.NeedDeclaredCaveat(
 			checkers.Caveat{
 				Location:  a.pool.params.IdentityLocation,

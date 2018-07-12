@@ -4,10 +4,11 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/juju/httprequest"
+	jujuhttprequest "github.com/juju/httprequest"
 	"github.com/juju/utils/debugstatus"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/httprequest.v1"
 
 	"github.com/CanonicalLtd/jem/internal/auth"
 	"github.com/CanonicalLtd/jem/internal/ctxutil"
@@ -20,10 +21,17 @@ import (
 
 // NewAPIHandler returns a new API handler that serves the /debug
 // endpoints.
-func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httprequest.Handler, error) {
-	return jemerror.Mapper.Handlers(func(p httprequest.Params) (*handler, error) {
+func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]jujuhttprequest.Handler, error) {
+	var handlers []jujuhttprequest.Handler
+	srv := &httprequest.Server{
+		ErrorMapper: func(_ context.Context, err error) (int, interface{}) {
+			return jemerror.Mapper(err)
+		},
+	}
+
+	for _, hnd := range srv.Handlers(func(p httprequest.Params) (*handler, context.Context, error) {
 		ctx := ctxutil.Join(ctx, p.Context)
-		ctx = zapctx.WithFields(ctx, zap.String("req-id", httprequest.RequestUUID(ctx)))
+		ctx = zapctx.WithFields(ctx, zap.String("req-id", jujuhttprequest.RequestUUID(ctx)))
 		h := &handler{
 			params:                         params.Params,
 			jem:                            params.JEMPool.JEM(ctx),
@@ -35,8 +43,11 @@ func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httpr
 			CheckPprofAllowed: h.checkIsAdmin,
 			Check:             h.check,
 		}
-		return h, nil
-	}), nil
+		return h, ctx, nil
+	}) {
+		handlers = append(handlers, jujuhttprequest.Handler(hnd))
+	}
+	return handlers, nil
 }
 
 type handler struct {
@@ -61,8 +72,9 @@ func (h *handler) checkIsAdmin(req *http.Request) error {
 	return auth.CheckIsUser(h.ctx, h.params.ControllerAdmin)
 }
 
-func (h *handler) check() map[string]debugstatus.CheckResult {
+func (h *handler) check(ctx context.Context) map[string]debugstatus.CheckResult {
 	return debugstatus.Check(
+		ctx,
 		debugstatus.ServerStartTime,
 		debugstatus.Connection(h.jem.DB.Session),
 		debugstatus.MongoCollections(h.jem.DB),
@@ -77,7 +89,7 @@ func (h *handler) Close() error {
 	return nil
 }
 
-// DebugOmnibusCheckRequest defines the request structure for the
+// DebugUsageSenderCheckRequest defines the request structure for the
 // omnibus usage sender authorization check.
 type DebugUsageSenderCheckRequest struct {
 	httprequest.Route `httprequest:"GET /debug/usage/:username"`
