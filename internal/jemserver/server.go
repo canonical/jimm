@@ -26,6 +26,7 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/jemerror"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/monitor"
 	"github.com/CanonicalLtd/jimm/internal/usagesender"
@@ -114,8 +115,8 @@ type HandlerParams struct {
 	// AuthenticatorPool contains the pool of Authenticators.
 	AuthenticatorPool *auth.Pool
 
-	// ACLStore contains the store for the ACLs.
-	ACLStore aclstore.ACLStore
+	// ACLManager contains the manager for the ACLs.
+	ACLManager *aclstore.Manager
 }
 
 // Server represents a JEM HTTP server.
@@ -192,6 +193,25 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make auth pool")
 	}
+	aclManager, err := aclstore.NewManager(ctx, aclstore.Params{
+		Store:    aclStore,
+		RootPath: "/admin/acls",
+		Authenticate: func(ctx context.Context, w http.ResponseWriter, req *http.Request) (aclstore.Identity, error) {
+			authenticator := authPool.Authenticator(ctx)
+			defer authenticator.Close()
+			ctx, err := authenticator.AuthenticateRequest(ctx, req)
+			if err != nil {
+				status, body := jemerror.Mapper(err)
+				httprequest.WriteJSON(w, status, body)
+				return nil, errgo.Mask(err, errgo.Any)
+			}
+			return identity{ctx}, nil
+		},
+		InitialAdminUsers: []string{string(config.ControllerAdmin)},
+	})
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
 	srv := &Server{
 		router:      httprouter.New(),
 		pool:        p,
@@ -218,6 +238,9 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 		}
 		srv.usageSender = worker
 	}
+	srv.router.Handler("GET", "/admin/acls/*path", aclManager)
+	srv.router.Handler("POST", "/admin/acls/*path", aclManager)
+	srv.router.Handler("PUT", "/admin/acls/*path", aclManager)
 	srv.router.Handler("GET", "/metrics", prometheus.Handler())
 	for name, newAPI := range versions {
 		handlers, err := newAPI(ctx, HandlerParams{
@@ -225,7 +248,7 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 			SessionPool:       sessionPool,
 			JEMPool:           p,
 			AuthenticatorPool: authPool,
-			ACLStore:          aclStore,
+			ACLManager:        aclManager,
 		})
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot create API %s", name)
@@ -260,6 +283,20 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	}
 
 	return srv, nil
+}
+
+type identity struct {
+	ctx context.Context
+}
+
+func (i identity) Allow(_ context.Context, acl []string) (bool, error) {
+	if err := auth.CheckACL(i.ctx, acl); err != nil {
+		if errgo.Cause(err) == params.ErrUnauthorized {
+			return false, nil
+		}
+		return false, errgo.Mask(err)
+	}
+	return true, nil
 }
 
 func monitorLeaseOwner(agentName string) (string, error) {

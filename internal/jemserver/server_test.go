@@ -5,18 +5,23 @@ package jemserver_test
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"time"
 
+	"github.com/juju/aclstore/aclclient"
 	"github.com/juju/httprequest"
 	jujutesting "github.com/juju/juju/testing"
+	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
+	errgo "gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
+	"github.com/CanonicalLtd/jimm/internal/apitest"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
-	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
@@ -25,7 +30,7 @@ import (
 var testContext = context.Background()
 
 type serverSuite struct {
-	jemtest.IsolatedMgoSuite
+	apitest.Suite
 }
 
 var _ = gc.Suite(&serverSuite{})
@@ -233,4 +238,58 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 		}
 	}
 	c.Assert(ctl.MonitorLeaseOwner, gc.Matches, "foo-[a-z0-9]+")
+}
+
+func (s *serverSuite) TestGetACL(c *gc.C) {
+	users, err := s.aclClient("controller-admin").Get(context.Background(), "admin")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(users, jc.DeepEquals, []string{"controller-admin"})
+}
+
+func (s *serverSuite) TestUnauthorized(c *gc.C) {
+	users, err := s.aclClient("bob").Get(context.Background(), "admin")
+	c.Assert(err, gc.ErrorMatches, `Get http.*/admin/acls/admin: forbidden`)
+	c.Assert(users, gc.IsNil)
+}
+
+func (s *serverSuite) TestSetACL(c *gc.C) {
+	client := s.aclClient("controller-admin")
+	err := client.Set(context.Background(), "admin", []string{"controller-admin", "bob"})
+	c.Assert(err, gc.Equals, nil)
+	users, err := client.Get(context.Background(), "admin")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(users, jc.DeepEquals, []string{"bob", "controller-admin"})
+}
+
+func (s *serverSuite) TestModifyACL(c *gc.C) {
+	client := s.aclClient("controller-admin")
+	err := client.Add(context.Background(), "admin", []string{"alice"})
+	c.Assert(err, gc.Equals, nil)
+	users, err := client.Get(context.Background(), "admin")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(users, jc.DeepEquals, []string{"alice", "controller-admin"})
+}
+
+func (s *serverSuite) aclClient(user string) *aclclient.Client {
+	return aclclient.New(aclclient.NewParams{
+		BaseURL: s.HTTPSrv.URL + "/admin/acls",
+		Doer:    bakeryDoer{s.IDMSrv.Client(user)},
+	})
+}
+
+type bakeryDoer struct {
+	client *httpbakery.Client
+}
+
+func (d bakeryDoer) Do(req *http.Request) (*http.Response, error) {
+	if req.Body == nil {
+		return d.client.Do(req)
+	}
+	body, ok := req.Body.(io.ReadSeeker)
+	if !ok {
+		return nil, errgo.Newf("unsupported body type")
+	}
+	req1 := *req
+	req1.Body = nil
+	return d.client.DoWithBody(&req1, body)
 }

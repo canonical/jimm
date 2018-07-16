@@ -47,27 +47,20 @@ const (
 var controllerClientInitiateMigration = (*controllerapi.Client).InitiateMigration
 
 type Handler struct {
-	jem      *jem.JEM
-	context  context.Context
-	cancel   context.CancelFunc
-	config   jemserver.Params
-	monReq   servermon.Request
-	aclstore aclstore.ACLStore
+	jem        *jem.JEM
+	context    context.Context
+	cancel     context.CancelFunc
+	config     jemserver.Params
+	monReq     servermon.Request
+	aclManager *aclstore.Manager
 }
 
 func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httprequest.Handler, error) {
 	// Ensure the required ACLs exist.
-	aclManager, err := aclstore.NewManager(ctx, aclstore.Params{
-		Store:             params.ACLStore,
-		InitialAdminUsers: []string{string(params.ControllerAdmin)},
-	})
-	if err != nil {
+	if err := params.ACLManager.CreateACL(ctx, auditLogACL, string(params.ControllerAdmin)); err != nil {
 		return nil, errgo.Mask(err)
 	}
-	if err := aclManager.CreateACL(ctx, auditLogACL, string(params.ControllerAdmin)); err != nil {
-		return nil, errgo.Mask(err)
-	}
-	if err := aclManager.CreateACL(ctx, logLevelACL, string(params.ControllerAdmin)); err != nil {
+	if err := params.ACLManager.CreateACL(ctx, logLevelACL, string(params.ControllerAdmin)); err != nil {
 		return nil, errgo.Mask(err)
 	}
 
@@ -90,11 +83,11 @@ func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httpr
 			return nil, errgo.Mask(err, errgo.Any)
 		}
 		h := &Handler{
-			jem:      params.JEMPool.JEM(ctx),
-			context:  ctx,
-			config:   params.Params,
-			cancel:   cancel,
-			aclstore: params.ACLStore,
+			jem:        params.JEMPool.JEM(ctx),
+			context:    ctx,
+			config:     params.Params,
+			cancel:     cancel,
+			aclManager: params.ACLManager,
 		}
 
 		h.monReq.Start(p.PathPattern)
@@ -995,7 +988,7 @@ func (h *Handler) GetModelStatuses(arg *params.ModelStatusesRequest) (params.Mod
 }
 
 func (h *Handler) checkACL(ctx context.Context, aclName string) error {
-	acl, err := h.aclstore.Get(ctx, aclName)
+	acl, err := h.aclManager.ACL(ctx, aclName)
 	if err != nil {
 		return errgo.Mask(err)
 	}
