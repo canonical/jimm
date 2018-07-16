@@ -12,11 +12,11 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	"gopkg.in/macaroon.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgostorage"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon.v2-unstable"
 
 	"github.com/CanonicalLtd/jem/internal/auth"
 	"github.com/CanonicalLtd/jem/internal/jemtest"
@@ -43,6 +43,11 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 	})
 	c.Assert(err, jc.ErrorIsNil)
 	s.sessionPool = mgosession.NewPool(context.TODO(), s.Session, 5)
+	idmClient, err := idmclient.New(idmclient.NewParams{
+		BaseURL: s.idmSrv.URL.String(),
+		Client:  s.idmSrv.Client("test-user"),
+	})
+	c.Assert(err, jc.ErrorIsNil)
 	s.pool, err = auth.NewPool(context.TODO(), auth.Params{
 		Bakery:   bakery,
 		RootKeys: mgostorage.NewRootKeys(100),
@@ -51,14 +56,8 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 		},
 		MacaroonCollection: db.C("macaroons"),
 		SessionPool:        s.sessionPool,
-		PermChecker: idmclient.NewPermChecker(
-			idmclient.New(idmclient.NewParams{
-				BaseURL: s.idmSrv.URL.String(),
-				Client:  s.idmSrv.Client("test-user"),
-			}),
-			time.Second,
-		),
-		IdentityLocation: s.idmSrv.URL.String(),
+		PermChecker:        idmclient.NewPermChecker(idmClient, time.Second),
+		IdentityLocation:   s.idmSrv.URL.String(),
 	})
 	c.Assert(err, jc.ErrorIsNil)
 }
@@ -198,44 +197,6 @@ func (s *authSuite) TestUsername(c *gc.C) {
 	ctx, _, err := a.Authenticate(context.Background(), []macaroon.Slice{ms}, checkers.New())
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(auth.Username(ctx), gc.Equals, "bob")
-}
-
-func (s *authSuite) TestAuthenticateWithDomain(c *gc.C) {
-	bakery, err := bakery.NewService(bakery.NewServiceParams{
-		Location: "here",
-		Locator:  s.idmSrv,
-	})
-	c.Assert(err, jc.ErrorIsNil)
-	pool, err := auth.NewPool(context.TODO(), auth.Params{
-		Bakery:   bakery,
-		RootKeys: mgostorage.NewRootKeys(100),
-		RootKeysPolicy: mgostorage.Policy{
-			ExpiryDuration: 1 * time.Second,
-		},
-		MacaroonCollection: s.Session.DB("auth").C("macaroons"),
-		SessionPool:        s.sessionPool,
-		PermChecker: idmclient.NewPermChecker(
-			idmclient.New(idmclient.NewParams{
-				BaseURL: s.idmSrv.URL.String(),
-				Client:  s.idmSrv.Client("test-user"),
-			}),
-			time.Second,
-		),
-		IdentityLocation: s.idmSrv.URL.String(),
-		Domain:           "test-domain",
-	})
-	c.Assert(err, jc.ErrorIsNil)
-	a := pool.Authenticator(context.TODO())
-	defer a.Close()
-	_, m, _ := a.Authenticate(nil, nil, checkers.New())
-	ms := s.discharge(c, m, "bob")
-	_, m, err = a.Authenticate(context.Background(), []macaroon.Slice{ms}, checkers.New())
-	c.Assert(err, gc.ErrorMatches, `verification failed: user not in "test-domain" domain`)
-	c.Assert(m, gc.Not(gc.IsNil))
-	ms = s.discharge(c, m, "bob@test-domain")
-	ctx, _, err := a.Authenticate(context.Background(), []macaroon.Slice{ms}, checkers.New())
-	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(auth.Username(ctx), gc.Equals, "bob@test-domain")
 }
 
 func (s *authSuite) discharge(c *gc.C, m *macaroon.Macaroon, username string, groups ...string) macaroon.Slice {

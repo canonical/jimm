@@ -621,10 +621,10 @@ func (s *jemSuite) TestDestroyModelWithStorage(c *gc.C) {
 	_, err = client.ModelInfo([]names.ModelTag{tag})
 	c.Assert(err, jc.ErrorIsNil)
 
-	modelState, err := s.State.ForModel(tag)
+	modelState, err := s.StatePool.Get(model.UUID)
 	c.Assert(err, jc.ErrorIsNil)
-	defer modelState.Close()
-	f := factory.NewFactory(modelState)
+	defer modelState.Release()
+	f := factory.NewFactory(modelState.State)
 	f.MakeUnit(c, &factory.UnitParams{
 		Application: f.MakeApplication(c, &factory.ApplicationParams{
 			Charm: f.MakeCharm(c, &factory.CharmParams{

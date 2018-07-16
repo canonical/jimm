@@ -29,7 +29,7 @@ import (
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
-	"gopkg.in/macaroon.v1"
+	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jem/internal/jemtest"
@@ -105,7 +105,7 @@ func (s *controllerSuite) TestLoginToController(c *gc.C) {
 
 func (s *controllerSuite) TestLoginToControllerWithInvalidMacaroon(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	invalidMacaroon, err := macaroon.New(nil, "", "")
+	invalidMacaroon, err := macaroon.New(nil, nil, "")
 	c.Assert(err, gc.IsNil)
 	conn := s.open(c, &api.Info{
 		Macaroons: []macaroon.Slice{{invalidMacaroon}},
@@ -573,6 +573,7 @@ func (s *controllerSuite) TestListModelSummaries(c *gc.C) {
 			Count:  0,
 		}},
 		AgentVersion: &jujuversion.Current,
+		Type:         "iaas",
 	}, {
 		Name:            "model-3",
 		UUID:            modelUUID3,
@@ -597,6 +598,7 @@ func (s *controllerSuite) TestListModelSummaries(c *gc.C) {
 			Count:  0,
 		}},
 		AgentVersion: &jujuversion.Current,
+		Type:         "iaas",
 	}})
 }
 
@@ -628,10 +630,12 @@ func (s *controllerSuite) TestListModels(c *gc.C) {
 		Name:  "model-1",
 		UUID:  modelUUID1,
 		Owner: "test@external",
+		Type:  "iaas",
 	}, {
 		Name:  "model-3",
 		UUID:  modelUUID3,
 		Owner: "test2@external",
+		Type:  "iaas",
 	}})
 }
 
@@ -831,6 +835,7 @@ func (s *controllerSuite) TestModelInfo(c *gc.C) {
 				Access:      jujuparams.ModelAdminAccess,
 			}},
 			AgentVersion: &jujuversion.Current,
+			Type:         "iaas",
 		},
 	}, {
 		Error: &jujuparams.Error{
@@ -865,6 +870,7 @@ func (s *controllerSuite) TestModelInfo(c *gc.C) {
 				},
 			}},
 			AgentVersion: &jujuversion.Current,
+			Type:         "iaas",
 		},
 	}, {
 		Result: &jujuparams.ModelInfo{
@@ -886,6 +892,7 @@ func (s *controllerSuite) TestModelInfo(c *gc.C) {
 				Access:      jujuparams.ModelWriteAccess,
 			}},
 			AgentVersion: &jujuversion.Current,
+			Type:         "iaas",
 		},
 	}, {
 		Result: &jujuparams.ModelInfo{
@@ -911,6 +918,7 @@ func (s *controllerSuite) TestModelInfo(c *gc.C) {
 				Access:      jujuparams.ModelAdminAccess,
 			}},
 			AgentVersion: &jujuversion.Current,
+			Type:         "iaas",
 		},
 	}, {
 		Error: &jujuparams.Error{
@@ -971,6 +979,7 @@ func (s *controllerSuite) TestModelInfoForLegacyModel(c *gc.C) {
 				Access:      jujuparams.ModelAdminAccess,
 			}},
 			AgentVersion: &jujuversion.Current,
+			Type:         "iaas",
 		},
 	}})
 
@@ -1033,6 +1042,7 @@ func (s *controllerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 				Access:      jujuparams.ModelAdminAccess,
 			}},
 			AgentVersion: &jujuversion.Current,
+			Type:         "iaas",
 		},
 	}})
 
@@ -1062,6 +1072,7 @@ func (s *controllerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 				Access:      jujuparams.ModelAdminAccess,
 			}},
 			AgentVersion: &jujuversion.Current,
+			Type:         "iaas",
 		},
 	}})
 
@@ -1092,6 +1103,7 @@ func (s *controllerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 				Access:      jujuparams.ModelAdminAccess,
 			}},
 			AgentVersion: &jujuversion.Current,
+			Type:         "iaas",
 		},
 	}})
 }
@@ -1165,11 +1177,13 @@ func (s *controllerSuite) TestAllModels(c *gc.C) {
 		UUID:           modelUUID1,
 		Owner:          "test@external",
 		LastConnection: nil,
+		Type:           "iaas",
 	}, {
 		Name:           "model-3",
 		UUID:           modelUUID3,
 		Owner:          "test2@external",
 		LastConnection: nil,
+		Type:           "iaas",
 	}})
 }
 
@@ -1209,7 +1223,7 @@ func (s *controllerSuite) TestModelStatus(c *gc.C) {
 			TotalMachineCount:  0,
 			CoreCount:          0,
 			HostedMachineCount: 0,
-			ServiceCount:       0,
+			ApplicationCount:   0,
 			Machines:           []base.Machine{},
 		}, {
 			UUID:               modelUUID3,
@@ -1218,7 +1232,7 @@ func (s *controllerSuite) TestModelStatus(c *gc.C) {
 			TotalMachineCount:  0,
 			CoreCount:          0,
 			HostedMachineCount: 0,
-			ServiceCount:       0,
+			ApplicationCount:   0,
 			Machines:           []base.Machine{},
 		}})
 		_, err = client.ModelStatus(names.NewModelTag(modelUUID2))
@@ -1543,11 +1557,10 @@ func (s *controllerSuite) TestDestroyModelWithStorageError(c *gc.C) {
 	s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
 	mi := s.assertCreateModel(c, createModelParams{name: "test-model", username: "alice", cred: "cred1"})
 
-	tag := names.NewModelTag(mi.UUID)
-	modelState, err := s.State.ForModel(tag)
+	modelState, err := s.StatePool.Get(mi.UUID)
 	c.Assert(err, jc.ErrorIsNil)
-	defer modelState.Close()
-	f := factory.NewFactory(modelState)
+	defer modelState.Release()
+	f := factory.NewFactory(modelState.State)
 	f.MakeUnit(c, &factory.UnitParams{
 		Application: f.MakeApplication(c, &factory.ApplicationParams{
 			Charm: f.MakeCharm(c, &factory.CharmParams{
@@ -1562,6 +1575,7 @@ func (s *controllerSuite) TestDestroyModelWithStorageError(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
+	tag := names.NewModelTag(mi.UUID)
 	client := modelmanager.NewClient(conn)
 	err = client.DestroyModel(tag, nil)
 	c.Assert(errgo.Cause(err), jc.Satisfies, jujuparams.IsCodeHasPersistentStorage)
@@ -1580,11 +1594,10 @@ func (s *controllerSuite) TestDestroyModelWithStorageDestroyStorageTrue(c *gc.C)
 	s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
 	mi := s.assertCreateModel(c, createModelParams{name: "test-model", username: "alice", cred: "cred1"})
 
-	tag := names.NewModelTag(mi.UUID)
-	modelState, err := s.State.ForModel(tag)
+	modelState, err := s.StatePool.Get(mi.UUID)
 	c.Assert(err, jc.ErrorIsNil)
-	defer modelState.Close()
-	f := factory.NewFactory(modelState)
+	defer modelState.Release()
+	f := factory.NewFactory(modelState.State)
 	f.MakeUnit(c, &factory.UnitParams{
 		Application: f.MakeApplication(c, &factory.ApplicationParams{
 			Charm: f.MakeCharm(c, &factory.CharmParams{
@@ -1599,6 +1612,7 @@ func (s *controllerSuite) TestDestroyModelWithStorageDestroyStorageTrue(c *gc.C)
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
+	tag := names.NewModelTag(mi.UUID)
 	client := modelmanager.NewClient(conn)
 	err = client.DestroyModel(tag, newBool(true))
 	c.Assert(err, gc.Equals, nil)
@@ -1617,11 +1631,10 @@ func (s *controllerSuite) TestDestroyModelWithStorageDestroyStorageFalse(c *gc.C
 	s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
 	mi := s.assertCreateModel(c, createModelParams{name: "test-model", username: "alice", cred: "cred1"})
 
-	tag := names.NewModelTag(mi.UUID)
-	modelState, err := s.State.ForModel(tag)
+	modelState, err := s.StatePool.Get(mi.UUID)
 	c.Assert(err, jc.ErrorIsNil)
-	defer modelState.Close()
-	f := factory.NewFactory(modelState)
+	defer modelState.Release()
+	f := factory.NewFactory(modelState.State)
 	f.MakeUnit(c, &factory.UnitParams{
 		Application: f.MakeApplication(c, &factory.ApplicationParams{
 			Charm: f.MakeCharm(c, &factory.CharmParams{
@@ -1636,6 +1649,7 @@ func (s *controllerSuite) TestDestroyModelWithStorageDestroyStorageFalse(c *gc.C
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
+	tag := names.NewModelTag(mi.UUID)
 	client := modelmanager.NewClient(conn)
 	err = client.DestroyModel(tag, newBool(false))
 	c.Assert(err, gc.Equals, nil)

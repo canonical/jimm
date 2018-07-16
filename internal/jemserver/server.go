@@ -18,10 +18,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/worker.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	"gopkg.in/macaroon-bakery.v1/httpbakery/agent"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgostorage"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/agent"
 	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jem/internal/auth"
@@ -280,10 +280,14 @@ func newIdentityClient(config Params) (*idmclient.Client, *httpbakery.Client, er
 		return nil, nil, errgo.Notef(err, "cannot parse identity location URL %q", config.IdentityLocation)
 	}
 	agent.SetUpAuth(bclient, idmURL, config.AgentUsername)
-	return idmclient.New(idmclient.NewParams{
+	client, err := idmclient.New(idmclient.NewParams{
 		BaseURL: config.IdentityLocation,
 		Client:  bclient,
-	}), bclient, nil
+	})
+	if err != nil {
+		return nil, nil, errgo.Notef(err, "cannot create IDM client")
+	}
+	return client, bclient, nil
 }
 
 // ServeHTTP implements http.Handler.Handle.

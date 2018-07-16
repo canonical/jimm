@@ -8,7 +8,7 @@ import (
 
 	"github.com/juju/httprequest"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"github.com/CanonicalLtd/jem/internal/zapctx"
 	"github.com/CanonicalLtd/jem/internal/zaputil"

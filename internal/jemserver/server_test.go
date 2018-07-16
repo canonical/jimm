@@ -47,8 +47,9 @@ type versionResponse struct {
 
 func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	serverParams := jemserver.Params{
-		DB:              s.Session.DB("foo"),
-		ControllerAdmin: "controller-admin",
+		DB:               s.Session.DB("foo"),
+		ControllerAdmin:  "controller-admin",
+		IdentityLocation: "http://0.1.2.3",
 	}
 	serveVersion := func(vers string) jemserver.NewAPIHandlerFunc {
 		return func(_ context.Context, params jemserver.HandlerParams) ([]httprequest.Handler, error) {
@@ -128,8 +129,9 @@ func assertDoesNotServeVersion(c *gc.C, h http.Handler, vers string) {
 
 func (s *serverSuite) TestServerHasAccessControlAllowOrigin(c *gc.C) {
 	serverParams := jemserver.Params{
-		DB:              s.Session.DB("foo"),
-		ControllerAdmin: "controller-admin",
+		DB:               s.Session.DB("foo"),
+		ControllerAdmin:  "controller-admin",
+		IdentityLocation: "http://0.1.2.3",
 	}
 	impl := map[string]jemserver.NewAPIHandlerFunc{
 		"/a": func(ctx context.Context, p jemserver.HandlerParams) ([]httprequest.Handler, error) {
@@ -199,10 +201,11 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	params := jemserver.Params{
-		DB:              db,
-		AgentUsername:   "foo",
-		RunMonitor:      true,
-		ControllerAdmin: "controller-admin",
+		DB:               db,
+		AgentUsername:    "foo",
+		RunMonitor:       true,
+		ControllerAdmin:  "controller-admin",
+		IdentityLocation: "http://0.1.2.3",
 	}
 	// Patch the API opening timeout so that it doesn't take the
 	// usual 15 seconds to fail - we don't, it holds on to the

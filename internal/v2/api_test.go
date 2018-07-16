@@ -1272,9 +1272,9 @@ func (s *APISuite) TestNewModelWithoutExplicitController(c *gc.C) {
 func (s *APISuite) assertModelConfigAttr(c *gc.C, modelPath params.EntityPath, attr string, val interface{}) {
 	m, err := s.JEM.DB.Model(testContext, modelPath)
 	c.Assert(err, gc.IsNil)
-	st, err := s.State.ForModel(names.NewModelTag(m.UUID))
+	st, err := s.StatePool.Get(m.UUID)
 	c.Assert(err, gc.IsNil)
-	defer st.Close()
+	defer st.Release()
 	stm, err := st.Model()
 	c.Assert(err, gc.IsNil)
 	cfg, err := stm.Config()
@@ -1827,6 +1827,7 @@ func (s *APISuite) TestJujuStatus(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	resp.Status.Model.ModelStatus.Since = nil
+	resp.Status.ControllerTimestamp = nil
 	c.Assert(resp, jc.DeepEquals, &params.JujuStatusResponse{
 		Status: jujuparams.FullStatus{
 			Model: jujuparams.ModelStatusInfo{
@@ -1838,7 +1839,8 @@ func (s *APISuite) TestJujuStatus(c *gc.C) {
 					Status: "available",
 					Data:   make(map[string]interface{}),
 				},
-				SLA: "unsupported",
+				SLA:  "unsupported",
+				Type: "iaas",
 			},
 			Machines:           map[string]jujuparams.MachineStatus{},
 			Applications:       map[string]jujuparams.ApplicationStatus{},
@@ -1854,6 +1856,7 @@ func (s *APISuite) TestJujuStatus(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	resp.Status.Model.ModelStatus.Since = nil
+	resp.Status.ControllerTimestamp = nil
 	c.Assert(resp, jc.DeepEquals, &params.JujuStatusResponse{
 		Status: jujuparams.FullStatus{
 			Model: jujuparams.ModelStatusInfo{
@@ -1865,7 +1868,8 @@ func (s *APISuite) TestJujuStatus(c *gc.C) {
 					Status: "available",
 					Data:   make(map[string]interface{}),
 				},
-				SLA: "unsupported",
+				SLA:  "unsupported",
+				Type: "iaas",
 			},
 			Machines:           map[string]jujuparams.MachineStatus{},
 			Applications:       map[string]jujuparams.ApplicationStatus{},
