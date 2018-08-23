@@ -49,9 +49,9 @@ func createCerts() error {
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(20 * 365 * 24 * time.Hour),
 		BasicConstraintsValid: true,
-		IsCA:           true,
-		MaxPathLen:     0,
-		MaxPathLenZero: true,
+		IsCA:                  true,
+		MaxPathLen:            0,
+		MaxPathLenZero:        true,
 	}
 	rootCertBytes, err := x509.CreateCertificate(rand.Reader, &rootTemplate, &rootTemplate, rootKey.Public(), rootKey)
 	if err != nil {
@@ -73,7 +73,7 @@ func createCerts() error {
 		NotBefore:             rootTemplate.NotBefore,
 		NotAfter:              rootTemplate.NotAfter,
 		BasicConstraintsValid: true,
-		IsCA: false,
+		IsCA:                  false,
 		DNSNames: []string{
 			"ip6-localhost",
 			"juju-apiserver",
