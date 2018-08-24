@@ -15,9 +15,9 @@ import (
 	"github.com/juju/utils"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jem/internal/jem"
-	"github.com/CanonicalLtd/jem/internal/zapctx"
-	"github.com/CanonicalLtd/jem/internal/zaputil"
+	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/internal/zaputil"
 )
 
 const (

@@ -13,7 +13,7 @@ import (
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
-	"github.com/CanonicalLtd/jem/internal/apitest"
+	"github.com/CanonicalLtd/jimm/internal/apitest"
 )
 
 type APISuite struct {

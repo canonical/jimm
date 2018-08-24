@@ -21,11 +21,11 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
 
-	"github.com/CanonicalLtd/jem/internal/apitest"
-	"github.com/CanonicalLtd/jem/internal/mongodoc"
-	"github.com/CanonicalLtd/jem/internal/v2"
-	"github.com/CanonicalLtd/jem/internal/zapctx"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/internal/apitest"
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/internal/v2"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 func init() {

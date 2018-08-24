@@ -19,11 +19,11 @@ import (
 	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
 
-	external_jem "github.com/CanonicalLtd/jem"
-	"github.com/CanonicalLtd/jem/internal/apitest"
-	"github.com/CanonicalLtd/jem/internal/jemerror"
-	"github.com/CanonicalLtd/jem/internal/usagesender"
-	"github.com/CanonicalLtd/jem/params"
+	external_jem "github.com/CanonicalLtd/jimm"
+	"github.com/CanonicalLtd/jimm/internal/apitest"
+	"github.com/CanonicalLtd/jimm/internal/jemerror"
+	"github.com/CanonicalLtd/jimm/internal/usagesender"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 var (

@@ -23,11 +23,11 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/mgo.v2"
 
-	"github.com/CanonicalLtd/jem"
-	"github.com/CanonicalLtd/jem/cmd/jaas-admin/admincmd"
-	"github.com/CanonicalLtd/jem/internal/jemtest"
-	"github.com/CanonicalLtd/jem/jemclient"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm"
+	"github.com/CanonicalLtd/jimm/cmd/jaas-admin/admincmd"
+	"github.com/CanonicalLtd/jimm/internal/jemtest"
+	"github.com/CanonicalLtd/jimm/jemclient"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 // run runs a jem plugin subcommand with the given arguments,

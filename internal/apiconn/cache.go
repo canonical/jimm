@@ -8,9 +8,9 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jem/internal/singleflight"
-	"github.com/CanonicalLtd/jem/internal/zapctx"
-	"github.com/CanonicalLtd/jem/internal/zaputil"
+	"github.com/CanonicalLtd/jimm/internal/singleflight"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/internal/zaputil"
 )
 
 // Cache holds a cache of connections to API servers.

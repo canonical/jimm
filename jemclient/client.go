@@ -9,7 +9,7 @@ import (
 
 	"github.com/juju/httprequest"
 
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 //go:generate httprequest-generate-client github.com/CanonicalLtd/jem/internal/v2 Handler client

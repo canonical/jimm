@@ -5,7 +5,7 @@ package admincmd_test
 import (
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 type deprecateControllerSuite struct {

@@ -30,13 +30,13 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/CanonicalLtd/jem/internal/apiconn"
-	"github.com/CanonicalLtd/jem/internal/auth"
-	"github.com/CanonicalLtd/jem/internal/mgosession"
-	"github.com/CanonicalLtd/jem/internal/mongodoc"
-	"github.com/CanonicalLtd/jem/internal/zapctx"
-	"github.com/CanonicalLtd/jem/internal/zaputil"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/internal/apiconn"
+	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/mgosession"
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/internal/zaputil"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 // wallClock provides access to the current time. It is a variable so

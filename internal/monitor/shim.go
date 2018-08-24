@@ -15,10 +15,10 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
 
-	"github.com/CanonicalLtd/jem/internal/apiconn"
-	"github.com/CanonicalLtd/jem/internal/jem"
-	"github.com/CanonicalLtd/jem/internal/mongodoc"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/internal/apiconn"
+	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 // jemShim implements the jemInterface interface

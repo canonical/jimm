@@ -26,14 +26,14 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/CanonicalLtd/jem/internal/auth"
-	"github.com/CanonicalLtd/jem/internal/jem"
-	"github.com/CanonicalLtd/jem/internal/jemserver"
-	"github.com/CanonicalLtd/jem/internal/mongodoc"
-	"github.com/CanonicalLtd/jem/internal/servermon"
-	"github.com/CanonicalLtd/jem/internal/zapctx"
-	"github.com/CanonicalLtd/jem/internal/zaputil"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/jemserver"
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/internal/servermon"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/internal/zaputil"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 type facade struct {

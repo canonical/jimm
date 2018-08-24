@@ -17,8 +17,8 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/names.v2"
 
-	"github.com/CanonicalLtd/jem/internal/apitest"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/internal/apitest"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 var testContext = context.Background()

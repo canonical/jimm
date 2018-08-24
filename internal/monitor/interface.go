@@ -11,8 +11,8 @@ import (
 	"github.com/juju/version"
 	names "gopkg.in/juju/names.v2"
 
-	"github.com/CanonicalLtd/jem/internal/mongodoc"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 // jemInterface holds the interface required by allMonitor to

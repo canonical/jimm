@@ -24,15 +24,15 @@ import (
 	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2"
 
-	external_jem "github.com/CanonicalLtd/jem"
-	"github.com/CanonicalLtd/jem/internal/jem"
-	"github.com/CanonicalLtd/jem/internal/jemserver"
-	"github.com/CanonicalLtd/jem/internal/jemtest"
-	"github.com/CanonicalLtd/jem/internal/mgosession"
-	"github.com/CanonicalLtd/jem/internal/mongodoc"
-	"github.com/CanonicalLtd/jem/internal/usagesender"
-	"github.com/CanonicalLtd/jem/jemclient"
-	"github.com/CanonicalLtd/jem/params"
+	external_jem "github.com/CanonicalLtd/jimm"
+	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/jemserver"
+	"github.com/CanonicalLtd/jimm/internal/jemtest"
+	"github.com/CanonicalLtd/jimm/internal/mgosession"
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/internal/usagesender"
+	"github.com/CanonicalLtd/jimm/jemclient"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 // Suite implements a test fixture that contains a JEM server

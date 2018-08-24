@@ -12,12 +12,12 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon.v1"
 
-	"github.com/CanonicalLtd/jem/internal/apitest"
-	"github.com/CanonicalLtd/jem/internal/auth"
-	"github.com/CanonicalLtd/jem/internal/jem"
-	"github.com/CanonicalLtd/jem/internal/mongodoc"
-	"github.com/CanonicalLtd/jem/params"
-	cmd "github.com/CanonicalLtd/jem/tools/register-existing-models"
+	"github.com/CanonicalLtd/jimm/internal/apitest"
+	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/params"
+	cmd "github.com/CanonicalLtd/jimm/tools/register-existing-models"
 )
 
 var testContext = context.Background()

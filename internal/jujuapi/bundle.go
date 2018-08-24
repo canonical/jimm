@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CanonicalLtd/jem/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/juju/bundlechanges"
 	"github.com/juju/errors"
 	"github.com/juju/juju/apiserver/params"

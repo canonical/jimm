@@ -27,10 +27,10 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/natefinch/lumberjack.v2"
 
-	"github.com/CanonicalLtd/jem"
-	"github.com/CanonicalLtd/jem/config"
-	"github.com/CanonicalLtd/jem/internal/zapctx"
-	"github.com/CanonicalLtd/jem/internal/zaputil"
+	"github.com/CanonicalLtd/jimm"
+	"github.com/CanonicalLtd/jimm/config"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/internal/zaputil"
 )
 
 // websocketRequestTimeout is the amount of time a webseocket connection

@@ -18,10 +18,10 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon.v2-unstable"
 
-	"github.com/CanonicalLtd/jem/internal/auth"
-	"github.com/CanonicalLtd/jem/internal/jemtest"
-	"github.com/CanonicalLtd/jem/internal/mgosession"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/jemtest"
+	"github.com/CanonicalLtd/jimm/internal/mgosession"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 type authSuite struct {

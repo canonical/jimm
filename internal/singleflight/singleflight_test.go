@@ -12,7 +12,7 @@ import (
 
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jem/internal/singleflight"
+	"github.com/CanonicalLtd/jimm/internal/singleflight"
 )
 
 func TestContextCanceled(t *testing.T) {

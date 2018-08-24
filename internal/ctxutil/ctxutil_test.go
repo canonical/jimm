@@ -8,7 +8,7 @@ import (
 
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jem/internal/ctxutil"
+	"github.com/CanonicalLtd/jimm/internal/ctxutil"
 )
 
 type ctxutilSuite struct {

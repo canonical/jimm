@@ -11,7 +11,7 @@ import (
 	"github.com/juju/mgosession"
 	mgo "gopkg.in/mgo.v2"
 
-	"github.com/CanonicalLtd/jem/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
 )
 
 // Pool represents a pool of mgo sessions.
