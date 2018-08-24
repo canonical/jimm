@@ -12,9 +12,9 @@ import (
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jem"
-	"github.com/CanonicalLtd/jem/internal/apitest"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm"
+	"github.com/CanonicalLtd/jimm/internal/apitest"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 type apiSuite struct {

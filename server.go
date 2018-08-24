@@ -12,12 +12,12 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/mgo.v2"
 
-	"github.com/CanonicalLtd/jem/internal/admin"
-	"github.com/CanonicalLtd/jem/internal/debugapi"
-	"github.com/CanonicalLtd/jem/internal/jemserver"
-	"github.com/CanonicalLtd/jem/internal/jujuapi"
-	"github.com/CanonicalLtd/jem/internal/v2"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/internal/admin"
+	"github.com/CanonicalLtd/jimm/internal/debugapi"
+	"github.com/CanonicalLtd/jimm/internal/jemserver"
+	"github.com/CanonicalLtd/jimm/internal/jujuapi"
+	"github.com/CanonicalLtd/jimm/internal/v2"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 var versions = map[string]jemserver.NewAPIHandlerFunc{

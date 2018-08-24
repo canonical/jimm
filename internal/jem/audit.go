@@ -7,7 +7,7 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 // AppendAudit appends the given entry to the audit log.

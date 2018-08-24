@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jem/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
 )
 
 type zapctxSuite struct {

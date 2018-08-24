@@ -7,8 +7,8 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jem/internal/jujuapi"
-	"github.com/CanonicalLtd/jem/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/internal/jujuapi"
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 )
 
 type cloudSuite struct{}

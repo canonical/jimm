@@ -8,7 +8,7 @@ import (
 
 	jujuparams "github.com/juju/juju/apiserver/params"
 
-	"github.com/CanonicalLtd/jem/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 )
 
 // makeCloud converts a cloud description in a mongodoc.Cloud into a jujuparams.Cloud.

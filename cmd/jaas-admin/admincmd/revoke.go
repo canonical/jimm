@@ -11,7 +11,7 @@ import (
 	"github.com/juju/juju/cmd/modelcmd"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 type revokeCommand struct {

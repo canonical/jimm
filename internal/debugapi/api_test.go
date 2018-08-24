@@ -10,9 +10,9 @@ import (
 	"github.com/juju/utils/debugstatus"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jem/internal/apitest"
-	"github.com/CanonicalLtd/jem/params"
-	"github.com/CanonicalLtd/jem/version"
+	"github.com/CanonicalLtd/jimm/internal/apitest"
+	"github.com/CanonicalLtd/jimm/params"
+	"github.com/CanonicalLtd/jimm/version"
 )
 
 type APISuite struct {

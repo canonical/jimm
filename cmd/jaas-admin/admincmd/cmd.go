@@ -19,8 +19,8 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
-	"github.com/CanonicalLtd/jem/jemclient"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/jemclient"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 // jujuLoggingConfigEnvKey matches osenv.JujuLoggingConfigEnvKey

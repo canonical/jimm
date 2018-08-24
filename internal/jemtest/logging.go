@@ -9,8 +9,8 @@ import (
 	"go.uber.org/zap/zapcore"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jem/internal/zapctx"
-	"github.com/CanonicalLtd/jem/internal/zaputil"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/internal/zaputil"
 )
 
 // LoggingSuite is a replacement for github.com/juju/testing.LoggingSuite
