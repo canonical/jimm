@@ -204,8 +204,8 @@ func (p *Pool) JEM(ctx context.Context) *JEM {
 	}
 	p.refCount++
 	return &JEM{
-		DB:   newDatabase(ctx, p.config.SessionPool, p.dbName),
-		pool: p,
+		DB:                             newDatabase(ctx, p.config.SessionPool, p.dbName),
+		pool:                           p,
 		usageSenderAuthorizationClient: p.usageSenderAuthorizationClient,
 	}
 }
@@ -918,6 +918,11 @@ func (j *JEM) UsageSenderAuthorization(applicationUser string) ([]byte, error) {
 // UpdateMachineInfo updates the information associated with a machine.
 func (j *JEM) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, info *multiwatcher.MachineInfo) error {
 	cloud, region, err := j.modelRegion(ctx, ctlPath, info.ModelUUID)
+	if errgo.Cause(err) == params.ErrNotFound {
+		// If the model isn't found then it is not controlled by
+		// JIMM and we aren't interested in it.
+		return nil
+	}
 	if err != nil {
 		return errgo.Notef(err, "cannot find region for model %s:%s", ctlPath, info.ModelUUID)
 	}
@@ -939,10 +944,7 @@ func (j *JEM) modelRegion(ctx context.Context, ctlPath params.EntityPath, uuid s
 	r, err := j.pool.regionCache.Get(key, func() (interface{}, error) {
 		m, err := j.DB.ModelFromUUID(ctx, uuid)
 		if err != nil {
-			return nil, errgo.Mask(err)
-		}
-		if m.Controller != ctlPath {
-			return nil, errgo.Newf("model %s not known on controller %s", uuid, ctlPath)
+			return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 		}
 		return cloudRegion{
 			cloud:  m.Cloud,
@@ -950,7 +952,7 @@ func (j *JEM) modelRegion(ctx context.Context, ctlPath params.EntityPath, uuid s
 		}, nil
 	})
 	if err != nil {
-		return "", "", errgo.Mask(err)
+		return "", "", errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	cr := r.(cloudRegion)
 	return cr.cloud, cr.region, nil

@@ -217,8 +217,8 @@ var _ jemInterface = (*jemShimInMemory)(nil)
 
 func newJEMShimInMemory() *jemShimInMemory {
 	return &jemShimInMemory{
-		controllers: make(map[params.EntityPath]*mongodoc.Controller),
-		models:      make(map[params.EntityPath]*mongodoc.Model),
+		controllers:                 make(map[params.EntityPath]*mongodoc.Controller),
+		models:                      make(map[params.EntityPath]*mongodoc.Model),
 		controllerUpdateCredentials: make(map[params.EntityPath]bool),
 		machines:                    make(map[string]map[machineId]*mongodoc.Machine),
 	}

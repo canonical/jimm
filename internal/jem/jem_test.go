@@ -1537,6 +1537,17 @@ func (s *jemSuite) TestUpdateMachineInfo(c *gc.C) {
 	}})
 }
 
+func (s *jemSuite) TestUpdateMachineUnknownModel(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "controller"}
+
+	err := s.jem.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
+		ModelUUID: "no-such-uuid",
+		Id:        "1",
+		Series:    "precise",
+	})
+	c.Assert(err, gc.IsNil)
+}
+
 func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityPath {
 	info := s.APIInfo(c)
 
