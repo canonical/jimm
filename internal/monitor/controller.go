@@ -304,11 +304,15 @@ func (m *controllerMonitor) connected(ctx context.Context, conn jujuAPI) error {
 		return errgo.Notef(err, "cannot set controller regions")
 	}
 
-	// Remove all the known machines for the controller. The ones
+	// Remove all the known machines and applications for the controller. The ones
 	// that still exist will be updated in the first deltas.
 	if err := m.jem.RemoveControllerMachines(ctx, m.ctlPath); err != nil {
 		return errgo.Notef(err, "cannot remove controller machines")
 	}
+	if err := m.jem.RemoveControllerApplications(ctx, m.ctlPath); err != nil {
+		return errgo.Notef(err, "cannot remove controller applications")
+	}
+
 	return nil
 }
 
@@ -543,13 +547,24 @@ func (w *watcherState) addDelta(ctx context.Context, d multiwatcher.Delta) error
 	case *multiwatcher.ApplicationInfo:
 		delta := w.adjustCount(&w.stats.ServiceCount, d)
 		w.modelInfo(e.ModelUUID).adjustCount(params.ApplicationCount, delta)
+		if d.Removed {
+			e.Life = "dead"
+		}
+		w.runner.Do(func() error {
+			return w.jem.UpdateApplicationInfo(ctx, w.ctlPath, e)
+		})
 	case *multiwatcher.MachineInfo:
 		// TODO for top level machines, increment instance count?
 		delta := w.adjustCount(&w.stats.MachineCount, d)
 		w.modelInfo(e.ModelUUID).adjustCount(params.MachineCount, delta)
+		if d.Removed {
+			e.Life = "dead"
+		}
 		w.runner.Do(func() error {
 			return w.jem.UpdateMachineInfo(ctx, w.ctlPath, e)
 		})
+	default:
+		zapctx.Debug(ctx, "unknown entity", zap.Bool("removed", d.Removed), zap.String("type", fmt.Sprintf("%T", e)))
 	}
 	return nil
 }

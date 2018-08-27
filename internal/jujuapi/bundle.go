@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/juju/bundlechanges"
 	"github.com/juju/errors"
 	"github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/constraints"
 	"github.com/juju/juju/storage"
 	charm "gopkg.in/juju/charm.v6"
+
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
 )
 
 // bundleAPI implements the Bundle facade.

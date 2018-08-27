@@ -84,8 +84,16 @@ func (j jemShim) RemoveControllerMachines(ctx context.Context, ctlPath params.En
 	return errgo.Mask(j.DB.RemoveControllerMachines(ctx, ctlPath), errgo.Any)
 }
 
+func (j jemShim) RemoveControllerApplications(ctx context.Context, ctlPath params.EntityPath) error {
+	return errgo.Mask(j.DB.RemoveControllerApplications(ctx, ctlPath), errgo.Any)
+}
+
 func (j jemShim) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, info *multiwatcher.MachineInfo) error {
 	return errgo.Mask(j.JEM.UpdateMachineInfo(ctx, ctlPath, info), errgo.Any)
+}
+
+func (j jemShim) UpdateApplicationInfo(ctx context.Context, ctlPath params.EntityPath, info *multiwatcher.ApplicationInfo) error {
+	return errgo.Mask(j.JEM.UpdateApplicationInfo(ctx, ctlPath, info), errgo.Any)
 }
 
 func (j jemShim) SetControllerVersion(ctx context.Context, ctlPath params.EntityPath, v version.Number) error {

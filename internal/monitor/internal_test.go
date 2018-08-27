@@ -350,8 +350,9 @@ func (s *internalSuite) TestModelRemovedWithFailedWatcher(c *gc.C) {
 	//	- Before the watcher update arrives which would tell jimm
 	//	to remove the model (perhaps because the
 	// 	watcher isn't currently working), the watcher is restarted.
-	//	- The model should then be removed from jimm,
-	//	even though it doesn't exist in the controller.
+	//	- The model (machines and applications linked to trhat model too)
+	//  should then be removed from jimm, even though it doesn't exist in
+	//  the controller.
 	//
 	// To simulate this, we add a model to the jimm database but don't
 	// add it to the underlying Juju state. It should be removed when we
@@ -363,12 +364,35 @@ func (s *internalSuite) TestModelRemovedWithFailedWatcher(c *gc.C) {
 
 	// Add the JEM model entry.
 	modelPath := params.EntityPath{"bob", "mode"}
+	modelUUID := "acf6cf9d-c758-45aa-83ad-923731853fdd"
 	err := s.jem.DB.AddModel(testContext, &mongodoc.Model{
 		Path:       modelPath,
 		Controller: ctlPath,
-		UUID:       "acf6cf9d-c758-45aa-83ad-923731853fdd",
+		UUID:       modelUUID,
 	})
 	c.Assert(err, gc.IsNil)
+
+	err = s.jem.DB.UpdateApplicationInfo(testContext, &mongodoc.Application{
+		Controller: ctlPath.String(),
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &mongodoc.ApplicationInfo{
+			ModelUUID: modelUUID,
+			Name:      "model-app",
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	err = s.jem.DB.UpdateMachineInfo(testContext, &mongodoc.Machine{
+		Controller: ctlPath.String(),
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &multiwatcher.MachineInfo{
+			Id:        "some-machine-id",
+			ModelUUID: modelUUID,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
 
 	// Start the watcher.
 	jshim := newJEMShimWithUpdateNotify(jemShim{s.jem})
@@ -383,8 +407,27 @@ func (s *internalSuite) TestModelRemovedWithFailedWatcher(c *gc.C) {
 	defer cleanStop(c, m)
 
 	jshim.await(c, func() interface{} {
-		return s.modelStats(c, modelPath)
-	}, modelStats{})
+		stats := s.modelStats(c, modelPath)
+		apps, err := s.jem.DB.ApplicationsForModel(testContext, modelUUID)
+		c.Check(err, gc.Equals, nil)
+		machines, err := s.jem.DB.MachinesForModel(testContext, modelUUID)
+		c.Check(err, gc.Equals, nil)
+		return modelData{
+			models:   stats,
+			machines: machines,
+			apps:     apps,
+		}
+	}, modelData{
+		models:   modelStats{},
+		apps:     []mongodoc.Application{},
+		machines: []mongodoc.Machine{},
+	})
+}
+
+type modelData struct {
+	models   modelStats
+	apps     []mongodoc.Application
+	machines []mongodoc.Machine
 }
 
 func (s *internalSuite) TestWatcherUpdatesMachineInfo(c *gc.C) {
@@ -443,6 +486,66 @@ func (s *internalSuite) TestWatcherUpdatesMachineInfo(c *gc.C) {
 	jshim.await(c, getMachineInfo, []machineInfo{{
 		modelUUID: modelState.ModelUUID(),
 		id:        "0",
+		life:      "alive",
+	}})
+}
+
+func (s *internalSuite) TestWatcherUpdatesApplicationInfo(c *gc.C) {
+	// Add a couple of models and applications with units to watch.
+	modelState := newModel(c, s.State, "model")
+	newApplication(c, modelState, "model-app", 1)
+	defer modelState.Close()
+
+	ctlPath := params.EntityPath{"bob", "foo"}
+	s.addJEMController(c, ctlPath)
+
+	// Add the JEM model entries
+	modelPath := params.EntityPath{"bob", "model"}
+	err := s.jem.DB.AddModel(testContext, &mongodoc.Model{
+		Path:       modelPath,
+		Controller: ctlPath,
+		UUID:       modelState.ModelUUID(),
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Start the watcher.
+	jshim := newJEMShimWithUpdateNotify(jemShim{s.jem})
+	m := &controllerMonitor{
+		ctlPath: ctlPath,
+		jem:     jshim,
+		ownerId: "jem1",
+	}
+	m.tomb.Go(func() error {
+		return m.watcher(testContext)
+	})
+	defer cleanStop(c, m)
+
+	// Wait for just a subset of the entire information so that
+	// we don't depend on loads of unrelated details - we
+	// care that the information is updated, not the specifics of
+	// what all the details are.
+	type appInfo struct {
+		modelUUID string
+		name      string
+		life      multiwatcher.Life
+	}
+
+	getApplicationInfo := func() interface{} {
+		ms, err := s.jem.DB.ApplicationsForModel(testContext, modelState.ModelUUID())
+		c.Assert(err, gc.IsNil)
+		infos := make([]appInfo, len(ms))
+		for i, m := range ms {
+			infos[i] = appInfo{
+				modelUUID: m.Info.ModelUUID,
+				name:      m.Info.Name,
+				life:      m.Info.Life,
+			}
+		}
+		return infos
+	}
+	jshim.await(c, getApplicationInfo, []appInfo{{
+		modelUUID: modelState.ModelUUID(),
+		name:      "model-app",
 		life:      "alive",
 	}})
 }

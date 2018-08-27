@@ -68,8 +68,14 @@ type jemInterface interface {
 	// RemoveControllerMachines removes all machines for a controller.
 	RemoveControllerMachines(ctx context.Context, ctlPath params.EntityPath) error
 
+	// RemoveControllerApplications removes all applications for a controller.
+	RemoveControllerApplications(ctx context.Context, ctlPath params.EntityPath) error
+
 	// UpdateMachineInfo updates the information associated with a machine.
 	UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, machine *multiwatcher.MachineInfo) error
+
+	// UpdateApplicationInfo updates the information associated with an application.
+	UpdateApplicationInfo(ctx context.Context, ctlPath params.EntityPath, machine *multiwatcher.ApplicationInfo) error
 
 	// AllControllers returns all the controllers in the system.
 	AllControllers(ctx context.Context) ([]*mongodoc.Controller, error)

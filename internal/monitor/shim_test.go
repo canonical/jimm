@@ -204,12 +204,18 @@ type machineId struct {
 	id        string
 }
 
+type applicationId struct {
+	modelUUID string
+	name      string
+}
+
 type jemShimInMemory struct {
 	mu                          sync.Mutex
 	refCount                    int
 	controllers                 map[params.EntityPath]*mongodoc.Controller
 	models                      map[params.EntityPath]*mongodoc.Model
 	machines                    map[string]map[machineId]*mongodoc.Machine
+	applications                map[string]map[applicationId]*mongodoc.Application
 	controllerUpdateCredentials map[params.EntityPath]bool
 }
 
@@ -221,6 +227,7 @@ func newJEMShimInMemory() *jemShimInMemory {
 		models:                      make(map[params.EntityPath]*mongodoc.Model),
 		controllerUpdateCredentials: make(map[params.EntityPath]bool),
 		machines:                    make(map[string]map[machineId]*mongodoc.Machine),
+		applications:                make(map[string]map[applicationId]*mongodoc.Application),
 	}
 }
 
@@ -366,6 +373,34 @@ func (s *jemShimInMemory) RemoveControllerMachines(ctx context.Context, ctlPath 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.machines[ctlPath.String()] = make(map[machineId]*mongodoc.Machine)
+	return nil
+}
+
+func (s *jemShimInMemory) RemoveControllerApplications(ctx context.Context, ctlPath params.EntityPath) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.applications[ctlPath.String()] = make(map[applicationId]*mongodoc.Application)
+	return nil
+}
+
+func (s *jemShimInMemory) UpdateApplicationInfo(ctx context.Context, ctlPath params.EntityPath, info *multiwatcher.ApplicationInfo) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	info1 := *info
+	s.applications[ctlPath.String()][applicationId{info1.ModelUUID, info1.Name}] = &mongodoc.Application{
+		Id: info1.ModelUUID + " " + info1.Name,
+		Info: &mongodoc.ApplicationInfo{
+			ModelUUID:       info1.ModelUUID,
+			Name:            info1.Name,
+			Exposed:         info1.Exposed,
+			CharmURL:        info1.CharmURL,
+			OwnerTag:        info1.OwnerTag,
+			Life:            info1.Life,
+			Subordinate:     info1.Subordinate,
+			Status:          info1.Status,
+			WorkloadVersion: info1.WorkloadVersion,
+		},
+	}
 	return nil
 }
 

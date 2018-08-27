@@ -934,6 +934,38 @@ func (j *JEM) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, 
 	}))
 }
 
+// UpdateApplicationInfo updates the information associated with an application.
+func (j *JEM) UpdateApplicationInfo(ctx context.Context, ctlPath params.EntityPath, info *multiwatcher.ApplicationInfo) error {
+	cloud, region, err := j.modelRegion(ctx, ctlPath, info.ModelUUID)
+	if errgo.Cause(err) == params.ErrNotFound {
+		// If the model isn't found then it is not controlled by
+		// JIMM and we aren't interested in it.
+		return nil
+	}
+	if err != nil {
+		return errgo.Notef(err, "cannot find region for model %s:%s", ctlPath, info.ModelUUID)
+	}
+	app := &mongodoc.Application{
+		Controller: ctlPath.String(),
+		Cloud:      cloud,
+		Region:     region,
+	}
+	if info != nil {
+		app.Info = &mongodoc.ApplicationInfo{
+			ModelUUID:       info.ModelUUID,
+			Name:            info.Name,
+			Exposed:         info.Exposed,
+			CharmURL:        info.CharmURL,
+			OwnerTag:        info.OwnerTag,
+			Life:            info.Life,
+			Subordinate:     info.Subordinate,
+			Status:          info.Status,
+			WorkloadVersion: info.WorkloadVersion,
+		}
+	}
+	return errgo.Mask(j.DB.UpdateApplicationInfo(ctx, app))
+}
+
 // modelRegion determines the cloud and region in which a model is contained.
 func (j *JEM) modelRegion(ctx context.Context, ctlPath params.EntityPath, uuid string) (params.Cloud, string, error) {
 	type cloudRegion struct {
