@@ -12,10 +12,8 @@ import (
 
 	"github.com/juju/httprequest"
 	jujujujutesting "github.com/juju/juju/testing"
-	romulus "github.com/juju/romulus/wireformat/metrics"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
-	"github.com/juju/utils"
 	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
 
@@ -202,15 +200,9 @@ func (m *testMonitor) set(value float64) {
 	m.failed <- int(value)
 }
 
-type metricBatch struct {
-	romulus.MetricBatch
-
-	ModelName string `json:"model-name"`
-}
-
 type usagePost struct {
-	httprequest.Route `httprequest:"POST /metrics"`
-	Body              []metricBatch `httprequest:",body"`
+	httprequest.Route `httprequest:"POST /v4/jimm/metrics"`
+	Body              []usagesender.MetricBatch `httprequest:",body"`
 }
 
 type testHandler struct {
@@ -224,11 +216,11 @@ type receivedMetric struct {
 	modelName string
 }
 
-func (c *testHandler) Metrics(arg *usagePost) (*romulus.UserStatusResponse, error) {
+func (c *testHandler) Metrics(arg *usagePost) (*usagesender.Response, error) {
 	for _, b := range arg.Body {
 		c.receivedMetrics <- receivedMetric{
 			value:     b.Metrics[0].Value,
-			modelName: b.ModelName,
+			modelName: b.Metrics[0].Tags[usagesender.ModelNameTag],
 		}
 	}
 
@@ -240,14 +232,15 @@ func (c *testHandler) Metrics(arg *usagePost) (*romulus.UserStatusResponse, erro
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	if c.acknowledge {
-		return &romulus.UserStatusResponse{
-			UUID: utils.MustNewUUID().String(),
-			UserResponses: map[string]romulus.UserResponse{
-				"bob": {AcknowledgedBatches: uuids},
-			},
+		return &usagesender.Response{
+			UserStatus: map[string]usagesender.UserStatus{
+				"bob": usagesender.UserStatus{
+					Code: "GREEN",
+					Info: "",
+				}},
 		}, nil
 	}
-	return &romulus.UserStatusResponse{}, nil
+	return nil, fmt.Errorf("error")
 }
 
 func (c *testHandler) setAcknowledge(value bool) {
