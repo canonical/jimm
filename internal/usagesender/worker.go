@@ -10,8 +10,6 @@ import (
 	"time"
 
 	"github.com/juju/httprequest"
-	romulus "github.com/juju/romulus/wireformat/metrics"
-	wireformat "github.com/juju/romulus/wireformat/metrics"
 	"github.com/juju/utils/clock"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
@@ -29,31 +27,26 @@ var (
 	// SenderClock holds the clock implementation used by the worker.
 	SenderClock clock.Clock = clock.WallClock
 
-	UnacknowledgedMetricBatchesCount = prometheus.NewGauge(prometheus.GaugeOpts{
+	UnacknowledgedMetricBatchesCount = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: "jem",
 		Subsystem: "usagesender",
 		Name:      "unacknowledged_batches",
 		Help:      "The number of unacknowledged batches.",
 	})
+	FailuresToRemoveSentBatches = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: "jem",
+		Subsystem: "usagesender",
+		Name:      "failures_to_remove_sent",
+		Help:      "Failures to remove sent batches from local storage.",
+	})
 
-	// TODO avoid the unnecessary function by using
-	// a method expression when https://golang.org/issue/25101
-	// is fixed.
-	monitorFailure = func(f float64) {
-		UnacknowledgedMetricBatchesCount.Set(f)
-	}
+	monitorFailure             = UnacknowledgedMetricBatchesCount.Add
+	monitorStoreCleanupFailure = FailuresToRemoveSentBatches.Inc
 )
 
 func init() {
 	prometheus.MustRegister(UnacknowledgedMetricBatchesCount)
-}
-
-// metricBatch extends the romulus metric batch wireformat with a model name.
-// NOTE: stop-gap solution until we upgrade juju dependency.
-type metricBatch struct {
-	wireformat.MetricBatch
-
-	ModelName string `json:"model-name"`
+	prometheus.MustRegister(FailuresToRemoveSentBatches)
 }
 
 // SendModelUsageWorkerConfig contains configuration values for the worker
@@ -171,45 +164,33 @@ func (w *sendModelUsageWorker) execute() error {
 		acknowledgedBatches[b.UUID] = false
 	}
 
-	response, err := w.send(batches)
+	_, err = w.send(batches)
 	if err != nil {
 		zapctx.Error(w.config.Context, "failed to send model usage", zaputil.Error(err))
+		monitorFailure(float64(len(batches)))
 		return errgo.Mask(err)
 	}
-	for _, userResponse := range response.UserResponses {
-		for _, ackBatchUUID := range userResponse.AcknowledgedBatches {
-			acknowledgedBatches[ackBatchUUID] = true
-			err = recorder.Remove(w.config.Context, ackBatchUUID)
-			if err != nil {
-				zapctx.Warn(w.config.Context, "failed to remove recorded metric")
-			}
+	for _, batch := range batches {
+		err = recorder.Remove(w.config.Context, batch.UUID)
+		if err != nil {
+			monitorStoreCleanupFailure()
+			zapctx.Warn(w.config.Context, "failed to remove recorded metric")
 		}
-	}
-	// check if all batches were acknowledged
-	numberOfUnacknowledgedBatches := 0
-	for _, acknowledged := range acknowledgedBatches {
-		if !acknowledged {
-			numberOfUnacknowledgedBatches += 1
-		}
-	}
-	if numberOfUnacknowledgedBatches > 0 {
-		zapctx.Debug(w.config.Context, "model usage receipt was not acknowledged", zap.Int("unacknowledged-batches", numberOfUnacknowledgedBatches))
-		monitorFailure(float64(numberOfUnacknowledgedBatches))
 	}
 	return nil
 }
 
 type sendUsageRequest struct {
 	httprequest.Route `httprequest:"POST"`
-	Body              []metricBatch `httprequest:",body"`
+	Body              []MetricBatch `httprequest:",body"`
 }
 
 // Send sends the given metrics to omnibus.
-func (w *sendModelUsageWorker) send(usage []metricBatch) (*romulus.UserStatusResponse, error) {
+func (w *sendModelUsageWorker) send(usage []MetricBatch) (*Response, error) {
 	client := httprequest.Client{}
-	var resp romulus.UserStatusResponse
+	var resp Response
 	if err := client.CallURL(
-		w.config.OmnibusURL+"/metrics",
+		w.config.OmnibusURL+"/v4/jimm/metrics",
 		&sendUsageRequest{Body: usage},
 		&resp,
 	); err != nil {

@@ -3,3 +3,4 @@ version/init.go
 /jimm-*/
 /jimm-*.tar.xz
 /access.log
+/vendor

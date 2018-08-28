@@ -6,8 +6,6 @@ github.com/BurntSushi/toml v0.3.0 h1:e1/Ivsx3Z0FVTV0NSOv/aVgbUWyQuzj7DDnFblkRvsY
 github.com/BurntSushi/toml v0.3.0/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/CanonicalLtd/omniutils v0.0.0-20180607151646-ed3ed7dca482 h1:z73GY/40yo6qWIli4iZF5YAm9+QMEh+ib0yjWtkJD1s=
 github.com/CanonicalLtd/omniutils v0.0.0-20180607151646-ed3ed7dca482/go.mod h1:5V82xWN3v1yBIydXmOEoIi8AEc6eD+anbxaEiYPyB6k=
-github.com/CanonicalLtd/plans-client v0.0.0-20170119082425-19be6ceb62a7 h1:qSZb+UCOXw/kRw20DZXrSz0vSz2zkUkpvU+kMb/93H0=
-github.com/CanonicalLtd/plans-client v0.0.0-20170119082425-19be6ceb62a7/go.mod h1:mQP20DwPSY6WnSEt8dfGS07CGAY7ArKpd8wW2SbKGFg=
 github.com/EvilSuperstars/go-cidrman v0.0.0-20170211231153-4e5a4a63d9b7 h1:X6kJyQZ082XuuFYSJRQR+GqzB3iM6/DR0hyuUZX67nM=
 github.com/EvilSuperstars/go-cidrman v0.0.0-20170211231153-4e5a4a63d9b7/go.mod h1:GkKW4CwpnoB4a2HKm0G9D5Slsq5k+37TuQktiDtELHo=
 github.com/ajstarks/svgo v0.0.0-20141004211159-89e3ac64b5b3 h1:T8jEYyGBYGpEfGFizvl7BB/uyxtVEnMz2M8+GqsCGuE=
@@ -58,12 +56,8 @@ github.com/googleapis/gnostic v0.2.0 h1:l6N3VoaVzTncYYW+9yOz2LJJammFZGBO13sqgEhp
 github.com/googleapis/gnostic v0.2.0/go.mod h1:sJBsCZ4ayReDTBIg8b9dl28c5xFWyhBTVRp3pOg5EKY=
 github.com/gopherjs/gopherjs v0.0.0-20180825215210-0210a2f0f73c h1:16eHWuMGvCjSfgRJKqIzapE78onvvTbdi1rMkU00lZw=
 github.com/gopherjs/gopherjs v0.0.0-20180825215210-0210a2f0f73c/go.mod h1:wJfORRmW1u3UXTncJ5qlYoELFm8eSnnEO6hX4iZ3EWY=
-github.com/gorilla/context v0.0.0-20141217160251-215affda49ad h1:wJwKN6X6iRRVnjdBgrkWjhBOvYm7yw5boqXwFUnBtbE=
-github.com/gorilla/context v0.0.0-20141217160251-215affda49ad/go.mod h1:kBGZzfjB9CEq2AlWe17Uuf7NDRt0dE0s8S51q0aT7Yg=
 github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474 h1:KNovrfevBTefw9X8FKnoaKhKOc+UWmGsQRsiZRTkGl4=
 github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474/go.mod h1:Qkdc/uu4tH4g6mTK6auzZ766c4CA0Ng8+o/OAirnOIQ=
-github.com/gorilla/mux v0.0.0-20140926153814-e444e69cbd2e h1:nH09qCdJVZxw0nRVfm14xjXkw2puLyLPN56n4u+vTC0=
-github.com/gorilla/mux v0.0.0-20140926153814-e444e69cbd2e/go.mod h1:1lud6UwP+6orDFRuTfBEV8e9/aOM/c4fVVCaMa2zaAs=
 github.com/gorilla/schema v0.0.0-20160426231512-08023a0215e7 h1:mOUfGq/7wiwNfHY5Wyz+aRzEfqUCGdUhUcSPsfHVaPs=
 github.com/gorilla/schema v0.0.0-20160426231512-08023a0215e7/go.mod h1:kgLaKoK1FELgZqMAVxx/5cbj0kT+57qxUrAlIO2eleU=
 github.com/gorilla/websocket v0.0.0-20180605202552-5ed622c449da h1:b5fma7aUP2fn6+tdKKCJ0TxXYzY/5wDiqUxNdyi5VF4=

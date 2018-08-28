@@ -108,11 +108,8 @@ func (h *handler) DebugUsageSenderCheck(p httprequest.Params, r *DebugUsageSende
 		return errgo.New("cannot perform the check")
 	}
 
-	_, err := h.usageSenderAuthorizationClient.AuthorizeReseller(
-		jem.OmnibusJIMMPlan,
-		jem.OmnibusJIMMCharm,
-		jem.OmnibusJIMMName,
-		jem.OmnibusJIMMOwner,
+	_, err := h.usageSenderAuthorizationClient.GetCredentials(
+		p.Context,
 		r.Username,
 	)
 	if err != nil {

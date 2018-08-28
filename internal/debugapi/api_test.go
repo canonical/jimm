@@ -76,10 +76,6 @@ func (s *APISuite) TestDebugUsageSenderCheck(c *gc.C) {
 	s.Suite.MetricsRegistrationClient.CheckCalls(c, []testing.StubCall{{
 		FuncName: "AuthorizeReseller",
 		Args: []interface{}{
-			"canonical/jimm",
-			"cs:~canonical/jimm-0",
-			"jimm",
-			"canonical",
 			"test-user",
 		},
 	}})
@@ -105,10 +101,6 @@ func (s *APISuite) TestDebugUsageSenderCheckError(c *gc.C) {
 	s.Suite.MetricsRegistrationClient.CheckCalls(c, []testing.StubCall{{
 		FuncName: "AuthorizeReseller",
 		Args: []interface{}{
-			"canonical/jimm",
-			"cs:~canonical/jimm-0",
-			"jimm",
-			"canonical",
 			"test-user",
 		},
 	}})
