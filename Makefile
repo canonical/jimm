@@ -1,11 +1,11 @@
 # Copyright 2014 Canonical Ltd.
-# Makefile for the JEM service.
+# Makefile for the JIMM service.
 
 ifndef GOPATH
 $(warning You need to set up a GOPATH.)
 endif
 
-PROJECT := github.com/CanonicalLtd/jem
+PROJECT := github.com/CanonicalLtd/jimm
 PROJECT_DIR := $(shell go list -e -f '{{.Dir}}' $(PROJECT))
 
 GIT_COMMIT := $(shell git rev-parse --verify HEAD)
