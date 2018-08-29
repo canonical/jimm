@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
+	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/ctxutil"
@@ -96,7 +97,7 @@ type DebugUsageSenderCheckRequest struct {
 	Username          string `httprequest:"username,path"`
 }
 
-// DebugUsageSenderCheck implements a check that verifies that jem is able
+// DebugUsageSenderCheck implements a check that verifies that JIMM is able
 // to perform usage sender authorization.
 func (h *handler) DebugUsageSenderCheck(p httprequest.Params, r *DebugUsageSenderCheckRequest) error {
 	if err := h.checkIsAdmin(p.Request); err != nil {
@@ -118,4 +119,50 @@ func (h *handler) DebugUsageSenderCheck(p httprequest.Params, r *DebugUsageSende
 		return errgo.Notef(err, "check failed")
 	}
 	return nil
+}
+
+// DebugDBStatsRequest contains the request for /debug/dbstats.
+type DebugDBStatsRequest struct {
+	httprequest.Route `httprequest:"GET /debug/dbstats"`
+}
+
+// DebugDBStatsResponse contains the response returned from
+// /debug/dbstats.
+type DebugDBStatsResponse struct {
+	// Stats contains the response from the mongodb server of a
+	// "dbStats" command. The actual value depends on the version of
+	// MongoDB in use. See
+	// https://docs.mongodb.com/manual/reference/command/dbStats/ for
+	// details.
+	Stats map[string]interface{} `json:"stats"`
+
+	// Collections contains a mapping from collection name to the
+	// response from the mongodb server of a "collStats" command
+	// performed on that collection. The actual value depends on the
+	// version of MongoDB in use. See
+	// https://docs.mongodb.com/manual/reference/command/collStats/
+	// for details.
+	Collections map[string]map[string]interface{} `json:"collections"`
+}
+
+// DebugDBStats serves the /debug/dbstats endpoint. This queries dbStats
+// and collStats from mongodb and returns the result.
+func (h *handler) DebugDBStats(p httprequest.Params, req *DebugDBStatsRequest) (*DebugDBStatsResponse, error) {
+	var resp DebugDBStatsResponse
+	if err := h.jem.DB.Run("dbStats", &resp.Stats); err != nil {
+		return nil, errgo.Mask(err)
+	}
+	names, err := h.jem.DB.CollectionNames()
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	resp.Collections = make(map[string]map[string]interface{}, len(names))
+	for _, name := range names {
+		var stats map[string]interface{}
+		if err := h.jem.DB.Run(bson.D{{"collStats", name}}, &stats); err != nil {
+			return nil, errgo.Mask(err)
+		}
+		resp.Collections[name] = stats
+	}
+	return &resp, nil
 }
