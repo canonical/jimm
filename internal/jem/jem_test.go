@@ -1548,6 +1548,90 @@ func (s *jemSuite) TestUpdateMachineUnknownModel(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 }
 
+func (s *jemSuite) TestUpdateApplicationInfo(c *gc.C) {
+	m := s.bootstrapModel(c, params.EntityPath{"bob", "model-1"})
+	ctlPath := params.EntityPath{"bob", "controller"}
+
+	err := s.jem.UpdateApplicationInfo(testContext, ctlPath, &multiwatcher.ApplicationInfo{
+		ModelUUID: m.UUID,
+		Name:      "0",
+	})
+	c.Assert(err, gc.IsNil)
+	err = s.jem.UpdateApplicationInfo(testContext, ctlPath, &multiwatcher.ApplicationInfo{
+		ModelUUID: m.UUID,
+		Name:      "1",
+	})
+	c.Assert(err, gc.IsNil)
+
+	docs, err := s.jem.DB.ApplicationsForModel(testContext, m.UUID)
+	c.Assert(err, gc.IsNil)
+	for i := range docs {
+		cleanApplicationDoc(&docs[i])
+	}
+	c.Assert(docs, jc.DeepEquals, []mongodoc.Application{{
+		Id:         ctlPath.String() + " " + m.UUID + " 0",
+		Controller: ctlPath.String(),
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &mongodoc.ApplicationInfo{
+			ModelUUID: m.UUID,
+			Name:      "0",
+		},
+	}, {
+		Id:         ctlPath.String() + " " + m.UUID + " 1",
+		Controller: ctlPath.String(),
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &mongodoc.ApplicationInfo{
+			ModelUUID: m.UUID,
+			Name:      "1",
+		},
+	}})
+
+	// Check that we can update one of the documents.
+	err = s.jem.UpdateApplicationInfo(testContext, ctlPath, &multiwatcher.ApplicationInfo{
+		ModelUUID: m.UUID,
+		Name:      "0",
+		Life:      "dying",
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Check that setting an application dead removes it.
+	err = s.jem.UpdateApplicationInfo(testContext, ctlPath, &multiwatcher.ApplicationInfo{
+		ModelUUID: m.UUID,
+		Name:      "1",
+		Life:      "dead",
+	})
+	c.Assert(err, gc.IsNil)
+
+	docs, err = s.jem.DB.ApplicationsForModel(testContext, m.UUID)
+	c.Assert(err, gc.IsNil)
+	for i := range docs {
+		cleanApplicationDoc(&docs[i])
+	}
+	c.Assert(docs, jc.DeepEquals, []mongodoc.Application{{
+		Id:         ctlPath.String() + " " + m.UUID + " 0",
+		Controller: ctlPath.String(),
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &mongodoc.ApplicationInfo{
+			ModelUUID: m.UUID,
+			Name:      "0",
+			Life:      "dying",
+		},
+	}})
+}
+
+func (s *jemSuite) TestUpdateApplicationUnknownModel(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "controller"}
+
+	err := s.jem.UpdateApplicationInfo(testContext, ctlPath, &multiwatcher.ApplicationInfo{
+		ModelUUID: "no-such-uuid",
+		Name:      "1",
+	})
+	c.Assert(err, gc.IsNil)
+}
+
 func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityPath {
 	info := s.APIInfo(c)
 
@@ -1597,9 +1681,4 @@ func (s *jemSuite) bootstrapModel(c *gc.C, path params.EntityPath) *mongodoc.Mod
 	})
 	c.Assert(err, jc.ErrorIsNil)
 	return model
-}
-
-// fakeUUID returns something that looks like a UUID but actually uses n.
-func fakeUUID(n int) string {
-	return fmt.Sprintf("00000000-0000-0000-0000-00000000%.04x", n)
 }

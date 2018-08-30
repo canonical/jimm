@@ -870,6 +870,168 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 	}})
 }
 
+func (s *databaseSuite) TestRemoveControllerMachines(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "x"}
+	err := s.database.UpdateMachineInfo(testContext, &mongodoc.Machine{
+		Controller: ctlPath.String(),
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &multiwatcher.MachineInfo{
+			ModelUUID: "fake-uuid",
+			Id:        "0",
+			Series:    "quantal",
+		},
+	})
+	c.Assert(err, gc.IsNil)
+	docs, err := s.database.MachinesForModel(testContext, "fake-uuid")
+	c.Assert(err, gc.IsNil)
+	for i := range docs {
+		cleanMachineDoc(&docs[i])
+	}
+	c.Assert(docs, jc.DeepEquals, []mongodoc.Machine{{
+		Id:         ctlPath.String() + " fake-uuid 0",
+		Controller: ctlPath.String(),
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &multiwatcher.MachineInfo{
+			ModelUUID: "fake-uuid",
+			Id:        "0",
+			Series:    "quantal",
+			Config:    map[string]interface{}{},
+		},
+	}})
+	err = s.database.RemoveControllerMachines(testContext, ctlPath)
+	c.Assert(err, gc.IsNil)
+	docs, err = s.database.MachinesForModel(testContext, "fake-uuid")
+	c.Assert(err, gc.IsNil)
+	c.Assert(docs, jc.DeepEquals, []mongodoc.Machine{})
+}
+
+func (s *databaseSuite) TestUpdateApplicationInfo(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "x"}
+	err := s.database.UpdateApplicationInfo(testContext, &mongodoc.Application{
+		Controller: ctlPath.String(),
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &mongodoc.ApplicationInfo{
+			ModelUUID: "fake-uuid",
+			Name:      "0",
+		},
+	})
+	c.Assert(err, gc.IsNil)
+	err = s.database.UpdateApplicationInfo(testContext, &mongodoc.Application{
+		Controller: ctlPath.String(),
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &mongodoc.ApplicationInfo{
+			ModelUUID: "fake-uuid",
+			Name:      "1",
+		},
+	})
+
+	docs, err := s.database.ApplicationsForModel(testContext, "fake-uuid")
+	c.Assert(err, gc.IsNil)
+	for i := range docs {
+		cleanApplicationDoc(&docs[i])
+	}
+	c.Assert(docs, jc.DeepEquals, []mongodoc.Application{{
+		Id:         ctlPath.String() + " fake-uuid 0",
+		Controller: ctlPath.String(),
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &mongodoc.ApplicationInfo{
+			ModelUUID: "fake-uuid",
+			Name:      "0",
+		},
+	}, {
+		Id:         ctlPath.String() + " fake-uuid 1",
+		Controller: ctlPath.String(),
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &mongodoc.ApplicationInfo{
+			ModelUUID: "fake-uuid",
+			Name:      "1",
+		},
+	}})
+
+	// Check that we can update one of the documents.
+	err = s.database.UpdateApplicationInfo(testContext, &mongodoc.Application{
+		Controller: ctlPath.String(),
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &mongodoc.ApplicationInfo{
+			ModelUUID: "fake-uuid",
+			Name:      "0",
+			Life:      "dying",
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Check that setting a machine dead removes it.
+	err = s.database.UpdateApplicationInfo(testContext, &mongodoc.Application{
+		Controller: ctlPath.String(),
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &mongodoc.ApplicationInfo{
+			ModelUUID: "fake-uuid",
+			Name:      "1",
+			Life:      "dead",
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	docs, err = s.database.ApplicationsForModel(testContext, "fake-uuid")
+	c.Assert(err, gc.IsNil)
+	for i := range docs {
+		cleanApplicationDoc(&docs[i])
+	}
+	c.Assert(docs, jc.DeepEquals, []mongodoc.Application{{
+		Id:         ctlPath.String() + " fake-uuid 0",
+		Controller: ctlPath.String(),
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &mongodoc.ApplicationInfo{
+			ModelUUID: "fake-uuid",
+			Name:      "0",
+			Life:      "dying",
+		},
+	}})
+}
+
+func (s *databaseSuite) TestRemoveControllerApplications(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "x"}
+	err := s.database.UpdateApplicationInfo(testContext, &mongodoc.Application{
+		Controller: ctlPath.String(),
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &mongodoc.ApplicationInfo{
+			ModelUUID: "fake-uuid",
+			Name:      "0",
+		},
+	})
+	c.Assert(err, gc.IsNil)
+	docs, err := s.database.ApplicationsForModel(testContext, "fake-uuid")
+	c.Assert(err, gc.IsNil)
+	for i := range docs {
+		cleanApplicationDoc(&docs[i])
+	}
+	c.Assert(docs, jc.DeepEquals, []mongodoc.Application{{
+		Id:         ctlPath.String() + " fake-uuid 0",
+		Controller: ctlPath.String(),
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &mongodoc.ApplicationInfo{
+			ModelUUID: "fake-uuid",
+			Name:      "0",
+		},
+	}})
+	err = s.database.RemoveControllerApplications(testContext, ctlPath)
+	c.Assert(err, gc.IsNil)
+	docs, err = s.database.ApplicationsForModel(testContext, "fake-uuid")
+	c.Assert(err, gc.IsNil)
+	c.Assert(docs, jc.DeepEquals, []mongodoc.Application{})
+}
+
 // cleanMachineDoc cleans up the machine document so
 // that we can use a DeepEqual comparison without worrying
 // about non-nil vs nil map comparisons.
@@ -879,6 +1041,15 @@ func cleanMachineDoc(doc *mongodoc.Machine) {
 	}
 	if len(doc.Info.InstanceStatus.Data) == 0 {
 		doc.Info.InstanceStatus.Data = nil
+	}
+}
+
+// cleanApplicationDoc cleans up the application document so
+// that we can use a DeepEqual comparison without worrying
+// about non-nil vs nil map comparisons.
+func cleanApplicationDoc(doc *mongodoc.Application) {
+	if len(doc.Info.Status.Data) == 0 {
+		doc.Info.Status.Data = nil
 	}
 }
 
@@ -1718,6 +1889,17 @@ var setDeadTests = []struct {
 			Info: &multiwatcher.MachineInfo{
 				ModelUUID: "xxx",
 				Id:        "yyy",
+			},
+		})
+	},
+}, {
+	about: "UpdateApplicationInfo",
+	run: func(db *jem.Database) {
+		db.UpdateApplicationInfo(testContext, &mongodoc.Application{
+			Controller: "test/test",
+			Info: &mongodoc.ApplicationInfo{
+				ModelUUID: "xxx",
+				Name:      "yyy",
 			},
 		})
 	},

@@ -87,7 +87,7 @@ format:
 simplify:
 	gofmt -w -l -s .
 
-# Run the JEM server.
+# Run the JIMM server.
 server: install
 	jemd cmd/jemd/config.yaml
 
@@ -113,7 +113,7 @@ jimm-release/bin/jemd: jemd
 	mkdir -p jimm-release/bin
 	cp jemd jimm-release/bin
 
-# Install packages required to develop JEM and run tests.
+# Install packages required to develop JIMM and run tests.
 APT_BASED := $(shell command -v apt-get >/dev/null; echo $$?)
 sysdeps:
 ifeq ($(APT_BASED),0)
@@ -136,7 +136,7 @@ help:
 	@echo 'make - Build the package.'
 	@echo 'make check - Run tests.'
 	@echo 'make install - Install the package.'
-	@echo 'make server - Start the JEM server.'
+	@echo 'make server - Start the JIMM server.'
 	@echo 'make clean - Remove object files from package source directories.'
 	@echo 'make sysdeps - Install the development environment system packages.'
 	@echo 'make deps - Set up the project Go dependencies.'

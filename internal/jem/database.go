@@ -82,6 +82,9 @@ func (db *Database) ensureIndexes() error {
 		db.Machines(),
 		mgo.Index{Key: []string{"info.uuid"}},
 	}, {
+		db.Applications(),
+		mgo.Index{Key: []string{"info.uuid"}},
+	}, {
 		db.Models(),
 		mgo.Index{Key: []string{"uuid"}, Unique: true},
 	}, {
@@ -580,8 +583,18 @@ func (db *Database) GetModelStatuses(ctx context.Context) (statuses params.Model
 // the given controller.
 func (db *Database) RemoveControllerMachines(ctx context.Context, ctlPath params.EntityPath) (err error) {
 	defer db.checkError(ctx, &err)
-	if _, err := db.Machines().RemoveAll(bson.D{{"controller", ctlPath}}); err != nil {
+	if _, err := db.Machines().RemoveAll(bson.D{{"controller", ctlPath.String()}}); err != nil {
 		return errgo.Notef(err, "cannot remove machines for controller %v", ctlPath)
+	}
+	return nil
+}
+
+// RemoveControllerApplications removes all of the application information for
+// the given controller.
+func (db *Database) RemoveControllerApplications(ctx context.Context, ctlPath params.EntityPath) (err error) {
+	defer db.checkError(ctx, &err)
+	if _, err := db.Applications().RemoveAll(bson.D{{"controller", ctlPath.String()}}); err != nil {
+		return errgo.Notef(err, "cannot remove applications for controller %v", ctlPath)
 	}
 	return nil
 }
@@ -595,7 +608,7 @@ func (db *Database) UpdateMachineInfo(ctx context.Context, m *mongodoc.Machine) 
 			if errgo.Cause(err) == mgo.ErrNotFound {
 				return nil
 			}
-			return errgo.Notef(err, "cannot update machine %v in model %v", m.Info.Id, m.Info.ModelUUID)
+			return errgo.Notef(err, "cannot remove machine %v in model %v", m.Info.Id, m.Info.ModelUUID)
 		}
 	} else {
 		update := bson.D{{
@@ -618,6 +631,44 @@ func (db *Database) UpdateMachineInfo(ctx context.Context, m *mongodoc.Machine) 
 func (db *Database) MachinesForModel(ctx context.Context, modelUUID string) (docs []mongodoc.Machine, err error) {
 	defer db.checkError(ctx, &err)
 	err = db.Machines().Find(bson.D{{"info.modeluuid", modelUUID}}).Sort("_id").All(&docs)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return docs, nil
+}
+
+// UpdateApplicationInfo updates the information associated with an application.
+func (db *Database) UpdateApplicationInfo(ctx context.Context, app *mongodoc.Application) (err error) {
+	defer db.checkError(ctx, &err)
+	app.Id = app.Controller + " " + app.Info.ModelUUID + " " + app.Info.Name
+	if app.Info.Life == "dead" {
+		if err := db.Applications().RemoveId(app.Id); err != nil {
+			if errgo.Cause(err) == mgo.ErrNotFound {
+				return nil
+			}
+			return errgo.Notef(err, "cannot remove application %v in model %v", app.Info.Name, app.Info.ModelUUID)
+		}
+	} else {
+		update := bson.D{{
+			"$set", bson.D{
+				{"info", app.Info},
+				{"controller", app.Controller},
+				{"cloud", app.Cloud},
+				{"region", app.Region},
+			},
+		}}
+		if _, err := db.Applications().UpsertId(app.Id, update); err != nil {
+			return errgo.Notef(err, "cannot update application %v in model %v", app.Info.Name, app.Info.ModelUUID)
+		}
+	}
+	return nil
+}
+
+// ApplicationsForModel returns information on all the applications in the model with
+// the given UUID.
+func (db *Database) ApplicationsForModel(ctx context.Context, modelUUID string) (docs []mongodoc.Application, err error) {
+	defer db.checkError(ctx, &err)
+	err = db.Applications().Find(bson.D{{"info.modeluuid", modelUUID}}).Sort("_id").All(&docs)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -1021,6 +1072,7 @@ func (iter *CanReadIter) Count() int {
 func (db *Database) Collections() []*mgo.Collection {
 	return []*mgo.Collection{
 		db.Audits(),
+		db.Applications(),
 		db.Controllers(),
 		db.Credentials(),
 		db.Macaroons(),
@@ -1047,6 +1099,10 @@ func (db *Database) Macaroons() *mgo.Collection {
 
 func (db *Database) Machines() *mgo.Collection {
 	return db.C("machines")
+}
+
+func (db *Database) Applications() *mgo.Collection {
+	return db.C("applications")
 }
 
 func (db *Database) Models() *mgo.Collection {

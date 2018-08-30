@@ -301,6 +301,31 @@ type Machine struct {
 	Info       *multiwatcher.MachineInfo
 }
 
+// Application holds information on an application in a model, as discovered by the
+// controller monitor.
+type Application struct {
+	// Id holds the combination of the controller path, model UUID and application id.
+	Id         string `bson:"_id"`
+	Controller string
+	Cloud      params.Cloud
+	Region     string
+	Info       *ApplicationInfo
+}
+
+// ApplicationInfo holds a subset of information about an application that is tracked
+// by multiwatcherStore.
+type ApplicationInfo struct {
+	ModelUUID       string
+	Name            string
+	Exposed         bool
+	CharmURL        string
+	OwnerTag        string
+	Life            multiwatcher.Life
+	Subordinate     bool
+	Status          multiwatcher.StatusInfo
+	WorkloadVersion string
+}
+
 type ModelUserInfo struct {
 	// Granted holds whether we granted the given user
 	// access (if false, we revoked it).
