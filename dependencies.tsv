@@ -42,7 +42,7 @@ github.com/juju/httpprof	git	14bf14c307672fd2456bdbf35d19cf0ccd3cf565	2014-12-17
 github.com/juju/httprequest	git	e4f0b769c8aeb2155281339360c4a7693bb26530	2016-11-07T14:39:25Z
 github.com/juju/idmclient	git	fb1dc7175251ac8e2dc460897313e05175cbbc0d	2016-11-07T14:02:50Z
 github.com/juju/jsonschema	git	a0ef8b74ebcffeeff9fc374854deb4af388f037e	2016-11-02T18:19:19Z
-github.com/juju/juju	git	fde9276aeeaab231f2e5533f3d8ad7bb03cbc877	2018-08-23T16:26:55Z
+github.com/juju/juju	git	b95187af705e4d42fc2087bfdf60f87030b19087	2018-08-29T07:54:58Z
 github.com/juju/loggo	git	8232ab8918d91c72af1a9fb94d3edbe31d88b790	2017-06-05T01:46:07Z
 github.com/juju/mgosession	git	9ae6df2882cd783cf81d3315dca3b64707f6d675	2017-02-06T15:02:31Z
 github.com/juju/mutex	git	1fe2a4bf0a3a2c10881501233ff7c6aed7790082	2017-11-10T02:00:13Z
@@ -111,7 +111,7 @@ gopkg.in/goose.v2	git	cf9b64132d71c47930543f2add6ddab0fc402147	2018-08-16T04:03:
 gopkg.in/httprequest.v1	git	a1015531595ff2ed1a0c126b55da352e6923eaac	2018-06-25T11:31:07Z
 gopkg.in/ini.v1	git	776aa739ce9373377cd16f526cdf06cb4c89b40f	2016-02-22T23:24:41Z
 gopkg.in/juju/blobstore.v2	git	51fa6e26128d74e445c72d3a91af555151cc3654	2016-01-25T02:37:03Z
-gopkg.in/juju/charm.v6	git	06071b5d8d1f31656352c417128e367248d5db13	2018-08-22T01:54:03Z
+gopkg.in/juju/charm.v6	git	c254caf8b8704ff71a10c552fa9e6f5df981ad06	2018-08-29T05:56:10Z
 gopkg.in/juju/charmrepo.v2	git	653bbd81990d2d7d48e0fb931a3b0f52c694572f	2017-11-14T18:40:45Z
 gopkg.in/juju/charmrepo.v3	git	7778a447283bd71109671c20818544514e16e9d9	2018-08-03T04:37:37Z
 gopkg.in/juju/environschema.v1	git	7359fc7857abe2b11b5b3e23811a9c64cb6b01e0	2015-11-04T11:58:10Z
