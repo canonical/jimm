@@ -204,8 +204,8 @@ func (p *Pool) JEM(ctx context.Context) *JEM {
 	}
 	p.refCount++
 	return &JEM{
-		DB:                             newDatabase(ctx, p.config.SessionPool, p.dbName),
-		pool:                           p,
+		DB:   newDatabase(ctx, p.config.SessionPool, p.dbName),
+		pool: p,
 		usageSenderAuthorizationClient: p.usageSenderAuthorizationClient,
 	}
 }
@@ -974,7 +974,7 @@ func (j *JEM) modelRegion(ctx context.Context, ctlPath params.EntityPath, uuid s
 	}
 	key := fmt.Sprintf("%s %s", ctlPath, uuid)
 	r, err := j.pool.regionCache.Get(key, func() (interface{}, error) {
-		m, err := j.DB.ModelFromUUID(ctx, uuid)
+		m, err := j.DB.modelFromControllerAndUUID(ctx, ctlPath, uuid)
 		if err != nil {
 			return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 		}

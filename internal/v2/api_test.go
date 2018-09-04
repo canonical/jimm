@@ -1326,7 +1326,7 @@ func (s *APISuite) TestGetModelWithCounts(c *gc.C) {
 	modelId, uuid := s.CreateModel(c, params.EntityPath{"bob", "foo"}, ctlId, cred)
 
 	t0 := time.Unix(0, 0)
-	err := s.JEM.DB.UpdateModelCounts(testContext, uuid, map[params.EntityCount]int{
+	err := s.JEM.DB.UpdateModelCounts(testContext, ctlId, uuid, map[params.EntityCount]int{
 		params.MachineCount: 3,
 		params.UnitCount:    99,
 	}, t0)
@@ -1643,7 +1643,7 @@ func (s *APISuite) TestListModels(c *gc.C) {
 
 	// Give one of the models some counts.
 	t0 := time.Unix(0, 0)
-	err := s.JEM.DB.UpdateModelCounts(testContext, uuid1, map[params.EntityCount]int{
+	err := s.JEM.DB.UpdateModelCounts(testContext, ctlId0, uuid1, map[params.EntityCount]int{
 		params.MachineCount: 3,
 	}, t0)
 

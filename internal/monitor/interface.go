@@ -63,7 +63,7 @@ type jemInterface interface {
 	// model with the given UUID recording them at the given current time.
 	// Each counts map entry holds the current count for its key. Counts not
 	// mentioned in the counts argument will not be affected.
-	UpdateModelCounts(ctx context.Context, uuid string, counts map[params.EntityCount]int, now time.Time) error
+	UpdateModelCounts(ctx context.Context, ctlPath params.EntityPath, uuid string, counts map[params.EntityCount]int, now time.Time) error
 
 	// RemoveControllerMachines removes all machines for a controller.
 	RemoveControllerMachines(ctx context.Context, ctlPath params.EntityPath) error

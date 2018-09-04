@@ -433,7 +433,7 @@ func (m *controllerMonitor) watch(ctx context.Context, conn jujuAPI) error {
 					// Note: if we get a "not found" error, ignore it because it is expected that
 					// some models (e.g. the controller model) will not have a record in the
 					// database.
-					if err := m.jem.UpdateModelCounts(ctx, uuid, info.counts, time.Now()); err != nil && errgo.Cause(err) != params.ErrNotFound {
+					if err := m.jem.UpdateModelCounts(ctx, w.ctlPath, uuid, info.counts, time.Now()); err != nil && errgo.Cause(err) != params.ErrNotFound {
 						return errgo.Notef(err, "cannot update model counts")
 					}
 					return nil

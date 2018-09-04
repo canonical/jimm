@@ -1548,6 +1548,18 @@ func (s *jemSuite) TestUpdateMachineUnknownModel(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 }
 
+func (s *jemSuite) TestUpdateMachineIncorrectController(c *gc.C) {
+	m := s.bootstrapModel(c, params.EntityPath{"bob", "model-1"})
+	ctlPath := params.EntityPath{"bob", "controller2"}
+
+	err := s.jem.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
+		ModelUUID: m.UUID,
+		Id:        "1",
+		Series:    "precise",
+	})
+	c.Assert(err, gc.IsNil)
+}
+
 func (s *jemSuite) TestUpdateApplicationInfo(c *gc.C) {
 	m := s.bootstrapModel(c, params.EntityPath{"bob", "model-1"})
 	ctlPath := params.EntityPath{"bob", "controller"}
@@ -1623,10 +1635,11 @@ func (s *jemSuite) TestUpdateApplicationInfo(c *gc.C) {
 }
 
 func (s *jemSuite) TestUpdateApplicationUnknownModel(c *gc.C) {
+	m := s.bootstrapModel(c, params.EntityPath{"bob", "model-1"})
 	ctlPath := params.EntityPath{"bob", "controller"}
 
 	err := s.jem.UpdateApplicationInfo(testContext, ctlPath, &multiwatcher.ApplicationInfo{
-		ModelUUID: "no-such-uuid",
+		ModelUUID: m.UUID,
 		Name:      "1",
 	})
 	c.Assert(err, gc.IsNil)

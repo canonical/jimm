@@ -727,18 +727,19 @@ var updateModelCountsTests = []struct {
 }}
 
 func (s *databaseSuite) TestUpdateModelCounts(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "controller"}
 	for i, test := range updateModelCountsTests {
 		c.Logf("test %d: %v", i, test.about)
 		modelId := params.EntityPath{"bob", params.Name(fmt.Sprintf("model-%d", i))}
 		uuid := fmt.Sprintf("uuid-%d", i)
 		err := s.database.AddModel(testContext, &mongodoc.Model{
 			Path:       modelId,
-			Controller: params.EntityPath{"bob", "controller"},
+			Controller: ctlPath,
 			UUID:       uuid,
 			Counts:     test.before,
 		})
 		c.Assert(err, gc.IsNil)
-		err = s.database.UpdateModelCounts(testContext, uuid, test.update, test.updateTime)
+		err = s.database.UpdateModelCounts(testContext, ctlPath, uuid, test.update, test.updateTime)
 		c.Assert(err, gc.IsNil)
 		model, err := s.database.Model(testContext, modelId)
 		c.Assert(err, gc.IsNil)
@@ -751,8 +752,32 @@ func (s *databaseSuite) TestUpdateModelCounts(c *gc.C) {
 	}
 }
 
-func (s *databaseSuite) TestUpdateModelCountsNotFound(c *gc.C) {
-	err := s.database.UpdateModelCounts(testContext, "fake-uuid", nil, T(0))
+func (s *databaseSuite) TestUpdateModelCountsNotFoundUUID(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "controller"}
+	modelId := params.EntityPath{"bob", "test-model"}
+	uuid := "real-uuid"
+	err := s.database.AddModel(testContext, &mongodoc.Model{
+		Path:       modelId,
+		Controller: ctlPath,
+		UUID:       uuid,
+	})
+	c.Assert(err, gc.IsNil)
+	err = s.database.UpdateModelCounts(testContext, ctlPath, "fake-uuid", nil, T(0))
+	c.Assert(err, gc.ErrorMatches, `cannot update model counts: not found`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}
+
+func (s *databaseSuite) TestUpdateModelCountsNotFoundController(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "controller"}
+	modelId := params.EntityPath{"bob", "test-model"}
+	uuid := "real-uuid"
+	err := s.database.AddModel(testContext, &mongodoc.Model{
+		Path:       modelId,
+		Controller: ctlPath,
+		UUID:       uuid,
+	})
+	c.Assert(err, gc.IsNil)
+	err = s.database.UpdateModelCounts(testContext, params.EntityPath{"bob", "not-controller"}, "real-uuid", nil, T(0))
 	c.Assert(err, gc.ErrorMatches, `cannot update model counts: not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
@@ -1906,7 +1931,7 @@ var setDeadTests = []struct {
 }, {
 	about: "UpdateModelCounts",
 	run: func(db *jem.Database) {
-		db.UpdateModelCounts(testContext, "fake-uuid", nil, T(0))
+		db.UpdateModelCounts(testContext, fakeEntityPath, "fake-uuid", nil, T(0))
 	},
 }}
 
