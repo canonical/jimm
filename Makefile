@@ -34,9 +34,6 @@ endif
 
 default: build
 
-$(GOPATH)/bin/godeps:
-	go get -v github.com/rogpeppe/godeps
-
 # Start of GOPATH-dependent targets. Some targets only make sense -
 # and will only work - when this tree is found on the GOPATH.
 ifeq ($(CURDIR),$(PROJECT_DIR))
@@ -91,14 +88,6 @@ simplify:
 server: install
 	jemd cmd/jemd/config.yaml
 
-# Update the project Go dependencies to the required revision.
-deps: $(GOPATH)/bin/godeps
-	$(GOPATH)/bin/godeps -u dependencies.tsv
-
-# Generate the dependencies file.
-create-deps: $(GOPATH)/bin/godeps
-	godeps -t $(shell go list $(PROJECT)/...) > dependencies.tsv || true
-
 # Generate version information
 version/init.go: version/init.go.tmpl FORCE
 	gofmt -r "unknownVersion -> Version{GitCommit: \"${GIT_COMMIT}\", Version: \"${GIT_VERSION}\",}" $< > $@
@@ -139,8 +128,6 @@ help:
 	@echo 'make server - Start the JIMM server.'
 	@echo 'make clean - Remove object files from package source directories.'
 	@echo 'make sysdeps - Install the development environment system packages.'
-	@echo 'make deps - Set up the project Go dependencies.'
-	@echo 'make create-deps - Generate the Go dependencies file.'
 	@echo 'make format - Format the source files.'
 	@echo 'make simplify - Format and simplify the source files.'
 

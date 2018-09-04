@@ -13,17 +13,8 @@ then run the following:
 
 ## Go dependencies
 
-The project uses godeps (https://launchpad.net/godeps) to manage Go
-dependencies. To install this, run:
-
-    go get launchpad.net/godeps
-
-After installing it, you can update the dependencies
-to the revision specified in the `dependencies.tsv` file with the following:
-
-    make deps
-
-Use `make create-deps` to update the dependencies file.
+The project uses Go modules (https://golang.org/cmd/go/#hdr-Module_maintenance) to manage Go
+dependencies. **Note: Go 1.11 or greater needed.**
 
 ## Development environment
 
