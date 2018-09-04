@@ -323,6 +323,22 @@ func (db *Database) ModelFromUUID(ctx context.Context, uuid string) (_ *mongodoc
 	return &m, nil
 }
 
+// modelFromControllerAndUUID returns the document representing the model
+// with the given UUID on the given controller. It returns an error with
+// a params.ErrNotFound cause if the model was not found.
+func (db *Database) modelFromControllerAndUUID(ctx context.Context, ctlPath params.EntityPath, uuid string) (_ *mongodoc.Model, err error) {
+	defer db.checkError(ctx, &err)
+	var m mongodoc.Model
+	err = db.Models().Find(bson.D{{"controller", ctlPath}, {"uuid", uuid}}).One(&m)
+	if err == mgo.ErrNotFound {
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "model %q not found", uuid)
+	}
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot get model %q", uuid)
+	}
+	return &m, nil
+}
+
 // controllerLocationQuery returns a mongo query that iterates through
 // all the public controllers matching the given location attributes,
 // including unavailable controllers only if includeUnavailable is true.
@@ -539,11 +555,14 @@ func (db *Database) SetModelInfo(ctx context.Context, ctlPath params.EntityPath,
 // model with the given UUID recording them at the given current time.
 // Each counts map entry holds the current count for its key. Counts not
 // mentioned in the counts argument will not be affected.
-func (db *Database) UpdateModelCounts(ctx context.Context, uuid string, counts map[params.EntityCount]int, now time.Time) error {
+func (db *Database) UpdateModelCounts(ctx context.Context, ctlPath params.EntityPath, uuid string, counts map[params.EntityCount]int, now time.Time) error {
 	if err := db.updateCounts(
 		ctx,
 		db.Models(),
-		bson.D{{"uuid", uuid}},
+		bson.D{
+			{"controller", ctlPath},
+			{"uuid", uuid},
+		},
 		counts,
 		now,
 	); err != nil {

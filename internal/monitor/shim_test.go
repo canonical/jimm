@@ -143,8 +143,8 @@ func (s jemShimWithUpdateNotify) DeleteModelWithUUID(ctx context.Context, ctlPat
 	return nil
 }
 
-func (s jemShimWithUpdateNotify) UpdateModelCounts(ctx context.Context, uuid string, counts map[params.EntityCount]int, now time.Time) error {
-	if err := s.jemInterface.UpdateModelCounts(ctx, uuid, counts, now); err != nil {
+func (s jemShimWithUpdateNotify) UpdateModelCounts(ctx context.Context, ctlPath params.EntityPath, uuid string, counts map[params.EntityCount]int, now time.Time) error {
+	if err := s.jemInterface.UpdateModelCounts(ctx, ctlPath, uuid, counts, now); err != nil {
 		return err
 	}
 	s.changed <- "model counts"
@@ -223,8 +223,8 @@ var _ jemInterface = (*jemShimInMemory)(nil)
 
 func newJEMShimInMemory() *jemShimInMemory {
 	return &jemShimInMemory{
-		controllers:                 make(map[params.EntityPath]*mongodoc.Controller),
-		models:                      make(map[params.EntityPath]*mongodoc.Model),
+		controllers: make(map[params.EntityPath]*mongodoc.Controller),
+		models:      make(map[params.EntityPath]*mongodoc.Model),
 		controllerUpdateCredentials: make(map[params.EntityPath]bool),
 		machines:                    make(map[string]map[machineId]*mongodoc.Machine),
 		applications:                make(map[string]map[applicationId]*mongodoc.Application),
@@ -345,12 +345,12 @@ func (s *jemShimInMemory) DeleteModelWithUUID(ctx context.Context, ctlPath param
 	return nil
 }
 
-func (s *jemShimInMemory) UpdateModelCounts(ctx context.Context, uuid string, counts map[params.EntityCount]int, now time.Time) error {
+func (s *jemShimInMemory) UpdateModelCounts(ctx context.Context, ctlPath params.EntityPath, uuid string, counts map[params.EntityCount]int, now time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var model *mongodoc.Model
 	for _, m := range s.models {
-		if m.UUID == uuid {
+		if m.UUID == uuid && m.Controller == ctlPath {
 			model = m
 			break
 		}

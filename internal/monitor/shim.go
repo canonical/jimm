@@ -76,8 +76,8 @@ func (j jemShim) DeleteModelWithUUID(ctx context.Context, ctlPath params.EntityP
 	return errgo.Mask(j.DB.DeleteModelWithUUID(ctx, ctlPath, uuid), errgo.Any)
 }
 
-func (j jemShim) UpdateModelCounts(ctx context.Context, uuid string, counts map[params.EntityCount]int, now time.Time) (err error) {
-	return errgo.Mask(j.DB.UpdateModelCounts(ctx, uuid, counts, now), errgo.Any)
+func (j jemShim) UpdateModelCounts(ctx context.Context, ctlPath params.EntityPath, uuid string, counts map[params.EntityCount]int, now time.Time) (err error) {
+	return errgo.Mask(j.DB.UpdateModelCounts(ctx, ctlPath, uuid, counts, now), errgo.Any)
 }
 
 func (j jemShim) RemoveControllerMachines(ctx context.Context, ctlPath params.EntityPath) error {

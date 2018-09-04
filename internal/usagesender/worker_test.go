@@ -89,14 +89,14 @@ func (s *usageSenderSuite) TestUsageSenderWorker(c *gc.C) {
 	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
 	_, uuid := s.CreateModel(c, params.EntityPath{"bob", "foo"}, ctlId, cred)
 
-	s.setUnitNumberAndCheckSentMetrics(c, uuid, 0, true)
-	s.setUnitNumberAndCheckSentMetrics(c, uuid, 0, false)
+	s.setUnitNumberAndCheckSentMetrics(c, ctlId, uuid, 0, true)
+	s.setUnitNumberAndCheckSentMetrics(c, ctlId, uuid, 0, false)
 
-	s.setUnitNumberAndCheckSentMetrics(c, uuid, 99, true)
-	s.setUnitNumberAndCheckSentMetrics(c, uuid, 99, false)
+	s.setUnitNumberAndCheckSentMetrics(c, ctlId, uuid, 99, true)
+	s.setUnitNumberAndCheckSentMetrics(c, ctlId, uuid, 99, false)
 
-	s.setUnitNumberAndCheckSentMetrics(c, uuid, 42, true)
-	s.setUnitNumberAndCheckSentMetrics(c, uuid, 42, false)
+	s.setUnitNumberAndCheckSentMetrics(c, ctlId, uuid, 42, true)
+	s.setUnitNumberAndCheckSentMetrics(c, ctlId, uuid, 42, false)
 }
 
 func (s *spoolDirMetricRecorderSuite) TestSpool(c *gc.C) {
@@ -112,7 +112,7 @@ func (s *spoolDirMetricRecorderSuite) TestSpool(c *gc.C) {
 	// next attempt
 	s.handler.setAcknowledge(false)
 
-	err := s.JEM.DB.UpdateModelCounts(testContext, model, map[params.EntityCount]int{
+	err := s.JEM.DB.UpdateModelCounts(testContext, ctlId, model, map[params.EntityCount]int{
 		params.MachineCount: 0,
 		params.UnitCount:    17,
 	}, s.Clock.Now())
@@ -130,7 +130,7 @@ func (s *spoolDirMetricRecorderSuite) TestSpool(c *gc.C) {
 	// on the second attempt all metrics will be acknowledged
 	s.handler.setAcknowledge(true)
 
-	err = s.JEM.DB.UpdateModelCounts(testContext, model, map[params.EntityCount]int{
+	err = s.JEM.DB.UpdateModelCounts(testContext, ctlId, model, map[params.EntityCount]int{
 		params.MachineCount: 0,
 		params.UnitCount:    42,
 	}, s.Clock.Now())
@@ -159,13 +159,13 @@ func (s *spoolDirMetricRecorderSuite) TestSpool(c *gc.C) {
 	}
 }
 
-func (s *usageSenderSuite) setUnitNumberAndCheckSentMetrics(c *gc.C, modelUUID string, unitCount int, acknowledge bool) {
+func (s *usageSenderSuite) setUnitNumberAndCheckSentMetrics(c *gc.C, ctlPath params.EntityPath, modelUUID string, unitCount int, acknowledge bool) {
 	m := &testMonitor{failed: make(chan int)}
 	s.PatchValue(usagesender.MonitorFailure, m.set)
 
 	s.handler.setAcknowledge(acknowledge)
 
-	err := s.JEM.DB.UpdateModelCounts(testContext, modelUUID, map[params.EntityCount]int{
+	err := s.JEM.DB.UpdateModelCounts(testContext, ctlPath, modelUUID, map[params.EntityCount]int{
 		params.MachineCount: 0,
 		params.UnitCount:    unitCount,
 	}, s.Clock.Now())
