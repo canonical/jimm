@@ -34,6 +34,7 @@ require (
 	github.com/hashicorp/go-msgpack v0.0.0-20150518234257-fa3f63826f7c // indirect
 	github.com/hashicorp/raft v1.0.0 // indirect
 	github.com/hashicorp/raft-boltdb v0.0.0-20171010151810-6e5ba93211ea // indirect
+	github.com/howeyc/gopass v0.0.0-20170109162249-bf9dde6d0d2c // indirect
 	github.com/imdario/mergo v0.3.6 // indirect
 	github.com/joyent/gocommon v0.0.0-20160320193133-ade826b8b54e // indirect
 	github.com/joyent/gosdc v0.0.0-20140524000815-2f11feadd2d9 // indirect
@@ -114,7 +115,7 @@ require (
 	golang.org/x/net v0.0.0-20180406214816-61147c48b25b // indirect
 	golang.org/x/oauth2 v0.0.0-20150325020022-11c60b6f71a6 // indirect
 	golang.org/x/sys v0.0.0-20180202135801-37707fdb30a5 // indirect
-	golang.org/x/text v0.0.0-20160726164857-2910a502d2bf // indirect
+	golang.org/x/text v0.3.0 // indirect
 	golang.org/x/time v0.0.0-20180412165947-fbb02b2291d2 // indirect
 	google.golang.org/api v0.0.0-20170817203427-ed10e890a836 // indirect
 	google.golang.org/appengine v1.1.0 // indirect
@@ -146,9 +147,9 @@ require (
 	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637
 	gopkg.in/vmihailenco/msgpack.v2 v2.9.1 // indirect
 	gopkg.in/yaml.v2 v2.1.1
-	k8s.io/api v0.0.0-20180406105533-8759fda11383 // indirect
+	k8s.io/api v0.0.0-20180904190239-89dfcd0b1128 // indirect
 	k8s.io/apimachinery v0.0.0-20180407065143-5d4f0da8e5fd // indirect
-	k8s.io/client-go v0.0.0-20180406225903-b7d03ad8c683 // indirect
+	k8s.io/client-go v7.0.0+incompatible // indirect
 	labix.org/v2/mgo v0.0.0-20140701140051-000000000287 // indirect
 	launchpad.net/xmlpath v0.0.0-20130614043138-000000000004 // indirect
 )
