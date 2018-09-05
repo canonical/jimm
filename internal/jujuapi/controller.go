@@ -648,6 +648,14 @@ func (c controller) modelStatus(ctx context.Context, arg jujuparams.Entity) (*ju
 	}, nil
 }
 
+// ControllerConfig returns the controller's configuration.
+func (c controller) ControllerConfig() (jujuparams.ControllerConfigResult, error) {
+	result := jujuparams.ControllerConfigResult{
+		Config: map[string]interface{}{},
+	}
+	return result, nil
+}
+
 // modelManagerV4 implements the ModelManager (version 4) facade.
 type modelManagerV4 struct {
 	root *controllerRoot

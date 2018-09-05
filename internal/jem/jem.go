@@ -204,8 +204,8 @@ func (p *Pool) JEM(ctx context.Context) *JEM {
 	}
 	p.refCount++
 	return &JEM{
-		DB:   newDatabase(ctx, p.config.SessionPool, p.dbName),
-		pool: p,
+		DB:                             newDatabase(ctx, p.config.SessionPool, p.dbName),
+		pool:                           p,
 		usageSenderAuthorizationClient: p.usageSenderAuthorizationClient,
 	}
 }
