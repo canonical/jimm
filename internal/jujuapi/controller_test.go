@@ -12,11 +12,12 @@ import (
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/base"
 	cloudapi "github.com/juju/juju/api/cloud"
-	"github.com/juju/juju/api/controller"
+	controllerapi "github.com/juju/juju/api/controller"
 	"github.com/juju/juju/api/modelmanager"
 	"github.com/juju/juju/api/usermanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
+	"github.com/juju/juju/controller"
 	"github.com/juju/juju/instance"
 	"github.com/juju/juju/state"
 	"github.com/juju/juju/state/multiwatcher"
@@ -1144,6 +1145,15 @@ func (s *controllerSuite) TestModelInfoDyingModelNotFound(c *gc.C) {
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
+func (s *controllerSuite) TestControllerConfig(c *gc.C) {
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := controllerapi.NewClient(conn)
+	conf, err := client.ControllerConfig()
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(conf, jc.DeepEquals, controller.Config(map[string]interface{}{}))
+}
+
 func (s *controllerSuite) TestAllModels(c *gc.C) {
 	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
@@ -1162,7 +1172,7 @@ func (s *controllerSuite) TestAllModels(c *gc.C) {
 
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
-	client := controller.NewClient(conn)
+	client := controllerapi.NewClient(conn)
 
 	err = s.JEM.DB.SetACL(testContext, s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
 		Read: []string{"test"},
@@ -1241,14 +1251,14 @@ func (s *controllerSuite) TestModelStatus(c *gc.C) {
 
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
-	doTest(controller.NewClient(conn))
+	doTest(controllerapi.NewClient(conn))
 	doTest(modelmanager.NewClient(conn))
 }
 
 func (s *controllerSuite) TestModelStatusNotFound(c *gc.C) {
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
-	cclient := controller.NewClient(conn)
+	cclient := controllerapi.NewClient(conn)
 	mmclient := modelmanager.NewClient(conn)
 	_, err := cclient.ModelStatus(names.NewModelTag("11111111-1111-1111-1111-111111111111"))
 	c.Assert(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
