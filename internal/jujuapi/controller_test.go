@@ -178,7 +178,9 @@ func (s *controllerSuite) TestDefaultCloud(c *gc.C) {
 				Cloud: mongodoc.Cloud{
 					Name: params.Cloud(cloud),
 				},
-			})
+			}, []mongodoc.CloudRegion{{
+				Cloud: params.Cloud(cloud),
+			}})
 			c.Assert(err, jc.ErrorIsNil)
 		}
 		cloud, err := client.DefaultCloud()

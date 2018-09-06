@@ -104,15 +104,22 @@ func (db *Database) ensureIndexes() error {
 // error with a params.ErrAlreadyExists cause if there is already a
 // controller with the given name. The Id field in ctl will be set from
 // its Path field.
-func (db *Database) AddController(ctx context.Context, ctl *mongodoc.Controller) (err error) {
+func (db *Database) AddController(ctx context.Context, ctl *mongodoc.Controller, cloudRegions []mongodoc.CloudRegion) (err error) {
 	defer db.checkError(ctx, &err)
 	ctl.Id = ctl.Path.String()
 	err = db.Controllers().Insert(ctl)
 	if err != nil {
 		if mgo.IsDup(err) {
-			return params.ErrAlreadyExists
+			return errgo.WithCausef(nil, params.ErrAlreadyExists, "")
 		}
 		return errgo.NoteMask(err, "cannot insert controller")
+	}
+	if len(cloudRegions) == 0 {
+		return nil
+	}
+	err = db.AddCloudRegions(ctx, cloudRegions)
+	if err != nil {
+		return errgo.NoteMask(err, "cannot insert controller cloud regions")
 	}
 	return nil
 }
@@ -824,15 +831,40 @@ func (db *Database) credentialRemoveController(ctx context.Context, credential p
 // same across all possible controllers.
 func (db *Database) Cloud(ctx context.Context, cloud params.Cloud) (_ *mongodoc.Cloud, err error) {
 	defer db.checkError(ctx, &err)
-	var ctl mongodoc.Controller
-	err = db.Controllers().Find(bson.D{{"cloud.name", cloud}}).One(&ctl)
+	var cloudRegion mongodoc.CloudRegion
+	err = db.CloudRegions().Find(bson.D{{"cloud", cloud}, {"region", ""}}).One(&cloudRegion)
 	if err == mgo.ErrNotFound {
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "cloud %q not found", cloud)
 	}
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot get cloud %q", cloud)
 	}
-	return &ctl.Cloud, nil
+
+	return &mongodoc.Cloud{
+		Name:             cloudRegion.Cloud,
+		ProviderType:     cloudRegion.ProviderType,
+		AuthTypes:        cloudRegion.AuthTypes,
+		Endpoint:         cloudRegion.Endpoint,
+		IdentityEndpoint: cloudRegion.IdentityEndpoint,
+		StorageEndpoint:  cloudRegion.StorageEndpoint,
+	}, nil
+}
+
+// AddCloudRegions adds new cloud regions to the database. It returns an
+// error with a params.ErrAlreadyExists cause if there is already a
+// cloud region with the given name.
+func (db *Database) AddCloudRegions(ctx context.Context, cloudRegions []mongodoc.CloudRegion) (err error) {
+	defer db.checkError(ctx, &err)
+	toInsert := make([]interface{}, len(cloudRegions))
+	for i, cr := range cloudRegions {
+		cr.Id = fmt.Sprintf("%s/%s", cr.Cloud, cr.Region)
+		toInsert[i] = cr
+	}
+	err = db.CloudRegions().Insert(toInsert...)
+	if err != nil && !mgo.IsDup(err) {
+		return errgo.NoteMask(err, "cannot insert cloud region")
+	}
+	return nil
 }
 
 // setCredentialUpdates marks all the controllers in the given ctlPaths
@@ -1092,6 +1124,7 @@ func (db *Database) Collections() []*mgo.Collection {
 	return []*mgo.Collection{
 		db.Audits(),
 		db.Applications(),
+		db.CloudRegions(),
 		db.Controllers(),
 		db.Credentials(),
 		db.Macaroons(),
@@ -1100,8 +1133,16 @@ func (db *Database) Collections() []*mgo.Collection {
 	}
 }
 
+func (db *Database) Applications() *mgo.Collection {
+	return db.C("applications")
+}
+
 func (db *Database) Audits() *mgo.Collection {
 	return db.C("audits")
+}
+
+func (db *Database) CloudRegions() *mgo.Collection {
+	return db.C("cloudregions")
 }
 
 func (db *Database) Controllers() *mgo.Collection {
@@ -1118,10 +1159,6 @@ func (db *Database) Macaroons() *mgo.Collection {
 
 func (db *Database) Machines() *mgo.Collection {
 	return db.C("machines")
-}
-
-func (db *Database) Applications() *mgo.Collection {
-	return db.C("applications")
 }
 
 func (db *Database) Models() *mgo.Collection {

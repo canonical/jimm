@@ -804,127 +804,173 @@ var doContollerTests = []struct {
 }}
 
 func (s *jemSuite) TestDoControllers(c *gc.C) {
-	testControllers := []mongodoc.Controller{{
-		Path: params.EntityPath{
-			User: params.User("bob"),
-			Name: "aws-us-east-1",
+	var testControllers = []struct {
+		controller   mongodoc.Controller
+		cloudRegions []mongodoc.CloudRegion
+	}{{
+		controller: mongodoc.Controller{
+			Path: params.EntityPath{
+				User: params.User("bob"),
+				Name: "aws-us-east-1",
+			},
+			Cloud: mongodoc.Cloud{
+				Name: "aws",
+				Regions: []mongodoc.Region{{
+					Name: "us-east-1",
+				}},
+			},
+			Location: map[string]string{
+				"cloud":  "aws",
+				"region": "us-east-1",
+			},
+			Public: true,
 		},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "us-east-1",
-			}},
-		},
-		Location: map[string]string{
-			"cloud":  "aws",
-			"region": "us-east-1",
-		},
-		Public: true,
+		cloudRegions: []mongodoc.CloudRegion{{
+			Cloud:  params.Cloud("aws"),
+			Region: "us-east-1",
+		}},
 	}, {
-		Path: params.EntityPath{
-			User: params.User("bob"),
-			Name: "aws-eu-west-1",
+		controller: mongodoc.Controller{
+			Path: params.EntityPath{
+				User: params.User("bob"),
+				Name: "aws-eu-west-1",
+			},
+			Cloud: mongodoc.Cloud{
+				Name: "aws",
+				Regions: []mongodoc.Region{{
+					Name: "us-west-1",
+				}},
+			},
+			Location: map[string]string{
+				"cloud":  "aws",
+				"region": "us-west-1",
+			},
+			Public: true,
 		},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "eu-west-1",
-			}},
-		},
-		Location: map[string]string{
-			"cloud":  "aws",
-			"region": "us-west-1",
-		},
-		Public: true,
+		cloudRegions: []mongodoc.CloudRegion{{
+			Cloud:  params.Cloud("aws"),
+			Region: "eu-west-1",
+		}},
 	}, {
-		Path: params.EntityPath{
-			User: params.User("alice"),
-			Name: "aws-us-east-1",
+		controller: mongodoc.Controller{
+			Path: params.EntityPath{
+				User: params.User("alice"),
+				Name: "aws-us-east-1",
+			},
+			ACL: params.ACL{
+				Read: []string{"bob-group"},
+			},
+			Cloud: mongodoc.Cloud{
+				Name: "aws",
+				Regions: []mongodoc.Region{{
+					Name: "us-east-1",
+				}},
+			},
+			Location: map[string]string{
+				"cloud":  "aws",
+				"region": "us-east-1",
+			},
+			Public: true,
 		},
-		ACL: params.ACL{
-			Read: []string{"bob-group"},
-		},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "us-east-1",
-			}},
-		},
-		Location: map[string]string{
-			"cloud":  "aws",
-			"region": "us-east-1",
-		},
-		Public: true,
+		cloudRegions: []mongodoc.CloudRegion{{
+			Cloud:  params.Cloud("aws"),
+			Region: "us-east-1",
+		}},
 	}, {
-		Path: params.EntityPath{
-			User: params.User("alice"),
-			Name: "aws-eu-west-1",
+		controller: mongodoc.Controller{
+			Path: params.EntityPath{
+				User: params.User("alice"),
+				Name: "aws-eu-west-1",
+			},
+			ACL: params.ACL{
+				Read: []string{"bob"},
+			},
+			Cloud: mongodoc.Cloud{
+				Name: "aws",
+				Regions: []mongodoc.Region{{
+					Name: "us-west-1",
+				}},
+			},
+			Location: map[string]string{
+				"cloud":  "aws",
+				"region": "eu-west-1",
+			},
+			Public: true,
 		},
-		ACL: params.ACL{
-			Read: []string{"bob"},
-		},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "eu-west-1",
-			}},
-		},
-		Location: map[string]string{
-			"cloud":  "aws",
-			"region": "eu-west-1",
-		},
-		Public: true,
+		cloudRegions: []mongodoc.CloudRegion{{
+			Cloud:  params.Cloud("aws"),
+			Region: "eu-west-1",
+		}},
 	}, {
-		Path: params.EntityPath{
-			User: params.User("alice"),
-			Name: "aws-us-east-2",
+		controller: mongodoc.Controller{
+			Path: params.EntityPath{
+				User: params.User("alice"),
+				Name: "aws-us-east-2",
+			},
+			Cloud: mongodoc.Cloud{
+				Name: "aws",
+				Regions: []mongodoc.Region{{
+					Name: "us-east-1",
+				}},
+			},
+			Location: map[string]string{
+				"cloud":  "aws",
+				"region": "us-east-1",
+			},
+			Public: true,
 		},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "us-east-1",
-			}},
-		},
-		Location: map[string]string{
-			"cloud":  "aws",
-			"region": "us-east-1",
-		},
-		Public: true,
+		cloudRegions: []mongodoc.CloudRegion{{
+			Cloud:  params.Cloud("aws"),
+			Region: "us-east-1",
+		}},
 	}, {
-		Path: params.EntityPath{
-			User: params.User("bob"),
-			Name: "gce-us-east-1",
+		controller: mongodoc.Controller{
+			Path: params.EntityPath{
+				User: params.User("bob"),
+				Name: "gce-us-east-1",
+			},
+			Cloud: mongodoc.Cloud{
+				Name: "gce",
+				Regions: []mongodoc.Region{{
+					Name: "us-east-1",
+				}},
+			},
+			Location: map[string]string{
+				"cloud":  "gce",
+				"region": "us-east-1",
+			},
+			Public: true,
 		},
-		Cloud: mongodoc.Cloud{
-			Name: "gce",
-			Regions: []mongodoc.Region{{
-				Name: "us-east-1",
-			}},
-		},
-		Location: map[string]string{
-			"cloud":  "gce",
-			"region": "us-east-1",
-		},
-		Public: true,
+		cloudRegions: []mongodoc.CloudRegion{{
+			Cloud:  params.Cloud("gce"),
+			Region: "us-east-1",
+		}},
 	}, {
-		Path: params.EntityPath{
-			User: params.User("alice"),
-			Name: "gce-us-east-1",
+		controller: mongodoc.Controller{
+			Path: params.EntityPath{
+				User: params.User("alice"),
+				Name: "gce-us-east-1",
+			},
+			Cloud: mongodoc.Cloud{
+				Name: "gce",
+				Regions: []mongodoc.Region{{
+					Name: "us-east-1",
+				}},
+			},
+			Location: map[string]string{
+				"cloud":  "gce",
+				"region": "us-east-1",
+			},
+			Public: true,
 		},
-		Cloud: mongodoc.Cloud{
-			Name: "gce",
-			Regions: []mongodoc.Region{{
-				Name: "us-east-1",
-			}},
-		},
-		Location: map[string]string{
-			"cloud":  "gce",
-			"region": "us-east-1",
-		},
-		Public: true,
+		cloudRegions: []mongodoc.CloudRegion{{
+			Cloud:  params.Cloud("gce"),
+			Region: "us-east-1",
+		}},
 	}}
+
 	for i := range testControllers {
-		err := s.jem.DB.AddController(testContext, &testControllers[i])
+		err := s.jem.DB.AddController(testContext, &testControllers[i].controller, testControllers[i].cloudRegions)
 
 		c.Assert(err, gc.IsNil)
 	}
@@ -942,99 +988,144 @@ func (s *jemSuite) TestDoControllers(c *gc.C) {
 }
 
 func (s *jemSuite) TestDoControllersErrorResponse(c *gc.C) {
-	testControllers := []mongodoc.Controller{{
-		Path: params.EntityPath{
-			User: params.User("bob"),
-			Name: "aws-us-east-1",
+	var testControllers = []struct {
+		controller   mongodoc.Controller
+		cloudRegions []mongodoc.CloudRegion
+	}{{
+		controller: mongodoc.Controller{
+			Cloud: mongodoc.Cloud{
+				Name: "aws",
+				Regions: []mongodoc.Region{{
+					Name: "us-east-1",
+				}},
+			},
+			Path: params.EntityPath{
+				User: params.User("bob"),
+				Name: "aws-us-east-1",
+			},
+			Public: true,
 		},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "us-east-1",
-			}},
-		},
-		Public: true,
+		cloudRegions: []mongodoc.CloudRegion{{
+			Cloud:  params.Cloud("aws"),
+			Region: "us-east-1",
+		}},
 	}, {
-		Path: params.EntityPath{
-			User: params.User("bob"),
-			Name: "aws-eu-west-1",
+		controller: mongodoc.Controller{
+			Path: params.EntityPath{
+				User: params.User("bob"),
+				Name: "aws-eu-west-1",
+			},
+			Cloud: mongodoc.Cloud{
+				Name: "aws",
+				Regions: []mongodoc.Region{{
+					Name: "us-west-1",
+				}},
+			},
+			Public: true,
 		},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "eu-west-1",
-			}},
-		},
-		Public: true,
+		cloudRegions: []mongodoc.CloudRegion{{
+			Cloud:  params.Cloud("aws"),
+			Region: "eu-west-1",
+		}},
 	}, {
-		Path: params.EntityPath{
-			User: params.User("alice"),
-			Name: "aws-us-east-1",
+		controller: mongodoc.Controller{
+			Path: params.EntityPath{
+				User: params.User("alice"),
+				Name: "aws-us-east-1",
+			},
+			Cloud: mongodoc.Cloud{
+				Name: "aws",
+				Regions: []mongodoc.Region{{
+					Name: "us-east-1",
+				}},
+			},
+			ACL: params.ACL{
+				Read: []string{"bob-group"},
+			},
+			Public: true,
 		},
-		ACL: params.ACL{
-			Read: []string{"bob-group"},
-		},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "us-east-1",
-			}},
-		},
-		Public: true,
+		cloudRegions: []mongodoc.CloudRegion{{
+			Cloud:  params.Cloud("aws"),
+			Region: "us-east-1",
+		}},
 	}, {
-		Path: params.EntityPath{
-			User: params.User("alice"),
-			Name: "aws-eu-west-1",
+		controller: mongodoc.Controller{
+			Path: params.EntityPath{
+				User: params.User("alice"),
+				Name: "aws-eu-west-1",
+			},
+			Cloud: mongodoc.Cloud{
+				Name: "aws",
+				Regions: []mongodoc.Region{{
+					Name: "us-west-1",
+				}},
+			},
+			ACL: params.ACL{
+				Read: []string{"bob"},
+			},
+			Public: true,
 		},
-		ACL: params.ACL{
-			Read: []string{"bob"},
-		},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "eu-west-1",
-			}},
-		},
-		Public: true,
+		cloudRegions: []mongodoc.CloudRegion{{
+			Cloud:  params.Cloud("aws"),
+			Region: "eu-west-1",
+		}},
 	}, {
-		Path: params.EntityPath{
-			User: params.User("alice"),
-			Name: "aws-us-east-2",
+		controller: mongodoc.Controller{
+			Path: params.EntityPath{
+				User: params.User("alice"),
+				Name: "aws-us-east-2",
+			},
+			Cloud: mongodoc.Cloud{
+				Name: "aws",
+				Regions: []mongodoc.Region{{
+					Name: "us-east-1",
+				}},
+			},
+			Public: true,
 		},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "us-east-1",
-			}},
-		},
-		Public: true,
+		cloudRegions: []mongodoc.CloudRegion{{
+			Cloud:  params.Cloud("aws"),
+			Region: "us-east-1",
+		}},
 	}, {
-		Path: params.EntityPath{
-			User: params.User("bob"),
-			Name: "gce-us-east-1",
+		controller: mongodoc.Controller{
+			Path: params.EntityPath{
+				User: params.User("bob"),
+				Name: "gce-us-east-1",
+			},
+			Cloud: mongodoc.Cloud{
+				Name: "gce",
+				Regions: []mongodoc.Region{{
+					Name: "us-east-1",
+				}},
+			},
+			Public: true,
 		},
-		Cloud: mongodoc.Cloud{
-			Name: "gce",
-			Regions: []mongodoc.Region{{
-				Name: "us-east-1",
-			}},
-		},
-		Public: true,
+		cloudRegions: []mongodoc.CloudRegion{{
+			Cloud:  params.Cloud("gce"),
+			Region: "us-east-1",
+		}},
 	}, {
-		Path: params.EntityPath{
-			User: params.User("alice"),
-			Name: "gce-us-east-1",
+		controller: mongodoc.Controller{
+			Path: params.EntityPath{
+				User: params.User("alice"),
+				Name: "gce-us-east-1",
+			},
+			Cloud: mongodoc.Cloud{
+				Name: "gce",
+				Regions: []mongodoc.Region{{
+					Name: "us-east-1",
+				}},
+			},
+			Public: true,
 		},
-		Cloud: mongodoc.Cloud{
-			Name: "gce",
-			Regions: []mongodoc.Region{{
-				Name: "us-east-1",
-			}},
-		},
-		Public: true,
+		cloudRegions: []mongodoc.CloudRegion{{
+			Cloud:  params.Cloud("gce"),
+			Region: "us-east-1",
+		}},
 	}}
 	for i := range testControllers {
-		err := s.jem.DB.AddController(testContext, &testControllers[i])
+		err := s.jem.DB.AddController(testContext, &testControllers[i].controller, testControllers[i].cloudRegions)
 
 		c.Assert(err, gc.IsNil)
 	}
@@ -1100,127 +1191,173 @@ func (s *jemSuite) TestSelectController(c *gc.C) {
 	s.PatchValue(jem.RandIntn, func(n int) int {
 		return (*randIntn)(n)
 	})
-	testControllers := []mongodoc.Controller{{
-		Path: params.EntityPath{
-			User: params.User("bob"),
-			Name: "aws-us-east-1",
+
+	var testControllers = []struct {
+		controller   mongodoc.Controller
+		cloudRegions []mongodoc.CloudRegion
+	}{{
+		controller: mongodoc.Controller{
+			Path: params.EntityPath{
+				User: params.User("bob"),
+				Name: "aws-us-east-1",
+			},
+			Cloud: mongodoc.Cloud{
+				Name: "aws",
+				Regions: []mongodoc.Region{{
+					Name: "us-east-1",
+				}},
+			},
+			Location: map[string]string{
+				"cloud":  "aws",
+				"region": "us-east-1",
+			},
+			Public: true,
 		},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "us-east-1",
-			}},
-		},
-		Location: map[string]string{
-			"cloud":  "aws",
-			"region": "us-east-1",
-		},
-		Public: true,
+		cloudRegions: []mongodoc.CloudRegion{{
+			Cloud:  params.Cloud("aws"),
+			Region: "us-east-1",
+		}},
 	}, {
-		Path: params.EntityPath{
-			User: params.User("bob"),
-			Name: "aws-eu-west-1",
+		controller: mongodoc.Controller{
+			Path: params.EntityPath{
+				User: params.User("bob"),
+				Name: "aws-eu-west-1",
+			},
+			Cloud: mongodoc.Cloud{
+				Name: "aws",
+				Regions: []mongodoc.Region{{
+					Name: "us-west-1",
+				}},
+			},
+			Location: map[string]string{
+				"cloud":  "aws",
+				"region": "eu-west-1",
+			},
+			Public: true,
 		},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "eu-west-1",
-			}},
-		},
-		Location: map[string]string{
-			"cloud":  "aws",
-			"region": "eu-west-1",
-		},
-		Public: true,
+		cloudRegions: []mongodoc.CloudRegion{{
+			Cloud:  params.Cloud("aws"),
+			Region: "eu-west-1",
+		}},
 	}, {
-		Path: params.EntityPath{
-			User: params.User("alice"),
-			Name: "aws-us-east-1",
+		controller: mongodoc.Controller{
+			Path: params.EntityPath{
+				User: params.User("alice"),
+				Name: "aws-us-east-1",
+			},
+			Cloud: mongodoc.Cloud{
+				Name: "aws",
+				Regions: []mongodoc.Region{{
+					Name: "us-east-1",
+				}},
+			},
+			ACL: params.ACL{
+				Read: []string{"bob-group"},
+			},
+			Location: map[string]string{
+				"cloud":  "aws",
+				"region": "us-east-1",
+			},
+			Public: true,
 		},
-		ACL: params.ACL{
-			Read: []string{"bob-group"},
-		},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "us-east-1",
-			}},
-		},
-		Location: map[string]string{
-			"cloud":  "aws",
-			"region": "us-east-1",
-		},
-		Public: true,
+		cloudRegions: []mongodoc.CloudRegion{{
+			Cloud:  params.Cloud("aws"),
+			Region: "us-east-1",
+		}},
 	}, {
-		Path: params.EntityPath{
-			User: params.User("alice"),
-			Name: "aws-eu-west-1",
+		controller: mongodoc.Controller{
+			Path: params.EntityPath{
+				User: params.User("alice"),
+				Name: "aws-eu-west-1",
+			},
+			ACL: params.ACL{
+				Read: []string{"bob"},
+			},
+			Cloud: mongodoc.Cloud{
+				Name: "aws",
+				Regions: []mongodoc.Region{{
+					Name: "us-west-1",
+				}},
+			},
+			Location: map[string]string{
+				"cloud":  "aws",
+				"region": "eu-west-1",
+			},
+			Public: true,
 		},
-		ACL: params.ACL{
-			Read: []string{"bob"},
-		},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "eu-west-1",
-			}},
-		},
-		Location: map[string]string{
-			"cloud":  "aws",
-			"region": "eu-west-1",
-		},
-		Public: true,
+		cloudRegions: []mongodoc.CloudRegion{{
+			Cloud:  params.Cloud("aws"),
+			Region: "eu-west-1",
+		}},
 	}, {
-		Path: params.EntityPath{
-			User: params.User("alice"),
-			Name: "aws-us-east-2",
+		controller: mongodoc.Controller{
+			Path: params.EntityPath{
+				User: params.User("alice"),
+				Name: "aws-us-east-2",
+			},
+			Cloud: mongodoc.Cloud{
+				Name: "aws",
+				Regions: []mongodoc.Region{{
+					Name: "us-east-1",
+				}},
+			},
+			Location: map[string]string{
+				"cloud":  "aws",
+				"region": "us-east-1",
+			},
+			Public: true,
 		},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "us-east-1",
-			}},
-		},
-		Location: map[string]string{
-			"cloud":  "aws",
-			"region": "us-east-1",
-		},
-		Public: true,
+		cloudRegions: []mongodoc.CloudRegion{{
+			Cloud:  params.Cloud("aws"),
+			Region: "us-east-1",
+		}},
 	}, {
-		Path: params.EntityPath{
-			User: params.User("bob"),
-			Name: "gce-us-east-1",
+		controller: mongodoc.Controller{
+			Path: params.EntityPath{
+				User: params.User("bob"),
+				Name: "gce-us-east-1",
+			},
+			Cloud: mongodoc.Cloud{
+				Name: "gce",
+				Regions: []mongodoc.Region{{
+					Name: "us-east-1",
+				}},
+			},
+			Location: map[string]string{
+				"cloud":  "gce",
+				"region": "us-east-1",
+			},
+			Public: true,
 		},
-		Cloud: mongodoc.Cloud{
-			Name: "gce",
-			Regions: []mongodoc.Region{{
-				Name: "us-east-1",
-			}},
-		},
-		Location: map[string]string{
-			"cloud":  "gce",
-			"region": "us-east-1",
-		},
-		Public: true,
+		cloudRegions: []mongodoc.CloudRegion{{
+			Cloud:  params.Cloud("gce"),
+			Region: "us-east-1",
+		}},
 	}, {
-		Path: params.EntityPath{
-			User: params.User("alice"),
-			Name: "gce-us-east-1",
+		controller: mongodoc.Controller{
+			Path: params.EntityPath{
+				User: params.User("alice"),
+				Name: "gce-us-east-1",
+			},
+			Cloud: mongodoc.Cloud{
+				Name: "gce",
+				Regions: []mongodoc.Region{{
+					Name: "us-east-1",
+				}},
+			},
+			Location: map[string]string{
+				"cloud":  "gce",
+				"region": "us-east-1",
+			},
+			Public: true,
 		},
-		Cloud: mongodoc.Cloud{
-			Name: "gce",
-			Regions: []mongodoc.Region{{
-				Name: "us-east-1",
-			}},
-		},
-		Location: map[string]string{
-			"cloud":  "gce",
-			"region": "us-east-1",
-		},
-		Public: true,
+		cloudRegions: []mongodoc.CloudRegion{{
+			Cloud:  params.Cloud("gce"),
+			Region: "us-east-1",
+		}},
 	}}
 	for i := range testControllers {
-		err := s.jem.DB.AddController(testContext, &testControllers[i])
+		err := s.jem.DB.AddController(testContext, &testControllers[i].controller, testControllers[i].cloudRegions)
 
 		c.Assert(err, gc.IsNil)
 	}
@@ -1425,7 +1562,7 @@ func (s *jemSuite) TestEarliestControllerVersion(c *gc.C) {
 		_, err := s.jem.DB.Controllers().RemoveAll(nil)
 		c.Assert(err, jc.ErrorIsNil)
 		for _, ctl := range test.controllers {
-			err := s.jem.DB.AddController(ctx, &ctl)
+			err := s.jem.DB.AddController(ctx, &ctl, nil)
 			c.Assert(err, jc.ErrorIsNil)
 		}
 		v, err := s.jem.EarliestControllerVersion(ctx)
@@ -1669,7 +1806,11 @@ func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityP
 		},
 		Public: true,
 	}
-	err = s.jem.DB.AddController(testContext, ctl)
+	cloudRegions := []mongodoc.CloudRegion{{
+		Cloud:  params.Cloud("dummy"),
+		Region: "dummy-region",
+	}}
+	err = s.jem.DB.AddController(testContext, ctl, cloudRegions)
 	c.Assert(err, jc.ErrorIsNil)
 	return path
 }
