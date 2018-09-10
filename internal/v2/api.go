@@ -199,8 +199,35 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	if err != nil {
 		return errgo.Notef(err, "cannot get clouds")
 	}
-	// Note: currently juju controllers only ever have exactly one
-	// cloud. This code will need to change if that changes.
+
+	var cloudRegions []mongodoc.CloudRegion
+	for k, v := range clouds {
+		cloud := mongodoc.CloudRegion{
+			Cloud:            params.Cloud(k.Id()),
+			Endpoint:         v.Endpoint,
+			IdentityEndpoint: v.IdentityEndpoint,
+			StorageEndpoint:  v.StorageEndpoint,
+			ProviderType:     v.Type,
+		}
+		cloudRegions = append(cloudRegions, cloud)
+
+		for _, reg := range v.Regions {
+			region := mongodoc.CloudRegion{
+				Cloud:            params.Cloud(k.Id()),
+				ProviderType:     v.Type,
+				Region:           reg.Name,
+				Endpoint:         reg.Endpoint,
+				IdentityEndpoint: reg.IdentityEndpoint,
+				StorageEndpoint:  reg.StorageEndpoint,
+			}
+			for _, at := range v.AuthTypes {
+				region.AuthTypes = append(region.AuthTypes, string(at))
+			}
+			cloudRegions = append(cloudRegions, region)
+		}
+	}
+
+	// TODO: This code will need to be removed when the cloud is stored completly in cloudregion.
 	for k, v := range clouds {
 		ctl.Cloud.Name = params.Cloud(k.Id())
 		ctl.Cloud.ProviderType = v.Type
@@ -226,7 +253,7 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	// address we succeeded in connecting to.
 	ctl.HostPorts = mongodocAPIHostPorts(conn.APIHostPorts())
 
-	err = h.jem.DB.AddController(ctx, ctl)
+	err = h.jem.DB.AddController(ctx, ctl, cloudRegions)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
@@ -527,7 +554,7 @@ func (h *Handler) GetControllerLocations(p httprequest.Params, arg *params.GetCo
 	}, nil
 }
 
-// GetAllControllerLocations returns all the available
+// `erLocations returns all the available
 // sets of controller location attributes, restricting
 // the search by any provided location attributes.
 func (h *Handler) GetAllControllerLocations(p httprequest.Params, arg *params.GetAllControllerLocations) (*params.AllControllerLocationsResponse, error) {

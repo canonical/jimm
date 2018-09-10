@@ -238,7 +238,7 @@ func (s *jemShimInMemory) controller(p params.EntityPath) *mongodoc.Controller {
 	return &c
 }
 
-func (s *jemShimInMemory) AddController(ctl *mongodoc.Controller) {
+func (s *jemShimInMemory) AddController(ctl *mongodoc.Controller, cloudRegions []mongodoc.CloudRegion) {
 	if ctl.Path == (params.EntityPath{}) {
 		panic("no path in controller")
 	}

@@ -85,7 +85,7 @@ func (s *internalSuite) TestLeaseUpdater(c *gc.C) {
 	err := s.jem.DB.AddController(testContext, &mongodoc.Controller{
 		Path: ctlPath,
 		UUID: "fake-uuid",
-	})
+	}, nil)
 
 	// The controller monitor assumes that it already has the
 	// lease when started, so acquire the lease.
@@ -596,7 +596,7 @@ func (s *internalSuite) TestWatcherKilledWhileDialingAPI(c *gc.C) {
 		CACert:    info.CACert,
 		AdminUser: "bob",
 		HostPorts: [][]mongodoc.HostPort{{{Host: "0.1.2.3", Port: 4567}}},
-	})
+	}, nil)
 
 	c.Assert(err, gc.IsNil)
 
@@ -643,7 +643,7 @@ func (s *internalSuite) TestWatcherDialAPIError(c *gc.C) {
 		CACert:    jujujujutesting.CACert,
 		AdminUser: "bob",
 		HostPorts: [][]mongodoc.HostPort{{{Host: "0.1.2.3", Port: 4567}}},
-	})
+	}, nil)
 
 	c.Assert(err, gc.IsNil)
 
@@ -839,7 +839,7 @@ func (s *internalSuite) TestControllerMonitor(c *gc.C) {
 		CACert:        info.CACert,
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
-	})
+	}, nil)
 	c.Assert(err, gc.IsNil)
 
 	err = s.jem.DB.AddModel(testContext, &mongodoc.Model{
@@ -914,7 +914,7 @@ func (s *internalSuite) TestControllerMonitorDiesWithMonitoringStoppedErrorWhenC
 		CACert:        info.CACert,
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
-	})
+	}, nil)
 
 	c.Assert(err, gc.IsNil)
 
@@ -1170,7 +1170,7 @@ func (s *internalSuite) TestAllMonitorWithRaceOnLeaseAcquisition(c *gc.C) {
 		CACert:    jujujujutesting.CACert,
 		AdminUser: "bob",
 		HostPorts: [][]mongodoc.HostPort{{{Host: "0.1.2.3", Port: 4567}}},
-	})
+	}, nil)
 
 	c.Assert(err, gc.IsNil)
 
@@ -1385,7 +1385,7 @@ func (s *internalSuite) addJEMController(c *gc.C, ctlPath params.EntityPath) {
 		CACert:        info.CACert,
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
-	})
+	}, nil)
 	c.Assert(err, gc.IsNil)
 }
 
@@ -1427,7 +1427,7 @@ func addFakeController(jshim *jemShimInMemory, path params.EntityPath) {
 		CACert:    jujujujutesting.CACert,
 		AdminUser: "bob",
 		HostPorts: [][]mongodoc.HostPort{{{Host: "0.1.2.3", Port: 4567}}},
-	})
+	}, nil)
 	jshim.AddModel(&mongodoc.Model{
 		Path:       path,
 		Controller: path,

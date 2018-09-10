@@ -175,6 +175,49 @@ type Region struct {
 	StorageEndpoint string
 }
 
+// CloudRegion holds the details of a cloud region.
+type CloudRegion struct {
+	// Id holds the primary key for a CloudRegion.
+	// It is in the format <cloud>/<region>
+	Id string `bson:"_id"`
+
+	// Cloud holds the cloud name.
+	Cloud params.Cloud
+
+	// Region holds the name of the region.
+	Region string
+
+	// ProviderType holds the type of cloud.
+	ProviderType string
+
+	// Authtypes holds the set of allowed authtypes for use with this
+	// cloud.
+	AuthTypes []string
+
+	// Endpoint contains the region or cloud endpoint parameter specified by the
+	// controller.
+	Endpoint string
+
+	// IdentityEndpoint contains the region or cloud identity endpoint parameter
+	// specified by the controller.
+	IdentityEndpoint string
+
+	// IdentityEndpoint contains the region or cloud storage endpoint parameter
+	// specified by the controller.
+	StorageEndpoint string
+
+	// PrimaryControllers holds the local user and name given to the
+	// controllers that can use that cloud and which are hosted on this region.
+	PrimaryControllers []params.EntityPath
+
+	// SecondaryControllers holds the local user and name given to the
+	// controllers that can use that cloud and which are hosted outside this region.
+	SecondaryControllers []params.EntityPath
+
+	// ACL holds permissions for the cloud.
+	ACL params.ACL
+}
+
 // Model holds information on a given model.
 type Model struct {
 	// Id holds the primary key for an model.

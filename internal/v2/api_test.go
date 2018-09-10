@@ -729,135 +729,162 @@ var getControllerLocationsTests = []struct {
 
 func (s *APISuite) TestGetControllerLocations(c *gc.C) {
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"bob", "aws-us-east"},
+		Path:   params.EntityPath{"bob", "aws-us-east"},
+		Public: true,
 		Cloud: mongodoc.Cloud{
 			Name: "aws",
 			Regions: []mongodoc.Region{{
 				Name: "us-east-1",
 			}},
 		},
-		Public: true,
 		Location: map[string]string{
 			"cloud":  "aws",
 			"region": "us-east-1",
 		},
-	})
+	}, []mongodoc.CloudRegion{{
+		Cloud:  params.Cloud("aws"),
+		Region: "us-east-1",
+	}})
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"bob", "aws-us-east2"},
+		Path:   params.EntityPath{"bob", "aws-us-east2"},
+		Public: true,
 		Cloud: mongodoc.Cloud{
 			Name: "aws",
 			Regions: []mongodoc.Region{{
 				Name: "us-east-1",
 			}},
 		},
-		Public: true,
 		Location: map[string]string{
 			"cloud":  "aws",
 			"region": "us-east-1",
 		},
-	})
+	}, []mongodoc.CloudRegion{{
+		Cloud:  params.Cloud("aws"),
+		Region: "us-east-1",
+	}})
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"bob", "aws-eu-west"},
+		Path:   params.EntityPath{"bob", "aws-eu-west"},
+		Public: true,
 		Cloud: mongodoc.Cloud{
 			Name: "aws",
 			Regions: []mongodoc.Region{{
 				Name: "eu-west-1",
 			}},
 		},
-		Public: true,
 		Location: map[string]string{
 			"cloud":  "aws",
 			"region": "eu-west-1",
 		},
-	})
+	}, []mongodoc.CloudRegion{{
+		Cloud:  params.Cloud("aws"),
+		Region: "us-west-1",
+	}})
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"bob", "gce-somewhere"},
+		Path:   params.EntityPath{"bob", "gce-somewhere"},
+		Public: true,
 		Cloud: mongodoc.Cloud{
 			Name: "gce",
 			Regions: []mongodoc.Region{{
 				Name: "somewhere",
 			}},
 		},
-		Public: true,
 		Location: map[string]string{
 			"cloud":  "gce",
 			"region": "somewhere",
 		},
-	})
+	}, []mongodoc.CloudRegion{{
+		Cloud:  params.Cloud("gce"),
+		Region: "somewhere",
+	}})
 	ctlId := params.EntityPath{"bob", "gce-down"}
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: ctlId,
+		Path:   ctlId,
+		Public: true,
 		Cloud: mongodoc.Cloud{
 			Name: "gce",
 			Regions: []mongodoc.Region{{
 				Name: "down",
 			}},
 		},
-		Public: true,
 		Location: map[string]string{
 			"cloud":  "gce",
 			"region": "down",
 		},
-	})
+	}, []mongodoc.CloudRegion{{
+		Cloud:  params.Cloud("gce"),
+		Region: "down",
+	}})
 	err := s.JEM.DB.SetControllerUnavailableAt(testContext, ctlId, time.Now())
 	c.Assert(err, gc.IsNil)
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"bob", "gce-elsewhere"},
+		Path:   params.EntityPath{"bob", "gce-elsewhere"},
+		Public: true,
 		Cloud: mongodoc.Cloud{
 			Name: "gce",
 			Regions: []mongodoc.Region{{
 				Name: "elsewhere",
 			}},
 		},
-		Public: true,
 		Location: map[string]string{
 			"cloud":  "gce",
 			"region": "elsewhere",
 		},
-	})
+	}, []mongodoc.CloudRegion{{
+		Cloud:  params.Cloud("gce"),
+		Region: "elsewhere",
+	}})
 	s.IDMSrv.AddUser("alice", "somegroup")
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"somegroup", "controller"},
+		Path:   params.EntityPath{"somegroup", "controller"},
+		Public: true,
 		Cloud: mongodoc.Cloud{
 			Name: "gce",
 			Regions: []mongodoc.Region{{
 				Name: "america",
 			}},
 		},
-		Public: true,
 		Location: map[string]string{
 			"cloud":  "gce",
 			"region": "america",
 		},
-	})
+	}, []mongodoc.CloudRegion{{
+		Cloud:  params.Cloud("gce"),
+		Region: "america",
+	}})
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"alice", "controller"},
-		Cloud: mongodoc.Cloud{
-			Name: "azure",
-			Regions: []mongodoc.Region{{
-				Name: "america",
-			}},
-		},
+		Path:   params.EntityPath{"alice", "controller"},
 		Public: true,
-		Location: map[string]string{
-			"cloud":  "azure",
-			"region": "america",
-		},
-	})
-	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"alice", "forgotten"},
 		Cloud: mongodoc.Cloud{
 			Name: "azure",
 			Regions: []mongodoc.Region{{
 				Name: "america",
 			}},
 		},
-		Public: false,
 		Location: map[string]string{
 			"cloud":  "azure",
 			"region": "america",
 		},
-	})
+	}, []mongodoc.CloudRegion{{
+		Cloud:  params.Cloud("azure"),
+		Region: "america",
+	}})
+	s.AssertAddControllerDoc(c, &mongodoc.Controller{
+		Path:   params.EntityPath{"alice", "forgotten"},
+		Public: false,
+		Cloud: mongodoc.Cloud{
+			Name: "azure",
+			Regions: []mongodoc.Region{{
+				Name: "america",
+			}},
+		},
+		Location: map[string]string{
+			"cloud":  "azure",
+			"region": "america",
+		},
+	}, []mongodoc.CloudRegion{{
+		Cloud:  params.Cloud("azure"),
+		Region: "america",
+	}})
 
 	for i, test := range getControllerLocationsTests {
 		c.Logf("test %d: %v", i, test.about)
@@ -947,121 +974,145 @@ var getAllControllerLocationsTests = []struct {
 
 func (s *APISuite) TestAllControllerLocations(c *gc.C) {
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"bob", "aws-us-east"},
+		Path:   params.EntityPath{"bob", "aws-us-east"},
+		Public: true,
 		Cloud: mongodoc.Cloud{
 			Name: "aws",
 			Regions: []mongodoc.Region{{
 				Name: "us-east-1",
 			}},
 		},
-		Public: true,
 		Location: map[string]string{
 			"cloud":  "aws",
 			"region": "us-east-1",
 		},
-	})
+	}, []mongodoc.CloudRegion{{
+		Cloud:  params.Cloud("aws"),
+		Region: "us-east-1",
+	}})
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"bob", "aws-us-east2"},
+		Path:   params.EntityPath{"bob", "aws-us-east2"},
+		Public: true,
 		Cloud: mongodoc.Cloud{
 			Name: "aws",
 			Regions: []mongodoc.Region{{
 				Name: "us-east-1",
 			}},
 		},
-		Public: true,
 		Location: map[string]string{
 			"cloud":  "aws",
 			"region": "us-east-1",
 		},
-	})
+	}, []mongodoc.CloudRegion{{
+		Cloud:  params.Cloud("aws"),
+		Region: "us-east-1",
+	}})
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"bob", "aws-eu-west"},
+		Path:   params.EntityPath{"bob", "aws-eu-west"},
+		Public: true,
 		Cloud: mongodoc.Cloud{
 			Name: "aws",
 			Regions: []mongodoc.Region{{
 				Name: "eu-west-1",
 			}},
 		},
-		Public: true,
 		Location: map[string]string{
 			"cloud":  "aws",
 			"region": "eu-west-1",
 		},
-	})
+	}, []mongodoc.CloudRegion{{
+		Cloud:  params.Cloud("aws"),
+		Region: "eu-west-1",
+	}})
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"bob", "gce-somewhere"},
+		Path:   params.EntityPath{"bob", "gce-somewhere"},
+		Public: true,
 		Cloud: mongodoc.Cloud{
 			Name: "gce",
 			Regions: []mongodoc.Region{{
 				Name: "somewhere",
 			}},
 		},
-		Public: true,
 		Location: map[string]string{
 			"cloud":  "gce",
 			"region": "somewhere",
 		},
-	})
+	}, []mongodoc.CloudRegion{{
+		Cloud:  params.Cloud("gce"),
+		Region: "somewhere",
+	}})
 	ctlId := params.EntityPath{"bob", "gce-down"}
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: ctlId,
+		Path:   ctlId,
+		Public: true,
 		Cloud: mongodoc.Cloud{
 			Name: "gce",
 			Regions: []mongodoc.Region{{
 				Name: "down",
 			}},
 		},
-		Public: true,
 		Location: map[string]string{
 			"cloud":  "gce",
 			"region": "down",
 		},
-	})
+	}, []mongodoc.CloudRegion{{
+		Cloud:  params.Cloud("gce"),
+		Region: "down",
+	}})
 	err := s.JEM.DB.SetControllerUnavailableAt(testContext, ctlId, time.Now())
 	c.Assert(err, gc.IsNil)
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"bob", "gce-elsewhere"},
+		Path:   params.EntityPath{"bob", "gce-elsewhere"},
+		Public: true,
 		Cloud: mongodoc.Cloud{
 			Name: "gce",
 			Regions: []mongodoc.Region{{
 				Name: "elsewhere",
 			}},
 		},
-		Public: true,
 		Location: map[string]string{
 			"cloud":  "gce",
 			"region": "elsewhere",
 		},
-	})
+	}, []mongodoc.CloudRegion{{
+		Cloud:  params.Cloud("gce"),
+		Region: "elsewhere",
+	}})
 	s.IDMSrv.AddUser("alice", "somegroup")
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"alice", "controller"},
-		Cloud: mongodoc.Cloud{
-			Name: "azure",
-			Regions: []mongodoc.Region{{
-				Name: "america",
-			}},
-		},
+		Path:   params.EntityPath{"alice", "controller"},
 		Public: true,
-		Location: map[string]string{
-			"cloud":  "azure",
-			"region": "america",
-		},
-	})
-	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"alice", "forgotten"},
 		Cloud: mongodoc.Cloud{
 			Name: "azure",
 			Regions: []mongodoc.Region{{
 				Name: "america",
 			}},
 		},
-		Public: false,
 		Location: map[string]string{
 			"cloud":  "azure",
 			"region": "america",
 		},
-	})
+	}, []mongodoc.CloudRegion{{
+		Cloud:  params.Cloud("azure"),
+		Region: "america",
+	}})
+	s.AssertAddControllerDoc(c, &mongodoc.Controller{
+		Path:   params.EntityPath{"alice", "forgotten"},
+		Public: false,
+		Cloud: mongodoc.Cloud{
+			Name: "azure",
+			Regions: []mongodoc.Region{{
+				Name: "america",
+			}},
+		},
+		Location: map[string]string{
+			"cloud":  "azure",
+			"region": "america",
+		},
+	}, []mongodoc.CloudRegion{{
+		Cloud:  params.Cloud("azure"),
+		Region: "america",
+	}})
 
 	for i, test := range getAllControllerLocationsTests {
 		c.Logf("test %d: %v", i, test.about)
@@ -1450,7 +1501,7 @@ func (s *APISuite) TestNewModelCannotOpenAPI(c *gc.C) {
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
 		Path:      params.EntityPath{"bob", "foo"},
 		AdminUser: "admin",
-	})
+	}, []mongodoc.CloudRegion{})
 	s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
