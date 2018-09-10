@@ -200,12 +200,15 @@ var uuidGenerator = fastuuid.MustNewGenerator()
 
 // AssertAddControllerDoc adds a controller document to the database.
 // Tests cannot connect to a controller added by this function.
-func (s *Suite) AssertAddControllerDoc(c *gc.C, cnt *mongodoc.Controller, cloudRegions []mongodoc.CloudRegion) *mongodoc.Controller {
+func (s *Suite) AssertAddControllerDoc(c *gc.C, cnt *mongodoc.Controller, primaryCloudRegion *mongodoc.CloudRegion) *mongodoc.Controller {
 	if cnt.UUID == "" {
 		cnt.UUID = fmt.Sprintf("%x", uuidGenerator.Next())
 	}
-	err := s.JEM.DB.AddController(context.Background(), cnt, cloudRegions)
-
+	var pControllers []*mongodoc.CloudRegion
+	if primaryCloudRegion != nil {
+		pControllers = append(pControllers, primaryCloudRegion)
+	}
+	err := s.JEM.AddController(context.Background(), cnt, pControllers, nil)
 	c.Assert(err, jc.ErrorIsNil)
 	return cnt
 }
