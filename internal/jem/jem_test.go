@@ -970,7 +970,7 @@ func (s *jemSuite) TestDoControllers(c *gc.C) {
 	}}
 
 	for i := range testControllers {
-		err := s.jem.DB.AddController(testContext, &testControllers[i].controller, testControllers[i].cloudRegions)
+		err := s.jem.DB.AddController(testContext, &testControllers[i].controller, testControllers[i].cloudRegions, true)
 
 		c.Assert(err, gc.IsNil)
 	}
@@ -1125,7 +1125,7 @@ func (s *jemSuite) TestDoControllersErrorResponse(c *gc.C) {
 		}},
 	}}
 	for i := range testControllers {
-		err := s.jem.DB.AddController(testContext, &testControllers[i].controller, testControllers[i].cloudRegions)
+		err := s.jem.DB.AddController(testContext, &testControllers[i].controller, testControllers[i].cloudRegions, true)
 
 		c.Assert(err, gc.IsNil)
 	}
@@ -1357,7 +1357,7 @@ func (s *jemSuite) TestSelectController(c *gc.C) {
 		}},
 	}}
 	for i := range testControllers {
-		err := s.jem.DB.AddController(testContext, &testControllers[i].controller, testControllers[i].cloudRegions)
+		err := s.jem.DB.AddController(testContext, &testControllers[i].controller, testControllers[i].cloudRegions, true)
 
 		c.Assert(err, gc.IsNil)
 	}
@@ -1562,7 +1562,7 @@ func (s *jemSuite) TestEarliestControllerVersion(c *gc.C) {
 		_, err := s.jem.DB.Controllers().RemoveAll(nil)
 		c.Assert(err, jc.ErrorIsNil)
 		for _, ctl := range test.controllers {
-			err := s.jem.DB.AddController(ctx, &ctl, nil)
+			err := s.jem.DB.AddController(ctx, &ctl, nil, true)
 			c.Assert(err, jc.ErrorIsNil)
 		}
 		v, err := s.jem.EarliestControllerVersion(ctx)
@@ -1810,7 +1810,7 @@ func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityP
 		Cloud:  params.Cloud("dummy"),
 		Region: "dummy-region",
 	}}
-	err = s.jem.DB.AddController(testContext, ctl, cloudRegions)
+	err = s.jem.DB.AddController(testContext, ctl, cloudRegions, true)
 	c.Assert(err, jc.ErrorIsNil)
 	return path
 }

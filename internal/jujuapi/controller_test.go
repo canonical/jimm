@@ -180,7 +180,7 @@ func (s *controllerSuite) TestDefaultCloud(c *gc.C) {
 				},
 			}, []mongodoc.CloudRegion{{
 				Cloud: params.Cloud(cloud),
-			}})
+			}}, true)
 			c.Assert(err, jc.ErrorIsNil)
 		}
 		cloud, err := client.DefaultCloud()

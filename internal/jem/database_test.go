@@ -83,7 +83,7 @@ func (s *databaseSuite) TestAddController(c *gc.C) {
 		Cloud:  params.Cloud("aws"),
 		Region: "foo",
 	}}
-	err := s.database.AddController(testContext, ctl, cloudRegions)
+	err := s.database.AddController(testContext, ctl, cloudRegions, true)
 	c.Assert(err, gc.IsNil)
 
 	// Check that the fields have been mutated as expected.
@@ -139,7 +139,7 @@ func (s *databaseSuite) TestAddController(c *gc.C) {
 		},
 	})
 
-	err = s.database.AddController(testContext, ctl, cloudRegions)
+	err = s.database.AddController(testContext, ctl, cloudRegions, true)
 	c.Assert(err, gc.ErrorMatches, "already exists")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
 
@@ -158,9 +158,145 @@ func (s *databaseSuite) TestAddController(c *gc.C) {
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 	}
-	err = s.database.AddController(testContext, ctl2, cloudRegions)
+	err = s.database.AddController(testContext, ctl2, cloudRegions, true)
 	c.Assert(err, gc.IsNil)
 	s.checkDBOK(c)
+}
+
+func (s *databaseSuite) TestAddPrimaryController(c *gc.C) {
+	ctlPathA := params.EntityPath{"bob", "x"}
+	ctlA := &mongodoc.Controller{
+		Id:     "ignored",
+		Path:   ctlPathA,
+		CACert: "certainly",
+		HostPorts: [][]mongodoc.HostPort{{{
+			Host: "host1",
+			Port: 1234,
+		}}, {{
+			Host: "host2",
+			Port: 9999,
+		}}},
+		AdminUser:     "foo-admin",
+		AdminPassword: "foo-password",
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "foo",
+			}},
+		},
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "foo",
+		},
+	}
+	cloudRegions := []mongodoc.CloudRegion{{
+		Cloud:  params.Cloud("aws"),
+		Region: "foo",
+	}}
+	err := s.database.AddController(testContext, ctlA, cloudRegions, true)
+	c.Assert(err, gc.IsNil)
+
+	cloudregionA, err := s.database.CloudRegion(testContext, params.Cloud("aws"), "foo")
+	c.Assert(err, gc.IsNil)
+	c.Assert(cloudregionA, gc.DeepEquals, &mongodoc.CloudRegion{
+		Id:                 "aws/foo",
+		Cloud:              params.Cloud("aws"),
+		Region:             "foo",
+		PrimaryControllers: []params.EntityPath{ctlPathA},
+		AuthTypes:          []string{},
+		ACL: params.ACL{
+			Read:  []string{},
+			Write: []string{},
+			Admin: []string{},
+		},
+	})
+
+	ctlPathB := params.EntityPath{"bob", "y"}
+	ctlB := &mongodoc.Controller{
+		Id:     "ignoredB",
+		Path:   ctlPathB,
+		CACert: "certainly",
+		HostPorts: [][]mongodoc.HostPort{{{
+			Host: "host1",
+			Port: 1234,
+		}}, {{
+			Host: "host2",
+			Port: 9999,
+		}}},
+		AdminUser:     "foo-admin",
+		AdminPassword: "foo-password",
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "foo",
+			}},
+		},
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "foo",
+		},
+	}
+
+	err = s.database.AddController(testContext, ctlB, cloudRegions, true)
+	c.Assert(err, gc.IsNil)
+	cloudregionB, err := s.database.CloudRegion(testContext, params.Cloud("aws"), "foo")
+	c.Assert(err, gc.IsNil)
+	c.Assert(cloudregionB, gc.DeepEquals, &mongodoc.CloudRegion{
+		Id:                 "aws/foo",
+		Cloud:              params.Cloud("aws"),
+		Region:             "foo",
+		PrimaryControllers: []params.EntityPath{ctlPathA, ctlPathB},
+		AuthTypes:          []string{},
+		ACL: params.ACL{
+			Read:  []string{},
+			Write: []string{},
+			Admin: []string{},
+		},
+	})
+
+	ctlPathC := params.EntityPath{"bob", "z"}
+	ctlC := &mongodoc.Controller{
+		Id:     "ignoredC",
+		Path:   ctlPathC,
+		CACert: "certainly",
+		HostPorts: [][]mongodoc.HostPort{{{
+			Host: "host1",
+			Port: 1234,
+		}}, {{
+			Host: "host2",
+			Port: 9999,
+		}}},
+		AdminUser:     "foo-admin",
+		AdminPassword: "foo-password",
+		Cloud: mongodoc.Cloud{
+			Name: "aws",
+			Regions: []mongodoc.Region{{
+				Name: "foo",
+			}},
+		},
+		Location: map[string]string{
+			"cloud":  "aws",
+			"region": "foo",
+		},
+	}
+
+	err = s.database.AddController(testContext, ctlC, cloudRegions, false)
+	c.Assert(err, gc.IsNil)
+	cloudregionC, err := s.database.CloudRegion(testContext, params.Cloud("aws"), "foo")
+	c.Assert(err, gc.IsNil)
+	c.Assert(cloudregionC, gc.DeepEquals, &mongodoc.CloudRegion{
+		Id:                   "aws/foo",
+		Cloud:                params.Cloud("aws"),
+		Region:               "foo",
+		PrimaryControllers:   []params.EntityPath{ctlPathA, ctlPathB},
+		SecondaryControllers: []params.EntityPath{ctlPathC},
+		AuthTypes:            []string{},
+		ACL: params.ACL{
+			Read:  []string{},
+			Write: []string{},
+			Admin: []string{},
+		},
+	})
 }
 
 func (s *databaseSuite) TestSetControllerAvailability(c *gc.C) {
@@ -168,7 +304,7 @@ func (s *databaseSuite) TestSetControllerAvailability(c *gc.C) {
 	ctl := &mongodoc.Controller{
 		Path: ctlPath,
 	}
-	err := s.database.AddController(testContext, ctl, []mongodoc.CloudRegion{})
+	err := s.database.AddController(testContext, ctl, []mongodoc.CloudRegion{}, true)
 
 	// Check that we can mark it as unavailable.
 	t0 := time.Now()
@@ -221,7 +357,7 @@ func (s *databaseSuite) TestSetControllerVersion(c *gc.C) {
 	ctl := &mongodoc.Controller{
 		Path: ctlPath,
 	}
-	err := s.database.AddController(testContext, ctl, []mongodoc.CloudRegion{})
+	err := s.database.AddController(testContext, ctl, []mongodoc.CloudRegion{}, true)
 	c.Assert(err, gc.IsNil)
 
 	testVersion := version.Number{Minor: 1}
@@ -250,7 +386,7 @@ func (s *databaseSuite) TestSetControllerRegions(c *gc.C) {
 		IdentityEndpoint: "https://example.com/test1/identity",
 		StorageEndpoint:  "https://example.com/test1/storage",
 	}}
-	err := s.database.AddController(testContext, ctl, cloudRegions)
+	err := s.database.AddController(testContext, ctl, cloudRegions, true)
 	c.Assert(err, gc.IsNil)
 
 	testRegions := []mongodoc.Region{{
@@ -289,7 +425,7 @@ func (s *databaseSuite) TestDeleteController(c *gc.C) {
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 	}
-	err := s.database.AddController(testContext, ctl, []mongodoc.CloudRegion{})
+	err := s.database.AddController(testContext, ctl, []mongodoc.CloudRegion{}, true)
 	c.Assert(err, gc.IsNil)
 	err = s.database.DeleteController(testContext, ctlPath)
 	c.Assert(err, gc.IsNil)
@@ -318,7 +454,7 @@ func (s *databaseSuite) TestDeleteController(c *gc.C) {
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 	}
-	err = s.database.AddController(testContext, ctl2, []mongodoc.CloudRegion{})
+	err = s.database.AddController(testContext, ctl2, []mongodoc.CloudRegion{}, true)
 	c.Assert(err, gc.IsNil)
 
 	err = s.database.DeleteController(testContext, ctlPath)
@@ -346,7 +482,7 @@ func (s *databaseSuite) TestDeleteModel(c *gc.C) {
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 	}
-	err := s.database.AddController(testContext, ctl, []mongodoc.CloudRegion{})
+	err := s.database.AddController(testContext, ctl, []mongodoc.CloudRegion{}, true)
 	c.Assert(err, gc.IsNil)
 
 	modelPath := params.EntityPath{"dalek", "exterminate"}
@@ -593,7 +729,7 @@ func (s *databaseSuite) TestAcquireLease(c *gc.C) {
 			UUID:               "fake-uuid",
 			MonitorLeaseOwner:  test.actualOldOwner,
 			MonitorLeaseExpiry: test.actualOldExpiry,
-		}, []mongodoc.CloudRegion{})
+		}, []mongodoc.CloudRegion{}, true)
 		c.Assert(err, gc.IsNil)
 		t, err := s.database.AcquireMonitorLease(testContext, test.ctlPath, test.oldExpiry, test.oldOwner, test.newExpiry, test.newOwner)
 		if test.expectError != "" {
@@ -626,7 +762,7 @@ func (s *databaseSuite) TestSetControllerStats(c *gc.C) {
 	err := s.database.AddController(testContext, &mongodoc.Controller{
 		Path: ctlPath,
 		UUID: "fake-uuid",
-	}, []mongodoc.CloudRegion{})
+	}, []mongodoc.CloudRegion{}, true)
 	c.Assert(err, gc.IsNil)
 
 	stats := &mongodoc.ControllerStats{
@@ -1084,7 +1220,7 @@ func (s *databaseSuite) TestSetModelControllerSuccess(c *gc.C) {
 	err := s.database.AddController(testContext, &mongodoc.Controller{
 		Path: ctlPath,
 		UUID: "fake-uuid",
-	}, []mongodoc.CloudRegion{})
+	}, []mongodoc.CloudRegion{}, true)
 	c.Assert(err, gc.IsNil)
 
 	modelPath := params.EntityPath{"bob", "foo"}
@@ -1131,7 +1267,7 @@ func (s *databaseSuite) TestSetControllerDeprecated(c *gc.C) {
 	err = s.database.AddController(testContext, &mongodoc.Controller{
 		Path: ctlPath,
 		UUID: "fake-uuid",
-	}, []mongodoc.CloudRegion{})
+	}, []mongodoc.CloudRegion{}, true)
 	c.Assert(err, gc.IsNil)
 
 	// When first added, the deprecated field is not present.
@@ -1173,7 +1309,7 @@ func (s *databaseSuite) TestSetModelLifeSuccess(c *gc.C) {
 	err := s.database.AddController(testContext, &mongodoc.Controller{
 		Path: ctlPath,
 		UUID: "fake-uuid",
-	}, []mongodoc.CloudRegion{})
+	}, []mongodoc.CloudRegion{}, true)
 	c.Assert(err, gc.IsNil)
 
 	// Add the controller model.
@@ -1222,7 +1358,7 @@ func (s *databaseSuite) TestSetModelInfoSuccess(c *gc.C) {
 	err := s.database.AddController(testContext, &mongodoc.Controller{
 		Path: ctlPath,
 		UUID: "fake-uuid",
-	}, []mongodoc.CloudRegion{})
+	}, []mongodoc.CloudRegion{}, true)
 	c.Assert(err, gc.IsNil)
 
 	// Add the controller model.
@@ -1273,7 +1409,7 @@ func (s *databaseSuite) TestDeleteModelWithUUID(c *gc.C) {
 	err := s.database.AddController(testContext, &mongodoc.Controller{
 		Path: ctlPath,
 		UUID: "fake-uuid",
-	}, []mongodoc.CloudRegion{})
+	}, []mongodoc.CloudRegion{}, true)
 	c.Assert(err, gc.IsNil)
 
 	// Add the controller model.
@@ -1375,7 +1511,7 @@ func (s *databaseSuite) TestCredentialAddController(c *gc.C) {
 	ctl := &mongodoc.Controller{
 		Path: ctlPath,
 	}
-	err = s.database.AddController(testContext, ctl, []mongodoc.CloudRegion{})
+	err = s.database.AddController(testContext, ctl, []mongodoc.CloudRegion{}, true)
 	c.Assert(err, gc.IsNil)
 
 	err = jem.CredentialAddController(s.database, testContext, path, ctlPath)
@@ -1435,7 +1571,7 @@ func (s *databaseSuite) TestCredentialRemoveController(c *gc.C) {
 	ctl := &mongodoc.Controller{
 		Path: ctlPath,
 	}
-	err = s.database.AddController(testContext, ctl, []mongodoc.CloudRegion{})
+	err = s.database.AddController(testContext, ctl, []mongodoc.CloudRegion{}, true)
 	c.Assert(err, gc.IsNil)
 
 	err = jem.CredentialAddController(s.database, testContext, path, ctlPath)
@@ -1491,7 +1627,7 @@ func (s *databaseSuite) TestSetACL(c *gc.C) {
 	err := s.database.AddController(testContext, &mongodoc.Controller{
 		Path: ctlPath,
 		UUID: "fake-uuid",
-	}, []mongodoc.CloudRegion{})
+	}, []mongodoc.CloudRegion{}, true)
 	c.Assert(err, gc.IsNil)
 
 	err = s.database.SetACL(testContext, s.database.Controllers(), ctlPath, params.ACL{
@@ -1518,7 +1654,7 @@ func (s *databaseSuite) TestGrant(c *gc.C) {
 	err := s.database.AddController(testContext, &mongodoc.Controller{
 		Path: ctlPath,
 		UUID: "fake-uuid",
-	}, []mongodoc.CloudRegion{})
+	}, []mongodoc.CloudRegion{}, true)
 	c.Assert(err, gc.IsNil)
 
 	err = s.database.Grant(testContext, s.database.Controllers(), ctlPath, "t1")
@@ -1541,7 +1677,7 @@ func (s *databaseSuite) TestRevoke(c *gc.C) {
 	err := s.database.AddController(testContext, &mongodoc.Controller{
 		Path: ctlPath,
 		UUID: "fake-uuid",
-	}, []mongodoc.CloudRegion{})
+	}, []mongodoc.CloudRegion{}, true)
 	c.Assert(err, gc.IsNil)
 
 	err = s.database.SetACL(testContext, s.database.Controllers(), ctlPath, params.ACL{
@@ -1564,14 +1700,14 @@ func (s *databaseSuite) TestRevoke(c *gc.C) {
 }
 
 func (s *databaseSuite) TestCloudRegion(c *gc.C) {
-	err := s.database.AddCloudRegions(testContext, []mongodoc.CloudRegion{{
+	err := s.database.AddCloudRegionsForController(testContext, []mongodoc.CloudRegion{{
 		Cloud:        "my-cloud",
 		Region:       "my-region",
 		ProviderType: "ec2",
 	}, {
 		Cloud:        "my-cloud",
 		ProviderType: "ec2",
-	}})
+	}}, params.EntityPath{"bob", "bar"}, true)
 	c.Assert(err, gc.IsNil)
 	cld, err := s.database.Cloud(testContext, "my-cloud")
 	c.Assert(err, gc.IsNil)
@@ -1596,7 +1732,7 @@ func (s *databaseSuite) TestCloudRegionDuplicate(c *gc.C) {
 		ProviderType: "ec2",
 	}
 
-	err := s.database.AddCloudRegions(testContext, []mongodoc.CloudRegion{cloudRegionA, cloudRegionB, cloudRegionA})
+	err := s.database.AddCloudRegionsForController(testContext, []mongodoc.CloudRegion{cloudRegionA, cloudRegionB, cloudRegionA}, params.EntityPath{"bob", "bar"}, true)
 	c.Assert(err, gc.IsNil)
 
 	cldA, err := s.database.Cloud(testContext, "my-cloud")
@@ -1778,7 +1914,7 @@ var setDeadTests = []struct {
 		}, []mongodoc.CloudRegion{{
 			Cloud:        params.Cloud("my-cloud"),
 			ProviderType: "ec2",
-		}})
+		}}, true)
 	},
 }, {
 	about: "AddModel",

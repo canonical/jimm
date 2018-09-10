@@ -253,7 +253,7 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	// address we succeeded in connecting to.
 	ctl.HostPorts = mongodocAPIHostPorts(conn.APIHostPorts())
 
-	err = h.jem.DB.AddController(ctx, ctl, cloudRegions)
+	err = h.jem.DB.AddController(ctx, ctl, cloudRegions, true)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
@@ -554,7 +554,7 @@ func (h *Handler) GetControllerLocations(p httprequest.Params, arg *params.GetCo
 	}, nil
 }
 
-// `erLocations returns all the available
+// GetAllControllerLocations returns all the available
 // sets of controller location attributes, restricting
 // the search by any provided location attributes.
 func (h *Handler) GetAllControllerLocations(p httprequest.Params, arg *params.GetAllControllerLocations) (*params.AllControllerLocationsResponse, error) {

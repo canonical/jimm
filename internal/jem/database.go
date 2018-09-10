@@ -104,7 +104,7 @@ func (db *Database) ensureIndexes() error {
 // error with a params.ErrAlreadyExists cause if there is already a
 // controller with the given name. The Id field in ctl will be set from
 // its Path field.
-func (db *Database) AddController(ctx context.Context, ctl *mongodoc.Controller, cloudRegions []mongodoc.CloudRegion) (err error) {
+func (db *Database) AddController(ctx context.Context, ctl *mongodoc.Controller, cloudRegions []mongodoc.CloudRegion, isPrimary bool) (err error) {
 	defer db.checkError(ctx, &err)
 	ctl.Id = ctl.Path.String()
 	err = db.Controllers().Insert(ctl)
@@ -117,7 +117,7 @@ func (db *Database) AddController(ctx context.Context, ctl *mongodoc.Controller,
 	if len(cloudRegions) == 0 {
 		return nil
 	}
-	err = db.AddCloudRegions(ctx, cloudRegions)
+	err = db.AddCloudRegionsForController(ctx, cloudRegions, ctl.Path, isPrimary)
 	if err != nil {
 		return errgo.NoteMask(err, "cannot insert controller cloud regions")
 	}
@@ -850,21 +850,49 @@ func (db *Database) Cloud(ctx context.Context, cloud params.Cloud) (_ *mongodoc.
 	}, nil
 }
 
-// AddCloudRegions adds new cloud regions to the database. It returns an
-// error with a params.ErrAlreadyExists cause if there is already a
-// cloud region with the given name.
-func (db *Database) AddCloudRegions(ctx context.Context, cloudRegions []mongodoc.CloudRegion) (err error) {
+// AddCloudRegionsForController adds new cloud regions to the database for a given controller.
+func (db *Database) AddCloudRegionsForController(ctx context.Context, cloudRegions []mongodoc.CloudRegion, ctl params.EntityPath, isPrimary bool) (err error) {
 	defer db.checkError(ctx, &err)
-	toInsert := make([]interface{}, len(cloudRegions))
-	for i, cr := range cloudRegions {
+	for _, cr := range cloudRegions {
 		cr.Id = fmt.Sprintf("%s/%s", cr.Cloud, cr.Region)
-		toInsert[i] = cr
-	}
-	err = db.CloudRegions().Insert(toInsert...)
-	if err != nil && !mgo.IsDup(err) {
-		return errgo.NoteMask(err, "cannot insert cloud region")
+		update := make(bson.D, 2, 2)
+		update[0] = bson.DocElem{
+			"$setOnInsert", bson.D{
+				{"cloud", cr.Cloud},
+				{"region", cr.Region},
+				{"providertype", cr.ProviderType},
+				{"authtypes", cr.AuthTypes},
+				{"endpoint", cr.Endpoint},
+				{"identityendpoint", cr.IdentityEndpoint},
+				{"storageendpoint", cr.StorageEndpoint},
+				{"acl", cr.ACL},
+			}}
+		if isPrimary {
+			update[1] = bson.DocElem{"$addToSet", bson.D{{"primarycontrollers", ctl}}}
+		} else {
+			update[1] = bson.DocElem{"$addToSet", bson.D{{"secondarycontrollers", ctl}}}
+		}
+
+		if _, err := db.CloudRegions().UpsertId(cr.Id, update); err != nil {
+			return errgo.Notef(err, "cannot add cloud regions")
+		}
 	}
 	return nil
+}
+
+//
+func (db *Database) CloudRegion(ctx context.Context, name params.Cloud, region string) (_ *mongodoc.CloudRegion, err error) {
+	defer db.checkError(ctx, &err)
+	var cloudRegion mongodoc.CloudRegion
+	err = db.CloudRegions().Find(bson.D{{"cloud", name}, {"region", region}}).One(&cloudRegion)
+	if err == mgo.ErrNotFound {
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "cloud %q region %q not found", name, region)
+	}
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot get cloud %q region %q", name, region)
+	}
+
+	return &cloudRegion, nil
 }
 
 // setCredentialUpdates marks all the controllers in the given ctlPaths
