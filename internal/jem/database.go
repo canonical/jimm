@@ -21,6 +21,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
 	"github.com/CanonicalLtd/jimm/params"
+	jujuparams "github.com/juju/juju/apiserver/params"
 )
 
 // Database wraps an mgo.DB ands adds a number of methods for
@@ -848,6 +849,48 @@ func (db *Database) Cloud(ctx context.Context, cloud params.Cloud) (_ *mongodoc.
 		IdentityEndpoint: cloudRegion.IdentityEndpoint,
 		StorageEndpoint:  cloudRegion.StorageEndpoint,
 	}, nil
+}
+
+func (db *Database) Clouds(ctx context.Context) (_ map[string]jujuparams.Cloud, err error) {
+	defer db.checkError(ctx, &err)
+	iter := db.CloudRegions().Find(bson.D{}).Select(bson.D{}).Iter()
+	results := map[string]jujuparams.Cloud{}
+	var v mongodoc.CloudRegion
+	for iter.Next(&v) {
+		if cr, ok := results[string(v.Cloud)]; ok {
+			if v.Region != "" {
+				cr.Regions = append(cr.Regions, jujuparams.CloudRegion{
+					Name:             v.Region,
+					Endpoint:         v.Endpoint,
+					IdentityEndpoint: v.IdentityEndpoint,
+					StorageEndpoint:  v.StorageEndpoint,
+				})
+			} else {
+				cr.Endpoint = v.Endpoint
+				cr.IdentityEndpoint = v.IdentityEndpoint
+				cr.StorageEndpoint = v.StorageEndpoint
+			}
+		} else {
+			j := jujuparams.Cloud{
+				Type:      v.ProviderType,
+				AuthTypes: v.AuthTypes,
+			}
+			if v.Region != "" {
+				j.Regions = []jujuparams.CloudRegion{{
+					Name:             v.Region,
+					Endpoint:         v.Endpoint,
+					IdentityEndpoint: v.IdentityEndpoint,
+					StorageEndpoint:  v.StorageEndpoint,
+				}}
+			} else {
+				j.Endpoint = v.Endpoint
+				j.IdentityEndpoint = v.IdentityEndpoint
+				j.StorageEndpoint = v.StorageEndpoint
+			}
+			results[string(v.Cloud)] = j
+		}
+	}
+	return results, nil
 }
 
 // AddCloudRegionsForController adds new cloud regions to the database for a given controller.
