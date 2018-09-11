@@ -23,6 +23,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
+	jujuparams "github.com/juju/juju/apiserver/params"
 )
 
 var testContext = context.Background()
@@ -1747,6 +1748,51 @@ func (s *databaseSuite) TestCloudRegionDuplicate(c *gc.C) {
 	c.Assert(cldB, jc.DeepEquals, &mongodoc.Cloud{
 		Name:         "my-cloud-2",
 		ProviderType: "ec2",
+	})
+
+	s.checkDBOK(c)
+}
+
+func (s *databaseSuite) TestClouds(c *gc.C) {
+	cloud := mongodoc.CloudRegion{
+		Cloud:        "my-cloud",
+		ProviderType: "ec2",
+	}
+
+	regionA := mongodoc.CloudRegion{
+		Cloud:        cloud.Cloud,
+		ProviderType: cloud.ProviderType,
+		Region:       "my-region-a",
+	}
+
+	regionB := mongodoc.CloudRegion{
+		Cloud:        cloud.Cloud,
+		ProviderType: cloud.ProviderType,
+		Region:       "my-region-b",
+	}
+
+	regionC := mongodoc.CloudRegion{
+		Cloud:        cloud.Cloud,
+		ProviderType: cloud.ProviderType,
+		Region:       "my-region-c",
+	}
+
+	err := s.database.AddCloudRegionsForController(testContext, []mongodoc.CloudRegion{cloud, regionA, regionB, regionC}, params.EntityPath{"bob", "bar"}, true)
+	c.Assert(err, gc.IsNil)
+
+	clouds, err := s.database.Clouds(testContext)
+	c.Assert(err, gc.IsNil)
+
+	c.Assert(clouds, gc.DeepEquals, map[string]jujuparams.Cloud{
+		"my-cloud": jujuparams.Cloud{
+			Type: cloud.ProviderType,
+			Regions: []jujuparams.CloudRegion{
+				{Name: regionA.Region},
+				{Name: regionB.Region},
+				{Name: regionC.Region},
+			},
+			AuthTypes: []string{},
+		},
 	})
 
 	s.checkDBOK(c)

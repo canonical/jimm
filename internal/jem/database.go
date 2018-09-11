@@ -857,38 +857,24 @@ func (db *Database) Clouds(ctx context.Context) (_ map[string]jujuparams.Cloud, 
 	results := map[string]jujuparams.Cloud{}
 	var v mongodoc.CloudRegion
 	for iter.Next(&v) {
-		if cr, ok := results[string(v.Cloud)]; ok {
-			if v.Region != "" {
-				cr.Regions = append(cr.Regions, jujuparams.CloudRegion{
-					Name:             v.Region,
-					Endpoint:         v.Endpoint,
-					IdentityEndpoint: v.IdentityEndpoint,
-					StorageEndpoint:  v.StorageEndpoint,
-				})
-			} else {
-				cr.Endpoint = v.Endpoint
-				cr.IdentityEndpoint = v.IdentityEndpoint
-				cr.StorageEndpoint = v.StorageEndpoint
-			}
+		cr, _ := results[string(v.Cloud)]
+		if v.Region == "" {
+			// v is a cloud
+			cr.Type = v.ProviderType
+			cr.AuthTypes = v.AuthTypes
+			cr.Endpoint = v.Endpoint
+			cr.IdentityEndpoint = v.IdentityEndpoint
+			cr.StorageEndpoint = v.StorageEndpoint
 		} else {
-			j := jujuparams.Cloud{
-				Type:      v.ProviderType,
-				AuthTypes: v.AuthTypes,
-			}
-			if v.Region != "" {
-				j.Regions = []jujuparams.CloudRegion{{
-					Name:             v.Region,
-					Endpoint:         v.Endpoint,
-					IdentityEndpoint: v.IdentityEndpoint,
-					StorageEndpoint:  v.StorageEndpoint,
-				}}
-			} else {
-				j.Endpoint = v.Endpoint
-				j.IdentityEndpoint = v.IdentityEndpoint
-				j.StorageEndpoint = v.StorageEndpoint
-			}
-			results[string(v.Cloud)] = j
+			// v is a region
+			cr.Regions = append(cr.Regions, jujuparams.CloudRegion{
+				Name:             v.Region,
+				Endpoint:         v.Endpoint,
+				IdentityEndpoint: v.IdentityEndpoint,
+				StorageEndpoint:  v.StorageEndpoint,
+			})
 		}
+		results[string(v.Cloud)] = cr
 	}
 	return results, nil
 }
