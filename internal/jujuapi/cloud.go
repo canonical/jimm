@@ -66,10 +66,10 @@ func mergeClouds(c1, c2 jujuparams.Cloud) jujuparams.Cloud {
 		c.Endpoint = c2.Endpoint
 	}
 	if c.IdentityEndpoint == "" {
-		c.Endpoint = c2.IdentityEndpoint
+		c.IdentityEndpoint = c2.IdentityEndpoint
 	}
 	if c.StorageEndpoint == "" {
-		c.Endpoint = c2.StorageEndpoint
+		c.StorageEndpoint = c2.StorageEndpoint
 	}
 	c.Regions = mergeRegions(c.Regions, c2.Regions)
 	return c

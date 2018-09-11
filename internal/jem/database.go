@@ -11,6 +11,7 @@ import (
 	"github.com/juju/version"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/juju/names.v2"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
 	"github.com/CanonicalLtd/jimm/params"
+	jujuparams "github.com/juju/juju/apiserver/params"
 )
 
 // Database wraps an mgo.DB ands adds a number of methods for
@@ -841,6 +843,36 @@ func (db *Database) Cloud(ctx context.Context, cloud params.Cloud) (_ *mongodoc.
 		IdentityEndpoint: cloudRegion.IdentityEndpoint,
 		StorageEndpoint:  cloudRegion.StorageEndpoint,
 	}, nil
+}
+
+// Clouds returns all of the clouds, keyed with thier CloudTag.
+func (db *Database) Clouds(ctx context.Context) (_ map[string]jujuparams.Cloud, err error) {
+	defer db.checkError(ctx, &err)
+	iter := db.CloudRegions().Find(bson.D{}).Select(bson.D{}).Iter()
+	results := map[string]jujuparams.Cloud{}
+	var v mongodoc.CloudRegion
+	for iter.Next(&v) {
+		key := names.NewCloudTag(string(v.Cloud)).String()
+		cr, _ := results[key]
+		if v.Region == "" {
+			// v is a cloud
+			cr.Type = v.ProviderType
+			cr.AuthTypes = v.AuthTypes
+			cr.Endpoint = v.Endpoint
+			cr.IdentityEndpoint = v.IdentityEndpoint
+			cr.StorageEndpoint = v.StorageEndpoint
+		} else {
+			// v is a region
+			cr.Regions = append(cr.Regions, jujuparams.CloudRegion{
+				Name:             v.Region,
+				Endpoint:         v.Endpoint,
+				IdentityEndpoint: v.IdentityEndpoint,
+				StorageEndpoint:  v.StorageEndpoint,
+			})
+		}
+		results[key] = cr
+	}
+	return results, errgo.Mask(iter.Err())
 }
 
 // UpsertCloudRegionsForController adds new cloud regions to the database for a given controller or update its

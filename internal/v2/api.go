@@ -215,6 +215,9 @@ func (h *Handler) AddController(arg *params.AddController) error {
 		} else {
 			secondaryCloudRegions = append(secondaryCloudRegions, &cloud)
 		}
+		for _, at := range v.AuthTypes {
+			cloud.AuthTypes = append(cloud.AuthTypes, string(at))
+		}
 		for _, reg := range v.Regions {
 			region := mongodoc.CloudRegion{
 				Cloud:            params.Cloud(k.Id()),

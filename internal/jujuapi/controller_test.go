@@ -212,7 +212,9 @@ func (s *controllerSuite) TestCloudCall(c *gc.C) {
 			IdentityEndpoint: "dummy-identity-endpoint",
 			StorageEndpoint:  "dummy-storage-endpoint",
 		}},
-		Endpoint: "dummy-storage-endpoint",
+		Endpoint:         "dummy-endpoint",
+		IdentityEndpoint: "dummy-identity-endpoint",
+		StorageEndpoint:  "dummy-storage-endpoint",
 	})
 }
 
@@ -236,7 +238,9 @@ func (s *controllerSuite) TestClouds(c *gc.C) {
 				IdentityEndpoint: "dummy-identity-endpoint",
 				StorageEndpoint:  "dummy-storage-endpoint",
 			}},
-			Endpoint: "dummy-storage-endpoint",
+			Endpoint:         "dummy-endpoint",
+			IdentityEndpoint: "dummy-identity-endpoint",
+			StorageEndpoint:  "dummy-storage-endpoint",
 		},
 	})
 }
