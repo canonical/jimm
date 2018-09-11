@@ -180,7 +180,7 @@ func (s *controllerSuite) TestDefaultCloud(c *gc.C) {
 				},
 			}, []mongodoc.CloudRegion{{
 				Cloud: params.Cloud(cloud),
-			}})
+			}}, true)
 			c.Assert(err, jc.ErrorIsNil)
 		}
 		cloud, err := client.DefaultCloud()
@@ -212,7 +212,9 @@ func (s *controllerSuite) TestCloudCall(c *gc.C) {
 			IdentityEndpoint: "dummy-identity-endpoint",
 			StorageEndpoint:  "dummy-storage-endpoint",
 		}},
-		Endpoint: "dummy-storage-endpoint",
+		Endpoint:         "dummy-endpoint",
+		IdentityEndpoint: "dummy-identity-endpoint",
+		StorageEndpoint:  "dummy-storage-endpoint",
 	})
 }
 
@@ -236,7 +238,9 @@ func (s *controllerSuite) TestClouds(c *gc.C) {
 				IdentityEndpoint: "dummy-identity-endpoint",
 				StorageEndpoint:  "dummy-storage-endpoint",
 			}},
-			Endpoint: "dummy-storage-endpoint",
+			Endpoint:         "dummy-endpoint",
+			IdentityEndpoint: "dummy-identity-endpoint",
+			StorageEndpoint:  "dummy-storage-endpoint",
 		},
 	})
 }

@@ -204,7 +204,7 @@ func (s *Suite) AssertAddControllerDoc(c *gc.C, cnt *mongodoc.Controller, cloudR
 	if cnt.UUID == "" {
 		cnt.UUID = fmt.Sprintf("%x", uuidGenerator.Next())
 	}
-	err := s.JEM.DB.AddController(context.Background(), cnt, cloudRegions)
+	err := s.JEM.DB.AddController(context.Background(), cnt, cloudRegions, true)
 
 	c.Assert(err, jc.ErrorIsNil)
 	return cnt

@@ -357,19 +357,8 @@ func (c cloud) Clouds() (jujuparams.CloudsResult, error) {
 }
 
 func (c cloud) clouds() (map[string]jujuparams.Cloud, error) {
-	clouds := make(map[string]jujuparams.Cloud)
-
-	err := c.root.jem.DoControllers(c.root.context, "", "", func(ctl *mongodoc.Controller) error {
-		cloudTag := jem.CloudTag(ctl.Cloud.Name).String()
-		// TODO consider caching this result because it will be often called and
-		// the result will change very rarely.
-		clouds[cloudTag] = mergeClouds(clouds[cloudTag], makeCloud(ctl.Cloud))
-		return nil
-	})
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	return clouds, nil
+	clouds, err := c.root.jem.DB.Clouds(c.root.context)
+	return clouds, errgo.Mask(err)
 }
 
 var errMoreThanOneCloud = errgo.Newf("more than one cloud")
