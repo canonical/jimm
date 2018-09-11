@@ -63,7 +63,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 		AdminPassword: info.Password,
 	}
 
-	err = s.jem.DB.AddController(testContext, ctl, []mongodoc.CloudRegion{})
+	err = s.jem.DB.AddController(testContext, ctl)
 	c.Assert(err, gc.IsNil)
 
 	// Open the API and check that it works.
@@ -124,7 +124,7 @@ func (s *jemAPIConnSuite) TestPoolOpenModelAPI(c *gc.C) {
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
 	}
-	err = s.jem.DB.AddController(testContext, ctl, []mongodoc.CloudRegion{})
+	err = s.jem.DB.AddController(testContext, ctl)
 	c.Assert(err, gc.IsNil)
 
 	mPath := params.EntityPath{"bob", "model"}
@@ -187,7 +187,7 @@ func (s *jemAPIConnSuite) TestOpenAPIFromDocsCancel(c *gc.C) {
 		AdminPassword: info.Password,
 	}
 
-	err = s.jem.DB.AddController(testContext, ctl, []mongodoc.CloudRegion{})
+	err = s.jem.DB.AddController(testContext, ctl)
 	c.Assert(err, gc.IsNil)
 
 	ctx, cancel := context.WithCancel(context.Background())

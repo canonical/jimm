@@ -805,8 +805,8 @@ var doContollerTests = []struct {
 
 func (s *jemSuite) TestDoControllers(c *gc.C) {
 	var testControllers = []struct {
-		controller   mongodoc.Controller
-		cloudRegions []mongodoc.CloudRegion
+		controller  mongodoc.Controller
+		cloudRegion mongodoc.CloudRegion
 	}{{
 		controller: mongodoc.Controller{
 			Path: params.EntityPath{
@@ -825,10 +825,10 @@ func (s *jemSuite) TestDoControllers(c *gc.C) {
 			},
 			Public: true,
 		},
-		cloudRegions: []mongodoc.CloudRegion{{
+		cloudRegion: mongodoc.CloudRegion{
 			Cloud:  params.Cloud("aws"),
 			Region: "us-east-1",
-		}},
+		},
 	}, {
 		controller: mongodoc.Controller{
 			Path: params.EntityPath{
@@ -847,10 +847,10 @@ func (s *jemSuite) TestDoControllers(c *gc.C) {
 			},
 			Public: true,
 		},
-		cloudRegions: []mongodoc.CloudRegion{{
+		cloudRegion: mongodoc.CloudRegion{
 			Cloud:  params.Cloud("aws"),
 			Region: "eu-west-1",
-		}},
+		},
 	}, {
 		controller: mongodoc.Controller{
 			Path: params.EntityPath{
@@ -872,10 +872,10 @@ func (s *jemSuite) TestDoControllers(c *gc.C) {
 			},
 			Public: true,
 		},
-		cloudRegions: []mongodoc.CloudRegion{{
+		cloudRegion: mongodoc.CloudRegion{
 			Cloud:  params.Cloud("aws"),
 			Region: "us-east-1",
-		}},
+		},
 	}, {
 		controller: mongodoc.Controller{
 			Path: params.EntityPath{
@@ -897,10 +897,10 @@ func (s *jemSuite) TestDoControllers(c *gc.C) {
 			},
 			Public: true,
 		},
-		cloudRegions: []mongodoc.CloudRegion{{
+		cloudRegion: mongodoc.CloudRegion{
 			Cloud:  params.Cloud("aws"),
 			Region: "eu-west-1",
-		}},
+		},
 	}, {
 		controller: mongodoc.Controller{
 			Path: params.EntityPath{
@@ -919,10 +919,10 @@ func (s *jemSuite) TestDoControllers(c *gc.C) {
 			},
 			Public: true,
 		},
-		cloudRegions: []mongodoc.CloudRegion{{
+		cloudRegion: mongodoc.CloudRegion{
 			Cloud:  params.Cloud("aws"),
 			Region: "us-east-1",
-		}},
+		},
 	}, {
 		controller: mongodoc.Controller{
 			Path: params.EntityPath{
@@ -941,10 +941,10 @@ func (s *jemSuite) TestDoControllers(c *gc.C) {
 			},
 			Public: true,
 		},
-		cloudRegions: []mongodoc.CloudRegion{{
+		cloudRegion: mongodoc.CloudRegion{
 			Cloud:  params.Cloud("gce"),
 			Region: "us-east-1",
-		}},
+		},
 	}, {
 		controller: mongodoc.Controller{
 			Path: params.EntityPath{
@@ -963,14 +963,16 @@ func (s *jemSuite) TestDoControllers(c *gc.C) {
 			},
 			Public: true,
 		},
-		cloudRegions: []mongodoc.CloudRegion{{
+		cloudRegion: mongodoc.CloudRegion{
 			Cloud:  params.Cloud("gce"),
 			Region: "us-east-1",
-		}},
+		},
 	}}
 
 	for i := range testControllers {
-		err := s.jem.DB.AddController(testContext, &testControllers[i].controller, testControllers[i].cloudRegions)
+		err := s.jem.AddController(testContext, &testControllers[i].controller, []*mongodoc.CloudRegion{
+			&testControllers[i].cloudRegion,
+		}, nil)
 
 		c.Assert(err, gc.IsNil)
 	}
@@ -989,8 +991,8 @@ func (s *jemSuite) TestDoControllers(c *gc.C) {
 
 func (s *jemSuite) TestDoControllersErrorResponse(c *gc.C) {
 	var testControllers = []struct {
-		controller   mongodoc.Controller
-		cloudRegions []mongodoc.CloudRegion
+		controller  mongodoc.Controller
+		cloudRegion mongodoc.CloudRegion
 	}{{
 		controller: mongodoc.Controller{
 			Cloud: mongodoc.Cloud{
@@ -1005,10 +1007,10 @@ func (s *jemSuite) TestDoControllersErrorResponse(c *gc.C) {
 			},
 			Public: true,
 		},
-		cloudRegions: []mongodoc.CloudRegion{{
+		cloudRegion: mongodoc.CloudRegion{
 			Cloud:  params.Cloud("aws"),
 			Region: "us-east-1",
-		}},
+		},
 	}, {
 		controller: mongodoc.Controller{
 			Path: params.EntityPath{
@@ -1023,10 +1025,10 @@ func (s *jemSuite) TestDoControllersErrorResponse(c *gc.C) {
 			},
 			Public: true,
 		},
-		cloudRegions: []mongodoc.CloudRegion{{
+		cloudRegion: mongodoc.CloudRegion{
 			Cloud:  params.Cloud("aws"),
 			Region: "eu-west-1",
-		}},
+		},
 	}, {
 		controller: mongodoc.Controller{
 			Path: params.EntityPath{
@@ -1044,10 +1046,10 @@ func (s *jemSuite) TestDoControllersErrorResponse(c *gc.C) {
 			},
 			Public: true,
 		},
-		cloudRegions: []mongodoc.CloudRegion{{
+		cloudRegion: mongodoc.CloudRegion{
 			Cloud:  params.Cloud("aws"),
 			Region: "us-east-1",
-		}},
+		},
 	}, {
 		controller: mongodoc.Controller{
 			Path: params.EntityPath{
@@ -1065,10 +1067,10 @@ func (s *jemSuite) TestDoControllersErrorResponse(c *gc.C) {
 			},
 			Public: true,
 		},
-		cloudRegions: []mongodoc.CloudRegion{{
+		cloudRegion: mongodoc.CloudRegion{
 			Cloud:  params.Cloud("aws"),
 			Region: "eu-west-1",
-		}},
+		},
 	}, {
 		controller: mongodoc.Controller{
 			Path: params.EntityPath{
@@ -1083,10 +1085,10 @@ func (s *jemSuite) TestDoControllersErrorResponse(c *gc.C) {
 			},
 			Public: true,
 		},
-		cloudRegions: []mongodoc.CloudRegion{{
+		cloudRegion: mongodoc.CloudRegion{
 			Cloud:  params.Cloud("aws"),
 			Region: "us-east-1",
-		}},
+		},
 	}, {
 		controller: mongodoc.Controller{
 			Path: params.EntityPath{
@@ -1101,10 +1103,10 @@ func (s *jemSuite) TestDoControllersErrorResponse(c *gc.C) {
 			},
 			Public: true,
 		},
-		cloudRegions: []mongodoc.CloudRegion{{
+		cloudRegion: mongodoc.CloudRegion{
 			Cloud:  params.Cloud("gce"),
 			Region: "us-east-1",
-		}},
+		},
 	}, {
 		controller: mongodoc.Controller{
 			Path: params.EntityPath{
@@ -1119,13 +1121,15 @@ func (s *jemSuite) TestDoControllersErrorResponse(c *gc.C) {
 			},
 			Public: true,
 		},
-		cloudRegions: []mongodoc.CloudRegion{{
+		cloudRegion: mongodoc.CloudRegion{
 			Cloud:  params.Cloud("gce"),
 			Region: "us-east-1",
-		}},
+		},
 	}}
 	for i := range testControllers {
-		err := s.jem.DB.AddController(testContext, &testControllers[i].controller, testControllers[i].cloudRegions)
+		err := s.jem.AddController(testContext, &testControllers[i].controller, []*mongodoc.CloudRegion{
+			&testControllers[i].cloudRegion,
+		}, nil)
 
 		c.Assert(err, gc.IsNil)
 	}
@@ -1193,8 +1197,8 @@ func (s *jemSuite) TestSelectController(c *gc.C) {
 	})
 
 	var testControllers = []struct {
-		controller   mongodoc.Controller
-		cloudRegions []mongodoc.CloudRegion
+		controller  mongodoc.Controller
+		cloudRegion mongodoc.CloudRegion
 	}{{
 		controller: mongodoc.Controller{
 			Path: params.EntityPath{
@@ -1213,10 +1217,10 @@ func (s *jemSuite) TestSelectController(c *gc.C) {
 			},
 			Public: true,
 		},
-		cloudRegions: []mongodoc.CloudRegion{{
+		cloudRegion: mongodoc.CloudRegion{
 			Cloud:  params.Cloud("aws"),
 			Region: "us-east-1",
-		}},
+		},
 	}, {
 		controller: mongodoc.Controller{
 			Path: params.EntityPath{
@@ -1235,10 +1239,10 @@ func (s *jemSuite) TestSelectController(c *gc.C) {
 			},
 			Public: true,
 		},
-		cloudRegions: []mongodoc.CloudRegion{{
+		cloudRegion: mongodoc.CloudRegion{
 			Cloud:  params.Cloud("aws"),
 			Region: "eu-west-1",
-		}},
+		},
 	}, {
 		controller: mongodoc.Controller{
 			Path: params.EntityPath{
@@ -1260,10 +1264,10 @@ func (s *jemSuite) TestSelectController(c *gc.C) {
 			},
 			Public: true,
 		},
-		cloudRegions: []mongodoc.CloudRegion{{
+		cloudRegion: mongodoc.CloudRegion{
 			Cloud:  params.Cloud("aws"),
 			Region: "us-east-1",
-		}},
+		},
 	}, {
 		controller: mongodoc.Controller{
 			Path: params.EntityPath{
@@ -1285,10 +1289,10 @@ func (s *jemSuite) TestSelectController(c *gc.C) {
 			},
 			Public: true,
 		},
-		cloudRegions: []mongodoc.CloudRegion{{
+		cloudRegion: mongodoc.CloudRegion{
 			Cloud:  params.Cloud("aws"),
 			Region: "eu-west-1",
-		}},
+		},
 	}, {
 		controller: mongodoc.Controller{
 			Path: params.EntityPath{
@@ -1307,10 +1311,10 @@ func (s *jemSuite) TestSelectController(c *gc.C) {
 			},
 			Public: true,
 		},
-		cloudRegions: []mongodoc.CloudRegion{{
+		cloudRegion: mongodoc.CloudRegion{
 			Cloud:  params.Cloud("aws"),
 			Region: "us-east-1",
-		}},
+		},
 	}, {
 		controller: mongodoc.Controller{
 			Path: params.EntityPath{
@@ -1329,10 +1333,10 @@ func (s *jemSuite) TestSelectController(c *gc.C) {
 			},
 			Public: true,
 		},
-		cloudRegions: []mongodoc.CloudRegion{{
+		cloudRegion: mongodoc.CloudRegion{
 			Cloud:  params.Cloud("gce"),
 			Region: "us-east-1",
-		}},
+		},
 	}, {
 		controller: mongodoc.Controller{
 			Path: params.EntityPath{
@@ -1351,13 +1355,15 @@ func (s *jemSuite) TestSelectController(c *gc.C) {
 			},
 			Public: true,
 		},
-		cloudRegions: []mongodoc.CloudRegion{{
+		cloudRegion: mongodoc.CloudRegion{
 			Cloud:  params.Cloud("gce"),
 			Region: "us-east-1",
-		}},
+		},
 	}}
 	for i := range testControllers {
-		err := s.jem.DB.AddController(testContext, &testControllers[i].controller, testControllers[i].cloudRegions)
+		err := s.jem.AddController(testContext, &testControllers[i].controller, []*mongodoc.CloudRegion{
+			&testControllers[i].cloudRegion,
+		}, nil)
 
 		c.Assert(err, gc.IsNil)
 	}
@@ -1562,7 +1568,7 @@ func (s *jemSuite) TestEarliestControllerVersion(c *gc.C) {
 		_, err := s.jem.DB.Controllers().RemoveAll(nil)
 		c.Assert(err, jc.ErrorIsNil)
 		for _, ctl := range test.controllers {
-			err := s.jem.DB.AddController(ctx, &ctl, nil)
+			err := s.jem.DB.AddController(ctx, &ctl)
 			c.Assert(err, jc.ErrorIsNil)
 		}
 		v, err := s.jem.EarliestControllerVersion(ctx)
@@ -1806,12 +1812,12 @@ func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityP
 		},
 		Public: true,
 	}
-	cloudRegions := []mongodoc.CloudRegion{{
+	err = s.jem.DB.AddController(testContext, ctl)
+	c.Assert(err, jc.ErrorIsNil)
+	err = s.jem.DB.UpsertCloudRegionsForController(testContext, []*mongodoc.CloudRegion{{
 		Cloud:  params.Cloud("dummy"),
 		Region: "dummy-region",
-	}}
-	err = s.jem.DB.AddController(testContext, ctl, cloudRegions)
-	c.Assert(err, jc.ErrorIsNil)
+	}}, path, true)
 	return path
 }
 

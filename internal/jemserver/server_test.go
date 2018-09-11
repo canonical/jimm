@@ -202,7 +202,7 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 		CACert:    jujutesting.CACert,
 		AdminUser: "bob",
 		HostPorts: [][]mongodoc.HostPort{{{Host: "0.1.2.3", Port: 4567}}},
-	}, nil)
+	})
 	c.Assert(err, gc.IsNil)
 
 	params := jemserver.Params{

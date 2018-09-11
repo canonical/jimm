@@ -41,7 +41,7 @@ func (s *monitorSuite) TestMonitor(c *gc.C) {
 		CACert:        info.CACert,
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
-	}, nil)
+	})
 
 	c.Assert(err, gc.IsNil)
 
@@ -96,7 +96,7 @@ func (s *monitorSuite) TestMonitorWithBrokenMongoConnection(c *gc.C) {
 		CACert:        apiInfo.CACert,
 		AdminUser:     apiInfo.Tag.Id(),
 		AdminPassword: apiInfo.Password,
-	}, nil)
+	})
 
 	c.Assert(err, gc.IsNil)
 
@@ -148,7 +148,7 @@ func (s *monitorSuite) TestMonitorWithBrokenJujuAPIConnection(c *gc.C) {
 		CACert:        apiInfo.CACert,
 		AdminUser:     apiInfo.Tag.Id(),
 		AdminPassword: apiInfo.Password,
-	}, nil)
+	})
 
 	c.Assert(err, gc.IsNil)
 

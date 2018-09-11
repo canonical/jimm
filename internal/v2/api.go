@@ -200,7 +200,8 @@ func (h *Handler) AddController(arg *params.AddController) error {
 		return errgo.Notef(err, "cannot get clouds")
 	}
 
-	var cloudRegions []mongodoc.CloudRegion
+	var primaryCloudRegions []*mongodoc.CloudRegion
+	var secondaryCloudRegions []*mongodoc.CloudRegion
 	for k, v := range clouds {
 		cloud := mongodoc.CloudRegion{
 			Cloud:            params.Cloud(k.Id()),
@@ -209,8 +210,11 @@ func (h *Handler) AddController(arg *params.AddController) error {
 			StorageEndpoint:  v.StorageEndpoint,
 			ProviderType:     v.Type,
 		}
-		cloudRegions = append(cloudRegions, cloud)
-
+		if ctl.Location["cloud"] == k.Id() {
+			primaryCloudRegions = append(primaryCloudRegions, &cloud)
+		} else {
+			secondaryCloudRegions = append(secondaryCloudRegions, &cloud)
+		}
 		for _, reg := range v.Regions {
 			region := mongodoc.CloudRegion{
 				Cloud:            params.Cloud(k.Id()),
@@ -223,7 +227,11 @@ func (h *Handler) AddController(arg *params.AddController) error {
 			for _, at := range v.AuthTypes {
 				region.AuthTypes = append(region.AuthTypes, string(at))
 			}
-			cloudRegions = append(cloudRegions, region)
+			if ctl.Location["region"] == reg.Name && ctl.Location["cloud"] == k.Id() {
+				primaryCloudRegions = append(primaryCloudRegions, &cloud)
+			} else {
+				secondaryCloudRegions = append(secondaryCloudRegions, &cloud)
+			}
 		}
 	}
 
@@ -253,7 +261,7 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	// address we succeeded in connecting to.
 	ctl.HostPorts = mongodocAPIHostPorts(conn.APIHostPorts())
 
-	err = h.jem.DB.AddController(ctx, ctl, cloudRegions)
+	err = h.jem.AddController(ctx, ctl, primaryCloudRegions, secondaryCloudRegions)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
@@ -554,7 +562,7 @@ func (h *Handler) GetControllerLocations(p httprequest.Params, arg *params.GetCo
 	}, nil
 }
 
-// `erLocations returns all the available
+// GetAllControllerLocations returns all the available
 // sets of controller location attributes, restricting
 // the search by any provided location attributes.
 func (h *Handler) GetAllControllerLocations(p httprequest.Params, arg *params.GetAllControllerLocations) (*params.AllControllerLocationsResponse, error) {

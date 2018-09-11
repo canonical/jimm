@@ -169,7 +169,7 @@ func (s *controllerSuite) TestDefaultCloud(c *gc.C) {
 		_, err := s.JEM.DB.Controllers().RemoveAll(nil)
 		c.Assert(err, jc.ErrorIsNil)
 		for j, cloud := range test.cloudNames {
-			err := s.JEM.DB.AddController(testContext, &mongodoc.Controller{
+			err := s.JEM.AddController(testContext, &mongodoc.Controller{
 				Path:   params.EntityPath{User: "test", Name: params.Name(fmt.Sprintf("controller-%d", j))},
 				ACL:    params.ACL{Read: []string{"everyone"}},
 				CACert: "cacert",
@@ -178,9 +178,9 @@ func (s *controllerSuite) TestDefaultCloud(c *gc.C) {
 				Cloud: mongodoc.Cloud{
 					Name: params.Cloud(cloud),
 				},
-			}, []mongodoc.CloudRegion{{
+			}, []*mongodoc.CloudRegion{{
 				Cloud: params.Cloud(cloud),
-			}})
+			}}, nil)
 			c.Assert(err, jc.ErrorIsNil)
 		}
 		cloud, err := client.DefaultCloud()

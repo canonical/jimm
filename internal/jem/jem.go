@@ -403,6 +403,30 @@ func (j *JEM) Credential(ctx context.Context, path params.CredentialPath) (*mong
 	return cred, nil
 }
 
+// AddController adds a controller. It will be treated as the primary controller for all regions
+// in primaryCloudRegions, and as a secondary (fallback) controller for regions in
+// secondaryCloudRegions.
+func (j *JEM) AddController(ctx context.Context, ctl *mongodoc.Controller, primaryCloudRegions []*mongodoc.CloudRegion, secondaryCloudRegions []*mongodoc.CloudRegion) error {
+	err := j.DB.AddController(ctx, ctl)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
+	}
+	if len(primaryCloudRegions) != 0 {
+		err = j.DB.UpsertCloudRegionsForController(ctx, primaryCloudRegions, ctl.Path, true)
+		if err != nil {
+			return errgo.NoteMask(err, "cannot insert controller primary cloud regions")
+		}
+	}
+	if len(secondaryCloudRegions) == 0 {
+		return nil
+	}
+	err = j.DB.UpsertCloudRegionsForController(ctx, secondaryCloudRegions, ctl.Path, false)
+	if err != nil {
+		return errgo.NoteMask(err, "cannot insert controller secondary cloud regions")
+	}
+	return nil
+}
+
 // CreateModelParams specifies the parameters needed to create a new
 // model using CreateModel.
 type CreateModelParams struct {
