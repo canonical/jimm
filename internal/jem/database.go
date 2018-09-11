@@ -11,6 +11,7 @@ import (
 	"github.com/juju/version"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/juju/names.v2"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
@@ -857,7 +858,8 @@ func (db *Database) Clouds(ctx context.Context) (_ map[string]jujuparams.Cloud, 
 	results := map[string]jujuparams.Cloud{}
 	var v mongodoc.CloudRegion
 	for iter.Next(&v) {
-		cr, _ := results[string(v.Cloud)]
+		key := names.NewCloudTag(string(v.Cloud)).String()
+		cr, _ := results[key]
 		if v.Region == "" {
 			// v is a cloud
 			cr.Type = v.ProviderType
@@ -874,7 +876,7 @@ func (db *Database) Clouds(ctx context.Context) (_ map[string]jujuparams.Cloud, 
 				StorageEndpoint:  v.StorageEndpoint,
 			})
 		}
-		results[string(v.Cloud)] = cr
+		results[key] = cr
 	}
 	return results, nil
 }

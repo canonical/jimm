@@ -1784,7 +1784,7 @@ func (s *databaseSuite) TestClouds(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	c.Assert(clouds, gc.DeepEquals, map[string]jujuparams.Cloud{
-		"my-cloud": jujuparams.Cloud{
+		"cloud-my-cloud": jujuparams.Cloud{
 			Type: cloud.ProviderType,
 			Regions: []jujuparams.CloudRegion{
 				{Name: regionA.Region},

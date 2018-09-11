@@ -209,6 +209,9 @@ func (h *Handler) AddController(arg *params.AddController) error {
 			StorageEndpoint:  v.StorageEndpoint,
 			ProviderType:     v.Type,
 		}
+		for _, at := range v.AuthTypes {
+			cloud.AuthTypes = append(cloud.AuthTypes, string(at))
+		}
 		cloudRegions = append(cloudRegions, cloud)
 
 		for _, reg := range v.Regions {
