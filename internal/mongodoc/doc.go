@@ -175,7 +175,18 @@ type Region struct {
 	StorageEndpoint string
 }
 
-// CloudRegion holds the details of a cloud region.
+// CloudRegion holds the details of a cloud or a region within a cloud.
+// For information about a whole cloud, Region will be empty, and the
+// document should not contain any secondary controllers, as all
+// controllers located in that cloud are considered equally primary.
+//
+// If there are any region entries in the collection, there should be a
+// cloud entry that represents the cloud for those regions.
+//
+// For a cloud region, secondary controllers are those that can be used
+// to manage a model within a region but are not located within that
+// region (primary controllers should be used in preference if
+// available).
 type CloudRegion struct {
 	// Id holds the primary key for a CloudRegion.
 	// It is in the format <cloud>/<region>
@@ -205,6 +216,10 @@ type CloudRegion struct {
 	// IdentityEndpoint contains the region or cloud storage endpoint parameter
 	// specified by the controller.
 	StorageEndpoint string
+
+	// CACertificates contains any CA root certificates for the cloud
+	// instances.
+	CACertificates []string
 
 	// PrimaryControllers holds the local user and name given to the
 	// controllers that can use that cloud and which are hosted on this region.

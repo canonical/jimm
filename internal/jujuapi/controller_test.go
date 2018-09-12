@@ -168,9 +168,12 @@ func (s *controllerSuite) TestDefaultCloud(c *gc.C) {
 		c.Logf("test %d: %s", i, test.about)
 		_, err := s.JEM.DB.Controllers().RemoveAll(nil)
 		c.Assert(err, jc.ErrorIsNil)
+		_, err = s.JEM.DB.CloudRegions().RemoveAll(nil)
+		c.Assert(err, jc.ErrorIsNil)
 		for j, cloud := range test.cloudNames {
-			err := s.JEM.AddController(testContext, &mongodoc.Controller{
-				Path:   params.EntityPath{User: "test", Name: params.Name(fmt.Sprintf("controller-%d", j))},
+			ctlPath := params.EntityPath{User: "test", Name: params.Name(fmt.Sprintf("controller-%d", j))}
+			err := s.JEM.DB.AddController(testContext, &mongodoc.Controller{
+				Path:   ctlPath,
 				ACL:    params.ACL{Read: []string{"everyone"}},
 				CACert: "cacert",
 				UUID:   fmt.Sprintf("uuid%d", j),
@@ -178,12 +181,15 @@ func (s *controllerSuite) TestDefaultCloud(c *gc.C) {
 				Cloud: mongodoc.Cloud{
 					Name: params.Cloud(cloud),
 				},
-			}, []*mongodoc.CloudRegion{{
-				Cloud: params.Cloud(cloud),
-				ACL: params.ACL {
+			})
+			c.Assert(err, jc.ErrorIsNil)
+			err = s.JEM.DB.UpdateCloudRegions(testContext, []mongodoc.CloudRegion{{
+				Cloud:              params.Cloud(cloud),
+				PrimaryControllers: []params.EntityPath{ctlPath},
+				ACL: params.ACL{
 					Read: []string{"everyone"},
 				},
-			}}, nil)
+			}})
 			c.Assert(err, jc.ErrorIsNil)
 		}
 		cloud, err := client.DefaultCloud()

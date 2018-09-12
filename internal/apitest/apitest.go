@@ -204,12 +204,12 @@ func (s *Suite) AssertAddControllerDoc(c *gc.C, cnt *mongodoc.Controller, primar
 	if cnt.UUID == "" {
 		cnt.UUID = fmt.Sprintf("%x", uuidGenerator.Next())
 	}
-	var pControllers []*mongodoc.CloudRegion
-	if primaryCloudRegion != nil {
-		pControllers = append(pControllers, primaryCloudRegion)
-	}
-	err := s.JEM.AddController(context.Background(), cnt, pControllers, nil)
+	err := s.JEM.DB.AddController(context.Background(), cnt)
 	c.Assert(err, jc.ErrorIsNil)
+	if primaryCloudRegion != nil {
+		err = s.JEM.DB.UpdateCloudRegions(context.Background(), []mongodoc.CloudRegion{*primaryCloudRegion})
+		c.Assert(err, jc.ErrorIsNil)
+	}
 	return cnt
 }
 

@@ -204,8 +204,8 @@ func (p *Pool) JEM(ctx context.Context) *JEM {
 	}
 	p.refCount++
 	return &JEM{
-		DB:   newDatabase(ctx, p.config.SessionPool, p.dbName),
-		pool: p,
+		DB:                             newDatabase(ctx, p.config.SessionPool, p.dbName),
+		pool:                           p,
 		usageSenderAuthorizationClient: p.usageSenderAuthorizationClient,
 	}
 }
@@ -401,30 +401,6 @@ func (j *JEM) Credential(ctx context.Context, path params.CredentialPath) (*mong
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	return cred, nil
-}
-
-// AddController adds a controller. It will be treated as the primary controller for all regions
-// in primaryCloudRegions, and as a secondary (fallback) controller for regions in
-// secondaryCloudRegions.
-func (j *JEM) AddController(ctx context.Context, ctl *mongodoc.Controller, primaryCloudRegions []*mongodoc.CloudRegion, secondaryCloudRegions []*mongodoc.CloudRegion) error {
-	err := j.DB.AddController(ctx, ctl)
-	if err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
-	}
-	if len(primaryCloudRegions) != 0 {
-		err = j.DB.UpsertCloudRegionsForController(ctx, primaryCloudRegions, ctl.Path, true)
-		if err != nil {
-			return errgo.NoteMask(err, "cannot insert controller primary cloud regions")
-		}
-	}
-	if len(secondaryCloudRegions) == 0 {
-		return nil
-	}
-	err = j.DB.UpsertCloudRegionsForController(ctx, secondaryCloudRegions, ctl.Path, false)
-	if err != nil {
-		return errgo.NoteMask(err, "cannot insert controller secondary cloud regions")
-	}
-	return nil
 }
 
 // CreateModelParams specifies the parameters needed to create a new
@@ -1012,6 +988,76 @@ func (j *JEM) modelRegion(ctx context.Context, ctlPath params.EntityPath, uuid s
 	}
 	cr := r.(cloudRegion)
 	return cr.cloud, cr.region, nil
+}
+
+// CreateCloud creates a new cloud in the database and adds it to a
+// controller. The slice of regions must contain at least a region for
+// the cloud as a whole (no region name) which must be first. If the
+// cloud name already exists then an error with a cause of
+// params.ErrAlreadyExists will be returned.
+func (j *JEM) CreateCloud(ctx context.Context, cloud mongodoc.CloudRegion, regions []mongodoc.CloudRegion) error {
+	// TODO(mhilton) check the cloud name isn't reserved.
+
+	// Attempt to insert the document for the cloud and fail early if
+	// such a cloud exists.
+	if err := j.DB.InsertCloudRegion(ctx, &cloud); err != nil {
+		if errgo.Cause(err) == params.ErrAlreadyExists {
+			return errgo.WithCausef(nil, params.ErrAlreadyExists, "cloud %q already exists", cloud.Cloud)
+		}
+		return errgo.Mask(err)
+	}
+	jcloud := jujucloud.Cloud{
+		Name:             string(cloud.Cloud),
+		Type:             cloud.ProviderType,
+		Endpoint:         cloud.Endpoint,
+		IdentityEndpoint: cloud.IdentityEndpoint,
+		StorageEndpoint:  cloud.StorageEndpoint,
+		CACertificates:   cloud.CACertificates,
+	}
+	for _, authType := range cloud.AuthTypes {
+		jcloud.AuthTypes = append(jcloud.AuthTypes, jujucloud.AuthType(authType))
+	}
+	for _, reg := range regions {
+		jcloud.Regions = append(jcloud.Regions, jujucloud.Region{
+			Name:             reg.Region,
+			Endpoint:         reg.Endpoint,
+			IdentityEndpoint: reg.IdentityEndpoint,
+			StorageEndpoint:  reg.StorageEndpoint,
+		})
+	}
+	ctlPath, err := j.createCloud(ctx, jcloud)
+	if err != nil {
+		if err := j.DB.RemoveCloudRegion(ctx, cloud.Cloud, ""); err != nil {
+			zapctx.Warn(ctx, "cannot remove cloud that failed to deploy", zaputil.Error(err))
+		}
+		return errgo.Mask(err)
+	}
+	cloud.PrimaryControllers = []params.EntityPath{ctlPath}
+	for i := range regions {
+		regions[i].PrimaryControllers = []params.EntityPath{ctlPath}
+	}
+	return errgo.Mask(j.DB.UpdateCloudRegions(ctx, append(regions, cloud)))
+}
+
+func (j *JEM) createCloud(ctx context.Context, cloud jujucloud.Cloud) (params.EntityPath, error) {
+	// Pick a random public controller.
+	// TODO(mhilton) find a better way to choose a controller for the
+	// cloud (presumably based on IP address magic).
+	ctlPath, err := j.selectController(ctx, "", "")
+	if err != nil {
+		return params.EntityPath{}, errgo.Mask(err)
+	}
+	conn, err := j.OpenAPI(ctx, ctlPath)
+	if err != nil {
+		// TODO(mhilton) if this controller fails try another?
+		return params.EntityPath{}, errgo.Mask(err)
+	}
+	defer conn.Close()
+	if err := cloudapi.NewClient(conn).AddCloud(cloud); err != nil {
+		// TODO(mhilton) if this controller fails try another?
+		return params.EntityPath{}, errgo.Mask(err)
+	}
+	return ctlPath, nil
 }
 
 // UserTag creates a juju user tag from a params.User

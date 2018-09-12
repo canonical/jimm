@@ -395,6 +395,7 @@ func (c cloud) DefaultCloud() (jujuparams.StringResult, error) {
 	if err != nil {
 		return result, errgo.Mask(err)
 	}
+	zapctx.Info(c.root.context, "clouds", zap.Any("clouds", clouds))
 	if len(clouds) != 1 {
 		return result, errgo.WithCausef(nil, params.ErrNotFound, "no default cloud")
 	}
