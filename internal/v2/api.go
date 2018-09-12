@@ -200,31 +200,27 @@ func (h *Handler) AddController(arg *params.AddController) error {
 		return errgo.Notef(err, "cannot get clouds")
 	}
 
-	var primaryCloudRegions []*mongodoc.CloudRegion
-	var secondaryCloudRegions []*mongodoc.CloudRegion
+	var cloudRegions []mongodoc.CloudRegion
 	for k, v := range clouds {
-		cloud := mongodoc.CloudRegion{
-			Cloud:            params.Cloud(k.Id()),
-			Endpoint:         v.Endpoint,
-			IdentityEndpoint: v.IdentityEndpoint,
-			StorageEndpoint:  v.StorageEndpoint,
-			ProviderType:     v.Type,
+		cr := mongodoc.CloudRegion{
+			Cloud:              params.Cloud(k.Id()),
+			Endpoint:           v.Endpoint,
+			IdentityEndpoint:   v.IdentityEndpoint,
+			StorageEndpoint:    v.StorageEndpoint,
+			ProviderType:       v.Type,
+			CACertificates:     v.CACertificates,
+			PrimaryControllers: []params.EntityPath{ctl.Path},
 			ACL: params.ACL{
 				Read: []string{"everyone"},
 			},
 		}
-		if ctl.Location["cloud"] == k.Id() {
-			primaryCloudRegions = append(primaryCloudRegions, &cloud)
-		} else {
-			secondaryCloudRegions = append(secondaryCloudRegions, &cloud)
-		}
 		for _, at := range v.AuthTypes {
-			cloud.AuthTypes = append(cloud.AuthTypes, string(at))
+			cr.AuthTypes = append(cr.AuthTypes, string(at))
 		}
+		cloudRegions = append(cloudRegions, cr)
 		for _, reg := range v.Regions {
-			region := mongodoc.CloudRegion{
+			cr := mongodoc.CloudRegion{
 				Cloud:            params.Cloud(k.Id()),
-				ProviderType:     v.Type,
 				Region:           reg.Name,
 				Endpoint:         reg.Endpoint,
 				IdentityEndpoint: reg.IdentityEndpoint,
@@ -233,14 +229,12 @@ func (h *Handler) AddController(arg *params.AddController) error {
 					Read: []string{"everyone"},
 				},
 			}
-			for _, at := range v.AuthTypes {
-				region.AuthTypes = append(region.AuthTypes, string(at))
-			}
-			if ctl.Location["region"] == reg.Name && ctl.Location["cloud"] == k.Id() {
-				primaryCloudRegions = append(primaryCloudRegions, &region)
+			if ctl.Location["cloud"] == k.Id() && ctl.Location["region"] == reg.Name {
+				cr.PrimaryControllers = []params.EntityPath{ctl.Path}
 			} else {
-				secondaryCloudRegions = append(secondaryCloudRegions, &region)
+				cr.SecondaryControllers = []params.EntityPath{ctl.Path}
 			}
+			cloudRegions = append(cloudRegions, cr)
 		}
 	}
 
@@ -270,9 +264,11 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	// address we succeeded in connecting to.
 	ctl.HostPorts = mongodocAPIHostPorts(conn.APIHostPorts())
 
-	err = h.jem.AddController(ctx, ctl, primaryCloudRegions, secondaryCloudRegions)
-	if err != nil {
+	if err := h.jem.DB.AddController(ctx, ctl); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
+	}
+	if err := h.jem.DB.UpdateCloudRegions(ctx, cloudRegions); err != nil {
+		return errgo.Mask(err)
 	}
 	return nil
 }

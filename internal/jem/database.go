@@ -859,13 +859,12 @@ func (db *Database) GetCloudRegionsIter(ctx context.Context) *CanReadIter {
 	return db.NewCanReadIter(ctx, db.CloudRegions().Find(nil).Iter())
 }
 
-// UpsertCloudRegionsForController adds new cloud regions to the database for a given controller or update its
-// controller list depending on the isPrimary parameter.
-func (db *Database) UpsertCloudRegionsForController(ctx context.Context, cloudRegions []*mongodoc.CloudRegion, ctl params.EntityPath, isPrimary bool) (err error) {
+// UpdateCloudRegions adds new cloud regions to the database.
+func (db *Database) UpdateCloudRegions(ctx context.Context, cloudRegions []mongodoc.CloudRegion) (err error) {
 	defer db.checkError(ctx, &err)
 	for _, cr := range cloudRegions {
 		cr.Id = fmt.Sprintf("%s/%s", cr.Cloud, cr.Region)
-		update := make(bson.D, 2)
+		update := make(bson.D, 1, 3)
 		update[0] = bson.DocElem{
 			"$setOnInsert", bson.D{
 				{"cloud", cr.Cloud},
@@ -875,16 +874,17 @@ func (db *Database) UpsertCloudRegionsForController(ctx context.Context, cloudRe
 				{"endpoint", cr.Endpoint},
 				{"identityendpoint", cr.IdentityEndpoint},
 				{"storageendpoint", cr.StorageEndpoint},
+				{"cacertificates", cr.CACertificates},
 				{"acl", cr.ACL},
 			}}
-		if isPrimary {
-			update[1] = bson.DocElem{"$addToSet", bson.D{{"primarycontrollers", ctl}}}
-		} else {
-			update[1] = bson.DocElem{"$addToSet", bson.D{{"secondarycontrollers", ctl}}}
+		if len(cr.PrimaryControllers) > 0 {
+			update = append(update, bson.DocElem{"$addToSet", bson.D{{"primarycontrollers", bson.D{{"$each", cr.PrimaryControllers}}}}})
 		}
-
+		if len(cr.SecondaryControllers) > 0 {
+			update = append(update, bson.DocElem{"$addToSet", bson.D{{"secondarycontrollers", bson.D{{"$each", cr.SecondaryControllers}}}}})
+		}
 		if _, err := db.CloudRegions().UpsertId(cr.Id, update); err != nil {
-			return errgo.Notef(err, "cannot add cloud regions")
+			return errgo.Notef(err, "cannot update cloud regions")
 		}
 	}
 	return nil
@@ -905,6 +905,26 @@ func (db *Database) CloudRegion(ctx context.Context, name params.Cloud, region s
 	}
 
 	return &cloudRegion, nil
+}
+
+// InsertCloudRegion inserts a new CloudRegion to the database. If the
+// region already exists then an error with the cause
+// params.ErrAlreadyExists is returned.
+func (db *Database) InsertCloudRegion(ctx context.Context, cr *mongodoc.CloudRegion) (err error) {
+	defer db.checkError(ctx, &err)
+	cr.Id = fmt.Sprintf("%s/%s", cr.Cloud, cr.Region)
+	if err = db.CloudRegions().Insert(cr); err != nil {
+		if mgo.IsDup(err) {
+			err = errgo.WithCausef(err, params.ErrAlreadyExists, "")
+		}
+	}
+	return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
+}
+
+// RemoveCloudRegion removes the given cloud region.
+func (db *Database) RemoveCloudRegion(ctx context.Context, cloud params.Cloud, region string) (err error) {
+	defer db.checkError(ctx, &err)
+	return errgo.Mask(db.CloudRegions().RemoveId(fmt.Sprintf("%s/%s", cloud, region)))
 }
 
 // setCredentialUpdates marks all the controllers in the given ctlPaths

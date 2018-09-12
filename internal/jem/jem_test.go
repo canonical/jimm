@@ -970,10 +970,10 @@ func (s *jemSuite) TestDoControllers(c *gc.C) {
 	}}
 
 	for i := range testControllers {
-		err := s.jem.AddController(testContext, &testControllers[i].controller, []*mongodoc.CloudRegion{
-			&testControllers[i].cloudRegion,
-		}, nil)
-
+		err := s.jem.DB.AddController(testContext, &testControllers[i].controller)
+		c.Assert(err, gc.IsNil)
+		testControllers[i].cloudRegion.PrimaryControllers = []params.EntityPath{testControllers[i].controller.Path}
+		err = s.jem.DB.UpdateCloudRegions(testContext, []mongodoc.CloudRegion{testControllers[i].cloudRegion})
 		c.Assert(err, gc.IsNil)
 	}
 	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
@@ -1127,10 +1127,10 @@ func (s *jemSuite) TestDoControllersErrorResponse(c *gc.C) {
 		},
 	}}
 	for i := range testControllers {
-		err := s.jem.AddController(testContext, &testControllers[i].controller, []*mongodoc.CloudRegion{
-			&testControllers[i].cloudRegion,
-		}, nil)
-
+		err := s.jem.DB.AddController(testContext, &testControllers[i].controller)
+		c.Assert(err, gc.IsNil)
+		testControllers[i].cloudRegion.PrimaryControllers = []params.EntityPath{testControllers[i].controller.Path}
+		err = s.jem.DB.UpdateCloudRegions(testContext, []mongodoc.CloudRegion{testControllers[i].cloudRegion})
 		c.Assert(err, gc.IsNil)
 	}
 	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
@@ -1361,10 +1361,10 @@ func (s *jemSuite) TestSelectController(c *gc.C) {
 		},
 	}}
 	for i := range testControllers {
-		err := s.jem.AddController(testContext, &testControllers[i].controller, []*mongodoc.CloudRegion{
-			&testControllers[i].cloudRegion,
-		}, nil)
-
+		err := s.jem.DB.AddController(testContext, &testControllers[i].controller)
+		c.Assert(err, gc.IsNil)
+		testControllers[i].cloudRegion.PrimaryControllers = []params.EntityPath{testControllers[i].controller.Path}
+		err = s.jem.DB.UpdateCloudRegions(testContext, []mongodoc.CloudRegion{testControllers[i].cloudRegion})
 		c.Assert(err, gc.IsNil)
 	}
 	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
@@ -1788,6 +1788,179 @@ func (s *jemSuite) TestUpdateApplicationUnknownModel(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 }
 
+func (s *jemSuite) TestCreateCloud(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	s.addController(c, ctlPath)
+	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	err := s.jem.CreateCloud(ctx, mongodoc.CloudRegion{
+		Cloud:            "test-cloud",
+		ProviderType:     "kubernetes",
+		AuthTypes:        []string{"certificate"},
+		Endpoint:         "https://1.2.3.4:5678",
+		IdentityEndpoint: "https://1.2.3.4:5679",
+		StorageEndpoint:  "https://1.2.3.4:5680",
+		CACertificates:   []string{"This is a CA Certficiate (honest)"},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}, nil)
+	c.Assert(err, gc.IsNil)
+
+	var docs []mongodoc.CloudRegion
+	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
+	c.Assert(err, gc.IsNil)
+	c.Assert(docs, jc.DeepEquals, []mongodoc.CloudRegion{{
+		Id:                   "test-cloud/",
+		Cloud:                "test-cloud",
+		ProviderType:         "kubernetes",
+		AuthTypes:            []string{"certificate"},
+		Endpoint:             "https://1.2.3.4:5678",
+		IdentityEndpoint:     "https://1.2.3.4:5679",
+		StorageEndpoint:      "https://1.2.3.4:5680",
+		CACertificates:       []string{"This is a CA Certficiate (honest)"},
+		PrimaryControllers:   []params.EntityPath{params.EntityPath{User: "bob", Name: "foo"}},
+		SecondaryControllers: []params.EntityPath{},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}})
+}
+
+func (s *jemSuite) TestCreateCloudWithRegions(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	s.addController(c, ctlPath)
+	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	err := s.jem.CreateCloud(ctx, mongodoc.CloudRegion{
+		Cloud:            "test-cloud",
+		ProviderType:     "kubernetes",
+		AuthTypes:        []string{"certificate"},
+		Endpoint:         "https://1.2.3.4:5678",
+		IdentityEndpoint: "https://1.2.3.4:5679",
+		StorageEndpoint:  "https://1.2.3.4:5680",
+		CACertificates:   []string{"This is a CA Certficiate (honest)"},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}, []mongodoc.CloudRegion{{
+		Cloud:  "test-cloud",
+		Region: "test-region",
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}})
+	c.Assert(err, gc.IsNil)
+
+	var docs []mongodoc.CloudRegion
+	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
+	c.Assert(err, gc.IsNil)
+	c.Assert(docs, jc.DeepEquals, []mongodoc.CloudRegion{{
+		Id:                   "test-cloud/",
+		Cloud:                "test-cloud",
+		ProviderType:         "kubernetes",
+		AuthTypes:            []string{"certificate"},
+		Endpoint:             "https://1.2.3.4:5678",
+		IdentityEndpoint:     "https://1.2.3.4:5679",
+		StorageEndpoint:      "https://1.2.3.4:5680",
+		CACertificates:       []string{"This is a CA Certficiate (honest)"},
+		PrimaryControllers:   []params.EntityPath{params.EntityPath{User: "bob", Name: "foo"}},
+		SecondaryControllers: []params.EntityPath{},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}, {
+		Id:                   "test-cloud/test-region",
+		Cloud:                "test-cloud",
+		Region:               "test-region",
+		PrimaryControllers:   []params.EntityPath{params.EntityPath{User: "bob", Name: "foo"}},
+		SecondaryControllers: []params.EntityPath{},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}})
+}
+
+func (s *jemSuite) TestCreateCloudNameMatch(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	s.addController(c, ctlPath)
+	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	err := s.jem.CreateCloud(ctx, mongodoc.CloudRegion{
+		Cloud:            "dummy",
+		ProviderType:     "kubernetes",
+		AuthTypes:        []string{"certificate"},
+		Endpoint:         "https://1.2.3.4:5678",
+		IdentityEndpoint: "https://1.2.3.4:5679",
+		StorageEndpoint:  "https://1.2.3.4:5680",
+		CACertificates:   []string{"This is a CA Certficiate (honest)"},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}, nil)
+	c.Assert(err, gc.ErrorMatches, `cloud "dummy" already exists`)
+}
+
+func (s *jemSuite) TestCreateCloudNoControllers(c *gc.C) {
+	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	err := s.jem.CreateCloud(ctx, mongodoc.CloudRegion{
+		Cloud:            "test-cloud",
+		ProviderType:     "kubernetes",
+		AuthTypes:        []string{"certificate"},
+		Endpoint:         "https://1.2.3.4:5678",
+		IdentityEndpoint: "https://1.2.3.4:5679",
+		StorageEndpoint:  "https://1.2.3.4:5680",
+		CACertificates:   []string{"This is a CA Certficiate (honest)"},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}, nil)
+	c.Assert(err, gc.ErrorMatches, `no matching controllers found`)
+
+	var docs []mongodoc.CloudRegion
+	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
+	c.Assert(err, gc.IsNil)
+	c.Assert(docs, jc.DeepEquals, []mongodoc.CloudRegion{})
+}
+
+func (s *jemSuite) TestCreateCloudAddCloudError(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	s.addController(c, ctlPath)
+	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	err := s.jem.CreateCloud(ctx, mongodoc.CloudRegion{
+		Cloud:            "test-cloud",
+		ProviderType:     "kubernetes",
+		Endpoint:         "https://1.2.3.4:5678",
+		IdentityEndpoint: "https://1.2.3.4:5679",
+		StorageEndpoint:  "https://1.2.3.4:5680",
+		CACertificates:   []string{"This is a CA Certficiate (honest)"},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}, nil)
+	c.Assert(err, gc.ErrorMatches, `invalid cloud: empty auth-types not valid`)
+
+	var docs []mongodoc.CloudRegion
+	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
+	c.Assert(err, gc.IsNil)
+	c.Assert(docs, jc.DeepEquals, []mongodoc.CloudRegion{})
+}
+
 func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityPath {
 	info := s.APIInfo(c)
 
@@ -1814,10 +1987,15 @@ func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityP
 	}
 	err = s.jem.DB.AddController(testContext, ctl)
 	c.Assert(err, jc.ErrorIsNil)
-	err = s.jem.DB.UpsertCloudRegionsForController(testContext, []*mongodoc.CloudRegion{{
-		Cloud:  params.Cloud("dummy"),
-		Region: "dummy-region",
-	}}, path, true)
+	err = s.jem.DB.UpdateCloudRegions(testContext, []mongodoc.CloudRegion{{
+		Cloud:              "dummy",
+		PrimaryControllers: []params.EntityPath{path},
+	}, {
+		Cloud:              "dummy",
+		Region:             "dummy-region",
+		PrimaryControllers: []params.EntityPath{path},
+	}})
+	c.Assert(err, jc.ErrorIsNil)
 	return path
 }
 
