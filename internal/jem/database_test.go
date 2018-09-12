@@ -23,7 +23,6 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
-	jujuparams "github.com/juju/juju/apiserver/params"
 )
 
 var testContext = context.Background()
@@ -1674,47 +1673,65 @@ func (s *databaseSuite) TestCloudRegionDuplicate(c *gc.C) {
 	s.checkDBOK(c)
 }
 
-func (s *databaseSuite) TestClouds(c *gc.C) {
-	cloud := &mongodoc.CloudRegion{
+func (s *databaseSuite) TestCloudRegions(c *gc.C) {
+	cloud := mongodoc.CloudRegion{
 		Cloud:        "my-cloud",
 		ProviderType: "ec2",
+		AuthTypes:    []string{},
+		ACL: params.ACL{
+			Read:  []string{},
+			Write: []string{},
+			Admin: []string{},
+		},
 	}
 
-	regionA := &mongodoc.CloudRegion{
+	regionA := mongodoc.CloudRegion{
 		Cloud:        cloud.Cloud,
 		ProviderType: cloud.ProviderType,
 		Region:       "my-region-a",
+		AuthTypes:    []string{},
+		ACL: params.ACL{
+			Read:  []string{},
+			Write: []string{},
+			Admin: []string{},
+		},
 	}
 
-	regionB := &mongodoc.CloudRegion{
+	regionB := mongodoc.CloudRegion{
 		Cloud:        cloud.Cloud,
 		ProviderType: cloud.ProviderType,
 		Region:       "my-region-b",
+		AuthTypes:    []string{},
+		ACL: params.ACL{
+			Read:  []string{},
+			Write: []string{},
+			Admin: []string{},
+		},
 	}
 
-	regionC := &mongodoc.CloudRegion{
+	regionC := mongodoc.CloudRegion{
 		Cloud:        cloud.Cloud,
 		ProviderType: cloud.ProviderType,
 		Region:       "my-region-c",
+		AuthTypes:    []string{},
+		ACL: params.ACL{
+			Read:  []string{},
+			Write: []string{},
+			Admin: []string{},
+		},
 	}
 
-	err := s.database.UpsertCloudRegionsForController(testContext, []*mongodoc.CloudRegion{cloud, regionA, regionB, regionC}, params.EntityPath{"bob", "bar"}, true)
+	ctlPath := params.EntityPath{"bob", "bar"}
+	err := s.database.UpsertCloudRegionsForController(testContext, []*mongodoc.CloudRegion{&cloud, &regionA, &regionB, &regionC}, ctlPath, true)
 	c.Assert(err, gc.IsNil)
 
-	clouds, err := s.database.Clouds(testContext)
+	clouds, err := s.database.GetCloudRegions(testContext)
 	c.Assert(err, gc.IsNil)
-
-	c.Assert(clouds, gc.DeepEquals, map[string]jujuparams.Cloud{
-		"cloud-my-cloud": jujuparams.Cloud{
-			Type: cloud.ProviderType,
-			Regions: []jujuparams.CloudRegion{
-				{Name: regionA.Region},
-				{Name: regionB.Region},
-				{Name: regionC.Region},
-			},
-			AuthTypes: []string{},
-		},
-	})
+	cloud.PrimaryControllers = append(cloud.PrimaryControllers, ctlPath)
+	regionA.PrimaryControllers = append(regionA.PrimaryControllers, ctlPath)
+	regionB.PrimaryControllers = append(regionB.PrimaryControllers, ctlPath)
+	regionC.PrimaryControllers = append(regionC.PrimaryControllers, ctlPath)
+	c.Assert(clouds, gc.DeepEquals, []mongodoc.CloudRegion{cloud, regionA, regionB, regionC})
 
 	s.checkDBOK(c)
 }
