@@ -233,7 +233,7 @@ var createModelTests = []struct {
 		Cloud:  "dummy",
 		Region: "not-a-region",
 	},
-	expectError: `cannot select controller: no matching controllers found`,
+	expectError: `cloud "dummy" region "not-a-region" not found`,
 }, {
 	about: "empty cloud credentials selects single choice",
 	user:  "bob",
@@ -386,7 +386,7 @@ func (s *jemSuite) TestCreateModelWithExistingModelInControllerOnly(c *gc.C) {
 		},
 		Cloud: "dummy",
 	})
-	c.Assert(err, gc.ErrorMatches, `cannot create model "bob/model" because it already exists in the backend controller; please contact an administrator to resolve this issue`)
+	c.Assert(err, gc.ErrorMatches, `cannot find suitable controller`)
 }
 
 func (s *jemSuite) TestCreateModelWithDeprecatedController(c *gc.C) {
@@ -413,7 +413,7 @@ func (s *jemSuite) TestCreateModelWithDeprecatedController(c *gc.C) {
 		Cloud:  "dummy",
 		Region: "dummy-region",
 	})
-	c.Assert(err, gc.ErrorMatches, `cannot select controller: no matching controllers found`)
+	c.Assert(err, gc.ErrorMatches, `cannot find suitable controller`)
 }
 
 func (s *jemSuite) TestGrantModelWrite(c *gc.C) {
@@ -1990,10 +1990,16 @@ func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityP
 	err = s.jem.DB.UpdateCloudRegions(testContext, []mongodoc.CloudRegion{{
 		Cloud:              "dummy",
 		PrimaryControllers: []params.EntityPath{path},
+		ACL: params.ACL{
+			Read: []string{"everyone"},
+		},
 	}, {
 		Cloud:              "dummy",
 		Region:             "dummy-region",
 		PrimaryControllers: []params.EntityPath{path},
+		ACL: params.ACL{
+			Read: []string{"everyone"},
+		},
 	}})
 	c.Assert(err, jc.ErrorIsNil)
 	return path

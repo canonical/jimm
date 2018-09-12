@@ -12,6 +12,7 @@ import (
 
 	plansapi "github.com/CanonicalLtd/plans-client/api"
 	"github.com/juju/juju/api"
+	"github.com/juju/juju/api/base"
 	cloudapi "github.com/juju/juju/api/cloud"
 	"github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
@@ -436,22 +437,7 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 	if err := auth.CheckIsUser(ctx, p.Path.User); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	if p.ControllerPath.Name == "" {
-		var err error
-		p.ControllerPath, err = j.selectController(ctx, p.Cloud, p.Region)
-		if err != nil {
-			return nil, errgo.NoteMask(err, "cannot select controller", errgo.Is(params.ErrNotFound))
-		}
-	}
-	ctl, err := j.Controller(ctx, p.ControllerPath)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
-	}
-	conn, err := j.OpenAPIFromDoc(ctx, ctl)
-	if err != nil {
-		return nil, errgo.NoteMask(err, "cannot connect to controller", errgo.Is(ErrAPIConnection))
-	}
-	defer conn.Close()
+
 	if p.Credential.IsZero() {
 		cred, err := j.selectCredential(ctx, p.Path.User, p.Cloud)
 		if err != nil {
@@ -459,16 +445,12 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 		}
 		p.Credential = cred
 	}
+	var cred *mongodoc.Credential
 	if !p.Credential.IsZero() {
-		cred, err := j.Credential(ctx, p.Credential)
+		var err error
+		cred, err = j.Credential(ctx, p.Credential)
 		if err != nil {
 			return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
-		}
-		if err := j.updateControllerCredential(ctx, p.ControllerPath, p.Credential, conn, cred); err != nil {
-			return nil, errgo.Mask(err)
-		}
-		if err := j.DB.credentialAddController(ctx, p.Credential, p.ControllerPath); err != nil {
-			return nil, errgo.Mask(err)
 		}
 	}
 
@@ -480,7 +462,7 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 	// Create the model record in the database before actually
 	// creating the model on the controller. It will have an invalid
 	// UUID because it doesn't exist but that's better than creating
-	// an model that we can't add locally because the name
+	// a model that we can't add locally because the name
 	// already exists.
 	modelDoc := &mongodoc.Model{
 		Path:                   p.Path,
@@ -497,25 +479,12 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 	if err := j.DB.AddModel(ctx, modelDoc); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
+
 	defer func() {
 		if err == nil {
-			if err := j.DB.AppendAudit(ctx, params.AuditModelCreated{
-				ID:             modelDoc.Id,
-				UUID:           modelDoc.UUID,
-				Owner:          string(modelDoc.Owner()),
-				Creator:        modelDoc.Creator,
-				ControllerPath: modelDoc.Controller.String(),
-				Cloud:          string(modelDoc.Cloud),
-				Region:         modelDoc.CloudRegion,
-				AuditEntryCommon: params.AuditEntryCommon{
-					Type_:    params.AuditLogType(params.AuditModelCreated{}),
-					Created_: time.Now(),
-				},
-			}); err != nil {
-				zapctx.Error(ctx, "cannot add audit log for model creation", zaputil.Error(err))
-			}
 			return
 		}
+
 		// We're returning an error, so remove the model from the
 		// database. Note that this might leave the model around
 		// in the controller, but this should be rare and we can
@@ -524,20 +493,147 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 			zapctx.Error(ctx, "cannot remove model from database after error; leaked model", zaputil.Error(err))
 		}
 	}()
+
+	var controllers []params.EntityPath
+	if p.ControllerPath.Name == "" {
+		cloudRegion, err := j.DB.CloudRegion(ctx, p.Cloud, p.Region)
+		if err != nil {
+			return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		}
+		if err := auth.CheckCanRead(ctx, cloudRegion); err != nil {
+			return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+		}
+		controllers = cloudRegion.PrimaryControllers
+		if len(controllers) == 0 {
+			controllers = cloudRegion.SecondaryControllers
+		}
+	} else {
+		controllers = []params.EntityPath{p.ControllerPath}
+	}
+	// randomize the possible controllers to attempt to spread the load.
+	shufflePaths(controllers)
+
+	var ctlPath params.EntityPath
+	var modelInfo base.ModelInfo
+	for _, controller := range controllers {
+		var err error
+		modelInfo, err = j.createModelOnController(ctx, controller, p, cred)
+		if err == nil {
+			ctlPath = controller
+			break
+		}
+		if errgo.Cause(err) == errCannotUseController {
+			zapctx.Error(ctx, "cannot create model on controller", zaputil.Error(err), zap.String("controller", controller.String()))
+			continue
+		}
+		return nil, errgo.Notef(err, "cannot create model")
+	}
+
+	if ctlPath.Name == "" {
+		return nil, errgo.New("cannot find suitable controller")
+	}
+
+	// Now set the UUID to that of the actually created model,
+	// and update other attributes from the response too.
+	// Use Apply so that we can return a result that's consistent
+	// with Database.Model.
+	info := mongodoc.ModelInfo{
+		Life: string(modelInfo.Life),
+		Status: mongodoc.ModelStatus{
+			Status:  string(modelInfo.Status.Status),
+			Message: modelInfo.Status.Info,
+			Data:    modelInfo.Status.Data,
+		},
+	}
+	if modelInfo.Status.Since != nil {
+		info.Status.Since = *modelInfo.Status.Since
+	}
+	if modelInfo.AgentVersion != nil {
+		info.Config = map[string]interface{}{
+			config.AgentVersionKey: modelInfo.AgentVersion.String(),
+		}
+	}
+	if _, err := j.DB.Models().FindId(modelDoc.Id).Apply(mgo.Change{
+		Update: bson.D{{"$set", bson.D{
+			{"uuid", modelInfo.UUID},
+			{"controller", ctlPath},
+			{"cloud", modelInfo.Cloud},
+			{"cloudregion", modelInfo.CloudRegion},
+			{"defaultseries", modelInfo.DefaultSeries},
+			{"info", info},
+		}}},
+		ReturnNew: true,
+	}, &modelDoc); err != nil {
+		j.DB.checkError(ctx, &err)
+		return nil, errgo.Notef(err, "cannot update model %s in database", modelInfo.UUID)
+	}
+
+	if err := j.DB.AppendAudit(ctx, params.AuditModelCreated{
+		ID:             modelDoc.Id,
+		UUID:           modelInfo.UUID,
+		Owner:          string(modelDoc.Owner()),
+		Creator:        modelDoc.Creator,
+		ControllerPath: ctlPath.String(),
+		Cloud:          string(modelDoc.Cloud),
+		Region:         modelDoc.CloudRegion,
+		AuditEntryCommon: params.AuditEntryCommon{
+			Type_:    params.AuditLogType(params.AuditModelCreated{}),
+			Created_: time.Now(),
+		},
+	}); err != nil {
+		zapctx.Error(ctx, "cannot add audit log for model creation", zaputil.Error(err))
+	}
+
+	return modelDoc, nil
+}
+
+func shufflePaths(paths []params.EntityPath) {
+	if len(paths) < 2 {
+		return
+	}
+	for i := len(paths) - 1; i > 0; i-- {
+		j := randIntn(i + 1)
+		paths[i-1], paths[j] = paths[j], paths[i-1]
+	}
+}
+
+const errCannotUseController params.ErrorCode = "cannot create model on requested controller"
+
+func (j *JEM) createModelOnController(ctx context.Context, ctlPath params.EntityPath, p CreateModelParams, cred *mongodoc.Credential) (base.ModelInfo, error) {
+	ctl, err := j.Controller(ctx, ctlPath)
+	if err != nil {
+		return base.ModelInfo{}, errgo.WithCausef(err, errCannotUseController, "cannot get controller document")
+	}
+	if ctl.Deprecated {
+		return base.ModelInfo{}, errgo.WithCausef(err, errCannotUseController, "controller deprecated")
+	}
+	conn, err := j.OpenAPIFromDoc(ctx, ctl)
+	if err != nil {
+		return base.ModelInfo{}, errgo.WithCausef(err, errCannotUseController, "cannot connect to controller")
+	}
+	defer conn.Close()
+
+	if cred != nil {
+		if err := j.updateControllerCredential(ctx, ctlPath, p.Credential, conn, cred); err != nil {
+			return base.ModelInfo{}, errgo.WithCausef(err, errCannotUseController, "cannot add credential")
+		}
+		if err := j.DB.credentialAddController(ctx, p.Credential, ctlPath); err != nil {
+			return base.ModelInfo{}, errgo.WithCausef(err, errCannotUseController, "cannot add credential")
+		}
+	}
+
 	mmClient := modelmanager.NewClient(conn.Connection)
 	m, err := mmClient.CreateModel(
 		string(p.Path.Name),
 		UserTag(p.Path.User).Id(),
-		ctl.Location["cloud"],
+		string(p.Cloud),
 		p.Region,
 		CloudCredentialTag(p.Credential),
 		p.Attributes,
 	)
 	if err != nil {
-		if err := j.DB.DeleteModel(ctx, modelDoc.Path); err != nil {
-			zapctx.Error(ctx, "cannot remove model from database after error; leaked model", zaputil.Error(err))
-		}
-		if jujuparams.IsCodeAlreadyExists(err) {
+		switch jujuparams.ErrCode(err) {
+		case jujuparams.CodeAlreadyExists:
 			// The model already exists in the controller but it didn't
 			// exist in the database. This probably means that it's
 			// been abortively created previously, but left around because
@@ -547,9 +643,15 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 			// the operation to delete a model isn't synchronous even
 			// for empty models. We could also have a worker that deletes
 			// empty models that don't appear in the database.
-			return nil, errgo.Newf("cannot create model %q because it already exists in the backend controller; please contact an administrator to resolve this issue", modelDoc.Path)
+			return base.ModelInfo{}, errgo.WithCausef(err, errCannotUseController, "model name in use")
+		case jujuparams.CodeUpgradeInProgress:
+			return base.ModelInfo{}, errgo.WithCausef(err, errCannotUseController, "upgrade in progress")
+		default:
+			// The model couldn't be created because of an
+			// error in the request, don't try another
+			// controller.
+			return base.ModelInfo{}, errgo.Mask(err)
 		}
-		return nil, errgo.Notef(err, "cannot create model")
 	}
 	// TODO should we try to delete the model from the controller
 	// on error here?
@@ -560,43 +662,11 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 	// in the backend controller" message above when the user
 	// attempts to create a model with the same name again.
 	if err := mmClient.GrantModel(conn.Info.Tag.(names.UserTag).Id(), "admin", m.UUID); err != nil {
-		return nil, errgo.Notef(err, "cannot grant admin access")
+		// TODO (mhilton) ensure that this is flagged in some admin interface somewhere.
+		zapctx.Error(ctx, "leaked model", zap.String("controller", ctlPath.String()), zap.String("model", p.Path.String()), zaputil.Error(err), zap.String("model-uuid", m.UUID))
+		return base.ModelInfo{}, errgo.WithCausef(err, errCannotUseController, "cannot grant model access")
 	}
-
-	// Now set the UUID to that of the actually created model,
-	// and update other attributes from the response too.
-	// Use Apply so that we can return a result that's consistent
-	// with Database.Model.
-	info := mongodoc.ModelInfo{
-		Life: string(m.Life),
-		Status: mongodoc.ModelStatus{
-			Status:  string(m.Status.Status),
-			Message: m.Status.Info,
-			Data:    m.Status.Data,
-		},
-	}
-	if m.Status.Since != nil {
-		info.Status.Since = *m.Status.Since
-	}
-	if m.AgentVersion != nil {
-		info.Config = map[string]interface{}{
-			config.AgentVersionKey: m.AgentVersion.String(),
-		}
-	}
-	if _, err := j.DB.Models().FindId(modelDoc.Id).Apply(mgo.Change{
-		Update: bson.D{{"$set", bson.D{
-			{"uuid", m.UUID},
-			{"cloud", m.Cloud},
-			{"cloudregion", m.CloudRegion},
-			{"defaultseries", m.DefaultSeries},
-			{"info", info},
-		}}},
-		ReturnNew: true,
-	}, &modelDoc); err != nil {
-		j.DB.checkError(ctx, &err)
-		return nil, errgo.Notef(err, "cannot update model %s in database", m.UUID)
-	}
-	return modelDoc, nil
+	return m, nil
 }
 
 // UpdateCredential updates the specified credential in the
