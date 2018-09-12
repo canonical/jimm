@@ -372,32 +372,23 @@ func (c cloud) clouds() (map[string]jujuparams.Cloud, error) {
 	return clouds, nil
 }
 
-var errMoreThanOneCloud = errgo.Newf("more than one cloud")
-
 // DefaultCloud implements the DefaultCloud method of the Cloud facade.
-// It returns a default cloud only if all the registered controllers
-// use the same cloud.
+// It returns a default cloud if there is only one cloud available.
 func (c cloud) DefaultCloud() (jujuparams.StringResult, error) {
-	var defaultCloud params.Cloud
-	if err := c.root.jem.DoControllers(c.root.context, "", "", func(c *mongodoc.Controller) error {
-		switch {
-		case defaultCloud == "":
-			defaultCloud = c.Cloud.Name
-		case c.Cloud.Name != defaultCloud:
-			defaultCloud = ""
-			return errMoreThanOneCloud
+	var result jujuparams.StringResult
+	clouds, err := c.clouds()
+	if err != nil {
+		return result, errgo.Mask(err)
+	}
+	if len(clouds) != 1 {
+		return result, errgo.WithCausef(nil, params.ErrNotFound, "no default cloud")
+	}
+	for tag, _ := range clouds {
+		result = jujuparams.StringResult{
+			Result: tag,
 		}
-		return nil
-	}); err != nil && errgo.Cause(err) != errMoreThanOneCloud {
-		return jujuparams.StringResult{}, errgo.Mask(err)
 	}
-	if defaultCloud == "" {
-		// No controllers or more than one possible cloud, so don't choose a default.
-		return jujuparams.StringResult{}, errgo.WithCausef(nil, params.ErrNotFound, "no default cloud")
-	}
-	return jujuparams.StringResult{
-		Result: names.NewCloudTag(string(defaultCloud)).String(),
-	}, nil
+	return result, nil
 }
 
 // UserCredentials implements the UserCredentials method of the Cloud facade.
