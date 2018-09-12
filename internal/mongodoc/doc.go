@@ -218,6 +218,14 @@ type CloudRegion struct {
 	ACL params.ACL
 }
 
+func (c *CloudRegion) GetACL() params.ACL {
+	return c.ACL
+}
+
+func (c *CloudRegion) Owner() params.User {
+	return ""
+}
+
 // Model holds information on a given model.
 type Model struct {
 	// Id holds the primary key for an model.

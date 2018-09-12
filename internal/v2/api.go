@@ -209,11 +209,17 @@ func (h *Handler) AddController(arg *params.AddController) error {
 			IdentityEndpoint: v.IdentityEndpoint,
 			StorageEndpoint:  v.StorageEndpoint,
 			ProviderType:     v.Type,
+			ACL: params.ACL{
+				Read: []string{"everyone"},
+			},
 		}
 		if ctl.Location["cloud"] == k.Id() {
 			primaryCloudRegions = append(primaryCloudRegions, &cloud)
 		} else {
 			secondaryCloudRegions = append(secondaryCloudRegions, &cloud)
+		}
+		for _, at := range v.AuthTypes {
+			cloud.AuthTypes = append(cloud.AuthTypes, string(at))
 		}
 		for _, reg := range v.Regions {
 			region := mongodoc.CloudRegion{
@@ -223,14 +229,17 @@ func (h *Handler) AddController(arg *params.AddController) error {
 				Endpoint:         reg.Endpoint,
 				IdentityEndpoint: reg.IdentityEndpoint,
 				StorageEndpoint:  reg.StorageEndpoint,
+				ACL: params.ACL{
+					Read: []string{"everyone"},
+				},
 			}
 			for _, at := range v.AuthTypes {
 				region.AuthTypes = append(region.AuthTypes, string(at))
 			}
 			if ctl.Location["region"] == reg.Name && ctl.Location["cloud"] == k.Id() {
-				primaryCloudRegions = append(primaryCloudRegions, &cloud)
+				primaryCloudRegions = append(primaryCloudRegions, &region)
 			} else {
-				secondaryCloudRegions = append(secondaryCloudRegions, &cloud)
+				secondaryCloudRegions = append(secondaryCloudRegions, &region)
 			}
 		}
 	}

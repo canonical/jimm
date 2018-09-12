@@ -1673,6 +1673,69 @@ func (s *databaseSuite) TestCloudRegionDuplicate(c *gc.C) {
 	s.checkDBOK(c)
 }
 
+func (s *databaseSuite) TestCloudRegions(c *gc.C) {
+	cloud := mongodoc.CloudRegion{
+		Cloud:        "my-cloud",
+		ProviderType: "ec2",
+		AuthTypes:    []string{},
+		ACL: params.ACL{
+			Read:  []string{},
+			Write: []string{},
+			Admin: []string{},
+		},
+	}
+
+	regionA := mongodoc.CloudRegion{
+		Cloud:        cloud.Cloud,
+		ProviderType: cloud.ProviderType,
+		Region:       "my-region-a",
+		AuthTypes:    []string{},
+		ACL: params.ACL{
+			Read:  []string{},
+			Write: []string{},
+			Admin: []string{},
+		},
+	}
+
+	regionB := mongodoc.CloudRegion{
+		Cloud:        cloud.Cloud,
+		ProviderType: cloud.ProviderType,
+		Region:       "my-region-b",
+		AuthTypes:    []string{},
+		ACL: params.ACL{
+			Read:  []string{},
+			Write: []string{},
+			Admin: []string{},
+		},
+	}
+
+	regionC := mongodoc.CloudRegion{
+		Cloud:        cloud.Cloud,
+		ProviderType: cloud.ProviderType,
+		Region:       "my-region-c",
+		AuthTypes:    []string{},
+		ACL: params.ACL{
+			Read:  []string{},
+			Write: []string{},
+			Admin: []string{},
+		},
+	}
+
+	ctlPath := params.EntityPath{"bob", "bar"}
+	err := s.database.UpsertCloudRegionsForController(testContext, []*mongodoc.CloudRegion{&cloud, &regionA, &regionB, &regionC}, ctlPath, true)
+	c.Assert(err, gc.IsNil)
+
+	clouds, err := s.database.GetCloudRegions(testContext)
+	c.Assert(err, gc.IsNil)
+	cloud.PrimaryControllers = append(cloud.PrimaryControllers, ctlPath)
+	regionA.PrimaryControllers = append(regionA.PrimaryControllers, ctlPath)
+	regionB.PrimaryControllers = append(regionB.PrimaryControllers, ctlPath)
+	regionC.PrimaryControllers = append(regionC.PrimaryControllers, ctlPath)
+	c.Assert(clouds, gc.DeepEquals, []mongodoc.CloudRegion{cloud, regionA, regionB, regionC})
+
+	s.checkDBOK(c)
+}
+
 func (s *databaseSuite) TestGetACL(c *gc.C) {
 	m := &mongodoc.Model{
 		Path: params.EntityPath{

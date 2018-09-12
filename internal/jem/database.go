@@ -843,6 +843,22 @@ func (db *Database) Cloud(ctx context.Context, cloud params.Cloud) (_ *mongodoc.
 	}, nil
 }
 
+// GetCloudRegions returns all of the cloudregion.
+func (db *Database) GetCloudRegions(ctx context.Context) (_ []mongodoc.CloudRegion, err error) {
+	defer db.checkError(ctx, &err)
+	var results []mongodoc.CloudRegion
+	err = db.CloudRegions().Find(nil).All(&results)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return results, nil
+}
+
+// GetCloudRegionsIter returns a CanReadIter for all of the cloudregion.
+func (db *Database) GetCloudRegionsIter(ctx context.Context) *CanReadIter {
+	return db.NewCanReadIter(ctx, db.CloudRegions().Find(nil).Iter())
+}
+
 // UpsertCloudRegionsForController adds new cloud regions to the database for a given controller or update its
 // controller list depending on the isPrimary parameter.
 func (db *Database) UpsertCloudRegionsForController(ctx context.Context, cloudRegions []*mongodoc.CloudRegion, ctl params.EntityPath, isPrimary bool) (err error) {

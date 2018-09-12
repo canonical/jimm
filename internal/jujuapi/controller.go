@@ -357,19 +357,34 @@ func (c cloud) Clouds() (jujuparams.CloudsResult, error) {
 }
 
 func (c cloud) clouds() (map[string]jujuparams.Cloud, error) {
-	clouds := make(map[string]jujuparams.Cloud)
-
-	err := c.root.jem.DoControllers(c.root.context, "", "", func(ctl *mongodoc.Controller) error {
-		cloudTag := jem.CloudTag(ctl.Cloud.Name).String()
-		// TODO consider caching this result because it will be often called and
-		// the result will change very rarely.
-		clouds[cloudTag] = mergeClouds(clouds[cloudTag], makeCloud(ctl.Cloud))
-		return nil
-	})
-	if err != nil {
-		return nil, errgo.Mask(err)
+	iter := c.root.jem.DB.GetCloudRegionsIter(c.root.context)
+	results := map[string]jujuparams.Cloud{}
+	var v mongodoc.CloudRegion
+	for iter.Next(&v) {
+		key := names.NewCloudTag(string(v.Cloud)).String()
+		cr, _ := results[key]
+		if v.Region == "" {
+			// v is a cloud
+			cr.Type = v.ProviderType
+			cr.AuthTypes = v.AuthTypes
+			cr.Endpoint = v.Endpoint
+			cr.IdentityEndpoint = v.IdentityEndpoint
+			cr.StorageEndpoint = v.StorageEndpoint
+		} else {
+			// v is a region
+			cr.Regions = append(cr.Regions, jujuparams.CloudRegion{
+				Name:             v.Region,
+				Endpoint:         v.Endpoint,
+				IdentityEndpoint: v.IdentityEndpoint,
+				StorageEndpoint:  v.StorageEndpoint,
+			})
+		}
+		results[key] = cr
 	}
-	return clouds, nil
+	if err := iter.Err(); err != nil {
+		return nil, errgo.Notef(err, "cannot query")
+	}
+	return results, nil
 }
 
 // DefaultCloud implements the DefaultCloud method of the Cloud facade.
