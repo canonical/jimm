@@ -5,7 +5,6 @@ package v2
 import (
 	"context"
 	"net/url"
-	"sort"
 	"strings"
 	"time"
 
@@ -519,92 +518,6 @@ func newTime(t time.Time) *time.Time {
 	return &t
 }
 
-// GetControllerLocations returns all the available values for a given controller
-// location attribute. The set of controllers is constrained by the URL query
-// parameters.
-func (h *Handler) GetControllerLocations(p httprequest.Params, arg *params.GetControllerLocations) (*params.ControllerLocationsResponse, error) {
-	ctx := h.context
-	attr := arg.Attr
-	if !params.IsValidLocationAttr(attr) {
-		return nil, badRequestf(nil, "invalid location %q", attr)
-	}
-	lp, err := parseFormLocations(p.Request.Form)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
-	}
-	if len(lp.other) > 0 {
-		return &params.ControllerLocationsResponse{
-			Values: []string{},
-		}, nil
-	}
-	// TODO(mhilton) this method may select many more controllers
-	// than necessary. Re-evaluate the method if we start seeing
-	// problems.
-	found := make(map[string]bool)
-	err = h.jem.DoControllers(ctx, lp.cloud, lp.region, func(ctl *mongodoc.Controller) error {
-		switch attr {
-		case "cloud":
-			found[string(ctl.Cloud.Name)] = true
-		case "region":
-			for _, r := range ctl.Cloud.Regions {
-				found[r.Name] = true
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
-	}
-
-	// Build the result slice and sort it so we get deterministic results.
-	results := make([]string, 0, len(found))
-	for val := range found {
-		results = append(results, val)
-	}
-	sort.Strings(results)
-	return &params.ControllerLocationsResponse{
-		Values: results,
-	}, nil
-}
-
-// GetAllControllerLocations returns all the available
-// sets of controller location attributes, restricting
-// the search by any provided location attributes.
-func (h *Handler) GetAllControllerLocations(p httprequest.Params, arg *params.GetAllControllerLocations) (*params.AllControllerLocationsResponse, error) {
-	ctx := h.context
-	lp, err := parseFormLocations(p.Request.Form)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
-	}
-	if len(lp.other) > 0 {
-		return &params.AllControllerLocationsResponse{
-			Locations: []map[string]string{},
-		}, nil
-	}
-	locSet := make(map[cloudRegion]bool)
-	err = h.jem.DoControllers(ctx, lp.cloud, lp.region, func(ctl *mongodoc.Controller) error {
-		if len(ctl.Cloud.Regions) == 0 {
-			locSet[cloudRegion{ctl.Cloud.Name, ""}] = true
-			return nil
-		}
-		for _, reg := range ctl.Cloud.Regions {
-			locSet[cloudRegion{ctl.Cloud.Name, reg.Name}] = true
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
-	}
-	ordered := make(cloudRegions, 0, len(locSet))
-	for k := range locSet {
-		ordered = append(ordered, k)
-	}
-	sort.Sort(ordered)
-	return &params.AllControllerLocationsResponse{
-		Locations: ordered.locations(),
-	}, nil
-}
-
 type cloudRegion struct {
 	cloud  params.Cloud
 	region string
@@ -642,24 +555,6 @@ func (c cloudRegions) locations() []map[string]string {
 		locs = append(locs, m)
 	}
 	return locs
-}
-
-// GetControllerLocation returns a map of location attributes for a given controller.
-func (h *Handler) GetControllerLocation(arg *params.GetControllerLocation) (params.ControllerLocation, error) {
-	ctx := h.context
-	ctl, err := h.jem.Controller(ctx, arg.EntityPath)
-	if err != nil {
-		return params.ControllerLocation{}, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
-	}
-	loc := map[string]string{
-		"cloud": string(ctl.Cloud.Name),
-	}
-	if len(ctl.Cloud.Regions) > 0 {
-		loc["region"] = ctl.Cloud.Regions[0].Name
-	}
-	return params.ControllerLocation{
-		Location: loc,
-	}, nil
 }
 
 // NewModel creates a new model inside an existing Controller.

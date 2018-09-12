@@ -65,7 +65,6 @@ func New() cmd.Command {
 	supercmd.Register(newGrantCommand())
 	supercmd.Register(newModelsCommand())
 	supercmd.RegisterAlias("list-models", "models", nil)
-	supercmd.Register(newLocationsCommand())
 	supercmd.Register(newRemoveCommand())
 	supercmd.Register(newRevokeCommand())
 

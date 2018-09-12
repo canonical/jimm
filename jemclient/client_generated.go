@@ -4,9 +4,8 @@
 package jemclient
 
 import (
-	"github.com/juju/httprequest"
-
 	"github.com/CanonicalLtd/jimm/params"
+	"github.com/juju/httprequest"
 )
 
 type client struct {
@@ -28,15 +27,6 @@ func (c *client) DeleteModel(p *params.DeleteModel) error {
 	return c.Client.Call(p, nil)
 }
 
-// GetAllControllerLocations returns all the available
-// sets of controller location attributes, restricting
-// the search by any provided location attributes.
-func (c *client) GetAllControllerLocations(p *params.GetAllControllerLocations) (*params.AllControllerLocationsResponse, error) {
-	var r *params.AllControllerLocationsResponse
-	err := c.Client.Call(p, &r)
-	return r, err
-}
-
 // GetAuditEntries return the list of audit log entries based on the requested query.
 func (c *client) GetAuditEntries(p *params.AuditLogRequest) (params.AuditLogEntries, error) {
 	var r params.AuditLogEntries
@@ -53,22 +43,6 @@ func (c *client) GetController(p *params.GetController) (*params.ControllerRespo
 
 func (c *client) GetControllerDeprecated(p *params.GetControllerDeprecated) (*params.DeprecatedBody, error) {
 	var r *params.DeprecatedBody
-	err := c.Client.Call(p, &r)
-	return r, err
-}
-
-// GetControllerLocation returns a map of location attributes for a given controller.
-func (c *client) GetControllerLocation(p *params.GetControllerLocation) (params.ControllerLocation, error) {
-	var r params.ControllerLocation
-	err := c.Client.Call(p, &r)
-	return r, err
-}
-
-// GetControllerLocations returns all the available values for a given controller
-// location attribute. The set of controllers is constrained by the URL query
-// parameters.
-func (c *client) GetControllerLocations(p *params.GetControllerLocations) (*params.ControllerLocationsResponse, error) {
-	var r *params.ControllerLocationsResponse
 	err := c.Client.Call(p, &r)
 	return r, err
 }

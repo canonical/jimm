@@ -60,21 +60,6 @@ type GetModelPerm struct {
 	EntityPath
 }
 
-// GetControllerLocation holds the parameters for getting the Location
-// field of a controller.
-type GetControllerLocation struct {
-	httprequest.Route `httprequest:"GET /v2/controller/:User/:Name/meta/location"`
-	EntityPath
-}
-
-// ControllerLocation holds details of a controller's location.
-type ControllerLocation struct {
-	// Location holds the location attributes.
-	Location map[string]string
-	// Public holds whether the controller is considered public.
-	Public bool
-}
-
 // ACL holds an access control list for an entity.
 type ACL struct {
 	// Read holds users and groups that are allowed to read the
@@ -103,37 +88,6 @@ type DeleteController struct {
 	EntityPath
 	// Force forces the delete even if the controller is still alive.
 	Force bool `httprequest:"force,form"`
-}
-
-type GetAllControllerLocations struct {
-	httprequest.Route `httprequest:"GET /v2/location"`
-
-	// Location constrains the controllers that the
-	// set of returned values will be returned from
-	// to those with matching location attributes.
-	// Note that the values in this should be passed in the
-	// URL query parameters.
-	Location map[string]string
-}
-
-type AllControllerLocationsResponse struct {
-	Locations []map[string]string
-}
-
-type GetControllerLocations struct {
-	httprequest.Route `httprequest:"GET /v2/location/:Attr"`
-	Attr              string `httprequest:",path"`
-
-	// Location constrains the controllers that the
-	// set of returned values will be returned from
-	// to those with matching location attributes.
-	// Note that the values in this should be passed in the
-	// URL query parameters.
-	Location map[string]string
-}
-
-type ControllerLocationsResponse struct {
-	Values []string
 }
 
 // ControllerInfo holds information specifying how
