@@ -1316,8 +1316,8 @@ var createModelTests = []struct {
 	ownerTag:      "user-test@external",
 	region:        "no-such-region",
 	cloudTag:      names.NewCloudTag("dummy").String(),
-	credentialTag: "cloudcred-dummy_test@external_cred1",
-	expectError:   `cannot select controller: no matching controllers found \(not found\)`,
+	credentialTag: "",
+	expectError:   `cloud "dummy" region "no-such-region" not found \(not found\)`,
 }, {
 	about:         "local user",
 	name:          "model-4",

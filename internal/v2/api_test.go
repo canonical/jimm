@@ -77,19 +77,6 @@ var unauthorizedTests = []struct {
 		},
 	},
 }, {
-	about:  "new model with inaccessible controller",
-	asUser: "alice",
-	method: "POST",
-	path:   "/v2/model/alice",
-	body: params.NewModelInfo{
-		Name:       "newmodel",
-		Controller: &params.EntityPath{"bob", "private"},
-		Credential: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"bob", "cred1"},
-		},
-	},
-}, {
 	about:  "set controller perm as non-owner",
 	asUser: "other",
 	method: "PUT",
@@ -134,6 +121,7 @@ func (s *APISuite) TestUnauthorized(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{"bob", "open"}, false)
 
 	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
+	s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
 	s.CreateModel(c, params.EntityPath{"bob", "open"}, params.EntityPath{"bob", "open"}, cred)
 
 	s.allowControllerPerm(c, params.EntityPath{"bob", "open"})
@@ -705,7 +693,7 @@ var newModelWithoutExplicitControllerTests = []struct {
 	info: params.NewModelInfo{
 		Name: "test-model",
 		Credential: params.CredentialPath{
-			Cloud:      "aws",
+			Cloud:      "dummy",
 			EntityPath: params.EntityPath{"alice", "cred1"},
 		},
 		Location: map[string]string{
@@ -715,7 +703,7 @@ var newModelWithoutExplicitControllerTests = []struct {
 			"secret": "a secret",
 		},
 	},
-	expectError:      `cannot select controller: no matching controllers found`,
+	expectError:      `cloud "aws" region "" not found`,
 	expectErrorCause: params.ErrNotFound,
 }, {
 	about: "no matching region",
@@ -723,7 +711,7 @@ var newModelWithoutExplicitControllerTests = []struct {
 	info: params.NewModelInfo{
 		Name: "test-model",
 		Credential: params.CredentialPath{
-			Cloud:      "aws",
+			Cloud:      "dummy",
 			EntityPath: params.EntityPath{"alice", "cred1"},
 		},
 		Location: map[string]string{
@@ -733,7 +721,7 @@ var newModelWithoutExplicitControllerTests = []struct {
 			"secret": "a secret",
 		},
 	},
-	expectError:      `cannot select controller: no matching controllers found`,
+	expectError:      `cloud "" region "us-east-1" not found`,
 	expectErrorCause: params.ErrNotFound,
 }, {
 	about: "unrecognised location parameter",
@@ -741,7 +729,7 @@ var newModelWithoutExplicitControllerTests = []struct {
 	info: params.NewModelInfo{
 		Name: "test-model",
 		Credential: params.CredentialPath{
-			Cloud:      "aws",
+			Cloud:      "dummy",
 			EntityPath: params.EntityPath{"alice", "cred1"},
 		},
 		Location: map[string]string{
@@ -1011,7 +999,7 @@ func (s *APISuite) TestNewModelCannotOpenAPI(c *gc.C) {
 			},
 		},
 		ExpectBody: params.Error{
-			Message: `cannot connect to controller: validating info for opening an API connection: missing addresses not valid`,
+			Message: `cannot find suitable controller`,
 		},
 		ExpectStatus: http.StatusInternalServerError,
 		Do:           apitest.Do(s.IDMSrv.Client("bob")),
