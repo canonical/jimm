@@ -104,6 +104,10 @@ func (j jemShim) SetControllerRegions(ctx context.Context, ctlPath params.Entity
 	return errgo.Mask(j.DB.SetControllerRegions(ctx, ctlPath, regions), errgo.Any)
 }
 
+func (j jemShim) UpdateCloudRegions(ctx context.Context, cloudRegions []mongodoc.CloudRegion) error {
+	return errgo.Mask(j.DB.UpdateCloudRegions(ctx, cloudRegions), errgo.Any)
+}
+
 func (j jemShim) AcquireMonitorLease(ctx context.Context, ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {
 	t, err := j.DB.AcquireMonitorLease(ctx, ctlPath, oldExpiry, oldOwner, newExpiry, newOwner)
 	if err != nil {

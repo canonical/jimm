@@ -729,7 +729,8 @@ func (s *internalSuite) TestWatcherMarksControllerAvailable(c *gc.C) {
 	defer worker.Stop(m)
 
 	unavailableSince := func() interface{} {
-		return jshim.controller(ctlPath).UnavailableSince
+		ctl, _ := jshim.Controller(testContext, ctlPath)
+		return ctl.UnavailableSince
 	}
 	jshim1.await(c, unavailableSince, time.Time{})
 }
@@ -762,7 +763,8 @@ func (s *internalSuite) TestAPIConnectionSetsControllerVersion(c *gc.C) {
 	defer worker.Stop(m)
 
 	controllerVersion := func() interface{} {
-		return jshim.controller(ctlPath).Version
+		ctl, _ := jshim.Controller(testContext, ctlPath)
+		return ctl.Version
 	}
 	jshim1.await(c, controllerVersion, &testVersion)
 }
@@ -819,9 +821,92 @@ func (s *internalSuite) TestAPIConnectionSetsControllerRegions(c *gc.C) {
 	defer worker.Stop(m)
 
 	controllerRegions := func() interface{} {
-		return jshim.controller(ctlPath).Cloud.Regions
+		ctl, _ := jshim.Controller(testContext, ctlPath)
+		return ctl.Cloud.Regions
 	}
 	jshim1.await(c, controllerRegions, expectRegions)
+}
+
+func (s *internalSuite) TestAPIConnectionSetsCloudRegions(c *gc.C) {
+	jshim := newJEMShimInMemory()
+	apiShims := newJujuAPIShims()
+	defer apiShims.CheckAllClosed(c)
+
+	ctlPath := params.EntityPath{"bob", "foo"}
+	cloud1 := mongodoc.CloudRegion{
+		Cloud:              params.Cloud("test"),
+		PrimaryControllers: []params.EntityPath{ctlPath},
+		ACL: params.ACL{
+			Read: []string{"everyone"},
+		},
+	}
+	cloudRegion1 := mongodoc.CloudRegion{
+		Cloud:              params.Cloud("test"),
+		Region:             "test1",
+		Endpoint:           "https://example.com/test1",
+		IdentityEndpoint:   "https://example.com/test1/identity",
+		StorageEndpoint:    "https://example.com/test1/storage",
+		PrimaryControllers: []params.EntityPath{ctlPath},
+		ACL: params.ACL{
+			Read: []string{"everyone"},
+		},
+	}
+	cloudRegion2 := mongodoc.CloudRegion{
+		Cloud:                params.Cloud("test"),
+		Region:               "test2",
+		Endpoint:             "https://example.com/test2",
+		IdentityEndpoint:     "https://example.com/test2/identity",
+		StorageEndpoint:      "https://example.com/test2/storage",
+		SecondaryControllers: []params.EntityPath{ctlPath},
+		ACL: params.ACL{
+			Read: []string{"everyone"},
+		},
+	}
+	expectCloudRegions := map[string]*mongodoc.CloudRegion{
+		cloud1.GetId():       &cloud1,
+		cloudRegion1.GetId(): &cloudRegion1,
+		cloudRegion2.GetId(): &cloudRegion2,
+	}
+	jshim1 := newJEMShimWithUpdateNotify(jemShimWithAPIOpener{
+		jemInterface: jshim,
+		openAPI: func(path params.EntityPath) (jujuAPI, error) {
+			conn := apiShims.newJujuAPIShim(nil)
+			conn.clouds = map[names.CloudTag]cloud.Cloud{
+				names.NewCloudTag("test"): {
+					Regions: []cloud.Region{{
+						Name:             "test1",
+						Endpoint:         "https://example.com/test1",
+						IdentityEndpoint: "https://example.com/test1/identity",
+						StorageEndpoint:  "https://example.com/test1/storage",
+					}, {
+						Name:             "test2",
+						Endpoint:         "https://example.com/test2",
+						IdentityEndpoint: "https://example.com/test2/identity",
+						StorageEndpoint:  "https://example.com/test2/storage",
+					}},
+				},
+			}
+			return conn, nil
+		},
+	})
+
+	addFakeController(jshim, ctlPath)
+
+	m := &controllerMonitor{
+		ctlPath: ctlPath,
+		jem:     jshim1,
+		ownerId: "jem1",
+	}
+	m.tomb.Go(func() error {
+		return m.watcher(testContext)
+	})
+	defer worker.Stop(m)
+
+	cloudRegions := func() interface{} {
+		return jshim.cloudRegions
+	}
+
+	jshim1.await(c, cloudRegions, expectCloudRegions)
 }
 
 // TestControllerMonitor tests that the controllerMonitor can be run with both the
@@ -1427,6 +1512,10 @@ func addFakeController(jshim *jemShimInMemory, path params.EntityPath) {
 		CACert:    jujujujutesting.CACert,
 		AdminUser: "bob",
 		HostPorts: [][]mongodoc.HostPort{{{Host: "0.1.2.3", Port: 4567}}},
+		Location: map[string]string{
+			"cloud":  "test",
+			"region": "test1",
+		},
 	})
 	jshim.AddModel(&mongodoc.Model{
 		Path:       path,
