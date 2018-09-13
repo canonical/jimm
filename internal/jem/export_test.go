@@ -9,7 +9,7 @@ var (
 	CredentialRemoveController = (*Database).credentialRemoveController
 	SetCredentialUpdates       = (*Database).setCredentialUpdates
 	UpdateCredential           = (*Database).updateCredential
-	SelectController           = (*JEM).selectController
+	SelectRandomController     = (*JEM).selectRandomController
 	UpdateControllerCredential = (*JEM).updateControllerCredential
 	Shuffle                    = &shuffle
 )

@@ -338,25 +338,6 @@ func (db *Database) modelFromControllerAndUUID(ctx context.Context, ctlPath para
 	return &m, nil
 }
 
-// controllerLocationQuery returns a mongo query that iterates through
-// all the public controllers matching the given location attributes,
-// including unavailable controllers only if includeUnavailable is true.
-// It returns an error if the location attribute keys aren't valid.
-func (db *Database) controllerLocationQuery(cloud params.Cloud, region string, includeUnavailable bool) *mgo.Query {
-	q := make(bson.D, 0, 4)
-	if cloud != "" {
-		q = append(q, bson.DocElem{"location.cloud", cloud})
-	}
-	if region != "" {
-		q = append(q, bson.DocElem{"cloud.regions", bson.D{{"$elemMatch", bson.D{{"name", region}}}}})
-	}
-	q = append(q, bson.DocElem{"public", true})
-	if !includeUnavailable {
-		q = append(q, bson.DocElem{"unavailablesince", notExistsQuery})
-	}
-	return db.Controllers().Find(q)
-}
-
 // SetControllerVersion sets the agent version of the given controller.
 // This method does not return an error when the controller doesn't exist.
 func (db *Database) SetControllerVersion(ctx context.Context, ctlPath params.EntityPath, v version.Number) (err error) {
@@ -895,7 +876,14 @@ func (db *Database) UpdateCloudRegions(ctx context.Context, cloudRegions []mongo
 func (db *Database) CloudRegion(ctx context.Context, name params.Cloud, region string) (_ *mongodoc.CloudRegion, err error) {
 	defer db.checkError(ctx, &err)
 	var cloudRegion mongodoc.CloudRegion
-	err = db.CloudRegions().Find(bson.D{{"cloud", name}, {"region", region}}).One(&cloudRegion)
+	var query bson.D
+	if name != "" {
+		query = append(query, bson.DocElem{"cloud", name})
+	}
+	if region != "" {
+		query = append(query, bson.DocElem{"region", region})
+	}
+	err = db.CloudRegions().Find(query).One(&cloudRegion)
 	if err == mgo.ErrNotFound {
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "cloud %q region %q not found", name, region)
 	}
