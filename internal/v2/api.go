@@ -354,6 +354,9 @@ func (h *Handler) DeleteController(arg *params.DeleteController) error {
 	if err := h.jem.DB.DeleteController(ctx, arg.EntityPath); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
+	if err := h.jem.DB.DeleteControllerFromCloudRegions(ctx, arg.EntityPath); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
 	return nil
 }
 

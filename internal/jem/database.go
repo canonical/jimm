@@ -926,6 +926,23 @@ func (db *Database) RemoveCloudRegion(ctx context.Context, cloud params.Cloud, r
 	return errgo.Mask(db.CloudRegions().RemoveId(fmt.Sprintf("%s/%s", cloud, region)))
 }
 
+// DeleteControllerFromCloudRegions deletes the controller presents in either the primary or secondary controller list
+// of each region.
+func (db *Database) DeleteControllerFromCloudRegions(ctx context.Context, ctlPath params.EntityPath) (err error) {
+	defer db.checkError(ctx, &err)
+	_, err = db.CloudRegions().UpdateAll(nil, bson.D{{
+		"$pull",
+		bson.D{
+			{"primarycontrollers", ctlPath},
+			{"secondarycontrollers", ctlPath},
+		},
+	}})
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
 // setCredentialUpdates marks all the controllers in the given ctlPaths
 // as requiring an update to the credential with the given credPath.
 func (db *Database) setCredentialUpdates(ctx context.Context, ctlPaths []params.EntityPath, credPath params.CredentialPath) (err error) {
