@@ -438,25 +438,21 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 
-	if p.Credential.IsZero() {
-		cred, err := j.selectCredential(ctx, p.Path.User, p.Cloud)
-		if err != nil {
-			return nil, errgo.Mask(err, errgo.Is(params.ErrAmbiguousChoice))
-		}
-		p.Credential = cred
-	}
-	var cred *mongodoc.Credential
-	if !p.Credential.IsZero() {
-		var err error
-		cred, err = j.Credential(ctx, p.Credential)
-		if err != nil {
-			return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
-		}
-	}
-
 	usageSenderCredentials, err := j.UsageSenderAuthorization(string(p.Path.User))
 	if err != nil {
 		return nil, errgo.Mask(err)
+	}
+
+	var cred *mongodoc.Credential
+	cred, err = j.selectCredential(ctx, p.Credential, p.Path.User, p.Cloud)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrAmbiguousChoice))
+	}
+
+	// Find controllers we could possibly create the model in.
+	controllers, err := j.possibleControllers(ctx, p.ControllerPath, p.Cloud, p.Region)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 
 	// Create the model record in the database before actually
@@ -466,15 +462,16 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 	// already exists.
 	modelDoc := &mongodoc.Model{
 		Path:                   p.Path,
-		Controller:             p.ControllerPath,
 		CreationTime:           wallClock.Now(),
 		Creator:                auth.Username(ctx),
-		Credential:             p.Credential,
 		UsageSenderCredentials: usageSenderCredentials,
 		// Use a temporary UUID so that we can create two at the
 		// same time, because the uuid field must always be
 		// unique.
 		UUID: fmt.Sprintf("creating-%x", j.pool.uuidGenerator.Next()),
+	}
+	if cred != nil {
+		modelDoc.Credential = cred.Path
 	}
 	if err := j.DB.AddModel(ctx, modelDoc); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
@@ -494,25 +491,6 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 		}
 	}()
 
-	var controllers []params.EntityPath
-	if p.ControllerPath.Name == "" {
-		cloudRegion, err := j.DB.CloudRegion(ctx, p.Cloud, p.Region)
-		if err != nil {
-			return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
-		}
-		if err := auth.CheckCanRead(ctx, cloudRegion); err != nil {
-			return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-		}
-		controllers = cloudRegion.PrimaryControllers
-		if len(controllers) == 0 {
-			controllers = cloudRegion.SecondaryControllers
-		}
-	} else {
-		controllers = []params.EntityPath{p.ControllerPath}
-	}
-	// randomize the possible controllers to attempt to spread the load.
-	shufflePaths(controllers)
-
 	var ctlPath params.EntityPath
 	var modelInfo base.ModelInfo
 	for _, controller := range controllers {
@@ -522,11 +500,10 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 			ctlPath = controller
 			break
 		}
-		if errgo.Cause(err) == errCannotUseController {
-			zapctx.Error(ctx, "cannot create model on controller", zaputil.Error(err), zap.String("controller", controller.String()))
-			continue
+		if errgo.Cause(err) == errInvalidModelParams {
+			return nil, errgo.Notef(err, "cannot create model")
 		}
-		return nil, errgo.Notef(err, "cannot create model")
+		zapctx.Error(ctx, "cannot create model on controller", zaputil.Error(err), zap.String("controller", controller.String()))
 	}
 
 	if ctlPath.Name == "" {
@@ -587,39 +564,54 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 	return modelDoc, nil
 }
 
-func shufflePaths(paths []params.EntityPath) {
-	if len(paths) < 2 {
-		return
+func (j *JEM) possibleControllers(ctx context.Context, ctlPath params.EntityPath, cloud params.Cloud, region string) ([]params.EntityPath, error) {
+	if ctlPath.Name != "" {
+		return []params.EntityPath{ctlPath}, nil
 	}
-	for i := len(paths) - 1; i > 0; i-- {
-		j := randIntn(i + 1)
-		paths[i-1], paths[j] = paths[j], paths[i-1]
+	cloudRegion, err := j.DB.CloudRegion(ctx, cloud, region)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
+	if err := auth.CheckCanRead(ctx, cloudRegion); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	controllers := cloudRegion.PrimaryControllers
+	if len(controllers) == 0 {
+		controllers = cloudRegion.SecondaryControllers
+	}
+	shuffle(len(controllers), func(i, j int) { controllers[i], controllers[j] = controllers[j], controllers[i] })
+	return controllers, nil
 }
 
-const errCannotUseController params.ErrorCode = "cannot create model on requested controller"
+// shuffle is used to randomize the order in which possible controllers
+// are tried. It is a variable so it can be replaced in tests.
+var shuffle func(int, func(int, int)) = rand.Shuffle
+
+const errInvalidModelParams params.ErrorCode = "invalid CreateModel request"
 
 func (j *JEM) createModelOnController(ctx context.Context, ctlPath params.EntityPath, p CreateModelParams, cred *mongodoc.Credential) (base.ModelInfo, error) {
 	ctl, err := j.Controller(ctx, ctlPath)
 	if err != nil {
-		return base.ModelInfo{}, errgo.WithCausef(err, errCannotUseController, "cannot get controller document")
+		return base.ModelInfo{}, errgo.Notef(err, "cannot get controller document")
 	}
 	if ctl.Deprecated {
-		return base.ModelInfo{}, errgo.WithCausef(err, errCannotUseController, "controller deprecated")
+		return base.ModelInfo{}, errgo.Notef(err, "controller deprecated")
 	}
 	conn, err := j.OpenAPIFromDoc(ctx, ctl)
 	if err != nil {
-		return base.ModelInfo{}, errgo.WithCausef(err, errCannotUseController, "cannot connect to controller")
+		return base.ModelInfo{}, errgo.Notef(err, "cannot connect to controller")
 	}
 	defer conn.Close()
 
+	var credTag names.CloudCredentialTag
 	if cred != nil {
-		if err := j.updateControllerCredential(ctx, ctlPath, p.Credential, conn, cred); err != nil {
-			return base.ModelInfo{}, errgo.WithCausef(err, errCannotUseController, "cannot add credential")
+		if err := j.updateControllerCredential(ctx, ctlPath, cred.Path, conn, cred); err != nil {
+			return base.ModelInfo{}, errgo.Notef(err, "cannot add credential")
 		}
-		if err := j.DB.credentialAddController(ctx, p.Credential, ctlPath); err != nil {
-			return base.ModelInfo{}, errgo.WithCausef(err, errCannotUseController, "cannot add credential")
+		if err := j.DB.credentialAddController(ctx, cred.Path, ctlPath); err != nil {
+			return base.ModelInfo{}, errgo.Notef(err, "cannot add credential")
 		}
+		credTag = CloudCredentialTag(cred.Path)
 	}
 
 	mmClient := modelmanager.NewClient(conn.Connection)
@@ -628,7 +620,7 @@ func (j *JEM) createModelOnController(ctx context.Context, ctlPath params.Entity
 		UserTag(p.Path.User).Id(),
 		string(p.Cloud),
 		p.Region,
-		CloudCredentialTag(p.Credential),
+		credTag,
 		p.Attributes,
 	)
 	if err != nil {
@@ -643,14 +635,14 @@ func (j *JEM) createModelOnController(ctx context.Context, ctlPath params.Entity
 			// the operation to delete a model isn't synchronous even
 			// for empty models. We could also have a worker that deletes
 			// empty models that don't appear in the database.
-			return base.ModelInfo{}, errgo.WithCausef(err, errCannotUseController, "model name in use")
+			return base.ModelInfo{}, errgo.Notef(err, "model name in use")
 		case jujuparams.CodeUpgradeInProgress:
-			return base.ModelInfo{}, errgo.WithCausef(err, errCannotUseController, "upgrade in progress")
+			return base.ModelInfo{}, errgo.Notef(err, "upgrade in progress")
 		default:
 			// The model couldn't be created because of an
 			// error in the request, don't try another
 			// controller.
-			return base.ModelInfo{}, errgo.Mask(err)
+			return base.ModelInfo{}, errgo.WithCausef(err, errInvalidModelParams, "")
 		}
 	}
 	// TODO should we try to delete the model from the controller
@@ -664,7 +656,7 @@ func (j *JEM) createModelOnController(ctx context.Context, ctlPath params.Entity
 	if err := mmClient.GrantModel(conn.Info.Tag.(names.UserTag).Id(), "admin", m.UUID); err != nil {
 		// TODO (mhilton) ensure that this is flagged in some admin interface somewhere.
 		zapctx.Error(ctx, "leaked model", zap.String("controller", ctlPath.String()), zap.String("model", p.Path.String()), zaputil.Error(err), zap.String("model-uuid", m.UUID))
-		return base.ModelInfo{}, errgo.WithCausef(err, errCannotUseController, "cannot grant model access")
+		return base.ModelInfo{}, errgo.Notef(err, "cannot grant model access")
 	}
 	return m, nil
 }
@@ -910,25 +902,35 @@ func (j *JEM) DoControllers(ctx context.Context, cloud params.Cloud, region stri
 // If there's more than one such credential, it returns a params.ErrAmbiguousChoice error.
 //
 // If there are no credentials found, a zero credential path is returned.
-func (j *JEM) selectCredential(ctx context.Context, user params.User, cloud params.Cloud) (params.CredentialPath, error) {
-	q := j.DB.Credentials().Find(bson.D{
-		{"path.entitypath.user", user},
-		{"path.cloud", cloud},
-	}).Select(bson.D{{"path", 1}})
-	iter := j.DB.NewCanReadIter(ctx, q.Iter())
-	var path params.CredentialPath
+func (j *JEM) selectCredential(ctx context.Context, path params.CredentialPath, user params.User, cloud params.Cloud) (*mongodoc.Credential, error) {
+	query := bson.D{{"path", path}}
+	if path.IsZero() {
+		query = bson.D{
+			{"path.entitypath.user", user},
+			{"path.cloud", cloud},
+		}
+	}
+	var creds []mongodoc.Credential
+	iter := j.DB.NewCanReadIter(ctx, j.DB.Credentials().Find(query).Iter())
 	var cred mongodoc.Credential
 	for iter.Next(&cred) {
-		if !path.IsZero() {
-			iter.Close()
-			return params.CredentialPath{}, errgo.WithCausef(nil, params.ErrAmbiguousChoice, "more than one possible credential to use")
-		}
-		path = cred.Path
+		creds = append(creds, cred)
 	}
 	if err := iter.Err(); err != nil {
-		return params.CredentialPath{}, errgo.Notef(err, "cannot query credentials")
+		return nil, errgo.Notef(err, "cannot query credentials")
 	}
-	return path, nil
+	switch len(creds) {
+	case 0:
+		var err error
+		if !path.IsZero() {
+			err = errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", path)
+		}
+		return nil, err
+	case 1:
+		return &creds[0], nil
+	default:
+		return nil, errgo.WithCausef(nil, params.ErrAmbiguousChoice, "more than one possible credential to use")
+	}
 }
 
 // selectController chooses a controller that matches the cloud and region criteria, if specified.

@@ -77,19 +77,6 @@ var unauthorizedTests = []struct {
 		},
 	},
 }, {
-	about:  "new model with inaccessible controller",
-	asUser: "alice",
-	method: "POST",
-	path:   "/v2/model/alice",
-	body: params.NewModelInfo{
-		Name:       "newmodel",
-		Controller: &params.EntityPath{"bob", "private"},
-		Credential: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"bob", "cred1"},
-		},
-	},
-}, {
 	about:  "set controller perm as non-owner",
 	asUser: "other",
 	method: "PUT",
@@ -134,6 +121,7 @@ func (s *APISuite) TestUnauthorized(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{"bob", "open"}, false)
 
 	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
+	s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
 	s.CreateModel(c, params.EntityPath{"bob", "open"}, params.EntityPath{"bob", "open"}, cred)
 
 	s.allowControllerPerm(c, params.EntityPath{"bob", "open"})

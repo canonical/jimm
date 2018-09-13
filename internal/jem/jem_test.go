@@ -416,6 +416,32 @@ func (s *jemSuite) TestCreateModelWithDeprecatedController(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `cannot find suitable controller`)
 }
 
+func (s *jemSuite) TestCreateModelWithMultipleControllers(c *gc.C) {
+	s.PatchValue(jem.Shuffle, func(int, func(int, int)) {})
+	ctlId := s.addController(c, params.EntityPath{"bob", "controller"})
+	err := s.jem.DB.SetACL(testContext, s.jem.DB.Controllers(), ctlId, params.ACL{
+		Read: []string{"everyone"},
+	})
+	c.Assert(err, gc.IsNil)
+	ctl2Id := s.addController(c, params.EntityPath{"bob", "controller2"})
+	err = s.jem.DB.SetACL(testContext, s.jem.DB.Controllers(), ctl2Id, params.ACL{
+		Read: []string{"everyone"},
+	})
+	c.Assert(err, gc.IsNil)
+	ctx := auth.ContextWithUser(testContext, "bob")
+	// Deprecate the first controller.
+	err = s.jem.DB.SetControllerDeprecated(testContext, ctlId, true)
+	c.Assert(err, gc.IsNil)
+
+	m, err := s.jem.CreateModel(ctx, jem.CreateModelParams{
+		Path:   params.EntityPath{"bob", "model2"},
+		Cloud:  "dummy",
+		Region: "dummy-region",
+	})
+	c.Assert(err, gc.IsNil)
+	c.Assert(m.Controller, jc.DeepEquals, ctl2Id)
+}
+
 func (s *jemSuite) TestGrantModelWrite(c *gc.C) {
 	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
 	conn, err := s.jem.OpenAPI(testContext, model.Controller)
