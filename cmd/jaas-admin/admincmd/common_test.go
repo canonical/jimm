@@ -12,15 +12,9 @@ import (
 
 	"github.com/juju/aclstore/aclclient"
 	"github.com/juju/cmd"
-	"github.com/juju/errors"
 	"github.com/juju/idmclient/idmtest"
-	"github.com/juju/juju/api"
-	"github.com/juju/juju/juju"
-	"github.com/juju/juju/jujuclient"
 	"github.com/juju/loggo"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jimm"
@@ -158,38 +152,3 @@ func (s *commonSuite) clearCookies(c *gc.C) {
 	err := os.Remove(s.cookieFile)
 	c.Assert(err, gc.IsNil)
 }
-
-func newAPIConnectionParams(
-	store jujuclient.ClientStore,
-	controllerName,
-	modelName string,
-	bakery *httpbakery.Client,
-) (juju.NewAPIConnectionParams, error) {
-	if controllerName == "" {
-		return juju.NewAPIConnectionParams{}, errgo.New("no controller name")
-	}
-	accountDetails, err := store.AccountDetails(controllerName)
-	if err != nil {
-		return juju.NewAPIConnectionParams{}, errors.Mask(err)
-	}
-	var modelUUID string
-	if modelName != "" {
-		modelDetails, err := store.ModelByName(controllerName, modelName)
-		if err != nil {
-			return juju.NewAPIConnectionParams{}, errors.Trace(err)
-		}
-		modelUUID = modelDetails.ModelUUID
-	}
-	dialOpts := api.DefaultDialOpts()
-	dialOpts.BakeryClient = bakery
-	return juju.NewAPIConnectionParams{
-		Store:          store,
-		ControllerName: controllerName,
-		AccountDetails: accountDetails,
-		ModelUUID:      modelUUID,
-		DialOpts:       dialOpts,
-		OpenAPI:        api.Open,
-	}, nil
-}
-
-const fakeSSHKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCcEHVJtQyjN0eaNMAQIwhwknKj+8uZCqmzeA6EfnUEsrOHisoKjRVzb3bIRVgbK3SJ2/1yHPpL2WYynt3LtToKgp0Xo7LCsspL2cmUIWNYCbcgNOsT5rFeDsIDr9yQito8A3y31Mf7Ka7Rc0EHtCW4zC5yl/WZjgmMmw930+V1rDa5GjkqivftHE5AvLyRGvZJPOLH8IoO+sl02NjZ7dRhniBO9O5UIwxSkuGA5wvfLV7dyT/LH56gex7C2fkeBkZ7YGqTdssTX6DvFTHjEbBAsdWd8/rqXWtB6Xdi8sb3+aMpg9DRomZfb69Y+JuqWTUaq+q30qG2CTiqFRbgwRpp bob@somewhere"

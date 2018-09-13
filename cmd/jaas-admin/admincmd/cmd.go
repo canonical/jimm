@@ -11,10 +11,8 @@ import (
 
 	"github.com/juju/aclstore/aclclient"
 	"github.com/juju/cmd"
-	"github.com/juju/errors"
 	"github.com/juju/gnuflag"
 	"github.com/juju/juju/cmd/modelcmd"
-	"github.com/juju/juju/jujuclient"
 	"github.com/juju/persistent-cookiejar"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
@@ -242,94 +240,3 @@ func (v *entityPathsValue) String() string {
 }
 
 var _ gnuflag.Value = (*entityPathsValue)(nil)
-
-// ensureController ensures that the given named controller exists in
-// the store with the given details, creating one if necessary.
-func ensureController(store jujuclient.ClientStore, controllerName string, ctl jujuclient.ControllerDetails) error {
-	oldCtl, err := store.ControllerByName(controllerName)
-	if err != nil && !errors.IsNotFound(err) {
-		return errgo.Mask(err)
-	}
-	if err != nil || oldCtl.ControllerUUID == ctl.ControllerUUID {
-		// The controller doesn't exist or it exists with the same UUID.
-		// In both these cases, update its details which will create
-		// it if needed.
-		if err := store.UpdateController(controllerName, ctl); err != nil {
-			return errgo.Notef(err, "cannot update controller %q", controllerName)
-		}
-		return nil
-	}
-	// The controller already exists with a different UUID.
-	// This is a problem. Return an error and get the user
-	// to sort it out.
-	// TODO if there are no accounts models stored under the controller,
-	// we *could* just replace the controller details, but that's
-	// probably a bad idea.
-	return errgo.Newf("controller %q already exists with a different UUID (old %s; new %s)", controllerName, oldCtl.ControllerUUID, ctl.ControllerUUID)
-}
-
-// ensureAccount ensures that the given named account exists in the given
-// store under the given controller. creating one if necessary.
-func ensureAccount(store jujuclient.ClientStore, controllerName string, acct jujuclient.AccountDetails) error {
-	oldAcct, err := store.AccountDetails(controllerName)
-	if err != nil && !errors.IsNotFound(err) {
-		return errgo.Mask(err)
-	}
-	if err != nil || oldAcct.User == acct.User {
-		// The controller doesn't exist or it exists with the same UUID.
-		// In both these cases, update its details which will create
-		// it if needed.
-		if err := store.UpdateAccount(controllerName, acct); err != nil {
-			return errgo.Notef(err, "cannot update account in controller %q", controllerName)
-		}
-		return nil
-	}
-	// The account already exists with a different user name.
-	// This is a problem. Return an error and get the user
-	// to sort it out.
-	return errgo.Newf("account in controller %q already exists with a different user name", controllerName)
-}
-
-const jemControllerPrefix = "jem-"
-
-func jemControllerToLocalControllerName(p params.EntityPath) string {
-	// Because we expect all controllers to be created under the
-	// same user name, we'll treat the controller name as if it
-	// were a global name space and ignore the user name.
-	return jemControllerPrefix + string(p.Name)
-}
-
-// modelExists checks if the model with the given name exists.
-// If controllerName is non-empty, it checks only in that controller;
-// otherwise it checks all controllers.
-// If a model is found, it returns the name of its controller
-// otherwise it returns the empty string.
-func modelExists(store jujuclient.ClientStore, modelName, controllerName string) (string, error) {
-	var controllerNames []string
-	if controllerName != "" {
-		controllerNames = []string{controllerName}
-	} else {
-		// We don't know the controller name in advance, so
-		// be conservative and check all jem-prefixed controllers
-		// for the model name.
-		ctls, err := store.AllControllers()
-		if err != nil {
-			return "", errgo.Notef(err, "cannot get local controllers")
-		}
-		for name := range ctls {
-			if strings.HasPrefix(name, jemControllerPrefix) {
-				controllerNames = append(controllerNames, name)
-			}
-		}
-	}
-	for _, controllerName := range controllerNames {
-		_, err := store.ModelByName(controllerName, modelName)
-		if err == nil {
-			return controllerName, nil
-		}
-		if !errors.IsNotFound(err) {
-			return "", errgo.Mask(err)
-		}
-	}
-	return "", nil
-}

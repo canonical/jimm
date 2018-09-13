@@ -4,8 +4,6 @@ package v2
 
 import (
 	"context"
-	"net/url"
-	"strings"
 	"time"
 
 	"github.com/juju/aclstore"
@@ -359,22 +357,6 @@ func (h *Handler) DeleteController(arg *params.DeleteController) error {
 	return nil
 }
 
-// isAlreadyGrantedError reports whether the error
-// (as returned from modelmanager.Client.GrantModel)
-// represents the condition that the user has already
-// been granted access.
-//
-// We have to use string comparison because of
-// https://bugs.launchpad.net/juju-core/+bug/1564880.
-func isAlreadyGrantedError(err error) bool {
-	if err == nil {
-		return false
-	}
-	s := err.Error()
-	return strings.HasPrefix(s, "user already has ") &&
-		strings.HasSuffix(s, " access or greater")
-}
-
 // GetModel returns information on a given model.
 func (h *Handler) GetModel(arg *params.GetModel) (*params.ModelResponse, error) {
 	ctx := h.context
@@ -516,45 +498,6 @@ func newTime(t time.Time) *time.Time {
 		return nil
 	}
 	return &t
-}
-
-type cloudRegion struct {
-	cloud  params.Cloud
-	region string
-}
-
-type cloudRegions []cloudRegion
-
-// Len implements sort.Interface.Len
-func (c cloudRegions) Len() int {
-	return len(c)
-}
-
-// Less implements sort.Interface.Less
-func (c cloudRegions) Less(i, j int) bool {
-	if c[i].cloud == c[j].cloud {
-		return c[i].region < c[j].region
-	}
-	return c[i].cloud < c[j].cloud
-}
-
-// Swap implements sort.Interface.Swap
-func (c cloudRegions) Swap(i, j int) {
-	c[i], c[j] = c[j], c[i]
-}
-
-func (c cloudRegions) locations() []map[string]string {
-	locs := make([]map[string]string, 0, len(c))
-	for _, cr := range c {
-		m := map[string]string{
-			"cloud": string(cr.cloud),
-		}
-		if cr.region != "" {
-			m["region"] = cr.region
-		}
-		locs = append(locs, m)
-	}
-	return locs
 }
 
 // NewModel creates a new model inside an existing Controller.
@@ -802,36 +745,6 @@ func badRequestf(underlying error, f string, a ...interface{}) error {
 	return err
 }
 
-// collapseHostPorts collapses a list of host-port lists
-// into a single list suitable for passing to api.Open.
-// It preserves ordering because api.State.APIHostPorts
-// makes sure to return the first-connected address
-// first in the slice.
-// See juju.PrepareEndpointsForCaching for a more
-// comprehensive version of this function.
-func collapseHostPorts(hpss [][]network.HostPort) []string {
-	hps := network.CollapseHostPorts(hpss)
-	hps = network.FilterUnusableHostPorts(hps)
-	hps = network.UniqueHostPorts(hps)
-	return network.HostPortsToStrings(hps)
-}
-
-// formToLocationAttrs converts a set of location attributes
-// specified as URL query paramerters into the usual
-// location attribute map form.
-func formToLocationAttrs(form url.Values) (map[string]string, error) {
-	attrs := make(map[string]string)
-	for attr, vals := range form {
-		if !params.IsValidLocationAttr(attr) {
-			return nil, badRequestf(nil, "invalid location attribute %q", attr)
-		}
-		if len(vals) > 0 {
-			attrs[attr] = vals[0]
-		}
-	}
-	return attrs, nil
-}
-
 type locationParams struct {
 	cloud  params.Cloud
 	region string
@@ -858,14 +771,6 @@ func cloudAndRegion(loc map[string]string) (locationParams, error) {
 		}
 	}
 	return p, nil
-}
-
-func parseFormLocations(form url.Values) (locationParams, error) {
-	loc, err := formToLocationAttrs(form)
-	if err != nil {
-		return locationParams{}, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
-	}
-	return cloudAndRegion(loc)
 }
 
 // entityIter is an iterator over a set of entities.
