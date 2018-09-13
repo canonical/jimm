@@ -282,10 +282,56 @@ func (m *controllerMonitor) connected(ctx context.Context, conn jujuAPI) error {
 	if err != nil {
 		return errgo.Notef(err, "cannot get clouds")
 	}
-	if len(clouds) > 1 {
-		zapctx.Warn(ctx, "controller reports more than one cloud", zap.String("controller", m.ctlPath.String()))
+
+	ctl, err := m.jem.Controller(ctx, m.ctlPath)
+	if err != nil {
+		return errgo.Notef(err, "cannot get controller")
 	}
 
+	var cloudRegions []mongodoc.CloudRegion
+	for k, v := range clouds {
+		cr := mongodoc.CloudRegion{
+			Cloud:              params.Cloud(k.Id()),
+			Endpoint:           v.Endpoint,
+			IdentityEndpoint:   v.IdentityEndpoint,
+			StorageEndpoint:    v.StorageEndpoint,
+			ProviderType:       v.Type,
+			CACertificates:     v.CACertificates,
+			PrimaryControllers: []params.EntityPath{ctl.Path},
+			ACL: params.ACL{
+				Read: []string{"everyone"},
+			},
+		}
+		for _, at := range v.AuthTypes {
+			cr.AuthTypes = append(cr.AuthTypes, string(at))
+		}
+		cloudRegions = append(cloudRegions, cr)
+		for _, reg := range v.Regions {
+			cr := mongodoc.CloudRegion{
+				Cloud:            params.Cloud(k.Id()),
+				Region:           reg.Name,
+				Endpoint:         reg.Endpoint,
+				IdentityEndpoint: reg.IdentityEndpoint,
+				StorageEndpoint:  reg.StorageEndpoint,
+				ACL: params.ACL{
+					Read: []string{"everyone"},
+				},
+			}
+			if ctl.Location["cloud"] == k.Id() && ctl.Location["region"] == reg.Name {
+				cr.PrimaryControllers = []params.EntityPath{ctl.Path}
+			} else {
+				cr.SecondaryControllers = []params.EntityPath{ctl.Path}
+			}
+			cloudRegions = append(cloudRegions, cr)
+		}
+	}
+	// Note: if regions change (other than by adding new regions), then the controller
+	// won't be removed from regions that are no longer supported
+	if err := m.jem.UpdateCloudRegions(ctx, cloudRegions); err != nil {
+		return errgo.Mask(err)
+	}
+
+	// TODO Remove when Cloud is removed from controller
 	var regions []mongodoc.Region
 	// Note: currently juju controllers only ever have exactly one
 	// cloud. This code will need to change if that changes.

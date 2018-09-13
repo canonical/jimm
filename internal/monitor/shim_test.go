@@ -217,6 +217,7 @@ type jemShimInMemory struct {
 	machines                    map[string]map[machineId]*mongodoc.Machine
 	applications                map[string]map[applicationId]*mongodoc.Application
 	controllerUpdateCredentials map[params.EntityPath]bool
+	cloudRegions                map[string]*mongodoc.CloudRegion
 }
 
 var _ jemInterface = (*jemShimInMemory)(nil)
@@ -228,14 +229,15 @@ func newJEMShimInMemory() *jemShimInMemory {
 		controllerUpdateCredentials: make(map[params.EntityPath]bool),
 		machines:                    make(map[string]map[machineId]*mongodoc.Machine),
 		applications:                make(map[string]map[applicationId]*mongodoc.Application),
+		cloudRegions:                make(map[string]*mongodoc.CloudRegion),
 	}
 }
 
-func (s *jemShimInMemory) controller(p params.EntityPath) *mongodoc.Controller {
+func (s *jemShimInMemory) Controller(ctx context.Context, p params.EntityPath) (*mongodoc.Controller, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	c := *s.controllers[p]
-	return &c
+	return &c, nil
 }
 
 func (s *jemShimInMemory) AddController(ctl *mongodoc.Controller) {
@@ -472,6 +474,22 @@ func (s *jemShimInMemory) AcquireMonitorLease(ctx context.Context, ctlPath param
 		ctl.MonitorLeaseExpiry = mongodoc.Time(newExpiry)
 	}
 	return ctl.MonitorLeaseExpiry, nil
+}
+
+func (s *jemShimInMemory) UpdateCloudRegions(ctx context.Context, cloudRegions []mongodoc.CloudRegion) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for k, cloudRegion := range cloudRegions {
+		id := cloudRegion.GetId()
+		if cr, ok := s.cloudRegions[id]; ok {
+			cr.PrimaryControllers = append(cr.PrimaryControllers, cloudRegion.PrimaryControllers...)
+			cr.SecondaryControllers = append(cr.SecondaryControllers, cloudRegion.SecondaryControllers...)
+			continue
+		}
+		s.cloudRegions[id] = &cloudRegions[k]
+	}
+
+	return nil
 }
 
 type jujuAPIShims struct {

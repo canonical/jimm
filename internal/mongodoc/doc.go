@@ -3,6 +3,7 @@
 package mongodoc
 
 import (
+	"fmt"
 	"net"
 	"strconv"
 	"time"
@@ -230,6 +231,13 @@ type CloudRegion struct {
 
 	// ACL holds permissions for the cloud.
 	ACL params.ACL
+}
+
+func (c CloudRegion) GetId() string {
+	if c.Id != "" {
+		return c.Id
+	}
+	return fmt.Sprintf("%s/%s", c.Cloud, c.Region)
 }
 
 func (c *CloudRegion) GetACL() params.ACL {

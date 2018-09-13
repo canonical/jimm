@@ -399,7 +399,7 @@ func (c cloud) DefaultCloud() (jujuparams.StringResult, error) {
 	if len(clouds) != 1 {
 		return result, errgo.WithCausef(nil, params.ErrNotFound, "no default cloud")
 	}
-	for tag, _ := range clouds {
+	for tag := range clouds {
 		result = jujuparams.StringResult{
 			Result: tag,
 		}

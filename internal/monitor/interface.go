@@ -112,6 +112,12 @@ type jemInterface interface {
 	// ControllerUpdateCredentials updates the given controller by updating
 	// all credentials listed in ctl.UpdateCredentials.
 	ControllerUpdateCredentials(ctx context.Context, ctlPath params.EntityPath) error
+
+	// Controller retrieve the controller based on the controller path.
+	Controller(ctx context.Context, ctlPath params.EntityPath) (*mongodoc.Controller, error)
+
+	// UpdateCloudRegions updates the cloud/region.
+	UpdateCloudRegions(ctx context.Context, cloudRegions []mongodoc.CloudRegion) error
 }
 
 // jujuAPI represents an API connection to a Juju controller.

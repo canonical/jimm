@@ -1617,11 +1617,11 @@ func (s *databaseSuite) TestCloud(c *gc.C) {
 		Cloud:              "my-cloud",
 		Region:             "my-region",
 		ProviderType:       "ec2",
-		PrimaryControllers: []params.EntityPath{params.EntityPath{"bob", "bar"}},
+		PrimaryControllers: []params.EntityPath{{"bob", "bar"}},
 	}, {
 		Cloud:              "my-cloud",
 		ProviderType:       "ec2",
-		PrimaryControllers: []params.EntityPath{params.EntityPath{"bob", "bar"}},
+		PrimaryControllers: []params.EntityPath{{"bob", "bar"}},
 	}})
 	c.Assert(err, gc.IsNil)
 	cld, err := s.database.Cloud(testContext, "my-cloud")

@@ -1820,7 +1820,7 @@ func (s *jemSuite) TestCreateCloud(c *gc.C) {
 		IdentityEndpoint:     "https://1.2.3.4:5679",
 		StorageEndpoint:      "https://1.2.3.4:5680",
 		CACertificates:       []string{"This is a CA Certficiate (honest)"},
-		PrimaryControllers:   []params.EntityPath{params.EntityPath{User: "bob", Name: "foo"}},
+		PrimaryControllers:   []params.EntityPath{{User: "bob", Name: "foo"}},
 		SecondaryControllers: []params.EntityPath{},
 		ACL: params.ACL{
 			Read:  []string{"bob"},
@@ -1870,7 +1870,7 @@ func (s *jemSuite) TestCreateCloudWithRegions(c *gc.C) {
 		IdentityEndpoint:     "https://1.2.3.4:5679",
 		StorageEndpoint:      "https://1.2.3.4:5680",
 		CACertificates:       []string{"This is a CA Certficiate (honest)"},
-		PrimaryControllers:   []params.EntityPath{params.EntityPath{User: "bob", Name: "foo"}},
+		PrimaryControllers:   []params.EntityPath{{User: "bob", Name: "foo"}},
 		SecondaryControllers: []params.EntityPath{},
 		ACL: params.ACL{
 			Read:  []string{"bob"},
@@ -1881,7 +1881,7 @@ func (s *jemSuite) TestCreateCloudWithRegions(c *gc.C) {
 		Id:                   "test-cloud/test-region",
 		Cloud:                "test-cloud",
 		Region:               "test-region",
-		PrimaryControllers:   []params.EntityPath{params.EntityPath{User: "bob", Name: "foo"}},
+		PrimaryControllers:   []params.EntityPath{{User: "bob", Name: "foo"}},
 		SecondaryControllers: []params.EntityPath{},
 		ACL: params.ACL{
 			Read:  []string{"bob"},
