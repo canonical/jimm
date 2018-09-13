@@ -5,7 +5,6 @@ package jem
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
 	"time"
 
 	"github.com/juju/version"
@@ -1230,18 +1229,4 @@ func (db *Database) C(name string) *mgo.Collection {
 		panic(fmt.Sprintf("cannot get collection %q because JEM closed", name))
 	}
 	return db.Database.C(name)
-}
-
-// sessionStatus records the current status of a mgo session.
-type sessionStatus int32
-
-// setDead marks the session as dead, so that it won't be
-// reused for new JEM instances.
-func (s *sessionStatus) setDead() {
-	atomic.StoreInt32((*int32)(s), 1)
-}
-
-// isDead reports whether the session has been marked as dead.
-func (s *sessionStatus) isDead() bool {
-	return atomic.LoadInt32((*int32)(s)) != 0
 }

@@ -3,7 +3,6 @@
 package mongodoc
 
 import (
-	"encoding/base64"
 	"net"
 	"strconv"
 	"time"
@@ -494,13 +493,4 @@ func ParseAddresses(addresses []string) ([]HostPort, error) {
 		hps[i].SetJujuHostPort(nhp)
 	}
 	return hps, nil
-}
-
-// Sanitize returns a version of key that's suitable
-// for using as a mongo key.
-// TODO base64 encoding is probably overkill - we
-// could probably do something that left keys
-// more readable.
-func Sanitize(key string) string {
-	return base64.StdEncoding.EncodeToString([]byte(key))
 }

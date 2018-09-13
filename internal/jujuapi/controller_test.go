@@ -1927,32 +1927,6 @@ func assertModelInfo(c *gc.C, obtained, expected []jujuparams.ModelInfoResult) {
 	c.Assert(obtained, jc.DeepEquals, expected)
 }
 
-func machineInfo(c *gc.C, m *state.Machine) jujuparams.ModelMachineInfo {
-	mi := jujuparams.ModelMachineInfo{
-		Id:        m.Id(),
-		HasVote:   m.HasVote(),
-		WantsVote: m.WantsVote(),
-	}
-	hc, err := m.HardwareCharacteristics()
-	c.Assert(err, jc.ErrorIsNil)
-	mi.Hardware = &jujuparams.MachineHardware{
-		Arch:             hc.Arch,
-		Mem:              hc.Mem,
-		RootDisk:         hc.RootDisk,
-		Cores:            hc.CpuCores,
-		CpuPower:         hc.CpuPower,
-		Tags:             hc.Tags,
-		AvailabilityZone: hc.AvailabilityZone,
-	}
-	id, err := m.InstanceId()
-	c.Assert(err, jc.ErrorIsNil)
-	mi.InstanceId = string(id)
-	st, err := m.Status()
-	c.Assert(err, jc.ErrorIsNil)
-	mi.Status = string(st.Status)
-	return mi
-}
-
 func newBool(b bool) *bool {
 	return &b
 }
