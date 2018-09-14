@@ -54,6 +54,7 @@ var facades = map[facade]string{
 	{"Admin", 3}:        "Admin",
 	{"Bundle", 1}:       "Bundle",
 	{"Cloud", 1}:        "Cloud",
+	{"Cloud", 2}:        "Cloud",
 	{"Controller", 3}:   "Controller",
 	{"JIMM", 1}:         "JIMM",
 	{"ModelManager", 2}: "ModelManagerV2",
@@ -579,6 +580,7 @@ func (c cloud) credential(ctx context.Context, cloudCredentialTag string) (*juju
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
+
 	credPath := params.CredentialPath{
 		Cloud: params.Cloud(cct.Cloud().Id()),
 		EntityPath: params.EntityPath{
@@ -586,6 +588,7 @@ func (c cloud) credential(ctx context.Context, cloudCredentialTag string) (*juju
 			Name: params.Name(cct.Name()),
 		},
 	}
+
 	cred, err := c.root.jem.Credential(ctx, credPath)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
@@ -609,6 +612,122 @@ func (c cloud) credential(ctx context.Context, cloudCredentialTag string) (*juju
 		}
 	}
 	return &cc, nil
+}
+
+// AddCloud implements the AddCloud method of the Cloud (v2) facade.
+func (c cloud) AddCloud(args jujuparams.AddCloudArgs) error {
+	username := auth.Username(c.root.context)
+	cloud := mongodoc.CloudRegion{
+		Cloud:            params.Cloud(args.Name),
+		ProviderType:     args.Cloud.Type,
+		AuthTypes:        args.Cloud.AuthTypes,
+		Endpoint:         args.Cloud.Endpoint,
+		IdentityEndpoint: args.Cloud.IdentityEndpoint,
+		StorageEndpoint:  args.Cloud.StorageEndpoint,
+		CACertificates:   args.Cloud.CACertificates,
+		ACL: params.ACL{
+			Read:  []string{username},
+			Write: []string{username},
+			Admin: []string{username},
+		},
+	}
+	regions := make([]mongodoc.CloudRegion, len(args.Cloud.Regions))
+	for i, region := range args.Cloud.Regions {
+		regions[i] = mongodoc.CloudRegion{
+			Cloud:            params.Cloud(args.Name),
+			Region:           region.Name,
+			Endpoint:         region.Endpoint,
+			IdentityEndpoint: region.IdentityEndpoint,
+			StorageEndpoint:  region.StorageEndpoint,
+			ACL: params.ACL{
+				Read:  []string{username},
+				Write: []string{username},
+				Admin: []string{username},
+			},
+		}
+	}
+	return c.root.jem.CreateCloud(c.root.context, cloud, regions)
+}
+
+// AddCredentials implements the AddCredentials method of the Cloud (v2) facade.
+func (c cloud) AddCredentials(args jujuparams.TaggedCredentials) (jujuparams.ErrorResults, error) {
+	// In JIMM UpdateCredentials behaves in the way AddCredentials is
+	// documented to. Presumably in juju UpdateCredentials works
+	// slightly differently.
+	return c.UpdateCredentials(args)
+}
+
+// CredentialContents implements the CredentialContents method of the Cloud (v2) facade.
+func (c cloud) CredentialContents(args jujuparams.CloudCredentialArgs) (jujuparams.CredentialContentResults, error) {
+	results := make([]jujuparams.CredentialContentResult, len(args.Credentials))
+	for i, arg := range args.Credentials {
+		credInfo, err := c.credentialInfo(c.root.context, arg.CloudName, arg.CredentialName, args.IncludeSecrets)
+		if err != nil {
+			results[i].Error = mapError(err)
+			continue
+		}
+		results[i].Result = credInfo
+	}
+	return jujuparams.CredentialContentResults{
+		Results: results,
+	}, nil
+}
+
+// credentialInfo returns Juju API information on the given credential
+// within the given cloud. If includeSecrets is true, secret information
+// will be included too.
+func (c cloud) credentialInfo(ctx context.Context, cloudName, credentialName string, includeSecrets bool) (*jujuparams.ControllerCredentialInfo, error) {
+	credPath := params.CredentialPath{
+		Cloud: params.Cloud(cloudName),
+		EntityPath: params.EntityPath{
+			User: params.User(auth.Username(ctx)),
+			Name: params.Name(credentialName),
+		},
+	}
+	cred, err := c.root.jem.Credential(ctx, credPath)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+	}
+	if cred.Revoked {
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "")
+	}
+	schema, err := c.root.credentialSchema(ctx, cred.Path.Cloud, cred.Type)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	cci := jujuparams.ControllerCredentialInfo{
+		Content: jujuparams.CredentialContent{
+			Name:       credentialName,
+			Cloud:      cloudName,
+			AuthType:   cred.Type,
+			Attributes: make(map[string]string),
+		},
+	}
+	for k, v := range cred.Attributes {
+		if ca, ok := schema.Attribute(k); ok && (!ca.Hidden || includeSecrets) {
+			cci.Content.Attributes[k] = v
+		}
+	}
+	c.root.doModels(ctx, func(ctx context.Context, model *mongodoc.Model) error {
+		if model.Credential != credPath {
+			return nil
+		}
+		access := jujuparams.ModelReadAccess
+		switch {
+		case params.User(auth.Username(ctx)) == model.Path.User:
+			access = jujuparams.ModelAdminAccess
+		case auth.CheckACL(ctx, model.ACL.Admin) == nil:
+			access = jujuparams.ModelAdminAccess
+		case auth.CheckACL(ctx, model.ACL.Write) == nil:
+			access = jujuparams.ModelWriteAccess
+		}
+		cci.Models = append(cci.Models, jujuparams.ModelAccess{
+			Model:  string(model.Path.Name),
+			Access: string(access),
+		})
+		return nil
+	})
+	return &cci, nil
 }
 
 // controller implements the Controller facade.

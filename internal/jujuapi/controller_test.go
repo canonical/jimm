@@ -526,16 +526,162 @@ func (s *controllerSuite) TestRevokeCredential(c *gc.C) {
 	c.Assert(tags, jc.DeepEquals, []names.CloudCredentialTag{})
 }
 
-func (s *controllerSuite) TestLoginToRoot(c *gc.C) {
-	conn := s.open(c, &api.Info{
-		SkipLogin: true,
-	}, "test")
+func (s *controllerSuite) TestAddCloud(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller"}, true)
+	conn := s.open(c, nil, "test")
 	defer conn.Close()
-	err := conn.Login(nil, "", "", nil)
+	client := cloudapi.NewClient(conn)
+	err := client.AddCloud(cloud.Cloud{
+		Name:             "test-cloud",
+		Type:             "kubernetes",
+		AuthTypes:        cloud.AuthTypes{cloud.CertificateAuthType},
+		Endpoint:         "https://1.2.3.4:5678",
+		IdentityEndpoint: "https://1.2.3.4:5679",
+		StorageEndpoint:  "https://1.2.3.4:5680",
+	})
 	c.Assert(err, jc.ErrorIsNil)
-	var resp jujuparams.RedirectInfoResult
-	err = conn.APICall("Admin", 3, "", "RedirectInfo", nil, &resp)
-	c.Assert(err, gc.ErrorMatches, `no such request - method Admin.RedirectInfo is not implemented \(not implemented\)`)
+	clouds, err := client.Clouds()
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(clouds[names.NewCloudTag("test-cloud")], jc.DeepEquals, cloud.Cloud{
+		Name:             "test-cloud",
+		Type:             "kubernetes",
+		AuthTypes:        cloud.AuthTypes{"certificate"},
+		Endpoint:         "https://1.2.3.4:5678",
+		IdentityEndpoint: "https://1.2.3.4:5679",
+		StorageEndpoint:  "https://1.2.3.4:5680",
+	})
+}
+
+func (s *controllerSuite) TestAddCloudError(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller"}, true)
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := cloudapi.NewClient(conn)
+	err := client.AddCloud(cloud.Cloud{
+		Name:             "test-cloud",
+		Type:             "kubernetes",
+		Endpoint:         "https://1.2.3.4:5678",
+		IdentityEndpoint: "https://1.2.3.4:5679",
+		StorageEndpoint:  "https://1.2.3.4:5680",
+	})
+	c.Assert(err, gc.ErrorMatches, `invalid cloud: empty auth-types not valid`)
+}
+
+func (s *controllerSuite) TestAddCredential(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := cloudapi.NewClient(conn)
+	credentialTag := names.NewCloudCredentialTag("dummy/test@external/cred3")
+	err := client.AddCredential(
+		credentialTag.String(),
+		cloud.NewCredential(
+			"userpass",
+			map[string]string{
+				"username": "test-user",
+				"password": "S3cret",
+			},
+		),
+	)
+	c.Assert(err, jc.ErrorIsNil)
+	creds, err := client.CredentialContents("dummy", "cred3", true)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(creds, jc.DeepEquals, []jujuparams.CredentialContentResult{{
+		Result: &jujuparams.ControllerCredentialInfo{
+			Content: jujuparams.CredentialContent{
+				Name:     "cred3",
+				Cloud:    "dummy",
+				AuthType: "userpass",
+				Attributes: map[string]string{
+					"username": "test-user",
+					"password": "S3cret",
+				},
+			},
+		},
+	}})
+	err = client.AddCredential(
+		credentialTag.String(),
+		cloud.NewCredential(
+			"userpass",
+			map[string]string{
+				"username": "test-user2",
+				"password": "S3cret2",
+			},
+		),
+	)
+	c.Assert(err, jc.ErrorIsNil)
+	creds, err = client.CredentialContents("dummy", "cred3", true)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(creds, jc.DeepEquals, []jujuparams.CredentialContentResult{{
+		Result: &jujuparams.ControllerCredentialInfo{
+			Content: jujuparams.CredentialContent{
+				Name:     "cred3",
+				Cloud:    "dummy",
+				AuthType: "userpass",
+				Attributes: map[string]string{
+					"username": "test-user2",
+					"password": "S3cret2",
+				},
+			},
+		},
+	}})
+}
+
+func (s *controllerSuite) TestCredentialContents(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := cloudapi.NewClient(conn)
+	credentialTag := names.NewCloudCredentialTag("dummy/test@external/cred3")
+	err := client.AddCredential(
+		credentialTag.String(),
+		cloud.NewCredential(
+			"userpass",
+			map[string]string{
+				"username": "test-user",
+				"password": "S3cret",
+			},
+		),
+	)
+	c.Assert(err, jc.ErrorIsNil)
+	creds, err := client.CredentialContents("dummy", "cred3", false)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(creds, jc.DeepEquals, []jujuparams.CredentialContentResult{{
+		Result: &jujuparams.ControllerCredentialInfo{
+			Content: jujuparams.CredentialContent{
+				Name:     "cred3",
+				Cloud:    "dummy",
+				AuthType: "userpass",
+				Attributes: map[string]string{
+					"username": "test-user",
+				},
+			},
+		},
+	}})
+
+	mmclient := modelmanager.NewClient(conn)
+	_, err = mmclient.CreateModel("model1", "test@external", "dummy", "", credentialTag, nil)
+	c.Assert(err, jc.ErrorIsNil)
+
+	creds, err = client.CredentialContents("dummy", "cred3", true)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(creds, jc.DeepEquals, []jujuparams.CredentialContentResult{{
+		Result: &jujuparams.ControllerCredentialInfo{
+			Content: jujuparams.CredentialContent{
+				Name:     "cred3",
+				Cloud:    "dummy",
+				AuthType: "userpass",
+				Attributes: map[string]string{
+					"username": "test-user",
+					"password": "S3cret",
+				},
+			},
+			Models: []jujuparams.ModelAccess{{
+				Model:  "model1",
+				Access: "admin",
+			}},
+		},
+	}})
 }
 
 func (s *controllerSuite) TestListModelSummaries(c *gc.C) {
