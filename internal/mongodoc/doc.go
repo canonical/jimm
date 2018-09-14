@@ -125,53 +125,6 @@ type UserInfo struct {
 	Password string
 }
 
-// Cloud holds the details of a cloud provided by a controller.
-type Cloud struct {
-	// Name holds the name of the cloud.
-	Name params.Cloud
-
-	// ProviderType holds the type of cloud.
-	ProviderType string
-
-	// Authtypes holds the set of allowed authtypes for use with this
-	// cloud.
-	AuthTypes []string
-
-	// Endpoint contains the endpoint parameter specified by the
-	// controller.
-	Endpoint string
-
-	// IdentityEndpoint contains the identity endpoint parameter
-	// specified by the controller.
-	IdentityEndpoint string
-
-	// StorageEndpoint contains the stroage endpoint parameter
-	// specified by the controller.
-	StorageEndpoint string
-
-	// Regions contains the details of the set of regions supported
-	// by the controller. Note: some providers do not use regions.
-	Regions []Region
-}
-
-// Region holds details of a cloud region supported by a controller.
-type Region struct {
-	// Name holds the name of the region.
-	Name string
-
-	// Endpoint contains the endpoint parameter specified by the
-	// controller.
-	Endpoint string
-
-	// IdentityEndpoint contains the identity endpoint parameter
-	// specified by the controller.
-	IdentityEndpoint string
-
-	// StorageEndpoint contains the storage endpoint parameter
-	// specified by the controller.
-	StorageEndpoint string
-}
-
 // CloudRegion holds the details of a cloud or a region within a cloud.
 // For information about a whole cloud, Region will be empty, and the
 // document should not contain any secondary controllers, as all

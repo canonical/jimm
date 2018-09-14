@@ -781,30 +781,19 @@ func (db *Database) credentialRemoveController(ctx context.Context, credential p
 	return nil
 }
 
-// Cloud gets the details of the given cloud.
-//
-// Note that there may be many controllers with the given cloud name. We
-// return an arbitrary choice, assuming that cloud definitions are the
-// same across all possible controllers.
-func (db *Database) Cloud(ctx context.Context, cloud params.Cloud) (_ *mongodoc.Cloud, err error) {
+// ProviderType gets the provider type of the given cloud.
+func (db *Database) ProviderType(ctx context.Context, cloud params.Cloud) (_ string, err error) {
 	defer db.checkError(ctx, &err)
 	var cloudRegion mongodoc.CloudRegion
 	err = db.CloudRegions().Find(bson.D{{"cloud", cloud}, {"region", ""}}).One(&cloudRegion)
 	if err == mgo.ErrNotFound {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "cloud %q not found", cloud)
+		return "", errgo.WithCausef(nil, params.ErrNotFound, "cloud %q not found", cloud)
 	}
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot get cloud %q", cloud)
+		return "", errgo.Notef(err, "cannot get cloud %q", cloud)
 	}
 
-	return &mongodoc.Cloud{
-		Name:             cloudRegion.Cloud,
-		ProviderType:     cloudRegion.ProviderType,
-		AuthTypes:        cloudRegion.AuthTypes,
-		Endpoint:         cloudRegion.Endpoint,
-		IdentityEndpoint: cloudRegion.IdentityEndpoint,
-		StorageEndpoint:  cloudRegion.StorageEndpoint,
-	}, nil
+	return cloudRegion.ProviderType, nil
 }
 
 // GetCloudRegions returns all of the cloudregion.
