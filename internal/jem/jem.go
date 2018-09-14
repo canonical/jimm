@@ -848,7 +848,7 @@ func (j *JEM) EarliestControllerVersion(ctx context.Context) (version.Number, er
 	// and we don't really need to make this extra round trip every
 	// time a user connects to the API?
 	var v *version.Number
-	if err := j.DoControllers(ctx, "", "", func(c *mongodoc.Controller) error {
+	if err := j.DoControllers(ctx, func(c *mongodoc.Controller) error {
 		zapctx.Info(ctx, "in EarliestControllerVersion", zap.Stringer("controller", c.Path), zap.Stringer("version", c.Version))
 		if c.Version == nil {
 			return nil
@@ -871,16 +871,13 @@ func (j *JEM) EarliestControllerVersion(ctx context.Context) (version.Number, er
 // If the function returns an error, the iteration stops and
 // DoControllers returns the error with the same cause.
 //
-// If cloud is empty, all clouds are selected. If region is empty,
-// all regions are selected.
-//
 // Note that the same pointer is passed to the do function on
 // each iteration. It is the responsibility of the do function to
 // copy it if needed.
-func (j *JEM) DoControllers(ctx context.Context, cloud params.Cloud, region string, do func(c *mongodoc.Controller) error) error {
+func (j *JEM) DoControllers(ctx context.Context, do func(c *mongodoc.Controller) error) error {
 	// Query all the controllers that match the attributes, building
 	// up all the possible values.
-	q := j.DB.controllerLocationQuery(cloud, region, false)
+	q := j.DB.Controllers().Find(bson.D{{"unavailablesince", notExistsQuery}, {"public", true}})
 	// Sort by _id so that we can make easily reproducible tests.
 	iter := j.DB.NewCanReadIter(ctx, q.Sort("_id").Iter())
 	var ctl mongodoc.Controller
@@ -933,35 +930,21 @@ func (j *JEM) selectCredential(ctx context.Context, path params.CredentialPath, 
 	}
 }
 
-// selectController chooses a controller that matches the cloud and region criteria, if specified.
-func (j *JEM) selectController(ctx context.Context, cloud params.Cloud, region string) (params.EntityPath, error) {
-	var controllers []mongodoc.Controller
-	var otherControllers []mongodoc.Controller
-	err := j.DoControllers(ctx, cloud, region, func(c *mongodoc.Controller) error {
-		if c.Deprecated {
-			// Never add a model to deprecated controller.
-			return nil
-		}
-		if region != "" && c.Location["region"] == region {
-			controllers = append(controllers, *c)
-		} else {
-			otherControllers = append(otherControllers, *c)
-		}
-
-		return nil
-	})
-	if err != nil {
-		return params.EntityPath{}, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
-	}
-	if len(controllers) == 0 {
-		controllers = otherControllers
-	}
-	if len(controllers) == 0 {
-		return params.EntityPath{}, errgo.WithCausef(nil, params.ErrNotFound, "no matching controllers found")
-	}
+// selectRandomController chooses a random controller that you have access to.
+func (j *JEM) selectRandomController(ctx context.Context) (params.EntityPath, error) {
 	// Choose a random controller.
 	// TODO select a controller more intelligently, for example
 	// by choosing the most lightly loaded controller
+	var controllers []mongodoc.Controller
+	if err := j.DoControllers(ctx, func(c *mongodoc.Controller) error {
+		controllers = append(controllers, *c)
+		return nil
+	}); err != nil {
+		return params.EntityPath{}, errgo.Mask(err)
+	}
+	if len(controllers) == 0 {
+		return params.EntityPath{}, errgo.Newf("cannot find a suitable controller")
+	}
 	n := randIntn(len(controllers))
 	return controllers[n].Path, nil
 }
@@ -1115,7 +1098,7 @@ func (j *JEM) createCloud(ctx context.Context, cloud jujucloud.Cloud) (params.En
 	// Pick a random public controller.
 	// TODO(mhilton) find a better way to choose a controller for the
 	// cloud (presumably based on IP address magic).
-	ctlPath, err := j.selectController(ctx, "", "")
+	ctlPath, err := j.selectRandomController(ctx)
 	if err != nil {
 		return params.EntityPath{}, errgo.Mask(err)
 	}
