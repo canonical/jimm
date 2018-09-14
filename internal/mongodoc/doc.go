@@ -278,6 +278,12 @@ type Model struct {
 
 	// Status holds the current status of the model
 	Info *ModelInfo `bson:",omitempty"`
+
+	// Type holds the type of the model (IAAS or CAAS)
+	Type string
+
+	// ProviderType holds the provider type of the model.
+	ProviderType string
 }
 
 type ModelInfo struct {
