@@ -969,9 +969,12 @@ func (r *controllerRoot) modelDocToModelInfo(ctx context.Context, model *mongodo
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	providerType, err := r.jem.DB.ProviderType(ctx, model.Cloud)
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot get cloud %q", model.Cloud)
+	providerType := model.ProviderType
+	if providerType == "" {
+		providerType, err = r.jem.DB.ProviderType(ctx, model.Cloud)
+		if err != nil {
+			return nil, errgo.Notef(err, "cannot get cloud %q", model.Cloud)
+		}
 	}
 
 	userLevels := make(map[string]jujuparams.UserAccessPermission)
@@ -1024,6 +1027,7 @@ func (r *controllerRoot) modelDocToModelInfo(ctx context.Context, model *mongodo
 		Users:              users,
 		Machines:           jemMachinesToModelMachineInfo(machines),
 		AgentVersion:       modelVersion(ctx, model.Info),
+		Type:               model.Type,
 	}, nil
 }
 

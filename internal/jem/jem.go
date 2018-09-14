@@ -538,6 +538,8 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 			{"cloudregion", modelInfo.CloudRegion},
 			{"defaultseries", modelInfo.DefaultSeries},
 			{"info", info},
+			{"type", modelInfo.Type},
+			{"providertype", modelInfo.ProviderType},
 		}}},
 		ReturnNew: true,
 	}, &modelDoc); err != nil {

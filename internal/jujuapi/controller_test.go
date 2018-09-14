@@ -18,6 +18,7 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/controller"
+	"github.com/juju/juju/core/model"
 	"github.com/juju/juju/instance"
 	"github.com/juju/juju/state"
 	"github.com/juju/juju/state/multiwatcher"
@@ -1555,6 +1556,31 @@ func (s *controllerSuite) TestCreateModel(c *gc.C) {
 			c.Assert(mi.CloudTag, gc.Equals, names.NewCloudTag(ct.Id()).String())
 		}
 	}
+}
+
+func (s *controllerSuite) TestCreateModelKubernetes(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+
+	err := cloudapi.NewClient(conn).AddCloud(cloud.Cloud{
+		Name:             "test-cloud",
+		Type:             "kubernetes",
+		AuthTypes:        cloud.AuthTypes{cloud.EmptyAuthType},
+		Endpoint:         "https://1.2.3.4:5678",
+		IdentityEndpoint: "https://1.2.3.4:5679",
+		StorageEndpoint:  "https://1.2.3.4:5680",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	mi, err := modelmanager.NewClient(conn).CreateModel("test-model", "test@external", "test-cloud", "", names.CloudCredentialTag{}, nil)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(mi.Name, gc.Equals, "test-model")
+	c.Assert(mi.Type, gc.Equals, model.CAAS)
+	c.Assert(mi.ProviderType, gc.Equals, "kubernetes")
+	c.Assert(mi.Cloud, gc.Equals, "test-cloud")
+	c.Assert(mi.CloudRegion, gc.Equals, "")
+	c.Assert(mi.Owner, gc.Equals, "test@external")
 }
 
 func (s *controllerSuite) TestGrantAndRevokeModel(c *gc.C) {
