@@ -769,64 +769,6 @@ func (s *internalSuite) TestAPIConnectionSetsControllerVersion(c *gc.C) {
 	jshim1.await(c, controllerVersion, &testVersion)
 }
 
-func (s *internalSuite) TestAPIConnectionSetsControllerRegions(c *gc.C) {
-	jshim := newJEMShimInMemory()
-	apiShims := newJujuAPIShims()
-	defer apiShims.CheckAllClosed(c)
-
-	expectRegions := []mongodoc.Region{{
-		Name:             "test1",
-		Endpoint:         "https://example.com/test1",
-		IdentityEndpoint: "https://example.com/test1/identity",
-		StorageEndpoint:  "https://example.com/test1/storage",
-	}, {
-		Name:             "test2",
-		Endpoint:         "https://example.com/test2",
-		IdentityEndpoint: "https://example.com/test2/identity",
-		StorageEndpoint:  "https://example.com/test2/storage",
-	}}
-	jshim1 := newJEMShimWithUpdateNotify(jemShimWithAPIOpener{
-		jemInterface: jshim,
-		openAPI: func(path params.EntityPath) (jujuAPI, error) {
-			conn := apiShims.newJujuAPIShim(nil)
-			conn.clouds = map[names.CloudTag]cloud.Cloud{
-				names.NewCloudTag("test"): {
-					Regions: []cloud.Region{{
-						Name:             "test1",
-						Endpoint:         "https://example.com/test1",
-						IdentityEndpoint: "https://example.com/test1/identity",
-						StorageEndpoint:  "https://example.com/test1/storage",
-					}, {
-						Name:             "test2",
-						Endpoint:         "https://example.com/test2",
-						IdentityEndpoint: "https://example.com/test2/identity",
-						StorageEndpoint:  "https://example.com/test2/storage",
-					}},
-				},
-			}
-			return conn, nil
-		},
-	})
-	ctlPath := params.EntityPath{"bob", "foo"}
-	addFakeController(jshim, ctlPath)
-
-	m := &controllerMonitor{
-		ctlPath: ctlPath,
-		jem:     jshim1,
-		ownerId: "jem1",
-	}
-	m.tomb.Go(func() error {
-		return m.watcher(testContext)
-	})
-	defer worker.Stop(m)
-
-	controllerRegions := func() interface{} {
-		ctl, _ := jshim.Controller(testContext, ctlPath)
-		return ctl.Cloud.Regions
-	}
-	jshim1.await(c, controllerRegions, expectRegions)
-}
-
 func (s *internalSuite) TestAPIConnectionSetsCloudRegions(c *gc.C) {
 	jshim := newJEMShimInMemory()
 	apiShims := newJujuAPIShims()
