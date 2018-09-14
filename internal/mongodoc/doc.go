@@ -65,9 +65,6 @@ type Controller struct {
 	// deprecated for the purposes of adding new models.
 	Deprecated bool `bson:",omitempty"`
 
-	// Cloud holds the details of the cloud provided by this controller.
-	Cloud Cloud
-
 	// MonitorLeaseOwner holds the name of the agent
 	// currently responsible for monitoring the controller.
 	MonitorLeaseOwner string `bson:",omitempty"`

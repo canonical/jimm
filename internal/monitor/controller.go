@@ -331,25 +331,6 @@ func (m *controllerMonitor) connected(ctx context.Context, conn jujuAPI) error {
 		return errgo.Mask(err)
 	}
 
-	// TODO Remove when Cloud is removed from controller
-	var regions []mongodoc.Region
-	// Note: currently juju controllers only ever have exactly one
-	// cloud. This code will need to change if that changes.
-	for _, v := range clouds {
-		for _, reg := range v.Regions {
-			regions = append(regions, mongodoc.Region{
-				Name:             reg.Name,
-				Endpoint:         reg.Endpoint,
-				IdentityEndpoint: reg.IdentityEndpoint,
-				StorageEndpoint:  reg.StorageEndpoint,
-			})
-		}
-		break
-	}
-	if err := m.jem.SetControllerRegions(ctx, m.ctlPath, regions); err != nil {
-		return errgo.Notef(err, "cannot set controller regions")
-	}
-
 	// Remove all the known machines and applications for the controller. The ones
 	// that still exist will be updated in the first deltas.
 	if err := m.jem.RemoveControllerMachines(ctx, m.ctlPath); err != nil {

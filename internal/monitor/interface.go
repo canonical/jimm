@@ -46,9 +46,6 @@ type jemInterface interface {
 	// SetControllerVersion sets the controller version of the given controller.
 	SetControllerVersion(ctx context.Context, ctlPath params.EntityPath, v version.Number) error
 
-	// SetControllerRegions sets the regions supported by the given controller.
-	SetControllerRegions(ctx context.Context, ctlPath params.EntityPath, regions []mongodoc.Region) error
-
 	// SetModelLife sets the Life field of all models controlled
 	// by the given controller that have the given UUID.
 	// It does not return an error if there are no such models.

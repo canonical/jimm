@@ -884,8 +884,7 @@ func (s *jemSuite) TestSelectController(c *gc.C) {
 			Read: []string{"someoneelse"},
 		},
 		Public: true,
-	}, {
-	}}
+	}, {}}
 	for i := range testControllers {
 		err := s.jem.DB.AddController(testContext, &testControllers[i])
 		c.Assert(err, gc.IsNil)
@@ -1492,12 +1491,6 @@ func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityP
 		CACert:        info.CACert,
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
-		Cloud: mongodoc.Cloud{
-			Name: "dummy",
-			Regions: []mongodoc.Region{{
-				Name: "dummy-region",
-			}},
-		},
 		Location: map[string]string{
 			"cloud":  "dummy",
 			"region": "dummy-region",
