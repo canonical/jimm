@@ -1561,7 +1561,7 @@ func (s *databaseSuite) TestRevoke(c *gc.C) {
 	s.checkDBOK(c)
 }
 
-func (s *databaseSuite) TestCloud(c *gc.C) {
+func (s *databaseSuite) TestProviderType(c *gc.C) {
 	err := s.database.UpdateCloudRegions(testContext, []mongodoc.CloudRegion{{
 		Cloud:              "my-cloud",
 		Region:             "my-region",
@@ -1573,46 +1573,12 @@ func (s *databaseSuite) TestCloud(c *gc.C) {
 		PrimaryControllers: []params.EntityPath{{"bob", "bar"}},
 	}})
 	c.Assert(err, gc.IsNil)
-	cld, err := s.database.Cloud(testContext, "my-cloud")
+	pt, err := s.database.ProviderType(testContext, "my-cloud")
 	c.Assert(err, gc.IsNil)
-	c.Assert(cld, jc.DeepEquals, &mongodoc.Cloud{
-		Name:         "my-cloud",
-		ProviderType: "ec2",
-	})
-	cld, err = s.database.Cloud(testContext, "not-my-cloud")
+	c.Assert(pt, gc.Equals, "ec2")
+	pt, err = s.database.ProviderType(testContext, "not-my-cloud")
 	c.Assert(err, gc.ErrorMatches, `cloud "not-my-cloud" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	s.checkDBOK(c)
-}
-
-func (s *databaseSuite) TestCloudRegionDuplicate(c *gc.C) {
-	cloudRegionA := mongodoc.CloudRegion{
-		Cloud:        "my-cloud",
-		ProviderType: "ec2",
-	}
-
-	cloudRegionB := mongodoc.CloudRegion{
-		Cloud:        "my-cloud-2",
-		ProviderType: "ec2",
-	}
-
-	err := s.database.UpdateCloudRegions(testContext, []mongodoc.CloudRegion{cloudRegionA, cloudRegionB, cloudRegionA})
-	c.Assert(err, gc.IsNil)
-
-	cldA, err := s.database.Cloud(testContext, "my-cloud")
-	c.Assert(err, gc.IsNil)
-	c.Assert(cldA, jc.DeepEquals, &mongodoc.Cloud{
-		Name:         "my-cloud",
-		ProviderType: "ec2",
-	})
-
-	cldB, err := s.database.Cloud(testContext, "my-cloud-2")
-	c.Assert(err, gc.IsNil)
-	c.Assert(cldB, jc.DeepEquals, &mongodoc.Cloud{
-		Name:         "my-cloud-2",
-		ProviderType: "ec2",
-	})
-
 	s.checkDBOK(c)
 }
 
@@ -1976,9 +1942,9 @@ var setDeadTests = []struct {
 		jem.ClearCredentialUpdate(db, testContext, fakeEntityPath, fakeCredPath)
 	},
 }, {
-	about: "Cloud",
+	about: "ProviderType",
 	run: func(db *jem.Database) {
-		db.Cloud(testContext, "my-cloud")
+		db.ProviderType(testContext, "my-cloud")
 	},
 }, {
 	about: "Controller",

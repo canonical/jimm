@@ -188,11 +188,11 @@ func (r *controllerRoot) credentialSchema(ctx context.Context, cloud params.Clou
 	if cs, ok := r.schemataCache[cloud]; ok {
 		return cs[jujucloud.AuthType(authType)], nil
 	}
-	cloudInfo, err := r.jem.DB.Cloud(ctx, cloud)
+	providerType, err := r.jem.DB.ProviderType(ctx, cloud)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	provider, err := environs.Provider(cloudInfo.ProviderType)
+	provider, err := environs.Provider(providerType)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -792,7 +792,7 @@ type modelManagerV4 struct {
 func (m modelManagerV4) ListModelSummaries(jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error) {
 	var results []jujuparams.ModelSummaryResult
 	err := m.root.doModels(m.root.context, func(ctx context.Context, model *mongodoc.Model) error {
-		cloud, err := m.root.jem.DB.Cloud(ctx, model.Cloud)
+		providerType, err := m.root.jem.DB.ProviderType(ctx, model.Cloud)
 		if err != nil {
 			results = append(results, jujuparams.ModelSummaryResult{
 				Error: mapError(errgo.Notef(err, "cannot get cloud %q", model.Cloud)),
@@ -830,7 +830,7 @@ func (m modelManagerV4) ListModelSummaries(jujuparams.ModelSummariesRequest) (ju
 				Name:               string(model.Path.Name),
 				UUID:               model.UUID,
 				ControllerUUID:     m.root.params.ControllerUUID,
-				ProviderType:       cloud.ProviderType,
+				ProviderType:       providerType,
 				DefaultSeries:      model.DefaultSeries,
 				CloudTag:           jem.CloudTag(model.Cloud).String(),
 				CloudRegion:        model.CloudRegion,
@@ -969,7 +969,7 @@ func (r *controllerRoot) modelDocToModelInfo(ctx context.Context, model *mongodo
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	cloud, err := r.jem.DB.Cloud(ctx, model.Cloud)
+	providerType, err := r.jem.DB.ProviderType(ctx, model.Cloud)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot get cloud %q", model.Cloud)
 	}
@@ -1013,7 +1013,7 @@ func (r *controllerRoot) modelDocToModelInfo(ctx context.Context, model *mongodo
 		Name:               string(model.Path.Name),
 		UUID:               model.UUID,
 		ControllerUUID:     r.params.ControllerUUID,
-		ProviderType:       cloud.ProviderType,
+		ProviderType:       providerType,
 		DefaultSeries:      model.DefaultSeries,
 		CloudTag:           jem.CloudTag(model.Cloud).String(),
 		CloudRegion:        model.CloudRegion,
