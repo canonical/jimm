@@ -730,6 +730,26 @@ func (c cloud) credentialInfo(ctx context.Context, cloudName, credentialName str
 	return &cci, nil
 }
 
+// RemoveClouds removes the specified clouds from the controller.
+// If a cloud is in use (has models deployed to it), the removal will fail.
+func (c cloud) RemoveClouds(args jujuparams.Entities) (jujuparams.ErrorResults, error) {
+	result := jujuparams.ErrorResults{
+		Results: make([]jujuparams.ErrorResult, len(args.Entities)),
+	}
+	for i, entity := range args.Entities {
+		tag, err := names.ParseCloudTag(entity.Tag)
+		if err != nil {
+			result.Results[i].Error = mapError(err)
+			continue
+		}
+		err = c.root.jem.RemoveCloud(c.root.context, params.Cloud(tag.Id()))
+		if err != nil {
+			result.Results[i].Error = mapError(err)
+		}
+	}
+	return result, nil
+}
+
 // controller implements the Controller facade.
 type controller struct {
 	root *controllerRoot

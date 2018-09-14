@@ -1117,6 +1117,52 @@ func (j *JEM) createCloud(ctx context.Context, cloud jujucloud.Cloud) (params.En
 	return ctlPath, nil
 }
 
+// RemoveCloud removes the given cloud, so long as no models are using it.
+func (j *JEM) RemoveCloud(ctx context.Context, cloud params.Cloud) (err error) {
+	cr, err := j.DB.CloudRegion(ctx, cloud, "")
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+	}
+	if err := auth.CheckACL(ctx, cr.ACL.Admin); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	// This check is technically redundant as we can't know whether
+	// the cloud is in use by any models at the moment we remove it from a controller
+	// (remember that only one of the primary controllers might be using it).
+	// However we like the error message and it's usually going to be OK,
+	// so we'll do the advance check anyway.
+	if n, err := j.DB.Models().Find(bson.D{{"cloud", cloud}}).Count(); n > 0 || err != nil {
+		if err != nil {
+			return errgo.Mask(err)
+		}
+		return errgo.Newf("cloud is used by %d model%s", n, plural(n))
+	}
+	// TODO delete the cloud from the controllers in parallel
+	// (although currently there is only ever one anyway).
+	for _, ctl := range cr.PrimaryControllers {
+		conn, err := j.OpenAPI(ctx, ctl)
+		if err != nil {
+			return errgo.Mask(err)
+		}
+		defer conn.Close()
+		if err := cloudapi.NewClient(conn).RemoveCloud(string(cloud)); err != nil {
+			return errgo.Notef(err, "cannot remove cloud from controller %s", ctl)
+		}
+	}
+	if err := j.DB.RemoveCloud(ctx, cloud); err != nil {
+		return errgo.Mask(err)
+	}
+	// TODO (mhilton) Audit cloud removals.
+	return nil
+}
+
+func plural(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
+}
+
 // UserTag creates a juju user tag from a params.User
 func UserTag(u params.User) names.UserTag {
 	tag := names.NewUserTag(string(u))

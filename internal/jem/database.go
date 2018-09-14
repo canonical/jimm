@@ -881,6 +881,13 @@ func (db *Database) InsertCloudRegion(ctx context.Context, cr *mongodoc.CloudReg
 	return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 }
 
+// RemoveCloud removes all entries for the given cloud.
+func (db *Database) RemoveCloud(ctx context.Context, cloud params.Cloud) (err error) {
+	defer db.checkError(ctx, &err)
+	_, err = db.CloudRegions().RemoveAll(bson.D{{"cloud", cloud}})
+	return errgo.Mask(err)
+}
+
 // RemoveCloudRegion removes the given cloud region.
 func (db *Database) RemoveCloudRegion(ctx context.Context, cloud params.Cloud, region string) (err error) {
 	defer db.checkError(ctx, &err)
