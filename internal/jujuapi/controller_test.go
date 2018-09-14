@@ -178,9 +178,6 @@ func (s *controllerSuite) TestDefaultCloud(c *gc.C) {
 				CACert: "cacert",
 				UUID:   fmt.Sprintf("uuid%d", j),
 				Public: true,
-				Cloud: mongodoc.Cloud{
-					Name: params.Cloud(cloud),
-				},
 			})
 			c.Assert(err, jc.ErrorIsNil)
 			err = s.JEM.DB.UpdateCloudRegions(testContext, []mongodoc.CloudRegion{{

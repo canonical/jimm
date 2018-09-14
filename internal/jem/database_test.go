@@ -68,12 +68,6 @@ func (s *databaseSuite) TestAddController(c *gc.C) {
 		}}},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "foo",
-			}},
-		},
 		Location: map[string]string{
 			"cloud":  "aws",
 			"region": "foo",
@@ -96,12 +90,6 @@ func (s *databaseSuite) TestAddController(c *gc.C) {
 		}}},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "foo",
-			}},
-		},
 		Location: map[string]string{
 			"cloud":  "aws",
 			"region": "foo",
@@ -123,12 +111,6 @@ func (s *databaseSuite) TestAddController(c *gc.C) {
 		}}},
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "foo",
-			}},
-		},
 		Location: map[string]string{
 			"cloud":  "aws",
 			"region": "foo",
@@ -286,39 +268,6 @@ func (s *databaseSuite) TestSetControllerVersion(c *gc.C) {
 func (s *databaseSuite) TestSetControllerVersionWithNotFoundController(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "x"}
 	err := s.database.SetControllerVersion(testContext, ctlPath, version.Number{Minor: 1})
-	c.Assert(err, gc.IsNil)
-}
-
-func (s *databaseSuite) TestSetControllerRegions(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "x"}
-	ctl := &mongodoc.Controller{
-		Path: ctlPath,
-		Cloud: mongodoc.Cloud{
-			Name:             params.Cloud("test1"),
-			Endpoint:         "https://example.com/test1",
-			IdentityEndpoint: "https://example.com/test1/identity",
-			StorageEndpoint:  "https://example.com/test1/storage",
-		}}
-	err := s.database.AddController(testContext, ctl)
-	c.Assert(err, gc.IsNil)
-
-	testRegions := []mongodoc.Region{{
-		Name:             "test2",
-		Endpoint:         "https://example.com/test2",
-		IdentityEndpoint: "https://example.com/test2/identity",
-		StorageEndpoint:  "https://example.com/test2/storage",
-	}}
-	err = s.database.SetControllerRegions(testContext, ctlPath, testRegions)
-	c.Assert(err, gc.IsNil)
-
-	ctl, err = s.database.Controller(testContext, ctlPath)
-	c.Assert(err, gc.IsNil)
-	c.Assert(ctl.Cloud.Regions, jc.DeepEquals, testRegions)
-}
-
-func (s *databaseSuite) TestSetControllerRegionsWithNotFoundController(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "x"}
-	err := s.database.SetControllerRegions(testContext, ctlPath, nil)
 	c.Assert(err, gc.IsNil)
 }
 
@@ -1754,13 +1703,13 @@ func (s *databaseSuite) TestDeleteControllerFromCloudRegions(c *gc.C) {
 		},
 	}
 	regionA := mongodoc.CloudRegion{
-		Cloud:              cloud.Cloud,
-		ProviderType:       cloud.ProviderType,
-		Region:             "my-region-a",
-		AuthTypes:          []string{},
-		PrimaryControllers: []params.EntityPath{ctlPath},
+		Cloud:                cloud.Cloud,
+		ProviderType:         cloud.ProviderType,
+		Region:               "my-region-a",
+		AuthTypes:            []string{},
+		PrimaryControllers:   []params.EntityPath{ctlPath},
 		SecondaryControllers: []params.EntityPath{ctlPath},
-		CACertificates:     []string{},
+		CACertificates:       []string{},
 		ACL: params.ACL{
 			Read:  []string{},
 			Write: []string{},
@@ -1768,13 +1717,13 @@ func (s *databaseSuite) TestDeleteControllerFromCloudRegions(c *gc.C) {
 		},
 	}
 	regionB := mongodoc.CloudRegion{
-		Cloud:              cloud.Cloud,
-		ProviderType:       cloud.ProviderType,
-		Region:             "my-region-b",
-		AuthTypes:          []string{},
-		PrimaryControllers: []params.EntityPath{ctlPath, ctlPathB},
+		Cloud:                cloud.Cloud,
+		ProviderType:         cloud.ProviderType,
+		Region:               "my-region-b",
+		AuthTypes:            []string{},
+		PrimaryControllers:   []params.EntityPath{ctlPath, ctlPathB},
 		SecondaryControllers: []params.EntityPath{ctlPath, ctlPathB},
-		CACertificates:     []string{},
+		CACertificates:       []string{},
 		ACL: params.ACL{
 			Read:  []string{},
 			Write: []string{},
@@ -1800,13 +1749,13 @@ func (s *databaseSuite) TestDeleteControllerFromCloudRegions(c *gc.C) {
 			Admin: []string{},
 		},
 	}, {
-		Id:                 fmt.Sprintf("%s/%s", cloud.Cloud, "my-region-a"),
-		Cloud:              cloud.Cloud,
-		ProviderType:       cloud.ProviderType,
-		Region:             "my-region-a",
-		AuthTypes:          []string{},
-		CACertificates:     []string{},
-		PrimaryControllers: []params.EntityPath{},
+		Id:                   fmt.Sprintf("%s/%s", cloud.Cloud, "my-region-a"),
+		Cloud:                cloud.Cloud,
+		ProviderType:         cloud.ProviderType,
+		Region:               "my-region-a",
+		AuthTypes:            []string{},
+		CACertificates:       []string{},
+		PrimaryControllers:   []params.EntityPath{},
 		SecondaryControllers: []params.EntityPath{},
 		ACL: params.ACL{
 			Read:  []string{},
@@ -1814,14 +1763,14 @@ func (s *databaseSuite) TestDeleteControllerFromCloudRegions(c *gc.C) {
 			Admin: []string{},
 		},
 	}, {
-		Id:                 fmt.Sprintf("%s/%s", cloud.Cloud, "my-region-b"),
-		Cloud:              cloud.Cloud,
-		ProviderType:       cloud.ProviderType,
-		Region:             "my-region-b",
-		AuthTypes:          []string{},
-		PrimaryControllers: []params.EntityPath{ctlPathB},
+		Id:                   fmt.Sprintf("%s/%s", cloud.Cloud, "my-region-b"),
+		Cloud:                cloud.Cloud,
+		ProviderType:         cloud.ProviderType,
+		Region:               "my-region-b",
+		AuthTypes:            []string{},
+		PrimaryControllers:   []params.EntityPath{ctlPathB},
 		SecondaryControllers: []params.EntityPath{ctlPathB},
-		CACertificates:     []string{},
+		CACertificates:       []string{},
 		ACL: params.ACL{
 			Read:  []string{},
 			Write: []string{},

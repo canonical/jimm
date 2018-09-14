@@ -235,27 +235,6 @@ func (h *Handler) AddController(arg *params.AddController) error {
 		}
 	}
 
-	// TODO: This code will need to be removed when the cloud is stored completly in cloudregion.
-	for k, v := range clouds {
-		ctl.Cloud.Name = params.Cloud(k.Id())
-		ctl.Cloud.ProviderType = v.Type
-		for _, at := range v.AuthTypes {
-			ctl.Cloud.AuthTypes = append(ctl.Cloud.AuthTypes, string(at))
-		}
-		ctl.Cloud.Endpoint = v.Endpoint
-		ctl.Cloud.IdentityEndpoint = v.IdentityEndpoint
-		ctl.Cloud.StorageEndpoint = v.StorageEndpoint
-		for _, reg := range v.Regions {
-			ctl.Cloud.Regions = append(ctl.Cloud.Regions, mongodoc.Region{
-				Name:             reg.Name,
-				Endpoint:         reg.Endpoint,
-				IdentityEndpoint: reg.IdentityEndpoint,
-				StorageEndpoint:  reg.StorageEndpoint,
-			})
-		}
-		break
-	}
-
 	// Update addresses from latest known in controller. Note that
 	// conn.APIHostPorts is always guaranteed to include the actual
 	// address we succeeded in connecting to.

@@ -119,14 +119,6 @@ func (s jemShimWithUpdateNotify) SetControllerVersion(ctx context.Context, ctlPa
 	return nil
 }
 
-func (s jemShimWithUpdateNotify) SetControllerRegions(ctx context.Context, ctlPath params.EntityPath, regions []mongodoc.Region) error {
-	if err := s.jemInterface.SetControllerRegions(ctx, ctlPath, regions); err != nil {
-		return err
-	}
-	s.changed <- "controller regions"
-	return nil
-}
-
 func (s jemShimWithUpdateNotify) SetModelInfo(ctx context.Context, ctlPath params.EntityPath, uuid string, info *mongodoc.ModelInfo) error {
 	if err := s.jemInterface.SetModelInfo(ctx, ctlPath, uuid, info); err != nil {
 		return err
@@ -309,16 +301,6 @@ func (s *jemShimInMemory) SetControllerVersion(ctx context.Context, ctlPath para
 	ctl, ok := s.controllers[ctlPath]
 	if ok {
 		ctl.Version = &v
-	}
-	return nil
-}
-
-func (s *jemShimInMemory) SetControllerRegions(ctx context.Context, ctlPath params.EntityPath, regions []mongodoc.Region) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	ctl, ok := s.controllers[ctlPath]
-	if ok {
-		ctl.Cloud.Regions = regions
 	}
 	return nil
 }
