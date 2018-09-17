@@ -777,7 +777,10 @@ func (c controller) modelStatus(ctx context.Context, arg jujuparams.Entity) (*ju
 // ControllerConfig returns the controller's configuration.
 func (c controller) ControllerConfig() (jujuparams.ControllerConfigResult, error) {
 	result := jujuparams.ControllerConfigResult{
-		Config: map[string]interface{}{},
+		Config: map[string]interface{}{
+			"charmstore-url": c.root.params.CharmstoreLocation,
+			"metering-url":   c.root.params.MeteringLocation,
+		},
 	}
 	return result, nil
 }

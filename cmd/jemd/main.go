@@ -116,6 +116,8 @@ func serve(conf *config.Config) error {
 		MaxMgoSessions:          conf.MaxMgoSessions,
 		ControllerAdmin:         conf.ControllerAdmin,
 		IdentityLocation:        conf.IdentityLocation,
+		CharmstoreLocation:      conf.CharmstoreLocation,
+		MeteringLocation:        conf.MeteringLocation,
 		PublicKeyLocator:        locator,
 		AgentUsername:           conf.AgentUsername,
 		AgentKey:                conf.AgentKey,

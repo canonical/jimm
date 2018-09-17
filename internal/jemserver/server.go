@@ -63,6 +63,14 @@ type Params struct {
 	// IdentityLocation holds the location of the third party identity service.
 	IdentityLocation string
 
+	// CharmstoreLocation holds the location of the charmstore
+	// associated with the controller.
+	CharmstoreLocation string
+
+	// MeteringLocation holds the location of the metering service
+	// associated with the controller.
+	MeteringLocation string
+
 	// PublicKeyLocator holds a public key store.
 	// It may be nil.
 	PublicKeyLocator bakery.PublicKeyLocator

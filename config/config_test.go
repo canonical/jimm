@@ -32,6 +32,8 @@ foo: 1
 bar: false
 state-server-admin: adminuser
 identity-location: localhost:18082
+charmstore-location: https://api.staging.jujucharms.com/charmstore
+metering-location: https://api.staging.jujucharms.com/metering
 identity-public-key: +qNbDWly3kRTDVv2UN03hrv/CBt4W6nxY5dHdw+KJFA=
 agent-username: agentuser
 agent-key:
@@ -119,7 +121,9 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 		APIAddr:         "blah:2324",
 		ControllerAdmin: "adminuser",
 
-		IdentityLocation: "localhost:18082",
+		IdentityLocation:   "localhost:18082",
+		CharmstoreLocation: "https://api.staging.jujucharms.com/charmstore",
+		MeteringLocation:   "https://api.staging.jujucharms.com/metering",
 		IdentityPublicKey: &bakery.PublicKey{
 			Key: mustParseKey("+qNbDWly3kRTDVv2UN03hrv/CBt4W6nxY5dHdw+KJFA="),
 		},
