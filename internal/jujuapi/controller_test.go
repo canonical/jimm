@@ -46,6 +46,12 @@ type controllerSuite struct {
 
 var _ = gc.Suite(&controllerSuite{})
 
+func (s *controllerSuite) SetUpTest(c *gc.C) {
+	s.ServerParams.CharmstoreLocation = "https://api.jujucharms.com/charmstore"
+	s.ServerParams.MeteringLocation = "https://api.jujucharms.com/omnibus"
+	s.websocketSuite.SetUpTest(c)
+}
+
 func (s *controllerSuite) TestServerVersion(c *gc.C) {
 	ctlPath := params.EntityPath{"test", "controller-1"}
 	s.AssertAddController(c, ctlPath, true)
@@ -1310,7 +1316,10 @@ func (s *controllerSuite) TestControllerConfig(c *gc.C) {
 	client := controllerapi.NewClient(conn)
 	conf, err := client.ControllerConfig()
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(conf, jc.DeepEquals, controller.Config(map[string]interface{}{}))
+	c.Assert(conf, jc.DeepEquals, controller.Config(map[string]interface{}{
+		"charmstore-url": "https://api.jujucharms.com/charmstore",
+		"metering-url":   "https://api.jujucharms.com/omnibus",
+	}))
 }
 
 func (s *controllerSuite) TestAllModels(c *gc.C) {

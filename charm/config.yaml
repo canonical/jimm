@@ -7,6 +7,14 @@ options:
     type: string
     description: The location of the identity service.
     default: "https://api.jujucharms.com/identity"
+  charmstore-location:
+    type: string
+    description: The location of the charmstore service.
+    default: "https://api.jujucharms.com/charmstore"
+  metering-location:
+    type: string
+    description: The location of the metering service.
+    default: "https://api.jujucharms.com/omnibus"
   agent-username:
     default: ""
     type: string

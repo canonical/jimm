@@ -31,6 +31,8 @@ type Config struct {
 	ControllerAdmin     params.User       `yaml:"state-server-admin"`
 	IdentityPublicKey   *bakery.PublicKey `yaml:"identity-public-key"`
 	IdentityLocation    string            `yaml:"identity-location"`
+	CharmstoreLocation  string            `yaml:"charmstore-location"`
+	MeteringLocation    string            `yaml:"metering-location"`
 	AgentUsername       string            `yaml:"agent-username"`
 	AgentKey            *bakery.KeyPair   `yaml:"agent-key"`
 	AccessLog           string            `yaml:"access-log"`

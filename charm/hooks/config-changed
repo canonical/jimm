@@ -16,6 +16,7 @@ def config_changed():
 
     keys = [
         "agent-username",
+        "charmstore-location",
         "controller-uuid",
         "dbname",
         "domain",
@@ -23,6 +24,7 @@ def config_changed():
         "identity-location",
         "logging-level",
         "max-mgo-sessions",
+        "metering-location",
         "usage-sender-url",
     ]
     app_config = {
