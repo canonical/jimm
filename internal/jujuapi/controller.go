@@ -795,12 +795,15 @@ type modelManagerV4 struct {
 func (m modelManagerV4) ListModelSummaries(jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error) {
 	var results []jujuparams.ModelSummaryResult
 	err := m.root.doModels(m.root.context, func(ctx context.Context, model *mongodoc.Model) error {
-		providerType, err := m.root.jem.DB.ProviderType(ctx, model.Cloud)
-		if err != nil {
-			results = append(results, jujuparams.ModelSummaryResult{
-				Error: mapError(errgo.Notef(err, "cannot get cloud %q", model.Cloud)),
-			})
-			return nil
+		if model.ProviderType == "" {
+			var err error
+			model.ProviderType, err = m.root.jem.DB.ProviderType(ctx, model.Cloud)
+			if err != nil {
+				results = append(results, jujuparams.ModelSummaryResult{
+					Error: mapError(errgo.Notef(err, "cannot get cloud %q", model.Cloud)),
+				})
+				return nil
+			}
 		}
 		// If we get this far the user must have at least read access.
 		access := jujuparams.ModelReadAccess
@@ -831,9 +834,10 @@ func (m modelManagerV4) ListModelSummaries(jujuparams.ModelSummariesRequest) (ju
 		results = append(results, jujuparams.ModelSummaryResult{
 			Result: &jujuparams.ModelSummary{
 				Name:               string(model.Path.Name),
+				Type:               model.Type,
 				UUID:               model.UUID,
 				ControllerUUID:     m.root.params.ControllerUUID,
-				ProviderType:       providerType,
+				ProviderType:       model.ProviderType,
 				DefaultSeries:      model.DefaultSeries,
 				CloudTag:           jem.CloudTag(model.Cloud).String(),
 				CloudRegion:        model.CloudRegion,
@@ -897,6 +901,7 @@ func userModelForModelDoc(m *mongodoc.Model) jujuparams.Model {
 	return jujuparams.Model{
 		Name:     string(m.Path.Name),
 		UUID:     m.UUID,
+		Type:     m.Type,
 		OwnerTag: jem.UserTag(m.Path.User).String(),
 	}
 }

@@ -699,6 +699,19 @@ func (s *controllerSuite) TestListModelSummaries(c *gc.C) {
 		Read: []string{"test2"},
 	})
 
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+
+	err = cloudapi.NewClient(conn).AddCloud(cloud.Cloud{
+		Name:             "test-cloud",
+		Type:             "kubernetes",
+		AuthTypes:        cloud.AuthTypes{cloud.EmptyAuthType},
+		Endpoint:         "https://1.2.3.4:5678",
+		IdentityEndpoint: "https://1.2.3.4:5679",
+		StorageEndpoint:  "https://1.2.3.4:5680",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
 	c.Assert(err, jc.ErrorIsNil)
 	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
 	modelUUID1 := mi.UUID
@@ -708,10 +721,12 @@ func (s *controllerSuite) TestListModelSummaries(c *gc.C) {
 	err = s.JEM.DB.SetACL(testContext, s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
 		Read: []string{"test"},
 	})
-
 	c.Assert(err, jc.ErrorIsNil)
-	conn := s.open(c, nil, "test")
-	defer conn.Close()
+
+	mi, err = modelmanager.NewClient(conn).CreateModel("model-4", "test@external", "test-cloud", "", names.CloudCredentialTag{}, nil)
+	c.Assert(err, jc.ErrorIsNil)
+	modelUUID4 := mi.UUID
+
 	client := modelmanager.NewClient(conn)
 	models, err := client.ListModelSummaries("test", false)
 	c.Assert(err, jc.ErrorIsNil)
@@ -740,6 +755,31 @@ func (s *controllerSuite) TestListModelSummaries(c *gc.C) {
 		}},
 		AgentVersion: &jujuversion.Current,
 		Type:         "iaas",
+	}, {
+		Name:            "model-4",
+		UUID:            modelUUID4,
+		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+		ProviderType:    "kubernetes",
+		DefaultSeries:   "bionic",
+		Cloud:           "test-cloud",
+		CloudRegion:     "",
+		CloudCredential: "",
+		Owner:           "test@external",
+		Life:            "alive",
+		Status: base.Status{
+			Status: status.Available,
+			Data:   map[string]interface{}{},
+		},
+		ModelUserAccess: "admin",
+		Counts: []base.EntityCount{{
+			Entity: "machines",
+			Count:  0,
+		}, {
+			Entity: "cores",
+			Count:  0,
+		}},
+		AgentVersion: &jujuversion.Current,
+		Type:         "caas",
 	}, {
 		Name:            "model-3",
 		UUID:            modelUUID3,
@@ -775,7 +815,19 @@ func (s *controllerSuite) TestListModels(c *gc.C) {
 	err := s.JEM.DB.SetACL(testContext, s.JEM.DB.Controllers(), ctlPath, params.ACL{
 		Read: []string{"test2"},
 	})
+	c.Assert(err, jc.ErrorIsNil)
 
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+
+	err = cloudapi.NewClient(conn).AddCloud(cloud.Cloud{
+		Name:             "test-cloud",
+		Type:             "kubernetes",
+		AuthTypes:        cloud.AuthTypes{cloud.EmptyAuthType},
+		Endpoint:         "https://1.2.3.4:5678",
+		IdentityEndpoint: "https://1.2.3.4:5679",
+		StorageEndpoint:  "https://1.2.3.4:5680",
+	})
 	c.Assert(err, jc.ErrorIsNil)
 	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
 	modelUUID1 := mi.UUID
@@ -785,10 +837,11 @@ func (s *controllerSuite) TestListModels(c *gc.C) {
 	err = s.JEM.DB.SetACL(testContext, s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
 		Read: []string{"test"},
 	})
-
 	c.Assert(err, jc.ErrorIsNil)
-	conn := s.open(c, nil, "test")
-	defer conn.Close()
+	mi, err = modelmanager.NewClient(conn).CreateModel("model-4", "test@external", "test-cloud", "", names.CloudCredentialTag{}, nil)
+	c.Assert(err, jc.ErrorIsNil)
+	modelUUID4 := mi.UUID
+
 	client := modelmanager.NewClient(conn)
 	models, err := client.ListModels("test")
 	c.Assert(err, jc.ErrorIsNil)
@@ -797,6 +850,11 @@ func (s *controllerSuite) TestListModels(c *gc.C) {
 		UUID:  modelUUID1,
 		Owner: "test@external",
 		Type:  "iaas",
+	}, {
+		Name:  "model-4",
+		UUID:  modelUUID4,
+		Owner: "test@external",
+		Type:  "caas",
 	}, {
 		Name:  "model-3",
 		UUID:  modelUUID3,
