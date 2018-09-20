@@ -1479,6 +1479,119 @@ func (s *jemSuite) TestCreateCloudAddCloudError(c *gc.C) {
 	c.Assert(docs, jc.DeepEquals, []mongodoc.CloudRegion{})
 }
 
+func (s *jemSuite) TestRemoveCloud(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	s.addController(c, ctlPath)
+	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	err := s.jem.CreateCloud(ctx, mongodoc.CloudRegion{
+		Cloud:            "test-cloud",
+		ProviderType:     "kubernetes",
+		AuthTypes:        []string{"certificate"},
+		Endpoint:         "https://1.2.3.4:5678",
+		IdentityEndpoint: "https://1.2.3.4:5679",
+		StorageEndpoint:  "https://1.2.3.4:5680",
+		CACertificates:   []string{"This is a CA Certficiate (honest)"},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}, nil)
+	c.Assert(err, gc.IsNil)
+
+	var docs []mongodoc.CloudRegion
+	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
+	c.Assert(err, gc.IsNil)
+	c.Assert(docs, jc.DeepEquals, []mongodoc.CloudRegion{{
+		Id:                   "test-cloud/",
+		Cloud:                "test-cloud",
+		ProviderType:         "kubernetes",
+		AuthTypes:            []string{"certificate"},
+		Endpoint:             "https://1.2.3.4:5678",
+		IdentityEndpoint:     "https://1.2.3.4:5679",
+		StorageEndpoint:      "https://1.2.3.4:5680",
+		CACertificates:       []string{"This is a CA Certficiate (honest)"},
+		PrimaryControllers:   []params.EntityPath{{User: "bob", Name: "foo"}},
+		SecondaryControllers: []params.EntityPath{},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}})
+
+	err = s.jem.RemoveCloud(ctx, "test-cloud")
+	c.Assert(err, gc.IsNil)
+
+	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
+	c.Assert(err, gc.IsNil)
+	c.Assert(docs, jc.DeepEquals, []mongodoc.CloudRegion{})
+}
+
+func (s *jemSuite) TestRemoveCloudUnauthorized(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	s.addController(c, ctlPath)
+	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	err := s.jem.CreateCloud(ctx, mongodoc.CloudRegion{
+		Cloud:            "test-cloud",
+		ProviderType:     "kubernetes",
+		AuthTypes:        []string{"certificate"},
+		Endpoint:         "https://1.2.3.4:5678",
+		IdentityEndpoint: "https://1.2.3.4:5679",
+		StorageEndpoint:  "https://1.2.3.4:5680",
+		CACertificates:   []string{"This is a CA Certficiate (honest)"},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"alice"},
+		},
+	}, nil)
+	c.Assert(err, gc.IsNil)
+
+	err = s.jem.RemoveCloud(ctx, "test-cloud")
+	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
+}
+
+func (s *jemSuite) TestRemoveCloudNotFound(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	s.addController(c, ctlPath)
+	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+
+	err := s.jem.RemoveCloud(ctx, "test-cloud")
+	c.Assert(err, gc.ErrorMatches, `cloud "test-cloud" region "" not found`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}
+
+func (s *jemSuite) TestRemoveCloudWithModel(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	s.addController(c, ctlPath)
+	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	err := s.jem.CreateCloud(ctx, mongodoc.CloudRegion{
+		Cloud:            "test-cloud",
+		ProviderType:     "kubernetes",
+		AuthTypes:        []string{"empty"},
+		Endpoint:         "https://1.2.3.4:5678",
+		IdentityEndpoint: "https://1.2.3.4:5679",
+		StorageEndpoint:  "https://1.2.3.4:5680",
+		CACertificates:   []string{"This is a CA Certficiate (honest)"},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}, nil)
+	c.Assert(err, gc.IsNil)
+
+	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
+		Path:  params.EntityPath{"bob", "test-model"},
+		Cloud: "test-cloud",
+	})
+	c.Assert(err, gc.IsNil)
+
+	err = s.jem.RemoveCloud(ctx, "test-cloud")
+	c.Assert(err, gc.ErrorMatches, `cloud is used by 1 model`)
+}
 func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityPath {
 	info := s.APIInfo(c)
 

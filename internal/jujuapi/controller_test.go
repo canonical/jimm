@@ -691,6 +691,48 @@ func (s *controllerSuite) TestCredentialContents(c *gc.C) {
 	}})
 }
 
+func (s *controllerSuite) TestRemoveCloud(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller"}, true)
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := cloudapi.NewClient(conn)
+	err := client.AddCloud(cloud.Cloud{
+		Name:             "test-cloud",
+		Type:             "kubernetes",
+		AuthTypes:        cloud.AuthTypes{cloud.CertificateAuthType},
+		Endpoint:         "https://1.2.3.4:5678",
+		IdentityEndpoint: "https://1.2.3.4:5679",
+		StorageEndpoint:  "https://1.2.3.4:5680",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	clouds, err := client.Clouds()
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(clouds[names.NewCloudTag("test-cloud")], jc.DeepEquals, cloud.Cloud{
+		Name:             "test-cloud",
+		Type:             "kubernetes",
+		AuthTypes:        cloud.AuthTypes{"certificate"},
+		Endpoint:         "https://1.2.3.4:5678",
+		IdentityEndpoint: "https://1.2.3.4:5679",
+		StorageEndpoint:  "https://1.2.3.4:5680",
+	})
+
+	err = client.RemoveCloud("test-cloud")
+	c.Assert(err, jc.ErrorIsNil)
+	clouds, err = client.Clouds()
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(clouds[names.NewCloudTag("test-cloud")], jc.DeepEquals, cloud.Cloud{})
+}
+
+func (s *controllerSuite) TestRemoveCloudNotFound(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller"}, true)
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := cloudapi.NewClient(conn)
+
+	err := client.RemoveCloud("test-cloud")
+	c.Assert(err, gc.ErrorMatches, `cloud "test-cloud" region "" not found`)
+}
+
 func (s *controllerSuite) TestListModelSummaries(c *gc.C) {
 	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
