@@ -24,29 +24,29 @@ import (
 var logger = loggo.GetLogger("jem.config")
 
 type Config struct {
-	MongoAddr string `yaml:"mongo-addr"`
-	DBName    string `yaml:"dbname"`
-	APIAddr   string `yaml:"api-addr"`
+	MongoAddr string `yaml:"mongo-addr,omitempty"`
+	DBName    string `yaml:"dbname,omitempty"`
+	APIAddr   string `yaml:"api-addr,omitempty"`
 	// TODO rename state-server-admin to controller-admin.
-	ControllerAdmin     params.User       `yaml:"state-server-admin"`
-	IdentityPublicKey   *bakery.PublicKey `yaml:"identity-public-key"`
-	IdentityLocation    string            `yaml:"identity-location"`
-	CharmstoreLocation  string            `yaml:"charmstore-location"`
-	MeteringLocation    string            `yaml:"metering-location"`
-	AgentUsername       string            `yaml:"agent-username"`
-	AgentKey            *bakery.KeyPair   `yaml:"agent-key"`
-	AccessLog           string            `yaml:"access-log"`
-	Autocert            bool              `yaml:"autocert"`
-	AutocertURL         string            `yaml:"autocert-url"`
-	TLSCert             string            `yaml:"tls-cert"`
-	TLSKey              string            `yaml:"tls-key"`
-	ControllerUUID      string            `yaml:"controller-uuid"`
-	MaxMgoSessions      int               `yaml:"max-mgo-sessions"`
-	GUILocation         string            `yaml:"gui-location"`
-	LoggingLevel        zapcore.Level     `yaml:"logging-level"`
+	ControllerAdmin     params.User       `yaml:"state-server-admin,omitempty"`
+	IdentityPublicKey   *bakery.PublicKey `yaml:"identity-public-key,omitempty"`
+	IdentityLocation    string            `yaml:"identity-location,omitempty"`
+	CharmstoreLocation  string            `yaml:"charmstore-location,omitempty"`
+	MeteringLocation    string            `yaml:"metering-location,omitempty"`
+	AgentUsername       string            `yaml:"agent-username,omitempty"`
+	AgentKey            *bakery.KeyPair   `yaml:"agent-key,omitempty"`
+	AccessLog           string            `yaml:"access-log,omitempty"`
+	Autocert            bool              `yaml:"autocert,omitempty"`
+	AutocertURL         string            `yaml:"autocert-url,omitempty"`
+	TLSCert             string            `yaml:"tls-cert,omitempty"`
+	TLSKey              string            `yaml:"tls-key,omitempty"`
+	ControllerUUID      string            `yaml:"controller-uuid,omitempty"`
+	MaxMgoSessions      int               `yaml:"max-mgo-sessions,omitempty"`
+	GUILocation         string            `yaml:"gui-location,omitempty"`
+	LoggingLevel        zapcore.Level     `yaml:"logging-level,omitempty"`
 	UsageSenderURL      string            `yaml:"usage-sender-url,omitempty"`
 	UsageSenderSpoolDir string            `yaml:"usage-sender-spool-dir,omitempty"`
-	Domain              string            `yaml:"domain"`
+	Domain              string            `yaml:"domain,omitempty"`
 	PublicCloudMetadata string            `yaml:"public-cloud-metadata"`
 }
 
