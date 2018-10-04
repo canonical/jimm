@@ -851,7 +851,7 @@ func (j *JEM) EarliestControllerVersion(ctx context.Context) (version.Number, er
 	// time a user connects to the API?
 	var v *version.Number
 	if err := j.DoControllers(ctx, func(c *mongodoc.Controller) error {
-		zapctx.Info(ctx, "in EarliestControllerVersion", zap.Stringer("controller", c.Path), zap.Stringer("version", c.Version))
+		zapctx.Debug(ctx, "in EarliestControllerVersion", zap.Stringer("controller", c.Path), zap.Stringer("version", c.Version))
 		if c.Version == nil {
 			return nil
 		}

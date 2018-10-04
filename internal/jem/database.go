@@ -237,7 +237,7 @@ func (db *Database) DeleteModel(ctx context.Context, path params.EntityPath) (er
 	if err != nil {
 		return errgo.Notef(err, "could not delete model")
 	}
-	zapctx.Info(ctx, "deleted model", zap.Stringer("model", path))
+	zapctx.Debug(ctx, "deleted model", zap.Stringer("model", path))
 	return nil
 }
 
