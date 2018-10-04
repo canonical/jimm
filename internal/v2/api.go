@@ -651,7 +651,7 @@ func (h *Handler) Migrate(arg *params.Migrate) error {
 	if err != nil {
 		return errgo.NoteMask(err, "cannot access destination controller", errgo.Is(params.ErrNotFound))
 	}
-	zapctx.Info(ctx, "about to call InitiateMigration")
+	zapctx.Debug(ctx, "about to call InitiateMigration")
 	api := controllerapi.NewClient(conn)
 	_, err = controllerClientInitiateMigration(api, controllerapi.MigrationSpec{
 		ModelUUID:            model.UUID,

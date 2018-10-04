@@ -249,7 +249,7 @@ func CheckACL(ctx context.Context, acl []string) error {
 		return errgo.Notef(err, "cannot check permissions")
 	}
 	if !ok {
-		zapctx.Info(ctx, "user not authorized",
+		zapctx.Debug(ctx, "user not authorized",
 			zap.String("user", auth.username()),
 			zap.Strings("acl", acl),
 		)
