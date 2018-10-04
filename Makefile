@@ -1,12 +1,9 @@
 # Copyright 2014 Canonical Ltd.
 # Makefile for the JIMM service.
 
-ifndef GOPATH
-$(warning You need to set up a GOPATH.)
-endif
+export GO111MODULE=on
 
 PROJECT := github.com/CanonicalLtd/jimm
-PROJECT_DIR := $(shell go list -e -f '{{.Dir}}' $(PROJECT))
 
 GIT_COMMIT := $(shell git rev-parse --verify HEAD)
 GIT_VERSION := $(shell git describe --dirty)
@@ -34,10 +31,6 @@ endif
 
 default: build
 
-# Start of GOPATH-dependent targets. Some targets only make sense -
-# and will only work - when this tree is found on the GOPATH.
-ifeq ($(CURDIR),$(PROJECT_DIR))
-
 build: $(VERSIONDEPS)
 	go build $(PROJECT)/...
 
@@ -55,26 +48,6 @@ clean:
 	-$(RM) jemd
 	-$(RM) -r jimm-release/
 	-$(RM) jimm-*.tar.xz
-
-else
-
-build:
-	$(error Cannot $@; $(CURDIR) is not on GOPATH)
-
-check:
-	$(error Cannot $@; $(CURDIR) is not on GOPATH)
-
-install:
-	$(error Cannot $@; $(CURDIR) is not on GOPATH)
-
-release:
-	$(error Cannot $@; $(CURDIR) is not on GOPATH)
-
-clean:
-	$(error Cannot $@; $(CURDIR) is not on GOPATH)
-
-endif
-# End of GOPATH-dependent targets.
 
 # Reformat source files.
 format:
