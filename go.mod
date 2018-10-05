@@ -3,7 +3,6 @@ module github.com/CanonicalLtd/jimm
 require (
 	github.com/Azure/azure-sdk-for-go v0.0.0-20170822195318-03719f665513 // indirect
 	github.com/Azure/go-autorest v0.0.0-20170816171900-10cfe58defab // indirect
-	github.com/CanonicalLtd/plans-client v0.0.0-20170119082425-19be6ceb62a7
 	github.com/EvilSuperstars/go-cidrman v0.0.0-20170211231153-4e5a4a63d9b7 // indirect
 	github.com/altoros/gosigma v0.0.0-20150408145232-31228935eec6 // indirect
 	github.com/armon/go-metrics v0.0.0-20180713145231-3c58d8115a78 // indirect
@@ -24,9 +23,7 @@ require (
 	github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf // indirect
 	github.com/googleapis/gnostic v0.2.0 // indirect
 	github.com/gopherjs/gopherjs v0.0.0-20180825215210-0210a2f0f73c // indirect
-	github.com/gorilla/context v0.0.0-20141217160251-215affda49ad // indirect
 	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
-	github.com/gorilla/mux v0.0.0-20140926153814-e444e69cbd2e // indirect
 	github.com/gorilla/schema v0.0.0-20160426231512-08023a0215e7 // indirect
 	github.com/gorilla/websocket v0.0.0-20180605202552-5ed622c449da
 	github.com/gosuri/uitable v0.0.0-20160404203958-36ee7e946282 // indirect
@@ -70,7 +67,7 @@ require (
 	github.com/juju/ratelimit v0.0.0-20170523012141-5b9ff8664717 // indirect
 	github.com/juju/replicaset v0.0.0-20180417123543-860376792248 // indirect
 	github.com/juju/rfc v0.0.0-20180510112117-b058ad085c94 // indirect
-	github.com/juju/romulus v0.0.0-20180327205418-5b6f449d5c36
+	github.com/juju/romulus v0.0.0-20180327205418-5b6f449d5c36 // indirect
 	github.com/juju/simplekv v0.0.0-20180627154058-dac8ed1f3b93
 	github.com/juju/terms-client v0.0.0-20160809131900-9b925afd6772 // indirect
 	github.com/juju/testing v0.0.0-20180807044555-c84dd6ba038a

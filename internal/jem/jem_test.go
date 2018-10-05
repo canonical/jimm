@@ -37,6 +37,8 @@ type jemSuite struct {
 	pool        *jem.Pool
 	sessionPool *mgosession.Pool
 	jem         *jem.JEM
+
+	suiteCleanups []func()
 }
 
 var _ = gc.Suite(&jemSuite{})

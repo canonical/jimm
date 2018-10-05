@@ -4,13 +4,12 @@ package jem
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math/rand"
 	"sync"
 	"time"
 
-	plansapi "github.com/CanonicalLtd/plans-client/api"
+	"github.com/juju/httprequest"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/base"
 	cloudapi "github.com/juju/juju/api/cloud"
@@ -27,7 +26,6 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
@@ -35,6 +33,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	usageauth "github.com/CanonicalLtd/jimm/internal/usagesender/auth"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
 	"github.com/CanonicalLtd/jimm/params"
@@ -48,15 +47,15 @@ var wallClock clock.Clock = clock.WallClock
 var (
 	randIntn = rand.Intn
 
-	NewUsageSenderAuthorizationClient = func(url string, client *httpbakery.Client) (UsageSenderAuthorizationClient, error) {
-		return plansapi.NewPlanClient(url, plansapi.HTTPClient(client))
+	NewUsageSenderAuthorizationClient = func(url string, client httprequest.Doer) (UsageSenderAuthorizationClient, error) {
+		return usageauth.NewAuthorizationClient(url, client), nil
 	}
 )
 
 // UsageSenderAuthorizationClient is used to obtain authorization to
 // collect and report usage metrics.
 type UsageSenderAuthorizationClient interface {
-	AuthorizeReseller(plan, charm, application, applicationOwner, applicationUser string) (*macaroon.Macaroon, error)
+	GetCredentials(ctx context.Context, applicationUser string) ([]byte, error)
 }
 
 // Params holds parameters for the NewPool function.
@@ -114,15 +113,6 @@ type Pool struct {
 var APIOpenTimeout = 15 * time.Second
 
 var notExistsQuery = bson.D{{"$exists", false}}
-
-const (
-	// OmnibusJIMMCharm specifies the charm url to be used when
-	// obtaining autorization for model usage collection.
-	OmnibusJIMMCharm = "cs:~canonical/jimm-0"
-	OmnibusJIMMPlan  = "canonical/jimm"
-	OmnibusJIMMName  = "jimm"
-	OmnibusJIMMOwner = "canonical"
-)
 
 // NewPool represents a pool of possible JEM instances that use the given
 // database as a store, and use the given bakery parameters to create the
@@ -205,8 +195,8 @@ func (p *Pool) JEM(ctx context.Context) *JEM {
 	}
 	p.refCount++
 	return &JEM{
-		DB:                             newDatabase(ctx, p.config.SessionPool, p.dbName),
-		pool:                           p,
+		DB:   newDatabase(ctx, p.config.SessionPool, p.dbName),
+		pool: p,
 		usageSenderAuthorizationClient: p.usageSenderAuthorizationClient,
 	}
 }
@@ -438,9 +428,14 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 
-	usageSenderCredentials, err := j.UsageSenderAuthorization(string(p.Path.User))
-	if err != nil {
-		return nil, errgo.Mask(err)
+	var usageSenderCredentials []byte
+	if j.usageSenderAuthorizationClient != nil {
+		usageSenderCredentials, err = j.usageSenderAuthorizationClient.GetCredentials(
+			ctx,
+			string(p.Path.User))
+		if err != nil {
+			return nil, errgo.Mask(err)
+		}
 	}
 
 	var cred *mongodoc.Credential
@@ -449,7 +444,6 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrAmbiguousChoice))
 	}
 
-	// Find controllers we could possibly create the model in.
 	controllers, err := j.possibleControllers(ctx, p.ControllerPath, p.Cloud, p.Region)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
@@ -949,27 +943,6 @@ func (j *JEM) selectRandomController(ctx context.Context) (params.EntityPath, er
 	}
 	n := randIntn(len(controllers))
 	return controllers[n].Path, nil
-}
-
-func (j *JEM) UsageSenderAuthorization(applicationUser string) ([]byte, error) {
-	if j.usageSenderAuthorizationClient == nil {
-		return nil, nil
-	}
-	macaroon, err := j.usageSenderAuthorizationClient.AuthorizeReseller(
-		OmnibusJIMMPlan,
-		OmnibusJIMMCharm,
-		OmnibusJIMMName,
-		OmnibusJIMMOwner,
-		applicationUser,
-	)
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot obtain authorization to collect usage metrics")
-	}
-	data, err := json.Marshal(macaroon)
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot marshal metrics authorization credentials")
-	}
-	return data, nil
 }
 
 // UpdateMachineInfo updates the information associated with a machine.
