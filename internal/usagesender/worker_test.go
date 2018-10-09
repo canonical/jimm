@@ -72,7 +72,7 @@ func (s *usageSenderSuite) SetUpTest(c *gc.C) {
 	// Set up the clock mockery.
 	s.Clock = jujutesting.NewClock(epoch)
 
-	s.ServerParams.UsageSenderURL = s.server.URL
+	s.ServerParams.MeteringLocation = s.server.URL
 
 	s.Suite.SetUpTest(c)
 }

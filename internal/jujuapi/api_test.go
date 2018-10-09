@@ -28,7 +28,8 @@ func (s *apiSuite) TestGUI(c *gc.C) {
 	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
 	_, uuid := s.CreateModel(c, params.EntityPath{"bob", "gui-model"}, params.EntityPath{"bob", "controller-1"}, cred)
 	jemSrv := s.NewServer(c, s.Session, s.IDMSrv, jem.ServerParams{
-		GUILocation: "https://jujucharms.com.test",
+		GUILocation:      "https://jujucharms.com.test",
+		MeteringLocation: "http://0.1.2.3/omnibus",
 	})
 	defer jemSrv.Close()
 	AssertRedirect(c, RedirectParams{
@@ -54,7 +55,8 @@ func (s *apiSuite) TestGUINotFound(c *gc.C) {
 
 func (s *apiSuite) TestGUIModelNotFound(c *gc.C) {
 	jemSrv := s.NewServer(c, s.Session, s.IDMSrv, jem.ServerParams{
-		GUILocation: "https://jujucharms.com.test",
+		GUILocation:      "https://jujucharms.com.test",
+		MeteringLocation: "http://0.1.2.3/omnibus",
 	})
 	defer jemSrv.Close()
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{

@@ -67,6 +67,9 @@ type Suite struct {
 }
 
 func (s *Suite) SetUpTest(c *gc.C) {
+	if s.ServerParams.MeteringLocation == "" {
+		s.ServerParams.MeteringLocation = "https://0.1.2.3/omnibus"
+	}
 	s.IDMSrv = idmtest.NewServer()
 	s.JujuConnSuite.ControllerConfigAttrs = map[string]interface{}{
 		controller.IdentityURL:       s.IDMSrv.URL,
@@ -147,7 +150,7 @@ func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server,
 		AgentKey:                s.IDMSrv.UserPublicKey("agent"),
 		ControllerUUID:          "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		WebsocketRequestTimeout: 3 * time.Minute,
-		UsageSenderURL:          "https://0.1.2.3/omnibus/v2",
+		UsageSenderURL:          "https://0.1.2.3/omnibus",
 		UsageSenderSpoolPath:    s.MetricsSpoolPath,
 	}
 	if params.UsageSenderURL != "" {
