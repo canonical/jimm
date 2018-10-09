@@ -235,7 +235,7 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	}
 	if config.UsageSenderURL != "" {
 		worker, err := usagesender.NewSendModelUsageWorker(usagesender.SendModelUsageWorkerConfig{
-			OmnibusURL:     config.UsageSenderURL,
+			OmnibusURL:     config.MeteringLocation,
 			Pool:           p,
 			Period:         usageSenderPeriod,
 			Context:        ctx,
