@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/juju/aclstore"
-	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/idmtest"
 	controllerapi "github.com/juju/juju/api/controller"
 	"github.com/juju/juju/controller"
@@ -80,7 +79,7 @@ func (s *Suite) SetUpTest(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 	s.PatchValue(&jem.APIOpenTimeout, time.Duration(0))
 	s.MetricsRegistrationClient = &stubMetricsRegistrationClient{}
-	s.PatchValue(&jem.NewUsageSenderAuthorizationClient, func(_ string, _ httprequest.Doer) (jem.UsageSenderAuthorizationClient, error) {
+	s.PatchValue(&jem.NewUsageSenderAuthorizationClient, func(_ string, _ *httpbakery.Client) (jem.UsageSenderAuthorizationClient, error) {
 		return s.MetricsRegistrationClient, nil
 	})
 	if s.Clock != nil {

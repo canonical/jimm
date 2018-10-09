@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/juju/httprequest"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/base"
 	cloudapi "github.com/juju/juju/api/cloud"
@@ -47,7 +46,7 @@ var wallClock clock.Clock = clock.WallClock
 var (
 	randIntn = rand.Intn
 
-	NewUsageSenderAuthorizationClient = func(url string, client httprequest.Doer) (UsageSenderAuthorizationClient, error) {
+	NewUsageSenderAuthorizationClient = func(url string, client *httpbakery.Client) (UsageSenderAuthorizationClient, error) {
 		return usageauth.NewAuthorizationClient(url, client), nil
 	}
 )
@@ -195,8 +194,8 @@ func (p *Pool) JEM(ctx context.Context) *JEM {
 	}
 	p.refCount++
 	return &JEM{
-		DB:   newDatabase(ctx, p.config.SessionPool, p.dbName),
-		pool: p,
+		DB:                             newDatabase(ctx, p.config.SessionPool, p.dbName),
+		pool:                           p,
 		usageSenderAuthorizationClient: p.usageSenderAuthorizationClient,
 	}
 }
