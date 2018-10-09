@@ -4,8 +4,6 @@ package admincmd
 
 import (
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"strings"
 
@@ -17,6 +15,7 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
+	"github.com/CanonicalLtd/jimm/internal/bakeryadaptor"
 	"github.com/CanonicalLtd/jimm/jemclient"
 	"github.com/CanonicalLtd/jimm/params"
 )
@@ -147,30 +146,11 @@ func (c *commandBase) newACLClient(ctxt *cmd.Context) (*aclClient, error) {
 	return &aclClient{
 		Client: aclclient.New(aclclient.NewParams{
 			BaseURL: c.serverURL() + "/admin/acls",
-			Doer:    bakeryDoer{bakeryClient},
+			Doer:    bakeryadaptor.Doer{bakeryClient},
 		}),
 		jar:  jar,
 		ctxt: ctxt,
 	}, nil
-}
-
-// bakeryDoer wraps a gopkg.in/macaroon-bakery.v2-unstable/httpbakey.Client so
-// that it behaves correctly as a gopkg.in/httprequest.v1.Doer.
-type bakeryDoer struct {
-	client *httpbakery.Client
-}
-
-func (d bakeryDoer) Do(req *http.Request) (*http.Response, error) {
-	if req.Body == nil {
-		return d.client.Do(req)
-	}
-	body, ok := req.Body.(io.ReadSeeker)
-	if !ok {
-		return nil, errgo.New("unsupported request body type")
-	}
-	req1 := *req
-	req1.Body = nil
-	return d.client.DoWithBody(&req1, body)
 }
 
 const jimmServerURL = "https://jimm.jujucharms.com"

@@ -19,6 +19,7 @@ import (
 
 	"github.com/CanonicalLtd/jimm"
 	"github.com/CanonicalLtd/jimm/cmd/jaas-admin/admincmd"
+	"github.com/CanonicalLtd/jimm/internal/bakeryadaptor"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/jemclient"
 	"github.com/CanonicalLtd/jimm/params"
@@ -84,7 +85,7 @@ func (s *commonSuite) jemClient(username string) *jemclient.Client {
 func (s *commonSuite) aclClient(username string) *aclclient.Client {
 	return aclclient.New(aclclient.NewParams{
 		BaseURL: s.httpSrv.URL + "/admin/acls",
-		Doer:    admincmd.BakeryDoer(s.idmSrv.Client(username)),
+		Doer:    bakeryadaptor.Doer{s.idmSrv.Client(username)},
 	})
 }
 
