@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/juju/juju/core/status"
 	"github.com/juju/juju/state/multiwatcher"
-	"github.com/juju/juju/status"
 	"github.com/prometheus/client_golang/prometheus"
 	gc "gopkg.in/check.v1"
 

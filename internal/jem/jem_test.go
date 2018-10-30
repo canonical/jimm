@@ -7,16 +7,19 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/juju/clock/testclock"
 	cloudapi "github.com/juju/juju/api/cloud"
 	"github.com/juju/juju/api/controller"
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/state"
 	"github.com/juju/juju/state/multiwatcher"
 	jujujujutesting "github.com/juju/juju/testing"
 	"github.com/juju/juju/testing/factory"
 	jt "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
+	"github.com/juju/utils"
 	"github.com/juju/version"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
@@ -27,6 +30,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
+	"github.com/CanonicalLtd/jimm/internal/kubetest"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
@@ -54,6 +58,7 @@ func (s *jemSuite) SetUpTest(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	s.pool = pool
 	s.jem = s.pool.JEM(context.TODO())
+	s.PatchValue(&utils.OutgoingAccessAllowed, true)
 }
 
 func (s *jemSuite) TearDownTest(c *gc.C) {
@@ -267,7 +272,7 @@ var createModelTests = []struct {
 
 func (s *jemSuite) TestCreateModel(c *gc.C) {
 	now := bson.Now()
-	s.PatchValue(jem.WallClock, jt.NewClock(now))
+	s.PatchValue(jem.WallClock, testclock.NewClock(now))
 	ctlId := s.addController(c, params.EntityPath{"bob", "controller"})
 	err := s.jem.DB.SetACL(testContext, s.jem.DB.Controllers(), ctlId, params.ACL{
 		Read: []string{"everyone"},
@@ -335,7 +340,7 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 
 func (s *jemSuite) TestCreateModelWithPartiallyCreatedModel(c *gc.C) {
 	now := bson.Now()
-	s.PatchValue(jem.WallClock, jt.NewClock(now))
+	s.PatchValue(jem.WallClock, testclock.NewClock(now))
 	ctlId := s.addController(c, params.EntityPath{"bob", "controller"})
 	err := s.jem.DB.SetACL(testContext, s.jem.DB.Controllers(), ctlId, params.ACL{
 		Read: []string{"everyone"},
@@ -652,7 +657,7 @@ func (s *jemSuite) TestDestroyModelWithStorage(c *gc.C) {
 	modelState, err := s.StatePool.Get(model.UUID)
 	c.Assert(err, jc.ErrorIsNil)
 	defer modelState.Release()
-	f := factory.NewFactory(modelState.State)
+	f := factory.NewFactory(modelState.State, s.StatePool)
 	f.MakeUnit(c, &factory.UnitParams{
 		Application: f.MakeApplication(c, &factory.ApplicationParams{
 			Charm: f.MakeCharm(c, &factory.CharmParams{
@@ -1566,17 +1571,25 @@ func (s *jemSuite) TestRemoveCloudNotFound(c *gc.C) {
 }
 
 func (s *jemSuite) TestRemoveCloudWithModel(c *gc.C) {
+	kubeconfig, err := kubetest.LoadConfig()
+	if errgo.Cause(err) == kubetest.ErrDisabled {
+		c.Skip("kubernetes testing disabled")
+	}
+	c.Assert(err, gc.Equals, nil, gc.Commentf("error loading kubernetes config: %v", err))
+
 	ctlPath := params.EntityPath{"bob", "foo"}
 	s.addController(c, ctlPath)
 	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
-	err := s.jem.CreateCloud(ctx, mongodoc.CloudRegion{
-		Cloud:            "test-cloud",
-		ProviderType:     "kubernetes",
-		AuthTypes:        []string{"empty"},
-		Endpoint:         "https://1.2.3.4:5678",
-		IdentityEndpoint: "https://1.2.3.4:5679",
-		StorageEndpoint:  "https://1.2.3.4:5680",
-		CACertificates:   []string{"This is a CA Certficiate (honest)"},
+	var cacerts []string
+	if cert := kubetest.CACertificate(kubeconfig); cert != "" {
+		cacerts = append(cacerts, cert)
+	}
+	err = s.jem.CreateCloud(ctx, mongodoc.CloudRegion{
+		Cloud:          "test-cloud",
+		ProviderType:   "kubernetes",
+		AuthTypes:      []string{string(cloud.UserPassAuthType)},
+		Endpoint:       kubetest.ServerURL(kubeconfig),
+		CACertificates: cacerts,
 		ACL: params.ACL{
 			Read:  []string{"bob"},
 			Write: []string{"bob"},
@@ -1585,9 +1598,27 @@ func (s *jemSuite) TestRemoveCloudWithModel(c *gc.C) {
 	}, nil)
 	c.Assert(err, gc.IsNil)
 
-	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
-		Path:  params.EntityPath{"bob", "test-model"},
+	credpath := params.CredentialPath{
 		Cloud: "test-cloud",
+		EntityPath: params.EntityPath{
+			User: "bob",
+			Name: "kubernetes",
+		},
+	}
+	err = s.jem.UpdateCredential(ctx, &mongodoc.Credential{
+		Path: credpath,
+		Type: string(cloud.UserPassAuthType),
+		Attributes: map[string]string{
+			"username": kubetest.Username(kubeconfig),
+			"password": kubetest.Password(kubeconfig),
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
+		Path:       params.EntityPath{"bob", "test-model"},
+		Cloud:      "test-cloud",
+		Credential: credpath,
 	})
 	c.Assert(err, gc.IsNil)
 
