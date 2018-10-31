@@ -8,11 +8,9 @@ require (
 	github.com/armon/go-metrics v0.0.0-20180713145231-3c58d8115a78 // indirect
 	github.com/bmizerany/pat v0.0.0-20160217103242-c068ca2f0aac // indirect
 	github.com/boltdb/bolt v1.3.1 // indirect
-	github.com/cloud-green/monitoring v0.0.0-20171127132220-666e3beca3cb
 	github.com/coreos/go-systemd v0.0.0-20160202211425-7b2428fec400 // indirect
 	github.com/dnaeon/go-vcr v0.0.0-20180814043457-aafff18a5cc2 // indirect
 	github.com/dustin/go-humanize v0.0.0-20141228071148-145fabdb1ab7 // indirect
-	github.com/frankban/quicktest v1.1.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/godbus/dbus v0.0.0-20160506222550-32c6cc29c145 // indirect
 	github.com/gogo/protobuf v1.1.1 // indirect
@@ -55,6 +53,7 @@ require (
 	github.com/juju/jsonschema v0.0.0-20161102181919-a0ef8b74ebcf // indirect
 	github.com/juju/juju v0.0.0-20180829075458-b95187af705e
 	github.com/juju/loggo v0.0.0-20180524022052-584905176618
+	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
 	github.com/juju/mgosession v0.0.0-20170206150231-9ae6df2882cd
 	github.com/juju/mutex v0.0.0-20171110020013-1fe2a4bf0a3a // indirect
 	github.com/juju/names v0.0.0-20160330150533-8a0aa0963bba
@@ -109,7 +108,6 @@ require (
 	go.uber.org/atomic v0.0.0-20170609002007-0506d69f5564 // indirect
 	go.uber.org/zap v0.0.0-20170610223901-300d56ffb8cc
 	golang.org/x/crypto v0.0.0-20180524125353-159ae71589f3
-	golang.org/x/net v0.0.0-20180406214816-61147c48b25b // indirect
 	golang.org/x/oauth2 v0.0.0-20150325020022-11c60b6f71a6 // indirect
 	golang.org/x/sys v0.0.0-20180202135801-37707fdb30a5 // indirect
 	golang.org/x/text v0.3.0 // indirect
@@ -118,7 +116,7 @@ require (
 	google.golang.org/appengine v1.1.0 // indirect
 	google.golang.org/cloud v0.0.0-20150319223635-f20d6dcccb44 // indirect
 	gopkg.in/amz.v3 v3.0.0-20161215130849-8c3190dff075 // indirect
-	gopkg.in/check.v1 v1.0.0-20160105164936-4f90aeace3a2
+	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 	gopkg.in/errgo.v1 v1.0.0-20161222125816-442357a80af5
 	gopkg.in/goose.v2 v2.0.0-20180816040309-cf9b64132d71 // indirect
 	gopkg.in/httprequest.v1 v1.1.2
@@ -135,15 +133,15 @@ require (
 	gopkg.in/macaroon-bakery.v1 v1.0.0-20160622121421-469b44e6f1f9 // indirect
 	gopkg.in/macaroon-bakery.v2 v2.0.0-20171103092624-ec9d2ad67961 // indirect
 	gopkg.in/macaroon-bakery.v2-unstable v2.0.0-20160623142747-5a131df02b23
-	gopkg.in/macaroon.v1 v1.0.0-20150121114231-ab3940c6c165
+	gopkg.in/macaroon.v1 v1.0.0-20150121114231-ab3940c6c165 // indirect
 	gopkg.in/macaroon.v2 v2.0.0 // indirect
 	gopkg.in/macaroon.v2-unstable v2.0.0-20180309131217-66ab28d0d56f
-	gopkg.in/mgo.v2 v2.0.0-20160818020120-3f83fa500528
+	gopkg.in/mgo.v2 v2.0.0-20180705113604-9856a29383ce
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0-20170531180850-df99d62fd42d
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637
 	gopkg.in/vmihailenco/msgpack.v2 v2.9.1 // indirect
-	gopkg.in/yaml.v2 v2.1.1
+	gopkg.in/yaml.v2 v2.2.1
 	k8s.io/api v0.0.0-20180904190239-89dfcd0b1128 // indirect
 	k8s.io/apimachinery v0.0.0-20180407065143-5d4f0da8e5fd // indirect
 	k8s.io/client-go v7.0.0+incompatible // indirect
