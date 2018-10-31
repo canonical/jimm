@@ -115,7 +115,7 @@ func (s *monitorSuite) TestMonitorWithBrokenMongoConnection(c *gc.C) {
 	// the monitoring continues.
 	session.CloseConns()
 
-	f := factory.NewFactory(s.State)
+	f := factory.NewFactory(s.State, s.StatePool)
 	f.MakeApplication(c, &factory.ApplicationParams{
 		Name: "wordpress",
 	})
@@ -166,7 +166,7 @@ func (s *monitorSuite) TestMonitorWithBrokenJujuAPIConnection(c *gc.C) {
 	// check the monitoring continues OK.
 	proxy.CloseConns()
 
-	f := factory.NewFactory(s.State)
+	f := factory.NewFactory(s.State, s.StatePool)
 	f.MakeApplication(c, &factory.ApplicationParams{
 		Name: "wordpress",
 	})

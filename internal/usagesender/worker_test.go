@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/juju/clock/testclock"
 	"github.com/juju/httprequest"
 	jujujujutesting "github.com/juju/juju/testing"
-	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
@@ -70,7 +70,7 @@ func (s *usageSenderSuite) SetUpTest(c *gc.C) {
 	s.server = httptest.NewServer(router)
 
 	// Set up the clock mockery.
-	s.Clock = jujutesting.NewClock(epoch)
+	s.Clock = testclock.NewClock(epoch)
 
 	s.ServerParams.UsageSenderURL = s.server.URL
 

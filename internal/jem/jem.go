@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/juju/clock"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/base"
 	cloudapi "github.com/juju/juju/api/cloud"
@@ -18,7 +19,6 @@ import (
 	"github.com/juju/juju/environs/config"
 	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/utils/cache"
-	"github.com/juju/utils/clock"
 	"github.com/juju/version"
 	"github.com/rogpeppe/fastuuid"
 	"go.uber.org/zap"
@@ -764,7 +764,7 @@ func (j *JEM) updateControllerCredential(
 	if cred.Revoked {
 		err = cloudClient.RevokeCredential(cloudCredentialTag)
 	} else {
-		err = cloudClient.UpdateCredential(
+		_, err = cloudClient.UpdateCredentialsCheckModels(
 			cloudCredentialTag,
 			jujucloud.NewCredential(jujucloud.AuthType(cred.Type), cred.Attributes),
 		)

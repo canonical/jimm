@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/juju/clock/testclock"
 	"github.com/juju/idmclient/idmtest"
 	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/state"
@@ -14,7 +15,6 @@ import (
 	jujuwatcher "github.com/juju/juju/state/watcher"
 	jujujujutesting "github.com/juju/juju/testing"
 	"github.com/juju/juju/testing/factory"
-	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/version"
 	gc "gopkg.in/check.v1"
@@ -42,7 +42,7 @@ type internalSuite struct {
 	startTime time.Time
 
 	// clock holds the mock clock used by the monitor package.
-	clock *jujutesting.Clock
+	clock *testclock.Clock
 }
 
 // We don't want to wait for the usual 5s poll interval.
@@ -66,7 +66,7 @@ func (s *internalSuite) SetUpTest(c *gc.C) {
 	s.jem = pool.JEM(context.TODO())
 
 	// Set up the clock mockery.
-	s.clock = jujutesting.NewClock(epoch)
+	s.clock = testclock.NewClock(epoch)
 	s.PatchValue(&Clock, s.clock)
 }
 
@@ -169,14 +169,14 @@ func (s *internalSuite) TestLeaseUpdaterWhenControllerRemoved(c *gc.C) {
 
 func (s *internalSuite) TestWatcher(c *gc.C) {
 	// Add a couple of models and applications with units to watch.
-	model1State := newModel(c, s.State, "model1")
-	newApplication(c, model1State, "model1-app", 2)
+	model1State := newModel(c, s.State, s.StatePool, "model1")
+	newApplication(c, model1State, s.StatePool, "model1-app", 2)
 	defer model1State.Close()
 
-	model2State := newModel(c, s.State, "model2")
-	newApplication(c, model2State, "model1-app", 2)
+	model2State := newModel(c, s.State, s.StatePool, "model2")
+	newApplication(c, model2State, s.StatePool, "model1-app", 2)
 	// Add a co-hosted unit so that we can see a different between units and machines.
-	addUnitOnMachine(c, model2State, "model1-app", "0")
+	addUnitOnMachine(c, model2State, s.StatePool, "model1-app", "0")
 	defer model2State.Close()
 
 	ctlPath := params.EntityPath{"bob", "foo"}
@@ -257,7 +257,7 @@ func (s *internalSuite) TestWatcher(c *gc.C) {
 
 	// Add another application and check that the service count and unit counts
 	// are maintained.
-	newApplication(c, model2State, "model2-app2", 2)
+	newApplication(c, model2State, s.StatePool, "model2-app2", 2)
 
 	jshim.await(c, getAllStats, allStats{
 		stats: mongodoc.ControllerStats{
@@ -432,8 +432,8 @@ type modelData struct {
 
 func (s *internalSuite) TestWatcherUpdatesMachineInfo(c *gc.C) {
 	// Add a couple of models and applications with units to watch.
-	modelState := newModel(c, s.State, "model")
-	newApplication(c, modelState, "model-app", 1)
+	modelState := newModel(c, s.State, s.StatePool, "model")
+	newApplication(c, modelState, s.StatePool, "model-app", 1)
 	defer modelState.Close()
 
 	ctlPath := params.EntityPath{"bob", "foo"}
@@ -492,8 +492,8 @@ func (s *internalSuite) TestWatcherUpdatesMachineInfo(c *gc.C) {
 
 func (s *internalSuite) TestWatcherUpdatesApplicationInfo(c *gc.C) {
 	// Add a couple of models and applications with units to watch.
-	modelState := newModel(c, s.State, "model")
-	newApplication(c, modelState, "model-app", 1)
+	modelState := newModel(c, s.State, s.StatePool, "model")
+	newApplication(c, modelState, s.StatePool, "model-app", 1)
 	defer modelState.Close()
 
 	ctlPath := params.EntityPath{"bob", "foo"}
@@ -1416,15 +1416,15 @@ func (s *internalSuite) addJEMController(c *gc.C, ctlPath params.EntityPath) {
 	c.Assert(err, gc.IsNil)
 }
 
-func newModel(c *gc.C, st *state.State, name string) *state.State {
-	f := factory.NewFactory(st)
+func newModel(c *gc.C, st *state.State, pool *state.StatePool, name string) *state.State {
+	f := factory.NewFactory(st, pool)
 	return f.MakeModel(c, &factory.ModelParams{
 		Name: name,
 	})
 }
 
-func newApplication(c *gc.C, st *state.State, name string, numUnits int) {
-	f := factory.NewFactory(st)
+func newApplication(c *gc.C, st *state.State, pool *state.StatePool, name string, numUnits int) {
+	f := factory.NewFactory(st, pool)
 	svc := f.MakeApplication(c, &factory.ApplicationParams{
 		Name: name,
 	})
@@ -1435,12 +1435,12 @@ func newApplication(c *gc.C, st *state.State, name string, numUnits int) {
 	}
 }
 
-func addUnitOnMachine(c *gc.C, st *state.State, appId, machineId string) {
+func addUnitOnMachine(c *gc.C, st *state.State, pool *state.StatePool, appId, machineId string) {
 	app, err := st.Application(appId)
 	c.Assert(err, gc.IsNil)
 	machine, err := st.Machine(machineId)
 	c.Assert(err, gc.IsNil)
-	f := factory.NewFactory(st)
+	f := factory.NewFactory(st, pool)
 	f.MakeUnit(c, &factory.UnitParams{
 		Application: app,
 		Machine:     machine,

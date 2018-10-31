@@ -19,14 +19,15 @@ import (
 	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/controller"
 	"github.com/juju/juju/core/model"
+	"github.com/juju/juju/core/status"
 	"github.com/juju/juju/instance"
 	"github.com/juju/juju/state"
 	"github.com/juju/juju/state/multiwatcher"
-	"github.com/juju/juju/status"
 	"github.com/juju/juju/testing/factory"
 	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
+	"github.com/juju/utils"
 	"github.com/juju/version"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
@@ -36,6 +37,7 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
+	"github.com/CanonicalLtd/jimm/internal/kubetest"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
 )
@@ -50,6 +52,7 @@ func (s *controllerSuite) SetUpTest(c *gc.C) {
 	s.ServerParams.CharmstoreLocation = "https://api.jujucharms.com/charmstore"
 	s.ServerParams.MeteringLocation = "https://api.jujucharms.com/omnibus"
 	s.websocketSuite.SetUpTest(c)
+	s.PatchValue(&utils.OutgoingAccessAllowed, true)
 }
 
 func (s *controllerSuite) TestServerVersion(c *gc.C) {
@@ -368,12 +371,12 @@ func (s *controllerSuite) TestUpdateCloudCredentials(c *gc.C) {
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
 	credentialTag := names.NewCloudCredentialTag(fmt.Sprintf("dummy/test@external/cred3"))
-	err := client.UpdateCredential(credentialTag, cloud.NewCredential("credtype", map[string]string{"attr1": "val31", "attr2": "val32"}))
+	_, err := client.UpdateCredentialsCheckModels(credentialTag, cloud.NewCredential("credtype", map[string]string{"attr1": "val31", "attr2": "val32"}))
 	c.Assert(err, jc.ErrorIsNil)
 	creds, err := client.UserCredentials(names.NewUserTag("test@external"), names.NewCloudTag("dummy"))
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(creds, jc.DeepEquals, []names.CloudCredentialTag{credentialTag})
-	err = client.UpdateCredential(credentialTag, cloud.NewCredential("credtype", map[string]string{"attr1": "val33", "attr2": "val34"}))
+	_, err = client.UpdateCredentialsCheckModels(credentialTag, cloud.NewCredential("credtype", map[string]string{"attr1": "val33", "attr2": "val34"}))
 	c.Assert(err, jc.ErrorIsNil)
 	creds, err = client.UserCredentials(names.NewUserTag("test@external"), names.NewCloudTag("dummy"))
 	c.Assert(err, jc.ErrorIsNil)
@@ -437,11 +440,11 @@ func (s *controllerSuite) TestCredential(c *gc.C) {
 	cred5 := cloud.NewCredential("empty", nil)
 
 	client := cloudapi.NewClient(conn)
-	err := client.UpdateCredential(cred1Tag, cred1)
+	_, err := client.UpdateCredentialsCheckModels(cred1Tag, cred1)
 	c.Assert(err, jc.ErrorIsNil)
-	err = client.UpdateCredential(cred2Tag, cred2)
+	_, err = client.UpdateCredentialsCheckModels(cred2Tag, cred2)
 	c.Assert(err, jc.ErrorIsNil)
-	err = client.UpdateCredential(cred5Tag, cred5)
+	_, err = client.UpdateCredentialsCheckModels(cred5Tag, cred5)
 	c.Assert(err, jc.ErrorIsNil)
 
 	creds, err := client.Credentials(
@@ -496,7 +499,7 @@ func (s *controllerSuite) TestRevokeCredential(c *gc.C) {
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
 	credTag := names.NewCloudCredentialTag("dummy/test@external/cred")
-	err := client.UpdateCredential(
+	_, err := client.UpdateCredentialsCheckModels(
 		credTag,
 		cloud.NewCredential("empty", nil),
 	)
@@ -744,16 +747,6 @@ func (s *controllerSuite) TestListModelSummaries(c *gc.C) {
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 
-	err = cloudapi.NewClient(conn).AddCloud(cloud.Cloud{
-		Name:             "test-cloud",
-		Type:             "kubernetes",
-		AuthTypes:        cloud.AuthTypes{cloud.EmptyAuthType},
-		Endpoint:         "https://1.2.3.4:5678",
-		IdentityEndpoint: "https://1.2.3.4:5679",
-		StorageEndpoint:  "https://1.2.3.4:5680",
-	})
-	c.Assert(err, jc.ErrorIsNil)
-
 	c.Assert(err, jc.ErrorIsNil)
 	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
 	modelUUID1 := mi.UUID
@@ -764,10 +757,6 @@ func (s *controllerSuite) TestListModelSummaries(c *gc.C) {
 		Read: []string{"test"},
 	})
 	c.Assert(err, jc.ErrorIsNil)
-
-	mi, err = modelmanager.NewClient(conn).CreateModel("model-4", "test@external", "test-cloud", "", names.CloudCredentialTag{}, nil)
-	c.Assert(err, jc.ErrorIsNil)
-	modelUUID4 := mi.UUID
 
 	client := modelmanager.NewClient(conn)
 	models, err := client.ListModelSummaries("test", false)
@@ -798,31 +787,6 @@ func (s *controllerSuite) TestListModelSummaries(c *gc.C) {
 		AgentVersion: &jujuversion.Current,
 		Type:         "iaas",
 	}, {
-		Name:            "model-4",
-		UUID:            modelUUID4,
-		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
-		ProviderType:    "kubernetes",
-		DefaultSeries:   "bionic",
-		Cloud:           "test-cloud",
-		CloudRegion:     "",
-		CloudCredential: "",
-		Owner:           "test@external",
-		Life:            "alive",
-		Status: base.Status{
-			Status: status.Available,
-			Data:   map[string]interface{}{},
-		},
-		ModelUserAccess: "admin",
-		Counts: []base.EntityCount{{
-			Entity: "machines",
-			Count:  0,
-		}, {
-			Entity: "cores",
-			Count:  0,
-		}},
-		AgentVersion: &jujuversion.Current,
-		Type:         "caas",
-	}, {
 		Name:            "model-3",
 		UUID:            modelUUID3,
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
@@ -850,6 +814,80 @@ func (s *controllerSuite) TestListModelSummaries(c *gc.C) {
 	}})
 }
 
+func (s *controllerSuite) TestListCAASModelSummaries(c *gc.C) {
+	kubeconfig, err := kubetest.LoadConfig()
+	if errgo.Cause(err) == kubetest.ErrDisabled {
+		c.Skip("kubernetes testing disabled")
+	}
+	c.Assert(err, gc.Equals, nil, gc.Commentf("error loading kubernetes config: %v", err))
+
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+
+	var cacerts []string
+	if cert := kubetest.CACertificate(kubeconfig); cert != "" {
+		cacerts = append(cacerts, cert)
+	}
+	cloudclient := cloudapi.NewClient(conn)
+	err = cloudclient.AddCloud(cloud.Cloud{
+		Name:           "test-cloud",
+		Type:           "kubernetes",
+		AuthTypes:      cloud.AuthTypes{cloud.UserPassAuthType},
+		Endpoint:       kubetest.ServerURL(kubeconfig),
+		CACertificates: cacerts,
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	credTag := names.NewCloudCredentialTag("test-cloud/test@external/test-cred")
+	cred := cloud.NewCredential(cloud.UserPassAuthType, map[string]string{
+		"username": kubetest.Username(kubeconfig),
+		"password": kubetest.Password(kubeconfig),
+	})
+	res, err := cloudclient.UpdateCredentialsCheckModels(credTag, cred)
+	c.Assert(err, jc.ErrorIsNil)
+	for _, model := range res {
+		for _, err := range model.Errors {
+			c.Assert(err, jc.ErrorIsNil)
+		}
+	}
+
+	mi, err := modelmanager.NewClient(conn).CreateModel("model-1", "test@external", "test-cloud", "", credTag, nil)
+	c.Assert(err, jc.ErrorIsNil)
+	modelUUID := mi.UUID
+
+	client := modelmanager.NewClient(conn)
+	models, err := client.ListModelSummaries("test", false)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(models, jemtest.CmpEquals(cmpopts.IgnoreTypes(&time.Time{})), []base.UserModelSummary{{
+		Name:            "model-1",
+		UUID:            modelUUID,
+		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+		ProviderType:    "kubernetes",
+		DefaultSeries:   "bionic",
+		Cloud:           "test-cloud",
+		CloudRegion:     "",
+		CloudCredential: "test-cloud/test@external/test-cred",
+		Owner:           "test@external",
+		Life:            "alive",
+		Status: base.Status{
+			Status: status.Available,
+			Data:   map[string]interface{}{},
+		},
+		ModelUserAccess: "admin",
+		Counts: []base.EntityCount{{
+			Entity: "machines",
+			Count:  0,
+		}, {
+			Entity: "cores",
+			Count:  0,
+		}},
+		AgentVersion: &jujuversion.Current,
+		Type:         "caas",
+	}})
+}
+
 func (s *controllerSuite) TestListModels(c *gc.C) {
 	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
@@ -862,15 +900,6 @@ func (s *controllerSuite) TestListModels(c *gc.C) {
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 
-	err = cloudapi.NewClient(conn).AddCloud(cloud.Cloud{
-		Name:             "test-cloud",
-		Type:             "kubernetes",
-		AuthTypes:        cloud.AuthTypes{cloud.EmptyAuthType},
-		Endpoint:         "https://1.2.3.4:5678",
-		IdentityEndpoint: "https://1.2.3.4:5679",
-		StorageEndpoint:  "https://1.2.3.4:5680",
-	})
-	c.Assert(err, jc.ErrorIsNil)
 	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
 	modelUUID1 := mi.UUID
 	s.assertCreateModel(c, createModelParams{name: "model-2", username: "test2", cred: cred2})
@@ -880,9 +909,6 @@ func (s *controllerSuite) TestListModels(c *gc.C) {
 		Read: []string{"test"},
 	})
 	c.Assert(err, jc.ErrorIsNil)
-	mi, err = modelmanager.NewClient(conn).CreateModel("model-4", "test@external", "test-cloud", "", names.CloudCredentialTag{}, nil)
-	c.Assert(err, jc.ErrorIsNil)
-	modelUUID4 := mi.UUID
 
 	client := modelmanager.NewClient(conn)
 	models, err := client.ListModels("test")
@@ -893,15 +919,64 @@ func (s *controllerSuite) TestListModels(c *gc.C) {
 		Owner: "test@external",
 		Type:  "iaas",
 	}, {
-		Name:  "model-4",
-		UUID:  modelUUID4,
-		Owner: "test@external",
-		Type:  "caas",
-	}, {
 		Name:  "model-3",
 		UUID:  modelUUID3,
 		Owner: "test2@external",
 		Type:  "iaas",
+	}})
+}
+
+func (s *controllerSuite) TestListCAASModels(c *gc.C) {
+	kubeconfig, err := kubetest.LoadConfig()
+	if errgo.Cause(err) == kubetest.ErrDisabled {
+		c.Skip("kubernetes testing disabled")
+	}
+	c.Assert(err, gc.Equals, nil, gc.Commentf("error loading kubernetes config: %v", err))
+
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+
+	var cacerts []string
+	if cert := kubetest.CACertificate(kubeconfig); cert != "" {
+		cacerts = append(cacerts, cert)
+	}
+	cloudclient := cloudapi.NewClient(conn)
+	err = cloudclient.AddCloud(cloud.Cloud{
+		Name:           "test-cloud",
+		Type:           "kubernetes",
+		AuthTypes:      cloud.AuthTypes{cloud.UserPassAuthType},
+		Endpoint:       kubetest.ServerURL(kubeconfig),
+		CACertificates: cacerts,
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	credTag := names.NewCloudCredentialTag("test-cloud/test@external/test-cred")
+	cred := cloud.NewCredential(cloud.UserPassAuthType, map[string]string{
+		"username": kubetest.Username(kubeconfig),
+		"password": kubetest.Password(kubeconfig),
+	})
+	res, err := cloudclient.UpdateCredentialsCheckModels(credTag, cred)
+	c.Assert(err, jc.ErrorIsNil)
+	for _, model := range res {
+		for _, err := range model.Errors {
+			c.Assert(err, jc.ErrorIsNil)
+		}
+	}
+
+	mi, err := modelmanager.NewClient(conn).CreateModel("model-1", "test@external", "test-cloud", "", credTag, nil)
+	c.Assert(err, jc.ErrorIsNil)
+	modelUUID := mi.UUID
+
+	client := modelmanager.NewClient(conn)
+	models, err := client.ListModels("test")
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(models, jc.DeepEquals, []base.UserModel{{
+		Name:  "model-1",
+		UUID:  modelUUID,
+		Owner: "test@external",
+		Type:  "caas",
 	}})
 }
 
@@ -1668,21 +1743,45 @@ func (s *controllerSuite) TestCreateModel(c *gc.C) {
 }
 
 func (s *controllerSuite) TestCreateModelKubernetes(c *gc.C) {
+	kubeconfig, err := kubetest.LoadConfig()
+	if errgo.Cause(err) == kubetest.ErrDisabled {
+		c.Skip("kubernetes testing disabled")
+	}
+	c.Assert(err, gc.Equals, nil, gc.Commentf("error loading kubernetes config: %v", err))
+
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 
-	err := cloudapi.NewClient(conn).AddCloud(cloud.Cloud{
-		Name:             "test-cloud",
-		Type:             "kubernetes",
-		AuthTypes:        cloud.AuthTypes{cloud.EmptyAuthType},
-		Endpoint:         "https://1.2.3.4:5678",
-		IdentityEndpoint: "https://1.2.3.4:5679",
-		StorageEndpoint:  "https://1.2.3.4:5680",
+	var cacerts []string
+	if cert := kubetest.CACertificate(kubeconfig); cert != "" {
+		cacerts = append(cacerts, cert)
+	}
+	cloudclient := cloudapi.NewClient(conn)
+	err = cloudclient.AddCloud(cloud.Cloud{
+		Name:           "test-cloud",
+		Type:           "kubernetes",
+		AuthTypes:      cloud.AuthTypes{cloud.UserPassAuthType},
+		Endpoint:       kubetest.ServerURL(kubeconfig),
+		CACertificates: cacerts,
 	})
 	c.Assert(err, jc.ErrorIsNil)
 
-	mi, err := modelmanager.NewClient(conn).CreateModel("test-model", "test@external", "test-cloud", "", names.CloudCredentialTag{}, nil)
+	credTag := names.NewCloudCredentialTag("test-cloud/test@external/test-cred")
+	cred := cloud.NewCredential(cloud.UserPassAuthType, map[string]string{
+		"username": kubetest.Username(kubeconfig),
+		"password": kubetest.Password(kubeconfig),
+	})
+	res, err := cloudclient.UpdateCredentialsCheckModels(credTag, cred)
+	c.Assert(err, jc.ErrorIsNil)
+	for _, model := range res {
+		for _, err := range model.Errors {
+			c.Assert(err, jc.ErrorIsNil)
+		}
+	}
+
+	mi, err := modelmanager.NewClient(conn).CreateModel("test-model", "test@external", "test-cloud", "", credTag, nil)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(mi.Name, gc.Equals, "test-model")
 	c.Assert(mi.Type, gc.Equals, model.CAAS)
@@ -1863,7 +1962,7 @@ func (s *controllerSuite) TestDestroyModelWithStorageError(c *gc.C) {
 	modelState, err := s.StatePool.Get(mi.UUID)
 	c.Assert(err, jc.ErrorIsNil)
 	defer modelState.Release()
-	f := factory.NewFactory(modelState.State)
+	f := factory.NewFactory(modelState.State, s.StatePool)
 	f.MakeUnit(c, &factory.UnitParams{
 		Application: f.MakeApplication(c, &factory.ApplicationParams{
 			Charm: f.MakeCharm(c, &factory.CharmParams{
@@ -1900,7 +1999,7 @@ func (s *controllerSuite) TestDestroyModelWithStorageDestroyStorageTrue(c *gc.C)
 	modelState, err := s.StatePool.Get(mi.UUID)
 	c.Assert(err, jc.ErrorIsNil)
 	defer modelState.Release()
-	f := factory.NewFactory(modelState.State)
+	f := factory.NewFactory(modelState.State, s.StatePool)
 	f.MakeUnit(c, &factory.UnitParams{
 		Application: f.MakeApplication(c, &factory.ApplicationParams{
 			Charm: f.MakeCharm(c, &factory.CharmParams{
@@ -1937,7 +2036,7 @@ func (s *controllerSuite) TestDestroyModelWithStorageDestroyStorageFalse(c *gc.C
 	modelState, err := s.StatePool.Get(mi.UUID)
 	c.Assert(err, jc.ErrorIsNil)
 	defer modelState.Release()
-	f := factory.NewFactory(modelState.State)
+	f := factory.NewFactory(modelState.State, s.StatePool)
 	f.MakeUnit(c, &factory.UnitParams{
 		Application: f.MakeApplication(c, &factory.ApplicationParams{
 			Charm: f.MakeCharm(c, &factory.CharmParams{

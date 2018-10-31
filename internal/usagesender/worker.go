@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/juju/clock"
 	"github.com/juju/httprequest"
-	"github.com/juju/utils/clock"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/juju/aclstore"
+	"github.com/juju/clock/testclock"
 	"github.com/juju/idmclient/idmtest"
 	controllerapi "github.com/juju/juju/api/controller"
 	"github.com/juju/juju/controller"
@@ -62,7 +63,7 @@ type Suite struct {
 	ServerParams              external_jem.ServerParams
 	MetricsRegistrationClient *stubMetricsRegistrationClient
 	MetricsSpoolPath          string
-	Clock                     *testing.Clock
+	Clock                     *testclock.Clock
 	ACLStore                  aclstore.ACLStore
 }
 
