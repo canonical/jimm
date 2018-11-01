@@ -686,7 +686,7 @@ func (s *jemSuite) TestUpdateCredential(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
 
-	err = jem.UpdateControllerCredential(s.jem, testContext, ctlPath, cred.Path, conn, cred)
+	err = jem.UpdateControllerCredential(s.jem, testContext, conn, ctlPath, cred, nil)
 	c.Assert(err, gc.Equals, nil)
 	err = jem.CredentialAddController(s.jem.DB, testContext, credPath, ctlPath)
 	c.Assert(err, gc.Equals, nil)
@@ -702,14 +702,14 @@ func (s *jemSuite) TestUpdateCredential(c *gc.C) {
 		},
 	}})
 
-	err = s.jem.UpdateCredential(testContext, &mongodoc.Credential{
+	_, err = s.jem.UpdateCredential(testContext, &mongodoc.Credential{
 		Path: credPath,
 		Type: "userpass",
 		Attributes: map[string]string{
 			"username": "cloud-user",
 			"password": "cloud-pass",
 		},
-	})
+	}, jem.CredentialUpdate)
 	c.Assert(err, gc.Equals, nil)
 
 	// check it was updated on the controller.
@@ -728,10 +728,7 @@ func (s *jemSuite) TestUpdateCredential(c *gc.C) {
 	}})
 
 	// Revoke the credential
-	err = s.jem.UpdateCredential(testContext, &mongodoc.Credential{
-		Path:    credPath,
-		Revoked: true,
-	})
+	err = s.jem.RevokeCredential(testContext, credPath, jem.CredentialUpdate)
 	c.Assert(err, gc.Equals, nil)
 
 	// check it was removed on the controller.
@@ -1006,7 +1003,8 @@ func (s *jemSuite) TestCredential(c *gc.C) {
 	}}
 	for _, cred := range creds {
 		cred.Id = cred.Path.String()
-		jem.UpdateCredential(s.jem.DB, testContext, &cred)
+		err := jem.UpdateCredential(s.jem.DB, testContext, &cred)
+		c.Assert(err, gc.Equals, nil)
 	}
 	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
 
@@ -1605,14 +1603,14 @@ func (s *jemSuite) TestRemoveCloudWithModel(c *gc.C) {
 			Name: "kubernetes",
 		},
 	}
-	err = s.jem.UpdateCredential(ctx, &mongodoc.Credential{
+	_, err = s.jem.UpdateCredential(ctx, &mongodoc.Credential{
 		Path: credpath,
 		Type: string(cloud.UserPassAuthType),
 		Attributes: map[string]string{
 			"username": kubetest.Username(kubeconfig),
 			"password": kubetest.Password(kubeconfig),
 		},
-	})
+	}, jem.CredentialUpdate)
 	c.Assert(err, gc.Equals, nil)
 
 	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
@@ -1620,7 +1618,7 @@ func (s *jemSuite) TestRemoveCloudWithModel(c *gc.C) {
 		Cloud:      "test-cloud",
 		Credential: credpath,
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, gc.IsNil)
 
 	err = s.jem.RemoveCloud(ctx, "test-cloud")
 	c.Assert(err, gc.ErrorMatches, `cloud is used by 1 model`)

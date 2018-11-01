@@ -87,6 +87,9 @@ func (db *Database) ensureIndexes() error {
 		db.Models(),
 		mgo.Index{Key: []string{"uuid"}, Unique: true},
 	}, {
+		db.Models(),
+		mgo.Index{Key: []string{"credential"}},
+	}, {
 		db.Credentials(),
 		mgo.Index{Key: []string{"path.entitypath.user", "path.cloud"}},
 	}}
@@ -114,6 +117,11 @@ func (db *Database) AddController(ctx context.Context, ctl *mongodoc.Controller)
 		return errgo.NoteMask(err, "cannot insert controller")
 	}
 	return nil
+}
+
+func (db *Database) ModelsWithCredential(ctx context.Context, credPath params.CredentialPath) ([]params.EntityPath, error) {
+	// TODO implement this
+	return nil, nil
 }
 
 // DeleteController deletes existing controller and all of its
