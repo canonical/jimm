@@ -6,7 +6,6 @@ import (
 	"context"
 	"reflect"
 	"sort"
-	"time"
 
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
 	"github.com/juju/juju/apiserver/common"
@@ -18,7 +17,6 @@ import (
 	"github.com/juju/juju/permission"
 	"github.com/juju/juju/rpc"
 	"github.com/juju/juju/rpc/rpcreflect"
-	"github.com/juju/utils/parallel"
 	"github.com/juju/version"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
@@ -59,7 +57,7 @@ var facades = map[facade]string{
 	{"JIMM", 1}:         "JIMM",
 	{"ModelManager", 2}: "ModelManagerV2",
 	{"ModelManager", 3}: "ModelManagerV3",
-	{"ModelManager", 4}: "ModelManagerV4",
+	{"ModelManager", 4}: "ModelManagerAPI",
 	{"Pinger", 1}:       "Pinger",
 	{"UserManager", 1}:  "UserManager",
 }
@@ -137,30 +135,6 @@ func (r *controllerRoot) JIMM(id string) (jimm, error) {
 		return jimm{}, common.ErrBadId
 	}
 	return jimm{r}, nil
-}
-
-// ModelManagerV2 returns an implementation of the ModelManager facade
-// (version 2).
-func (r *controllerRoot) ModelManagerV2(id string) (modelManagerV2, error) {
-	mm, err := r.ModelManagerV3(id)
-	return modelManagerV2{mm}, err
-}
-
-// ModelManagerV3 returns an implementation of the ModelManager facade
-// (version 3).
-func (r *controllerRoot) ModelManagerV3(id string) (modelManagerV3, error) {
-	mm, err := r.ModelManagerV4(id)
-	return modelManagerV3{mm}, err
-}
-
-// ModelManagerV4 returns an implementation of the ModelManager facade
-// (version 4).
-func (r *controllerRoot) ModelManagerV4(id string) (modelManagerV4, error) {
-	if id != "" {
-		// Safeguard id for possible future use.
-		return modelManagerV4{}, common.ErrBadId
-	}
-	return modelManagerV4{r}, nil
 }
 
 // Pinger returns an implementation of the Pinger facade (version 1).
@@ -805,100 +779,6 @@ func (c controller) ControllerConfig() (jujuparams.ControllerConfigResult, error
 	return result, nil
 }
 
-// modelManagerV4 implements the ModelManager (version 4) facade.
-type modelManagerV4 struct {
-	root *controllerRoot
-}
-
-// ListModelSummaries returns summaries for all the models that that
-// authenticated user has access to. The request parameter is ignored.
-func (m modelManagerV4) ListModelSummaries(jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error) {
-	var results []jujuparams.ModelSummaryResult
-	err := m.root.doModels(m.root.context, func(ctx context.Context, model *mongodoc.Model) error {
-		if model.ProviderType == "" {
-			var err error
-			model.ProviderType, err = m.root.jem.DB.ProviderType(ctx, model.Cloud)
-			if err != nil {
-				results = append(results, jujuparams.ModelSummaryResult{
-					Error: mapError(errgo.Notef(err, "cannot get cloud %q", model.Cloud)),
-				})
-				return nil
-			}
-		}
-		// If we get this far the user must have at least read access.
-		access := jujuparams.ModelReadAccess
-		switch {
-		case params.User(auth.Username(ctx)) == model.Path.User:
-			access = jujuparams.ModelAdminAccess
-		case auth.CheckACL(ctx, model.ACL.Admin) == nil:
-			access = jujuparams.ModelAdminAccess
-		case auth.CheckACL(ctx, model.ACL.Write) == nil:
-			access = jujuparams.ModelWriteAccess
-		}
-		machines, err := m.root.jem.DB.MachinesForModel(ctx, model.UUID)
-		if err != nil {
-			results = append(results, jujuparams.ModelSummaryResult{
-				Error: mapError(errgo.Notef(err, "cannot get machines for model %q", model.UUID)),
-			})
-			return nil
-		}
-		machineCount := int64(len(machines))
-		var coreCount int64
-		for _, machine := range machines {
-			if machine.Info != nil &&
-				machine.Info.HardwareCharacteristics != nil &&
-				machine.Info.HardwareCharacteristics.CpuCores != nil {
-				coreCount += int64(*machine.Info.HardwareCharacteristics.CpuCores)
-			}
-		}
-		results = append(results, jujuparams.ModelSummaryResult{
-			Result: &jujuparams.ModelSummary{
-				Name:               string(model.Path.Name),
-				Type:               model.Type,
-				UUID:               model.UUID,
-				ControllerUUID:     m.root.params.ControllerUUID,
-				ProviderType:       model.ProviderType,
-				DefaultSeries:      model.DefaultSeries,
-				CloudTag:           jem.CloudTag(model.Cloud).String(),
-				CloudRegion:        model.CloudRegion,
-				CloudCredentialTag: jem.CloudCredentialTag(model.Credential).String(),
-				OwnerTag:           jem.UserTag(model.Path.User).String(),
-				Life:               jujuparams.Life(model.Life()),
-				Status:             modelStatus(model.Info),
-				UserAccess:         access,
-				// TODO currently user logins aren't communicated by the multiwatcher
-				// so the UserLastConnection time is not known.
-				UserLastConnection: nil,
-				Counts: []jujuparams.ModelEntityCount{{
-					Entity: jujuparams.Machines,
-					Count:  machineCount,
-				}, {
-					Entity: jujuparams.Cores,
-					Count:  coreCount,
-				}},
-				// TODO currently we don't store any migration information about models.
-				Migration: nil,
-				// TODO currently we don't store any SLA information.
-				SLA:          nil,
-				AgentVersion: modelVersion(ctx, model.Info),
-			},
-		})
-		return nil
-	})
-	if err != nil {
-		return jujuparams.ModelSummaryResults{}, errgo.Mask(err)
-	}
-	return jujuparams.ModelSummaryResults{
-		Results: results,
-	}, nil
-}
-
-// ListModels returns the models that the authenticated user
-// has access to. The user parameter is ignored.
-func (m modelManagerV4) ListModels(_ jujuparams.Entity) (jujuparams.UserModelList, error) {
-	return m.root.allModels(m.root.context)
-}
-
 // allModels returns all the models the logged in user has access to.
 func (r *controllerRoot) allModels(ctx context.Context) (jujuparams.UserModelList, error) {
 	var models []jujuparams.UserModel
@@ -924,30 +804,6 @@ func userModelForModelDoc(m *mongodoc.Model) jujuparams.Model {
 		Type:     m.Type,
 		OwnerTag: jem.UserTag(m.Path.User).String(),
 	}
-}
-
-// ModelInfo implements the ModelManager facade's ModelInfo method.
-func (m modelManagerV4) ModelInfo(args jujuparams.Entities) (jujuparams.ModelInfoResults, error) {
-	ctx, cancel := context.WithTimeout(m.root.context, requestTimeout)
-	defer cancel()
-	results := make([]jujuparams.ModelInfoResult, len(args.Entities))
-	run := parallel.NewRun(maxRequestConcurrency)
-	for i, arg := range args.Entities {
-		i, arg := i, arg
-		run.Do(func() error {
-			mi, err := m.root.modelInfo(ctx, arg, len(args.Entities) != 1)
-			if err != nil {
-				results[i].Error = mapError(err)
-			} else {
-				results[i].Result = mi
-			}
-			return nil
-		})
-	}
-	run.Wait()
-	return jujuparams.ModelInfoResults{
-		Results: results,
-	}, nil
 }
 
 // modelInfo retrieves the model information for the specified entity.
@@ -1134,188 +990,6 @@ func iterUsers(ctx context.Context, users []jujuparams.ModelUserInfo, f func(par
 	}
 }
 
-// CreateModel implements the ModelManager facade's CreateModel method.
-func (m modelManagerV4) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.ModelInfo, error) {
-	ctx, cancel := context.WithTimeout(m.root.context, requestTimeout)
-	defer cancel()
-	mi, err := m.createModel(ctx, args)
-	if err == nil {
-		servermon.ModelsCreatedCount.Inc()
-	} else {
-		servermon.ModelsCreatedFailCount.Inc()
-	}
-	if err != nil {
-		return jujuparams.ModelInfo{}, errgo.Mask(err,
-			errgo.Is(params.ErrUnauthorized),
-			errgo.Is(params.ErrNotFound),
-			errgo.Is(params.ErrBadRequest),
-		)
-	}
-	return *mi, nil
-}
-
-func (m modelManagerV4) createModel(ctx context.Context, args jujuparams.ModelCreateArgs) (*jujuparams.ModelInfo, error) {
-	ownerTag, err := names.ParseUserTag(args.OwnerTag)
-	if err != nil {
-		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid owner tag")
-	}
-	owner, err := user(ownerTag)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
-	}
-	if args.CloudTag == "" {
-		return nil, errgo.New("no cloud specified for model; please specify one")
-	}
-	cloudTag, err := names.ParseCloudTag(args.CloudTag)
-	if err != nil {
-		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud tag")
-	}
-	cloud := params.Cloud(cloudTag.Id())
-	var credPath params.CredentialPath
-	if args.CloudCredentialTag != "" {
-		tag, err := names.ParseCloudCredentialTag(args.CloudCredentialTag)
-		if err != nil {
-			return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud credential tag")
-		}
-		credPath = params.CredentialPath{
-			Cloud: params.Cloud(tag.Cloud().Id()),
-			EntityPath: params.EntityPath{
-				User: owner,
-				Name: params.Name(tag.Name()),
-			},
-		}
-	}
-	model, err := m.root.jem.CreateModel(ctx, jem.CreateModelParams{
-		Path:       params.EntityPath{User: owner, Name: params.Name(args.Name)},
-		Credential: credPath,
-		Cloud:      cloud,
-		Region:     args.CloudRegion,
-		Attributes: args.Config,
-	})
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
-	}
-	info, err := m.root.modelDocToModelInfo(ctx, model)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-
-	return info, nil
-}
-
-// DestroyModels implements the ModelManager facade's DestroyModels method.
-func (m modelManagerV4) DestroyModels(args jujuparams.DestroyModelsParams) (jujuparams.ErrorResults, error) {
-	ctx, cancel := context.WithTimeout(m.root.context, requestTimeout)
-	defer cancel()
-	results := make([]jujuparams.ErrorResult, len(args.Models))
-
-	for i, model := range args.Models {
-		if err := m.destroyModel(ctx, model); err != nil {
-			results[i].Error = mapError(err)
-		}
-	}
-
-	return jujuparams.ErrorResults{
-		Results: results,
-	}, nil
-}
-
-// destroyModel destroys the specified model.
-func (m modelManagerV4) destroyModel(ctx context.Context, arg jujuparams.DestroyModelParams) error {
-	model, err := getModel(ctx, m.root.jem, arg.ModelTag, auth.CheckIsAdmin)
-	if err != nil {
-		if errgo.Cause(err) == params.ErrNotFound {
-			// Juju doesn't treat removing a model that isn't there as an error, and neither should we.
-			return nil
-		}
-		return errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
-	}
-	conn, err := m.root.jem.OpenAPI(ctx, model.Controller)
-	if err != nil {
-		return errgo.Mask(err)
-	}
-	defer conn.Close()
-	if err := m.root.jem.DestroyModel(ctx, conn, model, arg.DestroyStorage); err != nil {
-		return errgo.Mask(err, jujuparams.IsCodeHasPersistentStorage)
-	}
-	age := float64(time.Now().Sub(model.CreationTime)) / float64(time.Hour)
-	servermon.ModelLifetime.Observe(age)
-	servermon.ModelsDestroyedCount.Inc()
-	return nil
-}
-
-// ModifyModelAccess implements the ModelManager facade's ModifyModelAccess method.
-func (m modelManagerV4) ModifyModelAccess(args jujuparams.ModifyModelAccessRequest) (jujuparams.ErrorResults, error) {
-	ctx, cancel := context.WithTimeout(m.root.context, requestTimeout)
-	defer cancel()
-	results := make([]jujuparams.ErrorResult, len(args.Changes))
-	for i, change := range args.Changes {
-		err := m.modifyModelAccess(ctx, change)
-		if err != nil {
-			results[i].Error = mapError(err)
-		}
-	}
-	return jujuparams.ErrorResults{
-		Results: results,
-	}, nil
-}
-
-func (m modelManagerV4) modifyModelAccess(ctx context.Context, change jujuparams.ModifyModelAccess) error {
-	model, err := getModel(ctx, m.root.jem, change.ModelTag, auth.CheckIsAdmin)
-	if err != nil {
-		if errgo.Cause(err) == params.ErrNotFound {
-			err = params.ErrUnauthorized
-		}
-		return errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
-	}
-	userTag, err := names.ParseUserTag(change.UserTag)
-	if err != nil {
-		return errgo.WithCausef(err, params.ErrBadRequest, "invalid user tag")
-	}
-	user, err := user(userTag)
-	if err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrBadRequest))
-	}
-	conn, err := m.root.jem.OpenAPI(ctx, model.Controller)
-	if err != nil {
-		return errgo.Mask(err)
-	}
-	defer conn.Close()
-	switch change.Action {
-	case jujuparams.GrantModelAccess:
-		err = m.root.jem.GrantModel(ctx, conn, model, user, string(change.Access))
-	case jujuparams.RevokeModelAccess:
-		err = m.root.jem.RevokeModel(ctx, conn, model, user, string(change.Access))
-	default:
-		return errgo.WithCausef(err, params.ErrBadRequest, "invalid action %q", change.Action)
-	}
-	if err != nil {
-		return errgo.Mask(err)
-	}
-	return nil
-}
-
-type modelManagerV3 struct {
-	modelManagerV4
-}
-
-func (m modelManagerV3) DestroyModels(args jujuparams.Entities) (jujuparams.ErrorResults, error) {
-	// This is the default behviour for model manager V3 and below.
-	destroyStorage := true
-	models := make([]jujuparams.DestroyModelParams, len(args.Entities))
-	for i, ent := range args.Entities {
-		models[i] = jujuparams.DestroyModelParams{
-			ModelTag:       ent.Tag,
-			DestroyStorage: &destroyStorage,
-		}
-	}
-	return m.modelManagerV4.DestroyModels(jujuparams.DestroyModelsParams{models})
-}
-
-type modelManagerV2 struct {
-	modelManagerV3
-}
-
 // jimm implements a facade containing JIMM-specific API calls.
 type jimm struct {
 	root *controllerRoot
@@ -1432,11 +1106,6 @@ func fetchModelInfo(ctx context.Context, jem *jem.JEM, model *mongodoc.Model) (*
 		return nil, infos[0].Error
 	}
 	return infos[0].Result, nil
-}
-
-// ModelStatus implements the ModelManager facade's ModelStatus method.
-func (m modelManagerV4) ModelStatus(req jujuparams.Entities) (jujuparams.ModelStatusResults, error) {
-	return controller{m.root}.ModelStatus(req)
 }
 
 // pinger implements the Pinger facade.
