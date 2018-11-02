@@ -7,23 +7,17 @@ import (
 	"time"
 
 	"github.com/juju/juju/apiserver/common"
-	mmfacade "github.com/juju/juju/apiserver/facades/client/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/utils/parallel"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/ctxutil"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 	"github.com/CanonicalLtd/jimm/params"
-)
-
-var (
-	_ mmfacade.ModelManagerV2 = modelManagerV2{}
-	_ mmfacade.ModelManagerV3 = modelManagerV3{}
-	_ mmfacade.ModelManagerV4 = modelManagerAPI{}
 )
 
 // ModelManagerV2 returns an implementation of the ModelManager facade
@@ -40,9 +34,10 @@ type modelManagerV2 struct {
 // DumpModels implements the DumpModels method of the modelmanager (v2)
 // facade. Actually dumping the model is not yet supported, so it always
 // returns an error.
-func (m modelManagerV2) DumpModels(args jujuparams.Entities) jujuparams.MapResults {
-	ctx, cancel := context.WithTimeout(m.root.context, requestTimeout)
+func (m modelManagerV2) DumpModels(ctx context.Context, args jujuparams.Entities) jujuparams.MapResults {
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
+	ctx = ctxutil.Join(ctx, m.root.authContext)
 	results := make([]jujuparams.MapResult, len(args.Entities))
 	for i, ent := range args.Entities {
 		_, err := m.dumpModel(ctx, ent, false)
@@ -64,7 +59,7 @@ type modelManagerV3 struct {
 	modelManagerAPI
 }
 
-func (m modelManagerV3) DestroyModels(args jujuparams.Entities) (jujuparams.ErrorResults, error) {
+func (m modelManagerV3) DestroyModels(ctx context.Context, args jujuparams.Entities) (jujuparams.ErrorResults, error) {
 	// This is the default behviour for model manager V3 and below.
 	destroyStorage := true
 	models := make([]jujuparams.DestroyModelParams, len(args.Entities))
@@ -74,7 +69,7 @@ func (m modelManagerV3) DestroyModels(args jujuparams.Entities) (jujuparams.Erro
 			DestroyStorage: &destroyStorage,
 		}
 	}
-	return m.modelManagerAPI.DestroyModels(jujuparams.DestroyModelsParams{models})
+	return m.modelManagerAPI.DestroyModels(ctx, jujuparams.DestroyModelsParams{models})
 }
 
 // ModelManagerAPI returns an implementation of the latest ModelManager
@@ -94,9 +89,10 @@ type modelManagerAPI struct {
 
 // ListModelSummaries returns summaries for all the models that that
 // authenticated user has access to. The request parameter is ignored.
-func (m modelManagerAPI) ListModelSummaries(jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error) {
+func (m modelManagerAPI) ListModelSummaries(ctx context.Context, _ jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error) {
+	ctx = ctxutil.Join(ctx, m.root.authContext)
 	var results []jujuparams.ModelSummaryResult
-	err := m.root.doModels(m.root.context, func(ctx context.Context, model *mongodoc.Model) error {
+	err := m.root.doModels(ctx, func(ctx context.Context, model *mongodoc.Model) error {
 		if model.ProviderType == "" {
 			var err error
 			model.ProviderType, err = m.root.jem.DB.ProviderType(ctx, model.Cloud)
@@ -177,14 +173,16 @@ func (m modelManagerAPI) ListModelSummaries(jujuparams.ModelSummariesRequest) (j
 
 // ListModels returns the models that the authenticated user
 // has access to. The user parameter is ignored.
-func (m modelManagerAPI) ListModels(_ jujuparams.Entity) (jujuparams.UserModelList, error) {
-	return m.root.allModels(m.root.context)
+func (m modelManagerAPI) ListModels(ctx context.Context, _ jujuparams.Entity) (jujuparams.UserModelList, error) {
+	ctx = ctxutil.Join(ctx, m.root.authContext)
+	return m.root.allModels(ctx)
 }
 
 // ModelInfo implements the ModelManager facade's ModelInfo method.
-func (m modelManagerAPI) ModelInfo(args jujuparams.Entities) (jujuparams.ModelInfoResults, error) {
-	ctx, cancel := context.WithTimeout(m.root.context, requestTimeout)
+func (m modelManagerAPI) ModelInfo(ctx context.Context, args jujuparams.Entities) (jujuparams.ModelInfoResults, error) {
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
+	ctx = ctxutil.Join(ctx, m.root.authContext)
 	results := make([]jujuparams.ModelInfoResult, len(args.Entities))
 	run := parallel.NewRun(maxRequestConcurrency)
 	for i, arg := range args.Entities {
@@ -206,9 +204,10 @@ func (m modelManagerAPI) ModelInfo(args jujuparams.Entities) (jujuparams.ModelIn
 }
 
 // CreateModel implements the ModelManager facade's CreateModel method.
-func (m modelManagerAPI) CreateModel(args jujuparams.ModelCreateArgs) (jujuparams.ModelInfo, error) {
-	ctx, cancel := context.WithTimeout(m.root.context, requestTimeout)
+func (m modelManagerAPI) CreateModel(ctx context.Context, args jujuparams.ModelCreateArgs) (jujuparams.ModelInfo, error) {
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
+	ctx = ctxutil.Join(ctx, m.root.authContext)
 	mi, err := m.createModel(ctx, args)
 	if err == nil {
 		servermon.ModelsCreatedCount.Inc()
@@ -275,9 +274,10 @@ func (m modelManagerAPI) createModel(ctx context.Context, args jujuparams.ModelC
 }
 
 // DestroyModels implements the ModelManager facade's DestroyModels method.
-func (m modelManagerAPI) DestroyModels(args jujuparams.DestroyModelsParams) (jujuparams.ErrorResults, error) {
-	ctx, cancel := context.WithTimeout(m.root.context, requestTimeout)
+func (m modelManagerAPI) DestroyModels(ctx context.Context, args jujuparams.DestroyModelsParams) (jujuparams.ErrorResults, error) {
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
+	ctx = ctxutil.Join(ctx, m.root.authContext)
 	results := make([]jujuparams.ErrorResult, len(args.Models))
 
 	for i, model := range args.Models {
@@ -316,9 +316,10 @@ func (m modelManagerAPI) destroyModel(ctx context.Context, arg jujuparams.Destro
 }
 
 // ModifyModelAccess implements the ModelManager facade's ModifyModelAccess method.
-func (m modelManagerAPI) ModifyModelAccess(args jujuparams.ModifyModelAccessRequest) (jujuparams.ErrorResults, error) {
-	ctx, cancel := context.WithTimeout(m.root.context, requestTimeout)
+func (m modelManagerAPI) ModifyModelAccess(ctx context.Context, args jujuparams.ModifyModelAccessRequest) (jujuparams.ErrorResults, error) {
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
+	ctx = ctxutil.Join(ctx, m.root.authContext)
 	results := make([]jujuparams.ErrorResult, len(args.Changes))
 	for i, change := range args.Changes {
 		err := m.modifyModelAccess(ctx, change)
@@ -369,9 +370,10 @@ func (m modelManagerAPI) modifyModelAccess(ctx context.Context, change jujuparam
 // DumpModels implements the modelmanager facades DumpModels API.
 // Actually dumping the model is not yet supported, so it always returns
 // an error.
-func (m modelManagerAPI) DumpModels(args jujuparams.DumpModelRequest) jujuparams.StringResults {
-	ctx, cancel := context.WithTimeout(m.root.context, requestTimeout)
+func (m modelManagerAPI) DumpModels(ctx context.Context, args jujuparams.DumpModelRequest) jujuparams.StringResults {
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
+	ctx = ctxutil.Join(ctx, m.root.authContext)
 	results := make([]jujuparams.StringResult, len(args.Entities))
 	for i, ent := range args.Entities {
 		res, err := m.dumpModel(ctx, ent, args.Simplified)
@@ -400,9 +402,10 @@ func (m modelManagerAPI) dumpModel(ctx context.Context, ent jujuparams.Entity, s
 // DumpModelsDB implements the modelmanager facades DumpModelsDB API.
 // Actually dumping the model is not yet supported, so it always returns
 // an error.
-func (m modelManagerAPI) DumpModelsDB(args jujuparams.Entities) jujuparams.MapResults {
-	ctx, cancel := context.WithTimeout(m.root.context, requestTimeout)
+func (m modelManagerAPI) DumpModelsDB(ctx context.Context, args jujuparams.Entities) jujuparams.MapResults {
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
+	ctx = ctxutil.Join(ctx, m.root.authContext)
 	results := make([]jujuparams.MapResult, len(args.Entities))
 	for i, ent := range args.Entities {
 		res, err := m.dumpModelDB(ctx, ent)
@@ -429,6 +432,6 @@ func (m modelManagerAPI) dumpModelDB(ctx context.Context, ent jujuparams.Entity)
 }
 
 // ModelStatus implements the ModelManager facade's ModelStatus method.
-func (m modelManagerAPI) ModelStatus(req jujuparams.Entities) (jujuparams.ModelStatusResults, error) {
-	return controller{m.root}.ModelStatus(req)
+func (m modelManagerAPI) ModelStatus(ctx context.Context, req jujuparams.Entities) (jujuparams.ModelStatusResults, error) {
+	return controller{m.root}.ModelStatus(ctx, req)
 }

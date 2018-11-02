@@ -25,6 +25,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/ctxutil"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
@@ -37,13 +38,6 @@ import (
 type facade struct {
 	name    string
 	version int
-}
-
-// unauthenticatedfacades contains the list of facade versions supported by
-// this API before the user has authenticated.
-var unauthenticatedFacades = map[facade]string{
-	{"Admin", 3}:  "Admin",
-	{"Pinger", 1}: "Pinger",
 }
 
 // facades contains the list of facade versions supported by
@@ -64,28 +58,23 @@ var facades = map[facade]string{
 
 // controllerRoot is the root for endpoints served on controller connections.
 type controllerRoot struct {
-	context       context.Context
+	authContext   context.Context
 	params        jemserver.Params
 	authPool      *auth.Pool
 	jem           *jem.JEM
 	heartMonitor  heartMonitor
 	findMethod    func(rootName string, version int, methodName string) (rpcreflect.MethodCaller, error)
-	facades       map[facade]string
 	schemataCache map[params.Cloud]map[jujucloud.AuthType]jujucloud.CredentialSchema
-	cancel        context.CancelFunc
 }
 
-func newControllerRoot(ctx context.Context, jem *jem.JEM, ap *auth.Pool, p jemserver.Params, hm heartMonitor) *controllerRoot {
-	ctx, cancel := context.WithCancel(ctx)
+func newControllerRoot(jem *jem.JEM, ap *auth.Pool, p jemserver.Params, hm heartMonitor) *controllerRoot {
 	r := &controllerRoot{
-		context:       ctx,
+		authContext:   context.Background(),
 		params:        p,
 		authPool:      ap,
 		jem:           jem,
 		heartMonitor:  hm,
-		facades:       unauthenticatedFacades,
 		schemataCache: make(map[params.Cloud]map[jujucloud.AuthType]jujucloud.CredentialSchema),
-		cancel:        cancel,
 	}
 	r.findMethod = rpcreflect.ValueOf(reflect.ValueOf(r)).FindMethod
 	return r
@@ -205,7 +194,7 @@ func (r *controllerRoot) FindMethod(rootName string, version int, methodName str
 		}
 	}
 
-	rn := r.facades[facade{rootName, version}]
+	rn := facades[facade{rootName, version}]
 	if rn == "" {
 		return nil, &rpcreflect.CallNotImplementedError{
 			RootMethod: rootName,
@@ -216,9 +205,7 @@ func (r *controllerRoot) FindMethod(rootName string, version int, methodName str
 }
 
 // Kill implements rpcreflect.Root.Kill.
-func (r *controllerRoot) Kill() {
-	r.cancel()
-}
+func (r *controllerRoot) Kill() {}
 
 // admin implements the Admin facade.
 type admin struct {
@@ -226,11 +213,11 @@ type admin struct {
 }
 
 // Login implements the Login method on the Admin facade.
-func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResult, error) {
+func (a admin) Login(ctx context.Context, req jujuparams.LoginRequest) (jujuparams.LoginResult, error) {
 	// JIMM only supports macaroon login, ignore all the other fields.
-	authenticator := a.root.authPool.Authenticator(a.root.context)
+	authenticator := a.root.authPool.Authenticator(ctx)
 	defer authenticator.Close()
-	ctx, m, err := authenticator.Authenticate(a.root.context, req.Macaroons, checkers.TimeBefore)
+	authContext, m, err := authenticator.Authenticate(a.root.authContext, req.Macaroons, checkers.TimeBefore)
 	if err != nil {
 		servermon.LoginFailCount.Inc()
 		if m != nil {
@@ -241,10 +228,10 @@ func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResult, error
 		}
 		return jujuparams.LoginResult{}, errgo.Mask(err)
 	}
-	a.root.context = ctx
-	a.root.facades = facades
+	a.root.authContext = authContext
+	ctx = ctxutil.Join(ctx, a.root.authContext)
 	servermon.LoginSuccessCount.Inc()
-	username := auth.Username(a.root.context)
+	username := auth.Username(ctx)
 	srvVersion, err := a.root.jem.EarliestControllerVersion(ctx)
 	if err != nil {
 		return jujuparams.LoginResult{}, errgo.Mask(err)
@@ -256,14 +243,14 @@ func (a admin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResult, error
 			Identity:    userTag(username).String(),
 		},
 		ControllerTag: names.NewControllerTag(a.root.params.ControllerUUID).String(),
-		Facades:       facadeVersions(a.root.facades),
+		Facades:       facadeVersions(),
 		ServerVersion: srvVersion.String(),
 	}, nil
 }
 
 // facadeVersions creates a list of facadeVersions as specified in
 // facades.
-func facadeVersions(facades map[facade]string) []jujuparams.FacadeVersions {
+func facadeVersions() []jujuparams.FacadeVersions {
 	names := make([]string, 0, len(facades))
 	versions := make(map[string][]int, len(facades))
 	for k := range facades {
@@ -292,14 +279,15 @@ type cloud struct {
 }
 
 // Cloud implements the Cloud method of the Cloud facade.
-func (c cloud) Cloud(ents jujuparams.Entities) (jujuparams.CloudResults, error) {
+func (c cloud) Cloud(ctx context.Context, ents jujuparams.Entities) (jujuparams.CloudResults, error) {
+	ctx = ctxutil.Join(ctx, c.root.authContext)
 	cloudResults := make([]jujuparams.CloudResult, len(ents.Entities))
-	clouds, err := c.clouds()
+	clouds, err := c.clouds(ctx)
 	if err != nil {
 		return jujuparams.CloudResults{}, mapError(err)
 	}
 	for i, ent := range ents.Entities {
-		cloud, err := c.cloud(ent.Tag, clouds)
+		cloud, err := c.cloud(ctx, ent.Tag, clouds)
 		if err != nil {
 			cloudResults[i].Error = mapError(err)
 			continue
@@ -312,7 +300,7 @@ func (c cloud) Cloud(ents jujuparams.Entities) (jujuparams.CloudResults, error) 
 }
 
 // cloud finds and returns the cloud identified by cloudTag in clouds.
-func (c cloud) cloud(cloudTag string, clouds map[string]jujuparams.Cloud) (*jujuparams.Cloud, error) {
+func (c cloud) cloud(ctx context.Context, cloudTag string, clouds map[string]jujuparams.Cloud) (*jujuparams.Cloud, error) {
 	if cloud, ok := clouds[cloudTag]; ok {
 		return &cloud, nil
 	}
@@ -324,15 +312,16 @@ func (c cloud) cloud(cloudTag string, clouds map[string]jujuparams.Cloud) (*juju
 }
 
 // Clouds implements the Clouds method on the Cloud facade.
-func (c cloud) Clouds() (jujuparams.CloudsResult, error) {
+func (c cloud) Clouds(ctx context.Context) (jujuparams.CloudsResult, error) {
+	ctx = ctxutil.Join(ctx, c.root.authContext)
 	var res jujuparams.CloudsResult
 	var err error
-	res.Clouds, err = c.clouds()
+	res.Clouds, err = c.clouds(ctx)
 	return res, errgo.Mask(err)
 }
 
-func (c cloud) clouds() (map[string]jujuparams.Cloud, error) {
-	iter := c.root.jem.DB.GetCloudRegionsIter(c.root.context)
+func (c cloud) clouds(ctx context.Context) (map[string]jujuparams.Cloud, error) {
+	iter := c.root.jem.DB.GetCloudRegionsIter(ctx)
 	results := map[string]jujuparams.Cloud{}
 	var v mongodoc.CloudRegion
 	for iter.Next(&v) {
@@ -364,13 +353,14 @@ func (c cloud) clouds() (map[string]jujuparams.Cloud, error) {
 
 // DefaultCloud implements the DefaultCloud method of the Cloud facade.
 // It returns a default cloud if there is only one cloud available.
-func (c cloud) DefaultCloud() (jujuparams.StringResult, error) {
+func (c cloud) DefaultCloud(ctx context.Context) (jujuparams.StringResult, error) {
+	ctx = ctxutil.Join(ctx, c.root.authContext)
 	var result jujuparams.StringResult
-	clouds, err := c.clouds()
+	clouds, err := c.clouds(ctx)
 	if err != nil {
 		return result, errgo.Mask(err)
 	}
-	zapctx.Info(c.root.context, "clouds", zap.Any("clouds", clouds))
+	zapctx.Info(ctx, "clouds", zap.Any("clouds", clouds))
 	if len(clouds) != 1 {
 		return result, errgo.WithCausef(nil, params.ErrNotFound, "no default cloud")
 	}
@@ -383,10 +373,11 @@ func (c cloud) DefaultCloud() (jujuparams.StringResult, error) {
 }
 
 // UserCredentials implements the UserCredentials method of the Cloud facade.
-func (c cloud) UserCredentials(userclouds jujuparams.UserClouds) (jujuparams.StringsResults, error) {
+func (c cloud) UserCredentials(ctx context.Context, userclouds jujuparams.UserClouds) (jujuparams.StringsResults, error) {
+	ctx = ctxutil.Join(ctx, c.root.authContext)
 	results := make([]jujuparams.StringsResult, len(userclouds.UserClouds))
 	for i, ent := range userclouds.UserClouds {
-		creds, err := c.userCredentials(c.root.context, ent.UserTag, ent.CloudTag)
+		creds, err := c.userCredentials(ctx, ent.UserTag, ent.CloudTag)
 		if err != nil {
 			results[i].Error = mapError(err)
 			continue
@@ -433,9 +424,10 @@ func (c cloud) userCredentials(ctx context.Context, ownerTag, cloudTag string) (
 
 // UpdateCredentials implements the UpdateCredentials method of the Cloud
 // facade.
-func (c cloud) UpdateCredentials(args jujuparams.TaggedCredentials) (jujuparams.ErrorResults, error) {
-	ctx, cancel := context.WithTimeout(c.root.context, requestTimeout)
+func (c cloud) UpdateCredentials(ctx context.Context, args jujuparams.TaggedCredentials) (jujuparams.ErrorResults, error) {
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
+	ctx = ctxutil.Join(ctx, c.root.authContext)
 	results := make([]jujuparams.ErrorResult, len(args.Credentials))
 	for i, ucc := range args.Credentials {
 		if err := c.updateCredential(ctx, ucc); err != nil {
@@ -483,9 +475,10 @@ func (c cloud) updateCredential(ctx context.Context, arg jujuparams.TaggedCreden
 }
 
 // RevokeCredentials revokes a set of cloud credentials.
-func (c cloud) RevokeCredentials(args jujuparams.Entities) (jujuparams.ErrorResults, error) {
-	ctx, cancel := context.WithTimeout(c.root.context, requestTimeout)
+func (c cloud) RevokeCredentials(ctx context.Context, args jujuparams.Entities) (jujuparams.ErrorResults, error) {
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
+	ctx = ctxutil.Join(ctx, c.root.authContext)
 	results := make([]jujuparams.ErrorResult, len(args.Entities))
 	for i, ent := range args.Entities {
 		if err := c.revokeCredential(ctx, ent.Tag); err != nil {
@@ -527,10 +520,11 @@ func (c cloud) revokeCredential(ctx context.Context, tag string) error {
 }
 
 // Credential implements the Credential method of the Cloud facade.
-func (c cloud) Credential(args jujuparams.Entities) (jujuparams.CloudCredentialResults, error) {
+func (c cloud) Credential(ctx context.Context, args jujuparams.Entities) (jujuparams.CloudCredentialResults, error) {
+	ctx = ctxutil.Join(ctx, c.root.authContext)
 	results := make([]jujuparams.CloudCredentialResult, len(args.Entities))
 	for i, e := range args.Entities {
-		cred, err := c.credential(c.root.context, e.Tag)
+		cred, err := c.credential(ctx, e.Tag)
 		if err != nil {
 			results[i].Error = mapError(err)
 			continue
@@ -589,8 +583,9 @@ func (c cloud) credential(ctx context.Context, cloudCredentialTag string) (*juju
 }
 
 // AddCloud implements the AddCloud method of the Cloud (v2) facade.
-func (c cloud) AddCloud(args jujuparams.AddCloudArgs) error {
-	username := auth.Username(c.root.context)
+func (c cloud) AddCloud(ctx context.Context, args jujuparams.AddCloudArgs) error {
+	ctx = ctxutil.Join(ctx, c.root.authContext)
+	username := auth.Username(ctx)
 	cloud := mongodoc.CloudRegion{
 		Cloud:            params.Cloud(args.Name),
 		ProviderType:     args.Cloud.Type,
@@ -620,22 +615,23 @@ func (c cloud) AddCloud(args jujuparams.AddCloudArgs) error {
 			},
 		}
 	}
-	return c.root.jem.CreateCloud(c.root.context, cloud, regions)
+	return c.root.jem.CreateCloud(ctx, cloud, regions)
 }
 
 // AddCredentials implements the AddCredentials method of the Cloud (v2) facade.
-func (c cloud) AddCredentials(args jujuparams.TaggedCredentials) (jujuparams.ErrorResults, error) {
+func (c cloud) AddCredentials(ctx context.Context, args jujuparams.TaggedCredentials) (jujuparams.ErrorResults, error) {
 	// In JIMM UpdateCredentials behaves in the way AddCredentials is
 	// documented to. Presumably in juju UpdateCredentials works
 	// slightly differently.
-	return c.UpdateCredentials(args)
+	return c.UpdateCredentials(ctx, args)
 }
 
 // CredentialContents implements the CredentialContents method of the Cloud (v2) facade.
-func (c cloud) CredentialContents(args jujuparams.CloudCredentialArgs) (jujuparams.CredentialContentResults, error) {
+func (c cloud) CredentialContents(ctx context.Context, args jujuparams.CloudCredentialArgs) (jujuparams.CredentialContentResults, error) {
+	ctx = ctxutil.Join(ctx, c.root.authContext)
 	results := make([]jujuparams.CredentialContentResult, len(args.Credentials))
 	for i, arg := range args.Credentials {
-		credInfo, err := c.credentialInfo(c.root.context, arg.CloudName, arg.CredentialName, args.IncludeSecrets)
+		credInfo, err := c.credentialInfo(ctx, arg.CloudName, arg.CredentialName, args.IncludeSecrets)
 		if err != nil {
 			results[i].Error = mapError(err)
 			continue
@@ -706,7 +702,8 @@ func (c cloud) credentialInfo(ctx context.Context, cloudName, credentialName str
 
 // RemoveClouds removes the specified clouds from the controller.
 // If a cloud is in use (has models deployed to it), the removal will fail.
-func (c cloud) RemoveClouds(args jujuparams.Entities) (jujuparams.ErrorResults, error) {
+func (c cloud) RemoveClouds(ctx context.Context, args jujuparams.Entities) (jujuparams.ErrorResults, error) {
+	ctx = ctxutil.Join(ctx, c.root.authContext)
 	result := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, len(args.Entities)),
 	}
@@ -716,7 +713,7 @@ func (c cloud) RemoveClouds(args jujuparams.Entities) (jujuparams.ErrorResults, 
 			result.Results[i].Error = mapError(err)
 			continue
 		}
-		err = c.root.jem.RemoveCloud(c.root.context, params.Cloud(tag.Id()))
+		err = c.root.jem.RemoveCloud(ctx, params.Cloud(tag.Id()))
 		if err != nil {
 			result.Results[i].Error = mapError(err)
 		}
@@ -729,13 +726,15 @@ type controller struct {
 	root *controllerRoot
 }
 
-func (c controller) AllModels() (jujuparams.UserModelList, error) {
-	return c.root.allModels(c.root.context)
+func (c controller) AllModels(ctx context.Context) (jujuparams.UserModelList, error) {
+	ctx = ctxutil.Join(ctx, c.root.authContext)
+	return c.root.allModels(ctx)
 }
 
-func (c controller) ModelStatus(args jujuparams.Entities) (jujuparams.ModelStatusResults, error) {
-	ctx, cancel := context.WithTimeout(c.root.context, requestTimeout)
+func (c controller) ModelStatus(ctx context.Context, args jujuparams.Entities) (jujuparams.ModelStatusResults, error) {
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
+	ctx = ctxutil.Join(ctx, c.root.authContext)
 	results := make([]jujuparams.ModelStatus, len(args.Entities))
 	// TODO (fabricematrat) get status for all of the models connected
 	// to a single controller in one go.
@@ -997,11 +996,12 @@ type jimm struct {
 
 // UserModelStats returns statistics about all the models that were created
 // by the currently authenticated user.
-func (j jimm) UserModelStats() (params.UserModelStatsResponse, error) {
+func (j jimm) UserModelStats(ctx context.Context) (params.UserModelStatsResponse, error) {
+	ctx = ctxutil.Join(ctx, j.root.authContext)
 	models := make(map[string]params.ModelStats)
 
-	user := auth.Username(j.root.context)
-	it := j.root.jem.DB.NewCanReadIter(j.root.context,
+	user := auth.Username(ctx)
+	it := j.root.jem.DB.NewCanReadIter(ctx,
 		j.root.jem.DB.Models().
 			Find(bson.D{{"creator", user}}).
 			Select(bson.D{{"uuid", 1}, {"path", 1}, {"creator", 1}, {"counts", 1}}).
@@ -1141,12 +1141,13 @@ func (u userManager) DisableUser(jujuparams.Entities) (jujuparams.ErrorResults, 
 }
 
 // UserInfo implements the UserManager facade's UserInfo method.
-func (u userManager) UserInfo(req jujuparams.UserInfoRequest) (jujuparams.UserInfoResults, error) {
+func (u userManager) UserInfo(ctx context.Context, req jujuparams.UserInfoRequest) (jujuparams.UserInfoResults, error) {
+	ctx = ctxutil.Join(ctx, u.root.authContext)
 	res := jujuparams.UserInfoResults{
 		Results: make([]jujuparams.UserInfoResult, len(req.Entities)),
 	}
 	for i, ent := range req.Entities {
-		ui, err := u.userInfo(ent.Tag)
+		ui, err := u.userInfo(ctx, ent.Tag)
 		if err != nil {
 			res.Results[i].Error = mapError(err)
 			continue
@@ -1156,7 +1157,7 @@ func (u userManager) UserInfo(req jujuparams.UserInfoRequest) (jujuparams.UserIn
 	return res, nil
 }
 
-func (u userManager) userInfo(entity string) (*jujuparams.UserInfo, error) {
+func (u userManager) userInfo(ctx context.Context, entity string) (*jujuparams.UserInfo, error) {
 	userTag, err := names.ParseUserTag(entity)
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid user tag")
@@ -1165,14 +1166,14 @@ func (u userManager) userInfo(entity string) (*jujuparams.UserInfo, error) {
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
-	if auth.Username(u.root.context) != string(user) {
+	if auth.Username(ctx) != string(user) {
 		return nil, params.ErrUnauthorized
 	}
-	return u.currentUser()
+	return u.currentUser(ctx)
 }
 
-func (u userManager) currentUser() (*jujuparams.UserInfo, error) {
-	userTag := userTag(auth.Username(u.root.context))
+func (u userManager) currentUser(ctx context.Context) (*jujuparams.UserInfo, error) {
+	userTag := userTag(auth.Username(ctx))
 	return &jujuparams.UserInfo{
 		// TODO(mhilton) a number of these fields should
 		// be fetched from the identity manager, but that

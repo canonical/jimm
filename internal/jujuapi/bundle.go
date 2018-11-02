@@ -25,7 +25,7 @@ type bundleAPI struct {
 // Note: This is copied from
 // github.com/juju/juju/apiserver/facades/clientbundle/bundle.go and
 // should be kept in sync with that.
-func (b bundleAPI) GetChanges(args params.BundleChangesParams) (params.BundleChangesResults, error) {
+func (b bundleAPI) GetChanges(ctx context.Context, args params.BundleChangesParams) (params.BundleChangesResults, error) {
 	var results params.BundleChangesResults
 	data, err := charm.ReadBundleData(strings.NewReader(args.BundleDataYAML))
 	if err != nil {
@@ -53,7 +53,7 @@ func (b bundleAPI) GetChanges(args params.BundleChangesParams) (params.BundleCha
 	changes, err := bundlechanges.FromData(
 		bundlechanges.ChangesConfig{
 			Bundle: data,
-			Logger: zapLogger{b.root.context},
+			Logger: zapLogger{ctx},
 		})
 	if err != nil {
 		return results, err

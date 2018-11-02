@@ -149,9 +149,9 @@ func (h *wsHandler) handle(wsConn *websocket.Conn) {
 	hm := newHeartMonitor(h.params.WebsocketRequestTimeout)
 	var root rpc.Root
 	if h.modelUUID == "" {
-		root = newControllerRoot(h.context, h.jem, h.authPool, h.params, hm)
+		root = newControllerRoot(h.jem, h.authPool, h.params, hm)
 	} else {
-		root = newModelRoot(h.context, h.jem, hm, h.modelUUID)
+		root = newModelRoot(h.jem, hm, h.modelUUID)
 	}
 	defer root.Kill()
 	conn.ServeRoot(root, nil, func(err error) error {
