@@ -52,6 +52,7 @@ var facades = map[facade]string{
 	{"ModelManager", 2}: "ModelManagerV2",
 	{"ModelManager", 3}: "ModelManagerV3",
 	{"ModelManager", 4}: "ModelManagerAPI",
+	{"ModelManager", 5}: "ModelManagerAPI",
 	{"Pinger", 1}:       "Pinger",
 	{"UserManager", 1}:  "UserManager",
 }
