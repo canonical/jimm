@@ -21,24 +21,20 @@ import (
 
 // modelRoot is the root for endpoints served on model connections.
 type modelRoot struct {
-	context      context.Context
+	authContext  context.Context
 	jem          *jem.JEM
 	uuid         string
 	model        *mongodoc.Model
 	controller   *mongodoc.Controller
 	heartMonitor heartMonitor
 	findMethod   func(rootName string, version int, methodName string) (rpcreflect.MethodCaller, error)
-	cancel       context.CancelFunc
 }
 
-func newModelRoot(ctx context.Context, jem *jem.JEM, hm heartMonitor, uuid string) *modelRoot {
-	ctx, cancel := context.WithCancel(ctx)
+func newModelRoot(jem *jem.JEM, hm heartMonitor, uuid string) *modelRoot {
 	r := &modelRoot{
-		context:      ctx,
 		jem:          jem,
 		uuid:         uuid,
 		heartMonitor: hm,
-		cancel:       cancel,
 	}
 	r.findMethod = rpcreflect.ValueOf(reflect.ValueOf(r)).FindMethod
 	return r
@@ -78,9 +74,7 @@ func (r *modelRoot) FindMethod(rootName string, version int, methodName string) 
 }
 
 // Kill implements rpcreflect.Root.Kill.
-func (r *modelRoot) Kill() {
-	r.cancel()
-}
+func (r *modelRoot) Kill() {}
 
 // modelInfo retrieves the data about the model.
 func (r *modelRoot) modelInfo(ctx context.Context) (*mongodoc.Model, *mongodoc.Controller, error) {
@@ -106,8 +100,8 @@ type modelAdmin struct {
 }
 
 // Login implements the Login method on the Admin facade.
-func (a modelAdmin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResult, error) {
-	_, _, err := a.root.modelInfo(a.root.context)
+func (a modelAdmin) Login(ctx context.Context, req jujuparams.LoginRequest) (jujuparams.LoginResult, error) {
+	_, _, err := a.root.modelInfo(ctx)
 	if err != nil {
 		return jujuparams.LoginResult{}, errgo.Mask(err, errgo.Is(params.ErrModelNotFound))
 	}
@@ -120,8 +114,8 @@ func (a modelAdmin) Login(req jujuparams.LoginRequest) (jujuparams.LoginResult, 
 }
 
 // RedirectInfo implements the RedirectInfo method on the Admin facade.
-func (a modelAdmin) RedirectInfo() (jujuparams.RedirectInfoResult, error) {
-	_, controller, err := a.root.modelInfo(a.root.context)
+func (a modelAdmin) RedirectInfo(ctx context.Context) (jujuparams.RedirectInfoResult, error) {
+	_, controller, err := a.root.modelInfo(ctx)
 	if err != nil {
 		return jujuparams.RedirectInfoResult{}, errgo.Mask(err, errgo.Is(params.ErrModelNotFound))
 	}
