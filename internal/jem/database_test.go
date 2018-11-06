@@ -74,7 +74,7 @@ func (s *databaseSuite) TestAddController(c *gc.C) {
 		},
 	}
 	err := s.database.AddController(testContext, ctl)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Check that the fields have been mutated as expected.
 	c.Assert(ctl, jc.DeepEquals, &mongodoc.Controller{
@@ -97,7 +97,7 @@ func (s *databaseSuite) TestAddController(c *gc.C) {
 	})
 
 	ctl1, err := s.database.Controller(testContext, ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(ctl1, jc.DeepEquals, &mongodoc.Controller{
 		Id:     "bob/x",
 		Path:   ctlPath,
@@ -137,7 +137,7 @@ func (s *databaseSuite) TestAddController(c *gc.C) {
 		AdminPassword: "foo-password",
 	}
 	err = s.database.AddController(testContext, ctl2)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.checkDBOK(c)
 }
 
@@ -149,10 +149,10 @@ func (s *databaseSuite) TestUpdateCloudRegions(c *gc.C) {
 		PrimaryControllers: []params.EntityPath{ctlPathA},
 	}}
 	err := s.database.UpdateCloudRegions(testContext, cloudRegions)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	cloudregionA, err := s.database.CloudRegion(testContext, params.Cloud("aws"), "foo")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(cloudregionA, gc.DeepEquals, &mongodoc.CloudRegion{
 		Id:                 "aws/foo",
 		Cloud:              params.Cloud("aws"),
@@ -176,9 +176,9 @@ func (s *databaseSuite) TestUpdateCloudRegions(c *gc.C) {
 		SecondaryControllers: []params.EntityPath{ctlPathC},
 	}}
 	err = s.database.UpdateCloudRegions(testContext, cloudRegions)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	cloudregionB, err := s.database.CloudRegion(testContext, params.Cloud("aws"), "foo")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(cloudregionB, gc.DeepEquals, &mongodoc.CloudRegion{
 		Id:                   "aws/foo",
 		Cloud:                params.Cloud("aws"),
@@ -205,36 +205,36 @@ func (s *databaseSuite) TestSetControllerAvailability(c *gc.C) {
 	// Check that we can mark it as unavailable.
 	t0 := time.Now()
 	err = s.database.SetControllerUnavailableAt(testContext, ctlPath, t0)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	ctl, err = s.database.Controller(testContext, ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(ctl.UnavailableSince.UTC(), jc.DeepEquals, mongodoc.Time(t0).UTC())
 
 	// Check that if we mark it unavailable again, it doesn't
 	// have any affect.
 	err = s.database.SetControllerUnavailableAt(testContext, ctlPath, t0.Add(time.Second))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	ctl, err = s.database.Controller(testContext, ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(ctl.UnavailableSince.UTC(), jc.DeepEquals, mongodoc.Time(t0).UTC())
 
 	// Check that we can mark it as available again.
 	err = s.database.SetControllerAvailable(testContext, ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	ctl, err = s.database.Controller(testContext, ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(ctl.UnavailableSince, jc.Satisfies, time.Time.IsZero)
 
 	t1 := t0.Add(3 * time.Second)
 	// ... and that we can mark it as unavailable after that.
 	err = s.database.SetControllerUnavailableAt(testContext, ctlPath, t1)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	ctl, err = s.database.Controller(testContext, ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(ctl.UnavailableSince.UTC(), jc.DeepEquals, mongodoc.Time(t1).UTC())
 	s.checkDBOK(c)
 }
@@ -242,9 +242,9 @@ func (s *databaseSuite) TestSetControllerAvailability(c *gc.C) {
 func (s *databaseSuite) TestSetControllerAvailabilityWithNotFoundController(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "x"}
 	err := s.database.SetControllerUnavailableAt(testContext, ctlPath, time.Now())
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.database.SetControllerAvailable(testContext, ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.checkDBOK(c)
 }
 
@@ -254,21 +254,21 @@ func (s *databaseSuite) TestSetControllerVersion(c *gc.C) {
 		Path: ctlPath,
 	}
 	err := s.database.AddController(testContext, ctl)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	testVersion := version.Number{Minor: 1}
 	err = s.database.SetControllerVersion(testContext, ctlPath, testVersion)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	ctl, err = s.database.Controller(testContext, ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(ctl.Version, jc.DeepEquals, &testVersion)
 }
 
 func (s *databaseSuite) TestSetControllerVersionWithNotFoundController(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "x"}
 	err := s.database.SetControllerVersion(testContext, ctlPath, version.Number{Minor: 1})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *databaseSuite) TestDeleteController(c *gc.C) {
@@ -288,9 +288,9 @@ func (s *databaseSuite) TestDeleteController(c *gc.C) {
 		AdminPassword: "foo-password",
 	}
 	err := s.database.AddController(testContext, ctl)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.database.DeleteController(testContext, ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	ctl1, err := s.database.Controller(testContext, ctlPath)
 	c.Assert(ctl1, gc.IsNil)
@@ -317,10 +317,10 @@ func (s *databaseSuite) TestDeleteController(c *gc.C) {
 		AdminPassword: "foo-password",
 	}
 	err = s.database.AddController(testContext, ctl2)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = s.database.DeleteController(testContext, ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	ctl3, err := s.database.Controller(testContext, ctlPath)
 	c.Assert(ctl3, gc.IsNil)
 	m3, err := s.database.Model(testContext, ctlPath)
@@ -345,17 +345,17 @@ func (s *databaseSuite) TestDeleteModel(c *gc.C) {
 		AdminPassword: "foo-password",
 	}
 	err := s.database.AddController(testContext, ctl)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	modelPath := params.EntityPath{"dalek", "exterminate"}
 	m2 := &mongodoc.Model{
 		Path: modelPath,
 	}
 	err = s.database.AddModel(testContext, m2)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = s.database.DeleteModel(testContext, m2.Path)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	m3, err := s.database.Model(testContext, modelPath)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	c.Assert(m3, gc.IsNil)
@@ -373,14 +373,14 @@ func (s *databaseSuite) TestAddModel(c *gc.C) {
 		Path: ctlPath,
 	}
 	err := s.database.AddModel(testContext, m)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
 		Id:   "bob/x",
 		Path: ctlPath,
 	})
 
 	m1, err := s.database.Model(testContext, ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(m1, jemtest.CmpEquals(cmpopts.EquateEmpty()), m)
 
 	err = s.database.AddModel(testContext, m)
@@ -437,7 +437,7 @@ func (s *databaseSuite) TestUpdateLegacyModel(c *gc.C) {
 		Path: ctlPath,
 	}
 	err := s.database.AddModel(testContext, m)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
 		Id:   "bob/x",
 		Path: ctlPath,
@@ -454,7 +454,7 @@ func (s *databaseSuite) TestUpdateLegacyModel(c *gc.C) {
 		},
 	}
 	err = s.database.UpdateLegacyModel(testContext, m)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	m1, err := s.database.Model(testContext, ctlPath)
 	c.Assert(m1, jemtest.CmpEquals(cmpopts.EquateEmpty()), m)
@@ -478,7 +478,7 @@ func (s *databaseSuite) TestModelFromUUID(c *gc.C) {
 		UUID: uuid,
 	}
 	err := s.database.AddModel(testContext, m)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
 		Id:   "bob/x",
 		Path: path,
@@ -486,7 +486,7 @@ func (s *databaseSuite) TestModelFromUUID(c *gc.C) {
 	})
 
 	m1, err := s.database.ModelFromUUID(testContext, uuid)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(m1, jemtest.CmpEquals(cmpopts.EquateEmpty()), m)
 
 	m2, err := s.database.ModelFromUUID(testContext, "no-such-uuid")
@@ -583,16 +583,16 @@ func (s *databaseSuite) TestAcquireLease(c *gc.C) {
 	for i, test := range acquireLeaseTests {
 		c.Logf("test %d: %v", i, test.about)
 		_, err := s.database.Controllers().RemoveAll(bson.D{{"path", test.ctlPath}})
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		_, err = s.database.Models().RemoveAll(bson.D{{"path", test.ctlPath}})
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		err = s.database.AddController(testContext, &mongodoc.Controller{
 			Path:               test.ctlPath,
 			UUID:               "fake-uuid",
 			MonitorLeaseOwner:  test.actualOldOwner,
 			MonitorLeaseExpiry: test.actualOldExpiry,
 		})
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		t, err := s.database.AcquireMonitorLease(testContext, test.ctlPath, test.oldExpiry, test.oldOwner, test.newExpiry, test.newOwner)
 		if test.expectError != "" {
 			if test.expectCause != nil {
@@ -602,10 +602,10 @@ func (s *databaseSuite) TestAcquireLease(c *gc.C) {
 			c.Assert(t, jc.Satisfies, time.Time.IsZero)
 			continue
 		}
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(t.UTC(), gc.DeepEquals, test.expectExpiry.UTC())
 		ctl, err := s.database.Controller(testContext, test.ctlPath)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(ctl.MonitorLeaseExpiry.UTC(), gc.DeepEquals, test.expectExpiry.UTC())
 		c.Assert(ctl.MonitorLeaseOwner, gc.Equals, test.newOwner)
 		s.checkDBOK(c)
@@ -625,7 +625,7 @@ func (s *databaseSuite) TestSetControllerStats(c *gc.C) {
 		Path: ctlPath,
 		UUID: "fake-uuid",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	stats := &mongodoc.ControllerStats{
 		UnitCount:    1,
@@ -634,9 +634,9 @@ func (s *databaseSuite) TestSetControllerStats(c *gc.C) {
 		MachineCount: 4,
 	}
 	err = s.database.SetControllerStats(testContext, ctlPath, stats)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	ctl, err := s.database.Controller(testContext, ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(ctl.Stats, jc.DeepEquals, *stats)
 	s.checkDBOK(c)
 }
@@ -732,11 +732,11 @@ func (s *databaseSuite) TestUpdateModelCounts(c *gc.C) {
 			UUID:       uuid,
 			Counts:     test.before,
 		})
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		err = s.database.UpdateModelCounts(testContext, ctlPath, uuid, test.update, test.updateTime)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		model, err := s.database.Model(testContext, modelId)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		// Change all times to UTC for straightforward comparison.
 		for name, count := range model.Counts {
 			count.Time = count.Time.UTC()
@@ -755,7 +755,7 @@ func (s *databaseSuite) TestUpdateModelCountsNotFoundUUID(c *gc.C) {
 		Controller: ctlPath,
 		UUID:       uuid,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.database.UpdateModelCounts(testContext, ctlPath, "fake-uuid", nil, T(0))
 	c.Assert(err, gc.ErrorMatches, `cannot update model counts: not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
@@ -770,7 +770,7 @@ func (s *databaseSuite) TestUpdateModelCountsNotFoundController(c *gc.C) {
 		Controller: ctlPath,
 		UUID:       uuid,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.database.UpdateModelCounts(testContext, params.EntityPath{"bob", "not-controller"}, "real-uuid", nil, T(0))
 	c.Assert(err, gc.ErrorMatches, `cannot update model counts: not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
@@ -788,7 +788,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 			Series:    "quantal",
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.database.UpdateMachineInfo(testContext, &mongodoc.Machine{
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
@@ -799,7 +799,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 			Series:    "blah",
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.database.UpdateMachineInfo(testContext, &mongodoc.Machine{
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
@@ -810,10 +810,10 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 			Series:    "precise",
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	docs, err := s.database.MachinesForModel(testContext, "fake-uuid")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	for i := range docs {
 		cleanMachineDoc(&docs[i])
 	}
@@ -853,7 +853,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 			Life:      "dying",
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Check that setting a machine dead removes it.
 	err = s.database.UpdateMachineInfo(testContext, &mongodoc.Machine{
@@ -867,10 +867,10 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 			Life:      "dead",
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	docs, err = s.database.MachinesForModel(testContext, "fake-uuid")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	for i := range docs {
 		cleanMachineDoc(&docs[i])
 	}
@@ -901,9 +901,9 @@ func (s *databaseSuite) TestRemoveControllerMachines(c *gc.C) {
 			Series:    "quantal",
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	docs, err := s.database.MachinesForModel(testContext, "fake-uuid")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	for i := range docs {
 		cleanMachineDoc(&docs[i])
 	}
@@ -920,9 +920,9 @@ func (s *databaseSuite) TestRemoveControllerMachines(c *gc.C) {
 		},
 	}})
 	err = s.database.RemoveControllerMachines(testContext, ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	docs, err = s.database.MachinesForModel(testContext, "fake-uuid")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(docs, jc.DeepEquals, []mongodoc.Machine{})
 }
 
@@ -937,7 +937,7 @@ func (s *databaseSuite) TestUpdateApplicationInfo(c *gc.C) {
 			Name:      "0",
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.database.UpdateApplicationInfo(testContext, &mongodoc.Application{
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
@@ -949,7 +949,7 @@ func (s *databaseSuite) TestUpdateApplicationInfo(c *gc.C) {
 	})
 
 	docs, err := s.database.ApplicationsForModel(testContext, "fake-uuid")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	for i := range docs {
 		cleanApplicationDoc(&docs[i])
 	}
@@ -984,7 +984,7 @@ func (s *databaseSuite) TestUpdateApplicationInfo(c *gc.C) {
 			Life:      "dying",
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Check that setting a machine dead removes it.
 	err = s.database.UpdateApplicationInfo(testContext, &mongodoc.Application{
@@ -997,10 +997,10 @@ func (s *databaseSuite) TestUpdateApplicationInfo(c *gc.C) {
 			Life:      "dead",
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	docs, err = s.database.ApplicationsForModel(testContext, "fake-uuid")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	for i := range docs {
 		cleanApplicationDoc(&docs[i])
 	}
@@ -1028,9 +1028,9 @@ func (s *databaseSuite) TestRemoveControllerApplications(c *gc.C) {
 			Name:      "0",
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	docs, err := s.database.ApplicationsForModel(testContext, "fake-uuid")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	for i := range docs {
 		cleanApplicationDoc(&docs[i])
 	}
@@ -1045,9 +1045,9 @@ func (s *databaseSuite) TestRemoveControllerApplications(c *gc.C) {
 		},
 	}})
 	err = s.database.RemoveControllerApplications(testContext, ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	docs, err = s.database.ApplicationsForModel(testContext, "fake-uuid")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(docs, jc.DeepEquals, []mongodoc.Application{})
 }
 
@@ -1083,7 +1083,7 @@ func (s *databaseSuite) TestSetModelControllerSuccess(c *gc.C) {
 		Path: ctlPath,
 		UUID: "fake-uuid",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	modelPath := params.EntityPath{"bob", "foo"}
 	err = s.database.AddModel(testContext, &mongodoc.Model{
@@ -1091,9 +1091,9 @@ func (s *databaseSuite) TestSetModelControllerSuccess(c *gc.C) {
 		UUID:       "fake-uuid",
 		Controller: params.EntityPath{"bob", "foo"},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	origDoc, err := s.database.Model(testContext, modelPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = s.database.SetModelController(testContext, params.EntityPath{"bob", "foo"}, params.EntityPath{"x", "y"})
 	c.Assert(err, gc.Equals, nil)
@@ -1108,13 +1108,13 @@ func (s *databaseSuite) TestSetModelControllerSuccess(c *gc.C) {
 
 func (s *databaseSuite) TestSetModelLifeNotFound(c *gc.C) {
 	err := s.database.SetModelLife(testContext, params.EntityPath{"bob", "foo"}, "fake-uuid", "alive")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.checkDBOK(c)
 }
 
 func (s *databaseSuite) TestSetModelInfoNotFound(c *gc.C) {
 	err := s.database.SetModelInfo(testContext, params.EntityPath{"bob", "foo"}, "fake-uuid", &mongodoc.ModelInfo{})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.checkDBOK(c)
 }
 
@@ -1130,7 +1130,7 @@ func (s *databaseSuite) TestSetControllerDeprecated(c *gc.C) {
 		Path: ctlPath,
 		UUID: "fake-uuid",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// When first added, the deprecated field is not present.
 	var doc map[string]interface{}
@@ -1172,7 +1172,7 @@ func (s *databaseSuite) TestSetModelLifeSuccess(c *gc.C) {
 		Path: ctlPath,
 		UUID: "fake-uuid",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Add the controller model.
 	err = s.database.AddModel(testContext, &mongodoc.Model{
@@ -1180,7 +1180,7 @@ func (s *databaseSuite) TestSetModelLifeSuccess(c *gc.C) {
 		UUID:       "fake-uuid",
 		Controller: params.EntityPath{"bob", "foo"},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Add another model with the same UUID but a different controller.
 	err = s.database.AddModel(testContext, &mongodoc.Model{
@@ -1188,7 +1188,7 @@ func (s *databaseSuite) TestSetModelLifeSuccess(c *gc.C) {
 		UUID:       "fake-uuid",
 		Controller: params.EntityPath{"bar", "zzz"},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Add another model with the same controller but a different UUID.
 	err = s.database.AddModel(testContext, &mongodoc.Model{
@@ -1196,21 +1196,21 @@ func (s *databaseSuite) TestSetModelLifeSuccess(c *gc.C) {
 		UUID:       "another-uuid",
 		Controller: ctlPath,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = s.database.SetModelLife(testContext, ctlPath, "fake-uuid", "alive")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	m, err := s.database.Model(testContext, ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(m.Life(), gc.Equals, "alive")
 
 	m, err = s.database.Model(testContext, params.EntityPath{"bar", "baz"})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(m.Life(), gc.Equals, "")
 
 	m, err = s.database.Model(testContext, params.EntityPath{"alice", "baz"})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(m.Life(), gc.Equals, "")
 	s.checkDBOK(c)
 }
@@ -1221,7 +1221,7 @@ func (s *databaseSuite) TestSetModelInfoSuccess(c *gc.C) {
 		Path: ctlPath,
 		UUID: "fake-uuid",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Add the controller model.
 	err = s.database.AddModel(testContext, &mongodoc.Model{
@@ -1229,7 +1229,7 @@ func (s *databaseSuite) TestSetModelInfoSuccess(c *gc.C) {
 		UUID:       "fake-uuid",
 		Controller: params.EntityPath{"bob", "foo"},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Add another model with the same UUID but a different controller.
 	err = s.database.AddModel(testContext, &mongodoc.Model{
@@ -1237,7 +1237,7 @@ func (s *databaseSuite) TestSetModelInfoSuccess(c *gc.C) {
 		UUID:       "fake-uuid",
 		Controller: params.EntityPath{"bar", "zzz"},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Add another model with the same controller but a different UUID.
 	err = s.database.AddModel(testContext, &mongodoc.Model{
@@ -1245,23 +1245,23 @@ func (s *databaseSuite) TestSetModelInfoSuccess(c *gc.C) {
 		UUID:       "another-uuid",
 		Controller: ctlPath,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = s.database.SetModelInfo(testContext, ctlPath, "fake-uuid", &mongodoc.ModelInfo{
 		Life: "alive",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	m, err := s.database.Model(testContext, ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(m.Life(), gc.Equals, "alive")
 
 	m, err = s.database.Model(testContext, params.EntityPath{"bar", "baz"})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(m.Life(), gc.Equals, "")
 
 	m, err = s.database.Model(testContext, params.EntityPath{"alice", "baz"})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(m.Life(), gc.Equals, "")
 	s.checkDBOK(c)
 }
@@ -1272,7 +1272,7 @@ func (s *databaseSuite) TestDeleteModelWithUUID(c *gc.C) {
 		Path: ctlPath,
 		UUID: "fake-uuid",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Add the controller model.
 	err = s.database.AddModel(testContext, &mongodoc.Model{
@@ -1280,10 +1280,10 @@ func (s *databaseSuite) TestDeleteModelWithUUID(c *gc.C) {
 		UUID:       "fake-uuid",
 		Controller: params.EntityPath{"bob", "foo"},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = s.database.DeleteModelWithUUID(testContext, ctlPath, "fake-uuid")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	_, err = s.database.Model(testContext, ctlPath)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
@@ -1314,10 +1314,10 @@ func (s *databaseSuite) TestAddAndGetCredential(c *gc.C) {
 		Label:      "Test Label",
 		Attributes: attrs,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	cred, err = s.database.Credential(testContext, path)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
 		Id:         expectId,
 		Path:       path,
@@ -1332,10 +1332,10 @@ func (s *databaseSuite) TestAddAndGetCredential(c *gc.C) {
 		Label:      "Test Label 2",
 		Attributes: attrs,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	cred, err = s.database.Credential(testContext, path)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
 		Id:         expectId,
 		Path:       path,
@@ -1348,9 +1348,9 @@ func (s *databaseSuite) TestAddAndGetCredential(c *gc.C) {
 		Path:    path,
 		Revoked: true,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	cred, err = s.database.Credential(testContext, path)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
 		Id:         expectId,
 		Path:       path,
@@ -1367,20 +1367,20 @@ func (s *databaseSuite) TestCredentialAddController(c *gc.C) {
 		Path: path,
 		Type: "empty",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	ctlPath := params.EntityPath{"bob", "x"}
 	ctl := &mongodoc.Controller{
 		Path: ctlPath,
 	}
 	err = s.database.AddController(testContext, ctl)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = jem.CredentialAddController(s.database, testContext, path, ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	cred, err := s.database.Credential(testContext, path)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
 		Id:         expectId,
 		Path:       path,
@@ -1393,10 +1393,10 @@ func (s *databaseSuite) TestCredentialAddController(c *gc.C) {
 
 	// Add a second time
 	err = jem.CredentialAddController(s.database, testContext, path, ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	cred, err = s.database.Credential(testContext, path)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
 		Id:         expectId,
 		Path:       path,
@@ -1427,21 +1427,21 @@ func (s *databaseSuite) TestCredentialRemoveController(c *gc.C) {
 		Path: path,
 		Type: "empty",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	ctlPath := params.EntityPath{"bob", "x"}
 	ctl := &mongodoc.Controller{
 		Path: ctlPath,
 	}
 	err = s.database.AddController(testContext, ctl)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = jem.CredentialAddController(s.database, testContext, path, ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// sanity check the controller is there.
 	cred, err := s.database.Credential(testContext, path)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
 		Id:         expectId,
 		Path:       path,
@@ -1453,10 +1453,10 @@ func (s *databaseSuite) TestCredentialRemoveController(c *gc.C) {
 	})
 
 	err = jem.CredentialRemoveController(s.database, testContext, path, ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	cred, err = s.database.Credential(testContext, path)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
 		Id:         expectId,
 		Path:       path,
@@ -1466,10 +1466,10 @@ func (s *databaseSuite) TestCredentialRemoveController(c *gc.C) {
 
 	// Remove again
 	err = jem.CredentialRemoveController(s.database, testContext, path, ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	cred, err = s.database.Credential(testContext, path)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
 		Id:         expectId,
 		Path:       path,
@@ -1490,15 +1490,15 @@ func (s *databaseSuite) TestSetACL(c *gc.C) {
 		Path: ctlPath,
 		UUID: "fake-uuid",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = s.database.SetACL(testContext, s.database.Controllers(), ctlPath, params.ACL{
 		Read: []string{"t1", "t2"},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	var cnt mongodoc.Controller
 	err = s.database.Controllers().FindId(ctlPath.String()).One(&cnt)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(cnt.ACL, jc.DeepEquals, params.ACL{
 		Read: []string{"t1", "t2"},
 	})
@@ -1517,13 +1517,13 @@ func (s *databaseSuite) TestGrant(c *gc.C) {
 		Path: ctlPath,
 		UUID: "fake-uuid",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = s.database.Grant(testContext, s.database.Controllers(), ctlPath, "t1")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	var cnt mongodoc.Controller
 	err = s.database.Controllers().FindId(ctlPath.String()).One(&cnt)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(cnt.ACL, jc.DeepEquals, params.ACL{
 		Read: []string{"t1"},
 	})
@@ -1540,17 +1540,17 @@ func (s *databaseSuite) TestRevoke(c *gc.C) {
 		Path: ctlPath,
 		UUID: "fake-uuid",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = s.database.SetACL(testContext, s.database.Controllers(), ctlPath, params.ACL{
 		Read: []string{"t1", "t2"},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.database.Revoke(testContext, s.database.Controllers(), ctlPath, "t2")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	var cnt mongodoc.Controller
 	err = s.database.Controllers().FindId(ctlPath.String()).One(&cnt)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(cnt.ACL, jc.DeepEquals, params.ACL{
 		Read: []string{"t1"},
 	})
@@ -1572,9 +1572,9 @@ func (s *databaseSuite) TestProviderType(c *gc.C) {
 		ProviderType:       "ec2",
 		PrimaryControllers: []params.EntityPath{{"bob", "bar"}},
 	}})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	pt, err := s.database.ProviderType(testContext, "my-cloud")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(pt, gc.Equals, "ec2")
 	pt, err = s.database.ProviderType(testContext, "not-my-cloud")
 	c.Assert(err, gc.ErrorMatches, `cloud "not-my-cloud" not found`)
@@ -1640,10 +1640,10 @@ func (s *databaseSuite) TestCloudRegions(c *gc.C) {
 	}
 
 	err := s.database.UpdateCloudRegions(testContext, []mongodoc.CloudRegion{cloud, regionA, regionB, regionC})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	clouds, err := s.database.GetCloudRegions(testContext)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	cloud.Id = "my-cloud/"
 	regionA.Id = "my-cloud/my-region-a"
@@ -1697,11 +1697,11 @@ func (s *databaseSuite) TestDeleteControllerFromCloudRegions(c *gc.C) {
 		},
 	}
 	err := s.database.UpdateCloudRegions(testContext, []mongodoc.CloudRegion{cloud, regionA, regionB})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.database.DeleteControllerFromCloudRegions(testContext, ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	cloudRegions, err := s.database.GetCloudRegions(testContext)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(cloudRegions, gc.DeepEquals, []mongodoc.CloudRegion{{
 		Id:                 fmt.Sprintf("%s/%s", cloud.Cloud, ""),
 		Cloud:              "my-cloud",
@@ -1756,9 +1756,9 @@ func (s *databaseSuite) TestGetACL(c *gc.C) {
 		},
 	}
 	err := s.database.AddModel(testContext, m)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	acl, err := s.database.GetACL(testContext, s.database.Models(), m.Path)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(acl, jc.DeepEquals, m.ACL)
 }
 
@@ -1835,7 +1835,7 @@ func (s *databaseSuite) TestCheckReadACL(c *gc.C) {
 					Read: test.acl,
 				},
 			})
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 		err := s.database.CheckReadACL(ctx, s.database.Models(), entity)
 		if test.expectError != "" {
@@ -1846,7 +1846,7 @@ func (s *databaseSuite) TestCheckReadACL(c *gc.C) {
 				c.Assert(errgo.Cause(err), gc.Equals, err)
 			}
 		} else {
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 	}
 }
@@ -1873,7 +1873,7 @@ func (s *databaseSuite) TestCanReadIter(c *gc.C) {
 	}}
 	for i := range testModels {
 		err := s.database.AddModel(testContext, &testModels[i])
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
 	it := s.database.Models().Find(nil).Sort("_id").Iter()
@@ -2103,7 +2103,7 @@ func testSetDead(c *gc.C, proxy *jujutesting.TCPProxy, pool *mgosession.Pool, ru
 	defer db.Session.Close()
 	// Use the session so that it's bound to the socket.
 	err := db.Session.Ping()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	proxy.CloseConns() // Close the existing socket so that the connection is broken.
 
 	// Sanity check that getting another session from the pool also
@@ -2147,19 +2147,19 @@ func (s *databaseSuite) TestGetModelStatuses(c *gc.C) {
 		Path: ctlPath,
 	}
 	err := s.database.AddModel(testContext, m)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
 		Id:   "bob/x",
 		Path: ctlPath,
 	})
 
 	m1, err := s.database.Model(testContext, ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(m1, jemtest.CmpEquals(cmpopts.EquateEmpty()), m)
 	s.checkDBOK(c)
 
 	st, err := s.database.GetModelStatuses(testContext)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(st, gc.DeepEquals, params.ModelStatuses{{
 		Status:     "unknown",
 		ID:         "bob/x",
@@ -2171,7 +2171,7 @@ func (s *databaseSuite) TestInsertCloudRegion(c *gc.C) {
 	err := s.database.InsertCloudRegion(testContext, &mongodoc.CloudRegion{
 		Cloud: "test-cloud",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.database.InsertCloudRegion(testContext, &mongodoc.CloudRegion{
 		Cloud: "test-cloud",
 	})
@@ -2183,11 +2183,11 @@ func (s *databaseSuite) TestRemoveCloudRegion(c *gc.C) {
 	err := s.database.InsertCloudRegion(testContext, &mongodoc.CloudRegion{
 		Cloud: "test-cloud",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.database.RemoveCloudRegion(testContext, params.Cloud("test-cloud"), "")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.database.InsertCloudRegion(testContext, &mongodoc.CloudRegion{
 		Cloud: "test-cloud",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }

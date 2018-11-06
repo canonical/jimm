@@ -107,7 +107,7 @@ func (s *commonSuite) newServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.S
 		PublicKeyLocator: idmSrv,
 	}
 	srv, err := jem.NewServer(context.TODO(), config)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	return srv
 }
 
@@ -121,9 +121,9 @@ var dummyEnvConfig = map[string]interface{}{
 func (s *commonSuite) addModel(c *gc.C, pathStr, srvPathStr, credName string) {
 	var path, srvPath params.EntityPath
 	err := path.UnmarshalText([]byte(pathStr))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = srvPath.UnmarshalText([]byte(srvPathStr))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	credPath := params.CredentialPath{
 		Cloud:      "dummy",
@@ -135,7 +135,7 @@ func (s *commonSuite) addModel(c *gc.C, pathStr, srvPathStr, credName string) {
 			AuthType: "empty",
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	_, err = s.jemClient(string(path.User)).NewModel(&params.NewModel{
 		User: path.User,
@@ -146,10 +146,10 @@ func (s *commonSuite) addModel(c *gc.C, pathStr, srvPathStr, credName string) {
 			Config:     dummyEnvConfig,
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *commonSuite) clearCookies(c *gc.C) {
 	err := os.Remove(s.cookieFile)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }

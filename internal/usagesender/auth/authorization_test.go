@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/juju/httprequest"
-	jc "github.com/juju/testing/checkers"
 	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
@@ -43,7 +42,7 @@ func (s *authorizationSuite) TestGetCredentials(c *gc.C) {
 	hclient := httpbakery.NewClient()
 	client := auth.NewAuthorizationClient(s.server.URL, hclient)
 	creds, err := client.GetCredentials(context.Background(), "someuser")
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(s.handler.receivedRequest.Tags["user"], gc.Equals, "someuser")
 	c.Assert(creds, gc.DeepEquals, []byte("secret stuff"))
 }

@@ -55,7 +55,7 @@ func (s *jemSuite) SetUpTest(c *gc.C) {
 		ControllerAdmin: "controller-admin",
 		SessionPool:     s.sessionPool,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.pool = pool
 	s.jem = s.pool.JEM(context.TODO())
 	s.PatchValue(&utils.OutgoingAccessAllowed, true)
@@ -86,7 +86,7 @@ func (s *jemSuite) TestPoolDoesNotReuseDeadConnection(c *gc.C) {
 		ControllerAdmin: "controller-admin",
 		SessionPool:     sessionPool,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer pool.Close()
 
 	assertOK := func(j *jem.JEM) {
@@ -277,24 +277,24 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 	err := s.jem.DB.SetACL(testContext, s.jem.DB.Controllers(), ctlId, params.ACL{
 		Read: []string{"everyone"},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	// Bob has a single credential.
 	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
 		Path: credentialPath("dummy", "bob", "cred1"),
 		Type: "empty",
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	// Alice has two credentials.
 	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
 		Path: credentialPath("dummy", "alice", "cred1"),
 		Type: "empty",
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
 		Path: credentialPath("dummy", "alice", "cred2"),
 		Type: "empty",
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	ctx := auth.ContextWithUser(testContext, "bob")
 	// Create a model so that we can have a test case for an already-existing model
@@ -307,7 +307,7 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 		},
 		Cloud: "dummy",
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	for i, test := range createModelTests {
 		c.Logf("test %d. %s", i, test.about)
 		if test.params.Path.Name == "" {
@@ -321,7 +321,7 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 			}
 			continue
 		}
-		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(m.Path, jc.DeepEquals, test.params.Path)
 		c.Assert(m.UUID, gc.Not(gc.Equals), "")
 		c.Assert(m.CreationTime.Equal(now), gc.Equals, true)
@@ -345,7 +345,7 @@ func (s *jemSuite) TestCreateModelWithPartiallyCreatedModel(c *gc.C) {
 	err := s.jem.DB.SetACL(testContext, s.jem.DB.Controllers(), ctlId, params.ACL{
 		Read: []string{"everyone"},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	// Bob has a single credential.
 	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
 		Path: credentialPath("dummy", "bob", "cred1"),
@@ -360,7 +360,7 @@ func (s *jemSuite) TestCreateModelWithPartiallyCreatedModel(c *gc.C) {
 		Creator:      "bob",
 		Credential:   credentialPath("dummy", "bob", "cred1"),
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	// Create a new model
 	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
 		Path:           params.EntityPath{"bob", "model"},
@@ -371,7 +371,7 @@ func (s *jemSuite) TestCreateModelWithPartiallyCreatedModel(c *gc.C) {
 		},
 		Cloud: "dummy",
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *jemSuite) TestCreateModelWithExistingModelInControllerOnly(c *gc.C) {
@@ -401,7 +401,7 @@ func (s *jemSuite) TestCreateModelWithDeprecatedController(c *gc.C) {
 	err := s.jem.DB.SetACL(testContext, s.jem.DB.Controllers(), ctlId, params.ACL{
 		Read: []string{"everyone"},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	ctx := auth.ContextWithUser(testContext, "bob")
 	// Sanity check that we can create the model while the controller is not deprecated.
 	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
@@ -409,11 +409,11 @@ func (s *jemSuite) TestCreateModelWithDeprecatedController(c *gc.C) {
 		Cloud:  "dummy",
 		Region: "dummy-region",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Deprecate it and make sure it's not chosen again.
 	err = s.jem.DB.SetControllerDeprecated(testContext, ctlId, true)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
 		Path:   params.EntityPath{"bob", "model2"},
@@ -429,35 +429,35 @@ func (s *jemSuite) TestCreateModelWithMultipleControllers(c *gc.C) {
 	err := s.jem.DB.SetACL(testContext, s.jem.DB.Controllers(), ctlId, params.ACL{
 		Read: []string{"everyone"},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	ctl2Id := s.addController(c, params.EntityPath{"bob", "controller2"})
 	err = s.jem.DB.SetACL(testContext, s.jem.DB.Controllers(), ctl2Id, params.ACL{
 		Read: []string{"everyone"},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	ctx := auth.ContextWithUser(testContext, "bob")
 	// Deprecate the first controller.
 	err = s.jem.DB.SetControllerDeprecated(testContext, ctlId, true)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	m, err := s.jem.CreateModel(ctx, jem.CreateModelParams{
 		Path:   params.EntityPath{"bob", "model2"},
 		Cloud:  "dummy",
 		Region: "dummy-region",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(m.Controller, jc.DeepEquals, ctl2Id)
 }
 
 func (s *jemSuite) TestGrantModelWrite(c *gc.C) {
 	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
 	conn, err := s.jem.OpenAPI(testContext, model.Controller)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
 	err = s.jem.GrantModel(testContext, conn, model, "alice", "write")
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	model1, err := s.jem.DB.Model(testContext, model.Path)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
 		Read:  []string{"alice"},
 		Write: []string{"alice"},
@@ -467,12 +467,12 @@ func (s *jemSuite) TestGrantModelWrite(c *gc.C) {
 func (s *jemSuite) TestGrantModelRead(c *gc.C) {
 	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
 	conn, err := s.jem.OpenAPI(testContext, model.Controller)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
 	err = s.jem.GrantModel(testContext, conn, model, "alice", "read")
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	model1, err := s.jem.DB.Model(testContext, model.Path)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
 		Read: []string{"alice"},
 	})
@@ -481,54 +481,54 @@ func (s *jemSuite) TestGrantModelRead(c *gc.C) {
 func (s *jemSuite) TestGrantModelBadLevel(c *gc.C) {
 	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
 	conn, err := s.jem.OpenAPI(testContext, model.Controller)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
 	err = s.jem.GrantModel(testContext, conn, model, "alice", "superpowers")
 	c.Assert(err, gc.ErrorMatches, `"superpowers" model access not valid`)
 	model1, err := s.jem.DB.Model(testContext, model.Path)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{})
 }
 
 func (s *jemSuite) TestRevokeModel(c *gc.C) {
 	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
 	conn, err := s.jem.OpenAPI(testContext, model.Controller)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
 	err = s.jem.GrantModel(testContext, conn, model, "alice", "admin")
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	model1, err := s.jem.DB.Model(testContext, model.Path)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
 		Read:  []string{"alice"},
 		Write: []string{"alice"},
 		Admin: []string{"alice"},
 	})
 	err = s.jem.RevokeModel(testContext, conn, model, "alice", "read")
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	model1, err = s.jem.DB.Model(testContext, model.Path)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{})
 }
 
 func (s *jemSuite) TestRevokeModelAdmin(c *gc.C) {
 	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
 	conn, err := s.jem.OpenAPI(testContext, model.Controller)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
 	err = s.jem.GrantModel(testContext, conn, model, "alice", "admin")
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	model1, err := s.jem.DB.Model(testContext, model.Path)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
 		Read:  []string{"alice"},
 		Write: []string{"alice"},
 		Admin: []string{"alice"},
 	})
 	err = s.jem.RevokeModel(testContext, conn, model, "alice", "admin")
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	model1, err = s.jem.DB.Model(testContext, model.Path)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
 		Read:  []string{"alice"},
 		Write: []string{"alice"},
@@ -538,21 +538,21 @@ func (s *jemSuite) TestRevokeModelAdmin(c *gc.C) {
 func (s *jemSuite) TestRevokeModelWrite(c *gc.C) {
 	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
 	conn, err := s.jem.OpenAPI(testContext, model.Controller)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
 	err = s.jem.GrantModel(testContext, conn, model, "alice", "admin")
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	model1, err := s.jem.DB.Model(testContext, model.Path)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
 		Read:  []string{"alice"},
 		Write: []string{"alice"},
 		Admin: []string{"alice"},
 	})
 	err = s.jem.RevokeModel(testContext, conn, model, "alice", "write")
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	model1, err = s.jem.DB.Model(testContext, model.Path)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
 		Read: []string{"alice"},
 	})
@@ -561,12 +561,12 @@ func (s *jemSuite) TestRevokeModelWrite(c *gc.C) {
 func (s *jemSuite) TestRevokeModelControllerFailure(c *gc.C) {
 	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
 	conn, err := s.jem.OpenAPI(testContext, model.Controller)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
 	err = s.jem.GrantModel(testContext, conn, model, "alice", "write")
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	model1, err := s.jem.DB.Model(testContext, model.Path)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
 		Read:  []string{"alice"},
 		Write: []string{"alice"},
@@ -574,7 +574,7 @@ func (s *jemSuite) TestRevokeModelControllerFailure(c *gc.C) {
 	err = s.jem.RevokeModel(testContext, conn, model, "alice", "superpowers")
 	c.Assert(err, gc.ErrorMatches, `"superpowers" model access not valid`)
 	model1, err = s.jem.DB.Model(testContext, model.Path)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
 		Read:  []string{"alice"},
 		Write: []string{"alice"},
@@ -584,7 +584,7 @@ func (s *jemSuite) TestRevokeModelControllerFailure(c *gc.C) {
 func (s *jemSuite) TestDestroyModel(c *gc.C) {
 	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
 	conn, err := s.jem.OpenAPI(testContext, model.Controller)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
 
 	// Sanity check the model exists
@@ -592,12 +592,12 @@ func (s *jemSuite) TestDestroyModel(c *gc.C) {
 	_, err = client.ModelInfo([]names.ModelTag{
 		names.NewModelTag(model.UUID),
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	ch := waitForDestruction(conn, c, model.UUID)
 
 	err = s.jem.DestroyModel(testContext, conn, model, nil)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	select {
 	case <-ch:
@@ -607,15 +607,15 @@ func (s *jemSuite) TestDestroyModel(c *gc.C) {
 
 	// Check the model is dying.
 	_, err = s.jem.DB.Model(testContext, model.Path)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Check that it can be destroyed twice.
 	err = s.jem.DestroyModel(testContext, conn, model, nil)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Check the model is still dying.
 	_, err = s.jem.DB.Model(testContext, model.Path)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func waitForDestruction(conn *apiconn.Conn, c *gc.C, uuid string) <-chan struct{} {
@@ -645,17 +645,17 @@ func waitForDestruction(conn *apiconn.Conn, c *gc.C, uuid string) <-chan struct{
 func (s *jemSuite) TestDestroyModelWithStorage(c *gc.C) {
 	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
 	conn, err := s.jem.OpenAPI(testContext, model.Controller)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
 
 	// Sanity check the model exists
 	tag := names.NewModelTag(model.UUID)
 	client := modelmanagerapi.NewClient(conn)
 	_, err = client.ModelInfo([]names.ModelTag{tag})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	modelState, err := s.StatePool.Get(model.UUID)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer modelState.Release()
 	f := factory.NewFactory(modelState.State, s.StatePool)
 	f.MakeUnit(c, &factory.UnitParams{
@@ -681,21 +681,21 @@ func (s *jemSuite) TestUpdateCredential(c *gc.C) {
 		Type: "empty",
 	}
 	err := jem.UpdateCredential(s.jem.DB, testContext, cred)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	conn, err := s.jem.OpenAPI(testContext, ctlPath)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
 
 	err = jem.UpdateControllerCredential(s.jem, testContext, ctlPath, cred.Path, conn, cred)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = jem.CredentialAddController(s.jem.DB, testContext, credPath, ctlPath)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Sanity check it was deployed
 	client := cloudapi.NewClient(conn)
 	credTag := names.NewCloudCredentialTag("dummy/bob@external/cred")
 	creds, err := client.Credentials(credTag)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Result: &jujuparams.CloudCredential{
 			AuthType: "empty",
@@ -710,11 +710,11 @@ func (s *jemSuite) TestUpdateCredential(c *gc.C) {
 			"password": "cloud-pass",
 		},
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// check it was updated on the controller.
 	creds, err = client.Credentials(credTag)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Result: &jujuparams.CloudCredential{
 			AuthType: "userpass",
@@ -732,11 +732,11 @@ func (s *jemSuite) TestUpdateCredential(c *gc.C) {
 		Path:    credPath,
 		Revoked: true,
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// check it was removed on the controller.
 	creds, err = client.Credentials(credTag)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Error: &jujuparams.Error{
 			Code:    "not found",
@@ -754,22 +754,22 @@ func (s *jemSuite) TestControllerUpdateCredentials(c *gc.C) {
 		Type: "empty",
 	}
 	err := jem.UpdateCredential(s.jem.DB, testContext, cred)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = jem.SetCredentialUpdates(s.jem.DB, testContext, []params.EntityPath{ctlPath}, credPath)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = s.jem.ControllerUpdateCredentials(testContext, ctlPath)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// check it was updated on the controller.
 	conn, err := s.jem.OpenAPI(testContext, ctlPath)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
 
 	client := cloudapi.NewClient(conn)
 	creds, err := client.Credentials(credTag)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Result: &jujuparams.CloudCredential{
 			AuthType:   "empty",
@@ -838,7 +838,7 @@ func (s *jemSuite) TestDoControllers(c *gc.C) {
 	}}
 	for i := range testControllers {
 		err := s.jem.DB.AddController(testContext, &testControllers[i])
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
 	var controllers []string
@@ -894,7 +894,7 @@ func (s *jemSuite) TestSelectController(c *gc.C) {
 	}, {}}
 	for i := range testControllers {
 		err := s.jem.DB.AddController(testContext, &testControllers[i])
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
 	called := false
@@ -943,7 +943,7 @@ func (s *jemSuite) TestController(c *gc.C) {
 			c.Assert(errgo.Cause(err), gc.Equals, test.expectErrorCause)
 			continue
 		}
-		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(ctl.Path, jc.DeepEquals, test.path)
 	}
 }
@@ -1017,7 +1017,7 @@ func (s *jemSuite) TestCredential(c *gc.C) {
 			c.Assert(errgo.Cause(err), gc.Equals, test.expectErrorCause)
 			continue
 		}
-		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(ctl.Path, jc.DeepEquals, test.path)
 	}
 }
@@ -1091,13 +1091,13 @@ func (s *jemSuite) TestEarliestControllerVersion(c *gc.C) {
 	for i, test := range earliestControllerVersionTests {
 		c.Logf("test %d: %v", i, test.about)
 		_, err := s.jem.DB.Controllers().RemoveAll(nil)
-		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(err, gc.Equals, nil)
 		for _, ctl := range test.controllers {
 			err := s.jem.DB.AddController(ctx, &ctl)
-			c.Assert(err, jc.ErrorIsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 		v, err := s.jem.EarliestControllerVersion(ctx)
-		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(v, jc.DeepEquals, test.expect)
 	}
 }
@@ -1130,16 +1130,16 @@ func (s *jemSuite) TestUpdateMachineInfo(c *gc.C) {
 		Id:        "0",
 		Series:    "quantal",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.jem.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
 		ModelUUID: m.UUID,
 		Id:        "1",
 		Series:    "precise",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	docs, err := s.jem.DB.MachinesForModel(testContext, m.UUID)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	for i := range docs {
 		cleanMachineDoc(&docs[i])
 	}
@@ -1174,7 +1174,7 @@ func (s *jemSuite) TestUpdateMachineInfo(c *gc.C) {
 		Series:    "quantal",
 		Life:      "dying",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Check that setting a machine dead removes it.
 	err = s.jem.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
@@ -1183,10 +1183,10 @@ func (s *jemSuite) TestUpdateMachineInfo(c *gc.C) {
 		Series:    "precise",
 		Life:      "dead",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	docs, err = s.jem.DB.MachinesForModel(testContext, m.UUID)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	for i := range docs {
 		cleanMachineDoc(&docs[i])
 	}
@@ -1213,7 +1213,7 @@ func (s *jemSuite) TestUpdateMachineUnknownModel(c *gc.C) {
 		Id:        "1",
 		Series:    "precise",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *jemSuite) TestUpdateMachineIncorrectController(c *gc.C) {
@@ -1225,7 +1225,7 @@ func (s *jemSuite) TestUpdateMachineIncorrectController(c *gc.C) {
 		Id:        "1",
 		Series:    "precise",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *jemSuite) TestUpdateApplicationInfo(c *gc.C) {
@@ -1236,15 +1236,15 @@ func (s *jemSuite) TestUpdateApplicationInfo(c *gc.C) {
 		ModelUUID: m.UUID,
 		Name:      "0",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.jem.UpdateApplicationInfo(testContext, ctlPath, &multiwatcher.ApplicationInfo{
 		ModelUUID: m.UUID,
 		Name:      "1",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	docs, err := s.jem.DB.ApplicationsForModel(testContext, m.UUID)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	for i := range docs {
 		cleanApplicationDoc(&docs[i])
 	}
@@ -1274,7 +1274,7 @@ func (s *jemSuite) TestUpdateApplicationInfo(c *gc.C) {
 		Name:      "0",
 		Life:      "dying",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Check that setting an application dead removes it.
 	err = s.jem.UpdateApplicationInfo(testContext, ctlPath, &multiwatcher.ApplicationInfo{
@@ -1282,10 +1282,10 @@ func (s *jemSuite) TestUpdateApplicationInfo(c *gc.C) {
 		Name:      "1",
 		Life:      "dead",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	docs, err = s.jem.DB.ApplicationsForModel(testContext, m.UUID)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	for i := range docs {
 		cleanApplicationDoc(&docs[i])
 	}
@@ -1310,7 +1310,7 @@ func (s *jemSuite) TestUpdateApplicationUnknownModel(c *gc.C) {
 		ModelUUID: m.UUID,
 		Name:      "1",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *jemSuite) TestCreateCloud(c *gc.C) {
@@ -1331,11 +1331,11 @@ func (s *jemSuite) TestCreateCloud(c *gc.C) {
 			Admin: []string{"bob"},
 		},
 	}, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	var docs []mongodoc.CloudRegion
 	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(docs, jc.DeepEquals, []mongodoc.CloudRegion{{
 		Id:                   "test-cloud/",
 		Cloud:                "test-cloud",
@@ -1381,11 +1381,11 @@ func (s *jemSuite) TestCreateCloudWithRegions(c *gc.C) {
 			Admin: []string{"bob"},
 		},
 	}})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	var docs []mongodoc.CloudRegion
 	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(docs, jc.DeepEquals, []mongodoc.CloudRegion{{
 		Id:                   "test-cloud/",
 		Cloud:                "test-cloud",
@@ -1457,7 +1457,7 @@ func (s *jemSuite) TestCreateCloudNoControllers(c *gc.C) {
 
 	var docs []mongodoc.CloudRegion
 	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(docs, jc.DeepEquals, []mongodoc.CloudRegion{})
 }
 
@@ -1482,7 +1482,7 @@ func (s *jemSuite) TestCreateCloudAddCloudError(c *gc.C) {
 
 	var docs []mongodoc.CloudRegion
 	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(docs, jc.DeepEquals, []mongodoc.CloudRegion{})
 }
 
@@ -1504,11 +1504,11 @@ func (s *jemSuite) TestRemoveCloud(c *gc.C) {
 			Admin: []string{"bob"},
 		},
 	}, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	var docs []mongodoc.CloudRegion
 	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(docs, jc.DeepEquals, []mongodoc.CloudRegion{{
 		Id:                   "test-cloud/",
 		Cloud:                "test-cloud",
@@ -1528,10 +1528,10 @@ func (s *jemSuite) TestRemoveCloud(c *gc.C) {
 	}})
 
 	err = s.jem.RemoveCloud(ctx, "test-cloud")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(docs, jc.DeepEquals, []mongodoc.CloudRegion{})
 }
 
@@ -1553,7 +1553,7 @@ func (s *jemSuite) TestRemoveCloudUnauthorized(c *gc.C) {
 			Admin: []string{"alice"},
 		},
 	}, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = s.jem.RemoveCloud(ctx, "test-cloud")
 	c.Assert(err, gc.ErrorMatches, `unauthorized`)
@@ -1596,7 +1596,7 @@ func (s *jemSuite) TestRemoveCloudWithModel(c *gc.C) {
 			Admin: []string{"bob"},
 		},
 	}, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	credpath := params.CredentialPath{
 		Cloud: "test-cloud",
@@ -1613,14 +1613,14 @@ func (s *jemSuite) TestRemoveCloudWithModel(c *gc.C) {
 			"password": kubetest.Password(kubeconfig),
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
 		Path:       params.EntityPath{"bob", "test-model"},
 		Cloud:      "test-cloud",
 		Credential: credpath,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = s.jem.RemoveCloud(ctx, "test-cloud")
 	c.Assert(err, gc.ErrorMatches, `cloud is used by 1 model`)
@@ -1629,7 +1629,7 @@ func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityP
 	info := s.APIInfo(c)
 
 	hps, err := mongodoc.ParseAddresses(info.Addrs)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	ctl := &mongodoc.Controller{
 		Path:          path,
@@ -1644,7 +1644,7 @@ func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityP
 		Public: true,
 	}
 	err = s.jem.DB.AddController(testContext, ctl)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.jem.DB.UpdateCloudRegions(testContext, []mongodoc.CloudRegion{{
 		Cloud:              "dummy",
 		PrimaryControllers: []params.EntityPath{path},
@@ -1659,7 +1659,7 @@ func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityP
 			Read: []string{"everyone"},
 		},
 	}})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	return path
 }
 
@@ -1670,7 +1670,7 @@ func (s *jemSuite) bootstrapModel(c *gc.C, path params.EntityPath) *mongodoc.Mod
 		Path: credPath,
 		Type: "empty",
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	ctx := auth.ContextWithUser(testContext, string(path.User))
 	model, err := s.jem.CreateModel(ctx, jem.CreateModelParams{
 		Path:           path,
@@ -1681,6 +1681,6 @@ func (s *jemSuite) bootstrapModel(c *gc.C, path params.EntityPath) *mongodoc.Mod
 		},
 		Cloud: "dummy",
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	return model
 }

@@ -75,7 +75,7 @@ func (s *revokeSuite) TestRevoke(c *gc.C) {
 			Name: "foo",
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Add alice to controller permissions list.
 	stdout, stderr, code = run(c, c.MkDir(),
@@ -95,7 +95,7 @@ func (s *revokeSuite) TestRevoke(c *gc.C) {
 			Name: "foo",
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Remove alice.
 	stdout, stderr, code = run(c, c.MkDir(),
@@ -115,7 +115,7 @@ func (s *revokeSuite) TestRevoke(c *gc.C) {
 			Name: "foo",
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(acl, jc.DeepEquals, params.ACL{
 		Read: []string{},
 	})

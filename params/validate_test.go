@@ -139,7 +139,7 @@ func (*suite) TestValidators(c *gc.C) {
 			c.Assert(errgo.Cause(err), gc.Equals, httprequest.ErrUnmarshal)
 			continue
 		}
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(v, jc.DeepEquals, test.val)
 	}
 }
@@ -150,7 +150,7 @@ func (*suite) TestEntityPathMarshalText(c *gc.C) {
 		Name: "bar",
 	}
 	data, err := ep.MarshalText()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(string(data), gc.Equals, "foo/bar")
 }
 

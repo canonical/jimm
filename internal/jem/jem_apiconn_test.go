@@ -35,7 +35,7 @@ func (s *jemAPIConnSuite) SetUpTest(c *gc.C) {
 		ControllerAdmin: "controller-admin",
 		SessionPool:     s.sessionPool,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.pool = pool
 	s.jem = s.pool.JEM(context.TODO())
 	s.PatchValue(&jem.APIOpenTimeout, time.Duration(0))
@@ -53,7 +53,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 	info := s.APIInfo(c)
 
 	hps, err := mongodoc.ParseAddresses(info.Addrs)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	ctl := &mongodoc.Controller{
 		Path:          ctlPath,
@@ -64,32 +64,32 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 	}
 
 	err = s.jem.DB.AddController(testContext, ctl)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Open the API and check that it works.
 	conn, err := s.jem.OpenAPI(context.TODO(), ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.assertConnectionAlive(c, conn)
 
 	err = conn.Close()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Open it again and check that we get the
 	// same cached connection.
 	conn1, err := s.jem.OpenAPI(context.Background(), ctlPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.assertConnectionAlive(c, conn1)
 	c.Assert(conn1.Connection, gc.Equals, conn.Connection)
 	err = conn1.Close()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Open it with OpenAPIFromDocs and check
 	// that we still get the same connection.
 	conn1, err = s.jem.OpenAPIFromDoc(context.Background(), ctl)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(conn1.Connection, gc.Equals, conn.Connection)
 	err = conn1.Close()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Close the JEM instance and check that the
 	// connection is still alive, held open by the pool.
@@ -115,7 +115,7 @@ func (s *jemAPIConnSuite) TestPoolOpenModelAPI(c *gc.C) {
 	info := s.APIInfo(c)
 
 	hps, err := mongodoc.ParseAddresses(info.Addrs)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	ctl := &mongodoc.Controller{
 		Path:          ctlPath,
@@ -125,7 +125,7 @@ func (s *jemAPIConnSuite) TestPoolOpenModelAPI(c *gc.C) {
 		AdminPassword: info.Password,
 	}
 	err = s.jem.DB.AddController(testContext, ctl)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	mPath := params.EntityPath{"bob", "model"}
 	m := &mongodoc.Model{
@@ -134,24 +134,24 @@ func (s *jemAPIConnSuite) TestPoolOpenModelAPI(c *gc.C) {
 		Controller: ctlPath,
 	}
 	err = s.jem.DB.AddModel(testContext, m)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Open the API and check that it works.
 	conn, err := s.jem.OpenModelAPI(testContext, mPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.assertModelConnectionAlive(c, conn)
 
 	err = conn.Close()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Open it again and check that we get the
 	// same cached connection.
 	conn1, err := s.jem.OpenModelAPI(testContext, mPath)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.assertModelConnectionAlive(c, conn1)
 	c.Assert(conn1.Connection, gc.Equals, conn.Connection)
 	err = conn1.Close()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Close the JEM instance and check that the
 	// connection is still alive, held open by the pool.
@@ -177,7 +177,7 @@ func (s *jemAPIConnSuite) TestOpenAPIFromDocsCancel(c *gc.C) {
 	info := s.APIInfo(c)
 
 	hps, err := mongodoc.ParseAddresses(info.Addrs)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	ctl := &mongodoc.Controller{
 		Path:          ctlPath,
@@ -188,7 +188,7 @@ func (s *jemAPIConnSuite) TestOpenAPIFromDocsCancel(c *gc.C) {
 	}
 
 	err = s.jem.DB.AddController(testContext, ctl)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -216,12 +216,12 @@ func assertConnClosed(c *gc.C, conn *apiconn.Conn) {
 // connection is responding to requests.
 func (s *jemAPIConnSuite) assertConnectionAlive(c *gc.C, conn *apiconn.Conn) {
 	_, err := cloudapi.NewClient(conn).DefaultCloud()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 // assertModelConnectionAlive asserts that the given model API
 // connection is responding to requests.
 func (s *jemAPIConnSuite) assertModelConnectionAlive(c *gc.C, conn *apiconn.Conn) {
 	_, err := conn.Client().ModelUserInfo()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }

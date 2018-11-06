@@ -48,7 +48,7 @@ func (s *bundleSuite) TestGetChangesBundleVerificationErrors(c *gc.C) {
         `,
 	}
 	r, err := s.getChanges(c, args)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(r.Changes, gc.IsNil)
 	c.Assert(r.Errors, jc.SameContents, []string{
 		`too many units specified in unit placement for application "django"`,
@@ -69,7 +69,7 @@ func (s *bundleSuite) TestGetChangesBundleConstraintsError(c *gc.C) {
         `,
 	}
 	r, err := s.getChanges(c, args)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(r.Changes, gc.IsNil)
 	c.Assert(r.Errors, jc.SameContents, []string{
 		`invalid constraints "bad=wolf" in application "django": unknown constraint "bad"`,
@@ -88,7 +88,7 @@ func (s *bundleSuite) TestGetChangesBundleStorageError(c *gc.C) {
         `,
 	}
 	r, err := s.getChanges(c, args)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(r.Changes, gc.IsNil)
 	c.Assert(r.Errors, jc.SameContents, []string{
 		`invalid storage "bad" in application "django": cannot parse count: count must be greater than zero, got "0"`,
@@ -113,7 +113,7 @@ func (s *bundleSuite) TestGetChangesSuccess(c *gc.C) {
         `,
 	}
 	r, err := s.getChanges(c, args)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(r.Changes, jc.DeepEquals, []*jujuparams.BundleChange{{
 		Id:     "addCharm-0",
 		Method: "addCharm",
@@ -171,7 +171,7 @@ func (s *bundleSuite) TestGetChangesBundleEndpointBindingsSuccess(c *gc.C) {
         `,
 	}
 	r, err := s.getChanges(c, args)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	for _, change := range r.Changes {
 		if change.Method == "deploy" {

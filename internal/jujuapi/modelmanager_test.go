@@ -57,7 +57,7 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
 	modelUUID1 := mi.UUID
 	s.assertCreateModel(c, createModelParams{name: "model-2", username: "test2", cred: cred2})
@@ -66,11 +66,11 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 	err = s.JEM.DB.SetACL(testContext, s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
 		Read: []string{"test"},
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	client := modelmanager.NewClient(conn)
 	models, err := client.ListModelSummaries("test", false)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(models, jemtest.CmpEquals(cmpopts.IgnoreTypes(&time.Time{})), []base.UserModelSummary{{
 		Name:            "model-1",
 		UUID:            modelUUID1,
@@ -148,7 +148,7 @@ func (s *modelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 		Endpoint:       kubetest.ServerURL(kubeconfig),
 		CACertificates: cacerts,
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	credTag := names.NewCloudCredentialTag("test-cloud/test@external/test-cred")
 	cred := cloud.NewCredential(cloud.UserPassAuthType, map[string]string{
@@ -156,20 +156,20 @@ func (s *modelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 		"password": kubetest.Password(kubeconfig),
 	})
 	res, err := cloudclient.UpdateCredentialsCheckModels(credTag, cred)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	for _, model := range res {
 		for _, err := range model.Errors {
-			c.Assert(err, jc.ErrorIsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 	}
 
 	mi, err := modelmanager.NewClient(conn).CreateModel("model-1", "test@external", "test-cloud", "", credTag, nil)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	modelUUID := mi.UUID
 
 	client := modelmanager.NewClient(conn)
 	models, err := client.ListModelSummaries("test", false)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(models, jemtest.CmpEquals(cmpopts.IgnoreTypes(&time.Time{})), []base.UserModelSummary{{
 		Name:            "model-1",
 		UUID:            modelUUID,
@@ -205,7 +205,7 @@ func (s *modelManagerSuite) TestListModels(c *gc.C) {
 	err := s.JEM.DB.SetACL(testContext, s.JEM.DB.Controllers(), ctlPath, params.ACL{
 		Read: []string{"test2"},
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
@@ -218,11 +218,11 @@ func (s *modelManagerSuite) TestListModels(c *gc.C) {
 	err = s.JEM.DB.SetACL(testContext, s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
 		Read: []string{"test"},
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	client := modelmanager.NewClient(conn)
 	models, err := client.ListModels("test")
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(models, jc.DeepEquals, []base.UserModel{{
 		Name:  "model-1",
 		UUID:  modelUUID1,
@@ -260,7 +260,7 @@ func (s *modelManagerSuite) TestListCAASModels(c *gc.C) {
 		Endpoint:       kubetest.ServerURL(kubeconfig),
 		CACertificates: cacerts,
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	credTag := names.NewCloudCredentialTag("test-cloud/test@external/test-cred")
 	cred := cloud.NewCredential(cloud.UserPassAuthType, map[string]string{
@@ -268,20 +268,20 @@ func (s *modelManagerSuite) TestListCAASModels(c *gc.C) {
 		"password": kubetest.Password(kubeconfig),
 	})
 	res, err := cloudclient.UpdateCredentialsCheckModels(credTag, cred)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	for _, model := range res {
 		for _, err := range model.Errors {
-			c.Assert(err, jc.ErrorIsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 	}
 
 	mi, err := modelmanager.NewClient(conn).CreateModel("model-1", "test@external", "test-cloud", "", credTag, nil)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	modelUUID := mi.UUID
 
 	client := modelmanager.NewClient(conn)
 	models, err := client.ListModels("test")
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(models, jc.DeepEquals, []base.UserModel{{
 		Name:  "model-1",
 		UUID:  modelUUID,
@@ -298,7 +298,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 		Read: []string{"test2"},
 	})
 
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: "cred1"})
 	modelUUID1 := mi.UUID
@@ -320,7 +320,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 		ModelUUID: modelUUID3,
 		Id:        "machine-0",
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	machineArch := "bbc-micro"
 	err = s.JEM.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
 		ModelUUID: modelUUID3,
@@ -329,13 +329,13 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			Arch: &machineArch,
 		},
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.JEM.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
 		ModelUUID: modelUUID3,
 		Id:        "machine-2",
 		Life:      "dead",
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
@@ -349,7 +349,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 		names.NewModelTag(modelUUID5),
 		names.NewModelTag("00000000-0000-0000-0000-000000000007"),
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	assertModelInfo(c, models, []jujuparams.ModelInfoResult{{
 		Result: &jujuparams.ModelInfo{
@@ -483,18 +483,18 @@ func (s *modelManagerSuite) TestModelInfoForLegacyModel(c *gc.C) {
 			"defaultseries", 1,
 		}},
 	}})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Sanity check the required fields aren't present.
 	model, err := s.JEM.DB.Model(ctx, params.EntityPath{"test", "model-1"})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(model.Cloud, gc.Equals, params.Cloud(""))
 
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := modelmanager.NewClient(conn)
 	models, err := client.ModelInfo([]names.ModelTag{names.NewModelTag(modelUUID1)})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	assertModelInfo(c, models, []jujuparams.ModelInfoResult{{
 		Result: &jujuparams.ModelInfo{
 			Name:               "model-1",
@@ -521,7 +521,7 @@ func (s *modelManagerSuite) TestModelInfoForLegacyModel(c *gc.C) {
 
 	// Ensure the values in the database have been updated.
 	model, err = s.JEM.DB.Model(ctx, params.EntityPath{"test", "model-1"})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(model.Cloud, gc.Equals, params.Cloud("dummy"))
 	c.Assert(model.CloudRegion, gc.Equals, "dummy-region")
 	c.Assert(model.Credential.String(), gc.Equals, "dummy/test/cred1")
@@ -544,7 +544,7 @@ func (s *modelManagerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 	}
 	s.IDMSrv.AddUser("test", "controller-admin")
 	err := s.NewClient("test").AddController(p)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
 
 	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: "cred1"})
@@ -556,7 +556,7 @@ func (s *modelManagerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 	models, err := client.ModelInfo([]names.ModelTag{
 		names.NewModelTag(mi.UUID),
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	assertModelInfo(c, models, []jujuparams.ModelInfoResult{{
 		Result: &jujuparams.ModelInfo{
@@ -586,7 +586,7 @@ func (s *modelManagerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 	models, err = client.ModelInfo([]names.ModelTag{
 		names.NewModelTag(mi.UUID),
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	assertModelInfo(c, models, []jujuparams.ModelInfoResult{{
 		Result: &jujuparams.ModelInfo{
@@ -617,7 +617,7 @@ func (s *modelManagerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 	models, err = client.ModelInfo([]names.ModelTag{
 		names.NewModelTag(mi.UUID),
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	assertModelInfo(c, models, []jujuparams.ModelInfoResult{{
 		Result: &jujuparams.ModelInfo{
@@ -658,7 +658,7 @@ func (s *modelManagerSuite) TestModelInfoDyingModelNotFound(c *gc.C) {
 			Life: string(jujuparams.Dying),
 		},
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
@@ -667,7 +667,7 @@ func (s *modelManagerSuite) TestModelInfoDyingModelNotFound(c *gc.C) {
 	models, err := client.ModelInfo([]names.ModelTag{
 		names.NewModelTag("00000000-0000-0000-0000-000000000007"),
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	assertModelInfo(c, models, []jujuparams.ModelInfoResult{{
 		Error: &jujuparams.Error{
@@ -790,7 +790,7 @@ func (s *modelManagerSuite) TestCreateModel(c *gc.C) {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
 			continue
 		}
-		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(mi.Name, gc.Equals, test.name)
 		c.Assert(mi.UUID, gc.Not(gc.Equals), "")
 		c.Assert(mi.OwnerTag, gc.Equals, test.ownerTag)
@@ -800,14 +800,14 @@ func (s *modelManagerSuite) TestCreateModel(c *gc.C) {
 			c.Assert(mi.CloudCredentialTag, gc.Equals, "")
 		} else {
 			tag, err := names.ParseCloudCredentialTag(mi.CloudCredentialTag)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			c.Assert(tag.String(), gc.Equals, test.credentialTag)
 		}
 		if test.cloudTag == "" {
 			c.Assert(mi.CloudTag, gc.Equals, "cloud-dummy")
 		} else {
 			ct, err := names.ParseCloudTag(test.cloudTag)
-			c.Assert(err, jc.ErrorIsNil)
+			c.Assert(err, gc.Equals, nil)
 			c.Assert(mi.CloudTag, gc.Equals, names.NewCloudTag(ct.Id()).String())
 		}
 	}
@@ -837,7 +837,7 @@ func (s *modelManagerSuite) TestCreateModelKubernetes(c *gc.C) {
 		Endpoint:       kubetest.ServerURL(kubeconfig),
 		CACertificates: cacerts,
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	credTag := names.NewCloudCredentialTag("test-cloud/test@external/test-cred")
 	cred := cloud.NewCredential(cloud.UserPassAuthType, map[string]string{
@@ -845,15 +845,15 @@ func (s *modelManagerSuite) TestCreateModelKubernetes(c *gc.C) {
 		"password": kubetest.Password(kubeconfig),
 	})
 	res, err := cloudclient.UpdateCredentialsCheckModels(credTag, cred)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	for _, model := range res {
 		for _, err := range model.Errors {
-			c.Assert(err, jc.ErrorIsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 	}
 
 	mi, err := modelmanager.NewClient(conn).CreateModel("test-model", "test@external", "test-cloud", "", credTag, nil)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(mi.Name, gc.Equals, "test-model")
 	c.Assert(mi.Type, gc.Equals, model.CAAS)
 	c.Assert(mi.ProviderType, gc.Equals, "kubernetes")
@@ -876,24 +876,24 @@ func (s *modelManagerSuite) TestGrantAndRevokeModel(c *gc.C) {
 	client2 := modelmanager.NewClient(conn2)
 
 	res, err := client2.ModelInfo([]names.ModelTag{names.NewModelTag(mi.UUID)})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(res, gc.HasLen, 1)
 	c.Assert(res[0].Error, gc.ErrorMatches, "unauthorized")
 
 	err = client.GrantModel("bob@external", "write", mi.UUID)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	res, err = client2.ModelInfo([]names.ModelTag{names.NewModelTag(mi.UUID)})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(res, gc.HasLen, 1)
 	c.Assert(res[0].Error, gc.IsNil)
 	c.Assert(res[0].Result.UUID, gc.Equals, mi.UUID)
 
 	err = client.RevokeModel("bob@external", "read", mi.UUID)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	res, err = client2.ModelInfo([]names.ModelTag{names.NewModelTag(mi.UUID)})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(res, gc.HasLen, 1)
 	c.Assert(res[0].Error, gc.Not(gc.IsNil))
 	c.Assert(res[0].Error, gc.ErrorMatches, "unauthorized")
@@ -988,7 +988,7 @@ func (s *modelManagerSuite) TestModifyModelAccessErrors(c *gc.C) {
 			},
 		}
 		err := conn.APICall("ModelManager", 2, "", "ModifyModelAccess", req, &res)
-		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(res.Results, gc.HasLen, 1)
 		c.Assert(res.Results[0].Error, gc.ErrorMatches, test.expectError)
 	}
@@ -1006,22 +1006,22 @@ func (s *modelManagerSuite) TestDestroyModel(c *gc.C) {
 	client := modelmanager.NewClient(conn)
 	tag := names.NewModelTag(mi.UUID)
 	err := client.DestroyModel(tag, nil)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Check the model is now dying.
 	mis, err := client.ModelInfo([]names.ModelTag{tag})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(mis, gc.HasLen, 1)
 	c.Assert(mis[0].Error, gc.Equals, (*jujuparams.Error)(nil))
 	c.Assert(mis[0].Result.Life, gc.Equals, jujuparams.Dying)
 
 	// Kill the model.
 	err = s.JEM.DB.DeleteModelWithUUID(testContext, ctlPath, mi.UUID)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Make sure it's not an error if you destroy a model that't not there.
 	err = client.DestroyModel(names.NewModelTag(mi.UUID), nil)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *modelManagerSuite) TestDestroyModelWithStorageError(c *gc.C) {
@@ -1031,7 +1031,7 @@ func (s *modelManagerSuite) TestDestroyModelWithStorageError(c *gc.C) {
 	mi := s.assertCreateModel(c, createModelParams{name: "test-model", username: "alice", cred: "cred1"})
 
 	modelState, err := s.StatePool.Get(mi.UUID)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer modelState.Release()
 	f := factory.NewFactory(modelState.State, s.StatePool)
 	f.MakeUnit(c, &factory.UnitParams{
@@ -1055,7 +1055,7 @@ func (s *modelManagerSuite) TestDestroyModelWithStorageError(c *gc.C) {
 
 	// Check the model is not now dying.
 	mis, err := client.ModelInfo([]names.ModelTag{tag})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(mis, gc.HasLen, 1)
 	c.Assert(mis[0].Error, gc.Equals, (*jujuparams.Error)(nil))
 	c.Assert(mis[0].Result.Life, gc.Equals, jujuparams.Alive)
@@ -1068,7 +1068,7 @@ func (s *modelManagerSuite) TestDestroyModelWithStorageDestroyStorageTrue(c *gc.
 	mi := s.assertCreateModel(c, createModelParams{name: "test-model", username: "alice", cred: "cred1"})
 
 	modelState, err := s.StatePool.Get(mi.UUID)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer modelState.Release()
 	f := factory.NewFactory(modelState.State, s.StatePool)
 	f.MakeUnit(c, &factory.UnitParams{
@@ -1092,7 +1092,7 @@ func (s *modelManagerSuite) TestDestroyModelWithStorageDestroyStorageTrue(c *gc.
 
 	// Check the model is not now dying.
 	mis, err := client.ModelInfo([]names.ModelTag{tag})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(mis, gc.HasLen, 1)
 	c.Assert(mis[0].Error, gc.Equals, (*jujuparams.Error)(nil))
 	c.Assert(mis[0].Result.Life, gc.Equals, jujuparams.Dying)
@@ -1105,7 +1105,7 @@ func (s *modelManagerSuite) TestDestroyModelWithStorageDestroyStorageFalse(c *gc
 	mi := s.assertCreateModel(c, createModelParams{name: "test-model", username: "alice", cred: "cred1"})
 
 	modelState, err := s.StatePool.Get(mi.UUID)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer modelState.Release()
 	f := factory.NewFactory(modelState.State, s.StatePool)
 	f.MakeUnit(c, &factory.UnitParams{
@@ -1129,7 +1129,7 @@ func (s *modelManagerSuite) TestDestroyModelWithStorageDestroyStorageFalse(c *gc
 
 	// Check the model is not now dying.
 	mis, err := client.ModelInfo([]names.ModelTag{tag})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(mis, gc.HasLen, 1)
 	c.Assert(mis[0].Error, gc.Equals, (*jujuparams.Error)(nil))
 	c.Assert(mis[0].Result.Life, gc.Equals, jujuparams.Dying)
@@ -1158,7 +1158,7 @@ func (s *modelManagerSuite) TestDestroyModelV3(c *gc.C) {
 	// Check the model is now dying.
 	client := modelmanager.NewClient(conn)
 	mis, err := client.ModelInfo([]names.ModelTag{tag})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(mis, gc.HasLen, 1)
 	c.Assert(mis[0].Error, gc.Equals, (*jujuparams.Error)(nil))
 	c.Assert(mis[0].Result.Life, gc.Equals, jujuparams.Dying)

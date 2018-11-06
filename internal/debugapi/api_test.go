@@ -95,7 +95,7 @@ func (s *APISuite) TestDebugUsageSenderCheckError(c *gc.C) {
 	}
 	decoder := json.NewDecoder(resp.Body)
 	err := decoder.Decode(&errorMessage)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(errorMessage.Message, gc.Equals, "check failed: an embarassing error")
 
 	s.Suite.MetricsRegistrationClient.CheckCalls(c, []testing.StubCall{{

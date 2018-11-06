@@ -99,7 +99,7 @@ func (s *ConfigSuite) readConfig(c *gc.C, content string) (*config.Config, error
 	// Write the configuration content to file.
 	path := path.Join(c.MkDir(), "jemd.conf")
 	err := ioutil.WriteFile(path, []byte(content), 0666)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Read the configuration.
 	return config.Read(path)
@@ -107,11 +107,11 @@ func (s *ConfigSuite) readConfig(c *gc.C, content string) (*config.Config, error
 
 func (s *ConfigSuite) TestRead(c *gc.C) {
 	conf, err := s.readConfig(c, testConfig)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Check that the TLS configuration creates a valid *tls.Config
 	tlsConfig, err := conf.TLSConfig()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(tlsConfig, gc.Not(gc.IsNil))
 	conf.TLSCert = ""
 	conf.TLSKey = ""

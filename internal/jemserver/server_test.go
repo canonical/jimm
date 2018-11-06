@@ -81,7 +81,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	h, err := jemserver.New(testContext, serverParams, map[string]jemserver.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 	assertServesVersion(c, h, "version1")
 	assertDoesNotServeVersion(c, h, "version2")
@@ -91,7 +91,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 		"version1": serveVersion("version1"),
 		"version2": serveVersion("version2"),
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 	assertServesVersion(c, h, "version1")
 	assertServesVersion(c, h, "version2")
@@ -102,7 +102,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 		"version2": serveVersion("version2"),
 		"version3": serveVersion("version3"),
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 	assertServesVersion(c, h, "version1")
 	assertServesVersion(c, h, "version2")
@@ -149,7 +149,7 @@ func (s *serverSuite) TestServerHasAccessControlAllowOrigin(c *gc.C) {
 		},
 	}
 	h, err := jemserver.New(testContext, serverParams, impl)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: h,
@@ -190,7 +190,7 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 		ControllerAdmin: "controller-admin",
 		SessionPool:     sessionPool,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer pool.Close()
 	j := pool.JEM(context.TODO())
 	defer j.Close()
@@ -203,7 +203,7 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 		AdminUser: "bob",
 		HostPorts: [][]mongodoc.HostPort{{{Host: "0.1.2.3", Port: 4567}}},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	params := jemserver.Params{
 		DB:               db,
@@ -222,14 +222,14 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 			return nil, nil
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 
 	// Poll the database to check that the monitor lease is taken out.
 	var ctl *mongodoc.Controller
 	for a := jujutesting.LongAttempt.Start(); a.Next(); {
 		ctl, err = j.DB.Controller(testContext, ctlPath)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		if ctl.MonitorLeaseOwner != "" {
 			break
 		}

@@ -17,7 +17,6 @@ import (
 	"github.com/juju/juju/controller"
 	"github.com/juju/simplekv/mgosimplekv"
 	"github.com/juju/testing"
-	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"github.com/rogpeppe/fastuuid"
 	gc "gopkg.in/check.v1"
@@ -77,7 +76,7 @@ func (s *Suite) SetUpTest(c *gc.C) {
 	conn := s.OpenControllerAPI(c)
 	defer conn.Close()
 	err := controllerapi.NewClient(conn).GrantController("everyone@external", "login")
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.PatchValue(&jem.APIOpenTimeout, time.Duration(0))
 	s.MetricsRegistrationClient = &stubMetricsRegistrationClient{}
 	s.PatchValue(&jem.NewUsageSenderAuthorizationClient, func(_ string, _ *httpbakery.Client) (jem.UsageSenderAuthorizationClient, error) {
@@ -106,7 +105,7 @@ func (s *Suite) NewJEMPool(c *gc.C, sessionPool *mgosession.Pool) *jem.Pool {
 		ControllerAdmin: "controller-admin",
 		SessionPool:     sessionPool,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	session.Close()
 	return pool
 }
@@ -158,7 +157,7 @@ func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server,
 		config.GUILocation = params.GUILocation
 	}
 	srv, err := external_jem.NewServer(context.TODO(), config)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	return srv.(*jemserver.Server)
 }
 
@@ -166,7 +165,7 @@ func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server,
 // and checks that id succeeds. It returns the controller id.
 func (s *Suite) AssertAddController(c *gc.C, path params.EntityPath, public bool) params.EntityPath {
 	err := s.AddController(c, path, public)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	return path
 }
 
@@ -207,10 +206,10 @@ func (s *Suite) AssertAddControllerDoc(c *gc.C, cnt *mongodoc.Controller, primar
 		cnt.UUID = fmt.Sprintf("%x", uuidGenerator.Next())
 	}
 	err := s.JEM.DB.AddController(context.Background(), cnt)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	if primaryCloudRegion != nil {
 		err = s.JEM.DB.UpdateCloudRegions(context.Background(), []mongodoc.CloudRegion{*primaryCloudRegion})
-		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 	return cnt
 }
@@ -244,7 +243,7 @@ func (s *Suite) CreateModel(c *gc.C, path, ctlPath params.EntityPath, cred param
 			Config: dummyModelConfig,
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	s.MetricsRegistrationClient.CheckCalls(c, []testing.StubCall{{
 		FuncName: "AuthorizeReseller",
@@ -259,7 +258,7 @@ func (s *Suite) CreateModel(c *gc.C, path, ctlPath params.EntityPath, cred param
 
 func (s *Suite) AssertUpdateCredential(c *gc.C, user params.User, cloud params.Cloud, name params.Name, authType string) params.Name {
 	err := s.UpdateCredential(user, cloud, name, authType)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	return name
 }
 

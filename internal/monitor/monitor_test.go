@@ -33,7 +33,7 @@ func (s *monitorSuite) TestMonitor(c *gc.C) {
 	info := s.APIInfo(c)
 
 	hps, err := mongodoc.ParseAddresses(info.Addrs)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = s.JEM.DB.AddController(testContext, &mongodoc.Controller{
 		Path:          ctlPath,
@@ -43,7 +43,7 @@ func (s *monitorSuite) TestMonitor(c *gc.C) {
 		AdminPassword: info.Password,
 	})
 
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Start a monitor.
 	m := monitor.New(context.TODO(), s.Pool, "jem1")
@@ -53,7 +53,7 @@ func (s *monitorSuite) TestMonitor(c *gc.C) {
 	var ctl *mongodoc.Controller
 	for a := jujutesting.LongAttempt.Start(); a.Next(); {
 		ctl, err = s.JEM.DB.Controller(testContext, ctlPath)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		if ctl.Stats != (mongodoc.ControllerStats{}) {
 			break
 		}
@@ -88,7 +88,7 @@ func (s *monitorSuite) TestMonitorWithBrokenMongoConnection(c *gc.C) {
 	defer jem.Close()
 
 	hps, err := mongodoc.ParseAddresses(apiInfo.Addrs)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = jem.DB.AddController(testContext, &mongodoc.Controller{
 		Path:          ctlPath,
@@ -98,7 +98,7 @@ func (s *monitorSuite) TestMonitorWithBrokenMongoConnection(c *gc.C) {
 		AdminPassword: apiInfo.Password,
 	})
 
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Start a monitor.
 	m := monitor.New(context.TODO(), pool, "jem1")
@@ -128,7 +128,7 @@ func (s *monitorSuite) TestMonitorWithBrokenMongoConnection(c *gc.C) {
 
 	// Check that it shuts down cleanly.
 	err = worker.Stop(m)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *monitorSuite) TestMonitorWithBrokenJujuAPIConnection(c *gc.C) {
@@ -140,7 +140,7 @@ func (s *monitorSuite) TestMonitorWithBrokenJujuAPIConnection(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 
 	hps, err := mongodoc.ParseAddresses([]string{proxy.Addr()})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = s.JEM.DB.AddController(testContext, &mongodoc.Controller{
 		Path:          ctlPath,
@@ -150,7 +150,7 @@ func (s *monitorSuite) TestMonitorWithBrokenJujuAPIConnection(c *gc.C) {
 		AdminPassword: apiInfo.Password,
 	})
 
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Start a monitor.
 	m := monitor.New(context.TODO(), s.Pool, "jem1")
@@ -181,7 +181,7 @@ func (s *monitorSuite) TestMonitorWithBrokenJujuAPIConnection(c *gc.C) {
 func (s *monitorSuite) waitControllerStats(c *gc.C, ctlPath params.EntityPath, oldStats mongodoc.ControllerStats) mongodoc.ControllerStats {
 	for a := jujutesting.LongAttempt.Start(); a.Next(); {
 		ctl, err := s.JEM.DB.Controller(testContext, ctlPath)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		if ctl.Stats != oldStats {
 			return ctl.Stats
 		}
