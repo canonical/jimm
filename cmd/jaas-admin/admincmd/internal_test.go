@@ -51,7 +51,7 @@ func (s *internalSuite) TestEntityPathValue(c *gc.C) {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
 			continue
 		}
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(p.EntityPath, gc.Equals, test.expectEntityPath)
 	}
 }
@@ -90,7 +90,7 @@ func (s *internalSuite) TestEntityPathsValue(c *gc.C) {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
 			continue
 		}
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(p.paths, jc.DeepEquals, test.expectEntityPaths)
 	}
 }

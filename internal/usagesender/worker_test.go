@@ -13,7 +13,6 @@ import (
 	"github.com/juju/clock/testclock"
 	"github.com/juju/httprequest"
 	jujujujutesting "github.com/juju/juju/testing"
-	jc "github.com/juju/testing/checkers"
 	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
 
@@ -114,7 +113,7 @@ func (s *spoolDirMetricRecorderSuite) TestSpool(c *gc.C) {
 		params.MachineCount: 0,
 		params.UnitCount:    17,
 	}, s.Clock.Now())
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	s.Clock.WaitAdvance(6*time.Minute, jujujujutesting.LongWait, 1)
 
@@ -132,7 +131,7 @@ func (s *spoolDirMetricRecorderSuite) TestSpool(c *gc.C) {
 		params.MachineCount: 0,
 		params.UnitCount:    42,
 	}, s.Clock.Now())
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	s.Clock.WaitAdvance(6*time.Minute, jujujujutesting.LongWait, 1)
 
@@ -167,7 +166,7 @@ func (s *usageSenderSuite) setUnitNumberAndCheckSentMetrics(c *gc.C, ctlPath par
 		params.MachineCount: 0,
 		params.UnitCount:    unitCount,
 	}, s.Clock.Now())
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	s.Clock.WaitAdvance(6*time.Minute, jujujujutesting.LongWait, 1)
 
@@ -188,7 +187,7 @@ func (s *usageSenderSuite) setUnitNumberAndCheckSentMetrics(c *gc.C, ctlPath par
 			c.Fatal("timed out waiting for metrics batch to be acknowledged")
 		}
 		err = os.RemoveAll(s.MetricsSpoolPath)
-		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 }
 

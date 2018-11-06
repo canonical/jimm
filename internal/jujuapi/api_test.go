@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
-	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 
@@ -92,7 +91,7 @@ func AssertRedirect(c *gc.C, p RedirectParams) {
 		p.Method = "GET"
 	}
 	req, err := http.NewRequest(p.Method, p.URL, nil)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	rr := httptest.NewRecorder()
 	p.Handler.ServeHTTP(rr, req)
 	if p.ExpectCode == 0 {

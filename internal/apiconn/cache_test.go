@@ -34,14 +34,14 @@ func (s *cacheSuite) TestOpenAPI(c *gc.C) {
 		info = s.APIInfo(c)
 		return apiOpen(info, api.DialOpts{})
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(conn.Ping(), gc.IsNil)
 	c.Assert(conn.Info, gc.Equals, info)
 
 	// If we close the connection, it should still remain around
 	// in the cache.
 	err = conn.Close()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(conn.Ping(), gc.IsNil)
 
 	// If we open the same uuid, we should get
@@ -53,17 +53,17 @@ func (s *cacheSuite) TestOpenAPI(c *gc.C) {
 	})
 	c.Assert(conn1.Connection, gc.Equals, conn.Connection)
 	err = conn1.Close()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(conn1.Ping(), gc.IsNil)
 
 	// Check that Close is idempotent.
 	err = conn1.Close()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(conn1.Ping(), gc.IsNil)
 
 	// When we close the cache, the connection should be finally closed.
 	err = cache.Close()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	assertConnIsClosed(c, conn)
 }
@@ -134,12 +134,12 @@ func (s *cacheSuite) TestEvict(c *gc.C) {
 	}
 
 	conn, err := cache.OpenAPI(context.Background(), "uuid", dial)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(dialCount, gc.Equals, 1)
 
 	// Try again just to sanity check that we're caching it.
 	conn1, err := cache.OpenAPI(context.Background(), "uuid", dial)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(dialCount, gc.Equals, 1)
 	conn1.Close()
 
@@ -151,7 +151,7 @@ func (s *cacheSuite) TestEvict(c *gc.C) {
 	assertConnIsClosed(c, conn)
 
 	conn, err = cache.OpenAPI(context.Background(), "uuid", dial)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	conn.Close()
 	c.Assert(dialCount, gc.Equals, 2)
 }
@@ -161,7 +161,7 @@ func (s *cacheSuite) TestEvictAll(c *gc.C) {
 	conn, err := cache.OpenAPI(context.Background(), "uuid0", func() (api.Connection, *api.Info, error) {
 		return apiOpen(s.APIInfo(c), api.DialOpts{})
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	conn.Close()
 
 	_, err = cache.OpenAPI(context.Background(), "uuid1", func() (api.Connection, *api.Info, error) {
@@ -179,7 +179,7 @@ func (s *cacheSuite) TestEvictAll(c *gc.C) {
 			called++
 			return fakeConn{}, &api.Info{}, nil
 		})
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 	c.Assert(called, gc.Equals, 2)
 }
@@ -190,7 +190,7 @@ func (s *cacheSuite) TestOpenAPIWithBrokenConnection(c *gc.C) {
 	conn, err := cache.OpenAPI(context.Background(), "uuid0", func() (api.Connection, *api.Info, error) {
 		return c0, &api.Info{}, nil
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(conn.Connection, gc.Equals, c0)
 
 	// Because the earlier connection is flagged as broken,
@@ -222,7 +222,7 @@ func (s *cacheSuite) TestContextCancel(c *gc.C) {
 		<-ch
 		return c1, &api.Info{}, nil
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(conn.Connection, gc.Equals, c0)
 }
 
@@ -272,7 +272,7 @@ func (s *cacheSuite) TestEvictOnUpgradeInProgress(c *gc.C) {
 
 	// Try once again before upgrading, for luck.
 	conn, err = cache.OpenAPI(context.Background(), uuid, dial)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
 	err = callAPI(conn)
 	c.Check(params.ErrCode(err), gc.Equals, params.CodeUpgradeInProgress)
@@ -283,7 +283,7 @@ func (s *cacheSuite) TestEvictOnUpgradeInProgress(c *gc.C) {
 	close(upgraded)
 
 	conn, err = cache.OpenAPI(context.Background(), uuid, dial)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
 	err = callAPI(conn)
 	c.Check(err, gc.Equals, nil)

@@ -47,7 +47,7 @@ func (s *controllerSuite) TestServerVersion(c *gc.C) {
 	s.AssertAddController(c, ctlPath, true)
 	testVersion := version.MustParse("5.4.3")
 	err := s.JEM.DB.SetControllerVersion(testContext, ctlPath, testVersion)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
@@ -95,7 +95,7 @@ func (s *controllerSuite) TestLoginToController(c *gc.C) {
 	}, "test")
 	defer conn.Close()
 	err := conn.Login(nil, "", "", nil)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	var resp jujuparams.RedirectInfoResult
 	err = conn.APICall("Admin", 3, "", "RedirectInfo", nil, &resp)
 	c.Assert(err, gc.ErrorMatches, `no such request - method Admin.RedirectInfo is not implemented \(not implemented\)`)
@@ -104,7 +104,7 @@ func (s *controllerSuite) TestLoginToController(c *gc.C) {
 func (s *controllerSuite) TestLoginToControllerWithInvalidMacaroon(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	invalidMacaroon, err := macaroon.New(nil, nil, "")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	conn := s.open(c, &api.Info{
 		Macaroons: []macaroon.Slice{{invalidMacaroon}},
 	}, "test")
@@ -164,9 +164,9 @@ func (s *controllerSuite) TestDefaultCloud(c *gc.C) {
 	for i, test := range defaultCloudTests {
 		c.Logf("test %d: %s", i, test.about)
 		_, err := s.JEM.DB.Controllers().RemoveAll(nil)
-		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(err, gc.Equals, nil)
 		_, err = s.JEM.DB.CloudRegions().RemoveAll(nil)
-		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(err, gc.Equals, nil)
 		for j, cloud := range test.cloudNames {
 			ctlPath := params.EntityPath{User: "test", Name: params.Name(fmt.Sprintf("controller-%d", j))}
 			err := s.JEM.DB.AddController(testContext, &mongodoc.Controller{
@@ -176,7 +176,7 @@ func (s *controllerSuite) TestDefaultCloud(c *gc.C) {
 				UUID:   fmt.Sprintf("uuid%d", j),
 				Public: true,
 			})
-			c.Assert(err, jc.ErrorIsNil)
+			c.Assert(err, gc.Equals, nil)
 			err = s.JEM.DB.UpdateCloudRegions(testContext, []mongodoc.CloudRegion{{
 				Cloud:              params.Cloud(cloud),
 				PrimaryControllers: []params.EntityPath{ctlPath},
@@ -184,7 +184,7 @@ func (s *controllerSuite) TestDefaultCloud(c *gc.C) {
 					Read: []string{"everyone"},
 				},
 			}})
-			c.Assert(err, jc.ErrorIsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 		cloud, err := client.DefaultCloud()
 		if test.expect == "" {
@@ -193,7 +193,7 @@ func (s *controllerSuite) TestDefaultCloud(c *gc.C) {
 			c.Check(cloud, gc.Equals, names.CloudTag{})
 			continue
 		}
-		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(cloud, gc.Equals, names.NewCloudTag(test.expect))
 	}
 }
@@ -204,7 +204,7 @@ func (s *controllerSuite) TestCloudCall(c *gc.C) {
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
 	info, err := client.Cloud(names.NewCloudTag("dummy"))
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(info, jc.DeepEquals, cloud.Cloud{
 		Name:      "dummy",
 		Type:      "dummy",
@@ -229,7 +229,7 @@ func (s *controllerSuite) TestClouds(c *gc.C) {
 
 	client := cloudapi.NewClient(conn)
 	clouds, err := client.Clouds()
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(clouds, jc.DeepEquals, map[names.CloudTag]cloud.Cloud{
 		names.NewCloudTag("dummy"): {
 			Name:      "dummy",
@@ -266,7 +266,7 @@ func (s *controllerSuite) TestUserCredentials(c *gc.C) {
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
 	creds, err := client.UserCredentials(names.NewUserTag("test@external"), names.NewCloudTag("dummy"))
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []names.CloudCredentialTag{
 		names.NewCloudCredentialTag("dummy/test@external/cred1"),
 	})
@@ -290,7 +290,7 @@ func (s *controllerSuite) TestUserCredentialsWithDomain(c *gc.C) {
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
 	creds, err := client.UserCredentials(names.NewUserTag("test@domain"), names.NewCloudTag("dummy"))
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []names.CloudCredentialTag{
 		names.NewCloudCredentialTag("dummy/test@domain/cred1"),
 	})
@@ -329,7 +329,7 @@ func (s *controllerSuite) TestUserCredentialsACL(c *gc.C) {
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
 	creds, err := client.UserCredentials(names.NewUserTag("test2@external"), names.NewCloudTag("dummy"))
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []names.CloudCredentialTag{
 		names.NewCloudCredentialTag("dummy/test2@external/cred2"),
 	})
@@ -347,7 +347,7 @@ func (s *controllerSuite) TestUserCredentialsErrors(c *gc.C) {
 	}
 	var resp jujuparams.StringsResults
 	err := conn.APICall("Cloud", 1, "", "UserCredentials", req, &resp)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `"not-a-user-tag" is not a valid tag`)
 	c.Assert(resp.Results, gc.HasLen, 1)
 }
@@ -359,14 +359,14 @@ func (s *controllerSuite) TestUpdateCloudCredentials(c *gc.C) {
 	client := cloudapi.NewClient(conn)
 	credentialTag := names.NewCloudCredentialTag(fmt.Sprintf("dummy/test@external/cred3"))
 	_, err := client.UpdateCredentialsCheckModels(credentialTag, cloud.NewCredential("credtype", map[string]string{"attr1": "val31", "attr2": "val32"}))
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	creds, err := client.UserCredentials(names.NewUserTag("test@external"), names.NewCloudTag("dummy"))
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []names.CloudCredentialTag{credentialTag})
 	_, err = client.UpdateCredentialsCheckModels(credentialTag, cloud.NewCredential("credtype", map[string]string{"attr1": "val33", "attr2": "val34"}))
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	creds, err = client.UserCredentials(names.NewUserTag("test@external"), names.NewCloudTag("dummy"))
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	var _ = creds
 }
 
@@ -403,7 +403,7 @@ func (s *controllerSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
 	}
 	var resp jujuparams.ErrorResults
 	err := conn.APICall("Cloud", 1, "", "UpdateCredentials", req, &resp)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(resp.Results, gc.HasLen, 3)
 	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `"not-a-cloud-credentials-tag" is not a valid tag`)
 	c.Assert(resp.Results[1].Error, gc.ErrorMatches, `unauthorized`)
@@ -428,11 +428,11 @@ func (s *controllerSuite) TestCredential(c *gc.C) {
 
 	client := cloudapi.NewClient(conn)
 	_, err := client.UpdateCredentialsCheckModels(cred1Tag, cred1)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	_, err = client.UpdateCredentialsCheckModels(cred2Tag, cred2)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	_, err = client.UpdateCredentialsCheckModels(cred5Tag, cred5)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	creds, err := client.Credentials(
 		cred1Tag,
@@ -442,7 +442,7 @@ func (s *controllerSuite) TestCredential(c *gc.C) {
 		cred5Tag,
 		names.NewCloudCredentialTag("dummy/admin@local/cred6"),
 	)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Result: &jujuparams.CloudCredential{
 			AuthType: "userpass",
@@ -490,16 +490,16 @@ func (s *controllerSuite) TestRevokeCredential(c *gc.C) {
 		credTag,
 		cloud.NewCredential("empty", nil),
 	)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	tags, err := client.UserCredentials(credTag.Owner(), credTag.Cloud())
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(tags, jc.DeepEquals, []names.CloudCredentialTag{
 		credTag,
 	})
 
 	ccr, err := client.Credentials(credTag)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(ccr, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Result: &jujuparams.CloudCredential{
 			AuthType: "empty",
@@ -507,10 +507,10 @@ func (s *controllerSuite) TestRevokeCredential(c *gc.C) {
 	}})
 
 	err = client.RevokeCredential(credTag)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	ccr, err = client.Credentials(credTag)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(ccr, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Error: &jujuparams.Error{
 			Code:    jujuparams.CodeNotFound,
@@ -519,7 +519,7 @@ func (s *controllerSuite) TestRevokeCredential(c *gc.C) {
 	}})
 
 	tags, err = client.UserCredentials(credTag.Owner(), credTag.Cloud())
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(tags, jc.DeepEquals, []names.CloudCredentialTag{})
 }
 
@@ -536,9 +536,9 @@ func (s *controllerSuite) TestAddCloud(c *gc.C) {
 		IdentityEndpoint: "https://1.2.3.4:5679",
 		StorageEndpoint:  "https://1.2.3.4:5680",
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	clouds, err := client.Clouds()
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(clouds[names.NewCloudTag("test-cloud")], jc.DeepEquals, cloud.Cloud{
 		Name:             "test-cloud",
 		Type:             "kubernetes",
@@ -580,9 +580,9 @@ func (s *controllerSuite) TestAddCredential(c *gc.C) {
 			},
 		),
 	)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	creds, err := client.CredentialContents("dummy", "cred3", true)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []jujuparams.CredentialContentResult{{
 		Result: &jujuparams.ControllerCredentialInfo{
 			Content: jujuparams.CredentialContent{
@@ -606,9 +606,9 @@ func (s *controllerSuite) TestAddCredential(c *gc.C) {
 			},
 		),
 	)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	creds, err = client.CredentialContents("dummy", "cred3", true)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []jujuparams.CredentialContentResult{{
 		Result: &jujuparams.ControllerCredentialInfo{
 			Content: jujuparams.CredentialContent{
@@ -640,9 +640,9 @@ func (s *controllerSuite) TestCredentialContents(c *gc.C) {
 			},
 		),
 	)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	creds, err := client.CredentialContents("dummy", "cred3", false)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []jujuparams.CredentialContentResult{{
 		Result: &jujuparams.ControllerCredentialInfo{
 			Content: jujuparams.CredentialContent{
@@ -658,10 +658,10 @@ func (s *controllerSuite) TestCredentialContents(c *gc.C) {
 
 	mmclient := modelmanager.NewClient(conn)
 	_, err = mmclient.CreateModel("model1", "test@external", "dummy", "", credentialTag, nil)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	creds, err = client.CredentialContents("dummy", "cred3", true)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []jujuparams.CredentialContentResult{{
 		Result: &jujuparams.ControllerCredentialInfo{
 			Content: jujuparams.CredentialContent{
@@ -694,9 +694,9 @@ func (s *controllerSuite) TestRemoveCloud(c *gc.C) {
 		IdentityEndpoint: "https://1.2.3.4:5679",
 		StorageEndpoint:  "https://1.2.3.4:5680",
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	clouds, err := client.Clouds()
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(clouds[names.NewCloudTag("test-cloud")], jc.DeepEquals, cloud.Cloud{
 		Name:             "test-cloud",
 		Type:             "kubernetes",
@@ -707,9 +707,9 @@ func (s *controllerSuite) TestRemoveCloud(c *gc.C) {
 	})
 
 	err = client.RemoveCloud("test-cloud")
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	clouds, err = client.Clouds()
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(clouds[names.NewCloudTag("test-cloud")], jc.DeepEquals, cloud.Cloud{})
 }
 
@@ -737,7 +737,7 @@ func (s *controllerSuite) TestUserModelStats(c *gc.C) {
 		Read: []string{"test2"},
 	})
 
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	model1 := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
 	model2 := s.assertCreateModel(c, createModelParams{name: "model-2", username: "test2", cred: cred2})
@@ -750,17 +750,17 @@ func (s *controllerSuite) TestUserModelStats(c *gc.C) {
 		params.UnitCount: 99,
 	}, t0)
 
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.JEM.DB.UpdateModelCounts(testContext, ctlPath, model2.UUID, map[params.EntityCount]int{
 		params.MachineCount: 10,
 	}, t0)
 
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.JEM.DB.UpdateModelCounts(testContext, ctlPath, model3.UUID, map[params.EntityCount]int{
 		params.ApplicationCount: 1,
 	}, t0)
 
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Allow test2/model-3 access to everyone, so that we can be sure we're
 	// not seeing models that we have access to but aren't the creator of.
@@ -773,7 +773,7 @@ func (s *controllerSuite) TestUserModelStats(c *gc.C) {
 	defer conn.Close()
 	var resp params.UserModelStatsResponse
 	err = conn.APICall("JIMM", 1, "", "UserModelStats", nil, &resp)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	c.Assert(resp, jc.DeepEquals, params.UserModelStatsResponse{
 		Models: map[string]params.ModelStats{
@@ -800,7 +800,7 @@ func (s *controllerSuite) TestUserModelStats(c *gc.C) {
 	defer conn.Close()
 	resp = params.UserModelStatsResponse{}
 	err = conn.APICall("JIMM", 1, "", "UserModelStats", nil, &resp)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	c.Assert(resp, jc.DeepEquals, params.UserModelStatsResponse{
 		Models: map[string]params.ModelStats{
@@ -843,7 +843,7 @@ func (s *controllerSuite) TestControllerConfig(c *gc.C) {
 	defer conn.Close()
 	client := controllerapi.NewClient(conn)
 	conf, err := client.ControllerConfig()
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(conf, jc.DeepEquals, controller.Config(map[string]interface{}{
 		"charmstore-url": "https://api.jujucharms.com/charmstore",
 		"metering-url":   "https://api.jujucharms.com/omnibus",
@@ -858,7 +858,7 @@ func (s *controllerSuite) TestAllModels(c *gc.C) {
 		Read: []string{"test2"},
 	})
 
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: "cred1"})
 	modelUUID1 := mi.UUID
@@ -874,10 +874,10 @@ func (s *controllerSuite) TestAllModels(c *gc.C) {
 		Read: []string{"test"},
 	})
 
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	models, err := client.AllModels()
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(models, jc.DeepEquals, []base.UserModel{{
 		Name:           "model-1",
 		UUID:           modelUUID1,
@@ -901,7 +901,7 @@ func (s *controllerSuite) TestModelStatus(c *gc.C) {
 		Read: []string{"test2"},
 	})
 
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: "cred1"})
 	modelUUID1 := mi.UUID
@@ -914,14 +914,14 @@ func (s *controllerSuite) TestModelStatus(c *gc.C) {
 		Read: []string{"test"},
 	})
 
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	type modelStatuser interface {
 		ModelStatus(tags ...names.ModelTag) ([]base.ModelStatus, error)
 	}
 	doTest := func(client modelStatuser) {
 		models, err := client.ModelStatus(names.NewModelTag(modelUUID1), names.NewModelTag(modelUUID3))
-		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(models, jc.DeepEquals, []base.ModelStatus{{
 			UUID:               modelUUID1,
 			Life:               "alive",
@@ -1040,7 +1040,7 @@ func (s *controllerSuite) TestPingerUpdatesHeartMonitor(c *gc.C) {
 	defer conn.Close()
 	beats := hm.beats()
 	err := conn.APICall("Pinger", 1, "", "Ping", nil, nil)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(hm.beats(), gc.Equals, beats+1)
 }
 
@@ -1052,7 +1052,7 @@ func (s *controllerSuite) TestUnauthenticatedPinger(c *gc.C) {
 	conn := s.open(c, &api.Info{SkipLogin: true}, "test")
 	defer conn.Close()
 	err := conn.APICall("Pinger", 1, "", "Ping", nil, nil)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(hm.beats(), gc.Equals, 1)
 }
 

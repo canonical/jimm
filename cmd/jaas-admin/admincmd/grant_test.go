@@ -75,7 +75,7 @@ func (s *grantSuite) TestGrant(c *gc.C) {
 			Name: "foo",
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Add alice to controller permissions list.
 	stdout, stderr, code = run(c, c.MkDir(),
@@ -95,7 +95,7 @@ func (s *grantSuite) TestGrant(c *gc.C) {
 			Name: "foo",
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	bobClient := s.jemClient("bob")
 
@@ -116,7 +116,7 @@ func (s *grantSuite) TestGrant(c *gc.C) {
 			Name: "foo",
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(acl, jc.DeepEquals, params.ACL{
 		Read: []string{"chloe", "daisy", "emily@bar"},
 	})

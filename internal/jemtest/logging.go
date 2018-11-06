@@ -59,7 +59,7 @@ func (s *LoggingSuite) setUp(c *gc.C) {
 		level = envLevel
 	}
 	err := loggo.ConfigureLoggers(level)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 type discardWriter struct{}

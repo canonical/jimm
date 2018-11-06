@@ -41,13 +41,13 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 		Location: "here",
 		Locator:  s.idmSrv,
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.sessionPool = mgosession.NewPool(context.TODO(), s.Session, 5)
 	idmClient, err := idmclient.New(idmclient.NewParams{
 		BaseURL: s.idmSrv.URL.String(),
 		Client:  s.idmSrv.Client("test-user"),
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.pool, err = auth.NewPool(context.TODO(), auth.Params{
 		Bakery:   bakery,
 		RootKeys: mgostorage.NewRootKeys(100),
@@ -59,7 +59,7 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 		PermChecker:        idmclient.NewPermChecker(idmClient, time.Second),
 		IdentityLocation:   s.idmSrv.URL.String(),
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *authSuite) TearDownTest(c *gc.C) {
@@ -84,13 +84,13 @@ func (s *authSuite) TestAuthenticate(c *gc.C) {
 	_, m, _ := a.Authenticate(ctx, nil, checkers.New())
 	ms := s.discharge(c, m, "bob")
 	ctx2, m, err := a.Authenticate(ctx, []macaroon.Slice{ms}, checkers.New())
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(m, gc.IsNil)
 	err = auth.CheckIsUser(ctx, "bob")
 	c.Assert(err, gc.ErrorMatches, `unauthorized`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
 	err = auth.CheckIsUser(ctx2, "bob")
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *authSuite) TestAuthenticateRequest(c *gc.C) {
@@ -99,7 +99,7 @@ func (s *authSuite) TestAuthenticateRequest(c *gc.C) {
 	ctx := context.Background()
 	req, err := http.NewRequest("GET", "/", nil)
 	req.RequestURI = "/"
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	ctx2, err := a.AuthenticateRequest(ctx, req)
 	c.Assert(ctx2, gc.Equals, ctx)
 	c.Assert(err, gc.ErrorMatches, `verification failed: no macaroons`)
@@ -107,21 +107,21 @@ func (s *authSuite) TestAuthenticateRequest(c *gc.C) {
 	c.Assert(ok, gc.Equals, true)
 	ms := s.discharge(c, herr.Info.Macaroon, "bob")
 	cookie, err := httpbakery.NewCookie(ms)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	req.AddCookie(cookie)
 	ctx3, err := a.AuthenticateRequest(ctx, req)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = auth.CheckIsUser(ctx2, "bob")
 	c.Assert(err, gc.ErrorMatches, `unauthorized`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
 	err = auth.CheckIsUser(ctx3, "bob")
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *authSuite) TestCheckIsUser(c *gc.C) {
 	ctx := auth.ContextWithUser(context.Background(), "bob")
 	err := auth.CheckIsUser(ctx, "bob")
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = auth.CheckIsUser(ctx, "alice")
 	c.Assert(err, gc.ErrorMatches, `unauthorized`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
@@ -130,12 +130,12 @@ func (s *authSuite) TestCheckIsUser(c *gc.C) {
 func (s *authSuite) TestCheckACL(c *gc.C) {
 	ctx := auth.ContextWithUser(context.Background(), "bob")
 	err := auth.CheckACL(ctx, []string{"bob", "charlie"})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = auth.CheckACL(ctx, []string{"alice", "charlie"})
 	c.Assert(err, gc.ErrorMatches, `unauthorized`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
 	err = auth.CheckACL(ctx, []string{"alice", "charlie", "everyone"})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 var canReadTests = []struct {
@@ -180,7 +180,7 @@ func (s *authSuite) TestCheckCanRead(c *gc.C) {
 			readers: test.readers,
 		})
 		if test.allowed {
-			c.Assert(err, jc.ErrorIsNil)
+			c.Assert(err, gc.Equals, nil)
 			continue
 		}
 		c.Assert(err, gc.ErrorMatches, `unauthorized`)
@@ -195,7 +195,7 @@ func (s *authSuite) TestUsername(c *gc.C) {
 	_, m, _ := a.Authenticate(nil, nil, checkers.New())
 	ms := s.discharge(c, m, "bob")
 	ctx, _, err := a.Authenticate(context.Background(), []macaroon.Slice{ms}, checkers.New())
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(auth.Username(ctx), gc.Equals, "bob")
 }
 
@@ -204,7 +204,7 @@ func (s *authSuite) discharge(c *gc.C, m *macaroon.Macaroon, username string, gr
 	s.idmSrv.SetDefaultUser(username)
 	cl := s.idmSrv.Client(username)
 	ms, err := cl.DischargeAll(m)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	return ms
 }
 
