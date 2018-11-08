@@ -220,6 +220,21 @@ func (db *Database) SetModelController(ctx context.Context, model params.EntityP
 	return errgo.Mask(err)
 }
 
+// SetModelCredential updates the given model so that it uses the given
+// credential.
+func (db *Database) SetModelCredential(ctx context.Context, model params.EntityPath, cred params.CredentialPath) (err error) {
+	defer db.checkError(ctx, &err)
+	err = db.Models().UpdateId(model.String(), bson.D{{
+		"$set", bson.D{{
+			"credential", cred,
+		}},
+	}})
+	if errgo.Cause(err) == mgo.ErrNotFound {
+		return errgo.WithCausef(err, params.ErrNotFound, "cannot update %s", model)
+	}
+	return errgo.Mask(err)
+}
+
 // DeleteModel deletes an model from the database. If an
 // model is also a controller it will not be deleted and an error
 // with a cause of params.ErrForbidden will be returned. If the

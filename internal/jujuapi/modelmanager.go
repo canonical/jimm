@@ -435,3 +435,57 @@ func (m modelManagerAPI) dumpModelDB(ctx context.Context, ent jujuparams.Entity)
 func (m modelManagerAPI) ModelStatus(ctx context.Context, req jujuparams.Entities) (jujuparams.ModelStatusResults, error) {
 	return controller{m.root}.ModelStatus(ctx, req)
 }
+
+// ChangeModelCredential implements the ModelManager (v5) facade's
+// ChangeModelCredential method.
+func (m modelManagerAPI) ChangeModelCredential(ctx context.Context, args jujuparams.ChangeModelCredentialsParams) (jujuparams.ErrorResults, error) {
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
+	defer cancel()
+	ctx = ctxutil.Join(ctx, m.root.authContext)
+	results := make([]jujuparams.ErrorResult, len(args.Models))
+	for i, arg := range args.Models {
+		results[i].Error = mapError(m.changeModelCredential(ctx, arg))
+	}
+	return jujuparams.ErrorResults{
+		Results: results,
+	}, nil
+}
+
+func (m modelManagerAPI) changeModelCredential(ctx context.Context, arg jujuparams.ChangeModelCredentialParams) error {
+	model, err := getModel(ctx, m.root.jem, arg.ModelTag, auth.CheckIsAdmin)
+	if err != nil {
+		return errgo.Mask(
+			err,
+			errgo.Is(params.ErrBadRequest),
+			errgo.Is(params.ErrUnauthorized),
+			errgo.Is(params.ErrNotFound),
+		)
+	}
+	conn, err := m.root.jem.OpenAPI(ctx, model.Controller)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	credTag, err := names.ParseCloudCredentialTag(arg.CloudCredentialTag)
+	if err != nil {
+		return errgo.WithCausef(err, params.ErrBadRequest, "invalid credential tag")
+	}
+	credUser, err := user(credTag.Owner())
+	if err != nil {
+		return errgo.WithCausef(err, params.ErrBadRequest, "")
+	}
+	credPath := params.CredentialPath{
+		Cloud: params.Cloud(credTag.Cloud().Id()),
+		EntityPath: params.EntityPath{
+			User: credUser,
+			Name: params.Name(credTag.Name()),
+		},
+	}
+	cred, err := m.root.jem.Credential(ctx, credPath)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+	}
+	if err := m.root.jem.UpdateModelCredential(ctx, conn, model, cred); err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
+}

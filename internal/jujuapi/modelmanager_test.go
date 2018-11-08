@@ -1247,3 +1247,108 @@ func (s *modelManagerSuite) TestDumpModelDBUnauthorized(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `unauthorized`)
 	c.Assert(res, gc.IsNil)
 }
+
+func (s *modelManagerSuite) TestChangeModelCredential(c *gc.C) {
+	ctlPath := params.EntityPath{User: "alice", Name: "controller-1"}
+	s.AssertAddController(c, ctlPath, true)
+	s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
+	mi := s.assertCreateModel(c, createModelParams{name: "test-model", username: "alice", cred: "cred1"})
+	s.AssertUpdateCredential(c, "alice", "dummy", "cred2", "empty")
+
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	modelTag := names.NewModelTag(mi.UUID)
+	credTag := names.NewCloudCredentialTag("dummy/alice@external/cred2")
+	client := modelmanager.NewClient(conn)
+	err := client.ChangeModelCredential(modelTag, credTag)
+	c.Assert(err, gc.Equals, nil)
+	mir, err := client.ModelInfo([]names.ModelTag{modelTag})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(mir, gc.HasLen, 1)
+	c.Assert(mir[0].Error, gc.IsNil)
+	c.Assert(mir[0].Result.CloudCredentialTag, gc.Equals, credTag.String())
+}
+
+func (s *modelManagerSuite) TestChangeModelCredentialUnauthorizedModel(c *gc.C) {
+	ctlPath := params.EntityPath{User: "alice", Name: "controller-1"}
+	s.AssertAddController(c, ctlPath, true)
+	s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
+	mi := s.assertCreateModel(c, createModelParams{name: "test-model", username: "alice", cred: "cred1"})
+	s.AssertUpdateCredential(c, "bob", "dummy", "cred2", "empty")
+
+	conn := s.open(c, nil, "bob")
+	defer conn.Close()
+
+	modelTag := names.NewModelTag(mi.UUID)
+	credTag := names.NewCloudCredentialTag("dummy/bob@external/cred2")
+	client := modelmanager.NewClient(conn)
+	err := client.ChangeModelCredential(modelTag, credTag)
+	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+}
+
+func (s *modelManagerSuite) TestChangeModelCredentialUnauthorizedCredential(c *gc.C) {
+	ctlPath := params.EntityPath{User: "alice", Name: "controller-1"}
+	s.AssertAddController(c, ctlPath, true)
+	s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
+	mi := s.assertCreateModel(c, createModelParams{name: "test-model", username: "alice", cred: "cred1"})
+	s.AssertUpdateCredential(c, "bob", "dummy", "cred2", "empty")
+
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	modelTag := names.NewModelTag(mi.UUID)
+	credTag := names.NewCloudCredentialTag("dummy/bob@external/cred2")
+	client := modelmanager.NewClient(conn)
+	err := client.ChangeModelCredential(modelTag, credTag)
+	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+}
+
+func (s *modelManagerSuite) TestChangeModelCredentialNotFoundModel(c *gc.C) {
+	ctlPath := params.EntityPath{User: "alice", Name: "controller-1"}
+	s.AssertAddController(c, ctlPath, true)
+	s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
+	s.assertCreateModel(c, createModelParams{name: "test-model", username: "alice", cred: "cred1"})
+	s.AssertUpdateCredential(c, "bob", "dummy", "cred2", "empty")
+
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	modelTag := names.NewModelTag("000000000-0000-0000-0000-000000000000")
+	credTag := names.NewCloudCredentialTag("dummy/bob@external/cred2")
+	client := modelmanager.NewClient(conn)
+	err := client.ChangeModelCredential(modelTag, credTag)
+	c.Assert(err, gc.ErrorMatches, `model "000000000-0000-0000-0000-000000000000" not found`)
+}
+
+func (s *modelManagerSuite) TestChangeModelCredentialNotFoundCredential(c *gc.C) {
+	ctlPath := params.EntityPath{User: "alice", Name: "controller-1"}
+	s.AssertAddController(c, ctlPath, true)
+	s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
+	mi := s.assertCreateModel(c, createModelParams{name: "test-model", username: "alice", cred: "cred1"})
+
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	modelTag := names.NewModelTag(mi.UUID)
+	credTag := names.NewCloudCredentialTag("dummy/alice@external/cred2")
+	client := modelmanager.NewClient(conn)
+	err := client.ChangeModelCredential(modelTag, credTag)
+	c.Assert(err, gc.ErrorMatches, `credential "dummy/alice/cred2" not found`)
+}
+
+func (s *modelManagerSuite) TestChangeModelCredentialLocalUserCredential(c *gc.C) {
+	ctlPath := params.EntityPath{User: "alice", Name: "controller-1"}
+	s.AssertAddController(c, ctlPath, true)
+	s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
+	mi := s.assertCreateModel(c, createModelParams{name: "test-model", username: "alice", cred: "cred1"})
+
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	modelTag := names.NewModelTag(mi.UUID)
+	credTag := names.NewCloudCredentialTag("dummy/alice/cred2")
+	client := modelmanager.NewClient(conn)
+	err := client.ChangeModelCredential(modelTag, credTag)
+	c.Assert(err, gc.ErrorMatches, `unsupported local user`)
+}

@@ -2191,3 +2191,42 @@ func (s *databaseSuite) TestRemoveCloudRegion(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 }
+
+func (s *databaseSuite) TestSetModelCredentialNotFound(c *gc.C) {
+	err := s.database.SetModelCredential(testContext, params.EntityPath{"bob", "foo"}, params.CredentialPath{Cloud: "x", EntityPath: params.EntityPath{"y", "z"}})
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}
+
+func (s *databaseSuite) TestSetModelCredentialSuccess(c *gc.C) {
+	modelPath := params.EntityPath{"bob", "foo"}
+	err := s.database.AddModel(testContext, &mongodoc.Model{
+		Path: modelPath,
+		UUID: "fake-uuid",
+		Credential: params.CredentialPath{
+			Cloud: "cloud",
+			EntityPath: params.EntityPath{
+				User: "bob",
+				Name: "foo",
+			},
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	err = s.database.SetModelCredential(testContext, modelPath, params.CredentialPath{
+		Cloud: "cloud",
+		EntityPath: params.EntityPath{
+			User: "bob",
+			Name: "bar",
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	newDoc, err := s.database.Model(testContext, modelPath)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(newDoc.Credential, gc.DeepEquals, params.CredentialPath{
+		Cloud: "cloud",
+		EntityPath: params.EntityPath{
+			User: "bob",
+			Name: "bar",
+		},
+	})
+}

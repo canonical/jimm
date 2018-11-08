@@ -1625,6 +1625,30 @@ func (s *jemSuite) TestRemoveCloudWithModel(c *gc.C) {
 	err = s.jem.RemoveCloud(ctx, "test-cloud")
 	c.Assert(err, gc.ErrorMatches, `cloud is used by 1 model`)
 }
+
+func (s *jemSuite) TestUpdateModelCredential(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+
+	credPath := credentialPath("dummy", "bob", "cred2")
+	err := jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
+		Path: credPath,
+		Type: "empty",
+	})
+
+	conn, err := s.jem.OpenAPI(testContext, model.Controller)
+	c.Assert(err, gc.Equals, nil)
+	defer conn.Close()
+
+	err = s.jem.UpdateModelCredential(testContext, conn, model, &mongodoc.Credential{
+		Path: credPath,
+		Type: "empty",
+	})
+	c.Assert(err, gc.Equals, nil)
+	model1, err := s.jem.DB.Model(testContext, model.Path)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(model1.Credential, jc.DeepEquals, credPath)
+}
+
 func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityPath {
 	info := s.APIInfo(c)
 

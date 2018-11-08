@@ -1128,6 +1128,27 @@ func (j *JEM) RemoveCloud(ctx context.Context, cloud params.Cloud) (err error) {
 	return nil
 }
 
+// UpdateModelCredential updates the credential used with a model on both
+// the controller and the local database.
+func (j *JEM) UpdateModelCredential(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model, cred *mongodoc.Credential) error {
+	if err := j.updateControllerCredential(ctx, model.Controller, cred.Path, conn, cred); err != nil {
+		return errgo.Notef(err, "cannot add credential")
+	}
+	if err := j.DB.credentialAddController(ctx, cred.Path, model.Controller); err != nil {
+		return errgo.Notef(err, "cannot add credential")
+	}
+
+	client := modelmanager.NewClient(conn)
+	if err := client.ChangeModelCredential(names.NewModelTag(model.UUID), CloudCredentialTag(cred.Path)); err != nil {
+		return errgo.Mask(err)
+	}
+
+	if err := j.DB.SetModelCredential(ctx, model.Path, cred.Path); err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
 func plural(n int) string {
 	if n == 1 {
 		return ""
