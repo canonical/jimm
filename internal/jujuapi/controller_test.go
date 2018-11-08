@@ -17,10 +17,12 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/controller"
+	"github.com/juju/juju/rpc"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
 	"github.com/juju/version"
 	gc "gopkg.in/check.v1"
+	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
 	"gopkg.in/macaroon.v2-unstable"
 
@@ -98,7 +100,9 @@ func (s *controllerSuite) TestLoginToController(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	var resp jujuparams.RedirectInfoResult
 	err = conn.APICall("Admin", 3, "", "RedirectInfo", nil, &resp)
-	c.Assert(err, gc.ErrorMatches, `no such request - method Admin.RedirectInfo is not implemented \(not implemented\)`)
+	rerr, ok := errgo.Cause(err).(*rpc.RequestError)
+	c.Assert(ok, gc.Equals, true)
+	c.Assert(rerr.Code, gc.Equals, jujuparams.CodeNotImplemented)
 }
 
 func (s *controllerSuite) TestLoginToControllerWithInvalidMacaroon(c *gc.C) {
