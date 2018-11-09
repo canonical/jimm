@@ -6,6 +6,7 @@ import (
 	"context"
 	"reflect"
 	"sort"
+	"sync"
 
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
 	"github.com/juju/juju/apiserver/common"
@@ -40,10 +41,16 @@ type facade struct {
 	version int
 }
 
+// unauthenticatedfacades contains the list of facade versions supported by
+// this API before the user has authenticated.
+var unauthenticatedFacades = map[facade]string{
+	{"Admin", 3}:  "Admin",
+	{"Pinger", 1}: "Pinger",
+}
+
 // facades contains the list of facade versions supported by
 // this API.
 var facades = map[facade]string{
-	{"Admin", 3}:        "Admin",
 	{"Bundle", 1}:       "Bundle",
 	{"Cloud", 1}:        "Cloud",
 	{"Cloud", 2}:        "Cloud",
@@ -59,13 +66,18 @@ var facades = map[facade]string{
 
 // controllerRoot is the root for endpoints served on controller connections.
 type controllerRoot struct {
-	authContext   context.Context
-	params        jemserver.Params
-	authPool      *auth.Pool
-	jem           *jem.JEM
-	heartMonitor  heartMonitor
+	params       jemserver.Params
+	authPool     *auth.Pool
+	jem          *jem.JEM
+	heartMonitor heartMonitor
+
 	findMethod    func(rootName string, version int, methodName string) (rpcreflect.MethodCaller, error)
 	schemataCache map[params.Cloud]map[jujucloud.AuthType]jujucloud.CredentialSchema
+
+	// mu protects the fields below it
+	mu          sync.Mutex
+	authContext context.Context
+	facades     map[facade]string
 }
 
 func newControllerRoot(jem *jem.JEM, ap *auth.Pool, p jemserver.Params, hm heartMonitor) *controllerRoot {
@@ -75,6 +87,7 @@ func newControllerRoot(jem *jem.JEM, ap *auth.Pool, p jemserver.Params, hm heart
 		authPool:      ap,
 		jem:           jem,
 		heartMonitor:  hm,
+		facades:       unauthenticatedFacades,
 		schemataCache: make(map[params.Cloud]map[jujucloud.AuthType]jujucloud.CredentialSchema),
 	}
 	r.findMethod = rpcreflect.ValueOf(reflect.ValueOf(r)).FindMethod
@@ -194,8 +207,9 @@ func (r *controllerRoot) FindMethod(rootName string, version int, methodName str
 			Message: "JIMM does not support login from old clients",
 		}
 	}
-
-	rn := facades[facade{rootName, version}]
+	r.mu.Lock()
+	rn := r.facades[facade{rootName, version}]
+	r.mu.Unlock()
 	if rn == "" {
 		return nil, &rpcreflect.CallNotImplementedError{
 			RootMethod: rootName,
@@ -229,7 +243,11 @@ func (a admin) Login(ctx context.Context, req jujuparams.LoginRequest) (jujupara
 		}
 		return jujuparams.LoginResult{}, errgo.Mask(err)
 	}
+	a.root.mu.Lock()
+	a.root.facades = facades
 	a.root.authContext = authContext
+	a.root.mu.Unlock()
+
 	ctx = ctxutil.Join(ctx, a.root.authContext)
 	servermon.LoginSuccessCount.Inc()
 	username := auth.Username(ctx)
@@ -244,14 +262,14 @@ func (a admin) Login(ctx context.Context, req jujuparams.LoginRequest) (jujupara
 			Identity:    userTag(username).String(),
 		},
 		ControllerTag: names.NewControllerTag(a.root.params.ControllerUUID).String(),
-		Facades:       facadeVersions(),
+		Facades:       facadeVersions(a.root.facades),
 		ServerVersion: srvVersion.String(),
 	}, nil
 }
 
 // facadeVersions creates a list of facadeVersions as specified in
 // facades.
-func facadeVersions() []jujuparams.FacadeVersions {
+func facadeVersions(facades map[facade]string) []jujuparams.FacadeVersions {
 	names := make([]string, 0, len(facades))
 	versions := make(map[string][]int, len(facades))
 	for k := range facades {
