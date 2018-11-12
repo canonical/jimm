@@ -190,7 +190,7 @@ func (s *MachineStats) Describe(c chan<- *prometheus.Desc) {
 
 var machineStatsJob = &mgo.MapReduce{
 	Map:    `function() {emit (this.controller + " " + this.cloud + " " + this.region + " " + this.info.agentstatus.current, 1)}`,
-	Reduce: `function (key, values) {return values.length}`,
+	Reduce: `function (key, values) {return Array.sum(values);}`,
 }
 
 var machinesQuery = bson.D{
