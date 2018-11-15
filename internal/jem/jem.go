@@ -539,8 +539,7 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 		j.DB.checkError(ctx, &err)
 		return nil, errgo.Notef(err, "cannot update model %s in database", modelInfo.UUID)
 	}
-
-	if err := j.DB.AppendAudit(ctx, params.AuditModelCreated{
+	j.DB.AppendAudit(ctx, &params.AuditModelCreated{
 		ID:             modelDoc.Id,
 		UUID:           modelInfo.UUID,
 		Owner:          string(modelDoc.Owner()),
@@ -548,14 +547,7 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 		ControllerPath: ctlPath.String(),
 		Cloud:          string(modelDoc.Cloud),
 		Region:         modelDoc.CloudRegion,
-		AuditEntryCommon: params.AuditEntryCommon{
-			Type_:    params.AuditLogType(params.AuditModelCreated{}),
-			Created_: time.Now(),
-		},
-	}); err != nil {
-		zapctx.Error(ctx, "cannot add audit log for model creation", zaputil.Error(err))
-	}
-
+	})
 	return modelDoc, nil
 }
 
@@ -821,16 +813,10 @@ func (j *JEM) DestroyModel(ctx context.Context, conn *apiconn.Conn, model *mongo
 		// will detect the state change and update as appropriate.
 		zapctx.Warn(ctx, "error updating model life", zap.Error(err), zap.String("model", model.UUID))
 	}
-	if err := j.DB.AppendAudit(ctx, params.AuditModelDestroyed{
+	j.DB.AppendAudit(ctx, &params.AuditModelDestroyed{
 		ID:   model.Id,
 		UUID: model.UUID,
-		AuditEntryCommon: params.AuditEntryCommon{
-			Type_:    params.AuditLogType(params.AuditModelDestroyed{}),
-			Created_: time.Now(),
-		},
-	}); err != nil {
-		zapctx.Error(ctx, "cannot add audit log for model destruction", zaputil.Error(err))
-	}
+	})
 	return nil
 }
 
@@ -1065,7 +1051,15 @@ func (j *JEM) CreateCloud(ctx context.Context, cloud mongodoc.CloudRegion, regio
 	for i := range regions {
 		regions[i].PrimaryControllers = []params.EntityPath{ctlPath}
 	}
-	return errgo.Mask(j.DB.UpdateCloudRegions(ctx, append(regions, cloud)))
+	if err := j.DB.UpdateCloudRegions(ctx, append(regions, cloud)); err != nil {
+		return errgo.Mask(err)
+	}
+	j.DB.AppendAudit(ctx, &params.AuditCloudCreated{
+		ID:     cloud.Id,
+		Cloud:  string(cloud.Cloud),
+		Region: cloud.Region,
+	})
+	return nil
 }
 
 func (j *JEM) createCloud(ctx context.Context, cloud jujucloud.Cloud) (params.EntityPath, error) {
@@ -1124,7 +1118,11 @@ func (j *JEM) RemoveCloud(ctx context.Context, cloud params.Cloud) (err error) {
 	if err := j.DB.RemoveCloud(ctx, cloud); err != nil {
 		return errgo.Mask(err)
 	}
-	// TODO (mhilton) Audit cloud removals.
+	j.DB.AppendAudit(ctx, &params.AuditCloudRemoved{
+		ID:     cr.Id,
+		Cloud:  string(cr.Cloud),
+		Region: cr.Region,
+	})
 	return nil
 }
 

@@ -2,23 +2,31 @@ package jem
 
 import (
 	"context"
+	"github.com/CanonicalLtd/jimm/internal/auth"
+	"go.uber.org/zap"
 	"time"
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2/bson"
 
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/internal/zaputil"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
 // AppendAudit appends the given entry to the audit log.
-func (db *Database) AppendAudit(ctx context.Context, e params.AuditEntry) (err error) {
-	defer db.checkError(ctx, &err)
-	if err = db.Audits().Insert(&params.AuditLogEntry{
+func (db *Database) AppendAudit(ctx context.Context, e params.AuditEntry) {
+	common := e.Common()
+	common.Created_ = time.Now()
+	common.Originator = auth.Username(ctx)
+	common.Type_ = params.AuditLogType(e)
+
+	if err := db.Audits().Insert(&params.AuditLogEntry{
 		Content: e,
 	}); err != nil {
-		return errgo.NoteMask(err, "cannot insert audit")
+		zapctx.Error(ctx, "cannot insert audit entry", zap.String("type", common.Type_), zaputil.Error(err))
+		db.checkError(ctx, &err)
 	}
-	return nil
 }
 
 // GetAuditEntries returns audit log entries based on the parameters passed in.
