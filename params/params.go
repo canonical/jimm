@@ -536,6 +536,9 @@ type AuditEntry interface {
 	Created() time.Time
 	// isAuditEntry to specify that this this an audit entry log.
 	isAuditEntry()
+
+	// Common returns the AutryEntryCommon part of that entry.
+	Common() *AuditEntryCommon
 }
 
 // AuditLogEntries represents a list of audit log entry.
@@ -543,11 +546,18 @@ type AuditLogEntries []AuditLogEntry
 
 // AuditEntryCommon holds the type information so SetBSON can work for an AuditEntry and the Created field.
 type AuditEntryCommon struct {
+	// Originator holds the user who initiates the request.
+	Originator string `bson:"originator" json:"id"`
+
 	// Type is used for GetBSON and SetBSON to store the concrete type.
 	Type_ string `bson:"type" json:"type"`
 
 	// Created represents the ceation time of the entry.
 	Created_ time.Time `bson:"created" json:"created"`
+}
+
+func (a *AuditEntryCommon) Common() *AuditEntryCommon {
+	return a
 }
 
 // AuditModelCreated represents an audit log when a model is created.
@@ -586,6 +596,36 @@ type AuditModelDestroyed struct {
 // isAuditEntry implements AuditEntry.isAuditEntry.
 func (AuditModelDestroyed) isAuditEntry() {}
 
+// AuditCloudCreated represents an audit log when a cloud is created.
+type AuditCloudCreated struct {
+	// ID holds the id for a cloud.
+	ID string `bson:"modelid" json:"id"`
+	// Cloud holds the name of the cloud.
+	Cloud string `bson:"cloud" json:"cloud"`
+	// Region holds the name of the cloud region.
+	Region string `bson:"region" json:"region"`
+	// holds the common part for any entry.
+	AuditEntryCommon `bson:",inline"`
+}
+
+// isAuditEntry implements AuditEntry.isAuditEntry.
+func (AuditCloudCreated) isAuditEntry() {}
+
+// AuditCloudRemoved represents an audit log when a cloud is removed.
+type AuditCloudRemoved struct {
+	// ID holds the id for a cloud.
+	ID string `bson:"modelid" json:"id"`
+	// Cloud holds the name of the cloud.
+	Cloud string `bson:"cloud" json:"cloud"`
+	// Region holds the name of the cloud region.
+	Region string `bson:"region" json:"region"`
+	// holds the common part for any entry.
+	AuditEntryCommon `bson:",inline"`
+}
+
+// isAuditEntry implements AuditEntry.isAuditEntry.
+func (AuditCloudRemoved) isAuditEntry() {}
+
 // Type implements AuditEntry.Type.
 func (e AuditEntryCommon) Type() string {
 	return e.Type_
@@ -598,8 +638,10 @@ func (e AuditEntryCommon) Created() time.Time {
 
 // auditLogTypes holds a list of the possible audit logs type.
 var auditLogTypes = []AuditEntry{
-	AuditModelCreated{},
-	AuditModelDestroyed{},
+	&AuditCloudCreated{},
+	&AuditCloudRemoved{},
+	&AuditModelCreated{},
+	&AuditModelDestroyed{},
 }
 
 var validAuditLogTypes = func() map[string]AuditEntry {
@@ -612,10 +654,7 @@ var validAuditLogTypes = func() map[string]AuditEntry {
 
 // AuditLogType gives the type name of an audit log.
 func AuditLogType(v interface{}) string {
-	t := reflect.TypeOf(v)
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
+	t := reflect.TypeOf(v).Elem()
 	return strings.TrimPrefix(t.Name(), "Audit")
 }
 
@@ -631,11 +670,11 @@ func (e *AuditLogEntry) SetBSON(raw bson.Raw) error {
 	if !ok {
 		return errgo.Notef(nil, "cannot unmarshal unknown type %q", t.Type)
 	}
-	content := reflect.New(reflect.TypeOf(v))
+	content := reflect.New(reflect.TypeOf(v).Elem())
 	if err := raw.Unmarshal(content.Interface()); err != nil {
 		return errgo.Mask(err)
 	}
-	e.Content = content.Elem().Interface().(AuditEntry)
+	e.Content = content.Interface().(AuditEntry)
 	return nil
 }
 
@@ -663,11 +702,11 @@ func (e *AuditLogEntry) UnmarshalJSON(b []byte) error {
 	if !ok {
 		return errgo.Notef(nil, "cannot unmarshal unknown type %q", t.Type)
 	}
-	content := reflect.New(reflect.TypeOf(v))
+	content := reflect.New(reflect.TypeOf(v).Elem())
 	if err := json.Unmarshal(b, content.Interface()); err != nil {
 		return errgo.Mask(err)
 	}
-	e.Content = content.Elem().Interface().(AuditEntry)
+	e.Content = content.Interface().(AuditEntry)
 	return nil
 }
 

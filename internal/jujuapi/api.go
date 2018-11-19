@@ -61,7 +61,7 @@ func newRootWebSocketHandler(ctx context.Context, params jemserver.HandlerParams
 		Method: "GET",
 		Path:   path,
 		Handle: func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-			// TODO add unique id to context or derive it from http request.
+			// _TODO add unique id to context or derive it from http request.
 			ctx := zapctx.WithFields(ctx, zap.Bool("websocket", true))
 			j := params.JEMPool.JEM(ctx)
 			defer j.Close()

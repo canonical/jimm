@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/juju/api"
 	controllerapi "github.com/juju/juju/api/controller"
 	jujuparams "github.com/juju/juju/apiserver/params"
@@ -22,6 +23,7 @@ import (
 	"gopkg.in/juju/names.v2"
 
 	"github.com/CanonicalLtd/jimm/internal/apitest"
+	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/v2"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
@@ -1615,9 +1617,8 @@ func (s *APISuite) TestGetAuditEntries(c *gc.C) {
 	res, err := s.NewClient("charlie").GetAuditEntries(&params.AuditLogRequest{})
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(res, gc.HasLen, 1)
-	created := res[0].Content.(params.AuditModelCreated)
-	c.Assert(res, gc.DeepEquals, params.AuditLogEntries{{
-		Content: params.AuditModelCreated{
+	c.Assert(res, jemtest.CmpEquals(cmpopts.IgnoreTypes(time.Time{})), params.AuditLogEntries{{
+		Content: &params.AuditModelCreated{
 			ID:             "bob/open",
 			UUID:           uuid,
 			Owner:          "bob",
@@ -1626,8 +1627,7 @@ func (s *APISuite) TestGetAuditEntries(c *gc.C) {
 			Region:         "dummy-region",
 			ControllerPath: "bob/open",
 			AuditEntryCommon: params.AuditEntryCommon{
-				Type_:    params.AuditLogType(params.AuditModelCreated{}),
-				Created_: created.Created_,
+				Type_: params.AuditLogType(&params.AuditModelCreated{}),
 			},
 		},
 	}})
