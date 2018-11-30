@@ -5,7 +5,6 @@ package jem
 import (
 	"context"
 	"fmt"
-	"log"
 	"math/rand"
 	"sync"
 	"time"
@@ -840,7 +839,6 @@ type updateCredentialResult struct {
 
 func mergeUpdateCredentialResults(ctx context.Context, ch <-chan updateCredentialResult, n int, errorsAreFatal bool) (*jujuparams.UpdateCredentialResult, error) {
 	allResults := new(jujuparams.UpdateCredentialResult)
-	log.Printf("merging %d results", n)
 	for n > 0 {
 		select {
 		case r := <-ch:
@@ -865,7 +863,6 @@ func mergeUpdateCredentialResults(ctx context.Context, ch <-chan updateCredentia
 }
 
 func mergeCredentialCheckResult(r1, r2 *jujuparams.UpdateCredentialResult) {
-	log.Printf("merging %#v from %#v", r1, r2)
 	if r1.CredentialTag == "" {
 		r1.CredentialTag = r2.CredentialTag
 	}
@@ -979,7 +976,6 @@ func (j *JEM) updateControllerCredential(
 	if rp != nil {
 		// Our caller wants the UpdateCredentialResult.
 		if r == nil {
-			panic("TODO")
 			// We're talking to an old version of the API that doesn't
 			// return full results.
 			// TODO fill in r from models known to us.
@@ -1411,7 +1407,7 @@ func (j *JEM) RemoveCloud(ctx context.Context, cloud params.Cloud) (err error) {
 // UpdateModelCredential updates the credential used with a model on both
 // the controller and the local database.
 func (j *JEM) UpdateModelCredential(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model, cred *mongodoc.Credential) error {
-	if err := j.updateControllerCredential(ctx, model.Controller, cred.Path, conn, cred); err != nil {
+	if err := j.updateControllerCredential(ctx, conn, model.Controller, cred, nil); err != nil {
 		return errgo.Notef(err, "cannot add credential")
 	}
 	if err := j.DB.credentialAddController(ctx, cred.Path, model.Controller); err != nil {

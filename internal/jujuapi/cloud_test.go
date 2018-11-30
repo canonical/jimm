@@ -13,7 +13,6 @@ import (
 	"github.com/juju/juju/cloud"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
-	"github.com/kr/pretty"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/names.v2"
 
@@ -368,11 +367,11 @@ func (s *cloudSuite) TestUpdateCloudCredentialsForce(c *gc.C) {
 	// we got an error.
 	creds, err = client.Credentials(credentialTag)
 	c.Assert(err, gc.Equals, nil)
-	c.Logf("%s", pretty.Sprint(creds))
+	sort.Strings(creds[0].Result.Redacted)
 	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Result: &jujuparams.CloudCredential{
-			AuthType:   "badauthtype",
-			Redacted:   []string{"bad1attr", "bad2attr"},
+			AuthType: "badauthtype",
+			Redacted: []string{"bad1attr", "bad2attr"},
 		},
 	}})
 }
@@ -464,15 +463,20 @@ func (s *cloudSuite) TestCheckCredentialsModelsInvalidCreds(c *gc.C) {
 			},
 		}},
 	}, &resp)
-	c.Assert(err, gc.Equals, nil)
-	modelResults := []jujuparams.UpdateCredentialModelResult{{
-		ModelUUID: model1.UUID,
-		ModelName: "model1",
-	}}
 	c.Assert(resp, jc.DeepEquals, jujuparams.UpdateCredentialResults{
 		Results: []jujuparams.UpdateCredentialResult{{
-			CredentialTag: credTag.String(),
-			Models:        modelResults,
+			CredentialTag: "cloudcred-dummy_test@external_cred",
+			Error:         &jujuparams.Error{Message: "some models are no longer visible"},
+			Models: []jujuparams.UpdateCredentialModelResult{{
+				ModelUUID: model1.UUID,
+				ModelName: "model1",
+				Errors: []jujuparams.ErrorResult{{
+					Error: &jujuparams.Error{
+						Message: `validating credential "dummy/test@external/cred" for cloud "dummy": supported auth-types ["empty" "userpass"], "unknowntype" not supported`,
+						Code:    "not supported",
+					},
+				}},
+			}},
 		}},
 	})
 }

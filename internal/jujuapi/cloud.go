@@ -98,7 +98,14 @@ func (c cloudV2) DefaultCloud(ctx context.Context) (jujuparams.StringResult, err
 }
 
 func (c cloudV2) RevokeCredentials(ctx context.Context, args jujuparams.Entities) (jujuparams.ErrorResults, error) {
-	return c.c.RevokeCredentials(ctx, args)
+	creds := make([]jujuparams.RevokeCredentialArg, len(args.Entities))
+	for i, e := range args.Entities {
+		creds[i].Tag = e.Tag
+		creds[i].Force = true
+	}
+	return c.c.RevokeCredentialsCheckModels(ctx, jujuparams.RevokeCredentialArgs{
+		Credentials: creds,
+	})
 }
 
 func (c cloudV2) UpdateCredentials(ctx context.Context, args jujuparams.TaggedCredentials) (jujuparams.ErrorResults, error) {
@@ -281,14 +288,13 @@ func (c cloudV3) userCredentials(ctx context.Context, ownerTag, cloudTag string)
 	return cloudCreds, errgo.Mask(it.Err())
 }
 
-// RevokeCredentials revokes a set of cloud credentials.
-func (c cloudV3) RevokeCredentials(ctx context.Context, args jujuparams.Entities) (jujuparams.ErrorResults, error) {
+func (c cloudV3) RevokeCredentialsCheckModels(ctx context.Context, args jujuparams.RevokeCredentialArgs) (jujuparams.ErrorResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 	ctx = ctxutil.Join(ctx, c.root.authContext)
-	results := make([]jujuparams.ErrorResult, len(args.Entities))
-	for i, ent := range args.Entities {
-		if err := c.revokeCredential(ctx, ent.Tag); err != nil {
+	results := make([]jujuparams.ErrorResult, len(args.Credentials))
+	for i, ent := range args.Credentials {
+		if err := c.revokeCredential(ctx, ent.Tag, ent.Force); err != nil {
 			results[i].Error = mapError(err)
 		}
 	}
@@ -298,7 +304,8 @@ func (c cloudV3) RevokeCredentials(ctx context.Context, args jujuparams.Entities
 }
 
 // RevokeCredentials revokes a set of cloud credentials.
-func (c cloudV3) revokeCredential(ctx context.Context, tag string) error {
+func (c cloudV3) revokeCredential(ctx context.Context, tag string, force bool) error {
+	// TODO fail when force is false and  the credential is in use.
 	credtag, err := names.ParseCloudCredentialTag(tag)
 	if err != nil {
 		return errgo.WithCausef(err, params.ErrBadRequest, "cannot parse %q", tag)

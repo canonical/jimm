@@ -2,7 +2,6 @@ package monitor
 
 import (
 	"context"
-	"log"
 	"sync"
 	"time"
 
@@ -310,7 +309,6 @@ func (s *jemShimInMemory) SetModelInfo(ctx context.Context, ctlPath params.Entit
 	defer s.mu.Unlock()
 	for _, m := range s.models {
 		if m.Controller == ctlPath && m.UUID == uuid {
-			log.Printf("setting model info of %v to %v", uuid, info)
 			m.Info = info
 		}
 	}
@@ -322,7 +320,6 @@ func (s *jemShimInMemory) DeleteModelWithUUID(ctx context.Context, ctlPath param
 	defer s.mu.Unlock()
 	for k, m := range s.models {
 		if m.Controller == ctlPath && m.UUID == uuid {
-			log.Printf("delete model %v (%s)", uuid, k)
 			delete(s.models, k)
 		}
 	}

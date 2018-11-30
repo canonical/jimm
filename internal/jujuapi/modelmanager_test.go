@@ -4,11 +4,9 @@ package jujuapi_test
 
 import (
 	"context"
-	"reflect"
 	"time"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/juju/errors"
 	"github.com/juju/juju/api/base"
 	cloudapi "github.com/juju/juju/api/cloud"
 	"github.com/juju/juju/api/modelmanager"
@@ -24,7 +22,6 @@ import (
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
-	"github.com/kr/pretty"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
@@ -263,13 +260,6 @@ func (s *modelManagerSuite) TestListCAASModels(c *gc.C) {
 		Endpoint:       kubetest.ServerURL(kubeconfig),
 		CACertificates: cacerts,
 	})
-	if err != nil {
-		c.Logf("pretty error: %s", pretty.Sprint(err))
-		c.Logf("err %p; error type: %T package %s; str %q", err, err, reflect.TypeOf(err).Elem().PkgPath(), err.Error())
-		c.Logf("details: %s", errors.Details(err))
-		c.Logf("err: %q", err)
-		c.Assert(err, gc.Equals, nil, gc.Commentf("OK!!"))
-	}
 	c.Assert(err, gc.Equals, nil)
 
 	credTag := names.NewCloudCredentialTag("test-cloud/test@external/test-cred")
