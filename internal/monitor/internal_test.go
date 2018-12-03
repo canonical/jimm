@@ -583,7 +583,7 @@ func removeModel(c *gc.C, st *state.State) {
 	c.Assert(err, gc.Equals, nil)
 	err = st.ProcessDyingModel()
 	c.Assert(err, gc.Equals, nil)
-	err = st.RemoveAllModelDocs()
+	err = st.RemoveDyingModel()
 	c.Assert(err, gc.Equals, nil)
 }
 

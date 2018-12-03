@@ -15,7 +15,6 @@ import (
 	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/state"
 	"github.com/juju/juju/state/multiwatcher"
-	jujujujutesting "github.com/juju/juju/testing"
 	"github.com/juju/juju/testing/factory"
 	jt "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
@@ -594,20 +593,13 @@ func (s *jemSuite) TestDestroyModel(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	ch := waitForDestruction(conn, c, model.UUID)
-
 	err = s.jem.DestroyModel(testContext, conn, model, nil)
 	c.Assert(err, gc.Equals, nil)
 
-	select {
-	case <-ch:
-	case <-time.After(jujujujutesting.LongWait):
-		c.Fatalf("model not destroyed")
-	}
-
 	// Check the model is dying.
-	_, err = s.jem.DB.Model(testContext, model.Path)
+	m, err := s.jem.DB.Model(testContext, model.Path)
 	c.Assert(err, gc.Equals, nil)
+	c.Assert(m.Life(), gc.Equals, "dying")
 
 	// Check that it can be destroyed twice.
 	err = s.jem.DestroyModel(testContext, conn, model, nil)
@@ -616,6 +608,7 @@ func (s *jemSuite) TestDestroyModel(c *gc.C) {
 	// Check the model is still dying.
 	_, err = s.jem.DB.Model(testContext, model.Path)
 	c.Assert(err, gc.Equals, nil)
+	c.Assert(m.Life(), gc.Equals, "dying")
 }
 
 func waitForDestruction(conn *apiconn.Conn, c *gc.C, uuid string) <-chan struct{} {
