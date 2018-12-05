@@ -12,6 +12,7 @@ import (
 	"github.com/juju/clock"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/base"
+	jujuapibase "github.com/juju/juju/api/base"
 	cloudapi "github.com/juju/juju/api/cloud"
 	"github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
@@ -437,8 +438,7 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 		}
 	}
 
-	var cred *mongodoc.Credential
-	cred, err = j.selectCredential(ctx, p.Credential, p.Path.User, p.Cloud)
+	cred, err := j.selectCredential(ctx, p.Credential, p.Path.User, p.Cloud)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrAmbiguousChoice))
 	}
@@ -592,7 +592,7 @@ func (j *JEM) createModelOnController(ctx context.Context, ctlPath params.Entity
 
 	var credTag names.CloudCredentialTag
 	if cred != nil {
-		if err := j.updateControllerCredential(ctx, ctlPath, cred.Path, conn, cred); err != nil {
+		if err := j.updateControllerCredential(ctx, conn, ctlPath, cred, nil); err != nil {
 			return base.ModelInfo{}, errgo.Notef(err, "cannot add credential")
 		}
 		if err := j.DB.credentialAddController(ctx, cred.Path, ctlPath); err != nil {
@@ -648,57 +648,275 @@ func (j *JEM) createModelOnController(ctx context.Context, ctlPath params.Entity
 	return m, nil
 }
 
-// UpdateCredential updates the specified credential in the
-// local database and then updates it on all controllers to which it is
-// deployed.
-func (j *JEM) UpdateCredential(ctx context.Context, cred *mongodoc.Credential) (err error) {
-	if err := j.DB.updateCredential(ctx, cred); err != nil {
+// RevokeCredential checks that the credential with the given path
+// can be revoked (if flags&CredentialCheck!=0) and revokes
+// the credential (if flags&CredentialUpdate!=0).
+// If flags==0, it acts as if both CredentialCheck and CredentialUpdate
+// were set.
+func (j *JEM) RevokeCredential(ctx context.Context, credPath params.CredentialPath, flags CredentialUpdateFlags) error {
+	if flags == 0 {
+		flags = ^0
+	}
+	cred, err := j.DB.Credential(ctx, credPath)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	controllers := cred.Controllers
+	if flags&CredentialCheck != 0 {
+		models, err := j.DB.ModelsWithCredential(ctx, credPath)
+		if err != nil {
+			return errgo.Mask(err)
+		}
+		if len(models) > 0 {
+			// TODO more informative error message.
+			return errgo.Newf("cannot revoke because credential is in use on at least one model")
+		}
+	}
+	if flags&CredentialUpdate == 0 {
+		return nil
+	}
+	if err := j.DB.updateCredential(ctx, &mongodoc.Credential{
+		Path:    credPath,
+		Revoked: true,
+	}); err != nil {
 		return errgo.Notef(err, "cannot update local database")
 	}
-	c, err := j.DB.Credential(ctx, cred.Path)
-	if err != nil {
-		return errgo.Mask(err)
-	}
-	// Mark in the local database that an update is required for all controllers
-	if err := j.DB.setCredentialUpdates(ctx, cred.Controllers, cred.Path); err != nil {
-		// Log the error, but press on hoping to update the controllers anyway.
-		zapctx.Error(ctx,
-			"cannot update controllers with updated credential",
-			zap.String("cred", c.Path.String()),
-			zaputil.Error(err),
-		)
-	}
-	// Attempt to update all controllers to which the credential is
-	// deployed. If these fail they will be updated by the monitor.
-	n := len(c.Controllers)
-	// Make the channel buffered so we don't leak go-routines
-	ch := make(chan struct{}, n)
-	for _, ctlPath := range c.Controllers {
-		go func(j *JEM, ctlPath params.EntityPath) {
+	ch := make(chan struct{}, len(controllers))
+	n := len(controllers)
+	for _, ctlPath := range controllers {
+		ctlPath, j := ctlPath, j.Clone()
+		go func() {
 			defer func() {
 				ch <- struct{}{}
 			}()
 			defer j.Close()
-			if err := j.updateControllerCredential(ctx, ctlPath, cred.Path, nil, c); err != nil {
+			conn, err := j.OpenAPI(ctx, ctlPath)
+			if err != nil {
 				zapctx.Warn(ctx,
-					"cannot update credential",
-					zap.String("cred", c.Path.String()),
+					"cannot connect to controller to revoke credential",
 					zap.String("controller", ctlPath.String()),
 					zaputil.Error(err),
 				)
 				return
 			}
-		}(j.Clone(), ctlPath)
+			defer conn.Close()
+
+			err = j.revokeControllerCredential(ctx, conn, ctlPath, cred.Path)
+			if err != nil {
+				zapctx.Warn(ctx,
+					"cannot revoke credential",
+					zap.String("controller", ctlPath.String()),
+					zaputil.Error(err),
+				)
+			}
+		}()
 	}
-	// Only wait for as along as the context allows for the updates to finish.
 	for n > 0 {
 		select {
 		case <-ch:
 			n--
 		case <-ctx.Done():
+			return errgo.Notef(ctx.Err(), "timed out revoking credentials")
 		}
 	}
 	return nil
+}
+
+type CredentialUpdateFlags int
+
+const (
+	CredentialUpdate CredentialUpdateFlags = 1 << iota
+	CredentialCheck
+)
+
+// UpdateCredential checks that the credential can be updated (if the
+// CredentialUpdate flag is set) and updates its in the local database
+// and all controllers to which it is deployed (if the CredentialCheck
+// flag is specified).
+//
+// If flags is zero, it will both check and update.
+func (j *JEM) UpdateCredential(ctx context.Context, cred *mongodoc.Credential, flags CredentialUpdateFlags) (*jujuparams.UpdateCredentialResult, error) {
+	if cred.Revoked {
+		return nil, errgo.Newf("cannot use UpdateCredential to revoke a credential")
+	}
+	if flags == 0 {
+		flags = ^0
+	}
+	var controllers []params.EntityPath
+	c, err := j.DB.Credential(ctx, cred.Path)
+	if err == nil {
+		controllers = c.Controllers
+	} else if errgo.Cause(err) != params.ErrNotFound {
+		return nil, errgo.Mask(err)
+	}
+	if flags&CredentialCheck != 0 {
+		// There is a credential already recorded, so check with all its controllers
+		// that it's valid before we update it locally and update it on the controllers.
+		r, err := j.checkCredential(ctx, cred, controllers)
+		if err != nil {
+			return nil, errgo.Mask(err)
+		}
+		// Note: r.Error is non-nil if there are any models that contain an error.
+		if r.Error != nil || flags&CredentialUpdate == 0 {
+			return r, nil
+		}
+	}
+	// Note that because CredentialUpdate is checked for inside the
+	// CredentialCheck case above, we know that we need to
+	// update the credential in this case.
+	r, err := j.updateCredential(ctx, cred, controllers)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return r, nil
+}
+
+func (j *JEM) updateCredential(ctx context.Context, cred *mongodoc.Credential, controllers []params.EntityPath) (*jujuparams.UpdateCredentialResult, error) {
+	// The credential has now been checked (or we're going
+	// to force the update), so update it in the local database.
+	// and mark in the local database that an update is required for
+	// all controllers
+	if err := j.DB.updateCredential(ctx, cred); err != nil {
+		return nil, errgo.Notef(err, "cannot update local database")
+	}
+	if err := j.DB.setCredentialUpdates(ctx, cred.Controllers, cred.Path); err != nil {
+		return nil, errgo.Notef(err, "cannot mark controllers to be updated")
+	}
+
+	// Attempt to update all controllers to which the credential is
+	// deployed. If these fail they will be updated by the monitor.
+	// Make the channel buffered so we don't leak go-routines
+	ch := make(chan updateCredentialResult, len(controllers))
+	for _, ctlPath := range controllers {
+		ctlPath, j := ctlPath, j.Clone()
+		go func() {
+			defer j.Close()
+			conn, err := j.OpenAPI(ctx, ctlPath)
+			if err != nil {
+				ch <- updateCredentialResult{
+					ctlPath: ctlPath,
+					err:     errgo.Mask(err),
+				}
+				return
+			}
+			defer conn.Close()
+
+			var r *jujuparams.UpdateCredentialResult
+			err = j.updateControllerCredential(ctx, conn, ctlPath, cred, &r)
+			ch <- updateCredentialResult{
+				ctlPath: ctlPath,
+				err:     err,
+				r:       r,
+			}
+		}()
+	}
+	r, err := mergeUpdateCredentialResults(ctx, ch, len(controllers), false)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return r, nil
+}
+
+func (j *JEM) checkCredential(ctx context.Context, newCred *mongodoc.Credential, controllers []params.EntityPath) (*jujuparams.UpdateCredentialResult, error) {
+	if len(controllers) == 0 {
+		// No controllers, so there's nowhere to check that the credential
+		// is valid.
+		return &jujuparams.UpdateCredentialResult{
+			CredentialTag: CloudCredentialTag(newCred.Path).String(),
+		}, nil
+	}
+	ch := make(chan updateCredentialResult, len(controllers))
+	for _, ctlPath := range controllers {
+		ctlPath, j := ctlPath, j.Clone()
+		go func() {
+			defer j.Close()
+			r, err := j.checkCredentialOnController(ctx, ctlPath, newCred)
+			ch <- updateCredentialResult{ctlPath, r, err}
+		}()
+	}
+	r, err := mergeUpdateCredentialResults(ctx, ch, len(controllers), true)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return r, nil
+}
+
+type updateCredentialResult struct {
+	ctlPath params.EntityPath
+	r       *jujuparams.UpdateCredentialResult
+	err     error
+}
+
+func mergeUpdateCredentialResults(ctx context.Context, ch <-chan updateCredentialResult, n int, errorsAreFatal bool) (*jujuparams.UpdateCredentialResult, error) {
+	allResults := new(jujuparams.UpdateCredentialResult)
+	for n > 0 {
+		select {
+		case r := <-ch:
+			n--
+			if r.err != nil {
+				if errorsAreFatal {
+					return nil, errgo.Notef(r.err, "controller %s", r.ctlPath)
+				}
+				zapctx.Warn(ctx,
+					"cannot update credential",
+					zap.String("controller", r.ctlPath.String()),
+					zaputil.Error(r.err),
+				)
+				continue
+			}
+			mergeCredentialCheckResult(allResults, r.r)
+		case <-ctx.Done():
+			return nil, errgo.Notef(ctx.Err(), "timed out checking credentials")
+		}
+	}
+	return allResults, nil
+}
+
+func mergeCredentialCheckResult(r1, r2 *jujuparams.UpdateCredentialResult) {
+	if r1.CredentialTag == "" {
+		r1.CredentialTag = r2.CredentialTag
+	}
+	if r1.Error == nil {
+		r1.Error = r2.Error
+	}
+	r1.Models = append(r1.Models, r2.Models...)
+}
+
+func (j *JEM) checkCredentialOnController(ctx context.Context, ctlPath params.EntityPath, cred *mongodoc.Credential) (*jujuparams.UpdateCredentialResult, error) {
+	conn, err := j.OpenAPI(ctx, ctlPath)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	defer conn.Close()
+	_, facade := jujuapibase.NewClientFacade(conn, "Cloud")
+	if facade.BestAPIVersion() < 3 {
+		// If version 3 isn't supported, then the UpdateCredential entry point
+		// doesn't check for validity, so there's nothing to do.
+		return &jujuparams.UpdateCredentialResult{
+			CredentialTag: CloudCredentialTag(cred.Path).String(),
+		}, nil
+	}
+	in := jujuparams.TaggedCredentials{
+		Credentials: []jujuparams.TaggedCredential{newJujuCred(cred)},
+	}
+	var out jujuparams.UpdateCredentialResults
+	if err := facade.FacadeCall("CheckCredentialsModels", in, &out); err != nil {
+		return nil, errgo.Mask(err)
+	}
+	if len(out.Results) != 1 {
+		return nil, errgo.Newf("invalid result count")
+	}
+	return &out.Results[0], nil
+}
+
+func newJujuCred(cred *mongodoc.Credential) jujuparams.TaggedCredential {
+	return jujuparams.TaggedCredential{
+		Tag: CloudCredentialTag(cred.Path).String(),
+		Credential: jujuparams.CloudCredential{
+			AuthType:   string(cred.Type),
+			Attributes: cred.Attributes,
+		},
+	}
 }
 
 // ControllerUpdateCredentials updates the given controller by updating
@@ -714,65 +932,152 @@ func (j *JEM) ControllerUpdateCredentials(ctx context.Context, ctlPath params.En
 	}
 	defer conn.Close()
 	for _, credPath := range ctl.UpdateCredentials {
-		if err := j.updateControllerCredential(ctx, ctl.Path, credPath, conn, nil); err != nil {
+		cred, err := j.DB.Credential(ctx, credPath)
+		if err != nil {
 			zapctx.Warn(ctx,
-				"cannot update credential",
+				"cannot get credential for controller",
 				zap.Stringer("cred", credPath),
 				zap.Stringer("controller", ctl.Path),
 				zaputil.Error(err),
 			)
+			continue
+		}
+		if cred.Revoked {
+			if err := j.revokeControllerCredential(ctx, conn, ctl.Path, cred.Path); err != nil {
+				zapctx.Warn(ctx,
+					"cannot revoke credential",
+					zap.Stringer("cred", credPath),
+					zap.Stringer("controller", ctl.Path),
+					zaputil.Error(err),
+				)
+			}
+		} else {
+			if err := j.updateControllerCredential(ctx, conn, ctl.Path, cred, nil); err != nil {
+				zapctx.Warn(ctx,
+					"cannot update credential",
+					zap.Stringer("cred", credPath),
+					zap.Stringer("controller", ctl.Path),
+					zaputil.Error(err),
+				)
+			}
 		}
 	}
 	return nil
 }
 
-// updateControllerCredential updates the given credential on the given
-// controller. If conn is non-nil then it will be used to communicate
-// with the controller. If cred is non-nil then those credentials will be
-// updated on the controller.
+// updateControllerCredential updates the given credential (which must
+// not be revoked) on the given controller.
+// If rp is non-nil, it will be updated with information
+// on the models updated.
 func (j *JEM) updateControllerCredential(
 	ctx context.Context,
-	ctlPath params.EntityPath,
-	credPath params.CredentialPath,
 	conn *apiconn.Conn,
+	ctlPath params.EntityPath,
 	cred *mongodoc.Credential,
+	rp **jujuparams.UpdateCredentialResult,
 ) error {
-	var err error
-	if conn == nil {
-		conn, err = j.OpenAPI(ctx, ctlPath)
-		if err != nil {
-			return errgo.Mask(err)
-		}
-		defer conn.Close()
-	}
-	if cred == nil {
-		cred, err = j.DB.Credential(ctx, credPath)
-		if err != nil {
-			return errgo.Mask(err, errgo.Is(params.ErrNotFound))
-		}
-	}
-	cloudCredentialTag := CloudCredentialTag(credPath)
-	cloudClient := cloudapi.NewClient(conn)
 	if cred.Revoked {
-		err = cloudClient.RevokeCredential(cloudCredentialTag)
-	} else {
-		_, err = cloudClient.UpdateCredentialsCheckModels(
-			cloudCredentialTag,
-			jujucloud.NewCredential(jujucloud.AuthType(cred.Type), cred.Attributes),
-		)
+		return errgo.New("updateControllerCredential called with revoked credential (shouldn't happen)")
 	}
+	r, err := updateCredential(ctx, conn, cred)
 	if err != nil {
 		return errgo.Notef(err, "cannot update credentials")
 	}
-	if err := j.DB.clearCredentialUpdate(ctx, ctlPath, credPath); err != nil {
-		zapctx.Error(ctx,
-			"failed to update controller after successfully updating credential",
-			zap.Stringer("cred", credPath),
-			zap.Stringer("controller", ctlPath),
-			zaputil.Error(err),
-		)
+	if rp != nil {
+		// Our caller wants the UpdateCredentialResult.
+		if r == nil {
+			// We're talking to an old version of the API that doesn't
+			// return full results.
+			// TODO fill in r from models known to us.
+		}
+		*rp = r
+	}
+	if r != nil && r.Error != nil {
+		return errgo.Mask(r.Error)
+	}
+	if err := j.DB.clearCredentialUpdate(ctx, ctlPath, cred.Path); err != nil {
+		return errgo.Notef(err, "cannot update controller %q after successfully updating credntial", ctlPath)
 	}
 	return nil
+}
+
+func (j *JEM) revokeControllerCredential(
+	ctx context.Context,
+	conn *apiconn.Conn,
+	ctlPath params.EntityPath,
+	credPath params.CredentialPath,
+) error {
+	cloudCredentialTag := CloudCredentialTag(credPath)
+
+	_, facade := jujuapibase.NewClientFacade(conn, "Cloud")
+	var results jujuparams.ErrorResults
+	if facade.BestAPIVersion() < 3 {
+		// If we're using an older API version, the Force flag is implied.
+		args := jujuparams.Entities{
+			Entities: []jujuparams.Entity{{
+				Tag: cloudCredentialTag.String(),
+			}},
+		}
+		if err := facade.FacadeCall("RevokeCredentials", args, &results); err != nil {
+			return errgo.Mask(err)
+		}
+	} else {
+		// Newer API versions require an explicit Force argument
+		// (we're assuming that we've checked earlier, so we always force)
+		args := jujuparams.RevokeCredentialArgs{
+			Credentials: []jujuparams.RevokeCredentialArg{{
+				Tag:   cloudCredentialTag.String(),
+				Force: true,
+			}},
+		}
+		if err := facade.FacadeCall("RevokeCredentialsCheckModels", args, &results); err != nil {
+			return errgo.Mask(err)
+		}
+	}
+	if err := results.OneError(); err != nil {
+		return errgo.Mask(err)
+	}
+	if err := j.DB.clearCredentialUpdate(ctx, ctlPath, credPath); err != nil {
+		return errgo.Notef(err, "cannot update controller %q after successfully updating credntial", ctlPath)
+	}
+	return nil
+}
+
+// updateCredential updates a credential on a controller implied by the
+// given API connection.
+//
+// The first return parameter may include information on models
+// that are using the credential.
+func updateCredential(ctx context.Context, conn *apiconn.Conn, cred *mongodoc.Credential) (*jujuparams.UpdateCredentialResult, error) {
+	_, facade := jujuapibase.NewClientFacade(conn, "Cloud")
+	jcreds := []jujuparams.TaggedCredential{newJujuCred(cred)}
+	if facade.BestAPIVersion() < 3 {
+		// It's an old controller, so the UpdateCredentials entry point doesn't check
+		// that the credentials are valid.
+		// But we still need to return results with all the models in,
+		// so we'll get the models associated with the credential first.
+		in := jujuparams.TaggedCredentials{
+			Credentials: jcreds,
+		}
+		var out jujuparams.ErrorResults
+		if err := facade.FacadeCall("UpdateCredentials", in, &out); err != nil {
+			return nil, errgo.Mask(err)
+		}
+		return nil, out.OneError()
+	}
+	in := jujuparams.UpdateCredentialArgs{
+		Force:       true,
+		Credentials: jcreds,
+	}
+	var out jujuparams.UpdateCredentialResults
+	err := facade.FacadeCall("UpdateCredentialsCheckModels", in, &out)
+	switch {
+	case err != nil:
+		return nil, errgo.Mask(err)
+	case len(out.Results) != 1:
+		return nil, errgo.New("unexpected result count from UpdateCredentialsCheckModels")
+	}
+	return &out.Results[0], nil
 }
 
 // GrantModel grants the given access for the given user on the given model and updates the JEM database.
@@ -886,6 +1191,7 @@ func (j *JEM) selectCredential(ctx context.Context, path params.CredentialPath, 
 		query = bson.D{
 			{"path.entitypath.user", user},
 			{"path.cloud", cloud},
+			{"revoked", false},
 		}
 	}
 	var creds []mongodoc.Credential
@@ -905,7 +1211,14 @@ func (j *JEM) selectCredential(ctx context.Context, path params.CredentialPath, 
 		}
 		return nil, err
 	case 1:
-		return &creds[0], nil
+		cred := &creds[0]
+		if cred.Revoked {
+			// The credential (which must have been specifically selected by
+			// path, because if the path wasn't set, we will never select
+			// a revoked credential) has been revoked - we can't use it.
+			return nil, errgo.Newf("credential %v has been revoked", creds[0].Path)
+		}
+		return cred, nil
 	default:
 		return nil, errgo.WithCausef(nil, params.ErrAmbiguousChoice, "more than one possible credential to use")
 	}
@@ -1129,7 +1442,7 @@ func (j *JEM) RemoveCloud(ctx context.Context, cloud params.Cloud) (err error) {
 // UpdateModelCredential updates the credential used with a model on both
 // the controller and the local database.
 func (j *JEM) UpdateModelCredential(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model, cred *mongodoc.Credential) error {
-	if err := j.updateControllerCredential(ctx, model.Controller, cred.Path, conn, cred); err != nil {
+	if err := j.updateControllerCredential(ctx, conn, model.Controller, cred, nil); err != nil {
 		return errgo.Notef(err, "cannot add credential")
 	}
 	if err := j.DB.credentialAddController(ctx, cred.Path, model.Controller); err != nil {
