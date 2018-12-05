@@ -145,6 +145,7 @@ github.com/juju/gojsonschema v0.0.0-20150312170016-e1ad140384f2 h1:VqIDC6dRE0C7w
 github.com/juju/gojsonschema v0.0.0-20150312170016-e1ad140384f2/go.mod h1:w3BDUH3gGgrcrAyvEbBy3lNb1vmdqG31UMn3njL8oGc=
 github.com/juju/gomaasapi v0.0.0-20180919150011-8a8cec793ba7 h1:VuZvRs6onuPLOH49Ie9iFtbVsaSZfIghF39zfeH+oUA=
 github.com/juju/gomaasapi v0.0.0-20180919150011-8a8cec793ba7/go.mod h1:ppx9XlnQMX/+h/kH+cU9kfDUT6GimqGtNRWdobUZVRE=
+github.com/juju/gosigma v0.0.0-20170523021020-a27b59fe2be9 h1:uhGKbOQnRtYSt1BWOlHC4rFooZDWGSjMKWrYm8RkQjM=
 github.com/juju/gosigma v0.0.0-20170523021020-a27b59fe2be9/go.mod h1:OPBu48GcIJ30kNTA1cm+VbZb6GkQ6vthnr5v6NJ49eM=
 github.com/juju/httpprof v0.0.0-20141217160036-14bf14c30767 h1:COsaGcfAONDdIDnGS8yFdxOyReP7zKQEr7jFzCHKDkM=
 github.com/juju/httpprof v0.0.0-20141217160036-14bf14c30767/go.mod h1:+MaLYz4PumRkkyHYeXJ2G5g5cIW0sli2bOfpmbaMV/g=
@@ -163,6 +164,7 @@ github.com/juju/loggo v0.0.0-20180524022052-584905176618 h1:MK144iBQF9hTSwBW/9eJ
 github.com/juju/loggo v0.0.0-20180524022052-584905176618/go.mod h1:vgyd7OREkbtVEN/8IXZe5Ooef3LQePvuBm9UWj6ZL8U=
 github.com/juju/mempool v0.0.0-20160205104927-24974d6c264f h1:a3Vd00a20dTKLpyS2hdUafNG5zxQdTw5KhDMK5C0a8U=
 github.com/juju/mempool v0.0.0-20160205104927-24974d6c264f/go.mod h1:+7K7MqWi5xWI+s1LyB2g0Di71jZo27y+XOlmhNtV1Y0=
+github.com/juju/mgo v0.0.0-20181126100033-9ecfba03d10a h1:kUVy3id7CJ6xmVLw9NJBXLuridMXHddNPai7h3gCF0k=
 github.com/juju/mgo v0.0.0-20181126100033-9ecfba03d10a/go.mod h1:7a/cakyF0q2iwjcD35dn0dgVCdKnLW5j/5iCCAFu7vg=
 github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31 h1:v6GpXmpXOD6KwPbApRlwDGQxf1FpS6gfLdfVbE4ZLzk=
 github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31/go.mod h1:m6E+J+I+cE+6rcaVxSI4HwGLIEOCSOBMYedt3Sewh+U=
@@ -231,6 +233,7 @@ github.com/juju/webbrowser v0.0.0-20180907093207-efb9432b2bcb h1:iffwDjS1xyg1Owl
 github.com/juju/webbrowser v0.0.0-20180907093207-efb9432b2bcb/go.mod h1:G6PCelgkM6cuvyD10iYJsjLBsSadVXtJ+nBxFAxE2BU=
 github.com/juju/xml v0.0.0-20150413131121-eb759a627588 h1:sr4LCVUJTRlQxK/pBTUihgdGsUvJ6NVsiszop4AJkCw=
 github.com/juju/xml v0.0.0-20150413131121-eb759a627588/go.mod h1:RnnCV6b9HzujjOLGRpqvZc8INbwtBzZlhbCj5R9F1vw=
+github.com/juju/yaml v0.0.0-20181113141958-2025133c3826 h1:eSpIWid00XOT95sUYKdIR8kxvQU4rn44PJhnd7J47y8=
 github.com/juju/yaml v0.0.0-20181113141958-2025133c3826/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
 github.com/juju/zip v0.0.0-20160205105221-f6b1e93fa2e2 h1:McU3wXjBrKfJcOt2Pali5qEir9NLrqOh4EECzdWHknM=
 github.com/juju/zip v0.0.0-20160205105221-f6b1e93fa2e2/go.mod h1:3mJ64RiWU2x9U6IigvcoVLra6LZQTOwMuHpk02OtOJc=

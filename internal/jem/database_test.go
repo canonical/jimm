@@ -1561,6 +1561,26 @@ func (s *databaseSuite) TestRevoke(c *gc.C) {
 	s.checkDBOK(c)
 }
 
+func (s *databaseSuite) TestModelsWithCredential(c *gc.C) {
+	credPath := params.CredentialPath{
+		Cloud: "cloud",
+		EntityPath: params.EntityPath{
+			User: "bob",
+			Name: "foo",
+		},
+	}
+	modelPath := params.EntityPath{"bob", "foo"}
+	err := s.database.AddModel(testContext, &mongodoc.Model{
+		Path:       modelPath,
+		UUID:       "fake-uuid",
+		Credential: credPath,
+	})
+	c.Assert(err, gc.Equals, nil)
+	paths, err := s.database.ModelsWithCredential(testContext, credPath)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(paths, jc.DeepEquals, []params.EntityPath{modelPath})
+}
+
 func (s *databaseSuite) TestProviderType(c *gc.C) {
 	err := s.database.UpdateCloudRegions(testContext, []mongodoc.CloudRegion{{
 		Cloud:              "my-cloud",

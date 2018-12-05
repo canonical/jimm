@@ -648,6 +648,11 @@ func (j *JEM) createModelOnController(ctx context.Context, ctlPath params.Entity
 	return m, nil
 }
 
+// RevokeCredential checks that the credential with the given path
+// can be revoked (if flags&CredentialCheck!=0) and revokes
+// the credential (if flags&CredentialUpdate!=0).
+// If flags==0, it acts as if both CredentialCheck and CredentialUpdate
+// were set.
 func (j *JEM) RevokeCredential(ctx context.Context, credPath params.CredentialPath, flags CredentialUpdateFlags) error {
 	if flags == 0 {
 		flags = ^0
@@ -724,9 +729,12 @@ const (
 	CredentialCheck
 )
 
-// UpdateCredential updates the specified credential in the
-// local database and then updates it on all controllers to which it is
-// deployed.
+// UpdateCredential checks that the credential can be updated (if the
+// CredentialUpdate flag is set) and updates its in the local database
+// and all controllers to which it is deployed (if the CredentialCheck
+// flag is specified).
+//
+// If flags is zero, it will both check and update.
 func (j *JEM) UpdateCredential(ctx context.Context, cred *mongodoc.Credential, flags CredentialUpdateFlags) (*jujuparams.UpdateCredentialResult, error) {
 	if cred.Revoked {
 		return nil, errgo.Newf("cannot use UpdateCredential to revoke a credential")
@@ -753,6 +761,9 @@ func (j *JEM) UpdateCredential(ctx context.Context, cred *mongodoc.Credential, f
 			return r, nil
 		}
 	}
+	// Note that because CredentialUpdate is checked for inside the
+	// CredentialCheck case above, we know that we need to
+	// update the credential in this case.
 	r, err := j.updateCredential(ctx, cred, controllers)
 	if err != nil {
 		return nil, errgo.Mask(err)
@@ -830,7 +841,6 @@ func (j *JEM) checkCredential(ctx context.Context, newCred *mongodoc.Credential,
 	return r, nil
 }
 
-// Make the channel buffered so we don't leak go-routines
 type updateCredentialResult struct {
 	ctlPath params.EntityPath
 	r       *jujuparams.UpdateCredentialResult
@@ -998,8 +1008,33 @@ func (j *JEM) revokeControllerCredential(
 	credPath params.CredentialPath,
 ) error {
 	cloudCredentialTag := CloudCredentialTag(credPath)
-	cloudClient := cloudapi.NewClient(conn)
-	if err := cloudClient.RevokeCredential(cloudCredentialTag); err != nil {
+
+	_, facade := jujuapibase.NewClientFacade(conn, "Cloud")
+	var results jujuparams.ErrorResults
+	if facade.BestAPIVersion() < 3 {
+		// If we're using an older API version, the Force flag is implied.
+		args := jujuparams.Entities{
+			Entities: []jujuparams.Entity{{
+				Tag: cloudCredentialTag.String(),
+			}},
+		}
+		if err := facade.FacadeCall("RevokeCredentials", args, &results); err != nil {
+			return errgo.Mask(err)
+		}
+	} else {
+		// Newer API versions require an explicit Force argument
+		// (we're assuming that we've checked earlier, so we always force)
+		args := jujuparams.RevokeCredentialArgs{
+			Credentials: []jujuparams.RevokeCredentialArg{{
+				Tag:   cloudCredentialTag.String(),
+				Force: true,
+			}},
+		}
+		if err := facade.FacadeCall("RevokeCredentialsCheckModels", args, &results); err != nil {
+			return errgo.Mask(err)
+		}
+	}
+	if err := results.OneError(); err != nil {
 		return errgo.Mask(err)
 	}
 	if err := j.DB.clearCredentialUpdate(ctx, ctlPath, credPath); err != nil {

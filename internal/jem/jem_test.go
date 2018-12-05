@@ -448,6 +448,104 @@ func (s *jemSuite) TestCreateModelWithMultipleControllers(c *gc.C) {
 	c.Assert(m.Controller, jc.DeepEquals, ctl2Id)
 }
 
+func (s *jemSuite) TestRevokeCredentialsInUse(c *gc.C) {
+	ctlId := s.addController(c, params.EntityPath{"bob", "controller"})
+	err := s.jem.DB.SetACL(testContext, s.jem.DB.Controllers(), ctlId, params.ACL{
+		Read: []string{"everyone"},
+	})
+	c.Assert(err, gc.Equals, nil)
+	credPath := credentialPath("dummy", "bob", "cred1")
+	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
+		Path: credPath,
+		Type: "empty",
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	ctx := auth.ContextWithUser(testContext, "bob")
+	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", "oldmodel"},
+		ControllerPath: ctlId,
+		Credential:     credPath,
+		Cloud:          "dummy",
+	})
+	c.Assert(err, gc.Equals, nil)
+	err = s.jem.RevokeCredential(testContext, credPath, 0)
+	c.Assert(err, gc.ErrorMatches, `cannot revoke because credential is in use on at least one model`)
+
+	// Try with just the check.
+	err = s.jem.RevokeCredential(testContext, credPath, jem.CredentialCheck)
+	c.Assert(err, gc.ErrorMatches, `cannot revoke because credential is in use on at least one model`)
+
+	// Try without the check. It should succeed.
+	err = s.jem.RevokeCredential(testContext, credPath, jem.CredentialUpdate)
+	c.Assert(err, gc.Equals, nil)
+
+	// Try to create another with the credentials that have
+	// been revoked. We should fail to do that.
+	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", "newmodel"},
+		ControllerPath: ctlId,
+		Credential:     credPath,
+		Cloud:          "dummy",
+	})
+	c.Assert(err, gc.ErrorMatches, `credential dummy/bob/cred1 has been revoked`)
+
+	// Check that the credential really has been revoked on the
+	// controller.
+	conn, err := s.jem.OpenAPI(testContext, ctlId)
+	c.Assert(err, gc.Equals, nil)
+	defer conn.Close()
+	r, err := cloudapi.NewClient(conn).Credentials(jem.CloudCredentialTag(credPath))
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(r, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
+		Error: &jujuparams.Error{
+			Message: `credential "cred1" not found`,
+			Code:    "not found",
+		},
+	}})
+}
+
+func (s *jemSuite) TestRevokeCredentialsNotInUse(c *gc.C) {
+	ctlId := s.addController(c, params.EntityPath{"bob", "controller"})
+	err := s.jem.DB.SetACL(testContext, s.jem.DB.Controllers(), ctlId, params.ACL{
+		Read: []string{"everyone"},
+	})
+	c.Assert(err, gc.Equals, nil)
+	credPath := credentialPath("dummy", "bob", "cred1")
+	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
+		Path: credPath,
+		Type: "empty",
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	// Sanity check that we can get the credential.
+	_, err = s.jem.DB.Credential(testContext, credPath)
+	c.Assert(err, gc.Equals, nil)
+
+	// Try with just the check.
+	err = s.jem.RevokeCredential(testContext, credPath, jem.CredentialCheck)
+	c.Assert(err, gc.Equals, nil)
+
+	// Check that the credential is still there.
+	_, err = s.jem.DB.Credential(testContext, credPath)
+	c.Assert(err, gc.Equals, nil)
+
+	// Try with both the check and the update flag.
+	err = s.jem.RevokeCredential(testContext, credPath, 0)
+	c.Assert(err, gc.Equals, nil)
+
+	// The credential should be marked as revoked and all
+	// the details should be cleater.
+	cred, err := s.jem.DB.Credential(testContext, credPath)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
+		Id:      "dummy/bob/cred1",
+		Path:    credPath,
+		Revoked: true,
+		Attributes: make(map[string]string),
+	})
+}
+
 func (s *jemSuite) TestGrantModelWrite(c *gc.C) {
 	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
 	conn, err := s.jem.OpenAPI(testContext, model.Controller)

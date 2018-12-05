@@ -570,7 +570,8 @@ func (c cloudV3) CheckCredentialsModels(ctx context.Context, args jujuparams.Tag
 
 // ModifyCloudAccess changes the cloud access granted to users.
 func (c cloudV3) ModifyCloudAccess(ctx context.Context, args jujuparams.ModifyCloudAccessRequest) (jujuparams.ErrorResults, error) {
-	panic("unimplemented")
+	// TODO implement ModifyCloudAccess
+	return jujuparams.ErrorResults{}, errgo.WithCausef(nil, errNotImplemented, "ModifyCloudAccess is not implemented for JAAS models")
 }
 
 // UpdateCredentialsCheckModels updates a set of cloud credentials' content.

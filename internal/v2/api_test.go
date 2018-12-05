@@ -972,7 +972,7 @@ func (s *APISuite) TestNewModelWithInvalidControllerPath(c *gc.C) {
 				"controller": test.path,
 			},
 			ExpectBody: params.Error{
-				Message: fmt.Sprintf("cannot unmarshal parameters: cannot unmarshal into field: cannot unmarshal request body: %s", test.expectErr),
+				Message: fmt.Sprintf("cannot unmarshal parameters: cannot unmarshal into field Info: cannot unmarshal request body: %s", test.expectErr),
 				Code:    params.ErrBadRequest,
 			},
 			ExpectStatus: http.StatusBadRequest,

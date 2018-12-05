@@ -119,9 +119,20 @@ func (db *Database) AddController(ctx context.Context, ctl *mongodoc.Controller)
 	return nil
 }
 
-func (db *Database) ModelsWithCredential(ctx context.Context, credPath params.CredentialPath) ([]params.EntityPath, error) {
-	// TODO implement this
-	return nil, nil
+// ModelsWithCredential returns a list of the paths of all models that use the given credential.
+func (db *Database) ModelsWithCredential(ctx context.Context, credPath params.CredentialPath) (_ []params.EntityPath, err error) {
+	defer db.checkError(ctx, &err)
+
+	iter := db.Models().Find(bson.D{{"credential", credPath}}).Iter()
+	var paths []params.EntityPath
+	var doc mongodoc.Model
+	for iter.Next(&doc) {
+		paths = append(paths, doc.Path)
+	}
+	if iter.Err() != nil {
+		return nil, errgo.Mask(err)
+	}
+	return paths, nil
 }
 
 // DeleteController deletes existing controller and all of its
