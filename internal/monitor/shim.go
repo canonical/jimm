@@ -127,18 +127,19 @@ func (a apiShim) ModelExists(uuid string) (bool, error) {
 	}
 	results, err := apicontroller.NewClient(a.Conn).ModelStatus(names.NewModelTag(uuid))
 	if err != nil {
-		if jujuparams.IsCodeNotFound(err) {
-			return false, nil
-		}
 		return false, errgo.Mask(err)
 	}
 
 	if len(results) != 1 {
 		return false, errgo.Notef(err, "unexpected result count, %d, from ModelStatus call", len(results))
 	}
-	// A later version of the API adds an Error parameter, but we
-	// can't use that yet, so rely on UUID as a proxy for "is found".
-	return results[0].UUID != "", nil
+	if results[0].Error != nil {
+		if jujuparams.IsCodeNotFound(err) {
+			return false, nil
+		}
+		return false, errgo.Mask(err)
+	}
+	return true, nil
 }
 
 func (a apiShim) WatchAllModels() (allWatcher, error) {
