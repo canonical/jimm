@@ -350,9 +350,9 @@ func (s *internalSuite) TestModelRemovedWithFailedWatcher(c *gc.C) {
 	//	- Before the watcher update arrives which would tell jimm
 	//	to remove the model (perhaps because the
 	// 	watcher isn't currently working), the watcher is restarted.
-	//	- The model (machines and applications linked to trhat model too)
-	//  should then be removed from jimm, even though it doesn't exist in
-	//  the controller.
+	//	- The model (machines and applications linked to that model too)
+	//	should then be removed from jimm, even though it doesn't exist in
+	//	the controller.
 	//
 	// To simulate this, we add a model to the jimm database but don't
 	// add it to the underlying Juju state. It should be removed when we
