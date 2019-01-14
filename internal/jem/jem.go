@@ -1439,6 +1439,63 @@ func (j *JEM) RemoveCloud(ctx context.Context, cloud params.Cloud) (err error) {
 	return nil
 }
 
+// GrantCloud grants access to the given cloud at the given access level to the given user.
+func (j *JEM) GrantCloud(ctx context.Context, cloud params.Cloud, user params.User, access string) error {
+	cr, err := j.DB.CloudRegion(ctx, cloud, "")
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	if err := auth.CheckACL(ctx, cr.ACL.Admin); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	if err := j.DB.GrantCloud(ctx, cloud, user, access); err != nil {
+		return errgo.Mask(err)
+	}
+	// TODO grant the cloud access on the controllers in parallel
+	// (although currently there is only ever one anyway).
+	for _, ctl := range cr.PrimaryControllers {
+		conn, err := j.OpenAPI(ctx, ctl)
+		if err != nil {
+			return errgo.Mask(err)
+		}
+		defer conn.Close()
+		if err := cloudapi.NewClient(conn).GrantCloud(UserTag(user).String(), access, string(cloud)); err != nil {
+			// TODO(mhilton) If this happens then the
+			// controller will be in an inconsistent state
+			// with JIMM. Try and resolve this.
+			return errgo.Mask(err)
+		}
+	}
+	return nil
+}
+
+// RevokeCloud revokes access to the given cloud at the given access level from the given user.
+func (j *JEM) RevokeCloud(ctx context.Context, cloud params.Cloud, user params.User, access string) error {
+	cr, err := j.DB.CloudRegion(ctx, cloud, "")
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	if err := auth.CheckACL(ctx, cr.ACL.Admin); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	// TODO revoke the cloud access on the controllers in parallel
+	// (although currently there is only ever one anyway).
+	for _, ctl := range cr.PrimaryControllers {
+		conn, err := j.OpenAPI(ctx, ctl)
+		if err != nil {
+			return errgo.Mask(err)
+		}
+		defer conn.Close()
+		if err := cloudapi.NewClient(conn).RevokeCloud(UserTag(user).String(), access, string(cloud)); err != nil {
+			return errgo.Mask(err)
+		}
+	}
+	if err := j.DB.RevokeCloud(ctx, cloud, user, access); err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
 // UpdateModelCredential updates the credential used with a model on both
 // the controller and the local database.
 func (j *JEM) UpdateModelCredential(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model, cred *mongodoc.Credential) error {

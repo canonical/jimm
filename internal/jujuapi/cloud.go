@@ -570,8 +570,38 @@ func (c cloudV3) CheckCredentialsModels(ctx context.Context, args jujuparams.Tag
 
 // ModifyCloudAccess changes the cloud access granted to users.
 func (c cloudV3) ModifyCloudAccess(ctx context.Context, args jujuparams.ModifyCloudAccessRequest) (jujuparams.ErrorResults, error) {
-	// TODO implement ModifyCloudAccess
-	return jujuparams.ErrorResults{}, errgo.WithCausef(nil, errNotImplemented, "ModifyCloudAccess is not implemented for JAAS models")
+	ctx = ctxutil.Join(ctx, c.root.authContext)
+	results := make([]jujuparams.ErrorResult, len(args.Changes))
+	for i, change := range args.Changes {
+		results[i].Error = mapError(c.modifyCloudAccess(ctx, change))
+	}
+	return jujuparams.ErrorResults{
+		Results: results,
+	}, nil
+}
+
+func (c cloudV3) modifyCloudAccess(ctx context.Context, change jujuparams.ModifyCloudAccess) error {
+	userTag, err := names.ParseUserTag(change.UserTag)
+	if err != nil {
+		return errgo.WithCausef(err, params.ErrBadRequest, "")
+	}
+	cloudTag, err := names.ParseCloudTag(change.CloudTag)
+	if err != nil {
+		return errgo.WithCausef(err, params.ErrBadRequest, "")
+	}
+	var modifyf func(context.Context, params.Cloud, params.User, string) error
+	switch change.Action {
+	case jujuparams.GrantCloudAccess:
+		modifyf = c.root.jem.GrantCloud
+	case jujuparams.RevokeCloudAccess:
+		modifyf = c.root.jem.RevokeCloud
+	default:
+		return errgo.WithCausef(nil, params.ErrBadRequest, "unsupported modify cloud action %q", change.Action)
+	}
+	if err := modifyf(ctx, params.Cloud(cloudTag.Id()), params.User(userTag.Id()), change.Access); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+	}
+	return nil
 }
 
 // UpdateCredentialsCheckModels updates a set of cloud credentials' content.
