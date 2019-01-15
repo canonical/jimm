@@ -49,10 +49,13 @@ var _ = gc.Suite(&jemSuite{})
 func (s *jemSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
 	s.sessionPool = mgosession.NewPool(context.TODO(), s.Session, 5)
+	publicCloudMetadata, _, err := cloud.PublicCloudMetadata()
+	c.Assert(err, gc.Equals, nil)
 	pool, err := jem.NewPool(context.TODO(), jem.Params{
-		DB:              s.Session.DB("jem"),
-		ControllerAdmin: "controller-admin",
-		SessionPool:     s.sessionPool,
+		DB:                  s.Session.DB("jem"),
+		ControllerAdmin:     "controller-admin",
+		SessionPool:         s.sessionPool,
+		PublicCloudMetadata: publicCloudMetadata,
 	})
 	c.Assert(err, gc.Equals, nil)
 	s.pool = pool
@@ -1524,6 +1527,27 @@ func (s *jemSuite) TestCreateCloudNameMatch(c *gc.C) {
 		},
 	}, nil)
 	c.Assert(err, gc.ErrorMatches, `cloud "dummy" already exists`)
+}
+
+func (s *jemSuite) TestCreateCloudPublicNameMatch(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	s.addController(c, ctlPath)
+	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	err := s.jem.CreateCloud(ctx, mongodoc.CloudRegion{
+		Cloud:            "aws-china",
+		ProviderType:     "kubernetes",
+		AuthTypes:        []string{"certificate"},
+		Endpoint:         "https://1.2.3.4:5678",
+		IdentityEndpoint: "https://1.2.3.4:5679",
+		StorageEndpoint:  "https://1.2.3.4:5680",
+		CACertificates:   []string{"This is a CA Certficiate (honest)"},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}, nil)
+	c.Assert(err, gc.ErrorMatches, `cloud "aws-china" already exists`)
 }
 
 func (s *jemSuite) TestCreateCloudNoControllers(c *gc.C) {

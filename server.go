@@ -88,6 +88,11 @@ type ServerParams struct {
 	// including the leading "@". If this is empty, users may be in
 	// any domain.
 	Domain string
+
+	// PublicCloudMetadata contains the path of the file containing
+	// the public cloud metadata. If this is empty or the file
+	// doesn't exist the default public cloud information is used.
+	PublicCloudMetadata string
 }
 
 // HandleCloser represents an HTTP handler that can

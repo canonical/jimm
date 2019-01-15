@@ -635,6 +635,21 @@ func (s *cloudSuite) TestAddCloudError(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `invalid cloud: empty auth-types not valid`)
 }
 
+func (s *cloudSuite) TestAddCloudBadName(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller"}, true)
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := cloudapi.NewClient(conn)
+	err := client.AddCloud(cloud.Cloud{
+		Name:             "aws",
+		Type:             "kubernetes",
+		Endpoint:         "https://0.1.2.3:5678",
+		IdentityEndpoint: "https://0.1.2.3:5679",
+		StorageEndpoint:  "https://0.1.2.3:5680",
+	})
+	c.Assert(err, gc.ErrorMatches, `cloud "aws" already exists \(already exists\)`)
+}
+
 func (s *cloudSuite) TestAddCredential(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, nil, "test")

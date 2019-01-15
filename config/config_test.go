@@ -93,6 +93,7 @@ gui-location: https://jujucharms.com
 usage-sender-url: https://jujucharms.com/omnibus/v2
 usage-sender-spool-dir: /tmp/12345
 domain: test-domain
+public-cloud-metadata: cloud-metadata.yaml
 `
 
 func (s *ConfigSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
@@ -142,6 +143,7 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 		UsageSenderURL:      "https://jujucharms.com/omnibus/v2",
 		UsageSenderSpoolDir: "/tmp/12345",
 		Domain:              "test-domain",
+		PublicCloudMetadata: "cloud-metadata.yaml",
 	})
 }
 
