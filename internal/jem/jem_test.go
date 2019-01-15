@@ -539,9 +539,9 @@ func (s *jemSuite) TestRevokeCredentialsNotInUse(c *gc.C) {
 	cred, err := s.jem.DB.Credential(testContext, credPath)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
-		Id:      "dummy/bob/cred1",
-		Path:    credPath,
-		Revoked: true,
+		Id:         "dummy/bob/cred1",
+		Path:       credPath,
+		Revoked:    true,
 		Attributes: make(map[string]string),
 	})
 }
@@ -1713,6 +1713,376 @@ func (s *jemSuite) TestRemoveCloudWithModel(c *gc.C) {
 
 	err = s.jem.RemoveCloud(ctx, "test-cloud")
 	c.Assert(err, gc.ErrorMatches, `cloud is used by 1 model`)
+}
+
+func (s *jemSuite) TestGrantCloud(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	s.addController(c, ctlPath)
+	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	err := s.jem.CreateCloud(ctx, mongodoc.CloudRegion{
+		Cloud:            "test-cloud",
+		ProviderType:     "kubernetes",
+		AuthTypes:        []string{"certificate"},
+		Endpoint:         "https://1.2.3.4:5678",
+		IdentityEndpoint: "https://1.2.3.4:5679",
+		StorageEndpoint:  "https://1.2.3.4:5680",
+		CACertificates:   []string{"This is a CA Certficiate (honest)"},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	var docs []mongodoc.CloudRegion
+	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(docs, jc.DeepEquals, []mongodoc.CloudRegion{{
+		Id:                   "test-cloud/",
+		Cloud:                "test-cloud",
+		ProviderType:         "kubernetes",
+		AuthTypes:            []string{"certificate"},
+		Endpoint:             "https://1.2.3.4:5678",
+		IdentityEndpoint:     "https://1.2.3.4:5679",
+		StorageEndpoint:      "https://1.2.3.4:5680",
+		CACertificates:       []string{"This is a CA Certficiate (honest)"},
+		PrimaryControllers:   []params.EntityPath{{User: "bob", Name: "foo"}},
+		SecondaryControllers: []params.EntityPath{},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}})
+
+	err = s.jem.GrantCloud(ctx, "test-cloud", "alice", "admin")
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(docs, jc.DeepEquals, []mongodoc.CloudRegion{{
+		Id:                   "test-cloud/",
+		Cloud:                "test-cloud",
+		ProviderType:         "kubernetes",
+		AuthTypes:            []string{"certificate"},
+		Endpoint:             "https://1.2.3.4:5678",
+		IdentityEndpoint:     "https://1.2.3.4:5679",
+		StorageEndpoint:      "https://1.2.3.4:5680",
+		CACertificates:       []string{"This is a CA Certficiate (honest)"},
+		PrimaryControllers:   []params.EntityPath{{User: "bob", Name: "foo"}},
+		SecondaryControllers: []params.EntityPath{},
+		ACL: params.ACL{
+			Read:  []string{"bob", "alice"},
+			Write: []string{"bob", "alice"},
+			Admin: []string{"bob", "alice"},
+		},
+	}})
+}
+
+func (s *jemSuite) TestGrantCloudUnauthorized(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	s.addController(c, ctlPath)
+	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	err := s.jem.CreateCloud(ctx, mongodoc.CloudRegion{
+		Cloud:            "test-cloud",
+		ProviderType:     "kubernetes",
+		AuthTypes:        []string{"certificate"},
+		Endpoint:         "https://1.2.3.4:5678",
+		IdentityEndpoint: "https://1.2.3.4:5679",
+		StorageEndpoint:  "https://1.2.3.4:5680",
+		CACertificates:   []string{"This is a CA Certficiate (honest)"},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	var docs []mongodoc.CloudRegion
+	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(docs, jc.DeepEquals, []mongodoc.CloudRegion{{
+		Id:                   "test-cloud/",
+		Cloud:                "test-cloud",
+		ProviderType:         "kubernetes",
+		AuthTypes:            []string{"certificate"},
+		Endpoint:             "https://1.2.3.4:5678",
+		IdentityEndpoint:     "https://1.2.3.4:5679",
+		StorageEndpoint:      "https://1.2.3.4:5680",
+		CACertificates:       []string{"This is a CA Certficiate (honest)"},
+		PrimaryControllers:   []params.EntityPath{{User: "bob", Name: "foo"}},
+		SecondaryControllers: []params.EntityPath{},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}})
+
+	err = s.jem.GrantCloud(auth.ContextWithUser(testContext, "alice"), "test-cloud", "alice", "admin")
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
+	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+}
+
+func (s *jemSuite) TestGrantCloudNotFound(c *gc.C) {
+	err := s.jem.GrantCloud(auth.ContextWithUser(testContext, "alice"), "test-cloud", "alice", "admin")
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+	c.Assert(err, gc.ErrorMatches, `cloud "test-cloud" region "" not found`)
+}
+
+func (s *jemSuite) TestGrantCloudInvalidAccess(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	s.addController(c, ctlPath)
+	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	err := s.jem.CreateCloud(ctx, mongodoc.CloudRegion{
+		Cloud:            "test-cloud",
+		ProviderType:     "kubernetes",
+		AuthTypes:        []string{"certificate"},
+		Endpoint:         "https://1.2.3.4:5678",
+		IdentityEndpoint: "https://1.2.3.4:5679",
+		StorageEndpoint:  "https://1.2.3.4:5680",
+		CACertificates:   []string{"This is a CA Certficiate (honest)"},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	var docs []mongodoc.CloudRegion
+	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(docs, jc.DeepEquals, []mongodoc.CloudRegion{{
+		Id:                   "test-cloud/",
+		Cloud:                "test-cloud",
+		ProviderType:         "kubernetes",
+		AuthTypes:            []string{"certificate"},
+		Endpoint:             "https://1.2.3.4:5678",
+		IdentityEndpoint:     "https://1.2.3.4:5679",
+		StorageEndpoint:      "https://1.2.3.4:5680",
+		CACertificates:       []string{"This is a CA Certficiate (honest)"},
+		PrimaryControllers:   []params.EntityPath{{User: "bob", Name: "foo"}},
+		SecondaryControllers: []params.EntityPath{},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}})
+
+	err = s.jem.GrantCloud(ctx, "test-cloud", "alice", "not-valid")
+	c.Assert(err, gc.ErrorMatches, `"not-valid" cloud access not valid`)
+}
+
+func (s *jemSuite) TestRevokeCloud(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	s.addController(c, ctlPath)
+	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	err := s.jem.CreateCloud(ctx, mongodoc.CloudRegion{
+		Cloud:            "test-cloud",
+		ProviderType:     "kubernetes",
+		AuthTypes:        []string{"certificate"},
+		Endpoint:         "https://1.2.3.4:5678",
+		IdentityEndpoint: "https://1.2.3.4:5679",
+		StorageEndpoint:  "https://1.2.3.4:5680",
+		CACertificates:   []string{"This is a CA Certficiate (honest)"},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	var docs []mongodoc.CloudRegion
+	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(docs, jc.DeepEquals, []mongodoc.CloudRegion{{
+		Id:                   "test-cloud/",
+		Cloud:                "test-cloud",
+		ProviderType:         "kubernetes",
+		AuthTypes:            []string{"certificate"},
+		Endpoint:             "https://1.2.3.4:5678",
+		IdentityEndpoint:     "https://1.2.3.4:5679",
+		StorageEndpoint:      "https://1.2.3.4:5680",
+		CACertificates:       []string{"This is a CA Certficiate (honest)"},
+		PrimaryControllers:   []params.EntityPath{{User: "bob", Name: "foo"}},
+		SecondaryControllers: []params.EntityPath{},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}})
+
+	err = s.jem.GrantCloud(ctx, "test-cloud", "alice", "admin")
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(docs, jc.DeepEquals, []mongodoc.CloudRegion{{
+		Id:                   "test-cloud/",
+		Cloud:                "test-cloud",
+		ProviderType:         "kubernetes",
+		AuthTypes:            []string{"certificate"},
+		Endpoint:             "https://1.2.3.4:5678",
+		IdentityEndpoint:     "https://1.2.3.4:5679",
+		StorageEndpoint:      "https://1.2.3.4:5680",
+		CACertificates:       []string{"This is a CA Certficiate (honest)"},
+		PrimaryControllers:   []params.EntityPath{{User: "bob", Name: "foo"}},
+		SecondaryControllers: []params.EntityPath{},
+		ACL: params.ACL{
+			Read:  []string{"bob", "alice"},
+			Write: []string{"bob", "alice"},
+			Admin: []string{"bob", "alice"},
+		},
+	}})
+
+	err = s.jem.RevokeCloud(ctx, "test-cloud", "alice", "add-model")
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(docs, jc.DeepEquals, []mongodoc.CloudRegion{{
+		Id:                   "test-cloud/",
+		Cloud:                "test-cloud",
+		ProviderType:         "kubernetes",
+		AuthTypes:            []string{"certificate"},
+		Endpoint:             "https://1.2.3.4:5678",
+		IdentityEndpoint:     "https://1.2.3.4:5679",
+		StorageEndpoint:      "https://1.2.3.4:5680",
+		CACertificates:       []string{"This is a CA Certficiate (honest)"},
+		PrimaryControllers:   []params.EntityPath{{User: "bob", Name: "foo"}},
+		SecondaryControllers: []params.EntityPath{},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}})
+}
+
+func (s *jemSuite) TestRevokeCloudUnauthorized(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	s.addController(c, ctlPath)
+	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	err := s.jem.CreateCloud(ctx, mongodoc.CloudRegion{
+		Cloud:            "test-cloud",
+		ProviderType:     "kubernetes",
+		AuthTypes:        []string{"certificate"},
+		Endpoint:         "https://1.2.3.4:5678",
+		IdentityEndpoint: "https://1.2.3.4:5679",
+		StorageEndpoint:  "https://1.2.3.4:5680",
+		CACertificates:   []string{"This is a CA Certficiate (honest)"},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	var docs []mongodoc.CloudRegion
+	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(docs, jc.DeepEquals, []mongodoc.CloudRegion{{
+		Id:                   "test-cloud/",
+		Cloud:                "test-cloud",
+		ProviderType:         "kubernetes",
+		AuthTypes:            []string{"certificate"},
+		Endpoint:             "https://1.2.3.4:5678",
+		IdentityEndpoint:     "https://1.2.3.4:5679",
+		StorageEndpoint:      "https://1.2.3.4:5680",
+		CACertificates:       []string{"This is a CA Certficiate (honest)"},
+		PrimaryControllers:   []params.EntityPath{{User: "bob", Name: "foo"}},
+		SecondaryControllers: []params.EntityPath{},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}})
+
+	err = s.jem.GrantCloud(ctx, "test-cloud", "alice", "admin")
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(docs, jc.DeepEquals, []mongodoc.CloudRegion{{
+		Id:                   "test-cloud/",
+		Cloud:                "test-cloud",
+		ProviderType:         "kubernetes",
+		AuthTypes:            []string{"certificate"},
+		Endpoint:             "https://1.2.3.4:5678",
+		IdentityEndpoint:     "https://1.2.3.4:5679",
+		StorageEndpoint:      "https://1.2.3.4:5680",
+		CACertificates:       []string{"This is a CA Certficiate (honest)"},
+		PrimaryControllers:   []params.EntityPath{{User: "bob", Name: "foo"}},
+		SecondaryControllers: []params.EntityPath{},
+		ACL: params.ACL{
+			Read:  []string{"bob", "alice"},
+			Write: []string{"bob", "alice"},
+			Admin: []string{"bob", "alice"},
+		},
+	}})
+
+	err = s.jem.RevokeCloud(auth.ContextWithUser(testContext, "charlie"), "test-cloud", "alice", "admin")
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
+	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+}
+
+func (s *jemSuite) TestRevokeCloudNotFound(c *gc.C) {
+	err := s.jem.RevokeCloud(auth.ContextWithUser(testContext, "alice"), "test-cloud", "alice", "admin")
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+	c.Assert(err, gc.ErrorMatches, `cloud "test-cloud" region "" not found`)
+}
+
+func (s *jemSuite) TestRevokeCloudInvalidAccess(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	s.addController(c, ctlPath)
+	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	err := s.jem.CreateCloud(ctx, mongodoc.CloudRegion{
+		Cloud:            "test-cloud",
+		ProviderType:     "kubernetes",
+		AuthTypes:        []string{"certificate"},
+		Endpoint:         "https://1.2.3.4:5678",
+		IdentityEndpoint: "https://1.2.3.4:5679",
+		StorageEndpoint:  "https://1.2.3.4:5680",
+		CACertificates:   []string{"This is a CA Certficiate (honest)"},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	var docs []mongodoc.CloudRegion
+	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(docs, jc.DeepEquals, []mongodoc.CloudRegion{{
+		Id:                   "test-cloud/",
+		Cloud:                "test-cloud",
+		ProviderType:         "kubernetes",
+		AuthTypes:            []string{"certificate"},
+		Endpoint:             "https://1.2.3.4:5678",
+		IdentityEndpoint:     "https://1.2.3.4:5679",
+		StorageEndpoint:      "https://1.2.3.4:5680",
+		CACertificates:       []string{"This is a CA Certficiate (honest)"},
+		PrimaryControllers:   []params.EntityPath{{User: "bob", Name: "foo"}},
+		SecondaryControllers: []params.EntityPath{},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}})
+
+	err = s.jem.RevokeCloud(ctx, "test-cloud", "alice", "not-valid")
+	c.Assert(err, gc.ErrorMatches, `"not-valid" cloud access not valid`)
 }
 
 func (s *jemSuite) TestUpdateModelCredential(c *gc.C) {

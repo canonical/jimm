@@ -2250,3 +2250,82 @@ func (s *databaseSuite) TestSetModelCredentialSuccess(c *gc.C) {
 		},
 	})
 }
+
+func (s *databaseSuite) TestGrantCloud(c *gc.C) {
+	err := s.database.InsertCloudRegion(testContext, &mongodoc.CloudRegion{
+		Cloud: "test-cloud",
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.database.GrantCloud(testContext, "test-cloud", "test-user", "add-model")
+	c.Assert(err, gc.Equals, nil)
+
+	cr, err := s.database.CloudRegion(testContext, "test-cloud", "")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(cr.ACL.Read, jc.DeepEquals, []string{"test-user"})
+	c.Assert(cr.ACL.Write, jc.DeepEquals, []string{})
+	c.Assert(cr.ACL.Admin, jc.DeepEquals, []string{})
+
+	err = s.database.GrantCloud(testContext, "test-cloud", "test-user2", "admin")
+	c.Assert(err, gc.Equals, nil)
+
+	cr, err = s.database.CloudRegion(testContext, "test-cloud", "")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(cr.ACL.Read, jc.DeepEquals, []string{"test-user", "test-user2"})
+	c.Assert(cr.ACL.Write, jc.DeepEquals, []string{"test-user2"})
+	c.Assert(cr.ACL.Admin, jc.DeepEquals, []string{"test-user2"})
+}
+
+func (s *databaseSuite) TestGrantCloudInvalidAccess(c *gc.C) {
+	err := s.database.InsertCloudRegion(testContext, &mongodoc.CloudRegion{
+		Cloud: "test-cloud",
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.database.GrantCloud(testContext, "test-cloud", "test-user", "bad-access")
+	c.Assert(err, gc.ErrorMatches, `"bad-access" cloud access not valid`)
+}
+
+func (s *databaseSuite) TestRevokeCloud(c *gc.C) {
+	err := s.database.InsertCloudRegion(testContext, &mongodoc.CloudRegion{
+		Cloud: "test-cloud",
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.database.GrantCloud(testContext, "test-cloud", "test-user", "admin")
+	c.Assert(err, gc.Equals, nil)
+
+	cr, err := s.database.CloudRegion(testContext, "test-cloud", "")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(cr.ACL.Read, jc.DeepEquals, []string{"test-user"})
+	c.Assert(cr.ACL.Write, jc.DeepEquals, []string{"test-user"})
+	c.Assert(cr.ACL.Admin, jc.DeepEquals, []string{"test-user"})
+
+	err = s.database.RevokeCloud(testContext, "test-cloud", "test-user", "admin")
+	c.Assert(err, gc.Equals, nil)
+
+	cr, err = s.database.CloudRegion(testContext, "test-cloud", "")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(cr.ACL.Read, jc.DeepEquals, []string{"test-user"})
+	c.Assert(cr.ACL.Write, jc.DeepEquals, []string{})
+	c.Assert(cr.ACL.Admin, jc.DeepEquals, []string{})
+
+	err = s.database.RevokeCloud(testContext, "test-cloud", "test-user", "add-model")
+	c.Assert(err, gc.Equals, nil)
+
+	cr, err = s.database.CloudRegion(testContext, "test-cloud", "")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(cr.ACL.Read, jc.DeepEquals, []string{})
+	c.Assert(cr.ACL.Write, jc.DeepEquals, []string{})
+	c.Assert(cr.ACL.Admin, jc.DeepEquals, []string{})
+}
+
+func (s *databaseSuite) TestRevokeCloudInvalidAccess(c *gc.C) {
+	err := s.database.InsertCloudRegion(testContext, &mongodoc.CloudRegion{
+		Cloud: "test-cloud",
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.database.RevokeCloud(testContext, "test-cloud", "test-user", "bad-access")
+	c.Assert(err, gc.ErrorMatches, `"bad-access" cloud access not valid`)
+}

@@ -945,6 +945,48 @@ func (db *Database) DeleteControllerFromCloudRegions(ctx context.Context, ctlPat
 	return nil
 }
 
+// GrantCloud grants the given access level to the given user on the given cloud.
+func (db *Database) GrantCloud(ctx context.Context, cloud params.Cloud, user params.User, access string) (err error) {
+	defer db.checkError(ctx, &err)
+	aclUpdates := make(bson.D, 0, 3)
+	switch access {
+	case "admin":
+		aclUpdates = append(aclUpdates, bson.DocElem{"acl.admin", user})
+		aclUpdates = append(aclUpdates, bson.DocElem{"acl.write", user})
+		fallthrough
+	case "add-model":
+		aclUpdates = append(aclUpdates, bson.DocElem{"acl.read", user})
+	default:
+		return errgo.Newf("%q cloud access not valid", access)
+	}
+	_, err = db.CloudRegions().UpdateAll(bson.D{{"cloud", cloud}}, bson.D{{"$addToSet", aclUpdates}})
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
+// RevokeCloud revokes the given access level from the given user on the given cloud.
+func (db *Database) RevokeCloud(ctx context.Context, cloud params.Cloud, user params.User, access string) (err error) {
+	defer db.checkError(ctx, &err)
+	aclUpdates := make(bson.D, 0, 3)
+	switch access {
+	case "add-model":
+		aclUpdates = append(aclUpdates, bson.DocElem{"acl.read", user})
+		fallthrough
+	case "admin":
+		aclUpdates = append(aclUpdates, bson.DocElem{"acl.admin", user})
+		aclUpdates = append(aclUpdates, bson.DocElem{"acl.write", user})
+	default:
+		return errgo.Newf("%q cloud access not valid", access)
+	}
+	_, err = db.CloudRegions().UpdateAll(bson.D{{"cloud", cloud}}, bson.D{{"$pull", aclUpdates}})
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
 // setCredentialUpdates marks all the controllers in the given ctlPaths
 // as requiring an update to the credential with the given credPath.
 func (db *Database) setCredentialUpdates(ctx context.Context, ctlPaths []params.EntityPath, credPath params.CredentialPath) (err error) {
