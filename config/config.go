@@ -47,6 +47,7 @@ type Config struct {
 	UsageSenderURL      string            `yaml:"usage-sender-url,omitempty"`
 	UsageSenderSpoolDir string            `yaml:"usage-sender-spool-dir,omitempty"`
 	Domain              string            `yaml:"domain"`
+	PublicCloudMetadata string            `yaml:"public-cloud-metadata"`
 }
 
 func (c *Config) validate() error {

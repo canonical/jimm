@@ -13,6 +13,7 @@ import (
 	"github.com/juju/aclstore"
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient"
+	"github.com/juju/juju/cloud"
 	"github.com/juju/simplekv/mgosimplekv"
 	"github.com/julienschmidt/httprouter"
 	"github.com/prometheus/client_golang/prometheus"
@@ -108,6 +109,11 @@ type Params struct {
 	// including the leading "@". If this is empty, users may be in
 	// any domain.
 	Domain string
+
+	// PublicCloudMetadata contains the path of the file containing
+	// the public cloud metadata. If this is empty or the file
+	// doesn't exist the default public cloud information is used.
+	PublicCloudMetadata string
 }
 
 // HandlerParams are the parameters used to initialize a handler.
@@ -173,12 +179,21 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 		return nil, errgo.Notef(err, "cannot create ACL store")
 	}
 	aclStore := aclstore.NewACLStore(kvstore)
+	var publicCloudMetadataPath []string
+	if config.PublicCloudMetadata != "" {
+		publicCloudMetadataPath = append(publicCloudMetadataPath, config.PublicCloudMetadata)
+	}
+	publicCloudMetadata, _, err := cloud.PublicCloudMetadata(publicCloudMetadataPath...)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot load public cloud metadata")
+	}
 	jconfig := jem.Params{
-		DB:              config.DB,
-		SessionPool:     sessionPool,
-		ControllerAdmin: config.ControllerAdmin,
-		UsageSenderURL:  config.UsageSenderURL,
-		Client:          bclient,
+		DB:                  config.DB,
+		SessionPool:         sessionPool,
+		ControllerAdmin:     config.ControllerAdmin,
+		UsageSenderURL:      config.UsageSenderURL,
+		Client:              bclient,
+		PublicCloudMetadata: publicCloudMetadata,
 	}
 	p, err := jem.NewPool(ctx, jconfig)
 	if err != nil {

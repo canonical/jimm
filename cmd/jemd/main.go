@@ -128,6 +128,7 @@ func serve(conf *config.Config) error {
 		UsageSenderURL:          conf.UsageSenderURL,
 		UsageSenderSpoolPath:    conf.UsageSenderSpoolDir,
 		Domain:                  conf.Domain,
+		PublicCloudMetadata: conf.PublicCloudMetadata,
 	}
 	server, err := jem.NewServer(ctx, cfg)
 	if err != nil {

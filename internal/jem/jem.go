@@ -78,6 +78,10 @@ type Params struct {
 
 	// Client is used to make the request for usage metrics authorization
 	Client *httpbakery.Client
+
+	// PublicCloudMetadata contains the metadata details of all known
+	// public clouds.
+	PublicCloudMetadata map[string]jujucloud.Cloud
 }
 
 type Pool struct {
@@ -1324,7 +1328,11 @@ func (j *JEM) modelRegion(ctx context.Context, ctlPath params.EntityPath, uuid s
 // cloud name already exists then an error with a cause of
 // params.ErrAlreadyExists will be returned.
 func (j *JEM) CreateCloud(ctx context.Context, cloud mongodoc.CloudRegion, regions []mongodoc.CloudRegion) error {
-	// TODO(mhilton) check the cloud name isn't reserved.
+	if _, ok := j.pool.config.PublicCloudMetadata[string(cloud.Cloud)]; ok {
+		// The cloud uses the name of a public cloud, we assume
+		// these already exist (even if they don't yet).
+		return errgo.WithCausef(nil, params.ErrAlreadyExists, "cloud %q already exists", cloud.Cloud)
+	}
 
 	// Attempt to insert the document for the cloud and fail early if
 	// such a cloud exists.
