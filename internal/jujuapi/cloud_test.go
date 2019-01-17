@@ -620,6 +620,70 @@ func (s *cloudSuite) TestAddCloud(c *gc.C) {
 	})
 }
 
+func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller"}, true)
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := cloudapi.NewClient(conn)
+	credTag := names.NewCloudCredentialTag("dummy/test@external/cred")
+	_, err := client.UpdateCredentialsCheckModels(
+		credTag,
+		cloud.NewCredential("empty", nil),
+	)
+	c.Assert(err, gc.Equals, nil)
+
+	tags, err := client.UserCredentials(credTag.Owner(), credTag.Cloud())
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(tags, jc.DeepEquals, []names.CloudCredentialTag{
+		credTag,
+	})
+
+	ccr, err := client.Credentials(credTag)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(ccr, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
+		Result: &jujuparams.CloudCredential{
+			AuthType: "empty",
+		},
+	}})
+
+	mmclient := modelmanager.NewClient(conn)
+	_, err = mmclient.CreateModel("test", "test@external", "dummy", "dummy-region", credTag, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	var resp jujuparams.ErrorResults
+	err = conn.APICall("Cloud", 3, "", "RevokeCredentialsCheckModels", jujuparams.RevokeCredentialArgs{
+		Credentials: []jujuparams.RevokeCredentialArg{{
+			Tag: credTag.String(),
+			Force: false,
+		}},
+	}, &resp)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `cannot revoke because credential is in use on at least one model`)
+	
+	resp.Results = nil
+	err = conn.APICall("Cloud", 3, "", "RevokeCredentialsCheckModels", jujuparams.RevokeCredentialArgs{
+		Credentials: []jujuparams.RevokeCredentialArg{{
+			Tag: credTag.String(),
+			Force: true,
+		}},
+	}, &resp)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(resp.Results[0].Error, gc.IsNil)
+
+	ccr, err = client.Credentials(credTag)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(ccr, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
+		Error: &jujuparams.Error{
+			Code:    jujuparams.CodeNotFound,
+			Message: `credential "dummy/test@external/cred" not found`,
+		},
+	}})
+
+	tags, err = client.UserCredentials(credTag.Owner(), credTag.Cloud())
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(tags, jc.DeepEquals, []names.CloudCredentialTag{})
+}
+
 func (s *cloudSuite) TestAddCloudError(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller"}, true)
 	conn := s.open(c, nil, "test")
