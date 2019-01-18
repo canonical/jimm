@@ -305,7 +305,10 @@ func (c cloudV3) RevokeCredentialsCheckModels(ctx context.Context, args jujupara
 
 // RevokeCredentials revokes a set of cloud credentials.
 func (c cloudV3) revokeCredential(ctx context.Context, tag string, force bool) error {
-	// TODO fail when force is false and  the credential is in use.
+	var flags jem.CredentialUpdateFlags
+	if force {
+		flags |= jem.CredentialUpdate
+	}
 	credtag, err := names.ParseCloudCredentialTag(tag)
 	if err != nil {
 		return errgo.WithCausef(err, params.ErrBadRequest, "cannot parse %q", tag)
@@ -323,7 +326,7 @@ func (c cloudV3) revokeCredential(ctx context.Context, tag string, force bool) e
 			User: params.User(credtag.Owner().Name()),
 			Name: params.Name(credtag.Name()),
 		},
-	}, 0); err != nil {
+	}, flags); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil
