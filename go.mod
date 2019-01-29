@@ -44,7 +44,7 @@ require (
 	github.com/juju/aclstore v0.0.0-20180706073322-7fc1cdaacf01
 	github.com/juju/bundlechanges v0.0.0-20181109060345-b8d279cc30ff
 	github.com/juju/clock v0.0.0-20180808021310-bab88fc67299
-	github.com/juju/cmd v0.0.0-20171107070456-e74f39857ca0
+	github.com/juju/cmd v0.0.0-20181204233423-fd568e4a4120
 	github.com/juju/description v0.0.0-20181121140832-b351832010e6 // indirect
 	github.com/juju/errors v0.0.0-20181118221551-089d3ea4e4d5
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
@@ -54,8 +54,9 @@ require (
 	github.com/juju/httprequest v1.0.1
 	github.com/juju/idmclient v0.0.0-20161107140250-fb1dc7175251
 	github.com/juju/jsonschema v0.0.0-20161102181919-a0ef8b74ebcf // indirect
-	github.com/juju/juju v0.0.0-20181130004655-17e480906ca9
+	github.com/juju/juju v0.0.0-20190115014340-2c5fb8b8fd4e
 	github.com/juju/loggo v0.0.0-20180524022052-584905176618
+	github.com/juju/lru v0.0.0-20181205132344-305dec07bf2f // indirect
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
 	github.com/juju/mgosession v1.0.0
 	github.com/juju/mutex v0.0.0-20180619145857-d21b13acf4bf // indirect
@@ -73,7 +74,7 @@ require (
 	github.com/juju/simplekv v0.0.0-20180627154058-dac8ed1f3b93
 	github.com/juju/terms-client v1.0.1 // indirect
 	github.com/juju/testing v0.0.0-20180920084828-472a3e8b2073
-	github.com/juju/txn v0.0.0-20180821225855-f08211fa34f2 // indirect
+	github.com/juju/txn v0.0.0-20181220174448-79cdf4663070 // indirect
 	github.com/juju/usso v0.0.0-20160418121039-5b79b358f4bb // indirect
 	github.com/juju/utils v0.0.0-20180820210520-bf9cc5bdd62d
 	github.com/juju/version v0.0.0-20180108022336-b64dbd566305
