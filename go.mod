@@ -5,8 +5,10 @@ require (
 	github.com/Azure/azure-sdk-for-go v22.2.2+incompatible // indirect
 	github.com/Azure/go-autorest v11.2.8+incompatible // indirect
 	github.com/Azure/go-ntlmssp v0.0.0-20180810175552-4a21cbd618b4 // indirect
+	github.com/BurntSushi/toml v0.3.1 // indirect
 	github.com/ChrisTrenkamp/goxpath v0.0.0-20170922090931-c385f95c6022 // indirect
 	github.com/EvilSuperstars/go-cidrman v0.0.0-20170211231153-4e5a4a63d9b7 // indirect
+	github.com/ajstarks/svgo v0.0.0-20181006003313-6ce6a3bcf6cd // indirect
 	github.com/altoros/gosigma v0.0.0-20170523021020-a27b59fe2be9 // indirect
 	github.com/armon/go-metrics v0.0.0-20180713145231-3c58d8115a78 // indirect
 	github.com/bmizerany/pat v0.0.0-20170815010413-6226ea591a40 // indirect
@@ -44,8 +46,9 @@ require (
 	github.com/juju/aclstore v0.0.0-20180706073322-7fc1cdaacf01
 	github.com/juju/bundlechanges v0.0.0-20181109060345-b8d279cc30ff
 	github.com/juju/clock v0.0.0-20180808021310-bab88fc67299
-	github.com/juju/cmd v0.0.0-20181204233423-fd568e4a4120
-	github.com/juju/description v0.0.0-20181121140832-b351832010e6 // indirect
+	github.com/juju/cmd v0.0.0-20190116223025-a8c88215d37e
+	github.com/juju/collections v0.0.0-20180717171555-9be91dc79b7c // indirect
+	github.com/juju/description v0.0.0-20190212151246-69ade48572ea // indirect
 	github.com/juju/errors v0.0.0-20181118221551-089d3ea4e4d5
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
 	github.com/juju/go-oracle-cloud v0.0.0-20170510162943-95ad2a088ab9 // indirect
@@ -54,7 +57,7 @@ require (
 	github.com/juju/httprequest v1.0.1
 	github.com/juju/idmclient v0.0.0-20161107140250-fb1dc7175251
 	github.com/juju/jsonschema v0.0.0-20161102181919-a0ef8b74ebcf // indirect
-	github.com/juju/juju v0.0.0-20190115014340-2c5fb8b8fd4e
+	github.com/juju/juju v0.0.0-20190327025659-02fbecca24d9
 	github.com/juju/loggo v0.0.0-20180524022052-584905176618
 	github.com/juju/lru v0.0.0-20181205132344-305dec07bf2f // indirect
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
@@ -74,10 +77,11 @@ require (
 	github.com/juju/simplekv v0.0.0-20180627154058-dac8ed1f3b93
 	github.com/juju/terms-client v1.0.1 // indirect
 	github.com/juju/testing v0.0.0-20180920084828-472a3e8b2073
-	github.com/juju/txn v0.0.0-20181220174448-79cdf4663070 // indirect
+	github.com/juju/txn v0.0.0-20190227143948-90cbb53292a8 // indirect
 	github.com/juju/usso v0.0.0-20160418121039-5b79b358f4bb // indirect
 	github.com/juju/utils v0.0.0-20180820210520-bf9cc5bdd62d
 	github.com/juju/version v0.0.0-20180108022336-b64dbd566305
+	github.com/juju/webbrowser v0.0.0-20180907093207-efb9432b2bcb // indirect
 	github.com/julienschmidt/httprouter v0.0.0-20151013225520-77a895ad01eb
 	github.com/lestrrat/go-jspointer v0.0.0-20180109105637-d5f7c71bfd03 // indirect
 	github.com/lestrrat/go-jsref v0.0.0-20170215062819-50df7b2d07d7 // indirect
@@ -124,10 +128,12 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.39.0 // indirect
 	gopkg.in/juju/blobstore.v2 v2.0.0-20160125023703-51fa6e26128d // indirect
-	gopkg.in/juju/charm.v6 v6.0.0-20181107032505-3469d139dfb3
-	gopkg.in/juju/charmrepo.v2 v2.0.0-20180628053430-0252517febee // indirect
-	gopkg.in/juju/charmstore.v5 v5.6.5 // indirect
+	gopkg.in/juju/charm.v6 v6.0.0-20190219161141-ba56c9482e6c
+	gopkg.in/juju/charmrepo.v2 v2.0.0-20171114184045-653bbd81990d // indirect
+	gopkg.in/juju/charmrepo.v3 v3.0.0-20180803043737-7778a447283b // indirect
+	gopkg.in/juju/charmstore.v5 v5.5.2 // indirect
 	gopkg.in/juju/environschema.v1 v1.0.0-20151104115810-7359fc7857ab
+	gopkg.in/juju/jujusvg.v3 v3.0.0-20180629065738-1ebf5c5481e8 // indirect
 	gopkg.in/juju/names.v2 v2.0.0-20180621093930-fd59336b4621
 	gopkg.in/juju/worker.v1 v1.0.0-20181023182737-9becf9b2c705
 	gopkg.in/macaroon-bakery.v1 v1.0.0-20180822103327-f3518acd1415 // indirect
@@ -139,6 +145,7 @@ require (
 	gopkg.in/mgo.v2 v2.0.0-20180705113604-9856a29383ce
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0-20170531180850-df99d62fd42d
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
+	gopkg.in/retry.v1 v1.0.2 // indirect
 	gopkg.in/robfig/cron.v2 v2.0.0-20150107220207-be2e0b0deed5 // indirect
 	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637
 	gopkg.in/vmihailenco/msgpack.v2 v2.9.1 // indirect

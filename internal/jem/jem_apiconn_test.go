@@ -215,7 +215,7 @@ func assertConnClosed(c *gc.C, conn *apiconn.Conn) {
 // assertConnectionAlive asserts that the given API
 // connection is responding to requests.
 func (s *jemAPIConnSuite) assertConnectionAlive(c *gc.C, conn *apiconn.Conn) {
-	_, err := cloudapi.NewClient(conn).DefaultCloud()
+	_, err := cloudapi.NewClient(conn).Clouds()
 	c.Assert(err, gc.Equals, nil)
 }
 
