@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/juju/juju/api/base"
 	cloudapi "github.com/juju/juju/api/cloud"
 	"github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
@@ -14,6 +15,7 @@ import (
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
+	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
 
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
@@ -58,7 +60,6 @@ var defaultCloudTests = []struct {
 func (s *cloudSuite) TestDefaultCloud(c *gc.C) {
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
-	client := cloudapi.NewClient(conn)
 	for i, test := range defaultCloudTests {
 		c.Logf("test %d: %s", i, test.about)
 		_, err := s.JEM.DB.Controllers().RemoveAll(nil)
@@ -84,7 +85,7 @@ func (s *cloudSuite) TestDefaultCloud(c *gc.C) {
 			}})
 			c.Assert(err, gc.Equals, nil)
 		}
-		cloud, err := client.DefaultCloud()
+		cloud, err := defaultCloud(conn)
 		if test.expect == "" {
 			c.Check(err, gc.ErrorMatches, `no default cloud \(not found\)`)
 			c.Assert(jujuparams.IsCodeNotFound(err), gc.Equals, true)
@@ -94,6 +95,23 @@ func (s *cloudSuite) TestDefaultCloud(c *gc.C) {
 		c.Assert(err, gc.Equals, nil)
 		c.Assert(cloud, gc.Equals, names.NewCloudTag(test.expect))
 	}
+}
+
+// defaultCloud implements the old DefaultCloud method that was removed
+// from cloud.Client.
+func defaultCloud(conn base.APICaller) (names.CloudTag, error) {
+	var result jujuparams.StringResult
+	if err := conn.APICall("Cloud", 3, "", "DefaultCloud", nil, &result); err != nil {
+		return names.CloudTag{}, errgo.Mask(err, errgo.Any)
+	}
+	if result.Error != nil {
+		return names.CloudTag{}, result.Error
+	}
+	cloudTag, err := names.ParseCloudTag(result.Result)
+	if err != nil {
+		return names.CloudTag{}, errgo.Mask(err)
+	}
+	return cloudTag, nil
 }
 
 func (s *cloudSuite) TestCloudCall(c *gc.C) {
@@ -653,17 +671,17 @@ func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
 	var resp jujuparams.ErrorResults
 	err = conn.APICall("Cloud", 3, "", "RevokeCredentialsCheckModels", jujuparams.RevokeCredentialArgs{
 		Credentials: []jujuparams.RevokeCredentialArg{{
-			Tag: credTag.String(),
+			Tag:   credTag.String(),
 			Force: false,
 		}},
 	}, &resp)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `cannot revoke because credential is in use on at least one model`)
-	
+
 	resp.Results = nil
 	err = conn.APICall("Cloud", 3, "", "RevokeCredentialsCheckModels", jujuparams.RevokeCredentialArgs{
 		Credentials: []jujuparams.RevokeCredentialArg{{
-			Tag: credTag.String(),
+			Tag:   credTag.String(),
 			Force: true,
 		}},
 	}, &resp)
