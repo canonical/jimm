@@ -57,6 +57,8 @@ var facades = map[facade]string{
 	{"Cloud", 1}:        "CloudV1",
 	{"Cloud", 2}:        "CloudV2",
 	{"Cloud", 3}:        "CloudV3",
+	{"Cloud", 4}:        "CloudV4",
+	{"Cloud", 5}:        "CloudV5",
 	{"Controller", 3}:   "Controller",
 	{"JIMM", 1}:         "JIMM",
 	{"ModelManager", 2}: "ModelManagerV2",
