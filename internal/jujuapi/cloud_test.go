@@ -984,3 +984,18 @@ func (s *cloudSuite) TestModifyCloudAccessUnauthorized(c *gc.C) {
 	err = client2.GrantCloud("alice@external", "add-model", "test-cloud")
 	c.Assert(err, gc.ErrorMatches, `unauthorized`)
 }
+
+func (s *cloudSuite) TestUpdateCloud(c *gc.C) {
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := cloudapi.NewClient(conn)
+	err := client.UpdateCloud(cloud.Cloud{
+		Name:             "test-cloud",
+		Type:             "kubernetes",
+		AuthTypes:        cloud.AuthTypes{cloud.CertificateAuthType},
+		Endpoint:         "https://0.1.2.3:5678",
+		IdentityEndpoint: "https://0.1.2.3:5679",
+		StorageEndpoint:  "https://0.1.2.3:5680",
+	})
+	c.Assert(jujuparams.IsCodeForbidden(err), gc.Equals, true, gc.Commentf("%#v", err))
+}
