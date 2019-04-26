@@ -131,7 +131,6 @@ func (s *bundleSuite) TestGetChangesSuccess(c *gc.C) {
 			map[string]interface{}{},
 			map[string]interface{}{},
 			0.0,
-			"",
 		},
 		Requires: []string{"addCharm-0"},
 	}, {
@@ -151,7 +150,6 @@ func (s *bundleSuite) TestGetChangesSuccess(c *gc.C) {
 			map[string]interface{}{},
 			map[string]interface{}{},
 			0.0,
-			"",
 		},
 		Requires: []string{"addCharm-2"},
 	}, {
@@ -192,7 +190,6 @@ func (s *bundleSuite) TestGetChangesBundleEndpointBindingsSuccess(c *gc.C) {
 					map[string]interface{}{"url": "public"},
 					map[string]interface{}{},
 					0.0,
-					"",
 				},
 				Requires: []string{"addCharm-0"},
 			})

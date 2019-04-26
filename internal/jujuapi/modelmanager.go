@@ -306,7 +306,7 @@ func (m modelManagerAPI) destroyModel(ctx context.Context, arg jujuparams.Destro
 		return errgo.Mask(err)
 	}
 	defer conn.Close()
-	if err := m.root.jem.DestroyModel(ctx, conn, model, arg.DestroyStorage); err != nil {
+	if err := m.root.jem.DestroyModel(ctx, conn, model, arg.DestroyStorage, arg.Force, arg.MaxWait); err != nil {
 		return errgo.Mask(err, jujuparams.IsCodeHasPersistentStorage)
 	}
 	age := float64(time.Now().Sub(model.CreationTime)) / float64(time.Hour)

@@ -1112,9 +1112,9 @@ func (j *JEM) RevokeModel(ctx context.Context, conn *apiconn.Conn, model *mongod
 // DestroyModel destroys the specified model. The model will have its
 // Life set to dying, but won't be removed until it is removed from the
 // controller.
-func (j *JEM) DestroyModel(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model, destroyStorage *bool) error {
+func (j *JEM) DestroyModel(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model, destroyStorage *bool, force *bool, maxWait *time.Duration) error {
 	client := modelmanager.NewClient(conn)
-	if err := client.DestroyModel(names.NewModelTag(model.UUID), destroyStorage); err != nil {
+	if err := client.DestroyModel(names.NewModelTag(model.UUID), destroyStorage, force, maxWait); err != nil {
 		return errgo.Mask(err, jujuparams.IsCodeHasPersistentStorage)
 	}
 	if err := j.DB.SetModelLife(ctx, model.Controller, model.UUID, "dying"); err != nil {

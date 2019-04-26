@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/juju/clock/testclock"
+	jujuapi "github.com/juju/juju/api"
 	cloudapi "github.com/juju/juju/api/cloud"
 	"github.com/juju/juju/api/controller"
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
@@ -395,7 +396,7 @@ func (s *jemSuite) TestCreateModelWithExistingModelInControllerOnly(c *gc.C) {
 		},
 		Cloud: "dummy",
 	})
-	c.Assert(err, gc.ErrorMatches, `cannot find suitable controller`)
+	c.Assert(err, gc.ErrorMatches, `cannot create model: failed to create new model: model "model" for bob@external already exists`)
 }
 
 func (s *jemSuite) TestCreateModelWithDeprecatedController(c *gc.C) {
@@ -694,7 +695,7 @@ func (s *jemSuite) TestDestroyModel(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.jem.DestroyModel(testContext, conn, model, nil)
+	err = s.jem.DestroyModel(testContext, conn, model, nil, nil, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	// Check the model is dying.
@@ -703,7 +704,7 @@ func (s *jemSuite) TestDestroyModel(c *gc.C) {
 	c.Assert(m.Life(), gc.Equals, "dying")
 
 	// Check that it can be destroyed twice.
-	err = s.jem.DestroyModel(testContext, conn, model, nil)
+	err = s.jem.DestroyModel(testContext, conn, model, nil, nil, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	// Check the model is still dying.
@@ -763,7 +764,7 @@ func (s *jemSuite) TestDestroyModelWithStorage(c *gc.C) {
 		}),
 	})
 
-	err = s.jem.DestroyModel(testContext, conn, model, nil)
+	err = s.jem.DestroyModel(testContext, conn, model, nil, nil, nil)
 	c.Assert(err, jc.Satisfies, jujuparams.IsCodeHasPersistentStorage)
 }
 
@@ -1683,62 +1684,6 @@ func (s *jemSuite) TestRemoveCloudNotFound(c *gc.C) {
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
-func (s *jemSuite) TestRemoveCloudWithModel(c *gc.C) {
-	kubeconfig, err := kubetest.LoadConfig()
-	if errgo.Cause(err) == kubetest.ErrDisabled {
-		c.Skip("kubernetes testing disabled")
-	}
-	c.Assert(err, gc.Equals, nil, gc.Commentf("error loading kubernetes config: %v", err))
-
-	ctlPath := params.EntityPath{"bob", "foo"}
-	s.addController(c, ctlPath)
-	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
-	var cacerts []string
-	if cert := kubetest.CACertificate(kubeconfig); cert != "" {
-		cacerts = append(cacerts, cert)
-	}
-	err = s.jem.CreateCloud(ctx, mongodoc.CloudRegion{
-		Cloud:          "test-cloud",
-		ProviderType:   "kubernetes",
-		AuthTypes:      []string{string(cloud.UserPassAuthType)},
-		Endpoint:       kubetest.ServerURL(kubeconfig),
-		CACertificates: cacerts,
-		ACL: params.ACL{
-			Read:  []string{"bob"},
-			Write: []string{"bob"},
-			Admin: []string{"bob"},
-		},
-	}, nil)
-	c.Assert(err, gc.Equals, nil)
-
-	credpath := params.CredentialPath{
-		Cloud: "test-cloud",
-		EntityPath: params.EntityPath{
-			User: "bob",
-			Name: "kubernetes",
-		},
-	}
-	_, err = s.jem.UpdateCredential(ctx, &mongodoc.Credential{
-		Path: credpath,
-		Type: string(cloud.UserPassAuthType),
-		Attributes: map[string]string{
-			"username": kubetest.Username(kubeconfig),
-			"password": kubetest.Password(kubeconfig),
-		},
-	}, jem.CredentialUpdate)
-	c.Assert(err, gc.Equals, nil)
-
-	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
-		Path:       params.EntityPath{"bob", "test-model"},
-		Cloud:      "test-cloud",
-		Credential: credpath,
-	})
-	c.Assert(err, gc.IsNil)
-
-	err = s.jem.RemoveCloud(ctx, "test-cloud")
-	c.Assert(err, gc.ErrorMatches, `cloud is used by 1 model`)
-}
-
 func (s *jemSuite) TestGrantCloud(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	s.addController(c, ctlPath)
@@ -2133,8 +2078,10 @@ func (s *jemSuite) TestUpdateModelCredential(c *gc.C) {
 }
 
 func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityPath {
-	info := s.APIInfo(c)
+	return addController(c, path, s.APIInfo(c), s.jem)
+}
 
+func addController(c *gc.C, path params.EntityPath, info *jujuapi.Info, jem *jem.JEM) params.EntityPath {
 	hps, err := mongodoc.ParseAddresses(info.Addrs)
 	c.Assert(err, gc.Equals, nil)
 
@@ -2150,9 +2097,9 @@ func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityP
 		},
 		Public: true,
 	}
-	err = s.jem.DB.AddController(testContext, ctl)
+	err = jem.DB.AddController(testContext, ctl)
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.DB.UpdateCloudRegions(testContext, []mongodoc.CloudRegion{{
+	err = jem.DB.UpdateCloudRegions(testContext, []mongodoc.CloudRegion{{
 		Cloud:              "dummy",
 		PrimaryControllers: []params.EntityPath{path},
 		ACL: params.ACL{
@@ -2190,4 +2137,99 @@ func (s *jemSuite) bootstrapModel(c *gc.C, path params.EntityPath) *mongodoc.Mod
 	})
 	c.Assert(err, gc.Equals, nil)
 	return model
+}
+
+type jemK8sSuite struct {
+	jemtest.JujuConnSuite
+	kubetest.K8sSuite
+
+	pool        *jem.Pool
+	sessionPool *mgosession.Pool
+	jem         *jem.JEM
+
+	suiteCleanups []func()
+}
+
+var _ = gc.Suite(&jemK8sSuite{})
+
+func (s *jemK8sSuite) SetUpTest(c *gc.C) {
+	s.JujuConnSuite.SetUpTest(c)
+	s.PatchValue(&utils.OutgoingAccessAllowed, true)
+	s.K8sSuite.SetUpTest(c)
+	s.sessionPool = mgosession.NewPool(context.TODO(), s.Session, 5)
+	publicCloudMetadata, _, err := cloud.PublicCloudMetadata()
+	c.Assert(err, gc.Equals, nil)
+	pool, err := jem.NewPool(context.TODO(), jem.Params{
+		DB:                  s.Session.DB("jem"),
+		ControllerAdmin:     "controller-admin",
+		SessionPool:         s.sessionPool,
+		PublicCloudMetadata: publicCloudMetadata,
+	})
+	c.Assert(err, gc.Equals, nil)
+	s.pool = pool
+	s.jem = s.pool.JEM(context.TODO())
+}
+
+func (s *jemK8sSuite) TearDownTest(c *gc.C) {
+	if s.jem != nil {
+		s.jem.Close()
+	}
+	if s.pool != nil {
+		s.pool.Close()
+	}
+	if s.sessionPool != nil {
+		s.sessionPool.Close()
+	}
+	s.K8sSuite.TearDownTest(c)
+	s.JujuConnSuite.TearDownTest(c)
+}
+
+func (s *jemK8sSuite) TestRemoveCloudWithModel(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	addController(c, ctlPath, s.APIInfo(c), s.jem)
+	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	var cacerts []string
+	if cert := kubetest.CACertificate(s.KubeConfig); cert != "" {
+		cacerts = append(cacerts, cert)
+	}
+	err := s.jem.CreateCloud(ctx, mongodoc.CloudRegion{
+		Cloud:          "test-cloud",
+		ProviderType:   "kubernetes",
+		AuthTypes:      []string{string(cloud.UserPassAuthType)},
+		Endpoint:       kubetest.ServerURL(s.KubeConfig),
+		CACertificates: cacerts,
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	credpath := params.CredentialPath{
+		Cloud: "test-cloud",
+		EntityPath: params.EntityPath{
+			User: "bob",
+			Name: "kubernetes",
+		},
+	}
+	_, err = s.jem.UpdateCredential(ctx, &mongodoc.Credential{
+		Path: credpath,
+		Type: string(cloud.UserPassAuthType),
+		Attributes: map[string]string{
+			"username": kubetest.Username(s.KubeConfig),
+			"password": kubetest.Password(s.KubeConfig),
+		},
+	}, jem.CredentialUpdate)
+	c.Assert(err, gc.Equals, nil)
+
+	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
+		Path:       params.EntityPath{"bob", "test-model"},
+		Cloud:      "test-cloud",
+		Credential: credpath,
+	})
+	c.Assert(err, gc.IsNil)
+
+	err = s.jem.RemoveCloud(ctx, "test-cloud")
+	c.Assert(err, gc.ErrorMatches, `cloud is used by 1 model`)
 }
