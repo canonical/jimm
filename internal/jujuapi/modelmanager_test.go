@@ -1291,11 +1291,12 @@ func (s *caasModelManagerSuite) AssertAddKubernetesCloud(c *gc.C, credTag names.
 
 	cloudclient := cloudapi.NewClient(conn)
 	err := cloudclient.AddCloud(cloud.Cloud{
-		Name:           credTag.Cloud().Id(),
-		Type:           "kubernetes",
-		AuthTypes:      cloud.AuthTypes{cloud.UserPassAuthType},
-		Endpoint:       kubetest.ServerURL(s.KubeConfig),
-		CACertificates: cacerts,
+		Name:            credTag.Cloud().Id(),
+		Type:            "kubernetes",
+		AuthTypes:       cloud.AuthTypes{cloud.UserPassAuthType},
+		Endpoint:        kubetest.ServerURL(s.KubeConfig),
+		CACertificates:  cacerts,
+		HostCloudRegion: "dummy/dummy-region",
 	})
 	c.Assert(err, gc.Equals, nil)
 

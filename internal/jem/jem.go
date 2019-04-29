@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"strings"
 	"sync"
 	"time"
 
@@ -1327,7 +1328,7 @@ func (j *JEM) modelRegion(ctx context.Context, ctlPath params.EntityPath, uuid s
 // the cloud as a whole (no region name) which must be first. If the
 // cloud name already exists then an error with a cause of
 // params.ErrAlreadyExists will be returned.
-func (j *JEM) CreateCloud(ctx context.Context, cloud mongodoc.CloudRegion, regions []mongodoc.CloudRegion) error {
+func (j *JEM) CreateCloud(ctx context.Context, cloud mongodoc.CloudRegion, regions []mongodoc.CloudRegion, hostCloudRegion string) error {
 	if _, ok := j.pool.config.PublicCloudMetadata[string(cloud.Cloud)]; ok {
 		// The cloud uses the name of a public cloud, we assume
 		// these already exist (even if they don't yet).
@@ -1349,6 +1350,7 @@ func (j *JEM) CreateCloud(ctx context.Context, cloud mongodoc.CloudRegion, regio
 		IdentityEndpoint: cloud.IdentityEndpoint,
 		StorageEndpoint:  cloud.StorageEndpoint,
 		CACertificates:   cloud.CACertificates,
+		HostCloudRegion:  hostCloudRegion,
 	}
 	for _, authType := range cloud.AuthTypes {
 		jcloud.AuthTypes = append(jcloud.AuthTypes, jujucloud.AuthType(authType))
@@ -1366,7 +1368,7 @@ func (j *JEM) CreateCloud(ctx context.Context, cloud mongodoc.CloudRegion, regio
 		if err := j.DB.RemoveCloudRegion(ctx, cloud.Cloud, ""); err != nil {
 			zapctx.Warn(ctx, "cannot remove cloud that failed to deploy", zaputil.Error(err))
 		}
-		return errgo.Mask(err)
+		return errgo.Mask(err, errgo.Is(params.ErrCloudRegionRequired), errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	cloud.PrimaryControllers = []params.EntityPath{ctlPath}
 	for i := range regions {
@@ -1384,24 +1386,37 @@ func (j *JEM) CreateCloud(ctx context.Context, cloud mongodoc.CloudRegion, regio
 }
 
 func (j *JEM) createCloud(ctx context.Context, cloud jujucloud.Cloud) (params.EntityPath, error) {
-	// Pick a random public controller.
-	// TODO(mhilton) find a better way to choose a controller for the
-	// cloud (presumably based on IP address magic).
-	ctlPath, err := j.selectRandomController(ctx)
+	parts := strings.SplitN(cloud.HostCloudRegion, "/", 2)
+	if len(parts) != 2 || parts[0] == "" {
+		return params.EntityPath{}, errgo.WithCausef(nil, params.ErrCloudRegionRequired, "")
+	}
+
+	ctlPaths, err := j.possibleControllers(ctx, params.EntityPath{}, params.Cloud(parts[0]), parts[1])
 	if err != nil {
-		return params.EntityPath{}, errgo.Mask(err)
+		return params.EntityPath{}, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	conn, err := j.OpenAPI(ctx, ctlPath)
-	if err != nil {
-		// TODO(mhilton) if this controller fails try another?
-		return params.EntityPath{}, errgo.Mask(err)
+	errors := make([]error, len(ctlPaths))
+	for i, ctlPath := range ctlPaths {
+		conn, err := j.OpenAPI(ctx, ctlPath)
+		if err != nil {
+			errors[i] = err
+			zapctx.Error(ctx, "cannot connect to controller", zap.Stringer("controller", ctlPath), zaputil.Error(err))
+			continue
+		}
+		defer conn.Close()
+		err = cloudapi.NewClient(conn).AddCloud(cloud)
+		if err == nil {
+			return ctlPath, nil
+		}
+		zapctx.Error(ctx, "cannot create cloud", zap.Stringer("controller", ctlPath), zaputil.Error(err))
+		errors[i] = err
+		continue
 	}
-	defer conn.Close()
-	if err := cloudapi.NewClient(conn).AddCloud(cloud); err != nil {
-		// TODO(mhilton) if this controller fails try another?
-		return params.EntityPath{}, errgo.Mask(err)
+	if len(errors) > 0 {
+		// TODO(mhilton) perhaps filter errors to find the "best" one.
+		return params.EntityPath{}, errgo.Mask(errors[0])
 	}
-	return ctlPath, nil
+	return params.EntityPath{}, errgo.New("cannot create cloud")
 }
 
 // RemoveCloud removes the given cloud, so long as no models are using it.

@@ -30,14 +30,15 @@ const (
 var errNotImplemented = errgo.New("not implemented")
 
 var errorCodes = map[error]string{
-	params.ErrAlreadyExists:    jujuparams.CodeAlreadyExists,
-	params.ErrBadRequest:       jujuparams.CodeBadRequest,
-	params.ErrForbidden:        jujuparams.CodeForbidden,
-	params.ErrMethodNotAllowed: jujuparams.CodeMethodNotAllowed,
-	params.ErrNotFound:         jujuparams.CodeNotFound,
-	params.ErrModelNotFound:    jujuparams.CodeModelNotFound,
-	params.ErrUnauthorized:     jujuparams.CodeUnauthorized,
-	errNotImplemented:          jujuparams.CodeNotImplemented,
+	params.ErrAlreadyExists:       jujuparams.CodeAlreadyExists,
+	params.ErrBadRequest:          jujuparams.CodeBadRequest,
+	params.ErrForbidden:           jujuparams.CodeForbidden,
+	params.ErrMethodNotAllowed:    jujuparams.CodeMethodNotAllowed,
+	params.ErrNotFound:            jujuparams.CodeNotFound,
+	params.ErrModelNotFound:       jujuparams.CodeModelNotFound,
+	params.ErrUnauthorized:        jujuparams.CodeUnauthorized,
+	params.ErrCloudRegionRequired: jujuparams.CodeCloudRegionRequired,
+	errNotImplemented:             jujuparams.CodeNotImplemented,
 }
 
 // mapError maps JEM errors to errors suitable for use with the juju API.
