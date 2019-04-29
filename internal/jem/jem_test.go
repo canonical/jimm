@@ -1423,7 +1423,7 @@ func (s *jemSuite) TestCreateCloud(c *gc.C) {
 			Write: []string{"bob"},
 			Admin: []string{"bob"},
 		},
-	}, nil)
+	}, nil, "dummy/dummy-region")
 	c.Assert(err, gc.Equals, nil)
 
 	var docs []mongodoc.CloudRegion
@@ -1473,7 +1473,7 @@ func (s *jemSuite) TestCreateCloudWithRegions(c *gc.C) {
 			Write: []string{"bob"},
 			Admin: []string{"bob"},
 		},
-	}})
+	}}, "dummy/dummy-region")
 	c.Assert(err, gc.Equals, nil)
 
 	var docs []mongodoc.CloudRegion
@@ -1526,7 +1526,7 @@ func (s *jemSuite) TestCreateCloudNameMatch(c *gc.C) {
 			Write: []string{"bob"},
 			Admin: []string{"bob"},
 		},
-	}, nil)
+	}, nil, "dummy/dummy-region")
 	c.Assert(err, gc.ErrorMatches, `cloud "dummy" already exists`)
 }
 
@@ -1547,7 +1547,7 @@ func (s *jemSuite) TestCreateCloudPublicNameMatch(c *gc.C) {
 			Write: []string{"bob"},
 			Admin: []string{"bob"},
 		},
-	}, nil)
+	}, nil, "dummy/dummy-region")
 	c.Assert(err, gc.ErrorMatches, `cloud "aws-china" already exists`)
 }
 
@@ -1566,8 +1566,8 @@ func (s *jemSuite) TestCreateCloudNoControllers(c *gc.C) {
 			Write: []string{"bob"},
 			Admin: []string{"bob"},
 		},
-	}, nil)
-	c.Assert(err, gc.ErrorMatches, `cannot find a suitable controller`)
+	}, nil, "dummy/dummy-region")
+	c.Assert(err, gc.ErrorMatches, `cloud "dummy" region "dummy-region" not found`)
 
 	var docs []mongodoc.CloudRegion
 	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
@@ -1591,8 +1591,34 @@ func (s *jemSuite) TestCreateCloudAddCloudError(c *gc.C) {
 			Write: []string{"bob"},
 			Admin: []string{"bob"},
 		},
-	}, nil)
+	}, nil, "dummy/dummy-region")
 	c.Assert(err, gc.ErrorMatches, `invalid cloud: empty auth-types not valid`)
+
+	var docs []mongodoc.CloudRegion
+	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(docs, jc.DeepEquals, []mongodoc.CloudRegion{})
+}
+
+func (s *jemSuite) TestCreateCloudNoHostCloudRegion(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	s.addController(c, ctlPath)
+	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	err := s.jem.CreateCloud(ctx, mongodoc.CloudRegion{
+		Cloud:            "test-cloud",
+		ProviderType:     "kubernetes",
+		Endpoint:         "https://1.2.3.4:5678",
+		IdentityEndpoint: "https://1.2.3.4:5679",
+		StorageEndpoint:  "https://1.2.3.4:5680",
+		CACertificates:   []string{"This is a CA Certficiate (honest)"},
+		ACL: params.ACL{
+			Read:  []string{"bob"},
+			Write: []string{"bob"},
+			Admin: []string{"bob"},
+		},
+	}, nil, "")
+	c.Assert(err, gc.ErrorMatches, `cloud region required`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrCloudRegionRequired)
 
 	var docs []mongodoc.CloudRegion
 	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
@@ -1617,7 +1643,7 @@ func (s *jemSuite) TestRemoveCloud(c *gc.C) {
 			Write: []string{"bob"},
 			Admin: []string{"bob"},
 		},
-	}, nil)
+	}, nil, "dummy/dummy-region")
 	c.Assert(err, gc.Equals, nil)
 
 	var docs []mongodoc.CloudRegion
@@ -1666,7 +1692,7 @@ func (s *jemSuite) TestRemoveCloudUnauthorized(c *gc.C) {
 			Write: []string{"bob"},
 			Admin: []string{"alice"},
 		},
-	}, nil)
+	}, nil, "dummy/dummy-region")
 	c.Assert(err, gc.Equals, nil)
 
 	err = s.jem.RemoveCloud(ctx, "test-cloud")
@@ -1701,7 +1727,7 @@ func (s *jemSuite) TestGrantCloud(c *gc.C) {
 			Write: []string{"bob"},
 			Admin: []string{"bob"},
 		},
-	}, nil)
+	}, nil, "dummy/dummy-region")
 	c.Assert(err, gc.Equals, nil)
 
 	var docs []mongodoc.CloudRegion
@@ -1766,7 +1792,7 @@ func (s *jemSuite) TestGrantCloudUnauthorized(c *gc.C) {
 			Write: []string{"bob"},
 			Admin: []string{"bob"},
 		},
-	}, nil)
+	}, nil, "dummy/dummy-region")
 	c.Assert(err, gc.Equals, nil)
 
 	var docs []mongodoc.CloudRegion
@@ -1818,7 +1844,7 @@ func (s *jemSuite) TestGrantCloudInvalidAccess(c *gc.C) {
 			Write: []string{"bob"},
 			Admin: []string{"bob"},
 		},
-	}, nil)
+	}, nil, "dummy/dummy-region")
 	c.Assert(err, gc.Equals, nil)
 
 	var docs []mongodoc.CloudRegion
@@ -1863,7 +1889,7 @@ func (s *jemSuite) TestRevokeCloud(c *gc.C) {
 			Write: []string{"bob"},
 			Admin: []string{"bob"},
 		},
-	}, nil)
+	}, nil, "dummy/dummy-region")
 	c.Assert(err, gc.Equals, nil)
 
 	var docs []mongodoc.CloudRegion
@@ -1951,7 +1977,7 @@ func (s *jemSuite) TestRevokeCloudUnauthorized(c *gc.C) {
 			Write: []string{"bob"},
 			Admin: []string{"bob"},
 		},
-	}, nil)
+	}, nil, "dummy/dummy-region")
 	c.Assert(err, gc.Equals, nil)
 
 	var docs []mongodoc.CloudRegion
@@ -2026,7 +2052,7 @@ func (s *jemSuite) TestRevokeCloudInvalidAccess(c *gc.C) {
 			Write: []string{"bob"},
 			Admin: []string{"bob"},
 		},
-	}, nil)
+	}, nil, "dummy/dummy-region")
 	c.Assert(err, gc.Equals, nil)
 
 	var docs []mongodoc.CloudRegion
@@ -2203,7 +2229,7 @@ func (s *jemK8sSuite) TestRemoveCloudWithModel(c *gc.C) {
 			Write: []string{"bob"},
 			Admin: []string{"bob"},
 		},
-	}, nil)
+	}, nil, "dummy/dummy-region")
 	c.Assert(err, gc.Equals, nil)
 
 	credpath := params.CredentialPath{

@@ -624,6 +624,7 @@ func (s *cloudSuite) TestAddCloud(c *gc.C) {
 		Endpoint:         "https://0.1.2.3:5678",
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
+		HostCloudRegion:  "dummy/dummy-region",
 	})
 	c.Assert(err, gc.Equals, nil)
 	clouds, err := client.Clouds()
@@ -713,8 +714,25 @@ func (s *cloudSuite) TestAddCloudError(c *gc.C) {
 		Endpoint:         "https://0.1.2.3:5678",
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
+		HostCloudRegion:  "dummy/dummy-region",
 	})
 	c.Assert(err, gc.ErrorMatches, `invalid cloud: empty auth-types not valid`)
+}
+
+func (s *cloudSuite) TestAddCloudNoHostCloudRegion(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller"}, true)
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := cloudapi.NewClient(conn)
+	err := client.AddCloud(cloud.Cloud{
+		Name:             "test-cloud",
+		Type:             "kubernetes",
+		Endpoint:         "https://0.1.2.3:5678",
+		IdentityEndpoint: "https://0.1.2.3:5679",
+		StorageEndpoint:  "https://0.1.2.3:5680",
+	})
+	c.Assert(err, gc.ErrorMatches, `cloud region required \(cloud region required\)`)
+	c.Assert(jujuparams.IsCodeCloudRegionRequired(err), gc.Equals, true)
 }
 
 func (s *cloudSuite) TestAddCloudBadName(c *gc.C) {
@@ -861,6 +879,7 @@ func (s *cloudSuite) TestRemoveCloud(c *gc.C) {
 		Endpoint:         "https://0.1.2.3:5678",
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
+		HostCloudRegion:  "dummy/dummy-region",
 	})
 	c.Assert(err, gc.Equals, nil)
 	clouds, err := client.Clouds()
@@ -903,6 +922,7 @@ func (s *cloudSuite) TestModifyCloudAccess(c *gc.C) {
 		Endpoint:         "https://0.1.2.3:5678",
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
+		HostCloudRegion:  "dummy/dummy-region",
 	})
 	c.Assert(err, gc.Equals, nil)
 	clouds, err := client.Clouds()
@@ -959,6 +979,7 @@ func (s *cloudSuite) TestModifyCloudAccessUnauthorized(c *gc.C) {
 		Endpoint:         "https://0.1.2.3:5678",
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
+		HostCloudRegion:  "dummy/dummy-region",
 	})
 	c.Assert(err, gc.Equals, nil)
 	clouds, err := client.Clouds()
