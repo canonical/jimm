@@ -6,7 +6,13 @@ import (
 	"io/ioutil"
 	"os"
 
+	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
+	apicorev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/kubernetes"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 )
@@ -75,4 +81,88 @@ func Username(config *api.Config) string {
 // config.
 func Password(config *api.Config) string {
 	return config.AuthInfos[config.Contexts[config.CurrentContext].AuthInfo].Password
+}
+
+// K8sSuite is a mixin suite that will connect to a kubernetes instance
+// for tests, cleaning up any namespaces created in the tests at the end.
+type K8sSuite struct {
+	KubeConfig *api.Config
+
+	done, wait chan struct{}
+}
+
+func (s *K8sSuite) SetUpTest(c *gc.C) {
+	var err error
+	s.KubeConfig, err = LoadConfig()
+	if errgo.Cause(err) == ErrDisabled {
+		c.Skip("kubernetes testing disabled")
+	}
+	c.Assert(err, gc.Equals, nil, gc.Commentf("error loading kubernetes config: %v", err))
+
+	client := s.Client(c).CoreV1().Namespaces()
+	nss, err := client.List(metav1.ListOptions{})
+	c.Assert(err, gc.Equals, nil)
+
+	s.done = make(chan struct{})
+	s.wait = make(chan struct{})
+	go s.watch(c, client, nss.ResourceVersion)
+}
+
+func (s *K8sSuite) TearDownTest(c *gc.C) {
+	if s.KubeConfig == nil || s.done == nil {
+		return
+	}
+	close(s.done)
+	<-s.wait
+}
+
+func (s *K8sSuite) Client(c *gc.C) *kubernetes.Clientset {
+	config := clientcmd.NewDefaultClientConfig(*s.KubeConfig, &clientcmd.ConfigOverrides{})
+	clientconfig, err := config.ClientConfig()
+	c.Assert(err, gc.Equals, nil)
+	client, err := kubernetes.NewForConfig(clientconfig)
+	c.Assert(err, gc.Equals, nil)
+	return client
+}
+
+func (s *K8sSuite) watch(c *gc.C, client corev1.NamespaceInterface, rv string) {
+	w, err := client.Watch(metav1.ListOptions{
+		Watch:           true,
+		ResourceVersion: rv,
+	})
+	c.Check(err, gc.Equals, nil)
+	defer w.Stop()
+
+	var wch <-chan watch.Event
+	if w != nil {
+		wch = w.ResultChan()
+	}
+	var done bool
+	nss := make(map[string]struct{})
+	for {
+		select {
+		case ev := <-wch:
+			switch ev.Type {
+			case watch.Added:
+				ns := ev.Object.(*apicorev1.Namespace)
+				c.Logf("namespace %q created", ns.Name)
+				nss[ns.Name] = struct{}{}
+			case watch.Deleted:
+				ns := ev.Object.(*apicorev1.Namespace)
+				c.Logf("namespace %q deleted", ns.Name)
+				delete(nss, ns.Name)
+			}
+		case <-s.done:
+			s.done = nil
+			done = true
+			for k := range nss {
+				err := client.Delete(k, nil)
+				c.Check(err, gc.Equals, nil)
+			}
+		}
+		if done && len(nss) == 0 {
+			close(s.wait)
+			return
+		}
+	}
 }

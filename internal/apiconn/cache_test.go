@@ -253,14 +253,7 @@ func (s *cacheSuite) TestEvictOnUpgradeInProgress(c *gc.C) {
 	}
 
 	callAPI := func(conn api.Connection) error {
-		_, err := modelmanager.NewClient(conn).CreateModel(
-			"name",
-			apiInfo.Tag.Id(),
-			"dummy",
-			"",
-			names.CloudCredentialTag{},
-			nil,
-		)
+		_, err := modelmanager.NewClient(conn).ListModels("admin")
 		return err
 	}
 
@@ -268,14 +261,14 @@ func (s *cacheSuite) TestEvictOnUpgradeInProgress(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
 	err = callAPI(conn)
-	c.Check(params.ErrCode(err), gc.Equals, params.CodeUpgradeInProgress)
+	c.Check(params.ErrCode(err), gc.Equals, params.CodeUpgradeInProgress, gc.Commentf("%s", err))
 
 	// Try once again before upgrading, for luck.
 	conn, err = cache.OpenAPI(context.Background(), uuid, dial)
 	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
 	err = callAPI(conn)
-	c.Check(params.ErrCode(err), gc.Equals, params.CodeUpgradeInProgress)
+	c.Check(params.ErrCode(err), gc.Equals, params.CodeUpgradeInProgress, gc.Commentf("%s", err))
 
 	// Close the upgraded channel, which will cause UpgradeComplete
 	// to return true, which should mean that the next API connection

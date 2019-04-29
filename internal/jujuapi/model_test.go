@@ -51,8 +51,9 @@ func (s *modelSuite) TestLoginToModel(c *gc.C) {
 	}
 	err = conn.Login(nil, "", "", nil)
 	c.Assert(errgo.Cause(err), jc.DeepEquals, &api.RedirectError{
-		Servers: [][]network.HostPort{nhps},
-		CACert:  s.APIInfo(c).CACert,
+		Servers:        [][]network.HostPort{nhps},
+		CACert:         s.APIInfo(c).CACert,
+		FollowRedirect: true,
 	})
 }
 

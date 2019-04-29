@@ -10,6 +10,7 @@ import (
 
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
 	"github.com/juju/juju/apiserver/common"
+	"github.com/juju/juju/apiserver/facades/client/bundle"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	jujucloud "github.com/juju/juju/cloud"
 	jujustatus "github.com/juju/juju/core/status"
@@ -109,12 +110,14 @@ func (r *controllerRoot) Admin(id string) (admin, error) {
 }
 
 // Bundle returns an implementation of the Bundle facade (version 1).
-func (r *controllerRoot) Bundle(id string) (bundleAPI, error) {
+func (r *controllerRoot) Bundle(id string) (*bundle.APIv1, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return bundleAPI{}, common.ErrBadId
+		return nil, common.ErrBadId
 	}
-	return bundleAPI{r}, nil
+	// Use the juju implementation of the Bundle facade.
+	api, err := bundle.NewBundleAPIv1(nil, authorizer{r.authContext}, names.NewModelTag(""))
+	return api, errgo.Mask(err)
 }
 
 // Controller returns an implementation of the Controller facade (version 1).
@@ -837,4 +840,54 @@ func modelVersion(ctx context.Context, info *mongodoc.ModelInfo) *version.Number
 		return nil
 	}
 	return &v
+}
+
+// authorizer implements facade.Authorizer
+type authorizer struct {
+	ctx context.Context
+}
+
+func (a authorizer) GetAuthTag() names.Tag {
+	n := auth.Username(a.ctx)
+	if names.IsValidUserName(n) {
+		return names.NewLocalUserTag(n)
+	}
+	return names.NewUserTag(n)
+}
+
+func (authorizer) AuthController() bool {
+	return false
+}
+
+func (authorizer) AuthMachineAgent() bool {
+	return false
+}
+
+func (authorizer) AuthApplicationAgent() bool {
+	return false
+}
+
+func (authorizer) AuthUnitAgent() bool {
+	return false
+}
+
+func (a authorizer) AuthOwner(tag names.Tag) bool {
+	t := a.GetAuthTag()
+	return tag.Kind() == t.Kind() && tag.Id() == t.Id()
+}
+
+func (authorizer) AuthClient() bool {
+	return true
+}
+
+func (authorizer) HasPermission(operation permission.Access, target names.Tag) (bool, error) {
+	return false, nil
+}
+
+func (authorizer) UserHasPermission(user names.UserTag, operation permission.Access, target names.Tag) (bool, error) {
+	return false, nil
+}
+
+func (authorizer) ConnectedModel() string {
+	return ""
 }
