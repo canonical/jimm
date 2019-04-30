@@ -1323,12 +1323,18 @@ func (j *JEM) modelRegion(ctx context.Context, ctlPath params.EntityPath, uuid s
 	return cr.cloud, cr.region, nil
 }
 
+// A CreateCloudParams is used to pass additional cloud information to
+// CreateCloud.
+type CreateCloudParams struct {
+	HostCloudRegion string
+	Config          map[string]interface{}
+	RegionConfig    map[string]map[string]interface{}
+}
+
 // CreateCloud creates a new cloud in the database and adds it to a
-// controller. The slice of regions must contain at least a region for
-// the cloud as a whole (no region name) which must be first. If the
-// cloud name already exists then an error with a cause of
-// params.ErrAlreadyExists will be returned.
-func (j *JEM) CreateCloud(ctx context.Context, cloud mongodoc.CloudRegion, regions []mongodoc.CloudRegion, hostCloudRegion string) error {
+// controller. If the cloud name already exists then an error with a
+// cause of params.ErrAlreadyExists will be returned.
+func (j *JEM) CreateCloud(ctx context.Context, cloud mongodoc.CloudRegion, regions []mongodoc.CloudRegion, ccp CreateCloudParams) error {
 	if _, ok := j.pool.config.PublicCloudMetadata[string(cloud.Cloud)]; ok {
 		// The cloud uses the name of a public cloud, we assume
 		// these already exist (even if they don't yet).
@@ -1343,6 +1349,13 @@ func (j *JEM) CreateCloud(ctx context.Context, cloud mongodoc.CloudRegion, regio
 		}
 		return errgo.Mask(err)
 	}
+	var regionConfig map[string]jujucloud.Attrs
+	for r, attr := range ccp.RegionConfig {
+		if regionConfig == nil {
+			regionConfig = make(map[string]jujucloud.Attrs)
+		}
+		regionConfig[r] = attr
+	}
 	jcloud := jujucloud.Cloud{
 		Name:             string(cloud.Cloud),
 		Type:             cloud.ProviderType,
@@ -1350,7 +1363,9 @@ func (j *JEM) CreateCloud(ctx context.Context, cloud mongodoc.CloudRegion, regio
 		IdentityEndpoint: cloud.IdentityEndpoint,
 		StorageEndpoint:  cloud.StorageEndpoint,
 		CACertificates:   cloud.CACertificates,
-		HostCloudRegion:  hostCloudRegion,
+		HostCloudRegion:  ccp.HostCloudRegion,
+		Config:           ccp.Config,
+		RegionConfig:     regionConfig,
 	}
 	for _, authType := range cloud.AuthTypes {
 		jcloud.AuthTypes = append(jcloud.AuthTypes, jujucloud.AuthType(authType))

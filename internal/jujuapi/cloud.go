@@ -556,7 +556,16 @@ func (c cloudV5) AddCloud(ctx context.Context, args jujuparams.AddCloudArgs) err
 			},
 		}
 	}
-	return c.root.jem.CreateCloud(ctx, cloud, regions, args.Cloud.HostCloudRegion)
+	return c.root.jem.CreateCloud(
+		ctx,
+		cloud,
+		regions,
+		jem.CreateCloudParams{
+			HostCloudRegion: args.Cloud.HostCloudRegion,
+			Config:          args.Cloud.Config,
+			RegionConfig:    args.Cloud.RegionConfig,
+		},
+	)
 }
 
 // AddCredentials implements the AddCredentials method of the Cloud (v2) facade.
