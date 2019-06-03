@@ -91,7 +91,7 @@ controller-uuid: 00000000-0000-0000-0000-000000000000
 max-mgo-sessions: 200
 gui-location: https://jujucharms.com
 usage-sender-url: https://jujucharms.com/omnibus/v2
-usage-sender-spool-dir: /tmp/12345
+usage-sender-collection: "usagespool"
 domain: test-domain
 public-cloud-metadata: cloud-metadata.yaml
 `
@@ -137,13 +137,13 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 				mustParseKey("lsvcDkapKoFxIyjX9/eQgb3s41KVwPMISFwAJdVCZ70="),
 			},
 		},
-		ControllerUUID:      "00000000-0000-0000-0000-000000000000",
-		MaxMgoSessions:      200,
-		GUILocation:         "https://jujucharms.com",
-		UsageSenderURL:      "https://jujucharms.com/omnibus/v2",
-		UsageSenderSpoolDir: "/tmp/12345",
-		Domain:              "test-domain",
-		PublicCloudMetadata: "cloud-metadata.yaml",
+		ControllerUUID:        "00000000-0000-0000-0000-000000000000",
+		MaxMgoSessions:        200,
+		GUILocation:           "https://jujucharms.com",
+		UsageSenderURL:        "https://jujucharms.com/omnibus/v2",
+		UsageSenderCollection: "usagespool",
+		Domain:                "test-domain",
+		PublicCloudMetadata:   "cloud-metadata.yaml",
 	})
 }
 

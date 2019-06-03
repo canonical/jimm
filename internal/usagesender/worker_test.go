@@ -6,13 +6,13 @@ import (
 	"context"
 	"fmt"
 	"net/http/httptest"
-	"os"
 	"sync"
 	"time"
 
 	"github.com/juju/clock/testclock"
 	"github.com/juju/httprequest"
 	jujujujutesting "github.com/juju/juju/testing"
+	jc "github.com/juju/testing/checkers"
 	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
 
@@ -28,24 +28,17 @@ var (
 	epoch       = mustParseTime("2016-01-01T12:00:00Z")
 )
 
-var _ = gc.Suite(&spoolDirMetricRecorderSuite{})
+var _ = gc.Suite(&mgoMetricRecorderSuite{})
 
-type spoolDirMetricRecorderSuite struct {
+type mgoMetricRecorderSuite struct {
 	usageSenderSuite
 }
 
-func (s *spoolDirMetricRecorderSuite) SetUpTest(c *gc.C) {
-	s.MetricsSpoolPath = c.MkDir()
+func (s *mgoMetricRecorderSuite) SetUpTest(c *gc.C) {
 	s.ServerParams = external_jem.ServerParams{
-		UsageSenderSpoolPath: s.MetricsSpoolPath,
+		UsageSenderCollection: "usagetest",
 	}
 	s.usageSenderSuite.SetUpTest(c)
-}
-
-var _ = gc.Suite(&sliceMetricRecorderSuite{})
-
-type sliceMetricRecorderSuite struct {
-	usageSenderSuite
 }
 
 type usageSenderSuite struct {
@@ -56,7 +49,7 @@ type usageSenderSuite struct {
 }
 
 func (s *usageSenderSuite) SetUpTest(c *gc.C) {
-	s.handler = &testHandler{receivedMetrics: make(chan receivedMetric)}
+	s.handler = &testHandler{receivedMetrics: make(chan string)}
 
 	router := httprouter.New()
 	handlers := jemerror.Mapper.Handlers(func(_ httprequest.Params) (*testHandler, error) {
@@ -74,6 +67,9 @@ func (s *usageSenderSuite) SetUpTest(c *gc.C) {
 	s.ServerParams.UsageSenderURL = s.server.URL
 
 	s.Suite.SetUpTest(c)
+
+	err := s.Session.DB("jem").DropDatabase()
+	c.Assert(err, jc.ErrorIsNil)
 }
 
 func (s *usageSenderSuite) TearDownTest(c *gc.C) {
@@ -96,7 +92,7 @@ func (s *usageSenderSuite) TestUsageSenderWorker(c *gc.C) {
 	s.setUnitNumberAndCheckSentMetrics(c, ctlId, uuid, 42, false)
 }
 
-func (s *spoolDirMetricRecorderSuite) TestSpool(c *gc.C) {
+func (s *mgoMetricRecorderSuite) TestSpool(c *gc.C) {
 	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, false)
 	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
 	_, model := s.CreateModel(c, params.EntityPath{"bob", "test-model"}, ctlId, cred)
@@ -119,7 +115,7 @@ func (s *spoolDirMetricRecorderSuite) TestSpool(c *gc.C) {
 
 	select {
 	case receivedMetric := <-s.handler.receivedMetrics:
-		c.Assert(receivedMetric.value, gc.Equals, "17")
+		c.Assert(receivedMetric, gc.Equals, "17")
 	case <-time.After(jujujujutesting.LongWait):
 		c.Fatal("timed out waiting for metrics to be received")
 	}
@@ -140,7 +136,7 @@ func (s *spoolDirMetricRecorderSuite) TestSpool(c *gc.C) {
 	select {
 	case receivedMetric := <-s.handler.receivedMetrics:
 		c.Logf("received %v", receivedMetric)
-		if receivedMetric.value == a {
+		if receivedMetric == a {
 			a = "42"
 		}
 	case <-time.After(jujujujutesting.LongWait):
@@ -149,8 +145,7 @@ func (s *spoolDirMetricRecorderSuite) TestSpool(c *gc.C) {
 	select {
 	case receivedMetric := <-s.handler.receivedMetrics:
 		c.Logf("received %v", receivedMetric)
-		c.Assert(receivedMetric.value, gc.Equals, a)
-		c.Assert(receivedMetric.modelName, gc.Equals, "bob/test-model")
+		c.Assert(receivedMetric, gc.Equals, a)
 	case <-time.After(jujujujutesting.LongWait):
 		c.Fatal("timed out waiting for metrics to be received")
 	}
@@ -174,8 +169,7 @@ func (s *usageSenderSuite) setUnitNumberAndCheckSentMetrics(c *gc.C, ctlPath par
 
 	select {
 	case receivedMetric := <-s.handler.receivedMetrics:
-		c.Assert(receivedMetric.value, gc.Equals, unitCountString)
-		c.Assert(receivedMetric.modelName, gc.Equals, "bob/foo")
+		c.Assert(receivedMetric, gc.Equals, unitCountString)
 	case <-time.After(jujujujutesting.LongWait):
 		c.Fatal("timed out waiting for metrics to be received")
 	}
@@ -186,8 +180,9 @@ func (s *usageSenderSuite) setUnitNumberAndCheckSentMetrics(c *gc.C, ctlPath par
 		case <-time.After(jujujujutesting.LongWait):
 			c.Fatal("timed out waiting for metrics batch to be acknowledged")
 		}
-		err = os.RemoveAll(s.MetricsSpoolPath)
-		c.Assert(err, gc.Equals, nil)
+
+		_, err = s.Session.DB("jem").C("usagetest").RemoveAll(nil)
+		c.Assert(err, jc.ErrorIsNil)
 	}
 }
 
@@ -207,25 +202,14 @@ type usagePost struct {
 type testHandler struct {
 	mutex           sync.Mutex
 	acknowledge     bool
-	receivedMetrics chan receivedMetric
-}
-
-type receivedMetric struct {
-	value     string
-	modelName string
+	receivedMetrics chan string
 }
 
 func (c *testHandler) Metrics(arg *usagePost) (*usagesender.Response, error) {
-	for _, b := range arg.Body {
-		c.receivedMetrics <- receivedMetric{
-			value:     b.Metrics[0].Value,
-			modelName: b.Metrics[0].Tags[usagesender.ModelNameTag],
-		}
-	}
-
 	uuids := make([]string, len(arg.Body))
 	for i, b := range arg.Body {
 		uuids[i] = b.UUID
+		c.receivedMetrics <- b.Metrics[0].Value
 	}
 
 	c.mutex.Lock()

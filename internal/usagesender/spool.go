@@ -4,18 +4,12 @@ package usagesender
 
 import (
 	"context"
-	"encoding/json"
-	"io"
-	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/juju/utils"
 	"gopkg.in/errgo.v1"
-
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
-	"github.com/CanonicalLtd/jimm/internal/zaputil"
+	"gopkg.in/mgo.v2"
 )
 
 const (
@@ -31,205 +25,142 @@ type MetricRecorder interface {
 	// BatchesToSend returns all recorded metric batches.
 	BatchesToSend(ctx context.Context) ([]MetricBatch, error)
 	// Remove removes the metric.
-	Remove(ctx context.Context, uuid string) error
+	Remove(uuid string) error
+	// Finalize stores all unsent metrics.
+	Finalize() error
 }
 
-type metric struct {
-	ModelName   string    `json:"model-name"`
-	Model       string    `json:"model"`
-	Value       string    `json:"value"`
-	Time        time.Time `json:"time"`
-	Credentials []byte    `json:"credentials"`
+type metricDoc struct {
+	UUID        string    `bson:"_id"`
+	ModelName   string    `bson:"model-name"`
+	Model       string    `bson:"model"`
+	Value       string    `bson:"value"`
+	Time        time.Time `bson:"time"`
+	Credentials []byte    `bson:"credentials"`
 }
 
-var _ MetricRecorder = (*spoolDirMetricRecorder)(nil)
+var _ MetricRecorder = (*metricRecorder)(nil)
 
-// spoolDirMetricRecorder implements the MetricsRecorder interface
-// and writes metrics to a spool directory for store-and-forward.
-type spoolDirMetricRecorder struct {
-	spoolDir string
-}
-
-// newSpoolDirMetricRecorder creates a new MetricRecorder that writes and reads
-// metrics to and from a spool directory.
-func newSpoolDirMetricRecorder(spoolDir string) (MetricRecorder, error) {
-	err := checkSpoolDir(spoolDir)
-	if err != nil {
-		return nil, errgo.Mask(err)
+// newMetricRecorder creates a new MetricRecorder that writes and reads
+// metrics to and from mongodb.
+func newMetricRecorder(collection *mgo.Collection) (MetricRecorder, error) {
+	if collection == nil {
+		return nil, errgo.New("collection not specified")
 	}
-	return &spoolDirMetricRecorder{
-		spoolDir: spoolDir,
+	return &metricRecorder{
+		c:       collection,
+		batches: make(map[string]metricDoc),
 	}, nil
 }
 
+type metricRecorder struct {
+	c       *mgo.Collection
+	batches map[string]metricDoc
+	m       sync.Mutex
+}
+
 // AddMetric implements the MetricsRecorder interface.
-func (m *spoolDirMetricRecorder) AddMetric(ctx context.Context, modelName, model, value string, credentials []byte, created time.Time) error {
+func (m *metricRecorder) AddMetric(ctx context.Context, modelName, model, value string, credentials []byte, created time.Time) error {
 	uuid, err := utils.NewUUID()
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	dataFileName := filepath.Join(m.spoolDir, uuid.String())
-	dataWriter, err := createMetricFile(dataFileName)
-	if err != nil {
-		return errgo.Mask(err)
-	}
-	mm := metric{
+
+	m.m.Lock()
+	m.batches[uuid.String()] = metricDoc{
+		UUID:        uuid.String(),
 		ModelName:   modelName,
 		Model:       model,
 		Value:       value,
 		Time:        created,
 		Credentials: credentials,
 	}
-	encoder := json.NewEncoder(dataWriter)
-	err = encoder.Encode(mm)
-	cerr := dataWriter.Close()
-	switch {
-	case err != nil:
-		return errgo.Mask(err)
-	case cerr != nil:
-		return errgo.Mask(cerr)
-	default:
-		return nil
-	}
+	m.m.Unlock()
+	return nil
 }
 
 // BatchesToSend implements the MetricRecorder interface.
-func (r *spoolDirMetricRecorder) BatchesToSend(ctx context.Context) ([]MetricBatch, error) {
-	var batches []MetricBatch
+func (m *metricRecorder) BatchesToSend(ctx context.Context) ([]MetricBatch, error) {
+	iter := m.c.Find(nil).Iter()
 
-	walker := func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return errgo.Mask(err)
-		}
-		if info.IsDir() {
-			if path == r.spoolDir {
-				return nil
-			}
-			return filepath.SkipDir
-		}
-		metrics, err := readMetrics(path)
-		if err != nil {
-			// if we fail to read metrics from a file, we log and continue
-			zapctx.Error(ctx, "failed to read file", zaputil.Error(err))
-			return nil
-		}
-		for _, m := range metrics {
-			batches = append(batches, MetricBatch{
-				UUID:        info.Name(),
-				Created:     m.Time,
-				Credentials: m.Credentials,
+	batches := []MetricBatch{}
+	var batch metricDoc
+	for iter.Next(&batch) {
+		batches = append(batches,
+			MetricBatch{
+				UUID:        batch.UUID,
+				Created:     batch.Time,
+				Credentials: batch.Credentials,
 				Metrics: []Metric{{
 					Key:   metricKey,
-					Value: m.Value,
-					Time:  m.Time,
+					Value: batch.Value,
+					Time:  batch.Time,
 					Tags: map[string]string{
-						ModelTag:     m.Model,
-						ModelNameTag: m.ModelName,
+						ModelTag:     batch.Model,
+						ModelNameTag: batch.ModelName,
+					},
+				}},
+			},
+		)
+	}
+	if ierr := iter.Err(); ierr != nil {
+		return nil, errgo.Mask(ierr)
+	}
+	if cerr := iter.Close(); cerr != nil {
+		return nil, errgo.Mask(cerr)
+	}
+	m.m.Lock()
+	for _, b := range m.batches {
+		batches = append(batches,
+			MetricBatch{
+				UUID:        b.UUID,
+				Created:     b.Time,
+				Credentials: b.Credentials,
+				Metrics: []Metric{{
+					Key:   metricKey,
+					Value: b.Value,
+					Time:  b.Time,
+					Tags: map[string]string{
+						ModelTag:     b.Model,
+						ModelNameTag: b.ModelName,
 					},
 				}},
 			})
-		}
-		return nil
 	}
-	if err := filepath.Walk(r.spoolDir, walker); err != nil {
-		return nil, errgo.Mask(err)
-	}
+	m.m.Unlock()
 	return batches, nil
 }
 
 // Remove implements the MetricRecorder interface.
-func (r *spoolDirMetricRecorder) Remove(_ context.Context, uuid string) error {
-	dataFile := filepath.Join(r.spoolDir, uuid)
-	err := os.Remove(dataFile)
-	if err != nil {
+func (m *metricRecorder) Remove(uuid string) error {
+	// first remove from the batches slice
+	_, ok := m.batches[uuid]
+	if ok {
+		m.m.Lock()
+		delete(m.batches, uuid)
+		m.m.Unlock()
+		return nil
+	}
+	// then remove from mongo
+	err := m.c.RemoveId(uuid)
+	if err != nil && errgo.Cause(err) != mgo.ErrNotFound {
 		return errgo.Mask(err)
 	}
 	return nil
 }
 
-func readMetrics(file string) ([]metric, error) {
-	var metrics []metric
-	f, err := os.Open(file)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	defer f.Close()
-	dec := json.NewDecoder(f)
-	for {
-		var m metric
-		err := dec.Decode(&m)
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return nil, errgo.Mask(err)
+// Finalize stores all unsent metrics.
+func (m *metricRecorder) Finalize() error {
+	m.m.Lock()
+	defer m.m.Unlock()
+	// persist all batches to mongo
+	for _, b := range m.batches {
+		err := m.c.Insert(b)
+		if err != nil && !mgo.IsDup(err) {
+			return errgo.Mask(err)
 		}
-		metrics = append(metrics, m)
 	}
-	return metrics, nil
-}
-
-func createMetricFile(fileName string) (*os.File, error) {
-	f, err := os.OpenFile(fileName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	return f, nil
-}
-
-func checkSpoolDir(path string) error {
-	err := os.MkdirAll(path, 0755)
-	if err != nil {
-		return errgo.Notef(err, "failed to create spool directory: %v", path)
-	}
-	return nil
-}
-
-func newSliceMetricRecorder(_ string) (MetricRecorder, error) {
-	return &sliceMetricRecorder{}, nil
-}
-
-var _ MetricRecorder = (*sliceMetricRecorder)(nil)
-
-type sliceMetricRecorder struct {
-	batches []MetricBatch
-	m       sync.Mutex
-}
-
-// AddMetric implements the MetricRecorder interface.
-func (r *sliceMetricRecorder) AddMetric(_ context.Context, modelName, model, value string, credentials []byte, created time.Time) error {
-	r.m.Lock()
-	defer r.m.Unlock()
-	uuid, err := utils.NewUUID()
-	if err != nil {
-		return errgo.Notef(err, "failed to create a metric uuid")
-	}
-	r.batches = append(r.batches, MetricBatch{
-		UUID:        uuid.String(),
-		Created:     created,
-		Credentials: credentials,
-		Metrics: []Metric{{
-			Key:   metricKey,
-			Value: value,
-			Time:  created,
-			Tags: map[string]string{
-				ModelTag:     model,
-				ModelNameTag: modelName,
-			},
-		}},
-	})
-	return nil
-}
-
-// BatchesToSend implements the MetricRecorder interface.
-func (r *sliceMetricRecorder) BatchesToSend(_ context.Context) ([]MetricBatch, error) {
-	r.m.Lock()
-	defer r.m.Unlock()
-	return r.batches, nil
-}
-
-// Remove implement the MetricRecorder interface.
-func (r *sliceMetricRecorder) Remove(_ context.Context, uuid string) error {
-	// do nothing because we throw away the slice recorder on every worker
-	// execution
+	// clear the cache
+	m.batches = make(map[string]metricDoc)
 	return nil
 }

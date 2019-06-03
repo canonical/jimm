@@ -14,9 +14,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/juju/worker.v1"
 	"gopkg.in/tomb.v2"
 
 	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
@@ -40,8 +42,9 @@ var (
 		Help:      "Failures to remove sent batches from local storage.",
 	})
 
-	monitorFailure             = UnacknowledgedMetricBatchesCount.Add
-	monitorStoreCleanupFailure = FailuresToRemoveSentBatches.Inc
+	defaultSpoolCollection = "usagesender"
+
+	monitorFailure = UnacknowledgedMetricBatchesCount.Add
 )
 
 func init() {
@@ -52,11 +55,13 @@ func init() {
 // SendModelUsageWorkerConfig contains configuration values for the worker
 // that reports model usage.
 type SendModelUsageWorkerConfig struct {
-	OmnibusURL     string
-	Pool           *jem.Pool
-	Period         time.Duration
-	Context        context.Context
-	SpoolDirectory string
+	OmnibusURL  string
+	Pool        *jem.Pool
+	Period      time.Duration
+	Context     context.Context
+	DB          string
+	Collection  string
+	SessionPool *mgosession.Pool
 }
 
 func (c *SendModelUsageWorkerConfig) validate() error {
@@ -72,11 +77,17 @@ func (c *SendModelUsageWorkerConfig) validate() error {
 	if c.Context == nil {
 		return errgo.New("context not specified")
 	}
+	if c.DB == "" {
+		return errgo.Newf("database not specified")
+	}
+	if c.SessionPool == nil {
+		return errgo.Newf("session pool not specified")
+	}
 	return nil
 }
 
 // NewSendModelUsageWorker starts and returns a new worker that reports model usage.
-func NewSendModelUsageWorker(config SendModelUsageWorkerConfig) (*sendModelUsageWorker, error) {
+func NewSendModelUsageWorker(config SendModelUsageWorkerConfig) (worker.Worker, error) {
 	if err := config.validate(); err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -116,24 +127,29 @@ func (w *sendModelUsageWorker) run() error {
 	}
 }
 
-func (w *sendModelUsageWorker) execute() error {
+func (w *sendModelUsageWorker) execute() (err error) {
 	j := w.config.Pool.JEM(w.config.Context)
 	defer j.Close()
-	acknowledgedBatches := make(map[string]bool)
-	iter := j.DB.Models().Find(nil).Sort("_id").Iter()
 
-	recorder, err := newSliceMetricRecorder(w.config.SpoolDirectory)
+	iter := j.DB.Models().Find(nil).Sort("_id").Iter()
+	defer func() {
+		err := iter.Close()
+		if err != nil {
+			zapctx.Error(w.config.Context, "failed to close the iterator", zaputil.Error(err))
+		}
+	}()
+
+	if w.config.Collection == "" {
+		w.config.Collection = defaultSpoolCollection
+	}
+	session := w.config.SessionPool.Session(w.config.Context)
+	defer func() {
+		session.Close()
+	}()
+	recorder, err := newMetricRecorder(session.DB(w.config.DB).C(w.config.Collection))
 	if err != nil {
 		zapctx.Error(w.config.Context, "failed to create a metric recorder", zaputil.Error(err))
-		return errgo.Mask(err)
-	}
-	if w.config.SpoolDirectory != "" {
-		recorder, err = newSpoolDirMetricRecorder(w.config.SpoolDirectory)
-		if err != nil {
-			zapctx.Error(w.config.Context, "failed to create a metric recorder", zaputil.Error(err))
-			return errgo.Notef(err, "failed to create a metric recorder")
-		}
-
+		return errgo.Notef(err, "failed to create a metric recorder")
 	}
 
 	var model mongodoc.Model
@@ -155,28 +171,35 @@ func (w *sendModelUsageWorker) execute() error {
 		return errgo.Notef(err, "model query failed")
 	}
 
+	// fetch the batches we must send
 	batches, err := recorder.BatchesToSend(w.config.Context)
 	if err != nil {
 		zapctx.Error(w.config.Context, "failed to read recorded metrics", zaputil.Error(err))
 		return errgo.Notef(err, "failed to read recorded metrics")
 	}
-	for _, b := range batches {
-		acknowledgedBatches[b.UUID] = false
-	}
 
+	// attempt to send batches
 	_, err = w.send(batches)
 	if err != nil {
+		// if there was an error, then update the monitored value
 		zapctx.Error(w.config.Context, "failed to send model usage", zaputil.Error(err))
 		monitorFailure(float64(len(batches)))
-		return errgo.Mask(err)
-	}
-	for _, batch := range batches {
-		err = recorder.Remove(w.config.Context, batch.UUID)
-		if err != nil {
-			monitorStoreCleanupFailure()
-			zapctx.Warn(w.config.Context, "failed to remove recorded metric")
+	} else {
+		// otherwise remove sent batches from the spool
+		for _, b := range batches {
+			if err = recorder.Remove(b.UUID); err != nil {
+				zapctx.Error(w.config.Context, "failed to remove metric batch", zaputil.Error(err))
+			}
 		}
 	}
+
+	// finalize will store any unsent batches and prepare the spool
+	// for next execution
+	err = recorder.Finalize()
+	if err != nil {
+		return errgo.Mask(err)
+	}
+
 	return nil
 }
 

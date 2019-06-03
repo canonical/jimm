@@ -126,7 +126,7 @@ func serve(conf *config.Config) error {
 		WebsocketRequestTimeout: websocketRequestTimeout,
 		GUILocation:             conf.GUILocation,
 		UsageSenderURL:          conf.UsageSenderURL,
-		UsageSenderSpoolPath:    conf.UsageSenderSpoolDir,
+		UsageSenderCollection:   conf.UsageSenderCollection,
 		Domain:                  conf.Domain,
 		PublicCloudMetadata:     conf.PublicCloudMetadata,
 	}
