@@ -7,10 +7,6 @@ import "time"
 type HeartMonitor heartMonitor
 
 var (
-	MakeCloud       = makeCloud
-	MakeRegions     = makeRegions
-	MergeRegions    = mergeRegions
-	MergeStrings    = mergeStrings
 	NewHeartMonitor = &newHeartMonitor
 )
 

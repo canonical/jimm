@@ -15,10 +15,10 @@ import (
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/yaml.v2"
 
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 var logger = loggo.GetLogger("jem.config")
@@ -31,6 +31,8 @@ type Config struct {
 	ControllerAdmin       params.User       `yaml:"state-server-admin"`
 	IdentityPublicKey     *bakery.PublicKey `yaml:"identity-public-key"`
 	IdentityLocation      string            `yaml:"identity-location"`
+	CharmstoreLocation    string            `yaml:"charmstore-location"`
+	MeteringLocation      string            `yaml:"metering-location"`
 	AgentUsername         string            `yaml:"agent-username"`
 	AgentKey              *bakery.KeyPair   `yaml:"agent-key"`
 	AccessLog             string            `yaml:"access-log"`
@@ -45,6 +47,7 @@ type Config struct {
 	UsageSenderURL        string            `yaml:"usage-sender-url,omitempty"`
 	UsageSenderCollection string            `yaml:"usage-sender-collection,omitempty"`
 	Domain                string            `yaml:"domain"`
+	PublicCloudMetadata   string            `yaml:"public-cloud-metadata"`
 }
 
 func (c *Config) validate() error {

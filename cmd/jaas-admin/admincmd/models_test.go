@@ -22,9 +22,9 @@ func (s *modelsSuite) TestModels(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	s.addEnv(c, "bob/foo", "bob/foo", "cred1")
-	s.addEnv(c, "bob/foo-1", "bob/foo", "cred1")
-	s.addEnv(c, "bob/foo-2", "bob/foo", "cred1")
+	s.addModel(c, "bob/foo", "bob/foo", "cred1")
+	s.addModel(c, "bob/foo-1", "bob/foo", "cred1")
+	s.addModel(c, "bob/foo-2", "bob/foo", "cred1")
 
 	stdout, stderr, code = run(c, c.MkDir(), "models")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
@@ -48,11 +48,11 @@ func (s *modelsSuite) TestAllModels(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	s.addEnv(c, "alice/bar", "alice/foo", "cred1")
+	s.addModel(c, "alice/bar", "alice/foo", "cred1")
 
 	s.idmSrv.AddUser("bob")
 	s.idmSrv.SetDefaultUser("bob")
-	s.addEnv(c, "bob/bar", "alice/foo", "cred1")
+	s.addModel(c, "bob/bar", "alice/foo", "cred1")
 
 	s.idmSrv.SetDefaultUser("alice")
 	stdout, stderr, code = run(c, c.MkDir(), "models")

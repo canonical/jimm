@@ -1,12 +1,9 @@
 # Copyright 2014 Canonical Ltd.
-# Makefile for the JEM service.
+# Makefile for the JIMM service.
 
-ifndef GOPATH
-$(warning You need to set up a GOPATH.)
-endif
+export GO111MODULE=on
 
-PROJECT := github.com/CanonicalLtd/jem
-PROJECT_DIR := $(shell go list -e -f '{{.Dir}}' $(PROJECT))
+PROJECT := github.com/CanonicalLtd/jimm
 
 GIT_COMMIT := $(shell git rev-parse --verify HEAD)
 GIT_VERSION := $(shell git describe --dirty)
@@ -34,13 +31,6 @@ endif
 
 default: build
 
-$(GOPATH)/bin/godeps:
-	go get -v github.com/rogpeppe/godeps
-
-# Start of GOPATH-dependent targets. Some targets only make sense -
-# and will only work - when this tree is found on the GOPATH.
-ifeq ($(CURDIR),$(PROJECT_DIR))
-
 build: $(VERSIONDEPS)
 	go build $(PROJECT)/...
 
@@ -50,26 +40,14 @@ check: $(VERSIONDEPS)
 install: $(VERSIONDEPS)
 	go install $(INSTALL_FLAGS) -v $(PROJECT)/...
 
+release: jimm-$(GIT_VERSION).tar.xz
+
 clean:
 	go clean $(PROJECT)/...
 	-$(RM) version/init.go
-
-else
-
-build:
-	$(error Cannot $@; $(CURDIR) is not on GOPATH)
-
-check:
-	$(error Cannot $@; $(CURDIR) is not on GOPATH)
-
-install:
-	$(error Cannot $@; $(CURDIR) is not on GOPATH)
-
-clean:
-	$(error Cannot $@; $(CURDIR) is not on GOPATH)
-
-endif
-# End of GOPATH-dependent targets.
+	-$(RM) jemd
+	-$(RM) -r jimm-release/
+	-$(RM) jimm-*.tar.xz
 
 # Reformat source files.
 format:
@@ -79,23 +57,25 @@ format:
 simplify:
 	gofmt -w -l -s .
 
-# Run the JEM server.
+# Run the JIMM server.
 server: install
-	jemd -logging-config DEBUG cmd/jemd/config.yaml
-
-# Update the project Go dependencies to the required revision.
-deps: $(GOPATH)/bin/godeps
-	$(GOPATH)/bin/godeps -u dependencies.tsv
-
-# Generate the dependencies file.
-create-deps: $(GOPATH)/bin/godeps
-	godeps -t $(shell go list $(PROJECT)/...) > dependencies.tsv || true
+	jemd cmd/jemd/config.yaml
 
 # Generate version information
 version/init.go: version/init.go.tmpl FORCE
 	gofmt -r "unknownVersion -> Version{GitCommit: \"${GIT_COMMIT}\", Version: \"${GIT_VERSION}\",}" $< > $@
 
-# Install packages required to develop JEM and run tests.
+jemd: version/init.go
+	go build -v $(PROJECT)/cmd/jemd
+
+jimm-$(GIT_VERSION).tar.xz: jimm-release/bin/jemd
+	tar c -C jimm-release . | xz > $@
+
+jimm-release/bin/jemd: jemd
+	mkdir -p jimm-release/bin
+	cp jemd jimm-release/bin
+
+# Install packages required to develop JIMM and run tests.
 APT_BASED := $(shell command -v apt-get >/dev/null; echo $$?)
 sysdeps:
 ifeq ($(APT_BASED),0)
@@ -118,14 +98,12 @@ help:
 	@echo 'make - Build the package.'
 	@echo 'make check - Run tests.'
 	@echo 'make install - Install the package.'
-	@echo 'make server - Start the JEM server.'
+	@echo 'make server - Start the JIMM server.'
 	@echo 'make clean - Remove object files from package source directories.'
 	@echo 'make sysdeps - Install the development environment system packages.'
-	@echo 'make deps - Set up the project Go dependencies.'
-	@echo 'make create-deps - Generate the Go dependencies file.'
 	@echo 'make format - Format the source files.'
 	@echo 'make simplify - Format and simplify the source files.'
 
-.PHONY: build check install clean format server simplify sysdeps help FORCE
+.PHONY: build check install release clean format server simplify sysdeps help FORCE
 
 FORCE:

@@ -4,21 +4,25 @@ package jem_test
 
 import (
 	"bufio"
+	"fmt"
 	"math"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
 
+	"github.com/juju/juju/core/status"
+	"github.com/juju/juju/state/multiwatcher"
 	"github.com/prometheus/client_golang/prometheus"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jem/internal/auth"
-	"github.com/CanonicalLtd/jem/internal/mongodoc"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
-func (s *jemSuite) TestStats(c *gc.C) {
+func (s *jemSuite) TestModelStats(c *gc.C) {
 	ctx := auth.ContextWithUser(testContext, "bob")
 
 	ctl1Id := s.addController(c, params.EntityPath{"bob", "controller1"})
@@ -96,14 +100,14 @@ func (s *jemSuite) TestStats(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	stats := s.pool.Stats(testContext)
+	stats := s.pool.ModelStats(testContext)
 	err = prometheus.Register(stats)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer prometheus.Unregister(stats)
 	srv := httptest.NewServer(prometheus.Handler())
 	defer srv.Close()
 	resp, err := http.Get(srv.URL)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(resp.StatusCode, gc.Equals, http.StatusOK)
 	defer resp.Body.Close()
 	counts := make(map[string]float64)
@@ -139,6 +143,193 @@ func (s *jemSuite) TestStats(c *gc.C) {
 	}
 	for name, count := range expectCounts {
 		name = "jem_health_" + name
+		c.Check(math.Trunc(counts[name]), gc.Equals, float64(count), gc.Commentf("%s", name))
+	}
+}
+
+func (s *jemSuite) TestMachineStats(c *gc.C) {
+	ctx := auth.ContextWithUser(testContext, "bob")
+
+	ctl1Id := s.addController(c, params.EntityPath{"bob", "controller1"})
+	ctl2Id := s.addController(c, params.EntityPath{"bob", "controller2"})
+	err := jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
+		Path: credentialPath("dummy", "bob", "cred1"),
+		Type: "empty",
+	})
+	c.Assert(err, gc.Equals, nil)
+	m1, err := s.jem.CreateModel(ctx, jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", "model1"},
+		ControllerPath: ctl1Id,
+		Credential: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{"bob", "cred1"},
+		},
+		Cloud: "dummy",
+	})
+	c.Assert(err, gc.Equals, nil)
+	m2, err := s.jem.CreateModel(ctx, jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", "model2"},
+		ControllerPath: ctl1Id,
+		Credential: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{"bob", "cred1"},
+		},
+		Cloud: "dummy",
+	})
+	c.Assert(err, gc.Equals, nil)
+	m3, err := s.jem.CreateModel(ctx, jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", "model3"},
+		ControllerPath: ctl2Id,
+		Credential: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{"bob", "cred1"},
+		},
+		Cloud: "dummy",
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+		Id:        "0",
+		ModelUUID: m1.UUID,
+		AgentStatus: multiwatcher.StatusInfo{
+			Current: status.Started,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+		Id:        "1",
+		ModelUUID: m1.UUID,
+		AgentStatus: multiwatcher.StatusInfo{
+			Current: status.Pending,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+		Id:        "2",
+		ModelUUID: m1.UUID,
+		AgentStatus: multiwatcher.StatusInfo{
+			Current: status.Stopped,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+		Id:        "3",
+		ModelUUID: m1.UUID,
+		AgentStatus: multiwatcher.StatusInfo{
+			Current: status.Down,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+		Id:        "4",
+		ModelUUID: m1.UUID,
+		AgentStatus: multiwatcher.StatusInfo{
+			Current: status.Started,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+		Id:        "5",
+		ModelUUID: m1.UUID,
+		AgentStatus: multiwatcher.StatusInfo{
+			Current: status.Pending,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+		Id:        "6",
+		ModelUUID: m1.UUID,
+		AgentStatus: multiwatcher.StatusInfo{
+			Current: status.Stopped,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+		Id:        "7",
+		ModelUUID: m1.UUID,
+		AgentStatus: multiwatcher.StatusInfo{
+			Current: status.Started,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+		Id:        "8",
+		ModelUUID: m1.UUID,
+		AgentStatus: multiwatcher.StatusInfo{
+			Current: status.Pending,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+		Id:        "9",
+		ModelUUID: m1.UUID,
+		AgentStatus: multiwatcher.StatusInfo{
+			Current: status.Started,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+		Id:        "0",
+		ModelUUID: m2.UUID,
+		AgentStatus: multiwatcher.StatusInfo{
+			Current: status.Started,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	err = s.jem.UpdateMachineInfo(ctx, ctl2Id, &multiwatcher.MachineInfo{
+		Id:        "0",
+		ModelUUID: m3.UUID,
+		AgentStatus: multiwatcher.StatusInfo{
+			Current: status.Pending,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	stats := s.pool.MachineStats(ctx)
+	err = prometheus.Register(stats)
+	c.Assert(err, gc.Equals, nil)
+	defer prometheus.Unregister(stats)
+	srv := httptest.NewServer(prometheus.Handler())
+	defer srv.Close()
+	resp, err := http.Get(srv.URL)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusOK)
+	defer resp.Body.Close()
+	counts := make(map[string]float64)
+	for scan := bufio.NewScanner(resp.Body); scan.Scan(); {
+		t := scan.Text()
+		if t == "" || strings.HasPrefix(t, "#") {
+			continue
+		}
+		fields := strings.Fields(t)
+		if len(fields) != 2 {
+			c.Logf("unexpected prometheus line %q", scan.Text())
+			continue
+		}
+		f, err := strconv.ParseFloat(fields[1], 64)
+		if err != nil {
+			c.Logf("bad value in prometheus line %q", scan.Text())
+			continue
+		}
+		counts[fields[0]] += f
+	}
+
+	type labels struct {
+		controller params.EntityPath
+		cloud      string
+		region     string
+		status     status.Status
+	}
+
+	expectCounts := map[labels]int{
+		{ctl1Id, "dummy", "dummy-region", status.Started}: 5,
+		{ctl1Id, "dummy", "dummy-region", status.Pending}: 3,
+		{ctl1Id, "dummy", "dummy-region", status.Stopped}: 2,
+		{ctl1Id, "dummy", "dummy-region", status.Down}:    1,
+		{ctl2Id, "dummy", "dummy-region", status.Pending}: 1,
+	}
+	for label, count := range expectCounts {
+		name := fmt.Sprintf("jem_health_machines{cloud=%q,controller=%q,region=%q,status=%q}", label.cloud, label.controller, label.region, label.status)
 		c.Check(math.Trunc(counts[name]), gc.Equals, float64(count), gc.Commentf("%s", name))
 	}
 }

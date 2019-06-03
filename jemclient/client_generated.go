@@ -4,7 +4,7 @@
 package jemclient
 
 import (
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/params"
 	"github.com/juju/httprequest"
 )
 
@@ -27,11 +27,9 @@ func (c *client) DeleteModel(p *params.DeleteModel) error {
 	return c.Client.Call(p, nil)
 }
 
-// GetAllControllerLocations returns all the available
-// sets of controller location attributes, restricting
-// the search by any provided location attributes.
-func (c *client) GetAllControllerLocations(p *params.GetAllControllerLocations) (*params.AllControllerLocationsResponse, error) {
-	var r *params.AllControllerLocationsResponse
+// GetAuditEntries return the list of audit log entries based on the requested query.
+func (c *client) GetAuditEntries(p *params.AuditLogRequest) (params.AuditLogEntries, error) {
+	var r params.AuditLogEntries
 	err := c.Client.Call(p, &r)
 	return r, err
 }
@@ -43,18 +41,8 @@ func (c *client) GetController(p *params.GetController) (*params.ControllerRespo
 	return r, err
 }
 
-// GetControllerLocation returns a map of location attributes for a given controller.
-func (c *client) GetControllerLocation(p *params.GetControllerLocation) (params.ControllerLocation, error) {
-	var r params.ControllerLocation
-	err := c.Client.Call(p, &r)
-	return r, err
-}
-
-// GetControllerLocations returns all the available values for a given controller
-// location attribute. The set of controllers is constrained by the URL query
-// parameters.
-func (c *client) GetControllerLocations(p *params.GetControllerLocations) (*params.ControllerLocationsResponse, error) {
-	var r *params.ControllerLocationsResponse
+func (c *client) GetControllerDeprecated(p *params.GetControllerDeprecated) (*params.DeprecatedBody, error) {
+	var r *params.DeprecatedBody
 	err := c.Client.Call(p, &r)
 	return r, err
 }
@@ -74,10 +62,24 @@ func (c *client) GetModel(p *params.GetModel) (*params.ModelResponse, error) {
 	return r, err
 }
 
+// GetModelName returns the name of the model identified by the provided uuid.
+func (c *client) GetModelName(p *params.ModelNameRequest) (params.ModelNameResponse, error) {
+	var r params.ModelNameResponse
+	err := c.Client.Call(p, &r)
+	return r, err
+}
+
 // GetModelPerm returns the ACL for a given model.
 // Only the owner (arg.EntityPath.User) can read the ACL.
 func (c *client) GetModelPerm(p *params.GetModelPerm) (params.ACL, error) {
 	var r params.ACL
+	err := c.Client.Call(p, &r)
+	return r, err
+}
+
+// GetModelStatuses return the list of all models created between 2 dates (or all).
+func (c *client) GetModelStatuses(p *params.ModelStatusesRequest) (params.ModelStatuses, error) {
+	var r params.ModelStatuses
 	err := c.Client.Call(p, &r)
 	return r, err
 }
@@ -127,6 +129,10 @@ func (c *client) NewModel(p *params.NewModel) (*params.ModelResponse, error) {
 	var r *params.ModelResponse
 	err := c.Client.Call(p, &r)
 	return r, err
+}
+
+func (c *client) SetControllerDeprecated(p *params.SetControllerDeprecated) error {
+	return c.Client.Call(p, nil)
 }
 
 // SetControllerPerm sets the permissions on a controller entity.

@@ -1,56 +1,50 @@
 mongo-addr: localhost:27017
 api-addr: localhost:8082
-state-server-admin: admin
-# For locally running services.
-identity-public-key: CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk=
-identity-location: http://localhost:8081/
-autocert: true
+state-server-admin: yellow
+autocert: false
 # An agent is required for communicating with identity.
-# agent-username: jem-0@admin@idm
-# agent-key: {private: VnTcdjEOBBBjHNJ9knRtMA0I1PCATNySJXhW4PGE5hY=, public: MusIzFaXa7ImSMcQ9wgGpaDrgRQhbtsjsyawTvmXh1c=}
-# For production identity manager (jemd will collect the correct public key on startup).
-#identity-location: https://api.jujucharms.com/identity
-access-log: /var/log/jem/access.log
+agent-username: a-3e4b216d981d040ead38139b5c2574ee@candid
+agent-key: {"private": "DK3Agg6WIdOUAKbAAKspu3Ym53yhJf/b4x+451NTwA0=", "public": "z7EntB1kVOUL+K3W1UHGXR/fiVfE3LQgZ5HvQ94AkHg="}
+identity-location: https://api.staging.jujucharms.com/identity
+access-log: access.log
 # The following certificate may be used for testing purposes. The second
 # certificate in the chain is a root certificate. This can be used
 # a ca-cert parameter in juju configuration and also installed in
-# /usr/local/share/ca-certificates/jem.cnf for use with jaas-model.
+# /usr/local/share/ca-certificates/jimmqa.crt for use with jaas-admin.
 # The certificate identifies itself as:
+#  ip6-localhost
 #  juju-apiserver
 #  localhost
+#  localhost.localdomain
 #  127.0.0.1
 #  ::1
 tls-cert: |
   -----BEGIN CERTIFICATE-----
-  MIIBbDCCARYCCQCSJb9RIECG3TANBgkqhkiG9w0BAQsFADA9MQswCQYDVQQGEwJT
-  STETMBEGA1UECAwKU29tZS1TdGF0ZTENMAsGA1UECgwEanVqdTEKMAgGA1UEAwwB
-  KjAeFw0xNjA4MDcxOTIxMTJaFw0xNzA4MDcxOTIxMTJaMD0xCzAJBgNVBAYTAlNJ
-  MRMwEQYDVQQIDApTb21lLVN0YXRlMQ0wCwYDVQQKDARqdWp1MQowCAYDVQQDDAEq
-  MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAMnPMI1t2amkSWJKPnjScnIblL67W6Aj
-  1+82fWZYwfP81zv8u5AAsfYa68o2yzfT14vvWmCFaN53VHpz1xI47f0CAwEAATAN
-  BgkqhkiG9w0BAQsFAANBALT0/5yGpaGP9RaD+xRdoxGFf9m7g2IXUphlyN+KD4ST
-  kjzzw0795c5I6Mt2HSbi7P+hP+9MGWi0jWpoO2Xj8M4=
+  MIIBjTCCATSgAwIBAgIBATAKBggqhkjOPQQDAjAXMRUwEwYDVQQDEwxKSU1NIFFB
+  IFJvb3QwHhcNMTgwODIzMTUyNjU5WhcNMzgwODE4MTUyNjU5WjAUMRIwEAYDVQQD
+  Ewlsb2NhbGhvc3QwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAATdga0FYEBmHmrl
+  7qqToMtpCe5SDP6CuqGctJR5x+BREgYyS64yr8LGfoJWkwDjffBy3+u2GS9GRrFw
+  cpCudszho3QwcjAMBgNVHRMBAf8EAjAAMGIGA1UdEQRbMFmCDWlwNi1sb2NhbGhv
+  c3SCDmp1anUtYXBpc2VydmVygglsb2NhbGhvc3SCFWxvY2FsaG9zdC5sb2NhbGRv
+  bWFpbocEfwAAAYcQAAAAAAAAAAAAAAAAAAAAATAKBggqhkjOPQQDAgNHADBEAiBb
+  EB9XazzOrGLiYHt89FiTdChmuN9/W6HdYZV1zaPFUgIgOFXpVpyO9TXTJsPNPqgg
+  g4b53TqfGTXtEjwSUHdpZoI=
   -----END CERTIFICATE-----
   -----BEGIN CERTIFICATE-----
-  MIIBbDCCARYCCQCSJb9RIECG3TANBgkqhkiG9w0BAQsFADA9MQswCQYDVQQGEwJT
-  STETMBEGA1UECAwKU29tZS1TdGF0ZTENMAsGA1UECgwEanVqdTEKMAgGA1UEAwwB
-  KjAeFw0xNjA4MDcxOTIxMTJaFw0xNzA4MDcxOTIxMTJaMD0xCzAJBgNVBAYTAlNJ
-  MRMwEQYDVQQIDApTb21lLVN0YXRlMQ0wCwYDVQQKDARqdWp1MQowCAYDVQQDDAEq
-  MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAMnPMI1t2amkSWJKPnjScnIblL67W6Aj
-  1+82fWZYwfP81zv8u5AAsfYa68o2yzfT14vvWmCFaN53VHpz1xI47f0CAwEAATAN
-  BgkqhkiG9w0BAQsFAANBALT0/5yGpaGP9RaD+xRdoxGFf9m7g2IXUphlyN+KD4ST
-  kjzzw0795c5I6Mt2HSbi7P+hP+9MGWi0jWpoO2Xj8M4=
+  MIIBMzCB2aADAgECAgEAMAoGCCqGSM49BAMCMBcxFTATBgNVBAMTDEpJTU0gUUEg
+  Um9vdDAeFw0xODA4MjMxNTI2NTlaFw0zODA4MTgxNTI2NTlaMBcxFTATBgNVBAMT
+  DEpJTU0gUUEgUm9vdDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABIPkacSbGP8D
+  eApfTRnCRjFkAieB3Dz+lG0w1G9iTWX+DxzIFcrrZ3scvCQncX9LSUmUgj8oZqOz
+  1Qg6fSsCgO+jFjAUMBIGA1UdEwEB/wQIMAYBAf8CAQAwCgYIKoZIzj0EAwIDSQAw
+  RgIhAJ+cU1VHP1oabeUc3YdElH00xrv+DOMykyvShXOj1IDkAiEAqbIKDN1KhgwE
+  Yp3zu9uyZm9mSHzd66OWAx9Wnd79eqY=
   -----END CERTIFICATE-----
 tls-key: |
-  -----BEGIN RSA PRIVATE KEY-----
-  MIIBOwIBAAJBAMnPMI1t2amkSWJKPnjScnIblL67W6Aj1+82fWZYwfP81zv8u5AA
-  sfYa68o2yzfT14vvWmCFaN53VHpz1xI47f0CAwEAAQJBAMIh8Y7bkXtDcuR+j0Ij
-  D7z9E0W3bhjK4jpXrKH71/ggFtyAJ/guMIlIZVcHqnjMcfu4nPrJDavWK/6F+A5S
-  DQECIQD4Nr921aDOvJf9wyZu9Vl2fj+4w3i7jrDLDIwNpXx9zQIhANAjy7K4wf15
-  kY3CiD24vrd+++uJPdNIhAYjKkYNoIDxAiEAzqDc4LNUS+YJ7VEwxHvwvsi4iToI
-  XrKZkF7glFen/B0CIA3RgpGQAJkSfB5cPu1SGZ9XF+SQTQF8+/7oUMMr3m8RAiA0
-  X9RasyDocy/n3dUGVMqum9O1QwAoBwu+AzgRqOECVA==
-  -----END RSA PRIVATE KEY-----
+  -----BEGIN EC PRIVATE KEY-----
+  MHcCAQEEIELWIu6wXCoIlKzK3TA1NtRV5H3wBpDK724HNMwlFwokoAoGCCqGSM49
+  AwEHoUQDQgAE3YGtBWBAZh5q5e6qk6DLaQnuUgz+grqhnLSUecfgURIGMkuuMq/C
+  xn6CVpMA433wct/rthkvRkaxcHKQrnbM4Q==
+  -----END EC PRIVATE KEY-----
 controller-uuid: 00000000-0000-0000-0000-000000000001
 default-cloud: aws
-gui-location: https://jujucharms.com
+logging-level: debug

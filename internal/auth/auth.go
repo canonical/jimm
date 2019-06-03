@@ -3,26 +3,26 @@
 package auth
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
 	"github.com/juju/idmclient"
 	"github.com/juju/utils"
 	"go.uber.org/zap"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	"gopkg.in/macaroon.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgostorage"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2"
 
-	"github.com/CanonicalLtd/jem/internal/mgosession"
-	"github.com/CanonicalLtd/jem/internal/servermon"
-	"github.com/CanonicalLtd/jem/internal/zapctx"
-	"github.com/CanonicalLtd/jem/internal/zaputil"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/internal/mgosession"
+	"github.com/CanonicalLtd/jimm/internal/servermon"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/internal/zaputil"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 const usernameAttr = "username"
@@ -87,7 +87,7 @@ func (p *Pool) Authenticator(ctx context.Context) *Authenticator {
 	session := p.params.SessionPool.Session(ctx)
 	return &Authenticator{
 		pool: p,
-		bakery: p.params.Bakery.WithRootKeyStore(p.params.RootKeys.NewStorage(
+		bakery: p.params.Bakery.WithStore(p.params.RootKeys.NewStorage(
 			p.rootKeyCollection(session),
 			p.params.RootKeysPolicy,
 		)),
@@ -189,7 +189,7 @@ func (a *Authenticator) newMacaroon() (*macaroon.Macaroon, error) {
 	if a.domain != "" {
 		condition += " @" + a.domain
 	}
-	return a.bakery.NewMacaroon("", nil, []checkers.Caveat{
+	return a.bakery.NewMacaroon([]checkers.Caveat{
 		checkers.NeedDeclaredCaveat(
 			checkers.Caveat{
 				Location:  a.pool.params.IdentityLocation,
@@ -249,7 +249,7 @@ func CheckACL(ctx context.Context, acl []string) error {
 		return errgo.Notef(err, "cannot check permissions")
 	}
 	if !ok {
-		zapctx.Info(ctx, "user not authorized",
+		zapctx.Debug(ctx, "user not authorized",
 			zap.String("user", auth.username()),
 			zap.Strings("acl", acl),
 		)

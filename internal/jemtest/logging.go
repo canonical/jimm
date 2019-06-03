@@ -9,8 +9,8 @@ import (
 	"go.uber.org/zap/zapcore"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jem/internal/zapctx"
-	"github.com/CanonicalLtd/jem/internal/zaputil"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/internal/zaputil"
 )
 
 // LoggingSuite is a replacement for github.com/juju/testing.LoggingSuite
@@ -38,6 +38,7 @@ func (s *LoggingSuite) setUp(c *gc.C) {
 	logger := zap.New(zapcore.NewCore(
 		zapcore.NewConsoleEncoder(zapcore.EncoderConfig{
 			LevelKey:    "level",
+			MessageKey:  "msg",
 			EncodeLevel: zapcore.CapitalLevelEncoder,
 			EncodeTime:  zapcore.ISO8601TimeEncoder,
 		}),
@@ -58,7 +59,7 @@ func (s *LoggingSuite) setUp(c *gc.C) {
 		level = envLevel
 	}
 	err := loggo.ConfigureLoggers(level)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 type discardWriter struct{}

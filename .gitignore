@@ -1,1 +1,11 @@
 version/init.go
+/jemd
+/jimm-*/
+/jimm-*.tar.xz
+/*.snap
+/access.log
+/parts/
+/prime/
+/snap/.snapcraft/
+/stage/
+/vendor

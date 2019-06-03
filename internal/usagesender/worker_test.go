@@ -3,27 +3,24 @@
 package usagesender_test
 
 import (
+	"context"
 	"fmt"
 	"net/http/httptest"
 	"sync"
 	"time"
 
+	"github.com/juju/clock/testclock"
 	"github.com/juju/httprequest"
 	jujujujutesting "github.com/juju/juju/testing"
-	romulus "github.com/juju/romulus/wireformat/metrics"
-	wireformat "github.com/juju/romulus/wireformat/metrics"
-	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
-	"github.com/juju/utils"
 	"github.com/julienschmidt/httprouter"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 
-	external_jem "github.com/CanonicalLtd/jem"
-	"github.com/CanonicalLtd/jem/internal/apitest"
-	"github.com/CanonicalLtd/jem/internal/jemerror"
-	"github.com/CanonicalLtd/jem/internal/usagesender"
-	"github.com/CanonicalLtd/jem/params"
+	external_jem "github.com/CanonicalLtd/jimm"
+	"github.com/CanonicalLtd/jimm/internal/apitest"
+	"github.com/CanonicalLtd/jimm/internal/jemerror"
+	"github.com/CanonicalLtd/jimm/internal/usagesender"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 var (
@@ -52,7 +49,7 @@ type usageSenderSuite struct {
 }
 
 func (s *usageSenderSuite) SetUpTest(c *gc.C) {
-	s.handler = &testHandler{receivedMetrics: make(chan string, 1)}
+	s.handler = &testHandler{receivedMetrics: make(chan string)}
 
 	router := httprouter.New()
 	handlers := jemerror.Mapper.Handlers(func(_ httprequest.Params) (*testHandler, error) {
@@ -65,7 +62,7 @@ func (s *usageSenderSuite) SetUpTest(c *gc.C) {
 	s.server = httptest.NewServer(router)
 
 	// Set up the clock mockery.
-	s.Clock = jujutesting.NewClock(epoch)
+	s.Clock = testclock.NewClock(epoch)
 
 	s.ServerParams.UsageSenderURL = s.server.URL
 
@@ -85,20 +82,20 @@ func (s *usageSenderSuite) TestUsageSenderWorker(c *gc.C) {
 	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
 	_, uuid := s.CreateModel(c, params.EntityPath{"bob", "foo"}, ctlId, cred)
 
-	s.setUnitNumberAndCheckSentMetrics(c, uuid, 0, true)
-	s.setUnitNumberAndCheckSentMetrics(c, uuid, 0, false)
+	s.setUnitNumberAndCheckSentMetrics(c, ctlId, uuid, 0, true)
+	s.setUnitNumberAndCheckSentMetrics(c, ctlId, uuid, 0, false)
 
-	s.setUnitNumberAndCheckSentMetrics(c, uuid, 99, true)
-	s.setUnitNumberAndCheckSentMetrics(c, uuid, 99, false)
+	s.setUnitNumberAndCheckSentMetrics(c, ctlId, uuid, 99, true)
+	s.setUnitNumberAndCheckSentMetrics(c, ctlId, uuid, 99, false)
 
-	s.setUnitNumberAndCheckSentMetrics(c, uuid, 42, true)
-	s.setUnitNumberAndCheckSentMetrics(c, uuid, 42, false)
+	s.setUnitNumberAndCheckSentMetrics(c, ctlId, uuid, 42, true)
+	s.setUnitNumberAndCheckSentMetrics(c, ctlId, uuid, 42, false)
 }
 
 func (s *mgoMetricRecorderSuite) TestSpool(c *gc.C) {
 	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, false)
 	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
-	_, model := s.CreateModel(c, params.EntityPath{"bob", "foo"}, ctlId, cred)
+	_, model := s.CreateModel(c, params.EntityPath{"bob", "test-model"}, ctlId, cred)
 
 	m := &testMonitor{failed: make(chan int, 10)}
 	s.PatchValue(usagesender.MonitorFailure, m.set)
@@ -108,17 +105,17 @@ func (s *mgoMetricRecorderSuite) TestSpool(c *gc.C) {
 	// next attempt
 	s.handler.setAcknowledge(false)
 
-	err := s.JEM.DB.UpdateModelCounts(testContext, model, map[params.EntityCount]int{
+	err := s.JEM.DB.UpdateModelCounts(testContext, ctlId, model, map[params.EntityCount]int{
 		params.MachineCount: 0,
 		params.UnitCount:    17,
 	}, s.Clock.Now())
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	s.Clock.WaitAdvance(6*time.Minute, jujujujutesting.LongWait, 1)
 
 	select {
-	case receivedUnitCount := <-s.handler.receivedMetrics:
-		c.Assert(receivedUnitCount, gc.Equals, "17")
+	case receivedMetric := <-s.handler.receivedMetrics:
+		c.Assert(receivedMetric, gc.Equals, "17")
 	case <-time.After(jujujujutesting.LongWait):
 		c.Fatal("timed out waiting for metrics to be received")
 	}
@@ -126,53 +123,53 @@ func (s *mgoMetricRecorderSuite) TestSpool(c *gc.C) {
 	// on the second attempt all metrics will be acknowledged
 	s.handler.setAcknowledge(true)
 
-	err = s.JEM.DB.UpdateModelCounts(testContext, model, map[params.EntityCount]int{
+	err = s.JEM.DB.UpdateModelCounts(testContext, ctlId, model, map[params.EntityCount]int{
 		params.MachineCount: 0,
 		params.UnitCount:    42,
 	}, s.Clock.Now())
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	s.Clock.WaitAdvance(6*time.Minute, jujujujutesting.LongWait, 1)
 
 	// we expect both metrics to be sent this time
 	a := "17"
 	select {
-	case receivedUnitCount := <-s.handler.receivedMetrics:
-		c.Logf("received %v", receivedUnitCount)
-		if receivedUnitCount == a {
+	case receivedMetric := <-s.handler.receivedMetrics:
+		c.Logf("received %v", receivedMetric)
+		if receivedMetric == a {
 			a = "42"
 		}
 	case <-time.After(jujujujutesting.LongWait):
 		c.Fatal("timed out waiting for metrics to be received")
 	}
 	select {
-	case receivedUnitCount := <-s.handler.receivedMetrics:
-		c.Logf("received %v", receivedUnitCount)
-		c.Assert(receivedUnitCount, gc.Equals, a)
+	case receivedMetric := <-s.handler.receivedMetrics:
+		c.Logf("received %v", receivedMetric)
+		c.Assert(receivedMetric, gc.Equals, a)
 	case <-time.After(jujujujutesting.LongWait):
 		c.Fatal("timed out waiting for metrics to be received")
 	}
 }
 
-func (s *usageSenderSuite) setUnitNumberAndCheckSentMetrics(c *gc.C, modelUUID string, unitCount int, acknowledge bool) {
+func (s *usageSenderSuite) setUnitNumberAndCheckSentMetrics(c *gc.C, ctlPath params.EntityPath, modelUUID string, unitCount int, acknowledge bool) {
 	m := &testMonitor{failed: make(chan int)}
 	s.PatchValue(usagesender.MonitorFailure, m.set)
 
 	s.handler.setAcknowledge(acknowledge)
 
-	err := s.JEM.DB.UpdateModelCounts(testContext, modelUUID, map[params.EntityCount]int{
+	err := s.JEM.DB.UpdateModelCounts(testContext, ctlPath, modelUUID, map[params.EntityCount]int{
 		params.MachineCount: 0,
 		params.UnitCount:    unitCount,
 	}, s.Clock.Now())
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	s.Clock.WaitAdvance(6*time.Minute, jujujujutesting.LongWait, 1)
 
 	unitCountString := fmt.Sprintf("%d", unitCount)
 
 	select {
-	case receivedUnitCount := <-s.handler.receivedMetrics:
-		c.Assert(receivedUnitCount, gc.Equals, unitCountString)
+	case receivedMetric := <-s.handler.receivedMetrics:
+		c.Assert(receivedMetric, gc.Equals, unitCountString)
 	case <-time.After(jujujujutesting.LongWait):
 		c.Fatal("timed out waiting for metrics to be received")
 	}
@@ -198,8 +195,8 @@ func (m *testMonitor) set(value float64) {
 }
 
 type usagePost struct {
-	httprequest.Route `httprequest:"POST /metrics"`
-	Body              []wireformat.MetricBatch `httprequest:",body"`
+	httprequest.Route `httprequest:"POST /v4/jimm/metrics"`
+	Body              []usagesender.MetricBatch `httprequest:",body"`
 }
 
 type testHandler struct {
@@ -208,7 +205,7 @@ type testHandler struct {
 	receivedMetrics chan string
 }
 
-func (c *testHandler) Metrics(arg *usagePost) (*romulus.UserStatusResponse, error) {
+func (c *testHandler) Metrics(arg *usagePost) (*usagesender.Response, error) {
 	uuids := make([]string, len(arg.Body))
 	for i, b := range arg.Body {
 		uuids[i] = b.UUID
@@ -218,14 +215,15 @@ func (c *testHandler) Metrics(arg *usagePost) (*romulus.UserStatusResponse, erro
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	if c.acknowledge {
-		return &romulus.UserStatusResponse{
-			UUID: utils.MustNewUUID().String(),
-			UserResponses: map[string]romulus.UserResponse{
-				"bob": romulus.UserResponse{AcknowledgedBatches: uuids},
-			},
+		return &usagesender.Response{
+			UserStatus: map[string]usagesender.UserStatus{
+				"bob": usagesender.UserStatus{
+					Code: "GREEN",
+					Info: "",
+				}},
 		}, nil
 	}
-	return &romulus.UserStatusResponse{}, nil
+	return nil, fmt.Errorf("error")
 }
 
 func (c *testHandler) setAcknowledge(value bool) {

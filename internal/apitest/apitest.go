@@ -2,6 +2,7 @@
 package apitest
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,28 +10,28 @@ import (
 	"net/http/httptest"
 	"time"
 
+	"github.com/juju/aclstore"
+	"github.com/juju/clock/testclock"
 	"github.com/juju/idmclient/idmtest"
 	controllerapi "github.com/juju/juju/api/controller"
 	"github.com/juju/juju/controller"
+	"github.com/juju/simplekv/mgosimplekv"
 	"github.com/juju/testing"
-	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"github.com/rogpeppe/fastuuid"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	"gopkg.in/macaroon.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/mgo.v2"
 
-	external_jem "github.com/CanonicalLtd/jem"
-	"github.com/CanonicalLtd/jem/internal/jem"
-	"github.com/CanonicalLtd/jem/internal/jemserver"
-	"github.com/CanonicalLtd/jem/internal/jemtest"
-	"github.com/CanonicalLtd/jem/internal/mgosession"
-	"github.com/CanonicalLtd/jem/internal/mongodoc"
-	"github.com/CanonicalLtd/jem/internal/usagesender"
-	"github.com/CanonicalLtd/jem/jemclient"
-	"github.com/CanonicalLtd/jem/params"
+	external_jem "github.com/CanonicalLtd/jimm"
+	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/jemserver"
+	"github.com/CanonicalLtd/jimm/internal/jemtest"
+	"github.com/CanonicalLtd/jimm/internal/mgosession"
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/internal/usagesender"
+	"github.com/CanonicalLtd/jimm/jemclient"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 // Suite implements a test fixture that contains a JEM server
@@ -44,8 +45,8 @@ type Suite struct {
 	// IDMSrv holds a running instance of the fake identity server.
 	IDMSrv *idmtest.Server
 
-	// httpSrv holds the running HTTP server that uses IDMSrv.
-	httpSrv *httptest.Server
+	// HTTPSrv holds the running HTTP server that uses IDMSrv.
+	HTTPSrv *httptest.Server
 
 	// JEM holds an instance of the JEM store, suitable
 	// for invasive testing purposes.
@@ -60,20 +61,21 @@ type Suite struct {
 
 	ServerParams              external_jem.ServerParams
 	MetricsRegistrationClient *stubMetricsRegistrationClient
-	Clock                     *testing.Clock
+	Clock                     *testclock.Clock
+	ACLStore                  aclstore.ACLStore
 }
 
 func (s *Suite) SetUpTest(c *gc.C) {
 	s.IDMSrv = idmtest.NewServer()
 	s.JujuConnSuite.ControllerConfigAttrs = map[string]interface{}{
 		controller.IdentityURL:       s.IDMSrv.URL,
-		controller.IdentityPublicKey: s.IDMSrv.PublicKey,
+		controller.IdentityPublicKey: s.IDMSrv.PublicKey.String(),
 	}
 	s.JujuConnSuite.SetUpTest(c)
 	conn := s.OpenControllerAPI(c)
 	defer conn.Close()
 	err := controllerapi.NewClient(conn).GrantController("everyone@external", "login")
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.PatchValue(&jem.APIOpenTimeout, time.Duration(0))
 	s.MetricsRegistrationClient = &stubMetricsRegistrationClient{}
 	s.PatchValue(&jem.NewUsageSenderAuthorizationClient, func(_ string, _ *httpbakery.Client) (jem.UsageSenderAuthorizationClient, error) {
@@ -83,10 +85,13 @@ func (s *Suite) SetUpTest(c *gc.C) {
 		s.PatchValue(&usagesender.SenderClock, s.Clock)
 	}
 	s.JEMSrv = s.NewServer(c, s.Session, s.IDMSrv, s.ServerParams)
-	s.httpSrv = httptest.NewServer(s.JEMSrv)
+	s.HTTPSrv = httptest.NewServer(s.JEMSrv)
 	s.SessionPool = mgosession.NewPool(context.TODO(), s.Session, 1)
 	s.Pool = s.NewJEMPool(c, s.SessionPool)
 	s.JEM = s.Pool.JEM(context.TODO())
+	kvstore, err := mgosimplekv.NewStore(s.JEM.DB.C("acls"))
+	c.Assert(err, gc.Equals, nil)
+	s.ACLStore = aclstore.NewACLStore(kvstore)
 }
 
 // NewJEMPool returns a jem.Pool that uses the given
@@ -99,13 +104,13 @@ func (s *Suite) NewJEMPool(c *gc.C, sessionPool *mgosession.Pool) *jem.Pool {
 		ControllerAdmin: "controller-admin",
 		SessionPool:     sessionPool,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	session.Close()
 	return pool
 }
 
 func (s *Suite) TearDownTest(c *gc.C) {
-	s.httpSrv.Close()
+	s.HTTPSrv.Close()
 	s.JEMSrv.Close()
 	s.IDMSrv.Close()
 	s.JEM.Close()
@@ -119,7 +124,7 @@ func (s *Suite) TearDownTest(c *gc.C) {
 // s.JEMSrv.
 func (s *Suite) NewClient(username params.User) *jemclient.Client {
 	return jemclient.New(jemclient.NewParams{
-		BaseURL: s.httpSrv.URL,
+		BaseURL: s.HTTPSrv.URL,
 		Client:  s.IDMSrv.Client(string(username)),
 	})
 }
@@ -134,6 +139,8 @@ func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server,
 		DB:                      db,
 		ControllerAdmin:         "controller-admin",
 		IdentityLocation:        idmSrv.URL.String(),
+		CharmstoreLocation:      params.CharmstoreLocation,
+		MeteringLocation:        params.MeteringLocation,
 		PublicKeyLocator:        idmSrv,
 		AgentUsername:           "agent",
 		AgentKey:                s.IDMSrv.UserPublicKey("agent"),
@@ -149,7 +156,7 @@ func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server,
 		config.GUILocation = params.GUILocation
 	}
 	srv, err := external_jem.NewServer(context.TODO(), config)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	return srv.(*jemserver.Server)
 }
 
@@ -157,7 +164,7 @@ func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server,
 // and checks that id succeeds. It returns the controller id.
 func (s *Suite) AssertAddController(c *gc.C, path params.EntityPath, public bool) params.EntityPath {
 	err := s.AddController(c, path, public)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	return path
 }
 
@@ -193,13 +200,16 @@ var uuidGenerator = fastuuid.MustNewGenerator()
 
 // AssertAddControllerDoc adds a controller document to the database.
 // Tests cannot connect to a controller added by this function.
-func (s *Suite) AssertAddControllerDoc(c *gc.C, cnt *mongodoc.Controller) *mongodoc.Controller {
+func (s *Suite) AssertAddControllerDoc(c *gc.C, cnt *mongodoc.Controller, primaryCloudRegion *mongodoc.CloudRegion) *mongodoc.Controller {
 	if cnt.UUID == "" {
 		cnt.UUID = fmt.Sprintf("%x", uuidGenerator.Next())
 	}
 	err := s.JEM.DB.AddController(context.Background(), cnt)
-
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
+	if primaryCloudRegion != nil {
+		err = s.JEM.DB.UpdateCloudRegions(context.Background(), []mongodoc.CloudRegion{*primaryCloudRegion})
+		c.Assert(err, gc.Equals, nil)
+	}
 	return cnt
 }
 
@@ -232,15 +242,11 @@ func (s *Suite) CreateModel(c *gc.C, path, ctlPath params.EntityPath, cred param
 			Config: dummyModelConfig,
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	s.MetricsRegistrationClient.CheckCalls(c, []testing.StubCall{{
 		FuncName: "AuthorizeReseller",
 		Args: []interface{}{
-			"canonical/jimm",
-			"cs:~canonical/jimm-0",
-			"jimm",
-			"canonical",
 			string(path.User),
 		},
 	}})
@@ -251,7 +257,7 @@ func (s *Suite) CreateModel(c *gc.C, path, ctlPath params.EntityPath, cred param
 
 func (s *Suite) AssertUpdateCredential(c *gc.C, user params.User, cloud params.Cloud, name params.Name, authType string) params.Name {
 	err := s.UpdateCredential(user, cloud, name, authType)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	return name
 }
 
@@ -301,11 +307,7 @@ type stubMetricsRegistrationClient struct {
 	testing.Stub
 }
 
-func (c *stubMetricsRegistrationClient) AuthorizeReseller(plan, charm, application, applicationOwner, applicationUser string) (*macaroon.Macaroon, error) {
-	c.MethodCall(c, "AuthorizeReseller", plan, charm, application, applicationOwner, applicationUser)
-	m, err := macaroon.New(nil, "", "jem")
-	if err != nil {
-		return nil, err
-	}
-	return m, c.NextErr()
+func (c *stubMetricsRegistrationClient) GetCredentials(_ context.Context, applicationUser string) ([]byte, error) {
+	c.MethodCall(c, "AuthorizeReseller", applicationUser)
+	return []byte("secret credentials"), c.NextErr()
 }

@@ -3,6 +3,7 @@
 package jujuapi
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -10,16 +11,15 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/rpc"
 	"github.com/juju/juju/rpc/jsoncodec"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jem/internal/auth"
-	"github.com/CanonicalLtd/jem/internal/jem"
-	"github.com/CanonicalLtd/jem/internal/jemserver"
-	"github.com/CanonicalLtd/jem/internal/servermon"
-	"github.com/CanonicalLtd/jem/internal/zapctx"
-	"github.com/CanonicalLtd/jem/internal/zaputil"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/jemserver"
+	"github.com/CanonicalLtd/jimm/internal/servermon"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/internal/zaputil"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 const (
@@ -27,14 +27,18 @@ const (
 	maxRequestConcurrency = 10
 )
 
+var errNotImplemented = errgo.New("not implemented")
+
 var errorCodes = map[error]string{
-	params.ErrAlreadyExists:    jujuparams.CodeAlreadyExists,
-	params.ErrBadRequest:       jujuparams.CodeBadRequest,
-	params.ErrForbidden:        jujuparams.CodeForbidden,
-	params.ErrMethodNotAllowed: jujuparams.CodeMethodNotAllowed,
-	params.ErrNotFound:         jujuparams.CodeNotFound,
-	params.ErrModelNotFound:    jujuparams.CodeModelNotFound,
-	params.ErrUnauthorized:     jujuparams.CodeUnauthorized,
+	params.ErrAlreadyExists:       jujuparams.CodeAlreadyExists,
+	params.ErrBadRequest:          jujuparams.CodeBadRequest,
+	params.ErrForbidden:           jujuparams.CodeForbidden,
+	params.ErrMethodNotAllowed:    jujuparams.CodeMethodNotAllowed,
+	params.ErrNotFound:            jujuparams.CodeNotFound,
+	params.ErrModelNotFound:       jujuparams.CodeModelNotFound,
+	params.ErrUnauthorized:        jujuparams.CodeUnauthorized,
+	params.ErrCloudRegionRequired: jujuparams.CodeCloudRegionRequired,
+	errNotImplemented:             jujuparams.CodeNotImplemented,
 }
 
 // mapError maps JEM errors to errors suitable for use with the juju API.
@@ -44,7 +48,7 @@ func mapError(err error) *jujuparams.Error {
 	}
 	// TODO the error mapper should really accept a context from the RPC package.
 	zapctx.Debug(context.TODO(), "rpc error", zaputil.Error(err))
-	if perr, ok := err.(*jujuparams.Error); ok {
+	if perr, ok := errgo.Cause(err).(*jujuparams.Error); ok {
 		return perr
 	}
 	return &jujuparams.Error{
@@ -138,20 +142,24 @@ type wsHandler struct {
 // handle handles the connection.
 func (h *wsHandler) handle(wsConn *websocket.Conn) {
 	codec := jsoncodec.NewWebsocket(wsConn)
-	conn := rpc.NewConn(codec, observerFactory{})
+	conn := rpc.NewConn(codec, func() rpc.Recorder {
+		return recorder{
+			start: time.Now(),
+		}
+	})
 	hm := newHeartMonitor(h.params.WebsocketRequestTimeout)
 	var root rpc.Root
 	if h.modelUUID == "" {
-		root = newControllerRoot(h.context, h.jem, h.authPool, h.params, hm)
+		root = newControllerRoot(h.jem, h.authPool, h.params, hm)
 	} else {
-		root = newModelRoot(h.context, h.jem, hm, h.modelUUID)
+		root = newModelRoot(h.jem, hm, h.modelUUID)
 	}
 	defer root.Kill()
-	conn.ServeRoot(root, func(err error) error {
+	conn.ServeRoot(root, nil, func(err error) error {
 		return mapError(err)
 	})
 	defer conn.Close()
-	conn.Start()
+	conn.Start(h.context)
 	select {
 	case <-hm.Dead():
 		zapctx.Info(h.context, "ping timeout")
@@ -160,27 +168,19 @@ func (h *wsHandler) handle(wsConn *websocket.Conn) {
 	}
 }
 
-// observerFactory implemnts an rpc.ObserverFactory.
-type observerFactory struct{}
-
-// RPCObserver implements rpc.ObserverFactory.RPCObserver.
-func (observerFactory) RPCObserver() rpc.Observer {
-	return observer{
-		start: time.Now(),
-	}
-}
-
-// observer implements an rpc.Observer.
-type observer struct {
+// recorder implements an rpc.Recorder.
+type recorder struct {
 	start time.Time
 }
 
-// ServerRequest implements rpc.Observer.ServerRequest.
-func (o observer) ServerRequest(*rpc.Header, interface{}) {
+// HandleRequest implements rpc.Recorder.
+func (recorder) HandleRequest(*rpc.Header, interface{}) error {
+	return nil
 }
 
-// ServerReply implements rpc.Observer.ServerReply.
-func (o observer) ServerReply(r rpc.Request, _ *rpc.Header, _ interface{}) {
+// HandleReply implements rpc.Recorder.
+func (o recorder) HandleReply(r rpc.Request, _ *rpc.Header, _ interface{}) error {
 	d := time.Since(o.start)
 	servermon.WebsocketRequestDuration.WithLabelValues(r.Type, r.Action).Observe(float64(d) / float64(time.Second))
+	return nil
 }

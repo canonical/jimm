@@ -13,7 +13,7 @@ import (
 	"github.com/juju/juju/jujuclient"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 type addControllerCommand struct {

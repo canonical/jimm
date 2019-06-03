@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net/http"
@@ -20,17 +21,16 @@ import (
 	_ "github.com/juju/juju/provider/lxd"
 	_ "github.com/juju/juju/provider/maas"
 	_ "github.com/juju/juju/provider/openstack"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/natefinch/lumberjack.v2"
 
-	"github.com/CanonicalLtd/jem"
-	"github.com/CanonicalLtd/jem/config"
-	"github.com/CanonicalLtd/jem/internal/zapctx"
-	"github.com/CanonicalLtd/jem/internal/zaputil"
+	"github.com/CanonicalLtd/jimm"
+	"github.com/CanonicalLtd/jimm/config"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/internal/zaputil"
 )
 
 // websocketRequestTimeout is the amount of time a webseocket connection
@@ -57,27 +57,33 @@ func main() {
 	if *loggingConfig != "" && strings.ToUpper(*loggingConfig) != "INFO" {
 		fmt.Fprintln(os.Stderr, "warning: ignoring --logging-config flag; use logging-level in configuration file instead")
 	}
-	if err := serve(flag.Arg(0)); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+	conf, err := readConfig(flag.Arg(0))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "STOP %s\n", err)
+		os.Exit(2)
+	}
+	fmt.Fprintln(os.Stderr, "START")
+	if err := serve(conf); err != nil {
+		fmt.Fprintf(os.Stderr, "STOP %s\n", err)
 		os.Exit(1)
 	}
 }
 
-func serve(confPath string) error {
-	conf, err := config.Read(confPath)
+func readConfig(path string) (*config.Config, error) {
+	conf, err := config.Read(path)
 	if err != nil {
-		return errgo.Notef(err, "cannot read config file %q", confPath)
-	}
-	if conf.DBName == "" {
-		conf.DBName = "jem"
+		return nil, errgo.Mask(err)
 	}
 	conf.IdentityLocation = strings.TrimSuffix(conf.IdentityLocation, "/")
 	if strings.HasSuffix(conf.IdentityLocation, "v1/discharger") {
 		// It's probably some old code that uses the old IdentityLocation
 		// meaning.
-		return errgo.Notef(err, "identity location must not contain discharge path")
+		return nil, errgo.Newf("identity location must not contain discharge path")
 	}
+	return conf, nil
+}
 
+func serve(conf *config.Config) error {
 	ctx := context.Background()
 	zapctx.LogLevel.SetLevel(conf.LoggingLevel)
 	zaputil.InitLoggo(zapctx.Default, conf.LoggingLevel)
@@ -88,6 +94,9 @@ func serve(confPath string) error {
 		return errgo.Notef(err, "cannot dial mongo at %q", conf.MongoAddr)
 	}
 	defer session.Close()
+	if conf.DBName == "" {
+		conf.DBName = "jem"
+	}
 	db := session.DB(conf.DBName)
 
 	zapctx.Debug(ctx, "setting up the API server")
@@ -107,6 +116,8 @@ func serve(confPath string) error {
 		MaxMgoSessions:          conf.MaxMgoSessions,
 		ControllerAdmin:         conf.ControllerAdmin,
 		IdentityLocation:        conf.IdentityLocation,
+		CharmstoreLocation:      conf.CharmstoreLocation,
+		MeteringLocation:        conf.MeteringLocation,
 		PublicKeyLocator:        locator,
 		AgentUsername:           conf.AgentUsername,
 		AgentKey:                conf.AgentKey,
@@ -117,6 +128,7 @@ func serve(confPath string) error {
 		UsageSenderURL:          conf.UsageSenderURL,
 		UsageSenderCollection:   conf.UsageSenderCollection,
 		Domain:                  conf.Domain,
+		PublicCloudMetadata:     conf.PublicCloudMetadata,
 	}
 	server, err := jem.NewServer(ctx, cfg)
 	if err != nil {

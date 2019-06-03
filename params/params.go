@@ -2,13 +2,17 @@ package params
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"reflect"
+	"strings"
 	"time"
 
 	"github.com/juju/httprequest"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/environschema.v1"
+	"gopkg.in/mgo.v2/bson"
 )
 
 // SetControllerPerm holds the parameters for setting the ACL on a
@@ -26,6 +30,23 @@ type GetControllerPerm struct {
 	EntityPath
 }
 
+type SetControllerDeprecated struct {
+	httprequest.Route `httprequest:"PUT /v2/controller/:User/:Name/deprecated"`
+	EntityPath
+	Body DeprecatedBody `httprequest:",body"`
+}
+
+type GetControllerDeprecated struct {
+	httprequest.Route `httprequest:"GET /v2/controller/:User/:Name/deprecated"`
+	EntityPath
+}
+
+// DeprecatedBody holds the body of a SetControllerDeprecated request
+// or a GetControllerDeprecated response.
+type DeprecatedBody struct {
+	Deprecated bool `json:"deprecated"`
+}
+
 // SetModelPerm holds the parameters for setting the ACL on an model.
 type SetModelPerm struct {
 	httprequest.Route `httprequest:"PUT /v2/model/:User/:Name/perm"`
@@ -37,21 +58,6 @@ type SetModelPerm struct {
 type GetModelPerm struct {
 	httprequest.Route `httprequest:"GET /v2/model/:User/:Name/perm"`
 	EntityPath
-}
-
-// GetControllerLocation holds the parameters for getting the Location
-// field of a controller.
-type GetControllerLocation struct {
-	httprequest.Route `httprequest:"GET /v2/controller/:User/:Name/meta/location"`
-	EntityPath
-}
-
-// ControllerLocation holds details of a controller's location.
-type ControllerLocation struct {
-	// Location holds the location attributes.
-	Location map[string]string
-	// Public holds whether the controller is considered public.
-	Public bool
 }
 
 // ACL holds an access control list for an entity.
@@ -84,37 +90,6 @@ type DeleteController struct {
 	Force bool `httprequest:"force,form"`
 }
 
-type GetAllControllerLocations struct {
-	httprequest.Route `httprequest:"GET /v2/location"`
-
-	// Location constrains the controllers that the
-	// set of returned values will be returned from
-	// to those with matching location attributes.
-	// Note that the values in this should be passed in the
-	// URL query parameters.
-	Location map[string]string
-}
-
-type AllControllerLocationsResponse struct {
-	Locations []map[string]string
-}
-
-type GetControllerLocations struct {
-	httprequest.Route `httprequest:"GET /v2/location/:Attr"`
-	Attr              string `httprequest:",path"`
-
-	// Location constrains the controllers that the
-	// set of returned values will be returned from
-	// to those with matching location attributes.
-	// Note that the values in this should be passed in the
-	// URL query parameters.
-	Location map[string]string
-}
-
-type ControllerLocationsResponse struct {
-	Values []string
-}
-
 // ControllerInfo holds information specifying how
 // to connect to an existing controller.
 type ControllerInfo struct {
@@ -144,6 +119,10 @@ type ControllerInfo struct {
 	//
 	// Only privileged users may create public controllers.
 	Public bool `json:"public"`
+
+	// Deprecated holds whether the controller is considered deprecated
+	// for adding new models.
+	Deprecated bool `json:"deprecated"`
 }
 
 // EntityPath holds the path parameters for specifying
@@ -521,3 +500,238 @@ type SetLogLevel struct {
 type Level struct {
 	Level string `json:"level"`
 }
+
+// ModelNameRequest holds a request to get the model UUID based on the
+// UUID.
+type ModelNameRequest struct {
+	httprequest.Route `httprequest:"GET /v2/model-uuid/:UUID/name"`
+	UUID              string `httprequest:",path"`
+}
+
+// ModelNameResponse holds the model name.
+type ModelNameResponse struct {
+	Name string `json:"name"`
+}
+
+// AuditLogRequest represents the http request for audit logs.
+type AuditLogRequest struct {
+	httprequest.Route `httprequest:"GET /v2/audit"`
+	Start             QueryTime `httprequest:"start,form"`
+	End               QueryTime `httprequest:"end,form"`
+	Limit             int64     `httprequest:"limit,form"`
+	Type              string    `httprequest:"type,form"`
+}
+
+// AuditLogEntry represents a single line in the audit log and contains
+// information on the specific entry as content.
+type AuditLogEntry struct {
+	Content AuditEntry
+}
+
+// AuditEntry represents an entry in the audit log.
+type AuditEntry interface {
+	// Type returns the type information of the concrete type.
+	Type() string
+	// Created returns the creation time of the entry.
+	Created() time.Time
+	// isAuditEntry to specify that this this an audit entry log.
+	isAuditEntry()
+
+	// Common returns the AutryEntryCommon part of that entry.
+	Common() *AuditEntryCommon
+}
+
+// AuditLogEntries represents a list of audit log entry.
+type AuditLogEntries []AuditLogEntry
+
+// AuditEntryCommon holds the type information so SetBSON can work for an AuditEntry and the Created field.
+type AuditEntryCommon struct {
+	// Originator holds the user who initiates the request.
+	Originator string `bson:"originator" json:"id"`
+
+	// Type is used for GetBSON and SetBSON to store the concrete type.
+	Type_ string `bson:"type" json:"type"`
+
+	// Created represents the ceation time of the entry.
+	Created_ time.Time `bson:"created" json:"created"`
+}
+
+func (a *AuditEntryCommon) Common() *AuditEntryCommon {
+	return a
+}
+
+// AuditModelCreated represents an audit log when a model is created.
+type AuditModelCreated struct {
+	// ID holds the id for a model.
+	ID string `bson:"modelid" json:"id"`
+	// UUID holds the UUID of the model.
+	UUID string `bson:"uuid" json:"uuid"`
+	// ControllerPath holds the controller path normalized as string.
+	ControllerPath string `bson:"controller-path" json:"controller_path"`
+	// Owner holds the name of the user who owns the model.
+	Owner string `bson:"owner" json:"owner"`
+	// Creator holds the name of the user that issued the model creation request.
+	Creator string `bson:"creator" json:"creator"`
+	// Cloud holds the name of the cloud of the model.
+	Cloud string `bson:"cloud" json:"cloud"`
+	// Region holds the name of the cloud region of the model.
+	Region string `bson:"region" json:"region"`
+	// holds the common part for any entry.
+	AuditEntryCommon `bson:",inline"`
+}
+
+// isAuditEntry implements AuditEntry.isAuditEntry.
+func (AuditModelCreated) isAuditEntry() {}
+
+// AuditModelDestroyed represents an audit log when a model is destroyed.
+type AuditModelDestroyed struct {
+	// ID holds the id for a model.
+	ID string `bson:"modelid" json:"id"`
+	// UUID holds the UUID of the model.
+	UUID string `bson:"uuid" json:"uuid"`
+	// holds the common part for any entry.
+	AuditEntryCommon `bson:",inline"`
+}
+
+// isAuditEntry implements AuditEntry.isAuditEntry.
+func (AuditModelDestroyed) isAuditEntry() {}
+
+// AuditCloudCreated represents an audit log when a cloud is created.
+type AuditCloudCreated struct {
+	// ID holds the id for a cloud.
+	ID string `bson:"modelid" json:"id"`
+	// Cloud holds the name of the cloud.
+	Cloud string `bson:"cloud" json:"cloud"`
+	// Region holds the name of the cloud region.
+	Region string `bson:"region" json:"region"`
+	// holds the common part for any entry.
+	AuditEntryCommon `bson:",inline"`
+}
+
+// isAuditEntry implements AuditEntry.isAuditEntry.
+func (AuditCloudCreated) isAuditEntry() {}
+
+// AuditCloudRemoved represents an audit log when a cloud is removed.
+type AuditCloudRemoved struct {
+	// ID holds the id for a cloud.
+	ID string `bson:"modelid" json:"id"`
+	// Cloud holds the name of the cloud.
+	Cloud string `bson:"cloud" json:"cloud"`
+	// Region holds the name of the cloud region.
+	Region string `bson:"region" json:"region"`
+	// holds the common part for any entry.
+	AuditEntryCommon `bson:",inline"`
+}
+
+// isAuditEntry implements AuditEntry.isAuditEntry.
+func (AuditCloudRemoved) isAuditEntry() {}
+
+// Type implements AuditEntry.Type.
+func (e AuditEntryCommon) Type() string {
+	return e.Type_
+}
+
+// Created implements AuditEntry.Created.
+func (e AuditEntryCommon) Created() time.Time {
+	return e.Created_
+}
+
+// auditLogTypes holds a list of the possible audit logs type.
+var auditLogTypes = []AuditEntry{
+	&AuditCloudCreated{},
+	&AuditCloudRemoved{},
+	&AuditModelCreated{},
+	&AuditModelDestroyed{},
+}
+
+var validAuditLogTypes = func() map[string]AuditEntry {
+	m := make(map[string]AuditEntry)
+	for _, v := range auditLogTypes {
+		m[AuditLogType(v)] = v
+	}
+	return m
+}()
+
+// AuditLogType gives the type name of an audit log.
+func AuditLogType(v interface{}) string {
+	t := reflect.TypeOf(v).Elem()
+	return strings.TrimPrefix(t.Name(), "Audit")
+}
+
+// SetBSON implements the bson.Setter interface.
+func (e *AuditLogEntry) SetBSON(raw bson.Raw) error {
+	var t struct {
+		Type string `bson:"type"`
+	}
+	if err := raw.Unmarshal(&t); err != nil {
+		return errgo.Mask(err)
+	}
+	v, ok := validAuditLogTypes[t.Type]
+	if !ok {
+		return errgo.Notef(nil, "cannot unmarshal unknown type %q", t.Type)
+	}
+	content := reflect.New(reflect.TypeOf(v).Elem())
+	if err := raw.Unmarshal(content.Interface()); err != nil {
+		return errgo.Mask(err)
+	}
+	e.Content = content.Interface().(AuditEntry)
+	return nil
+}
+
+// GetBSON implements the bson.Getter interface.
+func (e *AuditLogEntry) GetBSON() (interface{}, error) {
+	return e.Content, nil
+}
+
+func (e *AuditLogEntry) MarshalJSON() ([]byte, error) {
+	out, err := json.Marshal(e.Content)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return out, err
+}
+
+func (e *AuditLogEntry) UnmarshalJSON(b []byte) error {
+	var t struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(b, &t); err != nil {
+		return errgo.Mask(err)
+	}
+	v, ok := validAuditLogTypes[t.Type]
+	if !ok {
+		return errgo.Notef(nil, "cannot unmarshal unknown type %q", t.Type)
+	}
+	content := reflect.New(reflect.TypeOf(v).Elem())
+	if err := json.Unmarshal(b, content.Interface()); err != nil {
+		return errgo.Mask(err)
+	}
+	e.Content = content.Interface().(AuditEntry)
+	return nil
+}
+
+// ModelStatusRequest represents the http request for model statuses.
+type ModelStatusesRequest struct {
+	httprequest.Route `httprequest:"GET /v2/modelstatus"`
+}
+
+// ModelStatus represent the status of a model with its description.
+type ModelStatus struct {
+	// ID holds the id for a model.
+	ID string `json:"id"`
+	// UUID holds the UUID of the model.
+	UUID string `json:"uuid"`
+	// Cloud holds the name of the cloud of the model.
+	Cloud string `json:"cloud"`
+	// Region holds the name of the cloud region of the model.
+	Region string `json:"region"`
+	// Created represents the creation time of the model.
+	Created time.Time `json:"created"`
+	// Status holds the status of the model.
+	Status string `json:"status"`
+	// Controller holds the controller name of the model.
+	Controller string `json:"controller"`
+}
+
+// ModelStatuses holds the list of model statuses.
+type ModelStatuses []ModelStatus

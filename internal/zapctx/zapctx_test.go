@@ -2,15 +2,15 @@ package zapctx_test
 
 import (
 	"bytes"
+	"context"
 	"io"
 
 	"github.com/juju/testing"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jem/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
 )
 
 type zapctxSuite struct {

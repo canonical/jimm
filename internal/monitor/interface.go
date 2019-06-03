@@ -3,14 +3,16 @@
 package monitor
 
 import (
+	"context"
 	"time"
 
+	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/version"
-	"golang.org/x/net/context"
+	names "gopkg.in/juju/names.v2"
 
-	"github.com/CanonicalLtd/jem/internal/mongodoc"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 // jemInterface holds the interface required by allMonitor to
@@ -47,19 +49,37 @@ type jemInterface interface {
 	// SetModelLife sets the Life field of all models controlled
 	// by the given controller that have the given UUID.
 	// It does not return an error if there are no such models.
-	SetModelLife(ctx context.Context, ctlPath params.EntityPath, uuid string, life string) error
+	SetModelInfo(ctx context.Context, ctlPath params.EntityPath, uuid string, info *mongodoc.ModelInfo) error
+
+	// DeleteModelWithUUID deletes any model from the database that has the
+	// given controller and UUID. No error is returned if no such model
+	// exists.
+	DeleteModelWithUUID(ctx context.Context, ctlPath params.EntityPath, uuid string) error
 
 	// UpdateModelCounts updates the count statistics associated with the
 	// model with the given UUID recording them at the given current time.
 	// Each counts map entry holds the current count for its key. Counts not
 	// mentioned in the counts argument will not be affected.
-	UpdateModelCounts(ctx context.Context, uuid string, counts map[params.EntityCount]int, now time.Time) error
+	UpdateModelCounts(ctx context.Context, ctlPath params.EntityPath, uuid string, counts map[params.EntityCount]int, now time.Time) error
+
+	// RemoveControllerMachines removes all machines for a controller.
+	RemoveControllerMachines(ctx context.Context, ctlPath params.EntityPath) error
+
+	// RemoveControllerApplications removes all applications for a controller.
+	RemoveControllerApplications(ctx context.Context, ctlPath params.EntityPath) error
 
 	// UpdateMachineInfo updates the information associated with a machine.
-	UpdateMachineInfo(ctx context.Context, machine *multiwatcher.MachineInfo) error
+	UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, machine *multiwatcher.MachineInfo) error
+
+	// UpdateApplicationInfo updates the information associated with an application.
+	UpdateApplicationInfo(ctx context.Context, ctlPath params.EntityPath, machine *multiwatcher.ApplicationInfo) error
 
 	// AllControllers returns all the controllers in the system.
 	AllControllers(ctx context.Context) ([]*mongodoc.Controller, error)
+
+	// ModelUUIDsForController returns the model UUIDs of all the models in the given
+	// controller.
+	ModelUUIDsForController(ctx context.Context, ctlPath params.EntityPath) ([]string, error)
 
 	// OpenAPI opens an API connection to the model with the given path
 	// and returns it along with the information used to connect.
@@ -89,6 +109,12 @@ type jemInterface interface {
 	// ControllerUpdateCredentials updates the given controller by updating
 	// all credentials listed in ctl.UpdateCredentials.
 	ControllerUpdateCredentials(ctx context.Context, ctlPath params.EntityPath) error
+
+	// Controller retrieve the controller based on the controller path.
+	Controller(ctx context.Context, ctlPath params.EntityPath) (*mongodoc.Controller, error)
+
+	// UpdateCloudRegions updates the cloud/region.
+	UpdateCloudRegions(ctx context.Context, cloudRegions []mongodoc.CloudRegion) error
 }
 
 // jujuAPI represents an API connection to a Juju controller.
@@ -103,8 +129,15 @@ type jujuAPI interface {
 	// Close closes the API connection.
 	Close() error
 
+	// ModelExists reports whether the model with the given UUID
+	// exists on the controller.
+	ModelExists(uuid string) (bool, error)
+
 	// ServerVersion holds the version of the API server that we are connected to.
 	ServerVersion() (version.Number, bool)
+
+	// Clouds gets the clouds supported by the controller.
+	Clouds() (map[names.CloudTag]cloud.Cloud, error)
 }
 
 // allWatcher represents a watcher of all events on a controller.

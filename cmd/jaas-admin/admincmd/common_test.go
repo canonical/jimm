@@ -4,29 +4,25 @@ package admincmd_test
 
 import (
 	"bytes"
+	"context"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/juju/aclstore/aclclient"
 	"github.com/juju/cmd"
-	"github.com/juju/errors"
 	"github.com/juju/idmclient/idmtest"
-	"github.com/juju/juju/api"
-	"github.com/juju/juju/juju"
-	"github.com/juju/juju/jujuclient"
 	"github.com/juju/loggo"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/mgo.v2"
 
-	"github.com/CanonicalLtd/jem"
-	"github.com/CanonicalLtd/jem/cmd/jaas-admin/admincmd"
-	"github.com/CanonicalLtd/jem/internal/jemtest"
-	"github.com/CanonicalLtd/jem/jemclient"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm"
+	"github.com/CanonicalLtd/jimm/cmd/jaas-admin/admincmd"
+	"github.com/CanonicalLtd/jimm/internal/bakeryadaptor"
+	"github.com/CanonicalLtd/jimm/internal/jemtest"
+	"github.com/CanonicalLtd/jimm/jemclient"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 // run runs a jem plugin subcommand with the given arguments,
@@ -85,6 +81,14 @@ func (s *commonSuite) jemClient(username string) *jemclient.Client {
 	})
 }
 
+// aclClient returns a new aclclient.Client that will act as the given user.
+func (s *commonSuite) aclClient(username string) *aclclient.Client {
+	return aclclient.New(aclclient.NewParams{
+		BaseURL: s.httpSrv.URL + "/admin/acls",
+		Doer:    bakeryadaptor.Doer{s.idmSrv.Client(username)},
+	})
+}
+
 func (s *commonSuite) TearDownTest(c *gc.C) {
 	s.idmSrv.Close()
 	s.jemSrv.Close()
@@ -103,7 +107,7 @@ func (s *commonSuite) newServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.S
 		PublicKeyLocator: idmSrv,
 	}
 	srv, err := jem.NewServer(context.TODO(), config)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	return srv
 }
 
@@ -114,12 +118,12 @@ var dummyEnvConfig = map[string]interface{}{
 	"controller":      true,
 }
 
-func (s *commonSuite) addEnv(c *gc.C, pathStr, srvPathStr, credName string) {
+func (s *commonSuite) addModel(c *gc.C, pathStr, srvPathStr, credName string) {
 	var path, srvPath params.EntityPath
 	err := path.UnmarshalText([]byte(pathStr))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = srvPath.UnmarshalText([]byte(srvPathStr))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	credPath := params.CredentialPath{
 		Cloud:      "dummy",
@@ -131,7 +135,7 @@ func (s *commonSuite) addEnv(c *gc.C, pathStr, srvPathStr, credName string) {
 			AuthType: "empty",
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	_, err = s.jemClient(string(path.User)).NewModel(&params.NewModel{
 		User: path.User,
@@ -142,45 +146,10 @@ func (s *commonSuite) addEnv(c *gc.C, pathStr, srvPathStr, credName string) {
 			Config:     dummyEnvConfig,
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *commonSuite) clearCookies(c *gc.C) {
 	err := os.Remove(s.cookieFile)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
-
-func newAPIConnectionParams(
-	store jujuclient.ClientStore,
-	controllerName,
-	modelName string,
-	bakery *httpbakery.Client,
-) (juju.NewAPIConnectionParams, error) {
-	if controllerName == "" {
-		return juju.NewAPIConnectionParams{}, errgo.New("no controller name")
-	}
-	accountDetails, err := store.AccountDetails(controllerName)
-	if err != nil {
-		return juju.NewAPIConnectionParams{}, errors.Mask(err)
-	}
-	var modelUUID string
-	if modelName != "" {
-		modelDetails, err := store.ModelByName(controllerName, modelName)
-		if err != nil {
-			return juju.NewAPIConnectionParams{}, errors.Trace(err)
-		}
-		modelUUID = modelDetails.ModelUUID
-	}
-	dialOpts := api.DefaultDialOpts()
-	dialOpts.BakeryClient = bakery
-	return juju.NewAPIConnectionParams{
-		Store:          store,
-		ControllerName: controllerName,
-		AccountDetails: accountDetails,
-		ModelUUID:      modelUUID,
-		DialOpts:       dialOpts,
-		OpenAPI:        api.Open,
-	}, nil
-}
-
-const fakeSSHKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCcEHVJtQyjN0eaNMAQIwhwknKj+8uZCqmzeA6EfnUEsrOHisoKjRVzb3bIRVgbK3SJ2/1yHPpL2WYynt3LtToKgp0Xo7LCsspL2cmUIWNYCbcgNOsT5rFeDsIDr9yQito8A3y31Mf7Ka7Rc0EHtCW4zC5yl/WZjgmMmw930+V1rDa5GjkqivftHE5AvLyRGvZJPOLH8IoO+sl02NjZ7dRhniBO9O5UIwxSkuGA5wvfLV7dyT/LH56gex7C2fkeBkZ7YGqTdssTX6DvFTHjEbBAsdWd8/rqXWtB6Xdi8sb3+aMpg9DRomZfb69Y+JuqWTUaq+q30qG2CTiqFRbgwRpp bob@somewhere"

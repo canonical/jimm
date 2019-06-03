@@ -11,7 +11,7 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
 
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 type modelSuite struct {
@@ -41,7 +41,7 @@ func (s *modelSuite) TestLoginToModel(c *gc.C) {
 	}, "test")
 	defer conn.Close()
 	nhps, err := network.ParseHostPorts(s.APIInfo(c).Addrs...)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	// Change all unknown scopes to public.
 	for i := range nhps {
 		nhp := &nhps[i]
@@ -51,8 +51,9 @@ func (s *modelSuite) TestLoginToModel(c *gc.C) {
 	}
 	err = conn.Login(nil, "", "", nil)
 	c.Assert(errgo.Cause(err), jc.DeepEquals, &api.RedirectError{
-		Servers: [][]network.HostPort{nhps},
-		CACert:  s.APIInfo(c).CACert,
+		Servers:        [][]network.HostPort{nhps},
+		CACert:         s.APIInfo(c).CACert,
+		FollowRedirect: true,
 	})
 }
 

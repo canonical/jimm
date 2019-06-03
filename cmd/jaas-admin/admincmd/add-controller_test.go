@@ -9,7 +9,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 type addControllerSuite struct {
@@ -59,7 +59,7 @@ func (s *addControllerSuite) TestAddController(c *gc.C) {
 				Name: params.Name(fmt.Sprintf("foo-%v", i)),
 			},
 		})
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(ctl.Location, gc.DeepEquals, test.expectLocation)
 		c.Assert(ctl.Public, gc.DeepEquals, test.expectPublic)
 		if test.expectPublic {
@@ -69,7 +69,7 @@ func (s *addControllerSuite) TestAddController(c *gc.C) {
 					Name: params.Name(fmt.Sprintf("foo-%v", i)),
 				},
 			})
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			c.Assert(perm, jc.DeepEquals, params.ACL{
 				Read: []string{"everyone"},
 			})

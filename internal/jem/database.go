@@ -3,25 +3,23 @@
 package jem
 
 import (
+	"context"
 	"fmt"
-	"sync/atomic"
 	"time"
 
-	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/version"
 	"go.uber.org/zap"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/CanonicalLtd/jem/internal/auth"
-	"github.com/CanonicalLtd/jem/internal/mgosession"
-	"github.com/CanonicalLtd/jem/internal/mongodoc"
-	"github.com/CanonicalLtd/jem/internal/servermon"
-	"github.com/CanonicalLtd/jem/internal/zapctx"
-	"github.com/CanonicalLtd/jem/internal/zaputil"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/mgosession"
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/internal/servermon"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/internal/zaputil"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 // Database wraps an mgo.DB ands adds a number of methods for
@@ -83,8 +81,14 @@ func (db *Database) ensureIndexes() error {
 		db.Machines(),
 		mgo.Index{Key: []string{"info.uuid"}},
 	}, {
+		db.Applications(),
+		mgo.Index{Key: []string{"info.uuid"}},
+	}, {
 		db.Models(),
 		mgo.Index{Key: []string{"uuid"}, Unique: true},
+	}, {
+		db.Models(),
+		mgo.Index{Key: []string{"credential"}},
 	}, {
 		db.Credentials(),
 		mgo.Index{Key: []string{"path.entitypath.user", "path.cloud"}},
@@ -108,11 +112,27 @@ func (db *Database) AddController(ctx context.Context, ctl *mongodoc.Controller)
 	err = db.Controllers().Insert(ctl)
 	if err != nil {
 		if mgo.IsDup(err) {
-			return params.ErrAlreadyExists
+			return errgo.WithCausef(nil, params.ErrAlreadyExists, "")
 		}
 		return errgo.NoteMask(err, "cannot insert controller")
 	}
 	return nil
+}
+
+// ModelsWithCredential returns a list of the paths of all models that use the given credential.
+func (db *Database) ModelsWithCredential(ctx context.Context, credPath params.CredentialPath) (_ []params.EntityPath, err error) {
+	defer db.checkError(ctx, &err)
+
+	iter := db.Models().Find(bson.D{{"credential", credPath}}).Iter()
+	var paths []params.EntityPath
+	var doc mongodoc.Model
+	for iter.Next(&doc) {
+		paths = append(paths, doc.Path)
+	}
+	if iter.Err() != nil {
+		return nil, errgo.Mask(err)
+	}
+	return paths, nil
 }
 
 // DeleteController deletes existing controller and all of its
@@ -146,6 +166,21 @@ func (db *Database) DeleteController(ctx context.Context, path params.EntityPath
 		zap.Int("model-count", info.Removed),
 	)
 	return nil
+}
+
+// ModelUUIDsForController returns the model UUIDs of all the models in the given
+// controller.
+func (db *Database) ModelUUIDsForController(ctx context.Context, ctlPath params.EntityPath) (uuids []string, err error) {
+	defer db.checkError(ctx, &err)
+	iter := db.Models().Find(bson.D{{"controller", ctlPath}}).Select(bson.D{{"uuid", 1}}).Iter()
+	var m mongodoc.Model
+	for iter.Next(&m) {
+		uuids = append(uuids, m.UUID)
+	}
+	if err := iter.Err(); err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return uuids, nil
 }
 
 // AddModel adds a new model to the database.
@@ -194,7 +229,24 @@ func (db *Database) UpdateLegacyModel(ctx context.Context, model *mongodoc.Model
 func (db *Database) SetModelController(ctx context.Context, model params.EntityPath, newController params.EntityPath) (err error) {
 	defer db.checkError(ctx, &err)
 	err = db.Models().UpdateId(model.String(), bson.D{{
-		"controller", newController,
+		"$set", bson.D{{
+			"controller", newController,
+		}},
+	}})
+	if errgo.Cause(err) == mgo.ErrNotFound {
+		return errgo.WithCausef(err, params.ErrNotFound, "cannot update %s", model)
+	}
+	return errgo.Mask(err)
+}
+
+// SetModelCredential updates the given model so that it uses the given
+// credential.
+func (db *Database) SetModelCredential(ctx context.Context, model params.EntityPath, cred params.CredentialPath) (err error) {
+	defer db.checkError(ctx, &err)
+	err = db.Models().UpdateId(model.String(), bson.D{{
+		"$set", bson.D{{
+			"credential", cred,
+		}},
 	}})
 	if errgo.Cause(err) == mgo.ErrNotFound {
 		return errgo.WithCausef(err, params.ErrNotFound, "cannot update %s", model)
@@ -219,8 +271,39 @@ func (db *Database) DeleteModel(ctx context.Context, path params.EntityPath) (er
 	if err != nil {
 		return errgo.Notef(err, "could not delete model")
 	}
-	zapctx.Info(ctx, "deleted model", zap.Stringer("model", path))
+	zapctx.Debug(ctx, "deleted model", zap.Stringer("model", path))
 	return nil
+}
+
+// DeleteModelWithUUID deletes any model from the database that has the
+// given controller and UUID. No error is returned if no such model
+// exists.
+func (db *Database) DeleteModelWithUUID(ctx context.Context, ctlPath params.EntityPath, uuid string) (err error) {
+	defer db.checkError(ctx, &err)
+	if _, err := db.Models().RemoveAll(bson.D{{"uuid", uuid}, {"controller", ctlPath}}); err != nil {
+		return errgo.Notef(err, "cannot remove model")
+	}
+	return nil
+}
+
+// SetControllerDeprecated sets whether the given controller is deprecated.
+func (db *Database) SetControllerDeprecated(ctx context.Context, ctlPath params.EntityPath, deprecated bool) (err error) {
+	defer db.checkError(ctx, &err)
+	if deprecated {
+		err = db.Controllers().UpdateId(ctlPath.String(), bson.D{{
+			"$set", bson.D{{"deprecated", true}},
+		}})
+	} else {
+		// A controller that's not deprecated is stored with no deprecated
+		// field for backward compatibility and consistency.
+		err = db.Controllers().UpdateId(ctlPath.String(), bson.D{{
+			"$unset", bson.D{{"deprecated", nil}},
+		}})
+	}
+	if errgo.Cause(err) == mgo.ErrNotFound {
+		return errgo.WithCausef(err, params.ErrNotFound, "cannot update %s", ctlPath)
+	}
+	return errgo.Mask(err)
 }
 
 // Controller returns information on the controller with the given
@@ -259,7 +342,7 @@ func (db *Database) Model(ctx context.Context, path params.EntityPath) (_ *mongo
 
 // ModelFromUUID returns the document representing the model with the
 // given UUID. It returns an error with a params.ErrNotFound cause if the
-// controller was not found.
+// model was not found.
 func (db *Database) ModelFromUUID(ctx context.Context, uuid string) (_ *mongodoc.Model, err error) {
 	defer db.checkError(ctx, &err)
 	var m mongodoc.Model
@@ -273,23 +356,20 @@ func (db *Database) ModelFromUUID(ctx context.Context, uuid string) (_ *mongodoc
 	return &m, nil
 }
 
-// controllerLocationQuery returns a mongo query that iterates through
-// all the public controllers matching the given location attributes,
-// including unavailable controllers only if includeUnavailable is true.
-// It returns an error if the location attribute keys aren't valid.
-func (db *Database) controllerLocationQuery(cloud params.Cloud, region string, includeUnavailable bool) *mgo.Query {
-	q := make(bson.D, 0, 4)
-	if cloud != "" {
-		q = append(q, bson.DocElem{"location.cloud", cloud})
+// modelFromControllerAndUUID returns the document representing the model
+// with the given UUID on the given controller. It returns an error with
+// a params.ErrNotFound cause if the model was not found.
+func (db *Database) modelFromControllerAndUUID(ctx context.Context, ctlPath params.EntityPath, uuid string) (_ *mongodoc.Model, err error) {
+	defer db.checkError(ctx, &err)
+	var m mongodoc.Model
+	err = db.Models().Find(bson.D{{"controller", ctlPath}, {"uuid", uuid}}).One(&m)
+	if err == mgo.ErrNotFound {
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "model %q not found", uuid)
 	}
-	if region != "" {
-		q = append(q, bson.DocElem{"cloud.regions", bson.D{{"$elemMatch", bson.D{{"name", region}}}}})
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot get model %q", uuid)
 	}
-	q = append(q, bson.DocElem{"public", true})
-	if !includeUnavailable {
-		q = append(q, bson.DocElem{"unavailablesince", notExistsQuery})
-	}
-	return db.Controllers().Find(q)
+	return &m, nil
 }
 
 // SetControllerVersion sets the agent version of the given controller.
@@ -439,26 +519,32 @@ func (db *Database) SetControllerStats(ctx context.Context, ctlPath params.Entit
 	return errgo.Mask(err)
 }
 
-// SetModelLife sets the Life field of all models controlled by the given
-// controller that have the given UUID. It does not return an error if
-// there are no such models. If life is "dead" then the model will also
-// be removed from the database.
-// TODO remove the ctlPath argument.
+// SetModelLife sets the Info.Life field of all models controlled by the
+// given controller that have the given UUID. It does not return an error
+// if there are no such models.
 func (db *Database) SetModelLife(ctx context.Context, ctlPath params.EntityPath, uuid string, life string) (err error) {
 	defer db.checkError(ctx, &err)
 	_, err = db.Models().UpdateAll(
 		bson.D{{"uuid", uuid}, {"controller", ctlPath}},
-		bson.D{{"$set", bson.D{{"life", life}}}},
+		bson.D{{"$set", bson.D{{"info.life", life}}}},
 	)
 	if err != nil {
 		return errgo.Notef(err, "cannot update model")
 	}
-	if life != "dead" {
-		return nil
-	}
-	_, err = db.Models().RemoveAll(bson.D{{"uuid", uuid}, {"controller", ctlPath}})
+	return nil
+}
+
+// SetModelInfo sets the Info field of all models controlled by the given
+// controller that have the given UUID. It does not return an error if
+// there are no such models.
+func (db *Database) SetModelInfo(ctx context.Context, ctlPath params.EntityPath, uuid string, info *mongodoc.ModelInfo) (err error) {
+	defer db.checkError(ctx, &err)
+	_, err = db.Models().UpdateAll(
+		bson.D{{"uuid", uuid}, {"controller", ctlPath}},
+		bson.D{{"$set", bson.D{{"info", info}}}},
+	)
 	if err != nil {
-		return errgo.Notef(err, "cannot remove model")
+		return errgo.Notef(err, "cannot update model")
 	}
 	return nil
 }
@@ -467,11 +553,14 @@ func (db *Database) SetModelLife(ctx context.Context, ctlPath params.EntityPath,
 // model with the given UUID recording them at the given current time.
 // Each counts map entry holds the current count for its key. Counts not
 // mentioned in the counts argument will not be affected.
-func (db *Database) UpdateModelCounts(ctx context.Context, uuid string, counts map[params.EntityCount]int, now time.Time) error {
+func (db *Database) UpdateModelCounts(ctx context.Context, ctlPath params.EntityPath, uuid string, counts map[params.EntityCount]int, now time.Time) error {
 	if err := db.updateCounts(
 		ctx,
 		db.Models(),
-		bson.D{{"uuid", uuid}},
+		bson.D{
+			{"controller", ctlPath},
+			{"uuid", uuid},
+		},
 		counts,
 		now,
 	); err != nil {
@@ -480,12 +569,76 @@ func (db *Database) UpdateModelCounts(ctx context.Context, uuid string, counts m
 	return nil
 }
 
-// UpdateMachineInfo updates the information associated with a machine.
-func (db *Database) UpdateMachineInfo(ctx context.Context, info *multiwatcher.MachineInfo) (err error) {
+// GetModelStatuses retrieves the model status from all models.
+func (db *Database) GetModelStatuses(ctx context.Context) (statuses params.ModelStatuses, err error) {
 	defer db.checkError(ctx, &err)
-	id := info.ModelUUID + " " + info.Id
-	if _, err := db.Machines().UpsertId(id, bson.D{{"$set", bson.D{{"info", info}}}}); err != nil {
-		return errgo.Notef(err, "cannot update machine %v in model %v", info.Id, info.ModelUUID)
+	query := make(bson.D, 0)
+	var models []mongodoc.Model
+	if err = db.Models().Find(query).Sort("-CreationTime").All(&models); err != nil {
+		return nil, errgo.Mask(err)
+	}
+	statuses = make([]params.ModelStatus, 0)
+	for _, model := range models {
+		status := params.ModelStatus{
+			ID:         model.Id,
+			UUID:       model.UUID,
+			Cloud:      string(model.Cloud),
+			Region:     model.CloudRegion,
+			Created:    model.CreationTime,
+			Controller: model.Controller.String(),
+			Status:     "unknown",
+		}
+		if model.Info != nil {
+			status.Status = model.Info.Status.Status
+		}
+		statuses = append(statuses, status)
+	}
+	return statuses, nil
+}
+
+// RemoveControllerMachines removes all of the machine information for
+// the given controller.
+func (db *Database) RemoveControllerMachines(ctx context.Context, ctlPath params.EntityPath) (err error) {
+	defer db.checkError(ctx, &err)
+	if _, err := db.Machines().RemoveAll(bson.D{{"controller", ctlPath.String()}}); err != nil {
+		return errgo.Notef(err, "cannot remove machines for controller %v", ctlPath)
+	}
+	return nil
+}
+
+// RemoveControllerApplications removes all of the application information for
+// the given controller.
+func (db *Database) RemoveControllerApplications(ctx context.Context, ctlPath params.EntityPath) (err error) {
+	defer db.checkError(ctx, &err)
+	if _, err := db.Applications().RemoveAll(bson.D{{"controller", ctlPath.String()}}); err != nil {
+		return errgo.Notef(err, "cannot remove applications for controller %v", ctlPath)
+	}
+	return nil
+}
+
+// UpdateMachineInfo updates the information associated with a machine.
+func (db *Database) UpdateMachineInfo(ctx context.Context, m *mongodoc.Machine) (err error) {
+	defer db.checkError(ctx, &err)
+	m.Id = m.Controller + " " + m.Info.ModelUUID + " " + m.Info.Id
+	if m.Info.Life == "dead" {
+		if err := db.Machines().RemoveId(m.Id); err != nil {
+			if errgo.Cause(err) == mgo.ErrNotFound {
+				return nil
+			}
+			return errgo.Notef(err, "cannot remove machine %v in model %v", m.Info.Id, m.Info.ModelUUID)
+		}
+	} else {
+		update := bson.D{{
+			"$set", bson.D{
+				{"info", m.Info},
+				{"controller", m.Controller},
+				{"cloud", m.Cloud},
+				{"region", m.Region},
+			},
+		}}
+		if _, err := db.Machines().UpsertId(m.Id, update); err != nil {
+			return errgo.Notef(err, "cannot update machine %v in model %v", m.Info.Id, m.Info.ModelUUID)
+		}
 	}
 	return nil
 }
@@ -495,6 +648,44 @@ func (db *Database) UpdateMachineInfo(ctx context.Context, info *multiwatcher.Ma
 func (db *Database) MachinesForModel(ctx context.Context, modelUUID string) (docs []mongodoc.Machine, err error) {
 	defer db.checkError(ctx, &err)
 	err = db.Machines().Find(bson.D{{"info.modeluuid", modelUUID}}).Sort("_id").All(&docs)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return docs, nil
+}
+
+// UpdateApplicationInfo updates the information associated with an application.
+func (db *Database) UpdateApplicationInfo(ctx context.Context, app *mongodoc.Application) (err error) {
+	defer db.checkError(ctx, &err)
+	app.Id = app.Controller + " " + app.Info.ModelUUID + " " + app.Info.Name
+	if app.Info.Life == "dead" {
+		if err := db.Applications().RemoveId(app.Id); err != nil {
+			if errgo.Cause(err) == mgo.ErrNotFound {
+				return nil
+			}
+			return errgo.Notef(err, "cannot remove application %v in model %v", app.Info.Name, app.Info.ModelUUID)
+		}
+	} else {
+		update := bson.D{{
+			"$set", bson.D{
+				{"info", app.Info},
+				{"controller", app.Controller},
+				{"cloud", app.Cloud},
+				{"region", app.Region},
+			},
+		}}
+		if _, err := db.Applications().UpsertId(app.Id, update); err != nil {
+			return errgo.Notef(err, "cannot update application %v in model %v", app.Info.Name, app.Info.ModelUUID)
+		}
+	}
+	return nil
+}
+
+// ApplicationsForModel returns information on all the applications in the model with
+// the given UUID.
+func (db *Database) ApplicationsForModel(ctx context.Context, modelUUID string) (docs []mongodoc.Application, err error) {
+	defer db.checkError(ctx, &err)
+	err = db.Applications().Find(bson.D{{"info.modeluuid", modelUUID}}).Sort("_id").All(&docs)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -624,22 +815,176 @@ func (db *Database) credentialRemoveController(ctx context.Context, credential p
 	return nil
 }
 
-// Cloud gets the details of the given cloud.
-//
-// Note that there may be many controllers with the given cloud name. We
-// return an arbitrary choice, assuming that cloud definitions are the
-// same across all possible controllers.
-func (db *Database) Cloud(ctx context.Context, cloud params.Cloud) (_ *mongodoc.Cloud, err error) {
+// ProviderType gets the provider type of the given cloud.
+func (db *Database) ProviderType(ctx context.Context, cloud params.Cloud) (_ string, err error) {
 	defer db.checkError(ctx, &err)
-	var ctl mongodoc.Controller
-	err = db.Controllers().Find(bson.D{{"cloud.name", cloud}}).One(&ctl)
+	var cloudRegion mongodoc.CloudRegion
+	err = db.CloudRegions().Find(bson.D{{"cloud", cloud}, {"region", ""}}).One(&cloudRegion)
 	if err == mgo.ErrNotFound {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "cloud %q not found", cloud)
+		return "", errgo.WithCausef(nil, params.ErrNotFound, "cloud %q not found", cloud)
 	}
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot get cloud %q", cloud)
+		return "", errgo.Notef(err, "cannot get cloud %q", cloud)
 	}
-	return &ctl.Cloud, nil
+
+	return cloudRegion.ProviderType, nil
+}
+
+// GetCloudRegions returns all of the cloudregion.
+func (db *Database) GetCloudRegions(ctx context.Context) (_ []mongodoc.CloudRegion, err error) {
+	defer db.checkError(ctx, &err)
+	var results []mongodoc.CloudRegion
+	err = db.CloudRegions().Find(nil).All(&results)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return results, nil
+}
+
+// GetCloudRegionsIter returns a CanReadIter for all of the cloudregion.
+func (db *Database) GetCloudRegionsIter(ctx context.Context) *CanReadIter {
+	return db.NewCanReadIter(ctx, db.CloudRegions().Find(nil).Iter())
+}
+
+// UpdateCloudRegions adds new cloud regions to the database.
+func (db *Database) UpdateCloudRegions(ctx context.Context, cloudRegions []mongodoc.CloudRegion) (err error) {
+	defer db.checkError(ctx, &err)
+	for _, cr := range cloudRegions {
+		cr.Id = fmt.Sprintf("%s/%s", cr.Cloud, cr.Region)
+		update := make(bson.D, 1, 3)
+		update[0] = bson.DocElem{
+			"$setOnInsert", bson.D{
+				{"cloud", cr.Cloud},
+				{"region", cr.Region},
+				{"providertype", cr.ProviderType},
+				{"authtypes", cr.AuthTypes},
+				{"endpoint", cr.Endpoint},
+				{"identityendpoint", cr.IdentityEndpoint},
+				{"storageendpoint", cr.StorageEndpoint},
+				{"cacertificates", cr.CACertificates},
+				{"acl", cr.ACL},
+			}}
+		if len(cr.PrimaryControllers) > 0 {
+			update = append(update, bson.DocElem{"$addToSet", bson.D{{"primarycontrollers", bson.D{{"$each", cr.PrimaryControllers}}}}})
+		}
+		if len(cr.SecondaryControllers) > 0 {
+			update = append(update, bson.DocElem{"$addToSet", bson.D{{"secondarycontrollers", bson.D{{"$each", cr.SecondaryControllers}}}}})
+		}
+		if _, err := db.CloudRegions().UpsertId(cr.Id, update); err != nil {
+			return errgo.Notef(err, "cannot update cloud regions")
+		}
+	}
+	return nil
+}
+
+// CloudRegion returns information on the CloudRegion with the given
+// cloud and region. It returns an error with a params.ErrNotFound cause if the
+// cloud/region was not found.
+func (db *Database) CloudRegion(ctx context.Context, name params.Cloud, region string) (_ *mongodoc.CloudRegion, err error) {
+	defer db.checkError(ctx, &err)
+	var cloudRegion mongodoc.CloudRegion
+	var query bson.D
+	if name != "" {
+		query = append(query, bson.DocElem{"cloud", name})
+	}
+	if region != "" {
+		query = append(query, bson.DocElem{"region", region})
+	}
+	err = db.CloudRegions().Find(query).One(&cloudRegion)
+	if err == mgo.ErrNotFound {
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "cloud %q region %q not found", name, region)
+	}
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot get cloud %q region %q", name, region)
+	}
+
+	return &cloudRegion, nil
+}
+
+// InsertCloudRegion inserts a new CloudRegion to the database. If the
+// region already exists then an error with the cause
+// params.ErrAlreadyExists is returned.
+func (db *Database) InsertCloudRegion(ctx context.Context, cr *mongodoc.CloudRegion) (err error) {
+	defer db.checkError(ctx, &err)
+	cr.Id = fmt.Sprintf("%s/%s", cr.Cloud, cr.Region)
+	if err = db.CloudRegions().Insert(cr); err != nil {
+		if mgo.IsDup(err) {
+			err = errgo.WithCausef(err, params.ErrAlreadyExists, "")
+		}
+	}
+	return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
+}
+
+// RemoveCloud removes all entries for the given cloud.
+func (db *Database) RemoveCloud(ctx context.Context, cloud params.Cloud) (err error) {
+	defer db.checkError(ctx, &err)
+	_, err = db.CloudRegions().RemoveAll(bson.D{{"cloud", cloud}})
+	return errgo.Mask(err)
+}
+
+// RemoveCloudRegion removes the given cloud region.
+func (db *Database) RemoveCloudRegion(ctx context.Context, cloud params.Cloud, region string) (err error) {
+	defer db.checkError(ctx, &err)
+	return errgo.Mask(db.CloudRegions().RemoveId(fmt.Sprintf("%s/%s", cloud, region)))
+}
+
+// DeleteControllerFromCloudRegions deletes the controller presents in either the primary or secondary controller list
+// of each region.
+func (db *Database) DeleteControllerFromCloudRegions(ctx context.Context, ctlPath params.EntityPath) (err error) {
+	defer db.checkError(ctx, &err)
+	_, err = db.CloudRegions().UpdateAll(nil, bson.D{{
+		"$pull",
+		bson.D{
+			{"primarycontrollers", ctlPath},
+			{"secondarycontrollers", ctlPath},
+		},
+	}})
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
+// GrantCloud grants the given access level to the given user on the given cloud.
+func (db *Database) GrantCloud(ctx context.Context, cloud params.Cloud, user params.User, access string) (err error) {
+	defer db.checkError(ctx, &err)
+	aclUpdates := make(bson.D, 0, 3)
+	switch access {
+	case "admin":
+		aclUpdates = append(aclUpdates, bson.DocElem{"acl.admin", user})
+		aclUpdates = append(aclUpdates, bson.DocElem{"acl.write", user})
+		fallthrough
+	case "add-model":
+		aclUpdates = append(aclUpdates, bson.DocElem{"acl.read", user})
+	default:
+		return errgo.Newf("%q cloud access not valid", access)
+	}
+	_, err = db.CloudRegions().UpdateAll(bson.D{{"cloud", cloud}}, bson.D{{"$addToSet", aclUpdates}})
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
+// RevokeCloud revokes the given access level from the given user on the given cloud.
+func (db *Database) RevokeCloud(ctx context.Context, cloud params.Cloud, user params.User, access string) (err error) {
+	defer db.checkError(ctx, &err)
+	aclUpdates := make(bson.D, 0, 3)
+	switch access {
+	case "add-model":
+		aclUpdates = append(aclUpdates, bson.DocElem{"acl.read", user})
+		fallthrough
+	case "admin":
+		aclUpdates = append(aclUpdates, bson.DocElem{"acl.admin", user})
+		aclUpdates = append(aclUpdates, bson.DocElem{"acl.write", user})
+	default:
+		return errgo.Newf("%q cloud access not valid", access)
+	}
+	_, err = db.CloudRegions().UpdateAll(bson.D{{"cloud", cloud}}, bson.D{{"$pull", aclUpdates}})
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
 }
 
 // setCredentialUpdates marks all the controllers in the given ctlPaths
@@ -897,12 +1242,27 @@ func (iter *CanReadIter) Count() int {
 
 func (db *Database) Collections() []*mgo.Collection {
 	return []*mgo.Collection{
+		db.Audits(),
+		db.Applications(),
+		db.CloudRegions(),
 		db.Controllers(),
 		db.Credentials(),
 		db.Macaroons(),
 		db.Machines(),
 		db.Models(),
 	}
+}
+
+func (db *Database) Applications() *mgo.Collection {
+	return db.C("applications")
+}
+
+func (db *Database) Audits() *mgo.Collection {
+	return db.C("audits")
+}
+
+func (db *Database) CloudRegions() *mgo.Collection {
+	return db.C("cloudregions")
 }
 
 func (db *Database) Controllers() *mgo.Collection {
@@ -930,18 +1290,4 @@ func (db *Database) C(name string) *mgo.Collection {
 		panic(fmt.Sprintf("cannot get collection %q because JEM closed", name))
 	}
 	return db.Database.C(name)
-}
-
-// sessionStatus records the current status of a mgo session.
-type sessionStatus int32
-
-// setDead marks the session as dead, so that it won't be
-// reused for new JEM instances.
-func (s *sessionStatus) setDead() {
-	atomic.StoreInt32((*int32)(s), 1)
-}
-
-// isDead reports whether the session has been marked as dead.
-func (s *sessionStatus) isDead() bool {
-	return atomic.LoadInt32((*int32)(s)) != 0
 }

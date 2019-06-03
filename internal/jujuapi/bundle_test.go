@@ -3,60 +3,23 @@
 package jujuapi_test
 
 import (
-	"encoding/pem"
-	"net/http/httptest"
-	"net/url"
-
-	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-
-	"github.com/CanonicalLtd/jem/internal/apitest"
 )
 
 type bundleSuite struct {
-	apitest.Suite
-	wsServer *httptest.Server
+	websocketSuite
 }
 
 var _ = gc.Suite(&bundleSuite{})
 
-func (s *bundleSuite) SetUpTest(c *gc.C) {
-	s.Suite.SetUpTest(c)
-	s.wsServer = httptest.NewTLSServer(s.JEMSrv)
-}
-
-func (s *bundleSuite) TearDownTest(c *gc.C) {
-	s.wsServer.Close()
-	s.Suite.TearDownTest(c)
-}
-
-func (s *bundleSuite) getChanges(args jujuparams.BundleChangesParams) (jujuparams.BundleChangesResults, error) {
+func (s *bundleSuite) getChanges(c *gc.C, args jujuparams.BundleChangesParams) (jujuparams.BundleChangesResults, error) {
 	var result jujuparams.BundleChangesResults
-	var info api.Info
-	u, err := url.Parse(s.wsServer.URL)
-	if err != nil {
-		return result, errgo.Mask(err)
-	}
-	info.Addrs = []string{
-		u.Host,
-	}
-	cert := pem.EncodeToMemory(&pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: s.wsServer.TLS.Certificates[0].Certificate[0],
-	})
-	info.CACert = string(cert)
-	conn, err := api.Open(&info, api.DialOpts{
-		InsecureSkipVerify: true,
-		BakeryClient:       s.IDMSrv.Client("bob"),
-	})
-	if err != nil {
-		return result, errgo.Mask(err)
-	}
+	conn := s.open(c, nil, "bob")
 	defer conn.Close()
-	err = conn.APICall("Bundle", 1, "", "GetChanges", args, &result)
+	err := conn.APICall("Bundle", 1, "", "GetChanges", args, &result)
 	if err != nil {
 		return result, errgo.Mask(err, errgo.Any)
 	}
@@ -67,7 +30,7 @@ func (s *bundleSuite) TestGetChangesBundleContentError(c *gc.C) {
 	args := jujuparams.BundleChangesParams{
 		BundleDataYAML: ":",
 	}
-	r, err := s.getChanges(args)
+	r, err := s.getChanges(c, args)
 	c.Assert(err, gc.ErrorMatches, `cannot read bundle YAML: cannot unmarshal bundle data: yaml: did not find expected key`)
 	c.Assert(r, gc.DeepEquals, jujuparams.BundleChangesResults{})
 }
@@ -84,8 +47,8 @@ func (s *bundleSuite) TestGetChangesBundleVerificationErrors(c *gc.C) {
                     num_units: -1
         `,
 	}
-	r, err := s.getChanges(args)
-	c.Assert(err, jc.ErrorIsNil)
+	r, err := s.getChanges(c, args)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(r.Changes, gc.IsNil)
 	c.Assert(r.Errors, jc.SameContents, []string{
 		`too many units specified in unit placement for application "django"`,
@@ -105,8 +68,8 @@ func (s *bundleSuite) TestGetChangesBundleConstraintsError(c *gc.C) {
                     constraints: bad=wolf
         `,
 	}
-	r, err := s.getChanges(args)
-	c.Assert(err, jc.ErrorIsNil)
+	r, err := s.getChanges(c, args)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(r.Changes, gc.IsNil)
 	c.Assert(r.Errors, jc.SameContents, []string{
 		`invalid constraints "bad=wolf" in application "django": unknown constraint "bad"`,
@@ -124,8 +87,8 @@ func (s *bundleSuite) TestGetChangesBundleStorageError(c *gc.C) {
                         bad: 0,100M
         `,
 	}
-	r, err := s.getChanges(args)
-	c.Assert(err, jc.ErrorIsNil)
+	r, err := s.getChanges(c, args)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(r.Changes, gc.IsNil)
 	c.Assert(r.Errors, jc.SameContents, []string{
 		`invalid storage "bad" in application "django": cannot parse count: count must be greater than zero, got "0"`,
@@ -149,8 +112,8 @@ func (s *bundleSuite) TestGetChangesSuccess(c *gc.C) {
                   - haproxy:web
         `,
 	}
-	r, err := s.getChanges(args)
-	c.Assert(err, jc.ErrorIsNil)
+	r, err := s.getChanges(c, args)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(r.Changes, jc.DeepEquals, []*jujuparams.BundleChange{{
 		Id:     "addCharm-0",
 		Method: "addCharm",
@@ -167,6 +130,7 @@ func (s *bundleSuite) TestGetChangesSuccess(c *gc.C) {
 			map[string]interface{}{"tmpfs": "tmpfs,1G"},
 			map[string]interface{}{},
 			map[string]interface{}{},
+			0.0,
 		},
 		Requires: []string{"addCharm-0"},
 	}, {
@@ -185,6 +149,7 @@ func (s *bundleSuite) TestGetChangesSuccess(c *gc.C) {
 			map[string]interface{}{},
 			map[string]interface{}{},
 			map[string]interface{}{},
+			0.0,
 		},
 		Requires: []string{"addCharm-2"},
 	}, {
@@ -207,8 +172,8 @@ func (s *bundleSuite) TestGetChangesBundleEndpointBindingsSuccess(c *gc.C) {
                         url: public
         `,
 	}
-	r, err := s.getChanges(args)
-	c.Assert(err, jc.ErrorIsNil)
+	r, err := s.getChanges(c, args)
+	c.Assert(err, gc.Equals, nil)
 
 	for _, change := range r.Changes {
 		if change.Method == "deploy" {
@@ -224,6 +189,7 @@ func (s *bundleSuite) TestGetChangesBundleEndpointBindingsSuccess(c *gc.C) {
 					map[string]interface{}{},
 					map[string]interface{}{"url": "public"},
 					map[string]interface{}{},
+					0.0,
 				},
 				Requires: []string{"addCharm-0"},
 			})

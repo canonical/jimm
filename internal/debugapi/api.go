@@ -1,42 +1,54 @@
 package debugapi
 
 import (
+	"context"
 	"net/http"
 
-	"github.com/juju/httprequest"
+	jujuhttprequest "github.com/juju/httprequest"
 	"github.com/juju/utils/debugstatus"
 	"go.uber.org/zap"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/httprequest.v1"
+	"gopkg.in/mgo.v2/bson"
 
-	"github.com/CanonicalLtd/jem/internal/auth"
-	"github.com/CanonicalLtd/jem/internal/ctxutil"
-	"github.com/CanonicalLtd/jem/internal/jem"
-	"github.com/CanonicalLtd/jem/internal/jemerror"
-	"github.com/CanonicalLtd/jem/internal/jemserver"
-	"github.com/CanonicalLtd/jem/internal/zapctx"
-	"github.com/CanonicalLtd/jem/version"
+	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/ctxutil"
+	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/jemerror"
+	"github.com/CanonicalLtd/jimm/internal/jemserver"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/version"
 )
 
 // NewAPIHandler returns a new API handler that serves the /debug
 // endpoints.
-func NewAPIHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, sp jemserver.Params) ([]httprequest.Handler, error) {
-	return jemerror.Mapper.Handlers(func(p httprequest.Params) (*handler, error) {
+func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]jujuhttprequest.Handler, error) {
+	var handlers []jujuhttprequest.Handler
+	srv := &httprequest.Server{
+		ErrorMapper: func(_ context.Context, err error) (int, interface{}) {
+			return jemerror.Mapper(err)
+		},
+	}
+
+	for _, hnd := range srv.Handlers(func(p httprequest.Params) (*handler, context.Context, error) {
 		ctx := ctxutil.Join(ctx, p.Context)
-		ctx = zapctx.WithFields(ctx, zap.String("req-id", httprequest.RequestUUID(ctx)))
+		ctx = zapctx.WithFields(ctx, zap.String("req-id", jujuhttprequest.RequestUUID(ctx)))
 		h := &handler{
-			params:                         sp,
-			jem:                            jp.JEM(ctx),
-			authPool:                       ap,
-			usageSenderAuthorizationClient: jp.UsageAuthorizationClient(),
+			params:                         params.Params,
+			jem:                            params.JEMPool.JEM(ctx),
+			authPool:                       params.AuthenticatorPool,
+			usageSenderAuthorizationClient: params.JEMPool.UsageAuthorizationClient(),
 		}
 		h.Handler = debugstatus.Handler{
 			Version:           debugstatus.Version(version.VersionInfo),
 			CheckPprofAllowed: h.checkIsAdmin,
 			Check:             h.check,
 		}
-		return h, nil
-	}), nil
+		return h, ctx, nil
+	}) {
+		handlers = append(handlers, jujuhttprequest.Handler(hnd))
+	}
+	return handlers, nil
 }
 
 type handler struct {
@@ -61,8 +73,9 @@ func (h *handler) checkIsAdmin(req *http.Request) error {
 	return auth.CheckIsUser(h.ctx, h.params.ControllerAdmin)
 }
 
-func (h *handler) check() map[string]debugstatus.CheckResult {
+func (h *handler) check(ctx context.Context) map[string]debugstatus.CheckResult {
 	return debugstatus.Check(
+		ctx,
 		debugstatus.ServerStartTime,
 		debugstatus.Connection(h.jem.DB.Session),
 		debugstatus.MongoCollections(h.jem.DB),
@@ -77,14 +90,14 @@ func (h *handler) Close() error {
 	return nil
 }
 
-// DebugOmnibusCheckRequest defines the request structure for the
+// DebugUsageSenderCheckRequest defines the request structure for the
 // omnibus usage sender authorization check.
 type DebugUsageSenderCheckRequest struct {
 	httprequest.Route `httprequest:"GET /debug/usage/:username"`
 	Username          string `httprequest:"username,path"`
 }
 
-// DebugUsageSenderCheck implements a check that verifies that jem is able
+// DebugUsageSenderCheck implements a check that verifies that JIMM is able
 // to perform usage sender authorization.
 func (h *handler) DebugUsageSenderCheck(p httprequest.Params, r *DebugUsageSenderCheckRequest) error {
 	if err := h.checkIsAdmin(p.Request); err != nil {
@@ -95,15 +108,58 @@ func (h *handler) DebugUsageSenderCheck(p httprequest.Params, r *DebugUsageSende
 		return errgo.New("cannot perform the check")
 	}
 
-	_, err := h.usageSenderAuthorizationClient.AuthorizeReseller(
-		jem.OmnibusJIMMPlan,
-		jem.OmnibusJIMMCharm,
-		jem.OmnibusJIMMName,
-		jem.OmnibusJIMMOwner,
+	_, err := h.usageSenderAuthorizationClient.GetCredentials(
+		p.Context,
 		r.Username,
 	)
 	if err != nil {
 		return errgo.Notef(err, "check failed")
 	}
 	return nil
+}
+
+// DebugDBStatsRequest contains the request for /debug/dbstats.
+type DebugDBStatsRequest struct {
+	httprequest.Route `httprequest:"GET /debug/dbstats"`
+}
+
+// DebugDBStatsResponse contains the response returned from
+// /debug/dbstats.
+type DebugDBStatsResponse struct {
+	// Stats contains the response from the mongodb server of a
+	// "dbStats" command. The actual value depends on the version of
+	// MongoDB in use. See
+	// https://docs.mongodb.com/manual/reference/command/dbStats/ for
+	// details.
+	Stats map[string]interface{} `json:"stats"`
+
+	// Collections contains a mapping from collection name to the
+	// response from the mongodb server of a "collStats" command
+	// performed on that collection. The actual value depends on the
+	// version of MongoDB in use. See
+	// https://docs.mongodb.com/manual/reference/command/collStats/
+	// for details.
+	Collections map[string]map[string]interface{} `json:"collections"`
+}
+
+// DebugDBStats serves the /debug/dbstats endpoint. This queries dbStats
+// and collStats from mongodb and returns the result.
+func (h *handler) DebugDBStats(p httprequest.Params, req *DebugDBStatsRequest) (*DebugDBStatsResponse, error) {
+	var resp DebugDBStatsResponse
+	if err := h.jem.DB.Run("dbStats", &resp.Stats); err != nil {
+		return nil, errgo.Mask(err)
+	}
+	names, err := h.jem.DB.CollectionNames()
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	resp.Collections = make(map[string]map[string]interface{}, len(names))
+	for _, name := range names {
+		var stats map[string]interface{}
+		if err := h.jem.DB.Run(bson.D{{"collStats", name}}, &stats); err != nil {
+			return nil, errgo.Mask(err)
+		}
+		resp.Collections[name] = stats
+	}
+	return &resp, nil
 }

@@ -3,7 +3,7 @@
 package mongodoc
 
 import (
-	"encoding/base64"
+	"fmt"
 	"net"
 	"strconv"
 	"time"
@@ -13,7 +13,7 @@ import (
 	"github.com/juju/version"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 // Controller holds information on a given controller.
@@ -61,8 +61,9 @@ type Controller struct {
 	// controllers by location.
 	Public bool `bson:",omitempty"`
 
-	// Cloud holds the details of the cloud provided by this controller.
-	Cloud Cloud
+	// Deprecated specifies whether a public controller is considered
+	// deprecated for the purposes of adding new models.
+	Deprecated bool `bson:",omitempty"`
 
 	// MonitorLeaseOwner holds the name of the agent
 	// currently responsible for monitoring the controller.
@@ -124,10 +125,28 @@ type UserInfo struct {
 	Password string
 }
 
-// Cloud holds the details of a cloud provided by a controller.
-type Cloud struct {
-	// Name holds the name of the cloud.
-	Name params.Cloud
+// CloudRegion holds the details of a cloud or a region within a cloud.
+// For information about a whole cloud, Region will be empty, and the
+// document should not contain any secondary controllers, as all
+// controllers located in that cloud are considered equally primary.
+//
+// If there are any region entries in the collection, there should be a
+// cloud entry that represents the cloud for those regions.
+//
+// For a cloud region, secondary controllers are those that can be used
+// to manage a model within a region but are not located within that
+// region (primary controllers should be used in preference if
+// available).
+type CloudRegion struct {
+	// Id holds the primary key for a CloudRegion.
+	// It is in the format <cloud>/<region>
+	Id string `bson:"_id"`
+
+	// Cloud holds the cloud name.
+	Cloud params.Cloud
+
+	// Region holds the name of the region.
+	Region string
 
 	// ProviderType holds the type of cloud.
 	ProviderType string
@@ -136,39 +155,47 @@ type Cloud struct {
 	// cloud.
 	AuthTypes []string
 
-	// Endpoint contains the endpoint parameter specified by the
+	// Endpoint contains the region or cloud endpoint parameter specified by the
 	// controller.
 	Endpoint string
 
-	// IdentityEndpoint contains the identity endpoint parameter
+	// IdentityEndpoint contains the region or cloud identity endpoint parameter
 	// specified by the controller.
 	IdentityEndpoint string
 
-	// StorageEndpoint contains the stroage endpoint parameter
+	// IdentityEndpoint contains the region or cloud storage endpoint parameter
 	// specified by the controller.
 	StorageEndpoint string
 
-	// Regions contains the details of the set of regions supported
-	// by the controller. Note: some providers do not use regions.
-	Regions []Region
+	// CACertificates contains any CA root certificates for the cloud
+	// instances.
+	CACertificates []string
+
+	// PrimaryControllers holds the local user and name given to the
+	// controllers that can use that cloud and which are hosted on this region.
+	PrimaryControllers []params.EntityPath
+
+	// SecondaryControllers holds the local user and name given to the
+	// controllers that can use that cloud and which are hosted outside this region.
+	SecondaryControllers []params.EntityPath
+
+	// ACL holds permissions for the cloud.
+	ACL params.ACL
 }
 
-// Region holds details of a cloud region supported by a controller.
-type Region struct {
-	// Name holds the name of the region.
-	Name string
+func (c CloudRegion) GetId() string {
+	if c.Id != "" {
+		return c.Id
+	}
+	return fmt.Sprintf("%s/%s", c.Cloud, c.Region)
+}
 
-	// Endpoint contains the endpoint parameter specified by the
-	// controller.
-	Endpoint string
+func (c *CloudRegion) GetACL() params.ACL {
+	return c.ACL
+}
 
-	// IdentityEndpoint contains the identity endpoint parameter
-	// specified by the controller.
-	IdentityEndpoint string
-
-	// StorageEndpoint contains the storage endpoint parameter
-	// specified by the controller.
-	StorageEndpoint string
+func (c *CloudRegion) Owner() params.User {
+	return ""
 }
 
 // Model holds information on a given model.
@@ -203,7 +230,7 @@ type Model struct {
 
 	// Life holds the current life status of the model ("alive", "dying"
 	// or "dead").
-	Life string
+	Life_ string `bson:"life"`
 
 	// Counts holds information about the number of various kinds
 	// of entities in the model.
@@ -248,14 +275,84 @@ type Model struct {
 	// UsageSenderCredentials prove that we are authorized to send usage
 	// information for this model.
 	UsageSenderCredentials []byte
+
+	// Status holds the current status of the model
+	Info *ModelInfo `bson:",omitempty"`
+
+	// Type holds the type of the model (IAAS or CAAS)
+	Type string
+
+	// ProviderType holds the provider type of the model.
+	ProviderType string
+}
+
+type ModelInfo struct {
+	// Life holds the life of the model
+	Life string
+
+	// Config holds the model configuration
+	Config map[string]interface{} `bson:",omitempty"`
+
+	// Status holds the current status of the model.
+	Status ModelStatus
+}
+
+type ModelStatus struct {
+	// Status holds the actual status value.
+	Status string
+
+	// Message holds a message associated with the status.
+	Message string
+
+	// Since contains the time this status has been valid since.
+	Since time.Time `bson:",omitempty"`
+
+	// Data contains data associated with the status.
+	Data map[string]interface{} `bson:",omitempty"`
+}
+
+// Life determines the current life of a model object.
+func (m *Model) Life() string {
+	if m.Info != nil {
+		return m.Info.Life
+	}
+	return m.Life_
 }
 
 // Machine holds information on a machine in a model, as discovered by the
 // controller monitor.
 type Machine struct {
-	// Id holds the combination of the model UUID and machine id.
-	Id   string `bson:"_id"`
-	Info *multiwatcher.MachineInfo
+	// Id holds the combination of the controller path, model UUID and machine id.
+	Id         string `bson:"_id"`
+	Controller string
+	Cloud      params.Cloud
+	Region     string
+	Info       *multiwatcher.MachineInfo
+}
+
+// Application holds information on an application in a model, as discovered by the
+// controller monitor.
+type Application struct {
+	// Id holds the combination of the controller path, model UUID and application id.
+	Id         string `bson:"_id"`
+	Controller string
+	Cloud      params.Cloud
+	Region     string
+	Info       *ApplicationInfo
+}
+
+// ApplicationInfo holds a subset of information about an application that is tracked
+// by multiwatcherStore.
+type ApplicationInfo struct {
+	ModelUUID       string
+	Name            string
+	Exposed         bool
+	CharmURL        string
+	OwnerTag        string
+	Life            multiwatcher.Life
+	Subordinate     bool
+	Status          multiwatcher.StatusInfo
+	WorkloadVersion string
 }
 
 type ModelUserInfo struct {
@@ -360,13 +457,4 @@ func ParseAddresses(addresses []string) ([]HostPort, error) {
 		hps[i].SetJujuHostPort(nhp)
 	}
 	return hps, nil
-}
-
-// Sanitize returns a version of key that's suitable
-// for using as a mongo key.
-// TODO base64 encoding is probably overkill - we
-// could probably do something that left keys
-// more readable.
-func Sanitize(key string) string {
-	return base64.StdEncoding.EncodeToString([]byte(key))
 }

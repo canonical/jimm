@@ -6,8 +6,8 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jem/internal/jemtest"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/internal/jemtest"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 type internalSuite struct {
@@ -51,7 +51,7 @@ func (s *internalSuite) TestEntityPathValue(c *gc.C) {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
 			continue
 		}
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(p.EntityPath, gc.Equals, test.expectEntityPath)
 	}
 }
@@ -90,7 +90,7 @@ func (s *internalSuite) TestEntityPathsValue(c *gc.C) {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
 			continue
 		}
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(p.paths, jc.DeepEquals, test.expectEntityPaths)
 	}
 }

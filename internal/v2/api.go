@@ -3,11 +3,10 @@
 package v2
 
 import (
-	"net/url"
-	"sort"
-	"strings"
+	"context"
 	"time"
 
+	"github.com/juju/aclstore"
 	"github.com/juju/httprequest"
 	cloudapi "github.com/juju/juju/api/cloud"
 	controllerapi "github.com/juju/juju/api/controller"
@@ -16,23 +15,28 @@ import (
 	"github.com/juju/juju/network"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/CanonicalLtd/jem/internal/apiconn"
-	"github.com/CanonicalLtd/jem/internal/auth"
-	"github.com/CanonicalLtd/jem/internal/ctxutil"
-	"github.com/CanonicalLtd/jem/internal/jem"
-	"github.com/CanonicalLtd/jem/internal/jemerror"
-	"github.com/CanonicalLtd/jem/internal/jemserver"
-	"github.com/CanonicalLtd/jem/internal/mongodoc"
-	"github.com/CanonicalLtd/jem/internal/servermon"
-	"github.com/CanonicalLtd/jem/internal/zapctx"
-	"github.com/CanonicalLtd/jem/internal/zaputil"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/internal/apiconn"
+	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/ctxutil"
+	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/jemerror"
+	"github.com/CanonicalLtd/jimm/internal/jemserver"
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/internal/servermon"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/internal/zaputil"
+	"github.com/CanonicalLtd/jimm/params"
+)
+
+const (
+	// ACL Names
+	auditLogACL = "audit-log"
+	logLevelACL = "log-level"
 )
 
 // controllerClientInitiateMigration is defined as a variable so that
@@ -40,14 +44,23 @@ import (
 var controllerClientInitiateMigration = (*controllerapi.Client).InitiateMigration
 
 type Handler struct {
-	jem     *jem.JEM
-	context context.Context
-	cancel  context.CancelFunc
-	config  jemserver.Params
-	monReq  servermon.Request
+	jem        *jem.JEM
+	context    context.Context
+	cancel     context.CancelFunc
+	config     jemserver.Params
+	monReq     servermon.Request
+	aclManager *aclstore.Manager
 }
 
-func NewAPIHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, sp jemserver.Params) ([]httprequest.Handler, error) {
+func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httprequest.Handler, error) {
+	// Ensure the required ACLs exist.
+	if err := params.ACLManager.CreateACL(ctx, auditLogACL, string(params.ControllerAdmin)); err != nil {
+		return nil, errgo.Mask(err)
+	}
+	if err := params.ACLManager.CreateACL(ctx, logLevelACL, string(params.ControllerAdmin)); err != nil {
+		return nil, errgo.Mask(err)
+	}
+
 	return jemerror.Mapper.Handlers(func(p httprequest.Params) (*Handler, error) {
 		// Time out all requests after 30s. Do this before joining
 		// the contexts because p.Context is likely to have a done
@@ -60,17 +73,18 @@ func NewAPIHandler(ctx context.Context, jp *jem.Pool, ap *auth.Pool, sp jemserve
 		zapctx.Debug(ctx, "HTTP request", zap.String("method", p.Request.Method), zap.Stringer("url", p.Request.URL))
 
 		// All requests require an authenticated client.
-		a := ap.Authenticator(ctx)
+		a := params.AuthenticatorPool.Authenticator(ctx)
 		defer a.Close()
 		ctx, err := a.AuthenticateRequest(ctx, p.Request)
 		if err != nil {
 			return nil, errgo.Mask(err, errgo.Any)
 		}
 		h := &Handler{
-			jem:     jp.JEM(ctx),
-			context: ctx,
-			config:  sp,
-			cancel:  cancel,
+			jem:        params.JEMPool.JEM(ctx),
+			context:    ctx,
+			config:     params.Params,
+			cancel:     cancel,
+			aclManager: params.ACLManager,
 		}
 
 		h.monReq.Start(p.PathPattern)
@@ -182,26 +196,43 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	if err != nil {
 		return errgo.Notef(err, "cannot get clouds")
 	}
-	// Note: currently juju controllers only ever have exactly one
-	// cloud. This code will need to change if that changes.
+
+	var cloudRegions []mongodoc.CloudRegion
 	for k, v := range clouds {
-		ctl.Cloud.Name = params.Cloud(k.Id())
-		ctl.Cloud.ProviderType = v.Type
-		for _, at := range v.AuthTypes {
-			ctl.Cloud.AuthTypes = append(ctl.Cloud.AuthTypes, string(at))
+		cr := mongodoc.CloudRegion{
+			Cloud:              params.Cloud(k.Id()),
+			Endpoint:           v.Endpoint,
+			IdentityEndpoint:   v.IdentityEndpoint,
+			StorageEndpoint:    v.StorageEndpoint,
+			ProviderType:       v.Type,
+			CACertificates:     v.CACertificates,
+			PrimaryControllers: []params.EntityPath{ctl.Path},
+			ACL: params.ACL{
+				Read: []string{"everyone"},
+			},
 		}
-		ctl.Cloud.Endpoint = v.Endpoint
-		ctl.Cloud.IdentityEndpoint = v.IdentityEndpoint
-		ctl.Cloud.StorageEndpoint = v.StorageEndpoint
+		for _, at := range v.AuthTypes {
+			cr.AuthTypes = append(cr.AuthTypes, string(at))
+		}
+		cloudRegions = append(cloudRegions, cr)
 		for _, reg := range v.Regions {
-			ctl.Cloud.Regions = append(ctl.Cloud.Regions, mongodoc.Region{
-				Name:             reg.Name,
+			cr := mongodoc.CloudRegion{
+				Cloud:            params.Cloud(k.Id()),
+				Region:           reg.Name,
 				Endpoint:         reg.Endpoint,
 				IdentityEndpoint: reg.IdentityEndpoint,
 				StorageEndpoint:  reg.StorageEndpoint,
-			})
+				ACL: params.ACL{
+					Read: []string{"everyone"},
+				},
+			}
+			if ctl.Location["cloud"] == k.Id() && ctl.Location["region"] == reg.Name {
+				cr.PrimaryControllers = []params.EntityPath{ctl.Path}
+			} else {
+				cr.SecondaryControllers = []params.EntityPath{ctl.Path}
+			}
+			cloudRegions = append(cloudRegions, cr)
 		}
-		break
 	}
 
 	// Update addresses from latest known in controller. Note that
@@ -209,9 +240,11 @@ func (h *Handler) AddController(arg *params.AddController) error {
 	// address we succeeded in connecting to.
 	ctl.HostPorts = mongodocAPIHostPorts(conn.APIHostPorts())
 
-	err = h.jem.DB.AddController(ctx, ctl)
-	if err != nil {
+	if err := h.jem.DB.AddController(ctx, ctl); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
+	}
+	if err := h.jem.DB.UpdateCloudRegions(ctx, cloudRegions); err != nil {
+		return errgo.Mask(err)
 	}
 	return nil
 }
@@ -300,23 +333,10 @@ func (h *Handler) DeleteController(arg *params.DeleteController) error {
 	if err := h.jem.DB.DeleteController(ctx, arg.EntityPath); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	return nil
-}
-
-// isAlreadyGrantedError reports whether the error
-// (as returned from modelmanager.Client.GrantModel)
-// represents the condition that the user has already
-// been granted access.
-//
-// We have to use string comparison because of
-// https://bugs.launchpad.net/juju-core/+bug/1564880.
-func isAlreadyGrantedError(err error) bool {
-	if err == nil {
-		return false
+	if err := h.jem.DB.DeleteControllerFromCloudRegions(ctx, arg.EntityPath); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	s := err.Error()
-	return strings.HasPrefix(s, "user already has ") &&
-		strings.HasSuffix(s, " access or greater")
+	return nil
 }
 
 // GetModel returns information on a given model.
@@ -342,7 +362,7 @@ func (h *Handler) GetModel(arg *params.GetModel) (*params.ModelResponse, error) 
 		CACert:           ctl.CACert,
 		HostPorts:        mongodoc.Addresses(ctl.HostPorts),
 		ControllerPath:   m.Controller,
-		Life:             m.Life,
+		Life:             m.Life(),
 		UnavailableSince: newTime(ctl.UnavailableSince.UTC()),
 		Counts:           m.Counts,
 		Creator:          m.Creator,
@@ -414,7 +434,7 @@ func (h *Handler) ListModels(arg *params.ListModels) (*params.ListModelsResponse
 			CACert:           ctl.CACert,
 			HostPorts:        mongodoc.Addresses(ctl.HostPorts),
 			ControllerPath:   m.Controller,
-			Life:             m.Life,
+			Life:             m.Life(),
 			UnavailableSince: newTime(ctl.UnavailableSince.UTC()),
 			Counts:           m.Counts,
 			Creator:          m.Creator,
@@ -460,149 +480,6 @@ func newTime(t time.Time) *time.Time {
 		return nil
 	}
 	return &t
-}
-
-// GetControllerLocations returns all the available values for a given controller
-// location attribute. The set of controllers is constrained by the URL query
-// parameters.
-func (h *Handler) GetControllerLocations(p httprequest.Params, arg *params.GetControllerLocations) (*params.ControllerLocationsResponse, error) {
-	ctx := h.context
-	attr := arg.Attr
-	if !params.IsValidLocationAttr(attr) {
-		return nil, badRequestf(nil, "invalid location %q", attr)
-	}
-	lp, err := parseFormLocations(p.Request.Form)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
-	}
-	if len(lp.other) > 0 {
-		return &params.ControllerLocationsResponse{
-			Values: []string{},
-		}, nil
-	}
-	// TODO(mhilton) this method may select many more controllers
-	// than necessary. Re-evaluate the method if we start seeing
-	// problems.
-	found := make(map[string]bool)
-	err = h.jem.DoControllers(ctx, lp.cloud, lp.region, func(ctl *mongodoc.Controller) error {
-		switch attr {
-		case "cloud":
-			found[string(ctl.Cloud.Name)] = true
-		case "region":
-			for _, r := range ctl.Cloud.Regions {
-				found[r.Name] = true
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
-	}
-
-	// Build the result slice and sort it so we get deterministic results.
-	results := make([]string, 0, len(found))
-	for val := range found {
-		results = append(results, val)
-	}
-	sort.Strings(results)
-	return &params.ControllerLocationsResponse{
-		Values: results,
-	}, nil
-}
-
-// GetAllControllerLocations returns all the available
-// sets of controller location attributes, restricting
-// the search by any provided location attributes.
-func (h *Handler) GetAllControllerLocations(p httprequest.Params, arg *params.GetAllControllerLocations) (*params.AllControllerLocationsResponse, error) {
-	ctx := h.context
-	lp, err := parseFormLocations(p.Request.Form)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
-	}
-	if len(lp.other) > 0 {
-		return &params.AllControllerLocationsResponse{
-			Locations: []map[string]string{},
-		}, nil
-	}
-	locSet := make(map[cloudRegion]bool)
-	err = h.jem.DoControllers(ctx, lp.cloud, lp.region, func(ctl *mongodoc.Controller) error {
-		if len(ctl.Cloud.Regions) == 0 {
-			locSet[cloudRegion{ctl.Cloud.Name, ""}] = true
-			return nil
-		}
-		for _, reg := range ctl.Cloud.Regions {
-			locSet[cloudRegion{ctl.Cloud.Name, reg.Name}] = true
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
-	}
-	ordered := make(cloudRegions, 0, len(locSet))
-	for k := range locSet {
-		ordered = append(ordered, k)
-	}
-	sort.Sort(ordered)
-	return &params.AllControllerLocationsResponse{
-		Locations: ordered.locations(),
-	}, nil
-}
-
-type cloudRegion struct {
-	cloud  params.Cloud
-	region string
-}
-
-type cloudRegions []cloudRegion
-
-// Len implements sort.Interface.Len
-func (c cloudRegions) Len() int {
-	return len(c)
-}
-
-// Less implements sort.Interface.Less
-func (c cloudRegions) Less(i, j int) bool {
-	if c[i].cloud == c[j].cloud {
-		return c[i].region < c[j].region
-	}
-	return c[i].cloud < c[j].cloud
-}
-
-// Swap implements sort.Interface.Swap
-func (c cloudRegions) Swap(i, j int) {
-	c[i], c[j] = c[j], c[i]
-}
-
-func (c cloudRegions) locations() []map[string]string {
-	locs := make([]map[string]string, 0, len(c))
-	for _, cr := range c {
-		m := map[string]string{
-			"cloud": string(cr.cloud),
-		}
-		if cr.region != "" {
-			m["region"] = cr.region
-		}
-		locs = append(locs, m)
-	}
-	return locs
-}
-
-// GetControllerLocation returns a map of location attributes for a given controller.
-func (h *Handler) GetControllerLocation(arg *params.GetControllerLocation) (params.ControllerLocation, error) {
-	ctx := h.context
-	ctl, err := h.jem.Controller(ctx, arg.EntityPath)
-	if err != nil {
-		return params.ControllerLocation{}, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
-	}
-	loc := map[string]string{
-		"cloud": string(ctl.Cloud.Name),
-	}
-	if len(ctl.Cloud.Regions) > 0 {
-		loc["region"] = ctl.Cloud.Regions[0].Name
-	}
-	return params.ControllerLocation{
-		Location: loc,
-	}, nil
 }
 
 // NewModel creates a new model inside an existing Controller.
@@ -679,7 +556,7 @@ func (h *Handler) setPerm(coll *mgo.Collection, path params.EntityPath, acl para
 		if err == mgo.ErrNotFound {
 			return params.ErrNotFound
 		}
-		return errgo.Notef(err, "cannot update %v", path)
+		return errgo.Notef(err, "cannot update %v", path.String())
 	}
 	return nil
 }
@@ -718,12 +595,11 @@ func (h *Handler) UpdateCredential(arg *params.UpdateCredential) error {
 	if err := auth.CheckIsUser(ctx, arg.EntityPath.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	// TODO(mhilton) validate the credentials.
-	err := h.jem.UpdateCredential(ctx, &mongodoc.Credential{
+	_, err := h.jem.UpdateCredential(ctx, &mongodoc.Credential{
 		Path:       arg.CredentialPath,
 		Type:       arg.Credential.AuthType,
 		Attributes: arg.Credential.Attributes,
-	})
+	}, 0)
 	if err != nil {
 		return errgo.Mask(err)
 	}
@@ -765,16 +641,16 @@ func (h *Handler) Migrate(arg *params.Migrate) error {
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	ctl, err := h.jem.Controller(ctx, arg.Controller)
-	if err != nil {
-		return errgo.NoteMask(err, "cannot access destination controller", errgo.Is(params.ErrNotFound))
-	}
-	conn, err := h.jem.OpenAPIFromDoc(ctx, ctl)
+	conn, err := h.jem.OpenAPI(ctx, model.Controller)
 	if err != nil {
 		return errgo.Mask(err)
 	}
 	defer conn.Close()
-	zapctx.Info(ctx, "about to call InitiateMigration")
+	ctl, err := h.jem.Controller(ctx, arg.Controller)
+	if err != nil {
+		return errgo.NoteMask(err, "cannot access destination controller", errgo.Is(params.ErrNotFound))
+	}
+	zapctx.Debug(ctx, "about to call InitiateMigration")
 	api := controllerapi.NewClient(conn)
 	_, err = controllerClientInitiateMigration(api, controllerapi.MigrationSpec{
 		ModelUUID:            model.UUID,
@@ -800,8 +676,7 @@ func (h *Handler) Migrate(arg *params.Migrate) error {
 
 // LogLevel returns the current logging level of the running service.
 func (h *Handler) LogLevel(*params.LogLevel) (params.Level, error) {
-	ctx := h.context
-	if err := auth.CheckIsUser(ctx, h.config.ControllerAdmin); err != nil {
+	if err := h.checkACL(h.context, logLevelACL); err != nil {
 		return params.Level{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	return params.Level{
@@ -809,10 +684,31 @@ func (h *Handler) LogLevel(*params.LogLevel) (params.Level, error) {
 	}, nil
 }
 
+func (h *Handler) SetControllerDeprecated(req *params.SetControllerDeprecated) error {
+	ctx := h.context
+	if err := auth.CheckIsUser(ctx, req.EntityPath.User); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	if err := h.jem.DB.SetControllerDeprecated(ctx, req.EntityPath, req.Body.Deprecated); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return nil
+}
+
+func (h *Handler) GetControllerDeprecated(req *params.GetControllerDeprecated) (*params.DeprecatedBody, error) {
+	ctx := h.context
+	ctl, err := h.jem.Controller(ctx, req.EntityPath)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+	}
+	return &params.DeprecatedBody{
+		Deprecated: ctl.Deprecated,
+	}, nil
+}
+
 // SetLogLevel configures the logging level of the running service.
 func (h *Handler) SetLogLevel(req *params.SetLogLevel) error {
-	ctx := h.context
-	if err := auth.CheckIsUser(ctx, h.config.ControllerAdmin); err != nil {
+	if err := h.checkACL(h.context, logLevelACL); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	var level zapcore.Level
@@ -828,36 +724,6 @@ func badRequestf(underlying error, f string, a ...interface{}) error {
 	err := errgo.WithCausef(underlying, params.ErrBadRequest, f, a...)
 	err.(*errgo.Err).SetLocation(1)
 	return err
-}
-
-// collapseHostPorts collapses a list of host-port lists
-// into a single list suitable for passing to api.Open.
-// It preserves ordering because api.State.APIHostPorts
-// makes sure to return the first-connected address
-// first in the slice.
-// See juju.PrepareEndpointsForCaching for a more
-// comprehensive version of this function.
-func collapseHostPorts(hpss [][]network.HostPort) []string {
-	hps := network.CollapseHostPorts(hpss)
-	hps = network.FilterUnusableHostPorts(hps)
-	hps = network.UniqueHostPorts(hps)
-	return network.HostPortsToStrings(hps)
-}
-
-// formToLocationAttrs converts a set of location attributes
-// specified as URL query paramerters into the usual
-// location attribute map form.
-func formToLocationAttrs(form url.Values) (map[string]string, error) {
-	attrs := make(map[string]string)
-	for attr, vals := range form {
-		if !params.IsValidLocationAttr(attr) {
-			return nil, badRequestf(nil, "invalid location attribute %q", attr)
-		}
-		if len(vals) > 0 {
-			attrs[attr] = vals[0]
-		}
-	}
-	return attrs, nil
 }
 
 type locationParams struct {
@@ -888,14 +754,6 @@ func cloudAndRegion(loc map[string]string) (locationParams, error) {
 	return p, nil
 }
 
-func parseFormLocations(form url.Values) (locationParams, error) {
-	loc, err := formToLocationAttrs(form)
-	if err != nil {
-		return locationParams{}, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
-	}
-	return cloudAndRegion(loc)
-}
-
 // entityIter is an iterator over a set of entities.
 type entityIter interface {
 	Next(item auth.ACLEntity) bool
@@ -912,4 +770,48 @@ type mgoIter struct {
 // auth.ACLEntity type.
 func (it mgoIter) Next(item auth.ACLEntity) bool {
 	return it.Iter.Next(item)
+}
+
+// GetModelName returns the name of the model identified by the provided uuid.
+func (h *Handler) GetModelName(arg *params.ModelNameRequest) (params.ModelNameResponse, error) {
+	m, err := h.jem.DB.ModelFromUUID(h.context, arg.UUID)
+	if err != nil {
+		return params.ModelNameResponse{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+
+	return params.ModelNameResponse{
+		Name: string(m.Path.Name),
+	}, nil
+}
+
+// GetAuditEntries return the list of audit log entries based on the requested query.
+func (h *Handler) GetAuditEntries(arg *params.AuditLogRequest) (params.AuditLogEntries, error) {
+	if err := h.checkACL(h.context, auditLogACL); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	entries, err := h.jem.DB.GetAuditEntries(h.context, arg.Start.Time, arg.End.Time, arg.Type)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return entries, nil
+}
+
+// GetModelStatuses return the list of all models created between 2 dates (or all).
+func (h *Handler) GetModelStatuses(arg *params.ModelStatusesRequest) (params.ModelStatuses, error) {
+	if err := auth.CheckIsUser(h.context, h.config.ControllerAdmin); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	entries, err := h.jem.DB.GetModelStatuses(h.context)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return entries, nil
+}
+
+func (h *Handler) checkACL(ctx context.Context, aclName string) error {
+	acl, err := h.aclManager.ACL(ctx, aclName)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	return errgo.Mask(auth.CheckACL(ctx, acl), errgo.Is(params.ErrUnauthorized))
 }

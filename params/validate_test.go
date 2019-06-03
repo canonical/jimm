@@ -15,7 +15,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 type suite struct{}
@@ -67,7 +67,7 @@ var validatorsTests = []struct {
 	val: new(struct {
 		Name params.Name `httprequest:",path"`
 	}),
-	expectError: `cannot unmarshal into field: invalid name "foo_invalid"`,
+	expectError: `cannot unmarshal into field.*: invalid name "foo_invalid"`,
 }, {
 	about: "invalid User in path",
 	params: httprequest.Params{
@@ -80,7 +80,7 @@ var validatorsTests = []struct {
 	val: new(struct {
 		User params.User `httprequest:",path"`
 	}),
-	expectError: `cannot unmarshal into field: invalid user name "foo_invalid"`,
+	expectError: `cannot unmarshal into field.*: invalid user name "foo_invalid"`,
 }, {
 	about: "double hyphen in user",
 	params: httprequest.Params{
@@ -117,7 +117,7 @@ var validatorsTests = []struct {
 	val: new(struct {
 		Path params.EntityPath `httprequest:",form"`
 	}),
-	expectError: `cannot unmarshal into field: invalid user name ""`,
+	expectError: `cannot unmarshal into field.*: invalid user name ""`,
 }, {
 	about: "bad name in entity path",
 	params: httprequest.Params{
@@ -126,7 +126,7 @@ var validatorsTests = []struct {
 	val: new(struct {
 		Path params.EntityPath `httprequest:",form"`
 	}),
-	expectError: `cannot unmarshal into field: invalid name ""`,
+	expectError: `cannot unmarshal into field.*: invalid name ""`,
 }}
 
 func (*suite) TestValidators(c *gc.C) {
@@ -139,7 +139,7 @@ func (*suite) TestValidators(c *gc.C) {
 			c.Assert(errgo.Cause(err), gc.Equals, httprequest.ErrUnmarshal)
 			continue
 		}
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(v, jc.DeepEquals, test.val)
 	}
 }
@@ -150,7 +150,7 @@ func (*suite) TestEntityPathMarshalText(c *gc.C) {
 		Name: "bar",
 	}
 	data, err := ep.MarshalText()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(string(data), gc.Equals, "foo/bar")
 }
 

@@ -4,6 +4,7 @@ package jujuapi_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/pem"
 	"fmt"
 	"net/http/httptest"
@@ -12,13 +13,11 @@ import (
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/api/modelmanager"
-	jc "github.com/juju/testing/checkers"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/names.v2"
 
-	"github.com/CanonicalLtd/jem/internal/apitest"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/internal/apitest"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 var testContext = context.Background()
@@ -47,7 +46,7 @@ func (s *websocketSuite) open(c *gc.C, info *api.Info, username string) api.Conn
 		inf = *info
 	}
 	u, err := url.Parse(s.Server.URL)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	inf.Addrs = []string{
 		u.Host,
 	}
@@ -56,13 +55,13 @@ func (s *websocketSuite) open(c *gc.C, info *api.Info, username string) api.Conn
 		Type:  "CERTIFICATE",
 		Bytes: s.Server.TLS.Certificates[0].Certificate[0],
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	inf.CACert = w.String()
 	conn, err := api.Open(&inf, api.DialOpts{
 		InsecureSkipVerify: true,
 		BakeryClient:       s.IDMSrv.Client(username),
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	return conn
 }
 
@@ -87,15 +86,15 @@ func (s *websocketSuite) assertCreateModel(c *gc.C, p createModelParams) base.Mo
 	}
 	credentialTag := names.NewCloudCredentialTag(fmt.Sprintf("dummy/%s@external/%s", p.username, p.cred))
 	mi, err := client.CreateModel(p.name, p.username+"@external", p.cloud, p.region, credentialTag, p.config)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	return mi
 }
 
 func (s *websocketSuite) grant(c *gc.C, path params.EntityPath, user params.User, access string) {
 	m, err := s.JEM.DB.Model(testContext, path)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	conn, err := s.JEM.OpenAPI(testContext, m.Controller)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.JEM.GrantModel(testContext, conn, m, user, access)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 }

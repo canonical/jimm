@@ -3,20 +3,20 @@
 package jem
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"time"
 
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/mgo.v2"
 
-	"github.com/CanonicalLtd/jem/internal/debugapi"
-	"github.com/CanonicalLtd/jem/internal/jemserver"
-	"github.com/CanonicalLtd/jem/internal/jujuapi"
-	"github.com/CanonicalLtd/jem/internal/v2"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/internal/debugapi"
+	"github.com/CanonicalLtd/jimm/internal/jemserver"
+	"github.com/CanonicalLtd/jimm/internal/jujuapi"
+	"github.com/CanonicalLtd/jimm/internal/v2"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 var versions = map[string]jemserver.NewAPIHandlerFunc{
@@ -42,6 +42,14 @@ type ServerParams struct {
 
 	// IdentityLocation holds the location of the third party identity service.
 	IdentityLocation string
+
+	// CharmstoreLocation holds the location of the charmstore
+	// associated with the controller.
+	CharmstoreLocation string
+
+	// MeteringLocation holds the location of the omnibus
+	// associated with the controller.
+	MeteringLocation string
 
 	// PublicKeyLocator holds a public key store.
 	// It may be nil.
@@ -80,6 +88,11 @@ type ServerParams struct {
 	// including the leading "@". If this is empty, users may be in
 	// any domain.
 	Domain string
+
+	// PublicCloudMetadata contains the path of the file containing
+	// the public cloud metadata. If this is empty or the file
+	// doesn't exist the default public cloud information is used.
+	PublicCloudMetadata string
 }
 
 // HandleCloser represents an HTTP handler that can

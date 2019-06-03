@@ -3,33 +3,37 @@
 package jemserver
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"net/http"
 	"net/url"
 	"time"
 
+	"github.com/juju/aclstore"
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient"
+	"github.com/juju/juju/cloud"
+	"github.com/juju/simplekv/mgosimplekv"
 	"github.com/julienschmidt/httprouter"
 	"github.com/prometheus/client_golang/prometheus"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/worker.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	"gopkg.in/macaroon-bakery.v1/httpbakery/agent"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgostorage"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/agent"
 	"gopkg.in/mgo.v2"
 
-	"github.com/CanonicalLtd/jem/internal/auth"
-	"github.com/CanonicalLtd/jem/internal/jem"
-	"github.com/CanonicalLtd/jem/internal/mgosession"
-	"github.com/CanonicalLtd/jem/internal/monitor"
-	"github.com/CanonicalLtd/jem/internal/usagesender"
-	"github.com/CanonicalLtd/jem/internal/zapctx"
-	"github.com/CanonicalLtd/jem/internal/zaputil"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/jemerror"
+	"github.com/CanonicalLtd/jimm/internal/mgosession"
+	"github.com/CanonicalLtd/jimm/internal/monitor"
+	"github.com/CanonicalLtd/jimm/internal/usagesender"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/internal/zaputil"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 var (
@@ -38,7 +42,7 @@ var (
 
 // NewAPIHandlerFunc is a function that returns set of httprequest
 // handlers that uses the given JEM pool and server params.
-type NewAPIHandlerFunc func(context.Context, *jem.Pool, *auth.Pool, Params) ([]httprequest.Handler, error)
+type NewAPIHandlerFunc func(context.Context, HandlerParams) ([]httprequest.Handler, error)
 
 // Params holds configuration for a new API server.
 // It must be kept in sync with identical definition in the
@@ -59,6 +63,14 @@ type Params struct {
 
 	// IdentityLocation holds the location of the third party identity service.
 	IdentityLocation string
+
+	// CharmstoreLocation holds the location of the charmstore
+	// associated with the controller.
+	CharmstoreLocation string
+
+	// MeteringLocation holds the location of the metering service
+	// associated with the controller.
+	MeteringLocation string
 
 	// PublicKeyLocator holds a public key store.
 	// It may be nil.
@@ -97,18 +109,41 @@ type Params struct {
 	// including the leading "@". If this is empty, users may be in
 	// any domain.
 	Domain string
+
+	// PublicCloudMetadata contains the path of the file containing
+	// the public cloud metadata. If this is empty or the file
+	// doesn't exist the default public cloud information is used.
+	PublicCloudMetadata string
+}
+
+// HandlerParams are the parameters used to initialize a handler.
+type HandlerParams struct {
+	Params
+
+	// SessionPool contains the pool of mgo sessions.
+	SessionPool *mgosession.Pool
+
+	// JEMPool contains the pool of JEM instances.
+	JEMPool *jem.Pool
+
+	// AuthenticatorPool contains the pool of Authenticators.
+	AuthenticatorPool *auth.Pool
+
+	// ACLManager contains the manager for the ACLs.
+	ACLManager *aclstore.Manager
 }
 
 // Server represents a JEM HTTP server.
 type Server struct {
-	router      *httprouter.Router
-	context     context.Context
-	pool        *jem.Pool
-	authPool    *auth.Pool
-	sessionPool *mgosession.Pool
-	monitor     *monitor.Monitor
-	usageSender worker.Worker
-	jemStats    *jem.Stats
+	router          *httprouter.Router
+	context         context.Context
+	pool            *jem.Pool
+	authPool        *auth.Pool
+	sessionPool     *mgosession.Pool
+	monitor         *monitor.Monitor
+	usageSender     worker.Worker
+	jemModelStats   *jem.ModelStats
+	jemMachineStats *jem.MachineStats
 }
 
 // New returns a new handler that handles model manager
@@ -139,12 +174,26 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 		return nil, errgo.Notef(err, "cannot create bakery")
 	}
 	sessionPool := mgosession.NewPool(ctx, config.DB.Session, config.MaxMgoSessions)
+	kvstore, err := mgosimplekv.NewStore(config.DB.C("acls"))
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot create ACL store")
+	}
+	aclStore := aclstore.NewACLStore(kvstore)
+	var publicCloudMetadataPath []string
+	if config.PublicCloudMetadata != "" {
+		publicCloudMetadataPath = append(publicCloudMetadataPath, config.PublicCloudMetadata)
+	}
+	publicCloudMetadata, _, err := cloud.PublicCloudMetadata(publicCloudMetadataPath...)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot load public cloud metadata")
+	}
 	jconfig := jem.Params{
-		DB:              config.DB,
-		SessionPool:     sessionPool,
-		ControllerAdmin: config.ControllerAdmin,
-		UsageSenderURL:  config.UsageSenderURL,
-		Client:          bclient,
+		DB:                  config.DB,
+		SessionPool:         sessionPool,
+		ControllerAdmin:     config.ControllerAdmin,
+		UsageSenderURL:      config.UsageSenderURL,
+		Client:              bclient,
+		PublicCloudMetadata: publicCloudMetadata,
 	}
 	p, err := jem.NewPool(ctx, jconfig)
 	if err != nil {
@@ -166,6 +215,25 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	})
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make auth pool")
+	}
+	aclManager, err := aclstore.NewManager(ctx, aclstore.Params{
+		Store:    aclStore,
+		RootPath: "/admin/acls",
+		Authenticate: func(ctx context.Context, w http.ResponseWriter, req *http.Request) (aclstore.Identity, error) {
+			authenticator := authPool.Authenticator(ctx)
+			defer authenticator.Close()
+			ctx, err := authenticator.AuthenticateRequest(ctx, req)
+			if err != nil {
+				status, body := jemerror.Mapper(err)
+				httprequest.WriteJSON(w, status, body)
+				return nil, errgo.Mask(err, errgo.Any)
+			}
+			return identity{ctx}, nil
+		},
+		InitialAdminUsers: []string{string(config.ControllerAdmin)},
+	})
+	if err != nil {
+		return nil, errgo.Mask(err)
 	}
 	srv := &Server{
 		router:      httprouter.New(),
@@ -199,9 +267,18 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 		}
 		srv.usageSender = worker
 	}
+	srv.router.Handler("GET", "/admin/acls/*path", aclManager)
+	srv.router.Handler("POST", "/admin/acls/*path", aclManager)
+	srv.router.Handler("PUT", "/admin/acls/*path", aclManager)
 	srv.router.Handler("GET", "/metrics", prometheus.Handler())
 	for name, newAPI := range versions {
-		handlers, err := newAPI(ctx, p, authPool, config)
+		handlers, err := newAPI(ctx, HandlerParams{
+			Params:            config,
+			SessionPool:       sessionPool,
+			JEMPool:           p,
+			AuthenticatorPool: authPool,
+			ACLManager:        aclManager,
+		})
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot create API %s", name)
 		}
@@ -214,17 +291,41 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 		}
 	}
 
-	srv.jemStats = p.Stats(ctx)
-	if err := prometheus.Register(srv.jemStats); err != nil {
+	srv.jemModelStats = p.ModelStats(ctx)
+	if err := prometheus.Register(srv.jemModelStats); err != nil {
 		// This happens when the stats have already been registered. In
 		// this case, we don't care much - just let the first one work.
 		// This is useful to enable tests that use more than one Server
 		// at the same time.
-		zapctx.Error(ctx, "cannot register JEM prometheus stats", zaputil.Error(err))
-		srv.jemStats = nil
+		zapctx.Error(ctx, "cannot register JEM model prometheus stats", zaputil.Error(err))
+		srv.jemModelStats = nil
+	}
+
+	srv.jemMachineStats = p.MachineStats(ctx)
+	if err := prometheus.Register(srv.jemMachineStats); err != nil {
+		// This happens when the stats have already been registered. In
+		// this case, we don't care much - just let the first one work.
+		// This is useful to enable tests that use more than one Server
+		// at the same time.
+		zapctx.Error(ctx, "cannot register JEM machine prometheus stats", zaputil.Error(err))
+		srv.jemMachineStats = nil
 	}
 
 	return srv, nil
+}
+
+type identity struct {
+	ctx context.Context
+}
+
+func (i identity) Allow(_ context.Context, acl []string) (bool, error) {
+	if err := auth.CheckACL(i.ctx, acl); err != nil {
+		if errgo.Cause(err) == params.ErrUnauthorized {
+			return false, nil
+		}
+		return false, errgo.Mask(err)
+	}
+	return true, nil
 }
 
 func monitorLeaseOwner(agentName string) (string, error) {
@@ -245,10 +346,14 @@ func newIdentityClient(config Params) (*idmclient.Client, *httpbakery.Client, er
 		return nil, nil, errgo.Notef(err, "cannot parse identity location URL %q", config.IdentityLocation)
 	}
 	agent.SetUpAuth(bclient, idmURL, config.AgentUsername)
-	return idmclient.New(idmclient.NewParams{
+	client, err := idmclient.New(idmclient.NewParams{
 		BaseURL: config.IdentityLocation,
 		Client:  bclient,
-	}), bclient, nil
+	})
+	if err != nil {
+		return nil, nil, errgo.Notef(err, "cannot create IDM client")
+	}
+	return client, bclient, nil
 }
 
 // ServeHTTP implements http.Handler.Handle.
@@ -276,8 +381,11 @@ func (srv *Server) options(http.ResponseWriter, *http.Request, httprouter.Params
 // Close implements io.Closer.Close. It should not be called
 // until all requests on the handler have completed.
 func (srv *Server) Close() error {
-	if srv.jemStats != nil {
-		prometheus.Unregister(srv.jemStats)
+	if srv.jemModelStats != nil {
+		prometheus.Unregister(srv.jemModelStats)
+	}
+	if srv.jemMachineStats != nil {
+		prometheus.Unregister(srv.jemMachineStats)
 	}
 	if srv.monitor != nil {
 		srv.monitor.Kill()

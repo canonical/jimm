@@ -3,21 +3,22 @@
 package monitor
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/utils/parallel"
 	"go.uber.org/zap"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/tomb.v2"
 
-	"github.com/CanonicalLtd/jem/internal/jem"
-	"github.com/CanonicalLtd/jem/internal/mongodoc"
-	"github.com/CanonicalLtd/jem/internal/zapctx"
-	"github.com/CanonicalLtd/jem/internal/zaputil"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/internal/servermon"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/internal/zaputil"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 var errControllerRemoved = errgo.New("controller has been removed")
@@ -166,19 +167,8 @@ func (m *controllerMonitor) watcher(ctx context.Context) error {
 		conn, err := m.dialAPI(ctx)
 		switch errgo.Cause(err) {
 		case nil:
-			if err := m.jem.SetControllerAvailable(ctx, m.ctlPath); err != nil {
-				return errgo.Notef(err, "cannot set controller availability")
-			}
-			if err := m.jem.ControllerUpdateCredentials(ctx, m.ctlPath); err != nil {
-				return errgo.Notef(err, "cannot update credentials")
-			}
-			// It's sufficient to update the server version only when we connect
-			// because if the server version changes, the API connection
-			// will be broken.
-			if v, ok := conn.ServerVersion(); ok {
-				if err := m.jem.SetControllerVersion(ctx, m.ctlPath, v); err != nil {
-					return errgo.Notef(err, "cannot set controller verision")
-				}
+			if err := m.connected(ctx, conn); err != nil {
+				return errgo.Mask(err)
 			}
 			err = m.watch(ctx, conn)
 			if errgo.Cause(err) == tomb.ErrDying {
@@ -195,6 +185,7 @@ func (m *controllerMonitor) watcher(ctx context.Context) error {
 			// The controller has been removed or we've been explicitly stopped.
 			return tomb.ErrDying
 		case jem.ErrAPIConnection:
+			incControllerErrorsMetric(m.ctlPath)
 			if err := m.jem.SetControllerUnavailableAt(ctx, m.ctlPath, dialStartTime); err != nil {
 				return errgo.Notef(err, "cannot set controller availability")
 			}
@@ -265,22 +256,129 @@ func (m *controllerMonitor) dialAPI(ctx context.Context) (jujuAPI, error) {
 	}
 }
 
+// connected performs the required updates that only need to happen when
+// the controller first connects.
+func (m *controllerMonitor) connected(ctx context.Context, conn jujuAPI) error {
+	if err := m.jem.SetControllerAvailable(ctx, m.ctlPath); err != nil {
+		return errgo.Notef(err, "cannot set controller availability")
+	}
+	if err := m.jem.ControllerUpdateCredentials(ctx, m.ctlPath); err != nil {
+		return errgo.Notef(err, "cannot update credentials")
+	}
+	// It's sufficient to update the server version only when we connect
+	// because if the server version changes, the API connection
+	// will be broken.
+	if v, ok := conn.ServerVersion(); ok {
+		if err := m.jem.SetControllerVersion(ctx, m.ctlPath, v); err != nil {
+			return errgo.Notef(err, "cannot set controller verision")
+		}
+	}
+	// Get the controller's supported regions, again this only needs
+	// to be done at connection time as we assume that a controller's
+	// supported regions won't change without an upgrade.
+
+	// Find out the cloud information.
+	clouds, err := conn.Clouds()
+	if err != nil {
+		return errgo.Notef(err, "cannot get clouds")
+	}
+
+	ctl, err := m.jem.Controller(ctx, m.ctlPath)
+	if err != nil {
+		return errgo.Notef(err, "cannot get controller")
+	}
+
+	var cloudRegions []mongodoc.CloudRegion
+	for k, v := range clouds {
+		cr := mongodoc.CloudRegion{
+			Cloud:              params.Cloud(k.Id()),
+			Endpoint:           v.Endpoint,
+			IdentityEndpoint:   v.IdentityEndpoint,
+			StorageEndpoint:    v.StorageEndpoint,
+			ProviderType:       v.Type,
+			CACertificates:     v.CACertificates,
+			PrimaryControllers: []params.EntityPath{ctl.Path},
+			ACL: params.ACL{
+				Read: []string{"everyone"},
+			},
+		}
+		for _, at := range v.AuthTypes {
+			cr.AuthTypes = append(cr.AuthTypes, string(at))
+		}
+		cloudRegions = append(cloudRegions, cr)
+		for _, reg := range v.Regions {
+			cr := mongodoc.CloudRegion{
+				Cloud:            params.Cloud(k.Id()),
+				Region:           reg.Name,
+				Endpoint:         reg.Endpoint,
+				IdentityEndpoint: reg.IdentityEndpoint,
+				StorageEndpoint:  reg.StorageEndpoint,
+				ACL: params.ACL{
+					Read: []string{"everyone"},
+				},
+			}
+			if ctl.Location["cloud"] == k.Id() && ctl.Location["region"] == reg.Name {
+				cr.PrimaryControllers = []params.EntityPath{ctl.Path}
+			} else {
+				cr.SecondaryControllers = []params.EntityPath{ctl.Path}
+			}
+			cloudRegions = append(cloudRegions, cr)
+		}
+	}
+	// Note: if regions change (other than by adding new regions), then the controller
+	// won't be removed from regions that are no longer supported
+	if err := m.jem.UpdateCloudRegions(ctx, cloudRegions); err != nil {
+		return errgo.Mask(err)
+	}
+
+	// Remove all the known machines and applications for the controller. The ones
+	// that still exist will be updated in the first deltas.
+	if err := m.jem.RemoveControllerMachines(ctx, m.ctlPath); err != nil {
+		return errgo.Notef(err, "cannot remove controller machines")
+	}
+	if err := m.jem.RemoveControllerApplications(ctx, m.ctlPath); err != nil {
+		return errgo.Notef(err, "cannot remove controller applications")
+	}
+
+	return nil
+}
+
 // watch reads events from the API megawatcher and
 // updates runtime stats in the controller document in response
 // to those.
 func (m *controllerMonitor) watch(ctx context.Context, conn jujuAPI) error {
 	apiw, err := conn.WatchAllModels()
 	if err != nil {
+		incControllerErrorsMetric(m.ctlPath)
 		return errgo.Notef(err, "cannot watch all models")
 	}
 	defer apiw.Stop()
 
 	w := newWatcherState(ctx, m.jem, m.ctlPath)
+
+	// Ensure an entry exists for every model UUID already in the database,
+	// with life set to dead. This means that when we get to the end of the first
+	// delta (which contains all entries for everything in the model), any
+	// models that haven't been updated will have their life updated to "dead"
+	// which will result in their entries being deleted from the jimm database.
+	uuids, err := m.jem.ModelUUIDsForController(ctx, m.ctlPath)
+	if err != nil {
+		return errgo.Notef(err, "cannot get existing model UUIDs")
+	}
+	for _, uuid := range uuids {
+		w.modelInfo(uuid)
+	}
+
 	type reply struct {
 		deltas []multiwatcher.Delta
 		err    error
 	}
 	replyc := make(chan reply, 1)
+	deltaMetric := servermon.MonitorDeltasReceivedCount.WithLabelValues(m.ctlPath.String())
+	deltaBatchMetric := servermon.MonitorDeltaBatchesReceivedCount.WithLabelValues(m.ctlPath.String())
+	if err != nil {
+		panic(err)
+	}
 	for {
 		go func() {
 			// Ideally rpc.Client would have a Go method
@@ -297,11 +395,14 @@ func (m *controllerMonitor) watch(ctx context.Context, conn jujuAPI) error {
 			return tomb.ErrDying
 		}
 		if r.err != nil {
+			incControllerErrorsMetric(m.ctlPath)
 			return errgo.Notef(r.err, "watcher error waiting for next event")
 		}
 		w.changed = false
 		w.runner = parallel.NewRun(maxConcurrentUpdates)
+		deltaBatchMetric.Inc()
 		for _, d := range r.deltas {
+			deltaMetric.Inc()
 			if err := w.addDelta(ctx, d); err != nil {
 				return errgo.Mask(err)
 			}
@@ -318,12 +419,38 @@ func (m *controllerMonitor) watch(ctx context.Context, conn jujuAPI) error {
 		// TODO perform all these updates concurrently?
 		for uuid, info := range w.models {
 			uuid, info := uuid, info
-			// TODO(rogpeppe) When both unit count and life change, we could
+			// TODO(rogpeppe) When both unit count and info change, we could
 			// combine them into a single database update.
-			if info.changed&lifeChange != 0 {
+			if info.changed&infoChange != 0 {
 				w.runner.Do(func() error {
-					if err := w.jem.SetModelLife(ctx, w.ctlPath, uuid, string(info.life)); err != nil {
-						return errgo.Notef(err, "cannot update model life")
+					if info.info == nil {
+						// We haven't received any updates for this model
+						// since the watcher started, but we don't necessarily
+						// trust that the watcher has actually provided all
+						// updates in the first delta, so check that the model
+						// really doesn't exist before setting its life to dead
+						// (which will remove it from the database).
+						ok, err := conn.ModelExists(uuid)
+						if err != nil {
+							return errgo.Mask(err)
+						}
+						if ok {
+							zapctx.Warn(
+								ctx,
+								"model exists but did not appear in first watcher delta",
+								zap.String("uuid", uuid),
+							)
+							return nil
+						}
+					}
+					if info.info == nil || info.info.Life == "dead" {
+						if err := w.jem.DeleteModelWithUUID(ctx, w.ctlPath, uuid); err != nil {
+							return errgo.Notef(err, "cannot delete model")
+						}
+					} else {
+						if err := w.jem.SetModelInfo(ctx, w.ctlPath, uuid, mongodocModelInfo(info.info)); err != nil {
+							return errgo.Notef(err, "cannot update model info")
+						}
 					}
 					return nil
 				})
@@ -333,7 +460,7 @@ func (m *controllerMonitor) watch(ctx context.Context, conn jujuAPI) error {
 					// Note: if we get a "not found" error, ignore it because it is expected that
 					// some models (e.g. the controller model) will not have a record in the
 					// database.
-					if err := m.jem.UpdateModelCounts(ctx, uuid, info.counts, time.Now()); err != nil && errgo.Cause(err) != params.ErrNotFound {
+					if err := m.jem.UpdateModelCounts(ctx, w.ctlPath, uuid, info.counts, time.Now()); err != nil && errgo.Cause(err) != params.ErrNotFound {
 						return errgo.Notef(err, "cannot update model counts")
 					}
 					return nil
@@ -378,7 +505,7 @@ type watcherState struct {
 type modelChange int
 
 const (
-	lifeChange modelChange = 1 << iota
+	infoChange modelChange = 1 << iota
 	countsChange
 )
 
@@ -386,8 +513,8 @@ const (
 type modelInfo struct {
 	uuid string
 
-	// life holds the lifecycle status of the model.
-	life multiwatcher.Life
+	// info contains the received watcher info for the model.
+	info *multiwatcher.ModelInfo
 
 	// counts holds current counts for entities in the model.
 	counts map[params.EntityCount]int
@@ -404,11 +531,9 @@ func (info *modelInfo) adjustCount(kind params.EntityCount, n int) {
 	}
 }
 
-func (info *modelInfo) setLife(life multiwatcher.Life) {
-	if life != info.life {
-		info.life = life
-		info.changed |= lifeChange
-	}
+func (info *modelInfo) setInfo(modelInfo *multiwatcher.ModelInfo) {
+	info.changed |= infoChange
+	info.info = modelInfo
 }
 
 func newWatcherState(ctx context.Context, j jemInterface, ctlPath params.EntityPath) *watcherState {
@@ -439,24 +564,34 @@ func (w *watcherState) addDelta(ctx context.Context, d multiwatcher.Delta) error
 	case *multiwatcher.ModelInfo:
 		// Ensure there's always a model entry.
 		w.adjustCount(&w.stats.ModelCount, d)
-		life := multiwatcher.Life("dead")
-		if !d.Removed {
-			life = e.Life
+		if d.Removed {
+			e.Life = "dead"
 		}
-		w.modelInfo(e.ModelUUID).setLife(life)
+		w.modelInfo(e.ModelUUID).setInfo(e)
 	case *multiwatcher.UnitInfo:
 		delta := w.adjustCount(&w.stats.UnitCount, d)
 		w.modelInfo(e.ModelUUID).adjustCount(params.UnitCount, delta)
 	case *multiwatcher.ApplicationInfo:
 		delta := w.adjustCount(&w.stats.ServiceCount, d)
 		w.modelInfo(e.ModelUUID).adjustCount(params.ApplicationCount, delta)
+		if d.Removed {
+			e.Life = "dead"
+		}
+		w.runner.Do(func() error {
+			return w.jem.UpdateApplicationInfo(ctx, w.ctlPath, e)
+		})
 	case *multiwatcher.MachineInfo:
 		// TODO for top level machines, increment instance count?
 		delta := w.adjustCount(&w.stats.MachineCount, d)
 		w.modelInfo(e.ModelUUID).adjustCount(params.MachineCount, delta)
+		if d.Removed {
+			e.Life = "dead"
+		}
 		w.runner.Do(func() error {
-			return w.jem.UpdateMachineInfo(ctx, e)
+			return w.jem.UpdateMachineInfo(ctx, w.ctlPath, e)
 		})
+	default:
+		zapctx.Debug(ctx, "unknown entity", zap.Bool("removed", d.Removed), zap.String("type", fmt.Sprintf("%T", e)))
 	}
 	return nil
 }
@@ -514,4 +649,25 @@ func (w *watcherState) adjustCount(n *int, delta multiwatcher.Delta) int {
 func isMonitoringStoppedError(err error) bool {
 	cause := errgo.Cause(err)
 	return cause == errControllerRemoved || cause == jem.ErrLeaseUnavailable
+}
+
+func incControllerErrorsMetric(ctlPath params.EntityPath) {
+	servermon.MonitorErrorsCount.WithLabelValues(ctlPath.String()).Inc()
+}
+
+func mongodocModelInfo(info *multiwatcher.ModelInfo) *mongodoc.ModelInfo {
+	since := time.Time{}
+	if info.Status.Since != nil {
+		since = *info.Status.Since
+	}
+	return &mongodoc.ModelInfo{
+		Life:   string(info.Life),
+		Config: info.Config,
+		Status: mongodoc.ModelStatus{
+			Status:  string(info.Status.Current),
+			Message: string(info.Status.Message),
+			Since:   since,
+			Data:    info.Status.Data,
+		},
+	}
 }

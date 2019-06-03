@@ -1,6 +1,7 @@
 package admincmd
 
 import (
+	"context"
 	"sort"
 	"strings"
 
@@ -10,14 +11,16 @@ import (
 	"github.com/juju/names"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 type grantCommand struct {
 	commandBase
 
-	path entityPathValue
+	path    entityPathValue
+	aclName string
 
+	admin      bool
 	controller bool
 	set        bool
 	users      userSet
@@ -28,10 +31,10 @@ func newGrantCommand() cmd.Command {
 }
 
 var grantDoc = `
-The grant command grants permissions for a set of users or groups
-to read a model (default) or controller within the managing server.
-Note that if someone can read a model from the managing server they can
-access that model and make changes to it.
+The grant command grants permissions for a set of users or groups to
+read a model (default), controller or an administrative function within
+the managing server.  Note that if someone can read a model from the
+managing server they can access that model and make changes to it.
 
 For example, this will allow alice and bob to read the model johndoe/mymodel.
 
@@ -40,12 +43,17 @@ For example, this will allow alice and bob to read the model johndoe/mymodel.
 If the --set flag is provided, the ACLs will be overwritten rather than added.
 
     jaas admin grant johndoe/mymodel --set fred,bob
+
+If the --admin flag is provided, the ACL that is changed will be for
+accessing an administrative function.
+
+    jaas admin grant --admin audit-log alice,bob
 `
 
 func (c *grantCommand) Info() *cmd.Info {
 	return &cmd.Info{
 		Name:    "grant",
-		Args:    "<user>/<modelname|controllername> username[,username]",
+		Args:    "<name> username[,username]",
 		Purpose: "grant permissions of managing server entity",
 		Doc:     grantDoc,
 	}
@@ -53,6 +61,7 @@ func (c *grantCommand) Info() *cmd.Info {
 
 func (c *grantCommand) SetFlags(f *gnuflag.FlagSet) {
 	f.BoolVar(&c.controller, "controller", false, "change ACL of controller not model")
+	f.BoolVar(&c.admin, "admin", false, "change an admin ACL")
 	f.BoolVar(&c.set, "set", false, "overwrite the current acl")
 }
 
@@ -67,8 +76,12 @@ func (c *grantCommand) Init(args []string) error {
 	if len(args) > 2 {
 		return errgo.Newf("too many arguments")
 	}
-	if err := c.path.Set(args[0]); err != nil {
-		return errgo.Mask(err)
+	if c.admin {
+		c.aclName = args[0]
+	} else {
+		if err := c.path.Set(args[0]); err != nil {
+			return errgo.Mask(err)
+		}
 	}
 	c.users = make(userSet)
 	if err := c.users.Set(args[1]); err != nil {
@@ -78,6 +91,13 @@ func (c *grantCommand) Init(args []string) error {
 }
 
 func (c *grantCommand) Run(ctxt *cmd.Context) error {
+	if c.admin {
+		return c.runAdmin(ctxt)
+	}
+	return c.run(ctxt)
+}
+
+func (c *grantCommand) run(ctxt *cmd.Context) error {
 	client, err := c.newClient(ctxt)
 	if err != nil {
 		return errgo.Mask(err)
@@ -136,6 +156,19 @@ func (c *grantCommand) getPerm(client *client) (params.ACL, error) {
 		})
 	}
 	return acl, errgo.Mask(err)
+}
+
+func (c *grantCommand) runAdmin(ctxt *cmd.Context) error {
+	client, err := c.newACLClient(ctxt)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	defer client.Close()
+
+	if c.set {
+		return errgo.Mask(client.Set(context.Background(), c.aclName, c.users.slice()))
+	}
+	return errgo.Mask(client.Add(context.Background(), c.aclName, c.users.slice()))
 }
 
 // userSet represents a set of users and implements gnuflag.Value

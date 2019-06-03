@@ -21,9 +21,9 @@ func (s *removeSuite) TestRemoveModel(c *gc.C) {
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
-	s.addEnv(c, "bob/foo", "bob/foo", "cred1")
+	s.addModel(c, "bob/foo", "bob/foo", "cred1")
 
-	s.addEnv(c, "bob/foo-1", "bob/foo", "cred1")
+	s.addModel(c, "bob/foo-1", "bob/foo", "cred1")
 
 	stdout, stderr, code = run(c, c.MkDir(), "remove", "bob/foo-1")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
@@ -45,16 +45,16 @@ func (s *removeSuite) TestRemoveController(c *gc.C) {
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
-	s.addEnv(c, "bob/foo", "bob/foo", "cred1")
+	s.addModel(c, "bob/foo", "bob/foo", "cred1")
 
 	// Add a second controller, that won't be deleted.
 	stdout, stderr, code = run(c, c.MkDir(), "add-controller", "bob/bar")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
-	s.addEnv(c, "bob/bar", "bob/bar", "cred1")
+	s.addModel(c, "bob/bar", "bob/bar", "cred1")
 
-	s.addEnv(c, "bob/foo-1", "bob/foo", "cred1")
+	s.addModel(c, "bob/foo-1", "bob/foo", "cred1")
 
 	// Without the --force flag, we'll be forbidden because the controller
 	// is live.
@@ -90,7 +90,7 @@ func (s *removeSuite) TestRemoveMultipleModels(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	s.addEnv(c, "bob/foo-1", "bob/foo", "cred1")
+	s.addModel(c, "bob/foo-1", "bob/foo", "cred1")
 
 	stdout, stderr, code = run(c, c.MkDir(), "remove", "bob/foo", "bob/foo-1")
 	c.Assert(code, gc.Equals, 1, gc.Commentf("stderr: %s", stderr))
@@ -112,9 +112,9 @@ func (s *removeSuite) TestRemoveVerbose(c *gc.C) {
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
-	s.addEnv(c, "bob/foo", "bob/foo", "cred1")
+	s.addModel(c, "bob/foo", "bob/foo", "cred1")
 
-	s.addEnv(c, "bob/foo-1", "bob/foo", "cred1")
+	s.addModel(c, "bob/foo-1", "bob/foo", "cred1")
 
 	stdout, stderr, code = run(c, c.MkDir(), "remove", "--verbose", "bob/foo-1")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))

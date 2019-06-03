@@ -10,9 +10,9 @@ import (
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 
-	"github.com/CanonicalLtd/jem/config"
+	"github.com/CanonicalLtd/jimm/config"
 )
 
 func TestPackage(t *testing.T) {
@@ -32,6 +32,8 @@ foo: 1
 bar: false
 state-server-admin: adminuser
 identity-location: localhost:18082
+charmstore-location: https://api.staging.jujucharms.com/charmstore
+metering-location: https://api.staging.jujucharms.com/metering
 identity-public-key: +qNbDWly3kRTDVv2UN03hrv/CBt4W6nxY5dHdw+KJFA=
 agent-username: agentuser
 agent-key:
@@ -91,13 +93,14 @@ gui-location: https://jujucharms.com
 usage-sender-url: https://jujucharms.com/omnibus/v2
 usage-sender-collection: "usagespool"
 domain: test-domain
+public-cloud-metadata: cloud-metadata.yaml
 `
 
 func (s *ConfigSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
 	// Write the configuration content to file.
 	path := path.Join(c.MkDir(), "jemd.conf")
 	err := ioutil.WriteFile(path, []byte(content), 0666)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Read the configuration.
 	return config.Read(path)
@@ -105,11 +108,11 @@ func (s *ConfigSuite) readConfig(c *gc.C, content string) (*config.Config, error
 
 func (s *ConfigSuite) TestRead(c *gc.C) {
 	conf, err := s.readConfig(c, testConfig)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Check that the TLS configuration creates a valid *tls.Config
 	tlsConfig, err := conf.TLSConfig()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(tlsConfig, gc.Not(gc.IsNil))
 	conf.TLSCert = ""
 	conf.TLSKey = ""
@@ -119,7 +122,9 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 		APIAddr:         "blah:2324",
 		ControllerAdmin: "adminuser",
 
-		IdentityLocation: "localhost:18082",
+		IdentityLocation:   "localhost:18082",
+		CharmstoreLocation: "https://api.staging.jujucharms.com/charmstore",
+		MeteringLocation:   "https://api.staging.jujucharms.com/metering",
 		IdentityPublicKey: &bakery.PublicKey{
 			Key: mustParseKey("+qNbDWly3kRTDVv2UN03hrv/CBt4W6nxY5dHdw+KJFA="),
 		},
@@ -138,6 +143,7 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 		UsageSenderURL:        "https://jujucharms.com/omnibus/v2",
 		UsageSenderCollection: "usagespool",
 		Domain:                "test-domain",
+		PublicCloudMetadata:   "cloud-metadata.yaml",
 	})
 }
 

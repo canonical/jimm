@@ -1,13 +1,13 @@
 package v2_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
-	"go.uber.org/zap/zapcore"
-
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/juju/api"
 	controllerapi "github.com/juju/juju/api/controller"
 	jujuparams "github.com/juju/juju/apiserver/params"
@@ -16,16 +16,18 @@ import (
 	jujuversion "github.com/juju/juju/version"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
-	"golang.org/x/net/context"
+	"github.com/juju/utils"
+	"go.uber.org/zap/zapcore"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
 
-	"github.com/CanonicalLtd/jem/internal/apitest"
-	"github.com/CanonicalLtd/jem/internal/mongodoc"
-	"github.com/CanonicalLtd/jem/internal/v2"
-	"github.com/CanonicalLtd/jem/internal/zapctx"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/internal/apitest"
+	"github.com/CanonicalLtd/jimm/internal/jemtest"
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/internal/v2"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 func init() {
@@ -77,19 +79,6 @@ var unauthorizedTests = []struct {
 		},
 	},
 }, {
-	about:  "new model with inaccessible controller",
-	asUser: "alice",
-	method: "POST",
-	path:   "/v2/model/alice",
-	body: params.NewModelInfo{
-		Name:       "newmodel",
-		Controller: &params.EntityPath{"bob", "private"},
-		Credential: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"bob", "cred1"},
-		},
-	},
-}, {
 	about:  "set controller perm as non-owner",
 	asUser: "other",
 	method: "PUT",
@@ -121,6 +110,12 @@ var unauthorizedTests = []struct {
 	asUser: "other",
 	method: "GET",
 	path:   "/v2/model/bob/open/perm",
+}, {
+	about:  "set deprecated status as non-owner",
+	asUser: "other",
+	method: "PUT",
+	path:   "/v2/controller/bob/open",
+	body:   params.DeprecatedBody{},
 }}
 
 func (s *APISuite) TestUnauthorized(c *gc.C) {
@@ -128,6 +123,7 @@ func (s *APISuite) TestUnauthorized(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{"bob", "open"}, false)
 
 	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
+	s.AssertUpdateCredential(c, "alice", "dummy", "cred1", "empty")
 	s.CreateModel(c, params.EntityPath{"bob", "open"}, params.EntityPath{"bob", "open"}, cred)
 
 	s.allowControllerPerm(c, params.EntityPath{"bob", "open"})
@@ -285,7 +281,7 @@ func (s *APISuite) TestAddController(c *gc.C) {
 		expectBody: httptesting.BodyAsserter(func(c *gc.C, m json.RawMessage) {
 			var body params.Error
 			err := json.Unmarshal(m, &body)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			c.Assert(body.Code, gc.Equals, params.ErrBadRequest)
 			c.Assert(body.Message, gc.Matches, `cannot connect to controller: unable to connect to API: .*`)
 		}),
@@ -332,12 +328,12 @@ func (s *APISuite) TestAddController(c *gc.C) {
 		// The controller was added successfully. Check that we
 		// can connect to it.
 		conn, err := s.JEM.OpenAPI(context.TODO(), controllerPath)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		conn.Close()
 
 		// Check that the version has been set correctly.
 		ctl, err := s.JEM.DB.Controller(context.TODO(), controllerPath)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		v, ok := conn.ServerVersion()
 		c.Assert(ok, gc.Equals, true)
 		c.Assert(ctl.Version, jc.DeepEquals, &v)
@@ -458,7 +454,7 @@ func (s *APISuite) TestGetController(c *gc.C) {
 	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, false)
 	t := time.Now()
 	err := s.JEM.DB.SetControllerUnavailableAt(testContext, ctlId, t)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.JEMSrv,
@@ -493,7 +489,7 @@ func (s *APISuite) TestGetControllerWithLocation(c *gc.C) {
 			Public:         true,
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.JEMSrv,
@@ -505,50 +501,6 @@ func (s *APISuite) TestGetControllerWithLocation(c *gc.C) {
 	err = json.Unmarshal(resp.Body.Bytes(), &controllerInfo)
 	c.Assert(err, gc.IsNil, gc.Commentf("body: %s", resp.Body.String()))
 	c.Assert(controllerInfo.Public, gc.Equals, true)
-}
-
-func (s *APISuite) TestGetControllerLocation(c *gc.C) {
-	ctlId := params.EntityPath{"bob", "foo"}
-
-	s.AssertAddController(c, ctlId, false)
-
-	// Check the location attributes.
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Method:       "GET",
-		Handler:      s.JEMSrv,
-		URL:          "/v2/controller/" + ctlId.String() + "/meta/location",
-		ExpectStatus: http.StatusOK,
-		ExpectBody: params.ControllerLocation{
-			Location: map[string]string{"cloud": "dummy", "region": "dummy-region"},
-		},
-		Do: apitest.Do(s.IDMSrv.Client("bob")),
-	})
-
-	// Check alice can't access them.
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Method:       "GET",
-		Handler:      s.JEMSrv,
-		URL:          "/v2/controller/" + ctlId.String() + "/meta/location",
-		ExpectStatus: http.StatusUnauthorized,
-		ExpectBody: &params.Error{
-			Message: `unauthorized`,
-			Code:    params.ErrUnauthorized,
-		},
-		Do: apitest.Do(s.IDMSrv.Client("alice")),
-	})
-
-	// Check alice can't probe controllers througth GET.
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Method:       "GET",
-		Handler:      s.JEMSrv,
-		URL:          "/v2/controller/bob/notexist/meta/location",
-		ExpectStatus: http.StatusUnauthorized,
-		ExpectBody: &params.Error{
-			Message: `unauthorized`,
-			Code:    params.ErrUnauthorized,
-		},
-		Do: apitest.Do(s.IDMSrv.Client("alice")),
-	})
 }
 
 func (s *APISuite) TestGetControllerNotFound(c *gc.C) {
@@ -661,417 +613,6 @@ func (s *APISuite) TestDeleteController(c *gc.C) {
 	})
 }
 
-var getControllerLocationsTests = []struct {
-	about       string
-	arg         params.GetControllerLocations
-	user        params.User
-	expect      params.ControllerLocationsResponse
-	expectError string
-	expectCause error
-}{{
-	about: "no filters",
-	user:  "bob",
-	arg: params.GetControllerLocations{
-		Attr: "cloud",
-	},
-	expect: params.ControllerLocationsResponse{
-		Values: []string{"aws", "gce"},
-	},
-}, {
-	about: "filter to single cloud",
-	user:  "bob",
-	arg: params.GetControllerLocations{
-		Attr: "region",
-		Location: map[string]string{
-			"cloud": "aws",
-		},
-	},
-	expect: params.ControllerLocationsResponse{
-		Values: []string{"eu-west-1", "us-east-1"},
-	},
-}, {
-	about: "no matching controllers",
-	user:  "bob",
-	arg: params.GetControllerLocations{
-		Attr: "region",
-		Location: map[string]string{
-			"cloud": "joyent",
-		},
-	},
-	expect: params.ControllerLocationsResponse{},
-}, {
-	about: "invalid filter attribute",
-	user:  "bob",
-	arg: params.GetControllerLocations{
-		Attr: "region",
-		Location: map[string]string{
-			"cloud.blah": "aws",
-		},
-	},
-	expectError: `invalid location attribute "cloud\.blah"`,
-	expectCause: params.ErrBadRequest,
-}, {
-	about: "user without access to everything",
-	user:  "alice",
-	arg: params.GetControllerLocations{
-		Attr: "cloud",
-	},
-	expect: params.ControllerLocationsResponse{
-		Values: []string{"azure", "gce"},
-	},
-}}
-
-func (s *APISuite) TestGetControllerLocations(c *gc.C) {
-	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"bob", "aws-us-east"},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "us-east-1",
-			}},
-		},
-		Public: true,
-		Location: map[string]string{
-			"cloud":  "aws",
-			"region": "us-east-1",
-		},
-	})
-	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"bob", "aws-us-east2"},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "us-east-1",
-			}},
-		},
-		Public: true,
-		Location: map[string]string{
-			"cloud":  "aws",
-			"region": "us-east-1",
-		},
-	})
-	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"bob", "aws-eu-west"},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "eu-west-1",
-			}},
-		},
-		Public: true,
-		Location: map[string]string{
-			"cloud":  "aws",
-			"region": "eu-west-1",
-		},
-	})
-	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"bob", "gce-somewhere"},
-		Cloud: mongodoc.Cloud{
-			Name: "gce",
-			Regions: []mongodoc.Region{{
-				Name: "somewhere",
-			}},
-		},
-		Public: true,
-		Location: map[string]string{
-			"cloud":  "gce",
-			"region": "somewhere",
-		},
-	})
-	ctlId := params.EntityPath{"bob", "gce-down"}
-	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: ctlId,
-		Cloud: mongodoc.Cloud{
-			Name: "gce",
-			Regions: []mongodoc.Region{{
-				Name: "down",
-			}},
-		},
-		Public: true,
-		Location: map[string]string{
-			"cloud":  "gce",
-			"region": "down",
-		},
-	})
-	err := s.JEM.DB.SetControllerUnavailableAt(testContext, ctlId, time.Now())
-	c.Assert(err, gc.IsNil)
-	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"bob", "gce-elsewhere"},
-		Cloud: mongodoc.Cloud{
-			Name: "gce",
-			Regions: []mongodoc.Region{{
-				Name: "elsewhere",
-			}},
-		},
-		Public: true,
-		Location: map[string]string{
-			"cloud":  "gce",
-			"region": "elsewhere",
-		},
-	})
-	s.IDMSrv.AddUser("alice", "somegroup")
-	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"somegroup", "controller"},
-		Cloud: mongodoc.Cloud{
-			Name: "gce",
-			Regions: []mongodoc.Region{{
-				Name: "america",
-			}},
-		},
-		Public: true,
-		Location: map[string]string{
-			"cloud":  "gce",
-			"region": "america",
-		},
-	})
-	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"alice", "controller"},
-		Cloud: mongodoc.Cloud{
-			Name: "azure",
-			Regions: []mongodoc.Region{{
-				Name: "america",
-			}},
-		},
-		Public: true,
-		Location: map[string]string{
-			"cloud":  "azure",
-			"region": "america",
-		},
-	})
-	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"alice", "forgotten"},
-		Cloud: mongodoc.Cloud{
-			Name: "azure",
-			Regions: []mongodoc.Region{{
-				Name: "america",
-			}},
-		},
-		Public: false,
-		Location: map[string]string{
-			"cloud":  "azure",
-			"region": "america",
-		},
-	})
-
-	for i, test := range getControllerLocationsTests {
-		c.Logf("test %d: %v", i, test.about)
-		resp, err := s.NewClient(test.user).GetControllerLocations(&test.arg)
-		if test.expectError != "" {
-			c.Check(resp, gc.IsNil)
-			c.Assert(err, gc.ErrorMatches, test.expectError)
-			c.Assert(errgo.Cause(err), gc.Equals, test.expectCause)
-			continue
-		}
-		c.Assert(err, gc.IsNil)
-		c.Assert(resp, jc.DeepEquals, &test.expect)
-	}
-}
-
-var getAllControllerLocationsTests = []struct {
-	about       string
-	arg         params.GetAllControllerLocations
-	user        params.User
-	expect      params.AllControllerLocationsResponse
-	expectError string
-	expectCause error
-}{{
-	about: "no filters",
-	user:  "bob",
-	expect: params.AllControllerLocationsResponse{
-		Locations: []map[string]string{{
-			"cloud":  "aws",
-			"region": "eu-west-1",
-		}, {
-			"cloud":  "aws",
-			"region": "us-east-1",
-		}, {
-			"cloud":  "gce",
-			"region": "elsewhere",
-		}, {
-			"cloud":  "gce",
-			"region": "somewhere",
-		}},
-	},
-}, {
-	about: "filter to single cloud",
-	user:  "bob",
-	arg: params.GetAllControllerLocations{
-		Location: map[string]string{
-			"cloud": "aws",
-		},
-	},
-	expect: params.AllControllerLocationsResponse{
-		Locations: []map[string]string{{
-			"cloud":  "aws",
-			"region": "eu-west-1",
-		}, {
-			"cloud":  "aws",
-			"region": "us-east-1",
-		}},
-	},
-}, {
-	about: "no matching controllers",
-	user:  "bob",
-	arg: params.GetAllControllerLocations{
-		Location: map[string]string{
-			"cloud": "joyent",
-		},
-	},
-	expect: params.AllControllerLocationsResponse{},
-}, {
-	about: "invalid filter attribute",
-	user:  "bob",
-	arg: params.GetAllControllerLocations{
-		Location: map[string]string{
-			"cloud.blah": "aws",
-		},
-	},
-	expectError: `invalid location attribute "cloud\.blah"`,
-	expectCause: params.ErrBadRequest,
-}, {
-	about: "user without access to everything",
-	user:  "alice",
-	expect: params.AllControllerLocationsResponse{
-		Locations: []map[string]string{{
-			"cloud":  "azure",
-			"region": "america",
-		}},
-	},
-}}
-
-func (s *APISuite) TestAllControllerLocations(c *gc.C) {
-	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"bob", "aws-us-east"},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "us-east-1",
-			}},
-		},
-		Public: true,
-		Location: map[string]string{
-			"cloud":  "aws",
-			"region": "us-east-1",
-		},
-	})
-	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"bob", "aws-us-east2"},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "us-east-1",
-			}},
-		},
-		Public: true,
-		Location: map[string]string{
-			"cloud":  "aws",
-			"region": "us-east-1",
-		},
-	})
-	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"bob", "aws-eu-west"},
-		Cloud: mongodoc.Cloud{
-			Name: "aws",
-			Regions: []mongodoc.Region{{
-				Name: "eu-west-1",
-			}},
-		},
-		Public: true,
-		Location: map[string]string{
-			"cloud":  "aws",
-			"region": "eu-west-1",
-		},
-	})
-	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"bob", "gce-somewhere"},
-		Cloud: mongodoc.Cloud{
-			Name: "gce",
-			Regions: []mongodoc.Region{{
-				Name: "somewhere",
-			}},
-		},
-		Public: true,
-		Location: map[string]string{
-			"cloud":  "gce",
-			"region": "somewhere",
-		},
-	})
-	ctlId := params.EntityPath{"bob", "gce-down"}
-	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: ctlId,
-		Cloud: mongodoc.Cloud{
-			Name: "gce",
-			Regions: []mongodoc.Region{{
-				Name: "down",
-			}},
-		},
-		Public: true,
-		Location: map[string]string{
-			"cloud":  "gce",
-			"region": "down",
-		},
-	})
-	err := s.JEM.DB.SetControllerUnavailableAt(testContext, ctlId, time.Now())
-	c.Assert(err, gc.IsNil)
-	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"bob", "gce-elsewhere"},
-		Cloud: mongodoc.Cloud{
-			Name: "gce",
-			Regions: []mongodoc.Region{{
-				Name: "elsewhere",
-			}},
-		},
-		Public: true,
-		Location: map[string]string{
-			"cloud":  "gce",
-			"region": "elsewhere",
-		},
-	})
-	s.IDMSrv.AddUser("alice", "somegroup")
-	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"alice", "controller"},
-		Cloud: mongodoc.Cloud{
-			Name: "azure",
-			Regions: []mongodoc.Region{{
-				Name: "america",
-			}},
-		},
-		Public: true,
-		Location: map[string]string{
-			"cloud":  "azure",
-			"region": "america",
-		},
-	})
-	s.AssertAddControllerDoc(c, &mongodoc.Controller{
-		Path: params.EntityPath{"alice", "forgotten"},
-		Cloud: mongodoc.Cloud{
-			Name: "azure",
-			Regions: []mongodoc.Region{{
-				Name: "america",
-			}},
-		},
-		Public: false,
-		Location: map[string]string{
-			"cloud":  "azure",
-			"region": "america",
-		},
-	})
-
-	for i, test := range getAllControllerLocationsTests {
-		c.Logf("test %d: %v", i, test.about)
-		resp, err := s.NewClient(test.user).GetAllControllerLocations(&test.arg)
-		if test.expectError != "" {
-			c.Check(resp, gc.IsNil)
-			c.Assert(err, gc.ErrorMatches, test.expectError)
-			c.Assert(errgo.Cause(err), gc.Equals, test.expectCause)
-			continue
-		}
-		c.Assert(err, gc.IsNil)
-		c.Assert(resp, jc.DeepEquals, &test.expect)
-	}
-
-}
-
 func (s *APISuite) TestNewModel(c *gc.C) {
 	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, false)
 	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
@@ -1100,7 +641,7 @@ func (s *APISuite) TestNewModel(c *gc.C) {
 	})
 	var modelResp params.ModelResponse
 	err := json.Unmarshal(modelRespBody, &modelResp)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	st := s.openAPIFromModelResponse(c, &modelResp, "bob")
 	defer st.Close()
@@ -1118,7 +659,7 @@ func (s *APISuite) TestNewModel(c *gc.C) {
 			Name: "bar",
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	st = s.openAPIFromModelResponse(c, modelResp2, "bob")
 	defer st.Close()
 	muuid2, valid2 := st.Client().ModelUUID()
@@ -1154,7 +695,7 @@ var newModelWithoutExplicitControllerTests = []struct {
 	info: params.NewModelInfo{
 		Name: "test-model",
 		Credential: params.CredentialPath{
-			Cloud:      "aws",
+			Cloud:      "dummy",
 			EntityPath: params.EntityPath{"alice", "cred1"},
 		},
 		Location: map[string]string{
@@ -1164,7 +705,7 @@ var newModelWithoutExplicitControllerTests = []struct {
 			"secret": "a secret",
 		},
 	},
-	expectError:      `cannot select controller: no matching controllers found`,
+	expectError:      `cloud "aws" region "" not found`,
 	expectErrorCause: params.ErrNotFound,
 }, {
 	about: "no matching region",
@@ -1172,7 +713,7 @@ var newModelWithoutExplicitControllerTests = []struct {
 	info: params.NewModelInfo{
 		Name: "test-model",
 		Credential: params.CredentialPath{
-			Cloud:      "aws",
+			Cloud:      "dummy",
 			EntityPath: params.EntityPath{"alice", "cred1"},
 		},
 		Location: map[string]string{
@@ -1182,7 +723,7 @@ var newModelWithoutExplicitControllerTests = []struct {
 			"secret": "a secret",
 		},
 	},
-	expectError:      `cannot select controller: no matching controllers found`,
+	expectError:      `cloud "" region "us-east-1" not found`,
 	expectErrorCause: params.ErrNotFound,
 }, {
 	about: "unrecognised location parameter",
@@ -1190,7 +731,7 @@ var newModelWithoutExplicitControllerTests = []struct {
 	info: params.NewModelInfo{
 		Name: "test-model",
 		Credential: params.CredentialPath{
-			Cloud:      "aws",
+			Cloud:      "dummy",
 			EntityPath: params.EntityPath{"alice", "cred1"},
 		},
 		Location: map[string]string{
@@ -1257,7 +798,7 @@ func (s *APISuite) TestNewModelWithoutExplicitController(c *gc.C) {
 			c.Assert(errgo.Cause(err), gc.Equals, test.expectErrorCause)
 			continue
 		}
-		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(resp.Path, jc.DeepEquals, params.EntityPath{test.user, test.info.Name})
 		c.Assert(resp.ControllerPath, jc.DeepEquals, ctlId)
 	}
@@ -1265,14 +806,14 @@ func (s *APISuite) TestNewModelWithoutExplicitController(c *gc.C) {
 
 func (s *APISuite) assertModelConfigAttr(c *gc.C, modelPath params.EntityPath, attr string, val interface{}) {
 	m, err := s.JEM.DB.Model(testContext, modelPath)
-	c.Assert(err, gc.IsNil)
-	st, err := s.State.ForModel(names.NewModelTag(m.UUID))
-	c.Assert(err, gc.IsNil)
-	defer st.Close()
+	c.Assert(err, gc.Equals, nil)
+	st, err := s.StatePool.Get(m.UUID)
+	c.Assert(err, gc.Equals, nil)
+	defer st.Release()
 	stm, err := st.Model()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	cfg, err := stm.Config()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(cfg.AllAttrs()[attr], jc.DeepEquals, val)
 }
 
@@ -1283,10 +824,10 @@ func (s *APISuite) TestGetModelWhenControllerUnavailable(c *gc.C) {
 	aModel, aUUID := s.CreateModel(c, params.EntityPath{"bob", "foo"}, ctlId, aCred)
 
 	err := s.JEM.DB.SetModelLife(testContext, aModel, aUUID, "dying")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	t := time.Now()
 	err = s.JEM.DB.SetControllerUnavailableAt(testContext, ctlId, t)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	var modelRespBody json.RawMessage
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -1300,7 +841,7 @@ func (s *APISuite) TestGetModelWhenControllerUnavailable(c *gc.C) {
 	})
 	var modelResp params.ModelResponse
 	err = json.Unmarshal(modelRespBody, &modelResp)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(modelResp, jc.DeepEquals, params.ModelResponse{
 		Path:             aModel,
 		UUID:             aUUID,
@@ -1320,17 +861,17 @@ func (s *APISuite) TestGetModelWithCounts(c *gc.C) {
 	modelId, uuid := s.CreateModel(c, params.EntityPath{"bob", "foo"}, ctlId, cred)
 
 	t0 := time.Unix(0, 0)
-	err := s.JEM.DB.UpdateModelCounts(testContext, uuid, map[params.EntityCount]int{
+	err := s.JEM.DB.UpdateModelCounts(testContext, ctlId, uuid, map[params.EntityCount]int{
 		params.MachineCount: 3,
 		params.UnitCount:    99,
 	}, t0)
 
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	m, err := s.NewClient("bob").GetModel(&params.GetModel{
 		EntityPath: modelId,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(m.Counts, jc.DeepEquals, map[params.EntityCount]params.Count{
 		params.MachineCount: {
 			Time:    t0,
@@ -1355,7 +896,7 @@ func (s *APISuite) openAPIFromModelResponse(c *gc.C, resp *params.ModelResponse,
 	st, err := api.Open(apiInfoFromModelResponse(resp), api.DialOpts{
 		BakeryClient: s.IDMSrv.Client(username),
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	return st
 }
 
@@ -1396,7 +937,7 @@ func (s *APISuite) TestNewModelUnderGroup(c *gc.C) {
 	})
 	var modelResp params.ModelResponse
 	err := json.Unmarshal(modelRespBody, &modelResp)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Ensure that we can connect to the new model
 	// Note: juju controllers cannot check groups yet, so we connect
@@ -1431,7 +972,7 @@ func (s *APISuite) TestNewModelWithInvalidControllerPath(c *gc.C) {
 				"controller": test.path,
 			},
 			ExpectBody: params.Error{
-				Message: fmt.Sprintf("cannot unmarshal parameters: cannot unmarshal into field: cannot unmarshal request body: %s", test.expectErr),
+				Message: fmt.Sprintf("cannot unmarshal parameters: cannot unmarshal into field Info: cannot unmarshal request body: %s", test.expectErr),
 				Code:    params.ErrBadRequest,
 			},
 			ExpectStatus: http.StatusBadRequest,
@@ -1444,7 +985,7 @@ func (s *APISuite) TestNewModelCannotOpenAPI(c *gc.C) {
 	s.AssertAddControllerDoc(c, &mongodoc.Controller{
 		Path:      params.EntityPath{"bob", "foo"},
 		AdminUser: "admin",
-	})
+	}, nil)
 	s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -1460,7 +1001,7 @@ func (s *APISuite) TestNewModelCannotOpenAPI(c *gc.C) {
 			},
 		},
 		ExpectBody: params.Error{
-			Message: `cannot connect to controller: validating info for opening an API connection: missing addresses not valid`,
+			Message: `cannot find suitable controller`,
 		},
 		ExpectStatus: http.StatusInternalServerError,
 		Do:           apitest.Do(s.IDMSrv.Client("bob")),
@@ -1578,14 +1119,14 @@ func (s *APISuite) TestListController(c *gc.C) {
 	ctlId1 := s.AssertAddController(c, params.EntityPath{"bob", "lost"}, false)
 	unavailableTime := time.Now()
 	err := s.JEM.DB.SetControllerUnavailableAt(testContext, ctlId1, unavailableTime)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	ctlId2 := s.AssertAddController(c, params.EntityPath{"bob", "another"}, false)
 	err = s.JEM.DB.SetControllerUnavailableAt(testContext, ctlId2, unavailableTime.Add(time.Second))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	resp, err := s.NewClient("bob").ListController(nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(resp, jc.DeepEquals, &params.ListControllerResponse{
 		Controllers: []params.ControllerResponse{{
 			Path:             ctlId2,
@@ -1607,19 +1148,19 @@ func (s *APISuite) TestListController(c *gc.C) {
 	// Check that the private entries don't show up when listing
 	// as a different user.
 	resp, err = s.NewClient("alice").ListController(nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(resp, jc.DeepEquals, &params.ListControllerResponse{})
 }
 
 func (s *APISuite) TestListControllerNoServers(c *gc.C) {
 	resp, err := s.NewClient("bob").ListController(nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(resp, jc.DeepEquals, &params.ListControllerResponse{})
 }
 
 func (s *APISuite) TestListModelsNoServers(c *gc.C) {
 	resp, err := s.NewClient("bob").ListModels(&params.ListModels{})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(resp, jc.DeepEquals, &params.ListModelsResponse{})
 }
 
@@ -1637,11 +1178,11 @@ func (s *APISuite) TestListModels(c *gc.C) {
 
 	// Give one of the models some counts.
 	t0 := time.Unix(0, 0)
-	err := s.JEM.DB.UpdateModelCounts(testContext, uuid1, map[params.EntityCount]int{
+	err := s.JEM.DB.UpdateModelCounts(testContext, ctlId0, uuid1, map[params.EntityCount]int{
 		params.MachineCount: 3,
 	}, t0)
 
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	resps := []params.ModelResponse{{
 		Path:           modelId0,
@@ -1710,7 +1251,7 @@ func (s *APISuite) TestListModels(c *gc.C) {
 		}
 
 		resp, err := s.NewClient(test.user).ListModels(&params.ListModels{All: test.all})
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(resp, jc.DeepEquals, expectResp)
 	}
 }
@@ -1727,7 +1268,7 @@ func (s *APISuite) TestGetSetControllerPerm(c *gc.C) {
 	acl, err := s.NewClient("alice").GetControllerPerm(&params.GetControllerPerm{
 		EntityPath: ctlId,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(acl, jc.DeepEquals, params.ACL{})
 
 	err = s.NewClient("alice").SetControllerPerm(&params.SetControllerPerm{
@@ -1736,11 +1277,11 @@ func (s *APISuite) TestGetSetControllerPerm(c *gc.C) {
 			Read: []string{"a", "b"},
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	acl, err = s.NewClient("alice").GetControllerPerm(&params.GetControllerPerm{
 		EntityPath: ctlId,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(acl, gc.DeepEquals, params.ACL{
 		Read: []string{"a", "b"},
 	})
@@ -1754,7 +1295,7 @@ func (s *APISuite) TestGetSetModelPerm(c *gc.C) {
 	acl, err := s.NewClient("alice").GetModelPerm(&params.GetModelPerm{
 		EntityPath: ctlId,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(acl, jc.DeepEquals, params.ACL{})
 
 	err = s.NewClient("alice").SetModelPerm(&params.SetModelPerm{
@@ -1763,11 +1304,11 @@ func (s *APISuite) TestGetSetModelPerm(c *gc.C) {
 			Read: []string{"a", "b"},
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	acl, err = s.NewClient("alice").GetModelPerm(&params.GetModelPerm{
 		EntityPath: aModel,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(acl, gc.DeepEquals, params.ACL{
 		Read: []string{"a", "b"},
 	})
@@ -1775,7 +1316,7 @@ func (s *APISuite) TestGetSetModelPerm(c *gc.C) {
 
 func (s *APISuite) TestWhoAmI(c *gc.C) {
 	resp, err := s.NewClient("bob").WhoAmI(nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(resp.User, gc.Equals, "bob")
 }
 
@@ -1819,8 +1360,9 @@ func (s *APISuite) TestJujuStatus(c *gc.C) {
 	resp, err := s.NewClient("bob").JujuStatus(&params.JujuStatus{
 		EntityPath: modelId,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	resp.Status.Model.ModelStatus.Since = nil
+	resp.Status.ControllerTimestamp = nil
 	c.Assert(resp, jc.DeepEquals, &params.JujuStatusResponse{
 		Status: jujuparams.FullStatus{
 			Model: jujuparams.ModelStatusInfo{
@@ -1832,12 +1374,14 @@ func (s *APISuite) TestJujuStatus(c *gc.C) {
 					Status: "available",
 					Data:   make(map[string]interface{}),
 				},
-				SLA: "unsupported",
+				SLA:  "unsupported",
+				Type: "iaas",
 			},
 			Machines:           map[string]jujuparams.MachineStatus{},
 			Applications:       map[string]jujuparams.ApplicationStatus{},
 			RemoteApplications: map[string]jujuparams.RemoteApplicationStatus{},
 			Relations:          nil,
+			Offers:             map[string]jujuparams.ApplicationOfferStatus{},
 		},
 	})
 
@@ -1845,8 +1389,9 @@ func (s *APISuite) TestJujuStatus(c *gc.C) {
 	resp, err = s.NewClient("alice").JujuStatus(&params.JujuStatus{
 		EntityPath: modelId,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	resp.Status.Model.ModelStatus.Since = nil
+	resp.Status.ControllerTimestamp = nil
 	c.Assert(resp, jc.DeepEquals, &params.JujuStatusResponse{
 		Status: jujuparams.FullStatus{
 			Model: jujuparams.ModelStatusInfo{
@@ -1858,12 +1403,14 @@ func (s *APISuite) TestJujuStatus(c *gc.C) {
 					Status: "available",
 					Data:   make(map[string]interface{}),
 				},
-				SLA: "unsupported",
+				SLA:  "unsupported",
+				Type: "iaas",
 			},
 			Machines:           map[string]jujuparams.MachineStatus{},
 			Applications:       map[string]jujuparams.ApplicationStatus{},
 			RemoteApplications: map[string]jujuparams.RemoteApplicationStatus{},
 			Relations:          nil,
+			Offers:             map[string]jujuparams.ApplicationOfferStatus{},
 		},
 	})
 
@@ -1887,7 +1434,25 @@ func (s *APISuite) TestJujuStatus(c *gc.C) {
 
 func (s *APISuite) TestMigrate(c *gc.C) {
 	ctlId1 := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, true)
-	ctlId2 := s.AssertAddController(c, params.EntityPath{"bob", "bar"}, true)
+	// Add the controller explicitly so that we can add it
+	// with an empty CACert as that matches most likely
+	// production scenario.
+	ctlId2 := params.EntityPath{"bob", "bar"}
+	info := s.APIInfo(c)
+	p := &params.AddController{
+		EntityPath: ctlId2,
+		Info: params.ControllerInfo{
+			HostPorts:      info.Addrs,
+			CACert:         info.CACert,
+			User:           info.Tag.Id(),
+			Password:       info.Password,
+			ControllerUUID: utils.MustNewUUID().String(),
+			Public:         true,
+		},
+	}
+	err := s.NewClient("bob").AddController(p)
+	c.Assert(err, gc.Equals, nil)
+
 	s.allowControllerPerm(c, ctlId1)
 	s.allowControllerPerm(c, ctlId2)
 
@@ -1903,7 +1468,7 @@ func (s *APISuite) TestMigrate(c *gc.C) {
 	// under the hood). This is about as decent an assurance as we
 	// can get that it works without changing the juju test machinery
 	// so that it can start up two controllers at the same time.
-	err := client.Migrate(&params.Migrate{
+	err = client.Migrate(&params.Migrate{
 		EntityPath: modelId,
 		Controller: ctlId2,
 	})
@@ -1920,7 +1485,7 @@ func (s *APISuite) TestMigrate(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	m, err := s.JEM.DB.Model(testContext, modelId)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(m.Controller, jc.DeepEquals, params.EntityPath{"bob", "bar"})
 }
 
@@ -1951,6 +1516,34 @@ func (s *APISuite) TestLogLevel(c *gc.C) {
 	})
 }
 
+func (s *APISuite) TestGetSetControllerDeprecated(c *gc.C) {
+	ctlId := s.AssertAddController(c, params.EntityPath{"alice", "foo"}, false)
+
+	d, err := s.NewClient("alice").GetControllerDeprecated(&params.GetControllerDeprecated{
+		EntityPath: ctlId,
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(d, jc.DeepEquals, &params.DeprecatedBody{
+		Deprecated: false,
+	})
+
+	err = s.NewClient("alice").SetControllerDeprecated(&params.SetControllerDeprecated{
+		EntityPath: ctlId,
+		Body: params.DeprecatedBody{
+			Deprecated: true,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	d, err = s.NewClient("alice").GetControllerDeprecated(&params.GetControllerDeprecated{
+		EntityPath: ctlId,
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(d, jc.DeepEquals, &params.DeprecatedBody{
+		Deprecated: true,
+	})
+}
+
 func (s *APISuite) allowControllerPerm(c *gc.C, path params.EntityPath, acl ...string) {
 	if len(acl) == 0 {
 		acl = []string{"everyone"}
@@ -1961,7 +1554,7 @@ func (s *APISuite) allowControllerPerm(c *gc.C, path params.EntityPath, acl ...s
 			Read: acl,
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *APISuite) allowModelPerm(c *gc.C, path params.EntityPath, acl ...string) {
@@ -1974,5 +1567,117 @@ func (s *APISuite) allowModelPerm(c *gc.C, path params.EntityPath, acl ...string
 			Read: acl,
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
+}
+
+func (s *APISuite) TestGetModelName(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{"bob", "open"}, false)
+
+	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
+	_, uuid := s.CreateModel(c, params.EntityPath{"bob", "open"}, params.EntityPath{"bob", "open"}, cred)
+
+	s.allowControllerPerm(c, params.EntityPath{"bob", "open"})
+	s.allowModelPerm(c, params.EntityPath{"bob", "open"})
+
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "GET",
+		Handler: s.JEMSrv,
+		URL:     fmt.Sprintf("/v2/model-uuid/%v/name", uuid),
+		ExpectBody: params.ModelNameResponse{
+			Name: "open",
+		},
+		ExpectStatus: http.StatusOK,
+		Do:           apitest.Do(s.IDMSrv.Client("bob")),
+	})
+
+	uuid1 := utils.MustNewUUID().String()
+
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:       "GET",
+		Handler:      s.JEMSrv,
+		URL:          fmt.Sprintf("/v2/model-uuid/%v/name", uuid1),
+		ExpectStatus: http.StatusNotFound,
+		Do:           apitest.Do(s.IDMSrv.Client("bob")),
+		ExpectBody: params.Error{
+			Code:    "not found",
+			Message: fmt.Sprintf("model %q not found", uuid1),
+		},
+	})
+
+}
+
+func (s *APISuite) TestGetAuditEntries(c *gc.C) {
+	s.ACLStore.Set(testContext, "audit-log", []string{"charlie"})
+	s.AssertAddController(c, params.EntityPath{"bob", "open"}, false)
+	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
+	_, uuid := s.CreateModel(c, params.EntityPath{"bob", "open"}, params.EntityPath{"bob", "open"}, cred)
+
+	s.allowControllerPerm(c, params.EntityPath{"bob", "open"})
+	s.allowModelPerm(c, params.EntityPath{"bob", "open"})
+	res, err := s.NewClient("charlie").GetAuditEntries(&params.AuditLogRequest{})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(res, gc.HasLen, 1)
+	c.Assert(res, jemtest.CmpEquals(cmpopts.IgnoreTypes(time.Time{})), params.AuditLogEntries{{
+		Content: &params.AuditModelCreated{
+			ID:             "bob/open",
+			UUID:           uuid,
+			Owner:          "bob",
+			Creator:        "bob",
+			Cloud:          "dummy",
+			Region:         "dummy-region",
+			ControllerPath: "bob/open",
+			AuditEntryCommon: params.AuditEntryCommon{
+				Type_: params.AuditLogType(&params.AuditModelCreated{}),
+			},
+		},
+	}})
+}
+
+func (s *APISuite) TestGetAuditEntriesNotAuthorized(c *gc.C) {
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "GET",
+		Handler: s.JEMSrv,
+		URL:     "/v2/audit",
+		ExpectBody: &params.Error{
+			Message: `unauthorized`,
+			Code:    params.ErrUnauthorized,
+		},
+		ExpectStatus: http.StatusUnauthorized,
+		Do:           apitest.Do(s.IDMSrv.Client("alice")),
+	})
+}
+
+func (s *APISuite) TestGetModelStatuses(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{"bob", "open"}, false)
+	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
+	_, uuid := s.CreateModel(c, params.EntityPath{"bob", "open"}, params.EntityPath{"bob", "open"}, cred)
+
+	s.allowControllerPerm(c, params.EntityPath{"bob", "open"})
+	s.allowModelPerm(c, params.EntityPath{"bob", "open"})
+	res, err := s.NewClient("bob").GetModelStatuses(&params.ModelStatusesRequest{})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(res, gc.HasLen, 1)
+	c.Assert(res, gc.DeepEquals, params.ModelStatuses{{
+		ID:         "bob/open",
+		UUID:       uuid,
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Status:     "available",
+		Created:    res[0].Created,
+		Controller: "bob/open",
+	}})
+}
+
+func (s *APISuite) TestGetModelStatusesNotAuthorized(c *gc.C) {
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Method:  "GET",
+		Handler: s.JEMSrv,
+		URL:     "/v2/modelstatus",
+		ExpectBody: &params.Error{
+			Message: `unauthorized`,
+			Code:    params.ErrUnauthorized,
+		},
+		ExpectStatus: http.StatusUnauthorized,
+		Do:           apitest.Do(s.IDMSrv.Client("alice")),
+	})
 }

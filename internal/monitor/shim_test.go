@@ -1,24 +1,25 @@
 package monitor
 
 import (
-	"log"
+	"context"
 	"sync"
 	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/state/multiwatcher"
 	jujujujutesting "github.com/juju/juju/testing"
 	jujutesting "github.com/juju/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
 	"github.com/juju/version"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
+	names "gopkg.in/juju/names.v2"
 
-	"github.com/CanonicalLtd/jem/internal/jem"
-	"github.com/CanonicalLtd/jem/internal/mongodoc"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 func newJEMShimWithUpdateNotify(j jemInterface) jemShimWithUpdateNotify {
@@ -117,24 +118,32 @@ func (s jemShimWithUpdateNotify) SetControllerVersion(ctx context.Context, ctlPa
 	return nil
 }
 
-func (s jemShimWithUpdateNotify) SetModelLife(ctx context.Context, ctlPath params.EntityPath, uuid string, life string) error {
-	if err := s.jemInterface.SetModelLife(ctx, ctlPath, uuid, life); err != nil {
+func (s jemShimWithUpdateNotify) SetModelInfo(ctx context.Context, ctlPath params.EntityPath, uuid string, info *mongodoc.ModelInfo) error {
+	if err := s.jemInterface.SetModelInfo(ctx, ctlPath, uuid, info); err != nil {
 		return err
 	}
-	s.changed <- "model life"
+	s.changed <- "model info"
 	return nil
 }
 
-func (s jemShimWithUpdateNotify) UpdateModelCounts(ctx context.Context, uuid string, counts map[params.EntityCount]int, now time.Time) error {
-	if err := s.jemInterface.UpdateModelCounts(ctx, uuid, counts, now); err != nil {
+func (s jemShimWithUpdateNotify) DeleteModelWithUUID(ctx context.Context, ctlPath params.EntityPath, uuid string) error {
+	if err := s.jemInterface.DeleteModelWithUUID(ctx, ctlPath, uuid); err != nil {
+		return err
+	}
+	s.changed <- "delete model"
+	return nil
+}
+
+func (s jemShimWithUpdateNotify) UpdateModelCounts(ctx context.Context, ctlPath params.EntityPath, uuid string, counts map[params.EntityCount]int, now time.Time) error {
+	if err := s.jemInterface.UpdateModelCounts(ctx, ctlPath, uuid, counts, now); err != nil {
 		return err
 	}
 	s.changed <- "model counts"
 	return nil
 }
 
-func (s jemShimWithUpdateNotify) UpdateMachineInfo(ctx context.Context, info *multiwatcher.MachineInfo) error {
-	if err := s.jemInterface.UpdateMachineInfo(ctx, info); err != nil {
+func (s jemShimWithUpdateNotify) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, info *multiwatcher.MachineInfo) error {
+	if err := s.jemInterface.UpdateMachineInfo(ctx, ctlPath, info); err != nil {
 		return err
 	}
 	s.changed <- "machine info"
@@ -186,31 +195,40 @@ type machineId struct {
 	id        string
 }
 
+type applicationId struct {
+	modelUUID string
+	name      string
+}
+
 type jemShimInMemory struct {
 	mu                          sync.Mutex
 	refCount                    int
 	controllers                 map[params.EntityPath]*mongodoc.Controller
 	models                      map[params.EntityPath]*mongodoc.Model
-	machines                    map[machineId]*mongodoc.Machine
+	machines                    map[string]map[machineId]*mongodoc.Machine
+	applications                map[string]map[applicationId]*mongodoc.Application
 	controllerUpdateCredentials map[params.EntityPath]bool
+	cloudRegions                map[string]*mongodoc.CloudRegion
 }
 
 var _ jemInterface = (*jemShimInMemory)(nil)
 
 func newJEMShimInMemory() *jemShimInMemory {
 	return &jemShimInMemory{
-		controllers: make(map[params.EntityPath]*mongodoc.Controller),
-		models:      make(map[params.EntityPath]*mongodoc.Model),
+		controllers:                 make(map[params.EntityPath]*mongodoc.Controller),
+		models:                      make(map[params.EntityPath]*mongodoc.Model),
 		controllerUpdateCredentials: make(map[params.EntityPath]bool),
-		machines:                    make(map[machineId]*mongodoc.Machine),
+		machines:                    make(map[string]map[machineId]*mongodoc.Machine),
+		applications:                make(map[string]map[applicationId]*mongodoc.Application),
+		cloudRegions:                make(map[string]*mongodoc.CloudRegion),
 	}
 }
 
-func (s *jemShimInMemory) controller(p params.EntityPath) *mongodoc.Controller {
+func (s *jemShimInMemory) Controller(ctx context.Context, p params.EntityPath) (*mongodoc.Controller, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	c := *s.controllers[p]
-	return &c
+	return &c, nil
 }
 
 func (s *jemShimInMemory) AddController(ctl *mongodoc.Controller) {
@@ -286,24 +304,34 @@ func (s *jemShimInMemory) SetControllerVersion(ctx context.Context, ctlPath para
 	return nil
 }
 
-func (s *jemShimInMemory) SetModelLife(ctx context.Context, ctlPath params.EntityPath, uuid string, life string) error {
+func (s *jemShimInMemory) SetModelInfo(ctx context.Context, ctlPath params.EntityPath, uuid string, info *mongodoc.ModelInfo) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, m := range s.models {
 		if m.Controller == ctlPath && m.UUID == uuid {
-			log.Printf("setting model life of %v to %v", uuid, life)
-			m.Life = life
+			m.Info = info
 		}
 	}
 	return nil
 }
 
-func (s *jemShimInMemory) UpdateModelCounts(ctx context.Context, uuid string, counts map[params.EntityCount]int, now time.Time) error {
+func (s *jemShimInMemory) DeleteModelWithUUID(ctx context.Context, ctlPath params.EntityPath, uuid string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for k, m := range s.models {
+		if m.Controller == ctlPath && m.UUID == uuid {
+			delete(s.models, k)
+		}
+	}
+	return nil
+}
+
+func (s *jemShimInMemory) UpdateModelCounts(ctx context.Context, ctlPath params.EntityPath, uuid string, counts map[params.EntityCount]int, now time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var model *mongodoc.Model
 	for _, m := range s.models {
-		if m.UUID == uuid {
+		if m.UUID == uuid && m.Controller == ctlPath {
 			model = m
 			break
 		}
@@ -322,11 +350,46 @@ func (s *jemShimInMemory) UpdateModelCounts(ctx context.Context, uuid string, co
 	return nil
 }
 
-func (s *jemShimInMemory) UpdateMachineInfo(ctx context.Context, info *multiwatcher.MachineInfo) error {
+func (s *jemShimInMemory) RemoveControllerMachines(ctx context.Context, ctlPath params.EntityPath) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.machines[ctlPath.String()] = make(map[machineId]*mongodoc.Machine)
+	return nil
+}
+
+func (s *jemShimInMemory) RemoveControllerApplications(ctx context.Context, ctlPath params.EntityPath) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.applications[ctlPath.String()] = make(map[applicationId]*mongodoc.Application)
+	return nil
+}
+
+func (s *jemShimInMemory) UpdateApplicationInfo(ctx context.Context, ctlPath params.EntityPath, info *multiwatcher.ApplicationInfo) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	info1 := *info
-	s.machines[machineId{info1.ModelUUID, info1.Id}] = &mongodoc.Machine{
+	s.applications[ctlPath.String()][applicationId{info1.ModelUUID, info1.Name}] = &mongodoc.Application{
+		Id: info1.ModelUUID + " " + info1.Name,
+		Info: &mongodoc.ApplicationInfo{
+			ModelUUID:       info1.ModelUUID,
+			Name:            info1.Name,
+			Exposed:         info1.Exposed,
+			CharmURL:        info1.CharmURL,
+			OwnerTag:        info1.OwnerTag,
+			Life:            info1.Life,
+			Subordinate:     info1.Subordinate,
+			Status:          info1.Status,
+			WorkloadVersion: info1.WorkloadVersion,
+		},
+	}
+	return nil
+}
+
+func (s *jemShimInMemory) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, info *multiwatcher.MachineInfo) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	info1 := *info
+	s.machines[ctlPath.String()][machineId{info1.ModelUUID, info1.Id}] = &mongodoc.Machine{
 		Id:   info1.ModelUUID + " " + info1.Id,
 		Info: &info1,
 	}
@@ -351,6 +414,15 @@ func (s *jemShimInMemory) AllControllers(ctx context.Context) ([]*mongodoc.Contr
 		r = append(r, &c1)
 	}
 	return r, nil
+}
+
+func (s *jemShimInMemory) ModelUUIDsForController(ctx context.Context, ctlPath params.EntityPath) (uuids []string, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, m := range s.models {
+		uuids = append(uuids, m.UUID)
+	}
+	return uuids, nil
 }
 
 func (s *jemShimInMemory) ControllerUpdateCredentials(_ context.Context, ctlPath params.EntityPath) error {
@@ -381,6 +453,22 @@ func (s *jemShimInMemory) AcquireMonitorLease(ctx context.Context, ctlPath param
 		ctl.MonitorLeaseExpiry = mongodoc.Time(newExpiry)
 	}
 	return ctl.MonitorLeaseExpiry, nil
+}
+
+func (s *jemShimInMemory) UpdateCloudRegions(ctx context.Context, cloudRegions []mongodoc.CloudRegion) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for k, cloudRegion := range cloudRegions {
+		id := cloudRegion.GetId()
+		if cr, ok := s.cloudRegions[id]; ok {
+			cr.PrimaryControllers = append(cr.PrimaryControllers, cloudRegion.PrimaryControllers...)
+			cr.SecondaryControllers = append(cr.SecondaryControllers, cloudRegion.SecondaryControllers...)
+			continue
+		}
+		s.cloudRegions[id] = &cloudRegions[k]
+	}
+
+	return nil
 }
 
 type jujuAPIShims struct {
@@ -441,6 +529,7 @@ type jujuAPIShim struct {
 	initial       []multiwatcher.Delta
 	stack         string
 	serverVersion version.Number
+	clouds        map[names.CloudTag]cloud.Cloud
 }
 
 func (s *jujuAPIShim) Evict() {
@@ -469,8 +558,16 @@ func (s *jujuAPIShim) WatchAllModels() (allWatcher, error) {
 	}, nil
 }
 
+func (s *jujuAPIShim) ModelExists(uuid string) (bool, error) {
+	panic("unexpected call to ModelExists")
+}
+
 func (s *jujuAPIShim) ServerVersion() (version.Number, bool) {
 	return s.serverVersion, true
+}
+
+func (s *jujuAPIShim) Clouds() (map[names.CloudTag]cloud.Cloud, error) {
+	return s.clouds, nil
 }
 
 type watcherShim struct {

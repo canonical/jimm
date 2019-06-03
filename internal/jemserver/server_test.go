@@ -3,30 +3,34 @@
 package jemserver_test
 
 import (
+	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"time"
 
+	"github.com/juju/aclstore/aclclient"
 	"github.com/juju/httprequest"
 	jujutesting "github.com/juju/juju/testing"
+	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"github.com/julienschmidt/httprouter"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
+	errgo "gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
-	"github.com/CanonicalLtd/jem/internal/auth"
-	"github.com/CanonicalLtd/jem/internal/jem"
-	"github.com/CanonicalLtd/jem/internal/jemserver"
-	"github.com/CanonicalLtd/jem/internal/jemtest"
-	"github.com/CanonicalLtd/jem/internal/mgosession"
-	"github.com/CanonicalLtd/jem/internal/mongodoc"
-	"github.com/CanonicalLtd/jem/params"
+	"github.com/CanonicalLtd/jimm/internal/apitest"
+	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/jemserver"
+	"github.com/CanonicalLtd/jimm/internal/mgosession"
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 var testContext = context.Background()
 
 type serverSuite struct {
-	jemtest.IsolatedMgoSuite
+	apitest.Suite
 }
 
 var _ = gc.Suite(&serverSuite{})
@@ -48,11 +52,12 @@ type versionResponse struct {
 
 func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	serverParams := jemserver.Params{
-		DB:              s.Session.DB("foo"),
-		ControllerAdmin: "controller-admin",
+		DB:               s.Session.DB("foo"),
+		ControllerAdmin:  "controller-admin",
+		IdentityLocation: "http://0.1.2.3",
 	}
 	serveVersion := func(vers string) jemserver.NewAPIHandlerFunc {
-		return func(_ context.Context, p *jem.Pool, _ *auth.Pool, config jemserver.Params) ([]httprequest.Handler, error) {
+		return func(_ context.Context, params jemserver.HandlerParams) ([]httprequest.Handler, error) {
 			versPrefix := ""
 			if vers != "" {
 				versPrefix = "/" + vers
@@ -76,7 +81,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	h, err := jemserver.New(testContext, serverParams, map[string]jemserver.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 	assertServesVersion(c, h, "version1")
 	assertDoesNotServeVersion(c, h, "version2")
@@ -86,7 +91,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 		"version1": serveVersion("version1"),
 		"version2": serveVersion("version2"),
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 	assertServesVersion(c, h, "version1")
 	assertServesVersion(c, h, "version2")
@@ -97,7 +102,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 		"version2": serveVersion("version2"),
 		"version3": serveVersion("version3"),
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 	assertServesVersion(c, h, "version1")
 	assertServesVersion(c, h, "version2")
@@ -129,11 +134,12 @@ func assertDoesNotServeVersion(c *gc.C, h http.Handler, vers string) {
 
 func (s *serverSuite) TestServerHasAccessControlAllowOrigin(c *gc.C) {
 	serverParams := jemserver.Params{
-		DB:              s.Session.DB("foo"),
-		ControllerAdmin: "controller-admin",
+		DB:               s.Session.DB("foo"),
+		ControllerAdmin:  "controller-admin",
+		IdentityLocation: "http://0.1.2.3",
 	}
 	impl := map[string]jemserver.NewAPIHandlerFunc{
-		"/a": func(ctx context.Context, p *jem.Pool, _ *auth.Pool, config jemserver.Params) ([]httprequest.Handler, error) {
+		"/a": func(ctx context.Context, p jemserver.HandlerParams) ([]httprequest.Handler, error) {
 			return []httprequest.Handler{{
 				Method: "GET",
 				Path:   "/a",
@@ -143,7 +149,7 @@ func (s *serverSuite) TestServerHasAccessControlAllowOrigin(c *gc.C) {
 		},
 	}
 	h, err := jemserver.New(testContext, serverParams, impl)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: h,
@@ -184,7 +190,7 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 		ControllerAdmin: "controller-admin",
 		SessionPool:     sessionPool,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer pool.Close()
 	j := pool.JEM(context.TODO())
 	defer j.Close()
@@ -197,13 +203,14 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 		AdminUser: "bob",
 		HostPorts: [][]mongodoc.HostPort{{{Host: "0.1.2.3", Port: 4567}}},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	params := jemserver.Params{
-		DB:              db,
-		AgentUsername:   "foo",
-		RunMonitor:      true,
-		ControllerAdmin: "controller-admin",
+		DB:               db,
+		AgentUsername:    "foo",
+		RunMonitor:       true,
+		ControllerAdmin:  "controller-admin",
+		IdentityLocation: "http://0.1.2.3",
 	}
 	// Patch the API opening timeout so that it doesn't take the
 	// usual 15 seconds to fail - we don't, it holds on to the
@@ -211,18 +218,18 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 	// API dialling isn't stopped when the monitor is.
 	s.PatchValue(&jem.APIOpenTimeout, time.Millisecond)
 	h, err := jemserver.New(testContext, params, map[string]jemserver.NewAPIHandlerFunc{
-		"/v0": func(ctx context.Context, p *jem.Pool, _ *auth.Pool, config jemserver.Params) ([]httprequest.Handler, error) {
+		"/v0": func(ctx context.Context, p jemserver.HandlerParams) ([]httprequest.Handler, error) {
 			return nil, nil
 		},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 
 	// Poll the database to check that the monitor lease is taken out.
 	var ctl *mongodoc.Controller
 	for a := jujutesting.LongAttempt.Start(); a.Next(); {
 		ctl, err = j.DB.Controller(testContext, ctlPath)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		if ctl.MonitorLeaseOwner != "" {
 			break
 		}
@@ -231,4 +238,58 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 		}
 	}
 	c.Assert(ctl.MonitorLeaseOwner, gc.Matches, "foo-[a-z0-9]+")
+}
+
+func (s *serverSuite) TestGetACL(c *gc.C) {
+	users, err := s.aclClient("controller-admin").Get(context.Background(), "admin")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(users, jc.DeepEquals, []string{"controller-admin"})
+}
+
+func (s *serverSuite) TestUnauthorized(c *gc.C) {
+	users, err := s.aclClient("bob").Get(context.Background(), "admin")
+	c.Assert(err, gc.ErrorMatches, `Get http.*/admin/acls/admin: forbidden`)
+	c.Assert(users, gc.IsNil)
+}
+
+func (s *serverSuite) TestSetACL(c *gc.C) {
+	client := s.aclClient("controller-admin")
+	err := client.Set(context.Background(), "admin", []string{"controller-admin", "bob"})
+	c.Assert(err, gc.Equals, nil)
+	users, err := client.Get(context.Background(), "admin")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(users, jc.DeepEquals, []string{"bob", "controller-admin"})
+}
+
+func (s *serverSuite) TestModifyACL(c *gc.C) {
+	client := s.aclClient("controller-admin")
+	err := client.Add(context.Background(), "admin", []string{"alice"})
+	c.Assert(err, gc.Equals, nil)
+	users, err := client.Get(context.Background(), "admin")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(users, jc.DeepEquals, []string{"alice", "controller-admin"})
+}
+
+func (s *serverSuite) aclClient(user string) *aclclient.Client {
+	return aclclient.New(aclclient.NewParams{
+		BaseURL: s.HTTPSrv.URL + "/admin/acls",
+		Doer:    bakeryDoer{s.IDMSrv.Client(user)},
+	})
+}
+
+type bakeryDoer struct {
+	client *httpbakery.Client
+}
+
+func (d bakeryDoer) Do(req *http.Request) (*http.Response, error) {
+	if req.Body == nil {
+		return d.client.Do(req)
+	}
+	body, ok := req.Body.(io.ReadSeeker)
+	if !ok {
+		return nil, errgo.Newf("unsupported body type")
+	}
+	req1 := *req
+	req1.Body = nil
+	return d.client.DoWithBody(&req1, body)
 }
