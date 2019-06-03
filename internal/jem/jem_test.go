@@ -4,6 +4,7 @@ package jem_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
@@ -38,9 +40,10 @@ import (
 
 type jemSuite struct {
 	jemtest.JujuConnSuite
-	pool        *jem.Pool
-	sessionPool *mgosession.Pool
-	jem         *jem.JEM
+	pool                           *jem.Pool
+	sessionPool                    *mgosession.Pool
+	jem                            *jem.JEM
+	usageSenderAuthorizationClient *testUsageSenderAuthorizationClient
 
 	suiteCleanups []func()
 }
@@ -52,11 +55,16 @@ func (s *jemSuite) SetUpTest(c *gc.C) {
 	s.sessionPool = mgosession.NewPool(context.TODO(), s.Session, 5)
 	publicCloudMetadata, _, err := cloud.PublicCloudMetadata()
 	c.Assert(err, gc.Equals, nil)
+	s.usageSenderAuthorizationClient = &testUsageSenderAuthorizationClient{}
+	s.PatchValue(&jem.NewUsageSenderAuthorizationClient, func(_ string, _ *httpbakery.Client) (jem.UsageSenderAuthorizationClient, error) {
+		return s.usageSenderAuthorizationClient, nil
+	})
 	pool, err := jem.NewPool(context.TODO(), jem.Params{
 		DB:                  s.Session.DB("jem"),
 		ControllerAdmin:     "controller-admin",
 		SessionPool:         s.sessionPool,
 		PublicCloudMetadata: publicCloudMetadata,
+		UsageSenderURL:      "test-usage-sender-url",
 	})
 	c.Assert(err, gc.Equals, nil)
 	s.pool = pool
@@ -164,12 +172,13 @@ func (s *jemSuite) TestClone(c *gc.C) {
 }
 
 var createModelTests = []struct {
-	about            string
-	user             string
-	params           jem.CreateModelParams
-	expectCredential params.CredentialPath
-	expectError      string
-	expectErrorCause error
+	about                          string
+	user                           string
+	params                         jem.CreateModelParams
+	usageSenderAuthorizationErrors []error
+	expectCredential               params.CredentialPath
+	expectError                    string
+	expectErrorCause               error
 }{{
 	about: "success",
 	user:  "bob",
@@ -271,6 +280,18 @@ var createModelTests = []struct {
 		Path:  params.EntityPath{"charlie", ""},
 		Cloud: "dummy",
 	},
+}, {
+	about: "success with usage sender authorization client",
+	user:  "bob",
+	params: jem.CreateModelParams{
+		Path: params.EntityPath{"bob", ""},
+		Credential: params.CredentialPath{
+			Cloud:      "dummy",
+			EntityPath: params.EntityPath{"bob", "cred1"},
+		},
+		Cloud: "dummy",
+	},
+	usageSenderAuthorizationErrors: []error{errors.New("a silly error")},
 }}
 
 func (s *jemSuite) TestCreateModel(c *gc.C) {
@@ -313,6 +334,7 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	for i, test := range createModelTests {
 		c.Logf("test %d. %s", i, test.about)
+		s.usageSenderAuthorizationClient.SetErrors(test.usageSenderAuthorizationErrors)
 		if test.params.Path.Name == "" {
 			test.params.Path.Name = params.Name(fmt.Sprintf("test-%d", i))
 		}
@@ -2051,4 +2073,20 @@ func (s *jemK8sSuite) TestRemoveCloudWithModel(c *gc.C) {
 
 	err = s.jem.RemoveCloud(ctx, "test-cloud")
 	c.Assert(err, gc.ErrorMatches, `cloud is used by 1 model`)
+}
+
+type testUsageSenderAuthorizationClient struct {
+	errors []error
+}
+
+func (c *testUsageSenderAuthorizationClient) SetErrors(errors []error) {
+	c.errors = errors
+}
+
+func (c *testUsageSenderAuthorizationClient) GetCredentials(ctx context.Context, applicationUser string) ([]byte, error) {
+	var err error
+	if len(c.errors) > 0 {
+		err, c.errors = c.errors[0], c.errors[1:]
+	}
+	return []byte("test credentials"), err
 }
