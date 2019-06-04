@@ -439,7 +439,7 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 			ctx,
 			string(p.Path.User))
 		if err != nil {
-			return nil, errgo.Mask(err)
+			zapctx.Warn(ctx, "failed to obtain credentials for model", zaputil.Error(err), zap.String("user", string(p.Path.User)))
 		}
 	}
 
