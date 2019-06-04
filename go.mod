@@ -56,15 +56,15 @@ require (
 	github.com/juju/httprequest v1.0.1
 	github.com/juju/idmclient v0.0.0-20161107140250-fb1dc7175251
 	github.com/juju/jsonschema v0.0.0-20161102181919-a0ef8b74ebcf // indirect
-	github.com/juju/juju v0.0.0-20190514172915-4eaafff03c8c
-	github.com/juju/loggo v0.0.0-20180524022052-584905176618
+	github.com/juju/juju v0.0.0-20190530053242-c88455697b7d
+	github.com/juju/loggo v0.0.0-20190526231331-6e530bcce5d8
 	github.com/juju/lru v0.0.0-20181205132344-305dec07bf2f // indirect
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
 	github.com/juju/mgosession v1.0.0
 	github.com/juju/mutex v0.0.0-20180619145857-d21b13acf4bf // indirect
 	github.com/juju/names v0.0.0-20160330150533-8a0aa0963bba
 	github.com/juju/naturalsort v0.0.0-20180423034842-5b81707e882b // indirect
-	github.com/juju/os v0.0.0-20181102050008-0ffd1641ec10 // indirect
+	github.com/juju/os v0.0.0-20190528203116-c23cb5719c78 // indirect
 	github.com/juju/packaging v0.0.0-20180516203043-ba21344fff20 // indirect
 	github.com/juju/persistent-cookiejar v0.0.0-20170428161559-d67418f14c93
 	github.com/juju/proxy v0.0.0-20180523025733-5f8741c297b4 // indirect
@@ -97,7 +97,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
 	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
-	github.com/oracle/oci-go-sdk v1.2.0 // indirect
+	github.com/oracle/oci-go-sdk v5.7.0+incompatible // indirect
 	github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/prometheus/client_golang v0.9.3-0.20190127221311-3c4408c8b829
@@ -135,7 +135,7 @@ require (
 	gopkg.in/juju/environschema.v1 v1.0.0-20151104115810-7359fc7857ab
 	gopkg.in/juju/jujusvg.v3 v3.0.0-20180629065738-1ebf5c5481e8 // indirect
 	gopkg.in/juju/names.v2 v2.0.0-20180621093930-fd59336b4621
-	gopkg.in/juju/worker.v1 v1.0.0-20190131122319-187c81176846
+	gopkg.in/juju/worker.v1 v1.0.0-20190527125722-5398f2291f2c
 	gopkg.in/macaroon-bakery.v1 v1.0.0-20180822103327-f3518acd1415 // indirect
 	gopkg.in/macaroon-bakery.v2 v2.1.0 // indirect
 	gopkg.in/macaroon-bakery.v2-unstable v2.0.0-20160623142747-5a131df02b23
