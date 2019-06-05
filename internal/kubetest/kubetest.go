@@ -83,49 +83,38 @@ func Password(config *api.Config) string {
 	return config.AuthInfos[config.Contexts[config.CurrentContext].AuthInfo].Password
 }
 
-// K8sSuite is a mixin suite that will connect to a kubernetes instance
-// for tests, cleaning up any namespaces created in the tests at the end.
-type K8sSuite struct {
-	KubeConfig *api.Config
-
-	done, wait chan struct{}
-}
-
-func (s *K8sSuite) SetUpTest(c *gc.C) {
-	var err error
-	s.KubeConfig, err = LoadConfig()
-	if errgo.Cause(err) == ErrDisabled {
-		c.Skip("kubernetes testing disabled")
-	}
-	c.Assert(err, gc.Equals, nil, gc.Commentf("error loading kubernetes config: %v", err))
-
-	client := s.Client(c).CoreV1().Namespaces()
-	nss, err := client.List(metav1.ListOptions{})
-	c.Assert(err, gc.Equals, nil)
-
-	s.done = make(chan struct{})
-	s.wait = make(chan struct{})
-	go s.watch(c, client, nss.ResourceVersion)
-}
-
-func (s *K8sSuite) TearDownTest(c *gc.C) {
-	if s.KubeConfig == nil || s.done == nil {
-		return
-	}
-	close(s.done)
-	<-s.wait
-}
-
-func (s *K8sSuite) Client(c *gc.C) *kubernetes.Clientset {
-	config := clientcmd.NewDefaultClientConfig(*s.KubeConfig, &clientcmd.ConfigOverrides{})
-	clientconfig, err := config.ClientConfig()
+// StartMonitor starts a monitor that listens for new namespaces created
+// whilst a test is running, removing them when the test is done.
+func StartMonitor(c *gc.C, config api.Config) *Monitor {
+	clientconfig, err := clientcmd.NewDefaultClientConfig(config, &clientcmd.ConfigOverrides{}).ClientConfig()
 	c.Assert(err, gc.Equals, nil)
 	client, err := kubernetes.NewForConfig(clientconfig)
 	c.Assert(err, gc.Equals, nil)
-	return client
+	nsclient := client.CoreV1().Namespaces()
+	nss, err := nsclient.List(metav1.ListOptions{})
+	m := &Monitor{
+		done: make(chan struct{}),
+		wait: make(chan struct{}),
+	}
+
+	go m.watch(c, nsclient, nss.ResourceVersion)
+	return m
 }
 
-func (s *K8sSuite) watch(c *gc.C, client corev1.NamespaceInterface, rv string) {
+// A Monitor listens for new namespaces being created during a test and
+// removes them when Done is called.
+type Monitor struct {
+	done, wait chan struct{}
+}
+
+// Done closes the monitor removing and new namespaces that were created
+// during the test.
+func (m *Monitor) Done() {
+	close(m.done)
+	<-m.wait
+}
+
+func (m *Monitor) watch(c *gc.C, client corev1.NamespaceInterface, rv string) {
 	w, err := client.Watch(metav1.ListOptions{
 		Watch:           true,
 		ResourceVersion: rv,
@@ -152,8 +141,8 @@ func (s *K8sSuite) watch(c *gc.C, client corev1.NamespaceInterface, rv string) {
 				c.Logf("namespace %q deleted", ns.Name)
 				delete(nss, ns.Name)
 			}
-		case <-s.done:
-			s.done = nil
+		case <-m.done:
+			m.done = nil
 			done = true
 			for k := range nss {
 				err := client.Delete(k, nil)
@@ -161,7 +150,7 @@ func (s *K8sSuite) watch(c *gc.C, client corev1.NamespaceInterface, rv string) {
 			}
 		}
 		if done && len(nss) == 0 {
-			close(s.wait)
+			close(m.wait)
 			return
 		}
 	}

@@ -1975,7 +1975,6 @@ func (s *jemSuite) createK8sCloud(c *gc.C, name, owner string) {
 
 type jemK8sSuite struct {
 	jemtest.JujuConnSuite
-	kubetest.K8sSuite
 
 	pool        *jem.Pool
 	sessionPool *mgosession.Pool
@@ -1989,7 +1988,6 @@ var _ = gc.Suite(&jemK8sSuite{})
 func (s *jemK8sSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
 	s.PatchValue(&utils.OutgoingAccessAllowed, true)
-	s.K8sSuite.SetUpTest(c)
 	s.sessionPool = mgosession.NewPool(context.TODO(), s.Session, 5)
 	publicCloudMetadata, _, err := cloud.PublicCloudMetadata()
 	c.Assert(err, gc.Equals, nil)
@@ -2014,25 +2012,34 @@ func (s *jemK8sSuite) TearDownTest(c *gc.C) {
 	if s.sessionPool != nil {
 		s.sessionPool.Close()
 	}
-	s.K8sSuite.TearDownTest(c)
 	s.JujuConnSuite.TearDownTest(c)
 }
 
 func (s *jemK8sSuite) TestRemoveCloudWithModel(c *gc.C) {
+	cfg, err := kubetest.LoadConfig()
+	if errgo.Cause(err) == kubetest.ErrDisabled {
+		c.Skip(err.Error())
+	}
+	c.Assert(err, gc.Equals, nil)
+	m := kubetest.StartMonitor(c, *cfg)
+	s.AddCleanup(func(c *gc.C) {
+		m.Done()
+	})
+
 	ctlPath := params.EntityPath{"bob", "foo"}
 	addController(c, ctlPath, s.APIInfo(c), s.jem)
 	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
 	var cacerts []string
-	if cert := kubetest.CACertificate(s.KubeConfig); cert != "" {
+	if cert := kubetest.CACertificate(cfg); cert != "" {
 		cacerts = append(cacerts, cert)
 	}
-	err := s.jem.CreateCloud(
+	err = s.jem.CreateCloud(
 		ctx,
 		mongodoc.CloudRegion{
 			Cloud:          "test-cloud",
 			ProviderType:   "kubernetes",
 			AuthTypes:      []string{string(cloud.UserPassAuthType)},
-			Endpoint:       kubetest.ServerURL(s.KubeConfig),
+			Endpoint:       kubetest.ServerURL(cfg),
 			CACertificates: cacerts,
 			ACL: params.ACL{
 				Read:  []string{"bob"},
@@ -2058,8 +2065,8 @@ func (s *jemK8sSuite) TestRemoveCloudWithModel(c *gc.C) {
 		Path: credpath,
 		Type: string(cloud.UserPassAuthType),
 		Attributes: map[string]string{
-			"username": kubetest.Username(s.KubeConfig),
-			"password": kubetest.Password(s.KubeConfig),
+			"username": kubetest.Username(cfg),
+			"password": kubetest.Password(cfg),
 		},
 	}, jem.CredentialUpdate)
 	c.Assert(err, gc.Equals, nil)

@@ -1177,7 +1177,6 @@ func (s *modelManagerSuite) TestChangeModelCredentialLocalUserCredential(c *gc.C
 }
 
 type caasModelManagerSuite struct {
-	kubetest.K8sSuite
 	websocketSuite
 
 	creds names.CloudCredentialTag
@@ -1190,19 +1189,13 @@ func (s *caasModelManagerSuite) SetUpTest(c *gc.C) {
 	s.ServerParams.MeteringLocation = "https://api.jujucharms.com/omnibus"
 	s.websocketSuite.SetUpTest(c)
 	s.PatchValue(&utils.OutgoingAccessAllowed, true)
-	s.K8sSuite.SetUpTest(c)
 
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	s.creds = names.NewCloudCredentialTag("test-cloud/test@external/test-cred")
-	s.AssertAddKubernetesCloud(c, s.creds)
-}
-
-func (s *caasModelManagerSuite) TearDownTest(c *gc.C) {
-	s.K8sSuite.TearDownTest(c)
-	s.websocketSuite.TearDownTest(c)
 }
 
 func (s *caasModelManagerSuite) TestCreateModelKubernetes(c *gc.C) {
+	s.AssertAddKubernetesCloud(c, s.creds)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 
@@ -1219,6 +1212,7 @@ func (s *caasModelManagerSuite) TestCreateModelKubernetes(c *gc.C) {
 }
 
 func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
+	s.AssertAddKubernetesCloud(c, s.creds)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 
@@ -1257,6 +1251,7 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 }
 
 func (s *caasModelManagerSuite) TestListCAASModels(c *gc.C) {
+	s.AssertAddKubernetesCloud(c, s.creds)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 
@@ -1275,6 +1270,16 @@ func (s *caasModelManagerSuite) TestListCAASModels(c *gc.C) {
 }
 
 func (s *caasModelManagerSuite) AssertAddKubernetesCloud(c *gc.C, credTag names.CloudCredentialTag) {
+	cfg, err := kubetest.LoadConfig()
+	if errgo.Cause(err) == kubetest.ErrDisabled {
+		c.Skip(err.Error())
+	}
+	c.Assert(err, gc.Equals, nil)
+	m := kubetest.StartMonitor(c, *cfg)
+	s.AddCleanup(func(c *gc.C) {
+		m.Done()
+	})
+
 	userTag := credTag.Owner()
 	user := userTag.Id()
 	if userTag.Domain() == "external" {
@@ -1285,24 +1290,24 @@ func (s *caasModelManagerSuite) AssertAddKubernetesCloud(c *gc.C, credTag names.
 	defer conn.Close()
 
 	var cacerts []string
-	if cert := kubetest.CACertificate(s.KubeConfig); cert != "" {
+	if cert := kubetest.CACertificate(cfg); cert != "" {
 		cacerts = append(cacerts, cert)
 	}
 
 	cloudclient := cloudapi.NewClient(conn)
-	err := cloudclient.AddCloud(cloud.Cloud{
+	err = cloudclient.AddCloud(cloud.Cloud{
 		Name:            credTag.Cloud().Id(),
 		Type:            "kubernetes",
 		AuthTypes:       cloud.AuthTypes{cloud.UserPassAuthType},
-		Endpoint:        kubetest.ServerURL(s.KubeConfig),
+		Endpoint:        kubetest.ServerURL(cfg),
 		CACertificates:  cacerts,
 		HostCloudRegion: "dummy/dummy-region",
 	})
 	c.Assert(err, gc.Equals, nil)
 
 	cred := cloud.NewCredential(cloud.UserPassAuthType, map[string]string{
-		"username": kubetest.Username(s.KubeConfig),
-		"password": kubetest.Password(s.KubeConfig),
+		"username": kubetest.Username(cfg),
+		"password": kubetest.Password(cfg),
 	})
 	res, err := cloudclient.UpdateCredentialsCheckModels(credTag, cred)
 	c.Assert(err, gc.Equals, nil)
