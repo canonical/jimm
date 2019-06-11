@@ -348,6 +348,16 @@ func (c controller) ControllerConfig() (jujuparams.ControllerConfigResult, error
 	return result, nil
 }
 
+// ModelConfig returns implements the controller facade's ModelConfig
+// method. This always returns a permission error, as no user has admin
+// access to the controller.
+func (c controller) ModelConfig() (jujuparams.ModelConfigResults, error) {
+	return jujuparams.ModelConfigResults{}, &jujuparams.Error{
+		Code:    jujuparams.CodeUnauthorized,
+		Message: "permission denied",
+	}
+}
+
 // allModels returns all the models the logged in user has access to.
 func (r *controllerRoot) allModels(ctx context.Context) (jujuparams.UserModelList, error) {
 	var models []jujuparams.UserModel

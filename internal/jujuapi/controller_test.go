@@ -261,6 +261,15 @@ func (s *controllerSuite) TestControllerConfig(c *gc.C) {
 	}))
 }
 
+func (s *controllerSuite) TestModelConfig(c *gc.C) {
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := controllerapi.NewClient(conn)
+	_, err := client.ModelConfig()
+	c.Assert(err, gc.ErrorMatches, `permission denied \(unauthorized access\)`)
+	c.Assert(jujuparams.IsCodeUnauthorized(err), gc.Equals, true)
+}
+
 func (s *controllerSuite) TestAllModels(c *gc.C) {
 	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
