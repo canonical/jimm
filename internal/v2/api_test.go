@@ -1681,3 +1681,39 @@ func (s *APISuite) TestGetModelStatusesNotAuthorized(c *gc.C) {
 		Do:           apitest.Do(s.IDMSrv.Client("alice")),
 	})
 }
+
+func (s *APISuite) TestMissingModels(c *gc.C) {
+	ctlID := s.AssertAddController(c, params.EntityPath{"bob", "open"}, false)
+	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
+	s.CreateModel(c, params.EntityPath{"bob", "open"}, params.EntityPath{"bob", "open"}, cred)
+
+	s.allowControllerPerm(c, params.EntityPath{"bob", "open"})
+	s.allowModelPerm(c, params.EntityPath{"bob", "open"})
+	res, err := s.NewClient("bob").MissingModels(&params.MissingModelsRequest{
+		EntityPath: ctlID,
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(res, gc.DeepEquals, params.MissingModels{
+		Models: []params.ModelStatus{{
+			ID:         "admin/controller",
+			UUID:       "deadbeef-0bad-400d-8000-4b1d0d06f00d",
+			Cloud:      "dummy",
+			Region:     "dummy-region",
+			Status:     "available",
+			Controller: "bob/open",
+		}},
+	})
+}
+
+func (s *APISuite) TestMissingModelsNotAuthorized(c *gc.C) {
+	ctlID := s.AssertAddController(c, params.EntityPath{"bob", "open"}, false)
+	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
+	s.CreateModel(c, params.EntityPath{"bob", "open"}, params.EntityPath{"bob", "open"}, cred)
+	_, err := s.NewClient("alice").MissingModels(&params.MissingModelsRequest{
+		EntityPath: ctlID,
+	})
+	c.Assert(err, gc.DeepEquals, &params.Error{
+		Code:    params.ErrUnauthorized,
+		Message: "admin access required",
+	})
+}
