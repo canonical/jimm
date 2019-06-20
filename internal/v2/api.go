@@ -815,3 +815,50 @@ func (h *Handler) checkACL(ctx context.Context, aclName string) error {
 	}
 	return errgo.Mask(auth.CheckACL(ctx, acl), errgo.Is(params.ErrUnauthorized))
 }
+
+// MissingModels returns a list of models present on the given controller
+// that are not in the local database.
+func (h *Handler) MissingModels(arg *params.MissingModelsRequest) (params.MissingModels, error) {
+	var resp params.MissingModels
+
+	if err := auth.CheckIsUser(h.context, h.jem.ControllerAdmin()); err != nil {
+		if errgo.Cause(err) == params.ErrUnauthorized {
+			return resp, errgo.WithCausef(nil, params.ErrUnauthorized, "admin access required")
+		}
+		return resp, errgo.Mask(err)
+	}
+
+	conn, err := h.jem.OpenAPI(h.context, arg.EntityPath)
+	if err != nil {
+		return resp, errgo.Mask(err)
+	}
+	defer conn.Close()
+
+	user := conn.Info.Tag.Id()
+	client := modelmanagerapi.NewClient(conn)
+	mss, err := client.ListModelSummaries(user, true)
+	if err != nil {
+		return resp, errgo.Mask(err)
+	}
+
+	for _, ms := range mss {
+		// Check that a model with the same UUID exists.
+		_, err := h.jem.DB.ModelFromUUID(h.context, ms.UUID)
+		if err == nil {
+			continue
+		}
+		if errgo.Cause(err) != params.ErrNotFound {
+			return resp, errgo.Mask(err)
+		}
+		resp.Models = append(resp.Models, params.ModelStatus{
+			ID:         ms.Owner + "/" + ms.Name,
+			UUID:       ms.UUID,
+			Cloud:      ms.Cloud,
+			Region:     ms.CloudRegion,
+			Status:     string(ms.Status.Status),
+			Controller: arg.EntityPath.String(),
+		})
+	}
+
+	return resp, nil
+}

@@ -124,6 +124,14 @@ func (c *client) Migrate(p *params.Migrate) error {
 	return c.Client.Call(p, nil)
 }
 
+// MissingModels returns a list of models present on the given controller
+// that are not in the local database.
+func (c *client) MissingModels(p *params.MissingModelsRequest) (params.MissingModels, error) {
+	var r params.MissingModels
+	err := c.Client.Call(p, &r)
+	return r, err
+}
+
 // NewModel creates a new model inside an existing Controller.
 func (c *client) NewModel(p *params.NewModel) (*params.ModelResponse, error) {
 	var r *params.ModelResponse

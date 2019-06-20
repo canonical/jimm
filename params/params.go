@@ -735,3 +735,14 @@ type ModelStatus struct {
 
 // ModelStatuses holds the list of model statuses.
 type ModelStatuses []ModelStatus
+
+// MissingModelsRequest holds a request to the missing-models endpoint.
+type MissingModelsRequest struct {
+	httprequest.Route `httprequest:"GET /v2/controller/:User/:Name/missing-models"`
+	EntityPath
+}
+
+// MissingModels is a response from the missing-models endpoint
+type MissingModels struct {
+	Models []ModelStatus
+}
