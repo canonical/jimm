@@ -56,7 +56,7 @@ require (
 	github.com/juju/httprequest v1.0.1
 	github.com/juju/idmclient v0.0.0-20161107140250-fb1dc7175251
 	github.com/juju/jsonschema v0.0.0-20161102181919-a0ef8b74ebcf // indirect
-	github.com/juju/juju v0.0.0-20190530053242-c88455697b7d
+	github.com/juju/juju v0.0.0-20190614025705-6c4f52c4ae77
 	github.com/juju/loggo v0.0.0-20190526231331-6e530bcce5d8
 	github.com/juju/lru v0.0.0-20181205132344-305dec07bf2f // indirect
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
@@ -123,19 +123,19 @@ require (
 	gopkg.in/amz.v3 v3.0.0-20161215130849-8c3190dff075 // indirect
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 	gopkg.in/errgo.v1 v1.0.0
-	gopkg.in/goose.v2 v2.0.0-20180816040309-cf9b64132d71 // indirect
+	gopkg.in/goose.v2 v2.0.0-20190611012650-f18d0f2f8f9b // indirect
 	gopkg.in/httprequest.v1 v1.1.2
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.39.0 // indirect
 	gopkg.in/juju/blobstore.v2 v2.0.0-20160125023703-51fa6e26128d // indirect
-	gopkg.in/juju/charm.v6 v6.0.0-20190429003656-b4861dc36187 // indirect
+	gopkg.in/juju/charm.v6 v6.0.0-20190530145454-f915791435aa // indirect
 	gopkg.in/juju/charmrepo.v2 v2.0.0-20171114184045-653bbd81990d // indirect
 	gopkg.in/juju/charmrepo.v3 v3.0.0-20180803043737-7778a447283b // indirect
 	gopkg.in/juju/charmstore.v5 v5.5.2 // indirect
 	gopkg.in/juju/environschema.v1 v1.0.0-20151104115810-7359fc7857ab
 	gopkg.in/juju/jujusvg.v3 v3.0.0-20180629065738-1ebf5c5481e8 // indirect
 	gopkg.in/juju/names.v2 v2.0.0-20180621093930-fd59336b4621
-	gopkg.in/juju/worker.v1 v1.0.0-20190527125722-5398f2291f2c
+	gopkg.in/juju/worker.v1 v1.0.0-20190612023203-40da96d5fd22
 	gopkg.in/macaroon-bakery.v1 v1.0.0-20180822103327-f3518acd1415 // indirect
 	gopkg.in/macaroon-bakery.v2 v2.1.0 // indirect
 	gopkg.in/macaroon-bakery.v2-unstable v2.0.0-20160623142747-5a131df02b23
