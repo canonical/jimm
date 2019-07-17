@@ -2016,31 +2016,20 @@ func (s *jemK8sSuite) TearDownTest(c *gc.C) {
 }
 
 func (s *jemK8sSuite) TestRemoveCloudWithModel(c *gc.C) {
-	cfg, err := kubetest.LoadConfig()
-	if errgo.Cause(err) == kubetest.ErrDisabled {
-		c.Skip(err.Error())
-	}
-	c.Assert(err, gc.Equals, nil)
-	m := kubetest.StartMonitor(c, *cfg)
-	s.AddCleanup(func(c *gc.C) {
-		m.Done()
-	})
+	ksrv := kubetest.NewFakeKubernetes(c)
+	defer ksrv.Close()
 
 	ctlPath := params.EntityPath{"bob", "foo"}
 	addController(c, ctlPath, s.APIInfo(c), s.jem)
 	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
-	var cacerts []string
-	if cert := kubetest.CACertificate(cfg); cert != "" {
-		cacerts = append(cacerts, cert)
-	}
-	err = s.jem.CreateCloud(
+
+	err := s.jem.CreateCloud(
 		ctx,
 		mongodoc.CloudRegion{
-			Cloud:          "test-cloud",
-			ProviderType:   "kubernetes",
-			AuthTypes:      []string{string(cloud.UserPassAuthType)},
-			Endpoint:       kubetest.ServerURL(cfg),
-			CACertificates: cacerts,
+			Cloud:        "test-cloud",
+			ProviderType: "kubernetes",
+			AuthTypes:    []string{string(cloud.UserPassAuthType)},
+			Endpoint:     ksrv.URL,
 			ACL: params.ACL{
 				Read:  []string{"bob"},
 				Write: []string{"bob"},
@@ -2065,8 +2054,8 @@ func (s *jemK8sSuite) TestRemoveCloudWithModel(c *gc.C) {
 		Path: credpath,
 		Type: string(cloud.UserPassAuthType),
 		Attributes: map[string]string{
-			"username": kubetest.Username(cfg),
-			"password": kubetest.Password(cfg),
+			"username": kubetest.Username,
+			"password": kubetest.Password,
 		},
 	}, jem.CredentialUpdate)
 	c.Assert(err, gc.Equals, nil)

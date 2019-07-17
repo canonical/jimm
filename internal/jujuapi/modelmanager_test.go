@@ -1270,14 +1270,9 @@ func (s *caasModelManagerSuite) TestListCAASModels(c *gc.C) {
 }
 
 func (s *caasModelManagerSuite) AssertAddKubernetesCloud(c *gc.C, credTag names.CloudCredentialTag) {
-	cfg, err := kubetest.LoadConfig()
-	if errgo.Cause(err) == kubetest.ErrDisabled {
-		c.Skip(err.Error())
-	}
-	c.Assert(err, gc.Equals, nil)
-	m := kubetest.StartMonitor(c, *cfg)
+	ksrv := kubetest.NewFakeKubernetes(c)
 	s.AddCleanup(func(c *gc.C) {
-		m.Done()
+		ksrv.Close()
 	})
 
 	userTag := credTag.Owner()
@@ -1289,25 +1284,19 @@ func (s *caasModelManagerSuite) AssertAddKubernetesCloud(c *gc.C, credTag names.
 	conn := s.open(c, nil, user)
 	defer conn.Close()
 
-	var cacerts []string
-	if cert := kubetest.CACertificate(cfg); cert != "" {
-		cacerts = append(cacerts, cert)
-	}
-
 	cloudclient := cloudapi.NewClient(conn)
-	err = cloudclient.AddCloud(cloud.Cloud{
+	err := cloudclient.AddCloud(cloud.Cloud{
 		Name:            credTag.Cloud().Id(),
 		Type:            "kubernetes",
 		AuthTypes:       cloud.AuthTypes{cloud.UserPassAuthType},
-		Endpoint:        kubetest.ServerURL(cfg),
-		CACertificates:  cacerts,
+		Endpoint:        ksrv.URL,
 		HostCloudRegion: "dummy/dummy-region",
 	})
 	c.Assert(err, gc.Equals, nil)
 
 	cred := cloud.NewCredential(cloud.UserPassAuthType, map[string]string{
-		"username": kubetest.Username(cfg),
-		"password": kubetest.Password(cfg),
+		"username": kubetest.Username,
+		"password": kubetest.Password,
 	})
 	res, err := cloudclient.UpdateCredentialsCheckModels(credTag, cred)
 	c.Assert(err, gc.Equals, nil)
