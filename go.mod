@@ -150,10 +150,10 @@ require (
 	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637
 	gopkg.in/vmihailenco/msgpack.v2 v2.9.1 // indirect
 	gopkg.in/yaml.v2 v2.2.1
-	k8s.io/api v0.0.0-20181117111259-46ad728b8d13
+	k8s.io/api v0.0.0-20181117111259-46ad728b8d13 // indirect
 	k8s.io/apiextensions-apiserver v0.0.0-20181018015743-2867844605ff // indirect
-	k8s.io/apimachinery v0.0.0-20181130031032-af2f90f9922d
-	k8s.io/client-go v9.0.0+incompatible
+	k8s.io/apimachinery v0.0.0-20181130031032-af2f90f9922d // indirect
+	k8s.io/client-go v9.0.0+incompatible // indirect
 	k8s.io/klog v0.3.0 // indirect
 	labix.org/v2/mgo v0.0.0-20140701140051-000000000287 // indirect
 	sigs.k8s.io/yaml v1.1.0 // indirect
@@ -166,3 +166,5 @@ replace (
 )
 
 replace github.com/hashicorp/raft => github.com/juju/raft v1.0.1-0.20190319034642-834fca2f9ffc
+
+go 1.12
