@@ -43,11 +43,11 @@ require (
 	github.com/json-iterator/go v1.1.5 // indirect
 	github.com/jtolds/gls v4.2.1+incompatible // indirect
 	github.com/juju/aclstore v0.0.0-20180706073322-7fc1cdaacf01
-	github.com/juju/bundlechanges v0.0.0-20190227165505-a15b892a4166 // indirect
+	github.com/juju/bundlechanges v0.0.0-20190627125043-bb96ad9a5018 // indirect
 	github.com/juju/clock v0.0.0-20190205081909-9c5c9712527c
 	github.com/juju/cmd v0.0.0-20190116223025-a8c88215d37e
 	github.com/juju/collections v0.0.0-20180717171555-9be91dc79b7c // indirect
-	github.com/juju/description v0.0.0-20190331215038-2f1dd3b325dc // indirect
+	github.com/juju/description v0.0.0-20190625082943-adb93fec16ac // indirect
 	github.com/juju/errors v0.0.0-20181118221551-089d3ea4e4d5
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
 	github.com/juju/go-oracle-cloud v0.0.0-20170510162943-95ad2a088ab9 // indirect
@@ -56,7 +56,7 @@ require (
 	github.com/juju/httprequest v1.0.1
 	github.com/juju/idmclient v0.0.0-20161107140250-fb1dc7175251
 	github.com/juju/jsonschema v0.0.0-20161102181919-a0ef8b74ebcf // indirect
-	github.com/juju/juju v0.0.0-20190614025705-6c4f52c4ae77
+	github.com/juju/juju v0.0.0-20190628170926-4c42a4305430
 	github.com/juju/loggo v0.0.0-20190526231331-6e530bcce5d8
 	github.com/juju/lru v0.0.0-20181205132344-305dec07bf2f // indirect
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
@@ -64,7 +64,7 @@ require (
 	github.com/juju/mutex v0.0.0-20180619145857-d21b13acf4bf // indirect
 	github.com/juju/names v0.0.0-20160330150533-8a0aa0963bba
 	github.com/juju/naturalsort v0.0.0-20180423034842-5b81707e882b // indirect
-	github.com/juju/os v0.0.0-20190528203116-c23cb5719c78 // indirect
+	github.com/juju/os v0.0.0-20190625135142-88a4c6ac59c1 // indirect
 	github.com/juju/packaging v0.0.0-20180516203043-ba21344fff20 // indirect
 	github.com/juju/persistent-cookiejar v0.0.0-20170428161559-d67418f14c93
 	github.com/juju/proxy v0.0.0-20180523025733-5f8741c297b4 // indirect
@@ -128,7 +128,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.39.0 // indirect
 	gopkg.in/juju/blobstore.v2 v2.0.0-20160125023703-51fa6e26128d // indirect
-	gopkg.in/juju/charm.v6 v6.0.0-20190530145454-f915791435aa // indirect
+	gopkg.in/juju/charm.v6 v6.0.0-20190627113248-52b617a34c5a // indirect
 	gopkg.in/juju/charmrepo.v2 v2.0.0-20171114184045-653bbd81990d // indirect
 	gopkg.in/juju/charmrepo.v3 v3.0.0-20180803043737-7778a447283b // indirect
 	gopkg.in/juju/charmstore.v5 v5.5.2 // indirect
