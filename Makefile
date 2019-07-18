@@ -63,7 +63,7 @@ server: install
 
 # Generate version information
 version/init.go: version/init.go.tmpl FORCE
-	gofmt -r "unknownVersion -> Version{GitCommit: \"${GIT_COMMIT}\", Version: \"${GIT_VERSION}\",}" $< > $@
+	gofmt -r "unknownVersion -> Version{GitCommit: \"${GIT_COMMIT}\", Version: \"${GIT_VERSION}\",}" $<  | tee $@ > /dev/null
 
 jemd: version/init.go
 	go build -v $(PROJECT)/cmd/jemd
