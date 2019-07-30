@@ -2195,7 +2195,7 @@ func (s *databaseSuite) TestInsertCloudRegion(c *gc.C) {
 	err = s.database.InsertCloudRegion(testContext, &mongodoc.CloudRegion{
 		Cloud: "test-cloud",
 	})
-	c.Assert(err, gc.ErrorMatches, `E11000 duplicate key error .*`)
+	c.Assert(err, gc.ErrorMatches, `.*E11000 duplicate key error .*`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
 }
 
