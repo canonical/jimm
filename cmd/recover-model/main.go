@@ -14,7 +14,7 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	envconfig "github.com/juju/juju/environs/config"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/juju/names.v2"
+	"gopkg.in/juju/names.v3"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/agent"
 	mgo "gopkg.in/mgo.v2"

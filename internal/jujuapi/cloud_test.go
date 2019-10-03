@@ -16,7 +16,7 @@ import (
 	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/juju/names.v2"
+	"gopkg.in/juju/names.v3"
 
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
@@ -625,7 +625,7 @@ func (s *cloudSuite) TestAddCloud(c *gc.C) {
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
 		HostCloudRegion:  "dummy/dummy-region",
-	})
+	}, false)
 	c.Assert(err, gc.Equals, nil)
 	clouds, err := client.Clouds()
 	c.Assert(err, gc.Equals, nil)
@@ -715,7 +715,7 @@ func (s *cloudSuite) TestAddCloudError(c *gc.C) {
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
 		HostCloudRegion:  "dummy/dummy-region",
-	})
+	}, false)
 	c.Assert(err, gc.ErrorMatches, `invalid cloud: empty auth-types not valid`)
 }
 
@@ -730,7 +730,7 @@ func (s *cloudSuite) TestAddCloudNoHostCloudRegion(c *gc.C) {
 		Endpoint:         "https://0.1.2.3:5678",
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
-	})
+	}, false)
 	c.Assert(err, gc.ErrorMatches, `cloud region required \(cloud region required\)`)
 	c.Assert(jujuparams.IsCodeCloudRegionRequired(err), gc.Equals, true)
 }
@@ -746,7 +746,7 @@ func (s *cloudSuite) TestAddCloudBadName(c *gc.C) {
 		Endpoint:         "https://0.1.2.3:5678",
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
-	})
+	}, false)
 	c.Assert(err, gc.ErrorMatches, `cloud "aws" already exists \(already exists\)`)
 }
 
@@ -880,7 +880,7 @@ func (s *cloudSuite) TestRemoveCloud(c *gc.C) {
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
 		HostCloudRegion:  "dummy/dummy-region",
-	})
+	}, false)
 	c.Assert(err, gc.Equals, nil)
 	clouds, err := client.Clouds()
 	c.Assert(err, gc.Equals, nil)
@@ -923,7 +923,7 @@ func (s *cloudSuite) TestModifyCloudAccess(c *gc.C) {
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
 		HostCloudRegion:  "dummy/dummy-region",
-	})
+	}, false)
 	c.Assert(err, gc.Equals, nil)
 	clouds, err := client.Clouds()
 	c.Assert(err, gc.Equals, nil)
@@ -980,7 +980,7 @@ func (s *cloudSuite) TestModifyCloudAccessUnauthorized(c *gc.C) {
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
 		HostCloudRegion:  "dummy/dummy-region",
-	})
+	}, false)
 	c.Assert(err, gc.Equals, nil)
 	clouds, err := client.Clouds()
 	c.Assert(err, gc.Equals, nil)

@@ -25,7 +25,7 @@ import (
 	"github.com/rogpeppe/fastuuid"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/names.v2"
+	"gopkg.in/juju/names.v3"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -1419,7 +1419,8 @@ func (j *JEM) createCloud(ctx context.Context, cloud jujucloud.Cloud) (params.En
 			continue
 		}
 		defer conn.Close()
-		err = cloudapi.NewClient(conn).AddCloud(cloud)
+		// TODO(mhilton) support force?
+		err = cloudapi.NewClient(conn).AddCloud(cloud, false)
 		if err == nil {
 			return ctlPath, nil
 		}

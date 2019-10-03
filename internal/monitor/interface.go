@@ -9,7 +9,7 @@ import (
 	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/version"
-	names "gopkg.in/juju/names.v2"
+	names "gopkg.in/juju/names.v3"
 
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"

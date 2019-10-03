@@ -4,7 +4,7 @@ import (
 	"regexp"
 
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/names.v2"
+	"gopkg.in/juju/names.v3"
 )
 
 var validName = regexp.MustCompile("^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$")
