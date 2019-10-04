@@ -1207,7 +1207,7 @@ func (s *caasModelManagerSuite) TestCreateModelKubernetes(c *gc.C) {
 	c.Assert(mi.Type, gc.Equals, model.CAAS)
 	c.Assert(mi.ProviderType, gc.Equals, "kubernetes")
 	c.Assert(mi.Cloud, gc.Equals, "test-cloud")
-	c.Assert(mi.CloudRegion, gc.Equals, "")
+	c.Assert(mi.CloudRegion, gc.Equals, "default")
 	c.Assert(mi.Owner, gc.Equals, "test@external")
 }
 
@@ -1229,7 +1229,7 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 		ProviderType:    "kubernetes",
 		DefaultSeries:   "bionic",
 		Cloud:           "test-cloud",
-		CloudRegion:     "",
+		CloudRegion:     "default",
 		CloudCredential: "test-cloud/test@external/test-cred",
 		Owner:           "test@external",
 		Life:            "alive",

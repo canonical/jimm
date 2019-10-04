@@ -31,7 +31,7 @@ func (s *bundleSuite) TestGetChangesBundleContentError(c *gc.C) {
 		BundleDataYAML: ":",
 	}
 	r, err := s.getChanges(c, args)
-	c.Assert(err, gc.ErrorMatches, `cannot read bundle YAML: cannot unmarshal bundle data: yaml: did not find expected key`)
+	c.Assert(err, gc.ErrorMatches, `cannot read bundle YAML: unmarshal document 0: yaml: did not find expected key`)
 	c.Assert(r, gc.DeepEquals, jujuparams.BundleChangesResults{})
 }
 
@@ -117,7 +117,7 @@ func (s *bundleSuite) TestGetChangesSuccess(c *gc.C) {
 	c.Assert(r.Changes, jc.DeepEquals, []*jujuparams.BundleChange{{
 		Id:     "addCharm-0",
 		Method: "addCharm",
-		Args:   []interface{}{"django", ""},
+		Args:   []interface{}{"django", "", ""},
 	}, {
 		Id:     "deploy-1",
 		Method: "deploy",
@@ -136,7 +136,7 @@ func (s *bundleSuite) TestGetChangesSuccess(c *gc.C) {
 	}, {
 		Id:     "addCharm-2",
 		Method: "addCharm",
-		Args:   []interface{}{"cs:trusty/haproxy-42", "trusty"},
+		Args:   []interface{}{"cs:trusty/haproxy-42", "trusty", ""},
 	}, {
 		Id:     "deploy-3",
 		Method: "deploy",
