@@ -12,7 +12,7 @@ import (
 	controllerapi "github.com/juju/juju/api/controller"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/component/all"
-	"github.com/juju/juju/network"
+	"github.com/juju/juju/core/network"
 	jujuversion "github.com/juju/juju/version"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
@@ -20,7 +20,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/names.v2"
+	"gopkg.in/juju/names.v3"
 
 	"github.com/CanonicalLtd/jimm/internal/apitest"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
@@ -1322,23 +1322,23 @@ func (s *APISuite) TestWhoAmI(c *gc.C) {
 
 var mongodocAPIHostPortsTests = []struct {
 	about  string
-	hps    [][]network.HostPort
+	hps    []network.MachineHostPorts
 	expect [][]mongodoc.HostPort
 }{{
 	about:  "one address",
-	hps:    [][]network.HostPort{{{Address: network.Address{Value: "0.1.2.3", Scope: network.ScopePublic}, Port: 1234}}},
+	hps:    []network.MachineHostPorts{{{MachineAddress: network.MachineAddress{Value: "0.1.2.3", Scope: network.ScopePublic}, NetPort: 1234}}},
 	expect: [][]mongodoc.HostPort{{{Host: "0.1.2.3", Port: 1234, Scope: "public"}}},
 }, {
 	about:  "unknown scope changed to public",
-	hps:    [][]network.HostPort{{{Address: network.Address{Value: "0.1.2.3", Scope: network.ScopeUnknown}, Port: 1234}}},
+	hps:    []network.MachineHostPorts{{{MachineAddress: network.MachineAddress{Value: "0.1.2.3", Scope: network.ScopeUnknown}, NetPort: 1234}}},
 	expect: [][]mongodoc.HostPort{{{Host: "0.1.2.3", Port: 1234, Scope: "public"}}},
 }, {
 	about: "unusable addresses removed",
-	hps: [][]network.HostPort{{
-		{Address: network.Address{Value: "0.1.2.3", Scope: network.ScopeMachineLocal}, Port: 1234},
+	hps: []network.MachineHostPorts{{
+		{MachineAddress: network.MachineAddress{Value: "0.1.2.3", Scope: network.ScopeMachineLocal}, NetPort: 1234},
 	}, {
-		{Address: network.Address{Value: "0.1.2.4", Scope: network.ScopeLinkLocal}, Port: 1234},
-		{Address: network.Address{Value: "0.1.2.5", Scope: network.ScopePublic}, Port: 1234},
+		{MachineAddress: network.MachineAddress{Value: "0.1.2.4", Scope: network.ScopeLinkLocal}, NetPort: 1234},
+		{MachineAddress: network.MachineAddress{Value: "0.1.2.5", Scope: network.ScopePublic}, NetPort: 1234},
 	}},
 	expect: [][]mongodoc.HostPort{{{Host: "0.1.2.5", Port: 1234, Scope: "public"}}},
 }}
@@ -1382,6 +1382,7 @@ func (s *APISuite) TestJujuStatus(c *gc.C) {
 			RemoteApplications: map[string]jujuparams.RemoteApplicationStatus{},
 			Relations:          nil,
 			Offers:             map[string]jujuparams.ApplicationOfferStatus{},
+			Branches:           map[string]jujuparams.BranchStatus{},
 		},
 	})
 
@@ -1411,6 +1412,7 @@ func (s *APISuite) TestJujuStatus(c *gc.C) {
 			RemoteApplications: map[string]jujuparams.RemoteApplicationStatus{},
 			Relations:          nil,
 			Offers:             map[string]jujuparams.ApplicationOfferStatus{},
+			Branches:           map[string]jujuparams.BranchStatus{},
 		},
 	})
 

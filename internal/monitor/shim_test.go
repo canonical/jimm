@@ -15,7 +15,7 @@ import (
 	"github.com/juju/version"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	names "gopkg.in/juju/names.v2"
+	names "gopkg.in/juju/names.v3"
 
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"

@@ -12,11 +12,11 @@ import (
 	controllerapi "github.com/juju/juju/api/controller"
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
-	"github.com/juju/juju/network"
+	"github.com/juju/juju/core/network"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/names.v2"
+	"gopkg.in/juju/names.v3"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
@@ -278,21 +278,21 @@ func controllerModelInfo(conn *apiconn.Conn, user string) (*jujuparams.ModelInfo
 // It removes unusable addresses and marks any scope-unknown
 // addresses as public so that the clients using only public-scoped
 // addresses will use them.
-func mongodocAPIHostPorts(nhpss [][]network.HostPort) [][]mongodoc.HostPort {
-	hpss := make([][]mongodoc.HostPort, 0, len(nhpss))
-	for _, nhps := range nhpss {
-		nhps = network.FilterUnusableHostPorts(nhps)
+func mongodocAPIHostPorts(nmhpss []network.MachineHostPorts) [][]mongodoc.HostPort {
+	hpss := make([][]mongodoc.HostPort, 0, len(nmhpss))
+	for _, nmhps := range nmhpss {
+		nhps := nmhps.HostPorts().FilterUnusable()
 		if len(nhps) == 0 {
 			continue
 		}
 		hps := make([]mongodoc.HostPort, len(nhps))
 		for i, nhp := range nhps {
-			if nhp.Scope == network.ScopeUnknown {
+			hps[i].SetJujuHostPort(nhp)
+			if hps[i].Scope == string(network.ScopeUnknown) {
 				// This is needed because network.NewHostPort returns
 				// scope unknown for DNS names.
-				nhp.Scope = network.ScopePublic
+				hps[i].Scope = string(network.ScopePublic)
 			}
-			hps[i].SetJujuHostPort(nhp)
 		}
 		hpss = append(hpss, hps)
 	}
