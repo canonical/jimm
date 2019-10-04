@@ -6,9 +6,9 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/juju/juju/core/network"
 	"github.com/juju/juju/apiserver/common"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/core/network"
 	"github.com/juju/juju/rpc"
 	"github.com/juju/rpcreflect"
 	"gopkg.in/errgo.v1"

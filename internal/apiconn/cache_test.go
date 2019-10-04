@@ -239,6 +239,7 @@ func (s *cacheSuite) TestEvictOnUpgradeInProgress(c *gc.C) {
 			return false
 		}
 	}
+	config.Controller = s.Controller
 	srv := testserver.NewServerWithConfig(c, s.StatePool, config)
 	defer srv.Stop()
 
