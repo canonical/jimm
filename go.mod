@@ -49,7 +49,7 @@ require (
 	github.com/juju/clock v0.0.0-20190205081909-9c5c9712527c
 	github.com/juju/cmd v0.0.0-20190815094254-0c5c82a8dfc6
 	github.com/juju/collections v0.0.0-20180717171555-9be91dc79b7c // indirect
-	github.com/juju/description v0.0.0-20190821151921-7eee51ddb1f5 // indirect
+	github.com/juju/description v0.0.0-20191007161550-303c0a2ac03f // indirect
 	github.com/juju/errors v0.0.0-20181118221551-089d3ea4e4d5
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
 	github.com/juju/go-oracle-cloud v0.0.0-20170510162943-95ad2a088ab9 // indirect
@@ -58,7 +58,7 @@ require (
 	github.com/juju/httprequest v1.0.1
 	github.com/juju/idmclient v0.0.0-20161107140250-fb1dc7175251
 	github.com/juju/jsonschema v0.0.0-20161102181919-a0ef8b74ebcf // indirect
-	github.com/juju/juju v0.0.0-20191004031853-b91c1ee7b3f4
+	github.com/juju/juju v0.0.0-20191015053136-a7a72656a11d
 	github.com/juju/loggo v0.0.0-20190526231331-6e530bcce5d8
 	github.com/juju/lru v0.0.0-20181205132344-305dec07bf2f // indirect
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
