@@ -6,7 +6,7 @@ import uuid
 import yaml
 
 
-src = os.path.join(os.getenv('SNAP'), 'config.yaml')
+src = os.path.join(os.getenv('SNAP'), 'etc', 'jimm', 'config.yaml')
 dst = os.path.join(os.getenv('SNAP_DATA'), 'config.yaml')
 
 with open(src) as f:
