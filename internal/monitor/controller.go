@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/juju/juju/state/multiwatcher"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/utils/parallel"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
@@ -370,7 +370,7 @@ func (m *controllerMonitor) watch(ctx context.Context, conn jujuAPI) error {
 	}
 
 	type reply struct {
-		deltas []multiwatcher.Delta
+		deltas []jujuparams.Delta
 		err    error
 	}
 	replyc := make(chan reply, 1)
@@ -486,7 +486,7 @@ type watcherState struct {
 	runner *parallel.Run
 
 	// entities holds a map from entity tag to whether it exists.
-	entities map[multiwatcher.EntityId]bool
+	entities map[jujuparams.EntityId]bool
 
 	// ctlPath holds the path to the controller.
 	ctlPath params.EntityPath
@@ -514,7 +514,7 @@ type modelInfo struct {
 	uuid string
 
 	// info contains the received watcher info for the model.
-	info *multiwatcher.ModelInfo
+	info *jujuparams.ModelUpdate
 
 	// counts holds current counts for entities in the model.
 	counts map[params.EntityCount]int
@@ -531,7 +531,7 @@ func (info *modelInfo) adjustCount(kind params.EntityCount, n int) {
 	}
 }
 
-func (info *modelInfo) setInfo(modelInfo *multiwatcher.ModelInfo) {
+func (info *modelInfo) setInfo(modelInfo *jujuparams.ModelUpdate) {
 	info.changed |= infoChange
 	info.info = modelInfo
 }
@@ -547,11 +547,11 @@ func newWatcherState(ctx context.Context, j jemInterface, ctlPath params.EntityP
 		// entities holds an entry for each entity in the controller
 		// so that we can tell the difference between change and
 		// creation.
-		entities: make(map[multiwatcher.EntityId]bool),
+		entities: make(map[jujuparams.EntityId]bool),
 	}
 }
 
-func (w *watcherState) addDelta(ctx context.Context, d multiwatcher.Delta) error {
+func (w *watcherState) addDelta(ctx context.Context, d jujuparams.Delta) error {
 	if m := zapctx.Logger(ctx).Check(zap.DebugLevel, "got delta"); m != nil {
 		id := d.Entity.EntityId()
 		if d.Removed {
@@ -561,17 +561,17 @@ func (w *watcherState) addDelta(ctx context.Context, d multiwatcher.Delta) error
 		}
 	}
 	switch e := d.Entity.(type) {
-	case *multiwatcher.ModelInfo:
+	case *jujuparams.ModelUpdate:
 		// Ensure there's always a model entry.
 		w.adjustCount(&w.stats.ModelCount, d)
 		if d.Removed {
 			e.Life = "dead"
 		}
 		w.modelInfo(e.ModelUUID).setInfo(e)
-	case *multiwatcher.UnitInfo:
+	case *jujuparams.UnitInfo:
 		delta := w.adjustCount(&w.stats.UnitCount, d)
 		w.modelInfo(e.ModelUUID).adjustCount(params.UnitCount, delta)
-	case *multiwatcher.ApplicationInfo:
+	case *jujuparams.ApplicationInfo:
 		delta := w.adjustCount(&w.stats.ServiceCount, d)
 		w.modelInfo(e.ModelUUID).adjustCount(params.ApplicationCount, delta)
 		if d.Removed {
@@ -580,7 +580,7 @@ func (w *watcherState) addDelta(ctx context.Context, d multiwatcher.Delta) error
 		w.runner.Do(func() error {
 			return w.jem.UpdateApplicationInfo(ctx, w.ctlPath, e)
 		})
-	case *multiwatcher.MachineInfo:
+	case *jujuparams.MachineInfo:
 		// TODO for top level machines, increment instance count?
 		delta := w.adjustCount(&w.stats.MachineCount, d)
 		w.modelInfo(e.ModelUUID).adjustCount(params.MachineCount, delta)
@@ -625,7 +625,7 @@ func (w watcherState) modelInfo(uuid string) *modelInfo {
 // changed and keeps track of whether the entity id exists.
 //
 // It returns the actual delta the count has been adjusted by.
-func (w *watcherState) adjustCount(n *int, delta multiwatcher.Delta) int {
+func (w *watcherState) adjustCount(n *int, delta jujuparams.Delta) int {
 	id := delta.Entity.EntityId()
 	diff := 0
 	if delta.Removed {
@@ -655,7 +655,7 @@ func incControllerErrorsMetric(ctlPath params.EntityPath) {
 	servermon.MonitorErrorsCount.WithLabelValues(ctlPath.String()).Inc()
 }
 
-func mongodocModelInfo(info *multiwatcher.ModelInfo) *mongodoc.ModelInfo {
+func mongodocModelInfo(info *jujuparams.ModelUpdate) *mongodoc.ModelInfo {
 	since := time.Time{}
 	if info.Status.Since != nil {
 		since = *info.Status.Since

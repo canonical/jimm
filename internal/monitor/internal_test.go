@@ -9,9 +9,10 @@ import (
 
 	"github.com/juju/clock/testclock"
 	"github.com/juju/idmclient/idmtest"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
+	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/state"
-	"github.com/juju/juju/state/multiwatcher"
 	jujuwatcher "github.com/juju/juju/state/watcher"
 	jujujujutesting "github.com/juju/juju/testing"
 	"github.com/juju/juju/testing/factory"
@@ -387,7 +388,7 @@ func (s *internalSuite) TestModelRemovedWithFailedWatcher(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			Id:        "some-machine-id",
 			ModelUUID: modelUUID,
 		},
@@ -467,7 +468,7 @@ func (s *internalSuite) TestWatcherUpdatesMachineInfo(c *gc.C) {
 	type machineInfo struct {
 		modelUUID string
 		id        string
-		life      multiwatcher.Life
+		life      life.Value
 	}
 
 	getMachineInfo := func() interface{} {
@@ -527,7 +528,7 @@ func (s *internalSuite) TestWatcherUpdatesApplicationInfo(c *gc.C) {
 	type appInfo struct {
 		modelUUID string
 		name      string
-		life      multiwatcher.Life
+		life      life.Value
 	}
 
 	getApplicationInfo := func() interface{} {

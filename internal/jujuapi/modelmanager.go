@@ -8,6 +8,7 @@ import (
 
 	"github.com/juju/juju/apiserver/common"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/core/life"
 	"github.com/juju/utils/parallel"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v3"
@@ -141,7 +142,7 @@ func (m modelManagerAPI) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 				CloudRegion:        model.CloudRegion,
 				CloudCredentialTag: jem.CloudCredentialTag(model.Credential).String(),
 				OwnerTag:           jem.UserTag(model.Path.User).String(),
-				Life:               jujuparams.Life(model.Life()),
+				Life:               life.Value(model.Life()),
 				Status:             modelStatus(model.Info),
 				UserAccess:         access,
 				// TODO currently user logins aren't communicated by the multiwatcher

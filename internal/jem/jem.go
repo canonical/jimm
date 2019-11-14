@@ -19,7 +19,6 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/juju/environs/config"
-	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/utils/cache"
 	"github.com/juju/version"
 	"github.com/rogpeppe/fastuuid"
@@ -1249,7 +1248,7 @@ func (j *JEM) selectRandomController(ctx context.Context) (params.EntityPath, er
 }
 
 // UpdateMachineInfo updates the information associated with a machine.
-func (j *JEM) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, info *multiwatcher.MachineInfo) error {
+func (j *JEM) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, info *jujuparams.MachineInfo) error {
 	cloud, region, err := j.modelRegion(ctx, ctlPath, info.ModelUUID)
 	if errgo.Cause(err) == params.ErrNotFound {
 		// If the model isn't found then it is not controlled by
@@ -1268,7 +1267,7 @@ func (j *JEM) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, 
 }
 
 // UpdateApplicationInfo updates the information associated with an application.
-func (j *JEM) UpdateApplicationInfo(ctx context.Context, ctlPath params.EntityPath, info *multiwatcher.ApplicationInfo) error {
+func (j *JEM) UpdateApplicationInfo(ctx context.Context, ctlPath params.EntityPath, info *jujuparams.ApplicationInfo) error {
 	cloud, region, err := j.modelRegion(ctx, ctlPath, info.ModelUUID)
 	if errgo.Cause(err) == params.ErrNotFound {
 		// If the model isn't found then it is not controlled by

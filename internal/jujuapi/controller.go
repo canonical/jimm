@@ -13,6 +13,7 @@ import (
 	"github.com/juju/juju/apiserver/facades/client/bundle"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	jujucloud "github.com/juju/juju/cloud"
+	"github.com/juju/juju/core/life"
 	jujustatus "github.com/juju/juju/core/status"
 	"github.com/juju/juju/environs"
 	"github.com/juju/juju/environs/config"
@@ -407,7 +408,7 @@ func (r *controllerRoot) modelInfo(ctx context.Context, arg jujuparams.Entity, l
 	infoFromController, err := fetchModelInfo(ctx, r.jem, model)
 	if err != nil {
 		code := jujuparams.ErrCode(err)
-		if model.Life() == string(jujuparams.Dying) && code == jujuparams.CodeUnauthorized {
+		if model.Life() == string(life.Dying) && code == jujuparams.CodeUnauthorized {
 			zapctx.Info(ctx, "could not get ModelInfo for dying model, marking dead", zap.Error(err))
 			// The model was dying and now cannot be accessed, assume it is now dead.
 			if err := r.jem.DB.DeleteModelWithUUID(ctx, model.Controller, model.UUID); err != nil {
@@ -485,7 +486,7 @@ func (r *controllerRoot) modelDocToModelInfo(ctx context.Context, model *mongodo
 		CloudRegion:        model.CloudRegion,
 		CloudCredentialTag: jem.CloudCredentialTag(model.Credential).String(),
 		OwnerTag:           jem.UserTag(model.Path.User).String(),
-		Life:               jujuparams.Life(model.Life()),
+		Life:               life.Value(model.Life()),
 		Status:             modelStatus(model.Info),
 		Users:              users,
 		Machines:           jemMachinesToModelMachineInfo(machines),

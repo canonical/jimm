@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/status"
-	"github.com/juju/juju/state/multiwatcher"
 	"github.com/prometheus/client_golang/prometheus"
 	gc "gopkg.in/check.v1"
 
@@ -188,98 +188,98 @@ func (s *jemSuite) TestMachineStats(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "0",
 		ModelUUID: m1.UUID,
-		AgentStatus: multiwatcher.StatusInfo{
+		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Started,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "1",
 		ModelUUID: m1.UUID,
-		AgentStatus: multiwatcher.StatusInfo{
+		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Pending,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "2",
 		ModelUUID: m1.UUID,
-		AgentStatus: multiwatcher.StatusInfo{
+		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Stopped,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "3",
 		ModelUUID: m1.UUID,
-		AgentStatus: multiwatcher.StatusInfo{
+		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Down,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "4",
 		ModelUUID: m1.UUID,
-		AgentStatus: multiwatcher.StatusInfo{
+		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Started,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "5",
 		ModelUUID: m1.UUID,
-		AgentStatus: multiwatcher.StatusInfo{
+		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Pending,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "6",
 		ModelUUID: m1.UUID,
-		AgentStatus: multiwatcher.StatusInfo{
+		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Stopped,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "7",
 		ModelUUID: m1.UUID,
-		AgentStatus: multiwatcher.StatusInfo{
+		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Started,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "8",
 		ModelUUID: m1.UUID,
-		AgentStatus: multiwatcher.StatusInfo{
+		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Pending,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "9",
 		ModelUUID: m1.UUID,
-		AgentStatus: multiwatcher.StatusInfo{
+		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Started,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "0",
 		ModelUUID: m2.UUID,
-		AgentStatus: multiwatcher.StatusInfo{
+		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Started,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl2Id, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(ctx, ctl2Id, &jujuparams.MachineInfo{
 		Id:        "0",
 		ModelUUID: m3.UUID,
-		AgentStatus: multiwatcher.StatusInfo{
+		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Pending,
 		},
 	})

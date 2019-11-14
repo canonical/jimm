@@ -13,10 +13,10 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/instance"
+	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/model"
 	"github.com/juju/juju/core/status"
 	"github.com/juju/juju/state"
-	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/juju/testing/factory"
 	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/testing"
@@ -188,13 +188,13 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 	s.grant(c, params.EntityPath{User: "test2", Name: "model-5"}, params.User("test"), "admin")
 
 	// Add some machines to one of the models
-	err = s.JEM.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
+	err = s.JEM.UpdateMachineInfo(testContext, ctlPath, &jujuparams.MachineInfo{
 		ModelUUID: modelUUID3,
 		Id:        "machine-0",
 	})
 	c.Assert(err, gc.Equals, nil)
 	machineArch := "bbc-micro"
-	err = s.JEM.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
+	err = s.JEM.UpdateMachineInfo(testContext, ctlPath, &jujuparams.MachineInfo{
 		ModelUUID: modelUUID3,
 		Id:        "machine-1",
 		HardwareCharacteristics: &instance.HardwareCharacteristics{
@@ -202,7 +202,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.JEM.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
+	err = s.JEM.UpdateMachineInfo(testContext, ctlPath, &jujuparams.MachineInfo{
 		ModelUUID: modelUUID3,
 		Id:        "machine-2",
 		Life:      "dead",
@@ -233,7 +233,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			CloudRegion:        "dummy-region",
 			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test@external/cred1").String(),
 			OwnerTag:           names.NewUserTag("test@external").String(),
-			Life:               jujuparams.Alive,
+			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
 				Status: status.Available,
 			},
@@ -260,7 +260,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			CloudRegion:        "dummy-region",
 			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test2@external/cred1").String(),
 			OwnerTag:           names.NewUserTag("test2@external").String(),
-			Life:               jujuparams.Alive,
+			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
 				Status: status.Available,
 			},
@@ -290,7 +290,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			CloudRegion:        "dummy-region",
 			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test2@external/cred1").String(),
 			OwnerTag:           names.NewUserTag("test2@external").String(),
-			Life:               jujuparams.Alive,
+			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
 				Status: status.Available,
 			},
@@ -312,7 +312,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			CloudRegion:        "dummy-region",
 			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test2@external/cred1").String(),
 			OwnerTag:           names.NewUserTag("test2@external").String(),
-			Life:               jujuparams.Alive,
+			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
 				Status: status.Available,
 			},
@@ -377,7 +377,7 @@ func (s *modelManagerSuite) TestModelInfoForLegacyModel(c *gc.C) {
 			CloudRegion:        "dummy-region",
 			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test@external/cred1").String(),
 			OwnerTag:           names.NewUserTag("test@external").String(),
-			Life:               jujuparams.Alive,
+			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
 				Status: status.Available,
 			},
@@ -440,7 +440,7 @@ func (s *modelManagerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 			CloudRegion:        "dummy-region",
 			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test@external/cred1").String(),
 			OwnerTag:           names.NewUserTag("test@external").String(),
-			Life:               jujuparams.Alive,
+			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
 				Status: status.Available,
 			},
@@ -470,7 +470,7 @@ func (s *modelManagerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 			CloudRegion:        "dummy-region",
 			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test@external/cred1").String(),
 			OwnerTag:           names.NewUserTag("test@external").String(),
-			Life:               jujuparams.Alive,
+			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
 				Status: status.Available,
 			},
@@ -501,7 +501,7 @@ func (s *modelManagerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 			CloudRegion:        "dummy-region",
 			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test@external/cred1").String(),
 			OwnerTag:           names.NewUserTag("test@external").String(),
-			Life:               jujuparams.Alive,
+			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
 				Status: status.Available,
 			},
@@ -527,7 +527,7 @@ func (s *modelManagerSuite) TestModelInfoDyingModelNotFound(c *gc.C) {
 		Cloud:       params.Cloud("dummy"),
 		CloudRegion: "dummy-region",
 		Info: &mongodoc.ModelInfo{
-			Life: string(jujuparams.Dying),
+			Life: string(life.Dying),
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
@@ -836,7 +836,7 @@ func (s *modelManagerSuite) TestDestroyModel(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(mis, gc.HasLen, 1)
 	c.Assert(mis[0].Error, gc.Equals, (*jujuparams.Error)(nil))
-	c.Assert(mis[0].Result.Life, gc.Equals, jujuparams.Dying)
+	c.Assert(mis[0].Result.Life, gc.Equals, life.Dying)
 
 	// Kill the model.
 	err = s.JEM.DB.DeleteModelWithUUID(testContext, ctlPath, mi.UUID)
@@ -881,7 +881,7 @@ func (s *modelManagerSuite) TestDestroyModelWithStorageError(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(mis, gc.HasLen, 1)
 	c.Assert(mis[0].Error, gc.Equals, (*jujuparams.Error)(nil))
-	c.Assert(mis[0].Result.Life, gc.Equals, jujuparams.Alive)
+	c.Assert(mis[0].Result.Life, gc.Equals, life.Alive)
 }
 
 func (s *modelManagerSuite) TestDestroyModelWithStorageDestroyStorageTrue(c *gc.C) {
@@ -918,7 +918,7 @@ func (s *modelManagerSuite) TestDestroyModelWithStorageDestroyStorageTrue(c *gc.
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(mis, gc.HasLen, 1)
 	c.Assert(mis[0].Error, gc.Equals, (*jujuparams.Error)(nil))
-	c.Assert(mis[0].Result.Life, gc.Equals, jujuparams.Dying)
+	c.Assert(mis[0].Result.Life, gc.Equals, life.Dying)
 }
 
 func (s *modelManagerSuite) TestDestroyModelWithStorageDestroyStorageFalse(c *gc.C) {
@@ -955,7 +955,7 @@ func (s *modelManagerSuite) TestDestroyModelWithStorageDestroyStorageFalse(c *gc
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(mis, gc.HasLen, 1)
 	c.Assert(mis[0].Error, gc.Equals, (*jujuparams.Error)(nil))
-	c.Assert(mis[0].Result.Life, gc.Equals, jujuparams.Dying)
+	c.Assert(mis[0].Result.Life, gc.Equals, life.Dying)
 }
 
 func (s *modelManagerSuite) TestDestroyModelV3(c *gc.C) {
@@ -984,7 +984,7 @@ func (s *modelManagerSuite) TestDestroyModelV3(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(mis, gc.HasLen, 1)
 	c.Assert(mis[0].Error, gc.Equals, (*jujuparams.Error)(nil))
-	c.Assert(mis[0].Result.Life, gc.Equals, jujuparams.Dying)
+	c.Assert(mis[0].Result.Life, gc.Equals, life.Dying)
 }
 
 func (s *modelManagerSuite) TestDumpModel(c *gc.C) {

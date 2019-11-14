@@ -8,8 +8,9 @@ import (
 	"strconv"
 	"time"
 
+	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/network"
-	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/version"
 	"gopkg.in/errgo.v1"
 
@@ -327,7 +328,7 @@ type Machine struct {
 	Controller string
 	Cloud      params.Cloud
 	Region     string
-	Info       *multiwatcher.MachineInfo
+	Info       *jujuparams.MachineInfo
 }
 
 // Application holds information on an application in a model, as discovered by the
@@ -349,9 +350,9 @@ type ApplicationInfo struct {
 	Exposed         bool
 	CharmURL        string
 	OwnerTag        string
-	Life            multiwatcher.Life
+	Life            life.Value
 	Subordinate     bool
-	Status          multiwatcher.StatusInfo
+	Status          jujuparams.StatusInfo
 	WorkloadVersion string
 }
 
