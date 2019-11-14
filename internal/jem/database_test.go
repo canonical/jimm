@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/juju/juju/state/multiwatcher"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/version"
@@ -782,7 +782,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: "fake-uuid",
 			Id:        "0",
 			Series:    "quantal",
@@ -793,7 +793,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: "another-uuid",
 			Id:        "0",
 			Series:    "blah",
@@ -804,7 +804,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: "fake-uuid",
 			Id:        "1",
 			Series:    "precise",
@@ -822,7 +822,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: "fake-uuid",
 			Id:        "0",
 			Series:    "quantal",
@@ -833,7 +833,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: "fake-uuid",
 			Id:        "1",
 			Series:    "precise",
@@ -846,7 +846,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: "fake-uuid",
 			Id:        "0",
 			Series:    "foo",
@@ -860,7 +860,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: "fake-uuid",
 			Id:        "1",
 			Series:    "foo",
@@ -879,7 +879,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: "fake-uuid",
 			Id:        "0",
 			Series:    "foo",
@@ -895,7 +895,7 @@ func (s *databaseSuite) TestRemoveControllerMachines(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: "fake-uuid",
 			Id:        "0",
 			Series:    "quantal",
@@ -912,7 +912,7 @@ func (s *databaseSuite) TestRemoveControllerMachines(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: "fake-uuid",
 			Id:        "0",
 			Series:    "quantal",
@@ -2082,7 +2082,7 @@ var setDeadTests = []struct {
 	run: func(db *jem.Database) {
 		db.UpdateMachineInfo(testContext, &mongodoc.Machine{
 			Controller: "test/test",
-			Info: &multiwatcher.MachineInfo{
+			Info: &jujuparams.MachineInfo{
 				ModelUUID: "xxx",
 				Id:        "yyy",
 			},

@@ -16,7 +16,6 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/state"
-	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/juju/testing/factory"
 	jt "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
@@ -749,7 +748,7 @@ func waitForDestruction(conn *apiconn.Conn, c *gc.C, uuid string) <-chan struct{
 				return
 			}
 			for _, d := range deltas {
-				d, ok := d.Entity.(*multiwatcher.ModelInfo)
+				d, ok := d.Entity.(*jujuparams.ModelUpdate)
 				if ok && d.ModelUUID == uuid && d.Life == "dead" {
 					return
 				}
@@ -1240,13 +1239,13 @@ func (s *jemSuite) TestUpdateMachineInfo(c *gc.C) {
 	m := s.bootstrapModel(c, params.EntityPath{"bob", "model-1"})
 	ctlPath := params.EntityPath{"bob", "controller"}
 
-	err := s.jem.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
+	err := s.jem.UpdateMachineInfo(testContext, ctlPath, &jujuparams.MachineInfo{
 		ModelUUID: m.UUID,
 		Id:        "0",
 		Series:    "quantal",
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(testContext, ctlPath, &jujuparams.MachineInfo{
 		ModelUUID: m.UUID,
 		Id:        "1",
 		Series:    "precise",
@@ -1263,7 +1262,7 @@ func (s *jemSuite) TestUpdateMachineInfo(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: m.UUID,
 			Id:        "0",
 			Series:    "quantal",
@@ -1274,7 +1273,7 @@ func (s *jemSuite) TestUpdateMachineInfo(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: m.UUID,
 			Id:        "1",
 			Series:    "precise",
@@ -1283,7 +1282,7 @@ func (s *jemSuite) TestUpdateMachineInfo(c *gc.C) {
 	}})
 
 	// Check that we can update one of the documents.
-	err = s.jem.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(testContext, ctlPath, &jujuparams.MachineInfo{
 		ModelUUID: m.UUID,
 		Id:        "0",
 		Series:    "quantal",
@@ -1292,7 +1291,7 @@ func (s *jemSuite) TestUpdateMachineInfo(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// Check that setting a machine dead removes it.
-	err = s.jem.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(testContext, ctlPath, &jujuparams.MachineInfo{
 		ModelUUID: m.UUID,
 		Id:        "1",
 		Series:    "precise",
@@ -1310,7 +1309,7 @@ func (s *jemSuite) TestUpdateMachineInfo(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: m.UUID,
 			Id:        "0",
 			Series:    "quantal",
@@ -1323,7 +1322,7 @@ func (s *jemSuite) TestUpdateMachineInfo(c *gc.C) {
 func (s *jemSuite) TestUpdateMachineUnknownModel(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "controller"}
 
-	err := s.jem.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
+	err := s.jem.UpdateMachineInfo(testContext, ctlPath, &jujuparams.MachineInfo{
 		ModelUUID: "no-such-uuid",
 		Id:        "1",
 		Series:    "precise",
@@ -1335,7 +1334,7 @@ func (s *jemSuite) TestUpdateMachineIncorrectController(c *gc.C) {
 	m := s.bootstrapModel(c, params.EntityPath{"bob", "model-1"})
 	ctlPath := params.EntityPath{"bob", "controller2"}
 
-	err := s.jem.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
+	err := s.jem.UpdateMachineInfo(testContext, ctlPath, &jujuparams.MachineInfo{
 		ModelUUID: m.UUID,
 		Id:        "1",
 		Series:    "precise",
@@ -1347,12 +1346,12 @@ func (s *jemSuite) TestUpdateApplicationInfo(c *gc.C) {
 	m := s.bootstrapModel(c, params.EntityPath{"bob", "model-1"})
 	ctlPath := params.EntityPath{"bob", "controller"}
 
-	err := s.jem.UpdateApplicationInfo(testContext, ctlPath, &multiwatcher.ApplicationInfo{
+	err := s.jem.UpdateApplicationInfo(testContext, ctlPath, &jujuparams.ApplicationInfo{
 		ModelUUID: m.UUID,
 		Name:      "0",
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateApplicationInfo(testContext, ctlPath, &multiwatcher.ApplicationInfo{
+	err = s.jem.UpdateApplicationInfo(testContext, ctlPath, &jujuparams.ApplicationInfo{
 		ModelUUID: m.UUID,
 		Name:      "1",
 	})
@@ -1384,7 +1383,7 @@ func (s *jemSuite) TestUpdateApplicationInfo(c *gc.C) {
 	}})
 
 	// Check that we can update one of the documents.
-	err = s.jem.UpdateApplicationInfo(testContext, ctlPath, &multiwatcher.ApplicationInfo{
+	err = s.jem.UpdateApplicationInfo(testContext, ctlPath, &jujuparams.ApplicationInfo{
 		ModelUUID: m.UUID,
 		Name:      "0",
 		Life:      "dying",
@@ -1392,7 +1391,7 @@ func (s *jemSuite) TestUpdateApplicationInfo(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// Check that setting an application dead removes it.
-	err = s.jem.UpdateApplicationInfo(testContext, ctlPath, &multiwatcher.ApplicationInfo{
+	err = s.jem.UpdateApplicationInfo(testContext, ctlPath, &jujuparams.ApplicationInfo{
 		ModelUUID: m.UUID,
 		Name:      "1",
 		Life:      "dead",
@@ -1421,7 +1420,7 @@ func (s *jemSuite) TestUpdateApplicationUnknownModel(c *gc.C) {
 	m := s.bootstrapModel(c, params.EntityPath{"bob", "model-1"})
 	ctlPath := params.EntityPath{"bob", "controller"}
 
-	err := s.jem.UpdateApplicationInfo(testContext, ctlPath, &multiwatcher.ApplicationInfo{
+	err := s.jem.UpdateApplicationInfo(testContext, ctlPath, &jujuparams.ApplicationInfo{
 		ModelUUID: m.UUID,
 		Name:      "1",
 	})

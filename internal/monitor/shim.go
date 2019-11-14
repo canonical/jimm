@@ -10,7 +10,6 @@ import (
 	apicontroller "github.com/juju/juju/api/controller"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
-	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/version"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v3"
@@ -88,11 +87,11 @@ func (j jemShim) RemoveControllerApplications(ctx context.Context, ctlPath param
 	return errgo.Mask(j.DB.RemoveControllerApplications(ctx, ctlPath), errgo.Any)
 }
 
-func (j jemShim) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, info *multiwatcher.MachineInfo) error {
+func (j jemShim) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, info *jujuparams.MachineInfo) error {
 	return errgo.Mask(j.JEM.UpdateMachineInfo(ctx, ctlPath, info), errgo.Any)
 }
 
-func (j jemShim) UpdateApplicationInfo(ctx context.Context, ctlPath params.EntityPath, info *multiwatcher.ApplicationInfo) error {
+func (j jemShim) UpdateApplicationInfo(ctx context.Context, ctlPath params.EntityPath, info *jujuparams.ApplicationInfo) error {
 	return errgo.Mask(j.JEM.UpdateApplicationInfo(ctx, ctlPath, info), errgo.Any)
 }
 

@@ -49,7 +49,7 @@ require (
 	github.com/juju/clock v0.0.0-20190205081909-9c5c9712527c
 	github.com/juju/cmd v0.0.0-20190815094254-0c5c82a8dfc6
 	github.com/juju/collections v0.0.0-20180717171555-9be91dc79b7c // indirect
-	github.com/juju/description v0.0.0-20191007161550-303c0a2ac03f // indirect
+	github.com/juju/description v0.0.0-20191028161211-518c591d8576 // indirect
 	github.com/juju/errors v0.0.0-20181118221551-089d3ea4e4d5
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
 	github.com/juju/go-oracle-cloud v0.0.0-20170510162943-95ad2a088ab9 // indirect
@@ -58,7 +58,7 @@ require (
 	github.com/juju/httprequest v1.0.1
 	github.com/juju/idmclient v0.0.0-20161107140250-fb1dc7175251
 	github.com/juju/jsonschema v0.0.0-20161102181919-a0ef8b74ebcf // indirect
-	github.com/juju/juju v0.0.0-20191015053136-a7a72656a11d
+	github.com/juju/juju v0.0.0-20191114073739-a647b9e98198
 	github.com/juju/loggo v0.0.0-20190526231331-6e530bcce5d8
 	github.com/juju/lru v0.0.0-20181205132344-305dec07bf2f // indirect
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
@@ -133,7 +133,7 @@ require (
 	gopkg.in/ini.v1 v1.39.0 // indirect
 	gopkg.in/juju/blobstore.v2 v2.0.0-20160125023703-51fa6e26128d // indirect
 	gopkg.in/juju/charm.v6 v6.0.0-20190919081840-adaf8c5c2037 // indirect
-	gopkg.in/juju/charmrepo.v3 v3.0.2-0.20190801165605-2adcece4e962 // indirect
+	gopkg.in/juju/charmrepo.v3 v3.0.2-0.20191105112621-5ca139ef9e6b // indirect
 	gopkg.in/juju/charmstore.v5 v5.5.2 // indirect
 	gopkg.in/juju/environschema.v1 v1.0.0-20151104115810-7359fc7857ab
 	gopkg.in/juju/jujusvg.v3 v3.0.0-20180629065738-1ebf5c5481e8 // indirect
@@ -156,7 +156,7 @@ require (
 	k8s.io/api v0.0.0-20181117111259-46ad728b8d13 // indirect
 	k8s.io/apiextensions-apiserver v0.0.0-20181018015743-2867844605ff // indirect
 	k8s.io/apimachinery v0.0.0-20181130031032-af2f90f9922d // indirect
-	k8s.io/client-go v9.0.0+incompatible // indirect
+	k8s.io/client-go v0.0.0-20180724102132-3db81bdd1286 // indirect
 	k8s.io/klog v0.3.0 // indirect
 	labix.org/v2/mgo v0.0.0-20140701140051-000000000287 // indirect
 	sigs.k8s.io/yaml v1.1.0 // indirect
