@@ -17,7 +17,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/mgo.v2"
 
-	"github.com/CanonicalLtd/jimm"
+	jem "github.com/CanonicalLtd/jimm"
 	"github.com/CanonicalLtd/jimm/cmd/jaas-admin/admincmd"
 	"github.com/CanonicalLtd/jimm/internal/bakeryadaptor"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
@@ -126,8 +126,9 @@ func (s *commonSuite) addModel(c *gc.C, pathStr, srvPathStr, credName string) {
 	c.Assert(err, gc.Equals, nil)
 
 	credPath := params.CredentialPath{
-		Cloud:      "dummy",
-		EntityPath: params.EntityPath{path.User, params.Name(credName)},
+		Cloud: "dummy",
+		User:  path.User,
+		Name:  params.CredentialName(credName),
 	}
 	err = s.jemClient(string(path.User)).UpdateCredential(&params.UpdateCredential{
 		CredentialPath: credPath,

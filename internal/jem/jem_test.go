@@ -185,8 +185,9 @@ var createModelTests = []struct {
 	params: jem.CreateModelParams{
 		Path: params.EntityPath{"bob", ""},
 		Credential: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"bob", "cred1"},
+			Cloud: "dummy",
+			User:  "bob",
+			Name:  "cred1",
 		},
 		Cloud: "dummy",
 	},
@@ -197,8 +198,9 @@ var createModelTests = []struct {
 		Path:           params.EntityPath{"bob", ""},
 		ControllerPath: params.EntityPath{"bob", "controller"},
 		Credential: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"bob", "cred1"},
+			Cloud: "dummy",
+			User:  "bob",
+			Name:  "cred1",
 		},
 		Cloud: "dummy",
 	},
@@ -208,8 +210,9 @@ var createModelTests = []struct {
 	params: jem.CreateModelParams{
 		Path: params.EntityPath{"bob", ""},
 		Credential: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"bob", "cred1"},
+			Cloud: "dummy",
+			User:  "bob",
+			Name:  "cred1",
 		},
 		Cloud:  "dummy",
 		Region: "dummy-region",
@@ -220,8 +223,9 @@ var createModelTests = []struct {
 	params: jem.CreateModelParams{
 		Path: params.EntityPath{"bob", ""},
 		Credential: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"bob", "cred2"},
+			Cloud: "dummy",
+			User:  "bob",
+			Name:  "cred2",
 		},
 		Cloud: "dummy",
 	},
@@ -233,8 +237,9 @@ var createModelTests = []struct {
 	params: jem.CreateModelParams{
 		Path: params.EntityPath{"bob", "oldmodel"},
 		Credential: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"bob", "cred1"},
+			Cloud: "dummy",
+			User:  "bob",
+			Name:  "cred1",
 		},
 		Cloud: "dummy",
 	},
@@ -246,8 +251,9 @@ var createModelTests = []struct {
 	params: jem.CreateModelParams{
 		Path: params.EntityPath{"bob", ""},
 		Credential: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"bob", "cred1"},
+			Cloud: "dummy",
+			User:  "bob",
+			Name:  "cred1",
 		},
 		Cloud:  "dummy",
 		Region: "not-a-region",
@@ -261,8 +267,9 @@ var createModelTests = []struct {
 		Cloud: "dummy",
 	},
 	expectCredential: params.CredentialPath{
-		Cloud:      "dummy",
-		EntityPath: params.EntityPath{"bob", "cred1"},
+		Cloud: "dummy",
+		User:  "bob",
+		Name:  "cred1",
 	},
 }, {
 	about: "empty cloud credentials fails with more than one choice",
@@ -286,8 +293,9 @@ var createModelTests = []struct {
 	params: jem.CreateModelParams{
 		Path: params.EntityPath{"bob", ""},
 		Credential: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"bob", "cred1"},
+			Cloud: "dummy",
+			User:  "bob",
+			Name:  "cred1",
 		},
 		Cloud: "dummy",
 	},
@@ -304,18 +312,18 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	// Bob has a single credential.
 	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
-		Path: credentialPath("dummy", "bob", "cred1"),
+		Path: mgoCredentialPath("dummy", "bob", "cred1"),
 		Type: "empty",
 	})
 	c.Assert(err, gc.Equals, nil)
 	// Alice has two credentials.
 	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
-		Path: credentialPath("dummy", "alice", "cred1"),
+		Path: mgoCredentialPath("dummy", "alice", "cred1"),
 		Type: "empty",
 	})
 	c.Assert(err, gc.Equals, nil)
 	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
-		Path: credentialPath("dummy", "alice", "cred2"),
+		Path: mgoCredentialPath("dummy", "alice", "cred2"),
 		Type: "empty",
 	})
 	c.Assert(err, gc.Equals, nil)
@@ -326,8 +334,9 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 		Path:           params.EntityPath{"bob", "oldmodel"},
 		ControllerPath: ctlId,
 		Credential: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"bob", "cred1"},
+			Cloud: "dummy",
+			User:  "bob",
+			Name:  "cred1",
 		},
 		Cloud: "dummy",
 	})
@@ -373,7 +382,7 @@ func (s *jemSuite) TestCreateModelWithPartiallyCreatedModel(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	// Bob has a single credential.
 	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
-		Path: credentialPath("dummy", "bob", "cred1"),
+		Path: mgoCredentialPath("dummy", "bob", "cred1"),
 		Type: "empty",
 	})
 	ctx := auth.ContextWithUser(testContext, "bob")
@@ -391,8 +400,9 @@ func (s *jemSuite) TestCreateModelWithPartiallyCreatedModel(c *gc.C) {
 		Path:           params.EntityPath{"bob", "model"},
 		ControllerPath: ctlId,
 		Credential: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"bob", "cred1"},
+			Cloud: "dummy",
+			User:  "bob",
+			Name:  "cred1",
 		},
 		Cloud: "dummy",
 	})
@@ -413,8 +423,9 @@ func (s *jemSuite) TestCreateModelWithExistingModelInControllerOnly(c *gc.C) {
 		Path:           model.Path,
 		ControllerPath: model.Controller,
 		Credential: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"bob", "cred"},
+			Cloud: "dummy",
+			User:  "bob",
+			Name:  "cred",
 		},
 		Cloud: "dummy",
 	})
@@ -482,7 +493,7 @@ func (s *jemSuite) TestRevokeCredentialsInUse(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	credPath := credentialPath("dummy", "bob", "cred1")
 	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
-		Path: credPath,
+		Path: mongodoc.CredentialPathFromParams(credPath),
 		Type: "empty",
 	})
 	c.Assert(err, gc.Equals, nil)
@@ -538,8 +549,9 @@ func (s *jemSuite) TestRevokeCredentialsNotInUse(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 	credPath := credentialPath("dummy", "bob", "cred1")
+	mCredPath := mgoCredentialPath("dummy", "bob", "cred1")
 	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
-		Path: credPath,
+		Path: mCredPath,
 		Type: "empty",
 	})
 	c.Assert(err, gc.Equals, nil)
@@ -566,7 +578,7 @@ func (s *jemSuite) TestRevokeCredentialsNotInUse(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
 		Id:         "dummy/bob/cred1",
-		Path:       credPath,
+		Path:       mCredPath,
 		Revoked:    true,
 		Attributes: make(map[string]string),
 	})
@@ -793,8 +805,9 @@ func (s *jemSuite) TestDestroyModelWithStorage(c *gc.C) {
 func (s *jemSuite) TestUpdateCredential(c *gc.C) {
 	ctlPath := s.addController(c, params.EntityPath{User: "bob", Name: "controller"})
 	credPath := credentialPath("dummy", "bob", "cred")
+	mCredPath := mgoCredentialPath("dummy", "bob", "cred")
 	cred := &mongodoc.Credential{
-		Path: credPath,
+		Path: mCredPath,
 		Type: "empty",
 	}
 	err := jem.UpdateCredential(s.jem.DB, testContext, cred)
@@ -820,7 +833,7 @@ func (s *jemSuite) TestUpdateCredential(c *gc.C) {
 	}})
 
 	_, err = s.jem.UpdateCredential(testContext, &mongodoc.Credential{
-		Path: credPath,
+		Path: mCredPath,
 		Type: "userpass",
 		Attributes: map[string]string{
 			"username": "cloud-user",
@@ -862,9 +875,10 @@ func (s *jemSuite) TestUpdateCredential(c *gc.C) {
 func (s *jemSuite) TestControllerUpdateCredentials(c *gc.C) {
 	ctlPath := s.addController(c, params.EntityPath{User: "bob", Name: "controller"})
 	credPath := credentialPath("dummy", "bob", "cred")
+	mCredPath := mgoCredentialPath("dummy", "bob", "cred")
 	credTag := names.NewCloudCredentialTag("dummy/bob@external/cred")
 	cred := &mongodoc.Credential{
-		Path: credPath,
+		Path: mCredPath,
 		Type: "empty",
 	}
 	err := jem.UpdateCredential(s.jem.DB, testContext, cred)
@@ -1067,55 +1081,70 @@ var credentialTests = []struct {
 	expectErrorCause error
 }{{
 	path: params.CredentialPath{
-		Cloud:      "dummy",
-		EntityPath: params.EntityPath{"bob", "credential"},
+		Cloud: "dummy",
+		User:  "bob",
+		Name:  "credential",
 	},
 }, {
 	path: params.CredentialPath{
-		Cloud:      "dummy",
-		EntityPath: params.EntityPath{"bob-group", "credential"},
+		Cloud: "dummy",
+		User:  "bob-group",
+		Name:  "credential",
 	},
 }, {
 	path: params.CredentialPath{
-		Cloud:      "dummy",
-		EntityPath: params.EntityPath{"alice", "credential"},
+		Cloud: "dummy",
+		User:  "alice",
+		Name:  "credential",
 	},
 	expectErrorCause: params.ErrUnauthorized,
 }, {
 	path: params.CredentialPath{
-		Cloud:      "dummy",
-		EntityPath: params.EntityPath{"bob", "credential2"},
+		Cloud: "dummy",
+		User:  "bob",
+		Name:  "credential2",
 	},
 	expectErrorCause: params.ErrNotFound,
 }, {
 	path: params.CredentialPath{
-		Cloud:      "dummy",
-		EntityPath: params.EntityPath{"bob-group", "credential2"},
+		Cloud: "dummy",
+		User:  "bob-group",
+		Name:  "credential2",
 	},
 	expectErrorCause: params.ErrNotFound,
 }, {
 	path: params.CredentialPath{
-		Cloud:      "dummy",
-		EntityPath: params.EntityPath{"alice", "credential2"},
+		Cloud: "dummy",
+		User:  "alice",
+		Name:  "credential2",
 	},
 	expectErrorCause: params.ErrUnauthorized,
 }}
 
 func (s *jemSuite) TestCredential(c *gc.C) {
 	creds := []mongodoc.Credential{{
-		Path: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"alice", "credential"},
+		Path: mongodoc.CredentialPath{
+			Cloud: "dummy",
+			EntityPath: mongodoc.EntityPath{
+				User: "alice",
+				Name: "credential",
+			},
 		},
 	}, {
-		Path: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"bob", "credential"},
+		Path: mongodoc.CredentialPath{
+			Cloud: "dummy",
+			EntityPath: mongodoc.EntityPath{
+				User: "bob",
+				Name: "credential",
+			},
 		},
 	}, {
-		Path: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"bob-group", "credential"},
+		Path: mongodoc.CredentialPath{
+			Cloud: "dummy",
+			EntityPath: mongodoc.EntityPath{
+				User: "bob-group",
+				Name: "credential",
+			},
 		},
 	}}
 	for _, cred := range creds {
@@ -1133,7 +1162,7 @@ func (s *jemSuite) TestCredential(c *gc.C) {
 			continue
 		}
 		c.Assert(err, gc.Equals, nil)
-		c.Assert(ctl.Path, jc.DeepEquals, test.path)
+		c.Assert(ctl.Path.ToParams(), jc.DeepEquals, test.path)
 	}
 }
 
@@ -1220,17 +1249,13 @@ func (s *jemSuite) TestEarliestControllerVersion(c *gc.C) {
 func (s *jemSuite) TestCloudCredentialTag(c *gc.C) {
 	cp1 := params.CredentialPath{
 		Cloud: "dummy",
-		EntityPath: params.EntityPath{
-			User: "alice",
-			Name: "cred",
-		},
+		User:  "alice",
+		Name:  "cred",
 	}
 	cp2 := params.CredentialPath{
 		Cloud: "dummy",
-		EntityPath: params.EntityPath{
-			User: "alice@domain",
-			Name: "cred",
-		},
+		User:  "alice@domain",
+		Name:  "cred",
 	}
 	c.Assert(jem.CloudCredentialTag(cp1).String(), gc.Equals, "cloudcred-dummy_alice@external_cred")
 	c.Assert(jem.CloudCredentialTag(cp2).String(), gc.Equals, "cloudcred-dummy_alice@domain_cred")
@@ -1868,7 +1893,7 @@ func (s *jemSuite) TestUpdateModelCredential(c *gc.C) {
 
 	credPath := credentialPath("dummy", "bob", "cred2")
 	err := jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
-		Path: credPath,
+		Path: mongodoc.CredentialPathFromParams(credPath),
 		Type: "empty",
 	})
 
@@ -1877,7 +1902,7 @@ func (s *jemSuite) TestUpdateModelCredential(c *gc.C) {
 	defer conn.Close()
 
 	err = s.jem.UpdateModelCredential(testContext, conn, model, &mongodoc.Credential{
-		Path: credPath,
+		Path: mongodoc.CredentialPathFromParams(credPath),
 		Type: "empty",
 	})
 	c.Assert(err, gc.Equals, nil)
@@ -1930,7 +1955,7 @@ func (s *jemSuite) bootstrapModel(c *gc.C, path params.EntityPath) *mongodoc.Mod
 	ctlPath := s.addController(c, params.EntityPath{User: path.User, Name: "controller"})
 	credPath := credentialPath("dummy", string(path.User), "cred")
 	err := jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
-		Path: credPath,
+		Path: mongodoc.CredentialPathFromParams(credPath),
 		Type: "empty",
 	})
 	c.Assert(err, gc.Equals, nil)
@@ -1939,8 +1964,9 @@ func (s *jemSuite) bootstrapModel(c *gc.C, path params.EntityPath) *mongodoc.Mod
 		Path:           path,
 		ControllerPath: ctlPath,
 		Credential: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"bob", "cred"},
+			Cloud: "dummy",
+			User:  "bob",
+			Name:  "cred",
 		},
 		Cloud: "dummy",
 	})
@@ -2045,13 +2071,11 @@ func (s *jemK8sSuite) TestRemoveCloudWithModel(c *gc.C) {
 
 	credpath := params.CredentialPath{
 		Cloud: "test-cloud",
-		EntityPath: params.EntityPath{
-			User: "bob",
-			Name: "kubernetes",
-		},
+		User:  "bob",
+		Name:  "kubernetes",
 	}
 	_, err = s.jem.UpdateCredential(ctx, &mongodoc.Credential{
-		Path: credpath,
+		Path: mongodoc.CredentialPathFromParams(credpath),
 		Type: string(cloud.UserPassAuthType),
 		Attributes: map[string]string{
 			"username": kubetest.Username,

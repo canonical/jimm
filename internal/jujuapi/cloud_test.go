@@ -167,9 +167,12 @@ func (s *cloudSuite) TestClouds(c *gc.C) {
 func (s *cloudSuite) TestUserCredentials(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	_, err := s.JEM.UpdateCredential(context.Background(), &mongodoc.Credential{
-		Path: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{User: "test", Name: "cred1"},
+		Path: mongodoc.CredentialPath{
+			Cloud: "dummy",
+			EntityPath: mongodoc.EntityPath{
+				User: "test",
+				Name: "cred1",
+			},
 		},
 		Type:  "credtype",
 		Label: "Credentials 1",
@@ -192,9 +195,12 @@ func (s *cloudSuite) TestUserCredentials(c *gc.C) {
 func (s *cloudSuite) TestUserCredentialsWithDomain(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	_, err := s.JEM.UpdateCredential(context.Background(), &mongodoc.Credential{
-		Path: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{User: "test@domain", Name: "cred1"},
+		Path: mongodoc.CredentialPath{
+			Cloud: "dummy",
+			EntityPath: mongodoc.EntityPath{
+				User: "test@domain",
+				Name: "cred1",
+			},
 		},
 		Type:  "credtype",
 		Label: "Credentials 1",
@@ -217,9 +223,12 @@ func (s *cloudSuite) TestUserCredentialsWithDomain(c *gc.C) {
 func (s *cloudSuite) TestUserCredentialsACL(c *gc.C) {
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	_, err := s.JEM.UpdateCredential(context.Background(), &mongodoc.Credential{
-		Path: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{User: "test", Name: "cred1"},
+		Path: mongodoc.CredentialPath{
+			Cloud: "dummy",
+			EntityPath: mongodoc.EntityPath{
+				User: "test",
+				Name: "cred1",
+			},
 		},
 		Type:  "credtype",
 		Label: "Credentials 1",
@@ -230,9 +239,12 @@ func (s *cloudSuite) TestUserCredentialsACL(c *gc.C) {
 	}, 0)
 	c.Assert(err, gc.Equals, nil)
 	_, err = s.JEM.UpdateCredential(context.Background(), &mongodoc.Credential{
-		Path: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{User: "test2", Name: "cred2"},
+		Path: mongodoc.CredentialPath{
+			Cloud: "dummy",
+			EntityPath: mongodoc.EntityPath{
+				User: "test2",
+				Name: "cred2",
+			},
 		},
 		ACL: params.ACL{
 			Read: []string{"test"},

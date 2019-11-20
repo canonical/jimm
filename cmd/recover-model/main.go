@@ -194,14 +194,15 @@ func mongodocFromModelInfo(ctx context.Context, mi *jujuparams.ModelInfo) (*mong
 		}
 	}
 
-	var cred params.CredentialPath
 	cct, err := names.ParseCloudCredentialTag(mi.CloudCredentialTag)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	cred.Cloud = params.Cloud(cct.Cloud().Id())
-	cred.User = params.User(strings.TrimSuffix(cct.Owner().Id(), "@external"))
-	cred.Name = params.Name(cct.Name())
+	cred := params.CredentialPath{
+		Cloud: params.Cloud(cct.Cloud().Id()),
+		User:  params.User(strings.TrimSuffix(cct.Owner().Id(), "@external")),
+		Name:  params.CredentialName(cct.Name()),
+	}
 
 	return &mongodoc.Model{
 		Path:          mPath,
