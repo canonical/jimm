@@ -25,7 +25,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/apitest"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	"github.com/CanonicalLtd/jimm/internal/v2"
+	v2 "github.com/CanonicalLtd/jimm/internal/v2"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/params"
 )
@@ -74,8 +74,9 @@ var unauthorizedTests = []struct {
 		Name:       "newmodel",
 		Controller: &params.EntityPath{"bob", "open"},
 		Credential: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"bob", "cred1"},
+			Cloud: "dummy",
+			User:  "bob",
+			Name:  "cred1",
 		},
 	},
 }, {
@@ -626,8 +627,9 @@ func (s *APISuite) TestNewModel(c *gc.C) {
 			Name:       params.Name("bar"),
 			Controller: &ctlId,
 			Credential: params.CredentialPath{
-				Cloud:      "dummy",
-				EntityPath: params.EntityPath{"bob", cred},
+				Cloud: "dummy",
+				User:  "bob",
+				Name:  cred,
 			},
 			Location: map[string]string{
 				"cloud": "dummy",
@@ -679,8 +681,9 @@ var newModelWithoutExplicitControllerTests = []struct {
 	info: params.NewModelInfo{
 		Name: "test-model",
 		Credential: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"alice", "cred1"},
+			Cloud: "dummy",
+			User:  "alice",
+			Name:  "cred1",
 		},
 		Location: map[string]string{
 			"cloud": "dummy",
@@ -695,8 +698,9 @@ var newModelWithoutExplicitControllerTests = []struct {
 	info: params.NewModelInfo{
 		Name: "test-model",
 		Credential: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"alice", "cred1"},
+			Cloud: "dummy",
+			User:  "alice",
+			Name:  "cred1",
 		},
 		Location: map[string]string{
 			"cloud": "aws",
@@ -713,8 +717,9 @@ var newModelWithoutExplicitControllerTests = []struct {
 	info: params.NewModelInfo{
 		Name: "test-model",
 		Credential: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"alice", "cred1"},
+			Cloud: "dummy",
+			User:  "alice",
+			Name:  "cred1",
 		},
 		Location: map[string]string{
 			"region": "us-east-1",
@@ -731,8 +736,9 @@ var newModelWithoutExplicitControllerTests = []struct {
 	info: params.NewModelInfo{
 		Name: "test-model",
 		Credential: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"alice", "cred1"},
+			Cloud: "dummy",
+			User:  "alice",
+			Name:  "cred1",
 		},
 		Location: map[string]string{
 			"dimension": "5th",
@@ -749,8 +755,9 @@ var newModelWithoutExplicitControllerTests = []struct {
 	info: params.NewModelInfo{
 		Name: "test-model",
 		Credential: params.CredentialPath{
-			Cloud:      "aws",
-			EntityPath: params.EntityPath{"alice", "cred1"},
+			Cloud: "aws",
+			User:  "alice",
+			Name:  "cred1",
 		},
 		Location: map[string]string{
 			"cloud.blah": "dummy",
@@ -767,8 +774,9 @@ var newModelWithoutExplicitControllerTests = []struct {
 	info: params.NewModelInfo{
 		Name: "test-model",
 		Credential: params.CredentialPath{
-			Cloud:      "aws",
-			EntityPath: params.EntityPath{"alice", "cred1"},
+			Cloud: "aws",
+			User:  "alice",
+			Name:  "cred1",
 		},
 		Location: map[string]string{
 			"cloud": "bad/name",
@@ -922,8 +930,9 @@ func (s *APISuite) TestNewModelUnderGroup(c *gc.C) {
 			Name:       params.Name("bar"),
 			Controller: &ctlId,
 			Credential: params.CredentialPath{
-				Cloud:      "dummy",
-				EntityPath: params.EntityPath{"beatles", cred},
+				Cloud: "dummy",
+				User:  "beatles",
+				Name:  cred,
 			},
 			Location: map[string]string{
 				"cloud": "dummy",
@@ -996,8 +1005,9 @@ func (s *APISuite) TestNewModelCannotOpenAPI(c *gc.C) {
 			Name:       params.Name("bar"),
 			Controller: &params.EntityPath{"bob", "foo"},
 			Credential: params.CredentialPath{
-				Cloud:      "dummy",
-				EntityPath: params.EntityPath{"bob", "cred1"},
+				Cloud: "dummy",
+				User:  "bob",
+				Name:  "cred1",
 			},
 		},
 		ExpectBody: params.Error{
@@ -1016,8 +1026,9 @@ func (s *APISuite) TestNewModelTwice(c *gc.C) {
 		Name:       "bar",
 		Controller: &ctlId,
 		Credential: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"bob", cred},
+			Cloud: "dummy",
+			User:  "bob",
+			Name:  cred,
 		},
 		Config: dummyModelConfig,
 	}
@@ -1058,8 +1069,9 @@ func (s *APISuite) TestNewModelCannotCreate(c *gc.C) {
 			Name:       "bar",
 			Controller: &ctlId,
 			Credential: params.CredentialPath{
-				Cloud:      "dummy",
-				EntityPath: params.EntityPath{"bob", cred},
+				Cloud: "dummy",
+				User:  "bob",
+				Name:  cred,
 			},
 			Config: map[string]interface{}{
 				"authorized-keys": sshKey,
@@ -1099,8 +1111,9 @@ func (s *APISuite) TestNewModelUnauthorized(c *gc.C) {
 			Name:       "bar",
 			Controller: &ctlId,
 			Credential: params.CredentialPath{
-				Cloud:      "dummy",
-				EntityPath: params.EntityPath{"bob", cred},
+				Cloud: "dummy",
+				User:  "bob",
+				Name:  cred,
 			},
 			Config: dummyModelConfig,
 		},

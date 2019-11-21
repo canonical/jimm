@@ -249,10 +249,8 @@ func (m modelManagerAPI) createModel(ctx context.Context, args jujuparams.ModelC
 		}
 		credPath = params.CredentialPath{
 			Cloud: params.Cloud(tag.Cloud().Id()),
-			EntityPath: params.EntityPath{
-				User: owner,
-				Name: params.Name(tag.Name()),
-			},
+			User:  owner,
+			Name:  params.CredentialName(tag.Name()),
 		}
 	}
 	model, err := m.root.jem.CreateModel(ctx, jem.CreateModelParams{
@@ -475,10 +473,8 @@ func (m modelManagerAPI) changeModelCredential(ctx context.Context, arg jujupara
 	}
 	credPath := params.CredentialPath{
 		Cloud: params.Cloud(credTag.Cloud().Id()),
-		EntityPath: params.EntityPath{
-			User: credUser,
-			Name: params.Name(credTag.Name()),
-		},
+		User:  credUser,
+		Name:  params.CredentialName(credTag.Name()),
 	}
 	cred, err := m.root.jem.Credential(ctx, credPath)
 	if err != nil {

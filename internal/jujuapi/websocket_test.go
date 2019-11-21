@@ -70,7 +70,7 @@ type createModelParams struct {
 	username string
 	cloud    string
 	region   string
-	cred     params.Name
+	cred     params.CredentialName
 	config   map[string]interface{}
 }
 
