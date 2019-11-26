@@ -28,7 +28,7 @@ lxd_exec_ubuntu() {
 }
 
 lxc launch -e ${image} $container
-trap "lxc stop $container; lxc delete --force $container" EXIT
+trap "lxc stop $container" EXIT
 
 lxd_exec sh -c 'while [ ! -f /var/lib/cloud/instance/boot-finished ]; do sleep 0.1; done'
 
