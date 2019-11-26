@@ -1,0 +1,47 @@
+name: jaas
+version: git
+summary: JAAS client
+description: Client for controlling JAAS multi-cloud juju controllers.
+grade: stable
+base: core18
+confinement: strict
+
+plugs:
+  juju-data:
+    interface: personal-files
+    read:
+    - $HOME/.local/share/juju
+
+apps:
+  jaas:
+    command: bin/wrappers/jaas
+    plugs:
+     - juju-data
+     - network
+
+parts:
+  jaas:
+    plugin: gomod
+    source: ../..
+    source-type: git
+    go-packages:
+    - github.com/CanonicalLtd/jimm/cmd/jaas-admin
+    go-private:
+    - github.com/CanonicalLtd
+    prime:
+     - bin/jaas-admin
+    override-build: |
+      set -ex
+      GIT_COMMIT=`git -C $SNAPCRAFT_PART_SRC rev-parse --verify HEAD`
+      GIT_VERSION=`git -C $SNAPCRAFT_PART_SRC describe --dirty`
+      cp version/init.go.tmpl version/init.go
+      gofmt -w -r "unknownVersion -> Version{GitCommit: \"${GIT_COMMIT}\", Version: \"${GIT_VERSION}\",}" version/init.go
+      snapcraftctl build
+
+  files:
+    plugin: dump
+    source: files
+    organize:
+      jaas.wrapper: bin/wrappers/jaas
+    prime:
+      - bin/wrappers/jaas
