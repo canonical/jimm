@@ -7,7 +7,9 @@ import (
 	"gopkg.in/juju/names.v3"
 )
 
-var validName = regexp.MustCompile("^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$")
+var (
+	validName = regexp.MustCompile("^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$")
+)
 
 type User string
 
@@ -40,6 +42,19 @@ func (c *Cloud) UnmarshalText(t []byte) error {
 		return errgo.WithCausef(nil, ErrBadRequest, "invalid cloud %q", t)
 	}
 	*c = Cloud(c0)
+	return nil
+}
+
+// CredentialName represents the credential name.
+type CredentialName string
+
+// UnmarshaText implements encoding.TextUnmarshaler.
+func (c *CredentialName) UnmarshalText(t []byte) error {
+	c0 := string(t)
+	if !names.IsValidCloudCredentialName(c0) {
+		return errgo.WithCausef(nil, ErrBadRequest, "invalid name %q", t)
+	}
+	*c = CredentialName(string(t))
 	return nil
 }
 

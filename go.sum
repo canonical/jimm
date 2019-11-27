@@ -196,8 +196,8 @@ github.com/juju/idmclient v0.0.0-20161107140250-fb1dc7175251 h1:BtpU10VkuUbEbsft
 github.com/juju/idmclient v0.0.0-20161107140250-fb1dc7175251/go.mod h1:SunI8KQv7kOPexz10/wL/9OM2btemSzsHcjBuceZ6xY=
 github.com/juju/jsonschema v0.0.0-20161102181919-a0ef8b74ebcf h1:SGTxyCG74uh2dYdBJCUJOo2FSx0fRHP7nMRH7s5JVeQ=
 github.com/juju/jsonschema v0.0.0-20161102181919-a0ef8b74ebcf/go.mod h1:gS6DuHCEAiaBi4m2UUp4DWSYtjDMlpWB4hT4URkEbaU=
-github.com/juju/juju v0.0.0-20191114073739-a647b9e98198 h1:+zpIugoyiQNZ8aoyjYW0HSgsLQy41BDqt8WHUHMefPY=
-github.com/juju/juju v0.0.0-20191114073739-a647b9e98198/go.mod h1:NEUvYUxOAm46eq0lY9f2nkGaLHgnw99lHIsTthsiOgo=
+github.com/juju/juju v0.0.0-20191127113545-5f5cb3ed2ddc h1:ZSMe3RPnHtg8bHIhtratrLyjZKQIi4GuscBi7Tgb3no=
+github.com/juju/juju v0.0.0-20191127113545-5f5cb3ed2ddc/go.mod h1:NEUvYUxOAm46eq0lY9f2nkGaLHgnw99lHIsTthsiOgo=
 github.com/juju/loggo v0.0.0-20150527035839-8477fc936adf/go.mod h1:vgyd7OREkbtVEN/8IXZe5Ooef3LQePvuBm9UWj6ZL8U=
 github.com/juju/loggo v0.0.0-20160818025724-3b7ece48644d/go.mod h1:vgyd7OREkbtVEN/8IXZe5Ooef3LQePvuBm9UWj6ZL8U=
 github.com/juju/loggo v0.0.0-20180524022052-584905176618 h1:MK144iBQF9hTSwBW/9eJm034bVoG30IshVm688T2hi8=
@@ -473,6 +473,7 @@ golang.org/x/tools v0.0.0-20180911133044-677d2ff680c1/go.mod h1:n7NCudcB/nEzxVGm
 golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
 golang.org/x/tools v0.0.0-20190114222345-bf090417da8b/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
 golang.org/x/tools v0.0.0-20190226205152-f727befe758c/go.mod h1:9Yl7xja0Znq3iFh3HoIrodX9oNMXvdceNzlUR8zjMvY=
+golang.org/x/tools v0.0.0-20190312170243-e65039ee4138 h1:H3uGjxCR/6Ds0Mjgyp7LMK81+LvmbvWWEnJhzk1Pi9E=
 golang.org/x/tools v0.0.0-20190312170243-e65039ee4138/go.mod h1:LCzVGOaR6xXOjkQ3onu1FJEFr0SW1gC7cKk1uF8kGRs=
 google.golang.org/api v0.3.1/go.mod h1:6wY9I6uQWHQ8EM57III9mq/AjF+i8G65rmVagqKMtkk=
 google.golang.org/api v0.3.2 h1:iTp+3yyl/KOtxa/d1/JUE0GGSoR6FuW5udver22iwpw=
@@ -491,8 +492,8 @@ google.golang.org/grpc v1.19.0/go.mod h1:mqu4LbDTu4XGKhr4mRzUsmM4RtVoemTSY81AxZi
 google.golang.org/grpc v1.19.1 h1:TrBcJ1yqAl1G++wO39nD/qtgpsW9/1+QGrluyMGEYgM=
 google.golang.org/grpc v1.19.1/go.mod h1:mqu4LbDTu4XGKhr4mRzUsmM4RtVoemTSY81AxZiDr8c=
 gopkg.in/alecthomas/kingpin.v2 v2.2.6/go.mod h1:FMv+mEhP44yOT+4EoQTLFTRgOQ1FBLkstjWtayDeSgw=
-gopkg.in/amz.v3 v3.0.0-20161215130849-8c3190dff075 h1:NioGrLK1SupSJJ3nxqN4uPv3TlXCasrCX7/ARv2WQHM=
-gopkg.in/amz.v3 v3.0.0-20161215130849-8c3190dff075/go.mod h1:cE0dCGx2UfBTjLFlzEx4EXJUmoX6BXBoX9GjKOvqha4=
+gopkg.in/amz.v3 v3.0.0-20191122063134-7ba11a47c789 h1:91RzSbXMxzSNCFCm8W3Q7Nc2Vcq3l7z9RdRuvkfluVM=
+gopkg.in/amz.v3 v3.0.0-20191122063134-7ba11a47c789/go.mod h1:cE0dCGx2UfBTjLFlzEx4EXJUmoX6BXBoX9GjKOvqha4=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/check.v1 v1.0.0-20160105164936-4f90aeace3a2 h1:+j1SppRob9bAgoYmsdW9NNBdKZfgYuWpqnYHv78Qt8w=
 gopkg.in/check.v1 v1.0.0-20160105164936-4f90aeace3a2/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=

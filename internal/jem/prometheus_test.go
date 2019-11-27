@@ -153,38 +153,29 @@ func (s *jemSuite) TestMachineStats(c *gc.C) {
 	ctl1Id := s.addController(c, params.EntityPath{"bob", "controller1"})
 	ctl2Id := s.addController(c, params.EntityPath{"bob", "controller2"})
 	err := jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
-		Path: credentialPath("dummy", "bob", "cred1"),
+		Path: mgoCredentialPath("dummy", "bob", "cred1"),
 		Type: "empty",
 	})
 	c.Assert(err, gc.Equals, nil)
 	m1, err := s.jem.CreateModel(ctx, jem.CreateModelParams{
 		Path:           params.EntityPath{"bob", "model1"},
 		ControllerPath: ctl1Id,
-		Credential: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"bob", "cred1"},
-		},
-		Cloud: "dummy",
+		Credential:     credentialPath("dummy", "bob", "cred1"),
+		Cloud:          "dummy",
 	})
 	c.Assert(err, gc.Equals, nil)
 	m2, err := s.jem.CreateModel(ctx, jem.CreateModelParams{
 		Path:           params.EntityPath{"bob", "model2"},
 		ControllerPath: ctl1Id,
-		Credential: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"bob", "cred1"},
-		},
-		Cloud: "dummy",
+		Credential:     credentialPath("dummy", "bob", "cred1"),
+		Cloud:          "dummy",
 	})
 	c.Assert(err, gc.Equals, nil)
 	m3, err := s.jem.CreateModel(ctx, jem.CreateModelParams{
 		Path:           params.EntityPath{"bob", "model3"},
 		ControllerPath: ctl2Id,
-		Credential: params.CredentialPath{
-			Cloud:      "dummy",
-			EntityPath: params.EntityPath{"bob", "cred1"},
-		},
-		Cloud: "dummy",
+		Credential:     credentialPath("dummy", "bob", "cred1"),
+		Cloud:          "dummy",
 	})
 	c.Assert(err, gc.Equals, nil)
 

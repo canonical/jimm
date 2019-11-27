@@ -224,7 +224,7 @@ var dummyModelConfig = map[string]interface{}{
 // CreateModel creates a new model with the specified path on the
 // specified controller, using the specified credentialss. It returns the
 // new model's path, user and uuid.
-func (s *Suite) CreateModel(c *gc.C, path, ctlPath params.EntityPath, cred params.Name) (modelPath params.EntityPath, uuid string) {
+func (s *Suite) CreateModel(c *gc.C, path, ctlPath params.EntityPath, cred params.CredentialName) (modelPath params.EntityPath, uuid string) {
 	// Note that because the cookies acquired in this request don't
 	// persist, the discharge macaroon we get won't affect subsequent
 	// requests in the caller.
@@ -234,8 +234,9 @@ func (s *Suite) CreateModel(c *gc.C, path, ctlPath params.EntityPath, cred param
 			Name:       path.Name,
 			Controller: &ctlPath,
 			Credential: params.CredentialPath{
-				Cloud:      "dummy",
-				EntityPath: params.EntityPath{path.User, cred},
+				Cloud: "dummy",
+				User:  path.User,
+				Name:  cred,
 			},
 			Location: map[string]string{
 				"cloud": "dummy",
@@ -256,21 +257,22 @@ func (s *Suite) CreateModel(c *gc.C, path, ctlPath params.EntityPath, cred param
 	return resp.Path, resp.UUID
 }
 
-func (s *Suite) AssertUpdateCredential(c *gc.C, user params.User, cloud params.Cloud, name params.Name, authType string) params.Name {
+func (s *Suite) AssertUpdateCredential(c *gc.C, user params.User, cloud params.Cloud, name params.CredentialName, authType string) params.CredentialName {
 	err := s.UpdateCredential(user, cloud, name, authType)
 	c.Assert(err, gc.Equals, nil)
 	return name
 }
 
 // UpdateCredential sets a  credential with the provided path and authType.
-func (s *Suite) UpdateCredential(user params.User, cloud params.Cloud, name params.Name, authType string) error {
+func (s *Suite) UpdateCredential(user params.User, cloud params.Cloud, name params.CredentialName, authType string) error {
 	// Note that because the cookies acquired in this request don't
 	// persist, the discharge macaroon we get won't affect subsequent
 	// requests in the caller.
 	p := &params.UpdateCredential{
 		CredentialPath: params.CredentialPath{
-			Cloud:      cloud,
-			EntityPath: params.EntityPath{User: user, Name: name},
+			Cloud: cloud,
+			User:  user,
+			Name:  name,
 		},
 		Credential: params.Credential{
 			AuthType: authType,
