@@ -58,7 +58,7 @@ require (
 	github.com/juju/httprequest v1.0.1
 	github.com/juju/idmclient v0.0.0-20161107140250-fb1dc7175251
 	github.com/juju/jsonschema v0.0.0-20161102181919-a0ef8b74ebcf // indirect
-	github.com/juju/juju v0.0.0-20191114073739-a647b9e98198
+	github.com/juju/juju v0.0.0-20191127113545-5f5cb3ed2ddc
 	github.com/juju/loggo v0.0.0-20190526231331-6e530bcce5d8
 	github.com/juju/lru v0.0.0-20181205132344-305dec07bf2f // indirect
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
@@ -124,7 +124,7 @@ require (
 	golang.org/x/time v0.0.0-20181108054448-85acf8d2951c // indirect
 	google.golang.org/api v0.3.2 // indirect
 	google.golang.org/appengine v1.5.0 // indirect
-	gopkg.in/amz.v3 v3.0.0-20161215130849-8c3190dff075 // indirect
+	gopkg.in/amz.v3 v3.0.0-20191122063134-7ba11a47c789 // indirect
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 	gopkg.in/errgo.v1 v1.0.0
 	gopkg.in/goose.v2 v2.0.0-20190611012650-f18d0f2f8f9b // indirect
