@@ -651,10 +651,8 @@ func getModel(ctx context.Context, jem *jem.JEM, modelTag string, authf func(con
 	}
 	model.Credential = params.CredentialPath{
 		Cloud: params.Cloud(credentialTag.Cloud().Id()),
-		EntityPath: params.EntityPath{
-			User: owner,
-			Name: params.Name(credentialTag.Name()),
-		},
+		User:  owner,
+		Name:  params.CredentialName(credentialTag.Name()),
 	}
 	model.DefaultSeries = info.DefaultSeries
 

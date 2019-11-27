@@ -410,7 +410,7 @@ func (c cloudV5) userCredentials(ctx context.Context, ownerTag, cloudTag string)
 	).Iter())
 	var cred mongodoc.Credential
 	for it.Next(&cred) {
-		cloudCreds = append(cloudCreds, jem.CloudCredentialTag(cred.Path).String())
+		cloudCreds = append(cloudCreds, jem.CloudCredentialTag(cred.Path.ToParams()).String())
 	}
 
 	return cloudCreds, errgo.Mask(it.Err())
@@ -450,10 +450,8 @@ func (c cloudV5) revokeCredential(ctx context.Context, tag string, force bool) e
 	}
 	if err := c.root.jem.RevokeCredential(ctx, params.CredentialPath{
 		Cloud: params.Cloud(credtag.Cloud().Id()),
-		EntityPath: params.EntityPath{
-			User: params.User(credtag.Owner().Name()),
-			Name: params.Name(credtag.Name()),
-		},
+		User:  params.User(credtag.Owner().Name()),
+		Name:  params.CredentialName(credtag.Name()),
 	}, flags); err != nil {
 		return errgo.Mask(err)
 	}
@@ -492,10 +490,8 @@ func (c cloudV5) credential(ctx context.Context, cloudCredentialTag string) (*ju
 
 	credPath := params.CredentialPath{
 		Cloud: params.Cloud(cct.Cloud().Id()),
-		EntityPath: params.EntityPath{
-			User: owner,
-			Name: params.Name(cct.Name()),
-		},
+		User:  owner,
+		Name:  params.CredentialName(cct.Name()),
 	}
 
 	cred, err := c.root.jem.Credential(ctx, credPath)
@@ -505,7 +501,7 @@ func (c cloudV5) credential(ctx context.Context, cloudCredentialTag string) (*ju
 	if cred.Revoked {
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", cct.Id())
 	}
-	schema, err := c.root.credentialSchema(ctx, cred.Path.Cloud, cred.Type)
+	schema, err := c.root.credentialSchema(ctx, cred.Path.ToParams().Cloud, cred.Type)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
@@ -632,10 +628,8 @@ func (c cloudV5) CredentialContents(ctx context.Context, args jujuparams.CloudCr
 func (c cloudV5) credentialInfo(ctx context.Context, cloudName, credentialName string, includeSecrets bool) (*jujuparams.ControllerCredentialInfo, error) {
 	credPath := params.CredentialPath{
 		Cloud: params.Cloud(cloudName),
-		EntityPath: params.EntityPath{
-			User: params.User(auth.Username(ctx)),
-			Name: params.Name(credentialName),
-		},
+		User:  params.User(auth.Username(ctx)),
+		Name:  params.CredentialName(credentialName),
 	}
 	cred, err := c.root.jem.Credential(ctx, credPath)
 	if err != nil {
@@ -644,7 +638,7 @@ func (c cloudV5) credentialInfo(ctx context.Context, cloudName, credentialName s
 	if cred.Revoked {
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "")
 	}
-	schema, err := c.root.credentialSchema(ctx, cred.Path.Cloud, cred.Type)
+	schema, err := c.root.credentialSchema(ctx, cred.Path.ToParams().Cloud, cred.Type)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
@@ -792,11 +786,11 @@ func (c cloudV5) updateCredential(ctx context.Context, cred jujuparams.TaggedCre
 		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
 	credential := mongodoc.Credential{
-		Path: params.CredentialPath{
-			Cloud: params.Cloud(tag.Cloud().Id()),
-			EntityPath: params.EntityPath{
-				User: owner,
-				Name: params.Name(tag.Name()),
+		Path: mongodoc.CredentialPath{
+			Cloud: tag.Cloud().Id(),
+			EntityPath: mongodoc.EntityPath{
+				User: string(owner),
+				Name: tag.Name(),
 			},
 		},
 		Type:       cred.Credential.AuthType,

@@ -362,14 +362,67 @@ type ModelUserInfo struct {
 	Granted bool
 }
 
-func (e *Model) Owner() params.User {
-	return e.Path.User
+// Owner returns the model owner.
+func (m *Model) Owner() params.User {
+	return m.Path.User
 }
 
-func (e *Model) GetACL() params.ACL {
-	return e.ACL
+// GetACL returns the model's ACL.
+func (m *Model) GetACL() params.ACL {
+	return m.ACL
 }
 
+// EntityPath holds the user and name part of the credential path. It is in place
+// to enable backwards due to legacy credential paths already stored in the
+// database.
+type EntityPath struct {
+	User string
+	Name string
+}
+
+// CredentialPath implements the params.CredentialPath interface.
+type CredentialPath struct {
+	Cloud string
+	EntityPath
+}
+
+// IsZero reports whether the receiver is the empty value.
+func (c CredentialPath) IsZero() bool {
+	return c.Cloud == "" && c.User == "" && c.Name == ""
+}
+
+// String returns a string representation of the CredentialPath.
+func (c CredentialPath) String() string {
+	p := params.CredentialPath{
+		Cloud: params.Cloud(c.Cloud),
+		User:  params.User(c.User),
+		Name:  params.CredentialName(c.Name),
+	}
+	return p.String()
+}
+
+// ToParams returns a params package representation of the CredentialPath.
+func (c CredentialPath) ToParams() params.CredentialPath {
+	return params.CredentialPath{
+		Cloud: params.Cloud(c.Cloud),
+		User:  params.User(c.User),
+		Name:  params.CredentialName(c.Name),
+	}
+}
+
+// CredentialPathFromParams returns a mongodoc package representation
+// of the CredentialPath.
+func CredentialPathFromParams(p params.CredentialPath) CredentialPath {
+	return CredentialPath{
+		Cloud: string(p.Cloud),
+		EntityPath: EntityPath{
+			User: string(p.User),
+			Name: string(p.Name),
+		},
+	}
+}
+
+// Credential holds the credentials.
 type Credential struct {
 	// Id holds the primary key for a credential.
 	// It holds "<User>/<Cloud>/<Name>"
@@ -378,7 +431,7 @@ type Credential struct {
 	// Path holds the local cloud, user and name given to the
 	// credential, denormalized from Id for convenience and ease of
 	// indexing. Its string value is used as the Id value.
-	Path params.CredentialPath
+	Path CredentialPath
 
 	// ACL holds permissions for the credential.
 	ACL params.ACL
@@ -400,10 +453,12 @@ type Credential struct {
 	Revoked bool
 }
 
+// Owner returns the owner of the credentials.
 func (c *Credential) Owner() params.User {
-	return c.Path.User
+	return params.User(c.Path.User)
 }
 
+// GetACL returns the credential's ACL.
 func (c *Credential) GetACL() params.ACL {
 	return c.ACL
 }

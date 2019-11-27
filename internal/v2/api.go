@@ -592,11 +592,11 @@ func (h *Handler) getPerm(coll *mgo.Collection, path params.EntityPath) (params.
 func (h *Handler) UpdateCredential(arg *params.UpdateCredential) error {
 	ctx := h.context
 	// Only the owner can set credentials.
-	if err := auth.CheckIsUser(ctx, arg.EntityPath.User); err != nil {
+	if err := auth.CheckIsUser(ctx, arg.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	_, err := h.jem.UpdateCredential(ctx, &mongodoc.Credential{
-		Path:       arg.CredentialPath,
+		Path:       mongodoc.CredentialPathFromParams(arg.CredentialPath),
 		Type:       arg.Credential.AuthType,
 		Attributes: arg.Credential.Attributes,
 	}, 0)

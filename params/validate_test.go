@@ -5,6 +5,7 @@ package params_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -141,6 +142,32 @@ func (*suite) TestValidators(c *gc.C) {
 		}
 		c.Assert(err, gc.Equals, nil)
 		c.Assert(v, jc.DeepEquals, test.val)
+	}
+}
+
+func (*suite) TestIsValidCloudCredentialName(c *gc.C) {
+	for i, t := range []struct {
+		string string
+		expect bool
+	}{
+		{"", false},
+		{"foo", true},
+		{"f00b4r", true},
+		{"foo-bar", true},
+		{"foo@bar", true},
+		{"foo+foo@bar", true},
+		{"foo_bar", true},
+		{"123", false},
+		{"0foo", false},
+	} {
+		c.Logf("test %d: %s", i, t.string)
+		var name params.CredentialName
+		err := name.UnmarshalText([]byte(t.string))
+		if t.expect {
+			c.Assert(err, gc.Equals, nil)
+		} else {
+			c.Assert(err, gc.ErrorMatches, fmt.Sprintf("invalid name %q", t.string))
+		}
 	}
 }
 

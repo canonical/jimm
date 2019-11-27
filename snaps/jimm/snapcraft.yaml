@@ -3,11 +3,12 @@ version: git
 summary: Juju Intelligent Model Manager
 description: Multi-cloud controller for managing JAAS models.
 grade: stable
+base: core18
 confinement: strict
 
 apps:
   jimm:
-    command: jimm.wrapper
+    command: bin/wrappers/jimm
     daemon: simple
     plugs:
      - network
@@ -15,23 +16,29 @@ apps:
 
 parts:
   jimm:
-    plugin: nil
-    source: .
+    plugin: gomod
+    source: ../..
     source-type: git
-    build-snaps:
-     - go
+    go-packages:
+    - github.com/CanonicalLtd/jimm/cmd/jemd
+    go-private:
+    - github.com/CanonicalLtd
     prime:
      - bin/jemd
-    override-pull: |
-      snapcraftctl pull
-      go mod download
     override-build: |
       set -ex
       GIT_COMMIT=`git -C $SNAPCRAFT_PART_SRC rev-parse --verify HEAD`
       GIT_VERSION=`git -C $SNAPCRAFT_PART_SRC describe --dirty`
       cp version/init.go.tmpl version/init.go
       gofmt -w -r "unknownVersion -> Version{GitCommit: \"${GIT_COMMIT}\", Version: \"${GIT_VERSION}\",}" version/init.go
-      GOBIN=${SNAPCRAFT_PART_INSTALL}/bin/ go install github.com/CanonicalLtd/jimm/cmd/jemd
-  snapcraft:
+      snapcraftctl build
+
+  files:
     plugin: dump
-    source: snapcraft
+    source: files
+    organize:
+      config.yaml: etc/jimm/config.yaml
+      jimm.wrapper: bin/wrappers/jimm
+    prime:
+    - etc/jimm/config.yaml
+    - bin/wrappers/jimm

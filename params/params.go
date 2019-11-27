@@ -145,6 +145,7 @@ func (p EntityPath) IsZero() bool {
 
 var slash = []byte("/")
 
+// UnmarshalText implements encoding.TextUnmarshaler interface.
 func (p *EntityPath) UnmarshalText(data []byte) error {
 	parts := bytes.Split(data, slash)
 	if len(parts) != 2 {
@@ -159,6 +160,7 @@ func (p *EntityPath) UnmarshalText(data []byte) error {
 	return nil
 }
 
+// MarshalText implements encoding.TextMarshaler interface.
 func (p EntityPath) MarshalText() ([]byte, error) {
 	data := make([]byte, 0, len(p.User)+1+len(p.Name))
 	data = append(data, p.User...)
@@ -167,23 +169,26 @@ func (p EntityPath) MarshalText() ([]byte, error) {
 	return data, nil
 }
 
-// CredentialPath holds the path parameters for specifying a credential
+// CredentialPath holds the part parameters for specifying a credential
 // in the API. It can also be used as a value in its own right, because
 // it implements TextMarshaler and TextUnmarshaler.
 type CredentialPath struct {
-	Cloud Cloud `httprequest:",path"`
-	EntityPath
+	Cloud Cloud          `httprequest:",path"`
+	User  User           `httprequest:",path"`
+	Name  CredentialName `httprequest:",path"`
 }
 
+// String returns a string representation of a credential path.
 func (p CredentialPath) String() string {
-	return fmt.Sprintf("%s/%s", p.Cloud, p.EntityPath)
+	return fmt.Sprintf("%s/%s/%s", p.Cloud, p.User, p.Name)
 }
 
 // IsZero reports whether the receiver is the empty value.
 func (p CredentialPath) IsZero() bool {
-	return p.Cloud == "" && p.EntityPath.IsZero()
+	return p.Cloud == "" && p.User == "" && p.Name == ""
 }
 
+// UnmarshalText implements encoding.TextUnmarshaler interface.
 func (p *CredentialPath) UnmarshalText(data []byte) error {
 	parts := bytes.Split(data, slash)
 	if len(parts) != 3 {
@@ -192,15 +197,16 @@ func (p *CredentialPath) UnmarshalText(data []byte) error {
 	if err := p.Cloud.UnmarshalText(parts[0]); err != nil {
 		return errgo.Mask(err)
 	}
-	if err := p.EntityPath.User.UnmarshalText(parts[1]); err != nil {
+	if err := p.User.UnmarshalText(parts[1]); err != nil {
 		return errgo.Mask(err)
 	}
-	if err := p.EntityPath.Name.UnmarshalText(parts[2]); err != nil {
+	if err := p.Name.UnmarshalText(parts[2]); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil
 }
 
+// MarshalText implements encoding.TextMarshaler interface.
 func (p CredentialPath) MarshalText() ([]byte, error) {
 	data := make([]byte, 0, len(p.Cloud)+1+len(p.User)+1+len(p.Name))
 	data = append(data, p.Cloud...)
