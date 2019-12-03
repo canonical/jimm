@@ -17,7 +17,9 @@ require (
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f // indirect
 	github.com/dnaeon/go-vcr v0.0.0-20181127134837-91ac6c0e83e3 // indirect
 	github.com/docker/distribution v2.7.0+incompatible // indirect
+	github.com/docker/spdystream v0.0.0-20181023171402-6480d4af844c // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
+	github.com/elazarl/goproxy v0.0.0-20190911111923-ecfe977594f1 // indirect
 	github.com/flosch/pongo2 v0.0.0-20180809100617-24195e6d38b0 // indirect
 	github.com/godbus/dbus v4.1.0+incompatible // indirect
 	github.com/golang/mock v1.1.2-0.20180820161358-600781dde9cc // indirect
@@ -43,11 +45,11 @@ require (
 	github.com/json-iterator/go v1.1.5 // indirect
 	github.com/jtolds/gls v4.2.1+incompatible // indirect
 	github.com/juju/aclstore v0.0.0-20180706073322-7fc1cdaacf01
-	github.com/juju/bundlechanges v0.0.0-20190627125043-bb96ad9a5018 // indirect
+	github.com/juju/bundlechanges v0.0.0-20190904095642-3ef4201dfd24 // indirect
 	github.com/juju/clock v0.0.0-20190205081909-9c5c9712527c
-	github.com/juju/cmd v0.0.0-20190116223025-a8c88215d37e
+	github.com/juju/cmd v0.0.0-20190815094254-0c5c82a8dfc6
 	github.com/juju/collections v0.0.0-20180717171555-9be91dc79b7c // indirect
-	github.com/juju/description v0.0.0-20190625082943-adb93fec16ac // indirect
+	github.com/juju/description v0.0.0-20191028161211-518c591d8576 // indirect
 	github.com/juju/errors v0.0.0-20181118221551-089d3ea4e4d5
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
 	github.com/juju/go-oracle-cloud v0.0.0-20170510162943-95ad2a088ab9 // indirect
@@ -56,7 +58,7 @@ require (
 	github.com/juju/httprequest v1.0.1
 	github.com/juju/idmclient v0.0.0-20161107140250-fb1dc7175251
 	github.com/juju/jsonschema v0.0.0-20161102181919-a0ef8b74ebcf // indirect
-	github.com/juju/juju v0.0.0-20190628170926-4c42a4305430
+	github.com/juju/juju v0.0.0-20191128005414-f29519aabe0d
 	github.com/juju/loggo v0.0.0-20190526231331-6e530bcce5d8
 	github.com/juju/lru v0.0.0-20181205132344-305dec07bf2f // indirect
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
@@ -64,8 +66,8 @@ require (
 	github.com/juju/mutex v0.0.0-20180619145857-d21b13acf4bf // indirect
 	github.com/juju/names v0.0.0-20160330150533-8a0aa0963bba
 	github.com/juju/naturalsort v0.0.0-20180423034842-5b81707e882b // indirect
-	github.com/juju/os v0.0.0-20190625135142-88a4c6ac59c1 // indirect
-	github.com/juju/packaging v0.0.0-20180516203043-ba21344fff20 // indirect
+	github.com/juju/os v0.0.0-20190830110809-31722624f15a // indirect
+	github.com/juju/packaging v0.0.0-20190830112352-cfc61ec3a3e9 // indirect
 	github.com/juju/persistent-cookiejar v0.0.0-20170428161559-d67418f14c93
 	github.com/juju/proxy v0.0.0-20180523025733-5f8741c297b4 // indirect
 	github.com/juju/pubsub v0.0.0-20190419131051-c1f7536b9cc6 // indirect
@@ -73,10 +75,11 @@ require (
 	github.com/juju/replicaset v0.0.0-20190321104350-501ab59799b1 // indirect
 	github.com/juju/rfc v0.0.0-20180510112117-b058ad085c94 // indirect
 	github.com/juju/romulus v0.0.0-20180724155144-958d8b71e5ff // indirect
+	github.com/juju/rpcreflect v0.0.0-20190806165913-cca922e065df
 	github.com/juju/schema v0.0.0-20181210140654-64a6158e9071 // indirect
 	github.com/juju/simplekv v0.0.0-20180627154058-dac8ed1f3b93
 	github.com/juju/terms-client v1.0.1 // indirect
-	github.com/juju/testing v0.0.0-20190418112600-6570bd8f8541
+	github.com/juju/testing v0.0.0-20191001232224-ce9dec17d28b
 	github.com/juju/txn v0.0.0-20190416045819-5f348e78887d // indirect
 	github.com/juju/usso v0.0.0-20160418121039-5b79b358f4bb // indirect
 	github.com/juju/utils v0.0.0-20180820210520-bf9cc5bdd62d
@@ -95,6 +98,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.3 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
+	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
 	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
 	github.com/oracle/oci-go-sdk v5.7.0+incompatible // indirect
@@ -128,13 +132,12 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.39.0 // indirect
 	gopkg.in/juju/blobstore.v2 v2.0.0-20160125023703-51fa6e26128d // indirect
-	gopkg.in/juju/charm.v6 v6.0.0-20190627113248-52b617a34c5a // indirect
-	gopkg.in/juju/charmrepo.v2 v2.0.0-20171114184045-653bbd81990d // indirect
-	gopkg.in/juju/charmrepo.v3 v3.0.0-20180803043737-7778a447283b // indirect
+	gopkg.in/juju/charm.v6 v6.0.0-20190919081840-adaf8c5c2037 // indirect
+	gopkg.in/juju/charmrepo.v3 v3.0.2-0.20190801165605-2adcece4e962 // indirect
 	gopkg.in/juju/charmstore.v5 v5.5.2 // indirect
 	gopkg.in/juju/environschema.v1 v1.0.0-20151104115810-7359fc7857ab
 	gopkg.in/juju/jujusvg.v3 v3.0.0-20180629065738-1ebf5c5481e8 // indirect
-	gopkg.in/juju/names.v2 v2.0.0-20180621093930-fd59336b4621
+	gopkg.in/juju/names.v3 v3.0.0-20191002051627-8d2f241f8a5d
 	gopkg.in/juju/worker.v1 v1.0.0-20190612023203-40da96d5fd22
 	gopkg.in/macaroon-bakery.v1 v1.0.0-20180822103327-f3518acd1415 // indirect
 	gopkg.in/macaroon-bakery.v2 v2.1.0 // indirect
@@ -152,11 +155,9 @@ require (
 	gopkg.in/yaml.v2 v2.2.1
 	k8s.io/api v0.0.0-20181117111259-46ad728b8d13 // indirect
 	k8s.io/apiextensions-apiserver v0.0.0-20181018015743-2867844605ff // indirect
-	k8s.io/apimachinery v0.0.0-20181130031032-af2f90f9922d // indirect
-	k8s.io/client-go v9.0.0+incompatible // indirect
-	k8s.io/klog v0.3.0 // indirect
+	k8s.io/apimachinery v0.0.0-20180724074904-cbafd24d5796 // indirect
+	k8s.io/client-go v0.0.0-20180724102132-3db81bdd1286 // indirect
 	labix.org/v2/mgo v0.0.0-20140701140051-000000000287 // indirect
-	sigs.k8s.io/yaml v1.1.0 // indirect
 )
 
 replace (

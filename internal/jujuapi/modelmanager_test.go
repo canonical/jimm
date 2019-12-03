@@ -24,7 +24,7 @@ import (
 	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/juju/names.v2"
+	"gopkg.in/juju/names.v3"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
@@ -1207,7 +1207,7 @@ func (s *caasModelManagerSuite) TestCreateModelKubernetes(c *gc.C) {
 	c.Assert(mi.Type, gc.Equals, model.CAAS)
 	c.Assert(mi.ProviderType, gc.Equals, "kubernetes")
 	c.Assert(mi.Cloud, gc.Equals, "test-cloud")
-	c.Assert(mi.CloudRegion, gc.Equals, "")
+	c.Assert(mi.CloudRegion, gc.Equals, "default")
 	c.Assert(mi.Owner, gc.Equals, "test@external")
 }
 
@@ -1229,7 +1229,7 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 		ProviderType:    "kubernetes",
 		DefaultSeries:   "bionic",
 		Cloud:           "test-cloud",
-		CloudRegion:     "",
+		CloudRegion:     "default",
 		CloudCredential: "test-cloud/test@external/test-cred",
 		Owner:           "test@external",
 		Life:            "alive",
@@ -1291,7 +1291,7 @@ func (s *caasModelManagerSuite) AssertAddKubernetesCloud(c *gc.C, credTag names.
 		AuthTypes:       cloud.AuthTypes{cloud.UserPassAuthType},
 		Endpoint:        ksrv.URL,
 		HostCloudRegion: "dummy/dummy-region",
-	})
+	}, false)
 	c.Assert(err, gc.Equals, nil)
 
 	cred := cloud.NewCredential(cloud.UserPassAuthType, map[string]string{
