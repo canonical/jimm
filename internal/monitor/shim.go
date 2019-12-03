@@ -13,7 +13,7 @@ import (
 	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/version"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/names.v2"
+	"gopkg.in/juju/names.v3"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/jem"

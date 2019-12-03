@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/juju/juju/network"
+	"github.com/juju/juju/core/network"
 	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/version"
 	"gopkg.in/errgo.v1"
@@ -478,9 +478,9 @@ func (hp HostPort) Address() string {
 }
 
 func (hp *HostPort) SetJujuHostPort(hp1 network.HostPort) {
-	hp.Host = hp1.Value
-	hp.Port = hp1.Port
-	hp.Scope = string(hp1.Scope)
+	hp.Host = hp1.Host()
+	hp.Port = hp1.Port()
+	hp.Scope = string(hp1.AddressScope())
 }
 
 // Addresses collapses a slice of slices of HostPorts to a single list of
@@ -503,7 +503,7 @@ func Addresses(hpss [][]HostPort) []string {
 
 // ParseAddresses parses the given addresses into a HostPort slice.
 func ParseAddresses(addresses []string) ([]HostPort, error) {
-	nhps, err := network.ParseHostPorts(addresses...)
+	nhps, err := network.ParseProviderHostPorts(addresses...)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}

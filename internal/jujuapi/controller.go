@@ -18,11 +18,11 @@ import (
 	"github.com/juju/juju/environs/config"
 	"github.com/juju/juju/permission"
 	"github.com/juju/juju/rpc"
-	"github.com/juju/juju/rpc/rpcreflect"
+	"github.com/juju/rpcreflect"
 	"github.com/juju/version"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/names.v2"
+	"gopkg.in/juju/names.v3"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/mgo.v2/bson"
 

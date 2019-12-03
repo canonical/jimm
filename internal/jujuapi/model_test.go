@@ -5,11 +5,11 @@ package jujuapi_test
 import (
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
-	"github.com/juju/juju/network"
+	"github.com/juju/juju/core/network"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/names.v2"
+	"gopkg.in/juju/names.v3"
 
 	"github.com/CanonicalLtd/jimm/params"
 )
@@ -40,18 +40,22 @@ func (s *modelSuite) TestLoginToModel(c *gc.C) {
 		SkipLogin: true,
 	}, "test")
 	defer conn.Close()
-	nhps, err := network.ParseHostPorts(s.APIInfo(c).Addrs...)
+	nphps, err := network.ParseProviderHostPorts(s.APIInfo(c).Addrs...)
 	c.Assert(err, gc.Equals, nil)
+	nmhps := make(network.MachineHostPorts, len(nphps))
 	// Change all unknown scopes to public.
-	for i := range nhps {
-		nhp := &nhps[i]
-		if nhp.Scope == network.ScopeUnknown {
-			nhp.Scope = network.ScopePublic
+	for i := range nphps {
+		nmhps[i] = network.MachineHostPort{
+			MachineAddress: nphps[i].MachineAddress,
+			NetPort:        nphps[i].NetPort,
+		}
+		if nmhps[i].Scope == network.ScopeUnknown {
+			nmhps[i].Scope = network.ScopePublic
 		}
 	}
 	err = conn.Login(nil, "", "", nil)
 	c.Assert(errgo.Cause(err), jc.DeepEquals, &api.RedirectError{
-		Servers:        [][]network.HostPort{nhps},
+		Servers:        []network.MachineHostPorts{nmhps},
 		CACert:         s.APIInfo(c).CACert,
 		FollowRedirect: true,
 	})
