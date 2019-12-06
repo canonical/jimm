@@ -159,7 +159,6 @@ require (
 	k8s.io/client-go v0.0.0-20180724102132-3db81bdd1286 // indirect
 	k8s.io/klog v0.3.0 // indirect
 	labix.org/v2/mgo v0.0.0-20140701140051-000000000287 // indirect
-	sigs.k8s.io/yaml v1.1.0 // indirect
 )
 
 replace (
