@@ -7,7 +7,7 @@ base: core18
 confinement: strict
 
 plugs:
-  juju-data:
+  dot-local-share-juju:
     interface: personal-files
     read:
     - $HOME/.local/share/juju
