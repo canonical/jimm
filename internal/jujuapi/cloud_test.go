@@ -595,7 +595,7 @@ func (s *cloudSuite) TestRevokeCredential(c *gc.C) {
 		},
 	}})
 
-	err = client.RevokeCredential(credTag)
+	err = client.RevokeCredential(credTag, false)
 	c.Assert(err, gc.Equals, nil)
 
 	ccr, err = client.Credentials(credTag)

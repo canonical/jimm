@@ -196,8 +196,8 @@ github.com/juju/idmclient v0.0.0-20161107140250-fb1dc7175251 h1:BtpU10VkuUbEbsft
 github.com/juju/idmclient v0.0.0-20161107140250-fb1dc7175251/go.mod h1:SunI8KQv7kOPexz10/wL/9OM2btemSzsHcjBuceZ6xY=
 github.com/juju/jsonschema v0.0.0-20161102181919-a0ef8b74ebcf h1:SGTxyCG74uh2dYdBJCUJOo2FSx0fRHP7nMRH7s5JVeQ=
 github.com/juju/jsonschema v0.0.0-20161102181919-a0ef8b74ebcf/go.mod h1:gS6DuHCEAiaBi4m2UUp4DWSYtjDMlpWB4hT4URkEbaU=
-github.com/juju/juju v0.0.0-20191205222155-8090882c4fd2 h1:DiZMHTQ9xLrOuKnRhXFyp5Au1YJk49DcBDyQ2nhQn/M=
-github.com/juju/juju v0.0.0-20191205222155-8090882c4fd2/go.mod h1:NEUvYUxOAm46eq0lY9f2nkGaLHgnw99lHIsTthsiOgo=
+github.com/juju/juju v0.0.0-20191211082759-c1bbb60c4c12 h1:hhRrSf0Bm3pT46OYBpoPOMnC9E6BH5L2k6+f2vnAoh8=
+github.com/juju/juju v0.0.0-20191211082759-c1bbb60c4c12/go.mod h1:NEUvYUxOAm46eq0lY9f2nkGaLHgnw99lHIsTthsiOgo=
 github.com/juju/loggo v0.0.0-20150527035839-8477fc936adf/go.mod h1:vgyd7OREkbtVEN/8IXZe5Ooef3LQePvuBm9UWj6ZL8U=
 github.com/juju/loggo v0.0.0-20160818025724-3b7ece48644d/go.mod h1:vgyd7OREkbtVEN/8IXZe5Ooef3LQePvuBm9UWj6ZL8U=
 github.com/juju/loggo v0.0.0-20180524022052-584905176618 h1:MK144iBQF9hTSwBW/9eJm034bVoG30IshVm688T2hi8=
