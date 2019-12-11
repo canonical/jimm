@@ -16,7 +16,7 @@ apps:
   jaas:
     command: bin/wrappers/jaas
     plugs:
-     - juju-data
+     - dot-local-share-juju
      - network
 
 parts:
