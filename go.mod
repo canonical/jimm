@@ -58,7 +58,7 @@ require (
 	github.com/juju/httprequest v1.0.1
 	github.com/juju/idmclient v0.0.0-20161107140250-fb1dc7175251
 	github.com/juju/jsonschema v0.0.0-20161102181919-a0ef8b74ebcf // indirect
-	github.com/juju/juju v0.0.0-20191128005414-f29519aabe0d
+	github.com/juju/juju v0.0.0-20200107182435-ec91b3228a8e
 	github.com/juju/loggo v0.0.0-20190526231331-6e530bcce5d8
 	github.com/juju/lru v0.0.0-20181205132344-305dec07bf2f // indirect
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
@@ -137,7 +137,7 @@ require (
 	gopkg.in/juju/charmstore.v5 v5.5.2 // indirect
 	gopkg.in/juju/environschema.v1 v1.0.0-20151104115810-7359fc7857ab
 	gopkg.in/juju/jujusvg.v3 v3.0.0-20180629065738-1ebf5c5481e8 // indirect
-	gopkg.in/juju/names.v3 v3.0.0-20191002051627-8d2f241f8a5d
+	gopkg.in/juju/names.v3 v3.0.0-20191210002836-39289f373765
 	gopkg.in/juju/worker.v1 v1.0.0-20190612023203-40da96d5fd22
 	gopkg.in/macaroon-bakery.v1 v1.0.0-20180822103327-f3518acd1415 // indirect
 	gopkg.in/macaroon-bakery.v2 v2.1.0 // indirect

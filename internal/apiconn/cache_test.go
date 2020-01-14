@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/juju/clock"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/modelmanager"
 	"github.com/juju/juju/apiserver/params"
@@ -230,7 +231,7 @@ func (s *cacheSuite) TestEvictOnUpgradeInProgress(c *gc.C) {
 	// Start a new API server so we control its upgrade-in-progress status.
 	upgraded := make(chan struct{})
 
-	config := testserver.DefaultServerConfig(c)
+	config := testserver.DefaultServerConfig(c, clock.WallClock)
 	config.UpgradeComplete = func() bool {
 		select {
 		case <-upgraded:
