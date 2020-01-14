@@ -7,22 +7,21 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/juju/aclstore"
-	"github.com/juju/httprequest"
-	"github.com/juju/idmclient"
 	"github.com/juju/juju/cloud"
 	"github.com/juju/simplekv/mgosimplekv"
 	"github.com/julienschmidt/httprouter"
 	"github.com/prometheus/client_golang/prometheus"
+	candidclient "gopkg.in/CanonicalLtd/candidclient.v1"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/httprequest.v1"
 	"gopkg.in/juju/worker.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgostorage"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/agent"
+	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
+	"gopkg.in/macaroon-bakery.v2/bakery/mgorootkeystore"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
@@ -72,9 +71,9 @@ type Params struct {
 	// associated with the controller.
 	MeteringLocation string
 
-	// PublicKeyLocator holds a public key store.
-	// It may be nil.
-	PublicKeyLocator bakery.PublicKeyLocator
+	// ThirdPartyLocator holds a third-party info store. It may be
+	// nil.
+	ThirdPartyLocator bakery.ThirdPartyLocator
 
 	// AgentUsername and AgentKey hold the credentials used for agent
 	// authentication.
@@ -126,8 +125,9 @@ type HandlerParams struct {
 	// JEMPool contains the pool of JEM instances.
 	JEMPool *jem.Pool
 
-	// AuthenticatorPool contains the pool of Authenticators.
-	AuthenticatorPool *auth.Pool
+	// Authenticator contains the authenticator to use to
+	// authenticate requests.
+	Authenticator *auth.Authenticator
 
 	// ACLManager contains the manager for the ACLs.
 	ACLManager *aclstore.Manager
@@ -138,7 +138,7 @@ type Server struct {
 	router          *httprouter.Router
 	context         context.Context
 	pool            *jem.Pool
-	authPool        *auth.Pool
+	auth            *auth.Authenticator
 	sessionPool     *mgosession.Pool
 	monitor         *monitor.Monitor
 	usageSender     worker.Worker
@@ -157,28 +157,17 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	if config.MaxMgoSessions <= 0 {
 		config.MaxMgoSessions = 1
 	}
-	idmClient, bclient, err := newIdentityClient(config)
+	identityClient, bclient, err := newIdentityClient(config)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	bakery, err := bakery.NewService(bakery.NewServiceParams{
-		// TODO The location is attached to any macaroons that we
-		// mint. Currently we don't know the location of the current
-		// service. We potentially provide a way to configure this,
-		// but it probably doesn't matter, as nothing currently uses
-		// the macaroon location for anything.
-		Location: "jimm",
-		Locator:  config.PublicKeyLocator,
-	})
+
+	key, err := bakery.GenerateKey()
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot create bakery")
+		return nil, errgo.Mask(err)
 	}
+
 	sessionPool := mgosession.NewPool(ctx, config.DB.Session, config.MaxMgoSessions)
-	kvstore, err := mgosimplekv.NewStore(config.DB.C("acls"))
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot create ACL store")
-	}
-	aclStore := aclstore.NewACLStore(kvstore)
 	var publicCloudMetadataPath []string
 	if config.PublicCloudMetadata != "" {
 		publicCloudMetadataPath = append(publicCloudMetadataPath, config.PublicCloudMetadata)
@@ -201,30 +190,55 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	}
 	jem := p.JEM(ctx)
 	defer jem.Close()
-	authPool, err := auth.NewPool(ctx, auth.Params{
-		Bakery:   bakery,
-		RootKeys: mgostorage.NewRootKeys(100),
-		RootKeysPolicy: mgostorage.Policy{
-			ExpiryDuration: 24 * time.Hour,
+
+	bakery := identchecker.NewBakery(identchecker.BakeryParams{
+		RootKeyStore: auth.NewRootKeyStore(auth.RootKeyStoreParams{
+			Pool:     sessionPool,
+			RootKeys: mgorootkeystore.NewRootKeys(100),
+			Policy: mgorootkeystore.Policy{
+				ExpiryDuration: 24 * time.Hour,
+			},
+			Collection: jem.DB.Macaroons(),
+		}),
+
+		Locator:        config.ThirdPartyLocator,
+		Key:            key,
+		IdentityClient: identityClient,
+		Authorizer: identchecker.ACLAuthorizer{
+			GetACL: func(ctx context.Context, op bakery.Op) (acl []string, allowPublic bool, err error) {
+				if op == identchecker.LoginOp {
+					return []string{identchecker.Everyone}, false, nil
+				}
+				return nil, false, nil
+			},
 		},
-		MacaroonCollection: jem.DB.Macaroons(),
-		SessionPool:        sessionPool,
-		PermChecker:        idmclient.NewPermChecker(idmClient, time.Hour),
-		IdentityLocation:   config.IdentityLocation,
-		Domain:             config.Domain,
+
+		// TODO The location is attached to any macaroons that we
+		// mint. Currently we don't know the location of the current
+		// service. We potentially provide a way to configure this,
+		// but it probably doesn't matter, as nothing currently uses
+		// the macaroon location for anything.
+		Location: "jimm",
+
+		// TODO(mhilton): work out how to make the logger better.
+		Logger: nil,
 	})
+
+	kvstore, err := mgosimplekv.NewStore(config.DB.C("acls"))
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot make auth pool")
+		return nil, errgo.Notef(err, "cannot create ACL store")
 	}
+	aclStore := aclstore.NewACLStore(kvstore)
+
+	authenticator := auth.NewAuthenticator(bakery)
+
 	aclManager, err := aclstore.NewManager(ctx, aclstore.Params{
 		Store:    aclStore,
 		RootPath: "/admin/acls",
 		Authenticate: func(ctx context.Context, w http.ResponseWriter, req *http.Request) (aclstore.Identity, error) {
-			authenticator := authPool.Authenticator(ctx)
-			defer authenticator.Close()
 			ctx, err := authenticator.AuthenticateRequest(ctx, req)
 			if err != nil {
-				status, body := jemerror.Mapper(err)
+				status, body := jemerror.Mapper(ctx, err)
 				httprequest.WriteJSON(w, status, body)
 				return nil, errgo.Mask(err, errgo.Any)
 			}
@@ -237,6 +251,7 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	}
 	srv := &Server{
 		router:      httprouter.New(),
+		auth:        authenticator,
 		pool:        p,
 		sessionPool: sessionPool,
 		context:     ctx,
@@ -267,11 +282,11 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	srv.router.Handler("GET", "/metrics", prometheus.Handler())
 	for name, newAPI := range versions {
 		handlers, err := newAPI(ctx, HandlerParams{
-			Params:            config,
-			SessionPool:       sessionPool,
-			JEMPool:           p,
-			AuthenticatorPool: authPool,
-			ACLManager:        aclManager,
+			Params:        config,
+			SessionPool:   sessionPool,
+			JEMPool:       p,
+			Authenticator: authenticator,
+			ACLManager:    aclManager,
 		})
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot create API %s", name)
@@ -330,24 +345,24 @@ func monitorLeaseOwner(agentName string) (string, error) {
 	return fmt.Sprintf("%s-%x", agentName, buf), nil
 }
 
-func newIdentityClient(config Params) (*idmclient.Client, *httpbakery.Client, error) {
+func newIdentityClient(config Params) (*auth.IdentityClient, *httpbakery.Client, error) {
 	// Note: no need for persistent cookies as we'll
 	// be able to recreate the macaroons on startup.
 	bclient := httpbakery.NewClient()
 	bclient.Key = config.AgentKey
-	idmURL, err := url.Parse(config.IdentityLocation)
-	if err != nil {
-		return nil, nil, errgo.Notef(err, "cannot parse identity location URL %q", config.IdentityLocation)
-	}
-	agent.SetUpAuth(bclient, idmURL, config.AgentUsername)
-	client, err := idmclient.New(idmclient.NewParams{
-		BaseURL: config.IdentityLocation,
-		Client:  bclient,
+	client, err := candidclient.New(candidclient.NewParams{
+		BaseURL:       config.IdentityLocation,
+		Client:        bclient,
+		AgentUsername: config.AgentUsername,
+		CacheTime:     10 * time.Minute,
 	})
 	if err != nil {
 		return nil, nil, errgo.Notef(err, "cannot create IDM client")
 	}
-	return client, bclient, nil
+	return auth.NewIdentityClient(auth.IdentityClientParams{
+		CandidClient: client,
+		Domain:       config.Domain,
+	}), bclient, nil
 }
 
 // ServeHTTP implements http.Handler.Handle.

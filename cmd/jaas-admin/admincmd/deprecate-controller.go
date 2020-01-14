@@ -58,12 +58,15 @@ func (c *deprecateControllerCommand) Init(args []string) error {
 }
 
 func (c *deprecateControllerCommand) Run(ctxt *cmd.Context) error {
+	ctx, cancel := wrapContext(ctxt)
+	defer cancel()
+
 	client, err := c.newClient(ctxt)
 	if err != nil {
 		return errgo.Mask(err)
 	}
 	defer client.Close()
-	err = client.SetControllerDeprecated(&params.SetControllerDeprecated{
+	err = client.SetControllerDeprecated(ctx, &params.SetControllerDeprecated{
 		EntityPath: c.path.EntityPath,
 		Body: params.DeprecatedBody{
 			Deprecated: !c.unset,

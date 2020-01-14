@@ -40,12 +40,15 @@ func (c *controllersCommand) Init(args []string) error {
 }
 
 func (c *controllersCommand) Run(ctxt *cmd.Context) error {
+	ctx, cancel := wrapContext(ctxt)
+	defer cancel()
+
 	client, err := c.newClient(ctxt)
 	if err != nil {
 		return errgo.Mask(err)
 	}
 	defer client.Close()
-	resp, err := client.ListController(&params.ListController{})
+	resp, err := client.ListController(ctx, &params.ListController{})
 	if err != nil {
 		return errgo.Mask(err)
 	}

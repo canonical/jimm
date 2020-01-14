@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juju/httprequest"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/httprequest.v1"
 	"gopkg.in/juju/environschema.v1"
 	"gopkg.in/mgo.v2/bson"
 )

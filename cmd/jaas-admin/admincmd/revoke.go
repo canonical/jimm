@@ -86,19 +86,22 @@ func (c *revokeCommand) Init(args []string) error {
 }
 
 func (c *revokeCommand) Run(ctxt *cmd.Context) error {
+	ctx, cancel := wrapContext(ctxt)
+	defer cancel()
+
 	if c.admin {
-		return c.runAdmin(ctxt)
+		return c.runAdmin(ctx, ctxt)
 	}
-	return c.run(ctxt)
+	return c.run(ctx, ctxt)
 }
 
-func (c *revokeCommand) run(ctxt *cmd.Context) error {
+func (c *revokeCommand) run(ctx context.Context, ctxt *cmd.Context) error {
 	client, err := c.newClient(ctxt)
 	if err != nil {
 		return errgo.Mask(err)
 	}
 	defer client.Close()
-	currentACL, err := c.getPerm(client)
+	currentACL, err := c.getPerm(ctx, client)
 	if err != nil {
 		return errgo.Mask(err)
 	}
@@ -113,21 +116,21 @@ func (c *revokeCommand) run(ctxt *cmd.Context) error {
 			delete(newReadPerms, u)
 		}
 	}
-	return c.setPerm(client, params.ACL{
+	return c.setPerm(ctx, client, params.ACL{
 		Read: newReadPerms.slice(),
 	})
 }
 
-func (c *revokeCommand) setPerm(client *client, acl params.ACL) error {
+func (c *revokeCommand) setPerm(ctx context.Context, client *client, acl params.ACL) error {
 	var err error
 	switch {
 	case c.controller:
-		err = client.SetControllerPerm(&params.SetControllerPerm{
+		err = client.SetControllerPerm(ctx, &params.SetControllerPerm{
 			EntityPath: c.path.EntityPath,
 			ACL:        acl,
 		})
 	default:
-		err = client.SetModelPerm(&params.SetModelPerm{
+		err = client.SetModelPerm(ctx, &params.SetModelPerm{
 			EntityPath: c.path.EntityPath,
 			ACL:        acl,
 		})
@@ -135,27 +138,27 @@ func (c *revokeCommand) setPerm(client *client, acl params.ACL) error {
 	return errgo.Mask(err)
 }
 
-func (c *revokeCommand) getPerm(client *client) (params.ACL, error) {
+func (c *revokeCommand) getPerm(ctx context.Context, client *client) (params.ACL, error) {
 	var acl params.ACL
 	var err error
 	switch {
 	case c.controller:
-		acl, err = client.GetControllerPerm(&params.GetControllerPerm{
+		acl, err = client.GetControllerPerm(ctx, &params.GetControllerPerm{
 			EntityPath: c.path.EntityPath,
 		})
 	default:
-		acl, err = client.GetModelPerm(&params.GetModelPerm{
+		acl, err = client.GetModelPerm(ctx, &params.GetModelPerm{
 			EntityPath: c.path.EntityPath,
 		})
 	}
 	return acl, errgo.Mask(err)
 }
 
-func (c *revokeCommand) runAdmin(ctxt *cmd.Context) error {
+func (c *revokeCommand) runAdmin(ctx context.Context, ctxt *cmd.Context) error {
 	client, err := c.newACLClient(ctxt)
 	if err != nil {
 		return errgo.Mask(err)
 	}
 	defer client.Close()
-	return errgo.Mask(client.Remove(context.Background(), c.aclName, c.users.slice()))
+	return errgo.Mask(client.Remove(ctx, c.aclName, c.users.slice()))
 }

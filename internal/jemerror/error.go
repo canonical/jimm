@@ -6,9 +6,9 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/juju/httprequest"
+	"gopkg.in/httprequest.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
@@ -18,18 +18,18 @@ import (
 // Mapper holds an ErrorMapper that can
 // translate from Go errors to standard JEM
 // error responses.
-var Mapper httprequest.ErrorMapper = errToResp
+var Mapper = errToResp
 
 type errorCoder interface {
 	ErrorCode() params.ErrorCode
 }
 
-func errToResp(err error) (int, interface{}) {
-	zapctx.Info(context.TODO(), "HTTP error response", zaputil.Error(err))
+func errToResp(ctx context.Context, err error) (int, interface{}) {
+	zapctx.Info(ctx, "HTTP error response", zaputil.Error(err))
 	// Allow bakery errors to be returned as the bakery would
 	// like them, so that httpbakery.Client.Do will work.
 	if err, ok := errgo.Cause(err).(*httpbakery.Error); ok {
-		return httpbakery.ErrorToResponse(err)
+		return httpbakery.ErrorToResponse(ctx, err)
 	}
 	errorBody := errorResponseBody(err)
 	status := http.StatusInternalServerError

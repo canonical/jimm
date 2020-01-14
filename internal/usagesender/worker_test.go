@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/juju/clock/testclock"
-	"github.com/juju/httprequest"
 	jujujujutesting "github.com/juju/juju/testing"
 	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/httprequest.v1"
 
 	external_jem "github.com/CanonicalLtd/jimm"
 	"github.com/CanonicalLtd/jimm/internal/apitest"
@@ -24,8 +24,7 @@ import (
 )
 
 var (
-	testContext = context.Background()
-	epoch       = mustParseTime("2016-01-01T12:00:00Z")
+	epoch = mustParseTime("2016-01-01T12:00:00Z")
 )
 
 var _ = gc.Suite(&spoolDirMetricRecorderSuite{})
@@ -59,8 +58,11 @@ func (s *usageSenderSuite) SetUpTest(c *gc.C) {
 	s.handler = &testHandler{receivedMetrics: make(chan receivedMetric)}
 
 	router := httprouter.New()
-	handlers := jemerror.Mapper.Handlers(func(_ httprequest.Params) (*testHandler, error) {
-		return s.handler, nil
+	srv := httprequest.Server{
+		ErrorMapper: jemerror.Mapper,
+	}
+	handlers := srv.Handlers(func(p httprequest.Params) (*testHandler, context.Context, error) {
+		return s.handler, p.Context, nil
 	})
 	for _, h := range handlers {
 		router.Handle(h.Method, h.Path, h.Handle)
@@ -82,24 +84,28 @@ func (s *usageSenderSuite) TearDownTest(c *gc.C) {
 }
 
 func (s *usageSenderSuite) TestUsageSenderWorker(c *gc.C) {
-	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, false)
-	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
-	_, uuid := s.CreateModel(c, params.EntityPath{"bob", "foo"}, ctlId, cred)
+	ctx := context.Background()
 
-	s.setUnitNumberAndCheckSentMetrics(c, ctlId, uuid, 0, true)
-	s.setUnitNumberAndCheckSentMetrics(c, ctlId, uuid, 0, false)
+	ctlId := s.AssertAddController(ctx, c, params.EntityPath{"bob", "foo"}, false)
+	cred := s.AssertUpdateCredential(ctx, c, "bob", "dummy", "cred1", "empty")
+	_, uuid := s.CreateModel(ctx, c, params.EntityPath{"bob", "foo"}, ctlId, cred)
 
-	s.setUnitNumberAndCheckSentMetrics(c, ctlId, uuid, 99, true)
-	s.setUnitNumberAndCheckSentMetrics(c, ctlId, uuid, 99, false)
+	s.setUnitNumberAndCheckSentMetrics(ctx, c, ctlId, uuid, 0, true)
+	s.setUnitNumberAndCheckSentMetrics(ctx, c, ctlId, uuid, 0, false)
 
-	s.setUnitNumberAndCheckSentMetrics(c, ctlId, uuid, 42, true)
-	s.setUnitNumberAndCheckSentMetrics(c, ctlId, uuid, 42, false)
+	s.setUnitNumberAndCheckSentMetrics(ctx, c, ctlId, uuid, 99, true)
+	s.setUnitNumberAndCheckSentMetrics(ctx, c, ctlId, uuid, 99, false)
+
+	s.setUnitNumberAndCheckSentMetrics(ctx, c, ctlId, uuid, 42, true)
+	s.setUnitNumberAndCheckSentMetrics(ctx, c, ctlId, uuid, 42, false)
 }
 
 func (s *spoolDirMetricRecorderSuite) TestSpool(c *gc.C) {
-	ctlId := s.AssertAddController(c, params.EntityPath{"bob", "foo"}, false)
-	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
-	_, model := s.CreateModel(c, params.EntityPath{"bob", "test-model"}, ctlId, cred)
+	ctx := context.Background()
+
+	ctlId := s.AssertAddController(ctx, c, params.EntityPath{"bob", "foo"}, false)
+	cred := s.AssertUpdateCredential(ctx, c, "bob", "dummy", "cred1", "empty")
+	_, model := s.CreateModel(ctx, c, params.EntityPath{"bob", "test-model"}, ctlId, cred)
 
 	m := &testMonitor{failed: make(chan int, 10)}
 	s.PatchValue(usagesender.MonitorFailure, m.set)
@@ -109,7 +115,7 @@ func (s *spoolDirMetricRecorderSuite) TestSpool(c *gc.C) {
 	// next attempt
 	s.handler.setAcknowledge(false)
 
-	err := s.JEM.DB.UpdateModelCounts(testContext, ctlId, model, map[params.EntityCount]int{
+	err := s.JEM.DB.UpdateModelCounts(ctx, ctlId, model, map[params.EntityCount]int{
 		params.MachineCount: 0,
 		params.UnitCount:    17,
 	}, s.Clock.Now())
@@ -127,7 +133,7 @@ func (s *spoolDirMetricRecorderSuite) TestSpool(c *gc.C) {
 	// on the second attempt all metrics will be acknowledged
 	s.handler.setAcknowledge(true)
 
-	err = s.JEM.DB.UpdateModelCounts(testContext, ctlId, model, map[params.EntityCount]int{
+	err = s.JEM.DB.UpdateModelCounts(ctx, ctlId, model, map[params.EntityCount]int{
 		params.MachineCount: 0,
 		params.UnitCount:    42,
 	}, s.Clock.Now())
@@ -156,13 +162,13 @@ func (s *spoolDirMetricRecorderSuite) TestSpool(c *gc.C) {
 	}
 }
 
-func (s *usageSenderSuite) setUnitNumberAndCheckSentMetrics(c *gc.C, ctlPath params.EntityPath, modelUUID string, unitCount int, acknowledge bool) {
+func (s *usageSenderSuite) setUnitNumberAndCheckSentMetrics(ctx context.Context, c *gc.C, ctlPath params.EntityPath, modelUUID string, unitCount int, acknowledge bool) {
 	m := &testMonitor{failed: make(chan int)}
 	s.PatchValue(usagesender.MonitorFailure, m.set)
 
 	s.handler.setAcknowledge(acknowledge)
 
-	err := s.JEM.DB.UpdateModelCounts(testContext, ctlPath, modelUUID, map[params.EntityCount]int{
+	err := s.JEM.DB.UpdateModelCounts(ctx, ctlPath, modelUUID, map[params.EntityCount]int{
 		params.MachineCount: 0,
 		params.UnitCount:    unitCount,
 	}, s.Clock.Now())

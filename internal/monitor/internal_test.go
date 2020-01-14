@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/juju/clock/testclock"
-	"github.com/juju/idmclient/idmtest"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/life"
@@ -18,6 +17,7 @@ import (
 	"github.com/juju/juju/testing/factory"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/version"
+	"gopkg.in/CanonicalLtd/candidclient.v1/candidtest"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	names "gopkg.in/juju/names.v3"
@@ -33,7 +33,7 @@ import (
 
 type internalSuite struct {
 	jemtest.JujuConnSuite
-	idmSrv      *idmtest.Server
+	idmSrv      *candidtest.Server
 	sessionPool *mgosession.Pool
 	pool        *jem.Pool
 	jem         *jem.JEM
@@ -55,7 +55,7 @@ var _ = gc.Suite(&internalSuite{})
 
 func (s *internalSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
-	s.idmSrv = idmtest.NewServer()
+	s.idmSrv = candidtest.NewServer()
 	s.sessionPool = mgosession.NewPool(context.TODO(), s.Session, 1)
 	pool, err := jem.NewPool(context.TODO(), jem.Params{
 		SessionPool:     s.sessionPool,

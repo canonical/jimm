@@ -4,9 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	jujuhttprequest "github.com/juju/httprequest"
 	"github.com/juju/utils/debugstatus"
-	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/mgo.v2/bson"
@@ -16,27 +14,24 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemerror"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/version"
 )
 
 // NewAPIHandler returns a new API handler that serves the /debug
 // endpoints.
-func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]jujuhttprequest.Handler, error) {
-	var handlers []jujuhttprequest.Handler
+func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httprequest.Handler, error) {
 	srv := &httprequest.Server{
-		ErrorMapper: func(_ context.Context, err error) (int, interface{}) {
-			return jemerror.Mapper(err)
+		ErrorMapper: func(ctx context.Context, err error) (int, interface{}) {
+			return jemerror.Mapper(ctx, err)
 		},
 	}
 
-	for _, hnd := range srv.Handlers(func(p httprequest.Params) (*handler, context.Context, error) {
+	return srv.Handlers(func(p httprequest.Params) (*handler, context.Context, error) {
 		ctx := ctxutil.Join(ctx, p.Context)
-		ctx = zapctx.WithFields(ctx, zap.String("req-id", jujuhttprequest.RequestUUID(ctx)))
 		h := &handler{
 			params:                         params.Params,
 			jem:                            params.JEMPool.JEM(ctx),
-			authPool:                       params.AuthenticatorPool,
+			auth:                           params.Authenticator,
 			usageSenderAuthorizationClient: params.JEMPool.UsageAuthorizationClient(),
 		}
 		h.Handler = debugstatus.Handler{
@@ -45,26 +40,21 @@ func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]jujuh
 			Check:             h.check,
 		}
 		return h, ctx, nil
-	}) {
-		handlers = append(handlers, jujuhttprequest.Handler(hnd))
-	}
-	return handlers, nil
+	}), nil
 }
 
 type handler struct {
 	debugstatus.Handler
 	params                         jemserver.Params
 	jem                            *jem.JEM
-	authPool                       *auth.Pool
+	auth                           *auth.Authenticator
 	ctx                            context.Context
 	usageSenderAuthorizationClient jem.UsageSenderAuthorizationClient
 }
 
 func (h *handler) checkIsAdmin(req *http.Request) error {
 	if h.ctx == nil {
-		a := h.authPool.Authenticator(context.TODO())
-		defer a.Close()
-		ctx, err := a.AuthenticateRequest(context.TODO(), req)
+		ctx, err := h.auth.AuthenticateRequest(context.TODO(), req)
 		if err != nil {
 			return errgo.Mask(err, errgo.Any)
 		}
