@@ -54,19 +54,22 @@ func (c *removeCommand) SetFlags(f *gnuflag.FlagSet) {
 }
 
 func (c *removeCommand) Run(ctxt *cmd.Context) error {
+	ctx, cancel := wrapContext(ctxt)
+	defer cancel()
+
 	client, err := c.newClient(ctxt)
 	if err != nil {
 		return errgo.Mask(err)
 	}
 	defer client.Close()
 	f := func(path entityPathValue) error {
-		return client.DeleteModel(&params.DeleteModel{
+		return client.DeleteModel(ctx, &params.DeleteModel{
 			EntityPath: path.EntityPath,
 		})
 	}
 	if c.controller {
 		f = func(path entityPathValue) error {
-			return client.DeleteController(&params.DeleteController{
+			return client.DeleteController(ctx, &params.DeleteController{
 				EntityPath: path.EntityPath,
 				Force:      c.force,
 			})

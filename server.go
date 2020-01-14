@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jimm/internal/debugapi"
@@ -51,9 +51,9 @@ type ServerParams struct {
 	// associated with the controller.
 	MeteringLocation string
 
-	// PublicKeyLocator holds a public key store.
+	// ThirdPartyLocator holds a third-party store.
 	// It may be nil.
-	PublicKeyLocator bakery.PublicKeyLocator
+	ThirdPartyLocator bakery.ThirdPartyLocator
 
 	// AgentUsername and AgentKey hold the credentials used for agent
 	// authentication.

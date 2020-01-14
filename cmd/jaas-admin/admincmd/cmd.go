@@ -3,6 +3,7 @@
 package admincmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -13,9 +14,8 @@ import (
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/persistent-cookiejar"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/CanonicalLtd/jimm/internal/bakeryadaptor"
 	"github.com/CanonicalLtd/jimm/jemclient"
 	"github.com/CanonicalLtd/jimm/params"
 )
@@ -117,7 +117,7 @@ func (c *commandBase) newBakeryClient() (*cookiejar.Jar, *httpbakery.Client, err
 	}
 	bakeryClient := httpbakery.NewClient()
 	bakeryClient.Client.Jar = jar
-	bakeryClient.VisitWebPage = httpbakery.OpenWebBrowser
+	bakeryClient.AddInteractor(httpbakery.WebBrowserInteractor{})
 	return jar, bakeryClient, nil
 }
 
@@ -146,7 +146,7 @@ func (c *commandBase) newACLClient(ctxt *cmd.Context) (*aclClient, error) {
 	return &aclClient{
 		Client: aclclient.New(aclclient.NewParams{
 			BaseURL: c.serverURL() + "/admin/acls",
-			Doer:    bakeryadaptor.Doer{bakeryClient},
+			Doer:    bakeryClient,
 		}),
 		jar:  jar,
 		ctxt: ctxt,
@@ -217,6 +217,22 @@ func (v *entityPathsValue) String() string {
 		ss[i] = p.String()
 	}
 	return strings.Join(ss, ",")
+}
+
+func wrapContext(ctxt *cmd.Context) (_ context.Context, cancel func()) {
+	ctx, cancel := context.WithCancel(context.Background())
+	sc := make(chan os.Signal)
+	ctxt.InterruptNotify(sc)
+	go func() {
+		defer ctxt.StopInterruptNotify(sc)
+		select {
+		case <-sc:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+
+	return ctx, cancel
 }
 
 var _ gnuflag.Value = (*entityPathsValue)(nil)

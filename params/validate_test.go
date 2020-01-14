@@ -10,11 +10,11 @@ import (
 	"net/http"
 	"reflect"
 
-	"github.com/juju/httprequest"
 	jc "github.com/juju/testing/checkers"
 	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/httprequest.v1"
 
 	"github.com/CanonicalLtd/jimm/params"
 )

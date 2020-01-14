@@ -14,17 +14,17 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/life"
+	"github.com/juju/juju/core/permission"
 	jujustatus "github.com/juju/juju/core/status"
 	"github.com/juju/juju/environs"
 	"github.com/juju/juju/environs/config"
-	"github.com/juju/juju/permission"
 	"github.com/juju/juju/rpc"
 	"github.com/juju/rpcreflect"
 	"github.com/juju/version"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v3"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
@@ -74,7 +74,7 @@ var facades = map[facade]string{
 // controllerRoot is the root for endpoints served on controller connections.
 type controllerRoot struct {
 	params       jemserver.Params
-	authPool     *auth.Pool
+	auth         *auth.Authenticator
 	jem          *jem.JEM
 	heartMonitor heartMonitor
 
@@ -87,11 +87,11 @@ type controllerRoot struct {
 	facades     map[facade]string
 }
 
-func newControllerRoot(jem *jem.JEM, ap *auth.Pool, p jemserver.Params, hm heartMonitor) *controllerRoot {
+func newControllerRoot(jem *jem.JEM, a *auth.Authenticator, p jemserver.Params, hm heartMonitor) *controllerRoot {
 	r := &controllerRoot{
 		authContext:   context.Background(),
 		params:        p,
-		authPool:      ap,
+		auth:          a,
 		jem:           jem,
 		heartMonitor:  hm,
 		facades:       unauthenticatedFacades,
@@ -230,14 +230,12 @@ type admin struct {
 // Login implements the Login method on the Admin facade.
 func (a admin) Login(ctx context.Context, req jujuparams.LoginRequest) (jujuparams.LoginResult, error) {
 	// JIMM only supports macaroon login, ignore all the other fields.
-	authenticator := a.root.authPool.Authenticator(ctx)
-	defer authenticator.Close()
-	authContext, m, err := authenticator.Authenticate(a.root.authContext, req.Macaroons, checkers.TimeBefore)
+	authContext, m, err := a.root.auth.Authenticate(a.root.authContext, bakery.Version1, req.Macaroons)
 	if err != nil {
 		servermon.LoginFailCount.Inc()
 		if m != nil {
 			return jujuparams.LoginResult{
-				DischargeRequired:       m,
+				DischargeRequired:       m.M(),
 				DischargeRequiredReason: err.Error(),
 			}, nil
 		}

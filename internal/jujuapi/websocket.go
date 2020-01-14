@@ -110,11 +110,11 @@ var websocketUpgrader = websocket.Upgrader{
 }
 
 // newWSServer creates a new WebSocket server suitible for handling the API for modelUUID.
-func newWSServer(ctx context.Context, jem *jem.JEM, ap *auth.Pool, jsParams jemserver.Params, modelUUID string) http.Handler {
+func newWSServer(ctx context.Context, jem *jem.JEM, a *auth.Authenticator, jsParams jemserver.Params, modelUUID string) http.Handler {
 	hnd := &wsHandler{
 		context:   ctx,
 		jem:       jem,
-		authPool:  ap,
+		auth:      a,
 		params:    jsParams,
 		modelUUID: modelUUID,
 	}
@@ -134,7 +134,7 @@ type wsHandler struct {
 	// TODO Make the context per-RPC-call instead of global across the handler.
 	context   context.Context
 	jem       *jem.JEM
-	authPool  *auth.Pool
+	auth      *auth.Authenticator
 	params    jemserver.Params
 	modelUUID string
 }
@@ -150,7 +150,7 @@ func (h *wsHandler) handle(wsConn *websocket.Conn) {
 	hm := newHeartMonitor(h.params.WebsocketRequestTimeout)
 	var root rpc.Root
 	if h.modelUUID == "" {
-		root = newControllerRoot(h.jem, h.authPool, h.params, hm)
+		root = newControllerRoot(h.jem, h.auth, h.params, hm)
 	} else {
 		root = newModelRoot(h.jem, hm, h.modelUUID)
 	}

@@ -3,6 +3,8 @@
 package admincmd_test
 
 import (
+	"context"
+
 	gc "gopkg.in/check.v1"
 )
 
@@ -13,6 +15,8 @@ type modelsSuite struct {
 var _ = gc.Suite(&modelsSuite{})
 
 func (s *modelsSuite) TestModels(c *gc.C) {
+	ctx := context.Background()
+
 	s.idmSrv.AddUser("bob", adminUser)
 	s.idmSrv.SetDefaultUser("bob")
 
@@ -22,9 +26,9 @@ func (s *modelsSuite) TestModels(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	s.addModel(c, "bob/foo", "bob/foo", "cred1")
-	s.addModel(c, "bob/foo-1", "bob/foo", "cred1")
-	s.addModel(c, "bob/foo-2", "bob/foo", "cred1")
+	s.addModel(ctx, c, "bob/foo", "bob/foo", "cred1")
+	s.addModel(ctx, c, "bob/foo-1", "bob/foo", "cred1")
+	s.addModel(ctx, c, "bob/foo-2", "bob/foo", "cred1")
 
 	stdout, stderr, code = run(c, c.MkDir(), "models")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
@@ -39,6 +43,8 @@ func (s *modelsSuite) TestModels(c *gc.C) {
 }
 
 func (s *modelsSuite) TestAllModels(c *gc.C) {
+	ctx := context.Background()
+
 	s.idmSrv.AddUser("alice", adminUser)
 	s.idmSrv.SetDefaultUser("alice")
 
@@ -48,11 +54,11 @@ func (s *modelsSuite) TestAllModels(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	s.addModel(c, "alice/bar", "alice/foo", "cred1")
+	s.addModel(ctx, c, "alice/bar", "alice/foo", "cred1")
 
 	s.idmSrv.AddUser("bob")
 	s.idmSrv.SetDefaultUser("bob")
-	s.addModel(c, "bob/bar", "alice/foo", "cred1")
+	s.addModel(ctx, c, "bob/bar", "alice/foo", "cred1")
 
 	s.idmSrv.SetDefaultUser("alice")
 	stdout, stderr, code = run(c, c.MkDir(), "models")

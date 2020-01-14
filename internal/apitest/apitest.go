@@ -5,22 +5,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"time"
 
 	"github.com/juju/aclstore"
 	"github.com/juju/clock/testclock"
-	"github.com/juju/idmclient/idmtest"
 	controllerapi "github.com/juju/juju/api/controller"
 	"github.com/juju/juju/controller"
 	"github.com/juju/simplekv/mgosimplekv"
 	"github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
 	"github.com/rogpeppe/fastuuid"
+	"gopkg.in/CanonicalLtd/candidclient.v1/candidtest"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/mgo.v2"
 
 	external_jem "github.com/CanonicalLtd/jimm"
@@ -43,7 +42,7 @@ type Suite struct {
 	JEMSrv *jemserver.Server
 
 	// IDMSrv holds a running instance of the fake identity server.
-	IDMSrv *idmtest.Server
+	IDMSrv *candidtest.Server
 
 	// HTTPSrv holds the running HTTP server that uses IDMSrv.
 	HTTPSrv *httptest.Server
@@ -67,15 +66,20 @@ type Suite struct {
 }
 
 func (s *Suite) SetUpTest(c *gc.C) {
-	s.IDMSrv = idmtest.NewServer()
+	ctx := context.Background()
+
+	s.IDMSrv = candidtest.NewServer()
+	tpi, err := s.IDMSrv.ThirdPartyInfo(ctx, s.IDMSrv.URL.String())
+	c.Assert(err, gc.Equals, nil)
+
 	s.JujuConnSuite.ControllerConfigAttrs = map[string]interface{}{
 		controller.IdentityURL:       s.IDMSrv.URL,
-		controller.IdentityPublicKey: s.IDMSrv.PublicKey.String(),
+		controller.IdentityPublicKey: tpi.PublicKey.String(),
 	}
 	s.JujuConnSuite.SetUpTest(c)
 	conn := s.OpenControllerAPI(c)
 	defer conn.Close()
-	err := controllerapi.NewClient(conn).GrantController("everyone@external", "login")
+	err = controllerapi.NewClient(conn).GrantController("everyone@external", "login")
 	c.Assert(err, gc.Equals, nil)
 	s.PatchValue(&jem.APIOpenTimeout, time.Duration(0))
 	s.MetricsRegistrationClient = &stubMetricsRegistrationClient{}
@@ -85,7 +89,7 @@ func (s *Suite) SetUpTest(c *gc.C) {
 	if s.Clock != nil {
 		s.PatchValue(&usagesender.SenderClock, s.Clock)
 	}
-	s.JEMSrv = s.NewServer(c, s.Session, s.IDMSrv, s.ServerParams)
+	s.JEMSrv = s.NewServer(ctx, c, s.Session, s.IDMSrv, s.ServerParams)
 	s.HTTPSrv = httptest.NewServer(s.JEMSrv)
 	s.SessionPool = mgosession.NewPool(context.TODO(), s.Session, 1)
 	s.Pool = s.NewJEMPool(c, s.SessionPool)
@@ -133,18 +137,18 @@ func (s *Suite) NewClient(username params.User) *jemclient.Client {
 // NewServer returns a new JEM server that uses the given mongo session
 // and identity server. If GUILocation is specified in params then that
 // will be used instead of the default value.
-func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server, params external_jem.ServerParams) *jemserver.Server {
+func (s *Suite) NewServer(ctx context.Context, c *gc.C, session *mgo.Session, idmSrv *candidtest.Server, params external_jem.ServerParams) *jemserver.Server {
 	db := session.DB("jem")
-	s.IDMSrv.AddUser("agent")
+	idmSrv.AddUser("agent", candidtest.GroupListGroup)
 	config := external_jem.ServerParams{
 		DB:                      db,
 		ControllerAdmin:         "controller-admin",
 		IdentityLocation:        idmSrv.URL.String(),
 		CharmstoreLocation:      params.CharmstoreLocation,
 		MeteringLocation:        params.MeteringLocation,
-		PublicKeyLocator:        idmSrv,
+		ThirdPartyLocator:       idmSrv,
 		AgentUsername:           "agent",
-		AgentKey:                s.IDMSrv.UserPublicKey("agent"),
+		AgentKey:                idmSrv.UserPublicKey("agent"),
 		ControllerUUID:          "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		WebsocketRequestTimeout: 3 * time.Minute,
 		UsageSenderURL:          "https://0.1.2.3/omnibus/v2",
@@ -156,22 +160,22 @@ func (s *Suite) NewServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server,
 	if params.GUILocation != "" {
 		config.GUILocation = params.GUILocation
 	}
-	srv, err := external_jem.NewServer(context.TODO(), config)
+	srv, err := external_jem.NewServer(ctx, config)
 	c.Assert(err, gc.Equals, nil)
 	return srv.(*jemserver.Server)
 }
 
 // AssertAddController adds the specified controller using AddController
 // and checks that id succeeds. It returns the controller id.
-func (s *Suite) AssertAddController(c *gc.C, path params.EntityPath, public bool) params.EntityPath {
-	err := s.AddController(c, path, public)
+func (s *Suite) AssertAddController(ctx context.Context, c *gc.C, path params.EntityPath, public bool) params.EntityPath {
+	err := s.AddController(ctx, c, path, public)
 	c.Assert(err, gc.Equals, nil)
 	return path
 }
 
 // AddController adds a new controller with the provided path and any
 // specified location parameters.
-func (s *Suite) AddController(c *gc.C, path params.EntityPath, public bool) error {
+func (s *Suite) AddController(ctx context.Context, c *gc.C, path params.EntityPath, public bool) error {
 	// Note that because the cookies acquired in this request don't
 	// persist, the discharge macaroon we get won't affect subsequent
 	// requests in the caller.
@@ -191,7 +195,7 @@ func (s *Suite) AddController(c *gc.C, path params.EntityPath, public bool) erro
 		},
 	}
 	s.IDMSrv.AddUser(string(path.User), "controller-admin")
-	if err := s.NewClient(path.User).AddController(p); err != nil {
+	if err := s.NewClient(path.User).AddController(ctx, p); err != nil {
 		return err
 	}
 	return nil
@@ -224,11 +228,11 @@ var dummyModelConfig = map[string]interface{}{
 // CreateModel creates a new model with the specified path on the
 // specified controller, using the specified credentialss. It returns the
 // new model's path, user and uuid.
-func (s *Suite) CreateModel(c *gc.C, path, ctlPath params.EntityPath, cred params.CredentialName) (modelPath params.EntityPath, uuid string) {
+func (s *Suite) CreateModel(ctx context.Context, c *gc.C, path, ctlPath params.EntityPath, cred params.CredentialName) (modelPath params.EntityPath, uuid string) {
 	// Note that because the cookies acquired in this request don't
 	// persist, the discharge macaroon we get won't affect subsequent
 	// requests in the caller.
-	resp, err := s.NewClient(path.User).NewModel(&params.NewModel{
+	resp, err := s.NewClient(path.User).NewModel(ctx, &params.NewModel{
 		User: path.User,
 		Info: params.NewModelInfo{
 			Name:       path.Name,
@@ -257,14 +261,14 @@ func (s *Suite) CreateModel(c *gc.C, path, ctlPath params.EntityPath, cred param
 	return resp.Path, resp.UUID
 }
 
-func (s *Suite) AssertUpdateCredential(c *gc.C, user params.User, cloud params.Cloud, name params.CredentialName, authType string) params.CredentialName {
-	err := s.UpdateCredential(user, cloud, name, authType)
+func (s *Suite) AssertUpdateCredential(ctx context.Context, c *gc.C, user params.User, cloud params.Cloud, name params.CredentialName, authType string) params.CredentialName {
+	err := s.UpdateCredential(ctx, user, cloud, name, authType)
 	c.Assert(err, gc.Equals, nil)
 	return name
 }
 
 // UpdateCredential sets a  credential with the provided path and authType.
-func (s *Suite) UpdateCredential(user params.User, cloud params.Cloud, name params.CredentialName, authType string) error {
+func (s *Suite) UpdateCredential(ctx context.Context, user params.User, cloud params.Cloud, name params.CredentialName, authType string) error {
 	// Note that because the cookies acquired in this request don't
 	// persist, the discharge macaroon we get won't affect subsequent
 	// requests in the caller.
@@ -278,7 +282,7 @@ func (s *Suite) UpdateCredential(user params.User, cloud params.Cloud, name para
 			AuthType: authType,
 		},
 	}
-	return s.NewClient(user).UpdateCredential(p)
+	return s.NewClient(user).UpdateCredential(ctx, p)
 }
 
 // Do returns a Do function appropriate for using in httptesting.AssertJSONCall.Do
@@ -291,14 +295,7 @@ func Do(client *httpbakery.Client) func(*http.Request) (*http.Response, error) {
 	if client == nil {
 		client = httpbakery.NewClient()
 	}
-	return func(req *http.Request) (*http.Response, error) {
-		if req.Body != nil {
-			body := req.Body.(io.ReadSeeker)
-			req.Body = nil
-			return client.DoWithBody(req, body)
-		}
-		return client.Do(req)
-	}
+	return client.Do
 }
 
 // AnyBody is a convenience value that can be used in

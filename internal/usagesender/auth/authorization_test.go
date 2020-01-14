@@ -7,10 +7,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/juju/httprequest"
 	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/httprequest.v1"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/jimm/internal/jemerror"
 	"github.com/CanonicalLtd/jimm/internal/usagesender/auth"
@@ -29,8 +29,11 @@ func (s *authorizationSuite) SetUpTest(c *gc.C) {
 
 	s.handler = &testAuthHandler{}
 	router := httprouter.New()
-	handlers := jemerror.Mapper.Handlers(func(_ httprequest.Params) (*testAuthHandler, error) {
-		return s.handler, nil
+	srv := httprequest.Server{
+		ErrorMapper: jemerror.Mapper,
+	}
+	handlers := srv.Handlers(func(p httprequest.Params) (*testAuthHandler, context.Context, error) {
+		return s.handler, p.Context, nil
 	})
 	for _, h := range handlers {
 		router.Handle(h.Method, h.Path, h.Handle)

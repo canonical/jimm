@@ -48,12 +48,15 @@ func (c *modelsCommand) Init(args []string) error {
 }
 
 func (c *modelsCommand) Run(ctxt *cmd.Context) error {
+	ctx, cancel := wrapContext(ctxt)
+	defer cancel()
+
 	client, err := c.newClient(ctxt)
 	if err != nil {
 		return errgo.Mask(err)
 	}
 	defer client.Close()
-	resp, err := client.ListModels(&params.ListModels{
+	resp, err := client.ListModels(ctx, &params.ListModels{
 		All: c.all,
 	})
 	if err != nil {

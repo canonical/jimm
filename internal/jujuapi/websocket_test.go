@@ -20,8 +20,6 @@ import (
 	"github.com/CanonicalLtd/jimm/params"
 )
 
-var testContext = context.Background()
-
 type websocketSuite struct {
 	apitest.Suite
 	Server *httptest.Server
@@ -91,10 +89,12 @@ func (s *websocketSuite) assertCreateModel(c *gc.C, p createModelParams) base.Mo
 }
 
 func (s *websocketSuite) grant(c *gc.C, path params.EntityPath, user params.User, access string) {
-	m, err := s.JEM.DB.Model(testContext, path)
+	ctx := context.Background()
+
+	m, err := s.JEM.DB.Model(ctx, path)
 	c.Assert(err, gc.Equals, nil)
-	conn, err := s.JEM.OpenAPI(testContext, m.Controller)
+	conn, err := s.JEM.OpenAPI(ctx, m.Controller)
 	c.Assert(err, gc.Equals, nil)
-	err = s.JEM.GrantModel(testContext, conn, m, user, access)
+	err = s.JEM.GrantModel(ctx, conn, m, user, access)
 	c.Assert(err, gc.Equals, nil)
 }
