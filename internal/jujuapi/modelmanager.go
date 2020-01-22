@@ -139,7 +139,7 @@ func (m modelManagerAPI) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 				DefaultSeries:      model.DefaultSeries,
 				CloudTag:           jem.CloudTag(model.Cloud).String(),
 				CloudRegion:        model.CloudRegion,
-				CloudCredentialTag: jem.CloudCredentialTag(model.Credential).String(),
+				CloudCredentialTag: jem.CloudCredentialTag(model.Credential.ToParams()).String(),
 				OwnerTag:           jem.UserTag(model.Path.User).String(),
 				Life:               jujuparams.Life(model.Life()),
 				Status:             modelStatus(model.Info),

@@ -656,7 +656,7 @@ func (c cloudV5) credentialInfo(ctx context.Context, cloudName, credentialName s
 		}
 	}
 	c.root.doModels(ctx, func(ctx context.Context, model *mongodoc.Model) error {
-		if model.Credential != credPath {
+		if model.Credential != mongodoc.CredentialPathFromParams(credPath) {
 			return nil
 		}
 		access := jujuparams.ModelReadAccess
