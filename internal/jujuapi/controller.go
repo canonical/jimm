@@ -483,7 +483,7 @@ func (r *controllerRoot) modelDocToModelInfo(ctx context.Context, model *mongodo
 		DefaultSeries:      model.DefaultSeries,
 		CloudTag:           jem.CloudTag(model.Cloud).String(),
 		CloudRegion:        model.CloudRegion,
-		CloudCredentialTag: jem.CloudCredentialTag(model.Credential).String(),
+		CloudCredentialTag: jem.CloudCredentialTag(model.Credential.ToParams()).String(),
 		OwnerTag:           jem.UserTag(model.Path.User).String(),
 		Life:               jujuparams.Life(model.Life()),
 		Status:             modelStatus(model.Info),
@@ -648,10 +648,12 @@ func getModel(ctx context.Context, jem *jem.JEM, modelTag string, authf func(con
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
-	model.Credential = params.CredentialPath{
-		Cloud: params.Cloud(credentialTag.Cloud().Id()),
-		User:  owner,
-		Name:  params.CredentialName(credentialTag.Name()),
+	model.Credential = mongodoc.CredentialPath{
+		Cloud: string(params.Cloud(credentialTag.Cloud().Id())),
+		EntityPath: mongodoc.EntityPath{
+			User: string(owner),
+			Name: credentialTag.Name(),
+		},
 	}
 	model.DefaultSeries = info.DefaultSeries
 

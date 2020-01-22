@@ -382,7 +382,7 @@ func (j *JEM) Controller(ctx context.Context, path params.EntityPath) (*mongodoc
 // Credential retrieves the given credential from the database,
 // validating that the current user is allowed to read the credential.
 func (j *JEM) Credential(ctx context.Context, path params.CredentialPath) (*mongodoc.Credential, error) {
-	cred, err := j.DB.Credential(ctx, path)
+	cred, err := j.DB.Credential(ctx, mongodoc.CredentialPathFromParams(path))
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			// We return an authorization error for all attempts to retrieve credentials
@@ -469,7 +469,7 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 		UUID: fmt.Sprintf("creating-%x", j.pool.uuidGenerator.Next()),
 	}
 	if cred != nil {
-		modelDoc.Credential = cred.Path.ToParams()
+		modelDoc.Credential = cred.Path
 	}
 	if err := j.DB.AddModel(ctx, modelDoc); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
@@ -597,14 +597,13 @@ func (j *JEM) createModelOnController(ctx context.Context, ctlPath params.Entity
 
 	var credTag names.CloudCredentialTag
 	if cred != nil {
-		path := cred.Path.ToParams()
 		if err := j.updateControllerCredential(ctx, conn, ctlPath, cred, nil); err != nil {
 			return base.ModelInfo{}, errgo.Notef(err, "cannot add credential")
 		}
-		if err := j.DB.credentialAddController(ctx, path, ctlPath); err != nil {
+		if err := j.DB.credentialAddController(ctx, cred.Path, ctlPath); err != nil {
 			return base.ModelInfo{}, errgo.Notef(err, "cannot add credential")
 		}
-		credTag = CloudCredentialTag(path)
+		credTag = CloudCredentialTag(cred.Path.ToParams())
 	}
 
 	mmClient := modelmanager.NewClient(conn.Connection)
@@ -663,13 +662,13 @@ func (j *JEM) RevokeCredential(ctx context.Context, credPath params.CredentialPa
 	if flags == 0 {
 		flags = ^0
 	}
-	cred, err := j.DB.Credential(ctx, credPath)
+	cred, err := j.DB.Credential(ctx, mongodoc.CredentialPathFromParams(credPath))
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	controllers := cred.Controllers
 	if flags&CredentialCheck != 0 {
-		models, err := j.DB.ModelsWithCredential(ctx, credPath)
+		models, err := j.DB.ModelsWithCredential(ctx, mongodoc.CredentialPathFromParams(credPath))
 		if err != nil {
 			return errgo.Mask(err)
 		}
@@ -749,7 +748,7 @@ func (j *JEM) UpdateCredential(ctx context.Context, cred *mongodoc.Credential, f
 		flags = ^0
 	}
 	var controllers []params.EntityPath
-	c, err := j.DB.Credential(ctx, cred.Path.ToParams())
+	c, err := j.DB.Credential(ctx, cred.Path)
 	if err == nil {
 		controllers = c.Controllers
 	} else if errgo.Cause(err) != params.ErrNotFound {
@@ -785,7 +784,7 @@ func (j *JEM) updateCredential(ctx context.Context, cred *mongodoc.Credential, c
 	if err := j.DB.updateCredential(ctx, cred); err != nil {
 		return nil, errgo.Notef(err, "cannot update local database")
 	}
-	if err := j.DB.setCredentialUpdates(ctx, cred.Controllers, cred.Path.ToParams()); err != nil {
+	if err := j.DB.setCredentialUpdates(ctx, cred.Controllers, cred.Path); err != nil {
 		return nil, errgo.Notef(err, "cannot mark controllers to be updated")
 	}
 
@@ -1001,7 +1000,7 @@ func (j *JEM) updateControllerCredential(
 	if r != nil && r.Error != nil {
 		return errgo.Mask(r.Error)
 	}
-	if err := j.DB.clearCredentialUpdate(ctx, ctlPath, cred.Path.ToParams()); err != nil {
+	if err := j.DB.clearCredentialUpdate(ctx, ctlPath, cred.Path); err != nil {
 		return errgo.Notef(err, "cannot update controller %q after successfully updating credntial", ctlPath)
 	}
 	return nil
@@ -1043,7 +1042,7 @@ func (j *JEM) revokeControllerCredential(
 	if err := results.OneError(); err != nil {
 		return errgo.Mask(err)
 	}
-	if err := j.DB.clearCredentialUpdate(ctx, ctlPath, credPath); err != nil {
+	if err := j.DB.clearCredentialUpdate(ctx, ctlPath, mongodoc.CredentialPathFromParams(credPath)); err != nil {
 		return errgo.Notef(err, "cannot update controller %q after successfully updating credntial", ctlPath)
 	}
 	return nil
@@ -1543,7 +1542,7 @@ func (j *JEM) UpdateModelCredential(ctx context.Context, conn *apiconn.Conn, mod
 	if err := j.updateControllerCredential(ctx, conn, model.Controller, cred, nil); err != nil {
 		return errgo.Notef(err, "cannot add credential")
 	}
-	if err := j.DB.credentialAddController(ctx, cred.Path.ToParams(), model.Controller); err != nil {
+	if err := j.DB.credentialAddController(ctx, cred.Path, model.Controller); err != nil {
 		return errgo.Notef(err, "cannot add credential")
 	}
 
@@ -1552,7 +1551,7 @@ func (j *JEM) UpdateModelCredential(ctx context.Context, conn *apiconn.Conn, mod
 		return errgo.Mask(err)
 	}
 
-	if err := j.DB.SetModelCredential(ctx, model.Path, cred.Path.ToParams()); err != nil {
+	if err := j.DB.SetModelCredential(ctx, model.Path, cred.Path); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil

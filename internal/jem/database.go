@@ -120,7 +120,7 @@ func (db *Database) AddController(ctx context.Context, ctl *mongodoc.Controller)
 }
 
 // ModelsWithCredential returns a list of the paths of all models that use the given credential.
-func (db *Database) ModelsWithCredential(ctx context.Context, credPath params.CredentialPath) (_ []params.EntityPath, err error) {
+func (db *Database) ModelsWithCredential(ctx context.Context, credPath mongodoc.CredentialPath) (_ []params.EntityPath, err error) {
 	defer db.checkError(ctx, &err)
 
 	iter := db.Models().Find(bson.D{{"credential", credPath}}).Iter()
@@ -241,7 +241,7 @@ func (db *Database) SetModelController(ctx context.Context, model params.EntityP
 
 // SetModelCredential updates the given model so that it uses the given
 // credential.
-func (db *Database) SetModelCredential(ctx context.Context, model params.EntityPath, cred params.CredentialPath) (err error) {
+func (db *Database) SetModelCredential(ctx context.Context, model params.EntityPath, cred mongodoc.CredentialPath) (err error) {
 	defer db.checkError(ctx, &err)
 	err = db.Models().UpdateId(model.String(), bson.D{{
 		"$set", bson.D{{
@@ -770,7 +770,7 @@ func (db *Database) updateCredential(ctx context.Context, cred *mongodoc.Credent
 
 // Credential gets the specified credential. If the credential cannot be
 // found the returned error will have a cause of params.ErrNotFound.
-func (db *Database) Credential(ctx context.Context, path params.CredentialPath) (_ *mongodoc.Credential, err error) {
+func (db *Database) Credential(ctx context.Context, path mongodoc.CredentialPath) (_ *mongodoc.Credential, err error) {
 	defer db.checkError(ctx, &err)
 	var cred mongodoc.Credential
 	err = db.Credentials().FindId(path.String()).One(&cred)
@@ -785,7 +785,7 @@ func (db *Database) Credential(ctx context.Context, path params.CredentialPath) 
 
 // credentialAddController stores the fact that the credential with the
 // given user, cloud and name is present on the given controller.
-func (db *Database) credentialAddController(ctx context.Context, credential params.CredentialPath, controller params.EntityPath) (err error) {
+func (db *Database) credentialAddController(ctx context.Context, credential mongodoc.CredentialPath, controller params.EntityPath) (err error) {
 	defer db.checkError(ctx, &err)
 	err = db.Credentials().UpdateId(credential.String(), bson.D{{
 		"$addToSet", bson.D{{"controllers", controller}},
@@ -801,7 +801,7 @@ func (db *Database) credentialAddController(ctx context.Context, credential para
 
 // credentialRemoveController stores the fact that the credential with
 // the given user, cloud and name is not present on the given controller.
-func (db *Database) credentialRemoveController(ctx context.Context, credential params.CredentialPath, controller params.EntityPath) (err error) {
+func (db *Database) credentialRemoveController(ctx context.Context, credential mongodoc.CredentialPath, controller params.EntityPath) (err error) {
 	defer db.checkError(ctx, &err)
 	err = db.Credentials().UpdateId(credential.String(), bson.D{{
 		"$pull", bson.D{{"controllers", controller}},
@@ -989,7 +989,7 @@ func (db *Database) RevokeCloud(ctx context.Context, cloud params.Cloud, user pa
 
 // setCredentialUpdates marks all the controllers in the given ctlPaths
 // as requiring an update to the credential with the given credPath.
-func (db *Database) setCredentialUpdates(ctx context.Context, ctlPaths []params.EntityPath, credPath params.CredentialPath) (err error) {
+func (db *Database) setCredentialUpdates(ctx context.Context, ctlPaths []params.EntityPath, credPath mongodoc.CredentialPath) (err error) {
 	defer db.checkError(ctx, &err)
 	_, err = db.Controllers().UpdateAll(bson.D{{
 		"path", bson.D{{
@@ -1008,7 +1008,7 @@ func (db *Database) setCredentialUpdates(ctx context.Context, ctlPaths []params.
 
 // clearCredentialUpdate removes the record indicating that the given
 // controller needs to update the given credential.
-func (db *Database) clearCredentialUpdate(ctx context.Context, ctlPath params.EntityPath, credPath params.CredentialPath) (err error) {
+func (db *Database) clearCredentialUpdate(ctx context.Context, ctlPath params.EntityPath, credPath mongodoc.CredentialPath) (err error) {
 	defer db.checkError(ctx, &err)
 	err = db.Controllers().UpdateId(
 		ctlPath.String(),
