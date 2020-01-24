@@ -302,6 +302,11 @@ type ControllerResponse struct {
 	// noticed that the model's controller could not be
 	// contacted. It is empty when the model is available.
 	UnavailableSince *time.Time `json:"unavailable-since,omitempty"`
+
+	// UUID holds the controller's UUID.
+	UUID string `json:"uuid,omitempty"`
+	// Version holds the version of the controller.
+	Version string `json:"version,omitempty"`
 }
 
 // GetController holds parameters for retrieving information on a Controller.

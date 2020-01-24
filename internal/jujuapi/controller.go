@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"sort"
 	"sync"
+	"time"
 
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
 	"github.com/juju/juju/apiserver/common"
@@ -61,7 +62,8 @@ var facades = map[facade]string{
 	{"Cloud", 4}:        "CloudV4",
 	{"Cloud", 5}:        "CloudV5",
 	{"Controller", 3}:   "Controller",
-	{"JIMM", 1}:         "JIMM",
+	{"JIMM", 1}:         "JIMMV2",
+	{"JIMM", 2}:         "JIMMV2",
 	{"ModelManager", 2}: "ModelManagerV2",
 	{"ModelManager", 3}: "ModelManagerV3",
 	{"ModelManager", 4}: "ModelManagerAPI",
@@ -129,14 +131,14 @@ func (r *controllerRoot) Controller(id string) (controller, error) {
 	return controller{r}, nil
 }
 
-// JIMM returns an implementation of the JIMM-specific
+// JIMMV2 returns an implementation of the V2 JIMM-specific
 // API facade.
-func (r *controllerRoot) JIMM(id string) (jimm, error) {
+func (r *controllerRoot) JIMMV2(id string) (jimmV2, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return jimm{}, common.ErrBadId
+		return jimmV2{}, common.ErrBadId
 	}
-	return jimm{r}, nil
+	return jimmV2{r}, nil
 }
 
 // Pinger returns an implementation of the Pinger facade (version 1).
@@ -569,14 +571,14 @@ func iterUsers(ctx context.Context, users []jujuparams.ModelUserInfo, f func(par
 	}
 }
 
-// jimm implements a facade containing JIMM-specific API calls.
-type jimm struct {
+// jimmV2 implements a facade V2 containing JIMM-specific API calls.
+type jimmV2 struct {
 	root *controllerRoot
 }
 
 // UserModelStats returns statistics about all the models that were created
 // by the currently authenticated user.
-func (j jimm) UserModelStats(ctx context.Context) (params.UserModelStatsResponse, error) {
+func (j jimmV2) UserModelStats(ctx context.Context) (params.UserModelStatsResponse, error) {
 	ctx = ctxutil.Join(ctx, j.root.authContext)
 	models := make(map[string]params.ModelStats)
 
@@ -599,6 +601,40 @@ func (j jimm) UserModelStats(ctx context.Context) (params.UserModelStatsResponse
 	return params.UserModelStatsResponse{
 		Models: models,
 	}, nil
+}
+
+func (j jimmV2) ListControllers(ctx context.Context) (params.ListControllerResponse, error) {
+	ctx = ctxutil.Join(ctx, j.root.authContext)
+	var controllers []params.ControllerResponse
+
+	// NOTE (alesstimec -> mhilton): Controllers shouldn't be readable by non-acl users even if they are public.
+	iter := j.root.jem.DB.NewCanReadIter(ctx, j.root.jem.DB.Controllers().Find(nil).Sort("_id").Iter())
+	var ctl mongodoc.Controller
+	for iter.Next(&ctl) {
+		controllers = append(controllers, params.ControllerResponse{
+			Path:             ctl.Path,
+			Public:           ctl.Public,
+			UnavailableSince: newTime(ctl.UnavailableSince.UTC()),
+			Location:         ctl.Location,
+			UUID:             ctl.UUID,
+			Version:          ctl.Version.String(),
+		})
+	}
+	if err := iter.Err(); err != nil {
+		return params.ListControllerResponse{}, errgo.Notef(err, "cannot get controllers")
+	}
+	return params.ListControllerResponse{
+		Controllers: controllers,
+	}, nil
+}
+
+// newTime returns a pointer to t if it's non-zero,
+// or nil otherwise.
+func newTime(t time.Time) *time.Time {
+	if t.IsZero() {
+		return nil
+	}
+	return &t
 }
 
 // getModel attempts to get the specified model from jem. If the model

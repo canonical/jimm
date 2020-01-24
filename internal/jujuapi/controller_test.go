@@ -3,6 +3,7 @@
 package jujuapi_test
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -137,7 +138,7 @@ func (s *controllerSuite) TestUnimplementedRootFails(c *gc.C) {
 func (s *controllerSuite) TestJIMMFacadeVersion(c *gc.C) {
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
-	c.Assert(conn.AllFacadeVersions()["JIMM"], jc.DeepEquals, []int{1})
+	c.Assert(conn.AllFacadeVersions()["JIMM"], jc.DeepEquals, []int{1, 2})
 }
 
 func (s *controllerSuite) TestUserModelStats(c *gc.C) {
@@ -247,6 +248,63 @@ func (s *controllerSuite) TestUserModelStats(c *gc.C) {
 			},
 		},
 	})
+}
+
+func (s *controllerSuite) TestListControllers(c *gc.C) {
+	ctlId0 := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-0"}, true)
+	ctlId1 := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	ctlId2 := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-2"}, true)
+
+	c0, err := s.JEM.DB.Controller(context.Background(), ctlId0)
+	c.Assert(err, gc.Equals, nil)
+	c1, err := s.JEM.DB.Controller(context.Background(), ctlId1)
+	c.Assert(err, gc.Equals, nil)
+	c2, err := s.JEM.DB.Controller(context.Background(), ctlId2)
+	c.Assert(err, gc.Equals, nil)
+
+	// Open the API connection as user "test".
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	var resp params.ListControllerResponse
+	err = conn.APICall("JIMM", 2, "", "ListControllers", nil, &resp)
+	c.Assert(err, gc.Equals, nil)
+
+	c.Assert(resp, jc.DeepEquals, params.ListControllerResponse{
+		Controllers: []params.ControllerResponse{{
+			Path:     ctlId0,
+			Location: map[string]string{"cloud": "dummy", "region": "dummy-region"},
+			Public:   true,
+			UUID:     c0.UUID,
+			Version:  c0.Version.String(),
+		}, {
+			Path:     ctlId1,
+			Location: map[string]string{"cloud": "dummy", "region": "dummy-region"},
+			Public:   true,
+			UUID:     c1.UUID,
+			Version:  c1.Version.String(),
+		}, {
+			Path:     ctlId2,
+			Location: map[string]string{"cloud": "dummy", "region": "dummy-region"},
+			Public:   true,
+			UUID:     c2.UUID,
+			Version:  c2.Version.String(),
+		}},
+	})
+}
+
+func (s *controllerSuite) TestListControllersUnauthorizedUser(c *gc.C) {
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-0"}, true)
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-2"}, true)
+
+	// Open the API connection as user "unknown-user".
+	conn := s.open(c, nil, "unknown-user")
+	defer conn.Close()
+	var resp params.ListControllerResponse
+	err := conn.APICall("JIMM", 2, "", "ListControllers", nil, &resp)
+	c.Assert(err, gc.Equals, nil)
+
+	c.Assert(resp, jc.DeepEquals, params.ListControllerResponse{})
 }
 
 func (s *controllerSuite) TestControllerConfig(c *gc.C) {
