@@ -129,7 +129,7 @@ func (m modelManagerAPI) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 				coreCount += int64(*machine.Info.HardwareCharacteristics.CpuCores)
 			}
 		}
-		results = append(results, jujuparams.ModelSummaryResult{
+		r := jujuparams.ModelSummaryResult{
 			Result: &jujuparams.ModelSummary{
 				Name:               string(model.Path.Name),
 				Type:               model.Type,
@@ -160,7 +160,16 @@ func (m modelManagerAPI) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 				SLA:          nil,
 				AgentVersion: modelVersion(ctx, model.Info),
 			},
-		})
+		}
+		if !m.root.controllerUUIDMasking {
+			c, err := m.root.jem.DB.Controller(ctx, model.Controller)
+			if err != nil {
+				return errgo.Notef(err, "failed to fetch controller: %v", model.Controller)
+			}
+			r.Result.ControllerUUID = c.UUID
+		}
+
+		results = append(results, r)
 		return nil
 	})
 	if err != nil {
