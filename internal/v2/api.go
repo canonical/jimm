@@ -466,7 +466,7 @@ func (h *Handler) ListController(arg *params.ListController) (*params.ListContro
 		})
 	}
 	if err := iter.Err(); err != nil {
-		return nil, errgo.Notef(err, "cannot get models")
+		return nil, errgo.Notef(err, "cannot get controllers")
 	}
 	return &params.ListControllerResponse{
 		Controllers: controllers,
