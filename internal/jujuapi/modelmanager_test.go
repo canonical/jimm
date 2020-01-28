@@ -124,6 +124,91 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 	}})
 }
 
+func (s *modelManagerSuite) TestListModelSummariesWitouthControllerUUIDMasking(c *gc.C) {
+	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
+	cred2 := s.AssertUpdateCredential(c, "test2", "dummy", "cred1", "empty")
+	err := s.JEM.DB.SetACL(testContext, s.JEM.DB.Controllers(), ctlPath, params.ACL{
+		Read: []string{"test2"},
+	})
+
+	conn1 := s.open(c, nil, "test-unknown")
+	defer conn1.Close()
+	err = conn1.APICall("Controller", 3, "", "DisableControllerUUIDMasking", nil, nil)
+	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	err = conn.APICall("Controller", 3, "", "DisableControllerUUIDMasking", nil, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	c.Assert(err, gc.Equals, nil)
+	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
+	modelUUID1 := mi.UUID
+	s.assertCreateModel(c, createModelParams{name: "model-2", username: "test2", cred: cred2})
+	mi = s.assertCreateModel(c, createModelParams{name: "model-3", username: "test2", cred: cred2})
+	modelUUID3 := mi.UUID
+	err = s.JEM.DB.SetACL(testContext, s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
+		Read: []string{"test"},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	client := modelmanager.NewClient(conn)
+	models, err := client.ListModelSummaries("test", false)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(models, jemtest.CmpEquals(cmpopts.IgnoreTypes(&time.Time{})), []base.UserModelSummary{{
+		Name:            "model-1",
+		UUID:            modelUUID1,
+		ControllerUUID:  "deadbeef-1bad-500d-9000-4b1d0d06f00d",
+		ProviderType:    "dummy",
+		DefaultSeries:   "bionic",
+		Cloud:           "dummy",
+		CloudRegion:     "dummy-region",
+		CloudCredential: "dummy/test@external/cred1",
+		Owner:           "test@external",
+		Life:            "alive",
+		Status: base.Status{
+			Status: status.Available,
+			Data:   map[string]interface{}{},
+		},
+		ModelUserAccess: "admin",
+		Counts: []base.EntityCount{{
+			Entity: "machines",
+			Count:  0,
+		}, {
+			Entity: "cores",
+			Count:  0,
+		}},
+		AgentVersion: &jujuversion.Current,
+		Type:         "iaas",
+	}, {
+		Name:            "model-3",
+		UUID:            modelUUID3,
+		ControllerUUID:  "deadbeef-1bad-500d-9000-4b1d0d06f00d",
+		ProviderType:    "dummy",
+		DefaultSeries:   "bionic",
+		Cloud:           "dummy",
+		CloudRegion:     "dummy-region",
+		CloudCredential: "dummy/test2@external/cred1",
+		Owner:           "test2@external",
+		Life:            "alive",
+		Status: base.Status{
+			Status: status.Available,
+			Data:   map[string]interface{}{},
+		},
+		ModelUserAccess: "read",
+		Counts: []base.EntityCount{{
+			Entity: "machines",
+			Count:  0,
+		}, {
+			Entity: "cores",
+			Count:  0,
+		}},
+		AgentVersion: &jujuversion.Current,
+		Type:         "iaas",
+	}})
+}
+
 func (s *modelManagerSuite) TestListModels(c *gc.C) {
 	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
@@ -336,6 +421,183 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 	}})
 }
 
+func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
+	ctlPath := s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
+	s.AssertUpdateCredential(c, "test2", "dummy", "cred1", "empty")
+	err := s.JEM.DB.SetACL(testContext, s.JEM.DB.Controllers(), ctlPath, params.ACL{
+		Read: []string{"test2"},
+	})
+
+	c.Assert(err, gc.Equals, nil)
+
+	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: "cred1"})
+	modelUUID1 := mi.UUID
+	mi = s.assertCreateModel(c, createModelParams{name: "model-2", username: "test2", cred: "cred1"})
+	modelUUID2 := mi.UUID
+	mi = s.assertCreateModel(c, createModelParams{name: "model-3", username: "test2", cred: "cred1"})
+	modelUUID3 := mi.UUID
+	mi = s.assertCreateModel(c, createModelParams{name: "model-4", username: "test2", cred: "cred1"})
+	modelUUID4 := mi.UUID
+	mi = s.assertCreateModel(c, createModelParams{name: "model-5", username: "test2", cred: "cred1"})
+	modelUUID5 := mi.UUID
+
+	s.grant(c, params.EntityPath{User: "test2", Name: "model-3"}, params.User("test"), "read")
+	s.grant(c, params.EntityPath{User: "test2", Name: "model-4"}, params.User("test"), "write")
+	s.grant(c, params.EntityPath{User: "test2", Name: "model-5"}, params.User("test"), "admin")
+
+	// Add some machines to one of the models
+	err = s.JEM.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
+		ModelUUID: modelUUID3,
+		Id:        "machine-0",
+	})
+	c.Assert(err, gc.Equals, nil)
+	machineArch := "bbc-micro"
+	err = s.JEM.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
+		ModelUUID: modelUUID3,
+		Id:        "machine-1",
+		HardwareCharacteristics: &instance.HardwareCharacteristics{
+			Arch: &machineArch,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	err = s.JEM.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
+		ModelUUID: modelUUID3,
+		Id:        "machine-2",
+		Life:      "dead",
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := modelmanager.NewClient(conn)
+
+	err = conn.APICall("Controller", 3, "", "DisableControllerUUIDMasking", nil, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	models, err := client.ModelInfo([]names.ModelTag{
+		names.NewModelTag(modelUUID1),
+		names.NewModelTag(modelUUID2),
+		names.NewModelTag(modelUUID3),
+		names.NewModelTag(modelUUID4),
+		names.NewModelTag(modelUUID5),
+		names.NewModelTag("00000000-0000-0000-0000-000000000007"),
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	assertModelInfo(c, models, []jujuparams.ModelInfoResult{{
+		Result: &jujuparams.ModelInfo{
+			Name:               "model-1",
+			UUID:               modelUUID1,
+			ControllerUUID:     "deadbeef-1bad-500d-9000-4b1d0d06f00d",
+			ProviderType:       "dummy",
+			CloudTag:           "cloud-dummy",
+			CloudRegion:        "dummy-region",
+			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test@external/cred1").String(),
+			OwnerTag:           names.NewUserTag("test@external").String(),
+			Life:               jujuparams.Alive,
+			Status: jujuparams.EntityStatus{
+				Status: status.Available,
+			},
+			Users: []jujuparams.ModelUserInfo{{
+				UserName:    "test@external",
+				DisplayName: "test",
+				Access:      jujuparams.ModelAdminAccess,
+			}},
+			AgentVersion: &jujuversion.Current,
+			Type:         "iaas",
+		},
+	}, {
+		Error: &jujuparams.Error{
+			Message: "unauthorized",
+			Code:    jujuparams.CodeUnauthorized,
+		},
+	}, {
+		Result: &jujuparams.ModelInfo{
+			Name:               "model-3",
+			UUID:               modelUUID3,
+			ControllerUUID:     "deadbeef-1bad-500d-9000-4b1d0d06f00d",
+			ProviderType:       "dummy",
+			CloudTag:           "cloud-dummy",
+			CloudRegion:        "dummy-region",
+			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test2@external/cred1").String(),
+			OwnerTag:           names.NewUserTag("test2@external").String(),
+			Life:               jujuparams.Alive,
+			Status: jujuparams.EntityStatus{
+				Status: status.Available,
+			},
+			Users: []jujuparams.ModelUserInfo{{
+				UserName:    "test@external",
+				DisplayName: "test",
+				Access:      jujuparams.ModelReadAccess,
+			}},
+			Machines: []jujuparams.ModelMachineInfo{{
+				Id: "machine-0",
+			}, {
+				Id: "machine-1",
+				Hardware: &jujuparams.MachineHardware{
+					Arch: &machineArch,
+				},
+			}},
+			AgentVersion: &jujuversion.Current,
+			Type:         "iaas",
+		},
+	}, {
+		Result: &jujuparams.ModelInfo{
+			Name:               "model-4",
+			UUID:               modelUUID4,
+			ControllerUUID:     "deadbeef-1bad-500d-9000-4b1d0d06f00d",
+			ProviderType:       "dummy",
+			CloudTag:           "cloud-dummy",
+			CloudRegion:        "dummy-region",
+			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test2@external/cred1").String(),
+			OwnerTag:           names.NewUserTag("test2@external").String(),
+			Life:               jujuparams.Alive,
+			Status: jujuparams.EntityStatus{
+				Status: status.Available,
+			},
+			Users: []jujuparams.ModelUserInfo{{
+				UserName:    "test@external",
+				DisplayName: "test",
+				Access:      jujuparams.ModelWriteAccess,
+			}},
+			AgentVersion: &jujuversion.Current,
+			Type:         "iaas",
+		},
+	}, {
+		Result: &jujuparams.ModelInfo{
+			Name:               "model-5",
+			UUID:               modelUUID5,
+			ControllerUUID:     "deadbeef-1bad-500d-9000-4b1d0d06f00d",
+			ProviderType:       "dummy",
+			CloudTag:           "cloud-dummy",
+			CloudRegion:        "dummy-region",
+			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test2@external/cred1").String(),
+			OwnerTag:           names.NewUserTag("test2@external").String(),
+			Life:               jujuparams.Alive,
+			Status: jujuparams.EntityStatus{
+				Status: status.Available,
+			},
+			Users: []jujuparams.ModelUserInfo{{
+				UserName:    "test@external",
+				DisplayName: "test",
+				Access:      jujuparams.ModelAdminAccess,
+			}, {
+				UserName:    "test2@external",
+				DisplayName: "test2",
+				Access:      jujuparams.ModelAdminAccess,
+			}},
+			AgentVersion: &jujuversion.Current,
+			Type:         "iaas",
+		},
+	}, {
+		Error: &jujuparams.Error{
+			Message: `model "00000000-0000-0000-0000-000000000007" not found`,
+			Code:    jujuparams.CodeNotFound,
+		},
+	}})
+}
+
 func (s *modelManagerSuite) TestModelInfoForLegacyModel(c *gc.C) {
 	ctx := context.Background()
 	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
@@ -372,6 +634,74 @@ func (s *modelManagerSuite) TestModelInfoForLegacyModel(c *gc.C) {
 			Name:               "model-1",
 			UUID:               modelUUID1,
 			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+			ProviderType:       "dummy",
+			CloudTag:           "cloud-dummy",
+			CloudRegion:        "dummy-region",
+			CloudCredentialTag: names.NewCloudCredentialTag("dummy/test@external/cred1").String(),
+			OwnerTag:           names.NewUserTag("test@external").String(),
+			Life:               jujuparams.Alive,
+			Status: jujuparams.EntityStatus{
+				Status: status.Available,
+			},
+			Users: []jujuparams.ModelUserInfo{{
+				UserName:    "test@external",
+				DisplayName: "test",
+				Access:      jujuparams.ModelAdminAccess,
+			}},
+			AgentVersion: &jujuversion.Current,
+			Type:         "iaas",
+		},
+	}})
+
+	// Ensure the values in the database have been updated.
+	model, err = s.JEM.DB.Model(ctx, params.EntityPath{"test", "model-1"})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(model.Cloud, gc.Equals, params.Cloud("dummy"))
+	c.Assert(model.CloudRegion, gc.Equals, "dummy-region")
+	c.Assert(model.Credential.String(), gc.Equals, "dummy/test/cred1")
+	c.Assert(model.DefaultSeries, gc.Not(gc.Equals), "")
+}
+
+func (s *modelManagerSuite) TestModelInfoForLegacyModelDisableControllerUUIDMasking(c *gc.C) {
+	ctx := context.Background()
+	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
+	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: "cred1"})
+	modelUUID1 := mi.UUID
+
+	err := s.JEM.DB.Models().UpdateId("test/model-1", bson.D{{
+		"$unset",
+		bson.D{{
+			"cloud", 1,
+		}, {
+			"cloudregion", 1,
+		}, {
+			"credential", 1,
+		}, {
+			"defaultseries", 1,
+		}},
+	}})
+	c.Assert(err, gc.Equals, nil)
+
+	// Sanity check the required fields aren't present.
+	model, err := s.JEM.DB.Model(ctx, params.EntityPath{"test", "model-1"})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(model.Cloud, gc.Equals, params.Cloud(""))
+
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+	client := modelmanager.NewClient(conn)
+
+	err = conn.APICall("Controller", 3, "", "DisableControllerUUIDMasking", nil, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	models, err := client.ModelInfo([]names.ModelTag{names.NewModelTag(modelUUID1)})
+	c.Assert(err, gc.Equals, nil)
+	assertModelInfo(c, models, []jujuparams.ModelInfoResult{{
+		Result: &jujuparams.ModelInfo{
+			Name:               "model-1",
+			UUID:               modelUUID1,
+			ControllerUUID:     "deadbeef-1bad-500d-9000-4b1d0d06f00d",
 			ProviderType:       "dummy",
 			CloudTag:           "cloud-dummy",
 			CloudRegion:        "dummy-region",

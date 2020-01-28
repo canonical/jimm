@@ -86,17 +86,20 @@ type controllerRoot struct {
 	mu          sync.Mutex
 	authContext context.Context
 	facades     map[facade]string
+
+	controllerUUIDMasking bool
 }
 
 func newControllerRoot(jem *jem.JEM, ap *auth.Pool, p jemserver.Params, hm heartMonitor) *controllerRoot {
 	r := &controllerRoot{
-		authContext:   context.Background(),
-		params:        p,
-		authPool:      ap,
-		jem:           jem,
-		heartMonitor:  hm,
-		facades:       unauthenticatedFacades,
-		schemataCache: make(map[params.Cloud]map[jujucloud.AuthType]jujucloud.CredentialSchema),
+		authContext:           context.Background(),
+		params:                p,
+		authPool:              ap,
+		jem:                   jem,
+		heartMonitor:          hm,
+		facades:               unauthenticatedFacades,
+		schemataCache:         make(map[params.Cloud]map[jujucloud.AuthType]jujucloud.CredentialSchema),
+		controllerUUIDMasking: true,
 	}
 	r.findMethod = rpcreflect.ValueOf(reflect.ValueOf(r)).FindMethod
 	return r
@@ -303,6 +306,15 @@ func (c controller) AllModels(ctx context.Context) (jujuparams.UserModelList, er
 	return c.root.allModels(ctx)
 }
 
+func (c controller) DisableControllerUUIDMasking(ctx context.Context) error {
+	err := auth.CheckACL(c.root.authContext, []string{string(c.root.jem.ControllerAdmin())})
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	c.root.controllerUUIDMasking = false
+	return nil
+}
+
 func (c controller) ModelStatus(ctx context.Context, args jujuparams.Entities) (jujuparams.ModelStatusResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
@@ -477,7 +489,7 @@ func (r *controllerRoot) modelDocToModelInfo(ctx context.Context, model *mongodo
 			Access:      userLevels[auth.Username(ctx)],
 		})
 	}
-	return &jujuparams.ModelInfo{
+	info := &jujuparams.ModelInfo{
 		Name:               string(model.Path.Name),
 		UUID:               model.UUID,
 		ControllerUUID:     r.params.ControllerUUID,
@@ -493,7 +505,16 @@ func (r *controllerRoot) modelDocToModelInfo(ctx context.Context, model *mongodo
 		Machines:           jemMachinesToModelMachineInfo(machines),
 		AgentVersion:       modelVersion(ctx, model.Info),
 		Type:               model.Type,
-	}, nil
+	}
+	if !r.controllerUUIDMasking {
+		c, err := r.jem.DB.Controller(ctx, model.Controller)
+		if err != nil {
+			return nil, errgo.Notef(err, "failed to fetch controller: %v", model.Controller)
+		}
+		info.ControllerUUID = c.UUID
+	}
+
+	return info, nil
 }
 
 func jemMachinesToModelMachineInfo(machines []mongodoc.Machine) []jujuparams.ModelMachineInfo {
