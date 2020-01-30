@@ -14,6 +14,7 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/status"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
@@ -104,7 +105,7 @@ func (s *jemSuite) TestModelStats(c *gc.C) {
 	err = prometheus.Register(stats)
 	c.Assert(err, gc.Equals, nil)
 	defer prometheus.Unregister(stats)
-	srv := httptest.NewServer(prometheus.Handler())
+	srv := httptest.NewServer(promhttp.Handler())
 	defer srv.Close()
 	resp, err := http.Get(srv.URL)
 	c.Assert(err, gc.Equals, nil)
@@ -280,7 +281,7 @@ func (s *jemSuite) TestMachineStats(c *gc.C) {
 	err = prometheus.Register(stats)
 	c.Assert(err, gc.Equals, nil)
 	defer prometheus.Unregister(stats)
-	srv := httptest.NewServer(prometheus.Handler())
+	srv := httptest.NewServer(promhttp.Handler())
 	defer srv.Close()
 	resp, err := http.Get(srv.URL)
 	c.Assert(err, gc.Equals, nil)
