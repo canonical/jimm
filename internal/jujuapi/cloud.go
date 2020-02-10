@@ -605,11 +605,20 @@ func (c cloudV5) AddCredentials(ctx context.Context, args jujuparams.TaggedCrede
 	return results, nil
 }
 
-// CredentialContents implements the CredentialContents method of the Cloud (v2) facade.
+// CredentialContents implements the CredentialContents method of the Cloud (v5) facade.
 func (c cloudV5) CredentialContents(ctx context.Context, args jujuparams.CloudCredentialArgs) (jujuparams.CredentialContentResults, error) {
 	ctx = ctxutil.Join(ctx, c.root.authContext)
-	results := make([]jujuparams.CredentialContentResult, len(args.Credentials))
-	for i, arg := range args.Credentials {
+	creds := args.Credentials
+	if len(creds) == 0 {
+		// If no credentials are requested return all available credentials.
+		var err error
+		creds, err = c.findUserCredentials(ctx)
+		if err != nil {
+			return jujuparams.CredentialContentResults{}, errgo.Mask(err)
+		}
+	}
+	results := make([]jujuparams.CredentialContentResult, len(creds))
+	for i, arg := range creds {
 		credInfo, err := c.credentialInfo(ctx, arg.CloudName, arg.CredentialName, args.IncludeSecrets)
 		if err != nil {
 			results[i].Error = mapError(err)
@@ -620,6 +629,21 @@ func (c cloudV5) CredentialContents(ctx context.Context, args jujuparams.CloudCr
 	return jujuparams.CredentialContentResults{
 		Results: results,
 	}, nil
+}
+
+// findUserCredentials finds all credentials owned by the authenticated user.
+func (c cloudV5) findUserCredentials(ctx context.Context) ([]jujuparams.CloudCredentialArg, error) {
+	username := auth.Username(ctx)
+	query := bson.D{{"path.entitypath.user", username}, {"revoked", false}}
+	iter := c.root.jem.DB.NewCanReadIter(ctx, c.root.jem.DB.Credentials().Find(query).Iter())
+	defer iter.Close()
+
+	var creds []jujuparams.CloudCredentialArg
+	var cred mongodoc.Credential
+	for iter.Next(&cred) {
+		creds = append(creds, jujuparams.CloudCredentialArg{CloudName: cred.Path.Cloud, CredentialName: cred.Path.Name})
+	}
+	return creds, errgo.Mask(iter.Err())
 }
 
 // credentialInfo returns Juju API information on the given credential
