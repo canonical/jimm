@@ -306,15 +306,6 @@ func (c controller) AllModels(ctx context.Context) (jujuparams.UserModelList, er
 	return c.root.allModels(ctx)
 }
 
-func (c controller) DisableControllerUUIDMasking(ctx context.Context) error {
-	err := auth.CheckACL(c.root.authContext, []string{string(c.root.jem.ControllerAdmin())})
-	if err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	c.root.controllerUUIDMasking = false
-	return nil
-}
-
 func (c controller) ModelStatus(ctx context.Context, args jujuparams.Entities) (jujuparams.ModelStatusResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
@@ -624,6 +615,20 @@ func (j jimmV2) UserModelStats(ctx context.Context) (params.UserModelStatsRespon
 	}, nil
 }
 
+// DisableControllerUUIDMasking ensures that the controller UUID returned
+// with any model information is the UUID of the juju controller that is
+// hosting the model, and not JAAS.
+func (j jimmV2) DisableControllerUUIDMasking(ctx context.Context) error {
+	err := auth.CheckACL(j.root.authContext, []string{string(j.root.jem.ControllerAdmin())})
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	j.root.controllerUUIDMasking = false
+	return nil
+}
+
+// ListControllers returns the list of juju controllers hosting models
+// as part of this JAAS system.
 func (j jimmV2) ListControllers(ctx context.Context) (params.ListControllerResponse, error) {
 	ctx = ctxutil.Join(ctx, j.root.authContext)
 	var controllers []params.ControllerResponse
