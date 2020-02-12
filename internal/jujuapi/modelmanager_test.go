@@ -134,12 +134,12 @@ func (s *modelManagerSuite) TestListModelSummariesWitouthControllerUUIDMasking(c
 
 	conn1 := s.open(c, nil, "test-unknown")
 	defer conn1.Close()
-	err = conn1.APICall("Controller", 3, "", "DisableControllerUUIDMasking", nil, nil)
+	err = conn1.APICall("JIMM", 2, "", "DisableControllerUUIDMasking", nil, nil)
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
-	err = conn.APICall("Controller", 3, "", "DisableControllerUUIDMasking", nil, nil)
+	err = conn.APICall("JIMM", 2, "", "DisableControllerUUIDMasking", nil, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	c.Assert(err, gc.Equals, nil)
@@ -472,7 +472,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 	defer conn.Close()
 	client := modelmanager.NewClient(conn)
 
-	err = conn.APICall("Controller", 3, "", "DisableControllerUUIDMasking", nil, nil)
+	err = conn.APICall("JIMM", 2, "", "DisableControllerUUIDMasking", nil, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	models, err := client.ModelInfo([]names.ModelTag{
@@ -692,7 +692,7 @@ func (s *modelManagerSuite) TestModelInfoForLegacyModelDisableControllerUUIDMask
 	defer conn.Close()
 	client := modelmanager.NewClient(conn)
 
-	err = conn.APICall("Controller", 3, "", "DisableControllerUUIDMasking", nil, nil)
+	err = conn.APICall("JIMM", 2, "", "DisableControllerUUIDMasking", nil, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	models, err := client.ModelInfo([]names.ModelTag{names.NewModelTag(modelUUID1)})
