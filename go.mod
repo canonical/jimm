@@ -1,7 +1,6 @@
 module github.com/CanonicalLtd/jimm
 
 require (
-	code.cloudfoundry.org/systemcerts v0.0.0-20180917154049-ca00b2f806f2 // indirect
 	contrib.go.opencensus.io/exporter/ocagent v0.4.12 // indirect
 	github.com/Azure/azure-sdk-for-go v22.2.2+incompatible // indirect
 	github.com/Azure/go-autorest v11.2.8+incompatible // indirect
@@ -58,7 +57,7 @@ require (
 	github.com/juju/httprequest v1.0.1
 	github.com/juju/idmclient v0.0.0-20161107140250-fb1dc7175251
 	github.com/juju/jsonschema v0.0.0-20161102181919-a0ef8b74ebcf // indirect
-	github.com/juju/juju v0.0.0-20200107182435-ec91b3228a8e
+	github.com/juju/juju v0.0.0-20200210142530-5cec786b7b1f
 	github.com/juju/loggo v0.0.0-20190526231331-6e530bcce5d8
 	github.com/juju/lru v0.0.0-20181205132344-305dec07bf2f // indirect
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
@@ -91,7 +90,7 @@ require (
 	github.com/lestrrat/go-jsval v0.0.0-20161021065934-cf70aae60f5b // indirect
 	github.com/lestrrat/go-pdebug v0.0.0-20180220043741-569c97477ae8 // indirect
 	github.com/lestrrat/go-structinfo v0.0.0-20180223064246-8204d40bbcd7 // indirect
-	github.com/lxc/lxd v0.0.0-20190116162917-4c2bbb608e7a // indirect
+	github.com/lxc/lxd v0.0.0-20191002163551-3a5f63bc4959 // indirect
 	github.com/marstr/guid v1.1.0 // indirect
 	github.com/masterzen/simplexml v0.0.0-20160608183007-4572e39b1ab9 // indirect
 	github.com/masterzen/winrm v0.0.0-20181112102303-a196a4ff2a86 // indirect
