@@ -105,6 +105,7 @@ require (
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/prometheus/client_golang v0.9.3-0.20190127221311-3c4408c8b829
 	github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af
+	github.com/rogpeppe/rog-go v0.0.0-20150110162453-f57ad5e24ab7
 	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/smartystreets/assertions v0.0.0-20180927180507-b2de0cb4f26d // indirect
 	github.com/smartystreets/goconvey v0.0.0-20181108003508-044398e4856c // indirect
