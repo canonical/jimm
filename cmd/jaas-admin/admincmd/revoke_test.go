@@ -28,7 +28,7 @@ func (s *revokeSuite) TestRevoke(c *gc.C) {
 	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, replSetWarning)
 	s.addModel(ctx, c, "bob/foo", "bob/foo", "cred1")
 
 	stdout, stderr, code = run(c, c.MkDir(), "revoke", "--controller", "bob/foo", "everyone")
