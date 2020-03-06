@@ -54,7 +54,7 @@ func (s *addControllerSuite) TestAddController(c *gc.C) {
 		stdout, stderr, code := run(c, c.MkDir(), "add-controller", test.args...)
 		c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 		c.Assert(stdout, gc.Equals, "")
-		c.Assert(stderr, gc.Equals, "")
+		c.Assert(stderr, gc.Equals, replSetWarning)
 		ctl, err := client.GetController(ctx, &params.GetController{
 			EntityPath: params.EntityPath{
 				User: "bob",

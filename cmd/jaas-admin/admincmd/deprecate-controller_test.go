@@ -26,7 +26,7 @@ func (s *deprecateControllerSuite) TestRevoke(c *gc.C) {
 	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, replSetWarning)
 
 	stdout, stderr, code = run(c, c.MkDir(), "deprecate-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))

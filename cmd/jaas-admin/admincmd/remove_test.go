@@ -8,6 +8,8 @@ import (
 	gc "gopkg.in/check.v1"
 )
 
+const replSetWarning = "WARNING could not determine if there is a primary HA machine: cannot get replica set status: not running with --replSet\n"
+
 type removeSuite struct {
 	commonSuite
 }
@@ -24,7 +26,7 @@ func (s *removeSuite) TestRemoveModel(c *gc.C) {
 	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, replSetWarning)
 	s.addModel(ctx, c, "bob/foo", "bob/foo", "cred1")
 
 	s.addModel(ctx, c, "bob/foo-1", "bob/foo", "cred1")
@@ -50,14 +52,14 @@ func (s *removeSuite) TestRemoveController(c *gc.C) {
 	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, replSetWarning)
 	s.addModel(ctx, c, "bob/foo", "bob/foo", "cred1")
 
 	// Add a second controller, that won't be deleted.
 	stdout, stderr, code = run(c, c.MkDir(), "add-controller", "bob/bar")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, replSetWarning)
 	s.addModel(ctx, c, "bob/bar", "bob/bar", "cred1")
 
 	s.addModel(ctx, c, "bob/foo-1", "bob/foo", "cred1")
@@ -96,7 +98,7 @@ func (s *removeSuite) TestRemoveMultipleModels(c *gc.C) {
 	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, replSetWarning)
 
 	s.addModel(ctx, c, "bob/foo-1", "bob/foo", "cred1")
 
@@ -121,7 +123,7 @@ func (s *removeSuite) TestRemoveVerbose(c *gc.C) {
 	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, replSetWarning)
 	s.addModel(ctx, c, "bob/foo", "bob/foo", "cred1")
 
 	s.addModel(ctx, c, "bob/foo-1", "bob/foo", "cred1")
