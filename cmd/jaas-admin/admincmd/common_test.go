@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/juju/aclstore/aclclient"
@@ -23,6 +24,8 @@ import (
 	"github.com/CanonicalLtd/jimm/jemclient"
 	"github.com/CanonicalLtd/jimm/params"
 )
+
+var haWarning = regexp.MustCompile("(?m)^WARNING could not determine if there is a primary HA machine:.*$")
 
 // run runs a jem plugin subcommand with the given arguments,
 // its context directory set to dir. It returns the output of the command
@@ -42,7 +45,18 @@ func run(c *gc.C, dir string, cmdName string, args ...string) (stdout, stderr st
 	}
 	allArgs := append([]string{cmdName}, args...)
 	exitCode = cmd.Main(admincmd.New(), ctxt, allArgs)
-	return stdoutBuf.String(), stderrBuf.String(), exitCode
+
+	// Filter out "WARNING could not determine if there is a primary
+	// HA machine" messages.
+	stderrB := stderrBuf.Bytes()
+	matches := haWarning.FindAllIndex(stderrB, -1)
+	// filter any matches out backwards so we don't have to
+	// recalculate the indexes.
+	for i := len(matches) - 1; i >= 0; i-- {
+		stderrB = append(stderrB[:matches[i][0]], stderrB[matches[i][1]+1:]...)
+	}
+
+	return stdoutBuf.String(), string(stderrB), exitCode
 }
 
 type commonSuite struct {

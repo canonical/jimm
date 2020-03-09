@@ -8,7 +8,7 @@ package pubsub
 import (
 	"sync"
 
-	"github.com/rogpeppe/rog-go/parallel"
+	"github.com/juju/utils/parallel"
 	"gopkg.in/errgo.v1"
 )
 

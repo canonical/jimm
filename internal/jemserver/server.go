@@ -14,6 +14,7 @@ import (
 	"github.com/juju/simplekv/mgosimplekv"
 	"github.com/julienschmidt/httprouter"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	candidclient "gopkg.in/CanonicalLtd/candidclient.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
@@ -279,7 +280,7 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	srv.router.Handler("GET", "/admin/acls/*path", aclManager)
 	srv.router.Handler("POST", "/admin/acls/*path", aclManager)
 	srv.router.Handler("PUT", "/admin/acls/*path", aclManager)
-	srv.router.Handler("GET", "/metrics", prometheus.Handler())
+	srv.router.Handler("GET", "/metrics", promhttp.Handler())
 	for name, newAPI := range versions {
 		handlers, err := newAPI(ctx, HandlerParams{
 			Params:        config,

@@ -271,7 +271,7 @@ func (s *APISuite) TestAddController(c *gc.C) {
 	}, {
 		about: "cannot connect to environment",
 		body: params.ControllerInfo{
-			HostPorts:      []string{"0.1.2.3:1234"},
+			HostPorts:      []string{"127.0.0.100:1234"},
 			CACert:         info.CACert,
 			User:           info.Tag.Id(),
 			Password:       info.Password,
