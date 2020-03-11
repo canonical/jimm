@@ -26,8 +26,9 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/natefinch/lumberjack.v2"
 
-	"github.com/CanonicalLtd/jimm"
+	jem "github.com/CanonicalLtd/jimm"
 	"github.com/CanonicalLtd/jimm/config"
+	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
 )
@@ -121,6 +122,9 @@ func serve(conf *config.Config) error {
 		UsageSenderSpoolPath:    conf.UsageSenderSpoolDir,
 		Domain:                  conf.Domain,
 		PublicCloudMetadata:     conf.PublicCloudMetadata,
+		Pubsub: &pubsub.Hub{
+			MaxConcurrency: conf.MaxPubsubConcurrency,
+		},
 	}
 	server, err := jem.NewServer(ctx, cfg)
 	if err != nil {

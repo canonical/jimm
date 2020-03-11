@@ -30,6 +30,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jemerror"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/monitor"
+	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	"github.com/CanonicalLtd/jimm/internal/usagesender"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
@@ -114,6 +115,8 @@ type Params struct {
 	// the public cloud metadata. If this is empty or the file
 	// doesn't exist the default public cloud information is used.
 	PublicCloudMetadata string
+
+	Pubsub *pubsub.Hub
 }
 
 // HandlerParams are the parameters used to initialize a handler.
@@ -184,6 +187,7 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 		UsageSenderURL:      config.UsageSenderURL,
 		Client:              bclient,
 		PublicCloudMetadata: publicCloudMetadata,
+		Pubsub:              config.Pubsub,
 	}
 	p, err := jem.NewPool(ctx, jconfig)
 	if err != nil {

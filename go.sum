@@ -525,6 +525,8 @@ github.com/mattn/go-runewidth v0.0.3 h1:a+kO+98RDGEfo6asOGMmpodZq4FNtnGP54yps8Bz
 github.com/mattn/go-runewidth v0.0.3/go.mod h1:LwmH8dsx7+W8Uxz3IHJYH5QSwggIsqBzpuz5H//U1FU=
 github.com/matttproud/golang_protobuf_extensions v1.0.1 h1:4hp9jkHxhMHkqkrB3Ix0jegS5sx/RkqARlsWZ6pIwiU=
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
+github.com/mhilton/juju-juju v0.0.0-20150901100907-a94dd2c73455 h1:CGUo5Uo0iKNYgo+/gjStzsFZ+ah7OA2kCgb00P2U1D8=
+github.com/mhilton/juju-juju v0.0.0-20150901100907-a94dd2c73455/go.mod h1:dnXkjAzwqIcieFgRiMCDjnmW89bnyEVMEEOEzC4Weck=
 github.com/mhilton/juju-juju v0.0.0-20200306113540-bbcb8d9711a2 h1:7xZcPfdd0Fg60BEPwS3TsLNrUGQiMLxc4Emx53YB6VY=
 github.com/mhilton/juju-juju v0.0.0-20200306113540-bbcb8d9711a2/go.mod h1:aSTzbO8rxZV93e/B5ZEoLlmap3wEHLWcqFSfdOeoHBo=
 github.com/mitchellh/go-homedir v1.1.0/go.mod h1:SfyaCUpYCn1Vlf4IUYiD9fPX4A5wJrkLzIz1N1q0pr0=

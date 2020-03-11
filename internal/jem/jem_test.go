@@ -34,6 +34,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/kubetest"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -64,6 +65,9 @@ func (s *jemSuite) SetUpTest(c *gc.C) {
 		SessionPool:         s.sessionPool,
 		PublicCloudMetadata: publicCloudMetadata,
 		UsageSenderURL:      "test-usage-sender-url",
+		Pubsub: &pubsub.Hub{
+			MaxConcurrency: 10,
+		},
 	})
 	c.Assert(err, gc.Equals, nil)
 	s.pool = pool
@@ -1914,7 +1918,7 @@ func (s *jemSuite) TestWatchAllModelSummaries(c *gc.C) {
 	s.addController(c, params.EntityPath{"bob", "controller"})
 	ctlPath := params.EntityPath{User: "bob", Name: "controller"}
 
-	pubsub := jem.Pubsub(s.jem)
+	pubsub := s.jem.Pubsub()
 	summaryChannel := make(chan interface{}, 1)
 	handlerFunction := func(_ string, summary interface{}) {
 		select {
