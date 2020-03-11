@@ -1162,7 +1162,7 @@ func (s *internalSuite) TestAllMonitorMultiControllerMultipleLeases(c *gc.C) {
 }
 
 func (s *internalSuite) TestAllMonitorWithRaceOnLeaseAcquisition(c *gc.C) {
-	jshim := jemShim{s.jem}
+	jshim := jemShimWithoutModelSummaryWatcher{jemShim{s.jem}}
 
 	// Fake the monitor lease acquiry so that it lets us know
 	// when a monitor is trying to acquire the lease and

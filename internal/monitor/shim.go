@@ -116,6 +116,10 @@ func (j jemShim) Controller(ctx context.Context, ctlPath params.EntityPath) (*mo
 	return ctl, errgo.Mask(err, errgo.Any)
 }
 
+func (j jemShim) WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityPath) error {
+	return j.JEM.WatchAllModelSummaries(ctx, ctlPath)
+}
+
 type apiShim struct {
 	*apiconn.Conn
 }
