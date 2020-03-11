@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -33,6 +34,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	usageauth "github.com/CanonicalLtd/jimm/internal/usagesender/auth"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
@@ -50,6 +52,10 @@ var (
 	NewUsageSenderAuthorizationClient = func(url string, client *httpbakery.Client) (UsageSenderAuthorizationClient, error) {
 		return usageauth.NewAuthorizationClient(url, client), nil
 	}
+
+	// ModelSummaryWatcherNotSupportedError is returned by WatchAllModelSummaries if
+	// the controller does not support this functionality
+	ModelSummaryWatcherNotSupportedError = errgo.New("model summary watcher not supported by the controller")
 )
 
 // UsageSenderAuthorizationClient is used to obtain authorization to
@@ -82,6 +88,10 @@ type Params struct {
 	// PublicCloudMetadata contains the metadata details of all known
 	// public clouds.
 	PublicCloudMetadata map[string]jujucloud.Cloud
+
+	// MaxPubsubConcurrency holds the maximum concurrency limit
+	// for the internal pubsub system.
+	MaxPubsubConcurrency int
 }
 
 type Pool struct {
@@ -202,6 +212,9 @@ func (p *Pool) JEM(ctx context.Context) *JEM {
 		DB:                             newDatabase(ctx, p.config.SessionPool, p.dbName),
 		pool:                           p,
 		usageSenderAuthorizationClient: p.usageSenderAuthorizationClient,
+		pubsub: &pubsub.Hub{
+			MaxConcurrency: p.config.MaxPubsubConcurrency,
+		},
 	}
 }
 
@@ -223,6 +236,8 @@ type JEM struct {
 	closed bool
 
 	usageSenderAuthorizationClient UsageSenderAuthorizationClient
+
+	pubsub *pubsub.Hub
 }
 
 // Clone returns an independent copy of the receiver
@@ -1586,4 +1601,81 @@ func CloudCredentialTag(p params.CredentialPath) names.CloudCredentialTag {
 	}
 	user := UserTag(p.User)
 	return names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", p.Cloud, user.Id(), p.Name))
+}
+
+// WatchAllModelSummaries starts watching the summary updates from
+// the controller.
+func (j *JEM) WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityPath) error {
+	conn, err := j.OpenAPI(ctx, ctlPath)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+
+	_, facade := jujuapibase.NewClientFacade(conn, "Controller")
+	if facade.BestAPIVersion() < 9 {
+		return ModelSummaryWatcherNotSupportedError
+	}
+
+	var out jujuparams.SummaryWatcherID
+	if err := facade.FacadeCall("WatchAllModelSummaries", nil, &out); err != nil {
+		return errgo.Mask(err)
+	}
+	if out.WatcherID == "" {
+		return errgo.Newf("invalid watcher ID")
+	}
+	watcher := &modelSummaryWatcher{
+		caller:  facade.RawAPICaller(),
+		id:      &out.WatcherID,
+		pubsub:  j.pubsub,
+		cleanup: conn.Close,
+	}
+	go watcher.loop(ctx)
+	return nil
+}
+
+type modelSummaryWatcher struct {
+	caller  jujuapibase.APICaller
+	id      *string
+	pubsub  *pubsub.Hub
+	cleanup func() error
+}
+
+func (w *modelSummaryWatcher) next() ([]jujuparams.ModelAbstract, error) {
+	var summary jujuparams.SummaryWatcherNextResults
+	err := w.caller.APICall(
+		"ModelSummaryWatcher",
+		w.caller.BestFacadeVersion("ModelSummaryWatcher"),
+		*w.id,
+		"Next",
+		nil,
+		&summary,
+	)
+	sort.Slice(summary.Models, func(i, j int) bool {
+		return summary.Models[i].UUID < summary.Models[j].UUID
+	})
+	return summary.Models, errgo.Mask(err)
+}
+
+func (w *modelSummaryWatcher) loop(ctx context.Context) {
+	defer func() {
+		if err := w.cleanup(); err != nil {
+			zapctx.Error(ctx, "cleanup failed", zaputil.Error(err))
+		}
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		modelSummaries, err := w.next()
+		if err != nil {
+			zapctx.Error(ctx, "failed to get next model summary", zaputil.Error(err))
+			return
+		}
+		for _, modelSummary := range modelSummaries {
+			w.pubsub.Publish(modelSummary.UUID, modelSummary)
+		}
+	}
 }

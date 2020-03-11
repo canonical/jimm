@@ -1910,6 +1910,51 @@ func (s *jemSuite) TestUpdateModelCredential(c *gc.C) {
 	c.Assert(model1.Credential, jc.DeepEquals, credPath)
 }
 
+func (s *jemSuite) TestWatchAllModelSummaries(c *gc.C) {
+	s.addController(c, params.EntityPath{"bob", "controller"})
+	ctlPath := params.EntityPath{User: "bob", Name: "controller"}
+
+	pubsub := jem.Pubsub(s.jem)
+	summaryChannel := make(chan interface{}, 1)
+	handlerFunction := func(_ string, summary interface{}) {
+		select {
+		case summaryChannel <- summary:
+		default:
+		}
+	}
+	cleanup, err := pubsub.Subscribe("deadbeef-0bad-400d-8000-4b1d0d06f00d", handlerFunction)
+	c.Assert(err, jc.ErrorIsNil)
+	defer cleanup()
+
+	err = s.jem.WatchAllModelSummaries(context.Background(), ctlPath)
+	c.Assert(err, gc.Equals, nil)
+
+	select {
+	case summary := <-summaryChannel:
+		c.Assert(summary, gc.DeepEquals,
+			jujuparams.ModelAbstract{
+				UUID:       "deadbeef-0bad-400d-8000-4b1d0d06f00d",
+				Removed:    false,
+				Controller: "",
+				Name:       "controller",
+				Admins:     []string{"admin"},
+				Cloud:      "dummy",
+				Region:     "dummy-region",
+				Credential: "dummy/admin/cred",
+				Size: jujuparams.ModelSummarySize{
+					Machines:     0,
+					Containers:   0,
+					Applications: 0,
+					Units:        0,
+					Relations:    0,
+				},
+				Status: "green",
+			})
+	case <-time.After(time.Second):
+		c.Fatal("timed out")
+	}
+}
+
 func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityPath {
 	return addController(c, path, s.APIInfo(c), s.jem)
 }

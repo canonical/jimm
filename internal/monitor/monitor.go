@@ -15,6 +15,7 @@ import (
 	"github.com/juju/clock"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/retry.v1"
 	"gopkg.in/tomb.v2"
 
 	"github.com/CanonicalLtd/jimm/internal/jem"
@@ -183,6 +184,25 @@ func (m *allMonitor) startMonitors(ctx context.Context) error {
 	for _, ctl := range ctls {
 		ctl := ctl
 		ctx := zapctx.WithFields(ctx, zap.Stringer("controller", ctl.Path))
+
+		go func() {
+			strategy := retry.Regular{
+				Delay: time.Second,
+			}
+			for a := strategy.Start(nil); a.Next(); {
+				err = m.jem.WatchAllModelSummaries(ctx, ctl.Path)
+				if err != nil {
+					if errgo.Cause(err) == jem.ModelSummaryWatcherNotSupportedError {
+						zapctx.Warn(ctx, "model summary watcher not supported", zaputil.Error(err))
+					} else {
+						zapctx.Error(ctx, "failed to start model summary watcher", zaputil.Error(err))
+					}
+				} else {
+					return
+				}
+			}
+		}()
+
 		if m.monitoring[ctl.Path] {
 			// We're already monitoring this controller; no need to do anything.
 			zapctx.Debug(ctx, "not starting: already monitoring")

@@ -1,5 +1,7 @@
 package jem
 
+import "github.com/CanonicalLtd/jimm/internal/pubsub"
+
 var (
 	RandIntn                   = &randIntn
 	WallClock                  = &wallClock
@@ -13,3 +15,7 @@ var (
 	UpdateControllerCredential = (*JEM).updateControllerCredential
 	Shuffle                    = &shuffle
 )
+
+func Pubsub(j *JEM) *pubsub.Hub {
+	return j.pubsub
+}

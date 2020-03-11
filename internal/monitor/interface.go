@@ -115,6 +115,10 @@ type jemInterface interface {
 
 	// UpdateCloudRegions updates the cloud/region.
 	UpdateCloudRegions(ctx context.Context, cloudRegions []mongodoc.CloudRegion) error
+
+	// WatchAllModelSummaries starts watching the summary updates from
+	// the controller.
+	WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityPath) error
 }
 
 // jujuAPI represents an API connection to a Juju controller.
