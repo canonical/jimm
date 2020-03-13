@@ -15,7 +15,8 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/debugapi"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
-	"github.com/CanonicalLtd/jimm/internal/v2"
+	"github.com/CanonicalLtd/jimm/internal/pubsub"
+	v2 "github.com/CanonicalLtd/jimm/internal/v2"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -93,6 +94,8 @@ type ServerParams struct {
 	// the public cloud metadata. If this is empty or the file
 	// doesn't exist the default public cloud information is used.
 	PublicCloudMetadata string
+
+	Pubsub *pubsub.Hub
 }
 
 // HandleCloser represents an HTTP handler that can

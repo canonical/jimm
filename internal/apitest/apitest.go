@@ -28,6 +28,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	"github.com/CanonicalLtd/jimm/internal/usagesender"
 	"github.com/CanonicalLtd/jimm/jemclient"
 	"github.com/CanonicalLtd/jimm/params"
@@ -63,6 +64,7 @@ type Suite struct {
 	MetricsSpoolPath          string
 	Clock                     *testclock.Clock
 	ACLStore                  aclstore.ACLStore
+	Pubsub                    *pubsub.Hub
 }
 
 func (s *Suite) SetUpTest(c *gc.C) {
@@ -89,6 +91,10 @@ func (s *Suite) SetUpTest(c *gc.C) {
 	if s.Clock != nil {
 		s.PatchValue(&usagesender.SenderClock, s.Clock)
 	}
+	s.Pubsub = &pubsub.Hub{
+		MaxConcurrency: 10,
+	}
+	s.ServerParams.Pubsub = s.Pubsub
 	s.JEMSrv = s.NewServer(ctx, c, s.Session, s.IDMSrv, s.ServerParams)
 	s.HTTPSrv = httptest.NewServer(s.JEMSrv)
 	s.SessionPool = mgosession.NewPool(context.TODO(), s.Session, 1)
@@ -108,6 +114,7 @@ func (s *Suite) NewJEMPool(c *gc.C, sessionPool *mgosession.Pool) *jem.Pool {
 		DB:              session.DB("jem"),
 		ControllerAdmin: "controller-admin",
 		SessionPool:     sessionPool,
+		Pubsub:          s.Pubsub,
 	})
 	c.Assert(err, gc.Equals, nil)
 	session.Close()
@@ -153,6 +160,7 @@ func (s *Suite) NewServer(ctx context.Context, c *gc.C, session *mgo.Session, id
 		WebsocketRequestTimeout: 3 * time.Minute,
 		UsageSenderURL:          "https://0.1.2.3/omnibus/v2",
 		UsageSenderSpoolPath:    s.MetricsSpoolPath,
+		Pubsub:                  s.Pubsub,
 	}
 	if params.UsageSenderURL != "" {
 		config.UsageSenderURL = params.UsageSenderURL

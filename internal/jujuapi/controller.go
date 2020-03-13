@@ -4,6 +4,7 @@ package jujuapi
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sort"
 	"sync"
@@ -21,6 +22,7 @@ import (
 	"github.com/juju/juju/rpc"
 	"github.com/juju/rpcreflect"
 	"github.com/juju/version"
+	"github.com/rogpeppe/fastuuid"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v3"
@@ -55,20 +57,27 @@ var unauthenticatedFacades = map[facade]string{
 // name of the top level method to call on controllerRoot
 // to obtain the facade object.
 var facades = map[facade]string{
-	{"Bundle", 1}:       "Bundle",
-	{"Cloud", 1}:        "CloudV1",
-	{"Cloud", 2}:        "CloudV2",
-	{"Cloud", 3}:        "CloudV3",
-	{"Cloud", 4}:        "CloudV4",
-	{"Cloud", 5}:        "CloudV5",
-	{"Controller", 3}:   "Controller",
-	{"JIMM", 1}:         "JIMM",
-	{"ModelManager", 2}: "ModelManagerV2",
-	{"ModelManager", 3}: "ModelManagerV3",
-	{"ModelManager", 4}: "ModelManagerAPI",
-	{"ModelManager", 5}: "ModelManagerAPI",
-	{"Pinger", 1}:       "Pinger",
-	{"UserManager", 1}:  "UserManager",
+	{"Bundle", 1}:              "Bundle",
+	{"Cloud", 1}:               "CloudV1",
+	{"Cloud", 2}:               "CloudV2",
+	{"Cloud", 3}:               "CloudV3",
+	{"Cloud", 4}:               "CloudV4",
+	{"Cloud", 5}:               "CloudV5",
+	{"Controller", 3}:          "Controller",
+	{"Controller", 4}:          "ControllerV4",
+	{"Controller", 5}:          "ControllerV5",
+	{"Controller", 6}:          "ControllerV6",
+	{"Controller", 7}:          "ControllerV7",
+	{"Controller", 8}:          "ControllerV8",
+	{"Controller", 9}:          "ControllerV9",
+	{"JIMM", 1}:                "JIMM",
+	{"ModelManager", 2}:        "ModelManagerV2",
+	{"ModelManager", 3}:        "ModelManagerV3",
+	{"ModelManager", 4}:        "ModelManagerAPI",
+	{"ModelManager", 5}:        "ModelManagerAPI",
+	{"Pinger", 1}:              "Pinger",
+	{"UserManager", 1}:         "UserManager",
+	{"ModelSummaryWatcher", 1}: "ModelSummaryWatcher",
 }
 
 // controllerRoot is the root for endpoints served on controller connections.
@@ -80,6 +89,8 @@ type controllerRoot struct {
 
 	findMethod    func(rootName string, version int, methodName string) (rpcreflect.MethodCaller, error)
 	schemataCache map[params.Cloud]map[jujucloud.AuthType]jujucloud.CredentialSchema
+
+	watchers *watcherRegistry
 
 	// mu protects the fields below it
 	mu          sync.Mutex
@@ -96,6 +107,9 @@ func newControllerRoot(jem *jem.JEM, a *auth.Authenticator, p jemserver.Params, 
 		heartMonitor:  hm,
 		facades:       unauthenticatedFacades,
 		schemataCache: make(map[params.Cloud]map[jujucloud.AuthType]jujucloud.CredentialSchema),
+		watchers: &watcherRegistry{
+			watchers: make(map[string]*modelSummaryWatcher),
+		},
 	}
 	r.findMethod = rpcreflect.ValueOf(reflect.ValueOf(r)).FindMethod
 	return r
@@ -121,13 +135,94 @@ func (r *controllerRoot) Bundle(id string) (*bundle.APIv1, error) {
 	return api, errgo.Mask(err)
 }
 
-// Controller returns an implementation of the Controller facade (version 1).
+// Controller returns an implementation of the Controller facade (version 3).
 func (r *controllerRoot) Controller(id string) (controller, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
 		return controller{}, common.ErrBadId
 	}
 	return controller{r}, nil
+}
+
+// ControllerV4 returns an implementation of the Controller facade (version 4).
+func (r *controllerRoot) ControllerV4(id string) (controllerV4, error) {
+	if id != "" {
+		// Safeguard id for possible future use.
+		return controllerV4{}, common.ErrBadId
+	}
+	return controllerV4{
+		controller{r},
+	}, nil
+}
+
+// ControllerV5 returns an implementation of the Controller facade (version 5).
+func (r *controllerRoot) ControllerV5(id string) (controllerV5, error) {
+	if id != "" {
+		// Safeguard id for possible future use.
+		return controllerV5{}, common.ErrBadId
+	}
+	return controllerV5{
+		controller{r},
+	}, nil
+}
+
+// ControllerV6 returns an implementation of the Controller facade (version 6).
+func (r *controllerRoot) ControllerV6(id string) (controllerV6, error) {
+	if id != "" {
+		// Safeguard id for possible future use.
+		return controllerV6{}, common.ErrBadId
+	}
+	return controllerV6{
+		controller{r},
+	}, nil
+}
+
+// ControllerV7 returns an implementation of the Controller facade (version 7).
+func (r *controllerRoot) ControllerV7(id string) (controllerV7, error) {
+	if id != "" {
+		// Safeguard id for possible future use.
+		return controllerV7{}, common.ErrBadId
+	}
+	return controllerV7{
+		controller{r},
+	}, nil
+}
+
+// ControllerV8 returns an implementation of the Controller facade (version 8).
+func (r *controllerRoot) ControllerV8(id string) (controllerV8, error) {
+	if id != "" {
+		// Safeguard id for possible future use.
+		return controllerV8{}, common.ErrBadId
+	}
+	return controllerV8{
+		controller{r},
+	}, nil
+}
+
+// Controller returns an implementation of the Controller facade (version 9).
+func (r *controllerRoot) ControllerV9(id string) (controllerV9, error) {
+	c, err := r.Controller(id)
+	if err != nil {
+		return controllerV9{}, errgo.Mask(err)
+	}
+	g, err := fastuuid.NewGenerator()
+	if err != nil {
+		return controllerV9{}, errgo.Mask(err)
+	}
+	return controllerV9{
+		controller: c,
+		generator:  g,
+	}, nil
+}
+
+// ModelSummaryWatcher returns an implementation fo the model summary watcher
+// corresponding to the specified id.
+func (r *controllerRoot) ModelSummaryWatcher(id string) (*modelSummaryWatcher, error) {
+	w, err := r.watchers.get(id)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return w, nil
 }
 
 // JIMM returns an implementation of the JIMM-specific
@@ -288,6 +383,47 @@ func facadeVersions(facades map[facade]string) []jujuparams.FacadeVersions {
 		}
 	}
 	return fvs
+}
+
+type controllerV4 struct {
+	controller
+}
+
+type controllerV5 struct {
+	controller
+}
+
+type controllerV6 struct {
+	controller
+}
+
+type controllerV7 struct {
+	controller
+}
+
+type controllerV8 struct {
+	controller
+}
+
+type controllerV9 struct {
+	controller
+
+	generator *fastuuid.Generator
+	watchers  watcherRegistry
+}
+
+func (c controllerV9) WatchModelSummaries(ctx context.Context) (jujuparams.SummaryWatcherID, error) {
+	id := fmt.Sprintf("%v", c.generator.Next())
+
+	watcher, err := newModelSummaryWatcher(c.root.authContext, id, c.root, c.root.jem.Pubsub())
+	if err != nil {
+		return jujuparams.SummaryWatcherID{}, errgo.Mask(err)
+	}
+	c.root.watchers.register(watcher)
+
+	return jujuparams.SummaryWatcherID{
+		WatcherID: id,
+	}, nil
 }
 
 // controller implements the Controller facade.

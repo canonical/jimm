@@ -28,6 +28,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -61,6 +62,9 @@ func (s *internalSuite) SetUpTest(c *gc.C) {
 		SessionPool:     s.sessionPool,
 		DB:              s.Session.DB("jem"),
 		ControllerAdmin: "controller-admin",
+		Pubsub: &pubsub.Hub{
+			MaxConcurrency: 10,
+		},
 	})
 	c.Assert(err, gc.Equals, nil)
 	s.pool = pool

@@ -4,6 +4,7 @@ package jujuapi_test
 
 import (
 	"context"
+	"sort"
 	"sync"
 	"time"
 
@@ -610,6 +611,80 @@ func (s *controllerSuite) TestSetPassword(c *gc.C) {
 	client := usermanager.NewClient(conn)
 	err := client.SetPassword("bob", "bob's new super secret password")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+}
+
+func (s *controllerSuite) TestWatchModelSummaries(c *gc.C) {
+	ctx := context.Background()
+
+	ctlPath := s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
+	s.AssertUpdateCredential(ctx, c, "test2", "dummy", "cred1", "empty")
+	err := s.JEM.DB.SetACL(ctx, s.JEM.DB.Controllers(), ctlPath, params.ACL{
+		Read: []string{"test2"},
+	})
+
+	c.Assert(err, gc.Equals, nil)
+
+	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: "cred1"})
+	modelUUID1 := mi.UUID
+	s.assertCreateModel(c, createModelParams{name: "model-2", username: "test2", cred: "cred1"})
+	mi = s.assertCreateModel(c, createModelParams{name: "model-3", username: "test2", cred: "cred1"})
+	modelUUID3 := mi.UUID
+	c.Logf("models: %v %v", modelUUID1, modelUUID3)
+
+	err = s.JEM.DB.SetACL(ctx, s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
+		Read: []string{"test"},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	done := s.Pubsub.Publish(modelUUID1, jujuparams.ModelAbstract{
+		UUID:  modelUUID1,
+		Cloud: "test-cloud",
+		Name:  "test-name-1",
+	})
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		c.Fatalf("timed out")
+	}
+	done = s.Pubsub.Publish(modelUUID3, jujuparams.ModelAbstract{
+		UUID:  modelUUID3,
+		Cloud: "test-cloud",
+		Name:  "test-name-3",
+	})
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		c.Fatalf("timed out")
+	}
+
+	expectedModels := []jujuparams.ModelAbstract{{
+		UUID:  modelUUID1,
+		Cloud: "test-cloud",
+		Name:  "test-name-1",
+	}, {
+		UUID:  modelUUID3,
+		Cloud: "test-cloud",
+		Name:  "test-name-3",
+	}}
+	sort.Slice(expectedModels, func(i, j int) bool {
+		return expectedModels[i].UUID < expectedModels[j].UUID
+	})
+
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+
+	var watcherID jujuparams.SummaryWatcherID
+	err = conn.APICall("Controller", 9, "", "WatchModelSummaries", nil, &watcherID)
+	c.Assert(err, gc.IsNil)
+
+	var summaries jujuparams.SummaryWatcherNextResults
+	err = conn.APICall("ModelSummaryWatcher", 1, watcherID.WatcherID, "Next", nil, &summaries)
+	c.Assert(err, gc.IsNil)
+	c.Assert(summaries.Models, gc.DeepEquals, expectedModels)
+
+	err = conn.APICall("ModelSummaryWatcher", 1, "unknown-id", "Next", nil, &summaries)
+	c.Assert(err, gc.ErrorMatches, `not found \(not found\)`)
 }
 
 func assertModelInfo(c *gc.C, obtained, expected []jujuparams.ModelInfoResult) {
