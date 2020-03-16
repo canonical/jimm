@@ -676,12 +676,15 @@ func (s *controllerSuite) TestWatchModelSummaries(c *gc.C) {
 
 	var watcherID jujuparams.SummaryWatcherID
 	err = conn.APICall("Controller", 9, "", "WatchModelSummaries", nil, &watcherID)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, jc.ErrorIsNil)
 
 	var summaries jujuparams.SummaryWatcherNextResults
 	err = conn.APICall("ModelSummaryWatcher", 1, watcherID.WatcherID, "Next", nil, &summaries)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(summaries.Models, gc.DeepEquals, expectedModels)
+
+	err = conn.APICall("ModelSummaryWatcher", 1, watcherID.WatcherID, "Stop", nil, nil)
+	c.Assert(err, jc.ErrorIsNil)
 
 	err = conn.APICall("ModelSummaryWatcher", 1, "unknown-id", "Next", nil, &summaries)
 	c.Assert(err, gc.ErrorMatches, `not found \(not found\)`)
