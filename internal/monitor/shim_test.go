@@ -470,16 +470,16 @@ func (s *jemShimInMemory) UpdateCloudRegions(ctx context.Context, cloudRegions [
 	return nil
 }
 
-func (j jemShimInMemory) WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityPath) error {
-	return nil
+func (j jemShimInMemory) WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityPath) (func() error, error) {
+	return func() error { return nil }, nil
 }
 
 type jemShimWithoutModelSummaryWatcher struct {
 	jemInterface
 }
 
-func (j jemShimWithoutModelSummaryWatcher) WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityPath) error {
-	return nil
+func (j jemShimWithoutModelSummaryWatcher) WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityPath) (func() error, error) {
+	return func() error { return nil }, nil
 }
 
 type jujuAPIShims struct {

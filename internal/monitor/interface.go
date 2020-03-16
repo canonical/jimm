@@ -118,7 +118,7 @@ type jemInterface interface {
 
 	// WatchAllModelSummaries starts watching the summary updates from
 	// the controller.
-	WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityPath) error
+	WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityPath) (func() error, error)
 }
 
 // jujuAPI represents an API connection to a Juju controller.

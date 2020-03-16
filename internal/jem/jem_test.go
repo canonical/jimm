@@ -1930,8 +1930,14 @@ func (s *jemSuite) TestWatchAllModelSummaries(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 	defer cleanup()
 
-	err = s.jem.WatchAllModelSummaries(context.Background(), ctlPath)
+	watcherCleanup, err := s.jem.WatchAllModelSummaries(context.Background(), ctlPath)
 	c.Assert(err, gc.Equals, nil)
+	defer func() {
+		err := watcherCleanup()
+		if err != nil {
+			c.Logf("failed to stop all model summaries watcher: %v", err)
+		}
+	}()
 
 	select {
 	case summary := <-summaryChannel:

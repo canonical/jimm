@@ -116,7 +116,7 @@ func (j jemShim) Controller(ctx context.Context, ctlPath params.EntityPath) (*mo
 	return ctl, errgo.Mask(err, errgo.Any)
 }
 
-func (j jemShim) WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityPath) error {
+func (j jemShim) WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityPath) (func() error, error) {
 	return j.JEM.WatchAllModelSummaries(ctx, ctlPath)
 }
 

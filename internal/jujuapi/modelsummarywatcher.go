@@ -124,6 +124,11 @@ func (w *modelSummaryWatcher) Next() (jujuparams.SummaryWatcherNextResults, erro
 	}, nil
 }
 
+func (w *modelSummaryWatcher) Stop() error {
+	w.cleanup()
+	return nil
+}
+
 type modelAccessWatcher struct {
 	ctx             context.Context
 	modelGetterFunc func(context.Context) (jujuparams.UserModelList, error)

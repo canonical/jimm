@@ -1609,23 +1609,23 @@ func CloudCredentialTag(p params.CredentialPath) names.CloudCredentialTag {
 
 // WatchAllModelSummaries starts watching the summary updates from
 // the controller.
-func (j *JEM) WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityPath) error {
+func (j *JEM) WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityPath) (func() error, error) {
 	conn, err := j.OpenAPI(ctx, ctlPath)
 	if err != nil {
-		return errgo.Mask(err)
+		return nil, errgo.Mask(err)
 	}
 
 	_, facade := jujuapibase.NewClientFacade(conn, "Controller")
 	if facade.BestAPIVersion() < 9 {
-		return ModelSummaryWatcherNotSupportedError
+		return nil, ModelSummaryWatcherNotSupportedError
 	}
 
 	var out jujuparams.SummaryWatcherID
 	if err := facade.FacadeCall("WatchAllModelSummaries", nil, &out); err != nil {
-		return errgo.Mask(err)
+		return nil, errgo.Mask(err)
 	}
 	if out.WatcherID == "" {
-		return errgo.Newf("invalid watcher ID")
+		return nil, errgo.Newf("invalid watcher ID")
 	}
 	watcher := &modelSummaryWatcher{
 		caller:  facade.RawAPICaller(),
@@ -1634,7 +1634,7 @@ func (j *JEM) WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityP
 		cleanup: conn.Close,
 	}
 	go watcher.loop(ctx)
-	return nil
+	return watcher.stop, nil
 }
 
 type modelSummaryWatcher struct {
@@ -1682,4 +1682,15 @@ func (w *modelSummaryWatcher) loop(ctx context.Context) {
 			w.pubsub.Publish(modelSummary.UUID, modelSummary)
 		}
 	}
+}
+
+func (w *modelSummaryWatcher) stop() error {
+	return errgo.Mask(w.caller.APICall(
+		"ModelSummaryWatcher",
+		w.caller.BestFacadeVersion("ModelSummaryWatcher"),
+		*w.id,
+		"Stop",
+		nil,
+		nil,
+	))
 }
