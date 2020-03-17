@@ -21,7 +21,6 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
-	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -29,27 +28,19 @@ type authSuite struct {
 	jemtest.IsolatedMgoSuite
 	idmSrv        *candidtest.Server
 	authenticator *auth.Authenticator
-	sessionPool   *mgosession.Pool
 }
 
 var _ = gc.Suite(&authSuite{})
 
 func (s *authSuite) SetUpTest(c *gc.C) {
-	ctx := context.Background()
-
 	s.IsolatedMgoSuite.SetUpTest(c)
 	s.idmSrv = candidtest.NewServer()
 
 	db := s.Session.DB("auth")
-	s.sessionPool = mgosession.NewPool(ctx, s.Session, 5)
-	rks := auth.NewRootKeyStore(auth.RootKeyStoreParams{
-		Pool:     s.sessionPool,
-		RootKeys: mgorootkeystore.NewRootKeys(100),
-		Policy: mgorootkeystore.Policy{
-			ExpiryDuration: 1 * time.Second,
-		},
-		Collection: db.C("macaroons"),
-	})
+
+	rks := mgorootkeystore.NewRootKeys(100)
+	err := rks.EnsureIndex(db.C("macaroons"))
+	c.Assert(err, jc.ErrorIsNil)
 
 	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.Equals, nil)
@@ -61,9 +52,14 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	s.authenticator = auth.NewAuthenticator(identchecker.NewBakery(identchecker.BakeryParams{
-		RootKeyStore: rks,
-		Locator:      s.idmSrv,
-		Key:          key,
+		RootKeyStore: rks.NewStore(
+			db.C("macaroons"),
+			mgorootkeystore.Policy{
+				ExpiryDuration: 1 * time.Second,
+			},
+		),
+		Locator: s.idmSrv,
+		Key:     key,
 		IdentityClient: auth.NewIdentityClient(auth.IdentityClientParams{
 			CandidClient: idmClient,
 		}),
@@ -74,30 +70,42 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 	}))
 }
 
-func (s *authSuite) TearDownTest(c *gc.C) {
-	s.sessionPool.Close()
-	s.IsolatedMgoSuite.TearDownTest(c)
-}
-
 func (s *authSuite) TestAuthenticateNoMacaroon(c *gc.C) {
 	ctx := context.Background()
-	ctx2, m, err := s.authenticator.Authenticate(ctx, bakery.Version3, nil)
-	c.Assert(ctx, jc.DeepEquals, ctx2)
+	id, m, err := s.authenticator.Authenticate(ctx, bakery.Version3, nil)
 	c.Assert(err, gc.ErrorMatches, `macaroon discharge required: authentication required`)
 	c.Assert(m, gc.Not(gc.IsNil))
+	c.Assert(id, gc.IsNil)
 }
 
 func (s *authSuite) TestAuthenticate(c *gc.C) {
 	ctx := context.Background()
 	_, m, _ := s.authenticator.Authenticate(ctx, bakery.Version3, nil)
 	ms := s.discharge(ctx, c, m, "bob")
-	ctx2, m, err := s.authenticator.Authenticate(ctx, bakery.Version3, []macaroon.Slice{ms})
+	id, m, err := s.authenticator.Authenticate(ctx, bakery.Version3, []macaroon.Slice{ms})
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(m, gc.IsNil)
-	err = auth.CheckIsUser(ctx, "bob")
+	err = auth.CheckIsUser(ctx, id, "alice")
 	c.Assert(err, gc.ErrorMatches, `unauthorized`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
-	err = auth.CheckIsUser(ctx2, "bob")
+	err = auth.CheckIsUser(ctx, id, "bob")
+	c.Assert(err, gc.Equals, nil)
+}
+
+func (s *authSuite) TestAuthenticateWithContextSession(c *gc.C) {
+	session := s.Session.Copy()
+	defer session.Close()
+
+	ctx := mgorootkeystore.ContextWithMgoSession(context.Background(), session)
+	_, m, _ := s.authenticator.Authenticate(ctx, bakery.Version3, nil)
+	ms := s.discharge(ctx, c, m, "bob")
+	id, m, err := s.authenticator.Authenticate(ctx, bakery.Version3, []macaroon.Slice{ms})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(m, gc.IsNil)
+	err = auth.CheckIsUser(ctx, id, "alice")
+	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
+	err = auth.CheckIsUser(ctx, id, "bob")
 	c.Assert(err, gc.Equals, nil)
 }
 
@@ -106,8 +114,8 @@ func (s *authSuite) TestAuthenticateRequest(c *gc.C) {
 	req, err := http.NewRequest("GET", "/", nil)
 	req.RequestURI = "/"
 	c.Assert(err, gc.Equals, nil)
-	ctx2, err := s.authenticator.AuthenticateRequest(ctx, req)
-	c.Assert(ctx2, gc.Equals, ctx)
+	id, err := s.authenticator.AuthenticateRequest(ctx, req)
+	c.Assert(id, gc.IsNil)
 	c.Assert(err, gc.ErrorMatches, `macaroon discharge required: authentication required`)
 	herr, ok := err.(*httpbakery.Error)
 	c.Assert(ok, gc.Equals, true)
@@ -115,32 +123,34 @@ func (s *authSuite) TestAuthenticateRequest(c *gc.C) {
 	cookie, err := httpbakery.NewCookie(nil, ms)
 	c.Assert(err, gc.Equals, nil)
 	req.AddCookie(cookie)
-	ctx3, err := s.authenticator.AuthenticateRequest(ctx, req)
+	id, err = s.authenticator.AuthenticateRequest(ctx, req)
 	c.Assert(err, gc.Equals, nil)
-	err = auth.CheckIsUser(ctx2, "bob")
+	err = auth.CheckIsUser(ctx, id, "alice")
 	c.Assert(err, gc.ErrorMatches, `unauthorized`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
-	err = auth.CheckIsUser(ctx3, "bob")
+	err = auth.CheckIsUser(ctx, id, "bob")
 	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *authSuite) TestCheckIsUser(c *gc.C) {
-	ctx := auth.ContextWithUser(context.Background(), "bob")
-	err := auth.CheckIsUser(ctx, "bob")
+	ctx := context.Background()
+	id := jemtest.NewIdentity("bob")
+	err := auth.CheckIsUser(ctx, id, "bob")
 	c.Assert(err, gc.Equals, nil)
-	err = auth.CheckIsUser(ctx, "alice")
+	err = auth.CheckIsUser(ctx, id, "alice")
 	c.Assert(err, gc.ErrorMatches, `unauthorized`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
 }
 
 func (s *authSuite) TestCheckACL(c *gc.C) {
-	ctx := auth.ContextWithUser(context.Background(), "bob")
-	err := auth.CheckACL(ctx, []string{"bob", "charlie"})
+	ctx := context.Background()
+	id := jemtest.NewIdentity("bob")
+	err := auth.CheckACL(ctx, id, []string{"bob", "charlie"})
 	c.Assert(err, gc.Equals, nil)
-	err = auth.CheckACL(ctx, []string{"alice", "charlie"})
+	err = auth.CheckACL(ctx, id, []string{"alice", "charlie"})
 	c.Assert(err, gc.ErrorMatches, `unauthorized`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
-	err = auth.CheckACL(ctx, []string{"alice", "charlie", "everyone"})
+	err = auth.CheckACL(ctx, id, []string{"alice", "charlie", "everyone"})
 	c.Assert(err, gc.Equals, nil)
 }
 
@@ -178,10 +188,11 @@ var canReadTests = []struct {
 }}
 
 func (s *authSuite) TestCheckCanRead(c *gc.C) {
-	ctx := auth.ContextWithUser(context.Background(), "bob", "bob-group")
+	ctx := context.Background()
+	id := jemtest.NewIdentity("bob", "bob-group")
 	for i, test := range canReadTests {
 		c.Logf("%d. %q %#v", i, test.owner, test.readers)
-		err := auth.CheckCanRead(ctx, testEntity{
+		err := auth.CheckCanRead(ctx, id, testEntity{
 			owner:   test.owner,
 			readers: test.readers,
 		})
@@ -192,17 +203,6 @@ func (s *authSuite) TestCheckCanRead(c *gc.C) {
 		c.Assert(err, gc.ErrorMatches, `unauthorized`)
 		c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
 	}
-}
-
-func (s *authSuite) TestUsername(c *gc.C) {
-	ctx := context.Background()
-
-	c.Assert(auth.Username(ctx), gc.Equals, "")
-	_, m, _ := s.authenticator.Authenticate(context.Background(), bakery.Version3, nil)
-	ms := s.discharge(ctx, c, m, "bob")
-	ctx, _, err := s.authenticator.Authenticate(context.Background(), bakery.Version3, []macaroon.Slice{ms})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(auth.Username(ctx), gc.Equals, "bob")
 }
 
 func (s *authSuite) discharge(ctx context.Context, c *gc.C, m *bakery.Macaroon, username string, groups ...string) macaroon.Slice {

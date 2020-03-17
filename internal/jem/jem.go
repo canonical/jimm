@@ -405,13 +405,13 @@ func (j *JEM) Credential(ctx context.Context, path params.CredentialPath) (*mong
 		if errgo.Cause(err) == params.ErrNotFound {
 			// We return an authorization error for all attempts to retrieve credentials
 			// from any other user's space.
-			if aerr := auth.CheckIsUser(ctx, path.User); aerr != nil {
+			if aerr := auth.CheckIsUser(ctx, auth.IdentityFromContext(ctx), path.User); aerr != nil {
 				err = aerr
 			}
 		}
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	if err := auth.CheckCanRead(ctx, cred); err != nil {
+	if err := auth.CheckCanRead(ctx, auth.IdentityFromContext(ctx), cred); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	return cred, nil
@@ -447,7 +447,7 @@ type CreateModelParams struct {
 // CreateModel creates a new model as specified by p.
 func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc.Model, err error) {
 	// Only the owner can create a new model in their namespace.
-	if err := auth.CheckIsUser(ctx, p.Path.User); err != nil {
+	if err := auth.CheckIsUser(ctx, auth.IdentityFromContext(ctx), p.Path.User); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 
@@ -479,7 +479,7 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 	modelDoc := &mongodoc.Model{
 		Path:                   p.Path,
 		CreationTime:           wallClock.Now(),
-		Creator:                auth.Username(ctx),
+		Creator:                auth.IdentityFromContext(ctx).Id(),
 		UsageSenderCredentials: usageSenderCredentials,
 		// Use a temporary UUID so that we can create two at the
 		// same time, because the uuid field must always be
@@ -582,7 +582,7 @@ func (j *JEM) possibleControllers(ctx context.Context, ctlPath params.EntityPath
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	if err := auth.CheckCanRead(ctx, cloudRegion); err != nil {
+	if err := auth.CheckCanRead(ctx, auth.IdentityFromContext(ctx), cloudRegion); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	controllers := cloudRegion.PrimaryControllers
@@ -1191,13 +1191,13 @@ func (j *JEM) DoControllers(ctx context.Context, do func(c *mongodoc.Controller)
 	// Sort by _id so that we can make easily reproducible tests.
 	iter := j.DB.NewCanReadIter(ctx, q.Sort("_id").Iter())
 	var ctl mongodoc.Controller
-	for iter.Next(&ctl) {
+	for iter.Next(ctx, &ctl) {
 		if err := do(&ctl); err != nil {
-			iter.Close()
+			iter.Close(ctx)
 			return errgo.Mask(err, errgo.Any)
 		}
 	}
-	if err := iter.Err(); err != nil {
+	if err := iter.Err(ctx); err != nil {
 		return errgo.Notef(err, "cannot query")
 	}
 	return nil
@@ -1222,10 +1222,10 @@ func (j *JEM) selectCredential(ctx context.Context, path params.CredentialPath, 
 	var creds []mongodoc.Credential
 	iter := j.DB.NewCanReadIter(ctx, j.DB.Credentials().Find(query).Iter())
 	var cred mongodoc.Credential
-	for iter.Next(&cred) {
+	for iter.Next(ctx, &cred) {
 		creds = append(creds, cred)
 	}
-	if err := iter.Err(); err != nil {
+	if err := iter.Err(ctx); err != nil {
 		return nil, errgo.Notef(err, "cannot query credentials")
 	}
 	switch len(creds) {
@@ -1461,7 +1461,7 @@ func (j *JEM) RemoveCloud(ctx context.Context, cloud params.Cloud) (err error) {
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	if err := auth.CheckACL(ctx, cr.ACL.Admin); err != nil {
+	if err := auth.CheckACL(ctx, auth.IdentityFromContext(ctx), cr.ACL.Admin); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	// This check is technically redundant as we can't know whether
@@ -1504,7 +1504,7 @@ func (j *JEM) GrantCloud(ctx context.Context, cloud params.Cloud, user params.Us
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	if err := auth.CheckACL(ctx, cr.ACL.Admin); err != nil {
+	if err := auth.CheckACL(ctx, auth.IdentityFromContext(ctx), cr.ACL.Admin); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	if err := j.DB.GrantCloud(ctx, cloud, user, access); err != nil {
@@ -1534,7 +1534,7 @@ func (j *JEM) RevokeCloud(ctx context.Context, cloud params.Cloud, user params.U
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	if err := auth.CheckACL(ctx, cr.ACL.Admin); err != nil {
+	if err := auth.CheckACL(ctx, auth.IdentityFromContext(ctx), cr.ACL.Admin); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	// TODO revoke the cloud access on the controllers in parallel

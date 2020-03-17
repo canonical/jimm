@@ -27,10 +27,10 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v3"
 	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
-	"github.com/CanonicalLtd/jimm/internal/ctxutil"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
@@ -93,14 +93,13 @@ type controllerRoot struct {
 	watchers *watcherRegistry
 
 	// mu protects the fields below it
-	mu          sync.Mutex
-	authContext context.Context
-	facades     map[facade]string
+	mu       sync.Mutex
+	identity identchecker.ACLIdentity
+	facades  map[facade]string
 }
 
 func newControllerRoot(jem *jem.JEM, a *auth.Authenticator, p jemserver.Params, hm heartMonitor) *controllerRoot {
 	r := &controllerRoot{
-		authContext:   context.Background(),
 		params:        p,
 		auth:          a,
 		jem:           jem,
@@ -131,7 +130,7 @@ func (r *controllerRoot) Bundle(id string) (*bundle.APIv1, error) {
 		return nil, common.ErrBadId
 	}
 	// Use the juju implementation of the Bundle facade.
-	api, err := bundle.NewBundleAPIv1(nil, authorizer{r.authContext}, names.NewModelTag(""))
+	api, err := bundle.NewBundleAPIv1(nil, authorizer{r.identity}, names.NewModelTag(""))
 	return api, errgo.Mask(err)
 }
 
@@ -259,18 +258,18 @@ func (r *controllerRoot) UserManager(id string) (userManager, error) {
 // will be stopped and the returned error will have the same cause.
 func (r *controllerRoot) doModels(ctx context.Context, f func(context.Context, *mongodoc.Model) error) error {
 	it := r.jem.DB.NewCanReadIter(ctx, r.jem.DB.Models().Find(nil).Sort("_id").Iter())
-	defer it.Close()
+	defer it.Close(ctx)
 
 	for {
 		var model mongodoc.Model
-		if !it.Next(&model) {
+		if !it.Next(ctx, &model) {
 			break
 		}
 		if err := f(ctx, &model); err != nil {
 			return errgo.Mask(err, errgo.Any)
 		}
 	}
-	return errgo.Mask(it.Err())
+	return errgo.Mask(it.Err(ctx))
 }
 
 // FindMethod implements rpcreflect.MethodFinder.
@@ -325,7 +324,7 @@ type admin struct {
 // Login implements the Login method on the Admin facade.
 func (a admin) Login(ctx context.Context, req jujuparams.LoginRequest) (jujuparams.LoginResult, error) {
 	// JIMM only supports macaroon login, ignore all the other fields.
-	authContext, m, err := a.root.auth.Authenticate(a.root.authContext, bakery.Version1, req.Macaroons)
+	id, m, err := a.root.auth.Authenticate(ctx, bakery.Version1, req.Macaroons)
 	if err != nil {
 		servermon.LoginFailCount.Inc()
 		if m != nil {
@@ -338,12 +337,12 @@ func (a admin) Login(ctx context.Context, req jujuparams.LoginRequest) (jujupara
 	}
 	a.root.mu.Lock()
 	a.root.facades = facades
-	a.root.authContext = authContext
+	a.root.identity = id
 	a.root.mu.Unlock()
 
-	ctx = ctxutil.Join(ctx, a.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, id)
 	servermon.LoginSuccessCount.Inc()
-	username := auth.Username(ctx)
+	username := id.Id()
 	srvVersion, err := a.root.jem.EarliestControllerVersion(ctx)
 	if err != nil {
 		return jujuparams.LoginResult{}, errgo.Mask(err)
@@ -415,7 +414,7 @@ type controllerV9 struct {
 func (c controllerV9) WatchModelSummaries(ctx context.Context) (jujuparams.SummaryWatcherID, error) {
 	id := fmt.Sprintf("%v", c.generator.Next())
 
-	watcher, err := newModelSummaryWatcher(c.root.authContext, id, c.root, c.root.jem.Pubsub())
+	watcher, err := newModelSummaryWatcher(auth.ContextWithIdentity(ctx, c.root.identity), id, c.root, c.root.jem.Pubsub())
 	if err != nil {
 		return jujuparams.SummaryWatcherID{}, errgo.Mask(err)
 	}
@@ -432,14 +431,14 @@ type controller struct {
 }
 
 func (c controller) AllModels(ctx context.Context) (jujuparams.UserModelList, error) {
-	ctx = ctxutil.Join(ctx, c.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, c.root.identity)
 	return c.root.allModels(ctx)
 }
 
 func (c controller) ModelStatus(ctx context.Context, args jujuparams.Entities) (jujuparams.ModelStatusResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = ctxutil.Join(ctx, c.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, c.root.identity)
 	results := make([]jujuparams.ModelStatus, len(args.Entities))
 	// TODO (fabricematrat) get status for all of the models connected
 	// to a single controller in one go.
@@ -558,7 +557,7 @@ func (r *controllerRoot) modelInfo(ctx context.Context, arg jujuparams.Entity, l
 		zapctx.Error(ctx, "failed to get ModelInfo from controller", zap.String("controller", model.Controller.String()), zaputil.Error(err))
 		return info, nil
 	}
-	info.Users = filterUsers(ctx, infoFromController.Users, isModelAdmin(ctx, infoFromController))
+	info.Users = filterUsers(ctx, r.identity, infoFromController.Users, isModelAdmin(ctx, r.identity, infoFromController))
 	return info, nil
 }
 
@@ -588,7 +587,7 @@ func (r *controllerRoot) modelDocToModelInfo(ctx context.Context, model *mongodo
 	userLevels[string(model.Path.User)] = jujuparams.ModelAdminAccess
 
 	var users []jujuparams.ModelUserInfo
-	if auth.CheckIsAdmin(ctx, model) == nil {
+	if auth.CheckIsAdmin(ctx, r.identity, model) == nil {
 		usernames := make([]string, 0, len(userLevels))
 		for user := range userLevels {
 			usernames = append(usernames, user)
@@ -603,11 +602,11 @@ func (r *controllerRoot) modelDocToModelInfo(ctx context.Context, model *mongodo
 			})
 		}
 	} else {
-		ut := userTag(auth.Username(ctx))
+		ut := userTag(r.identity.Id())
 		users = append(users, jujuparams.ModelUserInfo{
 			UserName:    ut.Id(),
 			DisplayName: ut.Name(),
-			Access:      userLevels[auth.Username(ctx)],
+			Access:      userLevels[r.identity.Id()],
 		})
 	}
 	return &jujuparams.ModelInfo{
@@ -663,10 +662,10 @@ func jemMachineToModelMachineInfo(m mongodoc.Machine) jujuparams.ModelMachineInf
 }
 
 // isModelAdmin determines if the current user is an admin on the given model.
-func isModelAdmin(ctx context.Context, info *jujuparams.ModelInfo) bool {
+func isModelAdmin(ctx context.Context, id identchecker.ACLIdentity, info *jujuparams.ModelInfo) bool {
 	var admin bool
 	iterUsers(ctx, info.Users, func(u params.User, ui jujuparams.ModelUserInfo) {
-		admin = admin || ui.Access == jujuparams.ModelAdminAccess && auth.CheckIsUser(ctx, u) == nil
+		admin = admin || ui.Access == jujuparams.ModelAdminAccess && auth.CheckIsUser(ctx, id, u) == nil
 	})
 	return admin
 }
@@ -675,10 +674,10 @@ func isModelAdmin(ctx context.Context, info *jujuparams.ModelInfo) bool {
 // current user should be able to see. Admin users can see everyone;
 // other users can only see users and groups they're a member of. Users
 // local to the controller are always removed.
-func filterUsers(ctx context.Context, users []jujuparams.ModelUserInfo, admin bool) []jujuparams.ModelUserInfo {
+func filterUsers(ctx context.Context, id identchecker.ACLIdentity, users []jujuparams.ModelUserInfo, admin bool) []jujuparams.ModelUserInfo {
 	filtered := make([]jujuparams.ModelUserInfo, 0, len(users))
 	iterUsers(ctx, users, func(u params.User, ui jujuparams.ModelUserInfo) {
-		if admin || auth.CheckIsUser(ctx, u) == nil {
+		if admin || auth.CheckIsUser(ctx, id, u) == nil {
 			filtered = append(filtered, ui)
 		}
 	})
@@ -712,23 +711,23 @@ type jimm struct {
 // UserModelStats returns statistics about all the models that were created
 // by the currently authenticated user.
 func (j jimm) UserModelStats(ctx context.Context) (params.UserModelStatsResponse, error) {
-	ctx = ctxutil.Join(ctx, j.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, j.root.identity)
 	models := make(map[string]params.ModelStats)
 
-	user := auth.Username(ctx)
+	user := j.root.identity.Id()
 	it := j.root.jem.DB.NewCanReadIter(ctx,
 		j.root.jem.DB.Models().
 			Find(bson.D{{"creator", user}}).
 			Select(bson.D{{"uuid", 1}, {"path", 1}, {"creator", 1}, {"counts", 1}}).
 			Iter())
 	var model mongodoc.Model
-	for it.Next(&model) {
+	for it.Next(ctx, &model) {
 		models[model.UUID] = params.ModelStats{
 			Model:  userModelForModelDoc(&model),
 			Counts: model.Counts,
 		}
 	}
-	if err := it.Err(); err != nil {
+	if err := it.Err(ctx); err != nil {
 		return params.UserModelStatsResponse{}, errgo.Mask(err)
 	}
 	return params.UserModelStatsResponse{
@@ -744,7 +743,7 @@ func (j jimm) UserModelStats(ctx context.Context) (params.UserModelStatsResponse
 // access is denied authf should return an error with the cause
 // params.ErrUnauthorized. The cause of any error returned by authf will
 // not be masked.
-func getModel(ctx context.Context, jem *jem.JEM, modelTag string, authf func(context.Context, auth.ACLEntity) error) (*mongodoc.Model, error) {
+func getModel(ctx context.Context, jem *jem.JEM, modelTag string, authf func(context.Context, identchecker.ACLIdentity, auth.ACLEntity) error) (*mongodoc.Model, error) {
 	tag, err := names.ParseModelTag(modelTag)
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid model tag")
@@ -756,7 +755,7 @@ func getModel(ctx context.Context, jem *jem.JEM, modelTag string, authf func(con
 	if authf == nil {
 		return model, nil
 	}
-	if err := authf(ctx, model); err != nil {
+	if err := authf(ctx, auth.IdentityFromContext(ctx), model); err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
 	if model.Cloud != "" {
@@ -855,7 +854,7 @@ func (u userManager) DisableUser(jujuparams.Entities) (jujuparams.ErrorResults, 
 
 // UserInfo implements the UserManager facade's UserInfo method.
 func (u userManager) UserInfo(ctx context.Context, req jujuparams.UserInfoRequest) (jujuparams.UserInfoResults, error) {
-	ctx = ctxutil.Join(ctx, u.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, u.root.identity)
 	res := jujuparams.UserInfoResults{
 		Results: make([]jujuparams.UserInfoResult, len(req.Entities)),
 	}
@@ -879,14 +878,14 @@ func (u userManager) userInfo(ctx context.Context, entity string) (*jujuparams.U
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
-	if auth.Username(ctx) != string(user) {
+	if u.root.identity.Id() != string(user) {
 		return nil, params.ErrUnauthorized
 	}
-	return u.currentUser(ctx)
+	return u.currentUser(u.root.identity)
 }
 
-func (u userManager) currentUser(ctx context.Context) (*jujuparams.UserInfo, error) {
-	userTag := userTag(auth.Username(ctx))
+func (u userManager) currentUser(id identchecker.ACLIdentity) (*jujuparams.UserInfo, error) {
+	userTag := userTag(id.Id())
 	return &jujuparams.UserInfo{
 		// TODO(mhilton) a number of these fields should
 		// be fetched from the identity manager, but that
@@ -987,11 +986,11 @@ func modelVersion(ctx context.Context, info *mongodoc.ModelInfo) *version.Number
 
 // authorizer implements facade.Authorizer
 type authorizer struct {
-	ctx context.Context
+	id identchecker.Identity
 }
 
 func (a authorizer) GetAuthTag() names.Tag {
-	n := auth.Username(a.ctx)
+	n := a.id.Id()
 	if names.IsValidUserName(n) {
 		return names.NewLocalUserTag(n)
 	}

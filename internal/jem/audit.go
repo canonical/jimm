@@ -2,9 +2,10 @@ package jem
 
 import (
 	"context"
+	"time"
+
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"go.uber.org/zap"
-	"time"
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2/bson"
@@ -18,7 +19,7 @@ import (
 func (db *Database) AppendAudit(ctx context.Context, e params.AuditEntry) {
 	common := e.Common()
 	common.Created_ = time.Now()
-	common.Originator = auth.Username(ctx)
+	common.Originator = auth.IdentityFromContext(ctx).Id()
 	common.Type_ = params.AuditLogType(e)
 
 	if err := db.Audits().Insert(&params.AuditLogEntry{

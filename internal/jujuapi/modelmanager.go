@@ -14,7 +14,6 @@ import (
 	"gopkg.in/juju/names.v3"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
-	"github.com/CanonicalLtd/jimm/internal/ctxutil"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
@@ -38,7 +37,7 @@ type modelManagerV2 struct {
 func (m modelManagerV2) DumpModels(ctx context.Context, args jujuparams.Entities) jujuparams.MapResults {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = ctxutil.Join(ctx, m.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, m.root.identity)
 	results := make([]jujuparams.MapResult, len(args.Entities))
 	for i, ent := range args.Entities {
 		_, err := m.dumpModel(ctx, ent, false)
@@ -91,7 +90,7 @@ type modelManagerAPI struct {
 // ListModelSummaries returns summaries for all the models that that
 // authenticated user has access to. The request parameter is ignored.
 func (m modelManagerAPI) ListModelSummaries(ctx context.Context, _ jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error) {
-	ctx = ctxutil.Join(ctx, m.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, m.root.identity)
 	var results []jujuparams.ModelSummaryResult
 	err := m.root.doModels(ctx, func(ctx context.Context, model *mongodoc.Model) error {
 		if model.ProviderType == "" {
@@ -107,11 +106,11 @@ func (m modelManagerAPI) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 		// If we get this far the user must have at least read access.
 		access := jujuparams.ModelReadAccess
 		switch {
-		case params.User(auth.Username(ctx)) == model.Path.User:
+		case params.User(m.root.identity.Id()) == model.Path.User:
 			access = jujuparams.ModelAdminAccess
-		case auth.CheckACL(ctx, model.ACL.Admin) == nil:
+		case auth.CheckACL(ctx, m.root.identity, model.ACL.Admin) == nil:
 			access = jujuparams.ModelAdminAccess
-		case auth.CheckACL(ctx, model.ACL.Write) == nil:
+		case auth.CheckACL(ctx, m.root.identity, model.ACL.Write) == nil:
 			access = jujuparams.ModelWriteAccess
 		}
 		machines, err := m.root.jem.DB.MachinesForModel(ctx, model.UUID)
@@ -175,7 +174,7 @@ func (m modelManagerAPI) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 // ListModels returns the models that the authenticated user
 // has access to. The user parameter is ignored.
 func (m modelManagerAPI) ListModels(ctx context.Context, _ jujuparams.Entity) (jujuparams.UserModelList, error) {
-	ctx = ctxutil.Join(ctx, m.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, m.root.identity)
 	return m.root.allModels(ctx)
 }
 
@@ -183,7 +182,7 @@ func (m modelManagerAPI) ListModels(ctx context.Context, _ jujuparams.Entity) (j
 func (m modelManagerAPI) ModelInfo(ctx context.Context, args jujuparams.Entities) (jujuparams.ModelInfoResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = ctxutil.Join(ctx, m.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, m.root.identity)
 	results := make([]jujuparams.ModelInfoResult, len(args.Entities))
 	run := parallel.NewRun(maxRequestConcurrency)
 	for i, arg := range args.Entities {
@@ -208,7 +207,7 @@ func (m modelManagerAPI) ModelInfo(ctx context.Context, args jujuparams.Entities
 func (m modelManagerAPI) CreateModel(ctx context.Context, args jujuparams.ModelCreateArgs) (jujuparams.ModelInfo, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = ctxutil.Join(ctx, m.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, m.root.identity)
 	mi, err := m.createModel(ctx, args)
 	if err == nil {
 		servermon.ModelsCreatedCount.Inc()
@@ -276,7 +275,7 @@ func (m modelManagerAPI) createModel(ctx context.Context, args jujuparams.ModelC
 func (m modelManagerAPI) DestroyModels(ctx context.Context, args jujuparams.DestroyModelsParams) (jujuparams.ErrorResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = ctxutil.Join(ctx, m.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, m.root.identity)
 	results := make([]jujuparams.ErrorResult, len(args.Models))
 
 	for i, model := range args.Models {
@@ -318,7 +317,7 @@ func (m modelManagerAPI) destroyModel(ctx context.Context, arg jujuparams.Destro
 func (m modelManagerAPI) ModifyModelAccess(ctx context.Context, args jujuparams.ModifyModelAccessRequest) (jujuparams.ErrorResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = ctxutil.Join(ctx, m.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, m.root.identity)
 	results := make([]jujuparams.ErrorResult, len(args.Changes))
 	for i, change := range args.Changes {
 		err := m.modifyModelAccess(ctx, change)
@@ -372,7 +371,7 @@ func (m modelManagerAPI) modifyModelAccess(ctx context.Context, change jujuparam
 func (m modelManagerAPI) DumpModels(ctx context.Context, args jujuparams.DumpModelRequest) jujuparams.StringResults {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = ctxutil.Join(ctx, m.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, m.root.identity)
 	results := make([]jujuparams.StringResult, len(args.Entities))
 	for i, ent := range args.Entities {
 		res, err := m.dumpModel(ctx, ent, args.Simplified)
@@ -404,7 +403,7 @@ func (m modelManagerAPI) dumpModel(ctx context.Context, ent jujuparams.Entity, s
 func (m modelManagerAPI) DumpModelsDB(ctx context.Context, args jujuparams.Entities) jujuparams.MapResults {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = ctxutil.Join(ctx, m.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, m.root.identity)
 	results := make([]jujuparams.MapResult, len(args.Entities))
 	for i, ent := range args.Entities {
 		res, err := m.dumpModelDB(ctx, ent)
@@ -440,7 +439,7 @@ func (m modelManagerAPI) ModelStatus(ctx context.Context, req jujuparams.Entitie
 func (m modelManagerAPI) ChangeModelCredential(ctx context.Context, args jujuparams.ChangeModelCredentialsParams) (jujuparams.ErrorResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = ctxutil.Join(ctx, m.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, m.root.identity)
 	results := make([]jujuparams.ErrorResult, len(args.Models))
 	for i, arg := range args.Models {
 		results[i].Error = mapError(m.changeModelCredential(ctx, arg))

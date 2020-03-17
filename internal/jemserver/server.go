@@ -196,14 +196,14 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	jem := p.JEM(ctx)
 	defer jem.Close()
 
+	rks := mgorootkeystore.NewRootKeys(100)
+	if err := rks.EnsureIndex(jem.DB.Macaroons()); err != nil {
+		return nil, errgo.Notef(err, "cannot make macaroon store")
+	}
+
 	bakery := identchecker.NewBakery(identchecker.BakeryParams{
-		RootKeyStore: auth.NewRootKeyStore(auth.RootKeyStoreParams{
-			Pool:     sessionPool,
-			RootKeys: mgorootkeystore.NewRootKeys(100),
-			Policy: mgorootkeystore.Policy{
-				ExpiryDuration: 24 * time.Hour,
-			},
-			Collection: jem.DB.Macaroons(),
+		RootKeyStore: rks.NewStore(jem.DB.Macaroons(), mgorootkeystore.Policy{
+			ExpiryDuration: 24 * time.Hour,
 		}),
 
 		Locator:        config.ThirdPartyLocator,
@@ -241,13 +241,13 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 		Store:    aclStore,
 		RootPath: "/admin/acls",
 		Authenticate: func(ctx context.Context, w http.ResponseWriter, req *http.Request) (aclstore.Identity, error) {
-			ctx, err := authenticator.AuthenticateRequest(ctx, req)
-			if err != nil {
-				status, body := jemerror.Mapper(ctx, err)
-				httprequest.WriteJSON(w, status, body)
-				return nil, errgo.Mask(err, errgo.Any)
+			id, err := authenticator.AuthenticateRequest(ctx, req)
+			if err == nil {
+				return id, nil
 			}
-			return identity{ctx}, nil
+			status, body := jemerror.Mapper(ctx, err)
+			httprequest.WriteJSON(w, status, body)
+			return nil, errgo.Mask(err, errgo.Any)
 		},
 		InitialAdminUsers: []string{string(config.ControllerAdmin)},
 	})
@@ -328,20 +328,6 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	return srv, nil
 }
 
-type identity struct {
-	ctx context.Context
-}
-
-func (i identity) Allow(_ context.Context, acl []string) (bool, error) {
-	if err := auth.CheckACL(i.ctx, acl); err != nil {
-		if errgo.Cause(err) == params.ErrUnauthorized {
-			return false, nil
-		}
-		return false, errgo.Mask(err)
-	}
-	return true, nil
-}
-
 func monitorLeaseOwner(agentName string) (string, error) {
 	var buf [16]byte
 	if _, err := rand.Read(buf[:]); err != nil {
@@ -384,6 +370,15 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// TODO: in handlers, look up methods for this request path and return only those methods here.
 	header.Set("Access-Control-Allow-Methods", "DELETE,GET,HEAD,PUT,POST,OPTIONS")
 	header.Set("Access-Control-Expose-Headers", "WWW-Authenticate")
+
+	// Get an mgo session for use in all database operations with this request.
+	ctx, close := srv.sessionPool.ContextWithSession(req.Context())
+	defer close()
+	s := srv.sessionPool.Session(ctx)
+	defer s.Close()
+	ctx = mgorootkeystore.ContextWithMgoSession(ctx, s)
+	req = req.WithContext(ctx)
+
 	srv.router.ServeHTTP(w, req)
 }
 

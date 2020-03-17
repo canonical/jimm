@@ -17,6 +17,7 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/juju/names.v3"
+	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
@@ -44,6 +45,7 @@ const (
 var controllerClientInitiateMigration = (*controllerapi.Client).InitiateMigration
 
 type Handler struct {
+	id         identchecker.ACLIdentity
 	jem        *jem.JEM
 	cancel     context.CancelFunc
 	config     jemserver.Params
@@ -75,11 +77,12 @@ func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httpr
 		zapctx.Debug(ctx, "HTTP request", zap.String("method", p.Request.Method), zap.Stringer("url", p.Request.URL))
 
 		// All requests require an authenticated client.
-		ctx, err := params.Authenticator.AuthenticateRequest(ctx, p.Request)
+		id, err := params.Authenticator.AuthenticateRequest(ctx, p.Request)
 		if err != nil {
 			return nil, ctx, errgo.Mask(err, errgo.Any)
 		}
 		h := &Handler{
+			id:         id,
 			jem:        params.JEMPool.JEM(ctx),
 			config:     params.Params,
 			cancel:     cancel,
@@ -87,7 +90,7 @@ func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httpr
 		}
 
 		h.monReq.Start(p.PathPattern)
-		return h, ctx, nil
+		return h, auth.ContextWithIdentity(ctx, id), nil
 	}), nil
 }
 
@@ -105,19 +108,19 @@ func (h *Handler) Close() error {
 // making the WhoAmI call.
 func (h *Handler) WhoAmI(p httprequest.Params, arg *params.WhoAmI) (params.WhoAmIResponse, error) {
 	return params.WhoAmIResponse{
-		User: auth.Username(p.Context),
+		User: h.id.Id(),
 	}, nil
 }
 
 // AddController adds a new controller.
 func (h *Handler) AddController(p httprequest.Params, arg *params.AddController) error {
-	if err := auth.CheckIsUser(p.Context, arg.User); err != nil {
+	if err := auth.CheckIsUser(p.Context, h.id, arg.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	if !arg.Info.Public {
 		return errgo.WithCausef(nil, params.ErrForbidden, "cannot add private controller")
 	}
-	if err := auth.CheckIsUser(p.Context, h.jem.ControllerAdmin()); err != nil {
+	if err := auth.CheckIsUser(p.Context, h.id, h.jem.ControllerAdmin()); err != nil {
 		if errgo.Cause(err) == params.ErrUnauthorized {
 			return errgo.WithCausef(nil, params.ErrUnauthorized, "admin access required to add public controllers")
 		}
@@ -312,9 +315,10 @@ func (h *Handler) GetController(p httprequest.Params, arg *params.GetController)
 // DeleteController removes an existing controller.
 func (h *Handler) DeleteController(p httprequest.Params, arg *params.DeleteController) error {
 	// Check if user has permissions.
-	if err := auth.CheckIsUser(p.Context, arg.EntityPath.User); err != nil {
+	if err := auth.CheckIsUser(p.Context, h.id, arg.EntityPath.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
+
 	if !arg.Force {
 		ctl, err := h.jem.DB.Controller(p.Context, arg.EntityPath)
 		if err != nil {
@@ -365,10 +369,11 @@ func (h *Handler) GetModel(p httprequest.Params, arg *params.GetModel) (*params.
 
 // DeleteModel deletes an model from JEM.
 func (h *Handler) DeleteModel(p httprequest.Params, arg *params.DeleteModel) error {
-	if err := auth.CheckIsUser(p.Context, arg.EntityPath.User); err != nil {
+	if err := auth.CheckIsUser(p.Context, h.id, arg.EntityPath.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	if err := h.jem.DB.DeleteModel(p.Context, arg.EntityPath); err != nil {
+	ctx := auth.ContextWithIdentity(p.Context, h.id)
+	if err := h.jem.DB.DeleteModel(ctx, arg.EntityPath); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrForbidden))
 	}
 	return nil
@@ -400,7 +405,7 @@ func (h *Handler) ListModels(p httprequest.Params, arg *params.ListModels) (*par
 	iter = h.jem.DB.Models().Find(nil).Sort("_id").Iter()
 	var modelIter entityIter
 	if arg.All {
-		if err := auth.CheckIsUser(p.Context, h.jem.ControllerAdmin()); err != nil {
+		if err := auth.CheckIsUser(p.Context, h.id, h.jem.ControllerAdmin()); err != nil {
 			if errgo.Cause(err) == params.ErrUnauthorized {
 				return nil, errgo.WithCausef(nil, params.ErrUnauthorized, "admin access required to list all models")
 			}
@@ -412,7 +417,7 @@ func (h *Handler) ListModels(p httprequest.Params, arg *params.ListModels) (*par
 	}
 	var models []params.ModelResponse
 	var m mongodoc.Model
-	for modelIter.Next(&m) {
+	for modelIter.Next(p.Context, &m) {
 		ctl, ok := controllers[m.Controller]
 		if !ok {
 			zapctx.Error(p.Context, "model has invalid controller value", zap.Stringer("model", m.Path), zap.Stringer("controller", m.Controller))
@@ -431,7 +436,7 @@ func (h *Handler) ListModels(p httprequest.Params, arg *params.ListModels) (*par
 			Creator:          m.Creator,
 		})
 	}
-	if err := modelIter.Err(); err != nil {
+	if err := modelIter.Err(p.Context); err != nil {
 		return nil, errgo.Notef(err, "cannot get models")
 	}
 	return &params.ListModelsResponse{
@@ -447,7 +452,7 @@ func (h *Handler) ListController(p httprequest.Params, arg *params.ListControlle
 
 	iter := h.jem.DB.NewCanReadIter(p.Context, h.jem.DB.Controllers().Find(nil).Sort("_id").Iter())
 	var ctl mongodoc.Controller
-	for iter.Next(&ctl) {
+	for iter.Next(p.Context, &ctl) {
 		controllers = append(controllers, params.ControllerResponse{
 			Path:             ctl.Path,
 			Public:           ctl.Public,
@@ -455,7 +460,7 @@ func (h *Handler) ListController(p httprequest.Params, arg *params.ListControlle
 			Location:         ctl.Location,
 		})
 	}
-	if err := iter.Err(); err != nil {
+	if err := iter.Err(p.Context); err != nil {
 		return nil, errgo.Notef(err, "cannot get models")
 	}
 	return &params.ListControllerResponse{
@@ -536,7 +541,7 @@ func (h *Handler) SetModelPerm(p httprequest.Params, arg *params.SetModelPerm) e
 
 func (h *Handler) setPerm(ctx context.Context, coll *mgo.Collection, path params.EntityPath, acl params.ACL) error {
 	// Only path.User (or members thereof) can change permissions.
-	if err := auth.CheckIsUser(ctx, path.User); err != nil {
+	if err := auth.CheckIsUser(ctx, h.id, path.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	zapctx.Info(ctx, "set perm", zap.String("collection", coll.Name), zap.Stringer("entity", path), zap.Any("acl", acl))
@@ -563,7 +568,7 @@ func (h *Handler) GetModelPerm(p httprequest.Params, arg *params.GetModelPerm) (
 
 func (h *Handler) getPerm(ctx context.Context, coll *mgo.Collection, path params.EntityPath) (params.ACL, error) {
 	// Only the owner can read permissions.
-	if err := auth.CheckIsUser(ctx, path.User); err != nil {
+	if err := auth.CheckIsUser(ctx, h.id, path.User); err != nil {
 		return params.ACL{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	acl, err := h.jem.DB.GetACL(ctx, coll, path)
@@ -578,7 +583,7 @@ func (h *Handler) getPerm(ctx context.Context, coll *mgo.Collection, path params
 // it is overwritten.
 func (h *Handler) UpdateCredential(p httprequest.Params, arg *params.UpdateCredential) error {
 	// Only the owner can set credentials.
-	if err := auth.CheckIsUser(p.Context, arg.User); err != nil {
+	if err := auth.CheckIsUser(p.Context, h.id, arg.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	_, err := h.jem.UpdateCredential(p.Context, &mongodoc.Credential{
@@ -594,7 +599,7 @@ func (h *Handler) UpdateCredential(p httprequest.Params, arg *params.UpdateCrede
 
 // JujuStatus retrieves and returns the status of the specifed model.
 func (h *Handler) JujuStatus(p httprequest.Params, arg *params.JujuStatus) (*params.JujuStatusResponse, error) {
-	if err := auth.CheckIsUser(p.Context, h.config.ControllerAdmin); err != nil {
+	if err := auth.CheckIsUser(p.Context, h.id, h.config.ControllerAdmin); err != nil {
 		if err := h.jem.DB.CheckReadACL(p.Context, h.jem.DB.Models(), arg.EntityPath); err != nil {
 			return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 		}
@@ -618,7 +623,7 @@ func (h *Handler) JujuStatus(p httprequest.Params, arg *params.JujuStatus) (*par
 // controller to a different one. The migration will not have
 // completed by the time the Migrate call returns.
 func (h *Handler) Migrate(p httprequest.Params, arg *params.Migrate) error {
-	if err := auth.CheckIsUser(p.Context, h.config.ControllerAdmin); err != nil {
+	if err := auth.CheckIsUser(p.Context, h.id, h.config.ControllerAdmin); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	model, err := h.jem.DB.Model(p.Context, arg.EntityPath)
@@ -669,7 +674,7 @@ func (h *Handler) LogLevel(p httprequest.Params, _ *params.LogLevel) (params.Lev
 }
 
 func (h *Handler) SetControllerDeprecated(p httprequest.Params, req *params.SetControllerDeprecated) error {
-	if err := auth.CheckIsUser(p.Context, req.EntityPath.User); err != nil {
+	if err := auth.CheckIsUser(p.Context, h.id, req.EntityPath.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	if err := h.jem.DB.SetControllerDeprecated(p.Context, req.EntityPath, req.Body.Deprecated); err != nil {
@@ -738,9 +743,9 @@ func cloudAndRegion(loc map[string]string) (locationParams, error) {
 
 // entityIter is an iterator over a set of entities.
 type entityIter interface {
-	Next(item auth.ACLEntity) bool
-	Close() error
-	Err() error
+	Next(ctx context.Context, item auth.ACLEntity) bool
+	Close(ctx context.Context) error
+	Err(ctx context.Context) error
 }
 
 // mgoIter is an adapter to convert a *mgo.Iter into an entityIter.
@@ -750,8 +755,16 @@ type mgoIter struct {
 
 // Next implements entityIter.Next by wrapping *mgo.Next using the
 // auth.ACLEntity type.
-func (it mgoIter) Next(item auth.ACLEntity) bool {
+func (it mgoIter) Next(_ context.Context, item auth.ACLEntity) bool {
 	return it.Iter.Next(item)
+}
+
+func (it mgoIter) Close(_ context.Context) error {
+	return it.Iter.Close()
+}
+
+func (it mgoIter) Err(_ context.Context) error {
+	return it.Iter.Err()
 }
 
 // GetModelName returns the name of the model identified by the provided uuid.
@@ -780,7 +793,7 @@ func (h *Handler) GetAuditEntries(p httprequest.Params, arg *params.AuditLogRequ
 
 // GetModelStatuses return the list of all models created between 2 dates (or all).
 func (h *Handler) GetModelStatuses(p httprequest.Params, arg *params.ModelStatusesRequest) (params.ModelStatuses, error) {
-	if err := auth.CheckIsUser(p.Context, h.config.ControllerAdmin); err != nil {
+	if err := auth.CheckIsUser(p.Context, h.id, h.config.ControllerAdmin); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	entries, err := h.jem.DB.GetModelStatuses(p.Context)
@@ -795,7 +808,7 @@ func (h *Handler) checkACL(ctx context.Context, aclName string) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	return errgo.Mask(auth.CheckACL(ctx, acl), errgo.Is(params.ErrUnauthorized))
+	return errgo.Mask(auth.CheckACL(ctx, h.id, acl), errgo.Is(params.ErrUnauthorized))
 }
 
 // MissingModels returns a list of models present on the given controller
@@ -803,7 +816,7 @@ func (h *Handler) checkACL(ctx context.Context, aclName string) error {
 func (h *Handler) MissingModels(p httprequest.Params, arg *params.MissingModelsRequest) (params.MissingModels, error) {
 	var resp params.MissingModels
 
-	if err := auth.CheckIsUser(p.Context, h.jem.ControllerAdmin()); err != nil {
+	if err := auth.CheckIsUser(p.Context, h.id, h.jem.ControllerAdmin()); err != nil {
 		if errgo.Cause(err) == params.ErrUnauthorized {
 			return resp, errgo.WithCausef(nil, params.ErrUnauthorized, "admin access required")
 		}

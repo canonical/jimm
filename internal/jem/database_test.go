@@ -1900,7 +1900,7 @@ var checkReadACLTests = []struct {
 func (s *databaseSuite) TestCheckReadACL(c *gc.C) {
 	for i, test := range checkReadACLTests {
 		c.Logf("%d. %s", i, test.about)
-		ctx := auth.ContextWithUser(testContext, test.user, test.groups...)
+		ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity(test.user, test.groups...))
 		entity := params.EntityPath{
 			User: params.User(test.owner),
 			Name: params.Name(fmt.Sprintf("test%d", i)),
@@ -1952,15 +1952,15 @@ func (s *databaseSuite) TestCanReadIter(c *gc.C) {
 		err := s.database.AddModel(testContext, &testModels[i])
 		c.Assert(err, gc.Equals, nil)
 	}
-	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 	it := s.database.Models().Find(nil).Sort("_id").Iter()
 	crit := s.database.NewCanReadIter(ctx, it)
 	var models []mongodoc.Model
 	var m mongodoc.Model
-	for crit.Next(&m) {
+	for crit.Next(testContext, &m) {
 		models = append(models, m)
 	}
-	c.Assert(crit.Err(), gc.IsNil)
+	c.Assert(crit.Err(testContext), gc.IsNil)
 	c.Assert(models, jemtest.CmpEquals(cmpopts.EquateEmpty()), []mongodoc.Model{
 		testModels[0],
 		testModels[2],
@@ -1999,19 +1999,19 @@ var setDeadTests = []struct {
 	about: "CanReadIter",
 	run: func(db *jem.Database) {
 		it := db.Models().Find(nil).Sort("_id").Iter()
-		ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+		ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 		crit := db.NewCanReadIter(ctx, it)
-		crit.Next(&mongodoc.Model{})
-		crit.Err()
+		crit.Next(ctx, &mongodoc.Model{})
+		crit.Err(ctx)
 	},
 }, {
 	about: "CanReadIter with Close",
 	run: func(db *jem.Database) {
 		it := db.Models().Find(nil).Sort("_id").Iter()
-		ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+		ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 		crit := db.NewCanReadIter(ctx, it)
-		crit.Next(&mongodoc.Model{})
-		crit.Close()
+		crit.Next(ctx, &mongodoc.Model{})
+		crit.Close(ctx)
 	},
 }, {
 	about: "clearCredentialUpdate",
