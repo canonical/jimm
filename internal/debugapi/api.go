@@ -36,7 +36,7 @@ func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httpr
 		}
 		h.Handler = debugstatus.Handler{
 			Version:           debugstatus.Version(version.VersionInfo),
-			CheckPprofAllowed: h.checkIsAdmin,
+			CheckPprofAllowed: func(req *http.Request) error { return h.checkIsAdmin(req.Context(), req) },
 			Check:             h.check,
 		}
 		return h, ctx, nil
@@ -48,19 +48,15 @@ type handler struct {
 	params                         jemserver.Params
 	jem                            *jem.JEM
 	auth                           *auth.Authenticator
-	ctx                            context.Context
 	usageSenderAuthorizationClient jem.UsageSenderAuthorizationClient
 }
 
-func (h *handler) checkIsAdmin(req *http.Request) error {
-	if h.ctx == nil {
-		ctx, err := h.auth.AuthenticateRequest(context.TODO(), req)
-		if err != nil {
-			return errgo.Mask(err, errgo.Any)
-		}
-		h.ctx = ctx
+func (h *handler) checkIsAdmin(ctx context.Context, req *http.Request) error {
+	id, err := h.auth.AuthenticateRequest(ctx, req)
+	if err != nil {
+		return errgo.Mask(err, errgo.Any)
 	}
-	return auth.CheckIsUser(h.ctx, h.params.ControllerAdmin)
+	return auth.CheckIsUser(ctx, id, h.params.ControllerAdmin)
 }
 
 func (h *handler) check(ctx context.Context) map[string]debugstatus.CheckResult {
@@ -90,7 +86,7 @@ type DebugUsageSenderCheckRequest struct {
 // DebugUsageSenderCheck implements a check that verifies that JIMM is able
 // to perform usage sender authorization.
 func (h *handler) DebugUsageSenderCheck(p httprequest.Params, r *DebugUsageSenderCheckRequest) error {
-	if err := h.checkIsAdmin(p.Request); err != nil {
+	if err := h.checkIsAdmin(p.Context, p.Request); err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}
 

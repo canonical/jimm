@@ -14,7 +14,6 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
-	"github.com/CanonicalLtd/jimm/internal/ctxutil"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
@@ -226,7 +225,7 @@ func (c cloudV4) Clouds(ctx context.Context) (jujuparams.CloudsResult, error) {
 // DefaultCloud implements the DefaultCloud method of the Cloud facade.
 // It returns a default cloud if there is only one cloud available.
 func (c cloudV4) DefaultCloud(ctx context.Context) (jujuparams.StringResult, error) {
-	ctx = ctxutil.Join(ctx, c.c.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, c.c.root.identity)
 	var result jujuparams.StringResult
 	clouds, err := c.c.clouds(ctx)
 	if err != nil {
@@ -295,7 +294,7 @@ type cloudV5 struct {
 
 // Cloud implements the Cloud method of the Cloud facade.
 func (c cloudV5) Cloud(ctx context.Context, ents jujuparams.Entities) (jujuparams.CloudResults, error) {
-	ctx = ctxutil.Join(ctx, c.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, c.root.identity)
 	cloudResults := make([]jujuparams.CloudResult, len(ents.Entities))
 	clouds, err := c.clouds(ctx)
 	if err != nil {
@@ -328,7 +327,7 @@ func (c cloudV5) cloud(cloudTag string, clouds map[string]jujuparams.Cloud) (*ju
 
 // Clouds implements the Clouds method on the Cloud facade.
 func (c cloudV5) Clouds(ctx context.Context) (jujuparams.CloudsResult, error) {
-	ctx = ctxutil.Join(ctx, c.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, c.root.identity)
 	var res jujuparams.CloudsResult
 	var err error
 	res.Clouds, err = c.clouds(ctx)
@@ -339,7 +338,7 @@ func (c cloudV5) clouds(ctx context.Context) (map[string]jujuparams.Cloud, error
 	iter := c.root.jem.DB.GetCloudRegionsIter(ctx)
 	results := map[string]jujuparams.Cloud{}
 	var v mongodoc.CloudRegion
-	for iter.Next(&v) {
+	for iter.Next(ctx, &v) {
 		key := names.NewCloudTag(string(v.Cloud)).String()
 		cr, _ := results[key]
 		if v.Region == "" {
@@ -360,7 +359,7 @@ func (c cloudV5) clouds(ctx context.Context) (map[string]jujuparams.Cloud, error
 		}
 		results[key] = cr
 	}
-	if err := iter.Err(); err != nil {
+	if err := iter.Err(ctx); err != nil {
 		return nil, errgo.Notef(err, "cannot query")
 	}
 	return results, nil
@@ -368,7 +367,7 @@ func (c cloudV5) clouds(ctx context.Context) (map[string]jujuparams.Cloud, error
 
 // UserCredentials implements the UserCredentials method of the Cloud facade.
 func (c cloudV5) UserCredentials(ctx context.Context, userclouds jujuparams.UserClouds) (jujuparams.StringsResults, error) {
-	ctx = ctxutil.Join(ctx, c.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, c.root.identity)
 	results := make([]jujuparams.StringsResult, len(userclouds.UserClouds))
 	for i, ent := range userclouds.UserClouds {
 		creds, err := c.userCredentials(ctx, ent.UserTag, ent.CloudTag)
@@ -409,17 +408,17 @@ func (c cloudV5) userCredentials(ctx context.Context, ownerTag, cloudTag string)
 		}},
 	).Iter())
 	var cred mongodoc.Credential
-	for it.Next(&cred) {
+	for it.Next(ctx, &cred) {
 		cloudCreds = append(cloudCreds, jem.CloudCredentialTag(cred.Path.ToParams()).String())
 	}
 
-	return cloudCreds, errgo.Mask(it.Err())
+	return cloudCreds, errgo.Mask(it.Err(ctx))
 }
 
 func (c cloudV5) RevokeCredentialsCheckModels(ctx context.Context, args jujuparams.RevokeCredentialArgs) (jujuparams.ErrorResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = ctxutil.Join(ctx, c.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, c.root.identity)
 	results := make([]jujuparams.ErrorResult, len(args.Credentials))
 	for i, ent := range args.Credentials {
 		if err := c.revokeCredential(ctx, ent.Tag, ent.Force); err != nil {
@@ -445,7 +444,7 @@ func (c cloudV5) revokeCredential(ctx context.Context, tag string, force bool) e
 		// such a credential will not have been uploaded, so it exists
 		return nil
 	}
-	if err := auth.CheckIsUser(ctx, params.User(credtag.Owner().Name())); err != nil {
+	if err := auth.CheckIsUser(ctx, c.root.identity, params.User(credtag.Owner().Name())); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	if err := c.root.jem.RevokeCredential(ctx, params.CredentialPath{
@@ -460,7 +459,7 @@ func (c cloudV5) revokeCredential(ctx context.Context, tag string, force bool) e
 
 // Credential implements the Credential method of the Cloud facade.
 func (c cloudV5) Credential(ctx context.Context, args jujuparams.Entities) (jujuparams.CloudCredentialResults, error) {
-	ctx = ctxutil.Join(ctx, c.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, c.root.identity)
 	results := make([]jujuparams.CloudCredentialResult, len(args.Entities))
 	for i, e := range args.Entities {
 		cred, err := c.credential(ctx, e.Tag)
@@ -521,8 +520,8 @@ func (c cloudV5) credential(ctx context.Context, cloudCredentialTag string) (*ju
 
 // AddCloud implements the AddCloud method of the Cloud (v2) facade.
 func (c cloudV5) AddCloud(ctx context.Context, args jujuparams.AddCloudArgs) error {
-	ctx = ctxutil.Join(ctx, c.root.authContext)
-	username := auth.Username(ctx)
+	ctx = auth.ContextWithIdentity(ctx, c.root.identity)
+	username := c.root.identity.Id()
 	cloud := mongodoc.CloudRegion{
 		Cloud:            params.Cloud(args.Name),
 		ProviderType:     args.Cloud.Type,
@@ -607,7 +606,7 @@ func (c cloudV5) AddCredentials(ctx context.Context, args jujuparams.TaggedCrede
 
 // CredentialContents implements the CredentialContents method of the Cloud (v2) facade.
 func (c cloudV5) CredentialContents(ctx context.Context, args jujuparams.CloudCredentialArgs) (jujuparams.CredentialContentResults, error) {
-	ctx = ctxutil.Join(ctx, c.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, c.root.identity)
 	results := make([]jujuparams.CredentialContentResult, len(args.Credentials))
 	for i, arg := range args.Credentials {
 		credInfo, err := c.credentialInfo(ctx, arg.CloudName, arg.CredentialName, args.IncludeSecrets)
@@ -628,7 +627,7 @@ func (c cloudV5) CredentialContents(ctx context.Context, args jujuparams.CloudCr
 func (c cloudV5) credentialInfo(ctx context.Context, cloudName, credentialName string, includeSecrets bool) (*jujuparams.ControllerCredentialInfo, error) {
 	credPath := params.CredentialPath{
 		Cloud: params.Cloud(cloudName),
-		User:  params.User(auth.Username(ctx)),
+		User:  params.User(c.root.identity.Id()),
 		Name:  params.CredentialName(credentialName),
 	}
 	cred, err := c.root.jem.Credential(ctx, credPath)
@@ -661,11 +660,11 @@ func (c cloudV5) credentialInfo(ctx context.Context, cloudName, credentialName s
 		}
 		access := jujuparams.ModelReadAccess
 		switch {
-		case params.User(auth.Username(ctx)) == model.Path.User:
+		case params.User(c.root.identity.Id()) == model.Path.User:
 			access = jujuparams.ModelAdminAccess
-		case auth.CheckACL(ctx, model.ACL.Admin) == nil:
+		case auth.CheckACL(ctx, c.root.identity, model.ACL.Admin) == nil:
 			access = jujuparams.ModelAdminAccess
-		case auth.CheckACL(ctx, model.ACL.Write) == nil:
+		case auth.CheckACL(ctx, c.root.identity, model.ACL.Write) == nil:
 			access = jujuparams.ModelWriteAccess
 		}
 		cci.Models = append(cci.Models, jujuparams.ModelAccess{
@@ -680,7 +679,7 @@ func (c cloudV5) credentialInfo(ctx context.Context, cloudName, credentialName s
 // RemoveClouds removes the specified clouds from the controller.
 // If a cloud is in use (has models deployed to it), the removal will fail.
 func (c cloudV5) RemoveClouds(ctx context.Context, args jujuparams.Entities) (jujuparams.ErrorResults, error) {
-	ctx = ctxutil.Join(ctx, c.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, c.root.identity)
 	result := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, len(args.Entities)),
 	}
@@ -704,7 +703,7 @@ func (c cloudV5) CheckCredentialsModels(ctx context.Context, args jujuparams.Tag
 
 // ModifyCloudAccess changes the cloud access granted to users.
 func (c cloudV5) ModifyCloudAccess(ctx context.Context, args jujuparams.ModifyCloudAccessRequest) (jujuparams.ErrorResults, error) {
-	ctx = ctxutil.Join(ctx, c.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, c.root.identity)
 	results := make([]jujuparams.ErrorResult, len(args.Changes))
 	for i, change := range args.Changes {
 		results[i].Error = mapError(c.modifyCloudAccess(ctx, change))
@@ -751,7 +750,7 @@ func (c cloudV5) UpdateCredentialsCheckModels(ctx context.Context, args jujupara
 }
 
 func (c cloudV5) updateCredentials(ctx context.Context, args []jujuparams.TaggedCredential, flags jem.CredentialUpdateFlags) (jujuparams.UpdateCredentialResults, error) {
-	ctx = ctxutil.Join(ctx, c.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, c.root.identity)
 	results := jujuparams.UpdateCredentialResults{
 		Results: make([]jujuparams.UpdateCredentialResult, len(args)),
 	}
@@ -778,7 +777,7 @@ func (c cloudV5) updateCredential(ctx context.Context, cred jujuparams.TaggedCre
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
-	if err := auth.CheckIsUser(ctx, owner); err != nil {
+	if err := auth.CheckIsUser(ctx, c.root.identity, owner); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	var name params.Name
@@ -805,7 +804,7 @@ func (c cloudV5) updateCredential(ctx context.Context, cred jujuparams.TaggedCre
 
 // UpdateCloud updates the specified clouds.
 func (c cloudV5) UpdateCloud(ctx context.Context, args jujuparams.UpdateCloudArgs) (jujuparams.ErrorResults, error) {
-	ctx = ctxutil.Join(ctx, c.root.authContext)
+	ctx = auth.ContextWithIdentity(ctx, c.root.identity)
 	results := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, len(args.Clouds)),
 	}

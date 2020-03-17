@@ -53,8 +53,8 @@ func newWebSocketHandler(ctx context.Context, params jemserver.HandlerParams) ht
 			defer servermon.ConcurrentWebsocketConnections.Dec()
 			j := params.JEMPool.JEM(ctx)
 			defer j.Close()
-			wsServer := newWSServer(ctx, j, params.Authenticator, params.Params, p.ByName("modeluuid"))
-			wsServer.ServeHTTP(w, r)
+			wsServer := newWSServer(j, params.Authenticator, params.Params, p.ByName("modeluuid"))
+			wsServer.ServeHTTP(w, r.WithContext(ctx))
 		},
 	}
 }
@@ -65,11 +65,12 @@ func newRootWebSocketHandler(ctx context.Context, params jemserver.HandlerParams
 		Path:   path,
 		Handle: func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 			// _TODO add unique id to context or derive it from http request.
-			ctx := zapctx.WithFields(ctx, zap.Bool("websocket", true))
+			ctx := ctxutil.Join(r.Context(), ctx)
+			ctx = zapctx.WithFields(ctx, zap.Bool("websocket", true))
 			j := params.JEMPool.JEM(ctx)
 			defer j.Close()
-			wsServer := newWSServer(ctx, j, params.Authenticator, params.Params, "")
-			wsServer.ServeHTTP(w, r)
+			wsServer := newWSServer(j, params.Authenticator, params.Params, "")
+			wsServer.ServeHTTP(w, r.WithContext(ctx))
 		},
 	}
 }

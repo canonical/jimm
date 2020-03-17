@@ -19,12 +19,13 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
 func (s *jemSuite) TestModelStats(c *gc.C) {
-	ctx := auth.ContextWithUser(testContext, "bob")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob"))
 
 	ctl1Id := s.addController(c, params.EntityPath{"bob", "controller1"})
 	ctl2Id := s.addController(c, params.EntityPath{"bob", "controller2"})
@@ -149,7 +150,7 @@ func (s *jemSuite) TestModelStats(c *gc.C) {
 }
 
 func (s *jemSuite) TestMachineStats(c *gc.C) {
-	ctx := auth.ContextWithUser(testContext, "bob")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob"))
 
 	ctl1Id := s.addController(c, params.EntityPath{"bob", "controller1"})
 	ctl2Id := s.addController(c, params.EntityPath{"bob", "controller2"})

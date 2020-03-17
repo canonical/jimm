@@ -10,6 +10,7 @@ import (
 	"github.com/juju/version"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
@@ -1152,7 +1153,7 @@ func (db *Database) RevokeModel(ctx context.Context, path params.EntityPath, use
 func (db *Database) CheckReadACL(ctx context.Context, c *mgo.Collection, path params.EntityPath) (err error) {
 	defer db.checkError(ctx, &err)
 	// The user can always access their own entities.
-	if err := auth.CheckIsUser(ctx, path.User); err == nil {
+	if err := auth.CheckIsUser(ctx, auth.IdentityFromContext(ctx), path.User); err == nil {
 		return nil
 	}
 	acl, err := db.GetACL(ctx, c, path)
@@ -1163,7 +1164,7 @@ func (db *Database) CheckReadACL(ctx context.Context, c *mgo.Collection, path pa
 		// people probing for the existence of other people's entities.
 		return params.ErrUnauthorized
 	}
-	if err := auth.CheckACL(ctx, acl.Read); err != nil {
+	if err := auth.CheckACL(ctx, auth.IdentityFromContext(ctx), acl.Read); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	return nil
@@ -1176,7 +1177,7 @@ func (db *Database) CheckReadACL(ctx context.Context, c *mgo.Collection, path pa
 // The API matches that of mgo.Iter.
 func (db *Database) NewCanReadIter(ctx context.Context, iter *mgo.Iter) *CanReadIter {
 	return &CanReadIter{
-		ctx:  ctx,
+		id:   auth.IdentityFromContext(ctx),
 		iter: iter,
 		db:   db,
 	}
@@ -1185,7 +1186,7 @@ func (db *Database) NewCanReadIter(ctx context.Context, iter *mgo.Iter) *CanRead
 // CanReadIter represents an iterator that returns only items
 // that the currently authenticated user has read access to.
 type CanReadIter struct {
-	ctx  context.Context
+	id   identchecker.ACLIdentity
 	db   *Database
 	iter *mgo.Iter
 	err  error
@@ -1194,13 +1195,13 @@ type CanReadIter struct {
 
 // Next reads the next item from the iterator into the given
 // item and returns whether it has done so.
-func (iter *CanReadIter) Next(item auth.ACLEntity) bool {
+func (iter *CanReadIter) Next(ctx context.Context, item auth.ACLEntity) bool {
 	if iter.err != nil {
 		return false
 	}
 	for iter.iter.Next(item) {
 		iter.n++
-		if err := auth.CheckCanRead(iter.ctx, item); err != nil {
+		if err := auth.CheckCanRead(ctx, iter.id, item); err != nil {
 			if errgo.Cause(err) == params.ErrUnauthorized {
 				// No permissions to look at the entity, so don't include
 				// it in the results.
@@ -1215,13 +1216,13 @@ func (iter *CanReadIter) Next(item auth.ACLEntity) bool {
 	return false
 }
 
-func (iter *CanReadIter) Close() error {
+func (iter *CanReadIter) Close(ctx context.Context) error {
 	iter.iter.Close()
-	return iter.Err()
+	return iter.Err(ctx)
 }
 
 // Err returns any error encountered when iterating.
-func (iter *CanReadIter) Err() error {
+func (iter *CanReadIter) Err(ctx context.Context) error {
 	if iter.err != nil {
 		// If iter.err is set, it's because CheckCanRead
 		// has failed, and that doesn't talk to mongo,
@@ -1229,7 +1230,7 @@ func (iter *CanReadIter) Err() error {
 		return iter.err
 	}
 	err := iter.iter.Err()
-	iter.db.checkError(iter.ctx, &err)
+	iter.db.checkError(ctx, &err)
 	return err
 }
 

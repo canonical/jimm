@@ -49,7 +49,6 @@ require (
 	github.com/lunixbochs/vtclean v0.0.0-20180621232353-2d01aacdc34a // indirect
 	github.com/masterzen/winrm v0.0.0-20181112102303-a196a4ff2a86 // indirect
 	github.com/mattn/go-runewidth v0.0.3 // indirect
-	github.com/mhilton/juju-juju v0.0.0-20150901100907-a94dd2c73455 // indirect
 	github.com/prometheus/client_golang v1.0.0
 	github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af
 	go.uber.org/zap v1.10.0
@@ -63,7 +62,7 @@ require (
 	gopkg.in/juju/environschema.v1 v1.0.0
 	gopkg.in/juju/names.v3 v3.0.0-20200131033104-139ecaca454c
 	gopkg.in/juju/worker.v1 v1.0.0-20191018043616-19a698a7150f
-	gopkg.in/macaroon-bakery.v2 v2.1.1-0.20190613120608-6734dc66fe81
+	gopkg.in/macaroon-bakery.v2 v2.2.0
 	gopkg.in/macaroon.v2 v2.1.0
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
