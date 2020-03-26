@@ -1576,6 +1576,16 @@ func (j *JEM) UpdateModelCredential(ctx context.Context, conn *apiconn.Conn, mod
 	return nil
 }
 
+func (j *JEM) MongoVersion(ctx context.Context) (jujuparams.StringResult, error) {
+	result := jujuparams.StringResult{}
+	binfo, err := j.pool.config.DB.Session.BuildInfo()
+	if err != nil {
+		return result, errgo.Mask(err)
+	}
+	result.Result = binfo.Version
+	return result, nil
+}
+
 func plural(n int) string {
 	if n == 1 {
 		return ""

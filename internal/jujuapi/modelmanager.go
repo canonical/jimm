@@ -431,7 +431,11 @@ func (m modelManagerAPI) dumpModelDB(ctx context.Context, ent jujuparams.Entity)
 
 // ModelStatus implements the ModelManager facade's ModelStatus method.
 func (m modelManagerAPI) ModelStatus(ctx context.Context, req jujuparams.Entities) (jujuparams.ModelStatusResults, error) {
-	return controller{m.root}.ModelStatus(ctx, req)
+	v3, err := m.root.ControllerV3("")
+	if err != nil {
+		return jujuparams.ModelStatusResults{}, errgo.Mask(err)
+	}
+	return v3.ModelStatus(ctx, req)
 }
 
 // ChangeModelCredential implements the ModelManager (v5) facade's
