@@ -6,8 +6,8 @@ import (
 	"context"
 	"net/http"
 
-	"gopkg.in/httprequest.v1"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/jimm/internal/zapctx"

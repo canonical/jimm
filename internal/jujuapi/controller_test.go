@@ -26,6 +26,7 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
 	"github.com/CanonicalLtd/jimm/params"
+	jimmversion "github.com/CanonicalLtd/jimm/version"
 )
 
 type controllerSuite struct {
@@ -688,6 +689,85 @@ func (s *controllerSuite) TestWatchModelSummaries(c *gc.C) {
 
 	err = conn.APICall("ModelSummaryWatcher", 1, "unknown-id", "Next", nil, &summaries)
 	c.Assert(err, gc.ErrorMatches, `not found \(not found\)`)
+}
+
+func (s *controllerSuite) TestMongoVersion(c *gc.C) {
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
+
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+
+	var version jujuparams.StringResult
+	err := conn.APICall("Controller", 6, "", "MongoVersion", nil, &version)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(version.Result, gc.Not(gc.Equals), "")
+
+	err = conn.APICall("Controller", 9, "", "MongoVersion", nil, &version)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(version.Result, gc.Not(gc.Equals), "")
+}
+
+func (s *controllerSuite) TestConfigSet(c *gc.C) {
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
+
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+
+	err := conn.APICall("Controller", 5, "", "ConfigSet", jujuparams.ControllerConfigSet{}, nil)
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = conn.APICall("Controller", 9, "", "ConfigSet", jujuparams.ControllerConfigSet{}, nil)
+	c.Assert(err, jc.ErrorIsNil)
+}
+
+func (s *controllerSuite) TestIdentityProviderURL(c *gc.C) {
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
+
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+
+	var result jujuparams.StringResult
+	err := conn.APICall("Controller", 7, "", "IdentityProviderURL", nil, &result)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(result.Result, gc.Matches, `https://127\.0\.0\.1.*`)
+
+	err = conn.APICall("Controller", 9, "", "IdentityProviderURL", nil, &result)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(result.Result, gc.Matches, `https://127\.0\.0\.1.*`)
+}
+
+func (s *controllerSuite) TestControllerVersion(c *gc.C) {
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
+
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+
+	var result jujuparams.ControllerVersionResults
+	err := conn.APICall("Controller", 8, "", "ControllerVersion", nil, &result)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(result, jc.DeepEquals, jujuparams.ControllerVersionResults{
+		Version:   "0.0.0",
+		GitCommit: jimmversion.VersionInfo.GitCommit,
+	})
+
+	err = conn.APICall("Controller", 9, "", "ControllerVersion", nil, &result)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(result, jc.DeepEquals, jujuparams.ControllerVersionResults{
+		Version:   "0.0.0",
+		GitCommit: jimmversion.VersionInfo.GitCommit,
+	})
 }
 
 func assertModelInfo(c *gc.C, obtained, expected []jujuparams.ModelInfoResult) {

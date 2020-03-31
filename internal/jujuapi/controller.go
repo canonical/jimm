@@ -38,6 +38,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
 	"github.com/CanonicalLtd/jimm/params"
+	jimmversion "github.com/CanonicalLtd/jimm/version"
 )
 
 type facade struct {
@@ -63,7 +64,7 @@ var facades = map[facade]string{
 	{"Cloud", 3}:               "CloudV3",
 	{"Cloud", 4}:               "CloudV4",
 	{"Cloud", 5}:               "CloudV5",
-	{"Controller", 3}:          "Controller",
+	{"Controller", 3}:          "ControllerV3",
 	{"Controller", 4}:          "ControllerV4",
 	{"Controller", 5}:          "ControllerV5",
 	{"Controller", 6}:          "ControllerV6",
@@ -135,12 +136,14 @@ func (r *controllerRoot) Bundle(id string) (*bundle.APIv1, error) {
 }
 
 // Controller returns an implementation of the Controller facade (version 3).
-func (r *controllerRoot) Controller(id string) (controller, error) {
+func (r *controllerRoot) ControllerV3(id string) (controllerV3, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return controller{}, common.ErrBadId
+		return controllerV3{}, common.ErrBadId
 	}
-	return controller{r}, nil
+	return controllerV3{
+		controllerRoot: r,
+	}, nil
 }
 
 // ControllerV4 returns an implementation of the Controller facade (version 4).
@@ -149,8 +152,12 @@ func (r *controllerRoot) ControllerV4(id string) (controllerV4, error) {
 		// Safeguard id for possible future use.
 		return controllerV4{}, common.ErrBadId
 	}
+	v3, err := r.ControllerV3(id)
+	if err != nil {
+		return controllerV4{}, errgo.Mask(err)
+	}
 	return controllerV4{
-		controller{r},
+		controllerV3: &v3,
 	}, nil
 }
 
@@ -160,8 +167,12 @@ func (r *controllerRoot) ControllerV5(id string) (controllerV5, error) {
 		// Safeguard id for possible future use.
 		return controllerV5{}, common.ErrBadId
 	}
+	v4, err := r.ControllerV4(id)
+	if err != nil {
+		return controllerV5{}, errgo.Mask(err)
+	}
 	return controllerV5{
-		controller{r},
+		controllerV4: &v4,
 	}, nil
 }
 
@@ -171,8 +182,12 @@ func (r *controllerRoot) ControllerV6(id string) (controllerV6, error) {
 		// Safeguard id for possible future use.
 		return controllerV6{}, common.ErrBadId
 	}
+	v5, err := r.ControllerV5(id)
+	if err != nil {
+		return controllerV6{}, errgo.Mask(err)
+	}
 	return controllerV6{
-		controller{r},
+		controllerV5: &v5,
 	}, nil
 }
 
@@ -182,8 +197,12 @@ func (r *controllerRoot) ControllerV7(id string) (controllerV7, error) {
 		// Safeguard id for possible future use.
 		return controllerV7{}, common.ErrBadId
 	}
+	v6, err := r.ControllerV6(id)
+	if err != nil {
+		return controllerV7{}, errgo.Mask(err)
+	}
 	return controllerV7{
-		controller{r},
+		controllerV6: &v6,
 	}, nil
 }
 
@@ -193,24 +212,28 @@ func (r *controllerRoot) ControllerV8(id string) (controllerV8, error) {
 		// Safeguard id for possible future use.
 		return controllerV8{}, common.ErrBadId
 	}
+	v7, err := r.ControllerV7(id)
+	if err != nil {
+		return controllerV8{}, errgo.Mask(err)
+	}
 	return controllerV8{
-		controller{r},
+		controllerV7: &v7,
 	}, nil
 }
 
 // Controller returns an implementation of the Controller facade (version 9).
-func (r *controllerRoot) ControllerV9(id string) (controllerV9, error) {
-	c, err := r.Controller(id)
-	if err != nil {
-		return controllerV9{}, errgo.Mask(err)
-	}
+func (r *controllerRoot) ControllerV9(id string) (*controllerV9, error) {
 	g, err := fastuuid.NewGenerator()
 	if err != nil {
-		return controllerV9{}, errgo.Mask(err)
+		return nil, errgo.Mask(err)
 	}
-	return controllerV9{
-		controller: c,
-		generator:  g,
+	v8, err := r.ControllerV8(id)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return &controllerV9{
+		controllerV8: &v8,
+		generator:    g,
 	}, nil
 }
 
@@ -384,61 +407,94 @@ func facadeVersions(facades map[facade]string) []jujuparams.FacadeVersions {
 	return fvs
 }
 
+type controllerV3 struct {
+	*controllerRoot
+}
+
 type controllerV4 struct {
-	controller
+	*controllerV3
 }
 
 type controllerV5 struct {
-	controller
+	*controllerV4
+}
+
+// ConfigSet changes the value of specified controller configuration
+// settings. Only some settings can be changed after bootstrap.
+// JIMM does not support changing settings via ConfigSet.
+func (c controllerV5) ConfigSet(ctx context.Context, args jujuparams.ControllerConfigSet) error {
+	return nil
 }
 
 type controllerV6 struct {
-	controller
+	*controllerV5
+}
+
+// MongoVersion allows the introspection of the mongo version per controller.
+func (c controllerV6) MongoVersion(ctx context.Context) (jujuparams.StringResult, error) {
+	return c.jem.MongoVersion(ctx)
 }
 
 type controllerV7 struct {
-	controller
+	*controllerV6
+}
+
+// IdentityProviderURL returns the URL of the configured external identity
+// provider for this controller or an empty string if no external identity
+// provider has been configured when the controller was bootstrapped.
+func (c controllerV7) IdentityProviderURL(ctx context.Context) (jujuparams.StringResult, error) {
+	return jujuparams.StringResult{
+		Result: c.params.IdentityLocation,
+	}, nil
 }
 
 type controllerV8 struct {
-	controller
+	*controllerV7
+}
+
+// ControllerVersion returns the version information associated with this
+// controller binary.
+func (c controllerV8) ControllerVersion(ctx context.Context) (jujuparams.ControllerVersionResults, error) {
+	srvVersion, err := c.jem.EarliestControllerVersion(ctx)
+	if err != nil {
+		return jujuparams.ControllerVersionResults{}, errgo.Mask(err)
+	}
+	result := jujuparams.ControllerVersionResults{
+		Version:   srvVersion.String(),
+		GitCommit: jimmversion.VersionInfo.GitCommit,
+	}
+	return result, nil
 }
 
 type controllerV9 struct {
-	controller
+	*controllerV8
 
 	generator *fastuuid.Generator
-	watchers  watcherRegistry
 }
 
 func (c controllerV9) WatchModelSummaries(ctx context.Context) (jujuparams.SummaryWatcherID, error) {
 	id := fmt.Sprintf("%v", c.generator.Next())
 
-	watcher, err := newModelSummaryWatcher(auth.ContextWithIdentity(ctx, c.root.identity), id, c.root, c.root.jem.Pubsub())
+	watcher, err := newModelSummaryWatcher(auth.ContextWithIdentity(ctx, c.identity), id, c.controllerRoot, c.jem.Pubsub())
 	if err != nil {
 		return jujuparams.SummaryWatcherID{}, errgo.Mask(err)
 	}
-	c.root.watchers.register(watcher)
+	c.watchers.register(watcher)
 
 	return jujuparams.SummaryWatcherID{
 		WatcherID: id,
 	}, nil
 }
 
-// controller implements the Controller facade.
-type controller struct {
-	root *controllerRoot
+func (c *controllerV3) AllModels(ctx context.Context) (jujuparams.UserModelList, error) {
+	ctx = auth.ContextWithIdentity(ctx, c.identity)
+	return c.allModels(ctx)
 }
 
-func (c controller) AllModels(ctx context.Context) (jujuparams.UserModelList, error) {
-	ctx = auth.ContextWithIdentity(ctx, c.root.identity)
-	return c.root.allModels(ctx)
-}
-
-func (c controller) ModelStatus(ctx context.Context, args jujuparams.Entities) (jujuparams.ModelStatusResults, error) {
+func (c *controllerV3) ModelStatus(ctx context.Context, args jujuparams.Entities) (jujuparams.ModelStatusResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, c.root.identity)
+	ctx = auth.ContextWithIdentity(ctx, c.identity)
 	results := make([]jujuparams.ModelStatus, len(args.Entities))
 	// TODO (fabricematrat) get status for all of the models connected
 	// to a single controller in one go.
@@ -456,8 +512,8 @@ func (c controller) ModelStatus(ctx context.Context, args jujuparams.Entities) (
 }
 
 // modelStatus retrieves the model status for the specified entity.
-func (c controller) modelStatus(ctx context.Context, arg jujuparams.Entity) (*jujuparams.ModelStatus, error) {
-	mi, err := c.root.modelInfo(ctx, arg, false)
+func (c *controllerV3) modelStatus(ctx context.Context, arg jujuparams.Entity) (*jujuparams.ModelStatus, error) {
+	mi, err := c.modelInfo(ctx, arg, false)
 	if err != nil {
 		return &jujuparams.ModelStatus{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
@@ -472,11 +528,11 @@ func (c controller) modelStatus(ctx context.Context, arg jujuparams.Entity) (*ju
 }
 
 // ControllerConfig returns the controller's configuration.
-func (c controller) ControllerConfig() (jujuparams.ControllerConfigResult, error) {
+func (c *controllerV3) ControllerConfig() (jujuparams.ControllerConfigResult, error) {
 	result := jujuparams.ControllerConfigResult{
 		Config: map[string]interface{}{
-			"charmstore-url": c.root.params.CharmstoreLocation,
-			"metering-url":   c.root.params.MeteringLocation,
+			"charmstore-url": c.params.CharmstoreLocation,
+			"metering-url":   c.params.MeteringLocation,
 		},
 	}
 	return result, nil
@@ -485,7 +541,7 @@ func (c controller) ControllerConfig() (jujuparams.ControllerConfigResult, error
 // ModelConfig returns implements the controller facade's ModelConfig
 // method. This always returns a permission error, as no user has admin
 // access to the controller.
-func (c controller) ModelConfig() (jujuparams.ModelConfigResults, error) {
+func (c *controllerV3) ModelConfig() (jujuparams.ModelConfigResults, error) {
 	return jujuparams.ModelConfigResults{}, &jujuparams.Error{
 		Code:    jujuparams.CodeUnauthorized,
 		Message: "permission denied",
