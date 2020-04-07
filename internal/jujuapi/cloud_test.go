@@ -919,6 +919,27 @@ func (s *cloudSuite) TestCredentialContents(c *gc.C) {
 			}},
 		},
 	}})
+
+	// unspecified credentials return all.
+	creds, err = client.CredentialContents("", "", true)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(creds, jc.DeepEquals, []jujuparams.CredentialContentResult{{
+		Result: &jujuparams.ControllerCredentialInfo{
+			Content: jujuparams.CredentialContent{
+				Name:     "cred3",
+				Cloud:    "dummy",
+				AuthType: "userpass",
+				Attributes: map[string]string{
+					"username": "test-user",
+					"password": "S3cret",
+				},
+			},
+			Models: []jujuparams.ModelAccess{{
+				Model:  "model1",
+				Access: "admin",
+			}},
+		},
+	}})
 }
 
 func (s *cloudSuite) TestRemoveCloud(c *gc.C) {

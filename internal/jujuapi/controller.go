@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"sort"
 	"sync"
+	"time"
 
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
 	"github.com/juju/juju/apiserver/common"
@@ -71,7 +72,8 @@ var facades = map[facade]string{
 	{"Controller", 7}:          "ControllerV7",
 	{"Controller", 8}:          "ControllerV8",
 	{"Controller", 9}:          "ControllerV9",
-	{"JIMM", 1}:                "JIMM",
+	{"JIMM", 1}:                "JIMMV2",
+	{"JIMM", 2}:                "JIMMV2",
 	{"ModelManager", 2}:        "ModelManagerV2",
 	{"ModelManager", 3}:        "ModelManagerV3",
 	{"ModelManager", 4}:        "ModelManagerAPI",
@@ -97,6 +99,8 @@ type controllerRoot struct {
 	mu       sync.Mutex
 	identity identchecker.ACLIdentity
 	facades  map[facade]string
+
+	controllerUUIDMasking bool
 }
 
 func newControllerRoot(jem *jem.JEM, a *auth.Authenticator, p jemserver.Params, hm heartMonitor) *controllerRoot {
@@ -110,6 +114,7 @@ func newControllerRoot(jem *jem.JEM, a *auth.Authenticator, p jemserver.Params, 
 		watchers: &watcherRegistry{
 			watchers: make(map[string]*modelSummaryWatcher),
 		},
+		controllerUUIDMasking: true,
 	}
 	r.findMethod = rpcreflect.ValueOf(reflect.ValueOf(r)).FindMethod
 	return r
@@ -247,14 +252,14 @@ func (r *controllerRoot) ModelSummaryWatcher(id string) (*modelSummaryWatcher, e
 	return w, nil
 }
 
-// JIMM returns an implementation of the JIMM-specific
+// JIMMV2 returns an implementation of the V2 JIMM-specific
 // API facade.
-func (r *controllerRoot) JIMM(id string) (jimm, error) {
+func (r *controllerRoot) JIMMV2(id string) (jimmV2, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return jimm{}, common.ErrBadId
+		return jimmV2{}, common.ErrBadId
 	}
-	return jimm{r}, nil
+	return jimmV2{r}, nil
 }
 
 // Pinger returns an implementation of the Pinger facade (version 1).
@@ -665,7 +670,7 @@ func (r *controllerRoot) modelDocToModelInfo(ctx context.Context, model *mongodo
 			Access:      userLevels[r.identity.Id()],
 		})
 	}
-	return &jujuparams.ModelInfo{
+	info := &jujuparams.ModelInfo{
 		Name:               string(model.Path.Name),
 		UUID:               model.UUID,
 		ControllerUUID:     r.params.ControllerUUID,
@@ -673,7 +678,7 @@ func (r *controllerRoot) modelDocToModelInfo(ctx context.Context, model *mongodo
 		DefaultSeries:      model.DefaultSeries,
 		CloudTag:           jem.CloudTag(model.Cloud).String(),
 		CloudRegion:        model.CloudRegion,
-		CloudCredentialTag: jem.CloudCredentialTag(model.Credential).String(),
+		CloudCredentialTag: jem.CloudCredentialTag(model.Credential.ToParams()).String(),
 		OwnerTag:           jem.UserTag(model.Path.User).String(),
 		Life:               life.Value(model.Life()),
 		Status:             modelStatus(model.Info),
@@ -681,7 +686,16 @@ func (r *controllerRoot) modelDocToModelInfo(ctx context.Context, model *mongodo
 		Machines:           jemMachinesToModelMachineInfo(machines),
 		AgentVersion:       modelVersion(ctx, model.Info),
 		Type:               model.Type,
-	}, nil
+	}
+	if !r.controllerUUIDMasking {
+		c, err := r.jem.DB.Controller(ctx, model.Controller)
+		if err != nil {
+			return nil, errgo.Notef(err, "failed to fetch controller: %v", model.Controller)
+		}
+		info.ControllerUUID = c.UUID
+	}
+
+	return info, nil
 }
 
 func jemMachinesToModelMachineInfo(machines []mongodoc.Machine) []jujuparams.ModelMachineInfo {
@@ -759,18 +773,18 @@ func iterUsers(ctx context.Context, users []jujuparams.ModelUserInfo, f func(par
 	}
 }
 
-// jimm implements a facade containing JIMM-specific API calls.
-type jimm struct {
+// jimmV2 implements a facade V2 containing JIMM-specific API calls.
+type jimmV2 struct {
 	root *controllerRoot
 }
 
 // UserModelStats returns statistics about all the models that were created
 // by the currently authenticated user.
-func (j jimm) UserModelStats(ctx context.Context) (params.UserModelStatsResponse, error) {
-	ctx = auth.ContextWithIdentity(ctx, j.root.identity)
+func (j jimmV2) UserModelStats(ctx context.Context) (params.UserModelStatsResponse, error) {
 	models := make(map[string]params.ModelStats)
 
 	user := j.root.identity.Id()
+	ctx = auth.ContextWithIdentity(ctx, j.root.identity)
 	it := j.root.jem.DB.NewCanReadIter(ctx,
 		j.root.jem.DB.Models().
 			Find(bson.D{{"creator", user}}).
@@ -789,6 +803,56 @@ func (j jimm) UserModelStats(ctx context.Context) (params.UserModelStatsResponse
 	return params.UserModelStatsResponse{
 		Models: models,
 	}, nil
+}
+
+// DisableControllerUUIDMasking ensures that the controller UUID returned
+// with any model information is the UUID of the juju controller that is
+// hosting the model, and not JAAS.
+func (j jimmV2) DisableControllerUUIDMasking(ctx context.Context) error {
+	err := auth.CheckACL(ctx, j.root.identity, []string{string(j.root.jem.ControllerAdmin())})
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	j.root.controllerUUIDMasking = false
+	return nil
+}
+
+// ListControllers returns the list of juju controllers hosting models
+// as part of this JAAS system.
+func (j jimmV2) ListControllers(ctx context.Context) (params.ListControllerResponse, error) {
+	ctx = auth.ContextWithIdentity(ctx, j.root.identity)
+
+	var controllers []params.ControllerResponse
+
+	// NOTE (alesstimec -> mhilton): Controllers shouldn't be readable by non-acl users even if they are public.
+	iter := j.root.jem.DB.NewCanReadIter(ctx, j.root.jem.DB.Controllers().Find(nil).Sort("_id").Iter())
+	defer iter.Close(ctx)
+	var ctl mongodoc.Controller
+	for iter.Next(ctx, &ctl) {
+		controllers = append(controllers, params.ControllerResponse{
+			Path:             ctl.Path,
+			Public:           ctl.Public,
+			UnavailableSince: newTime(ctl.UnavailableSince.UTC()),
+			Location:         ctl.Location,
+			UUID:             ctl.UUID,
+			Version:          ctl.Version.String(),
+		})
+	}
+	if err := iter.Err(ctx); err != nil {
+		return params.ListControllerResponse{}, errgo.Notef(err, "cannot get controllers")
+	}
+	return params.ListControllerResponse{
+		Controllers: controllers,
+	}, nil
+}
+
+// newTime returns a pointer to t if it's non-zero,
+// or nil otherwise.
+func newTime(t time.Time) *time.Time {
+	if t.IsZero() {
+		return nil
+	}
+	return &t
 }
 
 // getModel attempts to get the specified model from jem. If the model
@@ -838,10 +902,12 @@ func getModel(ctx context.Context, jem *jem.JEM, modelTag string, authf func(con
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
-	model.Credential = params.CredentialPath{
-		Cloud: params.Cloud(credentialTag.Cloud().Id()),
-		User:  owner,
-		Name:  params.CredentialName(credentialTag.Name()),
+	model.Credential = mongodoc.CredentialPath{
+		Cloud: string(params.Cloud(credentialTag.Cloud().Id())),
+		EntityPath: mongodoc.EntityPath{
+			User: string(owner),
+			Name: credentialTag.Name(),
+		},
 	}
 	model.DefaultSeries = info.DefaultSeries
 
