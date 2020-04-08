@@ -84,7 +84,7 @@ type Controller struct {
 
 	// UpdateCredentials holds a list of credentials which require
 	// updates on this controller.
-	UpdateCredentials []params.CredentialPath `bson:",omitempty"`
+	UpdateCredentials []CredentialPath `bson:",omitempty"`
 
 	// Location holds the location of the controller. The only key
 	// values currently supported are "cloud" and "region". All
@@ -268,7 +268,7 @@ type Model struct {
 	CloudRegion string `bson:",omitempty"`
 
 	// Credential holds a reference to the credential used to create the model.
-	Credential params.CredentialPath
+	Credential CredentialPath
 
 	// DefaultSeries holds the default series for the model.
 	DefaultSeries string

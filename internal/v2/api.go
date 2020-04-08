@@ -461,7 +461,7 @@ func (h *Handler) ListController(p httprequest.Params, arg *params.ListControlle
 		})
 	}
 	if err := iter.Err(p.Context); err != nil {
-		return nil, errgo.Notef(err, "cannot get models")
+		return nil, errgo.Notef(err, "cannot get controllers")
 	}
 	return &params.ListControllerResponse{
 		Controllers: controllers,

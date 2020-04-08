@@ -366,9 +366,9 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 		c.Assert(m.Cloud, gc.Equals, test.params.Cloud)
 		c.Assert(m.CloudRegion, gc.Equals, "dummy-region")
 		if !test.expectCredential.IsZero() {
-			c.Assert(m.Credential, jc.DeepEquals, test.expectCredential)
+			c.Assert(m.Credential, jc.DeepEquals, mongodoc.CredentialPathFromParams(test.expectCredential))
 		} else {
-			c.Assert(m.Credential, jc.DeepEquals, test.params.Credential)
+			c.Assert(m.Credential, jc.DeepEquals, mongodoc.CredentialPathFromParams(test.params.Credential))
 		}
 		c.Assert(m.DefaultSeries, gc.Not(gc.Equals), "")
 		c.Assert(m.Life(), gc.Equals, "alive")
@@ -395,7 +395,7 @@ func (s *jemSuite) TestCreateModelWithPartiallyCreatedModel(c *gc.C) {
 		Controller:   ctlId,
 		CreationTime: now,
 		Creator:      "bob",
-		Credential:   credentialPath("dummy", "bob", "cred1"),
+		Credential:   mongodoc.CredentialPathFromParams(credentialPath("dummy", "bob", "cred1")),
 	})
 	c.Assert(err, gc.Equals, nil)
 	// Create a new model
@@ -560,7 +560,7 @@ func (s *jemSuite) TestRevokeCredentialsNotInUse(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// Sanity check that we can get the credential.
-	_, err = s.jem.DB.Credential(testContext, credPath)
+	_, err = s.jem.DB.Credential(testContext, mCredPath)
 	c.Assert(err, gc.Equals, nil)
 
 	// Try with just the check.
@@ -568,7 +568,7 @@ func (s *jemSuite) TestRevokeCredentialsNotInUse(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// Check that the credential is still there.
-	_, err = s.jem.DB.Credential(testContext, credPath)
+	_, err = s.jem.DB.Credential(testContext, mCredPath)
 	c.Assert(err, gc.Equals, nil)
 
 	// Try with both the check and the update flag.
@@ -577,7 +577,7 @@ func (s *jemSuite) TestRevokeCredentialsNotInUse(c *gc.C) {
 
 	// The credential should be marked as revoked and all
 	// the details should be cleater.
-	cred, err := s.jem.DB.Credential(testContext, credPath)
+	cred, err := s.jem.DB.Credential(testContext, mCredPath)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
 		Id:         "dummy/bob/cred1",
@@ -821,7 +821,7 @@ func (s *jemSuite) TestUpdateCredential(c *gc.C) {
 
 	err = jem.UpdateControllerCredential(s.jem, testContext, conn, ctlPath, cred, nil)
 	c.Assert(err, gc.Equals, nil)
-	err = jem.CredentialAddController(s.jem.DB, testContext, credPath, ctlPath)
+	err = jem.CredentialAddController(s.jem.DB, testContext, mCredPath, ctlPath)
 	c.Assert(err, gc.Equals, nil)
 
 	// Sanity check it was deployed
@@ -887,7 +887,7 @@ func (s *jemSuite) TestControllerUpdateCredentials(c *gc.C) {
 	err := jem.UpdateCredential(s.jem.DB, testContext, cred)
 	c.Assert(err, gc.Equals, nil)
 
-	err = jem.SetCredentialUpdates(s.jem.DB, testContext, []params.EntityPath{ctlPath}, credPath)
+	err = jem.SetCredentialUpdates(s.jem.DB, testContext, []params.EntityPath{ctlPath}, mongodoc.CredentialPathFromParams(credPath))
 	c.Assert(err, gc.Equals, nil)
 
 	err = s.jem.ControllerUpdateCredentials(testContext, ctlPath)
@@ -1911,7 +1911,7 @@ func (s *jemSuite) TestUpdateModelCredential(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	model1, err := s.jem.DB.Model(testContext, model.Path)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(model1.Credential, jc.DeepEquals, credPath)
+	c.Assert(model1.Credential, jc.DeepEquals, mongodoc.CredentialPathFromParams(credPath))
 }
 
 func (s *jemSuite) TestWatchAllModelSummaries(c *gc.C) {
