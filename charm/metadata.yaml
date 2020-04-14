@@ -22,3 +22,7 @@ resources:
     type: file
     filename: jimm.tar.xz
     description: "jimm release tarball."
+  dashboard:
+    type: file
+    filename: dashboard.tar.xz
+    description: "juju dashboard tarball."
