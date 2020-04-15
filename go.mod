@@ -6,6 +6,7 @@ require (
 	github.com/altoros/gosigma v0.0.0-20170523021020-a27b59fe2be9 // indirect
 	github.com/bmizerany/pat v0.0.0-20170815010413-6226ea591a40 // indirect
 	github.com/boltdb/bolt v1.3.1 // indirect
+	github.com/canonical/candid v1.4.2
 	github.com/docker/distribution v2.7.0+incompatible // indirect
 	github.com/elazarl/goproxy v0.0.0-20190911111923-ecfe977594f1 // indirect
 	github.com/flosch/pongo2 v0.0.0-20180809100617-24195e6d38b0 // indirect
@@ -20,7 +21,6 @@ require (
 	github.com/joyent/gosdc v0.0.0-20161202192312-ec8b3503a75e // indirect
 	github.com/joyent/gosign v0.0.0-20161114191744-9abcee278795 // indirect
 	github.com/juju/aclstore v0.0.0-20180706073322-7fc1cdaacf01
-	github.com/juju/ansiterm v0.0.0-20180109212912-720a0952cc2a // indirect
 	github.com/juju/clock v0.0.0-20190205081909-9c5c9712527c
 	github.com/juju/cmd v0.0.0-20200108104440-8e43f3faa5c9
 	github.com/juju/errors v0.0.0-20190930114154-d42613fe1ab9
@@ -36,7 +36,6 @@ require (
 	github.com/juju/rpcreflect v0.0.0-20190806165913-cca922e065df
 	github.com/juju/simplekv v1.0.0
 	github.com/juju/testing v0.0.0-20191001232224-ce9dec17d28b
-	github.com/juju/usso v1.0.1 // indirect
 	github.com/juju/utils v0.0.0-20200116185830-d40c2fe10647
 	github.com/juju/version v0.0.0-20191219164919-81c1be00b9a6
 	github.com/julienschmidt/httprouter v1.3.0
@@ -46,14 +45,12 @@ require (
 	github.com/lestrrat/go-jsval v0.0.0-20161021065934-cf70aae60f5b // indirect
 	github.com/lestrrat/go-pdebug v0.0.0-20180220043741-569c97477ae8 // indirect
 	github.com/lestrrat/go-structinfo v0.0.0-20180223064246-8204d40bbcd7 // indirect
-	github.com/lunixbochs/vtclean v0.0.0-20180621232353-2d01aacdc34a // indirect
 	github.com/masterzen/winrm v0.0.0-20181112102303-a196a4ff2a86 // indirect
 	github.com/mattn/go-runewidth v0.0.3 // indirect
-	github.com/prometheus/client_golang v1.0.0
+	github.com/prometheus/client_golang v1.5.1
 	github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af
 	go.uber.org/zap v1.10.0
 	golang.org/x/crypto v0.0.0-20191206172530-e9b2fee46413
-	gopkg.in/CanonicalLtd/candidclient.v1 v1.2.0
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
 	gopkg.in/errgo.v1 v1.0.1
 	gopkg.in/httprequest.v1 v1.2.0
