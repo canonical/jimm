@@ -1,5 +1,5 @@
 name: jimm
-version: git
+version: '0.26.0'
 summary: Juju Intelligent Model Manager
 description: Multi-cloud controller for managing JAAS models.
 grade: stable
@@ -16,22 +16,23 @@ apps:
 
 parts:
   jimm:
-    plugin: gomod
-    source: ../..
-    source-type: git
+    plugin: go
+    source: .
     go-packages:
-    - github.com/CanonicalLtd/jimm/cmd/jemd
-    go-private:
-    - github.com/CanonicalLtd
-    prime:
-     - bin/jemd
-    override-build: |
+    - github.com/CanonicalLtd/jimm
+    go-importpath: github.com/CanonicalLtd/jimm
+    build-packages:
+    - git
+    - gcc
+    override-build: |-
       set -ex
+      ls -lah ~/src
+      ls -lah ~/src/version
       GIT_COMMIT=`git -C $SNAPCRAFT_PART_SRC rev-parse --verify HEAD`
-      GIT_VERSION=`git -C $SNAPCRAFT_PART_SRC describe --dirty`
-      cp version/init.go.tmpl version/init.go
-      gofmt -w -r "unknownVersion -> Version{GitCommit: \"${GIT_COMMIT}\", Version: \"${GIT_VERSION}\",}" version/init.go
-      snapcraftctl build
+      GIT_VERSION=`git -C $SNAPCRAFT_PART_SRC describe --dirty --abbrev=0`
+      cp ~/src/version/init.go.tmpl ~/src/version/init.go
+      gofmt -w -r "unknownVersion -> Version{GitCommit: \"${GIT_COMMIT}\", Version: \"${GIT_VERSION}\",}" ~/src/version/init.go
+      go build -a github.com/CanonicalLtd/jimm/cmd/jemd
 
   files:
     plugin: dump

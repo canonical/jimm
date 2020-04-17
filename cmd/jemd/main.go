@@ -125,6 +125,7 @@ func serve(conf *config.Config) error {
 		Pubsub: &pubsub.Hub{
 			MaxConcurrency: conf.MaxPubsubConcurrency,
 		},
+		JujuDashboardLocation: conf.JujuDashboardLocation,
 	}
 	server, err := jem.NewServer(ctx, cfg)
 	if err != nil {

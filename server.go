@@ -95,6 +95,10 @@ type ServerParams struct {
 	// doesn't exist the default public cloud information is used.
 	PublicCloudMetadata string
 
+	// JujuDashboardLocation contains the path to the folder
+	// where the Juju Dashboard tarball was extracted.
+	JujuDashboardLocation string
+
 	Pubsub *pubsub.Hub
 }
 

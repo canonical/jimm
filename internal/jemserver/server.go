@@ -26,6 +26,7 @@ import (
 	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/dashboard"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemerror"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
@@ -115,6 +116,10 @@ type Params struct {
 	// the public cloud metadata. If this is empty or the file
 	// doesn't exist the default public cloud information is used.
 	PublicCloudMetadata string
+
+	// JujuDashboardLocation contains the path to the folder
+	// where the Juju Dashboard tarball was extracted.
+	JujuDashboardLocation string
 
 	Pubsub *pubsub.Hub
 }
@@ -254,8 +259,14 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
+	router := httprouter.New()
+
+	if config.JujuDashboardLocation != "" {
+		dashboard.Register(ctx, router, config.JujuDashboardLocation)
+	}
+
 	srv := &Server{
-		router:      httprouter.New(),
+		router:      router,
 		auth:        authenticator,
 		pool:        p,
 		sessionPool: sessionPool,

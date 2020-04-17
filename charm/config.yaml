@@ -48,6 +48,10 @@ options:
     description: |
       A comma-separated list of nagios servicegroups.
       If left empty, the nagios_context will be used as the servicegroup
+  controller-url:
+    default: "jimm.jujucharms.com"
+    type: string
+    description: The URL of the JIMM controller.
   controller-uuid:
     default: ""
     type: string
