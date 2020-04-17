@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"time"
 
+	"github.com/canonical/candid/candidtest"
 	"github.com/juju/aclstore"
 	"github.com/juju/clock/testclock"
 	controllerapi "github.com/juju/juju/api/controller"
@@ -17,7 +18,6 @@ import (
 	"github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
 	"github.com/rogpeppe/fastuuid"
-	"gopkg.in/CanonicalLtd/candidclient.v1/candidtest"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/mgo.v2"
