@@ -66,14 +66,11 @@ def install(binary=None):
 
     new_resource_path = resource_path + '.new'
     old_resource_path = resource_path + '.old'
-    new_dashboard_path = dashboard_path() + '.new'
-    old_dashboard_path = dashboard_path() + '.old'
+
     # Remove possible remnants of a failed install and
     # the previous previous resource directory.
     shutil.rmtree(new_resource_path, ignore_errors=True)
     shutil.rmtree(old_resource_path, ignore_errors=True)
-    shutil.rmtree(new_dashboard_path, ignore_errors=True)
-    shutil.rmtree(old_dashboard_path, ignore_errors=True)
 
     hookenv.status_set('maintenance', 'getting service resource')
     resource_file = hookenv.resource_get('service')
@@ -111,6 +108,11 @@ def install(binary=None):
 
     dashboard_file = hookenv.resource_get('dashboard')
     if dashboard_file:
+        new_dashboard_path = dashboard_path() + '.new'
+        old_dashboard_path = dashboard_path() + '.old'
+        shutil.rmtree(new_dashboard_path, ignore_errors=True)
+        shutil.rmtree(old_dashboard_path, ignore_errors=True)
+
         hookenv.status_set('maintenance', 'installing dashboard')
         with tarfile.open(dashboard_file) as tf:
             tf.extractall(new_dashboard_path)
@@ -148,18 +150,19 @@ def update_config(config):
 
     """Update the config.js file for the Juju Dashboard.
     """
-    config_js_path = os.path.join(dashboard_path(), 'config.js')
-    config = hookenv.config()
-    dashboard_context = {
-        'base_controller_url': config['controller-url'],
-        'base_app_url': '/dashboard/',
-        'identity_provider_available': str(len(config['identity-location']) != 0).lower(),
-    }
-    templating.render(
-        'dashboard-config',
-        config_js_path,
-        dashboard_context
-    )
+    if os.path.exists(dashboard_path()):
+        config_js_path = os.path.join(dashboard_path(), 'config.js')
+        config = hookenv.config()
+        dashboard_context = {
+            'base_controller_url': config['controller-url'],
+            'base_app_url': '/dashboard/',
+            'identity_provider_available': str(len(config['identity-location']) != 0).lower(),
+        }
+        templating.render(
+            'dashboard-config',
+            config_js_path,
+            dashboard_context
+        )
 
     path = _config_path()
     data = {}

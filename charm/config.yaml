@@ -80,3 +80,7 @@ options:
      default: "jem"
      type: string
      description: MongoDB database name to use.
+  juju-dashboard-location:
+    default: ""
+    type: string
+    description: URL of the Juju Dashboard for this controller.
