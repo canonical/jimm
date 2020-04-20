@@ -779,7 +779,6 @@ func (c cloudV5) updateCredentials(ctx context.Context, args []jujuparams.Tagged
 		Results: make([]jujuparams.UpdateCredentialResult, len(args)),
 	}
 	for i, arg := range args {
-		results.Results[i].CredentialTag = arg.Tag
 		var err error
 		mr, err := c.updateCredential(ctx, arg, flags)
 		if err != nil {
@@ -787,6 +786,7 @@ func (c cloudV5) updateCredentials(ctx context.Context, args []jujuparams.Tagged
 		} else {
 			results.Results[i] = *mr
 		}
+		results.Results[i].CredentialTag = arg.Tag
 	}
 	return results, nil
 }
