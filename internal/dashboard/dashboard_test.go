@@ -52,7 +52,8 @@ func (s *dashboardSuite) SetUpTest(c *gc.C) {
 
 	ctx := context.Background()
 	router := httprouter.New()
-	dashboard.Register(ctx, router, dir)
+	err = dashboard.Register(ctx, router, dir)
+	c.Assert(err, jc.ErrorIsNil)
 
 	s.server = httptest.NewServer(router)
 }

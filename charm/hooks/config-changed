@@ -28,6 +28,7 @@ def config_changed():
         "max-mgo-sessions",
         "metering-location",
         "usage-sender-url",
+        "juju-dashboard-location",
     ]
 
     app_config = {

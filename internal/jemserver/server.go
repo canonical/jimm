@@ -262,7 +262,10 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	router := httprouter.New()
 
 	if config.JujuDashboardLocation != "" {
-		dashboard.Register(ctx, router, config.JujuDashboardLocation)
+		err = dashboard.Register(ctx, router, config.JujuDashboardLocation)
+		if err != nil {
+			return nil, errgo.Mask(err)
+		}
 	}
 
 	srv := &Server{
