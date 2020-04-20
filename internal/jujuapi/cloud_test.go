@@ -290,8 +290,17 @@ func (s *cloudSuite) TestUpdateCloudCredentials(c *gc.C) {
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
 	credentialTag := names.NewCloudCredentialTag(fmt.Sprintf("dummy/test@external/cred3"))
-	_, err := client.UpdateCredentialsCheckModels(credentialTag, cloud.NewCredential("credtype", map[string]string{"attr1": "val31", "attr2": "val32"}))
+	reqCreds := map[string]cloud.Credential{
+		credentialTag.String(): cloud.NewCredential("credtype", map[string]string{
+			"attr1": "val31",
+			"attr2": "val32",
+		}),
+	}
+	res, err := client.UpdateCloudsCredentials(reqCreds, false)
 	c.Assert(err, gc.Equals, nil)
+	c.Assert(res, gc.DeepEquals, []jujuparams.UpdateCredentialResult{{
+		CredentialTag: credentialTag.String(),
+	}})
 	creds, err := client.UserCredentials(names.NewUserTag("test@external"), names.NewCloudTag("dummy"))
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []names.CloudCredentialTag{credentialTag})
