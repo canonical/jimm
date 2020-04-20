@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/canonical/candid/candidclient"
+	"github.com/canonical/candid/candidtest"
 	jc "github.com/juju/testing/checkers"
-	candidclient "gopkg.in/CanonicalLtd/candidclient.v1"
-	"gopkg.in/CanonicalLtd/candidclient.v1/candidtest"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"

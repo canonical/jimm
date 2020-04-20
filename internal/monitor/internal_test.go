@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/canonical/candid/candidtest"
 	"github.com/juju/clock/testclock"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
@@ -17,7 +18,6 @@ import (
 	"github.com/juju/juju/testing/factory"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/version"
-	"gopkg.in/CanonicalLtd/candidclient.v1/candidtest"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	names "gopkg.in/juju/names.v3"
