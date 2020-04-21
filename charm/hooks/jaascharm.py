@@ -107,7 +107,8 @@ def install(binary=None):
     }
 
     dashboard_file = hookenv.resource_get('dashboard')
-    if dashboard_file:
+    hookenv.log('dashboard nonempty {}'.format(_dashboard_resource_nonempty()))
+    if _dashboard_resource_nonempty():
         new_dashboard_path = dashboard_path() + '.new'
         old_dashboard_path = dashboard_path() + '.old'
         shutil.rmtree(new_dashboard_path, ignore_errors=True)
@@ -150,7 +151,7 @@ def update_config(config):
 
     """Update the config.js file for the Juju Dashboard.
     """
-    if os.path.exists(dashboard_path()):
+    if _dashboard_resource_nonempty() and os.path.exists(dashboard_path()):
         config_js_path = os.path.join(dashboard_path(), 'config.js')
         config = hookenv.config()
         dashboard_context = {
@@ -329,3 +330,10 @@ def _service_enabled():
 def _service_running():
     """Report whether the service is running."""
     return host.service_running(_service())
+
+
+def _dashboard_resource_nonempty():
+    dashboard_file = hookenv.resource_get('dashboard')
+    if dashboard_file:
+        return os.path.getsize(dashboard_file) != 0
+    return False
