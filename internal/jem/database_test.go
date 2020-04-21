@@ -319,6 +319,17 @@ func (s *databaseSuite) TestDeleteController(c *gc.C) {
 	err = s.database.AddController(testContext, ctl2)
 	c.Assert(err, gc.Equals, nil)
 
+	path := credentialPath("test-cloud", "test-user", "test-credential")
+	mpath := mongodoc.CredentialPathFromParams(path)
+	err = jem.UpdateCredential(s.database, testContext, &mongodoc.Credential{
+		Path: mpath,
+		Type: "empty",
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	err = jem.CredentialAddController(s.database, testContext, mpath, ctlPath)
+	c.Assert(err, gc.Equals, nil)
+
 	err = s.database.DeleteController(testContext, ctlPath)
 	c.Assert(err, gc.Equals, nil)
 	ctl3, err := s.database.Controller(testContext, ctlPath)
@@ -326,6 +337,16 @@ func (s *databaseSuite) TestDeleteController(c *gc.C) {
 	m3, err := s.database.Model(testContext, ctlPath)
 	c.Assert(m3, gc.IsNil)
 	s.checkDBOK(c)
+
+	cred, err := s.database.Credential(testContext, mpath)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
+		Id:          path.String(),
+		Path:        mpath,
+		Type:        "empty",
+		Attributes:  map[string]string{},
+		Controllers: []params.EntityPath{},
+	})
 }
 
 func (s *databaseSuite) TestDeleteModel(c *gc.C) {

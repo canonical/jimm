@@ -145,6 +145,11 @@ func (db *Database) ModelsWithCredential(ctx context.Context, credPath mongodoc.
 func (db *Database) DeleteController(ctx context.Context, path params.EntityPath) (err error) {
 	defer db.checkError(ctx, &err)
 	// TODO (urosj) make this operation atomic.
+	// Delete controller from credentials
+	err = db.credentialsRemoveController(ctx, path)
+	if err != nil {
+		return errgo.Notef(err, "error deleting controler from credentials")
+	}
 	// Delete its models first.
 	info, err := db.Models().RemoveAll(bson.D{{"controller", path}})
 	if err != nil {
@@ -812,6 +817,19 @@ func (db *Database) credentialRemoveController(ctx context.Context, credential m
 			return errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", credential)
 		}
 		return errgo.Notef(err, "cannot update credential %q", credential)
+	}
+	return nil
+}
+
+// credentialsRemoveController stores the fact that the given controller
+// was removed and credentials are no longer present there.
+func (db *Database) credentialsRemoveController(ctx context.Context, controller params.EntityPath) (err error) {
+	defer db.checkError(ctx, &err)
+	_, err = db.Credentials().UpdateAll(bson.D{}, bson.D{{
+		"$pull", bson.D{{"controllers", controller}},
+	}})
+	if err != nil {
+		return errgo.Notef(err, "cannot remove controller from credentials")
 	}
 	return nil
 }
