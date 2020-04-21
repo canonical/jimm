@@ -624,6 +624,8 @@ func (s *APISuite) TestDeleteController(c *gc.C) {
 			Code:    params.ErrNotFound,
 		},
 	})
+	// check that we can still update credentials
+	s.AssertUpdateCredential(ctx, c, "bob", "dummy", "cred1", "empty")
 }
 
 func (s *APISuite) TestNewModel(c *gc.C) {
