@@ -107,7 +107,6 @@ def install(binary=None):
     }
 
     dashboard_file = hookenv.resource_get('dashboard')
-    hookenv.log('dashboard nonempty {}'.format(_dashboard_resource_nonempty()))
     if _dashboard_resource_nonempty():
         new_dashboard_path = dashboard_path() + '.new'
         old_dashboard_path = dashboard_path() + '.old'
@@ -153,7 +152,7 @@ def update_config(config):
     """
     if _dashboard_resource_nonempty() and os.path.exists(dashboard_path()):
         config_js_path = os.path.join(dashboard_path(), 'config.js')
-        config = hookenv.config()
+        
         dashboard_context = {
             'base_controller_url': config['controller-url'],
             'base_app_url': '/dashboard/',

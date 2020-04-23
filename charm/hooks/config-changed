@@ -20,6 +20,7 @@ def config_changed():
         "agent-username",
         "charmstore-location",
         "controller-uuid",
+        "controller-url",
         "dbname",
         "domain",
         "gui-location",
@@ -28,7 +29,6 @@ def config_changed():
         "max-mgo-sessions",
         "metering-location",
         "usage-sender-url",
-        "juju-dashboard-location",
     ]
 
     app_config = {
@@ -41,7 +41,9 @@ def config_changed():
             'public': config['agent-public-key'],
         }
 
-    if os.path.exists(dashboard_path()):
+    if config['juju-dashboard-location']:
+        app_config['juju-dashboard-location'] = config['juju-dashboard-location']
+    elif os.path.exists(dashboard_path()):
         app_config['juju-dashboard-location'] = dashboard_path()
 
     for key in keys:
