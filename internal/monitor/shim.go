@@ -10,9 +10,9 @@ import (
 	apicontroller "github.com/juju/juju/api/controller"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
+	"github.com/juju/names/v4"
 	"github.com/juju/version"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/names.v3"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/jem"

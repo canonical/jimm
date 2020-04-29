@@ -8,9 +8,9 @@ import (
 	"github.com/juju/errors"
 	"github.com/juju/juju/apiserver/common"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/names/v4"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/names.v3"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
