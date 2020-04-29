@@ -8,7 +8,7 @@ import (
 	"github.com/juju/cmd"
 	"github.com/juju/gnuflag"
 	"github.com/juju/juju/cmd/modelcmd"
-	"github.com/juju/names"
+	"github.com/juju/names/v4"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/params"

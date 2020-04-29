@@ -9,9 +9,9 @@ import (
 	"github.com/juju/juju/apiserver/common"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/life"
+	"github.com/juju/names/v4"
 	"github.com/juju/utils/parallel"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/names.v3"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/jem"

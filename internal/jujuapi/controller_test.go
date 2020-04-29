@@ -16,12 +16,12 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/controller"
 	"github.com/juju/juju/rpc"
+	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
 	"github.com/juju/version"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/juju/names.v3"
 	"gopkg.in/macaroon.v2"
 
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"

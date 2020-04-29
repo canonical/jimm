@@ -19,12 +19,12 @@ import (
 	"github.com/juju/juju/state"
 	"github.com/juju/juju/testing/factory"
 	jujuversion "github.com/juju/juju/version"
+	"github.com/juju/names/v4"
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/juju/names.v3"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/jemtest"

@@ -33,12 +33,12 @@ require (
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
 	github.com/juju/go-oracle-cloud v0.0.0-20170510162943-95ad2a088ab9 // indirect
 	github.com/juju/httprequest v1.0.1
-	github.com/juju/juju v0.0.0-20200424025818-44b37b03e873
+	github.com/juju/juju v0.0.0-20200429035756-9ed6c2f906f8
 	github.com/juju/loggo v0.0.0-20190526231331-6e530bcce5d8
 	github.com/juju/lru v0.0.0-20190314140547-92a0afabdc41 // indirect
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
 	github.com/juju/mgosession v1.0.0
-	github.com/juju/names v0.0.0-20160330150533-8a0aa0963bba
+	github.com/juju/names/v4 v4.0.0-20200424054733-9a8294627524
 	github.com/juju/persistent-cookiejar v0.0.0-20170428161559-d67418f14c93
 	github.com/juju/rpcreflect v0.0.0-20200416001309-bb46e9ba1476
 	github.com/juju/simplekv v1.0.0
@@ -68,9 +68,9 @@ require (
 	gopkg.in/errgo.v1 v1.0.1
 	gopkg.in/httprequest.v1 v1.2.0
 	gopkg.in/ini.v1 v1.39.0 // indirect
+	gopkg.in/juju/charm.v6 v6.0.0-20200415131143-ad2e04a67e7b // indirect
 	gopkg.in/juju/charmrepo.v3 v3.0.2-0.20191105112621-5ca139ef9e6b // indirect
 	gopkg.in/juju/environschema.v1 v1.0.0
-	gopkg.in/juju/names.v3 v3.0.0-20200331100531-2c9a102df211
 	gopkg.in/juju/worker.v1 v1.0.0-20191018043616-19a698a7150f
 	gopkg.in/macaroon-bakery.v2 v2.2.0
 	gopkg.in/macaroon.v2 v2.1.0

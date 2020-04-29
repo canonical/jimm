@@ -3,8 +3,8 @@ package params
 import (
 	"regexp"
 
+	"github.com/juju/names/v4"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/names.v3"
 )
 
 var (
