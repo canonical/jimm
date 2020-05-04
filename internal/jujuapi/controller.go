@@ -32,6 +32,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
@@ -576,7 +577,7 @@ func userModelForModelDoc(m *mongodoc.Model) jujuparams.Model {
 		Name:     string(m.Path.Name),
 		UUID:     m.UUID,
 		Type:     m.Type,
-		OwnerTag: jem.UserTag(m.Path.User).String(),
+		OwnerTag: conv.ToUserTag(m.Path.User).String(),
 	}
 }
 
@@ -678,8 +679,8 @@ func (r *controllerRoot) modelDocToModelInfo(ctx context.Context, model *mongodo
 		DefaultSeries:      model.DefaultSeries,
 		CloudTag:           jem.CloudTag(model.Cloud).String(),
 		CloudRegion:        model.CloudRegion,
-		CloudCredentialTag: jem.CloudCredentialTag(model.Credential.ToParams()).String(),
-		OwnerTag:           jem.UserTag(model.Path.User).String(),
+		CloudCredentialTag: conv.ToCloudCredentialTag(model.Credential.ToParams()).String(),
+		OwnerTag:           conv.ToUserTag(model.Path.User).String(),
 		Life:               life.Value(model.Life()),
 		Status:             modelStatus(model.Info),
 		Users:              users,

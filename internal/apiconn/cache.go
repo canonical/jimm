@@ -221,3 +221,14 @@ func (c *Conn) Evict() {
 func (c *Conn) Ping() error {
 	return errgo.Mask(c.Connection.APICall("Pinger", 1, "", "Ping", nil, nil))
 }
+
+// HasFacadeVersion returns whether the current connection supports the
+// requested facade version.
+func (c *Conn) HasFacadeVersion(facade string, version int) bool {
+	for _, v := range c.AllFacadeVersions()[facade] {
+		if v == version {
+			return true
+		}
+	}
+	return false
+}

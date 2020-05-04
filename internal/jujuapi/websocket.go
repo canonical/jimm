@@ -13,6 +13,7 @@ import (
 	"github.com/juju/juju/rpc/jsoncodec"
 	"gopkg.in/errgo.v1"
 
+	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
@@ -48,6 +49,10 @@ func mapError(err error) *jujuparams.Error {
 	}
 	// TODO the error mapper should really accept a context from the RPC package.
 	zapctx.Debug(context.TODO(), "rpc error", zaputil.Error(err))
+
+	if apierr, ok := errgo.Cause(err).(*apiconn.APIError); ok {
+		return apierr.ParamsError()
+	}
 	if perr, ok := errgo.Cause(err).(*jujuparams.Error); ok {
 		return perr
 	}

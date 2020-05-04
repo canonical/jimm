@@ -29,6 +29,7 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/kubetest"
@@ -535,7 +536,7 @@ func (s *jemSuite) TestRevokeCredentialsInUse(c *gc.C) {
 	conn, err := s.jem.OpenAPI(testContext, ctlId)
 	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
-	r, err := cloudapi.NewClient(conn).Credentials(jem.CloudCredentialTag(credPath))
+	r, err := cloudapi.NewClient(conn).Credentials(conv.ToCloudCredentialTag(credPath))
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(r, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Error: &jujuparams.Error{
@@ -819,7 +820,7 @@ func (s *jemSuite) TestUpdateCredential(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
 
-	err = jem.UpdateControllerCredential(s.jem, testContext, conn, ctlPath, cred, nil)
+	_, err = jem.UpdateControllerCredential(s.jem, testContext, conn, ctlPath, cred)
 	c.Assert(err, gc.Equals, nil)
 	err = jem.CredentialAddController(s.jem.DB, testContext, mCredPath, ctlPath)
 	c.Assert(err, gc.Equals, nil)
@@ -1169,11 +1170,6 @@ func (s *jemSuite) TestCredential(c *gc.C) {
 	}
 }
 
-func (s *jemSuite) TestUserTag(c *gc.C) {
-	c.Assert(jem.UserTag(params.User("alice")).String(), gc.Equals, "user-alice@external")
-	c.Assert(jem.UserTag(params.User("alice@domain")).String(), gc.Equals, "user-alice@domain")
-}
-
 var earliestControllerVersionTests = []struct {
 	about       string
 	controllers []mongodoc.Controller
@@ -1247,21 +1243,6 @@ func (s *jemSuite) TestEarliestControllerVersion(c *gc.C) {
 		c.Assert(err, gc.Equals, nil)
 		c.Assert(v, jc.DeepEquals, test.expect)
 	}
-}
-
-func (s *jemSuite) TestCloudCredentialTag(c *gc.C) {
-	cp1 := params.CredentialPath{
-		Cloud: "dummy",
-		User:  "alice",
-		Name:  "cred",
-	}
-	cp2 := params.CredentialPath{
-		Cloud: "dummy",
-		User:  "alice@domain",
-		Name:  "cred",
-	}
-	c.Assert(jem.CloudCredentialTag(cp1).String(), gc.Equals, "cloudcred-dummy_alice@external_cred")
-	c.Assert(jem.CloudCredentialTag(cp2).String(), gc.Equals, "cloudcred-dummy_alice@domain_cred")
 }
 
 func (s *jemSuite) TestUpdateMachineInfo(c *gc.C) {

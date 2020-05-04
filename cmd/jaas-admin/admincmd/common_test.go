@@ -11,10 +11,10 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/canonical/candid/candidtest"
 	"github.com/juju/aclstore/aclclient"
 	"github.com/juju/cmd"
 	"github.com/juju/loggo"
-	"github.com/canonical/candid/candidtest"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/mgo.v2"
 

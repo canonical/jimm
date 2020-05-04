@@ -14,6 +14,7 @@ import (
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
@@ -139,8 +140,8 @@ func (m modelManagerAPI) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 				DefaultSeries:      model.DefaultSeries,
 				CloudTag:           jem.CloudTag(model.Cloud).String(),
 				CloudRegion:        model.CloudRegion,
-				CloudCredentialTag: jem.CloudCredentialTag(model.Credential.ToParams()).String(),
-				OwnerTag:           jem.UserTag(model.Path.User).String(),
+				CloudCredentialTag: conv.ToCloudCredentialTag(model.Credential.ToParams()).String(),
+				OwnerTag:           conv.ToUserTag(model.Path.User).String(),
 				Life:               life.Value(model.Life()),
 				Status:             modelStatus(model.Info),
 				UserAccess:         access,
