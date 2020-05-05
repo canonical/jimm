@@ -13,7 +13,9 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2/bson"
 
+	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
@@ -409,7 +411,7 @@ func (c cloudV5) userCredentials(ctx context.Context, ownerTag, cloudTag string)
 	).Iter())
 	var cred mongodoc.Credential
 	for it.Next(ctx, &cred) {
-		cloudCreds = append(cloudCreds, jem.CloudCredentialTag(cred.Path.ToParams()).String())
+		cloudCreds = append(cloudCreds, conv.ToCloudCredentialTag(cred.Path.ToParams()).String())
 	}
 
 	return cloudCreds, errgo.Mask(it.Err(ctx))
@@ -780,18 +782,17 @@ func (c cloudV5) updateCredentials(ctx context.Context, args []jujuparams.Tagged
 	}
 	for i, arg := range args {
 		var err error
-		mr, err := c.updateCredential(ctx, arg, flags)
-		if err != nil {
-			results.Results[i].Error = mapError(err)
-		} else {
-			results.Results[i] = *mr
+		models, err := c.updateCredential(ctx, arg, flags)
+		results.Results[i] = jujuparams.UpdateCredentialResult{
+			CredentialTag: arg.Tag,
+			Error:         mapError(err),
+			Models:        models,
 		}
-		results.Results[i].CredentialTag = arg.Tag
 	}
 	return results, nil
 }
 
-func (c cloudV5) updateCredential(ctx context.Context, cred jujuparams.TaggedCredential, flags jem.CredentialUpdateFlags) (*jujuparams.UpdateCredentialResult, error) {
+func (c cloudV5) updateCredential(ctx context.Context, cred jujuparams.TaggedCredential, flags jem.CredentialUpdateFlags) ([]jujuparams.UpdateCredentialModelResult, error) {
 	tag, err := names.ParseCloudCredentialTag(cred.Tag)
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
@@ -819,11 +820,8 @@ func (c cloudV5) updateCredential(ctx context.Context, cred jujuparams.TaggedCre
 		Type:       cred.Credential.AuthType,
 		Attributes: cred.Credential.Attributes,
 	}
-	r, err := c.root.jem.UpdateCredential(ctx, &credential, flags)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	return r, nil
+	modelResults, err := c.root.jem.UpdateCredential(ctx, &credential, flags)
+	return modelResults, errgo.Mask(err, apiconn.IsAPIError)
 }
 
 // UpdateCloud updates the specified clouds.

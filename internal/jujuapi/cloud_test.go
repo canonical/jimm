@@ -420,7 +420,7 @@ func (s *cloudSuite) TestUpdateCloudCredentialsForce(c *gc.C) {
 	args.Force = true
 	err = conn.APICall("Cloud", 3, "", "UpdateCredentialsCheckModels", args, &resp)
 	c.Assert(err, gc.Equals, nil)
-	c.Check(resp.Results[0].Error, gc.ErrorMatches, `some models are no longer visible`)
+	c.Check(resp.Results[0].Error, gc.ErrorMatches, `updating cloud credentials: validating credential "dummy/test@external/cred3" for cloud "dummy": supported auth-types \["empty" "userpass"\], "badauthtype" not supported`)
 
 	// Check that the credentials have been updated even though
 	// we got an error.

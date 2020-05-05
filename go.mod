@@ -33,7 +33,7 @@ require (
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
 	github.com/juju/go-oracle-cloud v0.0.0-20170510162943-95ad2a088ab9 // indirect
 	github.com/juju/httprequest v1.0.1
-	github.com/juju/juju v0.0.0-20200429035756-9ed6c2f906f8
+	github.com/juju/juju v0.0.0-20200501092444-8145682fae15
 	github.com/juju/loggo v0.0.0-20190526231331-6e530bcce5d8
 	github.com/juju/lru v0.0.0-20190314140547-92a0afabdc41 // indirect
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31

@@ -32,6 +32,7 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
@@ -615,19 +616,19 @@ func (j *JEM) createModelOnController(ctx context.Context, ctlPath params.Entity
 
 	var credTag names.CloudCredentialTag
 	if cred != nil {
-		if err := j.updateControllerCredential(ctx, conn, ctlPath, cred, nil); err != nil {
-			return base.ModelInfo{}, errgo.Notef(err, "cannot add credential")
+		if _, err := j.updateControllerCredential(ctx, conn, ctlPath, cred); err != nil {
+			return base.ModelInfo{}, errgo.WithCausef(err, errInvalidModelParams, "cannot add credential")
 		}
 		if err := j.DB.credentialAddController(ctx, cred.Path, ctlPath); err != nil {
-			return base.ModelInfo{}, errgo.Notef(err, "cannot add credential")
+			return base.ModelInfo{}, errgo.WithCausef(err, errInvalidModelParams, "cannot add credential")
 		}
-		credTag = CloudCredentialTag(cred.Path.ToParams())
+		credTag = conv.ToCloudCredentialTag(cred.Path.ToParams())
 	}
 
 	mmClient := modelmanager.NewClient(conn.Connection)
 	m, err := mmClient.CreateModel(
 		string(p.Path.Name),
-		UserTag(p.Path.User).Id(),
+		conv.ToUserTag(p.Path.User).Id(),
 		string(p.Cloud),
 		p.Region,
 		credTag,
@@ -758,7 +759,7 @@ const (
 // flag is specified).
 //
 // If flags is zero, it will both check and update.
-func (j *JEM) UpdateCredential(ctx context.Context, cred *mongodoc.Credential, flags CredentialUpdateFlags) (*jujuparams.UpdateCredentialResult, error) {
+func (j *JEM) UpdateCredential(ctx context.Context, cred *mongodoc.Credential, flags CredentialUpdateFlags) ([]jujuparams.UpdateCredentialModelResult, error) {
 	if cred.Revoked {
 		return nil, errgo.Newf("cannot use UpdateCredential to revoke a credential")
 	}
@@ -775,26 +776,19 @@ func (j *JEM) UpdateCredential(ctx context.Context, cred *mongodoc.Credential, f
 	if flags&CredentialCheck != 0 {
 		// There is a credential already recorded, so check with all its controllers
 		// that it's valid before we update it locally and update it on the controllers.
-		r, err := j.checkCredential(ctx, cred, controllers)
-		if err != nil {
-			return nil, errgo.Mask(err)
-		}
-		// Note: r.Error is non-nil if there are any models that contain an error.
-		if r.Error != nil || flags&CredentialUpdate == 0 {
-			return r, nil
+		models, err := j.checkCredential(ctx, cred, controllers)
+		if err != nil || flags&CredentialUpdate == 0 {
+			return models, errgo.Mask(err, apiconn.IsAPIError)
 		}
 	}
 	// Note that because CredentialUpdate is checked for inside the
 	// CredentialCheck case above, we know that we need to
 	// update the credential in this case.
-	r, err := j.updateCredential(ctx, cred, controllers)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	return r, nil
+	models, err := j.updateCredential(ctx, cred, controllers)
+	return models, errgo.Mask(err, apiconn.IsAPIError)
 }
 
-func (j *JEM) updateCredential(ctx context.Context, cred *mongodoc.Credential, controllers []params.EntityPath) (*jujuparams.UpdateCredentialResult, error) {
+func (j *JEM) updateCredential(ctx context.Context, cred *mongodoc.Credential, controllers []params.EntityPath) ([]jujuparams.UpdateCredentialModelResult, error) {
 	// The credential has now been checked (or we're going
 	// to force the update), so update it in the local database.
 	// and mark in the local database that an update is required for
@@ -824,117 +818,87 @@ func (j *JEM) updateCredential(ctx context.Context, cred *mongodoc.Credential, c
 			}
 			defer conn.Close()
 
-			var r *jujuparams.UpdateCredentialResult
-			err = j.updateControllerCredential(ctx, conn, ctlPath, cred, &r)
+			models, err := j.updateControllerCredential(ctx, conn, ctlPath, cred)
 			ch <- updateCredentialResult{
 				ctlPath: ctlPath,
-				err:     err,
-				r:       r,
+				models:  models,
+				err:     errgo.Mask(err, apiconn.IsAPIError),
 			}
 		}()
 	}
-	r, err := mergeUpdateCredentialResults(ctx, ch, len(controllers), false)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	return r, nil
+	models, err := mergeUpdateCredentialResults(ctx, ch, len(controllers))
+	return models, errgo.Mask(err, apiconn.IsAPIError)
 }
 
-func (j *JEM) checkCredential(ctx context.Context, newCred *mongodoc.Credential, controllers []params.EntityPath) (*jujuparams.UpdateCredentialResult, error) {
+func (j *JEM) checkCredential(ctx context.Context, newCred *mongodoc.Credential, controllers []params.EntityPath) ([]jujuparams.UpdateCredentialModelResult, error) {
 	if len(controllers) == 0 {
 		// No controllers, so there's nowhere to check that the credential
 		// is valid.
-		return &jujuparams.UpdateCredentialResult{
-			CredentialTag: CloudCredentialTag(newCred.Path.ToParams()).String(),
-		}, nil
+		return nil, nil
 	}
 	ch := make(chan updateCredentialResult, len(controllers))
 	for _, ctlPath := range controllers {
 		ctlPath, j := ctlPath, j.Clone()
 		go func() {
 			defer j.Close()
-			r, err := j.checkCredentialOnController(ctx, ctlPath, newCred)
-			ch <- updateCredentialResult{ctlPath, r, err}
+			models, err := j.checkCredentialOnController(ctx, ctlPath, newCred)
+			ch <- updateCredentialResult{ctlPath, models, errgo.Mask(err, apiconn.IsAPIError)}
 		}()
 	}
-	r, err := mergeUpdateCredentialResults(ctx, ch, len(controllers), true)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	return r, nil
+	models, err := mergeUpdateCredentialResults(ctx, ch, len(controllers))
+	return models, errgo.Mask(err, apiconn.IsAPIError)
 }
 
 type updateCredentialResult struct {
 	ctlPath params.EntityPath
-	r       *jujuparams.UpdateCredentialResult
+	models  []jujuparams.UpdateCredentialModelResult
 	err     error
 }
 
-func mergeUpdateCredentialResults(ctx context.Context, ch <-chan updateCredentialResult, n int, errorsAreFatal bool) (*jujuparams.UpdateCredentialResult, error) {
-	allResults := new(jujuparams.UpdateCredentialResult)
+func mergeUpdateCredentialResults(ctx context.Context, ch <-chan updateCredentialResult, n int) ([]jujuparams.UpdateCredentialModelResult, error) {
+	var models []jujuparams.UpdateCredentialModelResult
+	var firstError error
 	for n > 0 {
 		select {
 		case r := <-ch:
 			n--
+			models = append(models, r.models...)
 			if r.err != nil {
-				if errorsAreFatal {
-					return nil, errgo.Notef(r.err, "controller %s", r.ctlPath)
-				}
 				zapctx.Warn(ctx,
 					"cannot update credential",
 					zap.String("controller", r.ctlPath.String()),
 					zaputil.Error(r.err),
 				)
-				continue
+				if firstError == nil {
+					firstError = errgo.NoteMask(r.err, fmt.Sprintf("controller %s", r.ctlPath), apiconn.IsAPIError)
+				}
 			}
-			mergeCredentialCheckResult(allResults, r.r)
+
 		case <-ctx.Done():
 			return nil, errgo.Notef(ctx.Err(), "timed out checking credentials")
 		}
 	}
-	return allResults, nil
+	return models, errgo.Mask(firstError, apiconn.IsAPIError)
 }
 
-func mergeCredentialCheckResult(r1, r2 *jujuparams.UpdateCredentialResult) {
-	if r1.CredentialTag == "" {
-		r1.CredentialTag = r2.CredentialTag
-	}
-	if r1.Error == nil {
-		r1.Error = r2.Error
-	}
-	r1.Models = append(r1.Models, r2.Models...)
-}
-
-func (j *JEM) checkCredentialOnController(ctx context.Context, ctlPath params.EntityPath, cred *mongodoc.Credential) (*jujuparams.UpdateCredentialResult, error) {
+func (j *JEM) checkCredentialOnController(ctx context.Context, ctlPath params.EntityPath, cred *mongodoc.Credential) ([]jujuparams.UpdateCredentialModelResult, error) {
 	conn, err := j.OpenAPI(ctx, ctlPath)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
 	defer conn.Close()
-	_, facade := jujuapibase.NewClientFacade(conn, "Cloud")
-	if facade.BestAPIVersion() < 3 {
-		// If version 3 isn't supported, then the UpdateCredential entry point
-		// doesn't check for validity, so there's nothing to do.
-		return &jujuparams.UpdateCredentialResult{
-			CredentialTag: CloudCredentialTag(cred.Path.ToParams()).String(),
-		}, nil
+
+	if !conn.SupportsCheckCredentialModels() {
+		// Version 3 of the Cloud facade isn't supported, so there is nothing to do.
+		return nil, nil
 	}
-	in := jujuparams.TaggedCredentials{
-		Credentials: []jujuparams.TaggedCredential{newJujuCred(cred)},
-	}
-	var out jujuparams.UpdateCredentialResults
-	if err := facade.FacadeCall("CheckCredentialsModels", in, &out); err != nil {
-		return nil, errgo.Mask(err)
-	}
-	if len(out.Results) != 1 {
-		return nil, errgo.Newf("invalid result count")
-	}
-	return &out.Results[0], nil
+	models, err := conn.CheckCredentialModels(ctx, cred)
+	return models, errgo.Mask(err, apiconn.IsAPIError)
 }
 
 func newJujuCred(cred *mongodoc.Credential) jujuparams.TaggedCredential {
 	return jujuparams.TaggedCredential{
-		Tag: CloudCredentialTag(cred.Path.ToParams()).String(),
+		Tag: conv.ToCloudCredentialTag(cred.Path.ToParams()).String(),
 		Credential: jujuparams.CloudCredential{
 			AuthType:   string(cred.Type),
 			Attributes: cred.Attributes,
@@ -975,7 +939,7 @@ func (j *JEM) ControllerUpdateCredentials(ctx context.Context, ctlPath params.En
 				)
 			}
 		} else {
-			if err := j.updateControllerCredential(ctx, conn, ctl.Path, cred, nil); err != nil {
+			if _, err := j.updateControllerCredential(ctx, conn, ctl.Path, cred); err != nil {
 				zapctx.Warn(ctx,
 					"cannot update credential",
 					zap.Stringer("cred", credPath),
@@ -997,31 +961,20 @@ func (j *JEM) updateControllerCredential(
 	conn *apiconn.Conn,
 	ctlPath params.EntityPath,
 	cred *mongodoc.Credential,
-	rp **jujuparams.UpdateCredentialResult,
-) error {
+) ([]jujuparams.UpdateCredentialModelResult, error) {
 	if cred.Revoked {
-		return errgo.New("updateControllerCredential called with revoked credential (shouldn't happen)")
+		return nil, errgo.New("updateControllerCredential called with revoked credential (shouldn't happen)")
 	}
-	r, err := updateCredential(ctx, conn, cred)
-	if err != nil {
-		return errgo.Notef(err, "cannot update credentials")
-	}
-	if rp != nil {
-		// Our caller wants the UpdateCredentialResult.
-		if r == nil {
-			// We're talking to an old version of the API that doesn't
-			// return full results.
-			// TODO fill in r from models known to us.
+	models, err := conn.UpdateCredential(ctx, cred)
+	if err == nil {
+		if dberr := j.DB.clearCredentialUpdate(ctx, ctlPath, cred.Path); dberr != nil {
+			err = errgo.Notef(dberr, "cannot update controller %q after successfully updating credential", ctlPath)
 		}
-		*rp = r
 	}
-	if r != nil && r.Error != nil {
-		return errgo.Mask(r.Error)
+	if err != nil {
+		err = errgo.NoteMask(err, "cannot update credentials", apiconn.IsAPIError)
 	}
-	if err := j.DB.clearCredentialUpdate(ctx, ctlPath, cred.Path); err != nil {
-		return errgo.Notef(err, "cannot update controller %q after successfully updating credntial", ctlPath)
-	}
-	return nil
+	return models, err
 }
 
 func (j *JEM) revokeControllerCredential(
@@ -1030,7 +983,7 @@ func (j *JEM) revokeControllerCredential(
 	ctlPath params.EntityPath,
 	credPath params.CredentialPath,
 ) error {
-	cloudCredentialTag := CloudCredentialTag(credPath)
+	cloudCredentialTag := conv.ToCloudCredentialTag(credPath)
 
 	_, facade := jujuapibase.NewClientFacade(conn, "Cloud")
 	var results jujuparams.ErrorResults
@@ -1066,50 +1019,13 @@ func (j *JEM) revokeControllerCredential(
 	return nil
 }
 
-// updateCredential updates a credential on a controller implied by the
-// given API connection.
-//
-// The first return parameter may include information on models
-// that are using the credential.
-func updateCredential(ctx context.Context, conn *apiconn.Conn, cred *mongodoc.Credential) (*jujuparams.UpdateCredentialResult, error) {
-	_, facade := jujuapibase.NewClientFacade(conn, "Cloud")
-	jcreds := []jujuparams.TaggedCredential{newJujuCred(cred)}
-	if facade.BestAPIVersion() < 3 {
-		// It's an old controller, so the UpdateCredentials entry point doesn't check
-		// that the credentials are valid.
-		// But we still need to return results with all the models in,
-		// so we'll get the models associated with the credential first.
-		in := jujuparams.TaggedCredentials{
-			Credentials: jcreds,
-		}
-		var out jujuparams.ErrorResults
-		if err := facade.FacadeCall("UpdateCredentials", in, &out); err != nil {
-			return nil, errgo.Mask(err)
-		}
-		return nil, out.OneError()
-	}
-	in := jujuparams.UpdateCredentialArgs{
-		Force:       true,
-		Credentials: jcreds,
-	}
-	var out jujuparams.UpdateCredentialResults
-	err := facade.FacadeCall("UpdateCredentialsCheckModels", in, &out)
-	switch {
-	case err != nil:
-		return nil, errgo.Mask(err)
-	case len(out.Results) != 1:
-		return nil, errgo.New("unexpected result count from UpdateCredentialsCheckModels")
-	}
-	return &out.Results[0], nil
-}
-
 // GrantModel grants the given access for the given user on the given model and updates the JEM database.
 func (j *JEM) GrantModel(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model, user params.User, access string) error {
 	if err := j.DB.GrantModel(ctx, model.Path, user, access); err != nil {
 		return errgo.Mask(err)
 	}
 	client := modelmanager.NewClient(conn)
-	if err := client.GrantModel(UserTag(user).Id(), access, model.UUID); err != nil {
+	if err := client.GrantModel(conv.ToUserTag(user).Id(), access, model.UUID); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil
@@ -1121,7 +1037,7 @@ func (j *JEM) RevokeModel(ctx context.Context, conn *apiconn.Conn, model *mongod
 		return errgo.Mask(err)
 	}
 	client := modelmanager.NewClient(conn)
-	if err := client.RevokeModel(UserTag(user).Id(), access, model.UUID); err != nil {
+	if err := client.RevokeModel(conv.ToUserTag(user).Id(), access, model.UUID); err != nil {
 		// TODO (mhilton) What should be done with the changes already made to JEM.
 		return errgo.Mask(err)
 	}
@@ -1517,7 +1433,7 @@ func (j *JEM) GrantCloud(ctx context.Context, cloud params.Cloud, user params.Us
 			return errgo.Mask(err)
 		}
 		defer conn.Close()
-		if err := cloudapi.NewClient(conn).GrantCloud(UserTag(user).String(), access, string(cloud)); err != nil {
+		if err := cloudapi.NewClient(conn).GrantCloud(conv.ToUserTag(user).String(), access, string(cloud)); err != nil {
 			// TODO(mhilton) If this happens then the
 			// controller will be in an inconsistent state
 			// with JIMM. Try and resolve this.
@@ -1544,7 +1460,7 @@ func (j *JEM) RevokeCloud(ctx context.Context, cloud params.Cloud, user params.U
 			return errgo.Mask(err)
 		}
 		defer conn.Close()
-		if err := cloudapi.NewClient(conn).RevokeCloud(UserTag(user).String(), access, string(cloud)); err != nil {
+		if err := cloudapi.NewClient(conn).RevokeCloud(conv.ToUserTag(user).String(), access, string(cloud)); err != nil {
 			return errgo.Mask(err)
 		}
 	}
@@ -1557,7 +1473,7 @@ func (j *JEM) RevokeCloud(ctx context.Context, cloud params.Cloud, user params.U
 // UpdateModelCredential updates the credential used with a model on both
 // the controller and the local database.
 func (j *JEM) UpdateModelCredential(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model, cred *mongodoc.Credential) error {
-	if err := j.updateControllerCredential(ctx, conn, model.Controller, cred, nil); err != nil {
+	if _, err := j.updateControllerCredential(ctx, conn, model.Controller, cred); err != nil {
 		return errgo.Notef(err, "cannot add credential")
 	}
 	if err := j.DB.credentialAddController(ctx, cred.Path, model.Controller); err != nil {
@@ -1565,7 +1481,7 @@ func (j *JEM) UpdateModelCredential(ctx context.Context, conn *apiconn.Conn, mod
 	}
 
 	client := modelmanager.NewClient(conn)
-	if err := client.ChangeModelCredential(names.NewModelTag(model.UUID), CloudCredentialTag(cred.Path.ToParams())); err != nil {
+	if err := client.ChangeModelCredential(names.NewModelTag(model.UUID), conv.ToCloudCredentialTag(cred.Path.ToParams())); err != nil {
 		return errgo.Mask(err)
 	}
 
@@ -1592,28 +1508,9 @@ func plural(n int) string {
 	return "s"
 }
 
-// UserTag creates a juju user tag from a params.User
-func UserTag(u params.User) names.UserTag {
-	tag := names.NewUserTag(string(u))
-	if tag.IsLocal() {
-		tag = tag.WithDomain("external")
-	}
-	return tag
-}
-
 // CloudTag creates a juju cloud tag from a params.Cloud
 func CloudTag(c params.Cloud) names.CloudTag {
 	return names.NewCloudTag(string(c))
-}
-
-// CloudCredentialTag creates a juju cloud credential tag from the given
-// CredentialPath.
-func CloudCredentialTag(p params.CredentialPath) names.CloudCredentialTag {
-	if p.IsZero() {
-		return names.CloudCredentialTag{}
-	}
-	user := UserTag(p.User)
-	return names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", p.Cloud, user.Id(), p.Name))
 }
 
 // WatchAllModelSummaries starts watching the summary updates from
