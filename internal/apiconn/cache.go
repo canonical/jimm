@@ -6,9 +6,9 @@ import (
 
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"golang.org/x/sync/singleflight"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/singleflight"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
 )
@@ -75,19 +75,19 @@ func (cache *Cache) EvictAll() {
 // returned unmasked.
 func (cache *Cache) OpenAPI(
 	ctx context.Context,
-	envUUID string,
+	modelUUID string,
 	dial func() (api.Connection, *api.Info, error),
 ) (*Conn, error) {
 	// First, a quick check to see whether the connection
 	// is currrently cached.
 	cache.mu.Lock()
-	c := cache.conns[envUUID]
+	c := cache.conns[modelUUID]
 	if c != nil {
 		select {
 		case <-c.Broken():
 			// The connection is broken. Evict it from the cache
 			// and try dialling again.
-			delete(cache.conns, envUUID)
+			delete(cache.conns, modelUUID)
 			c.Close()
 			c = nil
 		default:
@@ -102,7 +102,7 @@ func (cache *Cache) OpenAPI(
 	// server with the same model UUID at the same time,
 	// we only dial the controller once. The group is
 	// keyed by the model UUID.
-	x, err := cache.group.Do(ctx, envUUID, func() (interface{}, error) {
+	ch := cache.group.DoChan(modelUUID, func() (interface{}, error) {
 		st, stInfo, err := dial()
 		if err != nil {
 			return nil, errgo.Mask(err, errgo.Any)
@@ -117,15 +117,23 @@ func (cache *Cache) OpenAPI(
 			Info:       stInfo,
 			shared: &sharedConn{
 				cache:    cache,
-				uuid:     envUUID,
+				uuid:     modelUUID,
 				refCount: 1,
 			},
 		}
 		cache.mu.Lock()
-		cache.conns[envUUID] = c
+		cache.conns[modelUUID] = c
 		cache.mu.Unlock()
 		return c, nil
 	})
+	var x interface{}
+	var err error
+	select {
+	case r := <-ch:
+		x, err = r.Val, r.Err
+	case <-ctx.Done():
+		err = ctx.Err()
+	}
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
