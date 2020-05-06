@@ -13,7 +13,6 @@ import (
 
 	"github.com/juju/clock"
 	"github.com/juju/juju/api"
-	jujuapibase "github.com/juju/juju/api/base"
 	cloudapi "github.com/juju/juju/api/cloud"
 	"github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
@@ -873,16 +872,6 @@ func (j *JEM) checkCredentialOnController(ctx context.Context, ctlPath params.En
 	return models, errgo.Mask(err, apiconn.IsAPIError)
 }
 
-func newJujuCred(cred *mongodoc.Credential) jujuparams.TaggedCredential {
-	return jujuparams.TaggedCredential{
-		Tag: conv.ToCloudCredentialTag(cred.Path.ToParams()).String(),
-		Credential: jujuparams.CloudCredential{
-			AuthType:   string(cred.Type),
-			Attributes: cred.Attributes,
-		},
-	}
-}
-
 // ControllerUpdateCredentials updates the given controller by updating
 // all outstanding UpdateCredentials.
 func (j *JEM) ControllerUpdateCredentials(ctx context.Context, ctlPath params.EntityPath) error {
@@ -1466,21 +1455,16 @@ func (j *JEM) WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityP
 		return nil, errgo.Mask(err)
 	}
 
-	_, facade := jujuapibase.NewClientFacade(conn, "Controller")
-	if facade.BestAPIVersion() < 9 {
+	if !conn.SupportsModelSummaryWatcher() {
 		return nil, ModelSummaryWatcherNotSupportedError
 	}
-
-	var out jujuparams.SummaryWatcherID
-	if err := facade.FacadeCall("WatchAllModelSummaries", nil, &out); err != nil {
-		return nil, errgo.Mask(err)
-	}
-	if out.WatcherID == "" {
-		return nil, errgo.Newf("invalid watcher ID")
+	id, err := conn.WatchAllModelSummaries(ctx)
+	if err != nil {
+		errgo.Mask(err, apiconn.IsAPIError)
 	}
 	watcher := &modelSummaryWatcher{
-		caller:  facade.RawAPICaller(),
-		id:      &out.WatcherID,
+		conn:    conn,
+		id:      id,
 		pubsub:  j.pubsub,
 		cleanup: conn.Close,
 	}
@@ -1489,26 +1473,21 @@ func (j *JEM) WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityP
 }
 
 type modelSummaryWatcher struct {
-	caller  jujuapibase.APICaller
-	id      *string
+	conn    *apiconn.Conn
+	id      string
 	pubsub  *pubsub.Hub
 	cleanup func() error
 }
 
-func (w *modelSummaryWatcher) next() ([]jujuparams.ModelAbstract, error) {
-	var summary jujuparams.SummaryWatcherNextResults
-	err := w.caller.APICall(
-		"ModelSummaryWatcher",
-		w.caller.BestFacadeVersion("ModelSummaryWatcher"),
-		*w.id,
-		"Next",
-		nil,
-		&summary,
-	)
-	sort.Slice(summary.Models, func(i, j int) bool {
-		return summary.Models[i].UUID < summary.Models[j].UUID
+func (w *modelSummaryWatcher) next(ctx context.Context) ([]jujuparams.ModelAbstract, error) {
+	models, err := w.conn.ModelSummaryWatcherNext(ctx, w.id)
+	if err != nil {
+		return nil, errgo.Mask(err, apiconn.IsAPIError)
+	}
+	sort.Slice(models, func(i, j int) bool {
+		return models[i].UUID < models[j].UUID
 	})
-	return summary.Models, errgo.Mask(err)
+	return models, nil
 }
 
 func (w *modelSummaryWatcher) loop(ctx context.Context) {
@@ -1524,7 +1503,7 @@ func (w *modelSummaryWatcher) loop(ctx context.Context) {
 			return
 		default:
 		}
-		modelSummaries, err := w.next()
+		modelSummaries, err := w.next(ctx)
 		if err != nil {
 			zapctx.Error(ctx, "failed to get next model summary", zaputil.Error(err))
 			return
@@ -1536,12 +1515,5 @@ func (w *modelSummaryWatcher) loop(ctx context.Context) {
 }
 
 func (w *modelSummaryWatcher) stop() error {
-	return errgo.Mask(w.caller.APICall(
-		"ModelSummaryWatcher",
-		w.caller.BestFacadeVersion("ModelSummaryWatcher"),
-		*w.id,
-		"Stop",
-		nil,
-		nil,
-	))
+	return errgo.Mask(w.conn.ModelSummaryWatcherStop(context.TODO(), w.id), apiconn.IsAPIError)
 }
