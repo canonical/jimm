@@ -13,13 +13,11 @@ import (
 
 	"github.com/juju/clock"
 	"github.com/juju/juju/api"
-	"github.com/juju/juju/api/base"
 	jujuapibase "github.com/juju/juju/api/base"
 	cloudapi "github.com/juju/juju/api/cloud"
 	"github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	jujucloud "github.com/juju/juju/cloud"
-	"github.com/juju/juju/environs/config"
 	"github.com/juju/names/v4"
 	"github.com/juju/utils/cache"
 	"github.com/juju/version"
@@ -485,7 +483,12 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 		// Use a temporary UUID so that we can create two at the
 		// same time, because the uuid field must always be
 		// unique.
-		UUID: fmt.Sprintf("creating-%x", j.pool.uuidGenerator.Next()),
+		UUID:        fmt.Sprintf("creating-%x", j.pool.uuidGenerator.Next()),
+		Cloud:       p.Cloud,
+		CloudRegion: p.Region,
+		Info: &mongodoc.ModelInfo{
+			Config: p.Attributes,
+		},
 	}
 	if cred != nil {
 		modelDoc.Credential = cred.Path
@@ -509,10 +512,8 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 	}()
 
 	var ctlPath params.EntityPath
-	var modelInfo base.ModelInfo
 	for _, controller := range controllers {
-		var err error
-		modelInfo, err = j.createModelOnController(ctx, controller, p, cred)
+		err := j.createModelOnController(ctx, controller, modelDoc, cred)
 		if err == nil {
 			ctlPath = controller
 			break
@@ -531,41 +532,25 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 	// and update other attributes from the response too.
 	// Use Apply so that we can return a result that's consistent
 	// with Database.Model.
-	info := mongodoc.ModelInfo{
-		Life: string(modelInfo.Life),
-		Status: mongodoc.ModelStatus{
-			Status:  string(modelInfo.Status.Status),
-			Message: modelInfo.Status.Info,
-			Data:    modelInfo.Status.Data,
-		},
-	}
-	if modelInfo.Status.Since != nil {
-		info.Status.Since = *modelInfo.Status.Since
-	}
-	if modelInfo.AgentVersion != nil {
-		info.Config = map[string]interface{}{
-			config.AgentVersionKey: modelInfo.AgentVersion.String(),
-		}
-	}
 	if _, err := j.DB.Models().FindId(modelDoc.Id).Apply(mgo.Change{
 		Update: bson.D{{"$set", bson.D{
-			{"uuid", modelInfo.UUID},
+			{"uuid", modelDoc.UUID},
 			{"controller", ctlPath},
-			{"cloud", modelInfo.Cloud},
-			{"cloudregion", modelInfo.CloudRegion},
-			{"defaultseries", modelInfo.DefaultSeries},
-			{"info", info},
-			{"type", modelInfo.Type},
-			{"providertype", modelInfo.ProviderType},
+			{"cloud", modelDoc.Cloud},
+			{"cloudregion", modelDoc.CloudRegion},
+			{"defaultseries", modelDoc.DefaultSeries},
+			{"info", modelDoc.Info},
+			{"type", modelDoc.Type},
+			{"providertype", modelDoc.ProviderType},
 		}}},
 		ReturnNew: true,
 	}, &modelDoc); err != nil {
 		j.DB.checkError(ctx, &err)
-		return nil, errgo.Notef(err, "cannot update model %s in database", modelInfo.UUID)
+		return nil, errgo.Notef(err, "cannot update model %s in database", modelDoc.UUID)
 	}
 	j.DB.AppendAudit(ctx, &params.AuditModelCreated{
 		ID:             modelDoc.Id,
-		UUID:           modelInfo.UUID,
+		UUID:           modelDoc.UUID,
 		Owner:          string(modelDoc.Owner()),
 		Creator:        modelDoc.Creator,
 		ControllerPath: ctlPath.String(),
@@ -600,40 +585,31 @@ var shuffle func(int, func(int, int)) = rand.Shuffle
 
 const errInvalidModelParams params.ErrorCode = "invalid CreateModel request"
 
-func (j *JEM) createModelOnController(ctx context.Context, ctlPath params.EntityPath, p CreateModelParams, cred *mongodoc.Credential) (base.ModelInfo, error) {
+func (j *JEM) createModelOnController(ctx context.Context, ctlPath params.EntityPath, model *mongodoc.Model, cred *mongodoc.Credential) error {
 	ctl, err := j.Controller(ctx, ctlPath)
 	if err != nil {
-		return base.ModelInfo{}, errgo.Notef(err, "cannot get controller document")
+		return errgo.Notef(err, "cannot get controller document")
 	}
 	if ctl.Deprecated {
-		return base.ModelInfo{}, errgo.Notef(err, "controller deprecated")
+		return errgo.Notef(err, "controller deprecated")
 	}
 	conn, err := j.OpenAPIFromDoc(ctx, ctl)
 	if err != nil {
-		return base.ModelInfo{}, errgo.Notef(err, "cannot connect to controller")
+		return errgo.Notef(err, "cannot connect to controller")
 	}
 	defer conn.Close()
 
-	var credTag names.CloudCredentialTag
 	if cred != nil {
 		if _, err := j.updateControllerCredential(ctx, conn, ctlPath, cred); err != nil {
-			return base.ModelInfo{}, errgo.WithCausef(err, errInvalidModelParams, "cannot add credential")
+			return errgo.WithCausef(err, errInvalidModelParams, "cannot add credential")
 		}
 		if err := j.DB.credentialAddController(ctx, cred.Path, ctlPath); err != nil {
-			return base.ModelInfo{}, errgo.WithCausef(err, errInvalidModelParams, "cannot add credential")
+			return errgo.WithCausef(err, errInvalidModelParams, "cannot add credential")
 		}
-		credTag = conv.ToCloudCredentialTag(cred.Path.ToParams())
+		// TODO mhilton set credential?
 	}
 
-	mmClient := modelmanager.NewClient(conn.Connection)
-	m, err := mmClient.CreateModel(
-		string(p.Path.Name),
-		conv.ToUserTag(p.Path.User).Id(),
-		string(p.Cloud),
-		p.Region,
-		credTag,
-		p.Attributes,
-	)
+	err = conn.CreateModel(ctx, model)
 	if err != nil {
 		switch jujuparams.ErrCode(err) {
 		case jujuparams.CodeAlreadyExists:
@@ -646,14 +622,14 @@ func (j *JEM) createModelOnController(ctx context.Context, ctlPath params.Entity
 			// the operation to delete a model isn't synchronous even
 			// for empty models. We could also have a worker that deletes
 			// empty models that don't appear in the database.
-			return base.ModelInfo{}, errgo.Notef(err, "model name in use")
+			return errgo.WithCausef(err, errInvalidModelParams, "model name in use")
 		case jujuparams.CodeUpgradeInProgress:
-			return base.ModelInfo{}, errgo.Notef(err, "upgrade in progress")
+			return errgo.Notef(err, "upgrade in progress")
 		default:
 			// The model couldn't be created because of an
 			// error in the request, don't try another
 			// controller.
-			return base.ModelInfo{}, errgo.WithCausef(err, errInvalidModelParams, "")
+			return errgo.WithCausef(err, errInvalidModelParams, "")
 		}
 	}
 	// TODO should we try to delete the model from the controller
@@ -664,12 +640,13 @@ func (j *JEM) createModelOnController(ctx context.Context, ctlPath params.Entity
 	// will remain on the controller and will trigger the "already exists
 	// in the backend controller" message above when the user
 	// attempts to create a model with the same name again.
-	if err := mmClient.GrantModel(conn.Info.Tag.(names.UserTag).Id(), "admin", m.UUID); err != nil {
+	if err := conn.GrantJIMMModelAdmin(ctx, model.UUID); err != nil {
 		// TODO (mhilton) ensure that this is flagged in some admin interface somewhere.
-		zapctx.Error(ctx, "leaked model", zap.String("controller", ctlPath.String()), zap.String("model", p.Path.String()), zaputil.Error(err), zap.String("model-uuid", m.UUID))
-		return base.ModelInfo{}, errgo.Notef(err, "cannot grant model access")
+		zapctx.Error(ctx, "leaked model", zap.String("controller", ctlPath.String()), zap.String("model", model.Path.String()), zaputil.Error(err), zap.String("model-uuid", model.UUID))
+		return errgo.Notef(err, "cannot grant model access")
 	}
-	return m, nil
+
+	return nil
 }
 
 // RevokeCredential checks that the credential with the given path
@@ -1506,11 +1483,6 @@ func plural(n int) string {
 		return ""
 	}
 	return "s"
-}
-
-// CloudTag creates a juju cloud tag from a params.Cloud
-func CloudTag(c params.Cloud) names.CloudTag {
-	return names.NewCloudTag(string(c))
 }
 
 // WatchAllModelSummaries starts watching the summary updates from

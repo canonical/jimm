@@ -138,7 +138,7 @@ func (m modelManagerAPI) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 				ControllerUUID:     m.root.params.ControllerUUID,
 				ProviderType:       model.ProviderType,
 				DefaultSeries:      model.DefaultSeries,
-				CloudTag:           jem.CloudTag(model.Cloud).String(),
+				CloudTag:           conv.ToCloudTag(model.Cloud).String(),
 				CloudRegion:        model.CloudRegion,
 				CloudCredentialTag: conv.ToCloudCredentialTag(model.Credential.ToParams()).String(),
 				OwnerTag:           conv.ToUserTag(model.Path.User).String(),
