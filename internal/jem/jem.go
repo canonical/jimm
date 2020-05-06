@@ -960,38 +960,11 @@ func (j *JEM) revokeControllerCredential(
 	ctlPath params.EntityPath,
 	credPath params.CredentialPath,
 ) error {
-	cloudCredentialTag := conv.ToCloudCredentialTag(credPath)
-
-	_, facade := jujuapibase.NewClientFacade(conn, "Cloud")
-	var results jujuparams.ErrorResults
-	if facade.BestAPIVersion() < 3 {
-		// If we're using an older API version, the Force flag is implied.
-		args := jujuparams.Entities{
-			Entities: []jujuparams.Entity{{
-				Tag: cloudCredentialTag.String(),
-			}},
-		}
-		if err := facade.FacadeCall("RevokeCredentials", args, &results); err != nil {
-			return errgo.Mask(err)
-		}
-	} else {
-		// Newer API versions require an explicit Force argument
-		// (we're assuming that we've checked earlier, so we always force)
-		args := jujuparams.RevokeCredentialArgs{
-			Credentials: []jujuparams.RevokeCredentialArg{{
-				Tag:   cloudCredentialTag.String(),
-				Force: true,
-			}},
-		}
-		if err := facade.FacadeCall("RevokeCredentialsCheckModels", args, &results); err != nil {
-			return errgo.Mask(err)
-		}
-	}
-	if err := results.OneError(); err != nil {
-		return errgo.Mask(err)
+	if err := conn.RevokeCredential(ctx, credPath); err != nil {
+		return errgo.Mask(err, apiconn.IsAPIError)
 	}
 	if err := j.DB.clearCredentialUpdate(ctx, ctlPath, mongodoc.CredentialPathFromParams(credPath)); err != nil {
-		return errgo.Notef(err, "cannot update controller %q after successfully updating credntial", ctlPath)
+		return errgo.Notef(err, "cannot update controller %q after successfully updating credential", ctlPath)
 	}
 	return nil
 }

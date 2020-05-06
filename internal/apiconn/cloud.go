@@ -10,6 +10,7 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 // SupportsCheckCredentialModels reports whether the controller supports
@@ -89,4 +90,44 @@ func (c *Conn) UpdateCredential(_ context.Context, cred *mongodoc.Credential) ([
 		return nil, errgo.Newf("unexpected number of results (expected 1, got %d)", len(out.Results))
 	}
 	return out.Results[0].Models, newAPIError(out.Results[0].Error)
+}
+
+// RevokeCredential removes the given credential on the controller. The
+// credential will always be removed irrespective of whether it will
+// break existing models (this is a forced revoke). If the caller wants
+// to check that removing the credential will break existing models then
+// CheckCredentialModels should be used first.
+//
+// This method will call the first available procedure from:
+//     - Cloud(3).RevokeCredentialsCheckModels
+//     - Cloud(1).RevokeCredentials
+//
+// Any error that represents a Juju API failure will be of type
+// *APIError.
+func (c *Conn) RevokeCredential(_ context.Context, path params.CredentialPath) error {
+	var out jujuparams.ErrorResults
+	if c.SupportsCheckCredentialModels() {
+		in := jujuparams.RevokeCredentialArgs{
+			Credentials: []jujuparams.RevokeCredentialArg{{
+				Tag:   conv.ToCloudCredentialTag(path).String(),
+				Force: true,
+			}},
+		}
+		if err := c.APICall("Cloud", 3, "", "RevokeCredentialsCheckModels", &in, &out); err != nil {
+			return newAPIError(err)
+		}
+	} else {
+		in := jujuparams.Entities{
+			Entities: []jujuparams.Entity{{
+				Tag: conv.ToCloudCredentialTag(path).String(),
+			}},
+		}
+		if err := c.APICall("Cloud", 1, "", "RevokeCredentials", &in, &out); err != nil {
+			return newAPIError(err)
+		}
+	}
+	if len(out.Results) != 1 {
+		return errgo.Newf("unexpected number of results (expected 1, got %d)", len(out.Results))
+	}
+	return newAPIError(out.Results[0].Error)
 }
