@@ -1,3 +1,5 @@
+// Copyright 2020 Canonical Ltd.
+
 package apiconn_test
 
 import (
