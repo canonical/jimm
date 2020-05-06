@@ -433,7 +433,7 @@ func (s *jemSuite) TestCreateModelWithExistingModelInControllerOnly(c *gc.C) {
 		},
 		Cloud: "dummy",
 	})
-	c.Assert(err, gc.ErrorMatches, `cannot create model: failed to create new model: model "model" for bob@external already exists`)
+	c.Assert(err, gc.ErrorMatches, `cannot create model: model name in use: api error: failed to create new model: model "model" for bob@external already exists \(already exists\)`)
 }
 
 func (s *jemSuite) TestCreateModelWithDeprecatedController(c *gc.C) {
@@ -2124,7 +2124,7 @@ func (s *jemK8sSuite) TestRemoveCloudWithModel(c *gc.C) {
 		Cloud:      "test-cloud",
 		Credential: credpath,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = s.jem.RemoveCloud(ctx, "test-cloud")
 	c.Assert(err, gc.ErrorMatches, `cloud is used by 1 model`)

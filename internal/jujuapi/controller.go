@@ -677,7 +677,7 @@ func (r *controllerRoot) modelDocToModelInfo(ctx context.Context, model *mongodo
 		ControllerUUID:     r.params.ControllerUUID,
 		ProviderType:       providerType,
 		DefaultSeries:      model.DefaultSeries,
-		CloudTag:           jem.CloudTag(model.Cloud).String(),
+		CloudTag:           conv.ToCloudTag(model.Cloud).String(),
 		CloudRegion:        model.CloudRegion,
 		CloudCredentialTag: conv.ToCloudCredentialTag(model.Credential.ToParams()).String(),
 		OwnerTag:           conv.ToUserTag(model.Path.User).String(),
