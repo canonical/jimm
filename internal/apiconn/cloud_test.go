@@ -102,3 +102,27 @@ func (s *cloudSuite) TestUpdateCredential(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `api error: updating cloud credentials: validating credential "dummy/admin@external/pw1" for cloud "dummy": supported auth-types \["empty" "userpass"\], "bad-type" not supported`)
 	c.Assert(models, gc.HasLen, 0)
 }
+
+func (s *cloudSuite) TestRevokeCredential(c *gc.C) {
+	cred := &mongodoc.Credential{
+		Path: mongodoc.CredentialPath{
+			Cloud: "dummy",
+			EntityPath: mongodoc.EntityPath{
+				User: "admin",
+				Name: "pw1",
+			},
+		},
+		Type: "userpass",
+		Attributes: map[string]string{
+			"username": "alibaba",
+			"password": "open sesame",
+		},
+	}
+
+	models, err := s.conn.UpdateCredential(context.Background(), cred)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(models, gc.HasLen, 0)
+
+	err = s.conn.RevokeCredential(context.Background(), cred.Path.ToParams())
+	c.Assert(err, gc.Equals, nil)
+}
