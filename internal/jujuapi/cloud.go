@@ -788,6 +788,7 @@ func (c cloudV5) updateCredentials(ctx context.Context, args []jujuparams.Tagged
 			Error:         mapError(err),
 			Models:        models,
 		}
+		results.Results[i].CredentialTag = arg.Tag
 	}
 	return results, nil
 }
