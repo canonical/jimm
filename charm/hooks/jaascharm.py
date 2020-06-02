@@ -66,6 +66,7 @@ def install(binary=None):
 
     new_resource_path = resource_path + '.new'
     old_resource_path = resource_path + '.old'
+
     # Remove possible remnants of a failed install and
     # the previous previous resource directory.
     shutil.rmtree(new_resource_path, ignore_errors=True)
@@ -104,6 +105,24 @@ def install(binary=None):
         'resource_path': resource_path,
         'service': service,
     }
+
+    dashboard_file = hookenv.resource_get('dashboard')
+    if _dashboard_resource_nonempty():
+        new_dashboard_path = dashboard_path() + '.new'
+        old_dashboard_path = dashboard_path() + '.old'
+        shutil.rmtree(new_dashboard_path, ignore_errors=True)
+        shutil.rmtree(old_dashboard_path, ignore_errors=True)
+
+        hookenv.status_set('maintenance', 'installing dashboard')
+        with tarfile.open(dashboard_file) as tf:
+            tf.extractall(new_dashboard_path)
+            # Change the owner/group of all extracted files to root/wheel.
+            for name in tf.getnames():
+                os.chown(os.path.join(new_dashboard_path, name), 0, 0)
+        if os.path.exists(dashboard_path()):
+            os.rename(dashboard_path(), old_dashboard_path)
+        os.rename(new_dashboard_path, dashboard_path())
+
     templating.render(
         'service',
         service_path,
@@ -128,6 +147,23 @@ def update_config(config):
        None then that value will be removed from the configuration file.
        It reports whether the config file was changed.
     """
+
+    """Update the config.js file for the Juju Dashboard.
+    """
+    if _dashboard_resource_nonempty() and os.path.exists(dashboard_path()):
+        config_js_path = os.path.join(dashboard_path(), 'config.js')
+        
+        dashboard_context = {
+            'base_controller_url': config['controller-url'],
+            'base_app_url': '/dashboard/',
+            'identity_provider_available': str(len(config['identity-location']) != 0).lower(),
+        }
+        templating.render(
+            'dashboard-config',
+            config_js_path,
+            dashboard_context
+        )
+
     path = _config_path()
     data = {}
     changed = True
@@ -156,6 +192,7 @@ def update_config(config):
         group=_service(),
         perms=0o640,
     )
+
     return True
 
 
@@ -274,6 +311,11 @@ def _config_path():
     return os.path.join(_root(), 'config.yaml')
 
 
+def dashboard_path():
+    """Return the path to Juju Dashboard folder."""
+    return os.path.join(_root(), 'dashboard')
+
+
 def _service_failed():
     """Report whether the service has failed."""
     return host.service('is-failed', _service())
@@ -287,3 +329,10 @@ def _service_enabled():
 def _service_running():
     """Report whether the service is running."""
     return host.service_running(_service())
+
+
+def _dashboard_resource_nonempty():
+    dashboard_file = hookenv.resource_get('dashboard')
+    if dashboard_file:
+        return os.path.getsize(dashboard_file) != 0
+    return False

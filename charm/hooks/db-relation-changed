@@ -14,6 +14,7 @@ def relation_changed():
     config = {
         'mongo-addr': '{}:{}'.format(hostname, port),
     }
+    hookenv.log('db-relation-changed mongo-addr {}:{}'.format(hostname, port))
     jaascharm.update_config_and_restart(config)
     jaascharm.update_status(failed_status=charm_status)
 

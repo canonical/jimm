@@ -12,11 +12,11 @@ import (
 	"github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
+	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/juju/names.v3"
 
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
@@ -58,6 +58,8 @@ var defaultCloudTests = []struct {
 }}
 
 func (s *cloudSuite) TestDefaultCloud(c *gc.C) {
+	ctx := context.Background()
+
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	for i, test := range defaultCloudTests {
@@ -68,7 +70,7 @@ func (s *cloudSuite) TestDefaultCloud(c *gc.C) {
 		c.Assert(err, gc.Equals, nil)
 		for j, cloud := range test.cloudNames {
 			ctlPath := params.EntityPath{User: "test", Name: params.Name(fmt.Sprintf("controller-%d", j))}
-			err := s.JEM.DB.AddController(testContext, &mongodoc.Controller{
+			err := s.JEM.DB.AddController(ctx, &mongodoc.Controller{
 				Path:   ctlPath,
 				ACL:    params.ACL{Read: []string{"everyone"}},
 				CACert: "cacert",
@@ -76,7 +78,7 @@ func (s *cloudSuite) TestDefaultCloud(c *gc.C) {
 				Public: true,
 			})
 			c.Assert(err, gc.Equals, nil)
-			err = s.JEM.DB.UpdateCloudRegions(testContext, []mongodoc.CloudRegion{{
+			err = s.JEM.DB.UpdateCloudRegions(ctx, []mongodoc.CloudRegion{{
 				Cloud:              params.Cloud(cloud),
 				PrimaryControllers: []params.EntityPath{ctlPath},
 				ACL: params.ACL{
@@ -115,7 +117,9 @@ func defaultCloud(conn base.APICaller) (names.CloudTag, error) {
 }
 
 func (s *cloudSuite) TestCloudCall(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -138,7 +142,9 @@ func (s *cloudSuite) TestCloudCall(c *gc.C) {
 }
 
 func (s *cloudSuite) TestClouds(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test-group", Name: "controller-1"}, true)
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test-group", Name: "controller-1"}, true)
 	s.IDMSrv.AddUser("test", "test-group")
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
@@ -165,8 +171,10 @@ func (s *cloudSuite) TestClouds(c *gc.C) {
 }
 
 func (s *cloudSuite) TestUserCredentials(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	_, err := s.JEM.UpdateCredential(context.Background(), &mongodoc.Credential{
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	_, err := s.JEM.UpdateCredential(ctx, &mongodoc.Credential{
 		Path: mongodoc.CredentialPath{
 			Cloud: "dummy",
 			EntityPath: mongodoc.EntityPath{
@@ -193,8 +201,10 @@ func (s *cloudSuite) TestUserCredentials(c *gc.C) {
 }
 
 func (s *cloudSuite) TestUserCredentialsWithDomain(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	_, err := s.JEM.UpdateCredential(context.Background(), &mongodoc.Credential{
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	_, err := s.JEM.UpdateCredential(ctx, &mongodoc.Credential{
 		Path: mongodoc.CredentialPath{
 			Cloud: "dummy",
 			EntityPath: mongodoc.EntityPath{
@@ -221,8 +231,10 @@ func (s *cloudSuite) TestUserCredentialsWithDomain(c *gc.C) {
 }
 
 func (s *cloudSuite) TestUserCredentialsACL(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	_, err := s.JEM.UpdateCredential(context.Background(), &mongodoc.Credential{
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	_, err := s.JEM.UpdateCredential(ctx, &mongodoc.Credential{
 		Path: mongodoc.CredentialPath{
 			Cloud: "dummy",
 			EntityPath: mongodoc.EntityPath{
@@ -238,7 +250,7 @@ func (s *cloudSuite) TestUserCredentialsACL(c *gc.C) {
 		},
 	}, 0)
 	c.Assert(err, gc.Equals, nil)
-	_, err = s.JEM.UpdateCredential(context.Background(), &mongodoc.Credential{
+	_, err = s.JEM.UpdateCredential(ctx, &mongodoc.Credential{
 		Path: mongodoc.CredentialPath{
 			Cloud: "dummy",
 			EntityPath: mongodoc.EntityPath{
@@ -268,7 +280,9 @@ func (s *cloudSuite) TestUserCredentialsACL(c *gc.C) {
 }
 
 func (s *cloudSuite) TestUserCredentialsErrors(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	req := jujuparams.UserClouds{
@@ -285,7 +299,9 @@ func (s *cloudSuite) TestUserCredentialsErrors(c *gc.C) {
 }
 
 func (s *cloudSuite) TestUpdateCloudCredentials(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -312,7 +328,9 @@ func (s *cloudSuite) TestUpdateCloudCredentials(c *gc.C) {
 }
 
 func (s *cloudSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	req := jujuparams.TaggedCredentials{
@@ -352,7 +370,9 @@ func (s *cloudSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
 }
 
 func (s *cloudSuite) TestUpdateCloudCredentialsForce(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -400,7 +420,7 @@ func (s *cloudSuite) TestUpdateCloudCredentialsForce(c *gc.C) {
 	args.Force = true
 	err = conn.APICall("Cloud", 3, "", "UpdateCredentialsCheckModels", args, &resp)
 	c.Assert(err, gc.Equals, nil)
-	c.Check(resp.Results[0].Error, gc.ErrorMatches, `some models are no longer visible`)
+	c.Check(resp.Results[0].Error, gc.ErrorMatches, `updating cloud credentials: validating credential "dummy/test@external/cred3" for cloud "dummy": supported auth-types \["empty" "userpass"\], "badauthtype" not supported`)
 
 	// Check that the credentials have been updated even though
 	// we got an error.
@@ -416,7 +436,9 @@ func (s *cloudSuite) TestUpdateCloudCredentialsForce(c *gc.C) {
 }
 
 func (s *cloudSuite) TestCheckCredentialsModels(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
@@ -471,7 +493,9 @@ func (s *cloudSuite) TestCheckCredentialsModels(c *gc.C) {
 }
 
 func (s *cloudSuite) TestCheckCredentialsModelsInvalidCreds(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
@@ -521,7 +545,9 @@ func (s *cloudSuite) TestCheckCredentialsModelsInvalidCreds(c *gc.C) {
 }
 
 func (s *cloudSuite) TestCredential(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 
@@ -591,7 +617,9 @@ func (s *cloudSuite) TestCredential(c *gc.C) {
 }
 
 func (s *cloudSuite) TestRevokeCredential(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller"}, true)
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -634,7 +662,9 @@ func (s *cloudSuite) TestRevokeCredential(c *gc.C) {
 }
 
 func (s *cloudSuite) TestAddCloud(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller"}, true)
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -661,7 +691,9 @@ func (s *cloudSuite) TestAddCloud(c *gc.C) {
 }
 
 func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller"}, true)
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -725,7 +757,9 @@ func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
 }
 
 func (s *cloudSuite) TestAddCloudError(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller"}, true)
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -741,7 +775,9 @@ func (s *cloudSuite) TestAddCloudError(c *gc.C) {
 }
 
 func (s *cloudSuite) TestAddCloudNoHostCloudRegion(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller"}, true)
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -757,7 +793,9 @@ func (s *cloudSuite) TestAddCloudNoHostCloudRegion(c *gc.C) {
 }
 
 func (s *cloudSuite) TestAddCloudBadName(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller"}, true)
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -772,7 +810,9 @@ func (s *cloudSuite) TestAddCloudBadName(c *gc.C) {
 }
 
 func (s *cloudSuite) TestAddCredential(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -832,7 +872,9 @@ func (s *cloudSuite) TestAddCredential(c *gc.C) {
 }
 
 func (s *cloudSuite) TestCredentialContents(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -910,7 +952,9 @@ func (s *cloudSuite) TestCredentialContents(c *gc.C) {
 }
 
 func (s *cloudSuite) TestRemoveCloud(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller"}, true)
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -943,7 +987,9 @@ func (s *cloudSuite) TestRemoveCloud(c *gc.C) {
 }
 
 func (s *cloudSuite) TestRemoveCloudNotFound(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller"}, true)
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -953,7 +999,9 @@ func (s *cloudSuite) TestRemoveCloudNotFound(c *gc.C) {
 }
 
 func (s *cloudSuite) TestModifyCloudAccess(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller"}, true)
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -1010,7 +1058,9 @@ func (s *cloudSuite) TestModifyCloudAccess(c *gc.C) {
 }
 
 func (s *cloudSuite) TestModifyCloudAccessUnauthorized(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller"}, true)
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)

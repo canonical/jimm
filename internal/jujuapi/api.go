@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/juju/httprequest"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/julienschmidt/httprouter"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/httprequest.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/ctxutil"
 	"github.com/CanonicalLtd/jimm/internal/jem"
@@ -24,15 +24,18 @@ import (
 )
 
 func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httprequest.Handler, error) {
+	srv := &httprequest.Server{
+		ErrorMapper: jemerror.Mapper,
+	}
+
 	return append(
-		jemerror.Mapper.Handlers(func(p httprequest.Params) (*handler, error) {
+		srv.Handlers(func(p httprequest.Params) (*handler, context.Context, error) {
 			ctx := ctxutil.Join(ctx, p.Context)
-			ctx = zapctx.WithFields(ctx, zap.String("req-id", httprequest.RequestUUID(ctx)))
 			return &handler{
 				context: ctx,
 				params:  params.Params,
 				jem:     params.JEMPool.JEM(ctx),
-			}, nil
+			}, ctx, nil
 		}),
 		newWebSocketHandler(ctx, params),
 		newRootWebSocketHandler(ctx, params, "/"),
@@ -50,8 +53,8 @@ func newWebSocketHandler(ctx context.Context, params jemserver.HandlerParams) ht
 			defer servermon.ConcurrentWebsocketConnections.Dec()
 			j := params.JEMPool.JEM(ctx)
 			defer j.Close()
-			wsServer := newWSServer(ctx, j, params.AuthenticatorPool, params.Params, p.ByName("modeluuid"))
-			wsServer.ServeHTTP(w, r)
+			wsServer := newWSServer(j, params.Authenticator, params.Params, p.ByName("modeluuid"))
+			wsServer.ServeHTTP(w, r.WithContext(ctx))
 		},
 	}
 }
@@ -62,11 +65,12 @@ func newRootWebSocketHandler(ctx context.Context, params jemserver.HandlerParams
 		Path:   path,
 		Handle: func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 			// _TODO add unique id to context or derive it from http request.
-			ctx := zapctx.WithFields(ctx, zap.Bool("websocket", true))
+			ctx := ctxutil.Join(r.Context(), ctx)
+			ctx = zapctx.WithFields(ctx, zap.Bool("websocket", true))
 			j := params.JEMPool.JEM(ctx)
 			defer j.Close()
-			wsServer := newWSServer(ctx, j, params.AuthenticatorPool, params.Params, "")
-			wsServer.ServeHTTP(w, r)
+			wsServer := newWSServer(j, params.Authenticator, params.Params, "")
+			wsServer.ServeHTTP(w, r.WithContext(ctx))
 		},
 	}
 }

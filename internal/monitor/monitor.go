@@ -10,11 +10,13 @@ package monitor
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/juju/clock"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/retry.v1"
 	"gopkg.in/tomb.v2"
 
 	"github.com/CanonicalLtd/jimm/internal/jem"
@@ -110,6 +112,14 @@ func newAllMonitor(ctx context.Context, jem jemInterface, ownerId string) *allMo
 
 // Kill implements worker.Worker.Kill.
 func (m *allMonitor) Kill() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, cleanup := range m.cleanups {
+		err := cleanup()
+		if err != nil {
+			zapctx.Error(context.Background(), "failed to clean up after all monitor", zaputil.Error(err))
+		}
+	}
 	m.tomb.Kill(nil)
 }
 
@@ -140,6 +150,9 @@ type allMonitor struct {
 	// we are currently monitoring. This field is accessed
 	// only by the allMonitor.run goroutine.
 	monitoring map[params.EntityPath]bool
+
+	mu       sync.Mutex
+	cleanups []func() error
 }
 
 func (m *allMonitor) run(ctx context.Context) (err error) {
@@ -183,6 +196,28 @@ func (m *allMonitor) startMonitors(ctx context.Context) error {
 	for _, ctl := range ctls {
 		ctl := ctl
 		ctx := zapctx.WithFields(ctx, zap.Stringer("controller", ctl.Path))
+
+		go func() {
+			strategy := retry.Regular{
+				Delay: time.Second,
+			}
+			for a := strategy.Start(nil); a.Next(); {
+				cleanup, err := m.jem.WatchAllModelSummaries(ctx, ctl.Path)
+				if err != nil {
+					if errgo.Cause(err) == jem.ModelSummaryWatcherNotSupportedError {
+						zapctx.Warn(ctx, "model summary watcher not supported", zaputil.Error(err))
+					} else {
+						zapctx.Error(ctx, "failed to start model summary watcher", zaputil.Error(err))
+					}
+				} else {
+					m.mu.Lock()
+					defer m.mu.Unlock()
+					m.cleanups = append(m.cleanups, cleanup)
+					return
+				}
+			}
+		}()
+
 		if m.monitoring[ctl.Path] {
 			// We're already monitoring this controller; no need to do anything.
 			zapctx.Debug(ctx, "not starting: already monitoring")

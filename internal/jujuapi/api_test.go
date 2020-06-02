@@ -3,6 +3,7 @@
 package jujuapi_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -23,10 +24,12 @@ type apiSuite struct {
 var _ = gc.Suite(&apiSuite{})
 
 func (s *apiSuite) TestGUI(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "bob", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(c, "bob", "dummy", "cred1", "empty")
-	_, uuid := s.CreateModel(c, params.EntityPath{"bob", "gui-model"}, params.EntityPath{"bob", "controller-1"}, cred)
-	jemSrv := s.NewServer(c, s.Session, s.IDMSrv, jem.ServerParams{
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "bob", Name: "controller-1"}, true)
+	cred := s.AssertUpdateCredential(ctx, c, "bob", "dummy", "cred1", "empty")
+	_, uuid := s.CreateModel(ctx, c, params.EntityPath{"bob", "gui-model"}, params.EntityPath{"bob", "controller-1"}, cred)
+	jemSrv := s.NewServer(ctx, c, s.Session, s.IDMSrv, jem.ServerParams{
 		GUILocation: "https://jujucharms.com.test",
 	})
 	defer jemSrv.Close()
@@ -52,7 +55,9 @@ func (s *apiSuite) TestGUINotFound(c *gc.C) {
 }
 
 func (s *apiSuite) TestGUIModelNotFound(c *gc.C) {
-	jemSrv := s.NewServer(c, s.Session, s.IDMSrv, jem.ServerParams{
+	ctx := context.Background()
+
+	jemSrv := s.NewServer(ctx, c, s.Session, s.IDMSrv, jem.ServerParams{
 		GUILocation: "https://jujucharms.com.test",
 	})
 	defer jemSrv.Close()

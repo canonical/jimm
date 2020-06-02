@@ -10,7 +10,7 @@ import (
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/jimm/config"
 )
@@ -94,6 +94,7 @@ usage-sender-url: https://jujucharms.com/omnibus/v2
 usage-sender-spool-dir: /tmp/12345
 domain: test-domain
 public-cloud-metadata: cloud-metadata.yaml
+max-pubsub-concurrency: 42
 `
 
 func (s *ConfigSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
@@ -137,13 +138,14 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 				mustParseKey("lsvcDkapKoFxIyjX9/eQgb3s41KVwPMISFwAJdVCZ70="),
 			},
 		},
-		ControllerUUID:      "00000000-0000-0000-0000-000000000000",
-		MaxMgoSessions:      200,
-		GUILocation:         "https://jujucharms.com",
-		UsageSenderURL:      "https://jujucharms.com/omnibus/v2",
-		UsageSenderSpoolDir: "/tmp/12345",
-		Domain:              "test-domain",
-		PublicCloudMetadata: "cloud-metadata.yaml",
+		ControllerUUID:       "00000000-0000-0000-0000-000000000000",
+		MaxMgoSessions:       200,
+		GUILocation:          "https://jujucharms.com",
+		UsageSenderURL:       "https://jujucharms.com/omnibus/v2",
+		UsageSenderSpoolDir:  "/tmp/12345",
+		Domain:               "test-domain",
+		PublicCloudMetadata:  "cloud-metadata.yaml",
+		MaxPubsubConcurrency: 42,
 	})
 }
 

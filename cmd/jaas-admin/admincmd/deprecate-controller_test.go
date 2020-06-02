@@ -3,6 +3,8 @@
 package admincmd_test
 
 import (
+	"context"
+
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/params"
@@ -15,6 +17,8 @@ type deprecateControllerSuite struct {
 var _ = gc.Suite(&deprecateControllerSuite{})
 
 func (s *deprecateControllerSuite) TestRevoke(c *gc.C) {
+	ctx := context.Background()
+
 	s.idmSrv.AddUser("bob", adminUser)
 	s.idmSrv.SetDefaultUser("bob")
 
@@ -32,7 +36,7 @@ func (s *deprecateControllerSuite) TestRevoke(c *gc.C) {
 	// Check that the deprecated status is set correctly
 	// (rely on lower level testing to check that it's not chosen
 	// when a new model is added).
-	d, err := s.jemClient("bob").GetControllerDeprecated(&params.GetControllerDeprecated{
+	d, err := s.jemClient("bob").GetControllerDeprecated(ctx, &params.GetControllerDeprecated{
 		EntityPath: params.EntityPath{
 			User: "bob",
 			Name: "foo",
@@ -47,7 +51,7 @@ func (s *deprecateControllerSuite) TestRevoke(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	d, err = s.jemClient("bob").GetControllerDeprecated(&params.GetControllerDeprecated{
+	d, err = s.jemClient("bob").GetControllerDeprecated(ctx, &params.GetControllerDeprecated{
 		EntityPath: params.EntityPath{
 			User: "bob",
 			Name: "foo",

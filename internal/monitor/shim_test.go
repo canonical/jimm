@@ -7,15 +7,14 @@ import (
 
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
-	"github.com/juju/juju/state/multiwatcher"
 	jujujujutesting "github.com/juju/juju/testing"
 	jujutesting "github.com/juju/juju/testing"
+	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
 	"github.com/juju/version"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	names "gopkg.in/juju/names.v3"
 
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
@@ -142,7 +141,7 @@ func (s jemShimWithUpdateNotify) UpdateModelCounts(ctx context.Context, ctlPath 
 	return nil
 }
 
-func (s jemShimWithUpdateNotify) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, info *multiwatcher.MachineInfo) error {
+func (s jemShimWithUpdateNotify) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, info *jujuparams.MachineInfo) error {
 	if err := s.jemInterface.UpdateMachineInfo(ctx, ctlPath, info); err != nil {
 		return err
 	}
@@ -364,7 +363,7 @@ func (s *jemShimInMemory) RemoveControllerApplications(ctx context.Context, ctlP
 	return nil
 }
 
-func (s *jemShimInMemory) UpdateApplicationInfo(ctx context.Context, ctlPath params.EntityPath, info *multiwatcher.ApplicationInfo) error {
+func (s *jemShimInMemory) UpdateApplicationInfo(ctx context.Context, ctlPath params.EntityPath, info *jujuparams.ApplicationInfo) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	info1 := *info
@@ -385,7 +384,7 @@ func (s *jemShimInMemory) UpdateApplicationInfo(ctx context.Context, ctlPath par
 	return nil
 }
 
-func (s *jemShimInMemory) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, info *multiwatcher.MachineInfo) error {
+func (s *jemShimInMemory) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, info *jujuparams.MachineInfo) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	info1 := *info
@@ -471,6 +470,18 @@ func (s *jemShimInMemory) UpdateCloudRegions(ctx context.Context, cloudRegions [
 	return nil
 }
 
+func (j jemShimInMemory) WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityPath) (func() error, error) {
+	return func() error { return nil }, nil
+}
+
+type jemShimWithoutModelSummaryWatcher struct {
+	jemInterface
+}
+
+func (j jemShimWithoutModelSummaryWatcher) WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityPath) (func() error, error) {
+	return func() error { return nil }, nil
+}
+
 type jujuAPIShims struct {
 	mu           sync.Mutex
 	openCount    int
@@ -484,7 +495,7 @@ func newJujuAPIShims() *jujuAPIShims {
 // newJujuAPIShim returns an implementation of the jujuAPI interface
 // that, when WatchAllModels is called, returns the given initial
 // deltas and then nothing.
-func (s *jujuAPIShims) newJujuAPIShim(initial []multiwatcher.Delta) *jujuAPIShim {
+func (s *jujuAPIShims) newJujuAPIShim(initial []jujuparams.Delta) *jujuAPIShim {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.openCount++
@@ -526,7 +537,7 @@ var _ jujuAPI = (*jujuAPIShim)(nil)
 type jujuAPIShim struct {
 	shims         *jujuAPIShims
 	closed        bool
-	initial       []multiwatcher.Delta
+	initial       []jujuparams.Delta
 	stack         string
 	serverVersion version.Number
 	clouds        map[names.CloudTag]cloud.Cloud
@@ -574,10 +585,10 @@ type watcherShim struct {
 	jujuAPIShim *jujuAPIShim
 	mu          sync.Mutex
 	stopped     chan struct{}
-	initial     []multiwatcher.Delta
+	initial     []jujuparams.Delta
 }
 
-func (s *watcherShim) Next() ([]multiwatcher.Delta, error) {
+func (s *watcherShim) Next() ([]jujuparams.Delta, error) {
 	s.jujuAPIShim.shims.mu.Lock()
 	d := s.initial
 	s.initial = nil

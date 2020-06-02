@@ -7,18 +7,16 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/juju/idmclient"
+	"github.com/canonical/candid/candidclient"
 	"github.com/juju/utils"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgostorage"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-	"gopkg.in/macaroon.v2-unstable"
-	"gopkg.in/mgo.v2"
+	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
+	"gopkg.in/macaroon.v2"
 
-	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
@@ -27,97 +25,16 @@ import (
 
 const usernameAttr = "username"
 
-// Params holds parameters for the NewPool function.
-type Params struct {
-	// Bakery holds the bakery service used to create and verify
-	// macaroons.
-	Bakery *bakery.Service
-
-	// RootKeys holds a mgostorage.RootKeys instance, used when
-	// minting or verifying macaroons.
-	RootKeys *mgostorage.RootKeys
-
-	// RootKeysPolicy is the storage policy used with RootKeys.
-	RootKeysPolicy mgostorage.Policy
-
-	// MacaroonCollection holds a mgo.Collection which can be used
-	// with RootKeys to store and retrieve macaroons.
-	MacaroonCollection *mgo.Collection
-
-	// PermChecker holds a PermChecker that will be used to check if
-	// the current user is a member of an ACL.
-	PermChecker *idmclient.PermChecker
-
-	// IdentityLocation holds the location of the third party identity service.
-	IdentityLocation string
-
-	// SessionPool holds a pool from which session objects are
-	// taken to be used in database operations.
-	SessionPool *mgosession.Pool
-
-	// Domain holds the domain to which users must belong, not
-	// including the leading "@". If this is empty, users may be in
-	// any domain.
-	Domain string
-}
-
-// A Pool contains a pool of authenticator objects.
-type Pool struct {
-	params Params
-}
-
-// NewPool creates a new Pool from which Authenticator objects may be
-// retrieved.
-func NewPool(ctx context.Context, params Params) (*Pool, error) {
-	p := &Pool{
-		params: params,
-	}
-	auth := p.Authenticator(ctx)
-	defer auth.Close()
-	if err := params.RootKeys.EnsureIndex(p.rootKeyCollection(auth.session)); err != nil {
-		return nil, errgo.Notef(err, "cannot ensure index on root key store")
-	}
-	return p, nil
-}
-
-// Authenticator retrieves an Authenticator object from the pool, which
-// must be closed after use.
-func (p *Pool) Authenticator(ctx context.Context) *Authenticator {
-	servermon.AuthenticatorPoolGet.Inc()
-	session := p.params.SessionPool.Session(ctx)
-	return &Authenticator{
-		pool: p,
-		bakery: p.params.Bakery.WithStore(p.params.RootKeys.NewStorage(
-			p.rootKeyCollection(session),
-			p.params.RootKeysPolicy,
-		)),
-		session: session,
-		domain:  p.params.Domain,
-	}
-}
-
-func (p *Pool) rootKeyCollection(session *mgo.Session) *mgo.Collection {
-	return p.params.MacaroonCollection.With(session)
-}
-
 // An Authenticator can be used to authenticate a connection.
 type Authenticator struct {
-	closed  bool
-	pool    *Pool
-	bakery  *bakery.Service
-	session *mgo.Session
-	domain  string
+	bakery *identchecker.Bakery
 }
 
-// Close closes the authenticator instance.
-func (a *Authenticator) Close() {
-	if a.closed {
-		return
+// NewAuthenticator initialises a new Authenticator.
+func NewAuthenticator(b *identchecker.Bakery) *Authenticator {
+	return &Authenticator{
+		bakery: b,
 	}
-	a.closed = true
-	servermon.AuthenticatorPoolPut.Inc()
-	a.bakery = nil
-	a.session.Close()
 }
 
 // Authenticate checks all macaroons in mss. If any are valid then the
@@ -125,33 +42,24 @@ func (a *Authenticator) Close() {
 // otherwise the original context is returned unchanged. If the returned
 // macaroon is non-nil then it should be sent to the client and if
 // discharged can be used to gain access.
-func (a *Authenticator) Authenticate(ctx context.Context, mss []macaroon.Slice, checker checkers.Checker) (context.Context, *macaroon.Macaroon, error) {
-	attrMap, verr := a.bakery.CheckAny(mss, nil, checkers.New(
-		checker,
-		checkers.TimeBefore,
-	))
+func (a *Authenticator) Authenticate(ctx context.Context, v bakery.Version, mss []macaroon.Slice) (identchecker.ACLIdentity, *bakery.Macaroon, error) {
+	ai, verr := a.bakery.Checker.Auth(mss...).Allow(ctx, identchecker.LoginOp)
 	if verr == nil {
-		if a.domain == "" || strings.HasSuffix(attrMap[usernameAttr], "@"+a.domain) {
-			servermon.AuthenticationSuccessCount.Inc()
-			return context.WithValue(ctx, authKey{}, authentication{
-				username_:   attrMap[usernameAttr],
-				permChecker: a.pool.params.PermChecker,
-			}), nil, nil
-		}
-		verr = &bakery.VerificationError{
-			Reason: errgo.Newf("user not in %q domain", a.domain),
-		}
+		servermon.AuthenticationSuccessCount.Inc()
+		return ai.Identity.(identchecker.ACLIdentity), nil, nil
 	}
-	servermon.AuthenticationFailCount.Inc()
-	if _, ok := errgo.Cause(verr).(*bakery.VerificationError); !ok {
-		return ctx, nil, errgo.Mask(verr, errgo.Is(params.ErrUnauthorized))
+	if !bakery.IsDischargeRequiredError(errgo.Cause(verr)) {
+		servermon.AuthenticationFailCount.Inc()
+		return nil, nil, errgo.Mask(verr, errgo.Is(params.ErrUnauthorized))
 	}
+
+	derr := errgo.Cause(verr).(*bakery.DischargeRequiredError)
 	// Macaroon verification failed: mint a new macaroon.
-	m, err := a.newMacaroon()
+	m, err := a.bakery.Oven.NewMacaroon(ctx, v, derr.Caveats, derr.Ops...)
 	if err != nil {
-		return ctx, nil, errgo.Notef(err, "cannot mint macaroon")
+		return nil, nil, errgo.Notef(err, "cannot mint macaroon")
 	}
-	return ctx, m, verr
+	return nil, m, verr
 }
 
 // AuthenticateRequest is used to authenticate and http.Request. If the
@@ -159,10 +67,10 @@ func (a *Authenticator) Authenticate(ctx context.Context, mss []macaroon.Slice, 
 // authorization information attached, otherwise the original context
 // will be returned unchanged. If a discharge is required the returned
 // error will be a discharge required error.
-func (a *Authenticator) AuthenticateRequest(ctx context.Context, req *http.Request) (context.Context, error) {
-	ctx, m, err := a.Authenticate(ctx, httpbakery.RequestMacaroons(req), checkers.New(httpbakery.Checkers(req)))
+func (a *Authenticator) AuthenticateRequest(ctx context.Context, req *http.Request) (identchecker.ACLIdentity, error) {
+	id, m, err := a.Authenticate(ctx, httpbakery.RequestVersion(req), httpbakery.RequestMacaroons(req))
 	if m == nil {
-		return ctx, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+		return id, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	// Request that this macaroon be supplied for all requests
 	// to the whole handler. We use a relative path because
@@ -177,80 +85,32 @@ func (a *Authenticator) AuthenticateRequest(ctx context.Context, req *http.Reque
 	} else {
 		cookiePath = p
 	}
-	dischargeErr := httpbakery.NewDischargeRequiredErrorForRequest(m, cookiePath, err, req)
-	dischargeErr.(*httpbakery.Error).Info.CookieNameSuffix = "authn"
-	return ctx, dischargeErr
-}
-
-// newMacaroon returns a macaroon that, when discharged, will allow
-// access to JIMM.
-func (a *Authenticator) newMacaroon() (*macaroon.Macaroon, error) {
-	condition := "is-authenticated-user"
-	if a.domain != "" {
-		condition += " @" + a.domain
-	}
-	return a.bakery.NewMacaroon([]checkers.Caveat{
-		checkers.NeedDeclaredCaveat(
-			checkers.Caveat{
-				Location:  a.pool.params.IdentityLocation,
-				Condition: condition,
-			},
-			usernameAttr,
-		),
+	dischargeErr := httpbakery.NewDischargeRequiredError(httpbakery.DischargeRequiredErrorParams{
+		Macaroon:         m,
+		OriginalError:    err,
+		CookiePath:       cookiePath,
+		CookieNameSuffix: "authn",
+		Request:          req,
 	})
+	return nil, dischargeErr
 }
 
-type authKey struct{}
-
-func fromContext(ctx context.Context) authInfo {
-	if info, _ := ctx.Value(authKey{}).(authInfo); info != nil {
-		return info
-	}
-	return noAuth{}
+// CheckIsUser checks whether the given identity can act as the given
+// user. It returns params.ErrUnauthorized if not.
+func CheckIsUser(ctx context.Context, id identchecker.ACLIdentity, user params.User) error {
+	return CheckACL(ctx, id, []string{string(user)})
 }
 
-type authInfo interface {
-	allow(acl []string) (bool, error)
-	username() string
-}
-
-type authentication struct {
-	username_   string
-	permChecker *idmclient.PermChecker
-}
-
-func (a authentication) allow(acl []string) (bool, error) {
-	ok, err := a.permChecker.Allow(a.username_, acl)
-	if err != nil {
-		return false, errgo.Mask(err)
-	} else if ok {
-		return true, nil
-	}
-	return false, nil
-}
-
-func (a authentication) username() string {
-	return a.username_
-}
-
-// CheckIsUser checks whether the currently authenticated user can
-// act as the given name.
-func CheckIsUser(ctx context.Context, user params.User) error {
-	return CheckACL(ctx, []string{string(user)})
-}
-
-// CheckACL checks whether the currently authenticated user is
-// allowed to access an entity with the given ACL.
-// It returns params.ErrUnauthorized if not.
-func CheckACL(ctx context.Context, acl []string) error {
-	auth := fromContext(ctx)
-	ok, err := auth.allow(acl)
+// CheckACL checks whether the the given identity is allowed to access an
+// entity with the given ACL. It returns params.ErrUnauthorized if not.
+func CheckACL(ctx context.Context, id identchecker.ACLIdentity, acl []string) error {
+	ok, err := id.Allow(ctx, acl)
 	if err != nil {
 		return errgo.Notef(err, "cannot check permissions")
 	}
 	if !ok {
 		zapctx.Debug(ctx, "user not authorized",
-			zap.String("user", auth.username()),
+			zap.String("user", id.Id()),
 			zap.Strings("acl", acl),
 		)
 		return params.ErrUnauthorized
@@ -264,62 +124,102 @@ type ACLEntity interface {
 	Owner() params.User
 }
 
-// CheckCanRead checks whether the current user is allowed to read the
+// CheckCanRead checks whether the given identity is allowed to read the
 // given entity. The owner is always allowed to access an entity,
 // regardless of its ACL.
-func CheckCanRead(ctx context.Context, e ACLEntity) error {
+func CheckCanRead(ctx context.Context, id identchecker.ACLIdentity, e ACLEntity) error {
 	acl := append([]string{string(e.Owner())}, e.GetACL().Read...)
-	return CheckACL(ctx, acl)
+	return CheckACL(ctx, id, acl)
 }
 
 // CheckIsAdmin checks whether the current user is an admin on the given
 // entity. The owner is always allowed to access an entity, regardless of
 // its ACL.
-func CheckIsAdmin(ctx context.Context, e ACLEntity) error {
+func CheckIsAdmin(ctx context.Context, id identchecker.ACLIdentity, e ACLEntity) error {
 	acl := append([]string{string(e.Owner())}, e.GetACL().Admin...)
-	return CheckACL(ctx, acl)
+	return CheckACL(ctx, id, acl)
 }
 
-// Username returns the name of the user authenticated on the given
-// context. If no user is authenticated then an empty string is returned.
-func Username(ctx context.Context) string {
-	return fromContext(ctx).username()
+type IdentityClientParams struct {
+	// CandidClient contains the underlying candid client for the
+	// identity client.
+	CandidClient *candidclient.Client
+
+	// Domain contains a domain users must be a member of to
+	// successfully log in.
+	Domain string
 }
 
-type testAuthentication []string
+// NewIdentityClient creates a new identity client for the authorizer.
+func NewIdentityClient(p IdentityClientParams) *IdentityClient {
+	return &IdentityClient{p: p}
+}
 
-func (a testAuthentication) allow(acl []string) (bool, error) {
-	for _, g := range acl {
-		if g == "everyone" {
-			return true, nil
-		}
-		for _, allowg := range a {
-			if allowg == g {
-				return true, nil
-			}
-		}
+// An IdentityClient implements identchecker.IdentityClient.
+type IdentityClient struct {
+	p IdentityClientParams
+}
+
+// IdentityFromContext implements IdentityClient.IdentityFromContext.
+func (c *IdentityClient) IdentityFromContext(ctx context.Context) (identchecker.Identity, []checkers.Caveat, error) {
+	condition := "is-authenticated-user"
+	if c.p.Domain != "" {
+		condition += " @" + c.p.Domain
 	}
-	return false, nil
+	cav := checkers.NeedDeclaredCaveat(
+		checkers.Caveat{
+			Location:  c.p.CandidClient.Client.BaseURL,
+			Condition: condition,
+		},
+		usernameAttr,
+	)
+
+	return nil, []checkers.Caveat{cav}, nil
 }
 
-func (a testAuthentication) username() string {
-	return a[0]
+// DeclaredIdentity implements IdentityClient.DeclaredIdentity.
+func (c *IdentityClient) DeclaredIdentity(ctx context.Context, declared map[string]string) (identchecker.Identity, error) {
+	id, err := c.p.CandidClient.DeclaredIdentity(ctx, declared)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	if c.p.Domain == "" || strings.HasSuffix(id.Id(), "@"+c.p.Domain) {
+		return id, nil
+	}
+
+	return nil, &bakery.VerificationError{
+		Reason: errgo.Newf("user not in %q domain", c.p.Domain),
+	}
 }
 
-// ContextWithUser returns the given context as if it had been returned
-// from Authenticate with the given authenticated user
-// and as if the user was a member of all the given groups.
-func ContextWithUser(ctx context.Context, username string, groups ...string) context.Context {
-	groups = append([]string{username}, groups...)
-	return context.WithValue(ctx, authKey{}, testAuthentication(groups))
+type authKey struct{}
+
+// ContextWithIdentity returns the given context with the given identity
+// attached.
+func ContextWithIdentity(ctx context.Context, id identchecker.ACLIdentity) context.Context {
+	return context.WithValue(ctx, authKey{}, id)
 }
 
-type noAuth struct{}
+// IdentityFromContext returns the identity that was previously attached
+// to the context using ContextWithIdentity. If no identity has been
+// attached then an Identity with no authority is returned.
+func IdentityFromContext(ctx context.Context) identchecker.ACLIdentity {
+	if aid, _ := ctx.Value(authKey{}).(identchecker.ACLIdentity); aid != nil {
+		return aid
+	}
+	return noIdentity{}
+}
 
-func (noAuth) username() string {
+type noIdentity struct{}
+
+func (noIdentity) Id() string {
 	return ""
 }
 
-func (noAuth) allow([]string) (bool, error) {
+func (noIdentity) Domain() string {
+	return ""
+}
+
+func (noIdentity) Allow(context.Context, []string) (bool, error) {
 	return false, nil
 }

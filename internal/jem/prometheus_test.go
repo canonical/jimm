@@ -11,19 +11,21 @@ import (
 	"strconv"
 	"strings"
 
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/status"
-	"github.com/juju/juju/state/multiwatcher"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
 func (s *jemSuite) TestModelStats(c *gc.C) {
-	ctx := auth.ContextWithUser(testContext, "bob")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob"))
 
 	ctl1Id := s.addController(c, params.EntityPath{"bob", "controller1"})
 	ctl2Id := s.addController(c, params.EntityPath{"bob", "controller2"})
@@ -104,7 +106,7 @@ func (s *jemSuite) TestModelStats(c *gc.C) {
 	err = prometheus.Register(stats)
 	c.Assert(err, gc.Equals, nil)
 	defer prometheus.Unregister(stats)
-	srv := httptest.NewServer(prometheus.Handler())
+	srv := httptest.NewServer(promhttp.Handler())
 	defer srv.Close()
 	resp, err := http.Get(srv.URL)
 	c.Assert(err, gc.Equals, nil)
@@ -148,7 +150,7 @@ func (s *jemSuite) TestModelStats(c *gc.C) {
 }
 
 func (s *jemSuite) TestMachineStats(c *gc.C) {
-	ctx := auth.ContextWithUser(testContext, "bob")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob"))
 
 	ctl1Id := s.addController(c, params.EntityPath{"bob", "controller1"})
 	ctl2Id := s.addController(c, params.EntityPath{"bob", "controller2"})
@@ -179,98 +181,98 @@ func (s *jemSuite) TestMachineStats(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "0",
 		ModelUUID: m1.UUID,
-		AgentStatus: multiwatcher.StatusInfo{
+		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Started,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "1",
 		ModelUUID: m1.UUID,
-		AgentStatus: multiwatcher.StatusInfo{
+		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Pending,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "2",
 		ModelUUID: m1.UUID,
-		AgentStatus: multiwatcher.StatusInfo{
+		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Stopped,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "3",
 		ModelUUID: m1.UUID,
-		AgentStatus: multiwatcher.StatusInfo{
+		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Down,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "4",
 		ModelUUID: m1.UUID,
-		AgentStatus: multiwatcher.StatusInfo{
+		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Started,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "5",
 		ModelUUID: m1.UUID,
-		AgentStatus: multiwatcher.StatusInfo{
+		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Pending,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "6",
 		ModelUUID: m1.UUID,
-		AgentStatus: multiwatcher.StatusInfo{
+		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Stopped,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "7",
 		ModelUUID: m1.UUID,
-		AgentStatus: multiwatcher.StatusInfo{
+		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Started,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "8",
 		ModelUUID: m1.UUID,
-		AgentStatus: multiwatcher.StatusInfo{
+		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Pending,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "9",
 		ModelUUID: m1.UUID,
-		AgentStatus: multiwatcher.StatusInfo{
+		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Started,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "0",
 		ModelUUID: m2.UUID,
-		AgentStatus: multiwatcher.StatusInfo{
+		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Started,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl2Id, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(ctx, ctl2Id, &jujuparams.MachineInfo{
 		Id:        "0",
 		ModelUUID: m3.UUID,
-		AgentStatus: multiwatcher.StatusInfo{
+		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Pending,
 		},
 	})
@@ -280,7 +282,7 @@ func (s *jemSuite) TestMachineStats(c *gc.C) {
 	err = prometheus.Register(stats)
 	c.Assert(err, gc.Equals, nil)
 	defer prometheus.Unregister(stats)
-	srv := httptest.NewServer(prometheus.Handler())
+	srv := httptest.NewServer(promhttp.Handler())
 	defer srv.Close()
 	resp, err := http.Get(srv.URL)
 	c.Assert(err, gc.Equals, nil)

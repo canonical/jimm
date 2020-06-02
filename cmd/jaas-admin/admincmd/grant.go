@@ -8,7 +8,7 @@ import (
 	"github.com/juju/cmd"
 	"github.com/juju/gnuflag"
 	"github.com/juju/juju/cmd/modelcmd"
-	"github.com/juju/names"
+	"github.com/juju/names/v4"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/params"
@@ -91,13 +91,16 @@ func (c *grantCommand) Init(args []string) error {
 }
 
 func (c *grantCommand) Run(ctxt *cmd.Context) error {
+	ctx, cancel := wrapContext(ctxt)
+	defer cancel()
+
 	if c.admin {
-		return c.runAdmin(ctxt)
+		return c.runAdmin(ctx, ctxt)
 	}
-	return c.run(ctxt)
+	return c.run(ctx, ctxt)
 }
 
-func (c *grantCommand) run(ctxt *cmd.Context) error {
+func (c *grantCommand) run(ctx context.Context, ctxt *cmd.Context) error {
 	client, err := c.newClient(ctxt)
 	if err != nil {
 		return errgo.Mask(err)
@@ -105,11 +108,11 @@ func (c *grantCommand) run(ctxt *cmd.Context) error {
 	defer client.Close()
 
 	if c.set {
-		return c.setPerm(client, params.ACL{
+		return c.setPerm(ctx, client, params.ACL{
 			Read: c.users.slice(),
 		})
 	}
-	currentACL, err := c.getPerm(client)
+	currentACL, err := c.getPerm(ctx, client)
 	if err != nil {
 		return errgo.Mask(err)
 	}
@@ -120,21 +123,21 @@ func (c *grantCommand) run(ctxt *cmd.Context) error {
 	for u := range c.users {
 		newReadPerms[u] = true
 	}
-	return c.setPerm(client, params.ACL{
+	return c.setPerm(ctx, client, params.ACL{
 		Read: newReadPerms.slice(),
 	})
 }
 
-func (c *grantCommand) setPerm(client *client, acl params.ACL) error {
+func (c *grantCommand) setPerm(ctx context.Context, client *client, acl params.ACL) error {
 	var err error
 	switch {
 	case c.controller:
-		err = client.SetControllerPerm(&params.SetControllerPerm{
+		err = client.SetControllerPerm(ctx, &params.SetControllerPerm{
 			EntityPath: c.path.EntityPath,
 			ACL:        acl,
 		})
 	default:
-		err = client.SetModelPerm(&params.SetModelPerm{
+		err = client.SetModelPerm(ctx, &params.SetModelPerm{
 			EntityPath: c.path.EntityPath,
 			ACL:        acl,
 		})
@@ -142,23 +145,23 @@ func (c *grantCommand) setPerm(client *client, acl params.ACL) error {
 	return errgo.Mask(err)
 }
 
-func (c *grantCommand) getPerm(client *client) (params.ACL, error) {
+func (c *grantCommand) getPerm(ctx context.Context, client *client) (params.ACL, error) {
 	var acl params.ACL
 	var err error
 	switch {
 	case c.controller:
-		acl, err = client.GetControllerPerm(&params.GetControllerPerm{
+		acl, err = client.GetControllerPerm(ctx, &params.GetControllerPerm{
 			EntityPath: c.path.EntityPath,
 		})
 	default:
-		acl, err = client.GetModelPerm(&params.GetModelPerm{
+		acl, err = client.GetModelPerm(ctx, &params.GetModelPerm{
 			EntityPath: c.path.EntityPath,
 		})
 	}
 	return acl, errgo.Mask(err)
 }
 
-func (c *grantCommand) runAdmin(ctxt *cmd.Context) error {
+func (c *grantCommand) runAdmin(ctx context.Context, ctxt *cmd.Context) error {
 	client, err := c.newACLClient(ctxt)
 	if err != nil {
 		return errgo.Mask(err)
@@ -166,9 +169,9 @@ func (c *grantCommand) runAdmin(ctxt *cmd.Context) error {
 	defer client.Close()
 
 	if c.set {
-		return errgo.Mask(client.Set(context.Background(), c.aclName, c.users.slice()))
+		return errgo.Mask(client.Set(ctx, c.aclName, c.users.slice()))
 	}
-	return errgo.Mask(client.Add(context.Background(), c.aclName, c.users.slice()))
+	return errgo.Mask(client.Add(ctx, c.aclName, c.users.slice()))
 }
 
 // userSet represents a set of users and implements gnuflag.Value

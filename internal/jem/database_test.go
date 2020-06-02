@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/juju/juju/state/multiwatcher"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/version"
@@ -319,6 +319,17 @@ func (s *databaseSuite) TestDeleteController(c *gc.C) {
 	err = s.database.AddController(testContext, ctl2)
 	c.Assert(err, gc.Equals, nil)
 
+	path := credentialPath("test-cloud", "test-user", "test-credential")
+	mpath := mongodoc.CredentialPathFromParams(path)
+	err = jem.UpdateCredential(s.database, testContext, &mongodoc.Credential{
+		Path: mpath,
+		Type: "empty",
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	err = jem.CredentialAddController(s.database, testContext, mpath, ctlPath)
+	c.Assert(err, gc.Equals, nil)
+
 	err = s.database.DeleteController(testContext, ctlPath)
 	c.Assert(err, gc.Equals, nil)
 	ctl3, err := s.database.Controller(testContext, ctlPath)
@@ -326,6 +337,16 @@ func (s *databaseSuite) TestDeleteController(c *gc.C) {
 	m3, err := s.database.Model(testContext, ctlPath)
 	c.Assert(m3, gc.IsNil)
 	s.checkDBOK(c)
+
+	cred, err := s.database.Credential(testContext, mpath)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
+		Id:          path.String(),
+		Path:        mpath,
+		Type:        "empty",
+		Attributes:  map[string]string{},
+		Controllers: []params.EntityPath{},
+	})
 }
 
 func (s *databaseSuite) TestDeleteModel(c *gc.C) {
@@ -782,7 +803,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: "fake-uuid",
 			Id:        "0",
 			Series:    "quantal",
@@ -793,7 +814,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: "another-uuid",
 			Id:        "0",
 			Series:    "blah",
@@ -804,7 +825,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: "fake-uuid",
 			Id:        "1",
 			Series:    "precise",
@@ -822,7 +843,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: "fake-uuid",
 			Id:        "0",
 			Series:    "quantal",
@@ -833,7 +854,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: "fake-uuid",
 			Id:        "1",
 			Series:    "precise",
@@ -846,7 +867,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: "fake-uuid",
 			Id:        "0",
 			Series:    "foo",
@@ -860,7 +881,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: "fake-uuid",
 			Id:        "1",
 			Series:    "foo",
@@ -879,7 +900,7 @@ func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: "fake-uuid",
 			Id:        "0",
 			Series:    "foo",
@@ -895,7 +916,7 @@ func (s *databaseSuite) TestRemoveControllerMachines(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: "fake-uuid",
 			Id:        "0",
 			Series:    "quantal",
@@ -912,7 +933,7 @@ func (s *databaseSuite) TestRemoveControllerMachines(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: "fake-uuid",
 			Id:        "0",
 			Series:    "quantal",
@@ -1908,7 +1929,7 @@ var checkReadACLTests = []struct {
 func (s *databaseSuite) TestCheckReadACL(c *gc.C) {
 	for i, test := range checkReadACLTests {
 		c.Logf("%d. %s", i, test.about)
-		ctx := auth.ContextWithUser(testContext, test.user, test.groups...)
+		ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity(test.user, test.groups...))
 		entity := params.EntityPath{
 			User: params.User(test.owner),
 			Name: params.Name(fmt.Sprintf("test%d", i)),
@@ -1960,15 +1981,15 @@ func (s *databaseSuite) TestCanReadIter(c *gc.C) {
 		err := s.database.AddModel(testContext, &testModels[i])
 		c.Assert(err, gc.Equals, nil)
 	}
-	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 	it := s.database.Models().Find(nil).Sort("_id").Iter()
 	crit := s.database.NewCanReadIter(ctx, it)
 	var models []mongodoc.Model
 	var m mongodoc.Model
-	for crit.Next(&m) {
+	for crit.Next(testContext, &m) {
 		models = append(models, m)
 	}
-	c.Assert(crit.Err(), gc.IsNil)
+	c.Assert(crit.Err(testContext), gc.IsNil)
 	c.Assert(models, jemtest.CmpEquals(cmpopts.EquateEmpty()), []mongodoc.Model{
 		testModels[0],
 		testModels[2],
@@ -2007,19 +2028,19 @@ var setDeadTests = []struct {
 	about: "CanReadIter",
 	run: func(db *jem.Database) {
 		it := db.Models().Find(nil).Sort("_id").Iter()
-		ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+		ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 		crit := db.NewCanReadIter(ctx, it)
-		crit.Next(&mongodoc.Model{})
-		crit.Err()
+		crit.Next(ctx, &mongodoc.Model{})
+		crit.Err(ctx)
 	},
 }, {
 	about: "CanReadIter with Close",
 	run: func(db *jem.Database) {
 		it := db.Models().Find(nil).Sort("_id").Iter()
-		ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+		ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 		crit := db.NewCanReadIter(ctx, it)
-		crit.Next(&mongodoc.Model{})
-		crit.Close()
+		crit.Next(ctx, &mongodoc.Model{})
+		crit.Close(ctx)
 	},
 }, {
 	about: "clearCredentialUpdate",
@@ -2147,7 +2168,7 @@ var setDeadTests = []struct {
 	run: func(db *jem.Database) {
 		db.UpdateMachineInfo(testContext, &mongodoc.Machine{
 			Controller: "test/test",
-			Info: &multiwatcher.MachineInfo{
+			Info: &jujuparams.MachineInfo{
 				ModelUUID: "xxx",
 				Id:        "yyy",
 			},

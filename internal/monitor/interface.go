@@ -6,10 +6,10 @@ import (
 	"context"
 	"time"
 
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
-	"github.com/juju/juju/state/multiwatcher"
+	"github.com/juju/names/v4"
 	"github.com/juju/version"
-	names "gopkg.in/juju/names.v3"
 
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
@@ -69,10 +69,10 @@ type jemInterface interface {
 	RemoveControllerApplications(ctx context.Context, ctlPath params.EntityPath) error
 
 	// UpdateMachineInfo updates the information associated with a machine.
-	UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, machine *multiwatcher.MachineInfo) error
+	UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, machine *jujuparams.MachineInfo) error
 
 	// UpdateApplicationInfo updates the information associated with an application.
-	UpdateApplicationInfo(ctx context.Context, ctlPath params.EntityPath, machine *multiwatcher.ApplicationInfo) error
+	UpdateApplicationInfo(ctx context.Context, ctlPath params.EntityPath, machine *jujuparams.ApplicationInfo) error
 
 	// AllControllers returns all the controllers in the system.
 	AllControllers(ctx context.Context) ([]*mongodoc.Controller, error)
@@ -115,6 +115,10 @@ type jemInterface interface {
 
 	// UpdateCloudRegions updates the cloud/region.
 	UpdateCloudRegions(ctx context.Context, cloudRegions []mongodoc.CloudRegion) error
+
+	// WatchAllModelSummaries starts watching the summary updates from
+	// the controller.
+	WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityPath) (func() error, error)
 }
 
 // jujuAPI represents an API connection to a Juju controller.
@@ -145,7 +149,7 @@ type allWatcher interface {
 	// Next returns a new set of deltas. It will block until there
 	// are deltas to return. The first calls to Next on a given watcher
 	// will return the entire state of the system without blocking.
-	Next() ([]multiwatcher.Delta, error)
+	Next() ([]jujuparams.Delta, error)
 
 	// Stop stops the watcher and causes any outstanding Next calls
 	// to return an error.

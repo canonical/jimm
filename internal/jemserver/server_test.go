@@ -5,19 +5,17 @@ package jemserver_test
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"net/http"
 	"time"
 
 	"github.com/juju/aclstore/aclclient"
-	"github.com/juju/httprequest"
 	jujutesting "github.com/juju/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
-	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/httprequest.v1"
+	"gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/jimm/internal/apitest"
 	"github.com/CanonicalLtd/jimm/internal/jem"
@@ -205,9 +203,13 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
+	key, err := bakery.GenerateKey()
+	c.Assert(err, gc.Equals, nil)
+
 	params := jemserver.Params{
 		DB:               db,
 		AgentUsername:    "foo",
+		AgentKey:         key,
 		RunMonitor:       true,
 		ControllerAdmin:  "controller-admin",
 		IdentityLocation: "http://0.1.2.3",
@@ -273,23 +275,6 @@ func (s *serverSuite) TestModifyACL(c *gc.C) {
 func (s *serverSuite) aclClient(user string) *aclclient.Client {
 	return aclclient.New(aclclient.NewParams{
 		BaseURL: s.HTTPSrv.URL + "/admin/acls",
-		Doer:    bakeryDoer{s.IDMSrv.Client(user)},
+		Doer:    s.IDMSrv.Client(user),
 	})
-}
-
-type bakeryDoer struct {
-	client *httpbakery.Client
-}
-
-func (d bakeryDoer) Do(req *http.Request) (*http.Response, error) {
-	if req.Body == nil {
-		return d.client.Do(req)
-	}
-	body, ok := req.Body.(io.ReadSeeker)
-	if !ok {
-		return nil, errgo.Newf("unsupported body type")
-	}
-	req1 := *req
-	req1.Body = nil
-	return d.client.DoWithBody(&req1, body)
 }

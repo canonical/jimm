@@ -3,6 +3,7 @@
 package admincmd_test
 
 import (
+	"context"
 	"fmt"
 
 	jc "github.com/juju/testing/checkers"
@@ -36,12 +37,13 @@ var addControllerTests = []struct {
 }}
 
 func (s *addControllerSuite) TestAddController(c *gc.C) {
+	ctx := context.Background()
 	s.idmSrv.AddUser("bob", "admin")
 	s.idmSrv.SetDefaultUser("bob")
 	client := s.jemClient("bob")
 	for i, test := range addControllerTests {
 		c.Logf("test %d: %s", i, test.about)
-		_, err := client.GetController(&params.GetController{
+		_, err := client.GetController(ctx, &params.GetController{
 			EntityPath: params.EntityPath{
 				User: "bob",
 				Name: params.Name(fmt.Sprintf("foo-%v", i)),
@@ -53,7 +55,7 @@ func (s *addControllerSuite) TestAddController(c *gc.C) {
 		c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
 		c.Assert(stdout, gc.Equals, "")
 		c.Assert(stderr, gc.Equals, "")
-		ctl, err := client.GetController(&params.GetController{
+		ctl, err := client.GetController(ctx, &params.GetController{
 			EntityPath: params.EntityPath{
 				User: "bob",
 				Name: params.Name(fmt.Sprintf("foo-%v", i)),
@@ -63,7 +65,7 @@ func (s *addControllerSuite) TestAddController(c *gc.C) {
 		c.Assert(ctl.Location, gc.DeepEquals, test.expectLocation)
 		c.Assert(ctl.Public, gc.DeepEquals, test.expectPublic)
 		if test.expectPublic {
-			perm, err := client.GetControllerPerm(&params.GetControllerPerm{
+			perm, err := client.GetControllerPerm(ctx, &params.GetControllerPerm{
 				EntityPath: params.EntityPath{
 					User: "bob",
 					Name: params.Name(fmt.Sprintf("foo-%v", i)),

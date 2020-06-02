@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import os
 from charmhelpers.core import (
     hookenv,
 )
@@ -7,6 +8,7 @@ from jaascharm import (
     HTTP_LISTEN_PORT,
     update_config_and_restart,
     update_status,
+    dashboard_path,
 )
 from status import charm_status
 
@@ -18,6 +20,7 @@ def config_changed():
         "agent-username",
         "charmstore-location",
         "controller-uuid",
+        "controller-url",
         "dbname",
         "domain",
         "gui-location",
@@ -27,6 +30,7 @@ def config_changed():
         "metering-location",
         "usage-sender-url",
     ]
+
     app_config = {
         'api-addr': ':{}'.format(HTTP_LISTEN_PORT),
         'state-server-admin': config['controller-admin']
@@ -36,6 +40,12 @@ def config_changed():
             'private': config['agent-private-key'],
             'public': config['agent-public-key'],
         }
+
+    if config['juju-dashboard-location']:
+        app_config['juju-dashboard-location'] = config['juju-dashboard-location']
+    elif os.path.exists(dashboard_path()):
+        app_config['juju-dashboard-location'] = dashboard_path()
+
     for key in keys:
         app_config[key] = config[key]
 

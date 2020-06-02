@@ -6,17 +6,16 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"net/url"
 	"os"
 	"strings"
 
 	"github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	envconfig "github.com/juju/juju/environs/config"
+	"github.com/juju/names/v4"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/juju/names.v3"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/agent"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
+	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 	mgo "gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jimm/config"
@@ -64,12 +63,16 @@ func recoverModel(ctx context.Context, cfg *config.Config, controller, model str
 	db := session.DB(cfg.DBName)
 
 	bclient := httpbakery.NewClient()
-	bclient.Key = cfg.AgentKey
-	idmURL, err := url.Parse(cfg.IdentityLocation)
+	err = agent.SetUpAuth(bclient, &agent.AuthInfo{
+		Key: cfg.AgentKey,
+		Agents: []agent.Agent{{
+			URL:      cfg.IdentityLocation,
+			Username: cfg.AgentUsername,
+		}},
+	})
 	if err != nil {
-		return errgo.Notef(err, "cannot parse identity location URL %q", cfg.IdentityLocation)
+		return errgo.Notef(err, "cannot initialize agent")
 	}
-	agent.SetUpAuth(bclient, idmURL, cfg.AgentUsername)
 
 	p, err := jem.NewPool(ctx, jem.Params{
 		DB:              db,

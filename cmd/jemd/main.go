@@ -22,13 +22,13 @@ import (
 	_ "github.com/juju/juju/provider/maas"
 	_ "github.com/juju/juju/provider/openstack"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/natefinch/lumberjack.v2"
 
-	"github.com/CanonicalLtd/jimm"
+	jem "github.com/CanonicalLtd/jimm"
 	"github.com/CanonicalLtd/jimm/config"
+	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
 )
@@ -100,14 +100,7 @@ func serve(conf *config.Config) error {
 	db := session.DB(conf.DBName)
 
 	zapctx.Debug(ctx, "setting up the API server")
-	var locator bakery.PublicKeyLocator
-	if conf.IdentityPublicKey == nil {
-		locator = httpbakery.NewPublicKeyRing(nil, nil)
-	} else {
-		locator = bakery.PublicKeyLocatorMap{
-			conf.IdentityLocation: conf.IdentityPublicKey,
-		}
-	}
+	locator := httpbakery.NewThirdPartyLocator(nil, nil)
 	if conf.MaxMgoSessions == 0 {
 		conf.MaxMgoSessions = 100
 	}
@@ -118,7 +111,7 @@ func serve(conf *config.Config) error {
 		IdentityLocation:        conf.IdentityLocation,
 		CharmstoreLocation:      conf.CharmstoreLocation,
 		MeteringLocation:        conf.MeteringLocation,
-		PublicKeyLocator:        locator,
+		ThirdPartyLocator:       locator,
 		AgentUsername:           conf.AgentUsername,
 		AgentKey:                conf.AgentKey,
 		RunMonitor:              true,
@@ -129,6 +122,10 @@ func serve(conf *config.Config) error {
 		UsageSenderSpoolPath:    conf.UsageSenderSpoolDir,
 		Domain:                  conf.Domain,
 		PublicCloudMetadata:     conf.PublicCloudMetadata,
+		Pubsub: &pubsub.Hub{
+			MaxConcurrency: conf.MaxPubsubConcurrency,
+		},
+		JujuDashboardLocation: conf.JujuDashboardLocation,
 	}
 	server, err := jem.NewServer(ctx, cfg)
 	if err != nil {

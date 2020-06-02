@@ -8,22 +8,24 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
+	"github.com/canonical/candid/candidtest"
 	"github.com/juju/aclstore/aclclient"
 	"github.com/juju/cmd"
-	"github.com/juju/idmclient/idmtest"
 	"github.com/juju/loggo"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/mgo.v2"
 
 	jem "github.com/CanonicalLtd/jimm"
 	"github.com/CanonicalLtd/jimm/cmd/jaas-admin/admincmd"
-	"github.com/CanonicalLtd/jimm/internal/bakeryadaptor"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/jemclient"
 	"github.com/CanonicalLtd/jimm/params"
 )
+
+var haWarning = regexp.MustCompile("(?m)^WARNING could not determine if there is a primary HA machine:.*$")
 
 // run runs a jem plugin subcommand with the given arguments,
 // its context directory set to dir. It returns the output of the command
@@ -43,14 +45,25 @@ func run(c *gc.C, dir string, cmdName string, args ...string) (stdout, stderr st
 	}
 	allArgs := append([]string{cmdName}, args...)
 	exitCode = cmd.Main(admincmd.New(), ctxt, allArgs)
-	return stdoutBuf.String(), stderrBuf.String(), exitCode
+
+	// Filter out "WARNING could not determine if there is a primary
+	// HA machine" messages.
+	stderrB := stderrBuf.Bytes()
+	matches := haWarning.FindAllIndex(stderrB, -1)
+	// filter any matches out backwards so we don't have to
+	// recalculate the indexes.
+	for i := len(matches) - 1; i >= 0; i-- {
+		stderrB = append(stderrB[:matches[i][0]], stderrB[matches[i][1]+1:]...)
+	}
+
+	return stdoutBuf.String(), string(stderrB), exitCode
 }
 
 type commonSuite struct {
 	jemtest.JujuConnSuite
 
 	jemSrv  jem.HandleCloser
-	idmSrv  *idmtest.Server
+	idmSrv  *candidtest.Server
 	httpSrv *httptest.Server
 
 	cookieFile string
@@ -63,7 +76,7 @@ func (s *commonSuite) SetUpTest(c *gc.C) {
 	s.PatchEnvironment("JUJU_COOKIEFILE", s.cookieFile)
 	s.PatchEnvironment("JUJU_LOGGING_CONFIG", "<root>=DEBUG")
 
-	s.idmSrv = idmtest.NewServer()
+	s.idmSrv = candidtest.NewServer()
 	s.jemSrv = s.newServer(c, s.Session, s.idmSrv)
 	s.httpSrv = httptest.NewServer(s.jemSrv)
 
@@ -85,7 +98,7 @@ func (s *commonSuite) jemClient(username string) *jemclient.Client {
 func (s *commonSuite) aclClient(username string) *aclclient.Client {
 	return aclclient.New(aclclient.NewParams{
 		BaseURL: s.httpSrv.URL + "/admin/acls",
-		Doer:    bakeryadaptor.Doer{s.idmSrv.Client(username)},
+		Doer:    s.idmSrv.Client(username),
 	})
 }
 
@@ -98,13 +111,16 @@ func (s *commonSuite) TearDownTest(c *gc.C) {
 
 const adminUser = "admin"
 
-func (s *commonSuite) newServer(c *gc.C, session *mgo.Session, idmSrv *idmtest.Server) jem.HandleCloser {
+func (s *commonSuite) newServer(c *gc.C, session *mgo.Session, idmSrv *candidtest.Server) jem.HandleCloser {
 	db := session.DB("jem")
+	idmSrv.AddUser("agent", candidtest.GroupListGroup)
 	config := jem.ServerParams{
-		DB:               db,
-		ControllerAdmin:  adminUser,
-		IdentityLocation: idmSrv.URL.String(),
-		PublicKeyLocator: idmSrv,
+		DB:                db,
+		ControllerAdmin:   adminUser,
+		IdentityLocation:  idmSrv.URL.String(),
+		ThirdPartyLocator: idmSrv,
+		AgentUsername:     "agent",
+		AgentKey:          idmSrv.UserPublicKey("agent"),
 	}
 	srv, err := jem.NewServer(context.TODO(), config)
 	c.Assert(err, gc.Equals, nil)
@@ -118,7 +134,7 @@ var dummyEnvConfig = map[string]interface{}{
 	"controller":      true,
 }
 
-func (s *commonSuite) addModel(c *gc.C, pathStr, srvPathStr, credName string) {
+func (s *commonSuite) addModel(ctx context.Context, c *gc.C, pathStr, srvPathStr, credName string) {
 	var path, srvPath params.EntityPath
 	err := path.UnmarshalText([]byte(pathStr))
 	c.Assert(err, gc.Equals, nil)
@@ -130,7 +146,7 @@ func (s *commonSuite) addModel(c *gc.C, pathStr, srvPathStr, credName string) {
 		User:  path.User,
 		Name:  params.CredentialName(credName),
 	}
-	err = s.jemClient(string(path.User)).UpdateCredential(&params.UpdateCredential{
+	err = s.jemClient(string(path.User)).UpdateCredential(ctx, &params.UpdateCredential{
 		CredentialPath: credPath,
 		Credential: params.Credential{
 			AuthType: "empty",
@@ -138,7 +154,7 @@ func (s *commonSuite) addModel(c *gc.C, pathStr, srvPathStr, credName string) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	_, err = s.jemClient(string(path.User)).NewModel(&params.NewModel{
+	_, err = s.jemClient(string(path.User)).NewModel(ctx, &params.NewModel{
 		User: path.User,
 		Info: params.NewModelInfo{
 			Name:       path.Name,

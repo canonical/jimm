@@ -9,13 +9,14 @@ import (
 	"time"
 
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jimm/internal/debugapi"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
-	"github.com/CanonicalLtd/jimm/internal/v2"
+	"github.com/CanonicalLtd/jimm/internal/pubsub"
+	v2 "github.com/CanonicalLtd/jimm/internal/v2"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -51,9 +52,9 @@ type ServerParams struct {
 	// associated with the controller.
 	MeteringLocation string
 
-	// PublicKeyLocator holds a public key store.
+	// ThirdPartyLocator holds a third-party store.
 	// It may be nil.
-	PublicKeyLocator bakery.PublicKeyLocator
+	ThirdPartyLocator bakery.ThirdPartyLocator
 
 	// AgentUsername and AgentKey hold the credentials used for agent
 	// authentication.
@@ -93,6 +94,12 @@ type ServerParams struct {
 	// the public cloud metadata. If this is empty or the file
 	// doesn't exist the default public cloud information is used.
 	PublicCloudMetadata string
+
+	// JujuDashboardLocation contains the path to the folder
+	// where the Juju Dashboard tarball was extracted.
+	JujuDashboardLocation string
+
+	Pubsub *pubsub.Hub
 }
 
 // HandleCloser represents an HTTP handler that can

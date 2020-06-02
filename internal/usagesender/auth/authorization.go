@@ -8,9 +8,7 @@ import (
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-
-	"github.com/CanonicalLtd/jimm/internal/bakeryadaptor"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
 )
 
 type getCredentialsRequest struct {
@@ -31,7 +29,7 @@ func NewAuthorizationClient(baseURL string, client *httpbakery.Client) *authoriz
 	return &authorizationClient{
 		client: &httprequest.Client{
 			BaseURL: baseURL,
-			Doer:    bakeryadaptor.Doer{client},
+			Doer:    client,
 		},
 	}
 }

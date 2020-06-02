@@ -3,13 +3,15 @@
 package jujuapi_test
 
 import (
+	"context"
+
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/network"
+	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/names.v3"
 
 	"github.com/CanonicalLtd/jimm/params"
 )
@@ -31,8 +33,10 @@ func (s *modelSuite) TestUnknownModel(c *gc.C) {
 }
 
 func (s *modelSuite) TestLoginToModel(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	cred := s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
 	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
 	modelUUID := mi.UUID
 	conn := s.open(c, &api.Info{
@@ -62,8 +66,10 @@ func (s *modelSuite) TestLoginToModel(c *gc.C) {
 }
 
 func (s *modelSuite) TestOldAdminVersionFails(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	cred := s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
 	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
 	modelUUID := mi.UUID
 	conn := s.open(c, &api.Info{
@@ -78,8 +84,10 @@ func (s *modelSuite) TestOldAdminVersionFails(c *gc.C) {
 }
 
 func (s *modelSuite) TestAdminIDFails(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	cred := s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
 	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
 	modelUUID := mi.UUID
 	conn := s.open(c, &api.Info{
@@ -93,8 +101,10 @@ func (s *modelSuite) TestAdminIDFails(c *gc.C) {
 }
 
 func (s *modelSuite) TestUnimplementedMethodFails(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	cred := s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
 	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
 	modelUUID := mi.UUID
 	conn := s.open(c, &api.Info{
@@ -107,8 +117,10 @@ func (s *modelSuite) TestUnimplementedMethodFails(c *gc.C) {
 }
 
 func (s *modelSuite) TestUnimplementedRootFails(c *gc.C) {
-	s.AssertAddController(c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(c, "test", "dummy", "cred1", "empty")
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
+	cred := s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
 	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
 	modelUUID := mi.UUID
 	conn := s.open(c, &api.Info{

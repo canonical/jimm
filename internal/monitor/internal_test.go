@@ -7,19 +7,20 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/canonical/candid/candidtest"
 	"github.com/juju/clock/testclock"
-	"github.com/juju/idmclient/idmtest"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
+	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/state"
-	"github.com/juju/juju/state/multiwatcher"
 	jujuwatcher "github.com/juju/juju/state/watcher"
 	jujujujutesting "github.com/juju/juju/testing"
 	"github.com/juju/juju/testing/factory"
+	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/version"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	names "gopkg.in/juju/names.v3"
 	"gopkg.in/juju/worker.v1"
 	"gopkg.in/tomb.v2"
 
@@ -27,12 +28,13 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
 type internalSuite struct {
 	jemtest.JujuConnSuite
-	idmSrv      *idmtest.Server
+	idmSrv      *candidtest.Server
 	sessionPool *mgosession.Pool
 	pool        *jem.Pool
 	jem         *jem.JEM
@@ -54,12 +56,15 @@ var _ = gc.Suite(&internalSuite{})
 
 func (s *internalSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
-	s.idmSrv = idmtest.NewServer()
+	s.idmSrv = candidtest.NewServer()
 	s.sessionPool = mgosession.NewPool(context.TODO(), s.Session, 1)
 	pool, err := jem.NewPool(context.TODO(), jem.Params{
 		SessionPool:     s.sessionPool,
 		DB:              s.Session.DB("jem"),
 		ControllerAdmin: "controller-admin",
+		Pubsub: &pubsub.Hub{
+			MaxConcurrency: 10,
+		},
 	})
 	c.Assert(err, gc.Equals, nil)
 	s.pool = pool
@@ -387,7 +392,7 @@ func (s *internalSuite) TestModelRemovedWithFailedWatcher(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			Id:        "some-machine-id",
 			ModelUUID: modelUUID,
 		},
@@ -467,7 +472,7 @@ func (s *internalSuite) TestWatcherUpdatesMachineInfo(c *gc.C) {
 	type machineInfo struct {
 		modelUUID string
 		id        string
-		life      multiwatcher.Life
+		life      life.Value
 	}
 
 	getMachineInfo := func() interface{} {
@@ -527,7 +532,7 @@ func (s *internalSuite) TestWatcherUpdatesApplicationInfo(c *gc.C) {
 	type appInfo struct {
 		modelUUID string
 		name      string
-		life      multiwatcher.Life
+		life      life.Value
 	}
 
 	getApplicationInfo := func() interface{} {
@@ -1161,7 +1166,7 @@ func (s *internalSuite) TestAllMonitorMultiControllerMultipleLeases(c *gc.C) {
 }
 
 func (s *internalSuite) TestAllMonitorWithRaceOnLeaseAcquisition(c *gc.C) {
-	jshim := jemShim{s.jem}
+	jshim := jemShimWithoutModelSummaryWatcher{jemShim{s.jem}}
 
 	// Fake the monitor lease acquiry so that it lets us know
 	// when a monitor is trying to acquire the lease and

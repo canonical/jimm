@@ -16,25 +16,26 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/state"
-	"github.com/juju/juju/state/multiwatcher"
 	"github.com/juju/juju/testing/factory"
+	"github.com/juju/names/v4"
 	jt "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
 	"github.com/juju/version"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/names.v3"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/kubetest"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -65,6 +66,9 @@ func (s *jemSuite) SetUpTest(c *gc.C) {
 		SessionPool:         s.sessionPool,
 		PublicCloudMetadata: publicCloudMetadata,
 		UsageSenderURL:      "test-usage-sender-url",
+		Pubsub: &pubsub.Hub{
+			MaxConcurrency: 10,
+		},
 	})
 	c.Assert(err, gc.Equals, nil)
 	s.pool = pool
@@ -328,7 +332,7 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	ctx := auth.ContextWithUser(testContext, "bob")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob"))
 	// Create a model so that we can have a test case for an already-existing model
 	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
 		Path:           params.EntityPath{"bob", "oldmodel"},
@@ -347,7 +351,7 @@ func (s *jemSuite) TestCreateModel(c *gc.C) {
 		if test.params.Path.Name == "" {
 			test.params.Path.Name = params.Name(fmt.Sprintf("test-%d", i))
 		}
-		m, err := s.jem.CreateModel(auth.ContextWithUser(testContext, test.user), test.params)
+		m, err := s.jem.CreateModel(auth.ContextWithIdentity(testContext, jemtest.NewIdentity(test.user)), test.params)
 		if test.expectError != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
 			if test.expectErrorCause != nil {
@@ -385,7 +389,7 @@ func (s *jemSuite) TestCreateModelWithPartiallyCreatedModel(c *gc.C) {
 		Path: mgoCredentialPath("dummy", "bob", "cred1"),
 		Type: "empty",
 	})
-	ctx := auth.ContextWithUser(testContext, "bob")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob"))
 	// Create a partial model in the database.
 	err = s.jem.DB.AddModel(ctx, &mongodoc.Model{
 		Path:         params.EntityPath{"bob", "oldmodel"},
@@ -414,7 +418,7 @@ func (s *jemSuite) TestCreateModelWithExistingModelInControllerOnly(c *gc.C) {
 	// as if the controller model had been created but something
 	// had failed in CreateModel after that.
 	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
-	ctx := auth.ContextWithUser(testContext, string(model.Path.User))
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity(string(model.Path.User)))
 	err := s.jem.DB.DeleteModel(ctx, model.Path)
 	c.Assert(err, gc.Equals, nil)
 
@@ -429,7 +433,7 @@ func (s *jemSuite) TestCreateModelWithExistingModelInControllerOnly(c *gc.C) {
 		},
 		Cloud: "dummy",
 	})
-	c.Assert(err, gc.ErrorMatches, `cannot create model: failed to create new model: model "model" for bob@external already exists`)
+	c.Assert(err, gc.ErrorMatches, `cannot create model: model name in use: api error: failed to create new model: model "model" for bob@external already exists \(already exists\)`)
 }
 
 func (s *jemSuite) TestCreateModelWithDeprecatedController(c *gc.C) {
@@ -438,7 +442,7 @@ func (s *jemSuite) TestCreateModelWithDeprecatedController(c *gc.C) {
 		Read: []string{"everyone"},
 	})
 	c.Assert(err, gc.Equals, nil)
-	ctx := auth.ContextWithUser(testContext, "bob")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob"))
 	// Sanity check that we can create the model while the controller is not deprecated.
 	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
 		Path:   params.EntityPath{"bob", "model1"},
@@ -471,7 +475,7 @@ func (s *jemSuite) TestCreateModelWithMultipleControllers(c *gc.C) {
 		Read: []string{"everyone"},
 	})
 	c.Assert(err, gc.Equals, nil)
-	ctx := auth.ContextWithUser(testContext, "bob")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob"))
 	// Deprecate the first controller.
 	err = s.jem.DB.SetControllerDeprecated(testContext, ctlId, true)
 	c.Assert(err, gc.Equals, nil)
@@ -498,7 +502,7 @@ func (s *jemSuite) TestRevokeCredentialsInUse(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	ctx := auth.ContextWithUser(testContext, "bob")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob"))
 	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
 		Path:           params.EntityPath{"bob", "oldmodel"},
 		ControllerPath: ctlId,
@@ -532,7 +536,7 @@ func (s *jemSuite) TestRevokeCredentialsInUse(c *gc.C) {
 	conn, err := s.jem.OpenAPI(testContext, ctlId)
 	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
-	r, err := cloudapi.NewClient(conn).Credentials(jem.CloudCredentialTag(credPath))
+	r, err := cloudapi.NewClient(conn).Credentials(conv.ToCloudCredentialTag(credPath))
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(r, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Error: &jujuparams.Error{
@@ -761,7 +765,7 @@ func waitForDestruction(conn *apiconn.Conn, c *gc.C, uuid string) <-chan struct{
 				return
 			}
 			for _, d := range deltas {
-				d, ok := d.Entity.(*multiwatcher.ModelInfo)
+				d, ok := d.Entity.(*jujuparams.ModelUpdate)
 				if ok && d.ModelUUID == uuid && d.Life == "dead" {
 					return
 				}
@@ -816,7 +820,7 @@ func (s *jemSuite) TestUpdateCredential(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
 
-	err = jem.UpdateControllerCredential(s.jem, testContext, conn, ctlPath, cred, nil)
+	_, err = jem.UpdateControllerCredential(s.jem, testContext, conn, ctlPath, cred)
 	c.Assert(err, gc.Equals, nil)
 	err = jem.CredentialAddController(s.jem.DB, testContext, mCredPath, ctlPath)
 	c.Assert(err, gc.Equals, nil)
@@ -968,7 +972,7 @@ func (s *jemSuite) TestDoControllers(c *gc.C) {
 		err := s.jem.DB.AddController(testContext, &testControllers[i])
 		c.Assert(err, gc.Equals, nil)
 	}
-	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 	var controllers []string
 	err := s.jem.DoControllers(ctx, func(c *mongodoc.Controller) error {
 		controllers = append(controllers, c.Id)
@@ -1024,7 +1028,7 @@ func (s *jemSuite) TestSelectController(c *gc.C) {
 		err := s.jem.DB.AddController(testContext, &testControllers[i])
 		c.Assert(err, gc.Equals, nil)
 	}
-	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 	called := false
 	s.PatchValue(jem.RandIntn, func(n int) int {
 		called = true
@@ -1062,7 +1066,7 @@ func (s *jemSuite) TestController(c *gc.C) {
 	s.addController(c, params.EntityPath{"alice", "controller"})
 	s.addController(c, params.EntityPath{"bob", "controller"})
 	s.addController(c, params.EntityPath{"bob-group", "controller"})
-	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 
 	for i, test := range controllerTests {
 		c.Logf("tes %d. %s", i, test.path)
@@ -1152,7 +1156,7 @@ func (s *jemSuite) TestCredential(c *gc.C) {
 		err := jem.UpdateCredential(s.jem.DB, testContext, &cred)
 		c.Assert(err, gc.Equals, nil)
 	}
-	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 
 	for i, test := range credentialTests {
 		c.Logf("tes %d. %s", i, test.path)
@@ -1164,11 +1168,6 @@ func (s *jemSuite) TestCredential(c *gc.C) {
 		c.Assert(err, gc.Equals, nil)
 		c.Assert(ctl.Path.ToParams(), jc.DeepEquals, test.path)
 	}
-}
-
-func (s *jemSuite) TestUserTag(c *gc.C) {
-	c.Assert(jem.UserTag(params.User("alice")).String(), gc.Equals, "user-alice@external")
-	c.Assert(jem.UserTag(params.User("alice@domain")).String(), gc.Equals, "user-alice@domain")
 }
 
 var earliestControllerVersionTests = []struct {
@@ -1231,7 +1230,7 @@ var earliestControllerVersionTests = []struct {
 }}
 
 func (s *jemSuite) TestEarliestControllerVersion(c *gc.C) {
-	ctx := auth.ContextWithUser(testContext, "someone")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("someone"))
 	for i, test := range earliestControllerVersionTests {
 		c.Logf("test %d: %v", i, test.about)
 		_, err := s.jem.DB.Controllers().RemoveAll(nil)
@@ -1246,32 +1245,17 @@ func (s *jemSuite) TestEarliestControllerVersion(c *gc.C) {
 	}
 }
 
-func (s *jemSuite) TestCloudCredentialTag(c *gc.C) {
-	cp1 := params.CredentialPath{
-		Cloud: "dummy",
-		User:  "alice",
-		Name:  "cred",
-	}
-	cp2 := params.CredentialPath{
-		Cloud: "dummy",
-		User:  "alice@domain",
-		Name:  "cred",
-	}
-	c.Assert(jem.CloudCredentialTag(cp1).String(), gc.Equals, "cloudcred-dummy_alice@external_cred")
-	c.Assert(jem.CloudCredentialTag(cp2).String(), gc.Equals, "cloudcred-dummy_alice@domain_cred")
-}
-
 func (s *jemSuite) TestUpdateMachineInfo(c *gc.C) {
 	m := s.bootstrapModel(c, params.EntityPath{"bob", "model-1"})
 	ctlPath := params.EntityPath{"bob", "controller"}
 
-	err := s.jem.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
+	err := s.jem.UpdateMachineInfo(testContext, ctlPath, &jujuparams.MachineInfo{
 		ModelUUID: m.UUID,
 		Id:        "0",
 		Series:    "quantal",
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(testContext, ctlPath, &jujuparams.MachineInfo{
 		ModelUUID: m.UUID,
 		Id:        "1",
 		Series:    "precise",
@@ -1288,7 +1272,7 @@ func (s *jemSuite) TestUpdateMachineInfo(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: m.UUID,
 			Id:        "0",
 			Series:    "quantal",
@@ -1299,7 +1283,7 @@ func (s *jemSuite) TestUpdateMachineInfo(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: m.UUID,
 			Id:        "1",
 			Series:    "precise",
@@ -1308,7 +1292,7 @@ func (s *jemSuite) TestUpdateMachineInfo(c *gc.C) {
 	}})
 
 	// Check that we can update one of the documents.
-	err = s.jem.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(testContext, ctlPath, &jujuparams.MachineInfo{
 		ModelUUID: m.UUID,
 		Id:        "0",
 		Series:    "quantal",
@@ -1317,7 +1301,7 @@ func (s *jemSuite) TestUpdateMachineInfo(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// Check that setting a machine dead removes it.
-	err = s.jem.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
+	err = s.jem.UpdateMachineInfo(testContext, ctlPath, &jujuparams.MachineInfo{
 		ModelUUID: m.UUID,
 		Id:        "1",
 		Series:    "precise",
@@ -1335,7 +1319,7 @@ func (s *jemSuite) TestUpdateMachineInfo(c *gc.C) {
 		Controller: ctlPath.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
-		Info: &multiwatcher.MachineInfo{
+		Info: &jujuparams.MachineInfo{
 			ModelUUID: m.UUID,
 			Id:        "0",
 			Series:    "quantal",
@@ -1348,7 +1332,7 @@ func (s *jemSuite) TestUpdateMachineInfo(c *gc.C) {
 func (s *jemSuite) TestUpdateMachineUnknownModel(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "controller"}
 
-	err := s.jem.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
+	err := s.jem.UpdateMachineInfo(testContext, ctlPath, &jujuparams.MachineInfo{
 		ModelUUID: "no-such-uuid",
 		Id:        "1",
 		Series:    "precise",
@@ -1360,7 +1344,7 @@ func (s *jemSuite) TestUpdateMachineIncorrectController(c *gc.C) {
 	m := s.bootstrapModel(c, params.EntityPath{"bob", "model-1"})
 	ctlPath := params.EntityPath{"bob", "controller2"}
 
-	err := s.jem.UpdateMachineInfo(testContext, ctlPath, &multiwatcher.MachineInfo{
+	err := s.jem.UpdateMachineInfo(testContext, ctlPath, &jujuparams.MachineInfo{
 		ModelUUID: m.UUID,
 		Id:        "1",
 		Series:    "precise",
@@ -1372,12 +1356,12 @@ func (s *jemSuite) TestUpdateApplicationInfo(c *gc.C) {
 	m := s.bootstrapModel(c, params.EntityPath{"bob", "model-1"})
 	ctlPath := params.EntityPath{"bob", "controller"}
 
-	err := s.jem.UpdateApplicationInfo(testContext, ctlPath, &multiwatcher.ApplicationInfo{
+	err := s.jem.UpdateApplicationInfo(testContext, ctlPath, &jujuparams.ApplicationInfo{
 		ModelUUID: m.UUID,
 		Name:      "0",
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateApplicationInfo(testContext, ctlPath, &multiwatcher.ApplicationInfo{
+	err = s.jem.UpdateApplicationInfo(testContext, ctlPath, &jujuparams.ApplicationInfo{
 		ModelUUID: m.UUID,
 		Name:      "1",
 	})
@@ -1409,7 +1393,7 @@ func (s *jemSuite) TestUpdateApplicationInfo(c *gc.C) {
 	}})
 
 	// Check that we can update one of the documents.
-	err = s.jem.UpdateApplicationInfo(testContext, ctlPath, &multiwatcher.ApplicationInfo{
+	err = s.jem.UpdateApplicationInfo(testContext, ctlPath, &jujuparams.ApplicationInfo{
 		ModelUUID: m.UUID,
 		Name:      "0",
 		Life:      "dying",
@@ -1417,7 +1401,7 @@ func (s *jemSuite) TestUpdateApplicationInfo(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// Check that setting an application dead removes it.
-	err = s.jem.UpdateApplicationInfo(testContext, ctlPath, &multiwatcher.ApplicationInfo{
+	err = s.jem.UpdateApplicationInfo(testContext, ctlPath, &jujuparams.ApplicationInfo{
 		ModelUUID: m.UUID,
 		Name:      "1",
 		Life:      "dead",
@@ -1446,7 +1430,7 @@ func (s *jemSuite) TestUpdateApplicationUnknownModel(c *gc.C) {
 	m := s.bootstrapModel(c, params.EntityPath{"bob", "model-1"})
 	ctlPath := params.EntityPath{"bob", "controller"}
 
-	err := s.jem.UpdateApplicationInfo(testContext, ctlPath, &multiwatcher.ApplicationInfo{
+	err := s.jem.UpdateApplicationInfo(testContext, ctlPath, &jujuparams.ApplicationInfo{
 		ModelUUID: m.UUID,
 		Name:      "1",
 	})
@@ -1456,7 +1440,7 @@ func (s *jemSuite) TestUpdateApplicationUnknownModel(c *gc.C) {
 func (s *jemSuite) TestCreateCloud(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	s.addController(c, ctlPath)
-	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 	err := s.jem.CreateCloud(ctx, mongodoc.CloudRegion{
 		Cloud:            "test-cloud",
 		ProviderType:     "kubernetes",
@@ -1498,7 +1482,7 @@ func (s *jemSuite) TestCreateCloud(c *gc.C) {
 func (s *jemSuite) TestCreateCloudWithRegions(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	s.addController(c, ctlPath)
-	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 	err := s.jem.CreateCloud(ctx, mongodoc.CloudRegion{
 		Cloud:            "test-cloud",
 		ProviderType:     "kubernetes",
@@ -1561,7 +1545,7 @@ func (s *jemSuite) TestCreateCloudWithRegions(c *gc.C) {
 func (s *jemSuite) TestCreateCloudNameMatch(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	s.addController(c, ctlPath)
-	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 	err := s.jem.CreateCloud(
 		ctx,
 		mongodoc.CloudRegion{
@@ -1589,7 +1573,7 @@ func (s *jemSuite) TestCreateCloudNameMatch(c *gc.C) {
 func (s *jemSuite) TestCreateCloudPublicNameMatch(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	s.addController(c, ctlPath)
-	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 	err := s.jem.CreateCloud(
 		ctx,
 		mongodoc.CloudRegion{
@@ -1615,7 +1599,7 @@ func (s *jemSuite) TestCreateCloudPublicNameMatch(c *gc.C) {
 }
 
 func (s *jemSuite) TestCreateCloudNoControllers(c *gc.C) {
-	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 	err := s.jem.CreateCloud(
 		ctx,
 		mongodoc.CloudRegion{
@@ -1648,7 +1632,7 @@ func (s *jemSuite) TestCreateCloudNoControllers(c *gc.C) {
 func (s *jemSuite) TestCreateCloudAddCloudError(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	s.addController(c, ctlPath)
-	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 	err := s.jem.CreateCloud(
 		ctx,
 		mongodoc.CloudRegion{
@@ -1680,7 +1664,7 @@ func (s *jemSuite) TestCreateCloudAddCloudError(c *gc.C) {
 func (s *jemSuite) TestCreateCloudNoHostCloudRegion(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	s.addController(c, ctlPath)
-	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 	err := s.jem.CreateCloud(
 		ctx,
 		mongodoc.CloudRegion{
@@ -1713,7 +1697,7 @@ func (s *jemSuite) TestRemoveCloud(c *gc.C) {
 	s.addController(c, ctlPath)
 	s.createK8sCloud(c, "test-cloud", "bob")
 
-	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 	err := s.jem.RemoveCloud(ctx, "test-cloud")
 	c.Assert(err, gc.Equals, nil)
 
@@ -1727,11 +1711,11 @@ func (s *jemSuite) TestRemoveCloudUnauthorized(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	s.addController(c, ctlPath)
 	s.createK8sCloud(c, "test-cloud", "alice")
-	ctx := auth.ContextWithUser(testContext, "alice")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("alice"))
 	err := s.jem.GrantCloud(ctx, "test-cloud", "bob", "add-model")
 	c.Assert(err, gc.Equals, nil)
 
-	ctx = auth.ContextWithUser(testContext, "bob", "bob-group")
+	ctx = auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 	err = s.jem.RemoveCloud(ctx, "test-cloud")
 	c.Assert(err, gc.ErrorMatches, `unauthorized`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
@@ -1740,7 +1724,7 @@ func (s *jemSuite) TestRemoveCloudUnauthorized(c *gc.C) {
 func (s *jemSuite) TestRemoveCloudNotFound(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	s.addController(c, ctlPath)
-	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 
 	err := s.jem.RemoveCloud(ctx, "test-cloud")
 	c.Assert(err, gc.ErrorMatches, `cloud "test-cloud" region "" not found`)
@@ -1752,7 +1736,7 @@ func (s *jemSuite) TestGrantCloud(c *gc.C) {
 	s.addController(c, ctlPath)
 	s.createK8sCloud(c, "test-cloud", "bob")
 
-	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 	err := s.jem.GrantCloud(ctx, "test-cloud", "alice", "admin")
 	c.Assert(err, gc.Equals, nil)
 
@@ -1783,13 +1767,13 @@ func (s *jemSuite) TestGrantCloudUnauthorized(c *gc.C) {
 	s.addController(c, ctlPath)
 	s.createK8sCloud(c, "test-cloud", "bob")
 
-	err := s.jem.GrantCloud(auth.ContextWithUser(testContext, "alice"), "test-cloud", "alice", "admin")
+	err := s.jem.GrantCloud(auth.ContextWithIdentity(testContext, jemtest.NewIdentity("alice")), "test-cloud", "alice", "admin")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
 	c.Assert(err, gc.ErrorMatches, `unauthorized`)
 }
 
 func (s *jemSuite) TestGrantCloudNotFound(c *gc.C) {
-	err := s.jem.GrantCloud(auth.ContextWithUser(testContext, "alice"), "test-cloud", "alice", "admin")
+	err := s.jem.GrantCloud(auth.ContextWithIdentity(testContext, jemtest.NewIdentity("alice")), "test-cloud", "alice", "admin")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	c.Assert(err, gc.ErrorMatches, `cloud "test-cloud" region "" not found`)
 }
@@ -1799,7 +1783,7 @@ func (s *jemSuite) TestGrantCloudInvalidAccess(c *gc.C) {
 	s.addController(c, ctlPath)
 	s.createK8sCloud(c, "test-cloud", "bob")
 
-	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 	err := s.jem.GrantCloud(ctx, "test-cloud", "alice", "not-valid")
 	c.Assert(err, gc.ErrorMatches, `"not-valid" cloud access not valid`)
 }
@@ -1809,7 +1793,7 @@ func (s *jemSuite) TestRevokeCloud(c *gc.C) {
 	s.addController(c, ctlPath)
 	s.createK8sCloud(c, "test-cloud", "bob")
 
-	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 	err := s.jem.GrantCloud(ctx, "test-cloud", "alice", "admin")
 	c.Assert(err, gc.Equals, nil)
 
@@ -1863,17 +1847,17 @@ func (s *jemSuite) TestRevokeCloudUnauthorized(c *gc.C) {
 	s.addController(c, ctlPath)
 	s.createK8sCloud(c, "test-cloud", "bob")
 
-	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 	err := s.jem.GrantCloud(ctx, "test-cloud", "alice", "admin")
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.jem.RevokeCloud(auth.ContextWithUser(testContext, "charlie"), "test-cloud", "alice", "admin")
+	err = s.jem.RevokeCloud(auth.ContextWithIdentity(testContext, jemtest.NewIdentity("charlie")), "test-cloud", "alice", "admin")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
 	c.Assert(err, gc.ErrorMatches, `unauthorized`)
 }
 
 func (s *jemSuite) TestRevokeCloudNotFound(c *gc.C) {
-	err := s.jem.RevokeCloud(auth.ContextWithUser(testContext, "alice"), "test-cloud", "alice", "admin")
+	err := s.jem.RevokeCloud(auth.ContextWithIdentity(testContext, jemtest.NewIdentity("alice")), "test-cloud", "alice", "admin")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	c.Assert(err, gc.ErrorMatches, `cloud "test-cloud" region "" not found`)
 }
@@ -1883,7 +1867,7 @@ func (s *jemSuite) TestRevokeCloudInvalidAccess(c *gc.C) {
 	s.addController(c, ctlPath)
 	s.createK8sCloud(c, "test-cloud", "bob")
 
-	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 	err := s.jem.RevokeCloud(ctx, "test-cloud", "alice", "not-valid")
 	c.Assert(err, gc.ErrorMatches, `"not-valid" cloud access not valid`)
 }
@@ -1909,6 +1893,57 @@ func (s *jemSuite) TestUpdateModelCredential(c *gc.C) {
 	model1, err := s.jem.DB.Model(testContext, model.Path)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.Credential, jc.DeepEquals, mongodoc.CredentialPathFromParams(credPath))
+}
+
+func (s *jemSuite) TestWatchAllModelSummaries(c *gc.C) {
+	s.addController(c, params.EntityPath{"bob", "controller"})
+	ctlPath := params.EntityPath{User: "bob", Name: "controller"}
+
+	pubsub := s.jem.Pubsub()
+	summaryChannel := make(chan interface{}, 1)
+	handlerFunction := func(_ string, summary interface{}) {
+		select {
+		case summaryChannel <- summary:
+		default:
+		}
+	}
+	cleanup, err := pubsub.Subscribe("deadbeef-0bad-400d-8000-4b1d0d06f00d", handlerFunction)
+	c.Assert(err, jc.ErrorIsNil)
+	defer cleanup()
+
+	watcherCleanup, err := s.jem.WatchAllModelSummaries(context.Background(), ctlPath)
+	c.Assert(err, gc.Equals, nil)
+	defer func() {
+		err := watcherCleanup()
+		if err != nil {
+			c.Logf("failed to stop all model summaries watcher: %v", err)
+		}
+	}()
+
+	select {
+	case summary := <-summaryChannel:
+		c.Assert(summary, gc.DeepEquals,
+			jujuparams.ModelAbstract{
+				UUID:       "deadbeef-0bad-400d-8000-4b1d0d06f00d",
+				Removed:    false,
+				Controller: "",
+				Name:       "controller",
+				Admins:     []string{"admin"},
+				Cloud:      "dummy",
+				Region:     "dummy-region",
+				Credential: "dummy/admin/cred",
+				Size: jujuparams.ModelSummarySize{
+					Machines:     0,
+					Containers:   0,
+					Applications: 0,
+					Units:        0,
+					Relations:    0,
+				},
+				Status: "green",
+			})
+	case <-time.After(time.Second):
+		c.Fatal("timed out")
+	}
 }
 
 func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityPath {
@@ -1959,7 +1994,7 @@ func (s *jemSuite) bootstrapModel(c *gc.C, path params.EntityPath) *mongodoc.Mod
 		Type: "empty",
 	})
 	c.Assert(err, gc.Equals, nil)
-	ctx := auth.ContextWithUser(testContext, string(path.User))
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity(string(path.User)))
 	model, err := s.jem.CreateModel(ctx, jem.CreateModelParams{
 		Path:           path,
 		ControllerPath: ctlPath,
@@ -1976,7 +2011,7 @@ func (s *jemSuite) bootstrapModel(c *gc.C, path params.EntityPath) *mongodoc.Mod
 
 func (s *jemSuite) createK8sCloud(c *gc.C, name, owner string) {
 	err := s.jem.CreateCloud(
-		auth.ContextWithUser(testContext, owner),
+		auth.ContextWithIdentity(testContext, jemtest.NewIdentity(owner)),
 		mongodoc.CloudRegion{
 			Cloud:            params.Cloud(name),
 			ProviderType:     "kubernetes",
@@ -2047,7 +2082,7 @@ func (s *jemK8sSuite) TestRemoveCloudWithModel(c *gc.C) {
 
 	ctlPath := params.EntityPath{"bob", "foo"}
 	addController(c, ctlPath, s.APIInfo(c), s.jem)
-	ctx := auth.ContextWithUser(testContext, "bob", "bob-group")
+	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 
 	err := s.jem.CreateCloud(
 		ctx,
@@ -2089,7 +2124,7 @@ func (s *jemK8sSuite) TestRemoveCloudWithModel(c *gc.C) {
 		Cloud:      "test-cloud",
 		Credential: credpath,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = s.jem.RemoveCloud(ctx, "test-cloud")
 	c.Assert(err, gc.ErrorMatches, `cloud is used by 1 model`)

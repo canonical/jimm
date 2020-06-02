@@ -67,6 +67,9 @@ func (c *addControllerCommand) Init(args []string) error {
 }
 
 func (c *addControllerCommand) Run(ctxt *cmd.Context) error {
+	ctx, cancel := wrapContext(ctxt)
+	defer cancel()
+
 	client, err := c.newClient(ctxt)
 	if err != nil {
 		return errgo.Mask(err)
@@ -83,7 +86,7 @@ func (c *addControllerCommand) Run(ctxt *cmd.Context) error {
 	} else {
 		hostnames = info.controller.APIEndpoints
 	}
-	if err := client.AddController(&params.AddController{
+	if err := client.AddController(ctx, &params.AddController{
 		EntityPath: c.controllerPath.EntityPath,
 		Info: params.ControllerInfo{
 			HostPorts:      hostnames,
@@ -96,7 +99,7 @@ func (c *addControllerCommand) Run(ctxt *cmd.Context) error {
 	}); err != nil {
 		return errgo.Notef(err, "cannot add controller")
 	}
-	if err := client.SetControllerPerm(&params.SetControllerPerm{
+	if err := client.SetControllerPerm(ctx, &params.SetControllerPerm{
 		EntityPath: c.controllerPath.EntityPath,
 		ACL: params.ACL{
 			Read: []string{"everyone"},

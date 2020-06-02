@@ -10,10 +10,9 @@ import (
 	apicontroller "github.com/juju/juju/api/controller"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
-	"github.com/juju/juju/state/multiwatcher"
+	"github.com/juju/names/v4"
 	"github.com/juju/version"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/names.v3"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/jem"
@@ -88,11 +87,11 @@ func (j jemShim) RemoveControllerApplications(ctx context.Context, ctlPath param
 	return errgo.Mask(j.DB.RemoveControllerApplications(ctx, ctlPath), errgo.Any)
 }
 
-func (j jemShim) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, info *multiwatcher.MachineInfo) error {
+func (j jemShim) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, info *jujuparams.MachineInfo) error {
 	return errgo.Mask(j.JEM.UpdateMachineInfo(ctx, ctlPath, info), errgo.Any)
 }
 
-func (j jemShim) UpdateApplicationInfo(ctx context.Context, ctlPath params.EntityPath, info *multiwatcher.ApplicationInfo) error {
+func (j jemShim) UpdateApplicationInfo(ctx context.Context, ctlPath params.EntityPath, info *jujuparams.ApplicationInfo) error {
 	return errgo.Mask(j.JEM.UpdateApplicationInfo(ctx, ctlPath, info), errgo.Any)
 }
 
@@ -115,6 +114,10 @@ func (j jemShim) AcquireMonitorLease(ctx context.Context, ctlPath params.EntityP
 func (j jemShim) Controller(ctx context.Context, ctlPath params.EntityPath) (*mongodoc.Controller, error) {
 	ctl, err := j.DB.Controller(ctx, ctlPath)
 	return ctl, errgo.Mask(err, errgo.Any)
+}
+
+func (j jemShim) WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityPath) (func() error, error) {
+	return j.JEM.WatchAllModelSummaries(ctx, ctlPath)
 }
 
 type apiShim struct {
