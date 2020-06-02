@@ -1156,3 +1156,7 @@ func (authorizer) UserHasPermission(user names.UserTag, operation permission.Acc
 func (authorizer) ConnectedModel() string {
 	return ""
 }
+
+func (authorizer) AuthModelAgent() bool {
+	return false
+}
