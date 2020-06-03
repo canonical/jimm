@@ -1,0 +1,8 @@
+var jaasDashboardConfig = {
+  // API host to allow app to connect and retrieve models
+  baseControllerURL: "{{base_controller_url}}",
+  // Configurable base url to allow deploying to different paths.
+  baseAppURL: "{{base_app_url}}",
+  // If true then identity will be provided by a third party provider.
+  identityProviderAvailable: {{identity_provider_available}}
+};
