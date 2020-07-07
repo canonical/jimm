@@ -1,7 +1,6 @@
 module github.com/CanonicalLtd/jimm
 
 require (
-	github.com/Azure/azure-sdk-for-go v41.3.0+incompatible // indirect
 	github.com/Azure/go-ntlmssp v0.0.0-20180810175552-4a21cbd618b4 // indirect
 	github.com/ChrisTrenkamp/goxpath v0.0.0-20170922090931-c385f95c6022 // indirect
 	github.com/EvilSuperstars/go-cidrman v0.0.0-20190607145828-28e79e32899a // indirect
@@ -19,7 +18,7 @@ require (
 	github.com/gopherjs/gopherjs v0.0.0-20181103185306-d547d1d9531e // indirect
 	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
 	github.com/gorilla/schema v1.0.2 // indirect
-	github.com/gorilla/websocket v1.4.0
+	github.com/gorilla/websocket v1.4.2
 	github.com/gosuri/uitable v0.0.4 // indirect
 	github.com/hashicorp/go-msgpack v1.1.5 // indirect
 	github.com/hashicorp/raft-boltdb v0.0.0-20191021154308-4207f1bf0617 // indirect
@@ -33,8 +32,8 @@ require (
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
 	github.com/juju/go-oracle-cloud v0.0.0-20170510162943-95ad2a088ab9 // indirect
 	github.com/juju/httprequest v1.0.1
-	github.com/juju/juju v0.0.0-20200601220934-86cf21f395e2
-	github.com/juju/loggo v0.0.0-20190526231331-6e530bcce5d8
+	github.com/juju/juju v0.0.0-20200702151955-16439b3d1c52
+	github.com/juju/loggo v0.0.0-20200526014432-9ce3a2e09b5e
 	github.com/juju/lru v0.0.0-20190314140547-92a0afabdc41 // indirect
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
 	github.com/juju/mgosession v1.0.0
@@ -42,9 +41,9 @@ require (
 	github.com/juju/persistent-cookiejar v0.0.0-20170428161559-d67418f14c93
 	github.com/juju/rpcreflect v0.0.0-20200416001309-bb46e9ba1476
 	github.com/juju/simplekv v1.0.0
-	github.com/juju/testing v0.0.0-20200510222523-6c8c298c77a0
+	github.com/juju/testing v0.0.0-20200608005635-e4eedbc6f7aa
 	github.com/juju/txn v0.0.0-20190612234757-afeb83d59782 // indirect
-	github.com/juju/utils v0.0.0-20200424103611-54ececcc5fc7
+	github.com/juju/utils v0.0.0-20200604140309-9d78121a29e0
 	github.com/juju/version v0.0.0-20191219164919-81c1be00b9a6
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/lestrrat/go-jspointer v0.0.0-20180109105637-d5f7c71bfd03 // indirect
@@ -62,7 +61,7 @@ require (
 	github.com/vmware/govmomi v0.22.2 // indirect
 	go.uber.org/multierr v1.5.0 // indirect
 	go.uber.org/zap v1.10.0
-	golang.org/x/crypto v0.0.0-20200510223506-06a226fb4e37
+	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	google.golang.org/api v0.21.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f
