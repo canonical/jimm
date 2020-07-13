@@ -6,7 +6,7 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/juju/juju/apiserver/common"
+	apiservererrors "github.com/juju/juju/apiserver/errors"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/network"
 	"github.com/juju/juju/rpc"
@@ -44,7 +44,7 @@ func newModelRoot(jem *jem.JEM, hm heartMonitor, uuid string) *modelRoot {
 func (r *modelRoot) Admin(id string) (modelAdmin, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return modelAdmin{}, common.ErrBadId
+		return modelAdmin{}, apiservererrors.ErrBadId
 	}
 	return modelAdmin{r}, nil
 }
@@ -53,7 +53,7 @@ func (r *modelRoot) Admin(id string) (modelAdmin, error) {
 func (r *modelRoot) Pinger(id string) (pinger, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return pinger{}, common.ErrBadId
+		return pinger{}, apiservererrors.ErrBadId
 	}
 	return pinger{}, nil
 }

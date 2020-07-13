@@ -6,7 +6,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/juju/juju/apiserver/common"
+	apiservererrors "github.com/juju/juju/apiserver/errors"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/life"
 	"github.com/juju/names/v4"
@@ -78,7 +78,7 @@ func (m modelManagerV3) DestroyModels(ctx context.Context, args jujuparams.Entit
 func (r *controllerRoot) ModelManagerAPI(id string) (modelManagerAPI, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return modelManagerAPI{}, common.ErrBadId
+		return modelManagerAPI{}, apiservererrors.ErrBadId
 	}
 	return modelManagerAPI{r}, nil
 }

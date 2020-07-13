@@ -11,7 +11,7 @@ import (
 	"time"
 
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
-	"github.com/juju/juju/apiserver/common"
+	apiservererrors "github.com/juju/juju/apiserver/errors"
 	"github.com/juju/juju/apiserver/facades/client/bundle"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	jujucloud "github.com/juju/juju/cloud"
@@ -125,7 +125,7 @@ func newControllerRoot(jem *jem.JEM, a *auth.Authenticator, p jemserver.Params, 
 func (r *controllerRoot) Admin(id string) (admin, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return admin{}, common.ErrBadId
+		return admin{}, apiservererrors.ErrBadId
 	}
 	return admin{r}, nil
 }
@@ -134,7 +134,7 @@ func (r *controllerRoot) Admin(id string) (admin, error) {
 func (r *controllerRoot) Bundle(id string) (*bundle.APIv1, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return nil, common.ErrBadId
+		return nil, apiservererrors.ErrBadId
 	}
 	// Use the juju implementation of the Bundle facade.
 	api, err := bundle.NewBundleAPIv1(nil, authorizer{r.identity}, names.NewModelTag(""))
@@ -145,7 +145,7 @@ func (r *controllerRoot) Bundle(id string) (*bundle.APIv1, error) {
 func (r *controllerRoot) ControllerV3(id string) (controllerV3, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return controllerV3{}, common.ErrBadId
+		return controllerV3{}, apiservererrors.ErrBadId
 	}
 	return controllerV3{
 		controllerRoot: r,
@@ -156,7 +156,7 @@ func (r *controllerRoot) ControllerV3(id string) (controllerV3, error) {
 func (r *controllerRoot) ControllerV4(id string) (controllerV4, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return controllerV4{}, common.ErrBadId
+		return controllerV4{}, apiservererrors.ErrBadId
 	}
 	v3, err := r.ControllerV3(id)
 	if err != nil {
@@ -171,7 +171,7 @@ func (r *controllerRoot) ControllerV4(id string) (controllerV4, error) {
 func (r *controllerRoot) ControllerV5(id string) (controllerV5, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return controllerV5{}, common.ErrBadId
+		return controllerV5{}, apiservererrors.ErrBadId
 	}
 	v4, err := r.ControllerV4(id)
 	if err != nil {
@@ -186,7 +186,7 @@ func (r *controllerRoot) ControllerV5(id string) (controllerV5, error) {
 func (r *controllerRoot) ControllerV6(id string) (controllerV6, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return controllerV6{}, common.ErrBadId
+		return controllerV6{}, apiservererrors.ErrBadId
 	}
 	v5, err := r.ControllerV5(id)
 	if err != nil {
@@ -201,7 +201,7 @@ func (r *controllerRoot) ControllerV6(id string) (controllerV6, error) {
 func (r *controllerRoot) ControllerV7(id string) (controllerV7, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return controllerV7{}, common.ErrBadId
+		return controllerV7{}, apiservererrors.ErrBadId
 	}
 	v6, err := r.ControllerV6(id)
 	if err != nil {
@@ -216,7 +216,7 @@ func (r *controllerRoot) ControllerV7(id string) (controllerV7, error) {
 func (r *controllerRoot) ControllerV8(id string) (controllerV8, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return controllerV8{}, common.ErrBadId
+		return controllerV8{}, apiservererrors.ErrBadId
 	}
 	v7, err := r.ControllerV7(id)
 	if err != nil {
@@ -258,7 +258,7 @@ func (r *controllerRoot) ModelSummaryWatcher(id string) (*modelSummaryWatcher, e
 func (r *controllerRoot) JIMMV2(id string) (jimmV2, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return jimmV2{}, common.ErrBadId
+		return jimmV2{}, apiservererrors.ErrBadId
 	}
 	return jimmV2{r}, nil
 }
@@ -267,7 +267,7 @@ func (r *controllerRoot) JIMMV2(id string) (jimmV2, error) {
 func (r *controllerRoot) Pinger(id string) (pinger, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return pinger{}, common.ErrBadId
+		return pinger{}, apiservererrors.ErrBadId
 	}
 	return pinger{}, nil
 }
@@ -277,7 +277,7 @@ func (r *controllerRoot) Pinger(id string) (pinger, error) {
 func (r *controllerRoot) UserManager(id string) (userManager, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return userManager{}, common.ErrBadId
+		return userManager{}, apiservererrors.ErrBadId
 	}
 	return userManager{r}, nil
 }
