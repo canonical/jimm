@@ -6,7 +6,7 @@ import (
 	"context"
 
 	"github.com/juju/errors"
-	"github.com/juju/juju/apiserver/common"
+	apiservererrors "github.com/juju/juju/apiserver/errors"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 	"go.uber.org/zap"
@@ -25,7 +25,7 @@ import (
 func (r *controllerRoot) CloudV1(id string) (cloudV1, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return cloudV1{}, common.ErrBadId
+		return cloudV1{}, apiservererrors.ErrBadId
 	}
 	return cloudV1{cloudV2{cloudV3{cloudV4{cloudV5{r}}}}}, nil
 }
@@ -33,7 +33,7 @@ func (r *controllerRoot) CloudV1(id string) (cloudV1, error) {
 func (r *controllerRoot) CloudV2(id string) (cloudV2, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return cloudV2{}, common.ErrBadId
+		return cloudV2{}, apiservererrors.ErrBadId
 	}
 	return cloudV2{cloudV3{cloudV4{cloudV5{r}}}}, nil
 }
@@ -41,7 +41,7 @@ func (r *controllerRoot) CloudV2(id string) (cloudV2, error) {
 func (r *controllerRoot) CloudV3(id string) (cloudV3, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return cloudV3{}, common.ErrBadId
+		return cloudV3{}, apiservererrors.ErrBadId
 	}
 	return cloudV3{cloudV4{cloudV5{r}}}, nil
 }
@@ -49,7 +49,7 @@ func (r *controllerRoot) CloudV3(id string) (cloudV3, error) {
 func (r *controllerRoot) CloudV4(id string) (cloudV4, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return cloudV4{}, common.ErrBadId
+		return cloudV4{}, apiservererrors.ErrBadId
 	}
 	return cloudV4{cloudV5{r}}, nil
 }
@@ -57,7 +57,7 @@ func (r *controllerRoot) CloudV4(id string) (cloudV4, error) {
 func (r *controllerRoot) CloudV5(id string) (cloudV5, error) {
 	if id != "" {
 		// Safeguard id for possible future use.
-		return cloudV5{}, common.ErrBadId
+		return cloudV5{}, apiservererrors.ErrBadId
 	}
 	return cloudV5{r}, nil
 }
@@ -591,7 +591,7 @@ func (c cloudV5) AddCredentials(ctx context.Context, args jujuparams.TaggedCrede
 			if len(m.Errors) > 0 {
 				modelErors := jujuparams.ErrorResults{m.Errors}
 				combined := errors.Annotatef(modelErors.Combine(), "model %q (uuid %v)", m.ModelName, m.ModelUUID)
-				resultErrors = append(resultErrors, jujuparams.ErrorResult{common.ServerError(combined)})
+				resultErrors = append(resultErrors, jujuparams.ErrorResult{apiservererrors.ServerError(combined)})
 			}
 		}
 		if len(resultErrors) == 1 {
@@ -600,7 +600,7 @@ func (c cloudV5) AddCredentials(ctx context.Context, args jujuparams.TaggedCrede
 		}
 		if len(resultErrors) > 1 {
 			credentialError := jujuparams.ErrorResults{resultErrors}
-			results.Results[i].Error = common.ServerError(credentialError.Combine())
+			results.Results[i].Error = apiservererrors.ServerError(credentialError.Combine())
 		}
 	}
 	return results, nil
