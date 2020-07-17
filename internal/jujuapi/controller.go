@@ -823,9 +823,29 @@ func (j jimmV2) DisableControllerUUIDMasking(ctx context.Context) error {
 func (j jimmV2) ListControllers(ctx context.Context) (params.ListControllerResponse, error) {
 	ctx = auth.ContextWithIdentity(ctx, j.root.identity)
 
-	var controllers []params.ControllerResponse
+	err := auth.CheckACL(ctx, j.root.identity, []string{string(j.root.jem.ControllerAdmin())})
+	if errgo.Cause(err) == params.ErrUnauthorized {
+		// if the user isn't a controller admin return JAAS
+		// itself as the only controller.
 
-	// NOTE (alesstimec -> mhilton): Controllers shouldn't be readable by non-acl users even if they are public.
+		srvVersion, err := j.root.jem.EarliestControllerVersion(ctx)
+		if err != nil {
+			return params.ListControllerResponse{}, errgo.Mask(err)
+		}
+		return params.ListControllerResponse{
+			Controllers: []params.ControllerResponse{{
+				Path:    params.EntityPath{User: "admin", Name: "jaas"},
+				Public:  true,
+				UUID:    j.root.params.ControllerUUID,
+				Version: srvVersion.String(),
+			}},
+		}, nil
+	}
+	if err != nil {
+		return params.ListControllerResponse{}, errgo.Mask(err)
+	}
+
+	var controllers []params.ControllerResponse
 	iter := j.root.jem.DB.NewCanReadIter(ctx, j.root.jem.DB.Controllers().Find(nil).Sort("_id").Iter())
 	defer iter.Close(ctx)
 	var ctl mongodoc.Controller
