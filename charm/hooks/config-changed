@@ -37,8 +37,8 @@ def config_changed():
     }
     if config['agent-private-key'] and config['agent-public-key']:
         app_config['agent-key'] = {
-            'private': config['agent-private-key'],
-            'public': config['agent-public-key'],
+            'private': config['agent-private-key'].strip(),
+            'public': config['agent-public-key'].strip(),
         }
 
     if config['juju-dashboard-location']:

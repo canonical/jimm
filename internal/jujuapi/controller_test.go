@@ -324,7 +324,14 @@ func (s *controllerSuite) TestListControllersUnauthorizedUser(c *gc.C) {
 	err := conn.APICall("JIMM", 2, "", "ListControllers", nil, &resp)
 	c.Assert(err, gc.Equals, nil)
 
-	c.Assert(resp, jc.DeepEquals, params.ListControllerResponse{})
+	c.Assert(resp, jc.DeepEquals, params.ListControllerResponse{
+		Controllers: []params.ControllerResponse{{
+			Path:    params.EntityPath{User: "admin", Name: "jaas"},
+			Public:  true,
+			UUID:    "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+			Version: "0.0.0",
+		}},
+	})
 }
 
 func (s *controllerSuite) TestControllerConfig(c *gc.C) {
