@@ -13,6 +13,7 @@ import (
 	"github.com/juju/utils/parallel"
 	"gopkg.in/errgo.v1"
 
+	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
@@ -33,15 +34,27 @@ type modelManagerV2 struct {
 }
 
 // DumpModels implements the DumpModels method of the modelmanager (v2)
-// facade. Actually dumping the model is not yet supported, so it always
-// returns an error.
+// facade. The model dump is passed back as-is from the controller
+// without any changes from JIMM.
 func (m modelManagerV2) DumpModels(ctx context.Context, args jujuparams.Entities) jujuparams.MapResults {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 	ctx = auth.ContextWithIdentity(ctx, m.root.identity)
 	results := make([]jujuparams.MapResult, len(args.Entities))
 	for i, ent := range args.Entities {
-		_, err := m.dumpModel(ctx, ent, false)
+		err := m.root.modelWithConnection(
+			ctx,
+			ent.Tag,
+			auth.CheckIsAdmin,
+			func(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model) error {
+				var err error
+				results[i].Result, err = conn.DumpModel(ctx, model.UUID)
+				return errgo.Mask(err, apiconn.IsAPIError)
+			},
+		)
+		if errgo.Cause(err) == params.ErrNotFound {
+			err = params.ErrUnauthorized
+		}
 		results[i].Error = mapError(err)
 	}
 	return jujuparams.MapResults{
@@ -375,68 +388,63 @@ func (m modelManagerAPI) modifyModelAccess(ctx context.Context, change jujuparam
 	return nil
 }
 
-// DumpModels implements the modelmanager facades DumpModels API.
-// Actually dumping the model is not yet supported, so it always returns
-// an error.
+// DumpModels implements the modelmanager facades DumpModels API. The
+// model dump is passed back as-is from the controller without any
+// changes from JIMM.
 func (m modelManagerAPI) DumpModels(ctx context.Context, args jujuparams.DumpModelRequest) jujuparams.StringResults {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 	ctx = auth.ContextWithIdentity(ctx, m.root.identity)
 	results := make([]jujuparams.StringResult, len(args.Entities))
 	for i, ent := range args.Entities {
-		res, err := m.dumpModel(ctx, ent, args.Simplified)
-		if err != nil {
-			results[i].Error = mapError(err)
-			continue
+		err := m.root.modelWithConnection(
+			ctx,
+			ent.Tag,
+			auth.CheckIsAdmin,
+			func(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model) error {
+				var err error
+				results[i].Result, err = conn.DumpModelV3(ctx, model.UUID, args.Simplified)
+				return errgo.Mask(err, apiconn.IsAPIError)
+			},
+		)
+		if errgo.Cause(err) == params.ErrNotFound {
+			err = params.ErrUnauthorized
 		}
-		results[i].Result = res
+		results[i].Error = mapError(err)
 	}
 	return jujuparams.StringResults{
 		Results: results,
 	}
 }
 
-func (m modelManagerAPI) dumpModel(ctx context.Context, ent jujuparams.Entity, simplified bool) (string, error) {
-	_, err := getModel(ctx, m.root.jem, ent.Tag, auth.CheckIsAdmin)
-	if err != nil {
-		if errgo.Cause(err) == params.ErrNotFound {
-			err = params.ErrUnauthorized
-		}
-		return "", errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
-	}
-	return "", errgo.WithCausef(nil, errNotImplemented, "DumpModel is not implemented for JAAS models")
-}
-
-// DumpModelsDB implements the modelmanager facades DumpModelsDB API.
-// Actually dumping the model is not yet supported, so it always returns
-// an error.
+// DumpModelsDB implements the modelmanager facades DumpModelsDB API. The
+// model dump is passed back as-is from the controller without any
+// changes from JIMM.
 func (m modelManagerAPI) DumpModelsDB(ctx context.Context, args jujuparams.Entities) jujuparams.MapResults {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 	ctx = auth.ContextWithIdentity(ctx, m.root.identity)
 	results := make([]jujuparams.MapResult, len(args.Entities))
 	for i, ent := range args.Entities {
-		res, err := m.dumpModelDB(ctx, ent)
-		if err != nil {
-			results[i].Error = mapError(err)
-			continue
+		err := m.root.modelWithConnection(
+			ctx,
+			ent.Tag,
+			auth.CheckIsAdmin,
+			func(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model) error {
+				var err error
+				results[i].Result, err = conn.DumpModelDB(ctx, model.UUID)
+				return errgo.Mask(err, apiconn.IsAPIError)
+			},
+		)
+		if errgo.Cause(err) == params.ErrNotFound {
+			err = params.ErrUnauthorized
 		}
-		results[i].Result = res
+		results[i].Error = mapError(err)
+
 	}
 	return jujuparams.MapResults{
 		Results: results,
 	}
-}
-
-func (m modelManagerAPI) dumpModelDB(ctx context.Context, ent jujuparams.Entity) (map[string]interface{}, error) {
-	_, err := getModel(ctx, m.root.jem, ent.Tag, auth.CheckIsAdmin)
-	if err != nil {
-		if errgo.Cause(err) == params.ErrNotFound {
-			err = params.ErrUnauthorized
-		}
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
-	}
-	return nil, errgo.WithCausef(nil, errNotImplemented, "DumpModelDB is not implemented for JAAS models")
 }
 
 // ModelStatus implements the ModelManager facade's ModelStatus method.
