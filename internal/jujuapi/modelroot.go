@@ -8,14 +8,12 @@ import (
 
 	"github.com/juju/juju/apiserver/common"
 	jujuparams "github.com/juju/juju/apiserver/params"
-	"github.com/juju/juju/core/network"
 	"github.com/juju/juju/rpc"
 	"github.com/juju/rpcreflect"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	"github.com/CanonicalLtd/jimm/internal/servermon"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -93,48 +91,4 @@ func (r *modelRoot) modelInfo(ctx context.Context) (*mongodoc.Model, *mongodoc.C
 		}
 	}
 	return r.model, r.controller, nil
-}
-
-type modelAdmin struct {
-	root *modelRoot
-}
-
-// Login implements the Login method on the Admin facade.
-func (a modelAdmin) Login(ctx context.Context, req jujuparams.LoginRequest) (jujuparams.LoginResult, error) {
-	_, _, err := a.root.modelInfo(ctx)
-	if err != nil {
-		return jujuparams.LoginResult{}, errgo.Mask(err, errgo.Is(params.ErrModelNotFound))
-	}
-	// If the model was found then we'll need to redirect to it.
-	servermon.LoginRedirectCount.Inc()
-	return jujuparams.LoginResult{}, &jujuparams.Error{
-		Code:    jujuparams.CodeRedirect,
-		Message: "redirection required",
-	}
-}
-
-// RedirectInfo implements the RedirectInfo method on the Admin facade.
-func (a modelAdmin) RedirectInfo(ctx context.Context) (jujuparams.RedirectInfoResult, error) {
-	_, controller, err := a.root.modelInfo(ctx)
-	if err != nil {
-		return jujuparams.RedirectInfoResult{}, errgo.Mask(err, errgo.Is(params.ErrModelNotFound))
-	}
-	servers := make([][]jujuparams.HostPort, len(controller.HostPorts))
-	for i, hps := range controller.HostPorts {
-		servers[i] = make([]jujuparams.HostPort, len(hps))
-		for j, hp := range hps {
-			servers[i][j] = jujuparams.HostPort{
-				Address: jujuparams.Address{
-					Value: hp.Host,
-					Scope: hp.Scope,
-					Type:  string(network.DeriveAddressType(hp.Host)),
-				},
-				Port: hp.Port,
-			}
-		}
-	}
-	return jujuparams.RedirectInfoResult{
-		Servers: servers,
-		CACert:  controller.CACert,
-	}, nil
 }
