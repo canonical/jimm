@@ -1689,3 +1689,23 @@ func (s *caasModelManagerSuite) AssertAddKubernetesCloud(c *gc.C, credTag names.
 		}
 	}
 }
+
+func assertModelInfo(c *gc.C, obtained, expected []jujuparams.ModelInfoResult) {
+	for i := range obtained {
+		// DefaultSeries changes between juju versions and
+		// we don't care about its specific value.
+		if obtained[i].Result != nil {
+			obtained[i].Result.DefaultSeries = ""
+		}
+	}
+	for i := range obtained {
+		if obtained[i].Result == nil {
+			continue
+		}
+		obtained[i].Result.Status.Since = nil
+		for j := range obtained[i].Result.Users {
+			obtained[i].Result.Users[j].LastConnection = nil
+		}
+	}
+	c.Assert(obtained, jc.DeepEquals, expected)
+}
