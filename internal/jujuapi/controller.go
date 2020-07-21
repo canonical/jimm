@@ -31,6 +31,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/mgo.v2/bson"
 
+	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
@@ -280,6 +281,27 @@ func (r *controllerRoot) UserManager(id string) (userManager, error) {
 		return userManager{}, common.ErrBadId
 	}
 	return userManager{r}, nil
+}
+
+// modelWithConnection gets the model with the given model tag, opens a
+// connection to the model and runs the given function with the model and
+// connection. The function will not have any error cause masked.
+func (r *controllerRoot) modelWithConnection(ctx context.Context, modelTag string, authf authFunc, f func(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model) error) error {
+	model, err := getModel(ctx, r.jem, modelTag, authf)
+	if err != nil {
+		return errgo.Mask(err,
+			errgo.Is(params.ErrNotFound),
+			errgo.Is(params.ErrBadRequest),
+			errgo.Is(params.ErrUnauthorized),
+		)
+	}
+	conn, err := r.jem.OpenAPI(ctx, model.Controller)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	defer conn.Close()
+
+	return errgo.Mask(f(ctx, conn, model), errgo.Any)
 }
 
 // doModels calls the given function for each model that the
@@ -876,15 +898,19 @@ func newTime(t time.Time) *time.Time {
 	return &t
 }
 
+// An authFunc is a function that authorizes an ACL. If access is allowed
+// then authFunc returns nil, if access is denied then the function
+// should return an error with a cause of params.ErrUnauthorized. Any
+// other errors are interpreted as a lookup failure.
+type authFunc func(context.Context, identchecker.ACLIdentity, auth.ACLEntity) error
+
 // getModel attempts to get the specified model from jem. If the model
 // tag is not valid then the error cause will be params.ErrBadRequest. If
 // the model cannot be found then the error cause will be
 // params.ErrNotFound. If authf is non-nil then it will be called with
-// the found model. authf is used to authenticate access to the model, if
-// access is denied authf should return an error with the cause
-// params.ErrUnauthorized. The cause of any error returned by authf will
-// not be masked.
-func getModel(ctx context.Context, jem *jem.JEM, modelTag string, authf func(context.Context, identchecker.ACLIdentity, auth.ACLEntity) error) (*mongodoc.Model, error) {
+// the found model. authf is used to authenticate access to the model,the
+// cause of any error returned by authf will not be masked.
+func getModel(ctx context.Context, jem *jem.JEM, modelTag string, authf authFunc) (*mongodoc.Model, error) {
 	tag, err := names.ParseModelTag(modelTag)
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid model tag")
