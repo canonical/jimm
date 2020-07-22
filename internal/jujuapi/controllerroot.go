@@ -54,7 +54,6 @@ type controllerRoot struct {
 }
 
 func newControllerRoot(jem *jem.JEM, a *auth.Authenticator, p jemserver.Params, hm heartMonitor) *controllerRoot {
-
 	r := &controllerRoot{
 		params:        p,
 		auth:          a,
