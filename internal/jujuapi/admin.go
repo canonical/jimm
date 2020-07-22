@@ -8,24 +8,32 @@ import (
 
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/network"
+	"github.com/juju/juju/rpc"
 	"github.com/juju/names/v4"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
-// admin implements the Admin facade.
-type admin struct {
-	root *controllerRoot
+// unsupportedLogin returns an appropriate error for login attempts using
+// old version of the Admin facade.
+func unsupportedLogin() error {
+	return &rpc.RequestError{
+		Code:    jujuparams.CodeNotSupported,
+		Message: "JIMM does not support login from old clients",
+	}
 }
 
+var facadeInit = make(map[string]func(r *controllerRoot) []int)
+
 // Login implements the Login method on the Admin facade.
-func (a admin) Login(ctx context.Context, req jujuparams.LoginRequest) (jujuparams.LoginResult, error) {
+func (r *controllerRoot) Login(ctx context.Context, req jujuparams.LoginRequest) (jujuparams.LoginResult, error) {
 	// JIMM only supports macaroon login, ignore all the other fields.
-	id, m, err := a.root.auth.Authenticate(ctx, bakery.Version1, req.Macaroons)
+	id, m, err := r.auth.Authenticate(ctx, bakery.Version1, req.Macaroons)
 	if err != nil {
 		servermon.LoginFailCount.Inc()
 		if m != nil {
@@ -36,15 +44,26 @@ func (a admin) Login(ctx context.Context, req jujuparams.LoginRequest) (jujupara
 		}
 		return jujuparams.LoginResult{}, errgo.Mask(err)
 	}
-	a.root.mu.Lock()
-	a.root.facades = facades
-	a.root.identity = id
-	a.root.mu.Unlock()
+
+	r.mu.Lock()
+	r.identity = id
+	r.mu.Unlock()
+
+	var facades []jujuparams.FacadeVersions
+	for name, f := range facadeInit {
+		facades = append(facades, jujuparams.FacadeVersions{
+			Name:     name,
+			Versions: f(r),
+		})
+	}
+	sort.Slice(facades, func(i, j int) bool {
+		return facades[i].Name < facades[j].Name
+	})
 
 	ctx = auth.ContextWithIdentity(ctx, id)
 	servermon.LoginSuccessCount.Inc()
 	username := id.Id()
-	srvVersion, err := a.root.jem.EarliestControllerVersion(ctx)
+	srvVersion, err := r.jem.EarliestControllerVersion(ctx)
 	if err != nil {
 		return jujuparams.LoginResult{}, errgo.Mask(err)
 	}
@@ -54,44 +73,15 @@ func (a admin) Login(ctx context.Context, req jujuparams.LoginRequest) (jujupara
 			DisplayName: username,
 			Identity:    userTag(username).String(),
 		},
-		ControllerTag: names.NewControllerTag(a.root.params.ControllerUUID).String(),
-		Facades:       facadeVersions(a.root.facades),
+		ControllerTag: names.NewControllerTag(r.params.ControllerUUID).String(),
+		Facades:       facades,
 		ServerVersion: srvVersion.String(),
 	}, nil
 }
 
-// facadeVersions creates a list of facadeVersions as specified in
-// facades.
-func facadeVersions(facades map[facade]string) []jujuparams.FacadeVersions {
-	names := make([]string, 0, len(facades))
-	versions := make(map[string][]int, len(facades))
-	for k := range facades {
-		vs, ok := versions[k.name]
-		if !ok {
-			names = append(names, k.name)
-		}
-		versions[k.name] = append(vs, k.version)
-	}
-	sort.Strings(names)
-	fvs := make([]jujuparams.FacadeVersions, len(names))
-	for i, name := range names {
-		vs := versions[name]
-		sort.Ints(vs)
-		fvs[i] = jujuparams.FacadeVersions{
-			Name:     name,
-			Versions: vs,
-		}
-	}
-	return fvs
-}
-
-type modelAdmin struct {
-	root *modelRoot
-}
-
 // Login implements the Login method on the Admin facade.
-func (a modelAdmin) Login(ctx context.Context, req jujuparams.LoginRequest) (jujuparams.LoginResult, error) {
-	_, _, err := a.root.modelInfo(ctx)
+func (r *modelRoot) Login(ctx context.Context, req jujuparams.LoginRequest) (jujuparams.LoginResult, error) {
+	_, _, err := r.modelInfo(ctx)
 	if err != nil {
 		return jujuparams.LoginResult{}, errgo.Mask(err, errgo.Is(params.ErrModelNotFound))
 	}
@@ -104,8 +94,8 @@ func (a modelAdmin) Login(ctx context.Context, req jujuparams.LoginRequest) (juj
 }
 
 // RedirectInfo implements the RedirectInfo method on the Admin facade.
-func (a modelAdmin) RedirectInfo(ctx context.Context) (jujuparams.RedirectInfoResult, error) {
-	_, controller, err := a.root.modelInfo(ctx)
+func (r *modelRoot) RedirectInfo(ctx context.Context) (jujuparams.RedirectInfoResult, error) {
+	_, controller, err := r.modelInfo(ctx)
 	if err != nil {
 		return jujuparams.RedirectInfoResult{}, errgo.Mask(err, errgo.Is(params.ErrModelNotFound))
 	}
@@ -127,4 +117,23 @@ func (a modelAdmin) RedirectInfo(ctx context.Context) (jujuparams.RedirectInfoRe
 		Servers: servers,
 		CACert:  controller.CACert,
 	}, nil
+}
+
+// modelInfo retrieves the data about the model.
+func (r *modelRoot) modelInfo(ctx context.Context) (*mongodoc.Model, *mongodoc.Controller, error) {
+	if r.model == nil {
+		var err error
+		r.model, err = r.jem.DB.ModelFromUUID(ctx, r.uuid)
+		if errgo.Cause(err) == params.ErrNotFound {
+			return nil, nil, errgo.WithCausef(err, params.ErrModelNotFound, "%s", "")
+		}
+		if err != nil {
+			return nil, nil, errgo.Mask(err)
+		}
+		r.controller, err = r.jem.DB.Controller(ctx, r.model.Controller)
+		if err != nil {
+			return nil, nil, errgo.Mask(err)
+		}
+	}
+	return r.model, r.controller, nil
 }

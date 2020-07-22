@@ -63,7 +63,7 @@ func (s *controllerrootSuite) TestUnimplementedMethodFails(c *gc.C) {
 	defer conn.Close()
 	var resp jujuparams.RedirectInfoResult
 	err := conn.APICall("Admin", 3, "", "Logout", nil, &resp)
-	c.Assert(err, gc.ErrorMatches, `no such request - method Admin.Logout is not implemented \(not implemented\)`)
+	c.Assert(err, gc.ErrorMatches, `no such request - method Admin\(3\).Logout is not implemented \(not implemented\)`)
 }
 
 func (s *controllerrootSuite) TestUnimplementedRootFails(c *gc.C) {
@@ -74,7 +74,7 @@ func (s *controllerrootSuite) TestUnimplementedRootFails(c *gc.C) {
 	defer conn.Close()
 	var resp jujuparams.RedirectInfoResult
 	err := conn.APICall("NoSuch", 1, "", "Method", nil, &resp)
-	c.Assert(err, gc.ErrorMatches, `unknown version \(1\) of interface "NoSuch" \(not implemented\)`)
+	c.Assert(err, gc.ErrorMatches, `no such request - method NoSuch\(1\).Method is not implemented \(not implemented\)`)
 }
 
 type testHeartMonitor struct {

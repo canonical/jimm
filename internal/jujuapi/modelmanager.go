@@ -6,7 +6,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/juju/juju/apiserver/common"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/life"
 	"github.com/juju/names/v4"
@@ -17,32 +16,79 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
-// ModelManagerV2 returns an implementation of the ModelManager facade
-// (version 2).
-func (r *controllerRoot) ModelManagerV2(id string) (modelManagerV2, error) {
-	mm, err := r.ModelManagerV3(id)
-	return modelManagerV2{mm}, err
-}
+func init() {
+	facadeInit["ModelManager"] = func(r *controllerRoot) []int {
+		changeModelCredentialMethod := rpc.Method(r.ChangeModelCredential)
+		createModelMethod := rpc.Method(r.CreateModel)
+		destroyModelsMethod := rpc.Method(r.DestroyModels)
+		destroyModelsV4Method := rpc.Method(r.DestroyModelsV4)
+		dumpModelsMethod := rpc.Method(r.DumpModels)
+		dumpModelsV3Method := rpc.Method(r.DumpModelsV3)
+		dumpModelsDBMethod := rpc.Method(r.DumpModelsDB)
+		listModelSummariesMethod := rpc.Method(r.ListModelSummaries)
+		listModelsMethod := rpc.Method(r.ListModels)
+		modelInfoMethod := rpc.Method(r.ModelInfo)
+		modelStatusMethod := rpc.Method(r.ModelStatus)
+		modifyModelAccessMethod := rpc.Method(r.ModifyModelAccess)
 
-type modelManagerV2 struct {
-	modelManagerV3
+		r.AddMethod("ModelManager", 2, "CreateModel", createModelMethod)
+		r.AddMethod("ModelManager", 2, "DestroyModels", destroyModelsMethod)
+		r.AddMethod("ModelManager", 2, "DumpModels", dumpModelsMethod)
+		r.AddMethod("ModelManager", 2, "DumpModelsDB", dumpModelsDBMethod)
+		r.AddMethod("ModelManager", 2, "ListModels", listModelsMethod)
+		r.AddMethod("ModelManager", 2, "ModelStatus", modelStatusMethod)
+		r.AddMethod("ModelManager", 2, "ModifyModelAccess", modifyModelAccessMethod)
+
+		r.AddMethod("ModelManager", 3, "CreateModel", createModelMethod)
+		r.AddMethod("ModelManager", 3, "DestroyModels", destroyModelsMethod)
+		r.AddMethod("ModelManager", 3, "DumpModels", dumpModelsV3Method)
+		r.AddMethod("ModelManager", 3, "DumpModelsDB", dumpModelsDBMethod)
+		r.AddMethod("ModelManager", 3, "ListModels", listModelsMethod)
+		r.AddMethod("ModelManager", 3, "ModelInfo", modelInfoMethod)
+		r.AddMethod("ModelManager", 3, "ModelStatus", modelStatusMethod)
+		r.AddMethod("ModelManager", 3, "ModifyModelAccess", modifyModelAccessMethod)
+
+		r.AddMethod("ModelManager", 4, "CreateModel", createModelMethod)
+		r.AddMethod("ModelManager", 4, "DestroyModels", destroyModelsV4Method)
+		r.AddMethod("ModelManager", 4, "DumpModels", dumpModelsV3Method)
+		r.AddMethod("ModelManager", 4, "DumpModelsDB", dumpModelsDBMethod)
+		r.AddMethod("ModelManager", 4, "ListModelSummaries", listModelSummariesMethod)
+		r.AddMethod("ModelManager", 4, "ListModels", listModelsMethod)
+		r.AddMethod("ModelManager", 4, "ModelInfo", modelInfoMethod)
+		r.AddMethod("ModelManager", 4, "ModelStatus", modelStatusMethod)
+		r.AddMethod("ModelManager", 4, "ModifyModelAccess", modifyModelAccessMethod)
+
+		r.AddMethod("ModelManager", 5, "ChangeModelCredential", changeModelCredentialMethod)
+		r.AddMethod("ModelManager", 5, "CreateModel", createModelMethod)
+		r.AddMethod("ModelManager", 5, "DestroyModels", destroyModelsV4Method)
+		r.AddMethod("ModelManager", 5, "DumpModels", dumpModelsV3Method)
+		r.AddMethod("ModelManager", 5, "DumpModelsDB", dumpModelsDBMethod)
+		r.AddMethod("ModelManager", 5, "ListModelSummaries", listModelSummariesMethod)
+		r.AddMethod("ModelManager", 5, "ListModels", listModelsMethod)
+		r.AddMethod("ModelManager", 5, "ModelInfo", modelInfoMethod)
+		r.AddMethod("ModelManager", 5, "ModelStatus", modelStatusMethod)
+		r.AddMethod("ModelManager", 5, "ModifyModelAccess", modifyModelAccessMethod)
+
+		return []int{2, 3, 4, 5}
+	}
 }
 
 // DumpModels implements the DumpModels method of the modelmanager (v2)
 // facade. The model dump is passed back as-is from the controller
 // without any changes from JIMM.
-func (m modelManagerV2) DumpModels(ctx context.Context, args jujuparams.Entities) jujuparams.MapResults {
+func (r *controllerRoot) DumpModels(ctx context.Context, args jujuparams.Entities) jujuparams.MapResults {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, m.root.identity)
+	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.MapResult, len(args.Entities))
 	for i, ent := range args.Entities {
-		err := m.root.modelWithConnection(
+		err := r.modelWithConnection(
 			ctx,
 			ent.Tag,
 			auth.CheckIsAdmin,
@@ -62,18 +108,7 @@ func (m modelManagerV2) DumpModels(ctx context.Context, args jujuparams.Entities
 	}
 }
 
-// ModelManagerV3 returns an implementation of the ModelManager facade
-// (version 3).
-func (r *controllerRoot) ModelManagerV3(id string) (modelManagerV3, error) {
-	mm, err := r.ModelManagerAPI(id)
-	return modelManagerV3{mm}, err
-}
-
-type modelManagerV3 struct {
-	modelManagerAPI
-}
-
-func (m modelManagerV3) DestroyModels(ctx context.Context, args jujuparams.Entities) (jujuparams.ErrorResults, error) {
+func (r *controllerRoot) DestroyModels(ctx context.Context, args jujuparams.Entities) (jujuparams.ErrorResults, error) {
 	// This is the default behviour for model manager V3 and below.
 	destroyStorage := true
 	models := make([]jujuparams.DestroyModelParams, len(args.Entities))
@@ -83,33 +118,18 @@ func (m modelManagerV3) DestroyModels(ctx context.Context, args jujuparams.Entit
 			DestroyStorage: &destroyStorage,
 		}
 	}
-	return m.modelManagerAPI.DestroyModels(ctx, jujuparams.DestroyModelsParams{models})
-}
-
-// ModelManagerAPI returns an implementation of the latest ModelManager
-// facade.
-func (r *controllerRoot) ModelManagerAPI(id string) (modelManagerAPI, error) {
-	if id != "" {
-		// Safeguard id for possible future use.
-		return modelManagerAPI{}, common.ErrBadId
-	}
-	return modelManagerAPI{r}, nil
-}
-
-// modelManagerAPI implements the latest ModelManager facade.
-type modelManagerAPI struct {
-	root *controllerRoot
+	return r.DestroyModelsV4(ctx, jujuparams.DestroyModelsParams{models})
 }
 
 // ListModelSummaries returns summaries for all the models that that
 // authenticated user has access to. The request parameter is ignored.
-func (m modelManagerAPI) ListModelSummaries(ctx context.Context, _ jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error) {
-	ctx = auth.ContextWithIdentity(ctx, m.root.identity)
+func (r *controllerRoot) ListModelSummaries(ctx context.Context, _ jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error) {
+	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	var results []jujuparams.ModelSummaryResult
-	err := m.root.doModels(ctx, func(ctx context.Context, model *mongodoc.Model) error {
+	err := r.doModels(ctx, func(ctx context.Context, model *mongodoc.Model) error {
 		if model.ProviderType == "" {
 			var err error
-			model.ProviderType, err = m.root.jem.DB.ProviderType(ctx, model.Cloud)
+			model.ProviderType, err = r.jem.DB.ProviderType(ctx, model.Cloud)
 			if err != nil {
 				results = append(results, jujuparams.ModelSummaryResult{
 					Error: mapError(errgo.Notef(err, "cannot get cloud %q", model.Cloud)),
@@ -120,14 +140,14 @@ func (m modelManagerAPI) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 		// If we get this far the user must have at least read access.
 		access := jujuparams.ModelReadAccess
 		switch {
-		case params.User(m.root.identity.Id()) == model.Path.User:
+		case params.User(r.identity.Id()) == model.Path.User:
 			access = jujuparams.ModelAdminAccess
-		case auth.CheckACL(ctx, m.root.identity, model.ACL.Admin) == nil:
+		case auth.CheckACL(ctx, r.identity, model.ACL.Admin) == nil:
 			access = jujuparams.ModelAdminAccess
-		case auth.CheckACL(ctx, m.root.identity, model.ACL.Write) == nil:
+		case auth.CheckACL(ctx, r.identity, model.ACL.Write) == nil:
 			access = jujuparams.ModelWriteAccess
 		}
-		machines, err := m.root.jem.DB.MachinesForModel(ctx, model.UUID)
+		machines, err := r.jem.DB.MachinesForModel(ctx, model.UUID)
 		if err != nil {
 			results = append(results, jujuparams.ModelSummaryResult{
 				Error: mapError(errgo.Notef(err, "cannot get machines for model %q", model.UUID)),
@@ -143,12 +163,12 @@ func (m modelManagerAPI) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 				coreCount += int64(*machine.Info.HardwareCharacteristics.CpuCores)
 			}
 		}
-		r := jujuparams.ModelSummaryResult{
+		result := jujuparams.ModelSummaryResult{
 			Result: &jujuparams.ModelSummary{
 				Name:               string(model.Path.Name),
 				Type:               model.Type,
 				UUID:               model.UUID,
-				ControllerUUID:     m.root.params.ControllerUUID,
+				ControllerUUID:     r.params.ControllerUUID,
 				ProviderType:       model.ProviderType,
 				DefaultSeries:      model.DefaultSeries,
 				CloudTag:           conv.ToCloudTag(model.Cloud).String(),
@@ -175,15 +195,15 @@ func (m modelManagerAPI) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 				AgentVersion: modelVersion(ctx, model.Info),
 			},
 		}
-		if !m.root.controllerUUIDMasking {
-			c, err := m.root.jem.DB.Controller(ctx, model.Controller)
+		if !r.controllerUUIDMasking {
+			c, err := r.jem.DB.Controller(ctx, model.Controller)
 			if err != nil {
 				return errgo.Notef(err, "failed to fetch controller: %v", model.Controller)
 			}
-			r.Result.ControllerUUID = c.UUID
+			result.Result.ControllerUUID = c.UUID
 		}
 
-		results = append(results, r)
+		results = append(results, result)
 		return nil
 	})
 	if err != nil {
@@ -196,22 +216,22 @@ func (m modelManagerAPI) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 
 // ListModels returns the models that the authenticated user
 // has access to. The user parameter is ignored.
-func (m modelManagerAPI) ListModels(ctx context.Context, _ jujuparams.Entity) (jujuparams.UserModelList, error) {
-	ctx = auth.ContextWithIdentity(ctx, m.root.identity)
-	return m.root.allModels(ctx)
+func (r *controllerRoot) ListModels(ctx context.Context, _ jujuparams.Entity) (jujuparams.UserModelList, error) {
+	ctx = auth.ContextWithIdentity(ctx, r.identity)
+	return r.allModels(ctx)
 }
 
 // ModelInfo implements the ModelManager facade's ModelInfo method.
-func (m modelManagerAPI) ModelInfo(ctx context.Context, args jujuparams.Entities) (jujuparams.ModelInfoResults, error) {
+func (r *controllerRoot) ModelInfo(ctx context.Context, args jujuparams.Entities) (jujuparams.ModelInfoResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, m.root.identity)
+	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.ModelInfoResult, len(args.Entities))
 	run := parallel.NewRun(maxRequestConcurrency)
 	for i, arg := range args.Entities {
 		i, arg := i, arg
 		run.Do(func() error {
-			mi, err := m.root.modelInfo(ctx, arg, len(args.Entities) != 1)
+			mi, err := r.modelInfo(ctx, arg, len(args.Entities) != 1)
 			if err != nil {
 				results[i].Error = mapError(err)
 			} else {
@@ -227,11 +247,11 @@ func (m modelManagerAPI) ModelInfo(ctx context.Context, args jujuparams.Entities
 }
 
 // CreateModel implements the ModelManager facade's CreateModel method.
-func (m modelManagerAPI) CreateModel(ctx context.Context, args jujuparams.ModelCreateArgs) (jujuparams.ModelInfo, error) {
+func (r *controllerRoot) CreateModel(ctx context.Context, args jujuparams.ModelCreateArgs) (jujuparams.ModelInfo, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, m.root.identity)
-	mi, err := m.createModel(ctx, args)
+	ctx = auth.ContextWithIdentity(ctx, r.identity)
+	mi, err := r.createModel(ctx, args)
 	if err == nil {
 		servermon.ModelsCreatedCount.Inc()
 	} else {
@@ -247,7 +267,7 @@ func (m modelManagerAPI) CreateModel(ctx context.Context, args jujuparams.ModelC
 	return *mi, nil
 }
 
-func (m modelManagerAPI) createModel(ctx context.Context, args jujuparams.ModelCreateArgs) (*jujuparams.ModelInfo, error) {
+func (r *controllerRoot) createModel(ctx context.Context, args jujuparams.ModelCreateArgs) (*jujuparams.ModelInfo, error) {
 	ownerTag, err := names.ParseUserTag(args.OwnerTag)
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid owner tag")
@@ -276,7 +296,7 @@ func (m modelManagerAPI) createModel(ctx context.Context, args jujuparams.ModelC
 			Name:  params.CredentialName(tag.Name()),
 		}
 	}
-	model, err := m.root.jem.CreateModel(ctx, jem.CreateModelParams{
+	model, err := r.jem.CreateModel(ctx, jem.CreateModelParams{
 		Path:       params.EntityPath{User: owner, Name: params.Name(args.Name)},
 		Credential: credPath,
 		Cloud:      cloud,
@@ -286,7 +306,7 @@ func (m modelManagerAPI) createModel(ctx context.Context, args jujuparams.ModelC
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	info, err := m.root.modelDocToModelInfo(ctx, model)
+	info, err := r.modelDocToModelInfo(ctx, model)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -294,15 +314,16 @@ func (m modelManagerAPI) createModel(ctx context.Context, args jujuparams.ModelC
 	return info, nil
 }
 
-// DestroyModels implements the ModelManager facade's DestroyModels method.
-func (m modelManagerAPI) DestroyModels(ctx context.Context, args jujuparams.DestroyModelsParams) (jujuparams.ErrorResults, error) {
+// DestroyModelsV4 implements the ModelManager facade's DestroyModels
+// method used in version 4 onwards.
+func (r *controllerRoot) DestroyModelsV4(ctx context.Context, args jujuparams.DestroyModelsParams) (jujuparams.ErrorResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, m.root.identity)
+	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.ErrorResult, len(args.Models))
 
 	for i, model := range args.Models {
-		if err := m.destroyModel(ctx, model); err != nil {
+		if err := r.destroyModel(ctx, model); err != nil {
 			results[i].Error = mapError(err)
 		}
 	}
@@ -313,8 +334,8 @@ func (m modelManagerAPI) DestroyModels(ctx context.Context, args jujuparams.Dest
 }
 
 // destroyModel destroys the specified model.
-func (m modelManagerAPI) destroyModel(ctx context.Context, arg jujuparams.DestroyModelParams) error {
-	model, err := getModel(ctx, m.root.jem, arg.ModelTag, auth.CheckIsAdmin)
+func (r *controllerRoot) destroyModel(ctx context.Context, arg jujuparams.DestroyModelParams) error {
+	model, err := getModel(ctx, r.jem, arg.ModelTag, auth.CheckIsAdmin)
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			// Juju doesn't treat removing a model that isn't there as an error, and neither should we.
@@ -322,12 +343,12 @@ func (m modelManagerAPI) destroyModel(ctx context.Context, arg jujuparams.Destro
 		}
 		return errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
 	}
-	conn, err := m.root.jem.OpenAPI(ctx, model.Controller)
+	conn, err := r.jem.OpenAPI(ctx, model.Controller)
 	if err != nil {
 		return errgo.Mask(err)
 	}
 	defer conn.Close()
-	if err := m.root.jem.DestroyModel(ctx, conn, model, arg.DestroyStorage, arg.Force, arg.MaxWait); err != nil {
+	if err := r.jem.DestroyModel(ctx, conn, model, arg.DestroyStorage, arg.Force, arg.MaxWait); err != nil {
 		return errgo.Mask(err, jujuparams.IsCodeHasPersistentStorage)
 	}
 	age := float64(time.Now().Sub(model.CreationTime)) / float64(time.Hour)
@@ -337,13 +358,13 @@ func (m modelManagerAPI) destroyModel(ctx context.Context, arg jujuparams.Destro
 }
 
 // ModifyModelAccess implements the ModelManager facade's ModifyModelAccess method.
-func (m modelManagerAPI) ModifyModelAccess(ctx context.Context, args jujuparams.ModifyModelAccessRequest) (jujuparams.ErrorResults, error) {
+func (r *controllerRoot) ModifyModelAccess(ctx context.Context, args jujuparams.ModifyModelAccessRequest) (jujuparams.ErrorResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, m.root.identity)
+	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.ErrorResult, len(args.Changes))
 	for i, change := range args.Changes {
-		err := m.modifyModelAccess(ctx, change)
+		err := r.modifyModelAccess(ctx, change)
 		if err != nil {
 			results[i].Error = mapError(err)
 		}
@@ -353,8 +374,8 @@ func (m modelManagerAPI) ModifyModelAccess(ctx context.Context, args jujuparams.
 	}, nil
 }
 
-func (m modelManagerAPI) modifyModelAccess(ctx context.Context, change jujuparams.ModifyModelAccess) error {
-	model, err := getModel(ctx, m.root.jem, change.ModelTag, auth.CheckIsAdmin)
+func (r *controllerRoot) modifyModelAccess(ctx context.Context, change jujuparams.ModifyModelAccess) error {
+	model, err := getModel(ctx, r.jem, change.ModelTag, auth.CheckIsAdmin)
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			err = params.ErrUnauthorized
@@ -369,16 +390,16 @@ func (m modelManagerAPI) modifyModelAccess(ctx context.Context, change jujuparam
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
-	conn, err := m.root.jem.OpenAPI(ctx, model.Controller)
+	conn, err := r.jem.OpenAPI(ctx, model.Controller)
 	if err != nil {
 		return errgo.Mask(err)
 	}
 	defer conn.Close()
 	switch change.Action {
 	case jujuparams.GrantModelAccess:
-		err = m.root.jem.GrantModel(ctx, conn, model, user, string(change.Access))
+		err = r.jem.GrantModel(ctx, conn, model, user, string(change.Access))
 	case jujuparams.RevokeModelAccess:
-		err = m.root.jem.RevokeModel(ctx, conn, model, user, string(change.Access))
+		err = r.jem.RevokeModel(ctx, conn, model, user, string(change.Access))
 	default:
 		return errgo.WithCausef(err, params.ErrBadRequest, "invalid action %q", change.Action)
 	}
@@ -388,16 +409,16 @@ func (m modelManagerAPI) modifyModelAccess(ctx context.Context, change jujuparam
 	return nil
 }
 
-// DumpModels implements the modelmanager facades DumpModels API. The
-// model dump is passed back as-is from the controller without any
-// changes from JIMM.
-func (m modelManagerAPI) DumpModels(ctx context.Context, args jujuparams.DumpModelRequest) jujuparams.StringResults {
+// DumpModelsV3 implements the ModelManager (version 3 onwards) facade's
+// DumpModels API. The model dump is passed back as-is from the
+// controller without any changes from JIMM.
+func (r *controllerRoot) DumpModelsV3(ctx context.Context, args jujuparams.DumpModelRequest) jujuparams.StringResults {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, m.root.identity)
+	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.StringResult, len(args.Entities))
 	for i, ent := range args.Entities {
-		err := m.root.modelWithConnection(
+		err := r.modelWithConnection(
 			ctx,
 			ent.Tag,
 			auth.CheckIsAdmin,
@@ -420,13 +441,13 @@ func (m modelManagerAPI) DumpModels(ctx context.Context, args jujuparams.DumpMod
 // DumpModelsDB implements the modelmanager facades DumpModelsDB API. The
 // model dump is passed back as-is from the controller without any
 // changes from JIMM.
-func (m modelManagerAPI) DumpModelsDB(ctx context.Context, args jujuparams.Entities) jujuparams.MapResults {
+func (r *controllerRoot) DumpModelsDB(ctx context.Context, args jujuparams.Entities) jujuparams.MapResults {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, m.root.identity)
+	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.MapResult, len(args.Entities))
 	for i, ent := range args.Entities {
-		err := m.root.modelWithConnection(
+		err := r.modelWithConnection(
 			ctx,
 			ent.Tag,
 			auth.CheckIsAdmin,
@@ -447,32 +468,23 @@ func (m modelManagerAPI) DumpModelsDB(ctx context.Context, args jujuparams.Entit
 	}
 }
 
-// ModelStatus implements the ModelManager facade's ModelStatus method.
-func (m modelManagerAPI) ModelStatus(ctx context.Context, req jujuparams.Entities) (jujuparams.ModelStatusResults, error) {
-	v3, err := m.root.ControllerV3("")
-	if err != nil {
-		return jujuparams.ModelStatusResults{}, errgo.Mask(err)
-	}
-	return v3.ModelStatus(ctx, req)
-}
-
 // ChangeModelCredential implements the ModelManager (v5) facade's
 // ChangeModelCredential method.
-func (m modelManagerAPI) ChangeModelCredential(ctx context.Context, args jujuparams.ChangeModelCredentialsParams) (jujuparams.ErrorResults, error) {
+func (r *controllerRoot) ChangeModelCredential(ctx context.Context, args jujuparams.ChangeModelCredentialsParams) (jujuparams.ErrorResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, m.root.identity)
+	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.ErrorResult, len(args.Models))
 	for i, arg := range args.Models {
-		results[i].Error = mapError(m.changeModelCredential(ctx, arg))
+		results[i].Error = mapError(r.changeModelCredential(ctx, arg))
 	}
 	return jujuparams.ErrorResults{
 		Results: results,
 	}, nil
 }
 
-func (m modelManagerAPI) changeModelCredential(ctx context.Context, arg jujuparams.ChangeModelCredentialParams) error {
-	model, err := getModel(ctx, m.root.jem, arg.ModelTag, auth.CheckIsAdmin)
+func (r *controllerRoot) changeModelCredential(ctx context.Context, arg jujuparams.ChangeModelCredentialParams) error {
+	model, err := getModel(ctx, r.jem, arg.ModelTag, auth.CheckIsAdmin)
 	if err != nil {
 		return errgo.Mask(
 			err,
@@ -481,7 +493,7 @@ func (m modelManagerAPI) changeModelCredential(ctx context.Context, arg jujupara
 			errgo.Is(params.ErrNotFound),
 		)
 	}
-	conn, err := m.root.jem.OpenAPI(ctx, model.Controller)
+	conn, err := r.jem.OpenAPI(ctx, model.Controller)
 	if err != nil {
 		return errgo.Mask(err)
 	}
@@ -498,11 +510,11 @@ func (m modelManagerAPI) changeModelCredential(ctx context.Context, arg jujupara
 		User:  credUser,
 		Name:  params.CredentialName(credTag.Name()),
 	}
-	cred, err := m.root.jem.Credential(ctx, credPath)
+	cred, err := r.jem.Credential(ctx, credPath)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	if err := m.root.jem.UpdateModelCredential(ctx, conn, model, cred); err != nil {
+	if err := r.jem.UpdateModelCredential(ctx, conn, model, cred); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil
