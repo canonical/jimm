@@ -12,59 +12,103 @@ import (
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
 	jimmversion "github.com/CanonicalLtd/jimm/version"
 )
 
-type controllerV3 struct {
-	*controllerRoot
-}
+func init() {
+	facadeInit["Controller"] = func(r *controllerRoot) []int {
+		allModelsMethod := rpc.Method(r.AllModels)
+		configSetMethod := rpc.Method(r.ConfigSet)
+		controllerConfigMethod := rpc.Method(r.ControllerConfig)
+		controllerVersionMethod := rpc.Method(r.ControllerVersion)
+		identityProviderURLMethod := rpc.Method(r.IdentityProviderURL)
+		modelConfigMethod := rpc.Method(r.ModelConfig)
+		modelStatusMethod := rpc.Method(r.ModelStatus)
+		mongoVersionMethod := rpc.Method(r.MongoVersion)
+		watchModelSummariesMethod := rpc.Method(r.WatchModelSummaries)
 
-type controllerV4 struct {
-	*controllerV3
-}
+		r.AddMethod("Controller", 3, "AllModels", allModelsMethod)
+		r.AddMethod("Controller", 3, "ControllerConfig", controllerConfigMethod)
+		r.AddMethod("Controller", 3, "ModelConfig", modelConfigMethod)
+		r.AddMethod("Controller", 3, "ModelStatus", modelStatusMethod)
 
-type controllerV5 struct {
-	*controllerV4
+		r.AddMethod("Controller", 4, "AllModels", allModelsMethod)
+		r.AddMethod("Controller", 4, "ControllerConfig", controllerConfigMethod)
+		r.AddMethod("Controller", 4, "ModelConfig", modelConfigMethod)
+		r.AddMethod("Controller", 4, "ModelStatus", modelStatusMethod)
+
+		r.AddMethod("Controller", 5, "AllModels", allModelsMethod)
+		r.AddMethod("Controller", 5, "ConfigSet", configSetMethod)
+		r.AddMethod("Controller", 5, "ControllerConfig", controllerConfigMethod)
+		r.AddMethod("Controller", 5, "ModelConfig", modelConfigMethod)
+		r.AddMethod("Controller", 5, "ModelStatus", modelStatusMethod)
+
+		r.AddMethod("Controller", 6, "AllModels", allModelsMethod)
+		r.AddMethod("Controller", 6, "ConfigSet", configSetMethod)
+		r.AddMethod("Controller", 6, "ControllerConfig", controllerConfigMethod)
+		r.AddMethod("Controller", 6, "ModelConfig", modelConfigMethod)
+		r.AddMethod("Controller", 6, "ModelStatus", modelStatusMethod)
+		r.AddMethod("Controller", 6, "MongoVersion", mongoVersionMethod)
+
+		r.AddMethod("Controller", 7, "AllModels", allModelsMethod)
+		r.AddMethod("Controller", 7, "ConfigSet", configSetMethod)
+		r.AddMethod("Controller", 7, "ControllerConfig", controllerConfigMethod)
+		r.AddMethod("Controller", 7, "IdentityProviderURL", identityProviderURLMethod)
+		r.AddMethod("Controller", 7, "ModelConfig", modelConfigMethod)
+		r.AddMethod("Controller", 7, "ModelStatus", modelStatusMethod)
+		r.AddMethod("Controller", 7, "MongoVersion", mongoVersionMethod)
+
+		r.AddMethod("Controller", 8, "AllModels", allModelsMethod)
+		r.AddMethod("Controller", 8, "ConfigSet", configSetMethod)
+		r.AddMethod("Controller", 8, "ControllerConfig", controllerConfigMethod)
+		r.AddMethod("Controller", 8, "ControllerVersion", controllerVersionMethod)
+		r.AddMethod("Controller", 8, "IdentityProviderURL", identityProviderURLMethod)
+		r.AddMethod("Controller", 8, "ModelConfig", modelConfigMethod)
+		r.AddMethod("Controller", 8, "ModelStatus", modelStatusMethod)
+		r.AddMethod("Controller", 8, "MongoVersion", mongoVersionMethod)
+
+		r.AddMethod("Controller", 9, "AllModels", allModelsMethod)
+		r.AddMethod("Controller", 9, "ConfigSet", configSetMethod)
+		r.AddMethod("Controller", 9, "ControllerConfig", controllerConfigMethod)
+		r.AddMethod("Controller", 9, "ControllerVersion", controllerVersionMethod)
+		r.AddMethod("Controller", 9, "IdentityProviderURL", identityProviderURLMethod)
+		r.AddMethod("Controller", 9, "ModelConfig", modelConfigMethod)
+		r.AddMethod("Controller", 9, "ModelStatus", modelStatusMethod)
+		r.AddMethod("Controller", 9, "MongoVersion", mongoVersionMethod)
+		r.AddMethod("Controller", 9, "WatchModelSummaries", watchModelSummariesMethod)
+
+		return []int{3, 4, 5, 6, 7, 8, 9}
+	}
 }
 
 // ConfigSet changes the value of specified controller configuration
 // settings. Only some settings can be changed after bootstrap.
 // JIMM does not support changing settings via ConfigSet.
-func (c controllerV5) ConfigSet(ctx context.Context, args jujuparams.ControllerConfigSet) error {
+func (r *controllerRoot) ConfigSet(ctx context.Context, args jujuparams.ControllerConfigSet) error {
 	return nil
 }
 
-type controllerV6 struct {
-	*controllerV5
-}
-
 // MongoVersion allows the introspection of the mongo version per controller.
-func (c controllerV6) MongoVersion(ctx context.Context) (jujuparams.StringResult, error) {
-	return c.jem.MongoVersion(ctx)
-}
-
-type controllerV7 struct {
-	*controllerV6
+func (r *controllerRoot) MongoVersion(ctx context.Context) (jujuparams.StringResult, error) {
+	return r.jem.MongoVersion(ctx)
 }
 
 // IdentityProviderURL returns the URL of the configured external identity
 // provider for this controller or an empty string if no external identity
 // provider has been configured when the controller was bootstrapped.
-func (c controllerV7) IdentityProviderURL(ctx context.Context) (jujuparams.StringResult, error) {
+func (r *controllerRoot) IdentityProviderURL(ctx context.Context) (jujuparams.StringResult, error) {
 	return jujuparams.StringResult{
-		Result: c.params.IdentityLocation,
+		Result: r.params.IdentityLocation,
 	}, nil
-}
-
-type controllerV8 struct {
-	*controllerV7
 }
 
 // ControllerVersion returns the version information associated with this
 // controller binary.
-func (c controllerV8) ControllerVersion(ctx context.Context) (jujuparams.ControllerVersionResults, error) {
-	srvVersion, err := c.jem.EarliestControllerVersion(ctx)
+func (r *controllerRoot) ControllerVersion(ctx context.Context) (jujuparams.ControllerVersionResults, error) {
+	srvVersion, err := r.jem.EarliestControllerVersion(ctx)
 	if err != nil {
 		return jujuparams.ControllerVersionResults{}, errgo.Mask(err)
 	}
@@ -75,40 +119,65 @@ func (c controllerV8) ControllerVersion(ctx context.Context) (jujuparams.Control
 	return result, nil
 }
 
-type controllerV9 struct {
-	*controllerV8
+func (r *controllerRoot) WatchModelSummaries(ctx context.Context) (jujuparams.SummaryWatcherID, error) {
+	// TODO(mhilton) move this somewhere where it will be reused accross connections
+	r.mu.Lock()
+	if r.generator == nil {
+		var err error
+		r.generator, err = fastuuid.NewGenerator()
+		r.mu.Unlock()
+		if err != nil {
+			return jujuparams.SummaryWatcherID{}, errgo.Mask(err)
+		}
+	} else {
+		r.mu.Unlock()
+	}
 
-	generator *fastuuid.Generator
-}
+	id := fmt.Sprintf("%v", r.generator.Next())
 
-func (c controllerV9) WatchModelSummaries(ctx context.Context) (jujuparams.SummaryWatcherID, error) {
-	id := fmt.Sprintf("%v", c.generator.Next())
-
-	watcher, err := newModelSummaryWatcher(auth.ContextWithIdentity(ctx, c.identity), id, c.controllerRoot, c.jem.Pubsub())
+	watcher, err := newModelSummaryWatcher(auth.ContextWithIdentity(ctx, r.identity), id, r, r.jem.Pubsub())
 	if err != nil {
 		return jujuparams.SummaryWatcherID{}, errgo.Mask(err)
 	}
-	c.watchers.register(watcher)
+	r.watchers.register(watcher)
 
 	return jujuparams.SummaryWatcherID{
 		WatcherID: id,
 	}, nil
 }
 
-func (c *controllerV3) AllModels(ctx context.Context) (jujuparams.UserModelList, error) {
-	ctx = auth.ContextWithIdentity(ctx, c.identity)
-	return c.allModels(ctx)
+func (r *controllerRoot) AllModels(ctx context.Context) (jujuparams.UserModelList, error) {
+	ctx = auth.ContextWithIdentity(ctx, r.identity)
+	return r.allModels(ctx)
 }
 
-func (c *controllerV3) ModelStatus(ctx context.Context, args jujuparams.Entities) (jujuparams.ModelStatusResults, error) {
+// allModels returns all the models the logged in user has access to.
+func (r *controllerRoot) allModels(ctx context.Context) (jujuparams.UserModelList, error) {
+	var models []jujuparams.UserModel
+	err := r.doModels(ctx, func(ctx context.Context, model *mongodoc.Model) error {
+		models = append(models, jujuparams.UserModel{
+			Model:          userModelForModelDoc(model),
+			LastConnection: nil, // TODO (mhilton) work out how to record and set this.
+		})
+		return nil
+	})
+	if err != nil {
+		return jujuparams.UserModelList{}, errgo.Mask(err)
+	}
+	return jujuparams.UserModelList{
+		UserModels: models,
+	}, nil
+}
+
+func (r *controllerRoot) ModelStatus(ctx context.Context, args jujuparams.Entities) (jujuparams.ModelStatusResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, c.identity)
+	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.ModelStatus, len(args.Entities))
 	// TODO (fabricematrat) get status for all of the models connected
 	// to a single controller in one go.
 	for i, arg := range args.Entities {
-		mi, err := c.modelStatus(ctx, arg)
+		mi, err := r.modelStatus(ctx, arg)
 		if err != nil {
 			return jujuparams.ModelStatusResults{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 		}
@@ -121,8 +190,8 @@ func (c *controllerV3) ModelStatus(ctx context.Context, args jujuparams.Entities
 }
 
 // modelStatus retrieves the model status for the specified entity.
-func (c *controllerV3) modelStatus(ctx context.Context, arg jujuparams.Entity) (*jujuparams.ModelStatus, error) {
-	mi, err := c.modelInfo(ctx, arg, false)
+func (r *controllerRoot) modelStatus(ctx context.Context, arg jujuparams.Entity) (*jujuparams.ModelStatus, error) {
+	mi, err := r.modelInfo(ctx, arg, false)
 	if err != nil {
 		return &jujuparams.ModelStatus{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
@@ -137,11 +206,11 @@ func (c *controllerV3) modelStatus(ctx context.Context, arg jujuparams.Entity) (
 }
 
 // ControllerConfig returns the controller's configuration.
-func (c *controllerV3) ControllerConfig() (jujuparams.ControllerConfigResult, error) {
+func (r *controllerRoot) ControllerConfig() (jujuparams.ControllerConfigResult, error) {
 	result := jujuparams.ControllerConfigResult{
 		Config: map[string]interface{}{
-			"charmstore-url": c.params.CharmstoreLocation,
-			"metering-url":   c.params.MeteringLocation,
+			"charmstore-url": r.params.CharmstoreLocation,
+			"metering-url":   r.params.MeteringLocation,
 		},
 	}
 	return result, nil
@@ -150,7 +219,7 @@ func (c *controllerV3) ControllerConfig() (jujuparams.ControllerConfigResult, er
 // ModelConfig returns implements the controller facade's ModelConfig
 // method. This always returns a permission error, as no user has admin
 // access to the controller.
-func (c *controllerV3) ModelConfig() (jujuparams.ModelConfigResults, error) {
+func (r *controllerRoot) ModelConfig() (jujuparams.ModelConfigResults, error) {
 	return jujuparams.ModelConfigResults{}, &jujuparams.Error{
 		Code:    jujuparams.CodeUnauthorized,
 		Message: "permission denied",

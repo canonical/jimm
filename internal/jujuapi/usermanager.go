@@ -12,42 +12,58 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
-// userManager implements the UserManager facade.
-type userManager struct {
-	root *controllerRoot
+func init() {
+	facadeInit["UserManager"] = func(r *controllerRoot) []int {
+		addUserMethod := rpc.Method(r.AddUser)
+		disableUserMethod := rpc.Method(r.EnableUser)
+		enableUserMethod := rpc.Method(r.DisableUser)
+		removeUserMethod := rpc.Method(r.RemoveUser)
+		setPasswordMethod := rpc.Method(r.SetPassword)
+		userInfoMethod := rpc.Method(r.UserInfo)
+
+		r.AddMethod("UserManager", 1, "AddUser", addUserMethod)
+		r.AddMethod("UserManager", 1, "DisableUser", disableUserMethod)
+		r.AddMethod("UserManager", 1, "EnableUser", enableUserMethod)
+		r.AddMethod("UserManager", 1, "RemoveUser", removeUserMethod)
+		r.AddMethod("UserManager", 1, "SetPassword", setPasswordMethod)
+		r.AddMethod("UserManager", 1, "UserInfo", userInfoMethod)
+
+		return []int{1}
+	}
 }
 
 // AddUser implements the UserManager facade's AddUser method.
-func (u userManager) AddUser(args jujuparams.AddUsers) (jujuparams.AddUserResults, error) {
+func (r *controllerRoot) AddUser(args jujuparams.AddUsers) (jujuparams.AddUserResults, error) {
 	return jujuparams.AddUserResults{}, params.ErrUnauthorized
 }
 
 // RemoveUser implements the UserManager facade's RemoveUser method.
-func (u userManager) RemoveUser(jujuparams.Entities) (jujuparams.ErrorResults, error) {
+func (r *controllerRoot) RemoveUser(jujuparams.Entities) (jujuparams.ErrorResults, error) {
 	return jujuparams.ErrorResults{}, params.ErrUnauthorized
 }
 
 // EnableUser implements the UserManager facade's EnableUser method.
-func (u userManager) EnableUser(jujuparams.Entities) (jujuparams.ErrorResults, error) {
+func (r *controllerRoot) EnableUser(jujuparams.Entities) (jujuparams.ErrorResults, error) {
 	return jujuparams.ErrorResults{}, params.ErrUnauthorized
 }
 
 // DisableUser implements the UserManager facade's DisableUser method.
-func (u userManager) DisableUser(jujuparams.Entities) (jujuparams.ErrorResults, error) {
+func (r *controllerRoot) DisableUser(jujuparams.Entities) (jujuparams.ErrorResults, error) {
 	return jujuparams.ErrorResults{}, params.ErrUnauthorized
 }
 
 // UserInfo implements the UserManager facade's UserInfo method.
-func (u userManager) UserInfo(ctx context.Context, req jujuparams.UserInfoRequest) (jujuparams.UserInfoResults, error) {
-	ctx = auth.ContextWithIdentity(ctx, u.root.identity)
+func (r *controllerRoot) UserInfo(ctx context.Context, req jujuparams.UserInfoRequest) (jujuparams.UserInfoResults, error) {
+	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	res := jujuparams.UserInfoResults{
 		Results: make([]jujuparams.UserInfoResult, len(req.Entities)),
 	}
 	for i, ent := range req.Entities {
-		ui, err := u.userInfo(ctx, ent.Tag)
+		ui, err := r.userInfo(ctx, ent.Tag)
 		if err != nil {
 			res.Results[i].Error = mapError(err)
 			continue
@@ -57,7 +73,7 @@ func (u userManager) UserInfo(ctx context.Context, req jujuparams.UserInfoReques
 	return res, nil
 }
 
-func (u userManager) userInfo(ctx context.Context, entity string) (*jujuparams.UserInfo, error) {
+func (r *controllerRoot) userInfo(ctx context.Context, entity string) (*jujuparams.UserInfo, error) {
 	userTag, err := names.ParseUserTag(entity)
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid user tag")
@@ -66,13 +82,13 @@ func (u userManager) userInfo(ctx context.Context, entity string) (*jujuparams.U
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
-	if u.root.identity.Id() != string(user) {
+	if r.identity.Id() != string(user) {
 		return nil, params.ErrUnauthorized
 	}
-	return u.currentUser(u.root.identity)
+	return r.currentUser(r.identity)
 }
 
-func (u userManager) currentUser(id identchecker.ACLIdentity) (*jujuparams.UserInfo, error) {
+func (r *controllerRoot) currentUser(id identchecker.ACLIdentity) (*jujuparams.UserInfo, error) {
 	userTag := userTag(id.Id())
 	return &jujuparams.UserInfo{
 		// TODO(mhilton) a number of these fields should
@@ -86,6 +102,6 @@ func (u userManager) currentUser(id identchecker.ACLIdentity) (*jujuparams.UserI
 }
 
 // SetPassword implements the UserManager facade's SetPassword method.
-func (u userManager) SetPassword(jujuparams.EntityPasswords) (jujuparams.ErrorResults, error) {
+func (r *controllerRoot) SetPassword(jujuparams.EntityPasswords) (jujuparams.ErrorResults, error) {
 	return jujuparams.ErrorResults{}, params.ErrUnauthorized
 }

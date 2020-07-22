@@ -11,6 +11,7 @@ require (
 	github.com/docker/distribution v2.7.0+incompatible // indirect
 	github.com/elazarl/goproxy v0.0.0-20190911111923-ecfe977594f1 // indirect
 	github.com/flosch/pongo2 v0.0.0-20180809100617-24195e6d38b0 // indirect
+	github.com/frankban/quicktest v1.9.0
 	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/google/go-cmp v0.4.0
 	github.com/google/go-querystring v0.0.0-20170111101155-53e6ce116135 // indirect

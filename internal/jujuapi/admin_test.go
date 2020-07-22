@@ -169,35 +169,3 @@ func (s *modelAdminSuite) TestAdminIDFails(c *gc.C) {
 	err := conn.APICall("Admin", 3, "Object ID", "Login", nil, &resp)
 	c.Assert(err, gc.ErrorMatches, "id not found")
 }
-
-func (s *modelAdminSuite) TestUnimplementedMethodFails(c *gc.C) {
-	ctx := context.Background()
-
-	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
-	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
-	modelUUID := mi.UUID
-	conn := s.open(c, &api.Info{
-		ModelTag:  names.NewModelTag(modelUUID),
-		SkipLogin: true,
-	}, "test")
-	defer conn.Close()
-	err := conn.APICall("Admin", 3, "", "Logout", nil, nil)
-	c.Assert(err, gc.ErrorMatches, `no such request - method Admin.Logout is not implemented \(not implemented\)`)
-}
-
-func (s *modelAdminSuite) TestUnimplementedRootFails(c *gc.C) {
-	ctx := context.Background()
-
-	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
-	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
-	modelUUID := mi.UUID
-	conn := s.open(c, &api.Info{
-		ModelTag:  names.NewModelTag(modelUUID),
-		SkipLogin: true,
-	}, "test")
-	defer conn.Close()
-	err := conn.APICall("NoSuch", 1, "", "Method", nil, nil)
-	c.Assert(err, gc.ErrorMatches, `unknown object type "NoSuch" \(not implemented\)`)
-}

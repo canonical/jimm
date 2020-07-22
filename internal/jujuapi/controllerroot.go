@@ -4,22 +4,17 @@ package jujuapi
 
 import (
 	"context"
-	"reflect"
 	"sort"
 	"sync"
 	"time"
 
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
-	"github.com/juju/juju/apiserver/common"
-	"github.com/juju/juju/apiserver/facades/client/bundle"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/life"
-	"github.com/juju/juju/core/permission"
 	jujustatus "github.com/juju/juju/core/status"
 	"github.com/juju/juju/environs"
 	"github.com/juju/juju/environs/config"
-	"github.com/juju/juju/rpc"
 	"github.com/juju/names/v4"
 	"github.com/juju/rpcreflect"
 	"github.com/juju/version"
@@ -33,249 +28,50 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
+	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
-type facade struct {
-	name    string
-	version int
-}
-
-// unauthenticatedfacades contains the list of facade versions supported by
-// this API before the user has authenticated.
-var unauthenticatedFacades = map[facade]string{
-	{"Admin", 3}:  "Admin",
-	{"Pinger", 1}: "Pinger",
-}
-
-// facades contains the list of facade versions supported by
-// this API. The value associated with each key holds the
-// name of the top level method to call on controllerRoot
-// to obtain the facade object.
-var facades = map[facade]string{
-	{"Bundle", 1}:              "Bundle",
-	{"Cloud", 1}:               "CloudV1",
-	{"Cloud", 2}:               "CloudV2",
-	{"Cloud", 3}:               "CloudV3",
-	{"Cloud", 4}:               "CloudV4",
-	{"Cloud", 5}:               "CloudV5",
-	{"Controller", 3}:          "ControllerV3",
-	{"Controller", 4}:          "ControllerV4",
-	{"Controller", 5}:          "ControllerV5",
-	{"Controller", 6}:          "ControllerV6",
-	{"Controller", 7}:          "ControllerV7",
-	{"Controller", 8}:          "ControllerV8",
-	{"Controller", 9}:          "ControllerV9",
-	{"JIMM", 1}:                "JIMMV2",
-	{"JIMM", 2}:                "JIMMV2",
-	{"ModelManager", 2}:        "ModelManagerV2",
-	{"ModelManager", 3}:        "ModelManagerV3",
-	{"ModelManager", 4}:        "ModelManagerAPI",
-	{"ModelManager", 5}:        "ModelManagerAPI",
-	{"Pinger", 1}:              "Pinger",
-	{"UserManager", 1}:         "UserManager",
-	{"ModelSummaryWatcher", 1}: "ModelSummaryWatcher",
-}
-
 // controllerRoot is the root for endpoints served on controller connections.
 type controllerRoot struct {
-	params       jemserver.Params
-	auth         *auth.Authenticator
-	jem          *jem.JEM
-	heartMonitor heartMonitor
+	rpc.Root
 
-	findMethod    func(rootName string, version int, methodName string) (rpcreflect.MethodCaller, error)
+	params        jemserver.Params
+	auth          *auth.Authenticator
+	jem           *jem.JEM
+	heartMonitor  heartMonitor
 	schemataCache map[params.Cloud]map[jujucloud.AuthType]jujucloud.CredentialSchema
-
-	watchers *watcherRegistry
+	watchers      *watcherRegistry
 
 	// mu protects the fields below it
-	mu       sync.Mutex
-	identity identchecker.ACLIdentity
-	facades  map[facade]string
-
+	mu                    sync.Mutex
+	identity              identchecker.ACLIdentity
 	controllerUUIDMasking bool
+	generator             *fastuuid.Generator
 }
 
 func newControllerRoot(jem *jem.JEM, a *auth.Authenticator, p jemserver.Params, hm heartMonitor) *controllerRoot {
+
 	r := &controllerRoot{
 		params:        p,
 		auth:          a,
 		jem:           jem,
 		heartMonitor:  hm,
-		facades:       unauthenticatedFacades,
 		schemataCache: make(map[params.Cloud]map[jujucloud.AuthType]jujucloud.CredentialSchema),
 		watchers: &watcherRegistry{
 			watchers: make(map[string]*modelSummaryWatcher),
 		},
 		controllerUUIDMasking: true,
 	}
-	r.findMethod = rpcreflect.ValueOf(reflect.ValueOf(r)).FindMethod
+
+	r.AddMethod("Admin", 1, "Login", rpc.Method(unsupportedLogin))
+	r.AddMethod("Admin", 2, "Login", rpc.Method(unsupportedLogin))
+	r.AddMethod("Admin", 3, "Login", rpc.Method(r.Login))
+	r.AddMethod("Pinger", 1, "Ping", rpc.Method(ping))
 	return r
-}
-
-// Admin returns an implementation of the Admin facade (version 3).
-func (r *controllerRoot) Admin(id string) (admin, error) {
-	if id != "" {
-		// Safeguard id for possible future use.
-		return admin{}, common.ErrBadId
-	}
-	return admin{r}, nil
-}
-
-// Bundle returns an implementation of the Bundle facade (version 1).
-func (r *controllerRoot) Bundle(id string) (*bundle.APIv1, error) {
-	if id != "" {
-		// Safeguard id for possible future use.
-		return nil, common.ErrBadId
-	}
-	// Use the juju implementation of the Bundle facade.
-	api, err := bundle.NewBundleAPIv1(nil, authorizer{r.identity}, names.NewModelTag(""))
-	return api, errgo.Mask(err)
-}
-
-// Controller returns an implementation of the Controller facade (version 3).
-func (r *controllerRoot) ControllerV3(id string) (controllerV3, error) {
-	if id != "" {
-		// Safeguard id for possible future use.
-		return controllerV3{}, common.ErrBadId
-	}
-	return controllerV3{
-		controllerRoot: r,
-	}, nil
-}
-
-// ControllerV4 returns an implementation of the Controller facade (version 4).
-func (r *controllerRoot) ControllerV4(id string) (controllerV4, error) {
-	if id != "" {
-		// Safeguard id for possible future use.
-		return controllerV4{}, common.ErrBadId
-	}
-	v3, err := r.ControllerV3(id)
-	if err != nil {
-		return controllerV4{}, errgo.Mask(err)
-	}
-	return controllerV4{
-		controllerV3: &v3,
-	}, nil
-}
-
-// ControllerV5 returns an implementation of the Controller facade (version 5).
-func (r *controllerRoot) ControllerV5(id string) (controllerV5, error) {
-	if id != "" {
-		// Safeguard id for possible future use.
-		return controllerV5{}, common.ErrBadId
-	}
-	v4, err := r.ControllerV4(id)
-	if err != nil {
-		return controllerV5{}, errgo.Mask(err)
-	}
-	return controllerV5{
-		controllerV4: &v4,
-	}, nil
-}
-
-// ControllerV6 returns an implementation of the Controller facade (version 6).
-func (r *controllerRoot) ControllerV6(id string) (controllerV6, error) {
-	if id != "" {
-		// Safeguard id for possible future use.
-		return controllerV6{}, common.ErrBadId
-	}
-	v5, err := r.ControllerV5(id)
-	if err != nil {
-		return controllerV6{}, errgo.Mask(err)
-	}
-	return controllerV6{
-		controllerV5: &v5,
-	}, nil
-}
-
-// ControllerV7 returns an implementation of the Controller facade (version 7).
-func (r *controllerRoot) ControllerV7(id string) (controllerV7, error) {
-	if id != "" {
-		// Safeguard id for possible future use.
-		return controllerV7{}, common.ErrBadId
-	}
-	v6, err := r.ControllerV6(id)
-	if err != nil {
-		return controllerV7{}, errgo.Mask(err)
-	}
-	return controllerV7{
-		controllerV6: &v6,
-	}, nil
-}
-
-// ControllerV8 returns an implementation of the Controller facade (version 8).
-func (r *controllerRoot) ControllerV8(id string) (controllerV8, error) {
-	if id != "" {
-		// Safeguard id for possible future use.
-		return controllerV8{}, common.ErrBadId
-	}
-	v7, err := r.ControllerV7(id)
-	if err != nil {
-		return controllerV8{}, errgo.Mask(err)
-	}
-	return controllerV8{
-		controllerV7: &v7,
-	}, nil
-}
-
-// Controller returns an implementation of the Controller facade (version 9).
-func (r *controllerRoot) ControllerV9(id string) (*controllerV9, error) {
-	g, err := fastuuid.NewGenerator()
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	v8, err := r.ControllerV8(id)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	return &controllerV9{
-		controllerV8: &v8,
-		generator:    g,
-	}, nil
-}
-
-// ModelSummaryWatcher returns an implementation fo the model summary watcher
-// corresponding to the specified id.
-func (r *controllerRoot) ModelSummaryWatcher(id string) (*modelSummaryWatcher, error) {
-	w, err := r.watchers.get(id)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-	return w, nil
-}
-
-// JIMMV2 returns an implementation of the V2 JIMM-specific
-// API facade.
-func (r *controllerRoot) JIMMV2(id string) (jimmV2, error) {
-	if id != "" {
-		// Safeguard id for possible future use.
-		return jimmV2{}, common.ErrBadId
-	}
-	return jimmV2{r}, nil
-}
-
-// Pinger returns an implementation of the Pinger facade (version 1).
-func (r *controllerRoot) Pinger(id string) (pinger, error) {
-	if id != "" {
-		// Safeguard id for possible future use.
-		return pinger{}, common.ErrBadId
-	}
-	return pinger{}, nil
-}
-
-// UserManager returns an implementation of the UserManager facade
-// (version 1).
-func (r *controllerRoot) UserManager(id string) (userManager, error) {
-	if id != "" {
-		// Safeguard id for possible future use.
-		return userManager{}, common.ErrBadId
-	}
-	return userManager{r}, nil
 }
 
 // modelWithConnection gets the model with the given model tag, opens a
@@ -322,23 +118,7 @@ func (r *controllerRoot) doModels(ctx context.Context, f func(context.Context, *
 func (r *controllerRoot) FindMethod(rootName string, version int, methodName string) (rpcreflect.MethodCaller, error) {
 	// update the heart monitor for every request received.
 	r.heartMonitor.Heartbeat()
-
-	if rootName == "Admin" && version < 3 {
-		return nil, &rpc.RequestError{
-			Code:    jujuparams.CodeNotSupported,
-			Message: "JIMM does not support login from old clients",
-		}
-	}
-	r.mu.Lock()
-	rn := r.facades[facade{rootName, version}]
-	r.mu.Unlock()
-	if rn == "" {
-		return nil, &rpcreflect.CallNotImplementedError{
-			RootMethod: rootName,
-			Version:    version,
-		}
-	}
-	return r.findMethod(rn, 0, methodName)
+	return r.Root.FindMethod(rootName, version, methodName)
 }
 
 // credentialSchema gets the schema for the credential identified by the
@@ -357,27 +137,6 @@ func (r *controllerRoot) credentialSchema(ctx context.Context, cloud params.Clou
 	}
 	r.schemataCache[cloud] = provider.CredentialSchemas()
 	return r.schemataCache[cloud][jujucloud.AuthType(authType)], nil
-}
-
-// Kill implements rpcreflect.Root.Kill.
-func (r *controllerRoot) Kill() {}
-
-// allModels returns all the models the logged in user has access to.
-func (r *controllerRoot) allModels(ctx context.Context) (jujuparams.UserModelList, error) {
-	var models []jujuparams.UserModel
-	err := r.doModels(ctx, func(ctx context.Context, model *mongodoc.Model) error {
-		models = append(models, jujuparams.UserModel{
-			Model:          userModelForModelDoc(model),
-			LastConnection: nil, // TODO (mhilton) work out how to record and set this.
-		})
-		return nil
-	})
-	if err != nil {
-		return jujuparams.UserModelList{}, errgo.Mask(err)
-	}
-	return jujuparams.UserModelList{
-		UserModels: models,
-	}, nil
 }
 
 func userModelForModelDoc(m *mongodoc.Model) jujuparams.Model {
@@ -762,58 +521,4 @@ func modelVersion(ctx context.Context, info *mongodoc.ModelInfo) *version.Number
 		return nil
 	}
 	return &v
-}
-
-// authorizer implements facade.Authorizer
-type authorizer struct {
-	id identchecker.Identity
-}
-
-func (a authorizer) GetAuthTag() names.Tag {
-	n := a.id.Id()
-	if names.IsValidUserName(n) {
-		return names.NewLocalUserTag(n)
-	}
-	return names.NewUserTag(n)
-}
-
-func (authorizer) AuthController() bool {
-	return false
-}
-
-func (authorizer) AuthMachineAgent() bool {
-	return false
-}
-
-func (authorizer) AuthApplicationAgent() bool {
-	return false
-}
-
-func (authorizer) AuthUnitAgent() bool {
-	return false
-}
-
-func (a authorizer) AuthOwner(tag names.Tag) bool {
-	t := a.GetAuthTag()
-	return tag.Kind() == t.Kind() && tag.Id() == t.Id()
-}
-
-func (authorizer) AuthClient() bool {
-	return true
-}
-
-func (authorizer) HasPermission(operation permission.Access, target names.Tag) (bool, error) {
-	return false, nil
-}
-
-func (authorizer) UserHasPermission(user names.UserTag, operation permission.Access, target names.Tag) (bool, error) {
-	return false, nil
-}
-
-func (authorizer) ConnectedModel() string {
-	return ""
-}
-
-func (authorizer) AuthModelAgent() bool {
-	return false
 }
