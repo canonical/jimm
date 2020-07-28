@@ -40,3 +40,19 @@ func (s *pingerSuite) TestUnauthenticatedPinger(c *gc.C) {
 func newBool(b bool) *bool {
 	return &b
 }
+
+func (s *pingerSuite) TestPinger(c *gc.C) {
+	hm := newTestHeartMonitor()
+	s.PatchValue(jujuapi.NewHeartMonitor, jujuapi.InternalHeartMonitor(func(time.Duration) jujuapi.HeartMonitor {
+		return hm
+	}))
+	conn := s.open(c, nil, "test")
+	defer conn.Close()
+
+	c.Check(conn.BestFacadeVersion("Pinger"), gc.Equals, 1)
+
+	count := hm.beats()
+	err := conn.Ping()
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(hm.beats(), gc.Equals, count+1)
+}
