@@ -451,6 +451,10 @@ type Credential struct {
 
 	// Revoked records that the credential has been revoked.
 	Revoked bool
+
+	// AttributesInVault records that the actual credential attributes are
+	// stored in a seperate vault.
+	AttributesInVault bool
 }
 
 // Owner returns the owner of the credentials.
