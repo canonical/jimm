@@ -71,9 +71,11 @@ func (s *jemVaultSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *jemVaultSuite) TearDownTest(c *gc.C) {
-	err := s.vaultClient.Sys().Unmount("/test")
-	if err != nil {
-		c.Logf("cannot unmount vault secret store: %s", err)
+	if s.vaultClient != nil {
+		err := s.vaultClient.Sys().Unmount("/test")
+		if err != nil {
+			c.Logf("cannot unmount vault secret store: %s", err)
+		}
 	}
 	s.jem.Close()
 	s.pool.Close()
