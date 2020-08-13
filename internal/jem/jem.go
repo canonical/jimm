@@ -6,11 +6,13 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"path"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	vault "github.com/hashicorp/vault/api"
 	"github.com/juju/clock"
 	"github.com/juju/juju/api"
 	cloudapi "github.com/juju/juju/api/cloud"
@@ -23,6 +25,7 @@ import (
 	"github.com/rogpeppe/fastuuid"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -88,6 +91,13 @@ type Params struct {
 	PublicCloudMetadata map[string]jujucloud.Cloud
 
 	Pubsub *pubsub.Hub
+
+	// VaultClient is the client for a vault server that is used to store
+	// secrets.
+	VaultClient *vault.Client
+
+	// VaultPath is the root path in the vault for JIMM's secrets.
+	VaultPath string
 }
 
 type Pool struct {
@@ -397,22 +407,51 @@ func (j *JEM) Controller(ctx context.Context, path params.EntityPath) (*mongodoc
 
 // Credential retrieves the given credential from the database,
 // validating that the current user is allowed to read the credential.
-func (j *JEM) Credential(ctx context.Context, path params.CredentialPath) (*mongodoc.Credential, error) {
+func (j *JEM) GetCredential(ctx context.Context, id identchecker.ACLIdentity, path params.CredentialPath) (*mongodoc.Credential, error) {
 	cred, err := j.DB.Credential(ctx, mongodoc.CredentialPathFromParams(path))
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			// We return an authorization error for all attempts to retrieve credentials
 			// from any other user's space.
-			if aerr := auth.CheckIsUser(ctx, auth.IdentityFromContext(ctx), path.User); aerr != nil {
+			if aerr := auth.CheckIsUser(ctx, id, path.User); aerr != nil {
 				err = aerr
 			}
 		}
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	if err := auth.CheckCanRead(ctx, auth.IdentityFromContext(ctx), cred); err != nil {
+	if err := auth.CheckCanRead(ctx, id, cred); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	return cred, nil
+}
+
+// FillCredentialAttributes ensures that the credential attributes of the
+// given credential are set. User access is not checked in this method, it
+// is assumed that if the credential is held the user has access.
+func (j *JEM) FillCredentialAttributes(ctx context.Context, cred *mongodoc.Credential) error {
+	if !cred.AttributesInVault || len(cred.Attributes) > 0 {
+		return nil
+	}
+	if j.pool.config.VaultClient == nil {
+		return errgo.New("vault not configured")
+	}
+
+	logical := j.pool.config.VaultClient.Logical()
+	secret, err := logical.Read(path.Join(j.pool.config.VaultPath, "creds", cred.Path.String()))
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	cred.Attributes = make(map[string]string, len(secret.Data))
+	for k, v := range secret.Data {
+		// Nothing will be stored that isn't a string, so ignore anything
+		// that is a different type.
+		s, ok := v.(string)
+		if !ok {
+			continue
+		}
+		cred.Attributes[k] = s
+	}
+	return nil
 }
 
 // CreateModelParams specifies the parameters needed to create a new
@@ -769,8 +808,28 @@ func (j *JEM) updateCredential(ctx context.Context, cred *mongodoc.Credential, c
 	// to force the update), so update it in the local database.
 	// and mark in the local database that an update is required for
 	// all controllers
-	if err := j.DB.updateCredential(ctx, cred); err != nil {
-		return nil, errgo.Notef(err, "cannot update local database")
+	if j.pool.config.VaultClient != nil {
+		// There is a vault, so store the actual credential in there.
+		cred1 := *cred
+		cred1.Attributes = nil
+		cred1.AttributesInVault = true
+		if err := j.DB.updateCredential(ctx, &cred1); err != nil {
+			return nil, errgo.Notef(err, "cannot update local database")
+		}
+		data := make(map[string]interface{}, len(cred.Attributes))
+		for k, v := range cred.Attributes {
+			data[k] = v
+		}
+		logical := j.pool.config.VaultClient.Logical()
+		_, err := logical.Write(path.Join(j.pool.config.VaultPath, "creds", cred.Path.String()), data)
+		if err != nil {
+			return nil, errgo.Mask(err)
+		}
+	} else {
+		cred.AttributesInVault = false
+		if err := j.DB.updateCredential(ctx, cred); err != nil {
+			return nil, errgo.Notef(err, "cannot update local database")
+		}
 	}
 	if err := j.DB.setCredentialUpdates(ctx, cred.Controllers, cred.Path); err != nil {
 		return nil, errgo.Notef(err, "cannot mark controllers to be updated")
@@ -930,6 +989,9 @@ func (j *JEM) updateControllerCredential(
 ) ([]jujuparams.UpdateCredentialModelResult, error) {
 	if cred.Revoked {
 		return nil, errgo.New("updateControllerCredential called with revoked credential (shouldn't happen)")
+	}
+	if err := j.FillCredentialAttributes(ctx, cred); err != nil {
+		return nil, errgo.Mask(err)
 	}
 	models, err := conn.UpdateCredential(ctx, cred)
 	if err == nil {

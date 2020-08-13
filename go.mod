@@ -23,6 +23,7 @@ require (
 	github.com/gosuri/uitable v0.0.4 // indirect
 	github.com/hashicorp/go-msgpack v1.1.5 // indirect
 	github.com/hashicorp/raft-boltdb v0.0.0-20191021154308-4207f1bf0617 // indirect
+	github.com/hashicorp/vault/api v1.0.5-0.20200709165743-f98572ac11c9
 	github.com/joyent/gocommon v0.0.0-20161202192317-b78708995d1c // indirect
 	github.com/joyent/gosdc v0.0.0-20161202192312-ec8b3503a75e // indirect
 	github.com/joyent/gosign v0.0.0-20161114191744-9abcee278795 // indirect

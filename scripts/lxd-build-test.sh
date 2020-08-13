@@ -17,6 +17,7 @@ lxc exec --env http_proxy=${http_proxy:-} --env no_proxy=${no_proxy:-} $containe
 lxc exec $container -- snap set system proxy.http=${http_proxy:-}
 lxc exec $container -- snap set system proxy.https=${https_proxy:-${http_proxy:-}}
 lxc exec $container -- snap install go --classic
+lxc exec $container -- snap install vault
 if [ -n "${http_proxy:-}" ]; then
 	lxc exec \
 		--env HOME=/home/ubuntu \

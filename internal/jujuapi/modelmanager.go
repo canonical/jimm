@@ -510,7 +510,7 @@ func (r *controllerRoot) changeModelCredential(ctx context.Context, arg jujupara
 		User:  credUser,
 		Name:  params.CredentialName(credTag.Name()),
 	}
-	cred, err := r.jem.Credential(ctx, credPath)
+	cred, err := r.jem.GetCredential(ctx, r.identity, credPath)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}

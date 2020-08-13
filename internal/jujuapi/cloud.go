@@ -351,12 +351,15 @@ func (r *controllerRoot) credential(ctx context.Context, cloudCredentialTag stri
 		Name:  params.CredentialName(cct.Name()),
 	}
 
-	cred, err := r.jem.Credential(ctx, credPath)
+	cred, err := r.jem.GetCredential(ctx, r.identity, credPath)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	if cred.Revoked {
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", cct.Id())
+	}
+	if err := r.jem.FillCredentialAttributes(ctx, cred); err != nil {
+		return nil, errgo.Mask(err)
 	}
 	schema, err := r.credentialSchema(ctx, cred.Path.ToParams().Cloud, cred.Type)
 	if err != nil {
@@ -512,12 +515,15 @@ func (r *controllerRoot) credentialInfo(ctx context.Context, cloudName, credenti
 		User:  params.User(r.identity.Id()),
 		Name:  params.CredentialName(credentialName),
 	}
-	cred, err := r.jem.Credential(ctx, credPath)
+	cred, err := r.jem.GetCredential(ctx, r.identity, credPath)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	if cred.Revoked {
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "")
+	}
+	if err := r.jem.FillCredentialAttributes(ctx, cred); err != nil {
+		return nil, errgo.Mask(err)
 	}
 	schema, err := r.credentialSchema(ctx, cred.Path.ToParams().Cloud, cred.Type)
 	if err != nil {
