@@ -56,6 +56,7 @@ func (c *revokeCommand) Info() *cmd.Info {
 }
 
 func (c *revokeCommand) SetFlags(f *gnuflag.FlagSet) {
+	c.commandBase.SetFlags(f)
 	f.BoolVar(&c.controller, "controller", false, "change ACL of controller not model")
 	f.BoolVar(&c.admin, "admin", false, "change an admin ACL")
 }

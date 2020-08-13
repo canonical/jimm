@@ -60,6 +60,7 @@ func (c *grantCommand) Info() *cmd.Info {
 }
 
 func (c *grantCommand) SetFlags(f *gnuflag.FlagSet) {
+	c.commandBase.SetFlags(f)
 	f.BoolVar(&c.controller, "controller", false, "change ACL of controller not model")
 	f.BoolVar(&c.admin, "admin", false, "change an admin ACL")
 	f.BoolVar(&c.set, "set", false, "overwrite the current acl")
