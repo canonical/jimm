@@ -40,6 +40,7 @@ func (c *deprecateControllerCommand) Info() *cmd.Info {
 }
 
 func (c *deprecateControllerCommand) SetFlags(f *gnuflag.FlagSet) {
+	c.commandBase.SetFlags(f)
 	f.BoolVar(&c.unset, "unset", false, "Undeprecate controller")
 }
 

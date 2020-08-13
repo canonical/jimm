@@ -48,6 +48,7 @@ func (c *removeCommand) Init(args []string) error {
 }
 
 func (c *removeCommand) SetFlags(f *gnuflag.FlagSet) {
+	c.commandBase.SetFlags(f)
 	f.BoolVar(&c.controller, "controller", false, "remove controllers not models")
 	f.BoolVar(&c.force, "f", false, "force removal of live controller")
 	f.BoolVar(&c.force, "force", false, "")
