@@ -123,7 +123,7 @@ func (s *jemVaultSuite) TestVaultCredentials(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Check(cred3.Attributes, gc.HasLen, 0)
 
-	err = s.jem.GetCredentialAttributes(ctx, cred3)
+	err = s.jem.FillCredentialAttributes(ctx, cred3)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(cred3.Id, gc.Equals, "dummy/bob/test-1")
 	cred3.Id = ""

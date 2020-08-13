@@ -358,7 +358,7 @@ func (r *controllerRoot) credential(ctx context.Context, cloudCredentialTag stri
 	if cred.Revoked {
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", cct.Id())
 	}
-	if err := r.jem.GetCredentialAttributes(ctx, cred); err != nil {
+	if err := r.jem.FillCredentialAttributes(ctx, cred); err != nil {
 		return nil, errgo.Mask(err)
 	}
 	schema, err := r.credentialSchema(ctx, cred.Path.ToParams().Cloud, cred.Type)
@@ -522,7 +522,7 @@ func (r *controllerRoot) credentialInfo(ctx context.Context, cloudName, credenti
 	if cred.Revoked {
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "")
 	}
-	if err := r.jem.GetCredentialAttributes(ctx, cred); err != nil {
+	if err := r.jem.FillCredentialAttributes(ctx, cred); err != nil {
 		return nil, errgo.Mask(err)
 	}
 	schema, err := r.credentialSchema(ctx, cred.Path.ToParams().Cloud, cred.Type)

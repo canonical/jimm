@@ -425,10 +425,10 @@ func (j *JEM) GetCredential(ctx context.Context, id identchecker.ACLIdentity, pa
 	return cred, nil
 }
 
-// GetCredentialAttributes ensures that the credential attributes of the
+// FillCredentialAttributes ensures that the credential attributes of the
 // given credential are set. User access is not checked in this method, it
 // is assumed that if the credential is held the user has access.
-func (j *JEM) GetCredentialAttributes(ctx context.Context, cred *mongodoc.Credential) error {
+func (j *JEM) FillCredentialAttributes(ctx context.Context, cred *mongodoc.Credential) error {
 	if !cred.AttributesInVault || len(cred.Attributes) > 0 {
 		return nil
 	}
@@ -990,7 +990,7 @@ func (j *JEM) updateControllerCredential(
 	if cred.Revoked {
 		return nil, errgo.New("updateControllerCredential called with revoked credential (shouldn't happen)")
 	}
-	if err := j.GetCredentialAttributes(ctx, cred); err != nil {
+	if err := j.FillCredentialAttributes(ctx, cred); err != nil {
 		return nil, errgo.Mask(err)
 	}
 	models, err := conn.UpdateCredential(ctx, cred)
