@@ -53,6 +53,14 @@ type Config struct {
 	PublicCloudMetadata   string            `yaml:"public-cloud-metadata"`
 	MaxPubsubConcurrency  int               `yaml:"max-pubsub-concurrency"`
 	JujuDashboardLocation string            `yaml:"juju-dashboard-location"`
+	Vault                 VaultConfig       `yaml:"vault"`
+}
+
+type VaultConfig struct {
+	Address        string `yaml:"address"`
+	WrappedSecret  string `yaml:"wrapped-secret"`
+	AuthSecretPath string `yaml:"auth-secret-path"`
+	KVPrefix       string `yaml:"kv-prefix"`
 }
 
 func (c *Config) validate() error {

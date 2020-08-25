@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/canonical/candid/candidclient"
+	vault "github.com/hashicorp/vault/api"
 	"github.com/juju/aclstore"
 	"github.com/juju/juju/cloud"
 	"github.com/juju/simplekv/mgosimplekv"
@@ -122,6 +123,13 @@ type Params struct {
 	JujuDashboardLocation string
 
 	Pubsub *pubsub.Hub
+
+	// VaultClient is the (optional) vault client to use to store
+	// cloud credentials.
+	VaultClient *vault.Client
+
+	// VaultPath is the root path in the vault for JIMM's secrets.
+	VaultPath string
 }
 
 // HandlerParams are the parameters used to initialize a handler.
