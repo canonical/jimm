@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gorilla/handlers"
+
 	// Include any providers known to support JEM.
 	// Avoid including provider/all to reduce build time.
 	_ "github.com/juju/juju/provider/azure"
@@ -104,6 +105,7 @@ func serve(conf *config.Config) error {
 	if conf.MaxMgoSessions == 0 {
 		conf.MaxMgoSessions = 100
 	}
+
 	cfg := jem.ServerParams{
 		DB:                      db,
 		MaxMgoSessions:          conf.MaxMgoSessions,
@@ -127,6 +129,9 @@ func serve(conf *config.Config) error {
 		},
 		JujuDashboardLocation: conf.JujuDashboardLocation,
 	}
+
+	cfg.VaultClient, cfg.VaultPath = newVaultClient(ctx, conf)
+
 	server, err := jem.NewServer(ctx, cfg)
 	if err != nil {
 		return errgo.Notef(err, "cannot create new server at %q", conf.APIAddr)

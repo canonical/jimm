@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	vault "github.com/hashicorp/vault/api"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/mgo.v2"
@@ -100,6 +101,13 @@ type ServerParams struct {
 	JujuDashboardLocation string
 
 	Pubsub *pubsub.Hub
+
+	// VaultClient is the (optional) vault client to use to store
+	// cloud credentials.
+	VaultClient *vault.Client
+
+	// VaultPath is the root path in the vault for JIMM's secrets.
+	VaultPath string
 }
 
 // HandleCloser represents an HTTP handler that can
