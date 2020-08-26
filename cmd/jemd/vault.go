@@ -9,38 +9,34 @@ import (
 
 	vault "github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/config"
+	"github.com/CanonicalLtd/jimm/internal/servermon"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 )
 
-// newVaultClient returns the vault client and kv store path, if configured.
-func newVaultClient(ctx context.Context, conf *config.Config) (*vault.Client, string) {
-	if conf.Vault.Address == "" {
-		zapctx.Info(ctx, "vault not configured")
-		return nil, ""
-	}
-
+// startVaultClient creates a client to the configured vault server,
+// starting the background services needed to maintain the connection.
+func startVaultClient(ctx context.Context, eg *errgroup.Group, conf config.VaultConfig) (*vault.Client, error) {
+	servermon.VaultConfigured.Inc()
 	vConfig := vault.DefaultConfig()
-	vConfig.Address = conf.Vault.Address
+	vConfig.Address = conf.Address
 
 	vClient, err := vault.NewClient(vConfig)
 	if err != nil {
-		zapctx.Error(ctx, "cannot create vault client", zap.Error(err))
-		return nil, ""
+		return nil, errgo.Notef(err, "cannot create vault client")
 	}
 
-	s, err := loadVaultSecret(ctx, conf.Vault.AuthSecretPath, vClient, conf.Vault.WrappedSecret)
+	s, err := loadVaultSecret(ctx, conf.AuthSecretPath, vClient, conf.WrappedSecret)
 	if err != nil {
-		zapctx.Error(ctx, "cannot load vault secret", zap.Error(err))
-		return nil, ""
+		return nil, errgo.Notef(err, "cannot load vault secret")
 	}
 
 	tok, err := s.TokenID()
 	if err != nil {
-		zapctx.Error(ctx, "invalid vault secret", zap.Error(err))
-		return nil, ""
+		return nil, errgo.Notef(err, "invalid vault secret")
 	}
 	vClient.SetToken(tok)
 
@@ -48,21 +44,31 @@ func newVaultClient(ctx context.Context, conf *config.Config) (*vault.Client, st
 		Secret: s,
 	})
 	if err != nil {
-		zapctx.Error(ctx, "cannot create lifetime watcher", zap.Error(err))
-		return vClient, conf.Vault.KVPrefix
+		return nil, errgo.Notef(err, "cannot create lifetime watcher")
 	}
-	go func() {
+	eg.Go(func() error {
 		for {
-			r := <-w.RenewCh()
-			zapctx.Debug(ctx, "renewed auth secret", zap.Time("renewed-at", r.RenewedAt))
-			if err := writeSecret(conf.Vault.AuthSecretPath, r.Secret); err != nil {
-				zapctx.Error(ctx, "cannot write secret", zap.Error(err))
+			select {
+			case r := <-w.RenewCh():
+				servermon.VaultSecretRefreshes.Inc()
+				zapctx.Debug(ctx, "renewed auth secret", zap.Time("renewed-at", r.RenewedAt))
+				if err := writeSecret(conf.AuthSecretPath, r.Secret); err != nil {
+					zapctx.Error(ctx, "cannot write secret", zap.Error(err))
+				}
+			case err := <-w.DoneCh():
+				return errgo.Mask(err)
 			}
 		}
-	}()
+	})
 	w.Start()
 
-	return vClient, conf.Vault.KVPrefix
+	eg.Go(func() error {
+		<-ctx.Done()
+		w.Stop()
+		return ctx.Err()
+	})
+
+	return vClient, nil
 }
 
 // loadVaultSecret loads the vault secret from the given path, if the
@@ -93,10 +99,12 @@ func loadVaultSecret(ctx context.Context, path string, client *vault.Client, wra
 func writeSecret(path string, s *vault.Secret) error {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
+		servermon.VaultSecretWriteErrors.Inc()
 		return errgo.Mask(err)
 	}
 	defer f.Close()
 	if err := json.NewEncoder(f).Encode(s); err != nil {
+		servermon.VaultSecretWriteErrors.Inc()
 		return errgo.Mask(err)
 	}
 	return nil

@@ -23,7 +23,6 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
-	"github.com/CanonicalLtd/jimm/internal/ctxutil"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemerror"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
@@ -67,13 +66,8 @@ func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httpr
 	}
 
 	return srv.Handlers(func(p httprequest.Params) (*Handler, context.Context, error) {
-		// Time out all requests after 30s. Do this before joining
-		// the contexts because p.Context is likely to have a done
-		// channel already and context.WithTimeout will be more efficient
-		// in that case than working on the custom context type returned
-		// from ctxutil.Join.
+		// Time out all requests after 30s.
 		ctx, cancel := context.WithTimeout(p.Context, 30*time.Second)
-		ctx = ctxutil.Join(ctx, p.Context)
 		zapctx.Debug(ctx, "HTTP request", zap.String("method", p.Request.Method), zap.Stringer("url", p.Request.URL))
 
 		// All requests require an authenticated client.

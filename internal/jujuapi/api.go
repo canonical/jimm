@@ -14,7 +14,6 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/ctxutil"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemerror"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
@@ -30,9 +29,8 @@ func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httpr
 
 	return append(
 		srv.Handlers(func(p httprequest.Params) (*handler, context.Context, error) {
-			ctx := ctxutil.Join(ctx, p.Context)
 			return &handler{
-				context: ctx,
+				context: p.Context,
 				params:  params.Params,
 				jem:     params.JEMPool.JEM(ctx),
 			}, ctx, nil
@@ -48,7 +46,7 @@ func newWebSocketHandler(ctx context.Context, params jemserver.HandlerParams) ht
 		Method: "GET",
 		Path:   "/model/:modeluuid/api",
 		Handle: func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-			ctx := ctxutil.Join(r.Context(), ctx)
+			ctx := zapctx.WithFields(r.Context(), zap.Bool("websocket", true))
 			servermon.ConcurrentWebsocketConnections.Inc()
 			defer servermon.ConcurrentWebsocketConnections.Dec()
 			j := params.JEMPool.JEM(ctx)
@@ -65,8 +63,7 @@ func newRootWebSocketHandler(ctx context.Context, params jemserver.HandlerParams
 		Path:   path,
 		Handle: func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 			// _TODO add unique id to context or derive it from http request.
-			ctx := ctxutil.Join(r.Context(), ctx)
-			ctx = zapctx.WithFields(ctx, zap.Bool("websocket", true))
+			ctx := zapctx.WithFields(r.Context(), zap.Bool("websocket", true))
 			j := params.JEMPool.JEM(ctx)
 			defer j.Close()
 			wsServer := newWSServer(j, params.Authenticator, params.Params, "")
@@ -93,7 +90,7 @@ type guiRequest struct {
 
 // GUI provides a GUI by redirecting to the store front.
 func (h *handler) GUI(p httprequest.Params, arg *guiRequest) error {
-	ctx := ctxutil.Join(h.context, p.Context)
+	ctx := p.Context
 	if h.params.GUILocation == "" {
 		return errgo.WithCausef(nil, params.ErrNotFound, "no GUI location specified")
 	}
