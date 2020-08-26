@@ -56,11 +56,24 @@ type Config struct {
 	Vault                 VaultConfig       `yaml:"vault"`
 }
 
+// A VaultConfig contains the configuration settings for a vault server
+// that will be used to store cloud credentials.
 type VaultConfig struct {
-	Address        string `yaml:"address"`
-	WrappedSecret  string `yaml:"wrapped-secret"`
+	// Address is the address of the vault server.
+	Address string `yaml:"address"`
+
+	// WrappedSecret is the bootstrap secret to use to connect to the
+	// vault server. This is only used if there is no secret stored in
+	// AuthSecretPath. A wrapped secret can only be accessed once.
+	WrappedSecret string `yaml:"wrapped-secret"`
+
+	// AuthSecretPath is the file path used by JIMM to store the
+	// authentication secret to access the vault server.
 	AuthSecretPath string `yaml:"auth-secret-path"`
-	KVPrefix       string `yaml:"kv-prefix"`
+
+	// KVPrefix is the root path of the KV store assigned to the JIMM
+	// application.
+	KVPrefix string `yaml:"kv-prefix"`
 }
 
 func (c *Config) validate() error {
