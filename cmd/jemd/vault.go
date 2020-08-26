@@ -7,15 +7,16 @@ import (
 	"encoding/json"
 	"os"
 
-	"github.com/CanonicalLtd/jimm/config"
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	vault "github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
+
+	"github.com/CanonicalLtd/jimm/config"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
 )
 
-// vaultConfig returns the vault client and kv store path, if configured.
-func vaultConfig(ctx context.Context, conf *config.Config) (*vault.Client, string) {
+// newVaultClient returns the vault client and kv store path, if configured.
+func newVaultClient(ctx context.Context, conf *config.Config) (*vault.Client, string) {
 	if conf.Vault.Address == "" {
 		zapctx.Info(ctx, "vault not configured")
 		return nil, ""

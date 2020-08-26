@@ -130,7 +130,7 @@ func serve(conf *config.Config) error {
 		JujuDashboardLocation: conf.JujuDashboardLocation,
 	}
 
-	cfg.VaultClient, cfg.VaultPath = vaultConfig(ctx, conf)
+	cfg.VaultClient, cfg.VaultPath = newVaultClient(ctx, conf)
 
 	server, err := jem.NewServer(ctx, cfg)
 	if err != nil {
