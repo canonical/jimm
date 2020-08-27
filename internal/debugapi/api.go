@@ -10,7 +10,6 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
-	"github.com/CanonicalLtd/jimm/internal/ctxutil"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemerror"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
@@ -27,7 +26,6 @@ func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httpr
 	}
 
 	return srv.Handlers(func(p httprequest.Params) (*handler, context.Context, error) {
-		ctx := ctxutil.Join(ctx, p.Context)
 		h := &handler{
 			params:                         params.Params,
 			jem:                            params.JEMPool.JEM(ctx),
@@ -39,7 +37,7 @@ func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httpr
 			CheckPprofAllowed: func(req *http.Request) error { return h.checkIsAdmin(req.Context(), req) },
 			Check:             h.check,
 		}
-		return h, ctx, nil
+		return h, p.Context, nil
 	}), nil
 }
 

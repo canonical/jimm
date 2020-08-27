@@ -8,11 +8,16 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/gorilla/handlers"
+	vault "github.com/hashicorp/vault/api"
+	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 
 	// Include any providers known to support JEM.
 	// Avoid including provider/all to reduce build time.
@@ -34,7 +39,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
 )
 
-// websocketRequestTimeout is the amount of time a webseocket connection
+// websocketRequestTimeout is the amount of time a websocket connection
 // will wait for a request before failing the connections. It is
 // hardcoded in juju so I see no reason why it can't be here also.
 const websocketRequestTimeout = 5 * time.Minute
@@ -43,6 +48,8 @@ var (
 	// The logging-config flag is present for backward compatibility
 	// only and will probably be removed in the future.
 	loggingConfig = flag.String("logging-config", "", "specify log levels for modules e.g. <root>=TRACE")
+
+	errSignaled = errgo.New("signaled")
 )
 
 func main() {
@@ -63,9 +70,18 @@ func main() {
 		fmt.Fprintf(os.Stderr, "STOP %s\n", err)
 		os.Exit(2)
 	}
+
+	zapctx.LogLevel.SetLevel(conf.LoggingLevel)
+	zaputil.InitLoggo(zapctx.Default, conf.LoggingLevel)
+
 	fmt.Fprintln(os.Stderr, "START")
-	if err := serve(conf); err != nil {
-		fmt.Fprintf(os.Stderr, "STOP %s\n", err)
+	eg, ctx := errgroup.WithContext(context.Background())
+	eg.Go(func() error { return interrupt(ctx) })
+	eg.Go(func() error { return startServer(ctx, eg, conf) })
+	err = eg.Wait()
+	fmt.Fprintf(os.Stderr, "STOP %s\n", err)
+
+	if errgo.Cause(err) != errSignaled {
 		os.Exit(1)
 	}
 }
@@ -84,11 +100,7 @@ func readConfig(path string) (*config.Config, error) {
 	return conf, nil
 }
 
-func serve(conf *config.Config) error {
-	ctx := context.Background()
-	zapctx.LogLevel.SetLevel(conf.LoggingLevel)
-	zaputil.InitLoggo(zapctx.Default, conf.LoggingLevel)
-
+func startServer(ctx context.Context, eg *errgroup.Group, conf *config.Config) error {
 	zapctx.Debug(ctx, "connecting to mongo")
 	session, err := mgo.Dial(conf.MongoAddr)
 	if err != nil {
@@ -99,6 +111,22 @@ func serve(conf *config.Config) error {
 		conf.DBName = "jem"
 	}
 	db := session.DB(conf.DBName)
+
+	zapctx.Debug(ctx, "loading TLS configuration")
+	tlsConfig, err := conf.TLSConfig()
+	if err != nil {
+		return errgo.Mask(err)
+	}
+
+	var vaultClient *vault.Client
+	if conf.Vault.Address != "" {
+		zapctx.Debug(ctx, "connecting to vault server")
+		var err error
+		vaultClient, err = startVaultClient(ctx, eg, conf.Vault)
+		if err != nil {
+			return errgo.Mask(err)
+		}
+	}
 
 	zapctx.Debug(ctx, "setting up the API server")
 	locator := httpbakery.NewThirdPartyLocator(nil, nil)
@@ -128,9 +156,9 @@ func serve(conf *config.Config) error {
 			MaxConcurrency: conf.MaxPubsubConcurrency,
 		},
 		JujuDashboardLocation: conf.JujuDashboardLocation,
+		VaultClient:           vaultClient,
+		VaultPath:             conf.Vault.KVPrefix,
 	}
-
-	cfg.VaultClient, cfg.VaultPath = newVaultClient(ctx, conf)
 
 	server, err := jem.NewServer(ctx, cfg)
 	if err != nil {
@@ -148,17 +176,42 @@ func serve(conf *config.Config) error {
 	}
 
 	zapctx.Info(ctx, "starting the API server")
-	tlsConfig, err := conf.TLSConfig()
-	if err != nil {
-		return errgo.Mask(err)
-	}
 	httpServer := &http.Server{
 		Addr:      conf.APIAddr,
 		Handler:   handler,
 		TLSConfig: tlsConfig,
 	}
-	if httpServer.TLSConfig != nil {
-		return httpServer.ListenAndServeTLS("", "")
+	eg.Go(func() error {
+		<-ctx.Done()
+		ctx1, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := httpServer.Shutdown(ctx1); err != nil {
+			zapctx.Error(ctx, "HTTP server shutdown failed", zap.Error(err))
+		}
+		return nil
+	})
+	if tlsConfig == nil {
+		eg.Go(httpServer.ListenAndServe)
+	} else {
+		eg.Go(func() error {
+			return httpServer.ListenAndServeTLS("", "")
+		})
 	}
-	return httpServer.ListenAndServe()
+
+	return nil
+}
+
+func interrupt(ctx context.Context) error {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
+	select {
+	case sig := <-c:
+		if sig == syscall.SIGTERM {
+			return errgo.WithCausef(nil, errSignaled, "terminating")
+		}
+		return errgo.WithCausef(nil, errSignaled, "interrupted")
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
