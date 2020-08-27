@@ -162,12 +162,6 @@ var (
 		Name:      "secret_refreshes",
 		Help:      "The number of times the secret has been refreshed.",
 	})
-	VaultSecretWriteErrors = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: "jem",
-		Subsystem: "vault",
-		Name:      "secret_write_errors",
-		Help:      "The number of times writing the secret to local storage has failed.",
-	})
 	WebsocketRequestDuration = prometheus.NewSummaryVec(prometheus.SummaryOpts{
 		Namespace: "jem",
 		Subsystem: "websocket",
@@ -199,7 +193,6 @@ func init() {
 	prometheus.MustRegister(StatsCollectFailCount)
 	prometheus.MustRegister(VaultConfigured)
 	prometheus.MustRegister(VaultSecretRefreshes)
-	prometheus.MustRegister(VaultSecretWriteErrors)
 	prometheus.MustRegister(WebsocketRequestDuration)
 	prometheus.MustRegister(mgomonitor.NewCollector("jem"))
 }

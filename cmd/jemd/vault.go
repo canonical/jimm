@@ -4,8 +4,7 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"os"
+	"path"
 
 	vault "github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
@@ -29,9 +28,16 @@ func startVaultClient(ctx context.Context, eg *errgroup.Group, conf config.Vault
 		return nil, errgo.Notef(err, "cannot create vault client")
 	}
 
-	s, err := loadVaultSecret(ctx, conf.AuthSecretPath, vClient, conf.WrappedSecret)
+	if conf.ApprolePath == "" {
+		conf.ApprolePath = "auth/approle"
+	}
+
+	s, err := vClient.Logical().Write(path.Join(conf.ApprolePath, "login"), map[string]interface{}{
+		"role_id":   conf.ApproleRoleID,
+		"secret_id": conf.ApproleSecretID,
+	})
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot load vault secret")
+		return nil, errgo.Notef(err, "cannot authenticate to vault")
 	}
 
 	tok, err := s.TokenID()
@@ -52,9 +58,6 @@ func startVaultClient(ctx context.Context, eg *errgroup.Group, conf config.Vault
 			case r := <-w.RenewCh():
 				servermon.VaultSecretRefreshes.Inc()
 				zapctx.Debug(ctx, "renewed auth secret", zap.Time("renewed-at", r.RenewedAt))
-				if err := writeSecret(conf.AuthSecretPath, r.Secret); err != nil {
-					zapctx.Error(ctx, "cannot write secret", zap.Error(err))
-				}
 			case err := <-w.DoneCh():
 				return errgo.Mask(err)
 			}
@@ -69,43 +72,4 @@ func startVaultClient(ctx context.Context, eg *errgroup.Group, conf config.Vault
 	})
 
 	return vClient, nil
-}
-
-// loadVaultSecret loads the vault secret from the given path, if the
-// secret cannot be found, or is expired
-func loadVaultSecret(ctx context.Context, path string, client *vault.Client, wrappedToken string) (*vault.Secret, error) {
-	f, err := os.Open(path)
-	switch {
-	case err == nil:
-		s, err := vault.ParseSecret(f)
-		return s, errgo.Mask(err)
-	case os.IsNotExist(err):
-		// Attempt to unwrap the configured token (below).
-	default:
-		return nil, errgo.Mask(err)
-	}
-
-	s, err := client.Logical().Unwrap(wrappedToken)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	zapctx.Debug(ctx, "unwrapped secret")
-	if err := writeSecret(path, s); err != nil {
-		zapctx.Error(ctx, "cannot write secret", zap.Error(err))
-	}
-	return s, nil
-}
-
-func writeSecret(path string, s *vault.Secret) error {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0600)
-	if err != nil {
-		servermon.VaultSecretWriteErrors.Inc()
-		return errgo.Mask(err)
-	}
-	defer f.Close()
-	if err := json.NewEncoder(f).Encode(s); err != nil {
-		servermon.VaultSecretWriteErrors.Inc()
-		return errgo.Mask(err)
-	}
-	return nil
 }

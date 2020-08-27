@@ -62,18 +62,21 @@ type VaultConfig struct {
 	// Address is the address of the vault server.
 	Address string `yaml:"address"`
 
-	// WrappedSecret is the bootstrap secret to use to connect to the
-	// vault server. This is only used if there is no secret stored in
-	// AuthSecretPath. A wrapped secret can only be accessed once.
-	WrappedSecret string `yaml:"wrapped-secret"`
+	// ApprolePath is the path on the vault server of the approle
+	// authentication service.
+	ApprolePath string `yaml:"approle-path"`
 
-	// AuthSecretPath is the file path used by JIMM to store the
-	// authentication secret to access the vault server.
-	AuthSecretPath string `yaml:"auth-secret-path"`
+	// ApproleRoleID contains the role_id to use for approle
+	// authentication.
+	ApproleRoleID string `yaml:"approle-role-id"`
 
-	// KVPrefix is the root path of the KV store assigned to the JIMM
+	// ApproleSecretID contains the secret_id to use for approle
+	// authentication.
+	ApproleSecretID string `yaml:"approle-secret-id"`
+
+	// KVPath is the root path of the KV store assigned to the JIMM
 	// application.
-	KVPrefix string `yaml:"kv-prefix"`
+	KVPath string `yaml:"kv-path"`
 }
 
 func (c *Config) validate() error {
