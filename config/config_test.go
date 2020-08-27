@@ -97,9 +97,10 @@ public-cloud-metadata: cloud-metadata.yaml
 max-pubsub-concurrency: 42
 vault:
   address: http://localhost:8200
-  wrapped-secret: secret1
-  auth-secret-path: /token/path
-  kv-prefix: /kv/jimm
+  approle-path: /auth/approle
+  approle-role-id: 00000000-0000-0000-0000-000000000000
+  approle-secret-id: 00000000-0000-0000-0000-000000000001
+  kv-path: /kv/jimm
 `
 
 func (s *ConfigSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
@@ -152,10 +153,11 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 		PublicCloudMetadata:  "cloud-metadata.yaml",
 		MaxPubsubConcurrency: 42,
 		Vault: config.VaultConfig{
-			Address:        "http://localhost:8200",
-			WrappedSecret:  "secret1",
-			AuthSecretPath: "/token/path",
-			KVPrefix:       "/kv/jimm",
+			Address:         "http://localhost:8200",
+			ApprolePath:     "/auth/approle",
+			ApproleRoleID:   "00000000-0000-0000-0000-000000000000",
+			ApproleSecretID: "00000000-0000-0000-0000-000000000001",
+			KVPath:          "/kv/jimm",
 		},
 	})
 }
