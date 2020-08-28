@@ -63,11 +63,13 @@ func startVaultClient(ctx context.Context, eg *errgroup.Group, conf config.Vault
 			}
 		}
 	})
-	w.Start()
-
 	eg.Go(func() error {
+		w.Start()
+		return nil
+	})
+	eg.Go(func() error {
+		defer w.Stop()
 		<-ctx.Done()
-		w.Stop()
 		return ctx.Err()
 	})
 
