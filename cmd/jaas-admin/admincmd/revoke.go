@@ -8,14 +8,13 @@ import (
 
 	"github.com/juju/cmd"
 	"github.com/juju/gnuflag"
-	"github.com/juju/juju/cmd/modelcmd"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/params"
 )
 
 type revokeCommand struct {
-	commandBase
+	*commandBase
 
 	path    entityPathValue
 	aclName string
@@ -25,8 +24,10 @@ type revokeCommand struct {
 	users      userSet
 }
 
-func newRevokeCommand() cmd.Command {
-	return modelcmd.WrapBase(&revokeCommand{})
+func newRevokeCommand(c *commandBase) cmd.Command {
+	return &revokeCommand{
+		commandBase: c,
+	}
 }
 
 var revokeDoc = `
@@ -56,7 +57,6 @@ func (c *revokeCommand) Info() *cmd.Info {
 }
 
 func (c *revokeCommand) SetFlags(f *gnuflag.FlagSet) {
-	c.commandBase.SetFlags(f)
 	f.BoolVar(&c.controller, "controller", false, "change ACL of controller not model")
 	f.BoolVar(&c.admin, "admin", false, "change an admin ACL")
 }

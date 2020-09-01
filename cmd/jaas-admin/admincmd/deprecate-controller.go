@@ -5,21 +5,22 @@ package admincmd
 import (
 	"github.com/juju/cmd"
 	"github.com/juju/gnuflag"
-	"github.com/juju/juju/cmd/modelcmd"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/params"
 )
 
 type deprecateControllerCommand struct {
-	commandBase
+	*commandBase
 
 	path  entityPathValue
 	unset bool
 }
 
-func newDeprecateControllerCommand() cmd.Command {
-	return modelcmd.WrapBase(&deprecateControllerCommand{})
+func newDeprecateControllerCommand(c *commandBase) cmd.Command {
+	return &deprecateControllerCommand{
+		commandBase: c,
+	}
 }
 
 var deprecateControllerDoc = `
@@ -40,7 +41,6 @@ func (c *deprecateControllerCommand) Info() *cmd.Info {
 }
 
 func (c *deprecateControllerCommand) SetFlags(f *gnuflag.FlagSet) {
-	c.commandBase.SetFlags(f)
 	f.BoolVar(&c.unset, "unset", false, "Undeprecate controller")
 }
 

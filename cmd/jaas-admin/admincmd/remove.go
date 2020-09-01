@@ -5,22 +5,23 @@ package admincmd
 import (
 	"github.com/juju/cmd"
 	"github.com/juju/gnuflag"
-	"github.com/juju/juju/cmd/modelcmd"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/params"
 )
 
 type removeCommand struct {
-	commandBase
+	*commandBase
 
 	paths      []entityPathValue
 	controller bool
 	force      bool
 }
 
-func newRemoveCommand() cmd.Command {
-	return modelcmd.WrapBase(&removeCommand{})
+func newRemoveCommand(c *commandBase) cmd.Command {
+	return &removeCommand{
+		commandBase: c,
+	}
 }
 
 var removeDoc = `
@@ -48,7 +49,6 @@ func (c *removeCommand) Init(args []string) error {
 }
 
 func (c *removeCommand) SetFlags(f *gnuflag.FlagSet) {
-	c.commandBase.SetFlags(f)
 	f.BoolVar(&c.controller, "controller", false, "remove controllers not models")
 	f.BoolVar(&c.force, "f", false, "force removal of live controller")
 	f.BoolVar(&c.force, "force", false, "")
