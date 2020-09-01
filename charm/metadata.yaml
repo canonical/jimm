@@ -19,6 +19,9 @@ provides:
 requires:
   db:
     interface: mongodb
+  vault:
+    interface: vault-kv
+    optional: true
 resources:
   service:
     type: file
