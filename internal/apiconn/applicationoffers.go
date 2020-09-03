@@ -80,11 +80,10 @@ func (c *Conn) GetApplicationOffer(ctx context.Context, info *jujuparams.Applica
 	if len(resp.Results) != 1 {
 		return errgo.Newf("unexpected number of results (expected 1, got %d)", len(resp.Results))
 	}
-	if resp.Results[0].Error != nil {
-		return newAPIError(resp.Results[0].Error)
+	if resp.Results[0].Result != nil {
+		*info = *resp.Results[0].Result
 	}
-	*info = *resp.Results[0].Result
-	return nil
+	return newAPIError(resp.Results[0].Error)
 }
 
 // GrantApplicationOfferAccess grants the specified permission to the

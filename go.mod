@@ -34,7 +34,7 @@ require (
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
 	github.com/juju/go-oracle-cloud v0.0.0-20170510162943-95ad2a088ab9 // indirect
 	github.com/juju/httprequest v1.0.1
-	github.com/juju/juju v0.0.0-20200702151955-16439b3d1c52
+	github.com/juju/juju v0.0.0-20200903030021-a44e6eb38430
 	github.com/juju/loggo v0.0.0-20200526014432-9ce3a2e09b5e
 	github.com/juju/lru v0.0.0-20190314140547-92a0afabdc41 // indirect
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
@@ -43,7 +43,7 @@ require (
 	github.com/juju/persistent-cookiejar v0.0.0-20170428161559-d67418f14c93
 	github.com/juju/rpcreflect v0.0.0-20200416001309-bb46e9ba1476
 	github.com/juju/simplekv v1.0.0
-	github.com/juju/testing v0.0.0-20200608005635-e4eedbc6f7aa
+	github.com/juju/testing v0.0.0-20200706033705-4c23f9c453cd
 	github.com/juju/txn v0.0.0-20190612234757-afeb83d59782 // indirect
 	github.com/juju/utils v0.0.0-20200604140309-9d78121a29e0
 	github.com/juju/version v0.0.0-20191219164919-81c1be00b9a6
