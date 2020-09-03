@@ -4,6 +4,7 @@ package apiconn_test
 
 import (
 	"context"
+	"sort"
 
 	"github.com/juju/juju/testing/factory"
 	"github.com/juju/names/v4"
@@ -125,8 +126,6 @@ func (s *applicationoffersSuite) TestListApplicationOffersNoOffers(c *gc.C) {
 }
 
 func (s *applicationoffersSuite) TestListApplicationOffersMatching(c *gc.C) {
-	c.ExpectFailure("juju bug #1893940")
-
 	modelState, err := s.StatePool.Get(s.model.UUID)
 	c.Assert(err, gc.Equals, nil)
 	defer modelState.Release()
@@ -219,8 +218,6 @@ func (s *applicationoffersSuite) TestFindApplicationOffersNoOffers(c *gc.C) {
 }
 
 func (s *applicationoffersSuite) TestFindApplicationOffersMatching(c *gc.C) {
-	c.ExpectFailure("juju bug #1893940")
-
 	modelState, err := s.StatePool.Get(s.model.UUID)
 	c.Assert(err, gc.Equals, nil)
 	defer modelState.Release()
@@ -299,8 +296,6 @@ func (s *applicationoffersSuite) TestFindApplicationOffersNoMatch(c *gc.C) {
 }
 
 func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
-	c.ExpectFailure("juju bug #1893940")
-
 	modelState, err := s.StatePool.Get(s.model.UUID)
 	c.Assert(err, gc.Equals, nil)
 	defer modelState.Release()
@@ -332,17 +327,36 @@ func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
 	info.OfferURL = "test-user@external/test-model.test-offer"
 	err = s.conn.GetApplicationOffer(ctx, &info)
 	c.Assert(err, gc.Equals, nil)
+
 	c.Check(info.OfferUUID, gc.Not(gc.Equals), "")
 	info.OfferUUID = ""
+	sort.Slice(info.Users, func(i, j int) bool {
+		return info.Users[i].UserName < info.Users[j].UserName
+	})
+	c.Check(info.CharmURL, gc.Matches, `cs:quantal/wordpress-[0-9]*`)
+	info.CharmURL = ""
 	c.Check(info, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetails{
 		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
 			SourceModelTag:         names.NewModelTag(s.model.UUID).String(),
 			OfferURL:               "test-user@external/test-model.test-offer",
 			OfferName:              "test-offer",
 			ApplicationDescription: "A pretty popular blog engine",
+			Endpoints: []jujuparams.RemoteEndpoint{{
+				Name:      "url",
+				Role:      "provider",
+				Interface: "http",
+				Limit:     0,
+			}},
+			Users: []jujuparams.OfferUserDetails{{
+				UserName:    "admin",
+				DisplayName: "admin",
+				Access:      string(jujuparams.OfferAdminAccess),
+			}, {
+				UserName: "everyone@external",
+				Access:   string(jujuparams.OfferReadAccess),
+			}},
 		},
 		ApplicationName: "test-app",
-		CharmURL:        "cs:quantal/wordpress-1",
 	})
 }
 
@@ -356,8 +370,6 @@ func (s *applicationoffersSuite) TestGetApplicationOfferNotFound(c *gc.C) {
 }
 
 func (s *applicationoffersSuite) TestGrantApplicationOfferAccess(c *gc.C) {
-	c.ExpectFailure("juju bug #1893940")
-
 	modelState, err := s.StatePool.Get(s.model.UUID)
 	c.Assert(err, gc.Equals, nil)
 	defer modelState.Release()
@@ -396,19 +408,36 @@ func (s *applicationoffersSuite) TestGrantApplicationOfferAccess(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Check(info.OfferUUID, gc.Not(gc.Equals), "")
 	info.OfferUUID = ""
+	sort.Slice(info.Users, func(i, j int) bool {
+		return info.Users[i].UserName < info.Users[j].UserName
+	})
+	c.Check(info.CharmURL, gc.Matches, `cs:quantal/wordpress-[0-9]*`)
+	info.CharmURL = ""
 	c.Check(info, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetails{
 		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
 			SourceModelTag:         names.NewModelTag(s.model.UUID).String(),
 			OfferURL:               "test-user@external/test-model.test-offer",
 			OfferName:              "test-offer",
 			ApplicationDescription: "A pretty popular blog engine",
+			Endpoints: []jujuparams.RemoteEndpoint{{
+				Name:      "url",
+				Role:      "provider",
+				Interface: "http",
+				Limit:     0,
+			}},
 			Users: []jujuparams.OfferUserDetails{{
+				UserName:    "admin",
+				DisplayName: "admin",
+				Access:      string(jujuparams.OfferAdminAccess),
+			}, {
+				UserName: "everyone@external",
+				Access:   string(jujuparams.OfferReadAccess),
+			}, {
 				UserName: "test-user-2@external",
 				Access:   string(jujuparams.OfferConsumeAccess),
 			}},
 		},
 		ApplicationName: "test-app",
-		CharmURL:        "cs:quantal/wordpress-1",
 	})
 }
 
@@ -421,8 +450,6 @@ func (s *applicationoffersSuite) TestGrantApplicationOfferAccessNotFound(c *gc.C
 }
 
 func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
-	c.ExpectFailure("juju bug #1893940")
-
 	modelState, err := s.StatePool.Get(s.model.UUID)
 	c.Assert(err, gc.Equals, nil)
 	defer modelState.Release()
@@ -459,21 +486,39 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
 	info.OfferURL = offerURL
 	err = s.conn.GetApplicationOffer(ctx, &info)
 	c.Assert(err, gc.Equals, nil)
+
 	c.Check(info.OfferUUID, gc.Not(gc.Equals), "")
 	info.OfferUUID = ""
+	sort.Slice(info.Users, func(i, j int) bool {
+		return info.Users[i].UserName < info.Users[j].UserName
+	})
+	c.Check(info.CharmURL, gc.Matches, `cs:quantal/wordpress-[0-9]*`)
+	info.CharmURL = ""
 	c.Check(info, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetails{
 		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
 			SourceModelTag:         names.NewModelTag(s.model.UUID).String(),
 			OfferURL:               "test-user@external/test-model.test-offer",
 			OfferName:              "test-offer",
 			ApplicationDescription: "A pretty popular blog engine",
+			Endpoints: []jujuparams.RemoteEndpoint{{
+				Name:      "url",
+				Role:      "provider",
+				Interface: "http",
+				Limit:     0,
+			}},
 			Users: []jujuparams.OfferUserDetails{{
+				UserName:    "admin",
+				DisplayName: "admin",
+				Access:      string(jujuparams.OfferAdminAccess),
+			}, {
+				UserName: "everyone@external",
+				Access:   string(jujuparams.OfferReadAccess),
+			}, {
 				UserName: "test-user-2@external",
 				Access:   string(jujuparams.OfferConsumeAccess),
 			}},
 		},
 		ApplicationName: "test-app",
-		CharmURL:        "cs:quantal/wordpress-1",
 	})
 
 	err = s.conn.RevokeApplicationOfferAccess(ctx, offerURL, params.User("test-user-2"), jujuparams.OfferConsumeAccess)
@@ -483,19 +528,36 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Check(info.OfferUUID, gc.Not(gc.Equals), "")
 	info.OfferUUID = ""
+	sort.Slice(info.Users, func(i, j int) bool {
+		return info.Users[i].UserName < info.Users[j].UserName
+	})
+	c.Check(info.CharmURL, gc.Matches, `cs:quantal/wordpress-[0-9]*`)
+	info.CharmURL = ""
 	c.Check(info, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetails{
 		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
 			SourceModelTag:         names.NewModelTag(s.model.UUID).String(),
 			OfferURL:               "test-user@external/test-model.test-offer",
 			OfferName:              "test-offer",
 			ApplicationDescription: "A pretty popular blog engine",
+			Endpoints: []jujuparams.RemoteEndpoint{{
+				Name:      "url",
+				Role:      "provider",
+				Interface: "http",
+				Limit:     0,
+			}},
 			Users: []jujuparams.OfferUserDetails{{
+				UserName:    "admin",
+				DisplayName: "admin",
+				Access:      string(jujuparams.OfferAdminAccess),
+			}, {
+				UserName: "everyone@external",
+				Access:   string(jujuparams.OfferReadAccess),
+			}, {
 				UserName: "test-user-2@external",
 				Access:   string(jujuparams.OfferReadAccess),
 			}},
 		},
 		ApplicationName: "test-app",
-		CharmURL:        "cs:quantal/wordpress-1",
 	})
 }
 
@@ -555,8 +617,6 @@ func (s *applicationoffersSuite) TestDestroyApplicationOffer(c *gc.C) {
 }
 
 func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) {
-	c.ExpectFailure("juju bug #1893940")
-
 	modelState, err := s.StatePool.Get(s.model.UUID)
 	c.Assert(err, gc.Equals, nil)
 	defer modelState.Release()
@@ -592,12 +652,34 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 	c.Assert(err, gc.Equals, nil)
 	c.Check(info.Offer.OfferUUID, gc.Not(gc.Equals), "")
 	info.Offer.OfferUUID = ""
+	c.Check(info.Macaroon, gc.Not(gc.IsNil))
+	info.Macaroon = nil
 	c.Check(info, jc.DeepEquals, jujuparams.ConsumeOfferDetails{
 		Offer: &jujuparams.ApplicationOfferDetails{
 			SourceModelTag:         names.NewModelTag(s.model.UUID).String(),
 			OfferURL:               "test-user@external/test-model.test-offer",
 			OfferName:              "test-offer",
 			ApplicationDescription: "A pretty popular blog engine",
+			Endpoints: []jujuparams.RemoteEndpoint{{
+				Name:      "url",
+				Role:      "provider",
+				Interface: "http",
+				Limit:     0,
+			}},
+			Users: []jujuparams.OfferUserDetails{{
+				UserName:    "admin",
+				DisplayName: "admin",
+				Access:      "admin",
+			}, {
+				UserName:    "everyone@external",
+				DisplayName: "",
+				Access:      "read",
+			}},
+		},
+		ControllerInfo: &jujuparams.ExternalControllerInfo{
+			ControllerTag: names.NewControllerTag(s.ControllerConfig.ControllerUUID()).String(),
+			Addrs:         s.APIInfo(c).Addrs,
+			CACert:        s.APIInfo(c).CACert,
 		},
 	})
 }
