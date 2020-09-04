@@ -514,3 +514,33 @@ func ParseAddresses(addresses []string) ([]HostPort, error) {
 	}
 	return hps, nil
 }
+
+// ApplicationOffer represents a cross model application offer.
+type ApplicationOffer struct {
+	ID                     string            `bson:"_id"`
+	URL                    string            `bson:"url"`
+	Model                  string            `bson:"model"`
+	OfferName              string            `bson:"offer-name"`
+	ApplicationName        string            `bson:"application-name"`
+	ApplicationDescription string            `bson:"application-description"`
+	Endpoints              map[string]string `bson:"endpoints"`
+}
+
+// ApplicationOfferAccessPermission holds the access permission level.
+type ApplicationOfferAccessPermission int
+
+const (
+	ApplicationOfferNoAccess = iota
+	ApplicationOfferReadAccess
+	ApplicationOfferConsumeAccess
+	ApplicationOfferAdminAccess
+)
+
+// ApplicationOfferAccess holds the access permission
+// of a user to an application offer.
+type ApplicationOfferAccess struct {
+	User      string                           `bson:"user"`
+	Access    ApplicationOfferAccessPermission `bson:"access"`
+	OfferName string                           `bson:"offer-name"`
+	Model     string                           `bson:"model"`
+}

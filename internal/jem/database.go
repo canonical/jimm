@@ -5,6 +5,8 @@ package jem
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"sort"
 	"time"
 
 	"github.com/juju/version"
@@ -22,6 +24,31 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
 	"github.com/CanonicalLtd/jimm/params"
 )
+
+// ApplicationOfferFilter holds data intended for querying and filtering application offers.
+type ApplicationOfferFilter struct {
+	// OwnerName is the owner of the model hosting the offer.
+	OwnerName string
+
+	// Model is the model hosting the offer.
+	Model string
+
+	// OfferName is the name of the offer.
+	OfferName string
+
+	// ApplicationName is the name of the application to which the offer pertains.
+	ApplicationName string
+
+	// ApplicationDescription is a description of the application's functionality,
+	// typically copied from the charm metadata.
+	ApplicationDescription string
+
+	// Endpoint contains an endpoint filter criteria.
+	Endpoints []string
+
+	// AllowedConsumers are the users allowed to consume the offer.
+	AllowedConsumers []string
+}
 
 // Database wraps an mgo.DB ands adds a number of methods for
 // manipulating the database.
@@ -93,6 +120,12 @@ func (db *Database) ensureIndexes() error {
 	}, {
 		db.Credentials(),
 		mgo.Index{Key: []string{"path.entitypath.user", "path.cloud"}},
+	}, {
+		db.ApplicationOffers(),
+		mgo.Index{Key: []string{"model", "name"}, Unique: true},
+	}, {
+		db.ApplicationOfferAccesses(),
+		mgo.Index{Key: []string{"user", "name", "model"}, Unique: true},
 	}}
 	for _, idx := range indexes {
 		err := idx.c.EnsureIndex(idx.i)
@@ -1188,6 +1221,203 @@ func (db *Database) CheckReadACL(ctx context.Context, c *mgo.Collection, path pa
 	return nil
 }
 
+// AddApplicationOffer stores an application offer.
+func (db *Database) AddApplicationOffer(ctx context.Context, offer *mongodoc.ApplicationOffer) (err error) {
+	defer db.checkError(ctx, &err)
+
+	if err = db.ApplicationOffers().Insert(offer); err != nil {
+		if mgo.IsDup(err) {
+			err = errgo.WithCausef(err, params.ErrAlreadyExists, "")
+		}
+	}
+	return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
+}
+
+// UpdateApplicationOffer updates the application offer.
+func (db *Database) UpdateApplicationOffer(ctx context.Context, offer *mongodoc.ApplicationOffer) (err error) {
+	defer db.checkError(ctx, &err)
+	update := make(bson.D, 5)
+	update[0] = bson.DocElem{Name: "offer-name", Value: offer.OfferName}
+	update[1] = bson.DocElem{Name: "application-name", Value: offer.ApplicationName}
+	update[2] = bson.DocElem{Name: "application-description", Value: offer.ApplicationDescription}
+	update[3] = bson.DocElem{Name: "endpoints", Value: offer.Endpoints}
+	update[4] = bson.DocElem{Name: "url", Value: offer.URL}
+	err = db.ApplicationOffers().UpdateId(offer.ID, bson.D{{
+		Name: "$set", Value: update,
+	}})
+	if errgo.Cause(err) == mgo.ErrNotFound {
+		return errgo.WithCausef(err, params.ErrNotFound, "cannot update offer %s", offer.ID)
+	}
+	return errgo.Mask(err)
+}
+
+// ApplicationOffer returns the offer by its name. Each application offer is
+// uniquely identified by the model and offer name.
+func (db *Database) ApplicationOffer(ctx context.Context, model, offerName string) (_ *mongodoc.ApplicationOffer, err error) {
+	defer db.checkError(ctx, &err)
+	var doc mongodoc.ApplicationOffer
+	if err = db.ApplicationOffers().Find(bson.M{"offer-name": offerName, "model": model}).One(&doc); err != nil {
+		if err == mgo.ErrNotFound {
+			return nil, errgo.WithCausef(nil, params.ErrNotFound, "")
+		}
+		return nil, errgo.Mask(err)
+	}
+	return &doc, nil
+}
+
+// ApplicationOfferForUUID returns the offer by its ID.
+func (db *Database) ApplicationOfferForUUID(ctx context.Context, id string) (_ *mongodoc.ApplicationOffer, err error) {
+	defer db.checkError(ctx, &err)
+	var doc mongodoc.ApplicationOffer
+	if err = db.ApplicationOffers().FindId(id).One(&doc); err != nil {
+		if err == mgo.ErrNotFound {
+			return nil, errgo.WithCausef(nil, params.ErrNotFound, "")
+		}
+		return nil, errgo.Mask(err)
+	}
+	return &doc, nil
+}
+
+// RemoveApplicationOffer removes an application offer.
+func (db *Database) RemoveApplicationOffer(ctx context.Context, model, offerName string) (err error) {
+	defer db.checkError(ctx, &err)
+
+	if err = db.ApplicationOffers().Remove(bson.M{"offer-name": offerName, "model": model}); err != nil {
+		if err == mgo.ErrNotFound {
+			return errgo.WithCausef(nil, params.ErrNotFound, "")
+		}
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
+// ListApplicationOffers returns application offers
+// matching any one of the filter terms.
+func (db *Database) ListApplicationOffers(ctx context.Context, model string, filters ...ApplicationOfferFilter) (_ []mongodoc.ApplicationOffer, err error) {
+	defer db.checkError(ctx, &err)
+
+	if len(filters) == 0 {
+		return db.AllApplicationOffers(ctx, model)
+	}
+	var offers []mongodoc.ApplicationOffer
+	for _, filter := range filters {
+		query := bson.D{{Name: "model", Value: model}}
+		query = append(query, makeApplicationOfferFilterQuery(filter)...)
+
+		var docs []mongodoc.ApplicationOffer
+		err = db.ApplicationOffers().Find(query).All(&docs)
+		if err != nil {
+			return nil, errgo.Mask(err)
+		}
+		docs, err = db.filterOffers(ctx, docs, filter)
+		if err != nil {
+			return nil, errgo.Mask(err)
+		}
+		offers = append(offers, docs...)
+	}
+	sort.Slice(offers, func(i, j int) bool {
+		if offers[i].OfferName == offers[j].OfferName {
+			return offers[i].ApplicationName < offers[j].ApplicationName
+		}
+		return offers[i].OfferName < offers[j].OfferName
+	})
+	return offers, nil
+}
+
+// SetApplicationOfferAccess sets a user access level to an application offer.
+func (db *Database) SetApplicationOfferAccess(ctx context.Context, access mongodoc.ApplicationOfferAccess) (err error) {
+	defer db.checkError(ctx, &err)
+
+	_, err = db.ApplicationOfferAccesses().Upsert(
+		bson.M{
+			"user":       access.User,
+			"offer-name": access.OfferName,
+			"model":      access.Model,
+		},
+		bson.M{"$set": bson.M{
+			"access": access.Access,
+		}},
+	)
+	return errgo.Mask(err)
+}
+
+// GetApplicationOfferAccess returns a user access level to an application offer.
+func (db *Database) GetApplicationOfferAccess(ctx context.Context, user, model, offerName string) (_ *mongodoc.ApplicationOfferAccess, err error) {
+	defer db.checkError(ctx, &err)
+
+	var access mongodoc.ApplicationOfferAccess
+	if err = db.ApplicationOfferAccesses().Find(
+		bson.M{
+			"user":       user,
+			"offer-name": offerName,
+			"model":      model,
+		},
+	).One(&access); err != nil {
+		if err == mgo.ErrNotFound {
+			return nil, errgo.WithCausef(nil, params.ErrNotFound, "")
+		}
+		return nil, errgo.Mask(err)
+	}
+	return &access, nil
+}
+
+// GetApplicationOfferUsers returns a list of users that have the specified level of access (or higher).
+func (db *Database) GetApplicationOfferUsers(ctx context.Context, level mongodoc.ApplicationOfferAccessPermission, model, offerName string) (_ []string, err error) {
+	defer db.checkError(ctx, &err)
+
+	var accessDocs []mongodoc.ApplicationOfferAccess
+	if err = db.ApplicationOfferAccesses().Find(
+		bson.M{
+			"offer-name": offerName,
+			"model":      model,
+		},
+	).All(&accessDocs); err != nil {
+		if err == mgo.ErrNotFound {
+			return nil, errgo.WithCausef(nil, params.ErrNotFound, "")
+		}
+		return nil, errgo.Mask(err)
+	}
+
+	users := []string{}
+	for _, doc := range accessDocs {
+		if doc.Access >= level {
+			users = append(users, doc.User)
+		}
+	}
+	users = sort.StringSlice(users)
+
+	return users, nil
+}
+
+func makeApplicationOfferFilterQuery(filter ApplicationOfferFilter) bson.D {
+	var query bson.D
+	if filter.ApplicationName != "" {
+		query = append(query, bson.DocElem{"application-name", filter.ApplicationName})
+	}
+	// We match on partial names, eg "-sql"
+	if filter.OfferName != "" {
+		query = append(query, bson.DocElem{"offer-name", bson.D{{"$regex", fmt.Sprintf(".*%s.*", filter.OfferName)}}})
+	}
+	// We match descriptions by looking for containing terms.
+	if filter.ApplicationDescription != "" {
+		desc := regexp.QuoteMeta(filter.ApplicationDescription)
+		query = append(query, bson.DocElem{"application-description", bson.D{{"$regex", fmt.Sprintf(".*%s.*", desc)}}})
+	}
+	return query
+}
+
+// AllApplicationOffers returns all application offers for a model.
+func (db *Database) AllApplicationOffers(ctx context.Context, model string) (_ []mongodoc.ApplicationOffer, err error) {
+	defer db.checkError(ctx, &err)
+
+	var docs []mongodoc.ApplicationOffer
+	err = db.ApplicationOffers().Find(bson.M{"model": model}).All(&docs)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return docs, nil
+}
+
 // CanReadIter returns an iterator that iterates over items in the given
 // iterator, which must have been derived from db, returning only those
 // that the currently logged in user has permission to see.
@@ -1269,6 +1499,8 @@ func (db *Database) Collections() []*mgo.Collection {
 		db.Macaroons(),
 		db.Machines(),
 		db.Models(),
+		db.ApplicationOffers(),
+		db.ApplicationOfferAccesses(),
 	}
 }
 
@@ -1304,9 +1536,99 @@ func (db *Database) Models() *mgo.Collection {
 	return db.C("models")
 }
 
+// ApplicationOffers returns the collection holding application offers.
+func (db *Database) ApplicationOffers() *mgo.Collection {
+	return db.C("application_offers")
+}
+
+// ApplicationOfferAccesses returns the collection holding application offer
+// accesses for users.
+func (db *Database) ApplicationOfferAccesses() *mgo.Collection {
+	return db.C("application_offer_accesses")
+}
+
 func (db *Database) C(name string) *mgo.Collection {
 	if db.Database == nil {
 		panic(fmt.Sprintf("cannot get collection %q because JEM closed", name))
 	}
 	return db.Database.C(name)
+}
+
+// filterOffers takes a list of offers resulting from a db query
+// and performs additional filtering which cannot be done via mongo.
+func (db *Database) filterOffers(
+	ctx context.Context,
+	in []mongodoc.ApplicationOffer,
+	filter ApplicationOfferFilter,
+) ([]mongodoc.ApplicationOffer, error) {
+
+	out, err := db.filterOffersByEndpoint(ctx, in, filter.Endpoints)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return db.filterOffersByAllowedConsumer(ctx, out, filter.AllowedConsumers)
+}
+
+func (db *Database) filterOffersByEndpoint(
+	ctx context.Context,
+	in []mongodoc.ApplicationOffer,
+	endpoints []string,
+) ([]mongodoc.ApplicationOffer, error) {
+
+	if len(endpoints) == 0 {
+		return in, nil
+	}
+
+	var out []mongodoc.ApplicationOffer
+	for _, doc := range in {
+		if matchEndpoints(doc.Endpoints, endpoints) {
+			out = append(out, doc)
+		}
+	}
+	return out, nil
+}
+
+func matchEndpoints(offerEndpoints map[string]string, filterEndpoints []string) bool {
+	for _, ep1 := range offerEndpoints {
+		for _, ep2 := range filterEndpoints {
+			if ep1 == ep2 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (db *Database) filterOffersByAllowedConsumer(
+	ctx context.Context,
+	in []mongodoc.ApplicationOffer,
+	users []string,
+) ([]mongodoc.ApplicationOffer, error) {
+
+	if len(users) == 0 {
+		return in, nil
+	}
+
+	var out []mongodoc.ApplicationOffer
+	for _, doc := range in {
+		offerUsers, err := db.GetApplicationOfferUsers(ctx, mongodoc.ApplicationOfferConsumeAccess, doc.Model, doc.OfferName)
+		if err != nil {
+			return nil, errgo.Mask(err)
+		}
+		if matchUsers(offerUsers, users) {
+			out = append(out, doc)
+		}
+	}
+	return out, nil
+}
+
+func matchUsers(allowedUsers []string, filterUsers []string) bool {
+	for _, fu := range filterUsers {
+		for _, au := range allowedUsers {
+			if fu == au {
+				return true
+			}
+		}
+	}
+	return false
 }
