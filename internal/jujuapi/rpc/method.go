@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/juju/juju/apiserver/common"
+	"github.com/juju/juju/apiserver/errors"
 	"github.com/juju/rpcreflect"
 )
 
@@ -103,7 +103,7 @@ func (c methodCaller) Call(ctx context.Context, objId string, arg reflect.Value)
 		pv = append(pv, reflect.ValueOf(objId))
 	} else {
 		if objId != "" {
-			return reflect.Value{}, common.ErrBadId
+			return reflect.Value{}, errors.ErrBadId
 		}
 	}
 	if c.flags&inParams == inParams {
