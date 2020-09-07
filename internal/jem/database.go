@@ -789,6 +789,8 @@ func (db *Database) updateCredential(ctx context.Context, cred *mongodoc.Credent
 		"attributes", cred.Attributes,
 	}, {
 		"revoked", cred.Revoked,
+	}, {
+		"attributesinvault", cred.AttributesInVault,
 	}}
 	if len(cred.ACL.Read) > 0 {
 		update = append(update, bson.DocElem{"acl", cred.ACL})

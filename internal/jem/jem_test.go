@@ -1156,11 +1156,9 @@ func (s *jemSuite) TestCredential(c *gc.C) {
 		err := jem.UpdateCredential(s.jem.DB, testContext, &cred)
 		c.Assert(err, gc.Equals, nil)
 	}
-	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
-
 	for i, test := range credentialTests {
-		c.Logf("tes %d. %s", i, test.path)
-		ctl, err := s.jem.Credential(ctx, test.path)
+		c.Logf("test %d. %s", i, test.path)
+		ctl, err := s.jem.GetCredential(context.Background(), jemtest.NewIdentity("bob", "bob-group"), test.path)
 		if test.expectErrorCause != nil {
 			c.Assert(errgo.Cause(err), gc.Equals, test.expectErrorCause)
 			continue

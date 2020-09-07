@@ -1359,9 +1359,9 @@ func (s *modelManagerSuite) TestDumpModel(c *gc.C) {
 
 	tag := names.NewModelTag(mi.UUID)
 	client := modelmanager.NewClient(conn)
-	res, err := client.DumpModel(tag, true)
-	c.Assert(err, gc.ErrorMatches, `DumpModel is not implemented for JAAS models`)
-	c.Assert(res, gc.IsNil)
+	res, err := client.DumpModel(tag, false)
+	c.Check(err, gc.Equals, nil)
+	c.Check(res, gc.Not(gc.HasLen), 0)
 }
 
 func (s *modelManagerSuite) TestDumpModelV2(c *gc.C) {
@@ -1382,8 +1382,8 @@ func (s *modelManagerSuite) TestDumpModelV2(c *gc.C) {
 	}, &results)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(results.Results, gc.HasLen, 1)
-	c.Assert(results.Results[0].Error, gc.ErrorMatches, `DumpModel is not implemented for JAAS models`)
-	c.Assert(results.Results[0].Result, gc.IsNil)
+	c.Check(results.Results[0].Error, gc.IsNil)
+	c.Check(results.Results[0].Result, gc.Not(gc.HasLen), 0)
 }
 
 func (s *modelManagerSuite) TestDumpModelUnauthorized(c *gc.C) {
@@ -1400,8 +1400,8 @@ func (s *modelManagerSuite) TestDumpModelUnauthorized(c *gc.C) {
 	tag := names.NewModelTag(mi.UUID)
 	client := modelmanager.NewClient(conn)
 	res, err := client.DumpModel(tag, true)
-	c.Assert(err, gc.ErrorMatches, `unauthorized`)
-	c.Assert(res, gc.IsNil)
+	c.Check(err, gc.ErrorMatches, `unauthorized`)
+	c.Check(res, gc.IsNil)
 }
 
 func (s *modelManagerSuite) TestDumpModelDB(c *gc.C) {
@@ -1418,8 +1418,8 @@ func (s *modelManagerSuite) TestDumpModelDB(c *gc.C) {
 	tag := names.NewModelTag(mi.UUID)
 	client := modelmanager.NewClient(conn)
 	res, err := client.DumpModelDB(tag)
-	c.Assert(err, gc.ErrorMatches, `DumpModelDB is not implemented for JAAS models`)
-	c.Assert(res, gc.IsNil)
+	c.Check(err, gc.Equals, nil)
+	c.Check(res, gc.Not(gc.HasLen), 0)
 }
 
 func (s *modelManagerSuite) TestDumpModelDBUnauthorized(c *gc.C) {
@@ -1436,8 +1436,8 @@ func (s *modelManagerSuite) TestDumpModelDBUnauthorized(c *gc.C) {
 	tag := names.NewModelTag(mi.UUID)
 	client := modelmanager.NewClient(conn)
 	res, err := client.DumpModelDB(tag)
-	c.Assert(err, gc.ErrorMatches, `unauthorized`)
-	c.Assert(res, gc.IsNil)
+	c.Check(err, gc.ErrorMatches, `unauthorized`)
+	c.Check(res, gc.IsNil)
 }
 
 func (s *modelManagerSuite) TestChangeModelCredential(c *gc.C) {
@@ -1688,4 +1688,24 @@ func (s *caasModelManagerSuite) AssertAddKubernetesCloud(c *gc.C, credTag names.
 			c.Assert(err, gc.Equals, nil)
 		}
 	}
+}
+
+func assertModelInfo(c *gc.C, obtained, expected []jujuparams.ModelInfoResult) {
+	for i := range obtained {
+		// DefaultSeries changes between juju versions and
+		// we don't care about its specific value.
+		if obtained[i].Result != nil {
+			obtained[i].Result.DefaultSeries = ""
+		}
+	}
+	for i := range obtained {
+		if obtained[i].Result == nil {
+			continue
+		}
+		obtained[i].Result.Status.Since = nil
+		for j := range obtained[i].Result.Users {
+			obtained[i].Result.Users[j].LastConnection = nil
+		}
+	}
+	c.Assert(obtained, jc.DeepEquals, expected)
 }

@@ -103,7 +103,7 @@ func (c *Conn) ModelInfo(ctx context.Context, info *jujuparams.ModelInfo) error 
 // of the given model. This is a specialized wrapper around
 // ModifyModelAccess to be used when bootstrapping a model. Any error
 // that is returned from the API will be of type *APIError.
-// GrantJIMMModelAdmin uses the Create model procedure on the
+// GrantJIMMModelAdmin uses the ModifyModelAccess procedure on the
 // ModelManager facade version 2.
 func (c *Conn) GrantJIMMModelAdmin(ctx context.Context, uuid string) error {
 	args := jujuparams.ModifyModelAccessRequest{
@@ -123,4 +123,68 @@ func (c *Conn) GrantJIMMModelAdmin(ctx context.Context, uuid string) error {
 		return errgo.Newf("unexpected number of results (expected 1, got %d)", len(resp.Results))
 	}
 	return newAPIError(resp.Results[0].Error)
+}
+
+// DumpModel dumps debugging details for the given model. DumpModel uses
+// the DumpModels method on the ModelManager facade version 2.
+func (c *Conn) DumpModel(ctx context.Context, uuid string) (map[string]interface{}, error) {
+	args := jujuparams.Entities{
+		Entities: []jujuparams.Entity{{
+			Tag: names.NewModelTag(uuid).String(),
+		}},
+	}
+
+	var resp jujuparams.MapResults
+	if err := c.APICall("ModelManager", 2, "", "DumpModels", &args, &resp); err != nil {
+		return nil, newAPIError(err)
+	}
+
+	if len(resp.Results) != 1 {
+		return nil, errgo.Newf("unexpected number of results (expected 1, got %d)", len(resp.Results))
+	}
+	return resp.Results[0].Result, newAPIError(resp.Results[0].Error)
+}
+
+// DumpModelV3 dumps debugging details for the given model into the given
+// . If the simplied dump is requested then a simplified dump is
+// returned. DumpModelV3 uses the DumpModels method on the ModelManager
+// facade version 3.
+func (c *Conn) DumpModelV3(ctx context.Context, uuid string, simplified bool) (string, error) {
+	args := jujuparams.DumpModelRequest{
+		Entities: []jujuparams.Entity{{
+			Tag: names.NewModelTag(uuid).String(),
+		}},
+		Simplified: simplified,
+	}
+
+	var resp jujuparams.StringResults
+	if err := c.APICall("ModelManager", 3, "", "DumpModels", &args, &resp); err != nil {
+		return "", newAPIError(err)
+	}
+
+	if len(resp.Results) != 1 {
+		return "", errgo.Newf("unexpected number of results (expected 1, got %d)", len(resp.Results))
+	}
+	return resp.Results[0].Result, newAPIError(resp.Results[0].Error)
+}
+
+// DumpModelDB dumps the controller database entry given model.
+// DumpModelDB uses the DumpModelsDB method on the ModelManager facade
+// version 2.
+func (c *Conn) DumpModelDB(ctx context.Context, uuid string) (map[string]interface{}, error) {
+	args := jujuparams.Entities{
+		Entities: []jujuparams.Entity{{
+			Tag: names.NewModelTag(uuid).String(),
+		}},
+	}
+
+	var resp jujuparams.MapResults
+	if err := c.APICall("ModelManager", 2, "", "DumpModelsDB", &args, &resp); err != nil {
+		return nil, newAPIError(err)
+	}
+
+	if len(resp.Results) != 1 {
+		return nil, errgo.Newf("unexpected number of results (expected 1, got %d)", len(resp.Results))
+	}
+	return resp.Results[0].Result, newAPIError(resp.Results[0].Error)
 }

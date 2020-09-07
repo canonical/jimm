@@ -53,6 +53,30 @@ type Config struct {
 	PublicCloudMetadata   string            `yaml:"public-cloud-metadata"`
 	MaxPubsubConcurrency  int               `yaml:"max-pubsub-concurrency"`
 	JujuDashboardLocation string            `yaml:"juju-dashboard-location"`
+	Vault                 VaultConfig       `yaml:"vault"`
+}
+
+// A VaultConfig contains the configuration settings for a vault server
+// that will be used to store cloud credentials.
+type VaultConfig struct {
+	// Address is the address of the vault server.
+	Address string `yaml:"address"`
+
+	// ApprolePath is the path on the vault server of the approle
+	// authentication service.
+	ApprolePath string `yaml:"approle-path"`
+
+	// ApproleRoleID contains the role_id to use for approle
+	// authentication.
+	ApproleRoleID string `yaml:"approle-role-id"`
+
+	// ApproleSecretID contains the secret_id to use for approle
+	// authentication.
+	ApproleSecretID string `yaml:"approle-secret-id"`
+
+	// KVPath is the root path of the KV store assigned to the JIMM
+	// application.
+	KVPath string `yaml:"kv-path"`
 }
 
 func (c *Config) validate() error {

@@ -13,11 +13,40 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
 
+	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
 	"github.com/CanonicalLtd/jimm/params"
 )
+
+func init() {
+	facadeInit["ModelSummaryWatcher"] = func(r *controllerRoot) []int {
+		nextMethod := rpc.Method(r.ModelSummaryWatcherNext)
+		stopMethod := rpc.Method(r.ModelSummaryWatcherStop)
+
+		r.AddMethod("ModelSummaryWatcher", 1, "Next", nextMethod)
+		r.AddMethod("ModelSummaryWatcher", 1, "Stop", stopMethod)
+
+		return []int{1}
+	}
+}
+
+func (r *controllerRoot) ModelSummaryWatcherNext(ctx context.Context, objID string) (jujuparams.SummaryWatcherNextResults, error) {
+	w, err := r.watchers.get(objID)
+	if err != nil {
+		return jujuparams.SummaryWatcherNextResults{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return w.Next()
+}
+
+func (r *controllerRoot) ModelSummaryWatcherStop(ctx context.Context, objID string) error {
+	w, err := r.watchers.get(objID)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return w.Stop()
+}
 
 var (
 	defaultModelAccessWatcherPeriod = time.Minute

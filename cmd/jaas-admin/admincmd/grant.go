@@ -7,7 +7,6 @@ import (
 
 	"github.com/juju/cmd"
 	"github.com/juju/gnuflag"
-	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/names/v4"
 	"gopkg.in/errgo.v1"
 
@@ -15,7 +14,7 @@ import (
 )
 
 type grantCommand struct {
-	commandBase
+	*commandBase
 
 	path    entityPathValue
 	aclName string
@@ -26,8 +25,10 @@ type grantCommand struct {
 	users      userSet
 }
 
-func newGrantCommand() cmd.Command {
-	return modelcmd.WrapBase(&grantCommand{})
+func newGrantCommand(c *commandBase) cmd.Command {
+	return &grantCommand{
+		commandBase: c,
+	}
 }
 
 var grantDoc = `

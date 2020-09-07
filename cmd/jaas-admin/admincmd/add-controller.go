@@ -7,7 +7,6 @@ import (
 
 	"github.com/juju/cmd"
 	"github.com/juju/gnuflag"
-	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/environs"
 	"github.com/juju/juju/environs/bootstrap"
 	"github.com/juju/juju/jujuclient"
@@ -17,15 +16,17 @@ import (
 )
 
 type addControllerCommand struct {
-	commandBase
+	*commandBase
 
 	publicAddress  string
 	controllerName string
 	controllerPath entityPathValue
 }
 
-func newAddControllerCommand() cmd.Command {
-	return modelcmd.WrapBase(&addControllerCommand{})
+func newAddControllerCommand(c *commandBase) cmd.Command {
+	return &addControllerCommand{
+		commandBase: c,
+	}
 }
 
 var addControllerDoc = `
@@ -50,7 +51,6 @@ func (c *addControllerCommand) Info() *cmd.Info {
 }
 
 func (c *addControllerCommand) SetFlags(f *gnuflag.FlagSet) {
-	c.commandBase.SetFlags(f)
 	f.StringVar(&c.controllerName, "c", "", "controller to add")
 	f.StringVar(&c.controllerName, "controller", "", "")
 	f.StringVar(&c.publicAddress, "public-address", "", "public address for the controller.")

@@ -9,6 +9,7 @@ require (
 	github.com/canonical/candid v1.4.2
 	github.com/docker/distribution v2.7.0+incompatible // indirect
 	github.com/flosch/pongo2 v0.0.0-20180809100617-24195e6d38b0 // indirect
+	github.com/frankban/quicktest v1.9.0
 	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/google/go-cmp v0.4.0
 	github.com/google/go-querystring v0.0.0-20170111101155-53e6ce116135 // indirect
@@ -19,6 +20,11 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/gosuri/uitable v0.0.4 // indirect
 	github.com/hashicorp/go-msgpack v1.1.5 // indirect
+<<<<<<< HEAD
+=======
+	github.com/hashicorp/raft-boltdb v0.0.0-20191021154308-4207f1bf0617 // indirect
+	github.com/hashicorp/vault/api v1.0.5-0.20200709165743-f98572ac11c9
+>>>>>>> origin/master
 	github.com/joyent/gocommon v0.0.0-20161202192317-b78708995d1c // indirect
 	github.com/joyent/gosdc v0.0.0-20161202192312-ec8b3503a75e // indirect
 	github.com/joyent/gosign v0.0.0-20161114191744-9abcee278795 // indirect
@@ -29,7 +35,11 @@ require (
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
 	github.com/juju/go-oracle-cloud v0.0.0-20170510162943-95ad2a088ab9 // indirect
 	github.com/juju/httprequest v1.0.1
+<<<<<<< HEAD
 	github.com/juju/juju v0.0.0-20200713091106-a0d23d954065
+=======
+	github.com/juju/juju v0.0.0-20200903030021-a44e6eb38430
+>>>>>>> origin/master
 	github.com/juju/loggo v0.0.0-20200526014432-9ce3a2e09b5e
 	github.com/juju/lru v0.0.0-20190314140547-92a0afabdc41 // indirect
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
