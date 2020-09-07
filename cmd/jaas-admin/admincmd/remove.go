@@ -5,22 +5,23 @@ package admincmd
 import (
 	"github.com/juju/cmd"
 	"github.com/juju/gnuflag"
-	"github.com/juju/juju/cmd/modelcmd"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/params"
 )
 
 type removeCommand struct {
-	commandBase
+	*commandBase
 
 	paths      []entityPathValue
 	controller bool
 	force      bool
 }
 
-func newRemoveCommand() cmd.Command {
-	return modelcmd.WrapBase(&removeCommand{})
+func newRemoveCommand(c *commandBase) cmd.Command {
+	return &removeCommand{
+		commandBase: c,
+	}
 }
 
 var removeDoc = `

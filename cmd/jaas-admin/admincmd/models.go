@@ -7,20 +7,21 @@ import (
 
 	"github.com/juju/cmd"
 	"github.com/juju/gnuflag"
-	"github.com/juju/juju/cmd/modelcmd"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/params"
 )
 
 type modelsCommand struct {
-	commandBase
+	*commandBase
 
 	all bool
 }
 
-func newModelsCommand() cmd.Command {
-	return modelcmd.WrapBase(&modelsCommand{})
+func newModelsCommand(c *commandBase) cmd.Command {
+	return &modelsCommand{
+		commandBase: c,
+	}
 }
 
 var modelsDoc = `
@@ -36,7 +37,6 @@ func (c *modelsCommand) Info() *cmd.Info {
 }
 
 func (c *modelsCommand) SetFlags(f *gnuflag.FlagSet) {
-	c.commandBase.SetFlags(f)
 	f.BoolVar(&c.all, "all", false, "list all models in the system (admin only)")
 }
 

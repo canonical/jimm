@@ -11,8 +11,7 @@ import (
 	"github.com/juju/aclstore/aclclient"
 	"github.com/juju/cmd"
 	"github.com/juju/gnuflag"
-	"github.com/juju/juju/cmd/modelcmd"
-	"github.com/juju/persistent-cookiejar"
+	cookiejar "github.com/juju/persistent-cookiejar"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
@@ -24,70 +23,58 @@ import (
 // in the Juju project.
 const jujuLoggingConfigEnvKey = "JUJU_LOGGING_CONFIG"
 
+const jimmServerURL = "https://jimm.jujucharms.com"
+
 var cmdDoc = `
-The jaas admin command provides access to the managing server.
-The commands are at present for testing purposes only
-and are not stable in any form.
+The jaas command provides access to the managing server. The commands 
+are at present for testing purposes only and are not stable in any form.
 
 The location of the managing server can be specified
 as an environment variable:
 
 	JIMM_URL=<managing server URL>
 
-or as a command line flag on the admin subcommands
-(note that this does not work when used on the jaas
-admin command itself).
+or as a command line flag:
 
 	--jimm-url <managing server URL>
 
 The latter takes precedence over the former.
 `
 
-// New returns a command that can execute jaas-admin
-// commands.
+// New returns a command that can execute jaas commands.
 func New() cmd.Command {
+	base := new(commandBase)
 	supercmd := cmd.NewSuperCommand(cmd.SuperCommandParams{
-		Name:        "admin",
-		UsagePrefix: "jaas",
+		Name:        "jaas",
 		Doc:         cmdDoc,
 		Purpose:     "access the managing server",
+		GlobalFlags: base,
 		Log: &cmd.Log{
 			DefaultConfig: os.Getenv(jujuLoggingConfigEnvKey),
 		},
 	})
-	supercmd.Register(newAddControllerCommand())
-	supercmd.Register(newControllersCommand())
+	supercmd.Register(newAddControllerCommand(base))
+	supercmd.Register(newControllersCommand(base))
 	supercmd.RegisterAlias("list-controllers", "controllers", nil)
-	supercmd.Register(newDeprecateControllerCommand())
-	supercmd.Register(newGrantCommand())
-	supercmd.Register(newModelsCommand())
+	supercmd.Register(newDeprecateControllerCommand(base))
+	supercmd.Register(newGrantCommand(base))
+	supercmd.Register(newModelsCommand(base))
 	supercmd.RegisterAlias("list-models", "models", nil)
-	supercmd.Register(newRemoveCommand())
-	supercmd.Register(newRevokeCommand())
+	supercmd.Register(newRemoveCommand(base))
+	supercmd.Register(newRevokeCommand(base))
 
 	return supercmd
 }
 
-// commandBase holds the basis for commands.
 type commandBase struct {
-	modelcmd.CommandBase
-	jimmURL string
+	cmd.CommandBase
+
+	url string
 }
 
-func (c *commandBase) SetFlags(f *gnuflag.FlagSet) {
-	f.StringVar(&c.jimmURL, "jimm-url", "", "URL of managing server (defaults to $JIMM_URL)")
-}
-
-type client struct {
-	*jemclient.Client
-	jar  *cookiejar.Jar
-	ctxt *cmd.Context
-}
-
-func (c *client) Close() {
-	if err := c.jar.Save(); err != nil {
-		fmt.Fprintf(c.ctxt.Stderr, "cannot save cookies: %v", err)
-	}
+// AddFlags implements cmd.FlagAdder.
+func (cmd *commandBase) AddFlags(f *gnuflag.FlagSet) {
+	f.StringVar(&cmd.url, "jimm-url", "", "URL of managing server (defaults to $JIMM_URL)")
 }
 
 // newClient creates and return a JEM client with access to
@@ -121,13 +108,13 @@ func (c *commandBase) newBakeryClient() (*cookiejar.Jar, *httpbakery.Client, err
 	return jar, bakeryClient, nil
 }
 
-type aclClient struct {
-	*aclclient.Client
+type client struct {
+	*jemclient.Client
 	jar  *cookiejar.Jar
 	ctxt *cmd.Context
 }
 
-func (c *aclClient) Close() {
+func (c *client) Close() {
 	if err := c.jar.Save(); err != nil {
 		fmt.Fprintf(c.ctxt.Stderr, "cannot save cookies: %v", err)
 	}
@@ -153,13 +140,23 @@ func (c *commandBase) newACLClient(ctxt *cmd.Context) (*aclClient, error) {
 	}, nil
 }
 
-const jimmServerURL = "https://jimm.jujucharms.com"
+type aclClient struct {
+	*aclclient.Client
+	jar  *cookiejar.Jar
+	ctxt *cmd.Context
+}
+
+func (c *aclClient) Close() {
+	if err := c.jar.Save(); err != nil {
+		fmt.Fprintf(c.ctxt.Stderr, "cannot save cookies: %v", err)
+	}
+}
 
 // serverURL returns the JIMM server URL.
 // The returned value can be overridden by setting the JIMM_URL variable.
 func (c *commandBase) serverURL() string {
-	if c.jimmURL != "" {
-		return c.jimmURL
+	if c.url != "" {
+		return c.url
 	}
 	if url := os.Getenv("JIMM_URL"); url != "" {
 		return url
