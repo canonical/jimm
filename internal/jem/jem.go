@@ -1628,13 +1628,15 @@ func (j *JEM) Offer(ctx context.Context, id identchecker.ACLIdentity, offer juju
 	}
 
 	doc := mongodoc.ApplicationOffer{
-		ID:                     offerDetails.OfferUUID,
-		URL:                    offerDetails.OfferURL,
-		Model:                  model.UUID,
+		OfferUUID:              offerDetails.OfferUUID,
+		OfferURL:               offerDetails.OfferURL,
+		OwnerName:              conv.ToUserTag(model.Path.User).Id(),
+		ModelName:              string(model.Path.Name),
 		OfferName:              offerDetails.OfferName,
 		ApplicationName:        offerDetails.ApplicationName,
 		ApplicationDescription: offerDetails.ApplicationDescription,
 		Endpoints:              offer.Endpoints,
+		ControllerPath:         model.Controller,
 	}
 
 	err = j.DB.AddApplicationOffer(ctx, &doc)
@@ -1648,6 +1650,11 @@ func (j *JEM) Offer(ctx context.Context, id identchecker.ACLIdentity, offer juju
 	for _, user := range offerDetails.Users {
 		var userAccess mongodoc.ApplicationOfferAccessPermission
 
+		uid, err := conv.FromUserID(user.UserName)
+		if err != nil {
+			zapctx.Warn(ctx, "ignoring unsupported user name", zap.String("user name", user.UserName), zap.Error(err))
+			continue
+		}
 		switch user.Access {
 		case "read":
 			userAccess = mongodoc.ApplicationOfferReadAccess
@@ -1656,16 +1663,16 @@ func (j *JEM) Offer(ctx context.Context, id identchecker.ACLIdentity, offer juju
 		case "admin":
 			userAccess = mongodoc.ApplicationOfferAdminAccess
 		default:
-			zapctx.Error(ctx, "unknown user access level", zap.String("level", user.Access))
+			zapctx.Warn(ctx, "unknown user access level", zap.String("level", user.Access))
+			continue
 
 		}
 		offerAccess := mongodoc.ApplicationOfferAccess{
-			User:      string(params.User(user.UserName)),
-			Model:     model.UUID,
-			OfferName: offerDetails.OfferName,
+			User:      uid,
+			OfferUUID: offerDetails.OfferUUID,
 			Access:    userAccess,
 		}
-		err := j.DB.SetApplicationOfferAccess(ctx, offerAccess)
+		err = j.DB.SetApplicationOfferAccess(ctx, offerAccess)
 		if err != nil {
 			return errgo.Mask(err)
 		}
