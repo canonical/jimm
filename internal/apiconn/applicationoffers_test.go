@@ -13,6 +13,7 @@ import (
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
@@ -97,6 +98,19 @@ func (s *applicationoffersSuite) TestOffer(c *gc.C) {
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
+
+	err = s.conn.Offer(ctx, jujuparams.AddApplicationOffer{
+		ModelTag:        names.NewModelTag(s.model.UUID).String(),
+		OfferName:       "test-offer",
+		ApplicationName: "test-app",
+		Endpoints: map[string]string{
+			ep.Name: ep.Name,
+		},
+	})
+	c.Assert(err, gc.NotNil)
+	apiErr, ok := errgo.Cause(err).(*apiconn.APIError)
+	c.Assert(ok, gc.Equals, true)
+	c.Assert(apiErr.ParamsError().Message, gc.Matches, ".* application offer already exists")
 }
 
 func (s *applicationoffersSuite) TestOfferError(c *gc.C) {
