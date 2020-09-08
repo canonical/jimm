@@ -23,7 +23,11 @@ func init() {
 
 // Offer creates a new ApplicationOffer.
 func (r *controllerRoot) Offer(ctx context.Context, args jujuparams.AddApplicationOffers) (jujuparams.ErrorResults, error) {
-	return jujuparams.ErrorResults{
+	result := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, len(args.Offers)),
-	}, nil
+	}
+	for i, addOfferParams := range args.Offers {
+		result.Results[i].Error = mapError(r.jem.Offer(ctx, r.identity, addOfferParams))
+	}
+	return result, nil
 }
