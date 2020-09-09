@@ -12,6 +12,7 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
+	"github.com/juju/utils"
 	"github.com/juju/version"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
@@ -2484,15 +2485,18 @@ func (s *databaseSuite) TestApplicationOffers(c *gc.C) {
 		OfferUUID:              "00000000-0000-0000-0000-000000000001",
 		OfferURL:               "user1@external/test-model:test-offer1",
 		OwnerName:              "user1@external",
+		ModelUUID:              "00000000-0000-0000-0000-000000000002",
 		ModelName:              "test-model",
 		OfferName:              "test-offer1",
 		ApplicationName:        "test-application",
 		ApplicationDescription: "test description",
-		Endpoints: map[string]string{
-			"e1": "e1",
-			"e2": "e2",
-			"e3": "e3",
-		},
+		Endpoints: []mongodoc.RemoteEndpoint{{
+			Name: "ep1",
+		}, {
+			Name: "ep2",
+		}, {
+			Name: "ep3",
+		}},
 	}
 
 	err := s.database.AddApplicationOffer(context.Background(), &offer)
@@ -2506,7 +2510,7 @@ func (s *databaseSuite) TestApplicationOffers(c *gc.C) {
 	}
 	err = s.database.GetApplicationOffer(context.Background(), &offer1)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(offer1, gc.DeepEquals, offer)
+	c.Assert(offer1, jemtest.CmpEquals(cmpopts.EquateEmpty()), offer)
 
 	offer2 := mongodoc.ApplicationOffer{
 		OfferUUID: "no-such-offer",
@@ -2515,11 +2519,11 @@ func (s *databaseSuite) TestApplicationOffers(c *gc.C) {
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
 	update := offer
-	offer.OfferName = "another-test-offer"
-	offer.ApplicationName = "another-test-application"
-	offer.Endpoints = map[string]string{
-		"e4": "e4",
-	}
+	update.OfferName = "another-test-offer"
+	update.ApplicationName = "another-test-application"
+	update.Endpoints = []mongodoc.RemoteEndpoint{{
+		Name: "ep4",
+	}}
 	err = s.database.UpdateApplicationOffer(context.Background(), &update)
 	c.Assert(err, gc.Equals, nil)
 
@@ -2528,7 +2532,7 @@ func (s *databaseSuite) TestApplicationOffers(c *gc.C) {
 	}
 	err = s.database.GetApplicationOffer(context.Background(), &offer3)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(offer3, gc.DeepEquals, update)
+	c.Assert(offer3, jemtest.CmpEquals(cmpopts.EquateEmpty()), update)
 
 	newUpdate := update
 	newUpdate.OfferUUID = "no such offer"
@@ -2540,7 +2544,7 @@ func (s *databaseSuite) TestApplicationOffers(c *gc.C) {
 	}
 	err = s.database.GetApplicationOffer(context.Background(), &offer4)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(offer4, gc.DeepEquals, update)
+	c.Assert(offer4, jemtest.CmpEquals(cmpopts.EquateEmpty()), update)
 
 	offer5 := mongodoc.ApplicationOffer{
 		OfferURL: "no such offer",
@@ -2562,82 +2566,105 @@ func (s *databaseSuite) TestApplicationOffers(c *gc.C) {
 }
 
 func (s *databaseSuite) TestListApplicationOffers(c *gc.C) {
+	m1 := utils.MustNewUUID().String()
+	m2 := utils.MustNewUUID().String()
 	offer1 := mongodoc.ApplicationOffer{
 		OfferUUID:              "00000000-0000-0000-0000-000000000002",
 		OwnerName:              "bob@external",
+		ModelUUID:              m1,
 		ModelName:              "test-model1",
 		OfferName:              "test offer 1",
 		ApplicationName:        "test application",
 		ApplicationDescription: "test description",
-		Endpoints: map[string]string{
-			"e1": "e1",
-			"e2": "e2",
-			"e3": "e3",
-		},
+		Endpoints: []mongodoc.RemoteEndpoint{{
+			Name: "ep1",
+		}, {
+			Name: "ep2",
+		}, {
+			Name: "ep3",
+		}},
 	}
 	offer2 := mongodoc.ApplicationOffer{
 		OfferUUID:              "00000000-0000-0000-0000-000000000003",
 		OwnerName:              "bob@external",
+		ModelUUID:              m1,
 		ModelName:              "test-model1",
 		OfferName:              "test offer 2",
 		ApplicationName:        "test application 1",
 		ApplicationDescription: "test description 1",
-		Endpoints: map[string]string{
-			"e1": "e1",
-			"e2": "e2",
-			"e3": "e3",
-		},
+		Endpoints: []mongodoc.RemoteEndpoint{{
+			Name: "ep1",
+		}, {
+			Name: "ep2",
+		}, {
+			Name: "ep3",
+		}},
 	}
 	offer3 := mongodoc.ApplicationOffer{
 		OfferUUID:              "00000000-0000-0000-0000-000000000004",
 		OwnerName:              "bob@external",
+		ModelUUID:              m2,
 		ModelName:              "test-model2",
 		OfferName:              "test offer 1",
 		ApplicationName:        "test application 2",
 		ApplicationDescription: "test description 2",
-		Endpoints: map[string]string{
-			"e1": "e1",
-			"e2": "e2",
-			"e3": "e3",
-		},
+		Endpoints: []mongodoc.RemoteEndpoint{{
+			Name: "ep1",
+		}, {
+			Name: "ep2",
+		}, {
+			Name: "ep3",
+		}},
 	}
 	offer4 := mongodoc.ApplicationOffer{
 		OfferUUID:              "00000000-0000-0000-0000-000000000005",
 		OwnerName:              "bob@external",
+		ModelUUID:              m2,
 		ModelName:              "test-model2",
 		OfferName:              "test offer 2",
 		ApplicationName:        "test application 3",
 		ApplicationDescription: "test description 3",
-		Endpoints: map[string]string{
-			"e1": "e1",
-			"e2": "e2",
-			"e3": "e3",
-		},
+		Endpoints: []mongodoc.RemoteEndpoint{{
+			Name: "ep1",
+		}, {
+			Name: "ep2",
+		}, {
+			Name: "ep3",
+		}},
 	}
 	for _, offer := range []mongodoc.ApplicationOffer{offer1, offer2, offer3, offer4} {
 		err := s.database.AddApplicationOffer(context.Background(), &offer)
 		c.Assert(err, gc.Equals, nil)
 	}
 
-	offers, err := s.database.ListApplicationOffers(context.Background(), "no such user", "no such model")
+	offers, err := s.database.ListApplicationOffers(context.Background(), []jujuparams.OfferFilter{{
+		OwnerName: "no such user",
+		ModelName: "no such model",
+	}})
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(offers, gc.HasLen, 0)
 
-	offers, err = s.database.ListApplicationOffers(context.Background(), "bob@external", "test-model1")
+	offers, err = s.database.ListApplicationOffers(context.Background(), []jujuparams.OfferFilter{{
+		OwnerName: "bob@external",
+		ModelName: "test-model1",
+	}})
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(offers, gc.DeepEquals, []mongodoc.ApplicationOffer{offer1, offer2})
+	c.Assert(offers, jemtest.CmpEquals(cmpopts.EquateEmpty()), []mongodoc.ApplicationOffer{offer1, offer2})
 
-	offers, err = s.database.ListApplicationOffers(context.Background(), "bob@external", "test-model2")
+	offers, err = s.database.ListApplicationOffers(context.Background(), []jujuparams.OfferFilter{{
+		OwnerName: "bob@external",
+		ModelName: "test-model2",
+	}})
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(offers, gc.DeepEquals, []mongodoc.ApplicationOffer{offer3, offer4})
+	c.Assert(offers, jemtest.CmpEquals(cmpopts.EquateEmpty()), []mongodoc.ApplicationOffer{offer3, offer4})
 
 	offers, err = s.database.ListApplicationOffers(
 		context.Background(),
-		"bob@external",
-		"test-model1",
-		jem.ApplicationOfferFilter{
-			AllowedConsumers: []string{"user1"},
-		},
+		[]jujuparams.OfferFilter{{
+			OwnerName:           "bob@external",
+			ModelName:           "test-model1",
+			AllowedConsumerTags: []string{"user1"},
+		}},
 	)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(offers, gc.DeepEquals, []mongodoc.ApplicationOffer(nil))
@@ -2651,14 +2678,14 @@ func (s *databaseSuite) TestListApplicationOffers(c *gc.C) {
 
 	offers, err = s.database.ListApplicationOffers(
 		context.Background(),
-		"bob@external",
-		"test-model1",
-		jem.ApplicationOfferFilter{
-			AllowedConsumers: []string{"user1@external"},
-		},
+		[]jujuparams.OfferFilter{{
+			OwnerName:           "bob@external",
+			ModelName:           "test-model1",
+			AllowedConsumerTags: []string{"user1@external"},
+		}},
 	)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(offers, gc.DeepEquals, []mongodoc.ApplicationOffer{offer1})
+	c.Assert(offers, jemtest.CmpEquals(cmpopts.EquateEmpty()), []mongodoc.ApplicationOffer{offer1})
 
 	err = s.database.SetApplicationOfferAccess(context.Background(), mongodoc.ApplicationOfferAccess{
 		User:      "user1",
@@ -2669,15 +2696,15 @@ func (s *databaseSuite) TestListApplicationOffers(c *gc.C) {
 
 	offers, err = s.database.ListApplicationOffers(
 		context.Background(),
-		"bob@external",
-		"test-model1",
-		jem.ApplicationOfferFilter{
-			AllowedConsumers: []string{"user1@external"},
-			ApplicationName:  offer2.ApplicationName,
-		},
+		[]jujuparams.OfferFilter{{
+			OwnerName:           "bob@external",
+			ModelName:           "test-model1",
+			AllowedConsumerTags: []string{"user1@external"},
+			ApplicationName:     offer2.ApplicationName,
+		}},
 	)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(offers, gc.DeepEquals, []mongodoc.ApplicationOffer{offer2})
+	c.Assert(offers, jemtest.CmpEquals(cmpopts.EquateEmpty()), []mongodoc.ApplicationOffer{offer2})
 }
 
 func (s *databaseSuite) TestApplicationOfferAccess(c *gc.C) {

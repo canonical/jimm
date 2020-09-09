@@ -49,6 +49,7 @@ require (
 	github.com/juju/utils v0.0.0-20200604140309-9d78121a29e0
 	github.com/juju/version v0.0.0-20191219164919-81c1be00b9a6
 	github.com/julienschmidt/httprouter v1.3.0
+	github.com/kr/pretty v0.2.1 // indirect
 	github.com/lestrrat/go-jspointer v0.0.0-20180109105637-d5f7c71bfd03 // indirect
 	github.com/lestrrat/go-jsref v0.0.0-20170215062819-50df7b2d07d7 // indirect
 	github.com/lestrrat/go-jsschema v0.0.0-20161018213530-a6a42341b50d // indirect
@@ -61,11 +62,14 @@ require (
 	github.com/oracle/oci-go-sdk v17.4.0+incompatible // indirect
 	github.com/prometheus/client_golang v1.5.1
 	github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af
+	github.com/stretchr/testify v1.6.1 // indirect
 	github.com/vmware/govmomi v0.22.2 // indirect
 	go.uber.org/multierr v1.5.0 // indirect
 	go.uber.org/zap v1.10.0
-	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
+	golang.org/x/crypto v0.0.0-20200728195943-123391ffb6de
+	golang.org/x/net v0.0.0-20200813134508-3edf25e44fcc // indirect
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
+	golang.org/x/sys v0.0.0-20200817085935-3ff754bf58a9 // indirect
 	google.golang.org/api v0.21.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f
 	gopkg.in/errgo.v1 v1.0.1

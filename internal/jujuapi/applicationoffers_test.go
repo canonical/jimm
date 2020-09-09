@@ -6,11 +6,13 @@ import (
 	"context"
 
 	"github.com/CanonicalLtd/jimm/params"
+	"github.com/juju/charm/v7"
 	"github.com/juju/juju/api/applicationoffers"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/juju/testing/factory"
 	"github.com/juju/names/v4"
+	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 )
@@ -206,4 +208,129 @@ func (s *applicationOffersSuite) TestGetConsumeDetails(c *gc.C) {
 			CACert:        caCert,
 		},
 	})
+}
+
+func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
+	ctx := context.Background()
+
+	ctlPath := s.AssertAddController(ctx, c, params.EntityPath{User: "user1", Name: "controller-1"}, true)
+	cred := s.AssertUpdateCredential(ctx, c, "user1", "dummy", "cred1", "empty")
+	err := s.JEM.DB.SetACL(ctx, s.JEM.DB.Controllers(), ctlPath, params.ACL{
+		Read: []string{"user1"},
+	})
+
+	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "user1", cred: cred})
+	modelUUID := mi.UUID
+	modelName := mi.Name
+	err = s.JEM.DB.SetACL(ctx, s.JEM.DB.Models(), params.EntityPath{User: "user1", Name: "model-1"}, params.ACL{
+		Admin: []string{"user1"},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	modelState, err := s.StatePool.Get(modelUUID)
+	c.Assert(err, gc.Equals, nil)
+	defer modelState.Release()
+
+	f := factory.NewFactory(modelState.State, s.StatePool)
+	app := f.MakeApplication(c, &factory.ApplicationParams{
+		Name: "test-app",
+		Charm: f.MakeCharm(c, &factory.CharmParams{
+			Name: "wordpress",
+		}),
+	})
+	f.MakeUnit(c, &factory.UnitParams{
+		Application: app,
+	})
+	ep, err := app.Endpoint("url")
+	c.Assert(err, gc.Equals, nil)
+
+	conn := s.open(c, nil, "user1")
+	defer conn.Close()
+	client := applicationoffers.NewClient(conn)
+
+	results, err := client.Offer(
+		modelUUID,
+		"test-app",
+		[]string{ep.Name},
+		"test-offer1",
+		"test offer 1 description",
+	)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(results, gc.HasLen, 1)
+	c.Assert(results[0].Error, gc.Equals, (*jujuparams.Error)(nil))
+
+	results, err = client.Offer(
+		modelUUID,
+		"test-app",
+		[]string{ep.Name},
+		"test-offer2",
+		"test offer 2 description",
+	)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(results, gc.HasLen, 1)
+	c.Assert(results[0].Error, gc.Equals, (*jujuparams.Error)(nil))
+
+	// without filters
+	offers, err := client.ListOffers()
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(offers, jc.DeepEquals, []*crossmodel.ApplicationOfferDetails{{
+		OfferName:              "test-offer1",
+		ApplicationName:        "test-app",
+		ApplicationDescription: "test offer 1 description",
+		OfferURL:               "user1@external/model-1.test-offer1",
+		Endpoints: []charm.Relation{{
+			Name:      "url",
+			Role:      "provider",
+			Interface: "http",
+		}},
+		Users: []crossmodel.OfferUserDetails{{
+			UserName: "everyone@external",
+			Access:   "read",
+		}, {
+			UserName: "user1@external",
+			Access:   "admin",
+		}},
+	}, {
+		OfferName:              "test-offer2",
+		ApplicationName:        "test-app",
+		ApplicationDescription: "test offer 2 description",
+		OfferURL:               "user1@external/model-1.test-offer2",
+		Endpoints: []charm.Relation{{
+			Name:      "url",
+			Role:      "provider",
+			Interface: "http",
+		}},
+		Users: []crossmodel.OfferUserDetails{{
+			UserName: "everyone@external",
+			Access:   "read",
+		}, {
+			UserName: "user1@external",
+			Access:   "admin",
+		}},
+	}})
+
+	offers, err = client.ListOffers(crossmodel.ApplicationOfferFilter{
+		ModelName:       modelName,
+		ApplicationName: "test-app",
+		OfferName:       "test-offer1",
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(offers, jc.DeepEquals, []*crossmodel.ApplicationOfferDetails{{
+		OfferName:              "test-offer1",
+		ApplicationName:        "test-app",
+		ApplicationDescription: "test offer 1 description",
+		OfferURL:               "user1@external/model-1.test-offer1",
+		Endpoints: []charm.Relation{{
+			Name:      "url",
+			Role:      "provider",
+			Interface: "http",
+		}},
+		Users: []crossmodel.OfferUserDetails{{
+			UserName: "everyone@external",
+			Access:   "read",
+		}, {
+			UserName: "user1@external",
+			Access:   "admin",
+		}},
+	}})
 }

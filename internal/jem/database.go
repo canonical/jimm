@@ -9,6 +9,7 @@ import (
 	"sort"
 	"time"
 
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/version"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
@@ -25,31 +26,6 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
 	"github.com/CanonicalLtd/jimm/params"
 )
-
-// ApplicationOfferFilter holds data intended for querying and filtering application offers.
-type ApplicationOfferFilter struct {
-	// OwnerName is the owner of the model hosting the offer.
-	OwnerName string
-
-	// Model is the model hosting the offer.
-	Model string
-
-	// OfferName is the name of the offer.
-	OfferName string
-
-	// ApplicationName is the name of the application to which the offer pertains.
-	ApplicationName string
-
-	// ApplicationDescription is a description of the application's functionality,
-	// typically copied from the charm metadata.
-	ApplicationDescription string
-
-	// Endpoint contains an endpoint filter criteria.
-	Endpoints []string
-
-	// AllowedConsumers are the users allowed to consume the offer.
-	AllowedConsumers []string
-}
 
 // Database wraps an mgo.DB ands adds a number of methods for
 // manipulating the database.
@@ -1242,12 +1218,19 @@ func (db *Database) AddApplicationOffer(ctx context.Context, offer *mongodoc.App
 // UpdateApplicationOffer updates the application offer.
 func (db *Database) UpdateApplicationOffer(ctx context.Context, offer *mongodoc.ApplicationOffer) (err error) {
 	defer db.checkError(ctx, &err)
-	update := make(bson.D, 5)
-	update[0] = bson.DocElem{Name: "offer-name", Value: offer.OfferName}
-	update[1] = bson.DocElem{Name: "application-name", Value: offer.ApplicationName}
-	update[2] = bson.DocElem{Name: "application-description", Value: offer.ApplicationDescription}
-	update[3] = bson.DocElem{Name: "endpoints", Value: offer.Endpoints}
-	update[4] = bson.DocElem{Name: "offer-url", Value: offer.OfferURL}
+	update := bson.D{
+		{Name: "offer-url", Value: offer.OfferURL},
+		{Name: "offer-name", Value: offer.OfferName},
+		{Name: "owner-name", Value: offer.OwnerName},
+		{Name: "application-name", Value: offer.ApplicationName},
+		{Name: "application-description", Value: offer.ApplicationDescription},
+		{Name: "endpoints", Value: offer.Endpoints},
+		{Name: "spaces", Value: offer.Spaces},
+		{Name: "bindings", Value: offer.Bindings},
+		{Name: "users", Value: offer.Users},
+		{Name: "charm-url", Value: offer.CharmURL},
+		{Name: "connections", Value: offer.Connections},
+	}
 	err = db.ApplicationOffers().UpdateId(offer.OfferUUID, bson.D{{
 		Name: "$set", Value: update,
 	}})
@@ -1299,18 +1282,15 @@ func (db *Database) RemoveApplicationOffer(ctx context.Context, offerUUID string
 
 // ListApplicationOffers returns application offers
 // matching any one of the filter terms.
-func (db *Database) ListApplicationOffers(ctx context.Context, ownerName, modelName string, filters ...ApplicationOfferFilter) (_ []mongodoc.ApplicationOffer, err error) {
+func (db *Database) ListApplicationOffers(ctx context.Context, filters []jujuparams.OfferFilter) (_ []mongodoc.ApplicationOffer, err error) {
 	defer db.checkError(ctx, &err)
 
 	if len(filters) == 0 {
-		return db.AllApplicationOffers(ctx, ownerName, modelName)
+		return db.AllApplicationOffers(ctx)
 	}
 	var offers []mongodoc.ApplicationOffer
 	for _, filter := range filters {
-		query := bson.D{
-			{Name: "owner-name", Value: ownerName},
-			{Name: "model-name", Value: modelName},
-		}
+		query := bson.D{}
 		query = append(query, makeApplicationOfferFilterQuery(filter)...)
 
 		var docs []mongodoc.ApplicationOffer
@@ -1353,7 +1333,6 @@ func (db *Database) SetApplicationOfferAccess(ctx context.Context, access mongod
 // the application offer with the given UUID.
 func (db *Database) GetApplicationOfferAccess(ctx context.Context, user params.User, offerUUID string) (_ mongodoc.ApplicationOfferAccessPermission, err error) {
 	defer db.checkError(ctx, &err)
-
 	var access mongodoc.ApplicationOfferAccess
 	err = db.ApplicationOfferAccesses().Find(
 		bson.M{
@@ -1392,8 +1371,14 @@ func (db *Database) GetApplicationOfferUsers(ctx context.Context, level mongodoc
 	return users, errgo.Mask(it.Err())
 }
 
-func makeApplicationOfferFilterQuery(filter ApplicationOfferFilter) bson.D {
+func makeApplicationOfferFilterQuery(filter jujuparams.OfferFilter) bson.D {
 	var query bson.D
+	if filter.OwnerName != "" {
+		query = append(query, bson.DocElem{"owner-name", filter.OwnerName})
+	}
+	if filter.ModelName != "" {
+		query = append(query, bson.DocElem{"model-name", filter.ModelName})
+	}
 	if filter.ApplicationName != "" {
 		query = append(query, bson.DocElem{"application-name", filter.ApplicationName})
 	}
@@ -1410,14 +1395,11 @@ func makeApplicationOfferFilterQuery(filter ApplicationOfferFilter) bson.D {
 }
 
 // AllApplicationOffers returns all application offers for a model.
-func (db *Database) AllApplicationOffers(ctx context.Context, ownerName, modelName string) (_ []mongodoc.ApplicationOffer, err error) {
+func (db *Database) AllApplicationOffers(ctx context.Context) (_ []mongodoc.ApplicationOffer, err error) {
 	defer db.checkError(ctx, &err)
 
 	var docs []mongodoc.ApplicationOffer
-	query := bson.D{
-		{Name: "owner-name", Value: ownerName},
-		{Name: "model-name", Value: modelName},
-	}
+	query := bson.D{}
 	err = db.ApplicationOffers().Find(query).All(&docs)
 	if err != nil {
 		return nil, errgo.Mask(err)
@@ -1566,44 +1548,51 @@ func (db *Database) C(name string) *mgo.Collection {
 func (db *Database) filterOffers(
 	ctx context.Context,
 	in []mongodoc.ApplicationOffer,
-	filter ApplicationOfferFilter,
+	filter jujuparams.OfferFilter,
 ) ([]mongodoc.ApplicationOffer, error) {
 
 	out, err := db.filterOffersByEndpoint(ctx, in, filter.Endpoints)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	return db.filterOffersByAllowedConsumer(ctx, out, filter.AllowedConsumers)
+	return db.filterOffersByAllowedConsumer(ctx, out, filter.AllowedConsumerTags)
 }
 
 func (db *Database) filterOffersByEndpoint(
 	ctx context.Context,
 	in []mongodoc.ApplicationOffer,
-	endpoints []string,
+	endpoints []jujuparams.EndpointFilterAttributes,
 ) ([]mongodoc.ApplicationOffer, error) {
 
 	if len(endpoints) == 0 {
 		return in, nil
 	}
 
+	match := func(ep mongodoc.RemoteEndpoint) bool {
+		for _, fep := range endpoints {
+			if fep.Interface != "" && fep.Interface == ep.Interface {
+				continue
+			}
+			if fep.Name != "" && fep.Name == ep.Name {
+				continue
+			}
+			if fep.Role != "" && string(fep.Role) == ep.Role {
+				continue
+			}
+			return false
+		}
+		return true
+	}
+
 	var out []mongodoc.ApplicationOffer
 	for _, doc := range in {
-		if matchEndpoints(doc.Endpoints, endpoints) {
-			out = append(out, doc)
-		}
-	}
-	return out, nil
-}
-
-func matchEndpoints(offerEndpoints map[string]string, filterEndpoints []string) bool {
-	for _, ep1 := range offerEndpoints {
-		for _, ep2 := range filterEndpoints {
-			if ep1 == ep2 {
-				return true
+		for _, ep := range doc.Endpoints {
+			if match(ep) {
+				out = append(out, doc)
 			}
 		}
 	}
-	return false
+	return out, nil
 }
 
 func (db *Database) filterOffersByAllowedConsumer(
