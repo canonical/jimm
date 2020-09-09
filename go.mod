@@ -28,6 +28,7 @@ require (
 	github.com/joyent/gosdc v0.0.0-20161202192312-ec8b3503a75e // indirect
 	github.com/joyent/gosign v0.0.0-20161114191744-9abcee278795 // indirect
 	github.com/juju/aclstore v0.0.0-20180706073322-7fc1cdaacf01
+	github.com/juju/charm/v7 v7.0.0-20200625165032-ef717232a815
 	github.com/juju/clock v0.0.0-20190205081909-9c5c9712527c
 	github.com/juju/cmd v0.0.0-20200108104440-8e43f3faa5c9
 	github.com/juju/errors v0.0.0-20200330140219-3fe23663418f

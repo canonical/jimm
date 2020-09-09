@@ -19,7 +19,6 @@ import (
 	"github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	jujucloud "github.com/juju/juju/cloud"
-	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/names/v4"
 	"github.com/juju/utils/cache"
 	"github.com/juju/version"
@@ -1579,104 +1578,4 @@ func (w *modelSummaryWatcher) loop(ctx context.Context) {
 
 func (w *modelSummaryWatcher) stop() error {
 	return errgo.Mask(w.conn.ModelSummaryWatcherStop(context.TODO(), w.id), apiconn.IsAPIError)
-}
-
-// Offer creates a new application offer.
-func (j *JEM) Offer(ctx context.Context, id identchecker.ACLIdentity, offer jujuparams.AddApplicationOffer) (err error) {
-	modelTag, err := names.ParseModelTag(offer.ModelTag)
-	if err != nil {
-		return errgo.WithCausef(err, params.ErrBadRequest, "")
-	}
-
-	model, err := j.DB.ModelFromUUID(ctx, modelTag.Id())
-	if err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-
-	err = auth.CheckACL(ctx, id, model.ACL.Admin)
-	if err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-
-	conn, err := j.OpenAPI(ctx, model.Controller)
-	if err != nil {
-		return errgo.Notef(err, "cannot connect to controller")
-	}
-	defer conn.Close()
-
-	err = conn.Offer(ctx, offer)
-	if err != nil {
-		if !apiconn.IsAPIError(err) || !strings.Contains(err.Error(), "application offer already exists") {
-			return errgo.Mask(err, apiconn.IsAPIError)
-		}
-	}
-
-	offerURL := crossmodel.OfferURL{
-		User:            conv.ToUserTag(model.Path.User).Id(),
-		ModelName:       string(model.Path.Name),
-		ApplicationName: offer.OfferName,
-	}
-
-	offerDetails := jujuparams.ApplicationOfferAdminDetails{
-		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
-			OfferURL: offerURL.Path(),
-		},
-	}
-	err = conn.GetApplicationOffer(ctx, &offerDetails)
-	if err != nil {
-		return errgo.Mask(err, apiconn.IsAPIError)
-	}
-
-	doc := mongodoc.ApplicationOffer{
-		OfferUUID:              offerDetails.OfferUUID,
-		OfferURL:               offerDetails.OfferURL,
-		OwnerName:              conv.ToUserTag(model.Path.User).Id(),
-		ModelName:              string(model.Path.Name),
-		OfferName:              offerDetails.OfferName,
-		ApplicationName:        offerDetails.ApplicationName,
-		ApplicationDescription: offerDetails.ApplicationDescription,
-		Endpoints:              offer.Endpoints,
-		ControllerPath:         model.Controller,
-	}
-
-	err = j.DB.AddApplicationOffer(ctx, &doc)
-	if err != nil {
-		if errgo.Cause(err) == params.ErrAlreadyExists {
-			return nil
-		}
-		return errgo.Mask(err)
-	}
-
-	for _, user := range offerDetails.Users {
-		var userAccess mongodoc.ApplicationOfferAccessPermission
-
-		uid, err := conv.FromUserID(user.UserName)
-		if err != nil {
-			zapctx.Warn(ctx, "ignoring unsupported user name", zap.String("user name", user.UserName), zap.Error(err))
-			continue
-		}
-		switch user.Access {
-		case "read":
-			userAccess = mongodoc.ApplicationOfferReadAccess
-		case "consumer":
-			userAccess = mongodoc.ApplicationOfferConsumeAccess
-		case "admin":
-			userAccess = mongodoc.ApplicationOfferAdminAccess
-		default:
-			zapctx.Warn(ctx, "unknown user access level", zap.String("level", user.Access))
-			continue
-
-		}
-		offerAccess := mongodoc.ApplicationOfferAccess{
-			User:      uid,
-			OfferUUID: offerDetails.OfferUUID,
-			Access:    userAccess,
-		}
-		err = j.DB.SetApplicationOfferAccess(ctx, offerAccess)
-		if err != nil {
-			return errgo.Mask(err)
-		}
-	}
-
-	return nil
 }
