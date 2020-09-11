@@ -521,22 +521,59 @@ func ParseAddresses(addresses []string) ([]HostPort, error) {
 
 // ApplicationOffer represents a cross model application offer.
 type ApplicationOffer struct {
-	OfferUUID string `bson:"_id"`
-
-	// OfferURL is the URL of the offer. The OfferURL is normalised such
-	// that it includes the owner ID, but it does not include the
-	// controller name.
-	OfferURL               string            `bson:"offer-url"`
-	OwnerName              string            `bson:"owner-name"`
-	ModelName              string            `bson:"model-name"`
-	OfferName              string            `bson:"offer-name"`
-	ApplicationName        string            `bson:"application-name"`
-	ApplicationDescription string            `bson:"application-description"`
-	Endpoints              map[string]string `bson:"endpoints"`
-
+	ModelUUID string `bson:"model-uuid"`
+	ModelName string `bson:"model-name"`
 	// ControllerPath contains the path of the controller that owns the
 	// application offer.
 	ControllerPath params.EntityPath `bson:"controller-path"`
+
+	OfferUUID string `bson:"_id"`
+	// OfferURL is the URL of the offer. The OfferURL is normalised such
+	// that it includes the owner ID, but it does not include the
+	// controller name.
+	OfferURL               string             `bson:"offer-url"`
+	OfferName              string             `bson:"offer-name"`
+	OwnerName              string             `bson:"owner-name"`
+	ApplicationName        string             `bson:"application-name"`
+	ApplicationDescription string             `bson:"application-description"`
+	CharmURL               string             `bson:"charm-url"`
+	Endpoints              []RemoteEndpoint   `bson:"endpoints"`
+	Spaces                 []RemoteSpace      `bson:"spaces"`
+	Bindings               map[string]string  `bson:"bindings"`
+	Users                  []OfferUserDetails `bson:"users"`
+	Connections            []OfferConnection  `bson:"connections"`
+}
+
+// OfferConnection holds details about a connection to an offer.
+type OfferConnection struct {
+	SourceModelTag string   `bson:"source-model-tag"`
+	RelationId     int      `bson:"relation-id"`
+	Username       string   `bson:"username"`
+	Endpoint       string   `bson:"endpoint"`
+	IngressSubnets []string `bson:"ingress-subnets"`
+}
+
+// RemoteSpace represents a space in some remote model.
+type RemoteSpace struct {
+	CloudType          string                 `bson:"cloud-type"`
+	Name               string                 `bson:"name"`
+	ProviderId         string                 `bson:"provider-id"`
+	ProviderAttributes map[string]interface{} `bson:"provider-attributes"`
+}
+
+// OfferUserDetails represents an offer consumer and their permission on the offer.
+type OfferUserDetails struct {
+	UserName    string `bson:"user"`
+	DisplayName string `bson:"display-name"`
+	Access      string `bson:"access"`
+}
+
+// RemoteEndpoint represents a remote application endpoint.
+type RemoteEndpoint struct {
+	Name      string `bson:"name"`
+	Role      string `bson:"role"`
+	Interface string `bson:"interface"`
+	Limit     int    `bson:"limit"`
 }
 
 // ApplicationOfferAccessPermission holds the access permission level.

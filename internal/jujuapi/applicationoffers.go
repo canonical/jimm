@@ -18,12 +18,15 @@ func init() {
 	facadeInit["ApplicationOffers"] = func(r *controllerRoot) []int {
 		offerMethod := rpc.Method(r.Offer)
 		getConsumeDetailsMethod := rpc.Method(r.GetConsumeDetails)
+		listOffersMethod := rpc.Method(r.ListApplicationOffers)
 
 		r.AddMethod("ApplicationOffers", 1, "Offer", offerMethod)
 		r.AddMethod("ApplicationOffers", 1, "GetConsumeDetails", getConsumeDetailsMethod)
+		r.AddMethod("ApplicationOffers", 1, "ListApplicationOffers", listOffersMethod)
 
 		r.AddMethod("ApplicationOffers", 2, "Offer", offerMethod)
 		r.AddMethod("ApplicationOffers", 2, "GetConsumeDetails", getConsumeDetailsMethod)
+		r.AddMethod("ApplicationOffers", 2, "ListApplicationOffers", listOffersMethod)
 
 		return []int{1, 2}
 	}
@@ -72,5 +75,17 @@ func (r *controllerRoot) GetConsumeDetails(ctx context.Context, args jujuparams.
 			results.Results[i].ConsumeOfferDetails = details
 		}
 	}
+	return results, nil
+}
+
+func (r *controllerRoot) ListApplicationOffers(ctx context.Context, args jujuparams.OfferFilters) (jujuparams.QueryApplicationOffersResults, error) {
+	results := jujuparams.QueryApplicationOffersResults{}
+
+	offers, err := r.jem.ListApplicationOffers(ctx, r.identity, args.Filters...)
+	if err != nil {
+		return results, errgo.Mask(err)
+	}
+	results.Results = offers
+
 	return results, nil
 }

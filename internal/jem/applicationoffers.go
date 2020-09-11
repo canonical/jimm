@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/juju/charm/v7"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 	"go.uber.org/zap"
@@ -71,16 +72,58 @@ func (j *JEM) Offer(ctx context.Context, id identchecker.ACLIdentity, offer juju
 		return errgo.Mask(err, apiconn.IsAPIError)
 	}
 
+	endpoints := make([]mongodoc.RemoteEndpoint, len(offerDetails.Endpoints))
+	for i, endpoint := range offerDetails.Endpoints {
+		endpoints[i] = mongodoc.RemoteEndpoint{
+			Name:      endpoint.Name,
+			Role:      string(endpoint.Role),
+			Interface: endpoint.Interface,
+			Limit:     endpoint.Limit,
+		}
+	}
+	users := make([]mongodoc.OfferUserDetails, len(offerDetails.Users))
+	for i, user := range offerDetails.Users {
+		users[i] = mongodoc.OfferUserDetails{
+			UserName:    user.UserName,
+			DisplayName: user.DisplayName,
+			Access:      user.Access,
+		}
+	}
+	spaces := make([]mongodoc.RemoteSpace, len(offerDetails.Spaces))
+	for i, space := range offerDetails.Spaces {
+		spaces[i] = mongodoc.RemoteSpace{
+			CloudType:          space.CloudType,
+			Name:               space.Name,
+			ProviderId:         space.ProviderId,
+			ProviderAttributes: space.ProviderAttributes,
+		}
+	}
+	connections := make([]mongodoc.OfferConnection, len(offerDetails.Connections))
+	for i, connection := range offerDetails.Connections {
+		connections[i] = mongodoc.OfferConnection{
+			SourceModelTag: connection.SourceModelTag,
+			RelationId:     connection.RelationId,
+			Username:       connection.Username,
+			Endpoint:       connection.Endpoint,
+			IngressSubnets: connection.IngressSubnets,
+		}
+	}
+
 	doc := mongodoc.ApplicationOffer{
+		ModelUUID:              model.UUID,
+		ModelName:              string(model.Path.Name),
+		ControllerPath:         model.Controller,
 		OfferUUID:              offerDetails.OfferUUID,
 		OfferURL:               offerDetails.OfferURL,
-		OwnerName:              conv.ToUserTag(model.Path.User).Id(),
-		ModelName:              string(model.Path.Name),
 		OfferName:              offerDetails.OfferName,
+		OwnerName:              conv.ToUserTag(model.Path.User).Id(),
 		ApplicationName:        offerDetails.ApplicationName,
 		ApplicationDescription: offerDetails.ApplicationDescription,
-		Endpoints:              offer.Endpoints,
-		ControllerPath:         model.Controller,
+		Endpoints:              endpoints,
+		Spaces:                 spaces,
+		Bindings:               offerDetails.Bindings,
+		Users:                  users,
+		Connections:            connections,
 	}
 
 	err = j.DB.AddApplicationOffer(ctx, &doc)
@@ -216,4 +259,89 @@ func filterApplicationOfferUsers(id params.User, a mongodoc.ApplicationOfferAcce
 		return filtered[i].UserName < filtered[j].UserName
 	})
 	return filtered
+}
+
+// ListApplicationOffers returns details of offers matching the specified filter.
+func (j *JEM) ListApplicationOffers(ctx context.Context, id identchecker.ACLIdentity, filters ...jujuparams.OfferFilter) (_ []jujuparams.ApplicationOfferAdminDetails, err error) {
+	uid := params.User(id.Id())
+
+	docs, err := j.DB.ListApplicationOffers(ctx, filters)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+
+	offers := []jujuparams.ApplicationOfferAdminDetails{}
+	for _, offerDoc := range docs {
+		access, err := j.DB.GetApplicationOfferAccess(ctx, uid, offerDoc.OfferUUID)
+		if err != nil {
+			return nil, errgo.Mask(err)
+		}
+		if access == mongodoc.ApplicationOfferAdminAccess {
+			offers = append(offers, applicationOfferDocToDetails(uid, &offerDoc))
+		}
+	}
+
+	return offers, nil
+}
+
+// applicationOfferDocToDetails returns a jujuparams structure based on the provided
+// application offer mongo doc.
+func applicationOfferDocToDetails(id params.User, offerDoc *mongodoc.ApplicationOffer) jujuparams.ApplicationOfferAdminDetails {
+	endpoints := make([]jujuparams.RemoteEndpoint, len(offerDoc.Endpoints))
+	for i, endpoint := range offerDoc.Endpoints {
+		endpoints[i] = jujuparams.RemoteEndpoint{
+			Name:      endpoint.Name,
+			Role:      charm.RelationRole(endpoint.Role),
+			Interface: endpoint.Interface,
+			Limit:     endpoint.Limit,
+		}
+	}
+	spaces := make([]jujuparams.RemoteSpace, len(offerDoc.Spaces))
+	for i, space := range offerDoc.Spaces {
+		spaces[i] = jujuparams.RemoteSpace{
+			CloudType:          space.CloudType,
+			Name:               space.Name,
+			ProviderId:         space.ProviderId,
+			ProviderAttributes: space.ProviderAttributes,
+		}
+	}
+	users := make([]jujuparams.OfferUserDetails, len(offerDoc.Users))
+	for i, user := range offerDoc.Users {
+		users[i] = jujuparams.OfferUserDetails{
+			UserName:    user.UserName,
+			DisplayName: user.DisplayName,
+			Access:      user.Access,
+		}
+	}
+	sort.Slice(users, func(i, j int) bool {
+		return users[i].UserName < users[j].UserName
+	})
+	users = filterApplicationOfferUsers(id, mongodoc.ApplicationOfferAdminAccess, users)
+
+	connections := make([]jujuparams.OfferConnection, len(offerDoc.Connections))
+	for i, connection := range offerDoc.Connections {
+		connections[i] = jujuparams.OfferConnection{
+			SourceModelTag: connection.SourceModelTag,
+			RelationId:     connection.RelationId,
+			Username:       connection.Username,
+			Endpoint:       connection.Endpoint,
+			IngressSubnets: connection.IngressSubnets,
+		}
+	}
+	return jujuparams.ApplicationOfferAdminDetails{
+		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+			SourceModelTag:         names.NewModelTag(offerDoc.ModelUUID).String(),
+			OfferUUID:              offerDoc.OfferUUID,
+			OfferURL:               offerDoc.OfferURL,
+			OfferName:              offerDoc.OfferName,
+			ApplicationDescription: offerDoc.ApplicationDescription,
+			Endpoints:              endpoints,
+			Spaces:                 spaces,
+			Bindings:               offerDoc.Bindings,
+			Users:                  users,
+		},
+		ApplicationName: offerDoc.ApplicationName,
+		CharmURL:        offerDoc.CharmURL,
+		Connections:     connections,
+	}
 }
