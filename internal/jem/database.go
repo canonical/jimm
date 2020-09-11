@@ -1230,6 +1230,7 @@ func (db *Database) UpdateApplicationOffer(ctx context.Context, offer *mongodoc.
 		{Name: "users", Value: offer.Users},
 		{Name: "charm-url", Value: offer.CharmURL},
 		{Name: "connections", Value: offer.Connections},
+		{Name: "model-name", Value: offer.ModelName},
 	}
 	err = db.ApplicationOffers().UpdateId(offer.OfferUUID, bson.D{{
 		Name: "$set", Value: update,

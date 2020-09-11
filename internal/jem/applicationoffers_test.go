@@ -14,6 +14,7 @@ import (
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
@@ -312,4 +313,93 @@ func (s *applicationoffersSuite) TestListApplicationOffers(c *gc.C) {
 	},
 	})
 
+}
+
+func (s *applicationoffersSuite) TestModifyOfferAccess(c *gc.C) {
+	ctx := context.Background()
+
+	err := s.jem.Offer(ctx, s.identity, jujuparams.AddApplicationOffer{
+		ModelTag:        names.NewModelTag(s.model.UUID).String(),
+		OfferName:       "test-offer1",
+		ApplicationName: "test-app",
+		Endpoints: map[string]string{
+			s.endpoint.Relation.Name: s.endpoint.Relation.Name,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	offer1 := mongodoc.ApplicationOffer{
+		OfferURL: conv.ToOfferURL(s.model.Path, "test-offer1"),
+	}
+	err = s.jem.DB.GetApplicationOffer(ctx, &offer1)
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = s.jem.DB.SetApplicationOfferAccess(ctx, mongodoc.ApplicationOfferAccess{
+		OfferUUID: offer1.OfferUUID,
+		User:      params.User("user2"),
+		Access:    mongodoc.ApplicationOfferNoAccess,
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	// user2 does not have permission
+	err = s.jem.GrantOfferAccess(ctx, jemtest.NewIdentity("user2"), params.User("test-user"), offer1.OfferURL, jujuparams.OfferReadAccess)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+
+	err = s.jem.DB.SetApplicationOfferAccess(ctx, mongodoc.ApplicationOfferAccess{
+		OfferUUID: offer1.OfferUUID,
+		User:      params.User("user2"),
+		Access:    mongodoc.ApplicationOfferConsumeAccess,
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	// user2 has consume permission
+	err = s.jem.GrantOfferAccess(ctx, jemtest.NewIdentity("user2"), params.User("test-user"), offer1.OfferURL, jujuparams.OfferReadAccess)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
+
+	// try granting unknow access level
+	err = s.jem.GrantOfferAccess(ctx, jemtest.NewIdentity("user1"), params.User("test-user"), offer1.OfferURL, jujuparams.OfferAccessPermission("unknown"))
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrBadRequest)
+
+	// try granting permission on an offer that does not exist
+	err = s.jem.GrantOfferAccess(ctx, jemtest.NewIdentity("user1"), params.User("test-user"), "no such offer", jujuparams.OfferReadAccess)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+
+	// user1 is an admin - this should pass
+	err = s.jem.GrantOfferAccess(ctx, jemtest.NewIdentity("user1"), params.User("test-user"), offer1.OfferURL, jujuparams.OfferAdminAccess)
+	c.Assert(err, jc.ErrorIsNil)
+
+	access, err := s.jem.DB.GetApplicationOfferAccess(ctx, params.User("test-user"), offer1.OfferUUID)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(int(access), gc.Equals, mongodoc.ApplicationOfferAdminAccess)
+
+	// user1 is an admin - this should pass and access level be set to "read"
+	err = s.jem.RevokeOfferAccess(ctx, jemtest.NewIdentity("user1"), params.User("test-user"), offer1.OfferURL, jujuparams.OfferConsumeAccess)
+	c.Assert(err, jc.ErrorIsNil)
+
+	access, err = s.jem.DB.GetApplicationOfferAccess(ctx, params.User("test-user"), offer1.OfferUUID)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(int(access), gc.Equals, mongodoc.ApplicationOfferReadAccess)
+
+	// user2 is has consume access - unauthorized
+	err = s.jem.RevokeOfferAccess(ctx, jemtest.NewIdentity("user2"), params.User("test-user"), offer1.OfferURL, jujuparams.OfferConsumeAccess)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
+
+	err = s.jem.DB.SetApplicationOfferAccess(ctx, mongodoc.ApplicationOfferAccess{
+		OfferUUID: offer1.OfferUUID,
+		User:      params.User("user2"),
+		Access:    mongodoc.ApplicationOfferNoAccess,
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	// user2 is does not have access - not found
+	err = s.jem.RevokeOfferAccess(ctx, jemtest.NewIdentity("user2"), params.User("test-user"), offer1.OfferURL, jujuparams.OfferConsumeAccess)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+
+	// try revoking unknown access level
+	err = s.jem.RevokeOfferAccess(ctx, jemtest.NewIdentity("user1"), params.User("test-user"), offer1.OfferURL, jujuparams.OfferAccessPermission("unknown"))
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrBadRequest)
+
+	// try revoking for an offer that does not exist
+	err = s.jem.RevokeOfferAccess(ctx, jemtest.NewIdentity("user1"), params.User("test-user"), "no such offer", jujuparams.OfferReadAccess)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
