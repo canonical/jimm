@@ -420,3 +420,81 @@ func (s *applicationOffersSuite) TestModifyOfferAccess(c *gc.C) {
 	err = client3.RevokeOffer("test-user", "read", offerURL)
 	c.Assert(err, gc.ErrorMatches, "not found")
 }
+
+func (s *applicationOffersSuite) TestDestroyOffers(c *gc.C) {
+	ctx := context.Background()
+
+	ctlPath := s.AssertAddController(ctx, c, params.EntityPath{User: "user1", Name: "controller-1"}, true)
+	cred := s.AssertUpdateCredential(ctx, c, "user1", "dummy", "cred1", "empty")
+	err := s.JEM.DB.SetACL(ctx, s.JEM.DB.Controllers(), ctlPath, params.ACL{
+		Read: []string{"user1"},
+	})
+
+	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "user1", cred: cred})
+	modelUUID := mi.UUID
+	err = s.JEM.DB.SetACL(ctx, s.JEM.DB.Models(), params.EntityPath{User: "user1", Name: "model-1"}, params.ACL{
+		Admin: []string{"user1"},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	modelState, err := s.StatePool.Get(modelUUID)
+	c.Assert(err, gc.Equals, nil)
+	defer modelState.Release()
+
+	f := factory.NewFactory(modelState.State, s.StatePool)
+	app := f.MakeApplication(c, &factory.ApplicationParams{
+		Name: "test-app",
+		Charm: f.MakeCharm(c, &factory.CharmParams{
+			Name: "wordpress",
+		}),
+	})
+	f.MakeUnit(c, &factory.UnitParams{
+		Application: app,
+	})
+	ep, err := app.Endpoint("url")
+	c.Assert(err, gc.Equals, nil)
+
+	conn := s.open(c, nil, "user1")
+	defer conn.Close()
+	client := applicationoffers.NewClient(conn)
+
+	results, err := client.Offer(
+		modelUUID,
+		"test-app",
+		[]string{ep.Name},
+		"test-offer1",
+		"test offer 1 description",
+	)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(results, gc.HasLen, 1)
+	c.Assert(results[0].Error, gc.Equals, (*jujuparams.Error)(nil))
+
+	offerURL := "user1@external/model-1.test-offer1"
+
+	// user2 will have read access
+	err = client.GrantOffer("user2", "read", offerURL)
+	c.Assert(err, jc.ErrorIsNil)
+
+	// try to destroy offer that does not exist
+	err = client.DestroyOffers(true, "user1@external/model-1.test-offer2")
+	c.Assert(err, gc.ErrorMatches, "not found")
+
+	conn2 := s.open(c, nil, "user2")
+	defer conn2.Close()
+	client2 := applicationoffers.NewClient(conn2)
+
+	// user2 is not authorized to destroy the offer
+	err = client2.DestroyOffers(true, offerURL)
+	c.Assert(err, gc.ErrorMatches, "unauthorized")
+
+	// user1 can destroy the offer
+	err = client.DestroyOffers(true, offerURL)
+	c.Assert(err, jc.ErrorIsNil)
+
+	offers, err := client.ListOffers(crossmodel.ApplicationOfferFilter{
+		ModelName: mi.Name,
+		OfferName: "test-offer1",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(offers, gc.HasLen, 0)
+}

@@ -478,3 +478,58 @@ func (j *JEM) RevokeOfferAccess(ctx context.Context, id identchecker.ACLIdentity
 
 	return nil
 }
+
+// DestroyOffer removes the application offer.
+func (j *JEM) DestroyOffer(ctx context.Context, id identchecker.ACLIdentity, offerURL string, force bool) (err error) {
+	uid := params.User(id.Id())
+
+	// first we need to fetch the offer to get it's UUID
+	var offer mongodoc.ApplicationOffer
+	offer.OfferURL = offerURL
+	err = j.DB.GetApplicationOffer(ctx, &offer)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+
+	// retrieve the access rights for the authenticated user
+	offerAccess, err := j.DB.GetApplicationOfferAccess(ctx, uid, offer.OfferUUID)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+
+	// if the authenticated user has no access to the offer, we
+	// return a not found error.
+	// if the user has consume or read access we return an unauthorized error.
+	switch offerAccess {
+	case mongodoc.ApplicationOfferNoAccess:
+		return errgo.WithCausef(nil, params.ErrNotFound, "")
+	case mongodoc.ApplicationOfferReadAccess, mongodoc.ApplicationOfferConsumeAccess:
+		return errgo.WithCausef(nil, params.ErrUnauthorized, "")
+	default:
+	}
+
+	// first remove application offer from the jimm DB
+	err = j.DB.RemoveApplicationOffer(ctx, offer.OfferUUID)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+
+	// then remove from the actual controller
+	conn, err := j.OpenAPI(ctx, offer.ControllerPath)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	defer conn.Close()
+
+	err = conn.DestroyApplicationOffer(ctx, offerURL, force)
+	if err != nil {
+		zapctx.Error(ctx,
+			"failed to destroy application offer",
+			zap.String("controller", offer.ControllerPath.String()),
+			zap.String("offer", offer.OfferURL),
+		)
+		return errgo.Mask(err)
+	}
+
+	return nil
+}

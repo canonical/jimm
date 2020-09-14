@@ -21,16 +21,19 @@ func init() {
 		getConsumeDetailsMethod := rpc.Method(r.GetConsumeDetails)
 		listOffersMethod := rpc.Method(r.ListApplicationOffers)
 		modifyOfferAccessMethod := rpc.Method(r.ModifyOfferAccess)
+		destroyOffersMethod := rpc.Method(r.DestroyOffers)
 
 		r.AddMethod("ApplicationOffers", 1, "Offer", offerMethod)
 		r.AddMethod("ApplicationOffers", 1, "GetConsumeDetails", getConsumeDetailsMethod)
 		r.AddMethod("ApplicationOffers", 1, "ListApplicationOffers", listOffersMethod)
 		r.AddMethod("ApplicationOffers", 1, "ModifyOfferAccess", modifyOfferAccessMethod)
+		r.AddMethod("ApplicationOffers", 1, "DestroyOffers", destroyOffersMethod)
 
 		r.AddMethod("ApplicationOffers", 2, "Offer", offerMethod)
 		r.AddMethod("ApplicationOffers", 2, "GetConsumeDetails", getConsumeDetailsMethod)
 		r.AddMethod("ApplicationOffers", 2, "ListApplicationOffers", listOffersMethod)
 		r.AddMethod("ApplicationOffers", 2, "ModifyOfferAccess", modifyOfferAccessMethod)
+		r.AddMethod("ApplicationOffers", 2, "DestroyOffers", destroyOffersMethod)
 
 		return []int{1, 2}
 	}
@@ -121,4 +124,16 @@ func (r *controllerRoot) modifyOfferAcces(ctx context.Context, change jujuparams
 	default:
 		return errgo.WithCausef(nil, params.ErrBadRequest, "unknown action %q", change.Action)
 	}
+}
+
+// DestroyOffers removes specified application offers.
+func (r *controllerRoot) DestroyOffers(ctx context.Context, args jujuparams.DestroyApplicationOffers) (jujuparams.ErrorResults, error) {
+	results := jujuparams.ErrorResults{
+		Results: make([]jujuparams.ErrorResult, len(args.OfferURLs)),
+	}
+
+	for i, offerURL := range args.OfferURLs {
+		results.Results[i].Error = mapError(r.jem.DestroyOffer(ctx, r.identity, offerURL, args.Force))
+	}
+	return results, nil
 }
