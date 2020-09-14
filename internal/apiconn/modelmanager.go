@@ -12,6 +12,7 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 // CreateModel creates a new model as specified by the given model
@@ -187,4 +188,52 @@ func (c *Conn) DumpModelDB(ctx context.Context, uuid string) (map[string]interfa
 		return nil, errgo.Newf("unexpected number of results (expected 1, got %d)", len(resp.Results))
 	}
 	return resp.Results[0].Result, newAPIError(resp.Results[0].Error)
+}
+
+// GrantModelAccess gives the given user the given access level on the
+// given model. GrantModelAccess uses the ModifyModelAccess procedure
+// on the ModelManager facade version 2.
+func (c *Conn) GrantModelAccess(ctx context.Context, uuid string, user params.User, access jujuparams.UserAccessPermission) error {
+	args := jujuparams.ModifyModelAccessRequest{
+		Changes: []jujuparams.ModifyModelAccess{{
+			UserTag:  conv.ToUserTag(user).String(),
+			Action:   jujuparams.GrantModelAccess,
+			Access:   access,
+			ModelTag: names.NewModelTag(uuid).String(),
+		}},
+	}
+
+	var resp jujuparams.ErrorResults
+	err := c.APICall("ModelManager", 2, "", "ModifyModelAccess", &args, &resp)
+	if err != nil {
+		return newAPIError(err)
+	}
+	if len(resp.Results) != 1 {
+		return errgo.Newf("unexpected number of results (expected 1, got %d)", len(resp.Results))
+	}
+	return newAPIError(resp.Results[0].Error)
+}
+
+// RevokeModelAccess removes the given access level from the given user on
+// the given model. Revoke ModelAccess uses the ModifyModelAccess procedure
+// on the ModelManager facade version 2.
+func (c *Conn) RevokeModelAccess(ctx context.Context, uuid string, user params.User, access jujuparams.UserAccessPermission) error {
+	args := jujuparams.ModifyModelAccessRequest{
+		Changes: []jujuparams.ModifyModelAccess{{
+			UserTag:  conv.ToUserTag(user).String(),
+			Action:   jujuparams.RevokeModelAccess,
+			Access:   access,
+			ModelTag: names.NewModelTag(uuid).String(),
+		}},
+	}
+
+	var resp jujuparams.ErrorResults
+	err := c.APICall("ModelManager", 2, "", "ModifyModelAccess", &args, &resp)
+	if err != nil {
+		return newAPIError(err)
+	}
+	if len(resp.Results) != 1 {
+		return errgo.Newf("unexpected number of results (expected 1, got %d)", len(resp.Results))
+	}
+	return newAPIError(resp.Results[0].Error)
 }

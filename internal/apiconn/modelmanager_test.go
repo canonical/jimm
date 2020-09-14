@@ -6,6 +6,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/environs/config"
@@ -180,4 +181,71 @@ func (s *modelmanagerSuite) TestModelInfoError(c *gc.C) {
 	c.Check(apiconn.IsAPIError(err), gc.Equals, true)
 	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeUnauthorized)
 	c.Check(err, gc.ErrorMatches, `api error: permission denied`)
+}
+
+func (s *modelmanagerSuite) TestGrantRevokeModel(c *gc.C) {
+	ctx := context.Background()
+
+	model := mongodoc.Model{
+		Path: params.EntityPath{
+			User: "test-user",
+			Name: "test-model",
+		},
+	}
+
+	err := s.conn.CreateModel(ctx, &model)
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.conn.GrantModelAccess(ctx, model.UUID, "test-user-2", jujuparams.ModelReadAccess)
+	c.Assert(err, gc.Equals, nil)
+
+	mi := jujuparams.ModelInfo{
+		UUID: model.UUID,
+	}
+	err = s.conn.ModelInfo(ctx, &mi)
+	c.Assert(err, gc.Equals, nil)
+
+	lessf := func(a, b jujuparams.ModelUserInfo) bool {
+		return a.UserName < b.UserName
+	}
+	c.Check(mi.Users, jemtest.CmpEquals(cmpopts.SortSlices(lessf)), []jujuparams.ModelUserInfo{{
+		UserName:    "test-user@external",
+		DisplayName: "test-user",
+		Access:      "admin",
+	}, {
+		UserName: "test-user-2@external",
+		Access:   "read",
+	}})
+
+	err = s.conn.RevokeModelAccess(ctx, model.UUID, "test-user-2", jujuparams.ModelReadAccess)
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.conn.ModelInfo(ctx, &mi)
+	c.Assert(err, gc.Equals, nil)
+
+	c.Check(mi.Users, jemtest.CmpEquals(cmpopts.SortSlices(lessf)), []jujuparams.ModelUserInfo{{
+		UserName:    "test-user@external",
+		DisplayName: "test-user",
+		Access:      "admin",
+	}})
+}
+
+func (s *modelmanagerSuite) TestGrantModelAccessError(c *gc.C) {
+	ctx := context.Background()
+
+	err := s.conn.GrantModelAccess(ctx, "00000000-0000-0000-0000-000000000000", "test-user-2", jujuparams.ModelReadAccess)
+
+	c.Check(apiconn.IsAPIError(err), gc.Equals, true)
+	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
+	c.Check(err, gc.ErrorMatches, `api error: could not lookup model: model "00000000-0000-0000-0000-000000000000" not found`)
+}
+
+func (s *modelmanagerSuite) TestRevokeModelAccessError(c *gc.C) {
+	ctx := context.Background()
+
+	err := s.conn.RevokeModelAccess(ctx, "00000000-0000-0000-0000-000000000000", "test-user-2", jujuparams.ModelReadAccess)
+
+	c.Check(apiconn.IsAPIError(err), gc.Equals, true)
+	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
+	c.Check(err, gc.ErrorMatches, `api error: could not lookup model: model "00000000-0000-0000-0000-000000000000" not found`)
 }
