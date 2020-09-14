@@ -286,11 +286,13 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 			Interface: "http",
 		}},
 		Users: []crossmodel.OfferUserDetails{{
-			UserName: "everyone@external",
-			Access:   "read",
+			UserName:    "everyone@external",
+			DisplayName: "everyone",
+			Access:      "read",
 		}, {
-			UserName: "user1@external",
-			Access:   "admin",
+			UserName:    "user1@external",
+			DisplayName: "user1",
+			Access:      "admin",
 		}},
 	}, {
 		OfferName:              "test-offer2",
@@ -303,11 +305,13 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 			Interface: "http",
 		}},
 		Users: []crossmodel.OfferUserDetails{{
-			UserName: "everyone@external",
-			Access:   "read",
+			UserName:    "everyone@external",
+			DisplayName: "everyone",
+			Access:      "read",
 		}, {
-			UserName: "user1@external",
-			Access:   "admin",
+			UserName:    "user1@external",
+			DisplayName: "user1",
+			Access:      "admin",
 		}},
 	}})
 
@@ -328,11 +332,13 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 			Interface: "http",
 		}},
 		Users: []crossmodel.OfferUserDetails{{
-			UserName: "everyone@external",
-			Access:   "read",
+			UserName:    "everyone@external",
+			DisplayName: "everyone",
+			Access:      "read",
 		}, {
-			UserName: "user1@external",
-			Access:   "admin",
+			UserName:    "user1@external",
+			DisplayName: "user1",
+			Access:      "admin",
 		}},
 	}})
 }
@@ -404,14 +410,14 @@ func (s *applicationOffersSuite) TestModifyOfferAccess(c *gc.C) {
 
 	accessLevel, err := s.JEM.DB.GetApplicationOfferAccess(ctx, params.User("test-user"), offer.OfferUUID)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(int(accessLevel), gc.Equals, mongodoc.ApplicationOfferAdminAccess)
+	c.Assert(accessLevel, gc.Equals, mongodoc.ApplicationOfferAdminAccess)
 
 	err = client.RevokeOffer("test-user", "consume", offerURL)
 	c.Assert(err, jc.ErrorIsNil)
 
 	accessLevel, err = s.JEM.DB.GetApplicationOfferAccess(ctx, params.User("test-user"), offer.OfferUUID)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(int(accessLevel), gc.Equals, mongodoc.ApplicationOfferReadAccess)
+	c.Assert(accessLevel, gc.Equals, mongodoc.ApplicationOfferReadAccess)
 
 	conn3 := s.open(c, nil, "user3")
 	defer conn3.Close()

@@ -104,8 +104,8 @@ func (db *Database) ensureIndexes() error {
 		db.ApplicationOffers(),
 		mgo.Index{Key: []string{"owner-name", "model-name", "offer-name"}, Unique: true},
 	}, {
-		db.ApplicationOfferAccesses(),
-		mgo.Index{Key: []string{"user", "offer-uuid"}, Unique: true},
+		db.ApplicationOffers(),
+		mgo.Index{Key: []string{"users.user", "users.access"}},
 	}}
 	for _, idx := range indexes {
 		err := idx.c.EnsureIndex(idx.i)
@@ -1315,16 +1315,47 @@ func (db *Database) ListApplicationOffers(ctx context.Context, filters []jujupar
 }
 
 // SetApplicationOfferAccess sets a user access level to an application offer.
-func (db *Database) SetApplicationOfferAccess(ctx context.Context, access mongodoc.ApplicationOfferAccess) (err error) {
+func (db *Database) SetApplicationOfferAccess(ctx context.Context, user params.User, uuid string, access mongodoc.ApplicationOfferAccessPermission) (err error) {
 	defer db.checkError(ctx, &err)
 
-	_, err = db.ApplicationOfferAccesses().Upsert(
-		bson.M{
-			"user":       access.User,
-			"offer-uuid": access.OfferUUID,
-		},
-		bson.M{"$set": bson.M{
-			"access": access.Access,
+	// Add the new access level.
+	err = db.ApplicationOffers().UpdateId(uuid, bson.D{{
+		"$push", bson.D{{
+			"users", mongodoc.OfferUserDetails{
+				User:   user,
+				Access: access,
+			},
+		}},
+	}})
+	if err != nil {
+		if errgo.Cause(err) == mgo.ErrNotFound {
+			return errgo.WithCausef(err, params.ErrNotFound, "")
+		}
+		return errgo.Mask(err)
+	}
+
+	// Remove any other access levels as long as the intended access level
+	// is still present. This ensures that if there are racing updates they
+	// can't delete each other.
+
+	_, err = db.ApplicationOffers().UpdateAll(
+		bson.D{{
+			"_id", uuid,
+		}, {
+			"users", bson.D{{
+				"user", user,
+			}, {
+				"access", access,
+			}},
+		}},
+		bson.D{{
+			"$pull", bson.D{{
+				"users", bson.D{{
+					"user", user,
+				}, {
+					"access", bson.D{{"$ne", access}},
+				}},
+			}},
 		}},
 	)
 	return errgo.Mask(err)
@@ -1334,22 +1365,22 @@ func (db *Database) SetApplicationOfferAccess(ctx context.Context, access mongod
 // the application offer with the given UUID.
 func (db *Database) GetApplicationOfferAccess(ctx context.Context, user params.User, offerUUID string) (_ mongodoc.ApplicationOfferAccessPermission, err error) {
 	defer db.checkError(ctx, &err)
-	var access mongodoc.ApplicationOfferAccess
-	err = db.ApplicationOfferAccesses().Find(
-		bson.M{
-			"user":       user,
-			"offer-uuid": offerUUID,
-		},
-	).One(&access)
-	if err == nil {
-		return access.Access, nil
+	var offer mongodoc.ApplicationOffer
+	err = db.ApplicationOffers().FindId(offerUUID).One(&offer)
+	if err != nil && errgo.Cause(err) != mgo.ErrNotFound {
+		return mongodoc.ApplicationOfferNoAccess, errgo.Mask(err)
 	}
-	if errgo.Cause(err) == mgo.ErrNotFound {
-		// If we can't find a record then the user has no access, but don't
-		// return an error.
-		err = nil
+	return getApplicationOfferAccess(user, &offer), nil
+}
+
+func getApplicationOfferAccess(user params.User, offer *mongodoc.ApplicationOffer) mongodoc.ApplicationOfferAccessPermission {
+	access := mongodoc.ApplicationOfferNoAccess
+	for _, u := range offer.Users {
+		if (u.User == user || u.User == "everybody") && u.Access > access {
+			access = u.Access
+		}
 	}
-	return mongodoc.ApplicationOfferNoAccess, errgo.Mask(err)
+	return access
 }
 
 // GetApplicationOfferUsers returns a list of users that have the specified
@@ -1358,18 +1389,21 @@ func (db *Database) GetApplicationOfferAccess(ctx context.Context, user params.U
 func (db *Database) GetApplicationOfferUsers(ctx context.Context, level mongodoc.ApplicationOfferAccessPermission, offerUUID string) (_ []string, err error) {
 	defer db.checkError(ctx, &err)
 
-	it := db.ApplicationOfferAccesses().Find(bson.M{"offer-uuid": offerUUID}).Iter()
-	defer it.Close()
+	var offer mongodoc.ApplicationOffer
+	err = db.ApplicationOffers().FindId(offerUUID).One(&offer)
+	if err != nil && errgo.Cause(err) != mgo.ErrNotFound {
+		return nil, errgo.Mask(err)
+	}
 
 	var users []string
-	var access mongodoc.ApplicationOfferAccess
-	for it.Next(&access) {
-		if access.Access >= level {
-			users = append(users, conv.ToUserTag(access.User).Id())
+	for _, u := range offer.Users {
+		if u.Access >= level {
+			users = append(users, conv.ToUserTag(u.User).Id())
 		}
 	}
+
 	sort.Strings(users)
-	return users, errgo.Mask(it.Err())
+	return users, nil
 }
 
 func makeApplicationOfferFilterQuery(filter jujuparams.OfferFilter) bson.D {
@@ -1490,7 +1524,6 @@ func (db *Database) Collections() []*mgo.Collection {
 		db.Machines(),
 		db.Models(),
 		db.ApplicationOffers(),
-		db.ApplicationOfferAccesses(),
 	}
 }
 
@@ -1529,12 +1562,6 @@ func (db *Database) Models() *mgo.Collection {
 // ApplicationOffers returns the collection holding application offers.
 func (db *Database) ApplicationOffers() *mgo.Collection {
 	return db.C("application_offers")
-}
-
-// ApplicationOfferAccesses returns the collection holding application offer
-// accesses for users.
-func (db *Database) ApplicationOfferAccesses() *mgo.Collection {
-	return db.C("application_offer_accesses")
 }
 
 func (db *Database) C(name string) *mgo.Collection {

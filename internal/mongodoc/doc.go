@@ -563,9 +563,8 @@ type RemoteSpace struct {
 
 // OfferUserDetails represents an offer consumer and their permission on the offer.
 type OfferUserDetails struct {
-	UserName    string `bson:"user"`
-	DisplayName string `bson:"display-name"`
-	Access      string `bson:"access"`
+	User   params.User                      `bson:"user"`
+	Access ApplicationOfferAccessPermission `bson:"access"`
 }
 
 // RemoteEndpoint represents a remote application endpoint.
@@ -579,17 +578,22 @@ type RemoteEndpoint struct {
 // ApplicationOfferAccessPermission holds the access permission level.
 type ApplicationOfferAccessPermission int
 
+func (p ApplicationOfferAccessPermission) String() string {
+	switch p {
+	case ApplicationOfferReadAccess:
+		return string(jujuparams.OfferReadAccess)
+	case ApplicationOfferConsumeAccess:
+		return string(jujuparams.OfferConsumeAccess)
+	case ApplicationOfferAdminAccess:
+		return string(jujuparams.OfferAdminAccess)
+	default:
+		return ""
+	}
+}
+
 const (
-	ApplicationOfferNoAccess = iota
+	ApplicationOfferNoAccess ApplicationOfferAccessPermission = iota
 	ApplicationOfferReadAccess
 	ApplicationOfferConsumeAccess
 	ApplicationOfferAdminAccess
 )
-
-// ApplicationOfferAccess holds the access permission
-// of a user to an application offer.
-type ApplicationOfferAccess struct {
-	OfferUUID string                           `bson:"offer-uuid"`
-	User      params.User                      `bson:"user"`
-	Access    ApplicationOfferAccessPermission `bson:"access"`
-}

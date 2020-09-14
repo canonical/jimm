@@ -10,7 +10,6 @@ import (
 	"github.com/juju/charm/v7"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
-	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
@@ -19,7 +18,6 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -81,13 +79,29 @@ func (j *JEM) Offer(ctx context.Context, id identchecker.ACLIdentity, offer juju
 			Limit:     endpoint.Limit,
 		}
 	}
-	users := make([]mongodoc.OfferUserDetails, len(offerDetails.Users))
-	for i, user := range offerDetails.Users {
-		users[i] = mongodoc.OfferUserDetails{
-			UserName:    user.UserName,
-			DisplayName: user.DisplayName,
-			Access:      user.Access,
+	users := make([]mongodoc.OfferUserDetails, 0, len(offerDetails.Users))
+	for _, user := range offerDetails.Users {
+		pu, err := conv.FromUserID(user.UserName)
+		if err != nil {
+			// If we can't parse the user, it's either a local user which
+			// we don't store, or an invalid user which can't do anything.
+			continue
 		}
+		var access mongodoc.ApplicationOfferAccessPermission
+		switch user.Access {
+		case string(jujuparams.OfferAdminAccess):
+			access = mongodoc.ApplicationOfferAdminAccess
+		case string(jujuparams.OfferConsumeAccess):
+			access = mongodoc.ApplicationOfferConsumeAccess
+		case string(jujuparams.OfferReadAccess):
+			access = mongodoc.ApplicationOfferReadAccess
+		default:
+			continue
+		}
+		users = append(users, mongodoc.OfferUserDetails{
+			User:   pu,
+			Access: access,
+		})
 	}
 	spaces := make([]mongodoc.RemoteSpace, len(offerDetails.Spaces))
 	for i, space := range offerDetails.Spaces {
@@ -134,38 +148,6 @@ func (j *JEM) Offer(ctx context.Context, id identchecker.ACLIdentity, offer juju
 		return errgo.Mask(err)
 	}
 
-	for _, user := range offerDetails.Users {
-		var userAccess mongodoc.ApplicationOfferAccessPermission
-		zapctx.Debug(ctx, "adding user", zap.String("user", user.UserName))
-
-		uid, err := conv.FromUserID(user.UserName)
-		if err != nil {
-			zapctx.Warn(ctx, "ignoring unsupported user name", zap.String("user name", user.UserName), zap.Error(err))
-			continue
-		}
-		switch user.Access {
-		case "read":
-			userAccess = mongodoc.ApplicationOfferReadAccess
-		case "consumer":
-			userAccess = mongodoc.ApplicationOfferConsumeAccess
-		case "admin":
-			userAccess = mongodoc.ApplicationOfferAdminAccess
-		default:
-			zapctx.Warn(ctx, "unknown user access level", zap.String("level", user.Access))
-			continue
-
-		}
-		offerAccess := mongodoc.ApplicationOfferAccess{
-			User:      uid,
-			OfferUUID: offerDetails.OfferUUID,
-			Access:    userAccess,
-		}
-		err = j.DB.SetApplicationOfferAccess(ctx, offerAccess)
-		if err != nil {
-			return errgo.Mask(err)
-		}
-	}
-
 	return nil
 }
 
@@ -181,17 +163,11 @@ func (j *JEM) GetApplicationOfferConsumeDetails(ctx context.Context, id identche
 	}
 
 	uid := params.User(id.Id())
-	access, err := j.DB.GetApplicationOfferAccess(ctx, uid, offer.OfferUUID)
-	if err != nil {
-		return errgo.Mask(err)
-	}
+	access := getApplicationOfferAccess(uid, &offer)
 	if access < mongodoc.ApplicationOfferConsumeAccess {
 		// If the current user doesn't have access then check if it is
 		// publicly available.
-		access, err = j.DB.GetApplicationOfferAccess(ctx, params.User("everyone"), offer.OfferUUID)
-		if err != nil {
-			return errgo.Mask(err)
-		}
+		access = getApplicationOfferAccess(params.User("everyone"), &offer)
 	}
 	switch access {
 	case mongodoc.ApplicationOfferNoAccess:
@@ -307,10 +283,11 @@ func applicationOfferDocToDetails(id params.User, offerDoc *mongodoc.Application
 	}
 	users := make([]jujuparams.OfferUserDetails, len(offerDoc.Users))
 	for i, user := range offerDoc.Users {
+		userTag := conv.ToUserTag(user.User)
 		users[i] = jujuparams.OfferUserDetails{
-			UserName:    user.UserName,
-			DisplayName: user.DisplayName,
-			Access:      user.Access,
+			UserName:    userTag.Id(),
+			DisplayName: userTag.Name(),
+			Access:      user.Access.String(),
 		}
 	}
 	sort.Slice(users, func(i, j int) bool {
@@ -359,10 +336,7 @@ func (j *JEM) GrantOfferAccess(ctx context.Context, id identchecker.ACLIdentity,
 	}
 
 	// retrieve the access rights for the authenticated user
-	offerAccess, err := j.DB.GetApplicationOfferAccess(ctx, uid, offer.OfferUUID)
-	if err != nil {
-		return errgo.Mask(err)
-	}
+	offerAccess := getApplicationOfferAccess(uid, &offer)
 
 	// if the authenticated user has no access to the offer, we
 	// return a not found error.
@@ -400,11 +374,7 @@ func (j *JEM) GrantOfferAccess(ctx context.Context, id identchecker.ACLIdentity,
 	}
 
 	// then grant access in the jimm db
-	err = j.DB.SetApplicationOfferAccess(ctx, mongodoc.ApplicationOfferAccess{
-		User:      user,
-		OfferUUID: offer.OfferUUID,
-		Access:    permission,
-	})
+	err = j.DB.SetApplicationOfferAccess(ctx, user, offer.OfferUUID, permission)
 	if err != nil {
 		return errgo.Mask(err)
 	}
@@ -424,10 +394,7 @@ func (j *JEM) RevokeOfferAccess(ctx context.Context, id identchecker.ACLIdentity
 	}
 
 	// retrieve the access rights for the authenticated user
-	offerAccess, err := j.DB.GetApplicationOfferAccess(ctx, uid, offer.OfferUUID)
-	if err != nil {
-		return errgo.Mask(err)
-	}
+	offerAccess := getApplicationOfferAccess(uid, &offer)
 
 	// if the authenticated user has no access to the offer, we
 	// return a not found error.
@@ -455,11 +422,7 @@ func (j *JEM) RevokeOfferAccess(ctx context.Context, id identchecker.ACLIdentity
 	}
 
 	// first revoke access in the jimm DB
-	err = j.DB.SetApplicationOfferAccess(ctx, mongodoc.ApplicationOfferAccess{
-		User:      user,
-		OfferUUID: offer.OfferUUID,
-		Access:    permission,
-	})
+	err = j.DB.SetApplicationOfferAccess(ctx, user, offer.OfferUUID, permission)
 	if err != nil {
 		return errgo.Mask(err)
 	}

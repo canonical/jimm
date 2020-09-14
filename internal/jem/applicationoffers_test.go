@@ -231,11 +231,7 @@ func (s *applicationoffersSuite) TestListApplicationOffers(c *gc.C) {
 	err = s.jem.DB.GetApplicationOffer(ctx, &offer2)
 	c.Assert(err, jc.ErrorIsNil)
 
-	err = s.jem.DB.SetApplicationOfferAccess(ctx, mongodoc.ApplicationOfferAccess{
-		OfferUUID: offer1.OfferUUID,
-		User:      params.User("user2"),
-		Access:    mongodoc.ApplicationOfferReadAccess,
-	})
+	err = s.jem.DB.SetApplicationOfferAccess(ctx, params.User("user2"), offer1.OfferUUID, mongodoc.ApplicationOfferReadAccess)
 	c.Assert(err, jc.ErrorIsNil)
 
 	results, err := s.jem.ListApplicationOffers(ctx, jemtest.NewIdentity("unknown-user"), jujuparams.OfferFilter{
@@ -271,12 +267,16 @@ func (s *applicationoffersSuite) TestListApplicationOffers(c *gc.C) {
 			Bindings: offer1.Bindings,
 			Users: []jujuparams.OfferUserDetails{{
 				UserName:    "everyone@external",
-				DisplayName: "",
+				DisplayName: "everyone",
 				Access:      "read",
 			}, {
 				UserName:    "user1@external",
-				DisplayName: "",
+				DisplayName: "user1",
 				Access:      "admin",
+			}, {
+				UserName:    "user2@external",
+				DisplayName: "user2",
+				Access:      "read",
 			}},
 		},
 		ApplicationName: offer1.ApplicationName,
@@ -299,11 +299,11 @@ func (s *applicationoffersSuite) TestListApplicationOffers(c *gc.C) {
 			Bindings: offer2.Bindings,
 			Users: []jujuparams.OfferUserDetails{{
 				UserName:    "everyone@external",
-				DisplayName: "",
+				DisplayName: "everyone",
 				Access:      "read",
 			}, {
 				UserName:    "user1@external",
-				DisplayName: "",
+				DisplayName: "user1",
 				Access:      "admin",
 			}},
 		},
@@ -334,22 +334,14 @@ func (s *applicationoffersSuite) TestModifyOfferAccess(c *gc.C) {
 	err = s.jem.DB.GetApplicationOffer(ctx, &offer1)
 	c.Assert(err, jc.ErrorIsNil)
 
-	err = s.jem.DB.SetApplicationOfferAccess(ctx, mongodoc.ApplicationOfferAccess{
-		OfferUUID: offer1.OfferUUID,
-		User:      params.User("user2"),
-		Access:    mongodoc.ApplicationOfferNoAccess,
-	})
+	err = s.jem.DB.SetApplicationOfferAccess(ctx, "user2", offer1.OfferUUID, mongodoc.ApplicationOfferNoAccess)
 	c.Assert(err, jc.ErrorIsNil)
 
 	// user2 does not have permission
 	err = s.jem.GrantOfferAccess(ctx, jemtest.NewIdentity("user2"), params.User("test-user"), offer1.OfferURL, jujuparams.OfferReadAccess)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
-	err = s.jem.DB.SetApplicationOfferAccess(ctx, mongodoc.ApplicationOfferAccess{
-		OfferUUID: offer1.OfferUUID,
-		User:      params.User("user2"),
-		Access:    mongodoc.ApplicationOfferConsumeAccess,
-	})
+	err = s.jem.DB.SetApplicationOfferAccess(ctx, "user2", offer1.OfferUUID, mongodoc.ApplicationOfferConsumeAccess)
 	c.Assert(err, jc.ErrorIsNil)
 
 	// user2 has consume permission
@@ -370,7 +362,7 @@ func (s *applicationoffersSuite) TestModifyOfferAccess(c *gc.C) {
 
 	access, err := s.jem.DB.GetApplicationOfferAccess(ctx, params.User("test-user"), offer1.OfferUUID)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(int(access), gc.Equals, mongodoc.ApplicationOfferAdminAccess)
+	c.Assert(access, gc.Equals, mongodoc.ApplicationOfferAdminAccess)
 
 	// user1 is an admin - this should pass and access level be set to "read"
 	err = s.jem.RevokeOfferAccess(ctx, jemtest.NewIdentity("user1"), params.User("test-user"), offer1.OfferURL, jujuparams.OfferConsumeAccess)
@@ -378,17 +370,13 @@ func (s *applicationoffersSuite) TestModifyOfferAccess(c *gc.C) {
 
 	access, err = s.jem.DB.GetApplicationOfferAccess(ctx, params.User("test-user"), offer1.OfferUUID)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(int(access), gc.Equals, mongodoc.ApplicationOfferReadAccess)
+	c.Assert(access, gc.Equals, mongodoc.ApplicationOfferReadAccess)
 
 	// user2 is has consume access - unauthorized
 	err = s.jem.RevokeOfferAccess(ctx, jemtest.NewIdentity("user2"), params.User("test-user"), offer1.OfferURL, jujuparams.OfferConsumeAccess)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
 
-	err = s.jem.DB.SetApplicationOfferAccess(ctx, mongodoc.ApplicationOfferAccess{
-		OfferUUID: offer1.OfferUUID,
-		User:      params.User("user2"),
-		Access:    mongodoc.ApplicationOfferNoAccess,
-	})
+	err = s.jem.DB.SetApplicationOfferAccess(ctx, "user2", offer1.OfferUUID, mongodoc.ApplicationOfferNoAccess)
 	c.Assert(err, jc.ErrorIsNil)
 
 	// user2 is does not have access - not found
