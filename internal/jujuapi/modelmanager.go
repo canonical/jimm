@@ -404,7 +404,7 @@ func (r *controllerRoot) modifyModelAccess(ctx context.Context, change jujuparam
 		return errgo.WithCausef(err, params.ErrBadRequest, "invalid action %q", change.Action)
 	}
 	if err != nil {
-		return errgo.Mask(err)
+		return errgo.Mask(err, apiconn.IsAPIError)
 	}
 	return nil
 }

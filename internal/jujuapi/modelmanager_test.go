@@ -1148,7 +1148,7 @@ func (s *modelManagerSuite) TestModifyModelAccessErrors(c *gc.C) {
 			Access:   "not-an-access",
 			ModelTag: names.NewModelTag(mi.UUID).String(),
 		},
-		expectError: `"not-an-access" model access not valid`,
+		expectError: `could not modify model access: "not-an-access" model access not valid`,
 	}}
 
 	for i, test := range modifyModelAccessErrorTests {

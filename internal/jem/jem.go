@@ -1022,11 +1022,10 @@ func (j *JEM) revokeControllerCredential(
 
 // GrantModel grants the given access for the given user on the given model and updates the JEM database.
 func (j *JEM) GrantModel(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model, user params.User, access string) error {
-	if err := j.DB.GrantModel(ctx, model.Path, user, access); err != nil {
-		return errgo.Mask(err)
+	if err := conn.GrantModelAccess(ctx, model.UUID, user, jujuparams.UserAccessPermission(access)); err != nil {
+		return errgo.Mask(err, apiconn.IsAPIError)
 	}
-	client := modelmanager.NewClient(conn)
-	if err := client.GrantModel(conv.ToUserTag(user).Id(), access, model.UUID); err != nil {
+	if err := j.DB.GrantModel(ctx, model.Path, user, access); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil
@@ -1037,10 +1036,9 @@ func (j *JEM) RevokeModel(ctx context.Context, conn *apiconn.Conn, model *mongod
 	if err := j.DB.RevokeModel(ctx, model.Path, user, access); err != nil {
 		return errgo.Mask(err)
 	}
-	client := modelmanager.NewClient(conn)
-	if err := client.RevokeModel(conv.ToUserTag(user).Id(), access, model.UUID); err != nil {
-		// TODO (mhilton) What should be done with the changes already made to JEM.
-		return errgo.Mask(err)
+	if err := conn.RevokeModelAccess(ctx, model.UUID, user, jujuparams.UserAccessPermission(access)); err != nil {
+		// TODO (mhilton) What should be done with the changes already made to the database.
+		return errgo.Mask(err, apiconn.IsAPIError)
 	}
 	return nil
 }
