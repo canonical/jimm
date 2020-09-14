@@ -7,6 +7,7 @@ import (
 
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/crossmodel"
+	"github.com/juju/names/v4"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/conv"
@@ -19,14 +20,17 @@ func init() {
 		offerMethod := rpc.Method(r.Offer)
 		getConsumeDetailsMethod := rpc.Method(r.GetConsumeDetails)
 		listOffersMethod := rpc.Method(r.ListApplicationOffers)
+		modifyOfferAccessMethod := rpc.Method(r.ModifyOfferAccess)
 
 		r.AddMethod("ApplicationOffers", 1, "Offer", offerMethod)
 		r.AddMethod("ApplicationOffers", 1, "GetConsumeDetails", getConsumeDetailsMethod)
 		r.AddMethod("ApplicationOffers", 1, "ListApplicationOffers", listOffersMethod)
+		r.AddMethod("ApplicationOffers", 1, "ModifyOfferAccess", modifyOfferAccessMethod)
 
 		r.AddMethod("ApplicationOffers", 2, "Offer", offerMethod)
 		r.AddMethod("ApplicationOffers", 2, "GetConsumeDetails", getConsumeDetailsMethod)
 		r.AddMethod("ApplicationOffers", 2, "ListApplicationOffers", listOffersMethod)
+		r.AddMethod("ApplicationOffers", 2, "ModifyOfferAccess", modifyOfferAccessMethod)
 
 		return []int{1, 2}
 	}
@@ -78,6 +82,7 @@ func (r *controllerRoot) GetConsumeDetails(ctx context.Context, args jujuparams.
 	return results, nil
 }
 
+// ListApplicationOffers returns all offers matching the specified filters.
 func (r *controllerRoot) ListApplicationOffers(ctx context.Context, args jujuparams.OfferFilters) (jujuparams.QueryApplicationOffersResults, error) {
 	results := jujuparams.QueryApplicationOffersResults{}
 
@@ -88,4 +93,32 @@ func (r *controllerRoot) ListApplicationOffers(ctx context.Context, args jujupar
 	results.Results = offers
 
 	return results, nil
+}
+
+// ModifyOfferAccess modifies application offer access.
+func (r *controllerRoot) ModifyOfferAccess(ctx context.Context, args jujuparams.ModifyOfferAccessRequest) (jujuparams.ErrorResults, error) {
+	results := jujuparams.ErrorResults{
+		Results: make([]jujuparams.ErrorResult, len(args.Changes)),
+	}
+
+	for i, change := range args.Changes {
+		results.Results[i].Error = mapError(r.modifyOfferAcces(ctx, change))
+	}
+	return results, nil
+}
+
+func (r *controllerRoot) modifyOfferAcces(ctx context.Context, change jujuparams.ModifyOfferAccess) error {
+	userTag, err := names.ParseUserTag(change.UserTag)
+	if err != nil {
+		return errgo.WithCausef(err, params.ErrBadRequest, "")
+	}
+	user := params.User(userTag.Id())
+	switch change.Action {
+	case jujuparams.GrantOfferAccess:
+		return errgo.Mask(r.jem.GrantOfferAccess(ctx, r.identity, user, change.OfferURL, change.Access), errgo.Is(params.ErrNotFound), errgo.Is(params.ErrBadRequest))
+	case jujuparams.RevokeOfferAccess:
+		return errgo.Mask(r.jem.RevokeOfferAccess(ctx, r.identity, user, change.OfferURL, change.Access), errgo.Is(params.ErrNotFound), errgo.Is(params.ErrBadRequest))
+	default:
+		return errgo.WithCausef(nil, params.ErrBadRequest, "unknown action %q", change.Action)
+	}
 }

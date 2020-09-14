@@ -5,7 +5,6 @@ package jujuapi_test
 import (
 	"context"
 
-	"github.com/CanonicalLtd/jimm/params"
 	"github.com/juju/charm/v7"
 	"github.com/juju/juju/api/applicationoffers"
 	jujuparams "github.com/juju/juju/apiserver/params"
@@ -15,6 +14,9 @@ import (
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
+
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 type applicationOffersSuite struct {
@@ -333,4 +335,88 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 			Access:   "admin",
 		}},
 	}})
+}
+
+func (s *applicationOffersSuite) TestModifyOfferAccess(c *gc.C) {
+	ctx := context.Background()
+
+	ctlPath := s.AssertAddController(ctx, c, params.EntityPath{User: "user1", Name: "controller-1"}, true)
+	cred := s.AssertUpdateCredential(ctx, c, "user1", "dummy", "cred1", "empty")
+	err := s.JEM.DB.SetACL(ctx, s.JEM.DB.Controllers(), ctlPath, params.ACL{
+		Read: []string{"user1"},
+	})
+
+	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "user1", cred: cred})
+	modelUUID := mi.UUID
+	err = s.JEM.DB.SetACL(ctx, s.JEM.DB.Models(), params.EntityPath{User: "user1", Name: "model-1"}, params.ACL{
+		Admin: []string{"user1"},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	modelState, err := s.StatePool.Get(modelUUID)
+	c.Assert(err, gc.Equals, nil)
+	defer modelState.Release()
+
+	f := factory.NewFactory(modelState.State, s.StatePool)
+	app := f.MakeApplication(c, &factory.ApplicationParams{
+		Name: "test-app",
+		Charm: f.MakeCharm(c, &factory.CharmParams{
+			Name: "wordpress",
+		}),
+	})
+	f.MakeUnit(c, &factory.UnitParams{
+		Application: app,
+	})
+	ep, err := app.Endpoint("url")
+	c.Assert(err, gc.Equals, nil)
+
+	conn := s.open(c, nil, "user1")
+	defer conn.Close()
+	client := applicationoffers.NewClient(conn)
+
+	results, err := client.Offer(
+		modelUUID,
+		"test-app",
+		[]string{ep.Name},
+		"test-offer1",
+		"test offer 1 description",
+	)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(results, gc.HasLen, 1)
+	c.Assert(results[0].Error, gc.Equals, (*jujuparams.Error)(nil))
+
+	offerURL := "user1@external/model-1.test-offer1"
+
+	err = client.GrantOffer("test-user", "unknown", offerURL)
+	c.Assert(err, gc.ErrorMatches, `"unknown" offer access not valid`)
+
+	err = client.GrantOffer("test-user", "read", "no-such-offer")
+	c.Assert(err, gc.ErrorMatches, `not found`)
+
+	err = client.GrantOffer("test-user", "admin", offerURL)
+	c.Assert(err, jc.ErrorIsNil)
+
+	offer := mongodoc.ApplicationOffer{
+		OfferURL: offerURL,
+	}
+	err = s.JEM.DB.GetApplicationOffer(ctx, &offer)
+	c.Assert(err, jc.ErrorIsNil)
+
+	accessLevel, err := s.JEM.DB.GetApplicationOfferAccess(ctx, params.User("test-user"), offer.OfferUUID)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(int(accessLevel), gc.Equals, mongodoc.ApplicationOfferAdminAccess)
+
+	err = client.RevokeOffer("test-user", "consume", offerURL)
+	c.Assert(err, jc.ErrorIsNil)
+
+	accessLevel, err = s.JEM.DB.GetApplicationOfferAccess(ctx, params.User("test-user"), offer.OfferUUID)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(int(accessLevel), gc.Equals, mongodoc.ApplicationOfferReadAccess)
+
+	conn3 := s.open(c, nil, "user3")
+	defer conn3.Close()
+	client3 := applicationoffers.NewClient(conn3)
+
+	err = client3.RevokeOffer("test-user", "read", offerURL)
+	c.Assert(err, gc.ErrorMatches, "not found")
 }

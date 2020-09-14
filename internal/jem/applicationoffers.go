@@ -345,3 +345,136 @@ func applicationOfferDocToDetails(id params.User, offerDoc *mongodoc.Application
 		Connections:     connections,
 	}
 }
+
+// GrantOfferAccess grants rights for an application offer.
+func (j *JEM) GrantOfferAccess(ctx context.Context, id identchecker.ACLIdentity, user params.User, offerURL string, access jujuparams.OfferAccessPermission) (err error) {
+	uid := params.User(id.Id())
+
+	// first we need to fetch the offer to get it's UUID
+	var offer mongodoc.ApplicationOffer
+	offer.OfferURL = offerURL
+	err = j.DB.GetApplicationOffer(ctx, &offer)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+
+	// retrieve the access rights for the authenticated user
+	offerAccess, err := j.DB.GetApplicationOfferAccess(ctx, uid, offer.OfferUUID)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+
+	// if the authenticated user has no access to the offer, we
+	// return a not found error.
+	// if the user has consume or read access we return an unauthorized error.
+	switch offerAccess {
+	case mongodoc.ApplicationOfferNoAccess:
+		return errgo.WithCausef(nil, params.ErrNotFound, "")
+	case mongodoc.ApplicationOfferReadAccess, mongodoc.ApplicationOfferConsumeAccess:
+		return errgo.WithCausef(nil, params.ErrUnauthorized, "")
+	default:
+	}
+
+	var permission mongodoc.ApplicationOfferAccessPermission
+	switch access {
+	case jujuparams.OfferAdminAccess:
+		permission = mongodoc.ApplicationOfferAdminAccess
+	case jujuparams.OfferConsumeAccess:
+		permission = mongodoc.ApplicationOfferConsumeAccess
+	case jujuparams.OfferReadAccess:
+		permission = mongodoc.ApplicationOfferReadAccess
+	default:
+		return errgo.WithCausef(nil, params.ErrBadRequest, "unknown permission level")
+	}
+
+	// grant access on the controller
+	conn, err := j.OpenAPI(ctx, offer.ControllerPath)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	defer conn.Close()
+
+	err = conn.GrantApplicationOfferAccess(ctx, offer.OfferURL, user, access)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+
+	// then grant access in the jimm db
+	err = j.DB.SetApplicationOfferAccess(ctx, mongodoc.ApplicationOfferAccess{
+		User:      user,
+		OfferUUID: offer.OfferUUID,
+		Access:    permission,
+	})
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
+// RevokeOfferAccess revokes rights for an application offer.
+func (j *JEM) RevokeOfferAccess(ctx context.Context, id identchecker.ACLIdentity, user params.User, offerURL string, access jujuparams.OfferAccessPermission) (err error) {
+	uid := params.User(id.Id())
+
+	// first we need to fetch the offer to get it's UUID
+	var offer mongodoc.ApplicationOffer
+	offer.OfferURL = offerURL
+	err = j.DB.GetApplicationOffer(ctx, &offer)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+
+	// retrieve the access rights for the authenticated user
+	offerAccess, err := j.DB.GetApplicationOfferAccess(ctx, uid, offer.OfferUUID)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+
+	// if the authenticated user has no access to the offer, we
+	// return a not found error.
+	// if the user has consume or read access we return an unauthorized error.
+	switch offerAccess {
+	case mongodoc.ApplicationOfferNoAccess:
+		return errgo.WithCausef(nil, params.ErrNotFound, "")
+	case mongodoc.ApplicationOfferReadAccess, mongodoc.ApplicationOfferConsumeAccess:
+		return errgo.WithCausef(nil, params.ErrUnauthorized, "")
+	default:
+	}
+
+	// revoking access level L results in user
+	// retainig access level L-1
+	var permission mongodoc.ApplicationOfferAccessPermission
+	switch access {
+	case jujuparams.OfferAdminAccess:
+		permission = mongodoc.ApplicationOfferConsumeAccess
+	case jujuparams.OfferConsumeAccess:
+		permission = mongodoc.ApplicationOfferReadAccess
+	case jujuparams.OfferReadAccess:
+		permission = mongodoc.ApplicationOfferNoAccess
+	default:
+		return errgo.WithCausef(nil, params.ErrBadRequest, "unknown permission level")
+	}
+
+	// first revoke access in the jimm DB
+	err = j.DB.SetApplicationOfferAccess(ctx, mongodoc.ApplicationOfferAccess{
+		User:      user,
+		OfferUUID: offer.OfferUUID,
+		Access:    permission,
+	})
+	if err != nil {
+		return errgo.Mask(err)
+	}
+
+	// then revoke on the actual controller
+	conn, err := j.OpenAPI(ctx, offer.ControllerPath)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	defer conn.Close()
+
+	err = conn.RevokeApplicationOfferAccess(ctx, offer.OfferURL, user, access)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+
+	return nil
+}
