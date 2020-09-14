@@ -243,23 +243,15 @@ func filterApplicationOfferUsers(id params.User, a mongodoc.ApplicationOfferAcce
 func (j *JEM) ListApplicationOffers(ctx context.Context, id identchecker.ACLIdentity, filters ...jujuparams.OfferFilter) (_ []jujuparams.ApplicationOfferAdminDetails, err error) {
 	uid := params.User(id.Id())
 
-	docs, err := j.DB.ListApplicationOffers(ctx, filters)
-	if err != nil {
-		return nil, errgo.Mask(err)
+	it := j.DB.IterApplicationOffers(ctx, uid, mongodoc.ApplicationOfferAdminAccess, filters)
+	defer it.Close()
+	var offers []jujuparams.ApplicationOfferAdminDetails
+	var doc mongodoc.ApplicationOffer
+	for it.Next(&doc) {
+		offers = append(offers, applicationOfferDocToDetails(uid, &doc))
 	}
 
-	offers := []jujuparams.ApplicationOfferAdminDetails{}
-	for _, offerDoc := range docs {
-		access, err := j.DB.GetApplicationOfferAccess(ctx, uid, offerDoc.OfferUUID)
-		if err != nil {
-			return nil, errgo.Mask(err)
-		}
-		if access == mongodoc.ApplicationOfferAdminAccess {
-			offers = append(offers, applicationOfferDocToDetails(uid, &offerDoc, true))
-		}
-	}
-
-	return offers, nil
+	return offers, errgo.Mask(it.Err())
 }
 
 // FindApplicationOffers returns details of offers matching the specified filter.
@@ -270,25 +262,22 @@ func (j *JEM) FindApplicationOffers(ctx context.Context, id identchecker.ACLIden
 		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "at least one filter must be specified")
 	}
 
-	docs, err := j.DB.ListApplicationOffers(ctx, filters)
-	if err != nil {
-		return nil, errgo.Mask(err)
+	it := j.DB.IterApplicationOffers(ctx, uid, mongodoc.ApplicationOfferReadAccess, filters)
+	defer it.Close()
+	var offers []jujuparams.ApplicationOfferAdminDetails
+	var doc mongodoc.ApplicationOffer
+	for it.Next(&doc) {
+		offers = append(offers, applicationOfferDocToDetails(uid, &doc))
 	}
 
-	offers := []jujuparams.ApplicationOfferAdminDetails{}
-	for _, offerDoc := range docs {
-		access := getApplicationOfferAccess(uid, &offerDoc)
-		if access >= mongodoc.ApplicationOfferReadAccess {
-			offers = append(offers, applicationOfferDocToDetails(uid, &offerDoc, false))
-		}
-	}
-
-	return offers, nil
+	return offers, errgo.Mask(it.Err())
 }
 
 // applicationOfferDocToDetails returns a jujuparams structure based on the provided
 // application offer mongo doc.
-func applicationOfferDocToDetails(id params.User, offerDoc *mongodoc.ApplicationOffer, includeAdminDetails bool) jujuparams.ApplicationOfferAdminDetails {
+func applicationOfferDocToDetails(id params.User, offerDoc *mongodoc.ApplicationOffer) jujuparams.ApplicationOfferAdminDetails {
+	access := getApplicationOfferAccess(id, offerDoc)
+
 	endpoints := make([]jujuparams.RemoteEndpoint, len(offerDoc.Endpoints))
 	for i, endpoint := range offerDoc.Endpoints {
 		endpoints[i] = jujuparams.RemoteEndpoint{
@@ -309,7 +298,7 @@ func applicationOfferDocToDetails(id params.User, offerDoc *mongodoc.Application
 	}
 	var users []jujuparams.OfferUserDetails
 	for _, user := range offerDoc.Users {
-		if includeAdminDetails || user.User == id || user.User == params.User("everyone") {
+		if access == mongodoc.ApplicationOfferAdminAccess || user.User == id || user.User == params.User("everyone") {
 			userTag := conv.ToUserTag(user.User)
 			users = append(users, jujuparams.OfferUserDetails{
 				UserName:    userTag.Id(),
@@ -321,10 +310,9 @@ func applicationOfferDocToDetails(id params.User, offerDoc *mongodoc.Application
 	sort.Slice(users, func(i, j int) bool {
 		return users[i].UserName < users[j].UserName
 	})
-	users = filterApplicationOfferUsers(id, mongodoc.ApplicationOfferAdminAccess, users)
 
 	var connections []jujuparams.OfferConnection
-	if includeAdminDetails {
+	if access == mongodoc.ApplicationOfferAdminAccess {
 		connections = make([]jujuparams.OfferConnection, len(offerDoc.Connections))
 		for i, connection := range offerDoc.Connections {
 			connections[i] = jujuparams.OfferConnection{

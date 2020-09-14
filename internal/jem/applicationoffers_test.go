@@ -547,6 +547,10 @@ func (s *applicationoffersSuite) TestFindApplicationOffers(c *gc.C) {
 				UserName:    "user1@external",
 				DisplayName: "user1",
 				Access:      "admin",
+			}, {
+				UserName:    "user2@external",
+				DisplayName: "user2",
+				Access:      "read",
 			}},
 		},
 		ApplicationName: offer1.ApplicationName,
@@ -579,7 +583,5 @@ func (s *applicationoffersSuite) TestFindApplicationOffers(c *gc.C) {
 		ApplicationName: offer2.ApplicationName,
 		CharmURL:        offer2.CharmURL,
 		Connections:     []jujuparams.OfferConnection{},
-	},
-	})
-
+	}})
 }
