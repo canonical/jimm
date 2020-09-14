@@ -403,3 +403,47 @@ func (s *applicationoffersSuite) TestModifyOfferAccess(c *gc.C) {
 	err = s.jem.RevokeOfferAccess(ctx, jemtest.NewIdentity("user1"), params.User("test-user"), "no such offer", jujuparams.OfferReadAccess)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
+
+func (s *applicationoffersSuite) TestDestroyOffer(c *gc.C) {
+	ctx := context.Background()
+
+	err := s.jem.Offer(ctx, s.identity, jujuparams.AddApplicationOffer{
+		ModelTag:        names.NewModelTag(s.model.UUID).String(),
+		OfferName:       "test-offer1",
+		ApplicationName: "test-app",
+		Endpoints: map[string]string{
+			s.endpoint.Relation.Name: s.endpoint.Relation.Name,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	offer1 := mongodoc.ApplicationOffer{
+		OfferURL: conv.ToOfferURL(s.model.Path, "test-offer1"),
+	}
+	err = s.jem.DB.GetApplicationOffer(ctx, &offer1)
+	c.Assert(err, jc.ErrorIsNil)
+
+	// user1 is an admin - this should pass
+	err = s.jem.GrantOfferAccess(ctx, jemtest.NewIdentity("user1"), params.User("user2"), offer1.OfferURL, jujuparams.OfferConsumeAccess)
+	c.Assert(err, jc.ErrorIsNil)
+
+	// user2 has consumer access - unauthorized
+	err = s.jem.DestroyOffer(ctx, jemtest.NewIdentity("user2"), offer1.OfferURL, true)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
+
+	// user3 has no access - not found
+	err = s.jem.DestroyOffer(ctx, jemtest.NewIdentity("user3"), offer1.OfferURL, true)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+
+	// user1 is admin
+	err = s.jem.DestroyOffer(ctx, jemtest.NewIdentity("user1"), offer1.OfferURL, true)
+	c.Assert(err, jc.ErrorIsNil)
+
+	offer2 := offer1
+	err = s.jem.DB.GetApplicationOffer(ctx, &offer2)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+
+	// offer not found
+	err = s.jem.DestroyOffer(ctx, jemtest.NewIdentity("user1"), offer1.OfferURL, true)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}
