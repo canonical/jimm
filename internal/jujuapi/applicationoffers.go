@@ -22,18 +22,21 @@ func init() {
 		listOffersMethod := rpc.Method(r.ListApplicationOffers)
 		modifyOfferAccessMethod := rpc.Method(r.ModifyOfferAccess)
 		destroyOffersMethod := rpc.Method(r.DestroyOffers)
+		findOffersMethod := rpc.Method(r.FindApplicationOffers)
 
 		r.AddMethod("ApplicationOffers", 1, "Offer", offerMethod)
 		r.AddMethod("ApplicationOffers", 1, "GetConsumeDetails", getConsumeDetailsMethod)
 		r.AddMethod("ApplicationOffers", 1, "ListApplicationOffers", listOffersMethod)
 		r.AddMethod("ApplicationOffers", 1, "ModifyOfferAccess", modifyOfferAccessMethod)
 		r.AddMethod("ApplicationOffers", 1, "DestroyOffers", destroyOffersMethod)
+		r.AddMethod("ApplicationOffers", 1, "FindApplicationOffers", findOffersMethod)
 
 		r.AddMethod("ApplicationOffers", 2, "Offer", offerMethod)
 		r.AddMethod("ApplicationOffers", 2, "GetConsumeDetails", getConsumeDetailsMethod)
 		r.AddMethod("ApplicationOffers", 2, "ListApplicationOffers", listOffersMethod)
 		r.AddMethod("ApplicationOffers", 2, "ModifyOfferAccess", modifyOfferAccessMethod)
 		r.AddMethod("ApplicationOffers", 2, "DestroyOffers", destroyOffersMethod)
+		r.AddMethod("ApplicationOffers", 2, "FindApplicationOffers", findOffersMethod)
 
 		return []int{1, 2}
 	}
@@ -90,6 +93,21 @@ func (r *controllerRoot) ListApplicationOffers(ctx context.Context, args jujupar
 	results := jujuparams.QueryApplicationOffersResults{}
 
 	offers, err := r.jem.ListApplicationOffers(ctx, r.identity, args.Filters...)
+	if err != nil {
+		return results, errgo.Mask(err)
+	}
+	results.Results = offers
+
+	return results, nil
+}
+
+// FindApplicationOffers returns all offers matching the specified filters
+// as long as the user has read access to each offer. It also omits details
+// on users and connections.
+func (r *controllerRoot) FindApplicationOffers(ctx context.Context, args jujuparams.OfferFilters) (jujuparams.QueryApplicationOffersResults, error) {
+	results := jujuparams.QueryApplicationOffersResults{}
+
+	offers, err := r.jem.FindApplicationOffers(ctx, r.identity, args.Filters...)
 	if err != nil {
 		return results, errgo.Mask(err)
 	}

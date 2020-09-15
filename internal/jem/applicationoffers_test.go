@@ -439,3 +439,147 @@ func (s *applicationoffersSuite) TestDestroyOffer(c *gc.C) {
 	err = s.jem.DestroyOffer(ctx, jemtest.NewIdentity("user1"), offer1.OfferURL, true)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
+
+func (s *applicationoffersSuite) TestFindApplicationOffers(c *gc.C) {
+	ctx := context.Background()
+
+	err := s.jem.Offer(ctx, s.identity, jujuparams.AddApplicationOffer{
+		ModelTag:        names.NewModelTag(s.model.UUID).String(),
+		OfferName:       "test-offer1",
+		ApplicationName: "test-app",
+		Endpoints: map[string]string{
+			s.endpoint.Relation.Name: s.endpoint.Relation.Name,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.jem.Offer(ctx, s.identity, jujuparams.AddApplicationOffer{
+		ModelTag:        names.NewModelTag(s.model.UUID).String(),
+		OfferName:       "test-offer2",
+		ApplicationName: "test-app",
+		Endpoints: map[string]string{
+			s.endpoint.Relation.Name: s.endpoint.Relation.Name,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	offer1 := mongodoc.ApplicationOffer{
+		OfferURL: conv.ToOfferURL(s.model.Path, "test-offer1"),
+	}
+	offer2 := mongodoc.ApplicationOffer{
+		OfferURL: conv.ToOfferURL(s.model.Path, "test-offer2"),
+	}
+	err = s.jem.DB.GetApplicationOffer(ctx, &offer1)
+	c.Assert(err, jc.ErrorIsNil)
+	err = s.jem.DB.GetApplicationOffer(ctx, &offer2)
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = s.jem.DB.SetApplicationOfferAccess(ctx, params.User("user2"), offer1.OfferUUID, mongodoc.ApplicationOfferReadAccess)
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = s.jem.DB.SetApplicationOfferAccess(ctx, params.User("everyone"), offer2.OfferUUID, mongodoc.ApplicationOfferNoAccess)
+	c.Assert(err, jc.ErrorIsNil)
+
+	results, err := s.jem.FindApplicationOffers(ctx, jemtest.NewIdentity("unknown-user"), jujuparams.OfferFilter{
+		ModelName: s.model.UUID,
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(results, gc.HasLen, 0)
+
+	results, err = s.jem.FindApplicationOffers(ctx, jemtest.NewIdentity("user2"), jujuparams.OfferFilter{
+		ModelName: string(s.model.Path.Name),
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(results, jc.DeepEquals, []jujuparams.ApplicationOfferAdminDetails{{
+		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+			SourceModelTag:         names.NewModelTag(s.model.UUID).String(),
+			OfferUUID:              offer1.OfferUUID,
+			OfferURL:               offer1.OfferURL,
+			OfferName:              offer1.OfferName,
+			ApplicationDescription: offer1.ApplicationDescription,
+			Endpoints: []jujuparams.RemoteEndpoint{{
+				Name:      "url",
+				Role:      charm.RoleProvider,
+				Interface: "http",
+				Limit:     0,
+			}},
+			Spaces:   []jujuparams.RemoteSpace{},
+			Bindings: offer1.Bindings,
+			Users: []jujuparams.OfferUserDetails{{
+				UserName:    "everyone@external",
+				DisplayName: "everyone",
+				Access:      "read",
+			}, {
+				UserName:    "user2@external",
+				DisplayName: "user2",
+				Access:      "read",
+			}},
+		},
+		ApplicationName: offer1.ApplicationName,
+		CharmURL:        offer1.CharmURL,
+		Connections:     []jujuparams.OfferConnection{},
+	}})
+
+	results, err = s.jem.FindApplicationOffers(ctx, s.identity, jujuparams.OfferFilter{
+		ModelName: string(s.model.Path.Name),
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(results, jc.DeepEquals, []jujuparams.ApplicationOfferAdminDetails{{
+		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+			SourceModelTag:         names.NewModelTag(s.model.UUID).String(),
+			OfferUUID:              offer1.OfferUUID,
+			OfferURL:               offer1.OfferURL,
+			OfferName:              offer1.OfferName,
+			ApplicationDescription: offer1.ApplicationDescription,
+			Endpoints: []jujuparams.RemoteEndpoint{{
+				Name:      "url",
+				Role:      charm.RoleProvider,
+				Interface: "http",
+				Limit:     0,
+			}},
+			Spaces:   []jujuparams.RemoteSpace{},
+			Bindings: offer1.Bindings,
+			Users: []jujuparams.OfferUserDetails{{
+				UserName:    "everyone@external",
+				DisplayName: "everyone",
+				Access:      "read",
+			}, {
+				UserName:    "user1@external",
+				DisplayName: "user1",
+				Access:      "admin",
+			}},
+		},
+		ApplicationName: offer1.ApplicationName,
+		CharmURL:        offer1.CharmURL,
+		Connections:     []jujuparams.OfferConnection{},
+	}, {
+		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+			SourceModelTag:         names.NewModelTag(s.model.UUID).String(),
+			OfferUUID:              offer2.OfferUUID,
+			OfferURL:               offer2.OfferURL,
+			OfferName:              offer2.OfferName,
+			ApplicationDescription: offer2.ApplicationDescription,
+			Endpoints: []jujuparams.RemoteEndpoint{{
+				Name:      "url",
+				Role:      charm.RoleProvider,
+				Interface: "http",
+				Limit:     0,
+			}},
+			Spaces:   []jujuparams.RemoteSpace{},
+			Bindings: offer2.Bindings,
+			Users: []jujuparams.OfferUserDetails{{
+				UserName:    "everyone@external",
+				DisplayName: "everyone",
+			}, {
+				UserName:    "user1@external",
+				DisplayName: "user1",
+				Access:      "admin",
+			}},
+		},
+		ApplicationName: offer2.ApplicationName,
+		CharmURL:        offer2.CharmURL,
+		Connections:     []jujuparams.OfferConnection{},
+	},
+	})
+
+}
