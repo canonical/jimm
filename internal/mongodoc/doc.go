@@ -578,6 +578,7 @@ type RemoteEndpoint struct {
 // ApplicationOfferAccessPermission holds the access permission level.
 type ApplicationOfferAccessPermission int
 
+// String implements fmt.Stringer.
 func (p ApplicationOfferAccessPermission) String() string {
 	switch p {
 	case ApplicationOfferReadAccess:

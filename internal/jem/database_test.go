@@ -2751,3 +2751,43 @@ func (s *databaseSuite) TestApplicationOfferAccess(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(users, gc.HasLen, 0)
 }
+
+func (s *databaseSuite) TestApplicationOfferAccessMultipleTimes(c *gc.C) {
+	ctx := context.Background()
+	err := s.database.AddApplicationOffer(ctx, &mongodoc.ApplicationOffer{
+		OfferUUID:              "00000000-0000-0000-0000-000000000010",
+		OwnerName:              "bob@external",
+		ModelUUID:              "00000000-0000-0000-0000-000000000001",
+		ModelName:              "test-model1",
+		OfferName:              "test offer 1",
+		ApplicationName:        "test application",
+		ApplicationDescription: "test description",
+		Endpoints: []mongodoc.RemoteEndpoint{{
+			Name: "ep1",
+		}, {
+			Name: "ep2",
+		}, {
+			Name: "ep3",
+		}},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.database.SetApplicationOfferAccess(ctx, "user1", "00000000-0000-0000-0000-000000000010", mongodoc.ApplicationOfferReadAccess)
+	c.Assert(err, gc.Equals, nil)
+	err = s.database.SetApplicationOfferAccess(ctx, "user1", "00000000-0000-0000-0000-000000000010", mongodoc.ApplicationOfferReadAccess)
+	c.Assert(err, gc.Equals, nil)
+	err = s.database.SetApplicationOfferAccess(ctx, "user1", "00000000-0000-0000-0000-000000000010", mongodoc.ApplicationOfferReadAccess)
+	c.Assert(err, gc.Equals, nil)
+
+	offer := mongodoc.ApplicationOffer{
+		OfferUUID: "00000000-0000-0000-0000-000000000010",
+	}
+	err = s.database.GetApplicationOffer(ctx, &offer)
+	c.Assert(err, gc.Equals, nil)
+
+	c.Check(offer.Users, gc.HasLen, 1)
+	c.Check(offer.Users[0], jc.DeepEquals, mongodoc.OfferUserDetails{
+		User:   "user1",
+		Access: mongodoc.ApplicationOfferReadAccess,
+	})
+}

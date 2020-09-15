@@ -336,6 +336,8 @@ func (s *applicationoffersSuite) TestModifyOfferAccess(c *gc.C) {
 
 	err = s.jem.DB.SetApplicationOfferAccess(ctx, "user2", offer1.OfferUUID, mongodoc.ApplicationOfferNoAccess)
 	c.Assert(err, jc.ErrorIsNil)
+	err = s.jem.DB.SetApplicationOfferAccess(ctx, identchecker.Everyone, offer1.OfferUUID, mongodoc.ApplicationOfferNoAccess)
+	c.Assert(err, jc.ErrorIsNil)
 
 	// user2 does not have permission
 	err = s.jem.GrantOfferAccess(ctx, jemtest.NewIdentity("user2"), params.User("test-user"), offer1.OfferURL, jujuparams.OfferReadAccess)
@@ -409,11 +411,13 @@ func (s *applicationoffersSuite) TestDestroyOffer(c *gc.C) {
 		OfferURL: conv.ToOfferURL(s.model.Path, "test-offer1"),
 	}
 	err = s.jem.DB.GetApplicationOffer(ctx, &offer1)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
+	err = s.jem.DB.SetApplicationOfferAccess(ctx, identchecker.Everyone, offer1.OfferUUID, mongodoc.ApplicationOfferNoAccess)
+	c.Assert(err, gc.Equals, nil)
 
 	// user1 is an admin - this should pass
 	err = s.jem.GrantOfferAccess(ctx, jemtest.NewIdentity("user1"), params.User("user2"), offer1.OfferURL, jujuparams.OfferConsumeAccess)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// user2 has consumer access - unauthorized
 	err = s.jem.DestroyOffer(ctx, jemtest.NewIdentity("user2"), offer1.OfferURL, true)
@@ -425,7 +429,7 @@ func (s *applicationoffersSuite) TestDestroyOffer(c *gc.C) {
 
 	// user1 is admin
 	err = s.jem.DestroyOffer(ctx, jemtest.NewIdentity("user1"), offer1.OfferURL, true)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	offer2 := offer1
 	err = s.jem.DB.GetApplicationOffer(ctx, &offer2)

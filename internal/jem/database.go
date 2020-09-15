@@ -1315,18 +1315,32 @@ func (db *Database) ListApplicationOffers(ctx context.Context, filters []jujupar
 }
 
 // SetApplicationOfferAccess sets a user access level to an application offer.
-func (db *Database) SetApplicationOfferAccess(ctx context.Context, user params.User, uuid string, access mongodoc.ApplicationOfferAccessPermission) (err error) {
+func (db *Database) SetApplicationOfferAccess(ctx context.Context, user params.User, offerUUID string, access mongodoc.ApplicationOfferAccessPermission) (err error) {
 	defer db.checkError(ctx, &err)
 
-	// Add the new access level.
-	err = db.ApplicationOffers().UpdateId(uuid, bson.D{{
-		"$push", bson.D{{
-			"users", mongodoc.OfferUserDetails{
-				User:   user,
-				Access: access,
-			},
+	// Add the new access level, if it doesn't exist. This avoids adding
+	// duplicate OfferUserDetails entries to an ApplicationOffer.
+	_, err = db.ApplicationOffers().UpdateAll(
+		bson.D{{
+			"_id", offerUUID,
+		}, {
+			"users", bson.D{{
+				"$not", bson.D{{
+					"$elemMatch", mongodoc.OfferUserDetails{
+						User:   user,
+						Access: access,
+					},
+				}},
+			}},
 		}},
-	}})
+		bson.D{{
+			"$push", bson.D{{
+				"users", mongodoc.OfferUserDetails{
+					User:   user,
+					Access: access,
+				},
+			}},
+		}})
 	if err != nil {
 		if errgo.Cause(err) == mgo.ErrNotFound {
 			return errgo.WithCausef(err, params.ErrNotFound, "")
@@ -1337,10 +1351,38 @@ func (db *Database) SetApplicationOfferAccess(ctx context.Context, user params.U
 	// Remove any other access levels as long as the intended access level
 	// is still present. This ensures that if there are racing updates they
 	// can't delete each other.
-
+	//
+	// Each SetApplicationOfferAccess operation consists of two database
+	// updates. Update A adds a new entry to the "users" array for the new
+	// access level. Update B removes all entries in the users array that
+	// don't match the detected access level. Any given mongodb database
+	// operation on a single document is atomic so we do not need to
+	// consider how running updates might interfere with each other, but we
+	// do need to consider how the four database updates might interleave
+	// and what the resulting document would be. There are three possible
+	// ways for two processes to interleave:
+	//
+	//     - 1A, 1B, 2A, 2B
+	//     - 1A, 2A, 1B, 2B
+	//     - IA, 2A, 2B, 1B
+	//
+	// The first case is trivial and is as if there are two separate
+	// SetApplicationOfferAccess operations.
+	//
+	// In the second case 1A would ensure there is a OfferUserDetails
+	// record in the array with the requested access level. 2A would
+	// ensure there is a second OfferUserDetails record for a different
+	// access level. 1B would then remove all OfferUserDetails records
+	// for the user that don't match the one added in 1A, including the one
+	// added in 2A. 2B will not be able to find the OfferUserDetails record
+	// added in 2A so will not remove any OfferUserDetails records. The end
+	// result is that update 1 will be retained and update 2 discarded.
+	//
+	// The third case is much like the second except in that case update 2
+	// will be the one that is retained and update 1 discarded.
 	_, err = db.ApplicationOffers().UpdateAll(
 		bson.D{{
-			"_id", uuid,
+			"_id", offerUUID,
 		}, {
 			"users", bson.D{{
 				"user", user,
@@ -1376,7 +1418,7 @@ func (db *Database) GetApplicationOfferAccess(ctx context.Context, user params.U
 func getApplicationOfferAccess(user params.User, offer *mongodoc.ApplicationOffer) mongodoc.ApplicationOfferAccessPermission {
 	access := mongodoc.ApplicationOfferNoAccess
 	for _, u := range offer.Users {
-		if (u.User == user || u.User == "everybody") && u.Access > access {
+		if (u.User == user || u.User == identchecker.Everyone) && u.Access > access {
 			access = u.Access
 		}
 	}
