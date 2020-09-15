@@ -938,7 +938,7 @@ var createModelTests = []struct {
 	ownerTag:      "user-test@local",
 	cloudTag:      names.NewCloudTag("dummy").String(),
 	credentialTag: "cloudcred-dummy_test@external_cred1",
-	expectError:   `unsupported local user \(bad request\)`,
+	expectError:   `unsupported local user \(user not found\)`,
 }, {
 	about:         "invalid user",
 	name:          "model-5",

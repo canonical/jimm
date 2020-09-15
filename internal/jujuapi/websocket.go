@@ -15,6 +15,7 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
@@ -31,6 +32,7 @@ const (
 var errNotImplemented = errgo.New("not implemented")
 
 var errorCodes = map[error]string{
+	conv.ErrLocalUser:             jujuparams.CodeUserNotFound,
 	params.ErrAlreadyExists:       jujuparams.CodeAlreadyExists,
 	params.ErrBadRequest:          jujuparams.CodeBadRequest,
 	params.ErrForbidden:           jujuparams.CodeForbidden,
