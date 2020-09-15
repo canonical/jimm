@@ -115,7 +115,10 @@ func (r *controllerRoot) modifyOfferAcces(ctx context.Context, change jujuparams
 	if err != nil {
 		return errgo.WithCausef(err, params.ErrBadRequest, "")
 	}
-	user := params.User(userTag.Id())
+	user, err := conv.FromUserTag(userTag)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
+	}
 	switch change.Action {
 	case jujuparams.GrantOfferAccess:
 		return errgo.Mask(r.jem.GrantOfferAccess(ctx, r.identity, user, change.OfferURL, change.Access), errgo.Is(params.ErrNotFound), errgo.Is(params.ErrBadRequest))

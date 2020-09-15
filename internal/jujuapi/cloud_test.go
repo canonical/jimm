@@ -611,7 +611,7 @@ func (s *cloudSuite) TestCredential(c *gc.C) {
 	}, {
 		Error: &jujuparams.Error{
 			Message: `unsupported local user`,
-			Code:    jujuparams.CodeBadRequest,
+			Code:    jujuparams.CodeUserNotFound,
 		},
 	}})
 }

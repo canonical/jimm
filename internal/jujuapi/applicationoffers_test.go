@@ -394,16 +394,17 @@ func (s *applicationOffersSuite) TestModifyOfferAccess(c *gc.C) {
 
 	offerURL := "user1@external/model-1.test-offer1"
 
-	err = client.RevokeOffer(identchecker.Everyone, "read", offerURL)
+	err = client.RevokeOffer(identchecker.Everyone+"@external", "read", offerURL)
 	c.Assert(err, jc.ErrorIsNil)
 
 	err = client.GrantOffer("test-user", "unknown", offerURL)
+	err = client.GrantOffer("test-user@external", "unknown", offerURL)
 	c.Assert(err, gc.ErrorMatches, `"unknown" offer access not valid`)
 
-	err = client.GrantOffer("test-user", "read", "no-such-offer")
+	err = client.GrantOffer("test-user@external", "read", "no-such-offer")
 	c.Assert(err, gc.ErrorMatches, `not found`)
 
-	err = client.GrantOffer("test-user", "admin", offerURL)
+	err = client.GrantOffer("test-user@external", "admin", offerURL)
 	c.Assert(err, jc.ErrorIsNil)
 
 	offer := mongodoc.ApplicationOffer{
@@ -416,7 +417,7 @@ func (s *applicationOffersSuite) TestModifyOfferAccess(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(accessLevel, gc.Equals, mongodoc.ApplicationOfferAdminAccess)
 
-	err = client.RevokeOffer("test-user", "consume", offerURL)
+	err = client.RevokeOffer("test-user@external", "consume", offerURL)
 	c.Assert(err, jc.ErrorIsNil)
 
 	accessLevel, err = s.JEM.DB.GetApplicationOfferAccess(ctx, params.User("test-user"), offer.OfferUUID)
@@ -427,7 +428,7 @@ func (s *applicationOffersSuite) TestModifyOfferAccess(c *gc.C) {
 	defer conn3.Close()
 	client3 := applicationoffers.NewClient(conn3)
 
-	err = client3.RevokeOffer("test-user", "read", offerURL)
+	err = client3.RevokeOffer("test-user@external", "read", offerURL)
 	c.Assert(err, gc.ErrorMatches, "not found")
 }
 
@@ -482,7 +483,7 @@ func (s *applicationOffersSuite) TestDestroyOffers(c *gc.C) {
 	offerURL := "user1@external/model-1.test-offer1"
 
 	// user2 will have read access
-	err = client.GrantOffer("user2", "read", offerURL)
+	err = client.GrantOffer("user2@external", "read", offerURL)
 	c.Assert(err, jc.ErrorIsNil)
 
 	// try to destroy offer that does not exist

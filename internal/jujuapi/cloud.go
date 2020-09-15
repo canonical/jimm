@@ -247,9 +247,9 @@ func (r *controllerRoot) userCredentials(ctx context.Context, ownerTag, cloudTag
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
 	}
-	owner, err := user(ot)
+	owner, err := conv.FromUserTag(ot)
 	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
+		return nil, errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
 	}
 	cld, err := names.ParseCloudTag(cloudTag)
 	if err != nil {
@@ -340,9 +340,9 @@ func (r *controllerRoot) credential(ctx context.Context, cloudCredentialTag stri
 
 	}
 	ownerTag := cct.Owner()
-	owner, err := user(ownerTag)
+	owner, err := conv.FromUserTag(ownerTag)
 	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
+		return nil, errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
 	}
 
 	credPath := params.CredentialPath{
@@ -661,9 +661,9 @@ func (r *controllerRoot) updateCredential(ctx context.Context, cred jujuparams.T
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
 	}
 	ownerTag := tag.Owner()
-	owner, err := user(ownerTag)
+	owner, err := conv.FromUserTag(ownerTag)
 	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
+		return nil, errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
 	}
 	if err := auth.CheckIsUser(ctx, r.identity, owner); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))

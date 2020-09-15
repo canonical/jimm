@@ -259,6 +259,7 @@ func (r *controllerRoot) CreateModel(ctx context.Context, args jujuparams.ModelC
 	}
 	if err != nil {
 		return jujuparams.ModelInfo{}, errgo.Mask(err,
+			errgo.Is(conv.ErrLocalUser),
 			errgo.Is(params.ErrUnauthorized),
 			errgo.Is(params.ErrNotFound),
 			errgo.Is(params.ErrBadRequest),
@@ -272,9 +273,9 @@ func (r *controllerRoot) createModel(ctx context.Context, args jujuparams.ModelC
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid owner tag")
 	}
-	owner, err := user(ownerTag)
+	owner, err := conv.FromUserTag(ownerTag)
 	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
+		return nil, errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
 	}
 	if args.CloudTag == "" {
 		return nil, errgo.New("no cloud specified for model; please specify one")
@@ -386,9 +387,9 @@ func (r *controllerRoot) modifyModelAccess(ctx context.Context, change jujuparam
 	if err != nil {
 		return errgo.WithCausef(err, params.ErrBadRequest, "invalid user tag")
 	}
-	user, err := user(userTag)
+	user, err := conv.FromUserTag(userTag)
 	if err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrBadRequest))
+		return errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
 	}
 	conn, err := r.jem.OpenAPI(ctx, model.Controller)
 	if err != nil {
@@ -501,9 +502,9 @@ func (r *controllerRoot) changeModelCredential(ctx context.Context, arg jujupara
 	if err != nil {
 		return errgo.WithCausef(err, params.ErrBadRequest, "invalid credential tag")
 	}
-	credUser, err := user(credTag.Owner())
+	credUser, err := conv.FromUserTag(credTag.Owner())
 	if err != nil {
-		return errgo.WithCausef(err, params.ErrBadRequest, "")
+		return errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
 	}
 	credPath := params.CredentialPath{
 		Cloud: params.Cloud(credTag.Cloud().Id()),
