@@ -14,6 +14,7 @@ import (
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
@@ -286,11 +287,13 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 			Interface: "http",
 		}},
 		Users: []crossmodel.OfferUserDetails{{
-			UserName: "everyone@external",
-			Access:   "read",
+			UserName:    "everyone@external",
+			DisplayName: "everyone",
+			Access:      "read",
 		}, {
-			UserName: "user1@external",
-			Access:   "admin",
+			UserName:    "user1@external",
+			DisplayName: "user1",
+			Access:      "admin",
 		}},
 	}, {
 		OfferName:              "test-offer2",
@@ -303,11 +306,13 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 			Interface: "http",
 		}},
 		Users: []crossmodel.OfferUserDetails{{
-			UserName: "everyone@external",
-			Access:   "read",
+			UserName:    "everyone@external",
+			DisplayName: "everyone",
+			Access:      "read",
 		}, {
-			UserName: "user1@external",
-			Access:   "admin",
+			UserName:    "user1@external",
+			DisplayName: "user1",
+			Access:      "admin",
 		}},
 	}})
 
@@ -328,11 +333,13 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 			Interface: "http",
 		}},
 		Users: []crossmodel.OfferUserDetails{{
-			UserName: "everyone@external",
-			Access:   "read",
+			UserName:    "everyone@external",
+			DisplayName: "everyone",
+			Access:      "read",
 		}, {
-			UserName: "user1@external",
-			Access:   "admin",
+			UserName:    "user1@external",
+			DisplayName: "user1",
+			Access:      "admin",
 		}},
 	}})
 }
@@ -383,9 +390,12 @@ func (s *applicationOffersSuite) TestModifyOfferAccess(c *gc.C) {
 	)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(results, gc.HasLen, 1)
-	c.Assert(results[0].Error, gc.Equals, (*jujuparams.Error)(nil))
+	c.Assert(results[0].Error, gc.IsNil)
 
 	offerURL := "user1@external/model-1.test-offer1"
+
+	err = client.RevokeOffer(identchecker.Everyone, "read", offerURL)
+	c.Assert(err, jc.ErrorIsNil)
 
 	err = client.GrantOffer("test-user", "unknown", offerURL)
 	c.Assert(err, gc.ErrorMatches, `"unknown" offer access not valid`)
@@ -404,14 +414,14 @@ func (s *applicationOffersSuite) TestModifyOfferAccess(c *gc.C) {
 
 	accessLevel, err := s.JEM.DB.GetApplicationOfferAccess(ctx, params.User("test-user"), offer.OfferUUID)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(int(accessLevel), gc.Equals, mongodoc.ApplicationOfferAdminAccess)
+	c.Assert(accessLevel, gc.Equals, mongodoc.ApplicationOfferAdminAccess)
 
 	err = client.RevokeOffer("test-user", "consume", offerURL)
 	c.Assert(err, jc.ErrorIsNil)
 
 	accessLevel, err = s.JEM.DB.GetApplicationOfferAccess(ctx, params.User("test-user"), offer.OfferUUID)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(int(accessLevel), gc.Equals, mongodoc.ApplicationOfferReadAccess)
+	c.Assert(accessLevel, gc.Equals, mongodoc.ApplicationOfferReadAccess)
 
 	conn3 := s.open(c, nil, "user3")
 	defer conn3.Close()
