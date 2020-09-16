@@ -585,3 +585,111 @@ func (s *applicationoffersSuite) TestFindApplicationOffers(c *gc.C) {
 		Connections:     []jujuparams.OfferConnection{},
 	}})
 }
+
+func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
+	ctx := context.Background()
+
+	err := s.jem.Offer(ctx, s.identity, jujuparams.AddApplicationOffer{
+		ModelTag:        names.NewModelTag(s.model.UUID).String(),
+		OfferName:       "test-offer1",
+		ApplicationName: "test-app",
+		Endpoints: map[string]string{
+			s.endpoint.Relation.Name: s.endpoint.Relation.Name,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.jem.Offer(ctx, s.identity, jujuparams.AddApplicationOffer{
+		ModelTag:        names.NewModelTag(s.model.UUID).String(),
+		OfferName:       "test-offer2",
+		ApplicationName: "test-app",
+		Endpoints: map[string]string{
+			s.endpoint.Relation.Name: s.endpoint.Relation.Name,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	offer1 := mongodoc.ApplicationOffer{
+		OfferURL: conv.ToOfferURL(s.model.Path, "test-offer1"),
+	}
+	offer2 := mongodoc.ApplicationOffer{
+		OfferURL: conv.ToOfferURL(s.model.Path, "test-offer2"),
+	}
+	err = s.jem.DB.GetApplicationOffer(ctx, &offer1)
+	c.Assert(err, jc.ErrorIsNil)
+	err = s.jem.DB.GetApplicationOffer(ctx, &offer2)
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = s.jem.DB.SetApplicationOfferAccess(ctx, params.User("everyone"), offer2.OfferUUID, mongodoc.ApplicationOfferNoAccess)
+	c.Assert(err, jc.ErrorIsNil)
+
+	// "unknown-user" does not have acces to offer2
+	_, err = s.jem.GetApplicationOffer(ctx, jemtest.NewIdentity("unknown-user"), offer2.OfferURL)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+
+	// "user2" has read access to offer1
+	offerDetails, err := s.jem.GetApplicationOffer(ctx, jemtest.NewIdentity("unknown-user"), offer1.OfferURL)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(offerDetails, jc.DeepEquals, &jujuparams.ApplicationOfferAdminDetails{
+		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+			SourceModelTag:         names.NewModelTag(s.model.UUID).String(),
+			OfferUUID:              offer1.OfferUUID,
+			OfferURL:               offer1.OfferURL,
+			OfferName:              offer1.OfferName,
+			ApplicationDescription: offer1.ApplicationDescription,
+			Endpoints: []jujuparams.RemoteEndpoint{{
+				Name:      "url",
+				Role:      charm.RoleProvider,
+				Interface: "http",
+				Limit:     0,
+			}},
+			Spaces:   []jujuparams.RemoteSpace{},
+			Bindings: offer1.Bindings,
+			Users: []jujuparams.OfferUserDetails{{
+				UserName:    "everyone@external",
+				DisplayName: "everyone",
+				Access:      "read",
+			}},
+		},
+		ApplicationName: offer1.ApplicationName,
+		CharmURL:        offer1.CharmURL,
+		Connections:     []jujuparams.OfferConnection{},
+	})
+
+	// "user1" is admin and will see addition details of offer1
+	offerDetails, err = s.jem.GetApplicationOffer(ctx, jemtest.NewIdentity("user1"), offer1.OfferURL)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(offerDetails, jc.DeepEquals, &jujuparams.ApplicationOfferAdminDetails{
+		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+			SourceModelTag:         names.NewModelTag(s.model.UUID).String(),
+			OfferUUID:              offer1.OfferUUID,
+			OfferURL:               offer1.OfferURL,
+			OfferName:              offer1.OfferName,
+			ApplicationDescription: offer1.ApplicationDescription,
+			Endpoints: []jujuparams.RemoteEndpoint{{
+				Name:      "url",
+				Role:      charm.RoleProvider,
+				Interface: "http",
+				Limit:     0,
+			}},
+			Spaces:   []jujuparams.RemoteSpace{},
+			Bindings: offer1.Bindings,
+			Users: []jujuparams.OfferUserDetails{{
+				UserName:    "everyone@external",
+				DisplayName: "everyone",
+				Access:      "read",
+			}, {
+				UserName:    "user1@external",
+				DisplayName: "user1",
+				Access:      "admin",
+			}},
+		},
+		ApplicationName: offer1.ApplicationName,
+		CharmURL:        offer1.CharmURL,
+		Connections:     []jujuparams.OfferConnection{},
+	})
+
+	// "user1" is admin but still cannot get application offers that do not exist
+	_, err = s.jem.GetApplicationOffer(ctx, jemtest.NewIdentity("user1"), "no-such-offer")
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}

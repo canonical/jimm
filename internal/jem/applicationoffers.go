@@ -273,6 +273,27 @@ func (j *JEM) FindApplicationOffers(ctx context.Context, id identchecker.ACLIden
 	return offers, errgo.Mask(it.Err())
 }
 
+// GetApplicationOffer returns details of the offer with the specified URL.
+func (j *JEM) GetApplicationOffer(ctx context.Context, id identchecker.ACLIdentity, offerURL string) (*jujuparams.ApplicationOfferAdminDetails, error) {
+	uid := params.User(id.Id())
+
+	offer := mongodoc.ApplicationOffer{
+		OfferURL: offerURL,
+	}
+	err := j.DB.GetApplicationOffer(ctx, &offer)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	access := getApplicationOfferAccess(uid, &offer)
+	// one needs at least read access to get the application offer
+	if access < mongodoc.ApplicationOfferReadAccess {
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "")
+	}
+	offerDetails := applicationOfferDocToDetails(uid, &offer)
+
+	return &offerDetails, nil
+}
+
 // applicationOfferDocToDetails returns a jujuparams structure based on the provided
 // application offer mongo doc.
 func applicationOfferDocToDetails(id params.User, offerDoc *mongodoc.ApplicationOffer) jujuparams.ApplicationOfferAdminDetails {

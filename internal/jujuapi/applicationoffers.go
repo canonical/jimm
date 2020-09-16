@@ -23,6 +23,7 @@ func init() {
 		modifyOfferAccessMethod := rpc.Method(r.ModifyOfferAccess)
 		destroyOffersMethod := rpc.Method(r.DestroyOffers)
 		findOffersMethod := rpc.Method(r.FindApplicationOffers)
+		applicationOffersMethod := rpc.Method(r.ApplicationOffers)
 
 		r.AddMethod("ApplicationOffers", 1, "Offer", offerMethod)
 		r.AddMethod("ApplicationOffers", 1, "GetConsumeDetails", getConsumeDetailsMethod)
@@ -30,6 +31,7 @@ func init() {
 		r.AddMethod("ApplicationOffers", 1, "ModifyOfferAccess", modifyOfferAccessMethod)
 		r.AddMethod("ApplicationOffers", 1, "DestroyOffers", destroyOffersMethod)
 		r.AddMethod("ApplicationOffers", 1, "FindApplicationOffers", findOffersMethod)
+		r.AddMethod("ApplicationOffers", 1, "ApplicationOffers", applicationOffersMethod)
 
 		r.AddMethod("ApplicationOffers", 2, "Offer", offerMethod)
 		r.AddMethod("ApplicationOffers", 2, "GetConsumeDetails", getConsumeDetailsMethod)
@@ -37,6 +39,7 @@ func init() {
 		r.AddMethod("ApplicationOffers", 2, "ModifyOfferAccess", modifyOfferAccessMethod)
 		r.AddMethod("ApplicationOffers", 2, "DestroyOffers", destroyOffersMethod)
 		r.AddMethod("ApplicationOffers", 2, "FindApplicationOffers", findOffersMethod)
+		r.AddMethod("ApplicationOffers", 2, "ApplicationOffers", applicationOffersMethod)
 
 		return []int{1, 2}
 	}
@@ -157,4 +160,19 @@ func (r *controllerRoot) DestroyOffers(ctx context.Context, args jujuparams.Dest
 		results.Results[i].Error = mapError(r.jem.DestroyOffer(ctx, r.identity, offerURL, args.Force))
 	}
 	return results, nil
+}
+
+func (r *controllerRoot) ApplicationOffers(ctx context.Context, args jujuparams.OfferURLs) (jujuparams.ApplicationOffersResults, error) {
+	result := jujuparams.ApplicationOffersResults{
+		Results: make([]jujuparams.ApplicationOfferResult, len(args.OfferURLs)),
+	}
+	for i, offerURL := range args.OfferURLs {
+		details, err := r.jem.GetApplicationOffer(ctx, r.identity, offerURL)
+		result.Results[i] = jujuparams.ApplicationOfferResult{
+			Result: details,
+			Error:  mapError(err),
+		}
+	}
+
+	return result, nil
 }
