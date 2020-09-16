@@ -6,10 +6,10 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"sort"
 	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/names/v4"
 	"github.com/juju/version"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
@@ -1281,39 +1281,6 @@ func (db *Database) RemoveApplicationOffer(ctx context.Context, offerUUID string
 	return nil
 }
 
-// ListApplicationOffers returns application offers
-// matching any one of the filter terms.
-func (db *Database) ListApplicationOffers(ctx context.Context, filters []jujuparams.OfferFilter) (_ []mongodoc.ApplicationOffer, err error) {
-	defer db.checkError(ctx, &err)
-
-	if len(filters) == 0 {
-		return db.AllApplicationOffers(ctx)
-	}
-	var offers []mongodoc.ApplicationOffer
-	for _, filter := range filters {
-		query := bson.D{}
-		query = append(query, makeApplicationOfferFilterQuery(filter)...)
-
-		var docs []mongodoc.ApplicationOffer
-		err = db.ApplicationOffers().Find(query).All(&docs)
-		if err != nil {
-			return nil, errgo.Mask(err)
-		}
-		docs, err = db.filterOffers(ctx, docs, filter)
-		if err != nil {
-			return nil, errgo.Mask(err)
-		}
-		offers = append(offers, docs...)
-	}
-	sort.Slice(offers, func(i, j int) bool {
-		if offers[i].OfferName == offers[j].OfferName {
-			return offers[i].ApplicationName < offers[j].ApplicationName
-		}
-		return offers[i].OfferName < offers[j].OfferName
-	})
-	return offers, nil
-}
-
 // SetApplicationOfferAccess sets a user access level to an application offer.
 func (db *Database) SetApplicationOfferAccess(ctx context.Context, user params.User, offerUUID string, access mongodoc.ApplicationOfferAccessPermission) (err error) {
 	defer db.checkError(ctx, &err)
@@ -1425,31 +1392,41 @@ func getApplicationOfferAccess(user params.User, offer *mongodoc.ApplicationOffe
 	return access
 }
 
-// GetApplicationOfferUsers returns a list of users that have the specified
-// level of access (or higher). The returned list of users is in juju
-// external user format
-func (db *Database) GetApplicationOfferUsers(ctx context.Context, level mongodoc.ApplicationOfferAccessPermission, offerUUID string) (_ []string, err error) {
-	defer db.checkError(ctx, &err)
+// An Iter is an iterator that gives access to database objects.
+type Iter interface {
+	Next(interface{}) bool
+	Err() error
+	Close() error
+}
 
-	var offer mongodoc.ApplicationOffer
-	err = db.ApplicationOffers().FindId(offerUUID).One(&offer)
-	if err != nil && errgo.Cause(err) != mgo.ErrNotFound {
-		return nil, errgo.Mask(err)
+// IterApplicationOffers returns an Iter that will return all
+// ApplicationOffers that the given user has at least the given level of
+// access to and that pass any of the given filters. The returned Iter may
+// panic if the Next method is called with anything other than a pointer
+// to a mongodoc.ApplicationOffer.
+func (db *Database) IterApplicationOffers(ctx context.Context, user params.User, access mongodoc.ApplicationOfferAccessPermission, filters []jujuparams.OfferFilter) Iter {
+	q := make(bson.D, 1, 2)
+	q[0] = bson.DocElem{"users", bson.D{{
+		"$elemMatch", bson.D{{
+			"user", bson.D{{"$in", []string{string(user), identchecker.Everyone}}},
+		}, {
+			"access", bson.D{{"$gte", access}},
+		}},
+	}}}
+
+	filterQueries := make([]bson.D, len(filters))
+	for i, f := range filters {
+		filterQueries[i] = makeApplicationOfferFilterQuery(f)
+	}
+	if len(filterQueries) > 0 {
+		q = append(q, bson.DocElem{"$or", filterQueries})
 	}
 
-	var users []string
-	for _, u := range offer.Users {
-		if u.Access >= level {
-			users = append(users, conv.ToUserTag(u.User).Id())
-		}
-	}
-
-	sort.Strings(users)
-	return users, nil
+	return db.ApplicationOffers().Find(q).Iter()
 }
 
 func makeApplicationOfferFilterQuery(filter jujuparams.OfferFilter) bson.D {
-	var query bson.D
+	query := make(bson.D, 0, 7)
 	if filter.OwnerName != "" {
 		query = append(query, bson.DocElem{"owner-name", filter.OwnerName})
 	}
@@ -1468,20 +1445,75 @@ func makeApplicationOfferFilterQuery(filter jujuparams.OfferFilter) bson.D {
 		desc := regexp.QuoteMeta(filter.ApplicationDescription)
 		query = append(query, bson.DocElem{"application-description", bson.D{{"$regex", fmt.Sprintf(".*%s.*", desc)}}})
 	}
-	return query
-}
 
-// AllApplicationOffers returns all application offers for a model.
-func (db *Database) AllApplicationOffers(ctx context.Context) (_ []mongodoc.ApplicationOffer, err error) {
-	defer db.checkError(ctx, &err)
-
-	var docs []mongodoc.ApplicationOffer
-	query := bson.D{}
-	err = db.ApplicationOffers().Find(query).All(&docs)
-	if err != nil {
-		return nil, errgo.Mask(err)
+	if len(filter.Endpoints) > 0 {
+		endpoints := make([]bson.D, 0, len(filter.Endpoints))
+		for _, ep := range filter.Endpoints {
+			match := make(bson.D, 0, 3)
+			if ep.Interface != "" {
+				match = append(match, bson.DocElem{"interface", ep.Interface})
+			}
+			if ep.Name != "" {
+				match = append(match, bson.DocElem{"name", ep.Name})
+			}
+			if ep.Role != "" {
+				match = append(match, bson.DocElem{"role", ep.Role})
+			}
+			if len(match) == 0 {
+				continue
+			}
+			endpoints = append(endpoints, bson.D{{
+				"endpoints", bson.D{{"$elemMatch", match}},
+			}})
+		}
+		switch len(endpoints) {
+		case 1:
+			query = append(query, endpoints[0][0])
+		default:
+			query = append(query, bson.DocElem{"$or", endpoints})
+		case 0:
+		}
 	}
-	return docs, nil
+
+	if len(filter.AllowedConsumerTags) > 0 {
+		users := make([]bson.D, 0, len(filter.AllowedConsumerTags))
+		for _, userTag := range filter.AllowedConsumerTags {
+			ut, err := names.ParseUserTag(userTag)
+			var user params.User
+			if err == nil {
+				user, err = conv.FromUserTag(ut)
+			}
+			if err != nil {
+				// If this user does not parse then it will never match
+				// a record, add a query that can't match.
+				users = append(users, bson.D{{
+					"users", bson.D{{
+						"$elemMatch", bson.D{{
+							"no-such-field", bson.D{{"$exists", true}},
+						}},
+					}},
+				}})
+				continue
+			}
+
+			users = append(users, bson.D{{"users", bson.D{{
+				"$elemMatch", bson.D{{
+					"user", user,
+				}, {
+					"access", bson.D{{"$gte", mongodoc.ApplicationOfferConsumeAccess}},
+				}},
+			}}}})
+		}
+		switch len(users) {
+		case 1:
+			query = append(query, users[0][0])
+		default:
+			query = append(query, bson.DocElem{"$or", users})
+		case 0:
+		}
+	}
+
+	return query
 }
 
 // CanReadIter returns an iterator that iterates over items in the given
@@ -1611,90 +1643,4 @@ func (db *Database) C(name string) *mgo.Collection {
 		panic(fmt.Sprintf("cannot get collection %q because JEM closed", name))
 	}
 	return db.Database.C(name)
-}
-
-// filterOffers takes a list of offers resulting from a db query
-// and performs additional filtering which cannot be done via mongo.
-func (db *Database) filterOffers(
-	ctx context.Context,
-	in []mongodoc.ApplicationOffer,
-	filter jujuparams.OfferFilter,
-) ([]mongodoc.ApplicationOffer, error) {
-
-	out, err := db.filterOffersByEndpoint(ctx, in, filter.Endpoints)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	return db.filterOffersByAllowedConsumer(ctx, out, filter.AllowedConsumerTags)
-}
-
-func (db *Database) filterOffersByEndpoint(
-	ctx context.Context,
-	in []mongodoc.ApplicationOffer,
-	endpoints []jujuparams.EndpointFilterAttributes,
-) ([]mongodoc.ApplicationOffer, error) {
-
-	if len(endpoints) == 0 {
-		return in, nil
-	}
-
-	match := func(ep mongodoc.RemoteEndpoint) bool {
-		for _, fep := range endpoints {
-			if fep.Interface != "" && fep.Interface == ep.Interface {
-				continue
-			}
-			if fep.Name != "" && fep.Name == ep.Name {
-				continue
-			}
-			if fep.Role != "" && string(fep.Role) == ep.Role {
-				continue
-			}
-			return false
-		}
-		return true
-	}
-
-	var out []mongodoc.ApplicationOffer
-	for _, doc := range in {
-		for _, ep := range doc.Endpoints {
-			if match(ep) {
-				out = append(out, doc)
-			}
-		}
-	}
-	return out, nil
-}
-
-func (db *Database) filterOffersByAllowedConsumer(
-	ctx context.Context,
-	in []mongodoc.ApplicationOffer,
-	users []string,
-) ([]mongodoc.ApplicationOffer, error) {
-
-	if len(users) == 0 {
-		return in, nil
-	}
-
-	var out []mongodoc.ApplicationOffer
-	for _, doc := range in {
-		offerUsers, err := db.GetApplicationOfferUsers(ctx, mongodoc.ApplicationOfferConsumeAccess, doc.OfferUUID)
-		if err != nil {
-			return nil, errgo.Mask(err)
-		}
-		if matchUsers(offerUsers, users) {
-			out = append(out, doc)
-		}
-	}
-	return out, nil
-}
-
-func matchUsers(allowedUsers []string, filterUsers []string) bool {
-	for _, fu := range filterUsers {
-		for _, au := range allowedUsers {
-			if fu == au {
-				return true
-			}
-		}
-	}
-	return false
 }
