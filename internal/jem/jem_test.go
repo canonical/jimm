@@ -623,7 +623,7 @@ func (s *jemSuite) TestGrantModelBadLevel(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
 	err = s.jem.GrantModel(testContext, conn, model, "alice", "superpowers")
-	c.Assert(err, gc.ErrorMatches, `"superpowers" model access not valid`)
+	c.Assert(err, gc.ErrorMatches, `api error: could not modify model access: "superpowers" model access not valid`)
 	model1, err := s.jem.DB.Model(testContext, model.Path)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{})

@@ -325,15 +325,11 @@ func filterUsers(ctx context.Context, id identchecker.ACLIdentity, users []jujup
 // f with each in turn.
 func iterUsers(ctx context.Context, users []jujuparams.ModelUserInfo, f func(params.User, jujuparams.ModelUserInfo)) {
 	for _, u := range users {
-		if !names.IsValidUser(u.UserName) {
-			zapctx.Info(ctx, "controller sent invalid username, skipping", zap.String("username", u.UserName))
-			continue
-		}
-		tag := names.NewUserTag(u.UserName)
-		user, err := user(tag)
+		user, err := conv.FromUserID(u.UserName)
 		if err != nil {
-			// This error will occur if the user is local to
-			// the controller, it can be safely ignored.
+			if errgo.Cause(err) != conv.ErrLocalUser {
+				zapctx.Info(ctx, "controller sent invalid username, skipping", zap.String("username", u.UserName))
+			}
 			continue
 		}
 		f(user, u)
@@ -396,9 +392,9 @@ func getModel(ctx context.Context, jem *jem.JEM, modelTag string, authf authFunc
 	}
 	model.Cloud = params.Cloud(cloudTag.Id())
 	model.CloudRegion = info.CloudRegion
-	owner, err := user(credentialTag.Owner())
+	owner, err := conv.FromUserTag(credentialTag.Owner())
 	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
+		return nil, errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
 	}
 	model.Credential = mongodoc.CredentialPath{
 		Cloud: string(params.Cloud(credentialTag.Cloud().Id())),
@@ -449,23 +445,6 @@ func userTag(username string) names.UserTag {
 		tag = tag.WithDomain("external")
 	}
 	return tag
-}
-
-// user creates a params.User from the given UserTag. If the UserTag is
-// for a local user then an error will be returned. If the UserTag has
-// the domain "external" then the returned User will only contain the
-// name part.
-func user(tag names.UserTag) (params.User, error) {
-	if tag.IsLocal() {
-		return "", errgo.WithCausef(nil, params.ErrBadRequest, "unsupported local user")
-	}
-	var username string
-	if tag.Domain() == "external" {
-		username = tag.Name()
-	} else {
-		username = tag.Id()
-	}
-	return params.User(username), nil
 }
 
 // runWithContext runs the given function and completes either when the

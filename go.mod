@@ -19,6 +19,7 @@ require (
 	github.com/joyent/gosdc v0.0.0-20161202192312-ec8b3503a75e // indirect
 	github.com/joyent/gosign v0.0.0-20161114191744-9abcee278795 // indirect
 	github.com/juju/aclstore v0.0.0-20180706073322-7fc1cdaacf01
+	github.com/juju/charm/v8 v8.0.0-20200817113526-2a88e9b46b47
 	github.com/juju/clock v0.0.0-20190205081909-9c5c9712527c
 	github.com/juju/cmd v0.0.0-20200108104440-8e43f3faa5c9
 	github.com/juju/errors v0.0.0-20200330140219-3fe23663418f
@@ -53,7 +54,6 @@ require (
 	go.uber.org/zap v1.10.0
 	golang.org/x/crypto v0.0.0-20200728195943-123391ffb6de
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
-	gopkg.in/amz.v3 v3.0.0-20200811022415-7b63e5e39741 // indirect
 	gopkg.in/check.v1 v1.0.0-20200902074654-038fdea0a05b
 	gopkg.in/errgo.v1 v1.0.1
 	gopkg.in/httprequest.v1 v1.2.1

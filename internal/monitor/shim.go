@@ -120,6 +120,10 @@ func (j jemShim) WatchAllModelSummaries(ctx context.Context, ctlPath params.Enti
 	return j.JEM.WatchAllModelSummaries(ctx, ctlPath)
 }
 
+func (j jemShim) UpdateApplicationOffer(ctx context.Context, offerUUID string, removed bool) error {
+	return j.JEM.UpdateApplicationOffer(ctx, offerUUID, removed)
+}
+
 type apiShim struct {
 	*apiconn.Conn
 }

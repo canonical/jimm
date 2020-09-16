@@ -13,6 +13,8 @@ import (
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
@@ -97,6 +99,19 @@ func (s *applicationoffersSuite) TestOffer(c *gc.C) {
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
+
+	err = s.conn.Offer(ctx, jujuparams.AddApplicationOffer{
+		ModelTag:        names.NewModelTag(s.model.UUID).String(),
+		OfferName:       "test-offer",
+		ApplicationName: "test-app",
+		Endpoints: map[string]string{
+			ep.Name: ep.Name,
+		},
+	})
+	c.Assert(err, gc.NotNil)
+	apiErr, ok := errgo.Cause(err).(*apiconn.APIError)
+	c.Assert(ok, gc.Equals, true)
+	c.Assert(apiErr.ParamsError().Message, gc.Matches, ".* application offer already exists")
 }
 
 func (s *applicationoffersSuite) TestOfferError(c *gc.C) {
@@ -648,7 +663,7 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 	info.Offer = &jujuparams.ApplicationOfferDetails{
 		OfferURL: "test-user@external/test-model.test-offer",
 	}
-	err = s.conn.GetApplicationOfferConsumeDetails(ctx, &info)
+	err = s.conn.GetApplicationOfferConsumeDetails(ctx, &info, bakery.Version2)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(info.Offer.OfferUUID, gc.Not(gc.Equals), "")
 	info.Offer.OfferUUID = ""
@@ -689,6 +704,6 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetailsNotFound(c
 	info.Offer = &jujuparams.ApplicationOfferDetails{
 		OfferURL: "test-user@external/test-model.test-offer",
 	}
-	err := s.conn.GetApplicationOfferConsumeDetails(context.Background(), &info)
+	err := s.conn.GetApplicationOfferConsumeDetails(context.Background(), &info, bakery.Version2)
 	c.Check(err, gc.ErrorMatches, `api error: application offer "test-user@external/test-model.test-offer" not found`)
 }
