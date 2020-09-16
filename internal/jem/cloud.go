@@ -7,13 +7,13 @@ import (
 	"strings"
 
 	cloudapi "github.com/juju/juju/api/cloud"
-	jujucloud "github.com/juju/juju/cloud"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2/bson"
 
+	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
-	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
@@ -46,41 +46,37 @@ func (j *JEM) CreateCloud(ctx context.Context, cloud mongodoc.CloudRegion, regio
 		}
 		return errgo.Mask(err)
 	}
-	var regionConfig map[string]jujucloud.Attrs
-	for r, attr := range ccp.RegionConfig {
-		if regionConfig == nil {
-			regionConfig = make(map[string]jujucloud.Attrs)
-		}
-		regionConfig[r] = attr
-	}
-	jcloud := jujucloud.Cloud{
-		Name:             string(cloud.Cloud),
+
+	jcloud := jujuparams.Cloud{
 		Type:             cloud.ProviderType,
+		AuthTypes:        cloud.AuthTypes,
 		Endpoint:         cloud.Endpoint,
 		IdentityEndpoint: cloud.IdentityEndpoint,
 		StorageEndpoint:  cloud.StorageEndpoint,
 		CACertificates:   cloud.CACertificates,
 		HostCloudRegion:  ccp.HostCloudRegion,
 		Config:           ccp.Config,
-		RegionConfig:     regionConfig,
-	}
-	for _, authType := range cloud.AuthTypes {
-		jcloud.AuthTypes = append(jcloud.AuthTypes, jujucloud.AuthType(authType))
+		RegionConfig:     ccp.RegionConfig,
 	}
 	for _, reg := range regions {
-		jcloud.Regions = append(jcloud.Regions, jujucloud.Region{
+		jcloud.Regions = append(jcloud.Regions, jujuparams.CloudRegion{
 			Name:             reg.Region,
 			Endpoint:         reg.Endpoint,
 			IdentityEndpoint: reg.IdentityEndpoint,
 			StorageEndpoint:  reg.StorageEndpoint,
 		})
 	}
-	ctlPath, err := j.createCloud(ctx, jcloud)
+	ctlPath, err := j.createCloud(ctx, cloud.Cloud, jcloud)
 	if err != nil {
 		if err := j.DB.RemoveCloudRegion(ctx, cloud.Cloud, ""); err != nil {
 			zapctx.Warn(ctx, "cannot remove cloud that failed to deploy", zaputil.Error(err))
 		}
-		return errgo.Mask(err, errgo.Is(params.ErrCloudRegionRequired), errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+		return errgo.Mask(err,
+			errgo.Is(params.ErrCloudRegionRequired),
+			errgo.Is(params.ErrNotFound),
+			errgo.Is(params.ErrUnauthorized),
+			apiconn.IsAPIError,
+		)
 	}
 	cloud.PrimaryControllers = []params.EntityPath{ctlPath}
 	for i := range regions {
@@ -97,7 +93,7 @@ func (j *JEM) CreateCloud(ctx context.Context, cloud mongodoc.CloudRegion, regio
 	return nil
 }
 
-func (j *JEM) createCloud(ctx context.Context, cloud jujucloud.Cloud) (params.EntityPath, error) {
+func (j *JEM) createCloud(ctx context.Context, name params.Cloud, cloud jujuparams.Cloud) (params.EntityPath, error) {
 	parts := strings.SplitN(cloud.HostCloudRegion, "/", 2)
 	if len(parts) != 2 || parts[0] == "" {
 		return params.EntityPath{}, errgo.WithCausef(nil, params.ErrCloudRegionRequired, "")
@@ -117,7 +113,7 @@ func (j *JEM) createCloud(ctx context.Context, cloud jujucloud.Cloud) (params.En
 		}
 		defer conn.Close()
 		// TODO(mhilton) support force?
-		err = cloudapi.NewClient(conn).AddCloud(cloud, false)
+		err = conn.AddCloud(ctx, name, cloud)
 		if err == nil {
 			return ctlPath, nil
 		}
@@ -127,7 +123,7 @@ func (j *JEM) createCloud(ctx context.Context, cloud jujucloud.Cloud) (params.En
 	}
 	if len(errors) > 0 {
 		// TODO(mhilton) perhaps filter errors to find the "best" one.
-		return params.EntityPath{}, errgo.Mask(errors[0])
+		return params.EntityPath{}, errgo.Mask(errors[0], apiconn.IsAPIError)
 	}
 	return params.EntityPath{}, errgo.New("cannot create cloud")
 }
@@ -195,11 +191,11 @@ func (j *JEM) GrantCloud(ctx context.Context, cloud params.Cloud, user params.Us
 			return errgo.Mask(err)
 		}
 		defer conn.Close()
-		if err := cloudapi.NewClient(conn).GrantCloud(conv.ToUserTag(user).String(), access, string(cloud)); err != nil {
+		if err := conn.GrantCloudAccess(ctx, cloud, user, access); err != nil {
 			// TODO(mhilton) If this happens then the
 			// controller will be in an inconsistent state
 			// with JIMM. Try and resolve this.
-			return errgo.Mask(err)
+			return errgo.Mask(err, apiconn.IsAPIError)
 		}
 	}
 	return nil
@@ -222,8 +218,8 @@ func (j *JEM) RevokeCloud(ctx context.Context, cloud params.Cloud, user params.U
 			return errgo.Mask(err)
 		}
 		defer conn.Close()
-		if err := cloudapi.NewClient(conn).RevokeCloud(conv.ToUserTag(user).String(), access, string(cloud)); err != nil {
-			return errgo.Mask(err)
+		if err := conn.RevokeCloudAccess(ctx, cloud, user, access); err != nil {
+			return errgo.Mask(err, apiconn.IsAPIError)
 		}
 	}
 	if err := j.DB.RevokeCloud(ctx, cloud, user, access); err != nil {

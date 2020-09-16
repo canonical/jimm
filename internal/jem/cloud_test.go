@@ -281,7 +281,7 @@ func (s *cloudSuite) TestCreateCloudAddCloudError(c *gc.C) {
 			HostCloudRegion: "dummy/dummy-region",
 		},
 	)
-	c.Assert(err, gc.ErrorMatches, `invalid cloud: empty auth-types not valid`)
+	c.Assert(err, gc.ErrorMatches, `api error: invalid cloud: empty auth-types not valid`)
 
 	var docs []mongodoc.CloudRegion
 	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
@@ -497,7 +497,7 @@ func (s *cloudSuite) TestRevokeCloudInvalidAccess(c *gc.C) {
 
 	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 	err := s.jem.RevokeCloud(ctx, "test-cloud", "alice", "not-valid")
-	c.Assert(err, gc.ErrorMatches, `"not-valid" cloud access not valid`)
+	c.Assert(err, gc.ErrorMatches, `api error: "not-valid" cloud access not valid`)
 }
 
 func (s *cloudSuite) createK8sCloud(c *gc.C, name, owner string) {

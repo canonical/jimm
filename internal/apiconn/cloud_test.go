@@ -4,11 +4,14 @@ import (
 	"context"
 
 	"github.com/juju/juju/api"
+	jujuparams "github.com/juju/juju/apiserver/params"
+	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 type cloudSuite struct {
@@ -125,4 +128,105 @@ func (s *cloudSuite) TestRevokeCredential(c *gc.C) {
 
 	err = s.conn.RevokeCredential(context.Background(), cred.Path.ToParams())
 	c.Assert(err, gc.Equals, nil)
+}
+
+func (s *cloudSuite) TestClouds(c *gc.C) {
+	clouds, err := s.conn.Clouds(context.Background())
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(clouds, jc.DeepEquals, map[params.Cloud]jujuparams.Cloud{
+		"dummy": jujuparams.Cloud{
+			Type:             "dummy",
+			AuthTypes:        []string{"empty", "userpass"},
+			Endpoint:         "dummy-endpoint",
+			IdentityEndpoint: "dummy-identity-endpoint",
+			StorageEndpoint:  "dummy-storage-endpoint",
+			Regions: []jujuparams.CloudRegion{{
+				Name:             "dummy-region",
+				Endpoint:         "dummy-endpoint",
+				IdentityEndpoint: "dummy-identity-endpoint",
+				StorageEndpoint:  "dummy-storage-endpoint",
+			}},
+		},
+	})
+}
+
+func (s *cloudSuite) TestAddCloud(c *gc.C) {
+	cloud := jujuparams.Cloud{
+		Type:      "kubernetes",
+		AuthTypes: []string{"empty"},
+	}
+
+	ctx := context.Background()
+
+	err := s.conn.AddCloud(ctx, "dummy", cloud)
+	c.Assert(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeAlreadyExists)
+
+	err = s.conn.AddCloud(ctx, "test-cloud", cloud)
+	c.Assert(err, gc.Equals, nil)
+
+	clouds, err := s.conn.Clouds(ctx)
+	c.Assert(err, gc.Equals, nil)
+
+	c.Check(clouds["test-cloud"], jc.DeepEquals, jujuparams.Cloud{
+		Type:      "kubernetes",
+		AuthTypes: []string{"empty"},
+		Regions: []jujuparams.CloudRegion{{
+			Name: "default",
+		}},
+	})
+}
+
+func (s *cloudSuite) TestRemoveCloud(c *gc.C) {
+	cloud := jujuparams.Cloud{
+		Type:      "kubernetes",
+		AuthTypes: []string{"empty"},
+	}
+
+	ctx := context.Background()
+
+	err := s.conn.RemoveCloud(ctx, "test-cloud")
+	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
+
+	err = s.conn.AddCloud(ctx, "test-cloud", cloud)
+	c.Assert(err, gc.Equals, nil)
+
+	clouds, err := s.conn.Clouds(ctx)
+	c.Assert(err, gc.Equals, nil)
+
+	c.Assert(clouds["test-cloud"], jc.DeepEquals, jujuparams.Cloud{
+		Type:      "kubernetes",
+		AuthTypes: []string{"empty"},
+		Regions: []jujuparams.CloudRegion{{
+			Name: "default",
+		}},
+	})
+
+	err = s.conn.RemoveCloud(ctx, "test-cloud")
+	c.Assert(err, gc.Equals, nil)
+
+	clouds, err = s.conn.Clouds(ctx)
+	c.Assert(err, gc.Equals, nil)
+
+	_, ok := clouds["test-cloud"]
+	c.Assert(ok, gc.Equals, false)
+}
+
+func (s *cloudSuite) TestGrantCloudAccess(c *gc.C) {
+	err := s.conn.GrantCloudAccess(context.Background(), "no-such-cloud", "user", "add-model")
+	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
+	err = s.conn.GrantCloudAccess(context.Background(), "dummy", "user", "add-model")
+	c.Check(err, gc.Equals, nil)
+}
+
+func (s *cloudSuite) TestRevokeCloudAccess(c *gc.C) {
+	err := s.conn.RevokeCloudAccess(context.Background(), "no-such-cloud", "user", "add-model")
+	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
+	err = s.conn.GrantCloudAccess(context.Background(), "dummy", "user", "admin")
+	c.Assert(err, gc.Equals, nil)
+	err = s.conn.RevokeCloudAccess(context.Background(), "dummy", "user", "admin")
+	c.Check(err, gc.Equals, nil)
+	err = s.conn.RevokeCloudAccess(context.Background(), "dummy", "user", "add-model")
+	c.Check(err, gc.Equals, nil)
+	err = s.conn.RevokeCloudAccess(context.Background(), "dummy", "user", "add-model")
+	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
 }
