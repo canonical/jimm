@@ -501,7 +501,7 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrAmbiguousChoice))
 	}
 
-	controllers, err := j.possibleControllers(ctx, p.ControllerPath, p.Cloud, p.Region)
+	controllers, err := j.possibleControllers(ctx, auth.IdentityFromContext(ctx), p.ControllerPath, p.Cloud, p.Region)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
@@ -596,7 +596,7 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 	return modelDoc, nil
 }
 
-func (j *JEM) possibleControllers(ctx context.Context, ctlPath params.EntityPath, cloud params.Cloud, region string) ([]params.EntityPath, error) {
+func (j *JEM) possibleControllers(ctx context.Context, id identchecker.ACLIdentity, ctlPath params.EntityPath, cloud params.Cloud, region string) ([]params.EntityPath, error) {
 	if ctlPath.Name != "" {
 		return []params.EntityPath{ctlPath}, nil
 	}
@@ -604,7 +604,7 @@ func (j *JEM) possibleControllers(ctx context.Context, ctlPath params.EntityPath
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	if err := auth.CheckCanRead(ctx, auth.IdentityFromContext(ctx), cloudRegion); err != nil {
+	if err := auth.CheckCanRead(ctx, id, cloudRegion); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	controllers := cloudRegion.PrimaryControllers

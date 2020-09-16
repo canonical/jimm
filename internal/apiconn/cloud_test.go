@@ -150,6 +150,19 @@ func (s *cloudSuite) TestClouds(c *gc.C) {
 	})
 }
 
+func (s *cloudSuite) TestCloud(c *gc.C) {
+	ctx := context.Background()
+
+	clouds, err := s.conn.Clouds(ctx)
+	c.Assert(err, gc.Equals, nil)
+
+	var cloud jujuparams.Cloud
+	err = s.conn.Cloud(ctx, "dummy", &cloud)
+	c.Assert(err, gc.Equals, nil)
+
+	c.Check(cloud, jc.DeepEquals, clouds["dummy"])
+}
+
 func (s *cloudSuite) TestAddCloud(c *gc.C) {
 	cloud := jujuparams.Cloud{
 		Type:      "kubernetes",

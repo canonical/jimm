@@ -11,6 +11,7 @@ import (
 	"github.com/juju/names/v4"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
@@ -381,47 +382,7 @@ func (r *controllerRoot) credential(ctx context.Context, cloudCredentialTag stri
 
 // AddCloud implements the AddCloud method of the Cloud (v2) facade.
 func (r *controllerRoot) AddCloud(ctx context.Context, args jujuparams.AddCloudArgs) error {
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
-	username := r.identity.Id()
-	cloud := mongodoc.CloudRegion{
-		Cloud:            params.Cloud(args.Name),
-		ProviderType:     args.Cloud.Type,
-		AuthTypes:        args.Cloud.AuthTypes,
-		Endpoint:         args.Cloud.Endpoint,
-		IdentityEndpoint: args.Cloud.IdentityEndpoint,
-		StorageEndpoint:  args.Cloud.StorageEndpoint,
-		CACertificates:   args.Cloud.CACertificates,
-		ACL: params.ACL{
-			Read:  []string{username},
-			Write: []string{username},
-			Admin: []string{username},
-		},
-	}
-	regions := make([]mongodoc.CloudRegion, len(args.Cloud.Regions))
-	for i, region := range args.Cloud.Regions {
-		regions[i] = mongodoc.CloudRegion{
-			Cloud:            params.Cloud(args.Name),
-			Region:           region.Name,
-			Endpoint:         region.Endpoint,
-			IdentityEndpoint: region.IdentityEndpoint,
-			StorageEndpoint:  region.StorageEndpoint,
-			ACL: params.ACL{
-				Read:  []string{username},
-				Write: []string{username},
-				Admin: []string{username},
-			},
-		}
-	}
-	return r.jem.CreateCloud(
-		ctx,
-		cloud,
-		regions,
-		jem.CreateCloudParams{
-			HostCloudRegion: args.Cloud.HostCloudRegion,
-			Config:          args.Cloud.Config,
-			RegionConfig:    args.Cloud.RegionConfig,
-		},
-	)
+	return r.jem.AddCloud(ctx, r.identity, params.Cloud(args.Name), args.Cloud)
 }
 
 // AddCredentials implements the AddCredentials method of the Cloud (v2) facade.
@@ -567,7 +528,6 @@ func (r *controllerRoot) credentialInfo(ctx context.Context, cloudName, credenti
 // RemoveClouds removes the specified clouds from the controller.
 // If a cloud is in use (has models deployed to it), the removal will fail.
 func (r *controllerRoot) RemoveClouds(ctx context.Context, args jujuparams.Entities) (jujuparams.ErrorResults, error) {
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	result := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, len(args.Entities)),
 	}
@@ -577,7 +537,7 @@ func (r *controllerRoot) RemoveClouds(ctx context.Context, args jujuparams.Entit
 			result.Results[i].Error = mapError(err)
 			continue
 		}
-		err = r.jem.RemoveCloud(ctx, params.Cloud(tag.Id()))
+		err = r.jem.RemoveCloud(ctx, r.identity, params.Cloud(tag.Id()))
 		if err != nil {
 			result.Results[i].Error = mapError(err)
 		}
@@ -591,7 +551,6 @@ func (r *controllerRoot) CheckCredentialsModels(ctx context.Context, args jujupa
 
 // ModifyCloudAccess changes the cloud access granted to users.
 func (r *controllerRoot) ModifyCloudAccess(ctx context.Context, args jujuparams.ModifyCloudAccessRequest) (jujuparams.ErrorResults, error) {
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.ErrorResult, len(args.Changes))
 	for i, change := range args.Changes {
 		results[i].Error = mapError(r.modifyCloudAccess(ctx, change))
@@ -610,7 +569,7 @@ func (r *controllerRoot) modifyCloudAccess(ctx context.Context, change jujuparam
 	if err != nil {
 		return errgo.WithCausef(err, params.ErrBadRequest, "")
 	}
-	var modifyf func(context.Context, params.Cloud, params.User, string) error
+	var modifyf func(context.Context, identchecker.ACLIdentity, params.Cloud, params.User, string) error
 	switch change.Action {
 	case jujuparams.GrantCloudAccess:
 		modifyf = r.jem.GrantCloud
@@ -619,7 +578,7 @@ func (r *controllerRoot) modifyCloudAccess(ctx context.Context, change jujuparam
 	default:
 		return errgo.WithCausef(nil, params.ErrBadRequest, "unsupported modify cloud action %q", change.Action)
 	}
-	if err := modifyf(ctx, params.Cloud(cloudTag.Id()), params.User(userTag.Id()), change.Access); err != nil {
+	if err := modifyf(ctx, r.identity, params.Cloud(cloudTag.Id()), params.User(userTag.Id()), change.Access); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	return nil

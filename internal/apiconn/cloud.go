@@ -135,6 +135,29 @@ func (c *Conn) RevokeCredential(_ context.Context, path params.CredentialPath) e
 	return newAPIError(out.Results[0].Error)
 }
 
+// Cloud retrieves information about the given cloud. Cloud uses the
+// Cloud procedure on the Cloud facade version 1.
+func (c *Conn) Cloud(ctx context.Context, name params.Cloud, cloud *jujuparams.Cloud) error {
+	cloudTag := conv.ToCloudTag(name).String()
+	args := jujuparams.Entities{
+		Entities: []jujuparams.Entity{{
+			Tag: cloudTag,
+		}},
+	}
+	resp := jujuparams.CloudResults{
+		Results: []jujuparams.CloudResult{{
+			Cloud: cloud,
+		}},
+	}
+	if err := c.APICall("Cloud", 1, "", "Cloud", &args, &resp); err != nil {
+		return newAPIError(err)
+	}
+	if len(resp.Results) != 1 {
+		return errgo.Newf("unexpected number of results (expected 1, got %d)", len(resp.Results))
+	}
+	return newAPIError(resp.Results[0].Error)
+}
+
 // Clouds retrieves information about all available clouds. Clouds uses the
 // Clouds procedure on the Cloud facade version 1.
 func (c *Conn) Clouds(ctx context.Context) (map[params.Cloud]jujuparams.Cloud, error) {

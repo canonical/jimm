@@ -885,19 +885,26 @@ func (db *Database) UpdateCloudRegions(ctx context.Context, cloudRegions []mongo
 	defer db.checkError(ctx, &err)
 	for _, cr := range cloudRegions {
 		cr.Id = fmt.Sprintf("%s/%s", cr.Cloud, cr.Region)
-		update := make(bson.D, 1, 3)
+		update := make(bson.D, 2, 4)
 		update[0] = bson.DocElem{
-			"$setOnInsert", bson.D{
-				{"cloud", cr.Cloud},
-				{"region", cr.Region},
+			"$set", bson.D{
 				{"providertype", cr.ProviderType},
 				{"authtypes", cr.AuthTypes},
 				{"endpoint", cr.Endpoint},
 				{"identityendpoint", cr.IdentityEndpoint},
 				{"storageendpoint", cr.StorageEndpoint},
 				{"cacertificates", cr.CACertificates},
+			},
+		}
+		update[1] = bson.DocElem{
+			"$setOnInsert", bson.D{
+				{"cloud", cr.Cloud},
+				{"region", cr.Region},
 				{"acl", cr.ACL},
-			}}
+				// {"primarycontrollers", cr.PrimaryControllers},
+				// {"secondarycontrollers", cr.SecondaryControllers},
+			},
+		}
 		if len(cr.PrimaryControllers) > 0 {
 			update = append(update, bson.DocElem{"$addToSet", bson.D{{"primarycontrollers", bson.D{{"$each", cr.PrimaryControllers}}}}})
 		}

@@ -29,6 +29,7 @@ const (
 	ErrAmbiguousChoice     ErrorCode = "ambiguous choice"
 	ErrStillAlive          ErrorCode = "controller is still alive"
 	ErrCloudRegionRequired ErrorCode = "cloud region required"
+	ErrIncompatibleClouds  ErrorCode = "incompatible clouds"
 )
 
 // Error represents an error - it is returned for any response that fails.

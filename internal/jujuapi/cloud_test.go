@@ -687,6 +687,9 @@ func (s *cloudSuite) TestAddCloud(c *gc.C) {
 		Endpoint:         "https://0.1.2.3:5678",
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
+		Regions: []cloud.Region{{
+			Name: "default",
+		}},
 	})
 }
 
@@ -802,6 +805,7 @@ func (s *cloudSuite) TestAddCloudBadName(c *gc.C) {
 	err := client.AddCloud(cloud.Cloud{
 		Name:             "aws",
 		Type:             "kubernetes",
+		HostCloudRegion:  "dummy/dummy-region",
 		Endpoint:         "https://0.1.2.3:5678",
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
@@ -977,6 +981,9 @@ func (s *cloudSuite) TestRemoveCloud(c *gc.C) {
 		Endpoint:         "https://0.1.2.3:5678",
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
+		Regions: []cloud.Region{{
+			Name: "default",
+		}},
 	})
 
 	err = client.RemoveCloud("test-cloud")
@@ -1024,6 +1031,9 @@ func (s *cloudSuite) TestModifyCloudAccess(c *gc.C) {
 		Endpoint:         "https://0.1.2.3:5678",
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
+		Regions: []cloud.Region{{
+			Name: "default",
+		}},
 	})
 
 	// Check that alice@external does not yet have access
@@ -1047,6 +1057,9 @@ func (s *cloudSuite) TestModifyCloudAccess(c *gc.C) {
 		Endpoint:         "https://0.1.2.3:5678",
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
+		Regions: []cloud.Region{{
+			Name: "default",
+		}},
 	})
 
 	err = client.RevokeCloud("alice@external", "add-model", "test-cloud")
@@ -1083,6 +1096,9 @@ func (s *cloudSuite) TestModifyCloudAccessUnauthorized(c *gc.C) {
 		Endpoint:         "https://0.1.2.3:5678",
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
+		Regions: []cloud.Region{{
+			Name: "default",
+		}},
 	})
 
 	// Check that alice@external does not yet have access
