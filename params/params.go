@@ -447,9 +447,10 @@ type UserStatsResponse struct {
 type EntityCount string
 
 const (
-	UnitCount        EntityCount = "units"
-	ApplicationCount EntityCount = "applications"
-	MachineCount     EntityCount = "machines"
+	UnitCount             EntityCount = "units"
+	ApplicationCount      EntityCount = "applications"
+	MachineCount          EntityCount = "machines"
+	ApplicationOfferCount EntityCount = "application-offers"
 )
 
 // Count records information about a changing count of

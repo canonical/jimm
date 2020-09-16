@@ -72,75 +72,7 @@ func (j *JEM) Offer(ctx context.Context, id identchecker.ACLIdentity, offer juju
 		return errgo.Mask(err, apiconn.IsAPIError)
 	}
 
-	endpoints := make([]mongodoc.RemoteEndpoint, len(offerDetails.Endpoints))
-	for i, endpoint := range offerDetails.Endpoints {
-		endpoints[i] = mongodoc.RemoteEndpoint{
-			Name:      endpoint.Name,
-			Role:      string(endpoint.Role),
-			Interface: endpoint.Interface,
-			Limit:     endpoint.Limit,
-		}
-	}
-	users := make([]mongodoc.OfferUserDetails, 0, len(offerDetails.Users))
-	for _, user := range offerDetails.Users {
-		pu, err := conv.FromUserID(user.UserName)
-		if err != nil {
-			// If we can't parse the user, it's either a local user which
-			// we don't store, or an invalid user which can't do anything.
-			continue
-		}
-		var access mongodoc.ApplicationOfferAccessPermission
-		switch user.Access {
-		case string(jujuparams.OfferAdminAccess):
-			access = mongodoc.ApplicationOfferAdminAccess
-		case string(jujuparams.OfferConsumeAccess):
-			access = mongodoc.ApplicationOfferConsumeAccess
-		case string(jujuparams.OfferReadAccess):
-			access = mongodoc.ApplicationOfferReadAccess
-		default:
-			continue
-		}
-		users = append(users, mongodoc.OfferUserDetails{
-			User:   pu,
-			Access: access,
-		})
-	}
-	spaces := make([]mongodoc.RemoteSpace, len(offerDetails.Spaces))
-	for i, space := range offerDetails.Spaces {
-		spaces[i] = mongodoc.RemoteSpace{
-			CloudType:          space.CloudType,
-			Name:               space.Name,
-			ProviderId:         space.ProviderId,
-			ProviderAttributes: space.ProviderAttributes,
-		}
-	}
-	connections := make([]mongodoc.OfferConnection, len(offerDetails.Connections))
-	for i, connection := range offerDetails.Connections {
-		connections[i] = mongodoc.OfferConnection{
-			SourceModelTag: connection.SourceModelTag,
-			RelationId:     connection.RelationId,
-			Username:       connection.Username,
-			Endpoint:       connection.Endpoint,
-			IngressSubnets: connection.IngressSubnets,
-		}
-	}
-
-	doc := mongodoc.ApplicationOffer{
-		ModelUUID:              model.UUID,
-		ModelName:              string(model.Path.Name),
-		ControllerPath:         model.Controller,
-		OfferUUID:              offerDetails.OfferUUID,
-		OfferURL:               offerDetails.OfferURL,
-		OfferName:              offerDetails.OfferName,
-		OwnerName:              conv.ToUserTag(model.Path.User).Id(),
-		ApplicationName:        offerDetails.ApplicationName,
-		ApplicationDescription: offerDetails.ApplicationDescription,
-		Endpoints:              endpoints,
-		Spaces:                 spaces,
-		Bindings:               offerDetails.Bindings,
-		Users:                  users,
-		Connections:            connections,
-	}
+	doc := offerDetailsToMongodoc(model, offerDetails)
 
 	err = j.DB.AddApplicationOffer(ctx, &doc)
 	if err != nil {
@@ -535,4 +467,117 @@ func (j *JEM) DestroyOffer(ctx context.Context, id identchecker.ACLIdentity, off
 	}
 
 	return nil
+}
+
+// UpdateApplicationOffer fetches offer details from the controller and updates the
+// application offer in JIMM DB.
+func (j *JEM) UpdateApplicationOffer(ctx context.Context, offerUUID string, removed bool) error {
+	offer := mongodoc.ApplicationOffer{
+		OfferUUID: offerUUID,
+	}
+	err := j.DB.GetApplicationOffer(ctx, &offer)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+
+	model, err := j.DB.ModelFromUUID(ctx, offer.ModelUUID)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+
+	if removed {
+		return errgo.Mask(j.DB.RemoveApplicationOffer(ctx, offerUUID))
+	}
+
+	// then remove from the actual controller
+	conn, err := j.OpenAPI(ctx, offer.ControllerPath)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	defer conn.Close()
+
+	offerDetails := jujuparams.ApplicationOfferAdminDetails{
+		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+			OfferURL: offer.OfferURL,
+		},
+	}
+	err = conn.GetApplicationOffer(ctx, &offerDetails)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+
+	doc := offerDetailsToMongodoc(model, offerDetails)
+	return errgo.Mask(j.DB.UpdateApplicationOffer(ctx, &doc))
+}
+
+func offerDetailsToMongodoc(model *mongodoc.Model, offerDetails jujuparams.ApplicationOfferAdminDetails) mongodoc.ApplicationOffer {
+	endpoints := make([]mongodoc.RemoteEndpoint, len(offerDetails.Endpoints))
+	for i, endpoint := range offerDetails.Endpoints {
+		endpoints[i] = mongodoc.RemoteEndpoint{
+			Name:      endpoint.Name,
+			Role:      string(endpoint.Role),
+			Interface: endpoint.Interface,
+			Limit:     endpoint.Limit,
+		}
+	}
+	users := make([]mongodoc.OfferUserDetails, 0, len(offerDetails.Users))
+	for _, user := range offerDetails.Users {
+		pu, err := conv.FromUserID(user.UserName)
+		if err != nil {
+			// If we can't parse the user, it's either a local user which
+			// we don't store, or an invalid user which can't do anything.
+			continue
+		}
+		var access mongodoc.ApplicationOfferAccessPermission
+		switch user.Access {
+		case string(jujuparams.OfferAdminAccess):
+			access = mongodoc.ApplicationOfferAdminAccess
+		case string(jujuparams.OfferConsumeAccess):
+			access = mongodoc.ApplicationOfferConsumeAccess
+		case string(jujuparams.OfferReadAccess):
+			access = mongodoc.ApplicationOfferReadAccess
+		default:
+			continue
+		}
+		users = append(users, mongodoc.OfferUserDetails{
+			User:   pu,
+			Access: access,
+		})
+	}
+	spaces := make([]mongodoc.RemoteSpace, len(offerDetails.Spaces))
+	for i, space := range offerDetails.Spaces {
+		spaces[i] = mongodoc.RemoteSpace{
+			CloudType:          space.CloudType,
+			Name:               space.Name,
+			ProviderId:         space.ProviderId,
+			ProviderAttributes: space.ProviderAttributes,
+		}
+	}
+	connections := make([]mongodoc.OfferConnection, len(offerDetails.Connections))
+	for i, connection := range offerDetails.Connections {
+		connections[i] = mongodoc.OfferConnection{
+			SourceModelTag: connection.SourceModelTag,
+			RelationId:     connection.RelationId,
+			Username:       connection.Username,
+			Endpoint:       connection.Endpoint,
+			IngressSubnets: connection.IngressSubnets,
+		}
+	}
+
+	return mongodoc.ApplicationOffer{
+		ModelUUID:              model.UUID,
+		ModelName:              string(model.Path.Name),
+		ControllerPath:         model.Controller,
+		OfferUUID:              offerDetails.OfferUUID,
+		OfferURL:               offerDetails.OfferURL,
+		OfferName:              offerDetails.OfferName,
+		OwnerName:              conv.ToUserTag(model.Path.User).Id(),
+		ApplicationName:        offerDetails.ApplicationName,
+		ApplicationDescription: offerDetails.ApplicationDescription,
+		Endpoints:              endpoints,
+		Spaces:                 spaces,
+		Bindings:               offerDetails.Bindings,
+		Users:                  users,
+		Connections:            connections,
+	}
 }

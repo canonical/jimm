@@ -120,6 +120,10 @@ type ControllerStats struct {
 	// MachineCount holds the number of machines hosted in the controller.
 	// This includes all machines, not just top level instances.
 	MachineCount int
+
+	// ApplicationOfferCount hols the numer of application offers
+	// hoster in the controller.
+	ApplicationOfferCount int
 }
 
 type UserInfo struct {
