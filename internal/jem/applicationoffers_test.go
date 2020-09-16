@@ -8,6 +8,7 @@ import (
 	"github.com/juju/charm/v7"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
+	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/juju/state"
 	"github.com/juju/juju/testing/factory"
 	"github.com/juju/names/v4"
@@ -691,5 +692,58 @@ func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
 
 	// "user1" is admin but still cannot get application offers that do not exist
 	_, err = s.jem.GetApplicationOffer(ctx, jemtest.NewIdentity("user1"), "no-such-offer")
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}
+
+func (s *applicationoffersSuite) TestUpdateApplicationOffer(c *gc.C) {
+	ctx := context.Background()
+
+	err := s.jem.Offer(ctx, s.identity, jujuparams.AddApplicationOffer{
+		ModelTag:               names.NewModelTag(s.model.UUID).String(),
+		OfferName:              "test-offer1",
+		ApplicationName:        "test-app",
+		ApplicationDescription: "test application description",
+		Endpoints: map[string]string{
+			s.endpoint.Relation.Name: s.endpoint.Relation.Name,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	offer1 := mongodoc.ApplicationOffer{
+		OfferURL: conv.ToOfferURL(s.model.Path, "test-offer1"),
+	}
+	err = s.jem.DB.GetApplicationOffer(ctx, &offer1)
+	c.Assert(err, jc.ErrorIsNil)
+
+	modelState, err := s.StatePool.Get(s.model.UUID)
+	c.Assert(err, gc.Equals, nil)
+	defer modelState.Release()
+
+	appOfferState := state.NewApplicationOffers(modelState.State)
+	_, err = appOfferState.UpdateOffer(crossmodel.AddApplicationOfferArgs{
+		OfferName:              offer1.OfferName,
+		Owner:                  offer1.OwnerName,
+		ApplicationName:        offer1.ApplicationName,
+		ApplicationDescription: "changed test application description",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = s.jem.UpdateApplicationOffer(ctx, offer1.OfferUUID, false)
+	c.Assert(err, jc.ErrorIsNil)
+
+	offer2 := mongodoc.ApplicationOffer{
+		OfferUUID: offer1.OfferUUID,
+	}
+	err = s.jem.DB.GetApplicationOffer(ctx, &offer2)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(offer2.ApplicationDescription, gc.Equals, "changed test application description")
+
+	err = s.jem.UpdateApplicationOffer(ctx, offer1.OfferUUID, true)
+	c.Assert(err, jc.ErrorIsNil)
+
+	offer3 := mongodoc.ApplicationOffer{
+		OfferUUID: offer1.OfferUUID,
+	}
+	err = s.jem.DB.GetApplicationOffer(ctx, &offer3)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }

@@ -119,6 +119,10 @@ type jemInterface interface {
 	// WatchAllModelSummaries starts watching the summary updates from
 	// the controller.
 	WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityPath) (func() error, error)
+
+	// UpdateApplicationOffer fetches offer details from the controller and updates the
+	// application offer in JIMM DB.
+	UpdateApplicationOffer(ctx context.Context, offerUUID string, removed bool) error
 }
 
 // jujuAPI represents an API connection to a Juju controller.

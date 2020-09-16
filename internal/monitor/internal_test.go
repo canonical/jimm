@@ -5,6 +5,7 @@ package monitor
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/canonical/candid/candidtest"
@@ -24,6 +25,8 @@ import (
 	"gopkg.in/juju/worker.v1"
 	"gopkg.in/tomb.v2"
 
+	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
@@ -553,6 +556,114 @@ func (s *internalSuite) TestWatcherUpdatesApplicationInfo(c *gc.C) {
 		name:      "model-app",
 		life:      "alive",
 	}})
+}
+
+func (s *internalSuite) TestWatcherUpdatesApplicationOffer(c *gc.C) {
+	info := s.APIInfo(c)
+	hps, err := mongodoc.ParseAddresses(info.Addrs)
+	c.Assert(err, gc.Equals, nil)
+	caCert, _ := s.ControllerConfig.CACert()
+	ctlPath := params.EntityPath{User: "user1", Name: "controller-1"}
+	err = s.jem.DB.AddController(testContext, &mongodoc.Controller{
+		Path: ctlPath,
+		ACL: params.ACL{
+			Read: []string{"everyone"},
+		},
+		CACert:        caCert,
+		HostPorts:     [][]mongodoc.HostPort{hps},
+		AdminUser:     info.Tag.Id(),
+		AdminPassword: info.Password,
+		UUID:          s.ControllerConfig.ControllerUUID(),
+		Public:        true,
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	_, err = s.jem.UpdateCredential(testContext, &mongodoc.Credential{
+		Path: mongodoc.CredentialPath{
+			EntityPath: mongodoc.EntityPath{
+				User: "user1",
+				Name: "cred1",
+			},
+			Cloud: "dummy",
+		},
+		Type: "empty",
+	}, 0)
+	c.Assert(err, gc.Equals, nil)
+
+	// Add the JEM model entries
+	model, err := s.jem.CreateModel(auth.ContextWithIdentity(testContext, jemtest.NewIdentity("user1")), jem.CreateModelParams{
+		Path:           params.EntityPath{User: "user1", Name: "model-1"},
+		ControllerPath: ctlPath,
+		Credential: params.CredentialPath{
+			Cloud: "dummy",
+			User:  "user1",
+			Name:  "cred1",
+		},
+		Cloud:  "dummy",
+		Region: "dummy-region",
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	modelState, err := s.StatePool.Get(model.UUID)
+	c.Assert(err, gc.Equals, nil)
+	defer modelState.Release()
+
+	f := factory.NewFactory(modelState.State, s.StatePool)
+	app := f.MakeApplication(c, &factory.ApplicationParams{
+		Name: "test-app",
+		Charm: f.MakeCharm(c, &factory.CharmParams{
+			Name: "wordpress",
+		}),
+	})
+	f.MakeUnit(c, &factory.UnitParams{
+		Application: app,
+	})
+	ep, err := app.Endpoint("url")
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.jem.Offer(testContext, jemtest.NewIdentity("user1"), jujuparams.AddApplicationOffer{
+		ModelTag:        names.NewModelTag(model.UUID).String(),
+		OfferName:       "test-offer",
+		ApplicationName: "test-app",
+		Endpoints: map[string]string{
+			ep.Relation.Name: ep.Relation.Name,
+		},
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	offer1 := mongodoc.ApplicationOffer{
+		OfferURL: conv.ToOfferURL(model.Path, "test-offer"),
+	}
+	err = s.jem.DB.GetApplicationOffer(testContext, &offer1)
+	c.Assert(err, jc.ErrorIsNil)
+
+	var updateCount int
+	var mu sync.Mutex
+
+	// Start the watcher.
+	jshim := newJEMShimWithUpdateNotify(jemShim{s.jem})
+	ushim := newUpdateOfferShim(jshim, func() {
+		mu.Lock()
+		updateCount++
+		mu.Unlock()
+	})
+	m := &controllerMonitor{
+		ctlPath: ctlPath,
+		jem:     ushim,
+		ownerId: "jem1",
+	}
+	m.tomb.Go(func() error {
+		return m.watcher(testContext)
+	})
+	defer cleanStop(c, m)
+
+	updateOfferCalled := func() interface{} {
+		mu.Lock()
+		cnt := updateCount
+		mu.Unlock()
+		return cnt
+	}
+	jshim.await(c, updateOfferCalled, 1)
 }
 
 func removeModel(c *gc.C, st *state.State) {
