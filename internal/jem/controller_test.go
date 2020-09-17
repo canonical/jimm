@@ -258,7 +258,10 @@ func (s *controllerSuite) TestConnectMonitor(c *gc.C) {
 		},
 	)
 	c.Assert(err, gc.Equals, nil)
-	cr, err := s.jem.DB.CloudRegion(testContext, "dummy", "")
+	cr := mongodoc.CloudRegion{
+		Cloud: "dummy",
+	}
+	err = s.jem.DB.GetCloudRegion(testContext, &cr)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(cr.PrimaryControllers, gc.HasLen, 0)
 
@@ -288,7 +291,7 @@ func (s *controllerSuite) TestConnectMonitor(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// Check the cloud has been updated.
-	cr, err = s.jem.DB.CloudRegion(testContext, "dummy", "")
+	err = s.jem.DB.GetCloudRegion(testContext, &cr)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(cr.PrimaryControllers, jc.DeepEquals, []params.EntityPath{ctlPath})
 

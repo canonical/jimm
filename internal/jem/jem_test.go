@@ -261,7 +261,7 @@ var createModelTests = []struct {
 		Cloud:  "dummy",
 		Region: "not-a-region",
 	},
-	expectError: `cloud "dummy" region "not-a-region" not found`,
+	expectError: `cloudregion not found`,
 }, {
 	about: "empty cloud credentials selects single choice",
 	user:  "bob",

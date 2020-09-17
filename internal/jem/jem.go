@@ -600,11 +600,14 @@ func (j *JEM) possibleControllers(ctx context.Context, id identchecker.ACLIdenti
 	if ctlPath.Name != "" {
 		return []params.EntityPath{ctlPath}, nil
 	}
-	cloudRegion, err := j.DB.CloudRegion(ctx, cloud, region)
-	if err != nil {
+	cloudRegion := mongodoc.CloudRegion{
+		Cloud:  cloud,
+		Region: region,
+	}
+	if err := j.DB.GetCloudRegion(ctx, &cloudRegion); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	if err := auth.CheckCanRead(ctx, id, cloudRegion); err != nil {
+	if err := auth.CheckCanRead(ctx, id, &cloudRegion); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	controllers := cloudRegion.PrimaryControllers

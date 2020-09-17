@@ -710,7 +710,7 @@ var newModelWithoutExplicitControllerTests = []struct {
 			"secret": "a secret",
 		},
 	},
-	expectError:      `Post http://.*/v2/model/alice: cloud "aws" region "" not found`,
+	expectError:      `Post http://.*/v2/model/alice: cloudregion not found`,
 	expectErrorCause: params.ErrNotFound,
 }, {
 	about: "no matching region",
@@ -729,7 +729,7 @@ var newModelWithoutExplicitControllerTests = []struct {
 			"secret": "a secret",
 		},
 	},
-	expectError:      `Post http://.*/v2/model/alice: cloud "" region "us-east-1" not found`,
+	expectError:      `Post http://.*/v2/model/alice: cloudregion not found`,
 	expectErrorCause: params.ErrNotFound,
 }, {
 	about: "unrecognised location parameter",

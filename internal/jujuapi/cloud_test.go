@@ -1002,7 +1002,7 @@ func (s *cloudSuite) TestRemoveCloudNotFound(c *gc.C) {
 	client := cloudapi.NewClient(conn)
 
 	err := client.RemoveCloud("test-cloud")
-	c.Assert(err, gc.ErrorMatches, `cloud "test-cloud" region "" not found`)
+	c.Assert(err, gc.ErrorMatches, `cloudregion not found`)
 }
 
 func (s *cloudSuite) TestModifyCloudAccess(c *gc.C) {

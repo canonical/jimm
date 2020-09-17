@@ -223,7 +223,7 @@ func (s *cloudSuite) TestAddCloudNoControllers(c *gc.C) {
 		StorageEndpoint:  "https://1.2.3.4:5680",
 		CACertificates:   []string{"This is a CA Certficiate (honest)"},
 	})
-	c.Assert(err, gc.ErrorMatches, `cloud "aws" region "eu-west-99" not found`)
+	c.Assert(err, gc.ErrorMatches, `cloudregion not found`)
 
 	var docs []mongodoc.CloudRegion
 	err = s.jem.DB.CloudRegions().Find(bson.D{{"cloud", "test-cloud"}}).Sort("_id").All(&docs)
@@ -308,7 +308,7 @@ func (s *cloudSuite) TestRemoveCloudNotFound(c *gc.C) {
 	addController(c, ctlPath, s.APIInfo(c), s.jem)
 
 	err := s.jem.RemoveCloud(testContext, jemtest.NewIdentity("bob", "bob-group"), "test-cloud")
-	c.Assert(err, gc.ErrorMatches, `cloud "test-cloud" region "" not found`)
+	c.Assert(err, gc.ErrorMatches, `cloudregion not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
@@ -367,7 +367,7 @@ func (s *cloudSuite) TestGrantCloudUnauthorized(c *gc.C) {
 func (s *cloudSuite) TestGrantCloudNotFound(c *gc.C) {
 	err := s.jem.GrantCloud(testContext, jemtest.NewIdentity("alice"), "test-cloud", "alice", "admin")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	c.Assert(err, gc.ErrorMatches, `cloud "test-cloud" region "" not found`)
+	c.Assert(err, gc.ErrorMatches, `cloudregion not found`)
 }
 
 func (s *cloudSuite) TestGrantCloudInvalidAccess(c *gc.C) {
@@ -474,7 +474,7 @@ func (s *cloudSuite) TestRevokeCloudUnauthorized(c *gc.C) {
 func (s *cloudSuite) TestRevokeCloudNotFound(c *gc.C) {
 	err := s.jem.RevokeCloud(testContext, jemtest.NewIdentity("alice"), "test-cloud", "alice", "admin")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	c.Assert(err, gc.ErrorMatches, `cloud "test-cloud" region "" not found`)
+	c.Assert(err, gc.ErrorMatches, `cloudregion not found`)
 }
 
 func (s *cloudSuite) TestRevokeCloudInvalidAccess(c *gc.C) {

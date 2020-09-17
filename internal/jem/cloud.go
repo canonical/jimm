@@ -141,9 +141,11 @@ func (j *JEM) addCloud(ctx context.Context, id identchecker.ACLIdentity, name pa
 
 // RemoveCloud removes the given cloud, so long as no models are using it.
 func (j *JEM) RemoveCloud(ctx context.Context, id identchecker.ACLIdentity, cloud params.Cloud) (err error) {
-	cr, err := j.DB.CloudRegion(auth.ContextWithIdentity(ctx, id), cloud, "")
-	if err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+	cr := mongodoc.CloudRegion{
+		Cloud: cloud,
+	}
+	if err := j.DB.GetCloudRegion(ctx, &cr); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	if err := auth.CheckACL(ctx, id, cr.ACL.Admin); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
@@ -184,8 +186,10 @@ func (j *JEM) RemoveCloud(ctx context.Context, id identchecker.ACLIdentity, clou
 
 // GrantCloud grants access to the given cloud at the given access level to the given user.
 func (j *JEM) GrantCloud(ctx context.Context, id identchecker.ACLIdentity, cloud params.Cloud, user params.User, access string) error {
-	cr, err := j.DB.CloudRegion(ctx, cloud, "")
-	if err != nil {
+	cr := mongodoc.CloudRegion{
+		Cloud: cloud,
+	}
+	if err := j.DB.GetCloudRegion(ctx, &cr); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	if err := auth.CheckACL(ctx, id, cr.ACL.Admin); err != nil {
@@ -214,8 +218,10 @@ func (j *JEM) GrantCloud(ctx context.Context, id identchecker.ACLIdentity, cloud
 
 // RevokeCloud revokes access to the given cloud at the given access level from the given user.
 func (j *JEM) RevokeCloud(ctx context.Context, id identchecker.ACLIdentity, cloud params.Cloud, user params.User, access string) error {
-	cr, err := j.DB.CloudRegion(ctx, cloud, "")
-	if err != nil {
+	cr := mongodoc.CloudRegion{
+		Cloud: cloud,
+	}
+	if err := j.DB.GetCloudRegion(ctx, &cr); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	if err := auth.CheckACL(ctx, id, cr.ACL.Admin); err != nil {

@@ -931,7 +931,7 @@ var createModelTests = []struct {
 	region:        "no-such-region",
 	cloudTag:      names.NewCloudTag("dummy").String(),
 	credentialTag: "",
-	expectError:   `cloud "dummy" region "no-such-region" not found \(not found\)`,
+	expectError:   `cloudregion not found \(not found\)`,
 }, {
 	about:         "local user",
 	name:          "model-4",
