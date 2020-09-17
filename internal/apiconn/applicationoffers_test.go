@@ -663,7 +663,7 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 	info.Offer = &jujuparams.ApplicationOfferDetails{
 		OfferURL: "test-user@external/test-model.test-offer",
 	}
-	err = s.conn.GetApplicationOfferConsumeDetails(ctx, &info, bakery.Version2)
+	err = s.conn.GetApplicationOfferConsumeDetails(ctx, params.User("test-user"), &info, bakery.Version2)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(info.Offer.OfferUUID, gc.Not(gc.Equals), "")
 	info.Offer.OfferUUID = ""
@@ -682,6 +682,9 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 				Limit:     0,
 			}},
 			Users: []jujuparams.OfferUserDetails{{
+				UserName: "test-user@external",
+				Access:   "admin",
+			}, {
 				UserName:    "admin",
 				DisplayName: "admin",
 				Access:      "admin",
@@ -704,6 +707,6 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetailsNotFound(c
 	info.Offer = &jujuparams.ApplicationOfferDetails{
 		OfferURL: "test-user@external/test-model.test-offer",
 	}
-	err := s.conn.GetApplicationOfferConsumeDetails(context.Background(), &info, bakery.Version2)
+	err := s.conn.GetApplicationOfferConsumeDetails(context.Background(), params.User("test-user"), &info, bakery.Version2)
 	c.Check(err, gc.ErrorMatches, `api error: application offer "test-user@external/test-model.test-offer" not found`)
 }

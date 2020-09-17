@@ -123,7 +123,7 @@ func (j *JEM) GetApplicationOfferConsumeDetails(ctx context.Context, id identche
 	}
 	defer conn.Close()
 
-	if err := conn.GetApplicationOfferConsumeDetails(ctx, details, v); err != nil {
+	if err := conn.GetApplicationOfferConsumeDetails(ctx, uid, details, v); err != nil {
 		return errgo.Mask(err, apiconn.IsAPIError)
 	}
 	// Fix the consume details from the controller to be correct for JAAS.
