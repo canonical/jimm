@@ -88,7 +88,7 @@ func (j *JEM) Offer(ctx context.Context, id identchecker.ACLIdentity, offer juju
 // GetApplicationOfferConsumeDetails consume the application offer
 // specified by details.ApplicationOfferDetails.OfferURL and completes
 // the rest of the details.
-func (j *JEM) GetApplicationOfferConsumeDetails(ctx context.Context, id identchecker.ACLIdentity, details *jujuparams.ConsumeOfferDetails, v bakery.Version) error {
+func (j *JEM) GetApplicationOfferConsumeDetails(ctx context.Context, id identchecker.ACLIdentity, user params.User, details *jujuparams.ConsumeOfferDetails, v bakery.Version) error {
 	offer := mongodoc.ApplicationOffer{
 		OfferURL: details.Offer.OfferURL,
 	}
@@ -123,9 +123,17 @@ func (j *JEM) GetApplicationOfferConsumeDetails(ctx context.Context, id identche
 	}
 	defer conn.Close()
 
-	if err := conn.GetApplicationOfferConsumeDetails(ctx, uid, details, v); err != nil {
+	asUser := uid
+	if user != "" {
+		if err := auth.CheckIsUser(ctx, id, j.ControllerAdmin()); err != nil {
+			return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+		}
+		asUser = user
+	}
+	if err := conn.GetApplicationOfferConsumeDetails(ctx, asUser, details, v); err != nil {
 		return errgo.Mask(err, apiconn.IsAPIError)
 	}
+
 	// Fix the consume details from the controller to be correct for JAAS.
 	// Filter out any juju local users.
 	details.Offer.Users = filterApplicationOfferUsers(uid, access, details.Offer.Users)
