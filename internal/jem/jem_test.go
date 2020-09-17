@@ -1522,29 +1522,11 @@ func addController(c *gc.C, path params.EntityPath, info *jujuapi.Info, jem *jem
 		CACert:        info.CACert,
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
-		Location: map[string]string{
-			"cloud":  "dummy",
-			"region": "dummy-region",
-		},
-		Public: true,
+		Public:        true,
 	}
-	err = jem.DB.AddController(testContext, ctl)
+	err = jem.AddController(testContext, jemtest.NewIdentity(string(path.User), string(jem.ControllerAdmin())), ctl)
 	c.Assert(err, gc.Equals, nil)
-	err = jem.DB.UpdateCloudRegions(testContext, []mongodoc.CloudRegion{{
-		Cloud:              "dummy",
-		PrimaryControllers: []params.EntityPath{path},
-		ACL: params.ACL{
-			Read: []string{"everyone"},
-		},
-	}, {
-		Cloud:              "dummy",
-		Region:             "dummy-region",
-		PrimaryControllers: []params.EntityPath{path},
-		ACL: params.ACL{
-			Read: []string{"everyone"},
-		},
-	}})
-	c.Assert(err, gc.Equals, nil)
+
 	return path
 }
 

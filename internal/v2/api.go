@@ -7,12 +7,9 @@ import (
 	"time"
 
 	"github.com/juju/aclstore"
-	cloudapi "github.com/juju/juju/api/cloud"
 	controllerapi "github.com/juju/juju/api/controller"
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
-	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/network"
-	"github.com/juju/names/v4"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/errgo.v1"
@@ -21,7 +18,6 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemerror"
@@ -108,22 +104,6 @@ func (h *Handler) WhoAmI(p httprequest.Params, arg *params.WhoAmI) (params.WhoAm
 
 // AddController adds a new controller.
 func (h *Handler) AddController(p httprequest.Params, arg *params.AddController) error {
-	if err := auth.CheckIsUser(p.Context, h.id, arg.User); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	if !arg.Info.Public {
-		return errgo.WithCausef(nil, params.ErrForbidden, "cannot add private controller")
-	}
-	if err := auth.CheckIsUser(p.Context, h.id, h.jem.ControllerAdmin()); err != nil {
-		if errgo.Cause(err) == params.ErrUnauthorized {
-			return errgo.WithCausef(nil, params.ErrUnauthorized, "admin access required to add public controllers")
-		}
-		return errgo.Mask(err)
-	}
-	if len(arg.Info.HostPorts) == 0 {
-		return badRequestf(nil, "no host-ports in request")
-	}
-
 	hps, err := mongodoc.ParseAddresses(arg.Info.HostPorts)
 	if err != nil {
 		return errgo.WithCausef(err, params.ErrBadRequest, "")
@@ -138,15 +118,10 @@ func (h *Handler) AddController(p httprequest.Params, arg *params.AddController)
 			hps[i].Scope = string(network.ScopePublic)
 		}
 	}
-
 	if arg.Info.User == "" {
-		return badRequestf(nil, "no user in request")
+		return errgo.WithCausef(nil, params.ErrBadRequest, "no user in request")
 	}
-	if !names.IsValidModel(arg.Info.ControllerUUID) {
-		return badRequestf(nil, "bad model UUID in request")
-	}
-
-	ctl := &mongodoc.Controller{
+	ctl := mongodoc.Controller{
 		Path:          arg.EntityPath,
 		CACert:        arg.Info.CACert,
 		HostPorts:     [][]mongodoc.HostPort{hps},
@@ -155,141 +130,18 @@ func (h *Handler) AddController(p httprequest.Params, arg *params.AddController)
 		UUID:          arg.Info.ControllerUUID,
 		Public:        arg.Info.Public,
 	}
-	zapctx.Debug(p.Context, "dialling controller")
-	// Attempt to connect to the controller before accepting it.
-	conn, err := h.jem.OpenAPIFromDoc(p.Context, ctl)
-	if err != nil {
-		zapctx.Info(p.Context, "cannot open API", zaputil.Error(err))
-		return badRequestf(err, "cannot connect to controller")
+	err = h.jem.AddController(p.Context, h.id, &ctl)
+	switch errgo.Cause(err) {
+	case jem.ErrAPIConnection:
+		return errgo.WithCausef(err, params.ErrBadRequest, "")
+	default:
+		return errgo.Mask(
+			err,
+			errgo.Is(params.ErrAlreadyExists),
+			errgo.Is(params.ErrForbidden),
+			errgo.Is(params.ErrUnauthorized),
+		)
 	}
-	defer conn.Close()
-	ctl.UUID = conn.ControllerTag().Id()
-	if v, ok := conn.ServerVersion(); ok {
-		ctl.Version = &v
-	}
-	// Find out where the controller model is.
-	mi, err := controllerModelInfo(conn, arg.Info.User)
-	if err != nil {
-		return badRequestf(err, "cannot get controller model details")
-	}
-	cloud, err := names.ParseCloudTag(mi.CloudTag)
-	if err != nil {
-		return badRequestf(err, "bad data from controller")
-	}
-	location := map[string]string{
-		"cloud": cloud.Id(),
-	}
-	if mi.CloudRegion != "" {
-		location["region"] = mi.CloudRegion
-	}
-	ctl.Location = location
-
-	// Find out the cloud information.
-	clouds, err := cloudapi.NewClient(conn).Clouds()
-	if err != nil {
-		return errgo.Notef(err, "cannot get clouds")
-	}
-
-	var cloudRegions []mongodoc.CloudRegion
-	for k, v := range clouds {
-		cr := mongodoc.CloudRegion{
-			Cloud:              params.Cloud(k.Id()),
-			Endpoint:           v.Endpoint,
-			IdentityEndpoint:   v.IdentityEndpoint,
-			StorageEndpoint:    v.StorageEndpoint,
-			ProviderType:       v.Type,
-			CACertificates:     v.CACertificates,
-			PrimaryControllers: []params.EntityPath{ctl.Path},
-			ACL: params.ACL{
-				Read: []string{"everyone"},
-			},
-		}
-		for _, at := range v.AuthTypes {
-			cr.AuthTypes = append(cr.AuthTypes, string(at))
-		}
-		cloudRegions = append(cloudRegions, cr)
-		for _, reg := range v.Regions {
-			cr := mongodoc.CloudRegion{
-				Cloud:            params.Cloud(k.Id()),
-				Region:           reg.Name,
-				Endpoint:         reg.Endpoint,
-				IdentityEndpoint: reg.IdentityEndpoint,
-				StorageEndpoint:  reg.StorageEndpoint,
-				ACL: params.ACL{
-					Read: []string{"everyone"},
-				},
-			}
-			if ctl.Location["cloud"] == k.Id() && ctl.Location["region"] == reg.Name {
-				cr.PrimaryControllers = []params.EntityPath{ctl.Path}
-			} else {
-				cr.SecondaryControllers = []params.EntityPath{ctl.Path}
-			}
-			cloudRegions = append(cloudRegions, cr)
-		}
-	}
-
-	// Update addresses from latest known in controller. Note that
-	// conn.APIHostPorts is always guaranteed to include the actual
-	// address we succeeded in connecting to.
-	ctl.HostPorts = mongodocAPIHostPorts(conn.APIHostPorts())
-
-	if err := h.jem.DB.AddController(p.Context, ctl); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
-	}
-	if err := h.jem.DB.UpdateCloudRegions(p.Context, cloudRegions); err != nil {
-		return errgo.Mask(err)
-	}
-	return nil
-}
-
-// controllerModelInfo returns the model info for the controller model.
-func controllerModelInfo(conn *apiconn.Conn, user string) (*jujuparams.ModelInfo, error) {
-	client := modelmanagerapi.NewClient(conn)
-	models, err := client.ListModels(user)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	for _, m := range models {
-		if m.Name != "controller" {
-			continue
-		}
-		mir, err := client.ModelInfo([]names.ModelTag{names.NewModelTag(m.UUID)})
-		if err != nil {
-			return nil, errgo.Mask(err)
-		}
-		if mir[0].Error != nil {
-			return nil, errgo.Mask(mir[0].Error)
-		}
-		return mir[0].Result, nil
-	}
-	return nil, errgo.New("controller model not found")
-}
-
-// mongodocAPIHostPorts returns the given API addresses prepared
-// for storage in the database.
-//
-// It removes unusable addresses and marks any scope-unknown
-// addresses as public so that the clients using only public-scoped
-// addresses will use them.
-func mongodocAPIHostPorts(nmhpss []network.MachineHostPorts) [][]mongodoc.HostPort {
-	hpss := make([][]mongodoc.HostPort, 0, len(nmhpss))
-	for _, nmhps := range nmhpss {
-		nhps := nmhps.HostPorts().FilterUnusable()
-		if len(nhps) == 0 {
-			continue
-		}
-		hps := make([]mongodoc.HostPort, len(nhps))
-		for i, nhp := range nhps {
-			hps[i].SetJujuHostPort(nhp)
-			if hps[i].Scope == string(network.ScopeUnknown) {
-				// This is needed because network.NewHostPort returns
-				// scope unknown for DNS names.
-				hps[i].Scope = string(network.ScopePublic)
-			}
-		}
-		hpss = append(hpss, hps)
-	}
-	return hpss
 }
 
 // GetController returns information on a controller.

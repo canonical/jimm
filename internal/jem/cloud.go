@@ -14,7 +14,6 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
-	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
@@ -52,14 +51,15 @@ func (j *JEM) AddCloud(ctx context.Context, id identchecker.ACLIdentity, name pa
 	}
 
 	// Create a placeholder cloud to reserve the cloud name.
+	acl := params.ACL{
+		Read:  []string{id.Id()},
+		Write: []string{id.Id()},
+		Admin: []string{id.Id()},
+	}
 	cloudDoc := mongodoc.CloudRegion{
 		Cloud:        name,
 		ProviderType: cloud.Type,
-		ACL: params.ACL{
-			Read:  []string{id.Id()},
-			Write: []string{id.Id()},
-			Admin: []string{id.Id()},
-		},
+		ACL:          acl,
 	}
 
 	// Attempt to insert the document for the cloud and fail early if
@@ -98,20 +98,12 @@ func (j *JEM) AddCloud(ctx context.Context, id identchecker.ACLIdentity, name pa
 		return errgo.Mask(err)
 	}
 
-	regions := conv.FromCloud(name, cloud)
-	for i := range regions {
-		regions[i].PrimaryControllers = []params.EntityPath{ctlPath}
-		regions[i].ACL = params.ACL{
-			Read:  []string{id.Id()},
-			Write: []string{id.Id()},
-			Admin: []string{id.Id()},
-		}
-	}
-	if err := j.DB.UpdateCloudRegions(ctx, regions); err != nil {
+	if err := j.updateControllerCloud(ctx, ctlPath, name, cloud, nil, acl); err != nil {
 		return errgo.Mask(err)
 	}
+
 	j.DB.AppendAudit(ctx, &params.AuditCloudCreated{
-		ID:    regions[0].Id,
+		ID:    string(name) + "/",
 		Cloud: string(name),
 	})
 	return nil
