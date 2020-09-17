@@ -158,6 +158,15 @@ func (s jemShimWithUpdateNotify) AcquireMonitorLease(ctx context.Context, ctlPat
 	return t, err
 }
 
+func (s jemShimWithUpdateNotify) UpdateApplicationOffer(ctx context.Context, offerUUID string, removed bool) error {
+	err := s.jemInterface.UpdateApplicationOffer(ctx, offerUUID, removed)
+	if err != nil {
+		return err
+	}
+	s.changed <- "application offer"
+	return nil
+}
+
 type jemShimWithAPIOpener struct {
 	// openAPI is called when the OpenAPI method is called.
 	openAPI func(path params.EntityPath) (jujuAPI, error)
@@ -208,6 +217,7 @@ type jemShimInMemory struct {
 	applications                map[string]map[applicationId]*mongodoc.Application
 	controllerUpdateCredentials map[params.EntityPath]bool
 	cloudRegions                map[string]*mongodoc.CloudRegion
+	applicationOffers           map[string]bool
 }
 
 var _ jemInterface = (*jemShimInMemory)(nil)
@@ -220,6 +230,7 @@ func newJEMShimInMemory() *jemShimInMemory {
 		machines:                    make(map[string]map[machineId]*mongodoc.Machine),
 		applications:                make(map[string]map[applicationId]*mongodoc.Application),
 		cloudRegions:                make(map[string]*mongodoc.CloudRegion),
+		applicationOffers:           make(map[string]bool),
 	}
 }
 
@@ -474,6 +485,18 @@ func (j jemShimInMemory) WatchAllModelSummaries(ctx context.Context, ctlPath par
 	return func() error { return nil }, nil
 }
 
+func (j jemShimInMemory) UpdateApplicationOffer(ctx context.Context, offerUUID string, removed bool) error {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+
+	if removed {
+		delete(j.applicationOffers, offerUUID)
+	} else {
+		j.applicationOffers[offerUUID] = true
+	}
+	return nil
+}
+
 type jemShimWithoutModelSummaryWatcher struct {
 	jemInterface
 }
@@ -608,5 +631,27 @@ func (s *watcherShim) Stop() error {
 	s.jujuAPIShim.shims.mu.Lock()
 	s.jujuAPIShim.shims.watcherCount--
 	s.jujuAPIShim.shims.mu.Unlock()
+	return nil
+}
+
+func newUpdateOfferShim(jem jemInterface, notify func()) updateOfferShim {
+	return updateOfferShim{
+		jemInterface: jem,
+		notify:       notify,
+	}
+}
+
+type updateOfferShim struct {
+	jemInterface
+
+	notify func()
+}
+
+func (s updateOfferShim) UpdateApplicationOffer(ctx context.Context, offerUUID string, removed bool) error {
+	err := s.jemInterface.UpdateApplicationOffer(ctx, offerUUID, removed)
+	if err != nil {
+		return err
+	}
+	s.notify()
 	return nil
 }

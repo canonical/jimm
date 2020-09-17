@@ -7,6 +7,7 @@ import (
 
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/params"
@@ -161,9 +162,10 @@ func (c *Conn) DestroyApplicationOffer(ctx context.Context, offer string, force 
 // must include an Offer.OfferURL and the rest of the structure will be
 // filled in by the API call. GetApplicationOfferConsumeDetails uses the
 // GetConsumeDetails procedure on the ApplicationOffers facade version 2.
-func (c *Conn) GetApplicationOfferConsumeDetails(ctx context.Context, info *jujuparams.ConsumeOfferDetails) error {
+func (c *Conn) GetApplicationOfferConsumeDetails(ctx context.Context, info *jujuparams.ConsumeOfferDetails, v bakery.Version) error {
 	args := jujuparams.OfferURLs{
-		OfferURLs: []string{info.Offer.OfferURL},
+		OfferURLs:     []string{info.Offer.OfferURL},
+		BakeryVersion: v,
 	}
 
 	var resp jujuparams.ConsumeOfferDetailsResults

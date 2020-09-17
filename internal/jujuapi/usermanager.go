@@ -12,6 +12,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
 	"github.com/CanonicalLtd/jimm/params"
 )
@@ -78,9 +79,9 @@ func (r *controllerRoot) userInfo(ctx context.Context, entity string) (*jujupara
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid user tag")
 	}
-	user, err := user(userTag)
+	user, err := conv.FromUserTag(userTag)
 	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
+		return nil, errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
 	}
 	if r.identity.Id() != string(user) {
 		return nil, params.ErrUnauthorized

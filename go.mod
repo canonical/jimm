@@ -7,6 +7,7 @@ require (
 	github.com/canonical/candid v1.4.2
 	github.com/flosch/pongo2 v0.0.0-20180809100617-24195e6d38b0 // indirect
 	github.com/frankban/quicktest v1.10.0
+	github.com/golang/mock v1.4.4 // indirect
 	github.com/google/go-cmp v0.5.1
 	github.com/gopherjs/gopherjs v0.0.0-20181103185306-d547d1d9531e // indirect
 	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
@@ -19,12 +20,13 @@ require (
 	github.com/joyent/gosdc v0.0.0-20161202192312-ec8b3503a75e // indirect
 	github.com/joyent/gosign v0.0.0-20161114191744-9abcee278795 // indirect
 	github.com/juju/aclstore v0.0.0-20180706073322-7fc1cdaacf01
+	github.com/juju/charm/v8 v8.0.0-20200909140628-b1139b81a49c
 	github.com/juju/clock v0.0.0-20190205081909-9c5c9712527c
 	github.com/juju/cmd v0.0.0-20200108104440-8e43f3faa5c9
 	github.com/juju/errors v0.0.0-20200330140219-3fe23663418f
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
 	github.com/juju/httprequest v1.0.1
-	github.com/juju/juju v0.0.0-20200907071117-a5e6e716f158
+	github.com/juju/juju v0.0.0-20200916132042-eee14dba5b32
 	github.com/juju/loggo v0.0.0-20200526014432-9ce3a2e09b5e
 	github.com/juju/lru v0.0.0-20190314140547-92a0afabdc41 // indirect
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
@@ -53,7 +55,7 @@ require (
 	go.uber.org/zap v1.10.0
 	golang.org/x/crypto v0.0.0-20200728195943-123391ffb6de
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
-	gopkg.in/amz.v3 v3.0.0-20200811022415-7b63e5e39741 // indirect
+	golang.org/x/tools v0.0.0-20200916140129-56d9a0cd3487 // indirect
 	gopkg.in/check.v1 v1.0.0-20200902074654-038fdea0a05b
 	gopkg.in/errgo.v1 v1.0.1
 	gopkg.in/httprequest.v1 v1.2.1
