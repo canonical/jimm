@@ -929,52 +929,6 @@ func (j *JEM) checkCredentialOnController(ctx context.Context, ctlPath params.En
 	return models, errgo.Mask(err, apiconn.IsAPIError)
 }
 
-// ControllerUpdateCredentials updates the given controller by updating
-// all outstanding UpdateCredentials.
-func (j *JEM) ControllerUpdateCredentials(ctx context.Context, ctlPath params.EntityPath) error {
-	ctl, err := j.DB.Controller(ctx, ctlPath)
-	if err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-	conn, err := j.OpenAPIFromDoc(ctx, ctl)
-	if err != nil {
-		return errgo.Notef(err, "cannot connect to controller")
-	}
-	defer conn.Close()
-	for _, credPath := range ctl.UpdateCredentials {
-		cred, err := j.DB.Credential(ctx, credPath)
-		if err != nil {
-			zapctx.Warn(ctx,
-				"cannot get credential for controller",
-				zap.Stringer("cred", credPath),
-				zap.Stringer("controller", ctl.Path),
-				zaputil.Error(err),
-			)
-			continue
-		}
-		if cred.Revoked {
-			if err := j.revokeControllerCredential(ctx, conn, ctl.Path, cred.Path.ToParams()); err != nil {
-				zapctx.Warn(ctx,
-					"cannot revoke credential",
-					zap.Stringer("cred", credPath),
-					zap.Stringer("controller", ctl.Path),
-					zaputil.Error(err),
-				)
-			}
-		} else {
-			if _, err := j.updateControllerCredential(ctx, conn, ctl.Path, cred); err != nil {
-				zapctx.Warn(ctx,
-					"cannot update credential",
-					zap.Stringer("cred", credPath),
-					zap.Stringer("controller", ctl.Path),
-					zaputil.Error(err),
-				)
-			}
-		}
-	}
-	return nil
-}
-
 // updateControllerCredential updates the given credential (which must
 // not be revoked) on the given controller.
 // If rp is non-nil, it will be updated with information

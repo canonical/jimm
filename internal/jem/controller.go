@@ -8,6 +8,7 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/network"
 	"github.com/juju/names/v4"
+	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
@@ -15,6 +16,8 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/internal/zaputil"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -149,4 +152,77 @@ func (j *JEM) updateControllerCloud(
 		regions[i].ACL = acl
 	}
 	return errgo.Mask(j.DB.UpdateCloudRegions(ctx, regions))
+}
+
+// ConnectMonitor creates a connection to the given controller for use by
+// monitors. On a successful connection the cloud information will be read
+// from the controller and the local database updated, also any outstanding
+// changes that are scheduled to be made on the controller will be
+// performed. If the specified controlled cannot be found then an error
+// with a cause of params.ErrNotFound will be returned. If there is an
+// error connecting to the controller then an error with a cause of
+// ErrAPIConnection will be returned.
+func (j *JEM) ConnectMonitor(ctx context.Context, path params.EntityPath) (*apiconn.Conn, error) {
+	ctl, err := j.DB.Controller(ctx, path)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+
+	conn, err := j.OpenAPIFromDoc(ctx, ctl)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(ErrAPIConnection))
+	}
+
+	if v, ok := conn.ServerVersion(); ok {
+		if err := j.DB.SetControllerVersion(ctx, path, v); err != nil {
+			zapctx.Warn(ctx, "cannot update controller version", zap.Error(err))
+		}
+	}
+
+	if err := j.updateControllerClouds(ctx, conn, ctl); err != nil {
+		zapctx.Warn(ctx, "cannot update controller clouds", zap.Error(err))
+	}
+
+	if err := j.controllerUpdateCredentials(ctx, conn, ctl); err != nil {
+		zapctx.Warn(ctx, "cannot update credentials on controller", zap.Error(err))
+	}
+
+	return conn, nil
+}
+
+// controllerUpdateCredentials updates the given controller by updating
+// all outstanding UpdateCredentials.
+func (j *JEM) controllerUpdateCredentials(ctx context.Context, conn *apiconn.Conn, ctl *mongodoc.Controller) error {
+	for _, credPath := range ctl.UpdateCredentials {
+		cred, err := j.DB.Credential(ctx, credPath)
+		if err != nil {
+			zapctx.Warn(ctx,
+				"cannot get credential for controller",
+				zap.Stringer("cred", credPath),
+				zap.Stringer("controller", ctl.Path),
+				zaputil.Error(err),
+			)
+			continue
+		}
+		if cred.Revoked {
+			if err := j.revokeControllerCredential(ctx, conn, ctl.Path, cred.Path.ToParams()); err != nil {
+				zapctx.Warn(ctx,
+					"cannot revoke credential",
+					zap.Stringer("cred", credPath),
+					zap.Stringer("controller", ctl.Path),
+					zaputil.Error(err),
+				)
+			}
+		} else {
+			if _, err := j.updateControllerCredential(ctx, conn, ctl.Path, cred); err != nil {
+				zapctx.Warn(ctx,
+					"cannot update credential",
+					zap.Stringer("cred", credPath),
+					zap.Stringer("controller", ctl.Path),
+					zaputil.Error(err),
+				)
+			}
+		}
+	}
+	return nil
 }

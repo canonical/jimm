@@ -875,41 +875,6 @@ func (s *jemSuite) TestUpdateCredential(c *gc.C) {
 	}})
 }
 
-func (s *jemSuite) TestControllerUpdateCredentials(c *gc.C) {
-	ctlPath := s.addController(c, params.EntityPath{User: "bob", Name: "controller"})
-	credPath := credentialPath("dummy", "bob", "cred")
-	mCredPath := mgoCredentialPath("dummy", "bob", "cred")
-	credTag := names.NewCloudCredentialTag("dummy/bob@external/cred")
-	cred := &mongodoc.Credential{
-		Path: mCredPath,
-		Type: "empty",
-	}
-	err := jem.UpdateCredential(s.jem.DB, testContext, cred)
-	c.Assert(err, gc.Equals, nil)
-
-	err = jem.SetCredentialUpdates(s.jem.DB, testContext, []params.EntityPath{ctlPath}, mongodoc.CredentialPathFromParams(credPath))
-	c.Assert(err, gc.Equals, nil)
-
-	err = s.jem.ControllerUpdateCredentials(testContext, ctlPath)
-	c.Assert(err, gc.Equals, nil)
-
-	// check it was updated on the controller.
-	conn, err := s.jem.OpenAPI(testContext, ctlPath)
-	c.Assert(err, gc.Equals, nil)
-	defer conn.Close()
-
-	client := cloudapi.NewClient(conn)
-	creds, err := client.Credentials(credTag)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
-		Result: &jujuparams.CloudCredential{
-			AuthType:   "empty",
-			Attributes: nil,
-			Redacted:   nil,
-		},
-	}})
-}
-
 func (s *jemSuite) TestDoControllers(c *gc.C) {
 	var testControllers = []mongodoc.Controller{{
 		Path: params.EntityPath{

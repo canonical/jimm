@@ -5,14 +5,19 @@ package jem_test
 import (
 	"context"
 
+	cloudapi "github.com/juju/juju/api/cloud"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/network"
+	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
+	"github.com/juju/version"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
+	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
@@ -188,4 +193,127 @@ func (s *controllerSuite) TestAddController(c *gc.C) {
 			c.Check(err, gc.Equals, nil)
 		}
 	}
+}
+
+func (s *controllerSuite) TestControllerUpdateCredentials(c *gc.C) {
+	ctlPath := addController(c, params.EntityPath{User: "bob", Name: "controller"}, s.APIInfo(c), s.jem)
+	credPath := credentialPath("dummy", "bob", "cred")
+	mCredPath := mgoCredentialPath("dummy", "bob", "cred")
+	credTag := names.NewCloudCredentialTag("dummy/bob@external/cred")
+	cred := &mongodoc.Credential{
+		Path: mCredPath,
+		Type: "empty",
+	}
+	err := jem.UpdateCredential(s.jem.DB, testContext, cred)
+	c.Assert(err, gc.Equals, nil)
+
+	err = jem.SetCredentialUpdates(s.jem.DB, testContext, []params.EntityPath{ctlPath}, mongodoc.CredentialPathFromParams(credPath))
+	c.Assert(err, gc.Equals, nil)
+
+	ctl, err := s.jem.DB.Controller(testContext, ctlPath)
+	c.Assert(err, gc.Equals, nil)
+
+	conn, err := s.jem.OpenAPIFromDoc(testContext, ctl)
+	c.Assert(err, gc.Equals, nil)
+	defer conn.Close()
+
+	err = jem.ControllerUpdateCredentials(s.jem, testContext, conn, ctl)
+	c.Assert(err, gc.Equals, nil)
+
+	// check it was updated on the controller.
+	client := cloudapi.NewClient(conn)
+	creds, err := client.Credentials(credTag)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
+		Result: &jujuparams.CloudCredential{
+			AuthType:   "empty",
+			Attributes: nil,
+			Redacted:   nil,
+		},
+	}})
+}
+
+func (s *controllerSuite) TestConnectMonitor(c *gc.C) {
+	ctlPath := addController(c, params.EntityPath{User: "bob", Name: "controller"}, s.APIInfo(c), s.jem)
+
+	// create a credential.
+	credPath := credentialPath("dummy", "bob", "cred")
+	mCredPath := mgoCredentialPath("dummy", "bob", "cred")
+	credTag := names.NewCloudCredentialTag("dummy/bob@external/cred")
+	cred := &mongodoc.Credential{
+		Path: mCredPath,
+		Type: "empty",
+	}
+	err := jem.UpdateCredential(s.jem.DB, testContext, cred)
+	c.Assert(err, gc.Equals, nil)
+	err = jem.SetCredentialUpdates(s.jem.DB, testContext, []params.EntityPath{ctlPath}, mongodoc.CredentialPathFromParams(credPath))
+	c.Assert(err, gc.Equals, nil)
+
+	// Remove the controller from known clouds.
+	_, err = s.jem.DB.CloudRegions().UpdateAll(
+		bson.D{{"cloud", "dummy"}},
+		bson.D{
+			{"$pull", bson.D{{"primarycontrollers", ctlPath}}},
+			{"$pull", bson.D{{"secondarycontrollers", ctlPath}}},
+		},
+	)
+	c.Assert(err, gc.Equals, nil)
+	cr, err := s.jem.DB.CloudRegion(testContext, "dummy", "")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(cr.PrimaryControllers, gc.HasLen, 0)
+
+	// Set the version obviously wrong.
+	err = s.jem.DB.SetControllerVersion(testContext, ctlPath, version.Zero)
+	c.Assert(err, gc.Equals, nil)
+
+	conn, err := s.jem.ConnectMonitor(testContext, ctlPath)
+	c.Assert(err, gc.Equals, nil)
+
+	v, ok := conn.ServerVersion()
+	c.Assert(ok, gc.Equals, true)
+
+	// check the credential has been updated.
+	client := cloudapi.NewClient(conn)
+	creds, err := client.Credentials(credTag)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
+		Result: &jujuparams.CloudCredential{
+			AuthType:   "empty",
+			Attributes: nil,
+			Redacted:   nil,
+		},
+	}})
+
+	err = conn.Close()
+	c.Assert(err, gc.Equals, nil)
+
+	// Check the cloud has been updated.
+	cr, err = s.jem.DB.CloudRegion(testContext, "dummy", "")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(cr.PrimaryControllers, jc.DeepEquals, []params.EntityPath{ctlPath})
+
+	// Check the version has been updated.
+	ctl, err := s.jem.DB.Controller(testContext, ctlPath)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(ctl.Version, jc.DeepEquals, &v)
+}
+
+func (s *controllerSuite) TestConnectMonitorNotFound(c *gc.C) {
+	_, err := s.jem.ConnectMonitor(testContext, params.EntityPath{"not", "there"})
+	c.Check(err, gc.ErrorMatches, `controller "not/there" not found`)
+	c.Check(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}
+
+func (s *controllerSuite) TestConnectMonitorConnectionFailure(c *gc.C) {
+	ctlPath := addController(c, params.EntityPath{User: "bob", Name: "controller"}, s.APIInfo(c), s.jem)
+
+	// Set the password wrong
+	err := s.jem.DB.Controllers().Update(
+		bson.D{{"path", ctlPath}},
+		bson.D{{"$set", bson.D{{"adminpassword", "bad-password"}}}},
+	)
+
+	_, err = s.jem.ConnectMonitor(testContext, ctlPath)
+	c.Check(err, gc.ErrorMatches, `invalid entity name or password \(unauthorized access\)`)
+	c.Check(errgo.Cause(err), gc.Equals, jem.ErrAPIConnection)
 }
