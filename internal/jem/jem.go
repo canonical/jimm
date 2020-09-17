@@ -501,7 +501,15 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrAmbiguousChoice))
 	}
 
-	controllers, err := j.possibleControllers(ctx, auth.IdentityFromContext(ctx), p.ControllerPath, p.Cloud, p.Region)
+	controllers, err := j.possibleControllers(
+		ctx,
+		auth.IdentityFromContext(ctx),
+		p.ControllerPath,
+		&mongodoc.CloudRegion{
+			Cloud:  p.Cloud,
+			Region: p.Region,
+		},
+	)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
@@ -549,7 +557,7 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 
 	var ctlPath params.EntityPath
 	for _, controller := range controllers {
-		err := j.createModelOnController(ctx, controller, modelDoc, cred)
+		err := j.createModelOnController(ctx, auth.IdentityFromContext(ctx), controller, modelDoc, cred)
 		if err == nil {
 			ctlPath = controller
 			break
@@ -596,26 +604,23 @@ func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc
 	return modelDoc, nil
 }
 
-func (j *JEM) possibleControllers(ctx context.Context, id identchecker.ACLIdentity, ctlPath params.EntityPath, cloud params.Cloud, region string) ([]params.EntityPath, error) {
+func (j *JEM) possibleControllers(ctx context.Context, id identchecker.ACLIdentity, ctlPath params.EntityPath, cr *mongodoc.CloudRegion) ([]params.EntityPath, error) {
 	if ctlPath.Name != "" {
 		return []params.EntityPath{ctlPath}, nil
 	}
-	cloudRegion := mongodoc.CloudRegion{
-		Cloud:  cloud,
-		Region: region,
-	}
-	if err := j.DB.GetCloudRegion(ctx, &cloudRegion); err != nil {
+	if err := j.DB.GetCloudRegion(ctx, cr); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	if err := auth.CheckCanRead(ctx, id, &cloudRegion); err != nil {
+	if err := auth.CheckCanRead(ctx, id, cr); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	controllers := cloudRegion.PrimaryControllers
-	if len(controllers) == 0 {
-		controllers = cloudRegion.SecondaryControllers
-	}
-	shuffle(len(controllers), func(i, j int) { controllers[i], controllers[j] = controllers[j], controllers[i] })
-	return controllers, nil
+	shuffle(len(cr.PrimaryControllers), func(i, j int) {
+		cr.PrimaryControllers[i], cr.PrimaryControllers[j] = cr.PrimaryControllers[j], cr.PrimaryControllers[i]
+	})
+	shuffle(len(cr.SecondaryControllers), func(i, j int) {
+		cr.SecondaryControllers[i], cr.SecondaryControllers[j] = cr.SecondaryControllers[j], cr.SecondaryControllers[i]
+	})
+	return append(cr.PrimaryControllers, cr.SecondaryControllers...), nil
 }
 
 // shuffle is used to randomize the order in which possible controllers
@@ -624,13 +629,18 @@ var shuffle func(int, func(int, int)) = rand.Shuffle
 
 const errInvalidModelParams params.ErrorCode = "invalid CreateModel request"
 
-func (j *JEM) createModelOnController(ctx context.Context, ctlPath params.EntityPath, model *mongodoc.Model, cred *mongodoc.Credential) error {
+func (j *JEM) createModelOnController(ctx context.Context, id identchecker.ACLIdentity, ctlPath params.EntityPath, model *mongodoc.Model, cred *mongodoc.Credential) error {
 	ctl, err := j.Controller(ctx, ctlPath)
 	if err != nil {
 		return errgo.Notef(err, "cannot get controller document")
 	}
 	if ctl.Deprecated {
 		return errgo.Notef(err, "controller deprecated")
+	}
+	if !ctl.Public {
+		if err := auth.CheckCanRead(ctx, id, ctl); err != nil {
+			return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+		}
 	}
 	conn, err := j.OpenAPIFromDoc(ctx, ctl)
 	if err != nil {

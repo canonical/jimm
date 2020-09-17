@@ -50,6 +50,15 @@ func (j *JEM) AddCloud(ctx context.Context, id identchecker.ACLIdentity, name pa
 		return errgo.WithCausef(nil, params.ErrAlreadyExists, "cloud %q already exists", name)
 	}
 
+	// Check that the cloud can potentially be hosted.
+	controllers, err := j.possibleControllers(ctx, id, params.EntityPath{}, &mongodoc.CloudRegion{
+		ProviderType: parts[0],
+		Region:       parts[1],
+	})
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+	}
+
 	// Create a placeholder cloud to reserve the cloud name.
 	acl := params.ACL{
 		Read:  []string{id.Id()},
@@ -61,9 +70,8 @@ func (j *JEM) AddCloud(ctx context.Context, id identchecker.ACLIdentity, name pa
 		ProviderType: cloud.Type,
 		ACL:          acl,
 	}
-
-	// Attempt to insert the document for the cloud and fail early if
-	// such a cloud exists.
+	// Attempt to insert the document for the cloud and fail early if such
+	// a cloud exists.
 	if err := j.DB.InsertCloudRegion(ctx, &cloudDoc); err != nil {
 		if errgo.Cause(err) == params.ErrAlreadyExists {
 			return errgo.WithCausef(nil, params.ErrAlreadyExists, "cloud %q already exists", name)
@@ -71,24 +79,54 @@ func (j *JEM) AddCloud(ctx context.Context, id identchecker.ACLIdentity, name pa
 		return errgo.Mask(err)
 	}
 
-	ctlPath, err := j.addCloud(ctx, id, name, cloud, parts[0], parts[1])
-	if err != nil {
+	var ctlPath params.EntityPath
+	var conn *apiconn.Conn
+	var apiError error
+	for _, cp := range controllers {
+		ctx := zapctx.WithFields(ctx, zap.Stringer("controller", cp))
+		ctl, err := j.DB.Controller(ctx, cp)
+		if err != nil {
+			zapctx.Error(ctx, "cannot get controller", zap.Error(err))
+			continue
+		}
+		if ctl.Deprecated {
+			continue
+		}
+		if !ctl.Public {
+			if err := auth.CheckCanRead(ctx, id, ctl); err != nil {
+				zapctx.Error(ctx, "cannot access controller", zap.Error(err))
+				continue
+			}
+		}
+
+		conn, err = j.OpenAPIFromDoc(ctx, ctl)
+		if err != nil {
+			zapctx.Error(ctx, "cannot connect to controller", zap.Error(err))
+			continue
+		}
+		defer conn.Close()
+		if err := conn.AddCloud(ctx, name, cloud); err != nil {
+			zapctx.Error(ctx, "cannot create cloud", zap.Error(err))
+			if apiError == nil {
+				apiError = errgo.Mask(err, apiconn.IsAPIError)
+			}
+			continue
+		}
+		ctlPath = cp
+		break
+	}
+
+	if ctlPath.IsZero() {
 		if dberr := j.DB.RemoveCloudRegion(ctx, name, ""); dberr != nil {
 			zapctx.Warn(ctx, "cannot remove cloud that failed to deploy", zaputil.Error(dberr), zap.String("cloud", string(name)))
 		}
-		return errgo.Mask(err,
-			errgo.Is(params.ErrCloudRegionRequired),
-			errgo.Is(params.ErrNotFound),
-			errgo.Is(params.ErrUnauthorized),
-			apiconn.IsAPIError,
-		)
+		if apiError != nil {
+			return apiError
+		}
+		return errgo.New("cannot create cloud")
 	}
 
 	// Get the new cloud's definition from the controller.
-	conn, err := j.OpenAPI(ctx, ctlPath)
-	if err != nil {
-		return errgo.Mask(err)
-	}
 	if err := conn.Cloud(ctx, name, &cloud); err != nil {
 		return errgo.Mask(err)
 	}
@@ -107,36 +145,6 @@ func (j *JEM) AddCloud(ctx context.Context, id identchecker.ACLIdentity, name pa
 		Cloud: string(name),
 	})
 	return nil
-}
-
-func (j *JEM) addCloud(ctx context.Context, id identchecker.ACLIdentity, name params.Cloud, cloud jujuparams.Cloud, hostCloud string, hostRegion string) (params.EntityPath, error) {
-	ctlPaths, err := j.possibleControllers(ctx, id, params.EntityPath{}, params.Cloud(hostCloud), hostRegion)
-	if err != nil {
-		return params.EntityPath{}, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
-	}
-	errors := make([]error, len(ctlPaths))
-	for i, ctlPath := range ctlPaths {
-		conn, err := j.OpenAPI(ctx, ctlPath)
-		if err != nil {
-			errors[i] = err
-			zapctx.Error(ctx, "cannot connect to controller", zap.Stringer("controller", ctlPath), zaputil.Error(err))
-			continue
-		}
-		defer conn.Close()
-
-		err = conn.AddCloud(ctx, name, cloud)
-		if err == nil {
-			return ctlPath, nil
-		}
-		zapctx.Error(ctx, "cannot create cloud", zap.Stringer("controller", ctlPath), zaputil.Error(err))
-		errors[i] = err
-		continue
-	}
-	if len(errors) > 0 {
-		// TODO(mhilton) perhaps filter errors to find the "best" one.
-		return params.EntityPath{}, errgo.Mask(errors[0], apiconn.IsAPIError)
-	}
-	return params.EntityPath{}, errgo.New("cannot create cloud")
 }
 
 // RemoveCloud removes the given cloud, so long as no models are using it.
@@ -176,6 +184,7 @@ func (j *JEM) RemoveCloud(ctx context.Context, id identchecker.ACLIdentity, clou
 	if err := j.DB.RemoveCloud(ctx, cloud); err != nil {
 		return errgo.Mask(err)
 	}
+
 	j.DB.AppendAudit(ctx, &params.AuditCloudRemoved{
 		ID:     cr.Id,
 		Cloud:  string(cr.Cloud),
