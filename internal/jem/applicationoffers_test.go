@@ -81,7 +81,8 @@ func (s *applicationoffersSuite) SetUpTest(c *gc.C) {
 	err = s.jem.DB.AddController(ctx, &mongodoc.Controller{
 		Path: params.EntityPath{User: "user1", Name: "controller-1"},
 		ACL: params.ACL{
-			Read: []string{"everyone"},
+			Read:  []string{"everyone"},
+			Admin: []string{"user1"},
 		},
 		CACert:        s.caCert,
 		HostPorts:     [][]mongodoc.HostPort{hps},
@@ -158,12 +159,15 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 
 	offerURL := conv.ToOfferURL(s.model.Path, "test-offer")
 
+	err = s.jem.GrantOfferAccess(ctx, s.identity, params.User("user2"), offerURL, jujuparams.OfferConsumeAccess)
+	c.Assert(err, jc.ErrorIsNil)
+
 	d := jujuparams.ConsumeOfferDetails{
 		Offer: &jujuparams.ApplicationOfferDetails{
 			OfferURL: offerURL,
 		},
 	}
-	err = s.jem.GetApplicationOfferConsumeDetails(ctx, s.identity, &d, bakery.Version2)
+	err = s.jem.GetApplicationOfferConsumeDetails(ctx, s.identity, "", &d, bakery.Version2)
 	c.Assert(err, gc.Equals, nil)
 
 	c.Check(d.Macaroon, gc.Not(gc.IsNil))
@@ -187,6 +191,9 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 			}, {
 				UserName: "user1@external",
 				Access:   "admin",
+			}, {
+				UserName: "user2@external",
+				Access:   "consume",
 			}},
 		},
 		ControllerInfo: &jujuparams.ExternalControllerInfo{
@@ -196,6 +203,48 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 			CACert:        s.caCert,
 		},
 	})
+
+	d1 := jujuparams.ConsumeOfferDetails{
+		Offer: &jujuparams.ApplicationOfferDetails{
+			OfferURL: offerURL,
+		},
+	}
+	err = s.jem.GetApplicationOfferConsumeDetails(ctx, s.identity, names.NewUserTag("user2@external").String(), &d1, bakery.Version2)
+	c.Assert(err, gc.Equals, nil)
+	d.Offer.OfferUUID = ""
+	c.Check(d, jc.DeepEquals, jujuparams.ConsumeOfferDetails{
+		Offer: &jujuparams.ApplicationOfferDetails{
+			SourceModelTag:         names.NewModelTag(s.model.UUID).String(),
+			OfferURL:               offerURL,
+			OfferName:              "test-offer",
+			ApplicationDescription: "A pretty popular blog engine",
+			Endpoints: []jujuparams.RemoteEndpoint{{
+				Name:      "url",
+				Role:      charm.RoleProvider,
+				Interface: "http",
+			}},
+			Users: []jujuparams.OfferUserDetails{{
+				UserName: "everyone@external",
+				Access:   "read",
+			}, {
+				UserName: "user1@external",
+				Access:   "admin",
+			}, {
+				UserName: "user2@external",
+				Access:   "consume",
+			}},
+		},
+		ControllerInfo: &jujuparams.ExternalControllerInfo{
+			ControllerTag: names.NewControllerTag(s.ControllerConfig.ControllerUUID()).String(),
+			Alias:         "controller-1",
+			Addrs:         s.addrs,
+			CACert:        s.caCert,
+		},
+	})
+
+	// user2 is not controller admin
+	err = s.jem.GetApplicationOfferConsumeDetails(ctx, jemtest.NewIdentity("user2"), names.NewUserTag("user1@external").String(), &d1, bakery.Version2)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
 }
 
 func (s *applicationoffersSuite) TestListApplicationOffers(c *gc.C) {

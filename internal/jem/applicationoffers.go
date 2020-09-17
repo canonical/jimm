@@ -88,15 +88,44 @@ func (j *JEM) Offer(ctx context.Context, id identchecker.ACLIdentity, offer juju
 // GetApplicationOfferConsumeDetails consume the application offer
 // specified by details.ApplicationOfferDetails.OfferURL and completes
 // the rest of the details.
-func (j *JEM) GetApplicationOfferConsumeDetails(ctx context.Context, id identchecker.ACLIdentity, details *jujuparams.ConsumeOfferDetails, v bakery.Version) error {
+func (j *JEM) GetApplicationOfferConsumeDetails(ctx context.Context, id identchecker.ACLIdentity, userTag string, details *jujuparams.ConsumeOfferDetails, v bakery.Version) error {
 	offer := mongodoc.ApplicationOffer{
 		OfferURL: details.Offer.OfferURL,
 	}
 	if err := j.DB.GetApplicationOffer(ctx, &offer); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
+	// The user has consume access or higher.
+	ctl, err := j.DB.Controller(ctx, offer.ControllerPath)
+	if err != nil {
+		return errgo.Mask(err)
+	}
 
 	uid := params.User(id.Id())
+	if userTag != "" {
+		user, err := names.ParseUserTag(userTag)
+		if err != nil {
+			return errgo.WithCausef(err, params.ErrBadRequest, "")
+		}
+		userID, err := conv.FromUserTag(user)
+		if err != nil {
+			return errgo.WithCausef(err, params.ErrBadRequest, "")
+		}
+		// authenticated user must be controller admin to request
+		// details for another user
+		admin := false
+		for _, u := range ctl.ACL.Admin {
+			if u == string(uid) {
+				admin = true
+				break
+			}
+		}
+		if !admin {
+			return errgo.WithCausef(nil, params.ErrUnauthorized, "")
+		}
+		uid = userID
+	}
+
 	access := getApplicationOfferAccess(uid, &offer)
 	if access < mongodoc.ApplicationOfferConsumeAccess {
 		// If the current user doesn't have access then check if it is
@@ -112,11 +141,7 @@ func (j *JEM) GetApplicationOfferConsumeDetails(ctx context.Context, id identche
 		return errgo.WithCausef(nil, params.ErrUnauthorized, "")
 	default:
 	}
-	// The user has consume access or higher.
-	ctl, err := j.DB.Controller(ctx, offer.ControllerPath)
-	if err != nil {
-		return errgo.Mask(err)
-	}
+
 	conn, err := j.OpenAPIFromDoc(ctx, ctl)
 	if err != nil {
 		return errgo.Mask(err)
