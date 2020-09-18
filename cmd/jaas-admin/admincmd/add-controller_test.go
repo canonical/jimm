@@ -4,7 +4,6 @@ package admincmd_test
 
 import (
 	"context"
-	"fmt"
 
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
@@ -19,65 +18,41 @@ type addControllerSuite struct {
 
 var _ = gc.Suite(&addControllerSuite{})
 
-var addControllerTests = []struct {
-	about          string
-	args           []string
-	expectLocation map[string]string
-	expectPublic   bool
-}{{
-	about:          "simple",
-	args:           []string{},
-	expectLocation: map[string]string{"cloud": "dummy", "region": "dummy-region"},
-	expectPublic:   true,
-}, {
-	about:          "with api endpoint",
-	args:           []string{"--public-address=localhost"},
-	expectLocation: map[string]string{"cloud": "dummy", "region": "dummy-region"},
-	expectPublic:   true,
-}}
-
 func (s *addControllerSuite) TestAddController(c *gc.C) {
 	ctx := context.Background()
 	s.idmSrv.AddUser("bob", "admin")
 	s.idmSrv.SetDefaultUser("bob")
 	client := s.jemClient("bob")
-	for i, test := range addControllerTests {
-		c.Logf("test %d: %s", i, test.about)
-		_, err := client.GetController(ctx, &params.GetController{
-			EntityPath: params.EntityPath{
-				User: "bob",
-				Name: params.Name(fmt.Sprintf("foo-%v", i)),
-			},
-		})
-		c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-		test.args = append(test.args, fmt.Sprintf("bob/foo-%v", i))
-		stdout, stderr, code := run(c, c.MkDir(), "add-controller", test.args...)
-		c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
-		c.Assert(stdout, gc.Equals, "")
-		c.Assert(stderr, gc.Equals, "")
-		ctl, err := client.GetController(ctx, &params.GetController{
-			EntityPath: params.EntityPath{
-				User: "bob",
-				Name: params.Name(fmt.Sprintf("foo-%v", i)),
-			},
-		})
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(ctl.Location, gc.DeepEquals, test.expectLocation)
-		c.Assert(ctl.Public, gc.DeepEquals, test.expectPublic)
-		if test.expectPublic {
-			perm, err := client.GetControllerPerm(ctx, &params.GetControllerPerm{
-				EntityPath: params.EntityPath{
-					User: "bob",
-					Name: params.Name(fmt.Sprintf("foo-%v", i)),
-				},
-			})
-			c.Assert(err, gc.Equals, nil)
-			c.Assert(perm, jc.DeepEquals, params.ACL{
-				Read: []string{"everyone"},
-			})
-		}
-	}
+
+	ctlPath := params.EntityPath{User: "bob", Name: "foo"}
+
+	_, err := client.GetController(ctx, &params.GetController{
+		EntityPath: ctlPath,
+	})
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+	stdout, stderr, code := run(c, c.MkDir(), "add-controller", "bob/foo")
+	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
+	c.Assert(stdout, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, "")
+	ctl, err := client.GetController(ctx, &params.GetController{
+		EntityPath: ctlPath,
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(ctl.Location, gc.DeepEquals, map[string]string{"cloud": "dummy", "region": "dummy-region"})
+	c.Assert(ctl.Public, gc.DeepEquals, true)
+	perm, err := client.GetControllerPerm(ctx, &params.GetControllerPerm{
+		EntityPath: ctlPath,
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(perm, jc.DeepEquals, params.ACL{
+		Read: []string{"everyone"},
+	})
 }
+
+// TODO(mhilton) test adding controllers with a DNS address. The previously
+// existing test only worked because the connection was cached in the
+// preceding test. Changes to the available certificate handling will be
+// required before this can be done.
 
 var addControllerErrorTests = []struct {
 	about        string

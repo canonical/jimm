@@ -12,7 +12,6 @@ import (
 	controllerapi "github.com/juju/juju/api/controller"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/component/all"
-	"github.com/juju/juju/core/network"
 	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
@@ -113,7 +112,7 @@ var unauthorizedTests = []struct {
 	about:  "set deprecated status as non-owner",
 	asUser: "other",
 	method: "PUT",
-	path:   "/v2/controller/bob/open",
+	path:   "/v2/controller/bob/open/deprecated",
 	body:   params.DeprecatedBody{},
 }}
 
@@ -222,7 +221,7 @@ func (s *APISuite) TestAddController(c *gc.C) {
 		expectStatus: http.StatusBadRequest,
 		expectBody: params.Error{
 			Code:    "bad request",
-			Message: "no host-ports in request",
+			Message: "validating info for opening an API connection: missing addresses not valid",
 		},
 	}, {
 		about: "no user",
@@ -239,20 +238,6 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			Message: "no user in request",
 		},
 	}, {
-		about: "no model uuid",
-		body: params.ControllerInfo{
-			HostPorts: info.Addrs,
-			CACert:    info.CACert,
-			User:      info.Tag.Id(),
-			Password:  info.Password,
-			Public:    true,
-		},
-		expectStatus: http.StatusBadRequest,
-		expectBody: params.Error{
-			Code:    "bad request",
-			Message: "bad model UUID in request",
-		},
-	}, {
 		about:    "public but no controller-admin access",
 		username: "bob",
 		authUser: "bob",
@@ -266,10 +251,10 @@ func (s *APISuite) TestAddController(c *gc.C) {
 		expectStatus: http.StatusUnauthorized,
 		expectBody: params.Error{
 			Code:    params.ErrUnauthorized,
-			Message: `admin access required to add public controllers`,
+			Message: `unauthorized`,
 		},
 	}, {
-		about: "cannot connect to environment",
+		about: "cannot connect to controller",
 		body: params.ControllerInfo{
 			HostPorts:      []string{"127.1.2.3:1234"},
 			CACert:         info.CACert,
@@ -284,7 +269,7 @@ func (s *APISuite) TestAddController(c *gc.C) {
 			err := json.Unmarshal(m, &body)
 			c.Assert(err, gc.Equals, nil)
 			c.Assert(body.Code, gc.Equals, params.ErrBadRequest)
-			c.Assert(body.Message, gc.Matches, `cannot connect to controller: unable to connect to API: .*`)
+			c.Assert(body.Message, gc.Matches, `unable to connect to API: .*`)
 		}),
 	}, {
 		about: "controller with additional host address",
@@ -725,7 +710,7 @@ var newModelWithoutExplicitControllerTests = []struct {
 			"secret": "a secret",
 		},
 	},
-	expectError:      `Post http://.*/v2/model/alice: cloud "aws" region "" not found`,
+	expectError:      `Post http://.*/v2/model/alice: cloudregion not found`,
 	expectErrorCause: params.ErrNotFound,
 }, {
 	about: "no matching region",
@@ -744,7 +729,7 @@ var newModelWithoutExplicitControllerTests = []struct {
 			"secret": "a secret",
 		},
 	},
-	expectError:      `Post http://.*/v2/model/alice: cloud "" region "us-east-1" not found`,
+	expectError:      `Post http://.*/v2/model/alice: cloudregion not found`,
 	expectErrorCause: params.ErrNotFound,
 }, {
 	about: "unrecognised location parameter",
@@ -1381,37 +1366,6 @@ func (s *APISuite) TestWhoAmI(c *gc.C) {
 	resp, err := s.NewClient("bob").WhoAmI(ctx, nil)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(resp.User, gc.Equals, "bob")
-}
-
-var mongodocAPIHostPortsTests = []struct {
-	about  string
-	hps    []network.MachineHostPorts
-	expect [][]mongodoc.HostPort
-}{{
-	about:  "one address",
-	hps:    []network.MachineHostPorts{{{MachineAddress: network.MachineAddress{Value: "0.1.2.3", Scope: network.ScopePublic}, NetPort: 1234}}},
-	expect: [][]mongodoc.HostPort{{{Host: "0.1.2.3", Port: 1234, Scope: "public"}}},
-}, {
-	about:  "unknown scope changed to public",
-	hps:    []network.MachineHostPorts{{{MachineAddress: network.MachineAddress{Value: "0.1.2.3", Scope: network.ScopeUnknown}, NetPort: 1234}}},
-	expect: [][]mongodoc.HostPort{{{Host: "0.1.2.3", Port: 1234, Scope: "public"}}},
-}, {
-	about: "unusable addresses removed",
-	hps: []network.MachineHostPorts{{
-		{MachineAddress: network.MachineAddress{Value: "0.1.2.3", Scope: network.ScopeMachineLocal}, NetPort: 1234},
-	}, {
-		{MachineAddress: network.MachineAddress{Value: "0.1.2.4", Scope: network.ScopeLinkLocal}, NetPort: 1234},
-		{MachineAddress: network.MachineAddress{Value: "0.1.2.5", Scope: network.ScopePublic}, NetPort: 1234},
-	}},
-	expect: [][]mongodoc.HostPort{{{Host: "0.1.2.5", Port: 1234, Scope: "public"}}},
-}}
-
-func (s *APISuite) TestMongodocAPIHostPorts(c *gc.C) {
-	for i, test := range mongodocAPIHostPortsTests {
-		c.Logf("test %d: %v", i, test.about)
-		got := v2.MongodocAPIHostPorts(test.hps)
-		c.Assert(got, jc.DeepEquals, test.expect)
-	}
 }
 
 func (s *APISuite) TestJujuStatus(c *gc.C) {
