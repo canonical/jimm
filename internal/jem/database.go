@@ -789,19 +789,20 @@ func (db *Database) updateCredential(ctx context.Context, cred *mongodoc.Credent
 	return nil
 }
 
-// Credential gets the specified credential. If the credential cannot be
-// found the returned error will have a cause of params.ErrNotFound.
-func (db *Database) Credential(ctx context.Context, path mongodoc.CredentialPath) (_ *mongodoc.Credential, err error) {
+// GetCredential fills the specified credential. The given credential must
+// specify a path which will be used to lookup the credential. If the
+// credential cannot be found then an error with a cause of
+// params.ErrNotFound is returned.
+func (db *Database) GetCredential(ctx context.Context, cred *mongodoc.Credential) (err error) {
 	defer db.checkError(ctx, &err)
-	var cred mongodoc.Credential
-	err = db.Credentials().FindId(path.String()).One(&cred)
+	err = db.Credentials().FindId(cred.Path.String()).One(&cred)
 	if err == mgo.ErrNotFound {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", path)
+		return errgo.WithCausef(nil, params.ErrNotFound, "credential not found")
 	}
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot get credential %q", path)
+		return errgo.Notef(err, "cannot get credential")
 	}
-	return &cred, nil
+	return nil
 }
 
 // credentialAddController stores the fact that the credential with the

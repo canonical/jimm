@@ -11,9 +11,9 @@ require (
 	github.com/docker/distribution v2.7.0+incompatible // indirect
 	github.com/elazarl/goproxy v0.0.0-20190911111923-ecfe977594f1 // indirect
 	github.com/flosch/pongo2 v0.0.0-20180809100617-24195e6d38b0 // indirect
-	github.com/frankban/quicktest v1.9.0
+	github.com/frankban/quicktest v1.11.0
 	github.com/gogo/protobuf v1.3.1 // indirect
-	github.com/google/go-cmp v0.4.0
+	github.com/google/go-cmp v0.5.2
 	github.com/google/go-querystring v0.0.0-20170111101155-53e6ce116135 // indirect
 	github.com/google/gofuzz v1.1.0 // indirect
 	github.com/gopherjs/gopherjs v0.0.0-20181103185306-d547d1d9531e // indirect
@@ -49,7 +49,6 @@ require (
 	github.com/juju/utils v0.0.0-20200604140309-9d78121a29e0
 	github.com/juju/version v0.0.0-20191219164919-81c1be00b9a6
 	github.com/julienschmidt/httprouter v1.3.0
-	github.com/kr/pretty v0.2.1 // indirect
 	github.com/lestrrat/go-jspointer v0.0.0-20180109105637-d5f7c71bfd03 // indirect
 	github.com/lestrrat/go-jsref v0.0.0-20170215062819-50df7b2d07d7 // indirect
 	github.com/lestrrat/go-jsschema v0.0.0-20161018213530-a6a42341b50d // indirect

@@ -18,15 +18,6 @@ import (
 	vault "github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
-
-	// Include any providers known to support JEM.
-	// Avoid including provider/all to reduce build time.
-	_ "github.com/juju/juju/provider/azure"
-	_ "github.com/juju/juju/provider/ec2"
-	_ "github.com/juju/juju/provider/gce"
-	_ "github.com/juju/juju/provider/lxd"
-	_ "github.com/juju/juju/provider/maas"
-	_ "github.com/juju/juju/provider/openstack"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/mgo.v2"

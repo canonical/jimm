@@ -506,16 +506,19 @@ func (r *controllerRoot) changeModelCredential(ctx context.Context, arg jujupara
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
 	}
-	credPath := params.CredentialPath{
-		Cloud: params.Cloud(credTag.Cloud().Id()),
-		User:  credUser,
-		Name:  params.CredentialName(credTag.Name()),
+	cred := mongodoc.Credential{
+		Path: mongodoc.CredentialPath{
+			Cloud: credTag.Cloud().Id(),
+			EntityPath: mongodoc.EntityPath{
+				User: string(credUser),
+				Name: credTag.Name(),
+			},
+		},
 	}
-	cred, err := r.jem.GetCredential(ctx, r.identity, credPath)
-	if err != nil {
+	if err := r.jem.GetCredential(ctx, r.identity, &cred); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	if err := r.jem.UpdateModelCredential(ctx, conn, model, cred); err != nil {
+	if err := r.jem.UpdateModelCredential(ctx, conn, model, &cred); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil

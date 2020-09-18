@@ -459,6 +459,10 @@ type Credential struct {
 	// AttributesInVault records that the actual credential attributes are
 	// stored in a seperate vault.
 	AttributesInVault bool
+
+	// ProviderType holds the provider type of the cloud that this
+	// credential is for.
+	ProviderType string
 }
 
 // Owner returns the owner of the credentials.

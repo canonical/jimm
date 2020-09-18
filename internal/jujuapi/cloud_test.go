@@ -560,7 +560,10 @@ func (s *cloudSuite) TestCredential(c *gc.C) {
 	cred2 := cloud.NewCredential("empty", nil)
 
 	cred5Tag := names.NewCloudCredentialTag("no-such-cloud/test@external/cred5")
-	cred5 := cloud.NewCredential("empty", nil)
+	cred5 := cloud.NewCredential("userpass", map[string]string{
+		"username": "cloud-user",
+		"password": "cloud-pass",
+	})
 
 	client := cloudapi.NewClient(conn)
 	_, err := client.UpdateCredentialsCheckModels(cred1Tag, cred1)
@@ -595,7 +598,7 @@ func (s *cloudSuite) TestCredential(c *gc.C) {
 		},
 	}, {
 		Error: &jujuparams.Error{
-			Message: `credential "dummy/test/cred3" not found`,
+			Message: `credential not found`,
 			Code:    jujuparams.CodeNotFound,
 		},
 	}, {
@@ -604,9 +607,12 @@ func (s *cloudSuite) TestCredential(c *gc.C) {
 			Code:    jujuparams.CodeUnauthorized,
 		},
 	}, {
-		Error: &jujuparams.Error{
-			Message: `cloud "no-such-cloud" not found`,
-			Code:    jujuparams.CodeNotFound,
+		Result: &jujuparams.CloudCredential{
+			AuthType: "userpass",
+			Redacted: []string{
+				"password",
+				"username",
+			},
 		},
 	}, {
 		Error: &jujuparams.Error{

@@ -405,22 +405,31 @@ func (j *JEM) Controller(ctx context.Context, path params.EntityPath) (*mongodoc
 
 // GetCredential retrieves the given credential from the database,
 // validating that the current user is allowed to read the credential.
-func (j *JEM) GetCredential(ctx context.Context, id identchecker.ACLIdentity, path params.CredentialPath) (*mongodoc.Credential, error) {
-	cred, err := j.DB.Credential(ctx, mongodoc.CredentialPathFromParams(path))
-	if err != nil {
+func (j *JEM) GetCredential(ctx context.Context, id identchecker.ACLIdentity, cred *mongodoc.Credential) error {
+	if err := j.DB.GetCredential(ctx, cred); err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			// We return an authorization error for all attempts to retrieve credentials
 			// from any other user's space.
-			if aerr := auth.CheckIsUser(ctx, id, path.User); aerr != nil {
+			if aerr := auth.CheckIsUser(ctx, id, params.User(cred.Path.User)); aerr != nil {
 				err = aerr
 			}
 		}
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	if err := auth.CheckCanRead(ctx, id, cred); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	return cred, nil
+
+	// ensure we always have a provider-type in the credential.
+	if cred.ProviderType == "" {
+		var err error
+		cred.ProviderType, err = j.DB.ProviderType(ctx, params.Cloud(cred.Path.Cloud))
+		if err != nil {
+			zapctx.Error(ctx, "cannot find provider type for credential", zap.Error(err), zap.Stringer("credential", cred.Path))
+		}
+	}
+
+	return nil
 }
 
 // FillCredentialAttributes ensures that the credential attributes of the
@@ -707,8 +716,10 @@ func (j *JEM) RevokeCredential(ctx context.Context, credPath params.CredentialPa
 	if flags == 0 {
 		flags = ^0
 	}
-	cred, err := j.DB.Credential(ctx, mongodoc.CredentialPathFromParams(credPath))
-	if err != nil {
+	cred := mongodoc.Credential{
+		Path: mongodoc.CredentialPathFromParams(credPath),
+	}
+	if err := j.DB.GetCredential(ctx, &cred); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	controllers := cred.Controllers
@@ -793,8 +804,10 @@ func (j *JEM) UpdateCredential(ctx context.Context, cred *mongodoc.Credential, f
 		flags = ^0
 	}
 	var controllers []params.EntityPath
-	c, err := j.DB.Credential(ctx, cred.Path)
-	if err == nil {
+	c := mongodoc.Credential{
+		Path: cred.Path,
+	}
+	if err := j.DB.GetCredential(ctx, &c); err == nil {
 		controllers = c.Controllers
 	} else if errgo.Cause(err) != params.ErrNotFound {
 		return nil, errgo.Mask(err)
@@ -807,6 +820,17 @@ func (j *JEM) UpdateCredential(ctx context.Context, cred *mongodoc.Credential, f
 			return models, errgo.Mask(err, apiconn.IsAPIError)
 		}
 	}
+
+	// Try to ensure that we set the provider type.
+	cred.ProviderType = c.ProviderType
+	if cred.ProviderType == "" {
+		var err error
+		cred.ProviderType, err = j.DB.ProviderType(ctx, params.Cloud(cred.Path.Cloud))
+		if err != nil {
+			zapctx.Warn(ctx, "cannot determine provider type", zap.Error(err), zap.String("cloud", cred.Path.Cloud))
+		}
+	}
+
 	// Note that because CredentialUpdate is checked for inside the
 	// CredentialCheck case above, we know that we need to
 	// update the credential in this case.
