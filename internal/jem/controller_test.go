@@ -217,8 +217,7 @@ func (s *controllerSuite) TestControllerUpdateCredentials(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
 
-	err = jem.ControllerUpdateCredentials(s.jem, testContext, conn, ctl)
-	c.Assert(err, gc.Equals, nil)
+	jem.ControllerUpdateCredentials(s.jem, testContext, conn, ctl)
 
 	// check it was updated on the controller.
 	client := cloudapi.NewClient(conn)

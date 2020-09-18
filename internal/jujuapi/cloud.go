@@ -382,7 +382,7 @@ func (r *controllerRoot) credential(ctx context.Context, cloudCredentialTag stri
 
 // AddCloud implements the AddCloud method of the Cloud (v2) facade.
 func (r *controllerRoot) AddCloud(ctx context.Context, args jujuparams.AddCloudArgs) error {
-	return r.jem.AddCloud(ctx, r.identity, params.Cloud(args.Name), args.Cloud)
+	return r.jem.AddHostedCloud(ctx, r.identity, params.Cloud(args.Name), args.Cloud)
 }
 
 // AddCredentials implements the AddCredentials method of the Cloud (v2) facade.

@@ -182,17 +182,15 @@ func (j *JEM) ConnectMonitor(ctx context.Context, path params.EntityPath) (*apic
 	if err := j.updateControllerClouds(ctx, conn, ctl); err != nil {
 		zapctx.Warn(ctx, "cannot update controller clouds", zap.Error(err))
 	}
-
-	if err := j.controllerUpdateCredentials(ctx, conn, ctl); err != nil {
-		zapctx.Warn(ctx, "cannot update credentials on controller", zap.Error(err))
-	}
-
+	j.controllerUpdateCredentials(ctx, conn, ctl)
 	return conn, nil
 }
 
 // controllerUpdateCredentials updates the given controller by updating
-// all outstanding UpdateCredentials.
-func (j *JEM) controllerUpdateCredentials(ctx context.Context, conn *apiconn.Conn, ctl *mongodoc.Controller) error {
+// all outstanding UpdateCredentials. Note that if these updates fail they
+// are not considered fatal. Any failures are likely to persist and the
+// connection retried. In that case the updates will be tried again.
+func (j *JEM) controllerUpdateCredentials(ctx context.Context, conn *apiconn.Conn, ctl *mongodoc.Controller) {
 	for _, credPath := range ctl.UpdateCredentials {
 		cred, err := j.DB.Credential(ctx, credPath)
 		if err != nil {
@@ -224,5 +222,4 @@ func (j *JEM) controllerUpdateCredentials(ctx context.Context, conn *apiconn.Con
 			}
 		}
 	}
-	return nil
 }

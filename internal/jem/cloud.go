@@ -28,13 +28,13 @@ type CreateCloudParams struct {
 	RegionConfig    map[string]map[string]interface{}
 }
 
-// AddCloud creates a new cloud in the database and adds it to a
+// AddHostedCloud creates a new cloud in the database and adds it to a
 // controller. If the cloud being added is not a supported CAAS cloud
 // (currently only kubernetes) then an error with a cause of
 // params.ErrIncompatibleClouds will be returned. If the cloud name already
 // exists then an error with a cause of params.ErrAlreadyExists will be
 // returned.
-func (j *JEM) AddCloud(ctx context.Context, id identchecker.ACLIdentity, name params.Cloud, cloud jujuparams.Cloud) (err error) {
+func (j *JEM) AddHostedCloud(ctx context.Context, id identchecker.ACLIdentity, name params.Cloud, cloud jujuparams.Cloud) (err error) {
 	if cloud.Type != "kubernetes" {
 		return errgo.WithCausef(nil, params.ErrIncompatibleClouds, "clouds of type %q cannot be added to JAAS", cloud.Type)
 	}
@@ -125,18 +125,22 @@ func (j *JEM) AddCloud(ctx context.Context, id identchecker.ACLIdentity, name pa
 		}
 		return errgo.New("cannot create cloud")
 	}
-
-	// Get the new cloud's definition from the controller.
-	if err := conn.Cloud(ctx, name, &cloud); err != nil {
-		return errgo.Mask(err)
-	}
+	zapctx.WithFields(ctx, zap.Stringer("controller", ctlPath))
 
 	// Ensure the creating user is an admin on the cloud.
 	if err := conn.GrantCloudAccess(ctx, name, params.User(id.Id()), "admin"); err != nil {
+		zapctx.Error(ctx, "cannot grant cloud access after creating cloud", zap.Error(err), zap.String("user", id.Id()))
+		return errgo.Mask(err)
+	}
+
+	// Get the new cloud's definition from the controller.
+	if err := conn.Cloud(ctx, name, &cloud); err != nil {
+		zapctx.Error(ctx, "cannot get cloud definition after creating cloud", zap.Error(err))
 		return errgo.Mask(err)
 	}
 
 	if err := j.updateControllerCloud(ctx, ctlPath, name, cloud, nil, acl); err != nil {
+		zapctx.Error(ctx, "cannot store cloud definition after creating cloud", zap.Error(err))
 		return errgo.Mask(err)
 	}
 

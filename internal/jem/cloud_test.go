@@ -73,7 +73,7 @@ func (s *cloudSuite) TestAddCloud(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	addController(c, ctlPath, s.APIInfo(c), s.jem)
 	id := jemtest.NewIdentity("bob", "bob-group")
-	err := s.jem.AddCloud(ctx, id, "test-cloud", jujuparams.Cloud{
+	err := s.jem.AddHostedCloud(ctx, id, "test-cloud", jujuparams.Cloud{
 		Type:             "kubernetes",
 		HostCloudRegion:  "dummy/dummy-region",
 		AuthTypes:        []string{"certificate"},
@@ -124,7 +124,7 @@ func (s *cloudSuite) TestAddCloudWithRegions(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	addController(c, ctlPath, s.APIInfo(c), s.jem)
 	id := jemtest.NewIdentity("bob", "bob-group")
-	err := s.jem.AddCloud(ctx, id, "test-cloud", jujuparams.Cloud{
+	err := s.jem.AddHostedCloud(ctx, id, "test-cloud", jujuparams.Cloud{
 		Type:             "kubernetes",
 		HostCloudRegion:  "dummy/dummy-region",
 		AuthTypes:        []string{"certificate"},
@@ -178,7 +178,7 @@ func (s *cloudSuite) TestAddCloudNameMatch(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	addController(c, ctlPath, s.APIInfo(c), s.jem)
 	id := jemtest.NewIdentity("bob", "bob-group")
-	err := s.jem.AddCloud(ctx, id, "dummy", jujuparams.Cloud{
+	err := s.jem.AddHostedCloud(ctx, id, "dummy", jujuparams.Cloud{
 		Type:             "kubernetes",
 		HostCloudRegion:  "dummy/dummy-region",
 		AuthTypes:        []string{"certificate"},
@@ -196,7 +196,7 @@ func (s *cloudSuite) TestAddCloudPublicNameMatch(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	addController(c, ctlPath, s.APIInfo(c), s.jem)
 	id := jemtest.NewIdentity("bob", "bob-group")
-	err := s.jem.AddCloud(ctx, id, "aws-china", jujuparams.Cloud{
+	err := s.jem.AddHostedCloud(ctx, id, "aws-china", jujuparams.Cloud{
 		Type:             "kubernetes",
 		HostCloudRegion:  "dummy/dummy-region",
 		AuthTypes:        []string{"certificate"},
@@ -214,7 +214,7 @@ func (s *cloudSuite) TestAddCloudNoControllers(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	addController(c, ctlPath, s.APIInfo(c), s.jem)
 	id := jemtest.NewIdentity("bob", "bob-group")
-	err := s.jem.AddCloud(ctx, id, "test-cloud", jujuparams.Cloud{
+	err := s.jem.AddHostedCloud(ctx, id, "test-cloud", jujuparams.Cloud{
 		Type:             "kubernetes",
 		HostCloudRegion:  "aws/eu-west-99",
 		AuthTypes:        []string{"certificate"},
@@ -237,7 +237,7 @@ func (s *cloudSuite) TestAddCloudControllerError(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	addController(c, ctlPath, s.APIInfo(c), s.jem)
 	id := jemtest.NewIdentity("bob", "bob-group")
-	err := s.jem.AddCloud(ctx, id, "test-cloud", jujuparams.Cloud{
+	err := s.jem.AddHostedCloud(ctx, id, "test-cloud", jujuparams.Cloud{
 		Type:             "kubernetes",
 		HostCloudRegion:  "dummy/dummy-region",
 		Endpoint:         "https://1.2.3.4:5678",
@@ -260,7 +260,7 @@ func (s *cloudSuite) TestAddCloudNoHostCloudRegion(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	addController(c, ctlPath, s.APIInfo(c), s.jem)
 	id := jemtest.NewIdentity("bob", "bob-group")
-	err := s.jem.AddCloud(ctx, id, "test-cloud", jujuparams.Cloud{
+	err := s.jem.AddHostedCloud(ctx, id, "test-cloud", jujuparams.Cloud{
 		Type:             "kubernetes",
 		AuthTypes:        []string{"certificate"},
 		Endpoint:         "https://1.2.3.4:5678",
@@ -487,7 +487,7 @@ func (s *cloudSuite) TestRevokeCloudInvalidAccess(c *gc.C) {
 }
 
 func (s *cloudSuite) createK8sCloud(c *gc.C, name, owner string) {
-	err := s.jem.AddCloud(
+	err := s.jem.AddHostedCloud(
 		context.Background(),
 		jemtest.NewIdentity(owner),
 		params.Cloud(name),
@@ -512,7 +512,7 @@ func (s *cloudSuite) TestRemoveCloudWithModel(c *gc.C) {
 	addController(c, ctlPath, s.APIInfo(c), s.jem)
 
 	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
-	err := s.jem.AddCloud(
+	err := s.jem.AddHostedCloud(
 		ctx,
 		jemtest.NewIdentity("bob", "bob-group"),
 		params.Cloud("test-cloud"),
