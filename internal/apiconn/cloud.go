@@ -6,10 +6,13 @@ import (
 	"context"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/names/v4"
+	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -130,4 +133,126 @@ func (c *Conn) RevokeCredential(_ context.Context, path params.CredentialPath) e
 		return errgo.Newf("unexpected number of results (expected 1, got %d)", len(out.Results))
 	}
 	return newAPIError(out.Results[0].Error)
+}
+
+// Cloud retrieves information about the given cloud. Cloud uses the
+// Cloud procedure on the Cloud facade version 1.
+func (c *Conn) Cloud(ctx context.Context, name params.Cloud, cloud *jujuparams.Cloud) error {
+	cloudTag := conv.ToCloudTag(name).String()
+	args := jujuparams.Entities{
+		Entities: []jujuparams.Entity{{
+			Tag: cloudTag,
+		}},
+	}
+	resp := jujuparams.CloudResults{
+		Results: []jujuparams.CloudResult{{
+			Cloud: cloud,
+		}},
+	}
+	if err := c.APICall("Cloud", 1, "", "Cloud", &args, &resp); err != nil {
+		return newAPIError(err)
+	}
+	if len(resp.Results) != 1 {
+		return errgo.Newf("unexpected number of results (expected 1, got %d)", len(resp.Results))
+	}
+	return newAPIError(resp.Results[0].Error)
+}
+
+// Clouds retrieves information about all available clouds. Clouds uses the
+// Clouds procedure on the Cloud facade version 1.
+func (c *Conn) Clouds(ctx context.Context) (map[params.Cloud]jujuparams.Cloud, error) {
+	var resp jujuparams.CloudsResult
+	if err := c.APICall("Cloud", 1, "", "Clouds", nil, &resp); err != nil {
+		return nil, newAPIError(err)
+	}
+
+	clouds := make(map[params.Cloud]jujuparams.Cloud, len(resp.Clouds))
+	for cloudTag, cloud := range resp.Clouds {
+		tag, err := names.ParseCloudTag(cloudTag)
+		if err != nil {
+			zapctx.Warn(ctx, "controller returned invalid cloud tag", zap.String("tag", cloudTag))
+			continue
+		}
+		clouds[conv.FromCloudTag(tag)] = cloud
+	}
+	return clouds, nil
+}
+
+// AddCloud adds the given cloud to a controller with the given name.
+// AddCloud uses the AddCloud procedure on the Cloud facade version 2.
+func (c *Conn) AddCloud(ctx context.Context, name params.Cloud, cloud jujuparams.Cloud) error {
+	args := jujuparams.AddCloudArgs{
+		Cloud: cloud,
+		Name:  string(name),
+	}
+	if err := c.APICall("Cloud", 2, "", "AddCloud", &args, nil); err != nil {
+		return newAPIError(err)
+	}
+	return nil
+}
+
+// RemoveCloud removes the given cloud from the controller. RemoveCloud
+// uses the RemoveClouds procedure on the Cloud facade version 2.
+func (c *Conn) RemoveCloud(ctx context.Context, cloud params.Cloud) error {
+	args := jujuparams.Entities{
+		Entities: []jujuparams.Entity{{
+			Tag: conv.ToCloudTag(cloud).String(),
+		}},
+	}
+	var resp jujuparams.ErrorResults
+	if err := c.APICall("Cloud", 2, "", "RemoveClouds", &args, &resp); err != nil {
+		return newAPIError(err)
+	}
+	if len(resp.Results) != 1 {
+		return errgo.Newf("unexpected number of results (expected 1, got %d)", len(resp.Results))
+	}
+	return newAPIError(resp.Results[0].Error)
+}
+
+// GrantCloudAccess gives the given user the given access level on the
+// given cloud. GrantCloudAccess uses the ModifyCloudAccess procedure on
+// the Cloud facade version 3.
+func (c *Conn) GrantCloudAccess(ctx context.Context, cloud params.Cloud, user params.User, access string) error {
+	args := jujuparams.ModifyCloudAccessRequest{
+		Changes: []jujuparams.ModifyCloudAccess{{
+			UserTag:  conv.ToUserTag(user).String(),
+			Action:   jujuparams.GrantCloudAccess,
+			Access:   access,
+			CloudTag: conv.ToCloudTag(cloud).String(),
+		}},
+	}
+
+	var resp jujuparams.ErrorResults
+	err := c.APICall("Cloud", 3, "", "ModifyCloudAccess", &args, &resp)
+	if err != nil {
+		return newAPIError(err)
+	}
+	if len(resp.Results) != 1 {
+		return errgo.Newf("unexpected number of results (expected 1, got %d)", len(resp.Results))
+	}
+	return newAPIError(resp.Results[0].Error)
+}
+
+// RevokeCloudAccess revokes the given access level on the given cloud from
+// the given user. RevokeCloudAccess uses the ModifyCloudAccess procedure
+// on the Cloud facade version 3.
+func (c *Conn) RevokeCloudAccess(ctx context.Context, cloud params.Cloud, user params.User, access string) error {
+	args := jujuparams.ModifyCloudAccessRequest{
+		Changes: []jujuparams.ModifyCloudAccess{{
+			UserTag:  conv.ToUserTag(user).String(),
+			Action:   jujuparams.RevokeCloudAccess,
+			Access:   access,
+			CloudTag: conv.ToCloudTag(cloud).String(),
+		}},
+	}
+
+	var resp jujuparams.ErrorResults
+	err := c.APICall("Cloud", 3, "", "ModifyCloudAccess", &args, &resp)
+	if err != nil {
+		return newAPIError(err)
+	}
+	if len(resp.Results) != 1 {
+		return errgo.Newf("unexpected number of results (expected 1, got %d)", len(resp.Results))
+	}
+	return newAPIError(resp.Results[0].Error)
 }

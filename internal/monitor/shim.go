@@ -11,7 +11,6 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
 	"github.com/juju/names/v4"
-	"github.com/juju/version"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
@@ -31,7 +30,7 @@ func (j jemShim) Clone() jemInterface {
 }
 
 func (j jemShim) OpenAPI(ctx context.Context, path params.EntityPath) (jujuAPI, error) {
-	conn, err := j.JEM.OpenAPI(ctx, path)
+	conn, err := j.JEM.ConnectMonitor(ctx, path)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
@@ -93,14 +92,6 @@ func (j jemShim) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPat
 
 func (j jemShim) UpdateApplicationInfo(ctx context.Context, ctlPath params.EntityPath, info *jujuparams.ApplicationInfo) error {
 	return errgo.Mask(j.JEM.UpdateApplicationInfo(ctx, ctlPath, info), errgo.Any)
-}
-
-func (j jemShim) SetControllerVersion(ctx context.Context, ctlPath params.EntityPath, v version.Number) error {
-	return errgo.Mask(j.DB.SetControllerVersion(ctx, ctlPath, v), errgo.Any)
-}
-
-func (j jemShim) UpdateCloudRegions(ctx context.Context, cloudRegions []mongodoc.CloudRegion) error {
-	return errgo.Mask(j.DB.UpdateCloudRegions(ctx, cloudRegions), errgo.Any)
 }
 
 func (j jemShim) AcquireMonitorLease(ctx context.Context, ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {

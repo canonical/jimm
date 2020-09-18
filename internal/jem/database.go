@@ -885,19 +885,26 @@ func (db *Database) UpdateCloudRegions(ctx context.Context, cloudRegions []mongo
 	defer db.checkError(ctx, &err)
 	for _, cr := range cloudRegions {
 		cr.Id = fmt.Sprintf("%s/%s", cr.Cloud, cr.Region)
-		update := make(bson.D, 1, 3)
+		update := make(bson.D, 2, 4)
 		update[0] = bson.DocElem{
-			"$setOnInsert", bson.D{
-				{"cloud", cr.Cloud},
-				{"region", cr.Region},
+			"$set", bson.D{
 				{"providertype", cr.ProviderType},
 				{"authtypes", cr.AuthTypes},
 				{"endpoint", cr.Endpoint},
 				{"identityendpoint", cr.IdentityEndpoint},
 				{"storageendpoint", cr.StorageEndpoint},
 				{"cacertificates", cr.CACertificates},
+			},
+		}
+		update[1] = bson.DocElem{
+			"$setOnInsert", bson.D{
+				{"cloud", cr.Cloud},
+				{"region", cr.Region},
 				{"acl", cr.ACL},
-			}}
+				// {"primarycontrollers", cr.PrimaryControllers},
+				// {"secondarycontrollers", cr.SecondaryControllers},
+			},
+		}
 		if len(cr.PrimaryControllers) > 0 {
 			update = append(update, bson.DocElem{"$addToSet", bson.D{{"primarycontrollers", bson.D{{"$each", cr.PrimaryControllers}}}}})
 		}
@@ -911,28 +918,42 @@ func (db *Database) UpdateCloudRegions(ctx context.Context, cloudRegions []mongo
 	return nil
 }
 
-// CloudRegion returns information on the CloudRegion with the given
-// cloud and region. It returns an error with a params.ErrNotFound cause if the
-// cloud/region was not found.
-func (db *Database) CloudRegion(ctx context.Context, name params.Cloud, region string) (_ *mongodoc.CloudRegion, err error) {
+// GetCloudRegion fills in the given mongodoc.CloudRegion. GetCloudRegion
+// will match either on the first available combination of:
+//
+//     - cloud and region name
+//     - cloud type and region name
+//
+// If the region name is "" then the CloudRegion record will be for the
+// cloud.GetCloudRegion returns an error with a params.ErrNotFound cause
+// if there is no CloudRegion found.
+func (db *Database) GetCloudRegion(ctx context.Context, cloudRegion *mongodoc.CloudRegion) (err error) {
 	defer db.checkError(ctx, &err)
-	var cloudRegion mongodoc.CloudRegion
+
 	var query bson.D
-	if name != "" {
-		query = append(query, bson.DocElem{"cloud", name})
-	}
-	if region != "" {
-		query = append(query, bson.DocElem{"region", region})
+	switch {
+	case cloudRegion.Cloud != "":
+		query = bson.D{
+			{"cloud", cloudRegion.Cloud},
+			{"region", cloudRegion.Region},
+		}
+	case cloudRegion.ProviderType != "":
+		query = bson.D{
+			{"providertype", cloudRegion.ProviderType},
+			{"region", cloudRegion.Region},
+		}
+	default:
+		return errgo.WithCausef(nil, params.ErrNotFound, "cloudregion not found")
 	}
 	err = db.CloudRegions().Find(query).One(&cloudRegion)
 	if err == mgo.ErrNotFound {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "cloud %q region %q not found", name, region)
+		return errgo.WithCausef(nil, params.ErrNotFound, "cloudregion not found")
 	}
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot get cloud %q region %q", name, region)
+		return errgo.Notef(err, "cannot get cloudregion")
 	}
 
-	return &cloudRegion, nil
+	return nil
 }
 
 // InsertCloudRegion inserts a new CloudRegion to the database. If the

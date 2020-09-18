@@ -154,9 +154,13 @@ func (s *databaseSuite) TestUpdateCloudRegions(c *gc.C) {
 	err := s.database.UpdateCloudRegions(testContext, cloudRegions)
 	c.Assert(err, gc.Equals, nil)
 
-	cloudregionA, err := s.database.CloudRegion(testContext, params.Cloud("aws"), "foo")
+	cloudregionA := mongodoc.CloudRegion{
+		Cloud:  "aws",
+		Region: "foo",
+	}
+	err = s.database.GetCloudRegion(testContext, &cloudregionA)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(cloudregionA, gc.DeepEquals, &mongodoc.CloudRegion{
+	c.Assert(cloudregionA, gc.DeepEquals, mongodoc.CloudRegion{
 		Id:                 "aws/foo",
 		Cloud:              params.Cloud("aws"),
 		Region:             "foo",
@@ -180,9 +184,13 @@ func (s *databaseSuite) TestUpdateCloudRegions(c *gc.C) {
 	}}
 	err = s.database.UpdateCloudRegions(testContext, cloudRegions)
 	c.Assert(err, gc.Equals, nil)
-	cloudregionB, err := s.database.CloudRegion(testContext, params.Cloud("aws"), "foo")
+	cloudregionB := mongodoc.CloudRegion{
+		Cloud:  "aws",
+		Region: "foo",
+	}
+	err = s.database.GetCloudRegion(testContext, &cloudregionB)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(cloudregionB, gc.DeepEquals, &mongodoc.CloudRegion{
+	c.Assert(cloudregionB, gc.DeepEquals, mongodoc.CloudRegion{
 		Id:                   "aws/foo",
 		Cloud:                params.Cloud("aws"),
 		Region:               "foo",
@@ -2369,7 +2377,10 @@ func (s *databaseSuite) TestGrantCloud(c *gc.C) {
 	err = s.database.GrantCloud(testContext, "test-cloud", "test-user", "add-model")
 	c.Assert(err, gc.Equals, nil)
 
-	cr, err := s.database.CloudRegion(testContext, "test-cloud", "")
+	cr := mongodoc.CloudRegion{
+		Cloud: "test-cloud",
+	}
+	err = s.database.GetCloudRegion(testContext, &cr)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(cr.ACL.Read, jc.DeepEquals, []string{"test-user"})
 	c.Assert(cr.ACL.Write, jc.DeepEquals, []string{})
@@ -2378,7 +2389,7 @@ func (s *databaseSuite) TestGrantCloud(c *gc.C) {
 	err = s.database.GrantCloud(testContext, "test-cloud", "test-user2", "admin")
 	c.Assert(err, gc.Equals, nil)
 
-	cr, err = s.database.CloudRegion(testContext, "test-cloud", "")
+	err = s.database.GetCloudRegion(testContext, &cr)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(cr.ACL.Read, jc.DeepEquals, []string{"test-user", "test-user2"})
 	c.Assert(cr.ACL.Write, jc.DeepEquals, []string{"test-user2"})
@@ -2404,7 +2415,10 @@ func (s *databaseSuite) TestRevokeCloud(c *gc.C) {
 	err = s.database.GrantCloud(testContext, "test-cloud", "test-user", "admin")
 	c.Assert(err, gc.Equals, nil)
 
-	cr, err := s.database.CloudRegion(testContext, "test-cloud", "")
+	cr := mongodoc.CloudRegion{
+		Cloud: "test-cloud",
+	}
+	err = s.database.GetCloudRegion(testContext, &cr)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(cr.ACL.Read, jc.DeepEquals, []string{"test-user"})
 	c.Assert(cr.ACL.Write, jc.DeepEquals, []string{"test-user"})
@@ -2413,7 +2427,7 @@ func (s *databaseSuite) TestRevokeCloud(c *gc.C) {
 	err = s.database.RevokeCloud(testContext, "test-cloud", "test-user", "admin")
 	c.Assert(err, gc.Equals, nil)
 
-	cr, err = s.database.CloudRegion(testContext, "test-cloud", "")
+	err = s.database.GetCloudRegion(testContext, &cr)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(cr.ACL.Read, jc.DeepEquals, []string{"test-user"})
 	c.Assert(cr.ACL.Write, jc.DeepEquals, []string{})
@@ -2422,7 +2436,7 @@ func (s *databaseSuite) TestRevokeCloud(c *gc.C) {
 	err = s.database.RevokeCloud(testContext, "test-cloud", "test-user", "add-model")
 	c.Assert(err, gc.Equals, nil)
 
-	cr, err = s.database.CloudRegion(testContext, "test-cloud", "")
+	err = s.database.GetCloudRegion(testContext, &cr)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(cr.ACL.Read, jc.DeepEquals, []string{})
 	c.Assert(cr.ACL.Write, jc.DeepEquals, []string{})
@@ -2864,6 +2878,76 @@ func (s *databaseSuite) TestApplicationOfferAccessMultipleTimes(c *gc.C) {
 		User:   "user1",
 		Access: mongodoc.ApplicationOfferReadAccess,
 	})
+}
+
+func (s *databaseSuite) TestGetCloudRegion(c *gc.C) {
+	cloudRegions := []mongodoc.CloudRegion{{
+		Id:           "aws/",
+		Cloud:        "aws",
+		ProviderType: "ec2",
+	}, {
+		Id:           "aws/us-east-1",
+		Cloud:        "aws",
+		Region:       "us-east-1",
+		ProviderType: "ec2",
+	}, {
+		Id:           "aws/eu-west-1",
+		Cloud:        "aws",
+		Region:       "eu-west-1",
+		ProviderType: "ec2",
+	}}
+
+	err := s.database.UpdateCloudRegions(testContext, cloudRegions)
+	c.Assert(err, gc.Equals, nil)
+
+	cr := mongodoc.CloudRegion{
+		Cloud: "aws",
+	}
+	err = s.database.GetCloudRegion(testContext, &cr)
+	c.Assert(err, gc.Equals, nil)
+	c.Check(cr, jc.DeepEquals, cloudRegions[0])
+
+	cr = mongodoc.CloudRegion{
+		Cloud:  "aws",
+		Region: "eu-west-1",
+	}
+	err = s.database.GetCloudRegion(testContext, &cr)
+	c.Assert(err, gc.Equals, nil)
+	c.Check(cr, jc.DeepEquals, cloudRegions[2])
+
+	cr = mongodoc.CloudRegion{
+		ProviderType: "ec2",
+	}
+	err = s.database.GetCloudRegion(testContext, &cr)
+	c.Assert(err, gc.Equals, nil)
+	c.Check(cr, jc.DeepEquals, cloudRegions[0])
+
+	cr = mongodoc.CloudRegion{
+		ProviderType: "ec2",
+		Region:       "us-east-1",
+	}
+	err = s.database.GetCloudRegion(testContext, &cr)
+	c.Assert(err, gc.Equals, nil)
+	c.Check(cr, jc.DeepEquals, cloudRegions[1])
+
+	cr = mongodoc.CloudRegion{}
+	err = s.database.GetCloudRegion(testContext, &cr)
+	c.Check(err, gc.ErrorMatches, `cloudregion not found`)
+	c.Check(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+
+	cr = mongodoc.CloudRegion{
+		Cloud: "google",
+	}
+	err = s.database.GetCloudRegion(testContext, &cr)
+	c.Check(err, gc.ErrorMatches, `cloudregion not found`)
+	c.Check(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+
+	cr = mongodoc.CloudRegion{
+		ProviderType: "gce",
+	}
+	err = s.database.GetCloudRegion(testContext, &cr)
+	c.Check(err, gc.ErrorMatches, `cloudregion not found`)
+	c.Check(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
 var cmpUsers = jemtest.CmpEquals(cmpopts.SortSlices(func(a, b mongodoc.OfferUserDetails) bool {
