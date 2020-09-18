@@ -109,14 +109,6 @@ func (s jemShimWithUpdateNotify) SetControllerAvailable(ctx context.Context, ctl
 	return nil
 }
 
-func (s jemShimWithUpdateNotify) SetControllerVersion(ctx context.Context, ctlPath params.EntityPath, v version.Number) error {
-	if err := s.jemInterface.SetControllerVersion(ctx, ctlPath, v); err != nil {
-		return err
-	}
-	s.changed <- "controller version"
-	return nil
-}
-
 func (s jemShimWithUpdateNotify) SetModelInfo(ctx context.Context, ctlPath params.EntityPath, uuid string, info *mongodoc.ModelInfo) error {
 	if err := s.jemInterface.SetModelInfo(ctx, ctlPath, uuid, info); err != nil {
 		return err
@@ -304,16 +296,6 @@ func (s *jemShimInMemory) SetControllerUnavailableAt(ctx context.Context, ctlPat
 	return nil
 }
 
-func (s *jemShimInMemory) SetControllerVersion(ctx context.Context, ctlPath params.EntityPath, v version.Number) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	ctl, ok := s.controllers[ctlPath]
-	if ok {
-		ctl.Version = &v
-	}
-	return nil
-}
-
 func (s *jemShimInMemory) SetModelInfo(ctx context.Context, ctlPath params.EntityPath, uuid string, info *mongodoc.ModelInfo) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -435,13 +417,6 @@ func (s *jemShimInMemory) ModelUUIDsForController(ctx context.Context, ctlPath p
 	return uuids, nil
 }
 
-func (s *jemShimInMemory) ControllerUpdateCredentials(_ context.Context, ctlPath params.EntityPath) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.controllerUpdateCredentials[ctlPath] = true
-	return nil
-}
-
 func (s *jemShimInMemory) OpenAPI(context.Context, params.EntityPath) (jujuAPI, error) {
 	return nil, errgo.New("jemShimInMemory doesn't implement OpenAPI")
 }
@@ -463,22 +438,6 @@ func (s *jemShimInMemory) AcquireMonitorLease(ctx context.Context, ctlPath param
 		ctl.MonitorLeaseExpiry = mongodoc.Time(newExpiry)
 	}
 	return ctl.MonitorLeaseExpiry, nil
-}
-
-func (s *jemShimInMemory) UpdateCloudRegions(ctx context.Context, cloudRegions []mongodoc.CloudRegion) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for k, cloudRegion := range cloudRegions {
-		id := cloudRegion.GetId()
-		if cr, ok := s.cloudRegions[id]; ok {
-			cr.PrimaryControllers = append(cr.PrimaryControllers, cloudRegion.PrimaryControllers...)
-			cr.SecondaryControllers = append(cr.SecondaryControllers, cloudRegion.SecondaryControllers...)
-			continue
-		}
-		s.cloudRegions[id] = &cloudRegions[k]
-	}
-
-	return nil
 }
 
 func (j jemShimInMemory) WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityPath) (func() error, error) {

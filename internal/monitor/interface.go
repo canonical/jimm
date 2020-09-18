@@ -43,9 +43,6 @@ type jemInterface interface {
 	// This method does not return an error when the controller doesn't exist.
 	SetControllerAvailable(ctx context.Context, ctlPath params.EntityPath) error
 
-	// SetControllerVersion sets the controller version of the given controller.
-	SetControllerVersion(ctx context.Context, ctlPath params.EntityPath, v version.Number) error
-
 	// SetModelLife sets the Life field of all models controlled
 	// by the given controller that have the given UUID.
 	// It does not return an error if there are no such models.
@@ -106,15 +103,8 @@ type jemInterface interface {
 	// an error with a jem.ErrLeaseUnavailable cause will be returned.
 	AcquireMonitorLease(ctx context.Context, ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error)
 
-	// ControllerUpdateCredentials updates the given controller by updating
-	// all credentials listed in ctl.UpdateCredentials.
-	ControllerUpdateCredentials(ctx context.Context, ctlPath params.EntityPath) error
-
 	// Controller retrieve the controller based on the controller path.
 	Controller(ctx context.Context, ctlPath params.EntityPath) (*mongodoc.Controller, error)
-
-	// UpdateCloudRegions updates the cloud/region.
-	UpdateCloudRegions(ctx context.Context, cloudRegions []mongodoc.CloudRegion) error
 
 	// WatchAllModelSummaries starts watching the summary updates from
 	// the controller.

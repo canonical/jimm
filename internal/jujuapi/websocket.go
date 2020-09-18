@@ -41,6 +41,7 @@ var errorCodes = map[error]string{
 	params.ErrModelNotFound:       jujuparams.CodeModelNotFound,
 	params.ErrUnauthorized:        jujuparams.CodeUnauthorized,
 	params.ErrCloudRegionRequired: jujuparams.CodeCloudRegionRequired,
+	params.ErrIncompatibleClouds:  jujuparams.CodeIncompatibleClouds,
 	errNotImplemented:             jujuparams.CodeNotImplemented,
 }
 
