@@ -10,10 +10,8 @@ import (
 
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
-	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/life"
 	jujustatus "github.com/juju/juju/core/status"
-	"github.com/juju/juju/environs"
 	"github.com/juju/juju/environs/config"
 	"github.com/juju/names/v4"
 	"github.com/juju/rpcreflect"
@@ -39,12 +37,11 @@ import (
 type controllerRoot struct {
 	rpc.Root
 
-	params        jemserver.Params
-	auth          *auth.Authenticator
-	jem           *jem.JEM
-	heartMonitor  heartMonitor
-	schemataCache map[params.Cloud]map[jujucloud.AuthType]jujucloud.CredentialSchema
-	watchers      *watcherRegistry
+	params       jemserver.Params
+	auth         *auth.Authenticator
+	jem          *jem.JEM
+	heartMonitor heartMonitor
+	watchers     *watcherRegistry
 
 	// mu protects the fields below it
 	mu                    sync.Mutex
@@ -55,11 +52,10 @@ type controllerRoot struct {
 
 func newControllerRoot(jem *jem.JEM, a *auth.Authenticator, p jemserver.Params, hm heartMonitor) *controllerRoot {
 	r := &controllerRoot{
-		params:        p,
-		auth:          a,
-		jem:           jem,
-		heartMonitor:  hm,
-		schemataCache: make(map[params.Cloud]map[jujucloud.AuthType]jujucloud.CredentialSchema),
+		params:       p,
+		auth:         a,
+		jem:          jem,
+		heartMonitor: hm,
 		watchers: &watcherRegistry{
 			watchers: make(map[string]*modelSummaryWatcher),
 		},
@@ -118,24 +114,6 @@ func (r *controllerRoot) FindMethod(rootName string, version int, methodName str
 	// update the heart monitor for every request received.
 	r.heartMonitor.Heartbeat()
 	return r.Root.FindMethod(rootName, version, methodName)
-}
-
-// credentialSchema gets the schema for the credential identified by the
-// given cloud and authType.
-func (r *controllerRoot) credentialSchema(ctx context.Context, cloud params.Cloud, authType string) (jujucloud.CredentialSchema, error) {
-	if cs, ok := r.schemataCache[cloud]; ok {
-		return cs[jujucloud.AuthType(authType)], nil
-	}
-	providerType, err := r.jem.DB.ProviderType(ctx, cloud)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-	provider, err := environs.Provider(providerType)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	r.schemataCache[cloud] = provider.CredentialSchemas()
-	return r.schemataCache[cloud][jujucloud.AuthType(authType)], nil
 }
 
 func userModelForModelDoc(m *mongodoc.Model) jujuparams.Model {

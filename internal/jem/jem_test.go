@@ -560,7 +560,7 @@ func (s *jemSuite) TestRevokeCredentialsNotInUse(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// Sanity check that we can get the credential.
-	_, err = s.jem.DB.Credential(testContext, mCredPath)
+	err = s.jem.DB.GetCredential(testContext, &mongodoc.Credential{Path: mCredPath})
 	c.Assert(err, gc.Equals, nil)
 
 	// Try with just the check.
@@ -568,7 +568,7 @@ func (s *jemSuite) TestRevokeCredentialsNotInUse(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// Check that the credential is still there.
-	_, err = s.jem.DB.Credential(testContext, mCredPath)
+	err = s.jem.DB.GetCredential(testContext, &mongodoc.Credential{Path: mCredPath})
 	c.Assert(err, gc.Equals, nil)
 
 	// Try with both the check and the update flag.
@@ -577,9 +577,12 @@ func (s *jemSuite) TestRevokeCredentialsNotInUse(c *gc.C) {
 
 	// The credential should be marked as revoked and all
 	// the details should be cleater.
-	cred, err := s.jem.DB.Credential(testContext, mCredPath)
+	cred := mongodoc.Credential{
+		Path: mCredPath,
+	}
+	err = s.jem.DB.GetCredential(testContext, &cred)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
+	c.Assert(cred, jc.DeepEquals, mongodoc.Credential{
 		Id:         "dummy/bob/cred1",
 		Path:       mCredPath,
 		Revoked:    true,
@@ -1122,7 +1125,10 @@ func (s *jemSuite) TestCredential(c *gc.C) {
 	}
 	for i, test := range credentialTests {
 		c.Logf("test %d. %s", i, test.path)
-		ctl, err := s.jem.GetCredential(context.Background(), jemtest.NewIdentity("bob", "bob-group"), test.path)
+		ctl := mongodoc.Credential{
+			Path: mongodoc.CredentialPathFromParams(test.path),
+		}
+		err := s.jem.GetCredential(context.Background(), jemtest.NewIdentity("bob", "bob-group"), &ctl)
 		if test.expectErrorCause != nil {
 			c.Assert(errgo.Cause(err), gc.Equals, test.expectErrorCause)
 			continue

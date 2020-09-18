@@ -1536,7 +1536,7 @@ func (s *modelManagerSuite) TestChangeModelCredentialNotFoundCredential(c *gc.C)
 	credTag := names.NewCloudCredentialTag("dummy/alice@external/cred2")
 	client := modelmanager.NewClient(conn)
 	err := client.ChangeModelCredential(modelTag, credTag)
-	c.Assert(err, gc.ErrorMatches, `credential "dummy/alice/cred2" not found`)
+	c.Assert(err, gc.ErrorMatches, `credential not found`)
 }
 
 func (s *modelManagerSuite) TestChangeModelCredentialLocalUserCredential(c *gc.C) {

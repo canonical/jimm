@@ -349,9 +349,12 @@ func (s *databaseSuite) TestDeleteController(c *gc.C) {
 	c.Assert(m3, gc.IsNil)
 	s.checkDBOK(c)
 
-	cred, err := s.database.Credential(testContext, mpath)
+	cred := mongodoc.Credential{
+		Path: mpath,
+	}
+	err = s.database.GetCredential(testContext, &cred)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
+	c.Assert(cred, jc.DeepEquals, mongodoc.Credential{
 		Id:          path.String(),
 		Path:        mpath,
 		Type:        "empty",
@@ -1332,10 +1335,13 @@ func (s *databaseSuite) TestAddAndGetCredential(c *gc.C) {
 	path := credentialPath("test-cloud", "test-user", "test-credential")
 	mpath := mongodoc.CredentialPathFromParams(path)
 	expectId := path.String()
-	cred, err := s.database.Credential(testContext, mpath)
-	c.Assert(cred, gc.IsNil)
+	cred := mongodoc.Credential{
+		Path: mpath,
+	}
+	err := s.database.GetCredential(testContext, &cred)
+	c.Assert(cred.Id, gc.Equals, "")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	c.Assert(err, gc.ErrorMatches, `credential "test-cloud/test-user/test-credential" not found`)
+	c.Assert(err, gc.ErrorMatches, `credential not found`)
 
 	attrs := map[string]string{
 		"attr1": "val1",
@@ -1349,9 +1355,9 @@ func (s *databaseSuite) TestAddAndGetCredential(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	cred, err = s.database.Credential(testContext, mpath)
+	err = s.database.GetCredential(testContext, &cred)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
+	c.Assert(cred, jc.DeepEquals, mongodoc.Credential{
 		Id:         expectId,
 		Path:       mpath,
 		Type:       "credtype",
@@ -1367,9 +1373,9 @@ func (s *databaseSuite) TestAddAndGetCredential(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	cred, err = s.database.Credential(testContext, mpath)
+	err = s.database.GetCredential(testContext, &cred)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
+	c.Assert(cred, jc.DeepEquals, mongodoc.Credential{
 		Id:         expectId,
 		Path:       mpath,
 		Type:       "credtype",
@@ -1382,9 +1388,9 @@ func (s *databaseSuite) TestAddAndGetCredential(c *gc.C) {
 		Revoked: true,
 	})
 	c.Assert(err, gc.Equals, nil)
-	cred, err = s.database.Credential(testContext, mpath)
+	err = s.database.GetCredential(testContext, &cred)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
+	c.Assert(cred, jc.DeepEquals, mongodoc.Credential{
 		Id:         expectId,
 		Path:       mpath,
 		Attributes: map[string]string{},
@@ -1430,15 +1436,18 @@ func (s *databaseSuite) TestLegacyCredentials(c *gc.C) {
 		})
 	c.Assert(err, gc.Equals, nil)
 
-	cred, err := s.database.Credential(testContext, mongodoc.CredentialPath{
-		Cloud: "test-cloud",
-		EntityPath: mongodoc.EntityPath{
-			User: "test-user",
-			Name: "test-credentials",
+	cred := mongodoc.Credential{
+		Path: mongodoc.CredentialPath{
+			Cloud: "test-cloud",
+			EntityPath: mongodoc.EntityPath{
+				User: "test-user",
+				Name: "test-credentials",
+			},
 		},
-	})
+	}
+	err = s.database.GetCredential(testContext, &cred)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
+	c.Assert(cred, jc.DeepEquals, mongodoc.Credential{
 		Id: id,
 		Path: mongodoc.CredentialPath{
 			Cloud: "test-cloud",
@@ -1475,9 +1484,12 @@ func (s *databaseSuite) TestCredentialAddController(c *gc.C) {
 	err = jem.CredentialAddController(s.database, testContext, mpath, ctlPath)
 	c.Assert(err, gc.Equals, nil)
 
-	cred, err := s.database.Credential(testContext, mpath)
+	cred := mongodoc.Credential{
+		Path: mpath,
+	}
+	err = s.database.GetCredential(testContext, &cred)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
+	c.Assert(cred, jc.DeepEquals, mongodoc.Credential{
 		Id:         expectId,
 		Path:       mpath,
 		Type:       "empty",
@@ -1491,9 +1503,9 @@ func (s *databaseSuite) TestCredentialAddController(c *gc.C) {
 	err = jem.CredentialAddController(s.database, testContext, mpath, ctlPath)
 	c.Assert(err, gc.Equals, nil)
 
-	cred, err = s.database.Credential(testContext, mpath)
+	err = s.database.GetCredential(testContext, &cred)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
+	c.Assert(cred, jc.DeepEquals, mongodoc.Credential{
 		Id:         expectId,
 		Path:       mpath,
 		Type:       "empty",
@@ -1537,9 +1549,12 @@ func (s *databaseSuite) TestCredentialRemoveController(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// sanity check the controller is there.
-	cred, err := s.database.Credential(testContext, mpath)
+	cred := mongodoc.Credential{
+		Path: mpath,
+	}
+	err = s.database.GetCredential(testContext, &cred)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
+	c.Assert(cred, jc.DeepEquals, mongodoc.Credential{
 		Id:         expectId,
 		Path:       mpath,
 		Type:       "empty",
@@ -1552,9 +1567,9 @@ func (s *databaseSuite) TestCredentialRemoveController(c *gc.C) {
 	err = jem.CredentialRemoveController(s.database, testContext, mpath, ctlPath)
 	c.Assert(err, gc.Equals, nil)
 
-	cred, err = s.database.Credential(testContext, mpath)
+	err = s.database.GetCredential(testContext, &cred)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
+	c.Assert(cred, jc.DeepEquals, mongodoc.Credential{
 		Id:         expectId,
 		Path:       mpath,
 		Type:       "empty",
@@ -1565,9 +1580,9 @@ func (s *databaseSuite) TestCredentialRemoveController(c *gc.C) {
 	err = jem.CredentialRemoveController(s.database, testContext, mpath, ctlPath)
 	c.Assert(err, gc.Equals, nil)
 
-	cred, err = s.database.Credential(testContext, mpath)
+	err = s.database.GetCredential(testContext, &cred)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
+	c.Assert(cred, jc.DeepEquals, mongodoc.Credential{
 		Id:         expectId,
 		Path:       mpath,
 		Type:       "empty",
@@ -2069,9 +2084,9 @@ var setDeadTests = []struct {
 		db.Controller(testContext, fakeEntityPath)
 	},
 }, {
-	about: "Credential",
+	about: "GetCredential",
 	run: func(db *jem.Database) {
-		db.Credential(testContext, fakeCredPath)
+		db.GetCredential(testContext, &mongodoc.Credential{Path: fakeCredPath})
 	},
 }, {
 	about: "credentialAddController",
