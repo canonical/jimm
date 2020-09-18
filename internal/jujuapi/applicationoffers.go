@@ -19,6 +19,7 @@ func init() {
 	facadeInit["ApplicationOffers"] = func(r *controllerRoot) []int {
 		offerMethod := rpc.Method(r.Offer)
 		getConsumeDetailsMethod := rpc.Method(r.GetConsumeDetails)
+		getConsumeDetailsMethodV3 := rpc.Method(r.GetConsumeDetailsV3)
 		listOffersMethod := rpc.Method(r.ListApplicationOffers)
 		modifyOfferAccessMethod := rpc.Method(r.ModifyOfferAccess)
 		destroyOffersMethod := rpc.Method(r.DestroyOffers)
@@ -40,6 +41,14 @@ func init() {
 		r.AddMethod("ApplicationOffers", 2, "DestroyOffers", destroyOffersMethod)
 		r.AddMethod("ApplicationOffers", 2, "FindApplicationOffers", findOffersMethod)
 		r.AddMethod("ApplicationOffers", 2, "ApplicationOffers", applicationOffersMethod)
+
+		r.AddMethod("ApplicationOffers", 3, "Offer", offerMethod)
+		r.AddMethod("ApplicationOffers", 3, "GetConsumeDetails", getConsumeDetailsMethodV3)
+		r.AddMethod("ApplicationOffers", 3, "ListApplicationOffers", listOffersMethod)
+		r.AddMethod("ApplicationOffers", 3, "ModifyOfferAccess", modifyOfferAccessMethod)
+		r.AddMethod("ApplicationOffers", 3, "DestroyOffers", destroyOffersMethod)
+		r.AddMethod("ApplicationOffers", 3, "FindApplicationOffers", findOffersMethod)
+		r.AddMethod("ApplicationOffers", 3, "ApplicationOffers", applicationOffersMethod)
 
 		return []int{1, 2}
 	}
@@ -82,7 +91,54 @@ func (r *controllerRoot) GetConsumeDetails(ctx context.Context, args jujuparams.
 			},
 		}
 
-		if err := r.jem.GetApplicationOfferConsumeDetails(ctx, r.identity, &details, args.BakeryVersion); err != nil {
+		if err := r.jem.GetApplicationOfferConsumeDetails(ctx, r.identity, "", &details, args.BakeryVersion); err != nil {
+			results.Results[i].Error = mapError(err)
+		} else {
+			results.Results[i].ConsumeOfferDetails = details
+		}
+	}
+	return results, nil
+}
+
+// GetConsumeDetailsV3 implements the GetConsumeDetails procedure of the
+// ApplicationOffers facade (version 3).
+func (r *controllerRoot) GetConsumeDetailsV3(ctx context.Context, args jujuparams.ConsumeOfferDetailsArg) (jujuparams.ConsumeOfferDetailsResults, error) {
+	results := jujuparams.ConsumeOfferDetailsResults{
+		Results: make([]jujuparams.ConsumeOfferDetailsResult, len(args.OfferURLs.OfferURLs)),
+	}
+	for i, offerURL := range args.OfferURLs.OfferURLs {
+		ourl, err := crossmodel.ParseOfferURL(offerURL)
+		if err != nil {
+			results.Results[i].Error = mapError(errgo.WithCausef(err, params.ErrBadRequest, "cannot parse offer URL"))
+			continue
+		}
+
+		// Ensure the path is normalised.
+		if ourl.User == "" {
+			// If the model owner is not specified use the authenticated
+			// user.
+			ourl.User = conv.ToUserTag(params.User(r.identity.Id())).Id()
+		}
+
+		details := jujuparams.ConsumeOfferDetails{
+			Offer: &jujuparams.ApplicationOfferDetails{
+				OfferURL: ourl.AsLocal().Path(),
+			},
+		}
+
+		var user params.User
+		if args.UserTag != "" {
+			uTag, err := names.ParseUserTag(args.UserTag)
+			if err != nil {
+				return jujuparams.ConsumeOfferDetailsResults{}, errgo.WithCausef(err, params.ErrBadRequest, "")
+			}
+			user, err = conv.FromUserTag(uTag)
+			if err != nil {
+				return jujuparams.ConsumeOfferDetailsResults{}, errgo.WithCausef(err, params.ErrBadRequest, "")
+			}
+		}
+
+		if err := r.jem.GetApplicationOfferConsumeDetails(ctx, r.identity, user, &details, args.OfferURLs.BakeryVersion); err != nil {
 			results.Results[i].Error = mapError(err)
 		} else {
 			results.Results[i].ConsumeOfferDetails = details
