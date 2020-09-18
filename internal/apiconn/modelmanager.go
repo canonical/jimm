@@ -237,3 +237,25 @@ func (c *Conn) RevokeModelAccess(ctx context.Context, uuid string, user params.U
 	}
 	return newAPIError(resp.Results[0].Error)
 }
+
+// ControllerModelSummary retrieves the ModelSummary for the controller
+// model. ControllerModelSummary uses the ListModelSummaries procedure on
+// the ModelManager facade version 4.
+func (c *Conn) ControllerModelSummary(ctx context.Context, ms *jujuparams.ModelSummary) error {
+	args := jujuparams.ModelSummariesRequest{
+		UserTag: c.Info.Tag.String(),
+		All:     true,
+	}
+	var resp jujuparams.ModelSummaryResults
+	err := c.APICall("ModelManager", 4, "", "ListModelSummaries", &args, &resp)
+	if err != nil {
+		return newAPIError(err)
+	}
+	for _, r := range resp.Results {
+		if r.Result != nil && r.Result.IsController {
+			*ms = *r.Result
+			return nil
+		}
+	}
+	return errgo.WithCausef(nil, params.ErrNotFound, "controller model not found")
+}
