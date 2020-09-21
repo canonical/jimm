@@ -47,8 +47,8 @@ func FromUserID(s string) (params.User, error) {
 }
 
 // ParseUserTag parses the given string as a user tag and converts it to a
-// params.User. If the givne string is not a valid user tag then an error
-// is returned with a cuause of params.ErrBadRequest. If the user tag
+// params.User. If the given string is not a valid user tag then an error
+// is returned with a cause of params.ErrBadRequest. If the user tag
 // represents a juju local user an error with a cause of ErrLocalUser is
 // returned.
 func ParseUserTag(s string) (params.User, error) {
