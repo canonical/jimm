@@ -269,13 +269,9 @@ func (r *controllerRoot) CreateModel(ctx context.Context, args jujuparams.ModelC
 }
 
 func (r *controllerRoot) createModel(ctx context.Context, args jujuparams.ModelCreateArgs) (*jujuparams.ModelInfo, error) {
-	ownerTag, err := names.ParseUserTag(args.OwnerTag)
+	owner, err := conv.ParseUserTag(args.OwnerTag)
 	if err != nil {
-		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid owner tag")
-	}
-	owner, err := conv.FromUserTag(ownerTag)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
+		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(conv.ErrLocalUser))
 	}
 	if args.CloudTag == "" {
 		return nil, errgo.New("no cloud specified for model; please specify one")
@@ -383,13 +379,9 @@ func (r *controllerRoot) modifyModelAccess(ctx context.Context, change jujuparam
 		}
 		return errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
 	}
-	userTag, err := names.ParseUserTag(change.UserTag)
+	user, err := conv.ParseUserTag(change.UserTag)
 	if err != nil {
-		return errgo.WithCausef(err, params.ErrBadRequest, "invalid user tag")
-	}
-	user, err := conv.FromUserTag(userTag)
-	if err != nil {
-		return errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
+		return errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(conv.ErrLocalUser))
 	}
 	conn, err := r.jem.OpenAPI(ctx, model.Controller)
 	if err != nil {

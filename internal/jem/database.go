@@ -9,7 +9,6 @@ import (
 	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
-	"github.com/juju/names/v4"
 	"github.com/juju/version"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
@@ -1500,11 +1499,7 @@ func makeApplicationOfferFilterQuery(filter jujuparams.OfferFilter) bson.D {
 	if len(filter.AllowedConsumerTags) > 0 {
 		users := make([]bson.D, 0, len(filter.AllowedConsumerTags))
 		for _, userTag := range filter.AllowedConsumerTags {
-			ut, err := names.ParseUserTag(userTag)
-			var user params.User
-			if err == nil {
-				user, err = conv.FromUserTag(ut)
-			}
+			user, err := conv.ParseUserTag(userTag)
 			if err != nil {
 				// If this user does not parse then it will never match
 				// a record, add a query that can't match.
