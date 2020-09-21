@@ -6,10 +6,8 @@ import (
 	"context"
 	"time"
 
-	cloudapi "github.com/juju/juju/api/cloud"
 	apicontroller "github.com/juju/juju/api/controller"
 	jujuparams "github.com/juju/juju/apiserver/params"
-	"github.com/juju/juju/cloud"
 	"github.com/juju/names/v4"
 	"gopkg.in/errgo.v1"
 
@@ -146,12 +144,4 @@ func (a apiShim) WatchAllModels() (allWatcher, error) {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
 	return w, nil
-}
-
-func (a apiShim) Clouds() (map[names.CloudTag]cloud.Cloud, error) {
-	clouds, err := cloudapi.NewClient(a.Conn).Clouds()
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Any)
-	}
-	return clouds, nil
 }

@@ -559,10 +559,6 @@ func (s *jujuAPIShim) ServerVersion() (version.Number, bool) {
 	return s.serverVersion, true
 }
 
-func (s *jujuAPIShim) Clouds() (map[names.CloudTag]cloud.Cloud, error) {
-	return s.clouds, nil
-}
-
 type watcherShim struct {
 	jujuAPIShim *jujuAPIShim
 	mu          sync.Mutex
