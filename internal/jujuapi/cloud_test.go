@@ -1043,7 +1043,7 @@ func (s *cloudSuite) TestModifyCloudAccess(c *gc.C) {
 	})
 
 	// Check that alice@external does not yet have access
-	conn2 := s.open(c, nil, "alice@external")
+	conn2 := s.open(c, nil, "alice")
 	defer conn2.Close()
 	client2 := cloudapi.NewClient(conn2)
 	clouds, err = client2.Clouds()
@@ -1108,7 +1108,7 @@ func (s *cloudSuite) TestModifyCloudAccessUnauthorized(c *gc.C) {
 	})
 
 	// Check that alice@external does not yet have access
-	conn2 := s.open(c, nil, "alice@external")
+	conn2 := s.open(c, nil, "alice")
 	defer conn2.Close()
 	client2 := cloudapi.NewClient(conn2)
 	clouds, err = client2.Clouds()

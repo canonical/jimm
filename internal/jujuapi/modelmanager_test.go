@@ -945,7 +945,7 @@ var createModelTests = []struct {
 	ownerTag:      "user-test/test@external",
 	cloudTag:      names.NewCloudTag("dummy").String(),
 	credentialTag: "cloudcred-dummy_test@external_cred1",
-	expectError:   `invalid owner tag: "user-test/test@external" is not a valid user tag \(bad request\)`,
+	expectError:   `"user-test/test@external" is not a valid user tag \(bad request\)`,
 }, {
 	about:         "specific cloud",
 	name:          "model-6",
@@ -1130,7 +1130,7 @@ func (s *modelManagerSuite) TestModifyModelAccessErrors(c *gc.C) {
 			Access:   jujuparams.ModelReadAccess,
 			ModelTag: names.NewModelTag(mi.UUID).String(),
 		},
-		expectError: `invalid user tag: "not-a-user-tag" is not a valid tag`,
+		expectError: `"not-a-user-tag" is not a valid tag`,
 	}, {
 		about: "unknown action",
 		modifyModelAccess: jujuparams.ModifyModelAccess{

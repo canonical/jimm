@@ -245,13 +245,9 @@ func (r *controllerRoot) UserCredentials(ctx context.Context, userclouds jujupar
 
 // userCredentials retrieves the credentials stored for given owner and cloud.
 func (r *controllerRoot) userCredentials(ctx context.Context, ownerTag, cloudTag string) ([]string, error) {
-	ot, err := names.ParseUserTag(ownerTag)
+	owner, err := conv.ParseUserTag(ownerTag)
 	if err != nil {
-		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
-	}
-	owner, err := conv.FromUserTag(ot)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
+		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(conv.ErrLocalUser))
 	}
 	cld, err := names.ParseCloudTag(cloudTag)
 	if err != nil {
@@ -558,9 +554,9 @@ func (r *controllerRoot) ModifyCloudAccess(ctx context.Context, args jujuparams.
 }
 
 func (r *controllerRoot) modifyCloudAccess(ctx context.Context, change jujuparams.ModifyCloudAccess) error {
-	userTag, err := names.ParseUserTag(change.UserTag)
+	user, err := conv.ParseUserTag(change.UserTag)
 	if err != nil {
-		return errgo.WithCausef(err, params.ErrBadRequest, "")
+		return errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(conv.ErrLocalUser))
 	}
 	cloudTag, err := names.ParseCloudTag(change.CloudTag)
 	if err != nil {
@@ -575,7 +571,7 @@ func (r *controllerRoot) modifyCloudAccess(ctx context.Context, change jujuparam
 	default:
 		return errgo.WithCausef(nil, params.ErrBadRequest, "unsupported modify cloud action %q", change.Action)
 	}
-	if err := modifyf(ctx, r.identity, params.Cloud(cloudTag.Id()), params.User(userTag.Id()), change.Access); err != nil {
+	if err := modifyf(ctx, r.identity, params.Cloud(cloudTag.Id()), user, change.Access); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	return nil

@@ -7,7 +7,6 @@ import (
 
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/permission"
-	"github.com/juju/names/v4"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
@@ -75,13 +74,9 @@ func (r *controllerRoot) UserInfo(ctx context.Context, req jujuparams.UserInfoRe
 }
 
 func (r *controllerRoot) userInfo(ctx context.Context, entity string) (*jujuparams.UserInfo, error) {
-	userTag, err := names.ParseUserTag(entity)
+	user, err := conv.ParseUserTag(entity)
 	if err != nil {
-		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid user tag")
-	}
-	user, err := conv.FromUserTag(userTag)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
+		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(conv.ErrLocalUser))
 	}
 	if r.identity.Id() != string(user) {
 		return nil, params.ErrUnauthorized
