@@ -1,8 +1,8 @@
 // GENERATED FILE - DO NOT EDIT
 //
 // Generated from:
-//   Juju Version:   2.8.2
-//   Module Version: v0.0.0-20200911052050-f95683fcb37b
+//   Juju Version:   2.8.4
+//   Module Version: v0.0.0-20200924052920-602dbc79f0fe
 
 package cloudcred
 
