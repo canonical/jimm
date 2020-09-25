@@ -39,6 +39,7 @@ if [ -n "${http_proxy:-}" ]; then
 	lxd_exec_ubuntu git config --global http.proxy ${http_proxy:-}
 fi
 lxd_exec snap install go --classic
+lxd_exec snap install vault
 
 lxc file push --uid 1000 --gid 1000 --mode 600 ${NETRC:-$HOME/.netrc} $container/home/ubuntu/.netrc
 lxd_exec_ubuntu mkdir -p /home/ubuntu/src
