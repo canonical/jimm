@@ -4,6 +4,7 @@ package apiconn_test
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -11,6 +12,8 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/environs/config"
 	jujuversion "github.com/juju/juju/version"
+	"github.com/juju/names/v4"
+	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
@@ -248,4 +251,25 @@ func (s *modelmanagerSuite) TestRevokeModelAccessError(c *gc.C) {
 	c.Check(apiconn.IsAPIError(err), gc.Equals, true)
 	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
 	c.Check(err, gc.ErrorMatches, `api error: could not lookup model: model "00000000-0000-0000-0000-000000000000" not found`)
+}
+
+func (s *modelmanagerSuite) TestValidateModelUpgrade(c *gc.C) {
+	ctx := context.Background()
+
+	model := mongodoc.Model{
+		Path: params.EntityPath{
+			User: "test-user",
+			Name: "test-model",
+		},
+	}
+
+	err := s.conn.CreateModel(ctx, &model)
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.conn.ValidateModelUpgrade(ctx, names.NewModelTag(model.UUID), true)
+	c.Assert(err, gc.Equals, nil)
+
+	uuid := utils.MustNewUUID().String()
+	err = s.conn.ValidateModelUpgrade(ctx, names.NewModelTag(uuid), false)
+	c.Assert(err, gc.ErrorMatches, fmt.Sprintf("api error: model %q not found", uuid))
 }

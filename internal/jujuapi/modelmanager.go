@@ -36,6 +36,7 @@ func init() {
 		modelInfoMethod := rpc.Method(r.ModelInfo)
 		modelStatusMethod := rpc.Method(r.ModelStatus)
 		modifyModelAccessMethod := rpc.Method(r.ModifyModelAccess)
+		validateModelUpgradesMethod := rpc.Method(r.ValidateModelUpgrades)
 
 		r.AddMethod("ModelManager", 2, "CreateModel", createModelMethod)
 		r.AddMethod("ModelManager", 2, "DestroyModels", destroyModelsMethod)
@@ -74,8 +75,56 @@ func init() {
 		r.AddMethod("ModelManager", 5, "ModelInfo", modelInfoMethod)
 		r.AddMethod("ModelManager", 5, "ModelStatus", modelStatusMethod)
 		r.AddMethod("ModelManager", 5, "ModifyModelAccess", modifyModelAccessMethod)
+		// TODO (ashipika) From ModelManager V5: missing ModelDefaultsForClouds method
 
-		return []int{2, 3, 4, 5}
+		r.AddMethod("ModelManager", 6, "ChangeModelCredential", changeModelCredentialMethod)
+		r.AddMethod("ModelManager", 6, "CreateModel", createModelMethod)
+		r.AddMethod("ModelManager", 6, "DestroyModels", destroyModelsV4Method)
+		r.AddMethod("ModelManager", 6, "DumpModels", dumpModelsV3Method)
+		r.AddMethod("ModelManager", 6, "DumpModelsDB", dumpModelsDBMethod)
+		r.AddMethod("ModelManager", 6, "ListModelSummaries", listModelSummariesMethod)
+		r.AddMethod("ModelManager", 6, "ListModels", listModelsMethod)
+		r.AddMethod("ModelManager", 6, "ModelInfo", modelInfoMethod)
+		r.AddMethod("ModelManager", 6, "ModelStatus", modelStatusMethod)
+		r.AddMethod("ModelManager", 6, "ModifyModelAccess", modifyModelAccessMethod)
+
+		r.AddMethod("ModelManager", 7, "ChangeModelCredential", changeModelCredentialMethod)
+		r.AddMethod("ModelManager", 7, "CreateModel", createModelMethod)
+		// TODO (ashipika) From ModelManager v7 onwards, DestroyModels gains 'force' and 'max-wait' parameters.
+		r.AddMethod("ModelManager", 7, "DestroyModels", destroyModelsV4Method)
+		r.AddMethod("ModelManager", 7, "DumpModels", dumpModelsV3Method)
+		r.AddMethod("ModelManager", 7, "DumpModelsDB", dumpModelsDBMethod)
+		r.AddMethod("ModelManager", 7, "ListModelSummaries", listModelSummariesMethod)
+		r.AddMethod("ModelManager", 7, "ListModels", listModelsMethod)
+		r.AddMethod("ModelManager", 7, "ModelInfo", modelInfoMethod)
+		r.AddMethod("ModelManager", 7, "ModelStatus", modelStatusMethod)
+		r.AddMethod("ModelManager", 7, "ModifyModelAccess", modifyModelAccessMethod)
+
+		r.AddMethod("ModelManager", 8, "ChangeModelCredential", changeModelCredentialMethod)
+		r.AddMethod("ModelManager", 8, "CreateModel", createModelMethod)
+		r.AddMethod("ModelManager", 8, "DestroyModels", destroyModelsV4Method)
+		r.AddMethod("ModelManager", 8, "DumpModels", dumpModelsV3Method)
+		r.AddMethod("ModelManager", 8, "DumpModelsDB", dumpModelsDBMethod)
+		r.AddMethod("ModelManager", 8, "ListModelSummaries", listModelSummariesMethod)
+		r.AddMethod("ModelManager", 8, "ListModels", listModelsMethod)
+		// TODO (ashipika) ModelInfo gains credential validity in return.
+		r.AddMethod("ModelManager", 8, "ModelInfo", modelInfoMethod)
+		r.AddMethod("ModelManager", 8, "ModelStatus", modelStatusMethod)
+		r.AddMethod("ModelManager", 8, "ModifyModelAccess", modifyModelAccessMethod)
+
+		r.AddMethod("ModelManager", 9, "ChangeModelCredential", changeModelCredentialMethod)
+		r.AddMethod("ModelManager", 9, "CreateModel", createModelMethod)
+		r.AddMethod("ModelManager", 9, "DestroyModels", destroyModelsV4Method)
+		r.AddMethod("ModelManager", 9, "DumpModels", dumpModelsV3Method)
+		r.AddMethod("ModelManager", 9, "DumpModelsDB", dumpModelsDBMethod)
+		r.AddMethod("ModelManager", 9, "ListModelSummaries", listModelSummariesMethod)
+		r.AddMethod("ModelManager", 9, "ListModels", listModelsMethod)
+		r.AddMethod("ModelManager", 9, "ModelInfo", modelInfoMethod)
+		r.AddMethod("ModelManager", 9, "ModelStatus", modelStatusMethod)
+		r.AddMethod("ModelManager", 9, "ModifyModelAccess", modifyModelAccessMethod)
+		r.AddMethod("ModelManager", 9, "ValidateModelUpgrades", validateModelUpgradesMethod)
+
+		return []int{2, 3, 4, 5, 6, 7, 8, 9}
 	}
 }
 
@@ -519,4 +568,24 @@ func (r *controllerRoot) changeModelCredential(ctx context.Context, arg jujupara
 		return errgo.Mask(err)
 	}
 	return nil
+}
+
+// ValidateModelUpgrades validates if a model is allowed to perform an upgrade.
+// Examples of why you would want to block a model upgrade, would be situations
+// like upgrade-series. If performing an upgrade-series we don't know the
+// current status of the machine, so performing an upgrade-model can lead to
+// bad unintended errors down the line.
+func (r *controllerRoot) ValidateModelUpgrades(ctx context.Context, args jujuparams.ValidateModelUpgradeParams) (jujuparams.ErrorResults, error) {
+	results := make([]jujuparams.ErrorResult, len(args.Models))
+	for i, arg := range args.Models {
+		modelTag, err := names.ParseModelTag(arg.ModelTag)
+		if err != nil {
+			results[i].Error = mapError(errgo.WithCausef(err, params.ErrBadRequest, ""))
+			continue
+		}
+		results[i].Error = mapError(r.jem.ValidateModelUpgrade(ctx, r.identity, modelTag.Id(), args.Force))
+	}
+	return jujuparams.ErrorResults{
+		Results: results,
+	}, nil
 }
