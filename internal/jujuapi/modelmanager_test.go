@@ -4,6 +4,7 @@ package jujuapi_test
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -1650,6 +1651,28 @@ func (s *caasModelManagerSuite) TestListCAASModels(c *gc.C) {
 		Owner: "test@external",
 		Type:  "caas",
 	}})
+}
+
+func (s *modelManagerSuite) TestValidateModelUpgrades(c *gc.C) {
+	ctx := context.Background()
+
+	ctlPath := params.EntityPath{User: "alice", Name: "controller-1"}
+	s.AssertAddController(ctx, c, ctlPath, true)
+	s.AssertUpdateCredential(ctx, c, "alice", "dummy", "cred1", "empty")
+	mi := s.assertCreateModel(c, createModelParams{name: "test-model", username: "alice", cred: "cred1"})
+	s.AssertUpdateCredential(ctx, c, "bob", "dummy", "cred2", "empty")
+
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	modelTag := names.NewModelTag(mi.UUID)
+	client := modelmanager.NewClient(conn)
+	err := client.ValidateModelUpgrade(modelTag, false)
+	c.Assert(err, gc.Equals, nil)
+
+	uuid := utils.MustNewUUID().String()
+	err = client.ValidateModelUpgrade(names.NewModelTag(uuid), false)
+	c.Assert(err, gc.ErrorMatches, fmt.Sprintf("model %q not found", uuid))
 }
 
 func (s *caasModelManagerSuite) AssertAddKubernetesCloud(c *gc.C, credTag names.CloudCredentialTag) {
