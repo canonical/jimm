@@ -90,7 +90,6 @@ func init() {
 
 		r.AddMethod("ModelManager", 7, "ChangeModelCredential", changeModelCredentialMethod)
 		r.AddMethod("ModelManager", 7, "CreateModel", createModelMethod)
-		// TODO (ashipika) From ModelManager v7 onwards, DestroyModels gains 'force' and 'max-wait' parameters.
 		r.AddMethod("ModelManager", 7, "DestroyModels", destroyModelsV4Method)
 		r.AddMethod("ModelManager", 7, "DumpModels", dumpModelsV3Method)
 		r.AddMethod("ModelManager", 7, "DumpModelsDB", dumpModelsDBMethod)
@@ -107,7 +106,6 @@ func init() {
 		r.AddMethod("ModelManager", 8, "DumpModelsDB", dumpModelsDBMethod)
 		r.AddMethod("ModelManager", 8, "ListModelSummaries", listModelSummariesMethod)
 		r.AddMethod("ModelManager", 8, "ListModels", listModelsMethod)
-		// TODO (ashipika) ModelInfo gains credential validity in return.
 		r.AddMethod("ModelManager", 8, "ModelInfo", modelInfoMethod)
 		r.AddMethod("ModelManager", 8, "ModelStatus", modelStatusMethod)
 		r.AddMethod("ModelManager", 8, "ModifyModelAccess", modifyModelAccessMethod)
