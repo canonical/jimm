@@ -1,5 +1,7 @@
 module github.com/CanonicalLtd/jimm
 
+go 1.14
+
 require (
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/canonical/candid v1.4.2
@@ -53,7 +55,4 @@ replace (
 )
 
 replace github.com/hashicorp/raft => github.com/juju/raft v1.0.1-0.20190319034642-834fca2f9ffc
-
-go 1.12
-
 replace gopkg.in/macaroon-bakery.v2-unstable => github.com/wallyworld/macaroon-bakery v0.0.0-20200108032212-15effef1340d

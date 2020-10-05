@@ -12,7 +12,7 @@ import (
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm"
+	jem "github.com/CanonicalLtd/jimm"
 	"github.com/CanonicalLtd/jimm/internal/apitest"
 	"github.com/CanonicalLtd/jimm/params"
 )
@@ -67,7 +67,7 @@ func (s *apiSuite) TestGUIModelNotFound(c *gc.C) {
 		ExpectStatus: http.StatusNotFound,
 		ExpectBody: params.Error{
 			Code:    params.ErrNotFound,
-			Message: `model "000000000000-0000-0000-0000-00000000" not found`,
+			Message: `model not found`,
 		},
 	})
 }

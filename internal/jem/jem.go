@@ -355,15 +355,15 @@ func apiInfoFromDoc(ctl *mongodoc.Controller) *api.Info {
 // The returned connection must be closed when finished with.
 func (j *JEM) OpenModelAPI(ctx context.Context, path params.EntityPath) (_ *apiconn.Conn, err error) {
 	defer j.DB.checkError(ctx, &err)
-	m, err := j.DB.Model(ctx, path)
-	if err != nil {
+	m := mongodoc.Model{Path: path}
+	if err := j.DB.GetModel(ctx, &m); err != nil {
 		return nil, errgo.NoteMask(err, "cannot get model", errgo.Is(params.ErrNotFound))
 	}
 	ctl, err := j.DB.Controller(ctx, m.Controller)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot get controller")
 	}
-	return j.openModelAPIFromDocs(ctx, ctl, m)
+	return j.openModelAPIFromDocs(ctx, ctl, &m)
 }
 
 // openModelAPIFromDocs returns an API connection to the model held in the
@@ -391,6 +391,85 @@ func apiInfoFromDocs(ctl *mongodoc.Controller, m *mongodoc.Model) *api.Info {
 		Tag:      names.NewUserTag(ctl.AdminUser),
 		Password: ctl.AdminPassword,
 	}
+}
+
+// GetModel retrieves the given model from the database using
+// Database.GetModel. It then checks that the given user has the given
+// access level on the model. If the model cannot be found then an error
+// with a cause of params.ErrNotFound is returned. If the given user
+// does not have the correct access level on the model then an error of
+// type params.ErrUnauthorized will be returned.
+func (j *JEM) GetModel(ctx context.Context, id identchecker.ACLIdentity, access jujuparams.UserAccessPermission, m *mongodoc.Model) error {
+	if err := j.DB.GetModel(ctx, m); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+
+	// Currently in JAAS the namespace user has full access to the model.
+	acl := []string{string(m.Path.User)}
+	switch access {
+	case jujuparams.ModelReadAccess:
+		acl = append(acl, m.ACL.Read...)
+		fallthrough
+	case jujuparams.ModelWriteAccess:
+		acl = append(acl, m.ACL.Write...)
+		fallthrough
+	case jujuparams.ModelAdminAccess:
+		acl = append(acl, m.ACL.Admin...)
+	}
+	if err := auth.CheckACL(ctx, id, acl); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+
+	if m.Cloud == "" {
+		// The model does not currently store its cloud information so go
+		// and fetch it from the model itself. This happens if the model
+		// was created with a JIMM version older than 0.9.5.
+		if err := j.updateModelInfo(ctx, m); err != nil {
+			// Log the failure, but return what we have to the caller.
+			zapctx.Error(ctx, "cannot update model info", zap.Error(err))
+		}
+	}
+	return nil
+}
+
+// updateModelInfo retrieves model parameters missing in the current database
+// from the controller.
+func (j *JEM) updateModelInfo(ctx context.Context, model *mongodoc.Model) error {
+	conn, err := j.OpenAPI(ctx, model.Controller)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	info := jujuparams.ModelInfo{UUID: model.UUID}
+	if err := conn.ModelInfo(ctx, &info); err != nil {
+		return errgo.Mask(err)
+	}
+	cloudTag, err := names.ParseCloudTag(info.CloudTag)
+	if err != nil {
+		return errgo.Notef(err, "bad data from controller")
+	}
+	credentialTag, err := names.ParseCloudCredentialTag(info.CloudCredentialTag)
+	if err != nil {
+		return errgo.Notef(err, "bad data from controller")
+	}
+	model.Cloud = params.Cloud(cloudTag.Id())
+	model.CloudRegion = info.CloudRegion
+	owner, err := conv.FromUserTag(credentialTag.Owner())
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
+	}
+	model.Credential = mongodoc.CredentialPath{
+		Cloud: string(params.Cloud(credentialTag.Cloud().Id())),
+		EntityPath: mongodoc.EntityPath{
+			User: string(owner),
+			Name: credentialTag.Name(),
+		},
+	}
+	model.DefaultSeries = info.DefaultSeries
+
+	if err := j.DB.UpdateLegacyModel(ctx, model); err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
 }
 
 // Controller retrieves the given controller from the database,

@@ -17,6 +17,7 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/apitest"
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -91,10 +92,11 @@ func (s *websocketSuite) assertCreateModel(c *gc.C, p createModelParams) base.Mo
 func (s *websocketSuite) grant(c *gc.C, path params.EntityPath, user params.User, access string) {
 	ctx := context.Background()
 
-	m, err := s.JEM.DB.Model(ctx, path)
+	m := mongodoc.Model{Path: path}
+	err := s.JEM.DB.GetModel(ctx, &m)
 	c.Assert(err, gc.Equals, nil)
 	conn, err := s.JEM.OpenAPI(ctx, m.Controller)
 	c.Assert(err, gc.Equals, nil)
-	err = s.JEM.GrantModel(ctx, conn, m, user, access)
+	err = s.JEM.GrantModel(ctx, conn, &m, user, access)
 	c.Assert(err, gc.Equals, nil)
 }
