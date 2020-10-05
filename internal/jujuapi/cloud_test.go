@@ -582,6 +582,12 @@ func (s *cloudSuite) TestCredential(c *gc.C) {
 		names.NewCloudCredentialTag("dummy/admin@local/cred6"),
 	)
 	c.Assert(err, gc.Equals, nil)
+	for i := range creds {
+		if creds[i].Result == nil {
+			continue
+		}
+		sort.Strings(creds[i].Result.Redacted)
+	}
 	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Result: &jujuparams.CloudCredential{
 			AuthType: "userpass",

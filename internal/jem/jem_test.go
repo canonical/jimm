@@ -25,6 +25,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
+	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
@@ -104,12 +105,14 @@ func (s *jemSuite) TestPoolDoesNotReuseDeadConnection(c *gc.C) {
 	defer pool.Close()
 
 	assertOK := func(j *jem.JEM) {
-		_, err := j.DB.Model(testContext, params.EntityPath{"bob", "x"})
+		m := mongodoc.Model{Path: params.EntityPath{"bob", "x"}}
+		err := j.DB.GetModel(testContext, &m)
 		c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	}
 	assertBroken := func(j *jem.JEM) {
-		_, err := j.DB.Model(testContext, params.EntityPath{"bob", "x"})
-		c.Assert(err, gc.ErrorMatches, `cannot get model "bob/x": EOF`)
+		m := mongodoc.Model{Path: params.EntityPath{"bob", "x"}}
+		err = j.DB.GetModel(testContext, &m)
+		c.Assert(err, gc.ErrorMatches, `cannot get model: EOF`)
 	}
 
 	// Get a JEM instance and perform a single operation so that the session used by the
@@ -170,7 +173,8 @@ func (s *jemSuite) TestPoolDoesNotReuseDeadConnection(c *gc.C) {
 func (s *jemSuite) TestClone(c *gc.C) {
 	j := s.jem.Clone()
 	j.Close()
-	_, err := s.jem.DB.Model(testContext, params.EntityPath{"bob", "x"})
+	m := mongodoc.Model{Path: params.EntityPath{"bob", "x"}}
+	err := s.jem.DB.GetModel(testContext, &m)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
@@ -597,7 +601,8 @@ func (s *jemSuite) TestGrantModelWrite(c *gc.C) {
 	defer conn.Close()
 	err = s.jem.GrantModel(testContext, conn, model, "alice", "write")
 	c.Assert(err, gc.Equals, nil)
-	model1, err := s.jem.DB.Model(testContext, model.Path)
+	model1 := mongodoc.Model{Path: model.Path}
+	err = s.jem.DB.GetModel(testContext, &model1)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
 		Read:  []string{"alice"},
@@ -612,7 +617,8 @@ func (s *jemSuite) TestGrantModelRead(c *gc.C) {
 	defer conn.Close()
 	err = s.jem.GrantModel(testContext, conn, model, "alice", "read")
 	c.Assert(err, gc.Equals, nil)
-	model1, err := s.jem.DB.Model(testContext, model.Path)
+	model1 := mongodoc.Model{Path: model.Path}
+	err = s.jem.DB.GetModel(testContext, &model1)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
 		Read: []string{"alice"},
@@ -626,7 +632,8 @@ func (s *jemSuite) TestGrantModelBadLevel(c *gc.C) {
 	defer conn.Close()
 	err = s.jem.GrantModel(testContext, conn, model, "alice", "superpowers")
 	c.Assert(err, gc.ErrorMatches, `api error: could not modify model access: "superpowers" model access not valid`)
-	model1, err := s.jem.DB.Model(testContext, model.Path)
+	model1 := mongodoc.Model{Path: model.Path}
+	err = s.jem.DB.GetModel(testContext, &model1)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{})
 }
@@ -638,7 +645,8 @@ func (s *jemSuite) TestRevokeModel(c *gc.C) {
 	defer conn.Close()
 	err = s.jem.GrantModel(testContext, conn, model, "alice", "admin")
 	c.Assert(err, gc.Equals, nil)
-	model1, err := s.jem.DB.Model(testContext, model.Path)
+	model1 := mongodoc.Model{Path: model.Path}
+	err = s.jem.DB.GetModel(testContext, &model1)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
 		Read:  []string{"alice"},
@@ -647,7 +655,7 @@ func (s *jemSuite) TestRevokeModel(c *gc.C) {
 	})
 	err = s.jem.RevokeModel(testContext, conn, model, "alice", "read")
 	c.Assert(err, gc.Equals, nil)
-	model1, err = s.jem.DB.Model(testContext, model.Path)
+	err = s.jem.DB.GetModel(testContext, &model1)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{})
 }
@@ -659,7 +667,8 @@ func (s *jemSuite) TestRevokeModelAdmin(c *gc.C) {
 	defer conn.Close()
 	err = s.jem.GrantModel(testContext, conn, model, "alice", "admin")
 	c.Assert(err, gc.Equals, nil)
-	model1, err := s.jem.DB.Model(testContext, model.Path)
+	model1 := mongodoc.Model{Path: model.Path}
+	err = s.jem.DB.GetModel(testContext, &model1)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
 		Read:  []string{"alice"},
@@ -668,7 +677,7 @@ func (s *jemSuite) TestRevokeModelAdmin(c *gc.C) {
 	})
 	err = s.jem.RevokeModel(testContext, conn, model, "alice", "admin")
 	c.Assert(err, gc.Equals, nil)
-	model1, err = s.jem.DB.Model(testContext, model.Path)
+	err = s.jem.DB.GetModel(testContext, &model1)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
 		Read:  []string{"alice"},
@@ -683,7 +692,8 @@ func (s *jemSuite) TestRevokeModelWrite(c *gc.C) {
 	defer conn.Close()
 	err = s.jem.GrantModel(testContext, conn, model, "alice", "admin")
 	c.Assert(err, gc.Equals, nil)
-	model1, err := s.jem.DB.Model(testContext, model.Path)
+	model1 := mongodoc.Model{Path: model.Path}
+	err = s.jem.DB.GetModel(testContext, &model1)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
 		Read:  []string{"alice"},
@@ -692,7 +702,7 @@ func (s *jemSuite) TestRevokeModelWrite(c *gc.C) {
 	})
 	err = s.jem.RevokeModel(testContext, conn, model, "alice", "write")
 	c.Assert(err, gc.Equals, nil)
-	model1, err = s.jem.DB.Model(testContext, model.Path)
+	err = s.jem.DB.GetModel(testContext, &model1)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
 		Read: []string{"alice"},
@@ -706,7 +716,8 @@ func (s *jemSuite) TestRevokeModelControllerFailure(c *gc.C) {
 	defer conn.Close()
 	err = s.jem.GrantModel(testContext, conn, model, "alice", "write")
 	c.Assert(err, gc.Equals, nil)
-	model1, err := s.jem.DB.Model(testContext, model.Path)
+	model1 := mongodoc.Model{Path: model.Path}
+	err = s.jem.DB.GetModel(testContext, &model1)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
 		Read:  []string{"alice"},
@@ -714,7 +725,7 @@ func (s *jemSuite) TestRevokeModelControllerFailure(c *gc.C) {
 	})
 	err = s.jem.RevokeModel(testContext, conn, model, "alice", "superpowers")
 	c.Assert(err, gc.ErrorMatches, `"superpowers" model access not valid`)
-	model1, err = s.jem.DB.Model(testContext, model.Path)
+	err = s.jem.DB.GetModel(testContext, &model1)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
 		Read:  []string{"alice"},
@@ -739,7 +750,8 @@ func (s *jemSuite) TestDestroyModel(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// Check the model is dying.
-	m, err := s.jem.DB.Model(testContext, model.Path)
+	m := mongodoc.Model{Path: model.Path}
+	err = s.jem.DB.GetModel(testContext, &m)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(m.Life(), gc.Equals, "dying")
 
@@ -748,7 +760,7 @@ func (s *jemSuite) TestDestroyModel(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// Check the model is still dying.
-	_, err = s.jem.DB.Model(testContext, model.Path)
+	err = s.jem.DB.GetModel(testContext, &m)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(m.Life(), gc.Equals, "dying")
 }
@@ -1423,7 +1435,8 @@ func (s *jemSuite) TestUpdateModelCredential(c *gc.C) {
 		Type: "empty",
 	})
 	c.Assert(err, gc.Equals, nil)
-	model1, err := s.jem.DB.Model(testContext, model.Path)
+	model1 := mongodoc.Model{Path: model.Path}
+	err = s.jem.DB.GetModel(testContext, &model1)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.Credential, jc.DeepEquals, mongodoc.CredentialPathFromParams(credPath))
 }
@@ -1479,6 +1492,40 @@ func (s *jemSuite) TestWatchAllModelSummaries(c *gc.C) {
 	}
 }
 
+func (s *jemSuite) TestGetModel(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{"test", "model"})
+
+	model1 := mongodoc.Model{Path: model.Path}
+	err := s.jem.GetModel(testContext, jemtest.NewIdentity("test"), jujuparams.ModelReadAccess, &model1)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(model1, jc.DeepEquals, *model)
+
+	_, err = s.jem.DB.Models().FindId(model.Id).Apply(mgo.Change{
+		Update: bson.D{{"$unset", bson.D{
+			{"cloud", ""},
+			{"cloudregion", ""},
+			{"credential", ""},
+			{"defaultseries", ""},
+		}}},
+	}, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	model2 := mongodoc.Model{UUID: model.UUID}
+	err = s.jem.GetModel(testContext, jemtest.NewIdentity("test"), jujuparams.ModelReadAccess, &model2)
+	c.Assert(err, gc.Equals, nil)
+
+	c.Assert(model2, gc.DeepEquals, model1)
+}
+
+func (s *jemSuite) TestGetModelUnauthorized(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{"test", "model"})
+
+	model1 := mongodoc.Model{Path: model.Path}
+	err := s.jem.GetModel(testContext, jemtest.NewIdentity("not-test"), jujuparams.ModelReadAccess, &model1)
+	c.Assert(err, gc.ErrorMatches, "unauthorized")
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
+}
+
 func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityPath {
 	return addController(c, path, s.APIInfo(c), s.jem)
 }
@@ -1515,7 +1562,7 @@ func (s *jemSuite) bootstrapModel(c *gc.C, path params.EntityPath) *mongodoc.Mod
 		ControllerPath: ctlPath,
 		Credential: params.CredentialPath{
 			Cloud: "dummy",
-			User:  "bob",
+			User:  path.User,
 			Name:  "cred",
 		},
 		Cloud: "dummy",

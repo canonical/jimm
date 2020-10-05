@@ -1357,7 +1357,8 @@ type modelStats struct {
 }
 
 func (s *internalSuite) modelStats(c *gc.C, modelPath params.EntityPath) modelStats {
-	modelDoc, err := s.jem.DB.Model(testContext, modelPath)
+	modelDoc := mongodoc.Model{Path: modelPath}
+	err := s.jem.DB.GetModel(testContext, &modelDoc)
 	// The database now deletes any models set to "dead", if the
 	// model cannot be found then return that it is "dead".
 	if errgo.Cause(err) == params.ErrNotFound {

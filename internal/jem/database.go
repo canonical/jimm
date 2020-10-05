@@ -341,37 +341,36 @@ func (db *Database) Controller(ctx context.Context, path params.EntityPath) (_ *
 	return &ctl, nil
 }
 
-// Model returns information on the model with the given
-// path. It returns an error with a params.ErrNotFound cause if the
-// controller was not found.
-func (db *Database) Model(ctx context.Context, path params.EntityPath) (_ *mongodoc.Model, err error) {
+// GetModel completes the contents of the given model. The database model
+// is matched using the first non-zero value in the given model from the
+// following fields:
+//
+//  - Path
+//  - UUID
+//
+// If no matching model can be found then the returned error will have a
+// cause of params.ErrNotFound.
+func (db *Database) GetModel(ctx context.Context, m *mongodoc.Model) (err error) {
 	defer db.checkError(ctx, &err)
-	id := path.String()
-	var m mongodoc.Model
-	err = db.Models().FindId(id).One(&m)
+	var q *mgo.Query
+	switch {
+	case m == nil:
+		return errgo.WithCausef(nil, params.ErrNotFound, "model not found")
+	case !m.Path.IsZero():
+		q = db.Models().FindId(m.Path.String())
+	case m.UUID != "":
+		q = db.Models().Find(bson.D{{"uuid", m.UUID}})
+	default:
+		return errgo.WithCausef(nil, params.ErrNotFound, "model not found")
+	}
+	err = q.One(m)
 	if err == mgo.ErrNotFound {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "model %q not found", id)
+		return errgo.WithCausef(nil, params.ErrNotFound, "model not found")
 	}
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot get model %q", id)
+		return errgo.Notef(err, "cannot get model")
 	}
-	return &m, nil
-}
-
-// ModelFromUUID returns the document representing the model with the
-// given UUID. It returns an error with a params.ErrNotFound cause if the
-// model was not found.
-func (db *Database) ModelFromUUID(ctx context.Context, uuid string) (_ *mongodoc.Model, err error) {
-	defer db.checkError(ctx, &err)
-	var m mongodoc.Model
-	err = db.Models().Find(bson.D{{"uuid", uuid}}).One(&m)
-	if err == mgo.ErrNotFound {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "model %q not found", uuid)
-	}
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot get model %q", uuid)
-	}
-	return &m, nil
+	return nil
 }
 
 // modelFromControllerAndUUID returns the document representing the model

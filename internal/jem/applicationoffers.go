@@ -16,7 +16,6 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
-	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
@@ -30,16 +29,11 @@ func (j *JEM) Offer(ctx context.Context, id identchecker.ACLIdentity, offer juju
 		return errgo.WithCausef(err, params.ErrBadRequest, "")
 	}
 
-	model, err := j.DB.ModelFromUUID(ctx, modelTag.Id())
-	if err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	model := mongodoc.Model{
+		UUID: modelTag.Id(),
 	}
-
-	// The model owner is currently always an admin.
-	if err = auth.CheckIsUser(ctx, id, model.Path.User); err != nil {
-		if err = auth.CheckACL(ctx, id, model.ACL.Admin); err != nil {
-			return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-		}
+	if err := j.GetModel(ctx, id, jujuparams.ModelAdminAccess, &model); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 
 	conn, err := j.OpenAPI(ctx, model.Controller)
@@ -72,7 +66,7 @@ func (j *JEM) Offer(ctx context.Context, id identchecker.ACLIdentity, offer juju
 		return errgo.Mask(err, apiconn.IsAPIError)
 	}
 
-	doc := offerDetailsToMongodoc(model, offerDetails)
+	doc := offerDetailsToMongodoc(&model, offerDetails)
 
 	err = j.DB.AddApplicationOffer(ctx, &doc)
 	if err != nil {
@@ -480,8 +474,10 @@ func (j *JEM) UpdateApplicationOffer(ctx context.Context, offerUUID string, remo
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 
-	model, err := j.DB.ModelFromUUID(ctx, offer.ModelUUID)
-	if err != nil {
+	model := mongodoc.Model{
+		UUID: offer.ModelUUID,
+	}
+	if err := j.DB.GetModel(ctx, &model); err != nil {
 		return errgo.Mask(err)
 	}
 
@@ -506,7 +502,7 @@ func (j *JEM) UpdateApplicationOffer(ctx context.Context, offerUUID string, remo
 		return errgo.Mask(err)
 	}
 
-	doc := offerDetailsToMongodoc(model, offerDetails)
+	doc := offerDetailsToMongodoc(&model, offerDetails)
 	return errgo.Mask(j.DB.UpdateApplicationOffer(ctx, &doc))
 }
 

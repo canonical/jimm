@@ -91,7 +91,7 @@ func (r *controllerRoot) DumpModels(ctx context.Context, args jujuparams.Entitie
 		err := r.modelWithConnection(
 			ctx,
 			ent.Tag,
-			auth.CheckIsAdmin,
+			jujuparams.ModelAdminAccess,
 			func(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model) error {
 				var err error
 				results[i].Result, err = conn.DumpModel(ctx, model.UUID)
@@ -332,8 +332,12 @@ func (r *controllerRoot) DestroyModelsV4(ctx context.Context, args jujuparams.De
 
 // destroyModel destroys the specified model.
 func (r *controllerRoot) destroyModel(ctx context.Context, arg jujuparams.DestroyModelParams) error {
-	model, err := getModel(ctx, r.jem, arg.ModelTag, auth.CheckIsAdmin)
+	mt, err := names.ParseModelTag(arg.ModelTag)
 	if err != nil {
+		return errgo.WithCausef(err, params.ErrBadRequest, "")
+	}
+	model := mongodoc.Model{UUID: mt.Id()}
+	if err := r.jem.GetModel(ctx, r.identity, jujuparams.ModelAdminAccess, &model); err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			// Juju doesn't treat removing a model that isn't there as an error, and neither should we.
 			return nil
@@ -345,7 +349,7 @@ func (r *controllerRoot) destroyModel(ctx context.Context, arg jujuparams.Destro
 		return errgo.Mask(err)
 	}
 	defer conn.Close()
-	if err := r.jem.DestroyModel(ctx, conn, model, arg.DestroyStorage, arg.Force, arg.MaxWait); err != nil {
+	if err := r.jem.DestroyModel(ctx, conn, &model, arg.DestroyStorage, arg.Force, arg.MaxWait); err != nil {
 		return errgo.Mask(err, jujuparams.IsCodeHasPersistentStorage)
 	}
 	age := float64(time.Now().Sub(model.CreationTime)) / float64(time.Hour)
@@ -372,12 +376,16 @@ func (r *controllerRoot) ModifyModelAccess(ctx context.Context, args jujuparams.
 }
 
 func (r *controllerRoot) modifyModelAccess(ctx context.Context, change jujuparams.ModifyModelAccess) error {
-	model, err := getModel(ctx, r.jem, change.ModelTag, auth.CheckIsAdmin)
+	mt, err := names.ParseModelTag(change.ModelTag)
 	if err != nil {
+		return errgo.WithCausef(err, params.ErrBadRequest, "")
+	}
+	model := mongodoc.Model{UUID: mt.Id()}
+	if err := r.jem.GetModel(ctx, r.identity, jujuparams.ModelAdminAccess, &model); err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
-			err = params.ErrUnauthorized
+			err = errgo.WithCausef(nil, params.ErrUnauthorized, "")
 		}
-		return errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	user, err := conv.ParseUserTag(change.UserTag)
 	if err != nil {
@@ -390,9 +398,9 @@ func (r *controllerRoot) modifyModelAccess(ctx context.Context, change jujuparam
 	defer conn.Close()
 	switch change.Action {
 	case jujuparams.GrantModelAccess:
-		err = r.jem.GrantModel(ctx, conn, model, user, string(change.Access))
+		err = r.jem.GrantModel(ctx, conn, &model, user, string(change.Access))
 	case jujuparams.RevokeModelAccess:
-		err = r.jem.RevokeModel(ctx, conn, model, user, string(change.Access))
+		err = r.jem.RevokeModel(ctx, conn, &model, user, string(change.Access))
 	default:
 		return errgo.WithCausef(err, params.ErrBadRequest, "invalid action %q", change.Action)
 	}
@@ -414,7 +422,7 @@ func (r *controllerRoot) DumpModelsV3(ctx context.Context, args jujuparams.DumpM
 		err := r.modelWithConnection(
 			ctx,
 			ent.Tag,
-			auth.CheckIsAdmin,
+			jujuparams.ModelAdminAccess,
 			func(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model) error {
 				var err error
 				results[i].Result, err = conn.DumpModelV3(ctx, model.UUID, args.Simplified)
@@ -443,7 +451,7 @@ func (r *controllerRoot) DumpModelsDB(ctx context.Context, args jujuparams.Entit
 		err := r.modelWithConnection(
 			ctx,
 			ent.Tag,
-			auth.CheckIsAdmin,
+			jujuparams.ModelAdminAccess,
 			func(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model) error {
 				var err error
 				results[i].Result, err = conn.DumpModelDB(ctx, model.UUID)
@@ -477,8 +485,12 @@ func (r *controllerRoot) ChangeModelCredential(ctx context.Context, args jujupar
 }
 
 func (r *controllerRoot) changeModelCredential(ctx context.Context, arg jujuparams.ChangeModelCredentialParams) error {
-	model, err := getModel(ctx, r.jem, arg.ModelTag, auth.CheckIsAdmin)
+	mt, err := names.ParseModelTag(arg.ModelTag)
 	if err != nil {
+		return errgo.WithCausef(err, params.ErrBadRequest, "")
+	}
+	model := mongodoc.Model{UUID: mt.Id()}
+	if err := r.jem.GetModel(ctx, r.identity, jujuparams.ModelAdminAccess, &model); err != nil {
 		return errgo.Mask(
 			err,
 			errgo.Is(params.ErrBadRequest),
@@ -510,7 +522,7 @@ func (r *controllerRoot) changeModelCredential(ctx context.Context, arg jujupara
 	if err := r.jem.GetCredential(ctx, r.identity, &cred); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	if err := r.jem.UpdateModelCredential(ctx, conn, model, &cred); err != nil {
+	if err := r.jem.UpdateModelCredential(ctx, conn, &model, &cred); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil

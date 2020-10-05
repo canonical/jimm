@@ -305,8 +305,9 @@ func (s *databaseSuite) TestDeleteController(c *gc.C) {
 
 	ctl1, err := s.database.Controller(testContext, ctlPath)
 	c.Assert(ctl1, gc.IsNil)
-	m1, err := s.database.Model(testContext, ctlPath)
-	c.Assert(m1, gc.IsNil)
+	m1 := mongodoc.Model{Path: ctlPath}
+	err = s.database.GetModel(testContext, &m1)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
 	err = s.database.DeleteController(testContext, ctlPath)
 	c.Assert(err, gc.ErrorMatches, "controller \"dalek/who\" not found")
@@ -345,8 +346,9 @@ func (s *databaseSuite) TestDeleteController(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	ctl3, err := s.database.Controller(testContext, ctlPath)
 	c.Assert(ctl3, gc.IsNil)
-	m3, err := s.database.Model(testContext, ctlPath)
-	c.Assert(m3, gc.IsNil)
+	m3 := mongodoc.Model{Path: ctlPath}
+	err = s.database.GetModel(testContext, &m3)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	s.checkDBOK(c)
 
 	cred := mongodoc.Credential{
@@ -391,9 +393,9 @@ func (s *databaseSuite) TestDeleteModel(c *gc.C) {
 
 	err = s.database.DeleteModel(testContext, m2.Path)
 	c.Assert(err, gc.Equals, nil)
-	m3, err := s.database.Model(testContext, modelPath)
+	m3 := mongodoc.Model{Path: modelPath}
+	err = s.database.GetModel(testContext, &m3)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	c.Assert(m3, gc.IsNil)
 
 	err = s.database.DeleteModel(testContext, m2.Path)
 	c.Assert(err, gc.ErrorMatches, "model \"dalek/exterminate\" not found")
@@ -403,22 +405,23 @@ func (s *databaseSuite) TestDeleteModel(c *gc.C) {
 
 func (s *databaseSuite) TestAddModel(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "x"}
-	m := &mongodoc.Model{
+	m := mongodoc.Model{
 		Id:   "ignored",
 		Path: ctlPath,
 	}
-	err := s.database.AddModel(testContext, m)
+	err := s.database.AddModel(testContext, &m)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
+	c.Assert(m, jc.DeepEquals, mongodoc.Model{
 		Id:   "bob/x",
 		Path: ctlPath,
 	})
 
-	m1, err := s.database.Model(testContext, ctlPath)
+	m1 := mongodoc.Model{Path: ctlPath}
+	err = s.database.GetModel(testContext, &m1)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(m1, jemtest.CmpEquals(cmpopts.EquateEmpty()), m)
 
-	err = s.database.AddModel(testContext, m)
+	err = s.database.AddModel(testContext, &m)
 	c.Assert(err, gc.ErrorMatches, "already exists")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
 	s.checkDBOK(c)
@@ -467,13 +470,13 @@ func (s *databaseSuite) TestModelUUIDsForController(c *gc.C) {
 
 func (s *databaseSuite) TestUpdateLegacyModel(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "x"}
-	m := &mongodoc.Model{
+	m := mongodoc.Model{
 		Id:   "ignored",
 		Path: ctlPath,
 	}
-	err := s.database.AddModel(testContext, m)
+	err := s.database.AddModel(testContext, &m)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
+	c.Assert(m, jc.DeepEquals, mongodoc.Model{
 		Id:   "bob/x",
 		Path: ctlPath,
 	})
@@ -488,17 +491,19 @@ func (s *databaseSuite) TestUpdateLegacyModel(c *gc.C) {
 			Name: "cred",
 		},
 	}
-	err = s.database.UpdateLegacyModel(testContext, m)
+	err = s.database.UpdateLegacyModel(testContext, &m)
 	c.Assert(err, gc.Equals, nil)
 
-	m1, err := s.database.Model(testContext, ctlPath)
+	m1 := mongodoc.Model{Path: ctlPath}
+	err = s.database.GetModel(testContext, &m1)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(m1, jemtest.CmpEquals(cmpopts.EquateEmpty()), m)
 
-	m2 := &mongodoc.Model{
+	m2 := mongodoc.Model{
 		Id:   "ignored",
 		Path: params.EntityPath{"bob", "y"},
 	}
-	err = s.database.UpdateLegacyModel(testContext, m2)
+	err = s.database.UpdateLegacyModel(testContext, &m2)
 	c.Assert(err, gc.ErrorMatches, "cannot update bob/y: not found")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	s.checkDBOK(c)
@@ -507,27 +512,28 @@ func (s *databaseSuite) TestUpdateLegacyModel(c *gc.C) {
 func (s *databaseSuite) TestModelFromUUID(c *gc.C) {
 	uuid := "99999999-9999-9999-9999-999999999999"
 	path := params.EntityPath{"bob", "x"}
-	m := &mongodoc.Model{
+	m := mongodoc.Model{
 		Id:   "ignored",
 		Path: path,
 		UUID: uuid,
 	}
-	err := s.database.AddModel(testContext, m)
+	err := s.database.AddModel(testContext, &m)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
+	c.Assert(m, jc.DeepEquals, mongodoc.Model{
 		Id:   "bob/x",
 		Path: path,
 		UUID: uuid,
 	})
 
-	m1, err := s.database.ModelFromUUID(testContext, uuid)
+	m1 := mongodoc.Model{UUID: uuid}
+	err = s.database.GetModel(testContext, &m1)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(m1, jemtest.CmpEquals(cmpopts.EquateEmpty()), m)
 
-	m2, err := s.database.ModelFromUUID(testContext, "no-such-uuid")
-	c.Assert(err, gc.ErrorMatches, `model "no-such-uuid" not found`)
+	m2 := mongodoc.Model{UUID: "no-such-uuid"}
+	err = s.database.GetModel(testContext, &m2)
+	c.Assert(err, gc.ErrorMatches, `model not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	c.Assert(m2, gc.IsNil)
 	s.checkDBOK(c)
 }
 
@@ -770,7 +776,8 @@ func (s *databaseSuite) TestUpdateModelCounts(c *gc.C) {
 		c.Assert(err, gc.Equals, nil)
 		err = s.database.UpdateModelCounts(testContext, ctlPath, uuid, test.update, test.updateTime)
 		c.Assert(err, gc.Equals, nil)
-		model, err := s.database.Model(testContext, modelId)
+		model := mongodoc.Model{Path: modelId}
+		err = s.database.GetModel(testContext, &model)
 		c.Assert(err, gc.Equals, nil)
 		// Change all times to UTC for straightforward comparison.
 		for name, count := range model.Counts {
@@ -1127,13 +1134,15 @@ func (s *databaseSuite) TestSetModelControllerSuccess(c *gc.C) {
 		Controller: params.EntityPath{"bob", "foo"},
 	})
 	c.Assert(err, gc.Equals, nil)
-	origDoc, err := s.database.Model(testContext, modelPath)
+	origDoc := mongodoc.Model{Path: modelPath}
+	err = s.database.GetModel(testContext, &origDoc)
 	c.Assert(err, gc.Equals, nil)
 
 	err = s.database.SetModelController(testContext, params.EntityPath{"bob", "foo"}, params.EntityPath{"x", "y"})
 	c.Assert(err, gc.Equals, nil)
 
-	newDoc, err := s.database.Model(testContext, modelPath)
+	newDoc := mongodoc.Model{Path: modelPath}
+	err = s.database.GetModel(testContext, &newDoc)
 	c.Assert(err, gc.Equals, nil)
 
 	origDoc.Controller = params.EntityPath{"x", "y"}
@@ -1236,15 +1245,18 @@ func (s *databaseSuite) TestSetModelLifeSuccess(c *gc.C) {
 	err = s.database.SetModelLife(testContext, ctlPath, "fake-uuid", "alive")
 	c.Assert(err, gc.Equals, nil)
 
-	m, err := s.database.Model(testContext, ctlPath)
+	m := mongodoc.Model{Path: ctlPath}
+	err = s.database.GetModel(testContext, &m)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(m.Life(), gc.Equals, "alive")
 
-	m, err = s.database.Model(testContext, params.EntityPath{"bar", "baz"})
+	m.Path = params.EntityPath{"bar", "baz"}
+	err = s.database.GetModel(testContext, &m)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(m.Life(), gc.Equals, "")
 
-	m, err = s.database.Model(testContext, params.EntityPath{"alice", "baz"})
+	m.Path = params.EntityPath{"alice", "baz"}
+	err = s.database.GetModel(testContext, &m)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(m.Life(), gc.Equals, "")
 	s.checkDBOK(c)
@@ -1287,15 +1299,18 @@ func (s *databaseSuite) TestSetModelInfoSuccess(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	m, err := s.database.Model(testContext, ctlPath)
+	m := mongodoc.Model{Path: ctlPath}
+	err = s.database.GetModel(testContext, &m)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(m.Life(), gc.Equals, "alive")
 
-	m, err = s.database.Model(testContext, params.EntityPath{"bar", "baz"})
+	m.Path = params.EntityPath{"bar", "baz"}
+	err = s.database.GetModel(testContext, &m)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(m.Life(), gc.Equals, "")
 
-	m, err = s.database.Model(testContext, params.EntityPath{"alice", "baz"})
+	m.Path = params.EntityPath{"alice", "baz"}
+	err = s.database.GetModel(testContext, &m)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(m.Life(), gc.Equals, "")
 	s.checkDBOK(c)
@@ -1320,7 +1335,8 @@ func (s *databaseSuite) TestDeleteModelWithUUID(c *gc.C) {
 	err = s.database.DeleteModelWithUUID(testContext, ctlPath, "fake-uuid")
 	c.Assert(err, gc.Equals, nil)
 
-	_, err = s.database.Model(testContext, ctlPath)
+	m := mongodoc.Model{Path: ctlPath}
+	err = s.database.GetModel(testContext, &m)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
@@ -2114,19 +2130,14 @@ var setDeadTests = []struct {
 		db.Grant(testContext, db.Controllers(), fakeEntityPath, "t1")
 	},
 }, {
-	about: "Model",
+	about: "GetModel",
 	run: func(db *jem.Database) {
-		db.Model(testContext, fakeEntityPath)
+		db.GetModel(testContext, &mongodoc.Model{Path: fakeEntityPath})
 	},
 }, {
 	about: "MachinesForModel",
 	run: func(db *jem.Database) {
-		db.Model(testContext, fakeEntityPath)
-	},
-}, {
-	about: "ModelFromUUID",
-	run: func(db *jem.Database) {
-		db.ModelFromUUID(testContext, "99999999-9999-9999-9999-999999999999")
+		db.MachinesForModel(testContext, "00000000-0000-0000-0000-000000000000")
 	},
 }, {
 	about: "Revoke",
@@ -2282,18 +2293,19 @@ func mgoCredentialPath(cloud, user, name string) mongodoc.CredentialPath {
 
 func (s *databaseSuite) TestGetModelStatuses(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "x"}
-	m := &mongodoc.Model{
+	m := mongodoc.Model{
 		Id:   "ignored",
 		Path: ctlPath,
 	}
-	err := s.database.AddModel(testContext, m)
+	err := s.database.AddModel(testContext, &m)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(m, jc.DeepEquals, &mongodoc.Model{
+	c.Assert(m, jc.DeepEquals, mongodoc.Model{
 		Id:   "bob/x",
 		Path: ctlPath,
 	})
 
-	m1, err := s.database.Model(testContext, ctlPath)
+	m1 := mongodoc.Model{Path: ctlPath}
+	err = s.database.GetModel(testContext, &m1)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(m1, jemtest.CmpEquals(cmpopts.EquateEmpty()), m)
 	s.checkDBOK(c)
@@ -2372,7 +2384,8 @@ func (s *databaseSuite) TestSetModelCredentialSuccess(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	newDoc, err := s.database.Model(testContext, modelPath)
+	newDoc := mongodoc.Model{Path: modelPath}
+	err = s.database.GetModel(testContext, &newDoc)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(newDoc.Credential, gc.DeepEquals, mongodoc.CredentialPath{
 		Cloud: "cloud",
@@ -2494,8 +2507,10 @@ func (s *databaseSuite) TestLegacyModelCredentials(c *gc.C) {
 	err := s.database.Models().Insert(m)
 	c.Assert(err, gc.Equals, nil)
 
-	m1, err := s.database.Model(testContext, ctlPath)
-	c.Assert(m1, jemtest.CmpEquals(cmpopts.EquateEmpty()), &mongodoc.Model{
+	m1 := mongodoc.Model{Path: ctlPath}
+	err = s.database.GetModel(testContext, &m1)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(m1, jemtest.CmpEquals(cmpopts.EquateEmpty()), mongodoc.Model{
 		Id:            m.Id,
 		Path:          m.Path,
 		Cloud:         m.Cloud,
