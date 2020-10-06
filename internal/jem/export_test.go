@@ -9,7 +9,6 @@ var (
 	CredentialRemoveController  = (*Database).credentialRemoveController
 	SetCredentialUpdates        = (*Database).setCredentialUpdates
 	UpdateCredential            = (*Database).updateCredential
-	SelectRandomController      = (*JEM).selectRandomController
 	UpdateControllerCredential  = (*JEM).updateControllerCredential
 	Shuffle                     = &shuffle
 	MongodocAPIHostPorts        = mongodocAPIHostPorts

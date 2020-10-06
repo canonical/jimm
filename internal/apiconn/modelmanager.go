@@ -7,12 +7,10 @@ import (
 	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
-	"github.com/juju/juju/environs/config"
 	"github.com/juju/names/v4"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/conv"
-	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -22,51 +20,8 @@ import (
 // from the Create model call. If there is an error returned it will be
 // of type *APIError. CreateModel uses the Create model procedure on the
 // ModelManager facade version 2.
-func (c *Conn) CreateModel(ctx context.Context, model *mongodoc.Model) error {
-	if model.Info == nil {
-		model.Info = new(mongodoc.ModelInfo)
-	}
-	if model.Info.Config == nil {
-		model.Info.Config = make(map[string]interface{})
-	}
-
-	args := jujuparams.ModelCreateArgs{
-		Name:        string(model.Path.Name),
-		OwnerTag:    conv.ToUserTag(model.Path.User).String(),
-		Config:      model.Info.Config,
-		CloudRegion: model.CloudRegion,
-	}
-	if model.Cloud != "" {
-		args.CloudTag = conv.ToCloudTag(model.Cloud).String()
-	}
-	if !model.Credential.IsZero() {
-		args.CloudCredentialTag = conv.ToCloudCredentialTag(model.Credential.ToParams()).String()
-	}
-
-	var resp jujuparams.ModelInfo
-	if err := c.APICall("ModelManager", 2, "", "CreateModel", &args, &resp); err != nil {
-		return newAPIError(err)
-	}
-
-	model.UUID = resp.UUID
-	if ct, err := names.ParseCloudTag(resp.CloudTag); err == nil {
-		model.Cloud = conv.FromCloudTag(ct)
-	}
-	model.CloudRegion = resp.CloudRegion
-	model.DefaultSeries = resp.DefaultSeries
-	model.Info.Life = string(resp.Life)
-	model.Info.Status.Status = string(resp.Status.Status)
-	model.Info.Status.Message = resp.Status.Info
-	model.Info.Status.Data = resp.Status.Data
-	if resp.Status.Since != nil {
-		model.Info.Status.Since = *resp.Status.Since
-	}
-	if resp.AgentVersion != nil {
-		model.Info.Config[config.AgentVersionKey] = resp.AgentVersion.String()
-	}
-	model.Type = resp.Type
-	model.ProviderType = resp.ProviderType
-	return nil
+func (c *Conn) CreateModel(ctx context.Context, args *jujuparams.ModelCreateArgs, info *jujuparams.ModelInfo) error {
+	return newAPIError(c.APICall("ModelManager", 2, "", "CreateModel", args, info))
 }
 
 // ModelInfo retrieves information about a model from the controller. The

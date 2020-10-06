@@ -41,6 +41,9 @@ func IsAPIError(err error) bool {
 // should have been returned from the Juju API client. If the given error
 // represents a nil jujuparams.Error then the returned error will be nil.
 func newAPIError(err error) error {
+	if err == nil {
+		return nil
+	}
 	if err1, ok := err.(*jujuparams.Error); ok && err1 == nil {
 		return nil
 	}

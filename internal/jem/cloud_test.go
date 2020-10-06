@@ -15,7 +15,6 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
-	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/kubetest"
@@ -511,10 +510,10 @@ func (s *cloudSuite) TestRemoveCloudWithModel(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 	addController(c, ctlPath, s.APIInfo(c), s.jem)
 
-	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
+	id := jemtest.NewIdentity("bob", "bob-group")
 	err := s.jem.AddHostedCloud(
-		ctx,
-		jemtest.NewIdentity("bob", "bob-group"),
+		testContext,
+		id,
 		params.Cloud("test-cloud"),
 		jujuparams.Cloud{
 			Type:            "kubernetes",
@@ -530,7 +529,7 @@ func (s *cloudSuite) TestRemoveCloudWithModel(c *gc.C) {
 		User:  "bob",
 		Name:  "kubernetes",
 	}
-	_, err = s.jem.UpdateCredential(ctx, &mongodoc.Credential{
+	_, err = s.jem.UpdateCredential(testContext, &mongodoc.Credential{
 		Path: mongodoc.CredentialPathFromParams(credpath),
 		Type: string(cloud.UserPassAuthType),
 		Attributes: map[string]string{
@@ -540,13 +539,13 @@ func (s *cloudSuite) TestRemoveCloudWithModel(c *gc.C) {
 	}, jem.CredentialUpdate)
 	c.Assert(err, gc.Equals, nil)
 
-	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
+	err = s.jem.CreateModel(testContext, id, jem.CreateModelParams{
 		Path:       params.EntityPath{"bob", "test-model"},
 		Cloud:      "test-cloud",
 		Credential: credpath,
-	})
+	}, nil)
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.jem.RemoveCloud(testContext, jemtest.NewIdentity("bob", "bob-group"), "test-cloud")
+	err = s.jem.RemoveCloud(testContext, id, "test-cloud")
 	c.Assert(err, gc.ErrorMatches, `cloud is used by 1 model`)
 }

@@ -4,11 +4,8 @@ package jem_test
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"time"
 
-	"github.com/juju/clock/testclock"
 	jujuapi "github.com/juju/juju/api"
 	cloudapi "github.com/juju/juju/api/cloud"
 	jujuparams "github.com/juju/juju/apiserver/params"
@@ -173,320 +170,6 @@ func (s *jemSuite) TestClone(c *gc.C) {
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
-var createModelTests = []struct {
-	about                          string
-	user                           string
-	params                         jem.CreateModelParams
-	usageSenderAuthorizationErrors []error
-	expectCredential               params.CredentialPath
-	expectError                    string
-	expectErrorCause               error
-}{{
-	about: "success",
-	user:  "bob",
-	params: jem.CreateModelParams{
-		Path: params.EntityPath{"bob", ""},
-		Credential: params.CredentialPath{
-			Cloud: "dummy",
-			User:  "bob",
-			Name:  "cred1",
-		},
-		Cloud: "dummy",
-	},
-}, {
-	about: "success specified controller",
-	user:  "bob",
-	params: jem.CreateModelParams{
-		Path:           params.EntityPath{"bob", ""},
-		ControllerPath: params.EntityPath{"bob", "controller"},
-		Credential: params.CredentialPath{
-			Cloud: "dummy",
-			User:  "bob",
-			Name:  "cred1",
-		},
-		Cloud: "dummy",
-	},
-}, {
-	about: "success with region",
-	user:  "bob",
-	params: jem.CreateModelParams{
-		Path: params.EntityPath{"bob", ""},
-		Credential: params.CredentialPath{
-			Cloud: "dummy",
-			User:  "bob",
-			Name:  "cred1",
-		},
-		Cloud:  "dummy",
-		Region: "dummy-region",
-	},
-}, {
-	about: "unknown credential",
-	user:  "bob",
-	params: jem.CreateModelParams{
-		Path: params.EntityPath{"bob", ""},
-		Credential: params.CredentialPath{
-			Cloud: "dummy",
-			User:  "bob",
-			Name:  "cred2",
-		},
-		Cloud: "dummy",
-	},
-	expectError:      `credential "dummy/bob/cred2" not found`,
-	expectErrorCause: params.ErrNotFound,
-}, {
-	about: "model exists",
-	user:  "bob",
-	params: jem.CreateModelParams{
-		Path: params.EntityPath{"bob", "oldmodel"},
-		Credential: params.CredentialPath{
-			Cloud: "dummy",
-			User:  "bob",
-			Name:  "cred1",
-		},
-		Cloud: "dummy",
-	},
-	expectError:      `already exists`,
-	expectErrorCause: params.ErrAlreadyExists,
-}, {
-	about: "unrecognised region",
-	user:  "bob",
-	params: jem.CreateModelParams{
-		Path: params.EntityPath{"bob", ""},
-		Credential: params.CredentialPath{
-			Cloud: "dummy",
-			User:  "bob",
-			Name:  "cred1",
-		},
-		Cloud:  "dummy",
-		Region: "not-a-region",
-	},
-	expectError: `cloudregion not found`,
-}, {
-	about: "empty cloud credentials selects single choice",
-	user:  "bob",
-	params: jem.CreateModelParams{
-		Path:  params.EntityPath{"bob", ""},
-		Cloud: "dummy",
-	},
-	expectCredential: params.CredentialPath{
-		Cloud: "dummy",
-		User:  "bob",
-		Name:  "cred1",
-	},
-}, {
-	about: "empty cloud credentials fails with more than one choice",
-	user:  "alice",
-	params: jem.CreateModelParams{
-		Path:  params.EntityPath{"alice", ""},
-		Cloud: "dummy",
-	},
-	expectError:      `more than one possible credential to use`,
-	expectErrorCause: params.ErrAmbiguousChoice,
-}, {
-	about: "empty cloud credentials passed through if no credentials found",
-	user:  "charlie",
-	params: jem.CreateModelParams{
-		Path:  params.EntityPath{"charlie", ""},
-		Cloud: "dummy",
-	},
-}, {
-	about: "success with usage sender authorization client",
-	user:  "bob",
-	params: jem.CreateModelParams{
-		Path: params.EntityPath{"bob", ""},
-		Credential: params.CredentialPath{
-			Cloud: "dummy",
-			User:  "bob",
-			Name:  "cred1",
-		},
-		Cloud: "dummy",
-	},
-	usageSenderAuthorizationErrors: []error{errors.New("a silly error")},
-}}
-
-func (s *jemSuite) TestCreateModel(c *gc.C) {
-	now := bson.Now()
-	s.PatchValue(jem.WallClock, testclock.NewClock(now))
-	ctlId := s.addController(c, params.EntityPath{"bob", "controller"})
-	err := s.jem.DB.SetACL(testContext, s.jem.DB.Controllers(), ctlId, params.ACL{
-		Read: []string{"everyone"},
-	})
-	c.Assert(err, gc.Equals, nil)
-	// Bob has a single credential.
-	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
-		Path: mgoCredentialPath("dummy", "bob", "cred1"),
-		Type: "empty",
-	})
-	c.Assert(err, gc.Equals, nil)
-	// Alice has two credentials.
-	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
-		Path: mgoCredentialPath("dummy", "alice", "cred1"),
-		Type: "empty",
-	})
-	c.Assert(err, gc.Equals, nil)
-	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
-		Path: mgoCredentialPath("dummy", "alice", "cred2"),
-		Type: "empty",
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob"))
-	// Create a model so that we can have a test case for an already-existing model
-	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
-		Path:           params.EntityPath{"bob", "oldmodel"},
-		ControllerPath: ctlId,
-		Credential: params.CredentialPath{
-			Cloud: "dummy",
-			User:  "bob",
-			Name:  "cred1",
-		},
-		Cloud: "dummy",
-	})
-	c.Assert(err, gc.Equals, nil)
-	for i, test := range createModelTests {
-		c.Logf("test %d. %s", i, test.about)
-		s.usageSenderAuthorizationClient.SetErrors(test.usageSenderAuthorizationErrors)
-		if test.params.Path.Name == "" {
-			test.params.Path.Name = params.Name(fmt.Sprintf("test-%d", i))
-		}
-		m, err := s.jem.CreateModel(auth.ContextWithIdentity(testContext, jemtest.NewIdentity(test.user)), test.params)
-		if test.expectError != "" {
-			c.Assert(err, gc.ErrorMatches, test.expectError)
-			if test.expectErrorCause != nil {
-				c.Assert(errgo.Cause(err), gc.Equals, test.expectErrorCause)
-			}
-			continue
-		}
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(m.Path, jc.DeepEquals, test.params.Path)
-		c.Assert(m.UUID, gc.Not(gc.Equals), "")
-		c.Assert(m.CreationTime.Equal(now), gc.Equals, true)
-		c.Assert(m.Creator, gc.Equals, test.user)
-		c.Assert(m.Cloud, gc.Equals, test.params.Cloud)
-		c.Assert(m.CloudRegion, gc.Equals, "dummy-region")
-		if !test.expectCredential.IsZero() {
-			c.Assert(m.Credential, jc.DeepEquals, mongodoc.CredentialPathFromParams(test.expectCredential))
-		} else {
-			c.Assert(m.Credential, jc.DeepEquals, mongodoc.CredentialPathFromParams(test.params.Credential))
-		}
-		c.Assert(m.DefaultSeries, gc.Not(gc.Equals), "")
-		c.Assert(m.Life(), gc.Equals, "alive")
-	}
-}
-
-func (s *jemSuite) TestCreateModelWithPartiallyCreatedModel(c *gc.C) {
-	now := bson.Now()
-	s.PatchValue(jem.WallClock, testclock.NewClock(now))
-	ctlId := s.addController(c, params.EntityPath{"bob", "controller"})
-	err := s.jem.DB.SetACL(testContext, s.jem.DB.Controllers(), ctlId, params.ACL{
-		Read: []string{"everyone"},
-	})
-	c.Assert(err, gc.Equals, nil)
-	// Bob has a single credential.
-	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
-		Path: mgoCredentialPath("dummy", "bob", "cred1"),
-		Type: "empty",
-	})
-	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob"))
-	// Create a partial model in the database.
-	err = s.jem.DB.AddModel(ctx, &mongodoc.Model{
-		Path:         params.EntityPath{"bob", "oldmodel"},
-		Controller:   ctlId,
-		CreationTime: now,
-		Creator:      "bob",
-		Credential:   mongodoc.CredentialPathFromParams(credentialPath("dummy", "bob", "cred1")),
-	})
-	c.Assert(err, gc.Equals, nil)
-	// Create a new model
-	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
-		Path:           params.EntityPath{"bob", "model"},
-		ControllerPath: ctlId,
-		Credential: params.CredentialPath{
-			Cloud: "dummy",
-			User:  "bob",
-			Name:  "cred1",
-		},
-		Cloud: "dummy",
-	})
-	c.Assert(err, gc.Equals, nil)
-}
-
-func (s *jemSuite) TestCreateModelWithExistingModelInControllerOnly(c *gc.C) {
-	// Create a model and then delete its entry in the JIMM database
-	// as if the controller model had been created but something
-	// had failed in CreateModel after that.
-	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
-	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity(string(model.Path.User)))
-	err := s.jem.DB.DeleteModel(ctx, model.Path)
-	c.Assert(err, gc.Equals, nil)
-
-	// Now try to create the model again.
-	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
-		Path:           model.Path,
-		ControllerPath: model.Controller,
-		Credential: params.CredentialPath{
-			Cloud: "dummy",
-			User:  "bob",
-			Name:  "cred",
-		},
-		Cloud: "dummy",
-	})
-	c.Assert(err, gc.ErrorMatches, `cannot create model: model name in use: api error: failed to create new model: model "model" for bob@external already exists \(already exists\)`)
-}
-
-func (s *jemSuite) TestCreateModelWithDeprecatedController(c *gc.C) {
-	ctlId := s.addController(c, params.EntityPath{"bob", "controller"})
-	err := s.jem.DB.SetACL(testContext, s.jem.DB.Controllers(), ctlId, params.ACL{
-		Read: []string{"everyone"},
-	})
-	c.Assert(err, gc.Equals, nil)
-	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob"))
-	// Sanity check that we can create the model while the controller is not deprecated.
-	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
-		Path:   params.EntityPath{"bob", "model1"},
-		Cloud:  "dummy",
-		Region: "dummy-region",
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	// Deprecate it and make sure it's not chosen again.
-	err = s.jem.DB.SetControllerDeprecated(testContext, ctlId, true)
-	c.Assert(err, gc.Equals, nil)
-
-	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
-		Path:   params.EntityPath{"bob", "model2"},
-		Cloud:  "dummy",
-		Region: "dummy-region",
-	})
-	c.Assert(err, gc.ErrorMatches, `cannot find suitable controller`)
-}
-
-func (s *jemSuite) TestCreateModelWithMultipleControllers(c *gc.C) {
-	s.PatchValue(jem.Shuffle, func(int, func(int, int)) {})
-	ctlId := s.addController(c, params.EntityPath{"bob", "controller"})
-	err := s.jem.DB.SetACL(testContext, s.jem.DB.Controllers(), ctlId, params.ACL{
-		Read: []string{"everyone"},
-	})
-	c.Assert(err, gc.Equals, nil)
-	ctl2Id := s.addController(c, params.EntityPath{"bob", "controller2"})
-	err = s.jem.DB.SetACL(testContext, s.jem.DB.Controllers(), ctl2Id, params.ACL{
-		Read: []string{"everyone"},
-	})
-	c.Assert(err, gc.Equals, nil)
-	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob"))
-	// Deprecate the first controller.
-	err = s.jem.DB.SetControllerDeprecated(testContext, ctlId, true)
-	c.Assert(err, gc.Equals, nil)
-
-	m, err := s.jem.CreateModel(ctx, jem.CreateModelParams{
-		Path:   params.EntityPath{"bob", "model2"},
-		Cloud:  "dummy",
-		Region: "dummy-region",
-	})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(m.Controller, jc.DeepEquals, ctl2Id)
-}
-
 func (s *jemSuite) TestRevokeCredentialsInUse(c *gc.C) {
 	ctlId := s.addController(c, params.EntityPath{"bob", "controller"})
 	err := s.jem.DB.SetACL(testContext, s.jem.DB.Controllers(), ctlId, params.ACL{
@@ -500,13 +183,13 @@ func (s *jemSuite) TestRevokeCredentialsInUse(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob"))
-	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
+	id := jemtest.NewIdentity("bob")
+	err = s.jem.CreateModel(testContext, id, jem.CreateModelParams{
 		Path:           params.EntityPath{"bob", "oldmodel"},
 		ControllerPath: ctlId,
 		Credential:     credPath,
 		Cloud:          "dummy",
-	})
+	}, nil)
 	c.Assert(err, gc.Equals, nil)
 	err = s.jem.RevokeCredential(testContext, credPath, 0)
 	c.Assert(err, gc.ErrorMatches, `cannot revoke because credential is in use on at least one model`)
@@ -521,12 +204,12 @@ func (s *jemSuite) TestRevokeCredentialsInUse(c *gc.C) {
 
 	// Try to create another with the credentials that have
 	// been revoked. We should fail to do that.
-	_, err = s.jem.CreateModel(ctx, jem.CreateModelParams{
+	err = s.jem.CreateModel(testContext, id, jem.CreateModelParams{
 		Path:           params.EntityPath{"bob", "newmodel"},
 		ControllerPath: ctlId,
 		Credential:     credPath,
 		Cloud:          "dummy",
-	})
+	}, nil)
 	c.Assert(err, gc.ErrorMatches, `credential dummy/bob/cred1 has been revoked`)
 
 	// Check that the credential really has been revoked on the
@@ -871,61 +554,6 @@ func (s *jemSuite) TestDoControllers(c *gc.C) {
 		"alice/aws-us-east-1",
 		"bob/aws-us-east-1",
 	})
-}
-
-func (s *jemSuite) TestSelectController(c *gc.C) {
-	var testControllers = []mongodoc.Controller{{
-		Path: params.EntityPath{
-			User: params.User("alice"),
-			Name: "aws-eu-west-1",
-		},
-		ACL: params.ACL{
-			Read: []string{"bob"},
-		},
-		Public: true,
-	}, {
-		Path: params.EntityPath{
-			User: params.User("alice"),
-			Name: "aws-us-east-1",
-		},
-		ACL: params.ACL{
-			Read: []string{"bob-group"},
-		},
-		Public: true,
-	}, {
-		Path: params.EntityPath{
-			User: params.User("bob"),
-			Name: "aws-us-east-1",
-		},
-		ACL: params.ACL{
-			Read: []string{"everyone"},
-		},
-		Public: true,
-	}, {
-		Path: params.EntityPath{
-			User: params.User("alice"),
-			Name: "aws-eu-west-2",
-		},
-		ACL: params.ACL{
-			Read: []string{"someoneelse"},
-		},
-		Public: true,
-	}, {}}
-	for i := range testControllers {
-		err := s.jem.DB.AddController(testContext, &testControllers[i])
-		c.Assert(err, gc.Equals, nil)
-	}
-	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
-	called := false
-	s.PatchValue(jem.RandIntn, func(n int) int {
-		called = true
-		c.Assert(n, gc.Equals, 3)
-		return 1
-	})
-	ctl, err := jem.SelectRandomController(s.jem, ctx)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(called, gc.Equals, true)
-	c.Assert(ctl, jc.DeepEquals, params.EntityPath{"alice", "aws-us-east-1"})
 }
 
 var controllerTests = []struct {
@@ -1468,8 +1096,7 @@ func bootstrapModel(c *gc.C, path params.EntityPath, info *jujuapi.Info, j *jem.
 		Type: "empty",
 	})
 	c.Assert(err, gc.Equals, nil)
-	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity(string(path.User)))
-	model, err := j.CreateModel(ctx, jem.CreateModelParams{
+	err = j.CreateModel(testContext, jemtest.NewIdentity(string(path.User)), jem.CreateModelParams{
 		Path:           path,
 		ControllerPath: ctlPath,
 		Credential: params.CredentialPath{
@@ -1478,9 +1105,13 @@ func bootstrapModel(c *gc.C, path params.EntityPath, info *jujuapi.Info, j *jem.
 			Name:  "cred",
 		},
 		Cloud: "dummy",
-	})
+	}, nil)
 	c.Assert(err, gc.Equals, nil)
-	return model
+	model := mongodoc.Model{
+		Path: path,
+	}
+	err = j.DB.GetModel(testContext, &model)
+	return &model
 }
 
 type testUsageSenderAuthorizationClient struct {

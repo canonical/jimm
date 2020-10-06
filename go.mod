@@ -55,4 +55,5 @@ replace (
 )
 
 replace github.com/hashicorp/raft => github.com/juju/raft v1.0.1-0.20190319034642-834fca2f9ffc
+
 replace gopkg.in/macaroon-bakery.v2-unstable => github.com/wallyworld/macaroon-bakery v0.0.0-20200108032212-15effef1340d

@@ -335,14 +335,14 @@ func (h *Handler) NewModel(p httprequest.Params, args *params.NewModel) (*params
 	}
 
 	modelPath := params.EntityPath{args.User, args.Info.Name}
-	_, err = h.jem.CreateModel(p.Context, jem.CreateModelParams{
+	err = h.jem.CreateModel(p.Context, h.id, jem.CreateModelParams{
 		Path:           modelPath,
 		ControllerPath: ctlPath,
 		Credential:     args.Info.Credential,
 		Cloud:          lp.cloud,
 		Region:         lp.region,
 		Attributes:     args.Info.Config,
-	})
+	}, nil)
 	if err != nil {
 		return nil, errgo.Mask(err,
 			errgo.Is(params.ErrNotFound),
