@@ -84,7 +84,6 @@ func init() {
 func (r *controllerRoot) DumpModels(ctx context.Context, args jujuparams.Entities) jujuparams.MapResults {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.MapResult, len(args.Entities))
 	for i, ent := range args.Entities {
 		err := r.modelWithConnection(
@@ -123,7 +122,6 @@ func (r *controllerRoot) DestroyModels(ctx context.Context, args jujuparams.Enti
 // ListModelSummaries returns summaries for all the models that that
 // authenticated user has access to. The request parameter is ignored.
 func (r *controllerRoot) ListModelSummaries(ctx context.Context, _ jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error) {
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	var results []jujuparams.ModelSummaryResult
 	err := r.doModels(ctx, func(ctx context.Context, model *mongodoc.Model) error {
 		if model.ProviderType == "" {
@@ -216,7 +214,6 @@ func (r *controllerRoot) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 // ListModels returns the models that the authenticated user
 // has access to. The user parameter is ignored.
 func (r *controllerRoot) ListModels(ctx context.Context, _ jujuparams.Entity) (jujuparams.UserModelList, error) {
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	return r.allModels(ctx)
 }
 
@@ -224,7 +221,6 @@ func (r *controllerRoot) ListModels(ctx context.Context, _ jujuparams.Entity) (j
 func (r *controllerRoot) ModelInfo(ctx context.Context, args jujuparams.Entities) (jujuparams.ModelInfoResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.ModelInfoResult, len(args.Entities))
 	run := parallel.NewRun(maxRequestConcurrency)
 	for i, arg := range args.Entities {
@@ -264,7 +260,6 @@ func (r *controllerRoot) ModelInfo(ctx context.Context, args jujuparams.Entities
 func (r *controllerRoot) CreateModel(ctx context.Context, args jujuparams.ModelCreateArgs) (info jujuparams.ModelInfo, err error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	err = errgo.Mask(r.createModel(ctx, args, &info),
 		errgo.Is(conv.ErrLocalUser),
 		errgo.Is(params.ErrUnauthorized),
@@ -325,7 +320,6 @@ func (r *controllerRoot) createModel(ctx context.Context, args jujuparams.ModelC
 func (r *controllerRoot) DestroyModelsV4(ctx context.Context, args jujuparams.DestroyModelsParams) (jujuparams.ErrorResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.ErrorResult, len(args.Models))
 
 	for i, model := range args.Models {
@@ -353,7 +347,6 @@ func (r *controllerRoot) DestroyModelsV4(ctx context.Context, args jujuparams.De
 func (r *controllerRoot) ModifyModelAccess(ctx context.Context, args jujuparams.ModifyModelAccessRequest) (jujuparams.ErrorResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.ErrorResult, len(args.Changes))
 	for i, change := range args.Changes {
 		err := r.modifyModelAccess(ctx, change)
@@ -407,7 +400,6 @@ func (r *controllerRoot) modifyModelAccess(ctx context.Context, change jujuparam
 func (r *controllerRoot) DumpModelsV3(ctx context.Context, args jujuparams.DumpModelRequest) jujuparams.StringResults {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.StringResult, len(args.Entities))
 	for i, ent := range args.Entities {
 		err := r.modelWithConnection(
@@ -436,7 +428,6 @@ func (r *controllerRoot) DumpModelsV3(ctx context.Context, args jujuparams.DumpM
 func (r *controllerRoot) DumpModelsDB(ctx context.Context, args jujuparams.Entities) jujuparams.MapResults {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.MapResult, len(args.Entities))
 	for i, ent := range args.Entities {
 		err := r.modelWithConnection(
@@ -465,7 +456,6 @@ func (r *controllerRoot) DumpModelsDB(ctx context.Context, args jujuparams.Entit
 func (r *controllerRoot) ChangeModelCredential(ctx context.Context, args jujuparams.ChangeModelCredentialsParams) (jujuparams.ErrorResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.ErrorResult, len(args.Models))
 	for i, arg := range args.Models {
 		results[i].Error = mapError(r.changeModelCredential(ctx, arg))

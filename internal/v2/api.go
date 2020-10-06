@@ -81,7 +81,7 @@ func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httpr
 		}
 
 		h.monReq.Start(p.PathPattern)
-		return h, auth.ContextWithIdentity(ctx, id), nil
+		return h, ctx, nil
 	}), nil
 }
 
@@ -147,7 +147,7 @@ func (h *Handler) AddController(p httprequest.Params, arg *params.AddController)
 
 // GetController returns information on a controller.
 func (h *Handler) GetController(p httprequest.Params, arg *params.GetController) (*params.ControllerResponse, error) {
-	ctl, err := h.jem.Controller(p.Context, arg.EntityPath)
+	ctl, err := h.jem.Controller(p.Context, h.id, arg.EntityPath)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
@@ -256,7 +256,7 @@ func (h *Handler) ListModels(p httprequest.Params, arg *params.ListModels) (*par
 		}
 		modelIter = mgoIter{iter}
 	} else {
-		modelIter = h.jem.DB.NewCanReadIter(p.Context, iter)
+		modelIter = h.jem.DB.NewCanReadIter(h.id, iter)
 	}
 	var models []params.ModelResponse
 	var m mongodoc.Model
@@ -293,7 +293,7 @@ func (h *Handler) ListModels(p httprequest.Params, arg *params.ListModels) (*par
 func (h *Handler) ListController(p httprequest.Params, arg *params.ListController) (*params.ListControllerResponse, error) {
 	var controllers []params.ControllerResponse
 
-	iter := h.jem.DB.NewCanReadIter(p.Context, h.jem.DB.Controllers().Find(nil).Sort("_id").Iter())
+	iter := h.jem.DB.NewCanReadIter(h.id, h.jem.DB.Controllers().Find(nil).Sort("_id").Iter())
 	var ctl mongodoc.Controller
 	for iter.Next(p.Context, &ctl) {
 		controllers = append(controllers, params.ControllerResponse{
@@ -443,7 +443,7 @@ func (h *Handler) UpdateCredential(p httprequest.Params, arg *params.UpdateCrede
 // JujuStatus retrieves and returns the status of the specifed model.
 func (h *Handler) JujuStatus(p httprequest.Params, arg *params.JujuStatus) (*params.JujuStatusResponse, error) {
 	if err := auth.CheckIsUser(p.Context, h.id, h.config.ControllerAdmin); err != nil {
-		if err := h.jem.DB.CheckReadACL(p.Context, h.jem.DB.Models(), arg.EntityPath); err != nil {
+		if err := h.jem.DB.CheckReadACL(p.Context, h.id, h.jem.DB.Models(), arg.EntityPath); err != nil {
 			return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 		}
 	}
@@ -478,7 +478,7 @@ func (h *Handler) Migrate(p httprequest.Params, arg *params.Migrate) error {
 		return errgo.Mask(err)
 	}
 	defer conn.Close()
-	ctl, err := h.jem.Controller(p.Context, arg.Controller)
+	ctl, err := h.jem.Controller(p.Context, h.id, arg.Controller)
 	if err != nil {
 		return errgo.NoteMask(err, "cannot access destination controller", errgo.Is(params.ErrNotFound))
 	}
@@ -527,7 +527,7 @@ func (h *Handler) SetControllerDeprecated(p httprequest.Params, req *params.SetC
 }
 
 func (h *Handler) GetControllerDeprecated(p httprequest.Params, req *params.GetControllerDeprecated) (*params.DeprecatedBody, error) {
-	ctl, err := h.jem.Controller(p.Context, req.EntityPath)
+	ctl, err := h.jem.Controller(p.Context, h.id, req.EntityPath)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}

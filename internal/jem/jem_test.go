@@ -21,7 +21,6 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
@@ -542,9 +541,8 @@ func (s *jemSuite) TestDoControllers(c *gc.C) {
 		err := s.jem.DB.AddController(testContext, &testControllers[i])
 		c.Assert(err, gc.Equals, nil)
 	}
-	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 	var controllers []string
-	err := s.jem.DoControllers(ctx, func(c *mongodoc.Controller) error {
+	err := jem.DoControllers(s.jem, testContext, jemtest.NewIdentity("bob", "bob-group"), func(c *mongodoc.Controller) error {
 		controllers = append(controllers, c.Id)
 		return nil
 	})
@@ -581,11 +579,10 @@ func (s *jemSuite) TestController(c *gc.C) {
 	s.addController(c, params.EntityPath{"alice", "controller"})
 	s.addController(c, params.EntityPath{"bob", "controller"})
 	s.addController(c, params.EntityPath{"bob-group", "controller"})
-	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 
 	for i, test := range controllerTests {
 		c.Logf("tes %d. %s", i, test.path)
-		ctl, err := s.jem.Controller(ctx, test.path)
+		ctl, err := s.jem.Controller(testContext, jemtest.NewIdentity("bob", "bob-group"), test.path)
 		if test.expectErrorCause != nil {
 			c.Assert(errgo.Cause(err), gc.Equals, test.expectErrorCause)
 			continue
@@ -746,16 +743,15 @@ var earliestControllerVersionTests = []struct {
 }}
 
 func (s *jemSuite) TestEarliestControllerVersion(c *gc.C) {
-	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("someone"))
 	for i, test := range earliestControllerVersionTests {
 		c.Logf("test %d: %v", i, test.about)
 		_, err := s.jem.DB.Controllers().RemoveAll(nil)
 		c.Assert(err, gc.Equals, nil)
 		for _, ctl := range test.controllers {
-			err := s.jem.DB.AddController(ctx, &ctl)
+			err := s.jem.DB.AddController(testContext, &ctl)
 			c.Assert(err, gc.Equals, nil)
 		}
-		v, err := s.jem.EarliestControllerVersion(ctx)
+		v, err := s.jem.EarliestControllerVersion(testContext, jemtest.NewIdentity("someone"))
 		c.Assert(err, gc.Equals, nil)
 		c.Assert(v, jc.DeepEquals, test.expect)
 	}

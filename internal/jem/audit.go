@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/CanonicalLtd/jimm/internal/auth"
 	"go.uber.org/zap"
 
 	"gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
@@ -16,10 +16,10 @@ import (
 )
 
 // AppendAudit appends the given entry to the audit log.
-func (db *Database) AppendAudit(ctx context.Context, e params.AuditEntry) {
+func (db *Database) AppendAudit(ctx context.Context, id identchecker.ACLIdentity, e params.AuditEntry) {
 	common := e.Common()
 	common.Created_ = time.Now()
-	common.Originator = auth.IdentityFromContext(ctx).Id()
+	common.Originator = id.Id()
 	common.Type_ = params.AuditLogType(e)
 
 	if err := db.Audits().Insert(&params.AuditLogEntry{

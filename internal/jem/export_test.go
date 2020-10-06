@@ -13,4 +13,5 @@ var (
 	Shuffle                     = &shuffle
 	MongodocAPIHostPorts        = mongodocAPIHostPorts
 	ControllerUpdateCredentials = (*JEM).controllerUpdateCredentials
+	DoControllers               = (*JEM).doControllers
 )

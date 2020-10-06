@@ -4,8 +4,9 @@ package jem_test
 
 import (
 	"context"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"time"
+
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	gc "gopkg.in/check.v1"
 
@@ -46,7 +47,7 @@ func (s *auditSuite) TestAddAuditModelCreated(c *gc.C) {
 		Cloud:   "somecloud",
 		Region:  "someregion",
 	}
-	s.database.AppendAudit(testContext, &content)
+	s.database.AppendAudit(testContext, jemtest.NewIdentity("test"), &content)
 	entries, err := s.database.GetAuditEntries(testContext, time.Time{}, time.Time{}, "")
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(entries, jemtest.CmpEquals(cmpopts.IgnoreTypes(time.Time{})), params.AuditLogEntries{{
@@ -58,7 +59,8 @@ func (s *auditSuite) TestAddAuditModelCreated(c *gc.C) {
 			Cloud:   "somecloud",
 			Region:  "someregion",
 			AuditEntryCommon: params.AuditEntryCommon{
-				Type_: params.AuditLogType(&params.AuditModelCreated{}),
+				Originator: "test",
+				Type_:      params.AuditLogType(&params.AuditModelCreated{}),
 			},
 		},
 	}})
@@ -69,7 +71,7 @@ func (s *auditSuite) TestAddAuditModelDestroyed(c *gc.C) {
 		ID:   "someid",
 		UUID: "someuuid",
 	}
-	s.database.AppendAudit(testContext, &content)
+	s.database.AppendAudit(testContext, jemtest.NewIdentity("test"), &content)
 	entries, err := s.database.GetAuditEntries(testContext, time.Time{}, time.Time{}, "")
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(entries, jemtest.CmpEquals(cmpopts.IgnoreTypes(time.Time{})), params.AuditLogEntries{{
@@ -77,7 +79,8 @@ func (s *auditSuite) TestAddAuditModelDestroyed(c *gc.C) {
 			ID:   "someid",
 			UUID: "someuuid",
 			AuditEntryCommon: params.AuditEntryCommon{
-				Type_: params.AuditLogType(&params.AuditModelDestroyed{}),
+				Originator: "test",
+				Type_:      params.AuditLogType(&params.AuditModelDestroyed{}),
 			},
 		},
 	}})
@@ -89,7 +92,7 @@ func (s *auditSuite) TestAddAuditCloudCreated(c *gc.C) {
 		Cloud:  "somecloud",
 		Region: "someregion",
 	}
-	s.database.AppendAudit(testContext, &content)
+	s.database.AppendAudit(testContext, jemtest.NewIdentity("test"), &content)
 	entries, err := s.database.GetAuditEntries(testContext, time.Time{}, time.Time{}, "")
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(entries, jemtest.CmpEquals(cmpopts.IgnoreTypes(time.Time{})), params.AuditLogEntries{{
@@ -98,7 +101,8 @@ func (s *auditSuite) TestAddAuditCloudCreated(c *gc.C) {
 			Cloud:  "somecloud",
 			Region: "someregion",
 			AuditEntryCommon: params.AuditEntryCommon{
-				Type_: params.AuditLogType(&params.AuditCloudCreated{}),
+				Originator: "test",
+				Type_:      params.AuditLogType(&params.AuditCloudCreated{}),
 			},
 		},
 	}})
@@ -108,14 +112,15 @@ func (s *auditSuite) TestAddAuditCloudRemoved(c *gc.C) {
 	content := params.AuditCloudRemoved{
 		ID: "someid",
 	}
-	s.database.AppendAudit(testContext, &content)
+	s.database.AppendAudit(testContext, jemtest.NewIdentity("test"), &content)
 	entries, err := s.database.GetAuditEntries(testContext, time.Time{}, time.Time{}, "")
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(entries, jemtest.CmpEquals(cmpopts.IgnoreTypes(time.Time{})), params.AuditLogEntries{{
 		Content: &params.AuditCloudRemoved{
 			ID: "someid",
 			AuditEntryCommon: params.AuditEntryCommon{
-				Type_: params.AuditLogType(&params.AuditCloudRemoved{}),
+				Originator: "test",
+				Type_:      params.AuditLogType(&params.AuditCloudRemoved{}),
 			},
 		},
 	}})
@@ -130,13 +135,13 @@ func (s *auditSuite) TestGetAuditEntries(c *gc.C) {
 		Cloud:   "somecloud",
 		Region:  "someregion",
 	}
-	s.database.AppendAudit(testContext, &created)
+	s.database.AppendAudit(testContext, jemtest.NewIdentity("test"), &created)
 
 	content := params.AuditModelDestroyed{
 		ID:   "someid",
 		UUID: "someuuid",
 	}
-	s.database.AppendAudit(testContext, &content)
+	s.database.AppendAudit(testContext, jemtest.NewIdentity("test"), &content)
 	entries, err := s.database.GetAuditEntries(testContext, time.Time{}, time.Time{}, "")
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(entries, jemtest.CmpEquals(cmpopts.IgnoreTypes(time.Time{})), params.AuditLogEntries{{
@@ -148,7 +153,8 @@ func (s *auditSuite) TestGetAuditEntries(c *gc.C) {
 			Cloud:   "somecloud",
 			Region:  "someregion",
 			AuditEntryCommon: params.AuditEntryCommon{
-				Type_: params.AuditLogType(&params.AuditModelCreated{}),
+				Originator: "test",
+				Type_:      params.AuditLogType(&params.AuditModelCreated{}),
 			},
 		},
 	}, {
@@ -156,7 +162,8 @@ func (s *auditSuite) TestGetAuditEntries(c *gc.C) {
 			ID:   "someid",
 			UUID: "someuuid",
 			AuditEntryCommon: params.AuditEntryCommon{
-				Type_: params.AuditLogType(&params.AuditModelDestroyed{}),
+				Originator: "test",
+				Type_:      params.AuditLogType(&params.AuditModelDestroyed{}),
 			},
 		},
 	}})
