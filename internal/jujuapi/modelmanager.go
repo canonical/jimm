@@ -4,7 +4,6 @@ package jujuapi
 
 import (
 	"context"
-	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/life"
@@ -320,42 +319,24 @@ func (r *controllerRoot) DestroyModelsV4(ctx context.Context, args jujuparams.De
 	results := make([]jujuparams.ErrorResult, len(args.Models))
 
 	for i, model := range args.Models {
-		if err := r.destroyModel(ctx, model); err != nil {
-			results[i].Error = mapError(err)
+		mt, err := names.ParseModelTag(model.ModelTag)
+		if err != nil {
+			results[i].Error = mapError(errgo.WithCausef(err, params.ErrBadRequest, ""))
+			continue
+		}
+
+		if err := r.jem.DestroyModel(ctx, r.identity, &mongodoc.Model{UUID: mt.Id()}, model.DestroyStorage, model.Force, model.MaxWait); err != nil {
+			if errgo.Cause(err) != params.ErrNotFound {
+				// It isn't an error to try and destroy an already
+				// destroyed model.
+				results[i].Error = mapError(err)
+			}
 		}
 	}
 
 	return jujuparams.ErrorResults{
 		Results: results,
 	}, nil
-}
-
-// destroyModel destroys the specified model.
-func (r *controllerRoot) destroyModel(ctx context.Context, arg jujuparams.DestroyModelParams) error {
-	mt, err := names.ParseModelTag(arg.ModelTag)
-	if err != nil {
-		return errgo.WithCausef(err, params.ErrBadRequest, "")
-	}
-	model := mongodoc.Model{UUID: mt.Id()}
-	if err := r.jem.GetModel(ctx, r.identity, jujuparams.ModelAdminAccess, &model); err != nil {
-		if errgo.Cause(err) == params.ErrNotFound {
-			// Juju doesn't treat removing a model that isn't there as an error, and neither should we.
-			return nil
-		}
-		return errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrUnauthorized))
-	}
-	conn, err := r.jem.OpenAPI(ctx, model.Controller)
-	if err != nil {
-		return errgo.Mask(err)
-	}
-	defer conn.Close()
-	if err := r.jem.DestroyModel(ctx, conn, &model, arg.DestroyStorage, arg.Force, arg.MaxWait); err != nil {
-		return errgo.Mask(err, jujuparams.IsCodeHasPersistentStorage)
-	}
-	age := float64(time.Now().Sub(model.CreationTime)) / float64(time.Hour)
-	servermon.ModelLifetime.Observe(age)
-	servermon.ModelsDestroyedCount.Inc()
-	return nil
 }
 
 // ModifyModelAccess implements the ModelManager facade's ModifyModelAccess method.

@@ -398,7 +398,7 @@ func (s *APISuite) TestDeleteModelNotFound(c *gc.C) {
 		Handler: s.JEMSrv,
 		URL:     "/v2/model/user/foo",
 		ExpectBody: &params.Error{
-			Message: `model "user/foo" not found`,
+			Message: `model not found`,
 			Code:    params.ErrNotFound,
 		},
 		ExpectStatus: http.StatusNotFound,
