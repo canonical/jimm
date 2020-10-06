@@ -371,7 +371,7 @@ func (s *APISuite) TestGetModelNotFound(c *gc.C) {
 		Handler: s.JEMSrv,
 		URL:     "/v2/model/user/foo",
 		ExpectBody: &params.Error{
-			Message: `model "user/foo" not found`,
+			Message: `model not found`,
 			Code:    params.ErrNotFound,
 		},
 		ExpectStatus: http.StatusNotFound,
@@ -398,7 +398,7 @@ func (s *APISuite) TestDeleteModelNotFound(c *gc.C) {
 		Handler: s.JEMSrv,
 		URL:     "/v2/model/user/foo",
 		ExpectBody: &params.Error{
-			Message: `model "user/foo" not found`,
+			Message: `model not found`,
 			Code:    params.ErrNotFound,
 		},
 		ExpectStatus: http.StatusNotFound,
@@ -435,7 +435,7 @@ func (s *APISuite) TestDeleteModel(c *gc.C) {
 		URL:          "/v2/model/" + modelId.String(),
 		ExpectStatus: http.StatusNotFound,
 		ExpectBody: &params.Error{
-			Message: `model "bob/foobarred" not found`,
+			Message: `model not found`,
 			Code:    params.ErrNotFound,
 		},
 		Do: apitest.Do(s.IDMSrv.Client("bob")),
@@ -595,7 +595,7 @@ func (s *APISuite) TestDeleteController(c *gc.C) {
 		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 		ExpectStatus: http.StatusNotFound,
 		ExpectBody: params.Error{
-			Message: `model "bob/foobarred" not found`,
+			Message: `model not found`,
 			Code:    params.ErrNotFound,
 		},
 	})
@@ -605,7 +605,7 @@ func (s *APISuite) TestDeleteController(c *gc.C) {
 		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 		ExpectStatus: http.StatusNotFound,
 		ExpectBody: params.Error{
-			Message: `model "bob/bar" not found`,
+			Message: `model not found`,
 			Code:    params.ErrNotFound,
 		},
 	})
@@ -818,7 +818,8 @@ func (s *APISuite) TestNewModelWithoutExplicitController(c *gc.C) {
 func (s *APISuite) assertModelConfigAttr(c *gc.C, modelPath params.EntityPath, attr string, val interface{}) {
 	ctx := context.Background()
 
-	m, err := s.JEM.DB.Model(ctx, modelPath)
+	m := mongodoc.Model{Path: modelPath}
+	err := s.JEM.DB.GetModel(ctx, &m)
 	c.Assert(err, gc.Equals, nil)
 	st, err := s.StatePool.Get(m.UUID)
 	c.Assert(err, gc.Equals, nil)
@@ -1108,7 +1109,7 @@ func (s *APISuite) TestNewModelCannotCreate(c *gc.C) {
 		Handler: s.JEMSrv,
 		URL:     "/v2/model/bob/bar",
 		ExpectBody: &params.Error{
-			Message: `model "bob/bar" not found`,
+			Message: `model not found`,
 			Code:    params.ErrNotFound,
 		},
 		ExpectStatus: http.StatusNotFound,
@@ -1445,12 +1446,12 @@ func (s *APISuite) TestJujuStatus(c *gc.C) {
 	resp, err = s.NewClient("alice").JujuStatus(ctx, &params.JujuStatus{
 		EntityPath: params.EntityPath{User: "bob", Name: "no-such-model"},
 	})
-	c.Assert(err, gc.ErrorMatches, `Get http://.*/v2/model/bob/no-such-model/status: cannot get model: model "bob/no-such-model" not found`)
+	c.Assert(err, gc.ErrorMatches, `Get http://.*/v2/model/bob/no-such-model/status: cannot get model: model not found`)
 
 	resp, err = s.NewClient("bob").JujuStatus(ctx, &params.JujuStatus{
 		EntityPath: params.EntityPath{User: "bob", Name: "no-such-model"},
 	})
-	c.Assert(err, gc.ErrorMatches, `Get http://.*/v2/model/bob/no-such-model/status: cannot get model: model "bob/no-such-model" not found`)
+	c.Assert(err, gc.ErrorMatches, `Get http://.*/v2/model/bob/no-such-model/status: cannot get model: model not found`)
 }
 
 func (s *APISuite) TestMigrate(c *gc.C) {
@@ -1507,7 +1508,8 @@ func (s *APISuite) TestMigrate(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	m, err := s.JEM.DB.Model(ctx, modelId)
+	m := mongodoc.Model{Path: modelId}
+	err = s.JEM.DB.GetModel(ctx, &m)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(m.Controller, jc.DeepEquals, params.EntityPath{"bob", "bar"})
 }
@@ -1629,7 +1631,7 @@ func (s *APISuite) TestGetModelName(c *gc.C) {
 		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 		ExpectBody: params.Error{
 			Code:    "not found",
-			Message: fmt.Sprintf("model %q not found", uuid1),
+			Message: fmt.Sprintf("model not found"),
 		},
 	})
 

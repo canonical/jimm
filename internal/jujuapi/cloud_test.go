@@ -560,7 +560,10 @@ func (s *cloudSuite) TestCredential(c *gc.C) {
 	cred2 := cloud.NewCredential("empty", nil)
 
 	cred5Tag := names.NewCloudCredentialTag("no-such-cloud/test@external/cred5")
-	cred5 := cloud.NewCredential("empty", nil)
+	cred5 := cloud.NewCredential("userpass", map[string]string{
+		"username": "cloud-user",
+		"password": "cloud-pass",
+	})
 
 	client := cloudapi.NewClient(conn)
 	_, err := client.UpdateCredentialsCheckModels(cred1Tag, cred1)
@@ -579,6 +582,12 @@ func (s *cloudSuite) TestCredential(c *gc.C) {
 		names.NewCloudCredentialTag("dummy/admin@local/cred6"),
 	)
 	c.Assert(err, gc.Equals, nil)
+	for i := range creds {
+		if creds[i].Result == nil {
+			continue
+		}
+		sort.Strings(creds[i].Result.Redacted)
+	}
 	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Result: &jujuparams.CloudCredential{
 			AuthType: "userpass",
@@ -595,7 +604,7 @@ func (s *cloudSuite) TestCredential(c *gc.C) {
 		},
 	}, {
 		Error: &jujuparams.Error{
-			Message: `credential "dummy/test/cred3" not found`,
+			Message: `credential not found`,
 			Code:    jujuparams.CodeNotFound,
 		},
 	}, {
@@ -604,9 +613,12 @@ func (s *cloudSuite) TestCredential(c *gc.C) {
 			Code:    jujuparams.CodeUnauthorized,
 		},
 	}, {
-		Error: &jujuparams.Error{
-			Message: `cloud "no-such-cloud" not found`,
-			Code:    jujuparams.CodeNotFound,
+		Result: &jujuparams.CloudCredential{
+			AuthType: "userpass",
+			Redacted: []string{
+				"password",
+				"username",
+			},
 		},
 	}, {
 		Error: &jujuparams.Error{
@@ -1037,7 +1049,7 @@ func (s *cloudSuite) TestModifyCloudAccess(c *gc.C) {
 	})
 
 	// Check that alice@external does not yet have access
-	conn2 := s.open(c, nil, "alice@external")
+	conn2 := s.open(c, nil, "alice")
 	defer conn2.Close()
 	client2 := cloudapi.NewClient(conn2)
 	clouds, err = client2.Clouds()
@@ -1102,7 +1114,7 @@ func (s *cloudSuite) TestModifyCloudAccessUnauthorized(c *gc.C) {
 	})
 
 	// Check that alice@external does not yet have access
-	conn2 := s.open(c, nil, "alice@external")
+	conn2 := s.open(c, nil, "alice")
 	defer conn2.Close()
 	client2 := cloudapi.NewClient(conn2)
 	clouds, err = client2.Clouds()

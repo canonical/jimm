@@ -16,6 +16,7 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/cloudcred"
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
@@ -244,13 +245,9 @@ func (r *controllerRoot) UserCredentials(ctx context.Context, userclouds jujupar
 
 // userCredentials retrieves the credentials stored for given owner and cloud.
 func (r *controllerRoot) userCredentials(ctx context.Context, ownerTag, cloudTag string) ([]string, error) {
-	ot, err := names.ParseUserTag(ownerTag)
+	owner, err := conv.ParseUserTag(ownerTag)
 	if err != nil {
-		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
-	}
-	owner, err := conv.FromUserTag(ot)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
+		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(conv.ErrLocalUser))
 	}
 	cld, err := names.ParseCloudTag(cloudTag)
 	if err != nil {
@@ -340,38 +337,35 @@ func (r *controllerRoot) credential(ctx context.Context, cloudCredentialTag stri
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
 
 	}
-	ownerTag := cct.Owner()
-	owner, err := conv.FromUserTag(ownerTag)
+	owner, err := conv.FromUserTag(cct.Owner())
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
 	}
 
-	credPath := params.CredentialPath{
-		Cloud: params.Cloud(cct.Cloud().Id()),
-		User:  owner,
-		Name:  params.CredentialName(cct.Name()),
+	cred := mongodoc.Credential{
+		Path: mongodoc.CredentialPath{
+			Cloud: cct.Cloud().Id(),
+			EntityPath: mongodoc.EntityPath{
+				User: string(owner),
+				Name: cct.Name(),
+			},
+		},
 	}
-
-	cred, err := r.jem.GetCredential(ctx, r.identity, credPath)
-	if err != nil {
+	if err := r.jem.GetCredential(ctx, r.identity, &cred); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	if cred.Revoked {
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", cct.Id())
 	}
-	if err := r.jem.FillCredentialAttributes(ctx, cred); err != nil {
+	if err := r.jem.FillCredentialAttributes(ctx, &cred); err != nil {
 		return nil, errgo.Mask(err)
-	}
-	schema, err := r.credentialSchema(ctx, cred.Path.ToParams().Cloud, cred.Type)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	cc := jujuparams.CloudCredential{
 		AuthType:   cred.Type,
 		Attributes: make(map[string]string),
 	}
 	for k, v := range cred.Attributes {
-		if ca, ok := schema.Attribute(k); ok && !ca.Hidden {
+		if cloudcred.IsVisibleAttribute(cred.ProviderType, cred.Type, k) {
 			cc.Attributes[k] = v
 		} else {
 			cc.Redacted = append(cc.Redacted, k)
@@ -471,24 +465,23 @@ func (r *controllerRoot) findUserCredentials(ctx context.Context) ([]jujuparams.
 // within the given cloud. If includeSecrets is true, secret information
 // will be included too.
 func (r *controllerRoot) credentialInfo(ctx context.Context, cloudName, credentialName string, includeSecrets bool) (*jujuparams.ControllerCredentialInfo, error) {
-	credPath := params.CredentialPath{
-		Cloud: params.Cloud(cloudName),
-		User:  params.User(r.identity.Id()),
-		Name:  params.CredentialName(credentialName),
+	cred := mongodoc.Credential{
+		Path: mongodoc.CredentialPath{
+			Cloud: cloudName,
+			EntityPath: mongodoc.EntityPath{
+				User: r.identity.Id(),
+				Name: credentialName,
+			},
+		},
 	}
-	cred, err := r.jem.GetCredential(ctx, r.identity, credPath)
-	if err != nil {
+	if err := r.jem.GetCredential(ctx, r.identity, &cred); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	if cred.Revoked {
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "")
 	}
-	if err := r.jem.FillCredentialAttributes(ctx, cred); err != nil {
+	if err := r.jem.FillCredentialAttributes(ctx, &cred); err != nil {
 		return nil, errgo.Mask(err)
-	}
-	schema, err := r.credentialSchema(ctx, cred.Path.ToParams().Cloud, cred.Type)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	cci := jujuparams.ControllerCredentialInfo{
 		Content: jujuparams.CredentialContent{
@@ -499,12 +492,12 @@ func (r *controllerRoot) credentialInfo(ctx context.Context, cloudName, credenti
 		},
 	}
 	for k, v := range cred.Attributes {
-		if ca, ok := schema.Attribute(k); ok && (!ca.Hidden || includeSecrets) {
+		if includeSecrets || cloudcred.IsVisibleAttribute(cred.ProviderType, cred.Type, k) {
 			cci.Content.Attributes[k] = v
 		}
 	}
 	r.doModels(ctx, func(ctx context.Context, model *mongodoc.Model) error {
-		if model.Credential != mongodoc.CredentialPathFromParams(credPath) {
+		if model.Credential != cred.Path {
 			return nil
 		}
 		access := jujuparams.ModelReadAccess
@@ -561,9 +554,9 @@ func (r *controllerRoot) ModifyCloudAccess(ctx context.Context, args jujuparams.
 }
 
 func (r *controllerRoot) modifyCloudAccess(ctx context.Context, change jujuparams.ModifyCloudAccess) error {
-	userTag, err := names.ParseUserTag(change.UserTag)
+	user, err := conv.ParseUserTag(change.UserTag)
 	if err != nil {
-		return errgo.WithCausef(err, params.ErrBadRequest, "")
+		return errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(conv.ErrLocalUser))
 	}
 	cloudTag, err := names.ParseCloudTag(change.CloudTag)
 	if err != nil {
@@ -578,7 +571,7 @@ func (r *controllerRoot) modifyCloudAccess(ctx context.Context, change jujuparam
 	default:
 		return errgo.WithCausef(nil, params.ErrBadRequest, "unsupported modify cloud action %q", change.Action)
 	}
-	if err := modifyf(ctx, r.identity, params.Cloud(cloudTag.Id()), params.User(userTag.Id()), change.Access); err != nil {
+	if err := modifyf(ctx, r.identity, params.Cloud(cloudTag.Id()), user, change.Access); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	return nil

@@ -4,7 +4,6 @@ package jujuapi_test
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -423,7 +422,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 		},
 	}, {
 		Error: &jujuparams.Error{
-			Message: `model "00000000-0000-0000-0000-000000000007" not found`,
+			Message: `model not found`,
 			Code:    jujuparams.CodeNotFound,
 		},
 	}})
@@ -601,7 +600,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 		},
 	}, {
 		Error: &jujuparams.Error{
-			Message: `model "00000000-0000-0000-0000-000000000007" not found`,
+			Message: `model not found`,
 			Code:    jujuparams.CodeNotFound,
 		},
 	}})
@@ -630,7 +629,8 @@ func (s *modelManagerSuite) TestModelInfoForLegacyModel(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// Sanity check the required fields aren't present.
-	model, err := s.JEM.DB.Model(ctx, params.EntityPath{"test", "model-1"})
+	model := mongodoc.Model{Path: params.EntityPath{"test", "model-1"}}
+	err = s.JEM.DB.GetModel(ctx, &model)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model.Cloud, gc.Equals, params.Cloud(""))
 
@@ -664,7 +664,7 @@ func (s *modelManagerSuite) TestModelInfoForLegacyModel(c *gc.C) {
 	}})
 
 	// Ensure the values in the database have been updated.
-	model, err = s.JEM.DB.Model(ctx, params.EntityPath{"test", "model-1"})
+	err = s.JEM.DB.GetModel(ctx, &model)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model.Cloud, gc.Equals, params.Cloud("dummy"))
 	c.Assert(model.CloudRegion, gc.Equals, "dummy-region")
@@ -694,7 +694,8 @@ func (s *modelManagerSuite) TestModelInfoForLegacyModelDisableControllerUUIDMask
 	c.Assert(err, gc.Equals, nil)
 
 	// Sanity check the required fields aren't present.
-	model, err := s.JEM.DB.Model(ctx, params.EntityPath{"test", "model-1"})
+	model := mongodoc.Model{Path: params.EntityPath{"test", "model-1"}}
+	err = s.JEM.DB.GetModel(ctx, &model)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model.Cloud, gc.Equals, params.Cloud(""))
 
@@ -732,7 +733,7 @@ func (s *modelManagerSuite) TestModelInfoForLegacyModelDisableControllerUUIDMask
 	}})
 
 	// Ensure the values in the database have been updated.
-	model, err = s.JEM.DB.Model(ctx, params.EntityPath{"test", "model-1"})
+	err = s.JEM.DB.GetModel(ctx, &model)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model.Cloud, gc.Equals, params.Cloud("dummy"))
 	c.Assert(model.CloudRegion, gc.Equals, "dummy-region")
@@ -892,7 +893,7 @@ func (s *modelManagerSuite) TestModelInfoDyingModelNotFound(c *gc.C) {
 		},
 	}})
 
-	_, err = s.JEM.DB.Model(ctx, params.EntityPath{User: "alice", Name: "model-1"})
+	err = s.JEM.DB.GetModel(ctx, &mongodoc.Model{Path: params.EntityPath{User: "alice", Name: "model-1"}})
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
@@ -946,7 +947,7 @@ var createModelTests = []struct {
 	ownerTag:      "user-test/test@external",
 	cloudTag:      names.NewCloudTag("dummy").String(),
 	credentialTag: "cloudcred-dummy_test@external_cred1",
-	expectError:   `invalid owner tag: "user-test/test@external" is not a valid user tag \(bad request\)`,
+	expectError:   `"user-test/test@external" is not a valid user tag \(bad request\)`,
 }, {
 	about:         "specific cloud",
 	name:          "model-6",
@@ -1122,7 +1123,7 @@ func (s *modelManagerSuite) TestModifyModelAccessErrors(c *gc.C) {
 			Access:   jujuparams.ModelReadAccess,
 			ModelTag: "not-a-model-tag",
 		},
-		expectError: `invalid model tag: "not-a-model-tag" is not a valid tag`,
+		expectError: `"not-a-model-tag" is not a valid tag`,
 	}, {
 		about: "invalid user tag",
 		modifyModelAccess: jujuparams.ModifyModelAccess{
@@ -1131,7 +1132,7 @@ func (s *modelManagerSuite) TestModifyModelAccessErrors(c *gc.C) {
 			Access:   jujuparams.ModelReadAccess,
 			ModelTag: names.NewModelTag(mi.UUID).String(),
 		},
-		expectError: `invalid user tag: "not-a-user-tag" is not a valid tag`,
+		expectError: `"not-a-user-tag" is not a valid tag`,
 	}, {
 		about: "unknown action",
 		modifyModelAccess: jujuparams.ModifyModelAccess{
@@ -1519,7 +1520,7 @@ func (s *modelManagerSuite) TestChangeModelCredentialNotFoundModel(c *gc.C) {
 	credTag := names.NewCloudCredentialTag("dummy/bob@external/cred2")
 	client := modelmanager.NewClient(conn)
 	err := client.ChangeModelCredential(modelTag, credTag)
-	c.Assert(err, gc.ErrorMatches, `model "000000000-0000-0000-0000-000000000000" not found`)
+	c.Assert(err, gc.ErrorMatches, `model not found`)
 }
 
 func (s *modelManagerSuite) TestChangeModelCredentialNotFoundCredential(c *gc.C) {
@@ -1537,7 +1538,7 @@ func (s *modelManagerSuite) TestChangeModelCredentialNotFoundCredential(c *gc.C)
 	credTag := names.NewCloudCredentialTag("dummy/alice@external/cred2")
 	client := modelmanager.NewClient(conn)
 	err := client.ChangeModelCredential(modelTag, credTag)
-	c.Assert(err, gc.ErrorMatches, `credential "dummy/alice/cred2" not found`)
+	c.Assert(err, gc.ErrorMatches, `credential not found`)
 }
 
 func (s *modelManagerSuite) TestChangeModelCredentialLocalUserCredential(c *gc.C) {
@@ -1672,7 +1673,7 @@ func (s *modelManagerSuite) TestValidateModelUpgrades(c *gc.C) {
 
 	uuid := utils.MustNewUUID().String()
 	err = client.ValidateModelUpgrade(names.NewModelTag(uuid), false)
-	c.Assert(err, gc.ErrorMatches, fmt.Sprintf("model %q not found", uuid))
+	c.Assert(err, gc.ErrorMatches, "model not found")
 }
 
 func (s *caasModelManagerSuite) AssertAddKubernetesCloud(c *gc.C, credTag names.CloudCredentialTag) {

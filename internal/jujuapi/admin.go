@@ -122,8 +122,9 @@ func (r *modelRoot) RedirectInfo(ctx context.Context) (jujuparams.RedirectInfoRe
 // modelInfo retrieves the data about the model.
 func (r *modelRoot) modelInfo(ctx context.Context) (*mongodoc.Model, *mongodoc.Controller, error) {
 	if r.model == nil {
-		var err error
-		r.model, err = r.jem.DB.ModelFromUUID(ctx, r.uuid)
+		r.model = &mongodoc.Model{UUID: r.uuid}
+
+		err := r.jem.DB.GetModel(ctx, r.model)
 		if errgo.Cause(err) == params.ErrNotFound {
 			return nil, nil, errgo.WithCausef(err, params.ErrModelNotFound, "%s", "")
 		}

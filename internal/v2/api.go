@@ -9,6 +9,7 @@ import (
 	"github.com/juju/aclstore"
 	controllerapi "github.com/juju/juju/api/controller"
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/network"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -185,13 +186,12 @@ func (h *Handler) DeleteController(p httprequest.Params, arg *params.DeleteContr
 
 // GetModel returns information on a given model.
 func (h *Handler) GetModel(p httprequest.Params, arg *params.GetModel) (*params.ModelResponse, error) {
-	if err := h.jem.DB.CheckReadACL(p.Context, h.jem.DB.Models(), arg.EntityPath); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-
-	m, err := h.jem.DB.Model(p.Context, arg.EntityPath)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	m := mongodoc.Model{Path: arg.EntityPath}
+	if err := h.jem.GetModel(p.Context, h.id, jujuparams.ModelReadAccess, &m); err != nil {
+		if errgo.Cause(err) == params.ErrNotFound && auth.CheckIsUser(p.Context, h.id, arg.EntityPath.User) != nil {
+			err = errgo.WithCausef(nil, params.ErrUnauthorized, "")
+		}
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	ctl, err := h.jem.DB.Controller(p.Context, m.Controller)
 	if err != nil {
@@ -215,14 +215,11 @@ func (h *Handler) GetModel(p httprequest.Params, arg *params.GetModel) (*params.
 
 // DeleteModel deletes an model from JEM.
 func (h *Handler) DeleteModel(p httprequest.Params, arg *params.DeleteModel) error {
-	if err := auth.CheckIsUser(p.Context, h.id, arg.EntityPath.User); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	m := mongodoc.Model{Path: arg.EntityPath}
+	if err := h.jem.GetModel(p.Context, h.id, jujuparams.ModelAdminAccess, &m); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	ctx := auth.ContextWithIdentity(p.Context, h.id)
-	if err := h.jem.DB.DeleteModel(ctx, arg.EntityPath); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrForbidden))
-	}
-	return nil
+	return errgo.Mask(h.jem.DB.DeleteModel(p.Context, m.Path))
 }
 
 // ListModels returns all the models stored in JEM.
@@ -472,8 +469,8 @@ func (h *Handler) Migrate(p httprequest.Params, arg *params.Migrate) error {
 	if err := auth.CheckIsUser(p.Context, h.id, h.config.ControllerAdmin); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	model, err := h.jem.DB.Model(p.Context, arg.EntityPath)
-	if err != nil {
+	model := mongodoc.Model{Path: arg.EntityPath}
+	if err := h.jem.DB.GetModel(p.Context, &model); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	conn, err := h.jem.OpenAPI(p.Context, model.Controller)
@@ -615,9 +612,9 @@ func (it mgoIter) Err(_ context.Context) error {
 
 // GetModelName returns the name of the model identified by the provided uuid.
 func (h *Handler) GetModelName(p httprequest.Params, arg *params.ModelNameRequest) (params.ModelNameResponse, error) {
-	m, err := h.jem.DB.ModelFromUUID(p.Context, arg.UUID)
-	if err != nil {
-		return params.ModelNameResponse{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	m := mongodoc.Model{UUID: arg.UUID}
+	if err := h.jem.GetModel(p.Context, h.id, jujuparams.ModelReadAccess, &m); err != nil {
+		return params.ModelNameResponse{}, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 
 	return params.ModelNameResponse{
@@ -684,7 +681,8 @@ func (h *Handler) MissingModels(p httprequest.Params, arg *params.MissingModelsR
 
 	for _, ms := range mss {
 		// Check that a model with the same UUID exists.
-		_, err := h.jem.DB.ModelFromUUID(p.Context, ms.UUID)
+		m := mongodoc.Model{UUID: ms.UUID}
+		err := h.jem.DB.GetModel(p.Context, &m)
 		if err == nil {
 			continue
 		}

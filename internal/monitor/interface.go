@@ -7,8 +7,6 @@ import (
 	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
-	"github.com/juju/juju/cloud"
-	"github.com/juju/names/v4"
 	"github.com/juju/version"
 
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
@@ -133,9 +131,6 @@ type jujuAPI interface {
 
 	// ServerVersion holds the version of the API server that we are connected to.
 	ServerVersion() (version.Number, bool)
-
-	// Clouds gets the clouds supported by the controller.
-	Clouds() (map[names.CloudTag]cloud.Cloud, error)
 }
 
 // allWatcher represents a watcher of all events on a controller.
