@@ -140,6 +140,7 @@ func (s *controllerSuite) TestModelStatus(c *gc.C) {
 			HostedMachineCount: 0,
 			ApplicationCount:   0,
 			Machines:           []base.Machine{},
+			ModelType:          "iaas",
 		}, {
 			UUID:               modelUUID3,
 			Life:               "alive",
@@ -149,9 +150,12 @@ func (s *controllerSuite) TestModelStatus(c *gc.C) {
 			HostedMachineCount: 0,
 			ApplicationCount:   0,
 			Machines:           []base.Machine{},
+			ModelType:          "iaas",
 		}})
-		_, err = client.ModelStatus(names.NewModelTag(modelUUID2))
-		c.Assert(err, gc.ErrorMatches, `unauthorized`)
+		status, err := client.ModelStatus(names.NewModelTag(modelUUID2))
+		c.Assert(err, gc.Equals, nil)
+		c.Assert(status, gc.HasLen, 1)
+		c.Assert(status[0].Error, gc.ErrorMatches, "unauthorized")
 	}
 
 	conn := s.open(c, nil, "test")

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/juju/clock/testclock"
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
@@ -38,7 +39,7 @@ type modelManagerSuite struct {
 	usageSenderAuthorizationClient *testUsageSenderAuthorizationClient
 }
 
-var _ = gc.Suite(&controllerSuite{})
+var _ = gc.Suite(&modelManagerSuite{})
 
 func (s *modelManagerSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
@@ -320,13 +321,13 @@ func (s *modelManagerSuite) TestCreateModel(c *gc.C) {
 			continue
 		}
 		c.Assert(err, gc.Equals, nil)
-		c.Check(info.Name, gc.Equals, test.params.Path.Name)
+		c.Check(info.Name, gc.Equals, string(test.params.Path.Name))
 		c.Check(info.OwnerTag, gc.Equals, conv.ToUserTag(test.params.Path.User).String())
 		c.Check(info.UUID, gc.Not(gc.Equals), "")
 		c.Check(info.CloudTag, gc.Equals, conv.ToCloudTag(test.params.Cloud).String())
 		c.Check(info.CloudRegion, gc.Equals, "dummy-region")
 		c.Check(info.DefaultSeries, gc.Not(gc.Equals), "")
-		c.Check(info.Life, gc.Equals, "alive")
+		c.Check(string(info.Life), gc.Equals, "alive")
 
 		m := mongodoc.Model{
 			Path: test.params.Path,
@@ -454,6 +455,78 @@ func (s *modelManagerSuite) TestCreateModelWithMultipleControllers(c *gc.C) {
 	err = s.jem.DB.GetModel(testContext, &m)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(m.Controller, jc.DeepEquals, ctl2Id)
+}
+
+func (s *modelManagerSuite) TestGetModelInfo(c *gc.C) {
+	ctlPath := s.addController(c, params.EntityPath{"bob", "test"})
+	var info jujuparams.ModelInfo
+	id := jemtest.NewIdentity("bob")
+	err := s.jem.CreateModel(testContext, id, jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", "model"},
+		ControllerPath: ctlPath,
+	}, &info)
+	c.Assert(err, gc.Equals, nil)
+
+	info2 := jujuparams.ModelInfo{
+		UUID: info.UUID,
+	}
+	err = s.jem.GetModelInfo(testContext, id, &info2, true)
+	c.Assert(err, gc.Equals, nil)
+	c.Check(info2, jc.DeepEquals, info)
+}
+
+func (s *modelManagerSuite) TestGetModelInfoLocalOnly(c *gc.C) {
+	ctlPath := s.addController(c, params.EntityPath{"bob", "test"})
+	var info jujuparams.ModelInfo
+	id := jemtest.NewIdentity("bob")
+	err := s.jem.CreateModel(testContext, id, jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", "model"},
+		ControllerPath: ctlPath,
+	}, &info)
+	c.Assert(err, gc.Equals, nil)
+
+	info2 := jujuparams.ModelInfo{
+		UUID: info.UUID,
+	}
+	err = s.jem.GetModelInfo(testContext, id, &info2, false)
+	c.Assert(err, gc.Equals, nil)
+
+	// The local database doesn't have the information to populate these
+	// fields.
+	info.SLA = nil
+	info.CloudCredentialValidity = nil
+
+	// Round times to the resolution in the database.
+	roundedTime := info.Status.Since.Truncate(time.Millisecond)
+	info.Status.Since = &roundedTime
+	c.Check(info2, jc.DeepEquals, info)
+}
+
+func (s *modelManagerSuite) TestGetModelInfoUnauthorized(c *gc.C) {
+	ctlPath := s.addController(c, params.EntityPath{"bob", "test"})
+	var info jujuparams.ModelInfo
+	id := jemtest.NewIdentity("bob")
+	err := s.jem.CreateModel(testContext, id, jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", "model"},
+		ControllerPath: ctlPath,
+	}, &info)
+	c.Assert(err, gc.Equals, nil)
+
+	info2 := jujuparams.ModelInfo{
+		UUID: info.UUID,
+	}
+	err = s.jem.GetModelInfo(testContext, jemtest.NewIdentity("alice"), &info2, false)
+	c.Check(err, gc.ErrorMatches, "unauthorized")
+	c.Check(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
+}
+
+func (s *modelManagerSuite) TestGetModelInfoNotFound(c *gc.C) {
+	info := jujuparams.ModelInfo{
+		UUID: "no uuid",
+	}
+	err := s.jem.GetModelInfo(testContext, jemtest.NewIdentity("alice"), &info, true)
+	c.Check(err, gc.ErrorMatches, "model not found")
+	c.Check(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
 func (s *modelManagerSuite) addController(c *gc.C, path params.EntityPath) params.EntityPath {

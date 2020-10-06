@@ -300,6 +300,25 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 		Life:      "dead",
 	})
 	c.Assert(err, gc.Equals, nil)
+	err = s.JEM.UpdateMachineInfo(ctx, ctlPath, &jujuparams.MachineInfo{
+		ModelUUID: modelUUID4,
+		Id:        "machine-0",
+	})
+	c.Assert(err, gc.Equals, nil)
+	err = s.JEM.UpdateMachineInfo(ctx, ctlPath, &jujuparams.MachineInfo{
+		ModelUUID: modelUUID4,
+		Id:        "machine-1",
+		HardwareCharacteristics: &instance.HardwareCharacteristics{
+			Arch: &machineArch,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	err = s.JEM.UpdateMachineInfo(ctx, ctlPath, &jujuparams.MachineInfo{
+		ModelUUID: modelUUID4,
+		Id:        "machine-2",
+		Life:      "dead",
+	})
+	c.Assert(err, gc.Equals, nil)
 
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
@@ -361,14 +380,6 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 				DisplayName: "test",
 				Access:      jujuparams.ModelReadAccess,
 			}},
-			Machines: []jujuparams.ModelMachineInfo{{
-				Id: "machine-0",
-			}, {
-				Id: "machine-1",
-				Hardware: &jujuparams.MachineHardware{
-					Arch: &machineArch,
-				},
-			}},
 			AgentVersion: &jujuversion.Current,
 			Type:         "iaas",
 		},
@@ -391,6 +402,14 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 				DisplayName: "test",
 				Access:      jujuparams.ModelWriteAccess,
 			}},
+			Machines: []jujuparams.ModelMachineInfo{{
+				Id: "machine-0",
+			}, {
+				Id: "machine-1",
+				Hardware: &jujuparams.MachineHardware{
+					Arch: &machineArch,
+				},
+			}},
 			AgentVersion: &jujuversion.Current,
 			Type:         "iaas",
 		},
@@ -409,12 +428,12 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 				Status: status.Available,
 			},
 			Users: []jujuparams.ModelUserInfo{{
-				UserName:    "test@external",
-				DisplayName: "test",
-				Access:      jujuparams.ModelAdminAccess,
-			}, {
 				UserName:    "test2@external",
 				DisplayName: "test2",
+				Access:      jujuparams.ModelAdminAccess,
+			}, {
+				UserName:    "test@external",
+				DisplayName: "test",
 				Access:      jujuparams.ModelAdminAccess,
 			}},
 			AgentVersion: &jujuversion.Current,
@@ -422,8 +441,8 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 		},
 	}, {
 		Error: &jujuparams.Error{
-			Message: `model not found`,
-			Code:    jujuparams.CodeNotFound,
+			Message: `unauthorized`,
+			Code:    jujuparams.CodeUnauthorized,
 		},
 	}})
 }
@@ -471,6 +490,25 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	err = s.JEM.UpdateMachineInfo(ctx, ctlPath, &jujuparams.MachineInfo{
 		ModelUUID: modelUUID3,
+		Id:        "machine-2",
+		Life:      "dead",
+	})
+	c.Assert(err, gc.Equals, nil)
+	err = s.JEM.UpdateMachineInfo(ctx, ctlPath, &jujuparams.MachineInfo{
+		ModelUUID: modelUUID4,
+		Id:        "machine-0",
+	})
+	c.Assert(err, gc.Equals, nil)
+	err = s.JEM.UpdateMachineInfo(ctx, ctlPath, &jujuparams.MachineInfo{
+		ModelUUID: modelUUID4,
+		Id:        "machine-1",
+		HardwareCharacteristics: &instance.HardwareCharacteristics{
+			Arch: &machineArch,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	err = s.JEM.UpdateMachineInfo(ctx, ctlPath, &jujuparams.MachineInfo{
+		ModelUUID: modelUUID4,
 		Id:        "machine-2",
 		Life:      "dead",
 	})
@@ -539,14 +577,6 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 				DisplayName: "test",
 				Access:      jujuparams.ModelReadAccess,
 			}},
-			Machines: []jujuparams.ModelMachineInfo{{
-				Id: "machine-0",
-			}, {
-				Id: "machine-1",
-				Hardware: &jujuparams.MachineHardware{
-					Arch: &machineArch,
-				},
-			}},
 			AgentVersion: &jujuversion.Current,
 			Type:         "iaas",
 		},
@@ -569,6 +599,14 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 				DisplayName: "test",
 				Access:      jujuparams.ModelWriteAccess,
 			}},
+			Machines: []jujuparams.ModelMachineInfo{{
+				Id: "machine-0",
+			}, {
+				Id: "machine-1",
+				Hardware: &jujuparams.MachineHardware{
+					Arch: &machineArch,
+				},
+			}},
 			AgentVersion: &jujuversion.Current,
 			Type:         "iaas",
 		},
@@ -587,12 +625,12 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 				Status: status.Available,
 			},
 			Users: []jujuparams.ModelUserInfo{{
-				UserName:    "test@external",
-				DisplayName: "test",
-				Access:      jujuparams.ModelAdminAccess,
-			}, {
 				UserName:    "test2@external",
 				DisplayName: "test2",
+				Access:      jujuparams.ModelAdminAccess,
+			}, {
+				UserName:    "test@external",
+				DisplayName: "test",
 				Access:      jujuparams.ModelAdminAccess,
 			}},
 			AgentVersion: &jujuversion.Current,
@@ -600,8 +638,8 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 		},
 	}, {
 		Error: &jujuparams.Error{
-			Message: `model not found`,
-			Code:    jujuparams.CodeNotFound,
+			Message: `unauthorized`,
+			Code:    jujuparams.CodeUnauthorized,
 		},
 	}})
 }
@@ -658,8 +696,12 @@ func (s *modelManagerSuite) TestModelInfoForLegacyModel(c *gc.C) {
 				DisplayName: "test",
 				Access:      jujuparams.ModelAdminAccess,
 			}},
-			AgentVersion: &jujuversion.Current,
-			Type:         "iaas",
+			AgentVersion:            &jujuversion.Current,
+			Type:                    "iaas",
+			CloudCredentialValidity: newBool(true),
+			SLA: &jujuparams.ModelSLAInfo{
+				Level: "unsupported",
+			},
 		},
 	}})
 
@@ -727,8 +769,12 @@ func (s *modelManagerSuite) TestModelInfoForLegacyModelDisableControllerUUIDMask
 				DisplayName: "test",
 				Access:      jujuparams.ModelAdminAccess,
 			}},
-			AgentVersion: &jujuversion.Current,
-			Type:         "iaas",
+			AgentVersion:            &jujuversion.Current,
+			Type:                    "iaas",
+			CloudCredentialValidity: newBool(true),
+			SLA: &jujuparams.ModelSLAInfo{
+				Level: "unsupported",
+			},
 		},
 	}})
 
@@ -792,8 +838,12 @@ func (s *modelManagerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 				DisplayName: "test",
 				Access:      jujuparams.ModelAdminAccess,
 			}},
-			AgentVersion: &jujuversion.Current,
-			Type:         "iaas",
+			AgentVersion:            &jujuversion.Current,
+			Type:                    "iaas",
+			CloudCredentialValidity: newBool(true),
+			SLA: &jujuparams.ModelSLAInfo{
+				Level: "unsupported",
+			},
 		},
 	}})
 
@@ -822,8 +872,12 @@ func (s *modelManagerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 				DisplayName: "test",
 				Access:      jujuparams.ModelAdminAccess,
 			}},
-			AgentVersion: &jujuversion.Current,
-			Type:         "iaas",
+			AgentVersion:            &jujuversion.Current,
+			Type:                    "iaas",
+			CloudCredentialValidity: newBool(true),
+			SLA: &jujuparams.ModelSLAInfo{
+				Level: "unsupported",
+			},
 		},
 	}})
 
@@ -853,8 +907,12 @@ func (s *modelManagerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 				DisplayName: "test",
 				Access:      jujuparams.ModelAdminAccess,
 			}},
-			AgentVersion: &jujuversion.Current,
-			Type:         "iaas",
+			AgentVersion:            &jujuversion.Current,
+			Type:                    "iaas",
+			CloudCredentialValidity: newBool(true),
+			SLA: &jujuparams.ModelSLAInfo{
+				Level: "unsupported",
+			},
 		},
 	}})
 }

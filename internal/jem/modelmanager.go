@@ -5,10 +5,15 @@ package jem
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/core/life"
+	"github.com/juju/juju/core/status"
 	"github.com/juju/juju/environs/config"
+	"github.com/juju/names/v4"
+	"github.com/juju/version"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
@@ -112,6 +117,10 @@ func (j *JEM) CreateModel(ctx context.Context, id identchecker.ACLIdentity, p Cr
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 
+	var credPath mongodoc.CredentialPath
+	if cred != nil {
+		credPath = cred.Path
+	}
 	// Create the model record in the database before actually
 	// creating the model on the controller. It will have an invalid
 	// UUID because it doesn't exist but that's better than creating
@@ -122,7 +131,7 @@ func (j *JEM) CreateModel(ctx context.Context, id identchecker.ACLIdentity, p Cr
 		CreationTime:           wallClock.Now(),
 		Creator:                id.Id(),
 		UsageSenderCredentials: usageSenderCredentials,
-		Credential:             cred.Path,
+		Credential:             credPath,
 		// Use a temporary UUID so that we can create two at the
 		// same time, because the uuid field must always be
 		// unique.
@@ -203,11 +212,15 @@ func (j *JEM) CreateModel(ctx context.Context, id identchecker.ACLIdentity, p Cr
 	if info.AgentVersion != nil {
 		cfg[config.AgentVersionKey] = info.AgentVersion.String()
 	}
+	ct, err := names.ParseCloudTag(info.CloudTag)
+	if err != nil {
+		zapctx.Error(ctx, "bad data returned from controller", zap.Error(err))
+	}
 	if _, err := j.DB.Models().FindId(modelDoc.Id).Apply(mgo.Change{
 		Update: bson.D{{"$set", bson.D{
 			{"uuid", info.UUID},
 			{"controller", ctlPath},
-			{"cloud", p.Cloud},
+			{"cloud", ct.Id()},
 			{"cloudregion", info.CloudRegion},
 			{"defaultseries", info.DefaultSeries},
 			{"info", mongodoc.ModelInfo{
@@ -363,4 +376,209 @@ func (j *JEM) selectCredential(ctx context.Context, id identchecker.ACLIdentity,
 	default:
 		return nil, errgo.WithCausef(nil, params.ErrAmbiguousChoice, "more than one possible credential to use")
 	}
+}
+
+// GetModelInfo completes the given ModelInfo, which must have a non-zero
+// UUID. If the queryController parameter is true then ModelInfo will be
+// retrieved from the controller, otherwise only information available from
+// the  local database will be returned. If the model cannot be found then
+// an  error with a cause of params.ErrNotFound will be returned, if the
+// given user does not have read access to the model then an error with a
+// cause of params.ErrUnauthorized will be returned.
+func (j *JEM) GetModelInfo(ctx context.Context, id identchecker.ACLIdentity, info *jujuparams.ModelInfo, queryController bool) error {
+	if info == nil {
+		return errgo.WithCausef(nil, params.ErrUnauthorized, "")
+	}
+	m := mongodoc.Model{
+		UUID: info.UUID,
+	}
+	if err := j.GetModel(ctx, id, jujuparams.ModelReadAccess, &m); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+	}
+
+	ctl, err := j.DB.Controller(ctx, m.Controller)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+
+	if queryController {
+		ctx := zapctx.WithFields(ctx, zap.Stringer("controller", m.Controller))
+		conn, err := j.OpenAPIFromDoc(ctx, ctl)
+		if err == nil {
+			err = conn.ModelInfo(ctx, info)
+			if jujuparams.IsCodeUnauthorized(err) && m.Life() == "dying" {
+				zapctx.Info(ctx, "could not get ModelInfo for dying model, marking dead", zap.Error(err))
+				// The model was dying and now cannot be accessed, assume it is now dead.
+				if err := j.DB.DeleteModelWithUUID(ctx, m.Controller, m.UUID); err != nil {
+					// If this update fails then don't worry as the watcher
+					// will detect the state change and update as appropriate.
+					zapctx.Warn(ctx, "error deleting model", zap.Error(err))
+				}
+				// return the error with the an appropriate cause.
+				return errgo.Mask(err, apiconn.IsAPIError)
+			}
+		}
+		if err != nil {
+			zapctx.Error(ctx, "cannot get model info from controller", zap.Error(err))
+		}
+	}
+
+	if info.Name == "" {
+		// We couldn't populate the ModelInfo from the controller, so use
+		// the local database.
+		info.Name = string(m.Path.Name)
+		info.Type = m.Type
+		info.ControllerUUID = ctl.UUID
+		info.IsController = false
+		info.ProviderType = m.ProviderType
+		if info.ProviderType == "" {
+			info.ProviderType, err = j.DB.ProviderType(ctx, m.Cloud)
+			if err != nil {
+				zapctx.Error(ctx, "cannot get provider type", zap.Error(err))
+			}
+		}
+		info.DefaultSeries = m.DefaultSeries
+		info.CloudTag = conv.ToCloudTag(m.Cloud).String()
+		info.CloudRegion = m.CloudRegion
+		info.CloudCredentialTag = conv.ToCloudCredentialTag(m.Credential.ToParams()).String()
+		info.CloudCredentialValidity = nil
+		info.OwnerTag = conv.ToUserTag(m.Path.User).String()
+		info.Life = life.Value(m.Life())
+		info.Status = modelStatus(m.Info)
+
+		// Add all the possible users in priority order, they will be
+		// filtered later.
+		info.Users = []jujuparams.ModelUserInfo{userInfo(m.Path.User, jujuparams.ModelAdminAccess)}
+		for _, u := range m.ACL.Admin {
+			info.Users = append(info.Users, userInfo(params.User(u), jujuparams.ModelAdminAccess))
+		}
+		for _, u := range m.ACL.Write {
+			info.Users = append(info.Users, userInfo(params.User(u), jujuparams.ModelWriteAccess))
+		}
+		for _, u := range m.ACL.Read {
+			info.Users = append(info.Users, userInfo(params.User(u), jujuparams.ModelReadAccess))
+		}
+
+		machines, err := j.DB.MachinesForModel(ctx, info.UUID)
+		if err == nil {
+			info.Machines = make([]jujuparams.ModelMachineInfo, 0, len(machines))
+			for _, machine := range machines {
+				if machine.Info.Life == "dead" {
+					continue
+				}
+				mi := jujuparams.ModelMachineInfo{
+					Id:         machine.Info.Id,
+					InstanceId: machine.Info.InstanceId,
+					Status:     string(machine.Info.AgentStatus.Current),
+					HasVote:    machine.Info.HasVote,
+					WantsVote:  machine.Info.WantsVote,
+				}
+				if machine.Info.HardwareCharacteristics != nil {
+					mi.Hardware = &jujuparams.MachineHardware{
+						Arch:             machine.Info.HardwareCharacteristics.Arch,
+						Mem:              machine.Info.HardwareCharacteristics.Mem,
+						RootDisk:         machine.Info.HardwareCharacteristics.RootDisk,
+						Cores:            machine.Info.HardwareCharacteristics.CpuCores,
+						CpuPower:         machine.Info.HardwareCharacteristics.CpuPower,
+						Tags:             machine.Info.HardwareCharacteristics.Tags,
+						AvailabilityZone: machine.Info.HardwareCharacteristics.AvailabilityZone,
+					}
+				}
+				info.Machines = append(info.Machines, mi)
+			}
+		} else {
+			zapctx.Error(ctx, "cannot get machine information", zap.Error(err))
+		}
+
+		info.Migration = nil
+		// TODO(mhilton) we should store SLA information
+		info.SLA = nil
+		info.AgentVersion = modelVersion(ctx, m.Info)
+	}
+
+	var canSeeUsers, canSeeMachines bool
+	if err := auth.CheckIsUser(ctx, id, m.Path.User); err == nil {
+		canSeeUsers = true
+		canSeeMachines = true
+	} else if err := auth.CheckACL(ctx, id, m.ACL.Admin); err == nil {
+		canSeeUsers = true
+		canSeeMachines = true
+	} else if err := auth.CheckACL(ctx, id, m.ACL.Write); err == nil {
+		canSeeMachines = true
+	}
+
+	// Filter users to remove local users (from controller) and duplicates
+	// (from database).
+	var users []jujuparams.ModelUserInfo
+	seen := make(map[string]bool)
+	for _, u := range info.Users {
+		if seen[u.UserName] {
+			continue
+		}
+		seen[u.UserName] = true
+
+		ut := names.NewUserTag(u.UserName)
+		uid, err := conv.FromUserTag(ut)
+		if err != nil {
+			// This will be an error if the user is a controller-local
+			// user which does not make sense in a JAAS environement.
+			continue
+		}
+		if !canSeeUsers {
+			if err := auth.CheckIsUser(ctx, id, uid); err != nil {
+				continue
+			}
+		}
+		// The authenticated user is allowed to know about this user.
+		users = append(users, u)
+	}
+	info.Users = users
+
+	sort.Slice(info.Users, func(i, j int) bool { return info.Users[i].UserName < info.Users[j].UserName })
+
+	if !canSeeMachines {
+		info.Machines = nil
+	}
+	sort.Slice(info.Machines, func(i, j int) bool { return info.Machines[i].Id < info.Machines[j].Id })
+
+	return nil
+}
+
+func userInfo(u params.User, access jujuparams.UserAccessPermission) jujuparams.ModelUserInfo {
+	t := conv.ToUserTag(u)
+	return jujuparams.ModelUserInfo{
+		UserName:    t.Id(),
+		DisplayName: t.Name(),
+		Access:      access,
+	}
+}
+
+func modelStatus(info *mongodoc.ModelInfo) jujuparams.EntityStatus {
+	var st jujuparams.EntityStatus
+	if info == nil {
+		return st
+	}
+	st.Status = status.Status(info.Status.Status)
+	st.Info = info.Status.Message
+	st.Data = info.Status.Data
+	if !info.Status.Since.IsZero() {
+		st.Since = &info.Status.Since
+	}
+	return st
+}
+
+func modelVersion(ctx context.Context, info *mongodoc.ModelInfo) *version.Number {
+	if info == nil {
+		return nil
+	}
+	versionString, _ := info.Config[config.AgentVersionKey].(string)
+	if versionString == "" {
+		return nil
+	}
+	v, err := version.Parse(versionString)
+	if err != nil {
+		zapctx.Warn(ctx, "cannot parse agent-version", zap.String("agent-version", versionString), zap.Error(err))
+		return nil
+	}
+	return &v
 }

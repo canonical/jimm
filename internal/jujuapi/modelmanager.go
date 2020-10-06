@@ -228,13 +228,28 @@ func (r *controllerRoot) ModelInfo(ctx context.Context, args jujuparams.Entities
 	results := make([]jujuparams.ModelInfoResult, len(args.Entities))
 	run := parallel.NewRun(maxRequestConcurrency)
 	for i, arg := range args.Entities {
-		i, arg := i, arg
+		mt, err := names.ParseModelTag(arg.Tag)
+		if err != nil {
+			results[i].Error = mapError(errgo.WithCausef(err, params.ErrBadRequest, ""))
+			continue
+		}
+		results[i].Result = &jujuparams.ModelInfo{
+			UUID: mt.Id(),
+		}
+		i := i
 		run.Do(func() error {
-			mi, err := r.modelInfo(ctx, arg, len(args.Entities) != 1)
-			if err != nil {
-				results[i].Error = mapError(err)
-			} else {
-				results[i].Result = mi
+			err := r.jem.GetModelInfo(ctx, r.identity, results[i].Result, len(results) == 1)
+			if errgo.Cause(err) == params.ErrNotFound {
+				// Map not-found errors to unauthorized, this is what juju
+				// does.
+				err = params.ErrUnauthorized
+			}
+			results[i].Error = mapError(err)
+			if r.controllerUUIDMasking {
+				results[i].Result.ControllerUUID = r.params.ControllerUUID
+			}
+			if results[i].Error != nil {
+				results[i].Result = nil
 			}
 			return nil
 		})
