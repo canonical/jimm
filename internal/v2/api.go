@@ -215,14 +215,11 @@ func (h *Handler) GetModel(p httprequest.Params, arg *params.GetModel) (*params.
 
 // DeleteModel deletes an model from JEM.
 func (h *Handler) DeleteModel(p httprequest.Params, arg *params.DeleteModel) error {
-	if err := auth.CheckIsUser(p.Context, h.id, arg.EntityPath.User); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	m := mongodoc.Model{Path: arg.EntityPath}
+	if err := h.jem.GetModel(p.Context, h.id, jujuparams.ModelAdminAccess, &m); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	ctx := auth.ContextWithIdentity(p.Context, h.id)
-	if err := h.jem.DB.DeleteModel(ctx, arg.EntityPath); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrForbidden))
-	}
-	return nil
+	return errgo.Mask(h.jem.DB.DeleteModel(p.Context, m.Path))
 }
 
 // ListModels returns all the models stored in JEM.

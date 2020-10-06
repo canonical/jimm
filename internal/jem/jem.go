@@ -1111,26 +1111,6 @@ func (j *JEM) RevokeModel(ctx context.Context, conn *apiconn.Conn, model *mongod
 	return nil
 }
 
-// DestroyModel destroys the specified model. The model will have its
-// Life set to dying, but won't be removed until it is removed from the
-// controller.
-func (j *JEM) DestroyModel(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model, destroyStorage *bool, force *bool, maxWait *time.Duration) error {
-	client := modelmanager.NewClient(conn)
-	if err := client.DestroyModel(names.NewModelTag(model.UUID), destroyStorage, force, maxWait); err != nil {
-		return errgo.Mask(err, jujuparams.IsCodeHasPersistentStorage)
-	}
-	if err := j.DB.SetModelLife(ctx, model.Controller, model.UUID, "dying"); err != nil {
-		// If this update fails then don't worry as the watcher
-		// will detect the state change and update as appropriate.
-		zapctx.Warn(ctx, "error updating model life", zap.Error(err), zap.String("model", model.UUID))
-	}
-	j.DB.AppendAudit(ctx, &params.AuditModelDestroyed{
-		ID:   model.Id,
-		UUID: model.UUID,
-	})
-	return nil
-}
-
 // EarliestControllerVersion returns the earliest agent version
 // that any of the available public controllers is known to be running.
 // If there are no available controllers or none of their versions are
