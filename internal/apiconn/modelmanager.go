@@ -4,6 +4,7 @@ package apiconn
 
 import (
 	"context"
+	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/environs/config"
@@ -276,6 +277,46 @@ func (c *Conn) ValidateModelUpgrade(ctx context.Context, model names.ModelTag, f
 	}
 	if len(resp.Results) != 1 {
 		return errgo.Newf("unexpected number of results (expected 1, got %d)", len(resp.Results))
+	}
+
+	return newAPIError(resp.Results[0].Error)
+}
+
+// DestroyModel starts the destruction of the given model. This method uses
+// the highest available method from:
+//
+//  - ModelManager(7).DestroyModels
+//  - ModelManager(4).DestroyModels
+//  - ModelManager(2).DestroyModels
+func (c *Conn) DestroyModel(ctx context.Context, uuid string, destroyStorage *bool, force *bool, maxWait *time.Duration) error {
+	mt := names.NewModelTag(uuid)
+	args := jujuparams.DestroyModelsParams{
+		Models: []jujuparams.DestroyModelParams{{
+			ModelTag:       mt.String(),
+			DestroyStorage: destroyStorage,
+			Force:          force,
+			MaxWait:        maxWait,
+		}},
+	}
+
+	resp := jujuparams.ErrorResults{
+		Results: make([]jujuparams.ErrorResult, 1),
+	}
+	var err error
+	switch {
+	case c.HasFacadeVersion("ModelManager", 7):
+		err = c.APICall("ModelManager", 7, "", "DestroyModels", &args, &resp)
+	case c.HasFacadeVersion("ModelManager", 4):
+		err = c.APICall("ModelManager", 4, "", "DestroyModels", &args, &resp)
+	default:
+		err = c.APICall("ModelManager", 2, "", "DestroyModels",
+			&jujuparams.Entities{Entities: []jujuparams.Entity{{Tag: mt.String()}}},
+			&resp,
+		)
+	}
+
+	if err != nil {
+		return newAPIError(err)
 	}
 	return newAPIError(resp.Results[0].Error)
 }

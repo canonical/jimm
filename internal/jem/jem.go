@@ -355,15 +355,15 @@ func apiInfoFromDoc(ctl *mongodoc.Controller) *api.Info {
 // The returned connection must be closed when finished with.
 func (j *JEM) OpenModelAPI(ctx context.Context, path params.EntityPath) (_ *apiconn.Conn, err error) {
 	defer j.DB.checkError(ctx, &err)
-	m, err := j.DB.Model(ctx, path)
-	if err != nil {
+	m := mongodoc.Model{Path: path}
+	if err := j.DB.GetModel(ctx, &m); err != nil {
 		return nil, errgo.NoteMask(err, "cannot get model", errgo.Is(params.ErrNotFound))
 	}
 	ctl, err := j.DB.Controller(ctx, m.Controller)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot get controller")
 	}
-	return j.openModelAPIFromDocs(ctx, ctl, m)
+	return j.openModelAPIFromDocs(ctx, ctl, &m)
 }
 
 // openModelAPIFromDocs returns an API connection to the model held in the
@@ -393,6 +393,85 @@ func apiInfoFromDocs(ctl *mongodoc.Controller, m *mongodoc.Model) *api.Info {
 	}
 }
 
+// GetModel retrieves the given model from the database using
+// Database.GetModel. It then checks that the given user has the given
+// access level on the model. If the model cannot be found then an error
+// with a cause of params.ErrNotFound is returned. If the given user
+// does not have the correct access level on the model then an error of
+// type params.ErrUnauthorized will be returned.
+func (j *JEM) GetModel(ctx context.Context, id identchecker.ACLIdentity, access jujuparams.UserAccessPermission, m *mongodoc.Model) error {
+	if err := j.DB.GetModel(ctx, m); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+
+	// Currently in JAAS the namespace user has full access to the model.
+	acl := []string{string(m.Path.User)}
+	switch access {
+	case jujuparams.ModelReadAccess:
+		acl = append(acl, m.ACL.Read...)
+		fallthrough
+	case jujuparams.ModelWriteAccess:
+		acl = append(acl, m.ACL.Write...)
+		fallthrough
+	case jujuparams.ModelAdminAccess:
+		acl = append(acl, m.ACL.Admin...)
+	}
+	if err := auth.CheckACL(ctx, id, acl); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+
+	if m.Cloud == "" {
+		// The model does not currently store its cloud information so go
+		// and fetch it from the model itself. This happens if the model
+		// was created with a JIMM version older than 0.9.5.
+		if err := j.updateModelInfo(ctx, m); err != nil {
+			// Log the failure, but return what we have to the caller.
+			zapctx.Error(ctx, "cannot update model info", zap.Error(err))
+		}
+	}
+	return nil
+}
+
+// updateModelInfo retrieves model parameters missing in the current database
+// from the controller.
+func (j *JEM) updateModelInfo(ctx context.Context, model *mongodoc.Model) error {
+	conn, err := j.OpenAPI(ctx, model.Controller)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	info := jujuparams.ModelInfo{UUID: model.UUID}
+	if err := conn.ModelInfo(ctx, &info); err != nil {
+		return errgo.Mask(err)
+	}
+	cloudTag, err := names.ParseCloudTag(info.CloudTag)
+	if err != nil {
+		return errgo.Notef(err, "bad data from controller")
+	}
+	credentialTag, err := names.ParseCloudCredentialTag(info.CloudCredentialTag)
+	if err != nil {
+		return errgo.Notef(err, "bad data from controller")
+	}
+	model.Cloud = params.Cloud(cloudTag.Id())
+	model.CloudRegion = info.CloudRegion
+	owner, err := conv.FromUserTag(credentialTag.Owner())
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
+	}
+	model.Credential = mongodoc.CredentialPath{
+		Cloud: string(params.Cloud(credentialTag.Cloud().Id())),
+		EntityPath: mongodoc.EntityPath{
+			User: string(owner),
+			Name: credentialTag.Name(),
+		},
+	}
+	model.DefaultSeries = info.DefaultSeries
+
+	if err := j.DB.UpdateLegacyModel(ctx, model); err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
 // Controller retrieves the given controller from the database,
 // validating that the current user is allowed to read the controller.
 func (j *JEM) Controller(ctx context.Context, path params.EntityPath) (*mongodoc.Controller, error) {
@@ -405,22 +484,31 @@ func (j *JEM) Controller(ctx context.Context, path params.EntityPath) (*mongodoc
 
 // GetCredential retrieves the given credential from the database,
 // validating that the current user is allowed to read the credential.
-func (j *JEM) GetCredential(ctx context.Context, id identchecker.ACLIdentity, path params.CredentialPath) (*mongodoc.Credential, error) {
-	cred, err := j.DB.Credential(ctx, mongodoc.CredentialPathFromParams(path))
-	if err != nil {
+func (j *JEM) GetCredential(ctx context.Context, id identchecker.ACLIdentity, cred *mongodoc.Credential) error {
+	if err := j.DB.GetCredential(ctx, cred); err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			// We return an authorization error for all attempts to retrieve credentials
 			// from any other user's space.
-			if aerr := auth.CheckIsUser(ctx, id, path.User); aerr != nil {
+			if aerr := auth.CheckIsUser(ctx, id, params.User(cred.Path.User)); aerr != nil {
 				err = aerr
 			}
 		}
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	if err := auth.CheckCanRead(ctx, id, cred); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	return cred, nil
+
+	// ensure we always have a provider-type in the credential.
+	if cred.ProviderType == "" {
+		var err error
+		cred.ProviderType, err = j.DB.ProviderType(ctx, params.Cloud(cred.Path.Cloud))
+		if err != nil {
+			zapctx.Error(ctx, "cannot find provider type for credential", zap.Error(err), zap.Stringer("credential", cred.Path))
+		}
+	}
+
+	return nil
 }
 
 // FillCredentialAttributes ensures that the credential attributes of the
@@ -707,8 +795,10 @@ func (j *JEM) RevokeCredential(ctx context.Context, credPath params.CredentialPa
 	if flags == 0 {
 		flags = ^0
 	}
-	cred, err := j.DB.Credential(ctx, mongodoc.CredentialPathFromParams(credPath))
-	if err != nil {
+	cred := mongodoc.Credential{
+		Path: mongodoc.CredentialPathFromParams(credPath),
+	}
+	if err := j.DB.GetCredential(ctx, &cred); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	controllers := cred.Controllers
@@ -793,8 +883,10 @@ func (j *JEM) UpdateCredential(ctx context.Context, cred *mongodoc.Credential, f
 		flags = ^0
 	}
 	var controllers []params.EntityPath
-	c, err := j.DB.Credential(ctx, cred.Path)
-	if err == nil {
+	c := mongodoc.Credential{
+		Path: cred.Path,
+	}
+	if err := j.DB.GetCredential(ctx, &c); err == nil {
 		controllers = c.Controllers
 	} else if errgo.Cause(err) != params.ErrNotFound {
 		return nil, errgo.Mask(err)
@@ -807,6 +899,17 @@ func (j *JEM) UpdateCredential(ctx context.Context, cred *mongodoc.Credential, f
 			return models, errgo.Mask(err, apiconn.IsAPIError)
 		}
 	}
+
+	// Try to ensure that we set the provider type.
+	cred.ProviderType = c.ProviderType
+	if cred.ProviderType == "" {
+		var err error
+		cred.ProviderType, err = j.DB.ProviderType(ctx, params.Cloud(cred.Path.Cloud))
+		if err != nil {
+			zapctx.Warn(ctx, "cannot determine provider type", zap.Error(err), zap.String("cloud", cred.Path.Cloud))
+		}
+	}
+
 	// Note that because CredentialUpdate is checked for inside the
 	// CredentialCheck case above, we know that we need to
 	// update the credential in this case.
@@ -1005,26 +1108,6 @@ func (j *JEM) RevokeModel(ctx context.Context, conn *apiconn.Conn, model *mongod
 		// TODO (mhilton) What should be done with the changes already made to the database.
 		return errgo.Mask(err, apiconn.IsAPIError)
 	}
-	return nil
-}
-
-// DestroyModel destroys the specified model. The model will have its
-// Life set to dying, but won't be removed until it is removed from the
-// controller.
-func (j *JEM) DestroyModel(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model, destroyStorage *bool, force *bool, maxWait *time.Duration) error {
-	client := modelmanager.NewClient(conn)
-	if err := client.DestroyModel(names.NewModelTag(model.UUID), destroyStorage, force, maxWait); err != nil {
-		return errgo.Mask(err, jujuparams.IsCodeHasPersistentStorage)
-	}
-	if err := j.DB.SetModelLife(ctx, model.Controller, model.UUID, "dying"); err != nil {
-		// If this update fails then don't worry as the watcher
-		// will detect the state change and update as appropriate.
-		zapctx.Warn(ctx, "error updating model life", zap.Error(err), zap.String("model", model.UUID))
-	}
-	j.DB.AppendAudit(ctx, &params.AuditModelDestroyed{
-		ID:   model.Id,
-		UUID: model.UUID,
-	})
 	return nil
 }
 

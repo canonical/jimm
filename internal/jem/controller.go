@@ -192,8 +192,10 @@ func (j *JEM) ConnectMonitor(ctx context.Context, path params.EntityPath) (*apic
 // connection retried. In that case the updates will be tried again.
 func (j *JEM) controllerUpdateCredentials(ctx context.Context, conn *apiconn.Conn, ctl *mongodoc.Controller) {
 	for _, credPath := range ctl.UpdateCredentials {
-		cred, err := j.DB.Credential(ctx, credPath)
-		if err != nil {
+		cred := mongodoc.Credential{
+			Path: credPath,
+		}
+		if err := j.DB.GetCredential(ctx, &cred); err != nil {
 			zapctx.Warn(ctx,
 				"cannot get credential for controller",
 				zap.Stringer("cred", credPath),
@@ -212,7 +214,7 @@ func (j *JEM) controllerUpdateCredentials(ctx context.Context, conn *apiconn.Con
 				)
 			}
 		} else {
-			if _, err := j.updateControllerCredential(ctx, conn, ctl.Path, cred); err != nil {
+			if _, err := j.updateControllerCredential(ctx, conn, ctl.Path, &cred); err != nil {
 				zapctx.Warn(ctx,
 					"cannot update credential",
 					zap.Stringer("cred", credPath),

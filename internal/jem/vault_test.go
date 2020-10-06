@@ -119,14 +119,17 @@ func (s *jemVaultSuite) TestVaultCredentials(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Check(cred2.Attributes, gc.HasLen, 0)
 
-	cred3, err := s.jem.GetCredential(ctx, jemtest.NewIdentity("bob"), cred1.Path.ToParams())
+	cred3 := mongodoc.Credential{
+		Path: cred1.Path,
+	}
+	err = s.jem.GetCredential(ctx, jemtest.NewIdentity("bob"), &cred3)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(cred3.Attributes, gc.HasLen, 0)
 
-	err = s.jem.FillCredentialAttributes(ctx, cred3)
+	err = s.jem.FillCredentialAttributes(ctx, &cred3)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(cred3.Id, gc.Equals, "dummy/bob/test-1")
 	cred3.Id = ""
 	cred3.AttributesInVault = false
-	c.Check(cred3, gc.DeepEquals, cred1)
+	c.Check(&cred3, gc.DeepEquals, cred1)
 }

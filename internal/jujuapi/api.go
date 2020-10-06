@@ -17,6 +17,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemerror"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/params"
@@ -94,8 +95,8 @@ func (h *handler) GUI(p httprequest.Params, arg *guiRequest) error {
 	if h.params.GUILocation == "" {
 		return errgo.WithCausef(nil, params.ErrNotFound, "no GUI location specified")
 	}
-	m, err := h.jem.DB.ModelFromUUID(ctx, arg.UUID)
-	if err != nil {
+	m := mongodoc.Model{UUID: arg.UUID}
+	if err := h.jem.DB.GetModel(ctx, &m); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	http.Redirect(p.Response, p.Request, fmt.Sprintf("%s/u/%s/%s", h.params.GUILocation, m.Path.User, m.Path.Name), http.StatusMovedPermanently)

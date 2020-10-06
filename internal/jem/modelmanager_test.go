@@ -6,8 +6,13 @@ import (
 	"context"
 
 	"github.com/juju/clock/testclock"
+	modelmanagerapi "github.com/juju/juju/api/modelmanager"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
+	"github.com/juju/juju/state"
+	"github.com/juju/juju/testing/factory"
 	"github.com/juju/names/v4"
+	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
@@ -94,4 +99,71 @@ func (s *modelManagerSuite) TestValidateModelUpgrade(c *gc.C) {
 
 	err = s.jem.ValidateModelUpgrade(ctx, jemtest.NewIdentity("bob"), names.NewModelTag(utils.MustNewUUID().String()).String(), true)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}
+
+func (s *modelManagerSuite) TestDestroyModel(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	conn, err := s.jem.OpenAPI(testContext, model.Controller)
+	c.Assert(err, gc.Equals, nil)
+	defer conn.Close()
+
+	// Sanity check the model exists
+	client := modelmanagerapi.NewClient(conn)
+	_, err = client.ModelInfo([]names.ModelTag{
+		names.NewModelTag(model.UUID),
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.jem.DestroyModel(testContext, jemtest.NewIdentity("bob"), model, nil, nil, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	// Check the model is dying.
+	m := mongodoc.Model{Path: model.Path}
+	err = s.jem.DB.GetModel(testContext, &m)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(m.Life(), gc.Equals, "dying")
+
+	// Check that it can be destroyed twice.
+	err = s.jem.DestroyModel(testContext, jemtest.NewIdentity("bob"), model, nil, nil, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	// Check the model is still dying.
+	err = s.jem.DB.GetModel(testContext, &m)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(m.Life(), gc.Equals, "dying")
+}
+
+func (s *modelManagerSuite) TestDestroyModelWithStorage(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	conn, err := s.jem.OpenAPI(testContext, model.Controller)
+	c.Assert(err, gc.Equals, nil)
+	defer conn.Close()
+
+	// Sanity check the model exists
+	tag := names.NewModelTag(model.UUID)
+	client := modelmanagerapi.NewClient(conn)
+	_, err = client.ModelInfo([]names.ModelTag{tag})
+	c.Assert(err, gc.Equals, nil)
+
+	modelState, err := s.StatePool.Get(model.UUID)
+	c.Assert(err, gc.Equals, nil)
+	defer modelState.Release()
+	f := factory.NewFactory(modelState.State, s.StatePool)
+	f.MakeUnit(c, &factory.UnitParams{
+		Application: f.MakeApplication(c, &factory.ApplicationParams{
+			Charm: f.MakeCharm(c, &factory.CharmParams{
+				Name: "storage-block",
+			}),
+			Storage: map[string]state.StorageConstraints{
+				"data": {Pool: "modelscoped"},
+			},
+		}),
+	})
+
+	err = s.jem.DestroyModel(testContext, jemtest.NewIdentity("bob"), model, nil, nil, nil)
+	c.Assert(err, jc.Satisfies, jujuparams.IsCodeHasPersistentStorage)
+}
+
+func (s *modelManagerSuite) bootstrapModel(c *gc.C, path params.EntityPath) *mongodoc.Model {
+	return bootstrapModel(c, path, s.APIInfo(c), s.jem)
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/environs/config"
 	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/names/v4"
@@ -272,4 +273,29 @@ func (s *modelmanagerSuite) TestValidateModelUpgrade(c *gc.C) {
 	uuid := utils.MustNewUUID().String()
 	err = s.conn.ValidateModelUpgrade(ctx, names.NewModelTag(uuid), false)
 	c.Assert(err, gc.ErrorMatches, fmt.Sprintf("api error: model %q not found", uuid))
+}
+
+func (s *modelmanagerSuite) TestDestroyModel(c *gc.C) {
+	ctx := context.Background()
+
+	model := mongodoc.Model{
+		Path: params.EntityPath{
+			User: "test-user",
+			Name: "test-model",
+		},
+	}
+
+	err := s.conn.CreateModel(ctx, &model)
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.conn.DestroyModel(ctx, model.UUID, nil, nil, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	mi := jujuparams.ModelInfo{
+		UUID: model.UUID,
+	}
+	err = s.conn.ModelInfo(ctx, &mi)
+	c.Assert(err, gc.Equals, nil)
+
+	c.Check(mi.Life, gc.Equals, life.Dying)
 }

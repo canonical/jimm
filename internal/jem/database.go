@@ -9,7 +9,6 @@ import (
 	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
-	"github.com/juju/names/v4"
 	"github.com/juju/version"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
@@ -367,37 +366,36 @@ func (db *Database) Controller(ctx context.Context, path params.EntityPath) (_ *
 	return &ctl, nil
 }
 
-// Model returns information on the model with the given
-// path. It returns an error with a params.ErrNotFound cause if the
-// controller was not found.
-func (db *Database) Model(ctx context.Context, path params.EntityPath) (_ *mongodoc.Model, err error) {
+// GetModel completes the contents of the given model. The database model
+// is matched using the first non-zero value in the given model from the
+// following fields:
+//
+//  - Path
+//  - UUID
+//
+// If no matching model can be found then the returned error will have a
+// cause of params.ErrNotFound.
+func (db *Database) GetModel(ctx context.Context, m *mongodoc.Model) (err error) {
 	defer db.checkError(ctx, &err)
-	id := path.String()
-	var m mongodoc.Model
-	err = db.Models().FindId(id).One(&m)
+	var q *mgo.Query
+	switch {
+	case m == nil:
+		return errgo.WithCausef(nil, params.ErrNotFound, "model not found")
+	case !m.Path.IsZero():
+		q = db.Models().FindId(m.Path.String())
+	case m.UUID != "":
+		q = db.Models().Find(bson.D{{"uuid", m.UUID}})
+	default:
+		return errgo.WithCausef(nil, params.ErrNotFound, "model not found")
+	}
+	err = q.One(m)
 	if err == mgo.ErrNotFound {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "model %q not found", id)
+		return errgo.WithCausef(nil, params.ErrNotFound, "model not found")
 	}
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot get model %q", id)
+		return errgo.Notef(err, "cannot get model")
 	}
-	return &m, nil
-}
-
-// ModelFromUUID returns the document representing the model with the
-// given UUID. It returns an error with a params.ErrNotFound cause if the
-// model was not found.
-func (db *Database) ModelFromUUID(ctx context.Context, uuid string) (_ *mongodoc.Model, err error) {
-	defer db.checkError(ctx, &err)
-	var m mongodoc.Model
-	err = db.Models().Find(bson.D{{"uuid", uuid}}).One(&m)
-	if err == mgo.ErrNotFound {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "model %q not found", uuid)
-	}
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot get model %q", uuid)
-	}
-	return &m, nil
+	return nil
 }
 
 // modelFromControllerAndUUID returns the document representing the model
@@ -814,19 +812,20 @@ func (db *Database) updateCredential(ctx context.Context, cred *mongodoc.Credent
 	return nil
 }
 
-// Credential gets the specified credential. If the credential cannot be
-// found the returned error will have a cause of params.ErrNotFound.
-func (db *Database) Credential(ctx context.Context, path mongodoc.CredentialPath) (_ *mongodoc.Credential, err error) {
+// GetCredential fills the specified credential. The given credential must
+// specify a path which will be used to lookup the credential. If the
+// credential cannot be found then an error with a cause of
+// params.ErrNotFound is returned.
+func (db *Database) GetCredential(ctx context.Context, cred *mongodoc.Credential) (err error) {
 	defer db.checkError(ctx, &err)
-	var cred mongodoc.Credential
-	err = db.Credentials().FindId(path.String()).One(&cred)
+	err = db.Credentials().FindId(cred.Path.String()).One(&cred)
 	if err == mgo.ErrNotFound {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", path)
+		return errgo.WithCausef(nil, params.ErrNotFound, "credential not found")
 	}
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot get credential %q", path)
+		return errgo.Notef(err, "cannot get credential")
 	}
-	return &cred, nil
+	return nil
 }
 
 // credentialAddController stores the fact that the credential with the
@@ -1524,11 +1523,7 @@ func makeApplicationOfferFilterQuery(filter jujuparams.OfferFilter) bson.D {
 	if len(filter.AllowedConsumerTags) > 0 {
 		users := make([]bson.D, 0, len(filter.AllowedConsumerTags))
 		for _, userTag := range filter.AllowedConsumerTags {
-			ut, err := names.ParseUserTag(userTag)
-			var user params.User
-			if err == nil {
-				user, err = conv.FromUserTag(ut)
-			}
+			user, err := conv.ParseUserTag(userTag)
 			if err != nil {
 				// If this user does not parse then it will never match
 				// a record, add a query that can't match.

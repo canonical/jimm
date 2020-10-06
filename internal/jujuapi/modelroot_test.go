@@ -21,5 +21,5 @@ func (s *modelSuite) TestUnknownModel(c *gc.C) {
 	}, "bob")
 	defer conn.Close()
 	err := conn.Login(nil, "", "", nil)
-	c.Assert(err, gc.ErrorMatches, `model "00000000-0000-0000-0000-000000000000" not found \(model not found\)`)
+	c.Assert(err, gc.ErrorMatches, `model not found \(model not found\)`)
 }

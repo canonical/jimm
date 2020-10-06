@@ -10,10 +10,8 @@ import (
 
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
-	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/life"
 	jujustatus "github.com/juju/juju/core/status"
-	"github.com/juju/juju/environs"
 	"github.com/juju/juju/environs/config"
 	"github.com/juju/names/v4"
 	"github.com/juju/rpcreflect"
@@ -39,12 +37,11 @@ import (
 type controllerRoot struct {
 	rpc.Root
 
-	params        jemserver.Params
-	auth          *auth.Authenticator
-	jem           *jem.JEM
-	heartMonitor  heartMonitor
-	schemataCache map[params.Cloud]map[jujucloud.AuthType]jujucloud.CredentialSchema
-	watchers      *watcherRegistry
+	params       jemserver.Params
+	auth         *auth.Authenticator
+	jem          *jem.JEM
+	heartMonitor heartMonitor
+	watchers     *watcherRegistry
 
 	// mu protects the fields below it
 	mu                    sync.Mutex
@@ -55,11 +52,10 @@ type controllerRoot struct {
 
 func newControllerRoot(jem *jem.JEM, a *auth.Authenticator, p jemserver.Params, hm heartMonitor) *controllerRoot {
 	r := &controllerRoot{
-		params:        p,
-		auth:          a,
-		jem:           jem,
-		heartMonitor:  hm,
-		schemataCache: make(map[params.Cloud]map[jujucloud.AuthType]jujucloud.CredentialSchema),
+		params:       p,
+		auth:         a,
+		jem:          jem,
+		heartMonitor: hm,
 		watchers: &watcherRegistry{
 			watchers: make(map[string]*modelSummaryWatcher),
 		},
@@ -76,12 +72,15 @@ func newControllerRoot(jem *jem.JEM, a *auth.Authenticator, p jemserver.Params, 
 // modelWithConnection gets the model with the given model tag, opens a
 // connection to the model and runs the given function with the model and
 // connection. The function will not have any error cause masked.
-func (r *controllerRoot) modelWithConnection(ctx context.Context, modelTag string, authf authFunc, f func(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model) error) error {
-	model, err := getModel(ctx, r.jem, modelTag, authf)
+func (r *controllerRoot) modelWithConnection(ctx context.Context, modelTag string, access jujuparams.UserAccessPermission, f func(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model) error) error {
+	mt, err := names.ParseModelTag(modelTag)
 	if err != nil {
+		return errgo.WithCausef(err, params.ErrBadRequest, "")
+	}
+	model := mongodoc.Model{UUID: mt.Id()}
+	if err := r.jem.GetModel(ctx, r.identity, access, &model); err != nil {
 		return errgo.Mask(err,
 			errgo.Is(params.ErrNotFound),
-			errgo.Is(params.ErrBadRequest),
 			errgo.Is(params.ErrUnauthorized),
 		)
 	}
@@ -91,7 +90,7 @@ func (r *controllerRoot) modelWithConnection(ctx context.Context, modelTag strin
 	}
 	defer conn.Close()
 
-	return errgo.Mask(f(ctx, conn, model), errgo.Any)
+	return errgo.Mask(f(ctx, conn, &model), errgo.Any)
 }
 
 // doModels calls the given function for each model that the
@@ -120,24 +119,6 @@ func (r *controllerRoot) FindMethod(rootName string, version int, methodName str
 	return r.Root.FindMethod(rootName, version, methodName)
 }
 
-// credentialSchema gets the schema for the credential identified by the
-// given cloud and authType.
-func (r *controllerRoot) credentialSchema(ctx context.Context, cloud params.Cloud, authType string) (jujucloud.CredentialSchema, error) {
-	if cs, ok := r.schemataCache[cloud]; ok {
-		return cs[jujucloud.AuthType(authType)], nil
-	}
-	providerType, err := r.jem.DB.ProviderType(ctx, cloud)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-	provider, err := environs.Provider(providerType)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	r.schemataCache[cloud] = provider.CredentialSchemas()
-	return r.schemataCache[cloud][jujucloud.AuthType(authType)], nil
-}
-
 func userModelForModelDoc(m *mongodoc.Model) jujuparams.Model {
 	return jujuparams.Model{
 		Name:     string(m.Path.Name),
@@ -149,16 +130,19 @@ func userModelForModelDoc(m *mongodoc.Model) jujuparams.Model {
 
 // modelInfo retrieves the model information for the specified entity.
 func (r *controllerRoot) modelInfo(ctx context.Context, arg jujuparams.Entity, localOnly bool) (*jujuparams.ModelInfo, error) {
-	model, err := getModel(ctx, r.jem, arg.Tag, auth.CheckCanRead)
+	mt, err := names.ParseModelTag(arg.Tag)
 	if err != nil {
+		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
+	}
+	model := mongodoc.Model{UUID: mt.Id()}
+	if err := r.jem.GetModel(ctx, r.identity, jujuparams.ModelReadAccess, &model); err != nil {
 		return nil, errgo.Mask(err,
-			errgo.Is(params.ErrBadRequest),
 			errgo.Is(params.ErrUnauthorized),
 			errgo.Is(params.ErrNotFound),
 		)
 	}
 	ctx = zapctx.WithFields(ctx, zap.String("model-uuid", model.UUID))
-	info, err := r.modelDocToModelInfo(ctx, model)
+	info, err := r.modelDocToModelInfo(ctx, &model)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -166,7 +150,7 @@ func (r *controllerRoot) modelInfo(ctx context.Context, arg jujuparams.Entity, l
 		return info, nil
 	}
 	// Query the model itself for user information.
-	infoFromController, err := fetchModelInfo(ctx, r.jem, model)
+	infoFromController, err := fetchModelInfo(ctx, r.jem, &model)
 	if err != nil {
 		code := jujuparams.ErrCode(err)
 		if model.Life() == string(life.Dying) && code == jujuparams.CodeUnauthorized {
@@ -343,72 +327,6 @@ func newTime(t time.Time) *time.Time {
 		return nil
 	}
 	return &t
-}
-
-// An authFunc is a function that authorizes an ACL. If access is allowed
-// then authFunc returns nil, if access is denied then the function
-// should return an error with a cause of params.ErrUnauthorized. Any
-// other errors are interpreted as a lookup failure.
-type authFunc func(context.Context, identchecker.ACLIdentity, auth.ACLEntity) error
-
-// getModel attempts to get the specified model from jem. If the model
-// tag is not valid then the error cause will be params.ErrBadRequest. If
-// the model cannot be found then the error cause will be
-// params.ErrNotFound. If authf is non-nil then it will be called with
-// the found model. authf is used to authenticate access to the model,the
-// cause of any error returned by authf will not be masked.
-func getModel(ctx context.Context, jem *jem.JEM, modelTag string, authf authFunc) (*mongodoc.Model, error) {
-	tag, err := names.ParseModelTag(modelTag)
-	if err != nil {
-		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid model tag")
-	}
-	model, err := jem.DB.ModelFromUUID(ctx, tag.Id())
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-	if authf == nil {
-		return model, nil
-	}
-	if err := authf(ctx, auth.IdentityFromContext(ctx), model); err != nil {
-		return nil, errgo.Mask(err, errgo.Any)
-	}
-	if model.Cloud != "" {
-		return model, nil
-	}
-	// The model does not currently store its cloud information so go
-	// and fetch it from the model itself. This happens if the model
-	// was created with a JIMM version older than 0.9.5.
-	info, err := fetchModelInfo(ctx, jem, model)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	cloudTag, err := names.ParseCloudTag(info.CloudTag)
-	if err != nil {
-		return nil, errgo.Notef(err, "bad data from controller")
-	}
-	credentialTag, err := names.ParseCloudCredentialTag(info.CloudCredentialTag)
-	if err != nil {
-		return nil, errgo.Notef(err, "bad data from controller")
-	}
-	model.Cloud = params.Cloud(cloudTag.Id())
-	model.CloudRegion = info.CloudRegion
-	owner, err := conv.FromUserTag(credentialTag.Owner())
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
-	}
-	model.Credential = mongodoc.CredentialPath{
-		Cloud: string(params.Cloud(credentialTag.Cloud().Id())),
-		EntityPath: mongodoc.EntityPath{
-			User: string(owner),
-			Name: credentialTag.Name(),
-		},
-	}
-	model.DefaultSeries = info.DefaultSeries
-
-	if err := jem.DB.UpdateLegacyModel(ctx, model); err != nil {
-		zapctx.Warn(ctx, "cannot update %s with cloud details", zap.String("model", model.Path.String()), zaputil.Error(err))
-	}
-	return model, nil
 }
 
 func fetchModelInfo(ctx context.Context, jem *jem.JEM, model *mongodoc.Model) (*jujuparams.ModelInfo, error) {

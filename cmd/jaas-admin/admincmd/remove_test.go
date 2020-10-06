@@ -103,7 +103,7 @@ func (s *removeSuite) TestRemoveMultipleModels(c *gc.C) {
 	stdout, stderr, code = run(c, c.MkDir(), "remove", "bob/foo", "bob/foo-1")
 	c.Assert(code, gc.Equals, 1, gc.Commentf("stderr: %s", stderr))
 	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Matches, `cannot remove bob/foo: Delete .*/v2/model/bob/foo: model "bob/foo" not found`+"\n")
+	c.Assert(stderr, gc.Matches, `cannot remove bob/foo: Delete .*/v2/model/bob/foo: model not found`+"\n")
 
 	stdout, stderr, code = run(c, c.MkDir(), "models")
 	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))

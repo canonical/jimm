@@ -1,5 +1,7 @@
 // Copyright 2020 Canonical Ltd.
 
+// +build !release
+
 package jujuapi
 
 import (
@@ -182,19 +184,15 @@ func (r *controllerRoot) ModifyOfferAccess(ctx context.Context, args jujuparams.
 	}
 
 	for i, change := range args.Changes {
-		results.Results[i].Error = mapError(r.modifyOfferAcces(ctx, change))
+		results.Results[i].Error = mapError(r.modifyOfferAccess(ctx, change))
 	}
 	return results, nil
 }
 
-func (r *controllerRoot) modifyOfferAcces(ctx context.Context, change jujuparams.ModifyOfferAccess) error {
-	userTag, err := names.ParseUserTag(change.UserTag)
+func (r *controllerRoot) modifyOfferAccess(ctx context.Context, change jujuparams.ModifyOfferAccess) error {
+	user, err := conv.ParseUserTag(change.UserTag)
 	if err != nil {
-		return errgo.WithCausef(err, params.ErrBadRequest, "")
-	}
-	user, err := conv.FromUserTag(userTag)
-	if err != nil {
-		return errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
+		return errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(conv.ErrLocalUser))
 	}
 	switch change.Action {
 	case jujuparams.GrantOfferAccess:
