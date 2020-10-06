@@ -246,45 +246,42 @@ func (r *controllerRoot) ModelInfo(ctx context.Context, args jujuparams.Entities
 }
 
 // CreateModel implements the ModelManager facade's CreateModel method.
-func (r *controllerRoot) CreateModel(ctx context.Context, args jujuparams.ModelCreateArgs) (jujuparams.ModelInfo, error) {
+func (r *controllerRoot) CreateModel(ctx context.Context, args jujuparams.ModelCreateArgs) (info jujuparams.ModelInfo, err error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 	ctx = auth.ContextWithIdentity(ctx, r.identity)
-	mi, err := r.createModel(ctx, args)
+	err = errgo.Mask(r.createModel(ctx, args, &info),
+		errgo.Is(conv.ErrLocalUser),
+		errgo.Is(params.ErrUnauthorized),
+		errgo.Is(params.ErrNotFound),
+		errgo.Is(params.ErrBadRequest),
+	)
 	if err == nil {
 		servermon.ModelsCreatedCount.Inc()
 	} else {
 		servermon.ModelsCreatedFailCount.Inc()
 	}
-	if err != nil {
-		return jujuparams.ModelInfo{}, errgo.Mask(err,
-			errgo.Is(conv.ErrLocalUser),
-			errgo.Is(params.ErrUnauthorized),
-			errgo.Is(params.ErrNotFound),
-			errgo.Is(params.ErrBadRequest),
-		)
-	}
-	return *mi, nil
+	return
 }
 
-func (r *controllerRoot) createModel(ctx context.Context, args jujuparams.ModelCreateArgs) (*jujuparams.ModelInfo, error) {
+func (r *controllerRoot) createModel(ctx context.Context, args jujuparams.ModelCreateArgs, info *jujuparams.ModelInfo) error {
 	owner, err := conv.ParseUserTag(args.OwnerTag)
 	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(conv.ErrLocalUser))
+		return errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(conv.ErrLocalUser))
 	}
 	if args.CloudTag == "" {
-		return nil, errgo.New("no cloud specified for model; please specify one")
+		return errgo.New("no cloud specified for model; please specify one")
 	}
 	cloudTag, err := names.ParseCloudTag(args.CloudTag)
 	if err != nil {
-		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud tag")
+		return errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud tag")
 	}
 	cloud := params.Cloud(cloudTag.Id())
 	var credPath params.CredentialPath
 	if args.CloudCredentialTag != "" {
 		tag, err := names.ParseCloudCredentialTag(args.CloudCredentialTag)
 		if err != nil {
-			return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud credential tag")
+			return errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud credential tag")
 		}
 		credPath = params.CredentialPath{
 			Cloud: params.Cloud(tag.Cloud().Id()),
@@ -292,22 +289,20 @@ func (r *controllerRoot) createModel(ctx context.Context, args jujuparams.ModelC
 			Name:  params.CredentialName(tag.Name()),
 		}
 	}
-	model, err := r.jem.CreateModel(ctx, jem.CreateModelParams{
+	err = r.jem.CreateModel(ctx, r.identity, jem.CreateModelParams{
 		Path:       params.EntityPath{User: owner, Name: params.Name(args.Name)},
 		Credential: credPath,
 		Cloud:      cloud,
 		Region:     args.CloudRegion,
 		Attributes: args.Config,
-	})
+	}, info)
 	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+		return errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	info, err := r.modelDocToModelInfo(ctx, model)
-	if err != nil {
-		return nil, errgo.Mask(err)
+	if r.controllerUUIDMasking {
+		info.ControllerUUID = r.params.ControllerUUID
 	}
-
-	return info, nil
+	return nil
 }
 
 // DestroyModelsV4 implements the ModelManager facade's DestroyModels
