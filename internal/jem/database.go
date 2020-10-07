@@ -875,8 +875,8 @@ func (db *Database) GetCloudRegions(ctx context.Context) (_ []mongodoc.CloudRegi
 }
 
 // GetCloudRegionsIter returns a CanReadIter for all of the cloudregion.
-func (db *Database) GetCloudRegionsIter(ctx context.Context) *CanReadIter {
-	return db.NewCanReadIter(ctx, db.CloudRegions().Find(nil).Iter())
+func (db *Database) GetCloudRegionsIter(id identchecker.ACLIdentity) *CanReadIter {
+	return db.NewCanReadIter(id, db.CloudRegions().Find(nil).Iter())
 }
 
 // UpdateCloudRegions adds new cloud regions to the database.
@@ -1203,10 +1203,10 @@ func (db *Database) RevokeModel(ctx context.Context, path params.EntityPath, use
 // CheckReadACL checks that the entity with the given path in the given
 // collection (which must have been obtained from db) can be read by the
 // currently authenticated user.
-func (db *Database) CheckReadACL(ctx context.Context, c *mgo.Collection, path params.EntityPath) (err error) {
+func (db *Database) CheckReadACL(ctx context.Context, id identchecker.ACLIdentity, c *mgo.Collection, path params.EntityPath) (err error) {
 	defer db.checkError(ctx, &err)
 	// The user can always access their own entities.
-	if err := auth.CheckIsUser(ctx, auth.IdentityFromContext(ctx), path.User); err == nil {
+	if err := auth.CheckIsUser(ctx, id, path.User); err == nil {
 		return nil
 	}
 	acl, err := db.GetACL(ctx, c, path)
@@ -1217,7 +1217,7 @@ func (db *Database) CheckReadACL(ctx context.Context, c *mgo.Collection, path pa
 		// people probing for the existence of other people's entities.
 		return params.ErrUnauthorized
 	}
-	if err := auth.CheckACL(ctx, auth.IdentityFromContext(ctx), acl.Read); err != nil {
+	if err := auth.CheckACL(ctx, id, acl.Read); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	return nil
@@ -1537,9 +1537,9 @@ func makeApplicationOfferFilterQuery(filter jujuparams.OfferFilter) bson.D {
 // that the currently logged in user has permission to see.
 //
 // The API matches that of mgo.Iter.
-func (db *Database) NewCanReadIter(ctx context.Context, iter *mgo.Iter) *CanReadIter {
+func (db *Database) NewCanReadIter(id identchecker.ACLIdentity, iter *mgo.Iter) *CanReadIter {
 	return &CanReadIter{
-		id:   auth.IdentityFromContext(ctx),
+		id:   id,
 		iter: iter,
 		db:   db,
 	}

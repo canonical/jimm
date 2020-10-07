@@ -20,7 +20,6 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
@@ -1971,13 +1970,12 @@ var checkReadACLTests = []struct {
 func (s *databaseSuite) TestCheckReadACL(c *gc.C) {
 	for i, test := range checkReadACLTests {
 		c.Logf("%d. %s", i, test.about)
-		ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity(test.user, test.groups...))
 		entity := params.EntityPath{
 			User: params.User(test.owner),
 			Name: params.Name(fmt.Sprintf("test%d", i)),
 		}
 		if !test.skipCreateEntity {
-			err := s.database.AddModel(ctx, &mongodoc.Model{
+			err := s.database.AddModel(testContext, &mongodoc.Model{
 				Path: entity,
 				ACL: params.ACL{
 					Read: test.acl,
@@ -1985,7 +1983,7 @@ func (s *databaseSuite) TestCheckReadACL(c *gc.C) {
 			})
 			c.Assert(err, gc.Equals, nil)
 		}
-		err := s.database.CheckReadACL(ctx, s.database.Models(), entity)
+		err := s.database.CheckReadACL(testContext, jemtest.NewIdentity(test.user, test.groups...), s.database.Models(), entity)
 		if test.expectError != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
 			if test.expectCause != nil {
@@ -2023,9 +2021,8 @@ func (s *databaseSuite) TestCanReadIter(c *gc.C) {
 		err := s.database.AddModel(testContext, &testModels[i])
 		c.Assert(err, gc.Equals, nil)
 	}
-	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
 	it := s.database.Models().Find(nil).Sort("_id").Iter()
-	crit := s.database.NewCanReadIter(ctx, it)
+	crit := s.database.NewCanReadIter(jemtest.NewIdentity("bob", "bob-group"), it)
 	var models []mongodoc.Model
 	var m mongodoc.Model
 	for crit.Next(testContext, &m) {
@@ -2070,19 +2067,17 @@ var setDeadTests = []struct {
 	about: "CanReadIter",
 	run: func(db *jem.Database) {
 		it := db.Models().Find(nil).Sort("_id").Iter()
-		ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
-		crit := db.NewCanReadIter(ctx, it)
-		crit.Next(ctx, &mongodoc.Model{})
-		crit.Err(ctx)
+		crit := db.NewCanReadIter(jemtest.NewIdentity("bob", "bob-group"), it)
+		crit.Next(testContext, &mongodoc.Model{})
+		crit.Err(testContext)
 	},
 }, {
 	about: "CanReadIter with Close",
 	run: func(db *jem.Database) {
 		it := db.Models().Find(nil).Sort("_id").Iter()
-		ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob", "bob-group"))
-		crit := db.NewCanReadIter(ctx, it)
-		crit.Next(ctx, &mongodoc.Model{})
-		crit.Close(ctx)
+		crit := db.NewCanReadIter(jemtest.NewIdentity("bob", "bob-group"), it)
+		crit.Next(testContext, &mongodoc.Model{})
+		crit.Close(testContext)
 	},
 }, {
 	about: "clearCredentialUpdate",

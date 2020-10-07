@@ -10,7 +10,6 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
-	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
 	"github.com/CanonicalLtd/jimm/params"
@@ -58,7 +57,6 @@ func (r *controllerRoot) DisableUser(jujuparams.Entities) (jujuparams.ErrorResul
 
 // UserInfo implements the UserManager facade's UserInfo method.
 func (r *controllerRoot) UserInfo(ctx context.Context, req jujuparams.UserInfoRequest) (jujuparams.UserInfoResults, error) {
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	res := jujuparams.UserInfoResults{
 		Results: make([]jujuparams.UserInfoResult, len(req.Entities)),
 	}

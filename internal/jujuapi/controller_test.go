@@ -12,6 +12,7 @@ import (
 	"github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/controller"
+	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
@@ -231,14 +232,14 @@ func (s *controllerSuite) TestControllerVersion(c *gc.C) {
 	err := conn.APICall("Controller", 8, "", "ControllerVersion", nil, &result)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(result, jc.DeepEquals, jujuparams.ControllerVersionResults{
-		Version:   "0.0.0",
+		Version:   jujuversion.Current.String(),
 		GitCommit: jimmversion.VersionInfo.GitCommit,
 	})
 
 	err = conn.APICall("Controller", 9, "", "ControllerVersion", nil, &result)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(result, jc.DeepEquals, jujuparams.ControllerVersionResults{
-		Version:   "0.0.0",
+		Version:   jujuversion.Current.String(),
 		GitCommit: jimmversion.VersionInfo.GitCommit,
 	})
 }

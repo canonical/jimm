@@ -48,7 +48,7 @@ func (j *JEM) DestroyModel(ctx context.Context, id identchecker.ACLIdentity, mod
 		// will detect the state change and update as appropriate.
 		zapctx.Warn(ctx, "error updating model life", zap.Error(err), zap.String("model", model.UUID))
 	}
-	j.DB.AppendAudit(ctx, &params.AuditModelDestroyed{
+	j.DB.AppendAudit(ctx, id, &params.AuditModelDestroyed{
 		ID:   model.Id,
 		UUID: model.UUID,
 	})
@@ -241,7 +241,7 @@ func (j *JEM) CreateModel(ctx context.Context, id identchecker.ACLIdentity, p Cr
 		j.DB.checkError(ctx, &err)
 		return errgo.Notef(err, "cannot update model %s in database", modelDoc.UUID)
 	}
-	j.DB.AppendAudit(ctx, &params.AuditModelCreated{
+	j.DB.AppendAudit(ctx, id, &params.AuditModelCreated{
 		ID:             modelDoc.Id,
 		UUID:           modelDoc.UUID,
 		Owner:          string(modelDoc.Owner()),
@@ -349,7 +349,7 @@ func (j *JEM) selectCredential(ctx context.Context, id identchecker.ACLIdentity,
 		}
 	}
 	var creds []mongodoc.Credential
-	iter := j.DB.NewCanReadIter(auth.ContextWithIdentity(ctx, id), j.DB.Credentials().Find(query).Iter())
+	iter := j.DB.NewCanReadIter(id, j.DB.Credentials().Find(query).Iter())
 	var cred mongodoc.Credential
 	for iter.Next(ctx, &cred) {
 		creds = append(creds, cred)

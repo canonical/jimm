@@ -11,7 +11,6 @@ import (
 	"github.com/rogpeppe/fastuuid"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
@@ -108,7 +107,7 @@ func (r *controllerRoot) IdentityProviderURL(ctx context.Context) (jujuparams.St
 // ControllerVersion returns the version information associated with this
 // controller binary.
 func (r *controllerRoot) ControllerVersion(ctx context.Context) (jujuparams.ControllerVersionResults, error) {
-	srvVersion, err := r.jem.EarliestControllerVersion(ctx)
+	srvVersion, err := r.jem.EarliestControllerVersion(ctx, r.identity)
 	if err != nil {
 		return jujuparams.ControllerVersionResults{}, errgo.Mask(err)
 	}
@@ -135,7 +134,7 @@ func (r *controllerRoot) WatchModelSummaries(ctx context.Context) (jujuparams.Su
 
 	id := fmt.Sprintf("%v", r.generator.Next())
 
-	watcher, err := newModelSummaryWatcher(auth.ContextWithIdentity(ctx, r.identity), id, r, r.jem.Pubsub())
+	watcher, err := newModelSummaryWatcher(ctx, id, r, r.jem.Pubsub())
 	if err != nil {
 		return jujuparams.SummaryWatcherID{}, errgo.Mask(err)
 	}
@@ -147,7 +146,6 @@ func (r *controllerRoot) WatchModelSummaries(ctx context.Context) (jujuparams.Su
 }
 
 func (r *controllerRoot) AllModels(ctx context.Context) (jujuparams.UserModelList, error) {
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	return r.allModels(ctx)
 }
 

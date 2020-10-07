@@ -191,35 +191,3 @@ func (c *IdentityClient) DeclaredIdentity(ctx context.Context, declared map[stri
 		Reason: errgo.Newf("user not in %q domain", c.p.Domain),
 	}
 }
-
-type authKey struct{}
-
-// ContextWithIdentity returns the given context with the given identity
-// attached.
-func ContextWithIdentity(ctx context.Context, id identchecker.ACLIdentity) context.Context {
-	return context.WithValue(ctx, authKey{}, id)
-}
-
-// IdentityFromContext returns the identity that was previously attached
-// to the context using ContextWithIdentity. If no identity has been
-// attached then an Identity with no authority is returned.
-func IdentityFromContext(ctx context.Context) identchecker.ACLIdentity {
-	if aid, _ := ctx.Value(authKey{}).(identchecker.ACLIdentity); aid != nil {
-		return aid
-	}
-	return noIdentity{}
-}
-
-type noIdentity struct{}
-
-func (noIdentity) Id() string {
-	return ""
-}
-
-func (noIdentity) Domain() string {
-	return ""
-}
-
-func (noIdentity) Allow(context.Context, []string) (bool, error) {
-	return false, nil
-}

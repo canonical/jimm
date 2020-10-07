@@ -474,8 +474,8 @@ func (j *JEM) updateModelInfo(ctx context.Context, model *mongodoc.Model) error 
 
 // Controller retrieves the given controller from the database,
 // validating that the current user is allowed to read the controller.
-func (j *JEM) Controller(ctx context.Context, path params.EntityPath) (*mongodoc.Controller, error) {
-	if err := j.DB.CheckReadACL(ctx, j.DB.Controllers(), path); err != nil {
+func (j *JEM) Controller(ctx context.Context, id identchecker.ACLIdentity, path params.EntityPath) (*mongodoc.Controller, error) {
+	if err := j.DB.CheckReadACL(ctx, id, j.DB.Controllers(), path); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	ctl, err := j.DB.Controller(ctx, path)
@@ -892,12 +892,12 @@ func (j *JEM) RevokeModel(ctx context.Context, conn *apiconn.Conn, model *mongod
 // that any of the available public controllers is known to be running.
 // If there are no available controllers or none of their versions are
 // known, it returns the zero version.
-func (j *JEM) EarliestControllerVersion(ctx context.Context) (version.Number, error) {
+func (j *JEM) EarliestControllerVersion(ctx context.Context, id identchecker.ACLIdentity) (version.Number, error) {
 	// TOD(rog) cache the result of this for a while, as it changes only rarely
 	// and we don't really need to make this extra round trip every
 	// time a user connects to the API?
 	var v *version.Number
-	if err := j.DoControllers(ctx, func(c *mongodoc.Controller) error {
+	if err := j.doControllers(ctx, id, func(c *mongodoc.Controller) error {
 		zapctx.Debug(ctx, "in EarliestControllerVersion", zap.Stringer("controller", c.Path), zap.Stringer("version", c.Version))
 		if c.Version == nil {
 			return nil
@@ -915,20 +915,20 @@ func (j *JEM) EarliestControllerVersion(ctx context.Context) (version.Number, er
 	return *v, nil
 }
 
-// DoControllers calls the given function for each controller that
+// doControllers calls the given function for each controller that
 // can be read by the current user that matches the given attributes.
 // If the function returns an error, the iteration stops and
-// DoControllers returns the error with the same cause.
+// doControllers returns the error with the same cause.
 //
 // Note that the same pointer is passed to the do function on
 // each iteration. It is the responsibility of the do function to
 // copy it if needed.
-func (j *JEM) DoControllers(ctx context.Context, do func(c *mongodoc.Controller) error) error {
+func (j *JEM) doControllers(ctx context.Context, id identchecker.ACLIdentity, do func(c *mongodoc.Controller) error) error {
 	// Query all the controllers that match the attributes, building
 	// up all the possible values.
 	q := j.DB.Controllers().Find(bson.D{{"unavailablesince", notExistsQuery}, {"public", true}})
 	// Sort by _id so that we can make easily reproducible tests.
-	iter := j.DB.NewCanReadIter(ctx, q.Sort("_id").Iter())
+	iter := j.DB.NewCanReadIter(id, q.Sort("_id").Iter())
 	var ctl mongodoc.Controller
 	for iter.Next(ctx, &ctl) {
 		if err := do(&ctl); err != nil {

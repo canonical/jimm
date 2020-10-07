@@ -17,7 +17,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
@@ -25,12 +24,10 @@ import (
 )
 
 func (s *jemSuite) TestModelStats(c *gc.C) {
-	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob"))
-
 	ctl1Id := s.addController(c, params.EntityPath{"bob", "controller1"})
 	ctl2Id := s.addController(c, params.EntityPath{"bob", "controller2"})
 	s.addController(c, params.EntityPath{"bob", "controller3"})
-	err := s.jem.DB.AddModel(ctx, &mongodoc.Model{
+	err := s.jem.DB.AddModel(testContext, &mongodoc.Model{
 		Path: params.EntityPath{
 			User: "bob",
 			Name: "model1",
@@ -54,7 +51,7 @@ func (s *jemSuite) TestModelStats(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.jem.DB.AddModel(ctx, &mongodoc.Model{
+	err = s.jem.DB.AddModel(testContext, &mongodoc.Model{
 		Path: params.EntityPath{
 			User: "bob",
 			Name: "model2",
@@ -78,7 +75,7 @@ func (s *jemSuite) TestModelStats(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.jem.DB.AddModel(ctx, &mongodoc.Model{
+	err = s.jem.DB.AddModel(testContext, &mongodoc.Model{
 		Path: params.EntityPath{
 			User: "bob",
 			Name: "model3",

@@ -144,7 +144,7 @@ func (j *JEM) AddHostedCloud(ctx context.Context, id identchecker.ACLIdentity, n
 		return errgo.Mask(err)
 	}
 
-	j.DB.AppendAudit(ctx, &params.AuditCloudCreated{
+	j.DB.AppendAudit(ctx, id, &params.AuditCloudCreated{
 		ID:    string(name) + "/",
 		Cloud: string(name),
 	})
@@ -189,7 +189,7 @@ func (j *JEM) RemoveCloud(ctx context.Context, id identchecker.ACLIdentity, clou
 		return errgo.Mask(err)
 	}
 
-	j.DB.AppendAudit(ctx, &params.AuditCloudRemoved{
+	j.DB.AppendAudit(ctx, id, &params.AuditCloudRemoved{
 		ID:     cr.Id,
 		Cloud:  string(cr.Cloud),
 		Region: cr.Region,

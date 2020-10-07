@@ -41,8 +41,7 @@ func (r *controllerRoot) UserModelStats(ctx context.Context) (params.UserModelSt
 	models := make(map[string]params.ModelStats)
 
 	user := r.identity.Id()
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
-	it := r.jem.DB.NewCanReadIter(ctx,
+	it := r.jem.DB.NewCanReadIter(r.identity,
 		r.jem.DB.Models().
 			Find(bson.D{{"creator", user}}).
 			Select(bson.D{{"uuid", 1}, {"path", 1}, {"creator", 1}, {"counts", 1}}).
@@ -77,14 +76,12 @@ func (r *controllerRoot) DisableControllerUUIDMasking(ctx context.Context) error
 // ListControllers returns the list of juju controllers hosting models
 // as part of this JAAS system.
 func (r *controllerRoot) ListControllers(ctx context.Context) (params.ListControllerResponse, error) {
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
-
 	err := auth.CheckACL(ctx, r.identity, []string{string(r.jem.ControllerAdmin())})
 	if errgo.Cause(err) == params.ErrUnauthorized {
 		// if the user isn't a controller admin return JAAS
 		// itself as the only controller.
 
-		srvVersion, err := r.jem.EarliestControllerVersion(ctx)
+		srvVersion, err := r.jem.EarliestControllerVersion(ctx, r.identity)
 		if err != nil {
 			return params.ListControllerResponse{}, errgo.Mask(err)
 		}
@@ -102,7 +99,7 @@ func (r *controllerRoot) ListControllers(ctx context.Context) (params.ListContro
 	}
 
 	var controllers []params.ControllerResponse
-	iter := r.jem.DB.NewCanReadIter(ctx, r.jem.DB.Controllers().Find(nil).Sort("_id").Iter())
+	iter := r.jem.DB.NewCanReadIter(r.identity, r.jem.DB.Controllers().Find(nil).Sort("_id").Iter())
 	defer iter.Close(ctx)
 	var ctl mongodoc.Controller
 	for iter.Next(ctx, &ctl) {

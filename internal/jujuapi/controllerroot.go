@@ -93,7 +93,7 @@ func (r *controllerRoot) modelWithConnection(ctx context.Context, modelTag strin
 // authenticated user has access to. If f returns an error, the iteration
 // will be stopped and the returned error will have the same cause.
 func (r *controllerRoot) doModels(ctx context.Context, f func(context.Context, *mongodoc.Model) error) error {
-	it := r.jem.DB.NewCanReadIter(ctx, r.jem.DB.Models().Find(nil).Sort("_id").Iter())
+	it := r.jem.DB.NewCanReadIter(r.identity, r.jem.DB.Models().Find(nil).Sort("_id").Iter())
 	defer it.Close(ctx)
 
 	for {
