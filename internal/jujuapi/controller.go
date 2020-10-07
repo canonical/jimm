@@ -172,37 +172,36 @@ func (r *controllerRoot) allModels(ctx context.Context) (jujuparams.UserModelLis
 func (r *controllerRoot) ModelStatus(ctx context.Context, args jujuparams.Entities) (jujuparams.ModelStatusResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.ModelStatus, len(args.Entities))
 	// TODO (fabricematrat) get status for all of the models connected
 	// to a single controller in one go.
 	for i, arg := range args.Entities {
-		mi, err := r.modelStatus(ctx, arg)
-		if err != nil {
-			return jujuparams.ModelStatusResults{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
-		}
-		results[i] = *mi
+		results[i].ModelTag = arg.Tag
+		results[i].Error = mapError(r.modelStatus(ctx, &results[i]))
 	}
-
 	return jujuparams.ModelStatusResults{
 		Results: results,
 	}, nil
 }
 
 // modelStatus retrieves the model status for the specified entity.
-func (r *controllerRoot) modelStatus(ctx context.Context, arg jujuparams.Entity) (*jujuparams.ModelStatus, error) {
-	mi, err := r.modelInfo(ctx, arg, false)
+func (r *controllerRoot) modelStatus(ctx context.Context, status *jujuparams.ModelStatus) error {
+	mt, err := names.ParseModelTag(status.ModelTag)
 	if err != nil {
-		return &jujuparams.ModelStatus{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		return errgo.WithCausef(err, params.ErrBadRequest, "")
 	}
-	return &jujuparams.ModelStatus{
-		ModelTag:           names.NewModelTag(mi.UUID).String(),
-		Life:               mi.Life,
-		HostedMachineCount: len(mi.Machines),
-		ApplicationCount:   0,
-		OwnerTag:           mi.OwnerTag,
-		Machines:           mi.Machines,
-	}, nil
+	mi := jujuparams.ModelInfo{
+		UUID: mt.Id(),
+	}
+	if err := r.jem.GetModelInfo(ctx, r.identity, &mi, false); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+	}
+	status.Life = mi.Life
+	status.Type = mi.Type
+	status.HostedMachineCount = len(mi.Machines)
+	status.OwnerTag = mi.OwnerTag
+	status.Machines = mi.Machines
+	return nil
 }
 
 // ControllerConfig returns the controller's configuration.

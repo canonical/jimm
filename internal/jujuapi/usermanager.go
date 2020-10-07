@@ -85,13 +85,13 @@ func (r *controllerRoot) userInfo(ctx context.Context, entity string) (*jujupara
 }
 
 func (r *controllerRoot) currentUser(id identchecker.ACLIdentity) (*jujuparams.UserInfo, error) {
-	userTag := userTag(id.Id())
+	userTag := conv.ToUserTag(params.User(id.Id()))
 	return &jujuparams.UserInfo{
 		// TODO(mhilton) a number of these fields should
 		// be fetched from the identity manager, but that
 		// will have to change to support getting them.
 		Username:    userTag.Id(),
-		DisplayName: userTag.Id(),
+		DisplayName: userTag.Name(),
 		Access:      string(permission.AddModelAccess),
 		Disabled:    false,
 	}, nil
