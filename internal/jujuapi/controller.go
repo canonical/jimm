@@ -171,35 +171,17 @@ func (r *controllerRoot) ModelStatus(ctx context.Context, args jujuparams.Entiti
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 	results := make([]jujuparams.ModelStatus, len(args.Entities))
-	// TODO (fabricematrat) get status for all of the models connected
-	// to a single controller in one go.
 	for i, arg := range args.Entities {
-		results[i].ModelTag = arg.Tag
-		results[i].Error = mapError(r.modelStatus(ctx, &results[i]))
+		mt, err := names.ParseModelTag(arg.Tag)
+		if err != nil {
+			results[i].Error = mapError(errgo.WithCausef(err, params.ErrBadRequest, ""))
+			continue
+		}
+		results[i].Error = mapError(r.jem.GetModelStatus(ctx, r.identity, mt.Id(), &results[i], len(results) == 1))
 	}
 	return jujuparams.ModelStatusResults{
 		Results: results,
 	}, nil
-}
-
-// modelStatus retrieves the model status for the specified entity.
-func (r *controllerRoot) modelStatus(ctx context.Context, status *jujuparams.ModelStatus) error {
-	mt, err := names.ParseModelTag(status.ModelTag)
-	if err != nil {
-		return errgo.WithCausef(err, params.ErrBadRequest, "")
-	}
-	mi := jujuparams.ModelInfo{
-		UUID: mt.Id(),
-	}
-	if err := r.jem.GetModelInfo(ctx, r.identity, &mi, false); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
-	}
-	status.Life = mi.Life
-	status.Type = mi.Type
-	status.HostedMachineCount = len(mi.Machines)
-	status.OwnerTag = mi.OwnerTag
-	status.Machines = mi.Machines
-	return nil
 }
 
 // ControllerConfig returns the controller's configuration.

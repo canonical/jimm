@@ -254,3 +254,35 @@ func (c *Conn) DestroyModel(ctx context.Context, uuid string, destroyStorage *bo
 	}
 	return newAPIError(resp.Results[0].Error)
 }
+
+// ModelStatus retrieves the status of a model from the controller. The
+// given status structure must specify a ModelTag, the rest will be filled
+// out from the controller response. If an error is returned by the Juju
+// API then the resulting error response will be of type *APIError.
+// ModelStatus will use the ModelStatus procedure from the ModelManager
+// version 4 facade if it is available, falling back to version 2.
+func (c *Conn) ModelStatus(ctx context.Context, status *jujuparams.ModelStatus) error {
+	args := jujuparams.Entities{
+		Entities: []jujuparams.Entity{{
+			Tag: status.ModelTag,
+		}},
+	}
+
+	resp := jujuparams.ModelStatusResults{
+		Results: make([]jujuparams.ModelStatus, 1),
+	}
+	var err error
+	if c.HasFacadeVersion("ModelManager", 8) {
+		err = c.APICall("ModelManager", 4, "", "ModelStatus", &args, &resp)
+	} else {
+		err = c.APICall("ModelManager", 2, "", "ModelStatus", &args, &resp)
+	}
+	if err != nil {
+		return newAPIError(err)
+	}
+	if resp.Results[0].Error != nil {
+		return newAPIError(resp.Results[0].Error)
+	}
+	*status = resp.Results[0]
+	return nil
+}
