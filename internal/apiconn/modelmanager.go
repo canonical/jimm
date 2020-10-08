@@ -272,7 +272,7 @@ func (c *Conn) ModelStatus(ctx context.Context, status *jujuparams.ModelStatus) 
 		Results: make([]jujuparams.ModelStatus, 1),
 	}
 	var err error
-	if c.HasFacadeVersion("ModelManager", 8) {
+	if c.HasFacadeVersion("ModelManager", 4) {
 		err = c.APICall("ModelManager", 4, "", "ModelStatus", &args, &resp)
 	} else {
 		err = c.APICall("ModelManager", 2, "", "ModelStatus", &args, &resp)
