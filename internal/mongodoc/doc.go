@@ -606,3 +606,10 @@ const (
 	ApplicationOfferConsumeAccess
 	ApplicationOfferAdminAccess
 )
+
+type CloudRegionDefaults struct {
+	User     string                 `bson:"user"`
+	Cloud    string                 `bson:"cloud"`
+	Region   string                 `bson:"region"`
+	Defaults map[string]interface{} `bson:"defaults"`
+}

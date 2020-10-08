@@ -2983,3 +2983,106 @@ func (s *databaseSuite) TestGetCloudRegion(c *gc.C) {
 var cmpUsers = jemtest.CmpEquals(cmpopts.SortSlices(func(a, b mongodoc.OfferUserDetails) bool {
 	return a.User < b.User
 }))
+
+func (s *databaseSuite) TestModelDefaults(c *gc.C) {
+	ctx := context.Background()
+
+	defaults, err := s.database.ModelDefaults(ctx, "no-such-user", "no-such-cloud")
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(defaults, gc.HasLen, 0)
+
+	defaults = []mongodoc.CloudRegionDefaults{{
+		User:   "bob",
+		Cloud:  "aws",
+		Region: "eu-central-1",
+		Defaults: map[string]interface{}{
+			"a": "config1",
+			"b": 12345,
+			"c": "config2",
+		},
+	}, {
+		User:   "bob",
+		Cloud:  "aws",
+		Region: "us-east-1",
+		Defaults: map[string]interface{}{
+			"a": "config2",
+			"b": 54321,
+			"c": "config3",
+		},
+	}, {
+		User:   "bob",
+		Cloud:  "azure",
+		Region: "us-east",
+		Defaults: map[string]interface{}{
+			"a": "config4",
+			"b": 112358,
+			"c": "config5",
+		},
+	}}
+	for _, configuration := range defaults {
+		err = s.database.SetModelDefaults(ctx, configuration)
+		c.Assert(err, jc.ErrorIsNil)
+	}
+
+	azureDefaults, err := s.database.ModelDefaults(ctx, "bob", "azure")
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(azureDefaults, jc.DeepEquals, []mongodoc.CloudRegionDefaults{defaults[2]})
+
+	awsDefaults, err := s.database.ModelDefaults(ctx, "bob", "aws")
+	c.Assert(err, jc.ErrorIsNil)
+	sort.Slice(awsDefaults, func(i, j int) bool {
+		return awsDefaults[i].Region <= awsDefaults[j].Region
+	})
+	c.Assert(awsDefaults, jc.DeepEquals, []mongodoc.CloudRegionDefaults{defaults[0], defaults[1]})
+
+	update := mongodoc.CloudRegionDefaults{
+		User:   "bob",
+		Cloud:  "aws",
+		Region: "eu-central-1",
+		Defaults: map[string]interface{}{
+			"a": "config7",
+			"b": 24680,
+			"c": "config8",
+		},
+	}
+	err = s.database.SetModelDefaults(ctx, update)
+	c.Assert(err, jc.ErrorIsNil)
+
+	awsDefaults, err = s.database.ModelDefaults(ctx, "bob", "aws")
+	c.Assert(err, jc.ErrorIsNil)
+	sort.Slice(awsDefaults, func(i, j int) bool {
+		return awsDefaults[i].Region <= awsDefaults[j].Region
+	})
+	c.Assert(awsDefaults, jc.DeepEquals, []mongodoc.CloudRegionDefaults{update, defaults[1]})
+
+	err = s.database.UnsetModelDefaults(ctx, "bob", "aws", "eu-central-1", []string{"a", "c"})
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = s.database.UnsetModelDefaults(ctx, "bob", "aws", "us-east-1", []string{"b"})
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = s.database.UnsetModelDefaults(ctx, "bob", "aws", "no-such-region", []string{"b"})
+	c.Assert(err, jc.ErrorIsNil)
+
+	awsDefaults, err = s.database.ModelDefaults(ctx, "bob", "aws")
+	c.Assert(err, jc.ErrorIsNil)
+	sort.Slice(awsDefaults, func(i, j int) bool {
+		return awsDefaults[i].Region <= awsDefaults[j].Region
+	})
+	c.Assert(awsDefaults, jc.DeepEquals, []mongodoc.CloudRegionDefaults{{
+		User:   "bob",
+		Cloud:  "aws",
+		Region: "eu-central-1",
+		Defaults: map[string]interface{}{
+			"b": 24680,
+		},
+	}, {
+		User:   "bob",
+		Cloud:  "aws",
+		Region: "us-east-1",
+		Defaults: map[string]interface{}{
+			"a": "config2",
+			"c": "config3",
+		},
+	}})
+}

@@ -130,6 +130,9 @@ func (db *Database) ensureIndexes() error {
 	}, {
 		db.ApplicationOffers(),
 		mgo.Index{Key: []string{"users.user", "users.access"}},
+	}, {
+		db.ModelDefaultConfigs(),
+		mgo.Index{Key: []string{"user", "cloud", "region"}},
 	}}
 	for _, idx := range indexes {
 		err := idx.c.EnsureIndex(idx.i)
@@ -1557,6 +1560,63 @@ func makeApplicationOfferFilterQuery(filter jujuparams.OfferFilter) bson.D {
 	return query
 }
 
+// SetModelDfaults writes new values for the specified default model settings.
+func (db *Database) SetModelDefaults(ctx context.Context, defaults mongodoc.CloudRegionDefaults) (err error) {
+	defer db.checkError(ctx, &err)
+	setter := bson.M{}
+	for k, v := range defaults.Defaults {
+		setter[fmt.Sprintf("defaults.%s", k)] = v
+	}
+	_, err = db.ModelDefaultConfigs().Upsert(bson.M{
+		"user":   defaults.User,
+		"cloud":  defaults.Cloud,
+		"region": defaults.Region,
+	}, bson.M{
+		"$set": setter,
+	})
+	if err != nil {
+		return errgo.Mask(err)
+	}
+
+	return nil
+}
+
+// UnsetModelDefaults removes the specified default model settings.
+func (db *Database) UnsetModelDefaults(ctx context.Context, user, cloud, region string, keys []string) (err error) {
+	defer db.checkError(ctx, &err)
+	unsetter := bson.M{}
+	for _, k := range keys {
+		unsetter[fmt.Sprintf("defaults.%v", k)] = ""
+	}
+	err = db.ModelDefaultConfigs().Update(bson.M{
+		"user":   user,
+		"cloud":  cloud,
+		"region": region,
+	}, bson.M{
+		"$unset": unsetter,
+	})
+	if err != nil && errgo.Cause(err) != mgo.ErrNotFound {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
+// ModelDefaultsForClouds returns user's default config values for the specified
+// cloud.
+func (db *Database) ModelDefaults(ctx context.Context, user string, cloud string) (_ []mongodoc.CloudRegionDefaults, err error) {
+	defer db.checkError(ctx, &err)
+
+	var defaults []mongodoc.CloudRegionDefaults
+	err = db.ModelDefaultConfigs().Find(bson.M{
+		"user":  user,
+		"cloud": cloud,
+	}).All(&defaults)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return defaults, nil
+}
+
 // CanReadIter returns an iterator that iterates over items in the given
 // iterator, which must have been derived from db, returning only those
 // that the currently logged in user has permission to see.
@@ -1637,6 +1697,7 @@ func (db *Database) Collections() []*mgo.Collection {
 		db.Credentials(),
 		db.Macaroons(),
 		db.Machines(),
+		db.ModelDefaultConfigs(),
 		db.Models(),
 		db.ApplicationOffers(),
 	}
@@ -1672,6 +1733,10 @@ func (db *Database) Machines() *mgo.Collection {
 
 func (db *Database) Models() *mgo.Collection {
 	return db.C("models")
+}
+
+func (db *Database) ModelDefaultConfigs() *mgo.Collection {
+	return db.C("model-default-configs")
 }
 
 // ApplicationOffers returns the collection holding application offers.
