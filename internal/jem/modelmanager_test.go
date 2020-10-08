@@ -529,6 +529,77 @@ func (s *modelManagerSuite) TestGetModelInfoNotFound(c *gc.C) {
 	c.Check(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
+func (s *modelManagerSuite) TestGetModelStatus(c *gc.C) {
+	ctlPath := s.addController(c, params.EntityPath{"bob", "test"})
+	var info jujuparams.ModelInfo
+	id := jemtest.NewIdentity("bob")
+	err := s.jem.CreateModel(testContext, id, jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", "model"},
+		ControllerPath: ctlPath,
+	}, &info)
+	c.Assert(err, gc.Equals, nil)
+
+	conn, err := s.jem.OpenAPI(testContext, ctlPath)
+	c.Assert(err, gc.Equals, nil)
+	controllerStatus := jujuparams.ModelStatus{
+		ModelTag: names.NewModelTag(info.UUID).String(),
+	}
+	err = conn.ModelStatus(testContext, &controllerStatus)
+	c.Assert(err, gc.Equals, nil)
+
+	var status jujuparams.ModelStatus
+	err = s.jem.GetModelStatus(testContext, id, info.UUID, &status, true)
+	c.Assert(err, gc.Equals, nil)
+	c.Check(status, jc.DeepEquals, controllerStatus)
+}
+
+func (s *modelManagerSuite) TestGetModelStatusLocalOnly(c *gc.C) {
+	ctlPath := s.addController(c, params.EntityPath{"bob", "test"})
+	var info jujuparams.ModelInfo
+	id := jemtest.NewIdentity("bob")
+	err := s.jem.CreateModel(testContext, id, jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", "model"},
+		ControllerPath: ctlPath,
+	}, &info)
+	c.Assert(err, gc.Equals, nil)
+
+	conn, err := s.jem.OpenAPI(testContext, ctlPath)
+	c.Assert(err, gc.Equals, nil)
+	controllerStatus := jujuparams.ModelStatus{
+		ModelTag: names.NewModelTag(info.UUID).String(),
+	}
+	err = conn.ModelStatus(testContext, &controllerStatus)
+	c.Assert(err, gc.Equals, nil)
+
+	var status jujuparams.ModelStatus
+	err = s.jem.GetModelStatus(testContext, id, info.UUID, &status, false)
+	c.Assert(err, gc.Equals, nil)
+	c.Check(status, jc.DeepEquals, controllerStatus)
+}
+
+func (s *modelManagerSuite) TestGetModelStatusUnauthorized(c *gc.C) {
+	ctlPath := s.addController(c, params.EntityPath{"bob", "test"})
+	var info jujuparams.ModelInfo
+	id := jemtest.NewIdentity("bob")
+	err := s.jem.CreateModel(testContext, id, jem.CreateModelParams{
+		Path:           params.EntityPath{"bob", "model"},
+		ControllerPath: ctlPath,
+	}, &info)
+	c.Assert(err, gc.Equals, nil)
+
+	var status jujuparams.ModelStatus
+	err = s.jem.GetModelStatus(testContext, jemtest.NewIdentity("alice"), info.UUID, &status, false)
+	c.Check(err, gc.ErrorMatches, "unauthorized")
+	c.Check(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
+}
+
+func (s *modelManagerSuite) TestGetModelStatusNotFound(c *gc.C) {
+	var status jujuparams.ModelStatus
+	err := s.jem.GetModelStatus(testContext, jemtest.NewIdentity("alice"), "not a uuid", &status, true)
+	c.Check(err, gc.ErrorMatches, "model not found")
+	c.Check(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}
+
 func (s *modelManagerSuite) addController(c *gc.C, path params.EntityPath) params.EntityPath {
 	return addController(c, path, s.APIInfo(c), s.jem)
 }

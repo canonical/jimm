@@ -387,7 +387,7 @@ func (j *JEM) selectCredential(ctx context.Context, id identchecker.ACLIdentity,
 // cause of params.ErrUnauthorized will be returned.
 func (j *JEM) GetModelInfo(ctx context.Context, id identchecker.ACLIdentity, info *jujuparams.ModelInfo, queryController bool) error {
 	if info == nil {
-		return errgo.WithCausef(nil, params.ErrUnauthorized, "")
+		return errgo.WithCausef(nil, params.ErrNotFound, "")
 	}
 	m := mongodoc.Model{
 		UUID: info.UUID,
@@ -459,34 +459,8 @@ func (j *JEM) GetModelInfo(ctx context.Context, id identchecker.ACLIdentity, inf
 			info.Users = append(info.Users, userInfo(params.User(u), jujuparams.ModelReadAccess))
 		}
 
-		machines, err := j.DB.MachinesForModel(ctx, info.UUID)
-		if err == nil {
-			info.Machines = make([]jujuparams.ModelMachineInfo, 0, len(machines))
-			for _, machine := range machines {
-				if machine.Info.Life == "dead" {
-					continue
-				}
-				mi := jujuparams.ModelMachineInfo{
-					Id:         machine.Info.Id,
-					InstanceId: machine.Info.InstanceId,
-					Status:     string(machine.Info.AgentStatus.Current),
-					HasVote:    machine.Info.HasVote,
-					WantsVote:  machine.Info.WantsVote,
-				}
-				if machine.Info.HardwareCharacteristics != nil {
-					mi.Hardware = &jujuparams.MachineHardware{
-						Arch:             machine.Info.HardwareCharacteristics.Arch,
-						Mem:              machine.Info.HardwareCharacteristics.Mem,
-						RootDisk:         machine.Info.HardwareCharacteristics.RootDisk,
-						Cores:            machine.Info.HardwareCharacteristics.CpuCores,
-						CpuPower:         machine.Info.HardwareCharacteristics.CpuPower,
-						Tags:             machine.Info.HardwareCharacteristics.Tags,
-						AvailabilityZone: machine.Info.HardwareCharacteristics.AvailabilityZone,
-					}
-				}
-				info.Machines = append(info.Machines, mi)
-			}
-		} else {
+		info.Machines, err = j.modelMachineInfo(ctx, info.UUID)
+		if err != nil {
 			zapctx.Error(ctx, "cannot get machine information", zap.Error(err))
 		}
 
@@ -544,6 +518,39 @@ func (j *JEM) GetModelInfo(ctx context.Context, id identchecker.ACLIdentity, inf
 	return nil
 }
 
+func (j *JEM) modelMachineInfo(ctx context.Context, uuid string) ([]jujuparams.ModelMachineInfo, error) {
+	machines, err := j.DB.MachinesForModel(ctx, uuid)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	mmis := make([]jujuparams.ModelMachineInfo, 0, len(machines))
+	for _, machine := range machines {
+		if machine.Info.Life == "dead" {
+			continue
+		}
+		mmi := jujuparams.ModelMachineInfo{
+			Id:         machine.Info.Id,
+			InstanceId: machine.Info.InstanceId,
+			Status:     string(machine.Info.AgentStatus.Current),
+			HasVote:    machine.Info.HasVote,
+			WantsVote:  machine.Info.WantsVote,
+		}
+		if machine.Info.HardwareCharacteristics != nil {
+			mmi.Hardware = &jujuparams.MachineHardware{
+				Arch:             machine.Info.HardwareCharacteristics.Arch,
+				Mem:              machine.Info.HardwareCharacteristics.Mem,
+				RootDisk:         machine.Info.HardwareCharacteristics.RootDisk,
+				Cores:            machine.Info.HardwareCharacteristics.CpuCores,
+				CpuPower:         machine.Info.HardwareCharacteristics.CpuPower,
+				Tags:             machine.Info.HardwareCharacteristics.Tags,
+				AvailabilityZone: machine.Info.HardwareCharacteristics.AvailabilityZone,
+			}
+		}
+		mmis = append(mmis, mmi)
+	}
+	return mmis, nil
+}
+
 func userInfo(u params.User, access jujuparams.UserAccessPermission) jujuparams.ModelUserInfo {
 	t := conv.ToUserTag(u)
 	return jujuparams.ModelUserInfo{
@@ -581,4 +588,63 @@ func modelVersion(ctx context.Context, info *mongodoc.ModelInfo) *version.Number
 		return nil
 	}
 	return &v
+}
+
+// GetModelStatus writes the status of the model with the given uuid into
+// the given ModelStatus. If queryController is true then the status will
+// be read from the controller, otherwise it will be created from data in
+// the local database. If a model with the given UUID cannot be found then
+// an error with a cause of params.ErrNotFound will be returned. If the
+// given identity does not have admin level access to the model then an
+// error with a cause of params.ErrUnauthorized will be returned.
+func (j *JEM) GetModelStatus(ctx context.Context, id identchecker.ACLIdentity, uuid string, status *jujuparams.ModelStatus, queryController bool) error {
+	m := mongodoc.Model{
+		UUID: uuid,
+	}
+	if err := j.GetModel(ctx, id, jujuparams.ModelAdminAccess, &m); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+	}
+
+	status.ModelTag = names.NewModelTag(uuid).String()
+
+	if queryController {
+		ctx := zapctx.WithFields(ctx, zap.Stringer("controller", m.Controller))
+		conn, err := j.OpenAPI(ctx, m.Controller)
+		if err == nil {
+			err = conn.ModelStatus(ctx, status)
+			if jujuparams.IsCodeNotFound(err) && m.Life() == "dying" {
+				zapctx.Info(ctx, "could not get ModelStatus for dying model, marking dead", zap.Error(err))
+				// The model was dying and now cannot be accessed, assume it is now dead.
+				if err := j.DB.DeleteModelWithUUID(ctx, m.Controller, m.UUID); err != nil {
+					// If this update fails then don't worry as the watcher
+					// will detect the state change and update as appropriate.
+					zapctx.Warn(ctx, "error deleting model", zap.Error(err))
+				}
+				// return the error with the an appropriate cause.
+				return errgo.Mask(err, apiconn.IsAPIError)
+			}
+		}
+		if err != nil {
+			zapctx.Error(ctx, "cannot get model status from controller", zap.Error(err))
+		}
+	}
+
+	if status.OwnerTag != "" {
+		// We got a response from the controller.
+		return nil
+	}
+	// Fill out the ModelStatus from the Model as best we can.
+	status.Life = life.Value(m.Life())
+	status.Type = m.Type
+	status.OwnerTag = conv.ToUserTag(m.Path.User).String()
+	status.HostedMachineCount = m.Counts[params.MachineCount].Current
+	status.ApplicationCount = m.Counts[params.ApplicationCount].Current
+	status.UnitCount = m.Counts[params.UnitCount].Current
+	var err error
+	status.Machines, err = j.modelMachineInfo(ctx, uuid)
+	if err != nil {
+		zapctx.Error(ctx, "cannot get machine information", zap.Error(err))
+	}
+	// TODO(mhilton) store and populate Volume and FileSystem information.
+	return nil
 }
