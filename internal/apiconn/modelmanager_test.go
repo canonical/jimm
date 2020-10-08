@@ -239,3 +239,39 @@ func (s *modelmanagerSuite) TestDestroyModel(c *gc.C) {
 
 	c.Check(info.Life, gc.Equals, life.Dying)
 }
+
+func (s *modelmanagerSuite) TestModelStatus(c *gc.C) {
+	ctx := context.Background()
+
+	var info jujuparams.ModelInfo
+	err := s.conn.CreateModel(ctx, &jujuparams.ModelCreateArgs{
+		Name:     "test-model",
+		OwnerTag: conv.ToUserTag("test-user").String(),
+	}, &info)
+	c.Assert(err, gc.Equals, nil)
+
+	status := jujuparams.ModelStatus{
+		ModelTag: names.NewModelTag(info.UUID).String(),
+	}
+	err = s.conn.ModelStatus(ctx, &status)
+	c.Assert(err, gc.Equals, nil)
+
+	c.Check(status, jc.DeepEquals, jujuparams.ModelStatus{
+		ModelTag: names.NewModelTag(info.UUID).String(),
+		Life:     info.Life,
+		Type:     info.Type,
+		OwnerTag: info.OwnerTag,
+	})
+}
+
+func (s *modelmanagerSuite) TestModelStatusError(c *gc.C) {
+	ctx := context.Background()
+
+	status := jujuparams.ModelStatus{
+		ModelTag: names.NewModelTag("00000000-0000-0000-0000-000000000000").String(),
+	}
+	err := s.conn.ModelStatus(ctx, &status)
+	c.Check(apiconn.IsAPIError(err), gc.Equals, true)
+	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
+	c.Check(err, gc.ErrorMatches, `api error: model "00000000-0000-0000-0000-000000000000" not found`)
+}

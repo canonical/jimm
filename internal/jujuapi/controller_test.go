@@ -132,7 +132,8 @@ func (s *controllerSuite) TestModelStatus(c *gc.C) {
 	doTest := func(client modelStatuser) {
 		models, err := client.ModelStatus(names.NewModelTag(modelUUID1), names.NewModelTag(modelUUID3))
 		c.Assert(err, gc.Equals, nil)
-		c.Assert(models, jc.DeepEquals, []base.ModelStatus{{
+		c.Assert(models, gc.HasLen, 2)
+		c.Check(models[0], jc.DeepEquals, base.ModelStatus{
 			UUID:               modelUUID1,
 			Life:               "alive",
 			Owner:              "test@external",
@@ -142,21 +143,12 @@ func (s *controllerSuite) TestModelStatus(c *gc.C) {
 			ApplicationCount:   0,
 			Machines:           []base.Machine{},
 			ModelType:          "iaas",
-		}, {
-			UUID:               modelUUID3,
-			Life:               "alive",
-			Owner:              "test2@external",
-			TotalMachineCount:  0,
-			CoreCount:          0,
-			HostedMachineCount: 0,
-			ApplicationCount:   0,
-			Machines:           []base.Machine{},
-			ModelType:          "iaas",
-		}})
+		})
+		c.Check(models[1].Error, gc.ErrorMatches, `unauthorized`)
 		status, err := client.ModelStatus(names.NewModelTag(modelUUID2))
 		c.Assert(err, gc.Equals, nil)
 		c.Assert(status, gc.HasLen, 1)
-		c.Assert(status[0].Error, gc.ErrorMatches, "unauthorized")
+		c.Check(status[0].Error, gc.ErrorMatches, "unauthorized")
 	}
 
 	conn := s.open(c, nil, "test")
