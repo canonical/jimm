@@ -346,24 +346,28 @@ func (db *Database) Controller(ctx context.Context, path params.EntityPath) (_ *
 // following fields:
 //
 //  - Path
+//  - Controller & UUID
 //  - UUID
 //
 // If no matching model can be found then the returned error will have a
 // cause of params.ErrNotFound.
 func (db *Database) GetModel(ctx context.Context, m *mongodoc.Model) (err error) {
 	defer db.checkError(ctx, &err)
-	var q *mgo.Query
+	var q bson.D
 	switch {
 	case m == nil:
 		return errgo.WithCausef(nil, params.ErrNotFound, "model not found")
 	case !m.Path.IsZero():
-		q = db.Models().FindId(m.Path.String())
+		q = bson.D{{"path", m.Path}}
 	case m.UUID != "":
-		q = db.Models().Find(bson.D{{"uuid", m.UUID}})
+		q = bson.D{{"uuid", m.UUID}}
+		if !m.Controller.IsZero() {
+			q = append(q, bson.DocElem{"controller", m.Controller})
+		}
 	default:
 		return errgo.WithCausef(nil, params.ErrNotFound, "model not found")
 	}
-	err = q.One(m)
+	err = db.Models().Find(q).One(m)
 	if err == mgo.ErrNotFound {
 		return errgo.WithCausef(nil, params.ErrNotFound, "model not found")
 	}
@@ -371,22 +375,6 @@ func (db *Database) GetModel(ctx context.Context, m *mongodoc.Model) (err error)
 		return errgo.Notef(err, "cannot get model")
 	}
 	return nil
-}
-
-// modelFromControllerAndUUID returns the document representing the model
-// with the given UUID on the given controller. It returns an error with
-// a params.ErrNotFound cause if the model was not found.
-func (db *Database) modelFromControllerAndUUID(ctx context.Context, ctlPath params.EntityPath, uuid string) (_ *mongodoc.Model, err error) {
-	defer db.checkError(ctx, &err)
-	var m mongodoc.Model
-	err = db.Models().Find(bson.D{{"controller", ctlPath}, {"uuid", uuid}}).One(&m)
-	if err == mgo.ErrNotFound {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "model %q not found", uuid)
-	}
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot get model %q", uuid)
-	}
-	return &m, nil
 }
 
 // SetControllerVersion sets the agent version of the given controller.

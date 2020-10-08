@@ -1001,8 +1001,11 @@ func (j *JEM) modelRegion(ctx context.Context, ctlPath params.EntityPath, uuid s
 	}
 	key := fmt.Sprintf("%s %s", ctlPath, uuid)
 	r, err := j.pool.regionCache.Get(key, func() (interface{}, error) {
-		m, err := j.DB.modelFromControllerAndUUID(ctx, ctlPath, uuid)
-		if err != nil {
+		m := mongodoc.Model{
+			UUID:       uuid,
+			Controller: ctlPath,
+		}
+		if err := j.DB.GetModel(ctx, &m); err != nil {
 			return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 		}
 		return cloudRegion{
