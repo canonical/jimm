@@ -17,7 +17,7 @@ require (
 	github.com/juju/errors v0.0.0-20200330140219-3fe23663418f
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
 	github.com/juju/httprequest v1.0.1
-	github.com/juju/juju v0.0.0-20200924052920-602dbc79f0fe
+	github.com/juju/juju v0.0.0-20201007080928-1f35f6a20b57
 	github.com/juju/loggo v0.0.0-20200526014432-9ce3a2e09b5e
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
 	github.com/juju/mgosession v1.0.0
