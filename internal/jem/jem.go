@@ -31,6 +31,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/conv"
+	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
@@ -167,7 +168,7 @@ func NewPool(ctx context.Context, p Params) (*Pool, error) {
 	}
 	jem := pool.JEM(ctx)
 	defer jem.Close()
-	if err := jem.DB.ensureIndexes(); err != nil {
+	if err := jem.DB.EnsureIndexes(); err != nil {
 		return nil, errgo.Notef(err, "cannot ensure indexes")
 	}
 	return pool, nil
@@ -216,7 +217,7 @@ func (p *Pool) JEM(ctx context.Context) *JEM {
 	}
 	p.refCount++
 	return &JEM{
-		DB:                             newDatabase(ctx, p.config.SessionPool, p.dbName),
+		DB:                             jimmdb.NewDatabase(ctx, p.config.SessionPool, p.dbName),
 		pool:                           p,
 		usageSenderAuthorizationClient: p.usageSenderAuthorizationClient,
 		pubsub:                         p.pubsub,
@@ -230,7 +231,7 @@ func (p *Pool) UsageAuthorizationClient() UsageSenderAuthorizationClient {
 
 type JEM struct {
 	// DB holds the mongodb-backed identity store.
-	DB *Database
+	DB *jimmdb.Database
 
 	// pool holds the Pool from which the JEM instance
 	// was created.
@@ -254,7 +255,7 @@ func (j *JEM) Clone() *JEM {
 
 	j.pool.refCount++
 	return &JEM{
-		DB:   j.DB.clone(),
+		DB:   j.DB.Clone(),
 		pool: j.pool,
 	}
 }
@@ -298,8 +299,7 @@ var ErrAPIConnection params.ErrorCode = "cannot connect to API"
 // have a cause of ErrAPIConnection.
 //
 // The returned connection must be closed when finished with.
-func (j *JEM) OpenAPI(ctx context.Context, path params.EntityPath) (_ *apiconn.Conn, err error) {
-	defer j.DB.checkError(ctx, &err)
+func (j *JEM) OpenAPI(ctx context.Context, path params.EntityPath) (*apiconn.Conn, error) {
 	ctl, err := j.DB.Controller(ctx, path)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot get controller", errgo.Is(params.ErrNotFound))
@@ -353,8 +353,7 @@ func apiInfoFromDoc(ctl *mongodoc.Controller) *api.Info {
 // cause of ErrAPIConnection.
 //
 // The returned connection must be closed when finished with.
-func (j *JEM) OpenModelAPI(ctx context.Context, path params.EntityPath) (_ *apiconn.Conn, err error) {
-	defer j.DB.checkError(ctx, &err)
+func (j *JEM) OpenModelAPI(ctx context.Context, path params.EntityPath) (*apiconn.Conn, error) {
 	m := mongodoc.Model{Path: path}
 	if err := j.DB.GetModel(ctx, &m); err != nil {
 		return nil, errgo.NoteMask(err, "cannot get model", errgo.Is(params.ErrNotFound))
@@ -592,7 +591,7 @@ func (j *JEM) RevokeCredential(ctx context.Context, credPath params.CredentialPa
 	if flags&CredentialUpdate == 0 {
 		return nil
 	}
-	if err := j.DB.updateCredential(ctx, &mongodoc.Credential{
+	if err := j.DB.UpdateCredential(ctx, &mongodoc.Credential{
 		Path:    mongodoc.CredentialPathFromParams(credPath),
 		Revoked: true,
 	}); err != nil {
@@ -704,7 +703,7 @@ func (j *JEM) updateCredential(ctx context.Context, cred *mongodoc.Credential, c
 		cred1 := *cred
 		cred1.Attributes = nil
 		cred1.AttributesInVault = true
-		if err := j.DB.updateCredential(ctx, &cred1); err != nil {
+		if err := j.DB.UpdateCredential(ctx, &cred1); err != nil {
 			return nil, errgo.Notef(err, "cannot update local database")
 		}
 		data := make(map[string]interface{}, len(cred.Attributes))
@@ -718,11 +717,11 @@ func (j *JEM) updateCredential(ctx context.Context, cred *mongodoc.Credential, c
 		}
 	} else {
 		cred.AttributesInVault = false
-		if err := j.DB.updateCredential(ctx, cred); err != nil {
+		if err := j.DB.UpdateCredential(ctx, cred); err != nil {
 			return nil, errgo.Notef(err, "cannot update local database")
 		}
 	}
-	if err := j.DB.setCredentialUpdates(ctx, cred.Controllers, cred.Path); err != nil {
+	if err := j.DB.SetCredentialUpdates(ctx, cred.Controllers, cred.Path); err != nil {
 		return nil, errgo.Notef(err, "cannot mark controllers to be updated")
 	}
 
@@ -840,7 +839,7 @@ func (j *JEM) updateControllerCredential(
 	}
 	models, err := conn.UpdateCredential(ctx, cred)
 	if err == nil {
-		if dberr := j.DB.clearCredentialUpdate(ctx, ctlPath, cred.Path); dberr != nil {
+		if dberr := j.DB.ClearCredentialUpdate(ctx, ctlPath, cred.Path); dberr != nil {
 			err = errgo.Notef(dberr, "cannot update controller %q after successfully updating credential", ctlPath)
 		}
 	}
@@ -859,7 +858,7 @@ func (j *JEM) revokeControllerCredential(
 	if err := conn.RevokeCredential(ctx, credPath); err != nil {
 		return errgo.Mask(err, apiconn.IsAPIError)
 	}
-	if err := j.DB.clearCredentialUpdate(ctx, ctlPath, mongodoc.CredentialPathFromParams(credPath)); err != nil {
+	if err := j.DB.ClearCredentialUpdate(ctx, ctlPath, mongodoc.CredentialPathFromParams(credPath)); err != nil {
 		return errgo.Notef(err, "cannot update controller %q after successfully updating credential", ctlPath)
 	}
 	return nil
@@ -1026,7 +1025,7 @@ func (j *JEM) UpdateModelCredential(ctx context.Context, conn *apiconn.Conn, mod
 	if _, err := j.updateControllerCredential(ctx, conn, model.Controller, cred); err != nil {
 		return errgo.Notef(err, "cannot add credential")
 	}
-	if err := j.DB.credentialAddController(ctx, cred.Path, model.Controller); err != nil {
+	if err := j.DB.CredentialAddController(ctx, cred.Path, model.Controller); err != nil {
 		return errgo.Notef(err, "cannot add credential")
 	}
 

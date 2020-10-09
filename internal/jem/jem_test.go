@@ -30,6 +30,8 @@ import (
 	"github.com/CanonicalLtd/jimm/params"
 )
 
+var testContext = context.Background()
+
 type jemSuite struct {
 	jemtest.JujuConnSuite
 	pool                           *jem.Pool
@@ -176,7 +178,7 @@ func (s *jemSuite) TestRevokeCredentialsInUse(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 	credPath := credentialPath("dummy", "bob", "cred1")
-	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
+	err = s.jem.DB.UpdateCredential(testContext, &mongodoc.Credential{
 		Path: mongodoc.CredentialPathFromParams(credPath),
 		Type: "empty",
 	})
@@ -234,7 +236,7 @@ func (s *jemSuite) TestRevokeCredentialsNotInUse(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	credPath := credentialPath("dummy", "bob", "cred1")
 	mCredPath := mgoCredentialPath("dummy", "bob", "cred1")
-	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
+	err = s.jem.DB.UpdateCredential(testContext, &mongodoc.Credential{
 		Path: mCredPath,
 		Type: "empty",
 	})
@@ -418,7 +420,7 @@ func (s *jemSuite) TestUpdateCredential(c *gc.C) {
 		Path: mCredPath,
 		Type: "empty",
 	}
-	err := jem.UpdateCredential(s.jem.DB, testContext, cred)
+	err := s.jem.DB.UpdateCredential(testContext, cred)
 	c.Assert(err, gc.Equals, nil)
 	conn, err := s.jem.OpenAPI(testContext, ctlPath)
 	c.Assert(err, gc.Equals, nil)
@@ -426,7 +428,7 @@ func (s *jemSuite) TestUpdateCredential(c *gc.C) {
 
 	_, err = jem.UpdateControllerCredential(s.jem, testContext, conn, ctlPath, cred)
 	c.Assert(err, gc.Equals, nil)
-	err = jem.CredentialAddController(s.jem.DB, testContext, mCredPath, ctlPath)
+	err = s.jem.DB.CredentialAddController(testContext, mCredPath, ctlPath)
 	c.Assert(err, gc.Equals, nil)
 
 	// Sanity check it was deployed
@@ -665,7 +667,7 @@ func (s *jemSuite) TestCredential(c *gc.C) {
 	}}
 	for _, cred := range creds {
 		cred.Id = cred.Path.String()
-		err := jem.UpdateCredential(s.jem.DB, testContext, &cred)
+		err := s.jem.DB.UpdateCredential(testContext, &cred)
 		c.Assert(err, gc.Equals, nil)
 	}
 	for i, test := range credentialTests {
@@ -953,7 +955,7 @@ func (s *jemSuite) TestUpdateModelCredential(c *gc.C) {
 	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
 
 	credPath := credentialPath("dummy", "bob", "cred2")
-	err := jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
+	err := s.jem.DB.UpdateCredential(testContext, &mongodoc.Credential{
 		Path: mongodoc.CredentialPathFromParams(credPath),
 		Type: "empty",
 	})
@@ -1087,7 +1089,7 @@ func (s *jemSuite) bootstrapModel(c *gc.C, path params.EntityPath) *mongodoc.Mod
 func bootstrapModel(c *gc.C, path params.EntityPath, info *jujuapi.Info, j *jem.JEM) *mongodoc.Model {
 	ctlPath := addController(c, params.EntityPath{User: path.User, Name: "controller"}, info, j)
 	credPath := credentialPath("dummy", string(path.User), "cred")
-	err := jem.UpdateCredential(j.DB, testContext, &mongodoc.Credential{
+	err := j.DB.UpdateCredential(testContext, &mongodoc.Credential{
 		Path: mongodoc.CredentialPathFromParams(credPath),
 		Type: "empty",
 	})
@@ -1124,4 +1126,43 @@ func (c *testUsageSenderAuthorizationClient) GetCredentials(ctx context.Context,
 		err, c.errors = c.errors[0], c.errors[1:]
 	}
 	return []byte("test credentials"), err
+}
+
+func credentialPath(cloud, user, name string) params.CredentialPath {
+	return params.CredentialPath{
+		Cloud: params.Cloud(cloud),
+		User:  params.User(user),
+		Name:  params.CredentialName(name),
+	}
+}
+
+func mgoCredentialPath(cloud, user, name string) mongodoc.CredentialPath {
+	return mongodoc.CredentialPath{
+		Cloud: cloud,
+		EntityPath: mongodoc.EntityPath{
+			User: user,
+			Name: name,
+		},
+	}
+}
+
+// cleanMachineDoc cleans up the machine document so
+// that we can use a DeepEqual comparison without worrying
+// about non-nil vs nil map comparisons.
+func cleanMachineDoc(doc *mongodoc.Machine) {
+	if len(doc.Info.AgentStatus.Data) == 0 {
+		doc.Info.AgentStatus.Data = nil
+	}
+	if len(doc.Info.InstanceStatus.Data) == 0 {
+		doc.Info.InstanceStatus.Data = nil
+	}
+}
+
+// cleanApplicationDoc cleans up the application document so
+// that we can use a DeepEqual comparison without worrying
+// about non-nil vs nil map comparisons.
+func cleanApplicationDoc(doc *mongodoc.Application) {
+	if len(doc.Info.Status.Data) == 0 {
+		doc.Info.Status.Data = nil
+	}
 }

@@ -1,4 +1,4 @@
-package jem
+package jimmdb
 
 import (
 	"context"

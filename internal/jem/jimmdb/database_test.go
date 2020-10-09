@@ -1,6 +1,6 @@
 // Copyright 2016 Canonical Ltd.
 
-package jem_test
+package jimmdb_test
 
 import (
 	"context"
@@ -20,7 +20,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
@@ -31,7 +31,7 @@ var testContext = context.Background()
 
 type databaseSuite struct {
 	jemtest.IsolatedMgoSuite
-	database *jem.Database
+	database *jimmdb.Database
 }
 
 var _ = gc.Suite(&databaseSuite{})
@@ -39,7 +39,7 @@ var _ = gc.Suite(&databaseSuite{})
 func (s *databaseSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	pool := mgosession.NewPool(context.TODO(), s.Session, 1)
-	s.database = jem.NewDatabase(context.TODO(), pool, "jem")
+	s.database = jimmdb.NewDatabase(context.TODO(), pool, "jem")
 	c.Assert(s.database.Session.Ping(), gc.Equals, nil)
 	pool.Close()
 	c.Assert(s.database.Session.Ping(), gc.Equals, nil)
@@ -332,13 +332,13 @@ func (s *databaseSuite) TestDeleteController(c *gc.C) {
 
 	path := credentialPath("test-cloud", "test-user", "test-credential")
 	mpath := mongodoc.CredentialPathFromParams(path)
-	err = jem.UpdateCredential(s.database, testContext, &mongodoc.Credential{
+	err = s.database.UpdateCredential(testContext, &mongodoc.Credential{
 		Path: mpath,
 		Type: "empty",
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	err = jem.CredentialAddController(s.database, testContext, mpath, ctlPath)
+	err = s.database.CredentialAddController(testContext, mpath, ctlPath)
 	c.Assert(err, gc.Equals, nil)
 
 	err = s.database.DeleteController(testContext, ctlPath)
@@ -503,7 +503,7 @@ func (s *databaseSuite) TestUpdateLegacyModel(c *gc.C) {
 		Path: params.EntityPath{"bob", "y"},
 	}
 	err = s.database.UpdateLegacyModel(testContext, &m2)
-	c.Assert(err, gc.ErrorMatches, "cannot update bob/y: not found")
+	c.Assert(err, gc.ErrorMatches, "model not found")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	s.checkDBOK(c)
 }
@@ -596,7 +596,7 @@ var acquireLeaseTests = []struct {
 	actualOldExpiry: epoch.Add(leaseExpiryDuration * 2),
 	actualOldOwner:  "jem1",
 	expectError:     `controller has lease taken out by "jem1" expiring at 2016-01-01 12:00:30 \+0000 UTC`,
-	expectCause:     jem.ErrLeaseUnavailable,
+	expectCause:     jimmdb.ErrLeaseUnavailable,
 }, {
 	about:           "renewal with owner mismatch",
 	ctlPath:         params.EntityPath{"bob", "foo"},
@@ -606,7 +606,7 @@ var acquireLeaseTests = []struct {
 	actualOldExpiry: epoch.Add(leaseExpiryDuration),
 	actualOldOwner:  "jem0",
 	expectError:     `controller has lease taken out by "jem0" expiring at 2016-01-01 12:00:15 \+0000 UTC`,
-	expectCause:     jem.ErrLeaseUnavailable,
+	expectCause:     jimmdb.ErrLeaseUnavailable,
 }, {
 	about:           "drop lease",
 	now:             epoch.Add(leaseExpiryDuration / 2),
@@ -1371,7 +1371,7 @@ func (s *databaseSuite) TestAddAndGetCredential(c *gc.C) {
 		"attr1": "val1",
 		"attr2": "val2",
 	}
-	err = jem.UpdateCredential(s.database, testContext, &mongodoc.Credential{
+	err = s.database.UpdateCredential(testContext, &mongodoc.Credential{
 		Path:       mpath,
 		Type:       "credtype",
 		Label:      "Test Label",
@@ -1389,7 +1389,7 @@ func (s *databaseSuite) TestAddAndGetCredential(c *gc.C) {
 		Attributes: attrs,
 	})
 
-	err = jem.UpdateCredential(s.database, testContext, &mongodoc.Credential{
+	err = s.database.UpdateCredential(testContext, &mongodoc.Credential{
 		Path:       mpath,
 		Type:       "credtype",
 		Label:      "Test Label 2",
@@ -1407,7 +1407,7 @@ func (s *databaseSuite) TestAddAndGetCredential(c *gc.C) {
 		Attributes: attrs,
 	})
 
-	err = jem.UpdateCredential(s.database, testContext, &mongodoc.Credential{
+	err = s.database.UpdateCredential(testContext, &mongodoc.Credential{
 		Path:    mpath,
 		Revoked: true,
 	})
@@ -1492,7 +1492,7 @@ func (s *databaseSuite) TestCredentialAddController(c *gc.C) {
 	path := credentialPath("test-cloud", "test-user", "test-credential")
 	mpath := mongodoc.CredentialPathFromParams(path)
 	expectId := path.String()
-	err := jem.UpdateCredential(s.database, testContext, &mongodoc.Credential{
+	err := s.database.UpdateCredential(testContext, &mongodoc.Credential{
 		Path: mpath,
 		Type: "empty",
 	})
@@ -1505,7 +1505,7 @@ func (s *databaseSuite) TestCredentialAddController(c *gc.C) {
 	err = s.database.AddController(testContext, ctl)
 	c.Assert(err, gc.Equals, nil)
 
-	err = jem.CredentialAddController(s.database, testContext, mpath, ctlPath)
+	err = s.database.CredentialAddController(testContext, mpath, ctlPath)
 	c.Assert(err, gc.Equals, nil)
 
 	cred := mongodoc.Credential{
@@ -1524,7 +1524,7 @@ func (s *databaseSuite) TestCredentialAddController(c *gc.C) {
 	})
 
 	// Add a second time
-	err = jem.CredentialAddController(s.database, testContext, mpath, ctlPath)
+	err = s.database.CredentialAddController(testContext, mpath, ctlPath)
 	c.Assert(err, gc.Equals, nil)
 
 	err = s.database.GetCredential(testContext, &cred)
@@ -1546,7 +1546,7 @@ func (s *databaseSuite) TestCredentialAddController(c *gc.C) {
 		},
 	}
 	// Add to a non-existant credential
-	err = jem.CredentialAddController(s.database, testContext, path2, ctlPath)
+	err = s.database.CredentialAddController(testContext, path2, ctlPath)
 	c.Assert(err, gc.ErrorMatches, `credential "test-cloud/test-user/no-such-cred" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	s.checkDBOK(c)
@@ -1556,7 +1556,7 @@ func (s *databaseSuite) TestCredentialRemoveController(c *gc.C) {
 	path := credentialPath("test-cloud", "test-user", "test-credential")
 	mpath := mongodoc.CredentialPathFromParams(path)
 	expectId := path.String()
-	err := jem.UpdateCredential(s.database, testContext, &mongodoc.Credential{
+	err := s.database.UpdateCredential(testContext, &mongodoc.Credential{
 		Path: mpath,
 		Type: "empty",
 	})
@@ -1569,7 +1569,7 @@ func (s *databaseSuite) TestCredentialRemoveController(c *gc.C) {
 	err = s.database.AddController(testContext, ctl)
 	c.Assert(err, gc.Equals, nil)
 
-	err = jem.CredentialAddController(s.database, testContext, mpath, ctlPath)
+	err = s.database.CredentialAddController(testContext, mpath, ctlPath)
 	c.Assert(err, gc.Equals, nil)
 
 	// sanity check the controller is there.
@@ -1588,7 +1588,7 @@ func (s *databaseSuite) TestCredentialRemoveController(c *gc.C) {
 		},
 	})
 
-	err = jem.CredentialRemoveController(s.database, testContext, mpath, ctlPath)
+	err = s.database.CredentialRemoveController(testContext, mpath, ctlPath)
 	c.Assert(err, gc.Equals, nil)
 
 	err = s.database.GetCredential(testContext, &cred)
@@ -1601,7 +1601,7 @@ func (s *databaseSuite) TestCredentialRemoveController(c *gc.C) {
 	})
 
 	// Remove again
-	err = jem.CredentialRemoveController(s.database, testContext, mpath, ctlPath)
+	err = s.database.CredentialRemoveController(testContext, mpath, ctlPath)
 	c.Assert(err, gc.Equals, nil)
 
 	err = s.database.GetCredential(testContext, &cred)
@@ -1614,7 +1614,7 @@ func (s *databaseSuite) TestCredentialRemoveController(c *gc.C) {
 	})
 	path2 := mongodoc.CredentialPathFromParams(credentialPath("test-cloud", "test-user", "no-such-cred"))
 	// remove from a non-existant credential
-	err = jem.CredentialRemoveController(s.database, testContext, path2, ctlPath)
+	err = s.database.CredentialRemoveController(testContext, path2, ctlPath)
 	c.Assert(err, gc.ErrorMatches, `credential "test-cloud/test-user/no-such-cred" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	s.checkDBOK(c)
@@ -2051,10 +2051,10 @@ var (
 
 var setDeadTests = []struct {
 	about string
-	run   func(db *jem.Database)
+	run   func(db *jimmdb.Database)
 }{{
 	about: "AddController",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		db.AddController(testContext, &mongodoc.Controller{
 			Path: params.EntityPath{"bob", "foo"},
 			UUID: "fake-uuid",
@@ -2062,19 +2062,19 @@ var setDeadTests = []struct {
 	},
 }, {
 	about: "AddModel",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		db.AddModel(testContext, &mongodoc.Model{
 			Path: fakeEntityPath,
 		})
 	},
 }, {
 	about: "AcquireMonitorLease",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		db.AcquireMonitorLease(testContext, fakeEntityPath, time.Now(), "foo", time.Now(), "bar")
 	},
 }, {
 	about: "CanReadIter",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		it := db.Models().Find(nil).Sort("_id").Iter()
 		crit := db.NewCanReadIter(jemtest.NewIdentity("bob", "bob-group"), it)
 		crit.Next(testContext, &mongodoc.Model{})
@@ -2082,7 +2082,7 @@ var setDeadTests = []struct {
 	},
 }, {
 	about: "CanReadIter with Close",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		it := db.Models().Find(nil).Sort("_id").Iter()
 		crit := db.NewCanReadIter(jemtest.NewIdentity("bob", "bob-group"), it)
 		crit.Next(testContext, &mongodoc.Model{})
@@ -2090,115 +2090,115 @@ var setDeadTests = []struct {
 	},
 }, {
 	about: "clearCredentialUpdate",
-	run: func(db *jem.Database) {
-		jem.ClearCredentialUpdate(db, testContext, fakeEntityPath, fakeCredPath)
+	run: func(db *jimmdb.Database) {
+		db.ClearCredentialUpdate(testContext, fakeEntityPath, fakeCredPath)
 	},
 }, {
 	about: "ProviderType",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		db.ProviderType(testContext, "my-cloud")
 	},
 }, {
 	about: "Controller",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		db.Controller(testContext, fakeEntityPath)
 	},
 }, {
 	about: "GetCredential",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		db.GetCredential(testContext, &mongodoc.Credential{Path: fakeCredPath})
 	},
 }, {
 	about: "credentialAddController",
-	run: func(db *jem.Database) {
-		jem.CredentialAddController(db, testContext, fakeCredPath, fakeEntityPath)
+	run: func(db *jimmdb.Database) {
+		db.CredentialAddController(testContext, fakeCredPath, fakeEntityPath)
 	},
 }, {
 	about: "credentialRemoveController",
-	run: func(db *jem.Database) {
-		jem.CredentialRemoveController(db, testContext, fakeCredPath, fakeEntityPath)
+	run: func(db *jimmdb.Database) {
+		db.CredentialRemoveController(testContext, fakeCredPath, fakeEntityPath)
 	},
 }, {
 	about: "DeleteModel",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		db.DeleteModel(testContext, fakeEntityPath)
 	},
 }, {
 	about: "GetACL",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		db.GetACL(testContext, db.Models(), fakeEntityPath)
 	},
 }, {
 	about: "Grant",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		db.Grant(testContext, db.Controllers(), fakeEntityPath, "t1")
 	},
 }, {
 	about: "GetModel",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		db.GetModel(testContext, &mongodoc.Model{Path: fakeEntityPath})
 	},
 }, {
 	about: "MachinesForModel",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		db.MachinesForModel(testContext, "00000000-0000-0000-0000-000000000000")
 	},
 }, {
 	about: "Revoke",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		db.Revoke(testContext, db.Controllers(), fakeEntityPath, "t1")
 	},
 }, {
 	about: "SetACL",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		db.SetACL(testContext, db.Models(), fakeEntityPath, params.ACL{
 			Read: []string{"t1", "t2"},
 		})
 	},
 }, {
 	about: "SetControllerAvailable",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		db.SetControllerAvailable(testContext, fakeEntityPath)
 	},
 }, {
 	about: "SetControllerStats",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		db.SetControllerStats(testContext, fakeEntityPath, &mongodoc.ControllerStats{})
 	},
 }, {
 	about: "SetControllerUnavailableAt",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		db.SetControllerUnavailableAt(testContext, fakeEntityPath, time.Now())
 	},
 }, {
 	about: "SetControllerVersion",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		db.SetControllerVersion(testContext, fakeEntityPath, version.Number{})
 	},
 }, {
 	about: "setCredentialUpdates",
-	run: func(db *jem.Database) {
-		jem.SetCredentialUpdates(db, testContext, []params.EntityPath{fakeEntityPath}, fakeCredPath)
+	run: func(db *jimmdb.Database) {
+		db.SetCredentialUpdates(testContext, []params.EntityPath{fakeEntityPath}, fakeCredPath)
 	},
 }, {
 	about: "SetModelInfo",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		db.SetModelInfo(testContext, fakeEntityPath, "fake-uuid", &mongodoc.ModelInfo{})
 	},
 }, {
 	about: "SetModelLife",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		db.SetModelLife(testContext, fakeEntityPath, "fake-uuid", "fake-life")
 	},
 }, {
 	about: "SetModelController",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		db.SetModelController(testContext, fakeEntityPath, fakeEntityPath)
 	},
 }, {
 	about: "UpdateCredential",
-	run: func(db *jem.Database) {
-		jem.UpdateCredential(db, testContext, &mongodoc.Credential{
+	run: func(db *jimmdb.Database) {
+		db.UpdateCredential(testContext, &mongodoc.Credential{
 			Path:  fakeCredPath,
 			Type:  "credtype",
 			Label: "Test Label",
@@ -2206,7 +2206,7 @@ var setDeadTests = []struct {
 	},
 }, {
 	about: "UpdateMachineInfo",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		db.UpdateMachineInfo(testContext, &mongodoc.Machine{
 			Controller: "test/test",
 			Info: &jujuparams.MachineInfo{
@@ -2217,7 +2217,7 @@ var setDeadTests = []struct {
 	},
 }, {
 	about: "UpdateApplicationInfo",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		db.UpdateApplicationInfo(testContext, &mongodoc.Application{
 			Controller: "test/test",
 			Info: &mongodoc.ApplicationInfo{
@@ -2228,7 +2228,7 @@ var setDeadTests = []struct {
 	},
 }, {
 	about: "UpdateModelCounts",
-	run: func(db *jem.Database) {
+	run: func(db *jimmdb.Database) {
 		db.UpdateModelCounts(testContext, fakeEntityPath, "fake-uuid", nil, T(0))
 	},
 }}
@@ -2245,8 +2245,8 @@ func (s *databaseSuite) TestSetDead(c *gc.C) {
 	}
 }
 
-func testSetDead(c *gc.C, proxy *jujutesting.TCPProxy, pool *mgosession.Pool, run func(db *jem.Database)) {
-	db := jem.NewDatabase(context.TODO(), pool, "jem")
+func testSetDead(c *gc.C, proxy *jujutesting.TCPProxy, pool *mgosession.Pool, run func(db *jimmdb.Database)) {
+	db := jimmdb.NewDatabase(context.TODO(), pool, "jem")
 	defer db.Session.Close()
 	// Use the session so that it's bound to the socket.
 	err := db.Session.Ping()

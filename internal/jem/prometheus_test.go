@@ -149,7 +149,7 @@ func (s *jemSuite) TestModelStats(c *gc.C) {
 func (s *jemSuite) TestMachineStats(c *gc.C) {
 	ctl1Id := s.addController(c, params.EntityPath{"bob", "controller1"})
 	ctl2Id := s.addController(c, params.EntityPath{"bob", "controller2"})
-	err := jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
+	err := s.jem.DB.UpdateCredential(testContext, &mongodoc.Credential{
 		Path: mgoCredentialPath("dummy", "bob", "cred1"),
 		Type: "empty",
 	})

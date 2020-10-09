@@ -276,18 +276,18 @@ func (s *modelManagerSuite) TestCreateModel(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 	// Bob has a single credential.
-	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
+	err = s.jem.DB.UpdateCredential(testContext, &mongodoc.Credential{
 		Path: mgoCredentialPath("dummy", "bob", "cred1"),
 		Type: "empty",
 	})
 	c.Assert(err, gc.Equals, nil)
 	// Alice has two credentials.
-	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
+	err = s.jem.DB.UpdateCredential(testContext, &mongodoc.Credential{
 		Path: mgoCredentialPath("dummy", "alice", "cred1"),
 		Type: "empty",
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
+	err = s.jem.DB.UpdateCredential(testContext, &mongodoc.Credential{
 		Path: mgoCredentialPath("dummy", "alice", "cred2"),
 		Type: "empty",
 	})
@@ -353,7 +353,7 @@ func (s *modelManagerSuite) TestCreateModelWithPartiallyCreatedModel(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 	// Bob has a single credential.
-	err = jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
+	err = s.jem.DB.UpdateCredential(testContext, &mongodoc.Credential{
 		Path: mgoCredentialPath("dummy", "bob", "cred1"),
 		Type: "empty",
 	})

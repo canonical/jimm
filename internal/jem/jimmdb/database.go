@@ -1,6 +1,6 @@
 // Copyright 2016 Canonical Ltd.
 
-package jem
+package jimmdb
 
 import (
 	"context"
@@ -25,6 +25,8 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
 	"github.com/CanonicalLtd/jimm/params"
 )
+
+var notExistsQuery = bson.D{{"$exists", false}}
 
 // Database wraps an mgo.DB ands adds a number of methods for
 // manipulating the database.
@@ -57,24 +59,24 @@ func (db *Database) checkError(ctx context.Context, err *error) {
 	zapctx.Warn(ctx, "discarding mongo session", zaputil.Error(*err))
 }
 
-// newDatabase returns a new Database named dbName using
+// NewDatabase returns a new Database named dbName using
 // a session taken from the given pool. The database session
 // should be closed after the database is finished with.
-func newDatabase(ctx context.Context, pool *mgosession.Pool, dbName string) *Database {
+func NewDatabase(ctx context.Context, pool *mgosession.Pool, dbName string) *Database {
 	return &Database{
 		sessionPool: pool,
 		Database:    pool.Session(ctx).DB(dbName),
 	}
 }
 
-func (db *Database) clone() *Database {
+func (db *Database) Clone() *Database {
 	return &Database{
 		sessionPool: db.sessionPool,
 		Database:    db.Database.With(db.Database.Session.Clone()),
 	}
 }
 
-func (db *Database) ensureIndexes() error {
+func (db *Database) EnsureIndexes() error {
 	indexes := []struct {
 		c *mgo.Collection
 		i mgo.Index
@@ -158,7 +160,7 @@ func (db *Database) DeleteController(ctx context.Context, path params.EntityPath
 	defer db.checkError(ctx, &err)
 	// TODO (urosj) make this operation atomic.
 	// Delete controller from credentials
-	err = db.credentialsRemoveController(ctx, path)
+	err = db.CredentialsRemoveController(ctx, path)
 	if err != nil {
 		return errgo.Notef(err, "error deleting controler from credentials")
 	}
@@ -201,28 +203,10 @@ func (db *Database) ModelUUIDsForController(ctx context.Context, ctlPath params.
 	return uuids, nil
 }
 
-// AddModel adds a new model to the database.
-// It returns an error with a params.ErrAlreadyExists
-// cause if there is already an model with the given name.
-// If ignores m.Id and sets it from m.Path.
-func (db *Database) AddModel(ctx context.Context, m *mongodoc.Model) (err error) {
-	defer db.checkError(ctx, &err)
-	m.Id = m.Path.String()
-	err = db.Models().Insert(m)
-	if mgo.IsDup(err) {
-		return errgo.WithCausef(nil, params.ErrAlreadyExists, "")
-	}
-	if err != nil {
-		return errgo.Notef(err, "cannot insert controller model")
-	}
-	return nil
-}
-
 // UpdateLegacyModel updates the given model by adding the Cloud,
 // CloudRegion, Credential and DefaultSeries values from the given model
 // document. All other values will be ignored.
-func (db *Database) UpdateLegacyModel(ctx context.Context, model *mongodoc.Model) (err error) {
-	defer db.checkError(ctx, &err)
+func (db *Database) UpdateLegacyModel(ctx context.Context, model *mongodoc.Model) error {
 	update := make(bson.D, 3, 4)
 	update[0] = bson.DocElem{"cloud", model.Cloud}
 	update[1] = bson.DocElem{"credential", model.Credential}
@@ -230,14 +214,7 @@ func (db *Database) UpdateLegacyModel(ctx context.Context, model *mongodoc.Model
 	if model.CloudRegion != "" {
 		update = append(update, bson.DocElem{"cloudregion", model.CloudRegion})
 	}
-	err = db.Models().UpdateId(model.Path.String(), bson.D{{"$set", update}})
-	if err == nil {
-		return nil
-	}
-	if errgo.Cause(err) == mgo.ErrNotFound {
-		return errgo.WithCausef(err, params.ErrNotFound, "cannot update %s", model.Path)
-	}
-	return errgo.Notef(err, "cannot update %s", model.Path.String())
+	return errgo.Mask(db.UpdateModel(ctx, model, bson.D{{"$set", update}}, true), errgo.Is(params.ErrNotFound))
 }
 
 // SetModelController updates the given model so that it's associated
@@ -339,42 +316,6 @@ func (db *Database) Controller(ctx context.Context, path params.EntityPath) (_ *
 		return nil, errgo.Notef(err, "cannot get controller %q", id)
 	}
 	return &ctl, nil
-}
-
-// GetModel completes the contents of the given model. The database model
-// is matched using the first non-zero value in the given model from the
-// following fields:
-//
-//  - Path
-//  - Controller & UUID
-//  - UUID
-//
-// If no matching model can be found then the returned error will have a
-// cause of params.ErrNotFound.
-func (db *Database) GetModel(ctx context.Context, m *mongodoc.Model) (err error) {
-	defer db.checkError(ctx, &err)
-	var q bson.D
-	switch {
-	case m == nil:
-		return errgo.WithCausef(nil, params.ErrNotFound, "model not found")
-	case !m.Path.IsZero():
-		q = bson.D{{"path", m.Path}}
-	case m.UUID != "":
-		q = bson.D{{"uuid", m.UUID}}
-		if !m.Controller.IsZero() {
-			q = append(q, bson.DocElem{"controller", m.Controller})
-		}
-	default:
-		return errgo.WithCausef(nil, params.ErrNotFound, "model not found")
-	}
-	err = db.Models().Find(q).One(m)
-	if err == mgo.ErrNotFound {
-		return errgo.WithCausef(nil, params.ErrNotFound, "model not found")
-	}
-	if err != nil {
-		return errgo.Notef(err, "cannot get model")
-	}
-	return nil
 }
 
 // SetControllerVersion sets the agent version of the given controller.
@@ -743,9 +684,9 @@ func (db *Database) updateCounts(ctx context.Context, c *mgo.Collection, query b
 	return nil
 }
 
-// updateCredential stores the given credential in the database. If a
+// UpdateCredential stores the given credential in the database. If a
 // credential with the same name exists it is overwritten.
-func (db *Database) updateCredential(ctx context.Context, cred *mongodoc.Credential) (err error) {
+func (db *Database) UpdateCredential(ctx context.Context, cred *mongodoc.Credential) (err error) {
 	defer db.checkError(ctx, &err)
 	update := bson.D{{
 		"type", cred.Type,
@@ -791,9 +732,9 @@ func (db *Database) GetCredential(ctx context.Context, cred *mongodoc.Credential
 	return nil
 }
 
-// credentialAddController stores the fact that the credential with the
+// CredentialAddController stores the fact that the credential with the
 // given user, cloud and name is present on the given controller.
-func (db *Database) credentialAddController(ctx context.Context, credential mongodoc.CredentialPath, controller params.EntityPath) (err error) {
+func (db *Database) CredentialAddController(ctx context.Context, credential mongodoc.CredentialPath, controller params.EntityPath) (err error) {
 	defer db.checkError(ctx, &err)
 	err = db.Credentials().UpdateId(credential.String(), bson.D{{
 		"$addToSet", bson.D{{"controllers", controller}},
@@ -807,9 +748,9 @@ func (db *Database) credentialAddController(ctx context.Context, credential mong
 	return nil
 }
 
-// credentialRemoveController stores the fact that the credential with
+// CredentialRemoveController stores the fact that the credential with
 // the given user, cloud and name is not present on the given controller.
-func (db *Database) credentialRemoveController(ctx context.Context, credential mongodoc.CredentialPath, controller params.EntityPath) (err error) {
+func (db *Database) CredentialRemoveController(ctx context.Context, credential mongodoc.CredentialPath, controller params.EntityPath) (err error) {
 	defer db.checkError(ctx, &err)
 	err = db.Credentials().UpdateId(credential.String(), bson.D{{
 		"$pull", bson.D{{"controllers", controller}},
@@ -823,9 +764,9 @@ func (db *Database) credentialRemoveController(ctx context.Context, credential m
 	return nil
 }
 
-// credentialsRemoveController stores the fact that the given controller
+// CredentialsRemoveController stores the fact that the given controller
 // was removed and credentials are no longer present there.
-func (db *Database) credentialsRemoveController(ctx context.Context, controller params.EntityPath) (err error) {
+func (db *Database) CredentialsRemoveController(ctx context.Context, controller params.EntityPath) (err error) {
 	defer db.checkError(ctx, &err)
 	_, err = db.Credentials().UpdateAll(bson.D{}, bson.D{{
 		"$pull", bson.D{{"controllers", controller}},
@@ -1029,9 +970,9 @@ func (db *Database) RevokeCloud(ctx context.Context, cloud params.Cloud, user pa
 	return nil
 }
 
-// setCredentialUpdates marks all the controllers in the given ctlPaths
+// SetCredentialUpdates marks all the controllers in the given ctlPaths
 // as requiring an update to the credential with the given credPath.
-func (db *Database) setCredentialUpdates(ctx context.Context, ctlPaths []params.EntityPath, credPath mongodoc.CredentialPath) (err error) {
+func (db *Database) SetCredentialUpdates(ctx context.Context, ctlPaths []params.EntityPath, credPath mongodoc.CredentialPath) (err error) {
 	defer db.checkError(ctx, &err)
 	_, err = db.Controllers().UpdateAll(bson.D{{
 		"path", bson.D{{
@@ -1048,9 +989,9 @@ func (db *Database) setCredentialUpdates(ctx context.Context, ctlPaths []params.
 	return nil
 }
 
-// clearCredentialUpdate removes the record indicating that the given
+// ClearCredentialUpdate removes the record indicating that the given
 // controller needs to update the given credential.
-func (db *Database) clearCredentialUpdate(ctx context.Context, ctlPath params.EntityPath, credPath mongodoc.CredentialPath) (err error) {
+func (db *Database) ClearCredentialUpdate(ctx context.Context, ctlPath params.EntityPath, credPath mongodoc.CredentialPath) (err error) {
 	defer db.checkError(ctx, &err)
 	err = db.Controllers().UpdateId(
 		ctlPath.String(),
