@@ -533,6 +533,15 @@ func (s *databaseSuite) TestModelFromUUID(c *gc.C) {
 	err = s.database.GetModel(testContext, &m2)
 	c.Assert(err, gc.ErrorMatches, `model not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+
+	m3 := mongodoc.Model{
+		Controller: params.EntityPath{User: "bob", Name: "no-such-controller"},
+		UUID:       uuid,
+	}
+	err = s.database.GetModel(testContext, &m3)
+	c.Assert(err, gc.ErrorMatches, `model not found`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+
 	s.checkDBOK(c)
 }
 
