@@ -16,6 +16,7 @@ import (
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/model"
 	"github.com/juju/juju/core/status"
+	"github.com/juju/juju/environs/config"
 	"github.com/juju/juju/state"
 	"github.com/juju/juju/testing/factory"
 	jujuversion "github.com/juju/juju/version"
@@ -1732,4 +1733,84 @@ func assertModelInfo(c *gc.C, obtained, expected []jujuparams.ModelInfoResult) {
 		}
 	}
 	c.Assert(obtained, jc.DeepEquals, expected)
+}
+
+func (s *modelManagerSuite) TestModelDefaults(c *gc.C) {
+	ctx := context.Background()
+
+	ctlPath := params.EntityPath{User: "alice", Name: "controller-1"}
+	s.AssertAddController(ctx, c, ctlPath, true)
+	s.AssertUpdateCredential(ctx, c, "alice", "dummy", "cred1", "empty")
+
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+	client := modelmanager.NewClient(conn)
+
+	err := client.SetModelDefaults("aws", "eu-central-1", map[string]interface{}{
+		"a": 1,
+		"b": "value1",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	err = client.SetModelDefaults("aws", "eu-central-2", map[string]interface{}{
+		"b": "value2",
+		"c": 17,
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	values, err := client.ModelDefaults("aws")
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(values, jc.DeepEquals, config.ModelDefaultAttributes{
+		"a": config.AttributeDefaultValues{
+			Regions: []config.RegionDefaultValue{{
+				Name:  "eu-central-1",
+				Value: float64(1),
+			}},
+		},
+		"b": config.AttributeDefaultValues{
+			Regions: []config.RegionDefaultValue{{
+				Name:  "eu-central-1",
+				Value: "value1",
+			}, {
+				Name:  "eu-central-2",
+				Value: "value2",
+			}},
+		},
+		"c": config.AttributeDefaultValues{
+			Regions: []config.RegionDefaultValue{{
+				Name:  "eu-central-2",
+				Value: float64(17),
+			}},
+		},
+	})
+
+	err = client.UnsetModelDefaults("aws", "eu-central-1", "b", "c")
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = client.UnsetModelDefaults("aws", "eu-central-2", "a", "b")
+	c.Assert(err, jc.ErrorIsNil)
+
+	values, err = client.ModelDefaults("aws")
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(values, jc.DeepEquals, config.ModelDefaultAttributes{
+		"a": config.AttributeDefaultValues{
+			Regions: []config.RegionDefaultValue{{
+				Name:  "eu-central-1",
+				Value: float64(1),
+			}},
+		},
+		"c": config.AttributeDefaultValues{
+			Regions: []config.RegionDefaultValue{{
+				Name:  "eu-central-2",
+				Value: float64(17),
+			}},
+		},
+	})
+
+	conn1 := s.open(c, nil, "bob")
+	defer conn1.Close()
+	client1 := modelmanager.NewClient(conn1)
+
+	values, err = client1.ModelDefaults("aws")
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(values, jc.DeepEquals, config.ModelDefaultAttributes{})
 }

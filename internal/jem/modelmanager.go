@@ -59,3 +59,48 @@ func (j *JEM) DestroyModel(ctx context.Context, id identchecker.ACLIdentity, mod
 	})
 	return nil
 }
+
+// SetModelDefaults writes new default model setting values for the specified cloud/region.
+func (j *JEM) SetModelDefaults(ctx context.Context, id identchecker.ACLIdentity, cloud, region string, configs map[string]interface{}) error {
+	return errgo.Mask(j.DB.SetModelDefaults(ctx, mongodoc.CloudRegionDefaults{
+		User:     id.Id(),
+		Cloud:    cloud,
+		Region:   region,
+		Defaults: configs,
+	}))
+}
+
+// UnsetModelDefaults resets  default model setting values for the specified cloud/region.
+func (j *JEM) UnsetModelDefaults(ctx context.Context, id identchecker.ACLIdentity, cloud, region string, keys []string) error {
+	return errgo.Mask(j.DB.UnsetModelDefaults(
+		ctx,
+		id.Id(),
+		cloud,
+		region,
+		keys,
+	))
+}
+
+// ModelDefaultsForCloud returns the default config values for the specified cloud.
+func (j *JEM) ModelDefaultsForCloud(ctx context.Context, id identchecker.ACLIdentity, cloud params.Cloud) (jujuparams.ModelDefaultsResult, error) {
+	result := jujuparams.ModelDefaultsResult{
+		Config: make(map[string]jujuparams.ModelDefaults),
+	}
+
+	values, err := j.DB.ModelDefaults(ctx, id.Id(), string(cloud))
+	if err != nil {
+		return result, errgo.Mask(err)
+	}
+	for _, configPerRegion := range values {
+		for attr, value := range configPerRegion.Defaults {
+			modelDefaults := result.Config[attr]
+			modelDefaults.Regions = append(modelDefaults.Regions, jujuparams.RegionDefaults{
+				RegionName: configPerRegion.Region,
+				Value:      value,
+			})
+			result.Config[attr] = modelDefaults
+		}
+	}
+
+	return result, nil
+}
