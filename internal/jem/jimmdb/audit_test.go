@@ -1,6 +1,6 @@
 // Copyright 2018 Canonical Ltd.
 
-package jem_test
+package jimmdb_test
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/params"
@@ -18,7 +18,7 @@ import (
 
 type auditSuite struct {
 	jemtest.IsolatedMgoSuite
-	database *jem.Database
+	database *jimmdb.Database
 }
 
 var _ = gc.Suite(&auditSuite{})
@@ -26,7 +26,7 @@ var _ = gc.Suite(&auditSuite{})
 func (s *auditSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	pool := mgosession.NewPool(context.TODO(), s.Session, 1)
-	s.database = jem.NewDatabase(context.TODO(), pool, "jem")
+	s.database = jimmdb.NewDatabase(context.TODO(), pool, "jem")
 	c.Assert(s.database.Session.Ping(), gc.Equals, nil)
 	pool.Close()
 	c.Assert(s.database.Session.Ping(), gc.Equals, nil)

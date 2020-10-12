@@ -1,6 +1,6 @@
 // Copyright 2016 Canonical Ltd.
 
-package jem_test
+package jimmdb_test
 
 import (
 	"time"
@@ -8,7 +8,7 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -125,7 +125,7 @@ func (*countSuite) TestCount(c *gc.C) {
 	for i, test := range countTests {
 		c.Logf("test %d: %v", i, test.about)
 		count := test.doc
-		jem.UpdateCount(&count, test.n, test.when)
+		jimmdb.UpdateCount(&count, test.n, test.when)
 		count.Time = count.Time.UTC()
 		c.Assert(count, jc.DeepEquals, test.expect)
 	}

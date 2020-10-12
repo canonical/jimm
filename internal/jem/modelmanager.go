@@ -17,7 +17,6 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
-	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
@@ -216,29 +215,26 @@ func (j *JEM) CreateModel(ctx context.Context, id identchecker.ACLIdentity, p Cr
 	if err != nil {
 		zapctx.Error(ctx, "bad data returned from controller", zap.Error(err))
 	}
-	if _, err := j.DB.Models().FindId(modelDoc.Id).Apply(mgo.Change{
-		Update: bson.D{{"$set", bson.D{
-			{"uuid", info.UUID},
-			{"controller", ctlPath},
-			{"cloud", ct.Id()},
-			{"cloudregion", info.CloudRegion},
-			{"defaultseries", info.DefaultSeries},
-			{"info", mongodoc.ModelInfo{
-				Life:   string(info.Life),
-				Config: cfg,
-				Status: mongodoc.ModelStatus{
-					Status:  string(info.Status.Status),
-					Message: info.Status.Info,
-					Data:    info.Status.Data,
-					Since:   since,
-				},
-			}},
-			{"type", info.Type},
-			{"providertype", info.ProviderType},
-		}}},
-		ReturnNew: true,
-	}, &modelDoc); err != nil {
-		j.DB.checkError(ctx, &err)
+	update := bson.D{{"$set", bson.D{
+		{"uuid", info.UUID},
+		{"controller", ctlPath},
+		{"cloud", ct.Id()},
+		{"cloudregion", info.CloudRegion},
+		{"defaultseries", info.DefaultSeries},
+		{"info", mongodoc.ModelInfo{
+			Life:   string(info.Life),
+			Config: cfg,
+			Status: mongodoc.ModelStatus{
+				Status:  string(info.Status.Status),
+				Message: info.Status.Info,
+				Data:    info.Status.Data,
+				Since:   since,
+			},
+		}},
+		{"type", info.Type},
+		{"providertype", info.ProviderType},
+	}}}
+	if err := j.DB.UpdateModel(ctx, modelDoc, update, true); err != nil {
 		return errgo.Notef(err, "cannot update model %s in database", modelDoc.UUID)
 	}
 	j.DB.AppendAudit(ctx, id, &params.AuditModelCreated{
@@ -276,7 +272,7 @@ func (j *JEM) createModel(ctx context.Context, p createModelParams, info *jujupa
 		if _, err := j.updateControllerCredential(ctx, conn, p.controller.Path, p.cred); err != nil {
 			return errgo.WithCausef(err, errInvalidModelParams, "cannot add credential")
 		}
-		if err := j.DB.credentialAddController(ctx, p.cred.Path, p.controller.Path); err != nil {
+		if err := j.DB.CredentialAddController(ctx, p.cred.Path, p.controller.Path); err != nil {
 			return errgo.WithCausef(err, errInvalidModelParams, "cannot add credential")
 		}
 		cloudCredentialTag = conv.ToCloudCredentialTag(p.cred.Path.ToParams()).String()
