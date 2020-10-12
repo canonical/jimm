@@ -204,10 +204,10 @@ func (s *controllerSuite) TestControllerUpdateCredentials(c *gc.C) {
 		Path: mCredPath,
 		Type: "empty",
 	}
-	err := jem.UpdateCredential(s.jem.DB, testContext, cred)
+	err := s.jem.DB.UpdateCredential(testContext, cred)
 	c.Assert(err, gc.Equals, nil)
 
-	err = jem.SetCredentialUpdates(s.jem.DB, testContext, []params.EntityPath{ctlPath}, mongodoc.CredentialPathFromParams(credPath))
+	err = s.jem.DB.SetCredentialUpdates(testContext, []params.EntityPath{ctlPath}, mongodoc.CredentialPathFromParams(credPath))
 	c.Assert(err, gc.Equals, nil)
 
 	ctl, err := s.jem.DB.Controller(testContext, ctlPath)
@@ -243,9 +243,9 @@ func (s *controllerSuite) TestConnectMonitor(c *gc.C) {
 		Path: mCredPath,
 		Type: "empty",
 	}
-	err := jem.UpdateCredential(s.jem.DB, testContext, cred)
+	err := s.jem.DB.UpdateCredential(testContext, cred)
 	c.Assert(err, gc.Equals, nil)
-	err = jem.SetCredentialUpdates(s.jem.DB, testContext, []params.EntityPath{ctlPath}, mongodoc.CredentialPathFromParams(credPath))
+	err = s.jem.DB.SetCredentialUpdates(testContext, []params.EntityPath{ctlPath}, mongodoc.CredentialPathFromParams(credPath))
 	c.Assert(err, gc.Equals, nil)
 
 	// Remove the controller from known clouds.

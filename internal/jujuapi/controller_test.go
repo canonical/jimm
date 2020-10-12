@@ -12,6 +12,7 @@ import (
 	"github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/controller"
+	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
@@ -131,7 +132,8 @@ func (s *controllerSuite) TestModelStatus(c *gc.C) {
 	doTest := func(client modelStatuser) {
 		models, err := client.ModelStatus(names.NewModelTag(modelUUID1), names.NewModelTag(modelUUID3))
 		c.Assert(err, gc.Equals, nil)
-		c.Assert(models, jc.DeepEquals, []base.ModelStatus{{
+		c.Assert(models, gc.HasLen, 2)
+		c.Check(models[0], jc.DeepEquals, base.ModelStatus{
 			UUID:               modelUUID1,
 			Life:               "alive",
 			Owner:              "test@external",
@@ -140,18 +142,13 @@ func (s *controllerSuite) TestModelStatus(c *gc.C) {
 			HostedMachineCount: 0,
 			ApplicationCount:   0,
 			Machines:           []base.Machine{},
-		}, {
-			UUID:               modelUUID3,
-			Life:               "alive",
-			Owner:              "test2@external",
-			TotalMachineCount:  0,
-			CoreCount:          0,
-			HostedMachineCount: 0,
-			ApplicationCount:   0,
-			Machines:           []base.Machine{},
-		}})
-		_, err = client.ModelStatus(names.NewModelTag(modelUUID2))
-		c.Assert(err, gc.ErrorMatches, `unauthorized`)
+			ModelType:          "iaas",
+		})
+		c.Check(models[1].Error, gc.ErrorMatches, `unauthorized`)
+		status, err := client.ModelStatus(names.NewModelTag(modelUUID2))
+		c.Assert(err, gc.Equals, nil)
+		c.Assert(status, gc.HasLen, 1)
+		c.Check(status[0].Error, gc.ErrorMatches, "unauthorized")
 	}
 
 	conn := s.open(c, nil, "test")
@@ -227,14 +224,14 @@ func (s *controllerSuite) TestControllerVersion(c *gc.C) {
 	err := conn.APICall("Controller", 8, "", "ControllerVersion", nil, &result)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(result, jc.DeepEquals, jujuparams.ControllerVersionResults{
-		Version:   "0.0.0",
+		Version:   jujuversion.Current.String(),
 		GitCommit: jimmversion.VersionInfo.GitCommit,
 	})
 
 	err = conn.APICall("Controller", 9, "", "ControllerVersion", nil, &result)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(result, jc.DeepEquals, jujuparams.ControllerVersionResults{
-		Version:   "0.0.0",
+		Version:   jujuversion.Current.String(),
 		GitCommit: jimmversion.VersionInfo.GitCommit,
 	})
 }

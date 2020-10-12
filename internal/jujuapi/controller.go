@@ -11,7 +11,6 @@ import (
 	"github.com/rogpeppe/fastuuid"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
@@ -108,7 +107,7 @@ func (r *controllerRoot) IdentityProviderURL(ctx context.Context) (jujuparams.St
 // ControllerVersion returns the version information associated with this
 // controller binary.
 func (r *controllerRoot) ControllerVersion(ctx context.Context) (jujuparams.ControllerVersionResults, error) {
-	srvVersion, err := r.jem.EarliestControllerVersion(ctx)
+	srvVersion, err := r.jem.EarliestControllerVersion(ctx, r.identity)
 	if err != nil {
 		return jujuparams.ControllerVersionResults{}, errgo.Mask(err)
 	}
@@ -135,7 +134,7 @@ func (r *controllerRoot) WatchModelSummaries(ctx context.Context) (jujuparams.Su
 
 	id := fmt.Sprintf("%v", r.generator.Next())
 
-	watcher, err := newModelSummaryWatcher(auth.ContextWithIdentity(ctx, r.identity), id, r, r.jem.Pubsub())
+	watcher, err := newModelSummaryWatcher(ctx, id, r, r.jem.Pubsub())
 	if err != nil {
 		return jujuparams.SummaryWatcherID{}, errgo.Mask(err)
 	}
@@ -147,7 +146,6 @@ func (r *controllerRoot) WatchModelSummaries(ctx context.Context) (jujuparams.Su
 }
 
 func (r *controllerRoot) AllModels(ctx context.Context) (jujuparams.UserModelList, error) {
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	return r.allModels(ctx)
 }
 
@@ -172,36 +170,17 @@ func (r *controllerRoot) allModels(ctx context.Context) (jujuparams.UserModelLis
 func (r *controllerRoot) ModelStatus(ctx context.Context, args jujuparams.Entities) (jujuparams.ModelStatusResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.ModelStatus, len(args.Entities))
-	// TODO (fabricematrat) get status for all of the models connected
-	// to a single controller in one go.
 	for i, arg := range args.Entities {
-		mi, err := r.modelStatus(ctx, arg)
+		mt, err := names.ParseModelTag(arg.Tag)
 		if err != nil {
-			return jujuparams.ModelStatusResults{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+			results[i].Error = mapError(errgo.WithCausef(err, params.ErrBadRequest, ""))
+			continue
 		}
-		results[i] = *mi
+		results[i].Error = mapError(r.jem.GetModelStatus(ctx, r.identity, mt.Id(), &results[i], len(results) == 1))
 	}
-
 	return jujuparams.ModelStatusResults{
 		Results: results,
-	}, nil
-}
-
-// modelStatus retrieves the model status for the specified entity.
-func (r *controllerRoot) modelStatus(ctx context.Context, arg jujuparams.Entity) (*jujuparams.ModelStatus, error) {
-	mi, err := r.modelInfo(ctx, arg, false)
-	if err != nil {
-		return &jujuparams.ModelStatus{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-	return &jujuparams.ModelStatus{
-		ModelTag:           names.NewModelTag(mi.UUID).String(),
-		Life:               mi.Life,
-		HostedMachineCount: len(mi.Machines),
-		ApplicationCount:   0,
-		OwnerTag:           mi.OwnerTag,
-		Machines:           mi.Machines,
 	}, nil
 }
 

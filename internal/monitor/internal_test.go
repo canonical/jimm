@@ -23,7 +23,6 @@ import (
 	"gopkg.in/juju/worker.v1"
 	"gopkg.in/tomb.v2"
 
-	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
@@ -589,7 +588,8 @@ func (s *internalSuite) TestWatcherUpdatesApplicationOffer(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// Add the JEM model entries
-	model, err := s.jem.CreateModel(auth.ContextWithIdentity(testContext, jemtest.NewIdentity("user1")), jem.CreateModelParams{
+	var mi jujuparams.ModelInfo
+	err = s.jem.CreateModel(testContext, jemtest.NewIdentity("user1"), jem.CreateModelParams{
 		Path:           params.EntityPath{User: "user1", Name: "model-1"},
 		ControllerPath: ctlPath,
 		Credential: params.CredentialPath{
@@ -599,10 +599,10 @@ func (s *internalSuite) TestWatcherUpdatesApplicationOffer(c *gc.C) {
 		},
 		Cloud:  "dummy",
 		Region: "dummy-region",
-	})
+	}, &mi)
 	c.Assert(err, gc.Equals, nil)
 
-	modelState, err := s.StatePool.Get(model.UUID)
+	modelState, err := s.StatePool.Get(mi.UUID)
 	c.Assert(err, gc.Equals, nil)
 	defer modelState.Release()
 
@@ -620,7 +620,7 @@ func (s *internalSuite) TestWatcherUpdatesApplicationOffer(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	err = s.jem.Offer(testContext, jemtest.NewIdentity("user1"), jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(model.UUID).String(),
+		ModelTag:        names.NewModelTag(mi.UUID).String(),
 		OfferName:       "test-offer",
 		ApplicationName: "test-app",
 		Endpoints: map[string]string{
@@ -630,7 +630,7 @@ func (s *internalSuite) TestWatcherUpdatesApplicationOffer(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 
 	offer1 := mongodoc.ApplicationOffer{
-		OfferURL: conv.ToOfferURL(model.Path, "test-offer"),
+		OfferURL: conv.ToOfferURL(params.EntityPath{User: "user1", Name: "model-1"}, "test-offer"),
 	}
 	err = s.jem.DB.GetApplicationOffer(testContext, &offer1)
 	c.Assert(err, jc.ErrorIsNil)

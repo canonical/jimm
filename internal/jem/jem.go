@@ -31,6 +31,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/conv"
+	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
@@ -167,7 +168,7 @@ func NewPool(ctx context.Context, p Params) (*Pool, error) {
 	}
 	jem := pool.JEM(ctx)
 	defer jem.Close()
-	if err := jem.DB.ensureIndexes(); err != nil {
+	if err := jem.DB.EnsureIndexes(); err != nil {
 		return nil, errgo.Notef(err, "cannot ensure indexes")
 	}
 	return pool, nil
@@ -216,7 +217,7 @@ func (p *Pool) JEM(ctx context.Context) *JEM {
 	}
 	p.refCount++
 	return &JEM{
-		DB:                             newDatabase(ctx, p.config.SessionPool, p.dbName),
+		DB:                             jimmdb.NewDatabase(ctx, p.config.SessionPool, p.dbName),
 		pool:                           p,
 		usageSenderAuthorizationClient: p.usageSenderAuthorizationClient,
 		pubsub:                         p.pubsub,
@@ -230,7 +231,7 @@ func (p *Pool) UsageAuthorizationClient() UsageSenderAuthorizationClient {
 
 type JEM struct {
 	// DB holds the mongodb-backed identity store.
-	DB *Database
+	DB *jimmdb.Database
 
 	// pool holds the Pool from which the JEM instance
 	// was created.
@@ -254,7 +255,7 @@ func (j *JEM) Clone() *JEM {
 
 	j.pool.refCount++
 	return &JEM{
-		DB:   j.DB.clone(),
+		DB:   j.DB.Clone(),
 		pool: j.pool,
 	}
 }
@@ -298,8 +299,7 @@ var ErrAPIConnection params.ErrorCode = "cannot connect to API"
 // have a cause of ErrAPIConnection.
 //
 // The returned connection must be closed when finished with.
-func (j *JEM) OpenAPI(ctx context.Context, path params.EntityPath) (_ *apiconn.Conn, err error) {
-	defer j.DB.checkError(ctx, &err)
+func (j *JEM) OpenAPI(ctx context.Context, path params.EntityPath) (*apiconn.Conn, error) {
 	ctl, err := j.DB.Controller(ctx, path)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot get controller", errgo.Is(params.ErrNotFound))
@@ -353,8 +353,7 @@ func apiInfoFromDoc(ctl *mongodoc.Controller) *api.Info {
 // cause of ErrAPIConnection.
 //
 // The returned connection must be closed when finished with.
-func (j *JEM) OpenModelAPI(ctx context.Context, path params.EntityPath) (_ *apiconn.Conn, err error) {
-	defer j.DB.checkError(ctx, &err)
+func (j *JEM) OpenModelAPI(ctx context.Context, path params.EntityPath) (*apiconn.Conn, error) {
 	m := mongodoc.Model{Path: path}
 	if err := j.DB.GetModel(ctx, &m); err != nil {
 		return nil, errgo.NoteMask(err, "cannot get model", errgo.Is(params.ErrNotFound))
@@ -474,8 +473,8 @@ func (j *JEM) updateModelInfo(ctx context.Context, model *mongodoc.Model) error 
 
 // Controller retrieves the given controller from the database,
 // validating that the current user is allowed to read the controller.
-func (j *JEM) Controller(ctx context.Context, path params.EntityPath) (*mongodoc.Controller, error) {
-	if err := j.DB.CheckReadACL(ctx, j.DB.Controllers(), path); err != nil {
+func (j *JEM) Controller(ctx context.Context, id identchecker.ACLIdentity, path params.EntityPath) (*mongodoc.Controller, error) {
+	if err := j.DB.CheckReadACL(ctx, id, j.DB.Controllers(), path); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	ctl, err := j.DB.Controller(ctx, path)
@@ -540,158 +539,6 @@ func (j *JEM) FillCredentialAttributes(ctx context.Context, cred *mongodoc.Crede
 	return nil
 }
 
-// CreateModelParams specifies the parameters needed to create a new
-// model using CreateModel.
-type CreateModelParams struct {
-	// Path contains the path of the new model.
-	Path params.EntityPath
-
-	// ControllerPath contains the path of the owning
-	// controller.
-	ControllerPath params.EntityPath
-
-	// Credential contains the name of the credential to use to
-	// create the model.
-	Credential params.CredentialPath
-
-	// Cloud contains the name of the cloud in which the
-	// model will be created.
-	Cloud params.Cloud
-
-	// Region contains the name of the region in which the model will
-	// be created. This may be empty if the cloud does not support
-	// regions.
-	Region string
-
-	// Attributes contains the attributes to assign to the new model.
-	Attributes map[string]interface{}
-}
-
-// CreateModel creates a new model as specified by p.
-func (j *JEM) CreateModel(ctx context.Context, p CreateModelParams) (_ *mongodoc.Model, err error) {
-	// Only the owner can create a new model in their namespace.
-	if err := auth.CheckIsUser(ctx, auth.IdentityFromContext(ctx), p.Path.User); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-
-	var usageSenderCredentials []byte
-	if j.usageSenderAuthorizationClient != nil {
-		usageSenderCredentials, err = j.usageSenderAuthorizationClient.GetCredentials(
-			ctx,
-			string(p.Path.User))
-		if err != nil {
-			zapctx.Warn(ctx, "failed to obtain credentials for model", zaputil.Error(err), zap.String("user", string(p.Path.User)))
-		}
-	}
-
-	cred, err := j.selectCredential(ctx, p.Credential, p.Path.User, p.Cloud)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrAmbiguousChoice))
-	}
-
-	controllers, err := j.possibleControllers(
-		ctx,
-		auth.IdentityFromContext(ctx),
-		p.ControllerPath,
-		&mongodoc.CloudRegion{
-			Cloud:  p.Cloud,
-			Region: p.Region,
-		},
-	)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
-	}
-
-	// Create the model record in the database before actually
-	// creating the model on the controller. It will have an invalid
-	// UUID because it doesn't exist but that's better than creating
-	// a model that we can't add locally because the name
-	// already exists.
-	modelDoc := &mongodoc.Model{
-		Path:                   p.Path,
-		CreationTime:           wallClock.Now(),
-		Creator:                auth.IdentityFromContext(ctx).Id(),
-		UsageSenderCredentials: usageSenderCredentials,
-		// Use a temporary UUID so that we can create two at the
-		// same time, because the uuid field must always be
-		// unique.
-		UUID:        fmt.Sprintf("creating-%x", j.pool.uuidGenerator.Next()),
-		Cloud:       p.Cloud,
-		CloudRegion: p.Region,
-		Info: &mongodoc.ModelInfo{
-			Config: p.Attributes,
-		},
-	}
-	if cred != nil {
-		modelDoc.Credential = cred.Path
-	}
-	if err := j.DB.AddModel(ctx, modelDoc); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
-	}
-
-	defer func() {
-		if err == nil {
-			return
-		}
-
-		// We're returning an error, so remove the model from the
-		// database. Note that this might leave the model around
-		// in the controller, but this should be rare and we can
-		// deal with it at model creation time later (see TODO below).
-		if err := j.DB.DeleteModel(ctx, modelDoc.Path); err != nil {
-			zapctx.Error(ctx, "cannot remove model from database after error; leaked model", zaputil.Error(err))
-		}
-	}()
-
-	var ctlPath params.EntityPath
-	for _, controller := range controllers {
-		err := j.createModelOnController(ctx, auth.IdentityFromContext(ctx), controller, modelDoc, cred)
-		if err == nil {
-			ctlPath = controller
-			break
-		}
-		if errgo.Cause(err) == errInvalidModelParams {
-			return nil, errgo.Notef(err, "cannot create model")
-		}
-		zapctx.Error(ctx, "cannot create model on controller", zaputil.Error(err), zap.String("controller", controller.String()))
-	}
-
-	if ctlPath.Name == "" {
-		return nil, errgo.New("cannot find suitable controller")
-	}
-
-	// Now set the UUID to that of the actually created model,
-	// and update other attributes from the response too.
-	// Use Apply so that we can return a result that's consistent
-	// with Database.Model.
-	if _, err := j.DB.Models().FindId(modelDoc.Id).Apply(mgo.Change{
-		Update: bson.D{{"$set", bson.D{
-			{"uuid", modelDoc.UUID},
-			{"controller", ctlPath},
-			{"cloud", modelDoc.Cloud},
-			{"cloudregion", modelDoc.CloudRegion},
-			{"defaultseries", modelDoc.DefaultSeries},
-			{"info", modelDoc.Info},
-			{"type", modelDoc.Type},
-			{"providertype", modelDoc.ProviderType},
-		}}},
-		ReturnNew: true,
-	}, &modelDoc); err != nil {
-		j.DB.checkError(ctx, &err)
-		return nil, errgo.Notef(err, "cannot update model %s in database", modelDoc.UUID)
-	}
-	j.DB.AppendAudit(ctx, &params.AuditModelCreated{
-		ID:             modelDoc.Id,
-		UUID:           modelDoc.UUID,
-		Owner:          string(modelDoc.Owner()),
-		Creator:        modelDoc.Creator,
-		ControllerPath: ctlPath.String(),
-		Cloud:          string(modelDoc.Cloud),
-		Region:         modelDoc.CloudRegion,
-	})
-	return modelDoc, nil
-}
-
 func (j *JEM) possibleControllers(ctx context.Context, id identchecker.ACLIdentity, ctlPath params.EntityPath, cr *mongodoc.CloudRegion) ([]params.EntityPath, error) {
 	if ctlPath.Name != "" {
 		return []params.EntityPath{ctlPath}, nil
@@ -714,77 +561,6 @@ func (j *JEM) possibleControllers(ctx context.Context, id identchecker.ACLIdenti
 // shuffle is used to randomize the order in which possible controllers
 // are tried. It is a variable so it can be replaced in tests.
 var shuffle func(int, func(int, int)) = rand.Shuffle
-
-const errInvalidModelParams params.ErrorCode = "invalid CreateModel request"
-
-func (j *JEM) createModelOnController(ctx context.Context, id identchecker.ACLIdentity, ctlPath params.EntityPath, model *mongodoc.Model, cred *mongodoc.Credential) error {
-	ctl, err := j.Controller(ctx, ctlPath)
-	if err != nil {
-		return errgo.Notef(err, "cannot get controller document")
-	}
-	if ctl.Deprecated {
-		return errgo.Notef(err, "controller deprecated")
-	}
-	if !ctl.Public {
-		if err := auth.CheckCanRead(ctx, id, ctl); err != nil {
-			return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-		}
-	}
-	conn, err := j.OpenAPIFromDoc(ctx, ctl)
-	if err != nil {
-		return errgo.Notef(err, "cannot connect to controller")
-	}
-	defer conn.Close()
-
-	if cred != nil {
-		if _, err := j.updateControllerCredential(ctx, conn, ctlPath, cred); err != nil {
-			return errgo.WithCausef(err, errInvalidModelParams, "cannot add credential")
-		}
-		if err := j.DB.credentialAddController(ctx, cred.Path, ctlPath); err != nil {
-			return errgo.WithCausef(err, errInvalidModelParams, "cannot add credential")
-		}
-		// TODO mhilton set credential?
-	}
-
-	err = conn.CreateModel(ctx, model)
-	if err != nil {
-		switch jujuparams.ErrCode(err) {
-		case jujuparams.CodeAlreadyExists:
-			// The model already exists in the controller but it didn't
-			// exist in the database. This probably means that it's
-			// been abortively created previously, but left around because
-			// of connection failure.
-			// TODO initiate cleanup of the model, first checking that
-			// it's empty, but return an error to the user because
-			// the operation to delete a model isn't synchronous even
-			// for empty models. We could also have a worker that deletes
-			// empty models that don't appear in the database.
-			return errgo.WithCausef(err, errInvalidModelParams, "model name in use")
-		case jujuparams.CodeUpgradeInProgress:
-			return errgo.Notef(err, "upgrade in progress")
-		default:
-			// The model couldn't be created because of an
-			// error in the request, don't try another
-			// controller.
-			return errgo.WithCausef(err, errInvalidModelParams, "")
-		}
-	}
-	// TODO should we try to delete the model from the controller
-	// on error here?
-
-	// Grant JIMM admin access to the model. Note that if this fails,
-	// the local database entry will be deleted but the model
-	// will remain on the controller and will trigger the "already exists
-	// in the backend controller" message above when the user
-	// attempts to create a model with the same name again.
-	if err := conn.GrantJIMMModelAdmin(ctx, model.UUID); err != nil {
-		// TODO (mhilton) ensure that this is flagged in some admin interface somewhere.
-		zapctx.Error(ctx, "leaked model", zap.String("controller", ctlPath.String()), zap.String("model", model.Path.String()), zaputil.Error(err), zap.String("model-uuid", model.UUID))
-		return errgo.Notef(err, "cannot grant model access")
-	}
-
-	return nil
-}
 
 // RevokeCredential checks that the credential with the given path
 // can be revoked (if flags&CredentialCheck!=0) and revokes
@@ -815,7 +591,7 @@ func (j *JEM) RevokeCredential(ctx context.Context, credPath params.CredentialPa
 	if flags&CredentialUpdate == 0 {
 		return nil
 	}
-	if err := j.DB.updateCredential(ctx, &mongodoc.Credential{
+	if err := j.DB.UpdateCredential(ctx, &mongodoc.Credential{
 		Path:    mongodoc.CredentialPathFromParams(credPath),
 		Revoked: true,
 	}); err != nil {
@@ -927,7 +703,7 @@ func (j *JEM) updateCredential(ctx context.Context, cred *mongodoc.Credential, c
 		cred1 := *cred
 		cred1.Attributes = nil
 		cred1.AttributesInVault = true
-		if err := j.DB.updateCredential(ctx, &cred1); err != nil {
+		if err := j.DB.UpdateCredential(ctx, &cred1); err != nil {
 			return nil, errgo.Notef(err, "cannot update local database")
 		}
 		data := make(map[string]interface{}, len(cred.Attributes))
@@ -941,11 +717,11 @@ func (j *JEM) updateCredential(ctx context.Context, cred *mongodoc.Credential, c
 		}
 	} else {
 		cred.AttributesInVault = false
-		if err := j.DB.updateCredential(ctx, cred); err != nil {
+		if err := j.DB.UpdateCredential(ctx, cred); err != nil {
 			return nil, errgo.Notef(err, "cannot update local database")
 		}
 	}
-	if err := j.DB.setCredentialUpdates(ctx, cred.Controllers, cred.Path); err != nil {
+	if err := j.DB.SetCredentialUpdates(ctx, cred.Controllers, cred.Path); err != nil {
 		return nil, errgo.Notef(err, "cannot mark controllers to be updated")
 	}
 
@@ -1063,7 +839,7 @@ func (j *JEM) updateControllerCredential(
 	}
 	models, err := conn.UpdateCredential(ctx, cred)
 	if err == nil {
-		if dberr := j.DB.clearCredentialUpdate(ctx, ctlPath, cred.Path); dberr != nil {
+		if dberr := j.DB.ClearCredentialUpdate(ctx, ctlPath, cred.Path); dberr != nil {
 			err = errgo.Notef(dberr, "cannot update controller %q after successfully updating credential", ctlPath)
 		}
 	}
@@ -1082,7 +858,7 @@ func (j *JEM) revokeControllerCredential(
 	if err := conn.RevokeCredential(ctx, credPath); err != nil {
 		return errgo.Mask(err, apiconn.IsAPIError)
 	}
-	if err := j.DB.clearCredentialUpdate(ctx, ctlPath, mongodoc.CredentialPathFromParams(credPath)); err != nil {
+	if err := j.DB.ClearCredentialUpdate(ctx, ctlPath, mongodoc.CredentialPathFromParams(credPath)); err != nil {
 		return errgo.Notef(err, "cannot update controller %q after successfully updating credential", ctlPath)
 	}
 	return nil
@@ -1115,12 +891,12 @@ func (j *JEM) RevokeModel(ctx context.Context, conn *apiconn.Conn, model *mongod
 // that any of the available public controllers is known to be running.
 // If there are no available controllers or none of their versions are
 // known, it returns the zero version.
-func (j *JEM) EarliestControllerVersion(ctx context.Context) (version.Number, error) {
+func (j *JEM) EarliestControllerVersion(ctx context.Context, id identchecker.ACLIdentity) (version.Number, error) {
 	// TOD(rog) cache the result of this for a while, as it changes only rarely
 	// and we don't really need to make this extra round trip every
 	// time a user connects to the API?
 	var v *version.Number
-	if err := j.DoControllers(ctx, func(c *mongodoc.Controller) error {
+	if err := j.doControllers(ctx, id, func(c *mongodoc.Controller) error {
 		zapctx.Debug(ctx, "in EarliestControllerVersion", zap.Stringer("controller", c.Path), zap.Stringer("version", c.Version))
 		if c.Version == nil {
 			return nil
@@ -1138,20 +914,20 @@ func (j *JEM) EarliestControllerVersion(ctx context.Context) (version.Number, er
 	return *v, nil
 }
 
-// DoControllers calls the given function for each controller that
+// doControllers calls the given function for each controller that
 // can be read by the current user that matches the given attributes.
 // If the function returns an error, the iteration stops and
-// DoControllers returns the error with the same cause.
+// doControllers returns the error with the same cause.
 //
 // Note that the same pointer is passed to the do function on
 // each iteration. It is the responsibility of the do function to
 // copy it if needed.
-func (j *JEM) DoControllers(ctx context.Context, do func(c *mongodoc.Controller) error) error {
+func (j *JEM) doControllers(ctx context.Context, id identchecker.ACLIdentity, do func(c *mongodoc.Controller) error) error {
 	// Query all the controllers that match the attributes, building
 	// up all the possible values.
 	q := j.DB.Controllers().Find(bson.D{{"unavailablesince", notExistsQuery}, {"public", true}})
 	// Sort by _id so that we can make easily reproducible tests.
-	iter := j.DB.NewCanReadIter(ctx, q.Sort("_id").Iter())
+	iter := j.DB.NewCanReadIter(id, q.Sort("_id").Iter())
 	var ctl mongodoc.Controller
 	for iter.Next(ctx, &ctl) {
 		if err := do(&ctl); err != nil {
@@ -1163,71 +939,6 @@ func (j *JEM) DoControllers(ctx context.Context, do func(c *mongodoc.Controller)
 		return errgo.Notef(err, "cannot query")
 	}
 	return nil
-}
-
-// selectCredential chooses a credential appropriate for the given user that can
-// be used when starting a model in the given cloud.
-//
-// If there's more than one such credential, it returns a params.ErrAmbiguousChoice error.
-//
-// If there are no credentials found, a zero credential path is returned.
-func (j *JEM) selectCredential(ctx context.Context, path params.CredentialPath, user params.User, cloud params.Cloud) (*mongodoc.Credential, error) {
-	p := mongodoc.CredentialPathFromParams(path)
-	query := bson.D{{"path", p}}
-	if p.IsZero() {
-		query = bson.D{
-			{"path.entitypath.user", user},
-			{"path.cloud", cloud},
-			{"revoked", false},
-		}
-	}
-	var creds []mongodoc.Credential
-	iter := j.DB.NewCanReadIter(ctx, j.DB.Credentials().Find(query).Iter())
-	var cred mongodoc.Credential
-	for iter.Next(ctx, &cred) {
-		creds = append(creds, cred)
-	}
-	if err := iter.Err(ctx); err != nil {
-		return nil, errgo.Notef(err, "cannot query credentials")
-	}
-	switch len(creds) {
-	case 0:
-		var err error
-		if !p.IsZero() {
-			err = errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", path)
-		}
-		return nil, err
-	case 1:
-		cred := &creds[0]
-		if cred.Revoked {
-			// The credential (which must have been specifically selected by
-			// path, because if the path wasn't set, we will never select
-			// a revoked credential) has been revoked - we can't use it.
-			return nil, errgo.Newf("credential %v has been revoked", creds[0].Path)
-		}
-		return cred, nil
-	default:
-		return nil, errgo.WithCausef(nil, params.ErrAmbiguousChoice, "more than one possible credential to use")
-	}
-}
-
-// selectRandomController chooses a random controller that you have access to.
-func (j *JEM) selectRandomController(ctx context.Context) (params.EntityPath, error) {
-	// Choose a random controller.
-	// TODO select a controller more intelligently, for example
-	// by choosing the most lightly loaded controller
-	var controllers []mongodoc.Controller
-	if err := j.DoControllers(ctx, func(c *mongodoc.Controller) error {
-		controllers = append(controllers, *c)
-		return nil
-	}); err != nil {
-		return params.EntityPath{}, errgo.Mask(err)
-	}
-	if len(controllers) == 0 {
-		return params.EntityPath{}, errgo.Newf("cannot find a suitable controller")
-	}
-	n := randIntn(len(controllers))
-	return controllers[n].Path, nil
 }
 
 // UpdateMachineInfo updates the information associated with a machine.
@@ -1289,8 +1000,11 @@ func (j *JEM) modelRegion(ctx context.Context, ctlPath params.EntityPath, uuid s
 	}
 	key := fmt.Sprintf("%s %s", ctlPath, uuid)
 	r, err := j.pool.regionCache.Get(key, func() (interface{}, error) {
-		m, err := j.DB.modelFromControllerAndUUID(ctx, ctlPath, uuid)
-		if err != nil {
+		m := mongodoc.Model{
+			UUID:       uuid,
+			Controller: ctlPath,
+		}
+		if err := j.DB.GetModel(ctx, &m); err != nil {
 			return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 		}
 		return cloudRegion{
@@ -1311,7 +1025,7 @@ func (j *JEM) UpdateModelCredential(ctx context.Context, conn *apiconn.Conn, mod
 	if _, err := j.updateControllerCredential(ctx, conn, model.Controller, cred); err != nil {
 		return errgo.Notef(err, "cannot add credential")
 	}
-	if err := j.DB.credentialAddController(ctx, cred.Path, model.Controller); err != nil {
+	if err := j.DB.CredentialAddController(ctx, cred.Path, model.Controller); err != nil {
 		return errgo.Notef(err, "cannot add credential")
 	}
 
