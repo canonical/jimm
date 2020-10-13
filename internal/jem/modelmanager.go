@@ -657,6 +657,7 @@ func (j *JEM) GrantModel(ctx context.Context, id identchecker.ACLIdentity, m *mo
 	if err != nil {
 		return errgo.Mask(err)
 	}
+	defer conn.Close()
 	if err := conn.GrantModelAccess(ctx, m.UUID, user, access); err != nil {
 		return errgo.Mask(err, apiconn.IsAPIError)
 	}
@@ -699,6 +700,7 @@ func (j *JEM) RevokeModel(ctx context.Context, id identchecker.ACLIdentity, m *m
 	if err != nil {
 		return errgo.Mask(err)
 	}
+	defer conn.Close()
 	if err := conn.RevokeModelAccess(ctx, m.UUID, user, access); err != nil {
 		// TODO (mhilton) What should be done with the changes already made to the database.
 		return errgo.Mask(err, apiconn.IsAPIError)
