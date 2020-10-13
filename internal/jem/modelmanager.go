@@ -22,6 +22,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/conv"
+	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
@@ -42,7 +43,7 @@ func (j *JEM) DestroyModel(ctx context.Context, id identchecker.ACLIdentity, mod
 	if err := conn.DestroyModel(ctx, model.UUID, destroyStorage, force, maxWait); err != nil {
 		return errgo.Mask(err, apiconn.IsAPIError)
 	}
-	if err := j.DB.SetModelLife(ctx, model.Controller, model.UUID, "dying"); err != nil {
+	if err := j.SetModelLife(ctx, model.Controller, model.UUID, "dying"); err != nil {
 		// If this update fails then don't worry as the watcher
 		// will detect the state change and update as appropriate.
 		zapctx.Warn(ctx, "error updating model life", zap.Error(err), zap.String("model", model.UUID))
@@ -137,7 +138,7 @@ func (j *JEM) CreateModel(ctx context.Context, id identchecker.ACLIdentity, p Cr
 		UUID: fmt.Sprintf("creating-%x", j.pool.uuidGenerator.Next()),
 	}
 
-	if err := j.DB.AddModel(ctx, modelDoc); err != nil {
+	if err := j.DB.InsertModel(ctx, modelDoc); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
 
@@ -150,7 +151,7 @@ func (j *JEM) CreateModel(ctx context.Context, id identchecker.ACLIdentity, p Cr
 		// database. Note that this might leave the model around
 		// in the controller, but this should be rare and we can
 		// deal with it at model creation time later (see TODO below).
-		if err := j.DB.DeleteModel(ctx, modelDoc.Path); err != nil {
+		if err := j.DB.RemoveModel(ctx, modelDoc); err != nil {
 			zapctx.Error(ctx, "cannot remove model from database after error; leaked model", zaputil.Error(err))
 		}
 	}()
@@ -200,10 +201,18 @@ func (j *JEM) CreateModel(ctx context.Context, id identchecker.ACLIdentity, p Cr
 	// and update other attributes from the response too.
 	// Use Apply so that we can return a result that's consistent
 	// with Database.Model.
-	var since time.Time
-	if info.Status.Since != nil {
-		since = *info.Status.Since
+	update := new(jimmdb.Update)
+	update.Set("uuid", info.UUID)
+	update.Set("controller", ctlPath)
+	ct, err := names.ParseCloudTag(info.CloudTag)
+	if err != nil {
+		zapctx.Error(ctx, "bad data returned from controller", zap.Error(err))
+	} else {
+		update.Set("cloud", ct.Id())
 	}
+	update.Set("cloudregion", info.CloudRegion)
+	update.Set("defaultseries", info.DefaultSeries)
+
 	cfg := make(map[string]interface{}, len(p.Attributes)+1)
 	for k, v := range p.Attributes {
 		cfg[k] = v
@@ -211,29 +220,22 @@ func (j *JEM) CreateModel(ctx context.Context, id identchecker.ACLIdentity, p Cr
 	if info.AgentVersion != nil {
 		cfg[config.AgentVersionKey] = info.AgentVersion.String()
 	}
-	ct, err := names.ParseCloudTag(info.CloudTag)
-	if err != nil {
-		zapctx.Error(ctx, "bad data returned from controller", zap.Error(err))
+	var since time.Time
+	if info.Status.Since != nil {
+		since = *info.Status.Since
 	}
-	update := bson.D{{"$set", bson.D{
-		{"uuid", info.UUID},
-		{"controller", ctlPath},
-		{"cloud", ct.Id()},
-		{"cloudregion", info.CloudRegion},
-		{"defaultseries", info.DefaultSeries},
-		{"info", mongodoc.ModelInfo{
-			Life:   string(info.Life),
-			Config: cfg,
-			Status: mongodoc.ModelStatus{
-				Status:  string(info.Status.Status),
-				Message: info.Status.Info,
-				Data:    info.Status.Data,
-				Since:   since,
-			},
-		}},
-		{"type", info.Type},
-		{"providertype", info.ProviderType},
-	}}}
+	update.Set("info", mongodoc.ModelInfo{
+		Life:   string(info.Life),
+		Config: cfg,
+		Status: mongodoc.ModelStatus{
+			Status:  string(info.Status.Status),
+			Message: info.Status.Info,
+			Data:    info.Status.Data,
+			Since:   since,
+		},
+	})
+	update.Set("type", info.Type)
+	update.Set("providertype", info.ProviderType)
 	if err := j.DB.UpdateModel(ctx, modelDoc, update, true); err != nil {
 		return errgo.Notef(err, "cannot update model %s in database", modelDoc.UUID)
 	}
@@ -405,7 +407,7 @@ func (j *JEM) GetModelInfo(ctx context.Context, id identchecker.ACLIdentity, inf
 			if jujuparams.IsCodeUnauthorized(err) && m.Life() == "dying" {
 				zapctx.Info(ctx, "could not get ModelInfo for dying model, marking dead", zap.Error(err))
 				// The model was dying and now cannot be accessed, assume it is now dead.
-				if err := j.DB.DeleteModelWithUUID(ctx, m.Controller, m.UUID); err != nil {
+				if err := j.DB.RemoveModel(ctx, &m); err != nil {
 					// If this update fails then don't worry as the watcher
 					// will detect the state change and update as appropriate.
 					zapctx.Warn(ctx, "error deleting model", zap.Error(err))
@@ -611,7 +613,7 @@ func (j *JEM) GetModelStatus(ctx context.Context, id identchecker.ACLIdentity, u
 			if jujuparams.IsCodeNotFound(err) && m.Life() == "dying" {
 				zapctx.Info(ctx, "could not get ModelStatus for dying model, marking dead", zap.Error(err))
 				// The model was dying and now cannot be accessed, assume it is now dead.
-				if err := j.DB.DeleteModelWithUUID(ctx, m.Controller, m.UUID); err != nil {
+				if err := j.DB.RemoveModel(ctx, &m); err != nil {
 					// If this update fails then don't worry as the watcher
 					// will detect the state change and update as appropriate.
 					zapctx.Warn(ctx, "error deleting model", zap.Error(err))
@@ -643,4 +645,93 @@ func (j *JEM) GetModelStatus(ctx context.Context, id identchecker.ACLIdentity, u
 	}
 	// TODO(mhilton) store and populate Volume and FileSystem information.
 	return nil
+}
+
+// GrantModel grants the given access for the given user on the given model
+// and updates the JEM database.
+func (j *JEM) GrantModel(ctx context.Context, id identchecker.ACLIdentity, m *mongodoc.Model, user params.User, access jujuparams.UserAccessPermission) error {
+	if err := j.GetModel(ctx, id, jujuparams.ModelAdminAccess, m); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+	}
+	conn, err := j.OpenAPI(ctx, m.Controller)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	if err := conn.GrantModelAccess(ctx, m.UUID, user, access); err != nil {
+		return errgo.Mask(err, apiconn.IsAPIError)
+	}
+	u := new(jimmdb.Update)
+	switch access {
+	case jujuparams.ModelAdminAccess:
+		u.AddToSet("acl.admin", user)
+		fallthrough
+	case jujuparams.ModelWriteAccess:
+		u.AddToSet("acl.write", user)
+		fallthrough
+	case jujuparams.ModelReadAccess:
+		u.AddToSet("acl.read", user)
+	}
+	return errgo.Mask(j.DB.UpdateModel(ctx, m, u, false))
+}
+
+// RevokeModel revokes the given access for the given user on the given
+// model and updates the JEM database.
+func (j *JEM) RevokeModel(ctx context.Context, id identchecker.ACLIdentity, m *mongodoc.Model, user params.User, access jujuparams.UserAccessPermission) error {
+	if err := j.GetModel(ctx, id, jujuparams.ModelAdminAccess, m); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+	}
+	u := new(jimmdb.Update)
+	switch access {
+	case jujuparams.ModelReadAccess:
+		u.Pull("acl.read", user)
+		fallthrough
+	case jujuparams.ModelWriteAccess:
+		u.Pull("acl.write", user)
+		fallthrough
+	case jujuparams.ModelAdminAccess:
+		u.Pull("acl.admin", user)
+	}
+	if err := j.DB.UpdateModel(ctx, m, u, false); err != nil {
+		return errgo.Mask(err)
+	}
+
+	conn, err := j.OpenAPI(ctx, m.Controller)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	if err := conn.RevokeModelAccess(ctx, m.UUID, user, access); err != nil {
+		// TODO (mhilton) What should be done with the changes already made to the database.
+		return errgo.Mask(err, apiconn.IsAPIError)
+	}
+	return nil
+}
+
+// GetModelStatuses retrieves the model status from all models. If the
+// given user is not a controller admin then an error with a cause of
+// params.ErrUnauthorized will be retuned.
+func (j *JEM) GetModelStatuses(ctx context.Context, id identchecker.ACLIdentity) (params.ModelStatuses, error) {
+	if err := auth.CheckIsUser(ctx, id, j.ControllerAdmin()); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	var mss params.ModelStatuses
+	err := j.DB.ForEachModel(ctx, nil, []string{"-creationtime"}, func(m *mongodoc.Model) error {
+		status := "unknown"
+		if m.Info != nil {
+			status = m.Info.Status.Status
+		}
+		mss = append(mss, params.ModelStatus{
+			ID:         m.Id,
+			UUID:       m.UUID,
+			Cloud:      string(m.Cloud),
+			Region:     m.CloudRegion,
+			Created:    m.CreationTime,
+			Controller: m.Controller.String(),
+			Status:     status,
+		})
+		return nil
+	})
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return mss, nil
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/clock/testclock"
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
@@ -358,7 +359,7 @@ func (s *modelManagerSuite) TestCreateModelWithPartiallyCreatedModel(c *gc.C) {
 		Type: "empty",
 	})
 	// Create a partial model in the database.
-	err = s.jem.DB.AddModel(testContext, &mongodoc.Model{
+	err = s.jem.DB.InsertModel(testContext, &mongodoc.Model{
 		Path:         params.EntityPath{"bob", "oldmodel"},
 		Controller:   ctlId,
 		CreationTime: now,
@@ -385,7 +386,7 @@ func (s *modelManagerSuite) TestCreateModelWithExistingModelInControllerOnly(c *
 	// as if the controller model had been created but something
 	// had failed in CreateModel after that.
 	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
-	err := s.jem.DB.DeleteModel(testContext, model.Path)
+	err := s.jem.DB.RemoveModel(testContext, model)
 	c.Assert(err, gc.Equals, nil)
 
 	// Now try to create the model again.
@@ -598,6 +599,151 @@ func (s *modelManagerSuite) TestGetModelStatusNotFound(c *gc.C) {
 	err := s.jem.GetModelStatus(testContext, jemtest.NewIdentity("alice"), "not a uuid", &status, true)
 	c.Check(err, gc.ErrorMatches, "model not found")
 	c.Check(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}
+
+func (s *modelManagerSuite) TestGetModelStatuses(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "x"}
+	m := mongodoc.Model{
+		Id:   "ignored",
+		Path: ctlPath,
+	}
+	err := s.jem.DB.InsertModel(testContext, &m)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(m, jc.DeepEquals, mongodoc.Model{
+		Id:   "bob/x",
+		Path: ctlPath,
+	})
+
+	m1 := mongodoc.Model{Path: ctlPath}
+	err = s.jem.DB.GetModel(testContext, &m1)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(m1, jemtest.CmpEquals(cmpopts.EquateEmpty()), m)
+
+	st, err := s.jem.GetModelStatuses(testContext, jemtest.NewIdentity("bob", "controller-admin"))
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(st, gc.DeepEquals, params.ModelStatuses{{
+		Status:     "unknown",
+		ID:         "bob/x",
+		Controller: "/",
+	}})
+}
+
+func (s *modelManagerSuite) TestGrantModelWrite(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	err := s.jem.GrantModel(testContext, jemtest.NewIdentity("bob"), model, "alice", "write")
+	c.Assert(err, gc.Equals, nil)
+	model1 := mongodoc.Model{Path: model.Path}
+	err = s.jem.DB.GetModel(testContext, &model1)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
+		Read:  []string{"alice"},
+		Write: []string{"alice"},
+	})
+}
+
+func (s *modelManagerSuite) TestGrantModelRead(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	err := s.jem.GrantModel(testContext, jemtest.NewIdentity("bob"), model, "alice", "read")
+	c.Assert(err, gc.Equals, nil)
+	model1 := mongodoc.Model{Path: model.Path}
+	err = s.jem.DB.GetModel(testContext, &model1)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
+		Read: []string{"alice"},
+	})
+}
+
+func (s *modelManagerSuite) TestGrantModelBadLevel(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	err := s.jem.GrantModel(testContext, jemtest.NewIdentity("bob"), model, "alice", "superpowers")
+	c.Assert(err, gc.ErrorMatches, `api error: could not modify model access: "superpowers" model access not valid`)
+	model1 := mongodoc.Model{Path: model.Path}
+	err = s.jem.DB.GetModel(testContext, &model1)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{})
+}
+
+func (s *modelManagerSuite) TestRevokeModel(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	err := s.jem.GrantModel(testContext, jemtest.NewIdentity("bob"), model, "alice", "admin")
+	c.Assert(err, gc.Equals, nil)
+	model1 := mongodoc.Model{Path: model.Path}
+	err = s.jem.DB.GetModel(testContext, &model1)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
+		Read:  []string{"alice"},
+		Write: []string{"alice"},
+		Admin: []string{"alice"},
+	})
+	err = s.jem.RevokeModel(testContext, jemtest.NewIdentity("bob"), model, "alice", "read")
+	c.Assert(err, gc.Equals, nil)
+	err = s.jem.DB.GetModel(testContext, &model1)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{})
+}
+
+func (s *modelManagerSuite) TestRevokeModelAdmin(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	err := s.jem.GrantModel(testContext, jemtest.NewIdentity("bob"), model, "alice", "admin")
+	c.Assert(err, gc.Equals, nil)
+	model1 := mongodoc.Model{Path: model.Path}
+	err = s.jem.DB.GetModel(testContext, &model1)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
+		Read:  []string{"alice"},
+		Write: []string{"alice"},
+		Admin: []string{"alice"},
+	})
+	err = s.jem.RevokeModel(testContext, jemtest.NewIdentity("bob"), model, "alice", "admin")
+	c.Assert(err, gc.Equals, nil)
+	err = s.jem.DB.GetModel(testContext, &model1)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
+		Read:  []string{"alice"},
+		Write: []string{"alice"},
+	})
+}
+
+func (s *modelManagerSuite) TestRevokeModelWrite(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	err := s.jem.GrantModel(testContext, jemtest.NewIdentity("bob"), model, "alice", "admin")
+	c.Assert(err, gc.Equals, nil)
+	model1 := mongodoc.Model{Path: model.Path}
+	err = s.jem.DB.GetModel(testContext, &model1)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
+		Read:  []string{"alice"},
+		Write: []string{"alice"},
+		Admin: []string{"alice"},
+	})
+	err = s.jem.RevokeModel(testContext, jemtest.NewIdentity("bob"), model, "alice", "write")
+	c.Assert(err, gc.Equals, nil)
+	err = s.jem.DB.GetModel(testContext, &model1)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
+		Read: []string{"alice"},
+	})
+}
+
+func (s *modelManagerSuite) TestRevokeModelControllerFailure(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+	err := s.jem.GrantModel(testContext, jemtest.NewIdentity("bob"), model, "alice", "write")
+	c.Assert(err, gc.Equals, nil)
+	model1 := mongodoc.Model{Path: model.Path}
+	err = s.jem.DB.GetModel(testContext, &model1)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
+		Read:  []string{"alice"},
+		Write: []string{"alice"},
+	})
+	err = s.jem.RevokeModel(testContext, jemtest.NewIdentity("bob"), model, "alice", "superpowers")
+	c.Assert(err, gc.ErrorMatches, `api error: could not modify model access: "superpowers" model access not valid`)
+	err = s.jem.DB.GetModel(testContext, &model1)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
+		Read:  []string{"alice"},
+		Write: []string{"alice"},
+	})
 }
 
 func (s *modelManagerSuite) addController(c *gc.C, path params.EntityPath) params.EntityPath {

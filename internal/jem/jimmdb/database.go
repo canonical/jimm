@@ -134,22 +134,6 @@ func (db *Database) AddController(ctx context.Context, ctl *mongodoc.Controller)
 	return nil
 }
 
-// ModelsWithCredential returns a list of the paths of all models that use the given credential.
-func (db *Database) ModelsWithCredential(ctx context.Context, credPath mongodoc.CredentialPath) (_ []params.EntityPath, err error) {
-	defer db.checkError(ctx, &err)
-
-	iter := db.Models().Find(bson.D{{"credential", credPath}}).Iter()
-	var paths []params.EntityPath
-	var doc mongodoc.Model
-	for iter.Next(&doc) {
-		paths = append(paths, doc.Path)
-	}
-	if iter.Err() != nil {
-		return nil, errgo.Mask(err)
-	}
-	return paths, nil
-}
-
 // DeleteController deletes existing controller and all of its
 // associated models from the database. It returns an error if
 // either deletion fails. If there is no matching controller then the
@@ -188,35 +172,6 @@ func (db *Database) DeleteController(ctx context.Context, path params.EntityPath
 	return nil
 }
 
-// ModelUUIDsForController returns the model UUIDs of all the models in the given
-// controller.
-func (db *Database) ModelUUIDsForController(ctx context.Context, ctlPath params.EntityPath) (uuids []string, err error) {
-	defer db.checkError(ctx, &err)
-	iter := db.Models().Find(bson.D{{"controller", ctlPath}}).Select(bson.D{{"uuid", 1}}).Iter()
-	var m mongodoc.Model
-	for iter.Next(&m) {
-		uuids = append(uuids, m.UUID)
-	}
-	if err := iter.Err(); err != nil {
-		return nil, errgo.Mask(err)
-	}
-	return uuids, nil
-}
-
-// UpdateLegacyModel updates the given model by adding the Cloud,
-// CloudRegion, Credential and DefaultSeries values from the given model
-// document. All other values will be ignored.
-func (db *Database) UpdateLegacyModel(ctx context.Context, model *mongodoc.Model) error {
-	update := make(bson.D, 3, 4)
-	update[0] = bson.DocElem{"cloud", model.Cloud}
-	update[1] = bson.DocElem{"credential", model.Credential}
-	update[2] = bson.DocElem{"defaultseries", model.DefaultSeries}
-	if model.CloudRegion != "" {
-		update = append(update, bson.DocElem{"cloudregion", model.CloudRegion})
-	}
-	return errgo.Mask(db.UpdateModel(ctx, model, bson.D{{"$set", update}}, true), errgo.Is(params.ErrNotFound))
-}
-
 // SetModelController updates the given model so that it's associated
 // with the given controller. This should only be called when migration
 // has been initiated for the model and the new controller has been
@@ -232,53 +187,6 @@ func (db *Database) SetModelController(ctx context.Context, model params.EntityP
 		return errgo.WithCausef(err, params.ErrNotFound, "cannot update %s", model)
 	}
 	return errgo.Mask(err)
-}
-
-// SetModelCredential updates the given model so that it uses the given
-// credential.
-func (db *Database) SetModelCredential(ctx context.Context, model params.EntityPath, cred mongodoc.CredentialPath) (err error) {
-	defer db.checkError(ctx, &err)
-	err = db.Models().UpdateId(model.String(), bson.D{{
-		"$set", bson.D{{
-			"credential", cred,
-		}},
-	}})
-	if errgo.Cause(err) == mgo.ErrNotFound {
-		return errgo.WithCausef(err, params.ErrNotFound, "cannot update %s", model)
-	}
-	return errgo.Mask(err)
-}
-
-// DeleteModel deletes an model from the database. If an
-// model is also a controller it will not be deleted and an error
-// with a cause of params.ErrForbidden will be returned. If the
-// model cannot be found then an error with a cause of
-// params.ErrNotFound is returned.
-func (db *Database) DeleteModel(ctx context.Context, path params.EntityPath) (err error) {
-	defer db.checkError(ctx, &err)
-	// TODO when we monitor model health, prohibit this method
-	// and delete the model automatically when it is destroyed.
-	// Check if model is also a controller.
-	err = db.Models().RemoveId(path.String())
-	if err == mgo.ErrNotFound {
-		return errgo.WithCausef(nil, params.ErrNotFound, "model %q not found", path)
-	}
-	if err != nil {
-		return errgo.Notef(err, "could not delete model")
-	}
-	zapctx.Debug(ctx, "deleted model", zap.Stringer("model", path))
-	return nil
-}
-
-// DeleteModelWithUUID deletes any model from the database that has the
-// given controller and UUID. No error is returned if no such model
-// exists.
-func (db *Database) DeleteModelWithUUID(ctx context.Context, ctlPath params.EntityPath, uuid string) (err error) {
-	defer db.checkError(ctx, &err)
-	if _, err := db.Models().RemoveAll(bson.D{{"uuid", uuid}, {"controller", ctlPath}}); err != nil {
-		return errgo.Notef(err, "cannot remove model")
-	}
-	return nil
 }
 
 // SetControllerDeprecated sets whether the given controller is deprecated.
@@ -382,74 +290,6 @@ func (db *Database) SetControllerUnavailableAt(ctx context.Context, ctlPath para
 	return errgo.Notef(err, "cannot update controller")
 }
 
-// ErrLeaseUnavailable is the error cause returned by AcquireMonitorLease
-// when it cannot acquire the lease because it is unavailable.
-var ErrLeaseUnavailable params.ErrorCode = "cannot acquire lease"
-
-// AcquireMonitorLease acquires or renews the lease on a controller.
-// The lease will only be changed if the lease in the database
-// has the given old expiry time and owner.
-// When acquired, the lease will have the given new owner
-// and expiration time.
-//
-// If newOwner is empty, the lease will be dropped, the
-// returned time will be zero and newExpiry will be ignored.
-//
-// If the controller has been removed, an error with a params.ErrNotFound
-// cause will be returned. If the lease has been obtained by someone else
-// an error with a ErrLeaseUnavailable cause will be returned.
-func (db *Database) AcquireMonitorLease(ctx context.Context, ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (_ time.Time, err error) {
-	defer db.checkError(ctx, &err)
-	var update bson.D
-	if newOwner != "" {
-		newExpiry = mongodoc.Time(newExpiry)
-		update = bson.D{{"$set", bson.D{
-			{"monitorleaseexpiry", newExpiry},
-			{"monitorleaseowner", newOwner},
-		}}}
-	} else {
-		newExpiry = time.Time{}
-		update = bson.D{{"$unset", bson.D{
-			{"monitorleaseexpiry", nil},
-			{"monitorleaseowner", nil},
-		}}}
-	}
-	var oldOwnerQuery interface{}
-	var oldExpiryQuery interface{}
-	if oldOwner == "" {
-		oldOwnerQuery = notExistsQuery
-	} else {
-		oldOwnerQuery = oldOwner
-	}
-	if oldExpiry.IsZero() {
-		oldExpiryQuery = notExistsQuery
-	} else {
-		oldExpiryQuery = oldExpiry
-	}
-	err = db.Controllers().Update(bson.D{
-		{"path", ctlPath},
-		{"monitorleaseexpiry", oldExpiryQuery},
-		{"monitorleaseowner", oldOwnerQuery},
-	}, update)
-	if err == mgo.ErrNotFound {
-		// Someone else got there first, or the document has been
-		// removed. Technically don't need to distinguish between the
-		// two cases, but it's useful to see the different error messages.
-		ctl, err := db.Controller(ctx, ctlPath)
-		if errgo.Cause(err) == params.ErrNotFound {
-			return time.Time{}, errgo.WithCausef(nil, params.ErrNotFound, "controller removed")
-		}
-		if err != nil {
-			return time.Time{}, errgo.Mask(err)
-		}
-		return time.Time{}, errgo.WithCausef(nil, ErrLeaseUnavailable, "controller has lease taken out by %q expiring at %v", ctl.MonitorLeaseOwner, ctl.MonitorLeaseExpiry.UTC())
-	}
-	if err != nil {
-		return time.Time{}, errgo.Notef(err, "cannot acquire lease")
-	}
-	return newExpiry, nil
-}
-
 // SetControllerStats sets the stats associated with the controller
 // with the given path. It returns an error with a params.ErrNotFound
 // cause if the controller does not exist.
@@ -463,83 +303,6 @@ func (db *Database) SetControllerStats(ctx context.Context, ctlPath params.Entit
 		return errgo.WithCausef(nil, params.ErrNotFound, "controller not found")
 	}
 	return errgo.Mask(err)
-}
-
-// SetModelLife sets the Info.Life field of all models controlled by the
-// given controller that have the given UUID. It does not return an error
-// if there are no such models.
-func (db *Database) SetModelLife(ctx context.Context, ctlPath params.EntityPath, uuid string, life string) (err error) {
-	defer db.checkError(ctx, &err)
-	_, err = db.Models().UpdateAll(
-		bson.D{{"uuid", uuid}, {"controller", ctlPath}},
-		bson.D{{"$set", bson.D{{"info.life", life}}}},
-	)
-	if err != nil {
-		return errgo.Notef(err, "cannot update model")
-	}
-	return nil
-}
-
-// SetModelInfo sets the Info field of all models controlled by the given
-// controller that have the given UUID. It does not return an error if
-// there are no such models.
-func (db *Database) SetModelInfo(ctx context.Context, ctlPath params.EntityPath, uuid string, info *mongodoc.ModelInfo) (err error) {
-	defer db.checkError(ctx, &err)
-	_, err = db.Models().UpdateAll(
-		bson.D{{"uuid", uuid}, {"controller", ctlPath}},
-		bson.D{{"$set", bson.D{{"info", info}}}},
-	)
-	if err != nil {
-		return errgo.Notef(err, "cannot update model")
-	}
-	return nil
-}
-
-// UpdateModelCounts updates the count statistics associated with the
-// model with the given UUID recording them at the given current time.
-// Each counts map entry holds the current count for its key. Counts not
-// mentioned in the counts argument will not be affected.
-func (db *Database) UpdateModelCounts(ctx context.Context, ctlPath params.EntityPath, uuid string, counts map[params.EntityCount]int, now time.Time) error {
-	if err := db.updateCounts(
-		ctx,
-		db.Models(),
-		bson.D{
-			{"controller", ctlPath},
-			{"uuid", uuid},
-		},
-		counts,
-		now,
-	); err != nil {
-		return errgo.NoteMask(err, "cannot update model counts", errgo.Is(params.ErrNotFound))
-	}
-	return nil
-}
-
-// GetModelStatuses retrieves the model status from all models.
-func (db *Database) GetModelStatuses(ctx context.Context) (statuses params.ModelStatuses, err error) {
-	defer db.checkError(ctx, &err)
-	query := make(bson.D, 0)
-	var models []mongodoc.Model
-	if err = db.Models().Find(query).Sort("-CreationTime").All(&models); err != nil {
-		return nil, errgo.Mask(err)
-	}
-	statuses = make([]params.ModelStatus, 0)
-	for _, model := range models {
-		status := params.ModelStatus{
-			ID:         model.Id,
-			UUID:       model.UUID,
-			Cloud:      string(model.Cloud),
-			Region:     model.CloudRegion,
-			Created:    model.CreationTime,
-			Controller: model.Controller.String(),
-			Status:     "unknown",
-		}
-		if model.Info != nil {
-			status.Status = model.Info.Status.Status
-		}
-		statuses = append(statuses, status)
-	}
-	return statuses, nil
 }
 
 // RemoveControllerMachines removes all of the machine information for
@@ -636,52 +399,6 @@ func (db *Database) ApplicationsForModel(ctx context.Context, modelUUID string) 
 		return nil, errgo.Mask(err)
 	}
 	return docs, nil
-}
-
-// updateCounts updates the count statistics for an document in the given collection
-// which should be uniquely specified  by the query.
-// Each counts map entry holds the current count for its key.
-// Counts not mentioned in the counts argument will not be affected.
-func (db *Database) updateCounts(ctx context.Context, c *mgo.Collection, query bson.D, values map[params.EntityCount]int, now time.Time) (err error) {
-	defer db.checkError(ctx, &err)
-
-	// This looks racy but it's actually not too bad. Assuming that
-	// two concurrent updates are actually looking at the same
-	// controller and hence are setting valid information, they will
-	// both be working from a valid set of count values (we
-	// only update them all at the same time), so each one will
-	// update them to a new valid set. They might each ignore
-	// the other's updates but because they're working from the
-	// same state information, they should converge correctly.
-	var oldCounts struct {
-		Counts map[params.EntityCount]params.Count
-	}
-	err = c.Find(query).Select(bson.D{{"counts", 1}}).One(&oldCounts)
-	if err != nil {
-		if err == mgo.ErrNotFound {
-			return params.ErrNotFound
-		}
-		return errgo.Mask(err)
-	}
-	newCounts := make(bson.D, 0, len(values))
-	for name, val := range values {
-		count := oldCounts.Counts[name]
-		UpdateCount(&count, val, now)
-		newCounts = append(newCounts, bson.DocElem{string("counts." + name), count})
-	}
-	err = c.Update(query, bson.D{{"$set", newCounts}})
-	if err != nil {
-		if err == mgo.ErrNotFound {
-			// This can happen if the document has been
-			// removed since we retrieved it. The error
-			// should be the same in this case (and we want
-			// to prevent the mongo session being discarded
-			// if it happens).
-			return params.ErrNotFound
-		}
-		return errgo.Notef(err, "cannot update count")
-	}
-	return nil
 }
 
 // UpdateCredential stores the given credential in the database. If a
@@ -1064,62 +781,6 @@ func (db *Database) Grant(ctx context.Context, c *mgo.Collection, path params.En
 func (db *Database) Revoke(ctx context.Context, c *mgo.Collection, path params.EntityPath, user params.User) (err error) {
 	defer db.checkError(ctx, &err)
 	err = c.UpdateId(path.String(), bson.D{{"$pull", bson.D{{"acl.read", user}}}})
-	if err == nil {
-		return nil
-	}
-	if err == mgo.ErrNotFound {
-		return errgo.WithCausef(nil, params.ErrNotFound, "%q not found", path)
-	}
-	return errgo.Notef(err, "cannot update ACL on %q", path)
-}
-
-// GrantModel updates the ACL for the document with the given path in the
-// model collection. Permission is granted to the given access level and
-// all lower levels.
-func (db *Database) GrantModel(ctx context.Context, path params.EntityPath, user params.User, access string) (err error) {
-	defer db.checkError(ctx, &err)
-	aclUpdates := make(bson.D, 0, 3)
-	switch access {
-	case "admin":
-		aclUpdates = append(aclUpdates, bson.DocElem{"acl.admin", user})
-		fallthrough
-	case "write":
-		aclUpdates = append(aclUpdates, bson.DocElem{"acl.write", user})
-		fallthrough
-	case "read":
-		aclUpdates = append(aclUpdates, bson.DocElem{"acl.read", user})
-	default:
-		return errgo.Newf("%q model access not valid", access)
-	}
-	err = db.Models().UpdateId(path.String(), bson.D{{"$addToSet", aclUpdates}})
-	if err == nil {
-		return nil
-	}
-	if err == mgo.ErrNotFound {
-		return errgo.WithCausef(nil, params.ErrNotFound, "%q not found", path)
-	}
-	return errgo.Notef(err, "cannot update ACL on %q", path)
-}
-
-// RevokeModel updates the ACL for the document with the given path in
-// the model collection. Permission is revoked from the given access
-// level and all higher levels.
-func (db *Database) RevokeModel(ctx context.Context, path params.EntityPath, user params.User, access string) (err error) {
-	defer db.checkError(ctx, &err)
-	aclUpdates := make(bson.D, 0, 3)
-	switch access {
-	case "read":
-		aclUpdates = append(aclUpdates, bson.DocElem{"acl.read", user})
-		fallthrough
-	case "write":
-		aclUpdates = append(aclUpdates, bson.DocElem{"acl.write", user})
-		fallthrough
-	case "admin":
-		aclUpdates = append(aclUpdates, bson.DocElem{"acl.admin", user})
-	default:
-		return errgo.Newf("%q model access not valid", access)
-	}
-	err = db.Models().UpdateId(path.String(), bson.D{{"$pull", aclUpdates}})
 	if err == nil {
 		return nil
 	}

@@ -438,6 +438,7 @@ func (j *JEM) updateModelInfo(ctx context.Context, model *mongodoc.Model) error 
 	if err != nil {
 		return errgo.Mask(err)
 	}
+	defer conn.Close()
 	info := jujuparams.ModelInfo{UUID: model.UUID}
 	if err := conn.ModelInfo(ctx, &info); err != nil {
 		return errgo.Mask(err)
@@ -450,25 +451,24 @@ func (j *JEM) updateModelInfo(ctx context.Context, model *mongodoc.Model) error 
 	if err != nil {
 		return errgo.Notef(err, "bad data from controller")
 	}
-	model.Cloud = params.Cloud(cloudTag.Id())
-	model.CloudRegion = info.CloudRegion
 	owner, err := conv.FromUserTag(credentialTag.Owner())
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
 	}
-	model.Credential = mongodoc.CredentialPath{
+	u := new(jimmdb.Update)
+	u.Set("cloud", cloudTag.Id())
+	u.Set("credential", mongodoc.CredentialPath{
 		Cloud: string(params.Cloud(credentialTag.Cloud().Id())),
 		EntityPath: mongodoc.EntityPath{
 			User: string(owner),
 			Name: credentialTag.Name(),
 		},
+	})
+	u.Set("defaultseries", info.DefaultSeries)
+	if info.CloudRegion != "" {
+		u.Set("cloudregion", info.CloudRegion)
 	}
-	model.DefaultSeries = info.DefaultSeries
-
-	if err := j.DB.UpdateLegacyModel(ctx, model); err != nil {
-		return errgo.Mask(err)
-	}
-	return nil
+	return errgo.Mask(j.DB.UpdateModel(ctx, model, u, true))
 }
 
 // Controller retrieves the given controller from the database,
@@ -579,11 +579,11 @@ func (j *JEM) RevokeCredential(ctx context.Context, credPath params.CredentialPa
 	}
 	controllers := cred.Controllers
 	if flags&CredentialCheck != 0 {
-		models, err := j.DB.ModelsWithCredential(ctx, mongodoc.CredentialPathFromParams(credPath))
+		n, err := j.DB.CountModels(ctx, bson.D{{"credential", mongodoc.CredentialPathFromParams(credPath)}})
 		if err != nil {
 			return errgo.Mask(err)
 		}
-		if len(models) > 0 {
+		if n > 0 {
 			// TODO more informative error message.
 			return errgo.Newf("cannot revoke because credential is in use on at least one model")
 		}
@@ -864,29 +864,6 @@ func (j *JEM) revokeControllerCredential(
 	return nil
 }
 
-// GrantModel grants the given access for the given user on the given model and updates the JEM database.
-func (j *JEM) GrantModel(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model, user params.User, access string) error {
-	if err := conn.GrantModelAccess(ctx, model.UUID, user, jujuparams.UserAccessPermission(access)); err != nil {
-		return errgo.Mask(err, apiconn.IsAPIError)
-	}
-	if err := j.DB.GrantModel(ctx, model.Path, user, access); err != nil {
-		return errgo.Mask(err)
-	}
-	return nil
-}
-
-// RevokeModel revokes the given access for the given user on the given model and updates the JEM database.
-func (j *JEM) RevokeModel(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model, user params.User, access string) error {
-	if err := j.DB.RevokeModel(ctx, model.Path, user, access); err != nil {
-		return errgo.Mask(err)
-	}
-	if err := conn.RevokeModelAccess(ctx, model.UUID, user, jujuparams.UserAccessPermission(access)); err != nil {
-		// TODO (mhilton) What should be done with the changes already made to the database.
-		return errgo.Mask(err, apiconn.IsAPIError)
-	}
-	return nil
-}
-
 // EarliestControllerVersion returns the earliest agent version
 // that any of the available public controllers is known to be running.
 // If there are no available controllers or none of their versions are
@@ -1034,7 +1011,7 @@ func (j *JEM) UpdateModelCredential(ctx context.Context, conn *apiconn.Conn, mod
 		return errgo.Mask(err)
 	}
 
-	if err := j.DB.SetModelCredential(ctx, model.Path, cred.Path); err != nil {
+	if err := j.DB.UpdateModel(ctx, model, new(jimmdb.Update).Set("credential", cred.Path), true); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil

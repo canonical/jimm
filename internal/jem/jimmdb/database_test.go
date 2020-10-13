@@ -5,7 +5,6 @@ package jimmdb_test
 import (
 	"context"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -18,7 +17,6 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
-	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
@@ -364,303 +362,6 @@ func (s *databaseSuite) TestDeleteController(c *gc.C) {
 	})
 }
 
-func (s *databaseSuite) TestDeleteModel(c *gc.C) {
-	ctlPath := params.EntityPath{"dalek", "who"}
-	ctl := &mongodoc.Controller{
-		Id:     "ignored",
-		Path:   ctlPath,
-		CACert: "certainly",
-		HostPorts: [][]mongodoc.HostPort{{{
-			Host: "host1",
-			Port: 1234,
-		}}, {{
-			Host: "host2",
-			Port: 9999,
-		}}},
-		AdminUser:     "foo-admin",
-		AdminPassword: "foo-password",
-	}
-	err := s.database.AddController(testContext, ctl)
-	c.Assert(err, gc.Equals, nil)
-
-	modelPath := params.EntityPath{"dalek", "exterminate"}
-	m2 := &mongodoc.Model{
-		Path: modelPath,
-	}
-	err = s.database.AddModel(testContext, m2)
-	c.Assert(err, gc.Equals, nil)
-
-	err = s.database.DeleteModel(testContext, m2.Path)
-	c.Assert(err, gc.Equals, nil)
-	m3 := mongodoc.Model{Path: modelPath}
-	err = s.database.GetModel(testContext, &m3)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-
-	err = s.database.DeleteModel(testContext, m2.Path)
-	c.Assert(err, gc.ErrorMatches, "model \"dalek/exterminate\" not found")
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	s.checkDBOK(c)
-}
-
-func (s *databaseSuite) TestAddModel(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "x"}
-	m := mongodoc.Model{
-		Id:   "ignored",
-		Path: ctlPath,
-	}
-	err := s.database.AddModel(testContext, &m)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(m, jc.DeepEquals, mongodoc.Model{
-		Id:   "bob/x",
-		Path: ctlPath,
-	})
-
-	m1 := mongodoc.Model{Path: ctlPath}
-	err = s.database.GetModel(testContext, &m1)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(m1, jemtest.CmpEquals(cmpopts.EquateEmpty()), m)
-
-	err = s.database.AddModel(testContext, &m)
-	c.Assert(err, gc.ErrorMatches, "already exists")
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
-	s.checkDBOK(c)
-}
-
-func (s *databaseSuite) TestModelUUIDsForController(c *gc.C) {
-	models := []struct {
-		path    params.EntityPath
-		ctlPath params.EntityPath
-		uuid    string
-	}{{
-		path:    params.EntityPath{"bob", "m1"},
-		ctlPath: params.EntityPath{"admin", "ctl1"},
-		uuid:    "11111111-1111-1111-1111-111111111111",
-	}, {
-		path:    params.EntityPath{"bob", "m2"},
-		ctlPath: params.EntityPath{"admin", "ctl1"},
-		uuid:    "22222222-2222-2222-2222-222222222222",
-	}, {
-		path:    params.EntityPath{"bob", "m3"},
-		ctlPath: params.EntityPath{"admin", "ctl2"},
-		uuid:    "33333333-3333-3333-3333-333333333333",
-	}}
-	for _, m := range models {
-		err := s.database.AddModel(testContext, &mongodoc.Model{
-			Path:       m.path,
-			Controller: m.ctlPath,
-			UUID:       m.uuid,
-		})
-		c.Assert(err, gc.Equals, nil)
-	}
-	uuids, err := s.database.ModelUUIDsForController(testContext, params.EntityPath{"admin", "ctl1"})
-	c.Assert(err, gc.Equals, nil)
-	sort.Strings(uuids)
-	c.Assert(uuids, jc.DeepEquals, []string{
-		"11111111-1111-1111-1111-111111111111",
-		"22222222-2222-2222-2222-222222222222",
-	})
-	uuids, err = s.database.ModelUUIDsForController(testContext, params.EntityPath{"admin", "ctl2"})
-	c.Assert(err, gc.Equals, nil)
-	sort.Strings(uuids)
-	c.Assert(uuids, jc.DeepEquals, []string{
-		"33333333-3333-3333-3333-333333333333",
-	})
-}
-
-func (s *databaseSuite) TestUpdateLegacyModel(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "x"}
-	m := mongodoc.Model{
-		Id:   "ignored",
-		Path: ctlPath,
-	}
-	err := s.database.AddModel(testContext, &m)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(m, jc.DeepEquals, mongodoc.Model{
-		Id:   "bob/x",
-		Path: ctlPath,
-	})
-
-	m.Cloud = "bob-cloud"
-	m.CloudRegion = "bob-region"
-	m.DefaultSeries = "trusty"
-	m.Credential = mongodoc.CredentialPath{
-		Cloud: "bob-cloud",
-		EntityPath: mongodoc.EntityPath{
-			User: "bob",
-			Name: "cred",
-		},
-	}
-	err = s.database.UpdateLegacyModel(testContext, &m)
-	c.Assert(err, gc.Equals, nil)
-
-	m1 := mongodoc.Model{Path: ctlPath}
-	err = s.database.GetModel(testContext, &m1)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(m1, jemtest.CmpEquals(cmpopts.EquateEmpty()), m)
-
-	m2 := mongodoc.Model{
-		Id:   "ignored",
-		Path: params.EntityPath{"bob", "y"},
-	}
-	err = s.database.UpdateLegacyModel(testContext, &m2)
-	c.Assert(err, gc.ErrorMatches, "model not found")
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	s.checkDBOK(c)
-}
-
-func (s *databaseSuite) TestModelFromUUID(c *gc.C) {
-	uuid := "99999999-9999-9999-9999-999999999999"
-	path := params.EntityPath{"bob", "x"}
-	m := mongodoc.Model{
-		Id:   "ignored",
-		Path: path,
-		UUID: uuid,
-	}
-	err := s.database.AddModel(testContext, &m)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(m, jc.DeepEquals, mongodoc.Model{
-		Id:   "bob/x",
-		Path: path,
-		UUID: uuid,
-	})
-
-	m1 := mongodoc.Model{UUID: uuid}
-	err = s.database.GetModel(testContext, &m1)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(m1, jemtest.CmpEquals(cmpopts.EquateEmpty()), m)
-
-	m2 := mongodoc.Model{UUID: "no-such-uuid"}
-	err = s.database.GetModel(testContext, &m2)
-	c.Assert(err, gc.ErrorMatches, `model not found`)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-
-	m3 := mongodoc.Model{
-		Controller: params.EntityPath{User: "bob", Name: "no-such-controller"},
-		UUID:       uuid,
-	}
-	err = s.database.GetModel(testContext, &m3)
-	c.Assert(err, gc.ErrorMatches, `model not found`)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-
-	s.checkDBOK(c)
-}
-
-var epoch = parseTime("2016-01-01T12:00:00Z")
-
-func T(n int) time.Time {
-	return epoch.Add(time.Duration(n) * time.Millisecond)
-}
-
-const leaseExpiryDuration = 15 * time.Second
-
-var acquireLeaseTests = []struct {
-	about           string
-	now             time.Time
-	ctlPath         params.EntityPath
-	oldExpiry       time.Time
-	oldOwner        string
-	newExpiry       time.Time
-	newOwner        string
-	actualOldExpiry time.Time
-	actualOldOwner  string
-	expectExpiry    time.Time
-	expectError     string
-	expectCause     error
-}{{
-	about:           "initial lease acquisition",
-	ctlPath:         params.EntityPath{"bob", "foo"},
-	oldExpiry:       time.Time{},
-	newExpiry:       epoch.Add(leaseExpiryDuration),
-	oldOwner:        "",
-	newOwner:        "jem1",
-	actualOldExpiry: time.Time{},
-	actualOldOwner:  "",
-	expectExpiry:    epoch.Add(leaseExpiryDuration),
-}, {
-	about:           "renewal",
-	ctlPath:         params.EntityPath{"bob", "foo"},
-	oldExpiry:       epoch.Add(leaseExpiryDuration),
-	oldOwner:        "jem1",
-	newExpiry:       epoch.Add(leaseExpiryDuration/2 + leaseExpiryDuration),
-	newOwner:        "jem1",
-	actualOldExpiry: epoch.Add(leaseExpiryDuration),
-	actualOldOwner:  "jem1",
-	expectExpiry:    epoch.Add(leaseExpiryDuration/2 + leaseExpiryDuration),
-}, {
-	about:           "renewal with time mismatch",
-	ctlPath:         params.EntityPath{"bob", "foo"},
-	oldExpiry:       epoch.Add(leaseExpiryDuration),
-	oldOwner:        "jem1",
-	newExpiry:       epoch.Add(leaseExpiryDuration * 3),
-	newOwner:        "jem1",
-	actualOldExpiry: epoch.Add(leaseExpiryDuration * 2),
-	actualOldOwner:  "jem1",
-	expectError:     `controller has lease taken out by "jem1" expiring at 2016-01-01 12:00:30 \+0000 UTC`,
-	expectCause:     jimmdb.ErrLeaseUnavailable,
-}, {
-	about:           "renewal with owner mismatch",
-	ctlPath:         params.EntityPath{"bob", "foo"},
-	oldExpiry:       epoch.Add(leaseExpiryDuration),
-	oldOwner:        "jem1",
-	newOwner:        "jem1",
-	actualOldExpiry: epoch.Add(leaseExpiryDuration),
-	actualOldOwner:  "jem0",
-	expectError:     `controller has lease taken out by "jem0" expiring at 2016-01-01 12:00:15 \+0000 UTC`,
-	expectCause:     jimmdb.ErrLeaseUnavailable,
-}, {
-	about:           "drop lease",
-	now:             epoch.Add(leaseExpiryDuration / 2),
-	ctlPath:         params.EntityPath{"bob", "foo"},
-	oldExpiry:       epoch.Add(leaseExpiryDuration),
-	oldOwner:        "jem1",
-	newOwner:        "",
-	actualOldExpiry: epoch.Add(leaseExpiryDuration),
-	actualOldOwner:  "jem1",
-	expectExpiry:    time.Time{},
-}, {
-	about:           "drop never-acquired lease",
-	now:             epoch,
-	ctlPath:         params.EntityPath{"bob", "foo"},
-	oldOwner:        "",
-	newOwner:        "",
-	actualOldExpiry: time.Time{},
-	actualOldOwner:  "",
-	expectExpiry:    time.Time{},
-}}
-
-func (s *databaseSuite) TestAcquireLease(c *gc.C) {
-	for i, test := range acquireLeaseTests {
-		c.Logf("test %d: %v", i, test.about)
-		_, err := s.database.Controllers().RemoveAll(bson.D{{"path", test.ctlPath}})
-		c.Assert(err, gc.Equals, nil)
-		_, err = s.database.Models().RemoveAll(bson.D{{"path", test.ctlPath}})
-		c.Assert(err, gc.Equals, nil)
-		err = s.database.AddController(testContext, &mongodoc.Controller{
-			Path:               test.ctlPath,
-			UUID:               "fake-uuid",
-			MonitorLeaseOwner:  test.actualOldOwner,
-			MonitorLeaseExpiry: test.actualOldExpiry,
-		})
-		c.Assert(err, gc.Equals, nil)
-		t, err := s.database.AcquireMonitorLease(testContext, test.ctlPath, test.oldExpiry, test.oldOwner, test.newExpiry, test.newOwner)
-		if test.expectError != "" {
-			if test.expectCause != nil {
-				c.Check(errgo.Cause(err), gc.Equals, test.expectCause)
-			}
-			c.Assert(err, gc.ErrorMatches, test.expectError)
-			c.Assert(t, jc.Satisfies, time.Time.IsZero)
-			continue
-		}
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(t.UTC(), gc.DeepEquals, test.expectExpiry.UTC())
-		ctl, err := s.database.Controller(testContext, test.ctlPath)
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(ctl.MonitorLeaseExpiry.UTC(), gc.DeepEquals, test.expectExpiry.UTC())
-		c.Assert(ctl.MonitorLeaseOwner, gc.Equals, test.newOwner)
-		s.checkDBOK(c)
-	}
-}
-
 func (s *databaseSuite) TestSetControllerStatsNotFound(c *gc.C) {
 	err := s.database.SetControllerStats(testContext, params.EntityPath{"bob", "foo"}, &mongodoc.ControllerStats{})
 	c.Assert(err, gc.ErrorMatches, "controller not found")
@@ -688,142 +389,6 @@ func (s *databaseSuite) TestSetControllerStats(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(ctl.Stats, jc.DeepEquals, *stats)
 	s.checkDBOK(c)
-}
-
-var updateModelCountsTests = []struct {
-	about      string
-	before     map[params.EntityCount]params.Count
-	update     map[params.EntityCount]int
-	updateTime time.Time
-	expect     map[params.EntityCount]params.Count
-}{{
-	about: "empty counts",
-	update: map[params.EntityCount]int{
-		"foo": 5,
-		"bar": 20,
-	},
-	updateTime: T(1000),
-	expect: map[params.EntityCount]params.Count{
-		"foo": {
-			Time:    T(1000),
-			Current: 5,
-			Max:     5,
-			Total:   5,
-		},
-		"bar": {
-			Time:    T(1000),
-			Current: 20,
-			Max:     20,
-			Total:   20,
-		},
-	},
-}, {
-	about: "existing counts",
-	before: map[params.EntityCount]params.Count{
-		"foo": {
-			Time:    T(1000),
-			Current: 5,
-			Max:     5,
-			Total:   5,
-		},
-		"bar": {
-			Time:      T(1000),
-			Current:   20,
-			Max:       20,
-			Total:     100,
-			TotalTime: 9000,
-		},
-		"baz": {
-			Time:    T(500),
-			Current: 2,
-			Max:     3,
-			Total:   200,
-		},
-	},
-	updateTime: T(5000),
-	update: map[params.EntityCount]int{
-		"foo": 2,
-		"bar": 50,
-	},
-	expect: map[params.EntityCount]params.Count{
-		"foo": {
-			Time:      T(5000),
-			Current:   2,
-			Max:       5,
-			Total:     5,
-			TotalTime: (5000 - 1000) * 5,
-		},
-		"bar": {
-			Time:      T(5000),
-			Current:   50,
-			Max:       50,
-			Total:     130,
-			TotalTime: 9000 + (5000-1000)*20,
-		},
-		"baz": {
-			Time:    T(500),
-			Current: 2,
-			Max:     3,
-			Total:   200,
-		},
-	},
-}}
-
-func (s *databaseSuite) TestUpdateModelCounts(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "controller"}
-	for i, test := range updateModelCountsTests {
-		c.Logf("test %d: %v", i, test.about)
-		modelId := params.EntityPath{"bob", params.Name(fmt.Sprintf("model-%d", i))}
-		uuid := fmt.Sprintf("uuid-%d", i)
-		err := s.database.AddModel(testContext, &mongodoc.Model{
-			Path:       modelId,
-			Controller: ctlPath,
-			UUID:       uuid,
-			Counts:     test.before,
-		})
-		c.Assert(err, gc.Equals, nil)
-		err = s.database.UpdateModelCounts(testContext, ctlPath, uuid, test.update, test.updateTime)
-		c.Assert(err, gc.Equals, nil)
-		model := mongodoc.Model{Path: modelId}
-		err = s.database.GetModel(testContext, &model)
-		c.Assert(err, gc.Equals, nil)
-		// Change all times to UTC for straightforward comparison.
-		for name, count := range model.Counts {
-			count.Time = count.Time.UTC()
-			model.Counts[name] = count
-		}
-		c.Assert(model.Counts, jc.DeepEquals, test.expect)
-	}
-}
-
-func (s *databaseSuite) TestUpdateModelCountsNotFoundUUID(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "controller"}
-	modelId := params.EntityPath{"bob", "test-model"}
-	uuid := "real-uuid"
-	err := s.database.AddModel(testContext, &mongodoc.Model{
-		Path:       modelId,
-		Controller: ctlPath,
-		UUID:       uuid,
-	})
-	c.Assert(err, gc.Equals, nil)
-	err = s.database.UpdateModelCounts(testContext, ctlPath, "fake-uuid", nil, T(0))
-	c.Assert(err, gc.ErrorMatches, `cannot update model counts: not found`)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-}
-
-func (s *databaseSuite) TestUpdateModelCountsNotFoundController(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "controller"}
-	modelId := params.EntityPath{"bob", "test-model"}
-	uuid := "real-uuid"
-	err := s.database.AddModel(testContext, &mongodoc.Model{
-		Path:       modelId,
-		Controller: ctlPath,
-		UUID:       uuid,
-	})
-	c.Assert(err, gc.Equals, nil)
-	err = s.database.UpdateModelCounts(testContext, params.EntityPath{"bob", "not-controller"}, "real-uuid", nil, T(0))
-	c.Assert(err, gc.ErrorMatches, `cannot update model counts: not found`)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
 func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
@@ -1136,7 +701,7 @@ func (s *databaseSuite) TestSetModelControllerSuccess(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	modelPath := params.EntityPath{"bob", "foo"}
-	err = s.database.AddModel(testContext, &mongodoc.Model{
+	err = s.database.InsertModel(testContext, &mongodoc.Model{
 		Path:       modelPath,
 		UUID:       "fake-uuid",
 		Controller: params.EntityPath{"bob", "foo"},
@@ -1156,18 +721,6 @@ func (s *databaseSuite) TestSetModelControllerSuccess(c *gc.C) {
 	origDoc.Controller = params.EntityPath{"x", "y"}
 
 	c.Assert(newDoc, gc.DeepEquals, origDoc)
-}
-
-func (s *databaseSuite) TestSetModelLifeNotFound(c *gc.C) {
-	err := s.database.SetModelLife(testContext, params.EntityPath{"bob", "foo"}, "fake-uuid", "alive")
-	c.Assert(err, gc.Equals, nil)
-	s.checkDBOK(c)
-}
-
-func (s *databaseSuite) TestSetModelInfoNotFound(c *gc.C) {
-	err := s.database.SetModelInfo(testContext, params.EntityPath{"bob", "foo"}, "fake-uuid", &mongodoc.ModelInfo{})
-	c.Assert(err, gc.Equals, nil)
-	s.checkDBOK(c)
 }
 
 func (s *databaseSuite) TestSetControllerDeprecated(c *gc.C) {
@@ -1216,143 +769,6 @@ func (s *databaseSuite) TestSetControllerDeprecated(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	_, ok = doc["deprecated"]
 	c.Assert(ok, gc.Equals, false)
-}
-
-func (s *databaseSuite) TestSetModelLifeSuccess(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.database.AddController(testContext, &mongodoc.Controller{
-		Path: ctlPath,
-		UUID: "fake-uuid",
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	// Add the controller model.
-	err = s.database.AddModel(testContext, &mongodoc.Model{
-		Path:       params.EntityPath{"bob", "foo"},
-		UUID:       "fake-uuid",
-		Controller: params.EntityPath{"bob", "foo"},
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	// Add another model with the same UUID but a different controller.
-	err = s.database.AddModel(testContext, &mongodoc.Model{
-		Path:       params.EntityPath{"bar", "baz"},
-		UUID:       "fake-uuid",
-		Controller: params.EntityPath{"bar", "zzz"},
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	// Add another model with the same controller but a different UUID.
-	err = s.database.AddModel(testContext, &mongodoc.Model{
-		Path:       params.EntityPath{"alice", "baz"},
-		UUID:       "another-uuid",
-		Controller: ctlPath,
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	err = s.database.SetModelLife(testContext, ctlPath, "fake-uuid", "alive")
-	c.Assert(err, gc.Equals, nil)
-
-	m := mongodoc.Model{Path: ctlPath}
-	err = s.database.GetModel(testContext, &m)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(m.Life(), gc.Equals, "alive")
-
-	m.Path = params.EntityPath{"bar", "baz"}
-	err = s.database.GetModel(testContext, &m)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(m.Life(), gc.Equals, "")
-
-	m.Path = params.EntityPath{"alice", "baz"}
-	err = s.database.GetModel(testContext, &m)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(m.Life(), gc.Equals, "")
-	s.checkDBOK(c)
-}
-
-func (s *databaseSuite) TestSetModelInfoSuccess(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.database.AddController(testContext, &mongodoc.Controller{
-		Path: ctlPath,
-		UUID: "fake-uuid",
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	// Add the controller model.
-	err = s.database.AddModel(testContext, &mongodoc.Model{
-		Path:       params.EntityPath{"bob", "foo"},
-		UUID:       "fake-uuid",
-		Controller: params.EntityPath{"bob", "foo"},
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	// Add another model with the same UUID but a different controller.
-	err = s.database.AddModel(testContext, &mongodoc.Model{
-		Path:       params.EntityPath{"bar", "baz"},
-		UUID:       "fake-uuid",
-		Controller: params.EntityPath{"bar", "zzz"},
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	// Add another model with the same controller but a different UUID.
-	err = s.database.AddModel(testContext, &mongodoc.Model{
-		Path:       params.EntityPath{"alice", "baz"},
-		UUID:       "another-uuid",
-		Controller: ctlPath,
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	err = s.database.SetModelInfo(testContext, ctlPath, "fake-uuid", &mongodoc.ModelInfo{
-		Life: "alive",
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	m := mongodoc.Model{Path: ctlPath}
-	err = s.database.GetModel(testContext, &m)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(m.Life(), gc.Equals, "alive")
-
-	m.Path = params.EntityPath{"bar", "baz"}
-	err = s.database.GetModel(testContext, &m)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(m.Life(), gc.Equals, "")
-
-	m.Path = params.EntityPath{"alice", "baz"}
-	err = s.database.GetModel(testContext, &m)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(m.Life(), gc.Equals, "")
-	s.checkDBOK(c)
-}
-
-func (s *databaseSuite) TestDeleteModelWithUUID(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.database.AddController(testContext, &mongodoc.Controller{
-		Path: ctlPath,
-		UUID: "fake-uuid",
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	// Add the controller model.
-	err = s.database.AddModel(testContext, &mongodoc.Model{
-		Path:       params.EntityPath{"bob", "foo"},
-		UUID:       "fake-uuid",
-		Controller: params.EntityPath{"bob", "foo"},
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	err = s.database.DeleteModelWithUUID(testContext, ctlPath, "fake-uuid")
-	c.Assert(err, gc.Equals, nil)
-
-	m := mongodoc.Model{Path: ctlPath}
-	err = s.database.GetModel(testContext, &m)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-}
-
-func (s *databaseSuite) TestAcquireLeaseControllerNotFound(c *gc.C) {
-	_, err := s.database.AcquireMonitorLease(testContext, params.EntityPath{"bob", "foo"}, time.Time{}, "", time.Now(), "jem1")
-	c.Assert(err, gc.ErrorMatches, `controller removed`)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	s.checkDBOK(c)
 }
 
 func (s *databaseSuite) TestAddAndGetCredential(c *gc.C) {
@@ -1647,76 +1063,6 @@ func (s *databaseSuite) TestSetACL(c *gc.C) {
 	s.checkDBOK(c)
 }
 
-func (s *databaseSuite) TestGrant(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.database.AddController(testContext, &mongodoc.Controller{
-		Path: ctlPath,
-		UUID: "fake-uuid",
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	err = s.database.Grant(testContext, s.database.Controllers(), ctlPath, "t1")
-	c.Assert(err, gc.Equals, nil)
-	var cnt mongodoc.Controller
-	err = s.database.Controllers().FindId(ctlPath.String()).One(&cnt)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(cnt.ACL, jc.DeepEquals, params.ACL{
-		Read: []string{"t1"},
-	})
-
-	err = s.database.Grant(testContext, s.database.Controllers(), params.EntityPath{"bob", "bar"}, "t1")
-	c.Assert(err, gc.ErrorMatches, `"bob/bar" not found`)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	s.checkDBOK(c)
-}
-
-func (s *databaseSuite) TestRevoke(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.database.AddController(testContext, &mongodoc.Controller{
-		Path: ctlPath,
-		UUID: "fake-uuid",
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	err = s.database.SetACL(testContext, s.database.Controllers(), ctlPath, params.ACL{
-		Read: []string{"t1", "t2"},
-	})
-	c.Assert(err, gc.Equals, nil)
-	err = s.database.Revoke(testContext, s.database.Controllers(), ctlPath, "t2")
-	c.Assert(err, gc.Equals, nil)
-	var cnt mongodoc.Controller
-	err = s.database.Controllers().FindId(ctlPath.String()).One(&cnt)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(cnt.ACL, jc.DeepEquals, params.ACL{
-		Read: []string{"t1"},
-	})
-
-	err = s.database.Revoke(testContext, s.database.Controllers(), params.EntityPath{"bob", "bar"}, "t2")
-	c.Assert(err, gc.ErrorMatches, `"bob/bar" not found`)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	s.checkDBOK(c)
-}
-
-func (s *databaseSuite) TestModelsWithCredential(c *gc.C) {
-	credPath := mongodoc.CredentialPath{
-		Cloud: "cloud",
-		EntityPath: mongodoc.EntityPath{
-			User: "bob",
-			Name: "foo",
-		},
-	}
-	modelPath := params.EntityPath{"bob", "foo"}
-	err := s.database.AddModel(testContext, &mongodoc.Model{
-		Path:       modelPath,
-		UUID:       "fake-uuid",
-		Credential: credPath,
-	})
-	c.Assert(err, gc.Equals, nil)
-	paths, err := s.database.ModelsWithCredential(testContext, credPath)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(paths, jc.DeepEquals, []params.EntityPath{modelPath})
-}
-
 func (s *databaseSuite) TestProviderType(c *gc.C) {
 	err := s.database.UpdateCloudRegions(testContext, []mongodoc.CloudRegion{{
 		Cloud:              "my-cloud",
@@ -1911,7 +1257,7 @@ func (s *databaseSuite) TestGetACL(c *gc.C) {
 			Read: []string{"fred", "jim"},
 		},
 	}
-	err := s.database.AddModel(testContext, m)
+	err := s.database.InsertModel(testContext, m)
 	c.Assert(err, gc.Equals, nil)
 	acl, err := s.database.GetACL(testContext, s.database.Models(), m.Path)
 	c.Assert(err, gc.Equals, nil)
@@ -1984,7 +1330,7 @@ func (s *databaseSuite) TestCheckReadACL(c *gc.C) {
 			Name: params.Name(fmt.Sprintf("test%d", i)),
 		}
 		if !test.skipCreateEntity {
-			err := s.database.AddModel(testContext, &mongodoc.Model{
+			err := s.database.InsertModel(testContext, &mongodoc.Model{
 				Path: entity,
 				ACL: params.ACL{
 					Read: test.acl,
@@ -2027,7 +1373,7 @@ func (s *databaseSuite) TestCanReadIter(c *gc.C) {
 		},
 	}}
 	for i := range testModels {
-		err := s.database.AddModel(testContext, &testModels[i])
+		err := s.database.InsertModel(testContext, &testModels[i])
 		c.Assert(err, gc.Equals, nil)
 	}
 	it := s.database.Models().Find(nil).Sort("_id").Iter()
@@ -2061,16 +1407,11 @@ var setDeadTests = []struct {
 		})
 	},
 }, {
-	about: "AddModel",
+	about: "InsertModel",
 	run: func(db *jimmdb.Database) {
-		db.AddModel(testContext, &mongodoc.Model{
+		db.InsertModel(testContext, &mongodoc.Model{
 			Path: fakeEntityPath,
 		})
-	},
-}, {
-	about: "AcquireMonitorLease",
-	run: func(db *jimmdb.Database) {
-		db.AcquireMonitorLease(testContext, fakeEntityPath, time.Now(), "foo", time.Now(), "bar")
 	},
 }, {
 	about: "CanReadIter",
@@ -2119,9 +1460,11 @@ var setDeadTests = []struct {
 		db.CredentialRemoveController(testContext, fakeCredPath, fakeEntityPath)
 	},
 }, {
-	about: "DeleteModel",
+	about: "RemoveModel",
 	run: func(db *jimmdb.Database) {
-		db.DeleteModel(testContext, fakeEntityPath)
+		db.RemoveModel(testContext, &mongodoc.Model{
+			Path: fakeEntityPath,
+		})
 	},
 }, {
 	about: "GetACL",
@@ -2181,16 +1524,6 @@ var setDeadTests = []struct {
 		db.SetCredentialUpdates(testContext, []params.EntityPath{fakeEntityPath}, fakeCredPath)
 	},
 }, {
-	about: "SetModelInfo",
-	run: func(db *jimmdb.Database) {
-		db.SetModelInfo(testContext, fakeEntityPath, "fake-uuid", &mongodoc.ModelInfo{})
-	},
-}, {
-	about: "SetModelLife",
-	run: func(db *jimmdb.Database) {
-		db.SetModelLife(testContext, fakeEntityPath, "fake-uuid", "fake-life")
-	},
-}, {
 	about: "SetModelController",
 	run: func(db *jimmdb.Database) {
 		db.SetModelController(testContext, fakeEntityPath, fakeEntityPath)
@@ -2225,11 +1558,6 @@ var setDeadTests = []struct {
 				Name:      "yyy",
 			},
 		})
-	},
-}, {
-	about: "UpdateModelCounts",
-	run: func(db *jimmdb.Database) {
-		db.UpdateModelCounts(testContext, fakeEntityPath, "fake-uuid", nil, T(0))
 	},
 }}
 
@@ -2269,14 +1597,6 @@ func testSetDead(c *gc.C, proxy *jujutesting.TCPProxy, pool *mgosession.Pool, ru
 	c.Assert(s2.Ping(), gc.Equals, nil)
 }
 
-func parseTime(s string) time.Time {
-	t, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		panic(err)
-	}
-	return t
-}
-
 func credentialPath(cloud, user, name string) params.CredentialPath {
 	return params.CredentialPath{
 		Cloud: params.Cloud(cloud),
@@ -2293,34 +1613,6 @@ func mgoCredentialPath(cloud, user, name string) mongodoc.CredentialPath {
 			Name: name,
 		},
 	}
-}
-
-func (s *databaseSuite) TestGetModelStatuses(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "x"}
-	m := mongodoc.Model{
-		Id:   "ignored",
-		Path: ctlPath,
-	}
-	err := s.database.AddModel(testContext, &m)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(m, jc.DeepEquals, mongodoc.Model{
-		Id:   "bob/x",
-		Path: ctlPath,
-	})
-
-	m1 := mongodoc.Model{Path: ctlPath}
-	err = s.database.GetModel(testContext, &m1)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(m1, jemtest.CmpEquals(cmpopts.EquateEmpty()), m)
-	s.checkDBOK(c)
-
-	st, err := s.database.GetModelStatuses(testContext)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(st, gc.DeepEquals, params.ModelStatuses{{
-		Status:     "unknown",
-		ID:         "bob/x",
-		Controller: "/",
-	}})
 }
 
 func (s *databaseSuite) TestInsertCloudRegion(c *gc.C) {
@@ -2346,58 +1638,6 @@ func (s *databaseSuite) TestRemoveCloudRegion(c *gc.C) {
 		Cloud: "test-cloud",
 	})
 	c.Assert(err, gc.Equals, nil)
-}
-
-func (s *databaseSuite) TestSetModelCredentialNotFound(c *gc.C) {
-	err := s.database.SetModelCredential(
-		testContext,
-		params.EntityPath{
-			User: "bob",
-			Name: "foo",
-		},
-		mongodoc.CredentialPath{
-			Cloud: "x",
-			EntityPath: mongodoc.EntityPath{
-				User: "y",
-				Name: "z",
-			},
-		})
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-}
-
-func (s *databaseSuite) TestSetModelCredentialSuccess(c *gc.C) {
-	modelPath := params.EntityPath{"bob", "foo"}
-	err := s.database.AddModel(testContext, &mongodoc.Model{
-		Path: modelPath,
-		UUID: "fake-uuid",
-		Credential: mongodoc.CredentialPath{
-			Cloud: "cloud",
-			EntityPath: mongodoc.EntityPath{
-				User: "bob",
-				Name: "foo",
-			},
-		},
-	})
-	c.Assert(err, gc.Equals, nil)
-	err = s.database.SetModelCredential(testContext, modelPath, mongodoc.CredentialPath{
-		Cloud: "cloud",
-		EntityPath: mongodoc.EntityPath{
-			User: "bob",
-			Name: "bar",
-		},
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	newDoc := mongodoc.Model{Path: modelPath}
-	err = s.database.GetModel(testContext, &newDoc)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(newDoc.Credential, gc.DeepEquals, mongodoc.CredentialPath{
-		Cloud: "cloud",
-		EntityPath: mongodoc.EntityPath{
-			User: "bob",
-			Name: "bar",
-		},
-	})
 }
 
 func (s *databaseSuite) TestGrantCloud(c *gc.C) {

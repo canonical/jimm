@@ -13,10 +13,12 @@ import (
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/api/modelmanager"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/apitest"
+	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
 )
@@ -89,14 +91,8 @@ func (s *websocketSuite) assertCreateModel(c *gc.C, p createModelParams) base.Mo
 	return mi
 }
 
-func (s *websocketSuite) grant(c *gc.C, path params.EntityPath, user params.User, access string) {
+func (s *websocketSuite) grant(c *gc.C, path params.EntityPath, user params.User, access jujuparams.UserAccessPermission) {
 	ctx := context.Background()
-
-	m := mongodoc.Model{Path: path}
-	err := s.JEM.DB.GetModel(ctx, &m)
-	c.Assert(err, gc.Equals, nil)
-	conn, err := s.JEM.OpenAPI(ctx, m.Controller)
-	c.Assert(err, gc.Equals, nil)
-	err = s.JEM.GrantModel(ctx, conn, &m, user, access)
+	err := s.JEM.GrantModel(ctx, jemtest.NewIdentity(string(path.User)), &mongodoc.Model{Path: path}, user, access)
 	c.Assert(err, gc.Equals, nil)
 }

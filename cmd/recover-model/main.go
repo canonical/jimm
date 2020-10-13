@@ -125,7 +125,7 @@ func recoverModel(ctx context.Context, cfg *config.Config, controller, model str
 				return errgo.Notef(err, "cannot create usage sender credentials")
 			}
 		}
-		return errgo.Mask(j.DB.AddModel(ctx, doc))
+		return errgo.Mask(j.DB.InsertModel(ctx, doc))
 	}
 
 	return errgo.Newf("cannot find model %q", model)

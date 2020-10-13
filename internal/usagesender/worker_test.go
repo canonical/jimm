@@ -115,7 +115,7 @@ func (s *spoolDirMetricRecorderSuite) TestSpool(c *gc.C) {
 	// next attempt
 	s.handler.setAcknowledge(false)
 
-	err := s.JEM.DB.UpdateModelCounts(ctx, ctlId, model, map[params.EntityCount]int{
+	err := s.JEM.UpdateModelCounts(ctx, ctlId, model, map[params.EntityCount]int{
 		params.MachineCount: 0,
 		params.UnitCount:    17,
 	}, s.Clock.Now())
@@ -133,7 +133,7 @@ func (s *spoolDirMetricRecorderSuite) TestSpool(c *gc.C) {
 	// on the second attempt all metrics will be acknowledged
 	s.handler.setAcknowledge(true)
 
-	err = s.JEM.DB.UpdateModelCounts(ctx, ctlId, model, map[params.EntityCount]int{
+	err = s.JEM.UpdateModelCounts(ctx, ctlId, model, map[params.EntityCount]int{
 		params.MachineCount: 0,
 		params.UnitCount:    42,
 	}, s.Clock.Now())
@@ -168,7 +168,7 @@ func (s *usageSenderSuite) setUnitNumberAndCheckSentMetrics(ctx context.Context,
 
 	s.handler.setAcknowledge(acknowledge)
 
-	err := s.JEM.DB.UpdateModelCounts(ctx, ctlPath, modelUUID, map[params.EntityCount]int{
+	err := s.JEM.UpdateModelCounts(ctx, ctlPath, modelUUID, map[params.EntityCount]int{
 		params.MachineCount: 0,
 		params.UnitCount:    unitCount,
 	}, s.Clock.Now())

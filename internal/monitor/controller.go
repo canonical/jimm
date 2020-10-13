@@ -14,7 +14,6 @@ import (
 	"gopkg.in/tomb.v2"
 
 	"github.com/CanonicalLtd/jimm/internal/jem"
-	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
@@ -587,7 +586,7 @@ func (w *watcherState) adjustCount(n *int, delta jujuparams.Delta) int {
 
 func isMonitoringStoppedError(err error) bool {
 	cause := errgo.Cause(err)
-	return cause == errControllerRemoved || cause == jimmdb.ErrLeaseUnavailable
+	return cause == errControllerRemoved || cause == jem.ErrLeaseUnavailable
 }
 
 func incControllerErrorsMetric(ctlPath params.EntityPath) {

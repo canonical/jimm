@@ -190,13 +190,13 @@ func (s *internalSuite) TestWatcher(c *gc.C) {
 	// Add the JEM model entries
 	model1Path := params.EntityPath{"bob", "model1"}
 	model2Path := params.EntityPath{"bob", "model2"}
-	err := s.jem.DB.AddModel(testContext, &mongodoc.Model{
+	err := s.jem.DB.InsertModel(testContext, &mongodoc.Model{
 		Path:       model1Path,
 		Controller: ctlPath,
 		UUID:       model1State.ModelUUID(),
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.DB.AddModel(testContext, &mongodoc.Model{
+	err = s.jem.DB.InsertModel(testContext, &mongodoc.Model{
 		Path:       model2Path,
 		Controller: ctlPath,
 		UUID:       model2State.ModelUUID(),
@@ -370,7 +370,7 @@ func (s *internalSuite) TestModelRemovedWithFailedWatcher(c *gc.C) {
 	// Add the JEM model entry.
 	modelPath := params.EntityPath{"bob", "mode"}
 	modelUUID := "acf6cf9d-c758-45aa-83ad-923731853fdd"
-	err := s.jem.DB.AddModel(testContext, &mongodoc.Model{
+	err := s.jem.DB.InsertModel(testContext, &mongodoc.Model{
 		Path:       modelPath,
 		Controller: ctlPath,
 		UUID:       modelUUID,
@@ -446,7 +446,7 @@ func (s *internalSuite) TestWatcherUpdatesMachineInfo(c *gc.C) {
 
 	// Add the JEM model entries
 	modelPath := params.EntityPath{"bob", "model"}
-	err := s.jem.DB.AddModel(testContext, &mongodoc.Model{
+	err := s.jem.DB.InsertModel(testContext, &mongodoc.Model{
 		Path:       modelPath,
 		Controller: ctlPath,
 		UUID:       modelState.ModelUUID(),
@@ -506,7 +506,7 @@ func (s *internalSuite) TestWatcherUpdatesApplicationInfo(c *gc.C) {
 
 	// Add the JEM model entries
 	modelPath := params.EntityPath{"bob", "model"}
-	err := s.jem.DB.AddModel(testContext, &mongodoc.Model{
+	err := s.jem.DB.InsertModel(testContext, &mongodoc.Model{
 		Path:       modelPath,
 		Controller: ctlPath,
 		UUID:       modelState.ModelUUID(),
@@ -867,7 +867,7 @@ func (s *internalSuite) TestControllerMonitor(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.jem.DB.AddModel(testContext, &mongodoc.Model{
+	err = s.jem.DB.InsertModel(testContext, &mongodoc.Model{
 		Path:       ctlPath,
 		Controller: ctlPath,
 		UUID:       info.ModelTag.Id(),
