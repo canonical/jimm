@@ -17,17 +17,17 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
+	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
-	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
 type applicationoffersSuite struct {
 	jemtest.JujuConnSuite
 
-	cache *apiconn.Cache
-	conn  *apiconn.Conn
-	model mongodoc.Model
+	cache     *apiconn.Cache
+	conn      *apiconn.Conn
+	modelInfo jujuparams.ModelInfo
 }
 
 var _ = gc.Suite(&applicationoffersSuite{})
@@ -53,12 +53,10 @@ func (s *applicationoffersSuite) SetUpTest(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	s.model.Path = params.EntityPath{
-		User: "test-user",
-		Name: "test-model",
-	}
-
-	err = s.conn.CreateModel(ctx, &s.model)
+	err = s.conn.CreateModel(ctx, &jujuparams.ModelCreateArgs{
+		Name:     "test-model",
+		OwnerTag: conv.ToUserTag("test-user").String(),
+	}, &s.modelInfo)
 	c.Assert(err, gc.Equals, nil)
 }
 
@@ -73,7 +71,7 @@ func (s *applicationoffersSuite) TearDownTest(c *gc.C) {
 }
 
 func (s *applicationoffersSuite) TestOffer(c *gc.C) {
-	modelState, err := s.StatePool.Get(s.model.UUID)
+	modelState, err := s.StatePool.Get(s.modelInfo.UUID)
 	c.Assert(err, gc.Equals, nil)
 	defer modelState.Release()
 	f := factory.NewFactory(modelState.State, s.StatePool)
@@ -91,7 +89,7 @@ func (s *applicationoffersSuite) TestOffer(c *gc.C) {
 
 	ctx := context.Background()
 	err = s.conn.Offer(ctx, jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(s.model.UUID).String(),
+		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
 		OfferName:       "test-offer",
 		ApplicationName: "test-app",
 		Endpoints: map[string]string{
@@ -101,7 +99,7 @@ func (s *applicationoffersSuite) TestOffer(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	err = s.conn.Offer(ctx, jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(s.model.UUID).String(),
+		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
 		OfferName:       "test-offer",
 		ApplicationName: "test-app",
 		Endpoints: map[string]string{
@@ -116,7 +114,7 @@ func (s *applicationoffersSuite) TestOffer(c *gc.C) {
 
 func (s *applicationoffersSuite) TestOfferError(c *gc.C) {
 	err := s.conn.Offer(context.Background(), jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(s.model.UUID).String(),
+		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
 		OfferName:       "test-offer",
 		ApplicationName: "test-app",
 		Endpoints: map[string]string{
@@ -132,16 +130,18 @@ func (s *applicationoffersSuite) TestListApplicationOffersError(c *gc.C) {
 }
 
 func (s *applicationoffersSuite) TestListApplicationOffersNoOffers(c *gc.C) {
+	owner, err := names.ParseUserTag(s.modelInfo.OwnerTag)
+	c.Assert(err, gc.Equals, nil)
 	offers, err := s.conn.ListApplicationOffers(context.Background(), []jujuparams.OfferFilter{{
-		OwnerName: string(s.model.Path.User) + "@external",
-		ModelName: string(s.model.Path.Name),
+		OwnerName: owner.Id(),
+		ModelName: s.modelInfo.Name,
 	}})
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(offers, gc.HasLen, 0)
 }
 
 func (s *applicationoffersSuite) TestListApplicationOffersMatching(c *gc.C) {
-	modelState, err := s.StatePool.Get(s.model.UUID)
+	modelState, err := s.StatePool.Get(s.modelInfo.UUID)
 	c.Assert(err, gc.Equals, nil)
 	defer modelState.Release()
 	f := factory.NewFactory(modelState.State, s.StatePool)
@@ -159,7 +159,7 @@ func (s *applicationoffersSuite) TestListApplicationOffersMatching(c *gc.C) {
 
 	ctx := context.Background()
 	err = s.conn.Offer(ctx, jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(s.model.UUID).String(),
+		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
 		OfferName:       "test-offer",
 		ApplicationName: "test-app",
 		Endpoints: map[string]string{
@@ -173,16 +173,18 @@ func (s *applicationoffersSuite) TestListApplicationOffersMatching(c *gc.C) {
 	err = s.conn.GetApplicationOffer(ctx, &info)
 	c.Assert(err, gc.Equals, nil)
 
+	owner, err := names.ParseUserTag(s.modelInfo.OwnerTag)
+	c.Assert(err, gc.Equals, nil)
 	offers, err := s.conn.ListApplicationOffers(ctx, []jujuparams.OfferFilter{{
-		OwnerName: string(s.model.Path.User) + "@external",
-		ModelName: string(s.model.Path.Name),
+		OwnerName: owner.Id(),
+		ModelName: s.modelInfo.Name,
 	}})
 	c.Assert(err, gc.Equals, nil)
 	c.Check(offers, gc.DeepEquals, []jujuparams.ApplicationOfferAdminDetails{info})
 }
 
 func (s *applicationoffersSuite) TestListApplicationOffersNoMatch(c *gc.C) {
-	modelState, err := s.StatePool.Get(s.model.UUID)
+	modelState, err := s.StatePool.Get(s.modelInfo.UUID)
 	c.Assert(err, gc.Equals, nil)
 	defer modelState.Release()
 	f := factory.NewFactory(modelState.State, s.StatePool)
@@ -200,7 +202,7 @@ func (s *applicationoffersSuite) TestListApplicationOffersNoMatch(c *gc.C) {
 
 	ctx := context.Background()
 	err = s.conn.Offer(ctx, jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(s.model.UUID).String(),
+		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
 		OfferName:       "test-offer",
 		ApplicationName: "test-app",
 		Endpoints: map[string]string{
@@ -209,9 +211,11 @@ func (s *applicationoffersSuite) TestListApplicationOffersNoMatch(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
+	owner, err := names.ParseUserTag(s.modelInfo.OwnerTag)
+	c.Assert(err, gc.Equals, nil)
 	offers, err := s.conn.ListApplicationOffers(ctx, []jujuparams.OfferFilter{{
-		OwnerName:       string(s.model.Path.User) + "@external",
-		ModelName:       string(s.model.Path.Name),
+		OwnerName:       owner.Id(),
+		ModelName:       s.modelInfo.Name,
 		ApplicationName: "no-such-app",
 	}})
 	c.Assert(err, gc.Equals, nil)
@@ -224,16 +228,18 @@ func (s *applicationoffersSuite) TestFindApplicationOffersError(c *gc.C) {
 }
 
 func (s *applicationoffersSuite) TestFindApplicationOffersNoOffers(c *gc.C) {
+	owner, err := names.ParseUserTag(s.modelInfo.OwnerTag)
+	c.Assert(err, gc.Equals, nil)
 	offers, err := s.conn.FindApplicationOffers(context.Background(), []jujuparams.OfferFilter{{
-		OwnerName: string(s.model.Path.User) + "@external",
-		ModelName: string(s.model.Path.Name),
+		OwnerName: owner.Id(),
+		ModelName: s.modelInfo.Name,
 	}})
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(offers, gc.HasLen, 0)
 }
 
 func (s *applicationoffersSuite) TestFindApplicationOffersMatching(c *gc.C) {
-	modelState, err := s.StatePool.Get(s.model.UUID)
+	modelState, err := s.StatePool.Get(s.modelInfo.UUID)
 	c.Assert(err, gc.Equals, nil)
 	defer modelState.Release()
 	f := factory.NewFactory(modelState.State, s.StatePool)
@@ -251,7 +257,7 @@ func (s *applicationoffersSuite) TestFindApplicationOffersMatching(c *gc.C) {
 
 	ctx := context.Background()
 	err = s.conn.Offer(ctx, jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(s.model.UUID).String(),
+		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
 		OfferName:       "test-offer",
 		ApplicationName: "test-app",
 		Endpoints: map[string]string{
@@ -265,16 +271,18 @@ func (s *applicationoffersSuite) TestFindApplicationOffersMatching(c *gc.C) {
 	err = s.conn.GetApplicationOffer(ctx, &info)
 	c.Assert(err, gc.Equals, nil)
 
+	owner, err := names.ParseUserTag(s.modelInfo.OwnerTag)
+	c.Assert(err, gc.Equals, nil)
 	offers, err := s.conn.FindApplicationOffers(ctx, []jujuparams.OfferFilter{{
-		OwnerName: string(s.model.Path.User) + "@external",
-		ModelName: string(s.model.Path.Name),
+		OwnerName: owner.Id(),
+		ModelName: s.modelInfo.Name,
 	}})
 	c.Assert(err, gc.Equals, nil)
 	c.Check(offers, gc.DeepEquals, []jujuparams.ApplicationOfferAdminDetails{info})
 }
 
 func (s *applicationoffersSuite) TestFindApplicationOffersNoMatch(c *gc.C) {
-	modelState, err := s.StatePool.Get(s.model.UUID)
+	modelState, err := s.StatePool.Get(s.modelInfo.UUID)
 	c.Assert(err, gc.Equals, nil)
 	defer modelState.Release()
 	f := factory.NewFactory(modelState.State, s.StatePool)
@@ -292,7 +300,7 @@ func (s *applicationoffersSuite) TestFindApplicationOffersNoMatch(c *gc.C) {
 
 	ctx := context.Background()
 	err = s.conn.Offer(ctx, jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(s.model.UUID).String(),
+		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
 		OfferName:       "test-offer",
 		ApplicationName: "test-app",
 		Endpoints: map[string]string{
@@ -301,9 +309,11 @@ func (s *applicationoffersSuite) TestFindApplicationOffersNoMatch(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
+	owner, err := names.ParseUserTag(s.modelInfo.OwnerTag)
+	c.Assert(err, gc.Equals, nil)
 	offers, err := s.conn.FindApplicationOffers(ctx, []jujuparams.OfferFilter{{
-		OwnerName:       string(s.model.Path.User) + "@external",
-		ModelName:       string(s.model.Path.Name),
+		OwnerName:       owner.Id(),
+		ModelName:       s.modelInfo.Name,
 		ApplicationName: "no-such-app",
 	}})
 	c.Assert(err, gc.Equals, nil)
@@ -311,7 +321,7 @@ func (s *applicationoffersSuite) TestFindApplicationOffersNoMatch(c *gc.C) {
 }
 
 func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
-	modelState, err := s.StatePool.Get(s.model.UUID)
+	modelState, err := s.StatePool.Get(s.modelInfo.UUID)
 	c.Assert(err, gc.Equals, nil)
 	defer modelState.Release()
 	f := factory.NewFactory(modelState.State, s.StatePool)
@@ -329,7 +339,7 @@ func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
 
 	ctx := context.Background()
 	err = s.conn.Offer(ctx, jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(s.model.UUID).String(),
+		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
 		OfferName:       "test-offer",
 		ApplicationName: "test-app",
 		Endpoints: map[string]string{
@@ -352,7 +362,7 @@ func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
 	info.CharmURL = ""
 	c.Check(info, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetails{
 		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
-			SourceModelTag:         names.NewModelTag(s.model.UUID).String(),
+			SourceModelTag:         names.NewModelTag(s.modelInfo.UUID).String(),
 			OfferURL:               "test-user@external/test-model.test-offer",
 			OfferName:              "test-offer",
 			ApplicationDescription: "A pretty popular blog engine",
@@ -385,7 +395,7 @@ func (s *applicationoffersSuite) TestGetApplicationOfferNotFound(c *gc.C) {
 }
 
 func (s *applicationoffersSuite) TestGrantApplicationOfferAccess(c *gc.C) {
-	modelState, err := s.StatePool.Get(s.model.UUID)
+	modelState, err := s.StatePool.Get(s.modelInfo.UUID)
 	c.Assert(err, gc.Equals, nil)
 	defer modelState.Release()
 	f := factory.NewFactory(modelState.State, s.StatePool)
@@ -403,7 +413,7 @@ func (s *applicationoffersSuite) TestGrantApplicationOfferAccess(c *gc.C) {
 
 	ctx := context.Background()
 	err = s.conn.Offer(ctx, jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(s.model.UUID).String(),
+		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
 		OfferName:       "test-offer",
 		ApplicationName: "test-app",
 		Endpoints: map[string]string{
@@ -430,7 +440,7 @@ func (s *applicationoffersSuite) TestGrantApplicationOfferAccess(c *gc.C) {
 	info.CharmURL = ""
 	c.Check(info, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetails{
 		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
-			SourceModelTag:         names.NewModelTag(s.model.UUID).String(),
+			SourceModelTag:         names.NewModelTag(s.modelInfo.UUID).String(),
 			OfferURL:               "test-user@external/test-model.test-offer",
 			OfferName:              "test-offer",
 			ApplicationDescription: "A pretty popular blog engine",
@@ -465,7 +475,7 @@ func (s *applicationoffersSuite) TestGrantApplicationOfferAccessNotFound(c *gc.C
 }
 
 func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
-	modelState, err := s.StatePool.Get(s.model.UUID)
+	modelState, err := s.StatePool.Get(s.modelInfo.UUID)
 	c.Assert(err, gc.Equals, nil)
 	defer modelState.Release()
 	f := factory.NewFactory(modelState.State, s.StatePool)
@@ -483,7 +493,7 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
 
 	ctx := context.Background()
 	err = s.conn.Offer(ctx, jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(s.model.UUID).String(),
+		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
 		OfferName:       "test-offer",
 		ApplicationName: "test-app",
 		Endpoints: map[string]string{
@@ -511,7 +521,7 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
 	info.CharmURL = ""
 	c.Check(info, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetails{
 		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
-			SourceModelTag:         names.NewModelTag(s.model.UUID).String(),
+			SourceModelTag:         names.NewModelTag(s.modelInfo.UUID).String(),
 			OfferURL:               "test-user@external/test-model.test-offer",
 			OfferName:              "test-offer",
 			ApplicationDescription: "A pretty popular blog engine",
@@ -550,7 +560,7 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
 	info.CharmURL = ""
 	c.Check(info, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetails{
 		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
-			SourceModelTag:         names.NewModelTag(s.model.UUID).String(),
+			SourceModelTag:         names.NewModelTag(s.modelInfo.UUID).String(),
 			OfferURL:               "test-user@external/test-model.test-offer",
 			OfferName:              "test-offer",
 			ApplicationDescription: "A pretty popular blog engine",
@@ -585,7 +595,7 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccessNotFound(c *gc.
 }
 
 func (s *applicationoffersSuite) TestDestroyApplicationOffer(c *gc.C) {
-	modelState, err := s.StatePool.Get(s.model.UUID)
+	modelState, err := s.StatePool.Get(s.modelInfo.UUID)
 	c.Assert(err, gc.Equals, nil)
 	defer modelState.Release()
 	f := factory.NewFactory(modelState.State, s.StatePool)
@@ -603,7 +613,7 @@ func (s *applicationoffersSuite) TestDestroyApplicationOffer(c *gc.C) {
 
 	ctx := context.Background()
 	err = s.conn.Offer(ctx, jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(s.model.UUID).String(),
+		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
 		OfferName:       "test-offer",
 		ApplicationName: "test-app",
 		Endpoints: map[string]string{
@@ -612,9 +622,11 @@ func (s *applicationoffersSuite) TestDestroyApplicationOffer(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
+	owner, err := names.ParseUserTag(s.modelInfo.OwnerTag)
+	c.Assert(err, gc.Equals, nil)
 	offers, err := s.conn.ListApplicationOffers(ctx, []jujuparams.OfferFilter{{
-		OwnerName: string(s.model.Path.User) + "@external",
-		ModelName: string(s.model.Path.Name),
+		OwnerName: owner.Id(),
+		ModelName: s.modelInfo.Name,
 	}})
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(offers, gc.HasLen, 1)
@@ -624,15 +636,15 @@ func (s *applicationoffersSuite) TestDestroyApplicationOffer(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	offers, err = s.conn.ListApplicationOffers(ctx, []jujuparams.OfferFilter{{
-		OwnerName: string(s.model.Path.User) + "@external",
-		ModelName: string(s.model.Path.Name),
+		OwnerName: owner.Id(),
+		ModelName: s.modelInfo.Name,
 	}})
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(offers, gc.HasLen, 0)
 }
 
 func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) {
-	modelState, err := s.StatePool.Get(s.model.UUID)
+	modelState, err := s.StatePool.Get(s.modelInfo.UUID)
 	c.Assert(err, gc.Equals, nil)
 	defer modelState.Release()
 	f := factory.NewFactory(modelState.State, s.StatePool)
@@ -650,7 +662,7 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 
 	ctx := context.Background()
 	err = s.conn.Offer(ctx, jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(s.model.UUID).String(),
+		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
 		OfferName:       "test-offer",
 		ApplicationName: "test-app",
 		Endpoints: map[string]string{
@@ -671,7 +683,7 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 	info.Macaroon = nil
 	c.Check(info, jc.DeepEquals, jujuparams.ConsumeOfferDetails{
 		Offer: &jujuparams.ApplicationOfferDetails{
-			SourceModelTag:         names.NewModelTag(s.model.UUID).String(),
+			SourceModelTag:         names.NewModelTag(s.modelInfo.UUID).String(),
 			OfferURL:               "test-user@external/test-model.test-offer",
 			OfferName:              "test-offer",
 			ApplicationDescription: "A pretty popular blog engine",

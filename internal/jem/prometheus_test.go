@@ -17,7 +17,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
@@ -25,12 +24,10 @@ import (
 )
 
 func (s *jemSuite) TestModelStats(c *gc.C) {
-	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob"))
-
 	ctl1Id := s.addController(c, params.EntityPath{"bob", "controller1"})
 	ctl2Id := s.addController(c, params.EntityPath{"bob", "controller2"})
 	s.addController(c, params.EntityPath{"bob", "controller3"})
-	err := s.jem.DB.AddModel(ctx, &mongodoc.Model{
+	err := s.jem.DB.AddModel(testContext, &mongodoc.Model{
 		Path: params.EntityPath{
 			User: "bob",
 			Name: "model1",
@@ -54,7 +51,7 @@ func (s *jemSuite) TestModelStats(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.jem.DB.AddModel(ctx, &mongodoc.Model{
+	err = s.jem.DB.AddModel(testContext, &mongodoc.Model{
 		Path: params.EntityPath{
 			User: "bob",
 			Name: "model2",
@@ -78,7 +75,7 @@ func (s *jemSuite) TestModelStats(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.jem.DB.AddModel(ctx, &mongodoc.Model{
+	err = s.jem.DB.AddModel(testContext, &mongodoc.Model{
 		Path: params.EntityPath{
 			User: "bob",
 			Name: "model3",
@@ -150,38 +147,40 @@ func (s *jemSuite) TestModelStats(c *gc.C) {
 }
 
 func (s *jemSuite) TestMachineStats(c *gc.C) {
-	ctx := auth.ContextWithIdentity(testContext, jemtest.NewIdentity("bob"))
-
 	ctl1Id := s.addController(c, params.EntityPath{"bob", "controller1"})
 	ctl2Id := s.addController(c, params.EntityPath{"bob", "controller2"})
-	err := jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
+	err := s.jem.DB.UpdateCredential(testContext, &mongodoc.Credential{
 		Path: mgoCredentialPath("dummy", "bob", "cred1"),
 		Type: "empty",
 	})
 	c.Assert(err, gc.Equals, nil)
-	m1, err := s.jem.CreateModel(ctx, jem.CreateModelParams{
+	id := jemtest.NewIdentity("bob")
+	var m1 jujuparams.ModelInfo
+	err = s.jem.CreateModel(testContext, id, jem.CreateModelParams{
 		Path:           params.EntityPath{"bob", "model1"},
 		ControllerPath: ctl1Id,
 		Credential:     credentialPath("dummy", "bob", "cred1"),
 		Cloud:          "dummy",
-	})
+	}, &m1)
 	c.Assert(err, gc.Equals, nil)
-	m2, err := s.jem.CreateModel(ctx, jem.CreateModelParams{
+	var m2 jujuparams.ModelInfo
+	err = s.jem.CreateModel(testContext, id, jem.CreateModelParams{
 		Path:           params.EntityPath{"bob", "model2"},
 		ControllerPath: ctl1Id,
 		Credential:     credentialPath("dummy", "bob", "cred1"),
 		Cloud:          "dummy",
-	})
+	}, &m2)
 	c.Assert(err, gc.Equals, nil)
-	m3, err := s.jem.CreateModel(ctx, jem.CreateModelParams{
+	var m3 jujuparams.ModelInfo
+	err = s.jem.CreateModel(testContext, id, jem.CreateModelParams{
 		Path:           params.EntityPath{"bob", "model3"},
 		ControllerPath: ctl2Id,
 		Credential:     credentialPath("dummy", "bob", "cred1"),
 		Cloud:          "dummy",
-	})
+	}, &m3)
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
+	err = s.jem.UpdateMachineInfo(testContext, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "0",
 		ModelUUID: m1.UUID,
 		AgentStatus: jujuparams.StatusInfo{
@@ -189,7 +188,7 @@ func (s *jemSuite) TestMachineStats(c *gc.C) {
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
+	err = s.jem.UpdateMachineInfo(testContext, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "1",
 		ModelUUID: m1.UUID,
 		AgentStatus: jujuparams.StatusInfo{
@@ -197,7 +196,7 @@ func (s *jemSuite) TestMachineStats(c *gc.C) {
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
+	err = s.jem.UpdateMachineInfo(testContext, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "2",
 		ModelUUID: m1.UUID,
 		AgentStatus: jujuparams.StatusInfo{
@@ -205,7 +204,7 @@ func (s *jemSuite) TestMachineStats(c *gc.C) {
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
+	err = s.jem.UpdateMachineInfo(testContext, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "3",
 		ModelUUID: m1.UUID,
 		AgentStatus: jujuparams.StatusInfo{
@@ -213,7 +212,7 @@ func (s *jemSuite) TestMachineStats(c *gc.C) {
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
+	err = s.jem.UpdateMachineInfo(testContext, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "4",
 		ModelUUID: m1.UUID,
 		AgentStatus: jujuparams.StatusInfo{
@@ -221,7 +220,7 @@ func (s *jemSuite) TestMachineStats(c *gc.C) {
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
+	err = s.jem.UpdateMachineInfo(testContext, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "5",
 		ModelUUID: m1.UUID,
 		AgentStatus: jujuparams.StatusInfo{
@@ -229,7 +228,7 @@ func (s *jemSuite) TestMachineStats(c *gc.C) {
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
+	err = s.jem.UpdateMachineInfo(testContext, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "6",
 		ModelUUID: m1.UUID,
 		AgentStatus: jujuparams.StatusInfo{
@@ -237,7 +236,7 @@ func (s *jemSuite) TestMachineStats(c *gc.C) {
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
+	err = s.jem.UpdateMachineInfo(testContext, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "7",
 		ModelUUID: m1.UUID,
 		AgentStatus: jujuparams.StatusInfo{
@@ -245,7 +244,7 @@ func (s *jemSuite) TestMachineStats(c *gc.C) {
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
+	err = s.jem.UpdateMachineInfo(testContext, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "8",
 		ModelUUID: m1.UUID,
 		AgentStatus: jujuparams.StatusInfo{
@@ -253,7 +252,7 @@ func (s *jemSuite) TestMachineStats(c *gc.C) {
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
+	err = s.jem.UpdateMachineInfo(testContext, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "9",
 		ModelUUID: m1.UUID,
 		AgentStatus: jujuparams.StatusInfo{
@@ -261,7 +260,7 @@ func (s *jemSuite) TestMachineStats(c *gc.C) {
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
+	err = s.jem.UpdateMachineInfo(testContext, ctl1Id, &jujuparams.MachineInfo{
 		Id:        "0",
 		ModelUUID: m2.UUID,
 		AgentStatus: jujuparams.StatusInfo{
@@ -269,7 +268,7 @@ func (s *jemSuite) TestMachineStats(c *gc.C) {
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl2Id, &jujuparams.MachineInfo{
+	err = s.jem.UpdateMachineInfo(testContext, ctl2Id, &jujuparams.MachineInfo{
 		Id:        "0",
 		ModelUUID: m3.UUID,
 		AgentStatus: jujuparams.StatusInfo{
@@ -278,7 +277,7 @@ func (s *jemSuite) TestMachineStats(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	stats := s.pool.MachineStats(ctx)
+	stats := s.pool.MachineStats(testContext)
 	err = prometheus.Register(stats)
 	c.Assert(err, gc.Equals, nil)
 	defer prometheus.Unregister(stats)

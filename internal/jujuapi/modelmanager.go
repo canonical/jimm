@@ -153,7 +153,6 @@ func init() {
 func (r *controllerRoot) DumpModels(ctx context.Context, args jujuparams.Entities) jujuparams.MapResults {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.MapResult, len(args.Entities))
 	for i, ent := range args.Entities {
 		err := r.modelWithConnection(
@@ -192,7 +191,6 @@ func (r *controllerRoot) DestroyModels(ctx context.Context, args jujuparams.Enti
 // ListModelSummaries returns summaries for all the models that that
 // authenticated user has access to. The request parameter is ignored.
 func (r *controllerRoot) ListModelSummaries(ctx context.Context, _ jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error) {
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	var results []jujuparams.ModelSummaryResult
 	err := r.doModels(ctx, func(ctx context.Context, model *mongodoc.Model) error {
 		if model.ProviderType == "" {
@@ -285,7 +283,6 @@ func (r *controllerRoot) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 // ListModels returns the models that the authenticated user
 // has access to. The user parameter is ignored.
 func (r *controllerRoot) ListModels(ctx context.Context, _ jujuparams.Entity) (jujuparams.UserModelList, error) {
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	return r.allModels(ctx)
 }
 
@@ -293,17 +290,31 @@ func (r *controllerRoot) ListModels(ctx context.Context, _ jujuparams.Entity) (j
 func (r *controllerRoot) ModelInfo(ctx context.Context, args jujuparams.Entities) (jujuparams.ModelInfoResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.ModelInfoResult, len(args.Entities))
 	run := parallel.NewRun(maxRequestConcurrency)
 	for i, arg := range args.Entities {
-		i, arg := i, arg
+		mt, err := names.ParseModelTag(arg.Tag)
+		if err != nil {
+			results[i].Error = mapError(errgo.WithCausef(err, params.ErrBadRequest, ""))
+			continue
+		}
+		results[i].Result = &jujuparams.ModelInfo{
+			UUID: mt.Id(),
+		}
+		i := i
 		run.Do(func() error {
-			mi, err := r.modelInfo(ctx, arg, len(args.Entities) != 1)
-			if err != nil {
-				results[i].Error = mapError(err)
-			} else {
-				results[i].Result = mi
+			err := r.jem.GetModelInfo(ctx, r.identity, results[i].Result, len(results) == 1)
+			if errgo.Cause(err) == params.ErrNotFound {
+				// Map not-found errors to unauthorized, this is what juju
+				// does.
+				err = params.ErrUnauthorized
+			}
+			results[i].Error = mapError(err)
+			if r.controllerUUIDMasking {
+				results[i].Result.ControllerUUID = r.params.ControllerUUID
+			}
+			if results[i].Error != nil {
+				results[i].Result = nil
 			}
 			return nil
 		})
@@ -315,45 +326,41 @@ func (r *controllerRoot) ModelInfo(ctx context.Context, args jujuparams.Entities
 }
 
 // CreateModel implements the ModelManager facade's CreateModel method.
-func (r *controllerRoot) CreateModel(ctx context.Context, args jujuparams.ModelCreateArgs) (jujuparams.ModelInfo, error) {
+func (r *controllerRoot) CreateModel(ctx context.Context, args jujuparams.ModelCreateArgs) (info jujuparams.ModelInfo, err error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
-	mi, err := r.createModel(ctx, args)
+	err = errgo.Mask(r.createModel(ctx, args, &info),
+		errgo.Is(conv.ErrLocalUser),
+		errgo.Is(params.ErrUnauthorized),
+		errgo.Is(params.ErrNotFound),
+		errgo.Is(params.ErrBadRequest),
+	)
 	if err == nil {
 		servermon.ModelsCreatedCount.Inc()
 	} else {
 		servermon.ModelsCreatedFailCount.Inc()
 	}
-	if err != nil {
-		return jujuparams.ModelInfo{}, errgo.Mask(err,
-			errgo.Is(conv.ErrLocalUser),
-			errgo.Is(params.ErrUnauthorized),
-			errgo.Is(params.ErrNotFound),
-			errgo.Is(params.ErrBadRequest),
-		)
-	}
-	return *mi, nil
+	return
 }
 
-func (r *controllerRoot) createModel(ctx context.Context, args jujuparams.ModelCreateArgs) (*jujuparams.ModelInfo, error) {
+func (r *controllerRoot) createModel(ctx context.Context, args jujuparams.ModelCreateArgs, info *jujuparams.ModelInfo) error {
 	owner, err := conv.ParseUserTag(args.OwnerTag)
 	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(conv.ErrLocalUser))
+		return errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(conv.ErrLocalUser))
 	}
 	if args.CloudTag == "" {
-		return nil, errgo.New("no cloud specified for model; please specify one")
+		return errgo.New("no cloud specified for model; please specify one")
 	}
 	cloudTag, err := names.ParseCloudTag(args.CloudTag)
 	if err != nil {
-		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud tag")
+		return errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud tag")
 	}
 	cloud := params.Cloud(cloudTag.Id())
 	var credPath params.CredentialPath
 	if args.CloudCredentialTag != "" {
 		tag, err := names.ParseCloudCredentialTag(args.CloudCredentialTag)
 		if err != nil {
-			return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud credential tag")
+			return errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud credential tag")
 		}
 		credPath = params.CredentialPath{
 			Cloud: params.Cloud(tag.Cloud().Id()),
@@ -361,22 +368,20 @@ func (r *controllerRoot) createModel(ctx context.Context, args jujuparams.ModelC
 			Name:  params.CredentialName(tag.Name()),
 		}
 	}
-	model, err := r.jem.CreateModel(ctx, jem.CreateModelParams{
+	err = r.jem.CreateModel(ctx, r.identity, jem.CreateModelParams{
 		Path:       params.EntityPath{User: owner, Name: params.Name(args.Name)},
 		Credential: credPath,
 		Cloud:      cloud,
 		Region:     args.CloudRegion,
 		Attributes: args.Config,
-	})
+	}, info)
 	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+		return errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	info, err := r.modelDocToModelInfo(ctx, model)
-	if err != nil {
-		return nil, errgo.Mask(err)
+	if r.controllerUUIDMasking {
+		info.ControllerUUID = r.params.ControllerUUID
 	}
-
-	return info, nil
+	return nil
 }
 
 // DestroyModelsV4 implements the ModelManager facade's DestroyModels
@@ -384,7 +389,6 @@ func (r *controllerRoot) createModel(ctx context.Context, args jujuparams.ModelC
 func (r *controllerRoot) DestroyModelsV4(ctx context.Context, args jujuparams.DestroyModelsParams) (jujuparams.ErrorResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.ErrorResult, len(args.Models))
 
 	for i, model := range args.Models {
@@ -412,7 +416,6 @@ func (r *controllerRoot) DestroyModelsV4(ctx context.Context, args jujuparams.De
 func (r *controllerRoot) ModifyModelAccess(ctx context.Context, args jujuparams.ModifyModelAccessRequest) (jujuparams.ErrorResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.ErrorResult, len(args.Changes))
 	for i, change := range args.Changes {
 		err := r.modifyModelAccess(ctx, change)
@@ -466,7 +469,6 @@ func (r *controllerRoot) modifyModelAccess(ctx context.Context, change jujuparam
 func (r *controllerRoot) DumpModelsV3(ctx context.Context, args jujuparams.DumpModelRequest) jujuparams.StringResults {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.StringResult, len(args.Entities))
 	for i, ent := range args.Entities {
 		err := r.modelWithConnection(
@@ -495,7 +497,6 @@ func (r *controllerRoot) DumpModelsV3(ctx context.Context, args jujuparams.DumpM
 func (r *controllerRoot) DumpModelsDB(ctx context.Context, args jujuparams.Entities) jujuparams.MapResults {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.MapResult, len(args.Entities))
 	for i, ent := range args.Entities {
 		err := r.modelWithConnection(
@@ -524,7 +525,6 @@ func (r *controllerRoot) DumpModelsDB(ctx context.Context, args jujuparams.Entit
 func (r *controllerRoot) ChangeModelCredential(ctx context.Context, args jujuparams.ChangeModelCredentialsParams) (jujuparams.ErrorResults, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	ctx = auth.ContextWithIdentity(ctx, r.identity)
 	results := make([]jujuparams.ErrorResult, len(args.Models))
 	for i, arg := range args.Models {
 		results[i].Error = mapError(r.changeModelCredential(ctx, arg))

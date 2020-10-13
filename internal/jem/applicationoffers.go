@@ -153,6 +153,16 @@ func (j *JEM) GetApplicationOfferConsumeDetails(ctx context.Context, id identche
 	return nil
 }
 
+func getApplicationOfferAccess(user params.User, offer *mongodoc.ApplicationOffer) mongodoc.ApplicationOfferAccessPermission {
+	access := mongodoc.ApplicationOfferNoAccess
+	for _, u := range offer.Users {
+		if (u.User == user || u.User == identchecker.Everyone) && u.Access > access {
+			access = u.Access
+		}
+	}
+	return access
+}
+
 // filterApplicationOfferUsers filters the application offer user list
 // to be suitable for the given user at the given access level. All juju-
 // local users are omitted, and if the user is not an admin then they can

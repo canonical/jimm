@@ -11,17 +11,14 @@ import (
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/life"
-	"github.com/juju/juju/environs/config"
-	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/names/v4"
+	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
-	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	"github.com/CanonicalLtd/jimm/params"
 )
 
 type modelmanagerSuite struct {
@@ -67,41 +64,34 @@ func (s *modelmanagerSuite) TearDownTest(c *gc.C) {
 func (s *modelmanagerSuite) TestCreateModel(c *gc.C) {
 	ctx := context.Background()
 
-	model := mongodoc.Model{
-		Path: params.EntityPath{
-			User: "test-user",
-			Name: "test-model",
-		},
-	}
-
-	err := s.conn.CreateModel(ctx, &model)
+	var info jujuparams.ModelInfo
+	err := s.conn.CreateModel(ctx, &jujuparams.ModelCreateArgs{
+		Name:     "test-model",
+		OwnerTag: conv.ToUserTag("test-user").String(),
+	}, &info)
 	c.Assert(err, gc.Equals, nil)
 
-	c.Check(model.UUID, gc.Not(gc.Equals), "")
-	c.Check(model.Cloud, gc.Equals, params.Cloud("dummy"))
-	c.Check(model.CloudRegion, gc.Equals, "dummy-region")
-	c.Check(model.DefaultSeries, gc.Equals, "bionic")
-	c.Check(model.Info.Life, gc.Equals, "alive")
-	c.Check(model.Info.Status.Status, gc.Equals, "available")
-	c.Check(model.Info.Status.Data, gc.IsNil)
-	c.Check(model.Info.Status.Since.After(time.Now().Add(-10*time.Second)), gc.Equals, true)
-	c.Check(model.Info.Config[config.AgentVersionKey], gc.Equals, jujuversion.Current.String())
-	c.Check(model.Type, gc.Equals, "iaas")
-	c.Check(model.ProviderType, gc.Equals, "dummy")
+	c.Check(info.UUID, gc.Not(gc.Equals), "")
+	c.Check(info.CloudTag, gc.Equals, names.NewCloudTag("dummy").String())
+	c.Check(info.CloudRegion, gc.Equals, "dummy-region")
+	c.Check(info.DefaultSeries, gc.Equals, "focal")
+	c.Check(string(info.Life), gc.Equals, "alive")
+	c.Check(string(info.Status.Status), gc.Equals, "available")
+	c.Check(info.Status.Data, gc.IsNil)
+	c.Check(info.Status.Since.After(time.Now().Add(-10*time.Second)), gc.Equals, true)
+	c.Check(info.Type, gc.Equals, "iaas")
+	c.Check(info.ProviderType, gc.Equals, "dummy")
 }
 
 func (s *modelmanagerSuite) TestCreateModelError(c *gc.C) {
 	ctx := context.Background()
 
-	model := mongodoc.Model{
-		Path: params.EntityPath{
-			User: "test-user",
-			Name: "test-model",
-		},
-		Cloud: params.Cloud("nosuchcloud"),
-	}
-
-	err := s.conn.CreateModel(ctx, &model)
+	var info jujuparams.ModelInfo
+	err := s.conn.CreateModel(ctx, &jujuparams.ModelCreateArgs{
+		Name:     "test-model",
+		OwnerTag: conv.ToUserTag("test-user").String(),
+		CloudTag: conv.ToCloudTag("nosuchcloud").String(),
+	}, &info)
 	c.Check(apiconn.IsAPIError(err), gc.Equals, true)
 	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
 	c.Check(err, gc.ErrorMatches, `api error: cloud "nosuchcloud" not found, expected one of \["dummy"\] \(not found\)`)
@@ -110,27 +100,21 @@ func (s *modelmanagerSuite) TestCreateModelError(c *gc.C) {
 func (s *modelmanagerSuite) TestGrantJIMMModelAdmin(c *gc.C) {
 	ctx := context.Background()
 
-	model := mongodoc.Model{
-		Path: params.EntityPath{
-			User: "test-user",
-			Name: "test-model",
-		},
-	}
-
-	err := s.conn.CreateModel(ctx, &model)
+	var info jujuparams.ModelInfo
+	err := s.conn.CreateModel(ctx, &jujuparams.ModelCreateArgs{
+		Name:     "test-model",
+		OwnerTag: conv.ToUserTag("test-user").String(),
+	}, &info)
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.conn.GrantJIMMModelAdmin(ctx, model.UUID)
+	err = s.conn.GrantJIMMModelAdmin(ctx, info.UUID)
 	c.Assert(err, gc.Equals, nil)
 
-	mi := jujuparams.ModelInfo{
-		UUID: model.UUID,
-	}
-	err = s.conn.ModelInfo(ctx, &mi)
+	err = s.conn.ModelInfo(ctx, &info)
 	c.Assert(err, gc.Equals, nil)
 
 	var access jujuparams.UserAccessPermission
-	for _, u := range mi.Users {
+	for _, u := range info.Users {
 		if u.UserName == s.conn.Info.Tag.Id() {
 			access = u.Access
 		}
@@ -150,29 +134,20 @@ func (s *modelmanagerSuite) TestGrantJIMMModelAdminError(c *gc.C) {
 func (s *modelmanagerSuite) TestModelInfo(c *gc.C) {
 	ctx := context.Background()
 
-	model := mongodoc.Model{
-		Path: params.EntityPath{
-			User: "test-user",
-			Name: "test-model",
-		},
-	}
-
-	err := s.conn.CreateModel(ctx, &model)
+	var info jujuparams.ModelInfo
+	err := s.conn.CreateModel(ctx, &jujuparams.ModelCreateArgs{
+		Name:     "test-model",
+		OwnerTag: conv.ToUserTag("test-user").String(),
+	}, &info)
 	c.Assert(err, gc.Equals, nil)
 
 	mi := jujuparams.ModelInfo{
-		UUID: model.UUID,
+		UUID: info.UUID,
 	}
 	err = s.conn.ModelInfo(ctx, &mi)
 	c.Assert(err, gc.Equals, nil)
 
-	c.Check(mi.UUID, gc.Equals, model.UUID)
-	c.Check(mi.Name, gc.Equals, string(model.Path.Name))
-	c.Check(mi.OwnerTag, gc.Equals, conv.ToUserTag(model.Path.User).String())
-	c.Check(mi.CloudTag, gc.Equals, conv.ToCloudTag(model.Cloud).String())
-	c.Check(mi.CloudRegion, gc.Equals, model.CloudRegion)
-	c.Check(mi.Type, gc.Equals, model.Type)
-	c.Check(mi.ProviderType, gc.Equals, model.ProviderType)
+	c.Check(mi, jc.DeepEquals, info)
 }
 
 func (s *modelmanagerSuite) TestModelInfoError(c *gc.C) {
@@ -190,29 +165,23 @@ func (s *modelmanagerSuite) TestModelInfoError(c *gc.C) {
 func (s *modelmanagerSuite) TestGrantRevokeModel(c *gc.C) {
 	ctx := context.Background()
 
-	model := mongodoc.Model{
-		Path: params.EntityPath{
-			User: "test-user",
-			Name: "test-model",
-		},
-	}
-
-	err := s.conn.CreateModel(ctx, &model)
+	var info jujuparams.ModelInfo
+	err := s.conn.CreateModel(ctx, &jujuparams.ModelCreateArgs{
+		Name:     "test-model",
+		OwnerTag: conv.ToUserTag("test-user").String(),
+	}, &info)
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.conn.GrantModelAccess(ctx, model.UUID, "test-user-2", jujuparams.ModelReadAccess)
+	err = s.conn.GrantModelAccess(ctx, info.UUID, "test-user-2", jujuparams.ModelReadAccess)
 	c.Assert(err, gc.Equals, nil)
 
-	mi := jujuparams.ModelInfo{
-		UUID: model.UUID,
-	}
-	err = s.conn.ModelInfo(ctx, &mi)
+	err = s.conn.ModelInfo(ctx, &info)
 	c.Assert(err, gc.Equals, nil)
 
 	lessf := func(a, b jujuparams.ModelUserInfo) bool {
 		return a.UserName < b.UserName
 	}
-	c.Check(mi.Users, jemtest.CmpEquals(cmpopts.SortSlices(lessf)), []jujuparams.ModelUserInfo{{
+	c.Check(info.Users, jemtest.CmpEquals(cmpopts.SortSlices(lessf)), []jujuparams.ModelUserInfo{{
 		UserName:    "test-user@external",
 		DisplayName: "test-user",
 		Access:      "admin",
@@ -221,13 +190,13 @@ func (s *modelmanagerSuite) TestGrantRevokeModel(c *gc.C) {
 		Access:   "read",
 	}})
 
-	err = s.conn.RevokeModelAccess(ctx, model.UUID, "test-user-2", jujuparams.ModelReadAccess)
+	err = s.conn.RevokeModelAccess(ctx, info.UUID, "test-user-2", jujuparams.ModelReadAccess)
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.conn.ModelInfo(ctx, &mi)
+	err = s.conn.ModelInfo(ctx, &info)
 	c.Assert(err, gc.Equals, nil)
 
-	c.Check(mi.Users, jemtest.CmpEquals(cmpopts.SortSlices(lessf)), []jujuparams.ModelUserInfo{{
+	c.Check(info.Users, jemtest.CmpEquals(cmpopts.SortSlices(lessf)), []jujuparams.ModelUserInfo{{
 		UserName:    "test-user@external",
 		DisplayName: "test-user",
 		Access:      "admin",
@@ -257,17 +226,16 @@ func (s *modelmanagerSuite) TestRevokeModelAccessError(c *gc.C) {
 func (s *modelmanagerSuite) TestValidateModelUpgrade(c *gc.C) {
 	ctx := context.Background()
 
-	model := mongodoc.Model{
-		Path: params.EntityPath{
-			User: "test-user",
-			Name: "test-model",
-		},
+	args := jujuparams.ModelCreateArgs{
+		Name:     "test-model",
+		OwnerTag: conv.ToUserTag("test-user").String(),
 	}
+	var info jujuparams.ModelInfo
 
-	err := s.conn.CreateModel(ctx, &model)
+	err := s.conn.CreateModel(ctx, &args, &info)
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.conn.ValidateModelUpgrade(ctx, names.NewModelTag(model.UUID), true)
+	err = s.conn.ValidateModelUpgrade(ctx, names.NewModelTag(info.UUID), true)
 	c.Assert(err, gc.Equals, nil)
 
 	uuid := utils.MustNewUUID().String()
@@ -278,24 +246,54 @@ func (s *modelmanagerSuite) TestValidateModelUpgrade(c *gc.C) {
 func (s *modelmanagerSuite) TestDestroyModel(c *gc.C) {
 	ctx := context.Background()
 
-	model := mongodoc.Model{
-		Path: params.EntityPath{
-			User: "test-user",
-			Name: "test-model",
-		},
+	var info jujuparams.ModelInfo
+	err := s.conn.CreateModel(ctx, &jujuparams.ModelCreateArgs{
+		Name:     "test-model",
+		OwnerTag: conv.ToUserTag("test-user").String(),
+	}, &info)
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.conn.DestroyModel(ctx, info.UUID, nil, nil, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.conn.ModelInfo(ctx, &info)
+	c.Assert(err, gc.Equals, nil)
+
+	c.Check(info.Life, gc.Equals, life.Dying)
+}
+
+func (s *modelmanagerSuite) TestModelStatus(c *gc.C) {
+	ctx := context.Background()
+
+	var info jujuparams.ModelInfo
+	err := s.conn.CreateModel(ctx, &jujuparams.ModelCreateArgs{
+		Name:     "test-model",
+		OwnerTag: conv.ToUserTag("test-user").String(),
+	}, &info)
+	c.Assert(err, gc.Equals, nil)
+
+	status := jujuparams.ModelStatus{
+		ModelTag: names.NewModelTag(info.UUID).String(),
 	}
-
-	err := s.conn.CreateModel(ctx, &model)
+	err = s.conn.ModelStatus(ctx, &status)
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.conn.DestroyModel(ctx, model.UUID, nil, nil, nil)
-	c.Assert(err, gc.Equals, nil)
+	c.Check(status, jc.DeepEquals, jujuparams.ModelStatus{
+		ModelTag: names.NewModelTag(info.UUID).String(),
+		Life:     info.Life,
+		Type:     info.Type,
+		OwnerTag: info.OwnerTag,
+	})
+}
 
-	mi := jujuparams.ModelInfo{
-		UUID: model.UUID,
+func (s *modelmanagerSuite) TestModelStatusError(c *gc.C) {
+	ctx := context.Background()
+
+	status := jujuparams.ModelStatus{
+		ModelTag: names.NewModelTag("00000000-0000-0000-0000-000000000000").String(),
 	}
-	err = s.conn.ModelInfo(ctx, &mi)
-	c.Assert(err, gc.Equals, nil)
-
-	c.Check(mi.Life, gc.Equals, life.Dying)
+	err := s.conn.ModelStatus(ctx, &status)
+	c.Check(apiconn.IsAPIError(err), gc.Equals, true)
+	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
+	c.Check(err, gc.ErrorMatches, `api error: model "00000000-0000-0000-0000-000000000000" not found`)
 }

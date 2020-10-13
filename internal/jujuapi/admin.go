@@ -13,7 +13,7 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
-	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 	"github.com/CanonicalLtd/jimm/params"
@@ -60,10 +60,9 @@ func (r *controllerRoot) Login(ctx context.Context, req jujuparams.LoginRequest)
 		return facades[i].Name < facades[j].Name
 	})
 
-	ctx = auth.ContextWithIdentity(ctx, id)
 	servermon.LoginSuccessCount.Inc()
 	username := id.Id()
-	srvVersion, err := r.jem.EarliestControllerVersion(ctx)
+	srvVersion, err := r.jem.EarliestControllerVersion(ctx, id)
 	if err != nil {
 		return jujuparams.LoginResult{}, errgo.Mask(err)
 	}
@@ -71,7 +70,7 @@ func (r *controllerRoot) Login(ctx context.Context, req jujuparams.LoginRequest)
 		UserInfo: &jujuparams.AuthUserInfo{
 			// TODO(mhilton) get a better display name from the identity manager.
 			DisplayName: username,
-			Identity:    userTag(username).String(),
+			Identity:    conv.ToUserTag(params.User(username)).String(),
 		},
 		ControllerTag: names.NewControllerTag(r.params.ControllerUUID).String(),
 		Facades:       facades,

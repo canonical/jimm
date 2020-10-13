@@ -20,7 +20,6 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
@@ -105,7 +104,7 @@ func (s *applicationoffersSuite) SetUpTest(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	s.identity = jemtest.NewIdentity("user1")
-	s.model, err = s.jem.CreateModel(auth.ContextWithIdentity(ctx, s.identity), jem.CreateModelParams{
+	err = s.jem.CreateModel(ctx, s.identity, jem.CreateModelParams{
 		Path:           params.EntityPath{User: "user1", Name: "model-1"},
 		ControllerPath: params.EntityPath{User: "user1", Name: "controller-1"},
 		Credential: params.CredentialPath{
@@ -115,7 +114,12 @@ func (s *applicationoffersSuite) SetUpTest(c *gc.C) {
 		},
 		Cloud:  "dummy",
 		Region: "dummy-region",
-	})
+	}, nil)
+	c.Assert(err, gc.Equals, nil)
+	s.model = &mongodoc.Model{
+		Path: params.EntityPath{User: "user1", Name: "model-1"},
+	}
+	err = s.jem.DB.GetModel(ctx, s.model)
 	c.Assert(err, gc.Equals, nil)
 
 	modelState, err := s.StatePool.Get(s.model.UUID)

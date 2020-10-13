@@ -79,7 +79,7 @@ func (s *usermanagerSuite) TestUserInfoSpecifiedUser(c *gc.C) {
 	c.Assert(len(users), gc.Equals, 1)
 	c.Assert(users[0], jc.DeepEquals, jujuparams.UserInfo{
 		Username:    "alice@external",
-		DisplayName: "alice@external",
+		DisplayName: "alice",
 		Access:      "add-model",
 	})
 }
@@ -104,7 +104,7 @@ func (s *usermanagerSuite) TestUserInfoWithDomain(c *gc.C) {
 	c.Assert(len(users), gc.Equals, 1)
 	c.Assert(users[0], jc.DeepEquals, jujuparams.UserInfo{
 		Username:    "alice@mydomain",
-		DisplayName: "alice@mydomain",
+		DisplayName: "alice",
 		Access:      "add-model",
 	})
 }
