@@ -27,7 +27,7 @@ func (s *jemSuite) TestModelStats(c *gc.C) {
 	ctl1Id := s.addController(c, params.EntityPath{"bob", "controller1"})
 	ctl2Id := s.addController(c, params.EntityPath{"bob", "controller2"})
 	s.addController(c, params.EntityPath{"bob", "controller3"})
-	err := s.jem.DB.AddModel(testContext, &mongodoc.Model{
+	err := s.jem.DB.InsertModel(testContext, &mongodoc.Model{
 		Path: params.EntityPath{
 			User: "bob",
 			Name: "model1",
@@ -51,7 +51,7 @@ func (s *jemSuite) TestModelStats(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.jem.DB.AddModel(testContext, &mongodoc.Model{
+	err = s.jem.DB.InsertModel(testContext, &mongodoc.Model{
 		Path: params.EntityPath{
 			User: "bob",
 			Name: "model2",
@@ -75,7 +75,7 @@ func (s *jemSuite) TestModelStats(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.jem.DB.AddModel(testContext, &mongodoc.Model{
+	err = s.jem.DB.InsertModel(testContext, &mongodoc.Model{
 		Path: params.EntityPath{
 			User: "bob",
 			Name: "model3",

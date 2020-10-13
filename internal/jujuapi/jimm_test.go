@@ -53,17 +53,17 @@ func (s *jimmSuite) TestUserModelStats(c *gc.C) {
 	// Update some stats for the models we've just created'
 	t0 := time.Unix(0, 0)
 
-	err = s.JEM.DB.UpdateModelCounts(ctx, ctlPath, model1.UUID, map[params.EntityCount]int{
+	err = s.JEM.UpdateModelCounts(ctx, ctlPath, model1.UUID, map[params.EntityCount]int{
 		params.UnitCount: 99,
 	}, t0)
 
 	c.Assert(err, gc.Equals, nil)
-	err = s.JEM.DB.UpdateModelCounts(ctx, ctlPath, model2.UUID, map[params.EntityCount]int{
+	err = s.JEM.UpdateModelCounts(ctx, ctlPath, model2.UUID, map[params.EntityCount]int{
 		params.MachineCount: 10,
 	}, t0)
 
 	c.Assert(err, gc.Equals, nil)
-	err = s.JEM.DB.UpdateModelCounts(ctx, ctlPath, model3.UUID, map[params.EntityCount]int{
+	err = s.JEM.UpdateModelCounts(ctx, ctlPath, model3.UUID, map[params.EntityCount]int{
 		params.ApplicationCount: 1,
 	}, t0)
 

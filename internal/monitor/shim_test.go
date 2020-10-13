@@ -16,7 +16,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
+	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
 )
@@ -336,7 +336,7 @@ func (s *jemShimInMemory) UpdateModelCounts(ctx context.Context, ctlPath params.
 	}
 	for name, n := range counts {
 		count := model.Counts[name]
-		jimmdb.UpdateCount(&count, n, now)
+		jem.UpdateCount(&count, n, now)
 		model.Counts[name] = count
 	}
 	return nil
@@ -429,7 +429,7 @@ func (s *jemShimInMemory) AcquireMonitorLease(ctx context.Context, ctlPath param
 		return time.Time{}, errgo.WithCausef(nil, params.ErrNotFound, "")
 	}
 	if ctl.MonitorLeaseOwner != oldOwner || !ctl.MonitorLeaseExpiry.UTC().Equal(oldExpiry.UTC()) {
-		return time.Time{}, errgo.WithCausef(nil, jimmdb.ErrLeaseUnavailable, "")
+		return time.Time{}, errgo.WithCausef(nil, jem.ErrLeaseUnavailable, "")
 	}
 	ctl.MonitorLeaseOwner = newOwner
 	if newOwner == "" {

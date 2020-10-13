@@ -923,7 +923,7 @@ func (s *modelManagerSuite) TestModelInfoDyingModelNotFound(c *gc.C) {
 	ctlPath := s.AssertAddController(ctx, c, params.EntityPath{User: "alice", Name: "controller-1"}, true)
 	s.AssertUpdateCredential(ctx, c, "alice", "dummy", "cred1", "empty")
 
-	err := s.JEM.DB.AddModel(ctx, &mongodoc.Model{
+	err := s.JEM.DB.InsertModel(ctx, &mongodoc.Model{
 		Controller:  ctlPath,
 		Path:        params.EntityPath{User: "alice", Name: "model-1"},
 		UUID:        "00000000-0000-0000-0000-000000000007",
@@ -1250,7 +1250,7 @@ func (s *modelManagerSuite) TestDestroyModel(c *gc.C) {
 	c.Assert(mis[0].Result.Life, gc.Equals, life.Dying)
 
 	// Kill the model.
-	err = s.JEM.DB.DeleteModelWithUUID(ctx, ctlPath, mi.UUID)
+	err = s.JEM.DB.RemoveModel(ctx, &mongodoc.Model{Controller: ctlPath, UUID: mi.UUID})
 	c.Assert(err, gc.Equals, nil)
 
 	// Make sure it's not an error if you destroy a model that't not there.

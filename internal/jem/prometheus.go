@@ -136,9 +136,7 @@ func (s *ModelStats) Collect(c chan<- prometheus.Metric) {
 // collectStats returns a snapshot of the current statistics from JIMM.
 func (s *ModelStats) collectStats(jem *JEM) (*currentModelStats, error) {
 	var cs currentModelStats
-	iter := jem.DB.Models().Find(nil).Iter()
-	var m mongodoc.Model
-	for iter.Next(&m) {
+	err := jem.DB.ForEachModel(context.TODO(), nil, nil, func(m *mongodoc.Model) error {
 		cs.values[statModelsRunning]++
 		machineCount := m.Counts[params.MachineCount].Current
 		if machineCount > 0 {
@@ -147,11 +145,11 @@ func (s *ModelStats) collectStats(jem *JEM) (*currentModelStats, error) {
 		}
 		cs.values[statApplicationsRunning] += m.Counts[params.ApplicationCount].Current
 		cs.values[statUnitsRunning] += m.Counts[params.UnitCount].Current
-	}
-	if err := iter.Err(); err != nil {
+		return nil
+	})
+	if err != nil {
 		return nil, errgo.Notef(err, "cannot gather stats")
 	}
-	var err error
 	cs.values[statControllersRunning], err = jem.DB.Controllers().Count()
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot gather stats")

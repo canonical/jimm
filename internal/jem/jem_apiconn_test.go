@@ -133,7 +133,7 @@ func (s *jemAPIConnSuite) TestPoolOpenModelAPI(c *gc.C) {
 		UUID:       info.ModelTag.Id(),
 		Controller: ctlPath,
 	}
-	err = s.jem.DB.AddModel(testContext, m)
+	err = s.jem.DB.InsertModel(testContext, m)
 	c.Assert(err, gc.Equals, nil)
 
 	// Open the API and check that it works.

@@ -349,49 +349,32 @@ func (r *controllerRoot) ModifyModelAccess(ctx context.Context, args jujuparams.
 	defer cancel()
 	results := make([]jujuparams.ErrorResult, len(args.Changes))
 	for i, change := range args.Changes {
-		err := r.modifyModelAccess(ctx, change)
+		mt, err := names.ParseModelTag(change.ModelTag)
 		if err != nil {
-			results[i].Error = mapError(err)
+			results[i].Error = mapError(errgo.WithCausef(err, params.ErrBadRequest, ""))
+			continue
 		}
+		user, err := conv.ParseUserTag(change.UserTag)
+		if err != nil {
+			results[i].Error = mapError(errgo.WithCausef(err, params.ErrBadRequest, ""))
+			continue
+		}
+		switch change.Action {
+		case jujuparams.GrantModelAccess:
+			err = r.jem.GrantModel(ctx, r.identity, &mongodoc.Model{UUID: mt.Id()}, user, change.Access)
+		case jujuparams.RevokeModelAccess:
+			err = r.jem.RevokeModel(ctx, r.identity, &mongodoc.Model{UUID: mt.Id()}, user, change.Access)
+		default:
+			err = errgo.WithCausef(err, params.ErrBadRequest, "invalid action %q", change.Action)
+		}
+		if errgo.Cause(err) == params.ErrNotFound {
+			err = params.ErrUnauthorized
+		}
+		results[i].Error = mapError(err)
 	}
 	return jujuparams.ErrorResults{
 		Results: results,
 	}, nil
-}
-
-func (r *controllerRoot) modifyModelAccess(ctx context.Context, change jujuparams.ModifyModelAccess) error {
-	mt, err := names.ParseModelTag(change.ModelTag)
-	if err != nil {
-		return errgo.WithCausef(err, params.ErrBadRequest, "")
-	}
-	model := mongodoc.Model{UUID: mt.Id()}
-	if err := r.jem.GetModel(ctx, r.identity, jujuparams.ModelAdminAccess, &model); err != nil {
-		if errgo.Cause(err) == params.ErrNotFound {
-			err = errgo.WithCausef(nil, params.ErrUnauthorized, "")
-		}
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	user, err := conv.ParseUserTag(change.UserTag)
-	if err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(conv.ErrLocalUser))
-	}
-	conn, err := r.jem.OpenAPI(ctx, model.Controller)
-	if err != nil {
-		return errgo.Mask(err)
-	}
-	defer conn.Close()
-	switch change.Action {
-	case jujuparams.GrantModelAccess:
-		err = r.jem.GrantModel(ctx, conn, &model, user, string(change.Access))
-	case jujuparams.RevokeModelAccess:
-		err = r.jem.RevokeModel(ctx, conn, &model, user, string(change.Access))
-	default:
-		return errgo.WithCausef(err, params.ErrBadRequest, "invalid action %q", change.Action)
-	}
-	if err != nil {
-		return errgo.Mask(err, apiconn.IsAPIError)
-	}
-	return nil
 }
 
 // DumpModelsV3 implements the ModelManager (version 3 onwards) facade's

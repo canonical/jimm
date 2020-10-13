@@ -167,7 +167,7 @@ func (j *JEM) RemoveCloud(ctx context.Context, id identchecker.ACLIdentity, clou
 	// (remember that only one of the primary controllers might be using it).
 	// However we like the error message and it's usually going to be OK,
 	// so we'll do the advance check anyway.
-	if n, err := j.DB.Models().Find(bson.D{{"cloud", cloud}}).Count(); n > 0 || err != nil {
+	if n, err := j.DB.CountModels(ctx, bson.D{{"cloud", cloud}}); n > 0 || err != nil {
 		if err != nil {
 			return errgo.Mask(err)
 		}

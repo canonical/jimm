@@ -219,7 +219,7 @@ func (h *Handler) DeleteModel(p httprequest.Params, arg *params.DeleteModel) err
 	if err := h.jem.GetModel(p.Context, h.id, jujuparams.ModelAdminAccess, &m); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	return errgo.Mask(h.jem.DB.DeleteModel(p.Context, m.Path))
+	return errgo.Mask(h.jem.DB.RemoveModel(p.Context, &m))
 }
 
 // ListModels returns all the models stored in JEM.
@@ -636,12 +636,9 @@ func (h *Handler) GetAuditEntries(p httprequest.Params, arg *params.AuditLogRequ
 
 // GetModelStatuses return the list of all models created between 2 dates (or all).
 func (h *Handler) GetModelStatuses(p httprequest.Params, arg *params.ModelStatusesRequest) (params.ModelStatuses, error) {
-	if err := auth.CheckIsUser(p.Context, h.id, h.config.ControllerAdmin); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	entries, err := h.jem.DB.GetModelStatuses(p.Context)
+	entries, err := h.jem.GetModelStatuses(p.Context, h.id)
 	if err != nil {
-		return nil, errgo.Mask(err)
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	return entries, nil
 }
