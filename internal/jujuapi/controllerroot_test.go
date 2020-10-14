@@ -38,7 +38,7 @@ func (s *controllerrootSuite) TestServerVersion(c *gc.C) {
 	ctlPath := params.EntityPath{"test", "controller-1"}
 	s.AssertAddController(ctx, c, ctlPath, true)
 	testVersion := version.MustParse("5.4.3")
-	err := s.JEM.DB.SetControllerVersion(ctx, ctlPath, testVersion)
+	err := s.JEM.SetControllerVersion(ctx, ctlPath, testVersion)
 	c.Assert(err, gc.Equals, nil)
 
 	conn := s.open(c, nil, "test")

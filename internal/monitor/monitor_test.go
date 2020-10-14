@@ -35,7 +35,7 @@ func (s *monitorSuite) TestMonitor(c *gc.C) {
 	hps, err := mongodoc.ParseAddresses(info.Addrs)
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.JEM.DB.AddController(testContext, &mongodoc.Controller{
+	err = s.JEM.DB.InsertController(testContext, &mongodoc.Controller{
 		Path:          ctlPath,
 		HostPorts:     [][]mongodoc.HostPort{hps},
 		CACert:        info.CACert,
@@ -50,9 +50,9 @@ func (s *monitorSuite) TestMonitor(c *gc.C) {
 	defer worker.Stop(m)
 
 	// Wait for the stats to be updated.
-	var ctl *mongodoc.Controller
+	ctl := &mongodoc.Controller{Path: ctlPath}
 	for a := jujutesting.LongAttempt.Start(); a.Next(); {
-		ctl, err = s.JEM.DB.Controller(testContext, ctlPath)
+		err = s.JEM.DB.GetController(testContext, ctl)
 		c.Assert(err, gc.Equals, nil)
 		if ctl.Stats != (mongodoc.ControllerStats{}) {
 			break
@@ -90,7 +90,7 @@ func (s *monitorSuite) TestMonitorWithBrokenMongoConnection(c *gc.C) {
 	hps, err := mongodoc.ParseAddresses(apiInfo.Addrs)
 	c.Assert(err, gc.Equals, nil)
 
-	err = jem.DB.AddController(testContext, &mongodoc.Controller{
+	err = jem.DB.InsertController(testContext, &mongodoc.Controller{
 		Path:          ctlPath,
 		HostPorts:     [][]mongodoc.HostPort{hps},
 		CACert:        apiInfo.CACert,
@@ -142,7 +142,7 @@ func (s *monitorSuite) TestMonitorWithBrokenJujuAPIConnection(c *gc.C) {
 	hps, err := mongodoc.ParseAddresses([]string{proxy.Addr()})
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.JEM.DB.AddController(testContext, &mongodoc.Controller{
+	err = s.JEM.DB.InsertController(testContext, &mongodoc.Controller{
 		Path:          ctlPath,
 		HostPorts:     [][]mongodoc.HostPort{hps},
 		CACert:        apiInfo.CACert,
@@ -180,7 +180,8 @@ func (s *monitorSuite) TestMonitorWithBrokenJujuAPIConnection(c *gc.C) {
 
 func (s *monitorSuite) waitControllerStats(c *gc.C, ctlPath params.EntityPath, oldStats mongodoc.ControllerStats) mongodoc.ControllerStats {
 	for a := jujutesting.LongAttempt.Start(); a.Next(); {
-		ctl, err := s.JEM.DB.Controller(testContext, ctlPath)
+		ctl := &mongodoc.Controller{Path: ctlPath}
+		err := s.JEM.DB.GetController(testContext, ctl)
 		c.Assert(err, gc.Equals, nil)
 		if ctl.Stats != oldStats {
 			return ctl.Stats

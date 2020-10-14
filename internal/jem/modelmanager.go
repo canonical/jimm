@@ -17,7 +17,6 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
-	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
@@ -166,9 +165,8 @@ func (j *JEM) CreateModel(ctx context.Context, id identchecker.ACLIdentity, p Cr
 	var ctlPath params.EntityPath
 	for _, controller := range controllers {
 		ctx = zapctx.WithFields(ctx, zap.Stringer("controller", controller))
-
-		cmp.controller, err = j.DB.Controller(ctx, controller)
-		if err != nil {
+		cmp.controller = &mongodoc.Controller{Path: controller}
+		if err = j.DB.GetController(ctx, cmp.controller); err != nil {
 			zapctx.Error(ctx, "cannot get controller", zap.Error(err))
 			continue
 		}
@@ -338,13 +336,9 @@ func (j *JEM) createModel(ctx context.Context, p createModelParams, info *jujupa
 // If there are no credentials found, a zero credential path is returned.
 func (j *JEM) selectCredential(ctx context.Context, id identchecker.ACLIdentity, path params.CredentialPath, user params.User, cloud params.Cloud) (*mongodoc.Credential, error) {
 	p := mongodoc.CredentialPathFromParams(path)
-	query := bson.D{{"path", p}}
+	query := jimmdb.Eq("path", p)
 	if p.IsZero() {
-		query = bson.D{
-			{"path.entitypath.user", user},
-			{"path.cloud", cloud},
-			{"revoked", false},
-		}
+		query = jimmdb.And(jimmdb.Eq("path.entitypath.user", user), jimmdb.Eq("path.cloud", cloud), jimmdb.Eq("revoked", false))
 	}
 	var creds []mongodoc.Credential
 	iter := j.DB.NewCanReadIter(id, j.DB.Credentials().Find(query).Iter())
@@ -393,9 +387,8 @@ func (j *JEM) GetModelInfo(ctx context.Context, id identchecker.ACLIdentity, inf
 	if err := j.GetModel(ctx, id, jujuparams.ModelReadAccess, &m); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-
-	ctl, err := j.DB.Controller(ctx, m.Controller)
-	if err != nil {
+	ctl := &mongodoc.Controller{Path: m.Controller}
+	if err := j.DB.GetController(ctx, ctl); err != nil {
 		return errgo.Mask(err)
 	}
 
@@ -430,6 +423,7 @@ func (j *JEM) GetModelInfo(ctx context.Context, id identchecker.ACLIdentity, inf
 		info.IsController = false
 		info.ProviderType = m.ProviderType
 		if info.ProviderType == "" {
+			var err error
 			info.ProviderType, err = j.DB.ProviderType(ctx, m.Cloud)
 			if err != nil {
 				zapctx.Error(ctx, "cannot get provider type", zap.Error(err))
@@ -457,6 +451,7 @@ func (j *JEM) GetModelInfo(ctx context.Context, id identchecker.ACLIdentity, inf
 			info.Users = append(info.Users, userInfo(params.User(u), jujuparams.ModelReadAccess))
 		}
 
+		var err error
 		info.Machines, err = j.modelMachineInfo(ctx, info.UUID)
 		if err != nil {
 			zapctx.Error(ctx, "cannot get machine information", zap.Error(err))

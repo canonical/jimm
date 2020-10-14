@@ -12,13 +12,13 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
-	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/cloudcred"
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
@@ -251,13 +251,11 @@ func (r *controllerRoot) userCredentials(ctx context.Context, ownerTag, cloudTag
 	}
 	var cloudCreds []string
 	it := r.jem.DB.NewCanReadIter(r.identity, r.jem.DB.Credentials().Find(
-		bson.D{{
-			"path.entitypath.user", owner,
-		}, {
-			"path.cloud", cld.Id(),
-		}, {
-			"revoked", false,
-		}},
+		jimmdb.And(
+			jimmdb.Eq("path.entitypath.user", owner),
+			jimmdb.Eq("path.cloud", cld.Id()),
+			jimmdb.Eq("revoked", false),
+		),
 	).Iter())
 	var cred mongodoc.Credential
 	for it.Next(ctx, &cred) {
@@ -440,7 +438,7 @@ func (r *controllerRoot) CredentialContents(ctx context.Context, args jujuparams
 // findUserCredentials finds all credentials owned by the authenticated user.
 func (r *controllerRoot) findUserCredentials(ctx context.Context) ([]jujuparams.CloudCredentialArg, error) {
 	username := r.identity.Id()
-	query := bson.D{{"path.entitypath.user", username}, {"revoked", false}}
+	query := jimmdb.And(jimmdb.Eq("path.entitypath.user", username), jimmdb.Eq("revoked", false))
 	iter := r.jem.DB.NewCanReadIter(r.identity, r.jem.DB.Credentials().Find(query).Iter())
 	defer iter.Close(ctx)
 

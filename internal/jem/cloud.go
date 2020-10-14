@@ -10,10 +10,10 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
-	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
@@ -84,8 +84,10 @@ func (j *JEM) AddHostedCloud(ctx context.Context, id identchecker.ACLIdentity, n
 	var apiError error
 	for _, cp := range controllers {
 		ctx := zapctx.WithFields(ctx, zap.Stringer("controller", cp))
-		ctl, err := j.DB.Controller(ctx, cp)
-		if err != nil {
+		ctl := mongodoc.Controller{
+			Path: cp,
+		}
+		if err := j.DB.GetController(ctx, &ctl); err != nil {
 			zapctx.Error(ctx, "cannot get controller", zap.Error(err))
 			continue
 		}
@@ -93,13 +95,13 @@ func (j *JEM) AddHostedCloud(ctx context.Context, id identchecker.ACLIdentity, n
 			continue
 		}
 		if !ctl.Public {
-			if err := auth.CheckCanRead(ctx, id, ctl); err != nil {
+			if err := auth.CheckCanRead(ctx, id, &ctl); err != nil {
 				zapctx.Error(ctx, "cannot access controller", zap.Error(err))
 				continue
 			}
 		}
 
-		conn, err = j.OpenAPIFromDoc(ctx, ctl)
+		conn, err = j.OpenAPIFromDoc(ctx, &ctl)
 		if err != nil {
 			zapctx.Error(ctx, "cannot connect to controller", zap.Error(err))
 			continue
@@ -167,7 +169,7 @@ func (j *JEM) RemoveCloud(ctx context.Context, id identchecker.ACLIdentity, clou
 	// (remember that only one of the primary controllers might be using it).
 	// However we like the error message and it's usually going to be OK,
 	// so we'll do the advance check anyway.
-	if n, err := j.DB.CountModels(ctx, bson.D{{"cloud", cloud}}); n > 0 || err != nil {
+	if n, err := j.DB.CountModels(ctx, jimmdb.Eq("cloud", cloud)); n > 0 || err != nil {
 		if err != nil {
 			return errgo.Mask(err)
 		}

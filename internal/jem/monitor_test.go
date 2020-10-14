@@ -11,6 +11,7 @@ import (
 	"github.com/juju/juju/cloud"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
+	"github.com/juju/version"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
@@ -150,7 +151,7 @@ func (s *monitorSuite) TestAcquireLease(c *gc.C) {
 		c.Assert(err, gc.Equals, nil)
 		_, err = s.jem.DB.Models().RemoveAll(bson.D{{"path", test.ctlPath}})
 		c.Assert(err, gc.Equals, nil)
-		err = s.jem.DB.AddController(testContext, &mongodoc.Controller{
+		err = s.jem.DB.InsertController(testContext, &mongodoc.Controller{
 			Path:               test.ctlPath,
 			UUID:               "fake-uuid",
 			MonitorLeaseOwner:  test.actualOldOwner,
@@ -168,7 +169,8 @@ func (s *monitorSuite) TestAcquireLease(c *gc.C) {
 		}
 		c.Assert(err, gc.Equals, nil)
 		c.Assert(t.UTC(), gc.DeepEquals, test.expectExpiry.UTC())
-		ctl, err := s.jem.DB.Controller(testContext, test.ctlPath)
+		ctl := &mongodoc.Controller{Path: test.ctlPath}
+		err = s.jem.DB.GetController(testContext, ctl)
 		c.Assert(err, gc.Equals, nil)
 		c.Assert(ctl.MonitorLeaseExpiry.UTC(), gc.DeepEquals, test.expectExpiry.UTC())
 		c.Assert(ctl.MonitorLeaseOwner, gc.Equals, test.newOwner)
@@ -434,6 +436,110 @@ func (s *monitorSuite) TestUpdateModelCountsNotFoundController(c *gc.C) {
 	err = s.jem.UpdateModelCounts(testContext, params.EntityPath{"bob", "not-controller"}, "real-uuid", nil, T(0))
 	c.Assert(err, gc.ErrorMatches, `model not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}
+
+func (s *monitorSuite) TestSetControllerAvailability(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "x"}
+	ctl := &mongodoc.Controller{Path: ctlPath}
+	err := s.jem.DB.InsertController(testContext, ctl)
+
+	// Check that we can mark it as unavailable.
+	t0 := time.Now()
+	err = s.jem.SetControllerUnavailableAt(testContext, ctlPath, t0)
+	c.Assert(err, gc.Equals, nil)
+
+	ctl = &mongodoc.Controller{Path: ctlPath}
+	err = s.jem.DB.GetController(testContext, ctl)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(ctl.UnavailableSince.UTC(), jc.DeepEquals, mongodoc.Time(t0).UTC())
+
+	// Check that if we mark it unavailable again, it doesn't
+	// have any affect.
+	err = s.jem.SetControllerUnavailableAt(testContext, ctlPath, t0.Add(time.Second))
+	c.Assert(err, gc.Equals, nil)
+
+	ctl = &mongodoc.Controller{Path: ctlPath}
+	err = s.jem.DB.GetController(testContext, ctl)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(ctl.UnavailableSince.UTC(), jc.DeepEquals, mongodoc.Time(t0).UTC())
+
+	// Check that we can mark it as available again.
+	err = s.jem.SetControllerAvailable(testContext, ctlPath)
+	c.Assert(err, gc.Equals, nil)
+
+	ctl = &mongodoc.Controller{Path: ctlPath}
+	err = s.jem.DB.GetController(testContext, ctl)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(ctl.UnavailableSince, jc.Satisfies, time.Time.IsZero)
+
+	t1 := t0.Add(3 * time.Second)
+	// ... and that we can mark it as unavailable after that.
+	err = s.jem.SetControllerUnavailableAt(testContext, ctlPath, t1)
+	c.Assert(err, gc.Equals, nil)
+
+	ctl = &mongodoc.Controller{Path: ctlPath}
+	err = s.jem.DB.GetController(testContext, ctl)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(ctl.UnavailableSince.UTC(), jc.DeepEquals, mongodoc.Time(t1).UTC())
+}
+
+func (s *monitorSuite) TestSetControllerAvailabilityWithNotFoundController(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "x"}
+	err := s.jem.SetControllerUnavailableAt(testContext, ctlPath, time.Now())
+	c.Assert(err, gc.Equals, nil)
+	err = s.jem.SetControllerAvailable(testContext, ctlPath)
+	c.Assert(err, gc.Equals, nil)
+}
+
+func (s *monitorSuite) TestSetControllerVersion(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "x"}
+	ctl := &mongodoc.Controller{
+		Path: ctlPath,
+	}
+	err := s.jem.DB.InsertController(testContext, ctl)
+	c.Assert(err, gc.Equals, nil)
+
+	testVersion := version.Number{Minor: 1}
+	err = s.jem.SetControllerVersion(testContext, ctlPath, testVersion)
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.jem.DB.GetController(testContext, ctl)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(ctl.Version, jc.DeepEquals, &testVersion)
+}
+
+func (s *monitorSuite) TestSetControllerVersionWithNotFoundController(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "x"}
+	err := s.jem.SetControllerVersion(testContext, ctlPath, version.Number{Minor: 1})
+	c.Assert(err, gc.Equals, nil)
+}
+
+func (s *monitorSuite) TestSetControllerStatsNotFound(c *gc.C) {
+	err := s.jem.SetControllerStats(testContext, params.EntityPath{"bob", "foo"}, &mongodoc.ControllerStats{})
+	c.Assert(err, gc.ErrorMatches, "controller not found")
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}
+
+func (s *monitorSuite) TestSetControllerStats(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
+	err := s.jem.DB.InsertController(testContext, &mongodoc.Controller{
+		Path: ctlPath,
+		UUID: "fake-uuid",
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	stats := &mongodoc.ControllerStats{
+		UnitCount:    1,
+		ModelCount:   2,
+		ServiceCount: 3,
+		MachineCount: 4,
+	}
+	err = s.jem.SetControllerStats(testContext, ctlPath, stats)
+	c.Assert(err, gc.Equals, nil)
+	ctl := mongodoc.Controller{Path: ctlPath}
+	err = s.jem.DB.GetController(testContext, &ctl)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(ctl.Stats, jc.DeepEquals, *stats)
 }
 
 func parseTime(s string) time.Time {

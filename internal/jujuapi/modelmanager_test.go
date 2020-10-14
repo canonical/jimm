@@ -25,8 +25,8 @@ import (
 	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/mgo.v2/bson"
 
+	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/kubetest"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
@@ -652,22 +652,12 @@ func (s *modelManagerSuite) TestModelInfoForLegacyModel(c *gc.C) {
 	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: "cred1"})
 	modelUUID1 := mi.UUID
 
-	err := s.JEM.DB.Models().UpdateId("test/model-1", bson.D{{
-		"$unset",
-		bson.D{{
-			"cloud", 1,
-		}, {
-			"cloudregion", 1,
-		}, {
-			"credential", 1,
-		}, {
-			"defaultseries", 1,
-		}},
-	}})
+	model := mongodoc.Model{Path: params.EntityPath{"test", "model-1"}}
+	u := new(jimmdb.Update).Unset("cloud").Unset("cloudregion").Unset("cretential").Unset("defaultseries")
+	err := s.JEM.DB.UpdateModel(ctx, &model, u, true)
 	c.Assert(err, gc.Equals, nil)
 
 	// Sanity check the required fields aren't present.
-	model := mongodoc.Model{Path: params.EntityPath{"test", "model-1"}}
 	err = s.JEM.DB.GetModel(ctx, &model)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model.Cloud, gc.Equals, params.Cloud(""))
@@ -721,22 +711,12 @@ func (s *modelManagerSuite) TestModelInfoForLegacyModelDisableControllerUUIDMask
 	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: "cred1"})
 	modelUUID1 := mi.UUID
 
-	err := s.JEM.DB.Models().UpdateId("test/model-1", bson.D{{
-		"$unset",
-		bson.D{{
-			"cloud", 1,
-		}, {
-			"cloudregion", 1,
-		}, {
-			"credential", 1,
-		}, {
-			"defaultseries", 1,
-		}},
-	}})
+	model := mongodoc.Model{Path: params.EntityPath{"test", "model-1"}}
+	u := new(jimmdb.Update).Unset("cloud").Unset("cloudregion").Unset("cretential").Unset("defaultseries")
+	err := s.JEM.DB.UpdateModel(ctx, &model, u, true)
 	c.Assert(err, gc.Equals, nil)
 
 	// Sanity check the required fields aren't present.
-	model := mongodoc.Model{Path: params.EntityPath{"test", "model-1"}}
 	err = s.JEM.DB.GetModel(ctx, &model)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model.Cloud, gc.Equals, params.Cloud(""))

@@ -8,7 +8,6 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
@@ -62,10 +61,10 @@ func (db *Database) GetModel(ctx context.Context, m *mongodoc.Model) (err error)
 }
 
 // CountModels counts the number of models that match the given query.
-func (db *Database) CountModels(ctx context.Context, query interface{}) (i int, err error) {
+func (db *Database) CountModels(ctx context.Context, q Query) (i int, err error) {
 	defer db.checkError(ctx, &err)
-	zapctx.Debug(ctx, "CountModels", zaputil.BSON("q", query))
-	n, err := db.Models().Find(query).Count()
+	zapctx.Debug(ctx, "CountModels", zaputil.BSON("q", q))
+	n, err := db.Models().Find(q).Count()
 	if err != nil {
 		return 0, errgo.Notef(err, "cannot count models")
 	}
@@ -73,18 +72,17 @@ func (db *Database) CountModels(ctx context.Context, query interface{}) (i int, 
 }
 
 // ForEachModel iterates through every model that matches the given query,
-// calling the givne fucntion with each model. If a sort is specified then
-// the the models will iterate in the sorted order. If the function returns
-// an error the iterator stops immediately and the error is retuned
-// unmasked.
-func (db *Database) ForEachModel(ctx context.Context, query interface{}, sort []string, f func(*mongodoc.Model) error) (err error) {
+// calling the given function with each model. If a sort is specified then
+// the models will iterate in the sorted order. If the function returns an
+// error the iterator stops immediately and the error is retuned unmasked.
+func (db *Database) ForEachModel(ctx context.Context, q Query, sort []string, f func(*mongodoc.Model) error) (err error) {
 	defer db.checkError(ctx, &err)
-	q := db.Models().Find(query)
+	query := db.Models().Find(q)
 	if len(sort) > 0 {
-		q = q.Sort(sort...)
+		query = query.Sort(sort...)
 	}
-	zapctx.Debug(ctx, "ForEachModel", zaputil.BSON("q", query), zap.Strings("sort", sort))
-	it := q.Iter()
+	zapctx.Debug(ctx, "ForEachModel", zaputil.BSON("q", q), zap.Strings("sort", sort))
+	it := query.Iter()
 	defer it.Close()
 	var m mongodoc.Model
 	for it.Next(&m) {
@@ -145,6 +143,18 @@ func (db *Database) RemoveModel(ctx context.Context, m *mongodoc.Model) (err err
 	return nil
 }
 
+// RemoveModels removes all models that match the given query from the
+// database. The number of removed models will be returned.
+func (db *Database) RemoveModels(ctx context.Context, q Query) (count int, err error) {
+	defer db.checkError(ctx, &err)
+	zapctx.Debug(ctx, "RemoveModels", zaputil.BSON("q", q))
+	info, err := db.Models().RemoveAll(q)
+	if err != nil {
+		return info.Removed, errgo.Notef(err, "cannot remove models")
+	}
+	return info.Removed, nil
+}
+
 // modelQuery calculates a query to use to find the matching database
 // model. This with be the first non-zero value in the given model from the
 // following fields:
@@ -155,16 +165,16 @@ func (db *Database) RemoveModel(ctx context.Context, m *mongodoc.Model) (err err
 //
 // if all of these fields are zero valued then a nil value will be
 // returned.
-func modelQuery(m *mongodoc.Model) bson.D {
+func modelQuery(m *mongodoc.Model) Query {
 	switch {
 	case m == nil:
 		return nil
 	case !m.Path.IsZero():
-		return bson.D{{"path", m.Path}}
+		return Eq("path", m.Path)
 	case m.UUID != "":
-		q := bson.D{{"uuid", m.UUID}}
+		q := Eq("uuid", m.UUID)
 		if !m.Controller.IsZero() {
-			q = append(q, bson.DocElem{"controller", m.Controller})
+			q = And(q, Eq("controller", m.Controller))
 		}
 		return q
 	default:

@@ -9,6 +9,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
@@ -43,7 +44,7 @@ func (r *controllerRoot) UserModelStats(ctx context.Context) (params.UserModelSt
 	user := r.identity.Id()
 	it := r.jem.DB.NewCanReadIter(r.identity,
 		r.jem.DB.Models().
-			Find(bson.D{{"creator", user}}).
+			Find(jimmdb.Eq("creator", user)).
 			Select(bson.D{{"uuid", 1}, {"path", 1}, {"creator", 1}, {"counts", 1}}).
 			Iter())
 	var model mongodoc.Model

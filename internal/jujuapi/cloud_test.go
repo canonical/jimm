@@ -70,7 +70,7 @@ func (s *cloudSuite) TestDefaultCloud(c *gc.C) {
 		c.Assert(err, gc.Equals, nil)
 		for j, cloud := range test.cloudNames {
 			ctlPath := params.EntityPath{User: "test", Name: params.Name(fmt.Sprintf("controller-%d", j))}
-			err := s.JEM.DB.AddController(ctx, &mongodoc.Controller{
+			err := s.JEM.DB.InsertController(ctx, &mongodoc.Controller{
 				Path:   ctlPath,
 				ACL:    params.ACL{Read: []string{"everyone"}},
 				CACert: "cacert",

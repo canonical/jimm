@@ -77,7 +77,7 @@ func (s *applicationoffersSuite) SetUpTest(c *gc.C) {
 	hps, err := mongodoc.ParseAddresses(info.Addrs)
 	c.Assert(err, gc.Equals, nil)
 	s.caCert, _ = s.ControllerConfig.CACert()
-	err = s.jem.DB.AddController(ctx, &mongodoc.Controller{
+	err = s.jem.DB.InsertController(ctx, &mongodoc.Controller{
 		Path: params.EntityPath{User: "user1", Name: "controller-1"},
 		ACL: params.ACL{
 			Read: []string{"everyone"},

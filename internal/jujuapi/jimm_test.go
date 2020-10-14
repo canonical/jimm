@@ -12,6 +12,7 @@ import (
 	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -151,11 +152,14 @@ func (s *jimmSuite) TestListControllers(c *gc.C) {
 	ctlId1 := s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	ctlId2 := s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-2"}, true)
 
-	c0, err := s.JEM.DB.Controller(context.Background(), ctlId0)
+	c0 := &mongodoc.Controller{Path: ctlId0}
+	err := s.JEM.DB.GetController(context.Background(), c0)
 	c.Assert(err, gc.Equals, nil)
-	c1, err := s.JEM.DB.Controller(context.Background(), ctlId1)
+	c1 := &mongodoc.Controller{Path: ctlId1}
+	err = s.JEM.DB.GetController(context.Background(), c1)
 	c.Assert(err, gc.Equals, nil)
-	c2, err := s.JEM.DB.Controller(context.Background(), ctlId2)
+	c2 := &mongodoc.Controller{Path: ctlId2}
+	err = s.JEM.DB.GetController(context.Background(), c2)
 	c.Assert(err, gc.Equals, nil)
 
 	// Open the API connection as user "test".
