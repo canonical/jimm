@@ -343,118 +343,6 @@ func (s *jemSuite) TestUpdateCredential(c *gc.C) {
 	}})
 }
 
-func (s *jemSuite) TestDoControllers(c *gc.C) {
-	var testControllers = []mongodoc.Controller{{
-		Path: params.EntityPath{
-			User: params.User("alice"),
-			Name: "aws-eu-west-1",
-		},
-		ACL: params.ACL{
-			Read: []string{"bob"},
-		},
-		Public: true,
-	}, {
-		Path: params.EntityPath{
-			User: params.User("alice"),
-			Name: "aws-us-east-1",
-		},
-		ACL: params.ACL{
-			Read: []string{"bob-group"},
-		},
-		Public: true,
-	}, {
-		Path: params.EntityPath{
-			User: params.User("bob"),
-			Name: "aws-us-east-1",
-		},
-		ACL: params.ACL{
-			Read: []string{"everyone"},
-		},
-		Public: true,
-	}, {
-		Path: params.EntityPath{
-			User: params.User("alice"),
-			Name: "aws-eu-west-2",
-		},
-		ACL: params.ACL{
-			Read: []string{"someoneelse"},
-		},
-		Public: true,
-	}, {
-		Path: params.EntityPath{
-			User: params.User("alice"),
-			Name: "aws-eu-west-3",
-		},
-		UnavailableSince: time.Now(),
-		ACL: params.ACL{
-			Read: []string{"everyone"},
-		},
-		Public: true,
-	}, {
-		Path: params.EntityPath{
-			User: params.User("alice"),
-			Name: "aws-eu-west-4",
-		},
-		Public: false,
-		ACL: params.ACL{
-			Read: []string{"everyone"},
-		},
-	}}
-	for i := range testControllers {
-		err := s.jem.DB.AddController(testContext, &testControllers[i])
-		c.Assert(err, gc.Equals, nil)
-	}
-	var controllers []string
-	err := jem.DoControllers(s.jem, testContext, jemtest.NewIdentity("bob", "bob-group"), func(c *mongodoc.Controller) error {
-		controllers = append(controllers, c.Id)
-		return nil
-	})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(controllers, gc.DeepEquals, []string{
-		"alice/aws-eu-west-1",
-		"alice/aws-us-east-1",
-		"bob/aws-us-east-1",
-	})
-}
-
-var controllerTests = []struct {
-	path             params.EntityPath
-	expectErrorCause error
-}{{
-	path: params.EntityPath{"bob", "controller"},
-}, {
-	path: params.EntityPath{"bob-group", "controller"},
-}, {
-	path:             params.EntityPath{"alice", "controller"},
-	expectErrorCause: params.ErrUnauthorized,
-}, {
-	path:             params.EntityPath{"bob", "controller2"},
-	expectErrorCause: params.ErrNotFound,
-}, {
-	path:             params.EntityPath{"bob-group", "controller2"},
-	expectErrorCause: params.ErrNotFound,
-}, {
-	path:             params.EntityPath{"alice", "controller2"},
-	expectErrorCause: params.ErrUnauthorized,
-}}
-
-func (s *jemSuite) TestController(c *gc.C) {
-	s.addController(c, params.EntityPath{"alice", "controller"})
-	s.addController(c, params.EntityPath{"bob", "controller"})
-	s.addController(c, params.EntityPath{"bob-group", "controller"})
-
-	for i, test := range controllerTests {
-		c.Logf("tes %d. %s", i, test.path)
-		ctl, err := s.jem.Controller(testContext, jemtest.NewIdentity("bob", "bob-group"), test.path)
-		if test.expectErrorCause != nil {
-			c.Assert(errgo.Cause(err), gc.Equals, test.expectErrorCause)
-			continue
-		}
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(ctl.Path, jc.DeepEquals, test.path)
-	}
-}
-
 var credentialTests = []struct {
 	path             params.CredentialPath
 	expectErrorCause error
@@ -611,7 +499,7 @@ func (s *jemSuite) TestEarliestControllerVersion(c *gc.C) {
 		_, err := s.jem.DB.Controllers().RemoveAll(nil)
 		c.Assert(err, gc.Equals, nil)
 		for _, ctl := range test.controllers {
-			err := s.jem.DB.AddController(testContext, &ctl)
+			err := s.jem.DB.InsertController(testContext, &ctl)
 			c.Assert(err, gc.Equals, nil)
 		}
 		v, err := s.jem.EarliestControllerVersion(testContext, jemtest.NewIdentity("someone"))

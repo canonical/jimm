@@ -15,11 +15,24 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/conv"
+	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
 	"github.com/CanonicalLtd/jimm/params"
 )
+
+// GetController retrieves the given controller from the database,
+// validating that the current user is allowed to read the controller.
+func (j *JEM) GetController(ctx context.Context, id identchecker.ACLIdentity, ctl *mongodoc.Controller) error {
+	if err := j.DB.GetController(ctx, ctl); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	if err := auth.CheckCanRead(ctx, id, ctl); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	return nil
+}
 
 // AddController adds the given controller to the system.
 func (j *JEM) AddController(ctx context.Context, id identchecker.ACLIdentity, ctl *mongodoc.Controller) error {
@@ -74,7 +87,7 @@ func (j *JEM) AddController(ctx context.Context, id identchecker.ACLIdentity, ct
 	// address we succeeded in connecting to.
 	ctl.HostPorts = mongodocAPIHostPorts(conn.APIHostPorts())
 
-	if err := j.DB.AddController(ctx, ctl); err != nil {
+	if err := j.DB.InsertController(ctx, ctl); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
 
@@ -154,6 +167,79 @@ func (j *JEM) updateControllerCloud(
 	return errgo.Mask(j.DB.UpdateCloudRegions(ctx, regions))
 }
 
+// SetControllerDeprecated sets whether the given controller is deprecated.
+func (j *JEM) SetControllerDeprecated(ctx context.Context, id identchecker.ACLIdentity, ctlPath params.EntityPath, deprecated bool) error {
+	// Only a controller admin can mark a controller deprecated.
+	if err := auth.CheckIsUser(ctx, id, j.ControllerAdmin()); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+
+	u := new(jimmdb.Update)
+	if deprecated {
+		u.Set("deprecated", true)
+	} else {
+		// A controller that's not deprecated is stored with no deprecated
+		// field for backward compatibility and consistency.
+		u.Unset("deprecated")
+	}
+	return errgo.Mask(j.DB.UpdateController(ctx, &mongodoc.Controller{Path: ctlPath}, u, true), errgo.Is(params.ErrNotFound))
+}
+
+// DeleteController deletes existing controller and all of its
+// associated models from the database. It returns an error if
+// either deletion fails. If there is no matching controller then the
+// error will have the cause params.ErrNotFound.
+//
+// Note that this operation is not atomic.
+func (j *JEM) DeleteController(ctx context.Context, id identchecker.ACLIdentity, ctl *mongodoc.Controller, force bool) error {
+	// Only a controller admin can delete a controller.
+	if err := auth.CheckIsUser(ctx, id, ctl.Path.User); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+
+	// TODO (urosj) make this operation atomic.
+	if err := j.DB.GetController(ctx, ctl); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+
+	if !force && ctl.UnavailableSince.IsZero() {
+		return errgo.WithCausef(nil, params.ErrStillAlive, "cannot delete controller while it is still alive")
+	}
+
+	// Delete controller from credentials.
+	if err := j.DB.CredentialsRemoveController(ctx, ctl.Path); err != nil {
+		return errgo.Notef(err, "error deleting controller from credentials")
+	}
+
+	// Delete controller from cloud regions.
+	if err := j.DB.DeleteControllerFromCloudRegions(ctx, ctl.Path); err != nil {
+		return errgo.Mask(err)
+	}
+
+	// Delete its models first.
+	removed, err := j.DB.RemoveModels(ctx, jimmdb.Eq("controller", ctl.Path))
+	if err != nil {
+		errgo.Notef(err, "error deleting controller models")
+	}
+
+	// Then delete the controller.
+	if err := j.DB.RemoveController(ctx, ctl); err != nil {
+		if errgo.Cause(err) == params.ErrNotFound {
+			return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		}
+		zapctx.Error(ctx, "could not delete controller after removing models",
+			zap.Int("model-count", removed),
+			zaputil.Error(err),
+		)
+		return errgo.Notef(err, "cannot delete controller")
+	}
+	zapctx.Info(ctx, "deleted controller",
+		zap.Stringer("controller", ctl.Path),
+		zap.Int("model-count", removed),
+	)
+	return nil
+}
+
 // ConnectMonitor creates a connection to the given controller for use by
 // monitors. On a successful connection the cloud information will be read
 // from the controller and the local database updated, also any outstanding
@@ -163,26 +249,26 @@ func (j *JEM) updateControllerCloud(
 // error connecting to the controller then an error with a cause of
 // ErrAPIConnection will be returned.
 func (j *JEM) ConnectMonitor(ctx context.Context, path params.EntityPath) (*apiconn.Conn, error) {
-	ctl, err := j.DB.Controller(ctx, path)
-	if err != nil {
+	ctl := mongodoc.Controller{Path: path}
+	if err := j.DB.GetController(ctx, &ctl); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 
-	conn, err := j.OpenAPIFromDoc(ctx, ctl)
+	conn, err := j.OpenAPIFromDoc(ctx, &ctl)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(ErrAPIConnection))
 	}
 
 	if v, ok := conn.ServerVersion(); ok {
-		if err := j.DB.SetControllerVersion(ctx, path, v); err != nil {
+		if err := j.SetControllerVersion(ctx, path, v); err != nil {
 			zapctx.Warn(ctx, "cannot update controller version", zap.Error(err))
 		}
 	}
 
-	if err := j.updateControllerClouds(ctx, conn, ctl); err != nil {
+	if err := j.updateControllerClouds(ctx, conn, &ctl); err != nil {
 		zapctx.Warn(ctx, "cannot update controller clouds", zap.Error(err))
 	}
-	j.controllerUpdateCredentials(ctx, conn, ctl)
+	j.controllerUpdateCredentials(ctx, conn, &ctl)
 	return conn, nil
 }
 

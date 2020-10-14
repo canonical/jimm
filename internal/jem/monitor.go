@@ -7,12 +7,11 @@ import (
 	"time"
 
 	"gopkg.in/errgo.v1"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
+	"github.com/juju/version"
 )
 
 // ErrLeaseUnavailable is the error cause returned by AcquireMonitorLease
@@ -32,42 +31,34 @@ var ErrLeaseUnavailable params.ErrorCode = "cannot acquire lease"
 // cause will be returned. If the lease has been obtained by someone else
 // an error with a ErrLeaseUnavailable cause will be returned.
 func (j *JEM) AcquireMonitorLease(ctx context.Context, ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {
-	var update bson.D
+	update := new(jimmdb.Update)
 	if newOwner != "" {
 		newExpiry = mongodoc.Time(newExpiry)
-		update = bson.D{{"$set", bson.D{
-			{"monitorleaseexpiry", newExpiry},
-			{"monitorleaseowner", newOwner},
-		}}}
+		update.Set("monitorleaseexpiry", newExpiry).Set("monitorleaseowner", newOwner)
 	} else {
 		newExpiry = time.Time{}
-		update = bson.D{{"$unset", bson.D{
-			{"monitorleaseexpiry", nil},
-			{"monitorleaseowner", nil},
-		}}}
+		update.Unset("monitorleaseexpiry").Unset("monitorleaseowner")
 	}
-	var oldOwnerQuery interface{}
-	var oldExpiryQuery interface{}
+	var oldOwnerQuery jimmdb.Query
+	var oldExpiryQuery jimmdb.Query
 	if oldOwner == "" {
-		oldOwnerQuery = notExistsQuery
+		oldOwnerQuery = jimmdb.NotExists("monitorleaseowner")
 	} else {
-		oldOwnerQuery = oldOwner
+		oldOwnerQuery = jimmdb.Eq("monitorleaseowner", oldOwner)
 	}
 	if oldExpiry.IsZero() {
-		oldExpiryQuery = notExistsQuery
+		oldExpiryQuery = jimmdb.NotExists("monitorleaseexpiry")
 	} else {
-		oldExpiryQuery = oldExpiry
+		oldExpiryQuery = jimmdb.Eq("monitorleaseexpiry", oldExpiry)
 	}
-	err := j.DB.Controllers().Update(bson.D{
-		{"path", ctlPath},
-		{"monitorleaseexpiry", oldExpiryQuery},
-		{"monitorleaseowner", oldOwnerQuery},
-	}, update)
-	if err == mgo.ErrNotFound {
+	q := jimmdb.And(jimmdb.Eq("path", ctlPath), oldOwnerQuery, oldExpiryQuery)
+	err := j.DB.UpdateControllerQuery(ctx, q, nil, update, false)
+	if errgo.Cause(err) == params.ErrNotFound {
 		// Someone else got there first, or the document has been
 		// removed. Technically don't need to distinguish between the
 		// two cases, but it's useful to see the different error messages.
-		ctl, err := j.DB.Controller(ctx, ctlPath)
+		ctl := &mongodoc.Controller{Path: ctlPath}
+		err := j.DB.GetController(ctx, ctl)
 		if errgo.Cause(err) == params.ErrNotFound {
 			return time.Time{}, errgo.WithCausef(nil, params.ErrNotFound, "controller removed")
 		}
@@ -120,7 +111,7 @@ func (j *JEM) SetModelLife(ctx context.Context, ctlPath params.EntityPath, uuid 
 // controller.
 func (j *JEM) ModelUUIDsForController(ctx context.Context, ctlPath params.EntityPath) ([]string, error) {
 	var uuids []string
-	err := j.DB.ForEachModel(ctx, bson.D{{"controller", ctlPath}}, nil, func(m *mongodoc.Model) error {
+	err := j.DB.ForEachModel(ctx, jimmdb.Eq("controller", ctlPath), nil, func(m *mongodoc.Model) error {
 		uuids = append(uuids, m.UUID)
 		return nil
 	})
@@ -154,4 +145,60 @@ func (j *JEM) UpdateModelCounts(ctx context.Context, ctlPath params.EntityPath, 
 		u.Set(string("counts."+k), c)
 	}
 	return errgo.Mask(j.DB.UpdateModel(ctx, &m, u, false))
+}
+
+// SetControllerUnavailableAt marks the controller as having been unavailable
+// since at least the given time. If the controller was already marked
+// as unavailable, its time isn't changed.
+// This method does not return an error when the controller doesn't exist.
+func (j *JEM) SetControllerUnavailableAt(ctx context.Context, ctlPath params.EntityPath, t time.Time) error {
+	q := jimmdb.And(jimmdb.Eq("path", ctlPath), jimmdb.NotExists("unavailablesince"))
+	u := new(jimmdb.Update).Set("unavailablesince", t)
+	err := j.DB.UpdateControllerQuery(ctx, q, nil, u, false)
+	if err == nil || errgo.Cause(err) == params.ErrNotFound {
+		// We don't know whether a not-found error is because there
+		// are no controllers with the given name (in which case we want
+		// to return a params.ErrNotFound error) or because there was
+		// one but it is already unavailable.
+		// We could fetch the controller to decide whether it's actually there
+		// or not, but because in practice we don't care if we're setting
+		// controller-unavailable on a non-existent controller, we'll
+		// save the round trip.
+		return nil
+	}
+	return errgo.Mask(err)
+}
+
+// SetControllerAvailable marks the given controller as available.
+// This method does not return an error when the controller doesn't exist.
+func (j *JEM) SetControllerAvailable(ctx context.Context, ctlPath params.EntityPath) error {
+	u := new(jimmdb.Update).Unset("unavailablesince")
+	err := j.DB.UpdateController(ctx, &mongodoc.Controller{Path: ctlPath}, u, false)
+	if err == nil || errgo.Cause(err) == params.ErrNotFound {
+		return nil
+	}
+	return errgo.Mask(err)
+}
+
+// SetControllerVersion sets the agent version of the given controller.
+// This method does not return an error when the controller doesn't exist.
+func (j *JEM) SetControllerVersion(ctx context.Context, ctlPath params.EntityPath, v version.Number) error {
+	u := new(jimmdb.Update).Set("version", v)
+	err := j.DB.UpdateController(ctx, &mongodoc.Controller{Path: ctlPath}, u, false)
+	if err == nil || errgo.Cause(err) == params.ErrNotFound {
+		// For symmetry with SetControllerUnavailableAt.
+		return nil
+	}
+	return errgo.Mask(err)
+}
+
+// SetControllerStats sets the stats associated with the controller
+// with the given path. It returns an error with a params.ErrNotFound
+// cause if the controller does not exist.
+func (j *JEM) SetControllerStats(ctx context.Context, ctlPath params.EntityPath, stats *mongodoc.ControllerStats) error {
+	u := new(jimmdb.Update).Set("stats", stats)
+	if err := j.DB.UpdateController(ctx, &mongodoc.Controller{Path: ctlPath}, u, false); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return nil
 }

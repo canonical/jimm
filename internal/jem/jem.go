@@ -26,7 +26,6 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
@@ -132,8 +131,6 @@ type Pool struct {
 }
 
 var APIOpenTimeout = 15 * time.Second
-
-var notExistsQuery = bson.D{{"$exists", false}}
 
 // NewPool represents a pool of possible JEM instances that use the given
 // database as a store, and use the given bakery parameters to create the
@@ -300,11 +297,11 @@ var ErrAPIConnection params.ErrorCode = "cannot connect to API"
 //
 // The returned connection must be closed when finished with.
 func (j *JEM) OpenAPI(ctx context.Context, path params.EntityPath) (*apiconn.Conn, error) {
-	ctl, err := j.DB.Controller(ctx, path)
-	if err != nil {
+	ctl := mongodoc.Controller{Path: path}
+	if err := j.DB.GetController(ctx, &ctl); err != nil {
 		return nil, errgo.NoteMask(err, "cannot get controller", errgo.Is(params.ErrNotFound))
 	}
-	return j.OpenAPIFromDoc(ctx, ctl)
+	return j.OpenAPIFromDoc(ctx, &ctl)
 }
 
 // OpenAPIFromDoc returns an API connection to the controller held in the
@@ -358,11 +355,11 @@ func (j *JEM) OpenModelAPI(ctx context.Context, path params.EntityPath) (*apicon
 	if err := j.DB.GetModel(ctx, &m); err != nil {
 		return nil, errgo.NoteMask(err, "cannot get model", errgo.Is(params.ErrNotFound))
 	}
-	ctl, err := j.DB.Controller(ctx, m.Controller)
-	if err != nil {
+	ctl := mongodoc.Controller{Path: m.Controller}
+	if err := j.DB.GetController(ctx, &ctl); err != nil {
 		return nil, errgo.Notef(err, "cannot get controller")
 	}
-	return j.openModelAPIFromDocs(ctx, ctl, &m)
+	return j.openModelAPIFromDocs(ctx, &ctl, &m)
 }
 
 // openModelAPIFromDocs returns an API connection to the model held in the
@@ -471,16 +468,6 @@ func (j *JEM) updateModelInfo(ctx context.Context, model *mongodoc.Model) error 
 	return errgo.Mask(j.DB.UpdateModel(ctx, model, u, true))
 }
 
-// Controller retrieves the given controller from the database,
-// validating that the current user is allowed to read the controller.
-func (j *JEM) Controller(ctx context.Context, id identchecker.ACLIdentity, path params.EntityPath) (*mongodoc.Controller, error) {
-	if err := j.DB.CheckReadACL(ctx, id, j.DB.Controllers(), path); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	ctl, err := j.DB.Controller(ctx, path)
-	return ctl, errgo.Mask(err, errgo.Is(params.ErrNotFound))
-}
-
 // GetCredential retrieves the given credential from the database,
 // validating that the current user is allowed to read the credential.
 func (j *JEM) GetCredential(ctx context.Context, id identchecker.ACLIdentity, cred *mongodoc.Credential) error {
@@ -579,7 +566,7 @@ func (j *JEM) RevokeCredential(ctx context.Context, credPath params.CredentialPa
 	}
 	controllers := cred.Controllers
 	if flags&CredentialCheck != 0 {
-		n, err := j.DB.CountModels(ctx, bson.D{{"credential", mongodoc.CredentialPathFromParams(credPath)}})
+		n, err := j.DB.CountModels(ctx, jimmdb.Eq("credential", mongodoc.CredentialPathFromParams(credPath)))
 		if err != nil {
 			return errgo.Mask(err)
 		}
@@ -873,8 +860,15 @@ func (j *JEM) EarliestControllerVersion(ctx context.Context, id identchecker.ACL
 	// and we don't really need to make this extra round trip every
 	// time a user connects to the API?
 	var v *version.Number
-	if err := j.doControllers(ctx, id, func(c *mongodoc.Controller) error {
-		zapctx.Debug(ctx, "in EarliestControllerVersion", zap.Stringer("controller", c.Path), zap.Stringer("version", c.Version))
+	err := j.DB.ForEachController(ctx, jimmdb.NotExists("unavailablesince"), nil, func(c *mongodoc.Controller) error {
+		ctx := zapctx.WithFields(ctx, zap.Stringer("controller", c.Path))
+		if err := auth.CheckCanRead(ctx, id, c); err != nil {
+			if errgo.Cause(err) != params.ErrUnauthorized {
+				zapctx.Warn(ctx, "cannot check read access", zap.Error(err))
+			}
+			return nil
+		}
+		zapctx.Debug(ctx, "EarliestControllerVersion", zap.Stringer("version", c.Version))
 		if c.Version == nil {
 			return nil
 		}
@@ -882,40 +876,11 @@ func (j *JEM) EarliestControllerVersion(ctx context.Context, id identchecker.ACL
 			v = c.Version
 		}
 		return nil
-	}); err != nil {
+	})
+	if err != nil || v == nil {
 		return version.Number{}, errgo.Mask(err)
 	}
-	if v == nil {
-		return version.Number{}, nil
-	}
 	return *v, nil
-}
-
-// doControllers calls the given function for each controller that
-// can be read by the current user that matches the given attributes.
-// If the function returns an error, the iteration stops and
-// doControllers returns the error with the same cause.
-//
-// Note that the same pointer is passed to the do function on
-// each iteration. It is the responsibility of the do function to
-// copy it if needed.
-func (j *JEM) doControllers(ctx context.Context, id identchecker.ACLIdentity, do func(c *mongodoc.Controller) error) error {
-	// Query all the controllers that match the attributes, building
-	// up all the possible values.
-	q := j.DB.Controllers().Find(bson.D{{"unavailablesince", notExistsQuery}, {"public", true}})
-	// Sort by _id so that we can make easily reproducible tests.
-	iter := j.DB.NewCanReadIter(id, q.Sort("_id").Iter())
-	var ctl mongodoc.Controller
-	for iter.Next(ctx, &ctl) {
-		if err := do(&ctl); err != nil {
-			iter.Close(ctx)
-			return errgo.Mask(err, errgo.Any)
-		}
-	}
-	if err := iter.Err(ctx); err != nil {
-		return errgo.Notef(err, "cannot query")
-	}
-	return nil
 }
 
 // UpdateMachineInfo updates the information associated with a machine.

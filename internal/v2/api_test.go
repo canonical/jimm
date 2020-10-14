@@ -318,7 +318,8 @@ func (s *APISuite) TestAddController(c *gc.C) {
 		conn.Close()
 
 		// Check that the version has been set correctly.
-		ctl, err := s.JEM.DB.Controller(context.TODO(), controllerPath)
+		ctl := &mongodoc.Controller{Path: controllerPath}
+		err = s.JEM.DB.GetController(context.TODO(), ctl)
 		c.Assert(err, gc.Equals, nil)
 		v, ok := conn.ServerVersion()
 		c.Assert(ok, gc.Equals, true)
@@ -447,7 +448,7 @@ func (s *APISuite) TestGetController(c *gc.C) {
 
 	ctlId := s.AssertAddController(ctx, c, params.EntityPath{"bob", "foo"}, false)
 	t := time.Now()
-	err := s.JEM.DB.SetControllerUnavailableAt(ctx, ctlId, t)
+	err := s.JEM.SetControllerUnavailableAt(ctx, ctlId, t)
 	c.Assert(err, gc.Equals, nil)
 
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
@@ -505,7 +506,7 @@ func (s *APISuite) TestGetControllerNotFound(c *gc.C) {
 		Handler: s.JEMSrv,
 		URL:     "/v2/controller/bob/foo",
 		ExpectBody: &params.Error{
-			Message: `controller "bob/foo" not found`,
+			Message: `controller not found`,
 			Code:    params.ErrNotFound,
 		},
 		ExpectStatus: http.StatusNotFound,
@@ -532,7 +533,7 @@ func (s *APISuite) TestDeleteControllerNotFound(c *gc.C) {
 		Handler: s.JEMSrv,
 		URL:     "/v2/controller/bob/foobarred",
 		ExpectBody: &params.Error{
-			Message: `controller "bob/foobarred" not found`,
+			Message: `controller not found`,
 			Code:    params.ErrNotFound,
 		},
 		ExpectStatus: http.StatusNotFound,
@@ -584,7 +585,7 @@ func (s *APISuite) TestDeleteController(c *gc.C) {
 		Do:           apitest.Do(s.IDMSrv.Client("bob")),
 		ExpectStatus: http.StatusNotFound,
 		ExpectBody: params.Error{
-			Message: `controller "bob/foobarred" not found`,
+			Message: `controller not found`,
 			Code:    params.ErrNotFound,
 		},
 	})
@@ -842,7 +843,7 @@ func (s *APISuite) TestGetModelWhenControllerUnavailable(c *gc.C) {
 	err := s.JEM.SetModelLife(ctx, aModel, aUUID, "dying")
 	c.Assert(err, gc.Equals, nil)
 	t := time.Now()
-	err = s.JEM.DB.SetControllerUnavailableAt(ctx, ctlId, t)
+	err = s.JEM.SetControllerUnavailableAt(ctx, ctlId, t)
 	c.Assert(err, gc.Equals, nil)
 
 	var modelRespBody json.RawMessage
@@ -1153,11 +1154,11 @@ func (s *APISuite) TestListController(c *gc.C) {
 
 	ctlId1 := s.AssertAddController(ctx, c, params.EntityPath{"bob", "lost"}, false)
 	unavailableTime := time.Now()
-	err := s.JEM.DB.SetControllerUnavailableAt(ctx, ctlId1, unavailableTime)
+	err := s.JEM.SetControllerUnavailableAt(ctx, ctlId1, unavailableTime)
 	c.Assert(err, gc.Equals, nil)
 
 	ctlId2 := s.AssertAddController(ctx, c, params.EntityPath{"bob", "another"}, false)
-	err = s.JEM.DB.SetControllerUnavailableAt(ctx, ctlId2, unavailableTime.Add(time.Second))
+	err = s.JEM.SetControllerUnavailableAt(ctx, ctlId2, unavailableTime.Add(time.Second))
 	c.Assert(err, gc.Equals, nil)
 
 	resp, err := s.NewClient("bob").ListController(ctx, nil)

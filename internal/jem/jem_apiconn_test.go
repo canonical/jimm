@@ -63,7 +63,7 @@ func (s *jemAPIConnSuite) TestPoolOpenAPI(c *gc.C) {
 		AdminPassword: info.Password,
 	}
 
-	err = s.jem.DB.AddController(testContext, ctl)
+	err = s.jem.DB.InsertController(testContext, ctl)
 	c.Assert(err, gc.Equals, nil)
 
 	// Open the API and check that it works.
@@ -124,7 +124,7 @@ func (s *jemAPIConnSuite) TestPoolOpenModelAPI(c *gc.C) {
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
 	}
-	err = s.jem.DB.AddController(testContext, ctl)
+	err = s.jem.DB.InsertController(testContext, ctl)
 	c.Assert(err, gc.Equals, nil)
 
 	mPath := params.EntityPath{"bob", "model"}
@@ -187,7 +187,7 @@ func (s *jemAPIConnSuite) TestOpenAPIFromDocsCancel(c *gc.C) {
 		AdminPassword: info.Password,
 	}
 
-	err = s.jem.DB.AddController(testContext, ctl)
+	err = s.jem.DB.InsertController(testContext, ctl)
 	c.Assert(err, gc.Equals, nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -199,7 +199,7 @@ func (s *jemAPIConnSuite) TestOpenAPIFromDocsCancel(c *gc.C) {
 
 func (s *jemAPIConnSuite) TestPoolOpenAPIError(c *gc.C) {
 	conn, err := s.jem.OpenAPI(context.Background(), params.EntityPath{"bob", "notthere"})
-	c.Assert(err, gc.ErrorMatches, `cannot get controller: controller "bob/notthere" not found`)
+	c.Assert(err, gc.ErrorMatches, `cannot get controller: controller not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	c.Assert(conn, gc.IsNil)
 }

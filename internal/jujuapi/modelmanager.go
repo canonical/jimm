@@ -193,8 +193,8 @@ func (r *controllerRoot) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 			},
 		}
 		if !r.controllerUUIDMasking {
-			c, err := r.jem.DB.Controller(ctx, model.Controller)
-			if err != nil {
+			c := &mongodoc.Controller{Path: model.Controller}
+			if err := r.jem.DB.GetController(ctx, c); err != nil {
 				return errgo.Notef(err, "failed to fetch controller: %v", model.Controller)
 			}
 			result.Result.ControllerUUID = c.UUID

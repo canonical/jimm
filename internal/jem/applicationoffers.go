@@ -107,11 +107,13 @@ func (j *JEM) GetApplicationOfferConsumeDetails(ctx context.Context, id identche
 	default:
 	}
 	// The user has consume access or higher.
-	ctl, err := j.DB.Controller(ctx, offer.ControllerPath)
-	if err != nil {
+	ctl := mongodoc.Controller{
+		Path: offer.ControllerPath,
+	}
+	if err := j.DB.GetController(ctx, &ctl); err != nil {
 		return errgo.Mask(err)
 	}
-	conn, err := j.OpenAPIFromDoc(ctx, ctl)
+	conn, err := j.OpenAPIFromDoc(ctx, &ctl)
 	if err != nil {
 		return errgo.Mask(err)
 	}

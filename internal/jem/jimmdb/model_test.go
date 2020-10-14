@@ -9,7 +9,6 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
@@ -84,7 +83,7 @@ func (s *modelSuite) TestRemoveModel(c *gc.C) {
 		AdminUser:     "foo-admin",
 		AdminPassword: "foo-password",
 	}
-	err := s.database.AddController(testContext, ctl)
+	err := s.database.InsertController(testContext, ctl)
 	c.Assert(err, gc.Equals, nil)
 
 	modelPath := params.EntityPath{"dalek", "exterminate"}
@@ -108,7 +107,7 @@ func (s *modelSuite) TestRemoveModel(c *gc.C) {
 
 func (s *modelSuite) TestRemoveModelWithUUID(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.database.AddController(testContext, &mongodoc.Controller{
+	err := s.database.InsertController(testContext, &mongodoc.Controller{
 		Path: ctlPath,
 		UUID: "fake-uuid",
 	})
@@ -207,9 +206,9 @@ func (s *modelSuite) TestForEachModel(c *gc.C) {
 		return nil
 	}
 
-	err = s.database.ForEachModel(testContext, bson.D{{"controller", ctlPath1}}, []string{"-uuid"}, f)
+	err = s.database.ForEachModel(testContext, jimmdb.Eq("controller", ctlPath1), []string{"-uuid"}, f)
 	c.Assert(err, gc.Equals, nil)
-	err = s.database.ForEachModel(testContext, bson.D{{"controller", ctlPath2}}, []string{"-uuid"}, f)
+	err = s.database.ForEachModel(testContext, jimmdb.Eq("controller", ctlPath2), []string{"-uuid"}, f)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(paths, gc.HasLen, 0)
 
@@ -232,7 +231,7 @@ func (s *modelSuite) TestForEachModelReturnsError(c *gc.C) {
 		return testError
 	}
 
-	err = s.database.ForEachModel(testContext, bson.D{{"controller", ctlPath}}, []string{"-uuid"}, f)
+	err = s.database.ForEachModel(testContext, jimmdb.Eq("controller", ctlPath), []string{"-uuid"}, f)
 	c.Assert(errgo.Cause(err), gc.Equals, testError)
 
 	s.checkDBOK(c)
@@ -261,10 +260,10 @@ func (s *modelSuite) TestCountModels(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	i, err := s.database.CountModels(testContext, bson.D{{"controller", ctlPath1}})
+	i, err := s.database.CountModels(testContext, jimmdb.Eq("controller", ctlPath1))
 	c.Assert(err, gc.Equals, nil)
 	c.Check(i, gc.Equals, 2)
-	i, err = s.database.CountModels(testContext, bson.D{{"controller", ctlPath2}})
+	i, err = s.database.CountModels(testContext, jimmdb.Eq("controller", ctlPath2))
 	c.Assert(err, gc.Equals, nil)
 	c.Check(i, gc.Equals, 1)
 

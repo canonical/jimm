@@ -17,10 +17,10 @@ import (
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/jemerror"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
@@ -147,8 +147,13 @@ func (h *Handler) AddController(p httprequest.Params, arg *params.AddController)
 
 // GetController returns information on a controller.
 func (h *Handler) GetController(p httprequest.Params, arg *params.GetController) (*params.ControllerResponse, error) {
-	ctl, err := h.jem.Controller(p.Context, h.id, arg.EntityPath)
-	if err != nil {
+	ctl := &mongodoc.Controller{Path: arg.EntityPath}
+	if err := h.jem.GetController(p.Context, h.id, ctl); err != nil {
+		if errgo.Cause(err) == params.ErrNotFound {
+			if !(auth.CheckIsUser(p.Context, h.id, ctl.Path.User) == nil) {
+				err = params.ErrUnauthorized
+			}
+		}
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	return &params.ControllerResponse{
@@ -161,27 +166,12 @@ func (h *Handler) GetController(p httprequest.Params, arg *params.GetController)
 
 // DeleteController removes an existing controller.
 func (h *Handler) DeleteController(p httprequest.Params, arg *params.DeleteController) error {
-	// Check if user has permissions.
-	if err := auth.CheckIsUser(p.Context, h.id, arg.EntityPath.User); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-
-	if !arg.Force {
-		ctl, err := h.jem.DB.Controller(p.Context, arg.EntityPath)
-		if err != nil {
-			return errgo.Mask(err, errgo.Is(params.ErrNotFound))
-		}
-		if ctl.UnavailableSince.IsZero() {
-			return errgo.WithCausef(nil, params.ErrStillAlive, "cannot delete controller while it is still alive")
-		}
-	}
-	if err := h.jem.DB.DeleteController(p.Context, arg.EntityPath); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-	if err := h.jem.DB.DeleteControllerFromCloudRegions(p.Context, arg.EntityPath); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-	return nil
+	err := h.jem.DeleteController(p.Context, h.id, &mongodoc.Controller{Path: arg.EntityPath}, arg.Force)
+	return errgo.Mask(err,
+		errgo.Is(params.ErrUnauthorized),
+		errgo.Is(params.ErrNotFound),
+		errgo.Is(params.ErrStillAlive),
+	)
 }
 
 // GetModel returns information on a given model.
@@ -193,8 +183,8 @@ func (h *Handler) GetModel(p httprequest.Params, arg *params.GetModel) (*params.
 		}
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	ctl, err := h.jem.DB.Controller(p.Context, m.Controller)
-	if err != nil {
+	ctl := mongodoc.Controller{Path: m.Controller}
+	if err := h.jem.DB.GetController(p.Context, &ctl); err != nil {
 		return nil, errgo.Mask(err)
 	}
 
@@ -388,7 +378,7 @@ func (h *Handler) setPerm(ctx context.Context, coll *mgo.Collection, path params
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	zapctx.Info(ctx, "set perm", zap.String("collection", coll.Name), zap.Stringer("entity", path), zap.Any("acl", acl))
-	if err := coll.UpdateId(path.String(), bson.D{{"$set", bson.D{{"acl", acl}}}}); err != nil {
+	if err := coll.UpdateId(path.String(), new(jimmdb.Update).Set("acl", acl)); err != nil {
 		if err == mgo.ErrNotFound {
 			return params.ErrNotFound
 		}
@@ -478,8 +468,8 @@ func (h *Handler) Migrate(p httprequest.Params, arg *params.Migrate) error {
 		return errgo.Mask(err)
 	}
 	defer conn.Close()
-	ctl, err := h.jem.Controller(p.Context, h.id, arg.Controller)
-	if err != nil {
+	ctl := mongodoc.Controller{Path: arg.Controller}
+	if err := h.jem.GetController(p.Context, h.id, &ctl); err != nil {
 		return errgo.NoteMask(err, "cannot access destination controller", errgo.Is(params.ErrNotFound))
 	}
 	zapctx.Debug(p.Context, "about to call InitiateMigration")
@@ -517,18 +507,15 @@ func (h *Handler) LogLevel(p httprequest.Params, _ *params.LogLevel) (params.Lev
 }
 
 func (h *Handler) SetControllerDeprecated(p httprequest.Params, req *params.SetControllerDeprecated) error {
-	if err := auth.CheckIsUser(p.Context, h.id, req.EntityPath.User); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	if err := h.jem.DB.SetControllerDeprecated(p.Context, req.EntityPath, req.Body.Deprecated); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	if err := h.jem.SetControllerDeprecated(p.Context, h.id, req.EntityPath, req.Body.Deprecated); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	return nil
 }
 
 func (h *Handler) GetControllerDeprecated(p httprequest.Params, req *params.GetControllerDeprecated) (*params.DeprecatedBody, error) {
-	ctl, err := h.jem.Controller(p.Context, h.id, req.EntityPath)
-	if err != nil {
+	ctl := mongodoc.Controller{Path: req.EntityPath}
+	if err := h.jem.GetController(p.Context, h.id, &ctl); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	return &params.DeprecatedBody{

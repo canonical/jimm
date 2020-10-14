@@ -10,12 +10,13 @@ type Update struct {
 	AddToSet_ bson.D `bson:"$addToSet,omitempty"`
 	Pull_     bson.D `bson:"$pull,omitempty"`
 	Set_      bson.M `bson:"$set,omitempty"`
+	Unset_    bson.M `bson:"$unset,omitempty"`
 }
 
 // IsZero returns true if this update object is empty, and would therefore
 // not make any changes.
 func (u *Update) IsZero() bool {
-	return len(u.AddToSet_) == 0 && len(u.Pull_) == 0 && len(u.Set_) == 0
+	return len(u.AddToSet_) == 0 && len(u.Pull_) == 0 && len(u.Set_) == 0 && len(u.Unset_) == 0
 }
 
 // AddToSet adds a new $addToSet operation to the update. This will push
@@ -39,5 +40,15 @@ func (u *Update) Set(field string, value interface{}) *Update {
 		u.Set_ = make(bson.M)
 	}
 	u.Set_[field] = value
+	return u
+}
+
+// Unset adds a new $unset operation to the update. This will remove the
+// given field from the document.
+func (u *Update) Unset(field string) *Update {
+	if u.Unset_ == nil {
+		u.Unset_ = make(bson.M)
+	}
+	u.Unset_[field] = nil
 	return u
 }

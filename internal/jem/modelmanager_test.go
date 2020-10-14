@@ -419,7 +419,7 @@ func (s *modelManagerSuite) TestCreateModelWithDeprecatedController(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// Deprecate it and make sure it's not chosen again.
-	err = s.jem.DB.SetControllerDeprecated(testContext, ctlId, true)
+	err = s.jem.SetControllerDeprecated(testContext, jemtest.NewIdentity("controller-admin"), ctlId, true)
 	c.Assert(err, gc.Equals, nil)
 
 	err = s.jem.CreateModel(testContext, id, jem.CreateModelParams{
@@ -443,7 +443,7 @@ func (s *modelManagerSuite) TestCreateModelWithMultipleControllers(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 	// Deprecate the first controller.
-	err = s.jem.DB.SetControllerDeprecated(testContext, ctlId, true)
+	err = s.jem.SetControllerDeprecated(testContext, jemtest.NewIdentity("controller-admin"), ctlId, true)
 	c.Assert(err, gc.Equals, nil)
 
 	err = s.jem.CreateModel(testContext, jemtest.NewIdentity("bob"), jem.CreateModelParams{

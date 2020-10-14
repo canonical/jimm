@@ -6,11 +6,8 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
-	"github.com/juju/version"
-	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/mgo.v2"
@@ -25,8 +22,6 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
 	"github.com/CanonicalLtd/jimm/params"
 )
-
-var notExistsQuery = bson.D{{"$exists", false}}
 
 // Database wraps an mgo.DB ands adds a number of methods for
 // manipulating the database.
@@ -117,61 +112,6 @@ func (db *Database) EnsureIndexes() error {
 	return nil
 }
 
-// AddController adds a new controller to the database. It returns an
-// error with a params.ErrAlreadyExists cause if there is already a
-// controller with the given name. The Id field in ctl will be set from
-// its Path field.
-func (db *Database) AddController(ctx context.Context, ctl *mongodoc.Controller) (err error) {
-	defer db.checkError(ctx, &err)
-	ctl.Id = ctl.Path.String()
-	err = db.Controllers().Insert(ctl)
-	if err != nil {
-		if mgo.IsDup(err) {
-			return errgo.WithCausef(nil, params.ErrAlreadyExists, "")
-		}
-		return errgo.NoteMask(err, "cannot insert controller")
-	}
-	return nil
-}
-
-// DeleteController deletes existing controller and all of its
-// associated models from the database. It returns an error if
-// either deletion fails. If there is no matching controller then the
-// error will have the cause params.ErrNotFound.
-//
-// Note that this operation is not atomic.
-func (db *Database) DeleteController(ctx context.Context, path params.EntityPath) (err error) {
-	defer db.checkError(ctx, &err)
-	// TODO (urosj) make this operation atomic.
-	// Delete controller from credentials
-	err = db.CredentialsRemoveController(ctx, path)
-	if err != nil {
-		return errgo.Notef(err, "error deleting controler from credentials")
-	}
-	// Delete its models first.
-	info, err := db.Models().RemoveAll(bson.D{{"controller", path}})
-	if err != nil {
-		return errgo.Notef(err, "error deleting controller models")
-	}
-	// Then delete the controller.
-	err = db.Controllers().RemoveId(path.String())
-	if err == mgo.ErrNotFound {
-		return errgo.WithCausef(nil, params.ErrNotFound, "controller %q not found", path)
-	}
-	if err != nil {
-		zapctx.Error(ctx, "could not delete controller after removing models",
-			zap.Int("model-count", info.Removed),
-			zaputil.Error(err),
-		)
-		return errgo.Notef(err, "cannot delete controller")
-	}
-	zapctx.Info(ctx, "deleted controller",
-		zap.Stringer("controller", path),
-		zap.Int("model-count", info.Removed),
-	)
-	return nil
-}
-
 // SetModelController updates the given model so that it's associated
 // with the given controller. This should only be called when migration
 // has been initiated for the model and the new controller has been
@@ -185,122 +125,6 @@ func (db *Database) SetModelController(ctx context.Context, model params.EntityP
 	}})
 	if errgo.Cause(err) == mgo.ErrNotFound {
 		return errgo.WithCausef(err, params.ErrNotFound, "cannot update %s", model)
-	}
-	return errgo.Mask(err)
-}
-
-// SetControllerDeprecated sets whether the given controller is deprecated.
-func (db *Database) SetControllerDeprecated(ctx context.Context, ctlPath params.EntityPath, deprecated bool) (err error) {
-	defer db.checkError(ctx, &err)
-	if deprecated {
-		err = db.Controllers().UpdateId(ctlPath.String(), bson.D{{
-			"$set", bson.D{{"deprecated", true}},
-		}})
-	} else {
-		// A controller that's not deprecated is stored with no deprecated
-		// field for backward compatibility and consistency.
-		err = db.Controllers().UpdateId(ctlPath.String(), bson.D{{
-			"$unset", bson.D{{"deprecated", nil}},
-		}})
-	}
-	if errgo.Cause(err) == mgo.ErrNotFound {
-		return errgo.WithCausef(err, params.ErrNotFound, "cannot update %s", ctlPath)
-	}
-	return errgo.Mask(err)
-}
-
-// Controller returns information on the controller with the given
-// path. It returns an error with a params.ErrNotFound cause if the
-// controller was not found.
-func (db *Database) Controller(ctx context.Context, path params.EntityPath) (_ *mongodoc.Controller, err error) {
-	defer db.checkError(ctx, &err)
-	var ctl mongodoc.Controller
-	id := path.String()
-	err = db.Controllers().FindId(id).One(&ctl)
-	if err == mgo.ErrNotFound {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "controller %q not found", id)
-	}
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot get controller %q", id)
-	}
-	return &ctl, nil
-}
-
-// SetControllerVersion sets the agent version of the given controller.
-// This method does not return an error when the controller doesn't exist.
-func (db *Database) SetControllerVersion(ctx context.Context, ctlPath params.EntityPath, v version.Number) (err error) {
-	defer db.checkError(ctx, &err)
-	if err = db.Controllers().UpdateId(ctlPath.String(), bson.D{{
-		"$set", bson.D{{"version", v}},
-	}}); err != nil {
-		if err == mgo.ErrNotFound {
-			// For symmetry with SetControllerUnavailableAt.
-			return nil
-		}
-		return errgo.Notef(err, "cannot update %v", ctlPath)
-	}
-	return nil
-}
-
-// SetControllerAvailable marks the given controller as available.
-// This method does not return an error when the controller doesn't exist.
-func (db *Database) SetControllerAvailable(ctx context.Context, ctlPath params.EntityPath) (err error) {
-	defer db.checkError(ctx, &err)
-	if err = db.Controllers().UpdateId(ctlPath.String(), bson.D{{
-		"$unset", bson.D{{"unavailablesince", nil}},
-	}}); err != nil {
-		if err == mgo.ErrNotFound {
-			// For symmetry with SetControllerUnavailableAt.
-			return nil
-		}
-		return errgo.Notef(err, "cannot update %v", ctlPath)
-	}
-	return nil
-}
-
-// SetControllerUnavailableAt marks the controller as having been unavailable
-// since at least the given time. If the controller was already marked
-// as unavailable, its time isn't changed.
-// This method does not return an error when the controller doesn't exist.
-func (db *Database) SetControllerUnavailableAt(ctx context.Context, ctlPath params.EntityPath, t time.Time) (err error) {
-	defer db.checkError(ctx, &err)
-	err = db.Controllers().Update(
-		bson.D{
-			{"_id", ctlPath.String()},
-			{"unavailablesince", notExistsQuery},
-		},
-		bson.D{
-			{"$set", bson.D{{"unavailablesince", t}}},
-		},
-	)
-	if err == nil {
-		return nil
-	}
-	if err == mgo.ErrNotFound {
-		// We don't know whether the not-found error is because there
-		// are no controllers with the given name (in which case we want
-		// to return a params.ErrNotFound error) or because there was
-		// one but it is already unavailable.
-		// We could fetch the controller to decide whether it's actually there
-		// or not, but because in practice we don't care if we're setting
-		// controller-unavailable on a non-existent controller, we'll
-		// save the round trip.
-		return nil
-	}
-	return errgo.Notef(err, "cannot update controller")
-}
-
-// SetControllerStats sets the stats associated with the controller
-// with the given path. It returns an error with a params.ErrNotFound
-// cause if the controller does not exist.
-func (db *Database) SetControllerStats(ctx context.Context, ctlPath params.EntityPath, stats *mongodoc.ControllerStats) (err error) {
-	defer db.checkError(ctx, &err)
-	err = db.Controllers().UpdateId(
-		ctlPath.String(),
-		bson.D{{"$set", bson.D{{"stats", stats}}}},
-	)
-	if err == mgo.ErrNotFound {
-		return errgo.WithCausef(nil, params.ErrNotFound, "controller not found")
 	}
 	return errgo.Mask(err)
 }
