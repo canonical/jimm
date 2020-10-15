@@ -114,8 +114,10 @@ func (s *jemVaultSuite) TestVaultCredentials(c *gc.C) {
 		"password": "test-pass",
 	})
 
-	var cred2 mongodoc.Credential
-	err = s.jem.DB.Credentials().FindId("dummy/bob/test-1").One(&cred2)
+	cred2 := mongodoc.Credential{
+		Path: cred1.Path,
+	}
+	err = s.jem.DB.GetCredential(ctx, &cred2)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(cred2.Attributes, gc.HasLen, 0)
 

@@ -7,10 +7,8 @@ import (
 	"time"
 
 	jujuapi "github.com/juju/juju/api"
-	cloudapi "github.com/juju/juju/api/cloud"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
-	"github.com/juju/names/v4"
 	jt "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
@@ -18,11 +16,9 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 
-	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
@@ -169,269 +165,6 @@ func (s *jemSuite) TestClone(c *gc.C) {
 	m := mongodoc.Model{Path: params.EntityPath{"bob", "x"}}
 	err := s.jem.DB.GetModel(testContext, &m)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-}
-
-func (s *jemSuite) TestRevokeCredentialsInUse(c *gc.C) {
-	ctlId := s.addController(c, params.EntityPath{"bob", "controller"})
-	err := s.jem.DB.SetACL(testContext, s.jem.DB.Controllers(), ctlId, params.ACL{
-		Read: []string{"everyone"},
-	})
-	c.Assert(err, gc.Equals, nil)
-	credPath := credentialPath("dummy", "bob", "cred1")
-	err = s.jem.DB.UpdateCredential(testContext, &mongodoc.Credential{
-		Path: mongodoc.CredentialPathFromParams(credPath),
-		Type: "empty",
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	id := jemtest.NewIdentity("bob")
-	err = s.jem.CreateModel(testContext, id, jem.CreateModelParams{
-		Path:           params.EntityPath{"bob", "oldmodel"},
-		ControllerPath: ctlId,
-		Credential:     credPath,
-		Cloud:          "dummy",
-	}, nil)
-	c.Assert(err, gc.Equals, nil)
-	err = s.jem.RevokeCredential(testContext, credPath, 0)
-	c.Assert(err, gc.ErrorMatches, `cannot revoke because credential is in use on at least one model`)
-
-	// Try with just the check.
-	err = s.jem.RevokeCredential(testContext, credPath, jem.CredentialCheck)
-	c.Assert(err, gc.ErrorMatches, `cannot revoke because credential is in use on at least one model`)
-
-	// Try without the check. It should succeed.
-	err = s.jem.RevokeCredential(testContext, credPath, jem.CredentialUpdate)
-	c.Assert(err, gc.Equals, nil)
-
-	// Try to create another with the credentials that have
-	// been revoked. We should fail to do that.
-	err = s.jem.CreateModel(testContext, id, jem.CreateModelParams{
-		Path:           params.EntityPath{"bob", "newmodel"},
-		ControllerPath: ctlId,
-		Credential:     credPath,
-		Cloud:          "dummy",
-	}, nil)
-	c.Assert(err, gc.ErrorMatches, `credential dummy/bob/cred1 has been revoked`)
-
-	// Check that the credential really has been revoked on the
-	// controller.
-	conn, err := s.jem.OpenAPI(testContext, ctlId)
-	c.Assert(err, gc.Equals, nil)
-	defer conn.Close()
-	r, err := cloudapi.NewClient(conn).Credentials(conv.ToCloudCredentialTag(credPath))
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(r, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
-		Error: &jujuparams.Error{
-			Message: `credential "cred1" not found`,
-			Code:    "not found",
-		},
-	}})
-}
-
-func (s *jemSuite) TestRevokeCredentialsNotInUse(c *gc.C) {
-	ctlId := s.addController(c, params.EntityPath{"bob", "controller"})
-	err := s.jem.DB.SetACL(testContext, s.jem.DB.Controllers(), ctlId, params.ACL{
-		Read: []string{"everyone"},
-	})
-	c.Assert(err, gc.Equals, nil)
-	credPath := credentialPath("dummy", "bob", "cred1")
-	mCredPath := mgoCredentialPath("dummy", "bob", "cred1")
-	err = s.jem.DB.UpdateCredential(testContext, &mongodoc.Credential{
-		Path: mCredPath,
-		Type: "empty",
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	// Sanity check that we can get the credential.
-	err = s.jem.DB.GetCredential(testContext, &mongodoc.Credential{Path: mCredPath})
-	c.Assert(err, gc.Equals, nil)
-
-	// Try with just the check.
-	err = s.jem.RevokeCredential(testContext, credPath, jem.CredentialCheck)
-	c.Assert(err, gc.Equals, nil)
-
-	// Check that the credential is still there.
-	err = s.jem.DB.GetCredential(testContext, &mongodoc.Credential{Path: mCredPath})
-	c.Assert(err, gc.Equals, nil)
-
-	// Try with both the check and the update flag.
-	err = s.jem.RevokeCredential(testContext, credPath, 0)
-	c.Assert(err, gc.Equals, nil)
-
-	// The credential should be marked as revoked and all
-	// the details should be cleater.
-	cred := mongodoc.Credential{
-		Path: mCredPath,
-	}
-	err = s.jem.DB.GetCredential(testContext, &cred)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(cred, jc.DeepEquals, mongodoc.Credential{
-		Id:         "dummy/bob/cred1",
-		Path:       mCredPath,
-		Revoked:    true,
-		Attributes: make(map[string]string),
-	})
-}
-
-func (s *jemSuite) TestUpdateCredential(c *gc.C) {
-	ctlPath := s.addController(c, params.EntityPath{User: "bob", Name: "controller"})
-	credPath := credentialPath("dummy", "bob", "cred")
-	mCredPath := mgoCredentialPath("dummy", "bob", "cred")
-	cred := &mongodoc.Credential{
-		Path: mCredPath,
-		Type: "empty",
-	}
-	err := s.jem.DB.UpdateCredential(testContext, cred)
-	c.Assert(err, gc.Equals, nil)
-	conn, err := s.jem.OpenAPI(testContext, ctlPath)
-	c.Assert(err, gc.Equals, nil)
-	defer conn.Close()
-
-	_, err = jem.UpdateControllerCredential(s.jem, testContext, conn, ctlPath, cred)
-	c.Assert(err, gc.Equals, nil)
-	err = s.jem.DB.CredentialAddController(testContext, mCredPath, ctlPath)
-	c.Assert(err, gc.Equals, nil)
-
-	// Sanity check it was deployed
-	client := cloudapi.NewClient(conn)
-	credTag := names.NewCloudCredentialTag("dummy/bob@external/cred")
-	creds, err := client.Credentials(credTag)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
-		Result: &jujuparams.CloudCredential{
-			AuthType: "empty",
-		},
-	}})
-
-	_, err = s.jem.UpdateCredential(testContext, &mongodoc.Credential{
-		Path: mCredPath,
-		Type: "userpass",
-		Attributes: map[string]string{
-			"username": "cloud-user",
-			"password": "cloud-pass",
-		},
-	}, jem.CredentialUpdate)
-	c.Assert(err, gc.Equals, nil)
-
-	// check it was updated on the controller.
-	creds, err = client.Credentials(credTag)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
-		Result: &jujuparams.CloudCredential{
-			AuthType: "userpass",
-			Attributes: map[string]string{
-				"username": "cloud-user",
-			},
-			Redacted: []string{
-				"password",
-			},
-		},
-	}})
-
-	// Revoke the credential
-	err = s.jem.RevokeCredential(testContext, credPath, jem.CredentialUpdate)
-	c.Assert(err, gc.Equals, nil)
-
-	// check it was removed on the controller.
-	creds, err = client.Credentials(credTag)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
-		Error: &jujuparams.Error{
-			Code:    "not found",
-			Message: `credential "cred" not found`,
-		},
-	}})
-}
-
-var credentialTests = []struct {
-	path             params.CredentialPath
-	expectErrorCause error
-}{{
-	path: params.CredentialPath{
-		Cloud: "dummy",
-		User:  "bob",
-		Name:  "credential",
-	},
-}, {
-	path: params.CredentialPath{
-		Cloud: "dummy",
-		User:  "bob-group",
-		Name:  "credential",
-	},
-}, {
-	path: params.CredentialPath{
-		Cloud: "dummy",
-		User:  "alice",
-		Name:  "credential",
-	},
-	expectErrorCause: params.ErrUnauthorized,
-}, {
-	path: params.CredentialPath{
-		Cloud: "dummy",
-		User:  "bob",
-		Name:  "credential2",
-	},
-	expectErrorCause: params.ErrNotFound,
-}, {
-	path: params.CredentialPath{
-		Cloud: "dummy",
-		User:  "bob-group",
-		Name:  "credential2",
-	},
-	expectErrorCause: params.ErrNotFound,
-}, {
-	path: params.CredentialPath{
-		Cloud: "dummy",
-		User:  "alice",
-		Name:  "credential2",
-	},
-	expectErrorCause: params.ErrUnauthorized,
-}}
-
-func (s *jemSuite) TestCredential(c *gc.C) {
-	creds := []mongodoc.Credential{{
-		Path: mongodoc.CredentialPath{
-			Cloud: "dummy",
-			EntityPath: mongodoc.EntityPath{
-				User: "alice",
-				Name: "credential",
-			},
-		},
-	}, {
-		Path: mongodoc.CredentialPath{
-			Cloud: "dummy",
-			EntityPath: mongodoc.EntityPath{
-				User: "bob",
-				Name: "credential",
-			},
-		},
-	}, {
-		Path: mongodoc.CredentialPath{
-			Cloud: "dummy",
-			EntityPath: mongodoc.EntityPath{
-				User: "bob-group",
-				Name: "credential",
-			},
-		},
-	}}
-	for _, cred := range creds {
-		cred.Id = cred.Path.String()
-		err := s.jem.DB.UpdateCredential(testContext, &cred)
-		c.Assert(err, gc.Equals, nil)
-	}
-	for i, test := range credentialTests {
-		c.Logf("test %d. %s", i, test.path)
-		ctl := mongodoc.Credential{
-			Path: mongodoc.CredentialPathFromParams(test.path),
-		}
-		err := s.jem.GetCredential(context.Background(), jemtest.NewIdentity("bob", "bob-group"), &ctl)
-		if test.expectErrorCause != nil {
-			c.Assert(errgo.Cause(err), gc.Equals, test.expectErrorCause)
-			continue
-		}
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(ctl.Path.ToParams(), jc.DeepEquals, test.path)
-	}
 }
 
 var earliestControllerVersionTests = []struct {
@@ -700,30 +433,6 @@ func (s *jemSuite) TestUpdateApplicationUnknownModel(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 }
 
-func (s *jemSuite) TestUpdateModelCredential(c *gc.C) {
-	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
-
-	credPath := credentialPath("dummy", "bob", "cred2")
-	err := s.jem.DB.UpdateCredential(testContext, &mongodoc.Credential{
-		Path: mongodoc.CredentialPathFromParams(credPath),
-		Type: "empty",
-	})
-
-	conn, err := s.jem.OpenAPI(testContext, model.Controller)
-	c.Assert(err, gc.Equals, nil)
-	defer conn.Close()
-
-	err = s.jem.UpdateModelCredential(testContext, conn, model, &mongodoc.Credential{
-		Path: mongodoc.CredentialPathFromParams(credPath),
-		Type: "empty",
-	})
-	c.Assert(err, gc.Equals, nil)
-	model1 := mongodoc.Model{Path: model.Path}
-	err = s.jem.DB.GetModel(testContext, &model1)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(model1.Credential, jc.DeepEquals, mongodoc.CredentialPathFromParams(credPath))
-}
-
 func (s *jemSuite) TestWatchAllModelSummaries(c *gc.C) {
 	s.addController(c, params.EntityPath{"bob", "controller"})
 	ctlPath := params.EntityPath{User: "bob", Name: "controller"}
@@ -783,14 +492,9 @@ func (s *jemSuite) TestGetModel(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1, jc.DeepEquals, *model)
 
-	_, err = s.jem.DB.Models().FindId(model.Id).Apply(mgo.Change{
-		Update: bson.D{{"$unset", bson.D{
-			{"cloud", ""},
-			{"cloudregion", ""},
-			{"credential", ""},
-			{"defaultseries", ""},
-		}}},
-	}, nil)
+	u := new(jimmdb.Update).Unset("cloud").Unset("cloudregion").Unset("credential").Unset("defaultseries")
+	u.Unset("providertype").Unset("controlleruuid")
+	err = s.jem.DB.UpdateModel(testContext, model, u, true)
 	c.Assert(err, gc.Equals, nil)
 
 	model2 := mongodoc.Model{UUID: model.UUID}
@@ -807,6 +511,82 @@ func (s *jemSuite) TestGetModelUnauthorized(c *gc.C) {
 	err := s.jem.GetModel(testContext, jemtest.NewIdentity("not-test"), jujuparams.ModelReadAccess, &model1)
 	c.Assert(err, gc.ErrorMatches, "unauthorized")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
+}
+
+func (s *jemSuite) TestForEachModel(c *gc.C) {
+	model1 := s.bootstrapModel(c, params.EntityPath{"test", "model1"})
+	model2 := &mongodoc.Model{Path: params.EntityPath{"test", "model2"}}
+	err := s.jem.CreateModel(testContext, jemtest.NewIdentity("test"), jem.CreateModelParams{
+		Path:  model2.Path,
+		Cloud: "dummy",
+	}, nil)
+	c.Assert(err, gc.Equals, nil)
+	model3 := &mongodoc.Model{Path: params.EntityPath{"test", "model3"}}
+	err = s.jem.CreateModel(testContext, jemtest.NewIdentity("test"), jem.CreateModelParams{
+		Path:  model3.Path,
+		Cloud: "dummy",
+	}, nil)
+	c.Assert(err, gc.Equals, nil)
+	model4 := &mongodoc.Model{Path: params.EntityPath{"test", "model4"}}
+	err = s.jem.CreateModel(testContext, jemtest.NewIdentity("test"), jem.CreateModelParams{
+		Path:  model4.Path,
+		Cloud: "dummy",
+	}, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.jem.GrantModel(testContext, jemtest.NewIdentity("test"), model1, "bob", jujuparams.ModelAdminAccess)
+	c.Assert(err, gc.Equals, nil)
+	err = s.jem.GrantModel(testContext, jemtest.NewIdentity("test"), model2, "bob", jujuparams.ModelWriteAccess)
+	c.Assert(err, gc.Equals, nil)
+	err = s.jem.GrantModel(testContext, jemtest.NewIdentity("test"), model3, "bob", jujuparams.ModelReadAccess)
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.jem.GetModel(testContext, jemtest.NewIdentity("test"), jujuparams.ModelReadAccess, model1)
+	c.Assert(err, gc.Equals, nil)
+	err = s.jem.GetModel(testContext, jemtest.NewIdentity("test"), jujuparams.ModelReadAccess, model2)
+	c.Assert(err, gc.Equals, nil)
+	err = s.jem.GetModel(testContext, jemtest.NewIdentity("test"), jujuparams.ModelReadAccess, model3)
+	c.Assert(err, gc.Equals, nil)
+
+	u := new(jimmdb.Update).Unset("cloud").Unset("cloudregion").Unset("credential").Unset("defaultseries")
+	u.Unset("providertype").Unset("controlleruuid")
+	err = s.jem.DB.UpdateModel(testContext, model1, u, false)
+	c.Assert(err, gc.Equals, nil)
+
+	tests := []struct {
+		access       jujuparams.UserAccessPermission
+		expectModels []*mongodoc.Model
+	}{{
+		access: jujuparams.ModelReadAccess,
+		expectModels: []*mongodoc.Model{
+			model1,
+			model2,
+			model3,
+		},
+	}, {
+		access: jujuparams.ModelWriteAccess,
+		expectModels: []*mongodoc.Model{
+			model1,
+			model2,
+		},
+	}, {
+		access: jujuparams.ModelAdminAccess,
+		expectModels: []*mongodoc.Model{
+			model1,
+		},
+	}}
+
+	for i, test := range tests {
+		c.Logf("test %d. %s access", i, test.access)
+		j := 0
+		s.jem.ForEachModel(testContext, jemtest.NewIdentity("bob"), test.access, func(m *mongodoc.Model) error {
+			c.Assert(j < len(test.expectModels), gc.Equals, true)
+			c.Check(m, jc.DeepEquals, test.expectModels[j])
+			j++
+			return nil
+		})
+		c.Check(j, gc.Equals, len(test.expectModels))
+	}
 }
 
 func (s *jemSuite) addController(c *gc.C, path params.EntityPath) params.EntityPath {
@@ -838,7 +618,7 @@ func (s *jemSuite) bootstrapModel(c *gc.C, path params.EntityPath) *mongodoc.Mod
 func bootstrapModel(c *gc.C, path params.EntityPath, info *jujuapi.Info, j *jem.JEM) *mongodoc.Model {
 	ctlPath := addController(c, params.EntityPath{User: path.User, Name: "controller"}, info, j)
 	credPath := credentialPath("dummy", string(path.User), "cred")
-	err := j.DB.UpdateCredential(testContext, &mongodoc.Credential{
+	err := j.DB.UpsertCredential(testContext, &mongodoc.Credential{
 		Path: mongodoc.CredentialPathFromParams(credPath),
 		Type: "empty",
 	})
@@ -875,24 +655,6 @@ func (c *testUsageSenderAuthorizationClient) GetCredentials(ctx context.Context,
 		err, c.errors = c.errors[0], c.errors[1:]
 	}
 	return []byte("test credentials"), err
-}
-
-func credentialPath(cloud, user, name string) params.CredentialPath {
-	return params.CredentialPath{
-		Cloud: params.Cloud(cloud),
-		User:  params.User(user),
-		Name:  params.CredentialName(name),
-	}
-}
-
-func mgoCredentialPath(cloud, user, name string) mongodoc.CredentialPath {
-	return mongodoc.CredentialPath{
-		Cloud: cloud,
-		EntityPath: mongodoc.EntityPath{
-			User: user,
-			Name: name,
-		},
-	}
 }
 
 // cleanMachineDoc cleans up the machine document so

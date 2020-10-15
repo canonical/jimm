@@ -195,7 +195,7 @@ var createModelTests = []struct {
 		},
 		Cloud: "dummy",
 	},
-	expectError:      `credential "dummy/bob/cred2" not found`,
+	expectError:      `credential not found`,
 	expectErrorCause: params.ErrNotFound,
 }, {
 	about: "model exists",
@@ -277,18 +277,18 @@ func (s *modelManagerSuite) TestCreateModel(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 	// Bob has a single credential.
-	err = s.jem.DB.UpdateCredential(testContext, &mongodoc.Credential{
+	err = s.jem.DB.UpsertCredential(testContext, &mongodoc.Credential{
 		Path: mgoCredentialPath("dummy", "bob", "cred1"),
 		Type: "empty",
 	})
 	c.Assert(err, gc.Equals, nil)
 	// Alice has two credentials.
-	err = s.jem.DB.UpdateCredential(testContext, &mongodoc.Credential{
+	err = s.jem.DB.UpsertCredential(testContext, &mongodoc.Credential{
 		Path: mgoCredentialPath("dummy", "alice", "cred1"),
 		Type: "empty",
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.DB.UpdateCredential(testContext, &mongodoc.Credential{
+	err = s.jem.DB.UpsertCredential(testContext, &mongodoc.Credential{
 		Path: mgoCredentialPath("dummy", "alice", "cred2"),
 		Type: "empty",
 	})
@@ -354,7 +354,7 @@ func (s *modelManagerSuite) TestCreateModelWithPartiallyCreatedModel(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 	// Bob has a single credential.
-	err = s.jem.DB.UpdateCredential(testContext, &mongodoc.Credential{
+	err = s.jem.DB.UpsertCredential(testContext, &mongodoc.Credential{
 		Path: mgoCredentialPath("dummy", "bob", "cred1"),
 		Type: "empty",
 	})
@@ -744,6 +744,30 @@ func (s *modelManagerSuite) TestRevokeModelControllerFailure(c *gc.C) {
 		Read:  []string{"alice"},
 		Write: []string{"alice"},
 	})
+}
+
+func (s *modelManagerSuite) TestUpdateModelCredential(c *gc.C) {
+	model := s.bootstrapModel(c, params.EntityPath{User: "bob", Name: "model"})
+
+	credPath := credentialPath("dummy", "bob", "cred2")
+	err := s.jem.DB.UpsertCredential(testContext, &mongodoc.Credential{
+		Path: mongodoc.CredentialPathFromParams(credPath),
+		Type: "empty",
+	})
+
+	conn, err := s.jem.OpenAPI(testContext, model.Controller)
+	c.Assert(err, gc.Equals, nil)
+	defer conn.Close()
+
+	err = s.jem.UpdateModelCredential(testContext, conn, model, &mongodoc.Credential{
+		Path: mongodoc.CredentialPathFromParams(credPath),
+		Type: "empty",
+	})
+	c.Assert(err, gc.Equals, nil)
+	model1 := mongodoc.Model{Path: model.Path}
+	err = s.jem.DB.GetModel(testContext, &model1)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(model1.Credential, jc.DeepEquals, mongodoc.CredentialPathFromParams(credPath))
 }
 
 func (s *modelManagerSuite) addController(c *gc.C, path params.EntityPath) params.EntityPath {

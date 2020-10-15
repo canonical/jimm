@@ -132,6 +132,18 @@ func (db *Database) UpdateControllerQuery(ctx context.Context, q Query, c *mongo
 	return nil
 }
 
+// UpdateControllers performs the given update on all controllers that
+// match the given query.
+func (db *Database) UpdateControllers(ctx context.Context, q Query, u *Update) (count int, err error) {
+	defer db.checkError(ctx, &err)
+	zapctx.Debug(ctx, "UpdateControllers", zaputil.BSON("q", q), zaputil.BSON("u", u))
+	info, err := db.Controllers().UpdateAll(q, u)
+	if err != nil {
+		return info.Updated, errgo.Notef(err, "cannot update credentials")
+	}
+	return info.Updated, nil
+}
+
 // RemoveController removes a controller from the database. The controller
 // is matched using the same criteria as used in GetController. If the
 // controller cannot be found then an error with a cause of
