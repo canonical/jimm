@@ -144,22 +144,6 @@ func (r *controllerRoot) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 		case auth.CheckACL(ctx, r.identity, model.ACL.Write) == nil:
 			access = jujuparams.ModelWriteAccess
 		}
-		machines, err := r.jem.DB.MachinesForModel(ctx, model.UUID)
-		if err != nil {
-			results = append(results, jujuparams.ModelSummaryResult{
-				Error: mapError(errgo.Notef(err, "cannot get machines for model %q", model.UUID)),
-			})
-			return nil
-		}
-		machineCount := int64(len(machines))
-		var coreCount int64
-		for _, machine := range machines {
-			if machine.Info != nil &&
-				machine.Info.HardwareCharacteristics != nil &&
-				machine.Info.HardwareCharacteristics.CpuCores != nil {
-				coreCount += int64(*machine.Info.HardwareCharacteristics.CpuCores)
-			}
-		}
 		result := jujuparams.ModelSummaryResult{
 			Result: &jujuparams.ModelSummary{
 				Name:               string(model.Path.Name),
@@ -180,10 +164,13 @@ func (r *controllerRoot) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 				UserLastConnection: nil,
 				Counts: []jujuparams.ModelEntityCount{{
 					Entity: jujuparams.Machines,
-					Count:  machineCount,
+					Count:  int64(model.Counts[params.MachineCount].Current),
 				}, {
 					Entity: jujuparams.Cores,
-					Count:  coreCount,
+					Count:  int64(model.Counts[params.CoreCount].Current),
+				}, {
+					Entity: jujuparams.Units,
+					Count:  int64(model.Counts[params.UnitCount].Current),
 				}},
 				// TODO currently we don't store any migration information about models.
 				Migration: nil,
