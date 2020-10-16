@@ -3,20 +3,15 @@
 package jujuapi_test
 
 import (
-	"context"
-
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/network"
 	"github.com/juju/juju/rpc"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
-	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon.v2"
-
-	"github.com/CanonicalLtd/jimm/params"
 )
 
 type adminSuite struct {
@@ -25,22 +20,9 @@ type adminSuite struct {
 
 var _ = gc.Suite(&adminSuite{})
 
-func (s *adminSuite) SetUpTest(c *gc.C) {
-	s.ServerParams.CharmstoreLocation = "https://api.jujucharms.com/charmstore"
-	s.ServerParams.MeteringLocation = "https://api.jujucharms.com/omnibus"
-	s.websocketSuite.SetUpTest(c)
-	s.PatchValue(&utils.OutgoingAccessAllowed, true)
-}
-
 func (s *adminSuite) TestOldAdminVersionFails(c *gc.C) {
-	ctx := context.Background()
-
-	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
-	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
-	modelUUID := mi.UUID
 	conn := s.open(c, &api.Info{
-		ModelTag:  names.NewModelTag(modelUUID),
+		ModelTag:  names.NewModelTag(s.Model.UUID),
 		SkipLogin: true,
 	}, "test")
 	defer conn.Close()
@@ -51,14 +33,8 @@ func (s *adminSuite) TestOldAdminVersionFails(c *gc.C) {
 }
 
 func (s *adminSuite) TestAdminIDFails(c *gc.C) {
-	ctx := context.Background()
-
-	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
-	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
-	modelUUID := mi.UUID
 	conn := s.open(c, &api.Info{
-		ModelTag:  names.NewModelTag(modelUUID),
+		ModelTag:  names.NewModelTag(s.Model.UUID),
 		SkipLogin: true,
 	}, "test")
 	defer conn.Close()
@@ -68,9 +44,6 @@ func (s *adminSuite) TestAdminIDFails(c *gc.C) {
 }
 
 func (s *adminSuite) TestLoginToController(c *gc.C) {
-	ctx := context.Background()
-
-	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, &api.Info{
 		SkipLogin: true,
 	}, "test")
@@ -85,9 +58,6 @@ func (s *adminSuite) TestLoginToController(c *gc.C) {
 }
 
 func (s *adminSuite) TestLoginToControllerWithInvalidMacaroon(c *gc.C) {
-	ctx := context.Background()
-
-	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	invalidMacaroon, err := macaroon.New(nil, []byte("invalid"), "", macaroon.V1)
 	c.Assert(err, gc.Equals, nil)
 	conn := s.open(c, &api.Info{
@@ -103,14 +73,8 @@ type modelAdminSuite struct {
 var _ = gc.Suite(&modelAdminSuite{})
 
 func (s *modelAdminSuite) TestLoginToModel(c *gc.C) {
-	ctx := context.Background()
-
-	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
-	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
-	modelUUID := mi.UUID
 	conn := s.open(c, &api.Info{
-		ModelTag:  names.NewModelTag(modelUUID),
+		ModelTag:  names.NewModelTag(s.Model.UUID),
 		SkipLogin: true,
 	}, "test")
 	defer conn.Close()
@@ -136,14 +100,8 @@ func (s *modelAdminSuite) TestLoginToModel(c *gc.C) {
 }
 
 func (s *modelAdminSuite) TestOldAdminVersionFails(c *gc.C) {
-	ctx := context.Background()
-
-	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
-	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
-	modelUUID := mi.UUID
 	conn := s.open(c, &api.Info{
-		ModelTag:  names.NewModelTag(modelUUID),
+		ModelTag:  names.NewModelTag(s.Model.UUID),
 		SkipLogin: true,
 	}, "test")
 	defer conn.Close()
@@ -154,14 +112,8 @@ func (s *modelAdminSuite) TestOldAdminVersionFails(c *gc.C) {
 }
 
 func (s *modelAdminSuite) TestAdminIDFails(c *gc.C) {
-	ctx := context.Background()
-
-	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
-	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
-	modelUUID := mi.UUID
 	conn := s.open(c, &api.Info{
-		ModelTag:  names.NewModelTag(modelUUID),
+		ModelTag:  names.NewModelTag(s.Model.UUID),
 		SkipLogin: true,
 	}, "test")
 	defer conn.Close()

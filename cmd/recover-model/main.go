@@ -22,6 +22,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	usagesenderauth "github.com/CanonicalLtd/jimm/internal/usagesender/auth"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -73,13 +74,13 @@ func recoverModel(ctx context.Context, cfg *config.Config, controller, model str
 	if err != nil {
 		return errgo.Notef(err, "cannot initialize agent")
 	}
+	usageSenderAuthorizationClient := usagesenderauth.NewAuthorizationClient(cfg.UsageSenderURL, bclient)
 
 	p, err := jem.NewPool(ctx, jem.Params{
 		DB:                             db,
 		SessionPool:                    mgosession.NewPool(ctx, session, 100),
 		ControllerAdmin:                cfg.ControllerAdmin,
-		UsageSenderAuthorizationClient: nil,
-		Client:                         bclient,
+		UsageSenderAuthorizationClient: usageSenderAuthorizationClient,
 	})
 	if err != nil {
 		return errgo.Notef(err, "cannot access JIMM database")

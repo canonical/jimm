@@ -210,7 +210,6 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 		SessionPool:                    sessionPool,
 		ControllerAdmin:                config.ControllerAdmin,
 		UsageSenderAuthorizationClient: usageSenderAuthClient,
-		Client:                         bclient,
 		PublicCloudMetadata:            publicCloudMetadata,
 		Pubsub:                         config.Pubsub,
 	}

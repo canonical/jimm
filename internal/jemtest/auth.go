@@ -8,6 +8,14 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 )
 
+const ControllerAdmin = "controller-admin"
+
+var (
+	Alice   = NewIdentity("alice", ControllerAdmin)
+	Bob     = NewIdentity("bob", "bob-group")
+	Charlie = NewIdentity("charlie")
+)
+
 // NewIdentity returns an identity with the given ID that is a member of
 // the given groups.
 func NewIdentity(id string, groups ...string) identchecker.ACLIdentity {

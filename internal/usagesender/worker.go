@@ -76,33 +76,33 @@ func (c *SendModelUsageWorkerConfig) validate() error {
 }
 
 // NewSendModelUsageWorker starts and returns a new worker that reports model usage.
-func NewSendModelUsageWorker(config SendModelUsageWorkerConfig) (*sendModelUsageWorker, error) {
+func NewSendModelUsageWorker(config SendModelUsageWorkerConfig) (*SendModelUsageWorker, error) {
 	if err := config.validate(); err != nil {
 		return nil, errgo.Mask(err)
 	}
-	w := &sendModelUsageWorker{
+	w := &SendModelUsageWorker{
 		config: config,
 	}
 	w.tomb.Go(w.run)
 	return w, nil
 }
 
-type sendModelUsageWorker struct {
+type SendModelUsageWorker struct {
 	config SendModelUsageWorkerConfig
 	tomb   tomb.Tomb
 }
 
 // Kill implements worker.Worker.Kill.
-func (w *sendModelUsageWorker) Kill() {
+func (w *SendModelUsageWorker) Kill() {
 	w.tomb.Kill(nil)
 }
 
 // Wait implements worker.Worker.Wait.
-func (w *sendModelUsageWorker) Wait() error {
+func (w *SendModelUsageWorker) Wait() error {
 	return w.tomb.Wait()
 }
 
-func (w *sendModelUsageWorker) run() error {
+func (w *SendModelUsageWorker) run() error {
 	for {
 		select {
 		case <-w.tomb.Dying():
@@ -116,7 +116,7 @@ func (w *sendModelUsageWorker) run() error {
 	}
 }
 
-func (w *sendModelUsageWorker) execute() error {
+func (w *SendModelUsageWorker) execute() error {
 	j := w.config.Pool.JEM(w.config.Context)
 	defer j.Close()
 	acknowledgedBatches := make(map[string]bool)
@@ -186,7 +186,7 @@ type sendUsageRequest struct {
 }
 
 // Send sends the given metrics to omnibus.
-func (w *sendModelUsageWorker) send(usage []MetricBatch) (*Response, error) {
+func (w *SendModelUsageWorker) send(usage []MetricBatch) (*Response, error) {
 	client := httprequest.Client{}
 	var resp Response
 	if err := client.CallURL(

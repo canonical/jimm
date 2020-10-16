@@ -66,6 +66,14 @@ func (j *JEM) FillCredentialAttributes(ctx context.Context, cred *mongodoc.Crede
 	if err != nil {
 		return errgo.Mask(err)
 	}
+	if secret == nil {
+		// secret will be nil if it is not there. Return an error if we
+		// Don't expect the attributes to be empty.
+		if cred.Type == "empty" {
+			return nil
+		}
+		return errgo.New("credential attributes not found")
+	}
 	cred.Attributes = make(map[string]string, len(secret.Data))
 	for k, v := range secret.Data {
 		// Nothing will be stored that isn't a string, so ignore anything
@@ -228,10 +236,13 @@ func (j *JEM) updateCredential(ctx context.Context, cred *mongodoc.Credential, c
 		for k, v := range cred.Attributes {
 			data[k] = v
 		}
-		logical := j.pool.config.VaultClient.Logical()
-		_, err := logical.Write(path.Join(j.pool.config.VaultPath, "creds", cred.Path.String()), data)
-		if err != nil {
-			return nil, errgo.Mask(err)
+		if len(data) > 0 {
+			// Don't attempt to write no data to the vault.
+			logical := j.pool.config.VaultClient.Logical()
+			_, err := logical.Write(path.Join(j.pool.config.VaultPath, "creds", cred.Path.String()), data)
+			if err != nil {
+				return nil, errgo.Mask(err)
+			}
 		}
 	} else {
 		cred.AttributesInVault = false

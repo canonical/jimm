@@ -22,7 +22,6 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
-	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
@@ -73,9 +72,6 @@ type Params struct {
 	// UsageSenderAuthorizationClient holds the client to use to  obtain
 	// authorization to collect and report usage metrics.
 	UsageSenderAuthorizationClient UsageSenderAuthorizationClient
-
-	// Client is used to make the request for usage metrics authorization
-	Client *httpbakery.Client
 
 	// PublicCloudMetadata contains the metadata details of all known
 	// public clouds.
@@ -537,11 +533,13 @@ func (j *JEM) EarliestControllerVersion(ctx context.Context, id identchecker.ACL
 	var v *version.Number
 	err := j.DB.ForEachController(ctx, jimmdb.NotExists("unavailablesince"), nil, func(c *mongodoc.Controller) error {
 		ctx := zapctx.WithFields(ctx, zap.Stringer("controller", c.Path))
-		if err := auth.CheckCanRead(ctx, id, c); err != nil {
-			if errgo.Cause(err) != params.ErrUnauthorized {
-				zapctx.Warn(ctx, "cannot check read access", zap.Error(err))
+		if !c.Public {
+			if err := auth.CheckCanRead(ctx, id, c); err != nil {
+				if errgo.Cause(err) != params.ErrUnauthorized {
+					zapctx.Warn(ctx, "cannot check read access", zap.Error(err))
+				}
+				return nil
 			}
-			return nil
 		}
 		zapctx.Debug(ctx, "EarliestControllerVersion", zap.Stringer("version", c.Version))
 		if c.Version == nil {
@@ -693,6 +691,18 @@ func (w *modelSummaryWatcher) next(ctx context.Context) ([]jujuparams.ModelAbstr
 	sort.Slice(models, func(i, j int) bool {
 		return models[i].UUID < models[j].UUID
 	})
+	// Sanitize the model abstracts.
+	for i, m := range models {
+		admins := make([]string, 0, len(m.Admins))
+		for _, admin := range m.Admins {
+			if _, err := conv.FromUserTag(names.NewUserTag(admin)); err != nil {
+				// skip any admins that aren't valid external users.
+				continue
+			}
+			admins = append(admins, admin)
+		}
+		models[i].Admins = admins
+	}
 	return models, nil
 }
 

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/juju/juju/api"
-	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
@@ -17,13 +16,6 @@ type pingerSuite struct {
 }
 
 var _ = gc.Suite(&pingerSuite{})
-
-func (s *pingerSuite) SetUpTest(c *gc.C) {
-	s.ServerParams.CharmstoreLocation = "https://api.jujucharms.com/charmstore"
-	s.ServerParams.MeteringLocation = "https://api.jujucharms.com/omnibus"
-	s.websocketSuite.SetUpTest(c)
-	s.PatchValue(&utils.OutgoingAccessAllowed, true)
-}
 
 func (s *pingerSuite) TestUnauthenticatedPinger(c *gc.C) {
 	hm := newTestHeartMonitor()
