@@ -213,6 +213,9 @@ type Model struct {
 	// controller.
 	Controller params.EntityPath
 
+	// ControllerUUID holds the UUID of the model's controller.
+	ControllerUUID string `bson:",omitempty"`
+
 	// EntityPath holds the local user and name given to the
 	// model, denormalized from Id for convenience
 	// and ease of indexing. Its string value is used as the Id value.
@@ -447,7 +450,7 @@ type Credential struct {
 	Label string
 
 	// Attributes holds the credential attributes.
-	Attributes map[string]string
+	Attributes map[string]string `bson:",omitempty"`
 
 	// Controllers holds the controllers to which this credential has
 	// been uploaded.

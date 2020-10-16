@@ -360,10 +360,9 @@ func (h *Handler) SetControllerPerm(p httprequest.Params, arg *params.SetControl
 	return h.setPerm(p.Context, h.jem.DB.Controllers(), arg.EntityPath, arg.ACL)
 }
 
-// SetModelPerm sets the permissions on a controller entity.
-// Only the owner (arg.EntityPath.User) can change the permissions
-// on an an entity. The owner can always read an entity, even
-// if it has empty ACL.
+// SetModelPerm sets the permissions on a model entity. Only the owner
+// (arg.EntityPath.User) can change the permissions on an entity. The
+// owner can always read an entity, even if it has empty ACL.
 // TODO remove this.
 func (h *Handler) SetModelPerm(p httprequest.Params, arg *params.SetModelPerm) error {
 	// TODO revoke access from all the users that currently

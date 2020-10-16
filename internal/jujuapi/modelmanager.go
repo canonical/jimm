@@ -12,7 +12,6 @@ import (
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
-	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
@@ -123,33 +122,21 @@ func (r *controllerRoot) DestroyModels(ctx context.Context, args jujuparams.Enti
 // authenticated user has access to. The request parameter is ignored.
 func (r *controllerRoot) ListModelSummaries(ctx context.Context, _ jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error) {
 	var results []jujuparams.ModelSummaryResult
-	err := r.doModels(ctx, func(ctx context.Context, model *mongodoc.Model) error {
-		if model.ProviderType == "" {
-			var err error
-			model.ProviderType, err = r.jem.DB.ProviderType(ctx, model.Cloud)
-			if err != nil {
-				results = append(results, jujuparams.ModelSummaryResult{
-					Error: mapError(errgo.Notef(err, "cannot get cloud %q", model.Cloud)),
-				})
-				return nil
-			}
+	err := r.jem.ForEachModel(ctx, r.identity, jujuparams.ModelReadAccess, func(model *mongodoc.Model) error {
+		access, err := r.modelAccess(ctx, model)
+		if err != nil {
+			return errgo.Mask(err)
 		}
-		// If we get this far the user must have at least read access.
-		access := jujuparams.ModelReadAccess
-		switch {
-		case params.User(r.identity.Id()) == model.Path.User:
-			access = jujuparams.ModelAdminAccess
-		case auth.CheckACL(ctx, r.identity, model.ACL.Admin) == nil:
-			access = jujuparams.ModelAdminAccess
-		case auth.CheckACL(ctx, r.identity, model.ACL.Write) == nil:
-			access = jujuparams.ModelWriteAccess
+		controllerUUID := model.ControllerUUID
+		if r.controllerUUIDMasking {
+			controllerUUID = r.params.ControllerUUID
 		}
 		result := jujuparams.ModelSummaryResult{
 			Result: &jujuparams.ModelSummary{
 				Name:               string(model.Path.Name),
 				Type:               model.Type,
 				UUID:               model.UUID,
-				ControllerUUID:     r.params.ControllerUUID,
+				ControllerUUID:     controllerUUID,
 				ProviderType:       model.ProviderType,
 				DefaultSeries:      model.DefaultSeries,
 				CloudTag:           conv.ToCloudTag(model.Cloud).String(),
@@ -179,14 +166,6 @@ func (r *controllerRoot) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 				AgentVersion: modelVersion(ctx, model.Info),
 			},
 		}
-		if !r.controllerUUIDMasking {
-			c := &mongodoc.Controller{Path: model.Controller}
-			if err := r.jem.DB.GetController(ctx, c); err != nil {
-				return errgo.Notef(err, "failed to fetch controller: %v", model.Controller)
-			}
-			result.Result.ControllerUUID = c.UUID
-		}
-
 		results = append(results, result)
 		return nil
 	})

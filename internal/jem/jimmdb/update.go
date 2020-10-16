@@ -7,16 +7,18 @@ import "gopkg.in/mgo.v2/bson"
 // An Update object is used to perform updates to documents in the
 // database.
 type Update struct {
-	AddToSet_ bson.D `bson:"$addToSet,omitempty"`
-	Pull_     bson.D `bson:"$pull,omitempty"`
-	Set_      bson.M `bson:"$set,omitempty"`
-	Unset_    bson.M `bson:"$unset,omitempty"`
+	AddToSet_    bson.D `bson:"$addToSet,omitempty"`
+	Pull_        bson.D `bson:"$pull,omitempty"`
+	Set_         bson.M `bson:"$set,omitempty"`
+	SetOnInsert_ bson.M `bson:"$setOnInsert,omitempty"`
+	Unset_       bson.M `bson:"$unset,omitempty"`
 }
 
 // IsZero returns true if this update object is empty, and would therefore
 // not make any changes.
 func (u *Update) IsZero() bool {
-	return len(u.AddToSet_) == 0 && len(u.Pull_) == 0 && len(u.Set_) == 0 && len(u.Unset_) == 0
+	return len(u.AddToSet_) == 0 && len(u.Pull_) == 0 && len(u.Set_) == 0 &&
+		len(u.SetOnInsert_) == 0 && len(u.Unset_) == 0
 }
 
 // AddToSet adds a new $addToSet operation to the update. This will push
@@ -40,6 +42,17 @@ func (u *Update) Set(field string, value interface{}) *Update {
 		u.Set_ = make(bson.M)
 	}
 	u.Set_[field] = value
+	return u
+}
+
+// SetOnInsert adds a new $setOnInsert operation to the update. This will
+// set the given field to the given value when a new document is being
+// created as part of an upsert operation.
+func (u *Update) SetOnInsert(field string, value interface{}) *Update {
+	if u.SetOnInsert_ == nil {
+		u.SetOnInsert_ = make(bson.M)
+	}
+	u.SetOnInsert_[field] = value
 	return u
 }
 

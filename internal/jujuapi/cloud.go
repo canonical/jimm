@@ -18,7 +18,6 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/cloudcred"
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
-	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
@@ -226,43 +225,26 @@ func (r *controllerRoot) clouds(ctx context.Context) (map[string]jujuparams.Clou
 func (r *controllerRoot) UserCredentials(ctx context.Context, userclouds jujuparams.UserClouds) (jujuparams.StringsResults, error) {
 	results := make([]jujuparams.StringsResult, len(userclouds.UserClouds))
 	for i, ent := range userclouds.UserClouds {
-		creds, err := r.userCredentials(ctx, ent.UserTag, ent.CloudTag)
+		owner, err := conv.ParseUserTag(ent.UserTag)
 		if err != nil {
 			results[i].Error = mapError(err)
 			continue
 		}
-		results[i].Result = creds
+		cld, err := names.ParseCloudTag(ent.CloudTag)
+		if err != nil {
+			results[i].Error = mapError(errgo.WithCausef(err, params.ErrBadRequest, ""))
+			continue
+		}
+		err = r.jem.ForEachCredential(ctx, r.identity, owner, params.Cloud(cld.Id()), func(c *mongodoc.Credential) error {
+			results[i].Result = append(results[i].Result, conv.ToCloudCredentialTag(c.Path.ToParams()).String())
+			return nil
+		})
+		results[i].Error = mapError(err)
 	}
 
 	return jujuparams.StringsResults{
 		Results: results,
 	}, nil
-}
-
-// userCredentials retrieves the credentials stored for given owner and cloud.
-func (r *controllerRoot) userCredentials(ctx context.Context, ownerTag, cloudTag string) ([]string, error) {
-	owner, err := conv.ParseUserTag(ownerTag)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(conv.ErrLocalUser))
-	}
-	cld, err := names.ParseCloudTag(cloudTag)
-	if err != nil {
-		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
-	}
-	var cloudCreds []string
-	it := r.jem.DB.NewCanReadIter(r.identity, r.jem.DB.Credentials().Find(
-		jimmdb.And(
-			jimmdb.Eq("path.entitypath.user", owner),
-			jimmdb.Eq("path.cloud", cld.Id()),
-			jimmdb.Eq("revoked", false),
-		),
-	).Iter())
-	var cred mongodoc.Credential
-	for it.Next(ctx, &cred) {
-		cloudCreds = append(cloudCreds, conv.ToCloudCredentialTag(cred.Path.ToParams()).String())
-	}
-
-	return cloudCreds, errgo.Mask(it.Err(ctx))
 }
 
 func (r *controllerRoot) RevokeCredentialsCheckModels(ctx context.Context, args jujuparams.RevokeCredentialArgs) (jujuparams.ErrorResults, error) {
@@ -414,97 +396,78 @@ func (r *controllerRoot) AddCredentials(ctx context.Context, args jujuparams.Tag
 
 // CredentialContents implements the CredentialContents method of the Cloud (v5) facade.
 func (r *controllerRoot) CredentialContents(ctx context.Context, args jujuparams.CloudCredentialArgs) (jujuparams.CredentialContentResults, error) {
-	if len(args.Credentials) == 0 {
-		creds, err := r.findUserCredentials(ctx)
+	// calculate the model access for all known models.
+	modelAccess := make(map[mongodoc.CredentialPath][]jujuparams.ModelAccess)
+	err := r.jem.ForEachModel(ctx, r.identity, jujuparams.ModelReadAccess, func(m *mongodoc.Model) error {
+		access, err := r.modelAccess(ctx, m)
 		if err != nil {
-			return jujuparams.CredentialContentResults{}, errgo.Mask(err)
+			return errgo.Mask(err)
 		}
-		args.Credentials = creds
-	}
-	results := make([]jujuparams.CredentialContentResult, len(args.Credentials))
-	for i, arg := range args.Credentials {
-		credInfo, err := r.credentialInfo(ctx, arg.CloudName, arg.CredentialName, args.IncludeSecrets)
-		if err != nil {
-			results[i].Error = mapError(err)
-			continue
-		}
-		results[i].Result = credInfo
-	}
-	return jujuparams.CredentialContentResults{
-		Results: results,
-	}, nil
-}
-
-// findUserCredentials finds all credentials owned by the authenticated user.
-func (r *controllerRoot) findUserCredentials(ctx context.Context) ([]jujuparams.CloudCredentialArg, error) {
-	username := r.identity.Id()
-	query := jimmdb.And(jimmdb.Eq("path.entitypath.user", username), jimmdb.Eq("revoked", false))
-	iter := r.jem.DB.NewCanReadIter(r.identity, r.jem.DB.Credentials().Find(query).Iter())
-	defer iter.Close(ctx)
-
-	var creds []jujuparams.CloudCredentialArg
-	var cred mongodoc.Credential
-	for iter.Next(ctx, &cred) {
-		creds = append(creds, jujuparams.CloudCredentialArg{CloudName: cred.Path.Cloud, CredentialName: cred.Path.Name})
-	}
-	return creds, errgo.Mask(iter.Err(ctx))
-}
-
-// credentialInfo returns Juju API information on the given credential
-// within the given cloud. If includeSecrets is true, secret information
-// will be included too.
-func (r *controllerRoot) credentialInfo(ctx context.Context, cloudName, credentialName string, includeSecrets bool) (*jujuparams.ControllerCredentialInfo, error) {
-	cred := mongodoc.Credential{
-		Path: mongodoc.CredentialPath{
-			Cloud: cloudName,
-			EntityPath: mongodoc.EntityPath{
-				User: r.identity.Id(),
-				Name: credentialName,
-			},
-		},
-	}
-	if err := r.jem.GetCredential(ctx, r.identity, &cred); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
-	}
-	if cred.Revoked {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "")
-	}
-	if err := r.jem.FillCredentialAttributes(ctx, &cred); err != nil {
-		return nil, errgo.Mask(err)
-	}
-	cci := jujuparams.ControllerCredentialInfo{
-		Content: jujuparams.CredentialContent{
-			Name:       credentialName,
-			Cloud:      cloudName,
-			AuthType:   cred.Type,
-			Attributes: make(map[string]string),
-		},
-	}
-	for k, v := range cred.Attributes {
-		if includeSecrets || cloudcred.IsVisibleAttribute(cred.ProviderType, cred.Type, k) {
-			cci.Content.Attributes[k] = v
-		}
-	}
-	r.doModels(ctx, func(ctx context.Context, model *mongodoc.Model) error {
-		if model.Credential != cred.Path {
-			return nil
-		}
-		access := jujuparams.ModelReadAccess
-		switch {
-		case params.User(r.identity.Id()) == model.Path.User:
-			access = jujuparams.ModelAdminAccess
-		case auth.CheckACL(ctx, r.identity, model.ACL.Admin) == nil:
-			access = jujuparams.ModelAdminAccess
-		case auth.CheckACL(ctx, r.identity, model.ACL.Write) == nil:
-			access = jujuparams.ModelWriteAccess
-		}
-		cci.Models = append(cci.Models, jujuparams.ModelAccess{
-			Model:  string(model.Path.Name),
+		modelAccess[m.Credential] = append(modelAccess[m.Credential], jujuparams.ModelAccess{
+			Model:  string(m.Path.Name),
 			Access: string(access),
 		})
 		return nil
 	})
-	return &cci, nil
+	if err != nil {
+		return jujuparams.CredentialContentResults{}, errgo.Mask(err)
+	}
+
+	credentialContents := func(c *mongodoc.Credential) *jujuparams.ControllerCredentialInfo {
+		attr := make(map[string]string)
+		for k, v := range c.Attributes {
+			if args.IncludeSecrets || cloudcred.IsVisibleAttribute(c.ProviderType, c.Type, k) {
+				attr[k] = v
+			}
+		}
+		return &jujuparams.ControllerCredentialInfo{
+			Content: jujuparams.CredentialContent{
+				Name:       string(c.Path.Name),
+				Cloud:      string(c.Path.Cloud),
+				AuthType:   c.Type,
+				Attributes: attr,
+			},
+			Models: modelAccess[c.Path],
+		}
+	}
+
+	results := make([]jujuparams.CredentialContentResult, len(args.Credentials))
+	for i, arg := range args.Credentials {
+		cred := mongodoc.Credential{
+			Path: mongodoc.CredentialPath{
+				Cloud: arg.CloudName,
+				EntityPath: mongodoc.EntityPath{
+					User: r.identity.Id(),
+					Name: arg.CredentialName,
+				},
+			},
+		}
+		if err := r.jem.GetCredential(ctx, r.identity, &cred); err != nil {
+			results[i].Error = mapError(err)
+			continue
+		}
+		if err := r.jem.FillCredentialAttributes(ctx, &cred); err != nil {
+			results[i].Error = mapError(err)
+			continue
+		}
+		results[i].Result = credentialContents(&cred)
+	}
+	if len(results) > 0 {
+		return jujuparams.CredentialContentResults{Results: results}, nil
+	}
+
+	err = r.jem.ForEachCredential(ctx, r.identity, params.User(r.identity.Id()), "", func(c *mongodoc.Credential) error {
+		var result jujuparams.CredentialContentResult
+		err := r.jem.FillCredentialAttributes(ctx, c)
+		if err == nil {
+			result.Result = credentialContents(c)
+		}
+		result.Error = mapError(err)
+		results = append(results, result)
+		return nil
+	})
+
+	return jujuparams.CredentialContentResults{Results: results}, errgo.Mask(err)
 }
 
 // RemoveClouds removes the specified clouds from the controller.

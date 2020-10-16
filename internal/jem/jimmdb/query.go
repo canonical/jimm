@@ -22,6 +22,12 @@ func Exists(field string) Query {
 	return Query{{Name: field, Value: bson.D{{Name: "$exists", Value: true}}}}
 }
 
+// In returns a query that the given field contains one of the given
+// values.
+func In(field string, values ...interface{}) Query {
+	return Query{{Name: field, Value: bson.D{{Name: "$in", Value: values}}}}
+}
+
 // NotExists returns a query that the given field does not exist.
 func NotExists(field string) Query {
 	return Query{{Name: field, Value: bson.D{{Name: "$exists", Value: false}}}}

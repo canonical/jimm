@@ -207,7 +207,7 @@ func (j *JEM) DeleteController(ctx context.Context, id identchecker.ACLIdentity,
 	}
 
 	// Delete controller from credentials.
-	if err := j.DB.CredentialsRemoveController(ctx, ctl.Path); err != nil {
+	if err := j.credentialsRemoveController(ctx, ctl.Path); err != nil {
 		return errgo.Notef(err, "error deleting controller from credentials")
 	}
 
@@ -310,4 +310,23 @@ func (j *JEM) controllerUpdateCredentials(ctx context.Context, conn *apiconn.Con
 			}
 		}
 	}
+}
+
+// setCredentialUpdates marks all the controllers in the given ctlPaths
+// as requiring an update to the credential with the given credPath.
+func (j *JEM) setCredentialUpdates(ctx context.Context, ctlPaths []params.EntityPath, credPath mongodoc.CredentialPath) error {
+	in := make([]interface{}, len(ctlPaths))
+	for i, p := range ctlPaths {
+		in[i] = p
+	}
+	_, err := j.DB.UpdateControllers(ctx, jimmdb.In("path", in...), new(jimmdb.Update).AddToSet("updatecredentials", credPath))
+	return errgo.Mask(err)
+}
+
+// ClearCredentialUpdate removes the record indicating that the given
+// controller needs to update the given credential.
+func (j *JEM) clearCredentialUpdate(ctx context.Context, ctlPath params.EntityPath, credPath mongodoc.CredentialPath) error {
+	c := &mongodoc.Controller{Path: ctlPath}
+	err := j.DB.UpdateController(ctx, c, new(jimmdb.Update).Pull("updatecredentials", credPath), true)
+	return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 }

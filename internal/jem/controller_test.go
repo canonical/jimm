@@ -331,14 +331,14 @@ func (s *controllerSuite) TestDeleteController(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	path := credentialPath("test-cloud", "test-user", "test-credential")
-	mpath := mongodoc.CredentialPathFromParams(path)
-	err = s.jem.DB.UpdateCredential(testContext, &mongodoc.Credential{
-		Path: mpath,
+	cred := &mongodoc.Credential{
+		Path: mongodoc.CredentialPathFromParams(path),
 		Type: "empty",
-	})
+	}
+	err = s.jem.DB.UpsertCredential(testContext, cred)
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.jem.DB.CredentialAddController(testContext, mpath, ctlPath)
+	err = jem.CredentialAddController(s.jem, testContext, cred, ctlPath)
 	c.Assert(err, gc.Equals, nil)
 
 	err = s.jem.DeleteController(testContext, jemtest.NewIdentity("dalek", "controller-admin"), ctl2, true)
@@ -351,16 +351,12 @@ func (s *controllerSuite) TestDeleteController(c *gc.C) {
 	err = s.jem.DB.GetModel(testContext, &m3)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
-	cred := mongodoc.Credential{
-		Path: mpath,
-	}
-	err = s.jem.DB.GetCredential(testContext, &cred)
+	err = s.jem.DB.GetCredential(testContext, cred)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(cred, jc.DeepEquals, mongodoc.Credential{
+	c.Assert(cred, jc.DeepEquals, &mongodoc.Credential{
 		Id:          path.String(),
-		Path:        mpath,
+		Path:        cred.Path,
 		Type:        "empty",
-		Attributes:  map[string]string{},
 		Controllers: []params.EntityPath{},
 	})
 }
@@ -374,15 +370,16 @@ func (s *controllerSuite) TestControllerUpdateCredentials(c *gc.C) {
 		Path: mCredPath,
 		Type: "empty",
 	}
-	err := s.jem.DB.UpdateCredential(testContext, cred)
+	err := s.jem.DB.UpsertCredential(testContext, cred)
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.jem.DB.SetCredentialUpdates(testContext, []params.EntityPath{ctlPath}, mongodoc.CredentialPathFromParams(credPath))
+	err = jem.SetCredentialUpdates(s.jem, testContext, []params.EntityPath{ctlPath}, mongodoc.CredentialPathFromParams(credPath))
 	c.Assert(err, gc.Equals, nil)
 
 	ctl := &mongodoc.Controller{Path: ctlPath}
 	err = s.jem.DB.GetController(testContext, ctl)
 	c.Assert(err, gc.Equals, nil)
+	c.Logf("updatecredentials: %#v", ctl.UpdateCredentials)
 
 	conn, err := s.jem.OpenAPIFromDoc(testContext, ctl)
 	c.Assert(err, gc.Equals, nil)
@@ -414,9 +411,9 @@ func (s *controllerSuite) TestConnectMonitor(c *gc.C) {
 		Path: mCredPath,
 		Type: "empty",
 	}
-	err := s.jem.DB.UpdateCredential(testContext, cred)
+	err := s.jem.DB.UpsertCredential(testContext, cred)
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.DB.SetCredentialUpdates(testContext, []params.EntityPath{ctlPath}, mongodoc.CredentialPathFromParams(credPath))
+	err = jem.SetCredentialUpdates(s.jem, testContext, []params.EntityPath{ctlPath}, mongodoc.CredentialPathFromParams(credPath))
 	c.Assert(err, gc.Equals, nil)
 
 	// Remove the controller from known clouds.

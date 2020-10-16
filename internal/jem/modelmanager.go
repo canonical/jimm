@@ -8,6 +8,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
@@ -202,6 +203,7 @@ func (j *JEM) CreateModel(ctx context.Context, id identchecker.ACLIdentity, p Cr
 	update := new(jimmdb.Update)
 	update.Set("uuid", info.UUID)
 	update.Set("controller", ctlPath)
+	update.Set("controlleruuid", info.ControllerUUID)
 	ct, err := names.ParseCloudTag(info.CloudTag)
 	if err != nil {
 		zapctx.Error(ctx, "bad data returned from controller", zap.Error(err))
@@ -269,10 +271,11 @@ func (j *JEM) createModel(ctx context.Context, p createModelParams, info *jujupa
 
 	var cloudCredentialTag string
 	if p.cred != nil {
+
 		if _, err := j.updateControllerCredential(ctx, conn, p.controller.Path, p.cred); err != nil {
 			return errgo.WithCausef(err, errInvalidModelParams, "cannot add credential")
 		}
-		if err := j.DB.CredentialAddController(ctx, p.cred.Path, p.controller.Path); err != nil {
+		if err := j.credentialAddController(ctx, p.cred, p.controller.Path); err != nil {
 			return errgo.WithCausef(err, errInvalidModelParams, "cannot add credential")
 		}
 		cloudCredentialTag = conv.ToCloudCredentialTag(p.cred.Path.ToParams()).String()
@@ -335,39 +338,25 @@ func (j *JEM) createModel(ctx context.Context, p createModelParams, info *jujupa
 //
 // If there are no credentials found, a zero credential path is returned.
 func (j *JEM) selectCredential(ctx context.Context, id identchecker.ACLIdentity, path params.CredentialPath, user params.User, cloud params.Cloud) (*mongodoc.Credential, error) {
-	p := mongodoc.CredentialPathFromParams(path)
-	query := jimmdb.Eq("path", p)
-	if p.IsZero() {
-		query = jimmdb.And(jimmdb.Eq("path.entitypath.user", user), jimmdb.Eq("path.cloud", cloud), jimmdb.Eq("revoked", false))
-	}
-	var creds []mongodoc.Credential
-	iter := j.DB.NewCanReadIter(id, j.DB.Credentials().Find(query).Iter())
-	var cred mongodoc.Credential
-	for iter.Next(ctx, &cred) {
-		creds = append(creds, cred)
-	}
-	if err := iter.Err(ctx); err != nil {
-		return nil, errgo.Notef(err, "cannot query credentials")
-	}
-	switch len(creds) {
-	case 0:
-		var err error
-		if !p.IsZero() {
-			err = errgo.WithCausef(nil, params.ErrNotFound, "credential %q not found", path)
+	if !path.IsZero() {
+		cred := mongodoc.Credential{Path: mongodoc.CredentialPathFromParams(path)}
+		if err := j.GetCredential(ctx, id, &cred); err != nil {
+			return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized), errgo.Is(params.ErrNotFound))
 		}
-		return nil, err
-	case 1:
-		cred := &creds[0]
 		if cred.Revoked {
-			// The credential (which must have been specifically selected by
-			// path, because if the path wasn't set, we will never select
-			// a revoked credential) has been revoked - we can't use it.
-			return nil, errgo.Newf("credential %v has been revoked", creds[0].Path)
+			return nil, errgo.Newf("credential %v has been revoked", path)
 		}
-		return cred, nil
-	default:
-		return nil, errgo.WithCausef(nil, params.ErrAmbiguousChoice, "more than one possible credential to use")
+		return &cred, nil
 	}
+	var cred *mongodoc.Credential
+	err := j.ForEachCredential(ctx, id, user, cloud, func(c *mongodoc.Credential) error {
+		if cred != nil {
+			return errgo.WithCausef(nil, params.ErrAmbiguousChoice, "more than one possible credential to use")
+		}
+		cred = c
+		return nil
+	})
+	return cred, errgo.Mask(err, errgo.Is(params.ErrAmbiguousChoice))
 }
 
 // GetModelInfo completes the given ModelInfo, which must have a non-zero
@@ -387,14 +376,9 @@ func (j *JEM) GetModelInfo(ctx context.Context, id identchecker.ACLIdentity, inf
 	if err := j.GetModel(ctx, id, jujuparams.ModelReadAccess, &m); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	ctl := &mongodoc.Controller{Path: m.Controller}
-	if err := j.DB.GetController(ctx, ctl); err != nil {
-		return errgo.Mask(err)
-	}
-
 	if queryController {
 		ctx := zapctx.WithFields(ctx, zap.Stringer("controller", m.Controller))
-		conn, err := j.OpenAPIFromDoc(ctx, ctl)
+		conn, err := j.OpenAPI(ctx, m.Controller)
 		if err == nil {
 			err = conn.ModelInfo(ctx, info)
 			if jujuparams.IsCodeUnauthorized(err) && m.Life() == "dying" {
@@ -419,7 +403,7 @@ func (j *JEM) GetModelInfo(ctx context.Context, id identchecker.ACLIdentity, inf
 		// the local database.
 		info.Name = string(m.Path.Name)
 		info.Type = m.Type
-		info.ControllerUUID = ctl.UUID
+		info.ControllerUUID = m.ControllerUUID
 		info.IsController = false
 		info.ProviderType = m.ProviderType
 		if info.ProviderType == "" {
@@ -731,4 +715,25 @@ func (j *JEM) GetModelStatuses(ctx context.Context, id identchecker.ACLIdentity)
 		return nil, errgo.Mask(err)
 	}
 	return mss, nil
+}
+
+// UpdateModelCredential updates the credential used with a model on both
+// the controller and the local database.
+func (j *JEM) UpdateModelCredential(ctx context.Context, conn *apiconn.Conn, model *mongodoc.Model, cred *mongodoc.Credential) error {
+	if _, err := j.updateControllerCredential(ctx, conn, model.Controller, cred); err != nil {
+		return errgo.Notef(err, "cannot add credential")
+	}
+	if err := j.credentialAddController(ctx, cred, model.Controller); err != nil {
+		return errgo.Notef(err, "cannot add credential")
+	}
+
+	client := modelmanager.NewClient(conn)
+	if err := client.ChangeModelCredential(names.NewModelTag(model.UUID), conv.ToCloudCredentialTag(cred.Path.ToParams())); err != nil {
+		return errgo.Mask(err)
+	}
+
+	if err := j.DB.UpdateModel(ctx, model, new(jimmdb.Update).Set("credential", cred.Path), true); err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
 }

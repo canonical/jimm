@@ -230,55 +230,6 @@ func (s *cloudSuite) TestUserCredentialsWithDomain(c *gc.C) {
 	})
 }
 
-func (s *cloudSuite) TestUserCredentialsACL(c *gc.C) {
-	ctx := context.Background()
-
-	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	_, err := s.JEM.UpdateCredential(ctx, &mongodoc.Credential{
-		Path: mongodoc.CredentialPath{
-			Cloud: "dummy",
-			EntityPath: mongodoc.EntityPath{
-				User: "test",
-				Name: "cred1",
-			},
-		},
-		Type:  "credtype",
-		Label: "Credentials 1",
-		Attributes: map[string]string{
-			"attr1": "val1",
-			"attr2": "val2",
-		},
-	}, 0)
-	c.Assert(err, gc.Equals, nil)
-	_, err = s.JEM.UpdateCredential(ctx, &mongodoc.Credential{
-		Path: mongodoc.CredentialPath{
-			Cloud: "dummy",
-			EntityPath: mongodoc.EntityPath{
-				User: "test2",
-				Name: "cred2",
-			},
-		},
-		ACL: params.ACL{
-			Read: []string{"test"},
-		},
-		Type:  "credtype",
-		Label: "Credentials 2",
-		Attributes: map[string]string{
-			"attr1": "val3",
-			"attr2": "val4",
-		},
-	}, 0)
-	c.Assert(err, gc.Equals, nil)
-	conn := s.open(c, nil, "test")
-	defer conn.Close()
-	client := cloudapi.NewClient(conn)
-	creds, err := client.UserCredentials(names.NewUserTag("test2@external"), names.NewCloudTag("dummy"))
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(creds, jc.DeepEquals, []names.CloudCredentialTag{
-		names.NewCloudCredentialTag("dummy/test2@external/cred2"),
-	})
-}
-
 func (s *cloudSuite) TestUserCredentialsErrors(c *gc.C) {
 	ctx := context.Background()
 
