@@ -95,6 +95,9 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 		}, {
 			Entity: "cores",
 			Count:  0,
+		}, {
+			Entity: "units",
+			Count:  0,
 		}},
 		AgentVersion: &jujuversion.Current,
 		Type:         "iaas",
@@ -119,6 +122,9 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 			Count:  0,
 		}, {
 			Entity: "cores",
+			Count:  0,
+		}, {
+			Entity: "units",
 			Count:  0,
 		}},
 		AgentVersion: &jujuversion.Current,
@@ -181,6 +187,9 @@ func (s *modelManagerSuite) TestListModelSummariesWitouthControllerUUIDMasking(c
 		}, {
 			Entity: "cores",
 			Count:  0,
+		}, {
+			Entity: "units",
+			Count:  0,
 		}},
 		AgentVersion: &jujuversion.Current,
 		Type:         "iaas",
@@ -205,6 +214,9 @@ func (s *modelManagerSuite) TestListModelSummariesWitouthControllerUUIDMasking(c
 			Count:  0,
 		}, {
 			Entity: "cores",
+			Count:  0,
+		}, {
+			Entity: "units",
 			Count:  0,
 		}},
 		AgentVersion: &jujuversion.Current,
@@ -1666,6 +1678,9 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 			Count:  0,
 		}, {
 			Entity: "cores",
+			Count:  0,
+		}, {
+			Entity: "units",
 			Count:  0,
 		}},
 		AgentVersion: &jujuversion.Current,

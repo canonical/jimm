@@ -1352,12 +1352,12 @@ func (s *internalSuite) controllerStats(c *gc.C, ctlPath params.EntityPath) mong
 
 // modelStats holds the aspects of a model updated by the monitor.
 type modelStats struct {
-	life                                      string
-	status                                    string
-	message                                   string
-	hasConfig                                 bool
-	hasStatusSince                            bool
-	unitCount, machineCount, applicationCount int
+	life                                                 string
+	status                                               string
+	message                                              string
+	hasConfig                                            bool
+	hasStatusSince                                       bool
+	unitCount, machineCount, applicationCount, coreCount int
 }
 
 func (s *internalSuite) modelStats(c *gc.C, modelPath params.EntityPath) modelStats {
@@ -1378,6 +1378,7 @@ func (s *internalSuite) modelStats(c *gc.C, modelPath params.EntityPath) modelSt
 		unitCount:        modelDoc.Counts[params.UnitCount].Current,
 		machineCount:     modelDoc.Counts[params.MachineCount].Current,
 		applicationCount: modelDoc.Counts[params.ApplicationCount].Current,
+		coreCount:        modelDoc.Counts[params.CoreCount].Current,
 	}
 	if modelDoc.Info == nil {
 		return ms
