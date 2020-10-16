@@ -75,11 +75,11 @@ func recoverModel(ctx context.Context, cfg *config.Config, controller, model str
 	}
 
 	p, err := jem.NewPool(ctx, jem.Params{
-		DB:              db,
-		SessionPool:     mgosession.NewPool(ctx, session, 100),
-		ControllerAdmin: cfg.ControllerAdmin,
-		UsageSenderURL:  cfg.UsageSenderURL,
-		Client:          bclient,
+		DB:                             db,
+		SessionPool:                    mgosession.NewPool(ctx, session, 100),
+		ControllerAdmin:                cfg.ControllerAdmin,
+		UsageSenderAuthorizationClient: nil,
+		Client:                         bclient,
 	})
 	if err != nil {
 		return errgo.Notef(err, "cannot access JIMM database")

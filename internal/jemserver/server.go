@@ -34,13 +34,17 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/monitor"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	"github.com/CanonicalLtd/jimm/internal/usagesender"
+	usagesenderauth "github.com/CanonicalLtd/jimm/internal/usagesender/auth"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
 var (
-	usageSenderPeriod = 5 * time.Minute
+	usageSenderPeriod                 = 5 * time.Minute
+	NewUsageSenderAuthorizationClient = func(url string, client *httpbakery.Client) jem.UsageSenderAuthorizationClient {
+		return usagesenderauth.NewAuthorizationClient(url, client)
+	}
 )
 
 // NewAPIHandlerFunc is a function that returns set of httprequest
@@ -193,14 +197,18 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot load public cloud metadata")
 	}
+	var usageSenderAuthClient jem.UsageSenderAuthorizationClient
+	if config.UsageSenderURL != "" {
+		usageSenderAuthClient = NewUsageSenderAuthorizationClient(config.UsageSenderURL, bclient)
+	}
 	jconfig := jem.Params{
-		DB:                  config.DB,
-		SessionPool:         sessionPool,
-		ControllerAdmin:     config.ControllerAdmin,
-		UsageSenderURL:      config.UsageSenderURL,
-		Client:              bclient,
-		PublicCloudMetadata: publicCloudMetadata,
-		Pubsub:              config.Pubsub,
+		DB:                             config.DB,
+		SessionPool:                    sessionPool,
+		ControllerAdmin:                config.ControllerAdmin,
+		UsageSenderAuthorizationClient: usageSenderAuthClient,
+		Client:                         bclient,
+		PublicCloudMetadata:            publicCloudMetadata,
+		Pubsub:                         config.Pubsub,
 	}
 	p, err := jem.NewPool(ctx, jconfig)
 	if err != nil {

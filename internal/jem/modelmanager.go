@@ -90,10 +90,11 @@ func (j *JEM) CreateModel(ctx context.Context, id identchecker.ACLIdentity, p Cr
 	}
 
 	var usageSenderCredentials []byte
-	if j.usageSenderAuthorizationClient != nil {
-		usageSenderCredentials, err = j.usageSenderAuthorizationClient.GetCredentials(
+	if j.pool.config.UsageSenderAuthorizationClient != nil {
+		usageSenderCredentials, err = j.pool.config.UsageSenderAuthorizationClient.GetCredentials(
 			ctx,
-			string(p.Path.User))
+			string(p.Path.User),
+		)
 		if err != nil {
 			zapctx.Warn(ctx, "failed to obtain credentials for model", zaputil.Error(err), zap.String("user", string(p.Path.User)))
 		}
