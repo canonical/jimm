@@ -1,7 +1,4 @@
 // Copyright 2020 Canonical Ltd.
-
-// +build !release
-
 package jujuapi_test
 
 import (

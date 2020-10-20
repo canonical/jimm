@@ -5,6 +5,7 @@ go 1.14
 require (
 	github.com/canonical/candid v1.4.2
 	github.com/frankban/quicktest v1.11.0
+	github.com/golang/mock v1.4.4 // indirect
 	github.com/google/go-cmp v0.5.2
 	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
 	github.com/gorilla/websocket v1.4.2
@@ -16,7 +17,7 @@ require (
 	github.com/juju/errors v0.0.0-20200330140219-3fe23663418f
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
 	github.com/juju/httprequest v1.0.1
-	github.com/juju/juju v0.0.0-20201009195340-dcc51b432f65
+	github.com/juju/juju v0.0.0-20201020045753-90199a14310b
 	github.com/juju/loggo v0.0.0-20200526014432-9ce3a2e09b5e
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
 	github.com/juju/mgosession v1.0.0
@@ -31,8 +32,10 @@ require (
 	github.com/prometheus/client_golang v1.7.1
 	github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af
 	go.uber.org/zap v1.10.0
-	golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0
+	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
+	golang.org/x/sys v0.0.0-20201018230417-eeed37f84f13 // indirect
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gopkg.in/check.v1 v1.0.0-20200902074654-038fdea0a05b
 	gopkg.in/errgo.v1 v1.0.1
 	gopkg.in/httprequest.v1 v1.2.1
