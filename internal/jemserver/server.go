@@ -41,7 +41,11 @@ import (
 )
 
 var (
-	usageSenderPeriod                 = 5 * time.Minute
+	usageSenderPeriod = 5 * time.Minute
+
+	// NewUsageSenderAuthorizationClient is a function the creates a new
+	// UsageSenderAuthorizationClient. It is exported so that it can be
+	// overriden in tests.
 	NewUsageSenderAuthorizationClient = func(url string, client *httpbakery.Client) jem.UsageSenderAuthorizationClient {
 		return usagesenderauth.NewAuthorizationClient(url, client)
 	}
