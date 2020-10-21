@@ -85,8 +85,8 @@ func (s *Suite) SetUpTest(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	s.PatchValue(&jem.APIOpenTimeout, time.Duration(0))
 	s.MetricsRegistrationClient = &stubMetricsRegistrationClient{}
-	s.PatchValue(&jem.NewUsageSenderAuthorizationClient, func(_ string, _ *httpbakery.Client) (jem.UsageSenderAuthorizationClient, error) {
-		return s.MetricsRegistrationClient, nil
+	s.PatchValue(&jemserver.NewUsageSenderAuthorizationClient, func(_ string, _ *httpbakery.Client) jem.UsageSenderAuthorizationClient {
+		return s.MetricsRegistrationClient
 	})
 	if s.Clock != nil {
 		s.PatchValue(&usagesender.SenderClock, s.Clock)

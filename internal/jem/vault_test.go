@@ -9,7 +9,6 @@ import (
 	"github.com/juju/juju/cloud"
 	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
@@ -37,9 +36,6 @@ func (s *jemVaultSuite) SetUpTest(c *gc.C) {
 	publicCloudMetadata, _, err := cloud.PublicCloudMetadata()
 	c.Assert(err, gc.Equals, nil)
 	s.usageSenderAuthorizationClient = &testUsageSenderAuthorizationClient{}
-	s.PatchValue(&jem.NewUsageSenderAuthorizationClient, func(_ string, _ *httpbakery.Client) (jem.UsageSenderAuthorizationClient, error) {
-		return s.usageSenderAuthorizationClient, nil
-	})
 
 	vaultcfg := vault.DefaultConfig()
 	vaultcfg.Address = "http://localhost:8200"
@@ -53,11 +49,11 @@ func (s *jemVaultSuite) SetUpTest(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	pool, err := jem.NewPool(context.TODO(), jem.Params{
-		DB:                  s.Session.DB("jem"),
-		ControllerAdmin:     "controller-admin",
-		SessionPool:         s.sessionPool,
-		PublicCloudMetadata: publicCloudMetadata,
-		UsageSenderURL:      "test-usage-sender-url",
+		DB:                             s.Session.DB("jem"),
+		ControllerAdmin:                "controller-admin",
+		SessionPool:                    s.sessionPool,
+		PublicCloudMetadata:            publicCloudMetadata,
+		UsageSenderAuthorizationClient: s.usageSenderAuthorizationClient,
 		Pubsub: &pubsub.Hub{
 			MaxConcurrency: 10,
 		},
