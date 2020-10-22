@@ -3,7 +3,6 @@
 package jujuapi_test
 
 import (
-	"context"
 	"sort"
 	"time"
 
@@ -15,10 +14,9 @@ import (
 	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
-	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	jimmversion "github.com/CanonicalLtd/jimm/version"
 )
 
@@ -27,13 +25,6 @@ type controllerSuite struct {
 }
 
 var _ = gc.Suite(&controllerSuite{})
-
-func (s *controllerSuite) SetUpTest(c *gc.C) {
-	s.ServerParams.CharmstoreLocation = "https://api.jujucharms.com/charmstore"
-	s.ServerParams.MeteringLocation = "https://api.jujucharms.com/omnibus"
-	s.websocketSuite.SetUpTest(c)
-	s.PatchValue(&utils.OutgoingAccessAllowed, true)
-}
 
 func (s *controllerSuite) TestControllerConfig(c *gc.C) {
 	conn := s.open(c, nil, "test")
@@ -57,86 +48,39 @@ func (s *controllerSuite) TestModelConfig(c *gc.C) {
 }
 
 func (s *controllerSuite) TestAllModels(c *gc.C) {
-	ctx := context.Background()
-
-	ctlPath := s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
-	s.AssertUpdateCredential(ctx, c, "test2", "dummy", "cred1", "empty")
-	err := s.JEM.DB.SetACL(ctx, s.JEM.DB.Controllers(), ctlPath, params.ACL{
-		Read: []string{"test2"},
-	})
-
-	c.Assert(err, gc.Equals, nil)
-
-	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: "cred1"})
-	modelUUID1 := mi.UUID
-	s.assertCreateModel(c, createModelParams{name: "model-2", username: "test2", cred: "cred1"})
-	mi = s.assertCreateModel(c, createModelParams{name: "model-3", username: "test2", cred: "cred1"})
-	modelUUID3 := mi.UUID
-
-	conn := s.open(c, nil, "test")
+	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 	client := controllerapi.NewClient(conn)
-
-	err = s.JEM.DB.SetACL(ctx, s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
-		Read: []string{"test"},
-	})
-
-	c.Assert(err, gc.Equals, nil)
 
 	models, err := client.AllModels()
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(models, jc.DeepEquals, []base.UserModel{{
 		Name:           "model-1",
-		UUID:           modelUUID1,
-		Owner:          "test@external",
+		UUID:           s.Model.UUID,
+		Owner:          "bob@external",
 		LastConnection: nil,
 		Type:           "iaas",
 	}, {
 		Name:           "model-3",
-		UUID:           modelUUID3,
-		Owner:          "test2@external",
+		UUID:           s.Model3.UUID,
+		Owner:          "charlie@external",
 		LastConnection: nil,
 		Type:           "iaas",
 	}})
 }
 
 func (s *controllerSuite) TestModelStatus(c *gc.C) {
-	ctx := context.Background()
-
-	ctlPath := s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
-	s.AssertUpdateCredential(ctx, c, "test2", "dummy", "cred1", "empty")
-	err := s.JEM.DB.SetACL(ctx, s.JEM.DB.Controllers(), ctlPath, params.ACL{
-		Read: []string{"test2"},
-	})
-
-	c.Assert(err, gc.Equals, nil)
-
-	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: "cred1"})
-	modelUUID1 := mi.UUID
-	mi = s.assertCreateModel(c, createModelParams{name: "model-2", username: "test2", cred: "cred1"})
-	modelUUID2 := mi.UUID
-	mi = s.assertCreateModel(c, createModelParams{name: "model-3", username: "test2", cred: "cred1"})
-	modelUUID3 := mi.UUID
-
-	err = s.JEM.DB.SetACL(ctx, s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
-		Read: []string{"test"},
-	})
-
-	c.Assert(err, gc.Equals, nil)
-
 	type modelStatuser interface {
 		ModelStatus(tags ...names.ModelTag) ([]base.ModelStatus, error)
 	}
 	doTest := func(client modelStatuser) {
-		models, err := client.ModelStatus(names.NewModelTag(modelUUID1), names.NewModelTag(modelUUID3))
+		models, err := client.ModelStatus(names.NewModelTag(s.Model.UUID), names.NewModelTag(s.Model3.UUID))
 		c.Assert(err, gc.Equals, nil)
 		c.Assert(models, gc.HasLen, 2)
 		c.Check(models[0], jc.DeepEquals, base.ModelStatus{
-			UUID:               modelUUID1,
+			UUID:               s.Model.UUID,
 			Life:               "alive",
-			Owner:              "test@external",
+			Owner:              "bob@external",
 			TotalMachineCount:  0,
 			CoreCount:          0,
 			HostedMachineCount: 0,
@@ -145,25 +89,20 @@ func (s *controllerSuite) TestModelStatus(c *gc.C) {
 			ModelType:          "iaas",
 		})
 		c.Check(models[1].Error, gc.ErrorMatches, `unauthorized`)
-		status, err := client.ModelStatus(names.NewModelTag(modelUUID2))
+		status, err := client.ModelStatus(names.NewModelTag(s.Model2.UUID))
 		c.Assert(err, gc.Equals, nil)
 		c.Assert(status, gc.HasLen, 1)
 		c.Check(status[0].Error, gc.ErrorMatches, "unauthorized")
 	}
 
-	conn := s.open(c, nil, "test")
+	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 	doTest(controllerapi.NewClient(conn))
 	doTest(modelmanager.NewClient(conn))
 }
 
 func (s *controllerSuite) TestMongoVersion(c *gc.C) {
-	ctx := context.Background()
-
-	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
-
-	conn := s.open(c, nil, "test")
+	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 
 	var version jujuparams.StringResult
@@ -177,12 +116,7 @@ func (s *controllerSuite) TestMongoVersion(c *gc.C) {
 }
 
 func (s *controllerSuite) TestConfigSet(c *gc.C) {
-	ctx := context.Background()
-
-	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
-
-	conn := s.open(c, nil, "test")
+	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 
 	err := conn.APICall("Controller", 5, "", "ConfigSet", jujuparams.ControllerConfigSet{}, nil)
@@ -193,12 +127,7 @@ func (s *controllerSuite) TestConfigSet(c *gc.C) {
 }
 
 func (s *controllerSuite) TestIdentityProviderURL(c *gc.C) {
-	ctx := context.Background()
-
-	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
-
-	conn := s.open(c, nil, "test")
+	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 
 	var result jujuparams.StringResult
@@ -212,11 +141,6 @@ func (s *controllerSuite) TestIdentityProviderURL(c *gc.C) {
 }
 
 func (s *controllerSuite) TestControllerVersion(c *gc.C) {
-	ctx := context.Background()
-
-	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
-
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 
@@ -236,32 +160,22 @@ func (s *controllerSuite) TestControllerVersion(c *gc.C) {
 	})
 }
 
-func (s *controllerSuite) TestWatchModelSummaries(c *gc.C) {
-	ctx := context.Background()
+type watcherSuite struct {
+	websocketSuite
+}
 
-	ctlPath := s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
-	s.AssertUpdateCredential(ctx, c, "test2", "dummy", "cred1", "empty")
-	err := s.JEM.DB.SetACL(ctx, s.JEM.DB.Controllers(), ctlPath, params.ACL{
-		Read: []string{"test2"},
-	})
+var _ = gc.Suite(&watcherSuite{})
 
-	c.Assert(err, gc.Equals, nil)
+func (s *watcherSuite) SetUpTest(c *gc.C) {
+	s.JEMSuite.Params.Pubsub = &pubsub.Hub{MaxConcurrency: 10}
+	s.websocketSuite.SetUpTest(c)
+}
 
-	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: "cred1"})
-	modelUUID1 := mi.UUID
-	s.assertCreateModel(c, createModelParams{name: "model-2", username: "test2", cred: "cred1"})
-	mi = s.assertCreateModel(c, createModelParams{name: "model-3", username: "test2", cred: "cred1"})
-	modelUUID3 := mi.UUID
-	c.Logf("models: %v %v", modelUUID1, modelUUID3)
+func (s *watcherSuite) TestWatchModelSummaries(c *gc.C) {
+	c.Logf("models: %v %v", s.Model.UUID, s.Model3.UUID)
 
-	err = s.JEM.DB.SetACL(ctx, s.JEM.DB.Models(), params.EntityPath{User: "test2", Name: "model-3"}, params.ACL{
-		Read: []string{"test"},
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	done := s.Pubsub.Publish(modelUUID1, jujuparams.ModelAbstract{
-		UUID:  modelUUID1,
+	done := s.JEM.Pubsub().Publish(s.Model.UUID, jujuparams.ModelAbstract{
+		UUID:  s.Model.UUID,
 		Cloud: "test-cloud",
 		Name:  "test-name-1",
 	})
@@ -270,8 +184,8 @@ func (s *controllerSuite) TestWatchModelSummaries(c *gc.C) {
 	case <-time.After(time.Second):
 		c.Fatalf("timed out")
 	}
-	done = s.Pubsub.Publish(modelUUID3, jujuparams.ModelAbstract{
-		UUID:  modelUUID3,
+	done = s.JEMSuite.Params.Pubsub.Publish(s.Model3.UUID, jujuparams.ModelAbstract{
+		UUID:  s.Model3.UUID,
 		Cloud: "test-cloud",
 		Name:  "test-name-3",
 	})
@@ -282,11 +196,11 @@ func (s *controllerSuite) TestWatchModelSummaries(c *gc.C) {
 	}
 
 	expectedModels := []jujuparams.ModelAbstract{{
-		UUID:  modelUUID1,
+		UUID:  s.Model.UUID,
 		Cloud: "test-cloud",
 		Name:  "test-name-1",
 	}, {
-		UUID:  modelUUID3,
+		UUID:  s.Model3.UUID,
 		Cloud: "test-cloud",
 		Name:  "test-name-3",
 	}}
@@ -294,11 +208,11 @@ func (s *controllerSuite) TestWatchModelSummaries(c *gc.C) {
 		return expectedModels[i].UUID < expectedModels[j].UUID
 	})
 
-	conn := s.open(c, nil, "test")
+	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 
 	var watcherID jujuparams.SummaryWatcherID
-	err = conn.APICall("Controller", 9, "", "WatchModelSummaries", nil, &watcherID)
+	err := conn.APICall("Controller", 9, "", "WatchModelSummaries", nil, &watcherID)
 	c.Assert(err, jc.ErrorIsNil)
 
 	var summaries jujuparams.SummaryWatcherNextResults

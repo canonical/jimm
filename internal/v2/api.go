@@ -468,7 +468,7 @@ func (h *Handler) Migrate(p httprequest.Params, arg *params.Migrate) error {
 	}
 	defer conn.Close()
 	ctl := mongodoc.Controller{Path: arg.Controller}
-	if err := h.jem.GetController(p.Context, h.id, &ctl); err != nil {
+	if err := h.jem.DB.GetController(p.Context, &ctl); err != nil {
 		return errgo.NoteMask(err, "cannot access destination controller", errgo.Is(params.ErrNotFound))
 	}
 	zapctx.Debug(p.Context, "about to call InitiateMigration")

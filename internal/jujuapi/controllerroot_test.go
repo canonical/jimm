@@ -11,12 +11,10 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
-	"github.com/juju/utils"
 	"github.com/juju/version"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
-	"github.com/CanonicalLtd/jimm/params"
 )
 
 type controllerrootSuite struct {
@@ -25,20 +23,11 @@ type controllerrootSuite struct {
 
 var _ = gc.Suite(&controllerrootSuite{})
 
-func (s *controllerrootSuite) SetUpTest(c *gc.C) {
-	s.ServerParams.CharmstoreLocation = "https://api.jujucharms.com/charmstore"
-	s.ServerParams.MeteringLocation = "https://api.jujucharms.com/omnibus"
-	s.websocketSuite.SetUpTest(c)
-	s.PatchValue(&utils.OutgoingAccessAllowed, true)
-}
-
 func (s *controllerrootSuite) TestServerVersion(c *gc.C) {
 	ctx := context.Background()
 
-	ctlPath := params.EntityPath{"test", "controller-1"}
-	s.AssertAddController(ctx, c, ctlPath, true)
 	testVersion := version.MustParse("5.4.3")
-	err := s.JEM.SetControllerVersion(ctx, ctlPath, testVersion)
+	err := s.JEM.SetControllerVersion(ctx, s.Controller.Path, testVersion)
 	c.Assert(err, gc.Equals, nil)
 
 	conn := s.open(c, nil, "test")
@@ -50,14 +39,8 @@ func (s *controllerrootSuite) TestServerVersion(c *gc.C) {
 }
 
 func (s *controllerrootSuite) TestUnimplementedMethodFails(c *gc.C) {
-	ctx := context.Background()
-
-	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(ctx, c, "test", "dummy", "cred1", "empty")
-	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "test", cred: cred})
-	modelUUID := mi.UUID
 	conn := s.open(c, &api.Info{
-		ModelTag:  names.NewModelTag(modelUUID),
+		ModelTag:  names.NewModelTag(s.Model.UUID),
 		SkipLogin: true,
 	}, "test")
 	defer conn.Close()
@@ -67,9 +50,6 @@ func (s *controllerrootSuite) TestUnimplementedMethodFails(c *gc.C) {
 }
 
 func (s *controllerrootSuite) TestUnimplementedRootFails(c *gc.C) {
-	ctx := context.Background()
-
-	s.AssertAddController(ctx, c, params.EntityPath{User: "test", Name: "controller-1"}, true)
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	var resp jujuparams.RedirectInfoResult

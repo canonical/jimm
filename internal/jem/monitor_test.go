@@ -3,14 +3,11 @@
 package jem_test
 
 import (
-	"context"
 	"fmt"
 	"sort"
 	"time"
 
-	"github.com/juju/juju/cloud"
 	jc "github.com/juju/testing/checkers"
-	"github.com/juju/utils"
 	"github.com/juju/version"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
@@ -18,50 +15,15 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
-	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
 type monitorSuite struct {
-	jemtest.IsolatedMgoSuite
-	pool                           *jem.Pool
-	sessionPool                    *mgosession.Pool
-	jem                            *jem.JEM
-	usageSenderAuthorizationClient *testUsageSenderAuthorizationClient
+	jemtest.JEMSuite
 }
 
 var _ = gc.Suite(&monitorSuite{})
-
-func (s *monitorSuite) SetUpTest(c *gc.C) {
-	s.IsolatedMgoSuite.SetUpTest(c)
-	s.sessionPool = mgosession.NewPool(context.TODO(), s.Session, 5)
-	publicCloudMetadata, _, err := cloud.PublicCloudMetadata()
-	c.Assert(err, gc.Equals, nil)
-	s.usageSenderAuthorizationClient = &testUsageSenderAuthorizationClient{}
-	pool, err := jem.NewPool(context.TODO(), jem.Params{
-		DB:                             s.Session.DB("jem"),
-		ControllerAdmin:                "controller-admin",
-		SessionPool:                    s.sessionPool,
-		PublicCloudMetadata:            publicCloudMetadata,
-		UsageSenderAuthorizationClient: s.usageSenderAuthorizationClient,
-		Pubsub: &pubsub.Hub{
-			MaxConcurrency: 10,
-		},
-	})
-	c.Assert(err, gc.Equals, nil)
-	s.pool = pool
-	s.jem = s.pool.JEM(context.TODO())
-	s.PatchValue(&utils.OutgoingAccessAllowed, true)
-}
-
-func (s *monitorSuite) TearDownTest(c *gc.C) {
-	s.jem.Close()
-	s.pool.Close()
-	s.sessionPool.Close()
-	s.IsolatedMgoSuite.TearDownTest(c)
-}
 
 const leaseExpiryDuration = 15 * time.Second
 
@@ -143,18 +105,18 @@ var acquireLeaseTests = []struct {
 func (s *monitorSuite) TestAcquireLease(c *gc.C) {
 	for i, test := range acquireLeaseTests {
 		c.Logf("test %d: %v", i, test.about)
-		_, err := s.jem.DB.Controllers().RemoveAll(bson.D{{"path", test.ctlPath}})
+		_, err := s.JEM.DB.Controllers().RemoveAll(bson.D{{"path", test.ctlPath}})
 		c.Assert(err, gc.Equals, nil)
-		_, err = s.jem.DB.Models().RemoveAll(bson.D{{"path", test.ctlPath}})
+		_, err = s.JEM.DB.Models().RemoveAll(bson.D{{"path", test.ctlPath}})
 		c.Assert(err, gc.Equals, nil)
-		err = s.jem.DB.InsertController(testContext, &mongodoc.Controller{
+		err = s.JEM.DB.InsertController(testContext, &mongodoc.Controller{
 			Path:               test.ctlPath,
 			UUID:               "fake-uuid",
 			MonitorLeaseOwner:  test.actualOldOwner,
 			MonitorLeaseExpiry: test.actualOldExpiry,
 		})
 		c.Assert(err, gc.Equals, nil)
-		t, err := s.jem.AcquireMonitorLease(testContext, test.ctlPath, test.oldExpiry, test.oldOwner, test.newExpiry, test.newOwner)
+		t, err := s.JEM.AcquireMonitorLease(testContext, test.ctlPath, test.oldExpiry, test.oldOwner, test.newExpiry, test.newOwner)
 		if test.expectError != "" {
 			if test.expectCause != nil {
 				c.Check(errgo.Cause(err), gc.Equals, test.expectCause)
@@ -166,7 +128,7 @@ func (s *monitorSuite) TestAcquireLease(c *gc.C) {
 		c.Assert(err, gc.Equals, nil)
 		c.Assert(t.UTC(), gc.DeepEquals, test.expectExpiry.UTC())
 		ctl := &mongodoc.Controller{Path: test.ctlPath}
-		err = s.jem.DB.GetController(testContext, ctl)
+		err = s.JEM.DB.GetController(testContext, ctl)
 		c.Assert(err, gc.Equals, nil)
 		c.Assert(ctl.MonitorLeaseExpiry.UTC(), gc.DeepEquals, test.expectExpiry.UTC())
 		c.Assert(ctl.MonitorLeaseOwner, gc.Equals, test.newOwner)
@@ -174,7 +136,7 @@ func (s *monitorSuite) TestAcquireLease(c *gc.C) {
 }
 
 func (s *monitorSuite) TestAcquireLeaseControllerNotFound(c *gc.C) {
-	_, err := s.jem.AcquireMonitorLease(testContext, params.EntityPath{"bob", "foo"}, time.Time{}, "", time.Now(), "jem1")
+	_, err := s.JEM.AcquireMonitorLease(testContext, params.EntityPath{"bob", "foo"}, time.Time{}, "", time.Now(), "jem1")
 	c.Assert(err, gc.ErrorMatches, `controller removed`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
@@ -183,7 +145,7 @@ func (s *monitorSuite) TestSetModelInfoSuccess(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 
 	// Add the controller model.
-	err := s.jem.DB.InsertModel(testContext, &mongodoc.Model{
+	err := s.JEM.DB.InsertModel(testContext, &mongodoc.Model{
 		Path:       params.EntityPath{"bob", "foo"},
 		UUID:       "fake-uuid",
 		Controller: params.EntityPath{"bob", "foo"},
@@ -191,31 +153,31 @@ func (s *monitorSuite) TestSetModelInfoSuccess(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// Add another model with the same controller but a different UUID.
-	err = s.jem.DB.InsertModel(testContext, &mongodoc.Model{
+	err = s.JEM.DB.InsertModel(testContext, &mongodoc.Model{
 		Path:       params.EntityPath{"alice", "baz"},
 		UUID:       "another-uuid",
 		Controller: ctlPath,
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.jem.SetModelInfo(testContext, ctlPath, "fake-uuid", &mongodoc.ModelInfo{
+	err = s.JEM.SetModelInfo(testContext, ctlPath, "fake-uuid", &mongodoc.ModelInfo{
 		Life: "alive",
 	})
 	c.Assert(err, gc.Equals, nil)
 
 	m := mongodoc.Model{Path: ctlPath}
-	err = s.jem.DB.GetModel(testContext, &m)
+	err = s.JEM.DB.GetModel(testContext, &m)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(m.Life(), gc.Equals, "alive")
 
 	m.Path = params.EntityPath{"alice", "baz"}
-	err = s.jem.DB.GetModel(testContext, &m)
+	err = s.JEM.DB.GetModel(testContext, &m)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(m.Life(), gc.Equals, "")
 }
 
 func (s *monitorSuite) TestSetModelInfoNotFound(c *gc.C) {
-	err := s.jem.SetModelInfo(testContext, params.EntityPath{"bob", "foo"}, "fake-uuid", &mongodoc.ModelInfo{})
+	err := s.JEM.SetModelInfo(testContext, params.EntityPath{"bob", "foo"}, "fake-uuid", &mongodoc.ModelInfo{})
 	c.Assert(err, gc.Equals, nil)
 }
 
@@ -223,7 +185,7 @@ func (s *monitorSuite) TestSetModelLifeSuccess(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
 
 	// Add the controller model.
-	err := s.jem.DB.InsertModel(testContext, &mongodoc.Model{
+	err := s.JEM.DB.InsertModel(testContext, &mongodoc.Model{
 		Path:       params.EntityPath{"bob", "foo"},
 		UUID:       "fake-uuid",
 		Controller: params.EntityPath{"bob", "foo"},
@@ -231,29 +193,29 @@ func (s *monitorSuite) TestSetModelLifeSuccess(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// Add another model with the same controller but a different UUID.
-	err = s.jem.DB.InsertModel(testContext, &mongodoc.Model{
+	err = s.JEM.DB.InsertModel(testContext, &mongodoc.Model{
 		Path:       params.EntityPath{"alice", "baz"},
 		UUID:       "another-uuid",
 		Controller: ctlPath,
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.jem.SetModelLife(testContext, ctlPath, "fake-uuid", "alive")
+	err = s.JEM.SetModelLife(testContext, ctlPath, "fake-uuid", "alive")
 	c.Assert(err, gc.Equals, nil)
 
 	m := mongodoc.Model{Path: ctlPath}
-	err = s.jem.DB.GetModel(testContext, &m)
+	err = s.JEM.DB.GetModel(testContext, &m)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(m.Life(), gc.Equals, "alive")
 
 	m.Path = params.EntityPath{"alice", "baz"}
-	err = s.jem.DB.GetModel(testContext, &m)
+	err = s.JEM.DB.GetModel(testContext, &m)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(m.Life(), gc.Equals, "")
 }
 
 func (s *monitorSuite) TestSetModelLifeNotFound(c *gc.C) {
-	err := s.jem.SetModelLife(testContext, params.EntityPath{"bob", "foo"}, "fake-uuid", "alive")
+	err := s.JEM.SetModelLife(testContext, params.EntityPath{"bob", "foo"}, "fake-uuid", "alive")
 	c.Assert(err, gc.Equals, nil)
 }
 
@@ -276,21 +238,21 @@ func (s *monitorSuite) TestModelUUIDsForController(c *gc.C) {
 		uuid:    "33333333-3333-3333-3333-333333333333",
 	}}
 	for _, m := range models {
-		err := s.jem.DB.InsertModel(testContext, &mongodoc.Model{
+		err := s.JEM.DB.InsertModel(testContext, &mongodoc.Model{
 			Path:       m.path,
 			Controller: m.ctlPath,
 			UUID:       m.uuid,
 		})
 		c.Assert(err, gc.Equals, nil)
 	}
-	uuids, err := s.jem.ModelUUIDsForController(testContext, params.EntityPath{"admin", "ctl1"})
+	uuids, err := s.JEM.ModelUUIDsForController(testContext, params.EntityPath{"admin", "ctl1"})
 	c.Assert(err, gc.Equals, nil)
 	sort.Strings(uuids)
 	c.Assert(uuids, jc.DeepEquals, []string{
 		"11111111-1111-1111-1111-111111111111",
 		"22222222-2222-2222-2222-222222222222",
 	})
-	uuids, err = s.jem.ModelUUIDsForController(testContext, params.EntityPath{"admin", "ctl2"})
+	uuids, err = s.JEM.ModelUUIDsForController(testContext, params.EntityPath{"admin", "ctl2"})
 	c.Assert(err, gc.Equals, nil)
 	sort.Strings(uuids)
 	c.Assert(uuids, jc.DeepEquals, []string{
@@ -383,17 +345,17 @@ func (s *monitorSuite) TestUpdateModelCounts(c *gc.C) {
 		c.Logf("test %d: %v", i, test.about)
 		modelId := params.EntityPath{"bob", params.Name(fmt.Sprintf("model-%d", i))}
 		uuid := fmt.Sprintf("uuid-%d", i)
-		err := s.jem.DB.InsertModel(testContext, &mongodoc.Model{
+		err := s.JEM.DB.InsertModel(testContext, &mongodoc.Model{
 			Path:       modelId,
 			Controller: ctlPath,
 			UUID:       uuid,
 			Counts:     test.before,
 		})
 		c.Assert(err, gc.Equals, nil)
-		err = s.jem.UpdateModelCounts(testContext, ctlPath, uuid, test.update, test.updateTime)
+		err = s.JEM.UpdateModelCounts(testContext, ctlPath, uuid, test.update, test.updateTime)
 		c.Assert(err, gc.Equals, nil)
 		model := mongodoc.Model{Path: modelId}
-		err = s.jem.DB.GetModel(testContext, &model)
+		err = s.JEM.DB.GetModel(testContext, &model)
 		c.Assert(err, gc.Equals, nil)
 		// Change all times to UTC for straightforward comparison.
 		for name, count := range model.Counts {
@@ -408,13 +370,13 @@ func (s *monitorSuite) TestUpdateModelCountsNotFoundUUID(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "controller"}
 	modelId := params.EntityPath{"bob", "test-model"}
 	uuid := "real-uuid"
-	err := s.jem.DB.InsertModel(testContext, &mongodoc.Model{
+	err := s.JEM.DB.InsertModel(testContext, &mongodoc.Model{
 		Path:       modelId,
 		Controller: ctlPath,
 		UUID:       uuid,
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateModelCounts(testContext, ctlPath, "fake-uuid", nil, T(0))
+	err = s.JEM.UpdateModelCounts(testContext, ctlPath, "fake-uuid", nil, T(0))
 	c.Assert(err, gc.ErrorMatches, `model not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
@@ -423,13 +385,13 @@ func (s *monitorSuite) TestUpdateModelCountsNotFoundController(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "controller"}
 	modelId := params.EntityPath{"bob", "test-model"}
 	uuid := "real-uuid"
-	err := s.jem.DB.InsertModel(testContext, &mongodoc.Model{
+	err := s.JEM.DB.InsertModel(testContext, &mongodoc.Model{
 		Path:       modelId,
 		Controller: ctlPath,
 		UUID:       uuid,
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateModelCounts(testContext, params.EntityPath{"bob", "not-controller"}, "real-uuid", nil, T(0))
+	err = s.JEM.UpdateModelCounts(testContext, params.EntityPath{"bob", "not-controller"}, "real-uuid", nil, T(0))
 	c.Assert(err, gc.ErrorMatches, `model not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
@@ -437,53 +399,53 @@ func (s *monitorSuite) TestUpdateModelCountsNotFoundController(c *gc.C) {
 func (s *monitorSuite) TestSetControllerAvailability(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "x"}
 	ctl := &mongodoc.Controller{Path: ctlPath}
-	err := s.jem.DB.InsertController(testContext, ctl)
+	err := s.JEM.DB.InsertController(testContext, ctl)
 
 	// Check that we can mark it as unavailable.
 	t0 := time.Now()
-	err = s.jem.SetControllerUnavailableAt(testContext, ctlPath, t0)
+	err = s.JEM.SetControllerUnavailableAt(testContext, ctlPath, t0)
 	c.Assert(err, gc.Equals, nil)
 
 	ctl = &mongodoc.Controller{Path: ctlPath}
-	err = s.jem.DB.GetController(testContext, ctl)
+	err = s.JEM.DB.GetController(testContext, ctl)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(ctl.UnavailableSince.UTC(), jc.DeepEquals, mongodoc.Time(t0).UTC())
 
 	// Check that if we mark it unavailable again, it doesn't
 	// have any affect.
-	err = s.jem.SetControllerUnavailableAt(testContext, ctlPath, t0.Add(time.Second))
+	err = s.JEM.SetControllerUnavailableAt(testContext, ctlPath, t0.Add(time.Second))
 	c.Assert(err, gc.Equals, nil)
 
 	ctl = &mongodoc.Controller{Path: ctlPath}
-	err = s.jem.DB.GetController(testContext, ctl)
+	err = s.JEM.DB.GetController(testContext, ctl)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(ctl.UnavailableSince.UTC(), jc.DeepEquals, mongodoc.Time(t0).UTC())
 
 	// Check that we can mark it as available again.
-	err = s.jem.SetControllerAvailable(testContext, ctlPath)
+	err = s.JEM.SetControllerAvailable(testContext, ctlPath)
 	c.Assert(err, gc.Equals, nil)
 
 	ctl = &mongodoc.Controller{Path: ctlPath}
-	err = s.jem.DB.GetController(testContext, ctl)
+	err = s.JEM.DB.GetController(testContext, ctl)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(ctl.UnavailableSince, jc.Satisfies, time.Time.IsZero)
 
 	t1 := t0.Add(3 * time.Second)
 	// ... and that we can mark it as unavailable after that.
-	err = s.jem.SetControllerUnavailableAt(testContext, ctlPath, t1)
+	err = s.JEM.SetControllerUnavailableAt(testContext, ctlPath, t1)
 	c.Assert(err, gc.Equals, nil)
 
 	ctl = &mongodoc.Controller{Path: ctlPath}
-	err = s.jem.DB.GetController(testContext, ctl)
+	err = s.JEM.DB.GetController(testContext, ctl)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(ctl.UnavailableSince.UTC(), jc.DeepEquals, mongodoc.Time(t1).UTC())
 }
 
 func (s *monitorSuite) TestSetControllerAvailabilityWithNotFoundController(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "x"}
-	err := s.jem.SetControllerUnavailableAt(testContext, ctlPath, time.Now())
+	err := s.JEM.SetControllerUnavailableAt(testContext, ctlPath, time.Now())
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.SetControllerAvailable(testContext, ctlPath)
+	err = s.JEM.SetControllerAvailable(testContext, ctlPath)
 	c.Assert(err, gc.Equals, nil)
 }
 
@@ -492,33 +454,33 @@ func (s *monitorSuite) TestSetControllerVersion(c *gc.C) {
 	ctl := &mongodoc.Controller{
 		Path: ctlPath,
 	}
-	err := s.jem.DB.InsertController(testContext, ctl)
+	err := s.JEM.DB.InsertController(testContext, ctl)
 	c.Assert(err, gc.Equals, nil)
 
 	testVersion := version.Number{Minor: 1}
-	err = s.jem.SetControllerVersion(testContext, ctlPath, testVersion)
+	err = s.JEM.SetControllerVersion(testContext, ctlPath, testVersion)
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.jem.DB.GetController(testContext, ctl)
+	err = s.JEM.DB.GetController(testContext, ctl)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(ctl.Version, jc.DeepEquals, &testVersion)
 }
 
 func (s *monitorSuite) TestSetControllerVersionWithNotFoundController(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "x"}
-	err := s.jem.SetControllerVersion(testContext, ctlPath, version.Number{Minor: 1})
+	err := s.JEM.SetControllerVersion(testContext, ctlPath, version.Number{Minor: 1})
 	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *monitorSuite) TestSetControllerStatsNotFound(c *gc.C) {
-	err := s.jem.SetControllerStats(testContext, params.EntityPath{"bob", "foo"}, &mongodoc.ControllerStats{})
+	err := s.JEM.SetControllerStats(testContext, params.EntityPath{"bob", "foo"}, &mongodoc.ControllerStats{})
 	c.Assert(err, gc.ErrorMatches, "controller not found")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
 func (s *monitorSuite) TestSetControllerStats(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "foo"}
-	err := s.jem.DB.InsertController(testContext, &mongodoc.Controller{
+	err := s.JEM.DB.InsertController(testContext, &mongodoc.Controller{
 		Path: ctlPath,
 		UUID: "fake-uuid",
 	})
@@ -530,10 +492,10 @@ func (s *monitorSuite) TestSetControllerStats(c *gc.C) {
 		ServiceCount: 3,
 		MachineCount: 4,
 	}
-	err = s.jem.SetControllerStats(testContext, ctlPath, stats)
+	err = s.JEM.SetControllerStats(testContext, ctlPath, stats)
 	c.Assert(err, gc.Equals, nil)
 	ctl := mongodoc.Controller{Path: ctlPath}
-	err = s.jem.DB.GetController(testContext, &ctl)
+	err = s.JEM.DB.GetController(testContext, &ctl)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(ctl.Stats, jc.DeepEquals, *stats)
 }

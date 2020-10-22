@@ -12,57 +12,46 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/worker.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/apitest"
+	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/monitor"
+	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
-type monitorSuite struct {
-	apitest.Suite
-}
-
 var testContext = context.Background()
+
+type monitorSuite struct {
+	jemtest.BootstrapSuite
+}
 
 var _ = gc.Suite(&monitorSuite{})
 
+func (s *monitorSuite) SetUpTest(c *gc.C) {
+	s.Params.Pubsub = new(pubsub.Hub)
+	s.BootstrapSuite.SetUpTest(c)
+}
+
 func (s *monitorSuite) TestMonitor(c *gc.C) {
-	// Create a controller.
-	ctlPath := params.EntityPath{"bob", "foo"}
-	info := s.APIInfo(c)
-
-	hps, err := mongodoc.ParseAddresses(info.Addrs)
-	c.Assert(err, gc.Equals, nil)
-
-	err = s.JEM.DB.InsertController(testContext, &mongodoc.Controller{
-		Path:          ctlPath,
-		HostPorts:     [][]mongodoc.HostPort{hps},
-		CACert:        info.CACert,
-		AdminUser:     info.Tag.Id(),
-		AdminPassword: info.Password,
-	})
-
-	c.Assert(err, gc.Equals, nil)
-
 	// Start a monitor.
-	m := monitor.New(context.TODO(), s.Pool, "jem1")
+	m := monitor.New(testContext, s.Pool, "jem1")
 	defer worker.Stop(m)
 
 	// Wait for the stats to be updated.
-	ctl := &mongodoc.Controller{Path: ctlPath}
 	for a := jujutesting.LongAttempt.Start(); a.Next(); {
-		err = s.JEM.DB.GetController(testContext, ctl)
+		err := s.JEM.DB.GetController(testContext, &s.Controller)
 		c.Assert(err, gc.Equals, nil)
-		if ctl.Stats != (mongodoc.ControllerStats{}) {
+		if s.Controller.Stats != (mongodoc.ControllerStats{}) {
 			break
 		}
 		if !a.HasNext() {
 			c.Fatalf("controller stats never changed")
 		}
 	}
-	c.Assert(ctl.Stats, jc.DeepEquals, mongodoc.ControllerStats{
-		ModelCount: 1,
+	c.Assert(s.Controller.Stats, jc.DeepEquals, mongodoc.ControllerStats{
+		ModelCount: 2,
 	})
 }
 
@@ -77,15 +66,19 @@ func (s *monitorSuite) TestMonitorWithBrokenMongoConnection(c *gc.C) {
 
 	sessionPool := mgosession.NewPool(context.TODO(), session.Session, 2)
 	defer sessionPool.Close()
+	jemparams := s.Params
+	jemparams.SessionPool = sessionPool
 
-	pool := s.NewJEMPool(c, sessionPool)
+	pool, err := jem.NewPool(testContext, jemparams)
+	c.Assert(err, gc.Equals, nil)
 	defer pool.Close()
+
+	jem := pool.JEM(context.TODO())
+	defer jem.Close()
 
 	// Create a controller.
 	apiInfo := s.APIInfo(c)
 	ctlPath := params.EntityPath{"bob", "foo"}
-	jem := pool.JEM(context.TODO())
-	defer jem.Close()
 
 	hps, err := mongodoc.ParseAddresses(apiInfo.Addrs)
 	c.Assert(err, gc.Equals, nil)
@@ -107,7 +100,7 @@ func (s *monitorSuite) TestMonitorWithBrokenMongoConnection(c *gc.C) {
 	// Wait for the stats to be updated.
 	stats := s.waitControllerStats(c, ctlPath, mongodoc.ControllerStats{})
 	c.Assert(stats, jc.DeepEquals, mongodoc.ControllerStats{
-		ModelCount: 1,
+		ModelCount: 2,
 	})
 	c.Logf("watcher period: %v", jujuwatcher.Period)
 
@@ -122,7 +115,7 @@ func (s *monitorSuite) TestMonitorWithBrokenMongoConnection(c *gc.C) {
 
 	stats = s.waitControllerStats(c, ctlPath, stats)
 	c.Assert(stats, jc.DeepEquals, mongodoc.ControllerStats{
-		ModelCount:   1,
+		ModelCount:   2,
 		ServiceCount: 1,
 	})
 
@@ -159,7 +152,7 @@ func (s *monitorSuite) TestMonitorWithBrokenJujuAPIConnection(c *gc.C) {
 	// Wait for the stats to be updated.
 	stats := s.waitControllerStats(c, ctlPath, mongodoc.ControllerStats{})
 	c.Assert(stats, jc.DeepEquals, mongodoc.ControllerStats{
-		ModelCount: 1,
+		ModelCount: 2,
 	})
 
 	// Tear down the mongo connection, make a new service and
@@ -173,7 +166,7 @@ func (s *monitorSuite) TestMonitorWithBrokenJujuAPIConnection(c *gc.C) {
 
 	stats = s.waitControllerStats(c, ctlPath, stats)
 	c.Assert(stats, jc.DeepEquals, mongodoc.ControllerStats{
-		ModelCount:   1,
+		ModelCount:   2,
 		ServiceCount: 1,
 	})
 }
