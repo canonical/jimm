@@ -51,68 +51,6 @@ func (s *databaseSuite) checkDBOK(c *gc.C) {
 	c.Check(s.database.Session.Ping(), gc.Equals, nil)
 }
 
-func (s *databaseSuite) TestUpdateCloudRegions(c *gc.C) {
-	ctlPathA := params.EntityPath{"bob", "x"}
-	cloudRegions := []mongodoc.CloudRegion{{
-		Cloud:              params.Cloud("aws"),
-		Region:             "foo",
-		PrimaryControllers: []params.EntityPath{ctlPathA},
-	}}
-	err := s.database.UpdateCloudRegions(testContext, cloudRegions)
-	c.Assert(err, gc.Equals, nil)
-
-	cloudregionA := mongodoc.CloudRegion{
-		Cloud:  "aws",
-		Region: "foo",
-	}
-	err = s.database.GetCloudRegion(testContext, &cloudregionA)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(cloudregionA, gc.DeepEquals, mongodoc.CloudRegion{
-		Id:                 "aws/foo",
-		Cloud:              params.Cloud("aws"),
-		Region:             "foo",
-		PrimaryControllers: []params.EntityPath{ctlPathA},
-		AuthTypes:          []string{},
-		CACertificates:     []string{},
-		ACL: params.ACL{
-			Read:  []string{},
-			Write: []string{},
-			Admin: []string{},
-		},
-	})
-
-	ctlPathB := params.EntityPath{"bob", "y"}
-	ctlPathC := params.EntityPath{"bob", "z"}
-	cloudRegions = []mongodoc.CloudRegion{{
-		Cloud:                params.Cloud("aws"),
-		Region:               "foo",
-		PrimaryControllers:   []params.EntityPath{ctlPathB},
-		SecondaryControllers: []params.EntityPath{ctlPathC},
-	}}
-	err = s.database.UpdateCloudRegions(testContext, cloudRegions)
-	c.Assert(err, gc.Equals, nil)
-	cloudregionB := mongodoc.CloudRegion{
-		Cloud:  "aws",
-		Region: "foo",
-	}
-	err = s.database.GetCloudRegion(testContext, &cloudregionB)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(cloudregionB, gc.DeepEquals, mongodoc.CloudRegion{
-		Id:                   "aws/foo",
-		Cloud:                params.Cloud("aws"),
-		Region:               "foo",
-		PrimaryControllers:   []params.EntityPath{ctlPathA, ctlPathB},
-		SecondaryControllers: []params.EntityPath{ctlPathC},
-		AuthTypes:            []string{},
-		CACertificates:       []string{},
-		ACL: params.ACL{
-			Read:  []string{},
-			Write: []string{},
-			Admin: []string{},
-		},
-	})
-}
-
 func (s *databaseSuite) TestUpdateMachineInfo(c *gc.C) {
 	ctlPath := params.EntityPath{"bob", "x"}
 	err := s.database.UpdateMachineInfo(testContext, &mongodoc.Machine{
@@ -537,190 +475,6 @@ func (s *databaseSuite) TestSetACL(c *gc.C) {
 	s.checkDBOK(c)
 }
 
-func (s *databaseSuite) TestProviderType(c *gc.C) {
-	err := s.database.UpdateCloudRegions(testContext, []mongodoc.CloudRegion{{
-		Cloud:              "my-cloud",
-		Region:             "my-region",
-		ProviderType:       "ec2",
-		PrimaryControllers: []params.EntityPath{{"bob", "bar"}},
-	}, {
-		Cloud:              "my-cloud",
-		ProviderType:       "ec2",
-		PrimaryControllers: []params.EntityPath{{"bob", "bar"}},
-	}})
-	c.Assert(err, gc.Equals, nil)
-	pt, err := s.database.ProviderType(testContext, "my-cloud")
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(pt, gc.Equals, "ec2")
-	pt, err = s.database.ProviderType(testContext, "not-my-cloud")
-	c.Assert(err, gc.ErrorMatches, `cloud "not-my-cloud" not found`)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	s.checkDBOK(c)
-}
-
-func (s *databaseSuite) TestCloudRegions(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "bar"}
-	cloud := mongodoc.CloudRegion{
-		Cloud:              "my-cloud",
-		ProviderType:       "ec2",
-		AuthTypes:          []string{},
-		PrimaryControllers: []params.EntityPath{ctlPath},
-		CACertificates:     []string{},
-		ACL: params.ACL{
-			Read:  []string{},
-			Write: []string{},
-			Admin: []string{},
-		},
-	}
-
-	regionA := mongodoc.CloudRegion{
-		Cloud:              cloud.Cloud,
-		ProviderType:       cloud.ProviderType,
-		Region:             "my-region-a",
-		AuthTypes:          []string{},
-		PrimaryControllers: []params.EntityPath{ctlPath},
-		CACertificates:     []string{},
-		ACL: params.ACL{
-			Read:  []string{},
-			Write: []string{},
-			Admin: []string{},
-		},
-	}
-
-	regionB := mongodoc.CloudRegion{
-		Cloud:              cloud.Cloud,
-		ProviderType:       cloud.ProviderType,
-		Region:             "my-region-b",
-		AuthTypes:          []string{},
-		PrimaryControllers: []params.EntityPath{ctlPath},
-		CACertificates:     []string{},
-		ACL: params.ACL{
-			Read:  []string{},
-			Write: []string{},
-			Admin: []string{},
-		},
-	}
-
-	regionC := mongodoc.CloudRegion{
-		Cloud:              cloud.Cloud,
-		ProviderType:       cloud.ProviderType,
-		Region:             "my-region-c",
-		AuthTypes:          []string{},
-		PrimaryControllers: []params.EntityPath{ctlPath},
-		CACertificates:     []string{},
-		ACL: params.ACL{
-			Read:  []string{},
-			Write: []string{},
-			Admin: []string{},
-		},
-	}
-
-	err := s.database.UpdateCloudRegions(testContext, []mongodoc.CloudRegion{cloud, regionA, regionB, regionC})
-	c.Assert(err, gc.Equals, nil)
-
-	clouds, err := s.database.GetCloudRegions(testContext)
-	c.Assert(err, gc.Equals, nil)
-
-	cloud.Id = "my-cloud/"
-	regionA.Id = "my-cloud/my-region-a"
-	regionB.Id = "my-cloud/my-region-b"
-	regionC.Id = "my-cloud/my-region-c"
-	c.Assert(clouds, gc.DeepEquals, []mongodoc.CloudRegion{cloud, regionA, regionB, regionC})
-	s.checkDBOK(c)
-}
-
-func (s *databaseSuite) TestDeleteControllerFromCloudRegions(c *gc.C) {
-	ctlPath := params.EntityPath{"bob", "bar"}
-	ctlPathB := params.EntityPath{"bob", "foo"}
-	cloud := mongodoc.CloudRegion{
-		Cloud:              "my-cloud",
-		ProviderType:       "ec2",
-		AuthTypes:          []string{},
-		PrimaryControllers: []params.EntityPath{ctlPath},
-		CACertificates:     []string{},
-		ACL: params.ACL{
-			Read:  []string{},
-			Write: []string{},
-			Admin: []string{},
-		},
-	}
-	regionA := mongodoc.CloudRegion{
-		Cloud:                cloud.Cloud,
-		ProviderType:         cloud.ProviderType,
-		Region:               "my-region-a",
-		AuthTypes:            []string{},
-		PrimaryControllers:   []params.EntityPath{ctlPath},
-		SecondaryControllers: []params.EntityPath{ctlPath},
-		CACertificates:       []string{},
-		ACL: params.ACL{
-			Read:  []string{},
-			Write: []string{},
-			Admin: []string{},
-		},
-	}
-	regionB := mongodoc.CloudRegion{
-		Cloud:                cloud.Cloud,
-		ProviderType:         cloud.ProviderType,
-		Region:               "my-region-b",
-		AuthTypes:            []string{},
-		PrimaryControllers:   []params.EntityPath{ctlPath, ctlPathB},
-		SecondaryControllers: []params.EntityPath{ctlPath, ctlPathB},
-		CACertificates:       []string{},
-		ACL: params.ACL{
-			Read:  []string{},
-			Write: []string{},
-			Admin: []string{},
-		},
-	}
-	err := s.database.UpdateCloudRegions(testContext, []mongodoc.CloudRegion{cloud, regionA, regionB})
-	c.Assert(err, gc.Equals, nil)
-	err = s.database.DeleteControllerFromCloudRegions(testContext, ctlPath)
-	c.Assert(err, gc.Equals, nil)
-	cloudRegions, err := s.database.GetCloudRegions(testContext)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(cloudRegions, gc.DeepEquals, []mongodoc.CloudRegion{{
-		Id:                 fmt.Sprintf("%s/%s", cloud.Cloud, ""),
-		Cloud:              "my-cloud",
-		ProviderType:       "ec2",
-		AuthTypes:          []string{},
-		CACertificates:     []string{},
-		PrimaryControllers: []params.EntityPath{},
-		ACL: params.ACL{
-			Read:  []string{},
-			Write: []string{},
-			Admin: []string{},
-		},
-	}, {
-		Id:                   fmt.Sprintf("%s/%s", cloud.Cloud, "my-region-a"),
-		Cloud:                cloud.Cloud,
-		ProviderType:         cloud.ProviderType,
-		Region:               "my-region-a",
-		AuthTypes:            []string{},
-		CACertificates:       []string{},
-		PrimaryControllers:   []params.EntityPath{},
-		SecondaryControllers: []params.EntityPath{},
-		ACL: params.ACL{
-			Read:  []string{},
-			Write: []string{},
-			Admin: []string{},
-		},
-	}, {
-		Id:                   fmt.Sprintf("%s/%s", cloud.Cloud, "my-region-b"),
-		Cloud:                cloud.Cloud,
-		ProviderType:         cloud.ProviderType,
-		Region:               "my-region-b",
-		AuthTypes:            []string{},
-		PrimaryControllers:   []params.EntityPath{ctlPathB},
-		SecondaryControllers: []params.EntityPath{ctlPathB},
-		CACertificates:       []string{},
-		ACL: params.ACL{
-			Read:  []string{},
-			Write: []string{},
-			Admin: []string{},
-		},
-	}})
-}
-
 func (s *databaseSuite) TestGetACL(c *gc.C) {
 	m := &mongodoc.Model{
 		Path: params.EntityPath{
@@ -878,6 +632,49 @@ var setDeadTests = []struct {
 		db.AppendAudit(testContext, jemtest.NewIdentity("bob"), &params.AuditModelCreated{})
 	},
 }, {
+	about: "InsertCloudRegion",
+	run: func(db *jimmdb.Database) {
+		db.InsertCloudRegion(testContext, &mongodoc.CloudRegion{
+			Cloud: "dummy",
+		})
+	},
+}, {
+	about: "GetCloudRegion",
+	run: func(db *jimmdb.Database) {
+		db.GetCloudRegion(testContext, &mongodoc.CloudRegion{
+			Cloud: "dummy",
+		})
+	},
+}, {
+	about: "ForEachCloudRegion",
+	run: func(db *jimmdb.Database) {
+		db.ForEachCloudRegion(testContext, nil, nil, func(cr *mongodoc.CloudRegion) error { return nil })
+	},
+}, {
+	about: "UpsertCloudRegion",
+	run: func(db *jimmdb.Database) {
+		db.UpsertCloudRegion(testContext, &mongodoc.CloudRegion{
+			Cloud: "dummy",
+		})
+	},
+}, {
+	about: "UpdateCloudRegions",
+	run: func(db *jimmdb.Database) {
+		db.UpdateCloudRegions(testContext, nil, new(jimmdb.Update))
+	},
+}, {
+	about: "RemoveCloudRegion",
+	run: func(db *jimmdb.Database) {
+		db.RemoveCloudRegion(testContext, &mongodoc.CloudRegion{
+			Cloud: "dummy",
+		})
+	},
+}, {
+	about: "RemoveCloudRegions",
+	run: func(db *jimmdb.Database) {
+		db.RemoveCloudRegions(testContext, nil)
+	},
+}, {
 	about: "InsertController",
 	run: func(db *jimmdb.Database) {
 		db.InsertController(testContext, &mongodoc.Controller{
@@ -946,11 +743,6 @@ var setDeadTests = []struct {
 		crit := db.NewCanReadIter(jemtest.NewIdentity("bob", "bob-group"), it)
 		crit.Next(testContext, &mongodoc.Model{})
 		crit.Close(testContext)
-	},
-}, {
-	about: "ProviderType",
-	run: func(db *jimmdb.Database) {
-		db.ProviderType(testContext, "my-cloud")
 	},
 }, {
 	about: "GetCredential",
@@ -1086,116 +878,6 @@ func mgoCredentialPath(cloud, user, name string) mongodoc.CredentialPath {
 			Name: name,
 		},
 	}
-}
-
-func (s *databaseSuite) TestInsertCloudRegion(c *gc.C) {
-	err := s.database.InsertCloudRegion(testContext, &mongodoc.CloudRegion{
-		Cloud: "test-cloud",
-	})
-	c.Assert(err, gc.Equals, nil)
-	err = s.database.InsertCloudRegion(testContext, &mongodoc.CloudRegion{
-		Cloud: "test-cloud",
-	})
-	c.Assert(err, gc.ErrorMatches, `.*E11000 duplicate key error .*`)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
-}
-
-func (s *databaseSuite) TestRemoveCloudRegion(c *gc.C) {
-	err := s.database.InsertCloudRegion(testContext, &mongodoc.CloudRegion{
-		Cloud: "test-cloud",
-	})
-	c.Assert(err, gc.Equals, nil)
-	err = s.database.RemoveCloudRegion(testContext, params.Cloud("test-cloud"), "")
-	c.Assert(err, gc.Equals, nil)
-	err = s.database.InsertCloudRegion(testContext, &mongodoc.CloudRegion{
-		Cloud: "test-cloud",
-	})
-	c.Assert(err, gc.Equals, nil)
-}
-
-func (s *databaseSuite) TestGrantCloud(c *gc.C) {
-	err := s.database.InsertCloudRegion(testContext, &mongodoc.CloudRegion{
-		Cloud: "test-cloud",
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	err = s.database.GrantCloud(testContext, "test-cloud", "test-user", "add-model")
-	c.Assert(err, gc.Equals, nil)
-
-	cr := mongodoc.CloudRegion{
-		Cloud: "test-cloud",
-	}
-	err = s.database.GetCloudRegion(testContext, &cr)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(cr.ACL.Read, jc.DeepEquals, []string{"test-user"})
-	c.Assert(cr.ACL.Write, jc.DeepEquals, []string{})
-	c.Assert(cr.ACL.Admin, jc.DeepEquals, []string{})
-
-	err = s.database.GrantCloud(testContext, "test-cloud", "test-user2", "admin")
-	c.Assert(err, gc.Equals, nil)
-
-	err = s.database.GetCloudRegion(testContext, &cr)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(cr.ACL.Read, jc.DeepEquals, []string{"test-user", "test-user2"})
-	c.Assert(cr.ACL.Write, jc.DeepEquals, []string{"test-user2"})
-	c.Assert(cr.ACL.Admin, jc.DeepEquals, []string{"test-user2"})
-}
-
-func (s *databaseSuite) TestGrantCloudInvalidAccess(c *gc.C) {
-	err := s.database.InsertCloudRegion(testContext, &mongodoc.CloudRegion{
-		Cloud: "test-cloud",
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	err = s.database.GrantCloud(testContext, "test-cloud", "test-user", "bad-access")
-	c.Assert(err, gc.ErrorMatches, `"bad-access" cloud access not valid`)
-}
-
-func (s *databaseSuite) TestRevokeCloud(c *gc.C) {
-	err := s.database.InsertCloudRegion(testContext, &mongodoc.CloudRegion{
-		Cloud: "test-cloud",
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	err = s.database.GrantCloud(testContext, "test-cloud", "test-user", "admin")
-	c.Assert(err, gc.Equals, nil)
-
-	cr := mongodoc.CloudRegion{
-		Cloud: "test-cloud",
-	}
-	err = s.database.GetCloudRegion(testContext, &cr)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(cr.ACL.Read, jc.DeepEquals, []string{"test-user"})
-	c.Assert(cr.ACL.Write, jc.DeepEquals, []string{"test-user"})
-	c.Assert(cr.ACL.Admin, jc.DeepEquals, []string{"test-user"})
-
-	err = s.database.RevokeCloud(testContext, "test-cloud", "test-user", "admin")
-	c.Assert(err, gc.Equals, nil)
-
-	err = s.database.GetCloudRegion(testContext, &cr)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(cr.ACL.Read, jc.DeepEquals, []string{"test-user"})
-	c.Assert(cr.ACL.Write, jc.DeepEquals, []string{})
-	c.Assert(cr.ACL.Admin, jc.DeepEquals, []string{})
-
-	err = s.database.RevokeCloud(testContext, "test-cloud", "test-user", "add-model")
-	c.Assert(err, gc.Equals, nil)
-
-	err = s.database.GetCloudRegion(testContext, &cr)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(cr.ACL.Read, jc.DeepEquals, []string{})
-	c.Assert(cr.ACL.Write, jc.DeepEquals, []string{})
-	c.Assert(cr.ACL.Admin, jc.DeepEquals, []string{})
-}
-
-func (s *databaseSuite) TestRevokeCloudInvalidAccess(c *gc.C) {
-	err := s.database.InsertCloudRegion(testContext, &mongodoc.CloudRegion{
-		Cloud: "test-cloud",
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	err = s.database.RevokeCloud(testContext, "test-cloud", "test-user", "bad-access")
-	c.Assert(err, gc.ErrorMatches, `"bad-access" cloud access not valid`)
 }
 
 func (s *databaseSuite) TestLegacyModelCredentials(c *gc.C) {
@@ -1625,76 +1307,6 @@ func (s *databaseSuite) TestApplicationOfferAccessMultipleTimes(c *gc.C) {
 		User:   "user1",
 		Access: mongodoc.ApplicationOfferReadAccess,
 	})
-}
-
-func (s *databaseSuite) TestGetCloudRegion(c *gc.C) {
-	cloudRegions := []mongodoc.CloudRegion{{
-		Id:           "aws/",
-		Cloud:        "aws",
-		ProviderType: "ec2",
-	}, {
-		Id:           "aws/us-east-1",
-		Cloud:        "aws",
-		Region:       "us-east-1",
-		ProviderType: "ec2",
-	}, {
-		Id:           "aws/eu-west-1",
-		Cloud:        "aws",
-		Region:       "eu-west-1",
-		ProviderType: "ec2",
-	}}
-
-	err := s.database.UpdateCloudRegions(testContext, cloudRegions)
-	c.Assert(err, gc.Equals, nil)
-
-	cr := mongodoc.CloudRegion{
-		Cloud: "aws",
-	}
-	err = s.database.GetCloudRegion(testContext, &cr)
-	c.Assert(err, gc.Equals, nil)
-	c.Check(cr, jc.DeepEquals, cloudRegions[0])
-
-	cr = mongodoc.CloudRegion{
-		Cloud:  "aws",
-		Region: "eu-west-1",
-	}
-	err = s.database.GetCloudRegion(testContext, &cr)
-	c.Assert(err, gc.Equals, nil)
-	c.Check(cr, jc.DeepEquals, cloudRegions[2])
-
-	cr = mongodoc.CloudRegion{
-		ProviderType: "ec2",
-	}
-	err = s.database.GetCloudRegion(testContext, &cr)
-	c.Assert(err, gc.Equals, nil)
-	c.Check(cr, jc.DeepEquals, cloudRegions[0])
-
-	cr = mongodoc.CloudRegion{
-		ProviderType: "ec2",
-		Region:       "us-east-1",
-	}
-	err = s.database.GetCloudRegion(testContext, &cr)
-	c.Assert(err, gc.Equals, nil)
-	c.Check(cr, jc.DeepEquals, cloudRegions[1])
-
-	cr = mongodoc.CloudRegion{}
-	err = s.database.GetCloudRegion(testContext, &cr)
-	c.Check(err, gc.ErrorMatches, `cloudregion not found`)
-	c.Check(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-
-	cr = mongodoc.CloudRegion{
-		Cloud: "google",
-	}
-	err = s.database.GetCloudRegion(testContext, &cr)
-	c.Check(err, gc.ErrorMatches, `cloudregion not found`)
-	c.Check(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-
-	cr = mongodoc.CloudRegion{
-		ProviderType: "gce",
-	}
-	err = s.database.GetCloudRegion(testContext, &cr)
-	c.Check(err, gc.ErrorMatches, `cloudregion not found`)
-	c.Check(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
 var cmpUsers = jemtest.CmpEquals(cmpopts.SortSlices(func(a, b mongodoc.OfferUserDetails) bool {
