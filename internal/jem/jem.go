@@ -451,11 +451,11 @@ func (j *JEM) updateModelContent(ctx context.Context, model *mongodoc.Model) err
 		}
 	}
 	if model.ProviderType == "" {
-		pt, err := j.DB.ProviderType(ctx, cloud)
-		if err != nil {
+		cr := mongodoc.CloudRegion{Cloud: cloud}
+		if err := j.DB.GetCloudRegion(ctx, &cr); err != nil {
 			return errgo.Mask(err)
 		}
-		u.Set("providertype", pt)
+		u.Set("providertype", cr.ProviderType)
 	}
 	if model.ControllerUUID == "" {
 		ctl := mongodoc.Controller{Path: model.Controller}

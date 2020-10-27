@@ -9,7 +9,6 @@ import (
 	"github.com/juju/juju/apiserver/common"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
-	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
@@ -20,7 +19,6 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -134,91 +132,52 @@ func (r *controllerRoot) RevokeCredentials(ctx context.Context, args jujuparams.
 // It returns a default cloud if there is only one cloud available.
 func (r *controllerRoot) DefaultCloud(ctx context.Context) (jujuparams.StringResult, error) {
 	var result jujuparams.StringResult
-	clouds, err := r.clouds(ctx)
-	if err != nil {
-		return result, errgo.Mask(err)
-	}
-	zapctx.Info(ctx, "clouds", zap.Any("clouds", clouds))
-	if len(clouds) != 1 {
-		return result, errgo.WithCausef(nil, params.ErrNotFound, "no default cloud")
-	}
-	for tag := range clouds {
-		result = jujuparams.StringResult{
-			Result: tag,
+	err := r.jem.ForEachCloud(ctx, r.identity, func(cld *jem.Cloud) error {
+		if result.Result == "" {
+			result.Result = conv.ToCloudTag(cld.Name).String()
+			return nil
 		}
+		result.Result = ""
+		return errgo.WithCausef(nil, params.ErrNotFound, "no default cloud")
+	})
+	if err == nil && result.Result == "" {
+		// If there are no clouds then there can be no default cloud.
+		err = errgo.WithCausef(nil, params.ErrNotFound, "no default cloud")
 	}
-	return result, nil
+	return result, err
 }
 
 // Cloud implements the Cloud method of the Cloud facade.
 func (r *controllerRoot) Cloud(ctx context.Context, ents jujuparams.Entities) (jujuparams.CloudResults, error) {
 	cloudResults := make([]jujuparams.CloudResult, len(ents.Entities))
-	clouds, err := r.clouds(ctx)
-	if err != nil {
-		return jujuparams.CloudResults{}, mapError(err)
-	}
 	for i, ent := range ents.Entities {
-		cloud, err := r.cloud(ent.Tag, clouds)
+		tag, err := names.ParseCloudTag(ent.Tag)
 		if err != nil {
+			cloudResults[i].Error = mapError(errgo.WithCausef(err, params.ErrBadRequest, ""))
+			continue
+		}
+		cloud := jem.Cloud{Name: params.Cloud(tag.Id())}
+		if err := r.jem.GetCloud(ctx, r.identity, &cloud); err != nil {
 			cloudResults[i].Error = mapError(err)
 			continue
 		}
-		cloudResults[i].Cloud = cloud
+		cloudResults[i].Cloud = &cloud.Cloud
 	}
 	return jujuparams.CloudResults{
 		Results: cloudResults,
 	}, nil
 }
 
-// cloud finds and returns the cloud identified by cloudTag in clouds.
-func (r *controllerRoot) cloud(cloudTag string, clouds map[string]jujuparams.Cloud) (*jujuparams.Cloud, error) {
-	if cloud, ok := clouds[cloudTag]; ok {
-		return &cloud, nil
-	}
-	ct, err := names.ParseCloudTag(cloudTag)
-	if err != nil {
-		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
-	}
-	return nil, errgo.WithCausef(nil, params.ErrNotFound, "cloud %q not available", ct.Id())
-}
-
 // Clouds implements the Clouds method on the Cloud facade.
 func (r *controllerRoot) Clouds(ctx context.Context) (jujuparams.CloudsResult, error) {
-	var res jujuparams.CloudsResult
-	var err error
-	res.Clouds, err = r.clouds(ctx)
+	res := jujuparams.CloudsResult{
+		Clouds: make(map[string]jujuparams.Cloud),
+	}
+	err := r.jem.ForEachCloud(ctx, r.identity, func(cld *jem.Cloud) error {
+		res.Clouds[conv.ToCloudTag(cld.Name).String()] = cld.Cloud
+		return nil
+	})
 	return res, errgo.Mask(err)
-}
-
-func (r *controllerRoot) clouds(ctx context.Context) (map[string]jujuparams.Cloud, error) {
-	iter := r.jem.DB.GetCloudRegionsIter(r.identity)
-	results := map[string]jujuparams.Cloud{}
-	var v mongodoc.CloudRegion
-	for iter.Next(ctx, &v) {
-		key := names.NewCloudTag(string(v.Cloud)).String()
-		cr, _ := results[key]
-		if v.Region == "" {
-			// v is a cloud
-			cr.Type = v.ProviderType
-			cr.AuthTypes = v.AuthTypes
-			cr.Endpoint = v.Endpoint
-			cr.IdentityEndpoint = v.IdentityEndpoint
-			cr.StorageEndpoint = v.StorageEndpoint
-		} else {
-			// v is a region
-			cr.Regions = append(cr.Regions, jujuparams.CloudRegion{
-				Name:             v.Region,
-				Endpoint:         v.Endpoint,
-				IdentityEndpoint: v.IdentityEndpoint,
-				StorageEndpoint:  v.StorageEndpoint,
-			})
-		}
-		results[key] = cr
-	}
-	if err := iter.Err(ctx); err != nil {
-		return nil, errgo.Notef(err, "cannot query")
-	}
-	return results, nil
 }
 
 // UserCredentials implements the UserCredentials method of the Cloud facade.

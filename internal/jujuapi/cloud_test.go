@@ -70,13 +70,13 @@ func (s *cloudSuite) TestDefaultCloud(c *gc.C) {
 				Public: true,
 			})
 			c.Assert(err, gc.Equals, nil)
-			err = s.JEM.DB.UpdateCloudRegions(ctx, []mongodoc.CloudRegion{{
+			err = s.JEM.DB.UpsertCloudRegion(ctx, &mongodoc.CloudRegion{
 				Cloud:              params.Cloud(cloud),
 				PrimaryControllers: []params.EntityPath{ctlPath},
 				ACL: params.ACL{
 					Read: []string{"everyone"},
 				},
-			}})
+			})
 			c.Assert(err, gc.Equals, nil)
 		}
 		cloud, err := defaultCloud(conn)

@@ -407,13 +407,6 @@ func (j *JEM) GetModelInfo(ctx context.Context, id identchecker.ACLIdentity, inf
 		info.ControllerUUID = m.ControllerUUID
 		info.IsController = false
 		info.ProviderType = m.ProviderType
-		if info.ProviderType == "" {
-			var err error
-			info.ProviderType, err = j.DB.ProviderType(ctx, m.Cloud)
-			if err != nil {
-				zapctx.Error(ctx, "cannot get provider type", zap.Error(err))
-			}
-		}
 		info.DefaultSeries = m.DefaultSeries
 		info.CloudTag = conv.ToCloudTag(m.Cloud).String()
 		info.CloudRegion = m.CloudRegion

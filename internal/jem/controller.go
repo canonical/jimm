@@ -155,16 +155,18 @@ func (j *JEM) updateControllerCloud(
 	if isPrimaryRegion == nil {
 		isPrimaryRegion = func(string) bool { return true }
 	}
-	regions := conv.FromCloud(name, cloud)
-	for i := range regions {
-		if isPrimaryRegion(regions[i].Region) {
-			regions[i].PrimaryControllers = []params.EntityPath{ctlPath}
+	for _, cr := range conv.FromCloud(name, cloud) {
+		if isPrimaryRegion(cr.Region) {
+			cr.PrimaryControllers = []params.EntityPath{ctlPath}
 		} else {
-			regions[i].SecondaryControllers = []params.EntityPath{ctlPath}
+			cr.SecondaryControllers = []params.EntityPath{ctlPath}
 		}
-		regions[i].ACL = acl
+		cr.ACL = acl
+		if err := j.DB.UpsertCloudRegion(ctx, &cr); err != nil {
+			return errgo.Mask(err)
+		}
 	}
-	return errgo.Mask(j.DB.UpdateCloudRegions(ctx, regions))
+	return nil
 }
 
 // SetControllerDeprecated sets whether the given controller is deprecated.
@@ -212,7 +214,10 @@ func (j *JEM) DeleteController(ctx context.Context, id identchecker.ACLIdentity,
 	}
 
 	// Delete controller from cloud regions.
-	if err := j.DB.DeleteControllerFromCloudRegions(ctx, ctl.Path); err != nil {
+	u := new(jimmdb.Update)
+	u.Pull("primarycontrollers", ctl.Path)
+	u.Pull("secondarycontrollers", ctl.Path)
+	if _, err := j.DB.UpdateCloudRegions(ctx, nil, u); err != nil {
 		return errgo.Mask(err)
 	}
 

@@ -119,7 +119,7 @@ func (j *JEM) AddHostedCloud(ctx context.Context, id identchecker.ACLIdentity, n
 	}
 
 	if ctlPath.IsZero() {
-		if dberr := j.DB.RemoveCloudRegion(ctx, name, ""); dberr != nil {
+		if dberr := j.DB.RemoveCloudRegion(ctx, &cloudDoc); dberr != nil {
 			zapctx.Warn(ctx, "cannot remove cloud that failed to deploy", zaputil.Error(dberr), zap.String("cloud", string(name)))
 		}
 		if apiError != nil {
@@ -187,7 +187,7 @@ func (j *JEM) RemoveCloud(ctx context.Context, id identchecker.ACLIdentity, clou
 			return errgo.Notef(err, "cannot remove cloud from controller %s", ctl)
 		}
 	}
-	if err := j.DB.RemoveCloud(ctx, cloud); err != nil {
+	if _, err := j.DB.RemoveCloudRegions(ctx, jimmdb.Eq("cloud", cloud)); err != nil {
 		return errgo.Mask(err)
 	}
 
@@ -210,7 +210,19 @@ func (j *JEM) GrantCloud(ctx context.Context, id identchecker.ACLIdentity, cloud
 	if err := auth.CheckACL(ctx, id, cr.ACL.Admin); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	if err := j.DB.GrantCloud(ctx, cloud, user, access); err != nil {
+	q := jimmdb.Eq("cloud", cloud)
+	u := new(jimmdb.Update)
+	switch access {
+	case "admin":
+		u.AddToSet("acl.admin", user)
+		u.AddToSet("acl.write", user)
+		fallthrough
+	case "add-model":
+		u.AddToSet("acl.read", user)
+	default:
+		return errgo.WithCausef(nil, params.ErrBadRequest, "%q cloud access not valid", access)
+	}
+	if _, err := j.DB.UpdateCloudRegions(ctx, q, u); err != nil {
 		return errgo.Mask(err)
 	}
 	// TODO grant the cloud access on the controllers in parallel
@@ -242,6 +254,22 @@ func (j *JEM) RevokeCloud(ctx context.Context, id identchecker.ACLIdentity, clou
 	if err := auth.CheckACL(ctx, id, cr.ACL.Admin); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
+	q := jimmdb.Eq("cloud", cloud)
+	u := new(jimmdb.Update)
+	switch access {
+	case "add-model":
+		u.Pull("acl.read", user)
+		fallthrough
+	case "admin":
+		u.Pull("acl.admin", user)
+		u.Pull("acl.write", user)
+	default:
+		return errgo.WithCausef(nil, params.ErrBadRequest, "%q cloud access not valid", access)
+	}
+	if _, err := j.DB.UpdateCloudRegions(ctx, q, u); err != nil {
+		return errgo.Mask(err)
+	}
+
 	// TODO revoke the cloud access on the controllers in parallel
 	// (although currently there is only ever one anyway).
 	for _, ctl := range cr.PrimaryControllers {
@@ -254,8 +282,116 @@ func (j *JEM) RevokeCloud(ctx context.Context, id identchecker.ACLIdentity, clou
 			return errgo.Mask(err, apiconn.IsAPIError)
 		}
 	}
-	if err := j.DB.RevokeCloud(ctx, cloud, user, access); err != nil {
+
+	return nil
+}
+
+// A Cloud is a jujuparams.Cloud with an attached name.
+type Cloud struct {
+	Name params.Cloud
+	jujuparams.Cloud
+}
+
+// GetCloud fills in the given cloud structure. If no cloud with the given
+// name is found then an error with a cause of params.ErrNotFound will be
+// returned. If the given identity doesn't have access to the cloud then an
+// error with a cause of params.ErrPermissionDenied is returned.
+func (j *JEM) GetCloud(ctx context.Context, id identchecker.ACLIdentity, cloud *Cloud) error {
+	q := jimmdb.Eq("cloud", cloud.Name)
+	var found bool
+	err := j.DB.ForEachCloudRegion(ctx, q, []string{"region"}, func(cr *mongodoc.CloudRegion) error {
+		found = true
+		if err := auth.CheckCanRead(ctx, id, cr); err != nil {
+			return err
+		}
+		if cr.Region != "" {
+			cloud.Regions = append(cloud.Regions, jujuparams.CloudRegion{
+				Name:             cr.Region,
+				Endpoint:         cr.Endpoint,
+				IdentityEndpoint: cr.IdentityEndpoint,
+				StorageEndpoint:  cr.StorageEndpoint,
+			})
+			return nil
+		}
+		cloud.Cloud = jujuparams.Cloud{
+			Type: cr.ProviderType,
+			// TODO(mhilton) store the host cloud region so that it
+			// can be returned correctly.
+			// HostCloudRegion:  "",
+			AuthTypes:        cr.AuthTypes,
+			Endpoint:         cr.Endpoint,
+			IdentityEndpoint: cr.IdentityEndpoint,
+			StorageEndpoint:  cr.StorageEndpoint,
+			CACertificates:   cr.CACertificates,
+		}
+		return nil
+	})
+	if !found {
+		return errgo.WithCausef(nil, params.ErrNotFound, "cloud not found")
+	}
+	return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+}
+
+// ForEachCloud iterates through each cloud readable by the given identity
+// and calls the given function for each one. If the given function returns
+// an error iteration will stop immediately and the error will be returned
+// unmasked.
+func (j *JEM) ForEachCloud(ctx context.Context, id identchecker.ACLIdentity, f func(*Cloud) error) error {
+	var cloud *Cloud
+	var ferr error
+	err := j.DB.ForEachCloudRegion(ctx, nil, []string{"cloud", "region"}, func(cr *mongodoc.CloudRegion) error {
+		if err := auth.CheckCanRead(ctx, id, cr); err != nil {
+			if errgo.Cause(err) == params.ErrUnauthorized {
+				err = nil
+			}
+			return err
+		}
+
+		if cr.Region != "" {
+			// This is a new region in the current cloud.
+			cloud.Regions = append(cloud.Regions, jujuparams.CloudRegion{
+				Name:             cr.Region,
+				Endpoint:         cr.Endpoint,
+				IdentityEndpoint: cr.IdentityEndpoint,
+				StorageEndpoint:  cr.StorageEndpoint,
+			})
+			return nil
+		}
+		// This is a new cloud.
+
+		// Call f with the previous cloud, if any.
+		if cloud != nil {
+			if err := f(cloud); err != nil {
+				ferr = err
+				return errStop
+			}
+		}
+
+		cloud = &Cloud{
+			Name: cr.Cloud,
+			Cloud: jujuparams.Cloud{
+				Type: cr.ProviderType,
+				// TODO(mhilton) store the host cloud region so that it
+				// can be returned correctly.
+				// HostCloudRegion:  "",
+				AuthTypes:        cr.AuthTypes,
+				Endpoint:         cr.Endpoint,
+				IdentityEndpoint: cr.IdentityEndpoint,
+				StorageEndpoint:  cr.StorageEndpoint,
+				CACertificates:   cr.CACertificates,
+			},
+		}
+		return nil
+	})
+	if errgo.Cause(err) == errStop {
+		return ferr
+	}
+	if err != nil {
 		return errgo.Mask(err)
+	}
+	// f will not have been called for the final cloud, call it now.
+	if cloud != nil {
+		return f(cloud)
 	}
 	return nil
 }

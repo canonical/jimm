@@ -401,7 +401,7 @@ func (s *cloudSuite) TestRevokeCloudNotFound(c *gc.C) {
 
 func (s *cloudSuite) TestRevokeCloudInvalidAccess(c *gc.C) {
 	err := s.JEM.RevokeCloud(testContext, jemtest.Alice, "k8s-cloud", "bob", "not-valid")
-	c.Assert(err, gc.ErrorMatches, `api error: "not-valid" cloud access not valid`)
+	c.Assert(err, gc.ErrorMatches, `"not-valid" cloud access not valid`)
 }
 
 func (s *cloudSuite) TestRemoveCloudWithModel(c *gc.C) {
@@ -449,4 +449,86 @@ func (s *cloudSuite) TestRemoveCloudWithModel(c *gc.C) {
 
 	err = s.JEM.RemoveCloud(testContext, id, "test-cloud")
 	c.Assert(err, gc.ErrorMatches, `cloud is used by 1 model`)
+}
+
+func (s *cloudSuite) TestGetCloud(c *gc.C) {
+	cloud := jem.Cloud{
+		Name: "dummy",
+	}
+
+	err := s.JEM.GetCloud(testContext, jemtest.Bob, &cloud)
+	c.Assert(err, gc.Equals, nil)
+	c.Check(cloud, jc.DeepEquals, jem.Cloud{
+		Name: "dummy",
+		Cloud: jujuparams.Cloud{
+			Type:             "dummy",
+			AuthTypes:        []string{"empty", "userpass"},
+			Endpoint:         "dummy-endpoint",
+			IdentityEndpoint: "dummy-identity-endpoint",
+			StorageEndpoint:  "dummy-storage-endpoint",
+			Regions: []jujuparams.CloudRegion{{
+				Name:             "dummy-region",
+				Endpoint:         "dummy-endpoint",
+				IdentityEndpoint: "dummy-identity-endpoint",
+				StorageEndpoint:  "dummy-storage-endpoint",
+			}},
+		},
+	})
+
+	cloud = jem.Cloud{
+		Name: "not-dummy",
+	}
+	err = s.JEM.GetCloud(testContext, jemtest.Bob, &cloud)
+	c.Assert(err, gc.ErrorMatches, `cloud not found`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+
+	cr := mongodoc.CloudRegion{
+		Cloud: "dummy-2",
+		ACL: params.ACL{
+			Read: []string{"alice"},
+		},
+	}
+	err = s.JEM.DB.InsertCloudRegion(testContext, &cr)
+	c.Assert(err, gc.Equals, nil)
+
+	cloud = jem.Cloud{
+		Name: "dummy-2",
+	}
+	err = s.JEM.GetCloud(testContext, jemtest.Bob, &cloud)
+	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
+}
+
+func (s *cloudSuite) TestForEachCloud(c *gc.C) {
+	cr := mongodoc.CloudRegion{
+		Cloud: "dummy-2",
+		ACL: params.ACL{
+			Read: []string{"alice"},
+		},
+	}
+	err := s.JEM.DB.InsertCloudRegion(testContext, &cr)
+	c.Assert(err, gc.Equals, nil)
+
+	cloud := jem.Cloud{
+		Name: "dummy",
+	}
+	err = s.JEM.GetCloud(testContext, jemtest.Bob, &cloud)
+	c.Assert(err, gc.Equals, nil)
+
+	expect := []jem.Cloud{cloud}
+	err = s.JEM.ForEachCloud(testContext, jemtest.Bob, func(cld *jem.Cloud) error {
+		if len(expect) < 1 {
+			return errgo.Newf("unexpected cloud %q", cld.Name)
+		}
+		c.Check(*cld, jc.DeepEquals, expect[0])
+		expect = expect[1:]
+		return nil
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	testError := errgo.New("test")
+	err = s.JEM.ForEachCloud(testContext, jemtest.Bob, func(cld *jem.Cloud) error {
+		return testError
+	})
+	c.Check(err, gc.Equals, testError)
 }

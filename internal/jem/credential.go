@@ -34,16 +34,19 @@ func (j *JEM) GetCredential(ctx context.Context, id identchecker.ACLIdentity, cr
 		}
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
+	ctx = zapctx.WithFields(ctx, zap.Stringer("credential", cred.Path))
 	if err := auth.CheckCanRead(ctx, id, cred); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 
 	// ensure we always have a provider-type in the credential.
 	if cred.ProviderType == "" {
-		var err error
-		cred.ProviderType, err = j.DB.ProviderType(ctx, params.Cloud(cred.Path.Cloud))
-		if err != nil {
-			zapctx.Error(ctx, "cannot find provider type for credential", zap.Error(err), zap.Stringer("credential", cred.Path))
+		cr := mongodoc.CloudRegion{Cloud: params.Cloud(cred.Path.Cloud)}
+		if err := j.DB.GetCloudRegion(ctx, &cr); err != nil {
+			zapctx.Error(ctx, "cannot find provider type for credential", zap.Error(err))
+		}
+		if err := j.DB.UpdateCredential(ctx, cred, new(jimmdb.Update).Set("providertype", cr.ProviderType), true); err != nil {
+			zapctx.Error(ctx, "cannot update credential with provider type", zap.Error(err))
 		}
 	}
 
@@ -205,11 +208,11 @@ func (j *JEM) UpdateCredential(ctx context.Context, cred *mongodoc.Credential, f
 	// Try to ensure that we set the provider type.
 	cred.ProviderType = c.ProviderType
 	if cred.ProviderType == "" {
-		var err error
-		cred.ProviderType, err = j.DB.ProviderType(ctx, params.Cloud(cred.Path.Cloud))
-		if err != nil {
+		cr := mongodoc.CloudRegion{Cloud: params.Cloud(cred.Path.Cloud)}
+		if err := j.DB.GetCloudRegion(ctx, &cr); err != nil {
 			zapctx.Warn(ctx, "cannot determine provider type", zap.Error(err), zap.String("cloud", cred.Path.Cloud))
 		}
+		cred.ProviderType = cr.ProviderType
 	}
 
 	// Note that because CredentialUpdate is checked for inside the
