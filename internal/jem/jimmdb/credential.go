@@ -143,7 +143,7 @@ func (db *Database) UpdateCredentials(ctx context.Context, q Query, u *Update) (
 	zapctx.Debug(ctx, "UpdateCredentials", zaputil.BSON("q", q), zaputil.BSON("u", u))
 	info, err := db.Credentials().UpdateAll(q, u)
 	if err != nil {
-		return info.Updated, errgo.Notef(err, "cannot update credentials")
+		return 0, errgo.Notef(err, "cannot update credentials")
 	}
 	return info.Updated, nil
 }

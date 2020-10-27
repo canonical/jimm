@@ -150,8 +150,8 @@ func (s jemShimWithUpdateNotify) AcquireMonitorLease(ctx context.Context, ctlPat
 	return t, err
 }
 
-func (s jemShimWithUpdateNotify) UpdateApplicationOffer(ctx context.Context, offerUUID string, removed bool) error {
-	err := s.jemInterface.UpdateApplicationOffer(ctx, offerUUID, removed)
+func (s jemShimWithUpdateNotify) UpdateApplicationOffer(ctx context.Context, ctlPath params.EntityPath, offerUUID string, removed bool) error {
+	err := s.jemInterface.UpdateApplicationOffer(ctx, ctlPath, offerUUID, removed)
 	if err != nil {
 		return err
 	}
@@ -444,7 +444,7 @@ func (j jemShimInMemory) WatchAllModelSummaries(ctx context.Context, ctlPath par
 	return func() error { return nil }, nil
 }
 
-func (j jemShimInMemory) UpdateApplicationOffer(ctx context.Context, offerUUID string, removed bool) error {
+func (j jemShimInMemory) UpdateApplicationOffer(ctx context.Context, ctlPath params.EntityPath, offerUUID string, removed bool) error {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 
@@ -602,8 +602,8 @@ type updateOfferShim struct {
 	notify func()
 }
 
-func (s updateOfferShim) UpdateApplicationOffer(ctx context.Context, offerUUID string, removed bool) error {
-	err := s.jemInterface.UpdateApplicationOffer(ctx, offerUUID, removed)
+func (s updateOfferShim) UpdateApplicationOffer(ctx context.Context, ctlPath params.EntityPath, offerUUID string, removed bool) error {
+	err := s.jemInterface.UpdateApplicationOffer(ctx, ctlPath, offerUUID, removed)
 	if err != nil {
 		return err
 	}

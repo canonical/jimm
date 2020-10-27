@@ -18,6 +18,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
 	"github.com/CanonicalLtd/jimm/internal/conv"
+	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
@@ -140,7 +141,7 @@ func (s *applicationoffersSuite) TestListApplicationOffers(c *gc.C) {
 	err = s.JEM.DB.GetApplicationOffer(ctx, &offer2)
 	c.Assert(err, jc.ErrorIsNil)
 
-	err = s.JEM.DB.SetApplicationOfferAccess(ctx, "charlie", offer1.OfferUUID, mongodoc.ApplicationOfferReadAccess)
+	err = s.JEM.DB.UpdateApplicationOffer(ctx, &offer1, new(jimmdb.Update).Set("users.charlie", mongodoc.ApplicationOfferReadAccess), true)
 	c.Assert(err, jc.ErrorIsNil)
 
 	results, err := s.JEM.ListApplicationOffers(ctx, jemtest.NewIdentity("unknown-user"), jujuparams.OfferFilter{
@@ -243,16 +244,16 @@ func (s *applicationoffersSuite) TestModifyOfferAccess(c *gc.C) {
 	err = s.JEM.DB.GetApplicationOffer(ctx, &offer1)
 	c.Assert(err, jc.ErrorIsNil)
 
-	err = s.JEM.DB.SetApplicationOfferAccess(ctx, "charlie", offer1.OfferUUID, mongodoc.ApplicationOfferNoAccess)
+	err = s.JEM.DB.UpdateApplicationOffer(ctx, &offer1, new(jimmdb.Update).Set("users.charlie", mongodoc.ApplicationOfferNoAccess), true)
 	c.Assert(err, jc.ErrorIsNil)
-	err = s.JEM.DB.SetApplicationOfferAccess(ctx, identchecker.Everyone, offer1.OfferUUID, mongodoc.ApplicationOfferNoAccess)
+	err = s.JEM.DB.UpdateApplicationOffer(ctx, &offer1, new(jimmdb.Update).Set("users."+identchecker.Everyone, mongodoc.ApplicationOfferNoAccess), true)
 	c.Assert(err, jc.ErrorIsNil)
 
 	// charlie does not have permission
 	err = s.JEM.GrantOfferAccess(ctx, jemtest.Charlie, "test-user", offer1.OfferURL, jujuparams.OfferReadAccess)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
-	err = s.JEM.DB.SetApplicationOfferAccess(ctx, "charlie", offer1.OfferUUID, mongodoc.ApplicationOfferConsumeAccess)
+	err = s.JEM.DB.UpdateApplicationOffer(ctx, &offer1, new(jimmdb.Update).Set("users.charlie", mongodoc.ApplicationOfferConsumeAccess), true)
 	c.Assert(err, jc.ErrorIsNil)
 
 	// user2 has consume permission
@@ -271,23 +272,25 @@ func (s *applicationoffersSuite) TestModifyOfferAccess(c *gc.C) {
 	err = s.JEM.GrantOfferAccess(ctx, jemtest.Bob, "test-user", offer1.OfferURL, jujuparams.OfferAdminAccess)
 	c.Assert(err, jc.ErrorIsNil)
 
-	access, err := s.JEM.DB.GetApplicationOfferAccess(ctx, "test-user", offer1.OfferUUID)
+	err = s.JEM.DB.GetApplicationOffer(ctx, &offer1)
 	c.Assert(err, jc.ErrorIsNil)
+	access := offer1.Users["test-user"]
 	c.Assert(access, gc.Equals, mongodoc.ApplicationOfferAdminAccess)
 
 	// bob is an admin - this should pass and access level be set to "read"
 	err = s.JEM.RevokeOfferAccess(ctx, jemtest.Bob, "test-user", offer1.OfferURL, jujuparams.OfferConsumeAccess)
 	c.Assert(err, jc.ErrorIsNil)
 
-	access, err = s.JEM.DB.GetApplicationOfferAccess(ctx, "test-user", offer1.OfferUUID)
+	err = s.JEM.DB.GetApplicationOffer(ctx, &offer1)
 	c.Assert(err, jc.ErrorIsNil)
+	access = offer1.Users["test-user"]
 	c.Assert(access, gc.Equals, mongodoc.ApplicationOfferReadAccess)
 
 	// user2 is has consume access - unauthorized
 	err = s.JEM.RevokeOfferAccess(ctx, jemtest.Charlie, "test-user", offer1.OfferURL, jujuparams.OfferConsumeAccess)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
 
-	err = s.JEM.DB.SetApplicationOfferAccess(ctx, "charlie", offer1.OfferUUID, mongodoc.ApplicationOfferNoAccess)
+	err = s.JEM.DB.UpdateApplicationOffer(ctx, &offer1, new(jimmdb.Update).Set("users.charlie", mongodoc.ApplicationOfferNoAccess), true)
 	c.Assert(err, jc.ErrorIsNil)
 
 	// user2 is does not have access - not found
@@ -321,7 +324,7 @@ func (s *applicationoffersSuite) TestDestroyOffer(c *gc.C) {
 	}
 	err = s.JEM.DB.GetApplicationOffer(ctx, &offer1)
 	c.Assert(err, gc.Equals, nil)
-	err = s.JEM.DB.SetApplicationOfferAccess(ctx, identchecker.Everyone, offer1.OfferUUID, mongodoc.ApplicationOfferNoAccess)
+	err = s.JEM.DB.UpdateApplicationOffer(ctx, &offer1, new(jimmdb.Update).Set("users."+identchecker.Everyone, mongodoc.ApplicationOfferNoAccess), true)
 	c.Assert(err, gc.Equals, nil)
 
 	// bob is an admin - this should pass
@@ -383,10 +386,10 @@ func (s *applicationoffersSuite) TestFindApplicationOffers(c *gc.C) {
 	err = s.JEM.DB.GetApplicationOffer(ctx, &offer2)
 	c.Assert(err, jc.ErrorIsNil)
 
-	err = s.JEM.DB.SetApplicationOfferAccess(ctx, "charlie", offer1.OfferUUID, mongodoc.ApplicationOfferReadAccess)
+	err = s.JEM.DB.UpdateApplicationOffer(ctx, &offer1, new(jimmdb.Update).Set("users.charlie", mongodoc.ApplicationOfferReadAccess), true)
 	c.Assert(err, jc.ErrorIsNil)
 
-	err = s.JEM.DB.SetApplicationOfferAccess(ctx, "everyone", offer2.OfferUUID, mongodoc.ApplicationOfferNoAccess)
+	err = s.JEM.DB.UpdateApplicationOffer(ctx, &offer2, new(jimmdb.Update).Set("users."+identchecker.Everyone, mongodoc.ApplicationOfferNoAccess), true)
 	c.Assert(err, jc.ErrorIsNil)
 
 	results, err := s.JEM.FindApplicationOffers(ctx, jemtest.NewIdentity("unknown-user"), jujuparams.OfferFilter{
@@ -528,11 +531,10 @@ func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 	err = s.JEM.DB.GetApplicationOffer(ctx, &offer2)
 	c.Assert(err, jc.ErrorIsNil)
-
-	err = s.JEM.DB.SetApplicationOfferAccess(ctx, params.User("everyone"), offer2.OfferUUID, mongodoc.ApplicationOfferNoAccess)
+	err = s.JEM.DB.UpdateApplicationOffer(ctx, &offer2, new(jimmdb.Update).Set("users."+identchecker.Everyone, mongodoc.ApplicationOfferNoAccess), true)
 	c.Assert(err, jc.ErrorIsNil)
 
-	// "unknown-user" does not have acces to offer2
+	// "unknown-user" does not have access to offer2
 	_, err = s.JEM.GetApplicationOffer(ctx, jemtest.NewIdentity("unknown-user"), offer2.OfferURL)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
@@ -636,7 +638,7 @@ func (s *applicationoffersSuite) TestUpdateApplicationOffer(c *gc.C) {
 	})
 	c.Assert(err, jc.ErrorIsNil)
 
-	err = s.JEM.UpdateApplicationOffer(ctx, offer1.OfferUUID, false)
+	err = s.JEM.UpdateApplicationOffer(ctx, s.Controller.Path, offer1.OfferUUID, false)
 	c.Assert(err, jc.ErrorIsNil)
 
 	offer2 := mongodoc.ApplicationOffer{
@@ -646,7 +648,7 @@ func (s *applicationoffersSuite) TestUpdateApplicationOffer(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(offer2.ApplicationDescription, gc.Equals, "changed test application description")
 
-	err = s.JEM.UpdateApplicationOffer(ctx, offer1.OfferUUID, true)
+	err = s.JEM.UpdateApplicationOffer(ctx, s.Controller.Path, offer1.OfferUUID, true)
 	c.Assert(err, jc.ErrorIsNil)
 
 	offer3 := mongodoc.ApplicationOffer{

@@ -300,7 +300,7 @@ func (s *applicationOffersSuite) TestModifyOfferAccess(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `"unknown" offer access not valid`)
 
 	err = client.GrantOffer("test.user@external", "read", "no-such-offer")
-	c.Assert(err, gc.ErrorMatches, `not found`)
+	c.Assert(err, gc.ErrorMatches, `applicationoffer not found`)
 
 	err = client.GrantOffer("test.user@external", "admin", offerURL)
 	c.Assert(err, jc.ErrorIsNil)
@@ -310,17 +310,14 @@ func (s *applicationOffersSuite) TestModifyOfferAccess(c *gc.C) {
 	}
 	err = s.JEM.DB.GetApplicationOffer(ctx, &offer)
 	c.Assert(err, jc.ErrorIsNil)
-
-	accessLevel, err := s.JEM.DB.GetApplicationOfferAccess(ctx, "test.user", offer.OfferUUID)
-	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(accessLevel, gc.Equals, mongodoc.ApplicationOfferAdminAccess)
+	c.Assert(offer.Users["test.user"], gc.Equals, mongodoc.ApplicationOfferAdminAccess)
 
 	err = client.RevokeOffer("test.user@external", "consume", offerURL)
 	c.Assert(err, jc.ErrorIsNil)
 
-	accessLevel, err = s.JEM.DB.GetApplicationOfferAccess(ctx, "test.user", offer.OfferUUID)
+	err = s.JEM.DB.GetApplicationOffer(ctx, &offer)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(accessLevel, gc.Equals, mongodoc.ApplicationOfferReadAccess)
+	c.Assert(offer.Users["test.user"], gc.Equals, mongodoc.ApplicationOfferReadAccess)
 
 	conn3 := s.open(c, nil, "user3")
 	defer conn3.Close()
@@ -354,7 +351,7 @@ func (s *applicationOffersSuite) TestDestroyOffers(c *gc.C) {
 
 	// try to destroy offer that does not exist
 	err = client.DestroyOffers(true, "bob@external/model-1.test-offer2")
-	c.Assert(err, gc.ErrorMatches, "not found")
+	c.Assert(err, gc.ErrorMatches, "applicationoffer not found")
 
 	conn2 := s.open(c, nil, "charlie")
 	defer conn2.Close()
@@ -505,7 +502,7 @@ func (s *applicationOffersSuite) TestApplicationOffers(c *gc.C) {
 	})
 
 	_, err = client.ApplicationOffer("charlie@external/model-1.test-offer2")
-	c.Assert(err, gc.ErrorMatches, "not found")
+	c.Assert(err, gc.ErrorMatches, "applicationoffer not found")
 
 	conn2 := s.open(c, nil, "charlie")
 	defer conn2.Close()

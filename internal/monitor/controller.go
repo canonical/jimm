@@ -553,7 +553,7 @@ func (w *watcherState) addDelta(ctx context.Context, d jujuparams.Delta) error {
 		delta := w.adjustCount(&w.stats.ApplicationOfferCount, d)
 		w.modelInfo(e.ModelUUID).adjustCount(params.ApplicationOfferCount, delta)
 		w.runner.Do(func() error {
-			return w.jem.UpdateApplicationOffer(ctx, e.OfferUUID, d.Removed)
+			return w.jem.UpdateApplicationOffer(ctx, w.ctlPath, e.OfferUUID, d.Removed)
 		})
 	default:
 		zapctx.Debug(ctx, "unknown entity", zap.Bool("removed", d.Removed), zap.String("type", fmt.Sprintf("%T", e)))
