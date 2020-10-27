@@ -25,9 +25,9 @@ func (db *Database) InsertCloudRegion(ctx context.Context, cr *mongodoc.CloudReg
 	zapctx.Debug(ctx, "InsertCloudRegion", zaputil.BSON("cr", cr))
 	err = db.CloudRegions().Insert(cr)
 	if mgo.IsDup(err) {
-		err = errgo.WithCausef(nil, params.ErrAlreadyExists, "")
+		return errgo.WithCausef(nil, params.ErrAlreadyExists, "")
 	}
-	return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
+	return errgo.Mask(err)
 }
 
 // GetCloudRegion fills in the given mongodoc.CloudRegion. GetCloudRegion
@@ -48,13 +48,12 @@ func (db *Database) GetCloudRegion(ctx context.Context, cr *mongodoc.CloudRegion
 	}
 	zapctx.Debug(ctx, "GetCloudRegion", zaputil.BSON("q", q))
 	err = db.CloudRegions().Find(q).One(&cr)
-	if err == mgo.ErrNotFound {
-		return errgo.WithCausef(nil, params.ErrNotFound, "cloudregion not found")
-	}
 	if err != nil {
+		if err == mgo.ErrNotFound {
+			return errgo.WithCausef(nil, params.ErrNotFound, "cloudregion not found")
+		}
 		return errgo.Notef(err, "cannot get cloudregion")
 	}
-
 	return nil
 }
 

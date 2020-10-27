@@ -295,7 +295,7 @@ type Cloud struct {
 // GetCloud fills in the given cloud structure. If no cloud with the given
 // name is found then an error with a cause of params.ErrNotFound will be
 // returned. If the given identity doesn't have access to the cloud then an
-// error with a cause of params.ErrPermissionDenies is returned.
+// error with a cause of params.ErrPermissionDenied is returned.
 func (j *JEM) GetCloud(ctx context.Context, id identchecker.ACLIdentity, cloud *Cloud) error {
 	q := jimmdb.Eq("cloud", cloud.Name)
 	var found bool
