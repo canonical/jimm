@@ -45,14 +45,14 @@ func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httpr
 func newWebSocketHandler(ctx context.Context, params jemserver.HandlerParams) httprequest.Handler {
 	return httprequest.Handler{
 		Method: "GET",
-		Path:   "/model/:modeluuid/api",
+		Path:   "/model/:UUID/api",
 		Handle: func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 			ctx := zapctx.WithFields(r.Context(), zap.Bool("websocket", true))
 			servermon.ConcurrentWebsocketConnections.Inc()
 			defer servermon.ConcurrentWebsocketConnections.Dec()
 			j := params.JEMPool.JEM(ctx)
 			defer j.Close()
-			wsServer := newWSServer(j, params.Authenticator, params.Params, p.ByName("modeluuid"))
+			wsServer := newWSServer(j, params.Authenticator, params.Params, p.ByName("UUID"))
 			wsServer.ServeHTTP(w, r.WithContext(ctx))
 		},
 	}
@@ -111,4 +111,28 @@ type guiArchiveRequest struct {
 // controllers. In this case, no versions are returned.
 func (h *handler) GUIArchive(*guiArchiveRequest) (jujuparams.GUIArchiveResponse, error) {
 	return jujuparams.GUIArchiveResponse{}, nil
+}
+
+type modelCommandsRequest struct {
+	httprequest.Route `httprequest:"GET /model/:UUID/commands"`
+	UUID              string `httprequest:",path"`
+}
+
+// ModelCommands redirects the request to the controller responsible for the model.
+func (h *handler) ModelCommands(p httprequest.Params, arg *modelCommandsRequest) error {
+	ctx := p.Context
+	m := mongodoc.Model{UUID: arg.UUID}
+	if err := h.jem.DB.GetModel(ctx, &m); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	controller, err := h.jem.DB.Controller(ctx, m.Controller)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	addrs := mongodoc.Addresses(controller.HostPorts)
+	if len(addrs) == 0 {
+		return errgo.New("expected at least 1 address, got 0")
+	}
+	http.Redirect(p.Response, p.Request, fmt.Sprintf("%s/model/%s/commands", addrs[0], arg.UUID), http.StatusTemporaryRedirect)
+	return nil
 }
