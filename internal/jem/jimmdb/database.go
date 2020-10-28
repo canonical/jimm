@@ -99,9 +99,6 @@ func (db *Database) EnsureIndexes() error {
 	}, {
 		db.ApplicationOffers(),
 		mgo.Index{Key: []string{"owner-name", "model-name", "offer-name"}, Unique: true},
-	}, {
-		db.ApplicationOffers(),
-		mgo.Index{Key: []string{"users.user", "users.access"}},
 	}}
 	for _, idx := range indexes {
 		err := idx.c.EnsureIndex(idx.i)
@@ -365,7 +362,7 @@ func (db *Database) GetApplicationOffer(ctx context.Context, offer *mongodoc.App
 	default:
 		return errgo.WithCausef(nil, params.ErrNotFound, "")
 	}
-	if err = q.One(&offer); err != nil {
+	if err = q.One(offer); err != nil {
 		if err == mgo.ErrNotFound {
 			return errgo.WithCausef(nil, params.ErrNotFound, "")
 		}
@@ -391,89 +388,25 @@ func (db *Database) RemoveApplicationOffer(ctx context.Context, offerUUID string
 func (db *Database) SetApplicationOfferAccess(ctx context.Context, user params.User, offerUUID string, access mongodoc.ApplicationOfferAccessPermission) (err error) {
 	defer db.checkError(ctx, &err)
 
+	u := mongodoc.User(user)
+
 	// Add the new access level, if it doesn't exist. This avoids adding
 	// duplicate OfferUserDetails entries to an ApplicationOffer.
 	_, err = db.ApplicationOffers().UpdateAll(
 		bson.D{{
 			"_id", offerUUID,
-		}, {
-			"users", bson.D{{
-				"$not", bson.D{{
-					"$elemMatch", mongodoc.OfferUserDetails{
-						User:   user,
-						Access: access,
-					},
-				}},
-			}},
 		}},
 		bson.D{{
-			"$push", bson.D{{
-				"users", mongodoc.OfferUserDetails{
-					User:   user,
-					Access: access,
-				},
-			}},
-		}})
+			"$set", bson.D{{u.FieldName("users"), access}},
+		}},
+	)
 	if err != nil {
 		if errgo.Cause(err) == mgo.ErrNotFound {
 			return errgo.WithCausef(err, params.ErrNotFound, "")
 		}
 		return errgo.Mask(err)
 	}
-
-	// Remove any other access levels as long as the intended access level
-	// is still present. This ensures that if there are racing updates they
-	// can't delete each other.
-	//
-	// Each SetApplicationOfferAccess operation consists of two database
-	// updates. Update A adds a new entry to the "users" array for the new
-	// access level. Update B removes all entries in the users array that
-	// don't match the detected access level. Any given mongodb database
-	// operation on a single document is atomic so we do not need to
-	// consider how running updates might interfere with each other, but we
-	// do need to consider how the four database updates might interleave
-	// and what the resulting document would be. There are three possible
-	// ways for two processes to interleave:
-	//
-	//     - 1A, 1B, 2A, 2B
-	//     - 1A, 2A, 1B, 2B
-	//     - IA, 2A, 2B, 1B
-	//
-	// The first case is trivial and is as if there are two separate
-	// SetApplicationOfferAccess operations.
-	//
-	// In the second case 1A would ensure there is a OfferUserDetails
-	// record in the array with the requested access level. 2A would
-	// ensure there is a second OfferUserDetails record for a different
-	// access level. 1B would then remove all OfferUserDetails records
-	// for the user that don't match the one added in 1A, including the one
-	// added in 2A. 2B will not be able to find the OfferUserDetails record
-	// added in 2A so will not remove any OfferUserDetails records. The end
-	// result is that update 1 will be retained and update 2 discarded.
-	//
-	// The third case is much like the second except in that case update 2
-	// will be the one that is retained and update 1 discarded.
-	_, err = db.ApplicationOffers().UpdateAll(
-		bson.D{{
-			"_id", offerUUID,
-		}, {
-			"users", bson.D{{
-				"user", user,
-			}, {
-				"access", access,
-			}},
-		}},
-		bson.D{{
-			"$pull", bson.D{{
-				"users", bson.D{{
-					"user", user,
-				}, {
-					"access", bson.D{{"$ne", access}},
-				}},
-			}},
-		}},
-	)
-	return errgo.Mask(err)
+	return nil
 }
 
 // GetApplicationOfferAccess returns the access level a given user has to
@@ -485,17 +418,7 @@ func (db *Database) GetApplicationOfferAccess(ctx context.Context, user params.U
 	if err != nil && errgo.Cause(err) != mgo.ErrNotFound {
 		return mongodoc.ApplicationOfferNoAccess, errgo.Mask(err)
 	}
-	return getApplicationOfferAccess(user, &offer), nil
-}
-
-func getApplicationOfferAccess(user params.User, offer *mongodoc.ApplicationOffer) mongodoc.ApplicationOfferAccessPermission {
-	access := mongodoc.ApplicationOfferNoAccess
-	for _, u := range offer.Users {
-		if (u.User == user || u.User == identchecker.Everyone) && u.Access > access {
-			access = u.Access
-		}
-	}
-	return access
+	return offer.Users[mongodoc.User(user)], nil
 }
 
 // An Iter is an iterator that gives access to database objects.
@@ -511,24 +434,18 @@ type Iter interface {
 // panic if the Next method is called with anything other than a pointer
 // to a mongodoc.ApplicationOffer.
 func (db *Database) IterApplicationOffers(ctx context.Context, user params.User, access mongodoc.ApplicationOfferAccessPermission, filters []jujuparams.OfferFilter) Iter {
-	q := make(bson.D, 1, 2)
-	q[0] = bson.DocElem{"users", bson.D{{
-		"$elemMatch", bson.D{{
-			"user", bson.D{{"$in", []string{string(user), identchecker.Everyone}}},
-		}, {
-			"access", bson.D{{"$gte", access}},
-		}},
-	}}}
+	q := make([]Query, 1, 2)
+	q[0] = Or(Gte(mongodoc.User(user).FieldName("users"), access), Gte("users.everyone", access))
 
 	filterQueries := make([]bson.D, len(filters))
 	for i, f := range filters {
 		filterQueries[i] = makeApplicationOfferFilterQuery(f)
 	}
 	if len(filterQueries) > 0 {
-		q = append(q, bson.DocElem{"$or", filterQueries})
+		q = append(q, Or(filterQueries...))
 	}
 
-	return db.ApplicationOffers().Find(q).Iter()
+	return db.ApplicationOffers().Find(And(q...)).Iter()
 }
 
 func makeApplicationOfferFilterQuery(filter jujuparams.OfferFilter) bson.D {
@@ -588,23 +505,14 @@ func makeApplicationOfferFilterQuery(filter jujuparams.OfferFilter) bson.D {
 			if err != nil {
 				// If this user does not parse then it will never match
 				// a record, add a query that can't match.
-				users = append(users, bson.D{{
-					"users", bson.D{{
-						"$elemMatch", bson.D{{
-							"no-such-field", bson.D{{"$exists", true}},
-						}},
-					}},
-				}})
+				users = append(users, bson.D{{"users.~~impossible", bson.D{{"$exists", true}}}})
 				continue
 			}
 
-			users = append(users, bson.D{{"users", bson.D{{
-				"$elemMatch", bson.D{{
-					"user", user,
-				}, {
-					"access", bson.D{{"$gte", mongodoc.ApplicationOfferConsumeAccess}},
-				}},
-			}}}})
+			users = append(users, bson.D{{
+				mongodoc.User(user).FieldName("users"),
+				bson.D{{"$gte", mongodoc.ApplicationOfferConsumeAccess}},
+			}})
 		}
 		switch len(users) {
 		case 1:

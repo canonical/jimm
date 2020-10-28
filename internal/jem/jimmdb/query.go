@@ -22,6 +22,12 @@ func Exists(field string) Query {
 	return Query{{Name: field, Value: bson.D{{Name: "$exists", Value: true}}}}
 }
 
+// Gte returns a query that the given field is greater-than or equal to the
+// given value.
+func Gte(field string, value interface{}) Query {
+	return Query{{Name: field, Value: bson.D{{Name: "$gte", Value: value}}}}
+}
+
 // In returns a query that the given field contains one of the given
 // values.
 func In(field string, values ...interface{}) Query {
@@ -31,4 +37,9 @@ func In(field string, values ...interface{}) Query {
 // NotExists returns a query that the given field does not exist.
 func NotExists(field string) Query {
 	return Query{{Name: field, Value: bson.D{{Name: "$exists", Value: false}}}}
+}
+
+// Or returns a query that any of the given queries match.
+func Or(qs ...Query) Query {
+	return Query{{Name: "$or", Value: qs}}
 }

@@ -536,7 +536,7 @@ func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
 	_, err = s.JEM.GetApplicationOffer(ctx, jemtest.NewIdentity("unknown-user"), offer2.OfferURL)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
-	// "user2" has read access to offer1
+	// "unknown-user" has read access to offer1
 	offerDetails, err := s.JEM.GetApplicationOffer(ctx, jemtest.NewIdentity("unknown-user"), offer1.OfferURL)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(offerDetails, jc.DeepEquals, &jujuparams.ApplicationOfferAdminDetails{
