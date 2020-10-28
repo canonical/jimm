@@ -14,6 +14,7 @@ import (
 
 	jem "github.com/CanonicalLtd/jimm"
 	"github.com/CanonicalLtd/jimm/internal/apitest"
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -105,4 +106,35 @@ func AssertRedirect(c *gc.C, p RedirectParams) {
 		c.Assert(rr.Code, gc.Equals, p.ExpectCode)
 	}
 	c.Assert(rr.HeaderMap.Get("Location"), gc.Equals, p.ExpectLocation)
+}
+
+func (s *apiSuite) TestModelCommands(c *gc.C) {
+	ctx := context.Background()
+
+	s.AssertAddController(ctx, c, params.EntityPath{User: "bob", Name: "controller-1"}, true)
+	controller, err := s.JEM.DB.Controller(ctx, params.EntityPath{User: "bob", Name: "controller-1"})
+	c.Assert(err, gc.Equals, nil)
+	cred := s.AssertUpdateCredential(ctx, c, "bob", "dummy", "cred1", "empty")
+	_, uuid := s.CreateModel(ctx, c, params.EntityPath{"bob", "gui-model"}, params.EntityPath{"bob", "controller-1"}, cred)
+	jemSrv := s.NewServer(ctx, c, s.Session, s.IDMSrv, jem.ServerParams{})
+	defer jemSrv.Close()
+	AssertRedirect(c, RedirectParams{
+		Handler:        jemSrv,
+		Method:         "GET",
+		URL:            fmt.Sprintf("/model/%s/commands", uuid),
+		ExpectCode:     http.StatusTemporaryRedirect,
+		ExpectLocation: fmt.Sprintf("%s/model/%s/commands", mongodoc.Addresses(controller.HostPorts)[0], uuid),
+	})
+}
+
+func (s *apiSuite) TestModelCommandsNotFound(c *gc.C) {
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		URL:          fmt.Sprintf("/model/%s/commands", "000000000000-0000-0000-0000-00000000"),
+		Handler:      s.JEMSrv,
+		ExpectStatus: http.StatusNotFound,
+		ExpectBody: params.Error{
+			Code:    params.ErrNotFound,
+			Message: "model not found",
+		},
+	})
 }
