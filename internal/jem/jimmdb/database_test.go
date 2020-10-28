@@ -1028,16 +1028,11 @@ func (s *databaseSuite) TestIterApplicationOffers(c *gc.C) {
 		}, {
 			Name: "ep3",
 		}},
-		Users: []mongodoc.OfferUserDetails{{
-			User:   identchecker.Everyone,
-			Access: mongodoc.ApplicationOfferReadAccess,
-		}, {
-			User:   "alice",
-			Access: mongodoc.ApplicationOfferConsumeAccess,
-		}, {
-			User:   "bob",
-			Access: mongodoc.ApplicationOfferAdminAccess,
-		}},
+		Users: mongodoc.ApplicationOfferAccessMap{
+			identchecker.Everyone: mongodoc.ApplicationOfferReadAccess,
+			"alice":               mongodoc.ApplicationOfferConsumeAccess,
+			"bob":                 mongodoc.ApplicationOfferAdminAccess,
+		},
 	}
 	offer2 := mongodoc.ApplicationOffer{
 		OfferUUID:              "00000000-0000-0000-0000-000000000003",
@@ -1054,16 +1049,11 @@ func (s *databaseSuite) TestIterApplicationOffers(c *gc.C) {
 		}, {
 			Name: "ep3",
 		}},
-		Users: []mongodoc.OfferUserDetails{{
-			User:   identchecker.Everyone,
-			Access: mongodoc.ApplicationOfferReadAccess,
-		}, {
-			User:   "alice",
-			Access: mongodoc.ApplicationOfferConsumeAccess,
-		}, {
-			User:   "bob",
-			Access: mongodoc.ApplicationOfferAdminAccess,
-		}},
+		Users: mongodoc.ApplicationOfferAccessMap{
+			identchecker.Everyone: mongodoc.ApplicationOfferReadAccess,
+			"alice":               mongodoc.ApplicationOfferConsumeAccess,
+			"bob":                 mongodoc.ApplicationOfferAdminAccess,
+		},
 	}
 	offer3 := mongodoc.ApplicationOffer{
 		OfferUUID:              "00000000-0000-0000-0000-000000000004",
@@ -1080,16 +1070,11 @@ func (s *databaseSuite) TestIterApplicationOffers(c *gc.C) {
 		}, {
 			Name: "ep3",
 		}},
-		Users: []mongodoc.OfferUserDetails{{
-			User:   identchecker.Everyone,
-			Access: mongodoc.ApplicationOfferReadAccess,
-		}, {
-			User:   "alice",
-			Access: mongodoc.ApplicationOfferConsumeAccess,
-		}, {
-			User:   "bob",
-			Access: mongodoc.ApplicationOfferAdminAccess,
-		}},
+		Users: mongodoc.ApplicationOfferAccessMap{
+			identchecker.Everyone: mongodoc.ApplicationOfferReadAccess,
+			"alice":               mongodoc.ApplicationOfferConsumeAccess,
+			"bob":                 mongodoc.ApplicationOfferAdminAccess,
+		},
 	}
 	offer4 := mongodoc.ApplicationOffer{
 		OfferUUID:              "00000000-0000-0000-0000-000000000005",
@@ -1106,16 +1091,11 @@ func (s *databaseSuite) TestIterApplicationOffers(c *gc.C) {
 		}, {
 			Name: "ep3",
 		}},
-		Users: []mongodoc.OfferUserDetails{{
-			User:   identchecker.Everyone,
-			Access: mongodoc.ApplicationOfferReadAccess,
-		}, {
-			User:   "alice",
-			Access: mongodoc.ApplicationOfferConsumeAccess,
-		}, {
-			User:   "bob",
-			Access: mongodoc.ApplicationOfferAdminAccess,
-		}},
+		Users: mongodoc.ApplicationOfferAccessMap{
+			identchecker.Everyone: mongodoc.ApplicationOfferReadAccess,
+			"alice":               mongodoc.ApplicationOfferConsumeAccess,
+			"bob":                 mongodoc.ApplicationOfferAdminAccess,
+		},
 	}
 	for _, offer := range []mongodoc.ApplicationOffer{offer1, offer2, offer3, offer4} {
 		err := s.database.AddApplicationOffer(context.Background(), &offer)
@@ -1187,19 +1167,12 @@ func (s *databaseSuite) TestIterApplicationOffers(c *gc.C) {
 	)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(offers, gc.HasLen, 1)
-	c.Assert(offers[0].Users, cmpUsers, []mongodoc.OfferUserDetails{{
-		User:   identchecker.Everyone,
-		Access: mongodoc.ApplicationOfferReadAccess,
-	}, {
-		User:   "alice",
-		Access: mongodoc.ApplicationOfferConsumeAccess,
-	}, {
-		User:   "bob",
-		Access: mongodoc.ApplicationOfferAdminAccess,
-	}, {
-		User:   "user1",
-		Access: mongodoc.ApplicationOfferAdminAccess,
-	}})
+	c.Assert(offers[0].Users, jc.DeepEquals, mongodoc.ApplicationOfferAccessMap{
+		identchecker.Everyone: mongodoc.ApplicationOfferReadAccess,
+		"alice":               mongodoc.ApplicationOfferConsumeAccess,
+		"bob":                 mongodoc.ApplicationOfferAdminAccess,
+		"user1":               mongodoc.ApplicationOfferAdminAccess,
+	})
 	offers[0].Users = offer1.Users
 	c.Assert(offers, jemtest.CmpEquals(cmpopts.EquateEmpty()), []mongodoc.ApplicationOffer{offer1})
 
@@ -1219,19 +1192,12 @@ func (s *databaseSuite) TestIterApplicationOffers(c *gc.C) {
 	)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(offers, gc.HasLen, 1)
-	c.Assert(offers[0].Users, cmpUsers, []mongodoc.OfferUserDetails{{
-		User:   identchecker.Everyone,
-		Access: mongodoc.ApplicationOfferReadAccess,
-	}, {
-		User:   "alice",
-		Access: mongodoc.ApplicationOfferConsumeAccess,
-	}, {
-		User:   "bob",
-		Access: mongodoc.ApplicationOfferAdminAccess,
-	}, {
-		User:   "user1",
-		Access: mongodoc.ApplicationOfferAdminAccess,
-	}})
+	c.Assert(offers[0].Users, jc.DeepEquals, mongodoc.ApplicationOfferAccessMap{
+		identchecker.Everyone: mongodoc.ApplicationOfferReadAccess,
+		"alice":               mongodoc.ApplicationOfferConsumeAccess,
+		"bob":                 mongodoc.ApplicationOfferAdminAccess,
+		"user1":               mongodoc.ApplicationOfferAdminAccess,
+	})
 	offers[0].Users = offer2.Users
 	c.Assert(offers, jemtest.CmpEquals(cmpopts.EquateEmpty()), []mongodoc.ApplicationOffer{offer2})
 }
@@ -1303,12 +1269,5 @@ func (s *databaseSuite) TestApplicationOfferAccessMultipleTimes(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	c.Check(offer.Users, gc.HasLen, 1)
-	c.Check(offer.Users[0], jc.DeepEquals, mongodoc.OfferUserDetails{
-		User:   "user1",
-		Access: mongodoc.ApplicationOfferReadAccess,
-	})
+	c.Check(offer.Users["user1"], gc.Equals, mongodoc.ApplicationOfferReadAccess)
 }
-
-var cmpUsers = jemtest.CmpEquals(cmpopts.SortSlices(func(a, b mongodoc.OfferUserDetails) bool {
-	return a.User < b.User
-}))

@@ -19,7 +19,6 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	"github.com/CanonicalLtd/jimm/params"
 )
 
 type applicationOffersSuite struct {
@@ -297,13 +296,13 @@ func (s *applicationOffersSuite) TestModifyOfferAccess(c *gc.C) {
 	err = client.RevokeOffer(identchecker.Everyone+"@external", "read", offerURL)
 	c.Assert(err, jc.ErrorIsNil)
 
-	err = client.GrantOffer("test-user@external", "unknown", offerURL)
+	err = client.GrantOffer("test.user@external", "unknown", offerURL)
 	c.Assert(err, gc.ErrorMatches, `"unknown" offer access not valid`)
 
-	err = client.GrantOffer("test-user@external", "read", "no-such-offer")
+	err = client.GrantOffer("test.user@external", "read", "no-such-offer")
 	c.Assert(err, gc.ErrorMatches, `not found`)
 
-	err = client.GrantOffer("test-user@external", "admin", offerURL)
+	err = client.GrantOffer("test.user@external", "admin", offerURL)
 	c.Assert(err, jc.ErrorIsNil)
 
 	offer := mongodoc.ApplicationOffer{
@@ -312,14 +311,14 @@ func (s *applicationOffersSuite) TestModifyOfferAccess(c *gc.C) {
 	err = s.JEM.DB.GetApplicationOffer(ctx, &offer)
 	c.Assert(err, jc.ErrorIsNil)
 
-	accessLevel, err := s.JEM.DB.GetApplicationOfferAccess(ctx, params.User("test-user"), offer.OfferUUID)
+	accessLevel, err := s.JEM.DB.GetApplicationOfferAccess(ctx, "test.user", offer.OfferUUID)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(accessLevel, gc.Equals, mongodoc.ApplicationOfferAdminAccess)
 
-	err = client.RevokeOffer("test-user@external", "consume", offerURL)
+	err = client.RevokeOffer("test.user@external", "consume", offerURL)
 	c.Assert(err, jc.ErrorIsNil)
 
-	accessLevel, err = s.JEM.DB.GetApplicationOfferAccess(ctx, params.User("test-user"), offer.OfferUUID)
+	accessLevel, err = s.JEM.DB.GetApplicationOfferAccess(ctx, "test.user", offer.OfferUUID)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(accessLevel, gc.Equals, mongodoc.ApplicationOfferReadAccess)
 
@@ -327,7 +326,7 @@ func (s *applicationOffersSuite) TestModifyOfferAccess(c *gc.C) {
 	defer conn3.Close()
 	client3 := applicationoffers.NewClient(conn3)
 
-	err = client3.RevokeOffer("test-user@external", "read", offerURL)
+	err = client3.RevokeOffer("test.user@external", "read", offerURL)
 	c.Assert(err, gc.ErrorMatches, "not found")
 }
 
