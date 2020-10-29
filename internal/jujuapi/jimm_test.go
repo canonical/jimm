@@ -62,6 +62,7 @@ func (s *jimmSuite) TestUserModelStats(c *gc.C) {
 				Model: jujuparams.Model{
 					Name:     "model-1",
 					UUID:     s.Model.UUID,
+					Type:     "iaas",
 					OwnerTag: conv.ToUserTag(s.Model.Owner()).String(),
 				},
 				Counts: map[params.EntityCount]params.Count{
@@ -89,6 +90,7 @@ func (s *jimmSuite) TestUserModelStats(c *gc.C) {
 				Model: jujuparams.Model{
 					Name:     "model-2",
 					UUID:     s.Model2.UUID,
+					Type:     "iaas",
 					OwnerTag: conv.ToUserTag(s.Model2.Owner()).String(),
 				},
 				Counts: map[params.EntityCount]params.Count{
@@ -104,6 +106,7 @@ func (s *jimmSuite) TestUserModelStats(c *gc.C) {
 				Model: jujuparams.Model{
 					Name:     "model-3",
 					UUID:     s.Model3.UUID,
+					Type:     "iaas",
 					OwnerTag: conv.ToUserTag(s.Model3.Owner()).String(),
 				},
 				Counts: map[params.EntityCount]params.Count{

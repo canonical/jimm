@@ -15,6 +15,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 type credentialSuite struct {
@@ -146,4 +147,69 @@ func (s *credentialSuite) path(c *gc.C, t string) mongodoc.CredentialPath {
 			Name: parts[2],
 		},
 	}
+}
+
+type legacyCredentialPath struct {
+	Cloud params.Cloud `httprequest:",path"`
+	params.EntityPath
+}
+
+func (s *credentialSuite) TestLegacyCredentials(c *gc.C) {
+	attrs := map[string]string{
+		"attr1": "val1",
+		"attr2": "val2",
+	}
+
+	id := "test-cloud/test-user/test-credentials"
+	// insert credentials with the old path
+	err := s.database.Credentials().Insert(
+		struct {
+			Id         string `bson:"_id"`
+			Path       legacyCredentialPath
+			Type       string
+			Label      string
+			Attributes map[string]string
+			Revoked    bool
+		}{
+			Id: id,
+			Path: legacyCredentialPath{
+				Cloud: "test-cloud",
+				EntityPath: params.EntityPath{
+					User: params.User("test-user"),
+					Name: params.Name("test-credentials"),
+				},
+			},
+			Type:       "credtype",
+			Label:      "Test Label",
+			Attributes: attrs,
+			Revoked:    false,
+		})
+	c.Assert(err, gc.Equals, nil)
+
+	cred := mongodoc.Credential{
+		Path: mongodoc.CredentialPath{
+			Cloud: "test-cloud",
+			EntityPath: mongodoc.EntityPath{
+				User: "test-user",
+				Name: "test-credentials",
+			},
+		},
+	}
+	err = s.database.GetCredential(testContext, &cred)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(cred, jc.DeepEquals, mongodoc.Credential{
+		Id: id,
+		Path: mongodoc.CredentialPath{
+			Cloud: "test-cloud",
+			EntityPath: mongodoc.EntityPath{
+				User: "test-user",
+				Name: "test-credentials",
+			},
+		},
+		Type:       "credtype",
+		Label:      "Test Label",
+		Attributes: attrs,
+	})
+
+	s.checkDBOK(c)
 }

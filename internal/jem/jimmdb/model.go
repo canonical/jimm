@@ -150,7 +150,7 @@ func (db *Database) RemoveModels(ctx context.Context, q Query) (count int, err e
 	zapctx.Debug(ctx, "RemoveModels", zaputil.BSON("q", q))
 	info, err := db.Models().RemoveAll(q)
 	if err != nil {
-		return info.Removed, errgo.Notef(err, "cannot remove models")
+		return 0, errgo.Notef(err, "cannot remove models")
 	}
 	return info.Removed, nil
 }

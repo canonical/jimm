@@ -442,10 +442,8 @@ func (j *JEM) GetModelInfo(ctx context.Context, id identchecker.ACLIdentity, inf
 	}
 
 	var canSeeUsers, canSeeMachines bool
-	if err := auth.CheckIsUser(ctx, id, m.Path.User); err == nil {
-		canSeeUsers = true
-		canSeeMachines = true
-	} else if err := auth.CheckACL(ctx, id, m.ACL.Admin); err == nil {
+	adminACL := append(m.ACL.Admin, string(m.Path.User), string(j.ControllerAdmin()))
+	if err := auth.CheckACL(ctx, id, adminACL); err == nil {
 		canSeeUsers = true
 		canSeeMachines = true
 	} else if err := auth.CheckACL(ctx, id, m.ACL.Write); err == nil {
@@ -490,36 +488,33 @@ func (j *JEM) GetModelInfo(ctx context.Context, id identchecker.ACLIdentity, inf
 }
 
 func (j *JEM) modelMachineInfo(ctx context.Context, uuid string) ([]jujuparams.ModelMachineInfo, error) {
-	machines, err := j.DB.MachinesForModel(ctx, uuid)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	mmis := make([]jujuparams.ModelMachineInfo, 0, len(machines))
-	for _, machine := range machines {
-		if machine.Info.Life == "dead" {
-			continue
+	var mmis []jujuparams.ModelMachineInfo
+	err := j.DB.ForEachMachine(ctx, jimmdb.Eq("info.modeluuid", uuid), []string{"_id"}, func(m *mongodoc.Machine) error {
+		if m.Info == nil || m.Info.Life == "dead" {
+			return nil
 		}
 		mmi := jujuparams.ModelMachineInfo{
-			Id:         machine.Info.Id,
-			InstanceId: machine.Info.InstanceId,
-			Status:     string(machine.Info.AgentStatus.Current),
-			HasVote:    machine.Info.HasVote,
-			WantsVote:  machine.Info.WantsVote,
+			Id:         m.Info.Id,
+			InstanceId: m.Info.InstanceId,
+			Status:     string(m.Info.AgentStatus.Current),
+			HasVote:    m.Info.HasVote,
+			WantsVote:  m.Info.WantsVote,
 		}
-		if machine.Info.HardwareCharacteristics != nil {
+		if m.Info.HardwareCharacteristics != nil {
 			mmi.Hardware = &jujuparams.MachineHardware{
-				Arch:             machine.Info.HardwareCharacteristics.Arch,
-				Mem:              machine.Info.HardwareCharacteristics.Mem,
-				RootDisk:         machine.Info.HardwareCharacteristics.RootDisk,
-				Cores:            machine.Info.HardwareCharacteristics.CpuCores,
-				CpuPower:         machine.Info.HardwareCharacteristics.CpuPower,
-				Tags:             machine.Info.HardwareCharacteristics.Tags,
-				AvailabilityZone: machine.Info.HardwareCharacteristics.AvailabilityZone,
+				Arch:             m.Info.HardwareCharacteristics.Arch,
+				Mem:              m.Info.HardwareCharacteristics.Mem,
+				RootDisk:         m.Info.HardwareCharacteristics.RootDisk,
+				Cores:            m.Info.HardwareCharacteristics.CpuCores,
+				CpuPower:         m.Info.HardwareCharacteristics.CpuPower,
+				Tags:             m.Info.HardwareCharacteristics.Tags,
+				AvailabilityZone: m.Info.HardwareCharacteristics.AvailabilityZone,
 			}
 		}
 		mmis = append(mmis, mmi)
-	}
-	return mmis, nil
+		return nil
+	})
+	return mmis, errgo.Mask(err)
 }
 
 func userInfo(u params.User, access jujuparams.UserAccessPermission) jujuparams.ModelUserInfo {

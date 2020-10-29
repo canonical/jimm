@@ -269,3 +269,48 @@ func (s *modelSuite) TestCountModels(c *gc.C) {
 
 	s.checkDBOK(c)
 }
+
+func (s *modelSuite) TestLegacyModelCredentials(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "x"}
+	m := struct {
+		Id            string `bson:"_id"`
+		Path          params.EntityPath
+		Cloud         params.Cloud
+		CloudRegion   string `bson:",omitempty"`
+		DefaultSeries string
+		Credential    legacyCredentialPath
+	}{
+		Id:            ctlPath.String(),
+		Path:          ctlPath,
+		Cloud:         "bob-cloud",
+		CloudRegion:   "bob-region",
+		DefaultSeries: "trusty",
+		Credential: legacyCredentialPath{
+			Cloud: "bob-cloud",
+			EntityPath: params.EntityPath{
+				User: params.User("bob"),
+				Name: params.Name("test-credentials"),
+			},
+		},
+	}
+	err := s.database.Models().Insert(m)
+	c.Assert(err, gc.Equals, nil)
+
+	m1 := mongodoc.Model{Path: ctlPath}
+	err = s.database.GetModel(testContext, &m1)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(m1, jemtest.CmpEquals(cmpopts.EquateEmpty()), mongodoc.Model{
+		Id:            m.Id,
+		Path:          m.Path,
+		Cloud:         m.Cloud,
+		CloudRegion:   m.CloudRegion,
+		DefaultSeries: m.DefaultSeries,
+		Credential: mongodoc.CredentialPath{
+			Cloud: "bob-cloud",
+			EntityPath: mongodoc.EntityPath{
+				User: "bob",
+				Name: "test-credentials",
+			},
+		},
+	})
+}

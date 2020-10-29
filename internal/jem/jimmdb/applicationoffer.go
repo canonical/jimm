@@ -95,6 +95,9 @@ func (db *Database) UpdateApplicationOffer(ctx context.Context, offer *mongodoc.
 	if q == nil {
 		return errgo.WithCausef(nil, params.ErrNotFound, "applicationoffer not found")
 	}
+	if u == nil || u.IsZero() {
+		return nil
+	}
 	zapctx.Debug(ctx, "UpdateApplicationOffer", zaputil.BSON("q", q), zaputil.BSON("u", u))
 	_, err = db.ApplicationOffers().Find(q).Apply(mgo.Change{Update: u, ReturnNew: returnNew}, offer)
 	if err == mgo.ErrNotFound {

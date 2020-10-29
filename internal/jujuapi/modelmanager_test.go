@@ -471,9 +471,26 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 			Type:         "iaas",
 		},
 	}, {
-		Error: &jujuparams.Error{
-			Message: "unauthorized",
-			Code:    jujuparams.CodeUnauthorized,
+		Result: &jujuparams.ModelInfo{
+			Name:               "model-2",
+			UUID:               s.Model2.UUID,
+			ControllerUUID:     "deadbeef-1bad-500d-9000-4b1d0d06f00d",
+			ProviderType:       "dummy",
+			CloudTag:           "cloud-dummy",
+			CloudRegion:        "dummy-region",
+			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential2.Path.ToParams()).String(),
+			OwnerTag:           names.NewUserTag("charlie@external").String(),
+			Life:               life.Alive,
+			Status: jujuparams.EntityStatus{
+				Status: status.Available,
+			},
+			Users: []jujuparams.ModelUserInfo{{
+				UserName:    "charlie@external",
+				DisplayName: "charlie",
+				Access:      jujuparams.ModelAdminAccess,
+			}},
+			AgentVersion: &jujuversion.Current,
+			Type:         "iaas",
 		},
 	}, {
 		Result: &jujuparams.ModelInfo{
@@ -493,6 +510,18 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 				UserName:    "bob@external",
 				DisplayName: "bob",
 				Access:      jujuparams.ModelReadAccess,
+			}, {
+				UserName:    "charlie@external",
+				DisplayName: "charlie",
+				Access:      jujuparams.ModelAdminAccess,
+			}},
+			Machines: []jujuparams.ModelMachineInfo{{
+				Id: "machine-0",
+			}, {
+				Id: "machine-1",
+				Hardware: &jujuparams.MachineHardware{
+					Arch: &machineArch,
+				},
 			}},
 			AgentVersion: &jujuversion.Current,
 			Type:         "iaas",
@@ -515,6 +544,10 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 				UserName:    "bob@external",
 				DisplayName: "bob",
 				Access:      jujuparams.ModelWriteAccess,
+			}, {
+				UserName:    "charlie@external",
+				DisplayName: "charlie",
+				Access:      jujuparams.ModelAdminAccess,
 			}},
 			Machines: []jujuparams.ModelMachineInfo{{
 				Id: "machine-0",

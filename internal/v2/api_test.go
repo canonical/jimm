@@ -1345,12 +1345,12 @@ func (s *APISuite) TestJujuStatus(c *gc.C) {
 	resp, err = s.client("alice").JujuStatus(ctx, &params.JujuStatus{
 		EntityPath: params.EntityPath{User: "bob", Name: "no-such-model"},
 	})
-	c.Assert(err, gc.ErrorMatches, `Get http://.*/v2/model/bob/no-such-model/status: cannot get model: model not found`)
+	c.Assert(err, gc.ErrorMatches, `Get http://.*/v2/model/bob/no-such-model/status: model not found`)
 
 	resp, err = s.client("bob").JujuStatus(ctx, &params.JujuStatus{
 		EntityPath: params.EntityPath{User: "bob", Name: "no-such-model"},
 	})
-	c.Assert(err, gc.ErrorMatches, `Get http://.*/v2/model/bob/no-such-model/status: cannot get model: model not found`)
+	c.Assert(err, gc.ErrorMatches, `Get http://.*/v2/model/bob/no-such-model/status: model not found`)
 }
 
 func (s *APISuite) TestMigrate(c *gc.C) {
