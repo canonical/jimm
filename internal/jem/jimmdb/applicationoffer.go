@@ -56,6 +56,12 @@ func (db *Database) GetApplicationOffer(ctx context.Context, offer *mongodoc.App
 	return errgo.Mask(err)
 }
 
+// ForEachApplicationOffer iterates through every application-offer that
+// matches the given query, calling the given function with each
+// application-offer. If a sort is specified then the cloud-regions will
+// iterate in the sorted order. If the function returns an error the
+// iterator stops immediately and the error is retuned with the cause
+// unmasked.
 func (db *Database) ForEachApplicationOffer(ctx context.Context, q Query, sort []string, f func(*mongodoc.ApplicationOffer) error) (err error) {
 	defer db.checkError(ctx, &err)
 
