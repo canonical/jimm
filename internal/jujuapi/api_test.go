@@ -7,8 +7,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 
+	"github.com/gorilla/websocket"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/rpc/jsoncodec"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 
@@ -118,23 +121,54 @@ func (s *apiSuite) TestModelCommands(c *gc.C) {
 	_, uuid := s.CreateModel(ctx, c, params.EntityPath{"bob", "gui-model"}, params.EntityPath{"bob", "controller-1"}, cred)
 	jemSrv := s.NewServer(ctx, c, s.Session, s.IDMSrv, jem.ServerParams{})
 	defer jemSrv.Close()
-	AssertRedirect(c, RedirectParams{
-		Handler:        jemSrv,
-		Method:         "GET",
-		URL:            fmt.Sprintf("/model/%s/commands", uuid),
-		ExpectCode:     http.StatusTemporaryRedirect,
-		ExpectLocation: fmt.Sprintf("%s/model/%s/commands", mongodoc.Addresses(controller.HostPorts)[0], uuid),
-	})
+	path := fmt.Sprintf("/model/%s/commands", uuid)
+	server := httptest.NewServer(jemSrv)
+	defer server.Close()
+
+	serverURL, err := url.Parse(server.URL)
+	c.Assert(err, gc.Equals, nil)
+	u := url.URL{
+		Scheme: "ws",
+		Host:   serverURL.Host,
+		Path:   path,
+	}
+
+	conn, response, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	if err != nil {
+		c.Assert(err, gc.Equals, nil)
+	}
+	c.Assert(response.StatusCode, gc.Equals, http.StatusSwitchingProtocols)
+	defer conn.Close()
+
+	msg := struct {
+		RedirectTo string `json:"redirect-to"`
+	}{}
+	jsonConn := jsoncodec.NewWebsocketConn(conn)
+	err = jsonConn.Receive(&msg)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(msg.RedirectTo, gc.Equals, fmt.Sprintf("wss://%s/model/%s/commands", mongodoc.Addresses(controller.HostPorts)[0], uuid))
 }
 
-func (s *apiSuite) TestModelCommandsNotFound(c *gc.C) {
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		URL:          fmt.Sprintf("/model/%s/commands", "000000000000-0000-0000-0000-00000000"),
-		Handler:      s.JEMSrv,
-		ExpectStatus: http.StatusNotFound,
-		ExpectBody: params.Error{
-			Code:    params.ErrNotFound,
-			Message: "model not found",
-		},
-	})
+func (s *apiSuite) TestModelCommandsModelNotFoundf(c *gc.C) {
+	ctx := context.Background()
+
+	jemSrv := s.NewServer(ctx, c, s.Session, s.IDMSrv, jem.ServerParams{})
+	defer jemSrv.Close()
+	path := fmt.Sprintf("/model/%s/commands", "000000000000-0000-0000-0000-00000000")
+	server := httptest.NewServer(jemSrv)
+	defer server.Close()
+
+	serverURL, err := url.Parse(server.URL)
+	c.Assert(err, gc.Equals, nil)
+	u := url.URL{
+		Scheme: "ws",
+		Host:   serverURL.Host,
+		Path:   path,
+	}
+
+	_, response, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	if err != nil {
+		c.Assert(err, gc.ErrorMatches, "websocket: bad handshake")
+	}
+	c.Assert(response.StatusCode, gc.Equals, http.StatusNotFound)
 }
