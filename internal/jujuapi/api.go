@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/rpc/jsoncodec"
 	"github.com/julienschmidt/httprouter"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
@@ -20,6 +21,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/internal/zaputil"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -133,6 +135,20 @@ func (h *handler) ModelCommands(p httprequest.Params, arg *modelCommandsRequest)
 	if len(addrs) == 0 {
 		return errgo.New("expected at least 1 address, got 0")
 	}
-	http.Redirect(p.Response, p.Request, fmt.Sprintf("%s/model/%s/commands", addrs[0], arg.UUID), http.StatusTemporaryRedirect)
+	conn, err := websocketUpgrader.Upgrade(p.Response, p.Request, nil)
+	if err != nil {
+		zapctx.Error(ctx, "cannot upgrade websocket", zaputil.Error(err))
+		return errgo.Mask(err)
+	}
+	codec := jsoncodec.NewWebsocketConn(conn)
+	defer codec.Close()
+	err = codec.Send(struct {
+		RedirectTo string `json:"redirect-to"`
+	}{
+		RedirectTo: fmt.Sprintf("wss://%s/model/%s/commands", addrs[0], arg.UUID),
+	})
+	if err != nil {
+		return errgo.Mask(err)
+	}
 	return nil
 }
