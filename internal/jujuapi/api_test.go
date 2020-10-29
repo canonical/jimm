@@ -118,23 +118,29 @@ func (s *apiSuite) TestModelCommands(c *gc.C) {
 	_, uuid := s.CreateModel(ctx, c, params.EntityPath{"bob", "gui-model"}, params.EntityPath{"bob", "controller-1"}, cred)
 	jemSrv := s.NewServer(ctx, c, s.Session, s.IDMSrv, jem.ServerParams{})
 	defer jemSrv.Close()
-	AssertRedirect(c, RedirectParams{
-		Handler:        jemSrv,
-		Method:         "GET",
-		URL:            fmt.Sprintf("/model/%s/commands", uuid),
-		ExpectCode:     http.StatusTemporaryRedirect,
-		ExpectLocation: fmt.Sprintf("%s/model/%s/commands", mongodoc.Addresses(controller.HostPorts)[0], uuid),
+
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      jemSrv,
+		Method:       "GET",
+		URL:          fmt.Sprintf("/model/%s/commands", uuid),
+		ExpectStatus: http.StatusTemporaryRedirect,
+		ExpectBody: struct {
+			RedirectTo string `json:"redirect-to"`
+		}{
+			RedirectTo: fmt.Sprintf("%s/model/%s/commands", mongodoc.Addresses(controller.HostPorts)[0], uuid),
+		},
 	})
 }
 
 func (s *apiSuite) TestModelCommandsNotFound(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		URL:          fmt.Sprintf("/model/%s/commands", "000000000000-0000-0000-0000-00000000"),
 		Handler:      s.JEMSrv,
+		Method:       "GET",
+		URL:          fmt.Sprintf("/model/%s/commands", "000000000000-0000-0000-0000-00000000"),
 		ExpectStatus: http.StatusNotFound,
-		ExpectBody: params.Error{
-			Code:    params.ErrNotFound,
+		ExpectBody: jujuparams.Error{
 			Message: "model not found",
+			Code:    "not found",
 		},
 	})
 }

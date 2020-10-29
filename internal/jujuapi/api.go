@@ -5,6 +5,7 @@ package jujuapi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -118,6 +119,10 @@ type modelCommandsRequest struct {
 	UUID              string `httprequest:",path"`
 }
 
+type modelCommandsResponse struct {
+	RedirectTo string `json:"redirect-to"`
+}
+
 // ModelCommands redirects the request to the controller responsible for the model.
 func (h *handler) ModelCommands(p httprequest.Params, arg *modelCommandsRequest) error {
 	ctx := p.Context
@@ -133,6 +138,18 @@ func (h *handler) ModelCommands(p httprequest.Params, arg *modelCommandsRequest)
 	if len(addrs) == 0 {
 		return errgo.New("expected at least 1 address, got 0")
 	}
-	http.Redirect(p.Response, p.Request, fmt.Sprintf("%s/model/%s/commands", addrs[0], arg.UUID), http.StatusTemporaryRedirect)
+	response := modelCommandsResponse{
+		RedirectTo: fmt.Sprintf("%s/model/%s/commands", addrs[0], arg.UUID),
+	}
+	data, err := json.Marshal(response)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	p.Response.Header().Set("Content-Type", "application/json")
+	p.Response.WriteHeader(http.StatusTemporaryRedirect)
+	_, err = p.Response.Write(data)
+	if err != nil {
+		return errgo.Mask(err)
+	}
 	return nil
 }
