@@ -110,7 +110,7 @@ type jemInterface interface {
 
 	// UpdateApplicationOffer fetches offer details from the controller and updates the
 	// application offer in JIMM DB.
-	UpdateApplicationOffer(ctx context.Context, offerUUID string, removed bool) error
+	UpdateApplicationOffer(ctx context.Context, ctlPath params.EntityPath, offerUUID string, removed bool) error
 }
 
 // jujuAPI represents an API connection to a Juju controller.
