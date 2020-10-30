@@ -22,15 +22,15 @@ type credentialSuite struct {
 var _ = gc.Suite(&credentialSuite{})
 
 func (s *credentialSuite) TestRevokeCredentialsInUse(c *gc.C) {
-	err := s.JEM.RevokeCredential(testContext, s.Credential.Path.ToParams(), 0)
+	err := s.JEM.RevokeCredential(testContext, jemtest.Bob, &s.Credential, 0)
 	c.Assert(err, gc.ErrorMatches, `cannot revoke because credential is in use on at least one model`)
 
 	// Try with just the check.
-	err = s.JEM.RevokeCredential(testContext, s.Credential.Path.ToParams(), jem.CredentialCheck)
+	err = s.JEM.RevokeCredential(testContext, jemtest.Bob, &s.Credential, jem.CredentialCheck)
 	c.Assert(err, gc.ErrorMatches, `cannot revoke because credential is in use on at least one model`)
 
 	// Try without the check. It should succeed.
-	err = s.JEM.RevokeCredential(testContext, s.Credential.Path.ToParams(), jem.CredentialUpdate)
+	err = s.JEM.RevokeCredential(testContext, jemtest.Bob, &s.Credential, jem.CredentialUpdate)
 	c.Assert(err, gc.Equals, nil)
 
 	// Try to create another model with the credentials that have
@@ -38,7 +38,7 @@ func (s *credentialSuite) TestRevokeCredentialsInUse(c *gc.C) {
 	err = s.JEM.CreateModel(testContext, jemtest.Bob, jem.CreateModelParams{
 		Path:           params.EntityPath{"bob", "newmodel"},
 		ControllerPath: s.Controller.Path,
-		Credential:     s.Credential.Path.ToParams(),
+		Credential:     s.Credential.Path,
 		Cloud:          "dummy",
 	}, nil)
 	c.Assert(err, gc.ErrorMatches, `credential dummy/bob/cred has been revoked`)
@@ -48,7 +48,7 @@ func (s *credentialSuite) TestRevokeCredentialsInUse(c *gc.C) {
 	conn, err := s.JEM.OpenAPI(testContext, s.Controller.Path)
 	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
-	r, err := cloudapi.NewClient(conn).Credentials(conv.ToCloudCredentialTag(s.Credential.Path.ToParams()))
+	r, err := cloudapi.NewClient(conn).Credentials(conv.ToCloudCredentialTag(s.Credential.Path))
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(r, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Error: &jujuparams.Error{
@@ -68,7 +68,7 @@ func (s *credentialSuite) TestRevokeCredentialsNotInUse(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// Try with just the check.
-	err = s.JEM.RevokeCredential(testContext, cred.Path.ToParams(), jem.CredentialCheck)
+	err = s.JEM.RevokeCredential(testContext, jemtest.Bob, &cred, jem.CredentialCheck)
 	c.Assert(err, gc.Equals, nil)
 
 	// Check that the credential is still there.
@@ -76,7 +76,7 @@ func (s *credentialSuite) TestRevokeCredentialsNotInUse(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// Try with both the check and the update flag.
-	err = s.JEM.RevokeCredential(testContext, cred.Path.ToParams(), 0)
+	err = s.JEM.RevokeCredential(testContext, jemtest.Bob, &cred, 0)
 	c.Assert(err, gc.Equals, nil)
 
 	// The credential should be marked as revoked and all
@@ -93,7 +93,7 @@ func (s *credentialSuite) TestUpdateCredential(c *gc.C) {
 	conn, err := s.JEM.OpenAPI(testContext, s.Controller.Path)
 	c.Assert(err, gc.Equals, nil)
 	client := cloudapi.NewClient(conn)
-	creds, err := client.Credentials(conv.ToCloudCredentialTag(s.Credential.Path.ToParams()))
+	creds, err := client.Credentials(conv.ToCloudCredentialTag(s.Credential.Path))
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Result: &jujuparams.CloudCredential{
@@ -101,7 +101,7 @@ func (s *credentialSuite) TestUpdateCredential(c *gc.C) {
 		},
 	}})
 
-	_, err = s.JEM.UpdateCredential(testContext, &mongodoc.Credential{
+	_, err = s.JEM.UpdateCredential(testContext, jemtest.Bob, &mongodoc.Credential{
 		Path: s.Credential.Path,
 		Type: "userpass",
 		Attributes: map[string]string{
@@ -113,7 +113,7 @@ func (s *credentialSuite) TestUpdateCredential(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// check it was updated on the controller.
-	creds, err = client.Credentials(conv.ToCloudCredentialTag(s.Credential.Path.ToParams()))
+	creds, err = client.Credentials(conv.ToCloudCredentialTag(s.Credential.Path))
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Result: &jujuparams.CloudCredential{
@@ -128,11 +128,11 @@ func (s *credentialSuite) TestUpdateCredential(c *gc.C) {
 	}})
 
 	// Revoke the credential
-	err = s.JEM.RevokeCredential(testContext, s.Credential.Path.ToParams(), jem.CredentialUpdate)
+	err = s.JEM.RevokeCredential(testContext, jemtest.Bob, &s.Credential, jem.CredentialUpdate)
 	c.Assert(err, gc.Equals, nil)
 
 	// check it was removed on the controller.
-	creds, err = client.Credentials(conv.ToCloudCredentialTag(s.Credential.Path.ToParams()))
+	creds, err = client.Credentials(conv.ToCloudCredentialTag(s.Credential.Path))
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Error: &jujuparams.Error{

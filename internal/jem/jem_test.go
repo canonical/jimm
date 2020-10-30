@@ -238,7 +238,7 @@ func (s *jemSuite) TestWatchAllModelSummaries(c *gc.C) {
 				Admins:     []string{conv.ToUserTag(s.Model.Path.User).Id()},
 				Cloud:      "dummy",
 				Region:     "dummy-region",
-				Credential: conv.ToCloudCredentialTag(s.Model.Credential.ToParams()).Id(),
+				Credential: conv.ToCloudCredentialTag(s.Model.Credential).Id(),
 				Size: jujuparams.ModelSummarySize{
 					Machines:     0,
 					Containers:   0,

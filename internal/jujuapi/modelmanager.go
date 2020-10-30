@@ -141,7 +141,7 @@ func (r *controllerRoot) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 				DefaultSeries:      model.DefaultSeries,
 				CloudTag:           conv.ToCloudTag(model.Cloud).String(),
 				CloudRegion:        model.CloudRegion,
-				CloudCredentialTag: conv.ToCloudCredentialTag(model.Credential.ToParams()).String(),
+				CloudCredentialTag: conv.ToCloudCredentialTag(model.Credential).String(),
 				OwnerTag:           conv.ToUserTag(model.Path.User).String(),
 				Life:               life.Value(model.Life()),
 				Status:             modelStatus(model.Info),
@@ -253,16 +253,15 @@ func (r *controllerRoot) createModel(ctx context.Context, args jujuparams.ModelC
 		return errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud tag")
 	}
 	cloud := params.Cloud(cloudTag.Id())
-	var credPath params.CredentialPath
+	var credPath mongodoc.CredentialPath
 	if args.CloudCredentialTag != "" {
 		tag, err := names.ParseCloudCredentialTag(args.CloudCredentialTag)
 		if err != nil {
 			return errgo.WithCausef(err, params.ErrBadRequest, "invalid cloud credential tag")
 		}
-		credPath = params.CredentialPath{
-			Cloud: params.Cloud(tag.Cloud().Id()),
-			User:  owner,
-			Name:  params.CredentialName(tag.Name()),
+		credPath, err = conv.FromCloudCredentialTag(tag)
+		if err != nil {
+			return errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
 		}
 	}
 	err = r.jem.CreateModel(ctx, r.identity, jem.CreateModelParams{
@@ -436,18 +435,12 @@ func (r *controllerRoot) changeModelCredential(ctx context.Context, arg jujupara
 	if err != nil {
 		return errgo.WithCausef(err, params.ErrBadRequest, "invalid credential tag")
 	}
-	credUser, err := conv.FromUserTag(credTag.Owner())
+	credPath, err := conv.FromCloudCredentialTag(credTag)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
 	}
 	cred := mongodoc.Credential{
-		Path: mongodoc.CredentialPath{
-			Cloud: credTag.Cloud().Id(),
-			EntityPath: mongodoc.EntityPath{
-				User: string(credUser),
-				Name: credTag.Name(),
-			},
-		},
+		Path: credPath,
 	}
 	if err := r.jem.GetCredential(ctx, r.identity, &cred); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))

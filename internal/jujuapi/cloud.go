@@ -13,7 +13,6 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
-	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/cloudcred"
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
@@ -195,7 +194,7 @@ func (r *controllerRoot) UserCredentials(ctx context.Context, userclouds jujupar
 			continue
 		}
 		err = r.jem.ForEachCredential(ctx, r.identity, owner, params.Cloud(cld.Id()), func(c *mongodoc.Credential) error {
-			results[i].Result = append(results[i].Result, conv.ToCloudCredentialTag(c.Path.ToParams()).String())
+			results[i].Result = append(results[i].Result, conv.ToCloudCredentialTag(c.Path).String())
 			return nil
 		})
 		results[i].Error = mapError(err)
@@ -230,17 +229,16 @@ func (r *controllerRoot) revokeCredential(ctx context.Context, tag string, force
 	if err != nil {
 		return errgo.WithCausef(err, params.ErrBadRequest, "cannot parse %q", tag)
 	}
-	if credtag.Owner().Domain() == "local" {
-		// such a credential will not have been uploaded, so it exists
-		return nil
+	path, err := conv.FromCloudCredentialTag(credtag)
+	if err != nil {
+		if errgo.Cause(err) == conv.ErrLocalUser {
+			// such a credential will not have been uploaded, so it exits.
+			return nil
+		}
+		return errgo.Mask(err)
 	}
-	if err := auth.CheckIsUser(ctx, r.identity, params.User(credtag.Owner().Name())); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	if err := r.jem.RevokeCredential(ctx, params.CredentialPath{
-		Cloud: params.Cloud(credtag.Cloud().Id()),
-		User:  params.User(credtag.Owner().Name()),
-		Name:  params.CredentialName(credtag.Name()),
+	if err := r.jem.RevokeCredential(ctx, r.identity, &mongodoc.Credential{
+		Path: path,
 	}, flags); err != nil {
 		return errgo.Mask(err)
 	}
@@ -270,19 +268,13 @@ func (r *controllerRoot) credential(ctx context.Context, cloudCredentialTag stri
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
 
 	}
-	owner, err := conv.FromUserTag(cct.Owner())
+	path, err := conv.FromCloudCredentialTag(cct)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
 	}
 
 	cred := mongodoc.Credential{
-		Path: mongodoc.CredentialPath{
-			Cloud: cct.Cloud().Id(),
-			EntityPath: mongodoc.EntityPath{
-				User: string(owner),
-				Name: cct.Name(),
-			},
-		},
+		Path: path,
 	}
 	if err := r.jem.GetCredential(ctx, r.identity, &cred); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
@@ -522,30 +514,21 @@ func (r *controllerRoot) updateCredential(ctx context.Context, cred jujuparams.T
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
 	}
-	ownerTag := tag.Owner()
-	owner, err := conv.FromUserTag(ownerTag)
+	path, err := conv.FromCloudCredentialTag(tag)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
 	}
-	if err := auth.CheckIsUser(ctx, r.identity, owner); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
+
 	var name params.Name
 	if err := name.UnmarshalText([]byte(tag.Name())); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
 	credential := mongodoc.Credential{
-		Path: mongodoc.CredentialPath{
-			Cloud: tag.Cloud().Id(),
-			EntityPath: mongodoc.EntityPath{
-				User: string(owner),
-				Name: tag.Name(),
-			},
-		},
+		Path:       path,
 		Type:       cred.Credential.AuthType,
 		Attributes: cred.Credential.Attributes,
 	}
-	modelResults, err := r.jem.UpdateCredential(ctx, &credential, flags)
+	modelResults, err := r.jem.UpdateCredential(ctx, r.identity, &credential, flags)
 	return modelResults, errgo.Mask(err, apiconn.IsAPIError)
 }
 

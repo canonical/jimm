@@ -321,7 +321,7 @@ func (j *JEM) controllerUpdateCredentials(ctx context.Context, conn *apiconn.Con
 			continue
 		}
 		if cred.Revoked {
-			if err := j.revokeControllerCredential(ctx, conn, ctl.Path, cred.Path.ToParams()); err != nil {
+			if err := j.revokeControllerCredential(ctx, conn, ctl.Path, cred.Path); err != nil {
 				zapctx.Warn(ctx,
 					"cannot revoke credential",
 					zap.Stringer("cred", credPath),

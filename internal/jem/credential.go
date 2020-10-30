@@ -95,19 +95,16 @@ func (j *JEM) FillCredentialAttributes(ctx context.Context, cred *mongodoc.Crede
 // the credential (if flags&CredentialUpdate!=0).
 // If flags==0, it acts as if both CredentialCheck and CredentialUpdate
 // were set.
-func (j *JEM) RevokeCredential(ctx context.Context, credPath params.CredentialPath, flags CredentialUpdateFlags) error {
+func (j *JEM) RevokeCredential(ctx context.Context, id identchecker.ACLIdentity, cred *mongodoc.Credential, flags CredentialUpdateFlags) error {
 	if flags == 0 {
 		flags = ^0
 	}
-	cred := mongodoc.Credential{
-		Path: mongodoc.CredentialPathFromParams(credPath),
-	}
-	if err := j.DB.GetCredential(ctx, &cred); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	if err := j.GetCredential(ctx, id, cred); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	controllers := cred.Controllers
 	if flags&CredentialCheck != 0 {
-		n, err := j.DB.CountModels(ctx, jimmdb.Eq("credential", mongodoc.CredentialPathFromParams(credPath)))
+		n, err := j.DB.CountModels(ctx, jimmdb.Eq("credential", cred.Path))
 		if err != nil {
 			return errgo.Mask(err)
 		}
@@ -120,7 +117,7 @@ func (j *JEM) RevokeCredential(ctx context.Context, credPath params.CredentialPa
 		return nil
 	}
 	if err := j.DB.UpsertCredential(ctx, &mongodoc.Credential{
-		Path:       mongodoc.CredentialPathFromParams(credPath),
+		Path:       cred.Path,
 		Attributes: map[string]string{},
 		Revoked:    true,
 	}); err != nil {
@@ -146,7 +143,7 @@ func (j *JEM) RevokeCredential(ctx context.Context, credPath params.CredentialPa
 			}
 			defer conn.Close()
 
-			err = j.revokeControllerCredential(ctx, conn, ctlPath, cred.Path.ToParams())
+			err = j.revokeControllerCredential(ctx, conn, ctlPath, cred.Path)
 			if err != nil {
 				zapctx.Warn(ctx,
 					"cannot revoke credential",
@@ -180,7 +177,7 @@ const (
 // flag is specified).
 //
 // If flags is zero, it will both check and update.
-func (j *JEM) UpdateCredential(ctx context.Context, cred *mongodoc.Credential, flags CredentialUpdateFlags) ([]jujuparams.UpdateCredentialModelResult, error) {
+func (j *JEM) UpdateCredential(ctx context.Context, id identchecker.ACLIdentity, cred *mongodoc.Credential, flags CredentialUpdateFlags) ([]jujuparams.UpdateCredentialModelResult, error) {
 	if cred.Revoked {
 		return nil, errgo.Newf("cannot use UpdateCredential to revoke a credential")
 	}
@@ -191,7 +188,7 @@ func (j *JEM) UpdateCredential(ctx context.Context, cred *mongodoc.Credential, f
 	c := mongodoc.Credential{
 		Path: cred.Path,
 	}
-	if err := j.DB.GetCredential(ctx, &c); err == nil {
+	if err := j.GetCredential(ctx, id, &c); err == nil {
 		controllers = c.Controllers
 	} else if errgo.Cause(err) != params.ErrNotFound {
 		return nil, errgo.Mask(err)
@@ -385,12 +382,12 @@ func (j *JEM) revokeControllerCredential(
 	ctx context.Context,
 	conn *apiconn.Conn,
 	ctlPath params.EntityPath,
-	credPath params.CredentialPath,
+	credPath mongodoc.CredentialPath,
 ) error {
 	if err := conn.RevokeCredential(ctx, credPath); err != nil {
 		return errgo.Mask(err, apiconn.IsAPIError)
 	}
-	if err := j.clearCredentialUpdate(ctx, ctlPath, mongodoc.CredentialPathFromParams(credPath)); err != nil {
+	if err := j.clearCredentialUpdate(ctx, ctlPath, credPath); err != nil {
 		return errgo.Notef(err, "cannot update controller %q after successfully updating credential", ctlPath)
 	}
 	return nil

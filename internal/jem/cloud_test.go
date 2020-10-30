@@ -425,13 +425,15 @@ func (s *cloudSuite) TestRemoveCloudWithModel(c *gc.C) {
 	)
 	c.Assert(err, gc.Equals, nil)
 
-	credpath := params.CredentialPath{
+	credpath := mongodoc.CredentialPath{
 		Cloud: "test-cloud",
-		User:  "bob",
-		Name:  "kubernetes",
+		EntityPath: mongodoc.EntityPath{
+			User: "bob",
+			Name: "kubernetes",
+		},
 	}
-	_, err = s.JEM.UpdateCredential(testContext, &mongodoc.Credential{
-		Path: mongodoc.CredentialPathFromParams(credpath),
+	_, err = s.JEM.UpdateCredential(testContext, id, &mongodoc.Credential{
+		Path: credpath,
 		Type: string(cloud.UserPassAuthType),
 		Attributes: map[string]string{
 			"username": kubetest.Username,

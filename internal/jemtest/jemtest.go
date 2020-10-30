@@ -113,7 +113,7 @@ func (s *JEMSuite) AddController(c *gc.C, ctl *mongodoc.Controller) {
 
 // UpdateCredential updates the given credential.
 func (s *JEMSuite) UpdateCredential(c *gc.C, cred *mongodoc.Credential) {
-	_, err := s.JEM.UpdateCredential(context.TODO(), cred, jem.CredentialUpdate)
+	_, err := s.JEM.UpdateCredential(context.TODO(), NewIdentity(string(cred.Path.User)), cred, jem.CredentialUpdate)
 	c.Assert(err, gc.Equals, nil)
 }
 
@@ -126,7 +126,7 @@ func (s *JEMSuite) CreateModel(c *gc.C, m *mongodoc.Model, mi *jujuparams.ModelI
 	params := jem.CreateModelParams{
 		Path:           m.Path,
 		ControllerPath: m.Controller,
-		Credential:     m.Credential.ToParams(),
+		Credential:     m.Credential,
 		Cloud:          m.Cloud,
 		Region:         m.CloudRegion,
 	}
