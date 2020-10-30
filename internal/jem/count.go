@@ -1,6 +1,6 @@
 // Copyright 2016 Canonical Ltd.
 
-package jimmdb
+package jem
 
 import (
 	"time"

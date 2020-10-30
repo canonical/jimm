@@ -6,8 +6,10 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"time"
 
+	"github.com/canonical/candid/candidtest"
 	"github.com/juju/aclstore/aclclient"
 	jujutesting "github.com/juju/juju/testing"
 	jc "github.com/juju/testing/checkers"
@@ -17,9 +19,10 @@ import (
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
-	"github.com/CanonicalLtd/jimm/internal/apitest"
+	"github.com/CanonicalLtd/jimm/internal/debugapi"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
+	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
@@ -28,7 +31,7 @@ import (
 var testContext = context.Background()
 
 type serverSuite struct {
-	apitest.Suite
+	jemtest.IsolatedMgoSuite
 }
 
 var _ = gc.Suite(&serverSuite{})
@@ -194,7 +197,7 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 	defer j.Close()
 
 	ctlPath := params.EntityPath{"bob", "foo"}
-	err = j.DB.AddController(testContext, &mongodoc.Controller{
+	err = j.DB.InsertController(testContext, &mongodoc.Controller{
 		Path:      ctlPath,
 		UUID:      "some-uuid",
 		CACert:    jujutesting.CACert,
@@ -228,9 +231,9 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 	defer h.Close()
 
 	// Poll the database to check that the monitor lease is taken out.
-	var ctl *mongodoc.Controller
+	ctl := &mongodoc.Controller{Path: ctlPath}
 	for a := jujutesting.LongAttempt.Start(); a.Next(); {
-		ctl, err = j.DB.Controller(testContext, ctlPath)
+		err = j.DB.GetController(testContext, ctl)
 		c.Assert(err, gc.Equals, nil)
 		if ctl.MonitorLeaseOwner != "" {
 			break
@@ -242,19 +245,63 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 	c.Assert(ctl.MonitorLeaseOwner, gc.Matches, "foo-[a-z0-9]+")
 }
 
-func (s *serverSuite) TestGetACL(c *gc.C) {
-	users, err := s.aclClient("controller-admin").Get(context.Background(), "admin")
+type aclSuite struct {
+	jemtest.IsolatedMgoSuite
+
+	Candid *candidtest.Server
+	Srv    *jemserver.Server
+	HTTP   *httptest.Server
+}
+
+var _ = gc.Suite(&aclSuite{})
+
+func (s *aclSuite) SetUpTest(c *gc.C) {
+	s.IsolatedMgoSuite.SetUpTest(c)
+	s.Candid = candidtest.NewServer()
+	s.Candid.AddUser("agent", candidtest.GroupListGroup)
+	serverParams := jemserver.Params{
+		DB:                s.Session.DB("jimmtest"),
+		ControllerAdmin:   jemtest.ControllerAdmin,
+		IdentityLocation:  s.Candid.URL.String(),
+		ThirdPartyLocator: s.Candid,
+		AgentUsername:     "agent",
+		AgentKey:          s.Candid.UserPublicKey("agent"),
+	}
+	var err error
+	s.Srv, err = jemserver.New(testContext, serverParams, map[string]jemserver.NewAPIHandlerFunc{"/debug": debugapi.NewAPIHandler})
+	c.Assert(err, gc.Equals, nil)
+	s.HTTP = httptest.NewServer(s.Srv)
+}
+
+func (s *aclSuite) TearDownTest(c *gc.C) {
+	if s.HTTP != nil {
+		s.HTTP.Close()
+		s.HTTP = nil
+	}
+	if s.Srv != nil {
+		s.Srv.Close()
+		s.Srv = nil
+	}
+	if s.Candid != nil {
+		s.Candid.Close()
+		s.Candid = nil
+	}
+	s.IsolatedMgoSuite.TearDownTest(c)
+}
+
+func (s *aclSuite) TestGetACL(c *gc.C) {
+	users, err := s.aclClient(jemtest.ControllerAdmin).Get(context.Background(), "admin")
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(users, jc.DeepEquals, []string{"controller-admin"})
 }
 
-func (s *serverSuite) TestUnauthorized(c *gc.C) {
+func (s *aclSuite) TestUnauthorized(c *gc.C) {
 	users, err := s.aclClient("bob").Get(context.Background(), "admin")
 	c.Assert(err, gc.ErrorMatches, `Get http.*/admin/acls/admin: forbidden`)
 	c.Assert(users, gc.IsNil)
 }
 
-func (s *serverSuite) TestSetACL(c *gc.C) {
+func (s *aclSuite) TestSetACL(c *gc.C) {
 	client := s.aclClient("controller-admin")
 	err := client.Set(context.Background(), "admin", []string{"controller-admin", "bob"})
 	c.Assert(err, gc.Equals, nil)
@@ -263,7 +310,7 @@ func (s *serverSuite) TestSetACL(c *gc.C) {
 	c.Assert(users, jc.DeepEquals, []string{"bob", "controller-admin"})
 }
 
-func (s *serverSuite) TestModifyACL(c *gc.C) {
+func (s *aclSuite) TestModifyACL(c *gc.C) {
 	client := s.aclClient("controller-admin")
 	err := client.Add(context.Background(), "admin", []string{"alice"})
 	c.Assert(err, gc.Equals, nil)
@@ -272,9 +319,9 @@ func (s *serverSuite) TestModifyACL(c *gc.C) {
 	c.Assert(users, jc.DeepEquals, []string{"alice", "controller-admin"})
 }
 
-func (s *serverSuite) aclClient(user string) *aclclient.Client {
+func (s *aclSuite) aclClient(user string) *aclclient.Client {
 	return aclclient.New(aclclient.NewParams{
-		BaseURL: s.HTTPSrv.URL + "/admin/acls",
-		Doer:    s.IDMSrv.Client(user),
+		BaseURL: s.HTTP.URL + "/admin/acls",
+		Doer:    s.Candid.Client(user),
 	})
 }

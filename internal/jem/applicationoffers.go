@@ -4,6 +4,8 @@ package jem
 
 import (
 	"context"
+	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -18,6 +20,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/conv"
+	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/params"
@@ -69,7 +72,7 @@ func (j *JEM) Offer(ctx context.Context, id identchecker.ACLIdentity, offer juju
 
 	doc := offerDetailsToMongodoc(&model, offerDetails)
 
-	err = j.DB.AddApplicationOffer(ctx, &doc)
+	err = j.DB.InsertApplicationOffer(ctx, &doc)
 	if err != nil {
 		if errgo.Cause(err) == params.ErrAlreadyExists {
 			return nil
@@ -92,11 +95,11 @@ func (j *JEM) GetApplicationOfferConsumeDetails(ctx context.Context, id identche
 	}
 
 	uid := params.User(id.Id())
-	access := getApplicationOfferAccess(uid, &offer)
+	access := offer.Users[mongodoc.User(uid)]
 	if access < mongodoc.ApplicationOfferConsumeAccess {
 		// If the current user doesn't have access then check if it is
 		// publicly available.
-		access = getApplicationOfferAccess(params.User("everyone"), &offer)
+		access = offer.Users[identchecker.Everyone]
 	}
 	switch access {
 	case mongodoc.ApplicationOfferNoAccess:
@@ -108,11 +111,13 @@ func (j *JEM) GetApplicationOfferConsumeDetails(ctx context.Context, id identche
 	default:
 	}
 	// The user has consume access or higher.
-	ctl, err := j.DB.Controller(ctx, offer.ControllerPath)
-	if err != nil {
+	ctl := mongodoc.Controller{
+		Path: offer.ControllerPath,
+	}
+	if err := j.DB.GetController(ctx, &ctl); err != nil {
 		return errgo.Mask(err)
 	}
-	conn, err := j.OpenAPIFromDoc(ctx, ctl)
+	conn, err := j.OpenAPIFromDoc(ctx, &ctl)
 	if err != nil {
 		return errgo.Mask(err)
 	}
@@ -153,16 +158,6 @@ func (j *JEM) GetApplicationOfferConsumeDetails(ctx context.Context, id identche
 	return nil
 }
 
-func getApplicationOfferAccess(user params.User, offer *mongodoc.ApplicationOffer) mongodoc.ApplicationOfferAccessPermission {
-	access := mongodoc.ApplicationOfferNoAccess
-	for _, u := range offer.Users {
-		if (u.User == user || u.User == identchecker.Everyone) && u.Access > access {
-			access = u.Access
-		}
-	}
-	return access
-}
-
 // filterApplicationOfferUsers filters the application offer user list
 // to be suitable for the given user at the given access level. All juju-
 // local users are omitted, and if the user is not an admin then they can
@@ -185,37 +180,130 @@ func filterApplicationOfferUsers(id params.User, a mongodoc.ApplicationOfferAcce
 }
 
 // ListApplicationOffers returns details of offers matching the specified filter.
-func (j *JEM) ListApplicationOffers(ctx context.Context, id identchecker.ACLIdentity, filters ...jujuparams.OfferFilter) (_ []jujuparams.ApplicationOfferAdminDetails, err error) {
+func (j *JEM) ListApplicationOffers(ctx context.Context, id identchecker.ACLIdentity, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
 	uid := params.User(id.Id())
 
-	it := j.DB.IterApplicationOffers(ctx, uid, mongodoc.ApplicationOfferAdminAccess, filters)
-	defer it.Close()
+	q := applicationOffersQuery(uid, mongodoc.ApplicationOfferAdminAccess, filters)
 	var offers []jujuparams.ApplicationOfferAdminDetails
-	var doc mongodoc.ApplicationOffer
-	for it.Next(&doc) {
-		offers = append(offers, applicationOfferDocToDetails(uid, &doc))
-	}
-
-	return offers, errgo.Mask(it.Err())
+	err := j.DB.ForEachApplicationOffer(ctx, q, []string{"owner-name", "model-name", "offer-name"}, func(offer *mongodoc.ApplicationOffer) error {
+		offers = append(offers, applicationOfferDocToDetails(uid, offer))
+		return nil
+	})
+	return offers, errgo.Mask(err)
 }
 
 // FindApplicationOffers returns details of offers matching the specified filter.
-func (j *JEM) FindApplicationOffers(ctx context.Context, id identchecker.ACLIdentity, filters ...jujuparams.OfferFilter) (_ []jujuparams.ApplicationOfferAdminDetails, err error) {
+func (j *JEM) FindApplicationOffers(ctx context.Context, id identchecker.ACLIdentity, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
 	uid := params.User(id.Id())
 
 	if len(filters) == 0 {
 		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "at least one filter must be specified")
 	}
 
-	it := j.DB.IterApplicationOffers(ctx, uid, mongodoc.ApplicationOfferReadAccess, filters)
-	defer it.Close()
+	q := applicationOffersQuery(uid, mongodoc.ApplicationOfferReadAccess, filters)
 	var offers []jujuparams.ApplicationOfferAdminDetails
-	var doc mongodoc.ApplicationOffer
-	for it.Next(&doc) {
-		offers = append(offers, applicationOfferDocToDetails(uid, &doc))
+	err := j.DB.ForEachApplicationOffer(ctx, q, []string{"owner-name", "model-name", "offer-name"}, func(offer *mongodoc.ApplicationOffer) error {
+		offers = append(offers, applicationOfferDocToDetails(uid, offer))
+		return nil
+	})
+	return offers, errgo.Mask(err)
+}
+
+func applicationOffersQuery(u params.User, access mongodoc.ApplicationOfferAccessPermission, filters []jujuparams.OfferFilter) jimmdb.Query {
+	userQuery := jimmdb.Or(jimmdb.Gte(mongodoc.User(u).FieldName("users"), access), jimmdb.Gte("users.everyone", access))
+	fqs := make([]jimmdb.Query, 0, len(filters))
+	for _, f := range filters {
+		q := filterQuery(f)
+		if q == nil {
+			continue
+		}
+		fqs = append(fqs, q)
 	}
 
-	return offers, errgo.Mask(it.Err())
+	if len(fqs) > 0 {
+		return jimmdb.And(userQuery, jimmdb.Or(fqs...))
+	}
+	return userQuery
+}
+
+func filterQuery(f jujuparams.OfferFilter) jimmdb.Query {
+	qs := make([]jimmdb.Query, 0, 7)
+	if f.OwnerName != "" {
+		qs = append(qs, jimmdb.Eq("owner-name", f.OwnerName))
+	}
+
+	if f.ModelName != "" {
+		qs = append(qs, jimmdb.Eq("model-name", f.ModelName))
+	}
+
+	if f.ApplicationName != "" {
+		qs = append(qs, jimmdb.Eq("application-name", f.ApplicationName))
+	}
+
+	// We match on partial names, eg "-sql"
+	if f.OfferName != "" {
+		qs = append(qs, jimmdb.Regex("offer-name", fmt.Sprintf(".*%s.*", f.OfferName)))
+	}
+
+	// We match descriptions by looking for containing terms.
+	if f.ApplicationDescription != "" {
+		desc := regexp.QuoteMeta(f.ApplicationDescription)
+		qs = append(qs, jimmdb.Regex("application-description", fmt.Sprintf(".*%s.*", desc)))
+	}
+
+	if len(f.Endpoints) > 0 {
+		endpoints := make([]jimmdb.Query, 0, len(f.Endpoints))
+		for _, ep := range f.Endpoints {
+			match := make([]jimmdb.Query, 0, 3)
+			if ep.Interface != "" {
+				match = append(match, jimmdb.Eq("interface", ep.Interface))
+			}
+			if ep.Name != "" {
+				match = append(match, jimmdb.Eq("name", ep.Name))
+			}
+			if ep.Role != "" {
+				match = append(match, jimmdb.Eq("role", ep.Role))
+			}
+			if len(match) == 0 {
+				continue
+			}
+			endpoints = append(endpoints, jimmdb.ElemMatch("endpoints", jimmdb.And(match...)))
+		}
+		if len(endpoints) > 0 {
+			qs = append(qs, jimmdb.Or(endpoints...))
+		}
+	}
+
+	if len(f.AllowedConsumerTags) > 0 {
+		users := make([]jimmdb.Query, 0, len(f.AllowedConsumerTags))
+		for _, userTag := range f.AllowedConsumerTags {
+			user, err := conv.ParseUserTag(userTag)
+			if err != nil {
+				// If this user does not parse then it will never match
+				// a record, add a query that can't match.
+				users = append(users, jimmdb.Eq("users.~~impossible", "impossible"))
+				continue
+			}
+
+			users = append(users, jimmdb.Gte(mongodoc.User(user).FieldName("users"), mongodoc.ApplicationOfferConsumeAccess))
+		}
+		switch len(users) {
+		case 1:
+			qs = append(qs, users[0])
+		default:
+			qs = append(qs, jimmdb.Or(users...))
+		case 0:
+		}
+	}
+
+	switch len(qs) {
+	case 0:
+		return nil
+	case 1:
+		return qs[0]
+	default:
+		return jimmdb.And(qs...)
+	}
 }
 
 // GetApplicationOffer returns details of the offer with the specified URL.
@@ -229,7 +317,10 @@ func (j *JEM) GetApplicationOffer(ctx context.Context, id identchecker.ACLIdenti
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	access := getApplicationOfferAccess(uid, &offer)
+	access := offer.Users[mongodoc.User(uid)]
+	if access == mongodoc.ApplicationOfferNoAccess {
+		access = offer.Users[identchecker.Everyone]
+	}
 	// one needs at least read access to get the application offer
 	if access < mongodoc.ApplicationOfferReadAccess {
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "")
@@ -242,7 +333,7 @@ func (j *JEM) GetApplicationOffer(ctx context.Context, id identchecker.ACLIdenti
 // applicationOfferDocToDetails returns a jujuparams structure based on the provided
 // application offer mongo doc.
 func applicationOfferDocToDetails(id params.User, offerDoc *mongodoc.ApplicationOffer) jujuparams.ApplicationOfferAdminDetails {
-	access := getApplicationOfferAccess(id, offerDoc)
+	access := offerDoc.Users[mongodoc.User(id)]
 
 	endpoints := make([]jujuparams.RemoteEndpoint, len(offerDoc.Endpoints))
 	for i, endpoint := range offerDoc.Endpoints {
@@ -263,13 +354,13 @@ func applicationOfferDocToDetails(id params.User, offerDoc *mongodoc.Application
 		}
 	}
 	var users []jujuparams.OfferUserDetails
-	for _, user := range offerDoc.Users {
-		if access == mongodoc.ApplicationOfferAdminAccess || user.User == id || user.User == params.User("everyone") {
-			userTag := conv.ToUserTag(user.User)
+	for u, ua := range offerDoc.Users {
+		if access == mongodoc.ApplicationOfferAdminAccess || params.User(u) == id || u == identchecker.Everyone {
+			userTag := conv.ToUserTag(params.User(u))
 			users = append(users, jujuparams.OfferUserDetails{
 				UserName:    userTag.Id(),
 				DisplayName: userTag.Name(),
-				Access:      user.Access.String(),
+				Access:      ua.String(),
 			})
 		}
 	}
@@ -321,7 +412,7 @@ func (j *JEM) GrantOfferAccess(ctx context.Context, id identchecker.ACLIdentity,
 	}
 
 	// retrieve the access rights for the authenticated user
-	offerAccess := getApplicationOfferAccess(uid, &offer)
+	offerAccess := offer.Users[mongodoc.User(uid)]
 
 	// if the authenticated user has no access to the offer, we
 	// return a not found error.
@@ -358,9 +449,8 @@ func (j *JEM) GrantOfferAccess(ctx context.Context, id identchecker.ACLIdentity,
 		return errgo.Mask(err)
 	}
 
-	// then grant access in the jimm db
-	err = j.DB.SetApplicationOfferAccess(ctx, user, offer.OfferUUID, permission)
-	if err != nil {
+	u := new(jimmdb.Update).Set(mongodoc.User(user).FieldName("users"), permission)
+	if err := j.DB.UpdateApplicationOffer(ctx, &offer, u, true); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil
@@ -379,7 +469,7 @@ func (j *JEM) RevokeOfferAccess(ctx context.Context, id identchecker.ACLIdentity
 	}
 
 	// retrieve the access rights for the authenticated user
-	offerAccess := getApplicationOfferAccess(uid, &offer)
+	offerAccess := offer.Users[mongodoc.User(uid)]
 
 	// if the authenticated user has no access to the offer, we
 	// return a not found error.
@@ -407,8 +497,8 @@ func (j *JEM) RevokeOfferAccess(ctx context.Context, id identchecker.ACLIdentity
 	}
 
 	// first revoke access in the jimm DB
-	err = j.DB.SetApplicationOfferAccess(ctx, user, offer.OfferUUID, permission)
-	if err != nil {
+	u := new(jimmdb.Update).Set(mongodoc.User(user).FieldName("users"), permission)
+	if err := j.DB.UpdateApplicationOffer(ctx, &offer, u, true); err != nil {
 		return errgo.Mask(err)
 	}
 
@@ -440,10 +530,7 @@ func (j *JEM) DestroyOffer(ctx context.Context, id identchecker.ACLIdentity, off
 	}
 
 	// retrieve the access rights for the authenticated user
-	offerAccess, err := j.DB.GetApplicationOfferAccess(ctx, uid, offer.OfferUUID)
-	if err != nil {
-		return errgo.Mask(err)
-	}
+	offerAccess := offer.Users[mongodoc.User(uid)]
 
 	// if the authenticated user has no access to the offer, we
 	// return a not found error.
@@ -457,7 +544,7 @@ func (j *JEM) DestroyOffer(ctx context.Context, id identchecker.ACLIdentity, off
 	}
 
 	// first remove application offer from the jimm DB
-	err = j.DB.RemoveApplicationOffer(ctx, offer.OfferUUID)
+	err = j.DB.RemoveApplicationOffer(ctx, &offer)
 	if err != nil {
 		return errgo.Mask(err)
 	}
@@ -484,28 +571,22 @@ func (j *JEM) DestroyOffer(ctx context.Context, id identchecker.ACLIdentity, off
 
 // UpdateApplicationOffer fetches offer details from the controller and updates the
 // application offer in JIMM DB.
-func (j *JEM) UpdateApplicationOffer(ctx context.Context, offerUUID string, removed bool) error {
+func (j *JEM) UpdateApplicationOffer(ctx context.Context, ctlPath params.EntityPath, offerUUID string, removed bool) error {
 	offer := mongodoc.ApplicationOffer{
-		OfferUUID: offerUUID,
-	}
-	err := j.DB.GetApplicationOffer(ctx, &offer)
-	if err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-
-	model := mongodoc.Model{
-		UUID: offer.ModelUUID,
-	}
-	if err := j.DB.GetModel(ctx, &model); err != nil {
-		return errgo.Mask(err)
+		OfferUUID:      offerUUID,
+		ControllerPath: ctlPath,
 	}
 
 	if removed {
-		return errgo.Mask(j.DB.RemoveApplicationOffer(ctx, offerUUID))
+		return errgo.Mask(j.DB.RemoveApplicationOffer(ctx, &offer))
 	}
 
-	// then remove from the actual controller
-	conn, err := j.OpenAPI(ctx, offer.ControllerPath)
+	if err := j.DB.GetApplicationOffer(ctx, &offer); err != nil {
+		return errgo.Mask(err)
+	}
+
+	// Get the updated offer from the controller.
+	conn, err := j.OpenAPI(ctx, ctlPath)
 	if err != nil {
 		return errgo.Mask(err)
 	}
@@ -521,8 +602,17 @@ func (j *JEM) UpdateApplicationOffer(ctx context.Context, offerUUID string, remo
 		return errgo.Mask(err)
 	}
 
-	doc := offerDetailsToMongodoc(&model, offerDetails)
-	return errgo.Mask(j.DB.UpdateApplicationOffer(ctx, &doc))
+	u := new(jimmdb.Update)
+	u.Set("application-description", offerDetails.ApplicationDescription)
+	u.Set("application-name", offerDetails.ApplicationName)
+	u.Set("bindings", offerDetails.Bindings)
+	u.Set("charm-url", offerDetails.CharmURL)
+	u.Set("connections", offerDetails.Connections)
+	u.Set("endpoints", offerDetails.Endpoints)
+	u.Set("offer-name", offerDetails.OfferName)
+	u.Set("offer-url", offerDetails.OfferURL)
+
+	return errgo.Mask(j.DB.UpdateApplicationOffer(ctx, &offer, u, false))
 }
 
 func offerDetailsToMongodoc(model *mongodoc.Model, offerDetails jujuparams.ApplicationOfferAdminDetails) mongodoc.ApplicationOffer {
@@ -535,7 +625,7 @@ func offerDetailsToMongodoc(model *mongodoc.Model, offerDetails jujuparams.Appli
 			Limit:     endpoint.Limit,
 		}
 	}
-	users := make([]mongodoc.OfferUserDetails, 0, len(offerDetails.Users))
+	users := make(map[mongodoc.User]mongodoc.ApplicationOfferAccessPermission, len(offerDetails.Users))
 	for _, user := range offerDetails.Users {
 		pu, err := conv.FromUserID(user.UserName)
 		if err != nil {
@@ -554,10 +644,7 @@ func offerDetailsToMongodoc(model *mongodoc.Model, offerDetails jujuparams.Appli
 		default:
 			continue
 		}
-		users = append(users, mongodoc.OfferUserDetails{
-			User:   pu,
-			Access: access,
-		})
+		users[mongodoc.User(pu)] = access
 	}
 	spaces := make([]mongodoc.RemoteSpace, len(offerDetails.Spaces))
 	for i, space := range offerDetails.Spaces {

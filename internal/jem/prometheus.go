@@ -7,8 +7,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	errgo "gopkg.in/errgo.v1"
 	mgo "gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 
+	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
@@ -136,9 +136,7 @@ func (s *ModelStats) Collect(c chan<- prometheus.Metric) {
 // collectStats returns a snapshot of the current statistics from JIMM.
 func (s *ModelStats) collectStats(jem *JEM) (*currentModelStats, error) {
 	var cs currentModelStats
-	iter := jem.DB.Models().Find(nil).Iter()
-	var m mongodoc.Model
-	for iter.Next(&m) {
+	err := jem.DB.ForEachModel(context.TODO(), nil, nil, func(m *mongodoc.Model) error {
 		cs.values[statModelsRunning]++
 		machineCount := m.Counts[params.MachineCount].Current
 		if machineCount > 0 {
@@ -147,12 +145,12 @@ func (s *ModelStats) collectStats(jem *JEM) (*currentModelStats, error) {
 		}
 		cs.values[statApplicationsRunning] += m.Counts[params.ApplicationCount].Current
 		cs.values[statUnitsRunning] += m.Counts[params.UnitCount].Current
-	}
-	if err := iter.Err(); err != nil {
+		return nil
+	})
+	if err != nil {
 		return nil, errgo.Notef(err, "cannot gather stats")
 	}
-	var err error
-	cs.values[statControllersRunning], err = jem.DB.Controllers().Count()
+	cs.values[statControllersRunning], err = jem.DB.CountControllers(context.TODO(), nil)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot gather stats")
 	}
@@ -193,10 +191,7 @@ var machineStatsJob = &mgo.MapReduce{
 	Reduce: `function (key, values) {return Array.sum(values);}`,
 }
 
-var machinesQuery = bson.D{
-	{"controller", bson.D{{"$exists", true}}},
-	{"info.agentstatus.current", bson.D{{"$exists", true}}},
-}
+var machinesQuery = jimmdb.And(jimmdb.Exists("controller"), jimmdb.Exists("info.agentstatus.current"))
 
 // Collect implements prometheus.Collector.Collect by collecting all the
 // model statistics from JIMM.

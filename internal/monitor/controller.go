@@ -8,13 +8,13 @@ import (
 	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/core/instance"
 	"github.com/juju/utils/parallel"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/tomb.v2"
 
 	"github.com/CanonicalLtd/jimm/internal/jem"
-	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
@@ -455,6 +455,10 @@ type modelInfo struct {
 	// changed holds information about what's changed
 	// in the model since the last set of deltas.
 	changed modelChange
+
+	// machineHardware holds a map from a machine Id to the machine's
+	// hardware characteristics.
+	machineHardware map[string]*instance.HardwareCharacteristics
 }
 
 func (info *modelInfo) adjustCount(kind params.EntityCount, n int) {
@@ -467,6 +471,23 @@ func (info *modelInfo) adjustCount(kind params.EntityCount, n int) {
 func (info *modelInfo) setInfo(modelInfo *jujuparams.ModelUpdate) {
 	info.changed |= infoChange
 	info.info = modelInfo
+}
+
+func (info *modelInfo) setMachineHardware(id string, hw *instance.HardwareCharacteristics) int {
+	getCores := func(h *instance.HardwareCharacteristics) int {
+		if h == nil || h.CpuCores == nil {
+			return 0
+		}
+		return int(*h.CpuCores)
+	}
+	oldCount := getCores(info.machineHardware[id])
+	newCount := getCores(hw)
+	if hw == nil {
+		delete(info.machineHardware, id)
+	} else {
+		info.machineHardware[id] = hw
+	}
+	return newCount - oldCount
 }
 
 func newWatcherState(ctx context.Context, j jemInterface, ctlPath params.EntityPath) *watcherState {
@@ -517,9 +538,14 @@ func (w *watcherState) addDelta(ctx context.Context, d jujuparams.Delta) error {
 		// TODO for top level machines, increment instance count?
 		delta := w.adjustCount(&w.stats.MachineCount, d)
 		w.modelInfo(e.ModelUUID).adjustCount(params.MachineCount, delta)
+		var coreDelta int
 		if d.Removed {
+			coreDelta = w.modelInfo(e.ModelUUID).setMachineHardware(e.Id, nil)
 			e.Life = "dead"
+		} else {
+			coreDelta = w.modelInfo(e.ModelUUID).setMachineHardware(e.Id, e.HardwareCharacteristics)
 		}
+		w.modelInfo(e.ModelUUID).adjustCount(params.CoreCount, coreDelta)
 		w.runner.Do(func() error {
 			return w.jem.UpdateMachineInfo(ctx, w.ctlPath, e)
 		})
@@ -527,7 +553,7 @@ func (w *watcherState) addDelta(ctx context.Context, d jujuparams.Delta) error {
 		delta := w.adjustCount(&w.stats.ApplicationOfferCount, d)
 		w.modelInfo(e.ModelUUID).adjustCount(params.ApplicationOfferCount, delta)
 		w.runner.Do(func() error {
-			return w.jem.UpdateApplicationOffer(ctx, e.OfferUUID, d.Removed)
+			return w.jem.UpdateApplicationOffer(ctx, w.ctlPath, e.OfferUUID, d.Removed)
 		})
 	default:
 		zapctx.Debug(ctx, "unknown entity", zap.Bool("removed", d.Removed), zap.String("type", fmt.Sprintf("%T", e)))
@@ -548,10 +574,12 @@ func (w watcherState) modelInfo(uuid string) *modelInfo {
 			// update the counts even if no entities are created.
 			changed: ^0,
 			counts: map[params.EntityCount]int{
+				params.CoreCount:        0,
 				params.UnitCount:        0,
 				params.MachineCount:     0,
 				params.ApplicationCount: 0,
 			},
+			machineHardware: make(map[string]*instance.HardwareCharacteristics),
 		}
 		w.models[uuid] = info
 	}
@@ -587,7 +615,7 @@ func (w *watcherState) adjustCount(n *int, delta jujuparams.Delta) int {
 
 func isMonitoringStoppedError(err error) bool {
 	cause := errgo.Cause(err)
-	return cause == errControllerRemoved || cause == jimmdb.ErrLeaseUnavailable
+	return cause == errControllerRemoved || cause == jem.ErrLeaseUnavailable
 }
 
 func incControllerErrorsMetric(ctlPath params.EntityPath) {

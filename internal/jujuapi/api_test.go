@@ -3,7 +3,6 @@
 package jujuapi_test
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -15,41 +14,41 @@ import (
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 
-	jem "github.com/CanonicalLtd/jimm"
-	"github.com/CanonicalLtd/jimm/internal/apitest"
+	"github.com/CanonicalLtd/jimm/internal/jemtest/apitest"
+	"github.com/CanonicalLtd/jimm/internal/jujuapi"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
 type apiSuite struct {
-	apitest.Suite
+	apitest.BootstrapAPISuite
 }
 
 var _ = gc.Suite(&apiSuite{})
 
-func (s *apiSuite) TestGUI(c *gc.C) {
-	ctx := context.Background()
+func (s *apiSuite) SetUpTest(c *gc.C) {
+	s.NewAPIHandler = jujuapi.NewAPIHandler
+	s.Params.GUILocation = "https://jujucharms.com.test"
+	s.BootstrapAPISuite.SetUpTest(c)
+}
 
-	s.AssertAddController(ctx, c, params.EntityPath{User: "bob", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(ctx, c, "bob", "dummy", "cred1", "empty")
-	_, uuid := s.CreateModel(ctx, c, params.EntityPath{"bob", "gui-model"}, params.EntityPath{"bob", "controller-1"}, cred)
-	jemSrv := s.NewServer(ctx, c, s.Session, s.IDMSrv, jem.ServerParams{
-		GUILocation: "https://jujucharms.com.test",
-	})
-	defer jemSrv.Close()
+func (s *apiSuite) TestGUI(c *gc.C) {
 	AssertRedirect(c, RedirectParams{
-		Handler:        jemSrv,
+		Handler:        s.APIHandler,
 		Method:         "GET",
-		URL:            fmt.Sprintf("/gui/%s", uuid),
+		URL:            fmt.Sprintf("/gui/%s", s.Model.UUID),
 		ExpectCode:     http.StatusMovedPermanently,
-		ExpectLocation: "https://jujucharms.com.test/u/bob/gui-model",
+		ExpectLocation: "https://jujucharms.com.test/u/bob/model-1",
 	})
 }
 
 func (s *apiSuite) TestGUINotFound(c *gc.C) {
+	p := s.Params
+	p.GUILocation = ""
+	hnd := s.NewAPIHTTPHandler(c, p)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		URL:          fmt.Sprintf("/gui/%s", "000000000000-0000-0000-0000-00000000"),
-		Handler:      s.JEMSrv,
+		Handler:      hnd,
 		ExpectStatus: http.StatusNotFound,
 		ExpectBody: params.Error{
 			Code:    params.ErrNotFound,
@@ -59,15 +58,9 @@ func (s *apiSuite) TestGUINotFound(c *gc.C) {
 }
 
 func (s *apiSuite) TestGUIModelNotFound(c *gc.C) {
-	ctx := context.Background()
-
-	jemSrv := s.NewServer(ctx, c, s.Session, s.IDMSrv, jem.ServerParams{
-		GUILocation: "https://jujucharms.com.test",
-	})
-	defer jemSrv.Close()
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		URL:          fmt.Sprintf("/gui/%s", "000000000000-0000-0000-0000-00000000"),
-		Handler:      jemSrv,
+		Handler:      s.APIHandler,
 		ExpectStatus: http.StatusNotFound,
 		ExpectBody: params.Error{
 			Code:    params.ErrNotFound,
@@ -78,7 +71,7 @@ func (s *apiSuite) TestGUIModelNotFound(c *gc.C) {
 
 func (s *apiSuite) TestGUIArchive(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler:      s.JEMSrv,
+		Handler:      s.APIHandler,
 		Method:       "GET",
 		URL:          "/gui-archive",
 		ExpectStatus: http.StatusOK,
@@ -112,20 +105,8 @@ func AssertRedirect(c *gc.C, p RedirectParams) {
 }
 
 func (s *apiSuite) TestModelCommands(c *gc.C) {
-	ctx := context.Background()
-
-	s.AssertAddController(ctx, c, params.EntityPath{User: "bob", Name: "controller-1"}, true)
-	controller, err := s.JEM.DB.Controller(ctx, params.EntityPath{User: "bob", Name: "controller-1"})
-	c.Assert(err, gc.Equals, nil)
-	cred := s.AssertUpdateCredential(ctx, c, "bob", "dummy", "cred1", "empty")
-	_, uuid := s.CreateModel(ctx, c, params.EntityPath{"bob", "gui-model"}, params.EntityPath{"bob", "controller-1"}, cred)
-	jemSrv := s.NewServer(ctx, c, s.Session, s.IDMSrv, jem.ServerParams{})
-	defer jemSrv.Close()
-	path := fmt.Sprintf("/model/%s/commands", uuid)
-	server := httptest.NewServer(jemSrv)
-	defer server.Close()
-
-	serverURL, err := url.Parse(server.URL)
+	path := fmt.Sprintf("/model/%s/commands", s.Model.UUID)
+	serverURL, err := url.Parse(s.HTTP.URL)
 	c.Assert(err, gc.Equals, nil)
 	u := url.URL{
 		Scheme: "ws",
@@ -146,24 +127,16 @@ func (s *apiSuite) TestModelCommands(c *gc.C) {
 	jsonConn := jsoncodec.NewWebsocketConn(conn)
 	err = jsonConn.Receive(&msg)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(msg.RedirectTo, gc.Equals, fmt.Sprintf("wss://%s/model/%s/commands", mongodoc.Addresses(controller.HostPorts)[0], uuid))
+	c.Assert(msg.RedirectTo, gc.Equals, fmt.Sprintf("wss://%s/model/%s/commands", mongodoc.Addresses(s.Controller.HostPorts)[0], s.Model.UUID))
 }
 
 func (s *apiSuite) TestModelCommandsModelNotFoundf(c *gc.C) {
-	ctx := context.Background()
-
-	jemSrv := s.NewServer(ctx, c, s.Session, s.IDMSrv, jem.ServerParams{})
-	defer jemSrv.Close()
-	path := fmt.Sprintf("/model/%s/commands", "000000000000-0000-0000-0000-00000000")
-	server := httptest.NewServer(jemSrv)
-	defer server.Close()
-
-	serverURL, err := url.Parse(server.URL)
+	serverURL, err := url.Parse(s.HTTP.URL)
 	c.Assert(err, gc.Equals, nil)
 	u := url.URL{
 		Scheme: "ws",
 		Host:   serverURL.Host,
-		Path:   path,
+		Path:   fmt.Sprintf("/models/%s/commands", s.Model.UUID),
 	}
 
 	_, response, err := websocket.DefaultDialer.Dial(u.String(), nil)

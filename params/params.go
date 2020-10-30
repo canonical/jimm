@@ -451,6 +451,7 @@ const (
 	ApplicationCount      EntityCount = "applications"
 	MachineCount          EntityCount = "machines"
 	ApplicationOfferCount EntityCount = "application-offers"
+	CoreCount             EntityCount = "cores"
 )
 
 // Count records information about a changing count of

@@ -7,66 +7,171 @@ import (
 
 	cloudapi "github.com/juju/juju/api/cloud"
 	jujuparams "github.com/juju/juju/apiserver/params"
-	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/network"
-	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
-	"github.com/juju/utils"
 	"github.com/juju/version"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
-	"gopkg.in/macaroon-bakery.v2/httpbakery"
-	"gopkg.in/mgo.v2/bson"
 
+	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
-	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
+type addControllerSuite struct {
+	jemtest.JEMSuite
+}
+
+var _ = gc.Suite(&addControllerSuite{})
+
+var addControllerTests = []struct {
+	about            string
+	id               identchecker.ACLIdentity
+	ctl              mongodoc.Controller
+	expectError      string
+	expectErrorCause error
+}{{
+	about: "success",
+	id:    jemtest.Alice,
+	ctl: mongodoc.Controller{
+		Path:   params.EntityPath{"alice", "dummy-1"},
+		Public: true,
+	},
+}, {
+	// This test is dependent on the previous one succeeding.
+	about: "duplicate",
+	id:    jemtest.Alice,
+	ctl: mongodoc.Controller{
+		Path:   params.EntityPath{"alice", "dummy-1"},
+		Public: true,
+	},
+	expectError:      `already exists`,
+	expectErrorCause: params.ErrAlreadyExists,
+}, {
+	about: "unauthorized",
+	id:    jemtest.Bob,
+	ctl: mongodoc.Controller{
+		Path:   params.EntityPath{"bob", "dummy-1"},
+		Public: true,
+	},
+	expectError:      `unauthorized`,
+	expectErrorCause: params.ErrUnauthorized,
+}, {
+	about: "not public",
+	id:    jemtest.Alice,
+	ctl: mongodoc.Controller{
+		Path:   params.EntityPath{"alice", "dummy-2"},
+		Public: false,
+	},
+	expectError:      `cannot add private controller`,
+	expectErrorCause: params.ErrForbidden,
+}, {
+	about: "wrong namespace",
+	id:    jemtest.Alice,
+	ctl: mongodoc.Controller{
+		Path:   params.EntityPath{"bob", "dummy-1"},
+		Public: true,
+	},
+	expectError:      `unauthorized`,
+	expectErrorCause: params.ErrUnauthorized,
+}, {
+	about: "connect failure",
+	id:    jemtest.Alice,
+	ctl: mongodoc.Controller{
+		Path:          params.EntityPath{"alice", "dummy-2"},
+		AdminPassword: "not-the-password",
+		Public:        true,
+	},
+	expectError:      `invalid entity name or password \(unauthorized access\)`,
+	expectErrorCause: jem.ErrAPIConnection,
+}}
+
+func (s *addControllerSuite) TestAddController(c *gc.C) {
+	ctx := context.Background()
+	info := s.APIInfo(c)
+	hps, err := mongodoc.ParseAddresses(info.Addrs)
+	c.Assert(err, gc.Equals, nil)
+
+	for i, test := range addControllerTests {
+		c.Logf("%d. %s", i, test.about)
+		if test.ctl.HostPorts == nil {
+			test.ctl.HostPorts = [][]mongodoc.HostPort{hps}
+		}
+		if test.ctl.CACert == "" {
+			test.ctl.CACert = info.CACert
+		}
+		if test.ctl.AdminUser == "" {
+			test.ctl.AdminUser = info.Tag.Id()
+		}
+		if test.ctl.AdminPassword == "" {
+			test.ctl.AdminPassword = info.Password
+		}
+
+		err := s.JEM.AddController(ctx, test.id, &test.ctl)
+		if test.expectError != "" {
+			c.Check(err, gc.ErrorMatches, test.expectError)
+			if test.expectErrorCause != nil {
+				c.Check(errgo.Cause(err), gc.Equals, test.expectErrorCause)
+			}
+		} else {
+			c.Check(err, gc.Equals, nil)
+		}
+	}
+}
+
 type controllerSuite struct {
-	jemtest.JujuConnSuite
-	pool                           *jem.Pool
-	sessionPool                    *mgosession.Pool
-	jem                            *jem.JEM
-	usageSenderAuthorizationClient *testUsageSenderAuthorizationClient
+	jemtest.BootstrapSuite
 }
 
 var _ = gc.Suite(&controllerSuite{})
 
-func (s *controllerSuite) SetUpTest(c *gc.C) {
-	s.JujuConnSuite.SetUpTest(c)
-	s.sessionPool = mgosession.NewPool(context.TODO(), s.Session, 5)
-	publicCloudMetadata, _, err := cloud.PublicCloudMetadata()
-	c.Assert(err, gc.Equals, nil)
-	s.usageSenderAuthorizationClient = &testUsageSenderAuthorizationClient{}
-	s.PatchValue(&jem.NewUsageSenderAuthorizationClient, func(_ string, _ *httpbakery.Client) (jem.UsageSenderAuthorizationClient, error) {
-		return s.usageSenderAuthorizationClient, nil
-	})
-	pool, err := jem.NewPool(context.TODO(), jem.Params{
-		DB:                  s.Session.DB("jem"),
-		ControllerAdmin:     "controller-admin",
-		SessionPool:         s.sessionPool,
-		PublicCloudMetadata: publicCloudMetadata,
-		UsageSenderURL:      "test-usage-sender-url",
-		Pubsub: &pubsub.Hub{
-			MaxConcurrency: 10,
-		},
-	})
-	c.Assert(err, gc.Equals, nil)
-	s.pool = pool
-	s.jem = s.pool.JEM(context.TODO())
-	s.PatchValue(&utils.OutgoingAccessAllowed, true)
-}
+var getControllerTests = []struct {
+	path             params.EntityPath
+	expectErrorCause error
+}{{
+	path: params.EntityPath{"bob", "controller"},
+}, {
+	path: params.EntityPath{"bob-group", "controller"},
+}, {
+	path:             params.EntityPath{"alice", "controller"},
+	expectErrorCause: params.ErrUnauthorized,
+}, {
+	path:             params.EntityPath{"bob", "controller2"},
+	expectErrorCause: params.ErrNotFound,
+}, {
+	path:             params.EntityPath{"bob-group", "controller2"},
+	expectErrorCause: params.ErrNotFound,
+}, {
+	path:             params.EntityPath{"alice", "controller2"},
+	expectErrorCause: params.ErrNotFound,
+}}
 
-func (s *controllerSuite) TearDownTest(c *gc.C) {
-	s.jem.Close()
-	s.pool.Close()
-	s.sessionPool.Close()
-	s.JujuConnSuite.TearDownTest(c)
+func (s *controllerSuite) TestGetController(c *gc.C) {
+	s.AddController(c, &mongodoc.Controller{
+		Path: params.EntityPath{"alice", "controller"},
+	})
+	s.AddController(c, &mongodoc.Controller{
+		Path: params.EntityPath{"bob", "controller"},
+	})
+	s.AddController(c, &mongodoc.Controller{
+		Path: params.EntityPath{"bob-group", "controller"},
+	})
+
+	for i, test := range getControllerTests {
+		c.Logf("test %d. %s", i, test.path)
+		ctl := mongodoc.Controller{Path: test.path}
+		err := s.JEM.GetController(testContext, jemtest.Bob, &ctl)
+		if test.expectErrorCause != nil {
+			c.Assert(errgo.Cause(err), gc.Equals, test.expectErrorCause)
+			continue
+		}
+		c.Assert(err, gc.Equals, nil)
+		c.Assert(ctl.Id, gc.Equals, test.path.String())
+	}
 }
 
 var mongodocAPIHostPortsTests = []struct {
@@ -100,128 +205,87 @@ func (s *controllerSuite) TestMongodocAPIHostPorts(c *gc.C) {
 	}
 }
 
-var addControllerTests = []struct {
-	about            string
-	id               identchecker.ACLIdentity
-	ctl              mongodoc.Controller
-	expectError      string
-	expectErrorCause error
-}{{
-	about: "success",
-	id:    jemtest.NewIdentity("bob", "controller-admin"),
-	ctl: mongodoc.Controller{
-		Path:   params.EntityPath{"bob", "controller"},
-		Public: true,
-	},
-}, {
-	// This test is dependent on the previous one succeeding.
-	about: "duplicate",
-	id:    jemtest.NewIdentity("bob", "controller-admin"),
-	ctl: mongodoc.Controller{
-		Path:   params.EntityPath{"bob", "controller"},
-		Public: true,
-	},
-	expectError:      `already exists`,
-	expectErrorCause: params.ErrAlreadyExists,
-}, {
-	about: "unauthorized",
-	id:    jemtest.NewIdentity("bob"),
-	ctl: mongodoc.Controller{
-		Path:   params.EntityPath{"bob", "controller"},
-		Public: true,
-	},
-	expectError:      `unauthorized`,
-	expectErrorCause: params.ErrUnauthorized,
-}, {
-	about: "not public",
-	id:    jemtest.NewIdentity("bob", "controller-admin"),
-	ctl: mongodoc.Controller{
-		Path:   params.EntityPath{"bob", "controller"},
-		Public: false,
-	},
-	expectError:      `cannot add private controller`,
-	expectErrorCause: params.ErrForbidden,
-}, {
-	about: "wrong namespace",
-	id:    jemtest.NewIdentity("alice", "controller-admin"),
-	ctl: mongodoc.Controller{
-		Path:   params.EntityPath{"bob", "controller"},
-		Public: true,
-	},
-	expectError:      `unauthorized`,
-	expectErrorCause: params.ErrUnauthorized,
-}, {
-	about: "connect failure",
-	id:    jemtest.NewIdentity("bob", "controller-admin"),
-	ctl: mongodoc.Controller{
-		Path:          params.EntityPath{"bob", "controller"},
-		AdminPassword: "not-the-password",
-		Public:        true,
-	},
-	expectError:      `invalid entity name or password \(unauthorized access\)`,
-	expectErrorCause: jem.ErrAPIConnection,
-}}
+func (s *controllerSuite) TestSetControllerDeprecated(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "foo"}
 
-func (s *controllerSuite) TestAddController(c *gc.C) {
-	ctx := context.Background()
-	info := s.APIInfo(c)
-	hps, err := mongodoc.ParseAddresses(info.Addrs)
+	err := s.JEM.SetControllerDeprecated(testContext, jemtest.Alice, ctlPath, true)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+	err = s.JEM.SetControllerDeprecated(testContext, jemtest.Alice, ctlPath, false)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+
+	// Set the controller to deprecated and check that the field
+	// is set to true.
+	err = s.JEM.SetControllerDeprecated(testContext, jemtest.Alice, s.Controller.Path, true)
 	c.Assert(err, gc.Equals, nil)
 
-	for i, test := range addControllerTests {
-		c.Logf("%d. %s", i, test.about)
-		if test.ctl.HostPorts == nil {
-			test.ctl.HostPorts = [][]mongodoc.HostPort{hps}
-		}
-		if test.ctl.CACert == "" {
-			test.ctl.CACert = info.CACert
-		}
-		if test.ctl.AdminUser == "" {
-			test.ctl.AdminUser = info.Tag.Id()
-		}
-		if test.ctl.AdminPassword == "" {
-			test.ctl.AdminPassword = info.Password
-		}
-
-		err := s.jem.AddController(ctx, test.id, &test.ctl)
-		if test.expectError != "" {
-			c.Check(err, gc.ErrorMatches, test.expectError)
-			if test.expectErrorCause != nil {
-				c.Check(errgo.Cause(err), gc.Equals, test.expectErrorCause)
-			}
-		} else {
-			c.Check(err, gc.Equals, nil)
-		}
+	ctl := &mongodoc.Controller{
+		Path: s.Controller.Path,
 	}
+	err = s.JEM.DB.GetController(testContext, ctl)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(ctl.Deprecated, gc.Equals, true)
+
+	// Set it back to non-deprecated and check that the field is removed.
+	err = s.JEM.SetControllerDeprecated(testContext, jemtest.Alice, s.Controller.Path, false)
+	c.Assert(err, gc.Equals, nil)
+
+	ctl2 := &mongodoc.Controller{
+		Path: s.Controller.Path,
+	}
+	err = s.JEM.DB.GetController(testContext, ctl2)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(ctl2.Deprecated, gc.Equals, false)
+}
+
+func (s *controllerSuite) TestDeleteController(c *gc.C) {
+	// sanity check the credential is linked to the controller
+	err := s.JEM.DB.GetCredential(testContext, &s.Credential)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(s.Credential.Controllers, jc.DeepEquals, []params.EntityPath{s.Controller.Path})
+
+	// Attempt to delete the controller while it is still running.
+	err = s.JEM.DeleteController(testContext, jemtest.Alice, &s.Controller, false)
+	c.Assert(err, gc.ErrorMatches, `cannot delete controller while it is still alive`)
+
+	// Use force.
+	err = s.JEM.DeleteController(testContext, jemtest.Alice, &s.Controller, true)
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.JEM.DB.GetController(testContext, &s.Controller)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+	err = s.JEM.DB.GetModel(testContext, &s.Model)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+	err = s.JEM.DB.GetCredential(testContext, &s.Credential)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(s.Credential.Controllers, gc.HasLen, 0)
+
+	err = s.JEM.DeleteController(testContext, jemtest.Alice, &s.Controller, false)
+	c.Assert(err, gc.ErrorMatches, "controller not found")
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
 func (s *controllerSuite) TestControllerUpdateCredentials(c *gc.C) {
-	ctlPath := addController(c, params.EntityPath{User: "bob", Name: "controller"}, s.APIInfo(c), s.jem)
-	credPath := credentialPath("dummy", "bob", "cred")
-	mCredPath := mgoCredentialPath("dummy", "bob", "cred")
-	credTag := names.NewCloudCredentialTag("dummy/bob@external/cred")
-	cred := &mongodoc.Credential{
-		Path: mCredPath,
-		Type: "empty",
-	}
-	err := s.jem.DB.UpdateCredential(testContext, cred)
+	cred := jemtest.EmptyCredential("bob", "test")
+	err := s.JEM.DB.UpsertCredential(testContext, &cred)
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.jem.DB.SetCredentialUpdates(testContext, []params.EntityPath{ctlPath}, mongodoc.CredentialPathFromParams(credPath))
+	err = jem.SetCredentialUpdates(s.JEM, testContext, []params.EntityPath{s.Controller.Path}, cred.Path)
 	c.Assert(err, gc.Equals, nil)
 
-	ctl, err := s.jem.DB.Controller(testContext, ctlPath)
+	ctl := &mongodoc.Controller{Path: s.Controller.Path}
+	err = s.JEM.DB.GetController(testContext, ctl)
 	c.Assert(err, gc.Equals, nil)
+	c.Logf("updatecredentials: %#v", ctl.UpdateCredentials)
 
-	conn, err := s.jem.OpenAPIFromDoc(testContext, ctl)
+	conn, err := s.JEM.OpenAPIFromDoc(testContext, &s.Controller)
 	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
 
-	jem.ControllerUpdateCredentials(s.jem, testContext, conn, ctl)
+	jem.ControllerUpdateCredentials(s.JEM, testContext, conn, ctl)
 
 	// check it was updated on the controller.
 	client := cloudapi.NewClient(conn)
-	creds, err := client.Credentials(credTag)
+	creds, err := client.Credentials(conv.ToCloudCredentialTag(cred.Path.ToParams()))
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Result: &jujuparams.CloudCredential{
@@ -233,42 +297,31 @@ func (s *controllerSuite) TestControllerUpdateCredentials(c *gc.C) {
 }
 
 func (s *controllerSuite) TestConnectMonitor(c *gc.C) {
-	ctlPath := addController(c, params.EntityPath{User: "bob", Name: "controller"}, s.APIInfo(c), s.jem)
-
 	// create a credential.
-	credPath := credentialPath("dummy", "bob", "cred")
-	mCredPath := mgoCredentialPath("dummy", "bob", "cred")
-	credTag := names.NewCloudCredentialTag("dummy/bob@external/cred")
-	cred := &mongodoc.Credential{
-		Path: mCredPath,
-		Type: "empty",
-	}
-	err := s.jem.DB.UpdateCredential(testContext, cred)
+	cred := jemtest.EmptyCredential("bob", "test")
+	err := s.JEM.DB.UpsertCredential(testContext, &cred)
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.DB.SetCredentialUpdates(testContext, []params.EntityPath{ctlPath}, mongodoc.CredentialPathFromParams(credPath))
+	err = jem.SetCredentialUpdates(s.JEM, testContext, []params.EntityPath{s.Controller.Path}, cred.Path)
 	c.Assert(err, gc.Equals, nil)
 
 	// Remove the controller from known clouds.
-	_, err = s.jem.DB.CloudRegions().UpdateAll(
-		bson.D{{"cloud", "dummy"}},
-		bson.D{
-			{"$pull", bson.D{{"primarycontrollers", ctlPath}}},
-			{"$pull", bson.D{{"secondarycontrollers", ctlPath}}},
-		},
+	_, err = s.JEM.DB.CloudRegions().UpdateAll(
+		jimmdb.Eq("cloud", "dummy"),
+		new(jimmdb.Update).Pull("primarycontrollers", s.Controller.Path).Pull("secondarycontrollers", s.Controller.Path),
 	)
 	c.Assert(err, gc.Equals, nil)
 	cr := mongodoc.CloudRegion{
 		Cloud: "dummy",
 	}
-	err = s.jem.DB.GetCloudRegion(testContext, &cr)
+	err = s.JEM.DB.GetCloudRegion(testContext, &cr)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(cr.PrimaryControllers, gc.HasLen, 0)
 
 	// Set the version obviously wrong.
-	err = s.jem.DB.SetControllerVersion(testContext, ctlPath, version.Zero)
+	err = s.JEM.SetControllerVersion(testContext, s.Controller.Path, version.Zero)
 	c.Assert(err, gc.Equals, nil)
 
-	conn, err := s.jem.ConnectMonitor(testContext, ctlPath)
+	conn, err := s.JEM.ConnectMonitor(testContext, s.Controller.Path)
 	c.Assert(err, gc.Equals, nil)
 
 	v, ok := conn.ServerVersion()
@@ -276,7 +329,7 @@ func (s *controllerSuite) TestConnectMonitor(c *gc.C) {
 
 	// check the credential has been updated.
 	client := cloudapi.NewClient(conn)
-	creds, err := client.Credentials(credTag)
+	creds, err := client.Credentials(conv.ToCloudCredentialTag(cred.Path.ToParams()))
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Result: &jujuparams.CloudCredential{
@@ -290,32 +343,29 @@ func (s *controllerSuite) TestConnectMonitor(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// Check the cloud has been updated.
-	err = s.jem.DB.GetCloudRegion(testContext, &cr)
+	err = s.JEM.DB.GetCloudRegion(testContext, &cr)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(cr.PrimaryControllers, jc.DeepEquals, []params.EntityPath{ctlPath})
+	c.Assert(cr.PrimaryControllers, jc.DeepEquals, []params.EntityPath{s.Controller.Path})
 
 	// Check the version has been updated.
-	ctl, err := s.jem.DB.Controller(testContext, ctlPath)
+	ctl := mongodoc.Controller{Path: s.Controller.Path}
+	err = s.JEM.DB.GetController(testContext, &ctl)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(ctl.Version, jc.DeepEquals, &v)
 }
 
 func (s *controllerSuite) TestConnectMonitorNotFound(c *gc.C) {
-	_, err := s.jem.ConnectMonitor(testContext, params.EntityPath{"not", "there"})
-	c.Check(err, gc.ErrorMatches, `controller "not/there" not found`)
+	_, err := s.JEM.ConnectMonitor(testContext, params.EntityPath{"not", "there"})
+	c.Check(err, gc.ErrorMatches, `controller not found`)
 	c.Check(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
 func (s *controllerSuite) TestConnectMonitorConnectionFailure(c *gc.C) {
-	ctlPath := addController(c, params.EntityPath{User: "bob", Name: "controller"}, s.APIInfo(c), s.jem)
-
 	// Set the password wrong
-	err := s.jem.DB.Controllers().Update(
-		bson.D{{"path", ctlPath}},
-		bson.D{{"$set", bson.D{{"adminpassword", "bad-password"}}}},
-	)
+	err := s.JEM.DB.UpdateController(testContext, &s.Controller, new(jimmdb.Update).Set("adminpassword", "bad-password"), false)
+	s.Pool.ClearAPIConnCache()
 
-	_, err = s.jem.ConnectMonitor(testContext, ctlPath)
+	_, err = s.JEM.ConnectMonitor(testContext, s.Controller.Path)
 	c.Check(err, gc.ErrorMatches, `invalid entity name or password \(unauthorized access\)`)
 	c.Check(errgo.Cause(err), gc.Equals, jem.ErrAPIConnection)
 }

@@ -8,132 +8,92 @@ import (
 	"github.com/juju/juju/api/applicationoffers"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/crossmodel"
+	"github.com/juju/juju/state"
 	"github.com/juju/juju/testing/factory"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
-	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	"github.com/CanonicalLtd/jimm/params"
 )
 
 type applicationOffersSuite struct {
 	websocketSuite
+	state    *state.PooledState
+	factory  *factory.Factory
+	endpoint state.Endpoint
 }
 
 var _ = gc.Suite(&applicationOffersSuite{})
 
 func (s *applicationOffersSuite) SetUpTest(c *gc.C) {
-	s.ServerParams.CharmstoreLocation = "https://api.jujucharms.com/charmstore"
-	s.ServerParams.MeteringLocation = "https://api.jujucharms.com/omnibus"
 	s.websocketSuite.SetUpTest(c)
-	s.PatchValue(&utils.OutgoingAccessAllowed, true)
-}
-
-func (s *applicationOffersSuite) TestOffer(c *gc.C) {
-	ctx := context.Background()
-
-	ctlPath := s.AssertAddController(ctx, c, params.EntityPath{User: "user1", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(ctx, c, "user1", "dummy", "cred1", "empty")
-	err := s.JEM.DB.SetACL(ctx, s.JEM.DB.Controllers(), ctlPath, params.ACL{
-		Read: []string{"user1"},
-	})
-
-	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "user1", cred: cred})
-	modelUUID := mi.UUID
-	err = s.JEM.DB.SetACL(ctx, s.JEM.DB.Models(), params.EntityPath{User: "user1", Name: "model-1"}, params.ACL{
-		Admin: []string{"user1"},
-	})
+	var err error
+	s.state, err = s.StatePool.Get(s.Model.UUID)
 	c.Assert(err, gc.Equals, nil)
-
-	modelState, err := s.StatePool.Get(modelUUID)
-	c.Assert(err, gc.Equals, nil)
-	defer modelState.Release()
-
-	f := factory.NewFactory(modelState.State, s.StatePool)
-	app := f.MakeApplication(c, &factory.ApplicationParams{
+	s.factory = factory.NewFactory(s.state.State, s.StatePool)
+	app := s.factory.MakeApplication(c, &factory.ApplicationParams{
 		Name: "test-app",
-		Charm: f.MakeCharm(c, &factory.CharmParams{
+		Charm: s.factory.MakeCharm(c, &factory.CharmParams{
 			Name: "wordpress",
 		}),
 	})
-	f.MakeUnit(c, &factory.UnitParams{
+	s.factory.MakeUnit(c, &factory.UnitParams{
 		Application: app,
 	})
-	ep, err := app.Endpoint("url")
+	s.endpoint, err = app.Endpoint("url")
 	c.Assert(err, gc.Equals, nil)
+}
 
-	conn := s.open(c, nil, "user1")
+func (s *applicationOffersSuite) TearDownTest(c *gc.C) {
+	s.endpoint = state.Endpoint{}
+	s.factory = nil
+	if s.state != nil {
+		s.state.Release()
+		s.state = nil
+	}
+	s.websocketSuite.TearDownTest(c)
+}
+
+func (s *applicationOffersSuite) TestOffer(c *gc.C) {
+	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 	client := applicationoffers.NewClient(conn)
 
-	results, err := client.Offer(modelUUID, "test-app", []string{ep.Name}, "test-offer", "test offer description")
+	results, err := client.Offer(s.Model.UUID, "test-app", []string{s.endpoint.Name}, "test-offer", "test offer description")
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(results, gc.HasLen, 1)
 	c.Assert(results[0].Error, gc.Equals, (*jujuparams.Error)(nil))
 
-	results, err = client.Offer(modelUUID, "no-such-app", []string{ep.Name}, "test-offer", "test offer description")
+	results, err = client.Offer(s.Model.UUID, "no-such-app", []string{s.endpoint.Name}, "test-offer", "test offer description")
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(results, gc.HasLen, 1)
 	c.Assert(results[0].Error, gc.Not(gc.IsNil))
 	c.Assert(results[0].Error.Code, gc.Equals, "not found")
 
-	conn1 := s.open(c, nil, "alice")
+	conn1 := s.open(c, nil, "charlie")
 	defer conn1.Close()
 	client1 := applicationoffers.NewClient(conn1)
 
-	results, err = client1.Offer(modelUUID, "test-app", []string{ep.Name}, "test-offer-2", "test offer description")
+	results, err = client1.Offer(s.Model.UUID, "test-app", []string{s.endpoint.Name}, "test-offer-2", "test offer description")
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(results, gc.HasLen, 1)
 	c.Assert(results[0].Error.Code, gc.Equals, "unauthorized access")
 }
 
 func (s *applicationOffersSuite) TestGetConsumeDetails(c *gc.C) {
-	ctx := context.Background()
-
-	ctlPath := s.AssertAddController(ctx, c, params.EntityPath{User: "user1", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(ctx, c, "user1", "dummy", "cred1", "empty")
-	err := s.JEM.DB.SetACL(ctx, s.JEM.DB.Controllers(), ctlPath, params.ACL{
-		Read: []string{"user1"},
-	})
-
-	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "user1", cred: cred})
-	modelUUID := mi.UUID
-	err = s.JEM.DB.SetACL(ctx, s.JEM.DB.Models(), params.EntityPath{User: "user1", Name: "model-1"}, params.ACL{
-		Admin: []string{"user1"},
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	modelState, err := s.StatePool.Get(modelUUID)
-	c.Assert(err, gc.Equals, nil)
-	defer modelState.Release()
-
-	f := factory.NewFactory(modelState.State, s.StatePool)
-	app := f.MakeApplication(c, &factory.ApplicationParams{
-		Name: "test-app",
-		Charm: f.MakeCharm(c, &factory.CharmParams{
-			Name: "wordpress",
-		}),
-	})
-	f.MakeUnit(c, &factory.UnitParams{
-		Application: app,
-	})
-	ep, err := app.Endpoint("url")
-	c.Assert(err, gc.Equals, nil)
-
-	conn := s.open(c, nil, "user1")
+	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 	client := applicationoffers.NewClient(conn)
 
-	results, err := client.Offer(modelUUID, "test-app", []string{ep.Name}, "test-offer", "test offer description")
+	results, err := client.Offer(s.Model.UUID, "test-app", []string{s.endpoint.Name}, "test-offer", "test offer description")
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(results, gc.HasLen, 1)
 	c.Assert(results[0].Error, gc.Equals, (*jujuparams.Error)(nil))
 
 	ourl := &crossmodel.OfferURL{
-		User:            "user1@external",
+		User:            "bob@external",
 		ModelName:       "model-1",
 		ApplicationName: "test-offer",
 	}
@@ -148,7 +108,7 @@ func (s *applicationOffersSuite) TestGetConsumeDetails(c *gc.C) {
 	info := s.APIInfo(c)
 	c.Check(details, gc.DeepEquals, jujuparams.ConsumeOfferDetails{
 		Offer: &jujuparams.ApplicationOfferDetails{
-			SourceModelTag:         names.NewModelTag(modelUUID).String(),
+			SourceModelTag:         names.NewModelTag(s.Model.UUID).String(),
 			OfferURL:               ourl.Path(),
 			OfferName:              "test-offer",
 			ApplicationDescription: "test offer description",
@@ -158,17 +118,17 @@ func (s *applicationOffersSuite) TestGetConsumeDetails(c *gc.C) {
 				Interface: "http",
 			}},
 			Users: []jujuparams.OfferUserDetails{{
+				UserName: "bob@external",
+				Access:   "admin",
+			}, {
 				UserName: "everyone@external",
 				Access:   "read",
-			}, {
-				UserName: "user1@external",
-				Access:   "admin",
 			}},
 		},
 		ControllerInfo: &jujuparams.ExternalControllerInfo{
-			ControllerTag: names.NewControllerTag(s.ControllerConfig.ControllerUUID()).String(),
+			ControllerTag: names.NewControllerTag(s.Controller.UUID).String(),
 			Addrs:         info.Addrs,
-			Alias:         "controller-1",
+			Alias:         "dummy-1",
 			CACert:        caCert,
 		},
 	})
@@ -186,7 +146,7 @@ func (s *applicationOffersSuite) TestGetConsumeDetails(c *gc.C) {
 	details.Offer.OfferUUID = ""
 	c.Check(details, gc.DeepEquals, jujuparams.ConsumeOfferDetails{
 		Offer: &jujuparams.ApplicationOfferDetails{
-			SourceModelTag:         names.NewModelTag(modelUUID).String(),
+			SourceModelTag:         names.NewModelTag(s.Model.UUID).String(),
 			OfferURL:               ourl.Path(),
 			OfferName:              "test-offer",
 			ApplicationDescription: "test offer description",
@@ -196,64 +156,31 @@ func (s *applicationOffersSuite) TestGetConsumeDetails(c *gc.C) {
 				Interface: "http",
 			}},
 			Users: []jujuparams.OfferUserDetails{{
+				UserName: "bob@external",
+				Access:   "admin",
+			}, {
 				UserName: "everyone@external",
 				Access:   "read",
-			}, {
-				UserName: "user1@external",
-				Access:   "admin",
 			}},
 		},
 		ControllerInfo: &jujuparams.ExternalControllerInfo{
-			ControllerTag: names.NewControllerTag(s.ControllerConfig.ControllerUUID()).String(),
+			ControllerTag: names.NewControllerTag(s.Controller.UUID).String(),
 			Addrs:         info.Addrs,
-			Alias:         "controller-1",
+			Alias:         "dummy-1",
 			CACert:        caCert,
 		},
 	})
 }
 
 func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
-	ctx := context.Background()
-
-	ctlPath := s.AssertAddController(ctx, c, params.EntityPath{User: "user1", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(ctx, c, "user1", "dummy", "cred1", "empty")
-	err := s.JEM.DB.SetACL(ctx, s.JEM.DB.Controllers(), ctlPath, params.ACL{
-		Read: []string{"user1"},
-	})
-
-	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "user1", cred: cred})
-	modelUUID := mi.UUID
-	modelName := mi.Name
-	err = s.JEM.DB.SetACL(ctx, s.JEM.DB.Models(), params.EntityPath{User: "user1", Name: "model-1"}, params.ACL{
-		Admin: []string{"user1"},
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	modelState, err := s.StatePool.Get(modelUUID)
-	c.Assert(err, gc.Equals, nil)
-	defer modelState.Release()
-
-	f := factory.NewFactory(modelState.State, s.StatePool)
-	app := f.MakeApplication(c, &factory.ApplicationParams{
-		Name: "test-app",
-		Charm: f.MakeCharm(c, &factory.CharmParams{
-			Name: "wordpress",
-		}),
-	})
-	f.MakeUnit(c, &factory.UnitParams{
-		Application: app,
-	})
-	ep, err := app.Endpoint("url")
-	c.Assert(err, gc.Equals, nil)
-
-	conn := s.open(c, nil, "user1")
+	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 	client := applicationoffers.NewClient(conn)
 
 	results, err := client.Offer(
-		modelUUID,
+		s.Model.UUID,
 		"test-app",
-		[]string{ep.Name},
+		[]string{s.endpoint.Name},
 		"test-offer1",
 		"test offer 1 description",
 	)
@@ -262,9 +189,9 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 	c.Assert(results[0].Error, gc.Equals, (*jujuparams.Error)(nil))
 
 	results, err = client.Offer(
-		modelUUID,
+		s.Model.UUID,
 		"test-app",
-		[]string{ep.Name},
+		[]string{s.endpoint.Name},
 		"test-offer2",
 		"test offer 2 description",
 	)
@@ -279,44 +206,44 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 		OfferName:              "test-offer1",
 		ApplicationName:        "test-app",
 		ApplicationDescription: "test offer 1 description",
-		OfferURL:               "user1@external/model-1.test-offer1",
+		OfferURL:               "bob@external/model-1.test-offer1",
 		Endpoints: []charm.Relation{{
 			Name:      "url",
 			Role:      "provider",
 			Interface: "http",
 		}},
 		Users: []crossmodel.OfferUserDetails{{
+			UserName:    "bob@external",
+			DisplayName: "bob",
+			Access:      "admin",
+		}, {
 			UserName:    "everyone@external",
 			DisplayName: "everyone",
 			Access:      "read",
-		}, {
-			UserName:    "user1@external",
-			DisplayName: "user1",
-			Access:      "admin",
 		}},
 	}, {
 		OfferName:              "test-offer2",
 		ApplicationName:        "test-app",
 		ApplicationDescription: "test offer 2 description",
-		OfferURL:               "user1@external/model-1.test-offer2",
+		OfferURL:               "bob@external/model-1.test-offer2",
 		Endpoints: []charm.Relation{{
 			Name:      "url",
 			Role:      "provider",
 			Interface: "http",
 		}},
 		Users: []crossmodel.OfferUserDetails{{
+			UserName:    "bob@external",
+			DisplayName: "bob",
+			Access:      "admin",
+		}, {
 			UserName:    "everyone@external",
 			DisplayName: "everyone",
 			Access:      "read",
-		}, {
-			UserName:    "user1@external",
-			DisplayName: "user1",
-			Access:      "admin",
 		}},
 	}})
 
 	offers, err = client.ListOffers(crossmodel.ApplicationOfferFilter{
-		ModelName:       modelName,
+		ModelName:       string(s.Model.Path.Name),
 		ApplicationName: "test-app",
 		OfferName:       "test-offer1",
 	})
@@ -325,20 +252,20 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 		OfferName:              "test-offer1",
 		ApplicationName:        "test-app",
 		ApplicationDescription: "test offer 1 description",
-		OfferURL:               "user1@external/model-1.test-offer1",
+		OfferURL:               "bob@external/model-1.test-offer1",
 		Endpoints: []charm.Relation{{
 			Name:      "url",
 			Role:      "provider",
 			Interface: "http",
 		}},
 		Users: []crossmodel.OfferUserDetails{{
+			UserName:    "bob@external",
+			DisplayName: "bob",
+			Access:      "admin",
+		}, {
 			UserName:    "everyone@external",
 			DisplayName: "everyone",
 			Access:      "read",
-		}, {
-			UserName:    "user1@external",
-			DisplayName: "user1",
-			Access:      "admin",
 		}},
 	}})
 }
@@ -346,44 +273,14 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 func (s *applicationOffersSuite) TestModifyOfferAccess(c *gc.C) {
 	ctx := context.Background()
 
-	ctlPath := s.AssertAddController(ctx, c, params.EntityPath{User: "user1", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(ctx, c, "user1", "dummy", "cred1", "empty")
-	err := s.JEM.DB.SetACL(ctx, s.JEM.DB.Controllers(), ctlPath, params.ACL{
-		Read: []string{"user1"},
-	})
-
-	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "user1", cred: cred})
-	modelUUID := mi.UUID
-	err = s.JEM.DB.SetACL(ctx, s.JEM.DB.Models(), params.EntityPath{User: "user1", Name: "model-1"}, params.ACL{
-		Admin: []string{"user1"},
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	modelState, err := s.StatePool.Get(modelUUID)
-	c.Assert(err, gc.Equals, nil)
-	defer modelState.Release()
-
-	f := factory.NewFactory(modelState.State, s.StatePool)
-	app := f.MakeApplication(c, &factory.ApplicationParams{
-		Name: "test-app",
-		Charm: f.MakeCharm(c, &factory.CharmParams{
-			Name: "wordpress",
-		}),
-	})
-	f.MakeUnit(c, &factory.UnitParams{
-		Application: app,
-	})
-	ep, err := app.Endpoint("url")
-	c.Assert(err, gc.Equals, nil)
-
-	conn := s.open(c, nil, "user1")
+	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 	client := applicationoffers.NewClient(conn)
 
 	results, err := client.Offer(
-		modelUUID,
+		s.Model.UUID,
 		"test-app",
-		[]string{ep.Name},
+		[]string{s.endpoint.Name},
 		"test-offer1",
 		"test offer 1 description",
 	)
@@ -391,19 +288,18 @@ func (s *applicationOffersSuite) TestModifyOfferAccess(c *gc.C) {
 	c.Assert(results, gc.HasLen, 1)
 	c.Assert(results[0].Error, gc.IsNil)
 
-	offerURL := "user1@external/model-1.test-offer1"
+	offerURL := "bob@external/model-1.test-offer1"
 
 	err = client.RevokeOffer(identchecker.Everyone+"@external", "read", offerURL)
 	c.Assert(err, jc.ErrorIsNil)
 
-	err = client.GrantOffer("test-user", "unknown", offerURL)
-	err = client.GrantOffer("test-user@external", "unknown", offerURL)
+	err = client.GrantOffer("test.user@external", "unknown", offerURL)
 	c.Assert(err, gc.ErrorMatches, `"unknown" offer access not valid`)
 
-	err = client.GrantOffer("test-user@external", "read", "no-such-offer")
-	c.Assert(err, gc.ErrorMatches, `not found`)
+	err = client.GrantOffer("test.user@external", "read", "no-such-offer")
+	c.Assert(err, gc.ErrorMatches, `applicationoffer not found`)
 
-	err = client.GrantOffer("test-user@external", "admin", offerURL)
+	err = client.GrantOffer("test.user@external", "admin", offerURL)
 	c.Assert(err, jc.ErrorIsNil)
 
 	offer := mongodoc.ApplicationOffer{
@@ -411,67 +307,32 @@ func (s *applicationOffersSuite) TestModifyOfferAccess(c *gc.C) {
 	}
 	err = s.JEM.DB.GetApplicationOffer(ctx, &offer)
 	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(offer.Users["test.user"], gc.Equals, mongodoc.ApplicationOfferAdminAccess)
 
-	accessLevel, err := s.JEM.DB.GetApplicationOfferAccess(ctx, params.User("test-user"), offer.OfferUUID)
-	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(accessLevel, gc.Equals, mongodoc.ApplicationOfferAdminAccess)
-
-	err = client.RevokeOffer("test-user@external", "consume", offerURL)
+	err = client.RevokeOffer("test.user@external", "consume", offerURL)
 	c.Assert(err, jc.ErrorIsNil)
 
-	accessLevel, err = s.JEM.DB.GetApplicationOfferAccess(ctx, params.User("test-user"), offer.OfferUUID)
+	err = s.JEM.DB.GetApplicationOffer(ctx, &offer)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(accessLevel, gc.Equals, mongodoc.ApplicationOfferReadAccess)
+	c.Assert(offer.Users["test.user"], gc.Equals, mongodoc.ApplicationOfferReadAccess)
 
 	conn3 := s.open(c, nil, "user3")
 	defer conn3.Close()
 	client3 := applicationoffers.NewClient(conn3)
 
-	err = client3.RevokeOffer("test-user@external", "read", offerURL)
+	err = client3.RevokeOffer("test.user@external", "read", offerURL)
 	c.Assert(err, gc.ErrorMatches, "not found")
 }
 
 func (s *applicationOffersSuite) TestDestroyOffers(c *gc.C) {
-	ctx := context.Background()
-
-	ctlPath := s.AssertAddController(ctx, c, params.EntityPath{User: "user1", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(ctx, c, "user1", "dummy", "cred1", "empty")
-	err := s.JEM.DB.SetACL(ctx, s.JEM.DB.Controllers(), ctlPath, params.ACL{
-		Read: []string{"user1"},
-	})
-
-	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "user1", cred: cred})
-	modelUUID := mi.UUID
-	err = s.JEM.DB.SetACL(ctx, s.JEM.DB.Models(), params.EntityPath{User: "user1", Name: "model-1"}, params.ACL{
-		Admin: []string{"user1"},
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	modelState, err := s.StatePool.Get(modelUUID)
-	c.Assert(err, gc.Equals, nil)
-	defer modelState.Release()
-
-	f := factory.NewFactory(modelState.State, s.StatePool)
-	app := f.MakeApplication(c, &factory.ApplicationParams{
-		Name: "test-app",
-		Charm: f.MakeCharm(c, &factory.CharmParams{
-			Name: "wordpress",
-		}),
-	})
-	f.MakeUnit(c, &factory.UnitParams{
-		Application: app,
-	})
-	ep, err := app.Endpoint("url")
-	c.Assert(err, gc.Equals, nil)
-
-	conn := s.open(c, nil, "user1")
+	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 	client := applicationoffers.NewClient(conn)
 
 	results, err := client.Offer(
-		modelUUID,
+		s.Model.UUID,
 		"test-app",
-		[]string{ep.Name},
+		[]string{s.endpoint.Name},
 		"test-offer1",
 		"test offer 1 description",
 	)
@@ -479,30 +340,30 @@ func (s *applicationOffersSuite) TestDestroyOffers(c *gc.C) {
 	c.Assert(results, gc.HasLen, 1)
 	c.Assert(results[0].Error, gc.Equals, (*jujuparams.Error)(nil))
 
-	offerURL := "user1@external/model-1.test-offer1"
+	offerURL := "bob@external/model-1.test-offer1"
 
-	// user2 will have read access
-	err = client.GrantOffer("user2@external", "read", offerURL)
+	// charlie will have read access
+	err = client.GrantOffer("charlie@external", "read", offerURL)
 	c.Assert(err, jc.ErrorIsNil)
 
 	// try to destroy offer that does not exist
-	err = client.DestroyOffers(true, "user1@external/model-1.test-offer2")
-	c.Assert(err, gc.ErrorMatches, "not found")
+	err = client.DestroyOffers(true, "bob@external/model-1.test-offer2")
+	c.Assert(err, gc.ErrorMatches, "applicationoffer not found")
 
-	conn2 := s.open(c, nil, "user2")
+	conn2 := s.open(c, nil, "charlie")
 	defer conn2.Close()
 	client2 := applicationoffers.NewClient(conn2)
 
-	// user2 is not authorized to destroy the offer
+	// charlie is not authorized to destroy the offer
 	err = client2.DestroyOffers(true, offerURL)
 	c.Assert(err, gc.ErrorMatches, "unauthorized")
 
-	// user1 can destroy the offer
+	// bob can destroy the offer
 	err = client.DestroyOffers(true, offerURL)
 	c.Assert(err, jc.ErrorIsNil)
 
 	offers, err := client.ListOffers(crossmodel.ApplicationOfferFilter{
-		ModelName: mi.Name,
+		ModelName: string(s.Model.Path.Name),
 		OfferName: "test-offer1",
 	})
 	c.Assert(err, jc.ErrorIsNil)
@@ -510,47 +371,14 @@ func (s *applicationOffersSuite) TestDestroyOffers(c *gc.C) {
 }
 
 func (s *applicationOffersSuite) TestFindApplicationOffers(c *gc.C) {
-	ctx := context.Background()
-
-	ctlPath := s.AssertAddController(ctx, c, params.EntityPath{User: "user1", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(ctx, c, "user1", "dummy", "cred1", "empty")
-	err := s.JEM.DB.SetACL(ctx, s.JEM.DB.Controllers(), ctlPath, params.ACL{
-		Read: []string{"user1"},
-	})
-
-	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "user1", cred: cred})
-	modelUUID := mi.UUID
-	modelName := mi.Name
-	err = s.JEM.DB.SetACL(ctx, s.JEM.DB.Models(), params.EntityPath{User: "user1", Name: "model-1"}, params.ACL{
-		Admin: []string{"user1"},
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	modelState, err := s.StatePool.Get(modelUUID)
-	c.Assert(err, gc.Equals, nil)
-	defer modelState.Release()
-
-	f := factory.NewFactory(modelState.State, s.StatePool)
-	app := f.MakeApplication(c, &factory.ApplicationParams{
-		Name: "test-app",
-		Charm: f.MakeCharm(c, &factory.CharmParams{
-			Name: "wordpress",
-		}),
-	})
-	f.MakeUnit(c, &factory.UnitParams{
-		Application: app,
-	})
-	ep, err := app.Endpoint("url")
-	c.Assert(err, gc.Equals, nil)
-
-	conn := s.open(c, nil, "user1")
+	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 	client := applicationoffers.NewClient(conn)
 
 	results, err := client.Offer(
-		modelUUID,
+		s.Model.UUID,
 		"test-app",
-		[]string{ep.Name},
+		[]string{s.endpoint.Name},
 		"test-offer1",
 		"test offer 1 description",
 	)
@@ -559,9 +387,9 @@ func (s *applicationOffersSuite) TestFindApplicationOffers(c *gc.C) {
 	c.Assert(results[0].Error, gc.Equals, (*jujuparams.Error)(nil))
 
 	results, err = client.Offer(
-		modelUUID,
+		s.Model.UUID,
 		"test-app",
-		[]string{ep.Name},
+		[]string{s.endpoint.Name},
 		"test-offer2",
 		"test offer 2 description",
 	)
@@ -574,7 +402,7 @@ func (s *applicationOffersSuite) TestFindApplicationOffers(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, "at least one filter must be specified")
 
 	offers, err = client.FindApplicationOffers(crossmodel.ApplicationOfferFilter{
-		ModelName:       modelName,
+		ModelName:       string(s.Model.Path.Name),
 		ApplicationName: "test-app",
 		OfferName:       "test-offer1",
 	})
@@ -583,31 +411,31 @@ func (s *applicationOffersSuite) TestFindApplicationOffers(c *gc.C) {
 		OfferName:              "test-offer1",
 		ApplicationName:        "test-app",
 		ApplicationDescription: "test offer 1 description",
-		OfferURL:               "user1@external/model-1.test-offer1",
+		OfferURL:               "bob@external/model-1.test-offer1",
 		Endpoints: []charm.Relation{{
 			Name:      "url",
 			Role:      "provider",
 			Interface: "http",
 		}},
 		Users: []crossmodel.OfferUserDetails{{
+			UserName:    "bob@external",
+			DisplayName: "bob",
+			Access:      "admin",
+		}, {
 			UserName:    "everyone@external",
 			DisplayName: "everyone",
 			Access:      "read",
-		}, {
-			UserName:    "user1@external",
-			DisplayName: "user1",
-			Access:      "admin",
 		}},
 	}})
 
-	// by default each offer is publicly readable -> user2 should be
+	// by default each offer is publicly readable -> charlie should be
 	// able to find it
-	conn2 := s.open(c, nil, "user2")
+	conn2 := s.open(c, nil, "charlie")
 	defer conn2.Close()
 	client2 := applicationoffers.NewClient(conn2)
 
 	offers, err = client2.FindApplicationOffers(crossmodel.ApplicationOfferFilter{
-		ModelName:       modelName,
+		ModelName:       string(s.Model.Path.Name),
 		ApplicationName: "test-app",
 		OfferName:       "test-offer1",
 	})
@@ -616,7 +444,7 @@ func (s *applicationOffersSuite) TestFindApplicationOffers(c *gc.C) {
 		OfferName:              "test-offer1",
 		ApplicationName:        "test-app",
 		ApplicationDescription: "test offer 1 description",
-		OfferURL:               "user1@external/model-1.test-offer1",
+		OfferURL:               "bob@external/model-1.test-offer1",
 		Endpoints: []charm.Relation{{
 			Name:      "url",
 			Role:      "provider",
@@ -631,46 +459,14 @@ func (s *applicationOffersSuite) TestFindApplicationOffers(c *gc.C) {
 }
 
 func (s *applicationOffersSuite) TestApplicationOffers(c *gc.C) {
-	ctx := context.Background()
-
-	ctlPath := s.AssertAddController(ctx, c, params.EntityPath{User: "user1", Name: "controller-1"}, true)
-	cred := s.AssertUpdateCredential(ctx, c, "user1", "dummy", "cred1", "empty")
-	err := s.JEM.DB.SetACL(ctx, s.JEM.DB.Controllers(), ctlPath, params.ACL{
-		Read: []string{"user1"},
-	})
-
-	mi := s.assertCreateModel(c, createModelParams{name: "model-1", username: "user1", cred: cred})
-	modelUUID := mi.UUID
-	err = s.JEM.DB.SetACL(ctx, s.JEM.DB.Models(), params.EntityPath{User: "user1", Name: "model-1"}, params.ACL{
-		Admin: []string{"user1"},
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	modelState, err := s.StatePool.Get(modelUUID)
-	c.Assert(err, gc.Equals, nil)
-	defer modelState.Release()
-
-	f := factory.NewFactory(modelState.State, s.StatePool)
-	app := f.MakeApplication(c, &factory.ApplicationParams{
-		Name: "test-app",
-		Charm: f.MakeCharm(c, &factory.CharmParams{
-			Name: "wordpress",
-		}),
-	})
-	f.MakeUnit(c, &factory.UnitParams{
-		Application: app,
-	})
-	ep, err := app.Endpoint("url")
-	c.Assert(err, gc.Equals, nil)
-
-	conn := s.open(c, nil, "user1")
+	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 	client := applicationoffers.NewClient(conn)
 
 	results, err := client.Offer(
-		modelUUID,
+		s.Model.UUID,
 		"test-app",
-		[]string{ep.Name},
+		[]string{s.endpoint.Name},
 		"test-offer1",
 		"test offer 1 description",
 	)
@@ -678,34 +474,34 @@ func (s *applicationOffersSuite) TestApplicationOffers(c *gc.C) {
 	c.Assert(results, gc.HasLen, 1)
 	c.Assert(results[0].Error, gc.Equals, (*jujuparams.Error)(nil))
 
-	url := "user1@external/model-1.test-offer1"
+	url := "bob@external/model-1.test-offer1"
 	offer, err := client.ApplicationOffer(url)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(offer, jc.DeepEquals, &crossmodel.ApplicationOfferDetails{
 		OfferName:              "test-offer1",
 		ApplicationName:        "test-app",
 		ApplicationDescription: "test offer 1 description",
-		OfferURL:               "user1@external/model-1.test-offer1",
+		OfferURL:               "bob@external/model-1.test-offer1",
 		Endpoints: []charm.Relation{{
 			Name:      "url",
 			Role:      "provider",
 			Interface: "http",
 		}},
 		Users: []crossmodel.OfferUserDetails{{
+			UserName:    "bob@external",
+			DisplayName: "bob",
+			Access:      "admin",
+		}, {
 			UserName:    "everyone@external",
 			DisplayName: "everyone",
 			Access:      "read",
-		}, {
-			UserName:    "user1@external",
-			DisplayName: "user1",
-			Access:      "admin",
 		}},
 	})
 
-	_, err = client.ApplicationOffer("user2@external/model-1.test-offer2")
-	c.Assert(err, gc.ErrorMatches, "not found")
+	_, err = client.ApplicationOffer("charlie@external/model-1.test-offer2")
+	c.Assert(err, gc.ErrorMatches, "applicationoffer not found")
 
-	conn2 := s.open(c, nil, "user2")
+	conn2 := s.open(c, nil, "charlie")
 	defer conn2.Close()
 	client2 := applicationoffers.NewClient(conn2)
 
@@ -715,7 +511,7 @@ func (s *applicationOffersSuite) TestApplicationOffers(c *gc.C) {
 		OfferName:              "test-offer1",
 		ApplicationName:        "test-app",
 		ApplicationDescription: "test offer 1 description",
-		OfferURL:               "user1@external/model-1.test-offer1",
+		OfferURL:               "bob@external/model-1.test-offer1",
 		Endpoints: []charm.Relation{{
 			Name:      "url",
 			Role:      "provider",

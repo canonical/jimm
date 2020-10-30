@@ -12,7 +12,6 @@ import (
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
-	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
@@ -192,49 +191,21 @@ func (r *controllerRoot) DestroyModels(ctx context.Context, args jujuparams.Enti
 // authenticated user has access to. The request parameter is ignored.
 func (r *controllerRoot) ListModelSummaries(ctx context.Context, _ jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error) {
 	var results []jujuparams.ModelSummaryResult
-	err := r.doModels(ctx, func(ctx context.Context, model *mongodoc.Model) error {
-		if model.ProviderType == "" {
-			var err error
-			model.ProviderType, err = r.jem.DB.ProviderType(ctx, model.Cloud)
-			if err != nil {
-				results = append(results, jujuparams.ModelSummaryResult{
-					Error: mapError(errgo.Notef(err, "cannot get cloud %q", model.Cloud)),
-				})
-				return nil
-			}
-		}
-		// If we get this far the user must have at least read access.
-		access := jujuparams.ModelReadAccess
-		switch {
-		case params.User(r.identity.Id()) == model.Path.User:
-			access = jujuparams.ModelAdminAccess
-		case auth.CheckACL(ctx, r.identity, model.ACL.Admin) == nil:
-			access = jujuparams.ModelAdminAccess
-		case auth.CheckACL(ctx, r.identity, model.ACL.Write) == nil:
-			access = jujuparams.ModelWriteAccess
-		}
-		machines, err := r.jem.DB.MachinesForModel(ctx, model.UUID)
+	err := r.jem.ForEachModel(ctx, r.identity, jujuparams.ModelReadAccess, func(model *mongodoc.Model) error {
+		access, err := r.modelAccess(ctx, model)
 		if err != nil {
-			results = append(results, jujuparams.ModelSummaryResult{
-				Error: mapError(errgo.Notef(err, "cannot get machines for model %q", model.UUID)),
-			})
-			return nil
+			return errgo.Mask(err)
 		}
-		machineCount := int64(len(machines))
-		var coreCount int64
-		for _, machine := range machines {
-			if machine.Info != nil &&
-				machine.Info.HardwareCharacteristics != nil &&
-				machine.Info.HardwareCharacteristics.CpuCores != nil {
-				coreCount += int64(*machine.Info.HardwareCharacteristics.CpuCores)
-			}
+		controllerUUID := model.ControllerUUID
+		if r.controllerUUIDMasking {
+			controllerUUID = r.params.ControllerUUID
 		}
 		result := jujuparams.ModelSummaryResult{
 			Result: &jujuparams.ModelSummary{
 				Name:               string(model.Path.Name),
 				Type:               model.Type,
 				UUID:               model.UUID,
-				ControllerUUID:     r.params.ControllerUUID,
+				ControllerUUID:     controllerUUID,
 				ProviderType:       model.ProviderType,
 				DefaultSeries:      model.DefaultSeries,
 				CloudTag:           conv.ToCloudTag(model.Cloud).String(),
@@ -249,10 +220,13 @@ func (r *controllerRoot) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 				UserLastConnection: nil,
 				Counts: []jujuparams.ModelEntityCount{{
 					Entity: jujuparams.Machines,
-					Count:  machineCount,
+					Count:  int64(model.Counts[params.MachineCount].Current),
 				}, {
 					Entity: jujuparams.Cores,
-					Count:  coreCount,
+					Count:  int64(model.Counts[params.CoreCount].Current),
+				}, {
+					Entity: jujuparams.Units,
+					Count:  int64(model.Counts[params.UnitCount].Current),
 				}},
 				// TODO currently we don't store any migration information about models.
 				Migration: nil,
@@ -261,14 +235,6 @@ func (r *controllerRoot) ListModelSummaries(ctx context.Context, _ jujuparams.Mo
 				AgentVersion: modelVersion(ctx, model.Info),
 			},
 		}
-		if !r.controllerUUIDMasking {
-			c, err := r.jem.DB.Controller(ctx, model.Controller)
-			if err != nil {
-				return errgo.Notef(err, "failed to fetch controller: %v", model.Controller)
-			}
-			result.Result.ControllerUUID = c.UUID
-		}
-
 		results = append(results, result)
 		return nil
 	})
@@ -418,49 +384,32 @@ func (r *controllerRoot) ModifyModelAccess(ctx context.Context, args jujuparams.
 	defer cancel()
 	results := make([]jujuparams.ErrorResult, len(args.Changes))
 	for i, change := range args.Changes {
-		err := r.modifyModelAccess(ctx, change)
+		mt, err := names.ParseModelTag(change.ModelTag)
 		if err != nil {
-			results[i].Error = mapError(err)
+			results[i].Error = mapError(errgo.WithCausef(err, params.ErrBadRequest, ""))
+			continue
 		}
+		user, err := conv.ParseUserTag(change.UserTag)
+		if err != nil {
+			results[i].Error = mapError(errgo.WithCausef(err, params.ErrBadRequest, ""))
+			continue
+		}
+		switch change.Action {
+		case jujuparams.GrantModelAccess:
+			err = r.jem.GrantModel(ctx, r.identity, &mongodoc.Model{UUID: mt.Id()}, user, change.Access)
+		case jujuparams.RevokeModelAccess:
+			err = r.jem.RevokeModel(ctx, r.identity, &mongodoc.Model{UUID: mt.Id()}, user, change.Access)
+		default:
+			err = errgo.WithCausef(err, params.ErrBadRequest, "invalid action %q", change.Action)
+		}
+		if errgo.Cause(err) == params.ErrNotFound {
+			err = params.ErrUnauthorized
+		}
+		results[i].Error = mapError(err)
 	}
 	return jujuparams.ErrorResults{
 		Results: results,
 	}, nil
-}
-
-func (r *controllerRoot) modifyModelAccess(ctx context.Context, change jujuparams.ModifyModelAccess) error {
-	mt, err := names.ParseModelTag(change.ModelTag)
-	if err != nil {
-		return errgo.WithCausef(err, params.ErrBadRequest, "")
-	}
-	model := mongodoc.Model{UUID: mt.Id()}
-	if err := r.jem.GetModel(ctx, r.identity, jujuparams.ModelAdminAccess, &model); err != nil {
-		if errgo.Cause(err) == params.ErrNotFound {
-			err = errgo.WithCausef(nil, params.ErrUnauthorized, "")
-		}
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	user, err := conv.ParseUserTag(change.UserTag)
-	if err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(conv.ErrLocalUser))
-	}
-	conn, err := r.jem.OpenAPI(ctx, model.Controller)
-	if err != nil {
-		return errgo.Mask(err)
-	}
-	defer conn.Close()
-	switch change.Action {
-	case jujuparams.GrantModelAccess:
-		err = r.jem.GrantModel(ctx, conn, &model, user, string(change.Access))
-	case jujuparams.RevokeModelAccess:
-		err = r.jem.RevokeModel(ctx, conn, &model, user, string(change.Access))
-	default:
-		return errgo.WithCausef(err, params.ErrBadRequest, "invalid action %q", change.Action)
-	}
-	if err != nil {
-		return errgo.Mask(err, apiconn.IsAPIError)
-	}
-	return nil
 }
 
 // DumpModelsV3 implements the ModelManager (version 3 onwards) facade's

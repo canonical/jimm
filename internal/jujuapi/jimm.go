@@ -6,12 +6,12 @@ import (
 	"context"
 
 	"gopkg.in/errgo.v1"
-	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
+	jujuparams "github.com/juju/juju/apiserver/params"
 )
 
 func init() {
@@ -39,21 +39,17 @@ type jimmV2 struct {
 // by the currently authenticated user.
 func (r *controllerRoot) UserModelStats(ctx context.Context) (params.UserModelStatsResponse, error) {
 	models := make(map[string]params.ModelStats)
-
-	user := r.identity.Id()
-	it := r.jem.DB.NewCanReadIter(r.identity,
-		r.jem.DB.Models().
-			Find(bson.D{{"creator", user}}).
-			Select(bson.D{{"uuid", 1}, {"path", 1}, {"creator", 1}, {"counts", 1}}).
-			Iter())
-	var model mongodoc.Model
-	for it.Next(ctx, &model) {
-		models[model.UUID] = params.ModelStats{
-			Model:  userModelForModelDoc(&model),
-			Counts: model.Counts,
+	err := r.jem.ForEachModel(ctx, r.identity, jujuparams.ModelReadAccess, func(m *mongodoc.Model) error {
+		if m.Creator != r.identity.Id() {
+			return nil
 		}
-	}
-	if err := it.Err(ctx); err != nil {
+		models[m.UUID] = params.ModelStats{
+			Model:  userModelForModelDoc(m),
+			Counts: m.Counts,
+		}
+		return nil
+	})
+	if err != nil {
 		return params.UserModelStatsResponse{}, errgo.Mask(err)
 	}
 	return params.UserModelStatsResponse{
@@ -99,10 +95,7 @@ func (r *controllerRoot) ListControllers(ctx context.Context) (params.ListContro
 	}
 
 	var controllers []params.ControllerResponse
-	iter := r.jem.DB.NewCanReadIter(r.identity, r.jem.DB.Controllers().Find(nil).Sort("_id").Iter())
-	defer iter.Close(ctx)
-	var ctl mongodoc.Controller
-	for iter.Next(ctx, &ctl) {
+	err = r.jem.ForEachController(ctx, r.identity, func(ctl *mongodoc.Controller) error {
 		controllers = append(controllers, params.ControllerResponse{
 			Path:             ctl.Path,
 			Public:           ctl.Public,
@@ -111,9 +104,10 @@ func (r *controllerRoot) ListControllers(ctx context.Context) (params.ListContro
 			UUID:             ctl.UUID,
 			Version:          ctl.Version.String(),
 		})
-	}
-	if err := iter.Err(ctx); err != nil {
-		return params.ListControllerResponse{}, errgo.Notef(err, "cannot get controllers")
+		return nil
+	})
+	if err != nil {
+		return params.ListControllerResponse{}, errgo.Mask(err)
 	}
 	return params.ListControllerResponse{
 		Controllers: controllers,

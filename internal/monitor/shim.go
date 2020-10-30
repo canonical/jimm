@@ -4,7 +4,6 @@ package monitor
 
 import (
 	"context"
-	"time"
 
 	apicontroller "github.com/juju/juju/api/controller"
 	jujuparams "github.com/juju/juju/apiserver/params"
@@ -44,73 +43,14 @@ func (j jemShim) AllControllers(ctx context.Context) ([]*mongodoc.Controller, er
 	return ctls, nil
 }
 
-func (j jemShim) ModelUUIDsForController(ctx context.Context, ctlPath params.EntityPath) ([]string, error) {
-	uuids, err := j.DB.ModelUUIDsForController(ctx, ctlPath)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	return uuids, nil
-}
-
-func (j jemShim) SetControllerStats(ctx context.Context, ctlPath params.EntityPath, stats *mongodoc.ControllerStats) error {
-	return errgo.Mask(j.DB.SetControllerStats(ctx, ctlPath, stats), errgo.Any)
-}
-
-func (j jemShim) SetControllerUnavailableAt(ctx context.Context, ctlPath params.EntityPath, t time.Time) error {
-	return errgo.Mask(j.DB.SetControllerUnavailableAt(ctx, ctlPath, t), errgo.Any)
-}
-
-func (j jemShim) SetControllerAvailable(ctx context.Context, ctlPath params.EntityPath) error {
-	return errgo.Mask(j.DB.SetControllerAvailable(ctx, ctlPath), errgo.Any)
-}
-
-func (j jemShim) SetModelInfo(ctx context.Context, ctlPath params.EntityPath, uuid string, info *mongodoc.ModelInfo) error {
-	return errgo.Mask(j.DB.SetModelInfo(ctx, ctlPath, uuid, info), errgo.Any)
-}
-
 func (j jemShim) DeleteModelWithUUID(ctx context.Context, ctlPath params.EntityPath, uuid string) error {
-	return errgo.Mask(j.DB.DeleteModelWithUUID(ctx, ctlPath, uuid), errgo.Any)
-}
-
-func (j jemShim) UpdateModelCounts(ctx context.Context, ctlPath params.EntityPath, uuid string, counts map[params.EntityCount]int, now time.Time) (err error) {
-	return errgo.Mask(j.DB.UpdateModelCounts(ctx, ctlPath, uuid, counts, now), errgo.Any)
-}
-
-func (j jemShim) RemoveControllerMachines(ctx context.Context, ctlPath params.EntityPath) error {
-	return errgo.Mask(j.DB.RemoveControllerMachines(ctx, ctlPath), errgo.Any)
-}
-
-func (j jemShim) RemoveControllerApplications(ctx context.Context, ctlPath params.EntityPath) error {
-	return errgo.Mask(j.DB.RemoveControllerApplications(ctx, ctlPath), errgo.Any)
-}
-
-func (j jemShim) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, info *jujuparams.MachineInfo) error {
-	return errgo.Mask(j.JEM.UpdateMachineInfo(ctx, ctlPath, info), errgo.Any)
-}
-
-func (j jemShim) UpdateApplicationInfo(ctx context.Context, ctlPath params.EntityPath, info *jujuparams.ApplicationInfo) error {
-	return errgo.Mask(j.JEM.UpdateApplicationInfo(ctx, ctlPath, info), errgo.Any)
-}
-
-func (j jemShim) AcquireMonitorLease(ctx context.Context, ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error) {
-	t, err := j.DB.AcquireMonitorLease(ctx, ctlPath, oldExpiry, oldOwner, newExpiry, newOwner)
-	if err != nil {
-		return time.Time{}, errgo.Mask(err, errgo.Any)
-	}
-	return t, nil
+	return errgo.Mask(j.DB.RemoveModel(ctx, &mongodoc.Model{Controller: ctlPath, UUID: uuid}), errgo.Any)
 }
 
 func (j jemShim) Controller(ctx context.Context, ctlPath params.EntityPath) (*mongodoc.Controller, error) {
-	ctl, err := j.DB.Controller(ctx, ctlPath)
+	ctl := &mongodoc.Controller{Path: ctlPath}
+	err := j.DB.GetController(ctx, ctl)
 	return ctl, errgo.Mask(err, errgo.Any)
-}
-
-func (j jemShim) WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityPath) (func() error, error) {
-	return j.JEM.WatchAllModelSummaries(ctx, ctlPath)
-}
-
-func (j jemShim) UpdateApplicationOffer(ctx context.Context, offerUUID string, removed bool) error {
-	return j.JEM.UpdateApplicationOffer(ctx, offerUUID, removed)
 }
 
 type apiShim struct {
