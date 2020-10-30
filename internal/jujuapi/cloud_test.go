@@ -17,6 +17,7 @@ import (
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
 
+	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
 )
@@ -169,7 +170,7 @@ func (s *cloudSuite) TestUserCredentials(c *gc.C) {
 func (s *cloudSuite) TestUserCredentialsWithDomain(c *gc.C) {
 	ctx := context.Background()
 
-	_, err := s.JEM.UpdateCredential(ctx, &mongodoc.Credential{
+	_, err := s.JEM.UpdateCredential(ctx, jemtest.NewIdentity("test@domain"), &mongodoc.Credential{
 		Path: mongodoc.CredentialPath{
 			Cloud: "dummy",
 			EntityPath: mongodoc.EntityPath{

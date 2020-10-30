@@ -126,7 +126,7 @@ func (s *cloudSuite) TestRevokeCredential(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(models, gc.HasLen, 0)
 
-	err = s.conn.RevokeCredential(context.Background(), cred.Path.ToParams())
+	err = s.conn.RevokeCredential(context.Background(), cred.Path)
 	c.Assert(err, gc.Equals, nil)
 }
 

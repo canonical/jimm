@@ -66,7 +66,7 @@ func (s *jemVaultSuite) TestVaultCredentials(c *gc.C) {
 			"password": "test-pass",
 		},
 	}
-	_, err := s.JEM.UpdateCredential(ctx, cred1, 0)
+	_, err := s.JEM.UpdateCredential(ctx, jemtest.Bob, cred1, 0)
 	c.Assert(err, gc.Equals, nil)
 
 	secret, err := s.Params.VaultClient.Logical().Read("test/creds/dummy/bob/test-1")

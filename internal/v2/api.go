@@ -325,7 +325,7 @@ func (h *Handler) NewModel(p httprequest.Params, args *params.NewModel) (*params
 	err = h.jem.CreateModel(p.Context, h.id, jem.CreateModelParams{
 		Path:           modelPath,
 		ControllerPath: ctlPath,
-		Credential:     args.Info.Credential,
+		Credential:     mongodoc.CredentialPathFromParams(args.Info.Credential),
 		Cloud:          lp.cloud,
 		Region:         lp.region,
 		Attributes:     args.Info.Config,
@@ -419,11 +419,7 @@ func (h *Handler) GetModelPerm(p httprequest.Params, arg *params.GetModelPerm) (
 // user, cloud and name. If there is already a credential with that name
 // it is overwritten.
 func (h *Handler) UpdateCredential(p httprequest.Params, arg *params.UpdateCredential) error {
-	// Only the owner can set credentials.
-	if err := auth.CheckIsUser(p.Context, h.id, arg.User); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	_, err := h.jem.UpdateCredential(p.Context, &mongodoc.Credential{
+	_, err := h.jem.UpdateCredential(p.Context, h.id, &mongodoc.Credential{
 		Path:       mongodoc.CredentialPathFromParams(arg.CredentialPath),
 		Type:       arg.Credential.AuthType,
 		Attributes: arg.Credential.Attributes,
