@@ -47,22 +47,6 @@ func (j jemShim) DeleteModelWithUUID(ctx context.Context, ctlPath params.EntityP
 	return errgo.Mask(j.DB.RemoveModel(ctx, &mongodoc.Model{Controller: ctlPath, UUID: uuid}), errgo.Any)
 }
 
-func (j jemShim) RemoveControllerMachines(ctx context.Context, ctlPath params.EntityPath) error {
-	return errgo.Mask(j.DB.RemoveControllerMachines(ctx, ctlPath), errgo.Any)
-}
-
-func (j jemShim) RemoveControllerApplications(ctx context.Context, ctlPath params.EntityPath) error {
-	return errgo.Mask(j.DB.RemoveControllerApplications(ctx, ctlPath), errgo.Any)
-}
-
-func (j jemShim) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, info *jujuparams.MachineInfo) error {
-	return errgo.Mask(j.JEM.UpdateMachineInfo(ctx, ctlPath, info), errgo.Any)
-}
-
-func (j jemShim) UpdateApplicationInfo(ctx context.Context, ctlPath params.EntityPath, info *jujuparams.ApplicationInfo) error {
-	return errgo.Mask(j.JEM.UpdateApplicationInfo(ctx, ctlPath, info), errgo.Any)
-}
-
 func (j jemShim) Controller(ctx context.Context, ctlPath params.EntityPath) (*mongodoc.Controller, error) {
 	ctl := &mongodoc.Controller{Path: ctlPath}
 	err := j.DB.GetController(ctx, ctl)

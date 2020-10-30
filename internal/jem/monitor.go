@@ -4,13 +4,16 @@ package jem
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
+	"github.com/juju/juju/core/life"
 	"github.com/juju/version"
 )
 
@@ -201,4 +204,111 @@ func (j *JEM) SetControllerStats(ctx context.Context, ctlPath params.EntityPath,
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	return nil
+}
+
+// UpdateMachineInfo updates the information associated with a machine.
+func (j *JEM) UpdateMachineInfo(ctx context.Context, ctlPath params.EntityPath, info *jujuparams.MachineInfo) error {
+	cloud, region, err := j.modelRegion(ctx, ctlPath, info.ModelUUID)
+	if errgo.Cause(err) == params.ErrNotFound {
+		// If the model isn't found then it is not controlled by
+		// JIMM and we aren't interested in it.
+		return nil
+	}
+	if err != nil {
+		return errgo.Notef(err, "cannot find region for model %s:%s", ctlPath, info.ModelUUID)
+	}
+	machine := mongodoc.Machine{
+		Controller: ctlPath.String(),
+		Cloud:      cloud,
+		Region:     region,
+		Info:       info,
+	}
+	if info.Life == life.Dead {
+		err := j.DB.RemoveMachine(ctx, &machine)
+		if errgo.Cause(err) == params.ErrNotFound {
+			return nil
+		}
+		return errgo.Mask(err)
+	}
+	return errgo.Mask(j.DB.UpsertMachine(ctx, &machine))
+}
+
+// RemoveControllerMachines removes all the machines attached to the
+// given controller.
+func (j *JEM) RemoveControllerMachines(ctx context.Context, ctlPath params.EntityPath) error {
+	_, err := j.DB.RemoveMachines(ctx, jimmdb.Eq("controller", ctlPath.String()))
+	return errgo.Mask(err)
+}
+
+// UpdateApplicationInfo updates the information associated with an application.
+func (j *JEM) UpdateApplicationInfo(ctx context.Context, ctlPath params.EntityPath, info *jujuparams.ApplicationInfo) error {
+	cloud, region, err := j.modelRegion(ctx, ctlPath, info.ModelUUID)
+	if errgo.Cause(err) == params.ErrNotFound {
+		// If the model isn't found then it is not controlled by
+		// JIMM and we aren't interested in it.
+		return nil
+	}
+	if err != nil {
+		return errgo.Notef(err, "cannot find region for model %s:%s", ctlPath, info.ModelUUID)
+	}
+	app := mongodoc.Application{
+		Controller: ctlPath.String(),
+		Cloud:      cloud,
+		Region:     region,
+	}
+	if info != nil {
+		app.Info = &mongodoc.ApplicationInfo{
+			ModelUUID:       info.ModelUUID,
+			Name:            info.Name,
+			Exposed:         info.Exposed,
+			CharmURL:        info.CharmURL,
+			OwnerTag:        info.OwnerTag,
+			Life:            info.Life,
+			Subordinate:     info.Subordinate,
+			Status:          info.Status,
+			WorkloadVersion: info.WorkloadVersion,
+		}
+	}
+	if info.Life == life.Dead {
+		err := j.DB.RemoveApplication(ctx, &app)
+		if errgo.Cause(err) == params.ErrNotFound {
+			return nil
+		}
+		return errgo.Mask(err)
+	}
+	return errgo.Mask(j.DB.UpsertApplication(ctx, &app))
+}
+
+// RemoveControllerApplications removes all the applications attached to
+// the given controller.
+func (j *JEM) RemoveControllerApplications(ctx context.Context, ctlPath params.EntityPath) error {
+	_, err := j.DB.RemoveApplications(ctx, jimmdb.Eq("controller", ctlPath.String()))
+	return errgo.Mask(err)
+}
+
+// modelRegion determines the cloud and region in which a model is contained.
+func (j *JEM) modelRegion(ctx context.Context, ctlPath params.EntityPath, uuid string) (params.Cloud, string, error) {
+	type cloudRegion struct {
+		cloud  params.Cloud
+		region string
+	}
+	key := fmt.Sprintf("%s %s", ctlPath, uuid)
+	r, err := j.pool.regionCache.Get(key, func() (interface{}, error) {
+		m := mongodoc.Model{
+			UUID:       uuid,
+			Controller: ctlPath,
+		}
+		if err := j.DB.GetModel(ctx, &m); err != nil {
+			return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		}
+		return cloudRegion{
+			cloud:  m.Cloud,
+			region: m.CloudRegion,
+		}, nil
+	})
+	if err != nil {
+		return "", "", errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	cr := r.(cloudRegion)
+	return cr.cloud, cr.region, nil
 }

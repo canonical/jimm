@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	jujuparams "github.com/juju/juju/apiserver/params"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/version"
 	gc "gopkg.in/check.v1"
@@ -14,6 +15,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
@@ -498,6 +500,223 @@ func (s *monitorSuite) TestSetControllerStats(c *gc.C) {
 	err = s.JEM.DB.GetController(testContext, &ctl)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(ctl.Stats, jc.DeepEquals, *stats)
+}
+
+type monitorUpdateSuite struct {
+	jemtest.BootstrapSuite
+}
+
+var _ = gc.Suite(&monitorUpdateSuite{})
+
+func (s *monitorUpdateSuite) TestUpdateMachineInfo(c *gc.C) {
+	err := s.JEM.UpdateMachineInfo(testContext, s.Controller.Path, &jujuparams.MachineInfo{
+		ModelUUID: s.Model.UUID,
+		Id:        "0",
+		Series:    "quantal",
+	})
+	c.Assert(err, gc.Equals, nil)
+	err = s.JEM.UpdateMachineInfo(testContext, s.Controller.Path, &jujuparams.MachineInfo{
+		ModelUUID: s.Model.UUID,
+		Id:        "1",
+		Series:    "precise",
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	var docs []mongodoc.Machine
+	err = s.JEM.DB.ForEachMachine(testContext, jimmdb.Eq("info.modeluuid", s.Model.UUID), []string{"_id"}, func(m *mongodoc.Machine) error {
+		cleanMachineDoc(m)
+		docs = append(docs, *m)
+		return nil
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(docs, jc.DeepEquals, []mongodoc.Machine{{
+		Id:         s.Controller.Path.String() + " " + s.Model.UUID + " 0",
+		Controller: s.Controller.Path.String(),
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &jujuparams.MachineInfo{
+			ModelUUID: s.Model.UUID,
+			Id:        "0",
+			Series:    "quantal",
+			Config:    map[string]interface{}{},
+		},
+	}, {
+		Id:         s.Controller.Path.String() + " " + s.Model.UUID + " 1",
+		Controller: s.Controller.Path.String(),
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &jujuparams.MachineInfo{
+			ModelUUID: s.Model.UUID,
+			Id:        "1",
+			Series:    "precise",
+			Config:    map[string]interface{}{},
+		},
+	}})
+
+	// Check that we can update one of the documents.
+	err = s.JEM.UpdateMachineInfo(testContext, s.Controller.Path, &jujuparams.MachineInfo{
+		ModelUUID: s.Model.UUID,
+		Id:        "0",
+		Series:    "quantal",
+		Life:      "dying",
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	// Check that setting a machine dead removes it.
+	err = s.JEM.UpdateMachineInfo(testContext, s.Controller.Path, &jujuparams.MachineInfo{
+		ModelUUID: s.Model.UUID,
+		Id:        "1",
+		Series:    "precise",
+		Life:      "dead",
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	docs = docs[:0]
+	err = s.JEM.DB.ForEachMachine(testContext, jimmdb.Eq("info.modeluuid", s.Model.UUID), []string{"_id"}, func(m *mongodoc.Machine) error {
+		cleanMachineDoc(m)
+		docs = append(docs, *m)
+		return nil
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(docs, jc.DeepEquals, []mongodoc.Machine{{
+		Id:         s.Controller.Path.String() + " " + s.Model.UUID + " 0",
+		Controller: s.Controller.Path.String(),
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &jujuparams.MachineInfo{
+			ModelUUID: s.Model.UUID,
+			Id:        "0",
+			Series:    "quantal",
+			Config:    map[string]interface{}{},
+			Life:      "dying",
+		},
+	}})
+}
+
+func (s *monitorUpdateSuite) TestUpdateMachineUnknownModel(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "controller"}
+
+	err := s.JEM.UpdateMachineInfo(testContext, ctlPath, &jujuparams.MachineInfo{
+		ModelUUID: "no-such-uuid",
+		Id:        "1",
+		Series:    "precise",
+	})
+	c.Assert(err, gc.Equals, nil)
+}
+
+func (s *monitorUpdateSuite) TestUpdateMachineIncorrectController(c *gc.C) {
+	ctlPath := params.EntityPath{"bob", "controller2"}
+
+	err := s.JEM.UpdateMachineInfo(testContext, ctlPath, &jujuparams.MachineInfo{
+		ModelUUID: s.Model.UUID,
+		Id:        "1",
+		Series:    "precise",
+	})
+	c.Assert(err, gc.Equals, nil)
+}
+
+func (s *monitorUpdateSuite) TestUpdateApplicationInfo(c *gc.C) {
+	err := s.JEM.UpdateApplicationInfo(testContext, s.Controller.Path, &jujuparams.ApplicationInfo{
+		ModelUUID: s.Model.UUID,
+		Name:      "0",
+	})
+	c.Assert(err, gc.Equals, nil)
+	err = s.JEM.UpdateApplicationInfo(testContext, s.Controller.Path, &jujuparams.ApplicationInfo{
+		ModelUUID: s.Model.UUID,
+		Name:      "1",
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	var docs []mongodoc.Application
+	err = s.JEM.DB.ForEachApplication(testContext, jimmdb.Eq("info.modeluuid", s.Model.UUID), []string{"_id"}, func(app *mongodoc.Application) error {
+		cleanApplicationDoc(app)
+		docs = append(docs, *app)
+		return nil
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(docs, jc.DeepEquals, []mongodoc.Application{{
+		Id:         s.Controller.Path.String() + " " + s.Model.UUID + " 0",
+		Controller: s.Controller.Path.String(),
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &mongodoc.ApplicationInfo{
+			ModelUUID: s.Model.UUID,
+			Name:      "0",
+		},
+	}, {
+		Id:         s.Controller.Path.String() + " " + s.Model.UUID + " 1",
+		Controller: s.Controller.Path.String(),
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &mongodoc.ApplicationInfo{
+			ModelUUID: s.Model.UUID,
+			Name:      "1",
+		},
+	}})
+
+	// Check that we can update one of the documents.
+	err = s.JEM.UpdateApplicationInfo(testContext, s.Controller.Path, &jujuparams.ApplicationInfo{
+		ModelUUID: s.Model.UUID,
+		Name:      "0",
+		Life:      "dying",
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	// Check that setting an application dead removes it.
+	err = s.JEM.UpdateApplicationInfo(testContext, s.Controller.Path, &jujuparams.ApplicationInfo{
+		ModelUUID: s.Model.UUID,
+		Name:      "1",
+		Life:      "dead",
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	docs = docs[:0]
+	err = s.JEM.DB.ForEachApplication(testContext, jimmdb.Eq("info.modeluuid", s.Model.UUID), []string{"_id"}, func(app *mongodoc.Application) error {
+		cleanApplicationDoc(app)
+		docs = append(docs, *app)
+		return nil
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(docs, jc.DeepEquals, []mongodoc.Application{{
+		Id:         s.Controller.Path.String() + " " + s.Model.UUID + " 0",
+		Controller: s.Controller.Path.String(),
+		Cloud:      "dummy",
+		Region:     "dummy-region",
+		Info: &mongodoc.ApplicationInfo{
+			ModelUUID: s.Model.UUID,
+			Name:      "0",
+			Life:      "dying",
+		},
+	}})
+}
+
+func (s *monitorUpdateSuite) TestUpdateApplicationUnknownModel(c *gc.C) {
+	err := s.JEM.UpdateApplicationInfo(testContext, s.Controller.Path, &jujuparams.ApplicationInfo{
+		ModelUUID: s.Model.UUID,
+		Name:      "1",
+	})
+	c.Assert(err, gc.Equals, nil)
+}
+
+// cleanMachineDoc cleans up the machine document so
+// that we can use a DeepEqual comparison without worrying
+// about non-nil vs nil map comparisons.
+func cleanMachineDoc(doc *mongodoc.Machine) {
+	if len(doc.Info.AgentStatus.Data) == 0 {
+		doc.Info.AgentStatus.Data = nil
+	}
+	if len(doc.Info.InstanceStatus.Data) == 0 {
+		doc.Info.InstanceStatus.Data = nil
+	}
+}
+
+// cleanApplicationDoc cleans up the application document so
+// that we can use a DeepEqual comparison without worrying
+// about non-nil vs nil map comparisons.
+func cleanApplicationDoc(doc *mongodoc.Application) {
+	if len(doc.Info.Status.Data) == 0 {
+		doc.Info.Status.Data = nil
+	}
 }
 
 func parseTime(s string) time.Time {

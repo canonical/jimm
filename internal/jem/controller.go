@@ -34,6 +34,31 @@ func (j *JEM) GetController(ctx context.Context, id identchecker.ACLIdentity, ct
 	return nil
 }
 
+// ForEachController iterates through all controllers that the given user
+// has access to and calls the given function with each one. If the given
+// function returns an error iteration will immediately stop and the error
+// will be returned with the cause unamasked.
+func (j *JEM) ForEachController(ctx context.Context, id identchecker.ACLIdentity, f func(ctl *mongodoc.Controller) error) error {
+	var ferr error
+	err := j.DB.ForEachController(ctx, nil, []string{"path.user", "path.name"}, func(ctl *mongodoc.Controller) error {
+		if err := auth.CheckCanRead(ctx, id, ctl); err != nil {
+			if errgo.Cause(err) == params.ErrUnauthorized {
+				err = nil
+			}
+			return errgo.Mask(err)
+		}
+		if err := f(ctl); err != nil {
+			ferr = err
+			return errStop
+		}
+		return nil
+	})
+	if errgo.Cause(err) == errStop {
+		return errgo.Mask(ferr, errgo.Any)
+	}
+	return errgo.Mask(err)
+}
+
 // AddController adds the given controller to the system.
 func (j *JEM) AddController(ctx context.Context, id identchecker.ACLIdentity, ctl *mongodoc.Controller) error {
 	// Users can only create controllers in their namespace.

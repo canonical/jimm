@@ -24,6 +24,7 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
@@ -337,7 +338,7 @@ func (s *internalSuite) TestModelRemovedWithFailedWatcher(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.JEM.DB.UpdateApplicationInfo(testContext, &mongodoc.Application{
+	err = s.JEM.DB.UpsertApplication(testContext, &mongodoc.Application{
 		Controller: s.Controller.Path.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
@@ -348,7 +349,7 @@ func (s *internalSuite) TestModelRemovedWithFailedWatcher(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.JEM.DB.UpdateMachineInfo(testContext, &mongodoc.Machine{
+	err = s.JEM.DB.UpsertMachine(testContext, &mongodoc.Machine{
 		Controller: s.Controller.Path.String(),
 		Cloud:      "dummy",
 		Region:     "dummy-region",
@@ -373,9 +374,17 @@ func (s *internalSuite) TestModelRemovedWithFailedWatcher(c *gc.C) {
 
 	jshim.await(c, func() interface{} {
 		stats := s.modelStats(c, modelPath)
-		apps, err := s.JEM.DB.ApplicationsForModel(testContext, modelUUID)
+		var apps []mongodoc.Application
+		err := s.JEM.DB.ForEachApplication(testContext, jimmdb.Eq("info.modeluuid", modelUUID), []string{"_id"}, func(app *mongodoc.Application) error {
+			apps = append(apps, *app)
+			return nil
+		})
 		c.Check(err, gc.Equals, nil)
-		machines, err := s.JEM.DB.MachinesForModel(testContext, modelUUID)
+		var machines []mongodoc.Machine
+		err = s.JEM.DB.ForEachMachine(testContext, jimmdb.Eq("info.modeluuid", modelUUID), []string{"_id"}, func(m *mongodoc.Machine) error {
+			machines = append(machines, *m)
+			return nil
+		})
 		c.Check(err, gc.Equals, nil)
 		return modelData{
 			models:   stats,
@@ -433,16 +442,16 @@ func (s *internalSuite) TestWatcherUpdatesMachineInfo(c *gc.C) {
 	}
 
 	getMachineInfo := func() interface{} {
-		ms, err := s.JEM.DB.MachinesForModel(testContext, modelState.ModelUUID())
-		c.Assert(err, gc.Equals, nil)
-		infos := make([]machineInfo, len(ms))
-		for i, m := range ms {
-			infos[i] = machineInfo{
+		var infos []machineInfo
+		err := s.JEM.DB.ForEachMachine(testContext, jimmdb.Eq("info.modeluuid", modelState.ModelUUID()), []string{"_id"}, func(m *mongodoc.Machine) error {
+			infos = append(infos, machineInfo{
 				modelUUID: m.Info.ModelUUID,
 				id:        m.Info.Id,
 				life:      m.Info.Life,
-			}
-		}
+			})
+			return nil
+		})
+		c.Assert(err, gc.Equals, nil)
 		return infos
 	}
 	jshim.await(c, getMachineInfo, []machineInfo{{
@@ -490,16 +499,16 @@ func (s *internalSuite) TestWatcherUpdatesApplicationInfo(c *gc.C) {
 	}
 
 	getApplicationInfo := func() interface{} {
-		ms, err := s.JEM.DB.ApplicationsForModel(testContext, modelState.ModelUUID())
+		var infos []appInfo
+		err := s.JEM.DB.ForEachApplication(testContext, jimmdb.Eq("info.modeluuid", modelState.ModelUUID()), []string{"_id"}, func(app *mongodoc.Application) error {
+			infos = append(infos, appInfo{
+				modelUUID: app.Info.ModelUUID,
+				name:      app.Info.Name,
+				life:      app.Info.Life,
+			})
+			return nil
+		})
 		c.Assert(err, gc.Equals, nil)
-		infos := make([]appInfo, len(ms))
-		for i, m := range ms {
-			infos[i] = appInfo{
-				modelUUID: m.Info.ModelUUID,
-				name:      m.Info.Name,
-				life:      m.Info.Life,
-			}
-		}
 		return infos
 	}
 	jshim.await(c, getApplicationInfo, []appInfo{{
