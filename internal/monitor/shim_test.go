@@ -16,7 +16,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
+	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
 )
@@ -150,8 +150,8 @@ func (s jemShimWithUpdateNotify) AcquireMonitorLease(ctx context.Context, ctlPat
 	return t, err
 }
 
-func (s jemShimWithUpdateNotify) UpdateApplicationOffer(ctx context.Context, offerUUID string, removed bool) error {
-	err := s.jemInterface.UpdateApplicationOffer(ctx, offerUUID, removed)
+func (s jemShimWithUpdateNotify) UpdateApplicationOffer(ctx context.Context, ctlPath params.EntityPath, offerUUID string, removed bool) error {
+	err := s.jemInterface.UpdateApplicationOffer(ctx, ctlPath, offerUUID, removed)
 	if err != nil {
 		return err
 	}
@@ -336,7 +336,7 @@ func (s *jemShimInMemory) UpdateModelCounts(ctx context.Context, ctlPath params.
 	}
 	for name, n := range counts {
 		count := model.Counts[name]
-		jimmdb.UpdateCount(&count, n, now)
+		jem.UpdateCount(&count, n, now)
 		model.Counts[name] = count
 	}
 	return nil
@@ -429,7 +429,7 @@ func (s *jemShimInMemory) AcquireMonitorLease(ctx context.Context, ctlPath param
 		return time.Time{}, errgo.WithCausef(nil, params.ErrNotFound, "")
 	}
 	if ctl.MonitorLeaseOwner != oldOwner || !ctl.MonitorLeaseExpiry.UTC().Equal(oldExpiry.UTC()) {
-		return time.Time{}, errgo.WithCausef(nil, jimmdb.ErrLeaseUnavailable, "")
+		return time.Time{}, errgo.WithCausef(nil, jem.ErrLeaseUnavailable, "")
 	}
 	ctl.MonitorLeaseOwner = newOwner
 	if newOwner == "" {
@@ -444,7 +444,7 @@ func (j jemShimInMemory) WatchAllModelSummaries(ctx context.Context, ctlPath par
 	return func() error { return nil }, nil
 }
 
-func (j jemShimInMemory) UpdateApplicationOffer(ctx context.Context, offerUUID string, removed bool) error {
+func (j jemShimInMemory) UpdateApplicationOffer(ctx context.Context, ctlPath params.EntityPath, offerUUID string, removed bool) error {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 
@@ -602,8 +602,8 @@ type updateOfferShim struct {
 	notify func()
 }
 
-func (s updateOfferShim) UpdateApplicationOffer(ctx context.Context, offerUUID string, removed bool) error {
-	err := s.jemInterface.UpdateApplicationOffer(ctx, offerUUID, removed)
+func (s updateOfferShim) UpdateApplicationOffer(ctx context.Context, ctlPath params.EntityPath, offerUUID string, removed bool) error {
+	err := s.jemInterface.UpdateApplicationOffer(ctx, ctlPath, offerUUID, removed)
 	if err != nil {
 		return err
 	}

@@ -127,8 +127,8 @@ func (h *handler) ModelCommands(p httprequest.Params, arg *modelCommandsRequest)
 	if err := h.jem.DB.GetModel(ctx, &m); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	controller, err := h.jem.DB.Controller(ctx, m.Controller)
-	if err != nil {
+	controller := mongodoc.Controller{Path: m.Controller}
+	if err := h.jem.DB.GetController(ctx, &controller); err != nil {
 		return errgo.Mask(err)
 	}
 	addrs := mongodoc.Addresses(controller.HostPorts)

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
@@ -13,6 +14,7 @@ import (
 	"github.com/juju/juju/core/network"
 	"github.com/juju/version"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/params"
 )
@@ -212,6 +214,9 @@ type Model struct {
 	// Controller holds the path of the model's
 	// controller.
 	Controller params.EntityPath
+
+	// ControllerUUID holds the UUID of the model's controller.
+	ControllerUUID string `bson:",omitempty"`
 
 	// EntityPath holds the local user and name given to the
 	// model, denormalized from Id for convenience
@@ -447,7 +452,7 @@ type Credential struct {
 	Label string
 
 	// Attributes holds the credential attributes.
-	Attributes map[string]string
+	Attributes map[string]string `bson:",omitempty"`
 
 	// Controllers holds the controllers to which this credential has
 	// been uploaded.
@@ -539,17 +544,17 @@ type ApplicationOffer struct {
 	// OfferURL is the URL of the offer. The OfferURL is normalised such
 	// that it includes the owner ID, but it does not include the
 	// controller name.
-	OfferURL               string             `bson:"offer-url"`
-	OfferName              string             `bson:"offer-name"`
-	OwnerName              string             `bson:"owner-name"`
-	ApplicationName        string             `bson:"application-name"`
-	ApplicationDescription string             `bson:"application-description"`
-	CharmURL               string             `bson:"charm-url"`
-	Endpoints              []RemoteEndpoint   `bson:"endpoints"`
-	Spaces                 []RemoteSpace      `bson:"spaces"`
-	Bindings               map[string]string  `bson:"bindings"`
-	Users                  []OfferUserDetails `bson:"users"`
-	Connections            []OfferConnection  `bson:"connections"`
+	OfferURL               string                    `bson:"offer-url"`
+	OfferName              string                    `bson:"offer-name"`
+	OwnerName              string                    `bson:"owner-name"`
+	ApplicationName        string                    `bson:"application-name"`
+	ApplicationDescription string                    `bson:"application-description"`
+	CharmURL               string                    `bson:"charm-url"`
+	Endpoints              []RemoteEndpoint          `bson:"endpoints"`
+	Spaces                 []RemoteSpace             `bson:"spaces"`
+	Bindings               map[string]string         `bson:"bindings"`
+	Users                  ApplicationOfferAccessMap `bson:"users,omitempty"`
+	Connections            []OfferConnection         `bson:"connections"`
 }
 
 // OfferConnection holds details about a connection to an offer.
@@ -567,12 +572,6 @@ type RemoteSpace struct {
 	Name               string                 `bson:"name"`
 	ProviderId         string                 `bson:"provider-id"`
 	ProviderAttributes map[string]interface{} `bson:"provider-attributes"`
-}
-
-// OfferUserDetails represents an offer consumer and their permission on the offer.
-type OfferUserDetails struct {
-	User   params.User                      `bson:"user"`
-	Access ApplicationOfferAccessPermission `bson:"access"`
 }
 
 // RemoteEndpoint represents a remote application endpoint.
@@ -613,3 +612,77 @@ type CloudRegionDefaults struct {
 	Region   string                 `bson:"region"`
 	Defaults map[string]interface{} `bson:"defaults"`
 }
+
+// An ApplicationOfferAccessMap is a map from user to AccessPermission.
+type ApplicationOfferAccessMap map[User]ApplicationOfferAccessPermission
+
+// GetBSON implements bson.Getter.
+func (m ApplicationOfferAccessMap) GetBSON() (interface{}, error) {
+	if m == nil {
+		return nil, nil
+	}
+	b := make(map[string]ApplicationOfferAccessPermission, len(m))
+	for k, v := range m {
+		b[tildeEscape.Replace(string(k))] = v
+	}
+	return b, nil
+}
+
+// SetBSON implements bson.Setter.
+func (m *ApplicationOfferAccessMap) SetBSON(raw bson.Raw) error {
+	b := make(map[string]ApplicationOfferAccessPermission)
+	if err := raw.Unmarshal(&b); err != nil {
+		return err
+	}
+	if len(b) == 0 {
+		return nil
+	}
+	if *m == nil {
+		*m = make(ApplicationOfferAccessMap, len(b))
+	}
+	for k, v := range b {
+		(*m)[User(tildeUnescape.Replace(k))] = v
+	}
+	return nil
+}
+
+// A User represents a user in the database. A User automatically escapes
+// any chararacters in the username that are not valid field names making
+// a user suitable for use in map keys.
+type User string
+
+// GetBSON implements bson.Getter.
+func (u User) GetBSON() (interface{}, error) {
+	return tildeEscape.Replace(string(u)), nil
+}
+
+// SetBSON implements bson.Setter.
+func (u *User) SetBSON(r bson.Raw) error {
+	var s string
+	if err := r.Unmarshal(&s); err != nil {
+		return err
+	}
+	*u = User(tildeUnescape.Replace(s))
+	return nil
+}
+
+// FieldName returns the field name for this user. Any givne prefix strings
+// are the fields names of the embedded documents that are hold the field.
+func (u User) FieldName(prefix ...string) string {
+	prefix = append(prefix, tildeEscape.Replace(string(u)))
+	return strings.Join(prefix, ".")
+}
+
+// tildeEscape escapes strings with the following translation:
+//
+//     ~ -> ~0
+//     $ -> ~1
+//     . -> ~2
+var tildeEscape = strings.NewReplacer("~", "~0", "$", "~1", ".", "~2")
+
+// tildeUnescape unescapes strings with the following translation:
+//
+//     ~0 -> ~
+//     ~1 -> $
+//     ~2 -> .
+var tildeUnescape = strings.NewReplacer("~0", "~", "~1", "$", "~2", ".")

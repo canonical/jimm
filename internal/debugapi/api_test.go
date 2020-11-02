@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"net/http/httptest"
 
 	"github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
@@ -13,23 +12,52 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/httprequest.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/apitest"
 	"github.com/CanonicalLtd/jimm/internal/debugapi"
+	"github.com/CanonicalLtd/jimm/internal/jemtest"
+	"github.com/CanonicalLtd/jimm/internal/jemtest/apitest"
 	"github.com/CanonicalLtd/jimm/params"
 	"github.com/CanonicalLtd/jimm/version"
 )
 
 type APISuite struct {
-	apitest.Suite
+	jemtest.JEMSuite
+	apitest.APISuite
+
+	metricsRegistrationClient *stubMetricsRegistrationClient
 }
 
 var _ = gc.Suite(&APISuite{})
+
+func (s *APISuite) SetUpSuite(c *gc.C) {
+	s.JEMSuite.SetUpSuite(c)
+	s.APISuite.SetUpSuite(c)
+}
+
+func (s *APISuite) TearDownSuite(c *gc.C) {
+	s.APISuite.TearDownSuite(c)
+	s.JEMSuite.TearDownSuite(c)
+}
+
+func (s *APISuite) SetUpTest(c *gc.C) {
+	s.metricsRegistrationClient = &stubMetricsRegistrationClient{}
+	s.JEMSuite.Params.UsageSenderAuthorizationClient = s.metricsRegistrationClient
+	s.JEMSuite.SetUpTest(c)
+	s.APISuite.Params.SessionPool = s.SessionPool
+	s.APISuite.Params.JEMPool = s.Pool
+	s.APISuite.NewAPIHandler = debugapi.NewAPIHandler
+	s.APISuite.SetUpTest(c)
+}
+
+func (s *APISuite) TearDownTest(c *gc.C) {
+	s.APISuite.TearDownTest(c)
+	s.JEMSuite.TearDownTest(c)
+}
 
 func (s *APISuite) TestDebugInfo(c *gc.C) {
 	// The version endpoint is open to anyone, so use the
 	// default HTTP client.
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler:    s.JEMSrv,
+		Handler:    s.APIHandler,
 		URL:        "/debug/info",
 		ExpectBody: debugstatus.Version(version.VersionInfo),
 	})
@@ -37,29 +65,29 @@ func (s *APISuite) TestDebugInfo(c *gc.C) {
 
 func (s *APISuite) TestPprofDeniedWithBadAuth(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler:      s.JEMSrv,
+		Handler:      s.APIHandler,
 		URL:          "/debug/pprof/",
 		ExpectStatus: http.StatusProxyAuthRequired,
 		ExpectBody:   apitest.AnyBody,
 	})
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler:      s.JEMSrv,
+		Handler:      s.APIHandler,
 		URL:          "/debug/pprof/",
 		ExpectStatus: http.StatusUnauthorized,
 		ExpectBody: params.Error{
 			Message: "unauthorized",
 			Code:    params.ErrUnauthorized,
 		},
-		Do: apitest.Do(s.IDMSrv.Client("someone")),
+		Do: apitest.Do(s.Candid.Client("someone")),
 	})
 }
 
 func (s *APISuite) TestPprofOKWithAdmin(c *gc.C) {
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
-		Handler: s.JEMSrv,
+		Handler: s.APIHandler,
 		URL:     "/debug/pprof/",
-		Do:      apitest.Do(s.IDMSrv.Client("controller-admin")),
+		Do:      apitest.Do(s.Candid.Client(jemtest.ControllerAdmin)),
 	})
 	c.Assert(resp.Code, gc.Equals, http.StatusOK)
 	c.Assert(resp.HeaderMap.Get("Content-Type"), gc.Matches, "text/html.*")
@@ -67,13 +95,13 @@ func (s *APISuite) TestPprofOKWithAdmin(c *gc.C) {
 
 func (s *APISuite) TestDebugUsageSenderCheck(c *gc.C) {
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
-		Handler: s.JEMSrv,
+		Handler: s.APIHandler,
 		URL:     "/debug/usage/test-user",
-		Do:      apitest.Do(s.IDMSrv.Client("controller-admin")),
+		Do:      apitest.Do(s.Candid.Client(jemtest.ControllerAdmin)),
 	})
 	c.Assert(resp.Code, gc.Equals, http.StatusOK)
 
-	s.Suite.MetricsRegistrationClient.CheckCalls(c, []testing.StubCall{{
+	s.metricsRegistrationClient.CheckCalls(c, []testing.StubCall{{
 		FuncName: "AuthorizeReseller",
 		Args: []interface{}{
 			"test-user",
@@ -82,11 +110,11 @@ func (s *APISuite) TestDebugUsageSenderCheck(c *gc.C) {
 }
 
 func (s *APISuite) TestDebugUsageSenderCheckError(c *gc.C) {
-	s.MetricsRegistrationClient.SetErrors(errors.New("an embarassing error"))
+	s.metricsRegistrationClient.SetErrors(errors.New("an embarassing error"))
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
-		Handler: s.JEMSrv,
+		Handler: s.APIHandler,
 		URL:     "/debug/usage/test-user",
-		Do:      apitest.Do(s.IDMSrv.Client("controller-admin")),
+		Do:      apitest.Do(s.Candid.Client(jemtest.ControllerAdmin)),
 	})
 	c.Assert(resp.Code, gc.Equals, http.StatusInternalServerError)
 
@@ -98,7 +126,7 @@ func (s *APISuite) TestDebugUsageSenderCheckError(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(errorMessage.Message, gc.Equals, "check failed: an embarassing error")
 
-	s.Suite.MetricsRegistrationClient.CheckCalls(c, []testing.StubCall{{
+	s.metricsRegistrationClient.CheckCalls(c, []testing.StubCall{{
 		FuncName: "AuthorizeReseller",
 		Args: []interface{}{
 			"test-user",
@@ -107,10 +135,8 @@ func (s *APISuite) TestDebugUsageSenderCheckError(c *gc.C) {
 }
 
 func (s *APISuite) TestDBStats(c *gc.C) {
-	srv := httptest.NewServer(s.JEMSrv)
-	defer srv.Close()
 	client := &httprequest.Client{
-		BaseURL: srv.URL,
+		BaseURL: s.HTTP.URL,
 	}
 	var resp debugapi.DebugDBStatsResponse
 	err := client.Call(context.Background(), &debugapi.DebugDBStatsRequest{}, &resp)
@@ -120,4 +146,13 @@ func (s *APISuite) TestDBStats(c *gc.C) {
 	for _, coll := range resp.Collections {
 		c.Assert(coll["ok"], gc.Equals, float64(1))
 	}
+}
+
+type stubMetricsRegistrationClient struct {
+	testing.Stub
+}
+
+func (c *stubMetricsRegistrationClient) GetCredentials(_ context.Context, applicationUser string) ([]byte, error) {
+	c.MethodCall(c, "AuthorizeReseller", applicationUser)
+	return []byte("secret credentials"), c.NextErr()
 }

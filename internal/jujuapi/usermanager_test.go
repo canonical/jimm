@@ -6,7 +6,6 @@ import (
 	"github.com/juju/juju/api/usermanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	jc "github.com/juju/testing/checkers"
-	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 )
 
@@ -15,13 +14,6 @@ type usermanagerSuite struct {
 }
 
 var _ = gc.Suite(&usermanagerSuite{})
-
-func (s *usermanagerSuite) SetUpTest(c *gc.C) {
-	s.ServerParams.CharmstoreLocation = "https://api.jujucharms.com/charmstore"
-	s.ServerParams.MeteringLocation = "https://api.jujucharms.com/omnibus"
-	s.websocketSuite.SetUpTest(c)
-	s.PatchValue(&utils.OutgoingAccessAllowed, true)
-}
 
 func (s *usermanagerSuite) TestAddUser(c *gc.C) {
 	conn := s.open(c, nil, "alice")

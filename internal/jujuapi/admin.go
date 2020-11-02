@@ -130,8 +130,8 @@ func (r *modelRoot) modelInfo(ctx context.Context) (*mongodoc.Model, *mongodoc.C
 		if err != nil {
 			return nil, nil, errgo.Mask(err)
 		}
-		r.controller, err = r.jem.DB.Controller(ctx, r.model.Controller)
-		if err != nil {
+		r.controller = &mongodoc.Controller{Path: r.model.Controller}
+		if err = r.jem.DB.GetController(ctx, r.controller); err != nil {
 			return nil, nil, errgo.Mask(err)
 		}
 	}

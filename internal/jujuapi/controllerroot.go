@@ -89,25 +89,6 @@ func (r *controllerRoot) modelWithConnection(ctx context.Context, modelTag strin
 	return errgo.Mask(f(ctx, conn, &model), errgo.Any)
 }
 
-// doModels calls the given function for each model that the
-// authenticated user has access to. If f returns an error, the iteration
-// will be stopped and the returned error will have the same cause.
-func (r *controllerRoot) doModels(ctx context.Context, f func(context.Context, *mongodoc.Model) error) error {
-	it := r.jem.DB.NewCanReadIter(r.identity, r.jem.DB.Models().Find(nil).Sort("_id").Iter())
-	defer it.Close(ctx)
-
-	for {
-		var model mongodoc.Model
-		if !it.Next(ctx, &model) {
-			break
-		}
-		if err := f(ctx, &model); err != nil {
-			return errgo.Mask(err, errgo.Any)
-		}
-	}
-	return errgo.Mask(it.Err(ctx))
-}
-
 // FindMethod implements rpcreflect.MethodFinder.
 func (r *controllerRoot) FindMethod(rootName string, version int, methodName string) (rpcreflect.MethodCaller, error) {
 	// update the heart monitor for every request received.
@@ -161,4 +142,35 @@ func modelVersion(ctx context.Context, info *mongodoc.ModelInfo) *version.Number
 		return nil
 	}
 	return &v
+}
+
+// modelAccess determines the level of access the currently authenticated
+// user has to the given model.
+func (r *controllerRoot) modelAccess(ctx context.Context, m *mongodoc.Model) (jujuparams.UserAccessPermission, error) {
+	err := auth.CheckIsUser(ctx, r.identity, m.Path.User)
+	if err == nil {
+		return jujuparams.ModelAdminAccess, nil
+	}
+	if errgo.Cause(err) != params.ErrUnauthorized {
+		return "", errgo.Mask(err)
+	}
+	err = auth.CheckACL(ctx, r.identity, m.ACL.Admin)
+	if err == nil {
+		return jujuparams.ModelAdminAccess, nil
+	}
+	if errgo.Cause(err) != params.ErrUnauthorized {
+		return "", errgo.Mask(err)
+	}
+	err = auth.CheckACL(ctx, r.identity, m.ACL.Write)
+	if err == nil {
+		return jujuparams.ModelWriteAccess, nil
+	}
+	if errgo.Cause(err) != params.ErrUnauthorized {
+		return "", errgo.Mask(err)
+	}
+	err = auth.CheckACL(ctx, r.identity, m.ACL.Read)
+	if err == nil {
+		return jujuparams.ModelReadAccess, nil
+	}
+	return "", errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 }

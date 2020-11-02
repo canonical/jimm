@@ -152,7 +152,7 @@ func (r *controllerRoot) AllModels(ctx context.Context) (jujuparams.UserModelLis
 // allModels returns all the models the logged in user has access to.
 func (r *controllerRoot) allModels(ctx context.Context) (jujuparams.UserModelList, error) {
 	var models []jujuparams.UserModel
-	err := r.doModels(ctx, func(ctx context.Context, model *mongodoc.Model) error {
+	err := r.jem.ForEachModel(ctx, r.identity, jujuparams.ModelReadAccess, func(model *mongodoc.Model) error {
 		models = append(models, jujuparams.UserModel{
 			Model:          userModelForModelDoc(model),
 			LastConnection: nil, // TODO (mhilton) work out how to record and set this.
