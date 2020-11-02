@@ -17,7 +17,7 @@ require (
 	github.com/juju/errors v0.0.0-20200330140219-3fe23663418f
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
 	github.com/juju/httprequest v1.0.1
-	github.com/juju/juju v0.0.0-20201020045753-90199a14310b
+	github.com/juju/juju v0.0.0-20201102064548-d344015a21e6
 	github.com/juju/loggo v0.0.0-20200526014432-9ce3a2e09b5e
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
 	github.com/juju/mgosession v1.0.0
@@ -25,7 +25,7 @@ require (
 	github.com/juju/persistent-cookiejar v0.0.0-20170428161559-d67418f14c93
 	github.com/juju/rpcreflect v0.0.0-20200416001309-bb46e9ba1476
 	github.com/juju/simplekv v1.0.0
-	github.com/juju/testing v0.0.0-20200923013621-75df6121fbb0
+	github.com/juju/testing v0.0.0-20201030020617-7189b3728523
 	github.com/juju/utils v0.0.0-20200604140309-9d78121a29e0
 	github.com/juju/version v0.0.0-20191219164919-81c1be00b9a6
 	github.com/julienschmidt/httprouter v1.3.0
@@ -39,7 +39,7 @@ require (
 	gopkg.in/check.v1 v1.0.0-20200902074654-038fdea0a05b
 	gopkg.in/errgo.v1 v1.0.1
 	gopkg.in/httprequest.v1 v1.2.1
-	gopkg.in/juju/environschema.v1 v1.0.0
+	gopkg.in/juju/environschema.v1 v1.0.1-0.20201027142642-c89a4490670a
 	gopkg.in/juju/worker.v1 v1.0.0-20191018043616-19a698a7150f
 	gopkg.in/macaroon-bakery.v2 v2.2.0
 	gopkg.in/macaroon.v2 v2.1.0
