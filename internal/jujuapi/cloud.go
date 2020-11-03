@@ -27,10 +27,12 @@ func init() {
 		addCredentialsMethod := rpc.Method(r.AddCredentials)
 		checkCredentialsModelsMethod := rpc.Method(r.CheckCredentialsModels)
 		cloudMethod := rpc.Method(r.Cloud)
+		cloudInfoMethod := rpc.Method(r.CloudInfo)
 		cloudsMethod := rpc.Method(r.Clouds)
 		credentialMethod := rpc.Method(r.Credential)
 		credentialContentsMethod := rpc.Method(r.CredentialContents)
 		defaultCloudMethod := rpc.Method(r.DefaultCloud)
+		listCloudInfoMethod := rpc.Method(r.ListCloudInfo)
 		modifyCloudAccessMethod := rpc.Method(r.ModifyCloudAccess)
 		removeCloudsMethod := rpc.Method(r.RemoveClouds)
 		revokeCredentialsMethod := rpc.Method(r.RevokeCredentials)
@@ -99,10 +101,12 @@ func init() {
 		r.AddMethod("Cloud", 5, "AddCredentials", addCredentialsMethod)
 		r.AddMethod("Cloud", 5, "CheckCredentialsModels", checkCredentialsModelsMethod)
 		r.AddMethod("Cloud", 5, "Cloud", cloudMethod)
+		r.AddMethod("Cloud", 5, "CloudInfo", cloudInfoMethod)
 		r.AddMethod("Cloud", 5, "Clouds", cloudsMethod)
 		r.AddMethod("Cloud", 5, "Credential", credentialMethod)
 		r.AddMethod("Cloud", 5, "CredentialContents", credentialContentsMethod)
 		// Version 5 removed DefaultCloud
+		r.AddMethod("Cloud", 5, "ListCloudInfo", listCloudInfoMethod)
 		r.AddMethod("Cloud", 5, "ModifyCloudAccess", modifyCloudAccessMethod)
 		r.AddMethod("Cloud", 5, "RemoveClouds", removeCloudsMethod)
 		r.AddMethod("Cloud", 5, "RevokeCredentialsCheckModels", revokeCredentialsCheckModelsMethod)
@@ -160,7 +164,15 @@ func (r *controllerRoot) Cloud(ctx context.Context, ents jujuparams.Entities) (j
 			cloudResults[i].Error = mapError(err)
 			continue
 		}
-		cloudResults[i].Cloud = &cloud.Cloud
+		cloudResults[i].Cloud = &jujuparams.Cloud{
+			Type:             cloud.Type,
+			AuthTypes:        cloud.AuthTypes,
+			Endpoint:         cloud.Endpoint,
+			IdentityEndpoint: cloud.IdentityEndpoint,
+			StorageEndpoint:  cloud.StorageEndpoint,
+			Regions:          cloud.Regions,
+			CACertificates:   cloud.CACertificates,
+		}
 	}
 	return jujuparams.CloudResults{
 		Results: cloudResults,
@@ -173,7 +185,15 @@ func (r *controllerRoot) Clouds(ctx context.Context) (jujuparams.CloudsResult, e
 		Clouds: make(map[string]jujuparams.Cloud),
 	}
 	err := r.jem.ForEachCloud(ctx, r.identity, func(cld *jem.Cloud) error {
-		res.Clouds[conv.ToCloudTag(cld.Name).String()] = cld.Cloud
+		res.Clouds[conv.ToCloudTag(cld.Name).String()] = jujuparams.Cloud{
+			Type:             cld.Type,
+			AuthTypes:        cld.AuthTypes,
+			Endpoint:         cld.Endpoint,
+			IdentityEndpoint: cld.IdentityEndpoint,
+			StorageEndpoint:  cld.StorageEndpoint,
+			Regions:          cld.Regions,
+			CACertificates:   cld.CACertificates,
+		}
 		return nil
 	})
 	return res, errgo.Mask(err)
@@ -550,4 +570,72 @@ func (r *controllerRoot) updateCloud(ctx context.Context, args jujuparams.AddClo
 	// TODO(mhilton) work out how to support updating clouds, for now
 	// tell everyone they're not allowed.
 	return errgo.WithCausef(nil, params.ErrForbidden, "forbidden")
+}
+
+// CloudInfo implements the cloud facades CloudInfo method.
+func (r *controllerRoot) CloudInfo(ctx context.Context, args jujuparams.Entities) (jujuparams.CloudInfoResults, error) {
+	results := make([]jujuparams.CloudInfoResult, len(args.Entities))
+	for i, ent := range args.Entities {
+		tag, err := names.ParseCloudTag(ent.Tag)
+		if err != nil {
+			results[i].Error = mapError(errgo.WithCausef(err, params.ErrBadRequest, ""))
+			continue
+		}
+		c := jem.Cloud{Name: params.Cloud(tag.Id())}
+		if err := r.jem.GetCloud(ctx, r.identity, &c); err != nil {
+			results[i].Error = mapError(err)
+			continue
+		}
+		results[i].Result = &jujuparams.CloudInfo{
+			CloudDetails: jujuparams.CloudDetails{
+				Type:             c.Type,
+				AuthTypes:        c.AuthTypes,
+				Endpoint:         c.Endpoint,
+				IdentityEndpoint: c.IdentityEndpoint,
+				StorageEndpoint:  c.StorageEndpoint,
+				Regions:          c.Regions,
+			},
+			Users: c.Users,
+		}
+	}
+	return jujuparams.CloudInfoResults{
+		Results: results,
+	}, nil
+}
+
+// ListCloudInfo implements the ListCloudInfo method on the cloud facade.
+// ListClouds ignores the request parameters and returns the clouds visible
+// to the current user.
+func (r *controllerRoot) ListCloudInfo(ctx context.Context, _ jujuparams.ListCloudsRequest) (jujuparams.ListCloudInfoResults, error) {
+	// TODO(mhilton) support the arguments.
+	var results []jujuparams.ListCloudInfoResult
+	err := r.jem.ForEachCloud(ctx, r.identity, func(c *jem.Cloud) error {
+		var access string
+		for _, u := range c.Users {
+			if u.UserName == conv.ToUserTag(params.User(r.identity.Id())).Id() {
+				access = u.Access
+			}
+		}
+		results = append(results, jujuparams.ListCloudInfoResult{
+			Result: &jujuparams.ListCloudInfo{
+				CloudDetails: jujuparams.CloudDetails{
+					Type:             c.Type,
+					AuthTypes:        c.AuthTypes,
+					Endpoint:         c.Endpoint,
+					IdentityEndpoint: c.IdentityEndpoint,
+					StorageEndpoint:  c.StorageEndpoint,
+					Regions:          c.Regions,
+				},
+				Access: access,
+			},
+		})
+		return nil
+	})
+	if err != nil {
+		return jujuparams.ListCloudInfoResults{}, errgo.Mask(err)
+	}
+
+	return jujuparams.ListCloudInfoResults{
+		Results: results,
+	}, nil
 }

@@ -461,20 +461,23 @@ func (s *cloudSuite) TestGetCloud(c *gc.C) {
 	err := s.JEM.GetCloud(testContext, jemtest.Bob, &cloud)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(cloud, jc.DeepEquals, jem.Cloud{
-		Name: "dummy",
-		Cloud: jujuparams.Cloud{
-			Type:             "dummy",
-			AuthTypes:        []string{"empty", "userpass"},
+		Name:             "dummy",
+		Type:             "dummy",
+		AuthTypes:        []string{"empty", "userpass"},
+		Endpoint:         "dummy-endpoint",
+		IdentityEndpoint: "dummy-identity-endpoint",
+		StorageEndpoint:  "dummy-storage-endpoint",
+		Regions: []jujuparams.CloudRegion{{
+			Name:             "dummy-region",
 			Endpoint:         "dummy-endpoint",
 			IdentityEndpoint: "dummy-identity-endpoint",
 			StorageEndpoint:  "dummy-storage-endpoint",
-			Regions: []jujuparams.CloudRegion{{
-				Name:             "dummy-region",
-				Endpoint:         "dummy-endpoint",
-				IdentityEndpoint: "dummy-identity-endpoint",
-				StorageEndpoint:  "dummy-storage-endpoint",
-			}},
-		},
+		}},
+		Users: []jujuparams.CloudUserInfo{{
+			UserName:    "bob@external",
+			DisplayName: "bob",
+			Access:      "add-model",
+		}},
 	})
 
 	cloud = jem.Cloud{
