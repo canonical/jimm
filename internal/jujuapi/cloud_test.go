@@ -998,3 +998,182 @@ func (s *cloudSuite) TestUpdateCloud(c *gc.C) {
 	})
 	c.Assert(jujuparams.IsCodeForbidden(err), gc.Equals, true, gc.Commentf("%#v", err))
 }
+
+func (s *cloudSuite) TestCloudInfo(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+	client := cloudapi.NewClient(conn)
+	err := client.AddCloud(cloud.Cloud{
+		Name:             "test-cloud",
+		Type:             "kubernetes",
+		AuthTypes:        cloud.AuthTypes{cloud.CertificateAuthType},
+		Endpoint:         "https://0.1.2.3:5678",
+		IdentityEndpoint: "https://0.1.2.3:5679",
+		StorageEndpoint:  "https://0.1.2.3:5680",
+		HostCloudRegion:  "dummy/dummy-region",
+	}, false)
+	c.Assert(err, gc.Equals, nil)
+
+	conn = s.open(c, nil, "bob")
+	defer conn.Close()
+
+	args := jujuparams.Entities{
+		Entities: []jujuparams.Entity{{
+			Tag: names.NewCloudTag("dummy").String(),
+		}, {
+			Tag: names.NewCloudTag("no-such-cloud").String(),
+		}, {
+			Tag: names.NewUserTag("not-a-cloud").String(),
+		}, {
+			Tag: names.NewCloudTag("test-cloud").String(),
+		}},
+	}
+	var result jujuparams.CloudInfoResults
+	err = conn.APICall("Cloud", 5, "", "CloudInfo", args, &result)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(result, jc.DeepEquals, jujuparams.CloudInfoResults{
+		Results: []jujuparams.CloudInfoResult{{
+			Result: &jujuparams.CloudInfo{
+				CloudDetails: jujuparams.CloudDetails{
+					Type:      "dummy",
+					AuthTypes: []string{"empty", "userpass"},
+					Regions: []jujuparams.CloudRegion{{
+						Name:             "dummy-region",
+						Endpoint:         "dummy-endpoint",
+						IdentityEndpoint: "dummy-identity-endpoint",
+						StorageEndpoint:  "dummy-storage-endpoint",
+					}},
+					Endpoint:         "dummy-endpoint",
+					IdentityEndpoint: "dummy-identity-endpoint",
+					StorageEndpoint:  "dummy-storage-endpoint",
+				},
+				Users: []jujuparams.CloudUserInfo{{
+					UserName:    "bob@external",
+					DisplayName: "bob",
+					Access:      "add-model",
+				}},
+			},
+		}, {
+			Error: &jujuparams.Error{
+				Code:    "not found",
+				Message: "cloud not found",
+			},
+		}, {
+			Error: &jujuparams.Error{
+				Code:    "bad request",
+				Message: `"user-not-a-cloud" is not a valid cloud tag`,
+			},
+		}, {
+			Error: &jujuparams.Error{
+				Code:    "unauthorized access",
+				Message: "unauthorized",
+			},
+		}},
+	})
+}
+
+func (s *cloudSuite) TestListCloudInfo(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+	client := cloudapi.NewClient(conn)
+	err := client.AddCloud(cloud.Cloud{
+		Name:             "test-cloud",
+		Type:             "kubernetes",
+		AuthTypes:        cloud.AuthTypes{cloud.CertificateAuthType},
+		Endpoint:         "https://0.1.2.3:5678",
+		IdentityEndpoint: "https://0.1.2.3:5679",
+		StorageEndpoint:  "https://0.1.2.3:5680",
+		HostCloudRegion:  "dummy/dummy-region",
+	}, false)
+	c.Assert(err, gc.Equals, nil)
+
+	err = client.GrantCloud("bob@external", "add-model", "test-cloud")
+	c.Assert(err, gc.Equals, nil)
+
+	args := jujuparams.ListCloudsRequest{
+		UserTag: names.NewUserTag("alice@external").String(),
+		All:     false,
+	}
+	var result jujuparams.ListCloudInfoResults
+	err = conn.APICall("Cloud", 5, "", "ListCloudInfo", args, &result)
+	c.Assert(err, gc.Equals, nil)
+	c.Check(result, jc.DeepEquals, jujuparams.ListCloudInfoResults{
+		Results: []jujuparams.ListCloudInfoResult{{
+			Result: &jujuparams.ListCloudInfo{
+				CloudDetails: jujuparams.CloudDetails{
+					Type:             "dummy",
+					AuthTypes:        []string{"empty", "userpass"},
+					Endpoint:         "dummy-endpoint",
+					IdentityEndpoint: "dummy-identity-endpoint",
+					StorageEndpoint:  "dummy-storage-endpoint",
+					Regions: []jujuparams.CloudRegion{{
+						Name:             "dummy-region",
+						Endpoint:         "dummy-endpoint",
+						IdentityEndpoint: "dummy-identity-endpoint",
+						StorageEndpoint:  "dummy-storage-endpoint",
+					}},
+				},
+				Access: "add-model",
+			},
+		}, {
+			Result: &jujuparams.ListCloudInfo{
+				CloudDetails: jujuparams.CloudDetails{
+					Type:             "kubernetes",
+					AuthTypes:        []string{"certificate"},
+					Endpoint:         "https://0.1.2.3:5678",
+					IdentityEndpoint: "https://0.1.2.3:5679",
+					StorageEndpoint:  "https://0.1.2.3:5680",
+					Regions: []jujuparams.CloudRegion{{
+						Name: "default",
+					}},
+				},
+				Access: "admin",
+			},
+		}},
+	})
+
+	conn = s.open(c, nil, "bob")
+	defer conn.Close()
+
+	args = jujuparams.ListCloudsRequest{
+		UserTag: names.NewUserTag("bob@external").String(),
+		All:     false,
+	}
+	result.Results = nil
+	err = conn.APICall("Cloud", 5, "", "ListCloudInfo", args, &result)
+	c.Assert(err, gc.Equals, nil)
+	c.Check(result, jc.DeepEquals, jujuparams.ListCloudInfoResults{
+		Results: []jujuparams.ListCloudInfoResult{{
+			Result: &jujuparams.ListCloudInfo{
+				CloudDetails: jujuparams.CloudDetails{
+					Type:             "dummy",
+					AuthTypes:        []string{"empty", "userpass"},
+					Endpoint:         "dummy-endpoint",
+					IdentityEndpoint: "dummy-identity-endpoint",
+					StorageEndpoint:  "dummy-storage-endpoint",
+					Regions: []jujuparams.CloudRegion{{
+						Name:             "dummy-region",
+						Endpoint:         "dummy-endpoint",
+						IdentityEndpoint: "dummy-identity-endpoint",
+						StorageEndpoint:  "dummy-storage-endpoint",
+					}},
+				},
+				Access: "add-model",
+			},
+		}, {
+			Result: &jujuparams.ListCloudInfo{
+				CloudDetails: jujuparams.CloudDetails{
+					Type:             "kubernetes",
+					AuthTypes:        []string{"certificate"},
+					Endpoint:         "https://0.1.2.3:5678",
+					IdentityEndpoint: "https://0.1.2.3:5679",
+					StorageEndpoint:  "https://0.1.2.3:5680",
+					Regions: []jujuparams.CloudRegion{{
+						Name: "default",
+					}},
+				},
+				Access: "add-model",
+			},
+		}},
+	})
+}
