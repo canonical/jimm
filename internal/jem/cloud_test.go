@@ -425,13 +425,15 @@ func (s *cloudSuite) TestRemoveCloudWithModel(c *gc.C) {
 	)
 	c.Assert(err, gc.Equals, nil)
 
-	credpath := params.CredentialPath{
+	credpath := mongodoc.CredentialPath{
 		Cloud: "test-cloud",
-		User:  "bob",
-		Name:  "kubernetes",
+		EntityPath: mongodoc.EntityPath{
+			User: "bob",
+			Name: "kubernetes",
+		},
 	}
-	_, err = s.JEM.UpdateCredential(testContext, &mongodoc.Credential{
-		Path: mongodoc.CredentialPathFromParams(credpath),
+	_, err = s.JEM.UpdateCredential(testContext, id, &mongodoc.Credential{
+		Path: credpath,
 		Type: string(cloud.UserPassAuthType),
 		Attributes: map[string]string{
 			"username": kubetest.Username,
@@ -459,20 +461,23 @@ func (s *cloudSuite) TestGetCloud(c *gc.C) {
 	err := s.JEM.GetCloud(testContext, jemtest.Bob, &cloud)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(cloud, jc.DeepEquals, jem.Cloud{
-		Name: "dummy",
-		Cloud: jujuparams.Cloud{
-			Type:             "dummy",
-			AuthTypes:        []string{"empty", "userpass"},
+		Name:             "dummy",
+		Type:             "dummy",
+		AuthTypes:        []string{"empty", "userpass"},
+		Endpoint:         "dummy-endpoint",
+		IdentityEndpoint: "dummy-identity-endpoint",
+		StorageEndpoint:  "dummy-storage-endpoint",
+		Regions: []jujuparams.CloudRegion{{
+			Name:             "dummy-region",
 			Endpoint:         "dummy-endpoint",
 			IdentityEndpoint: "dummy-identity-endpoint",
 			StorageEndpoint:  "dummy-storage-endpoint",
-			Regions: []jujuparams.CloudRegion{{
-				Name:             "dummy-region",
-				Endpoint:         "dummy-endpoint",
-				IdentityEndpoint: "dummy-identity-endpoint",
-				StorageEndpoint:  "dummy-storage-endpoint",
-			}},
-		},
+		}},
+		Users: []jujuparams.CloudUserInfo{{
+			UserName:    "bob@external",
+			DisplayName: "bob",
+			Access:      "add-model",
+		}},
 	})
 
 	cloud = jem.Cloud{

@@ -136,7 +136,7 @@ type CreateModelParams struct {
 
 	// Credential contains the name of the credential to use to
 	// create the model.
-	Credential params.CredentialPath
+	Credential mongodoc.CredentialPath
 
 	// Cloud contains the name of the cloud in which the
 	// model will be created.
@@ -348,7 +348,7 @@ func (j *JEM) createModel(ctx context.Context, p createModelParams, info *jujupa
 		if err := j.credentialAddController(ctx, p.cred, p.controller.Path); err != nil {
 			return errgo.WithCausef(err, errInvalidModelParams, "cannot add credential")
 		}
-		cloudCredentialTag = conv.ToCloudCredentialTag(p.cred.Path.ToParams()).String()
+		cloudCredentialTag = conv.ToCloudCredentialTag(p.cred.Path).String()
 	}
 
 	args := jujuparams.ModelCreateArgs{
@@ -407,9 +407,9 @@ func (j *JEM) createModel(ctx context.Context, p createModelParams, info *jujupa
 // If there's more than one such credential, it returns a params.ErrAmbiguousChoice error.
 //
 // If there are no credentials found, a zero credential path is returned.
-func (j *JEM) selectCredential(ctx context.Context, id identchecker.ACLIdentity, path params.CredentialPath, user params.User, cloud params.Cloud) (*mongodoc.Credential, error) {
+func (j *JEM) selectCredential(ctx context.Context, id identchecker.ACLIdentity, path mongodoc.CredentialPath, user params.User, cloud params.Cloud) (*mongodoc.Credential, error) {
 	if !path.IsZero() {
-		cred := mongodoc.Credential{Path: mongodoc.CredentialPathFromParams(path)}
+		cred := mongodoc.Credential{Path: path}
 		if err := j.GetCredential(ctx, id, &cred); err != nil {
 			return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized), errgo.Is(params.ErrNotFound))
 		}
@@ -479,7 +479,7 @@ func (j *JEM) GetModelInfo(ctx context.Context, id identchecker.ACLIdentity, inf
 		info.DefaultSeries = m.DefaultSeries
 		info.CloudTag = conv.ToCloudTag(m.Cloud).String()
 		info.CloudRegion = m.CloudRegion
-		info.CloudCredentialTag = conv.ToCloudCredentialTag(m.Credential.ToParams()).String()
+		info.CloudCredentialTag = conv.ToCloudCredentialTag(m.Credential).String()
 		info.CloudCredentialValidity = nil
 		info.OwnerTag = conv.ToUserTag(m.Path.User).String()
 		info.Life = life.Value(m.Life())
@@ -786,7 +786,7 @@ func (j *JEM) UpdateModelCredential(ctx context.Context, conn *apiconn.Conn, mod
 	}
 
 	client := modelmanager.NewClient(conn)
-	if err := client.ChangeModelCredential(names.NewModelTag(model.UUID), conv.ToCloudCredentialTag(cred.Path.ToParams())); err != nil {
+	if err := client.ChangeModelCredential(names.NewModelTag(model.UUID), conv.ToCloudCredentialTag(cred.Path)); err != nil {
 		return errgo.Mask(err)
 	}
 

@@ -13,7 +13,6 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
-	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/cloudcred"
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
@@ -28,10 +27,12 @@ func init() {
 		addCredentialsMethod := rpc.Method(r.AddCredentials)
 		checkCredentialsModelsMethod := rpc.Method(r.CheckCredentialsModels)
 		cloudMethod := rpc.Method(r.Cloud)
+		cloudInfoMethod := rpc.Method(r.CloudInfo)
 		cloudsMethod := rpc.Method(r.Clouds)
 		credentialMethod := rpc.Method(r.Credential)
 		credentialContentsMethod := rpc.Method(r.CredentialContents)
 		defaultCloudMethod := rpc.Method(r.DefaultCloud)
+		listCloudInfoMethod := rpc.Method(r.ListCloudInfo)
 		modifyCloudAccessMethod := rpc.Method(r.ModifyCloudAccess)
 		removeCloudsMethod := rpc.Method(r.RemoveClouds)
 		revokeCredentialsMethod := rpc.Method(r.RevokeCredentials)
@@ -100,10 +101,12 @@ func init() {
 		r.AddMethod("Cloud", 5, "AddCredentials", addCredentialsMethod)
 		r.AddMethod("Cloud", 5, "CheckCredentialsModels", checkCredentialsModelsMethod)
 		r.AddMethod("Cloud", 5, "Cloud", cloudMethod)
+		r.AddMethod("Cloud", 5, "CloudInfo", cloudInfoMethod)
 		r.AddMethod("Cloud", 5, "Clouds", cloudsMethod)
 		r.AddMethod("Cloud", 5, "Credential", credentialMethod)
 		r.AddMethod("Cloud", 5, "CredentialContents", credentialContentsMethod)
 		// Version 5 removed DefaultCloud
+		r.AddMethod("Cloud", 5, "ListCloudInfo", listCloudInfoMethod)
 		r.AddMethod("Cloud", 5, "ModifyCloudAccess", modifyCloudAccessMethod)
 		r.AddMethod("Cloud", 5, "RemoveClouds", removeCloudsMethod)
 		r.AddMethod("Cloud", 5, "RevokeCredentialsCheckModels", revokeCredentialsCheckModelsMethod)
@@ -161,7 +164,15 @@ func (r *controllerRoot) Cloud(ctx context.Context, ents jujuparams.Entities) (j
 			cloudResults[i].Error = mapError(err)
 			continue
 		}
-		cloudResults[i].Cloud = &cloud.Cloud
+		cloudResults[i].Cloud = &jujuparams.Cloud{
+			Type:             cloud.Type,
+			AuthTypes:        cloud.AuthTypes,
+			Endpoint:         cloud.Endpoint,
+			IdentityEndpoint: cloud.IdentityEndpoint,
+			StorageEndpoint:  cloud.StorageEndpoint,
+			Regions:          cloud.Regions,
+			CACertificates:   cloud.CACertificates,
+		}
 	}
 	return jujuparams.CloudResults{
 		Results: cloudResults,
@@ -174,7 +185,15 @@ func (r *controllerRoot) Clouds(ctx context.Context) (jujuparams.CloudsResult, e
 		Clouds: make(map[string]jujuparams.Cloud),
 	}
 	err := r.jem.ForEachCloud(ctx, r.identity, func(cld *jem.Cloud) error {
-		res.Clouds[conv.ToCloudTag(cld.Name).String()] = cld.Cloud
+		res.Clouds[conv.ToCloudTag(cld.Name).String()] = jujuparams.Cloud{
+			Type:             cld.Type,
+			AuthTypes:        cld.AuthTypes,
+			Endpoint:         cld.Endpoint,
+			IdentityEndpoint: cld.IdentityEndpoint,
+			StorageEndpoint:  cld.StorageEndpoint,
+			Regions:          cld.Regions,
+			CACertificates:   cld.CACertificates,
+		}
 		return nil
 	})
 	return res, errgo.Mask(err)
@@ -195,7 +214,7 @@ func (r *controllerRoot) UserCredentials(ctx context.Context, userclouds jujupar
 			continue
 		}
 		err = r.jem.ForEachCredential(ctx, r.identity, owner, params.Cloud(cld.Id()), func(c *mongodoc.Credential) error {
-			results[i].Result = append(results[i].Result, conv.ToCloudCredentialTag(c.Path.ToParams()).String())
+			results[i].Result = append(results[i].Result, conv.ToCloudCredentialTag(c.Path).String())
 			return nil
 		})
 		results[i].Error = mapError(err)
@@ -230,17 +249,16 @@ func (r *controllerRoot) revokeCredential(ctx context.Context, tag string, force
 	if err != nil {
 		return errgo.WithCausef(err, params.ErrBadRequest, "cannot parse %q", tag)
 	}
-	if credtag.Owner().Domain() == "local" {
-		// such a credential will not have been uploaded, so it exists
-		return nil
+	path, err := conv.FromCloudCredentialTag(credtag)
+	if err != nil {
+		if errgo.Cause(err) == conv.ErrLocalUser {
+			// such a credential will not have been uploaded, so it exits.
+			return nil
+		}
+		return errgo.Mask(err)
 	}
-	if err := auth.CheckIsUser(ctx, r.identity, params.User(credtag.Owner().Name())); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	if err := r.jem.RevokeCredential(ctx, params.CredentialPath{
-		Cloud: params.Cloud(credtag.Cloud().Id()),
-		User:  params.User(credtag.Owner().Name()),
-		Name:  params.CredentialName(credtag.Name()),
+	if err := r.jem.RevokeCredential(ctx, r.identity, &mongodoc.Credential{
+		Path: path,
 	}, flags); err != nil {
 		return errgo.Mask(err)
 	}
@@ -270,19 +288,13 @@ func (r *controllerRoot) credential(ctx context.Context, cloudCredentialTag stri
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
 
 	}
-	owner, err := conv.FromUserTag(cct.Owner())
+	path, err := conv.FromCloudCredentialTag(cct)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
 	}
 
 	cred := mongodoc.Credential{
-		Path: mongodoc.CredentialPath{
-			Cloud: cct.Cloud().Id(),
-			EntityPath: mongodoc.EntityPath{
-				User: string(owner),
-				Name: cct.Name(),
-			},
-		},
+		Path: path,
 	}
 	if err := r.jem.GetCredential(ctx, r.identity, &cred); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
@@ -522,30 +534,21 @@ func (r *controllerRoot) updateCredential(ctx context.Context, cred jujuparams.T
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
 	}
-	ownerTag := tag.Owner()
-	owner, err := conv.FromUserTag(ownerTag)
+	path, err := conv.FromCloudCredentialTag(tag)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(conv.ErrLocalUser))
 	}
-	if err := auth.CheckIsUser(ctx, r.identity, owner); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
+
 	var name params.Name
 	if err := name.UnmarshalText([]byte(tag.Name())); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
 	credential := mongodoc.Credential{
-		Path: mongodoc.CredentialPath{
-			Cloud: tag.Cloud().Id(),
-			EntityPath: mongodoc.EntityPath{
-				User: string(owner),
-				Name: tag.Name(),
-			},
-		},
+		Path:       path,
 		Type:       cred.Credential.AuthType,
 		Attributes: cred.Credential.Attributes,
 	}
-	modelResults, err := r.jem.UpdateCredential(ctx, &credential, flags)
+	modelResults, err := r.jem.UpdateCredential(ctx, r.identity, &credential, flags)
 	return modelResults, errgo.Mask(err, apiconn.IsAPIError)
 }
 
@@ -567,4 +570,72 @@ func (r *controllerRoot) updateCloud(ctx context.Context, args jujuparams.AddClo
 	// TODO(mhilton) work out how to support updating clouds, for now
 	// tell everyone they're not allowed.
 	return errgo.WithCausef(nil, params.ErrForbidden, "forbidden")
+}
+
+// CloudInfo implements the cloud facades CloudInfo method.
+func (r *controllerRoot) CloudInfo(ctx context.Context, args jujuparams.Entities) (jujuparams.CloudInfoResults, error) {
+	results := make([]jujuparams.CloudInfoResult, len(args.Entities))
+	for i, ent := range args.Entities {
+		tag, err := names.ParseCloudTag(ent.Tag)
+		if err != nil {
+			results[i].Error = mapError(errgo.WithCausef(err, params.ErrBadRequest, ""))
+			continue
+		}
+		c := jem.Cloud{Name: params.Cloud(tag.Id())}
+		if err := r.jem.GetCloud(ctx, r.identity, &c); err != nil {
+			results[i].Error = mapError(err)
+			continue
+		}
+		results[i].Result = &jujuparams.CloudInfo{
+			CloudDetails: jujuparams.CloudDetails{
+				Type:             c.Type,
+				AuthTypes:        c.AuthTypes,
+				Endpoint:         c.Endpoint,
+				IdentityEndpoint: c.IdentityEndpoint,
+				StorageEndpoint:  c.StorageEndpoint,
+				Regions:          c.Regions,
+			},
+			Users: c.Users,
+		}
+	}
+	return jujuparams.CloudInfoResults{
+		Results: results,
+	}, nil
+}
+
+// ListCloudInfo implements the ListCloudInfo method on the cloud facade.
+// ListClouds ignores the request parameters and returns the clouds visible
+// to the current user.
+func (r *controllerRoot) ListCloudInfo(ctx context.Context, _ jujuparams.ListCloudsRequest) (jujuparams.ListCloudInfoResults, error) {
+	// TODO(mhilton) support the arguments.
+	var results []jujuparams.ListCloudInfoResult
+	err := r.jem.ForEachCloud(ctx, r.identity, func(c *jem.Cloud) error {
+		var access string
+		for _, u := range c.Users {
+			if u.UserName == conv.ToUserTag(params.User(r.identity.Id())).Id() {
+				access = u.Access
+			}
+		}
+		results = append(results, jujuparams.ListCloudInfoResult{
+			Result: &jujuparams.ListCloudInfo{
+				CloudDetails: jujuparams.CloudDetails{
+					Type:             c.Type,
+					AuthTypes:        c.AuthTypes,
+					Endpoint:         c.Endpoint,
+					IdentityEndpoint: c.IdentityEndpoint,
+					StorageEndpoint:  c.StorageEndpoint,
+					Regions:          c.Regions,
+				},
+				Access: access,
+			},
+		})
+		return nil
+	})
+	if err != nil {
+		return jujuparams.ListCloudInfoResults{}, errgo.Mask(err)
+	}
+
+	return jujuparams.ListCloudInfoResults{
+		Results: results,
+	}, nil
 }

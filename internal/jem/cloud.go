@@ -13,6 +13,7 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
@@ -286,10 +287,19 @@ func (j *JEM) RevokeCloud(ctx context.Context, id identchecker.ACLIdentity, clou
 	return nil
 }
 
-// A Cloud is a jujuparams.Cloud with an attached name.
+// A Cloud contains the known information about a cloud. It is the superset
+// of the known information that is returned by the various cloud
+// endpoints.
 type Cloud struct {
-	Name params.Cloud
-	jujuparams.Cloud
+	Name             params.Cloud
+	Type             string
+	AuthTypes        []string
+	Endpoint         string
+	IdentityEndpoint string
+	StorageEndpoint  string
+	Regions          []jujuparams.CloudRegion
+	CACertificates   []string
+	Users            []jujuparams.CloudUserInfo
 }
 
 // GetCloud fills in the given cloud structure. If no cloud with the given
@@ -313,17 +323,13 @@ func (j *JEM) GetCloud(ctx context.Context, id identchecker.ACLIdentity, cloud *
 			})
 			return nil
 		}
-		cloud.Cloud = jujuparams.Cloud{
-			Type: cr.ProviderType,
-			// TODO(mhilton) store the host cloud region so that it
-			// can be returned correctly.
-			// HostCloudRegion:  "",
-			AuthTypes:        cr.AuthTypes,
-			Endpoint:         cr.Endpoint,
-			IdentityEndpoint: cr.IdentityEndpoint,
-			StorageEndpoint:  cr.StorageEndpoint,
-			CACertificates:   cr.CACertificates,
-		}
+		cloud.Type = cr.ProviderType
+		cloud.AuthTypes = cr.AuthTypes
+		cloud.Endpoint = cr.Endpoint
+		cloud.IdentityEndpoint = cr.IdentityEndpoint
+		cloud.StorageEndpoint = cr.StorageEndpoint
+		cloud.CACertificates = cr.CACertificates
+		cloud.Users = cloudUsers(ctx, id, cr)
 		return nil
 	})
 	if !found {
@@ -368,18 +374,14 @@ func (j *JEM) ForEachCloud(ctx context.Context, id identchecker.ACLIdentity, f f
 		}
 
 		cloud = &Cloud{
-			Name: cr.Cloud,
-			Cloud: jujuparams.Cloud{
-				Type: cr.ProviderType,
-				// TODO(mhilton) store the host cloud region so that it
-				// can be returned correctly.
-				// HostCloudRegion:  "",
-				AuthTypes:        cr.AuthTypes,
-				Endpoint:         cr.Endpoint,
-				IdentityEndpoint: cr.IdentityEndpoint,
-				StorageEndpoint:  cr.StorageEndpoint,
-				CACertificates:   cr.CACertificates,
-			},
+			Name:             cr.Cloud,
+			Type:             cr.ProviderType,
+			AuthTypes:        cr.AuthTypes,
+			Endpoint:         cr.Endpoint,
+			IdentityEndpoint: cr.IdentityEndpoint,
+			StorageEndpoint:  cr.StorageEndpoint,
+			CACertificates:   cr.CACertificates,
+			Users:            cloudUsers(ctx, id, cr),
 		}
 		return nil
 	})
@@ -394,4 +396,43 @@ func (j *JEM) ForEachCloud(ctx context.Context, id identchecker.ACLIdentity, f f
 		return f(cloud)
 	}
 	return nil
+}
+
+func cloudUsers(ctx context.Context, id identchecker.ACLIdentity, cr *mongodoc.CloudRegion) []jujuparams.CloudUserInfo {
+	if err := auth.CheckACL(ctx, id, cr.ACL.Admin); err != nil {
+		ut := conv.ToUserTag(params.User(id.Id()))
+		return []jujuparams.CloudUserInfo{{
+			UserName:    ut.Id(),
+			DisplayName: ut.Name(),
+			Access:      "add-model",
+		}}
+	}
+	var users []jujuparams.CloudUserInfo
+	// Admin users can see all other users.
+	seen := make(map[string]bool)
+	for _, u := range cr.ACL.Admin {
+		if seen[u] {
+			continue
+		}
+		seen[u] = true
+		ut := conv.ToUserTag(params.User(u))
+		users = append(users, jujuparams.CloudUserInfo{
+			UserName:    ut.Id(),
+			DisplayName: ut.Name(),
+			Access:      "admin",
+		})
+	}
+	for _, u := range cr.ACL.Read {
+		if seen[u] {
+			continue
+		}
+		seen[u] = true
+		ut := conv.ToUserTag(params.User(u))
+		users = append(users, jujuparams.CloudUserInfo{
+			UserName:    ut.Id(),
+			DisplayName: ut.Name(),
+			Access:      "add-model",
+		})
+	}
+	return users
 }

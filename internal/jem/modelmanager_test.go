@@ -119,7 +119,7 @@ var createModelTests = []struct {
 	user                           string
 	params                         jem.CreateModelParams
 	usageSenderAuthorizationErrors []error
-	expectCredential               params.CredentialPath
+	expectCredential               mongodoc.CredentialPath
 	expectError                    string
 	expectErrorCause               error
 }{{
@@ -127,10 +127,12 @@ var createModelTests = []struct {
 	user:  "bob",
 	params: jem.CreateModelParams{
 		Path: params.EntityPath{"bob", ""},
-		Credential: params.CredentialPath{
+		Credential: mongodoc.CredentialPath{
 			Cloud: "dummy",
-			User:  "bob",
-			Name:  "cred",
+			EntityPath: mongodoc.EntityPath{
+				User: "bob",
+				Name: "cred",
+			},
 		},
 		Cloud: "dummy",
 	},
@@ -140,10 +142,12 @@ var createModelTests = []struct {
 	params: jem.CreateModelParams{
 		Path:           params.EntityPath{"bob", ""},
 		ControllerPath: params.EntityPath{"alice", "dummy-1"},
-		Credential: params.CredentialPath{
+		Credential: mongodoc.CredentialPath{
 			Cloud: "dummy",
-			User:  "bob",
-			Name:  "cred",
+			EntityPath: mongodoc.EntityPath{
+				User: "bob",
+				Name: "cred",
+			},
 		},
 		Cloud: "dummy",
 	},
@@ -152,10 +156,12 @@ var createModelTests = []struct {
 	user:  "bob",
 	params: jem.CreateModelParams{
 		Path: params.EntityPath{"bob", ""},
-		Credential: params.CredentialPath{
+		Credential: mongodoc.CredentialPath{
 			Cloud: "dummy",
-			User:  "bob",
-			Name:  "cred",
+			EntityPath: mongodoc.EntityPath{
+				User: "bob",
+				Name: "cred",
+			},
 		},
 		Cloud:  "dummy",
 		Region: "dummy-region",
@@ -165,10 +171,12 @@ var createModelTests = []struct {
 	user:  "bob",
 	params: jem.CreateModelParams{
 		Path: params.EntityPath{"bob", ""},
-		Credential: params.CredentialPath{
+		Credential: mongodoc.CredentialPath{
 			Cloud: "dummy",
-			User:  "bob",
-			Name:  "cred2",
+			EntityPath: mongodoc.EntityPath{
+				User: "bob",
+				Name: "cred2",
+			},
 		},
 		Cloud: "dummy",
 	},
@@ -179,10 +187,12 @@ var createModelTests = []struct {
 	user:  "bob",
 	params: jem.CreateModelParams{
 		Path: params.EntityPath{"bob", "model-1"},
-		Credential: params.CredentialPath{
+		Credential: mongodoc.CredentialPath{
 			Cloud: "dummy",
-			User:  "bob",
-			Name:  "cred",
+			EntityPath: mongodoc.EntityPath{
+				User: "bob",
+				Name: "cred",
+			},
 		},
 		Cloud: "dummy",
 	},
@@ -193,10 +203,12 @@ var createModelTests = []struct {
 	user:  "bob",
 	params: jem.CreateModelParams{
 		Path: params.EntityPath{"bob", ""},
-		Credential: params.CredentialPath{
+		Credential: mongodoc.CredentialPath{
 			Cloud: "dummy",
-			User:  "bob",
-			Name:  "cred",
+			EntityPath: mongodoc.EntityPath{
+				User: "bob",
+				Name: "cred",
+			},
 		},
 		Cloud:  "dummy",
 		Region: "not-a-region",
@@ -209,10 +221,12 @@ var createModelTests = []struct {
 		Path:  params.EntityPath{"bob", ""},
 		Cloud: "dummy",
 	},
-	expectCredential: params.CredentialPath{
+	expectCredential: mongodoc.CredentialPath{
 		Cloud: "dummy",
-		User:  "bob",
-		Name:  "cred",
+		EntityPath: mongodoc.EntityPath{
+			User: "bob",
+			Name: "cred",
+		},
 	},
 }, {
 	about: "empty cloud credentials fails with more than one choice",
@@ -235,10 +249,12 @@ var createModelTests = []struct {
 	user:  "bob",
 	params: jem.CreateModelParams{
 		Path: params.EntityPath{"bob", ""},
-		Credential: params.CredentialPath{
+		Credential: mongodoc.CredentialPath{
 			Cloud: "dummy",
-			User:  "bob",
-			Name:  "cred",
+			EntityPath: mongodoc.EntityPath{
+				User: "bob",
+				Name: "cred",
+			},
 		},
 		Cloud: "dummy",
 	},
@@ -288,9 +304,9 @@ func (s *modelManagerSuite) TestCreateModel(c *gc.C) {
 		c.Check(m.Creator, gc.Equals, test.user)
 		c.Check(m.CreationTime.Equal(now), gc.Equals, true)
 		if !test.expectCredential.IsZero() {
-			c.Check(m.Credential, jc.DeepEquals, mongodoc.CredentialPathFromParams(test.expectCredential))
+			c.Check(m.Credential, jc.DeepEquals, test.expectCredential)
 		} else {
-			c.Check(m.Credential, jc.DeepEquals, mongodoc.CredentialPathFromParams(test.params.Credential))
+			c.Check(m.Credential, jc.DeepEquals, test.params.Credential)
 		}
 	}
 }
@@ -312,7 +328,7 @@ func (s *modelManagerSuite) TestCreateModelWithPartiallyCreatedModel(c *gc.C) {
 	err = s.JEM.CreateModel(testContext, jemtest.Bob, jem.CreateModelParams{
 		Path:           params.EntityPath{"bob", "model"},
 		ControllerPath: s.Controller.Path,
-		Credential:     s.Credential.Path.ToParams(),
+		Credential:     s.Credential.Path,
 		Cloud:          "dummy",
 	}, nil)
 	c.Assert(err, gc.Equals, nil)
@@ -329,7 +345,7 @@ func (s *modelManagerSuite) TestCreateModelWithExistingModelInControllerOnly(c *
 	err = s.JEM.CreateModel(testContext, jemtest.Bob, jem.CreateModelParams{
 		Path:           s.Model.Path,
 		ControllerPath: s.Model.Controller,
-		Credential:     s.Model.Credential.ToParams(),
+		Credential:     s.Model.Credential,
 		Cloud:          s.Model.Cloud,
 	}, nil)
 	c.Assert(err, gc.ErrorMatches, `cannot create model: model name in use: api error: failed to create new model: model "model-1" for bob@external already exists \(already exists\)`)

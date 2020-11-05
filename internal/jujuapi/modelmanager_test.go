@@ -275,7 +275,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			ProviderType:       "dummy",
 			CloudTag:           "cloud-dummy",
 			CloudRegion:        "dummy-region",
-			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential.Path.ToParams()).String(),
+			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential.Path).String(),
 			OwnerTag:           names.NewUserTag("bob@external").String(),
 			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
@@ -302,7 +302,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			ProviderType:       "dummy",
 			CloudTag:           "cloud-dummy",
 			CloudRegion:        "dummy-region",
-			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential2.Path.ToParams()).String(),
+			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential2.Path).String(),
 			OwnerTag:           names.NewUserTag("charlie@external").String(),
 			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
@@ -324,7 +324,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			ProviderType:       "dummy",
 			CloudTag:           "cloud-dummy",
 			CloudRegion:        "dummy-region",
-			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential2.Path.ToParams()).String(),
+			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential2.Path).String(),
 			OwnerTag:           names.NewUserTag("charlie@external").String(),
 			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
@@ -354,7 +354,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			ProviderType:       "dummy",
 			CloudTag:           "cloud-dummy",
 			CloudRegion:        "dummy-region",
-			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential2.Path.ToParams()).String(),
+			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential2.Path).String(),
 			OwnerTag:           names.NewUserTag("charlie@external").String(),
 			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
@@ -458,7 +458,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 			ProviderType:       "dummy",
 			CloudTag:           "cloud-dummy",
 			CloudRegion:        "dummy-region",
-			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential.Path.ToParams()).String(),
+			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential.Path).String(),
 			OwnerTag:           names.NewUserTag("bob@external").String(),
 			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
@@ -480,7 +480,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 			ProviderType:       "dummy",
 			CloudTag:           "cloud-dummy",
 			CloudRegion:        "dummy-region",
-			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential2.Path.ToParams()).String(),
+			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential2.Path).String(),
 			OwnerTag:           names.NewUserTag("charlie@external").String(),
 			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
@@ -502,7 +502,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 			ProviderType:       "dummy",
 			CloudTag:           "cloud-dummy",
 			CloudRegion:        "dummy-region",
-			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential2.Path.ToParams()).String(),
+			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential2.Path).String(),
 			OwnerTag:           names.NewUserTag("charlie@external").String(),
 			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
@@ -536,7 +536,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 			ProviderType:       "dummy",
 			CloudTag:           "cloud-dummy",
 			CloudRegion:        "dummy-region",
-			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential2.Path.ToParams()).String(),
+			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential2.Path).String(),
 			OwnerTag:           names.NewUserTag("charlie@external").String(),
 			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
@@ -570,7 +570,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 			ProviderType:       "dummy",
 			CloudTag:           "cloud-dummy",
 			CloudRegion:        "dummy-region",
-			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential2.Path.ToParams()).String(),
+			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential2.Path).String(),
 			OwnerTag:           names.NewUserTag("charlie@external").String(),
 			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
@@ -622,7 +622,7 @@ func (s *modelManagerSuite) TestModelInfoForLegacyModel(c *gc.C) {
 			ProviderType:       "dummy",
 			CloudTag:           "cloud-dummy",
 			CloudRegion:        "dummy-region",
-			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential.Path.ToParams()).String(),
+			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential.Path).String(),
 			OwnerTag:           names.NewUserTag("bob@external").String(),
 			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
@@ -682,7 +682,7 @@ func (s *modelManagerSuite) TestModelInfoForLegacyModelDisableControllerUUIDMask
 			ProviderType:       "dummy",
 			CloudTag:           "cloud-dummy",
 			CloudRegion:        "dummy-region",
-			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential.Path.ToParams()).String(),
+			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential.Path).String(),
 			OwnerTag:           names.NewUserTag("bob@external").String(),
 			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
@@ -812,7 +812,7 @@ func (s *modelManagerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 			ProviderType:       "dummy",
 			CloudTag:           "cloud-dummy",
 			CloudRegion:        "dummy-region",
-			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential.Path.ToParams()).String(),
+			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential.Path).String(),
 			OwnerTag:           names.NewUserTag("bob@external").String(),
 			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
@@ -1234,7 +1234,7 @@ func (s *modelManagerSuite) TestChangeModelCredential(c *gc.C) {
 	modelTag := names.NewModelTag(s.Model.UUID)
 	cred := jemtest.EmptyCredential("bob", "cred2")
 	s.UpdateCredential(c, &cred)
-	credTag := conv.ToCloudCredentialTag(cred.Path.ToParams())
+	credTag := conv.ToCloudCredentialTag(cred.Path)
 	client := modelmanager.NewClient(conn)
 	err := client.ChangeModelCredential(modelTag, credTag)
 	c.Assert(err, gc.Equals, nil)
