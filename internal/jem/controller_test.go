@@ -285,7 +285,7 @@ func (s *controllerSuite) TestControllerUpdateCredentials(c *gc.C) {
 
 	// check it was updated on the controller.
 	client := cloudapi.NewClient(conn)
-	creds, err := client.Credentials(conv.ToCloudCredentialTag(cred.Path.ToParams()))
+	creds, err := client.Credentials(conv.ToCloudCredentialTag(cred.Path))
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Result: &jujuparams.CloudCredential{
@@ -329,7 +329,7 @@ func (s *controllerSuite) TestConnectMonitor(c *gc.C) {
 
 	// check the credential has been updated.
 	client := cloudapi.NewClient(conn)
-	creds, err := client.Credentials(conv.ToCloudCredentialTag(cred.Path.ToParams()))
+	creds, err := client.Credentials(conv.ToCloudCredentialTag(cred.Path))
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Result: &jujuparams.CloudCredential{

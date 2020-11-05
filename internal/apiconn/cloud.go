@@ -107,7 +107,7 @@ func (c *Conn) UpdateCredential(_ context.Context, cred *mongodoc.Credential) ([
 //
 // Any error that represents a Juju API failure will be of type
 // *APIError.
-func (c *Conn) RevokeCredential(_ context.Context, path params.CredentialPath) error {
+func (c *Conn) RevokeCredential(_ context.Context, path mongodoc.CredentialPath) error {
 	var out jujuparams.ErrorResults
 	if c.SupportsCheckCredentialModels() {
 		in := jujuparams.RevokeCredentialArgs{
