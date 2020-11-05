@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/juju/charm/v7"
+	"github.com/juju/charm/v8"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 	"go.uber.org/zap"
@@ -18,6 +18,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
+	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
@@ -85,7 +86,7 @@ func (j *JEM) Offer(ctx context.Context, id identchecker.ACLIdentity, offer juju
 // GetApplicationOfferConsumeDetails consume the application offer
 // specified by details.ApplicationOfferDetails.OfferURL and completes
 // the rest of the details.
-func (j *JEM) GetApplicationOfferConsumeDetails(ctx context.Context, id identchecker.ACLIdentity, details *jujuparams.ConsumeOfferDetails, v bakery.Version) error {
+func (j *JEM) GetApplicationOfferConsumeDetails(ctx context.Context, id identchecker.ACLIdentity, user params.User, details *jujuparams.ConsumeOfferDetails, v bakery.Version) error {
 	offer := mongodoc.ApplicationOffer{
 		OfferURL: details.Offer.OfferURL,
 	}
@@ -122,9 +123,17 @@ func (j *JEM) GetApplicationOfferConsumeDetails(ctx context.Context, id identche
 	}
 	defer conn.Close()
 
-	if err := conn.GetApplicationOfferConsumeDetails(ctx, details, v); err != nil {
+	asUser := uid
+	if user != "" {
+		if err := auth.CheckIsUser(ctx, id, j.ControllerAdmin()); err != nil {
+			return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+		}
+		asUser = user
+	}
+	if err := conn.GetApplicationOfferConsumeDetails(ctx, asUser, details, v); err != nil {
 		return errgo.Mask(err, apiconn.IsAPIError)
 	}
+
 	// Fix the consume details from the controller to be correct for JAAS.
 	// Filter out any juju local users.
 	details.Offer.Users = filterApplicationOfferUsers(uid, access, details.Offer.Users)

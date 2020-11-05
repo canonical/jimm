@@ -6,7 +6,7 @@ import (
 	"context"
 
 	"github.com/juju/errors"
-	"github.com/juju/juju/apiserver/common"
+	apiservererrors "github.com/juju/juju/apiserver/errors"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 	"gopkg.in/errgo.v1"
@@ -350,7 +350,7 @@ func (r *controllerRoot) AddCredentials(ctx context.Context, args jujuparams.Tag
 			if len(m.Errors) > 0 {
 				modelErors := jujuparams.ErrorResults{m.Errors}
 				combined := errors.Annotatef(modelErors.Combine(), "model %q (uuid %v)", m.ModelName, m.ModelUUID)
-				resultErrors = append(resultErrors, jujuparams.ErrorResult{common.ServerError(combined)})
+				resultErrors = append(resultErrors, jujuparams.ErrorResult{apiservererrors.ServerError(combined)})
 			}
 		}
 		if len(resultErrors) == 1 {
@@ -359,7 +359,7 @@ func (r *controllerRoot) AddCredentials(ctx context.Context, args jujuparams.Tag
 		}
 		if len(resultErrors) > 1 {
 			credentialError := jujuparams.ErrorResults{resultErrors}
-			results.Results[i].Error = common.ServerError(credentialError.Combine())
+			results.Results[i].Error = apiservererrors.ServerError(credentialError.Combine())
 		}
 	}
 	return results, nil

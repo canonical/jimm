@@ -216,6 +216,27 @@ func (c *Conn) ControllerModelSummary(ctx context.Context, ms *jujuparams.ModelS
 	return errgo.WithCausef(nil, params.ErrNotFound, "controller model not found")
 }
 
+// ValidateModelUpgrade validates if a model is allowed to perform an upgrade. It
+// uses ValidateModelUpgrades on the ModelManager facade version 9.
+func (c *Conn) ValidateModelUpgrade(ctx context.Context, model names.ModelTag, force bool) error {
+	args := jujuparams.ValidateModelUpgradeParams{
+		Models: []jujuparams.ValidateModelUpgradeParam{{
+			ModelTag: model.String(),
+		}},
+		Force: force,
+	}
+	var resp jujuparams.ErrorResults
+	err := c.APICall("ModelManager", 9, "", "ValidateModelUpgrades", &args, &resp)
+	if err != nil {
+		return newAPIError(err)
+	}
+	if len(resp.Results) != 1 {
+		return errgo.Newf("unexpected number of results (expected 1, got %d)", len(resp.Results))
+	}
+
+	return newAPIError(resp.Results[0].Error)
+}
+
 // DestroyModel starts the destruction of the given model. This method uses
 // the highest available method from:
 //

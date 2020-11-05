@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/rpc/jsoncodec"
 	"github.com/julienschmidt/httprouter"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
@@ -20,6 +21,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/internal/zaputil"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -45,14 +47,14 @@ func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httpr
 func newWebSocketHandler(ctx context.Context, params jemserver.HandlerParams) httprequest.Handler {
 	return httprequest.Handler{
 		Method: "GET",
-		Path:   "/model/:modeluuid/api",
+		Path:   "/model/:UUID/api",
 		Handle: func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 			ctx := zapctx.WithFields(r.Context(), zap.Bool("websocket", true))
 			servermon.ConcurrentWebsocketConnections.Inc()
 			defer servermon.ConcurrentWebsocketConnections.Dec()
 			j := params.JEMPool.JEM(ctx)
 			defer j.Close()
-			wsServer := newWSServer(j, params.Authenticator, params.Params, p.ByName("modeluuid"))
+			wsServer := newWSServer(j, params.Authenticator, params.Params, p.ByName("UUID"))
 			wsServer.ServeHTTP(w, r.WithContext(ctx))
 		},
 	}
@@ -111,4 +113,42 @@ type guiArchiveRequest struct {
 // controllers. In this case, no versions are returned.
 func (h *handler) GUIArchive(*guiArchiveRequest) (jujuparams.GUIArchiveResponse, error) {
 	return jujuparams.GUIArchiveResponse{}, nil
+}
+
+type modelCommandsRequest struct {
+	httprequest.Route `httprequest:"GET /model/:UUID/commands"`
+	UUID              string `httprequest:",path"`
+}
+
+// ModelCommands redirects the request to the controller responsible for the model.
+func (h *handler) ModelCommands(p httprequest.Params, arg *modelCommandsRequest) error {
+	ctx := p.Context
+	m := mongodoc.Model{UUID: arg.UUID}
+	if err := h.jem.DB.GetModel(ctx, &m); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	controller := mongodoc.Controller{Path: m.Controller}
+	if err := h.jem.DB.GetController(ctx, &controller); err != nil {
+		return errgo.Mask(err)
+	}
+	addrs := mongodoc.Addresses(controller.HostPorts)
+	if len(addrs) == 0 {
+		return errgo.New("expected at least 1 address, got 0")
+	}
+	conn, err := websocketUpgrader.Upgrade(p.Response, p.Request, nil)
+	if err != nil {
+		zapctx.Error(ctx, "cannot upgrade websocket", zaputil.Error(err))
+		return errgo.Mask(err)
+	}
+	codec := jsoncodec.NewWebsocketConn(conn)
+	defer codec.Close()
+	err = codec.Send(struct {
+		RedirectTo string `json:"redirect-to"`
+	}{
+		RedirectTo: fmt.Sprintf("wss://%s/model/%s/commands", addrs[0], arg.UUID),
+	})
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
 }

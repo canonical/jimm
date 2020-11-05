@@ -1,8 +1,8 @@
 // GENERATED FILE - DO NOT EDIT
 //
 // Generated from:
-//   Juju Version:   2.8.4
-//   Module Version: v0.0.0-20200924052920-602dbc79f0fe
+//   Juju Version:   2.9-rc2
+//   Module Version: v0.0.0-20201102064548-d344015a21e6
 
 package cloudcred
 
@@ -22,10 +22,6 @@ var attr = map[string]bool{
 	"gce\x1eoauth2\x1eclient-id":                                true,
 	"gce\x1eoauth2\x1eprivate-key":                              false,
 	"gce\x1eoauth2\x1eproject-id":                               true,
-	"joyent\x1euserpass\x1ealgorithm":                           true,
-	"joyent\x1euserpass\x1eprivate-key":                         false,
-	"joyent\x1euserpass\x1esdc-key-id":                          true,
-	"joyent\x1euserpass\x1esdc-user":                            true,
 	"kubernetes\x1ecertificate\x1eClientCertificateData":        true,
 	"kubernetes\x1ecertificate\x1eToken":                        false,
 	"kubernetes\x1ecertificate\x1erbac-id":                      true,
@@ -58,9 +54,6 @@ var attr = map[string]bool{
 	"openstack\x1euserpass\x1euser-domain-name":                 true,
 	"openstack\x1euserpass\x1eusername":                         true,
 	"openstack\x1euserpass\x1eversion":                          true,
-	"oracle\x1euserpass\x1eidentity-domain":                     true,
-	"oracle\x1euserpass\x1epassword":                            false,
-	"oracle\x1euserpass\x1eusername":                            true,
 	"rackspace\x1euserpass\x1epassword":                         false,
 	"rackspace\x1euserpass\x1etenant-name":                      true,
 	"rackspace\x1euserpass\x1eusername":                         true,

@@ -16,12 +16,14 @@ import (
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/model"
 	"github.com/juju/juju/core/status"
+	"github.com/juju/juju/environs/config"
 	"github.com/juju/juju/state"
 	"github.com/juju/juju/testing/factory"
 	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/names/v4"
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
+	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
 
@@ -51,7 +53,7 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 		UUID:            s.Model.UUID,
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		ProviderType:    "dummy",
-		DefaultSeries:   "bionic",
+		DefaultSeries:   "focal",
 		Cloud:           "dummy",
 		CloudRegion:     "dummy-region",
 		CloudCredential: "dummy/bob@external/cred",
@@ -79,7 +81,7 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 		UUID:            s.Model3.UUID,
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		ProviderType:    "dummy",
-		DefaultSeries:   "bionic",
+		DefaultSeries:   "focal",
 		Cloud:           "dummy",
 		CloudRegion:     "dummy-region",
 		CloudCredential: "dummy/charlie@external/cred",
@@ -125,7 +127,7 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 		UUID:            s.Model.UUID,
 		ControllerUUID:  "deadbeef-1bad-500d-9000-4b1d0d06f00d",
 		ProviderType:    "dummy",
-		DefaultSeries:   "bionic",
+		DefaultSeries:   "focal",
 		Cloud:           "dummy",
 		CloudRegion:     "dummy-region",
 		CloudCredential: "dummy/bob@external/cred",
@@ -153,7 +155,7 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 		UUID:            s.Model3.UUID,
 		ControllerUUID:  "deadbeef-1bad-500d-9000-4b1d0d06f00d",
 		ProviderType:    "dummy",
-		DefaultSeries:   "bionic",
+		DefaultSeries:   "focal",
 		Cloud:           "dummy",
 		CloudRegion:     "dummy-region",
 		CloudCredential: "dummy/charlie@external/cred",
@@ -1298,6 +1300,20 @@ func (s *modelManagerSuite) TestChangeModelCredentialLocalUserCredential(c *gc.C
 	c.Assert(err, gc.ErrorMatches, `unsupported local user`)
 }
 
+func (s *modelManagerSuite) TestValidateModelUpgrades(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	modelTag := names.NewModelTag(s.Model.UUID)
+	client := modelmanager.NewClient(conn)
+	err := client.ValidateModelUpgrade(modelTag, false)
+	c.Assert(err, gc.Equals, nil)
+
+	uuid := utils.MustNewUUID().String()
+	err = client.ValidateModelUpgrade(names.NewModelTag(uuid), false)
+	c.Assert(err, gc.ErrorMatches, "model not found")
+}
+
 type modelManagerStorageSuite struct {
 	websocketSuite
 	state   *state.PooledState
@@ -1458,7 +1474,7 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 		UUID:            mi.UUID,
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		ProviderType:    "kubernetes",
-		DefaultSeries:   "bionic",
+		DefaultSeries:   "focal",
 		Cloud:           "bob-cloud",
 		CloudRegion:     "default",
 		CloudCredential: s.cred.Id(),
@@ -1487,7 +1503,7 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 		Type:            "iaas",
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		ProviderType:    "dummy",
-		DefaultSeries:   "bionic",
+		DefaultSeries:   "focal",
 		Cloud:           "dummy",
 		CloudRegion:     "dummy-region",
 		CloudCredential: "dummy/bob@external/cred",
@@ -1506,7 +1522,7 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 		Type:            "iaas",
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		ProviderType:    "dummy",
-		DefaultSeries:   "bionic",
+		DefaultSeries:   "focal",
 		Cloud:           "dummy",
 		CloudRegion:     "dummy-region",
 		CloudCredential: "dummy/charlie@external/cred",
@@ -1568,4 +1584,78 @@ func assertModelInfo(c *gc.C, obtained, expected []jujuparams.ModelInfoResult) {
 		}
 	}
 	c.Assert(obtained, jc.DeepEquals, expected)
+}
+
+func (s *modelManagerSuite) TestModelDefaults(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+	client := modelmanager.NewClient(conn)
+
+	err := client.SetModelDefaults("aws", "eu-central-1", map[string]interface{}{
+		"a": 1,
+		"b": "value1",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+	err = client.SetModelDefaults("aws", "eu-central-2", map[string]interface{}{
+		"b": "value2",
+		"c": 17,
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	values, err := client.ModelDefaults("aws")
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(values, jc.DeepEquals, config.ModelDefaultAttributes{
+		"a": config.AttributeDefaultValues{
+			Regions: []config.RegionDefaultValue{{
+				Name:  "eu-central-1",
+				Value: float64(1),
+			}},
+		},
+		"b": config.AttributeDefaultValues{
+			Regions: []config.RegionDefaultValue{{
+				Name:  "eu-central-1",
+				Value: "value1",
+			}, {
+				Name:  "eu-central-2",
+				Value: "value2",
+			}},
+		},
+		"c": config.AttributeDefaultValues{
+			Regions: []config.RegionDefaultValue{{
+				Name:  "eu-central-2",
+				Value: float64(17),
+			}},
+		},
+	})
+
+	err = client.UnsetModelDefaults("aws", "eu-central-1", "b", "c")
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = client.UnsetModelDefaults("aws", "eu-central-2", "a", "b")
+	c.Assert(err, jc.ErrorIsNil)
+
+	values, err = client.ModelDefaults("aws")
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(values, jc.DeepEquals, config.ModelDefaultAttributes{
+		"a": config.AttributeDefaultValues{
+			Regions: []config.RegionDefaultValue{{
+				Name:  "eu-central-1",
+				Value: float64(1),
+			}},
+		},
+		"c": config.AttributeDefaultValues{
+			Regions: []config.RegionDefaultValue{{
+				Name:  "eu-central-2",
+				Value: float64(17),
+			}},
+		},
+	})
+
+	conn1 := s.open(c, nil, "bob")
+	defer conn1.Close()
+	client1 := modelmanager.NewClient(conn1)
+
+	values, err = client1.ModelDefaults("aws")
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(values, jc.DeepEquals, config.ModelDefaultAttributes{})
 }

@@ -34,6 +34,10 @@ func init() {
 		modelInfoMethod := rpc.Method(r.ModelInfo)
 		modelStatusMethod := rpc.Method(r.ModelStatus)
 		modifyModelAccessMethod := rpc.Method(r.ModifyModelAccess)
+		validateModelUpgradesMethod := rpc.Method(r.ValidateModelUpgrades)
+		setModelDefaultsMethod := rpc.Method(r.SetModelDefaults)
+		unsetModelDefaultsMethod := rpc.Method(r.UnsetModelDefaults)
+		modelDefaultsForCloudsMethod := rpc.Method(r.ModelDefaultsForClouds)
 
 		r.AddMethod("ModelManager", 2, "CreateModel", createModelMethod)
 		r.AddMethod("ModelManager", 2, "DestroyModels", destroyModelsMethod)
@@ -42,6 +46,8 @@ func init() {
 		r.AddMethod("ModelManager", 2, "ListModels", listModelsMethod)
 		r.AddMethod("ModelManager", 2, "ModelStatus", modelStatusMethod)
 		r.AddMethod("ModelManager", 2, "ModifyModelAccess", modifyModelAccessMethod)
+		r.AddMethod("ModelManager", 2, "SetModelDefaults", setModelDefaultsMethod)
+		r.AddMethod("ModelManager", 2, "UnsetModelDefaults", unsetModelDefaultsMethod)
 
 		r.AddMethod("ModelManager", 3, "CreateModel", createModelMethod)
 		r.AddMethod("ModelManager", 3, "DestroyModels", destroyModelsMethod)
@@ -51,6 +57,8 @@ func init() {
 		r.AddMethod("ModelManager", 3, "ModelInfo", modelInfoMethod)
 		r.AddMethod("ModelManager", 3, "ModelStatus", modelStatusMethod)
 		r.AddMethod("ModelManager", 3, "ModifyModelAccess", modifyModelAccessMethod)
+		r.AddMethod("ModelManager", 3, "SetModelDefaults", setModelDefaultsMethod)
+		r.AddMethod("ModelManager", 3, "UnsetModelDefaults", unsetModelDefaultsMethod)
 
 		r.AddMethod("ModelManager", 4, "CreateModel", createModelMethod)
 		r.AddMethod("ModelManager", 4, "DestroyModels", destroyModelsV4Method)
@@ -61,6 +69,8 @@ func init() {
 		r.AddMethod("ModelManager", 4, "ModelInfo", modelInfoMethod)
 		r.AddMethod("ModelManager", 4, "ModelStatus", modelStatusMethod)
 		r.AddMethod("ModelManager", 4, "ModifyModelAccess", modifyModelAccessMethod)
+		r.AddMethod("ModelManager", 4, "SetModelDefaults", setModelDefaultsMethod)
+		r.AddMethod("ModelManager", 4, "UnsetModelDefaults", unsetModelDefaultsMethod)
 
 		r.AddMethod("ModelManager", 5, "ChangeModelCredential", changeModelCredentialMethod)
 		r.AddMethod("ModelManager", 5, "CreateModel", createModelMethod)
@@ -72,8 +82,67 @@ func init() {
 		r.AddMethod("ModelManager", 5, "ModelInfo", modelInfoMethod)
 		r.AddMethod("ModelManager", 5, "ModelStatus", modelStatusMethod)
 		r.AddMethod("ModelManager", 5, "ModifyModelAccess", modifyModelAccessMethod)
+		r.AddMethod("ModelManager", 5, "SetModelDefaults", setModelDefaultsMethod)
+		r.AddMethod("ModelManager", 5, "UnsetModelDefaults", unsetModelDefaultsMethod)
 
-		return []int{2, 3, 4, 5}
+		r.AddMethod("ModelManager", 6, "ChangeModelCredential", changeModelCredentialMethod)
+		r.AddMethod("ModelManager", 6, "CreateModel", createModelMethod)
+		r.AddMethod("ModelManager", 6, "DestroyModels", destroyModelsV4Method)
+		r.AddMethod("ModelManager", 6, "DumpModels", dumpModelsV3Method)
+		r.AddMethod("ModelManager", 6, "DumpModelsDB", dumpModelsDBMethod)
+		r.AddMethod("ModelManager", 6, "ListModelSummaries", listModelSummariesMethod)
+		r.AddMethod("ModelManager", 6, "ListModels", listModelsMethod)
+		r.AddMethod("ModelManager", 6, "ModelInfo", modelInfoMethod)
+		r.AddMethod("ModelManager", 6, "ModelStatus", modelStatusMethod)
+		r.AddMethod("ModelManager", 6, "ModifyModelAccess", modifyModelAccessMethod)
+		r.AddMethod("ModelManager", 6, "SetModelDefaults", setModelDefaultsMethod)
+		r.AddMethod("ModelManager", 6, "UnsetModelDefaults", unsetModelDefaultsMethod)
+		r.AddMethod("ModelManager", 6, "ModelDefaultsForClouds", modelDefaultsForCloudsMethod)
+
+		r.AddMethod("ModelManager", 7, "ChangeModelCredential", changeModelCredentialMethod)
+		r.AddMethod("ModelManager", 7, "CreateModel", createModelMethod)
+		r.AddMethod("ModelManager", 7, "DestroyModels", destroyModelsV4Method)
+		r.AddMethod("ModelManager", 7, "DumpModels", dumpModelsV3Method)
+		r.AddMethod("ModelManager", 7, "DumpModelsDB", dumpModelsDBMethod)
+		r.AddMethod("ModelManager", 7, "ListModelSummaries", listModelSummariesMethod)
+		r.AddMethod("ModelManager", 7, "ListModels", listModelsMethod)
+		r.AddMethod("ModelManager", 7, "ModelInfo", modelInfoMethod)
+		r.AddMethod("ModelManager", 7, "ModelStatus", modelStatusMethod)
+		r.AddMethod("ModelManager", 7, "ModifyModelAccess", modifyModelAccessMethod)
+		r.AddMethod("ModelManager", 7, "SetModelDefaults", setModelDefaultsMethod)
+		r.AddMethod("ModelManager", 7, "UnsetModelDefaults", unsetModelDefaultsMethod)
+		r.AddMethod("ModelManager", 7, "ModelDefaultsForClouds", modelDefaultsForCloudsMethod)
+
+		r.AddMethod("ModelManager", 8, "ChangeModelCredential", changeModelCredentialMethod)
+		r.AddMethod("ModelManager", 8, "CreateModel", createModelMethod)
+		r.AddMethod("ModelManager", 8, "DestroyModels", destroyModelsV4Method)
+		r.AddMethod("ModelManager", 8, "DumpModels", dumpModelsV3Method)
+		r.AddMethod("ModelManager", 8, "DumpModelsDB", dumpModelsDBMethod)
+		r.AddMethod("ModelManager", 8, "ListModelSummaries", listModelSummariesMethod)
+		r.AddMethod("ModelManager", 8, "ListModels", listModelsMethod)
+		r.AddMethod("ModelManager", 8, "ModelInfo", modelInfoMethod)
+		r.AddMethod("ModelManager", 8, "ModelStatus", modelStatusMethod)
+		r.AddMethod("ModelManager", 8, "ModifyModelAccess", modifyModelAccessMethod)
+		r.AddMethod("ModelManager", 8, "SetModelDefaults", setModelDefaultsMethod)
+		r.AddMethod("ModelManager", 8, "UnsetModelDefaults", unsetModelDefaultsMethod)
+		r.AddMethod("ModelManager", 8, "ModelDefaultsForClouds", modelDefaultsForCloudsMethod)
+
+		r.AddMethod("ModelManager", 9, "ChangeModelCredential", changeModelCredentialMethod)
+		r.AddMethod("ModelManager", 9, "CreateModel", createModelMethod)
+		r.AddMethod("ModelManager", 9, "DestroyModels", destroyModelsV4Method)
+		r.AddMethod("ModelManager", 9, "DumpModels", dumpModelsV3Method)
+		r.AddMethod("ModelManager", 9, "DumpModelsDB", dumpModelsDBMethod)
+		r.AddMethod("ModelManager", 9, "ListModelSummaries", listModelSummariesMethod)
+		r.AddMethod("ModelManager", 9, "ListModels", listModelsMethod)
+		r.AddMethod("ModelManager", 9, "ModelInfo", modelInfoMethod)
+		r.AddMethod("ModelManager", 9, "ModelStatus", modelStatusMethod)
+		r.AddMethod("ModelManager", 9, "ModifyModelAccess", modifyModelAccessMethod)
+		r.AddMethod("ModelManager", 9, "ValidateModelUpgrades", validateModelUpgradesMethod)
+		r.AddMethod("ModelManager", 9, "SetModelDefaults", setModelDefaultsMethod)
+		r.AddMethod("ModelManager", 9, "UnsetModelDefaults", unsetModelDefaultsMethod)
+		r.AddMethod("ModelManager", 9, "ModelDefaultsForClouds", modelDefaultsForCloudsMethod)
+
+		return []int{2, 3, 4, 5, 6, 7, 8, 9}
 	}
 }
 
@@ -450,3 +519,92 @@ func (r *controllerRoot) changeModelCredential(ctx context.Context, arg jujupara
 	}
 	return nil
 }
+
+// ValidateModelUpgrades validates if a model is allowed to perform an upgrade.
+// Examples of why you would want to block a model upgrade, would be situations
+// like upgrade-series. If performing an upgrade-series we don't know the
+// current status of the machine, so performing an upgrade-model can lead to
+// bad unintended errors down the line.
+func (r *controllerRoot) ValidateModelUpgrades(ctx context.Context, args jujuparams.ValidateModelUpgradeParams) (jujuparams.ErrorResults, error) {
+	results := make([]jujuparams.ErrorResult, len(args.Models))
+	for i, arg := range args.Models {
+		modelTag, err := names.ParseModelTag(arg.ModelTag)
+		if err != nil {
+			results[i].Error = mapError(errgo.WithCausef(err, params.ErrBadRequest, ""))
+			continue
+		}
+		results[i].Error = mapError(r.jem.ValidateModelUpgrade(ctx, r.identity, modelTag.Id(), args.Force))
+	}
+	return jujuparams.ErrorResults{
+		Results: results,
+	}, nil
+}
+
+// SetModelDefaults writes new values for the specified default model settings.
+func (r *controllerRoot) SetModelDefaults(ctx context.Context, args jujuparams.SetModelDefaults) (jujuparams.ErrorResults, error) {
+	if r.identity.Id() == "" {
+		return jujuparams.ErrorResults{}, errgo.WithCausef(nil, params.ErrUnauthorized, "")
+	}
+	results := make([]jujuparams.ErrorResult, len(args.Config))
+	for i, config := range args.Config {
+		cloudTag, err := names.ParseCloudTag(config.CloudTag)
+		if err != nil {
+			results[i].Error = mapError(err)
+			continue
+		}
+		cloud := string(conv.FromCloudTag(cloudTag))
+		results[i].Error = mapError(r.jem.SetModelDefaults(ctx, r.identity, cloud, config.CloudRegion, config.Config))
+	}
+
+	return jujuparams.ErrorResults{
+		Results: results,
+	}, nil
+}
+
+// UnsetModelDefaults removes the specified default model settings.
+func (r *controllerRoot) UnsetModelDefaults(ctx context.Context, args jujuparams.UnsetModelDefaults) (jujuparams.ErrorResults, error) {
+	if r.identity.Id() == "" {
+		return jujuparams.ErrorResults{}, errgo.WithCausef(nil, params.ErrUnauthorized, "")
+	}
+	results := make([]jujuparams.ErrorResult, len(args.Keys))
+	for i, key := range args.Keys {
+		cloudTag, err := names.ParseCloudTag(key.CloudTag)
+		if err != nil {
+			results[i].Error = mapError(err)
+			continue
+		}
+		cloud := string(conv.FromCloudTag(cloudTag))
+		results[i].Error = mapError(r.jem.UnsetModelDefaults(ctx, r.identity, cloud, key.CloudRegion, key.Keys))
+	}
+
+	return jujuparams.ErrorResults{
+		Results: results,
+	}, nil
+}
+
+// ModelDefaultsForClouds returns the default config values for the specified
+// clouds.
+func (r *controllerRoot) ModelDefaultsForClouds(ctx context.Context, args jujuparams.Entities) (jujuparams.ModelDefaultsResults, error) {
+	if r.identity.Id() == "" {
+		return jujuparams.ModelDefaultsResults{}, errgo.WithCausef(nil, params.ErrUnauthorized, "")
+	}
+	result := jujuparams.ModelDefaultsResults{}
+	result.Results = make([]jujuparams.ModelDefaultsResult, len(args.Entities))
+	for i, entity := range args.Entities {
+		cloudTag, err := names.ParseCloudTag(entity.Tag)
+		if err != nil {
+			result.Results[i].Error = mapError(err)
+			continue
+		}
+		cloud := conv.FromCloudTag(cloudTag)
+		defaults, err := r.jem.ModelDefaultsForCloud(ctx, r.identity, cloud)
+		if err != nil {
+			result.Results[i].Error = mapError(err)
+			continue
+		}
+		result.Results[i] = defaults
+	}
+	return result, nil
+}
+
+// TODO (ashipika) Implement ModelDefaults - need to determine which cloud this would refer to.

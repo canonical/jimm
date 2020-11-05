@@ -161,15 +161,18 @@ func (c *Conn) DestroyApplicationOffer(ctx context.Context, offer string, force 
 // consume an application offer. The given ConsumeOfferDetails structure
 // must include an Offer.OfferURL and the rest of the structure will be
 // filled in by the API call. GetApplicationOfferConsumeDetails uses the
-// GetConsumeDetails procedure on the ApplicationOffers facade version 2.
-func (c *Conn) GetApplicationOfferConsumeDetails(ctx context.Context, info *jujuparams.ConsumeOfferDetails, v bakery.Version) error {
-	args := jujuparams.OfferURLs{
-		OfferURLs:     []string{info.Offer.OfferURL},
-		BakeryVersion: v,
+// GetConsumeDetails procedure on the ApplicationOffers facade version 3.
+func (c *Conn) GetApplicationOfferConsumeDetails(ctx context.Context, user params.User, info *jujuparams.ConsumeOfferDetails, v bakery.Version) error {
+	args := jujuparams.ConsumeOfferDetailsArg{
+		OfferURLs: jujuparams.OfferURLs{
+			OfferURLs:     []string{info.Offer.OfferURL},
+			BakeryVersion: v,
+		},
+		UserTag: conv.ToUserTag(user).String(),
 	}
 
 	var resp jujuparams.ConsumeOfferDetailsResults
-	err := c.APICall("ApplicationOffers", 2, "", "GetConsumeDetails", &args, &resp)
+	err := c.APICall("ApplicationOffers", 3, "", "GetConsumeDetails", &args, &resp)
 	if err != nil {
 		return newAPIError(err)
 	}

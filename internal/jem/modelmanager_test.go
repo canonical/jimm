@@ -3,8 +3,10 @@
 package jem_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -15,6 +17,7 @@ import (
 	"github.com/juju/juju/testing/factory"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
+	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2/bson"
@@ -37,6 +40,20 @@ func (s *modelManagerSuite) SetUpTest(c *gc.C) {
 	s.usageSenderAuthorizationClient = new(testUsageSenderAuthorizationClient)
 	s.Params.UsageSenderAuthorizationClient = s.usageSenderAuthorizationClient
 	s.BootstrapSuite.SetUpTest(c)
+}
+
+func (s *modelManagerSuite) TestValidateModelUpgrade(c *gc.C) {
+	now := bson.Now()
+	s.PatchValue(jem.WallClock, testclock.NewClock(now))
+
+	err := s.JEM.ValidateModelUpgrade(testContext, jemtest.Charlie, s.Model.UUID, true)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
+
+	err = s.JEM.ValidateModelUpgrade(testContext, jemtest.Bob, s.Model.UUID, false)
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.JEM.ValidateModelUpgrade(testContext, jemtest.Bob, utils.MustNewUUID().String(), true)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
 func (s *modelManagerSuite) TestDestroyModel(c *gc.C) {
@@ -645,4 +662,157 @@ func (s *modelManagerSuite) TestUpdateModelCredential(c *gc.C) {
 	err = s.JEM.DB.GetModel(testContext, &model1)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model1.Credential, jc.DeepEquals, cred.Path)
+}
+
+func (s *modelManagerSuite) TestModelDefaults(c *gc.C) {
+	ctx := context.Background()
+
+	result, err := s.JEM.ModelDefaultsForCloud(ctx, jemtest.NewIdentity("bob"), "no-such-cloud")
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(result.Error, gc.IsNil)
+	c.Assert(result.Config, gc.HasLen, 0)
+
+	err = s.JEM.SetModelDefaults(
+		ctx,
+		jemtest.NewIdentity("bob"),
+		"test-cloud",
+		"test-region",
+		map[string]interface{}{
+			"a": 12345,
+			"b": "value1",
+		},
+	)
+	c.Assert(err, jc.ErrorIsNil)
+
+	result, err = s.JEM.ModelDefaultsForCloud(ctx, jemtest.Bob, "test-cloud")
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(result.Error, gc.IsNil)
+	c.Assert(result.Config, jc.DeepEquals, map[string]jujuparams.ModelDefaults{
+		"a": jujuparams.ModelDefaults{
+			Regions: []jujuparams.RegionDefaults{{
+				RegionName: "test-region",
+				Value:      12345,
+			}},
+		},
+		"b": jujuparams.ModelDefaults{
+			Regions: []jujuparams.RegionDefaults{{
+				RegionName: "test-region",
+				Value:      "value1",
+			}},
+		},
+	})
+
+	err = s.JEM.SetModelDefaults(
+		ctx,
+		jemtest.NewIdentity("bob"),
+		"test-cloud",
+		"test-region",
+		map[string]interface{}{
+			"a": 12345,
+			"b": "value1",
+			"c": 17,
+		},
+	)
+	c.Assert(err, jc.ErrorIsNil)
+	err = s.JEM.SetModelDefaults(
+		ctx,
+		jemtest.NewIdentity("bob"),
+		"test-cloud",
+		"test-another-region",
+		map[string]interface{}{
+			"a": 1,
+			"b": "value2",
+			"c": 2,
+		},
+	)
+	c.Assert(err, jc.ErrorIsNil)
+
+	result, err = s.JEM.ModelDefaultsForCloud(ctx, jemtest.NewIdentity("bob"), "test-cloud")
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(result.Error, gc.IsNil)
+	for k, v := range result.Config {
+		sort.Slice(v.Regions, func(i, j int) bool {
+			return v.Regions[i].RegionName < v.Regions[j].RegionName
+		})
+		result.Config[k] = v
+	}
+	c.Assert(result.Config, jc.DeepEquals, map[string]jujuparams.ModelDefaults{
+		"a": jujuparams.ModelDefaults{
+			Regions: []jujuparams.RegionDefaults{{
+				RegionName: "test-another-region",
+				Value:      1,
+			}, {
+				RegionName: "test-region",
+				Value:      12345,
+			}},
+		},
+		"b": jujuparams.ModelDefaults{
+			Regions: []jujuparams.RegionDefaults{{
+				RegionName: "test-another-region",
+				Value:      "value2",
+			}, {
+				RegionName: "test-region",
+				Value:      "value1",
+			}},
+		},
+		"c": jujuparams.ModelDefaults{
+			Regions: []jujuparams.RegionDefaults{{
+				RegionName: "test-another-region",
+				Value:      2,
+			}, {
+				RegionName: "test-region",
+				Value:      17,
+			}},
+		},
+	})
+
+	err = s.JEM.UnsetModelDefaults(
+		ctx,
+		jemtest.NewIdentity("bob"),
+		"test-cloud",
+		"test-another-region",
+		[]string{"a"},
+	)
+	c.Assert(err, jc.ErrorIsNil)
+	err = s.JEM.UnsetModelDefaults(
+		ctx,
+		jemtest.NewIdentity("bob"),
+		"test-cloud",
+		"test-region",
+		[]string{"c"},
+	)
+	c.Assert(err, jc.ErrorIsNil)
+
+	result, err = s.JEM.ModelDefaultsForCloud(ctx, jemtest.NewIdentity("bob"), "test-cloud")
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(result.Error, gc.IsNil)
+	for k, v := range result.Config {
+		sort.Slice(v.Regions, func(i, j int) bool {
+			return v.Regions[i].RegionName < v.Regions[j].RegionName
+		})
+		result.Config[k] = v
+	}
+	c.Assert(result.Config, jc.DeepEquals, map[string]jujuparams.ModelDefaults{
+		"a": jujuparams.ModelDefaults{
+			Regions: []jujuparams.RegionDefaults{{
+				RegionName: "test-region",
+				Value:      12345,
+			}},
+		},
+		"b": jujuparams.ModelDefaults{
+			Regions: []jujuparams.RegionDefaults{{
+				RegionName: "test-another-region",
+				Value:      "value2",
+			}, {
+				RegionName: "test-region",
+				Value:      "value1",
+			}},
+		},
+		"c": jujuparams.ModelDefaults{
+			Regions: []jujuparams.RegionDefaults{{
+				RegionName: "test-another-region",
+				Value:      2,
+			}},
+		},
+	})
 }

@@ -6,13 +6,17 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 
+	"github.com/gorilla/websocket"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/rpc/jsoncodec"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/jemtest/apitest"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
+	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -98,4 +102,46 @@ func AssertRedirect(c *gc.C, p RedirectParams) {
 		c.Assert(rr.Code, gc.Equals, p.ExpectCode)
 	}
 	c.Assert(rr.HeaderMap.Get("Location"), gc.Equals, p.ExpectLocation)
+}
+
+func (s *apiSuite) TestModelCommands(c *gc.C) {
+	path := fmt.Sprintf("/model/%s/commands", s.Model.UUID)
+	serverURL, err := url.Parse(s.HTTP.URL)
+	c.Assert(err, gc.Equals, nil)
+	u := url.URL{
+		Scheme: "ws",
+		Host:   serverURL.Host,
+		Path:   path,
+	}
+
+	conn, response, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	if err != nil {
+		c.Assert(err, gc.Equals, nil)
+	}
+	c.Assert(response.StatusCode, gc.Equals, http.StatusSwitchingProtocols)
+	defer conn.Close()
+
+	msg := struct {
+		RedirectTo string `json:"redirect-to"`
+	}{}
+	jsonConn := jsoncodec.NewWebsocketConn(conn)
+	err = jsonConn.Receive(&msg)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(msg.RedirectTo, gc.Equals, fmt.Sprintf("wss://%s/model/%s/commands", mongodoc.Addresses(s.Controller.HostPorts)[0], s.Model.UUID))
+}
+
+func (s *apiSuite) TestModelCommandsModelNotFoundf(c *gc.C) {
+	serverURL, err := url.Parse(s.HTTP.URL)
+	c.Assert(err, gc.Equals, nil)
+	u := url.URL{
+		Scheme: "ws",
+		Host:   serverURL.Host,
+		Path:   fmt.Sprintf("/models/%s/commands", s.Model.UUID),
+	}
+
+	_, response, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	if err != nil {
+		c.Assert(err, gc.ErrorMatches, "websocket: bad handshake")
+	}
+	c.Assert(response.StatusCode, gc.Equals, http.StatusNotFound)
 }

@@ -3,7 +3,7 @@
 
 set -eu
 
-image=${image:-ubuntu:16.04}
+image=${image:-ubuntu:20.04}
 container=${container:-jimm-release-`uuidgen`}
 
 lxd_exec() {
@@ -26,7 +26,7 @@ lxd_exec_ubuntu() {
 		$container -- "$@"
 }
 
-lxc launch -e ubuntu:16.04 $container
+lxc launch -e ${image} $container
 trap "lxc delete --force $container" EXIT
 
 lxd_exec sh -c 'while [ ! -f /var/lib/cloud/instance/boot-finished ]; do sleep 0.1; done'

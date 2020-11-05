@@ -5,7 +5,7 @@ package jem_test
 import (
 	"context"
 
-	"github.com/juju/charm/v7"
+	"github.com/juju/charm/v8"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/juju/state"
@@ -72,7 +72,7 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 			OfferURL: offerURL,
 		},
 	}
-	err = s.JEM.GetApplicationOfferConsumeDetails(ctx, jemtest.Bob, &d, bakery.Version2)
+	err = s.JEM.GetApplicationOfferConsumeDetails(ctx, jemtest.Bob, "", &d, bakery.Version2)
 	c.Assert(err, gc.Equals, nil)
 
 	c.Check(d.Macaroon, gc.Not(gc.IsNil))
@@ -96,6 +96,43 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 			}, {
 				UserName: "everyone@external",
 				Access:   "read",
+			}},
+		},
+		ControllerInfo: &jujuparams.ExternalControllerInfo{
+			ControllerTag: names.NewControllerTag(s.ControllerConfig.ControllerUUID()).String(),
+			Alias:         "dummy-1",
+			Addrs:         s.APIInfo(c).Addrs,
+			CACert:        s.Controller.CACert,
+		},
+	})
+
+	err = s.JEM.GrantOfferAccess(ctx, jemtest.Bob, "charlie", offerURL, jujuparams.OfferConsumeAccess)
+	c.Assert(err, jc.ErrorIsNil)
+	err = s.JEM.GrantOfferAccess(ctx, jemtest.Bob, "alice", offerURL, jujuparams.OfferAdminAccess)
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = s.JEM.GetApplicationOfferConsumeDetails(ctx, jemtest.Alice, "charlie", &d, bakery.Version2)
+	c.Assert(err, gc.Equals, nil)
+
+	c.Check(d.Macaroon, gc.Not(gc.IsNil))
+	d.Macaroon = nil
+	c.Check(d.Offer.OfferUUID, gc.Matches, `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
+	d.Offer.OfferUUID = ""
+	c.Check(d, jc.DeepEquals, jujuparams.ConsumeOfferDetails{
+		Offer: &jujuparams.ApplicationOfferDetails{
+			SourceModelTag:         names.NewModelTag(s.Model.UUID).String(),
+			OfferURL:               offerURL,
+			OfferName:              "test-offer",
+			ApplicationDescription: "A pretty popular blog engine",
+			Endpoints: []jujuparams.RemoteEndpoint{{
+				Name:      "url",
+				Role:      charm.RoleProvider,
+				Interface: "http",
+			}},
+			Users: []jujuparams.OfferUserDetails{{
+				UserName:    "charlie@external",
+				DisplayName: "",
+				Access:      "consume",
 			}},
 		},
 		ControllerInfo: &jujuparams.ExternalControllerInfo{

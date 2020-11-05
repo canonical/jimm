@@ -1,13 +1,10 @@
 // Copyright 2020 Canonical Ltd.
-
-// +build !release
-
 package jujuapi_test
 
 import (
 	"context"
 
-	"github.com/juju/charm/v7"
+	"github.com/juju/charm/v8"
 	"github.com/juju/juju/api/applicationoffers"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/crossmodel"

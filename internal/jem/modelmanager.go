@@ -29,6 +29,22 @@ import (
 	"github.com/CanonicalLtd/jimm/params"
 )
 
+// ValidateModelUpgrade validates if a model is allowed to perform an upgrade.
+func (j *JEM) ValidateModelUpgrade(ctx context.Context, id identchecker.ACLIdentity, modelUUID string, force bool) error {
+	model := mongodoc.Model{UUID: modelUUID}
+	if err := j.GetModel(ctx, id, jujuparams.ModelAdminAccess, &model); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+	}
+
+	conn, err := j.OpenAPI(ctx, model.Controller)
+	if err != nil {
+		return errgo.Notef(err, "cannot connect to controller")
+	}
+	defer conn.Close()
+
+	return errgo.Mask(conn.ValidateModelUpgrade(ctx, names.NewModelTag(model.UUID), force), apiconn.IsAPIError)
+}
+
 // DestroyModel destroys the specified model. The model will have its
 // Life set to dying, but won't be removed until it is removed from the
 // controller.
@@ -53,6 +69,59 @@ func (j *JEM) DestroyModel(ctx context.Context, id identchecker.ACLIdentity, mod
 		UUID: model.UUID,
 	})
 	return nil
+}
+
+// SetModelDefaults writes new default model setting values for the specified cloud/region.
+func (j *JEM) SetModelDefaults(ctx context.Context, id identchecker.ACLIdentity, cloud, region string, configs map[string]interface{}) error {
+	return errgo.Mask(j.DB.UpsertModelDefaultConfig(ctx, &mongodoc.CloudRegionDefaults{
+		User:     id.Id(),
+		Cloud:    cloud,
+		Region:   region,
+		Defaults: configs,
+	}))
+}
+
+// UnsetModelDefaults resets  default model setting values for the specified cloud/region.
+func (j *JEM) UnsetModelDefaults(ctx context.Context, id identchecker.ACLIdentity, cloud, region string, keys []string) error {
+	u := new(jimmdb.Update)
+	for _, k := range keys {
+		u.Unset("defaults." + k)
+	}
+	d := mongodoc.CloudRegionDefaults{
+		User:   id.Id(),
+		Cloud:  cloud,
+		Region: region,
+	}
+
+	return errgo.Mask(j.DB.UpdateModelDefaultConfig(ctx, &d, u, true))
+}
+
+// ModelDefaultsForCloud returns the default config values for the specified cloud.
+func (j *JEM) ModelDefaultsForCloud(ctx context.Context, id identchecker.ACLIdentity, cloud params.Cloud) (jujuparams.ModelDefaultsResult, error) {
+	result := jujuparams.ModelDefaultsResult{
+		Config: make(map[string]jujuparams.ModelDefaults),
+	}
+	q := jimmdb.And(jimmdb.Eq("user", id.Id()), jimmdb.Eq("cloud", cloud))
+	err := j.DB.ForEachModelDefaultConfig(ctx, q, []string{"region"}, func(config *mongodoc.CloudRegionDefaults) error {
+		zapctx.Debug(ctx, "XXX###XXX", zap.Any("config", config))
+		for k, v := range config.Defaults {
+			d := result.Config[k]
+			if config.Region == "" {
+				d.Default = v
+			} else {
+				d.Regions = append(d.Regions, jujuparams.RegionDefaults{
+					RegionName: config.Region,
+					Value:      v,
+				})
+			}
+			result.Config[k] = d
+		}
+		return nil
+	})
+	if err != nil {
+		return jujuparams.ModelDefaultsResult{}, errgo.Mask(err)
+	}
+	return result, nil
 }
 
 // CreateModelParams specifies the parameters needed to create a new

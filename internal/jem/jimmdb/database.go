@@ -92,6 +92,9 @@ func (db *Database) EnsureIndexes() error {
 	}, {
 		db.ApplicationOffers(),
 		mgo.Index{Key: []string{"owner-name", "model-name", "offer-name"}, Unique: true},
+	}, {
+		db.ModelDefaultConfigs(),
+		mgo.Index{Key: []string{"user", "cloud", "region"}},
 	}}
 	for _, idx := range indexes {
 		err := idx.c.EnsureIndex(idx.i)
@@ -105,14 +108,15 @@ func (db *Database) EnsureIndexes() error {
 func (db *Database) Collections() []*mgo.Collection {
 	return []*mgo.Collection{
 		db.Audits(),
+		db.ApplicationOffers(),
 		db.Applications(),
 		db.CloudRegions(),
 		db.Controllers(),
 		db.Credentials(),
 		db.Macaroons(),
 		db.Machines(),
+		db.ModelDefaultConfigs(),
 		db.Models(),
-		db.ApplicationOffers(),
 	}
 }
 
@@ -146,6 +150,10 @@ func (db *Database) Machines() *mgo.Collection {
 
 func (db *Database) Models() *mgo.Collection {
 	return db.C("models")
+}
+
+func (db *Database) ModelDefaultConfigs() *mgo.Collection {
+	return db.C("model-default-configs")
 }
 
 // ApplicationOffers returns the collection holding application offers.

@@ -3,41 +3,43 @@ module github.com/CanonicalLtd/jimm
 go 1.14
 
 require (
-	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/canonical/candid v1.4.2
 	github.com/frankban/quicktest v1.11.0
+	github.com/golang/mock v1.4.4 // indirect
 	github.com/google/go-cmp v0.5.2
 	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
 	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/vault/api v1.0.5-0.20200709165743-f98572ac11c9
 	github.com/juju/aclstore v0.0.0-20180706073322-7fc1cdaacf01
-	github.com/juju/charm/v7 v7.0.0-20200625165032-ef717232a815
+	github.com/juju/charm/v8 v8.0.0-20200925052646-bb021a575610
 	github.com/juju/clock v0.0.0-20190205081909-9c5c9712527c
 	github.com/juju/cmd v0.0.0-20200108104440-8e43f3faa5c9
 	github.com/juju/errors v0.0.0-20200330140219-3fe23663418f
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
 	github.com/juju/httprequest v1.0.1
-	github.com/juju/juju v0.0.0-20201007080928-1f35f6a20b57
+	github.com/juju/juju v0.0.0-20201102064548-d344015a21e6
 	github.com/juju/loggo v0.0.0-20200526014432-9ce3a2e09b5e
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
 	github.com/juju/mgosession v1.0.0
-	github.com/juju/names/v4 v4.0.0-20200424054733-9a8294627524
+	github.com/juju/names/v4 v4.0.0-20200929085019-be23e191fee0
 	github.com/juju/persistent-cookiejar v0.0.0-20170428161559-d67418f14c93
 	github.com/juju/rpcreflect v0.0.0-20200416001309-bb46e9ba1476
 	github.com/juju/simplekv v1.0.0
-	github.com/juju/testing v0.0.0-20200706033705-4c23f9c453cd
+	github.com/juju/testing v0.0.0-20201030020617-7189b3728523
 	github.com/juju/utils v0.0.0-20200604140309-9d78121a29e0
 	github.com/juju/version v0.0.0-20191219164919-81c1be00b9a6
 	github.com/julienschmidt/httprouter v1.3.0
-	github.com/prometheus/client_golang v1.5.1
+	github.com/prometheus/client_golang v1.7.1
 	github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af
 	go.uber.org/zap v1.10.0
-	golang.org/x/crypto v0.0.0-20200728195943-123391ffb6de
-	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
-	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f
+	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
+	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
+	golang.org/x/sys v0.0.0-20201018230417-eeed37f84f13 // indirect
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
+	gopkg.in/check.v1 v1.0.0-20200902074654-038fdea0a05b
 	gopkg.in/errgo.v1 v1.0.1
-	gopkg.in/httprequest.v1 v1.2.0
-	gopkg.in/juju/environschema.v1 v1.0.0
+	gopkg.in/httprequest.v1 v1.2.1
+	gopkg.in/juju/environschema.v1 v1.0.1-0.20201027142642-c89a4490670a
 	gopkg.in/juju/worker.v1 v1.0.0-20191018043616-19a698a7150f
 	gopkg.in/macaroon-bakery.v2 v2.2.0
 	gopkg.in/macaroon.v2 v2.1.0

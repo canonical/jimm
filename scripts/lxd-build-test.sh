@@ -3,11 +3,11 @@
 
 set -eu
 
-image=${image:-ubuntu:16.04}
+image=${image:-ubuntu:20.04}
 container=${container:-jimm-test-`uuidgen`}
 packages="build-essential bzr git make mongodb"
 
-lxc launch -e ubuntu:16.04 $container
+lxc launch -e ${image} $container
 trap "lxc delete --force $container" EXIT
 
 lxc exec $container -- sh -c 'while [ ! -f /var/lib/cloud/instance/boot-finished ]; do sleep 0.1; done'

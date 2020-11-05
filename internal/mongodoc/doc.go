@@ -606,6 +606,13 @@ const (
 	ApplicationOfferAdminAccess
 )
 
+type CloudRegionDefaults struct {
+	User     string                 `bson:"user"`
+	Cloud    string                 `bson:"cloud"`
+	Region   string                 `bson:"region"`
+	Defaults map[string]interface{} `bson:"defaults"`
+}
+
 // An ApplicationOfferAccessMap is a map from user to AccessPermission.
 type ApplicationOfferAccessMap map[User]ApplicationOfferAccessPermission
 

@@ -4,6 +4,7 @@ package apiconn_test
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -12,6 +13,7 @@ import (
 	"github.com/juju/juju/core/life"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
+	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
@@ -72,7 +74,7 @@ func (s *modelmanagerSuite) TestCreateModel(c *gc.C) {
 	c.Check(info.UUID, gc.Not(gc.Equals), "")
 	c.Check(info.CloudTag, gc.Equals, names.NewCloudTag("dummy").String())
 	c.Check(info.CloudRegion, gc.Equals, "dummy-region")
-	c.Check(info.DefaultSeries, gc.Equals, "bionic")
+	c.Check(info.DefaultSeries, gc.Equals, "focal")
 	c.Check(string(info.Life), gc.Equals, "alive")
 	c.Check(string(info.Status.Status), gc.Equals, "available")
 	c.Check(info.Status.Data, gc.IsNil)
@@ -219,6 +221,26 @@ func (s *modelmanagerSuite) TestRevokeModelAccessError(c *gc.C) {
 	c.Check(apiconn.IsAPIError(err), gc.Equals, true)
 	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
 	c.Check(err, gc.ErrorMatches, `api error: could not lookup model: model "00000000-0000-0000-0000-000000000000" not found`)
+}
+
+func (s *modelmanagerSuite) TestValidateModelUpgrade(c *gc.C) {
+	ctx := context.Background()
+
+	args := jujuparams.ModelCreateArgs{
+		Name:     "test-model",
+		OwnerTag: conv.ToUserTag("test-user").String(),
+	}
+	var info jujuparams.ModelInfo
+
+	err := s.conn.CreateModel(ctx, &args, &info)
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.conn.ValidateModelUpgrade(ctx, names.NewModelTag(info.UUID), true)
+	c.Assert(err, gc.Equals, nil)
+
+	uuid := utils.MustNewUUID().String()
+	err = s.conn.ValidateModelUpgrade(ctx, names.NewModelTag(uuid), false)
+	c.Assert(err, gc.ErrorMatches, fmt.Sprintf("api error: model %q not found", uuid))
 }
 
 func (s *modelmanagerSuite) TestDestroyModel(c *gc.C) {
