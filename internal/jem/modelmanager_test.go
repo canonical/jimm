@@ -4,7 +4,6 @@ package jem_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -31,14 +30,11 @@ import (
 
 type modelManagerSuite struct {
 	jemtest.BootstrapSuite
-	usageSenderAuthorizationClient *testUsageSenderAuthorizationClient
 }
 
 var _ = gc.Suite(&modelManagerSuite{})
 
 func (s *modelManagerSuite) SetUpTest(c *gc.C) {
-	s.usageSenderAuthorizationClient = new(testUsageSenderAuthorizationClient)
-	s.Params.UsageSenderAuthorizationClient = s.usageSenderAuthorizationClient
 	s.BootstrapSuite.SetUpTest(c)
 }
 
@@ -115,13 +111,12 @@ func (s *modelManagerSuite) TestDestroyModelWithStorage(c *gc.C) {
 }
 
 var createModelTests = []struct {
-	about                          string
-	user                           string
-	params                         jem.CreateModelParams
-	usageSenderAuthorizationErrors []error
-	expectCredential               mongodoc.CredentialPath
-	expectError                    string
-	expectErrorCause               error
+	about            string
+	user             string
+	params           jem.CreateModelParams
+	expectCredential mongodoc.CredentialPath
+	expectError      string
+	expectErrorCause error
 }{{
 	about: "success",
 	user:  "bob",
@@ -244,21 +239,6 @@ var createModelTests = []struct {
 		Path:  params.EntityPath{"charlie", ""},
 		Cloud: "dummy",
 	},
-}, {
-	about: "success with usage sender authorization client",
-	user:  "bob",
-	params: jem.CreateModelParams{
-		Path: params.EntityPath{"bob", ""},
-		Credential: mongodoc.CredentialPath{
-			Cloud: "dummy",
-			EntityPath: mongodoc.EntityPath{
-				User: "bob",
-				Name: "cred",
-			},
-		},
-		Cloud: "dummy",
-	},
-	usageSenderAuthorizationErrors: []error{errors.New("a silly error")},
 }}
 
 func (s *modelManagerSuite) TestCreateModel(c *gc.C) {
@@ -274,7 +254,6 @@ func (s *modelManagerSuite) TestCreateModel(c *gc.C) {
 
 	for i, test := range createModelTests {
 		c.Logf("test %d. %s", i, test.about)
-		s.usageSenderAuthorizationClient.SetErrors(test.usageSenderAuthorizationErrors)
 		if test.params.Path.Name == "" {
 			test.params.Path.Name = params.Name(fmt.Sprintf("test-%d", i))
 		}

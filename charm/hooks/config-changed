@@ -28,7 +28,6 @@ def config_changed():
         "logging-level",
         "max-mgo-sessions",
         "metering-location",
-        "usage-sender-url",
     ]
 
     app_config = {

@@ -158,17 +158,6 @@ func (j *JEM) CreateModel(ctx context.Context, id identchecker.ACLIdentity, p Cr
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 
-	var usageSenderCredentials []byte
-	if j.pool.config.UsageSenderAuthorizationClient != nil {
-		usageSenderCredentials, err = j.pool.config.UsageSenderAuthorizationClient.GetCredentials(
-			ctx,
-			string(p.Path.User),
-		)
-		if err != nil {
-			zapctx.Warn(ctx, "failed to obtain credentials for model", zaputil.Error(err), zap.String("user", string(p.Path.User)))
-		}
-	}
-
 	cred, err := j.selectCredential(ctx, id, p.Credential, p.Path.User, p.Cloud)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrAmbiguousChoice))
@@ -197,11 +186,10 @@ func (j *JEM) CreateModel(ctx context.Context, id identchecker.ACLIdentity, p Cr
 	// a model that we can't add locally because the name
 	// already exists.
 	modelDoc := &mongodoc.Model{
-		Path:                   p.Path,
-		CreationTime:           wallClock.Now(),
-		Creator:                id.Id(),
-		UsageSenderCredentials: usageSenderCredentials,
-		Credential:             credPath,
+		Path:         p.Path,
+		CreationTime: wallClock.Now(),
+		Creator:      id.Id(),
+		Credential:   credPath,
 		// Use a temporary UUID so that we can create two at the
 		// same time, because the uuid field must always be
 		// unique.

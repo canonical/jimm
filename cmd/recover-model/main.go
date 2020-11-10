@@ -22,7 +22,6 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	usagesenderauth "github.com/CanonicalLtd/jimm/internal/usagesender/auth"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -74,13 +73,11 @@ func recoverModel(ctx context.Context, cfg *config.Config, controller, model str
 	if err != nil {
 		return errgo.Notef(err, "cannot initialize agent")
 	}
-	usageSenderAuthorizationClient := usagesenderauth.NewAuthorizationClient(cfg.UsageSenderURL, bclient)
 
 	p, err := jem.NewPool(ctx, jem.Params{
-		DB:                             db,
-		SessionPool:                    mgosession.NewPool(ctx, session, 100),
-		ControllerAdmin:                cfg.ControllerAdmin,
-		UsageSenderAuthorizationClient: usageSenderAuthorizationClient,
+		DB:              db,
+		SessionPool:     mgosession.NewPool(ctx, session, 100),
+		ControllerAdmin: cfg.ControllerAdmin,
 	})
 	if err != nil {
 		return errgo.Notef(err, "cannot access JIMM database")
@@ -119,13 +116,6 @@ func recoverModel(ctx context.Context, cfg *config.Config, controller, model str
 			return errgo.Mask(err)
 		}
 		doc.Controller = cPath
-		if uac := p.UsageAuthorizationClient(); uac != nil {
-			var err error
-			doc.UsageSenderCredentials, err = uac.GetCredentials(ctx, string(doc.Path.User))
-			if err != nil {
-				return errgo.Notef(err, "cannot create usage sender credentials")
-			}
-		}
 		return errgo.Mask(j.DB.InsertModel(ctx, doc))
 	}
 

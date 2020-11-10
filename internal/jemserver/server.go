@@ -19,7 +19,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/juju/worker.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/bakery/mgorootkeystore"
@@ -33,22 +32,9 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/monitor"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
-	"github.com/CanonicalLtd/jimm/internal/usagesender"
-	usagesenderauth "github.com/CanonicalLtd/jimm/internal/usagesender/auth"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
 	"github.com/CanonicalLtd/jimm/params"
-)
-
-var (
-	usageSenderPeriod = 5 * time.Minute
-
-	// NewUsageSenderAuthorizationClient is a function the creates a new
-	// UsageSenderAuthorizationClient. It is exported so that it can be
-	// overriden in tests.
-	NewUsageSenderAuthorizationClient = func(url string, client *httpbakery.Client) jem.UsageSenderAuthorizationClient {
-		return usagesenderauth.NewAuthorizationClient(url, client)
-	}
 )
 
 // NewAPIHandlerFunc is a function that returns set of httprequest
@@ -108,14 +94,6 @@ type Params struct {
 	// used with this controller.
 	GUILocation string
 
-	// UsageSenderURL holds the URL where we obtain authorization
-	// to collect and report usage metrics.
-	UsageSenderURL string
-
-	// UsageSenderSpoolPath holds the path to a directory where the usage
-	// send worker will store metrics.
-	UsageSenderSpoolPath string
-
 	// Domain holds the domain to which users must belong, not
 	// including the leading "@". If this is empty, users may be in
 	// any domain.
@@ -166,7 +144,6 @@ type Server struct {
 	auth            *auth.Authenticator
 	sessionPool     *mgosession.Pool
 	monitor         *monitor.Monitor
-	usageSender     worker.Worker
 	jemModelStats   *jem.ModelStats
 	jemMachineStats *jem.MachineStats
 }
@@ -182,7 +159,7 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	if config.MaxMgoSessions <= 0 {
 		config.MaxMgoSessions = 1
 	}
-	identityClient, bclient, err := newIdentityClient(config)
+	identityClient, _, err := newIdentityClient(config)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -201,17 +178,12 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot load public cloud metadata")
 	}
-	var usageSenderAuthClient jem.UsageSenderAuthorizationClient
-	if config.UsageSenderURL != "" {
-		usageSenderAuthClient = NewUsageSenderAuthorizationClient(config.UsageSenderURL, bclient)
-	}
 	jconfig := jem.Params{
-		DB:                             config.DB,
-		SessionPool:                    sessionPool,
-		ControllerAdmin:                config.ControllerAdmin,
-		UsageSenderAuthorizationClient: usageSenderAuthClient,
-		PublicCloudMetadata:            publicCloudMetadata,
-		Pubsub:                         config.Pubsub,
+		DB:                  config.DB,
+		SessionPool:         sessionPool,
+		ControllerAdmin:     config.ControllerAdmin,
+		PublicCloudMetadata: publicCloudMetadata,
+		Pubsub:              config.Pubsub,
 	}
 	p, err := jem.NewPool(ctx, jconfig)
 	if err != nil {
@@ -300,19 +272,6 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 			return nil, errgo.Mask(err)
 		}
 		srv.monitor = monitor.New(ctx, p, owner)
-	}
-	if config.UsageSenderURL != "" {
-		worker, err := usagesender.NewSendModelUsageWorker(usagesender.SendModelUsageWorkerConfig{
-			OmnibusURL:     config.UsageSenderURL,
-			Pool:           p,
-			Period:         usageSenderPeriod,
-			Context:        ctx,
-			SpoolDirectory: config.UsageSenderSpoolPath,
-		})
-		if err != nil {
-			return nil, errgo.Mask(err)
-		}
-		srv.usageSender = worker
 	}
 	srv.router.Handler("GET", "/admin/acls/*path", aclManager)
 	srv.router.Handler("POST", "/admin/acls/*path", aclManager)
@@ -433,11 +392,6 @@ func (srv *Server) Close() error {
 		srv.monitor.Kill()
 		if err := srv.monitor.Wait(); err != nil {
 			zapctx.Warn(srv.context, "error shutting down monitor", zaputil.Error(err))
-		}
-	}
-	if srv.usageSender != nil {
-		if err := worker.Stop(srv.usageSender); err != nil {
-			zapctx.Warn(srv.context, "error shutting down usage sender", zaputil.Error(err))
 		}
 	}
 	srv.pool.Close()
