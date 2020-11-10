@@ -282,10 +282,6 @@ type Model struct {
 	// DefaultSeries holds the default series for the model.
 	DefaultSeries string
 
-	// UsageSenderCredentials prove that we are authorized to send usage
-	// information for this model.
-	UsageSenderCredentials []byte
-
 	// Status holds the current status of the model
 	Info *ModelInfo `bson:",omitempty"`
 

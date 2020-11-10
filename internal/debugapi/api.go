@@ -27,10 +27,9 @@ func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httpr
 
 	return srv.Handlers(func(p httprequest.Params) (*handler, context.Context, error) {
 		h := &handler{
-			params:                         params.Params,
-			jem:                            params.JEMPool.JEM(ctx),
-			auth:                           params.Authenticator,
-			usageSenderAuthorizationClient: params.JEMPool.UsageAuthorizationClient(),
+			params: params.Params,
+			jem:    params.JEMPool.JEM(ctx),
+			auth:   params.Authenticator,
 		}
 		h.Handler = debugstatus.Handler{
 			Version:           debugstatus.Version(version.VersionInfo),
@@ -43,10 +42,9 @@ func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httpr
 
 type handler struct {
 	debugstatus.Handler
-	params                         jemserver.Params
-	jem                            *jem.JEM
-	auth                           *auth.Authenticator
-	usageSenderAuthorizationClient jem.UsageSenderAuthorizationClient
+	params jemserver.Params
+	jem    *jem.JEM
+	auth   *auth.Authenticator
 }
 
 func (h *handler) checkIsAdmin(ctx context.Context, req *http.Request) error {
@@ -71,34 +69,6 @@ func (h *handler) check(ctx context.Context) map[string]debugstatus.CheckResult 
 func (h *handler) Close() error {
 	h.jem.Close()
 	h.jem = nil
-	return nil
-}
-
-// DebugUsageSenderCheckRequest defines the request structure for the
-// omnibus usage sender authorization check.
-type DebugUsageSenderCheckRequest struct {
-	httprequest.Route `httprequest:"GET /debug/usage/:username"`
-	Username          string `httprequest:"username,path"`
-}
-
-// DebugUsageSenderCheck implements a check that verifies that JIMM is able
-// to perform usage sender authorization.
-func (h *handler) DebugUsageSenderCheck(p httprequest.Params, r *DebugUsageSenderCheckRequest) error {
-	if err := h.checkIsAdmin(p.Context, p.Request); err != nil {
-		return errgo.Mask(err, errgo.Any)
-	}
-
-	if h.usageSenderAuthorizationClient == nil {
-		return errgo.New("cannot perform the check")
-	}
-
-	_, err := h.usageSenderAuthorizationClient.GetCredentials(
-		p.Context,
-		r.Username,
-	)
-	if err != nil {
-		return errgo.Notef(err, "check failed")
-	}
 	return nil
 }
 

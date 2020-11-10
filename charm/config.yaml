@@ -68,10 +68,6 @@ options:
     description: |
       The URL to redirect users to if they wish to access the GUI for
       the JIMM controller.
-  usage-sender-url:
-    default: ""
-    type: string
-    description: Location of the omnibus service.
   domain:
     default: ""
     type: string

@@ -2,11 +2,8 @@ package debugapi_test
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"net/http"
 
-	"github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
 	"github.com/juju/utils/debugstatus"
 	gc "gopkg.in/check.v1"
@@ -22,8 +19,6 @@ import (
 type APISuite struct {
 	jemtest.JEMSuite
 	apitest.APISuite
-
-	metricsRegistrationClient *stubMetricsRegistrationClient
 }
 
 var _ = gc.Suite(&APISuite{})
@@ -39,8 +34,6 @@ func (s *APISuite) TearDownSuite(c *gc.C) {
 }
 
 func (s *APISuite) SetUpTest(c *gc.C) {
-	s.metricsRegistrationClient = &stubMetricsRegistrationClient{}
-	s.JEMSuite.Params.UsageSenderAuthorizationClient = s.metricsRegistrationClient
 	s.JEMSuite.SetUpTest(c)
 	s.APISuite.Params.SessionPool = s.SessionPool
 	s.APISuite.Params.JEMPool = s.Pool
@@ -93,47 +86,6 @@ func (s *APISuite) TestPprofOKWithAdmin(c *gc.C) {
 	c.Assert(resp.HeaderMap.Get("Content-Type"), gc.Matches, "text/html.*")
 }
 
-func (s *APISuite) TestDebugUsageSenderCheck(c *gc.C) {
-	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
-		Handler: s.APIHandler,
-		URL:     "/debug/usage/test-user",
-		Do:      apitest.Do(s.Candid.Client(jemtest.ControllerAdmin)),
-	})
-	c.Assert(resp.Code, gc.Equals, http.StatusOK)
-
-	s.metricsRegistrationClient.CheckCalls(c, []testing.StubCall{{
-		FuncName: "AuthorizeReseller",
-		Args: []interface{}{
-			"test-user",
-		},
-	}})
-}
-
-func (s *APISuite) TestDebugUsageSenderCheckError(c *gc.C) {
-	s.metricsRegistrationClient.SetErrors(errors.New("an embarassing error"))
-	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
-		Handler: s.APIHandler,
-		URL:     "/debug/usage/test-user",
-		Do:      apitest.Do(s.Candid.Client(jemtest.ControllerAdmin)),
-	})
-	c.Assert(resp.Code, gc.Equals, http.StatusInternalServerError)
-
-	var errorMessage struct {
-		Message string `json:"message"`
-	}
-	decoder := json.NewDecoder(resp.Body)
-	err := decoder.Decode(&errorMessage)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(errorMessage.Message, gc.Equals, "check failed: an embarassing error")
-
-	s.metricsRegistrationClient.CheckCalls(c, []testing.StubCall{{
-		FuncName: "AuthorizeReseller",
-		Args: []interface{}{
-			"test-user",
-		},
-	}})
-}
-
 func (s *APISuite) TestDBStats(c *gc.C) {
 	client := &httprequest.Client{
 		BaseURL: s.HTTP.URL,
@@ -146,13 +98,4 @@ func (s *APISuite) TestDBStats(c *gc.C) {
 	for _, coll := range resp.Collections {
 		c.Assert(coll["ok"], gc.Equals, float64(1))
 	}
-}
-
-type stubMetricsRegistrationClient struct {
-	testing.Stub
-}
-
-func (c *stubMetricsRegistrationClient) GetCredentials(_ context.Context, applicationUser string) ([]byte, error) {
-	c.MethodCall(c, "AuthorizeReseller", applicationUser)
-	return []byte("secret credentials"), c.NextErr()
 }

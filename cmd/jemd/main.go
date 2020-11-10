@@ -139,8 +139,6 @@ func startServer(ctx context.Context, eg *errgroup.Group, conf *config.Config) e
 		ControllerUUID:          conf.ControllerUUID,
 		WebsocketRequestTimeout: websocketRequestTimeout,
 		GUILocation:             conf.GUILocation,
-		UsageSenderURL:          conf.UsageSenderURL,
-		UsageSenderSpoolPath:    conf.UsageSenderSpoolDir,
 		Domain:                  conf.Domain,
 		PublicCloudMetadata:     conf.PublicCloudMetadata,
 		Pubsub: &pubsub.Hub{
