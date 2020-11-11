@@ -48,12 +48,6 @@ var (
 	ModelSummaryWatcherNotSupportedError = errgo.New("model summary watcher not supported by the controller")
 )
 
-// UsageSenderAuthorizationClient is used to obtain authorization to
-// collect and report usage metrics.
-type UsageSenderAuthorizationClient interface {
-	GetCredentials(ctx context.Context, applicationUser string) ([]byte, error)
-}
-
 // Params holds parameters for the NewPool function.
 type Params struct {
 	// DB holds the mongo database that will be used to
@@ -67,10 +61,6 @@ type Params struct {
 	// ControllerAdmin holds the identity of the user
 	// or group that is allowed to create controllers.
 	ControllerAdmin params.User
-
-	// UsageSenderAuthorizationClient holds the client to use to  obtain
-	// authorization to collect and report usage metrics.
-	UsageSenderAuthorizationClient UsageSenderAuthorizationClient
 
 	// PublicCloudMetadata contains the metadata details of all known
 	// public clouds.
@@ -199,11 +189,6 @@ func (p *Pool) JEM(ctx context.Context) *JEM {
 	}
 }
 
-// UsageAuthorizationClient returns the UsageSenderAuthorizationClient.
-func (p *Pool) UsageAuthorizationClient() UsageSenderAuthorizationClient {
-	return p.config.UsageSenderAuthorizationClient
-}
-
 type JEM struct {
 	// DB holds the mongodb-backed identity store.
 	DB *jimmdb.Database
@@ -215,8 +200,6 @@ type JEM struct {
 	// closed records whether the JEM instance has
 	// been closed.
 	closed bool
-
-	usageSenderAuthorizationClient UsageSenderAuthorizationClient
 
 	pubsub *pubsub.Hub
 }

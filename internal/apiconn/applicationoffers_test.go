@@ -6,6 +6,7 @@ import (
 	"context"
 	"sort"
 
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/juju/testing/factory"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
@@ -681,7 +682,10 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 	info.Offer.OfferUUID = ""
 	c.Check(info.Macaroon, gc.Not(gc.IsNil))
 	info.Macaroon = nil
-	c.Check(info, jc.DeepEquals, jujuparams.ConsumeOfferDetails{
+	lessF := func(a, b jujuparams.OfferUserDetails) bool {
+		return a.UserName < b.UserName
+	}
+	c.Check(info, jemtest.CmpEquals(cmpopts.SortSlices(lessF)), jujuparams.ConsumeOfferDetails{
 		Offer: &jujuparams.ApplicationOfferDetails{
 			SourceModelTag:         names.NewModelTag(s.modelInfo.UUID).String(),
 			OfferURL:               "test-user@external/test-model.test-offer",
@@ -694,9 +698,6 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 				Limit:     0,
 			}},
 			Users: []jujuparams.OfferUserDetails{{
-				UserName: "test-user@external",
-				Access:   "admin",
-			}, {
 				UserName:    "admin",
 				DisplayName: "admin",
 				Access:      "admin",
@@ -704,6 +705,9 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 				UserName:    "everyone@external",
 				DisplayName: "",
 				Access:      "read",
+			}, {
+				UserName: "test-user@external",
+				Access:   "admin",
 			}},
 		},
 		ControllerInfo: &jujuparams.ExternalControllerInfo{

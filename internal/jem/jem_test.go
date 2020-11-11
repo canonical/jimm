@@ -270,19 +270,3 @@ func addController(c *gc.C, path params.EntityPath, info *jujuapi.Info, jem *jem
 
 	return path
 }
-
-type testUsageSenderAuthorizationClient struct {
-	errors []error
-}
-
-func (c *testUsageSenderAuthorizationClient) SetErrors(errors []error) {
-	c.errors = errors
-}
-
-func (c *testUsageSenderAuthorizationClient) GetCredentials(ctx context.Context, applicationUser string) ([]byte, error) {
-	var err error
-	if len(c.errors) > 0 {
-		err, c.errors = c.errors[0], c.errors[1:]
-	}
-	return []byte("test credentials"), err
-}

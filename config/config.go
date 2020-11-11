@@ -47,8 +47,6 @@ type Config struct {
 	MaxMgoSessions        int               `yaml:"max-mgo-sessions"`
 	GUILocation           string            `yaml:"gui-location"`
 	LoggingLevel          zapcore.Level     `yaml:"logging-level"`
-	UsageSenderURL        string            `yaml:"usage-sender-url,omitempty"`
-	UsageSenderSpoolDir   string            `yaml:"usage-sender-spool-dir,omitempty"`
 	Domain                string            `yaml:"domain"`
 	PublicCloudMetadata   string            `yaml:"public-cloud-metadata"`
 	MaxPubsubConcurrency  int               `yaml:"max-pubsub-concurrency"`
