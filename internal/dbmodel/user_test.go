@@ -58,3 +58,31 @@ func TestUserTag(t *testing.T) {
 	}
 	c.Check(u.Tag().String(), qt.Equals, "user-bob@external")
 }
+
+func TestUserClouds(t *testing.T) {
+	c := qt.New(t)
+
+	db := gormDB(c, &dbmodel.Cloud{}, &dbmodel.User{}, &dbmodel.UserCloudAccess{})
+
+	cl := dbmodel.Cloud{
+		Name: "test-cloud",
+		Users: []dbmodel.UserCloudAccess{{
+			User: dbmodel.User{
+				Username:    "bob@external",
+				DisplayName: "bob",
+			},
+			Access: "add-model",
+		}},
+	}
+	result := db.Create(&cl)
+	c.Assert(result.Error, qt.IsNil)
+
+	var u dbmodel.User
+	result = db.Preload("Clouds").Where("username = ?", "bob@external").First(&u)
+	c.Assert(result.Error, qt.IsNil)
+
+	c.Assert(u.Clouds, qt.HasLen, 1)
+	c.Check(u.Clouds[0].UserID, qt.Equals, u.ID)
+	c.Check(u.Clouds[0].CloudID, qt.Equals, cl.ID)
+	c.Check(u.Clouds[0].Access, qt.Equals, "add-model")
+}

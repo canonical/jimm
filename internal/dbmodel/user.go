@@ -34,9 +34,12 @@ type User struct {
 	// ControllerAccess is the access level this user has on the JIMM
 	// controller. By default all users have "add-model" access.
 	ControllerAccess string `gorm:"not null;default:'add-model'"`
+
+	// Clouds are the clouds accessible to this user.
+	Clouds []UserCloudAccess
 }
 
-// Tag returns a names.UserTag for the user.
-func (u User) Tag() names.UserTag {
+// Tag returns a names.Tag for the user.
+func (u User) Tag() names.Tag {
 	return names.NewUserTag(u.Username)
 }
