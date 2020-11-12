@@ -21,7 +21,7 @@ func gormDB(t testing.TB, objects ...interface{}) *gorm.DB {
 	cfg := gorm.Config{
 		Logger: testLogger{t},
 	}
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &cfg)
+	db, err := gorm.Open(sqlite.Open("file::memory:"), &cfg)
 	if err != nil {
 		t.Fatalf("error creating test database: %s", err)
 	}

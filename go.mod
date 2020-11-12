@@ -47,6 +47,7 @@ require (
 	gopkg.in/retry.v1 v1.0.3
 	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637
 	gopkg.in/yaml.v2 v2.3.0
+	gorm.io/datatypes v1.0.0
 	gorm.io/driver/sqlite v1.1.3
 	gorm.io/gorm v1.20.6
 )
