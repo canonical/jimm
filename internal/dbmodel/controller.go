@@ -149,7 +149,14 @@ func (c *Controller) SetHostPorts(hpss [][]jujuparams.HostPort) {
 }
 
 const (
-	CloudRegionControllerPriorityDeployed  = 10
+	// CloudRegionControllerPriorityDeployed is the priority given to the
+	// controller when deploying to a cloud region to which the controller
+	// model is deployed.
+	CloudRegionControllerPriorityDeployed = 10
+
+	// CloudRegionControllerPrioritySupported is the priority given to the
+	// controller when deploying to a cloud region to which the controller
+	// model is not deployed.
 	CloudRegionControllerPrioritySupported = 1
 )
 
