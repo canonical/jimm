@@ -129,3 +129,80 @@ func TestCloudRegions(t *testing.T) {
 	c.Check(cl2, qt.DeepEquals, cl1)
 	c.Check(cl2.Region("region2").Config(), qt.DeepEquals, map[string]interface{}{"A": "b"})
 }
+
+func TestCloudRegionControllers(t *testing.T) {
+	c := qt.New(t)
+	db := gormDB(c, &dbmodel.Cloud{}, &dbmodel.CloudRegion{}, &dbmodel.CloudRegionControllerPriority{}, &dbmodel.Controller{})
+
+	cl := dbmodel.Cloud{
+		Name: "test-cloud",
+	}
+	result := db.Create(&cl)
+	c.Assert(result.Error, qt.IsNil)
+
+	cr1 := dbmodel.CloudRegion{
+		Cloud: cl,
+		Name:  "test-region-1",
+	}
+	result = db.Create(&cr1)
+	c.Assert(result.Error, qt.IsNil)
+
+	cr2 := dbmodel.CloudRegion{
+		Cloud: cl,
+		Name:  "test-region-2",
+	}
+	result = db.Create(&cr2)
+	c.Assert(result.Error, qt.IsNil)
+
+	ctl1 := dbmodel.Controller{
+		Name: "test-controller-1",
+		CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+			CloudRegion: cr1,
+			Priority:    dbmodel.CloudRegionControllerPrioritySupported,
+		}, {
+			CloudRegion: cr2,
+			Priority:    dbmodel.CloudRegionControllerPriorityDeployed,
+		}},
+	}
+	result = db.Create(&ctl1)
+	c.Assert(result.Error, qt.IsNil)
+
+	ctl2 := dbmodel.Controller{
+		Name: "test-controller-2",
+		CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+			CloudRegion: cr1,
+			Priority:    dbmodel.CloudRegionControllerPriorityDeployed,
+		}, {
+			CloudRegion: cr2,
+			Priority:    dbmodel.CloudRegionControllerPrioritySupported,
+		}},
+	}
+	result = db.Create(&ctl2)
+	c.Assert(result.Error, qt.IsNil)
+
+	var crcps []dbmodel.CloudRegionControllerPriority
+	err := db.Model(cr1).Order("priority desc").Preload("Controller").Association("Controllers").Find(&crcps)
+	c.Assert(err, qt.IsNil)
+	c.Check(crcps, qt.HasLen, 2)
+	c.Check(crcps[0].Controller, qt.DeepEquals, dbmodel.Controller{
+		Model: ctl2.Model,
+		Name:  ctl2.Name,
+	})
+	c.Check(crcps[1].Controller, qt.DeepEquals, dbmodel.Controller{
+		Model: ctl1.Model,
+		Name:  ctl1.Name,
+	})
+
+	crcps = crcps[:0]
+	err = db.Model(cr2).Order("priority desc").Preload("Controller").Association("Controllers").Find(&crcps)
+	c.Assert(err, qt.IsNil)
+	c.Check(crcps, qt.HasLen, 2)
+	c.Check(crcps[0].Controller, qt.DeepEquals, dbmodel.Controller{
+		Model: ctl1.Model,
+		Name:  ctl1.Name,
+	})
+	c.Check(crcps[1].Controller, qt.DeepEquals, dbmodel.Controller{
+		Model: ctl2.Model,
+		Name:  ctl2.Name,
+	})
+}

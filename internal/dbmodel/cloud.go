@@ -4,6 +4,7 @@ package dbmodel
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/juju/names/v4"
 	"gorm.io/datatypes"
@@ -42,9 +43,8 @@ type Cloud struct {
 	Regions []CloudRegion
 
 	// CACertificates_ contains the CA Certificates associated with this
-	// cloud. The certificates are stored as a JSON value containing a
-	// string array.
-	CACertificates_ datatypes.JSON `gorm:"column:ca_certificates"`
+	// cloud. The certificates are stored as a flattened string array.
+	CACertificates_ string `gorm:"column:ca_certificates"`
 
 	// Config_ contains the configuration associated with this cloud. The
 	// config is stored as a JSON object.
@@ -78,21 +78,14 @@ func (c *Cloud) SetAuthTypes(authTypes []string) {
 
 // CACertificates returns the cloud's CA certificates.
 func (c Cloud) CACertificates() []string {
-	var certs []string
-	// Ignore any unmarshal error, if the data is not a valid string
-	// array then there is no CA certificates.
-	json.Unmarshal(([]byte)(c.CACertificates_), &certs)
-	return certs
+	return strings.Split(c.CACertificates_, "\x1f")
 }
 
 // SetCACertificates sets the cloud's CA certificats to the given value.
+// The certificates are stored in a single string with each certificate
+// separated by a \x1f (unit separator).
 func (c *Cloud) SetCACertificates(certs []string) {
-	buf, err := json.Marshal(certs)
-	if err != nil {
-		// It should be impossible to fail to marshal a string slice.
-		panic(err)
-	}
-	c.CACertificates_ = datatypes.JSON(buf)
+	c.CACertificates_ = strings.Join(certs, "\x1f")
 }
 
 // Config returns the cloud-specific configuration.
@@ -150,6 +143,10 @@ type CloudRegion struct {
 	// Config_ contains the configuration associated with this region. The
 	// config is stored as a JSON object.
 	Config_ datatypes.JSON `gorm:"column:config"`
+
+	// Controllers contains any controllers that can provide service for
+	// this cloud-region.
+	Controllers []CloudRegionControllerPriority
 }
 
 // Config returns the region-specific configuration.
