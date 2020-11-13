@@ -37,9 +37,17 @@ type User struct {
 
 	// Clouds are the clouds accessible to this user.
 	Clouds []UserCloudAccess
+
+	// CloudCredentials are the cloud credentials owned by this user.
+	CloudCredentials []CloudCredential `gorm:"foreignKey:OwnerID;references:Username"`
 }
 
 // Tag returns a names.Tag for the user.
 func (u User) Tag() names.Tag {
 	return names.NewUserTag(u.Username)
+}
+
+// SetTag sets the username of the user to the value from the given tag.
+func (u *User) SetTag(t names.UserTag) {
+	u.Username = t.Id()
 }

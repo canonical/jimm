@@ -8,6 +8,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	qt "github.com/frankban/quicktest"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/names/v4"
 )
 
 func TestControllerTag(t *testing.T) {
@@ -17,50 +18,12 @@ func TestControllerTag(t *testing.T) {
 		UUID: "11111111-2222-3333-4444-555555555555",
 	}
 
-	c.Check(ctl.Tag().String(), qt.Equals, "controller-11111111-2222-3333-4444-555555555555")
-}
+	tag := ctl.Tag()
+	c.Check(tag.String(), qt.Equals, "controller-11111111-2222-3333-4444-555555555555")
 
-func TestControllerHostPorts(t *testing.T) {
-	c := qt.New(t)
-
-	var hpss [][]jujuparams.HostPort
-	hpss = append(hpss, []jujuparams.HostPort{{
-		Address: jujuparams.Address{
-			Value:           "1.1.1.1",
-			Type:            "t1",
-			Scope:           "s1",
-			SpaceName:       "sp1",
-			ProviderSpaceID: "psp1",
-		},
-		Port: 1,
-	}, {
-		Address: jujuparams.Address{
-			Value: "2.2.2.2",
-		},
-		Port: 2,
-	}})
-
-	hpss = append(hpss, []jujuparams.HostPort{{
-		Address: jujuparams.Address{
-			Value:           "1.1.1.1",
-			Type:            "t1",
-			Scope:           "s1",
-			SpaceName:       "sp1",
-			ProviderSpaceID: "psp1",
-		},
-		Port: 1,
-	}, {
-		Address: jujuparams.Address{
-			Value: "3.3.3.3",
-		},
-		Port: 3,
-	}})
-
-	var ctl dbmodel.Controller
-	ctl.SetHostPorts(hpss)
-	hpss2 := ctl.HostPorts()
-
-	c.Check(hpss2, qt.DeepEquals, hpss)
+	var ctl2 dbmodel.Controller
+	ctl2.SetTag(tag.(names.ControllerTag))
+	c.Check(ctl2, qt.DeepEquals, ctl)
 }
 
 func TestController(t *testing.T) {
@@ -74,13 +37,27 @@ func TestController(t *testing.T) {
 		AdminPassword: "pw",
 		CACertificate: "ca-cert",
 		PublicAddress: "controller.example.com:443",
+		HostPorts: [][]jujuparams.HostPort{{{
+			Address: jujuparams.Address{
+				Value:           "1.1.1.1",
+				Type:            "t1",
+				Scope:           "s1",
+				SpaceName:       "sp1",
+				ProviderSpaceID: "psp1",
+			},
+			Port: 1,
+		}, {
+			Address: jujuparams.Address{
+				Value: "2.2.2.2",
+			},
+			Port: 2,
+		}}, {{
+			Address: jujuparams.Address{
+				Value: "3.3.3.3",
+			},
+			Port: 3,
+		}}},
 	}
-	ctl.SetHostPorts([][]jujuparams.HostPort{{{
-		Address: jujuparams.Address{
-			Value: "1.1.1.1",
-		},
-		Port: 17070,
-	}}})
 	result := db.Create(&ctl)
 	c.Assert(result.Error, qt.IsNil)
 

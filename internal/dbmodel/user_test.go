@@ -7,6 +7,7 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/juju/names/v4"
 	"gorm.io/gorm"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
@@ -56,7 +57,11 @@ func TestUserTag(t *testing.T) {
 	u := dbmodel.User{
 		Username: "bob@external",
 	}
-	c.Check(u.Tag().String(), qt.Equals, "user-bob@external")
+	tag := u.Tag()
+	c.Check(tag.String(), qt.Equals, "user-bob@external")
+	var u2 dbmodel.User
+	u2.SetTag(tag.(names.UserTag))
+	c.Check(u2, qt.DeepEquals, u)
 }
 
 func TestUserClouds(t *testing.T) {
@@ -85,4 +90,56 @@ func TestUserClouds(t *testing.T) {
 	c.Check(u.Clouds[0].UserID, qt.Equals, u.ID)
 	c.Check(u.Clouds[0].CloudID, qt.Equals, cl.ID)
 	c.Check(u.Clouds[0].Access, qt.Equals, "add-model")
+}
+
+func TestUserCloudCredentials(t *testing.T) {
+	c := qt.New(t)
+	db := gormDB(c, &dbmodel.Cloud{}, &dbmodel.CloudCredential{}, &dbmodel.User{})
+
+	cl := dbmodel.Cloud{
+		Name: "test-cloud",
+	}
+	result := db.Create(&cl)
+	c.Assert(result.Error, qt.IsNil)
+
+	u := dbmodel.User{
+		Username: "bob@external",
+	}
+	result = db.Create(&u)
+	c.Assert(result.Error, qt.IsNil)
+
+	cred1 := dbmodel.CloudCredential{
+		Name:     "test-cred-1",
+		Cloud:    cl,
+		Owner:    u,
+		AuthType: "empty",
+	}
+	result = db.Create(&cred1)
+	c.Assert(result.Error, qt.IsNil)
+
+	cred2 := dbmodel.CloudCredential{
+		Name:     "test-cred-2",
+		Cloud:    cl,
+		Owner:    u,
+		AuthType: "empty",
+	}
+	result = db.Create(&cred2)
+	c.Assert(result.Error, qt.IsNil)
+
+	var creds []dbmodel.CloudCredential
+	err := db.Model(u).Association("CloudCredentials").Find(&creds)
+	c.Assert(err, qt.IsNil)
+	c.Check(creds, qt.DeepEquals, []dbmodel.CloudCredential{{
+		Model:     cred1.Model,
+		Name:      cred1.Name,
+		CloudName: cred1.CloudName,
+		OwnerID:   cred1.OwnerID,
+		AuthType:  cred1.AuthType,
+	}, {
+		Model:     cred2.Model,
+		Name:      cred2.Name,
+		CloudName: cred2.CloudName,
+		OwnerID:   cred2.OwnerID,
+		AuthType:  cred2.AuthType,
+	}})
 }

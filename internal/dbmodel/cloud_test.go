@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/juju/names/v4"
 	"gorm.io/gorm"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
@@ -18,7 +19,12 @@ func TestCloudTag(t *testing.T) {
 		Name: "test",
 	}
 
-	c.Check(cl.Tag().String(), qt.Equals, "cloud-test")
+	tag := cl.Tag()
+	c.Check(tag.String(), qt.Equals, "cloud-test")
+
+	var cl2 dbmodel.Cloud
+	cl2.SetTag(tag.(names.CloudTag))
+	c.Check(cl2, qt.DeepEquals, cl)
 }
 
 func TestCloud(t *testing.T) {
@@ -36,13 +42,13 @@ func TestCloud(t *testing.T) {
 		Endpoint:         "https://cloud.example.com",
 		IdentityEndpoint: "https://identity.cloud.example.com",
 		StorageEndpoint:  "https://storage.cloud.example.com",
+		CACertificates:   dbmodel.Strings{"cert1", "cert2"},
+		Config: dbmodel.Map{
+			"k1": float64(1),
+			"k2": "A",
+			"k3": map[string]interface{}{"k": []interface{}{"v"}},
+		},
 	}
-	cl1.SetCACertificates([]string{"cert1", "cert2"})
-	cl1.SetConfig(map[string]interface{}{
-		"k1": float64(1),
-		"k2": "A",
-		"k3": map[string]interface{}{"k": []interface{}{"v"}},
-	})
 	result = db.Create(&cl1)
 	c.Assert(result.Error, qt.IsNil)
 	c.Check(result.RowsAffected, qt.Equals, int64(1))
@@ -51,14 +57,8 @@ func TestCloud(t *testing.T) {
 	result = db.Where("name = ?", "test-cloud").First(&cl2)
 	c.Assert(result.Error, qt.IsNil)
 	c.Check(cl2, qt.DeepEquals, cl1)
-	c.Check(cl2.CACertificates(), qt.DeepEquals, []string{"cert1", "cert2"})
-	c.Check(cl2.Config(), qt.DeepEquals, map[string]interface{}{
-		"k1": float64(1),
-		"k2": "A",
-		"k3": map[string]interface{}{"k": []interface{}{"v"}},
-	})
 
-	cl2.SetCACertificates([]string{"cert2", "cert3"})
+	cl2.CACertificates = dbmodel.Strings{"cert2", "cert3"}
 	result = db.Save(&cl2)
 	c.Assert(result.Error, qt.IsNil)
 	c.Check(result.RowsAffected, qt.Equals, int64(1))
@@ -77,21 +77,19 @@ func TestCloud(t *testing.T) {
 
 func TestCloudAuthTypes(t *testing.T) {
 	c := qt.New(t)
-	db := gormDB(c, &dbmodel.AuthType{}, &dbmodel.Cloud{})
+	db := gormDB(c, &dbmodel.Cloud{})
 
 	cl1 := dbmodel.Cloud{
-		Name: "test-cloud",
+		Name:      "test-cloud",
+		AuthTypes: dbmodel.Strings{"empty", "userpass"},
 	}
-	cl1.SetAuthTypes([]string{"empty", "userpass"})
 	result := db.Create(&cl1)
 	c.Assert(result.Error, qt.IsNil)
 
 	var cl2 dbmodel.Cloud
-	result = db.Where("name = ?", "test-cloud").Preload("AuthTypes_").First(&cl2)
+	result = db.Where("name = ?", "test-cloud").First(&cl2)
 	c.Assert(result.Error, qt.IsNil)
 	c.Check(cl2, qt.DeepEquals, cl1)
-
-	c.Check(cl2.AuthTypes(), qt.DeepEquals, []string{"empty", "userpass"})
 }
 
 func TestCloudRegions(t *testing.T) {
@@ -110,15 +108,15 @@ func TestCloudRegions(t *testing.T) {
 		Endpoint:         "https://region1.cloud.example.com",
 		IdentityEndpoint: "https://identity.region1.cloud.example.com",
 		StorageEndpoint:  "https://storage.region1.cloud.example.com",
+		Config:           dbmodel.Map{"A": "a"},
 	}
-	cr1.SetConfig(map[string]interface{}{"A": "a"})
 	cr2 := dbmodel.CloudRegion{
 		Name:             "region2",
 		Endpoint:         "https://region2.cloud.example.com",
 		IdentityEndpoint: "https://identity.region2.cloud.example.com",
 		StorageEndpoint:  "https://storage.region2.cloud.example.com",
+		Config:           dbmodel.Map{"A": "b"},
 	}
-	cr2.SetConfig(map[string]interface{}{"A": "b"})
 	cl1.Regions = append(cl1.Regions, cr1, cr2)
 	result := db.Create(&cl1)
 	c.Assert(result.Error, qt.IsNil)
@@ -127,7 +125,6 @@ func TestCloudRegions(t *testing.T) {
 	result = db.Where("name = ?", "test-cloud").Preload("Regions").First(&cl2)
 	c.Assert(result.Error, qt.IsNil)
 	c.Check(cl2, qt.DeepEquals, cl1)
-	c.Check(cl2.Region("region2").Config(), qt.DeepEquals, map[string]interface{}{"A": "b"})
 }
 
 func TestCloudRegionControllers(t *testing.T) {
@@ -205,4 +202,19 @@ func TestCloudRegionControllers(t *testing.T) {
 		Model: ctl2.Model,
 		Name:  ctl2.Name,
 	})
+}
+
+func TestCloudRegion(t *testing.T) {
+	c := qt.New(t)
+
+	cl := dbmodel.Cloud{
+		Name: "test-cloud",
+		Regions: []dbmodel.CloudRegion{{
+			Name:     "test-region",
+			Endpoint: "example.com",
+		}},
+	}
+	r := cl.Region("test-region")
+	c.Check(r.Endpoint, qt.Equals, "example.com")
+	c.Check(cl.Region("test-region-2"), qt.DeepEquals, dbmodel.CloudRegion{})
 }

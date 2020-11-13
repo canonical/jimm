@@ -3,11 +3,7 @@
 package dbmodel
 
 import (
-	"encoding/json"
-	"strings"
-
 	"github.com/juju/names/v4"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -25,8 +21,8 @@ type Cloud struct {
 	// cloud is hosted.
 	HostCloudRegion string
 
-	// AuthTypes_ is the authentication types supported by this cloud.
-	AuthTypes_ []AuthType `gorm:"many2many:cloud_auth_types"`
+	// AuthTypes is the authentication types supported by this cloud.
+	AuthTypes Strings
 
 	// Endpoint is the API endpoint URL for the cloud.
 	Endpoint string
@@ -42,13 +38,12 @@ type Cloud struct {
 	// Regions contains the regions associated with this cloud.
 	Regions []CloudRegion
 
-	// CACertificates_ contains the CA Certificates associated with this
-	// cloud. The certificates are stored as a flattened string array.
-	CACertificates_ string `gorm:"column:ca_certificates"`
+	// CACertificates contains the CA Certificates associated with this
+	// cloud.
+	CACertificates Strings
 
-	// Config_ contains the configuration associated with this cloud. The
-	// config is stored as a JSON object.
-	Config_ datatypes.JSON `gorm:"column:config"`
+	// Config contains the configuration associated with this cloud.
+	Config Map
 
 	// Users contains the users that are authorized on this cloud.
 	Users []UserCloudAccess
@@ -59,52 +54,9 @@ func (c Cloud) Tag() names.Tag {
 	return names.NewCloudTag(c.Name)
 }
 
-// AuthTypes returns the cloud's authentication types as a string slice.
-func (c Cloud) AuthTypes() []string {
-	authTypes := make([]string, len(c.AuthTypes_))
-	for i, v := range c.AuthTypes_ {
-		authTypes[i] = v.Name
-	}
-	return authTypes
-}
-
-// SetAuthTypes sets the clouds authentication types.
-func (c *Cloud) SetAuthTypes(authTypes []string) {
-	c.AuthTypes_ = make([]AuthType, len(authTypes))
-	for i, v := range authTypes {
-		c.AuthTypes_[i].Name = v
-	}
-}
-
-// CACertificates returns the cloud's CA certificates.
-func (c Cloud) CACertificates() []string {
-	return strings.Split(c.CACertificates_, "\x1f")
-}
-
-// SetCACertificates sets the cloud's CA certificats to the given value.
-// The certificates are stored in a single string with each certificate
-// separated by a \x1f (unit separator).
-func (c *Cloud) SetCACertificates(certs []string) {
-	c.CACertificates_ = strings.Join(certs, "\x1f")
-}
-
-// Config returns the cloud-specific configuration.
-func (c Cloud) Config() map[string]interface{} {
-	var config map[string]interface{}
-	// Ignore any unmarshal error, if the data is not a valid object then
-	// there is no config.
-	json.Unmarshal(([]byte)(c.Config_), &config)
-	return config
-}
-
-// SetConfig sets the cloud-specific configuration.
-func (c *Cloud) SetConfig(config map[string]interface{}) {
-	buf, err := json.Marshal(config)
-	if err != nil {
-		// It should be impossible to fail to marshal the config.
-		panic(err)
-	}
-	c.Config_ = datatypes.JSON(buf)
+// SetTag sets the name of the cloud to the value from the given cloud tag.
+func (c *Cloud) SetTag(t names.CloudTag) {
+	c.Name = t.Id()
 }
 
 // Region returns the cloud region with the given name. If there is no
@@ -140,41 +92,12 @@ type CloudRegion struct {
 	// service.
 	StorageEndpoint string
 
-	// Config_ contains the configuration associated with this region. The
-	// config is stored as a JSON object.
-	Config_ datatypes.JSON `gorm:"column:config"`
+	// Config contains the configuration associated with this region.
+	Config Map
 
 	// Controllers contains any controllers that can provide service for
 	// this cloud-region.
 	Controllers []CloudRegionControllerPriority
-}
-
-// Config returns the region-specific configuration.
-func (r CloudRegion) Config() map[string]interface{} {
-	var config map[string]interface{}
-	// Ignore any unmarshal error, if the data is not a valid object then
-	// there is no config.
-	json.Unmarshal(([]byte)(r.Config_), &config)
-	return config
-}
-
-// SetConfig sets the region-specific configuration.
-func (r *CloudRegion) SetConfig(config map[string]interface{}) {
-	buf, err := json.Marshal(config)
-	if err != nil {
-		// It should be impossible to fail to marshal the config.
-		panic(err)
-	}
-	r.Config_ = datatypes.JSON(buf)
-}
-
-// AuthType is a type of authentication that can be used to authenticate
-// to a cloud.
-type AuthType struct {
-	gorm.Model
-
-	// Name is the name of the authentication type.
-	Name string `gorm:"not null;uniqueIndex"`
 }
 
 // A UserCloudAccess maps the access level of a user on a cloud.
