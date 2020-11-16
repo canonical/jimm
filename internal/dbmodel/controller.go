@@ -3,12 +3,8 @@
 package dbmodel
 
 import (
-	"fmt"
-	"strconv"
-	"strings"
 	"time"
 
-	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 	"gorm.io/gorm"
 )
@@ -53,9 +49,9 @@ type Controller struct {
 	// agent version.
 	AgentVersion string
 
-	// HostPorts_ holds the known addresses on which the controller is
+	// HostPorts holds the known addresses on which the controller is
 	// listening.
-	HostPorts_ string `gorm:"column:host_ports"`
+	HostPorts HostPorts
 
 	// UnavailableSince records the time that this controller became
 	// unavailable, if it has.
@@ -75,77 +71,9 @@ func (c Controller) Tag() names.Tag {
 	return names.NewControllerTag(c.UUID)
 }
 
-// HostPorts returns all the known addresses that can be used to access the
-// controller. See SetHostPorts for details of the internal representation.
-// When parsing the internal HostPort representation any missing fields are
-// taken to have their zero value, any additional fields are ignored.
-func (c Controller) HostPorts() [][]jujuparams.HostPort {
-	var hpss [][]jujuparams.HostPort
-
-	groups := strings.Split(c.HostPorts_, "\x1d")
-	for _, g := range groups {
-		var hps []jujuparams.HostPort
-		records := strings.Split(g, "\x1e")
-		for _, r := range records {
-			var hp jujuparams.HostPort
-			parts := strings.Split(r, "\x1f")
-			if len(parts) > 0 {
-				port, _ := strconv.Atoi(parts[0])
-				// Ignore the error here. failing to parse will set the
-				// port to be 0 which will cause the whole record to be
-				// rejected later.
-				hp.Port = port
-			}
-			if len(parts) > 1 {
-				hp.Value = parts[1]
-			}
-			if len(parts) > 2 {
-				hp.Type = parts[2]
-			}
-			if len(parts) > 3 {
-				hp.Scope = parts[3]
-			}
-			if len(parts) > 4 {
-				hp.SpaceName = parts[4]
-			}
-			if len(parts) > 5 {
-				hp.ProviderSpaceID = parts[5]
-			}
-
-			if hp.Port != 0 && hp.Value != "" {
-				hps = append(hps, hp)
-			}
-		}
-		if len(hps) > 0 {
-			hpss = append(hpss, hps)
-		}
-	}
-
-	return hpss
-}
-
-// SetHostPorts sets the HostPorts for the controller to be the given
-// values. The given HostPorts will be flattened to an internal string
-// representation. Each HostPort is encoded with the individual fields
-// sepatated with \x1f (unit separator) i.e:
-//
-//     <port>\x1f<value>\x1f<type>\x1f<scope>\x1f<spacename>\x1f<providerspaceid>
-//
-// These string representations are then flattened by joining the members
-// of the inner slices with \x1e (record separator) and the outer slice
-// with \x1d (group separator).
-func (c *Controller) SetHostPorts(hpss [][]jujuparams.HostPort) {
-	var groups []string
-	for _, hps := range hpss {
-		var records []string
-		for _, hp := range hps {
-			records = append(records, fmt.Sprintf("%d\x1f%s\x1f%s\x1f%s\x1f%s\x1f%s",
-				hp.Port, hp.Value, hp.Type, hp.Scope, hp.SpaceName, hp.ProviderSpaceID))
-		}
-		groups = append(groups, strings.Join(records, "\x1e"))
-	}
-
-	c.HostPorts_ = strings.Join(groups, "\x1d")
+// SetTag sets the controller's UUID to the value from the given tag.
+func (c *Controller) SetTag(t names.ControllerTag) {
+	c.UUID = t.Id()
 }
 
 const (

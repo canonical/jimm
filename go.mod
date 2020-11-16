@@ -30,6 +30,7 @@ require (
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/prometheus/client_golang v1.7.1
 	github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af
+	go.uber.org/multierr v1.5.0 // indirect
 	go.uber.org/zap v1.10.0
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
@@ -47,7 +48,6 @@ require (
 	gopkg.in/retry.v1 v1.0.3
 	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637
 	gopkg.in/yaml.v2 v2.3.0
-	gorm.io/datatypes v1.0.0
 	gorm.io/driver/sqlite v1.1.3
 	gorm.io/gorm v1.20.6
 )
