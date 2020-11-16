@@ -3,7 +3,7 @@
 package dbmodel
 
 import (
-	"time"
+	"database/sql"
 
 	"github.com/juju/names/v4"
 	"gorm.io/gorm"
@@ -55,13 +55,15 @@ type Controller struct {
 
 	// UnavailableSince records the time that this controller became
 	// unavailable, if it has.
-	UnavailableSince time.Time
+	UnavailableSince sql.NullTime
 
 	// CloudRegions is the set of cloud-regions that are available on this
 	// controller.
 	CloudRegions []CloudRegionControllerPriority
 
-	// TODO(mhilton) Record details of the controller model.
+	// Models contains all the models that are running on this controller.
+	Models []Model
+
 	// TODO(mhilton) Monitor Lease management.
 	// TODO(mhilton) Save controller statistics?
 }

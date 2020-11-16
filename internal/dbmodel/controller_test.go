@@ -3,6 +3,7 @@
 package dbmodel_test
 
 import (
+	"database/sql"
 	"testing"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
@@ -66,4 +67,67 @@ func TestController(t *testing.T) {
 	c.Assert(result.Error, qt.IsNil)
 
 	c.Check(ctl2, qt.DeepEquals, ctl)
+}
+
+func TestControllerModels(t *testing.T) {
+	c := qt.New(t)
+	db := gormDB(c, &dbmodel.Controller{}, &dbmodel.Model{})
+	cl, cred, ctl, u1 := initModelEnv(c, db)
+
+	m1 := dbmodel.Model{
+		Name: "test",
+		UUID: sql.NullString{
+			String: "00000001-0000-0000-0000-0000-000000000001",
+			Valid:  true,
+		},
+		Owner:           u1,
+		Controller:      ctl,
+		CloudRegion:     cl.Regions[0],
+		CloudCredential: cred,
+	}
+	c.Assert(db.Create(&m1).Error, qt.IsNil)
+
+	u2 := dbmodel.User{
+		Username: "charlie@external",
+	}
+	c.Assert(db.Create(&u2).Error, qt.IsNil)
+
+	m2 := dbmodel.Model{
+		Name: "test",
+		UUID: sql.NullString{
+			String: "00000001-0000-0000-0000-0000-000000000002",
+			Valid:  true,
+		},
+		Owner:           u2,
+		Controller:      ctl,
+		CloudRegion:     cl.Regions[0],
+		CloudCredential: cred,
+	}
+	c.Assert(db.Create(&m2).Error, qt.IsNil)
+
+	var models []dbmodel.Model
+	err := db.Model(&ctl).Association("Models").Find(&models)
+	c.Assert(err, qt.IsNil)
+
+	c.Check(models, qt.DeepEquals, []dbmodel.Model{{
+		ID:                m1.ID,
+		CreatedAt:         m1.CreatedAt,
+		UpdatedAt:         m1.UpdatedAt,
+		Name:              m1.Name,
+		UUID:              m1.UUID,
+		OwnerID:           m1.OwnerID,
+		ControllerID:      m1.ControllerID,
+		CloudRegionID:     m1.CloudRegionID,
+		CloudCredentialID: m1.CloudCredentialID,
+	}, {
+		ID:                m2.ID,
+		CreatedAt:         m2.CreatedAt,
+		UpdatedAt:         m2.UpdatedAt,
+		Name:              m2.Name,
+		UUID:              m2.UUID,
+		OwnerID:           m2.OwnerID,
+		ControllerID:      m2.ControllerID,
+		CloudRegionID:     m2.CloudRegionID,
+		CloudCredentialID: m2.CloudCredentialID,
+	}})
 }
