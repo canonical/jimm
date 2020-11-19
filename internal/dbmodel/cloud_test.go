@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 	"gorm.io/gorm"
 
@@ -73,6 +74,132 @@ func TestCloud(t *testing.T) {
 	}
 	result = db.Create(&cl4)
 	c.Check(result.Error, qt.ErrorMatches, `UNIQUE constraint failed: clouds.name`)
+}
+
+func TestWriteCloud(t *testing.T) {
+	c := qt.New(t)
+
+	cl := dbmodel.Cloud{
+		Name:             "test-cloud",
+		Type:             "test-provider",
+		HostCloudRegion:  "test-cloud/test-region",
+		Endpoint:         "https://cloud.example.com",
+		IdentityEndpoint: "https://identity.cloud.example.com",
+		StorageEndpoint:  "https://storage.cloud.example.com",
+		CACertificates:   dbmodel.Strings{"cert1", "cert2"},
+		Regions: []dbmodel.CloudRegion{{
+			Name:             "test-region",
+			Endpoint:         "https://region.example.com",
+			IdentityEndpoint: "https://identity.region.example.com",
+			StorageEndpoint:  "https://storage.region.example.com",
+			Config: dbmodel.Map{
+				"k1": float64(2),
+				"k2": "B",
+				"k3": map[string]interface{}{"k": []interface{}{"V"}},
+			},
+		}},
+		Config: dbmodel.Map{
+			"k1": float64(1),
+			"k2": "A",
+			"k3": map[string]interface{}{"k": []interface{}{"v"}},
+		},
+	}
+	var pc jujuparams.Cloud
+	cl.WriteCloud(&pc)
+	c.Check(pc, qt.DeepEquals, jujuparams.Cloud{
+		Type:             "test-provider",
+		HostCloudRegion:  "test-cloud/test-region",
+		Endpoint:         "https://cloud.example.com",
+		IdentityEndpoint: "https://identity.cloud.example.com",
+		StorageEndpoint:  "https://storage.cloud.example.com",
+		Regions: []jujuparams.CloudRegion{{
+			Name:             "test-region",
+			Endpoint:         "https://region.example.com",
+			IdentityEndpoint: "https://identity.region.example.com",
+			StorageEndpoint:  "https://storage.region.example.com",
+		}},
+		CACertificates: []string{"cert1", "cert2"},
+		Config: map[string]interface{}{
+			"k1": float64(1),
+			"k2": "A",
+			"k3": map[string]interface{}{"k": []interface{}{string("v")}},
+		},
+		RegionConfig: map[string]map[string]interface{}{
+			"test-region": {
+				"k1": float64(2),
+				"k2": "B",
+				"k3": map[string]interface{}{"k": []interface{}{string("V")}},
+			},
+		},
+	})
+}
+
+func TestWriteCloudInfo(t *testing.T) {
+	c := qt.New(t)
+
+	cl := dbmodel.Cloud{
+		Name:             "test-cloud",
+		Type:             "test-provider",
+		HostCloudRegion:  "test-cloud/test-region",
+		Endpoint:         "https://cloud.example.com",
+		IdentityEndpoint: "https://identity.cloud.example.com",
+		StorageEndpoint:  "https://storage.cloud.example.com",
+		CACertificates:   dbmodel.Strings{"cert1", "cert2"},
+		Regions: []dbmodel.CloudRegion{{
+			Name:             "test-region",
+			Endpoint:         "https://region.example.com",
+			IdentityEndpoint: "https://identity.region.example.com",
+			StorageEndpoint:  "https://storage.region.example.com",
+			Config: dbmodel.Map{
+				"k1": float64(2),
+				"k2": "B",
+				"k3": map[string]interface{}{"k": []interface{}{"V"}},
+			},
+		}},
+		Config: dbmodel.Map{
+			"k1": float64(1),
+			"k2": "A",
+			"k3": map[string]interface{}{"k": []interface{}{"v"}},
+		},
+		Users: []dbmodel.UserCloudAccess{{
+			User: dbmodel.User{
+				Username:    "alice@external",
+				DisplayName: "Alice",
+			},
+			Access: "admin",
+		}, {
+			User: dbmodel.User{
+				Username:    "bob@external",
+				DisplayName: "Bob",
+			},
+			Access: "add-model",
+		}},
+	}
+	var pci jujuparams.CloudInfo
+	cl.WriteCloudInfo(&pci)
+	c.Check(pci, qt.DeepEquals, jujuparams.CloudInfo{
+		CloudDetails: jujuparams.CloudDetails{
+			Type:             "test-provider",
+			Endpoint:         "https://cloud.example.com",
+			IdentityEndpoint: "https://identity.cloud.example.com",
+			StorageEndpoint:  "https://storage.cloud.example.com",
+			Regions: []jujuparams.CloudRegion{{
+				Name:             "test-region",
+				Endpoint:         "https://region.example.com",
+				IdentityEndpoint: "https://identity.region.example.com",
+				StorageEndpoint:  "https://storage.region.example.com",
+			}},
+		},
+		Users: []jujuparams.CloudUserInfo{{
+			UserName:    "alice@external",
+			DisplayName: "Alice",
+			Access:      "admin",
+		}, {
+			UserName:    "bob@external",
+			DisplayName: "Bob",
+			Access:      "add-model",
+		}},
+	})
 }
 
 func TestCloudAuthTypes(t *testing.T) {
