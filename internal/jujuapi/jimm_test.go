@@ -11,6 +11,8 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
+	"github.com/CanonicalLtd/jimm/api"
+	apiparams "github.com/CanonicalLtd/jimm/api/params"
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
@@ -25,7 +27,7 @@ var _ = gc.Suite(&jimmSuite{})
 func (s *jimmSuite) TestJIMMFacadeVersion(c *gc.C) {
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
-	c.Assert(conn.AllFacadeVersions()["JIMM"], jc.DeepEquals, []int{1, 2})
+	c.Assert(conn.AllFacadeVersions()["JIMM"], jc.DeepEquals, []int{1, 2, 3})
 }
 
 func (s *jimmSuite) TestUserModelStats(c *gc.C) {
@@ -179,4 +181,119 @@ func (s *jimmSuite) TestListControllersUnauthorizedUser(c *gc.C) {
 			Version: jujuversion.Current.String(),
 		}},
 	})
+}
+
+func (s *jimmSuite) TestListControllersV3(c *gc.C) {
+	c0 := mongodoc.Controller{Path: params.EntityPath{User: "alice", Name: "dummy-0"}}
+	s.AddController(c, &c0)
+	c2 := mongodoc.Controller{Path: params.EntityPath{User: "alice", Name: "dummy-2"}}
+	s.AddController(c, &c2)
+
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := api.NewClient(conn)
+	cis, err := client.ListControllers()
+	c.Assert(err, gc.Equals, nil)
+	c.Check(cis, jc.DeepEquals, []apiparams.ControllerInfo{{
+		Name:          "dummy-0",
+		UUID:          s.Controller.UUID,
+		APIAddresses:  []string{s.Controller.HostPorts[0][0].Address()},
+		CACertificate: s.Controller.CACert,
+		CloudTag:      "cloud-dummy",
+		CloudRegion:   "dummy-region",
+		Username:      "admin",
+		AgentVersion:  s.Controller.Version.String(),
+		Status: jujuparams.EntityStatus{
+			Status: "available",
+		},
+	}, {
+		Name:          "dummy-1",
+		UUID:          s.Controller.UUID,
+		APIAddresses:  []string{s.Controller.HostPorts[0][0].Address()},
+		CACertificate: s.Controller.CACert,
+		CloudTag:      "cloud-dummy",
+		CloudRegion:   "dummy-region",
+		Username:      "admin",
+		AgentVersion:  s.Controller.Version.String(),
+		Status: jujuparams.EntityStatus{
+			Status: "available",
+		},
+	}, {
+		Name:          "dummy-2",
+		UUID:          s.Controller.UUID,
+		APIAddresses:  []string{s.Controller.HostPorts[0][0].Address()},
+		CACertificate: s.Controller.CACert,
+		CloudTag:      "cloud-dummy",
+		CloudRegion:   "dummy-region",
+		Username:      "admin",
+		AgentVersion:  s.Controller.Version.String(),
+		Status: jujuparams.EntityStatus{
+			Status: "available",
+		},
+	}})
+}
+
+func (s *jimmSuite) TestListControllersV3Unauthorized(c *gc.C) {
+	c0 := mongodoc.Controller{Path: params.EntityPath{User: "alice", Name: "dummy-0"}}
+	s.AddController(c, &c0)
+	c2 := mongodoc.Controller{Path: params.EntityPath{User: "alice", Name: "dummy-2"}}
+	s.AddController(c, &c2)
+
+	conn := s.open(c, nil, "bob")
+	defer conn.Close()
+
+	client := api.NewClient(conn)
+	cis, err := client.ListControllers()
+	c.Assert(err, gc.Equals, nil)
+	c.Check(cis, jc.DeepEquals, []apiparams.ControllerInfo{{
+		Name:         "jaas",
+		UUID:         "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+		AgentVersion: s.Controller.Version.String(),
+		Status: jujuparams.EntityStatus{
+			Status: "available",
+		},
+	}})
+}
+
+func (s *jimmSuite) TestAddController(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+	client := api.NewClient(conn)
+
+	acr := apiparams.AddControllerRequest{
+		Name:          "dummy-2",
+		APIAddresses:  s.APIInfo(c).Addrs,
+		CACertificate: s.APIInfo(c).CACert,
+		Username:      s.APIInfo(c).Tag.Id(),
+		Password:      s.APIInfo(c).Password,
+	}
+
+	ci, err := client.AddController(&acr)
+	c.Assert(err, gc.Equals, nil)
+	c.Check(ci, jc.DeepEquals, apiparams.ControllerInfo{
+		Name:          "dummy-2",
+		UUID:          s.Controller.UUID,
+		APIAddresses:  s.APIInfo(c).Addrs,
+		CACertificate: s.APIInfo(c).CACert,
+		CloudTag:      "cloud-dummy",
+		CloudRegion:   "dummy-region",
+		Username:      s.APIInfo(c).Tag.Id(),
+		AgentVersion:  s.Controller.Version.String(),
+		Status: jujuparams.EntityStatus{
+			Status: "available",
+		},
+	})
+
+	_, err = client.AddController(&acr)
+	c.Check(err, gc.ErrorMatches, `already exists \(already exists\)`)
+	c.Check(jujuparams.IsCodeAlreadyExists(err), gc.Equals, true)
+
+	conn = s.open(c, nil, "bob")
+	defer conn.Close()
+	client = api.NewClient(conn)
+	acr.Name = "dummy-3"
+	_, err = client.AddController(&acr)
+	c.Check(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Check(jujuparams.IsCodeUnauthorized(err), gc.Equals, true)
 }
