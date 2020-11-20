@@ -3,13 +3,17 @@
 package dbmodel
 
 import (
+	"time"
+
 	"github.com/juju/names/v4"
 	"gorm.io/gorm"
 )
 
 // A Cloud represents a cloud service.
 type Cloud struct {
-	gorm.Model
+	ID        uint `gorm:"primarykey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 
 	// Name is the name of the cloud.
 	Name string `gorm:"not null;uniqueIndex"`
@@ -110,7 +114,7 @@ type UserCloudAccess struct {
 
 	// Cloud is the Cloud this access is for.
 	CloudID uint
-	Cloud   Cloud
+	Cloud   Cloud `gorm:"constraint:OnDelete:CASCADE"`
 
 	// Access is the access level of the user on the cloud.
 	Access string `gorm:"not null"`
