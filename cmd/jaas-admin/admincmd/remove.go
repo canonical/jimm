@@ -13,9 +13,8 @@ import (
 type removeCommand struct {
 	*commandBase
 
-	paths      []entityPathValue
-	controller bool
-	force      bool
+	paths []entityPathValue
+	force bool
 }
 
 func newRemoveCommand(c *commandBase) cmd.Command {
@@ -25,14 +24,14 @@ func newRemoveCommand(c *commandBase) cmd.Command {
 }
 
 var removeDoc = `
-The remove command removes models or controllers.
+The remove command removes controllers.
 `
 
 func (c *removeCommand) Info() *cmd.Info {
 	return &cmd.Info{
 		Name:    "remove",
 		Args:    "[<user>/<name>...]",
-		Purpose: "remove entities",
+		Purpose: "remove controllers",
 		Doc:     removeDoc,
 	}
 }
@@ -49,7 +48,7 @@ func (c *removeCommand) Init(args []string) error {
 }
 
 func (c *removeCommand) SetFlags(f *gnuflag.FlagSet) {
-	f.BoolVar(&c.controller, "controller", false, "remove controllers not models")
+	c.commandBase.SetFlags(f)
 	f.BoolVar(&c.force, "f", false, "force removal of live controller")
 	f.BoolVar(&c.force, "force", false, "")
 }
@@ -63,23 +62,15 @@ func (c *removeCommand) Run(ctxt *cmd.Context) error {
 		return errgo.Mask(err)
 	}
 	defer client.Close()
-	f := func(path entityPathValue) error {
-		return client.DeleteModel(ctx, &params.DeleteModel{
-			EntityPath: path.EntityPath,
-		})
-	}
-	if c.controller {
-		f = func(path entityPathValue) error {
-			return client.DeleteController(ctx, &params.DeleteController{
-				EntityPath: path.EntityPath,
-				Force:      c.force,
-			})
-		}
-	}
+
 	var failed bool
 	for _, path := range c.paths {
 		ctxt.Verbosef("removing %s", path)
-		if err := f(path); err != nil {
+		err := client.DeleteController(ctx, &params.DeleteController{
+			EntityPath: path.EntityPath,
+			Force:      c.force,
+		})
+		if err != nil {
 			failed = true
 			ctxt.Infof("cannot remove %s: %s", path, err)
 		}
