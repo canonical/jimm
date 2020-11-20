@@ -134,7 +134,7 @@ func (hp HostPorts) Value() (driver.Value, error) {
 	}
 	// It would normally be bad practice to directly encode exernal
 	// data-types one doesn't control in the database, but in this case
-	// it is probalbly fine because it is part of the published API and
+	// it is probably fine because it is part of the published API and
 	// therefore is unlikely to change in an incompatible way.
 	return json.Marshal(hp)
 }
@@ -173,7 +173,7 @@ func (p Ports) Value() (driver.Value, error) {
 	}
 	// It would normally be bad practice to directly encode exernal
 	// data-types one doesn't control in the database, but in this case
-	// it is probalbly fine because it is part of the published API and
+	// it is probably fine because it is part of the published API and
 	// therefore is unlikely to change in an incompatible way.
 	return json.Marshal(p)
 }
@@ -213,7 +213,7 @@ func (pr PortRanges) Value() (driver.Value, error) {
 	}
 	// It would normally be bad practice to directly encode exernal
 	// data-types one doesn't control in the database, but in this case
-	// it is probalbly fine because it is part of the published API and
+	// it is probably fine because it is part of the published API and
 	// therefore is unlikely to change in an incompatible way.
 	return json.Marshal(pr)
 }
@@ -249,7 +249,6 @@ func (NullUint64) GormDataType() string {
 
 // Value implements driver.Valuer.
 func (u NullUint64) Value() (driver.Value, error) {
-
 	if u.Valid {
 		return int64(u.Uint64), nil
 	}

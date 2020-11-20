@@ -23,8 +23,8 @@ type User struct {
 	DisplayName string `gorm:"not null"`
 
 	// LastLogin is the time the user last authenticated to the JIMM
-	// server. It will be not be valid if the user has never logged in
-	// to JIMM.
+	// server. LastLogin will only be a valid time if the user has
+	// authenticated at least once.
 	LastLogin sql.NullTime
 
 	// Disabled records whether the user has been disabled or not, disabled
