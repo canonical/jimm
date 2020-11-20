@@ -3,6 +3,7 @@
 package dbmodel
 
 import (
+	"database/sql"
 	"fmt"
 
 	"github.com/juju/names/v4"
@@ -36,6 +37,9 @@ type CloudCredential struct {
 
 	// Attributes contains the attributes of the credential.
 	Attributes StringMap
+
+	// Valid stores whether the cloud-credential is known to be valid.
+	Valid sql.NullBool
 }
 
 // Tag returns a names.Tag for the cloud-credential.
