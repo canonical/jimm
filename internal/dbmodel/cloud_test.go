@@ -218,3 +218,29 @@ func TestCloudRegion(t *testing.T) {
 	c.Check(r.Endpoint, qt.Equals, "example.com")
 	c.Check(cl.Region("test-region-2"), qt.DeepEquals, dbmodel.CloudRegion{})
 }
+
+func TestReuseDeletedCloudName(t *testing.T) {
+	c := qt.New(t)
+	db := gormDB(c, &dbmodel.Cloud{})
+
+	cl1 := dbmodel.Cloud{
+		Name: "test-cloud",
+	}
+	result := db.Create(&cl1)
+	c.Assert(result.Error, qt.IsNil)
+
+	cl2 := dbmodel.Cloud{
+		Name: "test-cloud",
+	}
+	result = db.Create(&cl2)
+	c.Check(result.Error, qt.ErrorMatches, `UNIQUE constraint failed: clouds.name`)
+
+	result = db.Delete(&cl1)
+	c.Assert(result.Error, qt.IsNil)
+
+	result = db.First(&cl1)
+	c.Check(result.Error, qt.Equals, gorm.ErrRecordNotFound)
+
+	result = db.Create(&cl2)
+	c.Assert(result.Error, qt.IsNil)
+}
