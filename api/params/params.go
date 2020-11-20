@@ -76,8 +76,26 @@ type ControllerInfo struct {
 	Status jujuparams.EntityStatus `json:"status"`
 }
 
-// ListControllersResponse is the response that is sent in a
+// A ListControllersResponse is the response that is sent in a
 // ListControllers method.
 type ListControllersResponse struct {
 	Controllers []ControllerInfo `json:"controllers"`
+}
+
+// A RemoveControllerRequest is the request that is sent in a
+// RemoveController method.
+type RemoveControllerRequest struct {
+	Name  string `json:"name"`
+	Force bool   `json:"force"`
+}
+
+// A SetControllerDeprecatedRequest is the request this is sent in a
+// SetControllerDeprecated method.
+type SetControllerDeprecatedRequest struct {
+	// Name is the name of the controller to set deprecated.
+	Name string `json:"name"`
+
+	// Deprecated specifies whether the controller should be set to
+	// deprecated or not.
+	Deprecated bool `json:"deprecated"`
 }
