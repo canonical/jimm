@@ -31,6 +31,12 @@ func (c *Client) AddController(req *params.AddControllerRequest) (params.Control
 	return info, err
 }
 
+// DisableControllerUUIDMasking disables UUID the masking of the real
+// controller UUID with JIMM's UUID in those response.
+func (c *Client) DisableControllerUUIDMasking() error {
+	return c.caller.APICall("JIMM", 3, "", "DisableControllerUUIDMasking", nil, nil)
+}
+
 // ListControllers returns controller info for all controllers known to
 // JIMM.
 func (c *Client) ListControllers() ([]params.ControllerInfo, error) {
@@ -39,8 +45,19 @@ func (c *Client) ListControllers() ([]params.ControllerInfo, error) {
 	return resp.Controllers, err
 }
 
-// DisableControllerUUIDMasking disables UUID the masking of the real
-// controller UUID with JIMM's UUID in those response.
-func (c *Client) DisableControllerUUIDMasking() error {
-	return c.caller.APICall("JIMM", 3, "", "DisableControllerUUIDMasking", nil, nil)
+// RemoveController removes a controller from the JAAS system. Only
+// controllers that are unavailable can be removed, unless force is used.
+// The return value contains the details of the controller that was
+// removed.
+func (c *Client) RemoveController(req *params.RemoveControllerRequest) (params.ControllerInfo, error) {
+	var info params.ControllerInfo
+	err := c.caller.APICall("JIMM", 3, "", "RemoveController", req, &info)
+	return info, err
+}
+
+// SetControllerDeprecated sets the deprecated status of a controller.
+func (c *Client) SetControllerDeprecated(req *params.SetControllerDeprecatedRequest) (params.ControllerInfo, error) {
+	var info params.ControllerInfo
+	err := c.caller.APICall("JIMM", 3, "", "SetControllerDeprecated", req, &info)
+	return info, err
 }

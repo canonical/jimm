@@ -78,7 +78,7 @@ var unauthorizedTests = []struct {
 	about:  "get controller as non-owner",
 	asUser: "other",
 	method: "GET",
-	path:   "/v2/controller/alice/dummy-1",
+	path:   "/v2/controller/controller-admin/dummy-1",
 }, {
 	about:  "new model as non-owner",
 	asUser: "other",
@@ -357,7 +357,7 @@ func (s *APISuite) TestAddControllerDuplicate(c *gc.C) {
 			Public:         true,
 		},
 	})
-	c.Assert(err, gc.ErrorMatches, "Put http://.*/v2/controller/alice/dummy-1: already exists")
+	c.Assert(err, gc.ErrorMatches, "Put http://.*/v2/controller/controller-admin/dummy-1: already exists")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
 }
 
@@ -1042,12 +1042,12 @@ func (s *APISuite) TestNewModelUnauthorized(c *gc.C) {
 func (s *APISuite) TestListController(c *gc.C) {
 	ctx := context.Background()
 
-	c0 := mongodoc.Controller{Path: params.EntityPath{"alice", "dummy-0"}}
+	c0 := mongodoc.Controller{Path: params.EntityPath{jemtest.ControllerAdmin, "dummy-0"}}
 	s.AddController(c, &c0)
 	unavailableTime := time.Now()
 	err := s.JEM.SetControllerUnavailableAt(ctx, s.Controller.Path, unavailableTime)
 	c.Assert(err, gc.Equals, nil)
-	c2 := mongodoc.Controller{Path: params.EntityPath{"alice", "dummy-2"}}
+	c2 := mongodoc.Controller{Path: params.EntityPath{jemtest.ControllerAdmin, "dummy-2"}}
 	s.AddController(c, &c2)
 	err = s.JEM.SetControllerUnavailableAt(ctx, c2.Path, unavailableTime.Add(time.Second))
 	c.Assert(err, gc.Equals, nil)
@@ -1581,7 +1581,7 @@ func (s *APISuite) TestMissingModels(c *gc.C) {
 			Cloud:      "dummy",
 			Region:     "dummy-region",
 			Status:     "available",
-			Controller: "alice/dummy-1",
+			Controller: jemtest.ControllerAdmin + "/dummy-1",
 		}},
 	})
 }
@@ -1593,5 +1593,5 @@ func (s *APISuite) TestMissingModelsNotAuthorized(c *gc.C) {
 		EntityPath: s.Controller.Path,
 	})
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
-	c.Assert(err, gc.ErrorMatches, `Get http://.*/v2/controller/alice/dummy-1/missing-models: admin access required`)
+	c.Assert(err, gc.ErrorMatches, `Get http://.*/v2/controller/controller-admin/dummy-1/missing-models: admin access required`)
 }

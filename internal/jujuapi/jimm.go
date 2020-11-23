@@ -24,6 +24,8 @@ func init() {
 		disableControllerUUIDMaskingMethod := rpc.Method(r.DisableControllerUUIDMasking)
 		listControllersMethod := rpc.Method(r.ListControllers)
 		listControllersV3Method := rpc.Method(r.ListControllersV3)
+		removeControllerMethod := rpc.Method(r.RemoveController)
+		setControllerDeprecatedMethod := rpc.Method(r.SetControllerDeprecated)
 		userModelStatsMethod := rpc.Method(r.UserModelStats)
 
 		r.AddMethod("JIMM", 1, "UserModelStats", userModelStatsMethod)
@@ -35,6 +37,8 @@ func init() {
 		r.AddMethod("JIMM", 3, "AddController", addControllerMethod)
 		r.AddMethod("JIMM", 3, "DisableControllerUUIDMasking", disableControllerUUIDMaskingMethod)
 		r.AddMethod("JIMM", 3, "ListControllers", listControllersV3Method)
+		r.AddMethod("JIMM", 3, "RemoveController", removeControllerMethod)
+		r.AddMethod("JIMM", 3, "SetControllerDeprecated", setControllerDeprecatedMethod)
 
 		return []int{1, 2, 3}
 	}
@@ -212,6 +216,42 @@ func (r *controllerRoot) ListControllersV3(ctx context.Context) (apiparams.ListC
 	return apiparams.ListControllersResponse{
 		Controllers: controllers,
 	}, nil
+}
+
+// RemoveController removes a controller.
+func (r *controllerRoot) RemoveController(ctx context.Context, req apiparams.RemoveControllerRequest) (apiparams.ControllerInfo, error) {
+	ctl := mongodoc.Controller{
+		Path: params.EntityPath{
+			User: r.jem.ControllerAdmin(),
+			Name: params.Name(req.Name),
+		},
+	}
+	if err := r.jem.DeleteController(ctx, r.identity, &ctl, req.Force); err != nil {
+		return apiparams.ControllerInfo{}, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized), errgo.Is(params.ErrStillAlive))
+	}
+	var info apiparams.ControllerInfo
+	writeControllerInfo(&info, &ctl)
+	return info, nil
+}
+
+// SetControllerDeprecated sets the deprecated status of a controller.
+func (r *controllerRoot) SetControllerDeprecated(ctx context.Context, req apiparams.SetControllerDeprecatedRequest) (apiparams.ControllerInfo, error) {
+	path := params.EntityPath{
+		User: r.jem.ControllerAdmin(),
+		Name: params.Name(req.Name),
+	}
+	if err := r.jem.SetControllerDeprecated(ctx, r.identity, path, req.Deprecated); err != nil {
+		return apiparams.ControllerInfo{}, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+	}
+	ctl := mongodoc.Controller{
+		Path: path,
+	}
+	if err := r.jem.GetController(ctx, r.identity, &ctl); err != nil {
+		return apiparams.ControllerInfo{}, errgo.Mask(err)
+	}
+	var info apiparams.ControllerInfo
+	writeControllerInfo(&info, &ctl)
+	return info, nil
 }
 
 func writeControllerInfo(ci *apiparams.ControllerInfo, ctl *mongodoc.Controller) {

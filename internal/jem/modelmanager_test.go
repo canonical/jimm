@@ -136,7 +136,7 @@ var createModelTests = []struct {
 	user:  "bob",
 	params: jem.CreateModelParams{
 		Path:           params.EntityPath{"bob", ""},
-		ControllerPath: params.EntityPath{"alice", "dummy-1"},
+		ControllerPath: params.EntityPath{jemtest.ControllerAdmin, "dummy-1"},
 		Credential: mongodoc.CredentialPath{
 			Cloud: "dummy",
 			EntityPath: mongodoc.EntityPath{

@@ -13,6 +13,7 @@ import (
 	"github.com/juju/juju/rpc/jsoncodec"
 	"gopkg.in/errgo.v1"
 
+	apiparams "github.com/CanonicalLtd/jimm/api/params"
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/conv"
@@ -42,6 +43,7 @@ var errorCodes = map[error]string{
 	params.ErrUnauthorized:        jujuparams.CodeUnauthorized,
 	params.ErrCloudRegionRequired: jujuparams.CodeCloudRegionRequired,
 	params.ErrIncompatibleClouds:  jujuparams.CodeIncompatibleClouds,
+	params.ErrStillAlive:          apiparams.CodeStillAlive,
 	errNotImplemented:             jujuparams.CodeNotImplemented,
 }
 

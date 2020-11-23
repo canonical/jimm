@@ -155,7 +155,7 @@ func (s *BootstrapSuite) SetUpTest(c *gc.C) {
 	s.JEMSuite.SetUpTest(c)
 
 	s.Controller = mongodoc.Controller{
-		Path: params.EntityPath{User: "alice", Name: "dummy-1"},
+		Path: params.EntityPath{User: ControllerAdmin, Name: "dummy-1"},
 	}
 	s.AddController(c, &s.Controller)
 
