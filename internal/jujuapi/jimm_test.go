@@ -6,8 +6,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	jujuversion "github.com/juju/juju/version"
+	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
@@ -399,4 +401,70 @@ func (s *jimmSuite) TestSetControllerDeprecated(c *gc.C) {
 	})
 	c.Check(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 	c.Check(jujuparams.IsCodeUnauthorized(err), gc.Equals, true)
+}
+
+func (s *jimmSuite) TestAuditLog(c *gc.C) {
+	conn := s.open(c, nil, "bob")
+	defer conn.Close()
+	client := api.NewClient(conn)
+
+	_, err := client.FindAuditEvents(&apiparams.FindAuditEventsRequest{})
+	c.Check(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeUnauthorized)
+
+	mmclient := modelmanager.NewClient(conn)
+	err = mmclient.DestroyModel(names.NewModelTag(s.Model.UUID), nil, nil, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	conn2 := s.open(c, nil, "alice")
+	defer conn2.Close()
+	client2 := api.NewClient(conn2)
+
+	evs, err := client2.FindAuditEvents(&apiparams.FindAuditEventsRequest{})
+	c.Assert(err, gc.Equals, nil)
+
+	c.Check(evs, jc.DeepEquals, apiparams.AuditEvents{
+		Events: []apiparams.AuditEvent{{
+			Time:    evs.Events[0].Time,
+			Tag:     names.NewModelTag(s.Model.UUID).String(),
+			UserTag: conv.ToUserTag(s.Model.Path.User).String(),
+			Action:  "created",
+			Params: map[string]string{
+				"owner":           "bob",
+				"name":            "bob/model-1",
+				"controller-name": "controller-admin/dummy-1",
+				"cloud":           "dummy",
+				"region":          "dummy-region",
+			},
+		}, {
+			Time:    evs.Events[1].Time,
+			Tag:     names.NewModelTag(s.Model2.UUID).String(),
+			UserTag: conv.ToUserTag(s.Model2.Path.User).String(),
+			Action:  "created",
+			Params: map[string]string{
+				"owner":           "charlie",
+				"name":            "charlie/model-2",
+				"controller-name": "controller-admin/dummy-1",
+				"cloud":           "dummy",
+				"region":          "dummy-region",
+			},
+		}, {
+			Time:    evs.Events[2].Time,
+			Tag:     names.NewModelTag(s.Model3.UUID).String(),
+			UserTag: conv.ToUserTag(s.Model3.Path.User).String(),
+			Action:  "created",
+			Params: map[string]string{
+				"owner":           "charlie",
+				"name":            "charlie/model-3",
+				"controller-name": "controller-admin/dummy-1",
+				"cloud":           "dummy",
+				"region":          "dummy-region",
+			},
+		}, {
+			Time:    evs.Events[3].Time,
+			Tag:     names.NewModelTag(s.Model.UUID).String(),
+			UserTag: conv.ToUserTag(s.Model.Path.User).String(),
+			Action:  "deleted",
+		}},
+	})
 }

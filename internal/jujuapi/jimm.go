@@ -4,6 +4,7 @@ package jujuapi
 
 import (
 	"context"
+	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/network"
@@ -12,6 +13,7 @@ import (
 
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
 	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
@@ -22,9 +24,12 @@ func init() {
 	facadeInit["JIMM"] = func(r *controllerRoot) []int {
 		addControllerMethod := rpc.Method(r.AddController)
 		disableControllerUUIDMaskingMethod := rpc.Method(r.DisableControllerUUIDMasking)
+		findAuditEventsMethod := rpc.Method(r.FindAuditEvents)
+		grantAuditLogAccessMethod := rpc.Method(r.GrantAuditLogAccess)
 		listControllersMethod := rpc.Method(r.ListControllers)
 		listControllersV3Method := rpc.Method(r.ListControllersV3)
 		removeControllerMethod := rpc.Method(r.RemoveController)
+		revokeAuditLogAccessMethod := rpc.Method(r.RevokeAuditLogAccess)
 		setControllerDeprecatedMethod := rpc.Method(r.SetControllerDeprecated)
 		userModelStatsMethod := rpc.Method(r.UserModelStats)
 
@@ -36,8 +41,11 @@ func init() {
 
 		r.AddMethod("JIMM", 3, "AddController", addControllerMethod)
 		r.AddMethod("JIMM", 3, "DisableControllerUUIDMasking", disableControllerUUIDMaskingMethod)
+		r.AddMethod("JIMM", 3, "FindAuditEvents", findAuditEventsMethod)
+		r.AddMethod("JIMM", 3, "GrantAuditLogAccess", grantAuditLogAccessMethod)
 		r.AddMethod("JIMM", 3, "ListControllers", listControllersV3Method)
 		r.AddMethod("JIMM", 3, "RemoveController", removeControllerMethod)
+		r.AddMethod("JIMM", 3, "RevokeAuditLogAccess", revokeAuditLogAccessMethod)
 		r.AddMethod("JIMM", 3, "SetControllerDeprecated", setControllerDeprecatedMethod)
 
 		return []int{1, 2, 3}
@@ -252,6 +260,131 @@ func (r *controllerRoot) SetControllerDeprecated(ctx context.Context, req apipar
 	var info apiparams.ControllerInfo
 	writeControllerInfo(&info, &ctl)
 	return info, nil
+}
+
+// maxLimit is the maximum number of audit-log entries that will be
+// returned from the audit log, no matter how many are requested.
+const maxLimit = 50
+
+// FindAuditEvents finds the audit-log entries that match the given filter.
+func (r *controllerRoot) FindAuditEvents(ctx context.Context, req apiparams.FindAuditEventsRequest) (apiparams.AuditEvents, error) {
+	// Until the new database comes into effect the only supported
+	// queries are "after", "before", and limit.
+	var after, before time.Time
+	var err error
+	if req.After != "" {
+		after, err = time.Parse(time.RFC3339, req.After)
+		if err != nil {
+			return apiparams.AuditEvents{}, errgo.WithCausef(err, params.ErrBadRequest, `invalid "after" filter`)
+		}
+	}
+	if req.Before != "" {
+		before, err = time.Parse(time.RFC3339, req.Before)
+		if err != nil {
+			return apiparams.AuditEvents{}, errgo.WithCausef(err, params.ErrBadRequest, `invalid "before" filter`)
+		}
+	}
+	if req.Tag != "" {
+		// Validate the requested Tag filter event though we don't use it
+		// yet.
+		if _, err := names.ParseTag(req.Tag); err != nil {
+			return apiparams.AuditEvents{}, errgo.WithCausef(err, params.ErrBadRequest, `invalid "tag" filter`)
+		}
+	}
+	if req.UserTag != "" {
+		// Validate the requested UserTag filter event though we don't use
+		// it yet.
+		if _, err := names.ParseUserTag(req.UserTag); err != nil {
+			return apiparams.AuditEvents{}, errgo.WithCausef(err, params.ErrBadRequest, `invalid "user-tag" filter`)
+		}
+	}
+
+	limit := int(req.Limit)
+	if limit < 1 || limit > maxLimit {
+		limit = maxLimit
+	}
+
+	if err := auth.CheckIsUser(ctx, r.identity, r.jem.ControllerAdmin()); err != nil {
+		return apiparams.AuditEvents{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	entries, err := r.jem.DB.GetAuditEntries(ctx, after, before, "")
+	if err != nil {
+		return apiparams.AuditEvents{}, errgo.Mask(err)
+	}
+
+	if len(entries) > limit {
+		entries = entries[:limit]
+	}
+
+	events := make([]apiparams.AuditEvent, len(entries))
+	for i, ent := range entries {
+		events[i].Time = ent.Content.Created()
+		u := names.NewUserTag(ent.Content.Common().Originator)
+		if u.Domain() == "" {
+			u = u.WithDomain("external")
+		}
+		events[i].UserTag = u.String()
+		switch e := ent.Content.(type) {
+		case *params.AuditModelCreated:
+			events[i].Tag = names.NewModelTag(e.UUID).String()
+			events[i].Action = "created"
+			events[i].Params = map[string]string{
+				"controller-name": e.ControllerPath,
+				"name":            e.ID,
+				"owner":           e.Owner,
+				"cloud":           e.Cloud,
+				"region":          e.Region,
+			}
+		case *params.AuditModelDestroyed:
+			events[i].Tag = names.NewModelTag(e.UUID).String()
+			events[i].Action = "deleted"
+		case *params.AuditCloudCreated:
+			events[i].Tag = names.NewCloudTag(e.Cloud).String()
+			events[i].Action = "created"
+			events[i].Params = map[string]string{
+				"region": e.Region,
+			}
+		case *params.AuditCloudRemoved:
+			events[i].Tag = names.NewCloudTag(e.Cloud).String()
+			events[i].Action = "deleted"
+			events[i].Params = map[string]string{
+				"region": e.Region,
+			}
+		}
+	}
+	return apiparams.AuditEvents{
+		Events: events,
+	}, nil
+}
+
+// GrantAuditLogAccess grants access to the audit log at the specified
+// level to the specified user. The only currently supported level is
+// "read". Only controller admin users can grant access to the audit log.
+func (r *controllerRoot) GrantAuditLogAccess(ctx context.Context, req apiparams.AuditLogAccessRequest) error {
+	if err := auth.CheckIsUser(ctx, r.identity, r.jem.ControllerAdmin()); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	_, err := conv.ParseUserTag(req.UserTag)
+	if err != nil {
+		return errgo.WithCausef(err, params.ErrBadRequest, "")
+	}
+	// TODO(mhilton) actually grant access to the user.
+	return nil
+}
+
+// RevokeAuditLogAccess revokes access to the audit log at the specified
+// level from the specified user. The only currently supported level is
+// "read". Only controller admin users can revoke access to the audit log.
+func (r *controllerRoot) RevokeAuditLogAccess(ctx context.Context, req apiparams.AuditLogAccessRequest) error {
+	if err := auth.CheckIsUser(ctx, r.identity, r.jem.ControllerAdmin()); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	_, err := conv.ParseUserTag(req.UserTag)
+	if err != nil {
+		return errgo.WithCausef(err, params.ErrBadRequest, "")
+	}
+	// TODO(mhilton) actually revoke access from the user.
+	return nil
 }
 
 func writeControllerInfo(ci *apiparams.ControllerInfo, ctl *mongodoc.Controller) {
