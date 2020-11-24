@@ -37,6 +37,21 @@ func (c *Client) DisableControllerUUIDMasking() error {
 	return c.caller.APICall("JIMM", 3, "", "DisableControllerUUIDMasking", nil, nil)
 }
 
+// FindAuditEvents finds audit events that match the requested filters.
+func (c *Client) FindAuditEvents(req *params.FindAuditEventsRequest) (params.AuditEvents, error) {
+	var resp params.AuditEvents
+	if err := c.caller.APICall("JIMM", 3, "", "FindAuditEvents", req, &resp); err != nil {
+		return params.AuditEvents{}, err
+	}
+	return resp, nil
+}
+
+// GrantAuditLogAccess grants the given access to the audit log to the
+// given user.
+func (c *Client) GrantAuditLogAccess(req *params.AuditLogAccessRequest) error {
+	return c.caller.APICall("JIMM", 3, "", "GrantAuditLogAccess", req, nil)
+}
+
 // ListControllers returns controller info for all controllers known to
 // JIMM.
 func (c *Client) ListControllers() ([]params.ControllerInfo, error) {
@@ -53,6 +68,12 @@ func (c *Client) RemoveController(req *params.RemoveControllerRequest) (params.C
 	var info params.ControllerInfo
 	err := c.caller.APICall("JIMM", 3, "", "RemoveController", req, &info)
 	return info, err
+}
+
+// RevokeAuditLogAccess revokes the given access to the audit log from the
+// given user.
+func (c *Client) RevokeAuditLogAccess(req *params.AuditLogAccessRequest) error {
+	return c.caller.APICall("JIMM", 3, "", "RevokeAuditLogAccess", req, nil)
 }
 
 // SetControllerDeprecated sets the deprecated status of a controller.
