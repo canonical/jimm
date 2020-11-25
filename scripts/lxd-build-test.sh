@@ -5,13 +5,14 @@ set -eu
 
 image=${image:-ubuntu:20.04}
 container=${container:-jimm-test-`uuidgen`}
-packages="build-essential bzr git make mongodb"
+packages="build-essential bzr dqlite git libdqlite-dev make mongodb"
 
 lxc launch -e ${image} $container
 trap "lxc delete --force $container" EXIT
 
 lxc exec $container -- sh -c 'while [ ! -f /var/lib/cloud/instance/boot-finished ]; do sleep 0.1; done'
 
+lxc exec --env http_proxy=${http_proxy:-} --env no_proxy=${no_proxy:-} $container -- apt-add-repository -y ppa:dqlite/stable
 lxc exec --env http_proxy=${http_proxy:-} --env no_proxy=${no_proxy:-} $container -- apt-get update -y
 lxc exec --env http_proxy=${http_proxy:-} --env no_proxy=${no_proxy:-} $container -- apt-get install -y $packages
 lxc exec $container -- snap set system proxy.http=${http_proxy:-}

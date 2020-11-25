@@ -4,12 +4,13 @@ go 1.14
 
 require (
 	github.com/canonical/candid v1.4.2
+	github.com/canonical/go-dqlite v1.8.0
 	github.com/frankban/quicktest v1.11.0
-	github.com/golang/mock v1.4.4 // indirect
 	github.com/google/go-cmp v0.5.2
 	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
 	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/vault/api v1.0.5-0.20200709165743-f98572ac11c9
+	github.com/jackc/pgx/v4 v4.9.0
 	github.com/juju/aclstore v0.0.0-20180706073322-7fc1cdaacf01
 	github.com/juju/charm/v8 v8.0.0-20200925052646-bb021a575610
 	github.com/juju/clock v0.0.0-20190205081909-9c5c9712527c
@@ -28,14 +29,12 @@ require (
 	github.com/juju/utils v0.0.0-20200604140309-9d78121a29e0
 	github.com/juju/version v0.0.0-20191219164919-81c1be00b9a6
 	github.com/julienschmidt/httprouter v1.3.0
+	github.com/mattn/go-sqlite3 v2.0.3+incompatible
 	github.com/prometheus/client_golang v1.7.1
 	github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af
-	go.uber.org/multierr v1.5.0 // indirect
 	go.uber.org/zap v1.10.0
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
-	golang.org/x/sys v0.0.0-20201018230417-eeed37f84f13 // indirect
-	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gopkg.in/check.v1 v1.0.0-20200902074654-038fdea0a05b
 	gopkg.in/errgo.v1 v1.0.1
 	gopkg.in/httprequest.v1 v1.2.1
@@ -48,7 +47,8 @@ require (
 	gopkg.in/retry.v1 v1.0.3
 	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637
 	gopkg.in/yaml.v2 v2.3.0
-	gorm.io/driver/sqlite v1.1.3
+	gorm.io/driver/postgres v1.0.5
+	gorm.io/driver/sqlite v1.1.4-0.20201029040614-e1caf3738eb9
 	gorm.io/gorm v1.20.6
 )
 
@@ -61,3 +61,5 @@ replace (
 replace github.com/hashicorp/raft => github.com/juju/raft v1.0.1-0.20190319034642-834fca2f9ffc
 
 replace gopkg.in/macaroon-bakery.v2-unstable => github.com/wallyworld/macaroon-bakery v0.0.0-20200108032212-15effef1340d
+
+replace github.com/mattn/go-sqlite3 => github.com/mattn/go-sqlite3 v1.14.5
