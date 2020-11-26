@@ -10,6 +10,7 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
+	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 )
 
@@ -27,12 +28,12 @@ func (s *sqliteSuite) Init(c *qt.C) {
 	cfg := gorm.Config{
 		Logger: jimmtest.NewGormLogger(c),
 	}
-	db, err := gorm.Open(sqlite.Open("file::memory:"), &cfg)
+	gdb, err := gorm.Open(sqlite.Open("file::memory:"), &cfg)
 	c.Assert(err, qt.IsNil)
 	// Enable foreign key constraints in SQLite, which are disabled by
 	// default. This makes the encoded foreign key constraints behave as
 	// expected.
-	err = db.Exec("PRAGMA foreign_keys=ON").Error
+	err = gdb.Exec("PRAGMA foreign_keys=ON").Error
 	c.Assert(err, qt.IsNil)
-	s.dbSuite.Database.DB = db
+	s.dbSuite.Database = db.NewDatabase(gdb)
 }

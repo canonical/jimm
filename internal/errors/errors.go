@@ -100,10 +100,11 @@ type Op string
 type Code string
 
 const (
-	CodeServerConfiguration Code = "server configuration"
-	CodeNotFound            Code = jujuparams.CodeNotFound
-	CodeUnauthorized        Code = jujuparams.CodeUnauthorized
 	CodeAlreadyExists       Code = jujuparams.CodeAlreadyExists
+	CodeNotFound            Code = jujuparams.CodeNotFound
+	CodeServerConfiguration Code = "server configuration"
+	CodeUnauthorized        Code = jujuparams.CodeUnauthorized
+	CodeUpgradeInProgress   Code = jujuparams.CodeUpgradeInProgress
 )
 
 // ErrorCode returns the error code from the given error.

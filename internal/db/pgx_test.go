@@ -5,6 +5,7 @@ package db_test
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"fmt"
 	"os"
 	"testing"
@@ -13,9 +14,11 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
 	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/stdlib"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
+	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 )
 
@@ -57,13 +60,24 @@ func (s *postgresSuite) Init(c *qt.C) {
 		}
 	})
 
-	testCfg := *connCfg
+	testCfg := connCfg.Copy()
 	testCfg.Database = dbname
 
-	cfg := gorm.Config{
-		Logger: jimmtest.NewGormLogger(c),
-	}
-	db, err := gorm.Open(postgres.Open(testCfg.ConnString()), &cfg)
+	sqlDB, err := sql.Open("pgx", stdlib.RegisterConnConfig(testCfg))
 	c.Assert(err, qt.IsNil)
-	s.dbSuite.Database.DB = db
+	c.Cleanup(func() {
+		if err := sqlDB.Close(); err != nil {
+			c.Logf("error closing database: %s", err)
+		}
+	})
+	cfg := gorm.Config{
+		NowFunc: func() time.Time { return time.Now().UTC().Round(time.Millisecond) },
+		Logger:  jimmtest.NewGormLogger(c),
+	}
+	pCfg := postgres.Config{
+		Conn: sqlDB,
+	}
+	gdb, err := gorm.Open(postgres.New(pCfg), &cfg)
+	c.Assert(err, qt.IsNil)
+	s.dbSuite.Database = db.NewDatabase(gdb)
 }

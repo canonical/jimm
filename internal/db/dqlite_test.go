@@ -1,5 +1,10 @@
 // Copyright 2020 Canonical Ltd.
 
+// go-dqlite only works properly if the go-sqlite3 package is built with
+// the libsqlite3 tag.
+// +build libsqlite3
+//go:build !libsqlite3
+
 package db_test
 
 import (
@@ -12,6 +17,7 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
+	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 )
 
@@ -42,13 +48,13 @@ func (s *dqliteSuite) Init(c *qt.C) {
 		Conn:       sqldb,
 	}
 
-	db, err := gorm.Open(&dialector, &cfg)
+	gdb, err := gorm.Open(&dialector, &cfg)
 	c.Assert(err, qt.IsNil)
 
 	// Enable foreign key constraints in SQLite, which are disabled by
 	// default. This makes the encoded foreign key constraints behave as
 	// expected.
-	err = db.Exec("PRAGMA foreign_keys=ON").Error
+	err = gdb.Exec("PRAGMA foreign_keys=ON").Error
 	c.Assert(err, qt.IsNil)
-	s.dbSuite.Database.DB = db
+	s.dbSuite.Database = db.NewDatabase(gdb)
 }
