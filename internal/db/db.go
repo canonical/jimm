@@ -97,3 +97,15 @@ func (d Database) Migrate(ctx context.Context, force bool) error {
 	atomic.StoreUint32(d.migrated, 1)
 	return nil
 }
+
+// ready checks that the database is ready to accept requests. An error is
+// returned if the database is not yet initialised.
+func (d Database) ready(op errors.Op) error {
+	if d.DB == nil {
+		return errors.E(op, errors.CodeServerConfiguration, "database not configured")
+	}
+	if atomic.LoadUint32(d.migrated) == 0 {
+		return errors.E(op, errors.CodeUpgradeInProgress)
+	}
+	return nil
+}

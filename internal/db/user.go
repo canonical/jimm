@@ -4,7 +4,6 @@ package db
 
 import (
 	"context"
-	"sync/atomic"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
@@ -23,11 +22,8 @@ import (
 func (d Database) GetUser(ctx context.Context, u *dbmodel.User) error {
 	const op = errors.Op("db.GetUser")
 
-	if d.DB == nil {
-		return errors.E(op, errors.CodeServerConfiguration, "database not configured")
-	}
-	if atomic.LoadUint32(d.migrated) == 0 {
-		return errors.E(op, errors.CodeUpgradeInProgress)
+	if err := d.ready(op); err != nil {
+		return err
 	}
 
 	if u.Username == "" {
