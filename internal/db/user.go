@@ -19,11 +19,10 @@ import (
 // this information.
 //
 // GetUser returns an error with CodeNotFound if the username is invalid.
-func (d Database) GetUser(ctx context.Context, u *dbmodel.User) error {
+func (d *Database) GetUser(ctx context.Context, u *dbmodel.User) error {
 	const op = errors.Op("db.GetUser")
-
-	if err := d.ready(op); err != nil {
-		return err
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
 	}
 
 	if u.Username == "" {
@@ -33,6 +32,30 @@ func (d Database) GetUser(ctx context.Context, u *dbmodel.User) error {
 	db := d.DB.WithContext(ctx)
 	if err := db.Where("username = ?", u.Username).FirstOrCreate(&u).Error; err != nil {
 		return errors.E(op, err)
+	}
+	return nil
+}
+
+// UpdateUser updates the given user record. UpdateUser will not store any
+// changes to a user's ApplicationOffers, Clouds, CloudCredentials, or
+// Models. These should be updated through the object in question.
+//
+// UpdateUser returns an error with CodeNotFound if the username is
+// invalid.
+func (d *Database) UpdateUser(ctx context.Context, u *dbmodel.User) error {
+	const op = errors.Op("db.UpdateUser")
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	if u.Username == "" {
+		return errors.E(op, errors.CodeNotFound, `invalid username ""`)
+	}
+
+	db := d.DB.WithContext(ctx)
+	db = db.Omit("ApplicationOffers").Omit("Clouds").Omit("CloudCredentials").Omit("Models")
+	if err := db.Save(u).Error; err != nil {
+		return errors.E(op)
 	}
 	return nil
 }

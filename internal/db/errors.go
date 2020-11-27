@@ -3,23 +3,38 @@
 package db
 
 import (
+	dqlitedriver "github.com/canonical/go-dqlite/driver"
+	"github.com/jackc/pgconn"
 	sqlite3 "github.com/mattn/go-sqlite3"
 	"gorm.io/gorm"
 
 	"github.com/CanonicalLtd/jimm/internal/errors"
 )
 
-// errorCode determines the error code from the database error returned.
-func errorCode(err error) errors.Code {
-	switch err {
-	case gorm.ErrRecordNotFound:
-		return errors.CodeNotFound
+// postgresql error codes from
+// https://www.postgresql.org/docs/11/errcodes-appendix.html.
+const pgUniqueViolation = "23505"
+
+// dbError translates an error returned from the database into the error
+// form understood by the JIMM system.
+func dbError(err error) error {
+	code := errors.Code(errors.ErrorCode(err))
+
+	if err == gorm.ErrRecordNotFound {
+		code = errors.CodeNotFound
 	}
-	if e, ok := err.(sqlite3.Error); ok {
-		switch e.ExtendedCode {
-		case sqlite3.ErrConstraintUnique:
-			return errors.CodeAlreadyExists
+	switch e := err.(type) {
+	case sqlite3.Error:
+		if e.ExtendedCode == sqlite3.ErrConstraintUnique {
+			code = errors.CodeAlreadyExists
+		}
+	case dqlitedriver.Error:
+		// TODO(mhilton) work out how to decode dqlite errors.
+	case *pgconn.PgError:
+		if e.Code == pgUniqueViolation {
+			code = errors.CodeAlreadyExists
 		}
 	}
-	return ""
+
+	return errors.E(code, err)
 }

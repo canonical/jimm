@@ -10,6 +10,7 @@ require (
 	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
 	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/vault/api v1.0.5-0.20200709165743-f98572ac11c9
+	github.com/jackc/pgconn v1.7.0
 	github.com/jackc/pgx/v4 v4.9.0
 	github.com/juju/aclstore v0.0.0-20180706073322-7fc1cdaacf01
 	github.com/juju/charm/v8 v8.0.0-20200925052646-bb021a575610
