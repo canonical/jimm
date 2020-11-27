@@ -32,7 +32,7 @@ type testEnvironment struct {
 	model      dbmodel.Model
 }
 
-func initTestEnvironment(c *qt.C, db db.Database) testEnvironment {
+func initTestEnvironment(c *qt.C, db *db.Database) testEnvironment {
 	err := db.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
@@ -209,7 +209,7 @@ func (s *dbSuite) TestGetApplicationOffer(c *qt.C) {
 		UUID: "00000000-0000-0000-0000-000000000002",
 	}
 	err = s.Database.GetApplicationOffer(context.Background(), &dbOffer)
-	c.Assert(err, qt.ErrorMatches, "not found")
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
 func (s *dbSuite) TestUpdateApplicationOffer(c *qt.C) {
@@ -264,7 +264,6 @@ func (s *dbSuite) TestUpdateApplicationOffer(c *qt.C) {
 	}
 	err = s.Database.UpdateApplicationOffer(context.Background(), &offer3)
 	c.Assert(err, qt.Not(qt.IsNil))
-
 }
 
 func (s *dbSuite) TestDeleteApplicationOffer(c *qt.C) {
@@ -285,5 +284,5 @@ func (s *dbSuite) TestDeleteApplicationOffer(c *qt.C) {
 		Users: nil,
 	}
 	err = s.Database.GetApplicationOffer(context.Background(), &dbOffer)
-	c.Assert(err, qt.ErrorMatches, "not found")
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }

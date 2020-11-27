@@ -35,5 +35,5 @@ func (s *sqliteSuite) Init(c *qt.C) {
 	// expected.
 	err = gdb.Exec("PRAGMA foreign_keys=ON").Error
 	c.Assert(err, qt.IsNil)
-	s.dbSuite.Database = db.NewDatabase(gdb)
+	s.dbSuite.Database = &db.Database{DB: gdb}
 }

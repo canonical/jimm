@@ -79,5 +79,5 @@ func (s *postgresSuite) Init(c *qt.C) {
 	}
 	gdb, err := gorm.Open(postgres.New(pCfg), &cfg)
 	c.Assert(err, qt.IsNil)
-	s.dbSuite.Database = db.NewDatabase(gdb)
+	s.dbSuite.Database = &db.Database{DB: gdb}
 }
