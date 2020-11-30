@@ -7,8 +7,6 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
@@ -25,15 +23,5 @@ type sqliteSuite struct {
 }
 
 func (s *sqliteSuite) Init(c *qt.C) {
-	cfg := gorm.Config{
-		Logger: jimmtest.NewGormLogger(c),
-	}
-	gdb, err := gorm.Open(sqlite.Open("file::memory:"), &cfg)
-	c.Assert(err, qt.IsNil)
-	// Enable foreign key constraints in SQLite, which are disabled by
-	// default. This makes the encoded foreign key constraints behave as
-	// expected.
-	err = gdb.Exec("PRAGMA foreign_keys=ON").Error
-	c.Assert(err, qt.IsNil)
-	s.dbSuite.Database = &db.Database{DB: gdb}
+	s.dbSuite.Database = &db.Database{DB: jimmtest.MemoryDB(c, nil)}
 }
