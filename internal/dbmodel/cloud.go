@@ -40,7 +40,7 @@ type Cloud struct {
 	StorageEndpoint string
 
 	// Regions contains the regions associated with this cloud.
-	Regions []CloudRegion
+	Regions []CloudRegion `gorm:"foreignKey:CloudName;references:Name"`
 
 	// CACertificates contains the CA Certificates associated with this
 	// cloud.
@@ -50,7 +50,7 @@ type Cloud struct {
 	Config Map
 
 	// Users contains the users that are authorized on this cloud.
-	Users []UserCloudAccess
+	Users []UserCloudAccess `gorm:"foreignkey:CloudName;references:Name"`
 }
 
 // Tag returns a names.Tag for this cloud.
@@ -79,11 +79,11 @@ type CloudRegion struct {
 	gorm.Model
 
 	// Cloud is the cloud this region belongs to.
-	CloudID uint `gorm:"uniqueIndex:idx_cloud_region_cloud_id_name"`
-	Cloud   Cloud
+	CloudName string `gorm:"uniqueIndex:idx_cloud_region_cloud_name_name"`
+	Cloud     Cloud  `gorm:"foreignKey:CloudName;references:Name"`
 
 	// Name is the name of the region.
-	Name string `gorm:"not null;uniqueIndex:idx_cloud_region_cloud_id_name"`
+	Name string `gorm:"not null;uniqueIndex:idx_cloud_region_cloud_name_name"`
 
 	// Endpoint is the API endpoint URL for the region.
 	Endpoint string
@@ -109,12 +109,12 @@ type UserCloudAccess struct {
 	gorm.Model
 
 	// User is the User this access is for.
-	UserID uint
-	User   User
+	Username string `gorm:"uniqueIndex:idx_user_cloud_accesses_username_cloud_name"`
+	User     User   `gorm:"foreignKey:Username;references:Username"`
 
 	// Cloud is the Cloud this access is for.
-	CloudID uint
-	Cloud   Cloud `gorm:"constraint:OnDelete:CASCADE"`
+	CloudName string `gorm:"uniqueIndex:idx_user_cloud_accesses_username_cloud_name"`
+	Cloud     Cloud  `gorm:"foreignKey:CloudName;references:Name;constraint:OnDelete:CASCADE"`
 
 	// Access is the access level of the user on the cloud.
 	Access string `gorm:"not null"`

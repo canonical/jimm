@@ -40,7 +40,7 @@ type User struct {
 	AuditLogAccess string `gorm:"not null;default:''"`
 
 	// Clouds are the clouds accessible to this user.
-	Clouds []UserCloudAccess
+	Clouds []UserCloudAccess `gorm:"foreignKey:Username;references:Username"`
 
 	// CloudCredentials are the cloud credentials owned by this user.
 	CloudCredentials []CloudCredential `gorm:"foreignKey:OwnerID;references:Username"`
