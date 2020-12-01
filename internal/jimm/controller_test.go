@@ -11,6 +11,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/version"
+	"github.com/juju/names/v4"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
@@ -24,9 +25,9 @@ func TestAddController(t *testing.T) {
 
 	now := time.Now().UTC().Round(time.Millisecond)
 	api := &jimmtest.API{
-		Clouds_: func(context.Context) (map[string]jujuparams.Cloud, error) {
-			clouds := map[string]jujuparams.Cloud{
-				"cloud-aws": jujuparams.Cloud{
+		Clouds_: func(context.Context) (map[names.CloudTag]jujuparams.Cloud, error) {
+			clouds := map[names.CloudTag]jujuparams.Cloud{
+				names.NewCloudTag("aws"): jujuparams.Cloud{
 					Type:             "ec2",
 					AuthTypes:        []string{"userpass"},
 					Endpoint:         "https://example.com",
@@ -59,7 +60,7 @@ func TestAddController(t *testing.T) {
 						},
 					},
 				},
-				"cloud-k8s": jujuparams.Cloud{
+				names.NewCloudTag("k8s"): jujuparams.Cloud{
 					Type:      "kubernetes",
 					AuthTypes: []string{"userpass"},
 					Endpoint:  "https://k8s.example.com",
@@ -70,8 +71,8 @@ func TestAddController(t *testing.T) {
 			}
 			return clouds, nil
 		},
-		CloudInfo_: func(_ context.Context, tag string, ci *jujuparams.CloudInfo) error {
-			if tag != "cloud-k8s" {
+		CloudInfo_: func(_ context.Context, tag names.CloudTag, ci *jujuparams.CloudInfo) error {
+			if tag.Id() != "k8s" {
 				c.Errorf("CloudInfo called for unexpected cloud %q", tag)
 				return errors.E("unexpected cloud")
 			}
