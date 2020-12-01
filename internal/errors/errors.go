@@ -101,6 +101,7 @@ type Code string
 
 const (
 	CodeAlreadyExists       Code = jujuparams.CodeAlreadyExists
+	CodeBadRequest          Code = jujuparams.CodeBadRequest
 	CodeNotFound            Code = jujuparams.CodeNotFound
 	CodeServerConfiguration Code = "server configuration"
 	CodeUnauthorized        Code = jujuparams.CodeUnauthorized
