@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
 
@@ -50,3 +52,23 @@ func (l gormLogger) Trace(ctx context.Context, begin time.Time, fc func() (strin
 }
 
 var _ logger.Interface = gormLogger{}
+
+// MemoryDB returns an in-memory gorm.DB for use in tests. The underlying
+// SQL database is an in-memory SQLite database.
+func MemoryDB(t testing.TB, nowFunc func() time.Time) *gorm.DB {
+	cfg := gorm.Config{
+		Logger:  NewGormLogger(t),
+		NowFunc: nowFunc,
+	}
+	gdb, err := gorm.Open(sqlite.Open("file::memory:"), &cfg)
+	if err != nil {
+		t.Fatalf("error opening database: %s", err)
+	}
+	// Enable foreign key constraints in SQLite, which are disabled by
+	// default. This makes the encoded foreign key constraints behave as
+	// expected.
+	if err = gdb.Exec("PRAGMA foreign_keys=ON").Error; err != nil {
+		t.Fatalf("cannot enable foreign keys: %s", err)
+	}
+	return gdb
+}
