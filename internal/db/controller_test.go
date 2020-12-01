@@ -66,14 +66,14 @@ func (s *dbSuite) TestGetController(c *qt.C) {
 	}
 	err = s.Database.GetController(context.Background(), &dbController)
 	c.Assert(err, qt.Equals, nil)
-	c.Assert(dbController, qt.DeepEquals, controller)
+	c.Assert(dbController, qt.CmpEquals(cmpopts.EquateEmpty()), controller)
 
 	dbController = dbmodel.Controller{
 		Name: controller.Name,
 	}
 	err = s.Database.GetController(context.Background(), &dbController)
 	c.Assert(err, qt.Equals, nil)
-	c.Assert(dbController, qt.DeepEquals, controller)
+	c.Assert(dbController, qt.CmpEquals(cmpopts.EquateEmpty()), controller)
 
 	dbController = dbmodel.Controller{
 		Name: "no such controller",
@@ -188,7 +188,5 @@ func (s *dbSuite) TestGetControllerWithModels(c *qt.C) {
 	controller.Models = []dbmodel.Model{
 		models[0],
 	}
-	c.Assert(dbController, qt.CmpEquals(cmpopts.IgnoreFields(dbmodel.Controller{}, "Models")), controller)
-	c.Assert(dbController.Models, qt.HasLen, 1)
-	c.Assert(dbController.Models[0].UUID, qt.Equals, models[0].UUID)
+	c.Assert(dbController, qt.CmpEquals(cmpopts.IgnoreFields(dbmodel.Controller{}, "Models"), cmpopts.EquateEmpty()), controller)
 }

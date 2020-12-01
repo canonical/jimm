@@ -39,8 +39,7 @@ func (d *Database) GetController(ctx context.Context, controller *dbmodel.Contro
 		db = db.Where("name = ?", controller.Name)
 	}
 
-	// TODO (ashipika): think about model preloading - is it needed?
-	if err := db.Preload("Models", "is_controller = true").First(&controller).Error; err != nil {
+	if err := db.Preload("CloudRegions").First(&controller).Error; err != nil {
 		return errors.E(op, dbError(err))
 	}
 	return nil
