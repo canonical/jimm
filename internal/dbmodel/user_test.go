@@ -89,8 +89,8 @@ func TestUserClouds(t *testing.T) {
 	c.Assert(result.Error, qt.IsNil)
 
 	c.Assert(u.Clouds, qt.HasLen, 1)
-	c.Check(u.Clouds[0].UserID, qt.Equals, u.ID)
-	c.Check(u.Clouds[0].CloudID, qt.Equals, cl.ID)
+	c.Check(u.Clouds[0].Username, qt.Equals, u.Username)
+	c.Check(u.Clouds[0].CloudName, qt.Equals, cl.Name)
 	c.Check(u.Clouds[0].Access, qt.Equals, "add-model")
 }
 
