@@ -30,7 +30,7 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 		return errors.E(op, errors.CodeUnauthorized, "cannot add controller")
 	}
 
-	api, err := j.dial(ctx, ctl, "")
+	api, err := j.dial(ctx, ctl, names.ModelTag{})
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -48,14 +48,9 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 	}
 
 	for tag, cld := range clouds {
-		ctx := zapctx.WithFields(ctx, zap.String("tag", tag))
-		ct, err := names.ParseCloudTag(tag)
-		if err != nil {
-			zapctx.Error(ctx, "cannot parse cloud tag - skipping", zap.Error(err))
-			continue
-		}
+		ctx := zapctx.WithFields(ctx, zap.Stringer("tag", tag))
 		cloud := dbmodel.Cloud{
-			Name:             ct.Id(),
+			Name:             tag.Id(),
 			Type:             cld.Type,
 			HostCloudRegion:  cld.HostCloudRegion,
 			AuthTypes:        dbmodel.Strings(cld.AuthTypes),
@@ -76,7 +71,7 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 		}
 		// If this cloud is not the one used by the controller model then
 		// it is only available to a subset of users.
-		if tag != ms.CloudTag {
+		if tag.String() != ms.CloudTag {
 			var err error
 			cloud.Users, err = cloudUsers(ctx, api, tag)
 			if err != nil {
@@ -97,6 +92,7 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 				StorageEndpoint:  r.StorageEndpoint,
 				Config:           dbmodel.Map(cld.RegionConfig[r.Name]),
 			}
+
 			cloud.Regions = append(cloud.Regions, cr)
 		}
 
@@ -106,7 +102,7 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 
 		for _, cr := range cloud.Regions {
 			priority := dbmodel.CloudRegionControllerPrioritySupported
-			if tag == ms.CloudTag && cr.Name == ms.CloudRegion {
+			if tag.String() == ms.CloudTag && cr.Name == ms.CloudRegion {
 				priority = dbmodel.CloudRegionControllerPriorityDeployed
 			}
 			ctl.CloudRegions = append(ctl.CloudRegions, dbmodel.CloudRegionControllerPriority{
@@ -126,7 +122,7 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 }
 
 // cloudUsers determines the users that can access a cloud.
-func cloudUsers(ctx context.Context, api API, tag string) ([]dbmodel.UserCloudAccess, error) {
+func cloudUsers(ctx context.Context, api API, tag names.CloudTag) ([]dbmodel.UserCloudAccess, error) {
 	const op = errors.Op("jimm.cloudUsers")
 	var ci jujuparams.CloudInfo
 	if err := api.CloudInfo(ctx, tag, &ci); err != nil {

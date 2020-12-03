@@ -49,9 +49,9 @@ type Controller struct {
 	// agent version.
 	AgentVersion string
 
-	// HostPorts holds the known addresses on which the controller is
+	// Addresses holds the known addresses on which the controller is
 	// listening.
-	HostPorts HostPorts
+	Addresses Strings
 
 	// UnavailableSince records the time that this controller became
 	// unavailable, if it has.

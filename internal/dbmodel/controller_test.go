@@ -8,7 +8,6 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	qt "github.com/frankban/quicktest"
-	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 )
 
@@ -38,26 +37,7 @@ func TestController(t *testing.T) {
 		AdminPassword: "pw",
 		CACertificate: "ca-cert",
 		PublicAddress: "controller.example.com:443",
-		HostPorts: [][]jujuparams.HostPort{{{
-			Address: jujuparams.Address{
-				Value:           "1.1.1.1",
-				Type:            "t1",
-				Scope:           "s1",
-				SpaceName:       "sp1",
-				ProviderSpaceID: "psp1",
-			},
-			Port: 1,
-		}, {
-			Address: jujuparams.Address{
-				Value: "2.2.2.2",
-			},
-			Port: 2,
-		}}, {{
-			Address: jujuparams.Address{
-				Value: "3.3.3.3",
-			},
-			Port: 3,
-		}}},
+		Addresses:     dbmodel.Strings{"1.1.1.1:1", "2.2.2.2:2", "3.3.3.3:3"},
 	}
 	result := db.Create(&ctl)
 	c.Assert(result.Error, qt.IsNil)
