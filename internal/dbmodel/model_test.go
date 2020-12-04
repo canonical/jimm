@@ -252,7 +252,7 @@ func TestModel(t *testing.T) {
 	c.Check(m2, qt.DeepEquals, m)
 }
 
-func TestWriteModelInfo(t *testing.T) {
+func TestToJujuModelInfo(t *testing.T) {
 	c := qt.New(t)
 	db := gormDB(c,
 		&dbmodel.Application{},
@@ -351,9 +351,8 @@ func TestWriteModelInfo(t *testing.T) {
 		}},
 	}
 	m.CloudRegion.Cloud = cl
-	var mi jujuparams.ModelInfo
-	m.WriteModelInfo(&mi)
 
+	mi := m.ToJujuModelInfo()
 	c.Check(mi, qt.DeepEquals, jujuparams.ModelInfo{
 		Name:                    "test-model",
 		Type:                    "iaas",
@@ -492,9 +491,8 @@ func TestWriteModelSummary(t *testing.T) {
 		}},
 	}
 	m.CloudRegion.Cloud = cl
-	var ms jujuparams.ModelSummary
-	m.WriteModelSummary(&ms)
 
+	ms := m.ToJujuModelSummary()
 	c.Check(ms, qt.DeepEquals, jujuparams.ModelSummary{
 		Name:               "test-model",
 		Type:               "iaas",
