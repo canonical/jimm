@@ -75,9 +75,10 @@ func (c Cloud) Region(name string) CloudRegion {
 	return CloudRegion{}
 }
 
-// WriteCloud writes the Cloud object into a jujuparams.Cloud. The cloud
-// must have its regions association filled out.
-func (c Cloud) WriteCloud(cl *jujuparams.Cloud) {
+// ToJujuCloud converts the  Cloud object into a jujuparams.Cloud. The
+// cloud must have its regions association filled out.
+func (c Cloud) ToJujuCloud() jujuparams.Cloud {
+	var cl jujuparams.Cloud
 	cl.Type = c.Type
 	cl.HostCloudRegion = c.HostCloudRegion
 	cl.AuthTypes = []string(c.AuthTypes)
@@ -87,17 +88,19 @@ func (c Cloud) WriteCloud(cl *jujuparams.Cloud) {
 	cl.Regions = make([]jujuparams.CloudRegion, len(c.Regions))
 	cl.RegionConfig = make(map[string]map[string]interface{}, len(c.Regions))
 	for i, r := range c.Regions {
-		r.WriteCloudRegion(&cl.Regions[i])
-		r.WriteCloudRegionConfig(cl.RegionConfig)
+		cl.Regions[i] = r.ToJujuCloudRegion()
+		cl.RegionConfig[r.Name] = map[string]interface{}(r.Config)
 	}
 	cl.CACertificates = []string(c.CACertificates)
 	cl.Config = map[string]interface{}(c.Config)
+	return cl
 }
 
-// WriteCloudDetails writes the Cloud object into a
+// ToJujuCloudDetails converts the Cloud object into a
 // jujuparams.CloudDetails. The cloud must have its regions association
 // filled out.
-func (c Cloud) WriteCloudDetails(cd *jujuparams.CloudDetails) {
+func (c Cloud) ToJujuCloudDetails() jujuparams.CloudDetails {
+	var cd jujuparams.CloudDetails
 	cd.Type = c.Type
 	cd.AuthTypes = []string(c.AuthTypes)
 	cd.Endpoint = c.Endpoint
@@ -105,19 +108,22 @@ func (c Cloud) WriteCloudDetails(cd *jujuparams.CloudDetails) {
 	cd.StorageEndpoint = c.StorageEndpoint
 	cd.Regions = make([]jujuparams.CloudRegion, len(c.Regions))
 	for i, r := range c.Regions {
-		r.WriteCloudRegion(&cd.Regions[i])
+		cd.Regions[i] = r.ToJujuCloudRegion()
 	}
+	return cd
 }
 
-// WriteCloudInfo writes the Cloud object into a
+// ToJujuCloudInfo converts the Cloud object into a
 // jujuparams.CloudInfo. The cloud must have its regions and users
 // associations filled out.
-func (c Cloud) WriteCloudInfo(ci *jujuparams.CloudInfo) {
-	c.WriteCloudDetails(&ci.CloudDetails)
+func (c Cloud) ToJujuCloudInfo() jujuparams.CloudInfo {
+	var ci jujuparams.CloudInfo
+	ci.CloudDetails = c.ToJujuCloudDetails()
 	ci.Users = make([]jujuparams.CloudUserInfo, len(c.Users))
 	for i, u := range c.Users {
-		u.WriteCloudUserInfo(&ci.Users[i])
+		ci.Users[i] = u.ToJujuCloudUserInfo()
 	}
+	return ci
 }
 
 // A CloudRegion is a region of a cloud.
@@ -150,18 +156,14 @@ type CloudRegion struct {
 	Controllers []CloudRegionControllerPriority
 }
 
-// WriteCloudRegion writes a CloudRegion into a jujuparams.CloudRegion.
-func (r CloudRegion) WriteCloudRegion(cr *jujuparams.CloudRegion) {
+// ToJujuCloudRegion converts a CloudRegion into a jujuparams.CloudRegion.
+func (r CloudRegion) ToJujuCloudRegion() jujuparams.CloudRegion {
+	var cr jujuparams.CloudRegion
 	cr.Name = r.Name
 	cr.Endpoint = r.Endpoint
 	cr.IdentityEndpoint = r.IdentityEndpoint
 	cr.StorageEndpoint = r.StorageEndpoint
-}
-
-// WriteCloudRegionConfig writes the configuration from the CloudRegion
-// into the given config map.
-func (r CloudRegion) WriteCloudRegionConfig(cfg map[string]map[string]interface{}) {
-	cfg[r.Name] = map[string]interface{}(r.Config)
+	return cr
 }
 
 // A UserCloudAccess maps the access level of a user on a cloud.
@@ -180,8 +182,13 @@ type UserCloudAccess struct {
 	Access string `gorm:"not null"`
 }
 
-func (a UserCloudAccess) WriteCloudUserInfo(cui *jujuparams.CloudUserInfo) {
+// ToJujuCloudUserInfo convert a UserCloudAccess into a
+// jujuparams.CloudUserInfo. The UserCloudAccess must have its user
+// association filled out.
+func (a UserCloudAccess) ToJujuCloudUserInfo() jujuparams.CloudUserInfo {
+	var cui jujuparams.CloudUserInfo
 	cui.UserName = a.User.Username
 	cui.DisplayName = a.User.DisplayName
 	cui.Access = a.Access
+	return cui
 }

@@ -76,7 +76,7 @@ func TestCloud(t *testing.T) {
 	c.Check(result.Error, qt.ErrorMatches, `UNIQUE constraint failed: clouds.name`)
 }
 
-func TestWriteCloud(t *testing.T) {
+func TestToJujuCloud(t *testing.T) {
 	c := qt.New(t)
 
 	cl := dbmodel.Cloud{
@@ -104,8 +104,7 @@ func TestWriteCloud(t *testing.T) {
 			"k3": map[string]interface{}{"k": []interface{}{"v"}},
 		},
 	}
-	var pc jujuparams.Cloud
-	cl.WriteCloud(&pc)
+	pc := cl.ToJujuCloud()
 	c.Check(pc, qt.DeepEquals, jujuparams.Cloud{
 		Type:             "test-provider",
 		HostCloudRegion:  "test-cloud/test-region",
@@ -134,7 +133,7 @@ func TestWriteCloud(t *testing.T) {
 	})
 }
 
-func TestWriteCloudInfo(t *testing.T) {
+func TestToJujuCloudInfo(t *testing.T) {
 	c := qt.New(t)
 
 	cl := dbmodel.Cloud{
@@ -175,8 +174,7 @@ func TestWriteCloudInfo(t *testing.T) {
 			Access: "add-model",
 		}},
 	}
-	var pci jujuparams.CloudInfo
-	cl.WriteCloudInfo(&pci)
+	pci := cl.ToJujuCloudInfo()
 	c.Check(pci, qt.DeepEquals, jujuparams.CloudInfo{
 		CloudDetails: jujuparams.CloudDetails{
 			Type:             "test-provider",

@@ -86,12 +86,13 @@ func (m *Model) SetTag(t names.ModelTag) {
 	m.UUID.Valid = true
 }
 
-// WriteModelInfo writes the data from this model object into the given
-// jujuparams.ModelInfo. The model must have its Applications, CloudRegion,
-// CloudCredential, Controller, Machines, Owner, and Users associations
-// fetched. The ModelInfo is written with admin-level data, it is the
-// caller's responsibility to filter any data that should not be returned.
-func (m Model) WriteModelInfo(mi *jujuparams.ModelInfo) {
+// ToJujuModelInfo converts a model into a jujuparams.ModelInfo. The model
+// must have its Applications, CloudRegion, CloudCredential, Controller,
+// Machines, Owner, and Users associations fetched. The ModelInfo is
+// created with admin-level data, it is the caller's responsibility to
+// filter any data that should not be returned.
+func (m Model) ToJujuModelInfo() jujuparams.ModelInfo {
+	var mi jujuparams.ModelInfo
 	mi.Name = m.Name
 	mi.Type = m.Type
 	mi.UUID = m.UUID.String
@@ -107,18 +108,18 @@ func (m Model) WriteModelInfo(mi *jujuparams.ModelInfo) {
 	}
 	mi.OwnerTag = m.Owner.Tag().String()
 	mi.Life = life.Value(m.Life)
-	m.Status.WriteEntityStatus(&mi.Status)
+	mi.Status = m.Status.ToJujuEntityStatus()
 	mi.Users = make([]jujuparams.ModelUserInfo, len(m.Users))
 	for i, u := range m.Users {
-		u.WriteModelUserInfo(&mi.Users[i])
+		mi.Users[i] = u.ToJujuModelUserInfo()
 	}
 	mi.Machines = make([]jujuparams.ModelMachineInfo, len(m.Machines))
 	for i, machine := range m.Machines {
-		machine.WriteModelMachineInfo(&mi.Machines[i])
+		mi.Machines[i] = machine.ToJujuModelMachineInfo()
 	}
 	// JIMM doesn't store information about Migrations so this is omitted.
 	mi.SLA = new(jujuparams.ModelSLAInfo)
-	m.SLA.WriteModelSLAInfo(mi.SLA)
+	*mi.SLA = m.SLA.ToJujuModelSLAInfo()
 
 	v, err := version.Parse(m.Status.Version)
 	if err == nil {
@@ -126,15 +127,16 @@ func (m Model) WriteModelInfo(mi *jujuparams.ModelInfo) {
 		// unavailable and therefore is not set.
 		mi.AgentVersion = &v
 	}
+	return mi
 }
 
-// WriteModelSummary writes the data from this model to the given
-// jujuparams.ModelSummary. The model must have its Applications,
-// CloudRegion, CloudCredential, Controller, Machines, and Owner,
-// associations fetched. The ModelSummary is written without completing
-// the UserAccess or UserLastConnection fields, it is the caller's
-// responsibility to complete these fields appropriately.
-func (m Model) WriteModelSummary(ms *jujuparams.ModelSummary) {
+// ToJujuModelSummary converts a model to a jujuparams.ModelSummary. The
+// model must have its Applications, CloudRegion, CloudCredential,
+// Controller, Machines, and Owner, associations fetched. The ModelSummary
+// will not include the UserAccess or UserLastConnection fields, it is the
+// caller's responsibility to complete these fields appropriately.
+func (m Model) ToJujuModelSummary() jujuparams.ModelSummary {
+	var ms jujuparams.ModelSummary
 	ms.Name = m.Name
 	ms.Type = m.Type
 	ms.UUID = m.UUID.String
@@ -147,7 +149,7 @@ func (m Model) WriteModelSummary(ms *jujuparams.ModelSummary) {
 	ms.CloudCredentialTag = m.CloudCredential.Tag().String()
 	ms.OwnerTag = m.Owner.Tag().String()
 	ms.Life = life.Value(m.Life)
-	m.Status.WriteEntityStatus(&ms.Status)
+	ms.Status = m.Status.ToJujuEntityStatus()
 	var machines, cores, units int64
 	for _, mach := range m.Machines {
 		machines += 1
@@ -169,7 +171,7 @@ func (m Model) WriteModelSummary(ms *jujuparams.ModelSummary) {
 
 	// JIMM doesn't store information about Migrations so this is omitted.
 	ms.SLA = new(jujuparams.ModelSLAInfo)
-	m.SLA.WriteModelSLAInfo(ms.SLA)
+	*ms.SLA = m.SLA.ToJujuModelSLAInfo()
 
 	v, err := version.Parse(m.Status.Version)
 	if err == nil {
@@ -177,6 +179,7 @@ func (m Model) WriteModelSummary(ms *jujuparams.ModelSummary) {
 		// unavailable and therefore is not set.
 		ms.AgentVersion = &v
 	}
+	return ms
 }
 
 // An SLA contains the details of the SLA associated with the model.
@@ -188,11 +191,12 @@ type SLA struct {
 	Owner string
 }
 
-// WriteModelSLAInfo writes the SLA value into the given
-// jujuparams.ModelSLAInfo.
-func (s SLA) WriteModelSLAInfo(msi *jujuparams.ModelSLAInfo) {
+// ToJujuModelSLAInfo converts a SLA into a jujuparams.ModelSLAInfo.
+func (s SLA) ToJujuModelSLAInfo() jujuparams.ModelSLAInfo {
+	var msi jujuparams.ModelSLAInfo
 	msi.Level = s.Level
 	msi.Owner = s.Owner
+	return msi
 }
 
 // A UserModelAccess maps the access level of a user on a model.
@@ -214,10 +218,11 @@ type UserModelAccess struct {
 	LastConnection sql.NullTime
 }
 
-// WriteModelUserInfo writes the contents of the UserModelAccess into the
-// given ModelUserInfo structure. The UserModelAccess must have its User
-// association loaded for this to work correctly.
-func (a UserModelAccess) WriteModelUserInfo(mui *jujuparams.ModelUserInfo) {
+// ToJujuModelUserInfo covnerts a UserModelAccess into a
+// jujuparams.ModelUserInfo. The UserModelAccess must have its User
+// association loaded.
+func (a UserModelAccess) ToJujuModelUserInfo() jujuparams.ModelUserInfo {
+	var mui jujuparams.ModelUserInfo
 	mui.UserName = a.User.Username
 	mui.DisplayName = a.User.DisplayName
 	if a.LastConnection.Valid {
@@ -226,6 +231,7 @@ func (a UserModelAccess) WriteModelUserInfo(mui *jujuparams.ModelUserInfo) {
 		mui.LastConnection = nil
 	}
 	mui.Access = jujuparams.UserAccessPermission(a.Access)
+	return mui
 }
 
 // A Status holds the entity status of an object.
@@ -237,9 +243,9 @@ type Status struct {
 	Version string
 }
 
-// WriteEntityStatus writes the status value into the given
-// jujuparams.EntityStatus.
-func (s Status) WriteEntityStatus(es *jujuparams.EntityStatus) {
+// ToJujuEntityStatus converts the status into a jujuparams.EntityStatus.
+func (s Status) ToJujuEntityStatus() jujuparams.EntityStatus {
+	var es jujuparams.EntityStatus
 	es.Status = status.Status(s.Status)
 	es.Info = s.Info
 	es.Data = map[string]interface{}(s.Data)
@@ -248,6 +254,7 @@ func (s Status) WriteEntityStatus(es *jujuparams.EntityStatus) {
 	} else {
 		es.Since = nil
 	}
+	return es
 }
 
 // A Machine is a machine in a model.
@@ -291,12 +298,13 @@ type Machine struct {
 	Units []Unit
 }
 
-// WriteModelMachineInfo writes the machine data into the given
+// ToJujuModelMachineInfo converts a Machine into a
 // jujuparams.ModelMachineInfo.
-func (m Machine) WriteModelMachineInfo(mmi *jujuparams.ModelMachineInfo) {
+func (m Machine) ToJujuModelMachineInfo() jujuparams.ModelMachineInfo {
+	var mmi jujuparams.ModelMachineInfo
 	mmi.Id = m.MachineID
 	mmi.Hardware = new(jujuparams.MachineHardware)
-	m.Hardware.WriteMachineHardware(mmi.Hardware)
+	*mmi.Hardware = m.Hardware.ToJujuMachineHardware()
 	mmi.InstanceId = m.InstanceID
 	mmi.DisplayName = m.DisplayName
 	mmi.Status = m.InstanceStatus.Status
@@ -305,6 +313,7 @@ func (m Machine) WriteModelMachineInfo(mmi *jujuparams.ModelMachineInfo) {
 	mmi.WantsVote = m.WantsVote
 	// HAPrimary status is not known in jimm so it is always
 	// omitted.
+	return mmi
 }
 
 // A MachineHardware contains the known details of the machine's hardware.
@@ -331,9 +340,10 @@ type MachineHardware struct {
 	AvailabilityZone sql.NullString
 }
 
-// WriteMachineHardware writes the MachineHardware into the given
+// ToJujuMachineHardware converts a MachineHardware into a
 // jujuparams.MachineHardware.
-func (h MachineHardware) WriteMachineHardware(mh *jujuparams.MachineHardware) {
+func (h MachineHardware) ToJujuMachineHardware() jujuparams.MachineHardware {
+	var mh jujuparams.MachineHardware
 	if h.Arch.Valid {
 		mh.Arch = &h.Arch.String
 	} else {
@@ -369,6 +379,7 @@ func (h MachineHardware) WriteMachineHardware(mh *jujuparams.MachineHardware) {
 	} else {
 		mh.AvailabilityZone = nil
 	}
+	return mh
 }
 
 // An Application is an application in a model.
