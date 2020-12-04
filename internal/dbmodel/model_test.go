@@ -8,6 +8,7 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 	"gorm.io/gorm"
 
@@ -249,6 +250,282 @@ func TestModel(t *testing.T) {
 	pdb = pdb.Preload("Users").Preload("Users.User")
 	c.Assert(pdb.First(&m2).Error, qt.IsNil)
 	c.Check(m2, qt.DeepEquals, m)
+}
+
+func TestWriteModelInfo(t *testing.T) {
+	c := qt.New(t)
+	db := gormDB(c,
+		&dbmodel.Application{},
+		&dbmodel.Machine{},
+		&dbmodel.Model{},
+		&dbmodel.Unit{},
+		&dbmodel.UserModelAccess{},
+	)
+	cl, cred, ctl, u := initModelEnv(c, db)
+	now := time.Now()
+	m := dbmodel.Model{
+		Name: "test-model",
+		UUID: sql.NullString{
+			String: "00000001-0000-0000-0000-0000-000000000001",
+			Valid:  true,
+		},
+		Owner:           u,
+		Controller:      ctl,
+		CloudRegion:     cl.Regions[0],
+		CloudCredential: cred,
+		Type:            "iaas",
+		IsController:    false,
+		DefaultSeries:   "warty",
+		Life:            "alive",
+		Status: dbmodel.Status{
+			Status: "available",
+			Since: sql.NullTime{
+				Time:  now,
+				Valid: true,
+			},
+		},
+		SLA: dbmodel.SLA{
+			Level: "unsupported",
+		},
+		Applications: []dbmodel.Application{{
+			Name:     "app-1",
+			Exposed:  true,
+			CharmURL: "ch:charm",
+			Life:     "alive",
+			MinUnits: 1,
+			Constraints: dbmodel.Constraints{
+				Arch: sql.NullString{
+					String: "amd64",
+					Valid:  true,
+				},
+			},
+			Config: dbmodel.Map(map[string]interface{}{
+				"a": "b",
+			}),
+			Subordinate: false,
+			Status: dbmodel.Status{
+				Status: "active",
+				Info:   "Unit Is Ready",
+				Since: sql.NullTime{
+					Time:  now,
+					Valid: true,
+				},
+			},
+			WorkloadVersion: "1.0.0",
+		}},
+		Machines: []dbmodel.Machine{{
+			MachineID: "0",
+			Hardware: dbmodel.MachineHardware{
+				Arch: sql.NullString{
+					String: "amd64",
+					Valid:  true,
+				},
+				Mem: dbmodel.NullUint64{
+					Uint64: 2000,
+					Valid:  true,
+				},
+			},
+			InstanceID:  "test-machine-0",
+			DisplayName: "Machine 0",
+			AgentStatus: dbmodel.Status{
+				Status: "started",
+				Since: sql.NullTime{
+					Time:  now,
+					Valid: true,
+				},
+				Version: "1.0.0",
+			},
+			InstanceStatus: dbmodel.Status{
+				Status: "running",
+				Info:   "ACTIVE",
+				Since: sql.NullTime{
+					Time:  now,
+					Valid: true,
+				},
+			},
+			Series: "warty",
+		}},
+		Users: []dbmodel.UserModelAccess{{
+			User:   u,
+			Access: "admin",
+		}},
+	}
+	m.CloudRegion.Cloud = cl
+	var mi jujuparams.ModelInfo
+	m.WriteModelInfo(&mi)
+
+	c.Check(mi, qt.DeepEquals, jujuparams.ModelInfo{
+		Name:                    "test-model",
+		Type:                    "iaas",
+		UUID:                    "00000001-0000-0000-0000-0000-000000000001",
+		ControllerUUID:          "00000000-0000-0000-0000-0000-0000000000001",
+		IsController:            false,
+		ProviderType:            "test-provider",
+		DefaultSeries:           "warty",
+		CloudTag:                "cloud-test-cloud",
+		CloudRegion:             "test-region",
+		CloudCredentialTag:      "cloudcred-test-cloud_bob@external_test-cred",
+		CloudCredentialValidity: nil,
+		OwnerTag:                "user-bob@external",
+		Life:                    "alive",
+		Status: jujuparams.EntityStatus{
+			Status: "available",
+			Since:  &now,
+		},
+		Users: []jujuparams.ModelUserInfo{{
+			UserName: "bob@external",
+			Access:   "admin",
+		}},
+		Machines: []jujuparams.ModelMachineInfo{{
+			Id: "0",
+			Hardware: &jujuparams.MachineHardware{
+				Arch: &m.Machines[0].Hardware.Arch.String,
+				Mem:  &m.Machines[0].Hardware.Mem.Uint64,
+			},
+			InstanceId:  "test-machine-0",
+			DisplayName: "Machine 0",
+			Status:      "running",
+			Message:     "ACTIVE",
+		}},
+		SLA: &jujuparams.ModelSLAInfo{
+			Level: "unsupported",
+		},
+	})
+}
+
+func TestWriteModelSummary(t *testing.T) {
+	c := qt.New(t)
+	db := gormDB(c,
+		&dbmodel.Application{},
+		&dbmodel.Machine{},
+		&dbmodel.Model{},
+		&dbmodel.Unit{},
+		&dbmodel.UserModelAccess{},
+	)
+	cl, cred, ctl, u := initModelEnv(c, db)
+	now := time.Now()
+	m := dbmodel.Model{
+		Name: "test-model",
+		UUID: sql.NullString{
+			String: "00000001-0000-0000-0000-0000-000000000001",
+			Valid:  true,
+		},
+		Owner:           u,
+		Controller:      ctl,
+		CloudRegion:     cl.Regions[0],
+		CloudCredential: cred,
+		Type:            "iaas",
+		IsController:    false,
+		DefaultSeries:   "warty",
+		Life:            "alive",
+		Status: dbmodel.Status{
+			Status: "available",
+			Since: sql.NullTime{
+				Time:  now,
+				Valid: true,
+			},
+		},
+		SLA: dbmodel.SLA{
+			Level: "unsupported",
+		},
+		Applications: []dbmodel.Application{{
+			Name:     "app-1",
+			Exposed:  true,
+			CharmURL: "ch:charm",
+			Life:     "alive",
+			MinUnits: 1,
+			Constraints: dbmodel.Constraints{
+				Arch: sql.NullString{
+					String: "amd64",
+					Valid:  true,
+				},
+			},
+			Config: dbmodel.Map(map[string]interface{}{
+				"a": "b",
+			}),
+			Subordinate: false,
+			Status: dbmodel.Status{
+				Status: "active",
+				Info:   "Unit Is Ready",
+				Since: sql.NullTime{
+					Time:  now,
+					Valid: true,
+				},
+			},
+			WorkloadVersion: "1.0.0",
+		}},
+		Machines: []dbmodel.Machine{{
+			MachineID: "0",
+			Hardware: dbmodel.MachineHardware{
+				Arch: sql.NullString{
+					String: "amd64",
+					Valid:  true,
+				},
+				Mem: dbmodel.NullUint64{
+					Uint64: 2000,
+					Valid:  true,
+				},
+			},
+			InstanceID:  "test-machine-0",
+			DisplayName: "Machine 0",
+			AgentStatus: dbmodel.Status{
+				Status: "started",
+				Since: sql.NullTime{
+					Time:  now,
+					Valid: true,
+				},
+				Version: "1.0.0",
+			},
+			InstanceStatus: dbmodel.Status{
+				Status: "running",
+				Info:   "ACTIVE",
+				Since: sql.NullTime{
+					Time:  now,
+					Valid: true,
+				},
+			},
+			Series: "warty",
+		}},
+		Users: []dbmodel.UserModelAccess{{
+			User:   u,
+			Access: "admin",
+		}},
+	}
+	m.CloudRegion.Cloud = cl
+	var ms jujuparams.ModelSummary
+	m.WriteModelSummary(&ms)
+
+	c.Check(ms, qt.DeepEquals, jujuparams.ModelSummary{
+		Name:               "test-model",
+		Type:               "iaas",
+		UUID:               "00000001-0000-0000-0000-0000-000000000001",
+		ControllerUUID:     "00000000-0000-0000-0000-0000-0000000000001",
+		IsController:       false,
+		ProviderType:       "test-provider",
+		DefaultSeries:      "warty",
+		CloudTag:           "cloud-test-cloud",
+		CloudRegion:        "test-region",
+		CloudCredentialTag: "cloudcred-test-cloud_bob@external_test-cred",
+		OwnerTag:           "user-bob@external",
+		Life:               "alive",
+		Status: jujuparams.EntityStatus{
+			Status: "available",
+			Since:  &now,
+		},
+		Counts: []jujuparams.ModelEntityCount{{
+			Entity: "machines",
+			Count:  1,
+		}, {
+			Entity: "cores",
+			Count:  0,
+		}, {
+			Entity: "units",
+			Count:  0,
+		}},
+		SLA: &jujuparams.ModelSLAInfo{
+			Level: "unsupported",
+		},
+	})
 }
 
 func TestApplicationOfferTag(t *testing.T) {
