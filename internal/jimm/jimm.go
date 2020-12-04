@@ -8,6 +8,7 @@ import (
 	"context"
 	"time"
 
+	vault "github.com/hashicorp/vault/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 	"gopkg.in/macaroon-bakery.v2/bakery"
@@ -22,7 +23,7 @@ import (
 // connections therefore the JIMM object itself does not contain any per-
 // request state.
 type JIMM struct {
-	// Database is the satabase used by JIMM, this provides direct access
+	// Database is the database used by JIMM, this provides direct access
 	// to the data store. Any client accessing the database directly is
 	// responsible for ensuring that the authenticated user has access to
 	// the data.
@@ -36,6 +37,13 @@ type JIMM struct {
 	// Dialer is the API dialer JIMM uses to contact juju controllers. if
 	// this is not configured all connection attempts will fail.
 	Dialer Dialer
+
+	// VaultClient is the client for a vault server that is used to store
+	// secrets.
+	VaultClient *vault.Client
+
+	// VaultPath is the root path in the vault for JIMM's secrets.
+	VaultPath string
 }
 
 // An Authenticator authenticates login requests.

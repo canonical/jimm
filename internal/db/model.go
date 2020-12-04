@@ -56,3 +56,16 @@ func (d *Database) UpdateModel(ctx context.Context, model *dbmodel.Model) error 
 	}
 	return nil
 }
+
+// DeleteModel removes the model information from the database.
+func (d *Database) DeleteModel(ctx context.Context, model *dbmodel.Model) error {
+	const op = errors.Op("db.DeleteModel")
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+	db := d.DB.WithContext(ctx)
+	if err := db.Delete(model, model.ID).Error; err != nil {
+		return errors.E(op, dbError(err))
+	}
+	return nil
+}

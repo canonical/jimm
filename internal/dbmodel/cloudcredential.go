@@ -53,3 +53,8 @@ func (c *CloudCredential) SetTag(t names.CloudCredentialTag) {
 	c.Name = t.Name()
 	c.OwnerID = t.Owner().Id()
 }
+
+// Path returns a juju style cloud credential path.
+func (c CloudCredential) Path() string {
+	return fmt.Sprintf("%s/%s/%s", c.CloudName, c.OwnerID, c.Name)
+}

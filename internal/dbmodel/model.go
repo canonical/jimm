@@ -12,6 +12,8 @@ import (
 	"github.com/juju/names/v4"
 	"github.com/juju/version"
 	"gorm.io/gorm"
+
+	"github.com/CanonicalLtd/jimm/internal/errors"
 )
 
 // A Model is a juju model.
@@ -84,6 +86,64 @@ func (m Model) Tag() names.Tag {
 func (m *Model) SetTag(t names.ModelTag) {
 	m.UUID.String = t.Id()
 	m.UUID.Valid = true
+}
+
+// FromJujuModelInfo converts jujuparams.ModelInfo into Model.
+func (m *Model) FromJujuModelInfo(info *jujuparams.ModelInfo) error {
+	m.Name = info.Name
+	m.Type = info.Type
+	m.UUID = sql.NullString{
+		String: info.UUID,
+		Valid:  true,
+	}
+	m.IsController = info.IsController
+	m.DefaultSeries = info.DefaultSeries
+	if info.OwnerTag != "" {
+		ut, err := names.ParseUserTag(info.OwnerTag)
+		if err != nil {
+			return errors.E(err)
+		}
+		m.OwnerID = ut.Id()
+	}
+	m.Life = string(info.Life)
+	m.Status.FromJujuEntityStatus(info.Status)
+
+	m.CloudRegion.Name = info.CloudRegion
+	if info.CloudTag != "" {
+		ct, err := names.ParseCloudTag(info.CloudTag)
+		if err != nil {
+			return errors.E(err)
+		}
+		m.CloudRegion.Cloud.Name = ct.Id()
+	}
+	if info.CloudCredentialTag != "" {
+		cct, err := names.ParseCloudCredentialTag(info.CloudCredentialTag)
+		if err != nil {
+			return errors.E(err)
+		}
+		m.CloudCredential.Name = cct.Name()
+		m.CloudCredential.CloudName = cct.Cloud().Id()
+		m.CloudCredential.Owner.Username = cct.Owner().Id()
+	}
+
+	m.Users = make([]UserModelAccess, len(info.Users))
+	for i, u := range info.Users {
+		m.Users[i].FromJujuModelUserInfo(u)
+	}
+
+	m.Machines = make([]Machine, len(info.Machines))
+	for i, machine := range info.Machines {
+		m.Machines[i].FromJujuModelMachineInfo(machine)
+	}
+
+	if info.SLA != nil {
+		m.SLA.FromJujuModelSLAInfo(*info.SLA)
+	}
+
+	if info.AgentVersion != nil {
+		m.Status.Version = info.AgentVersion.String()
+	}
+	return nil
 }
 
 // ToJujuModelInfo converts a model into a jujuparams.ModelInfo. The model
@@ -191,6 +251,12 @@ type SLA struct {
 	Owner string
 }
 
+// FromJujuModelSLAInfo convers jujuparams.ModelSLAInfo into SLA.
+func (s *SLA) FromJujuModelSLAInfo(js jujuparams.ModelSLAInfo) {
+	s.Level = js.Level
+	s.Owner = js.Owner
+}
+
 // ToJujuModelSLAInfo converts a SLA into a jujuparams.ModelSLAInfo.
 func (s SLA) ToJujuModelSLAInfo() jujuparams.ModelSLAInfo {
 	var msi jujuparams.ModelSLAInfo
@@ -218,6 +284,21 @@ type UserModelAccess struct {
 	LastConnection sql.NullTime
 }
 
+// FromJujuModelUserInfo converts jujuparams.ModelUserInfo into a User.
+func (a *UserModelAccess) FromJujuModelUserInfo(u jujuparams.ModelUserInfo) {
+	a.User = User{
+		Username:    u.UserName,
+		DisplayName: u.DisplayName,
+	}
+	a.Access = string(u.Access)
+	if u.LastConnection != nil {
+		a.LastConnection = sql.NullTime{
+			Time:  *u.LastConnection,
+			Valid: true,
+		}
+	}
+}
+
 // ToJujuModelUserInfo covnerts a UserModelAccess into a
 // jujuparams.ModelUserInfo. The UserModelAccess must have its User
 // association loaded.
@@ -241,6 +322,19 @@ type Status struct {
 	Data    Map
 	Since   sql.NullTime
 	Version string
+}
+
+// FromJujuEntityStatus convers jujuparams.EntitytStatus into Status.
+func (s *Status) FromJujuEntityStatus(js jujuparams.EntityStatus) {
+	s.Status = string(js.Status)
+	s.Info = js.Info
+	s.Data = Map(js.Data)
+	if js.Since != nil {
+		s.Since = sql.NullTime{
+			Time:  js.Since.UTC().Truncate(time.Millisecond),
+			Valid: true,
+		}
+	}
 }
 
 // ToJujuEntityStatus converts the status into a jujuparams.EntityStatus.
@@ -298,6 +392,20 @@ type Machine struct {
 	Units []Unit
 }
 
+// FromJujuModelMachineInfo converts jujuparams.ModelMachineInfo into a Machine.
+func (m *Machine) FromJujuModelMachineInfo(mi jujuparams.ModelMachineInfo) {
+	m.MachineID = mi.Id
+	if mi.Hardware != nil {
+		m.Hardware.FromJujuMachineHardware(*mi.Hardware)
+	}
+	m.InstanceID = mi.InstanceId
+	m.DisplayName = mi.DisplayName
+	m.InstanceStatus.Status = mi.Status
+	m.InstanceStatus.Info = mi.Message
+	m.HasVote = mi.HasVote
+	m.WantsVote = mi.WantsVote
+}
+
 // ToJujuModelMachineInfo converts a Machine into a
 // jujuparams.ModelMachineInfo.
 func (m Machine) ToJujuModelMachineInfo() jujuparams.ModelMachineInfo {
@@ -338,6 +446,32 @@ type MachineHardware struct {
 
 	// AvailabilityZone contains the availability zone of the machine.
 	AvailabilityZone sql.NullString
+}
+
+// FromJujuMachineHardware converts jujuparams.MachineHardware into a MachineHardware.
+func (h *MachineHardware) FromJujuMachineHardware(mh jujuparams.MachineHardware) {
+	if mh.Arch != nil {
+		h.Arch = sql.NullString{
+			String: *mh.Arch,
+			Valid:  true,
+		}
+	}
+	h.Mem.FromValue(mh.Mem)
+	h.RootDisk.FromValue(mh.RootDisk)
+	h.Cores.FromValue(mh.Cores)
+	h.CPUPower.FromValue(mh.CpuPower)
+	if mh.Tags != nil {
+		h.Tags = make([]string, len(*mh.Tags))
+		for i, t := range *mh.Tags {
+			h.Tags[i] = t
+		}
+	}
+	if mh.AvailabilityZone != nil {
+		h.AvailabilityZone = sql.NullString{
+			String: *mh.AvailabilityZone,
+			Valid:  true,
+		}
+	}
 }
 
 // ToJujuMachineHardware converts a MachineHardware into a
