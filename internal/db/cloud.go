@@ -55,6 +55,22 @@ func (d *Database) GetCloud(ctx context.Context, c *dbmodel.Cloud) error {
 	return nil
 }
 
+// GetClouds retrieves all the clouds from the database.
+func (d *Database) GetClouds(ctx context.Context) ([]dbmodel.Cloud, error) {
+	const op = errors.Op("db.GetClouds")
+	if err := d.ready(); err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	var clouds []dbmodel.Cloud
+	db := d.DB.WithContext(ctx)
+	db = preloadCloud("", db)
+	if err := db.Find(&clouds).Error; err != nil {
+		return nil, errors.E(op, err)
+	}
+	return clouds, nil
+}
+
 // SetCloud creates, or updates, the given cloud document. If the cloud
 // already exists it will be unaltered except for the adddion of new
 // regions and users.

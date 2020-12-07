@@ -121,6 +121,54 @@ func (s *dbSuite) TestGetCloud(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	c.Check(cl, qt.CmpEquals(cmpopts.EquateEmpty()), cl2)
 }
+func TestGetCloudsUnconfiguredDatabase(t *testing.T) {
+	c := qt.New(t)
+
+	var d db.Database
+	_, err := d.GetClouds(context.Background())
+	c.Check(err, qt.ErrorMatches, `database not configured`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
+}
+
+func (s *dbSuite) TestGetClouds(c *qt.C) {
+	ctx := context.Background()
+
+	_, err := s.Database.GetClouds(ctx)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
+
+	err = s.Database.Migrate(context.Background(), false)
+	c.Assert(err, qt.IsNil)
+
+	clouds, err := s.Database.GetClouds(ctx)
+	c.Assert(err, qt.IsNil)
+	c.Check(clouds, qt.HasLen, 0)
+
+	cl := dbmodel.Cloud{
+		Name:             "test-cloud",
+		Type:             "dummy",
+		Endpoint:         "https://example.com",
+		IdentityEndpoint: "https://identity.example.com",
+		StorageEndpoint:  "https://storage.example.com",
+		Regions: []dbmodel.CloudRegion{{
+			Name: "dummy-region",
+		}},
+		CACertificates: dbmodel.Strings{"CACERT 1", "CACERT 2"},
+		Users: []dbmodel.UserCloudAccess{{
+			User: dbmodel.User{
+				Username:    "everyone@external",
+				DisplayName: "everyone",
+			},
+			Access: "add-model",
+		}},
+	}
+
+	err = s.Database.AddCloud(ctx, &cl)
+	c.Assert(err, qt.IsNil)
+
+	clouds, err = s.Database.GetClouds(ctx)
+	c.Assert(err, qt.IsNil)
+	c.Check(clouds, qt.CmpEquals(cmpopts.EquateEmpty()), []dbmodel.Cloud{cl})
+}
 
 func TestSetCloudUnconfiguredDatabase(t *testing.T) {
 	c := qt.New(t)
