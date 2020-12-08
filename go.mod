@@ -3,6 +3,7 @@ module github.com/CanonicalLtd/jimm
 go 1.14
 
 require (
+	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/canonical/candid v1.4.2
 	github.com/frankban/quicktest v1.11.0
 	github.com/golang/mock v1.4.4 // indirect
@@ -11,17 +12,19 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/vault/api v1.0.5-0.20200709165743-f98572ac11c9
 	github.com/juju/aclstore v0.0.0-20180706073322-7fc1cdaacf01
-	github.com/juju/charm/v8 v8.0.0-20200925052646-bb021a575610
+	github.com/juju/bundlechanges v1.0.0 // indirect
+	github.com/juju/charm/v8 v8.0.0-20201119121237-bd48f89b02b9
 	github.com/juju/clock v0.0.0-20190205081909-9c5c9712527c
 	github.com/juju/cmd v0.0.0-20200108104440-8e43f3faa5c9
 	github.com/juju/errors v0.0.0-20200330140219-3fe23663418f
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
 	github.com/juju/httprequest v1.0.1
-	github.com/juju/juju v0.0.0-20201102064548-d344015a21e6
+	github.com/juju/juju v0.0.0-20201208094155-eb32b5dd98b5
 	github.com/juju/loggo v0.0.0-20200526014432-9ce3a2e09b5e
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
 	github.com/juju/mgosession v1.0.0
 	github.com/juju/names/v4 v4.0.0-20200929085019-be23e191fee0
+	github.com/juju/os v0.0.0-20201029152849-68703c0e39a2 // indirect
 	github.com/juju/persistent-cookiejar v0.0.0-20170428161559-d67418f14c93
 	github.com/juju/rpcreflect v0.0.0-20200416001309-bb46e9ba1476
 	github.com/juju/simplekv v1.0.0
@@ -30,11 +33,10 @@ require (
 	github.com/juju/version v0.0.0-20191219164919-81c1be00b9a6
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/prometheus/client_golang v1.7.1
-	github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af
+	github.com/rogpeppe/fastuuid v1.2.0
 	go.uber.org/zap v1.10.0
-	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
+	golang.org/x/crypto v0.0.0-20201117144127-c1f2f97bffc9
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
-	golang.org/x/sys v0.0.0-20201018230417-eeed37f84f13 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gopkg.in/check.v1 v1.0.0-20200902074654-038fdea0a05b
 	gopkg.in/errgo.v1 v1.0.1
