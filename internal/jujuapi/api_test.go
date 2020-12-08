@@ -9,7 +9,6 @@ import (
 	"net/url"
 
 	"github.com/gorilla/websocket"
-	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/rpc/jsoncodec"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
@@ -66,16 +65,6 @@ func (s *apiSuite) TestGUIModelNotFound(c *gc.C) {
 			Code:    params.ErrNotFound,
 			Message: `model not found`,
 		},
-	})
-}
-
-func (s *apiSuite) TestGUIArchive(c *gc.C) {
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler:      s.APIHandler,
-		Method:       "GET",
-		URL:          "/gui-archive",
-		ExpectStatus: http.StatusOK,
-		ExpectBody:   jujuparams.GUIArchiveResponse{},
 	})
 }
 
