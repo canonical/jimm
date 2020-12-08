@@ -7,9 +7,14 @@
 package dashboard
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
+	"text/template"
+	"time"
 
 	"github.com/julienschmidt/httprouter"
 	"gopkg.in/errgo.v1"
@@ -32,10 +37,52 @@ func Register(ctx context.Context, router *httprouter.Router, dashboardLocation 
 		})
 		return nil
 	}
-	router.ServeFiles("/"+dashboardPathPrefix+"/*filepath", http.Dir(dashboardLocation))
-	router.ServeFiles("/static/*filepath", http.Dir(dashboardLocation+"/static"))
-	router.GET("/config.js", func(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-		http.ServeFile(w, req, dashboardLocation+"/config.js")
-	})
+	f, err := os.Open(dashboardLocation)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	defer f.Close()
+	fis, err := f.Readdir(0)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	for _, fi := range fis {
+		path := filepath.Join(dashboardLocation, fi.Name())
+		if fi.IsDir() {
+			router.ServeFiles("/"+fi.Name()+"/*filepath", http.Dir(path))
+			continue
+		}
+		serveFile := func(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+			http.ServeFile(w, req, path)
+		}
+		switch fi.Name() {
+		case "index.html":
+			// Use index.html to serve anything we don't otherwise know about.
+			router.GET("/"+dashboardPathPrefix, serveFile)
+			router.GET("/"+dashboardPathPrefix+"/*anything", serveFile)
+		case "config.js":
+			// Ignore any config.js file, use a rendered one instead.
+		case "config.js.go":
+			tmpl, err := template.ParseFiles(path)
+			if err != nil {
+				return errgo.Notef(err, "cannot parse dashboard configuration template")
+			}
+			var buf bytes.Buffer
+			err = tmpl.Execute(&buf, map[string]interface{}{
+				"baseAppURL":                "/" + dashboardPathPrefix + "/",
+				"identityProviderAvailable": true,
+				"isJuju":                    false,
+			})
+			if err != nil {
+				return errgo.Notef(err, "cannot execute dashboard configuration template")
+			}
+			serveConfig := func(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+				http.ServeContent(w, req, "config.js", time.Now(), bytes.NewReader(buf.Bytes()))
+			}
+			router.GET("/config.js", serveConfig)
+		default:
+			router.GET("/"+fi.Name(), serveFile)
+		}
+	}
 	return nil
 }
