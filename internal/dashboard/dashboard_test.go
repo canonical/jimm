@@ -30,6 +30,7 @@ var jaasDashboardConfig = {
   identityProviderAvailable: true
 };
 `
+	indexFile = `Index File`
 )
 
 var _ = gc.Suite(&dashboardSuite{})
@@ -46,8 +47,12 @@ func (s *dashboardSuite) SetUpTest(c *gc.C) {
 	}
 	s.dataPath = dir
 
-	tmpFile := filepath.Join(dir, "config.js")
+	tmpFile := filepath.Join(dir, "config.js.go")
 	err = ioutil.WriteFile(tmpFile, []byte(configFile), 0666)
+	c.Assert(err, jc.ErrorIsNil)
+
+	tmpFile = filepath.Join(dir, "index.html")
+	err = ioutil.WriteFile(tmpFile, []byte(indexFile), 0666)
 	c.Assert(err, jc.ErrorIsNil)
 
 	ctx := context.Background()
@@ -68,7 +73,7 @@ func (s *dashboardSuite) TearDownTest(c *gc.C) {
 }
 
 func (s *dashboardSuite) TestDashboardConfigFile(c *gc.C) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/dashboard/config.js", s.server.URL), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/config.js", s.server.URL), nil)
 	c.Assert(err, jc.ErrorIsNil)
 
 	response, err := http.DefaultClient.Do(req)
@@ -80,11 +85,15 @@ func (s *dashboardSuite) TestDashboardConfigFile(c *gc.C) {
 	c.Assert(string(data), gc.Equals, configFile)
 }
 
-func (s *dashboardSuite) TestDashboardFileNotFound(c *gc.C) {
+func (s *dashboardSuite) TestDashboardDefaultToIndex(c *gc.C) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/dashboard/not_found.js", s.server.URL), nil)
 	c.Assert(err, jc.ErrorIsNil)
 
 	response, err := http.DefaultClient.Do(req)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(response.StatusCode, gc.Equals, http.StatusNotFound)
+	c.Assert(response.StatusCode, gc.Equals, http.StatusOK)
+
+	data, err := ioutil.ReadAll(response.Body)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(string(data), gc.Equals, indexFile)
 }
