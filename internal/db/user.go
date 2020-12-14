@@ -76,3 +76,22 @@ func (d *Database) UpdateUser(ctx context.Context, u *dbmodel.User) error {
 	}
 	return nil
 }
+
+// GetUserCloudCredentials fetches user cloud credentials for the specified cloud.
+func (d *Database) GetUserCloudCredentials(ctx context.Context, u *dbmodel.User, cloud string) ([]dbmodel.CloudCredential, error) {
+	const op = errors.Op("db.GetUserCloudCredentials")
+	if err := d.ready(); err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	if u.Username == "" || cloud == "" {
+		return nil, errors.E(op, errors.CodeNotFound, `cloudcredential not found`)
+	}
+
+	var credentials []dbmodel.CloudCredential
+	db := d.DB.WithContext(ctx)
+	if err := db.Model(u).Where("cloud_name = ?", cloud).Association("CloudCredentials").Find(&credentials); err != nil {
+		return nil, errors.E(op, err)
+	}
+	return credentials, nil
+}

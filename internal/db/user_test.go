@@ -162,3 +162,64 @@ func (s *dbSuite) TestGetUserClouds(c *qt.C) {
 		Access:    "add-model",
 	}})
 }
+
+func TestGetUserCloudCredentialsUnconfiguredDatabase(t *testing.T) {
+	c := qt.New(t)
+
+	var d db.Database
+	_, err := d.GetUserCloudCredentials(context.Background(), &dbmodel.User{}, "")
+	c.Check(err, qt.ErrorMatches, `database not configured`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
+}
+
+func (s *dbSuite) TestGetUserCloudCredentials(c *qt.C) {
+	ctx := context.Background()
+
+	err := s.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	_, err = s.Database.GetUserCloudCredentials(ctx, &dbmodel.User{}, "")
+	c.Check(err, qt.ErrorMatches, `cloudcredential not found`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+
+	_, err = s.Database.GetUserCloudCredentials(ctx, &dbmodel.User{
+		Username: "test",
+	}, "ec2")
+	c.Check(err, qt.IsNil)
+
+	u := dbmodel.User{
+		Username: "bob@external",
+	}
+	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
+
+	cloud := dbmodel.Cloud{
+		Name: "test-cloud",
+		Type: "test-provider",
+		Regions: []dbmodel.CloudRegion{{
+			Name: "test-region",
+		}},
+	}
+	c.Assert(s.Database.DB.Create(&cloud).Error, qt.IsNil)
+
+	cred1 := dbmodel.CloudCredential{
+		Name:      "test-cred-1",
+		CloudName: cloud.Name,
+		OwnerID:   u.Username,
+		AuthType:  "empty",
+	}
+	err = s.Database.SetCloudCredential(context.Background(), &cred1)
+	c.Assert(err, qt.Equals, nil)
+
+	cred2 := dbmodel.CloudCredential{
+		Name:      "test-cred-2",
+		CloudName: cloud.Name,
+		OwnerID:   u.Username,
+		AuthType:  "empty",
+	}
+	err = s.Database.SetCloudCredential(context.Background(), &cred2)
+	c.Assert(err, qt.Equals, nil)
+
+	credentials, err := s.Database.GetUserCloudCredentials(ctx, &u, cloud.Name)
+	c.Check(err, qt.IsNil)
+	c.Assert(credentials, qt.DeepEquals, []dbmodel.CloudCredential{cred1, cred2})
+}

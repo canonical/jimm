@@ -583,3 +583,116 @@ func initModelEnv(c *qt.C, db *gorm.DB) (dbmodel.Cloud, dbmodel.CloudCredential,
 
 	return cl, cred, ctl, u
 }
+
+func TestModelFromJujuModelInfo(t *testing.T) {
+	c := qt.New(t)
+	now := time.Now().UTC().Truncate(time.Millisecond)
+
+	arch := "amd64"
+	count := uint64(2000)
+	modelInfo := jujuparams.ModelInfo{
+		Name:                    "test-model",
+		Type:                    "iaas",
+		UUID:                    "00000001-0000-0000-0000-0000-000000000001",
+		ControllerUUID:          "00000000-0000-0000-0000-0000-0000000000001",
+		IsController:            false,
+		ProviderType:            "test-provider",
+		DefaultSeries:           "warty",
+		CloudTag:                "cloud-test-cloud",
+		CloudRegion:             "test-region",
+		CloudCredentialTag:      "cloudcred-test-cloud_bob@external_test-cred",
+		CloudCredentialValidity: nil,
+		OwnerTag:                "user-bob@external",
+		Life:                    "alive",
+		Status: jujuparams.EntityStatus{
+			Status: "available",
+			Since:  &now,
+		},
+		Users: []jujuparams.ModelUserInfo{{
+			UserName:    "bob@external",
+			DisplayName: "Bobby The Tester",
+			Access:      "admin",
+		}},
+		Machines: []jujuparams.ModelMachineInfo{{
+			Id: "0",
+			Hardware: &jujuparams.MachineHardware{
+				Arch: &arch,
+				Mem:  &count,
+			},
+			InstanceId:  "test-machine-0",
+			DisplayName: "Machine 0",
+			Status:      "running",
+			Message:     "ACTIVE",
+		}},
+		SLA: &jujuparams.ModelSLAInfo{
+			Level: "unsupported",
+		},
+	}
+
+	model := dbmodel.Model{}
+	err := model.FromJujuModelInfo(&modelInfo)
+	c.Assert(err, qt.IsNil)
+
+	c.Assert(model, qt.DeepEquals, dbmodel.Model{
+		Name: "test-model",
+		UUID: sql.NullString{
+			String: "00000001-0000-0000-0000-0000-000000000001",
+			Valid:  true,
+		},
+		CloudRegion: dbmodel.CloudRegion{
+			Name: "test-region",
+			Cloud: dbmodel.Cloud{
+				Name: "test-cloud",
+			},
+		},
+		CloudCredential: dbmodel.CloudCredential{
+			Name:      "test-cred",
+			CloudName: "test-cloud",
+			Owner: dbmodel.User{
+				Username: "bob@external",
+			},
+		},
+		OwnerID:       "bob@external",
+		Type:          "iaas",
+		IsController:  false,
+		DefaultSeries: "warty",
+		Life:          "alive",
+		Status: dbmodel.Status{
+			Status: "available",
+			Since: sql.NullTime{
+				Time:  now,
+				Valid: true,
+			},
+		},
+		SLA: dbmodel.SLA{
+			Level: "unsupported",
+		},
+		Machines: []dbmodel.Machine{{
+			MachineID: "0",
+			Hardware: dbmodel.MachineHardware{
+				Arch: sql.NullString{
+					String: "amd64",
+					Valid:  true,
+				},
+				Mem: dbmodel.NullUint64{
+					Uint64: 2000,
+					Valid:  true,
+				},
+			},
+			InstanceID:  "test-machine-0",
+			DisplayName: "Machine 0",
+			InstanceStatus: dbmodel.Status{
+				Status: "running",
+				Info:   "ACTIVE",
+			},
+		}},
+		Users: []dbmodel.UserModelAccess{{
+			UserID: 0,
+			Access: "admin",
+			User: dbmodel.User{
+				Username:    "bob@external",
+				DisplayName: "Bobby The Tester",
+			},
+		}},
+	})
+}

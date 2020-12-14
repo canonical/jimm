@@ -271,3 +271,14 @@ func (n *NullUint64) Scan(src interface{}) error {
 	}
 	return nil
 }
+
+// FromValue uses the value from the provided uint64 if not nil.
+func (u *NullUint64) FromValue(v *uint64) {
+	if v != nil {
+		u.Uint64 = *v
+		u.Valid = true
+	} else {
+		u.Valid = false
+		u.Uint64 = 0
+	}
+}
