@@ -8,7 +8,6 @@ import (
 
 	jujuapi "github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
-	jt "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/version"
 	gc "gopkg.in/check.v1"
@@ -17,7 +16,6 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
-	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	"github.com/CanonicalLtd/jimm/params"
@@ -42,85 +40,6 @@ func (s *jemSuite) TestPoolRequiresControllerAdmin(c *gc.C) {
 	})
 	c.Assert(err, gc.ErrorMatches, "no controller admin group specified")
 	c.Assert(pool, gc.IsNil)
-}
-
-func (s *jemSuite) TestPoolDoesNotReuseDeadConnection(c *gc.C) {
-	session := jt.NewProxiedSession(c)
-	defer session.Close()
-	sessionPool := mgosession.NewPool(testContext, session.Session, 3)
-	defer sessionPool.Close()
-	pool, err := jem.NewPool(testContext, jem.Params{
-		DB:              session.DB("jem"),
-		ControllerAdmin: jemtest.ControllerAdmin,
-		SessionPool:     sessionPool,
-	})
-	c.Assert(err, gc.Equals, nil)
-	defer pool.Close()
-
-	assertOK := func(j *jem.JEM) {
-		m := mongodoc.Model{Path: params.EntityPath{"bob", "x"}}
-		err := j.DB.GetModel(testContext, &m)
-		c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	}
-	assertBroken := func(j *jem.JEM) {
-		m := mongodoc.Model{Path: params.EntityPath{"bob", "x"}}
-		err = j.DB.GetModel(testContext, &m)
-		c.Assert(err, gc.ErrorMatches, `cannot get model: EOF`)
-	}
-
-	// Get a JEM instance and perform a single operation so that the session used by the
-	// JEM instance obtains a mongo socket.
-	c.Logf("make jem0")
-	jem0 := pool.JEM(context.TODO())
-	defer jem0.Close()
-	assertOK(jem0)
-
-	c.Logf("close connections")
-	// Close all current connections to the mongo instance,
-	// which should cause subsequent operations on jem1 to fail.
-	session.CloseConns()
-
-	// Get another JEM instance, which should be a new session,
-	// so operations on it should not fail.
-	c.Logf("make jem1")
-	jem1 := pool.JEM(context.TODO())
-	defer jem1.Close()
-	assertOK(jem1)
-
-	// Get another JEM instance which should clone the same session
-	// used by jem0 because only two sessions are available.
-	c.Logf("make jem2")
-	jem2 := pool.JEM(context.TODO())
-	defer jem2.Close()
-
-	// Perform another operation on jem0, which should fail and
-	// cause its session not to be reused.
-	c.Logf("check jem0 is broken")
-	assertBroken(jem0)
-
-	// The jem1 connection should still be working because it
-	// was created after the connections were broken.
-	c.Logf("check jem1 is ok")
-	assertOK(jem1)
-
-	c.Logf("check jem2 is ok")
-	// The jem2 connection should also be broken because it
-	// reused the same sessions as jem0
-	assertBroken(jem2)
-
-	// Get another instance, which should reuse the jem3 connection
-	// and work OK.
-	c.Logf("make jem3")
-	jem3 := pool.JEM(context.TODO())
-	defer jem3.Close()
-	assertOK(jem3)
-
-	// When getting the next instance, we should see that the connection
-	// that we would have used is broken and create another one.
-	c.Logf("make jem4")
-	jem4 := pool.JEM(context.TODO())
-	defer jem4.Close()
-	assertOK(jem4)
 }
 
 func (s *jemSuite) TestClone(c *gc.C) {

@@ -4,7 +4,7 @@ package jujuapi_test
 import (
 	"context"
 
-	"github.com/juju/charm/v8"
+	"github.com/juju/charm/v9"
 	"github.com/juju/juju/api/applicationoffers"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/crossmodel"

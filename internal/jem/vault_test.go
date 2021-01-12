@@ -20,7 +20,7 @@ var _ = gc.Suite(&jemVaultSuite{})
 
 func (s *jemVaultSuite) SetUpTest(c *gc.C) {
 	vaultcfg := vault.DefaultConfig()
-	vaultcfg.Address = "http://localhost:8200"
+	vaultcfg.Address = "http://localhost:8228"
 	var err error
 	s.Params.VaultClient, err = vault.NewClient(vaultcfg)
 	c.Assert(err, gc.Equals, nil)

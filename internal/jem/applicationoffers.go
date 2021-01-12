@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/juju/charm/v8"
+	"github.com/juju/charm/v9"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 	"go.uber.org/zap"

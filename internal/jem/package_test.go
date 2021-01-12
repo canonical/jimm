@@ -14,7 +14,7 @@ import (
 var vaultNotAvailable bool
 
 func TestPackage(t *testing.T) {
-	cmd := exec.Command("vault", "server", "-dev", "-dev-root-token-id=test-token")
+	cmd := exec.Command("vault", "server", "-dev", "-dev-no-store-token", "-dev-root-token-id=test-token", "-dev-listen-address=localhost:8228")
 	err := cmd.Start()
 	if err != nil {
 		vaultNotAvailable = true

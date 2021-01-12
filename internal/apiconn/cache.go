@@ -225,11 +225,6 @@ func (c *Conn) Evict() {
 	}
 }
 
-// Ping implements the erstwhile api.Connection.Ping() method.
-func (c *Conn) Ping() error {
-	return errgo.Mask(c.Connection.APICall("Pinger", 1, "", "Ping", nil, nil))
-}
-
 // HasFacadeVersion returns whether the current connection supports the
 // requested facade version.
 func (c *Conn) HasFacadeVersion(facade string, version int) bool {

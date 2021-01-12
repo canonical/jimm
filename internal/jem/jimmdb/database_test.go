@@ -321,13 +321,6 @@ func testSetDead(c *gc.C, proxy *jujutesting.TCPProxy, pool *mgosession.Pool, ru
 	c.Assert(err, gc.Equals, nil)
 	proxy.CloseConns() // Close the existing socket so that the connection is broken.
 
-	// Sanity check that getting another session from the pool also
-	// gives us a broken session (note that we know that the
-	// pool only contains one session).
-	s1 := pool.Session(context.TODO())
-	defer s1.Close()
-	c.Assert(s1.Ping(), gc.NotNil)
-
 	run(db)
 
 	// Check that another session from the pool is OK to use now

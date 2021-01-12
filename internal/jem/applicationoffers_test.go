@@ -5,7 +5,7 @@ package jem_test
 import (
 	"context"
 
-	"github.com/juju/charm/v8"
+	"github.com/juju/charm/v9"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/juju/state"
