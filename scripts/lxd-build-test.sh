@@ -3,22 +3,22 @@
 
 set -eu
 
-image=${image:-ubuntu:20.04}
+image=${image:-ubuntu:16.04}
 container=${container:-jimm-test-`uuidgen`}
-packages="build-essential bzr dqlite git libdqlite-dev make mongodb postgresql"
+packages="build-essential bzr git make"
 
-lxc launch -e ${image} $container
+lxc launch -e ubuntu:16.04 $container
 trap "lxc delete --force $container" EXIT
 
 lxc exec $container -- sh -c 'while [ ! -f /var/lib/cloud/instance/boot-finished ]; do sleep 0.1; done'
 
-lxc exec --env http_proxy=${http_proxy:-} --env no_proxy=${no_proxy:-} $container -- apt-add-repository -y ppa:dqlite/stable
 lxc exec --env http_proxy=${http_proxy:-} --env no_proxy=${no_proxy:-} $container -- apt-get update -y
 lxc exec --env http_proxy=${http_proxy:-} --env no_proxy=${no_proxy:-} $container -- apt-get install -y $packages
 lxc exec $container -- snap set system proxy.http=${http_proxy:-}
 lxc exec $container -- snap set system proxy.https=${https_proxy:-${http_proxy:-}}
 lxc exec $container -- snap install go --classic
 lxc exec $container -- snap install vault
+lxc exec $container -- snap install juju-db
 if [ -n "${http_proxy:-}" ]; then
 	lxc exec \
 		--env HOME=/home/ubuntu \
@@ -27,9 +27,6 @@ if [ -n "${http_proxy:-}" ]; then
 		--group 1000 \
 		$container -- git config --global http.proxy ${http_proxy:-}
 fi
-
-lxc exec $container -- sudo -u postgres psql -c "ALTER USER postgres PASSWORD '7es7pa55w0rd';"
-lxc exec $container -- sudo -u postgres psql -c "CREATE DATABASE jimm;"
 
 lxc file push --uid 1000 --gid 1000 --mode 600 ${NETRC:-$HOME/.netrc} $container/home/ubuntu/.netrc
 lxc exec --cwd /home/ubuntu/ --user 1000 --group 1000 $container -- mkdir -p /home/ubuntu/src
@@ -58,7 +55,6 @@ lxc exec \
 	--env HOME=/home/ubuntu \
 	--env http_proxy=${http_proxy:-} \
 	--env no_proxy=${no_proxy:-} \
-	--env JIMM_TEST_PGXDSN="user=postgres password=7es7pa55w0rd host=localhost port=5432 dbname=jimm" \
 	--cwd /home/ubuntu/src/ \
 	--user 1000 \
 	--group 1000 \

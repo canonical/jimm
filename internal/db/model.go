@@ -78,8 +78,8 @@ func (d *Database) DeleteModel(ctx context.Context, model *dbmodel.Model) error 
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
-	db := d.DB.WithContext(ctx)
-	if err := db.Delete(model, model.ID).Error; err != nil {
+
+	if err := d.DB.Delete(model, model.ID).Error; err != nil {
 		return errors.E(op, dbError(err))
 	}
 	return nil
