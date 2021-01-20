@@ -44,6 +44,21 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model) error {
 	return nil
 }
 
+// GetModelsUsingCredential returns all models that use the specified credentials.
+func (d *Database) GetModelsUsingCredential(ctx context.Context, credentialID uint) ([]dbmodel.Model, error) {
+	const op = errors.Op("db.GetModelsUsingCredential")
+	if err := d.ready(); err != nil {
+		return nil, errors.E(op, err)
+	}
+	db := d.DB.WithContext(ctx)
+	var models []dbmodel.Model
+	result := db.Where("cloud_credential_id = ?", credentialID).Preload("Controller").Find(&models)
+	if result.Error != nil {
+		return nil, errors.E(op, dbError(result.Error))
+	}
+	return models, nil
+}
+
 // UpdateModel updates the model information.
 func (d *Database) UpdateModel(ctx context.Context, model *dbmodel.Model) error {
 	const op = errors.Op("db.UpdateModel")
