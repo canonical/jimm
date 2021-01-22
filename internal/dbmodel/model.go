@@ -65,13 +65,13 @@ type Model struct {
 	SLA SLA `gorm:"embedded"`
 
 	// Applications are the applications attached to the model.
-	Applications []Application
+	Applications []Application `gorm:"constraint:OnDelete:CASCADE;"`
 
 	// Machines are the machines attached to the model.
-	Machines []Machine
+	Machines []Machine `gorm:"constraint:OnDelete:CASCADE;"`
 
 	// Users are the users that can access the model.
-	Users []UserModelAccess
+	Users []UserModelAccess `gorm:"constraint:OnDelete:CASCADE;"`
 }
 
 // Tag returns a names.Tag for the model.

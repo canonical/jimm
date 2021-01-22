@@ -4,6 +4,7 @@ package jimm
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"path"
 
@@ -16,6 +17,117 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
 )
+
+// GetCloudCredential retrieves the given credential from the database.
+func (j *JIMM) GetCloudCredential(ctx context.Context, user *dbmodel.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error) {
+	const op = errors.Op("jimm.GetCloudCredential")
+
+	if user.Username != tag.Owner().Id() {
+		return nil, errors.E(op, errors.CodeUnauthorized)
+	}
+
+	var credential dbmodel.CloudCredential
+	credential.SetTag(tag)
+
+	err := j.Database.GetCloudCredential(ctx, &credential)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	return &credential, nil
+}
+
+// RevokeCloudCredential checks that the credential with the given path
+// can be revoked  and revokes the credential.
+func (j *JIMM) RevokeCloudCredential(ctx context.Context, user *dbmodel.User, tag names.CloudCredentialTag) error {
+	const op = errors.Op("jimm.RevokeCloudCredential")
+
+	if user.Username != tag.Owner().Id() {
+		return errors.E(op, errors.CodeUnauthorized)
+	}
+
+	var credential dbmodel.CloudCredential
+	credential.SetTag(tag)
+
+	err := j.Database.GetCloudCredential(ctx, &credential)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	credential.Valid = sql.NullBool{
+		Bool:  false,
+		Valid: true,
+	}
+
+	models, err := j.Database.GetModelsUsingCredential(ctx, credential.ID)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	// if the cloud credential is still used by any model we return an error
+	if len(models) > 0 {
+		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("cloud credential still used by %d model(s)", len(models)))
+	}
+
+	cloud := dbmodel.Cloud{
+		Name: credential.CloudName,
+	}
+	if err = j.Database.GetCloud(ctx, &cloud); err != nil {
+		return errors.E(op, err)
+	}
+
+	controllers := make(map[uint]dbmodel.Controller)
+	for _, region := range cloud.Regions {
+		for _, cr := range region.Controllers {
+			controllers[cr.ControllerID] = cr.Controller
+		}
+	}
+
+	ch := make(chan error, len(controllers))
+	for _, controller := range controllers {
+		controller := controller
+		go func() {
+			err := j.revokeControllerCredential(ctx, &controller, tag)
+			select {
+			case ch <- err:
+			case <-ctx.Done():
+				zapctx.Error(ctx, "timed out: failed to forward credential check results")
+			}
+		}()
+	}
+
+	for i := 0; i < len(controllers); i++ {
+		select {
+		case err := <-ch:
+			if err != nil {
+				return errors.E(err, "failed to revoke credential")
+			}
+		case <-ctx.Done():
+			return errors.E("timed out: revoking credentials")
+		}
+	}
+
+	err = j.Database.SetCloudCredential(ctx, &credential)
+	if err != nil {
+		return errors.E(op, err, "failed to revoke credential in local database")
+	}
+	return nil
+}
+
+func (j *JIMM) revokeControllerCredential(ctx context.Context, controller *dbmodel.Controller, credentialTag names.CloudCredentialTag) error {
+	api, err := j.dial(ctx, controller, names.ModelTag{})
+	if err != nil {
+		return errors.E(err)
+	}
+	defer api.Close()
+
+	err = api.RevokeCredential(ctx, credentialTag)
+	if err != nil {
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return nil
+		}
+		return errors.E(err, "cannot revoke credential")
+	}
+	return nil
+}
 
 // UpdateCloudCredentialArgs holds arguments for the cloud credential update
 type UpdateCloudCredentialArgs struct {
