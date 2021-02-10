@@ -373,6 +373,34 @@ func (s *modelManagerSuite) TestCreateModelWithMultipleControllers(c *gc.C) {
 	c.Assert(m.Controller, jc.DeepEquals, ctlPath)
 }
 
+func (s *modelManagerSuite) TestCreateModelWithUnreachableController(c *gc.C) {
+	// Sanity check that we can create the model while the controller is not deprecated.
+	err := s.JEM.CreateModel(testContext, jemtest.Bob, jem.CreateModelParams{
+		Path:   params.EntityPath{"bob", "model1"},
+		Cloud:  "dummy",
+		Region: "dummy-region",
+	}, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.JEM.DB.Controllers().Update(
+		bson.D{{"_id", s.Controller.Path.String()}},
+		bson.D{{"$set", bson.D{{"hostports", []bson.D{{
+			{"host", "0.1.2.3"},
+			{"port", "1234"},
+			{"scope", "public"},
+		}}}}}})
+	c.Assert(err, gc.Equals, nil)
+
+	s.Pool.ClearAPIConnCache()
+
+	err = s.JEM.CreateModel(testContext, jemtest.Bob, jem.CreateModelParams{
+		Path:   params.EntityPath{"bob", "model2"},
+		Cloud:  "dummy",
+		Region: "dummy-region",
+	}, nil)
+	c.Assert(err, gc.ErrorMatches, `cannot create model: cannot connect to controller: validating info for opening an API connection: missing addresses not valid`)
+}
+
 func (s *modelManagerSuite) TestGetModelInfo(c *gc.C) {
 	conn, err := s.JEM.OpenAPIFromDoc(testContext, &s.Controller)
 	c.Assert(err, gc.Equals, nil)

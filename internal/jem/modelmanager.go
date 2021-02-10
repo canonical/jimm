@@ -222,6 +222,7 @@ func (j *JEM) CreateModel(ctx context.Context, id identchecker.ACLIdentity, p Cr
 		cred:              cred,
 	}
 	var ctlPath params.EntityPath
+	var firstError error
 	for _, controller := range controllers {
 		ctx = zapctx.WithFields(ctx, zap.Stringer("controller", controller))
 		cmp.controller = &mongodoc.Controller{Path: controller}
@@ -247,10 +248,16 @@ func (j *JEM) CreateModel(ctx context.Context, id identchecker.ACLIdentity, p Cr
 		if errgo.Cause(err) == errInvalidModelParams {
 			return errgo.Notef(err, "cannot create model")
 		}
+		if firstError == nil {
+			firstError = err
+		}
 		zapctx.Error(ctx, "cannot create model on controller", zaputil.Error(err))
 	}
 
 	if ctlPath.Name == "" {
+		if firstError != nil {
+			return errgo.Notef(firstError, "cannot create model")
+		}
 		return errgo.New("cannot find suitable controller")
 	}
 
