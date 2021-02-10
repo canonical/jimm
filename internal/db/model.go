@@ -5,6 +5,8 @@ package db
 import (
 	"context"
 
+	"gorm.io/gorm"
+
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 )
@@ -25,20 +27,40 @@ func (d *Database) AddModel(ctx context.Context, model *dbmodel.Model) error {
 	return nil
 }
 
+// GetOption lets you specify which fields are to be populated when
+// fetching an object from the database.
+type GetOption func(*gorm.DB) *gorm.DB
+
+// AssociatedApplications populates the associated applications.
+func AssociatedApplications() GetOption {
+	return func(db *gorm.DB) *gorm.DB {
+		return db.Preload("Applications")
+	}
+}
+
 // GetModel returns model information based on the
 // model UUID.
-func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model) error {
+func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model, options ...GetOption) error {
 	const op = errors.Op("db.GetModel")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
-	if model.UUID.String == "" {
-		return errors.E(op, errors.CodeNotFound, `invalid uuid ""`)
-	}
 	db := d.DB.WithContext(ctx)
 	// TODO (ashipika) consider which fields we need to preload
 	// when fetching a model.
-	if err := db.Where("uuid = ?", model.UUID.String).Preload("Users").First(&model).Error; err != nil {
+	if model.UUID.Valid {
+		db = db.Where("uuid = ?", model.UUID.String)
+	} else if model.ID != 0 {
+		db = db.Where("id = ?", model.ID)
+	} else {
+		return errors.E(op, "missing id or uuid", errors.CodeBadRequest)
+	}
+
+	for _, option := range options {
+		db = option(db)
+	}
+
+	if err := db.Preload("Users").Preload("Controller").First(&model).Error; err != nil {
 		return errors.E(op, dbError(err))
 	}
 	return nil
