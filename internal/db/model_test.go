@@ -9,12 +9,12 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"gorm.io/gorm"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 )
 
 func TestAddModelUnconfiguredDatabase(t *testing.T) {
@@ -145,9 +145,13 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 			Valid:  true,
 		},
 		OwnerID:           u.Username,
+		Owner:             u,
 		ControllerID:      controller.ID,
+		Controller:        controller,
 		CloudRegionID:     cloud.Regions[0].ID,
+		CloudRegion:       cloud.Regions[0],
 		CloudCredentialID: cred.ID,
+		CloudCredential:   cred,
 		Type:              "iaas",
 		DefaultSeries:     "warty",
 		Life:              "alive",
@@ -163,18 +167,24 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 		},
 		Users: []dbmodel.UserModelAccess{{
 			UserID: u.ID,
+			User:   u,
 			Access: "admin",
 		}},
 	}
+	model.CloudCredential.Cloud = dbmodel.Cloud{}
+	model.CloudCredential.Owner = dbmodel.User{}
 	err = s.Database.AddModel(context.Background(), &model)
 	c.Assert(err, qt.Equals, nil)
-
+	
 	dbModel := dbmodel.Model{
 		UUID: model.UUID,
 	}
 	err = s.Database.GetModel(context.Background(), &dbModel)
 	c.Assert(err, qt.Equals, nil)
-	c.Assert(dbModel, qt.CmpEquals(cmpopts.IgnoreTypes(dbmodel.Controller{})), model)
+	expectModel := model
+	expectModel.CloudRegion.Cloud = cloud
+	expectModel.CloudRegion.Cloud.Regions = nil
+	c.Assert(dbModel, jimmtest.DBObjectEquals, expectModel)
 
 	dbModel = dbmodel.Model{
 		UUID: sql.NullString{
@@ -310,6 +320,7 @@ func (s *dbSuite) TestDeleteModel(c *qt.C) {
 		Name:              "test-model-1",
 		OwnerID:           u.Username,
 		ControllerID:      controller.ID,
+		Controller:        controller,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
 		Type:              "iaas",
@@ -327,6 +338,7 @@ func (s *dbSuite) TestDeleteModel(c *qt.C) {
 		},
 		Users: []dbmodel.UserModelAccess{{
 			UserID: u.ID,
+			User:   u,
 			Access: "admin",
 		}},
 	}
