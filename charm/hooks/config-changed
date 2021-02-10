@@ -3,12 +3,14 @@
 import os
 from charmhelpers.core import (
     hookenv,
+    templating,
 )
 from jaascharm import (
     HTTP_LISTEN_PORT,
     update_config_and_restart,
     update_status,
     dashboard_path,
+    dashboard_resource_nonempty,
 )
 from status import charm_status
 
@@ -47,6 +49,21 @@ def config_changed():
 
     for key in keys:
         app_config[key] = config[key]
+
+    """Update the config.js file for the Juju Dashboard.
+    """
+    if dashboard_resource_nonempty() and os.path.exists(dashboard_path()):
+        config_js_path = os.path.join(dashboard_path(), 'config.js')
+        dashboard_context = {
+            'base_controller_url': app_config['controller-url'],
+            'base_app_url': '/dashboard/',
+            'identity_provider_available': str(len(app_config['identity-location']) != 0).lower(),
+        }
+        templating.render(
+            'dashboard-config',
+            config_js_path,
+            dashboard_context
+        )
 
     update_config_and_restart(app_config)
 
