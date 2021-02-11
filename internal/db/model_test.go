@@ -9,6 +9,7 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"gorm.io/gorm"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
@@ -173,7 +174,7 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 	}
 	err = s.Database.GetModel(context.Background(), &dbModel)
 	c.Assert(err, qt.Equals, nil)
-	c.Assert(dbModel, qt.DeepEquals, model)
+	c.Assert(dbModel, qt.CmpEquals(cmpopts.IgnoreTypes(dbmodel.Controller{})), model)
 
 	dbModel = dbmodel.Model{
 		UUID: sql.NullString{

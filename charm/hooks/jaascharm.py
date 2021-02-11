@@ -107,7 +107,7 @@ def install(binary=None):
     }
 
     dashboard_file = hookenv.resource_get('dashboard')
-    if _dashboard_resource_nonempty():
+    if dashboard_resource_nonempty():
         new_dashboard_path = dashboard_path() + '.new'
         old_dashboard_path = dashboard_path() + '.old'
         shutil.rmtree(new_dashboard_path, ignore_errors=True)
@@ -147,22 +147,6 @@ def update_config(config):
        None then that value will be removed from the configuration file.
        It reports whether the config file was changed.
     """
-
-    """Update the config.js file for the Juju Dashboard.
-    """
-    if _dashboard_resource_nonempty() and os.path.exists(dashboard_path()):
-        config_js_path = os.path.join(dashboard_path(), 'config.js')
-        
-        dashboard_context = {
-            'base_controller_url': config['controller-url'],
-            'base_app_url': '/dashboard/',
-            'identity_provider_available': str(len(config['identity-location']) != 0).lower(),
-        }
-        templating.render(
-            'dashboard-config',
-            config_js_path,
-            dashboard_context
-        )
 
     path = _config_path()
     data = {}
@@ -331,7 +315,7 @@ def _service_running():
     return host.service_running(_service())
 
 
-def _dashboard_resource_nonempty():
+def dashboard_resource_nonempty():
     dashboard_file = hookenv.resource_get('dashboard')
     if dashboard_file:
         return os.path.getsize(dashboard_file) != 0

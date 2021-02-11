@@ -1032,7 +1032,7 @@ func TestAddModel(t *testing.T) {
 				}
 				err = j.Database.GetModel(ctx, &m1)
 				c.Assert(err, qt.IsNil)
-				c.Assert(m1, qt.CmpEquals(cmpopts.EquateEmpty()), model)
+				c.Assert(m1, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(dbmodel.Controller{})), model)
 			} else {
 				c.Assert(err, qt.ErrorMatches, expectedError)
 			}
