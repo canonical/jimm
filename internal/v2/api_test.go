@@ -955,7 +955,7 @@ func (s *APISuite) TestNewModelCannotOpenAPI(c *gc.C) {
 			Credential: s.Credential.Path.ToParams(),
 		},
 		ExpectBody: params.Error{
-			Message: `cannot find suitable controller`,
+			Message: `cannot create model: cannot connect to controller: interaction required but not possible`,
 		},
 		ExpectStatus: http.StatusInternalServerError,
 		Do:           apitest.Do(s.Candid.Client("bob")),
