@@ -265,16 +265,20 @@ func TestUserApplicationOffers(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	c.Check(offers, qt.DeepEquals, []dbmodel.UserApplicationOfferAccess{{
-		ID:                 m.Applications[0].Offers[0].Users[0].ID,
-		CreatedAt:          m.Applications[0].Offers[0].Users[0].CreatedAt,
-		UpdatedAt:          m.Applications[0].Offers[0].Users[0].UpdatedAt,
+		Model: gorm.Model{
+			ID:        m.Applications[0].Offers[0].Users[0].ID,
+			CreatedAt: m.Applications[0].Offers[0].Users[0].CreatedAt,
+			UpdatedAt: m.Applications[0].Offers[0].Users[0].UpdatedAt,
+		},
 		UserID:             u.ID,
 		ApplicationOfferID: m.Applications[0].Offers[0].ID,
 		Access:             "admin",
 	}, {
-		ID:                 m.Applications[1].Offers[0].Users[0].ID,
-		CreatedAt:          m.Applications[1].Offers[0].Users[0].CreatedAt,
-		UpdatedAt:          m.Applications[1].Offers[0].Users[0].UpdatedAt,
+		Model: gorm.Model{
+			ID:        m.Applications[1].Offers[0].Users[0].ID,
+			CreatedAt: m.Applications[1].Offers[0].Users[0].CreatedAt,
+			UpdatedAt: m.Applications[1].Offers[0].Users[0].UpdatedAt,
+		},
 		UserID:             u.ID,
 		ApplicationOfferID: m.Applications[1].Offers[0].ID,
 		Access:             "consume",

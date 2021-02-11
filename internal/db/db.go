@@ -92,6 +92,9 @@ func (d *Database) Migrate(ctx context.Context, force bool) error {
 		&dbmodel.Unit{},
 		&dbmodel.User{},
 		&dbmodel.UserApplicationOfferAccess{},
+		&dbmodel.ApplicationOfferRemoteSpace{},
+		&dbmodel.ApplicationOfferRemoteEndpoint{},
+		&dbmodel.ApplicationOfferConnection{},
 		&dbmodel.UserCloudAccess{},
 		&dbmodel.UserModelAccess{},
 	)

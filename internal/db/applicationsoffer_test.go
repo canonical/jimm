@@ -9,6 +9,7 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
@@ -17,8 +18,8 @@ import (
 
 func TestAddApplicationOfferUnconfiguredDatabase(t *testing.T) {
 	c := qt.New(t)
-
 	var d db.Database
+
 	err := d.AddApplicationOffer(context.Background(), &dbmodel.ApplicationOffer{})
 	c.Check(err, qt.ErrorMatches, `database not configured`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
@@ -189,10 +190,15 @@ func (s *dbSuite) TestGetApplicationOffer(c *qt.C) {
 	offer := dbmodel.ApplicationOffer{
 		UUID:          "00000000-0000-0000-0000-000000000001",
 		ApplicationID: env.model.Applications[0].ID,
+		Application:   env.model.Applications[0],
 		Users: []dbmodel.UserApplicationOfferAccess{{
 			UserID: env.u.ID,
+			User:   env.u,
 			Access: "admin",
 		}},
+		Endpoints:   []dbmodel.ApplicationOfferRemoteEndpoint{},
+		Spaces:      []dbmodel.ApplicationOfferRemoteSpace{},
+		Connections: []dbmodel.ApplicationOfferConnection{},
 	}
 	err := s.Database.AddApplicationOffer(context.Background(), &offer)
 	c.Assert(err, qt.Equals, nil)
@@ -203,7 +209,7 @@ func (s *dbSuite) TestGetApplicationOffer(c *qt.C) {
 
 	err = s.Database.GetApplicationOffer(context.Background(), &dbOffer)
 	c.Assert(err, qt.Equals, nil)
-	c.Assert(dbOffer, qt.DeepEquals, offer)
+	c.Assert(dbOffer, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(dbmodel.Model{})), offer)
 
 	dbOffer = dbmodel.ApplicationOffer{
 		UUID: "00000000-0000-0000-0000-000000000002",
@@ -218,7 +224,11 @@ func (s *dbSuite) TestUpdateApplicationOffer(c *qt.C) {
 	offer := dbmodel.ApplicationOffer{
 		UUID:          "00000000-0000-0000-0000-000000000001",
 		ApplicationID: env.model.Applications[0].ID,
+		Application:   env.model.Applications[0],
 		Users:         []dbmodel.UserApplicationOfferAccess{},
+		Endpoints:     []dbmodel.ApplicationOfferRemoteEndpoint{},
+		Spaces:        []dbmodel.ApplicationOfferRemoteSpace{},
+		Connections:   []dbmodel.ApplicationOfferConnection{},
 	}
 	err := s.Database.AddApplicationOffer(context.Background(), &offer)
 	c.Assert(err, qt.Equals, nil)
@@ -229,7 +239,7 @@ func (s *dbSuite) TestUpdateApplicationOffer(c *qt.C) {
 	err = s.Database.GetApplicationOffer(context.Background(), &dbOffer)
 	c.Assert(err, qt.Equals, nil)
 	c.Logf("%#v %#v", dbOffer.Users, offer.Users)
-	c.Assert(dbOffer, qt.DeepEquals, offer)
+	c.Assert(dbOffer, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(dbmodel.Model{})), offer)
 
 	offer1 := offer
 	offer1.Users = []dbmodel.UserApplicationOfferAccess{{

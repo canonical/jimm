@@ -5,6 +5,8 @@ package db
 import (
 	"context"
 
+	"gorm.io/gorm"
+
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 )
@@ -32,7 +34,7 @@ func (d *Database) UpdateApplicationOffer(ctx context.Context, offer *dbmodel.Ap
 	}
 	db := d.DB.WithContext(ctx)
 
-	result := db.Model(offer).Updates(offer)
+	result := db.Session(&gorm.Session{FullSaveAssociations: true}).Save(offer)
 	if result.Error != nil {
 		return errors.E(op, dbError(result.Error))
 	}
@@ -53,7 +55,14 @@ func (d *Database) GetApplicationOffer(ctx context.Context, offer *dbmodel.Appli
 	}
 	db := d.DB.WithContext(ctx)
 
-	result := db.Where("uuid = ?", offer.UUID).Preload("Users").First(&offer)
+	if offer.UUID != "" {
+		db = db.Where("uuid = ?", offer.UUID)
+	} else if offer.URL != "" {
+		db = db.Where("url = ?", offer.URL)
+	} else {
+		return errors.E(op, "missing offer UUID or URL")
+	}
+	result := db.Preload("Application").Preload("Application.Model").Preload("Users").Preload("Users.User").Preload("Endpoints").Preload("Spaces").Preload("Connections").First(&offer)
 	if result.Error != nil {
 		return errors.E(op, dbError(result.Error))
 	}
