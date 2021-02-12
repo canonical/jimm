@@ -5,4 +5,5 @@ package jimm
 var (
 	DetermineAccessLevelAfterRevoke = determineAccessLevelAfterRevoke
 	DetermineAccessLevelAfterGrant  = determineAccessLevelAfterGrant
+	FilterApplicationOfferDetail    = filterApplicationOfferDetail
 )

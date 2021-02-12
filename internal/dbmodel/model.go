@@ -698,6 +698,18 @@ func (o *ApplicationOffer) SetTag(t names.ApplicationOfferTag) {
 	o.UUID = t.Id()
 }
 
+// UserAccessLevel returns the access level for the specified user.
+func (o *ApplicationOffer) UserAccessLevel(username string) string {
+	var userAccessLevel string
+	for _, u := range o.Users {
+		if u.User.Username == username {
+			userAccessLevel = u.Access
+			break
+		}
+	}
+	return userAccessLevel
+}
+
 // FromJujuApplicationOfferAdminDetails fills in the information from jujuparams ApplicationOfferAdminDetails.
 func (o *ApplicationOffer) FromJujuApplicationOfferAdminDetails(application *Application, offerDetails jujuparams.ApplicationOfferAdminDetails) {
 	o.ApplicationID = application.ID
@@ -759,7 +771,7 @@ func (o *ApplicationOffer) FromJujuApplicationOfferAdminDetails(application *App
 }
 
 // ToJujuApplicationOfferDetails returns a jujuparams ApplicationOfferAdminDetails based on the application offer.
-func (o *ApplicationOffer) ToJujuApplicationOfferDetails(user *User, accessLevel string) *jujuparams.ApplicationOfferAdminDetails {
+func (o *ApplicationOffer) ToJujuApplicationOfferDetails() jujuparams.ApplicationOfferAdminDetails {
 	endpoints := make([]jujuparams.RemoteEndpoint, len(o.Endpoints))
 	for i, endpoint := range o.Endpoints {
 		endpoints[i] = jujuparams.RemoteEndpoint{
@@ -778,34 +790,30 @@ func (o *ApplicationOffer) ToJujuApplicationOfferDetails(user *User, accessLevel
 			ProviderAttributes: space.ProviderAttributes,
 		}
 	}
-	var users []jujuparams.OfferUserDetails
-	for _, ua := range o.Users {
-		if accessLevel == string(jujuparams.OfferAdminAccess) || ua.UserID == user.ID {
-			users = append(users, jujuparams.OfferUserDetails{
-				UserName:    ua.User.Username,
-				DisplayName: ua.User.DisplayName,
-				Access:      ua.Access,
-			})
+	users := make([]jujuparams.OfferUserDetails, len(o.Users))
+	for i, ua := range o.Users {
+		users[i] = jujuparams.OfferUserDetails{
+			UserName:    ua.User.Username,
+			DisplayName: ua.User.DisplayName,
+			Access:      ua.Access,
 		}
+
 	}
 	sort.Slice(users, func(i, j int) bool {
 		return users[i].UserName < users[j].UserName
 	})
 
-	var connections []jujuparams.OfferConnection
-	if accessLevel == string(jujuparams.OfferAdminAccess) {
-		connections = make([]jujuparams.OfferConnection, len(o.Connections))
-		for i, connection := range o.Connections {
-			connections[i] = jujuparams.OfferConnection{
-				SourceModelTag: connection.SourceModelTag,
-				RelationId:     connection.RelationID,
-				Username:       connection.Username,
-				Endpoint:       connection.Endpoint,
-				IngressSubnets: connection.IngressSubnets,
-			}
+	connections := make([]jujuparams.OfferConnection, len(o.Connections))
+	for i, connection := range o.Connections {
+		connections[i] = jujuparams.OfferConnection{
+			SourceModelTag: connection.SourceModelTag,
+			RelationId:     connection.RelationID,
+			Username:       connection.Username,
+			Endpoint:       connection.Endpoint,
+			IngressSubnets: connection.IngressSubnets,
 		}
 	}
-	return &jujuparams.ApplicationOfferAdminDetails{
+	return jujuparams.ApplicationOfferAdminDetails{
 		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
 			SourceModelTag:         o.Application.Model.Tag().String(),
 			OfferUUID:              o.UUID,
