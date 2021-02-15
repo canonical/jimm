@@ -35,6 +35,127 @@ type environment struct {
 	applicationOffers []dbmodel.ApplicationOffer
 }
 
+var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database) *environment {
+	env := environment{}
+
+	controller := dbmodel.Controller{
+		Name:          "test-controller-1",
+		UUID:          "00000000-0000-0000-0000-0000-0000000000001",
+		PublicAddress: "test-public-address",
+		CACertificate: "test-ca-cert",
+	}
+	err := db.AddController(ctx, &controller)
+	c.Assert(err, qt.Equals, nil)
+	env.controllers = []dbmodel.Controller{controller}
+
+	u := dbmodel.User{
+		Username:         "alice@external",
+		ControllerAccess: "superuser",
+	}
+	c.Assert(db.DB.Create(&u).Error, qt.IsNil)
+
+	u1 := dbmodel.User{
+		Username: "eve@external",
+	}
+	c.Assert(db.DB.Create(&u1).Error, qt.IsNil)
+
+	u2 := dbmodel.User{
+		Username: "bob@external",
+	}
+	c.Assert(db.DB.Create(&u2).Error, qt.IsNil)
+
+	u3 := dbmodel.User{
+		Username: "fred@external",
+	}
+	c.Assert(db.DB.Create(&u3).Error, qt.IsNil)
+
+	u4 := dbmodel.User{
+		Username: "grant@external",
+	}
+	c.Assert(db.DB.Create(&u4).Error, qt.IsNil)
+	env.users = []dbmodel.User{u, u1, u2, u3, u4}
+
+	cloud := dbmodel.Cloud{
+		Name: "test-cloud",
+		Type: "test-provider",
+		Regions: []dbmodel.CloudRegion{{
+			Name: "test-region-1",
+			Controllers: []dbmodel.CloudRegionControllerPriority{{
+				Priority:     0,
+				ControllerID: controller.ID,
+			}},
+		}},
+		Users: []dbmodel.UserCloudAccess{{
+			Username: u.Username,
+		}},
+	}
+	c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
+	env.clouds = []dbmodel.Cloud{cloud}
+
+	cred := dbmodel.CloudCredential{
+		Name:      "test-credential-1",
+		CloudName: cloud.Name,
+		OwnerID:   u.Username,
+		AuthType:  "empty",
+	}
+	err = db.SetCloudCredential(ctx, &cred)
+	c.Assert(err, qt.Equals, nil)
+	env.credentials = []dbmodel.CloudCredential{cred}
+
+	model := dbmodel.Model{
+		Name: "test-model",
+		UUID: sql.NullString{
+			String: "00000000-0000-0000-0000-0000-0000000000003",
+			Valid:  true,
+		},
+		OwnerID:           u.Username,
+		ControllerID:      controller.ID,
+		CloudRegionID:     cloud.Regions[0].ID,
+		CloudCredentialID: cred.ID,
+		Applications: []dbmodel.Application{{
+			Name:     "test-app",
+			Exposed:  true,
+			CharmURL: "cs:test-app:17",
+		}},
+	}
+	err = db.AddModel(ctx, &model)
+	c.Assert(err, qt.Equals, nil)
+	env.models = []dbmodel.Model{model}
+
+	offer := dbmodel.ApplicationOffer{
+		ID:            1,
+		UUID:          "00000000-0000-0000-0000-0000-0000000000011",
+		URL:           "test-offer-url",
+		Name:          "test-offer",
+		ApplicationID: 1,
+		Application: dbmodel.Application{
+			ID:       1,
+			ModelID:  model.ID,
+			Name:     "test-app",
+			Exposed:  true,
+			CharmURL: "cs:test-app:17",
+		},
+		Users: []dbmodel.UserApplicationOfferAccess{{
+			UserID: u.ID,
+			Access: string(jujuparams.OfferAdminAccess),
+		}, {
+			UserID: u1.ID,
+			Access: string(jujuparams.OfferAdminAccess),
+		}, {
+			UserID: u2.ID,
+			Access: string(jujuparams.OfferConsumeAccess),
+		}, {
+			UserID: u3.ID,
+			Access: string(jujuparams.OfferReadAccess),
+		}},
+	}
+	err = db.AddApplicationOffer(ctx, &offer)
+	c.Assert(err, qt.Equals, nil)
+	env.applicationOffers = []dbmodel.ApplicationOffer{offer}
+
+	return &env
+}
+
 func TestRevokeOfferAccess(t *testing.T) {
 	c := qt.New(t)
 
@@ -42,125 +163,6 @@ func TestRevokeOfferAccess(t *testing.T) {
 	now := time.Now().UTC().Round(time.Millisecond)
 
 	revokeErrorsChannel := make(chan error, 1)
-
-	initializeEnvironment := func(c *qt.C, db *db.Database) *environment {
-		env := environment{}
-
-		controller := dbmodel.Controller{
-			Name:          "test-controller-1",
-			UUID:          "00000000-0000-0000-0000-0000-0000000000001",
-			PublicAddress: "test-public-address",
-			CACertificate: "test-ca-cert",
-		}
-		err := db.AddController(ctx, &controller)
-		c.Assert(err, qt.Equals, nil)
-		env.controllers = []dbmodel.Controller{controller}
-
-		u := dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "superuser",
-		}
-		c.Assert(db.DB.Create(&u).Error, qt.IsNil)
-
-		u1 := dbmodel.User{
-			Username: "eve@external",
-		}
-		c.Assert(db.DB.Create(&u1).Error, qt.IsNil)
-
-		u2 := dbmodel.User{
-			Username: "bob@external",
-		}
-		c.Assert(db.DB.Create(&u2).Error, qt.IsNil)
-
-		u3 := dbmodel.User{
-			Username: "fred@external",
-		}
-		c.Assert(db.DB.Create(&u3).Error, qt.IsNil)
-
-		u4 := dbmodel.User{
-			Username: "grant@external",
-		}
-		c.Assert(db.DB.Create(&u4).Error, qt.IsNil)
-		env.users = []dbmodel.User{u, u1, u2, u3, u4}
-
-		cloud := dbmodel.Cloud{
-			Name: "test-cloud",
-			Type: "test-provider",
-			Regions: []dbmodel.CloudRegion{{
-				Name: "test-region-1",
-				Controllers: []dbmodel.CloudRegionControllerPriority{{
-					Priority:     0,
-					ControllerID: controller.ID,
-				}},
-			}},
-			Users: []dbmodel.UserCloudAccess{{
-				Username: u.Username,
-			}},
-		}
-		c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
-		env.clouds = []dbmodel.Cloud{cloud}
-
-		cred := dbmodel.CloudCredential{
-			Name:      "test-credential-1",
-			CloudName: cloud.Name,
-			OwnerID:   u.Username,
-			AuthType:  "empty",
-		}
-		err = db.SetCloudCredential(ctx, &cred)
-		c.Assert(err, qt.Equals, nil)
-		env.credentials = []dbmodel.CloudCredential{cred}
-
-		model := dbmodel.Model{
-			Name: "test-model",
-			UUID: sql.NullString{
-				String: "00000000-0000-0000-0000-0000-0000000000003",
-				Valid:  true,
-			},
-			OwnerID:           u.Username,
-			ControllerID:      controller.ID,
-			CloudRegionID:     cloud.Regions[0].ID,
-			CloudCredentialID: cred.ID,
-			Applications: []dbmodel.Application{{
-				Name:     "test-app",
-				Exposed:  true,
-				CharmURL: "cs:test-app:17",
-			}},
-		}
-		err = db.AddModel(ctx, &model)
-		c.Assert(err, qt.Equals, nil)
-		env.models = []dbmodel.Model{model}
-
-		offer := dbmodel.ApplicationOffer{
-			ID:            1,
-			URL:           "test-offer-url",
-			ApplicationID: 1,
-			Application: dbmodel.Application{
-				ID:       1,
-				ModelID:  model.ID,
-				Name:     "test-app",
-				Exposed:  true,
-				CharmURL: "cs:test-app:17",
-			},
-			Users: []dbmodel.UserApplicationOfferAccess{{
-				UserID: u.ID,
-				Access: string(jujuparams.OfferAdminAccess),
-			}, {
-				UserID: u1.ID,
-				Access: string(jujuparams.OfferAdminAccess),
-			}, {
-				UserID: u2.ID,
-				Access: string(jujuparams.OfferConsumeAccess),
-			}, {
-				UserID: u3.ID,
-				Access: string(jujuparams.OfferReadAccess),
-			}},
-		}
-		err = db.AddApplicationOffer(ctx, &offer)
-		c.Assert(err, qt.Equals, nil)
-		env.applicationOffers = []dbmodel.ApplicationOffer{offer}
-
-		return &env
-	}
 
 	tests := []struct {
 		about              string
@@ -264,7 +266,7 @@ func TestRevokeOfferAccess(t *testing.T) {
 			err := db.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
-			environment := initializeEnvironment(c, &db)
+			environment := initializeEnvironment(c, ctx, &db)
 			authenticatedUser, offerUser, offerURL, grantAccessLevel := test.parameterFunc(environment)
 
 			j := &jimm.JIMM{
@@ -321,125 +323,6 @@ func TestGrantOfferAccess(t *testing.T) {
 	now := time.Now().UTC().Round(time.Millisecond)
 
 	grantErrorsChannel := make(chan error, 1)
-
-	initializeEnvironment := func(c *qt.C, db *db.Database) *environment {
-		env := environment{}
-
-		controller := dbmodel.Controller{
-			Name:          "test-controller-1",
-			UUID:          "00000000-0000-0000-0000-0000-0000000000001",
-			PublicAddress: "test-public-address",
-			CACertificate: "test-ca-cert",
-		}
-		err := db.AddController(ctx, &controller)
-		c.Assert(err, qt.Equals, nil)
-		env.controllers = []dbmodel.Controller{controller}
-
-		u := dbmodel.User{
-			Username:         "alice@external",
-			ControllerAccess: "superuser",
-		}
-		c.Assert(db.DB.Create(&u).Error, qt.IsNil)
-
-		u1 := dbmodel.User{
-			Username: "eve@external",
-		}
-		c.Assert(db.DB.Create(&u1).Error, qt.IsNil)
-
-		u2 := dbmodel.User{
-			Username: "bob@external",
-		}
-		c.Assert(db.DB.Create(&u2).Error, qt.IsNil)
-
-		u3 := dbmodel.User{
-			Username: "fred@external",
-		}
-		c.Assert(db.DB.Create(&u3).Error, qt.IsNil)
-
-		u4 := dbmodel.User{
-			Username: "grant@external",
-		}
-		c.Assert(db.DB.Create(&u4).Error, qt.IsNil)
-		env.users = []dbmodel.User{u, u1, u2, u3, u4}
-
-		cloud := dbmodel.Cloud{
-			Name: "test-cloud",
-			Type: "test-provider",
-			Regions: []dbmodel.CloudRegion{{
-				Name: "test-region-1",
-				Controllers: []dbmodel.CloudRegionControllerPriority{{
-					Priority:     0,
-					ControllerID: controller.ID,
-				}},
-			}},
-			Users: []dbmodel.UserCloudAccess{{
-				Username: u.Username,
-			}},
-		}
-		c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
-		env.clouds = []dbmodel.Cloud{cloud}
-
-		cred := dbmodel.CloudCredential{
-			Name:      "test-credential-1",
-			CloudName: cloud.Name,
-			OwnerID:   u.Username,
-			AuthType:  "empty",
-		}
-		err = db.SetCloudCredential(ctx, &cred)
-		c.Assert(err, qt.Equals, nil)
-		env.credentials = []dbmodel.CloudCredential{cred}
-
-		model := dbmodel.Model{
-			Name: "test-model",
-			UUID: sql.NullString{
-				String: "00000000-0000-0000-0000-0000-0000000000003",
-				Valid:  true,
-			},
-			OwnerID:           u.Username,
-			ControllerID:      controller.ID,
-			CloudRegionID:     cloud.Regions[0].ID,
-			CloudCredentialID: cred.ID,
-			Applications: []dbmodel.Application{{
-				Name:     "test-app",
-				Exposed:  true,
-				CharmURL: "cs:test-app:17",
-			}},
-		}
-		err = db.AddModel(ctx, &model)
-		c.Assert(err, qt.Equals, nil)
-		env.models = []dbmodel.Model{model}
-
-		offer := dbmodel.ApplicationOffer{
-			ID:            1,
-			URL:           "test-offer-url",
-			ApplicationID: 1,
-			Application: dbmodel.Application{
-				ID:       1,
-				ModelID:  model.ID,
-				Name:     "test-app",
-				Exposed:  true,
-				CharmURL: "cs:test-app:17",
-			},
-			Users: []dbmodel.UserApplicationOfferAccess{{
-				UserID: u.ID,
-				Access: string(jujuparams.OfferAdminAccess),
-			}, {
-				UserID: u1.ID,
-				Access: string(jujuparams.OfferAdminAccess),
-			}, {
-				UserID: u2.ID,
-				Access: string(jujuparams.OfferConsumeAccess),
-			}, {
-				UserID: u3.ID,
-				Access: string(jujuparams.OfferReadAccess),
-			}},
-		}
-		err = db.AddApplicationOffer(ctx, &offer)
-		c.Assert(err, qt.Equals, nil)
-		env.applicationOffers = []dbmodel.ApplicationOffer{offer}
-
-		return &env
-	}
 
 	tests := []struct {
 		about              string
@@ -555,7 +438,7 @@ func TestGrantOfferAccess(t *testing.T) {
 			err := db.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
-			environment := initializeEnvironment(c, &db)
+			environment := initializeEnvironment(c, ctx, &db)
 			authenticatedUser, offerUser, offerURL, grantAccessLevel := test.parameterFunc(environment)
 
 			j := &jimm.JIMM{
@@ -2256,6 +2139,439 @@ func TestDetermineAccessLevelAfterRevoke(t *testing.T) {
 		c.Run(test.about, func(c *qt.C) {
 			level := jimm.DetermineAccessLevelAfterRevoke(test.currentAccessLevel, test.revokeAccessLevel)
 			c.Assert(level, qt.Equals, test.expectedAccessLevel)
+		})
+	}
+}
+
+func TestDestroyOffer(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+	now := time.Now().UTC().Round(time.Millisecond)
+
+	destroyErrorsChannel := make(chan error, 1)
+
+	tests := []struct {
+		about         string
+		parameterFunc func(*environment) (dbmodel.User, string)
+		destroyError  string
+		expectedError string
+	}{{
+		about: "admin allowed to destroy an offer",
+		parameterFunc: func(env *environment) (dbmodel.User, string) {
+			return env.users[0], "test-offer-url"
+		},
+	}, {
+		about: "user with consume access not allowed to destroy an offer",
+		parameterFunc: func(env *environment) (dbmodel.User, string) {
+			return env.users[2], "test-offer-url"
+		},
+		expectedError: "unauthorized access",
+	}, {
+		about: "user with read access not allowed to destroy an offer",
+		parameterFunc: func(env *environment) (dbmodel.User, string) {
+			return env.users[3], "test-offer-url"
+		},
+		expectedError: "unauthorized access",
+	}, {
+		about: "user without access not allowed to destroy an offer",
+		parameterFunc: func(env *environment) (dbmodel.User, string) {
+			return env.users[4], "test-offer-url"
+		},
+		expectedError: "application offer not found",
+	}, {
+		about: "offer not found",
+		parameterFunc: func(env *environment) (dbmodel.User, string) {
+			return env.users[0], "no-such-offer"
+		},
+		expectedError: "application offer not found",
+	}, {
+		about:        "controller returns an error",
+		destroyError: "a silly error",
+		parameterFunc: func(env *environment) (dbmodel.User, string) {
+			return env.users[0], "test-offer-url"
+		},
+		expectedError: "a silly error",
+	}}
+
+	for _, test := range tests {
+		c.Run(test.about, func(c *qt.C) {
+
+			db := db.Database{
+				DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+			}
+			err := db.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+
+			environment := initializeEnvironment(c, ctx, &db)
+			authenticatedUser, offerURL := test.parameterFunc(environment)
+
+			j := &jimm.JIMM{
+				Database: db,
+				Dialer: &jimmtest.Dialer{
+					API: &jimmtest.API{
+						DestroyApplicationOffer_: func(context.Context, string, bool) error {
+							select {
+							case err := <-destroyErrorsChannel:
+								return err
+							default:
+								return nil
+							}
+						},
+					},
+				},
+			}
+
+			if test.destroyError != "" {
+				select {
+				case destroyErrorsChannel <- errors.E(test.destroyError):
+				default:
+				}
+			}
+			err = j.DestroyOffer(ctx, &authenticatedUser, offerURL, true)
+			if test.expectedError == "" {
+				c.Assert(err, qt.IsNil)
+
+				offer := dbmodel.ApplicationOffer{
+					URL: offerURL,
+				}
+				err = db.GetApplicationOffer(ctx, &offer)
+				c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+			} else {
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
+			}
+		})
+	}
+}
+
+func TestUpdateOffer(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+	now := time.Now().UTC().Round(time.Millisecond)
+
+	tests := []struct {
+		about         string
+		parameterFunc func(*environment) (string, bool)
+		expectedError string
+		expectedOffer dbmodel.ApplicationOffer
+	}{{
+		about: "update works",
+		parameterFunc: func(env *environment) (string, bool) {
+			return env.applicationOffers[0].UUID, false
+		},
+		expectedOffer: dbmodel.ApplicationOffer{
+			ID:            1,
+			UUID:          "00000000-0000-0000-0000-0000-0000000000011",
+			URL:           "test-offer-url",
+			ApplicationID: 1,
+			Application: dbmodel.Application{
+				ID:       1,
+				ModelID:  1,
+				Name:     "test-app",
+				Exposed:  true,
+				CharmURL: "cs:test-app:17",
+			},
+			ApplicationDescription: "changed offer description",
+			Spaces: []dbmodel.ApplicationOfferRemoteSpace{{
+				ApplicationOfferID: 1,
+				CloudType:          "test-cloud-type",
+				Name:               "test-remote-space",
+				ProviderID:         "test-provider-id",
+				ProviderAttributes: dbmodel.Map{
+					"attr1": "value3",
+					"attr2": "value4"},
+			}},
+			Bindings: dbmodel.StringMap{
+				"key1": "value4",
+				"key2": "value5",
+			},
+			Connections: []dbmodel.ApplicationOfferConnection{{
+				ApplicationOfferID: 1,
+				SourceModelTag:     "test-model-src",
+				RelationID:         1,
+				Username:           "unknown",
+				Endpoint:           "test-endpoint",
+			}},
+			Endpoints: []dbmodel.ApplicationOfferRemoteEndpoint{{
+				ApplicationOfferID: 1,
+				Name:               "test-endpoint",
+				Role:               "requirer",
+				Interface:          "unknown",
+				Limit:              1,
+			}},
+			Users: []dbmodel.UserApplicationOfferAccess{{
+				UserID: 1,
+				User: dbmodel.User{
+					Username:         "alice@external",
+					ControllerAccess: "superuser",
+				},
+				ApplicationOfferID: 1,
+				Access:             "admin",
+			}, {
+				UserID: 2,
+				User: dbmodel.User{
+					Username:         "eve@external",
+					ControllerAccess: "add-model",
+				},
+				ApplicationOfferID: 1,
+				Access:             "admin",
+			}, {
+				UserID: 3,
+				User: dbmodel.User{
+					Username:         "bob@external",
+					ControllerAccess: "add-model",
+				},
+				ApplicationOfferID: 1,
+				Access:             "consume",
+			}, {
+				UserID: 4,
+				User: dbmodel.User{
+					Username:         "fred@external",
+					ControllerAccess: "add-model",
+				},
+				ApplicationOfferID: 1,
+				Access:             "read",
+			}},
+		},
+	}, {
+		about: "offer removed",
+		parameterFunc: func(env *environment) (string, bool) {
+			return env.applicationOffers[0].UUID, true
+		},
+	}, {
+		about: "offer not found",
+		parameterFunc: func(env *environment) (string, bool) {
+			return "no-such-uuid", false
+		},
+		expectedError: "application offer not found",
+	}}
+
+	for _, test := range tests {
+		c.Run(test.about, func(c *qt.C) {
+
+			db := db.Database{
+				DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+			}
+			err := db.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+
+			environment := initializeEnvironment(c, ctx, &db)
+			offerUUID, removed := test.parameterFunc(environment)
+
+			j := &jimm.JIMM{
+				Database: db,
+				Dialer: &jimmtest.Dialer{
+					API: &jimmtest.API{
+						GetApplicationOffer_: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
+							details.ApplicationName = "test-app"
+							details.CharmURL = "cs:test-app:17"
+							details.Connections = []jujuparams.OfferConnection{{
+								SourceModelTag: "test-model-src",
+								RelationId:     1,
+								Username:       "unknown",
+								Endpoint:       "test-endpoint",
+							}}
+							details.ApplicationOfferDetails = jujuparams.ApplicationOfferDetails{
+								OfferUUID:              "00000000-0000-0000-0000-0000-0000000000011",
+								OfferURL:               "test-offer-url",
+								ApplicationDescription: "changed offer description",
+								Endpoints: []jujuparams.RemoteEndpoint{{
+									Name:      "test-endpoint",
+									Role:      charm.RoleRequirer,
+									Interface: "unknown",
+									Limit:     1,
+								}},
+								Spaces: []jujuparams.RemoteSpace{{
+									CloudType:  "test-cloud-type",
+									Name:       "test-remote-space",
+									ProviderId: "test-provider-id",
+									ProviderAttributes: map[string]interface{}{
+										"attr1": "value3",
+										"attr2": "value4",
+									},
+									Subnets: []jujuparams.Subnet{{
+										SpaceTag: "test-remote-space",
+										VLANTag:  1024,
+										Status:   "dead",
+									}},
+								}},
+								Bindings: map[string]string{
+									"key1": "value4",
+									"key2": "value5",
+								},
+								Users: []jujuparams.OfferUserDetails{{
+									UserName:    "alice",
+									DisplayName: "alice, sister of eve",
+									Access:      string(jujuparams.OfferAdminAccess),
+								}},
+							}
+							return nil
+						},
+					},
+				},
+			}
+
+			err = j.UpdateApplicationOffer(ctx, &environment.controllers[0], offerUUID, removed)
+			if test.expectedError == "" {
+				c.Assert(err, qt.IsNil)
+
+				offer := dbmodel.ApplicationOffer{
+					UUID: offerUUID,
+				}
+				err = db.GetApplicationOffer(ctx, &offer)
+				if removed {
+					c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+				} else {
+					c.Assert(err, qt.Equals, nil)
+					c.Assert(
+						offer,
+						qt.CmpEquals(
+							cmpopts.EquateEmpty(),
+							cmpopts.IgnoreTypes(time.Time{}),
+							cmpopts.IgnoreTypes(gorm.Model{}),
+							cmpopts.IgnoreTypes(dbmodel.Model{}),
+						),
+						test.expectedOffer,
+					)
+				}
+			} else {
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
+			}
+		})
+	}
+}
+
+func TestFindApplicationOffers(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+	now := time.Now().UTC().Round(time.Millisecond)
+
+	expectedOffer := dbmodel.ApplicationOffer{
+		ID:            1,
+		UUID:          "00000000-0000-0000-0000-0000-0000000000011",
+		URL:           "test-offer-url",
+		Name:          "test-offer",
+		ApplicationID: 1,
+		Application: dbmodel.Application{
+			ID:      1,
+			ModelID: 1,
+			Model: dbmodel.Model{
+				UUID: sql.NullString{
+					String: "00000000-0000-0000-0000-0000-0000000000003",
+					Valid:  true,
+				},
+			},
+			Name:     "test-app",
+			Exposed:  true,
+			CharmURL: "cs:test-app:17",
+		},
+		Users: []dbmodel.UserApplicationOfferAccess{{
+			UserID: 1,
+			User: dbmodel.User{
+				Username:         "alice@external",
+				ControllerAccess: "superuser",
+			},
+			ApplicationOfferID: 1,
+			Access:             "admin",
+		}, {
+			UserID: 2,
+			User: dbmodel.User{
+				Username:         "eve@external",
+				ControllerAccess: "add-model",
+			},
+			ApplicationOfferID: 1,
+			Access:             "admin",
+		}, {
+			UserID: 3,
+			User: dbmodel.User{
+				Username:         "bob@external",
+				ControllerAccess: "add-model",
+			},
+			ApplicationOfferID: 1,
+			Access:             "consume",
+		}, {
+			UserID: 4,
+			User: dbmodel.User{
+				Username:         "fred@external",
+				ControllerAccess: "add-model",
+			},
+			ApplicationOfferID: 1,
+			Access:             "read",
+		}},
+	}
+
+	tests := []struct {
+		about         string
+		parameterFunc func(*environment) (dbmodel.User, string, []jujuparams.OfferFilter)
+		expectedError string
+		expectedOffer *dbmodel.ApplicationOffer
+	}{{
+		about: "find an offer as admin",
+		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
+			return env.users[0], "admin", []jujuparams.OfferFilter{{
+				OfferName: "test-offer",
+			}}
+		},
+		expectedOffer: &expectedOffer,
+	}, {
+		about: "offer not found",
+		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
+			return env.users[0], "admin", []jujuparams.OfferFilter{{
+				OfferName: "no-such-offer",
+			}}
+		},
+	}, {
+		about: "user without access cannot find offers",
+		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
+			return env.users[4], "", []jujuparams.OfferFilter{{
+				OfferName: "test-offer",
+			}}
+		},
+	}}
+
+	for _, test := range tests {
+		c.Run(test.about, func(c *qt.C) {
+
+			db := db.Database{
+				DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+			}
+			err := db.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+
+			environment := initializeEnvironment(c, ctx, &db)
+			user, accessLevel, filters := test.parameterFunc(environment)
+
+			j := &jimm.JIMM{
+				Database: db,
+				Dialer: &jimmtest.Dialer{
+					API: &jimmtest.API{},
+				},
+			}
+
+			offers, err := j.FindApplicationOffers(ctx, &user, filters...)
+			if test.expectedError == "" {
+				c.Assert(err, qt.IsNil)
+				if test.expectedOffer != nil {
+					details := test.expectedOffer.ToJujuApplicationOfferDetails()
+					details = jimm.FilterApplicationOfferDetail(details, &user, accessLevel)
+					c.Assert(
+						offers,
+						qt.CmpEquals(
+							cmpopts.EquateEmpty(),
+							cmpopts.IgnoreTypes(time.Time{}),
+							cmpopts.IgnoreTypes(gorm.Model{}),
+							cmpopts.IgnoreTypes(dbmodel.Model{}),
+						),
+						[]jujuparams.ApplicationOfferAdminDetails{details},
+					)
+				} else {
+					c.Assert(offers, qt.HasLen, 0)
+				}
+			} else {
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
+			}
 		})
 	}
 }
