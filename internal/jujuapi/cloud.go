@@ -114,7 +114,39 @@ func init() {
 		r.AddMethod("Cloud", 5, "UpdateCredentialsCheckModels", updateCredentialsCheckModelsMethod)
 		r.AddMethod("Cloud", 5, "UserCredentials", userCredentialsMethod)
 
-		return []int{1, 2, 3, 4, 5}
+		r.AddMethod("Cloud", 6, "AddCloud", addCloudMethod)
+		r.AddMethod("Cloud", 6, "AddCredentials", addCredentialsMethod)
+		r.AddMethod("Cloud", 6, "CheckCredentialsModels", checkCredentialsModelsMethod)
+		r.AddMethod("Cloud", 6, "Cloud", cloudMethod)
+		r.AddMethod("Cloud", 6, "CloudInfo", cloudInfoMethod)
+		r.AddMethod("Cloud", 6, "Clouds", cloudsMethod)
+		r.AddMethod("Cloud", 6, "Credential", credentialMethod)
+		r.AddMethod("Cloud", 6, "CredentialContents", credentialContentsMethod)
+		r.AddMethod("Cloud", 6, "ListCloudInfo", listCloudInfoMethod)
+		r.AddMethod("Cloud", 6, "ModifyCloudAccess", modifyCloudAccessMethod)
+		r.AddMethod("Cloud", 6, "RemoveClouds", removeCloudsMethod)
+		r.AddMethod("Cloud", 6, "RevokeCredentialsCheckModels", revokeCredentialsCheckModelsMethod)
+		r.AddMethod("Cloud", 6, "UpdateCloud", updateCloudMethod)
+		r.AddMethod("Cloud", 6, "UpdateCredentialsCheckModels", updateCredentialsCheckModelsMethod)
+		r.AddMethod("Cloud", 6, "UserCredentials", userCredentialsMethod)
+
+		r.AddMethod("Cloud", 7, "AddCloud", addCloudMethod)
+		r.AddMethod("Cloud", 7, "AddCredentials", addCredentialsMethod)
+		r.AddMethod("Cloud", 7, "CheckCredentialsModels", checkCredentialsModelsMethod)
+		r.AddMethod("Cloud", 7, "Cloud", cloudMethod)
+		r.AddMethod("Cloud", 7, "CloudInfo", cloudInfoMethod)
+		r.AddMethod("Cloud", 7, "Clouds", cloudsMethod)
+		r.AddMethod("Cloud", 7, "Credential", credentialMethod)
+		r.AddMethod("Cloud", 7, "CredentialContents", credentialContentsMethod)
+		r.AddMethod("Cloud", 7, "ListCloudInfo", listCloudInfoMethod)
+		r.AddMethod("Cloud", 7, "ModifyCloudAccess", modifyCloudAccessMethod)
+		r.AddMethod("Cloud", 7, "RemoveClouds", removeCloudsMethod)
+		r.AddMethod("Cloud", 7, "RevokeCredentialsCheckModels", revokeCredentialsCheckModelsMethod)
+		r.AddMethod("Cloud", 7, "UpdateCloud", updateCloudMethod)
+		r.AddMethod("Cloud", 7, "UpdateCredentialsCheckModels", updateCredentialsCheckModelsMethod)
+		r.AddMethod("Cloud", 7, "UserCredentials", userCredentialsMethod)
+
+		return []int{1, 2, 3, 4, 5, 6, 7}
 	}
 }
 
