@@ -5,6 +5,7 @@ package jemclient
 
 import (
 	"context"
+
 	"github.com/CanonicalLtd/jimm/params"
 	"gopkg.in/httprequest.v1"
 )
