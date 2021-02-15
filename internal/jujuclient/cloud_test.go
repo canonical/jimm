@@ -96,6 +96,7 @@ func (s *cloudSuite) TestClouds(c *gc.C) {
 				IdentityEndpoint: "dummy-identity-endpoint",
 				StorageEndpoint:  "dummy-storage-endpoint",
 			}},
+			IsControllerCloud: true,
 		},
 	})
 }
