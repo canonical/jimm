@@ -669,3 +669,45 @@ func (j *JIMM) ModelInfo(ctx context.Context, u *dbmodel.User, mt names.ModelTag
 
 	return &mi, nil
 }
+
+// ModelStatus returns a jujuparams.ModelStatus for the given model. If
+// the model doesn't exist then the returned error will have the code
+// CodeNotFound, If the given user does not have admin access to the model
+// then the returned error will have the code CodeUnauthorized.
+func (j *JIMM) ModelStatus(ctx context.Context, u *dbmodel.User, mt names.ModelTag) (*jujuparams.ModelStatus, error) {
+	const op = errors.Op("jimm.ModelStatus")
+
+	m := dbmodel.Model{
+		UUID: sql.NullString{
+			String: mt.Id(),
+			Valid:  true,
+		},
+	}
+
+	if err := j.Database.GetModel(ctx, &m); err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	if u.ControllerAccess != "admin" && m.UserAccess(u) != "admin" {
+		// If the user doesn't have admin access on the model return
+		// an unauthorized error.
+		return nil, errors.E(op, errors.CodeUnauthorized)
+	}
+
+	// ModelStatus contains fields that aren't exported over watchers
+	// and is only available to admin users, so always fetch from
+	// the controller.
+	api, err := j.dial(ctx, &m.Controller, names.ModelTag{})
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	defer api.Close()
+
+	ms := jujuparams.ModelStatus{
+		ModelTag: m.Tag().String(),
+	}
+	if err := api.ModelStatus(ctx, &ms); err != nil {
+		return nil, errors.E(op, err)
+	}
+	return &ms, nil
+}

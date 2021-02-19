@@ -1096,6 +1096,132 @@ func TestModelInfo(t *testing.T) {
 	}
 }
 
+const modelStatusTestEnv = `clouds:
+- name: dummy
+  type: dummy
+  regions:
+  - name: dummy-region
+cloud-credentials:
+- owner: alice@external
+  name: cred-1
+  cloud: dummy
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+models:
+- name: model-1
+  type: iaas
+  uuid: 00000002-0000-0000-0000-000000000001
+  controller: controller-1
+  default-series: warty
+  cloud: dummy
+  region: dummy-region
+  cloud-credential: cred-1
+  owner: alice@external
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: write
+  - user: charlie@external
+    access: read
+users:
+- username: diane@external
+  controller-access: admin
+`
+
+var modelStatusTests = []struct {
+	name              string
+	env               string
+	modelStatus       func(context.Context, *jujuparams.ModelStatus) error
+	username          string
+	uuid              string
+	expectModelStatus *jujuparams.ModelStatus
+	expectError       string
+}{{
+	name:        "ModelNotFound",
+	username:    "alice@external",
+	uuid:        "00000001-0000-0000-0000-000000000001",
+	expectError: `record not found`,
+}, {
+	name:        "UnauthorizedUser",
+	env:         modelStatusTestEnv,
+	username:    "bob@external",
+	uuid:        "00000002-0000-0000-0000-000000000001",
+	expectError: "unauthorized access",
+}, {
+	name: "Success",
+	env:  modelStatusTestEnv,
+	modelStatus: func(_ context.Context, ms *jujuparams.ModelStatus) error {
+		if ms.ModelTag != names.NewModelTag("00000002-0000-0000-0000-000000000001").String() {
+			return errors.E("incorrect model tag")
+		}
+		ms.Life = "alive"
+		ms.Type = "iaas"
+		ms.HostedMachineCount = 10
+		ms.ApplicationCount = 3
+		ms.UnitCount = 20
+		ms.OwnerTag = names.NewUserTag("alice@external").String()
+		return nil
+	},
+	username: "alice@external",
+	uuid:     "00000002-0000-0000-0000-000000000001",
+	expectModelStatus: &jujuparams.ModelStatus{
+		ModelTag:           names.NewModelTag("00000002-0000-0000-0000-000000000001").String(),
+		Life:               "alive",
+		Type:               "iaas",
+		HostedMachineCount: 10,
+		ApplicationCount:   3,
+		UnitCount:          20,
+		OwnerTag:           names.NewUserTag("alice@external").String(),
+	},
+}, {
+	name: "APIError",
+	env:  modelStatusTestEnv,
+	modelStatus: func(_ context.Context, ms *jujuparams.ModelStatus) error {
+		return errors.E("test error")
+	},
+	username:    "alice@external",
+	uuid:        "00000002-0000-0000-0000-000000000001",
+	expectError: "test error",
+}}
+
+func TestModelStatus(t *testing.T) {
+	c := qt.New(t)
+
+	for _, test := range modelStatusTests {
+		c.Run(test.name, func(c *qt.C) {
+			ctx := context.Background()
+
+			env := jimmtest.ParseEnvironment(c, test.env)
+			dialer := &jimmtest.Dialer{
+				API: &jimmtest.API{
+					ModelStatus_: test.modelStatus,
+				},
+			}
+			j := &jimm.JIMM{
+				Database: db.Database{
+					DB: jimmtest.MemoryDB(c, nil),
+				},
+				Dialer: dialer,
+			}
+			err := j.Database.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+			env.PopulateDB(c, j.Database)
+			u := env.User(test.username).DBObject(c, j.Database)
+			ms, err := j.ModelStatus(context.Background(), &u, names.NewModelTag(test.uuid))
+			if test.expectError != "" {
+				c.Check(err, qt.ErrorMatches, test.expectError)
+			} else {
+				c.Assert(err, qt.IsNil)
+				c.Check(ms, qt.CmpEquals(cmpopts.EquateEmpty()), test.expectModelStatus)
+			}
+
+			c.Check(dialer.IsClosed(), qt.Equals, true)
+		})
+	}
+}
+
 // newDate wraps time.Date to return a *time.Time.
 func newDate(year int, month time.Month, day, hour, min, sec, nsec int, loc *time.Location) *time.Time {
 	t := time.Date(year, month, day, hour, min, sec, nsec, loc)
