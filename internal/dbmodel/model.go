@@ -91,6 +91,17 @@ func (m *Model) SetTag(t names.ModelTag) {
 	m.UUID.Valid = true
 }
 
+// UserAccess returns the access level of the given user on the model. If
+// the user has no access then an empty string is returned.
+func (m *Model) UserAccess(u *User) string {
+	for _, mu := range m.Users {
+		if u.Username == mu.User.Username {
+			return mu.Access
+		}
+	}
+	return ""
+}
+
 // FromJujuModelInfo converts jujuparams.ModelInfo into Model.
 func (m *Model) FromJujuModelInfo(info *jujuparams.ModelInfo) error {
 	m.Name = info.Name

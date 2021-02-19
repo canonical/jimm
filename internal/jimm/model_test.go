@@ -12,10 +12,9 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	jujuparams "github.com/juju/juju/apiserver/params"
-	"github.com/juju/juju/core/life"
-	"github.com/juju/juju/core/status"
 	"github.com/juju/names/v4"
-	"gorm.io/gorm"
+	"github.com/juju/version"
+	"sigs.k8s.io/yaml"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
@@ -133,871 +132,656 @@ func TestModelCreateArgs(t *testing.T) {
 	}
 }
 
+var addModelTests = []struct {
+	name                string
+	env                 string
+	updateCredential    func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
+	grantJIMMModelAdmin func(context.Context, names.ModelTag) error
+	createModel         func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error
+	username            string
+	args                jujuparams.ModelCreateArgs
+	expectModel         dbmodel.Model
+	expectError         string
+}{{
+	name: "CreateModelWithCloudRegion",
+	env: `
+clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-region-1
+cloud-credentials:
+- name: test-credential-1
+  owner: alice@external
+  cloud: test-cloud
+  auth-type: empty
+controllers:
+- name: controller-1
+  uuid: 00000000-0000-0000-0000-0000-0000000000001
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 0
+- name: controller-2
+  uuid: 00000000-0000-0000-0000-0000-0000000000002
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 2
+`[1:],
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+		return nil, nil
+	},
+	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+		return nil
+	},
+	createModel: createModel(`
+uuid: 00000001-0000-0000-0000-0000-000000000001
+status:
+  status: started
+  info: running a test
+life: alive
+users:
+- user: alice@external
+  access: admin
+- user: bob
+  access: read
+machines:
+- id: test-machine-id
+  hardware:
+    arch: amd64
+    mem: 8096
+    cores: 8
+  display-name: a test machine
+  status: running
+  message: a test message
+  has-vote: true
+  wants-vote: false
+`[1:]),
+	username: "alice@external",
+	args: jujuparams.ModelCreateArgs{
+		Name:               "test-model",
+		OwnerTag:           names.NewUserTag("alice@external").String(),
+		CloudTag:           names.NewCloudTag("test-cloud").String(),
+		CloudRegion:        "test-region-1",
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
+	},
+	expectModel: dbmodel.Model{
+		Name: "test-model",
+		UUID: sql.NullString{
+			String: "00000001-0000-0000-0000-0000-000000000001",
+			Valid:  true,
+		},
+		Owner: dbmodel.User{
+			Username:         "alice@external",
+			ControllerAccess: "add-model",
+		},
+		Controller: dbmodel.Controller{
+			Name: "controller-2",
+			UUID: "00000000-0000-0000-0000-0000-0000000000002",
+		},
+		CloudRegion: dbmodel.CloudRegion{
+			Cloud: dbmodel.Cloud{
+				Name: "test-cloud",
+				Type: "test-provider",
+			},
+			Name: "test-region-1",
+		},
+		CloudCredential: dbmodel.CloudCredential{
+			Name:     "test-credential-1",
+			AuthType: "empty",
+		},
+		Life: "alive",
+		Status: dbmodel.Status{
+			Status: "started",
+			Info:   "running a test",
+		},
+		Machines: []dbmodel.Machine{{
+			MachineID: "test-machine-id",
+			Hardware: dbmodel.MachineHardware{
+				Arch: sql.NullString{
+					String: "amd64",
+					Valid:  true,
+				},
+				Mem: dbmodel.NullUint64{
+					Uint64: 8096,
+					Valid:  true,
+				},
+				Cores: dbmodel.NullUint64{
+					Uint64: 8,
+					Valid:  true,
+				},
+			},
+			DisplayName: "a test machine",
+			InstanceStatus: dbmodel.Status{
+				Status: "running",
+				Info:   "a test message",
+			},
+			HasVote: true,
+		}},
+		Users: []dbmodel.UserModelAccess{{
+			User: dbmodel.User{
+				Username:         "alice@external",
+				ControllerAccess: "add-model",
+			},
+			Access: "admin",
+		}},
+	},
+}, {
+	name: "CreateModelWithCloud",
+	env: `
+clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-region-1
+cloud-credentials:
+- name: test-credential-1
+  owner: alice@external
+  cloud: test-cloud
+  auth-type: empty
+controllers:
+- name: controller-1
+  uuid: 00000000-0000-0000-0000-0000-0000000000001
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 0
+- name: controller-2
+  uuid: 00000000-0000-0000-0000-0000-0000000000002
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 2
+`[1:],
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+		return nil, nil
+	},
+	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+		return nil
+	},
+	createModel: createModel(`
+uuid: 00000001-0000-0000-0000-0000-000000000001
+status:
+  status: started
+  info: running a test
+life: alive
+users:
+- user: alice@external
+  access: admin
+- user: bob
+  access: read
+machines:
+- id: test-machine-id
+  hardware:
+    arch: amd64
+    mem: 8096
+    cores: 8
+  display-name: a test machine
+  status: running
+  message: a test message
+  has-vote: true
+  wants-vote: false
+`[1:]),
+	username: "alice@external",
+	args: jujuparams.ModelCreateArgs{
+		Name:               "test-model",
+		OwnerTag:           names.NewUserTag("alice@external").String(),
+		CloudTag:           names.NewCloudTag("test-cloud").String(),
+		CloudRegion:        "test-region-1",
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
+	},
+	expectModel: dbmodel.Model{
+		Name: "test-model",
+		UUID: sql.NullString{
+			String: "00000001-0000-0000-0000-0000-000000000001",
+			Valid:  true,
+		},
+		Owner: dbmodel.User{
+			Username:         "alice@external",
+			ControllerAccess: "add-model",
+		},
+		Controller: dbmodel.Controller{
+			Name: "controller-2",
+			UUID: "00000000-0000-0000-0000-0000-0000000000002",
+		},
+		CloudRegion: dbmodel.CloudRegion{
+			Cloud: dbmodel.Cloud{
+				Name: "test-cloud",
+				Type: "test-provider",
+			},
+			Name: "test-region-1",
+		},
+		CloudCredential: dbmodel.CloudCredential{
+			Name:     "test-credential-1",
+			AuthType: "empty",
+		},
+		Life: "alive",
+		Status: dbmodel.Status{
+			Status: "started",
+			Info:   "running a test",
+		},
+		Machines: []dbmodel.Machine{{
+			MachineID: "test-machine-id",
+			Hardware: dbmodel.MachineHardware{
+				Arch: sql.NullString{
+					String: "amd64",
+					Valid:  true,
+				},
+				Mem: dbmodel.NullUint64{
+					Uint64: 8096,
+					Valid:  true,
+				},
+				Cores: dbmodel.NullUint64{
+					Uint64: 8,
+					Valid:  true,
+				},
+			},
+			DisplayName: "a test machine",
+			InstanceStatus: dbmodel.Status{
+				Status: "running",
+				Info:   "a test message",
+			},
+			HasVote: true,
+		}},
+		Users: []dbmodel.UserModelAccess{{
+			User: dbmodel.User{
+				Username:         "alice@external",
+				ControllerAccess: "add-model",
+			},
+			Access: "admin",
+		}},
+	},
+}, {
+	name: "CreateModelInOtherNamespaceAsSuperUser",
+	env: `
+clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-region-1
+cloud-credentials:
+- name: test-credential-1
+  owner: alice@external
+  cloud: test-cloud
+  auth-type: empty
+controllers:
+- name: controller-1
+  uuid: 00000000-0000-0000-0000-0000-0000000000001
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 0
+- name: controller-2
+  uuid: 00000000-0000-0000-0000-0000-0000000000002
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 2
+users:
+- username: alice@external
+  controller-access: superuser
+- username: bob@external
+  controller-access: add-model
+`[1:],
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+		return nil, nil
+	},
+	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+		return nil
+	},
+	createModel: createModel(`
+uuid: 00000001-0000-0000-0000-0000-000000000001
+status:
+  status: started
+  info: running a test
+life: alive
+users:
+- user: alice@external
+  access: admin
+- user: bob
+  access: read
+machines:
+- id: test-machine-id
+  hardware:
+    arch: amd64
+    mem: 8096
+    cores: 8
+  display-name: a test machine
+  status: running
+  message: a test message
+  has-vote: true
+  wants-vote: false
+`[1:]),
+	username: "alice@external",
+	args: jujuparams.ModelCreateArgs{
+		Name:               "test-model",
+		OwnerTag:           names.NewUserTag("bob@external").String(),
+		CloudTag:           names.NewCloudTag("test-cloud").String(),
+		CloudRegion:        "test-region-1",
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
+	},
+	expectModel: dbmodel.Model{
+		Name: "test-model",
+		UUID: sql.NullString{
+			String: "00000001-0000-0000-0000-0000-000000000001",
+			Valid:  true,
+		},
+		Owner: dbmodel.User{
+			Username:         "bob@external",
+			ControllerAccess: "add-model",
+		},
+		Controller: dbmodel.Controller{
+			Name: "controller-2",
+			UUID: "00000000-0000-0000-0000-0000-0000000000002",
+		},
+		CloudRegion: dbmodel.CloudRegion{
+			Cloud: dbmodel.Cloud{
+				Name: "test-cloud",
+				Type: "test-provider",
+			},
+			Name: "test-region-1",
+		},
+		CloudCredential: dbmodel.CloudCredential{
+			Name:     "test-credential-1",
+			AuthType: "empty",
+		},
+		Life: "alive",
+		Status: dbmodel.Status{
+			Status: "started",
+			Info:   "running a test",
+		},
+		Machines: []dbmodel.Machine{{
+			MachineID: "test-machine-id",
+			Hardware: dbmodel.MachineHardware{
+				Arch: sql.NullString{
+					String: "amd64",
+					Valid:  true,
+				},
+				Mem: dbmodel.NullUint64{
+					Uint64: 8096,
+					Valid:  true,
+				},
+				Cores: dbmodel.NullUint64{
+					Uint64: 8,
+					Valid:  true,
+				},
+			},
+			DisplayName: "a test machine",
+			InstanceStatus: dbmodel.Status{
+				Status: "running",
+				Info:   "a test message",
+			},
+			HasVote: true,
+		}},
+		Users: []dbmodel.UserModelAccess{{
+			User: dbmodel.User{
+				Username:         "alice@external",
+				ControllerAccess: "superuser",
+			},
+			Access: "admin",
+		}},
+	},
+}, {
+	name: "CreateModelInOtherNamespace",
+	env: `
+clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-region-1
+cloud-credentials:
+- name: test-credential-1
+  owner: alice@external
+  cloud: test-cloud
+  auth-type: empty
+controllers:
+- name: controller-1
+  uuid: 00000000-0000-0000-0000-0000-0000000000001
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 0
+- name: controller-2
+  uuid: 00000000-0000-0000-0000-0000-0000000000002
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 2
+users:
+- username: alice@external
+  controller-access: add-model
+- username: bob@external
+  controller-access: add-model
+`[1:],
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+		return nil, nil
+	},
+	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+		return nil
+	},
+	createModel: createModel(`
+uuid: 00000001-0000-0000-0000-0000-000000000001
+status:
+  status: started
+  info: running a test
+life: alive
+users:
+- user: alice@external
+  access: admin
+- user: bob
+  access: read
+machines:
+- id: test-machine-id
+  hardware:
+    arch: amd64
+    mem: 8096
+    cores: 8
+  display-name: a test machine
+  status: running
+  message: a test message
+  has-vote: true
+  wants-vote: false
+`[1:]),
+	username: "alice@external",
+	args: jujuparams.ModelCreateArgs{
+		Name:               "test-model",
+		OwnerTag:           names.NewUserTag("bob@external").String(),
+		CloudTag:           names.NewCloudTag("test-cloud").String(),
+		CloudRegion:        "test-region-1",
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
+	},
+	expectError: "unauthorized access",
+}, {
+	name: "CreateModelError",
+	env: `
+clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-region-1
+cloud-credentials:
+- name: test-credential-1
+  owner: alice@external
+  cloud: test-cloud
+  auth-type: empty
+controllers:
+- name: controller-1
+  uuid: 00000000-0000-0000-0000-0000-0000000000001
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 0
+- name: controller-2
+  uuid: 00000000-0000-0000-0000-0000-0000000000002
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 2
+`[1:],
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+		return nil, nil
+	},
+	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+		return nil
+	},
+	createModel: func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
+		return errors.E("a test error")
+	},
+	username: "alice@external",
+	args: jujuparams.ModelCreateArgs{
+		Name:               "test-model",
+		OwnerTag:           names.NewUserTag("alice@external").String(),
+		CloudTag:           names.NewCloudTag("test-cloud").String(),
+		CloudRegion:        "test-region-1",
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
+	},
+	expectError: "a test error",
+}, {
+	name: "ModelExists",
+	env: `
+clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-region-1
+cloud-credentials:
+- name: test-credential-1
+  owner: alice@external
+  cloud: test-cloud
+  auth-type: empty
+controllers:
+- name: controller-1
+  uuid: 00000000-0000-0000-0000-0000-000000000001
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 0
+- name: controller-2
+  uuid: 00000000-0000-0000-0000-0000-000000000002
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 2
+models:
+- name: test-model
+  owner: alice@external
+  uuid: 00000001-0000-0000-0000-0000-000000000003
+  cloud: test-cloud
+  region: test-region-1
+  cloud-credential: test-credential-1
+  controller: controller-1
+`[1:],
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+		return nil, nil
+	},
+	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+		return nil
+	},
+	createModel: createModel(`
+uuid: 00000001-0000-0000-0000-0000-000000000001
+status:
+  status: started
+  info: running a test
+life: alive
+users:
+- user: alice@external
+  access: admin
+- user: bob
+  access: read
+machines:
+- id: test-machine-id
+  hardware:
+    arch: amd64
+    mem: 8096
+    cores: 8
+  display-name: a test machine
+  status: running
+  message: a test message
+  has-vote: true
+  wants-vote: false
+`[1:]),
+	username: "alice@external",
+	args: jujuparams.ModelCreateArgs{
+		Name:               "test-model",
+		OwnerTag:           names.NewUserTag("alice@external").String(),
+		CloudTag:           names.NewCloudTag("test-cloud").String(),
+		CloudRegion:        "test-region-1",
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
+	},
+	expectError: "model alice@external/test-model already exists",
+}, {
+	name: "UpdateCredentialError",
+	env: `
+clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-region-1
+cloud-credentials:
+- name: test-credential-1
+  owner: alice@external
+  cloud: test-cloud
+  auth-type: empty
+controllers:
+- name: controller-1
+  uuid: 00000000-0000-0000-0000-0000-0000000000001
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 0
+- name: controller-2
+  uuid: 00000000-0000-0000-0000-0000-0000000000002
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 2
+`[1:],
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+		return nil, errors.E("a silly error")
+	},
+	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+		return nil
+	},
+	createModel: createModel(`
+uuid: 00000001-0000-0000-0000-0000-000000000001
+status:
+  status: started
+  info: running a test
+life: alive
+users:
+- user: alice@external
+  access: admin
+- user: bob
+  access: read
+machines:
+- id: test-machine-id
+  hardware:
+    arch: amd64
+    mem: 8096
+    cores: 8
+  display-name: a test machine
+  status: running
+  message: a test message
+  has-vote: true
+  wants-vote: false
+`[1:]),
+	username: "alice@external",
+	args: jujuparams.ModelCreateArgs{
+		Name:               "test-model",
+		OwnerTag:           names.NewUserTag("alice@external").String(),
+		CloudTag:           names.NewCloudTag("test-cloud").String(),
+		CloudRegion:        "test-region-1",
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
+	},
+	expectError: "failed to update cloud credential",
+}}
+
 func TestAddModel(t *testing.T) {
 	c := qt.New(t)
 
-	now := time.Now().UTC().Round(time.Millisecond)
-	arch := "amd64"
-	mem := uint64(8096)
-	cores := uint64(8)
-
-	tests := []struct {
-		about               string
-		updateCredential    func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
-		grantJIMMModelAdmin func(context.Context, names.ModelTag) error
-		createModel         func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error
-		createEnv           func(*qt.C, db.Database) (dbmodel.User, jujuparams.ModelCreateArgs, dbmodel.Model, string)
-	}{{
-		about: "creating a model by specifying the cloud region",
-		updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-			return nil, nil
-		},
-		grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
-			return nil
-		},
-		createModel: func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
-			mi.Name = args.Name
-			mi.UUID = "00000001-0000-0000-0000-0000-000000000001"
-			mi.CloudTag = args.CloudTag
-			mi.CloudCredentialTag = args.CloudCredentialTag
-			mi.CloudRegion = args.CloudRegion
-			mi.OwnerTag = args.OwnerTag
-			mi.Status = jujuparams.EntityStatus{
-				Status: status.Started,
-				Info:   "running a test",
-			}
-			mi.Life = life.Alive
-			mi.Users = []jujuparams.ModelUserInfo{{
-				UserName: "alice@external",
-				Access:   jujuparams.ModelAdminAccess,
-			}, {
-				// "bob" is a local user
-				UserName: "bob",
-				Access:   jujuparams.ModelReadAccess,
-			}}
-			mi.Machines = []jujuparams.ModelMachineInfo{{
-				Id: "test-machine-id",
-				Hardware: &jujuparams.MachineHardware{
-					Arch:  &arch,
-					Mem:   &mem,
-					Cores: &cores,
-				},
-				DisplayName: "a test machine",
-				Status:      "running",
-				Message:     "a test message",
-				HasVote:     true,
-				WantsVote:   false,
-			}}
-			return nil
-		},
-		createEnv: func(c *qt.C, db db.Database) (dbmodel.User, jujuparams.ModelCreateArgs, dbmodel.Model, string) {
-			controller1 := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := db.AddController(context.Background(), &controller1)
-			c.Assert(err, qt.Equals, nil)
-
-			controller2 := dbmodel.Controller{
-				Name: "test-controller-2",
-				UUID: "00000000-0000-0000-0000-0000-0000000000002",
-			}
-			err = db.AddController(context.Background(), &controller2)
-			c.Assert(err, qt.Equals, nil)
-
-			u := dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "superuser",
-			}
-			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
-
-			cloud := dbmodel.Cloud{
-				Name: "test-cloud",
-				Type: "test-provider",
-				Regions: []dbmodel.CloudRegion{{
-					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller1.ID,
-					}, {
-						// controller2 has a higher priority and the model
-						// should be created on this controller
-						Priority:     2,
-						ControllerID: controller2.ID,
-					}},
-				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u.Username,
-				}},
-			}
-			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
-
-			cred := dbmodel.CloudCredential{
-				Name:      "test-credential-1",
-				CloudName: cloud.Name,
-				OwnerID:   u.Username,
-				AuthType:  "empty",
-			}
-			err = db.SetCloudCredential(context.Background(), &cred)
-			c.Assert(err, qt.Equals, nil)
-
-			args := jujuparams.ModelCreateArgs{
-				Name:               "test-model",
-				OwnerTag:           names.NewUserTag(u.Username).String(),
-				CloudTag:           names.NewCloudTag(cloud.Name).String(),
-				CloudRegion:        "test-region-1",
-				CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
-			}
-
-			expectedModel := dbmodel.Model{
-				ID:        1,
-				CreatedAt: now,
-				UpdatedAt: now,
-				Name:      "test-model",
-				UUID: sql.NullString{
-					String: "00000001-0000-0000-0000-0000-000000000001",
-					Valid:  true,
-				},
-				OwnerID:           "alice@external",
-				ControllerID:      controller2.ID,
-				CloudRegionID:     1,
-				CloudCredentialID: cred.ID,
-				Life:              "alive",
-				Status: dbmodel.Status{
-					Status: "started",
-					Info:   "running a test",
-				},
-				Users: []dbmodel.UserModelAccess{{
-					Model: gorm.Model{
-						ID:        1,
-						CreatedAt: now,
-						UpdatedAt: now,
-					},
-					UserID:  1,
-					ModelID: 1,
-					Access:  "admin",
-				}},
-			}
-			return u, args, expectedModel, ""
-		},
-	}, {
-		about: "creating a model by specifying the cloud",
-		updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-			return nil, nil
-		},
-		grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
-			return nil
-		},
-		createModel: func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
-			mi.Name = args.Name
-			mi.UUID = "00000001-0000-0000-0000-0000-000000000001"
-			mi.CloudTag = args.CloudTag
-			mi.CloudCredentialTag = args.CloudCredentialTag
-			mi.CloudRegion = args.CloudRegion
-			mi.OwnerTag = args.OwnerTag
-			mi.Status = jujuparams.EntityStatus{
-				Status: status.Started,
-				Info:   "running a test",
-			}
-			mi.Life = life.Alive
-			mi.Users = []jujuparams.ModelUserInfo{{
-				UserName: "alice@external",
-				Access:   jujuparams.ModelAdminAccess,
-			}}
-			mi.Machines = []jujuparams.ModelMachineInfo{{
-				Id: "test-machine-id",
-				Hardware: &jujuparams.MachineHardware{
-					Arch:  &arch,
-					Mem:   &mem,
-					Cores: &cores,
-				},
-				DisplayName: "a test machine",
-				Status:      "running",
-				Message:     "a test message",
-				HasVote:     true,
-				WantsVote:   false,
-			}}
-			return nil
-		},
-		createEnv: func(c *qt.C, db db.Database) (dbmodel.User, jujuparams.ModelCreateArgs, dbmodel.Model, string) {
-			controller1 := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := db.AddController(context.Background(), &controller1)
-			c.Assert(err, qt.Equals, nil)
-
-			controller2 := dbmodel.Controller{
-				Name: "test-controller-2",
-				UUID: "00000000-0000-0000-0000-0000-0000000000002",
-			}
-			err = db.AddController(context.Background(), &controller2)
-			c.Assert(err, qt.Equals, nil)
-
-			u := dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "superuser",
-			}
-			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
-
-			cloud := dbmodel.Cloud{
-				Name: "test-cloud",
-				Type: "test-provider",
-				Regions: []dbmodel.CloudRegion{{
-					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller1.ID,
-					}, {
-						// controller2 has a higher priority and the model
-						// should be created on this controller
-						Priority:     2,
-						ControllerID: controller2.ID,
-					}},
-				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u.Username,
-				}},
-			}
-			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
-
-			cred := dbmodel.CloudCredential{
-				Name:      "test-credential-1",
-				CloudName: cloud.Name,
-				OwnerID:   u.Username,
-				AuthType:  "empty",
-			}
-			err = db.SetCloudCredential(context.Background(), &cred)
-			c.Assert(err, qt.Equals, nil)
-
-			args := jujuparams.ModelCreateArgs{
-				Name:               "test-model",
-				OwnerTag:           names.NewUserTag(u.Username).String(),
-				CloudTag:           names.NewCloudTag(cloud.Name).String(),
-				CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
-			}
-
-			expectedModel := dbmodel.Model{
-				ID:        1,
-				CreatedAt: now,
-				UpdatedAt: now,
-				Name:      "test-model",
-				UUID: sql.NullString{
-					String: "00000001-0000-0000-0000-0000-000000000001",
-					Valid:  true,
-				},
-				OwnerID:           "alice@external",
-				ControllerID:      controller2.ID,
-				CloudRegionID:     1,
-				CloudCredentialID: cred.ID,
-				Life:              "alive",
-				Status: dbmodel.Status{
-					Status: "started",
-					Info:   "running a test",
-				},
-				Users: []dbmodel.UserModelAccess{{
-					Model: gorm.Model{
-						ID:        1,
-						CreatedAt: now,
-						UpdatedAt: now,
-					},
-					UserID:  1,
-					ModelID: 1,
-					Access:  "admin",
-				}},
-			}
-			return u, args, expectedModel, ""
-		},
-	}, {
-		about: "creating a model in another namespace - allowed since alice is superuser",
-		updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-			return nil, nil
-		},
-		grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
-			return nil
-		},
-		createModel: func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
-			mi.Name = args.Name
-			mi.UUID = "00000001-0000-0000-0000-0000-000000000001"
-			mi.CloudTag = args.CloudTag
-			mi.CloudCredentialTag = args.CloudCredentialTag
-			mi.CloudRegion = args.CloudRegion
-			mi.OwnerTag = args.OwnerTag
-			mi.Status = jujuparams.EntityStatus{
-				Status: status.Started,
-				Info:   "running a test",
-			}
-			mi.Life = life.Alive
-			mi.Users = []jujuparams.ModelUserInfo{{
-				UserName: "alice@external",
-				Access:   jujuparams.ModelAdminAccess,
-			}}
-			mi.Machines = []jujuparams.ModelMachineInfo{{
-				Id: "test-machine-id",
-				Hardware: &jujuparams.MachineHardware{
-					Arch:  &arch,
-					Mem:   &mem,
-					Cores: &cores,
-				},
-				DisplayName: "a test machine",
-				Status:      "running",
-				Message:     "a test message",
-				HasVote:     true,
-				WantsVote:   false,
-			}}
-			return nil
-		},
-		createEnv: func(c *qt.C, db db.Database) (dbmodel.User, jujuparams.ModelCreateArgs, dbmodel.Model, string) {
-			controller1 := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := db.AddController(context.Background(), &controller1)
-			c.Assert(err, qt.Equals, nil)
-
-			u1 := dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "superuser",
-			}
-			c.Assert(db.DB.Create(&u1).Error, qt.IsNil)
-
-			u2 := dbmodel.User{
-				Username:         "bob",
-				ControllerAccess: "add-model",
-			}
-			c.Assert(db.DB.Create(&u2).Error, qt.IsNil)
-
-			cloud := dbmodel.Cloud{
-				Name: "test-cloud",
-				Type: "test-provider",
-				Regions: []dbmodel.CloudRegion{{
-					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller1.ID,
-					}},
-				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u1.Username,
-				}, {
-					Username: u2.Username,
-				}},
-			}
-			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
-
-			cred := dbmodel.CloudCredential{
-				Name:      "test-credential-1",
-				CloudName: cloud.Name,
-				OwnerID:   u1.Username,
-				AuthType:  "empty",
-			}
-			err = db.SetCloudCredential(context.Background(), &cred)
-			c.Assert(err, qt.Equals, nil)
-
-			args := jujuparams.ModelCreateArgs{
-				Name:               "test-model",
-				OwnerTag:           names.NewUserTag(u2.Username).String(),
-				CloudTag:           names.NewCloudTag(cloud.Name).String(),
-				CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
-			}
-
-			expectedModel := dbmodel.Model{
-				ID:        1,
-				CreatedAt: now,
-				UpdatedAt: now,
-				Name:      "test-model",
-				UUID: sql.NullString{
-					String: "00000001-0000-0000-0000-0000-000000000001",
-					Valid:  true,
-				},
-				OwnerID:           "bob",
-				ControllerID:      controller1.ID,
-				CloudRegionID:     1,
-				CloudCredentialID: cred.ID,
-				Life:              "alive",
-				Status: dbmodel.Status{
-					Status: "started",
-					Info:   "running a test",
-				},
-				Users: []dbmodel.UserModelAccess{{
-					Model: gorm.Model{
-						ID:        1,
-						CreatedAt: now,
-						UpdatedAt: now,
-					},
-					UserID:  1,
-					ModelID: 1,
-					Access:  "admin",
-				}},
-			}
-			return u1, args, expectedModel, ""
-		},
-	}, {
-		about: "creating a model in another namespace - not allowed since alice is not superuser",
-		updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-			return nil, nil
-		},
-		grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
-			return nil
-		},
-		createModel: func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
-			mi.Name = args.Name
-			mi.UUID = "00000001-0000-0000-0000-0000-000000000001"
-			mi.CloudTag = args.CloudTag
-			mi.CloudCredentialTag = args.CloudCredentialTag
-			mi.CloudRegion = args.CloudRegion
-			mi.OwnerTag = args.OwnerTag
-			mi.Status = jujuparams.EntityStatus{
-				Status: status.Started,
-				Info:   "running a test",
-			}
-			mi.Life = life.Alive
-			mi.Users = []jujuparams.ModelUserInfo{{
-				UserName: "alice@external",
-				Access:   jujuparams.ModelAdminAccess,
-			}}
-			mi.Machines = []jujuparams.ModelMachineInfo{{
-				Id: "test-machine-id",
-				Hardware: &jujuparams.MachineHardware{
-					Arch:  &arch,
-					Mem:   &mem,
-					Cores: &cores,
-				},
-				DisplayName: "a test machine",
-				Status:      "running",
-				Message:     "a test message",
-				HasVote:     true,
-				WantsVote:   false,
-			}}
-			return nil
-		},
-		createEnv: func(c *qt.C, db db.Database) (dbmodel.User, jujuparams.ModelCreateArgs, dbmodel.Model, string) {
-			controller1 := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := db.AddController(context.Background(), &controller1)
-			c.Assert(err, qt.Equals, nil)
-
-			u1 := dbmodel.User{
-				Username:         "alice",
-				ControllerAccess: "add-model",
-			}
-			c.Assert(db.DB.Create(&u1).Error, qt.IsNil)
-
-			u2 := dbmodel.User{
-				Username:         "bob",
-				ControllerAccess: "add-model",
-			}
-			c.Assert(db.DB.Create(&u2).Error, qt.IsNil)
-
-			cloud := dbmodel.Cloud{
-				Name: "test-cloud",
-				Type: "test-provider",
-				Regions: []dbmodel.CloudRegion{{
-					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller1.ID,
-					}},
-				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u1.Username,
-				}, {
-					Username: u2.Username,
-				}},
-			}
-			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
-
-			cred := dbmodel.CloudCredential{
-				Name:      "test-credential-1",
-				CloudName: cloud.Name,
-				OwnerID:   u1.Username,
-				AuthType:  "empty",
-			}
-			err = db.SetCloudCredential(context.Background(), &cred)
-			c.Assert(err, qt.Equals, nil)
-
-			args := jujuparams.ModelCreateArgs{
-				Name:               "test-model",
-				OwnerTag:           names.NewUserTag(u2.Username).String(),
-				CloudTag:           names.NewCloudTag(cloud.Name).String(),
-				CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice/test-credential-1").String(),
-			}
-
-			expectedModel := dbmodel.Model{
-				ID:        1,
-				CreatedAt: now,
-				UpdatedAt: now,
-				Name:      "test-model",
-				UUID: sql.NullString{
-					String: "00000001-0000-0000-0000-0000-000000000001",
-					Valid:  true,
-				},
-				OwnerID:           "bob",
-				ControllerID:      controller1.ID,
-				CloudRegionID:     1,
-				CloudCredentialID: cred.ID,
-				Life:              "alive",
-				Status: dbmodel.Status{
-					Status: "started",
-					Info:   "running a test",
-				},
-				Users: []dbmodel.UserModelAccess{{
-					Model: gorm.Model{
-						ID:        1,
-						CreatedAt: now,
-						UpdatedAt: now,
-					},
-					UserID:  1,
-					ModelID: 1,
-					Access:  "admin",
-				}},
-			}
-			return u1, args, expectedModel, "unauthorized access"
-		},
-	}, {
-		about: "CreateModel returns an error",
-		updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-			return nil, nil
-		},
-		grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
-			return nil
-		},
-		createModel: func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
-			return errors.E("a test error")
-		},
-		createEnv: func(c *qt.C, db db.Database) (dbmodel.User, jujuparams.ModelCreateArgs, dbmodel.Model, string) {
-			controller1 := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := db.AddController(context.Background(), &controller1)
-			c.Assert(err, qt.Equals, nil)
-
-			controller2 := dbmodel.Controller{
-				Name: "test-controller-2",
-				UUID: "00000000-0000-0000-0000-0000-0000000000002",
-			}
-			err = db.AddController(context.Background(), &controller2)
-			c.Assert(err, qt.Equals, nil)
-
-			u := dbmodel.User{
-				Username:         "alice",
-				ControllerAccess: "superuser",
-			}
-			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
-
-			cloud := dbmodel.Cloud{
-				Name: "test-cloud",
-				Type: "test-provider",
-				Regions: []dbmodel.CloudRegion{{
-					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller1.ID,
-					}, {
-						// controller2 has a higher priority and the model
-						// should be created on this controller
-						Priority:     2,
-						ControllerID: controller2.ID,
-					}},
-				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u.Username,
-				}},
-			}
-			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
-
-			cred := dbmodel.CloudCredential{
-				Name:      "test-credential-1",
-				CloudName: cloud.Name,
-				OwnerID:   u.Username,
-				AuthType:  "empty",
-			}
-			err = db.SetCloudCredential(context.Background(), &cred)
-			c.Assert(err, qt.Equals, nil)
-
-			args := jujuparams.ModelCreateArgs{
-				Name:               "test-model",
-				OwnerTag:           names.NewUserTag(u.Username).String(),
-				CloudTag:           names.NewCloudTag(cloud.Name).String(),
-				CloudRegion:        "test-region-1",
-				CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice/test-credential-1").String(),
-			}
-
-			return u, args, dbmodel.Model{}, "a test error"
-		},
-	}, {
-		about: "model with the same name already exists",
-		updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-			return nil, nil
-		},
-		grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
-			return nil
-		},
-		createModel: func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
-			mi.Name = args.Name
-			mi.UUID = "00000001-0000-0000-0000-0000-000000000001"
-			mi.CloudTag = args.CloudTag
-			mi.CloudCredentialTag = args.CloudCredentialTag
-			mi.CloudRegion = args.CloudRegion
-			mi.OwnerTag = args.OwnerTag
-			mi.Status = jujuparams.EntityStatus{
-				Status: status.Started,
-				Info:   "running a test",
-			}
-			mi.Life = life.Alive
-			mi.Users = []jujuparams.ModelUserInfo{{
-				UserName: "alice@external",
-				Access:   jujuparams.ModelAdminAccess,
-			}}
-			mi.Machines = []jujuparams.ModelMachineInfo{{
-				Id: "test-machine-id",
-				Hardware: &jujuparams.MachineHardware{
-					Arch:  &arch,
-					Mem:   &mem,
-					Cores: &cores,
-				},
-				DisplayName: "a test machine",
-				Status:      "running",
-				Message:     "a test message",
-				HasVote:     true,
-				WantsVote:   false,
-			}}
-			return nil
-		},
-		createEnv: func(c *qt.C, db db.Database) (dbmodel.User, jujuparams.ModelCreateArgs, dbmodel.Model, string) {
-			controller1 := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := db.AddController(context.Background(), &controller1)
-			c.Assert(err, qt.Equals, nil)
-
-			controller2 := dbmodel.Controller{
-				Name: "test-controller-2",
-				UUID: "00000000-0000-0000-0000-0000-0000000000002",
-			}
-			err = db.AddController(context.Background(), &controller2)
-			c.Assert(err, qt.Equals, nil)
-
-			u := dbmodel.User{
-				Username:         "alice",
-				ControllerAccess: "superuser",
-			}
-			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
-
-			cloud := dbmodel.Cloud{
-				Name: "test-cloud",
-				Type: "test-provider",
-				Regions: []dbmodel.CloudRegion{{
-					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller1.ID,
-					}, {
-						// controller2 has a higher priority and the model
-						// should be created on this controller
-						Priority:     2,
-						ControllerID: controller2.ID,
-					}},
-				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u.Username,
-				}},
-			}
-			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
-
-			cred := dbmodel.CloudCredential{
-				Name:      "test-credential-1",
-				CloudName: cloud.Name,
-				OwnerID:   u.Username,
-				AuthType:  "empty",
-			}
-			err = db.SetCloudCredential(context.Background(), &cred)
-			c.Assert(err, qt.Equals, nil)
-
-			model := dbmodel.Model{
-				Name:              "test-model",
-				OwnerID:           u.Username,
-				CloudRegionID:     cloud.Regions[0].ID,
-				CloudCredentialID: cred.ID,
-				ControllerID:      controller2.ID,
-			}
-			err = db.AddModel(context.Background(), &model)
-			c.Assert(err, qt.Equals, nil)
-
-			args := jujuparams.ModelCreateArgs{
-				Name:               "test-model",
-				OwnerTag:           names.NewUserTag(u.Username).String(),
-				CloudTag:           names.NewCloudTag(cloud.Name).String(),
-				CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice/test-credential-1").String(),
-			}
-
-			expectedModel := dbmodel.Model{
-				ID:        1,
-				CreatedAt: now,
-				UpdatedAt: now,
-				Name:      "test-model",
-				UUID: sql.NullString{
-					String: "00000001-0000-0000-0000-0000-000000000001",
-					Valid:  true,
-				},
-				OwnerID:           "alice",
-				ControllerID:      controller2.ID,
-				CloudRegionID:     1,
-				CloudCredentialID: cred.ID,
-				Life:              "alive",
-				Status: dbmodel.Status{
-					Status: "started",
-					Info:   "running a test",
-				},
-				Users: []dbmodel.UserModelAccess{{
-					Model: gorm.Model{
-						ID:        1,
-						CreatedAt: now,
-						UpdatedAt: now,
-					},
-					UserID:  1,
-					ModelID: 1,
-					Access:  "admin",
-				}},
-			}
-			return u, args, expectedModel, "model alice/test-model already exists"
-		},
-	}, {
-		about: "UpdateCredential returns an error",
-		updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-			return nil, errors.E("a silly error")
-		},
-		grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
-			return nil
-		},
-		createModel: func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
-			mi.Name = args.Name
-			mi.UUID = "00000001-0000-0000-0000-0000-000000000001"
-			mi.CloudTag = args.CloudTag
-			mi.CloudCredentialTag = args.CloudCredentialTag
-			mi.CloudRegion = args.CloudRegion
-			mi.OwnerTag = args.OwnerTag
-			mi.Status = jujuparams.EntityStatus{
-				Status: status.Started,
-				Info:   "running a test",
-			}
-			mi.Life = life.Alive
-			mi.Users = []jujuparams.ModelUserInfo{{
-				UserName: "alice@external",
-				Access:   jujuparams.ModelAdminAccess,
-			}}
-			mi.Machines = []jujuparams.ModelMachineInfo{{
-				Id: "test-machine-id",
-				Hardware: &jujuparams.MachineHardware{
-					Arch:  &arch,
-					Mem:   &mem,
-					Cores: &cores,
-				},
-				DisplayName: "a test machine",
-				Status:      "running",
-				Message:     "a test message",
-				HasVote:     true,
-				WantsVote:   false,
-			}}
-			return nil
-		},
-		createEnv: func(c *qt.C, db db.Database) (dbmodel.User, jujuparams.ModelCreateArgs, dbmodel.Model, string) {
-			controller1 := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := db.AddController(context.Background(), &controller1)
-			c.Assert(err, qt.Equals, nil)
-
-			controller2 := dbmodel.Controller{
-				Name: "test-controller-2",
-				UUID: "00000000-0000-0000-0000-0000-0000000000002",
-			}
-			err = db.AddController(context.Background(), &controller2)
-			c.Assert(err, qt.Equals, nil)
-
-			u := dbmodel.User{
-				Username:         "alice",
-				ControllerAccess: "superuser",
-			}
-			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
-
-			cloud := dbmodel.Cloud{
-				Name: "test-cloud",
-				Type: "test-provider",
-				Regions: []dbmodel.CloudRegion{{
-					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller1.ID,
-					}, {
-						// controller2 has a higher priority and the model
-						// should be created on this controller
-						Priority:     2,
-						ControllerID: controller2.ID,
-					}},
-				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u.Username,
-				}},
-			}
-			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
-
-			cred := dbmodel.CloudCredential{
-				Name:      "test-credential-1",
-				CloudName: cloud.Name,
-				OwnerID:   u.Username,
-				AuthType:  "empty",
-			}
-			err = db.SetCloudCredential(context.Background(), &cred)
-			c.Assert(err, qt.Equals, nil)
-
-			args := jujuparams.ModelCreateArgs{
-				Name:               "test-model",
-				OwnerTag:           names.NewUserTag(u.Username).String(),
-				CloudTag:           names.NewCloudTag(cloud.Name).String(),
-				CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice/test-credential-1").String(),
-			}
-
-			expectedModel := dbmodel.Model{
-				ID:        1,
-				CreatedAt: now,
-				UpdatedAt: now,
-				Name:      "test-model",
-				UUID: sql.NullString{
-					String: "00000001-0000-0000-0000-0000-000000000001",
-					Valid:  true,
-				},
-				OwnerID:           "alice",
-				ControllerID:      controller2.ID,
-				CloudRegionID:     1,
-				CloudCredentialID: cred.ID,
-				Life:              "alive",
-				Status: dbmodel.Status{
-					Status: "started",
-					Info:   "running a test",
-				},
-				Users: []dbmodel.UserModelAccess{{
-					Model: gorm.Model{
-						ID:        1,
-						CreatedAt: now,
-						UpdatedAt: now,
-					},
-					UserID:  1,
-					ModelID: 1,
-					Access:  "admin",
-				}},
-			}
-			return u, args, expectedModel, "failed to update cloud credential"
-		},
-	}}
-
-	for _, test := range tests {
-		c.Run(test.about, func(c *qt.C) {
+	for _, test := range addModelTests {
+		c.Run(test.name, func(c *qt.C) {
 			api := &jimmtest.API{
 				UpdateCredential_:    test.updateCredential,
 				GrantJIMMModelAdmin_: test.grantJIMMModelAdmin,
@@ -1006,36 +790,320 @@ func TestAddModel(t *testing.T) {
 
 			j := &jimm.JIMM{
 				Database: db.Database{
-					DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+					DB: jimmtest.MemoryDB(c, nil),
 				},
 				Dialer: &jimmtest.Dialer{
 					API: api,
 				},
 			}
-
 			ctx := context.Background()
 			err := j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
-			u, jujuArgs, model, expectedError := test.createEnv(c, j.Database)
+			env := jimmtest.ParseEnvironment(c, test.env)
+			env.PopulateDB(c, j.Database)
 
+			u := env.User(test.username).DBObject(c, j.Database)
 			args := jimm.ModelCreateArgs{}
-			err = args.FromJujuModelCreateArgs(&jujuArgs)
+			err = args.FromJujuModelCreateArgs(&test.args)
 			c.Assert(err, qt.IsNil)
 
 			_, err = j.AddModel(context.Background(), &u, &args)
-			if expectedError == "" {
+			if test.expectError == "" {
 				c.Assert(err, qt.IsNil)
 
 				m1 := dbmodel.Model{
-					UUID: model.UUID,
+					UUID: test.expectModel.UUID,
 				}
 				err = j.Database.GetModel(ctx, &m1)
 				c.Assert(err, qt.IsNil)
-				c.Assert(m1, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(dbmodel.Controller{})), model)
+				c.Assert(m1, jimmtest.DBObjectEquals, test.expectModel)
 			} else {
-				c.Assert(err, qt.ErrorMatches, expectedError)
+				c.Assert(err, qt.ErrorMatches, test.expectError)
 			}
 		})
 	}
+}
+
+func createModel(template string) func(context.Context, *jujuparams.ModelCreateArgs, *jujuparams.ModelInfo) error {
+	var tmi jujuparams.ModelInfo
+	err := yaml.Unmarshal([]byte(template), &tmi)
+	return func(_ context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
+		if err != nil {
+			return err
+		}
+		*mi = tmi
+		mi.Name = args.Name
+		mi.CloudTag = args.CloudTag
+		mi.CloudCredentialTag = args.CloudCredentialTag
+		mi.CloudRegion = args.CloudRegion
+		mi.OwnerTag = args.OwnerTag
+		return nil
+	}
+}
+
+const modelInfoTestEnv = `clouds:
+- name: dummy
+  type: dummy
+  regions:
+  - name: dummy-region
+cloud-credentials:
+- owner: alice@external
+  name: cred-1
+  cloud: dummy
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+models:
+- name: model-1
+  type: iaas
+  uuid: 00000002-0000-0000-0000-000000000001
+  controller: controller-1
+  default-series: warty
+  cloud: dummy
+  region: dummy-region
+  cloud-credential: cred-1
+  owner: alice@external
+  life: alive
+  status:
+    status: available
+    info: "OK!"
+    since: 2020-02-20T20:02:20Z
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: write
+  - user: charlie@external
+    access: read
+  machines:
+  - id: 0
+    hardware:
+      arch: amd64
+      mem: 8096
+      root-disk: 10240
+      cores: 1
+    instance-id: 00000009-0000-0000-0000-0000000000000
+    display-name: Machine 0
+    status: available
+    message: OK!
+    has-vote: true
+    wants-vote: false
+    ha-primary: false
+  - id: 1
+    hardware:
+      arch: amd64
+      mem: 8096
+      root-disk: 10240
+      cores: 2
+    instance-id: 00000009-0000-0000-0000-0000000000001
+    display-name: Machine 1
+    status: available
+    message: OK!
+    has-vote: true
+    wants-vote: false
+    ha-primary: false
+  sla:
+    level: unsupported
+  agent-version: 1.2.3
+`
+
+var modelInfoTests = []struct {
+	name            string
+	env             string
+	username        string
+	uuid            string
+	expectModelInfo *jujuparams.ModelInfo
+	expectError     string
+}{{
+	name:     "AdminUser",
+	env:      modelInfoTestEnv,
+	username: "alice@external",
+	uuid:     "00000002-0000-0000-0000-000000000001",
+	expectModelInfo: &jujuparams.ModelInfo{
+		Name:               "model-1",
+		Type:               "iaas",
+		UUID:               "00000002-0000-0000-0000-000000000001",
+		ControllerUUID:     "00000001-0000-0000-0000-000000000001",
+		ProviderType:       "dummy",
+		DefaultSeries:      "warty",
+		CloudTag:           names.NewCloudTag("dummy").String(),
+		CloudRegion:        "dummy-region",
+		CloudCredentialTag: names.NewCloudCredentialTag("dummy/alice@external/cred-1").String(),
+		OwnerTag:           names.NewUserTag("alice@external").String(),
+		Life:               "alive",
+		Status: jujuparams.EntityStatus{
+			Status: "available",
+			Info:   "OK!",
+			Since:  newDate(2020, 2, 20, 20, 2, 20, 0, time.UTC),
+		},
+		Users: []jujuparams.ModelUserInfo{{
+			UserName: "alice@external",
+			Access:   "admin",
+		}, {
+			UserName: "bob@external",
+			Access:   "write",
+		}, {
+			UserName: "charlie@external",
+			Access:   "read",
+		}},
+		Machines: []jujuparams.ModelMachineInfo{{
+			Id:          "0",
+			Hardware:    jimmtest.ParseMachineHardware("arch=amd64 mem=8096 root-disk=10240 cores=1"),
+			InstanceId:  "00000009-0000-0000-0000-0000000000000",
+			DisplayName: "Machine 0",
+			Status:      "available",
+			Message:     "OK!",
+			HasVote:     true,
+		}, {
+			Id:          "1",
+			Hardware:    jimmtest.ParseMachineHardware("arch=amd64 mem=8096 root-disk=10240 cores=2"),
+			InstanceId:  "00000009-0000-0000-0000-0000000000001",
+			DisplayName: "Machine 1",
+			Status:      "available",
+			Message:     "OK!",
+			HasVote:     true,
+		}},
+		SLA: &jujuparams.ModelSLAInfo{
+			Level: "unsupported",
+		},
+		AgentVersion: newVersion("1.2.3"),
+	},
+}, {
+	name:     "WriteUser",
+	env:      modelInfoTestEnv,
+	username: "bob@external",
+	uuid:     "00000002-0000-0000-0000-000000000001",
+	expectModelInfo: &jujuparams.ModelInfo{
+		Name:               "model-1",
+		Type:               "iaas",
+		UUID:               "00000002-0000-0000-0000-000000000001",
+		ControllerUUID:     "00000001-0000-0000-0000-000000000001",
+		ProviderType:       "dummy",
+		DefaultSeries:      "warty",
+		CloudTag:           names.NewCloudTag("dummy").String(),
+		CloudRegion:        "dummy-region",
+		CloudCredentialTag: names.NewCloudCredentialTag("dummy/alice@external/cred-1").String(),
+		OwnerTag:           names.NewUserTag("alice@external").String(),
+		Life:               "alive",
+		Status: jujuparams.EntityStatus{
+			Status: "available",
+			Info:   "OK!",
+			Since:  newDate(2020, 2, 20, 20, 2, 20, 0, time.UTC),
+		},
+		Users: []jujuparams.ModelUserInfo{{
+			UserName: "bob@external",
+			Access:   "write",
+		}},
+		Machines: []jujuparams.ModelMachineInfo{{
+			Id:          "0",
+			Hardware:    jimmtest.ParseMachineHardware("arch=amd64 mem=8096 root-disk=10240 cores=1"),
+			InstanceId:  "00000009-0000-0000-0000-0000000000000",
+			DisplayName: "Machine 0",
+			Status:      "available",
+			Message:     "OK!",
+			HasVote:     true,
+		}, {
+			Id:          "1",
+			Hardware:    jimmtest.ParseMachineHardware("arch=amd64 mem=8096 root-disk=10240 cores=2"),
+			InstanceId:  "00000009-0000-0000-0000-0000000000001",
+			DisplayName: "Machine 1",
+			Status:      "available",
+			Message:     "OK!",
+			HasVote:     true,
+		}},
+		SLA: &jujuparams.ModelSLAInfo{
+			Level: "unsupported",
+		},
+		AgentVersion: newVersion("1.2.3"),
+	},
+}, {
+	name:     "ReadUser",
+	env:      modelInfoTestEnv,
+	username: "charlie@external",
+	uuid:     "00000002-0000-0000-0000-000000000001",
+	expectModelInfo: &jujuparams.ModelInfo{
+		Name:               "model-1",
+		Type:               "iaas",
+		UUID:               "00000002-0000-0000-0000-000000000001",
+		ControllerUUID:     "00000001-0000-0000-0000-000000000001",
+		ProviderType:       "dummy",
+		DefaultSeries:      "warty",
+		CloudTag:           names.NewCloudTag("dummy").String(),
+		CloudRegion:        "dummy-region",
+		CloudCredentialTag: names.NewCloudCredentialTag("dummy/alice@external/cred-1").String(),
+		OwnerTag:           names.NewUserTag("alice@external").String(),
+		Life:               "alive",
+		Status: jujuparams.EntityStatus{
+			Status: "available",
+			Info:   "OK!",
+			Since:  newDate(2020, 2, 20, 20, 2, 20, 0, time.UTC),
+		},
+		Users: []jujuparams.ModelUserInfo{{
+			UserName: "charlie@external",
+			Access:   "read",
+		}},
+		SLA: &jujuparams.ModelSLAInfo{
+			Level: "unsupported",
+		},
+		AgentVersion: newVersion("1.2.3"),
+	},
+}, {
+	name:        "NoAccess",
+	env:         modelInfoTestEnv,
+	username:    "diane@external",
+	uuid:        "00000002-0000-0000-0000-000000000001",
+	expectError: "unauthorized access",
+}, {
+	name:        "NotFound",
+	env:         modelInfoTestEnv,
+	username:    "alice@external",
+	uuid:        "00000002-0000-0000-0000-000000000002",
+	expectError: "record not found",
+}}
+
+func TestModelInfo(t *testing.T) {
+	c := qt.New(t)
+
+	for _, test := range modelInfoTests {
+		c.Run(test.name, func(c *qt.C) {
+			ctx := context.Background()
+
+			env := jimmtest.ParseEnvironment(c, test.env)
+			j := &jimm.JIMM{
+				Database: db.Database{
+					DB: jimmtest.MemoryDB(c, nil),
+				},
+				Dialer: &jimmtest.Dialer{
+					API: &jimmtest.API{},
+				},
+			}
+			err := j.Database.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+			env.PopulateDB(c, j.Database)
+
+			u := &dbmodel.User{
+				Username: test.username,
+			}
+			mi, err := j.ModelInfo(context.Background(), u, names.NewModelTag(test.uuid))
+			if test.expectError != "" {
+				c.Check(err, qt.ErrorMatches, test.expectError)
+			} else {
+				c.Assert(err, qt.IsNil)
+				c.Check(mi, qt.CmpEquals(cmpopts.EquateEmpty()), test.expectModelInfo)
+			}
+		})
+	}
+}
+
+// newDate wraps time.Date to return a *time.Time.
+func newDate(year int, month time.Month, day, hour, min, sec, nsec int, loc *time.Location) *time.Time {
+	t := time.Date(year, month, day, hour, min, sec, nsec, loc)
+	return &t
+}
+
+// newVersion wraps version.MustParse to return a *version.Number
+func newVersion(s string) *version.Number {
+	n := version.MustParse(s)
+	return &n
 }

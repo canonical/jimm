@@ -53,6 +53,7 @@ require (
 	gorm.io/driver/postgres v1.0.5
 	gorm.io/driver/sqlite v1.1.4-0.20201029040614-e1caf3738eb9
 	gorm.io/gorm v1.20.6
+	sigs.k8s.io/yaml v1.2.0
 )
 
 replace (

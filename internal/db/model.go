@@ -56,11 +56,19 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model, options .
 		return errors.E(op, "missing id or uuid", errors.CodeBadRequest)
 	}
 
+	db = db.Preload("Owner")
+	db = db.Preload("Controller")
+	db = db.Preload("CloudRegion").Preload("CloudRegion.Cloud")
+	db = db.Preload("CloudCredential")
+	db = db.Preload("Applications")
+	db = db.Preload("Machines")
+	db = db.Preload("Users").Preload("Users.User")
+	
 	for _, option := range options {
 		db = option(db)
 	}
-
-	if err := db.Preload("Users").Preload("Controller").First(&model).Error; err != nil {
+	
+	if err := db.First(&model).Error; err != nil {
 		return errors.E(op, dbError(err))
 	}
 	return nil

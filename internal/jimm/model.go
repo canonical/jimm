@@ -4,6 +4,7 @@ package jimm
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"math/rand"
 	"path"
@@ -615,4 +616,56 @@ func (j *JIMM) AddModel(ctx context.Context, u *dbmodel.User, args *ModelCreateA
 		return nil, errors.E(op, err)
 	}
 	return builder.JujuModelInfo(), nil
+}
+
+// ModelInfo returns the model info for the model with the given ModelTag.
+// The returned ModelInfo will be appropriate for the given user's
+// access-level on the model. If the model does not exist then the returned
+// error will have the code CodeNotFound. If the given user does not have
+// access to the model then the returned error will have the code
+// CodeUnauthorized.
+func (j *JIMM) ModelInfo(ctx context.Context, u *dbmodel.User, mt names.ModelTag) (*jujuparams.ModelInfo, error) {
+	const op = errors.Op("jimm.ModelInfo")
+
+	m := dbmodel.Model{
+		UUID: sql.NullString{
+			String: mt.Id(),
+			Valid:  true,
+		},
+	}
+
+	if err := j.Database.GetModel(ctx, &m); err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	mi := m.ToJujuModelInfo()
+	var modelUser jujuparams.ModelUserInfo
+	for _, user := range mi.Users {
+		if user.UserName == u.Username {
+			modelUser = user
+		}
+	}
+
+	if u.ControllerAccess == "admin" || modelUser.Access == "admin" {
+		// Admin users have access to all data unmodified.
+		return &mi, nil
+	}
+
+	if modelUser.Access == "" {
+		// If the user doesn't have any access on the model return an
+		// unauthorized error
+		return nil, errors.E(op, errors.CodeUnauthorized)
+	}
+
+	// Non-admin users can only see their own user.
+	mi.Users = []jujuparams.ModelUserInfo{modelUser}
+
+	if modelUser.Access != "write" {
+		// Users need "write" level access (or above) to see machine
+		// information. Note "admin" level users will have already
+		// returned data above.
+		mi.Machines = nil
+	}
+
+	return &mi, nil
 }
