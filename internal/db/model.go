@@ -46,8 +46,6 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model, options .
 		return errors.E(op, err)
 	}
 	db := d.DB.WithContext(ctx)
-	// TODO (ashipika) consider which fields we need to preload
-	// when fetching a model.
 	if model.UUID.Valid {
 		db = db.Where("uuid = ?", model.UUID.String)
 	} else if model.ID != 0 {
@@ -56,18 +54,12 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model, options .
 		return errors.E(op, "missing id or uuid", errors.CodeBadRequest)
 	}
 
-	db = db.Preload("Owner")
-	db = db.Preload("Controller")
-	db = db.Preload("CloudRegion").Preload("CloudRegion.Cloud")
-	db = db.Preload("CloudCredential")
-	db = db.Preload("Applications")
-	db = db.Preload("Machines")
-	db = db.Preload("Users").Preload("Users.User")
-	
+	db = preloadModel("", db)
+
 	for _, option := range options {
 		db = option(db)
 	}
-	
+
 	if err := db.First(&model).Error; err != nil {
 		return errors.E(op, dbError(err))
 	}
@@ -113,4 +105,19 @@ func (d *Database) DeleteModel(ctx context.Context, model *dbmodel.Model) error 
 		return errors.E(op, dbError(err))
 	}
 	return nil
+}
+
+func preloadModel(prefix string, db *gorm.DB) *gorm.DB {
+	if len(prefix) > 0 && prefix[len(prefix)-1] != '.' {
+		prefix += "."
+	}
+	db = db.Preload(prefix + "Owner")
+	db = db.Preload(prefix + "Controller")
+	db = db.Preload(prefix + "CloudRegion").Preload(prefix + "CloudRegion.Cloud")
+	db = db.Preload(prefix + "CloudCredential")
+	db = db.Preload(prefix + "Applications")
+	db = db.Preload(prefix + "Machines")
+	db = db.Preload(prefix + "Users").Preload(prefix + "Users.User")
+
+	return db
 }

@@ -711,3 +711,30 @@ func (j *JIMM) ModelStatus(ctx context.Context, u *dbmodel.User, mt names.ModelT
 	}
 	return &ms, nil
 }
+
+// ListModelSummaries returns the list of models accessible to the given
+// user.
+func (j *JIMM) ListModelSummaries(ctx context.Context, u *dbmodel.User) ([]jujuparams.ModelSummaryResult, error) {
+	const op = errors.Op("jimm.ListModelSummaries")
+
+	models, err := j.Database.GetUserModels(ctx, u)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	res := make([]jujuparams.ModelSummaryResult, 0, len(models))
+	for _, m := range models {
+		switch m.Access {
+		default:
+			continue
+		case "read", "write", "admin":
+		}
+		ms := m.Model_.ToJujuModelSummary()
+		ms.UserAccess = jujuparams.UserAccessPermission(m.Access)
+		// TODO(mhilton) work out how to find UserLastConnection
+		res = append(res, jujuparams.ModelSummaryResult{
+			Result: &ms,
+		})
+	}
+	return res, nil
+}
