@@ -11,6 +11,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/juju/juju/apiserver/params"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/version"
@@ -1220,6 +1221,342 @@ func TestModelStatus(t *testing.T) {
 			c.Check(dialer.IsClosed(), qt.Equals, true)
 		})
 	}
+}
+
+const listModelSummariesTestEnv = `clouds:
+- name: dummy
+  type: dummy
+  regions:
+  - name: dummy-region
+cloud-credentials:
+- owner: alice@external
+  name: cred-1
+  cloud: dummy
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+models:
+- name: model-1
+  type: iaas
+  uuid: 00000002-0000-0000-0000-000000000001
+  controller: controller-1
+  default-series: warty
+  cloud: dummy
+  region: dummy-region
+  cloud-credential: cred-1
+  owner: alice@external
+  life: alive
+  status:
+    status: available
+    info: "OK!"
+    since: 2020-02-20T20:02:20Z
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: admin
+  machines:
+  - id: 0
+    hardware:
+      arch: amd64
+      mem: 8096
+      root-disk: 10240
+      cores: 1
+    instance-id: 00000009-0000-0000-0000-0000000000000
+    display-name: Machine 0
+    status: available
+    message: OK!
+    has-vote: true
+    wants-vote: false
+    ha-primary: false
+  - id: 1
+    hardware:
+      arch: amd64
+      mem: 8096
+      root-disk: 10240
+      cores: 2
+    instance-id: 00000009-0000-0000-0000-0000000000001
+    display-name: Machine 1
+    status: available
+    message: OK!
+    has-vote: true
+    wants-vote: false
+    ha-primary: false
+  sla:
+    level: unsupported
+  agent-version: 1.2.3
+- name: model-2
+  type: iaas
+  uuid: 00000002-0000-0000-0000-000000000002
+  controller: controller-1
+  default-series: warty
+  cloud: dummy
+  region: dummy-region
+  cloud-credential: cred-1
+  owner: alice@external
+  life: alive
+  status:
+    status: available
+    info: "OK!"
+    since: 2020-02-20T20:02:20Z
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: write
+  machines:
+  - id: 0
+    hardware:
+      arch: amd64
+      mem: 8096
+      root-disk: 10240
+      cores: 1
+    instance-id: 0000000a-0000-0000-0000-0000000000000
+    display-name: Machine 0
+    status: available
+    message: OK!
+    has-vote: true
+    wants-vote: false
+    ha-primary: false
+  - id: 1
+    hardware:
+      arch: amd64
+      mem: 8096
+      root-disk: 10240
+      cores: 2
+    instance-id: 0000000a-0000-0000-0000-0000000000001
+    display-name: Machine 1
+    status: available
+    message: OK!
+    has-vote: true
+    wants-vote: false
+    ha-primary: false
+  sla:
+    level: unsupported
+  agent-version: 1.2.3
+- name: model-3
+  type: iaas
+  uuid: 00000002-0000-0000-0000-000000000003
+  controller: controller-1
+  default-series: warty
+  cloud: dummy
+  region: dummy-region
+  cloud-credential: cred-1
+  owner: alice@external
+  life: alive
+  status:
+    status: available
+    info: "OK!"
+    since: 2020-02-20T20:02:20Z
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: ""
+  machines:
+  - id: 0
+    hardware:
+      arch: amd64
+      mem: 8096
+      root-disk: 10240
+      cores: 1
+    instance-id: 0000000b-0000-0000-0000-0000000000000
+    display-name: Machine 0
+    status: available
+    message: OK!
+    has-vote: true
+    wants-vote: false
+    ha-primary: false
+  - id: 1
+    hardware:
+      arch: amd64
+      mem: 8096
+      root-disk: 10240
+      cores: 2
+    instance-id: 0000000b-0000-0000-0000-0000000000001
+    display-name: Machine 1
+    status: available
+    message: OK!
+    has-vote: true
+    wants-vote: false
+    ha-primary: false
+  sla:
+    level: unsupported
+  agent-version: 1.2.3
+- name: model-4
+  type: iaas
+  uuid: 00000002-0000-0000-0000-000000000004
+  controller: controller-1
+  default-series: warty
+  cloud: dummy
+  region: dummy-region
+  cloud-credential: cred-1
+  owner: alice@external
+  life: alive
+  status:
+    status: available
+    info: "OK!"
+    since: 2020-02-20T20:02:20Z
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: read
+  machines:
+  - id: 0
+    hardware:
+      arch: amd64
+      mem: 8096
+      root-disk: 10240
+      cores: 1
+    instance-id: 0000000c-0000-0000-0000-0000000000000
+    display-name: Machine 0
+    status: available
+    message: OK!
+    has-vote: true
+    wants-vote: false
+    ha-primary: false
+  - id: 1
+    hardware:
+      arch: amd64
+      mem: 8096
+      root-disk: 10240
+      cores: 2
+    instance-id: 0000000c-0000-0000-0000-0000000000001
+    display-name: Machine 1
+    status: available
+    message: OK!
+    has-vote: true
+    wants-vote: false
+    ha-primary: false
+  sla:
+    level: unsupported
+  agent-version: 1.2.3
+`
+
+func TestListModelSummaries(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	env := jimmtest.ParseEnvironment(c, listModelSummariesTestEnv)
+	j := &jimm.JIMM{
+		Database: db.Database{
+			DB: jimmtest.MemoryDB(c, nil),
+		},
+		Dialer: &jimmtest.Dialer{
+			API: &jimmtest.API{},
+		},
+	}
+	err := j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+	env.PopulateDB(c, j.Database)
+
+	u := env.User("bob@external").DBObject(c, j.Database)
+	res, err := j.ListModelSummaries(ctx, &u)
+	c.Assert(err, qt.IsNil)
+	c.Check(res, qt.DeepEquals, []jujuparams.ModelSummaryResult{{
+		Result: &jujuparams.ModelSummary{
+			Name:               "model-1",
+			UUID:               "00000002-0000-0000-0000-000000000001",
+			Type:               "iaas",
+			ControllerUUID:     "00000001-0000-0000-0000-000000000001",
+			ProviderType:       "dummy",
+			DefaultSeries:      "warty",
+			CloudTag:           names.NewCloudTag("dummy").String(),
+			CloudRegion:        "dummy-region",
+			CloudCredentialTag: names.NewCloudCredentialTag("dummy/alice@external/cred-1").String(),
+			OwnerTag:           names.NewUserTag("alice@external").String(),
+			Life:               "alive",
+			Status: jujuparams.EntityStatus{
+				Status: "available",
+				Info:   "OK!",
+				Since:  newDate(2020, 02, 20, 20, 02, 20, 0, time.UTC),
+			},
+			UserAccess: "admin",
+			Counts: []params.ModelEntityCount{{
+				Entity: "machines",
+				Count:  2,
+			}, {
+				Entity: "cores",
+				Count:  3,
+			}, {
+				Entity: "units",
+				Count:  0,
+			}},
+			SLA: &jujuparams.ModelSLAInfo{
+				Level: "unsupported",
+			},
+			AgentVersion: newVersion("1.2.3"),
+		},
+	}, {
+		Result: &jujuparams.ModelSummary{
+			Name:               "model-2",
+			UUID:               "00000002-0000-0000-0000-000000000002",
+			Type:               "iaas",
+			ControllerUUID:     "00000001-0000-0000-0000-000000000001",
+			ProviderType:       "dummy",
+			DefaultSeries:      "warty",
+			CloudTag:           names.NewCloudTag("dummy").String(),
+			CloudRegion:        "dummy-region",
+			CloudCredentialTag: names.NewCloudCredentialTag("dummy/alice@external/cred-1").String(),
+			OwnerTag:           names.NewUserTag("alice@external").String(),
+			Life:               "alive",
+			Status: jujuparams.EntityStatus{
+				Status: "available",
+				Info:   "OK!",
+				Since:  newDate(2020, 02, 20, 20, 02, 20, 0, time.UTC),
+			},
+			UserAccess: "write",
+			Counts: []params.ModelEntityCount{{
+				Entity: "machines",
+				Count:  2,
+			}, {
+				Entity: "cores",
+				Count:  3,
+			}, {
+				Entity: "units",
+				Count:  0,
+			}},
+			SLA: &jujuparams.ModelSLAInfo{
+				Level: "unsupported",
+			},
+			AgentVersion: newVersion("1.2.3"),
+		},
+	}, {
+		Result: &jujuparams.ModelSummary{
+			Name:               "model-4",
+			UUID:               "00000002-0000-0000-0000-000000000004",
+			Type:               "iaas",
+			ControllerUUID:     "00000001-0000-0000-0000-000000000001",
+			ProviderType:       "dummy",
+			DefaultSeries:      "warty",
+			CloudTag:           names.NewCloudTag("dummy").String(),
+			CloudRegion:        "dummy-region",
+			CloudCredentialTag: names.NewCloudCredentialTag("dummy/alice@external/cred-1").String(),
+			OwnerTag:           names.NewUserTag("alice@external").String(),
+			Life:               "alive",
+			Status: jujuparams.EntityStatus{
+				Status: "available",
+				Info:   "OK!",
+				Since:  newDate(2020, 02, 20, 20, 02, 20, 0, time.UTC),
+			},
+			UserAccess: "read",
+			Counts: []params.ModelEntityCount{{
+				Entity: "machines",
+				Count:  2,
+			}, {
+				Entity: "cores",
+				Count:  3,
+			}, {
+				Entity: "units",
+				Count:  0,
+			}},
+			SLA: &jujuparams.ModelSLAInfo{
+				Level: "unsupported",
+			},
+			AgentVersion: newVersion("1.2.3"),
+		},
+	}})
 }
 
 // newDate wraps time.Date to return a *time.Time.

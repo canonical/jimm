@@ -14,6 +14,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 )
 
 func TestGetUserUnconfiguredDatabase(t *testing.T) {
@@ -222,4 +223,156 @@ func (s *dbSuite) TestGetUserCloudCredentials(c *qt.C) {
 	credentials, err := s.Database.GetUserCloudCredentials(ctx, &u, cloud.Name)
 	c.Check(err, qt.IsNil)
 	c.Assert(credentials, qt.DeepEquals, []dbmodel.CloudCredential{cred1, cred2})
+}
+
+func TestGetUserModelsUnconfiguredDatabase(t *testing.T) {
+	c := qt.New(t)
+
+	var d db.Database
+	_, err := d.GetUserModels(context.Background(), &dbmodel.User{})
+	c.Check(err, qt.ErrorMatches, `database not configured`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
+}
+
+func (s *dbSuite) TestGetUserModels(c *qt.C) {
+	ctx := context.Background()
+
+	err := s.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	env := jimmtest.ParseEnvironment(c, `clouds:
+- name: test
+  type: test
+  regions:
+  - name: test-region
+cloud-credentials:
+- name: test
+  owner: alice@external
+  cloud: test
+  type: empty
+controllers:
+- name: test
+  uuid: 00000001-0000-0000-0000-000000000001
+models:
+- name: test-1
+  owner: alice@external
+  uuid: 00000002-0000-0000-0000-000000000001
+  controller: test
+  cloud: test
+  region: test-region
+  cloud-credential: test
+  users:
+  - user: alice@external
+    access: "admin"
+  - user: bob@external
+    access: "write"
+- name: test-2
+  owner: alice@external
+  uuid: 00000002-0000-0000-0000-000000000002
+  controller: test
+  cloud: test
+  region: test-region
+  cloud-credential: test
+  users:
+  - user: alice@external
+    access: "admin"
+- name: test-3
+  owner: alice@external
+  uuid: 00000002-0000-0000-0000-000000000003
+  controller: test
+  cloud: test
+  region: test-region
+  cloud-credential: test
+  users:
+  - user: alice@external
+    access: "admin"
+  - user: bob@external
+    access: "read"
+`)
+	env.PopulateDB(c, *s.Database)
+
+	u := env.User("bob@external").DBObject(c, *s.Database)
+	models, err := s.Database.GetUserModels(ctx, &u)
+	c.Assert(err, qt.IsNil)
+	c.Check(models, jimmtest.DBObjectEquals, []dbmodel.UserModelAccess{{
+		Model_: dbmodel.Model{
+			Name: "test-1",
+			UUID: sql.NullString{
+				String: "00000002-0000-0000-0000-000000000001",
+				Valid:  true,
+			},
+			Owner: dbmodel.User{
+				Username:         "alice@external",
+				ControllerAccess: "add-model",
+			},
+			Controller: dbmodel.Controller{
+				Name: "test",
+				UUID: "00000001-0000-0000-0000-000000000001",
+			},
+			CloudRegion: dbmodel.CloudRegion{
+				Cloud: dbmodel.Cloud{
+					Name: "test",
+					Type: "test",
+				},
+				Name: "test-region",
+			},
+			CloudCredential: dbmodel.CloudCredential{
+				Name: "test",
+			},
+			Users: []dbmodel.UserModelAccess{{
+				User: dbmodel.User{
+					Username:         "alice@external",
+					ControllerAccess: "add-model",
+				},
+				Access: "admin",
+			}, {
+				User: dbmodel.User{
+					Username:         "bob@external",
+					ControllerAccess: "add-model",
+				},
+				Access: "write",
+			}},
+		},
+		Access: "write",
+	}, {
+		Model_: dbmodel.Model{
+			Name: "test-3",
+			UUID: sql.NullString{
+				String: "00000002-0000-0000-0000-000000000003",
+				Valid:  true,
+			},
+			Owner: dbmodel.User{
+				Username:         "alice@external",
+				ControllerAccess: "add-model",
+			},
+			Controller: dbmodel.Controller{
+				Name: "test",
+				UUID: "00000001-0000-0000-0000-000000000001",
+			},
+			CloudRegion: dbmodel.CloudRegion{
+				Cloud: dbmodel.Cloud{
+					Name: "test",
+					Type: "test",
+				},
+				Name: "test-region",
+			},
+			CloudCredential: dbmodel.CloudCredential{
+				Name: "test",
+			},
+			Users: []dbmodel.UserModelAccess{{
+				User: dbmodel.User{
+					Username:         "alice@external",
+					ControllerAccess: "add-model",
+				},
+				Access: "admin",
+			}, {
+				User: dbmodel.User{
+					Username:         "bob@external",
+					ControllerAccess: "add-model",
+				},
+				Access: "read",
+			}},
+		},
+		Access: "read",
+	}})
 }
