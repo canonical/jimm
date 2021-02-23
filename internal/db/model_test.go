@@ -175,7 +175,7 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 	model.CloudCredential.Owner = dbmodel.User{}
 	err = s.Database.AddModel(context.Background(), &model)
 	c.Assert(err, qt.Equals, nil)
-	
+
 	dbModel := dbmodel.Model{
 		UUID: model.UUID,
 	}
@@ -493,4 +493,137 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 	models, err = s.Database.GetModelsUsingCredential(context.Background(), 0)
 	c.Assert(err, qt.IsNil)
 	c.Assert(models, qt.HasLen, 0)
+}
+
+func TestUpdateUserModelAccessUnconfiguredDatabase(t *testing.T) {
+	c := qt.New(t)
+
+	var d db.Database
+	err := d.UpdateUserModelAccess(context.Background(), &dbmodel.UserModelAccess{})
+	c.Check(err, qt.ErrorMatches, `database not configured`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
+}
+
+const testUpdateUserModelAccessEnv = `clouds:
+- name: test
+  type: test
+  regions:
+  - name: test-region
+cloud-credentials:
+- name: test-cred
+  cloud: test
+  owner: alice@external
+  type: empty
+controllers:
+- name: test
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test
+  region: test-region
+models:
+- name: test
+  uuid: 00000002-0000-0000-0000-000000000001
+  owner: alice@external
+  cloud: test
+  region: test-region
+  cloud-credential: test-cred
+  controller: test
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: write
+`
+
+func (s *dbSuite) TestUpdateUserModelAccess(c *qt.C) {
+	ctx := context.Background()
+	err := s.Database.Migrate(context.Background(), true)
+	c.Assert(err, qt.Equals, nil)
+
+	env := jimmtest.ParseEnvironment(c, testUpdateUserModelAccessEnv)
+	env.PopulateDB(c, *s.Database)
+
+	m := dbmodel.Model{
+		UUID: sql.NullString{
+			String: "00000002-0000-0000-0000-000000000001",
+			Valid:  true,
+		},
+	}
+	err = s.Database.GetModel(ctx, &m)
+	c.Assert(err, qt.IsNil)
+
+	charlie := env.User("charlie@external").DBObject(c, *s.Database)
+
+	// Add a new user
+	err = s.Database.UpdateUserModelAccess(ctx, &dbmodel.UserModelAccess{
+		User:   charlie,
+		Model_: m,
+		Access: "read",
+	})
+	c.Assert(err, qt.Equals, nil)
+	err = s.Database.GetModel(ctx, &m)
+	c.Check(m.Users, jimmtest.DBObjectEquals, []dbmodel.UserModelAccess{{
+		User: dbmodel.User{
+			Username:         "alice@external",
+			ControllerAccess: "add-model",
+		},
+		Access: "admin",
+	}, {
+		User: dbmodel.User{
+			Username:         "bob@external",
+			ControllerAccess: "add-model",
+		},
+		Access: "write",
+	}, {
+		User: dbmodel.User{
+			Username:         "charlie@external",
+			ControllerAccess: "add-model",
+		},
+		Access: "read",
+	}})
+
+	// Update an existing user
+	uma := m.Users[1]
+	uma.Access = "read"
+	err = s.Database.UpdateUserModelAccess(ctx, &uma)
+	c.Assert(err, qt.Equals, nil)
+	err = s.Database.GetModel(ctx, &m)
+	c.Check(m.Users, jimmtest.DBObjectEquals, []dbmodel.UserModelAccess{{
+		User: dbmodel.User{
+			Username:         "alice@external",
+			ControllerAccess: "add-model",
+		},
+		Access: "admin",
+	}, {
+		User: dbmodel.User{
+			Username:         "bob@external",
+			ControllerAccess: "add-model",
+		},
+		Access: "read",
+	}, {
+		User: dbmodel.User{
+			Username:         "charlie@external",
+			ControllerAccess: "add-model",
+		},
+		Access: "read",
+	}})
+
+	// Remove a user
+	uma = m.Users[1]
+	uma.Access = ""
+	err = s.Database.UpdateUserModelAccess(ctx, &uma)
+	c.Assert(err, qt.Equals, nil)
+	err = s.Database.GetModel(ctx, &m)
+	c.Check(m.Users, jimmtest.DBObjectEquals, []dbmodel.UserModelAccess{{
+		User: dbmodel.User{
+			Username:         "alice@external",
+			ControllerAccess: "add-model",
+		},
+		Access: "admin",
+	}, {
+		User: dbmodel.User{
+			Username:         "charlie@external",
+			ControllerAccess: "add-model",
+		},
+		Access: "read",
+	}})
 }

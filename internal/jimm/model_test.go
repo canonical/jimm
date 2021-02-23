@@ -1128,7 +1128,7 @@ models:
     access: read
 users:
 - username: diane@external
-  controller-access: admin
+  controller-access: superuser
 `
 
 var modelStatusTests = []struct {
@@ -1557,6 +1557,508 @@ func TestListModelSummaries(t *testing.T) {
 			AgentVersion: newVersion("1.2.3"),
 		},
 	}})
+}
+
+const grantModelAccessTestEnv = `clouds:
+- name: dummy
+  type: dummy
+  regions:
+  - name: dummy-region
+cloud-credentials:
+- owner: alice@external
+  name: cred-1
+  cloud: dummy
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+models:
+- name: model-1
+  uuid: 00000002-0000-0000-0000-000000000001
+  controller: controller-1
+  cloud: dummy
+  region: dummy-region
+  cloud-credential: cred-1
+  owner: alice@external
+  users:
+  - user: alice@external
+    access: admin
+  - user: charlie@external
+    access: write
+`
+
+var grantModelAccessTests = []struct {
+	name             string
+	env              string
+	grantModelAccess func(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
+	dialError        error
+	username         string
+	uuid             string
+	targetUsername   string
+	access           string
+	expectModel      dbmodel.Model
+	expectError      string
+	expectErrorCode  errors.Code
+}{{
+	name:            "ModelNotFound",
+	username:        "alice@external",
+	uuid:            "00000002-0000-0000-0000-000000000001",
+	targetUsername:  "bob@external",
+	access:          "write",
+	expectError:     `record not found`,
+	expectErrorCode: errors.CodeNotFound,
+}, {
+	name: "Success",
+	env:  grantModelAccessTestEnv,
+	grantModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
+		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
+			return errors.E("bad model tag")
+		}
+		if ut.Id() != "bob@external" {
+			return errors.E("bad user tag")
+		}
+		if access != "write" {
+			return errors.E("bad permission")
+		}
+		return nil
+	},
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "bob@external",
+	access:         "write",
+	expectModel: dbmodel.Model{
+		Name: "model-1",
+		UUID: sql.NullString{
+			String: "00000002-0000-0000-0000-000000000001",
+			Valid:  true,
+		},
+		Owner: dbmodel.User{
+			Username:         "alice@external",
+			ControllerAccess: "add-model",
+		},
+		Controller: dbmodel.Controller{
+			Name: "controller-1",
+			UUID: "00000001-0000-0000-0000-000000000001",
+		},
+		CloudRegion: dbmodel.CloudRegion{
+			Cloud: dbmodel.Cloud{
+				Name: "dummy",
+				Type: "dummy",
+			},
+			Name: "dummy-region",
+		},
+		CloudCredential: dbmodel.CloudCredential{
+			Name: "cred-1",
+		},
+		Users: []dbmodel.UserModelAccess{{
+			User: dbmodel.User{
+				Username:         "alice@external",
+				ControllerAccess: "add-model",
+			},
+			Access: "admin",
+		}, {
+			User: dbmodel.User{
+				Username:         "charlie@external",
+				ControllerAccess: "add-model",
+			},
+			Access: "write",
+		}, {
+			User: dbmodel.User{
+				Username:         "bob@external",
+				ControllerAccess: "add-model",
+			},
+			Access: "write",
+		}},
+	},
+}, {
+	name:            "UserNotAuthorized",
+	env:             grantModelAccessTestEnv,
+	username:        "charlie@external",
+	uuid:            "00000002-0000-0000-0000-000000000001",
+	targetUsername:  "bob@external",
+	access:          "write",
+	expectError:     `unauthorized access`,
+	expectErrorCode: errors.CodeUnauthorized,
+}, {
+	name:           "DialError",
+	env:            grantModelAccessTestEnv,
+	dialError:      errors.E("test dial error"),
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "bob@external",
+	access:         "write",
+	expectError:    `test dial error`,
+}, {
+	name: "APIError",
+	env:  grantModelAccessTestEnv,
+	grantModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
+		return errors.E("test error")
+	},
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "bob@external",
+	access:         "write",
+	expectError:    `test error`,
+}}
+
+func TestGrantModelAccess(t *testing.T) {
+	c := qt.New(t)
+
+	for _, test := range grantModelAccessTests {
+		c.Run(test.name, func(c *qt.C) {
+			ctx := context.Background()
+
+			env := jimmtest.ParseEnvironment(c, test.env)
+			dialer := &jimmtest.Dialer{
+				API: &jimmtest.API{
+					GrantModelAccess_: test.grantModelAccess,
+				},
+				Err: test.dialError,
+			}
+			j := &jimm.JIMM{
+				Database: db.Database{
+					DB: jimmtest.MemoryDB(c, nil),
+				},
+				Dialer: dialer,
+			}
+			err := j.Database.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+			env.PopulateDB(c, j.Database)
+
+			u := env.User(test.username).DBObject(c, j.Database)
+
+			err = j.GrantModelAccess(ctx, &u, names.NewModelTag(test.uuid), names.NewUserTag(test.targetUsername), jujuparams.UserAccessPermission(test.access))
+			c.Assert(dialer.IsClosed(), qt.Equals, true)
+			if test.expectError != "" {
+				c.Check(err, qt.ErrorMatches, test.expectError)
+				if test.expectErrorCode != "" {
+					c.Check(errors.ErrorCode(err), qt.Equals, test.expectErrorCode)
+				}
+				return
+			}
+			c.Assert(err, qt.IsNil)
+			m := dbmodel.Model{
+				UUID: sql.NullString{
+					String: test.uuid,
+					Valid:  true,
+				},
+			}
+			err = j.Database.GetModel(ctx, &m)
+			c.Assert(err, qt.IsNil)
+			c.Check(m, jimmtest.DBObjectEquals, test.expectModel)
+		})
+	}
+}
+
+const revokeModelAccessTestEnv = `clouds:
+- name: dummy
+  type: dummy
+  regions:
+  - name: dummy-region
+cloud-credentials:
+- owner: alice@external
+  name: cred-1
+  cloud: dummy
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+models:
+- name: model-1
+  uuid: 00000002-0000-0000-0000-000000000001
+  controller: controller-1
+  cloud: dummy
+  region: dummy-region
+  cloud-credential: cred-1
+  owner: alice@external
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: admin
+  - user: charlie@external
+    access: write
+`
+
+var revokeModelAccessTests = []struct {
+	name              string
+	env               string
+	revokeModelAccess func(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
+	dialError         error
+	username          string
+	uuid              string
+	targetUsername    string
+	access            string
+	expectModel       dbmodel.Model
+	expectError       string
+	expectErrorCode   errors.Code
+}{{
+	name:            "ModelNotFound",
+	username:        "alice@external",
+	uuid:            "00000002-0000-0000-0000-000000000001",
+	targetUsername:  "bob@external",
+	access:          "write",
+	expectError:     `record not found`,
+	expectErrorCode: errors.CodeNotFound,
+}, {
+	name: "SuccessAdmin",
+	env:  revokeModelAccessTestEnv,
+	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
+		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
+			return errors.E("bad model tag")
+		}
+		if ut.Id() != "bob@external" {
+			return errors.E("bad user tag")
+		}
+		if access != "admin" {
+			return errors.E("bad permission")
+		}
+		return nil
+	},
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "bob@external",
+	access:         "admin",
+	expectModel: dbmodel.Model{
+		Name: "model-1",
+		UUID: sql.NullString{
+			String: "00000002-0000-0000-0000-000000000001",
+			Valid:  true,
+		},
+		Owner: dbmodel.User{
+			Username:         "alice@external",
+			ControllerAccess: "add-model",
+		},
+		Controller: dbmodel.Controller{
+			Name: "controller-1",
+			UUID: "00000001-0000-0000-0000-000000000001",
+		},
+		CloudRegion: dbmodel.CloudRegion{
+			Cloud: dbmodel.Cloud{
+				Name: "dummy",
+				Type: "dummy",
+			},
+			Name: "dummy-region",
+		},
+		CloudCredential: dbmodel.CloudCredential{
+			Name: "cred-1",
+		},
+		Users: []dbmodel.UserModelAccess{{
+			User: dbmodel.User{
+				Username:         "alice@external",
+				ControllerAccess: "add-model",
+			},
+			Access: "admin",
+		}, {
+			User: dbmodel.User{
+				Username:         "bob@external",
+				ControllerAccess: "add-model",
+			},
+			Access: "write",
+		}, {
+			User: dbmodel.User{
+				Username:         "charlie@external",
+				ControllerAccess: "add-model",
+			},
+			Access: "write",
+		}},
+	},
+}, {
+	name: "SuccessWrite",
+	env:  revokeModelAccessTestEnv,
+	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
+		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
+			return errors.E("bad model tag")
+		}
+		if ut.Id() != "bob@external" {
+			return errors.E("bad user tag")
+		}
+		if access != "write" {
+			return errors.E("bad permission")
+		}
+		return nil
+	},
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "bob@external",
+	access:         "write",
+	expectModel: dbmodel.Model{
+		Name: "model-1",
+		UUID: sql.NullString{
+			String: "00000002-0000-0000-0000-000000000001",
+			Valid:  true,
+		},
+		Owner: dbmodel.User{
+			Username:         "alice@external",
+			ControllerAccess: "add-model",
+		},
+		Controller: dbmodel.Controller{
+			Name: "controller-1",
+			UUID: "00000001-0000-0000-0000-000000000001",
+		},
+		CloudRegion: dbmodel.CloudRegion{
+			Cloud: dbmodel.Cloud{
+				Name: "dummy",
+				Type: "dummy",
+			},
+			Name: "dummy-region",
+		},
+		CloudCredential: dbmodel.CloudCredential{
+			Name: "cred-1",
+		},
+		Users: []dbmodel.UserModelAccess{{
+			User: dbmodel.User{
+				Username:         "alice@external",
+				ControllerAccess: "add-model",
+			},
+			Access: "admin",
+		}, {
+			User: dbmodel.User{
+				Username:         "bob@external",
+				ControllerAccess: "add-model",
+			},
+			Access: "read",
+		}, {
+			User: dbmodel.User{
+				Username:         "charlie@external",
+				ControllerAccess: "add-model",
+			},
+			Access: "write",
+		}},
+	},
+}, {
+	name: "SuccessRead",
+	env:  revokeModelAccessTestEnv,
+	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
+		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
+			return errors.E("bad model tag")
+		}
+		if ut.Id() != "bob@external" {
+			return errors.E("bad user tag")
+		}
+		if access != "read" {
+			return errors.E("bad permission")
+		}
+		return nil
+	},
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "bob@external",
+	access:         "read",
+	expectModel: dbmodel.Model{
+		Name: "model-1",
+		UUID: sql.NullString{
+			String: "00000002-0000-0000-0000-000000000001",
+			Valid:  true,
+		},
+		Owner: dbmodel.User{
+			Username:         "alice@external",
+			ControllerAccess: "add-model",
+		},
+		Controller: dbmodel.Controller{
+			Name: "controller-1",
+			UUID: "00000001-0000-0000-0000-000000000001",
+		},
+		CloudRegion: dbmodel.CloudRegion{
+			Cloud: dbmodel.Cloud{
+				Name: "dummy",
+				Type: "dummy",
+			},
+			Name: "dummy-region",
+		},
+		CloudCredential: dbmodel.CloudCredential{
+			Name: "cred-1",
+		},
+		Users: []dbmodel.UserModelAccess{{
+			User: dbmodel.User{
+				Username:         "alice@external",
+				ControllerAccess: "add-model",
+			},
+			Access: "admin",
+		}, {
+			User: dbmodel.User{
+				Username:         "charlie@external",
+				ControllerAccess: "add-model",
+			},
+			Access: "write",
+		}},
+	},
+}, {
+	name:            "UserNotAuthorized",
+	env:             revokeModelAccessTestEnv,
+	username:        "charlie@external",
+	uuid:            "00000002-0000-0000-0000-000000000001",
+	targetUsername:  "bob@external",
+	access:          "write",
+	expectError:     `unauthorized access`,
+	expectErrorCode: errors.CodeUnauthorized,
+}, {
+	name:           "DialError",
+	env:            revokeModelAccessTestEnv,
+	dialError:      errors.E("test dial error"),
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "bob@external",
+	access:         "write",
+	expectError:    `test dial error`,
+}, {
+	name: "APIError",
+	env:  revokeModelAccessTestEnv,
+	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
+		return errors.E("test error")
+	},
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "bob@external",
+	access:         "write",
+	expectError:    `test error`,
+}}
+
+func TestRevokeModelAccess(t *testing.T) {
+	c := qt.New(t)
+
+	for _, test := range revokeModelAccessTests {
+		c.Run(test.name, func(c *qt.C) {
+			ctx := context.Background()
+
+			env := jimmtest.ParseEnvironment(c, test.env)
+			dialer := &jimmtest.Dialer{
+				API: &jimmtest.API{
+					RevokeModelAccess_: test.revokeModelAccess,
+				},
+				Err: test.dialError,
+			}
+			j := &jimm.JIMM{
+				Database: db.Database{
+					DB: jimmtest.MemoryDB(c, nil),
+				},
+				Dialer: dialer,
+			}
+			err := j.Database.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+			env.PopulateDB(c, j.Database)
+
+			u := env.User(test.username).DBObject(c, j.Database)
+
+			err = j.RevokeModelAccess(ctx, &u, names.NewModelTag(test.uuid), names.NewUserTag(test.targetUsername), jujuparams.UserAccessPermission(test.access))
+			c.Assert(dialer.IsClosed(), qt.Equals, true)
+			if test.expectError != "" {
+				c.Check(err, qt.ErrorMatches, test.expectError)
+				if test.expectErrorCode != "" {
+					c.Check(errors.ErrorCode(err), qt.Equals, test.expectErrorCode)
+				}
+				return
+			}
+			c.Assert(err, qt.IsNil)
+			m := dbmodel.Model{
+				UUID: sql.NullString{
+					String: test.uuid,
+					Valid:  true,
+				},
+			}
+			err = j.Database.GetModel(ctx, &m)
+			c.Assert(err, qt.IsNil)
+			c.Check(m, jimmtest.DBObjectEquals, test.expectModel)
+		})
+	}
 }
 
 // newDate wraps time.Date to return a *time.Time.
