@@ -1223,7 +1223,7 @@ func TestModelStatus(t *testing.T) {
 	}
 }
 
-const listModelSummariesTestEnv = `clouds:
+const forEachModelTestEnv = `clouds:
 - name: dummy
   type: dummy
   regions:
@@ -1432,13 +1432,16 @@ models:
   sla:
     level: unsupported
   agent-version: 1.2.3
+users:
+- username: alice@external
+  controller-access: superuser
 `
 
-func TestListModelSummaries(t *testing.T) {
+func TestForEachUserModel(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	env := jimmtest.ParseEnvironment(c, listModelSummariesTestEnv)
+	env := jimmtest.ParseEnvironment(c, forEachModelTestEnv)
 	j := &jimm.JIMM{
 		Database: db.Database{
 			DB: jimmtest.MemoryDB(c, nil),
@@ -1452,7 +1455,13 @@ func TestListModelSummaries(t *testing.T) {
 	env.PopulateDB(c, j.Database)
 
 	u := env.User("bob@external").DBObject(c, j.Database)
-	res, err := j.ListModelSummaries(ctx, &u)
+	var res []jujuparams.ModelSummaryResult
+	err = j.ForEachUserModel(ctx, &u, func(uma *dbmodel.UserModelAccess) error {
+		s := uma.Model_.ToJujuModelSummary()
+		s.UserAccess = jujuparams.UserAccessPermission(uma.Access)
+		res = append(res, jujuparams.ModelSummaryResult{Result: &s})
+		return nil
+	})
 	c.Assert(err, qt.IsNil)
 	c.Check(res, qt.DeepEquals, []jujuparams.ModelSummaryResult{{
 		Result: &jujuparams.ModelSummary{
@@ -1557,6 +1566,46 @@ func TestListModelSummaries(t *testing.T) {
 			AgentVersion: newVersion("1.2.3"),
 		},
 	}})
+}
+
+func TestForEachModel(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	env := jimmtest.ParseEnvironment(c, forEachModelTestEnv)
+	j := &jimm.JIMM{
+		Database: db.Database{
+			DB: jimmtest.MemoryDB(c, nil),
+		},
+		Dialer: &jimmtest.Dialer{
+			API: &jimmtest.API{},
+		},
+	}
+	err := j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+	env.PopulateDB(c, j.Database)
+
+	u := env.User("bob@external").DBObject(c, j.Database)
+	err = j.ForEachModel(ctx, &u, func(uma *dbmodel.UserModelAccess) error {
+		return errors.E("function called unexpectedly")
+	})
+	c.Check(err, qt.ErrorMatches, `unauthorized access`)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeUnauthorized)
+
+	u = env.User("alice@external").DBObject(c, j.Database)
+	var models []string
+	err = j.ForEachModel(ctx, &u, func(uma *dbmodel.UserModelAccess) error {
+		c.Check(uma.Access, qt.Equals, "admin")
+		models = append(models, uma.Model_.UUID.String)
+		return nil
+	})
+	c.Assert(err, qt.IsNil)
+	c.Check(models, qt.DeepEquals, []string{
+		"00000002-0000-0000-0000-000000000001",
+		"00000002-0000-0000-0000-000000000002",
+		"00000002-0000-0000-0000-000000000003",
+		"00000002-0000-0000-0000-000000000004",
+	})
 }
 
 const grantModelAccessTestEnv = `clouds:

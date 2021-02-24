@@ -712,31 +712,70 @@ func (j *JIMM) ModelStatus(ctx context.Context, u *dbmodel.User, mt names.ModelT
 	return &ms, nil
 }
 
-// ListModelSummaries returns the list of models accessible to the given
-// user.
-func (j *JIMM) ListModelSummaries(ctx context.Context, u *dbmodel.User) ([]jujuparams.ModelSummaryResult, error) {
-	const op = errors.Op("jimm.ListModelSummaries")
+// ForEachUserModel calls the given function once for each model that the
+// given user has been granted explicit access to. The UserModelAccess
+// object passed to f will always include the Model_, Access, and
+// LastConnection fields populated. ForEachUserModel ignores a user's
+// controller access when determining the set of models to return, for
+// superusers the ForEachModel method should be used to get every model
+// in the system. If the given function returns an error the error will
+// be returned unmodified and iteration will stop immediately.
+func (j *JIMM) ForEachUserModel(ctx context.Context, u *dbmodel.User, f func(*dbmodel.UserModelAccess) error) error {
+	const op = errors.Op("jimm.ForEachUserModel")
 
 	models, err := j.Database.GetUserModels(ctx, u)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return errors.E(op, err)
 	}
 
-	res := make([]jujuparams.ModelSummaryResult, 0, len(models))
 	for _, m := range models {
 		switch m.Access {
 		default:
 			continue
 		case "read", "write", "admin":
 		}
-		ms := m.Model_.ToJujuModelSummary()
-		ms.UserAccess = jujuparams.UserAccessPermission(m.Access)
-		// TODO(mhilton) work out how to find UserLastConnection
-		res = append(res, jujuparams.ModelSummaryResult{
-			Result: &ms,
-		})
+		if err := f(&m); err != nil {
+			return err
+		}
 	}
-	return res, nil
+	return nil
+}
+
+// ForEachModel calls the given function once for each model in the
+// system. The UserModelAccess object passed to f will always specify
+// that the user's Access is "admin" and will not include the
+// LastConnection tim. ForEachModel will return an error with the code
+// CodeUnauthorized when the user is not a controller admin. If the given
+// function returns an error the error will be returned unmodified and
+// iteration will stop immediately.
+func (j *JIMM) ForEachModel(ctx context.Context, u *dbmodel.User, f func(*dbmodel.UserModelAccess) error) error {
+	const op = errors.Op("jimm.ForEachUserModel")
+
+	if u.ControllerAccess != "superuser" {
+		return errors.E(op, errors.CodeUnauthorized)
+	}
+
+	errStop := errors.E("stop")
+	var iterErr error
+	err := j.Database.ForEachModel(ctx, func(m *dbmodel.Model) error {
+		uma := dbmodel.UserModelAccess{
+			Access: "admin",
+			Model_: *m,
+		}
+		if err := f(&uma); err != nil {
+			iterErr = err
+			return errStop
+		}
+		return nil
+	})
+	switch err {
+	case nil:
+		return nil
+	case errStop:
+		return iterErr
+	default:
+		return errors.E(op, err)
+	}
 }
 
 // GrantModelAccess grants the given access level on the given model to
