@@ -10,6 +10,7 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
@@ -869,5 +870,47 @@ func (j *JIMM) RevokeModelAccess(ctx context.Context, u *dbmodel.User, mt names.
 	if err := j.Database.UpdateUserModelAccess(ctx, &uma); err != nil {
 		return errors.E(op, err, "cannot update database after updating controller")
 	}
+	return nil
+}
+
+// DestroyModel starts the process of destroying the given model. If the
+// given user is not a controller superuser or a model admin an error
+// with a code of CodeUnauthorized is returned. Any error returned from
+// the juju API will not have it's code masked.
+func (j *JIMM) DestroyModel(ctx context.Context, u *dbmodel.User, mt names.ModelTag, destroyStorage, force *bool, maxWait *time.Duration) error {
+	const op = errors.Op("jimm.DestroyModel")
+
+	m := dbmodel.Model{
+		UUID: sql.NullString{
+			String: mt.Id(),
+			Valid:  true,
+		},
+	}
+
+	if err := j.Database.GetModel(ctx, &m); err != nil {
+		return errors.E(op, err)
+	}
+	if u.ControllerAccess != "superuser" && m.UserAccess(u) != "admin" {
+		// If the user doesn't have admin access on the model return
+		// an unauthorized error.
+		return errors.E(op, errors.CodeUnauthorized)
+	}
+
+	api, err := j.dial(ctx, &m.Controller, names.ModelTag{})
+	if err != nil {
+		return errors.E(op, err)
+	}
+	defer api.Close()
+	if err := api.DestroyModel(ctx, mt, destroyStorage, force, maxWait); err != nil {
+		return errors.E(op, err)
+	}
+
+	m.Life = "dying"
+	if err := j.Database.UpdateModel(ctx, &m); err != nil {
+		// If the database fails to update don't worry too much the
+		// monitor should catch it.
+		zapctx.Error(ctx, "failed to store model change", zaputil.Error(err))
+	}
+
 	return nil
 }
