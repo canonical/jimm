@@ -11,14 +11,14 @@ import (
 	"sort"
 	"strings"
 
+	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/names/v4"
+	"go.uber.org/zap"
+
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
-	"go.uber.org/zap"
-
-	jujuparams "github.com/juju/juju/apiserver/params"
-	"github.com/juju/names/v4"
 )
 
 // shuffle is used to randomize the order in which possible controllers
@@ -646,7 +646,7 @@ func (j *JIMM) ModelInfo(ctx context.Context, u *dbmodel.User, mt names.ModelTag
 		}
 	}
 
-	if u.ControllerAccess == "admin" || modelUser.Access == "admin" {
+	if u.ControllerAccess == "superuser" || modelUser.Access == "admin" {
 		// Admin users have access to all data unmodified.
 		return &mi, nil
 	}
@@ -688,7 +688,7 @@ func (j *JIMM) ModelStatus(ctx context.Context, u *dbmodel.User, mt names.ModelT
 		return nil, errors.E(op, err)
 	}
 
-	if u.ControllerAccess != "admin" && m.UserAccess(u) != "admin" {
+	if u.ControllerAccess != "superuser" && m.UserAccess(u) != "admin" {
 		// If the user doesn't have admin access on the model return
 		// an unauthorized error.
 		return nil, errors.E(op, errors.CodeUnauthorized)
@@ -737,4 +737,137 @@ func (j *JIMM) ListModelSummaries(ctx context.Context, u *dbmodel.User) ([]jujup
 		})
 	}
 	return res, nil
+}
+
+// GrantModelAccess grants the given access level on the given model to
+// the given user. If the model is not found then an error with the code
+// CodeNotFound is returned. If the authenticated user does not have
+// admin access to the model then an error with the code CodeUnauthorized
+// is returned. If the ModifyModelAccess API call retuns an error the
+// error code is not masked.
+func (j *JIMM) GrantModelAccess(ctx context.Context, u *dbmodel.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
+	const op = errors.Op("jimm.GrantModelAccess")
+
+	m := dbmodel.Model{
+		UUID: sql.NullString{
+			String: mt.Id(),
+			Valid:  true,
+		},
+	}
+
+	if err := j.Database.GetModel(ctx, &m); err != nil {
+		return errors.E(op, err)
+	}
+
+	if u.ControllerAccess != "superuser" && m.UserAccess(u) != "admin" {
+		// If the user doesn't have admin access on the model return
+		// an unauthorized error.
+		return errors.E(op, errors.CodeUnauthorized)
+	}
+	targetUser := dbmodel.User{
+		Username: ut.Id(),
+	}
+	if err := j.Database.GetUser(ctx, &targetUser); err != nil {
+		return errors.E(op, err)
+	}
+
+	// Attempt to grant access to the user on the controller, the
+	// controller will validate the request so there is no need to do
+	// it here.
+	api, err := j.dial(ctx, &m.Controller, names.ModelTag{})
+	if err != nil {
+		return errors.E(op, err)
+	}
+	defer api.Close()
+	if err := api.GrantModelAccess(ctx, mt, ut, access); err != nil {
+		return errors.E(op, err)
+	}
+
+	// The change on the controller has succeeded, update the local
+	// database.
+	var uma dbmodel.UserModelAccess
+	for _, a := range m.Users {
+		if a.UserID == targetUser.ID {
+			uma = a
+			break
+		}
+	}
+	uma.User = targetUser
+	uma.Model_ = m
+	uma.Access = string(access)
+
+	if err := j.Database.UpdateUserModelAccess(ctx, &uma); err != nil {
+		return errors.E(op, err, "cannot update database after updating controller")
+	}
+	return nil
+}
+
+// RevokeModelAccess revokes the given access level on the given model
+// from the given user. If the model is not found then an error with the
+// code CodeNotFound is returned. If the authenticated user does not
+// have admin access to the model then an error with the code
+// CodeUnauthorized is returned. If the ModifyModelAccess API call
+// retuns an error the error code is not masked.
+func (j *JIMM) RevokeModelAccess(ctx context.Context, u *dbmodel.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
+	const op = errors.Op("jimm.RevokeModelAccess")
+
+	m := dbmodel.Model{
+		UUID: sql.NullString{
+			String: mt.Id(),
+			Valid:  true,
+		},
+	}
+
+	if err := j.Database.GetModel(ctx, &m); err != nil {
+		return errors.E(op, err)
+	}
+
+	if u.ControllerAccess != "superuser" && m.UserAccess(u) != "admin" {
+		// If the user doesn't have admin access on the model return
+		// an unauthorized error.
+		return errors.E(op, errors.CodeUnauthorized)
+	}
+	targetUser := dbmodel.User{
+		Username: ut.Id(),
+	}
+	if err := j.Database.GetUser(ctx, &targetUser); err != nil {
+		return errors.E(op, err)
+	}
+
+	// Attempt to revoke access to the user on the controller, the
+	// controller will validate the request so there is no need to do
+	// it here.
+	api, err := j.dial(ctx, &m.Controller, names.ModelTag{})
+	if err != nil {
+		return errors.E(op, err)
+	}
+	defer api.Close()
+	if err := api.RevokeModelAccess(ctx, mt, ut, access); err != nil {
+		return errors.E(op, err)
+	}
+
+	// The change on the controller has succeeded, update the local
+	// database.
+	var uma dbmodel.UserModelAccess
+	for _, a := range m.Users {
+		if a.UserID == targetUser.ID {
+			uma = a
+			break
+		}
+	}
+	uma.User = targetUser
+	uma.Model_ = m
+	switch access {
+	case "admin":
+		uma.Access = "write"
+	case "write":
+		uma.Access = "read"
+	default:
+		uma.Access = ""
+	}
+
+	if err := j.Database.UpdateUserModelAccess(ctx, &uma); err != nil {
+		return errors.E(op, err, "cannot update database after updating controller")
+	}
+	return nil
 }

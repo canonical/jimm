@@ -21,7 +21,7 @@ import (
 // the controller is not authorized then an error with a code of
 // CodeUnauthorized will be returned. If there already exists a controller
 // with the same name as the controller being added then an error with a
-// code of CodeAlreasyExists will be returned. If the controller cannot be
+// code of CodeAlreadyExists will be returned. If the controller cannot be
 // contacted then an error with a code of CodeConnectionFailed will be
 // returned.
 func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.Controller) error {
