@@ -130,6 +130,35 @@ func (d *Database) UpdateUserModelAccess(ctx context.Context, a *dbmodel.UserMod
 	return nil
 }
 
+// ForEachModel iterates through every model calling the given function
+// for each one. If the given function returns an error the iteration
+// will stop immediately and the error will be returned unmodified.
+func (d *Database) ForEachModel(ctx context.Context, f func(m *dbmodel.Model) error) error {
+	const op = errors.Op("db.ForEachModel")
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	db := d.DB.WithContext(ctx)
+	db = preloadModel("", db)
+	rows, err := db.Model(&dbmodel.Model{}).Rows()
+	if err != nil {
+		return errors.E(op, err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var m dbmodel.Model
+		if err := db.ScanRows(rows, &m); err != nil {
+			return errors.E(op, err)
+		}
+		if err := f(&m); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func preloadModel(prefix string, db *gorm.DB) *gorm.DB {
 	if len(prefix) > 0 && prefix[len(prefix)-1] != '.' {
 		prefix += "."
