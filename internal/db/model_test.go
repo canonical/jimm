@@ -627,3 +627,89 @@ func (s *dbSuite) TestUpdateUserModelAccess(c *qt.C) {
 		Access: "read",
 	}})
 }
+
+func TestForEachModelUnconfiguredDatabase(t *testing.T) {
+	c := qt.New(t)
+
+	var d db.Database
+	err := d.ForEachModel(context.Background(), nil)
+	c.Check(err, qt.ErrorMatches, `database not configured`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
+}
+
+const testForEachModelEnv = `clouds:
+- name: test
+  type: test
+  regions:
+  - name: test-region
+cloud-credentials:
+- name: test-cred
+  cloud: test
+  owner: alice@external
+  type: empty
+controllers:
+- name: test
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test
+  region: test-region
+models:
+- name: test-1
+  uuid: 00000002-0000-0000-0000-000000000001
+  owner: alice@external
+  cloud: test
+  region: test-region
+  cloud-credential: test-cred
+  controller: test
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: write
+- name: test-2
+  uuid: 00000002-0000-0000-0000-000000000002
+  owner: bob@external
+  cloud: test
+  region: test-region
+  cloud-credential: test-cred
+  controller: test
+  users:
+  - user: bob@external
+    access: admin
+- name: test-3
+  uuid: 00000002-0000-0000-0000-000000000003
+  owner: bob@external
+  cloud: test
+  region: test-region
+  cloud-credential: test-cred
+  controller: test
+  users:
+  - user: bob@external
+    access: admin
+`
+
+func (s *dbSuite) TestForEachModel(c *qt.C) {
+	ctx := context.Background()
+	err := s.Database.Migrate(context.Background(), true)
+	c.Assert(err, qt.Equals, nil)
+
+	env := jimmtest.ParseEnvironment(c, testForEachModelEnv)
+	env.PopulateDB(c, *s.Database)
+
+	testError := errors.E("test error")
+	err = s.Database.ForEachModel(ctx, func(m *dbmodel.Model) error {
+		return testError
+	})
+	c.Check(err, qt.Equals, testError)
+
+	var models []string
+	err = s.Database.ForEachModel(ctx, func(m *dbmodel.Model) error {
+		models = append(models, m.UUID.String)
+		return nil
+	})
+	c.Assert(err, qt.IsNil)
+	c.Check(models, qt.DeepEquals, []string{
+		"00000002-0000-0000-0000-000000000001",
+		"00000002-0000-0000-0000-000000000002",
+		"00000002-0000-0000-0000-000000000003",
+	})
+}
