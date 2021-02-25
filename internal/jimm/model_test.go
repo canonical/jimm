@@ -2110,6 +2110,169 @@ func TestRevokeModelAccess(t *testing.T) {
 	}
 }
 
+const destroyModelTestEnv = `clouds:
+- name: dummy
+  type: dummy
+  regions:
+  - name: dummy-region
+cloud-credentials:
+- owner: alice@external
+  name: cred-1
+  cloud: dummy
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+models:
+- name: model-1
+  uuid: 00000002-0000-0000-0000-000000000001
+  controller: controller-1
+  cloud: dummy
+  region: dummy-region
+  cloud-credential: cred-1
+  owner: alice@external
+  life: alive
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: write
+users:
+- username: charlie@external
+  controller-access: superuser
+`
+
+var destroyModelTests = []struct {
+	name            string
+	env             string
+	destroyModel    func(context.Context, names.ModelTag, *bool, *bool, *time.Duration) error
+	dialError       error
+	username        string
+	uuid            string
+	destroyStorage  *bool
+	force           *bool
+	maxWait         *time.Duration
+	expectError     string
+	expectErrorCode errors.Code
+}{{
+	name:            "NotFound",
+	env:             destroyModelTestEnv,
+	username:        "alice@external",
+	uuid:            "00000002-0000-0000-0000-000000000002",
+	expectError:     `record not found`,
+	expectErrorCode: errors.CodeNotFound,
+}, {
+	name:            "Unauthorized",
+	env:             destroyModelTestEnv,
+	username:        "bob@external",
+	uuid:            "00000002-0000-0000-0000-000000000001",
+	expectError:     `unauthorized access`,
+	expectErrorCode: errors.CodeUnauthorized,
+}, {
+	name: "Success",
+	env:  destroyModelTestEnv,
+	destroyModel: func(_ context.Context, mt names.ModelTag, destroyStorage, force *bool, maxWait *time.Duration) error {
+		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
+			return errors.E("incorrect model uuid")
+		}
+		if destroyStorage == nil || *destroyStorage != true {
+			return errors.E("invalid destroyStorage")
+		}
+		if force == nil || *force != false {
+			return errors.E("invalid force")
+		}
+		if maxWait == nil || *maxWait != time.Second {
+			return errors.E("invalid maxWait")
+		}
+		return nil
+	},
+	username:       "alice@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	destroyStorage: newBool(true),
+	force:          newBool(false),
+	maxWait:        newDuration(time.Second),
+}, {
+	name: "SuperuserSuccess",
+	env:  destroyModelTestEnv,
+	destroyModel: func(_ context.Context, _ names.ModelTag, _, _ *bool, _ *time.Duration) error {
+		return nil
+	},
+	username: "charlie@external",
+	uuid:     "00000002-0000-0000-0000-000000000001",
+}, {
+	name:        "DialError",
+	env:         destroyModelTestEnv,
+	dialError:   errors.E("dial error"),
+	username:    "alice@external",
+	uuid:        "00000002-0000-0000-0000-000000000001",
+	expectError: `dial error`,
+}, {
+	name: "APIError",
+	env:  destroyModelTestEnv,
+	destroyModel: func(_ context.Context, _ names.ModelTag, _, _ *bool, _ *time.Duration) error {
+		return errors.E("api error")
+	},
+	username:    "charlie@external",
+	uuid:        "00000002-0000-0000-0000-000000000001",
+	expectError: `api error`,
+}}
+
+func TestDestroyModel(t *testing.T) {
+	c := qt.New(t)
+
+	for _, test := range destroyModelTests {
+		c.Run(test.name, func(c *qt.C) {
+			ctx := context.Background()
+
+			env := jimmtest.ParseEnvironment(c, test.env)
+			dialer := &jimmtest.Dialer{
+				API: &jimmtest.API{
+					DestroyModel_: test.destroyModel,
+				},
+				Err: test.dialError,
+			}
+			j := &jimm.JIMM{
+				Database: db.Database{
+					DB: jimmtest.MemoryDB(c, nil),
+				},
+				Dialer: dialer,
+			}
+			err := j.Database.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+			env.PopulateDB(c, j.Database)
+
+			u := env.User(test.username).DBObject(c, j.Database)
+
+			err = j.DestroyModel(ctx, &u, names.NewModelTag(test.uuid), test.destroyStorage, test.force, test.maxWait)
+			c.Assert(dialer.IsClosed(), qt.Equals, true)
+			if test.expectError != "" {
+				c.Check(err, qt.ErrorMatches, test.expectError)
+				if test.expectErrorCode != "" {
+					c.Check(errors.ErrorCode(err), qt.Equals, test.expectErrorCode)
+				}
+				return
+			}
+			c.Assert(err, qt.IsNil)
+			m := dbmodel.Model{
+				UUID: sql.NullString{
+					String: test.uuid,
+					Valid:  true,
+				},
+			}
+			err = j.Database.GetModel(ctx, &m)
+			c.Assert(err, qt.IsNil)
+			c.Check(m.Life, qt.Equals, "dying")
+		})
+	}
+}
+
+func newBool(b bool) *bool {
+	return &b
+}
+
+func newDuration(d time.Duration) *time.Duration {
+	return &d
+}
+
 // newDate wraps time.Date to return a *time.Time.
 func newDate(year int, month time.Month, day, hour, min, sec, nsec int, loc *time.Location) *time.Time {
 	t := time.Date(year, month, day, hour, min, sec, nsec, loc)
