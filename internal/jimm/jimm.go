@@ -109,6 +109,12 @@ type API interface {
 	// DestroyModel destroys a model.
 	DestroyModel(context.Context, names.ModelTag, *bool, *bool, *time.Duration) error
 
+	// DumpModel collects a database-agnostic dump of a model.
+	DumpModel(context.Context, names.ModelTag, bool) (string, error)
+
+	// DumpModelDB collects a database dump of a model.
+	DumpModelDB(context.Context, names.ModelTag) (map[string]interface{}, error)
+
 	// FindApplicationOffers finds application offers that match the
 	// filter.
 	FindApplicationOffers(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error)

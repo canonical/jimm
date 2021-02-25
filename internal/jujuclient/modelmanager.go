@@ -90,34 +90,11 @@ func (c Connection) GrantJIMMModelAdmin(ctx context.Context, tag names.ModelTag)
 	return nil
 }
 
-// DumpModel dumps debugging details for the given model. DumpModel uses
-// the DumpModels method on the ModelManager facade version 2.
-func (c Connection) DumpModel(ctx context.Context, tag names.ModelTag) (map[string]interface{}, error) {
+// DumpModel dumps debugging details for the given model. If the simplied
+// dump is requested then a simplified dump is returned. DumpModel uses the
+// DumpModels method on the ModelManager facade version 3.
+func (c Connection) DumpModel(ctx context.Context, tag names.ModelTag, simplified bool) (string, error) {
 	const op = errors.Op("jujuclient.DumpModel")
-	args := jujuparams.Entities{
-		Entities: []jujuparams.Entity{{
-			Tag: tag.String(),
-		}},
-	}
-
-	resp := jujuparams.MapResults{
-		Results: make([]jujuparams.MapResult, 1),
-	}
-	if err := c.conn.APICall("ModelManager", 2, "", "DumpModels", &args, &resp); err != nil {
-		return nil, errors.E(op, jujuerrors.Cause(err))
-	}
-	if resp.Results[0].Error != nil {
-		return nil, errors.E(op, resp.Results[0].Error)
-	}
-	return resp.Results[0].Result, nil
-}
-
-// DumpModelV3 dumps debugging details for the given model into the given
-// . If the simplied dump is requested then a simplified dump is
-// returned. DumpModelV3 uses the DumpModels method on the ModelManager
-// facade version 3.
-func (c Connection) DumpModelV3(ctx context.Context, tag names.ModelTag, simplified bool) (string, error) {
-	const op = errors.Op("jujuclient.DumpModelV3")
 	args := jujuparams.DumpModelRequest{
 		Entities: []jujuparams.Entity{{
 			Tag: tag.String(),

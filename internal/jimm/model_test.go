@@ -2216,6 +2216,223 @@ func TestDestroyModel(t *testing.T) {
 	}
 }
 
+var dumpModelTests = []struct {
+	name            string
+	env             string
+	dumpModel       func(context.Context, names.ModelTag, bool) (string, error)
+	dialError       error
+	username        string
+	uuid            string
+	simplified      bool
+	expectString    string
+	expectError     string
+	expectErrorCode errors.Code
+}{{
+	name: "NotFound",
+	// reuse the destroyModelTestEnv for these tests.
+	env:             destroyModelTestEnv,
+	username:        "alice@external",
+	uuid:            "00000002-0000-0000-0000-000000000002",
+	expectError:     `record not found`,
+	expectErrorCode: errors.CodeNotFound,
+}, {
+	name:            "Unauthorized",
+	env:             destroyModelTestEnv,
+	username:        "bob@external",
+	uuid:            "00000002-0000-0000-0000-000000000001",
+	expectError:     `unauthorized access`,
+	expectErrorCode: errors.CodeUnauthorized,
+}, {
+	name: "Success",
+	env:  destroyModelTestEnv,
+	dumpModel: func(_ context.Context, mt names.ModelTag, simplified bool) (string, error) {
+		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
+			return "", errors.E("incorrect model uuid")
+		}
+		if simplified != true {
+			return "", errors.E("invalid simplified")
+		}
+		return "model dump", nil
+	},
+	username:     "alice@external",
+	uuid:         "00000002-0000-0000-0000-000000000001",
+	simplified:   true,
+	expectString: "model dump",
+}, {
+	name: "SuperuserSuccess",
+	env:  destroyModelTestEnv,
+	dumpModel: func(_ context.Context, _ names.ModelTag, _ bool) (string, error) {
+		return "model dump2", nil
+	},
+	username:     "charlie@external",
+	uuid:         "00000002-0000-0000-0000-000000000001",
+	expectString: "model dump2",
+}, {
+	name:        "DialError",
+	env:         destroyModelTestEnv,
+	dialError:   errors.E("dial error"),
+	username:    "alice@external",
+	uuid:        "00000002-0000-0000-0000-000000000001",
+	expectError: `dial error`,
+}, {
+	name: "APIError",
+	env:  destroyModelTestEnv,
+	dumpModel: func(_ context.Context, _ names.ModelTag, _ bool) (string, error) {
+		return "", errors.E("api error")
+	},
+	username:    "charlie@external",
+	uuid:        "00000002-0000-0000-0000-000000000001",
+	expectError: `api error`,
+}}
+
+func TestDumpModel(t *testing.T) {
+	c := qt.New(t)
+
+	for _, test := range dumpModelTests {
+		c.Run(test.name, func(c *qt.C) {
+			ctx := context.Background()
+
+			env := jimmtest.ParseEnvironment(c, test.env)
+			dialer := &jimmtest.Dialer{
+				API: &jimmtest.API{
+					DumpModel_: test.dumpModel,
+				},
+				Err: test.dialError,
+			}
+			j := &jimm.JIMM{
+				Database: db.Database{
+					DB: jimmtest.MemoryDB(c, nil),
+				},
+				Dialer: dialer,
+			}
+			err := j.Database.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+			env.PopulateDB(c, j.Database)
+
+			u := env.User(test.username).DBObject(c, j.Database)
+
+			s, err := j.DumpModel(ctx, &u, names.NewModelTag(test.uuid), test.simplified)
+			c.Assert(dialer.IsClosed(), qt.Equals, true)
+			if test.expectError != "" {
+				c.Check(err, qt.ErrorMatches, test.expectError)
+				if test.expectErrorCode != "" {
+					c.Check(errors.ErrorCode(err), qt.Equals, test.expectErrorCode)
+				}
+				return
+			}
+			c.Assert(err, qt.IsNil)
+			c.Check(s, qt.Equals, test.expectString)
+		})
+	}
+}
+
+var dumpModelDBTests = []struct {
+	name            string
+	env             string
+	dumpModelDB     func(context.Context, names.ModelTag) (map[string]interface{}, error)
+	dialError       error
+	username        string
+	uuid            string
+	simplified      bool
+	expectDump      map[string]interface{}
+	expectError     string
+	expectErrorCode errors.Code
+}{{
+	name: "NotFound",
+	// reuse the destroyModelTestEnv for these tests.
+	env:             destroyModelTestEnv,
+	username:        "alice@external",
+	uuid:            "00000002-0000-0000-0000-000000000002",
+	expectError:     `record not found`,
+	expectErrorCode: errors.CodeNotFound,
+}, {
+	name:            "Unauthorized",
+	env:             destroyModelTestEnv,
+	username:        "bob@external",
+	uuid:            "00000002-0000-0000-0000-000000000001",
+	expectError:     `unauthorized access`,
+	expectErrorCode: errors.CodeUnauthorized,
+}, {
+	name: "Success",
+	env:  destroyModelTestEnv,
+	dumpModelDB: func(_ context.Context, mt names.ModelTag) (map[string]interface{}, error) {
+		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
+			return nil, errors.E("incorrect model uuid")
+		}
+		return map[string]interface{}{"model": "dump"}, nil
+	},
+	username:   "alice@external",
+	uuid:       "00000002-0000-0000-0000-000000000001",
+	simplified: true,
+	expectDump: map[string]interface{}{"model": "dump"},
+}, {
+	name: "SuperuserSuccess",
+	env:  destroyModelTestEnv,
+	dumpModelDB: func(_ context.Context, _ names.ModelTag) (map[string]interface{}, error) {
+		return map[string]interface{}{"model": "dump 2"}, nil
+	},
+	username:   "charlie@external",
+	uuid:       "00000002-0000-0000-0000-000000000001",
+	expectDump: map[string]interface{}{"model": "dump 2"},
+}, {
+	name:        "DialError",
+	env:         destroyModelTestEnv,
+	dialError:   errors.E("dial error"),
+	username:    "alice@external",
+	uuid:        "00000002-0000-0000-0000-000000000001",
+	expectError: `dial error`,
+}, {
+	name: "APIError",
+	env:  destroyModelTestEnv,
+	dumpModelDB: func(_ context.Context, _ names.ModelTag) (map[string]interface{}, error) {
+		return nil, errors.E("api error")
+	},
+	username:    "charlie@external",
+	uuid:        "00000002-0000-0000-0000-000000000001",
+	expectError: `api error`,
+}}
+
+func TestDumpModelDB(t *testing.T) {
+	c := qt.New(t)
+
+	for _, test := range dumpModelDBTests {
+		c.Run(test.name, func(c *qt.C) {
+			ctx := context.Background()
+
+			env := jimmtest.ParseEnvironment(c, test.env)
+			dialer := &jimmtest.Dialer{
+				API: &jimmtest.API{
+					DumpModelDB_: test.dumpModelDB,
+				},
+				Err: test.dialError,
+			}
+			j := &jimm.JIMM{
+				Database: db.Database{
+					DB: jimmtest.MemoryDB(c, nil),
+				},
+				Dialer: dialer,
+			}
+			err := j.Database.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+			env.PopulateDB(c, j.Database)
+
+			u := env.User(test.username).DBObject(c, j.Database)
+
+			dump, err := j.DumpModelDB(ctx, &u, names.NewModelTag(test.uuid))
+			c.Assert(dialer.IsClosed(), qt.Equals, true)
+			if test.expectError != "" {
+				c.Check(err, qt.ErrorMatches, test.expectError)
+				if test.expectErrorCode != "" {
+					c.Check(errors.ErrorCode(err), qt.Equals, test.expectErrorCode)
+				}
+				return
+			}
+			c.Assert(err, qt.IsNil)
+			c.Check(dump, qt.DeepEquals, test.expectDump)
+		})
+	}
+}
+
 func newBool(b bool) *bool {
 	return &b
 }
