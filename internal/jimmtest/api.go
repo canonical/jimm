@@ -99,6 +99,8 @@ type API struct {
 	CreateModel_                       func(context.Context, *jujuparams.ModelCreateArgs, *jujuparams.ModelInfo) error
 	DestroyApplicationOffer_           func(context.Context, string, bool) error
 	DestroyModel_                      func(context.Context, names.ModelTag, *bool, *bool, *time.Duration) error
+	DumpModel_                         func(context.Context, names.ModelTag, bool) (string, error)
+	DumpModelDB_                       func(context.Context, names.ModelTag) (map[string]interface{}, error)
 	FindApplicationOffers_             func(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error)
 	GetApplicationOffer_               func(context.Context, *jujuparams.ApplicationOfferAdminDetails) error
 	GetApplicationOfferConsumeDetails_ func(context.Context, names.UserTag, *jujuparams.ConsumeOfferDetails, bakery.Version) error
@@ -192,6 +194,20 @@ func (a *API) DestroyModel(ctx context.Context, tag names.ModelTag, destroyStora
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return a.DestroyModel_(ctx, tag, destroyStorage, force, maxWait)
+}
+
+func (a *API) DumpModel(ctx context.Context, mt names.ModelTag, simplified bool) (string, error) {
+	if a.DumpModel_ == nil {
+		return "", errors.E(errors.CodeNotImplemented)
+	}
+	return a.DumpModel_(ctx, mt, simplified)
+}
+
+func (a *API) DumpModelDB(ctx context.Context, mt names.ModelTag) (map[string]interface{}, error) {
+	if a.DumpModelDB_ == nil {
+		return nil, errors.E(errors.CodeNotImplemented)
+	}
+	return a.DumpModelDB_(ctx, mt)
 }
 
 func (a *API) FindApplicationOffers(ctx context.Context, f []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {

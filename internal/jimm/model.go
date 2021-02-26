@@ -953,3 +953,72 @@ func (j *JIMM) DestroyModel(ctx context.Context, u *dbmodel.User, mt names.Model
 
 	return nil
 }
+
+// DumpModel retrieves a database-agnostic dump of the given model from its
+// juju controller. If simplified is true a simpllified dump is requested.
+// If the given user is not a controller superuser or a model admin an
+// error with the code CodeUnauthorized is returned.
+func (j *JIMM) DumpModel(ctx context.Context, u *dbmodel.User, mt names.ModelTag, simplified bool) (string, error) {
+	const op = errors.Op("jimm.DumpModel")
+
+	m := dbmodel.Model{
+		UUID: sql.NullString{
+			String: mt.Id(),
+			Valid:  true,
+		},
+	}
+
+	if err := j.Database.GetModel(ctx, &m); err != nil {
+		return "", errors.E(op, err)
+	}
+	if u.ControllerAccess != "superuser" && m.UserAccess(u) != "admin" {
+		// If the user doesn't have admin access on the model return
+		// an unauthorized error.
+		return "", errors.E(op, errors.CodeUnauthorized)
+	}
+
+	api, err := j.dial(ctx, &m.Controller, names.ModelTag{})
+	if err != nil {
+		return "", errors.E(op, err)
+	}
+	defer api.Close()
+	s, err := api.DumpModel(ctx, mt, simplified)
+	if err != nil {
+		return "", errors.E(op, err)
+	}
+	return s, nil
+}
+
+// DumpModelDB retrieves a database dump of the given model from its juju
+// controller. If the given user is not a controller superuser or a model
+// admin an error with the code CodeUnauthorized is returned.
+func (j *JIMM) DumpModelDB(ctx context.Context, u *dbmodel.User, mt names.ModelTag) (map[string]interface{}, error) {
+	const op = errors.Op("jimm.DumpModelDB")
+
+	m := dbmodel.Model{
+		UUID: sql.NullString{
+			String: mt.Id(),
+			Valid:  true,
+		},
+	}
+
+	if err := j.Database.GetModel(ctx, &m); err != nil {
+		return nil, errors.E(op, err)
+	}
+	if u.ControllerAccess != "superuser" && m.UserAccess(u) != "admin" {
+		// If the user doesn't have admin access on the model return
+		// an unauthorized error.
+		return nil, errors.E(op, errors.CodeUnauthorized)
+	}
+
+	api, err := j.dial(ctx, &m.Controller, names.ModelTag{})
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	defer api.Close()
+	dump, err := api.DumpModelDB(ctx, mt)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	return dump, nil
+}
