@@ -678,36 +678,12 @@ func (j *JIMM) ModelInfo(ctx context.Context, u *dbmodel.User, mt names.ModelTag
 func (j *JIMM) ModelStatus(ctx context.Context, u *dbmodel.User, mt names.ModelTag) (*jujuparams.ModelStatus, error) {
 	const op = errors.Op("jimm.ModelStatus")
 
-	m := dbmodel.Model{
-		UUID: sql.NullString{
-			String: mt.Id(),
-			Valid:  true,
-		},
-	}
-
-	if err := j.Database.GetModel(ctx, &m); err != nil {
-		return nil, errors.E(op, err)
-	}
-
-	if u.ControllerAccess != "superuser" && m.UserAccess(u) != "admin" {
-		// If the user doesn't have admin access on the model return
-		// an unauthorized error.
-		return nil, errors.E(op, errors.CodeUnauthorized)
-	}
-
-	// ModelStatus contains fields that aren't exported over watchers
-	// and is only available to admin users, so always fetch from
-	// the controller.
-	api, err := j.dial(ctx, &m.Controller, names.ModelTag{})
+	var ms jujuparams.ModelStatus
+	err := j.doModelAdmin(ctx, u, mt, func(_ *dbmodel.Model, api API) error {
+		ms.ModelTag = mt.String()
+		return api.ModelStatus(ctx, &ms)
+	})
 	if err != nil {
-		return nil, errors.E(op, err)
-	}
-	defer api.Close()
-
-	ms := jujuparams.ModelStatus{
-		ModelTag: m.Tag().String(),
-	}
-	if err := api.ModelStatus(ctx, &ms); err != nil {
 		return nil, errors.E(op, err)
 	}
 	return &ms, nil
@@ -788,58 +764,37 @@ func (j *JIMM) ForEachModel(ctx context.Context, u *dbmodel.User, f func(*dbmode
 func (j *JIMM) GrantModelAccess(ctx context.Context, u *dbmodel.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
 	const op = errors.Op("jimm.GrantModelAccess")
 
-	m := dbmodel.Model{
-		UUID: sql.NullString{
-			String: mt.Id(),
-			Valid:  true,
-		},
-	}
+	err := j.doModelAdmin(ctx, u, mt, func(m *dbmodel.Model, api API) error {
+		targetUser := dbmodel.User{
+			Username: ut.Id(),
+		}
+		if err := j.Database.GetUser(ctx, &targetUser); err != nil {
+			return err
+		}
+		if err := api.GrantModelAccess(ctx, mt, ut, access); err != nil {
+			return err
+		}
+		var uma dbmodel.UserModelAccess
+		for _, a := range m.Users {
+			if a.UserID == targetUser.ID {
+				uma = a
+				break
+			}
+		}
+		uma.User = targetUser
+		uma.Model_ = *m
+		uma.Access = string(access)
 
-	if err := j.Database.GetModel(ctx, &m); err != nil {
-		return errors.E(op, err)
-	}
-
-	if u.ControllerAccess != "superuser" && m.UserAccess(u) != "admin" {
-		// If the user doesn't have admin access on the model return
-		// an unauthorized error.
-		return errors.E(op, errors.CodeUnauthorized)
-	}
-	targetUser := dbmodel.User{
-		Username: ut.Id(),
-	}
-	if err := j.Database.GetUser(ctx, &targetUser); err != nil {
-		return errors.E(op, err)
-	}
-
-	// Attempt to grant access to the user on the controller, the
-	// controller will validate the request so there is no need to do
-	// it here.
-	api, err := j.dial(ctx, &m.Controller, names.ModelTag{})
+		if err := j.Database.UpdateUserModelAccess(ctx, &uma); err != nil {
+			return errors.E(op, err, "cannot update database after updating controller")
+		}
+		return nil
+	})
 	if err != nil {
 		return errors.E(op, err)
 	}
-	defer api.Close()
-	if err := api.GrantModelAccess(ctx, mt, ut, access); err != nil {
-		return errors.E(op, err)
-	}
-
-	// The change on the controller has succeeded, update the local
-	// database.
-	var uma dbmodel.UserModelAccess
-	for _, a := range m.Users {
-		if a.UserID == targetUser.ID {
-			uma = a
-			break
-		}
-	}
-	uma.User = targetUser
-	uma.Model_ = m
-	uma.Access = string(access)
-
-	if err := j.Database.UpdateUserModelAccess(ctx, &uma); err != nil {
-		return errors.E(op, err, "cannot update database after updating controller")
-	}
 	return nil
+
 }
 
 // RevokeModelAccess revokes the given access level on the given model
@@ -851,63 +806,41 @@ func (j *JIMM) GrantModelAccess(ctx context.Context, u *dbmodel.User, mt names.M
 func (j *JIMM) RevokeModelAccess(ctx context.Context, u *dbmodel.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
 	const op = errors.Op("jimm.RevokeModelAccess")
 
-	m := dbmodel.Model{
-		UUID: sql.NullString{
-			String: mt.Id(),
-			Valid:  true,
-		},
-	}
+	err := j.doModelAdmin(ctx, u, mt, func(m *dbmodel.Model, api API) error {
+		targetUser := dbmodel.User{
+			Username: ut.Id(),
+		}
+		if err := j.Database.GetUser(ctx, &targetUser); err != nil {
+			return err
+		}
+		if err := api.RevokeModelAccess(ctx, mt, ut, access); err != nil {
+			return err
+		}
+		var uma dbmodel.UserModelAccess
+		for _, a := range m.Users {
+			if a.UserID == targetUser.ID {
+				uma = a
+				break
+			}
+		}
+		uma.User = targetUser
+		uma.Model_ = *m
+		switch access {
+		case "admin":
+			uma.Access = "write"
+		case "write":
+			uma.Access = "read"
+		default:
+			uma.Access = ""
+		}
 
-	if err := j.Database.GetModel(ctx, &m); err != nil {
-		return errors.E(op, err)
-	}
-
-	if u.ControllerAccess != "superuser" && m.UserAccess(u) != "admin" {
-		// If the user doesn't have admin access on the model return
-		// an unauthorized error.
-		return errors.E(op, errors.CodeUnauthorized)
-	}
-	targetUser := dbmodel.User{
-		Username: ut.Id(),
-	}
-	if err := j.Database.GetUser(ctx, &targetUser); err != nil {
-		return errors.E(op, err)
-	}
-
-	// Attempt to revoke access to the user on the controller, the
-	// controller will validate the request so there is no need to do
-	// it here.
-	api, err := j.dial(ctx, &m.Controller, names.ModelTag{})
+		if err := j.Database.UpdateUserModelAccess(ctx, &uma); err != nil {
+			return errors.E(op, err, "cannot update database after updating controller")
+		}
+		return nil
+	})
 	if err != nil {
 		return errors.E(op, err)
-	}
-	defer api.Close()
-	if err := api.RevokeModelAccess(ctx, mt, ut, access); err != nil {
-		return errors.E(op, err)
-	}
-
-	// The change on the controller has succeeded, update the local
-	// database.
-	var uma dbmodel.UserModelAccess
-	for _, a := range m.Users {
-		if a.UserID == targetUser.ID {
-			uma = a
-			break
-		}
-	}
-	uma.User = targetUser
-	uma.Model_ = m
-	switch access {
-	case "admin":
-		uma.Access = "write"
-	case "write":
-		uma.Access = "read"
-	default:
-		uma.Access = ""
-	}
-
-	if err := j.Database.UpdateUserModelAccess(ctx, &uma); err != nil {
-		return errors.E(op, err, "cannot update database after updating controller")
 	}
 	return nil
 }
@@ -919,38 +852,22 @@ func (j *JIMM) RevokeModelAccess(ctx context.Context, u *dbmodel.User, mt names.
 func (j *JIMM) DestroyModel(ctx context.Context, u *dbmodel.User, mt names.ModelTag, destroyStorage, force *bool, maxWait *time.Duration) error {
 	const op = errors.Op("jimm.DestroyModel")
 
-	m := dbmodel.Model{
-		UUID: sql.NullString{
-			String: mt.Id(),
-			Valid:  true,
-		},
-	}
+	err := j.doModelAdmin(ctx, u, mt, func(m *dbmodel.Model, api API) error {
+		if err := api.DestroyModel(ctx, mt, destroyStorage, force, maxWait); err != nil {
+			return err
+		}
+		m.Life = "dying"
+		if err := j.Database.UpdateModel(ctx, m); err != nil {
+			// If the database fails to update don't worry too much the
+			// monitor should catch it.
+			zapctx.Error(ctx, "failed to store model change", zaputil.Error(err))
+		}
 
-	if err := j.Database.GetModel(ctx, &m); err != nil {
-		return errors.E(op, err)
-	}
-	if u.ControllerAccess != "superuser" && m.UserAccess(u) != "admin" {
-		// If the user doesn't have admin access on the model return
-		// an unauthorized error.
-		return errors.E(op, errors.CodeUnauthorized)
-	}
-
-	api, err := j.dial(ctx, &m.Controller, names.ModelTag{})
+		return nil
+	})
 	if err != nil {
 		return errors.E(op, err)
 	}
-	defer api.Close()
-	if err := api.DestroyModel(ctx, mt, destroyStorage, force, maxWait); err != nil {
-		return errors.E(op, err)
-	}
-
-	m.Life = "dying"
-	if err := j.Database.UpdateModel(ctx, &m); err != nil {
-		// If the database fails to update don't worry too much the
-		// monitor should catch it.
-		zapctx.Error(ctx, "failed to store model change", zaputil.Error(err))
-	}
-
 	return nil
 }
 
@@ -961,32 +878,16 @@ func (j *JIMM) DestroyModel(ctx context.Context, u *dbmodel.User, mt names.Model
 func (j *JIMM) DumpModel(ctx context.Context, u *dbmodel.User, mt names.ModelTag, simplified bool) (string, error) {
 	const op = errors.Op("jimm.DumpModel")
 
-	m := dbmodel.Model{
-		UUID: sql.NullString{
-			String: mt.Id(),
-			Valid:  true,
-		},
-	}
-
-	if err := j.Database.GetModel(ctx, &m); err != nil {
-		return "", errors.E(op, err)
-	}
-	if u.ControllerAccess != "superuser" && m.UserAccess(u) != "admin" {
-		// If the user doesn't have admin access on the model return
-		// an unauthorized error.
-		return "", errors.E(op, errors.CodeUnauthorized)
-	}
-
-	api, err := j.dial(ctx, &m.Controller, names.ModelTag{})
+	var dump string
+	err := j.doModelAdmin(ctx, u, mt, func(m *dbmodel.Model, api API) error {
+		var err error
+		dump, err = api.DumpModel(ctx, mt, simplified)
+		return err
+	})
 	if err != nil {
 		return "", errors.E(op, err)
 	}
-	defer api.Close()
-	s, err := api.DumpModel(ctx, mt, simplified)
-	if err != nil {
-		return "", errors.E(op, err)
-	}
-	return s, nil
+	return dump, nil
 }
 
 // DumpModelDB retrieves a database dump of the given model from its juju
@@ -995,28 +896,12 @@ func (j *JIMM) DumpModel(ctx context.Context, u *dbmodel.User, mt names.ModelTag
 func (j *JIMM) DumpModelDB(ctx context.Context, u *dbmodel.User, mt names.ModelTag) (map[string]interface{}, error) {
 	const op = errors.Op("jimm.DumpModelDB")
 
-	m := dbmodel.Model{
-		UUID: sql.NullString{
-			String: mt.Id(),
-			Valid:  true,
-		},
-	}
-
-	if err := j.Database.GetModel(ctx, &m); err != nil {
-		return nil, errors.E(op, err)
-	}
-	if u.ControllerAccess != "superuser" && m.UserAccess(u) != "admin" {
-		// If the user doesn't have admin access on the model return
-		// an unauthorized error.
-		return nil, errors.E(op, errors.CodeUnauthorized)
-	}
-
-	api, err := j.dial(ctx, &m.Controller, names.ModelTag{})
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-	defer api.Close()
-	dump, err := api.DumpModelDB(ctx, mt)
+	var dump map[string]interface{}
+	err := j.doModelAdmin(ctx, u, mt, func(m *dbmodel.Model, api API) error {
+		var err error
+		dump, err = api.DumpModelDB(ctx, mt)
+		return err
+	})
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -1031,6 +916,30 @@ func (j *JIMM) DumpModelDB(ctx context.Context, u *dbmodel.User, mt names.ModelT
 // CodeNotImplemented error code will be propergated back to the client.
 func (j *JIMM) ValidateModelUpgrade(ctx context.Context, u *dbmodel.User, mt names.ModelTag, force bool) error {
 	const op = errors.Op("jimm.ValidateModelUpgrade")
+
+	err := j.doModelAdmin(ctx, u, mt, func(_ *dbmodel.Model, api API) error {
+		return api.ValidateModelUpgrade(ctx, mt, force)
+	})
+	if err != nil {
+		return errors.E(op, err)
+	}
+	return nil
+}
+
+// doModelAdmin is a simple wrapper that provides the common parts of model
+// administration commands. doModelAdmin finds the model with the given tag
+// and validates that the given user has admin access to the model.
+// doModelAdmin then connects to the controller hosting the model and calls
+// the given function with the model and API connection to perform the
+// operation specific commands. If the model cannot be found then an error
+// with the code CodeNotFound is returned. If the given user does not have
+// admin access to the model then an error with the code CodeUnauthorized
+// is returned. If there is an error connecting to the controller hosting
+// the model then ther returned error will have the same code as the error
+// returned from the dial operation. If the given function returns an error
+// that error will be returned with the code unmasked.
+func (j *JIMM) doModelAdmin(ctx context.Context, u *dbmodel.User, mt names.ModelTag, f func(*dbmodel.Model, API) error) error {
+	const op = errors.Op("jimm.doModelAdmin")
 
 	var m dbmodel.Model
 	m.SetTag(mt)
@@ -1049,7 +958,7 @@ func (j *JIMM) ValidateModelUpgrade(ctx context.Context, u *dbmodel.User, mt nam
 		return errors.E(op, err)
 	}
 	defer api.Close()
-	if err := api.ValidateModelUpgrade(ctx, mt, force); err != nil {
+	if err := f(&m, api); err != nil {
 		return errors.E(op, err)
 	}
 	return nil
