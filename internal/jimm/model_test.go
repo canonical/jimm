@@ -2382,7 +2382,6 @@ var dumpModelDBTests = []struct {
 	dialError       error
 	username        string
 	uuid            string
-	simplified      bool
 	expectDump      map[string]interface{}
 	expectError     string
 	expectErrorCode errors.Code
@@ -2412,7 +2411,6 @@ var dumpModelDBTests = []struct {
 	},
 	username:   "alice@external",
 	uuid:       "00000002-0000-0000-0000-000000000001",
-	simplified: true,
 	expectDump: map[string]interface{}{"model": "dump"},
 }, {
 	name: "SuperuserSuccess",
@@ -2478,6 +2476,115 @@ func TestDumpModelDB(t *testing.T) {
 			}
 			c.Assert(err, qt.IsNil)
 			c.Check(dump, qt.DeepEquals, test.expectDump)
+		})
+	}
+}
+
+var validateModelUpgradeTests = []struct {
+	name                 string
+	env                  string
+	validateModelUpgrade func(context.Context, names.ModelTag, bool) error
+	dialError            error
+	username             string
+	uuid                 string
+	force                bool
+	expectError          string
+	expectErrorCode      errors.Code
+}{{
+	name: "NotFound",
+	// reuse the destroyModelTestEnv for these tests.
+	env:             destroyModelTestEnv,
+	username:        "alice@external",
+	uuid:            "00000002-0000-0000-0000-000000000002",
+	expectError:     `record not found`,
+	expectErrorCode: errors.CodeNotFound,
+}, {
+	name:            "Unauthorized",
+	env:             destroyModelTestEnv,
+	username:        "bob@external",
+	uuid:            "00000002-0000-0000-0000-000000000001",
+	expectError:     `unauthorized access`,
+	expectErrorCode: errors.CodeUnauthorized,
+}, {
+	name: "Success",
+	env:  destroyModelTestEnv,
+	validateModelUpgrade: func(_ context.Context, mt names.ModelTag, force bool) error {
+		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
+			return errors.E("incorrect model uuid")
+		}
+		if force != true {
+			return errors.E("incorrect force")
+		}
+		return nil
+	},
+	username: "alice@external",
+	uuid:     "00000002-0000-0000-0000-000000000001",
+	force:    true,
+}, {
+	name: "SuperuserSuccess",
+	env:  destroyModelTestEnv,
+	validateModelUpgrade: func(_ context.Context, _ names.ModelTag, force bool) error {
+		if force != false {
+			return errors.E("incorrect force")
+		}
+		return nil
+	},
+	username: "charlie@external",
+	uuid:     "00000002-0000-0000-0000-000000000001",
+}, {
+	name:        "DialError",
+	env:         destroyModelTestEnv,
+	dialError:   errors.E("dial error"),
+	username:    "alice@external",
+	uuid:        "00000002-0000-0000-0000-000000000001",
+	expectError: `dial error`,
+}, {
+	name: "APIError",
+	env:  destroyModelTestEnv,
+	validateModelUpgrade: func(_ context.Context, _ names.ModelTag, _ bool) error {
+		return errors.E("api error")
+	},
+	username:    "charlie@external",
+	uuid:        "00000002-0000-0000-0000-000000000001",
+	expectError: `api error`,
+}}
+
+func TestValidateModelUpgrade(t *testing.T) {
+	c := qt.New(t)
+
+	for _, test := range validateModelUpgradeTests {
+		c.Run(test.name, func(c *qt.C) {
+			ctx := context.Background()
+
+			env := jimmtest.ParseEnvironment(c, test.env)
+			dialer := &jimmtest.Dialer{
+				API: &jimmtest.API{
+					ValidateModelUpgrade_: test.validateModelUpgrade,
+				},
+				Err: test.dialError,
+			}
+			j := &jimm.JIMM{
+				Database: db.Database{
+					DB: jimmtest.MemoryDB(c, nil),
+				},
+				Dialer: dialer,
+			}
+			err := j.Database.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+			env.PopulateDB(c, j.Database)
+
+			u := env.User(test.username).DBObject(c, j.Database)
+
+			err = j.ValidateModelUpgrade(ctx, &u, names.NewModelTag(test.uuid), test.force)
+			c.Assert(dialer.IsClosed(), qt.Equals, true)
+			if test.expectError != "" {
+				c.Check(err, qt.ErrorMatches, test.expectError)
+				if test.expectErrorCode != "" {
+					c.Check(errors.ErrorCode(err), qt.Equals, test.expectErrorCode)
+				}
+				return
+			}
+			c.Assert(err, qt.IsNil)
 		})
 	}
 }
