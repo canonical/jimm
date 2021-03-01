@@ -1022,3 +1022,35 @@ func (j *JIMM) DumpModelDB(ctx context.Context, u *dbmodel.User, mt names.ModelT
 	}
 	return dump, nil
 }
+
+// ValidateModelUpgrade validates that a model is in a state that can be
+// upgraded. If the given user is not a controller superuser or a model
+// admin then an error with the code CodeUnauthorized is returned. Any
+// error returned from the API will have the code maintained therefore if
+// the controller doesn't support the ValidateModelUpgrades command the
+// CodeNotImplemented error code will be propergated back to the client.
+func (j *JIMM) ValidateModelUpgrade(ctx context.Context, u *dbmodel.User, mt names.ModelTag, force bool) error {
+	const op = errors.Op("jimm.ValidateModelUpgrade")
+
+	var m dbmodel.Model
+	m.SetTag(mt)
+
+	if err := j.Database.GetModel(ctx, &m); err != nil {
+		return errors.E(op, err)
+	}
+	if u.ControllerAccess != "superuser" && m.UserAccess(u) != "admin" {
+		// If the user doesn't have admin access on the model return
+		// an unauthorized error.
+		return errors.E(op, errors.CodeUnauthorized)
+	}
+
+	api, err := j.dial(ctx, &m.Controller, names.ModelTag{})
+	if err != nil {
+		return errors.E(op, err)
+	}
+	defer api.Close()
+	if err := api.ValidateModelUpgrade(ctx, mt, force); err != nil {
+		return errors.E(op, err)
+	}
+	return nil
+}
