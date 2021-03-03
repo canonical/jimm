@@ -11,6 +11,7 @@ import (
 	vault "github.com/hashicorp/vault/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
+	"golang.org/x/sync/errgroup"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
@@ -192,4 +193,28 @@ type API interface {
 
 	// WatchAllModelSummaries creates a ModelSummaryWatcher.
 	WatchAllModelSummaries(context.Context) (string, error)
+}
+
+// forEachController runs a given function on multiple controllers
+// simultaneously. A connection is established to every controller in the
+// given list concurrently and then the given function is called with the
+// controller and API connection to use to perform the controller
+// operation. ForEachConnection waits until all operations have finished
+// before returning, any error returned will be ther first error
+// encountered when connecting to the controller or returned from the given
+// function.
+func (j *JIMM) forEachController(ctx context.Context, controllers []dbmodel.Controller, f func(*dbmodel.Controller, API) error) error {
+	eg := new(errgroup.Group)
+	for i := range controllers {
+		i := i
+		eg.Go(func() error {
+			api, err := j.dial(ctx, &controllers[i], names.ModelTag{})
+			if err != nil {
+				return err
+			}
+			defer api.Close()
+			return f(&controllers[i], api)
+		})
+	}
+	return eg.Wait()
 }

@@ -9,10 +9,12 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/juju/names/v4"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 )
 
 func TestSetCloudCredentialUnconfiguredDatabase(t *testing.T) {
@@ -116,6 +118,9 @@ func (s *dbSuite) TestSetCloudCredentialUpdate(c *qt.C) {
 	err = s.Database.SetCloudCredential(context.Background(), &cred)
 	c.Assert(err, qt.Equals, nil)
 
+	cred.Cloud = cloud
+	cred.Cloud.Regions = nil
+
 	cred.Label = "test label"
 	cred.Attributes = dbmodel.StringMap{
 		"key1": "value1",
@@ -136,7 +141,7 @@ func (s *dbSuite) TestSetCloudCredentialUpdate(c *qt.C) {
 	}
 	err = s.Database.GetCloudCredential(context.Background(), &dbCred)
 	c.Assert(err, qt.Equals, nil)
-	c.Assert(dbCred, qt.DeepEquals, cred)
+	c.Assert(dbCred, jimmtest.DBObjectEquals, cred)
 	c.Assert(dbCred.Attributes, qt.DeepEquals, dbmodel.StringMap{
 		"key1": "value1",
 		"key2": "value2",
@@ -180,8 +185,12 @@ func (s *dbSuite) TestGetCloudCredential(c *qt.C) {
 		OwnerID:   u.Username,
 		AuthType:  "empty",
 	}
+	cred.Cloud.Regions = nil
 	err = s.Database.SetCloudCredential(context.Background(), &cred)
 	c.Assert(err, qt.Equals, nil)
+
+	cred.Cloud = cloud
+	cred.Cloud.Regions = nil
 
 	dbCred := dbmodel.CloudCredential{
 		CloudName: cloud.Name,
@@ -190,5 +199,109 @@ func (s *dbSuite) TestGetCloudCredential(c *qt.C) {
 	}
 	err = s.Database.GetCloudCredential(context.Background(), &dbCred)
 	c.Assert(err, qt.Equals, nil)
-	c.Assert(dbCred, qt.DeepEquals, cred)
+	c.Assert(dbCred, jimmtest.DBObjectEquals, cred)
+}
+
+func TestForEachCloudCredentialUnconfiguredDatabase(t *testing.T) {
+	c := qt.New(t)
+
+	var d db.Database
+	err := d.ForEachCloudCredential(context.Background(), "", "", nil)
+	c.Check(err, qt.ErrorMatches, `database not configured`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
+}
+
+const forEachCloudCredentialEnv = `clouds:
+- name: cloud-1
+  regions:
+  - name: default
+- name: cloud-2
+  regions:
+  - name: default
+cloud-credentials:
+- name: cred-1
+  cloud: cloud-1
+  owner: alice@external
+  attributes:
+    k1: v1
+    k2: v2
+- name: cred-2
+  cloud: cloud-1
+  owner: bob@external
+  attributes:
+    k1: v1
+    k2: v2
+- name: cred-3
+  cloud: cloud-2
+  owner: alice@external
+- name: cred-4
+  cloud: cloud-2
+  owner: bob@external
+- name: cred-5
+  cloud: cloud-1
+  owner: alice@external
+`
+
+var forEachCloudCredentialTests = []struct {
+	name              string
+	username          string
+	cloud             string
+	f                 func(cred *dbmodel.CloudCredential) error
+	expectCredentials []string
+	expectError       string
+	expectErrorCode   errors.Code
+}{{
+	name:     "UserCredentialsWithCloud",
+	username: "alice@external",
+	cloud:    "cloud-1",
+	expectCredentials: []string{
+		names.NewCloudCredentialTag("cloud-1/alice@external/cred-1").String(),
+		names.NewCloudCredentialTag("cloud-1/alice@external/cred-5").String(),
+	},
+}, {
+	name:     "UserCredentialsWithoutCloud",
+	username: "bob@external",
+	expectCredentials: []string{
+		names.NewCloudCredentialTag("cloud-1/bob@external/cred-2").String(),
+		names.NewCloudCredentialTag("cloud-2/bob@external/cred-4").String(),
+	},
+}, {
+	name:     "IterationError",
+	username: "alice@external",
+	f: func(*dbmodel.CloudCredential) error {
+		return errors.E("test error", errors.Code("test code"))
+	},
+	expectError:     "test error",
+	expectErrorCode: "test code",
+}}
+
+func (s *dbSuite) TestForEachCloudCredential(c *qt.C) {
+	ctx := context.Background()
+
+	env := jimmtest.ParseEnvironment(c, forEachCloudCredentialEnv)
+	err := s.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+	env.PopulateDB(c, *s.Database)
+
+	for _, test := range forEachCloudCredentialTests {
+		c.Run(test.name, func(c *qt.C) {
+			var credentials []string
+			if test.f == nil {
+				test.f = func(cred *dbmodel.CloudCredential) error {
+					credentials = append(credentials, cred.Tag().String())
+					return nil
+				}
+			}
+			err = s.Database.ForEachCloudCredential(ctx, test.username, test.cloud, test.f)
+			if test.expectError != "" {
+				c.Check(err, qt.ErrorMatches, test.expectError)
+				if test.expectErrorCode != "" {
+					c.Check(errors.ErrorCode(err), qt.Equals, test.expectErrorCode)
+				}
+				return
+			}
+			c.Assert(err, qt.IsNil)
+			c.Check(credentials, qt.DeepEquals, test.expectCredentials)
+		})
+	}
 }

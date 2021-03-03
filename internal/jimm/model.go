@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"fmt"
 	"math/rand"
-	"path"
 	"sort"
 	"strings"
 	"time"
@@ -508,59 +507,15 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 }
 
 func (b *modelBuilder) updateCredential(ctx context.Context, api API, cred *dbmodel.CloudCredential) error {
-	if err := b.fillCredentialAttributes(ctx, cred); err != nil {
-		return errors.E(err)
-	}
-
-	update := jujuparams.TaggedCredential{
-		Tag: names.NewCloudCredentialTag(cred.Path()).String(),
-		Credential: jujuparams.CloudCredential{
-			AuthType:   cred.AuthType,
-			Attributes: cred.Attributes,
-		},
-	}
-	_, err := api.UpdateCredential(ctx, update)
+	var err error
+	cred1 := *cred
+	cred1.Attributes, err = b.jimm.getCloudCredentialAttributes(ctx, cred)
 	if err != nil {
-		return errors.E(err)
-	}
-	return nil
-}
-
-// fillCredentialAttributes ensures that the credential attributes of the
-// given credential are set. User access is not checked in this method, it
-// is assumed that if the credential is held the user has access.
-func (b *modelBuilder) fillCredentialAttributes(ctx context.Context, cred *dbmodel.CloudCredential) error {
-	if !cred.AttributesInVault || len(cred.Attributes) > 0 {
-		return nil
-	}
-	if b.jimm.VaultClient == nil {
-		return errors.E("vault not configured")
+		return err
 	}
 
-	logical := b.jimm.VaultClient.Logical()
-	secret, err := logical.Read(path.Join(b.jimm.VaultPath, "creds", cred.Path()))
-	if err != nil {
-		return errors.E(err)
-	}
-	if secret == nil {
-		// secret will be nil if it is not there. Return an error if we
-		// Don't expect the attributes to be empty.
-		if cred.AuthType == "empty" {
-			return nil
-		}
-		return errors.E("credential attributes not found")
-	}
-	cred.Attributes = make(map[string]string, len(secret.Data))
-	for k, v := range secret.Data {
-		// Nothing will be stored that isn't a string, so ignore anything
-		// that is a different type.
-		s, ok := v.(string)
-		if !ok {
-			continue
-		}
-		cred.Attributes[k] = s
-	}
-	return nil
+	_, err = b.jimm.updateControllerCloudCredential(ctx, &cred1, api.UpdateCredential)
+	return err
 }
 
 // JujuModelInfo returns model information returned by the controller.
