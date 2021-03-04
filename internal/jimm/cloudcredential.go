@@ -137,7 +137,7 @@ func (j *JIMM) UpdateCloudCredential(ctx context.Context, u *dbmodel.User, args 
 	credential.SetTag(args.CredentialTag)
 
 	err := j.Database.GetCloudCredential(ctx, &credential)
-	if err != nil {
+	if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
 		return nil, errors.E(op, err)
 	}
 
@@ -231,7 +231,7 @@ func (j *JIMM) updateCredential(ctx context.Context, credential *dbmodel.CloudCr
 		data[k] = v
 	}
 	logical := j.VaultClient.Logical()
-	pth := path.Join(j.VaultPath, "creds", credential.Cloud.Name, credential.Owner.Username, credential.Name)
+	pth := path.Join(j.vaultCredPath(credential))
 
 	var err error
 	if len(data) == 0 {
@@ -283,7 +283,7 @@ func (j *JIMM) updateControllerCloudCredential(
 // function is called for each credential found. The credential used when
 // calling the function will not contain any attributes,
 // GetCloudCredentialAttributes should be used to retrive the credential
-// attributes if needed.
+// attributes if needed. The given function should not update the database.
 func (j *JIMM) ForEachUserCloudCredential(ctx context.Context, u *dbmodel.User, ct names.CloudTag, f func(cred *dbmodel.CloudCredential) error) error {
 	const op = errors.Op("jimm.ForEachUserCloudCredential")
 
@@ -370,7 +370,7 @@ func (j *JIMM) getCloudCredentialAttributes(ctx context.Context, cred *dbmodel.C
 	}
 
 	logical := j.VaultClient.Logical()
-	secret, err := logical.Read(path.Join(j.VaultPath, "creds", cred.Path()))
+	secret, err := logical.Read(j.vaultCredPath(cred))
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -394,4 +394,8 @@ func (j *JIMM) getCloudCredentialAttributes(ctx context.Context, cred *dbmodel.C
 	}
 
 	return attributes, nil
+}
+
+func (j *JIMM) vaultCredPath(cred *dbmodel.CloudCredential) string {
+	return path.Join(j.VaultPath, "creds", cred.Path())
 }
