@@ -43,11 +43,11 @@ func (j *JIMM) GetCloud(ctx context.Context, u *dbmodel.User, tag names.CloudTag
 // ForEachCloud iterates through all of the clouds a user has access to
 // calling the given function for each cloud. If the user has admin level
 // access to the cloud then the provided cloud will include all user
-// information, otherwise it will just include the authenticated user.
-// If the authenticated user is a controller superuser and the all flag is
+// information, otherwise it will just include the authenticated user. If
+// the authenticated user is a controller superuser and the all flag is
 // true then f will be called with all clouds known to JIMM. If f returns
 // an error then iteration will stop immediately and the error will be
-// returned unchanged.
+// returned unchanged. The given function should not update the database.
 func (j *JIMM) ForEachCloud(ctx context.Context, u *dbmodel.User, all bool, f func(*dbmodel.Cloud) error) error {
 	const op = errors.Op("jimm.ForEachCloud")
 

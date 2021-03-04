@@ -1404,3 +1404,82 @@ func TestGetCloudCredentialAttributes(t *testing.T) {
 		})
 	}
 }
+
+func TestCloudCredentialVault(t *testing.T) {
+	vaultClient, vaultPath, ok := jimmtest.VaultClient(t)
+	if !ok {
+		t.Skip("vault not available")
+	}
+
+	c := qt.New(t)
+	ctx := context.Background()
+
+	j := &jimm.JIMM{
+		Database: db.Database{
+			DB: jimmtest.MemoryDB(c, nil),
+		},
+		Dialer: &jimmtest.Dialer{
+			API: &jimmtest.API{},
+		},
+		VaultClient: vaultClient,
+		VaultPath:   vaultPath,
+	}
+	err := j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	env := jimmtest.ParseEnvironment(c, `clouds:
+- name: test
+  type: dummy
+  regions:
+  - name: test-region
+`)
+	env.PopulateDB(c, j.Database)
+
+	u := env.User("alice@external").DBObject(c, j.Database)
+	args := jimm.UpdateCloudCredentialArgs{
+		CredentialTag: names.NewCloudCredentialTag("test/alice@external/cred-1"),
+		Credential: jujuparams.CloudCredential{
+			AuthType: "userpass",
+			Attributes: map[string]string{
+				"username": "test-user",
+				"password": "test-password",
+			},
+		},
+	}
+	_, err = j.UpdateCloudCredential(ctx, &u, args)
+	c.Assert(err, qt.IsNil)
+
+	cred := dbmodel.CloudCredential{
+		OwnerID:   "alice@external",
+		Name:      "cred-1",
+		CloudName: "test",
+	}
+	err = j.Database.GetCloudCredential(ctx, &cred)
+	c.Assert(err, qt.IsNil)
+	c.Check(cred, jimmtest.DBObjectEquals, dbmodel.CloudCredential{
+		OwnerID:   "alice@external",
+		Name:      "cred-1",
+		CloudName: "test",
+		AuthType:  "userpass",
+		Cloud: dbmodel.Cloud{
+			Name: "test",
+			Type: "dummy",
+		},
+		AttributesInVault: true,
+	})
+
+	attr, _, err := j.GetCloudCredentialAttributes(ctx, &u, &cred, true)
+	c.Assert(err, qt.IsNil)
+	c.Check(attr, qt.DeepEquals, args.Credential.Attributes)
+
+	// Update to an "empty" credential
+	args.Credential.AuthType = "empty"
+	args.Credential.Attributes = nil
+	_, err = j.UpdateCloudCredential(ctx, &u, args)
+	c.Assert(err, qt.IsNil)
+
+	cred.AuthType = args.Credential.AuthType
+	attr, _, err = j.GetCloudCredentialAttributes(ctx, &u, &cred, true)
+	c.Assert(err, qt.IsNil)
+	c.Check(attr, qt.DeepEquals, args.Credential.Attributes)
+}

@@ -649,9 +649,10 @@ func (j *JIMM) ModelStatus(ctx context.Context, u *dbmodel.User, mt names.ModelT
 // object passed to f will always include the Model_, Access, and
 // LastConnection fields populated. ForEachUserModel ignores a user's
 // controller access when determining the set of models to return, for
-// superusers the ForEachModel method should be used to get every model
-// in the system. If the given function returns an error the error will
-// be returned unmodified and iteration will stop immediately.
+// superusers the ForEachModel method should be used to get every model in
+// the system. If the given function returns an error the error will be
+// returned unmodified and iteration will stop immediately. The given
+// function should not update the database.
 func (j *JIMM) ForEachUserModel(ctx context.Context, u *dbmodel.User, f func(*dbmodel.UserModelAccess) error) error {
 	const op = errors.Op("jimm.ForEachUserModel")
 
@@ -673,13 +674,13 @@ func (j *JIMM) ForEachUserModel(ctx context.Context, u *dbmodel.User, f func(*db
 	return nil
 }
 
-// ForEachModel calls the given function once for each model in the
-// system. The UserModelAccess object passed to f will always specify
-// that the user's Access is "admin" and will not include the
-// LastConnection tim. ForEachModel will return an error with the code
-// CodeUnauthorized when the user is not a controller admin. If the given
-// function returns an error the error will be returned unmodified and
-// iteration will stop immediately.
+// ForEachModel calls the given function once for each model in the system.
+// The UserModelAccess object passed to f will always specify that the
+// user's Access is "admin" and will not include the LastConnection time.
+// ForEachModel will return an error with the code CodeUnauthorized when
+// the user is not a controller admin. If the given function returns an
+// error the error will be returned unmodified and iteration will stop
+// immediately. The given function should not update the database.
 func (j *JIMM) ForEachModel(ctx context.Context, u *dbmodel.User, f func(*dbmodel.UserModelAccess) error) error {
 	const op = errors.Op("jimm.ForEachUserModel")
 
