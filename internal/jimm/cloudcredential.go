@@ -6,23 +6,31 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/http"
 	"path"
+	"sort"
+	"sync"
 
+	vault "github.com/hashicorp/vault/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
-	"go.uber.org/zap"
 
+	"github.com/CanonicalLtd/jimm/internal/cloudcred"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
-	"github.com/CanonicalLtd/jimm/internal/zaputil"
 )
 
-// GetCloudCredential retrieves the given credential from the database.
+// GetCloudCredential retrieves the given credential from the database. The
+// returned credential will never contain any attrbiutes, see
+// GetCloudCredentialAttributes to retrieve those. If credentials
+// identified by the given tag cannot be found then an errror with a code
+// of CodeNotFound will be returned. If the given user is not a controller
+// superuser or the owner of the credentials then an error with a code of
+// CodeUnauthorized will be returned.
 func (j *JIMM) GetCloudCredential(ctx context.Context, user *dbmodel.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error) {
 	const op = errors.Op("jimm.GetCloudCredential")
 
-	if user.Username != tag.Owner().Id() {
+	if user.ControllerAccess != "superuser" && user.Username != tag.Owner().Id() {
 		return nil, errors.E(op, errors.CodeUnauthorized)
 	}
 
@@ -33,6 +41,8 @@ func (j *JIMM) GetCloudCredential(ctx context.Context, user *dbmodel.User, tag n
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
+	credential.Attributes = nil
+
 	return &credential, nil
 }
 
@@ -74,35 +84,28 @@ func (j *JIMM) RevokeCloudCredential(ctx context.Context, user *dbmodel.User, ta
 		return errors.E(op, err)
 	}
 
-	controllers := make(map[uint]dbmodel.Controller)
+	var controllers []dbmodel.Controller
+	seen := make(map[uint]bool)
 	for _, region := range cloud.Regions {
 		for _, cr := range region.Controllers {
-			controllers[cr.ControllerID] = cr.Controller
+			if seen[cr.ControllerID] {
+				continue
+			}
+			seen[cr.ControllerID] = true
+			controllers = append(controllers, cr.Controller)
 		}
 	}
 
-	ch := make(chan error, len(controllers))
-	for _, controller := range controllers {
-		controller := controller
-		go func() {
-			err := j.revokeControllerCredential(ctx, &controller, tag)
-			select {
-			case ch <- err:
-			case <-ctx.Done():
-				zapctx.Error(ctx, "timed out: failed to forward credential check results")
-			}
-		}()
-	}
-
-	for i := 0; i < len(controllers); i++ {
-		select {
-		case err := <-ch:
-			if err != nil {
-				return errors.E(err, "failed to revoke credential")
-			}
-		case <-ctx.Done():
-			return errors.E("timed out: revoking credentials")
+	err = j.forEachController(ctx, controllers, func(ctl *dbmodel.Controller, api API) error {
+		err := api.RevokeCredential(ctx, tag)
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			err = nil
 		}
+		return err
+	})
+
+	if err != nil {
+		return errors.E(op, err)
 	}
 
 	err = j.Database.SetCloudCredential(ctx, &credential)
@@ -112,26 +115,8 @@ func (j *JIMM) RevokeCloudCredential(ctx context.Context, user *dbmodel.User, ta
 	return nil
 }
 
-func (j *JIMM) revokeControllerCredential(ctx context.Context, controller *dbmodel.Controller, credentialTag names.CloudCredentialTag) error {
-	api, err := j.dial(ctx, controller, names.ModelTag{})
-	if err != nil {
-		return errors.E(err)
-	}
-	defer api.Close()
-
-	err = api.RevokeCredential(ctx, credentialTag)
-	if err != nil {
-		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return nil
-		}
-		return errors.E(err, "cannot revoke credential")
-	}
-	return nil
-}
-
 // UpdateCloudCredentialArgs holds arguments for the cloud credential update
 type UpdateCloudCredentialArgs struct {
-	User          *dbmodel.User
 	CredentialTag names.CloudCredentialTag
 	Credential    jujuparams.CloudCredential
 	SkipCheck     bool
@@ -141,10 +126,10 @@ type UpdateCloudCredentialArgs struct {
 // UpdateCloudCredential checks that the credential can be updated
 // and updates it in the local database and all controllers
 // to which it is deployed.
-func (j *JIMM) UpdateCloudCredential(ctx context.Context, args UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
+func (j *JIMM) UpdateCloudCredential(ctx context.Context, u *dbmodel.User, args UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
 	const op = errors.Op("jimm.UpdateCloudCredential")
 
-	if args.User.Username != args.CredentialTag.Owner().Id() {
+	if u.ControllerAccess != "superuser" && u.Username != args.CredentialTag.Owner().Id() {
 		return nil, errors.E(op, errors.CodeUnauthorized)
 	}
 
@@ -160,183 +145,253 @@ func (j *JIMM) UpdateCloudCredential(ctx context.Context, args UpdateCloudCreden
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	controllers := make(map[uint]dbmodel.Controller)
+	var controllers []dbmodel.Controller
+	seen := make(map[uint]bool)
 	for _, model := range models {
-		controllers[model.ControllerID] = model.Controller
+		if seen[model.ControllerID] {
+			continue
+		}
+		seen[model.ControllerID] = true
+		controllers = append(controllers, model.Controller)
 	}
 
+	credential.AuthType = args.Credential.AuthType
+	credential.Attributes = args.Credential.Attributes
+
+	var resultMu sync.Mutex
+	var result []jujuparams.UpdateCredentialModelResult
 	if !args.SkipCheck {
-		modelResults, err := j.checkCredential(ctx, args, controllers)
-		if err != nil {
-			return modelResults, errors.E(op, err)
-		}
-	}
-
-	if !args.SkipUpdate {
-		credential.Attributes = args.Credential.Attributes
-		credential.AuthType = args.Credential.AuthType
-		credential.Label = args.CredentialTag.String()
-
-		modelResults, err := j.updateCredential(ctx, args, &credential, controllers)
-		if err != nil {
-			return modelResults, errors.E(op, err)
-		}
-		return modelResults, nil
-	}
-	return nil, nil
-}
-
-func (j *JIMM) updateCredential(ctx context.Context, arg UpdateCloudCredentialArgs, credential *dbmodel.CloudCredential, controllers map[uint]dbmodel.Controller) ([]jujuparams.UpdateCredentialModelResult, error) {
-	if j.VaultClient != nil {
-		credential1 := *credential
-		credential1.Attributes = nil
-		credential1.AttributesInVault = true
-		if err := j.Database.SetCloudCredential(ctx, &credential1); err != nil {
-			return nil, errors.E(err, "cannot update local database")
-		}
-
-		data := make(map[string]interface{}, len(credential.Attributes))
-		for k, v := range credential.Attributes {
-			data[k] = v
-		}
-		if len(data) > 0 {
-			// Don't attempt to write no data to the vault.
-			logical := j.VaultClient.Logical()
-			_, err := logical.Write(path.Join(j.VaultPath, "creds", credential.Cloud.Name, credential.Owner.Username, credential.Name), data)
+		err := j.forEachController(ctx, controllers, func(ctl *dbmodel.Controller, api API) error {
+			models, err := j.updateControllerCloudCredential(ctx, &credential, api.CheckCredentialModels)
 			if err != nil {
-				return nil, errors.E(err)
+				return err
 			}
+			resultMu.Lock()
+			defer resultMu.Unlock()
+			result = append(result, models...)
+			return nil
+		})
+		if err != nil {
+			return result, errors.E(op, err)
 		}
-	} else {
-		credential.AttributesInVault = false
-		if err := j.Database.SetCloudCredential(ctx, credential); err != nil {
-			return nil, errors.E(err, "cannot update local database")
+	}
+	var modelsErr bool
+	for _, r := range result {
+		if len(r.Errors) > 0 {
+			modelsErr = true
 		}
 	}
-	ch := make(chan credentialResult, len(controllers))
-	for _, controller := range controllers {
-		controller := controller
-		go func() {
-			models, err := j.updateControllerCredential(ctx, &controller, arg)
-			select {
-			case ch <- credentialResult{
-				controller: controller,
-				models:     models,
-				err:        err,
-			}:
-			case <-ctx.Done():
-				zapctx.Error(ctx, "timed out: failed to forward credential check results")
-			}
-		}()
+	if args.SkipUpdate || modelsErr {
+		return result, nil
 	}
-	models, err := mergeCredentialResults(ctx, ch, len(controllers))
-	if err != nil {
-		return nil, errors.E(err)
-	}
-	return models, nil
-}
 
-func (j *JIMM) updateControllerCredential(
-	ctx context.Context,
-	controller *dbmodel.Controller,
-	arg UpdateCloudCredentialArgs,
-) ([]jujuparams.UpdateCredentialModelResult, error) {
-	api, err := j.dial(ctx, controller, names.ModelTag{})
-	if err != nil {
-		return nil, errors.E(err)
+	if err := j.updateCredential(ctx, &credential); err != nil {
+		return result, errors.E(op, err)
 	}
-	defer api.Close()
 
-	models, err := api.UpdateCredential(ctx, jujuparams.TaggedCredential{
-		Tag:        arg.CredentialTag.String(),
-		Credential: arg.Credential,
+	err = j.forEachController(ctx, controllers, func(ctl *dbmodel.Controller, api API) error {
+		models, err := j.updateControllerCloudCredential(ctx, &credential, api.UpdateCredential)
+		if err != nil {
+			return err
+		}
+		if args.SkipCheck {
+			resultMu.Lock()
+			defer resultMu.Unlock()
+			result = append(result, models...)
+		}
+		return nil
 	})
 	if err != nil {
-		return models, errors.E(err, "cannot update credentials")
+		return result, errors.E(op, err)
 	}
-	return models, err
+	return result, nil
 }
 
-func (j *JIMM) checkCredential(ctx context.Context, arg UpdateCloudCredentialArgs, controllers map[uint]dbmodel.Controller) ([]jujuparams.UpdateCredentialModelResult, error) {
-	if len(controllers) == 0 {
-		return nil, nil
-	}
-	ch := make(chan credentialResult, len(controllers))
-	for _, controller := range controllers {
-		controller := controller
-		go func() {
-			models, err := j.checkCredentialOnController(ctx, &controller, jujuparams.TaggedCredential{
-				Tag:        arg.CredentialTag.String(),
-				Credential: arg.Credential,
-			})
-			select {
-			case ch <- credentialResult{
-				controller: controller,
-				models:     models,
-				err:        err,
-			}:
-			case <-ctx.Done():
-				zapctx.Error(ctx, "timed out: failed to forward credential check results")
-			}
-		}()
+// updateCredential updates the credential stored in JIMM's database.
+func (j *JIMM) updateCredential(ctx context.Context, credential *dbmodel.CloudCredential) error {
+	const op = errors.Op("jimm.updateCredential")
+
+	if j.VaultClient == nil {
+		credential.AttributesInVault = false
+		if err := j.Database.SetCloudCredential(ctx, credential); err != nil {
+			return errors.E(op, err)
+		}
+		return nil
 	}
 
-	models, err := mergeCredentialResults(ctx, ch, len(controllers))
+	credential1 := *credential
+	credential1.Attributes = nil
+	credential1.AttributesInVault = true
+	if err := j.Database.SetCloudCredential(ctx, &credential1); err != nil {
+		return errors.E(op, err)
+	}
+
+	data := make(map[string]interface{}, len(credential.Attributes))
+	for k, v := range credential.Attributes {
+		data[k] = v
+	}
+	logical := j.VaultClient.Logical()
+	pth := path.Join(j.VaultPath, "creds", credential.Cloud.Name, credential.Owner.Username, credential.Name)
+
+	var err error
+	if len(data) == 0 {
+		_, err = logical.Delete(pth)
+		if rerr, ok := err.(*vault.ResponseError); ok && rerr.StatusCode == http.StatusNotFound {
+			// Ignore the error if attempting to delete something that isn't there.
+			err = nil
+		}
+	} else {
+		_, err = logical.Write(pth, data)
+	}
 	if err != nil {
-		return nil, errors.E(err)
+		return errors.E(op, err)
 	}
-	return models, nil
+	return nil
 }
 
-func (j *JIMM) checkCredentialOnController(ctx context.Context, controller *dbmodel.Controller, credential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-	api, err := j.dial(ctx, controller, names.ModelTag{})
-	if err != nil {
-		return nil, errors.E(err)
-	}
-	defer api.Close()
+func (j *JIMM) updateControllerCloudCredential(
+	ctx context.Context,
+	cred *dbmodel.CloudCredential,
+	f func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error),
+) ([]jujuparams.UpdateCredentialModelResult, error) {
+	const op = errors.Op("jimm.updateControllerCloudCredential")
 
-	if !api.SupportsCheckCredentialModels() {
-		return nil, errors.E(fmt.Sprintf("CheckCredentialModels method not supported on controller %v", controller.Name))
-	}
-
-	models, err := api.CheckCredentialModels(ctx, credential)
-	if err != nil {
-		return nil, errors.E(err, "credential check failed")
-	}
-	return models, nil
-}
-
-type credentialResult struct {
-	controller dbmodel.Controller
-	models     []jujuparams.UpdateCredentialModelResult
-	err        error
-}
-
-func mergeCredentialResults(ctx context.Context, ch <-chan credentialResult, n int) ([]jujuparams.UpdateCredentialModelResult, error) {
-	var models []jujuparams.UpdateCredentialModelResult
-	var firstError error
-	for n > 0 {
-		select {
-		case r := <-ch:
-			n--
-			models = append(models, r.models...)
-			if r.err != nil {
-				zapctx.Warn(ctx,
-					"cannot update credential",
-					zap.String("controller", r.controller.Name),
-					zaputil.Error(r.err),
-				)
-				if firstError == nil {
-					firstError = errors.E(r.err, fmt.Sprintf("controller %s: %v", r.controller.Name, r.err))
-				}
-			}
-
-		case <-ctx.Done():
-			return nil, errors.E(ctx.Err(), "timed out: waiting for credential checks")
+	attr := cred.Attributes
+	if attr == nil {
+		var err error
+		attr, err = j.getCloudCredentialAttributes(ctx, cred)
+		if err != nil {
+			return nil, errors.E(op, err)
 		}
 	}
-	if firstError != nil {
-		return models, errors.E(firstError)
+
+	models, err := f(ctx, jujuparams.TaggedCredential{
+		Tag: cred.Tag().String(),
+		Credential: jujuparams.CloudCredential{
+			AuthType:   cred.AuthType,
+			Attributes: attr,
+		},
+	})
+	if err != nil {
+		return models, errors.E(op, err)
 	}
 	return models, nil
+}
+
+// ForEachUserCloudCredential iterates through every credential owned by
+// the given user and for the given cloud (if specified). The given
+// function is called for each credential found. The credential used when
+// calling the function will not contain any attributes,
+// GetCloudCredentialAttributes should be used to retrive the credential
+// attributes if needed.
+func (j *JIMM) ForEachUserCloudCredential(ctx context.Context, u *dbmodel.User, ct names.CloudTag, f func(cred *dbmodel.CloudCredential) error) error {
+	const op = errors.Op("jimm.ForEachUserCloudCredential")
+
+	var cloud string
+	if ct != (names.CloudTag{}) {
+		cloud = ct.Id()
+	}
+
+	errStop := errors.E("stop")
+	var iterErr error
+	err := j.Database.ForEachCloudCredential(ctx, u.Username, cloud, func(cred *dbmodel.CloudCredential) error {
+		cred.Attributes = nil
+		iterErr = f(cred)
+		if iterErr != nil {
+			return errStop
+		}
+		return nil
+	})
+	if err == errStop {
+		err = iterErr
+	} else if err != nil {
+		err = errors.E(op, err)
+	}
+	return err
+}
+
+// GetCloudCredentialAttributes retrieves the attributes for a cloud
+// credential. If hidden is true then returned credentials will include
+// hidden attributes, otherwise a list of redacted attributes will be
+// returned. Only the credential owner can retrieve hidden attributes any
+// other user, including controller superusers, will recieve an error with
+// the code CodeUnauthorized.
+func (j *JIMM) GetCloudCredentialAttributes(ctx context.Context, u *dbmodel.User, cred *dbmodel.CloudCredential, hidden bool) (attrs map[string]string, redacted []string, err error) {
+	const op = errors.Op("jimm.GetCloudCredentialAttributes")
+
+	if hidden {
+		// Controller superusers cannot read hidden credential attributes.
+		if u.Username != cred.OwnerID {
+			return nil, nil, errors.E(op, errors.CodeUnauthorized)
+		}
+	} else {
+		if u.ControllerAccess != "superuser" && u.Username != cred.OwnerID {
+			return nil, nil, errors.E(op, errors.CodeUnauthorized)
+		}
+	}
+
+	attrs, err = j.getCloudCredentialAttributes(ctx, cred)
+	if err != nil {
+		err = errors.E(op, err)
+		return
+	}
+
+	if hidden {
+		return
+	}
+
+	for k := range attrs {
+		if !cloudcred.IsVisibleAttribute(cred.Cloud.Type, cred.AuthType, k) {
+			delete(attrs, k)
+			redacted = append(redacted, k)
+		}
+	}
+	sort.Strings(redacted)
+
+	return
+}
+
+// getCloudCredentialAttributes retrieves the attributes for a cloud credential.
+func (j *JIMM) getCloudCredentialAttributes(ctx context.Context, cred *dbmodel.CloudCredential) (map[string]string, error) {
+	const op = errors.Op("jimm.getCloudCredentialAttributes")
+
+	if !cred.AttributesInVault {
+		if err := j.Database.GetCloudCredential(ctx, cred); err != nil {
+			return nil, errors.E(op, err)
+		}
+	}
+	if !cred.AttributesInVault {
+		return map[string]string(cred.Attributes), nil
+	}
+
+	// Attributes have to be loaded from vault.
+	if j.VaultClient == nil {
+		return nil, errors.E(op, errors.CodeServerConfiguration, "vault not configured")
+	}
+
+	logical := j.VaultClient.Logical()
+	secret, err := logical.Read(path.Join(j.VaultPath, "creds", cred.Path()))
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	if secret == nil {
+		// secret will be nil if it is not there. Return an error if we
+		// Don't expect the attributes to be empty.
+		if cred.AuthType == "empty" {
+			return nil, nil
+		}
+		return nil, errors.E(op, "credential attributes not found")
+	}
+	attributes := make(map[string]string, len(secret.Data))
+	for k, v := range secret.Data {
+		// Nothing will be stored that isn't a string, so ignore anything
+		// that is a different type.
+		s, ok := v.(string)
+		if !ok {
+			continue
+		}
+		attributes[k] = s
+	}
+
+	return attributes, nil
 }
