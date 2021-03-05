@@ -108,6 +108,7 @@ const (
 	CodeServerConfiguration Code = "server configuration"
 	CodeUnauthorized        Code = jujuparams.CodeUnauthorized
 	CodeUpgradeInProgress   Code = jujuparams.CodeUpgradeInProgress
+	CodeNotSupported        Code = jujuparams.CodeNotSupported
 )
 
 // ErrorCode returns the error code from the given error.
