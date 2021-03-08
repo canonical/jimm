@@ -17,6 +17,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/CanonicalLtd/jimm/internal/pubsub"
 )
 
 // A JIMM provides the buisness logic for managing resources in the JAAS
@@ -45,6 +46,9 @@ type JIMM struct {
 
 	// VaultPath is the root path in the vault for JIMM's secrets.
 	VaultPath string
+
+	// Pubsub is a pub-sub hub used for buffering model summaries.
+	Pubsub *pubsub.Hub
 }
 
 // An Authenticator authenticates login requests.
