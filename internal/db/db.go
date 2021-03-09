@@ -97,7 +97,7 @@ func (d *Database) Migrate(ctx context.Context, force bool) error {
 		&dbmodel.ApplicationOfferConnection{},
 		&dbmodel.UserCloudAccess{},
 		&dbmodel.UserModelAccess{},
-		&dbmodel.CloudRegionDefaults{},
+		&dbmodel.CloudDefaults{},
 	)
 	if err != nil {
 		return errors.E(op, dbError(err))
