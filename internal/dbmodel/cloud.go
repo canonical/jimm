@@ -96,6 +96,27 @@ func (c Cloud) ToJujuCloud() jujuparams.Cloud {
 	return cl
 }
 
+// FromJujuCloud updates a Cloud object with the details from the given
+// jujuparams.Cloud.
+func (c *Cloud) FromJujuCloud(cld jujuparams.Cloud) {
+	c.Type = cld.Type
+	c.HostCloudRegion = cld.HostCloudRegion
+	c.AuthTypes = Strings(cld.AuthTypes)
+	c.Endpoint = cld.Endpoint
+	c.IdentityEndpoint = cld.IdentityEndpoint
+	c.StorageEndpoint = cld.StorageEndpoint
+	c.CACertificates = Strings(cld.CACertificates)
+	c.Config = Map(cld.Config)
+	regions := make([]CloudRegion, 0, len(c.Regions))
+	for _, r := range cld.Regions {
+		reg := c.Region(r.Name)
+		reg.FromJujuCloudRegion(r)
+		reg.Config = Map(cld.RegionConfig[r.Name])
+		regions = append(regions, reg)
+	}
+	c.Regions = regions
+}
+
 // ToJujuCloudDetails converts the Cloud object into a
 // jujuparams.CloudDetails. The cloud must have its regions association
 // filled out.
@@ -164,6 +185,15 @@ func (r CloudRegion) ToJujuCloudRegion() jujuparams.CloudRegion {
 	cr.IdentityEndpoint = r.IdentityEndpoint
 	cr.StorageEndpoint = r.StorageEndpoint
 	return cr
+}
+
+// FromJujuCloudRegion updates a CloudRegion object with the details from
+// the given jujuparams.CloudRegion.
+func (cr *CloudRegion) FromJujuCloudRegion(r jujuparams.CloudRegion) {
+	cr.Name = r.Name
+	cr.Endpoint = r.Endpoint
+	cr.IdentityEndpoint = r.IdentityEndpoint
+	cr.StorageEndpoint = r.StorageEndpoint
 }
 
 // A UserCloudAccess maps the access level of a user on a cloud.

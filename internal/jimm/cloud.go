@@ -4,7 +4,10 @@ package jimm
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
@@ -40,7 +43,7 @@ func (j *JIMM) GetCloud(ctx context.Context, u *dbmodel.User, tag names.CloudTag
 	}
 }
 
-// ForEachCloud iterates through all of the clouds a user has access to
+// ForEachUserCloud iterates through all of the clouds a user has access to
 // calling the given function for each cloud. If the user has admin level
 // access to the cloud then the provided cloud will include all user
 // information, otherwise it will just include the authenticated user. If
@@ -48,12 +51,8 @@ func (j *JIMM) GetCloud(ctx context.Context, u *dbmodel.User, tag names.CloudTag
 // true then f will be called with all clouds known to JIMM. If f returns
 // an error then iteration will stop immediately and the error will be
 // returned unchanged. The given function should not update the database.
-func (j *JIMM) ForEachCloud(ctx context.Context, u *dbmodel.User, all bool, f func(*dbmodel.Cloud) error) error {
-	const op = errors.Op("jimm.ForEachCloud")
-
-	if all && u.ControllerAccess == "superuser" {
-		return j.forEachAllClouds(ctx, f)
-	}
+func (j *JIMM) ForEachUserCloud(ctx context.Context, u *dbmodel.User, f func(*dbmodel.Cloud) error) error {
+	const op = errors.Op("jimm.ForEachUserCloud")
 
 	clds, err := j.Database.GetUserClouds(ctx, u)
 	if err != nil {
@@ -102,11 +101,17 @@ func (j *JIMM) ForEachCloud(ctx context.Context, u *dbmodel.User, all bool, f fu
 	return nil
 }
 
-// forEachAllClouds iterates through each cloud known to JIMM calling the
-// given function. If f returns an error then iteration stops immediately
-// and the error is returned unmodified.
-func (j *JIMM) forEachAllClouds(ctx context.Context, f func(*dbmodel.Cloud) error) error {
-	const op = errors.Op("jimm.forEachAllCloud")
+// ForEachCloud iterates through each cloud known to JIMM calling the given
+// function. If f returns an error then iteration stops immediately and the
+// error is returned unmodified. If the given user is not a controller
+// superuser then an error with the code CodeUnauthorized is returned. The
+// given function should not update the database.
+func (j *JIMM) ForEachCloud(ctx context.Context, u *dbmodel.User, f func(*dbmodel.Cloud) error) error {
+	const op = errors.Op("jimm.ForEachCloud")
+
+	if u.ControllerAccess != "superuser" {
+		return errors.E(op, errors.CodeUnauthorized)
+	}
 
 	clds, err := j.Database.GetClouds(ctx)
 	if err != nil {
@@ -143,4 +148,144 @@ func cloudUserAccess(u *dbmodel.User, cl *dbmodel.Cloud) string {
 		userAccess = everyoneAccess
 	}
 	return userAccess
+}
+
+// DefaultReservedCloudNames contains a list of cloud names that are used
+// with public (or similar) clouds that cannot be used for the name of a
+// hosted cloud.
+var DefaultReservedCloudNames = []string{
+	"aks",
+	"aws",
+	"aws-china",
+	"aws-gov",
+	"azure",
+	"azure-china",
+	"cloudsigma",
+	"ecs",
+	"eks",
+	"google",
+	"joyent",
+	"localhost",
+	"oracle",
+	"oracle-classic",
+	"oracle-compute",
+	"rackspace",
+}
+
+// AddHostedCloud adds the cloud defined by the given tag and cloud to the
+// JAAS system. The cloud will be created on a controller running on the
+// requested host cloud-region and the cloud created there. If the given
+// user does not have add-model access to JAAS then an error with a code of
+// CodeUnauthorized will be returned (please note this differs from juju
+// which requires admin controller access to create clouds). If the
+// requested cloud cannot be created on this JAAS system an error with a
+// code of CodeIncompatibleClouds will be returned. If there is an error
+// returned by the controller when creating the cloud then that error code
+// will be preserved.
+func (j *JIMM) AddHostedCloud(ctx context.Context, u *dbmodel.User, tag names.CloudTag, cloud jujuparams.Cloud) error {
+	const op = errors.Op("jimm.AddHostedCloud")
+
+	if u.ControllerAccess != "add-model" && u.ControllerAccess != "superuser" {
+		return errors.E(op, errors.CodeUnauthorized)
+	}
+
+	// Ensure the new cloud could not mask the name of a known public cloud.
+	reservedNames := j.ReservedCloudNames
+	if len(reservedNames) == 0 {
+		reservedNames = DefaultReservedCloudNames
+	}
+	for _, n := range reservedNames {
+		if tag.Id() == n {
+			return errors.E(op, errors.CodeAlreadyExists, fmt.Sprintf("cloud %q already exists", tag.Id()))
+		}
+	}
+
+	// Validate that the requested cloud is valid.
+	if cloud.Type != "kubernetes" {
+		return errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud type %q", cloud.Type))
+	}
+	parts := strings.SplitN(cloud.HostCloudRegion, "/", 2)
+	if len(parts) != 2 || parts[0] == "" {
+		return errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion))
+	}
+	region, err := j.Database.FindRegion(ctx, parts[0], parts[1])
+	if errors.ErrorCode(err) == errors.CodeNotFound {
+		return errors.E(op, err, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion))
+	} else if err != nil {
+		return errors.E(op, err)
+	}
+
+	switch cloudUserAccess(u, &region.Cloud) {
+	case "admin", "add-model":
+	default:
+		return errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion))
+	}
+
+	if region.Cloud.HostCloudRegion != "" {
+		// Do not support creating a new cloud on an already hosted
+		// cloud.
+		return errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion))
+	}
+
+	// Create the cloud locally, to reserve the name.
+	var dbCloud dbmodel.Cloud
+	dbCloud.FromJujuCloud(cloud)
+	dbCloud.Name = tag.Id()
+	dbCloud.Users = []dbmodel.UserCloudAccess{{
+		User:   *u,
+		Access: "admin",
+	}}
+	if err := j.Database.AddCloud(ctx, &dbCloud); err != nil {
+		return errors.E(op, err)
+	}
+
+	// Create the cloud on a host.
+	shuffleRegionControllers(region.Controllers)
+	ccloud, err := j.addControllerCloud(ctx, &region.Controllers[0].Controller, u.Tag().(names.UserTag), tag, cloud)
+	if err != nil {
+		// TODO(mhilton) remove the added cloud if adding it to the controller failed.
+		return errors.E(op, err)
+	}
+	// Update the cloud in the database.
+	dbCloud.FromJujuCloud(*ccloud)
+	for i := range dbCloud.Regions {
+		dbCloud.Regions[i].Controllers = []dbmodel.CloudRegionControllerPriority{{
+			ControllerID: region.Controllers[0].ID,
+			Priority:     dbmodel.CloudRegionControllerPrioritySupported,
+		}}
+	}
+
+	if err := j.Database.SetCloud(ctx, &dbCloud); err != nil {
+		// At this point the cloud has been created on the
+		// controller and we know something about it. Trying to
+		// undo that will probably make things worse.
+		return errors.E(op, err)
+	}
+	return nil
+}
+
+// addControllerCloud creates the hosted cloud defined by the given tag and
+// jujuparams cloud definition. Admin access to the cloud will be granted
+// to the user identified by the given user tag. On success
+// addControllerCloud returns the definition of the cloud retrieved from
+// the controller.
+func (j *JIMM) addControllerCloud(ctx context.Context, ctl *dbmodel.Controller, ut names.UserTag, tag names.CloudTag, cloud jujuparams.Cloud) (*jujuparams.Cloud, error) {
+	const op = errors.Op("jimm.addControllerCloud")
+
+	api, err := j.dial(ctx, ctl, names.ModelTag{})
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	defer api.Close()
+	if err := api.AddCloud(ctx, tag, cloud); err != nil {
+		return nil, errors.E(op, err)
+	}
+	if err := api.GrantCloudAccess(ctx, tag, ut, "admin"); err != nil {
+		return nil, errors.E(op, err)
+	}
+	var result jujuparams.Cloud
+	if err := api.Cloud(ctx, tag, &result); err != nil {
+		return nil, errors.E(op, err)
+	}
+	return &result, nil
 }

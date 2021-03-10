@@ -13,6 +13,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 )
 
 func TestAddCloudUnconfiguredDatabase(t *testing.T) {
@@ -279,4 +280,56 @@ func (s *dbSuite) TestSetCloud(c *qt.C) {
 			cl2.Users[1],
 		},
 	})
+}
+
+func TestFindRegionUnconfiguredDatabase(t *testing.T) {
+	c := qt.New(t)
+
+	var d db.Database
+	cr, err := d.FindRegion(context.Background(), "", "")
+	c.Check(err, qt.ErrorMatches, `database not configured`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
+	c.Check(cr, qt.IsNil)
+}
+
+func (s *dbSuite) TestFindRegion(c *qt.C) {
+	ctx := context.Background()
+
+	err := s.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	env := jimmtest.ParseEnvironment(c, `clouds:
+- name: test
+  type: testp
+  regions:
+  - name: test-region
+controllers:
+- name: test
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud-regions:
+  - cloud: test
+    region: test-region
+    priority: 1
+`)
+	env.PopulateDB(c, *s.Database)
+
+	cr, err := s.Database.FindRegion(ctx, "testp", "test-region")
+	c.Assert(err, qt.IsNil)
+	c.Check(cr, jimmtest.DBObjectEquals, &dbmodel.CloudRegion{
+		Cloud: dbmodel.Cloud{
+			Name: "test",
+			Type: "testp",
+		},
+		Name: "test-region",
+		Controllers: []dbmodel.CloudRegionControllerPriority{{
+			Controller: dbmodel.Controller{
+				Name: "test",
+				UUID: "00000001-0000-0000-0000-000000000001",
+			},
+			Priority: 1,
+		}},
+	})
+
+	_, err = s.Database.FindRegion(ctx, "no-such", "region")
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }

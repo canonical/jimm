@@ -103,6 +103,7 @@ const (
 	CodeAlreadyExists       Code = jujuparams.CodeAlreadyExists
 	CodeBadRequest          Code = jujuparams.CodeBadRequest
 	CodeConnectionFailed    Code = "connection failed"
+	CodeIncompatibleClouds  Code = jujuparams.CodeIncompatibleClouds
 	CodeNotFound            Code = jujuparams.CodeNotFound
 	CodeNotImplemented      Code = jujuparams.CodeNotImplemented
 	CodeServerConfiguration Code = "server configuration"

@@ -112,10 +112,11 @@ func (e *Environment) PopulateDB(c *qt.C, db db.Database) {
 
 // A Cloud represents the definition of a cloud in a test environment.
 type Cloud struct {
-	Name    string        `json:"name"`
-	Type    string        `json:"type"`
-	Regions []CloudRegion `json:"regions"`
-	Users   []UserAccess  `json:"users"`
+	Name            string        `json:"name"`
+	Type            string        `json:"type"`
+	HostCloudRegion string        `json:"host-cloud-region"`
+	Regions         []CloudRegion `json:"regions"`
+	Users           []UserAccess  `json:"users"`
 
 	env *Environment
 	dbo dbmodel.Cloud
@@ -136,6 +137,7 @@ func (cl *Cloud) DBObject(c *qt.C, db db.Database) dbmodel.Cloud {
 
 	cl.dbo.Name = cl.Name
 	cl.dbo.Type = cl.Type
+	cl.dbo.HostCloudRegion = cl.HostCloudRegion
 	for _, r := range cl.Regions {
 		cl.dbo.Regions = append(cl.dbo.Regions, dbmodel.CloudRegion{
 			Name: r.Name,
@@ -219,7 +221,7 @@ func (ctl *Controller) DBObject(c *qt.C, db db.Database) dbmodel.Controller {
 type CloudRegionControllerPriority struct {
 	Cloud    string `json:"cloud"`
 	Region   string `json:"region"`
-	Priority uint   `json:"int"`
+	Priority uint   `json:"priority"`
 }
 
 // A Model represents the definition of a model in a test environment.

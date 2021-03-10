@@ -72,7 +72,7 @@ func (d *Database) GetClouds(ctx context.Context) ([]dbmodel.Cloud, error) {
 }
 
 // SetCloud creates, or updates, the given cloud document. If the cloud
-// already exists it will be unaltered except for the adddion of new
+// already exists it will be unaltered except for the addition of new
 // regions and users.
 func (d *Database) SetCloud(ctx context.Context, c *dbmodel.Cloud) error {
 	const op = errors.Op("db.SetCloud")
@@ -127,4 +127,23 @@ func preloadCloud(prefix string, db *gorm.DB) *gorm.DB {
 	db = db.Preload(prefix + "Regions").Preload(prefix + "Regions.Controllers").Preload(prefix + "Regions.Controllers.Controller")
 	db = db.Preload(prefix + "Users").Preload(prefix + "Users.User")
 	return db
+}
+
+// FindRegion finds a region with the given name on a cloud with the given
+// provider type.
+func (d *Database) FindRegion(ctx context.Context, providerType, name string) (*dbmodel.CloudRegion, error) {
+	const op = errors.Op("db.FindRegion")
+	if err := d.ready(); err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	db := d.DB.WithContext(ctx)
+	db = db.Joins("Cloud").Preload("Cloud.Users").Preload("Controllers").Preload("Controllers.Controller")
+	db = db.Model(dbmodel.CloudRegion{}).Where("cloud.type = ? AND cloud_regions.name = ?", providerType, name)
+
+	var region dbmodel.CloudRegion
+	if err := db.First(&region).Error; err != nil {
+		return nil, errors.E(op, dbError(err))
+	}
+	return &region, nil
 }

@@ -133,6 +133,70 @@ func TestToJujuCloud(t *testing.T) {
 	})
 }
 
+func TestFromJujuCloud(t *testing.T) {
+	c := qt.New(t)
+
+	jcld := jujuparams.Cloud{
+		Type:             "test-provider",
+		HostCloudRegion:  "test-cloud/test-region",
+		AuthTypes:        []string{"empty"},
+		Endpoint:         "https://cloud.example.com",
+		IdentityEndpoint: "https://identity.cloud.example.com",
+		StorageEndpoint:  "https://storage.cloud.example.com",
+		Regions: []jujuparams.CloudRegion{{
+			Name:             "test-region",
+			Endpoint:         "https://region.example.com",
+			IdentityEndpoint: "https://identity.region.example.com",
+			StorageEndpoint:  "https://storage.region.example.com",
+		}},
+		CACertificates: []string{"cert1", "cert2"},
+		Config: map[string]interface{}{
+			"k1": float64(1),
+			"k2": "A",
+			"k3": map[string]interface{}{"k": []interface{}{string("v")}},
+		},
+		RegionConfig: map[string]map[string]interface{}{
+			"test-region": {
+				"k1": float64(2),
+				"k2": "B",
+				"k3": map[string]interface{}{"k": []interface{}{string("V")}},
+			},
+		},
+	}
+
+	cl := dbmodel.Cloud{
+		Name: "test-cloud",
+	}
+
+	cl.FromJujuCloud(jcld)
+	c.Check(cl, qt.DeepEquals, dbmodel.Cloud{
+		Name:             "test-cloud",
+		Type:             "test-provider",
+		HostCloudRegion:  "test-cloud/test-region",
+		AuthTypes:        dbmodel.Strings{"empty"},
+		Endpoint:         "https://cloud.example.com",
+		IdentityEndpoint: "https://identity.cloud.example.com",
+		StorageEndpoint:  "https://storage.cloud.example.com",
+		Regions: []dbmodel.CloudRegion{{
+			Name:             "test-region",
+			Endpoint:         "https://region.example.com",
+			IdentityEndpoint: "https://identity.region.example.com",
+			StorageEndpoint:  "https://storage.region.example.com",
+			Config: dbmodel.Map{
+				"k1": float64(2),
+				"k2": "B",
+				"k3": map[string]interface{}{"k": []interface{}{string("V")}},
+			},
+		}},
+		CACertificates: dbmodel.Strings{"cert1", "cert2"},
+		Config: dbmodel.Map{
+			"k1": float64(1),
+			"k2": "A",
+			"k3": map[string]interface{}{"k": []interface{}{string("v")}},
+		},
+	})
+}
+
 func TestToJujuCloudInfo(t *testing.T) {
 	c := qt.New(t)
 
