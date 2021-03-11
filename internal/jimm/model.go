@@ -891,7 +891,7 @@ func (j *JIMM) ValidateModelUpgrade(ctx context.Context, u *dbmodel.User, mt nam
 // with the code CodeNotFound is returned. If the given user does not have
 // admin access to the model then an error with the code CodeUnauthorized
 // is returned. If there is an error connecting to the controller hosting
-// the model then ther returned error will have the same code as the error
+// the model then the returned error will have the same code as the error
 // returned from the dial operation. If the given function returns an error
 // that error will be returned with the code unmasked.
 func (j *JIMM) doModelAdmin(ctx context.Context, u *dbmodel.User, mt names.ModelTag, f func(*dbmodel.Model, API) error) error {

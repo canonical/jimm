@@ -98,11 +98,11 @@ type CloudRegionControllerPriority struct {
 
 	// CloudRegion is the cloud-region this pertains to.
 	CloudRegionID uint
-	CloudRegion   CloudRegion
+	CloudRegion   CloudRegion `gorm:"constraint:OnDelete:CASCADE"`
 
 	// Controller is the controller this pertains to.
 	ControllerID uint
-	Controller   Controller
+	Controller   Controller `gorm:"constraint:OnDelete:CASCADE"`
 
 	// Priority is the priority with which this controller should be
 	// chosen when deploying to a cloud-region.

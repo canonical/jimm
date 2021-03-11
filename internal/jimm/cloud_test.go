@@ -838,3 +838,535 @@ func TestAddHostedCloud(t *testing.T) {
 		})
 	}
 }
+
+const grantCloudAccessTestEnv = `clouds:
+- name: dummy
+  type: dummy
+  regions:
+  - name: dummy-region
+- name: test
+  type: kubernetes
+  host-cloud-region: dummy/dummy-region
+  regions:
+  - name: default
+  users:
+  - user: alice@external
+    access: admin
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud-regions:
+  - cloud: dummy
+    region: dummy-region
+    priority: 10
+  - cloud: test
+    region: default
+    priority: 1
+`
+
+var grantCloudAccessTests = []struct {
+	name             string
+	env              string
+	grantCloudAccess func(context.Context, names.CloudTag, names.UserTag, string) error
+	dialError        error
+	username         string
+	cloud            string
+	targetUsername   string
+	access           string
+	expectCloud      dbmodel.Cloud
+	expectError      string
+	expectErrorCode  errors.Code
+}{{
+	name:            "CloudNotFound",
+	username:        "alice@external",
+	cloud:           "test2",
+	targetUsername:  "bob@external",
+	access:          "add-model",
+	expectError:     `cloud "test2" not found`,
+	expectErrorCode: errors.CodeNotFound,
+}, {
+	name: "Success",
+	env:  grantCloudAccessTestEnv,
+	grantCloudAccess: func(_ context.Context, ct names.CloudTag, ut names.UserTag, access string) error {
+		if ct.Id() != "test" {
+			return errors.E("bad cloud tag")
+		}
+		if ut.Id() != "bob@external" {
+			return errors.E("bad user tag")
+		}
+		if access != "add-model" {
+			return errors.E("bad permission")
+		}
+		return nil
+	},
+	username:       "alice@external",
+	cloud:          "test",
+	targetUsername: "bob@external",
+	access:         "add-model",
+	expectCloud: dbmodel.Cloud{
+		Name:            "test",
+		Type:            "kubernetes",
+		HostCloudRegion: "dummy/dummy-region",
+		Regions: []dbmodel.CloudRegion{{
+			Name: "default",
+			Controllers: []dbmodel.CloudRegionControllerPriority{{
+				Controller: dbmodel.Controller{
+					Name: "controller-1",
+					UUID: "00000001-0000-0000-0000-000000000001",
+				},
+				Priority: 1,
+			}},
+		}},
+		Users: []dbmodel.UserCloudAccess{{
+			Username: "alice@external",
+			User: dbmodel.User{
+				Username:         "alice@external",
+				ControllerAccess: "add-model",
+			},
+			CloudName: "test",
+			Access:    "admin",
+		}, {
+			Username: "bob@external",
+			User: dbmodel.User{
+				Username:         "bob@external",
+				ControllerAccess: "add-model",
+			},
+			CloudName: "test",
+			Access:    "add-model",
+		}},
+	},
+}, {
+	name:            "UserNotAuthorized",
+	env:             grantCloudAccessTestEnv,
+	username:        "charlie@external",
+	cloud:           "test",
+	targetUsername:  "bob@external",
+	access:          "add-model",
+	expectError:     `unauthorized access`,
+	expectErrorCode: errors.CodeUnauthorized,
+}, {
+	name:           "DialError",
+	env:            grantCloudAccessTestEnv,
+	dialError:      errors.E("test dial error"),
+	username:       "alice@external",
+	cloud:          "test",
+	targetUsername: "bob@external",
+	access:         "add-model",
+	expectError:    `test dial error`,
+}, {
+	name: "APIError",
+	env:  grantCloudAccessTestEnv,
+	grantCloudAccess: func(_ context.Context, mt names.CloudTag, ut names.UserTag, access string) error {
+		return errors.E("test error")
+	},
+	username:       "alice@external",
+	cloud:          "test",
+	targetUsername: "bob@external",
+	access:         "add-model",
+	expectError:    `test error`,
+}}
+
+func TestGrantCloudAccess(t *testing.T) {
+	c := qt.New(t)
+
+	for _, test := range grantCloudAccessTests {
+		c.Run(test.name, func(c *qt.C) {
+			ctx := context.Background()
+
+			env := jimmtest.ParseEnvironment(c, test.env)
+			dialer := &jimmtest.Dialer{
+				API: &jimmtest.API{
+					GrantCloudAccess_: test.grantCloudAccess,
+				},
+				Err: test.dialError,
+			}
+			j := &jimm.JIMM{
+				Database: db.Database{
+					DB: jimmtest.MemoryDB(c, nil),
+				},
+				Dialer: dialer,
+			}
+			err := j.Database.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+			env.PopulateDB(c, j.Database)
+
+			u := env.User(test.username).DBObject(c, j.Database)
+
+			err = j.GrantCloudAccess(ctx, &u, names.NewCloudTag(test.cloud), names.NewUserTag(test.targetUsername), test.access)
+			c.Assert(dialer.IsClosed(), qt.Equals, true)
+			if test.expectError != "" {
+				c.Check(err, qt.ErrorMatches, test.expectError)
+				if test.expectErrorCode != "" {
+					c.Check(errors.ErrorCode(err), qt.Equals, test.expectErrorCode)
+				}
+				return
+			}
+			c.Assert(err, qt.IsNil)
+			cl := dbmodel.Cloud{
+				Name: test.cloud,
+			}
+			err = j.Database.GetCloud(ctx, &cl)
+			c.Assert(err, qt.IsNil)
+			c.Check(cl, jimmtest.DBObjectEquals, test.expectCloud)
+		})
+	}
+}
+
+const revokeCloudAccessTestEnv = `clouds:
+- name: dummy
+  type: dummy
+  regions:
+  - name: dummy-region
+- name: test
+  type: kubernetes
+  host-cloud-region: dummy/dummy-region
+  regions:
+  - name: default
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: admin
+  - user: charlie@external
+    access: add-model
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud-regions:
+  - cloud: dummy
+    region: dummy-region
+    priority: 10
+  - cloud: test
+    region: default
+    priority: 1
+`
+
+var revokeCloudAccessTests = []struct {
+	name              string
+	env               string
+	revokeCloudAccess func(context.Context, names.CloudTag, names.UserTag, string) error
+	dialError         error
+	username          string
+	cloud             string
+	targetUsername    string
+	access            string
+	expectCloud       dbmodel.Cloud
+	expectError       string
+	expectErrorCode   errors.Code
+}{{
+	name:            "CloudNotFound",
+	username:        "alice@external",
+	cloud:           "test2",
+	targetUsername:  "bob@external",
+	access:          "admin",
+	expectError:     `cloud "test2" not found`,
+	expectErrorCode: errors.CodeNotFound,
+}, {
+	name: "SuccessAdmin",
+	env:  revokeCloudAccessTestEnv,
+	revokeCloudAccess: func(_ context.Context, ct names.CloudTag, ut names.UserTag, access string) error {
+		if ct.Id() != "test" {
+			return errors.E("bad model tag")
+		}
+		if ut.Id() != "bob@external" {
+			return errors.E("bad user tag")
+		}
+		if access != "admin" {
+			return errors.E("bad permission")
+		}
+		return nil
+	},
+	username:       "alice@external",
+	cloud:          "test",
+	targetUsername: "bob@external",
+	access:         "admin",
+	expectCloud: dbmodel.Cloud{
+		Name:            "test",
+		Type:            "kubernetes",
+		HostCloudRegion: "dummy/dummy-region",
+		Regions: []dbmodel.CloudRegion{{
+			Name: "default",
+			Controllers: []dbmodel.CloudRegionControllerPriority{{
+				Controller: dbmodel.Controller{
+					Name: "controller-1",
+					UUID: "00000001-0000-0000-0000-000000000001",
+				},
+				Priority: 1,
+			}},
+		}},
+		Users: []dbmodel.UserCloudAccess{{
+			Username: "alice@external",
+			User: dbmodel.User{
+				Username:         "alice@external",
+				ControllerAccess: "add-model",
+			},
+			CloudName: "test",
+			Access:    "admin",
+		}, {
+			Username: "bob@external",
+			User: dbmodel.User{
+				Username:         "bob@external",
+				ControllerAccess: "add-model",
+			},
+			CloudName: "test",
+			Access:    "add-model",
+		}, {
+			Username: "charlie@external",
+			User: dbmodel.User{
+				Username:         "charlie@external",
+				ControllerAccess: "add-model",
+			},
+			CloudName: "test",
+			Access:    "add-model",
+		}},
+	},
+}, {
+	name: "SuccessAddModel",
+	env:  revokeCloudAccessTestEnv,
+	revokeCloudAccess: func(_ context.Context, ct names.CloudTag, ut names.UserTag, access string) error {
+		if ct.Id() != "test" {
+			return errors.E("bad model tag")
+		}
+		if ut.Id() != "bob@external" {
+			return errors.E("bad user tag")
+		}
+		if access != "add-model" {
+			return errors.E("bad permission")
+		}
+		return nil
+	},
+	username:       "alice@external",
+	cloud:          "test",
+	targetUsername: "bob@external",
+	access:         "add-model",
+	expectCloud: dbmodel.Cloud{
+		Name:            "test",
+		Type:            "kubernetes",
+		HostCloudRegion: "dummy/dummy-region",
+		Regions: []dbmodel.CloudRegion{{
+			Name: "default",
+			Controllers: []dbmodel.CloudRegionControllerPriority{{
+				Controller: dbmodel.Controller{
+					Name: "controller-1",
+					UUID: "00000001-0000-0000-0000-000000000001",
+				},
+				Priority: 1,
+			}},
+		}},
+		Users: []dbmodel.UserCloudAccess{{
+			Username: "alice@external",
+			User: dbmodel.User{
+				Username:         "alice@external",
+				ControllerAccess: "add-model",
+			},
+			CloudName: "test",
+			Access:    "admin",
+		}, {
+			Username: "charlie@external",
+			User: dbmodel.User{
+				Username:         "charlie@external",
+				ControllerAccess: "add-model",
+			},
+			CloudName: "test",
+			Access:    "add-model",
+		}},
+	},
+}, {
+	name:            "UserNotAuthorized",
+	env:             revokeCloudAccessTestEnv,
+	username:        "charlie@external",
+	cloud:           "test",
+	targetUsername:  "bob@external",
+	access:          "add-model",
+	expectError:     `unauthorized access`,
+	expectErrorCode: errors.CodeUnauthorized,
+}, {
+	name:           "DialError",
+	env:            revokeCloudAccessTestEnv,
+	dialError:      errors.E("test dial error"),
+	username:       "alice@external",
+	cloud:          "test",
+	targetUsername: "bob@external",
+	access:         "add-model",
+	expectError:    `test dial error`,
+}, {
+	name: "APIError",
+	env:  revokeCloudAccessTestEnv,
+	revokeCloudAccess: func(_ context.Context, mt names.CloudTag, ut names.UserTag, access string) error {
+		return errors.E("test error")
+	},
+	username:       "alice@external",
+	cloud:          "test",
+	targetUsername: "bob@external",
+	access:         "add-model",
+	expectError:    `test error`,
+}}
+
+func TestRevokeCloudAccess(t *testing.T) {
+	c := qt.New(t)
+
+	for _, test := range revokeCloudAccessTests {
+		c.Run(test.name, func(c *qt.C) {
+			ctx := context.Background()
+
+			env := jimmtest.ParseEnvironment(c, test.env)
+			dialer := &jimmtest.Dialer{
+				API: &jimmtest.API{
+					RevokeCloudAccess_: test.revokeCloudAccess,
+				},
+				Err: test.dialError,
+			}
+			j := &jimm.JIMM{
+				Database: db.Database{
+					DB: jimmtest.MemoryDB(c, nil),
+				},
+				Dialer: dialer,
+			}
+			err := j.Database.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+			env.PopulateDB(c, j.Database)
+
+			u := env.User(test.username).DBObject(c, j.Database)
+
+			err = j.RevokeCloudAccess(ctx, &u, names.NewCloudTag(test.cloud), names.NewUserTag(test.targetUsername), test.access)
+			c.Assert(dialer.IsClosed(), qt.Equals, true)
+			if test.expectError != "" {
+				c.Check(err, qt.ErrorMatches, test.expectError)
+				if test.expectErrorCode != "" {
+					c.Check(errors.ErrorCode(err), qt.Equals, test.expectErrorCode)
+				}
+				return
+			}
+			c.Assert(err, qt.IsNil)
+			cl := dbmodel.Cloud{
+				Name: test.cloud,
+			}
+			err = j.Database.GetCloud(ctx, &cl)
+			c.Assert(err, qt.IsNil)
+			c.Check(cl, jimmtest.DBObjectEquals, test.expectCloud)
+		})
+	}
+}
+
+const removeCloudTestEnv = `clouds:
+- name: dummy
+  type: dummy
+  regions:
+  - name: dummy-region
+- name: test
+  type: kubernetes
+  host-cloud-region: dummy/dummy-region
+  regions:
+  - name: default
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: add-model
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud-regions:
+  - cloud: dummy
+    region: dummy-region
+    priority: 10
+  - cloud: test
+    region: default
+    priority: 1
+`
+
+var removeCloudTests = []struct {
+	name            string
+	env             string
+	removeCloud     func(context.Context, names.CloudTag) error
+	dialError       error
+	username        string
+	cloud           string
+	expectError     string
+	expectErrorCode errors.Code
+}{{
+	name:            "CloudNotFound",
+	username:        "alice@external",
+	cloud:           "test2",
+	expectError:     `cloud "test2" not found`,
+	expectErrorCode: errors.CodeNotFound,
+}, {
+	name: "Success",
+	env:  removeCloudTestEnv,
+	removeCloud: func(_ context.Context, ct names.CloudTag) error {
+		if ct.Id() != "test" {
+			return errors.E("bad cloud tag")
+		}
+		return nil
+	},
+	username: "alice@external",
+	cloud:    "test",
+}, {
+	name:            "UserNotAuthorized",
+	env:             removeCloudTestEnv,
+	username:        "bob@external",
+	cloud:           "test",
+	expectError:     `unauthorized access`,
+	expectErrorCode: errors.CodeUnauthorized,
+}, {
+	name:        "DialError",
+	env:         removeCloudTestEnv,
+	dialError:   errors.E("test dial error"),
+	username:    "alice@external",
+	cloud:       "test",
+	expectError: `test dial error`,
+}, {
+	name: "APIError",
+	env:  removeCloudTestEnv,
+	removeCloud: func(_ context.Context, mt names.CloudTag) error {
+		return errors.E("test error")
+	},
+	username:    "alice@external",
+	cloud:       "test",
+	expectError: `test error`,
+}}
+
+func TestRemoveCloud(t *testing.T) {
+	c := qt.New(t)
+
+	for _, test := range removeCloudTests {
+		c.Run(test.name, func(c *qt.C) {
+			ctx := context.Background()
+
+			env := jimmtest.ParseEnvironment(c, test.env)
+			dialer := &jimmtest.Dialer{
+				API: &jimmtest.API{
+					RemoveCloud_: test.removeCloud,
+				},
+				Err: test.dialError,
+			}
+			j := &jimm.JIMM{
+				Database: db.Database{
+					DB: jimmtest.MemoryDB(c, nil),
+				},
+				Dialer: dialer,
+			}
+			err := j.Database.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+			env.PopulateDB(c, j.Database)
+
+			u := env.User(test.username).DBObject(c, j.Database)
+
+			err = j.RemoveCloud(ctx, &u, names.NewCloudTag(test.cloud))
+			c.Assert(dialer.IsClosed(), qt.Equals, true)
+			if test.expectError != "" {
+				c.Check(err, qt.ErrorMatches, test.expectError)
+				if test.expectErrorCode != "" {
+					c.Check(errors.ErrorCode(err), qt.Equals, test.expectErrorCode)
+				}
+				return
+			}
+			c.Assert(err, qt.IsNil)
+			cl := dbmodel.Cloud{
+				Name: test.cloud,
+			}
+			err = j.Database.GetCloud(ctx, &cl)
+			c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+		})
+	}
+}

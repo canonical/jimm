@@ -333,3 +333,197 @@ controllers:
 	_, err = s.Database.FindRegion(ctx, "no-such", "region")
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
+
+func TestUpdateUserCloudAccessUnconfiguredDatabase(t *testing.T) {
+	c := qt.New(t)
+
+	var d db.Database
+	err := d.UpdateUserCloudAccess(context.Background(), nil)
+	c.Check(err, qt.ErrorMatches, `database not configured`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
+}
+
+const testUpdateUserCloudAccessEnv = `clouds:
+- name: test
+  type: test
+  regions:
+  - name: test-region
+- name: test-hosted
+  type: kubernetes
+  host-cloud-region: test/test-region
+  regions:
+  - name: default
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: add-model
+controllers:
+- name: test
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud-regions:
+  - cloud: test
+    region: test-region
+    priority: 10
+  - cloud: test-hosted
+    region: default
+    priority: 1
+`
+
+func (s *dbSuite) TestUpdateUserCloudAccess(c *qt.C) {
+	ctx := context.Background()
+	err := s.Database.Migrate(context.Background(), true)
+	c.Assert(err, qt.Equals, nil)
+
+	env := jimmtest.ParseEnvironment(c, testUpdateUserCloudAccessEnv)
+	env.PopulateDB(c, *s.Database)
+
+	cld := dbmodel.Cloud{
+		Name: "test-hosted",
+	}
+	err = s.Database.GetCloud(ctx, &cld)
+	c.Assert(err, qt.IsNil)
+
+	charlie := env.User("charlie@external").DBObject(c, *s.Database)
+
+	// Add a new user
+	err = s.Database.UpdateUserCloudAccess(ctx, &dbmodel.UserCloudAccess{
+		User:   charlie,
+		Cloud:  cld,
+		Access: "add-model",
+	})
+	c.Assert(err, qt.Equals, nil)
+	err = s.Database.GetCloud(ctx, &cld)
+	c.Check(cld.Users, jimmtest.DBObjectEquals, []dbmodel.UserCloudAccess{{
+		Username: "alice@external",
+		User: dbmodel.User{
+			Username:         "alice@external",
+			ControllerAccess: "add-model",
+		},
+		CloudName: "test-hosted",
+		Access:    "admin",
+	}, {
+		Username: "bob@external",
+		User: dbmodel.User{
+			Username:         "bob@external",
+			ControllerAccess: "add-model",
+		},
+		CloudName: "test-hosted",
+		Access:    "add-model",
+	}, {
+		Username: "charlie@external",
+		User: dbmodel.User{
+			Username:         "charlie@external",
+			ControllerAccess: "add-model",
+		},
+		CloudName: "test-hosted",
+		Access:    "add-model",
+	}})
+
+	// Update an existing user
+	uca := cld.Users[1]
+	uca.Access = "admin"
+	err = s.Database.UpdateUserCloudAccess(ctx, &uca)
+	c.Assert(err, qt.Equals, nil)
+	err = s.Database.GetCloud(ctx, &cld)
+	c.Check(cld.Users, jimmtest.DBObjectEquals, []dbmodel.UserCloudAccess{{
+		Username: "alice@external",
+		User: dbmodel.User{
+			Username:         "alice@external",
+			ControllerAccess: "add-model",
+		},
+		CloudName: "test-hosted",
+		Access:    "admin",
+	}, {
+		Username: "bob@external",
+		User: dbmodel.User{
+			Username:         "bob@external",
+			ControllerAccess: "add-model",
+		},
+		CloudName: "test-hosted",
+		Access:    "admin",
+	}, {
+		Username: "charlie@external",
+		User: dbmodel.User{
+			Username:         "charlie@external",
+			ControllerAccess: "add-model",
+		},
+		CloudName: "test-hosted",
+		Access:    "add-model",
+	}})
+
+	// Remove a user
+	uca = cld.Users[1]
+	uca.Access = ""
+	err = s.Database.UpdateUserCloudAccess(ctx, &uca)
+	c.Assert(err, qt.Equals, nil)
+	err = s.Database.GetCloud(ctx, &cld)
+	c.Check(cld.Users, jimmtest.DBObjectEquals, []dbmodel.UserCloudAccess{{
+		Username: "alice@external",
+		User: dbmodel.User{
+			Username:         "alice@external",
+			ControllerAccess: "add-model",
+		},
+		CloudName: "test-hosted",
+		Access:    "admin",
+	}, {
+		Username: "charlie@external",
+		User: dbmodel.User{
+			Username:         "charlie@external",
+			ControllerAccess: "add-model",
+		},
+		CloudName: "test-hosted",
+		Access:    "add-model",
+	}})
+}
+
+func TestDeleteCloudUnconfiguredDatabase(t *testing.T) {
+	c := qt.New(t)
+
+	var d db.Database
+	err := d.DeleteCloud(context.Background(), nil)
+	c.Check(err, qt.ErrorMatches, `database not configured`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
+}
+
+func (s *dbSuite) TestDeleteCloud(c *qt.C) {
+	ctx := context.Background()
+
+	cl := dbmodel.Cloud{
+		Name:             "test-cloud",
+		Type:             "dummy",
+		Endpoint:         "https://example.com",
+		IdentityEndpoint: "https://identity.example.com",
+		StorageEndpoint:  "https://storage.example.com",
+		Regions: []dbmodel.CloudRegion{{
+			Name: "dummy-region",
+		}},
+		CACertificates: dbmodel.Strings{"CACERT 1", "CACERT 2"},
+		Users: []dbmodel.UserCloudAccess{{
+			User: dbmodel.User{
+				Username:    "everyone@external",
+				DisplayName: "everyone",
+			},
+			Access: "add-model",
+		}},
+	}
+
+	err := s.Database.DeleteCloud(ctx, &cl)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
+
+	err = s.Database.Migrate(context.Background(), false)
+	c.Assert(err, qt.IsNil)
+
+	err = s.Database.AddCloud(ctx, &cl)
+	c.Assert(err, qt.IsNil)
+
+	err = s.Database.DeleteCloud(ctx, &cl)
+	c.Assert(err, qt.IsNil)
+
+	cl2 := dbmodel.Cloud{
+		Name: cl.Name,
+	}
+	err = s.Database.GetCloud(ctx, &cl2)
+	c.Check(err, qt.ErrorMatches, `cloud "test-cloud" not found`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+}

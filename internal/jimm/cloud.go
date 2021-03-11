@@ -289,3 +289,160 @@ func (j *JIMM) addControllerCloud(ctx context.Context, ctl *dbmodel.Controller, 
 	}
 	return &result, nil
 }
+
+// doCloudAdmin is a simple wrapper that provides the common parts of cloud
+// administration commands. doCloudAdmin finds the cloud with the given tag
+// and validates that the given user has admin access to the cloud.
+// doCloudAdmin then connects to the controller hosting the cloud and calls
+// the given function with the cloud and API connection to perform the
+// operation specific commands. If the cloud cannot be found then an error
+// with the code CodeNotFound is returned. If the given user does not have
+// admin access to the cloud then an error with the code CodeUnauthorized
+// is returned. If there is an error connecting to the controller hosting
+// the cloud then the returned error will have the same code as the error
+// returned from the dial operation. If the given function returns an error
+// that error will be returned with the code unmasked.
+func (j *JIMM) doCloudAdmin(ctx context.Context, u *dbmodel.User, ct names.CloudTag, f func(*dbmodel.Cloud, API) error) error {
+	const op = errors.Op("jimm.doModelAdmin")
+
+	var c dbmodel.Cloud
+	c.SetTag(ct)
+
+	if err := j.Database.GetCloud(ctx, &c); err != nil {
+		return errors.E(op, err)
+	}
+	if cloudUserAccess(u, &c) != "admin" {
+		// If the user doesn't have admin access on the cloud return
+		// an unauthorized error.
+		return errors.E(op, errors.CodeUnauthorized)
+	}
+
+	if len(c.Regions) != 1 || len(c.Regions[0].Controllers) != 1 {
+		return errors.E(op, "cloud administration not available for %s", ct.Id())
+	}
+
+	api, err := j.dial(ctx, &c.Regions[0].Controllers[0].Controller, names.ModelTag{})
+	if err != nil {
+		return errors.E(op, err)
+	}
+	defer api.Close()
+	if err := f(&c, api); err != nil {
+		return errors.E(op, err)
+	}
+	return nil
+}
+
+// GrantCloudAccess grants the given access level on the given cloud to the
+// given user. If the cloud is not found then an error with the code
+// CodeNotFound is returned. If the authenticated user does not have admin
+// access to the cloud then an error with the code CodeUnauthorized is
+// returned. If the ModifyCloudAccess API call retuns an error the error
+// code is not masked.
+func (j *JIMM) GrantCloudAccess(ctx context.Context, u *dbmodel.User, ct names.CloudTag, ut names.UserTag, access string) error {
+	const op = errors.Op("jimm.GrantCloudAccess")
+
+	err := j.doCloudAdmin(ctx, u, ct, func(c *dbmodel.Cloud, api API) error {
+		targetUser := dbmodel.User{
+			Username: ut.Id(),
+		}
+		if err := j.Database.GetUser(ctx, &targetUser); err != nil {
+			return err
+		}
+		if err := api.GrantCloudAccess(ctx, ct, ut, access); err != nil {
+			return err
+		}
+		var uca dbmodel.UserCloudAccess
+		for _, a := range c.Users {
+			if a.Username == targetUser.Username {
+				uca = a
+				break
+			}
+		}
+		uca.User = targetUser
+		uca.Cloud = *c
+		uca.Access = access
+
+		if err := j.Database.UpdateUserCloudAccess(ctx, &uca); err != nil {
+			return errors.E(op, err, "cannot update database after updating controller")
+		}
+		return nil
+	})
+	if err != nil {
+		return errors.E(op, err)
+	}
+	return nil
+}
+
+// RevokeCloudAccess revokes the given access level on the given cloud from
+// the given user. If the cloud is not found then an error with the code
+// CodeNotFound is returned. If the authenticated user does not have admin
+// access to the cloud then an error with the code CodeUnauthorized is
+// returned. If the ModifyCloudAccess API call retuns an error the error
+// code is not masked.
+func (j *JIMM) RevokeCloudAccess(ctx context.Context, u *dbmodel.User, ct names.CloudTag, ut names.UserTag, access string) error {
+	const op = errors.Op("jimm.RevokeCloudAccess")
+
+	err := j.doCloudAdmin(ctx, u, ct, func(c *dbmodel.Cloud, api API) error {
+		targetUser := dbmodel.User{
+			Username: ut.Id(),
+		}
+		if err := j.Database.GetUser(ctx, &targetUser); err != nil {
+			return err
+		}
+		if err := api.RevokeCloudAccess(ctx, ct, ut, access); err != nil {
+			return err
+		}
+		var uca dbmodel.UserCloudAccess
+		for _, a := range c.Users {
+			if a.Username == targetUser.Username {
+				uca = a
+				break
+			}
+		}
+		uca.User = targetUser
+		uca.Cloud = *c
+		switch access {
+		case "admin":
+			uca.Access = "add-model"
+		default:
+			uca.Access = ""
+		}
+
+		if err := j.Database.UpdateUserCloudAccess(ctx, &uca); err != nil {
+			return errors.E(op, err, "cannot update database after updating controller")
+		}
+		return nil
+	})
+	if err != nil {
+		return errors.E(op, err)
+	}
+	return nil
+}
+
+// RemoveCloud removes the given cloud from JAAS If the cloud is not found
+// then an error with the code CodeNotFound is returned. If the
+// authenticated user does not have admin access to the cloud then an error
+// with the code CodeUnauthorized is returned. If the REmoveClouds API call
+// retuns an error the error code is not masked.
+func (j *JIMM) RemoveCloud(ctx context.Context, u *dbmodel.User, ct names.CloudTag) error {
+	const op = errors.Op("jimm.RemoveCloud")
+
+	err := j.doCloudAdmin(ctx, u, ct, func(c *dbmodel.Cloud, api API) error {
+		// Note: JIMM doesn't attempt to determine if the cloud is
+		// used by any models before attempting to remove it. JIMM
+		// relies on the controller failing the RemoveClouds API
+		// request if the cloud is in use.
+		if err := api.RemoveCloud(ctx, ct); err != nil {
+			return err
+		}
+
+		if err := j.Database.DeleteCloud(ctx, c); err != nil {
+			return errors.E(op, err, "cannot update database after updating controller")
+		}
+		return nil
+	})
+	if err != nil {
+		return errors.E(op, err)
+	}
+	return nil
+}
