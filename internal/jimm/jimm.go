@@ -194,6 +194,9 @@ type API interface {
 	// a ModelSummaryWatcher.
 	SupportsModelSummaryWatcher() bool
 
+	// UpdateCloud updates a cloud definition.
+	UpdateCloud(context.Context, names.CloudTag, jujuparams.Cloud) error
+
 	// UpdateCredential updates a credential.
 	UpdateCredential(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
 
