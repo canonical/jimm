@@ -103,7 +103,6 @@ func (j *JEM) ModelDefaultsForCloud(ctx context.Context, id identchecker.ACLIden
 	}
 	q := jimmdb.And(jimmdb.Eq("user", id.Id()), jimmdb.Eq("cloud", cloud))
 	err := j.DB.ForEachModelDefaultConfig(ctx, q, []string{"region"}, func(config *mongodoc.CloudRegionDefaults) error {
-		zapctx.Debug(ctx, "XXX###XXX", zap.Any("config", config))
 		for k, v := range config.Defaults {
 			d := result.Config[k]
 			if config.Region == "" {
