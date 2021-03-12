@@ -1,0 +1,129 @@
+                         Juju RPC Protocol 1.1
+
+1. Introduction
+
+   This document describes the RPC protocol used by juju since version
+   2.6. The author has dubbed this version of the protocol 1.1. The
+   version 1.1 protocol is a small extension to the RPC protocol used
+   by juju since version 2.0.
+
+2. Transport
+
+   The transport of Juju RPC messages is provided using websockets
+   implementations MUST establish connections, send data, and close
+   connections as described in [RFC6455].
+
+3. Messages
+
+   Juju RPC messages MUST be encoded as JSON as described in [RFC8259]
+   and MUST be sent in websocket text frames as described in [RFC6455]
+   Section 5.6.
+
+   There are two types of Juju RPC message, requests and
+   responses. Exactly one response message MUST be sent for each
+   request message received. Juju RPC connections are bi-directional
+   a request MAY be sent from either party in the connection.
+
+3.1. Request Messages
+
+   A request message initiates an RPC request and is JSON encoded
+   message containing the following fields:
+
+   request-id
+
+      The request-id is an integer value in the range 1 to
+      18446744073709551615 it is used to correlate response messages
+      with requests. The peer that receives the request SHOULD
+      NOT apply any meaning to the request-id and MUST reflect the
+      request-id unchanged in the corresponding response message. The
+      sending peer MUST include a request-id in every request
+      message. The sending peer MAY reuse any particular request-id
+      but SHOULD ensure that all requests that are in progress have
+      unique request-ids.
+
+   type
+
+      The type of a request specifies the object type that the RPC
+      request is for. In the juju API this corresponds to the facade
+      name. Every request MUST include a type.
+
+   version
+
+      The version field is a positive integer that specifies the
+      version of the type specified in the type field. A request
+      SHOULD include either a version or an id field.
+
+   id
+
+      The id parameter is a string that specifies the instance ID of
+      the type specified in the type field. A request SHOULD include
+      either a version or an id field.
+
+   request
+
+      The request field is a string that specifies the name of the
+      method to execute on the object with the specified type and
+      id, or type and version. Every request message MUST include a
+      request field.
+
+   params
+
+      The params field is a free-form field that contains the
+      parameters to pass to the procedure being called. A request
+      MAY omit the params field if there are no paramters to pass to
+      the procedure.
+
+3.2. Response Message
+
+   A response message completes an RPC request. A result message
+   MUST only be sent as a result of calling, or failing to call,
+   a requested procedure. A result message is a JSON encoded message
+   containing the following fields:
+
+   request-id
+
+      The request-id field is an integer value in the range 1 to
+      18446744073709551615. The request-id field MUST be included in
+      a response messagee and MUST be identical to request-id field
+      in the request message that initiated the procedure call.
+
+   error
+
+      The error field is a string that contains the error message
+      that resulted from calling, or failing to call, the requested
+      procedure. The error field SHOULD be omitted if the procedure
+      completed successfully. The error field MUST be specified if
+      the procedure resulted in an error.
+
+   error-code
+
+      The error-code field is a string field that MAY be used to
+      clasify the type of error that resulted from calling, or failing
+      to call, the requested procedure. The error field SHOULD be
+      omitted if the procedure completed successfully.
+
+   error-info (version 1.1)
+
+      The error-info field is a JSON object that contains arbitrary
+      extra information about the error that resulted from calling,
+      or failing to call, the requested procedure. The exact meaning
+      of any error-info is not specified and SHOULD be agreed privately
+      between the sender and receiver.
+
+   response
+
+      The response field is a free-form field that contains any result
+      from calling the requested procedure. A response message MAY
+      omit the response field either if the called procedure resulted
+      in an error, or the called procedure does not return any value.
+
+4. References
+
+   [RFC6455]  Fette, I. and A. Melnikov, "The WebSocket Protocol",
+              RFC 6455, DOI 10.17487/RFC6455, December 2011,
+              <https://www.rfc-editor.org/info/rfc6455>.
+
+   [RFC8259]  Bray, T., Ed., "The JavaScript Object Notation (JSON) Data
+              Interchange Format", STD 90, RFC 8259,
+              DOI 10.17487/RFC8259, December 2017,
+              <https://www.rfc-editor.org/info/rfc8259>.
