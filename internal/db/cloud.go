@@ -123,7 +123,7 @@ func (d *Database) SetCloud(ctx context.Context, c *dbmodel.Cloud) error {
 // UpdateCloud updates the database definition of the cloud to match the
 // given cloud. UpdateCloud does not update any user information.
 func (d *Database) UpdateCloud(ctx context.Context, c *dbmodel.Cloud) error {
-	const op = errors.Op("db.SetCloud")
+	const op = errors.Op("db.UpdateCloud")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
