@@ -293,3 +293,28 @@ func (c Connection) CloudInfo(_ context.Context, tag names.CloudTag, ci *jujupar
 	}
 	return nil
 }
+
+// UpdateCloud updates the given cloud with the given cloud definition.
+// UpdateCloud uses the UpdateCloud procedure on the cloud facade version
+// 4.
+func (c Connection) UpdateCloud(_ context.Context, tag names.CloudTag, cloud jujuparams.Cloud) error {
+	const op = errors.Op("jujuclient.UpdateCloud")
+
+	args := jujuparams.UpdateCloudArgs{
+		Clouds: []jujuparams.AddCloudArgs{{
+			Cloud: cloud,
+			Name:  tag.Id(),
+		}},
+	}
+	resp := jujuparams.ErrorResults{
+		Results: make([]jujuparams.ErrorResult, 1),
+	}
+	err := c.conn.APICall("Cloud", 4, "", "UpdateCloud", &args, &resp)
+	if err != nil {
+		return errors.E(op, jujuerrors.Cause(err))
+	}
+	if resp.Results[0].Error != nil {
+		return errors.E(op, resp.Results[0].Error)
+	}
+	return nil
+}
