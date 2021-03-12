@@ -1370,3 +1370,243 @@ func TestRemoveCloud(t *testing.T) {
 		})
 	}
 }
+
+const updateCloudTestEnv = `clouds:
+- name: dummy
+  type: dummy
+  regions:
+  - name: dummy-region
+- name: test
+  type: kubernetes
+  host-cloud-region: dummy/dummy-region
+  regions:
+  - name: default
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: admin
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud-regions:
+  - cloud: dummy
+    region: dummy-region
+    priority: 10
+  - cloud: test
+    region: default
+    priority: 1
+users:
+- username: alice@external
+  controller-access: superuser
+`
+
+var updateCloudTests = []struct {
+	name            string
+	env             string
+	updateCloud     func(context.Context, names.CloudTag, jujuparams.Cloud) error
+	dialError       error
+	username        string
+	cloud           string
+	update          jujuparams.Cloud
+	expectError     string
+	expectErrorCode errors.Code
+	expectCloud     dbmodel.Cloud
+}{{
+	name:            "CloudNotFound",
+	username:        "alice@external",
+	cloud:           "test2",
+	expectError:     `cloud "test2" not found`,
+	expectErrorCode: errors.CodeNotFound,
+}, {
+	name: "SuccessPublicCloud",
+	env:  updateCloudTestEnv,
+	updateCloud: func(_ context.Context, ct names.CloudTag, c jujuparams.Cloud) error {
+		if ct.Id() != "dummy" {
+			return errors.E("bad cloud tag")
+		}
+		return nil
+	},
+	username: "alice@external",
+	cloud:    "dummy",
+	update: jujuparams.Cloud{
+		Type:             "dummy",
+		AuthTypes:        []string{"empty", "userpass"},
+		Endpoint:         "https://example.com",
+		IdentityEndpoint: "https://identity.example.com",
+		StorageEndpoint:  "https://storage.example.com",
+		Regions: []jujuparams.CloudRegion{{
+			Name:             "dummy-region",
+			Endpoint:         "https://region.example.com",
+			IdentityEndpoint: "https://identity.region.example.com",
+			StorageEndpoint:  "https://storage.region.example.com",
+		}, {
+			Name:             "dummy-region-2",
+			Endpoint:         "https://region2.example.com",
+			IdentityEndpoint: "https://identity.region2.example.com",
+			StorageEndpoint:  "https://storage.region2.example.com",
+		}},
+	},
+	expectCloud: dbmodel.Cloud{
+		Name:             "dummy",
+		Type:             "dummy",
+		AuthTypes:        dbmodel.Strings{"empty", "userpass"},
+		Endpoint:         "https://example.com",
+		IdentityEndpoint: "https://identity.example.com",
+		StorageEndpoint:  "https://storage.example.com",
+		Regions: []dbmodel.CloudRegion{{
+			Name:             "dummy-region",
+			Endpoint:         "https://region.example.com",
+			IdentityEndpoint: "https://identity.region.example.com",
+			StorageEndpoint:  "https://storage.region.example.com",
+			Controllers: []dbmodel.CloudRegionControllerPriority{{
+				Controller: dbmodel.Controller{
+					Name: "controller-1",
+					UUID: "00000001-0000-0000-0000-000000000001",
+				},
+				Priority: 10,
+			}},
+		}, {
+			Name:             "dummy-region-2",
+			Endpoint:         "https://region2.example.com",
+			IdentityEndpoint: "https://identity.region2.example.com",
+			StorageEndpoint:  "https://storage.region2.example.com",
+			Controllers: []dbmodel.CloudRegionControllerPriority{{
+				Controller: dbmodel.Controller{
+					Name: "controller-1",
+					UUID: "00000001-0000-0000-0000-000000000001",
+				},
+				Priority: 1,
+			}},
+		}},
+	},
+}, {
+	name: "SuccessHostedCloud",
+	env:  updateCloudTestEnv,
+	updateCloud: func(_ context.Context, ct names.CloudTag, c jujuparams.Cloud) error {
+		if ct.Id() != "test" {
+			return errors.E("bad cloud tag")
+		}
+		return nil
+	},
+	username: "bob@external",
+	cloud:    "test",
+	update: jujuparams.Cloud{
+		Type:             "kubernetes",
+		HostCloudRegion:  "dummy/dummy-region",
+		AuthTypes:        []string{"empty", "userpass"},
+		Endpoint:         "https://k8s.example.com",
+		IdentityEndpoint: "https://k8s.identity.example.com",
+		StorageEndpoint:  "https://k8s.storage.example.com",
+		Regions: []jujuparams.CloudRegion{{
+			Name: "default",
+		}},
+	},
+	expectCloud: dbmodel.Cloud{
+		Name:             "test",
+		Type:             "kubernetes",
+		HostCloudRegion:  "dummy/dummy-region",
+		AuthTypes:        []string{"empty", "userpass"},
+		Endpoint:         "https://k8s.example.com",
+		IdentityEndpoint: "https://k8s.identity.example.com",
+		StorageEndpoint:  "https://k8s.storage.example.com",
+		Regions: []dbmodel.CloudRegion{{
+			Name: "default",
+			Controllers: []dbmodel.CloudRegionControllerPriority{{
+				Controller: dbmodel.Controller{
+					Name: "controller-1",
+					UUID: "00000001-0000-0000-0000-000000000001",
+				},
+				Priority: 1,
+			}},
+		}},
+		Users: []dbmodel.UserCloudAccess{{
+			Username: "alice@external",
+			User: dbmodel.User{
+				Username:         "alice@external",
+				ControllerAccess: "superuser",
+			},
+			CloudName: "test",
+			Access:    "admin",
+		}, {
+			Username: "bob@external",
+			User: dbmodel.User{
+				Username:         "bob@external",
+				ControllerAccess: "add-model",
+			},
+			CloudName: "test",
+			Access:    "admin",
+		}},
+	},
+}, {
+	name:            "UserNotAuthorized",
+	env:             updateCloudTestEnv,
+	username:        "bob@external",
+	cloud:           "dummy",
+	expectError:     `unauthorized access`,
+	expectErrorCode: errors.CodeUnauthorized,
+}, {
+	name:        "DialError",
+	env:         updateCloudTestEnv,
+	dialError:   errors.E("test dial error"),
+	username:    "alice@external",
+	cloud:       "dummy",
+	expectError: `test dial error`,
+}, {
+	name: "APIError",
+	env:  updateCloudTestEnv,
+	updateCloud: func(context.Context, names.CloudTag, jujuparams.Cloud) error {
+		return errors.E("test error")
+	},
+	username:    "alice@external",
+	cloud:       "dummy",
+	expectError: `test error`,
+}}
+
+func TestUpdateCloud(t *testing.T) {
+	c := qt.New(t)
+
+	for _, test := range updateCloudTests {
+		c.Run(test.name, func(c *qt.C) {
+			ctx := context.Background()
+
+			env := jimmtest.ParseEnvironment(c, test.env)
+			dialer := &jimmtest.Dialer{
+				API: &jimmtest.API{
+					UpdateCloud_: test.updateCloud,
+				},
+				Err:          test.dialError,
+				UUID:         "00000001-0000-0000-0000-000000000001",
+				AgentVersion: "1",
+			}
+			j := &jimm.JIMM{
+				Database: db.Database{
+					DB: jimmtest.MemoryDB(c, nil),
+				},
+				Dialer: dialer,
+			}
+			err := j.Database.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+			env.PopulateDB(c, j.Database)
+
+			u := env.User(test.username).DBObject(c, j.Database)
+
+			tag := names.NewCloudTag(test.cloud)
+			err = j.UpdateCloud(ctx, &u, tag, test.update)
+			c.Assert(dialer.IsClosed(), qt.Equals, true)
+			if test.expectError != "" {
+				c.Check(err, qt.ErrorMatches, test.expectError)
+				if test.expectErrorCode != "" {
+					c.Check(errors.ErrorCode(err), qt.Equals, test.expectErrorCode)
+				}
+				return
+			}
+			c.Assert(err, qt.IsNil)
+			var cloud dbmodel.Cloud
+			cloud.SetTag(tag)
+			err = j.Database.GetCloud(ctx, &cloud)
+			c.Assert(err, qt.IsNil)
+			c.Check(cloud, jimmtest.DBObjectEquals, test.expectCloud)
+		})
+	}
+}

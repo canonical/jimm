@@ -122,6 +122,7 @@ type API struct {
 	RevokeModelAccess_                 func(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
 	SupportsCheckCredentialModels_     bool
 	SupportsModelSummaryWatcher_       bool
+	UpdateCloud_                       func(context.Context, names.CloudTag, jujuparams.Cloud) error
 	UpdateCredential_                  func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
 	ValidateModelUpgrade_              func(context.Context, names.ModelTag, bool) error
 	WatchAllModelSummaries_            func(context.Context) (string, error)
@@ -343,6 +344,13 @@ func (a *API) SupportsCheckCredentialModels() bool {
 
 func (a *API) SupportsModelSummaryWatcher() bool {
 	return a.SupportsModelSummaryWatcher_
+}
+
+func (a *API) UpdateCloud(ctx context.Context, tag names.CloudTag, cloud jujuparams.Cloud) error {
+	if a.UpdateCloud_ == nil {
+		return errors.E(errors.CodeNotImplemented)
+	}
+	return a.UpdateCloud_(ctx, tag, cloud)
 }
 
 func (a *API) UpdateCredential(ctx context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {

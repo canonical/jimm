@@ -120,6 +120,38 @@ func (d *Database) SetCloud(ctx context.Context, c *dbmodel.Cloud) error {
 	return nil
 }
 
+// UpdateCloud updates the database definition of the cloud to match the
+// given cloud. UpdateCloud does not update any user information.
+func (d *Database) UpdateCloud(ctx context.Context, c *dbmodel.Cloud) error {
+	const op = errors.Op("db.UpdateCloud")
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	err := d.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(c).Error; err != nil {
+			return err
+		}
+		for _, r := range c.Regions {
+			r.CloudName = c.Name
+			if err := tx.Save(&r).Error; err != nil {
+				return err
+			}
+			for _, ctl := range r.Controllers {
+				ctl.CloudRegionID = r.ID
+				if err := tx.Save(&ctl).Error; err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return errors.E(op, dbError(err))
+	}
+	return nil
+}
+
 func preloadCloud(prefix string, db *gorm.DB) *gorm.DB {
 	if len(prefix) > 0 && prefix[len(prefix)-1] != '.' {
 		prefix += "."

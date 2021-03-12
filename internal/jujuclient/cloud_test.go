@@ -194,3 +194,53 @@ func (s *cloudSuite) TestRevokeCloudAccess(c *gc.C) {
 	err = s.API.RevokeCloudAccess(context.Background(), names.NewCloudTag("dummy"), names.NewUserTag("user@external"), "add-model")
 	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
 }
+
+func (s *cloudSuite) TestCloudInfo(c *gc.C) {
+	var ci jujuparams.CloudInfo
+
+	err := s.API.CloudInfo(context.Background(), names.NewCloudTag("no-such-cloud"), &ci)
+	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
+
+	err = s.API.CloudInfo(context.Background(), names.NewCloudTag("dummy"), &ci)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(ci, jc.DeepEquals, jujuparams.CloudInfo{
+		CloudDetails: jujuparams.CloudDetails{
+			Type:             "dummy",
+			AuthTypes:        []string{"empty", "userpass"},
+			Endpoint:         "dummy-endpoint",
+			IdentityEndpoint: "dummy-identity-endpoint",
+			StorageEndpoint:  "dummy-storage-endpoint",
+			Regions: []jujuparams.CloudRegion{{
+				Name:             "dummy-region",
+				Endpoint:         "dummy-endpoint",
+				IdentityEndpoint: "dummy-identity-endpoint",
+				StorageEndpoint:  "dummy-storage-endpoint",
+			}},
+		},
+		Users: []jujuparams.CloudUserInfo{{
+			UserName:    "admin",
+			DisplayName: "admin",
+			Access:      "admin",
+		}},
+	})
+}
+
+func (s *cloudSuite) TestUpdateCloud(c *gc.C) {
+	var cloud jujuparams.Cloud
+
+	err := s.API.Cloud(context.Background(), names.NewCloudTag("dummy"), &cloud)
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.API.UpdateCloud(context.Background(), names.NewCloudTag("no-such-cloud"), cloud)
+	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
+
+	cloud.Endpoint = "new-dummy-endpoint"
+
+	err = s.API.UpdateCloud(context.Background(), names.NewCloudTag("dummy"), cloud)
+	c.Assert(err, gc.Equals, nil)
+
+	var cloud2 jujuparams.Cloud
+	err = s.API.Cloud(context.Background(), names.NewCloudTag("dummy"), &cloud2)
+	c.Assert(err, gc.Equals, nil)
+	c.Check(cloud2, jc.DeepEquals, cloud)
+}

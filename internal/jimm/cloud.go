@@ -10,6 +10,7 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 
+	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 )
@@ -441,6 +442,75 @@ func (j *JIMM) RemoveCloud(ctx context.Context, u *dbmodel.User, ct names.CloudT
 		}
 		return nil
 	})
+	if err != nil {
+		return errors.E(op, err)
+	}
+	return nil
+}
+
+// UpdateCloud updates the cloud with the given name on all controllers
+// that host the cloud. If the given user is not a controller superuser or
+// an admin on the cloud an errror is returned with a code of
+// CodeUnauthorized. If the cloud with the given name cannot be found then
+// an error with the code CodeNotFound is returned.
+func (j *JIMM) UpdateCloud(ctx context.Context, u *dbmodel.User, ct names.CloudTag, cloud jujuparams.Cloud) error {
+	const op = errors.Op("jimm.UpdateCloud")
+
+	var c dbmodel.Cloud
+	c.SetTag(ct)
+
+	if err := j.Database.GetCloud(ctx, &c); err != nil {
+		return errors.E(op, err)
+	}
+	if cloudUserAccess(u, &c) != "admin" {
+		// If the user doesn't have admin access on the cloud return
+		// an unauthorized error.
+		return errors.E(op, errors.CodeUnauthorized)
+	}
+
+	var controllers []dbmodel.Controller
+	seen := make(map[uint]bool)
+	for _, r := range c.Regions {
+		for _, ctl := range r.Controllers {
+			if seen[ctl.ControllerID] {
+				continue
+			}
+			seen[ctl.ControllerID] = true
+			controllers = append(controllers, ctl.Controller)
+		}
+	}
+
+	err := j.forEachController(ctx, controllers, func(ctl *dbmodel.Controller, api API) error {
+		return api.UpdateCloud(ctx, ct, cloud)
+	})
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	// Update the local database with the updated cloud definition. We
+	// do this in a transaction so that the local view cannot finish in
+	// an inconsistent state.
+	err = j.Database.Transaction(func(db *db.Database) error {
+
+		var c dbmodel.Cloud
+		c.SetTag(ct)
+		if err := db.GetCloud(ctx, &c); err != nil {
+			return err
+		}
+		c.FromJujuCloud(cloud)
+		for i := range c.Regions {
+			if len(c.Regions[i].Controllers) == 0 {
+				for _, ctl := range controllers {
+					c.Regions[i].Controllers = append(c.Regions[i].Controllers, dbmodel.CloudRegionControllerPriority{
+						Controller: ctl,
+						Priority:   dbmodel.CloudRegionControllerPrioritySupported,
+					})
+				}
+			}
+		}
+		return db.UpdateCloud(ctx, &c)
+	})
+
 	if err != nil {
 		return errors.E(op, err)
 	}
