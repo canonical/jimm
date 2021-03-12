@@ -311,3 +311,22 @@ func (c Connection) ModelStatus(ctx context.Context, status *jujuparams.ModelSta
 	*status = resp.Results[0]
 	return nil
 }
+
+// ChangeModelCredential replaces cloud credential for a given model with the provided one.
+func (c Connection) ChangeModelCredential(ctx context.Context, model names.ModelTag, credential names.CloudCredentialTag) error {
+	const op = errors.Op("jujuclient.ChangeModelCredential")
+
+	var out jujuparams.ErrorResults
+	args := jujuparams.ChangeModelCredentialsParams{
+		Models: []jujuparams.ChangeModelCredentialParams{{
+			ModelTag:           model.String(),
+			CloudCredentialTag: credential.String(),
+		}},
+	}
+
+	err := c.conn.APICall("ChangeModelCredential", 5, "", "ChangeModelCredential", &args, &out)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	return out.OneError()
+}

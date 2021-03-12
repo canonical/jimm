@@ -254,3 +254,14 @@ func (s *modelmanagerSuite) TestModelStatusError(c *gc.C) {
 	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
 	c.Check(err, gc.ErrorMatches, `model "00000000-0000-0000-0000-000000000000" not found`)
 }
+
+func (s *modelmanagerSuite) ChangeModelCredential(c *gc.C) {
+	ctx := context.Background()
+
+	err := s.API.ChangeModelCredential(
+		ctx,
+		names.NewModelTag("00000000-0000-0000-0000-000000000000"),
+		names.NewCloudCredentialTag("test-cloud/test-owner/test-credential"),
+	)
+	c.Assert(err, gc.Equals, nil)
+}

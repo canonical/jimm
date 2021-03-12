@@ -2589,6 +2589,244 @@ func TestValidateModelUpgrade(t *testing.T) {
 	}
 }
 
+const updateModelCredentialTestEnv = `clouds:
+- name: dummy
+  type: dummy
+  regions:
+  - name: dummy-region
+cloud-credentials:
+- owner: alice@external
+  name: cred-2
+  cloud: dummy
+- owner: alice@external
+  name: cred-1
+  cloud: dummy
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+models:
+- name: model-1
+  uuid: 00000002-0000-0000-0000-000000000001
+  controller: controller-1
+  cloud: dummy
+  region: dummy-region
+  cloud-credential: cred-1
+  owner: alice@external
+  users:
+  - user: alice@external
+    access: admin
+  - user: charlie@external
+    access: write
+`
+
+var updateModelCredentialTests = []struct {
+	name                  string
+	env                   string
+	updateCredential      func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
+	changeModelCredential func(context.Context, names.ModelTag, names.CloudCredentialTag) error
+	dialError             error
+	username              string
+	credential            string
+	uuid                  string
+	expectModel           dbmodel.Model
+	expectError           string
+	expectErrorCode       errors.Code
+}{{
+	name: "success",
+	env:  updateModelCredentialTestEnv,
+	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+		if taggedCredential.Tag != "cloudcred-dummy_alice@external_cred-2" {
+			return nil, errors.E("bad cloud credential tag")
+		}
+		return nil, nil
+	},
+	changeModelCredential: func(_ context.Context, modelTag names.ModelTag, credentialTag names.CloudCredentialTag) error {
+		if modelTag.Id() != "00000002-0000-0000-0000-000000000001" {
+			return errors.E("bad model tag")
+		}
+		if credentialTag.Id() != "dummy/alice@external/cred-2" {
+			return errors.E("bad cloud credential tag")
+		}
+		return nil
+	},
+	username:   "alice@external",
+	credential: "dummy/alice@external/cred-2",
+	uuid:       "00000002-0000-0000-0000-000000000001",
+	expectModel: dbmodel.Model{
+		Name: "model-1",
+		UUID: sql.NullString{
+			String: "00000002-0000-0000-0000-000000000001",
+			Valid:  true,
+		},
+		Owner: dbmodel.User{
+			Username:         "alice@external",
+			ControllerAccess: "add-model",
+		},
+		Controller: dbmodel.Controller{
+			Name: "controller-1",
+			UUID: "00000001-0000-0000-0000-000000000001",
+		},
+		CloudRegion: dbmodel.CloudRegion{
+			Cloud: dbmodel.Cloud{
+				Name: "dummy",
+				Type: "dummy",
+			},
+			Name: "dummy-region",
+		},
+		CloudCredential: dbmodel.CloudCredential{
+			Name: "cred-2",
+		},
+		Users: []dbmodel.UserModelAccess{{
+			User: dbmodel.User{
+				Username:         "alice@external",
+				ControllerAccess: "add-model",
+			},
+			Access: "admin",
+		}, {
+			User: dbmodel.User{
+				Username:         "charlie@external",
+				ControllerAccess: "add-model",
+			},
+			Access: "write",
+		}},
+	},
+}, {
+	name: "user not admin",
+	env:  updateModelCredentialTestEnv,
+	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+		if taggedCredential.Tag != "cloudcred-dummy_alice@external_cred-2" {
+			return nil, errors.E("bad cloud credential tag")
+		}
+		return nil, nil
+	},
+	changeModelCredential: func(_ context.Context, modelTag names.ModelTag, credentialTag names.CloudCredentialTag) error {
+		if modelTag.Id() != "00000002-0000-0000-0000-000000000001" {
+			return errors.E("bad model tag")
+		}
+		if credentialTag.Id() != "dummy/alice@external/cred-2" {
+			return errors.E("bad cloud credential tag")
+		}
+		return nil
+	},
+	username:        "charlie@external",
+	credential:      "dummy/alice@external/cred-2",
+	uuid:            "00000002-0000-0000-0000-000000000001",
+	expectError:     "unauthorized access",
+	expectErrorCode: errors.CodeUnauthorized,
+}, {
+	name:            "model not found",
+	env:             updateModelCredentialTestEnv,
+	username:        "charlie@external",
+	credential:      "dummy/alice@external/cred-2",
+	uuid:            "00000002-0000-0000-0000-000000000002",
+	expectError:     "record not found",
+	expectErrorCode: errors.CodeNotFound,
+}, {
+	name: "credential not found",
+	env:  updateModelCredentialTestEnv,
+	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+		if taggedCredential.Tag != "cloudcred-dummy_alice@external_cred-2" {
+			return nil, errors.E("bad cloud credential tag")
+		}
+		return nil, nil
+	},
+	changeModelCredential: func(_ context.Context, modelTag names.ModelTag, credentialTag names.CloudCredentialTag) error {
+		if modelTag.Id() != "00000002-0000-0000-0000-000000000001" {
+			return errors.E("bad model tag")
+		}
+		if credentialTag.Id() != "dummy/alice@external/cred-2" {
+			return errors.E("bad cloud credential tag")
+		}
+		return nil
+	},
+	username:        "alice@external",
+	credential:      "dummy/alice@external/cred-3",
+	uuid:            "00000002-0000-0000-0000-000000000001",
+	expectError:     `cloudcredential "dummy/alice@external/cred-3" not found`,
+	expectErrorCode: errors.CodeNotFound,
+}, {
+	name: "update credential returns an error",
+	env:  updateModelCredentialTestEnv,
+	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+		return nil, errors.E("an error")
+	},
+	username:    "alice@external",
+	credential:  "dummy/alice@external/cred-2",
+	uuid:        "00000002-0000-0000-0000-000000000001",
+	expectError: "an error",
+}, {
+	name: "change model credential returns an error",
+	env:  updateModelCredentialTestEnv,
+	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+		if taggedCredential.Tag != "cloudcred-dummy_alice@external_cred-2" {
+			return nil, errors.E("bad cloud credential tag")
+		}
+		return nil, nil
+	},
+	changeModelCredential: func(_ context.Context, modelTag names.ModelTag, credentialTag names.CloudCredentialTag) error {
+		return errors.E("an error")
+	},
+	username:    "alice@external",
+	credential:  "dummy/alice@external/cred-2",
+	uuid:        "00000002-0000-0000-0000-000000000001",
+	expectError: "an error",
+}}
+
+func TestUpdateModelCredential(t *testing.T) {
+	c := qt.New(t)
+
+	for _, test := range updateModelCredentialTests {
+		c.Run(test.name, func(c *qt.C) {
+			ctx := context.Background()
+
+			env := jimmtest.ParseEnvironment(c, test.env)
+			dialer := &jimmtest.Dialer{
+				API: &jimmtest.API{
+					UpdateCredential_:      test.updateCredential,
+					ChangeModelCredential_: test.changeModelCredential,
+				},
+				Err: test.dialError,
+			}
+			j := &jimm.JIMM{
+				Database: db.Database{
+					DB: jimmtest.MemoryDB(c, nil),
+				},
+				Dialer: dialer,
+			}
+			err := j.Database.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+			env.PopulateDB(c, j.Database)
+
+			u := env.User(test.username).DBObject(c, j.Database)
+
+			err = j.ChangeModelCredential(
+				ctx,
+				&u,
+				names.NewModelTag(test.uuid),
+				names.NewCloudCredentialTag(test.credential),
+			)
+			c.Assert(dialer.IsClosed(), qt.Equals, true)
+			if test.expectError != "" {
+				c.Check(err, qt.ErrorMatches, test.expectError)
+				if test.expectErrorCode != "" {
+					c.Check(errors.ErrorCode(err), qt.Equals, test.expectErrorCode)
+				}
+				return
+			}
+			c.Assert(err, qt.IsNil)
+			m := dbmodel.Model{
+				UUID: sql.NullString{
+					String: test.uuid,
+					Valid:  true,
+				},
+			}
+			err = j.Database.GetModel(ctx, &m)
+			c.Assert(err, qt.IsNil)
+			c.Check(m, jimmtest.DBObjectEquals, test.expectModel)
+		})
+	}
+}
+
 func newBool(b bool) *bool {
 	return &b
 }
