@@ -182,7 +182,12 @@ func (b *modelBuilder) WithName(name string) *modelBuilder {
 
 // WithConfig returns a builder with the specified model config.
 func (b *modelBuilder) WithConfig(cfg map[string]interface{}) *modelBuilder {
-	b.config = cfg
+	if b.config == nil {
+		b.config = make(map[string]interface{})
+	}
+	for k, v := range cfg {
+		b.config[k] = v
+	}
 	return b
 }
 
@@ -200,6 +205,7 @@ func (b *modelBuilder) WithCloud(cloud names.CloudTag) *modelBuilder {
 		return b
 	}
 	b.cloud = &c
+
 	return b
 }
 
@@ -232,6 +238,35 @@ func (b *modelBuilder) WithCloudRegion(region string) *modelBuilder {
 		// we looped through all cloud regions and could not find a match
 		if b.cloudRegionID == 0 {
 			b.err = errors.E(fmt.Sprintf("cloud region %s not found", region))
+		}
+
+		if b.owner != nil {
+			defaults := dbmodel.CloudDefaults{
+				UserID:  b.owner.Username,
+				CloudID: b.cloud.ID,
+				Region:  region,
+			}
+			err := b.jimm.Database.CloudDefaults(b.ctx, &defaults)
+			if err != nil {
+				if errors.ErrorCode(err) == errors.CodeNotFound {
+					defaults = dbmodel.CloudDefaults{
+						UserID:  b.owner.Username,
+						CloudID: b.cloud.ID,
+					}
+					err := b.jimm.Database.CloudDefaults(b.ctx, &defaults)
+					if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
+						b.err = errors.E(err, "could not fetch cloudregiondefaults")
+					}
+				} else {
+					b.err = errors.E(err, "could not fetch cloudregiondefaults")
+				}
+			} else {
+				for k, v := range defaults.Defaults {
+					if _, ok := b.config[k]; !ok {
+						b.config[k] = v
+					}
+				}
+			}
 		}
 	} else {
 		b.err = errors.E("cloud not specified")

@@ -44,3 +44,31 @@ func (d *Database) GetController(ctx context.Context, controller *dbmodel.Contro
 	}
 	return nil
 }
+
+// ForEachController iterates through every controller calling the given function
+// for each one. If the given function returns an error the iteration
+// will stop immediately and the error will be returned unmodified.
+func (d *Database) ForEachController(ctx context.Context, f func(*dbmodel.Controller) error) error {
+	const op = errors.Op("db.ForEachController")
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	db := d.DB.WithContext(ctx)
+	rows, err := db.Model(&dbmodel.Controller{}).Rows()
+	if err != nil {
+		return errors.E(op, err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var controller dbmodel.Controller
+		if err := db.ScanRows(rows, &controller); err != nil {
+			return errors.E(op, err)
+		}
+		if err := f(&controller); err != nil {
+			return err
+		}
+	}
+	return nil
+}

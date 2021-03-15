@@ -191,6 +191,7 @@ type Controller struct {
 	Name         string                          `json:"name"`
 	UUID         string                          `json:"uuid"`
 	CloudRegions []CloudRegionControllerPriority `json:"cloud-regions"`
+	AgentVersion string                          `json:"agent-version"`
 
 	env *Environment
 	dbo dbmodel.Controller
@@ -202,6 +203,7 @@ func (ctl *Controller) DBObject(c *qt.C, db db.Database) dbmodel.Controller {
 	}
 	ctl.dbo.Name = ctl.Name
 	ctl.dbo.UUID = ctl.UUID
+	ctl.dbo.AgentVersion = ctl.AgentVersion
 	ctl.dbo.CloudRegions = make([]dbmodel.CloudRegionControllerPriority, len(ctl.CloudRegions))
 	for i, cr := range ctl.CloudRegions {
 		cl := ctl.env.Cloud(cr.Cloud).DBObject(c, db)
