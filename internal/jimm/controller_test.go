@@ -12,6 +12,7 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/version"
 	"github.com/juju/names/v4"
+	semversion "github.com/juju/version"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
@@ -147,4 +148,55 @@ func TestAddController(t *testing.T) {
 	err = j.Database.GetController(ctx, &ctl2)
 	c.Assert(err, qt.IsNil)
 	c.Check(ctl2, qt.CmpEquals(cmpopts.EquateEmpty()), ctl)
+}
+
+const testEarliestControllerVersionEnv = `clouds:
+- name: test
+  type: test
+  regions:
+  - name: test-region
+cloud-credentials:
+- name: test-cred
+  cloud: test
+  owner: alice@external
+  type: empty
+controllers:
+- name: test1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test
+  region: test-region-1
+  agent-version: 3.2.1
+- name: test2
+  uuid: 00000001-0000-0000-0000-000000000002
+  cloud: test
+  region: test-region-2
+  agent-version: 3.2.0
+- name: test3
+  uuid: 00000001-0000-0000-0000-000000000003
+  cloud: test
+  region: test-region-3
+  agent-version: 2.1.0
+`
+
+func TestEarliestControllerVersion(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+	now := time.Now().UTC().Round(time.Millisecond)
+
+	j := &jimm.JIMM{
+		Database: db.Database{
+			DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+		},
+	}
+
+	err := j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	env := jimmtest.ParseEnvironment(c, testEarliestControllerVersionEnv)
+	env.PopulateDB(c, j.Database)
+
+	v, err := j.EarliestControllerVersion(ctx)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(v, qt.DeepEquals, semversion.MustParse("2.1.0"))
 }

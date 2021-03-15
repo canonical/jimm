@@ -9,6 +9,7 @@ import (
 
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
+	"github.com/juju/version"
 	"go.uber.org/zap"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
@@ -144,4 +145,40 @@ func cloudUsers(ctx context.Context, api API, tag names.CloudTag) ([]dbmodel.Use
 		})
 	}
 	return users, nil
+}
+
+// EarliestControllerVersion returns the earliest agent version
+// that any of the available public controllers is known to be running.
+// If there are no available controllers or none of their versions are
+// known, it returns the zero version.
+func (j *JIMM) EarliestControllerVersion(ctx context.Context) (version.Number, error) {
+	const op = errors.Op("jimm.EarliestControllerVersion")
+	var v *version.Number
+
+	err := j.Database.ForEachController(ctx, func(controller *dbmodel.Controller) error {
+		if controller.AgentVersion == "" {
+			return nil
+		}
+		versionNumber, err := version.Parse(controller.AgentVersion)
+		if err != nil {
+			zapctx.Error(
+				ctx,
+				"failed to parse agent version",
+				zap.String("version", controller.AgentVersion),
+				zap.String("controller", controller.Name),
+			)
+			return nil
+		}
+		if v == nil || versionNumber.Compare(*v) < 0 {
+			v = &versionNumber
+		}
+		return nil
+	})
+	if err != nil {
+		return version.Number{}, errors.E(op, err)
+	}
+	if v == nil {
+		return version.Number{}, nil
+	}
+	return *v, nil
 }

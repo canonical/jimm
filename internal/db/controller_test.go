@@ -14,6 +14,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 )
 
 func TestAddControllerUnconfiguredDatabase(t *testing.T) {
@@ -189,4 +190,65 @@ func (s *dbSuite) TestGetControllerWithModels(c *qt.C) {
 		models[0],
 	}
 	c.Assert(dbController, qt.CmpEquals(cmpopts.IgnoreFields(dbmodel.Controller{}, "Models"), cmpopts.EquateEmpty()), controller)
+}
+
+func TestForEachControllerUnconfiguredDatabase(t *testing.T) {
+	c := qt.New(t)
+
+	var d db.Database
+	err := d.ForEachController(context.Background(), nil)
+	c.Check(err, qt.ErrorMatches, `database not configured`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
+}
+
+const testForEachControllerEnv = `clouds:
+- name: test
+  type: test
+  regions:
+  - name: test-region
+cloud-credentials:
+- name: test-cred
+  cloud: test
+  owner: alice@external
+  type: empty
+controllers:
+- name: test1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test
+  region: test-region-1
+- name: test2
+  uuid: 00000001-0000-0000-0000-000000000002
+  cloud: test
+  region: test-region-2
+- name: test3
+  uuid: 00000001-0000-0000-0000-000000000003
+  cloud: test
+  region: test-region-3
+`
+
+func (s *dbSuite) TestForEachController(c *qt.C) {
+	ctx := context.Background()
+	err := s.Database.Migrate(context.Background(), true)
+	c.Assert(err, qt.Equals, nil)
+
+	env := jimmtest.ParseEnvironment(c, testForEachControllerEnv)
+	env.PopulateDB(c, *s.Database)
+
+	testError := errors.E("test error")
+	err = s.Database.ForEachController(ctx, func(controller *dbmodel.Controller) error {
+		return testError
+	})
+	c.Check(err, qt.Equals, testError)
+
+	var controllers []string
+	err = s.Database.ForEachController(ctx, func(controller *dbmodel.Controller) error {
+		controllers = append(controllers, controller.UUID)
+		return nil
+	})
+	c.Assert(err, qt.IsNil)
+	c.Check(controllers, qt.DeepEquals, []string{
+		"00000001-0000-0000-0000-000000000001",
+		"00000001-0000-0000-0000-000000000002",
+		"00000001-0000-0000-0000-000000000003",
+	})
 }
