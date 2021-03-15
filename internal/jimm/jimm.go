@@ -89,6 +89,9 @@ type API interface {
 	// AddCloud adds a new cloud.
 	AddCloud(context.Context, names.CloudTag, jujuparams.Cloud) error
 
+	// ChangeModelCredential replaces cloud credential for a given model with the provided one.
+	ChangeModelCredential(context.Context, names.ModelTag, names.CloudCredentialTag) error
+
 	// CheckCredentialModels checks that an updated credential can be used
 	// with the associated models.
 	CheckCredentialModels(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)

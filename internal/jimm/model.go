@@ -919,3 +919,44 @@ func (j *JIMM) doModelAdmin(ctx context.Context, u *dbmodel.User, mt names.Model
 	}
 	return nil
 }
+
+// ChangeModelCredential changes the credential used with a model on both
+// the controller and the local database.
+func (j *JIMM) ChangeModelCredential(ctx context.Context, user *dbmodel.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error {
+	const op = errors.Op("jimm.ChangeModelCredential")
+
+	credential := dbmodel.CloudCredential{}
+	credential.SetTag(cloudCredentialTag)
+
+	err := j.Database.GetCloudCredential(ctx, &credential)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	var m *dbmodel.Model
+	err = j.doModelAdmin(ctx, user, modelTag, func(model *dbmodel.Model, api API) error {
+		_, err = j.updateControllerCloudCredential(ctx, &credential, api.UpdateCredential)
+		if err != nil {
+			return errors.E(op, err)
+		}
+
+		err = api.ChangeModelCredential(ctx, modelTag, cloudCredentialTag)
+		if err != nil {
+			return errors.E(op, err)
+		}
+		m = model
+		return nil
+	})
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	m.CloudCredential = credential
+	m.CloudCredentialID = credential.ID
+	err = j.Database.UpdateModel(ctx, m)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	return nil
+}

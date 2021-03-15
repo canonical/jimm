@@ -90,6 +90,7 @@ func (w apiWrapper) Close() error {
 // a NotImplemented error.
 type API struct {
 	AddCloud_                          func(context.Context, names.CloudTag, jujuparams.Cloud) error
+	ChangeModelCredential_             func(context.Context, names.ModelTag, names.CloudCredentialTag) error
 	CheckCredentialModels_             func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
 	Close_                             func() error
 	Cloud_                             func(context.Context, names.CloudTag, *jujuparams.Cloud) error
@@ -371,6 +372,13 @@ func (a *API) WatchAllModelSummaries(ctx context.Context) (string, error) {
 		return "", errors.E(errors.CodeNotImplemented)
 	}
 	return a.WatchAllModelSummaries_(ctx)
+}
+
+func (a *API) ChangeModelCredential(ctx context.Context, model names.ModelTag, cred names.CloudCredentialTag) error {
+	if a.ChangeModelCredential_ == nil {
+		return errors.E(errors.CodeNotImplemented)
+	}
+	return a.ChangeModelCredential_(ctx, model, cred)
 }
 
 var _ jimm.API = &API{}
