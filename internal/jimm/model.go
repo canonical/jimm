@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -562,51 +563,75 @@ func (b *modelBuilder) JujuModelInfo() *jujuparams.ModelInfo {
 func (j *JIMM) AddModel(ctx context.Context, u *dbmodel.User, args *ModelCreateArgs) (_ *jujuparams.ModelInfo, err error) {
 	const op = errors.Op("jimm.AddModel")
 
+	ale := dbmodel.AuditLogEntry{
+		Time:    time.Now().UTC().Round(time.Millisecond),
+		UserTag: u.Tag().String(),
+		Action:  "create",
+		Params: dbmodel.StringMap{
+			"name":  args.Name,
+			"owner": args.Owner.String(),
+		},
+	}
+	defer j.addAuditLogEntry(&ale)
+
+	fail := func(err error) (*jujuparams.ModelInfo, error) {
+		ale.Params["err"] = err.Error()
+		return nil, err
+	}
+
 	builder := newModelBuilder(ctx, j)
 	builder = builder.WithName(args.Name)
 	builder = builder.WithConfig(args.Config)
 	builder = builder.WithUser(u)
 	if err := builder.Error(); err != nil {
-		return nil, errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
 	builder = builder.WithOwner(args.Owner)
 	if err := builder.Error(); err != nil {
-		return nil, errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
 	if args.Cloud != (names.CloudTag{}) {
+		ale.Params["cloud"] = args.Cloud.String()
 		builder = builder.WithCloud(args.Cloud)
 		if err := builder.Error(); err != nil {
-			return nil, errors.E(op, err)
+			return fail(errors.E(op, err))
 		}
 	}
 	if args.CloudRegion != "" {
+		ale.Params["region"] = args.CloudRegion
 		builder = builder.WithCloudRegion(args.CloudRegion)
 		if err := builder.Error(); err != nil {
-			return nil, errors.E(op, err)
+			return fail(errors.E(op, err))
 		}
 	}
 	if args.CloudCredential != (names.CloudCredentialTag{}) {
+		ale.Params["cloud-credential"] = args.CloudCredential.String()
 		builder = builder.WithCloudCredential(args.CloudCredential)
 		if err := builder.Error(); err != nil {
-			return nil, errors.E(op, err)
+			return fail(errors.E(op, err))
 		}
 	}
 	builder = builder.CreateDatabaseModel()
 	if err := builder.Error(); err != nil {
-		return nil, errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
 	defer builder.Cleanup()
 
 	builder = builder.CreateControllerModel()
 	if err := builder.Error(); err != nil {
-		return nil, errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
 
 	builder = builder.UpdateDatabaseModel()
 	if err := builder.Error(); err != nil {
-		return nil, errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
-	return builder.JujuModelInfo(), nil
+
+	mi := builder.JujuModelInfo()
+	ale.Tag = names.NewModelTag(mi.UUID).String()
+	ale.Success = true
+
+	return mi, nil
 }
 
 // ModelInfo returns the model info for the model with the given ModelTag.
@@ -755,6 +780,18 @@ func (j *JIMM) ForEachModel(ctx context.Context, u *dbmodel.User, f func(*dbmode
 func (j *JIMM) GrantModelAccess(ctx context.Context, u *dbmodel.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
 	const op = errors.Op("jimm.GrantModelAccess")
 
+	ale := dbmodel.AuditLogEntry{
+		Time:    time.Now().UTC().Round(time.Millisecond),
+		Tag:     mt.String(),
+		UserTag: u.Tag().String(),
+		Action:  "grant",
+		Params: dbmodel.StringMap{
+			"user":   ut.String(),
+			"access": string(access),
+		},
+	}
+	defer j.addAuditLogEntry(&ale)
+
 	err := j.doModelAdmin(ctx, u, mt, func(m *dbmodel.Model, api API) error {
 		targetUser := dbmodel.User{
 			Username: ut.Id(),
@@ -782,8 +819,10 @@ func (j *JIMM) GrantModelAccess(ctx context.Context, u *dbmodel.User, mt names.M
 		return nil
 	})
 	if err != nil {
+		ale.Params["err"] = err.Error()
 		return errors.E(op, err)
 	}
+	ale.Success = true
 	return nil
 
 }
@@ -796,6 +835,18 @@ func (j *JIMM) GrantModelAccess(ctx context.Context, u *dbmodel.User, mt names.M
 // retuns an error the error code is not masked.
 func (j *JIMM) RevokeModelAccess(ctx context.Context, u *dbmodel.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
 	const op = errors.Op("jimm.RevokeModelAccess")
+
+	ale := dbmodel.AuditLogEntry{
+		Time:    time.Now().UTC().Round(time.Millisecond),
+		Tag:     mt.String(),
+		UserTag: u.Tag().String(),
+		Action:  "revoke",
+		Params: dbmodel.StringMap{
+			"user":   ut.String(),
+			"access": string(access),
+		},
+	}
+	defer j.addAuditLogEntry(&ale)
 
 	err := j.doModelAdmin(ctx, u, mt, func(m *dbmodel.Model, api API) error {
 		targetUser := dbmodel.User{
@@ -831,8 +882,10 @@ func (j *JIMM) RevokeModelAccess(ctx context.Context, u *dbmodel.User, mt names.
 		return nil
 	})
 	if err != nil {
+		ale.Params["err"] = err.Error()
 		return errors.E(op, err)
 	}
+	ale.Success = true
 	return nil
 }
 
@@ -842,6 +895,22 @@ func (j *JIMM) RevokeModelAccess(ctx context.Context, u *dbmodel.User, mt names.
 // the juju API will not have it's code masked.
 func (j *JIMM) DestroyModel(ctx context.Context, u *dbmodel.User, mt names.ModelTag, destroyStorage, force *bool, maxWait *time.Duration) error {
 	const op = errors.Op("jimm.DestroyModel")
+
+	ale := dbmodel.AuditLogEntry{
+		Time:    time.Now().UTC().Round(time.Millisecond),
+		Tag:     mt.String(),
+		UserTag: u.Tag().String(),
+		Action:  "destroy",
+		Params:  dbmodel.StringMap{},
+	}
+	defer j.addAuditLogEntry(&ale)
+
+	if destroyStorage != nil {
+		ale.Params["destroy-storage"] = strconv.FormatBool(*destroyStorage)
+	}
+	if force != nil {
+		ale.Params["force"] = strconv.FormatBool(*force)
+	}
 
 	err := j.doModelAdmin(ctx, u, mt, func(m *dbmodel.Model, api API) error {
 		if err := api.DestroyModel(ctx, mt, destroyStorage, force, maxWait); err != nil {
@@ -857,8 +926,10 @@ func (j *JIMM) DestroyModel(ctx context.Context, u *dbmodel.User, mt names.Model
 		return nil
 	})
 	if err != nil {
+		ale.Params["err"] = err.Error()
 		return errors.E(op, err)
 	}
+	ale.Success = true
 	return nil
 }
 
@@ -960,12 +1031,28 @@ func (j *JIMM) doModelAdmin(ctx context.Context, u *dbmodel.User, mt names.Model
 func (j *JIMM) ChangeModelCredential(ctx context.Context, user *dbmodel.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error {
 	const op = errors.Op("jimm.ChangeModelCredential")
 
+	ale := dbmodel.AuditLogEntry{
+		Time:    time.Now().UTC().Round(time.Millisecond),
+		Tag:     modelTag.String(),
+		UserTag: user.Tag().String(),
+		Action:  "change-credential",
+		Params: dbmodel.StringMap{
+			"cloud-credential": cloudCredentialTag.String(),
+		},
+	}
+	defer j.addAuditLogEntry(&ale)
+
+	fail := func(err error) error {
+		ale.Params["err"] = err.Error()
+		return err
+	}
+
 	credential := dbmodel.CloudCredential{}
 	credential.SetTag(cloudCredentialTag)
 
 	err := j.Database.GetCloudCredential(ctx, &credential)
 	if err != nil {
-		return errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
 
 	var m *dbmodel.Model
@@ -983,15 +1070,16 @@ func (j *JIMM) ChangeModelCredential(ctx context.Context, user *dbmodel.User, mo
 		return nil
 	})
 	if err != nil {
-		return errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
 
 	m.CloudCredential = credential
 	m.CloudCredentialID = credential.ID
 	err = j.Database.UpdateModel(ctx, m)
 	if err != nil {
-		return errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
 
+	ale.Success = true
 	return nil
 }

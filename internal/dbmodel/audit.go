@@ -24,6 +24,9 @@ type AuditLogEntry struct {
 	// Action is the type of event that this audit entry is for.
 	Action string `gorm:"index"`
 
+	// Success indicates whether the action succeeded, or not.
+	Success bool
+
 	// Params contains the event-specific params for the audit entry.
 	Params StringMap
 }

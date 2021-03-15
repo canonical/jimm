@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
@@ -27,25 +28,42 @@ import (
 // returned.
 func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.Controller) error {
 	const op = errors.Op("jimm.AddController")
+
+	ale := dbmodel.AuditLogEntry{
+		Time:    time.Now().UTC().Round(time.Millisecond),
+		UserTag: u.Tag().String(),
+		Action:  "add",
+		Params: dbmodel.StringMap{
+			"name": ctl.Name,
+		},
+	}
+	defer j.addAuditLogEntry(&ale)
+
+	fail := func(err error) error {
+		ale.Params["err"] = err.Error()
+		return err
+	}
+
 	if u.ControllerAccess != "superuser" {
-		return errors.E(op, errors.CodeUnauthorized, "cannot add controller")
+		return fail(errors.E(op, errors.CodeUnauthorized, "cannot add controller"))
 	}
 
 	api, err := j.dial(ctx, ctl, names.ModelTag{})
 	if err != nil {
-		return errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
 	defer api.Close()
+	ale.Tag = names.NewControllerTag(ctl.UUID).String()
 
 	var ms jujuparams.ModelSummary
 	if err := api.ControllerModelSummary(ctx, &ms); err != nil {
-		return errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
 	// TODO(mhilton) add the controller model?
 
 	clouds, err := api.Clouds(ctx)
 	if err != nil {
-		return errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
 
 	for tag, cld := range clouds {
@@ -98,7 +116,7 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 		}
 
 		if err := j.Database.SetCloud(ctx, &cloud); err != nil {
-			return errors.E(op, errors.Code(""), fmt.Sprintf("cannot load controller cloud %q", cloud.Name), err)
+			return fail(errors.E(op, errors.Code(""), fmt.Sprintf("cannot load controller cloud %q", cloud.Name), err))
 		}
 
 		for _, cr := range cloud.Regions {
@@ -115,10 +133,11 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 
 	if err := j.Database.AddController(ctx, ctl); err != nil {
 		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
-			return errors.E(op, err, fmt.Sprintf("controller %q already exists", ctl.Name))
+			return fail(errors.E(op, err, fmt.Sprintf("controller %q already exists", ctl.Name)))
 		}
-		return errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
+	ale.Success = true
 	return nil
 }
 

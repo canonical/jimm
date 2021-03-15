@@ -21,6 +21,7 @@ func TestAuditLogEntry(t *testing.T) {
 		Tag:     names.NewModelTag("00000001-0000-0000-0000-0000-000000000008").String(),
 		UserTag: names.NewUserTag("bob@external").String(),
 		Action:  "created",
+		Success: true,
 		Params:  dbmodel.StringMap{"a": "b", "c": "d"},
 	}
 	c.Assert(db.Create(&ale).Error, qt.IsNil)

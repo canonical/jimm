@@ -82,6 +82,7 @@ func (d *Database) Migrate(ctx context.Context, force bool) error {
 	err := db.AutoMigrate(
 		&dbmodel.Application{},
 		&dbmodel.ApplicationOffer{},
+		&dbmodel.AuditLogEntry{},
 		&dbmodel.Cloud{},
 		&dbmodel.CloudCredential{},
 		&dbmodel.CloudRegion{},

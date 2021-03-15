@@ -9,7 +9,9 @@ import (
 	"net/http"
 	"path"
 	"sort"
+	"strconv"
 	"sync"
+	"time"
 
 	vault "github.com/hashicorp/vault/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
@@ -51,8 +53,22 @@ func (j *JIMM) GetCloudCredential(ctx context.Context, user *dbmodel.User, tag n
 func (j *JIMM) RevokeCloudCredential(ctx context.Context, user *dbmodel.User, tag names.CloudCredentialTag) error {
 	const op = errors.Op("jimm.RevokeCloudCredential")
 
+	ale := dbmodel.AuditLogEntry{
+		Time:    time.Now().UTC().Round(time.Millisecond),
+		Tag:     tag.String(),
+		UserTag: user.Tag().String(),
+		Action:  "revoke",
+		Params:  dbmodel.StringMap{},
+	}
+	defer j.addAuditLogEntry(&ale)
+
+	fail := func(err error) error {
+		ale.Params["err"] = err.Error()
+		return err
+	}
+
 	if user.Username != tag.Owner().Id() {
-		return errors.E(op, errors.CodeUnauthorized)
+		return fail(errors.E(op, errors.CodeUnauthorized))
 	}
 
 	var credential dbmodel.CloudCredential
@@ -60,7 +76,7 @@ func (j *JIMM) RevokeCloudCredential(ctx context.Context, user *dbmodel.User, ta
 
 	err := j.Database.GetCloudCredential(ctx, &credential)
 	if err != nil {
-		return errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
 
 	credential.Valid = sql.NullBool{
@@ -70,7 +86,7 @@ func (j *JIMM) RevokeCloudCredential(ctx context.Context, user *dbmodel.User, ta
 
 	models, err := j.Database.GetModelsUsingCredential(ctx, credential.ID)
 	if err != nil {
-		return errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
 	// if the cloud credential is still used by any model we return an error
 	if len(models) > 0 {
@@ -81,7 +97,7 @@ func (j *JIMM) RevokeCloudCredential(ctx context.Context, user *dbmodel.User, ta
 		Name: credential.CloudName,
 	}
 	if err = j.Database.GetCloud(ctx, &cloud); err != nil {
-		return errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
 
 	var controllers []dbmodel.Controller
@@ -105,13 +121,14 @@ func (j *JIMM) RevokeCloudCredential(ctx context.Context, user *dbmodel.User, ta
 	})
 
 	if err != nil {
-		return errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
 
 	err = j.Database.SetCloudCredential(ctx, &credential)
 	if err != nil {
-		return errors.E(op, err, "failed to revoke credential in local database")
+		return fail(errors.E(op, err, "failed to revoke credential in local database"))
 	}
+	ale.Success = true
 	return nil
 }
 
@@ -129,8 +146,27 @@ type UpdateCloudCredentialArgs struct {
 func (j *JIMM) UpdateCloudCredential(ctx context.Context, u *dbmodel.User, args UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
 	const op = errors.Op("jimm.UpdateCloudCredential")
 
+	ale := dbmodel.AuditLogEntry{
+		Time:    time.Now().UTC().Round(time.Millisecond),
+		Tag:     args.CredentialTag.String(),
+		UserTag: u.Tag().String(),
+		Action:  "update",
+		Params: dbmodel.StringMap{
+			"skip-check":  strconv.FormatBool(args.SkipCheck),
+			"skip-update": strconv.FormatBool(args.SkipUpdate),
+		},
+	}
+	defer j.addAuditLogEntry(&ale)
+
+	var resultMu sync.Mutex
+	var result []jujuparams.UpdateCredentialModelResult
+	fail := func(err error) ([]jujuparams.UpdateCredentialModelResult, error) {
+		ale.Params["err"] = err.Error()
+		return result, err
+	}
+
 	if u.ControllerAccess != "superuser" && u.Username != args.CredentialTag.Owner().Id() {
-		return nil, errors.E(op, errors.CodeUnauthorized)
+		return fail(errors.E(op, errors.CodeUnauthorized))
 	}
 
 	var credential dbmodel.CloudCredential
@@ -138,12 +174,12 @@ func (j *JIMM) UpdateCloudCredential(ctx context.Context, u *dbmodel.User, args 
 
 	err := j.Database.GetCloudCredential(ctx, &credential)
 	if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
-		return nil, errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
 
 	models, err := j.Database.GetModelsUsingCredential(ctx, credential.ID)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
 	var controllers []dbmodel.Controller
 	seen := make(map[uint]bool)
@@ -158,8 +194,6 @@ func (j *JIMM) UpdateCloudCredential(ctx context.Context, u *dbmodel.User, args 
 	credential.AuthType = args.Credential.AuthType
 	credential.Attributes = args.Credential.Attributes
 
-	var resultMu sync.Mutex
-	var result []jujuparams.UpdateCredentialModelResult
 	if !args.SkipCheck {
 		err := j.forEachController(ctx, controllers, func(ctl *dbmodel.Controller, api API) error {
 			models, err := j.updateControllerCloudCredential(ctx, &credential, api.CheckCredentialModels)
@@ -172,7 +206,7 @@ func (j *JIMM) UpdateCloudCredential(ctx context.Context, u *dbmodel.User, args 
 			return nil
 		})
 		if err != nil {
-			return result, errors.E(op, err)
+			return fail(errors.E(op, err))
 		}
 	}
 	var modelsErr bool
@@ -181,12 +215,17 @@ func (j *JIMM) UpdateCloudCredential(ctx context.Context, u *dbmodel.User, args 
 			modelsErr = true
 		}
 	}
-	if args.SkipUpdate || modelsErr {
+	if modelsErr {
+		ale.Params["models-error"] = "true"
+		return result, nil
+	}
+	if args.SkipUpdate {
+		ale.Success = true
 		return result, nil
 	}
 
 	if err := j.updateCredential(ctx, &credential); err != nil {
-		return result, errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
 
 	err = j.forEachController(ctx, controllers, func(ctl *dbmodel.Controller, api API) error {
@@ -202,8 +241,9 @@ func (j *JIMM) UpdateCloudCredential(ctx context.Context, u *dbmodel.User, args 
 		return nil
 	})
 	if err != nil {
-		return result, errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
+	ale.Success = true
 	return result, nil
 }
 
