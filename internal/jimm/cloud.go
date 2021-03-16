@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
@@ -186,8 +187,24 @@ var DefaultReservedCloudNames = []string{
 func (j *JIMM) AddHostedCloud(ctx context.Context, u *dbmodel.User, tag names.CloudTag, cloud jujuparams.Cloud) error {
 	const op = errors.Op("jimm.AddHostedCloud")
 
+	ale := dbmodel.AuditLogEntry{
+		Time:    time.Now().UTC().Round(time.Millisecond),
+		Tag:     tag.String(),
+		UserTag: u.Tag().String(),
+		Action:  "add",
+		Params: dbmodel.StringMap{
+			"type":              cloud.Type,
+			"host-cloud-region": cloud.HostCloudRegion,
+		},
+	}
+	defer j.addAuditLogEntry(&ale)
+	fail := func(err error) error {
+		ale.Params["err"] = err.Error()
+		return err
+	}
+
 	if u.ControllerAccess != "add-model" && u.ControllerAccess != "superuser" {
-		return errors.E(op, errors.CodeUnauthorized)
+		return fail(errors.E(op, errors.CodeUnauthorized))
 	}
 
 	// Ensure the new cloud could not mask the name of a known public cloud.
@@ -197,35 +214,35 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, u *dbmodel.User, tag names.Cl
 	}
 	for _, n := range reservedNames {
 		if tag.Id() == n {
-			return errors.E(op, errors.CodeAlreadyExists, fmt.Sprintf("cloud %q already exists", tag.Id()))
+			return fail(errors.E(op, errors.CodeAlreadyExists, fmt.Sprintf("cloud %q already exists", tag.Id())))
 		}
 	}
 
 	// Validate that the requested cloud is valid.
 	if cloud.Type != "kubernetes" {
-		return errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud type %q", cloud.Type))
+		return fail(errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud type %q", cloud.Type)))
 	}
 	parts := strings.SplitN(cloud.HostCloudRegion, "/", 2)
 	if len(parts) != 2 || parts[0] == "" {
-		return errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion))
+		return fail(errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion)))
 	}
 	region, err := j.Database.FindRegion(ctx, parts[0], parts[1])
 	if errors.ErrorCode(err) == errors.CodeNotFound {
-		return errors.E(op, err, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion))
+		return fail(errors.E(op, err, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion)))
 	} else if err != nil {
-		return errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
 
 	switch cloudUserAccess(u, &region.Cloud) {
 	case "admin", "add-model":
 	default:
-		return errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion))
+		return fail(errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion)))
 	}
 
 	if region.Cloud.HostCloudRegion != "" {
 		// Do not support creating a new cloud on an already hosted
 		// cloud.
-		return errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion))
+		return fail(errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion)))
 	}
 
 	// Create the cloud locally, to reserve the name.
@@ -237,7 +254,7 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, u *dbmodel.User, tag names.Cl
 		Access: "admin",
 	}}
 	if err := j.Database.AddCloud(ctx, &dbCloud); err != nil {
-		return errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
 
 	// Create the cloud on a host.
@@ -245,7 +262,7 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, u *dbmodel.User, tag names.Cl
 	ccloud, err := j.addControllerCloud(ctx, &region.Controllers[0].Controller, u.Tag().(names.UserTag), tag, cloud)
 	if err != nil {
 		// TODO(mhilton) remove the added cloud if adding it to the controller failed.
-		return errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
 	// Update the cloud in the database.
 	dbCloud.FromJujuCloud(*ccloud)
@@ -260,8 +277,9 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, u *dbmodel.User, tag names.Cl
 		// At this point the cloud has been created on the
 		// controller and we know something about it. Trying to
 		// undo that will probably make things worse.
-		return errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
+	ale.Success = true
 	return nil
 }
 
@@ -304,7 +322,7 @@ func (j *JIMM) addControllerCloud(ctx context.Context, ctl *dbmodel.Controller, 
 // returned from the dial operation. If the given function returns an error
 // that error will be returned with the code unmasked.
 func (j *JIMM) doCloudAdmin(ctx context.Context, u *dbmodel.User, ct names.CloudTag, f func(*dbmodel.Cloud, API) error) error {
-	const op = errors.Op("jimm.doModelAdmin")
+	const op = errors.Op("jimm.doCloudAdmin")
 
 	var c dbmodel.Cloud
 	c.SetTag(ct)
@@ -342,6 +360,18 @@ func (j *JIMM) doCloudAdmin(ctx context.Context, u *dbmodel.User, ct names.Cloud
 func (j *JIMM) GrantCloudAccess(ctx context.Context, u *dbmodel.User, ct names.CloudTag, ut names.UserTag, access string) error {
 	const op = errors.Op("jimm.GrantCloudAccess")
 
+	ale := dbmodel.AuditLogEntry{
+		Time:    time.Now().UTC().Round(time.Millisecond),
+		Tag:     ct.String(),
+		UserTag: u.Tag().String(),
+		Action:  "grant",
+		Params: dbmodel.StringMap{
+			"user":   ut.String(),
+			"access": access,
+		},
+	}
+	defer j.addAuditLogEntry(&ale)
+
 	err := j.doCloudAdmin(ctx, u, ct, func(c *dbmodel.Cloud, api API) error {
 		targetUser := dbmodel.User{
 			Username: ut.Id(),
@@ -369,8 +399,10 @@ func (j *JIMM) GrantCloudAccess(ctx context.Context, u *dbmodel.User, ct names.C
 		return nil
 	})
 	if err != nil {
+		ale.Params["err"] = err.Error()
 		return errors.E(op, err)
 	}
+	ale.Success = true
 	return nil
 }
 
@@ -382,6 +414,18 @@ func (j *JIMM) GrantCloudAccess(ctx context.Context, u *dbmodel.User, ct names.C
 // code is not masked.
 func (j *JIMM) RevokeCloudAccess(ctx context.Context, u *dbmodel.User, ct names.CloudTag, ut names.UserTag, access string) error {
 	const op = errors.Op("jimm.RevokeCloudAccess")
+
+	ale := dbmodel.AuditLogEntry{
+		Time:    time.Now().UTC().Round(time.Millisecond),
+		Tag:     ct.String(),
+		UserTag: u.Tag().String(),
+		Action:  "revoke",
+		Params: dbmodel.StringMap{
+			"user":   ut.String(),
+			"access": access,
+		},
+	}
+	defer j.addAuditLogEntry(&ale)
 
 	err := j.doCloudAdmin(ctx, u, ct, func(c *dbmodel.Cloud, api API) error {
 		targetUser := dbmodel.User{
@@ -415,8 +459,10 @@ func (j *JIMM) RevokeCloudAccess(ctx context.Context, u *dbmodel.User, ct names.
 		return nil
 	})
 	if err != nil {
+		ale.Params["err"] = err.Error()
 		return errors.E(op, err)
 	}
+	ale.Success = true
 	return nil
 }
 
@@ -427,6 +473,15 @@ func (j *JIMM) RevokeCloudAccess(ctx context.Context, u *dbmodel.User, ct names.
 // retuns an error the error code is not masked.
 func (j *JIMM) RemoveCloud(ctx context.Context, u *dbmodel.User, ct names.CloudTag) error {
 	const op = errors.Op("jimm.RemoveCloud")
+
+	ale := dbmodel.AuditLogEntry{
+		Time:    time.Now().UTC().Round(time.Millisecond),
+		Tag:     ct.String(),
+		UserTag: u.Tag().String(),
+		Action:  "remove",
+		Params:  dbmodel.StringMap{},
+	}
+	defer j.addAuditLogEntry(&ale)
 
 	err := j.doCloudAdmin(ctx, u, ct, func(c *dbmodel.Cloud, api API) error {
 		// Note: JIMM doesn't attempt to determine if the cloud is
@@ -443,29 +498,43 @@ func (j *JIMM) RemoveCloud(ctx context.Context, u *dbmodel.User, ct names.CloudT
 		return nil
 	})
 	if err != nil {
+		ale.Params["err"] = err.Error()
 		return errors.E(op, err)
 	}
+	ale.Success = true
 	return nil
 }
 
 // UpdateCloud updates the cloud with the given name on all controllers
 // that host the cloud. If the given user is not a controller superuser or
-// an admin on the cloud an errror is returned with a code of
+// an admin on the cloud an error is returned with a code of
 // CodeUnauthorized. If the cloud with the given name cannot be found then
 // an error with the code CodeNotFound is returned.
 func (j *JIMM) UpdateCloud(ctx context.Context, u *dbmodel.User, ct names.CloudTag, cloud jujuparams.Cloud) error {
 	const op = errors.Op("jimm.UpdateCloud")
 
+	ale := dbmodel.AuditLogEntry{
+		Time:    time.Now().UTC().Round(time.Millisecond),
+		Tag:     ct.String(),
+		UserTag: u.Tag().String(),
+		Action:  "update",
+		Params:  dbmodel.StringMap{},
+	}
+	fail := func(err error) error {
+		ale.Params["err"] = err.Error()
+		return err
+	}
+
 	var c dbmodel.Cloud
 	c.SetTag(ct)
 
 	if err := j.Database.GetCloud(ctx, &c); err != nil {
-		return errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
 	if cloudUserAccess(u, &c) != "admin" {
 		// If the user doesn't have admin access on the cloud return
 		// an unauthorized error.
-		return errors.E(op, errors.CodeUnauthorized)
+		return fail(errors.E(op, errors.CodeUnauthorized))
 	}
 
 	var controllers []dbmodel.Controller
@@ -484,7 +553,7 @@ func (j *JIMM) UpdateCloud(ctx context.Context, u *dbmodel.User, ct names.CloudT
 		return api.UpdateCloud(ctx, ct, cloud)
 	})
 	if err != nil {
-		return errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
 
 	// Update the local database with the updated cloud definition. We
@@ -512,7 +581,8 @@ func (j *JIMM) UpdateCloud(ctx context.Context, u *dbmodel.User, ct names.CloudT
 	})
 
 	if err != nil {
-		return errors.E(op, err)
+		return fail(errors.E(op, err))
 	}
+	ale.Success = true
 	return nil
 }

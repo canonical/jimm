@@ -11,6 +11,7 @@ import (
 	vault "github.com/hashicorp/vault/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
 )
 
 // A JIMM provides the buisness logic for managing resources in the JAAS
@@ -232,4 +234,12 @@ func (j *JIMM) forEachController(ctx context.Context, controllers []dbmodel.Cont
 		})
 	}
 	return eg.Wait()
+}
+
+// addAuditLogEntry causes an entry to be added the the audit log.
+func (j *JIMM) addAuditLogEntry(ale *dbmodel.AuditLogEntry) {
+	ctx := context.Background()
+	if err := j.Database.AddAuditLogEntry(ctx, ale); err != nil {
+		zapctx.Error(ctx, "cannot store audit log entry", zap.Error(err), zap.Any("entry", *ale))
+	}
 }
