@@ -142,41 +142,22 @@ func (b *modelBuilder) jujuModelCreateArgs() (*jujuparams.ModelCreateArgs, error
 		CloudRegion:        b.cloudRegion,
 		CloudCredentialTag: b.credential.Tag().String(),
 	}, nil
-
-}
-
-// WithUser returns a builder with the authorized user.
-func (b *modelBuilder) WithUser(user *dbmodel.User) *modelBuilder {
-	b.user = user
-	if b.owner != nil && b.owner.Username != user.Username && user.ControllerAccess != "superuser" {
-		b.err = errors.E(errors.CodeUnauthorized)
-	}
-	return b
 }
 
 // WithOwner returns a builder with the specified owner.
-func (b *modelBuilder) WithOwner(owner names.UserTag) *modelBuilder {
+func (b *modelBuilder) WithOwner(owner *dbmodel.User) *modelBuilder {
 	if b.err != nil {
 		return b
 	}
-	if b.user != nil && owner.Id() != b.user.Username && b.user.ControllerAccess != "superuser" {
-		b.err = errors.E(errors.CodeUnauthorized)
-	}
-
-	user := dbmodel.User{
-		Username: owner.Id(),
-	}
-	err := b.jimm.Database.GetUser(b.ctx, &user)
-	if err != nil {
-		b.err = err
-	}
-	b.owner = &user
+	b.owner = owner
 	return b
 }
 
 // WithName returns a builder with the specified model name.
 func (b *modelBuilder) WithName(name string) *modelBuilder {
-
+	if b.err != nil {
+		return b
+	}
 	b.name = name
 	return b
 }
@@ -186,8 +167,8 @@ func (b *modelBuilder) WithConfig(cfg map[string]interface{}) *modelBuilder {
 	if b.config == nil {
 		b.config = make(map[string]interface{})
 	}
-	for k, v := range cfg {
-		b.config[k] = v
+	for key, value := range cfg {
+		b.config[key] = value
 	}
 	return b
 }
@@ -239,35 +220,6 @@ func (b *modelBuilder) WithCloudRegion(region string) *modelBuilder {
 		// we looped through all cloud regions and could not find a match
 		if b.cloudRegionID == 0 {
 			b.err = errors.E(fmt.Sprintf("cloud region %s not found", region))
-		}
-
-		if b.owner != nil {
-			defaults := dbmodel.CloudDefaults{
-				UserID:  b.owner.Username,
-				CloudID: b.cloud.ID,
-				Region:  region,
-			}
-			err := b.jimm.Database.CloudDefaults(b.ctx, &defaults)
-			if err != nil {
-				if errors.ErrorCode(err) == errors.CodeNotFound {
-					defaults = dbmodel.CloudDefaults{
-						UserID:  b.owner.Username,
-						CloudID: b.cloud.ID,
-					}
-					err := b.jimm.Database.CloudDefaults(b.ctx, &defaults)
-					if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
-						b.err = errors.E(err, "could not fetch cloudregiondefaults")
-					}
-				} else {
-					b.err = errors.E(err, "could not fetch cloudregiondefaults")
-				}
-			} else {
-				for k, v := range defaults.Defaults {
-					if _, ok := b.config[k]; !ok {
-						b.config[k] = v
-					}
-				}
-			}
 		}
 	} else {
 		b.err = errors.E("cloud not specified")
@@ -578,18 +530,67 @@ func (j *JIMM) AddModel(ctx context.Context, u *dbmodel.User, args *ModelCreateA
 		ale.Params["err"] = err.Error()
 		return nil, err
 	}
+	owner := dbmodel.User{
+		Username: args.Owner.Id(),
+	}
+	err = j.Database.GetUser(ctx, &owner)
+	if err != nil {
+		return fail(errors.E(op, err))
+	}
+
+	if owner.Username != u.Username && u.ControllerAccess != "superuser" {
+		return fail(errors.E(op, errors.CodeUnauthorized))
+	}
 
 	builder := newModelBuilder(ctx, j)
+	builder = builder.WithOwner(&owner)
 	builder = builder.WithName(args.Name)
+	if err := builder.Error(); err != nil {
+		return fail(errors.E(op, err))
+	}
+
+	// fetch user model defaults
+	userConfig, err := j.UserModelDefaults(ctx, u)
+	if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
+		return fail(errors.E(op, "failed to fetch cloud defaults"))
+	}
+	builder = builder.WithConfig(userConfig)
+
+	// fetch cloud defaults
+	if args.Cloud != (names.CloudTag{}) {
+		cloudDefaults := dbmodel.CloudDefaults{
+			UserID: u.Username,
+			Cloud: dbmodel.Cloud{
+				Name: args.Cloud.Id(),
+			},
+		}
+		err = j.Database.CloudDefaults(ctx, &cloudDefaults)
+		if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
+			return fail(errors.E(op, "failed to fetch cloud defaults"))
+		}
+		builder = builder.WithConfig(cloudDefaults.Defaults)
+	}
+
+	// fetch cloud region defaults
+	if args.Cloud != (names.CloudTag{}) && args.CloudRegion != "" {
+		cloudRegionDefaults := dbmodel.CloudDefaults{
+			UserID: u.Username,
+			Cloud: dbmodel.Cloud{
+				Name: args.Cloud.Id(),
+			},
+			Region: args.CloudRegion,
+		}
+		err = j.Database.CloudDefaults(ctx, &cloudRegionDefaults)
+		if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
+			return fail(errors.E(op, "failed to fetch cloud defaults"))
+		}
+		builder = builder.WithConfig(cloudRegionDefaults.Defaults)
+	}
+
+	// last but not least, use the provided config values
+	// overriding all defaults
 	builder = builder.WithConfig(args.Config)
-	builder = builder.WithUser(u)
-	if err := builder.Error(); err != nil {
-		return fail(errors.E(op, err))
-	}
-	builder = builder.WithOwner(args.Owner)
-	if err := builder.Error(); err != nil {
-		return fail(errors.E(op, err))
-	}
+
 	if args.Cloud != (names.CloudTag{}) {
 		ale.Params["cloud"] = args.Cloud.String()
 		builder = builder.WithCloud(args.Cloud)

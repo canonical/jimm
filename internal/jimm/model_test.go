@@ -5,6 +5,7 @@ package jimm_test
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"testing"
 	"time"
 
@@ -151,6 +152,21 @@ clouds:
   type: test-provider
   regions:
   - name: test-region-1
+user-defaults:
+- user: alice@external
+  defaults:
+    key4: value4
+cloud-defaults:
+- user: alice@external
+  cloud: test-cloud
+  region: test-region-1
+  defaults:
+    key1: value1
+    key2: value2
+- user: alice@external
+  cloud: test-cloud
+  defaults:
+    key3: value3
 cloud-credentials:
 - name: test-credential-1
   owner: alice@external
@@ -176,7 +192,12 @@ controllers:
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
 	},
-	createModel: createModel(`
+	createModel: assertConfig(map[string]interface{}{
+		"key1": "value1",
+		"key2": "value2",
+		"key3": "value3",
+		"key4": "value4",
+	}, createModel(`
 uuid: 00000001-0000-0000-0000-0000-000000000001
 status:
   status: started
@@ -198,7 +219,7 @@ machines:
   message: a test message
   has-vote: true
   wants-vote: false
-`[1:]),
+`[1:])),
 	username: "alice@external",
 	args: jujuparams.ModelCreateArgs{
 		Name:               "test-model",
@@ -841,6 +862,21 @@ func createModel(template string) func(context.Context, *jujuparams.ModelCreateA
 		mi.OwnerTag = args.OwnerTag
 		return nil
 	}
+}
+
+func assertConfig(config map[string]interface{}, fnc func(context.Context, *jujuparams.ModelCreateArgs, *jujuparams.ModelInfo) error) func(context.Context, *jujuparams.ModelCreateArgs, *jujuparams.ModelInfo) error {
+	return func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
+		if len(config) != len(args.Config) {
+			return errors.E(fmt.Sprintf("expected %d config settings, got %d", len(config), len(args.Config)))
+		}
+		for k, v := range args.Config {
+			if config[k] != v {
+				return errors.E(fmt.Sprintf("config value mismatch for key %s", k))
+			}
+		}
+		return fnc(ctx, args, mi)
+	}
+
 }
 
 const modelInfoTestEnv = `clouds:

@@ -14,7 +14,7 @@ import (
 
 // SetCloudDefaults sets default model setting values for the specified cloud/region.
 func (d *Database) SetCloudDefaults(ctx context.Context, defaults *dbmodel.CloudDefaults) error {
-	const op = errors.Op("db.UpsertCloudDefaults")
+	const op = errors.Op("db.SetCloudDefaults")
 
 	err := d.Transaction(func(d *Database) error {
 		db := d.DB.WithContext(ctx)

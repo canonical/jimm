@@ -18,9 +18,11 @@ import (
 type Environment struct {
 	Clouds           []Cloud           `json:"clouds"`
 	CloudCredentials []CloudCredential `json:"cloud-credentials"`
+	CloudDefaults    []CloudDefaults   `json:"cloud-defaults"`
 	Controllers      []Controller      `json:"controllers"`
 	Models           []Model           `json:"models"`
 	Users            []User            `json:"users"`
+	UserDefaults     []UserDefaults    `json:"user-defaults"`
 }
 
 func ParseEnvironment(c *qt.C, env string) *Environment {
@@ -46,6 +48,24 @@ func (e *Environment) CloudCredential(owner, cloud, name string) *CloudCredentia
 	for i := range e.CloudCredentials {
 		if e.CloudCredentials[i].Name == name {
 			return &e.CloudCredentials[i]
+		}
+	}
+	return nil
+}
+
+func (e *Environment) CloudDefault(owner, cloud string) *CloudDefaults {
+	for i := range e.CloudDefaults {
+		if e.CloudDefaults[i].User == owner && e.CloudDefaults[i].Cloud == cloud {
+			return &e.CloudDefaults[i]
+		}
+	}
+	return nil
+}
+
+func (e *Environment) UserDefault(owner string) *UserDefaults {
+	for i := range e.UserDefaults {
+		if e.UserDefaults[i].User == owner {
+			return &e.UserDefaults[i]
 		}
 	}
 	return nil
@@ -100,6 +120,10 @@ func (e *Environment) PopulateDB(c *qt.C, db db.Database) {
 		e.CloudCredentials[i].env = e
 		e.CloudCredentials[i].DBObject(c, db)
 	}
+	for i := range e.CloudDefaults {
+		e.CloudDefaults[i].env = e
+		e.CloudDefaults[i].DBObject(c, db)
+	}
 	for i := range e.Controllers {
 		e.Controllers[i].env = e
 		e.Controllers[i].DBObject(c, db)
@@ -108,6 +132,58 @@ func (e *Environment) PopulateDB(c *qt.C, db db.Database) {
 		e.Models[i].env = e
 		e.Models[i].DBObject(c, db)
 	}
+	for i := range e.UserDefaults {
+		e.UserDefaults[i].env = e
+		e.UserDefaults[i].DBObject(c, db)
+	}
+}
+
+// UserDefaults represents user's default configuration for a new model.
+type UserDefaults struct {
+	User     string                 `json:"user"`
+	Defaults map[string]interface{} `json:"defaults"`
+
+	env *Environment
+	dbo dbmodel.UserModelDefaults
+}
+
+func (cd *UserDefaults) DBObject(c *qt.C, db db.Database) dbmodel.UserModelDefaults {
+	if cd.dbo.ID != 0 {
+		return cd.dbo
+	}
+
+	cd.dbo.User = cd.env.User(cd.User).DBObject(c, db)
+	cd.dbo.Defaults = cd.Defaults
+
+	err := db.SetUserModelDefaults(context.Background(), &cd.dbo)
+	c.Assert(err, qt.IsNil)
+	return cd.dbo
+}
+
+// CloudDefaults represents default cloud/region configuration for a new model.
+type CloudDefaults struct {
+	User     string                 `json:"user"`
+	Cloud    string                 `json:"cloud"`
+	Region   string                 `json:"region"`
+	Defaults map[string]interface{} `json:"defaults"`
+
+	env *Environment
+	dbo dbmodel.CloudDefaults
+}
+
+func (cd *CloudDefaults) DBObject(c *qt.C, db db.Database) dbmodel.CloudDefaults {
+	if cd.dbo.ID != 0 {
+		return cd.dbo
+	}
+
+	cd.dbo.User = cd.env.User(cd.User).DBObject(c, db)
+	cd.dbo.Cloud = cd.env.Cloud(cd.Cloud).DBObject(c, db)
+	cd.dbo.Region = cd.Region
+	cd.dbo.Defaults = cd.Defaults
+
+	err := db.SetCloudDefaults(context.Background(), &cd.dbo)
+	c.Assert(err, qt.IsNil)
+	return cd.dbo
 }
 
 // A Cloud represents the definition of a cloud in a test environment.
