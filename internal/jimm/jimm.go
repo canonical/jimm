@@ -56,6 +56,9 @@ type JIMM struct {
 	// hosted clouds. If this is empty then DefaultReservedCloudNames
 	// is used.
 	ReservedCloudNames []string
+
+	// UUID holds the UUID of the JIMM controller.
+	UUID string
 }
 
 // An Authenticator authenticates login requests.
