@@ -34,6 +34,7 @@ tar c . | lxc exec --cwd /home/ubuntu/src/ --user 1000 --group 1000 $container -
 lxc exec \
 	--env HOME=/home/ubuntu \
 	--env http_proxy=${http_proxy:-} \
+	--env https_proxy=${https_proxy:-${http_proxy:-}} \
 	--env no_proxy=${no_proxy:-} \
 	--cwd /home/ubuntu/src/ \
 	--user 1000 \
@@ -44,6 +45,7 @@ if [ -n "${juju_version:-}" ]; then
 	lxc exec \
 		--env HOME=/home/ubuntu \
 		--env http_proxy=${http_proxy:-} \
+		--env https_proxy=${https_proxy:-${http_proxy:-}} \
 		--env no_proxy=${no_proxy:-} \
 		--cwd /home/ubuntu/src/ \
 		--user 1000 \
@@ -54,6 +56,7 @@ fi
 lxc exec \
 	--env HOME=/home/ubuntu \
 	--env http_proxy=${http_proxy:-} \
+	--env https_proxy=${https_proxy:-${http_proxy:-}} \
 	--env no_proxy=${no_proxy:-} \
 	--cwd /home/ubuntu/src/ \
 	--user 1000 \
