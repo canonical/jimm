@@ -21,7 +21,7 @@ import (
 // ModelManager facade version 2.
 func (c Connection) CreateModel(ctx context.Context, args *jujuparams.ModelCreateArgs, info *jujuparams.ModelInfo) error {
 	const op = errors.Op("jujuclient.CreateModel")
-	if err := c.conn.APICall("ModelManager", 2, "", "CreateModel", args, info); err != nil {
+	if err := c.client.Call(ctx, "ModelManager", 2, "", "CreateModel", args, info); err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}
 	return nil
@@ -48,9 +48,9 @@ func (c Connection) ModelInfo(ctx context.Context, info *jujuparams.ModelInfo) e
 	}
 	var err error
 	if c.hasFacadeVersion("ModelManager", 8) {
-		err = c.conn.APICall("ModelManager", 8, "", "ModelInfo", &args, &resp)
+		err = c.client.Call(ctx, "ModelManager", 8, "", "ModelInfo", &args, &resp)
 	} else {
-		err = c.conn.APICall("ModelManager", 3, "", "ModelInfo", &args, &resp)
+		err = c.client.Call(ctx, "ModelManager", 3, "", "ModelInfo", &args, &resp)
 	}
 	if err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
@@ -71,7 +71,7 @@ func (c Connection) GrantJIMMModelAdmin(ctx context.Context, tag names.ModelTag)
 	const op = errors.Op("jujuclient.GrantJIMMModelAdmin")
 	args := jujuparams.ModifyModelAccessRequest{
 		Changes: []jujuparams.ModifyModelAccess{{
-			UserTag:  c.conn.AuthTag().String(),
+			UserTag:  c.userTag,
 			Action:   jujuparams.GrantModelAccess,
 			Access:   jujuparams.ModelAdminAccess,
 			ModelTag: tag.String(),
@@ -81,7 +81,7 @@ func (c Connection) GrantJIMMModelAdmin(ctx context.Context, tag names.ModelTag)
 	resp := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, 1),
 	}
-	if err := c.conn.APICall("ModelManager", 2, "", "ModifyModelAccess", &args, &resp); err != nil {
+	if err := c.client.Call(ctx, "ModelManager", 2, "", "ModifyModelAccess", &args, &resp); err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}
 	if resp.Results[0].Error != nil {
@@ -105,7 +105,7 @@ func (c Connection) DumpModel(ctx context.Context, tag names.ModelTag, simplifie
 	resp := jujuparams.StringResults{
 		Results: make([]jujuparams.StringResult, 1),
 	}
-	if err := c.conn.APICall("ModelManager", 3, "", "DumpModels", &args, &resp); err != nil {
+	if err := c.client.Call(ctx, "ModelManager", 3, "", "DumpModels", &args, &resp); err != nil {
 		return "", errors.E(op, jujuerrors.Cause(err))
 	}
 	if resp.Results[0].Error != nil {
@@ -128,7 +128,7 @@ func (c Connection) DumpModelDB(ctx context.Context, tag names.ModelTag) (map[st
 	resp := jujuparams.MapResults{
 		Results: make([]jujuparams.MapResult, 1),
 	}
-	if err := c.conn.APICall("ModelManager", 2, "", "DumpModelsDB", &args, &resp); err != nil {
+	if err := c.client.Call(ctx, "ModelManager", 2, "", "DumpModelsDB", &args, &resp); err != nil {
 		return nil, errors.E(op, jujuerrors.Cause(err))
 	}
 	if resp.Results[0].Error != nil {
@@ -154,7 +154,7 @@ func (c Connection) GrantModelAccess(ctx context.Context, modelTag names.ModelTa
 	resp := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, 1),
 	}
-	err := c.conn.APICall("ModelManager", 2, "", "ModifyModelAccess", &args, &resp)
+	err := c.client.Call(ctx, "ModelManager", 2, "", "ModifyModelAccess", &args, &resp)
 	if err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}
@@ -181,7 +181,7 @@ func (c Connection) RevokeModelAccess(ctx context.Context, modelTag names.ModelT
 	resp := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, 1),
 	}
-	err := c.conn.APICall("ModelManager", 2, "", "ModifyModelAccess", &args, &resp)
+	err := c.client.Call(ctx, "ModelManager", 2, "", "ModifyModelAccess", &args, &resp)
 	if err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}
@@ -197,11 +197,11 @@ func (c Connection) RevokeModelAccess(ctx context.Context, modelTag names.ModelT
 func (c Connection) ControllerModelSummary(ctx context.Context, ms *jujuparams.ModelSummary) error {
 	const op = errors.Op("jujuclient.ControllerModelSummary")
 	args := jujuparams.ModelSummariesRequest{
-		UserTag: c.conn.AuthTag().String(),
+		UserTag: c.userTag,
 		All:     true,
 	}
 	var resp jujuparams.ModelSummaryResults
-	err := c.conn.APICall("ModelManager", 4, "", "ListModelSummaries", &args, &resp)
+	err := c.client.Call(ctx, "ModelManager", 4, "", "ListModelSummaries", &args, &resp)
 	if err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}
@@ -227,7 +227,7 @@ func (c Connection) ValidateModelUpgrade(ctx context.Context, model names.ModelT
 	resp := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, 1),
 	}
-	err := c.conn.APICall("ModelManager", 9, "", "ValidateModelUpgrades", &args, &resp)
+	err := c.client.Call(ctx, "ModelManager", 9, "", "ValidateModelUpgrades", &args, &resp)
 	if err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}
@@ -260,11 +260,11 @@ func (c Connection) DestroyModel(ctx context.Context, tag names.ModelTag, destro
 	var err error
 	switch {
 	case c.hasFacadeVersion("ModelManager", 7):
-		err = c.conn.APICall("ModelManager", 7, "", "DestroyModels", &args, &resp)
+		err = c.client.Call(ctx, "ModelManager", 7, "", "DestroyModels", &args, &resp)
 	case c.hasFacadeVersion("ModelManager", 4):
-		err = c.conn.APICall("ModelManager", 4, "", "DestroyModels", &args, &resp)
+		err = c.client.Call(ctx, "ModelManager", 4, "", "DestroyModels", &args, &resp)
 	default:
-		err = c.conn.APICall("ModelManager", 2, "", "DestroyModels",
+		err = c.client.Call(ctx, "ModelManager", 2, "", "DestroyModels",
 			&jujuparams.Entities{Entities: []jujuparams.Entity{{Tag: tag.String()}}},
 			&resp,
 		)
@@ -298,9 +298,9 @@ func (c Connection) ModelStatus(ctx context.Context, status *jujuparams.ModelSta
 	}
 	var err error
 	if c.hasFacadeVersion("ModelManager", 4) {
-		err = c.conn.APICall("ModelManager", 4, "", "ModelStatus", &args, &resp)
+		err = c.client.Call(ctx, "ModelManager", 4, "", "ModelStatus", &args, &resp)
 	} else {
-		err = c.conn.APICall("ModelManager", 2, "", "ModelStatus", &args, &resp)
+		err = c.client.Call(ctx, "ModelManager", 2, "", "ModelStatus", &args, &resp)
 	}
 	if err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
@@ -324,7 +324,7 @@ func (c Connection) ChangeModelCredential(ctx context.Context, model names.Model
 		}},
 	}
 
-	err := c.conn.APICall("ChangeModelCredential", 5, "", "ChangeModelCredential", &args, &out)
+	err := c.client.Call(ctx, "ChangeModelCredential", 5, "", "ChangeModelCredential", &args, &out)
 	if err != nil {
 		return errors.E(op, err)
 	}

@@ -10,14 +10,22 @@ package jujuclient
 
 import (
 	"context"
-	"time"
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
+	"net/url"
+	"path"
+	"sync"
 
-	"github.com/juju/juju/api"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
+	"go.uber.org/zap"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
+	"github.com/CanonicalLtd/jimm/internal/rpc"
+	"github.com/CanonicalLtd/jimm/internal/zapctx"
 )
 
 // A Dialer is an implementation of a jimm.Dialer that adapts a juju API
@@ -28,39 +36,134 @@ type Dialer struct{}
 func (Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag) (jimm.API, error) {
 	const op = errors.Op("jujuclient.Dial")
 
-	info := api.Info{
-		CACert:   ctl.CACertificate,
-		ModelTag: modelTag,
-		Tag:      names.NewUserTag(ctl.AdminUser),
-		Password: ctl.AdminPassword,
-	}
-	if ctl.PublicAddress != "" {
-		info.Addrs = []string{ctl.PublicAddress}
-	}
-	info.Addrs = append(info.Addrs, ctl.Addresses...)
-	dialOpts := api.DialOpts{}
-	if dl, ok := ctx.Deadline(); ok {
-		t := time.Now()
-		if !t.Before(dl) {
-			return nil, errors.E(op, errors.CodeConnectionFailed, ctx.Err())
+	var tlsConfig *tls.Config
+	if ctl.CACertificate != "" {
+		cp := x509.NewCertPool()
+		cp.AppendCertsFromPEM([]byte(ctl.CACertificate))
+		tlsConfig = &tls.Config{
+			RootCAs: cp,
 		}
-		dialOpts.Timeout = dl.Sub(t)
 	}
-	conn, err := api.Open(&info, dialOpts)
-	if err != nil {
+	dialer := rpc.Dialer{
+		TLSConfig: tlsConfig,
+	}
+
+	var client *rpc.Client
+	var err error
+	if ctl.PublicAddress != "" {
+		// If there is a public-address configured it is almost
+		// certainly the one we want to use, try it first.
+		client, err = dialer.Dial(ctx, websocketURL(ctl.PublicAddress, modelTag))
+	}
+	if client == nil {
+		var urls []string
+		for _, addr := range ctl.Addresses {
+			urls = append(urls, websocketURL(addr, modelTag))
+		}
+		var err2 error
+		client, err2 = dialAll(ctx, &dialer, urls)
+		if err == nil {
+			err = err2
+		}
+	}
+	if client == nil {
 		return nil, errors.E(op, errors.CodeConnectionFailed, err)
 	}
-	ctl.SetTag(conn.ControllerTag())
-	v, ok := conn.ServerVersion()
-	if ok {
-		ctl.AgentVersion = v.String()
+
+	args := jujuparams.LoginRequest{
+		AuthTag:       names.NewUserTag(ctl.AdminUser).String(),
+		Credentials:   ctl.AdminPassword,
+		ClientVersion: "2.9.0", // claim to be a 2.9 client.
 	}
-	for _, hps := range conn.APIHostPorts() {
+
+	var res jujuparams.LoginResult
+	if err := client.Call(ctx, "Admin", 3, "", "Login", args, &res); err != nil {
+		client.Close()
+		return nil, errors.E(op, errors.CodeConnectionFailed, "authentication failed", err)
+	}
+
+	ct, err := names.ParseControllerTag(res.ControllerTag)
+	if err == nil {
+		ctl.SetTag(ct)
+	}
+	if res.ServerVersion != "" {
+		ctl.AgentVersion = res.ServerVersion
+	}
+	for _, hps := range res.Servers {
 		for _, hp := range hps {
-			ctl.Addresses = append(ctl.Addresses, hp.String())
+			ctl.Addresses = append(ctl.Addresses, fmt.Sprintf("%s:%d", hp.Value, hp.Port))
 		}
 	}
-	return Connection{conn: conn}, nil
+	facades := make(map[string]bool)
+	for _, fv := range res.Facades {
+		for _, v := range fv.Versions {
+			facades[fmt.Sprintf("%s\x1f%d", fv.Name, v)] = true
+		}
+	}
+
+	return Connection{
+		client:         client,
+		userTag:        args.AuthTag,
+		facadeVersions: facades,
+	}, nil
+}
+
+func websocketURL(s string, mt names.ModelTag) string {
+	u := url.URL{
+		Scheme: "wss",
+		Host:   s,
+	}
+	if mt.Id() != "" {
+		u.Path = path.Join(u.Path, mt.Id())
+	}
+	u.Path = path.Join(u.Path, "api")
+	return u.String()
+}
+
+// dialAll simultaneously dials all given urls and returns the first
+// connection.
+func dialAll(ctx context.Context, dialer *rpc.Dialer, urls []string) (*rpc.Client, error) {
+	if len(urls) == 0 {
+		return nil, errors.E("no urls to dial")
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var clientOnce, errOnce sync.Once
+	var client *rpc.Client
+	var err error
+	var wg sync.WaitGroup
+
+	for _, url := range urls {
+		zapctx.Info(ctx, "dialing", zap.String("url", url))
+		url := url
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			cl, dErr := dialer.Dial(ctx, url)
+			if dErr != nil {
+				errOnce.Do(func() {
+					err = dErr
+				})
+				return
+			}
+			var keep bool
+			clientOnce.Do(func() {
+				client = cl
+				keep = true
+				cancel()
+			})
+			if !keep {
+				cl.Close()
+			}
+		}()
+	}
+	wg.Wait()
+	if client == nil {
+		return nil, err
+	}
+	return client, nil
 }
 
 // A Connection is a connection to a juju controller. Connection methods
@@ -70,21 +173,18 @@ func (Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.
 // fall-back to earlier versions with slightly degraded functionality if
 // possible.
 type Connection struct {
-	conn api.Connection
+	client         *rpc.Client
+	userTag        string
+	facadeVersions map[string]bool
 }
 
 // Close closes the connection.
 func (c Connection) Close() error {
-	return c.conn.Close()
+	return c.client.Close()
 }
 
 // hasFacadeVersion returns whether the connection supports the given
 // facade at the given version.
 func (c Connection) hasFacadeVersion(facade string, version int) bool {
-	for _, v := range c.conn.AllFacadeVersions()[facade] {
-		if v == version {
-			return true
-		}
-	}
-	return false
+	return c.facadeVersions[fmt.Sprintf("%s\x1f%d", facade, version)]
 }

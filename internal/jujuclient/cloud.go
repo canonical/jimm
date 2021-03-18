@@ -26,7 +26,7 @@ func (c Connection) SupportsCheckCredentialModels() bool {
 // credential. This method uses the CheckCredentialsModel procedure on
 // the Cloud facade version 3. Any error that represents a Juju API
 // failure will be of type *APIError.
-func (c Connection) CheckCredentialModels(_ context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+func (c Connection) CheckCredentialModels(ctx context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 	const op = errors.Op("jujuclient.CheckCredentialModels")
 	in := jujuparams.TaggedCredentials{
 		Credentials: []jujuparams.TaggedCredential{cred},
@@ -35,7 +35,7 @@ func (c Connection) CheckCredentialModels(_ context.Context, cred jujuparams.Tag
 	out := jujuparams.UpdateCredentialResults{
 		Results: make([]jujuparams.UpdateCredentialResult, 1),
 	}
-	if err := c.conn.APICall("Cloud", 3, "", "CheckCredentialsModels", &in, &out); err != nil {
+	if err := c.client.Call(ctx, "Cloud", 3, "", "CheckCredentialsModels", &in, &out); err != nil {
 		return nil, errors.E(op, jujuerrors.Cause(err))
 	}
 	if out.Results[0].Error != nil {
@@ -57,7 +57,7 @@ func (c Connection) CheckCredentialModels(_ context.Context, cred jujuparams.Tag
 //
 // Any error that represents a Juju API failure will be of type
 // *APIError.
-func (c Connection) UpdateCredential(_ context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+func (c Connection) UpdateCredential(ctx context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 	const op = errors.Op("jujuclient.UpdateCredential")
 	creds := jujuparams.TaggedCredentials{
 		Credentials: []jujuparams.TaggedCredential{cred},
@@ -72,11 +72,11 @@ func (c Connection) UpdateCredential(_ context.Context, cred jujuparams.TaggedCr
 		Results: make([]jujuparams.UpdateCredentialResult, 1),
 	}
 	if c.hasFacadeVersion("Cloud", 7) {
-		if err := c.conn.APICall("Cloud", 7, "", "UpdateCredentialsCheckModels", &update, &out); err != nil {
+		if err := c.client.Call(ctx, "Cloud", 7, "", "UpdateCredentialsCheckModels", &update, &out); err != nil {
 			return nil, errors.E(op, jujuerrors.Cause(err))
 		}
 	} else if c.hasFacadeVersion("Cloud", 3) {
-		if err := c.conn.APICall("Cloud", 3, "", "UpdateCredentialsCheckModels", &update, &out); err != nil {
+		if err := c.client.Call(ctx, "Cloud", 3, "", "UpdateCredentialsCheckModels", &update, &out); err != nil {
 			return nil, errors.E(op, jujuerrors.Cause(err))
 		}
 	} else {
@@ -85,7 +85,7 @@ func (c Connection) UpdateCredential(_ context.Context, cred jujuparams.TaggedCr
 		// jujuparams.UpdateCredentialsResults, but the former will still
 		// unmarshal correctly into the latter so there is no need to use
 		// a different response type.
-		if err := c.conn.APICall("Cloud", 1, "", "UpdateCredentials", &creds, &out); err != nil {
+		if err := c.client.Call(ctx, "Cloud", 1, "", "UpdateCredentials", &creds, &out); err != nil {
 			return nil, errors.E(op, jujuerrors.Cause(err))
 		}
 	}
@@ -107,7 +107,7 @@ func (c Connection) UpdateCredential(_ context.Context, cred jujuparams.TaggedCr
 //
 // Any error that represents a Juju API failure will be of type
 // *APIError.
-func (c Connection) RevokeCredential(_ context.Context, cred names.CloudCredentialTag) error {
+func (c Connection) RevokeCredential(ctx context.Context, cred names.CloudCredentialTag) error {
 	const op = errors.Op("jujuclient.RevokeCredential")
 	out := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, 1),
@@ -119,7 +119,7 @@ func (c Connection) RevokeCredential(_ context.Context, cred names.CloudCredenti
 				Force: true,
 			}},
 		}
-		if err := c.conn.APICall("Cloud", 3, "", "RevokeCredentialsCheckModels", &in, &out); err != nil {
+		if err := c.client.Call(ctx, "Cloud", 3, "", "RevokeCredentialsCheckModels", &in, &out); err != nil {
 			return errors.E(op, jujuerrors.Cause(err))
 		}
 	} else {
@@ -128,7 +128,7 @@ func (c Connection) RevokeCredential(_ context.Context, cred names.CloudCredenti
 				Tag: cred.String(),
 			}},
 		}
-		if err := c.conn.APICall("Cloud", 1, "", "RevokeCredentials", &in, &out); err != nil {
+		if err := c.client.Call(ctx, "Cloud", 1, "", "RevokeCredentials", &in, &out); err != nil {
 			return errors.E(op, jujuerrors.Cause(err))
 		}
 	}
@@ -152,7 +152,7 @@ func (c Connection) Cloud(ctx context.Context, tag names.CloudTag, cloud *jujupa
 			Cloud: cloud,
 		}},
 	}
-	if err := c.conn.APICall("Cloud", 1, "", "Cloud", &args, &resp); err != nil {
+	if err := c.client.Call(ctx, "Cloud", 1, "", "Cloud", &args, &resp); err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}
 	if resp.Results[0].Error != nil {
@@ -166,7 +166,7 @@ func (c Connection) Cloud(ctx context.Context, tag names.CloudTag, cloud *jujupa
 func (c Connection) Clouds(ctx context.Context) (map[names.CloudTag]jujuparams.Cloud, error) {
 	const op = errors.Op("jujuclient.Clouds")
 	var resp jujuparams.CloudsResult
-	if err := c.conn.APICall("Cloud", 1, "", "Clouds", nil, &resp); err != nil {
+	if err := c.client.Call(ctx, "Cloud", 1, "", "Clouds", nil, &resp); err != nil {
 		return nil, errors.E(op, jujuerrors.Cause(err))
 	}
 
@@ -190,7 +190,7 @@ func (c Connection) AddCloud(ctx context.Context, tag names.CloudTag, cloud juju
 		Cloud: cloud,
 		Name:  tag.Id(),
 	}
-	if err := c.conn.APICall("Cloud", 2, "", "AddCloud", &args, nil); err != nil {
+	if err := c.client.Call(ctx, "Cloud", 2, "", "AddCloud", &args, nil); err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}
 	return nil
@@ -208,7 +208,7 @@ func (c Connection) RemoveCloud(ctx context.Context, tag names.CloudTag) error {
 	resp := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, 1),
 	}
-	if err := c.conn.APICall("Cloud", 2, "", "RemoveClouds", &args, &resp); err != nil {
+	if err := c.client.Call(ctx, "Cloud", 2, "", "RemoveClouds", &args, &resp); err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}
 	if resp.Results[0].Error != nil {
@@ -234,7 +234,7 @@ func (c Connection) GrantCloudAccess(ctx context.Context, cloudTag names.CloudTa
 	resp := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, 1),
 	}
-	err := c.conn.APICall("Cloud", 3, "", "ModifyCloudAccess", &args, &resp)
+	err := c.client.Call(ctx, "Cloud", 3, "", "ModifyCloudAccess", &args, &resp)
 	if err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}
@@ -261,7 +261,7 @@ func (c Connection) RevokeCloudAccess(ctx context.Context, cloudTag names.CloudT
 	resp := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, 1),
 	}
-	err := c.conn.APICall("Cloud", 3, "", "ModifyCloudAccess", &args, &resp)
+	err := c.client.Call(ctx, "Cloud", 3, "", "ModifyCloudAccess", &args, &resp)
 	if err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}
@@ -273,7 +273,7 @@ func (c Connection) RevokeCloudAccess(ctx context.Context, cloudTag names.CloudT
 
 // CloudInfo retrieves information about the cloud with the given name.
 // CloudInfo uses the CloudInfo procedure on the Cloud facade version 2.
-func (c Connection) CloudInfo(_ context.Context, tag names.CloudTag, ci *jujuparams.CloudInfo) error {
+func (c Connection) CloudInfo(ctx context.Context, tag names.CloudTag, ci *jujuparams.CloudInfo) error {
 	const op = errors.Op("jujuclient.CloudInfo")
 	args := jujuparams.Entities{
 		Entities: []jujuparams.Entity{{Tag: tag.String()}},
@@ -284,7 +284,7 @@ func (c Connection) CloudInfo(_ context.Context, tag names.CloudTag, ci *jujupar
 			Result: ci,
 		}},
 	}
-	err := c.conn.APICall("Cloud", 2, "", "CloudInfo", &args, &resp)
+	err := c.client.Call(ctx, "Cloud", 2, "", "CloudInfo", &args, &resp)
 	if err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}
@@ -297,7 +297,7 @@ func (c Connection) CloudInfo(_ context.Context, tag names.CloudTag, ci *jujupar
 // UpdateCloud updates the given cloud with the given cloud definition.
 // UpdateCloud uses the UpdateCloud procedure on the cloud facade version
 // 4.
-func (c Connection) UpdateCloud(_ context.Context, tag names.CloudTag, cloud jujuparams.Cloud) error {
+func (c Connection) UpdateCloud(ctx context.Context, tag names.CloudTag, cloud jujuparams.Cloud) error {
 	const op = errors.Op("jujuclient.UpdateCloud")
 
 	args := jujuparams.UpdateCloudArgs{
@@ -309,7 +309,7 @@ func (c Connection) UpdateCloud(_ context.Context, tag names.CloudTag, cloud juj
 	resp := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, 1),
 	}
-	err := c.conn.APICall("Cloud", 4, "", "UpdateCloud", &args, &resp)
+	err := c.client.Call(ctx, "Cloud", 4, "", "UpdateCloud", &args, &resp)
 	if err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}
