@@ -201,3 +201,146 @@ func (j *JIMM) EarliestControllerVersion(ctx context.Context) (version.Number, e
 	}
 	return *v, nil
 }
+
+// controllerAccessLevel holds the controller access level for a user.
+type controllerAccessLevel string
+
+const (
+	// noAccess allows a user no permissions at all.
+	noAccess controllerAccessLevel = ""
+
+	// loginAccess allows a user to log-ing into the subject.
+	loginAccess controllerAccessLevel = "login"
+
+	// addModelAccess allows user to add new models in subjects supporting it.
+	addModelAccess controllerAccessLevel = "add-model"
+
+	// superuserAccess allows user unrestricted permissions in the subject.
+	superuserAccess controllerAccessLevel = "superuser"
+)
+
+// validate returns error if the current is not a valid access level.
+func (a controllerAccessLevel) validate() error {
+	switch a {
+	case noAccess, loginAccess, addModelAccess, superuserAccess:
+		return nil
+	}
+	return errors.E(fmt.Sprintf("invalid access level %q", a))
+}
+
+func (a controllerAccessLevel) value() int {
+	switch a {
+	case noAccess:
+		return 0
+	case loginAccess:
+		return 1
+	case addModelAccess:
+		return 2
+	case superuserAccess:
+		return 3
+	default:
+		return -1
+	}
+}
+
+// GrantControllerAccess changes the controller access granted to users.
+func (j *JIMM) GrantControllerAccess(ctx context.Context, u *dbmodel.User, accessUserTag names.UserTag, accessLevel string) error {
+	const op = errors.Op("jimm.GrantControllerAccess")
+
+	ale := dbmodel.AuditLogEntry{
+		Time:    time.Now().UTC().Round(time.Millisecond),
+		UserTag: u.Tag().String(),
+		Action:  "grant",
+		Params: dbmodel.StringMap{
+			"access":     accessLevel,
+			"controller": names.NewControllerTag(j.UUID).String(),
+			"user":       accessUserTag.String(),
+		},
+	}
+	defer j.addAuditLogEntry(&ale)
+
+	fail := func(err error) error {
+		ale.Params["err"] = err.Error()
+		return err
+	}
+
+	if u.ControllerAccess != "superuser" {
+		return fail(errors.E(op, errors.CodeUnauthorized, "cannot grant controller access"))
+	}
+
+	if err := controllerAccessLevel(accessLevel).validate(); err != nil {
+		return fail(errors.E(op, err, errors.CodeBadRequest))
+	}
+
+	user := dbmodel.User{
+		Username: accessUserTag.Id(),
+	}
+	err := j.Database.GetUser(ctx, &user)
+	if err != nil {
+		return fail(errors.E(op, err))
+	}
+
+	// if user's access level is already greater than what we are trying to set
+	// there is nothing to do
+	if controllerAccessLevel(user.ControllerAccess).value() >= controllerAccessLevel(accessLevel).value() {
+		return nil
+	}
+	user.ControllerAccess = string(accessLevel)
+	err = j.Database.UpdateUser(ctx, &user)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	return nil
+}
+
+// RevokeControllerAccess revokes the controller access for a users.
+func (j *JIMM) RevokeControllerAccess(ctx context.Context, u *dbmodel.User, accessUserTag names.UserTag, accessLevel string) error {
+	const op = errors.Op("jimm.RevokeControllerAccess")
+
+	ale := dbmodel.AuditLogEntry{
+		Time:    time.Now().UTC().Round(time.Millisecond),
+		UserTag: u.Tag().String(),
+		Action:  "revoke",
+		Params: dbmodel.StringMap{
+			"access":     accessLevel,
+			"controller": names.NewControllerTag(j.UUID).String(),
+			"user":       accessUserTag.String(),
+		},
+	}
+	defer j.addAuditLogEntry(&ale)
+
+	fail := func(err error) error {
+		ale.Params["err"] = err.Error()
+		return err
+	}
+
+	if u.ControllerAccess != "superuser" {
+		return fail(errors.E(op, errors.CodeUnauthorized, "cannot revoke controller access"))
+	}
+
+	if err := controllerAccessLevel(accessLevel).validate(); err != nil {
+		return fail(errors.E(op, err, errors.CodeBadRequest))
+	}
+	userAccess := noAccess
+	switch controllerAccessLevel(accessLevel) {
+	case loginAccess:
+	case addModelAccess:
+		userAccess = loginAccess
+	case superuserAccess:
+		userAccess = addModelAccess
+	}
+
+	user := dbmodel.User{
+		Username: accessUserTag.Id(),
+	}
+	err := j.Database.GetUser(ctx, &user)
+	if err != nil {
+		return fail(errors.E(op, err))
+	}
+	user.ControllerAccess = string(userAccess)
+	err = j.Database.UpdateUser(ctx, &user)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	return nil
+}
