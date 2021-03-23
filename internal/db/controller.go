@@ -70,5 +70,8 @@ func (d *Database) ForEachController(ctx context.Context, f func(*dbmodel.Contro
 			return err
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return errors.E(op, dbError(err))
+	}
 	return nil
 }
