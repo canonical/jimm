@@ -246,3 +246,23 @@ func (j *JIMM) addAuditLogEntry(ale *dbmodel.AuditLogEntry) {
 		zapctx.Error(ctx, "cannot store audit log entry", zap.Error(err), zap.Any("entry", *ale))
 	}
 }
+
+// FindAuditEvents returns audit events matching the given filter.
+func (j *JIMM) FindAuditEvents(ctx context.Context, user *dbmodel.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error) {
+	const op = errors.Op("jimm.FindAuditEvents")
+
+	if user.ControllerAccess != "superuser" {
+		return nil, errors.E(op, errors.CodeUnauthorized)
+	}
+
+	var entries []dbmodel.AuditLogEntry
+	err := j.Database.ForEachAuditLogEntry(ctx, filter, func(entry *dbmodel.AuditLogEntry) error {
+		entries = append(entries, *entry)
+		return nil
+	})
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	return entries, nil
+}

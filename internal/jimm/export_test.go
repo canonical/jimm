@@ -2,8 +2,14 @@
 
 package jimm
 
+import "github.com/CanonicalLtd/jimm/internal/dbmodel"
+
 var (
 	DetermineAccessLevelAfterRevoke = determineAccessLevelAfterRevoke
 	DetermineAccessLevelAfterGrant  = determineAccessLevelAfterGrant
 	FilterApplicationOfferDetail    = filterApplicationOfferDetail
 )
+
+func (j *JIMM) AddAuditLogEntry(ale *dbmodel.AuditLogEntry) {
+	j.addAuditLogEntry(ale)
+}
