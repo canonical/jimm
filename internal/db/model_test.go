@@ -6,7 +6,6 @@ import (
 	"context"
 	"database/sql"
 	"testing"
-	"time"
 
 	qt "github.com/frankban/quicktest"
 	"gorm.io/gorm"
@@ -75,10 +74,7 @@ func (s *dbSuite) TestAddModel(c *qt.C) {
 		Life:              "alive",
 		Status: dbmodel.Status{
 			Status: "available",
-			Since: sql.NullTime{
-				Time:  time.Now().Truncate(time.Millisecond),
-				Valid: true,
-			},
+			Since:  db.Now(),
 		},
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
@@ -157,10 +153,7 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 		Life:              "alive",
 		Status: dbmodel.Status{
 			Status: "available",
-			Since: sql.NullTime{
-				Time:  time.Now().Truncate(time.Millisecond),
-				Valid: true,
-			},
+			Since:  db.Now(),
 		},
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
@@ -244,10 +237,7 @@ func (s *dbSuite) TestUpdateModel(c *qt.C) {
 		Life:              "alive",
 		Status: dbmodel.Status{
 			Status: "available",
-			Since: sql.NullTime{
-				Time:  time.Now().Truncate(time.Millisecond),
-				Valid: true,
-			},
+			Since:  db.Now(),
 		},
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
@@ -328,10 +318,7 @@ func (s *dbSuite) TestDeleteModel(c *qt.C) {
 		Life:              "alive",
 		Status: dbmodel.Status{
 			Status: "available",
-			Since: sql.NullTime{
-				Time:  time.Now().Truncate(time.Millisecond),
-				Valid: true,
-			},
+			Since:  db.Now(),
 		},
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
@@ -418,10 +405,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 		Life:              "alive",
 		Status: dbmodel.Status{
 			Status: "available",
-			Since: sql.NullTime{
-				Time:  time.Now().UTC().Truncate(time.Millisecond),
-				Valid: true,
-			},
+			Since:  db.Now(),
 		},
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
@@ -449,10 +433,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 		Life:              "alive",
 		Status: dbmodel.Status{
 			Status: "available",
-			Since: sql.NullTime{
-				Time:  time.Now().UTC().Truncate(time.Millisecond),
-				Valid: true,
-			},
+			Since:  db.Now(),
 		},
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
@@ -712,4 +693,485 @@ func (s *dbSuite) TestForEachModel(c *qt.C) {
 		"00000002-0000-0000-0000-000000000002",
 		"00000002-0000-0000-0000-000000000003",
 	})
+}
+
+func TestGetApplicationUnconfiguredDatabase(t *testing.T) {
+	c := qt.New(t)
+
+	var d db.Database
+	err := d.GetApplication(context.Background(), nil)
+	c.Check(err, qt.ErrorMatches, `database not configured`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
+}
+
+const testGetApplicationEnv = `clouds:
+- name: test
+  type: test
+  regions:
+  - name: test-region
+cloud-credentials:
+- name: test-cred
+  cloud: test
+  owner: alice@external
+  type: empty
+controllers:
+- name: test
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test
+  region: test-region
+models:
+- name: test-1
+  uuid: 00000002-0000-0000-0000-000000000001
+  owner: alice@external
+  cloud: test
+  region: test-region
+  cloud-credential: test-cred
+  controller: test
+  applications:
+  - name: app-1
+    charm-url: cs:app
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: write
+`
+
+func (s *dbSuite) TestGetApplication(c *qt.C) {
+	ctx := context.Background()
+	err := s.Database.GetApplication(ctx, nil)
+	c.Check(err, qt.ErrorMatches, `upgrade in progress`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
+
+	err = s.Database.Migrate(ctx, true)
+	c.Assert(err, qt.Equals, nil)
+
+	env := jimmtest.ParseEnvironment(c, testGetApplicationEnv)
+	env.PopulateDB(c, *s.Database)
+
+	app := dbmodel.Application{
+		ModelID: env.Model("alice@external", "test-1").DBObject(c, *s.Database).ID,
+		Name:    "app-1",
+	}
+
+	err = s.Database.GetApplication(ctx, &app)
+	c.Assert(err, qt.IsNil)
+
+	app2 := dbmodel.Application{
+		ModelID: app.ModelID,
+		Name:    "app-2",
+	}
+
+	err = s.Database.GetApplication(ctx, &app2)
+	c.Check(err, qt.ErrorMatches, `application not found`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+}
+
+func TestDeleteApplicationUnconfiguredDatabase(t *testing.T) {
+	c := qt.New(t)
+
+	var d db.Database
+	err := d.DeleteApplication(context.Background(), nil)
+	c.Check(err, qt.ErrorMatches, `database not configured`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
+}
+
+func (s *dbSuite) TestDeleteApplication(c *qt.C) {
+	ctx := context.Background()
+	err := s.Database.DeleteApplication(ctx, nil)
+	c.Check(err, qt.ErrorMatches, `upgrade in progress`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
+
+	err = s.Database.Migrate(ctx, true)
+	c.Assert(err, qt.Equals, nil)
+
+	env := jimmtest.ParseEnvironment(c, testGetApplicationEnv)
+	env.PopulateDB(c, *s.Database)
+
+	app := dbmodel.Application{
+		ModelID: env.Model("alice@external", "test-1").DBObject(c, *s.Database).ID,
+		Name:    "app-1",
+	}
+	err = s.Database.DeleteApplication(ctx, &app)
+	c.Assert(err, qt.IsNil)
+	err = s.Database.GetApplication(ctx, &app)
+	c.Check(err, qt.ErrorMatches, `application not found`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+
+	err = s.Database.DeleteApplication(ctx, &app)
+	c.Assert(err, qt.IsNil)
+	err = s.Database.GetApplication(ctx, &app)
+	c.Check(err, qt.ErrorMatches, `application not found`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+}
+
+func TestUpdateApplicationUnconfiguredDatabase(t *testing.T) {
+	c := qt.New(t)
+
+	var d db.Database
+	err := d.UpdateApplication(context.Background(), nil)
+	c.Check(err, qt.ErrorMatches, `database not configured`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
+}
+
+func (s *dbSuite) TestUpdateApplication(c *qt.C) {
+	ctx := context.Background()
+	err := s.Database.UpdateApplication(ctx, nil)
+	c.Check(err, qt.ErrorMatches, `upgrade in progress`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
+
+	err = s.Database.Migrate(ctx, true)
+	c.Assert(err, qt.Equals, nil)
+
+	env := jimmtest.ParseEnvironment(c, testGetApplicationEnv)
+	env.PopulateDB(c, *s.Database)
+
+	app := dbmodel.Application{
+		ModelID: env.Model("alice@external", "test-1").DBObject(c, *s.Database).ID,
+		Name:    "app-2",
+		Life:    "starting",
+	}
+	err = s.Database.UpdateApplication(ctx, &app)
+	c.Assert(err, qt.IsNil)
+
+	app2 := dbmodel.Application{
+		ModelID: app.ModelID,
+		Name:    "app-2",
+	}
+	err = s.Database.GetApplication(ctx, &app2)
+	c.Assert(err, qt.IsNil)
+	c.Check(app2, jimmtest.DBObjectEquals, app)
+
+	app2.Life = "alive"
+	err = s.Database.UpdateApplication(ctx, &app2)
+	c.Assert(err, qt.IsNil)
+
+	app3 := dbmodel.Application{
+		ModelID: app.ModelID,
+		Name:    "app-2",
+	}
+	err = s.Database.GetApplication(ctx, &app3)
+	c.Assert(err, qt.IsNil)
+	c.Check(app3, jimmtest.DBObjectEquals, app2)
+}
+
+func TestGetMachineUnconfiguredDatabase(t *testing.T) {
+	c := qt.New(t)
+
+	var d db.Database
+	err := d.GetMachine(context.Background(), nil)
+	c.Check(err, qt.ErrorMatches, `database not configured`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
+}
+
+const testGetMachineEnv = `clouds:
+- name: test
+  type: test
+  regions:
+  - name: test-region
+cloud-credentials:
+- name: test-cred
+  cloud: test
+  owner: alice@external
+  type: empty
+controllers:
+- name: test
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test
+  region: test-region
+models:
+- name: test-1
+  uuid: 00000002-0000-0000-0000-000000000001
+  owner: alice@external
+  cloud: test
+  region: test-region
+  cloud-credential: test-cred
+  controller: test
+  machines:
+  - id: "0"
+    display-name: Test Machine
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: write
+`
+
+func (s *dbSuite) TestGetMachine(c *qt.C) {
+	ctx := context.Background()
+	err := s.Database.GetMachine(ctx, nil)
+	c.Check(err, qt.ErrorMatches, `upgrade in progress`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
+
+	err = s.Database.Migrate(ctx, true)
+	c.Assert(err, qt.Equals, nil)
+
+	env := jimmtest.ParseEnvironment(c, testGetMachineEnv)
+	env.PopulateDB(c, *s.Database)
+
+	m := dbmodel.Machine{
+		ModelID:   env.Model("alice@external", "test-1").DBObject(c, *s.Database).ID,
+		MachineID: "0",
+	}
+
+	err = s.Database.GetMachine(ctx, &m)
+	c.Assert(err, qt.IsNil)
+	c.Check(m.DisplayName, qt.Equals, "Test Machine")
+
+	m2 := dbmodel.Machine{
+		ModelID:   m.ModelID,
+		MachineID: "1",
+	}
+
+	err = s.Database.GetMachine(ctx, &m2)
+	c.Check(err, qt.ErrorMatches, `machine not found`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+}
+
+func TestDeleteMachineUnconfiguredDatabase(t *testing.T) {
+	c := qt.New(t)
+
+	var d db.Database
+	err := d.DeleteMachine(context.Background(), nil)
+	c.Check(err, qt.ErrorMatches, `database not configured`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
+}
+
+func (s *dbSuite) TestDeleteMachine(c *qt.C) {
+	ctx := context.Background()
+	err := s.Database.DeleteMachine(ctx, nil)
+	c.Check(err, qt.ErrorMatches, `upgrade in progress`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
+
+	err = s.Database.Migrate(ctx, true)
+	c.Assert(err, qt.Equals, nil)
+
+	env := jimmtest.ParseEnvironment(c, testGetMachineEnv)
+	env.PopulateDB(c, *s.Database)
+
+	m := dbmodel.Machine{
+		ModelID:   env.Model("alice@external", "test-1").DBObject(c, *s.Database).ID,
+		MachineID: "0",
+	}
+	err = s.Database.DeleteMachine(ctx, &m)
+	c.Assert(err, qt.IsNil)
+	err = s.Database.GetMachine(ctx, &m)
+	c.Check(err, qt.ErrorMatches, `machine not found`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+
+	err = s.Database.DeleteMachine(ctx, &m)
+	c.Assert(err, qt.IsNil)
+	err = s.Database.GetMachine(ctx, &m)
+	c.Check(err, qt.ErrorMatches, `machine not found`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+}
+
+func TestUpdateMachineUnconfiguredDatabase(t *testing.T) {
+	c := qt.New(t)
+
+	var d db.Database
+	err := d.UpdateMachine(context.Background(), nil)
+	c.Check(err, qt.ErrorMatches, `database not configured`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
+}
+
+func (s *dbSuite) TestUpdateMachine(c *qt.C) {
+	ctx := context.Background()
+	err := s.Database.UpdateMachine(ctx, nil)
+	c.Check(err, qt.ErrorMatches, `upgrade in progress`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
+
+	err = s.Database.Migrate(ctx, true)
+	c.Assert(err, qt.Equals, nil)
+
+	env := jimmtest.ParseEnvironment(c, testGetMachineEnv)
+	env.PopulateDB(c, *s.Database)
+
+	m := dbmodel.Machine{
+		ModelID:     env.Model("alice@external", "test-1").DBObject(c, *s.Database).ID,
+		MachineID:   "1",
+		DisplayName: "Machine 1",
+	}
+	err = s.Database.UpdateMachine(ctx, &m)
+	c.Assert(err, qt.IsNil)
+
+	m2 := dbmodel.Machine{
+		ModelID:   m.ModelID,
+		MachineID: "1",
+	}
+	err = s.Database.GetMachine(ctx, &m2)
+	c.Assert(err, qt.IsNil)
+	c.Check(m2, jimmtest.DBObjectEquals, m)
+
+	m2.DisplayName = "Updated"
+	err = s.Database.UpdateMachine(ctx, &m2)
+	c.Assert(err, qt.IsNil)
+
+	m3 := dbmodel.Machine{
+		ModelID:   m.ModelID,
+		MachineID: "1",
+	}
+	err = s.Database.GetMachine(ctx, &m3)
+	c.Assert(err, qt.IsNil)
+	c.Check(m3, jimmtest.DBObjectEquals, m2)
+}
+
+const testGetUnitEnv = `clouds:
+- name: test
+  type: test
+  regions:
+  - name: test-region
+cloud-credentials:
+- name: test-cred
+  cloud: test
+  owner: alice@external
+  type: empty
+controllers:
+- name: test
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test
+  region: test-region
+models:
+- name: test-1
+  uuid: 00000002-0000-0000-0000-000000000001
+  owner: alice@external
+  cloud: test
+  region: test-region
+  cloud-credential: test-cred
+  controller: test
+  applications:
+  - name: app-1
+  machines:
+  - id: "0"
+  units:
+  - name: app-1/0
+    application: app-1
+    machine-id: "0"
+    life: starting
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: write
+`
+
+func (s *dbSuite) TestGetUnit(c *qt.C) {
+	ctx := context.Background()
+	err := s.Database.GetUnit(ctx, nil)
+	c.Check(err, qt.ErrorMatches, `upgrade in progress`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
+
+	err = s.Database.Migrate(ctx, true)
+	c.Assert(err, qt.Equals, nil)
+
+	env := jimmtest.ParseEnvironment(c, testGetUnitEnv)
+	env.PopulateDB(c, *s.Database)
+
+	u := dbmodel.Unit{
+		ModelID: env.Model("alice@external", "test-1").DBObject(c, *s.Database).ID,
+		Name:    "app-1/0",
+	}
+
+	err = s.Database.GetUnit(ctx, &u)
+	c.Assert(err, qt.IsNil)
+	c.Check(u.Life, qt.Equals, "starting")
+
+	u2 := dbmodel.Unit{
+		ModelID: u.ModelID,
+		Name:    "app-1/1",
+	}
+
+	err = s.Database.GetUnit(ctx, &u2)
+	c.Check(err, qt.ErrorMatches, `unit not found`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+}
+
+func TestDeleteUnitUnconfiguredDatabase(t *testing.T) {
+	c := qt.New(t)
+
+	var d db.Database
+	err := d.DeleteUnit(context.Background(), nil)
+	c.Check(err, qt.ErrorMatches, `database not configured`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
+}
+
+func (s *dbSuite) TestDeleteUnit(c *qt.C) {
+	ctx := context.Background()
+	err := s.Database.DeleteUnit(ctx, nil)
+	c.Check(err, qt.ErrorMatches, `upgrade in progress`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
+
+	err = s.Database.Migrate(ctx, true)
+	c.Assert(err, qt.Equals, nil)
+
+	env := jimmtest.ParseEnvironment(c, testGetUnitEnv)
+	env.PopulateDB(c, *s.Database)
+
+	u := dbmodel.Unit{
+		ModelID: env.Model("alice@external", "test-1").DBObject(c, *s.Database).ID,
+		Name:    "app-1/0",
+	}
+	err = s.Database.DeleteUnit(ctx, &u)
+	c.Assert(err, qt.IsNil)
+	err = s.Database.GetUnit(ctx, &u)
+	c.Check(err, qt.ErrorMatches, `unit not found`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+
+	err = s.Database.DeleteUnit(ctx, &u)
+	c.Assert(err, qt.IsNil)
+	err = s.Database.GetUnit(ctx, &u)
+	c.Check(err, qt.ErrorMatches, `unit not found`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+}
+
+func TestUpdateUnitUnconfiguredDatabase(t *testing.T) {
+	c := qt.New(t)
+
+	var d db.Database
+	err := d.UpdateUnit(context.Background(), nil)
+	c.Check(err, qt.ErrorMatches, `database not configured`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
+}
+
+func (s *dbSuite) TestUpdateUnit(c *qt.C) {
+	ctx := context.Background()
+	err := s.Database.UpdateUnit(ctx, nil)
+	c.Check(err, qt.ErrorMatches, `upgrade in progress`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
+
+	err = s.Database.Migrate(ctx, true)
+	c.Assert(err, qt.Equals, nil)
+
+	env := jimmtest.ParseEnvironment(c, testGetUnitEnv)
+	env.PopulateDB(c, *s.Database)
+
+	u := dbmodel.Unit{
+		ModelID:         env.Model("alice@external", "test-1").DBObject(c, *s.Database).ID,
+		ApplicationName: "app-1",
+		MachineID:       "0",
+		Name:            "app-1/1",
+		Life:            "starting",
+	}
+	err = s.Database.UpdateUnit(ctx, &u)
+	c.Assert(err, qt.IsNil)
+
+	u2 := dbmodel.Unit{
+		ModelID: u.ModelID,
+		Name:    "app-1/1",
+	}
+	err = s.Database.GetUnit(ctx, &u2)
+	c.Assert(err, qt.IsNil)
+	c.Check(u2, jimmtest.DBObjectEquals, u)
+
+	u2.Life = "alive"
+	err = s.Database.UpdateUnit(ctx, &u2)
+	c.Assert(err, qt.IsNil)
+
+	u3 := dbmodel.Unit{
+		ModelID: u.ModelID,
+		Name:    "app-1/1",
+	}
+	err = s.Database.GetUnit(ctx, &u3)
+	c.Assert(err, qt.IsNil)
+	c.Check(u3, jimmtest.DBObjectEquals, u2)
 }

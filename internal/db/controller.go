@@ -52,7 +52,6 @@ func (d *Database) UpdateController(ctx context.Context, controller *dbmodel.Con
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
-
 	if controller.ID == 0 {
 		return errors.E(op, errors.CodeNotFound, `controller not found`)
 	}
@@ -65,7 +64,7 @@ func (d *Database) UpdateController(ctx context.Context, controller *dbmodel.Con
 	return nil
 }
 
-// Delete controller removes the specified controller from the database.
+// DeleteController removes the specified controller from the database.
 func (d *Database) DeleteController(ctx context.Context, controller *dbmodel.Controller) error {
 	const op = errors.Op("db.DeleteController")
 	if err := d.ready(); err != nil {
@@ -114,6 +113,30 @@ func (d *Database) ForEachController(ctx context.Context, f func(*dbmodel.Contro
 	}
 	if err := rows.Err(); err != nil {
 		return errors.E(op, dbError(err))
+	}
+	return nil
+}
+
+// ForEachControllerModel iterates through every model running on the given
+// controller calling the given function for each one. If the given
+// function returns an error the iteration will stop immediately and the
+// error will be returned unmodified.
+func (d *Database) ForEachControllerModel(ctx context.Context, ctl *dbmodel.Controller, f func(m *dbmodel.Model) error) error {
+	const op = errors.Op("db.ForEachControllerModel")
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	var models []dbmodel.Model
+	db := d.DB.WithContext(ctx)
+	if err := db.Model(ctl).Association("Models").Find(&models); err != nil {
+		return errors.E(op, dbError(err))
+	}
+	for _, m := range models {
+		if err := f(&m); err != nil {
+			return err
+		}
 	}
 	return nil
 }

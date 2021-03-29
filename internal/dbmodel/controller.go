@@ -64,7 +64,6 @@ type Controller struct {
 	// Models contains all the models that are running on this controller.
 	Models []Model
 
-	// TODO(mhilton) Monitor Lease management.
 	// TODO(mhilton) Save controller statistics?
 }
 

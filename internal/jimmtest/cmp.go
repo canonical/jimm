@@ -39,6 +39,7 @@ func UserTagCompare(a, b dbmodel.User) bool {
 var DBObjectEquals = qt.CmpEquals(
 	cmpopts.EquateEmpty(),
 	cmpopts.IgnoreTypes(gorm.Model{}),
+	cmpopts.IgnoreFields(dbmodel.Application{}, "ID", "CreatedAt", "UpdatedAt", "ModelID"),
 	cmpopts.IgnoreFields(dbmodel.Cloud{}, "ID", "CreatedAt", "UpdatedAt"),
 	cmpopts.IgnoreFields(dbmodel.CloudCredential{}, "CloudName", "OwnerUsername"),
 	cmpopts.IgnoreFields(dbmodel.CloudRegion{}, "CloudName"),
@@ -46,5 +47,6 @@ var DBObjectEquals = qt.CmpEquals(
 	cmpopts.IgnoreFields(dbmodel.Controller{}, "ID"),
 	cmpopts.IgnoreFields(dbmodel.Machine{}, "ID", "CreatedAt", "UpdatedAt", "ModelID"),
 	cmpopts.IgnoreFields(dbmodel.Model{}, "ID", "CreatedAt", "UpdatedAt", "OwnerUsername", "ControllerID", "CloudRegionID", "CloudCredentialID"),
+	cmpopts.IgnoreFields(dbmodel.Unit{}, "ID", "CreatedAt", "UpdatedAt", "ModelID"),
 	cmpopts.IgnoreFields(dbmodel.UserModelAccess{}, "ModelID", "Username"),
 )

@@ -28,6 +28,9 @@ func dbError(err error) error {
 		if e.ExtendedCode == sqlite3.ErrConstraintUnique {
 			code = errors.CodeAlreadyExists
 		}
+		if e.Code == sqlite3.ErrLocked {
+			code = errors.CodeDatabaseLocked
+		}
 	case dqlitedriver.Error:
 		// TODO(mhilton) work out how to decode dqlite errors.
 	case *pgconn.PgError:

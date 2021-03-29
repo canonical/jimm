@@ -60,7 +60,8 @@ func MemoryDB(t testing.TB, nowFunc func() time.Time) *gorm.DB {
 		Logger:  NewGormLogger(t),
 		NowFunc: nowFunc,
 	}
-	gdb, err := gorm.Open(sqlite.Open("file::memory:"), &cfg)
+	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", t.Name())
+	gdb, err := gorm.Open(sqlite.Open(dsn), &cfg)
 	if err != nil {
 		t.Fatalf("error opening database: %s", err)
 	}
