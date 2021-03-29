@@ -156,6 +156,9 @@ func (d *Database) ForEachModel(ctx context.Context, f func(m *dbmodel.Model) er
 			return err
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return errors.E(op, dbError(err))
+	}
 	return nil
 }
 

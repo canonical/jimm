@@ -266,3 +266,23 @@ func (j *JIMM) FindAuditEvents(ctx context.Context, user *dbmodel.User, filter d
 
 	return entries, nil
 }
+
+// ListControllers returns a list of controllers the user has access to.
+func (j *JIMM) ListControllers(ctx context.Context, user *dbmodel.User) ([]dbmodel.Controller, error) {
+	const op = errors.Op("jimm.ListControllers")
+
+	if user.ControllerAccess != "superuser" {
+		return nil, errors.E(op, errors.CodeUnauthorized)
+	}
+
+	var controllers []dbmodel.Controller
+	err := j.Database.ForEachController(ctx, func(c *dbmodel.Controller) error {
+		controllers = append(controllers, *c)
+		return nil
+	})
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	return controllers, nil
+}
