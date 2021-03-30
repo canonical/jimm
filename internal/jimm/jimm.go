@@ -174,7 +174,6 @@ type API interface {
 
 	// ModelSummaryWatcherStop stops a model summary watcher.
 	ModelSummaryWatcherStop(context.Context, string) error
-
 	// Offer creates a new application-offer.
 	Offer(context.Context, jujuparams.AddApplicationOffer) error
 
@@ -285,4 +284,33 @@ func (j *JIMM) ListControllers(ctx context.Context, user *dbmodel.User) ([]dbmod
 	}
 
 	return controllers, nil
+}
+
+// SetControllerDeprecated records if the controller is to be deprecated.
+// No new models or clouds can be added to a deprecated controller.
+func (j *JIMM) SetControllerDeprecated(ctx context.Context, user *dbmodel.User, controllerName string, deprecated bool) error {
+	const op = errors.Op("jimm.SetControllerDeprecated")
+
+	if user.ControllerAccess != "superuser" {
+		return errors.E(op, errors.CodeUnauthorized)
+	}
+
+	// Update the local database with the updated cloud definition. We
+	// do this in a transaction so that the local view cannot finish in
+	// an inconsistent state.
+	err := j.Database.Transaction(func(db *db.Database) error {
+		c := dbmodel.Controller{
+			Name: controllerName,
+		}
+		if err := db.GetController(ctx, &c); err != nil {
+			return err
+		}
+		c.Deprecated = deprecated
+		return db.UpdateController(ctx, &c)
+	})
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	return nil
 }

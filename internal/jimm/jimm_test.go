@@ -237,3 +237,88 @@ func TestListControllers(t *testing.T) {
 		})
 	}
 }
+
+const testSetControllerDeprecatedEnv = `clouds:
+- name: test
+  type: test
+  regions:
+  - name: test-region
+cloud-credentials:
+- name: test-cred
+  cloud: test
+  owner: alice@external
+  type: empty
+controllers:
+- name: test1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test
+  region: test-region-1
+  agent-version: 3.2.1
+users:
+- username: alice@external
+  controller-access: superuser
+- username: bob@external
+  controller-access: add-model
+- username: eve@external
+  controller-access: "no-access"
+`
+
+func TestSetControllerDeprecated(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+	now := time.Now().UTC().Round(time.Millisecond)
+
+	j := &jimm.JIMM{
+		Database: db.Database{
+			DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+		},
+	}
+
+	err := j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	env := jimmtest.ParseEnvironment(c, testSetControllerDeprecatedEnv)
+	env.PopulateDB(c, j.Database)
+
+	tests := []struct {
+		about         string
+		user          dbmodel.User
+		deprecated    bool
+		expectedError string
+	}{{
+		about:      "superuser can deprecate a controller",
+		user:       env.User("alice@external").DBObject(c, j.Database),
+		deprecated: true,
+	}, {
+		about:      "superuser can deprecate a controller",
+		user:       env.User("alice@external").DBObject(c, j.Database),
+		deprecated: false,
+	}, {
+		about:         "add-model user cannot deprecate a controller",
+		expectedError: "unauthorized access",
+		deprecated:    true,
+	}, {
+		about:         "user withouth access rights cannot deprecate a controller",
+		user:          env.User("eve@external").DBObject(c, j.Database),
+		expectedError: "unauthorized access",
+		deprecated:    true,
+	}}
+
+	for _, test := range tests {
+		c.Run(test.about, func(c *qt.C) {
+			err := j.SetControllerDeprecated(ctx, &test.user, "test1", test.deprecated)
+			if test.expectedError != "" {
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
+			} else {
+				c.Assert(err, qt.Equals, nil)
+				controller := dbmodel.Controller{
+					Name: "test1",
+				}
+				err = j.Database.GetController(ctx, &controller)
+				c.Assert(err, qt.Equals, nil)
+				c.Assert(controller.Deprecated, qt.Equals, test.deprecated)
+			}
+		})
+	}
+}
