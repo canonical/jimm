@@ -6,7 +6,7 @@ import (
 	"context"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/juju/utils"
+	"github.com/juju/utils/v2"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"

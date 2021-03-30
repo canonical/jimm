@@ -4,9 +4,9 @@ import (
 	"context"
 	"strings"
 
+	"github.com/juju/mgo/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	errgo "gopkg.in/errgo.v1"
-	mgo "gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"

@@ -8,13 +8,13 @@ import (
 	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/core/life"
+	"github.com/juju/version"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
-	"github.com/juju/juju/core/life"
-	"github.com/juju/version"
 )
 
 // ErrLeaseUnavailable is the error cause returned by AcquireMonitorLease

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path"
 
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
@@ -18,7 +19,6 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
 	"github.com/CanonicalLtd/jimm/params"
-	jujuparams "github.com/juju/juju/apiserver/params"
 )
 
 // GetCredential retrieves the given credential from the database,

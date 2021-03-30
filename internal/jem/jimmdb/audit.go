@@ -4,18 +4,16 @@ import (
 	"context"
 	"time"
 
+	"github.com/juju/mgo/v2/bson"
 	"go.uber.org/zap"
-
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
-	"gopkg.in/mgo.v2/bson"
+	"gopkg.in/macaroon-bakery.v2/bakery/identchecker" // AppendAudit appends the given entry to the audit log.
 
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
-// AppendAudit appends the given entry to the audit log.
 func (db *Database) AppendAudit(ctx context.Context, id identchecker.ACLIdentity, e params.AuditEntry) {
 	common := e.Common()
 	common.Created_ = time.Now()

@@ -10,9 +10,11 @@ import (
 	"time"
 
 	"github.com/canonical/candid/candidclient"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/mgorootkeystore"
 	vault "github.com/hashicorp/vault/api"
 	"github.com/juju/aclstore"
 	"github.com/juju/juju/cloud"
+	"github.com/juju/mgo/v2"
 	"github.com/juju/simplekv/mgosimplekv"
 	"github.com/julienschmidt/httprouter"
 	"github.com/prometheus/client_golang/prometheus"
@@ -21,9 +23,7 @@ import (
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
-	"gopkg.in/macaroon-bakery.v2/bakery/mgorootkeystore"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
-	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/dashboard"

@@ -9,9 +9,9 @@ import (
 	"time"
 
 	vault "github.com/hashicorp/vault/api"
+	"github.com/juju/mgo/v2"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
-	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jimm/internal/debugapi"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"

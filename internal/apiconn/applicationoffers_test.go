@@ -6,16 +6,14 @@ import (
 	"context"
 	"sort"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/juju/juju/api"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/testing/factory"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
-
-	"github.com/juju/juju/api"
-	jujuparams "github.com/juju/juju/apiserver/params"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/conv"
@@ -99,6 +97,9 @@ func (s *applicationoffersSuite) TestOffer(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
+	// Note that the behaviour of offer changed at some point in the
+	// 2.9 development such that an existing offer is updated, rather
+	// than producing an error.
 	err = s.conn.Offer(ctx, jujuparams.AddApplicationOffer{
 		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
 		OfferName:       "test-offer",
@@ -107,10 +108,7 @@ func (s *applicationoffersSuite) TestOffer(c *gc.C) {
 			ep.Name: ep.Name,
 		},
 	})
-	c.Assert(err, gc.NotNil)
-	apiErr, ok := errgo.Cause(err).(*apiconn.APIError)
-	c.Assert(ok, gc.Equals, true)
-	c.Assert(apiErr.ParamsError().Message, gc.Matches, ".* application offer already exists")
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *applicationoffersSuite) TestOfferError(c *gc.C) {
@@ -472,7 +470,7 @@ func (s *applicationoffersSuite) TestGrantApplicationOfferAccessNotFound(c *gc.C
 	offerURL := "test-user@external/test-model.test-offer"
 
 	err := s.conn.GrantApplicationOfferAccess(ctx, offerURL, params.User("test-user-2"), jujuparams.OfferConsumeAccess)
-	c.Check(err, gc.ErrorMatches, `api error: application offer "test-offer" not found`)
+	c.Check(err, gc.ErrorMatches, `api error: offer "test-offer" not found`)
 }
 
 func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
@@ -592,7 +590,7 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccessNotFound(c *gc.
 	offerURL := "test-user@external/test-model.test-offer"
 
 	err := s.conn.RevokeApplicationOfferAccess(ctx, offerURL, params.User("test-user-2"), jujuparams.OfferConsumeAccess)
-	c.Check(err, gc.ErrorMatches, `api error: application offer "test-offer" not found`)
+	c.Check(err, gc.ErrorMatches, `api error: offer "test-offer" not found`)
 }
 
 func (s *applicationoffersSuite) TestDestroyApplicationOffer(c *gc.C) {

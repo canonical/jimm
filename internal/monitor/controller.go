@@ -9,7 +9,7 @@ import (
 
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/instance"
-	"github.com/juju/utils/parallel"
+	"github.com/juju/utils/v2/parallel"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/tomb.v2"

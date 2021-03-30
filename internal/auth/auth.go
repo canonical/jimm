@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/canonical/candid/candidclient"
-	"github.com/juju/utils"
+	"github.com/juju/utils/v2"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"

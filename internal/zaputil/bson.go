@@ -5,8 +5,8 @@ package zaputil
 import (
 	"time"
 
+	"github.com/juju/mgo/v2/bson"
 	"go.uber.org/zap/zapcore"
-	"gopkg.in/mgo.v2/bson"
 )
 
 func BSON(key string, v interface{}) zapcore.Field {

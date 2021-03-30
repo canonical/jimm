@@ -6,8 +6,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/juju/mgo/v2"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/servermon"

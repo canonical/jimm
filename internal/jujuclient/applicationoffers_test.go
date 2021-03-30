@@ -6,14 +6,13 @@ import (
 	"context"
 	"sort"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/testing/factory"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
-
-	jujuparams "github.com/juju/juju/apiserver/params"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
@@ -74,7 +73,7 @@ func (s *applicationoffersSuite) TestOffer(c *gc.C) {
 			ep.Name: ep.Name,
 		},
 	})
-	c.Assert(err, gc.ErrorMatches, `cannot add application offer "test-offer": application offer already exists`)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *applicationoffersSuite) TestOfferError(c *gc.C) {
@@ -436,7 +435,7 @@ func (s *applicationoffersSuite) TestGrantApplicationOfferAccessNotFound(c *gc.C
 	offerURL := "test-user@external/test-model.test-offer"
 
 	err := s.API.GrantApplicationOfferAccess(ctx, offerURL, names.NewUserTag("test-user-2@external"), jujuparams.OfferConsumeAccess)
-	c.Check(err, gc.ErrorMatches, `application offer "test-offer" not found`)
+	c.Check(err, gc.ErrorMatches, `offer "test-offer" not found`)
 }
 
 func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
@@ -556,7 +555,7 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccessNotFound(c *gc.
 	offerURL := "test-user@external/test-model.test-offer"
 
 	err := s.API.RevokeApplicationOfferAccess(ctx, offerURL, names.NewUserTag("test-user-2@external"), jujuparams.OfferConsumeAccess)
-	c.Check(err, gc.ErrorMatches, `application offer "test-offer" not found`)
+	c.Check(err, gc.ErrorMatches, `offer "test-offer" not found`)
 }
 
 func (s *applicationoffersSuite) TestDestroyApplicationOffer(c *gc.C) {
