@@ -4,6 +4,7 @@ package jimm_test
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"testing"
 	"time"
@@ -318,6 +319,159 @@ func TestSetControllerDeprecated(t *testing.T) {
 				err = j.Database.GetController(ctx, &controller)
 				c.Assert(err, qt.Equals, nil)
 				c.Assert(controller.Deprecated, qt.Equals, test.deprecated)
+			}
+		})
+	}
+}
+
+const removeControllerTestEnv = `clouds:
+- name: dummy
+  type: dummy
+  regions:
+  - name: dummy-region
+cloud-credentials:
+- owner: alice@external
+  name: cred-1
+  cloud: dummy
+users:
+- username: alice@external
+  controller-access: superuser
+- username: bob@external
+  controller-access: add-model
+- username: eve@external
+  controller-access: "no-access"
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+models:
+- name: model-1
+  type: iaas
+  uuid: 00000002-0000-0000-0000-000000000001
+  controller: controller-1
+  default-series: warty
+  cloud: dummy
+  region: dummy-region
+  cloud-credential: cred-1
+  owner: alice@external
+  life: alive
+  status:
+    status: available
+    info: "OK!"
+    since: 2020-02-20T20:02:20Z
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: write
+  - user: charlie@external
+    access: read
+  machines:
+  - id: 0
+    hardware:
+      arch: amd64
+      mem: 8096
+      root-disk: 10240
+      cores: 1
+    instance-id: 00000009-0000-0000-0000-0000000000000
+    display-name: Machine 0
+    status: available
+    message: OK!
+    has-vote: true
+    wants-vote: false
+    ha-primary: false
+  - id: 1
+    hardware:
+      arch: amd64
+      mem: 8096
+      root-disk: 10240
+      cores: 2
+    instance-id: 00000009-0000-0000-0000-0000000000001
+    display-name: Machine 1
+    status: available
+    message: OK!
+    has-vote: true
+    wants-vote: false
+    ha-primary: false
+  sla:
+    level: unsupported
+  agent-version: 1.2.3
+`
+
+func TestRemoveController(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+	now := time.Now().UTC().Round(time.Millisecond)
+
+	tests := []struct {
+		about            string
+		user             string
+		unavailableSince *time.Time
+		force            bool
+		expectedError    string
+	}{{
+		about:            "superuser can remove and unavailable controller",
+		user:             "alice@external",
+		unavailableSince: &now,
+		force:            true,
+	}, {
+		about: "superuser can remove a live controller with force",
+		user:  "alice@external",
+		force: true,
+	}, {
+		about:         "superuser cannot remove a live controller",
+		user:          "alice@external",
+		force:         false,
+		expectedError: "controller is still alive",
+	}, {
+		about:         "add-model user cannot remove a controller",
+		user:          "bob@external",
+		expectedError: "unauthorized access",
+		force:         false,
+	}, {
+		about:         "user withouth access rights cannot remove a controller",
+		user:          "eve@external",
+		expectedError: "unauthorized access",
+		force:         false,
+	}}
+
+	for _, test := range tests {
+		c.Run(test.about, func(c *qt.C) {
+			j := &jimm.JIMM{
+				Database: db.Database{
+					DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+				},
+			}
+
+			err := j.Database.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+
+			env := jimmtest.ParseEnvironment(c, removeControllerTestEnv)
+			env.PopulateDB(c, j.Database)
+
+			u := env.User(test.user).DBObject(c, j.Database)
+
+			if test.unavailableSince != nil {
+				// make the controller unavailable
+				controller := env.Controller("controller-1").DBObject(c, j.Database)
+				controller.UnavailableSince = sql.NullTime{
+					Valid: true,
+					Time:  *test.unavailableSince,
+				}
+				err = j.Database.UpdateController(ctx, &controller)
+				c.Assert(err, qt.Equals, nil)
+			}
+
+			err = j.RemoveController(ctx, &u, "controller-1", test.force)
+			if test.expectedError != "" {
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
+			} else {
+				c.Assert(err, qt.Equals, nil)
+				controller := dbmodel.Controller{
+					Name: "test1",
+				}
+				err = j.Database.GetController(ctx, &controller)
+				c.Assert(err, qt.ErrorMatches, "record not found")
 			}
 		})
 	}

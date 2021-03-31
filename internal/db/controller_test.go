@@ -301,3 +301,35 @@ func (s *dbSuite) TestUpdateController(c *qt.C) {
 	c.Assert(ok, qt.IsTrue)
 	c.Assert(eError.Code, qt.Equals, errors.CodeNotFound)
 }
+
+func (s *dbSuite) TestDeleteController(c *qt.C) {
+	err := s.Database.Migrate(context.Background(), true)
+	c.Assert(err, qt.Equals, nil)
+
+	controller := dbmodel.Controller{
+		Name:   "test-controller",
+		UUID:   "00000000-0000-0000-0000-0000-0000000000001",
+		Models: []dbmodel.Model{},
+	}
+	err = s.Database.AddController(context.Background(), &controller)
+	c.Assert(err, qt.Equals, nil)
+
+	dbController := dbmodel.Controller{
+		UUID: controller.UUID,
+	}
+	err = s.Database.GetController(context.Background(), &dbController)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(dbController, qt.CmpEquals(cmpopts.EquateEmpty()), controller)
+
+	err = s.Database.DeleteController(context.Background(), &controller)
+	c.Assert(err, qt.Equals, nil)
+
+	dbController = dbmodel.Controller{
+		Name: controller.Name,
+	}
+	err = s.Database.GetController(context.Background(), &dbController)
+	c.Assert(err, qt.ErrorMatches, "record not found")
+
+	err = s.Database.DeleteController(context.Background(), &dbmodel.Controller{})
+	c.Assert(err, qt.ErrorMatches, "controller not found")
+}

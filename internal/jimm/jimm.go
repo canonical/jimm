@@ -314,3 +314,47 @@ func (j *JIMM) SetControllerDeprecated(ctx context.Context, user *dbmodel.User, 
 
 	return nil
 }
+
+// RemoveController removes a controller.
+func (j *JIMM) RemoveController(ctx context.Context, user *dbmodel.User, controllerName string, force bool) error {
+	const op = errors.Op("jimm.RemoveController")
+
+	if user.ControllerAccess != "superuser" {
+		return errors.E(op, errors.CodeUnauthorized)
+	}
+
+	// Update the local database with the updated cloud definition. We
+	// do this in a transaction so that the local view cannot finish in
+	// an inconsistent state.
+	err := j.Database.Transaction(func(db *db.Database) error {
+		c := dbmodel.Controller{
+			Name: controllerName,
+		}
+		if err := db.GetController(ctx, &c); err != nil {
+			return err
+		}
+
+		// if c.UnavailableSince is valid, then we can delete is
+		// if c.UnavailableSince is no valid, then we can't delete is
+		// if force is true, we can always delete is
+		if !(force || c.UnavailableSince.Valid) {
+			return errors.E(errors.CodeBadRequest, "controller is still alive")
+		}
+
+		// Delete its models first.
+		for _, model := range c.Models {
+			err := db.DeleteModel(ctx, &model)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Then delete the controller
+		return db.DeleteController(ctx, &c)
+	})
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	return nil
+}
