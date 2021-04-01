@@ -45,6 +45,26 @@ func (d *Database) GetController(ctx context.Context, controller *dbmodel.Contro
 	return nil
 }
 
+// UpdateController updates the given controller record. UpdateController will not store any
+// changes to a controller's CloudRegions or Models.
+func (d *Database) UpdateController(ctx context.Context, controller *dbmodel.Controller) error {
+	const op = errors.Op("db.UpdateController")
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	if controller.ID == 0 {
+		return errors.E(op, errors.CodeNotFound, `controller not found`)
+	}
+
+	db := d.DB.WithContext(ctx)
+	db = db.Omit("CloudRegions").Omit("Models")
+	if err := db.Save(controller).Error; err != nil {
+		return errors.E(op)
+	}
+	return nil
+}
+
 // ForEachController iterates through every controller calling the given function
 // for each one. If the given function returns an error the iteration
 // will stop immediately and the error will be returned unmodified.
