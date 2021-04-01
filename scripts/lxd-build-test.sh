@@ -5,7 +5,7 @@ set -eu
 
 image=${image:-ubuntu:18.04}
 container=${container:-jimm-test-`uuidgen`}
-packages="build-essential bzr git make mongodb-server"
+packages="build-essential bzr git make"
 
 lxc launch -e $image $container
 trap "lxc delete --force $container" EXIT
@@ -18,6 +18,7 @@ lxc exec $container -- snap set system proxy.http=${http_proxy:-}
 lxc exec $container -- snap set system proxy.https=${https_proxy:-${http_proxy:-}}
 lxc exec $container -- snap install go --classic
 lxc exec $container -- snap install vault
+lxc exec $container -- snap install juju-db --devmode
 if [ -n "${http_proxy:-}" ]; then
 	lxc exec \
 		--env HOME=/home/ubuntu \
