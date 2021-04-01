@@ -16,11 +16,11 @@ import (
 
 	"github.com/gorilla/handlers"
 	vault "github.com/hashicorp/vault/api"
+	"github.com/juju/mgo/v2"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
-	"gopkg.in/mgo.v2"
 	"gopkg.in/natefinch/lumberjack.v2"
 
 	jem "github.com/CanonicalLtd/jimm"

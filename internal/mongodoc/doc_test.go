@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"gopkg.in/mgo.v2/bson"
+	"github.com/juju/mgo/v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 )

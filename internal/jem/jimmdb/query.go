@@ -2,7 +2,7 @@
 
 package jimmdb
 
-import "gopkg.in/mgo.v2/bson"
+import "github.com/juju/mgo/v2/bson"
 
 // A Query is a helper for creating document queries.
 type Query = bson.D

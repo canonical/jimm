@@ -4,11 +4,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/juju/mgo/v2/bson"
 	"go.uber.org/zap"
-
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
-	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"

@@ -72,7 +72,7 @@ func (s *websocketSuite) open(c *gc.C, info *api.Info, username string) api.Conn
 	inf.CACert = w.String()
 	conn, err := api.Open(&inf, api.DialOpts{
 		InsecureSkipVerify: true,
-		BakeryClient:       s.Candid.Client(username),
+		BakeryClient:       s.Client(username),
 	})
 	c.Assert(err, gc.Equals, nil)
 	return conn

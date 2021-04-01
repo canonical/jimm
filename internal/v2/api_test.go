@@ -16,7 +16,7 @@ import (
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
-	"github.com/juju/utils"
+	"github.com/juju/utils/v2"
 	"go.uber.org/zap/zapcore"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
@@ -851,7 +851,7 @@ func newTime(t time.Time) *time.Time {
 
 func (s *APISuite) openAPIFromModelResponse(c *gc.C, resp *params.ModelResponse, username string) api.Connection {
 	st, err := api.Open(apiInfoFromModelResponse(resp), api.DialOpts{
-		BakeryClient: s.Candid.Client(username),
+		BakeryClient: s.Client(username),
 	})
 	c.Assert(err, gc.Equals, nil)
 	return st

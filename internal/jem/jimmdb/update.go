@@ -2,7 +2,7 @@
 
 package jimmdb
 
-import "gopkg.in/mgo.v2/bson"
+import "github.com/juju/mgo/v2/bson"
 
 // An Update object is used to perform updates to documents in the
 // database.

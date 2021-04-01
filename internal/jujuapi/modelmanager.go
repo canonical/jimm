@@ -8,7 +8,7 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/life"
 	"github.com/juju/names/v4"
-	"github.com/juju/utils/parallel"
+	"github.com/juju/utils/v2/parallel"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"

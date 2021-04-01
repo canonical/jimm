@@ -7,6 +7,9 @@ import (
 	"net/http/httptest"
 
 	"github.com/canonical/candid/candidtest"
+	bakeryv3 "github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
+	httpbakeryv3 "github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
+	agentv3 "github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
 	"github.com/juju/aclstore"
 	controllerapi "github.com/juju/juju/api/controller"
 	"github.com/juju/juju/controller"
@@ -221,6 +224,31 @@ func (s *APISuite) NewAPIHTTPHandler(c *gc.C, p jemserver.HandlerParams) http.Ha
 		r.Handle(h.Method, h.Path, h.Handle)
 	}
 	return r
+}
+
+// Client returns an httpbakery client suitable for use when creating a
+// juju API connection.
+func (s *APISuite) Client(username string) *httpbakeryv3.Client {
+	cl := s.Candid.Client(username)
+
+	var cl3 httpbakeryv3.Client
+	cl3.Client = cl.Client
+	cl3.Logger = cl.Logger
+	if cl.Key != nil {
+		var kp bakeryv3.KeyPair
+		kp.Public.Key = bakeryv3.Key(cl.Key.Public.Key)
+		kp.Private.Key = bakeryv3.Key(cl.Key.Private.Key)
+		cl3.Key = &kp
+
+		agentv3.SetUpAuth(&cl3, &agentv3.AuthInfo{
+			Key: cl3.Key,
+			Agents: []agentv3.Agent{{
+				URL:      s.Candid.URL.String(),
+				Username: username,
+			}},
+		})
+	}
+	return &cl3
 }
 
 type bakeryLogger struct {

@@ -6,9 +6,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/juju/mgo/v2"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"

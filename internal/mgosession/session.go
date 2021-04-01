@@ -8,10 +8,9 @@ package mgosession
 import (
 	"context"
 
-	"github.com/juju/mgosession"
-	mgo "gopkg.in/mgo.v2"
-
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/juju/mgo/v2"
+	"github.com/juju/mgosession/v2"
 )
 
 // Pool represents a pool of mgo sessions.

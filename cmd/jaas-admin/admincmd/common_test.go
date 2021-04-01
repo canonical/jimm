@@ -15,8 +15,8 @@ import (
 	"github.com/juju/aclstore/aclclient"
 	"github.com/juju/cmd"
 	"github.com/juju/loggo"
+	"github.com/juju/mgo/v2"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/mgo.v2"
 
 	jem "github.com/CanonicalLtd/jimm"
 	"github.com/CanonicalLtd/jimm/cmd/jaas-admin/admincmd"

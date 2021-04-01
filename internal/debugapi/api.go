@@ -4,10 +4,10 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/juju/utils/debugstatus"
+	"github.com/juju/mgo/v2/bson"
+	"github.com/juju/utils/v2/debugstatus"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/jem"

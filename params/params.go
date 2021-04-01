@@ -9,10 +9,10 @@ import (
 	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/mgo/v2/bson"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/juju/environschema.v1"
-	"gopkg.in/mgo.v2/bson"
 )
 
 // SetControllerPerm holds the parameters for setting the ACL on a

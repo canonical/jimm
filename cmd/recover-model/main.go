@@ -12,11 +12,11 @@ import (
 	"github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	envconfig "github.com/juju/juju/environs/config"
+	mgo "github.com/juju/mgo/v2"
 	"github.com/juju/names/v4"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
-	mgo "gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jimm/config"
 	"github.com/CanonicalLtd/jimm/internal/jem"
