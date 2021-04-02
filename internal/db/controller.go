@@ -60,7 +60,29 @@ func (d *Database) UpdateController(ctx context.Context, controller *dbmodel.Con
 	db := d.DB.WithContext(ctx)
 	db = db.Omit("CloudRegions").Omit("Models")
 	if err := db.Save(controller).Error; err != nil {
-		return errors.E(op)
+		return errors.E(op, dbError(err))
+	}
+	return nil
+}
+
+// Delete controller removes the specified controller from the database.
+func (d *Database) DeleteController(ctx context.Context, controller *dbmodel.Controller) error {
+	const op = errors.Op("db.DeleteController")
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	if controller.ID == 0 {
+		return errors.E(op, errors.CodeNotFound, `controller not found`)
+	}
+
+	db := d.DB.WithContext(ctx)
+	if err := db.Delete(controller).Error; err != nil {
+		err := dbError(err)
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return errors.E(op, err, "controller not found")
+		}
+		return errors.E(op, err)
 	}
 	return nil
 }
