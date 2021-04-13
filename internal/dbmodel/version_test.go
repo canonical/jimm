@@ -13,7 +13,7 @@ import (
 
 func TestVersion(t *testing.T) {
 	c := qt.New(t)
-	db := gormDB(c, dbmodel.Version{})
+	db := gormDB(c)
 
 	var v0 dbmodel.Version
 	result := db.First(&v0, "component = ?", dbmodel.Component)

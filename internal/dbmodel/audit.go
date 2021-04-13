@@ -30,3 +30,9 @@ type AuditLogEntry struct {
 	// Params contains the event-specific params for the audit entry.
 	Params StringMap
 }
+
+// TableName overrides the table name gorm will use to find
+// AuditLogEntry records.
+func (AuditLogEntry) TableName() string {
+	return "audit_log"
+}

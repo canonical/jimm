@@ -4,10 +4,8 @@ package dbmodel
 
 import (
 	"database/sql"
-	"sort"
 	"time"
 
-	"github.com/juju/charm/v8"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
@@ -15,7 +13,6 @@ import (
 	"github.com/juju/version"
 	"gorm.io/gorm"
 
-	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 )
 
@@ -28,14 +25,14 @@ type Model struct {
 	UpdatedAt time.Time
 
 	// Name is the name of the model.
-	Name string `gorm:"not null;uniqueIndex:idx_model_name_owner_id"`
+	Name string
 
 	// UUID is the UUID of the model.
-	UUID sql.NullString `gorm:"uniqueIndex"`
+	UUID sql.NullString
 
 	// Owner is user that owns the model.
-	OwnerID string `gorm:"uniqueIndex:idx_model_name_owner_id"`
-	Owner   User   `gorm:"foreignkey:OwnerID;references:Username"`
+	OwnerUsername string
+	Owner         User `gorm:"foreignkey:OwnerUsername;references:Username"`
 
 	// Controller is the controller that is hosting the model.
 	ControllerID uint
@@ -62,19 +59,19 @@ type Model struct {
 	Life string
 
 	// Status holds the current status of the model.
-	Status Status `gorm:"embedded;embeddedPrefix:status"`
+	Status Status `gorm:"embedded;embeddedPrefix:status_"`
 
 	// SLA contains the SLA of the model.
-	SLA SLA `gorm:"embedded"`
+	SLA SLA `gorm:"embedded;embeddedPrefix:sla_"`
 
 	// Applications are the applications attached to the model.
-	Applications []Application `gorm:"constraint:OnDelete:CASCADE;"`
+	Applications []Application
 
 	// Machines are the machines attached to the model.
-	Machines []Machine `gorm:"constraint:OnDelete:CASCADE;"`
+	Machines []Machine
 
 	// Users are the users that can access the model.
-	Users []UserModelAccess `gorm:"constraint:OnDelete:CASCADE;"`
+	Users []UserModelAccess
 }
 
 // Tag returns a names.Tag for the model.
@@ -95,7 +92,7 @@ func (m *Model) SetTag(t names.ModelTag) {
 // the user has no access then an empty string is returned.
 func (m *Model) UserAccess(u *User) string {
 	for _, mu := range m.Users {
-		if u.Username == mu.User.Username {
+		if u.Username == mu.Username {
 			return mu.Access
 		}
 	}
@@ -117,10 +114,15 @@ func (m *Model) FromJujuModelInfo(info *jujuparams.ModelInfo) error {
 		if err != nil {
 			return errors.E(err)
 		}
-		m.OwnerID = ut.Id()
+		m.OwnerUsername = ut.Id()
 	}
 	m.Life = string(info.Life)
 	m.Status.FromJujuEntityStatus(info.Status)
+
+	m.Users = make([]UserModelAccess, len(info.Users))
+	for i, u := range info.Users {
+		m.Users[i].FromJujuModelUserInfo(u)
+	}
 
 	m.CloudRegion.Name = info.CloudRegion
 	if info.CloudTag != "" {
@@ -138,11 +140,6 @@ func (m *Model) FromJujuModelInfo(info *jujuparams.ModelInfo) error {
 		m.CloudCredential.Name = cct.Name()
 		m.CloudCredential.CloudName = cct.Cloud().Id()
 		m.CloudCredential.Owner.Username = cct.Owner().Id()
-	}
-
-	m.Users = make([]UserModelAccess, len(info.Users))
-	for i, u := range info.Users {
-		m.Users[i].FromJujuModelUserInfo(u)
 	}
 
 	m.Machines = make([]Machine, len(info.Machines))
@@ -227,8 +224,8 @@ func (m Model) ToJujuModelSummary() jujuparams.ModelSummary {
 	var machines, cores, units int64
 	for _, mach := range m.Machines {
 		machines += 1
-		if mach.Hardware.Cores.Valid {
-			cores += int64(mach.Hardware.Cores.Uint64)
+		if mach.Hardware.CPUCores.Valid {
+			cores += int64(mach.Hardware.CPUCores.Uint64)
 		}
 		units += int64(len(mach.Units))
 	}
@@ -284,18 +281,24 @@ type UserModelAccess struct {
 	gorm.Model
 
 	// User is the User this access is for.
-	UserID uint `gorm:"not null;unitIndex:idx_user_model_access_user_id_model_id"`
-	User   User
+	Username string
+	User     User `gorm:"foreignKey:Username;references:Username"`
 
 	// Model is the Model this access is for.
-	ModelID uint  `gorm:"not null;unitIndex:idx_user_model_access_user_id_model_id"`
-	Model_  Model `gorm:"foreignkey:ModelID;constraint:OnDelete:CASCADE"`
+	ModelID uint
+	Model_  Model `gorm:"foreignKey:ModelID"`
 
 	// Access is the access level of the user on the model.
 	Access string `gorm:"not null"`
 
 	// LastConnection holds the last time the user connected to the model.
 	LastConnection sql.NullTime
+}
+
+// TableName overrides the table name gorm will use to find
+// UserModelAccess records.
+func (UserModelAccess) TableName() string {
+	return "user_model_access"
 }
 
 // FromJujuModelUserInfo converts jujuparams.ModelUserInfo into a User.
@@ -379,7 +382,7 @@ type Machine struct {
 	MachineID string `gorm:"not null;uniqueIndex:idx_machine_model_id_machine_id"`
 
 	// Hardware contains the hardware characteristics of the machine.
-	Hardware MachineHardware `gorm:"embedded"`
+	Hardware Hardware `gorm:"embedded;embeddedPrefix:hw_"`
 
 	// InstanceID is the instance ID of the machine.
 	InstanceID string
@@ -388,10 +391,10 @@ type Machine struct {
 	DisplayName string
 
 	// AgentStatus is the status of the machine agent.
-	AgentStatus Status `gorm:"embedded;embeddedPrefix:agent_status"`
+	AgentStatus Status `gorm:"embedded;embeddedPrefix:agent_status_"`
 
 	// InstanceStatus is the status of the machine instance.
-	InstanceStatus Status `gorm:"embedded;embeddedPrefix:instance_status"`
+	InstanceStatus Status `gorm:"embedded;embeddedPrefix:instance_status_"`
 
 	// HasVote indicates whether the machine has a vote.
 	HasVote bool
@@ -403,7 +406,7 @@ type Machine struct {
 	Series string
 
 	// Units are the units deployed to this machine.
-	Units []Unit
+	Units []Unit `gorm:"foreignKey:ModelID,MachineID;references:ModelID,MachineID"`
 }
 
 // FromJujuModelMachineInfo converts jujuparams.ModelMachineInfo into a Machine.
@@ -438,10 +441,15 @@ func (m Machine) ToJujuModelMachineInfo() jujuparams.ModelMachineInfo {
 	return mmi
 }
 
-// A MachineHardware contains the known details of the machine's hardware.
-type MachineHardware struct {
+// A Hardware structure contains the known details of a hardware
+// definition. This is the superset of the various hardware and constraints
+// structures in the juju API.
+type Hardware struct {
 	// Arch contains the architecture of the machine.
 	Arch sql.NullString
+
+	// Container contains any container-type.
+	Container sql.NullString
 
 	// Mem contains the amount of memory attached to the machine.
 	Mem NullUint64
@@ -449,8 +457,11 @@ type MachineHardware struct {
 	// RootDisk contains the size of the root-disk attached to the machine.
 	RootDisk NullUint64
 
-	// Cores contains the number of cores attached to the machine.
-	Cores NullUint64
+	// RootDiskSource contains any root-disk-source constraint.
+	RootDiskSource sql.NullString
+
+	// CPUCores contains the number of cores attached to the machine.
+	CPUCores NullUint64
 
 	// CPUPower contains the cpu-power of the machine.
 	CPUPower NullUint64
@@ -460,10 +471,25 @@ type MachineHardware struct {
 
 	// AvailabilityZone contains the availability zone of the machine.
 	AvailabilityZone sql.NullString
+
+	// Zones contains any zones constraint.
+	Zones Strings
+
+	// InstanceType contains any instance-type constraint.
+	InstanceType sql.NullString
+
+	// Spaces contains any spaces constraint.
+	Spaces Strings
+
+	// VirtType contains any virt-type constraint.
+	VirtType sql.NullString
+
+	// AllocatePublicIP contains any allocate-public-ip constraint.
+	AllocatePublicIP sql.NullBool
 }
 
-// FromJujuMachineHardware converts jujuparams.MachineHardware into a MachineHardware.
-func (h *MachineHardware) FromJujuMachineHardware(mh jujuparams.MachineHardware) {
+// FromJujuMachineHardware converts jujuparams.MachineHardware into a Hardware.
+func (h *Hardware) FromJujuMachineHardware(mh jujuparams.MachineHardware) {
 	if mh.Arch != nil {
 		h.Arch = sql.NullString{
 			String: *mh.Arch,
@@ -472,7 +498,7 @@ func (h *MachineHardware) FromJujuMachineHardware(mh jujuparams.MachineHardware)
 	}
 	h.Mem.FromValue(mh.Mem)
 	h.RootDisk.FromValue(mh.RootDisk)
-	h.Cores.FromValue(mh.Cores)
+	h.CPUCores.FromValue(mh.Cores)
 	h.CPUPower.FromValue(mh.CpuPower)
 	if mh.Tags != nil {
 		h.Tags = make([]string, len(*mh.Tags))
@@ -490,7 +516,7 @@ func (h *MachineHardware) FromJujuMachineHardware(mh jujuparams.MachineHardware)
 
 // ToJujuMachineHardware converts a MachineHardware into a
 // jujuparams.MachineHardware.
-func (h MachineHardware) ToJujuMachineHardware() jujuparams.MachineHardware {
+func (h Hardware) ToJujuMachineHardware() jujuparams.MachineHardware {
 	var mh jujuparams.MachineHardware
 	if h.Arch.Valid {
 		mh.Arch = &h.Arch.String
@@ -507,8 +533,8 @@ func (h MachineHardware) ToJujuMachineHardware() jujuparams.MachineHardware {
 	} else {
 		mh.RootDisk = nil
 	}
-	if h.Cores.Valid {
-		mh.Cores = &h.Cores.Uint64
+	if h.CPUCores.Valid {
+		mh.Cores = &h.CPUCores.Uint64
 	} else {
 		mh.Cores = nil
 	}
@@ -536,7 +562,7 @@ type Application struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 
-	// Model_ is the model that contains this application.
+	// Model is the model that contains this application.
 	ModelID uint  `gorm:"not null;uniqueIndex:idx_application_model_id_name"`
 	Model   Model `gorm:"constraint:OnDelete:CASCADE"`
 
@@ -557,7 +583,7 @@ type Application struct {
 	MinUnits uint
 
 	// Constraints contains the application constraints.
-	Constraints Constraints `gorm:"embedded"`
+	Constraints Hardware `gorm:"embedded;embeddedPrefix:constraint_"`
 
 	// Config contains the application config.
 	Config Map
@@ -566,58 +592,16 @@ type Application struct {
 	Subordinate bool
 
 	// Status contains the application status.
-	Status Status `gorm:"embedded;embeddedPrefix:status"`
+	Status Status `gorm:"embedded;embeddedPrefix:status_"`
 
 	// WorkloadVersion contains the application's workload-version.
 	WorkloadVersion string
 
 	// Units are units of this application.
-	Units []Unit
+	Units []Unit `gorm:"foreignKey:ModelID,ApplicationName;references:ModelID,Name"`
 
 	// Offers are offers for this application.
-	Offers []ApplicationOffer
-}
-
-// A Constraints object holds constraints for an application.
-type Constraints struct {
-	// Arch contains any arch constraint.
-	Arch sql.NullString
-
-	// Container contains any container-type.
-	Container sql.NullString
-
-	// CpuCores contains any cpu-cores.
-	CpuCores NullUint64
-
-	// CpuPower contains any cpu-power constraint.
-	CpuPower NullUint64
-
-	// Mem contains any mem constraint.
-	Mem NullUint64
-
-	// RootDisk contains any root-disk constraint.
-	RootDisk NullUint64
-
-	// RootDiskSource contains any root-disk-source constraint.
-	RootDiskSource sql.NullString
-
-	// Tags contains any tags constraint.
-	Tags Strings
-
-	// InstanceType contains any instance-type constraint.
-	InstanceType sql.NullString
-
-	// Spaces contains any spaces constraint.
-	Spaces Strings
-
-	// VirtType contains any virt-type constraint.
-	VirtType sql.NullString
-
-	// Zones contains any zones constraint.
-	Zones Strings
-
-	// AllocatePublicIP contains any allocate-public-ip constraint.
-	AllocatePublicIP sql.NullBool
+	Offers []ApplicationOffer `gorm:"foreignKey:ModelID,ApplicationName;references:ModelID,Name"`
 }
 
 // A Unit represents a unit of an application in a model.
@@ -626,16 +610,20 @@ type Unit struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 
+	// Model is the model this unit belongs to.
+	ModelID uint
+	Model   Model
+
 	// Application contains the application this unit belongs to.
-	ApplicationID uint        `gorm:"not null;uniqueIndex:idx_unit_application_id_name"`
-	Application   Application `constraint:OnDelete:CASCADE"`
+	ApplicationName string
+	Application     Application `gorm:"foreignKey:ModelID,ApplicationName;references:ModelID,Name"`
 
 	// Machine contains the machine this unit is deployed to.
-	MachineID uint
-	Machine   Machine `constraint:OnDelete:CASCADE"`
+	MachineID string
+	Machine   Machine `gorm:"foreignKey:ModelID,MachineID;references:ModelID,MachineID"`
 
 	// Name contains the unit name.
-	Name string `gorm:"not null;uniqueIndex:idx_unit_application_id_name"`
+	Name string
 
 	// Life contains the life status of the unit.
 	Life string
@@ -656,249 +644,8 @@ type Unit struct {
 	Principal string
 
 	// WorkloadStatus is the workload status of the unit.
-	WorkloadStatus Status `gorm:"embedded;embeddedPrefix:workload_status"`
+	WorkloadStatus Status `gorm:"embedded;embeddedPrefix:workload_status_"`
 
 	// AgentStatus is the agent status of the unit.
-	AgentStatus Status `gorm:"embedded;embeddedPrefix:agent_status"`
-}
-
-// An ApplicationOffer is an offer for an application.
-type ApplicationOffer struct {
-	ID        uint `gorm:"primaryKey"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
-
-	// Application is the application that this offer is for.
-	ApplicationID uint        `gorm:"not null;uniqueIndex:idx_application_offer_application_id_name"`
-	Application   Application `gorm:"constraint:OnDelete:CASCADE"`
-
-	ApplicationDescription string
-
-	// Name is the name of the offer.
-	Name string `gorm:"not null;uniqueIndex:idx_application_offer_application_id_name"`
-
-	// UUID is the unique ID of the offer.
-	UUID string `gorm:"not null;uniqueIndex"`
-
-	// Application offer URL.
-	URL string
-
-	// Users contains the users with access to the application offer.
-	Users []UserApplicationOfferAccess
-
-	// Endpoints contains remote endpoints for the application offer.
-	Endpoints []ApplicationOfferRemoteEndpoint
-
-	// Spaces contains spaces in remote models for the application offer.
-	Spaces []ApplicationOfferRemoteSpace
-
-	// Bindings contains bindings for the application offer.
-	Bindings StringMap
-
-	// Conntections contains details about connections to the application offer.
-	Connections []ApplicationOfferConnection
-}
-
-// Tag returns a names.Tag for the application-offer.
-func (o ApplicationOffer) Tag() names.Tag {
-	return names.NewApplicationOfferTag(o.UUID)
-}
-
-// SetTag sets the application-offer's UUID from the given tag.
-func (o *ApplicationOffer) SetTag(t names.ApplicationOfferTag) {
-	o.UUID = t.Id()
-}
-
-// UserAccessLevel returns the access level for the specified user.
-func (o *ApplicationOffer) UserAccessLevel(username string) string {
-	var userAccessLevel string
-	for _, u := range o.Users {
-		if u.User.Username == username {
-			userAccessLevel = u.Access
-			break
-		}
-	}
-	return userAccessLevel
-}
-
-// FromJujuApplicationOfferAdminDetails fills in the information from jujuparams ApplicationOfferAdminDetails.
-func (o *ApplicationOffer) FromJujuApplicationOfferAdminDetails(application *Application, offerDetails jujuparams.ApplicationOfferAdminDetails) {
-	o.ApplicationID = application.ID
-	o.ApplicationDescription = offerDetails.ApplicationDescription
-	o.Name = offerDetails.OfferName
-	o.UUID = offerDetails.OfferUUID
-	o.URL = offerDetails.OfferURL
-	o.Bindings = offerDetails.Bindings
-
-	o.Endpoints = make([]ApplicationOfferRemoteEndpoint, len(offerDetails.Endpoints))
-	for i, endpoint := range offerDetails.Endpoints {
-		o.Endpoints[i] = ApplicationOfferRemoteEndpoint{
-			Name:      endpoint.Name,
-			Role:      string(endpoint.Role),
-			Interface: endpoint.Interface,
-			Limit:     endpoint.Limit,
-		}
-	}
-
-	o.Users = []UserApplicationOfferAccess{}
-	for _, user := range offerDetails.Users {
-		// TODO (mhilton) see what we can do to get rid of params.User
-		pu, err := conv.FromUserID(user.UserName)
-		if err != nil {
-			// If we can't parse the user, it's either a local user which
-			// we don't store, or an invalid user which can't do anything.
-			continue
-		}
-
-		o.Users = append(o.Users, UserApplicationOfferAccess{
-			ApplicationOfferID: application.ID,
-			User: User{
-				Username: string(pu),
-			},
-			Access: user.Access,
-		})
-	}
-
-	o.Spaces = make([]ApplicationOfferRemoteSpace, len(offerDetails.Spaces))
-	for i, space := range offerDetails.Spaces {
-		o.Spaces[i] = ApplicationOfferRemoteSpace{
-			CloudType:          space.CloudType,
-			Name:               space.Name,
-			ProviderID:         space.ProviderId,
-			ProviderAttributes: space.ProviderAttributes,
-		}
-	}
-
-	o.Connections = make([]ApplicationOfferConnection, len(offerDetails.Connections))
-	for i, connection := range offerDetails.Connections {
-		o.Connections[i] = ApplicationOfferConnection{
-			SourceModelTag: connection.SourceModelTag,
-			RelationID:     connection.RelationId,
-			Username:       connection.Username,
-			Endpoint:       connection.Endpoint,
-			IngressSubnets: connection.IngressSubnets,
-		}
-	}
-}
-
-// ToJujuApplicationOfferDetails returns a jujuparams ApplicationOfferAdminDetails based on the application offer.
-func (o *ApplicationOffer) ToJujuApplicationOfferDetails() jujuparams.ApplicationOfferAdminDetails {
-	endpoints := make([]jujuparams.RemoteEndpoint, len(o.Endpoints))
-	for i, endpoint := range o.Endpoints {
-		endpoints[i] = jujuparams.RemoteEndpoint{
-			Name:      endpoint.Name,
-			Role:      charm.RelationRole(endpoint.Role),
-			Interface: endpoint.Interface,
-			Limit:     endpoint.Limit,
-		}
-	}
-	spaces := make([]jujuparams.RemoteSpace, len(o.Spaces))
-	for i, space := range o.Spaces {
-		spaces[i] = jujuparams.RemoteSpace{
-			CloudType:          space.CloudType,
-			Name:               space.Name,
-			ProviderId:         space.ProviderID,
-			ProviderAttributes: space.ProviderAttributes,
-		}
-	}
-	users := make([]jujuparams.OfferUserDetails, len(o.Users))
-	for i, ua := range o.Users {
-		users[i] = jujuparams.OfferUserDetails{
-			UserName:    ua.User.Username,
-			DisplayName: ua.User.DisplayName,
-			Access:      ua.Access,
-		}
-
-	}
-	sort.Slice(users, func(i, j int) bool {
-		return users[i].UserName < users[j].UserName
-	})
-
-	connections := make([]jujuparams.OfferConnection, len(o.Connections))
-	for i, connection := range o.Connections {
-		connections[i] = jujuparams.OfferConnection{
-			SourceModelTag: connection.SourceModelTag,
-			RelationId:     connection.RelationID,
-			Username:       connection.Username,
-			Endpoint:       connection.Endpoint,
-			IngressSubnets: connection.IngressSubnets,
-		}
-	}
-	return jujuparams.ApplicationOfferAdminDetails{
-		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
-			SourceModelTag:         o.Application.Model.Tag().String(),
-			OfferUUID:              o.UUID,
-			OfferURL:               o.URL,
-			OfferName:              o.Name,
-			ApplicationDescription: o.ApplicationDescription,
-			Endpoints:              endpoints,
-			Spaces:                 spaces,
-			Bindings:               o.Bindings,
-			Users:                  users,
-		},
-		ApplicationName: o.Application.Name,
-		CharmURL:        o.Application.CharmURL,
-		Connections:     connections,
-	}
-}
-
-// ApplicationOfferRemoteEndpoint represents a remote application endpoint.
-type ApplicationOfferRemoteEndpoint struct {
-	gorm.Model
-
-	// ApplicationOffer is the application-offer associated with this endpoint.
-	ApplicationOfferID uint
-	ApplicationOffer   ApplicationOffer `gorm:"constraint:OnDelete:CASCADE"`
-
-	Name      string
-	Role      string
-	Interface string
-	Limit     int
-}
-
-// ApplicationOfferRemoteSpace represents a space in some remote model.
-type ApplicationOfferRemoteSpace struct {
-	gorm.Model
-
-	// ApplicationOffer is the application-offer associated with this space.
-	ApplicationOfferID uint
-	ApplicationOffer   ApplicationOffer `gorm:"constraint:OnDelete:CASCADE"`
-
-	CloudType          string
-	Name               string
-	ProviderID         string
-	ProviderAttributes Map
-}
-
-// ApplicationOfferConnection holds details about a connection to an offer.
-type ApplicationOfferConnection struct {
-	gorm.Model
-
-	// ApplicationOffer is the application-offer associated with this connection.
-	ApplicationOfferID uint
-	ApplicationOffer   ApplicationOffer `gorm:"constraint:OnDelete:CASCADE"`
-
-	SourceModelTag string
-	RelationID     int
-	Username       string
-	Endpoint       string
-	IngressSubnets Strings
-}
-
-// A UserApplicationOfferAccess maps the access level for a user on an
-// application-offer.
-type UserApplicationOfferAccess struct {
-	gorm.Model
-
-	// User is the user associated with this access.
-	UserID uint
-	User   User
-
-	// ApplicationOffer is the application-offer associated with this
-	// access.
-	ApplicationOfferID uint
-	ApplicationOffer   ApplicationOffer `gorm:"constraint:OnDelete:CASCADE"`
-
-	// Access is the access level for to the application offer to the user.
-	Access string `gorm:"not null"`
+	AgentStatus Status `gorm:"embedded;embeddedPrefix:agent_status_"`
 }

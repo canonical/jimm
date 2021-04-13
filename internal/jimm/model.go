@@ -233,9 +233,9 @@ func (b *modelBuilder) WithCloudCredential(credentialTag names.CloudCredentialTa
 		return b
 	}
 	credential := dbmodel.CloudCredential{
-		Name:      credentialTag.Name(),
-		CloudName: credentialTag.Cloud().Id(),
-		OwnerID:   credentialTag.Owner().Id(),
+		Name:          credentialTag.Name(),
+		CloudName:     credentialTag.Cloud().Id(),
+		OwnerUsername: credentialTag.Owner().Id(),
 	}
 	err := b.jimm.Database.GetCloudCredential(b.ctx, &credential)
 	if err != nil {
@@ -559,7 +559,7 @@ func (j *JIMM) AddModel(ctx context.Context, u *dbmodel.User, args *ModelCreateA
 	// fetch cloud defaults
 	if args.Cloud != (names.CloudTag{}) {
 		cloudDefaults := dbmodel.CloudDefaults{
-			UserID: u.Username,
+			Username: u.Username,
 			Cloud: dbmodel.Cloud{
 				Name: args.Cloud.Id(),
 			},
@@ -574,7 +574,7 @@ func (j *JIMM) AddModel(ctx context.Context, u *dbmodel.User, args *ModelCreateA
 	// fetch cloud region defaults
 	if args.Cloud != (names.CloudTag{}) && args.CloudRegion != "" {
 		cloudRegionDefaults := dbmodel.CloudDefaults{
-			UserID: u.Username,
+			Username: u.Username,
 			Cloud: dbmodel.Cloud{
 				Name: args.Cloud.Id(),
 			},
@@ -805,7 +805,7 @@ func (j *JIMM) GrantModelAccess(ctx context.Context, u *dbmodel.User, mt names.M
 		}
 		var uma dbmodel.UserModelAccess
 		for _, a := range m.Users {
-			if a.UserID == targetUser.ID {
+			if a.Username == targetUser.Username {
 				uma = a
 				break
 			}
@@ -861,7 +861,7 @@ func (j *JIMM) RevokeModelAccess(ctx context.Context, u *dbmodel.User, mt names.
 		}
 		var uma dbmodel.UserModelAccess
 		for _, a := range m.Users {
-			if a.UserID == targetUser.ID {
+			if a.Username == targetUser.Username {
 				uma = a
 				break
 			}

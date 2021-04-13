@@ -15,25 +15,25 @@ type CloudCredential struct {
 	gorm.Model
 
 	// Name is the name of the credential.
-	Name string `gorm:"not null;uniqueIndex:idx_cloud_owner_name"`
+	Name string
 
 	// Cloud is the cloud this credential is for.
-	CloudName string `gorm:"not null;uniqueIndex:idx_cloud_owner_name"`
-	Cloud     Cloud  `gorm:"foreignKey:CloudName;references:Name"`
+	CloudName string
+	Cloud     Cloud `gorm:"foreignKey:CloudName;references:Name"`
 
-	// User is the user that owns this credential.
-	OwnerID string `gorm:"not null;uniqueIndex:idx_cloud_owner_name"`
-	Owner   User   `gorm:"foreignKey:OwnerID;references:Username"`
+	// Owner is the user that owns this credential.
+	OwnerUsername string
+	Owner         User `gorm:"foreignKey:OwnerUsername;references:Username"`
 
 	// AuthType is the type of the credential.
-	AuthType string `gorm:"not null"`
+	AuthType string
 
 	// Label is an optional label for the credential.
 	Label string
 
 	// AttributesInVault indicates whether the attributes are stored in
 	// the configured vault key-value store, rather than this database.
-	AttributesInVault bool `gorm:"not null"`
+	AttributesInVault bool
 
 	// Attributes contains the attributes of the credential.
 	Attributes StringMap
@@ -44,17 +44,17 @@ type CloudCredential struct {
 
 // Tag returns a names.Tag for the cloud-credential.
 func (c CloudCredential) Tag() names.Tag {
-	return names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", c.CloudName, c.OwnerID, c.Name))
+	return names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", c.CloudName, c.OwnerUsername, c.Name))
 }
 
 // SetTag sets the Name, CloudName and Username fields from the given tag.
 func (c *CloudCredential) SetTag(t names.CloudCredentialTag) {
 	c.CloudName = t.Cloud().Id()
 	c.Name = t.Name()
-	c.OwnerID = t.Owner().Id()
+	c.OwnerUsername = t.Owner().Id()
 }
 
 // Path returns a juju style cloud credential path.
 func (c CloudCredential) Path() string {
-	return fmt.Sprintf("%s/%s/%s", c.CloudName, c.OwnerID, c.Name)
+	return fmt.Sprintf("%s/%s/%s", c.CloudName, c.OwnerUsername, c.Name)
 }

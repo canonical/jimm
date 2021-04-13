@@ -201,15 +201,21 @@ type UserCloudAccess struct {
 	gorm.Model
 
 	// User is the User this access is for.
-	Username string `gorm:"uniqueIndex:idx_user_cloud_accesses_username_cloud_name"`
-	User     User   `gorm:"foreignKey:Username;references:Username"`
+	Username string
+	User     User `gorm:"foreignKey:Username;references:Username"`
 
 	// Cloud is the Cloud this access is for.
-	CloudName string `gorm:"uniqueIndex:idx_user_cloud_accesses_username_cloud_name"`
-	Cloud     Cloud  `gorm:"foreignKey:CloudName;references:Name;constraint:OnDelete:CASCADE"`
+	CloudName string
+	Cloud     Cloud `gorm:"foreignKey:CloudName;references:Name"`
 
 	// Access is the access level of the user on the cloud.
 	Access string `gorm:"not null"`
+}
+
+// TableName overrides the table name gorm will use to find
+// UserCloudAccess records.
+func (UserCloudAccess) TableName() string {
+	return "user_cloud_access"
 }
 
 // ToJujuCloudUserInfo convert a UserCloudAccess into a

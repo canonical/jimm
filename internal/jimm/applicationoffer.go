@@ -90,6 +90,7 @@ func (j *JIMM) Offer(ctx context.Context, user *dbmodel.User, offer AddApplicati
 
 	for _, existingOffer := range application.Offers {
 		if offer.OfferName == existingOffer.Name {
+			// TODO(mhilton) juju recently changed to update the offer in this situation.
 			return fail(errors.E(op, errors.CodeAlreadyExists, "application offer already exists"))
 		}
 	}
@@ -140,13 +141,23 @@ func (j *JIMM) Offer(ctx context.Context, user *dbmodel.User, offer AddApplicati
 	}
 
 	var doc dbmodel.ApplicationOffer
-	doc.FromJujuApplicationOfferAdminDetails(application, offerDetails)
+	doc.FromJujuApplicationOfferAdminDetails(offerDetails)
 	if err != nil {
 		zapctx.Error(ctx, "failed to convert application offer details", zaputil.Error(err))
 		return fail(errors.E(op, err))
 	}
-
-	err = j.Database.AddApplicationOffer(ctx, &doc)
+	doc.ModelID = model.ID
+	err = j.Database.Transaction(func(db *db.Database) error {
+		if err := db.AddApplicationOffer(ctx, &doc); err != nil {
+			return err
+		}
+		for _, u := range doc.Users {
+			if err := db.UpdateUserApplicationOfferAccess(ctx, &u); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 	if err != nil {
 		zapctx.Error(ctx, "failed to store the created application offer", zaputil.Error(err))
 		return fail(errors.E(op, err))
@@ -172,9 +183,9 @@ func (j *JIMM) GetApplicationOfferConsumeDetails(ctx context.Context, user *dbmo
 		return errors.E(op, err)
 	}
 
-	accessLevel := offer.UserAccessLevel(user.Username)
+	accessLevel := offer.UserAccess(user)
 	if accessLevel == "" {
-		accessLevel = offer.UserAccessLevel("everyone@external")
+		accessLevel = offer.UserAccess(&dbmodel.User{Username: "everyone@external"})
 	}
 
 	if accessLevel == "" {
@@ -256,9 +267,9 @@ func (j *JIMM) GetApplicationOffer(ctx context.Context, user *dbmodel.User, offe
 		return nil, errors.E(op, err)
 	}
 
-	accessLevel := offer.UserAccessLevel(user.Username)
+	accessLevel := offer.UserAccess(user)
 	if accessLevel == "" {
-		accessLevel = offer.UserAccessLevel("everyone@external")
+		accessLevel = offer.UserAccess(&dbmodel.User{Username: "everyone@external"})
 	}
 	if accessLevel == "" {
 		return nil, errors.E(op, errors.CodeNotFound, "application offer not found")
@@ -288,16 +299,16 @@ func filterApplicationOfferDetail(offerDetails jujuparams.ApplicationOfferAdminD
 }
 
 // GrantOfferAccess grants rights for an application offer.
-func (j *JIMM) GrantOfferAccess(ctx context.Context, user, offerUser *dbmodel.User, offerURL string, access jujuparams.OfferAccessPermission) error {
+func (j *JIMM) GrantOfferAccess(ctx context.Context, u *dbmodel.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) error {
 	const op = errors.Op("jimm.GrantOfferAccess")
 
 	ale := dbmodel.AuditLogEntry{
 		Time:    time.Now().UTC().Round(time.Millisecond),
-		UserTag: user.Tag().String(),
+		UserTag: u.Tag().String(),
 		Action:  "grant",
 		Params: dbmodel.StringMap{
 			"url":    offerURL,
-			"user":   offerUser.Tag().String(),
+			"user":   ut.String(),
 			"access": string(access),
 		},
 	}
@@ -308,66 +319,32 @@ func (j *JIMM) GrantOfferAccess(ctx context.Context, user, offerUser *dbmodel.Us
 		return err
 	}
 
-	// first we need to fetch the offer to get it's UUID
-	offer := dbmodel.ApplicationOffer{
-		URL: offerURL,
-	}
-	err := j.Database.GetApplicationOffer(ctx, &offer)
-	if err != nil {
-		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return fail(errors.E(op, err, "application offer not found"))
+	err := j.doApplicationOfferAdmin(ctx, u, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
+		ale.Tag = offer.Tag().String()
+		targetUser := dbmodel.User{
+			Username: ut.Id(),
 		}
-		return fail(errors.E(op, err))
-	}
-	ale.Tag = offer.Tag().String()
-
-	authenticatedUserAccessLevel := offer.UserAccessLevel(user.Username)
-
-	// if the authenticated user has no access to the offer, we
-	// return a not found error.
-	// if the user has consume or read access we return an unauthorized error.
-	switch authenticatedUserAccessLevel {
-	case "":
-		return fail(errors.E(errors.CodeNotFound))
-	case string(jujuparams.OfferReadAccess), string(jujuparams.OfferConsumeAccess):
-		return fail(errors.E(errors.CodeUnauthorized))
-	default:
-	}
-
-	model := offer.Application.Model
-	err = j.Database.GetModel(ctx, &model)
-	if err != nil {
-		return fail(errors.E(op, err))
-	}
-
-	// grant access on the controller
-	api, err := j.dial(ctx, &model.Controller, names.ModelTag{})
-	if err != nil {
-		return fail(errors.E(op, err))
-	}
-	defer api.Close()
-
-	err = api.GrantApplicationOfferAccess(ctx, offer.URL, offerUser.Tag().(names.UserTag), access)
-	if err != nil {
-		return fail(errors.E(op, err))
-	}
-
-	found := false
-	for i, ua := range offer.Users {
-		if ua.User.ID == offerUser.ID {
-			found = true
-			offer.Users[i].Access = determineAccessLevelAfterGrant(ua.Access, string(access))
+		if err := j.Database.GetUser(ctx, &targetUser); err != nil {
+			return err
 		}
-	}
-	if !found {
-		offer.Users = append(offer.Users, dbmodel.UserApplicationOfferAccess{
-			UserID: offerUser.ID,
-			User:   *offerUser,
-			Access: string(access),
-		})
-	}
-
-	err = j.Database.UpdateApplicationOffer(ctx, &offer)
+		if err := api.GrantApplicationOfferAccess(ctx, offerURL, ut, access); err != nil {
+			return err
+		}
+		var offerAccess dbmodel.UserApplicationOfferAccess
+		for _, a := range offer.Users {
+			if a.Username == targetUser.Username {
+				offerAccess = a
+				break
+			}
+		}
+		offerAccess.Username = targetUser.Username
+		offerAccess.ApplicationOfferID = offer.ID
+		offerAccess.Access = determineAccessLevelAfterGrant(offerAccess.Access, string(access))
+		if err := j.Database.UpdateUserApplicationOfferAccess(ctx, &offerAccess); err != nil {
+			return errors.E(err, "cannot update database after updating controller")
+		}
+		return nil
+	})
 	if err != nil {
 		return fail(errors.E(op, err))
 	}
@@ -402,7 +379,7 @@ func determineAccessLevelAfterGrant(currentAccessLevel, grantAccessLevel string)
 }
 
 // RevokeOfferAccess revokes rights for an application offer.
-func (j *JIMM) RevokeOfferAccess(ctx context.Context, user, offerUser *dbmodel.User, offerURL string, access jujuparams.OfferAccessPermission) (err error) {
+func (j *JIMM) RevokeOfferAccess(ctx context.Context, user *dbmodel.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) (err error) {
 	const op = errors.Op("jimm.RevokeOfferAccess")
 
 	ale := dbmodel.AuditLogEntry{
@@ -411,7 +388,7 @@ func (j *JIMM) RevokeOfferAccess(ctx context.Context, user, offerUser *dbmodel.U
 		Action:  "revoke",
 		Params: dbmodel.StringMap{
 			"url":    offerURL,
-			"user":   offerUser.Tag().String(),
+			"user":   ut.String(),
 			"access": string(access),
 		},
 	}
@@ -422,65 +399,34 @@ func (j *JIMM) RevokeOfferAccess(ctx context.Context, user, offerUser *dbmodel.U
 		return err
 	}
 
-	offer := dbmodel.ApplicationOffer{
-		URL: offerURL,
-	}
-	err = j.Database.GetApplicationOffer(ctx, &offer)
-	if err != nil {
-		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return fail(errors.E(op, err, "application offer not found"))
+	err = j.doApplicationOfferAdmin(ctx, user, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
+		ale.Tag = offer.Tag().String()
+		targetUser := dbmodel.User{
+			Username: ut.Id(),
 		}
-		return fail(errors.E(op, err))
-	}
-	ale.Tag = offer.Tag().String()
-
-	authenticatedUserAccessLevel := offer.UserAccessLevel(user.Username)
-
-	// if the authenticated user has no access to the offer, we
-	// return a not found error.
-	// if the user has consume or read access we return an unauthorized error.
-	switch authenticatedUserAccessLevel {
-	case "":
-		return fail(errors.E(op, errors.CodeNotFound))
-	case string(jujuparams.OfferReadAccess), string(jujuparams.OfferConsumeAccess):
-		return fail(errors.E(op, errors.CodeUnauthorized))
-	default:
-	}
-
-	var userAccessLevel string
-	updateNeeded := false
-	for i, ua := range offer.Users {
-		if ua.UserID == offerUser.ID {
-			userAccessLevel = determineAccessLevelAfterRevoke(ua.Access, string(access))
-			offer.Users[i].Access = userAccessLevel
-			updateNeeded = true
-			break
+		if err := j.Database.GetUser(ctx, &targetUser); err != nil {
+			return err
 		}
-	}
-
-	model := offer.Application.Model
-	err = j.Database.GetModel(ctx, &model)
-	if err != nil {
-		return fail(errors.E(op, err))
-	}
-
-	// then revoke on the actual controller
-	api, err := j.dial(ctx, &model.Controller, model.Tag().(names.ModelTag))
-	if err != nil {
-		return fail(errors.E(op, err))
-	}
-	defer api.Close()
-
-	err = api.RevokeApplicationOfferAccess(ctx, offer.URL, offerUser.Tag().(names.UserTag), access)
-	if err != nil {
-		return fail(errors.E(op, err))
-	}
-
-	if updateNeeded {
-		err = j.Database.UpdateApplicationOffer(ctx, &offer)
-		if err != nil {
-			return fail(errors.E(op, err))
+		if err := api.RevokeApplicationOfferAccess(ctx, offerURL, ut, access); err != nil {
+			return err
 		}
+		var offerAccess dbmodel.UserApplicationOfferAccess
+		for _, a := range offer.Users {
+			if a.Username == targetUser.Username {
+				offerAccess = a
+				break
+			}
+		}
+		offerAccess.Username = targetUser.Username
+		offerAccess.ApplicationOfferID = offer.ID
+		offerAccess.Access = determineAccessLevelAfterRevoke(offerAccess.Access, string(access))
+		if err := j.Database.UpdateUserApplicationOfferAccess(ctx, &offerAccess); err != nil {
+			return errors.E(err, "cannot update database after updating controller")
+		}
+		return nil
+	})
+	if err != nil {
+		return fail(errors.E(op, err))
 	}
 
 	ale.Success = true
@@ -547,51 +493,21 @@ func (j *JIMM) DestroyOffer(ctx context.Context, user *dbmodel.User, offerURL st
 		return err
 	}
 
-	offer := &dbmodel.ApplicationOffer{
-		URL: offerURL,
-	}
-	err := j.Database.GetApplicationOffer(ctx, offer)
-	if err != nil {
-		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return fail(errors.E(op, err, "application offer not found"))
+	err := j.doApplicationOfferAdmin(ctx, user, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
+		ale.Tag = offer.Tag().String()
+		if err := api.DestroyApplicationOffer(ctx, offerURL, force); err != nil {
+			return err
 		}
-		return fail(errors.E(op, err))
-	}
-	ale.Tag = offer.Tag().String()
-
-	accessLevel := offer.UserAccessLevel(user.Username)
-	// if the authenticated user has no access to the offer, we
-	// return a not found error.
-	// if the user has consume or read access we return an unauthorized error.
-	switch accessLevel {
-	case "":
-		return fail(errors.E(op, errors.CodeNotFound, "application offer not found"))
-	case string(jujuparams.OfferReadAccess), string(jujuparams.OfferConsumeAccess):
-		return fail(errors.E(op, errors.CodeUnauthorized))
-	default:
-	}
-
-	model := offer.Application.Model
-	err = j.Database.GetModel(ctx, &model)
+		if err := j.Database.DeleteApplicationOffer(ctx, offer); err != nil {
+			return err
+		}
+		return nil
+	})
 	if err != nil {
 		return fail(errors.E(op, err))
 	}
 
-	api, err := j.dial(ctx, &model.Controller, model.Tag().(names.ModelTag))
-	if err != nil {
-		return fail(errors.E(op, err))
-	}
-	defer api.Close()
-
-	err = api.DestroyApplicationOffer(ctx, offerURL, force)
-	if err != nil {
-		return fail(errors.E(op, err))
-	}
-
-	err = j.Database.DeleteApplicationOffer(ctx, offer)
-	if err != nil {
-		return fail(errors.E(op, err))
-	}
+	ale.Success = true
 	return nil
 }
 
@@ -636,7 +552,7 @@ func (j *JIMM) UpdateApplicationOffer(ctx context.Context, controller *dbmodel.C
 		return errors.E(op, err)
 	}
 
-	offer.FromJujuApplicationOfferAdminDetails(&offer.Application, offerDetails)
+	offer.FromJujuApplicationOfferAdminDetails(offerDetails)
 	err = j.Database.UpdateApplicationOffer(ctx, &offer)
 	if err != nil {
 		return errors.E(op, err)
@@ -656,14 +572,14 @@ func (j *JIMM) FindApplicationOffers(ctx context.Context, user *dbmodel.User, fi
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	offerFilters = append(offerFilters, db.ApplicationOfferFilterByUser(user.ID))
+	offerFilters = append(offerFilters, db.ApplicationOfferFilterByUser(user.Username))
 	offers, err := j.Database.FindApplicationOffers(ctx, offerFilters...)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
 	offerDetails := make([]jujuparams.ApplicationOfferAdminDetails, len(offers))
 	for i, offer := range offers {
-		accessLevel := offer.UserAccessLevel(user.Username)
+		accessLevel := offer.UserAccess(user)
 		offerDetails[i] = offer.ToJujuApplicationOfferDetails()
 		offerDetails[i] = filterApplicationOfferDetail(offerDetails[i], user, accessLevel)
 	}
@@ -720,11 +636,36 @@ func (j *JIMM) applicationOfferFilters(ctx context.Context, jujuFilters ...jujup
 				}
 				filters = append(
 					filters,
-					db.ApplicationOfferFilterByConsumer(user.ID),
+					db.ApplicationOfferFilterByConsumer(user.Username),
 				)
 			}
 		}
 
 	}
 	return filters, nil
+}
+
+func (j *JIMM) doApplicationOfferAdmin(ctx context.Context, u *dbmodel.User, offerURL string, f func(offer *dbmodel.ApplicationOffer, api API) error) error {
+	const op = errors.Op("jimm.doApplicationOfferAdmin")
+
+	offer := dbmodel.ApplicationOffer{
+		URL: offerURL,
+	}
+	if err := j.Database.GetApplicationOffer(ctx, &offer); err != nil {
+		return errors.E(op, err)
+	}
+	if u.ControllerAccess != "superuser" && offer.UserAccess(u) != "admin" && offer.Model.UserAccess(u) != "admin" {
+		// If the user doesn't have admin access on the application
+		// offer return an unauthorized error.
+		return errors.E(op, errors.CodeUnauthorized)
+	}
+	api, err := j.dial(ctx, &offer.Model.Controller, names.ModelTag{})
+	if err != nil {
+		return errors.E(op, err)
+	}
+	defer api.Close()
+	if err := f(&offer, api); err != nil {
+		return errors.E(op, err)
+	}
+	return nil
 }

@@ -7,6 +7,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 )
 
@@ -14,10 +15,20 @@ import (
 // will be an in-memory SQLite database that logs to the given test with
 // debug enabled. If any objects are specified the datbase automatically
 // performs the migrations for those objects.
-func gormDB(t testing.TB, objects ...interface{}) *gorm.DB {
-	db := jimmtest.MemoryDB(t, nil)
-	err := db.AutoMigrate(objects...)
+func gormDB(t testing.TB) *gorm.DB {
+	vschema, err := dbmodel.SQL.ReadFile("sql/sqlite/versions.sql")
 	if err != nil {
+		t.Fatalf("error loading database schema: %s", err)
+	}
+	schema, err := dbmodel.SQL.ReadFile("sql/sqlite/0_0.sql")
+	if err != nil {
+		t.Fatalf("error loading database schema: %s", err)
+	}
+	db := jimmtest.MemoryDB(t, nil)
+	if err := db.Exec(string(vschema)).Error; err != nil {
+		t.Fatalf("error perform migrations on test database: %s", err)
+	}
+	if err := db.Exec(string(schema)).Error; err != nil {
 		t.Fatalf("error perform migrations on test database: %s", err)
 	}
 	return db

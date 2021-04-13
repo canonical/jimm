@@ -6,6 +6,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"path"
 	"sync/atomic"
 
 	"gorm.io/gorm"
@@ -61,57 +62,41 @@ func (d *Database) Migrate(ctx context.Context, force bool) error {
 		return errors.E(op, errors.CodeServerConfiguration, "database not configured")
 	}
 	db := d.DB.WithContext(ctx)
-	if err := db.AutoMigrate(&dbmodel.Version{}); err != nil {
-		return errors.E(op, dbError(err))
-	}
-	v := dbmodel.Version{Component: dbmodel.Component}
-	if err := db.FirstOrCreate(&v).Error; err != nil {
-		return errors.E(op, dbError(err))
-	}
-	if dbmodel.Major == v.Major && dbmodel.Minor <= v.Minor {
-		// The database is already at, or past, our current version.
-		// Nothing to do.
-		atomic.StoreUint32(&d.migrated, 1)
-		return nil
-	}
-	if v.Major != dbmodel.Major && !force && v.Major != 0 {
-		return errors.E(op, errors.CodeServerConfiguration, fmt.Sprintf("database has incompatible version %d.%d", v.Major, v.Minor))
-	}
-
-	// The major versions are unchanged, the database can be migrated.
-	err := db.AutoMigrate(
-		&dbmodel.Application{},
-		&dbmodel.ApplicationOffer{},
-		&dbmodel.AuditLogEntry{},
-		&dbmodel.Cloud{},
-		&dbmodel.CloudCredential{},
-		&dbmodel.CloudRegion{},
-		&dbmodel.CloudRegionControllerPriority{},
-		&dbmodel.Controller{},
-		&dbmodel.Machine{},
-		&dbmodel.Model{},
-		&dbmodel.Unit{},
-		&dbmodel.User{},
-		&dbmodel.UserApplicationOfferAccess{},
-		&dbmodel.ApplicationOfferRemoteSpace{},
-		&dbmodel.ApplicationOfferRemoteEndpoint{},
-		&dbmodel.ApplicationOfferConnection{},
-		&dbmodel.UserCloudAccess{},
-		&dbmodel.UserModelAccess{},
-		&dbmodel.CloudDefaults{},
-		&dbmodel.UserModelDefaults{},
-	)
-	if err != nil {
+	schema, _ := dbmodel.SQL.ReadFile(path.Join("sql", db.Name(), "versions.sql"))
+	if err := db.Exec(string(schema)).Error; err != nil {
 		return errors.E(op, dbError(err))
 	}
 
-	v.Major = dbmodel.Major
-	v.Minor = dbmodel.Minor
-	if err := db.Save(&v).Error; err != nil {
-		return errors.E(op, dbError(err))
+	for {
+		v := dbmodel.Version{Component: dbmodel.Component}
+		if err := db.FirstOrCreate(&v).Error; err != nil {
+			return errors.E(op, dbError(err))
+		}
+		if dbmodel.Major == v.Major && dbmodel.Minor <= v.Minor {
+			// The database is already at, or past, our current version.
+			// Nothing to do.
+			atomic.StoreUint32(&d.migrated, 1)
+			return nil
+		}
+		if v.Major != dbmodel.Major && !force && v.Major != 0 {
+			return errors.E(op, errors.CodeServerConfiguration, fmt.Sprintf("database has incompatible version %d.%d", v.Major, v.Minor))
+		}
+		// The major versions are unchanged, the database can be migrated.
+		schema, err := dbmodel.SQL.ReadFile(path.Join("sql", db.Name(), fmt.Sprintf("%d_%d.sql", v.Major, v.Minor)))
+		if err != nil {
+			return errors.E(op, err)
+		}
+
+		err = db.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Exec(string(schema)).Error; err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			return errors.E(op, dbError(err))
+		}
 	}
-	atomic.StoreUint32(&d.migrated, 1)
-	return nil
 }
 
 // ready checks that the database is ready to accept requests. An error is

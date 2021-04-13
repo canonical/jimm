@@ -66,7 +66,7 @@ func (s *dbSuite) TestAddModel(c *qt.C) {
 			String: "00000001-0000-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		OwnerID:           u.Username,
+		OwnerUsername:     u.Username,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
@@ -84,8 +84,8 @@ func (s *dbSuite) TestAddModel(c *qt.C) {
 			Level: "unsupported",
 		},
 		Users: []dbmodel.UserModelAccess{{
-			UserID: u.ID,
-			Access: "admin",
+			Username: u.Username,
+			Access:   "admin",
 		}},
 	}
 	m1 := model
@@ -144,7 +144,7 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 			String: "00000001-0000-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		OwnerID:           u.Username,
+		OwnerUsername:     u.Username,
 		Owner:             u,
 		ControllerID:      controller.ID,
 		Controller:        controller,
@@ -166,9 +166,9 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 			Level: "unsupported",
 		},
 		Users: []dbmodel.UserModelAccess{{
-			UserID: u.ID,
-			User:   u,
-			Access: "admin",
+			Username: u.Username,
+			User:     u,
+			Access:   "admin",
 		}},
 	}
 	model.CloudCredential.Cloud = dbmodel.Cloud{}
@@ -235,7 +235,7 @@ func (s *dbSuite) TestUpdateModel(c *qt.C) {
 
 	model := dbmodel.Model{
 		Name:              "test-model-1",
-		OwnerID:           u.Username,
+		OwnerUsername:     u.Username,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
@@ -253,8 +253,8 @@ func (s *dbSuite) TestUpdateModel(c *qt.C) {
 			Level: "unsupported",
 		},
 		Users: []dbmodel.UserModelAccess{{
-			UserID: u.ID,
-			Access: "admin",
+			Username: u.Username,
+			Access:   "admin",
 		}},
 	}
 	err = s.Database.AddModel(context.Background(), &model)
@@ -318,7 +318,7 @@ func (s *dbSuite) TestDeleteModel(c *qt.C) {
 
 	model := dbmodel.Model{
 		Name:              "test-model-1",
-		OwnerID:           u.Username,
+		OwnerUsername:     u.Username,
 		ControllerID:      controller.ID,
 		Controller:        controller,
 		CloudRegionID:     cloud.Regions[0].ID,
@@ -337,9 +337,9 @@ func (s *dbSuite) TestDeleteModel(c *qt.C) {
 			Level: "unsupported",
 		},
 		Users: []dbmodel.UserModelAccess{{
-			UserID: u.ID,
-			User:   u,
-			Access: "admin",
+			Username: u.Username,
+			User:     u,
+			Access:   "admin",
 		}},
 	}
 
@@ -409,7 +409,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 			String: "00000001-0000-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		OwnerID:           u.Username,
+		OwnerUsername:     u.Username,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred1.ID,
@@ -427,8 +427,8 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 			Level: "unsupported",
 		},
 		Users: []dbmodel.UserModelAccess{{
-			UserID: u.ID,
-			Access: "admin",
+			Username: u.Username,
+			Access:   "admin",
 		}},
 	}
 	err = s.Database.AddModel(context.Background(), &model1)
@@ -440,7 +440,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 			String: "00000001-0000-0000-0000-0000-000000000002",
 			Valid:  true,
 		},
-		OwnerID:           u.Username,
+		OwnerUsername:     u.Username,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred2.ID,
@@ -458,8 +458,8 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 			Level: "unsupported",
 		},
 		Users: []dbmodel.UserModelAccess{{
-			UserID: u.ID,
-			Access: "admin",
+			Username: u.Username,
+			Access:   "admin",
 		}},
 	}
 	err = s.Database.AddModel(context.Background(), &model2)
@@ -476,7 +476,7 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 			String: "00000001-0000-0000-0000-0000-000000000001",
 			Valid:  true,
 		},
-		OwnerID:           u.Username,
+		OwnerUsername:     u.Username,
 		ControllerID:      controller.ID,
 		Controller:        controller,
 		CloudRegionID:     cloud.Regions[0].ID,
