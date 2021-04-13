@@ -19,7 +19,7 @@ func (d *Database) SetUserModelDefaults(ctx context.Context, defaults *dbmodel.U
 		db := d.DB.WithContext(ctx)
 
 		dbDefaults := dbmodel.UserModelDefaults{
-			UserID: defaults.UserID,
+			Username: defaults.Username,
 		}
 		// try to fetch cloud defaults from the db
 		err := d.UserModelDefaults(ctx, &dbDefaults)
@@ -40,7 +40,7 @@ func (d *Database) SetUserModelDefaults(ctx context.Context, defaults *dbmodel.U
 		}
 		if err := db.Clauses(clause.OnConflict{
 			Columns: []clause.Column{
-				{Name: "user_id"},
+				{Name: "username"},
 			},
 			DoUpdates: clause.AssignmentColumns([]string{"defaults"}),
 		}).Create(&dbDefaults).Error; err != nil {
@@ -63,7 +63,7 @@ func (d *Database) UserModelDefaults(ctx context.Context, defaults *dbmodel.User
 	}
 	db := d.DB.WithContext(ctx)
 
-	db = db.Where("user_id = ?", defaults.UserID)
+	db = db.Where("username = ?", defaults.Username)
 
 	result := db.Preload("User").First(&defaults)
 	if result.Error != nil {

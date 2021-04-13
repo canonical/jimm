@@ -14,7 +14,7 @@ import (
 
 func TestAuditLogEntry(t *testing.T) {
 	c := qt.New(t)
-	db := gormDB(t, &dbmodel.AuditLogEntry{})
+	db := gormDB(t)
 
 	ale := dbmodel.AuditLogEntry{
 		Time:    time.Now(),

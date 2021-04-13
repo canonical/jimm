@@ -43,14 +43,14 @@ type User struct {
 	Clouds []UserCloudAccess `gorm:"foreignKey:Username;references:Username"`
 
 	// CloudCredentials are the cloud credentials owned by this user.
-	CloudCredentials []CloudCredential `gorm:"foreignKey:OwnerID;references:Username"`
+	CloudCredentials []CloudCredential `gorm:"foreignKey:OwnerUsername;references:Username"`
 
 	// Models are the models accessible to this user.
-	Models []UserModelAccess
+	Models []UserModelAccess `gorm:"foreignKey:Username;references:Username"`
 
 	// ApplicationOffers are the application-offers accessible to this
 	// user.
-	ApplicationOffers []UserApplicationOfferAccess
+	ApplicationOffers []UserApplicationOfferAccess `gorm:"foreignKey:Username;references:Username"`
 }
 
 // Tag returns a names.Tag for the user.

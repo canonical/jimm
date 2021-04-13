@@ -33,10 +33,15 @@ func (d *Database) UpdateApplicationOffer(ctx context.Context, offer *dbmodel.Ap
 		return errors.E(op, err)
 	}
 	db := d.DB.WithContext(ctx)
-
-	result := db.Session(&gorm.Session{FullSaveAssociations: true}).Save(offer)
-	if result.Error != nil {
-		return errors.E(op, dbError(result.Error))
+	err := db.Transaction(func(tx *gorm.DB) error {
+		tx.Omit("Connections", "Endpoints", "Spaces", "Users").Save(offer)
+		tx.Model(offer).Association("Connections").Replace(offer.Connections)
+		tx.Model(offer).Association("Endpoints").Replace(offer.Endpoints)
+		tx.Model(offer).Association("Spaces").Replace(offer.Spaces)
+		return tx.Error
+	})
+	if err != nil {
+		return errors.E(op, dbError(err))
 	}
 
 	if err := d.GetApplicationOffer(ctx, offer); err != nil {
@@ -64,7 +69,11 @@ func (d *Database) GetApplicationOffer(ctx context.Context, offer *dbmodel.Appli
 	}
 	result := db.Preload("Application").Preload("Application.Model").Preload("Users").Preload("Users.User").Preload("Endpoints").Preload("Spaces").Preload("Connections").First(&offer)
 	if result.Error != nil {
-		return errors.E(op, dbError(result.Error))
+		err := dbError(result.Error)
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return errors.E(op, err, "application offer not found")
+		}
+		return errors.E(op, err)
 	}
 	return nil
 }
@@ -104,29 +113,29 @@ func ApplicationOfferFilterByDescription(substring string) ApplicationOfferFilte
 // ApplicationOfferFilterByModel filters application offers by model name.
 func ApplicationOfferFilterByModel(modelName string) ApplicationOfferFilter {
 	return func(db *gorm.DB) *gorm.DB {
-		return db.Joins("JOIN applications AS a1 ON a1.id = offers.application_id").Joins("JOIN models ON models.id = a1.model_id").Where("models.name = ?", modelName)
+		return db.Joins("JOIN models ON models.id = offers.model_id").Where("models.name = ?", modelName)
 	}
 }
 
 // ApplicationOfferFilterByApplication filters application offers by application name.
 func ApplicationOfferFilterByApplication(applicationName string) ApplicationOfferFilter {
 	return func(db *gorm.DB) *gorm.DB {
-		return db.Joins("JOIN applications AS a2 ON a2.id = offers.application_id").Where("a2.name = ?", applicationName)
+		return db.Where("offers.application_name = ?", applicationName)
 	}
 }
 
 // ApplicationOfferFilterByUser filters application offer accessible by the user.
-func ApplicationOfferFilterByUser(userID uint) ApplicationOfferFilter {
+func ApplicationOfferFilterByUser(username string) ApplicationOfferFilter {
 	// TODO (ashipika) allow offers to which everyone@external has access.
 	return func(db *gorm.DB) *gorm.DB {
-		return db.Joins("INNER JOIN user_application_offer_accesses AS users ON users.application_offer_id = offers.id AND users.user_id = ? AND users.access IN ?", userID, []string{"read", "consume", "admin"})
+		return db.Joins("INNER JOIN user_application_offer_access AS users ON users.application_offer_id = offers.id AND users.username = ? AND users.access IN ?", username, []string{"read", "consume", "admin"})
 	}
 }
 
 // ApplicationOfferFilterByConsumer filters application offer accessible by the user.
-func ApplicationOfferFilterByConsumer(userID uint) ApplicationOfferFilter {
+func ApplicationOfferFilterByConsumer(username string) ApplicationOfferFilter {
 	return func(db *gorm.DB) *gorm.DB {
-		return db.Joins("INNER JOIN user_application_offer_accesses AS consumers ON consumers.application_offer_id = offers.id AND consumers.user_id = ? AND consumers.access IN ?", userID, []string{"consume", "admin"})
+		return db.Joins("INNER JOIN user_application_offer_access AS consumers ON consumers.application_offer_id = offers.id AND consumers.username = ? AND consumers.access IN ?", username, []string{"consume", "admin"})
 	}
 }
 
@@ -179,4 +188,26 @@ func (d *Database) FindApplicationOffers(ctx context.Context, filters ...Applica
 	}
 
 	return offers, nil
+}
+
+// UpdateUserApplicationOfferAccess updates the given
+// UserApplicationOfferAccess record. If the specified access is changed to
+// "" (no access) then the record is removed.
+func (d *Database) UpdateUserApplicationOfferAccess(ctx context.Context, a *dbmodel.UserApplicationOfferAccess) error {
+	const op = errors.Op("db.UpdateUserApplicationOfferAccess")
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	db := d.DB.WithContext(ctx)
+	if a.Access == "" {
+		db = db.Where("username = ? AND application_offer_id = ?", a.Username, a.ApplicationOfferID).Delete(a)
+	} else {
+		db = db.Where("username = ? AND application_offer_id = ?", a.Username, a.ApplicationOfferID).Save(a)
+	}
+	if db.Error != nil {
+		return errors.E(op, dbError(db.Error))
+	}
+	return nil
 }

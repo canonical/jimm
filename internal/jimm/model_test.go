@@ -260,7 +260,7 @@ machines:
 		},
 		Machines: []dbmodel.Machine{{
 			MachineID: "test-machine-id",
-			Hardware: dbmodel.MachineHardware{
+			Hardware: dbmodel.Hardware{
 				Arch: sql.NullString{
 					String: "amd64",
 					Valid:  true,
@@ -269,7 +269,7 @@ machines:
 					Uint64: 8096,
 					Valid:  true,
 				},
-				Cores: dbmodel.NullUint64{
+				CPUCores: dbmodel.NullUint64{
 					Uint64: 8,
 					Valid:  true,
 				},
@@ -385,7 +385,7 @@ machines:
 		},
 		Machines: []dbmodel.Machine{{
 			MachineID: "test-machine-id",
-			Hardware: dbmodel.MachineHardware{
+			Hardware: dbmodel.Hardware{
 				Arch: sql.NullString{
 					String: "amd64",
 					Valid:  true,
@@ -394,7 +394,7 @@ machines:
 					Uint64: 8096,
 					Valid:  true,
 				},
-				Cores: dbmodel.NullUint64{
+				CPUCores: dbmodel.NullUint64{
 					Uint64: 8,
 					Valid:  true,
 				},
@@ -515,7 +515,7 @@ machines:
 		},
 		Machines: []dbmodel.Machine{{
 			MachineID: "test-machine-id",
-			Hardware: dbmodel.MachineHardware{
+			Hardware: dbmodel.Hardware{
 				Arch: sql.NullString{
 					String: "amd64",
 					Valid:  true,
@@ -524,7 +524,7 @@ machines:
 					Uint64: 8096,
 					Valid:  true,
 				},
-				Cores: dbmodel.NullUint64{
+				CPUCores: dbmodel.NullUint64{
 					Uint64: 8,
 					Valid:  true,
 				},

@@ -20,7 +20,7 @@ func (j *JIMM) SetUserModelDefaults(ctx context.Context, user *dbmodel.User, con
 	}
 
 	err := j.Database.SetUserModelDefaults(ctx, &dbmodel.UserModelDefaults{
-		UserID:   user.Username,
+		Username: user.Username,
 		Defaults: configs,
 	})
 	if err != nil {
@@ -34,7 +34,7 @@ func (j *JIMM) UserModelDefaults(ctx context.Context, user *dbmodel.User) (map[s
 	const op = errors.Op("jimm.UserModelDefaults")
 
 	defaults := dbmodel.UserModelDefaults{
-		UserID: user.Username,
+		Username: user.Username,
 	}
 	err := j.Database.UserModelDefaults(ctx, &defaults)
 	if err != nil {

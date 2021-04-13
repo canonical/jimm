@@ -93,10 +93,10 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database) 
 	env.clouds = []dbmodel.Cloud{cloud}
 
 	cred := dbmodel.CloudCredential{
-		Name:      "test-credential-1",
-		CloudName: cloud.Name,
-		OwnerID:   u.Username,
-		AuthType:  "empty",
+		Name:          "test-credential-1",
+		CloudName:     cloud.Name,
+		OwnerUsername: u.Username,
+		AuthType:      "empty",
 	}
 	err = db.SetCloudCredential(ctx, &cred)
 	c.Assert(err, qt.Equals, nil)
@@ -108,7 +108,7 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database) 
 			String: "00000000-0000-0000-0000-0000-0000000000003",
 			Valid:  true,
 		},
-		OwnerID:           u.Username,
+		OwnerUsername:     u.Username,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
@@ -119,15 +119,16 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database) 
 		}},
 	}
 	err = db.AddModel(ctx, &model)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	env.models = []dbmodel.Model{model}
 
 	offer := dbmodel.ApplicationOffer{
-		ID:            1,
-		UUID:          "00000000-0000-0000-0000-0000-0000000000011",
-		URL:           "test-offer-url",
-		Name:          "test-offer",
-		ApplicationID: 1,
+		ID:              1,
+		UUID:            "00000000-0000-0000-0000-0000-0000000000011",
+		URL:             "test-offer-url",
+		Name:            "test-offer",
+		ModelID:         model.ID,
+		ApplicationName: "test-app",
 		Application: dbmodel.Application{
 			ID:       1,
 			ModelID:  model.ID,
@@ -136,21 +137,21 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database) 
 			CharmURL: "cs:test-app:17",
 		},
 		Users: []dbmodel.UserApplicationOfferAccess{{
-			UserID: u.ID,
-			Access: string(jujuparams.OfferAdminAccess),
+			Username: u.Username,
+			Access:   string(jujuparams.OfferAdminAccess),
 		}, {
-			UserID: u1.ID,
-			Access: string(jujuparams.OfferAdminAccess),
+			Username: u1.Username,
+			Access:   string(jujuparams.OfferAdminAccess),
 		}, {
-			UserID: u2.ID,
-			Access: string(jujuparams.OfferConsumeAccess),
+			Username: u2.Username,
+			Access:   string(jujuparams.OfferConsumeAccess),
 		}, {
-			UserID: u3.ID,
-			Access: string(jujuparams.OfferReadAccess),
+			Username: u3.Username,
+			Access:   string(jujuparams.OfferReadAccess),
 		}},
 	}
 	err = db.AddApplicationOffer(ctx, &offer)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	env.applicationOffers = []dbmodel.ApplicationOffer{offer}
 
 	return &env
@@ -267,7 +268,7 @@ func TestRevokeOfferAccess(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 
 			environment := initializeEnvironment(c, ctx, &db)
-			authenticatedUser, offerUser, offerURL, grantAccessLevel := test.parameterFunc(environment)
+			authenticatedUser, offerUser, offerURL, revokeAccessLevel := test.parameterFunc(environment)
 
 			j := &jimm.JIMM{
 				Database: db,
@@ -291,7 +292,7 @@ func TestRevokeOfferAccess(t *testing.T) {
 				default:
 				}
 			}
-			err = j.RevokeOfferAccess(ctx, &authenticatedUser, &offerUser, offerURL, grantAccessLevel)
+			err = j.RevokeOfferAccess(ctx, &authenticatedUser, offerURL, offerUser.Tag().(names.UserTag), revokeAccessLevel)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 
@@ -300,15 +301,7 @@ func TestRevokeOfferAccess(t *testing.T) {
 				}
 				err = db.GetApplicationOffer(ctx, &offer)
 				c.Assert(err, qt.Equals, nil)
-
-				var accessLevel string
-				for _, u := range offer.Users {
-					if u.UserID == offerUser.ID {
-						accessLevel = u.Access
-						break
-					}
-				}
-				c.Assert(accessLevel, qt.Equals, test.expectedAccesLevel)
+				c.Assert(offer.UserAccess(&offerUser), qt.Equals, test.expectedAccesLevel)
 			} else {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
 			}
@@ -463,7 +456,7 @@ func TestGrantOfferAccess(t *testing.T) {
 				default:
 				}
 			}
-			err = j.GrantOfferAccess(ctx, &authenticatedUser, &offerUser, offerURL, grantAccessLevel)
+			err = j.GrantOfferAccess(ctx, &authenticatedUser, offerURL, offerUser.Tag().(names.UserTag), grantAccessLevel)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 
@@ -472,15 +465,7 @@ func TestGrantOfferAccess(t *testing.T) {
 				}
 				err = db.GetApplicationOffer(ctx, &offer)
 				c.Assert(err, qt.Equals, nil)
-
-				var accessLevel string
-				for _, u := range offer.Users {
-					if u.UserID == offerUser.ID {
-						accessLevel = u.Access
-						break
-					}
-				}
-				c.Assert(accessLevel, qt.Equals, test.expectedAccesLevel)
+				c.Assert(offer.UserAccess(&offerUser), qt.Equals, test.expectedAccesLevel)
 			} else {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
 			}
@@ -544,10 +529,10 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
-		Name:      "test-credential-1",
-		CloudName: cloud.Name,
-		OwnerID:   u.Username,
-		AuthType:  "empty",
+		Name:          "test-credential-1",
+		CloudName:     cloud.Name,
+		OwnerUsername: u.Username,
+		AuthType:      "empty",
 	}
 	err = db.SetCloudCredential(ctx, &cred)
 	c.Assert(err, qt.Equals, nil)
@@ -558,7 +543,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 			String: "00000000-0000-0000-0000-0000-0000000000003",
 			Valid:  true,
 		},
-		OwnerID:           u.Username,
+		OwnerUsername:     u.Username,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
@@ -572,9 +557,10 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	c.Assert(err, qt.Equals, nil)
 
 	offer := dbmodel.ApplicationOffer{
-		ID:            1,
-		URL:           "test-offer-url",
-		ApplicationID: 1,
+		ID:              1,
+		URL:             "test-offer-url",
+		ModelID:         model.ID,
+		ApplicationName: "test-app",
 		Application: dbmodel.Application{
 			ID:       1,
 			ModelID:  model.ID,
@@ -583,14 +569,14 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 			CharmURL: "cs:test-app:17",
 		},
 		Users: []dbmodel.UserApplicationOfferAccess{{
-			UserID: u.ID,
-			Access: string(jujuparams.OfferAdminAccess),
+			Username: u.Username,
+			Access:   string(jujuparams.OfferAdminAccess),
 		}, {
-			UserID: u1.ID,
-			Access: string(jujuparams.OfferReadAccess),
+			Username: u1.Username,
+			Access:   string(jujuparams.OfferReadAccess),
 		}, {
-			UserID: u2.ID,
-			Access: string(jujuparams.OfferConsumeAccess),
+			Username: u2.Username,
+			Access:   string(jujuparams.OfferConsumeAccess),
 		}},
 	}
 	err = db.AddApplicationOffer(ctx, &offer)
@@ -846,10 +832,10 @@ func TestGetApplicationOffer(t *testing.T) {
 	c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
-		Name:      "test-credential-1",
-		CloudName: cloud.Name,
-		OwnerID:   u.Username,
-		AuthType:  "empty",
+		Name:          "test-credential-1",
+		CloudName:     cloud.Name,
+		OwnerUsername: u.Username,
+		AuthType:      "empty",
 	}
 	err = j.Database.SetCloudCredential(ctx, &cred)
 	c.Assert(err, qt.Equals, nil)
@@ -860,7 +846,7 @@ func TestGetApplicationOffer(t *testing.T) {
 			String: "00000000-0000-0000-0000-0000-0000000000003",
 			Valid:  true,
 		},
-		OwnerID:           u.Username,
+		OwnerUsername:     u.Username,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
@@ -874,8 +860,9 @@ func TestGetApplicationOffer(t *testing.T) {
 	c.Assert(err, qt.Equals, nil)
 
 	offer := dbmodel.ApplicationOffer{
-		ID:            1,
-		ApplicationID: 1,
+		ID:              1,
+		ModelID:         1,
+		ApplicationName: "test-app",
 		Application: dbmodel.Application{
 			ID:       1,
 			ModelID:  1,
@@ -888,9 +875,6 @@ func TestGetApplicationOffer(t *testing.T) {
 		UUID:                   "00000000-0000-0000-0000-0000-0000000000004",
 		URL:                    "test-offer-url",
 		Endpoints: []dbmodel.ApplicationOfferRemoteEndpoint{{
-			Model: gorm.Model{
-				ID: 1,
-			},
 			ApplicationOfferID: 1,
 			Name:               "test-endpoint",
 			Role:               "requirer",
@@ -898,9 +882,6 @@ func TestGetApplicationOffer(t *testing.T) {
 			Limit:              1,
 		}},
 		Spaces: []dbmodel.ApplicationOfferRemoteSpace{{
-			Model: gorm.Model{
-				ID: 1,
-			},
 			ApplicationOfferID: 1,
 			CloudType:          "test-cloud-type",
 			Name:               "test-remote-space",
@@ -915,9 +896,6 @@ func TestGetApplicationOffer(t *testing.T) {
 			"key2": "value2",
 		},
 		Connections: []dbmodel.ApplicationOfferConnection{{
-			Model: gorm.Model{
-				ID: 1,
-			},
 			ApplicationOfferID: 1,
 			SourceModelTag:     "test-model-src",
 			RelationID:         1,
@@ -925,19 +903,19 @@ func TestGetApplicationOffer(t *testing.T) {
 			Endpoint:           "test-endpoint",
 		}},
 		Users: []dbmodel.UserApplicationOfferAccess{{
-			UserID: u.ID,
-			Access: string(jujuparams.OfferAdminAccess),
+			Username: u.Username,
+			Access:   string(jujuparams.OfferAdminAccess),
 		}, {
-			UserID: u1.ID,
-			Access: string(jujuparams.OfferReadAccess),
+			Username: u1.Username,
+			Access:   string(jujuparams.OfferReadAccess),
 		}},
 	}
 	err = j.Database.AddApplicationOffer(ctx, &offer)
 	c.Assert(err, qt.Equals, nil)
 
 	offer1 := dbmodel.ApplicationOffer{
-		ID:            2,
-		ApplicationID: 1,
+		ModelID:         1,
+		ApplicationName: "test-app",
 		Application: dbmodel.Application{
 			ID:       1,
 			ModelID:  1,
@@ -950,9 +928,6 @@ func TestGetApplicationOffer(t *testing.T) {
 		UUID:                   "00000000-0000-0000-0000-0000-0000000000005",
 		URL:                    "test-offer-url-1",
 		Endpoints: []dbmodel.ApplicationOfferRemoteEndpoint{{
-			Model: gorm.Model{
-				ID: 2,
-			},
 			ApplicationOfferID: 2,
 			Name:               "test-endpoint",
 			Role:               "requirer",
@@ -960,9 +935,6 @@ func TestGetApplicationOffer(t *testing.T) {
 			Limit:              1,
 		}},
 		Spaces: []dbmodel.ApplicationOfferRemoteSpace{{
-			Model: gorm.Model{
-				ID: 2,
-			},
 			ApplicationOfferID: 2,
 			CloudType:          "test-cloud-type",
 			Name:               "test-remote-space",
@@ -977,9 +949,6 @@ func TestGetApplicationOffer(t *testing.T) {
 			"key2": "value2",
 		},
 		Connections: []dbmodel.ApplicationOfferConnection{{
-			Model: gorm.Model{
-				ID: 2,
-			},
 			ApplicationOfferID: 2,
 			SourceModelTag:     "test-model-src",
 			RelationID:         1,
@@ -1242,10 +1211,10 @@ func TestOffer(t *testing.T) {
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
 			cred := dbmodel.CloudCredential{
-				Name:      "test-credential-1",
-				CloudName: cloud.Name,
-				OwnerID:   u.Username,
-				AuthType:  "empty",
+				Name:          "test-credential-1",
+				CloudName:     cloud.Name,
+				OwnerUsername: u.Username,
+				AuthType:      "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
 			c.Assert(err, qt.Equals, nil)
@@ -1256,7 +1225,7 @@ func TestOffer(t *testing.T) {
 					String: "00000000-0000-0000-0000-0000-0000000000003",
 					Valid:  true,
 				},
-				OwnerID:           u.Username,
+				OwnerUsername:     u.Username,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
@@ -1284,8 +1253,9 @@ func TestOffer(t *testing.T) {
 			}
 
 			offer := dbmodel.ApplicationOffer{
-				ID:            1,
-				ApplicationID: 1,
+				ID:              1,
+				ModelID:         1,
+				ApplicationName: "test-app",
 				Application: dbmodel.Application{
 					ID:       1,
 					ModelID:  1,
@@ -1297,9 +1267,6 @@ func TestOffer(t *testing.T) {
 				UUID:                   "00000000-0000-0000-0000-0000-0000000000004",
 				URL:                    "test-offer-url",
 				Endpoints: []dbmodel.ApplicationOfferRemoteEndpoint{{
-					Model: gorm.Model{
-						ID: 1,
-					},
 					ApplicationOfferID: 1,
 					Name:               "test-endpoint",
 					Role:               "requirer",
@@ -1307,9 +1274,6 @@ func TestOffer(t *testing.T) {
 					Limit:              1,
 				}},
 				Spaces: []dbmodel.ApplicationOfferRemoteSpace{{
-					Model: gorm.Model{
-						ID: 1,
-					},
 					ApplicationOfferID: 1,
 					CloudType:          "test-cloud-type",
 					Name:               "test-remote-space",
@@ -1324,9 +1288,6 @@ func TestOffer(t *testing.T) {
 					"key2": "value2",
 				},
 				Connections: []dbmodel.ApplicationOfferConnection{{
-					Model: gorm.Model{
-						ID: 1,
-					},
 					ApplicationOfferID: 1,
 					SourceModelTag:     "test-model-src",
 					RelationID:         1,
@@ -1381,10 +1342,10 @@ func TestOffer(t *testing.T) {
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
 			cred := dbmodel.CloudCredential{
-				Name:      "test-credential-1",
-				CloudName: cloud.Name,
-				OwnerID:   u.Username,
-				AuthType:  "empty",
+				Name:          "test-credential-1",
+				CloudName:     cloud.Name,
+				OwnerUsername: u.Username,
+				AuthType:      "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
 			c.Assert(err, qt.Equals, nil)
@@ -1395,7 +1356,7 @@ func TestOffer(t *testing.T) {
 					String: "00000000-0000-0000-0000-0000-0000000000003",
 					Valid:  true,
 				},
-				OwnerID:           u.Username,
+				OwnerUsername:     u.Username,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
@@ -1472,10 +1433,10 @@ func TestOffer(t *testing.T) {
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
 			cred := dbmodel.CloudCredential{
-				Name:      "test-credential-1",
-				CloudName: cloud.Name,
-				OwnerID:   u.Username,
-				AuthType:  "empty",
+				Name:          "test-credential-1",
+				CloudName:     cloud.Name,
+				OwnerUsername: u.Username,
+				AuthType:      "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
 			c.Assert(err, qt.Equals, nil)
@@ -1486,7 +1447,7 @@ func TestOffer(t *testing.T) {
 					String: "00000000-0000-0000-0000-0000-0000000000003",
 					Valid:  true,
 				},
-				OwnerID:           u.Username,
+				OwnerUsername:     u.Username,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
@@ -1597,10 +1558,10 @@ func TestOffer(t *testing.T) {
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
 			cred := dbmodel.CloudCredential{
-				Name:      "test-credential-1",
-				CloudName: cloud.Name,
-				OwnerID:   u.Username,
-				AuthType:  "empty",
+				Name:          "test-credential-1",
+				CloudName:     cloud.Name,
+				OwnerUsername: u.Username,
+				AuthType:      "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
 			c.Assert(err, qt.Equals, nil)
@@ -1611,7 +1572,7 @@ func TestOffer(t *testing.T) {
 					String: "00000000-0000-0000-0000-0000-0000000000003",
 					Valid:  true,
 				},
-				OwnerID:           u.Username,
+				OwnerUsername:     u.Username,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
@@ -1689,10 +1650,10 @@ func TestOffer(t *testing.T) {
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
 			cred := dbmodel.CloudCredential{
-				Name:      "test-credential-1",
-				CloudName: cloud.Name,
-				OwnerID:   u.Username,
-				AuthType:  "empty",
+				Name:          "test-credential-1",
+				CloudName:     cloud.Name,
+				OwnerUsername: u.Username,
+				AuthType:      "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
 			c.Assert(err, qt.Equals, nil)
@@ -1703,7 +1664,7 @@ func TestOffer(t *testing.T) {
 					String: "00000000-0000-0000-0000-0000-0000000000003",
 					Valid:  true,
 				},
-				OwnerID:           u.Username,
+				OwnerUsername:     u.Username,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
@@ -1780,10 +1741,10 @@ func TestOffer(t *testing.T) {
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
 			cred := dbmodel.CloudCredential{
-				Name:      "test-credential-1",
-				CloudName: cloud.Name,
-				OwnerID:   u.Username,
-				AuthType:  "empty",
+				Name:          "test-credential-1",
+				CloudName:     cloud.Name,
+				OwnerUsername: u.Username,
+				AuthType:      "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
 			c.Assert(err, qt.Equals, nil)
@@ -1794,7 +1755,7 @@ func TestOffer(t *testing.T) {
 					String: "00000000-0000-0000-0000-0000-0000000000003",
 					Valid:  true,
 				},
-				OwnerID:           u.Username,
+				OwnerUsername:     u.Username,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
@@ -1876,10 +1837,10 @@ func TestOffer(t *testing.T) {
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 
 			cred := dbmodel.CloudCredential{
-				Name:      "test-credential-1",
-				CloudName: cloud.Name,
-				OwnerID:   u.Username,
-				AuthType:  "empty",
+				Name:          "test-credential-1",
+				CloudName:     cloud.Name,
+				OwnerUsername: u.Username,
+				AuthType:      "empty",
 			}
 			err = db.SetCloudCredential(ctx, &cred)
 			c.Assert(err, qt.Equals, nil)
@@ -1890,7 +1851,7 @@ func TestOffer(t *testing.T) {
 					String: "00000000-0000-0000-0000-0000-0000000000003",
 					Valid:  true,
 				},
-				OwnerID:           u.Username,
+				OwnerUsername:     u.Username,
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
@@ -1958,7 +1919,7 @@ func TestOffer(t *testing.T) {
 				}
 				err = j.Database.GetApplicationOffer(ctx, &offer)
 				c.Assert(err, qt.IsNil)
-				c.Assert(offer, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(time.Time{}), cmpopts.IgnoreTypes(dbmodel.Model{})), expectedOffer)
+				c.Assert(offer, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(time.Time{}, gorm.Model{}), cmpopts.IgnoreTypes(dbmodel.Model{})), expectedOffer)
 			} else {
 				errorAssertion(c, err)
 			}
@@ -2178,7 +2139,7 @@ func TestDestroyOffer(t *testing.T) {
 		parameterFunc: func(env *environment) (dbmodel.User, string) {
 			return env.users[4], "test-offer-url"
 		},
-		expectedError: "application offer not found",
+		expectedError: "unauthorized access",
 	}, {
 		about: "offer not found",
 		parameterFunc: func(env *environment) (dbmodel.User, string) {
@@ -2261,10 +2222,11 @@ func TestUpdateOffer(t *testing.T) {
 			return env.applicationOffers[0].UUID, false
 		},
 		expectedOffer: dbmodel.ApplicationOffer{
-			ID:            1,
-			UUID:          "00000000-0000-0000-0000-0000-0000000000011",
-			URL:           "test-offer-url",
-			ApplicationID: 1,
+			ID:              1,
+			UUID:            "00000000-0000-0000-0000-0000-0000000000011",
+			URL:             "test-offer-url",
+			ModelID:         1,
+			ApplicationName: "test-app",
 			Application: dbmodel.Application{
 				ID:       1,
 				ModelID:  1,
@@ -2301,7 +2263,7 @@ func TestUpdateOffer(t *testing.T) {
 				Limit:              1,
 			}},
 			Users: []dbmodel.UserApplicationOfferAccess{{
-				UserID: 1,
+				Username: "alice@external",
 				User: dbmodel.User{
 					Username:         "alice@external",
 					ControllerAccess: "superuser",
@@ -2309,7 +2271,7 @@ func TestUpdateOffer(t *testing.T) {
 				ApplicationOfferID: 1,
 				Access:             "admin",
 			}, {
-				UserID: 2,
+				Username: "eve@external",
 				User: dbmodel.User{
 					Username:         "eve@external",
 					ControllerAccess: "add-model",
@@ -2317,7 +2279,7 @@ func TestUpdateOffer(t *testing.T) {
 				ApplicationOfferID: 1,
 				Access:             "admin",
 			}, {
-				UserID: 3,
+				Username: "bob@external",
 				User: dbmodel.User{
 					Username:         "bob@external",
 					ControllerAccess: "add-model",
@@ -2325,7 +2287,7 @@ func TestUpdateOffer(t *testing.T) {
 				ApplicationOfferID: 1,
 				Access:             "consume",
 			}, {
-				UserID: 4,
+				Username: "fred@external",
 				User: dbmodel.User{
 					Username:         "fred@external",
 					ControllerAccess: "add-model",
@@ -2449,11 +2411,12 @@ func TestFindApplicationOffers(t *testing.T) {
 	now := time.Now().UTC().Round(time.Millisecond)
 
 	expectedOffer := dbmodel.ApplicationOffer{
-		ID:            1,
-		UUID:          "00000000-0000-0000-0000-0000-0000000000011",
-		URL:           "test-offer-url",
-		Name:          "test-offer",
-		ApplicationID: 1,
+		ID:              1,
+		UUID:            "00000000-0000-0000-0000-0000-0000000000011",
+		URL:             "test-offer-url",
+		Name:            "test-offer",
+		ModelID:         1,
+		ApplicationName: "test-app",
 		Application: dbmodel.Application{
 			ID:      1,
 			ModelID: 1,
@@ -2468,7 +2431,7 @@ func TestFindApplicationOffers(t *testing.T) {
 			CharmURL: "cs:test-app:17",
 		},
 		Users: []dbmodel.UserApplicationOfferAccess{{
-			UserID: 1,
+			Username: "alice@external",
 			User: dbmodel.User{
 				Username:         "alice@external",
 				ControllerAccess: "superuser",
@@ -2476,7 +2439,7 @@ func TestFindApplicationOffers(t *testing.T) {
 			ApplicationOfferID: 1,
 			Access:             "admin",
 		}, {
-			UserID: 2,
+			Username: "eve@external",
 			User: dbmodel.User{
 				Username:         "eve@external",
 				ControllerAccess: "add-model",
@@ -2484,7 +2447,7 @@ func TestFindApplicationOffers(t *testing.T) {
 			ApplicationOfferID: 1,
 			Access:             "admin",
 		}, {
-			UserID: 3,
+			Username: "bob@external",
 			User: dbmodel.User{
 				Username:         "bob@external",
 				ControllerAccess: "add-model",
@@ -2492,7 +2455,7 @@ func TestFindApplicationOffers(t *testing.T) {
 			ApplicationOfferID: 1,
 			Access:             "consume",
 		}, {
-			UserID: 4,
+			Username: "fred@external",
 			User: dbmodel.User{
 				Username:         "fred@external",
 				ControllerAccess: "add-model",

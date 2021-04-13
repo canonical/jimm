@@ -36,7 +36,7 @@ func TestModelTag(t *testing.T) {
 
 func TestRecreateDeletedModel(t *testing.T) {
 	c := qt.New(t)
-	db := gormDB(t, &dbmodel.Model{}, &dbmodel.User{})
+	db := gormDB(c)
 	cl, cred, ctl, u := initModelEnv(c, db)
 
 	m1 := dbmodel.Model{
@@ -55,7 +55,7 @@ func TestRecreateDeletedModel(t *testing.T) {
 		CloudRegion:     cl.Regions[0],
 		CloudCredential: cred,
 	}
-	c.Check(db.Create(&m2).Error, qt.ErrorMatches, `UNIQUE constraint failed: models.name, models.owner_id`)
+	c.Check(db.Create(&m2).Error, qt.ErrorMatches, `UNIQUE constraint failed: models.owner_username, models.name`)
 
 	c.Assert(db.Delete(&m1).Error, qt.IsNil)
 	c.Check(db.First(&m1).Error, qt.Equals, gorm.ErrRecordNotFound)
@@ -64,7 +64,7 @@ func TestRecreateDeletedModel(t *testing.T) {
 
 func TestDeleteModelRemovesMachinesAndApplications(t *testing.T) {
 	c := qt.New(t)
-	db := gormDB(t, &dbmodel.Application{}, &dbmodel.Machine{}, &dbmodel.Model{}, &dbmodel.User{})
+	db := gormDB(c)
 	cl, cred, ctl, u := initModelEnv(c, db)
 
 	m := dbmodel.Model{
@@ -106,13 +106,7 @@ func TestDeleteModelRemovesMachinesAndApplications(t *testing.T) {
 
 func TestModel(t *testing.T) {
 	c := qt.New(t)
-	db := gormDB(c,
-		&dbmodel.Application{},
-		&dbmodel.Machine{},
-		&dbmodel.Model{},
-		&dbmodel.Unit{},
-		&dbmodel.UserModelAccess{},
-	)
+	db := gormDB(c)
 	cl, cred, ctl, u := initModelEnv(c, db)
 
 	m := dbmodel.Model{
@@ -145,7 +139,7 @@ func TestModel(t *testing.T) {
 			CharmURL: "ch:charm",
 			Life:     "alive",
 			MinUnits: 1,
-			Constraints: dbmodel.Constraints{
+			Constraints: dbmodel.Hardware{
 				Arch: sql.NullString{
 					String: "amd64",
 					Valid:  true,
@@ -167,7 +161,7 @@ func TestModel(t *testing.T) {
 		}},
 		Machines: []dbmodel.Machine{{
 			MachineID: "0",
-			Hardware: dbmodel.MachineHardware{
+			Hardware: dbmodel.Hardware{
 				Arch: sql.NullString{
 					String: "amd64",
 					Valid:  true,
@@ -254,13 +248,7 @@ func TestModel(t *testing.T) {
 
 func TestToJujuModelInfo(t *testing.T) {
 	c := qt.New(t)
-	db := gormDB(c,
-		&dbmodel.Application{},
-		&dbmodel.Machine{},
-		&dbmodel.Model{},
-		&dbmodel.Unit{},
-		&dbmodel.UserModelAccess{},
-	)
+	db := gormDB(c)
 	cl, cred, ctl, u := initModelEnv(c, db)
 	now := time.Now()
 	m := dbmodel.Model{
@@ -293,7 +281,7 @@ func TestToJujuModelInfo(t *testing.T) {
 			CharmURL: "ch:charm",
 			Life:     "alive",
 			MinUnits: 1,
-			Constraints: dbmodel.Constraints{
+			Constraints: dbmodel.Hardware{
 				Arch: sql.NullString{
 					String: "amd64",
 					Valid:  true,
@@ -315,7 +303,7 @@ func TestToJujuModelInfo(t *testing.T) {
 		}},
 		Machines: []dbmodel.Machine{{
 			MachineID: "0",
-			Hardware: dbmodel.MachineHardware{
+			Hardware: dbmodel.Hardware{
 				Arch: sql.NullString{
 					String: "amd64",
 					Valid:  true,
@@ -346,8 +334,9 @@ func TestToJujuModelInfo(t *testing.T) {
 			Series: "warty",
 		}},
 		Users: []dbmodel.UserModelAccess{{
-			User:   u,
-			Access: "admin",
+			Username: u.Username,
+			User:     u,
+			Access:   "admin",
 		}},
 	}
 	m.CloudRegion.Cloud = cl
@@ -394,13 +383,7 @@ func TestToJujuModelInfo(t *testing.T) {
 
 func TestWriteModelSummary(t *testing.T) {
 	c := qt.New(t)
-	db := gormDB(c,
-		&dbmodel.Application{},
-		&dbmodel.Machine{},
-		&dbmodel.Model{},
-		&dbmodel.Unit{},
-		&dbmodel.UserModelAccess{},
-	)
+	db := gormDB(c)
 	cl, cred, ctl, u := initModelEnv(c, db)
 	now := time.Now()
 	m := dbmodel.Model{
@@ -433,7 +416,7 @@ func TestWriteModelSummary(t *testing.T) {
 			CharmURL: "ch:charm",
 			Life:     "alive",
 			MinUnits: 1,
-			Constraints: dbmodel.Constraints{
+			Constraints: dbmodel.Hardware{
 				Arch: sql.NullString{
 					String: "amd64",
 					Valid:  true,
@@ -455,7 +438,7 @@ func TestWriteModelSummary(t *testing.T) {
 		}},
 		Machines: []dbmodel.Machine{{
 			MachineID: "0",
-			Hardware: dbmodel.MachineHardware{
+			Hardware: dbmodel.Hardware{
 				Arch: sql.NullString{
 					String: "amd64",
 					Valid:  true,
@@ -486,8 +469,8 @@ func TestWriteModelSummary(t *testing.T) {
 			Series: "warty",
 		}},
 		Users: []dbmodel.UserModelAccess{{
-			User:   u,
-			Access: "admin",
+			Username: u.Username,
+			Access:   "admin",
 		}},
 	}
 	m.CloudRegion.Cloud = cl
@@ -526,33 +509,9 @@ func TestWriteModelSummary(t *testing.T) {
 	})
 }
 
-func TestApplicationOfferTag(t *testing.T) {
-	c := qt.New(t)
-
-	ao := dbmodel.ApplicationOffer{
-		UUID: "00000003-0000-0000-0000-0000-000000000001",
-	}
-
-	tag := ao.Tag()
-	c.Check(tag.String(), qt.Equals, "applicationoffer-00000003-0000-0000-0000-0000-000000000001")
-
-	var ao2 dbmodel.ApplicationOffer
-	ao2.SetTag(tag.(names.ApplicationOfferTag))
-	c.Check(ao2, qt.DeepEquals, ao)
-}
-
 // initModelEnv initialises a controller, cloud and cloud-credential so
 // that a model can be created.
 func initModelEnv(c *qt.C, db *gorm.DB) (dbmodel.Cloud, dbmodel.CloudCredential, dbmodel.Controller, dbmodel.User) {
-	err := db.AutoMigrate(
-		&dbmodel.Cloud{},
-		&dbmodel.CloudRegion{},
-		&dbmodel.CloudCredential{},
-		&dbmodel.Controller{},
-		&dbmodel.User{},
-	)
-	c.Assert(err, qt.Equals, nil)
-
 	u := dbmodel.User{
 		Username: "bob@external",
 	}
@@ -652,7 +611,7 @@ func TestModelFromJujuModelInfo(t *testing.T) {
 				Username: "bob@external",
 			},
 		},
-		OwnerID:       "bob@external",
+		OwnerUsername: "bob@external",
 		Type:          "iaas",
 		IsController:  false,
 		DefaultSeries: "warty",
@@ -669,7 +628,7 @@ func TestModelFromJujuModelInfo(t *testing.T) {
 		},
 		Machines: []dbmodel.Machine{{
 			MachineID: "0",
-			Hardware: dbmodel.MachineHardware{
+			Hardware: dbmodel.Hardware{
 				Arch: sql.NullString{
 					String: "amd64",
 					Valid:  true,
@@ -687,7 +646,6 @@ func TestModelFromJujuModelInfo(t *testing.T) {
 			},
 		}},
 		Users: []dbmodel.UserModelAccess{{
-			UserID: 0,
 			Access: "admin",
 			User: dbmodel.User{
 				Username:    "bob@external",

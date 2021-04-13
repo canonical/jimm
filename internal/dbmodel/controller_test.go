@@ -28,7 +28,7 @@ func TestControllerTag(t *testing.T) {
 
 func TestController(t *testing.T) {
 	c := qt.New(t)
-	db := gormDB(c, &dbmodel.Controller{})
+	db := gormDB(c)
 
 	ctl := dbmodel.Controller{
 		Name:          "test-controller",
@@ -51,7 +51,7 @@ func TestController(t *testing.T) {
 
 func TestControllerModels(t *testing.T) {
 	c := qt.New(t)
-	db := gormDB(c, &dbmodel.Controller{}, &dbmodel.Model{})
+	db := gormDB(c)
 	cl, cred, ctl, u1 := initModelEnv(c, db)
 
 	m1 := dbmodel.Model{
@@ -95,7 +95,7 @@ func TestControllerModels(t *testing.T) {
 		UpdatedAt:         m1.UpdatedAt,
 		Name:              m1.Name,
 		UUID:              m1.UUID,
-		OwnerID:           m1.OwnerID,
+		OwnerUsername:     m1.OwnerUsername,
 		ControllerID:      m1.ControllerID,
 		CloudRegionID:     m1.CloudRegionID,
 		CloudCredentialID: m1.CloudCredentialID,
@@ -105,7 +105,7 @@ func TestControllerModels(t *testing.T) {
 		UpdatedAt:         m2.UpdatedAt,
 		Name:              m2.Name,
 		UUID:              m2.UUID,
-		OwnerID:           m2.OwnerID,
+		OwnerUsername:     m2.OwnerUsername,
 		ControllerID:      m2.ControllerID,
 		CloudRegionID:     m2.CloudRegionID,
 		CloudCredentialID: m2.CloudCredentialID,

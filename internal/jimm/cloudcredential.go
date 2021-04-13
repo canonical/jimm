@@ -361,11 +361,11 @@ func (j *JIMM) GetCloudCredentialAttributes(ctx context.Context, u *dbmodel.User
 
 	if hidden {
 		// Controller superusers cannot read hidden credential attributes.
-		if u.Username != cred.OwnerID {
+		if u.Username != cred.OwnerUsername {
 			return nil, nil, errors.E(op, errors.CodeUnauthorized)
 		}
 	} else {
-		if u.ControllerAccess != "superuser" && u.Username != cred.OwnerID {
+		if u.ControllerAccess != "superuser" && u.Username != cred.OwnerUsername {
 			return nil, nil, errors.E(op, errors.CodeUnauthorized)
 		}
 	}
