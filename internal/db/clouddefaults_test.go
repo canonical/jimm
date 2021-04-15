@@ -48,11 +48,11 @@ func (s *dbSuite) TestModelDefaults(c *qt.C) {
 	cloud := cloud1
 	cloud.Regions = nil
 	defaults := dbmodel.CloudDefaults{
-		UserID:  u.Username,
-		User:    u,
-		CloudID: cloud.ID,
-		Cloud:   cloud,
-		Region:  cloud1.Regions[0].Name,
+		Username: u.Username,
+		User:     u,
+		CloudID:  cloud.ID,
+		Cloud:    cloud,
+		Region:   cloud1.Regions[0].Name,
 		Defaults: map[string]interface{}{
 			"key1": float64(17),
 			"key2": "some other data",
@@ -81,20 +81,20 @@ func (s *dbSuite) TestModelDefaults(c *qt.C) {
 	})
 
 	dbDefaults := dbmodel.CloudDefaults{
-		UserID:  u.Username,
-		CloudID: cloud2.ID,
-		Cloud:   cloud2,
-		Region:  cloud2.Regions[0].Name,
+		Username: u.Username,
+		CloudID:  cloud2.ID,
+		Cloud:    cloud2,
+		Region:   cloud2.Regions[0].Name,
 	}
 	err = s.Database.CloudDefaults(ctx, &dbDefaults)
 	c.Assert(err, qt.ErrorMatches, "cloudregiondefaults not found")
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	dbDefaults = dbmodel.CloudDefaults{
-		UserID:  u.Username,
-		CloudID: cloud1.ID,
-		Cloud:   cloud1,
-		Region:  cloud1.Regions[0].Name,
+		Username: u.Username,
+		CloudID:  cloud1.ID,
+		Cloud:    cloud1,
+		Region:   cloud1.Regions[0].Name,
 	}
 	err = s.Database.CloudDefaults(ctx, &dbDefaults)
 	c.Assert(err, qt.Equals, nil)
@@ -106,20 +106,20 @@ func (s *dbSuite) TestModelDefaults(c *qt.C) {
 	err = s.Database.CloudDefaults(ctx, &dbDefaults)
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(dbDefaults, qt.CmpEquals(cmpopts.IgnoreTypes([]dbmodel.CloudRegion{}, gorm.Model{})), dbmodel.CloudDefaults{
-		UserID:  u.Username,
-		User:    u,
-		CloudID: cloud1.ID,
-		Cloud:   cloud1,
-		Region:  cloud1.Regions[0].Name,
+		Username: u.Username,
+		User:     u,
+		CloudID:  cloud1.ID,
+		Cloud:    cloud1,
+		Region:   cloud1.Regions[0].Name,
 		Defaults: map[string]interface{}{
 			"key3": "more data",
 		},
 	})
 
 	err = s.Database.UnsetCloudDefaults(ctx, &dbmodel.CloudDefaults{
-		UserID:  u.Username,
-		CloudID: cloud2.ID,
-		Region:  "no-such-region",
+		Username: u.Username,
+		CloudID:  cloud2.ID,
+		Region:   "no-such-region",
 	}, []string{"key1", "key2", "unknown-key"})
 	c.Assert(err, qt.ErrorMatches, "cloudregiondefaults not found")
 }

@@ -344,3 +344,130 @@ func (j *JIMM) RevokeControllerAccess(ctx context.Context, u *dbmodel.User, acce
 	}
 	return nil
 }
+
+// ImportModel imports model with the specified uuid from the controller.
+func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName string, modelTag names.ModelTag) error {
+	const op = errors.Op("jimm.ImportModel")
+
+	ale := dbmodel.AuditLogEntry{
+		Time:    time.Now().UTC().Round(time.Millisecond),
+		UserTag: u.Tag().String(),
+		Action:  "import",
+		Tag:     modelTag.String(),
+		Params: dbmodel.StringMap{
+			"controller": controllerName,
+			"model":      modelTag.String(),
+		},
+	}
+	defer j.addAuditLogEntry(&ale)
+
+	fail := func(err error) error {
+		ale.Params["err"] = err.Error()
+		return err
+	}
+
+	if u.ControllerAccess != "superuser" {
+		return fail(errors.E(op, errors.CodeUnauthorized, "cannot import model"))
+	}
+
+	controller := dbmodel.Controller{
+		Name: controllerName,
+	}
+	err := j.Database.GetController(ctx, &controller)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	api, err := j.dial(ctx, &controller, names.ModelTag{})
+	if err != nil {
+		return errors.E(op, err)
+	}
+	defer api.Close()
+
+	modelInfo := jujuparams.ModelInfo{
+		UUID: modelTag.Id(),
+	}
+	err = api.ModelInfo(ctx, &modelInfo)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	model := dbmodel.Model{}
+	// fill in data from model info
+	err = model.FromJujuModelInfo(&modelInfo)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	model.ControllerID = controller.ID
+	model.Controller = controller
+
+	// fetch the model owner user
+	ownerTag, err := names.ParseUserTag(modelInfo.OwnerTag)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	owner := dbmodel.User{}
+	owner.SetTag(ownerTag)
+	err = j.Database.GetUser(ctx, &owner)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	model.OwnerUsername = owner.Username
+	model.Owner = owner
+
+	// fetch cloud credential used by the model
+	credentialTag, err := names.ParseCloudCredentialTag(modelInfo.CloudCredentialTag)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	cloudCredential := dbmodel.CloudCredential{}
+	cloudCredential.SetTag(credentialTag)
+	err = j.Database.GetCloudCredential(ctx, &cloudCredential)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	model.CloudCredentialID = cloudCredential.ID
+	model.CloudCredential = cloudCredential
+
+	// fetch the cloud used by the model
+	cloud := dbmodel.Cloud{
+		Name: cloudCredential.CloudName,
+	}
+	err = j.Database.GetCloud(ctx, &cloud)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	regionFound := false
+	for _, cr := range cloud.Regions {
+		if cr.Name == modelInfo.CloudRegion {
+			regionFound = true
+			model.CloudRegion = cr
+			model.CloudRegionID = cr.ID
+			break
+		}
+	}
+	if !regionFound {
+		return errors.E(op, "cloud region not found")
+	}
+
+	for i, userAccess := range model.Users {
+		u := userAccess.User
+		err = j.Database.GetUser(ctx, &u)
+		if err != nil {
+			return errors.E(op, err)
+		}
+		model.Users[i].Username = u.Username
+		model.Users[i].User = u
+	}
+
+	err = j.Database.AddModel(ctx, &model)
+	if err != nil {
+		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
+			return errors.E(op, err, "model already exists")
+		}
+		return errors.E(op, err)
+	}
+
+	return nil
+}

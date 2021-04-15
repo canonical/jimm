@@ -30,7 +30,7 @@ func TestCloudTag(t *testing.T) {
 
 func TestCloud(t *testing.T) {
 	c := qt.New(t)
-	db := gormDB(c, &dbmodel.Cloud{})
+	db := gormDB(c)
 
 	var cl0 dbmodel.Cloud
 	result := db.Where("name = ?", "test-cloud").First(&cl0)
@@ -266,7 +266,7 @@ func TestToJujuCloudInfo(t *testing.T) {
 
 func TestCloudAuthTypes(t *testing.T) {
 	c := qt.New(t)
-	db := gormDB(c, &dbmodel.Cloud{})
+	db := gormDB(c)
 
 	cl1 := dbmodel.Cloud{
 		Name:      "test-cloud",
@@ -283,7 +283,7 @@ func TestCloudAuthTypes(t *testing.T) {
 
 func TestCloudRegions(t *testing.T) {
 	c := qt.New(t)
-	db := gormDB(c, &dbmodel.Cloud{}, &dbmodel.CloudRegion{})
+	db := gormDB(c)
 
 	cl1 := dbmodel.Cloud{
 		Name:             "test-cloud",
@@ -318,7 +318,7 @@ func TestCloudRegions(t *testing.T) {
 
 func TestCloudRegionControllers(t *testing.T) {
 	c := qt.New(t)
-	db := gormDB(c, &dbmodel.Cloud{}, &dbmodel.CloudRegion{}, &dbmodel.CloudRegionControllerPriority{}, &dbmodel.Controller{})
+	db := gormDB(c)
 
 	cl := dbmodel.Cloud{
 		Name: "test-cloud",
@@ -410,7 +410,7 @@ func TestCloudRegion(t *testing.T) {
 
 func TestReuseDeletedCloudName(t *testing.T) {
 	c := qt.New(t)
-	db := gormDB(c, &dbmodel.Cloud{})
+	db := gormDB(c)
 
 	cl1 := dbmodel.Cloud{
 		Name: "test-cloud",
