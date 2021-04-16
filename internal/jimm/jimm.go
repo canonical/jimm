@@ -165,6 +165,9 @@ type API interface {
 	// GrantModelAccess grants model access to a user.
 	GrantModelAccess(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
 
+	// IsBroken returns true if the API connection has failed.
+	IsBroken() bool
+
 	// ListApplicationOffers lists application offers that match the
 	// filter.
 	ListApplicationOffers(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error)
@@ -181,6 +184,7 @@ type API interface {
 
 	// ModelSummaryWatcherStop stops a model summary watcher.
 	ModelSummaryWatcherStop(context.Context, string) error
+
 	// Offer creates a new application-offer.
 	Offer(context.Context, jujuparams.AddApplicationOffer) error
 

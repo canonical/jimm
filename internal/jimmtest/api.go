@@ -124,6 +124,7 @@ type API struct {
 	GrantCloudAccess_                  func(context.Context, names.CloudTag, names.UserTag, string) error
 	GrantJIMMModelAdmin_               func(context.Context, names.ModelTag) error
 	GrantModelAccess_                  func(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
+	IsBroken_                          bool
 	ListApplicationOffers_             func(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error)
 	ModelInfo_                         func(context.Context, *jujuparams.ModelInfo) error
 	ModelStatus_                       func(context.Context, *jujuparams.ModelStatus) error
@@ -289,6 +290,10 @@ func (a *API) GrantModelAccess(ctx context.Context, mt names.ModelTag, ut names.
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return a.GrantModelAccess_(ctx, mt, ut, p)
+}
+
+func (a *API) IsBroken() bool {
+	return a.IsBroken_
 }
 
 func (a *API) ListApplicationOffers(ctx context.Context, f []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
