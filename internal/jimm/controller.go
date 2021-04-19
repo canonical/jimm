@@ -394,7 +394,7 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 
 	model := dbmodel.Model{}
 	// fill in data from model info
-	err = model.FromJujuModelInfo(&modelInfo)
+	err = model.FromJujuModelInfo(modelInfo)
 	if err != nil {
 		return errors.E(op, err)
 	}

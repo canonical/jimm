@@ -3,6 +3,7 @@
 package dbmodel
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
@@ -26,6 +27,16 @@ func (s Strings) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return json.Marshal(s)
+}
+
+// FromPointer sets the Strings value to be that of the given pointer to a
+// string slice.
+func (s *Strings) FromPointer(sp *[]string) {
+	if sp == nil {
+		*s = nil
+		return
+	}
+	*s = Strings(*sp)
 }
 
 // Scan implements sql.Scanner.
@@ -281,4 +292,22 @@ func (u *NullUint64) FromValue(v *uint64) {
 		u.Valid = false
 		u.Uint64 = 0
 	}
+}
+
+// SetNullString sets ns to a valid string with the value of *s if s is not
+// nil, otherwise ns is set to be invalid.
+func SetNullString(ns *sql.NullString, s *string) {
+	ns.Valid = s != nil
+	if ns.Valid {
+		ns.String = *s
+	} else {
+		ns.String = ""
+	}
+}
+
+// SetNullBool sets nb to a valid bool with the value of *b if b is not
+// nil, otherwise nb is set to be invalid.
+func SetNullBool(nb *sql.NullBool, b *bool) {
+	nb.Valid = b != nil
+	nb.Bool = nb.Valid && *b
 }

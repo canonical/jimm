@@ -51,7 +51,7 @@ type ApplicationOffer struct {
 	// Bindings contains bindings for the application offer.
 	Bindings StringMap
 
-	// Conntections contains details about connections to the application offer.
+	// Connections contains details about connections to the application offer.
 	Connections []ApplicationOfferConnection
 }
 
@@ -105,6 +105,7 @@ func (o *ApplicationOffer) FromJujuApplicationOfferAdminDetails(offerDetails juj
 		}
 
 		o.Users = append(o.Users, UserApplicationOfferAccess{
+			Username: string(pu),
 			User: User{
 				Username: string(pu),
 			},

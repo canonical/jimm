@@ -4,6 +4,7 @@ package jimmtest
 
 import (
 	"context"
+	"fmt"
 	"sync/atomic"
 	"time"
 
@@ -84,12 +85,26 @@ func (w apiWrapper) Close() error {
 	return w.API.Close()
 }
 
+// A DialerMap implements a jimm.Dialer that uses a different Dialer for
+// each controller. The DialerMap is keyed by controller name.
+type DialerMap map[string]jimm.Dialer
+
+// Dialer implements jimm.Dialer.
+func (m DialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag) (jimm.API, error) {
+	if d, ok := m[ctl.Name]; ok {
+		return d.Dial(ctx, ctl, mt)
+	}
+	return nil, errors.E(fmt.Sprintf("dialer not configured for controller %s", ctl.Name))
+}
+
 // API is a default implementation of the jimm.API interface. Every method
 // has a corresponding function field. Whenever the method is called it
 // will delegate to the requested function or if the function is nil return
 // a NotImplemented error.
 type API struct {
 	AddCloud_                          func(context.Context, names.CloudTag, jujuparams.Cloud) error
+	AllModelWatcherNext_               func(context.Context, string) ([]jujuparams.Delta, error)
+	AllModelWatcherStop_               func(context.Context, string) error
 	ChangeModelCredential_             func(context.Context, names.ModelTag, names.CloudCredentialTag) error
 	CheckCredentialModels_             func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
 	Close_                             func() error
@@ -126,6 +141,7 @@ type API struct {
 	UpdateCredential_                  func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
 	ValidateModelUpgrade_              func(context.Context, names.ModelTag, bool) error
 	WatchAllModelSummaries_            func(context.Context) (string, error)
+	WatchAllModels_                    func(context.Context) (string, error)
 }
 
 func (a *API) AddCloud(ctx context.Context, tag names.CloudTag, cld jujuparams.Cloud) error {
@@ -133,6 +149,20 @@ func (a *API) AddCloud(ctx context.Context, tag names.CloudTag, cld jujuparams.C
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return a.AddCloud_(ctx, tag, cld)
+}
+
+func (a *API) AllModelWatcherNext(ctx context.Context, id string) ([]jujuparams.Delta, error) {
+	if a.AllModelWatcherNext_ == nil {
+		return nil, errors.E(errors.CodeNotImplemented)
+	}
+	return a.AllModelWatcherNext_(ctx, id)
+}
+
+func (a *API) AllModelWatcherStop(ctx context.Context, id string) error {
+	if a.AllModelWatcherStop_ == nil {
+		return errors.E(errors.CodeNotImplemented)
+	}
+	return a.AllModelWatcherStop_(ctx, id)
 }
 
 func (a *API) CheckCredentialModels(ctx context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
@@ -372,6 +402,13 @@ func (a *API) WatchAllModelSummaries(ctx context.Context) (string, error) {
 		return "", errors.E(errors.CodeNotImplemented)
 	}
 	return a.WatchAllModelSummaries_(ctx)
+}
+
+func (a *API) WatchAllModels(ctx context.Context) (string, error) {
+	if a.WatchAllModels_ == nil {
+		return "", errors.E(errors.CodeNotImplemented)
+	}
+	return a.WatchAllModels_(ctx)
 }
 
 func (a *API) ChangeModelCredential(ctx context.Context, model names.ModelTag, cred names.CloudCredentialTag) error {

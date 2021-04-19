@@ -5,9 +5,11 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"path"
 	"sync/atomic"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -109,4 +111,14 @@ func (d *Database) ready() error {
 		return errors.E(errors.CodeUpgradeInProgress)
 	}
 	return nil
+}
+
+// Now returns the current time as a valid sql.NullTime. The time that is
+// returned is in UTC and is truncated to milliseconds which is the
+// resolution supported on all databases.
+func Now() sql.NullTime {
+	return sql.NullTime{
+		Time:  time.Now().UTC().Truncate(time.Millisecond),
+		Valid: true,
+	}
 }
