@@ -535,6 +535,8 @@ type Hardware struct {
 	AllocatePublicIP sql.NullBool
 }
 
+// FromJujuConstraintsValue updates the Hardware entry with the values from
+// a juju constraints.Value structure.
 func (h *Hardware) FromJujuConstraintsValue(v constraints.Value) {
 	SetNullString(&h.Arch, v.Arch)
 	h.Container.Valid = v.Container != nil
@@ -669,6 +671,8 @@ type Application struct {
 	Offers []ApplicationOffer `gorm:"foreignKey:ModelID,ApplicationName;references:ModelID,Name"`
 }
 
+// FromJujuApplicationInfo sets the values of the Application from a juju
+// ApplicationInfo structure.
 func (a *Application) FromJujuApplicationInfo(info jujuparams.ApplicationInfo) {
 	a.Name = info.Name
 	a.Exposed = info.Exposed

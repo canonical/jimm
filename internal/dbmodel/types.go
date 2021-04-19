@@ -305,6 +305,8 @@ func SetNullString(ns *sql.NullString, s *string) {
 	}
 }
 
+// SetNullBool sets nb to a valid bool with the value of *b if b is not
+// nil, otherwise nb is set to be invalid.
 func SetNullBool(nb *sql.NullBool, b *bool) {
 	nb.Valid = b != nil
 	nb.Bool = nb.Valid && *b
