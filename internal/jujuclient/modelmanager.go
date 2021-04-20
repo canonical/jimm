@@ -324,7 +324,7 @@ func (c Connection) ChangeModelCredential(ctx context.Context, model names.Model
 		}},
 	}
 
-	err := c.client.Call(ctx, "ChangeModelCredential", 5, "", "ChangeModelCredential", &args, &out)
+	err := c.client.Call(ctx, "ModelManager", 5, "", "ChangeModelCredential", &args, &out)
 	if err != nil {
 		return errors.E(op, err)
 	}
