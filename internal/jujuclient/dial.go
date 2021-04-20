@@ -16,6 +16,8 @@ import (
 	"net/url"
 	"path"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
@@ -101,10 +103,15 @@ func (Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.
 		}
 	}
 
-	return Connection{
+	monitorC := make(chan struct{})
+	broken := new(uint32)
+	go monitor(client, monitorC, broken)
+	return &Connection{
 		client:         client,
 		userTag:        args.AuthTag,
 		facadeVersions: facades,
+		monitorC:       monitorC,
+		broken:         broken,
 	}, nil
 }
 
@@ -166,6 +173,37 @@ func dialAll(ctx context.Context, dialer *rpc.Dialer, urls []string) (*rpc.Clien
 	return client, nil
 }
 
+const pingTimeout = 30 * time.Second
+const pingInterval = time.Minute
+
+// monitor runs in the background ensuring the client connection is kept alive.
+func monitor(client *rpc.Client, doneC <-chan struct{}, broken *uint32) {
+	doPing := func() bool {
+		ctx, cancel := context.WithTimeout(context.Background(), pingTimeout)
+		defer cancel()
+		if err := client.Call(ctx, "Pinger", 1, "", "Ping", nil, nil); err != nil {
+			zapctx.Error(ctx, "connection failed", zap.Error(err))
+			return false
+		}
+		return true
+	}
+
+	t := time.NewTimer(pingInterval)
+	defer t.Stop()
+	for {
+		select {
+		case <-doneC:
+			atomic.StoreUint32(broken, 1)
+			return
+		case <-t.C:
+			if !doPing() {
+				atomic.StoreUint32(broken, 1)
+				return
+			}
+		}
+	}
+}
+
 // A Connection is a connection to a juju controller. Connection methods
 // are generally thin wrappers around juju RPC calls, although there are
 // some more JIMM specific operations. The RPC calls prefer to use the
@@ -176,11 +214,23 @@ type Connection struct {
 	client         *rpc.Client
 	userTag        string
 	facadeVersions map[string]bool
+
+	monitorC chan struct{}
+	broken   *uint32
 }
 
 // Close closes the connection.
 func (c Connection) Close() error {
+	close(c.monitorC)
 	return c.client.Close()
+}
+
+// IsBroken returns true if the connection has failed.
+func (c Connection) IsBroken() bool {
+	if atomic.LoadUint32(c.broken) != 0 {
+		return true
+	}
+	return c.client.IsBroken()
 }
 
 // hasFacadeVersion returns whether the connection supports the given

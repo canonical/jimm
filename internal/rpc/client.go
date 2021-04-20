@@ -80,6 +80,7 @@ type Client struct {
 	msgs  map[uint64]inflight
 
 	closing bool
+	broken  bool
 	err     error
 }
 
@@ -188,6 +189,7 @@ func (c *Client) Call(ctx context.Context, facade string, version int, id, metho
 	// this will wrap. So probably don't worry about checking for it.
 	req.RequestID = c.reqID
 	if err := c.conn.WriteJSON(req); err != nil {
+		c.broken = true
 		return errors.E(op, err)
 	}
 	ch := make(chan struct{})
@@ -255,4 +257,12 @@ func (c *Client) Close() error {
 		c.conn.Close()
 	}
 	return c.err
+}
+
+// IsBroken returns true if client has determined that it is no longer able
+// to send messages to the server.
+func (c *Client) IsBroken() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.broken
 }
