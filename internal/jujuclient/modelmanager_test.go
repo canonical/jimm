@@ -255,13 +255,25 @@ func (s *modelmanagerSuite) TestModelStatusError(c *gc.C) {
 	c.Check(err, gc.ErrorMatches, `model "00000000-0000-0000-0000-000000000000" not found`)
 }
 
-func (s *modelmanagerSuite) ChangeModelCredential(c *gc.C) {
+func (s *modelmanagerSuite) TestChangeModelCredential(c *gc.C) {
 	ctx := context.Background()
 
-	err := s.API.ChangeModelCredential(
-		ctx,
-		names.NewModelTag("00000000-0000-0000-0000-000000000000"),
-		names.NewCloudCredentialTag("test-cloud/test-owner/test-credential"),
-	)
+	var info jujuparams.ModelInfo
+	err := s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
+		Name:     "test-model",
+		OwnerTag: names.NewUserTag("test-user@external").String(),
+	}, &info)
+	c.Assert(err, gc.Equals, nil)
+
+	ct := names.NewCloudCredentialTag("dummy/test-owner/test-credential")
+	_, err = s.API.UpdateCredential(ctx, jujuparams.TaggedCredential{
+		Tag: ct.String(),
+		Credential: jujuparams.CloudCredential{
+			AuthType: "empty",
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.API.ChangeModelCredential(ctx, names.NewModelTag(info.UUID), ct)
 	c.Assert(err, gc.Equals, nil)
 }
