@@ -41,6 +41,11 @@ func (e *Error) Error() string {
 	return "unknown error"
 }
 
+// Unwrap implements the Unwrap method used by errors.Unwrap.
+func (e *Error) Unwrap() error {
+	return e.Err
+}
+
 // ErrorCode returns the value of this error's Code.
 func (e *Error) ErrorCode() string {
 	return string(e.Code)

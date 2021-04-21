@@ -52,7 +52,7 @@ type JIMM struct {
 	// Pubsub is a pub-sub hub used for buffering model summaries.
 	Pubsub *pubsub.Hub
 
-	// ReservecCloudNames is the list of names that cannot be used for
+	// ReservedCloudNames is the list of names that cannot be used for
 	// hosted clouds. If this is empty then DefaultReservedCloudNames
 	// is used.
 	ReservedCloudNames []string
