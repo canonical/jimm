@@ -461,6 +461,7 @@ func TestImportModel(t *testing.T) {
 		modelInfo      func(context.Context, *jujuparams.ModelInfo) error
 		expectedModel  dbmodel.Model
 		expectedError  string
+		deltas         []jujuparams.Delta
 	}{{
 		about:          "model imported",
 		user:           "alice@external",
@@ -503,6 +504,64 @@ func TestImportModel(t *testing.T) {
 			info.AgentVersion = &version
 			return nil
 		},
+		deltas: []jujuparams.Delta{{
+			Entity: &jujuparams.ModelUpdate{
+				ModelUUID:      "00000002-0000-0000-0000-000000000001",
+				Name:           "test-model",
+				Owner:          "alice@external",
+				Life:           "alive",
+				ControllerUUID: "00000001-0000-0000-0000-000000000001",
+				Status: jujuparams.StatusInfo{
+					Current: "available",
+					Message: "updated status message",
+					Version: "1.2.3",
+					Since:   &now,
+				},
+				SLA: jujuparams.ModelSLAInfo{
+					Level: "1",
+					Owner: "me",
+				},
+			},
+		}, {
+			Entity: &jujuparams.ApplicationInfo{
+				ModelUUID:       "00000002-0000-0000-0000-000000000001",
+				Name:            "app-1",
+				Exposed:         true,
+				CharmURL:        "cs:app-1",
+				Life:            "alive",
+				MinUnits:        1,
+				WorkloadVersion: "2",
+			},
+		}, {
+			Entity: &jujuparams.MachineInfo{
+				ModelUUID: "00000002-0000-0000-0000-000000000001",
+				Id:        "machine-1",
+				Life:      "alive",
+				Hostname:  "test-machine-1",
+			},
+		}, {
+			Entity: &jujuparams.UnitInfo{
+				ModelUUID:   "00000002-0000-0000-0000-000000000001",
+				Name:        "app-1/1",
+				Application: "app-1",
+				Series:      "warty",
+				CharmURL:    "cs:app-1",
+				Life:        "starting",
+				MachineId:   "machine-1",
+			},
+		}, {
+			// TODO (ashipika) ApplicationOfferInfo is currently ignored. Consider
+			// fetching application offer details from the controller.
+			Entity: &jujuparams.ApplicationOfferInfo{
+				ModelUUID:            "00000002-0000-0000-0000-000000000001",
+				OfferName:            "test-offer-1",
+				OfferUUID:            "00000003-0000-0000-0000-000000000001",
+				ApplicationName:      "app-1",
+				CharmName:            "cs:~test-charmers/test-charm",
+				TotalConnectedCount:  17,
+				ActiveConnectedCount: 7,
+			},
+		}},
 		expectedModel: dbmodel.Model{
 			Name: "test-model",
 			UUID: sql.NullString{
@@ -533,19 +592,30 @@ func TestImportModel(t *testing.T) {
 			DefaultSeries: "test-series",
 			Life:          "alive",
 			Status: dbmodel.Status{
-				Status: "ok",
-				Info:   "test-info",
+				Status: "available",
+				Info:   "updated status message",
 				Since: sql.NullTime{
 					Valid: true,
 					Time:  now,
 				},
-				Version: "2.1.0",
+				Version: "1.2.3",
 			},
 			SLA: dbmodel.SLA{
-				Level: "essential",
-				Owner: "alice@external",
+				Level: "1",
+				Owner: "me",
 			},
+			Applications: []dbmodel.Application{{
+				CharmURL:        "cs:app-1",
+				Exposed:         true,
+				Life:            "alive",
+				MinUnits:        1,
+				Name:            "app-1",
+				WorkloadVersion: "2",
+			}},
 			Machines: []dbmodel.Machine{{
+				MachineID: "machine-1",
+				Life:      "alive",
+			}, {
 				MachineID:   "test-machine",
 				DisplayName: "Test machine",
 				InstanceStatus: dbmodel.Status{
@@ -660,6 +730,21 @@ func TestImportModel(t *testing.T) {
 		c.Run(test.about, func(c *qt.C) {
 			api := &jimmtest.API{
 				ModelInfo_: test.modelInfo,
+				ModelWatcherNext_: func(ctx context.Context, id string) ([]jujuparams.Delta, error) {
+					if id != test.about {
+						return nil, errors.E("incorrect id")
+					}
+					return test.deltas, nil
+				},
+				ModelWatcherStop_: func(ctx context.Context, id string) error {
+					if id != test.about {
+						return errors.E("incorrect id")
+					}
+					return nil
+				},
+				WatchAll_: func(context.Context) (string, error) {
+					return test.about, nil
+				},
 			}
 
 			j := &jimm.JIMM{
