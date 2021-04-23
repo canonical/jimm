@@ -121,7 +121,7 @@ func websocketURL(s string, mt names.ModelTag) string {
 		Host:   s,
 	}
 	if mt.Id() != "" {
-		u.Path = path.Join(u.Path, mt.Id())
+		u.Path = path.Join(u.Path, "model", mt.Id())
 	}
 	u.Path = path.Join(u.Path, "api")
 	return u.String()

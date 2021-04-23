@@ -130,6 +130,8 @@ type API struct {
 	ModelStatus_                       func(context.Context, *jujuparams.ModelStatus) error
 	ModelSummaryWatcherNext_           func(context.Context, string) ([]jujuparams.ModelAbstract, error)
 	ModelSummaryWatcherStop_           func(context.Context, string) error
+	ModelWatcherNext_                  func(ctx context.Context, id string) ([]jujuparams.Delta, error)
+	ModelWatcherStop_                  func(ctx context.Context, id string) error
 	Offer_                             func(context.Context, jujuparams.AddApplicationOffer) error
 	RemoveCloud_                       func(context.Context, names.CloudTag) error
 	RevokeApplicationOfferAccess_      func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
@@ -141,6 +143,7 @@ type API struct {
 	UpdateCloud_                       func(context.Context, names.CloudTag, jujuparams.Cloud) error
 	UpdateCredential_                  func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
 	ValidateModelUpgrade_              func(context.Context, names.ModelTag, bool) error
+	WatchAll_                          func(context.Context) (string, error)
 	WatchAllModelSummaries_            func(context.Context) (string, error)
 	WatchAllModels_                    func(context.Context) (string, error)
 }
@@ -421,6 +424,27 @@ func (a *API) ChangeModelCredential(ctx context.Context, model names.ModelTag, c
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return a.ChangeModelCredential_(ctx, model, cred)
+}
+
+func (a *API) ModelWatcherNext(ctx context.Context, id string) ([]jujuparams.Delta, error) {
+	if a.ModelWatcherNext_ == nil {
+		return nil, errors.E(errors.CodeNotImplemented)
+	}
+	return a.ModelWatcherNext_(ctx, id)
+}
+
+func (a *API) ModelWatcherStop(ctx context.Context, id string) error {
+	if a.ModelWatcherStop_ == nil {
+		return errors.E(errors.CodeNotImplemented)
+	}
+	return a.ModelWatcherStop_(ctx, id)
+}
+
+func (a *API) WatchAll(ctx context.Context) (string, error) {
+	if a.WatchAll_ == nil {
+		return "", errors.E(errors.CodeNotImplemented)
+	}
+	return a.WatchAll_(ctx)
 }
 
 var _ jimm.API = &API{}

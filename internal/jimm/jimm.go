@@ -185,6 +185,13 @@ type API interface {
 	// ModelSummaryWatcherStop stops a model summary watcher.
 	ModelSummaryWatcherStop(context.Context, string) error
 
+	// ModelWatcherNext receives the next set of results from the model
+	// watcher with the given id.
+	ModelWatcherNext(ctx context.Context, id string) ([]jujuparams.Delta, error)
+
+	// ModelWatcherStop stops the model watcher with the given id.
+	ModelWatcherStop(ctx context.Context, id string) error
+
 	// Offer creates a new application-offer.
 	Offer(context.Context, jujuparams.AddApplicationOffer) error
 
@@ -220,6 +227,9 @@ type API interface {
 
 	// ValidateModelUpgrade validates that a model can be upgraded.
 	ValidateModelUpgrade(context.Context, names.ModelTag, bool) error
+
+	// WatchAll creates a watcher that reports deltas for a specific model.
+	WatchAll(context.Context) (string, error)
 
 	// WatchAllModelSummaries creates a ModelSummaryWatcher.
 	WatchAllModelSummaries(context.Context) (string, error)
