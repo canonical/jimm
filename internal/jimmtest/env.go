@@ -266,6 +266,8 @@ func (cc *CloudCredential) DBObject(c *qt.C, db db.Database) dbmodel.CloudCreden
 type Controller struct {
 	Name         string                          `json:"name"`
 	UUID         string                          `json:"uuid"`
+	Cloud        string                          `json:"cloud"`
+	CloudRegion  string                          `json:"region"`
 	CloudRegions []CloudRegionControllerPriority `json:"cloud-regions"`
 	AgentVersion string                          `json:"agent-version"`
 
@@ -280,6 +282,8 @@ func (ctl *Controller) DBObject(c *qt.C, db db.Database) dbmodel.Controller {
 	ctl.dbo.Name = ctl.Name
 	ctl.dbo.UUID = ctl.UUID
 	ctl.dbo.AgentVersion = ctl.AgentVersion
+	ctl.dbo.CloudName = ctl.Cloud
+	ctl.dbo.CloudRegion = ctl.CloudRegion
 	ctl.dbo.CloudRegions = make([]dbmodel.CloudRegionControllerPriority, len(ctl.CloudRegions))
 	for i, cr := range ctl.CloudRegions {
 		cl := ctl.env.Cloud(cr.Cloud).DBObject(c, db)

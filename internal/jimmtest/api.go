@@ -42,7 +42,7 @@ type Dialer struct {
 	AgentVersion string
 
 	// Addresses contains the addresses to set on the controller.
-	Addresses []string
+	Addresses [][]jujuparams.HostPort
 
 	open int64
 }
@@ -61,7 +61,7 @@ func (d *Dialer) Dial(_ context.Context, ctl *dbmodel.Controller, _ names.ModelT
 	if ctl.AgentVersion == "" {
 		ctl.AgentVersion = version.Current.String()
 	}
-	ctl.Addresses = dbmodel.Strings(d.Addresses)
+	ctl.Addresses = dbmodel.HostPorts(d.Addresses)
 	return apiWrapper{
 		API:  d.API,
 		open: &d.open,

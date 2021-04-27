@@ -382,6 +382,8 @@ func (s *dbSuite) TestFindRegion(c *qt.C) {
 controllers:
 - name: test
   uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test
+  region: test-region
   cloud-regions:
   - cloud: test
     region: test-region
@@ -399,8 +401,10 @@ controllers:
 		Name: "test-region",
 		Controllers: []dbmodel.CloudRegionControllerPriority{{
 			Controller: dbmodel.Controller{
-				Name: "test",
-				UUID: "00000001-0000-0000-0000-000000000001",
+				Name:        "test",
+				UUID:        "00000001-0000-0000-0000-000000000001",
+				CloudName:   "test",
+				CloudRegion: "test-region",
 			},
 			Priority: 1,
 		}},
@@ -437,6 +441,8 @@ const testUpdateUserCloudAccessEnv = `clouds:
 controllers:
 - name: test
   uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test
+  region: test-region
   cloud-regions:
   - cloud: test
     region: test-region

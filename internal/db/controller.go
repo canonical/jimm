@@ -38,9 +38,13 @@ func (d *Database) GetController(ctx context.Context, controller *dbmodel.Contro
 	if controller.Name != "" {
 		db = db.Where("name = ?", controller.Name)
 	}
-
-	if err := db.Preload("CloudRegions").First(&controller).Error; err != nil {
-		return errors.E(op, dbError(err))
+	db = db.Preload("CloudRegions").Preload("CloudRegions.CloudRegion").Preload("CloudRegions.CloudRegion.Cloud")
+	if err := db.First(&controller).Error; err != nil {
+		err = dbError(err)
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return errors.E(op, err, "controller not found")
+		}
+		return errors.E(op, err)
 	}
 	return nil
 }
@@ -97,7 +101,8 @@ func (d *Database) ForEachController(ctx context.Context, f func(*dbmodel.Contro
 	}
 
 	db := d.DB.WithContext(ctx)
-	rows, err := db.Model(&dbmodel.Controller{}).Rows()
+	db = db.Preload("CloudRegions").Preload("CloudRegions.CloudRegion").Preload("CloudRegions.CloudRegion.Cloud")
+	rows, err := db.Model(&dbmodel.Controller{}).Order("name asc").Rows()
 	if err != nil {
 		return errors.E(op, err)
 	}

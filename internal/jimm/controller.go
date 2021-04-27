@@ -59,6 +59,12 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 	if err := api.ControllerModelSummary(ctx, &ms); err != nil {
 		return fail(errors.E(op, err))
 	}
+	ct, err := names.ParseCloudTag(ms.CloudTag)
+	if err != nil {
+		return fail(errors.E(op, err))
+	}
+	ctl.CloudName = ct.Id()
+	ctl.CloudRegion = ms.CloudRegion
 	// TODO(mhilton) add the controller model?
 
 	clouds, err := api.Clouds(ctx)

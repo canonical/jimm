@@ -38,16 +38,6 @@ type environment struct {
 var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database) *environment {
 	env := environment{}
 
-	controller := dbmodel.Controller{
-		Name:          "test-controller-1",
-		UUID:          "00000000-0000-0000-0000-0000-0000000000001",
-		PublicAddress: "test-public-address",
-		CACertificate: "test-ca-cert",
-	}
-	err := db.AddController(ctx, &controller)
-	c.Assert(err, qt.Equals, nil)
-	env.controllers = []dbmodel.Controller{controller}
-
 	u := dbmodel.User{
 		Username:         "alice@external",
 		ControllerAccess: "superuser",
@@ -80,10 +70,6 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database) 
 		Type: "test-provider",
 		Regions: []dbmodel.CloudRegion{{
 			Name: "test-region-1",
-			Controllers: []dbmodel.CloudRegionControllerPriority{{
-				Priority:     0,
-				ControllerID: controller.ID,
-			}},
 		}},
 		Users: []dbmodel.UserCloudAccess{{
 			Username: u.Username,
@@ -91,6 +77,22 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database) 
 	}
 	c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 	env.clouds = []dbmodel.Cloud{cloud}
+
+	controller := dbmodel.Controller{
+		Name:          "test-controller-1",
+		UUID:          "00000000-0000-0000-0000-0000-0000000000001",
+		PublicAddress: "test-public-address",
+		CACertificate: "test-ca-cert",
+		CloudName:     cloud.Name,
+		CloudRegion:   cloud.Regions[0].Name,
+		CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+			Priority:      0,
+			CloudRegionID: cloud.Regions[0].ID,
+		}},
+	}
+	err := db.AddController(ctx, &controller)
+	c.Assert(err, qt.Equals, nil)
+	env.controllers = []dbmodel.Controller{controller}
 
 	cred := dbmodel.CloudCredential{
 		Name:          "test-credential-1",
@@ -485,15 +487,6 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	err := db.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	controller := dbmodel.Controller{
-		Name:          "test-controller-1",
-		UUID:          "00000000-0000-0000-0000-0000-0000000000001",
-		PublicAddress: "test-public-address",
-		CACertificate: "test-ca-cert",
-	}
-	err = db.AddController(ctx, &controller)
-	c.Assert(err, qt.Equals, nil)
-
 	u := dbmodel.User{
 		Username:         "alice@external",
 		ControllerAccess: "superuser",
@@ -517,16 +510,27 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 		Type: "test-provider",
 		Regions: []dbmodel.CloudRegion{{
 			Name: "test-region-1",
-			Controllers: []dbmodel.CloudRegionControllerPriority{{
-				Priority:     0,
-				ControllerID: controller.ID,
-			}},
 		}},
 		Users: []dbmodel.UserCloudAccess{{
 			Username: u.Username,
 		}},
 	}
 	c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
+
+	controller := dbmodel.Controller{
+		Name:          "test-controller-1",
+		UUID:          "00000000-0000-0000-0000-0000-0000000000001",
+		PublicAddress: "test-public-address",
+		CACertificate: "test-ca-cert",
+		CloudName:     "test-cloud",
+		CloudRegion:   "test-region-1",
+		CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+			Priority:      0,
+			CloudRegionID: cloud.Regions[0].ID,
+		}},
+	}
+	err = db.AddController(ctx, &controller)
+	c.Assert(err, qt.Equals, nil)
 
 	cred := dbmodel.CloudCredential{
 		Name:          "test-credential-1",
@@ -790,13 +794,6 @@ func TestGetApplicationOffer(t *testing.T) {
 	err := j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	controller := dbmodel.Controller{
-		Name: "test-controller-1",
-		UUID: "00000000-0000-0000-0000-0000-0000000000001",
-	}
-	err = j.Database.AddController(ctx, &controller)
-	c.Assert(err, qt.Equals, nil)
-
 	u := dbmodel.User{
 		Username:         "alice@external",
 		ControllerAccess: "superuser",
@@ -820,16 +817,25 @@ func TestGetApplicationOffer(t *testing.T) {
 		Type: "test-provider",
 		Regions: []dbmodel.CloudRegion{{
 			Name: "test-region-1",
-			Controllers: []dbmodel.CloudRegionControllerPriority{{
-				Priority:     0,
-				ControllerID: controller.ID,
-			}},
 		}},
 		Users: []dbmodel.UserCloudAccess{{
 			Username: u.Username,
 		}},
 	}
 	c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
+
+	controller := dbmodel.Controller{
+		Name:        "test-controller-1",
+		UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+		CloudName:   "test-cloud",
+		CloudRegion: "test-region-1",
+		CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+			Priority:      0,
+			CloudRegionID: cloud.Regions[0].ID,
+		}},
+	}
+	err = j.Database.AddController(ctx, &controller)
+	c.Assert(err, qt.Equals, nil)
 
 	cred := dbmodel.CloudCredential{
 		Name:          "test-credential-1",
@@ -1181,13 +1187,6 @@ func TestOffer(t *testing.T) {
 		createEnv: func(c *qt.C, db db.Database) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
-			controller := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := db.AddController(ctx, &controller)
-			c.Assert(err, qt.Equals, nil)
-
 			u := dbmodel.User{
 				Username:         "alice@external",
 				ControllerAccess: "superuser",
@@ -1199,16 +1198,25 @@ func TestOffer(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller.ID,
-					}},
 				}},
 				Users: []dbmodel.UserCloudAccess{{
 					Username: u.Username,
 				}},
 			}
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
+
+			controller := dbmodel.Controller{
+				Name:        "test-controller-1",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					Priority:      0,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err := db.AddController(ctx, &controller)
+			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
@@ -1312,13 +1320,6 @@ func TestOffer(t *testing.T) {
 		createEnv: func(c *qt.C, db db.Database) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
-			controller := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := db.AddController(ctx, &controller)
-			c.Assert(err, qt.Equals, nil)
-
 			u := dbmodel.User{
 				Username:         "alice@external",
 				ControllerAccess: "superuser",
@@ -1330,16 +1331,25 @@ func TestOffer(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller.ID,
-					}},
 				}},
 				Users: []dbmodel.UserCloudAccess{{
 					Username: u.Username,
 				}},
 			}
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
+
+			controller := dbmodel.Controller{
+				Name:        "test-controller-1",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					Priority:      0,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err := db.AddController(ctx, &controller)
+			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
@@ -1403,13 +1413,6 @@ func TestOffer(t *testing.T) {
 		createEnv: func(c *qt.C, db db.Database) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
-			controller := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := db.AddController(ctx, &controller)
-			c.Assert(err, qt.Equals, nil)
-
 			u := dbmodel.User{
 				Username:         "alice@external",
 				ControllerAccess: "superuser",
@@ -1421,16 +1424,25 @@ func TestOffer(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller.ID,
-					}},
 				}},
 				Users: []dbmodel.UserCloudAccess{{
 					Username: u.Username,
 				}},
 			}
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
+
+			controller := dbmodel.Controller{
+				Name:        "test-controller-1",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					Priority:      0,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err := db.AddController(ctx, &controller)
+			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
@@ -1528,13 +1540,6 @@ func TestOffer(t *testing.T) {
 		createEnv: func(c *qt.C, db db.Database) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
-			controller := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := db.AddController(ctx, &controller)
-			c.Assert(err, qt.Equals, nil)
-
 			u := dbmodel.User{
 				Username:         "alice@external",
 				ControllerAccess: "superuser",
@@ -1546,16 +1551,25 @@ func TestOffer(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller.ID,
-					}},
 				}},
 				Users: []dbmodel.UserCloudAccess{{
 					Username: u.Username,
 				}},
 			}
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
+
+			controller := dbmodel.Controller{
+				Name:        "test-controller-1",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					Priority:      0,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err := db.AddController(ctx, &controller)
+			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
@@ -1614,13 +1628,6 @@ func TestOffer(t *testing.T) {
 		createEnv: func(c *qt.C, db db.Database) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
-			controller := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := db.AddController(ctx, &controller)
-			c.Assert(err, qt.Equals, nil)
-
 			u := dbmodel.User{
 				Username:         "alice@external",
 				ControllerAccess: "superuser",
@@ -1638,16 +1645,25 @@ func TestOffer(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller.ID,
-					}},
 				}},
 				Users: []dbmodel.UserCloudAccess{{
 					Username: u.Username,
 				}},
 			}
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
+
+			controller := dbmodel.Controller{
+				Name:        "test-controller-1",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					Priority:      0,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err := db.AddController(ctx, &controller)
+			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
@@ -1711,13 +1727,6 @@ func TestOffer(t *testing.T) {
 		createEnv: func(c *qt.C, db db.Database) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
-			controller := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := db.AddController(ctx, &controller)
-			c.Assert(err, qt.Equals, nil)
-
 			u := dbmodel.User{
 				Username:         "alice@external",
 				ControllerAccess: "superuser",
@@ -1729,16 +1738,25 @@ func TestOffer(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller.ID,
-					}},
 				}},
 				Users: []dbmodel.UserCloudAccess{{
 					Username: u.Username,
 				}},
 			}
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
+
+			controller := dbmodel.Controller{
+				Name:        "test-controller-1",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					Priority:      0,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err := db.AddController(ctx, &controller)
+			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
@@ -1807,13 +1825,6 @@ func TestOffer(t *testing.T) {
 		createEnv: func(c *qt.C, db db.Database) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
 
-			controller := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := db.AddController(ctx, &controller)
-			c.Assert(err, qt.Equals, nil)
-
 			u := dbmodel.User{
 				Username:         "alice@external",
 				ControllerAccess: "superuser",
@@ -1825,16 +1836,25 @@ func TestOffer(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller.ID,
-					}},
 				}},
 				Users: []dbmodel.UserCloudAccess{{
 					Username: u.Username,
 				}},
 			}
 			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
+
+			controller := dbmodel.Controller{
+				Name:        "test-controller-1",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					Priority:      0,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err := db.AddController(ctx, &controller)
+			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",

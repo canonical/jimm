@@ -341,7 +341,9 @@ func TestCloudRegionControllers(t *testing.T) {
 	c.Assert(result.Error, qt.IsNil)
 
 	ctl1 := dbmodel.Controller{
-		Name: "test-controller-1",
+		Name:        "test-controller-1",
+		CloudName:   "test-cloud",
+		CloudRegion: "test-region-2",
 		CloudRegions: []dbmodel.CloudRegionControllerPriority{{
 			CloudRegion: cr1,
 			Priority:    dbmodel.CloudRegionControllerPrioritySupported,
@@ -354,7 +356,9 @@ func TestCloudRegionControllers(t *testing.T) {
 	c.Assert(result.Error, qt.IsNil)
 
 	ctl2 := dbmodel.Controller{
-		Name: "test-controller-2",
+		Name:        "test-controller-2",
+		CloudName:   "test-cloud",
+		CloudRegion: "test-region-1",
 		CloudRegions: []dbmodel.CloudRegionControllerPriority{{
 			CloudRegion: cr1,
 			Priority:    dbmodel.CloudRegionControllerPriorityDeployed,
@@ -371,12 +375,16 @@ func TestCloudRegionControllers(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Check(crcps, qt.HasLen, 2)
 	c.Check(crcps[0].Controller, qt.DeepEquals, dbmodel.Controller{
-		Model: ctl2.Model,
-		Name:  ctl2.Name,
+		Model:       ctl2.Model,
+		Name:        ctl2.Name,
+		CloudName:   ctl2.CloudName,
+		CloudRegion: ctl2.CloudRegion,
 	})
 	c.Check(crcps[1].Controller, qt.DeepEquals, dbmodel.Controller{
-		Model: ctl1.Model,
-		Name:  ctl1.Name,
+		Model:       ctl1.Model,
+		Name:        ctl1.Name,
+		CloudName:   ctl1.CloudName,
+		CloudRegion: ctl1.CloudRegion,
 	})
 
 	crcps = crcps[:0]
@@ -384,12 +392,16 @@ func TestCloudRegionControllers(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Check(crcps, qt.HasLen, 2)
 	c.Check(crcps[0].Controller, qt.DeepEquals, dbmodel.Controller{
-		Model: ctl1.Model,
-		Name:  ctl1.Name,
+		Model:       ctl1.Model,
+		Name:        ctl1.Name,
+		CloudName:   ctl1.CloudName,
+		CloudRegion: ctl1.CloudRegion,
 	})
 	c.Check(crcps[1].Controller, qt.DeepEquals, dbmodel.Controller{
-		Model: ctl2.Model,
-		Name:  ctl2.Name,
+		Model:       ctl2.Model,
+		Name:        ctl2.Name,
+		CloudName:   ctl2.CloudName,
+		CloudRegion: ctl2.CloudRegion,
 	})
 }
 

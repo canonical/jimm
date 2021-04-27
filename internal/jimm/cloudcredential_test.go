@@ -38,20 +38,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 	}{{
 		about: "all ok",
 		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.User, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
-			controller1 := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := j.Database.AddController(context.Background(), &controller1)
-			c.Assert(err, qt.Equals, nil)
-
-			controller2 := dbmodel.Controller{
-				Name: "test-controller-2",
-				UUID: "00000000-0000-0000-0000-0000-0000000000002",
-			}
-			err = j.Database.AddController(context.Background(), &controller2)
-			c.Assert(err, qt.Equals, nil)
-
 			u := dbmodel.User{
 				Username:         "alice@external",
 				ControllerAccess: "superuser",
@@ -63,21 +49,40 @@ func TestUpdateCloudCredential(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller1.ID,
-					}, {
-						// controller2 has a higher priority and the model
-						// should be created on this controller
-						Priority:     2,
-						ControllerID: controller2.ID,
-					}},
 				}},
 				Users: []dbmodel.UserCloudAccess{{
 					Username: u.Username,
 				}},
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
+
+			controller1 := dbmodel.Controller{
+				Name:        "test-controller-1",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					Priority:      0,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err := j.Database.AddController(context.Background(), &controller1)
+			c.Assert(err, qt.Equals, nil)
+
+			controller2 := dbmodel.Controller{
+				Name:        "test-controller-2",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					// controller2 has a higher priority and the model
+					// should be created on this controller
+					Priority:      2,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
@@ -126,20 +131,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 		about:                  "update credential error returned by controller",
 		updateCredentialErrors: []error{nil, errors.E("test error")},
 		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.User, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
-			controller1 := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := j.Database.AddController(context.Background(), &controller1)
-			c.Assert(err, qt.Equals, nil)
-
-			controller2 := dbmodel.Controller{
-				Name: "test-controller-2",
-				UUID: "00000000-0000-0000-0000-0000-0000000000002",
-			}
-			err = j.Database.AddController(context.Background(), &controller2)
-			c.Assert(err, qt.Equals, nil)
-
 			u := dbmodel.User{
 				Username:         "alice@external",
 				ControllerAccess: "superuser",
@@ -151,21 +142,40 @@ func TestUpdateCloudCredential(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller1.ID,
-					}, {
-						// controller2 has a higher priority and the model
-						// should be created on this controller
-						Priority:     2,
-						ControllerID: controller2.ID,
-					}},
 				}},
 				Users: []dbmodel.UserCloudAccess{{
 					Username: u.Username,
 				}},
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
+
+			controller1 := dbmodel.Controller{
+				Name:        "test-controller-1",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					Priority:      0,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err := j.Database.AddController(context.Background(), &controller1)
+			c.Assert(err, qt.Equals, nil)
+
+			controller2 := dbmodel.Controller{
+				Name:        "test-controller-2",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					// controller2 has a higher priority and the model
+					// should be created on this controller
+					Priority:      2,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
@@ -207,20 +217,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 		checkCredentialErrors:  []error{errors.E("test error")},
 		updateCredentialErrors: []error{nil},
 		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.User, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
-			controller1 := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := j.Database.AddController(context.Background(), &controller1)
-			c.Assert(err, qt.Equals, nil)
-
-			controller2 := dbmodel.Controller{
-				Name: "test-controller-2",
-				UUID: "00000000-0000-0000-0000-0000-0000000000002",
-			}
-			err = j.Database.AddController(context.Background(), &controller2)
-			c.Assert(err, qt.Equals, nil)
-
 			u := dbmodel.User{
 				Username:         "alice@external",
 				ControllerAccess: "superuser",
@@ -232,21 +228,40 @@ func TestUpdateCloudCredential(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller1.ID,
-					}, {
-						// controller2 has a higher priority and the model
-						// should be created on this controller
-						Priority:     2,
-						ControllerID: controller2.ID,
-					}},
 				}},
 				Users: []dbmodel.UserCloudAccess{{
 					Username: u.Username,
 				}},
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
+
+			controller1 := dbmodel.Controller{
+				Name:        "test-controller-1",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					Priority:      0,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err := j.Database.AddController(context.Background(), &controller1)
+			c.Assert(err, qt.Equals, nil)
+
+			controller2 := dbmodel.Controller{
+				Name:        "test-controller-2",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					// controller2 has a higher priority and the model
+					// should be created on this controller
+					Priority:      2,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
@@ -281,20 +296,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 	}, {
 		about: "user is controller superuser",
 		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.User, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
-			controller1 := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := j.Database.AddController(context.Background(), &controller1)
-			c.Assert(err, qt.Equals, nil)
-
-			controller2 := dbmodel.Controller{
-				Name: "test-controller-2",
-				UUID: "00000000-0000-0000-0000-0000-0000000000002",
-			}
-			err = j.Database.AddController(context.Background(), &controller2)
-			c.Assert(err, qt.Equals, nil)
-
 			u := dbmodel.User{
 				Username:         "alice@external",
 				ControllerAccess: "superuser",
@@ -310,21 +311,40 @@ func TestUpdateCloudCredential(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller1.ID,
-					}, {
-						// controller2 has a higher priority and the model
-						// should be created on this controller
-						Priority:     2,
-						ControllerID: controller2.ID,
-					}},
 				}},
 				Users: []dbmodel.UserCloudAccess{{
 					Username: u.Username,
 				}},
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
+
+			controller1 := dbmodel.Controller{
+				Name:        "test-controller-1",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					Priority:      0,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err := j.Database.AddController(context.Background(), &controller1)
+			c.Assert(err, qt.Equals, nil)
+
+			controller2 := dbmodel.Controller{
+				Name:        "test-controller-2",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					// controller2 has a higher priority and the model
+					// should be created on this controller
+					Priority:      2,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
@@ -373,20 +393,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 		about:                 "skip check, which would return an error",
 		checkCredentialErrors: []error{errors.E("test error")},
 		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.User, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
-			controller1 := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := j.Database.AddController(context.Background(), &controller1)
-			c.Assert(err, qt.Equals, nil)
-
-			controller2 := dbmodel.Controller{
-				Name: "test-controller-2",
-				UUID: "00000000-0000-0000-0000-0000-0000000000002",
-			}
-			err = j.Database.AddController(context.Background(), &controller2)
-			c.Assert(err, qt.Equals, nil)
-
 			u := dbmodel.User{
 				Username:         "alice@external",
 				ControllerAccess: "superuser",
@@ -398,21 +404,40 @@ func TestUpdateCloudCredential(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller1.ID,
-					}, {
-						// controller2 has a higher priority and the model
-						// should be created on this controller
-						Priority:     2,
-						ControllerID: controller2.ID,
-					}},
 				}},
 				Users: []dbmodel.UserCloudAccess{{
 					Username: u.Username,
 				}},
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
+
+			controller1 := dbmodel.Controller{
+				Name:        "test-controller-1",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					Priority:      0,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err := j.Database.AddController(context.Background(), &controller1)
+			c.Assert(err, qt.Equals, nil)
+
+			controller2 := dbmodel.Controller{
+				Name:        "test-controller-2",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					// controller2 has a higher priority and the model
+					// should be created on this controller
+					Priority:      2,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
@@ -461,20 +486,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 	}, {
 		about: "skip update",
 		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.User, jimm.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
-			controller1 := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := j.Database.AddController(context.Background(), &controller1)
-			c.Assert(err, qt.Equals, nil)
-
-			controller2 := dbmodel.Controller{
-				Name: "test-controller-2",
-				UUID: "00000000-0000-0000-0000-0000-0000000000002",
-			}
-			err = j.Database.AddController(context.Background(), &controller2)
-			c.Assert(err, qt.Equals, nil)
-
 			u := dbmodel.User{
 				Username:         "alice@external",
 				ControllerAccess: "superuser",
@@ -486,21 +497,40 @@ func TestUpdateCloudCredential(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller1.ID,
-					}, {
-						// controller2 has a higher priority and the model
-						// should be created on this controller
-						Priority:     2,
-						ControllerID: controller2.ID,
-					}},
 				}},
 				Users: []dbmodel.UserCloudAccess{{
 					Username: u.Username,
 				}},
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
+
+			controller1 := dbmodel.Controller{
+				Name:        "test-controller-1",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					Priority:      0,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err := j.Database.AddController(context.Background(), &controller1)
+			c.Assert(err, qt.Equals, nil)
+
+			controller2 := dbmodel.Controller{
+				Name:        "test-controller-2",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					// controller2 has a higher priority and the model
+					// should be created on this controller
+					Priority:      2,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
@@ -693,20 +723,6 @@ func TestRevokeCloudCredential(t *testing.T) {
 	}{{
 		about: "credential revoked",
 		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.User, names.CloudCredentialTag, dbmodel.CloudCredential, string) {
-			controller1 := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := j.Database.AddController(context.Background(), &controller1)
-			c.Assert(err, qt.Equals, nil)
-
-			controller2 := dbmodel.Controller{
-				Name: "test-controller-2",
-				UUID: "00000000-0000-0000-0000-0000-0000000000002",
-			}
-			err = j.Database.AddController(context.Background(), &controller2)
-			c.Assert(err, qt.Equals, nil)
-
 			u := dbmodel.User{
 				Username:         "alice@external",
 				ControllerAccess: "superuser",
@@ -718,21 +734,40 @@ func TestRevokeCloudCredential(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller1.ID,
-					}, {
-						// controller2 has a higher priority and the model
-						// should be created on this controller
-						Priority:     2,
-						ControllerID: controller2.ID,
-					}},
 				}},
 				Users: []dbmodel.UserCloudAccess{{
 					Username: u.Username,
 				}},
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
+
+			controller1 := dbmodel.Controller{
+				Name:        "test-controller-1",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					Priority:      0,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err := j.Database.AddController(context.Background(), &controller1)
+			c.Assert(err, qt.Equals, nil)
+
+			controller2 := dbmodel.Controller{
+				Name:        "test-controller-2",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					// controller2 has a higher priority and the model
+					// should be created on this controller
+					Priority:      2,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
@@ -764,20 +799,6 @@ func TestRevokeCloudCredential(t *testing.T) {
 			Code:    jujuparams.CodeNotFound,
 		}},
 		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.User, names.CloudCredentialTag, dbmodel.CloudCredential, string) {
-			controller1 := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := j.Database.AddController(context.Background(), &controller1)
-			c.Assert(err, qt.Equals, nil)
-
-			controller2 := dbmodel.Controller{
-				Name: "test-controller-2",
-				UUID: "00000000-0000-0000-0000-0000-0000000000002",
-			}
-			err = j.Database.AddController(context.Background(), &controller2)
-			c.Assert(err, qt.Equals, nil)
-
 			u := dbmodel.User{
 				Username:         "alice@external",
 				ControllerAccess: "superuser",
@@ -789,21 +810,40 @@ func TestRevokeCloudCredential(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller1.ID,
-					}, {
-						// controller2 has a higher priority and the model
-						// should be created on this controller
-						Priority:     2,
-						ControllerID: controller2.ID,
-					}},
 				}},
 				Users: []dbmodel.UserCloudAccess{{
 					Username: u.Username,
 				}},
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
+
+			controller1 := dbmodel.Controller{
+				Name:        "test-controller-1",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					Priority:      0,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err := j.Database.AddController(context.Background(), &controller1)
+			c.Assert(err, qt.Equals, nil)
+
+			controller2 := dbmodel.Controller{
+				Name:        "test-controller-2",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					// controller2 has a higher priority and the model
+					// should be created on this controller
+					Priority:      2,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
@@ -831,20 +871,6 @@ func TestRevokeCloudCredential(t *testing.T) {
 	}, {
 		about: "credential still used by a model",
 		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.User, names.CloudCredentialTag, dbmodel.CloudCredential, string) {
-			controller1 := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := j.Database.AddController(context.Background(), &controller1)
-			c.Assert(err, qt.Equals, nil)
-
-			controller2 := dbmodel.Controller{
-				Name: "test-controller-2",
-				UUID: "00000000-0000-0000-0000-0000-0000000000002",
-			}
-			err = j.Database.AddController(context.Background(), &controller2)
-			c.Assert(err, qt.Equals, nil)
-
 			u := dbmodel.User{
 				Username:         "alice@external",
 				ControllerAccess: "superuser",
@@ -856,21 +882,40 @@ func TestRevokeCloudCredential(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller1.ID,
-					}, {
-						// controller2 has a higher priority and the model
-						// should be created on this controller
-						Priority:     2,
-						ControllerID: controller2.ID,
-					}},
 				}},
 				Users: []dbmodel.UserCloudAccess{{
 					Username: u.Username,
 				}},
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
+
+			controller1 := dbmodel.Controller{
+				Name:        "test-controller-1",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					Priority:      0,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err := j.Database.AddController(context.Background(), &controller1)
+			c.Assert(err, qt.Equals, nil)
+
+			controller2 := dbmodel.Controller{
+				Name:        "test-controller-2",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					// controller2 has a higher priority and the model
+					// should be created on this controller
+					Priority:      2,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
@@ -924,20 +969,6 @@ func TestRevokeCloudCredential(t *testing.T) {
 		about:                  "error revoking credential on controller",
 		revokeCredentialErrors: []error{errors.E("test error")},
 		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.User, names.CloudCredentialTag, dbmodel.CloudCredential, string) {
-			controller1 := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := j.Database.AddController(context.Background(), &controller1)
-			c.Assert(err, qt.Equals, nil)
-
-			controller2 := dbmodel.Controller{
-				Name: "test-controller-2",
-				UUID: "00000000-0000-0000-0000-0000-0000000000002",
-			}
-			err = j.Database.AddController(context.Background(), &controller2)
-			c.Assert(err, qt.Equals, nil)
-
 			u := dbmodel.User{
 				Username:         "alice@external",
 				ControllerAccess: "superuser",
@@ -949,21 +980,40 @@ func TestRevokeCloudCredential(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller1.ID,
-					}, {
-						// controller2 has a higher priority and the model
-						// should be created on this controller
-						Priority:     2,
-						ControllerID: controller2.ID,
-					}},
 				}},
 				Users: []dbmodel.UserCloudAccess{{
 					Username: u.Username,
 				}},
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
+
+			controller1 := dbmodel.Controller{
+				Name:        "test-controller-1",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					Priority:      0,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err := j.Database.AddController(context.Background(), &controller1)
+			c.Assert(err, qt.Equals, nil)
+
+			controller2 := dbmodel.Controller{
+				Name:        "test-controller-2",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					// controller2 has a higher priority and the model
+					// should be created on this controller
+					Priority:      2,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
 				Name:          "test-credential-1",
@@ -1086,20 +1136,6 @@ func TestGetCloudCredential(t *testing.T) {
 	}{{
 		about: "all ok",
 		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.User, names.CloudCredentialTag, dbmodel.CloudCredential, string) {
-			controller1 := dbmodel.Controller{
-				Name: "test-controller-1",
-				UUID: "00000000-0000-0000-0000-0000-0000000000001",
-			}
-			err := j.Database.AddController(context.Background(), &controller1)
-			c.Assert(err, qt.Equals, nil)
-
-			controller2 := dbmodel.Controller{
-				Name: "test-controller-2",
-				UUID: "00000000-0000-0000-0000-0000-0000000000002",
-			}
-			err = j.Database.AddController(context.Background(), &controller2)
-			c.Assert(err, qt.Equals, nil)
-
 			u := dbmodel.User{
 				Username:         "alice@external",
 				ControllerAccess: "superuser",
@@ -1111,21 +1147,40 @@ func TestGetCloudCredential(t *testing.T) {
 				Type: "test-provider",
 				Regions: []dbmodel.CloudRegion{{
 					Name: "test-region-1",
-					Controllers: []dbmodel.CloudRegionControllerPriority{{
-						Priority:     0,
-						ControllerID: controller1.ID,
-					}, {
-						// controller2 has a higher priority and the model
-						// should be created on this controller
-						Priority:     2,
-						ControllerID: controller2.ID,
-					}},
 				}},
 				Users: []dbmodel.UserCloudAccess{{
 					Username: u.Username,
 				}},
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
+
+			controller1 := dbmodel.Controller{
+				Name:        "test-controller-1",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					Priority:      0,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err := j.Database.AddController(context.Background(), &controller1)
+			c.Assert(err, qt.Equals, nil)
+
+			controller2 := dbmodel.Controller{
+				Name:        "test-controller-2",
+				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
+				CloudName:   "test-cloud",
+				CloudRegion: "test-region-1",
+				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+					// controller2 has a higher priority and the model
+					// should be created on this controller
+					Priority:      2,
+					CloudRegionID: cloud.Regions[0].ID,
+				}},
+			}
+			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
 				Name:      "test-credential-1",

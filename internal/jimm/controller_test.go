@@ -150,7 +150,7 @@ func TestAddController(t *testing.T) {
 	}
 	err = j.Database.GetController(ctx, &ctl2)
 	c.Assert(err, qt.IsNil)
-	c.Check(ctl2, qt.CmpEquals(cmpopts.EquateEmpty()), ctl)
+	c.Check(ctl2, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(dbmodel.CloudRegion{})), ctl)
 }
 
 const testEarliestControllerVersionEnv = `clouds:
@@ -389,7 +389,7 @@ cloud-credentials:
 controllers:
 - name: test-controller
   uuid: 00000001-0000-0000-0000-000000000001
-  cloud: test
+  cloud: test-cloud
   region: test-region-1
   agent-version: 3.2.1
 models:
@@ -576,6 +576,8 @@ func TestImportModel(t *testing.T) {
 			Controller: dbmodel.Controller{
 				Name:         "test-controller",
 				UUID:         "00000001-0000-0000-0000-000000000001",
+				CloudName:    "test-cloud",
+				CloudRegion:  "test-region-1",
 				AgentVersion: "3.2.1",
 			},
 			CloudRegion: dbmodel.CloudRegion{

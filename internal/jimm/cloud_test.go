@@ -555,6 +555,8 @@ const addHostedCloudTestEnv = `clouds:
 controllers:
 - name: test-controller
   uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-region
   cloud-regions:
   - cloud: test-cloud
     region: test-region
@@ -631,8 +633,10 @@ var addHostedCloudTests = []struct {
 			Config: dbmodel.Map{"B": float64(2)},
 			Controllers: []dbmodel.CloudRegionControllerPriority{{
 				Controller: dbmodel.Controller{
-					Name: "test-controller",
-					UUID: "00000001-0000-0000-0000-000000000001",
+					Name:        "test-controller",
+					UUID:        "00000001-0000-0000-0000-000000000001",
+					CloudName:   "test-cloud",
+					CloudRegion: "test-region",
 				},
 				Priority: 1,
 			}},
@@ -855,6 +859,8 @@ const grantCloudAccessTestEnv = `clouds:
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
+  cloud: dummy
+  region: dummy-region
   cloud-regions:
   - cloud: dummy
     region: dummy-region
@@ -911,8 +917,10 @@ var grantCloudAccessTests = []struct {
 			Name: "default",
 			Controllers: []dbmodel.CloudRegionControllerPriority{{
 				Controller: dbmodel.Controller{
-					Name: "controller-1",
-					UUID: "00000001-0000-0000-0000-000000000001",
+					Name:        "controller-1",
+					UUID:        "00000001-0000-0000-0000-000000000001",
+					CloudName:   "dummy",
+					CloudRegion: "dummy-region",
 				},
 				Priority: 1,
 			}},
@@ -1032,6 +1040,8 @@ const revokeCloudAccessTestEnv = `clouds:
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
+  cloud: dummy
+  region: dummy-region
   cloud-regions:
   - cloud: dummy
     region: dummy-region
@@ -1088,8 +1098,10 @@ var revokeCloudAccessTests = []struct {
 			Name: "default",
 			Controllers: []dbmodel.CloudRegionControllerPriority{{
 				Controller: dbmodel.Controller{
-					Name: "controller-1",
-					UUID: "00000001-0000-0000-0000-000000000001",
+					Name:        "controller-1",
+					UUID:        "00000001-0000-0000-0000-000000000001",
+					CloudName:   "dummy",
+					CloudRegion: "dummy-region",
 				},
 				Priority: 1,
 			}},
@@ -1147,8 +1159,10 @@ var revokeCloudAccessTests = []struct {
 			Name: "default",
 			Controllers: []dbmodel.CloudRegionControllerPriority{{
 				Controller: dbmodel.Controller{
-					Name: "controller-1",
-					UUID: "00000001-0000-0000-0000-000000000001",
+					Name:        "controller-1",
+					UUID:        "00000001-0000-0000-0000-000000000001",
+					CloudName:   "dummy",
+					CloudRegion: "dummy-region",
 				},
 				Priority: 1,
 			}},
@@ -1266,6 +1280,8 @@ const removeCloudTestEnv = `clouds:
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
+  cloud: dummy
+  region: dummy-region
   cloud-regions:
   - cloud: dummy
     region: dummy-region
@@ -1389,6 +1405,8 @@ const updateCloudTestEnv = `clouds:
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
+  cloud: dummy
+  region: dummy-region
   cloud-regions:
   - cloud: dummy
     region: dummy-region
@@ -1461,8 +1479,10 @@ var updateCloudTests = []struct {
 			StorageEndpoint:  "https://storage.region.example.com",
 			Controllers: []dbmodel.CloudRegionControllerPriority{{
 				Controller: dbmodel.Controller{
-					Name: "controller-1",
-					UUID: "00000001-0000-0000-0000-000000000001",
+					Name:        "controller-1",
+					UUID:        "00000001-0000-0000-0000-000000000001",
+					CloudName:   "dummy",
+					CloudRegion: "dummy-region",
 				},
 				Priority: 10,
 			}},
@@ -1473,8 +1493,10 @@ var updateCloudTests = []struct {
 			StorageEndpoint:  "https://storage.region2.example.com",
 			Controllers: []dbmodel.CloudRegionControllerPriority{{
 				Controller: dbmodel.Controller{
-					Name: "controller-1",
-					UUID: "00000001-0000-0000-0000-000000000001",
+					Name:        "controller-1",
+					UUID:        "00000001-0000-0000-0000-000000000001",
+					CloudName:   "dummy",
+					CloudRegion: "dummy-region",
 				},
 				Priority: 1,
 			}},
@@ -1514,8 +1536,10 @@ var updateCloudTests = []struct {
 			Name: "default",
 			Controllers: []dbmodel.CloudRegionControllerPriority{{
 				Controller: dbmodel.Controller{
-					Name: "controller-1",
-					UUID: "00000001-0000-0000-0000-000000000001",
+					Name:        "controller-1",
+					UUID:        "00000001-0000-0000-0000-000000000001",
+					CloudName:   "dummy",
+					CloudRegion: "dummy-region",
 				},
 				Priority: 1,
 			}},

@@ -4,9 +4,14 @@ package dbmodel
 
 import (
 	"database/sql"
+	"fmt"
+	"net"
 
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 	"gorm.io/gorm"
+
+	apiparams "github.com/CanonicalLtd/jimm/api/params"
 )
 
 // A controller represents a juju controller which is hosting models
@@ -41,6 +46,14 @@ type Controller struct {
 	// name and port.
 	PublicAddress string
 
+	// CloudName is the name of the cloud which is hosting this
+	// controller.
+	CloudName string
+
+	// CloudRegion is the name of the cloud region which is hosting
+	// this controller.
+	CloudRegion string
+
 	// Deprecated records whether this controller is deprecated, and
 	// therefore no new models or clouds will be added to the controller.
 	Deprecated bool `gorm:"not null;default:FALSE"`
@@ -51,7 +64,7 @@ type Controller struct {
 
 	// Addresses holds the known addresses on which the controller is
 	// listening.
-	Addresses Strings
+	Addresses HostPorts
 
 	// UnavailableSince records the time that this controller became
 	// unavailable, if it has.
@@ -75,6 +88,65 @@ func (c Controller) Tag() names.Tag {
 // SetTag sets the controller's UUID to the value from the given tag.
 func (c *Controller) SetTag(t names.ControllerTag) {
 	c.UUID = t.Id()
+}
+
+// ToAPIControllerInfo converts a controller entry to a JIMM API
+// ControllerInfo.
+func (c Controller) ToAPIControllerInfo() apiparams.ControllerInfo {
+	var ci apiparams.ControllerInfo
+	ci.Name = c.Name
+	ci.UUID = c.UUID
+	ci.PublicAddress = c.PublicAddress
+	for _, hps := range c.Addresses {
+		for _, hp := range hps {
+			ci.APIAddresses = append(ci.APIAddresses, fmt.Sprintf("%s:%d", hp.Value, hp.Port))
+		}
+	}
+	ci.CACertificate = c.CACertificate
+	ci.CloudTag = names.NewCloudTag(c.CloudName).String()
+	ci.CloudRegion = c.CloudRegion
+	ci.Username = c.AdminUser
+	ci.AgentVersion = c.AgentVersion
+	if c.UnavailableSince.Valid {
+		ci.Status = jujuparams.EntityStatus{
+			Status: "unavailable",
+			Since:  &c.UnavailableSince.Time,
+		}
+	} else if c.Deprecated {
+		ci.Status = jujuparams.EntityStatus{
+			Status: "deprecated",
+		}
+	} else {
+		ci.Status = jujuparams.EntityStatus{
+			Status: "available",
+		}
+	}
+	return ci
+}
+
+// ToJujuRedirectInfoResult converts a controller entry to a juju
+// RedirectInfoResult value.
+func (c Controller) ToJujuRedirectInfoResult() jujuparams.RedirectInfoResult {
+	var servers [][]jujuparams.HostPort
+	host, port, err := net.SplitHostPort(c.PublicAddress)
+	if err == nil {
+		port, err := net.LookupPort("tcp", port)
+		if err == nil {
+			servers = append(servers, []jujuparams.HostPort{{
+				Address: jujuparams.Address{
+					Value: host,
+					Scope: "public",
+					Type:  "hostname",
+				},
+				Port: port,
+			}})
+		}
+	}
+	servers = append(servers, [][]jujuparams.HostPort(c.Addresses)...)
+	return jujuparams.RedirectInfoResult{
+		Servers: servers,
+		CACert:  c.CACertificate,
+	}
 }
 
 const (

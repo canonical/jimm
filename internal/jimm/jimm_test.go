@@ -343,6 +343,8 @@ users:
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
+  cloud: dummy
+  region: dummy-region
 models:
 - name: model-1
   type: iaas
@@ -410,7 +412,7 @@ func TestRemoveController(t *testing.T) {
 		force            bool
 		expectedError    string
 	}{{
-		about:            "superuser can remove and unavailable controller",
+		about:            "superuser can remove an unavailable controller",
 		user:             "alice@external",
 		unavailableSince: &now,
 		force:            true,
@@ -471,7 +473,7 @@ func TestRemoveController(t *testing.T) {
 					Name: "test1",
 				}
 				err = j.Database.GetController(ctx, &controller)
-				c.Assert(err, qt.ErrorMatches, "record not found")
+				c.Assert(err, qt.ErrorMatches, "controller not found")
 			}
 		})
 	}

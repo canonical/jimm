@@ -253,6 +253,8 @@ cloud-credentials:
 controllers:
 - name: test
   uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test
+  region: test-region
 models:
 - name: test-1
   owner: alice@external
@@ -306,8 +308,10 @@ models:
 				ControllerAccess: "add-model",
 			},
 			Controller: dbmodel.Controller{
-				Name: "test",
-				UUID: "00000001-0000-0000-0000-000000000001",
+				Name:        "test",
+				UUID:        "00000001-0000-0000-0000-000000000001",
+				CloudName:   "test",
+				CloudRegion: "test-region",
 			},
 			CloudRegion: dbmodel.CloudRegion{
 				Cloud: dbmodel.Cloud{
@@ -346,8 +350,10 @@ models:
 				ControllerAccess: "add-model",
 			},
 			Controller: dbmodel.Controller{
-				Name: "test",
-				UUID: "00000001-0000-0000-0000-000000000001",
+				Name:        "test",
+				UUID:        "00000001-0000-0000-0000-000000000001",
+				CloudName:   "test",
+				CloudRegion: "test-region",
 			},
 			CloudRegion: dbmodel.CloudRegion{
 				Cloud: dbmodel.Cloud{

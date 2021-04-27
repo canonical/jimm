@@ -59,8 +59,13 @@ func (Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.
 	}
 	if client == nil {
 		var urls []string
-		for _, addr := range ctl.Addresses {
-			urls = append(urls, websocketURL(addr, modelTag))
+		for _, hps := range ctl.Addresses {
+			for _, hp := range hps {
+				if hp.Scope != "public" && hp.Scope != "" {
+					continue
+				}
+				urls = append(urls, websocketURL(fmt.Sprintf("%s:%d", hp.Value, hp.Port), modelTag))
+			}
 		}
 		var err2 error
 		client, err2 = dialAll(ctx, &dialer, urls)
@@ -91,11 +96,7 @@ func (Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.
 	if res.ServerVersion != "" {
 		ctl.AgentVersion = res.ServerVersion
 	}
-	for _, hps := range res.Servers {
-		for _, hp := range hps {
-			ctl.Addresses = append(ctl.Addresses, fmt.Sprintf("%s:%d", hp.Value, hp.Port))
-		}
-	}
+	ctl.Addresses = dbmodel.HostPorts(res.Servers)
 	facades := make(map[string]bool)
 	for _, fv := range res.Facades {
 		for _, v := range fv.Versions {
