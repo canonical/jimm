@@ -246,13 +246,13 @@ func TestRevokeOfferAccess(t *testing.T) {
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[2], env.users[3], "test-offer-url", jujuparams.OfferReadAccess
 		},
-		expectedError: "unauthorized access",
+		expectedError: "unauthorized",
 	}, {
 		about: "user with read access cannot revoke access",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[3], env.users[3], "test-offer-url", jujuparams.OfferReadAccess
 		},
-		expectedError: "unauthorized access",
+		expectedError: "unauthorized",
 	}, {
 		about: "no such offer",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
@@ -398,13 +398,13 @@ func TestGrantOfferAccess(t *testing.T) {
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[2], env.users[4], "test-offer-url", jujuparams.OfferConsumeAccess
 		},
-		expectedError: "unauthorized access",
+		expectedError: "unauthorized",
 	}, {
 		about: "user with read rights cannot grant any rights",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[3], env.users[4], "test-offer-url", jujuparams.OfferConsumeAccess
 		},
-		expectedError: "unauthorized access",
+		expectedError: "unauthorized",
 	}, {
 		about: "admin grants new user admin access - new user has admin access",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
@@ -754,7 +754,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 				OfferURL: "test-offer-url",
 			},
 		},
-		expectedError: "unauthorized access",
+		expectedError: "unauthorized",
 	}, {
 		about: "no such offer",
 		user:  &u,
@@ -1713,7 +1713,7 @@ func TestOffer(t *testing.T) {
 			offer := dbmodel.ApplicationOffer{}
 
 			return u1, offerParams, offer, func(c *qt.C, err error) {
-				c.Assert(err, qt.ErrorMatches, "unauthorized access")
+				c.Assert(err, qt.ErrorMatches, "unauthorized")
 			}
 		},
 	}, {
@@ -2150,19 +2150,19 @@ func TestDestroyOffer(t *testing.T) {
 		parameterFunc: func(env *environment) (dbmodel.User, string) {
 			return env.users[2], "test-offer-url"
 		},
-		expectedError: "unauthorized access",
+		expectedError: "unauthorized",
 	}, {
 		about: "user with read access not allowed to destroy an offer",
 		parameterFunc: func(env *environment) (dbmodel.User, string) {
 			return env.users[3], "test-offer-url"
 		},
-		expectedError: "unauthorized access",
+		expectedError: "unauthorized",
 	}, {
 		about: "user without access not allowed to destroy an offer",
 		parameterFunc: func(env *environment) (dbmodel.User, string) {
 			return env.users[4], "test-offer-url"
 		},
-		expectedError: "unauthorized access",
+		expectedError: "unauthorized",
 	}, {
 		about: "offer not found",
 		parameterFunc: func(env *environment) (dbmodel.User, string) {

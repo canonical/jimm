@@ -74,7 +74,7 @@ func (j *JIMM) Offer(ctx context.Context, user *dbmodel.User, offer AddApplicati
 		}
 	}
 	if userAccessLevel != string(jujuparams.ModelAdminAccess) {
-		return fail(errors.E(op, errors.CodeUnauthorized))
+		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
 	}
 
 	var application *dbmodel.Application
@@ -192,7 +192,7 @@ func (j *JIMM) GetApplicationOfferConsumeDetails(ctx context.Context, user *dbmo
 	case string(jujuparams.OfferAdminAccess):
 	case string(jujuparams.OfferConsumeAccess):
 	case string(jujuparams.OfferReadAccess):
-		return errors.E(op, errors.CodeUnauthorized)
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	default:
 		// TODO (ashipika)
 		//   - think about the returned error code
@@ -646,7 +646,7 @@ func (j *JIMM) doApplicationOfferAdmin(ctx context.Context, u *dbmodel.User, off
 	if u.ControllerAccess != "superuser" && offer.UserAccess(u) != "admin" && offer.Model.UserAccess(u) != "admin" {
 		// If the user doesn't have admin access on the application
 		// offer return an unauthorized error.
-		return errors.E(op, errors.CodeUnauthorized)
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 	api, err := j.dial(ctx, &offer.Model.Controller, names.ModelTag{})
 	if err != nil {

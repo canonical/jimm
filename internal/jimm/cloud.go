@@ -41,7 +41,7 @@ func (j *JIMM) GetCloud(ctx context.Context, u *dbmodel.User, tag names.CloudTag
 		}}
 		return cl, nil
 	default:
-		return cl, errors.E(op, errors.CodeUnauthorized)
+		return cl, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 }
 
@@ -112,7 +112,7 @@ func (j *JIMM) ForEachCloud(ctx context.Context, u *dbmodel.User, f func(*dbmode
 	const op = errors.Op("jimm.ForEachCloud")
 
 	if u.ControllerAccess != "superuser" {
-		return errors.E(op, errors.CodeUnauthorized)
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	clds, err := j.Database.GetClouds(ctx)
@@ -204,7 +204,7 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, u *dbmodel.User, tag names.Cl
 	}
 
 	if u.ControllerAccess != "add-model" && u.ControllerAccess != "superuser" {
-		return fail(errors.E(op, errors.CodeUnauthorized))
+		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
 	}
 
 	// Ensure the new cloud could not mask the name of a known public cloud.
@@ -221,6 +221,9 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, u *dbmodel.User, tag names.Cl
 	// Validate that the requested cloud is valid.
 	if cloud.Type != "kubernetes" {
 		return fail(errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud type %q", cloud.Type)))
+	}
+	if cloud.HostCloudRegion == "" {
+		return fail(errors.E(op, errors.CodeCloudRegionRequired, "cloud host region not specified"))
 	}
 	parts := strings.SplitN(cloud.HostCloudRegion, "/", 2)
 	if len(parts) != 2 || parts[0] == "" {
@@ -333,7 +336,7 @@ func (j *JIMM) doCloudAdmin(ctx context.Context, u *dbmodel.User, ct names.Cloud
 	if cloudUserAccess(u, &c) != "admin" {
 		// If the user doesn't have admin access on the cloud return
 		// an unauthorized error.
-		return errors.E(op, errors.CodeUnauthorized)
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	if len(c.Regions) != 1 || len(c.Regions[0].Controllers) != 1 {
@@ -534,7 +537,7 @@ func (j *JIMM) UpdateCloud(ctx context.Context, u *dbmodel.User, ct names.CloudT
 	if cloudUserAccess(u, &c) != "admin" {
 		// If the user doesn't have admin access on the cloud return
 		// an unauthorized error.
-		return fail(errors.E(op, errors.CodeUnauthorized))
+		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
 	}
 
 	var controllers []dbmodel.Controller

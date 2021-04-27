@@ -63,7 +63,7 @@ func TestModelCreateArgs(t *testing.T) {
 			CloudTag:           names.NewCloudTag("test-cloud").String(),
 			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice/test-credential-1").String(),
 		},
-		expectedError: "invalid owner tag",
+		expectedError: `"alice@external" is not a valid tag`,
 	}, {
 		about: "invalid cloud tag",
 		args: jujuparams.ModelCreateArgs{
@@ -72,7 +72,7 @@ func TestModelCreateArgs(t *testing.T) {
 			CloudTag:           "test-cloud",
 			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice/test-credential-1").String(),
 		},
-		expectedError: "invalid cloud tag",
+		expectedError: `"test-cloud" is not a valid tag`,
 	}, {
 		about: "invalid cloud credential tag",
 		args: jujuparams.ModelCreateArgs{
@@ -106,7 +106,7 @@ func TestModelCreateArgs(t *testing.T) {
 			OwnerTag:           names.NewUserTag("alice@external").String(),
 			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice/test-credential-1").String(),
 		},
-		expectedError: "cloud tag not specified",
+		expectedError: "no cloud specified for model; please specify one",
 	}}
 
 	opts := []cmp.Option{
@@ -635,7 +635,7 @@ machines:
 		CloudRegion:        "test-region-1",
 		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
 	},
-	expectError: "unauthorized access",
+	expectError: "unauthorized",
 }, {
 	name: "CreateModelError",
 	env: `
@@ -1126,13 +1126,13 @@ var modelInfoTests = []struct {
 	env:         modelInfoTestEnv,
 	username:    "diane@external",
 	uuid:        "00000002-0000-0000-0000-000000000001",
-	expectError: "unauthorized access",
+	expectError: "unauthorized",
 }, {
 	name:        "NotFound",
 	env:         modelInfoTestEnv,
 	username:    "alice@external",
 	uuid:        "00000002-0000-0000-0000-000000000002",
-	expectError: "record not found",
+	expectError: "model not found",
 }}
 
 func TestModelInfo(t *testing.T) {
@@ -1217,13 +1217,13 @@ var modelStatusTests = []struct {
 	name:        "ModelNotFound",
 	username:    "alice@external",
 	uuid:        "00000001-0000-0000-0000-000000000001",
-	expectError: `record not found`,
+	expectError: `model not found`,
 }, {
 	name:        "UnauthorizedUser",
 	env:         modelStatusTestEnv,
 	username:    "bob@external",
 	uuid:        "00000002-0000-0000-0000-000000000001",
-	expectError: "unauthorized access",
+	expectError: "unauthorized",
 }, {
 	name: "Success",
 	env:  modelStatusTestEnv,
@@ -1665,7 +1665,7 @@ func TestForEachModel(t *testing.T) {
 	err = j.ForEachModel(ctx, &u, func(uma *dbmodel.UserModelAccess) error {
 		return errors.E("function called unexpectedly")
 	})
-	c.Check(err, qt.ErrorMatches, `unauthorized access`)
+	c.Check(err, qt.ErrorMatches, `unauthorized`)
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeUnauthorized)
 
 	u = env.User("alice@external").DBObject(c, j.Database)
@@ -1731,7 +1731,7 @@ var grantModelAccessTests = []struct {
 	uuid:            "00000002-0000-0000-0000-000000000001",
 	targetUsername:  "bob@external",
 	access:          "write",
-	expectError:     `record not found`,
+	expectError:     `model not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name: "Success",
@@ -1805,7 +1805,7 @@ var grantModelAccessTests = []struct {
 	uuid:            "00000002-0000-0000-0000-000000000001",
 	targetUsername:  "bob@external",
 	access:          "write",
-	expectError:     `unauthorized access`,
+	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
 }, {
 	name:           "DialError",
@@ -1927,7 +1927,7 @@ var revokeModelAccessTests = []struct {
 	uuid:            "00000002-0000-0000-0000-000000000001",
 	targetUsername:  "bob@external",
 	access:          "write",
-	expectError:     `record not found`,
+	expectError:     `model not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name: "SuccessAdmin",
@@ -2125,7 +2125,7 @@ var revokeModelAccessTests = []struct {
 	uuid:            "00000002-0000-0000-0000-000000000001",
 	targetUsername:  "bob@external",
 	access:          "write",
-	expectError:     `unauthorized access`,
+	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
 }, {
 	name:           "DialError",
@@ -2248,14 +2248,14 @@ var destroyModelTests = []struct {
 	env:             destroyModelTestEnv,
 	username:        "alice@external",
 	uuid:            "00000002-0000-0000-0000-000000000002",
-	expectError:     `record not found`,
+	expectError:     `model not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name:            "Unauthorized",
 	env:             destroyModelTestEnv,
 	username:        "bob@external",
 	uuid:            "00000002-0000-0000-0000-000000000001",
-	expectError:     `unauthorized access`,
+	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
 }, {
 	name: "Success",
@@ -2372,14 +2372,14 @@ var dumpModelTests = []struct {
 	env:             destroyModelTestEnv,
 	username:        "alice@external",
 	uuid:            "00000002-0000-0000-0000-000000000002",
-	expectError:     `record not found`,
+	expectError:     `model not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name:            "Unauthorized",
 	env:             destroyModelTestEnv,
 	username:        "bob@external",
 	uuid:            "00000002-0000-0000-0000-000000000001",
-	expectError:     `unauthorized access`,
+	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
 }, {
 	name: "Success",
@@ -2481,14 +2481,14 @@ var dumpModelDBTests = []struct {
 	env:             destroyModelTestEnv,
 	username:        "alice@external",
 	uuid:            "00000002-0000-0000-0000-000000000002",
-	expectError:     `record not found`,
+	expectError:     `model not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name:            "Unauthorized",
 	env:             destroyModelTestEnv,
 	username:        "bob@external",
 	uuid:            "00000002-0000-0000-0000-000000000001",
-	expectError:     `unauthorized access`,
+	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
 }, {
 	name: "Success",
@@ -2586,14 +2586,14 @@ var validateModelUpgradeTests = []struct {
 	env:             destroyModelTestEnv,
 	username:        "alice@external",
 	uuid:            "00000002-0000-0000-0000-000000000002",
-	expectError:     `record not found`,
+	expectError:     `model not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name:            "Unauthorized",
 	env:             destroyModelTestEnv,
 	username:        "bob@external",
 	uuid:            "00000002-0000-0000-0000-000000000001",
-	expectError:     `unauthorized access`,
+	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
 }, {
 	name: "Success",
@@ -2805,7 +2805,7 @@ var updateModelCredentialTests = []struct {
 	username:        "charlie@external",
 	credential:      "dummy/alice@external/cred-2",
 	uuid:            "00000002-0000-0000-0000-000000000001",
-	expectError:     "unauthorized access",
+	expectError:     "unauthorized",
 	expectErrorCode: errors.CodeUnauthorized,
 }, {
 	name:            "model not found",
@@ -2813,8 +2813,8 @@ var updateModelCredentialTests = []struct {
 	username:        "charlie@external",
 	credential:      "dummy/alice@external/cred-2",
 	uuid:            "00000002-0000-0000-0000-000000000002",
-	expectError:     "record not found",
-	expectErrorCode: errors.CodeNotFound,
+	expectError:     "unauthorized",
+	expectErrorCode: errors.CodeUnauthorized,
 }, {
 	name: "credential not found",
 	env:  updateModelCredentialTestEnv,

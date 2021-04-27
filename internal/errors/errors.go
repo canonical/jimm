@@ -9,6 +9,7 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"go.uber.org/zap"
 
+	apiparams "github.com/CanonicalLtd/jimm/api/params"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 )
 
@@ -107,6 +108,7 @@ type Code string
 const (
 	CodeAlreadyExists       Code = jujuparams.CodeAlreadyExists
 	CodeBadRequest          Code = jujuparams.CodeBadRequest
+	CodeCloudRegionRequired Code = jujuparams.CodeCloudRegionRequired
 	CodeConnectionFailed    Code = "connection failed"
 	CodeDatabaseLocked      Code = "database locked"
 	CodeIncompatibleClouds  Code = jujuparams.CodeIncompatibleClouds
@@ -114,6 +116,7 @@ const (
 	CodeNotImplemented      Code = jujuparams.CodeNotImplemented
 	CodeNotSupported        Code = jujuparams.CodeNotSupported
 	CodeServerConfiguration Code = "server configuration"
+	CodeStillAlive          Code = apiparams.CodeStillAlive
 	CodeUnauthorized        Code = jujuparams.CodeUnauthorized
 	CodeUpgradeInProgress   Code = jujuparams.CodeUpgradeInProgress
 )
