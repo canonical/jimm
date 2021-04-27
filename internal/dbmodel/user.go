@@ -5,6 +5,7 @@ package dbmodel
 import (
 	"database/sql"
 
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 	"gorm.io/gorm"
 )
@@ -61,4 +62,17 @@ func (u User) Tag() names.Tag {
 // SetTag sets the username of the user to the value from the given tag.
 func (u *User) SetTag(t names.UserTag) {
 	u.Username = t.Id()
+}
+
+// ToJujuUserInfo convers a User into a juju UserInfo value.
+func (u User) ToJujuUserInfo() jujuparams.UserInfo {
+	var ui jujuparams.UserInfo
+	ui.Username = u.Username
+	ui.DisplayName = u.DisplayName
+	ui.Access = u.ControllerAccess
+	ui.DateCreated = u.CreatedAt
+	if u.LastLogin.Valid {
+		ui.LastConnection = &u.LastLogin.Time
+	}
+	return ui
 }

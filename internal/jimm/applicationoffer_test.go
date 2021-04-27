@@ -130,6 +130,7 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database) 
 		URL:             "test-offer-url",
 		Name:            "test-offer",
 		ModelID:         model.ID,
+		Model:           model,
 		ApplicationName: "test-app",
 		Application: dbmodel.Application{
 			ID:       1,
@@ -564,6 +565,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 		ID:              1,
 		URL:             "test-offer-url",
 		ModelID:         model.ID,
+		Model:           model,
 		ApplicationName: "test-app",
 		Application: dbmodel.Application{
 			ID:       1,
@@ -589,6 +591,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 	j := &jimm.JIMM{
 		Database: db,
 		Dialer: &jimmtest.Dialer{
+			UUID: "00000000-0000-0000-0000-0000-0000000000001",
 			API: &jimmtest.API{
 				GetApplicationOfferConsumeDetails_: func(ctx context.Context, user names.UserTag, details *jujuparams.ConsumeOfferDetails, v bakery.Version) error {
 					details.Offer = &jujuparams.ApplicationOfferDetails{
@@ -2431,21 +2434,21 @@ func TestFindApplicationOffers(t *testing.T) {
 	now := time.Now().UTC().Round(time.Millisecond)
 
 	expectedOffer := dbmodel.ApplicationOffer{
-		ID:              1,
-		UUID:            "00000000-0000-0000-0000-0000-0000000000011",
-		URL:             "test-offer-url",
-		Name:            "test-offer",
-		ModelID:         1,
+		ID:      1,
+		UUID:    "00000000-0000-0000-0000-0000-0000000000011",
+		URL:     "test-offer-url",
+		Name:    "test-offer",
+		ModelID: 1,
+		Model: dbmodel.Model{
+			UUID: sql.NullString{
+				String: "00000000-0000-0000-0000-0000-0000000000003",
+				Valid:  true,
+			},
+		},
 		ApplicationName: "test-app",
 		Application: dbmodel.Application{
-			ID:      1,
-			ModelID: 1,
-			Model: dbmodel.Model{
-				UUID: sql.NullString{
-					String: "00000000-0000-0000-0000-0000-0000000000003",
-					Valid:  true,
-				},
-			},
+			ID:       1,
+			ModelID:  1,
 			Name:     "test-app",
 			Exposed:  true,
 			CharmURL: "cs:test-app:17",

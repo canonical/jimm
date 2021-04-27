@@ -9,6 +9,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/names/v4"
 
+	apiparams "github.com/CanonicalLtd/jimm/api/params"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 )
 
@@ -29,4 +30,43 @@ func TestAuditLogEntry(t *testing.T) {
 	var ale2 dbmodel.AuditLogEntry
 	c.Assert(db.First(&ale2).Error, qt.IsNil)
 	c.Check(ale2, qt.DeepEquals, ale)
+}
+
+func TestToAPIAuditEvent(t *testing.T) {
+	c := qt.New(t)
+
+	ale := dbmodel.AuditLogEntry{
+		Time:    time.Now(),
+		Tag:     names.NewModelTag("00000001-0000-0000-0000-0000-000000000008").String(),
+		UserTag: names.NewUserTag("bob@external").String(),
+		Action:  "created",
+		Success: true,
+		Params:  dbmodel.StringMap{"a": "b", "c": "d"},
+	}
+	event := ale.ToAPIAuditEvent()
+	c.Check(event, qt.DeepEquals, apiparams.AuditEvent{
+		Time:    ale.Time,
+		Tag:     names.NewModelTag("00000001-0000-0000-0000-0000-000000000008").String(),
+		UserTag: names.NewUserTag("bob@external").String(),
+		Action:  "created",
+		Params: map[string]string{
+			"a":       "b",
+			"c":       "d",
+			"success": "true",
+		},
+	})
+
+	ale.Success = false
+	event = ale.ToAPIAuditEvent()
+	c.Check(event, qt.DeepEquals, apiparams.AuditEvent{
+		Time:    ale.Time,
+		Tag:     names.NewModelTag("00000001-0000-0000-0000-0000-000000000008").String(),
+		UserTag: names.NewUserTag("bob@external").String(),
+		Action:  "created",
+		Params: map[string]string{
+			"a":       "b",
+			"c":       "d",
+			"success": "false",
+		},
+	})
 }

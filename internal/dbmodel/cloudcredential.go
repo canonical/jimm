@@ -40,6 +40,9 @@ type CloudCredential struct {
 
 	// Valid stores whether the cloud-credential is known to be valid.
 	Valid sql.NullBool
+
+	// Models contains the models using this credential.
+	Models []Model
 }
 
 // Tag returns a names.Tag for the cloud-credential.

@@ -167,6 +167,16 @@ func (m *Model) FromJujuModelUpdate(info jujuparams.ModelUpdate) {
 	m.SLA.FromJujuModelSLAInfo(info.SLA)
 }
 
+// ToJujuModel converts a model into a jujuparams.Model.
+func (m Model) ToJujuModel() jujuparams.Model {
+	var jm jujuparams.Model
+	jm.Name = m.Name
+	jm.UUID = m.UUID.String
+	jm.Type = m.Type
+	jm.OwnerTag = names.NewUserTag(m.OwnerUsername).String()
+	return jm
+}
+
 // ToJujuModelInfo converts a model into a jujuparams.ModelInfo. The model
 // must have its Applications, CloudRegion, CloudCredential, Controller,
 // Machines, Owner, and Users associations fetched. The ModelInfo is
@@ -326,7 +336,7 @@ func (a *UserModelAccess) FromJujuModelUserInfo(u jujuparams.ModelUserInfo) {
 	}
 }
 
-// ToJujuModelUserInfo covnerts a UserModelAccess into a
+// ToJujuModelUserInfo converts a UserModelAccess into a
 // jujuparams.ModelUserInfo. The UserModelAccess must have its User
 // association loaded.
 func (a UserModelAccess) ToJujuModelUserInfo() jujuparams.ModelUserInfo {
@@ -340,6 +350,33 @@ func (a UserModelAccess) ToJujuModelUserInfo() jujuparams.ModelUserInfo {
 	}
 	mui.Access = jujuparams.UserAccessPermission(a.Access)
 	return mui
+}
+
+// ToUserModel converts a UserModelAccess into a jujuparams.ModelUserInfo.
+// The UserModelAccess must have its Model_ association loaded.
+func (a UserModelAccess) ToJujuUserModel() jujuparams.UserModel {
+	var um jujuparams.UserModel
+	um.Model = a.Model_.ToJujuModel()
+	if a.LastConnection.Valid {
+		um.LastConnection = &a.LastConnection.Time
+	} else {
+		um.LastConnection = nil
+	}
+	return um
+}
+
+// ToJujuModelSummary converts a UserModelAccess to a
+// jujuparams.ModelSummary. The UserModelAccess must have its Model_
+// association filled out.
+func (a UserModelAccess) ToJujuModelSummary() jujuparams.ModelSummary {
+	ms := a.Model_.ToJujuModelSummary()
+	ms.UserAccess = jujuparams.UserAccessPermission(a.Access)
+	if a.LastConnection.Valid {
+		ms.UserLastConnection = &a.LastConnection.Time
+	} else {
+		ms.UserLastConnection = nil
+	}
+	return ms
 }
 
 // A Status holds the entity status of an object.

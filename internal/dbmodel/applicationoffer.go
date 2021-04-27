@@ -4,14 +4,13 @@ package dbmodel
 
 import (
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/juju/charm/v8"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 	"gorm.io/gorm"
-
-	"github.com/CanonicalLtd/jimm/internal/conv"
 )
 
 // An ApplicationOffer is an offer for an application.
@@ -96,18 +95,14 @@ func (o *ApplicationOffer) FromJujuApplicationOfferAdminDetails(offerDetails juj
 
 	o.Users = []UserApplicationOfferAccess{}
 	for _, user := range offerDetails.Users {
-		// TODO (mhilton) see what we can do to get rid of params.User
-		pu, err := conv.FromUserID(user.UserName)
-		if err != nil {
-			// If we can't parse the user, it's either a local user which
-			// we don't store, or an invalid user which can't do anything.
+		if strings.IndexByte(user.UserName, '@') < 0 {
+			// skip controller local users.
 			continue
 		}
-
 		o.Users = append(o.Users, UserApplicationOfferAccess{
-			Username: string(pu),
+			Username: user.UserName,
 			User: User{
-				Username: string(pu),
+				Username: user.UserName,
 			},
 			Access: user.Access,
 		})
@@ -180,7 +175,7 @@ func (o *ApplicationOffer) ToJujuApplicationOfferDetails() jujuparams.Applicatio
 	}
 	return jujuparams.ApplicationOfferAdminDetails{
 		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
-			SourceModelTag:         o.Application.Model.Tag().String(),
+			SourceModelTag:         o.Model.Tag().String(),
 			OfferUUID:              o.UUID,
 			OfferURL:               o.URL,
 			OfferName:              o.Name,

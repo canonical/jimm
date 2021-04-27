@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	apiparams "github.com/CanonicalLtd/jimm/api/params"
 )
 
 // An AuditLogEntry is an entry in the audit log.
@@ -35,4 +37,23 @@ type AuditLogEntry struct {
 // AuditLogEntry records.
 func (AuditLogEntry) TableName() string {
 	return "audit_log"
+}
+
+// ToAPIAuditEvent convers an AuditLogEntry to a JIMM API AuditEvent.
+func (e AuditLogEntry) ToAPIAuditEvent() apiparams.AuditEvent {
+	var ale apiparams.AuditEvent
+	ale.Time = e.Time
+	ale.Tag = e.Tag
+	ale.UserTag = e.UserTag
+	ale.Action = e.Action
+	ale.Params = make(map[string]string)
+	if e.Success {
+		ale.Params["success"] = "true"
+	} else {
+		ale.Params["success"] = "false"
+	}
+	for k, v := range e.Params {
+		ale.Params[k] = v
+	}
+	return ale
 }
