@@ -7,6 +7,7 @@ import (
 
 	jujuparams "github.com/juju/juju/apiserver/params"
 
+	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 )
@@ -28,21 +29,29 @@ func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	isSuperuser := u.ControllerAccess == "superuser"
-	u.ControllerAccess = ""
 
-	if err := j.Database.GetUser(ctx, u); err != nil {
-		return nil, errors.E(op, err)
-	}
-	// Update the last-login time.
-	u.LastLogin.Time = j.Database.DB.Config.NowFunc()
-	u.LastLogin.Valid = true
-	if err := j.Database.UpdateUser(ctx, u); err != nil {
-		return nil, errors.E(op, err)
-	}
-
-	if isSuperuser {
-		u.ControllerAccess = "superuser"
-	}
+	err = j.Database.Transaction(func(tx *db.Database) error {
+		pu := dbmodel.User{
+			Username: u.Username,
+		}
+		if err := tx.GetUser(ctx, &pu); err != nil {
+			return err
+		}
+		u.Model = pu.Model
+		u.LastLogin = pu.LastLogin
+		if u.ControllerAccess == "" {
+			u.ControllerAccess = pu.ControllerAccess
+		}
+		if u.AuditLogAccess == "" {
+			u.AuditLogAccess = pu.AuditLogAccess
+		}
+		// TODO(mhilton) support disabled users.
+		if u.DisplayName != "" {
+			pu.DisplayName = u.DisplayName
+		}
+		pu.LastLogin.Time = j.Database.DB.Config.NowFunc()
+		pu.LastLogin.Valid = true
+		return tx.UpdateUser(ctx, &pu)
+	})
 	return u, nil
 }

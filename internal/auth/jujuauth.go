@@ -11,7 +11,6 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 
-	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
@@ -68,8 +67,8 @@ func (a JujuAuthenticator) Authenticate(ctx context.Context, req *jujuparams.Log
 		ut = ut.WithDomain("external")
 	}
 	u := &dbmodel.User{
-		Username:  ut.Id(),
-		LastLogin: db.Now(),
+		Username:    ut.Id(),
+		DisplayName: ut.Name(),
 	}
 	if id, ok := authInfo.Identity.(identchecker.ACLIdentity); ok {
 		if ok, _ := id.Allow(ctx, a.ControllerAdmins); ok {
