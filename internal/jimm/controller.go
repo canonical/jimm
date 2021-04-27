@@ -469,5 +469,38 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 		return errors.E(op, err)
 	}
 
+	modelAPI, err := j.dial(ctx, &controller, modelTag)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	defer modelAPI.Close()
+
+	watcherID, err := modelAPI.WatchAll(ctx)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	defer modelAPI.ModelWatcherStop(ctx, watcherID)
+
+	deltas, err := modelAPI.ModelWatcherNext(ctx, watcherID)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	modelIDf := func(uuid string) uint {
+		if uuid == model.UUID.String {
+			return model.ID
+		}
+		return 0
+	}
+
+	w := &Watcher{
+		Database: j.Database,
+	}
+	for _, d := range deltas {
+		if err := w.handleDelta(ctx, modelIDf, d); err != nil {
+			return errors.E(op, err)
+		}
+	}
+
 	return nil
 }
