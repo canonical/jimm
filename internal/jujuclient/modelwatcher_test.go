@@ -12,6 +12,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jujuclient"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/core/network"
 )
 
 type modelWatcherSuite struct {
@@ -27,12 +28,23 @@ func (s *modelWatcherSuite) SetUpTest(c *gc.C) {
 	s.Dialer = jujuclient.Dialer{}
 	var err error
 	info := s.APIInfo(c)
+	hpss := make(dbmodel.HostPorts, 0, len(info.Addrs))
+	for _, addr := range info.Addrs {
+		hp, err := network.ParseMachineHostPort(addr)
+		if err != nil {
+			continue
+		}
+		hpss = append(hpss, []jujuparams.HostPort{{
+			Address: jujuparams.FromMachineAddress(hp.MachineAddress),
+			Port:    hp.Port(),
+		}})
+	}
 	ctl := dbmodel.Controller{
 		Name:          s.ControllerConfig.ControllerName(),
 		CACertificate: info.CACert,
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
-		Addresses:     dbmodel.Strings(info.Addrs),
+		Addresses:     hpss,
 	}
 
 	s.API, err = s.Dialer.Dial(context.Background(), &ctl, s.Model.ModelTag())
