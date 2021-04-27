@@ -94,6 +94,13 @@ type API interface {
 	// AddCloud adds a new cloud.
 	AddCloud(context.Context, names.CloudTag, jujuparams.Cloud) error
 
+	// AllModelWatcherNext returns the next set of deltas from an
+	// all-model watcher.
+	AllModelWatcherNext(context.Context, string) ([]jujuparams.Delta, error)
+
+	// AllModelWatcherStop stops an all-model watcher.
+	AllModelWatcherStop(context.Context, string) error
+
 	// ChangeModelCredential replaces cloud credential for a given model with the provided one.
 	ChangeModelCredential(context.Context, names.ModelTag, names.CloudCredentialTag) error
 
@@ -158,6 +165,9 @@ type API interface {
 	// GrantModelAccess grants model access to a user.
 	GrantModelAccess(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
 
+	// IsBroken returns true if the API connection has failed.
+	IsBroken() bool
+
 	// ListApplicationOffers lists application offers that match the
 	// filter.
 	ListApplicationOffers(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error)
@@ -174,6 +184,7 @@ type API interface {
 
 	// ModelSummaryWatcherStop stops a model summary watcher.
 	ModelSummaryWatcherStop(context.Context, string) error
+
 	// Offer creates a new application-offer.
 	Offer(context.Context, jujuparams.AddApplicationOffer) error
 
@@ -212,6 +223,9 @@ type API interface {
 
 	// WatchAllModelSummaries creates a ModelSummaryWatcher.
 	WatchAllModelSummaries(context.Context) (string, error)
+
+	// WatchAllModels creates a megawatcher.
+	WatchAllModels(context.Context) (string, error)
 }
 
 // forEachController runs a given function on multiple controllers

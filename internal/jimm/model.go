@@ -326,7 +326,7 @@ func (b *modelBuilder) UpdateDatabaseModel() *modelBuilder {
 	if b.err != nil {
 		return b
 	}
-	err := b.model.FromJujuModelInfo(b.modelInfo)
+	err := b.model.FromJujuModelInfo(*b.modelInfo)
 	if err != nil {
 		b.err = errors.E(err, "failed to convert model info")
 		return b

@@ -269,6 +269,7 @@ CREATE TABLE machines (
 	instance_status_data BYTEA,
 	instance_status_since TIMESTAMP WITH TIME ZONE,
 	instance_status_version TEXT NOT NULL,
+	life TEXT NOT NULL,
 	has_vote BOOLEAN NOT NULL,
 	wants_vote BOOLEAN NOT NULL,
 	series TEXT NOT NULL,

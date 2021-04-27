@@ -48,6 +48,9 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model, options .
 	db := d.DB.WithContext(ctx)
 	if model.UUID.Valid {
 		db = db.Where("uuid = ?", model.UUID.String)
+		if model.ControllerID != 0 {
+			db = db.Where("controller_id = ?", model.ControllerID)
+		}
 	} else if model.ID != 0 {
 		db = db.Where("id = ?", model.ID)
 	} else {
@@ -175,4 +178,151 @@ func preloadModel(prefix string, db *gorm.DB) *gorm.DB {
 	db = db.Preload(prefix + "Users").Preload(prefix + "Users.User")
 
 	return db
+}
+
+// GetApplication retrieves the application identified by ModelID and Name.
+func (d *Database) GetApplication(ctx context.Context, app *dbmodel.Application) error {
+	const op = errors.Op("db.GetApplication")
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	db := d.DB.WithContext(ctx)
+	if err := db.Where("model_id = ? AND name = ?", app.ModelID, app.Name).First(app).Error; err != nil {
+		err = dbError(err)
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return errors.E(op, err, "application not found")
+		}
+		return errors.E(op, err)
+	}
+	return nil
+}
+
+// DeleteApplication deletes the application identified by ModelID and Name.
+func (d *Database) DeleteApplication(ctx context.Context, app *dbmodel.Application) error {
+	const op = errors.Op("db.DeleteApplication")
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	db := d.DB.WithContext(ctx)
+	if err := db.Where("model_id = ? AND name = ?", app.ModelID, app.Name).Delete(&dbmodel.Application{}).Error; err != nil {
+		return errors.E(op, dbError(err))
+	}
+	return nil
+}
+
+// UpdateApplication updates the application information.
+func (d *Database) UpdateApplication(ctx context.Context, app *dbmodel.Application) error {
+	const op = errors.Op("db.UpdateApplication")
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	db := d.DB.WithContext(ctx)
+	if err := db.Save(app).Error; err != nil {
+		return errors.E(op, dbError(err))
+	}
+	return nil
+}
+
+// GetMachine retrieves a machine identified by ModelID and MachineID.
+func (d *Database) GetMachine(ctx context.Context, m *dbmodel.Machine) error {
+	const op = errors.Op("db.GetMachine")
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	db := d.DB.WithContext(ctx)
+	if err := db.Where("model_id = ? AND machine_id = ?", m.ModelID, m.MachineID).First(m).Error; err != nil {
+		err = dbError(err)
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return errors.E(op, err, "machine not found")
+		}
+		return errors.E(op, err)
+	}
+	return nil
+}
+
+// DeleteMachine deletes the machine identified by ModelID and MachineID.
+func (d *Database) DeleteMachine(ctx context.Context, m *dbmodel.Machine) error {
+	const op = errors.Op("db.DeleteMachine")
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	db := d.DB.WithContext(ctx)
+	if err := db.Where("model_id = ? AND machine_id = ?", m.ModelID, m.MachineID).Delete(&dbmodel.Machine{}).Error; err != nil {
+		return errors.E(op, dbError(err))
+	}
+	return nil
+}
+
+// UpdateMachine updates the machine information.
+func (d *Database) UpdateMachine(ctx context.Context, m *dbmodel.Machine) error {
+	const op = errors.Op("db.UpdateMachine")
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	db := d.DB.WithContext(ctx)
+	if err := db.Save(m).Error; err != nil {
+		return errors.E(op, dbError(err))
+	}
+	return nil
+}
+
+// GetUnit retrieves a unit identified by ModelID and Name.
+func (d *Database) GetUnit(ctx context.Context, u *dbmodel.Unit) error {
+	const op = errors.Op("db.GetUnit")
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	db := d.DB.WithContext(ctx)
+	if err := db.Where("model_id = ? AND name = ?", u.ModelID, u.Name).First(u).Error; err != nil {
+		err = dbError(err)
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return errors.E(op, err, "unit not found")
+		}
+		return errors.E(op, err)
+	}
+	return nil
+}
+
+// DeleteUnit deletes the unit identified by ModelID and Name.
+func (d *Database) DeleteUnit(ctx context.Context, u *dbmodel.Unit) error {
+	const op = errors.Op("db.DeleteUnit")
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	db := d.DB.WithContext(ctx)
+	if err := db.Where("model_id = ? AND name = ?", u.ModelID, u.Name).Delete(&dbmodel.Unit{}).Error; err != nil {
+		return errors.E(op, dbError(err))
+	}
+	return nil
+}
+
+// UpdateUnit updates the unit information.
+func (d *Database) UpdateUnit(ctx context.Context, u *dbmodel.Unit) error {
+	const op = errors.Op("db.UpdateUnit")
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	db := d.DB.WithContext(ctx)
+	if err := db.Save(u).Error; err != nil {
+		return errors.E(op, dbError(err))
+	}
+	return nil
 }

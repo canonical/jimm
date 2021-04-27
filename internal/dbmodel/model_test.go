@@ -9,6 +9,8 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/core/constraints"
+	"github.com/juju/juju/core/instance"
 	"github.com/juju/names/v4"
 	"gorm.io/gorm"
 
@@ -589,7 +591,7 @@ func TestModelFromJujuModelInfo(t *testing.T) {
 	}
 
 	model := dbmodel.Model{}
-	err := model.FromJujuModelInfo(&modelInfo)
+	err := model.FromJujuModelInfo(modelInfo)
 	c.Assert(err, qt.IsNil)
 
 	c.Assert(model, qt.DeepEquals, dbmodel.Model{
@@ -652,5 +654,244 @@ func TestModelFromJujuModelInfo(t *testing.T) {
 				DisplayName: "Bobby The Tester",
 			},
 		}},
+	})
+}
+
+func TestModelFromJujuModelUpdate(t *testing.T) {
+	c := qt.New(t)
+	now := time.Now().UTC().Truncate(time.Millisecond)
+
+	info := jujuparams.ModelUpdate{
+		Name: "test-model",
+		Life: "alive",
+		Status: jujuparams.StatusInfo{
+			Current: "available",
+			Since:   &now,
+		},
+		SLA: jujuparams.ModelSLAInfo{
+			Level: "unsupported",
+		},
+	}
+
+	model := dbmodel.Model{}
+	model.FromJujuModelUpdate(info)
+	c.Assert(model, qt.DeepEquals, dbmodel.Model{
+		Name: "test-model",
+		Life: "alive",
+		Status: dbmodel.Status{
+			Status: "available",
+			Since: sql.NullTime{
+				Time:  now,
+				Valid: true,
+			},
+		},
+		SLA: dbmodel.SLA{
+			Level: "unsupported",
+		},
+	})
+}
+
+func TestMachineFromJujuMachineInfo(t *testing.T) {
+	c := qt.New(t)
+	now := time.Now().UTC().Truncate(time.Millisecond)
+
+	arch := "amd64"
+	mem := uint64(8096)
+	rootDisk := uint64(10240)
+	info := jujuparams.MachineInfo{
+		Id:         "0",
+		InstanceId: "machine-0",
+		AgentStatus: jujuparams.StatusInfo{
+			Current: "idle",
+			Message: "okay",
+			Since:   &now,
+			Version: "1.2.3",
+		},
+		InstanceStatus: jujuparams.StatusInfo{
+			Current: "running",
+			Message: "hello",
+			Since:   &now,
+			Version: "1.2.4",
+		},
+		Life:   "alive",
+		Series: "warty",
+		HardwareCharacteristics: &instance.HardwareCharacteristics{
+			Arch:     &arch,
+			Mem:      &mem,
+			RootDisk: &rootDisk,
+		},
+		HasVote:   true,
+		WantsVote: true,
+	}
+
+	machine := dbmodel.Machine{}
+	machine.FromJujuMachineInfo(info)
+	c.Assert(machine, qt.DeepEquals, dbmodel.Machine{
+		MachineID: "0",
+		Hardware: dbmodel.Hardware{
+			Arch: sql.NullString{
+				String: "amd64",
+				Valid:  true,
+			},
+			Mem: dbmodel.NullUint64{
+				Uint64: 8096,
+				Valid:  true,
+			},
+			RootDisk: dbmodel.NullUint64{
+				Uint64: 10240,
+				Valid:  true,
+			},
+		},
+		InstanceID: "machine-0",
+		AgentStatus: dbmodel.Status{
+			Status: "idle",
+			Info:   "okay",
+			Since: sql.NullTime{
+				Time:  now,
+				Valid: true,
+			},
+			Version: "1.2.3",
+		},
+		InstanceStatus: dbmodel.Status{
+			Status: "running",
+			Info:   "hello",
+			Since: sql.NullTime{
+				Time:  now,
+				Valid: true,
+			},
+			Version: "1.2.4",
+		},
+		Life:      "alive",
+		HasVote:   true,
+		WantsVote: true,
+		Series:    "warty",
+	})
+}
+
+func TestApplicationFromJujuApplicationInfo(t *testing.T) {
+	c := qt.New(t)
+	now := time.Now().UTC().Truncate(time.Millisecond)
+
+	arch := "amd64"
+	mem := uint64(8096)
+	rootDisk := uint64(10240)
+	info := jujuparams.ApplicationInfo{
+		Name:     "app-1",
+		Exposed:  true,
+		CharmURL: "cs:app-1",
+		Life:     "alive",
+		MinUnits: 3,
+		Constraints: constraints.Value{
+			Arch:     &arch,
+			Mem:      &mem,
+			RootDisk: &rootDisk,
+		},
+		Subordinate: false,
+		Status: jujuparams.StatusInfo{
+			Current: "idle",
+			Message: "okay",
+			Since:   &now,
+			Version: "1.2.3",
+		},
+		WorkloadVersion: "12",
+	}
+
+	application := dbmodel.Application{}
+	application.FromJujuApplicationInfo(info)
+	c.Assert(application, qt.DeepEquals, dbmodel.Application{
+		Name:     "app-1",
+		Exposed:  true,
+		CharmURL: "cs:app-1",
+		Life:     "alive",
+		MinUnits: 3,
+		Constraints: dbmodel.Hardware{
+			Arch: sql.NullString{
+				String: "amd64",
+				Valid:  true,
+			},
+			Mem: dbmodel.NullUint64{
+				Uint64: 8096,
+				Valid:  true,
+			},
+			RootDisk: dbmodel.NullUint64{
+				Uint64: 10240,
+				Valid:  true,
+			},
+		},
+		Subordinate: false,
+		Status: dbmodel.Status{
+			Status: "idle",
+			Info:   "okay",
+			Since: sql.NullTime{
+				Time:  now,
+				Valid: true,
+			},
+			Version: "1.2.3",
+		},
+		WorkloadVersion: "12",
+	})
+}
+
+func TestUnitFromJujuUnitInfo(t *testing.T) {
+	c := qt.New(t)
+	now := time.Now().UTC().Truncate(time.Millisecond)
+
+	info := jujuparams.UnitInfo{
+		Name:           "app-1/0",
+		Application:    "app-1",
+		Series:         "warty",
+		CharmURL:       "cs:app-1",
+		Life:           "alive",
+		PublicAddress:  "public-address",
+		PrivateAddress: "private-address",
+		MachineId:      "0",
+		Ports:          []jujuparams.Port{{Protocol: "tcp", Number: 8080}},
+		PortRanges:     []jujuparams.PortRange{{FromPort: 8080, ToPort: 8090, Protocol: "tcp"}},
+		Principal:      "Skinner",
+		Subordinate:    false,
+		WorkloadStatus: jujuparams.StatusInfo{
+			Current: "idle",
+			Message: "okay",
+			Since:   &now,
+			Version: "1.2.3",
+		},
+		AgentStatus: jujuparams.StatusInfo{
+			Current: "running",
+			Message: "hello",
+			Since:   &now,
+			Version: "1.2.4",
+		},
+	}
+
+	unit := dbmodel.Unit{}
+	unit.FromJujuUnitInfo(info)
+	c.Assert(unit, qt.DeepEquals, dbmodel.Unit{
+		Name:            "app-1/0",
+		ApplicationName: "app-1",
+		MachineID:       "0",
+		Life:            "alive",
+		PublicAddress:   "public-address",
+		PrivateAddress:  "private-address",
+		Ports:           dbmodel.Ports{{Protocol: "tcp", Number: 8080}},
+		PortRanges:      dbmodel.PortRanges{{FromPort: 8080, ToPort: 8090, Protocol: "tcp"}},
+		Principal:       "Skinner",
+		WorkloadStatus: dbmodel.Status{
+			Status: "idle",
+			Info:   "okay",
+			Since: sql.NullTime{
+				Time:  now,
+				Valid: true,
+			},
+			Version: "1.2.3",
+		},
+		AgentStatus: dbmodel.Status{
+			Status: "running",
+			Info:   "hello",
+			Since: sql.NullTime{
+				Time:  now,
+				Valid: true,
+			},
+			Version: "1.2.4",
+		},
 	})
 }

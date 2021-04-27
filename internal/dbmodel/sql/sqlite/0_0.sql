@@ -268,6 +268,7 @@ CREATE TABLE machines (
 	instance_status_data BLOB,
 	instance_status_since DATETIME,
 	instance_status_version TEXT NOT NULL,
+	life TEXT NOT NULL,
 	has_vote INTEGER NOT NULL,
 	wants_vote INTEGER NOT NULL,
 	series TEXT NOT NULL,

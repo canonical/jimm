@@ -333,3 +333,90 @@ func (s *dbSuite) TestDeleteController(c *qt.C) {
 	err = s.Database.DeleteController(context.Background(), &dbmodel.Controller{})
 	c.Assert(err, qt.ErrorMatches, "controller not found")
 }
+
+func TestForEachControllerModelUnconfiguredDatabase(t *testing.T) {
+	c := qt.New(t)
+
+	var d db.Database
+	err := d.ForEachControllerModel(context.Background(), nil, nil)
+	c.Check(err, qt.ErrorMatches, `database not configured`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
+}
+
+const testForEachControllerModelEnv = `clouds:
+- name: test
+  type: test
+  regions:
+  - name: test-region
+cloud-credentials:
+- name: test-cred
+  cloud: test
+  owner: alice@external
+  type: empty
+controllers:
+- name: test
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test
+  region: test-region
+- name: test-2
+  uuid: 00000001-0000-0000-0000-000000000002
+  cloud: test
+  region: test-region
+models:
+- name: test-1
+  owner: alice@external
+  uuid: 00000002-0000-0000-0000-000000000001
+  controller: test
+  cloud: test
+  region: test-region
+  cloud-credential: test-cred
+- name: test-2
+  owner: alice@external
+  uuid: 00000002-0000-0000-0000-000000000002
+  controller: test
+  cloud: test
+  region: test-region
+  cloud-credential: test-cred
+- name: test-3
+  owner: alice@external
+  uuid: 00000002-0000-0000-0000-000000000003
+  controller: test-2
+  cloud: test
+  region: test-region
+  cloud-credential: test-cred
+- name: test-4
+  owner: alice@external
+  uuid: 00000002-0000-0000-0000-000000000004
+  controller: test
+  cloud: test
+  region: test-region
+  cloud-credential: test-cred
+`
+
+func (s *dbSuite) TestForEachControllerModel(c *qt.C) {
+	ctx := context.Background()
+	err := s.Database.Migrate(context.Background(), true)
+	c.Assert(err, qt.Equals, nil)
+
+	env := jimmtest.ParseEnvironment(c, testForEachControllerModelEnv)
+	env.PopulateDB(c, *s.Database)
+
+	ctl := env.Controller("test").DBObject(c, *s.Database)
+	testError := errors.E("test error")
+	err = s.Database.ForEachControllerModel(ctx, &ctl, func(_ *dbmodel.Model) error {
+		return testError
+	})
+	c.Check(err, qt.Equals, testError)
+
+	var models []string
+	err = s.Database.ForEachControllerModel(ctx, &ctl, func(model *dbmodel.Model) error {
+		models = append(models, model.UUID.String)
+		return nil
+	})
+	c.Assert(err, qt.IsNil)
+	c.Check(models, qt.DeepEquals, []string{
+		"00000002-0000-0000-0000-000000000001",
+		"00000002-0000-0000-0000-000000000002",
+		"00000002-0000-0000-0000-000000000004",
+	})
+}

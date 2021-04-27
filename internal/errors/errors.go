@@ -103,13 +103,14 @@ const (
 	CodeAlreadyExists       Code = jujuparams.CodeAlreadyExists
 	CodeBadRequest          Code = jujuparams.CodeBadRequest
 	CodeConnectionFailed    Code = "connection failed"
+	CodeDatabaseLocked      Code = "database locked"
 	CodeIncompatibleClouds  Code = jujuparams.CodeIncompatibleClouds
 	CodeNotFound            Code = jujuparams.CodeNotFound
 	CodeNotImplemented      Code = jujuparams.CodeNotImplemented
+	CodeNotSupported        Code = jujuparams.CodeNotSupported
 	CodeServerConfiguration Code = "server configuration"
 	CodeUnauthorized        Code = jujuparams.CodeUnauthorized
 	CodeUpgradeInProgress   Code = jujuparams.CodeUpgradeInProgress
-	CodeNotSupported        Code = jujuparams.CodeNotSupported
 )
 
 // ErrorCode returns the error code from the given error.

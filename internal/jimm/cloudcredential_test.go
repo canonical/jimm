@@ -5,6 +5,7 @@ package jimm_test
 import (
 	"context"
 	"database/sql"
+	"sync"
 	"testing"
 	"time"
 
@@ -980,9 +981,12 @@ func TestRevokeCloudCredential(t *testing.T) {
 	}}
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
+			var mu sync.Mutex
 			revokeErrors := test.revokeCredentialErrors
 			api := &jimmtest.API{
 				RevokeCredential_: func(context.Context, names.CloudCredentialTag) error {
+					mu.Lock()
+					defer mu.Unlock()
 					if len(revokeErrors) > 0 {
 						var err error
 						err, revokeErrors = revokeErrors[0], revokeErrors[1:]

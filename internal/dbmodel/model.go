@@ -7,6 +7,8 @@ import (
 	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/core/constraints"
+	"github.com/juju/juju/core/instance"
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
 	"github.com/juju/names/v4"
@@ -70,6 +72,9 @@ type Model struct {
 	// Machines are the machines attached to the model.
 	Machines []Machine
 
+	// Units are the units attached to the model.
+	Units []Unit
+
 	// Users are the users that can access the model.
 	Users []UserModelAccess
 }
@@ -100,13 +105,10 @@ func (m *Model) UserAccess(u *User) string {
 }
 
 // FromJujuModelInfo converts jujuparams.ModelInfo into Model.
-func (m *Model) FromJujuModelInfo(info *jujuparams.ModelInfo) error {
+func (m *Model) FromJujuModelInfo(info jujuparams.ModelInfo) error {
 	m.Name = info.Name
 	m.Type = info.Type
-	m.UUID = sql.NullString{
-		String: info.UUID,
-		Valid:  true,
-	}
+	SetNullString(&m.UUID, &info.UUID)
 	m.IsController = info.IsController
 	m.DefaultSeries = info.DefaultSeries
 	if info.OwnerTag != "" {
@@ -155,6 +157,14 @@ func (m *Model) FromJujuModelInfo(info *jujuparams.ModelInfo) error {
 		m.Status.Version = info.AgentVersion.String()
 	}
 	return nil
+}
+
+// FromModelUpdate updates the model from the given ModelUpdate.
+func (m *Model) FromJujuModelUpdate(info jujuparams.ModelUpdate) {
+	m.Name = info.Name
+	m.Life = string(info.Life)
+	m.Status.FromJujuStatusInfo(info.Status)
+	m.SLA.FromJujuModelSLAInfo(info.SLA)
 }
 
 // ToJujuModelInfo converts a model into a jujuparams.ModelInfo. The model
@@ -341,17 +351,36 @@ type Status struct {
 	Version string
 }
 
-// FromJujuEntityStatus convers jujuparams.EntitytStatus into Status.
+// FromJujuEntityStatus converts jujuparams.EntityStatus into Status.
 func (s *Status) FromJujuEntityStatus(js jujuparams.EntityStatus) {
 	s.Status = string(js.Status)
 	s.Info = js.Info
 	s.Data = Map(js.Data)
-	if js.Since != nil {
+	if js.Since == nil {
+		s.Since = sql.NullTime{Valid: false}
+	} else {
 		s.Since = sql.NullTime{
 			Time:  js.Since.UTC().Truncate(time.Millisecond),
 			Valid: true,
 		}
 	}
+}
+
+// FromJujuStatusInfo updates the Status from the given
+// jujuparams.StatusInfo.
+func (s *Status) FromJujuStatusInfo(info jujuparams.StatusInfo) {
+	s.Status = string(info.Current)
+	s.Info = info.Message
+	s.Version = info.Version
+	if info.Since == nil {
+		s.Since = sql.NullTime{Valid: false}
+	} else {
+		s.Since = sql.NullTime{
+			Time:  info.Since.UTC().Truncate(time.Millisecond),
+			Valid: true,
+		}
+	}
+	s.Data = Map(info.Data)
 }
 
 // ToJujuEntityStatus converts the status into a jujuparams.EntityStatus.
@@ -396,6 +425,9 @@ type Machine struct {
 	// InstanceStatus is the status of the machine instance.
 	InstanceStatus Status `gorm:"embedded;embeddedPrefix:instance_status_"`
 
+	// Life contains the life status of the machine.
+	Life string
+
 	// HasVote indicates whether the machine has a vote.
 	HasVote bool
 
@@ -407,6 +439,21 @@ type Machine struct {
 
 	// Units are the units deployed to this machine.
 	Units []Unit `gorm:"foreignKey:ModelID,MachineID;references:ModelID,MachineID"`
+}
+
+// FromJujuMachineInfo converts jujuparams.MachineInfo into a Machine.
+func (m *Machine) FromJujuMachineInfo(info jujuparams.MachineInfo) {
+	m.MachineID = info.Id
+	m.InstanceID = info.InstanceId
+	m.AgentStatus.FromJujuStatusInfo(info.AgentStatus)
+	m.InstanceStatus.FromJujuStatusInfo(info.InstanceStatus)
+	m.Life = string(info.Life)
+	m.Series = info.Series
+	if info.HardwareCharacteristics != nil {
+		m.Hardware.FromJujuInstanceHardwareCharacteristics(*info.HardwareCharacteristics)
+	}
+	m.HasVote = info.HasVote
+	m.WantsVote = info.WantsVote
 }
 
 // FromJujuModelMachineInfo converts jujuparams.ModelMachineInfo into a Machine.
@@ -488,30 +535,50 @@ type Hardware struct {
 	AllocatePublicIP sql.NullBool
 }
 
+// FromJujuConstraintsValue updates the Hardware entry with the values from
+// a juju constraints.Value structure.
+func (h *Hardware) FromJujuConstraintsValue(v constraints.Value) {
+	SetNullString(&h.Arch, v.Arch)
+	h.Container.Valid = v.Container != nil
+	if h.Container.Valid {
+		h.Container.String = string(*v.Container)
+	} else {
+		h.Container.String = ""
+	}
+	h.CPUCores.FromValue(v.CpuCores)
+	h.CPUPower.FromValue(v.CpuPower)
+	h.Mem.FromValue(v.Mem)
+	h.RootDisk.FromValue(v.RootDisk)
+	h.Tags.FromPointer(v.Tags)
+	SetNullString(&h.InstanceType, v.InstanceType)
+	h.Spaces.FromPointer(v.Spaces)
+	SetNullString(&h.VirtType, v.VirtType)
+	h.Zones.FromPointer(v.Zones)
+	SetNullBool(&h.AllocatePublicIP, v.AllocatePublicIP)
+}
+
+// FromJujuInstanceHardwareCharacteristics converts
+// instance.HardwareCharacteristics into a MachineHardware.
+func (h *Hardware) FromJujuInstanceHardwareCharacteristics(hwc instance.HardwareCharacteristics) {
+	SetNullString(&h.Arch, hwc.Arch)
+	h.Mem.FromValue(hwc.Mem)
+	h.RootDisk.FromValue(hwc.RootDisk)
+	SetNullString(&h.RootDiskSource, hwc.RootDiskSource)
+	h.CPUCores.FromValue(hwc.CpuCores)
+	h.CPUPower.FromValue(hwc.CpuPower)
+	h.Tags.FromPointer(hwc.Tags)
+	SetNullString(&h.AvailabilityZone, hwc.AvailabilityZone)
+}
+
 // FromJujuMachineHardware converts jujuparams.MachineHardware into a Hardware.
 func (h *Hardware) FromJujuMachineHardware(mh jujuparams.MachineHardware) {
-	if mh.Arch != nil {
-		h.Arch = sql.NullString{
-			String: *mh.Arch,
-			Valid:  true,
-		}
-	}
+	SetNullString(&h.Arch, mh.Arch)
 	h.Mem.FromValue(mh.Mem)
 	h.RootDisk.FromValue(mh.RootDisk)
 	h.CPUCores.FromValue(mh.Cores)
 	h.CPUPower.FromValue(mh.CpuPower)
-	if mh.Tags != nil {
-		h.Tags = make([]string, len(*mh.Tags))
-		for i, t := range *mh.Tags {
-			h.Tags[i] = t
-		}
-	}
-	if mh.AvailabilityZone != nil {
-		h.AvailabilityZone = sql.NullString{
-			String: *mh.AvailabilityZone,
-			Valid:  true,
-		}
-	}
+	h.Tags.FromPointer(mh.Tags)
+	SetNullString(&h.AvailabilityZone, mh.AvailabilityZone)
 }
 
 // ToJujuMachineHardware converts a MachineHardware into a
@@ -604,6 +671,21 @@ type Application struct {
 	Offers []ApplicationOffer `gorm:"foreignKey:ModelID,ApplicationName;references:ModelID,Name"`
 }
 
+// FromJujuApplicationInfo sets the values of the Application from a juju
+// ApplicationInfo structure.
+func (a *Application) FromJujuApplicationInfo(info jujuparams.ApplicationInfo) {
+	a.Name = info.Name
+	a.Exposed = info.Exposed
+	a.CharmURL = info.CharmURL
+	a.Life = string(info.Life)
+	a.MinUnits = uint(info.MinUnits)
+	a.Constraints.FromJujuConstraintsValue(info.Constraints)
+	a.Config = Map(info.Config)
+	a.Subordinate = info.Subordinate
+	a.Status.FromJujuStatusInfo(info.Status)
+	a.WorkloadVersion = info.WorkloadVersion
+}
+
 // A Unit represents a unit of an application in a model.
 type Unit struct {
 	ID        uint `gorm:"primaryKey"`
@@ -648,4 +730,20 @@ type Unit struct {
 
 	// AgentStatus is the agent status of the unit.
 	AgentStatus Status `gorm:"embedded;embeddedPrefix:agent_status_"`
+}
+
+// FromJujuUnitInfo populates the values of the Unit structure from the
+// given jujuparams.UnitInfo.
+func (u *Unit) FromJujuUnitInfo(info jujuparams.UnitInfo) {
+	u.Name = info.Name
+	u.MachineID = info.MachineId
+	u.ApplicationName = info.Application
+	u.Life = string(info.Life)
+	u.PublicAddress = info.PublicAddress
+	u.PrivateAddress = info.PrivateAddress
+	u.Ports = Ports(info.Ports)
+	u.PortRanges = PortRanges(info.PortRanges)
+	u.Principal = info.Principal
+	u.WorkloadStatus.FromJujuStatusInfo(info.WorkloadStatus)
+	u.AgentStatus.FromJujuStatusInfo(info.AgentStatus)
 }
