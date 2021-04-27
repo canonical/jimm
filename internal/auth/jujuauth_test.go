@@ -59,6 +59,44 @@ func TestAuthenticateLogin(t *testing.T) {
 	})
 }
 
+func TestAuthenticateLoginWithDomain(t *testing.T) {
+	c := qt.New(t)
+
+	discharger := bakerytest.NewDischarger(nil)
+	c.Cleanup(discharger.Close)
+	discharger.CheckerP = httpbakery.ThirdPartyCaveatCheckerPFunc(
+		func(ctx context.Context, p httpbakery.ThirdPartyCaveatCheckerParams) ([]checkers.Caveat, error) {
+			return []checkers.Caveat{checkers.DeclaredCaveat("username", "alice@mydomain")}, nil
+		},
+	)
+	authenticator := auth.JujuAuthenticator{
+		Bakery: identchecker.NewBakery(identchecker.BakeryParams{
+			Locator:        discharger,
+			Key:            bakery.MustGenerateKey(),
+			IdentityClient: testIdentityClient{loc: discharger.Location()},
+			Location:       "jimm",
+			Logger:         testLogger{t: c},
+		}),
+	}
+
+	ctx := context.Background()
+	u, err := authenticator.Authenticate(ctx, &jujuparams.LoginRequest{})
+	c.Check(u, qt.IsNil)
+	aerr, ok := err.(*auth.AuthenticationError)
+	c.Assert(ok, qt.Equals, true, qt.Commentf("unexpected error %s", err))
+
+	client := httpbakery.NewClient()
+	ms, err := client.DischargeAll(ctx, aerr.LoginResult.BakeryDischargeRequired)
+	c.Assert(err, qt.IsNil)
+	u, err = authenticator.Authenticate(ctx, &jujuparams.LoginRequest{Macaroons: []macaroon.Slice{ms}})
+	c.Assert(err, qt.IsNil)
+	c.Check(u.LastLogin.Valid, qt.Equals, true)
+	u.LastLogin = sql.NullTime{}
+	c.Check(u, qt.DeepEquals, &dbmodel.User{
+		Username: "alice@mydomain",
+	})
+}
+
 func TestAuthenticateLoginSuperuser(t *testing.T) {
 	c := qt.New(t)
 
@@ -97,6 +135,39 @@ func TestAuthenticateLoginSuperuser(t *testing.T) {
 		Username:         "bob@external",
 		ControllerAccess: "superuser",
 	})
+}
+
+func TestAuthenticateLoginInvalidUsernameDeclared(t *testing.T) {
+	c := qt.New(t)
+
+	discharger := bakerytest.NewDischarger(nil)
+	c.Cleanup(discharger.Close)
+	discharger.CheckerP = httpbakery.ThirdPartyCaveatCheckerPFunc(
+		func(ctx context.Context, p httpbakery.ThirdPartyCaveatCheckerParams) ([]checkers.Caveat, error) {
+			return []checkers.Caveat{checkers.DeclaredCaveat("username", "A")}, nil
+		},
+	)
+	authenticator := auth.JujuAuthenticator{
+		Bakery: identchecker.NewBakery(identchecker.BakeryParams{
+			Locator:        discharger,
+			Key:            bakery.MustGenerateKey(),
+			IdentityClient: testIdentityClient{loc: discharger.Location()},
+			Location:       "jimm",
+			Logger:         testLogger{t: c},
+		}),
+	}
+
+	ctx := context.Background()
+	u, err := authenticator.Authenticate(ctx, &jujuparams.LoginRequest{})
+	c.Check(u, qt.IsNil)
+	aerr, ok := err.(*auth.AuthenticationError)
+	c.Assert(ok, qt.Equals, true, qt.Commentf("unexpected error %s", err))
+
+	client := httpbakery.NewClient()
+	ms, err := client.DischargeAll(ctx, aerr.LoginResult.BakeryDischargeRequired)
+	c.Assert(err, qt.IsNil)
+	u, err = authenticator.Authenticate(ctx, &jujuparams.LoginRequest{Macaroons: []macaroon.Slice{ms}})
+	c.Assert(err, qt.ErrorMatches, `authenticated identity "A" cannot be used as juju username`)
 }
 
 type testIdentityClient struct {
