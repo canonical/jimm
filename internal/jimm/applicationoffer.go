@@ -188,29 +188,18 @@ func (j *JIMM) GetApplicationOfferConsumeDetails(ctx context.Context, user *dbmo
 		accessLevel = offer.UserAccess(&dbmodel.User{Username: "everyone@external"})
 	}
 
-	if accessLevel == "" {
-		// TODO (ashipika)
-		//   - think about the returned error code
-		return errors.E(op, errors.CodeNotFound)
-	}
-
 	switch accessLevel {
 	case string(jujuparams.OfferAdminAccess):
 	case string(jujuparams.OfferConsumeAccess):
 	case string(jujuparams.OfferReadAccess):
 		return errors.E(op, errors.CodeUnauthorized)
 	default:
+		// TODO (ashipika)
+		//   - think about the returned error code
 		return errors.E(op, errors.CodeNotFound)
 	}
 
-	model := offer.Application.Model
-	err := j.Database.GetModel(ctx, &model)
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	controller := model.Controller
-	api, err := j.dial(ctx, &controller, names.NewModelTag(model.UUID.String))
+	api, err := j.dial(ctx, &offer.Model.Controller, names.ModelTag{})
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -226,11 +215,11 @@ func (j *JIMM) GetApplicationOfferConsumeDetails(ctx context.Context, user *dbmo
 
 	// Fix the addresses to be a controller's external addresses.
 	details.ControllerInfo = &jujuparams.ExternalControllerInfo{
-		ControllerTag: model.Controller.Tag().String(),
-		Alias:         model.Controller.Name,
-		CACert:        model.Controller.CACertificate,
+		ControllerTag: offer.Model.Controller.Tag().String(),
+		Alias:         offer.Model.Controller.Name,
+		CACert:        offer.Model.Controller.CACertificate,
 	}
-	details.ControllerInfo.Addrs = append(details.ControllerInfo.Addrs, model.Controller.PublicAddress)
+	details.ControllerInfo.Addrs = append(details.ControllerInfo.Addrs, offer.Model.Controller.PublicAddress)
 
 	return nil
 }

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 	"gorm.io/gorm"
 
@@ -283,4 +284,37 @@ func TestUserApplicationOffers(t *testing.T) {
 		ApplicationOfferID: m.Applications[1].Offers[0].ID,
 		Access:             "consume",
 	}})
+}
+
+func TestUserToJujuUserInfo(t *testing.T) {
+	c := qt.New(t)
+
+	u := dbmodel.User{
+		Model: gorm.Model{
+			CreatedAt: time.Now(),
+		},
+		Username:         "alice@external",
+		DisplayName:      "Alice",
+		ControllerAccess: "superuser",
+	}
+	ui := u.ToJujuUserInfo()
+	c.Check(ui, qt.DeepEquals, jujuparams.UserInfo{
+		Username:    "alice@external",
+		DisplayName: "Alice",
+		Access:      "superuser",
+		DateCreated: u.CreatedAt,
+	})
+
+	u.LastLogin = sql.NullTime{
+		Time:  time.Now(),
+		Valid: true,
+	}
+	ui = u.ToJujuUserInfo()
+	c.Check(ui, qt.DeepEquals, jujuparams.UserInfo{
+		Username:       "alice@external",
+		DisplayName:    "Alice",
+		Access:         "superuser",
+		DateCreated:    u.CreatedAt,
+		LastConnection: &u.LastLogin.Time,
+	})
 }

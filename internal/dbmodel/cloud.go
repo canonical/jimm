@@ -64,6 +64,16 @@ func (c *Cloud) SetTag(t names.CloudTag) {
 	c.Name = t.Id()
 }
 
+// UserAccess returns the access level of the given user on the cloud.
+func (c Cloud) UserAccess(user *User) string {
+	for _, u := range c.Users {
+		if u.Username == user.Username {
+			return u.Access
+		}
+	}
+	return ""
+}
+
 // Region returns the cloud region with the given name. If there is no
 // such region a zero valued region is returned.
 func (c Cloud) Region(name string) CloudRegion {
@@ -89,7 +99,9 @@ func (c Cloud) ToJujuCloud() jujuparams.Cloud {
 	cl.RegionConfig = make(map[string]map[string]interface{}, len(c.Regions))
 	for i, r := range c.Regions {
 		cl.Regions[i] = r.ToJujuCloudRegion()
-		cl.RegionConfig[r.Name] = map[string]interface{}(r.Config)
+		if r.Config != nil {
+			cl.RegionConfig[r.Name] = map[string]interface{}(r.Config)
+		}
 	}
 	cl.CACertificates = []string(c.CACertificates)
 	cl.Config = map[string]interface{}(c.Config)
