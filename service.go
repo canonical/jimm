@@ -12,6 +12,7 @@ import (
 
 	"github.com/canonical/candid/candidclient"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/dbrootkeystore"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/google/uuid"
@@ -26,6 +27,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/debugapi"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
@@ -186,7 +188,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err)
 	}
 
-	s.jimm.Authenticator, err = newAuthenticator(ctx, s.jimm.Database.DB, p)
+	s.jimm.Authenticator, err = newAuthenticator(ctx, &s.jimm.Database, p)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -244,7 +246,7 @@ func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {
 	})
 }
 
-func newAuthenticator(ctx context.Context, _ *gorm.DB, p Params) (jimm.Authenticator, error) {
+func newAuthenticator(ctx context.Context, db *db.Database, p Params) (jimm.Authenticator, error) {
 	if p.CandidURL == "" {
 		// No authenticator configured
 		return nil, nil
@@ -301,8 +303,9 @@ func newAuthenticator(ctx context.Context, _ *gorm.DB, p Params) (jimm.Authentic
 	}
 	return auth.JujuAuthenticator{
 		Bakery: identchecker.NewBakery(identchecker.BakeryParams{
-			// TODO(mhilton) create a root-key-store with the gorm database.
-			RootKeyStore:   nil,
+			RootKeyStore: dbrootkeystore.NewRootKeys(100, nil).NewStore(db, dbrootkeystore.Policy{
+				ExpiryDuration: 24 * time.Hour,
+			}),
 			Locator:        httpbakery.NewThirdPartyLocator(nil, tps),
 			Key:            key,
 			IdentityClient: auth.IdentityClientV3{IdentityClient: candidClient},
