@@ -59,6 +59,8 @@ CREATE TABLE controllers (
 	admin_password TEXT NOT NULL,
 	ca_certificate TEXT NOT NULL,
 	public_address TEXT NOT NULL,
+	cloud_name TEXT NOT NULL REFERENCES clouds (name),
+	cloud_region TEXT NOT NULL,
 	deprecated BOOLEAN NOT NULL DEFAULT false,
 	agent_version TEXT NOT NULL,
 	addresses BYTEA,

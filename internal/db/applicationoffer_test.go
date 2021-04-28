@@ -62,8 +62,10 @@ func initTestEnvironment(c *qt.C, db *db.Database) testEnvironment {
 	c.Assert(db.DB.Create(&env.cred).Error, qt.IsNil)
 
 	env.controller = dbmodel.Controller{
-		Name: "test-controller",
-		UUID: "00000000-0000-0000-0000-0000-0000000000001",
+		Name:        "test-controller",
+		UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+		CloudName:   "test-cloud",
+		CloudRegion: "test-region",
 	}
 	c.Assert(db.DB.Create(&env.controller).Error, qt.IsNil)
 

@@ -6,8 +6,10 @@ import (
 	"database/sql"
 	"testing"
 
+	apiparams "github.com/CanonicalLtd/jimm/api/params"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	qt "github.com/frankban/quicktest"
+	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 )
 
@@ -30,6 +32,12 @@ func TestController(t *testing.T) {
 	c := qt.New(t)
 	db := gormDB(c)
 
+	cl := dbmodel.Cloud{
+		Name: "test-cloud",
+	}
+	result := db.Create(&cl)
+	c.Assert(result.Error, qt.IsNil)
+
 	ctl := dbmodel.Controller{
 		Name:          "test-controller",
 		UUID:          "00000000-0000-0000-0000-000000000001",
@@ -37,9 +45,25 @@ func TestController(t *testing.T) {
 		AdminPassword: "pw",
 		CACertificate: "ca-cert",
 		PublicAddress: "controller.example.com:443",
-		Addresses:     dbmodel.Strings{"1.1.1.1:1", "2.2.2.2:2", "3.3.3.3:3"},
+		CloudName:     "test-cloud",
+		Addresses: dbmodel.HostPorts([][]jujuparams.HostPort{{{
+			Address: jujuparams.Address{
+				Value: "1.1.1.1",
+			},
+			Port: 1,
+		}}, {{
+			Address: jujuparams.Address{
+				Value: "2.2.2.2",
+			},
+			Port: 2,
+		}}, {{
+			Address: jujuparams.Address{
+				Value: "3.3.3.3",
+			},
+			Port: 3,
+		}}}),
 	}
-	result := db.Create(&ctl)
+	result = db.Create(&ctl)
 	c.Assert(result.Error, qt.IsNil)
 
 	var ctl2 dbmodel.Controller
@@ -110,4 +134,97 @@ func TestControllerModels(t *testing.T) {
 		CloudRegionID:     m2.CloudRegionID,
 		CloudCredentialID: m2.CloudCredentialID,
 	}})
+}
+
+func TestToAPIControllerInfo(t *testing.T) {
+	c := qt.New(t)
+	db := gormDB(c)
+	cl, _, ctl, _ := initModelEnv(c, db)
+	ctl.PublicAddress = "example.com:443"
+	ctl.Addresses = dbmodel.HostPorts{
+		{{
+			Address: jujuparams.Address{
+				Value: "1.1.1.1",
+			},
+			Port: 1,
+		}},
+		{{
+			Address: jujuparams.Address{
+				Value: "2.2.2.2",
+			},
+			Port: 2,
+		}},
+		{{
+			Address: jujuparams.Address{
+				Value: "3.3.3.3",
+			},
+			Port: 3,
+		}},
+	}
+	ctl.CACertificate = "ca-cert"
+	ctl.CloudRegions = []dbmodel.CloudRegionControllerPriority{{
+		CloudRegion: cl.Regions[0],
+		Priority:    dbmodel.CloudRegionControllerPriorityDeployed,
+	}}
+	ctl.AdminUser = "admin"
+	ctl.AgentVersion = "1.2.3"
+
+	ci := ctl.ToAPIControllerInfo()
+	c.Check(ci, qt.DeepEquals, apiparams.ControllerInfo{
+		Name:          "test-controller",
+		UUID:          "00000000-0000-0000-0000-0000-0000000000001",
+		PublicAddress: "example.com:443",
+		APIAddresses: []string{
+			"1.1.1.1:1",
+			"2.2.2.2:2",
+			"3.3.3.3:3",
+		},
+		CACertificate: "ca-cert",
+		CloudTag:      names.NewCloudTag("test-cloud").String(),
+		CloudRegion:   "test-region",
+		Username:      "admin",
+		AgentVersion:  "1.2.3",
+		Status: jujuparams.EntityStatus{
+			Status: "available",
+		},
+	})
+}
+
+func TestToJujuRedirectInfoResult(t *testing.T) {
+	c := qt.New(t)
+	db := gormDB(c)
+	_, _, ctl, _ := initModelEnv(c, db)
+	ctl.PublicAddress = "example.com:443"
+	ctl.Addresses = dbmodel.HostPorts{
+		{{
+			Address: jujuparams.Address{
+				Value: "1.1.1.1",
+			},
+			Port: 1,
+		}},
+		{{
+			Address: jujuparams.Address{
+				Value: "2.2.2.2",
+			},
+			Port: 2,
+		}},
+		{{
+			Address: jujuparams.Address{
+				Value: "3.3.3.3",
+			},
+			Port: 3,
+		}},
+	}
+	ctl.CACertificate = "ca-cert"
+
+	ri := ctl.ToJujuRedirectInfoResult()
+	c.Check(ri, qt.DeepEquals, jujuparams.RedirectInfoResult{
+		Servers: [][]jujuparams.HostPort{
+			{{Address: jujuparams.Address{Value: "example.com", Type: "hostname", Scope: "public"}, Port: 443}},
+			{{Address: jujuparams.Address{Value: "1.1.1.1"}, Port: 1}},
+			{{Address: jujuparams.Address{Value: "2.2.2.2"}, Port: 2}},
+			{{Address: jujuparams.Address{Value: "3.3.3.3"}, Port: 3}},
+		},
+		CACert: "ca-cert",
+	})
 }

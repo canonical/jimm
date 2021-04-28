@@ -10,6 +10,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	jujuparams "github.com/juju/juju/apiserver/params"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
@@ -30,9 +31,16 @@ func (s *dbSuite) TestAddController(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
+	cloud := dbmodel.Cloud{
+		Name: "test-cloud",
+	}
+	err = s.Database.AddCloud(context.Background(), &cloud)
+	c.Assert(err, qt.IsNil)
+
 	controller := dbmodel.Controller{
-		Name: "test-controller",
-		UUID: "00000000-0000-0000-0000-0000-0000000000001",
+		Name:      "test-controller",
+		UUID:      "00000000-0000-0000-0000-0000-0000000000001",
+		CloudName: "test-cloud",
 	}
 	c1 := controller
 	err = s.Database.AddController(context.Background(), &controller)
@@ -54,10 +62,17 @@ func (s *dbSuite) TestGetController(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
+	cloud := dbmodel.Cloud{
+		Name: "test-cloud",
+	}
+	err = s.Database.AddCloud(context.Background(), &cloud)
+	c.Assert(err, qt.IsNil)
+
 	controller := dbmodel.Controller{
-		Name:   "test-controller",
-		UUID:   "00000000-0000-0000-0000-0000-0000000000001",
-		Models: []dbmodel.Model{},
+		Name:      "test-controller",
+		UUID:      "00000000-0000-0000-0000-0000-0000000000001",
+		Models:    []dbmodel.Model{},
+		CloudName: "test-cloud",
 	}
 	err = s.Database.AddController(context.Background(), &controller)
 	c.Assert(err, qt.Equals, nil)
@@ -90,16 +105,6 @@ func (s *dbSuite) TestGetControllerWithModels(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
-	controller := dbmodel.Controller{
-		Name:   "test-controller",
-		UUID:   "00000000-0000-0000-0000-0000-0000000000001",
-		Models: []dbmodel.Model{},
-	}
-	u := dbmodel.User{
-		Username: "bob@external",
-	}
-	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
-
 	cloud := dbmodel.Cloud{
 		Name: "test-cloud",
 		Type: "test-provider",
@@ -108,6 +113,18 @@ func (s *dbSuite) TestGetControllerWithModels(c *qt.C) {
 		}},
 	}
 	c.Assert(s.Database.DB.Create(&cloud).Error, qt.IsNil)
+
+	controller := dbmodel.Controller{
+		Name:        "test-controller",
+		UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+		Models:      []dbmodel.Model{},
+		CloudName:   "test-cloud",
+		CloudRegion: "test-region",
+	}
+	u := dbmodel.User{
+		Username: "bob@external",
+	}
+	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
 		Name:     "test-cred",
@@ -266,10 +283,21 @@ func (s *dbSuite) TestUpdateController(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
+	cloud := dbmodel.Cloud{
+		Name: "test-cloud",
+		Type: "test-provider",
+		Regions: []dbmodel.CloudRegion{{
+			Name: "test-region",
+		}},
+	}
+	c.Assert(s.Database.DB.Create(&cloud).Error, qt.IsNil)
+
 	controller := dbmodel.Controller{
-		Name:   "test-controller",
-		UUID:   "00000000-0000-0000-0000-0000-0000000000001",
-		Models: []dbmodel.Model{},
+		Name:        "test-controller",
+		UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+		CloudName:   "test-cloud",
+		CloudRegion: "test-region",
+		Models:      []dbmodel.Model{},
 	}
 	err = s.Database.AddController(context.Background(), &controller)
 	c.Assert(err, qt.Equals, nil)
@@ -283,7 +311,7 @@ func (s *dbSuite) TestUpdateController(c *qt.C) {
 
 	controller.Deprecated = true
 	controller.AgentVersion = "test-agent-version"
-	controller.Addresses = []string{"test-addresses"}
+	controller.Addresses = dbmodel.HostPorts{{{Address: jujuparams.Address{Value: "test-address"}, Port: 10}}}
 
 	err = s.Database.UpdateController(context.Background(), &controller)
 	c.Assert(err, qt.Equals, nil)
@@ -306,10 +334,17 @@ func (s *dbSuite) TestDeleteController(c *qt.C) {
 	err := s.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
+	cloud := dbmodel.Cloud{
+		Name: "test-cloud",
+	}
+	err = s.Database.AddCloud(context.Background(), &cloud)
+	c.Assert(err, qt.IsNil)
+
 	controller := dbmodel.Controller{
-		Name:   "test-controller",
-		UUID:   "00000000-0000-0000-0000-0000-0000000000001",
-		Models: []dbmodel.Model{},
+		Name:      "test-controller",
+		UUID:      "00000000-0000-0000-0000-0000-0000000000001",
+		CloudName: "test-cloud",
+		Models:    []dbmodel.Model{},
 	}
 	err = s.Database.AddController(context.Background(), &controller)
 	c.Assert(err, qt.Equals, nil)
@@ -328,7 +363,7 @@ func (s *dbSuite) TestDeleteController(c *qt.C) {
 		Name: controller.Name,
 	}
 	err = s.Database.GetController(context.Background(), &dbController)
-	c.Assert(err, qt.ErrorMatches, "record not found")
+	c.Assert(err, qt.ErrorMatches, "controller not found")
 
 	err = s.Database.DeleteController(context.Background(), &dbmodel.Controller{})
 	c.Assert(err, qt.ErrorMatches, "controller not found")

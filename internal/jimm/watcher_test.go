@@ -32,6 +32,8 @@ cloud-credentials:
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
+  cloud: dummy
+  region: dummy-region
 models:
 - name: model-1
   type: iaas
@@ -839,8 +841,12 @@ cloud-credentials:
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
+  cloud: dummy
+  region: dummy-region
 - name: controller-2
   uuid: 00000001-0000-0000-0000-000000000002
+  cloud: dummy
+  region: dummy-region
 models:
 - name: model-1
   type: iaas

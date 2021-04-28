@@ -175,12 +175,16 @@ cloud-credentials:
 controllers:
 - name: controller-1
   uuid: 00000000-0000-0000-0000-0000-0000000000001
+  cloud: test-cloud
+  region: test-region-1
   cloud-regions:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
+  cloud: test-cloud
+  region: test-region-1
   cloud-regions:
   - cloud: test-cloud
     region: test-region-1
@@ -239,8 +243,10 @@ machines:
 			ControllerAccess: "add-model",
 		},
 		Controller: dbmodel.Controller{
-			Name: "controller-2",
-			UUID: "00000000-0000-0000-0000-0000-0000000000002",
+			Name:        "controller-2",
+			UUID:        "00000000-0000-0000-0000-0000-0000000000002",
+			CloudName:   "test-cloud",
+			CloudRegion: "test-region-1",
 		},
 		CloudRegion: dbmodel.CloudRegion{
 			Cloud: dbmodel.Cloud{
@@ -305,12 +311,16 @@ cloud-credentials:
 controllers:
 - name: controller-1
   uuid: 00000000-0000-0000-0000-0000-0000000000001
+  cloud: test-cloud
+  region: test-region-1
   cloud-regions:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
+  cloud: test-cloud
+  region: test-region-1
   cloud-regions:
   - cloud: test-cloud
     region: test-region-1
@@ -364,8 +374,10 @@ machines:
 			ControllerAccess: "add-model",
 		},
 		Controller: dbmodel.Controller{
-			Name: "controller-2",
-			UUID: "00000000-0000-0000-0000-0000-0000000000002",
+			Name:        "controller-2",
+			UUID:        "00000000-0000-0000-0000-0000-0000000000002",
+			CloudName:   "test-cloud",
+			CloudRegion: "test-region-1",
 		},
 		CloudRegion: dbmodel.CloudRegion{
 			Cloud: dbmodel.Cloud{
@@ -430,12 +442,16 @@ cloud-credentials:
 controllers:
 - name: controller-1
   uuid: 00000000-0000-0000-0000-0000-0000000000001
+  cloud: test-cloud
+  region: test-region-1
   cloud-regions:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
+  cloud: test-cloud
+  region: test-region-1
   cloud-regions:
   - cloud: test-cloud
     region: test-region-1
@@ -494,8 +510,10 @@ machines:
 			ControllerAccess: "add-model",
 		},
 		Controller: dbmodel.Controller{
-			Name: "controller-2",
-			UUID: "00000000-0000-0000-0000-0000-0000000000002",
+			Name:        "controller-2",
+			UUID:        "00000000-0000-0000-0000-0000-0000000000002",
+			CloudName:   "test-cloud",
+			CloudRegion: "test-region-1",
 		},
 		CloudRegion: dbmodel.CloudRegion{
 			Cloud: dbmodel.Cloud{
@@ -560,12 +578,16 @@ cloud-credentials:
 controllers:
 - name: controller-1
   uuid: 00000000-0000-0000-0000-0000-0000000000001
+  cloud: test-cloud
+  region: test-region-1
   cloud-regions:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
+  cloud: test-cloud
+  region: test-region-1
   cloud-regions:
   - cloud: test-cloud
     region: test-region-1
@@ -630,12 +652,16 @@ cloud-credentials:
 controllers:
 - name: controller-1
   uuid: 00000000-0000-0000-0000-0000-0000000000001
+  cloud: test-cloud
+  region: test-region-1
   cloud-regions:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
+  cloud: test-cloud
+  regions: test-region-1
   cloud-regions:
   - cloud: test-cloud
     region: test-region-1
@@ -675,12 +701,16 @@ cloud-credentials:
 controllers:
 - name: controller-1
   uuid: 00000000-0000-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-region-1
   cloud-regions:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-000000000002
+  cloud: test-cloud
+  region: test-region-1
   cloud-regions:
   - cloud: test-cloud
     region: test-region-1
@@ -748,12 +778,16 @@ cloud-credentials:
 controllers:
 - name: controller-1
   uuid: 00000000-0000-0000-0000-0000-0000000000001
+  cloud: test-cloud
+  region: test-region-1
   cloud-regions:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
+  cloud: test-cloud
+  region: test-region-1
   cloud-regions:
   - cloud: test-cloud
     region: test-region-1
@@ -891,6 +925,8 @@ cloud-credentials:
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
+  cloud: dummy
+  region: dummy-region
 models:
 - name: model-1
   type: iaas
@@ -1145,6 +1181,8 @@ cloud-credentials:
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
+  cloud: dummy
+  region: dummy-region
 models:
 - name: model-1
   type: iaas
@@ -1271,6 +1309,8 @@ cloud-credentials:
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
+  cloud: dummy
+  region: dummy-region
 models:
 - name: model-1
   type: iaas
@@ -1656,6 +1696,8 @@ cloud-credentials:
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
+  cloud: dummy
+  region: dummy-region
 models:
 - name: model-1
   uuid: 00000002-0000-0000-0000-000000000001
@@ -1721,8 +1763,10 @@ var grantModelAccessTests = []struct {
 			ControllerAccess: "add-model",
 		},
 		Controller: dbmodel.Controller{
-			Name: "controller-1",
-			UUID: "00000001-0000-0000-0000-000000000001",
+			Name:        "controller-1",
+			UUID:        "00000001-0000-0000-0000-000000000001",
+			CloudName:   "dummy",
+			CloudRegion: "dummy-region",
 		},
 		CloudRegion: dbmodel.CloudRegion{
 			Cloud: dbmodel.Cloud{
@@ -1846,6 +1890,8 @@ cloud-credentials:
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
+  cloud: dummy
+  region: dummy-region
 models:
 - name: model-1
   uuid: 00000002-0000-0000-0000-000000000001
@@ -1913,8 +1959,10 @@ var revokeModelAccessTests = []struct {
 			ControllerAccess: "add-model",
 		},
 		Controller: dbmodel.Controller{
-			Name: "controller-1",
-			UUID: "00000001-0000-0000-0000-000000000001",
+			Name:        "controller-1",
+			UUID:        "00000001-0000-0000-0000-000000000001",
+			CloudName:   "dummy",
+			CloudRegion: "dummy-region",
 		},
 		CloudRegion: dbmodel.CloudRegion{
 			Cloud: dbmodel.Cloud{
@@ -1976,8 +2024,10 @@ var revokeModelAccessTests = []struct {
 			ControllerAccess: "add-model",
 		},
 		Controller: dbmodel.Controller{
-			Name: "controller-1",
-			UUID: "00000001-0000-0000-0000-000000000001",
+			Name:        "controller-1",
+			UUID:        "00000001-0000-0000-0000-000000000001",
+			CloudName:   "dummy",
+			CloudRegion: "dummy-region",
 		},
 		CloudRegion: dbmodel.CloudRegion{
 			Cloud: dbmodel.Cloud{
@@ -2039,8 +2089,10 @@ var revokeModelAccessTests = []struct {
 			ControllerAccess: "add-model",
 		},
 		Controller: dbmodel.Controller{
-			Name: "controller-1",
-			UUID: "00000001-0000-0000-0000-000000000001",
+			Name:        "controller-1",
+			UUID:        "00000001-0000-0000-0000-000000000001",
+			CloudName:   "dummy",
+			CloudRegion: "dummy-region",
 		},
 		CloudRegion: dbmodel.CloudRegion{
 			Cloud: dbmodel.Cloud{
@@ -2158,6 +2210,8 @@ cloud-credentials:
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
+  cloud: dummy
+  region: dummy-region
 models:
 - name: model-1
   uuid: 00000002-0000-0000-0000-000000000001
@@ -2640,6 +2694,8 @@ cloud-credentials:
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
+  cloud: dummy
+  region: dummy-region
 models:
 - name: model-1
   uuid: 00000002-0000-0000-0000-000000000001
@@ -2699,8 +2755,10 @@ var updateModelCredentialTests = []struct {
 			ControllerAccess: "add-model",
 		},
 		Controller: dbmodel.Controller{
-			Name: "controller-1",
-			UUID: "00000001-0000-0000-0000-000000000001",
+			Name:        "controller-1",
+			UUID:        "00000001-0000-0000-0000-000000000001",
+			CloudName:   "dummy",
+			CloudRegion: "dummy-region",
 		},
 		CloudRegion: dbmodel.CloudRegion{
 			Cloud: dbmodel.Cloud{

@@ -537,8 +537,10 @@ func initModelEnv(c *qt.C, db *gorm.DB) (dbmodel.Cloud, dbmodel.CloudCredential,
 	c.Assert(db.Create(&cred).Error, qt.IsNil)
 
 	ctl := dbmodel.Controller{
-		Name: "test-controller",
-		UUID: "00000000-0000-0000-0000-0000-0000000000001",
+		Name:        "test-controller",
+		UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+		CloudName:   cl.Name,
+		CloudRegion: "test-region",
 	}
 	c.Assert(db.Create(&ctl).Error, qt.IsNil)
 

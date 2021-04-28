@@ -79,9 +79,16 @@ func TestWatchAllModelSummaries(t *testing.T) {
 	err := j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
+	cloud := dbmodel.Cloud{
+		Name: "test-cloud",
+	}
+	err = j.Database.AddCloud(context.Background(), &cloud)
+	c.Assert(err, qt.Equals, nil)
+
 	controller := dbmodel.Controller{
-		Name: controllerName,
-		UUID: controllerUUID,
+		Name:      controllerName,
+		UUID:      controllerUUID,
+		CloudName: "test-cloud",
 	}
 	err = j.Database.AddController(context.Background(), &controller)
 	c.Assert(err, qt.Equals, nil)

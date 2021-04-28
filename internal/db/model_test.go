@@ -52,9 +52,11 @@ func (s *dbSuite) TestAddModel(c *qt.C) {
 	c.Assert(s.Database.DB.Create(&cred).Error, qt.IsNil)
 
 	controller := dbmodel.Controller{
-		Name:   "test-controller",
-		UUID:   "00000000-0000-0000-0000-0000-0000000000001",
-		Models: []dbmodel.Model{},
+		Name:        "test-controller",
+		UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+		CloudName:   "test-cloud",
+		CloudRegion: "test-region",
+		Models:      []dbmodel.Model{},
 	}
 	err = s.Database.AddController(context.Background(), &controller)
 	c.Assert(err, qt.Equals, nil)
@@ -127,9 +129,11 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 	c.Assert(s.Database.DB.Create(&cred).Error, qt.IsNil)
 
 	controller := dbmodel.Controller{
-		Name:   "test-controller",
-		UUID:   "00000000-0000-0000-0000-0000-0000000000001",
-		Models: []dbmodel.Model{},
+		Name:        "test-controller",
+		UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+		Models:      []dbmodel.Model{},
+		CloudName:   "test-cloud",
+		CloudRegion: "test-region",
 	}
 	err = s.Database.AddController(context.Background(), &controller)
 	c.Assert(err, qt.Equals, nil)
@@ -219,9 +223,11 @@ func (s *dbSuite) TestUpdateModel(c *qt.C) {
 	c.Assert(s.Database.DB.Create(&cred).Error, qt.IsNil)
 
 	controller := dbmodel.Controller{
-		Name:   "test-controller",
-		UUID:   "00000000-0000-0000-0000-0000-0000000000001",
-		Models: []dbmodel.Model{},
+		Name:        "test-controller",
+		UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+		CloudName:   "test-cloud",
+		CloudRegion: "test-region",
+		Models:      []dbmodel.Model{},
 	}
 	err = s.Database.AddController(context.Background(), &controller)
 	c.Assert(err, qt.Equals, nil)
@@ -299,9 +305,11 @@ func (s *dbSuite) TestDeleteModel(c *qt.C) {
 	c.Assert(s.Database.DB.Create(&cred).Error, qt.IsNil)
 
 	controller := dbmodel.Controller{
-		Name:   "test-controller",
-		UUID:   "00000000-0000-0000-0000-0000-0000000000001",
-		Models: []dbmodel.Model{},
+		Name:        "test-controller",
+		UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+		CloudName:   "test-cloud",
+		CloudRegion: "test-region",
+		Models:      []dbmodel.Model{},
 	}
 	err = s.Database.AddController(context.Background(), &controller)
 	c.Assert(err, qt.Equals, nil)
@@ -384,8 +392,10 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 	c.Assert(s.Database.DB.Create(&cred2).Error, qt.IsNil)
 
 	controller := dbmodel.Controller{
-		Name: "test-controller",
-		UUID: "00000000-0000-0000-0000-0000-0000000000001",
+		Name:        "test-controller",
+		UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+		CloudName:   "test-cloud",
+		CloudRegion: "test-region",
 	}
 	err = s.Database.AddController(context.Background(), &controller)
 	c.Assert(err, qt.Equals, nil)

@@ -4,7 +4,10 @@ package jujuclient_test
 
 import (
 	"context"
+	"fmt"
 
+	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/core/network"
 	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
@@ -29,12 +32,23 @@ func (s *jujuclientSuite) SetUpTest(c *gc.C) {
 	s.Dialer = jujuclient.Dialer{}
 	var err error
 	info := s.APIInfo(c)
+	hpss := make(dbmodel.HostPorts, 0, len(info.Addrs))
+	for _, addr := range info.Addrs {
+		hp, err := network.ParseMachineHostPort(addr)
+		if err != nil {
+			continue
+		}
+		hpss = append(hpss, []jujuparams.HostPort{{
+			Address: jujuparams.FromMachineAddress(hp.MachineAddress),
+			Port:    hp.Port(),
+		}})
+	}
 	ctl := dbmodel.Controller{
 		Name:          s.ControllerConfig.ControllerName(),
 		CACertificate: info.CACert,
 		AdminUser:     info.Tag.Id(),
 		AdminPassword: info.Password,
-		Addresses:     dbmodel.Strings(info.Addrs),
+		Addresses:     hpss,
 	}
 	s.API, err = s.Dialer.Dial(context.Background(), &ctl, names.ModelTag{})
 	c.Assert(err, gc.Equals, nil)
@@ -69,5 +83,9 @@ func (s *dialSuite) TestDial(c *gc.C) {
 	defer api.Close()
 	c.Check(ctl.UUID, gc.Equals, "deadbeef-1bad-500d-9000-4b1d0d06f00d")
 	c.Check(ctl.AgentVersion, gc.Equals, jujuversion.Current.String())
-	c.Check(ctl.Addresses, jc.DeepEquals, dbmodel.Strings(info.Addrs))
+	addrs := make([]string, len(ctl.Addresses))
+	for i, addr := range ctl.Addresses {
+		addrs[i] = fmt.Sprintf("%s:%d", addr[0].Value, addr[0].Port)
+	}
+	c.Check(addrs, jc.DeepEquals, info.Addrs)
 }
