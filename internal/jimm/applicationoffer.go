@@ -15,7 +15,6 @@ import (
 	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/names/v4"
 
-	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
@@ -66,14 +65,7 @@ func (j *JIMM) Offer(ctx context.Context, user *dbmodel.User, offer AddApplicati
 		return fail(errors.E(op, err))
 	}
 
-	var userAccessLevel string
-	for _, u := range model.Users {
-		if u.ID == user.ID {
-			userAccessLevel = u.Access
-			break
-		}
-	}
-	if userAccessLevel != string(jujuparams.ModelAdminAccess) {
+	if model.UserAccess(user) != string(jujuparams.ModelAdminAccess) {
 		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
 	}
 
@@ -109,16 +101,18 @@ func (j *JIMM) Offer(ctx context.Context, user *dbmodel.User, offer AddApplicati
 		Endpoints:              offer.Endpoints,
 	})
 	if err != nil {
-		if apiconn.IsAPIError(err) && strings.Contains(err.Error(), "application offer already exists") {
+		if strings.Contains(err.Error(), "application offer already exists") {
 			return fail(errors.E(op, err, errors.CodeAlreadyExists))
 		}
 		return fail(errors.E(op, err))
 	}
 
 	offerURL := crossmodel.OfferURL{
-		User:            user.Username,
-		ModelName:       model.Name,
-		ApplicationName: offer.ApplicationName,
+		User:      model.OwnerUsername,
+		ModelName: model.Name,
+		// Confusingly the application name in the offer URL is
+		// actually the offer name.
+		ApplicationName: offer.OfferName,
 	}
 
 	// Ensure the user creating the offer is an admin for the offer.
@@ -212,14 +206,19 @@ func (j *JIMM) GetApplicationOfferConsumeDetails(ctx context.Context, user *dbmo
 	// Fix the consume details from the controller to be correct for JAAS.
 	// Filter out any juju local users.
 	details.Offer.Users = filterApplicationOfferUsers(user, accessLevel, details.Offer.Users)
+	ci := details.ControllerInfo
 
 	// Fix the addresses to be a controller's external addresses.
 	details.ControllerInfo = &jujuparams.ExternalControllerInfo{
 		ControllerTag: offer.Model.Controller.Tag().String(),
 		Alias:         offer.Model.Controller.Name,
-		CACert:        offer.Model.Controller.CACertificate,
 	}
-	details.ControllerInfo.Addrs = append(details.ControllerInfo.Addrs, offer.Model.Controller.PublicAddress)
+	if offer.Model.Controller.PublicAddress != "" {
+		details.ControllerInfo.Addrs = []string{offer.Model.Controller.PublicAddress}
+	} else {
+		details.ControllerInfo.Addrs = ci.Addrs
+		details.ControllerInfo.CACert = ci.CACert
+	}
 
 	return nil
 }
@@ -231,6 +230,10 @@ func (j *JIMM) GetApplicationOfferConsumeDetails(ctx context.Context, user *dbmo
 func filterApplicationOfferUsers(user *dbmodel.User, accessLevel string, users []jujuparams.OfferUserDetails) []jujuparams.OfferUserDetails {
 	filtered := make([]jujuparams.OfferUserDetails, 0, len(users))
 	for _, u := range users {
+		// ignore all controller-local users
+		if strings.IndexByte(u.UserName, '@') < 0 {
+			continue
+		}
 		if accessLevel == string(jujuparams.OfferAdminAccess) || u.UserName == user.Username {
 			filtered = append(filtered, u)
 		}
@@ -278,7 +281,7 @@ func filterApplicationOfferDetail(offerDetails jujuparams.ApplicationOfferAdminD
 	if accessLevel != string(jujuparams.OfferAdminAccess) {
 		var users []jujuparams.OfferUserDetails
 		for _, ua := range offerDetails.Users {
-			if ua.UserName == user.Username {
+			if ua.UserName == user.Username || ua.UserName == "everyone@external" {
 				users = append(users, ua)
 			}
 		}

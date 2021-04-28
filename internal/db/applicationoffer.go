@@ -131,9 +131,11 @@ func ApplicationOfferFilterByApplication(applicationName string) ApplicationOffe
 
 // ApplicationOfferFilterByUser filters application offer accessible by the user.
 func ApplicationOfferFilterByUser(username string) ApplicationOfferFilter {
-	// TODO (ashipika) allow offers to which everyone@external has access.
 	return func(db *gorm.DB) *gorm.DB {
-		return db.Joins("INNER JOIN user_application_offer_access AS users ON users.application_offer_id = offers.id AND users.username = ? AND users.access IN ?", username, []string{"read", "consume", "admin"})
+		db = db.Joins("LEFT JOIN user_application_offer_access AS users ON users.application_offer_id = offers.id AND users.username = ?", username)
+		db = db.Joins("LEFT JOIN user_application_offer_access AS public ON public.application_offer_id = offers.id AND public.username = 'everyone@external'")
+		db = db.Where("users.access IN ('read', 'consume', 'admin') OR public.access IN ('read', 'consume', 'admin')")
+		return db
 	}
 }
 
