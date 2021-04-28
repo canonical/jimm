@@ -39,7 +39,7 @@ func (c Connection) CheckCredentialModels(ctx context.Context, cred jujuparams.T
 		return nil, errors.E(op, jujuerrors.Cause(err))
 	}
 	if out.Results[0].Error != nil {
-		return nil, errors.E(op, out.Results[0].Error)
+		return out.Results[0].Models, errors.E(op, out.Results[0].Error)
 	}
 	return out.Results[0].Models, nil
 }
@@ -90,7 +90,7 @@ func (c Connection) UpdateCredential(ctx context.Context, cred jujuparams.Tagged
 		}
 	}
 	if out.Results[0].Error != nil {
-		return nil, errors.E(op, out.Results[0].Error)
+		return out.Results[0].Models, errors.E(op, out.Results[0].Error)
 	}
 	return out.Results[0].Models, nil
 }

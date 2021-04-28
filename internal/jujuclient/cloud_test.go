@@ -2,6 +2,7 @@ package jujuclient_test
 
 import (
 	"context"
+	"sort"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
@@ -34,6 +35,70 @@ func (s *cloudSuite) TestCheckCredentialModels(c *gc.C) {
 	models, err := s.API.CheckCredentialModels(context.Background(), cred)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(models, gc.HasLen, 0)
+}
+
+func (s *cloudSuite) TestCheckCredentialModelsWithModels(c *gc.C) {
+	ctx := context.Background()
+
+	cct := names.NewCloudCredentialTag("dummy/bob@external/pw1").String()
+	cred := jujuparams.TaggedCredential{
+		Tag: cct,
+		Credential: jujuparams.CloudCredential{
+			AuthType: "userpass",
+			Attributes: map[string]string{
+				"username": "alibaba",
+				"password": "open sesame",
+			},
+		},
+	}
+
+	models, err := s.API.UpdateCredential(ctx, cred)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(models, gc.HasLen, 0)
+
+	var info jujuparams.ModelInfo
+	err = s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
+		Name:               "model-1",
+		OwnerTag:           names.NewUserTag("bob@external").String(),
+		CloudCredentialTag: cct,
+	}, &info)
+	c.Assert(err, gc.Equals, nil)
+	uuid1 := info.UUID
+
+	err = s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
+		Name:               "model-2",
+		OwnerTag:           names.NewUserTag("bob@external").String(),
+		CloudCredentialTag: cct,
+	}, &info)
+	c.Assert(err, gc.Equals, nil)
+	uuid2 := info.UUID
+
+	expectModels := []jujuparams.UpdateCredentialModelResult{{
+		ModelUUID: uuid1,
+		ModelName: "model-1",
+	}, {
+		ModelUUID: uuid2,
+		ModelName: "model-2",
+	}}
+
+	cred = jujuparams.TaggedCredential{
+		Tag: cct,
+		Credential: jujuparams.CloudCredential{
+			AuthType: "userpass",
+			Attributes: map[string]string{
+				"username": "alibaba",
+				"password": "new password",
+			},
+		},
+	}
+
+	models, err = s.API.CheckCredentialModels(ctx, cred)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(models, gc.HasLen, 2)
+	sort.Slice(models, func(i, j int) bool {
+		return models[i].ModelName < models[j].ModelName
+	})
+	c.Assert(models, jc.DeepEquals, expectModels)
 }
 
 func (s *cloudSuite) TestUpdateCredential(c *gc.C) {
@@ -78,6 +143,70 @@ func (s *cloudSuite) TestRevokeCredential(c *gc.C) {
 
 	err = s.API.RevokeCredential(context.Background(), tag)
 	c.Assert(err, gc.Equals, nil)
+}
+
+func (s *cloudSuite) TestUpdateCredentialWithModels(c *gc.C) {
+	ctx := context.Background()
+
+	cct := names.NewCloudCredentialTag("dummy/bob@external/pw1").String()
+	cred := jujuparams.TaggedCredential{
+		Tag: cct,
+		Credential: jujuparams.CloudCredential{
+			AuthType: "userpass",
+			Attributes: map[string]string{
+				"username": "alibaba",
+				"password": "open sesame",
+			},
+		},
+	}
+
+	models, err := s.API.UpdateCredential(ctx, cred)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(models, gc.HasLen, 0)
+
+	var info jujuparams.ModelInfo
+	err = s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
+		Name:               "model-1",
+		OwnerTag:           names.NewUserTag("bob@external").String(),
+		CloudCredentialTag: cct,
+	}, &info)
+	c.Assert(err, gc.Equals, nil)
+	uuid1 := info.UUID
+
+	err = s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
+		Name:               "model-2",
+		OwnerTag:           names.NewUserTag("bob@external").String(),
+		CloudCredentialTag: cct,
+	}, &info)
+	c.Assert(err, gc.Equals, nil)
+	uuid2 := info.UUID
+
+	expectModels := []jujuparams.UpdateCredentialModelResult{{
+		ModelUUID: uuid1,
+		ModelName: "model-1",
+	}, {
+		ModelUUID: uuid2,
+		ModelName: "model-2",
+	}}
+
+	cred = jujuparams.TaggedCredential{
+		Tag: cct,
+		Credential: jujuparams.CloudCredential{
+			AuthType: "userpass",
+			Attributes: map[string]string{
+				"username": "alibaba",
+				"password": "new password",
+			},
+		},
+	}
+
+	models, err = s.API.UpdateCredential(ctx, cred)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(models, gc.HasLen, 2)
+	sort.Slice(models, func(i, j int) bool {
+		return models[i].ModelName < models[j].ModelName
+	})
+	c.Assert(models, jc.DeepEquals, expectModels)
 }
 
 func (s *cloudSuite) TestClouds(c *gc.C) {
