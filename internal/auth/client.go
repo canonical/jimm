@@ -12,7 +12,7 @@ import (
 	identcheckerv2 "gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 )
 
-// IdentityClientV3 "upgrades" a v2 identity client to a v3 one.
+// IdentityClientV3 "upgrades" a v2 IdentityClient to a v3 one.
 type IdentityClientV3 struct {
 	IdentityClient identcheckerv2.IdentityClient
 }
@@ -48,10 +48,12 @@ func (c IdentityClientV3) DeclaredIdentity(ctx context.Context, declared map[str
 	return id, err
 }
 
+// A ThirdPartyLocatorV3 adapts a v2 ThirdPartyLocator to a v3 one.
 type ThirdPartyLocatorV3 struct {
 	ThirdPartyLocator bakeryv2.ThirdPartyLocator
 }
 
+// ThirdPartyInfo implements ThirdPartyLocator.
 func (l ThirdPartyLocatorV3) ThirdPartyInfo(ctx context.Context, loc string) (bakery.ThirdPartyInfo, error) {
 	var tpi bakery.ThirdPartyInfo
 	tpi2, err := l.ThirdPartyLocator.ThirdPartyInfo(ctx, loc)

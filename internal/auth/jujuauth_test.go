@@ -91,10 +91,11 @@ func TestAuthenticateLoginWithDomain(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	u, err = authenticator.Authenticate(ctx, &jujuparams.LoginRequest{Macaroons: []macaroon.Slice{ms}})
 	c.Assert(err, qt.IsNil)
-	c.Check(u.LastLogin.Valid, qt.Equals, true)
+	c.Check(u.LastLogin.Valid, qt.Equals, false)
 	u.LastLogin = sql.NullTime{}
 	c.Check(u, qt.DeepEquals, &dbmodel.User{
-		Username: "alice@mydomain",
+		Username:    "alice@mydomain",
+		DisplayName: "alice",
 	})
 }
 
