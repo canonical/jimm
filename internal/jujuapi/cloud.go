@@ -10,8 +10,6 @@ import (
 	apiservererrors "github.com/juju/juju/apiserver/errors"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
-	"github.com/juju/zaputil/zapctx"
-	"go.uber.org/zap"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
@@ -499,7 +497,6 @@ func (r *controllerRoot) updateCredentials(ctx context.Context, args []jujuparam
 	for i, arg := range args {
 		var err error
 		models, err := r.updateCredential(ctx, arg, skipCheck, skipUpdate)
-		zapctx.Error(ctx, "XXX - XXX", zap.Any("models", models), zap.Error(err))
 		results.Results[i] = jujuparams.UpdateCredentialResult{
 			CredentialTag: arg.Tag,
 			Error:         mapError(err),

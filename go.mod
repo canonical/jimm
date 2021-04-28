@@ -6,14 +6,16 @@ require (
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/canonical/candid v1.4.2
 	github.com/canonical/go-dqlite v1.8.0
+	github.com/canonical/go-service v1.0.0
 	github.com/canonical/pebble v0.0.0-20210329083523-52c8d6b3e55a // indirect
 	github.com/frankban/quicktest v1.11.3
 	github.com/go-macaroon-bakery/macaroon-bakery/v3 v3.0.0-20210309064400-d73aa8f92aa2
 	github.com/golang/mock v1.5.0 // indirect
 	github.com/google/go-cmp v0.5.4
+	github.com/google/uuid v1.1.2
 	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
 	github.com/gorilla/websocket v1.4.2
-	github.com/hashicorp/vault/api v1.0.5-0.20200709165743-f98572ac11c9
+	github.com/hashicorp/vault/api v1.1.0
 	github.com/jackc/pgconn v1.7.0
 	github.com/jackc/pgx/v4 v4.9.0
 	github.com/juju/aclstore v0.0.0-20180706073322-7fc1cdaacf01
@@ -43,7 +45,7 @@ require (
 	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
 	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/net v0.0.0-20210326220855-61e056675ecf // indirect
-	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20210326220804-49726bf1d181 // indirect
 	golang.org/x/term v0.0.0-20210317153231-de623e64d2a6 // indirect
 	golang.org/x/tools v0.1.0 // indirect
