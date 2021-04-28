@@ -3,6 +3,7 @@
 package jujuapi_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -12,31 +13,53 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/rpc/jsoncodec"
 	"github.com/juju/testing/httptesting"
+	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/jemtest/apitest"
+	"github.com/CanonicalLtd/jimm/internal/jemserver"
+	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
-	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
 type apiSuite struct {
-	apitest.BootstrapAPISuite
+	jimmtest.BootstrapSuite
+
+	Params     jemserver.HandlerParams
+	APIHandler http.Handler
+	HTTP       *httptest.Server
 }
 
 var _ = gc.Suite(&apiSuite{})
 
 func (s *apiSuite) SetUpTest(c *gc.C) {
-	s.NewAPIHandler = jujuapi.NewAPIHandler
+	s.BootstrapSuite.SetUpTest(c)
+	ctx := context.Background()
+
 	s.Params.GUILocation = "https://jujucharms.com.test"
-	s.BootstrapAPISuite.SetUpTest(c)
+	handlers, err := jujuapi.NewAPIHandler(ctx, s.JIMM, s.Params)
+	c.Assert(err, gc.Equals, nil)
+	var r httprouter.Router
+	for _, h := range handlers {
+		r.Handle(h.Method, h.Path, h.Handle)
+	}
+	s.APIHandler = &r
+	s.HTTP = httptest.NewServer(s.APIHandler)
+}
+
+func (s *apiSuite) TearDownTest(c *gc.C) {
+	if s.HTTP != nil {
+		s.HTTP.Close()
+		s.HTTP = nil
+	}
+	s.BootstrapSuite.TearDownTest(c)
 }
 
 func (s *apiSuite) TestGUI(c *gc.C) {
 	AssertRedirect(c, RedirectParams{
 		Handler:        s.APIHandler,
 		Method:         "GET",
-		URL:            fmt.Sprintf("/gui/%s", s.Model.UUID),
+		URL:            fmt.Sprintf("/gui/%s", s.Model.UUID.String),
 		ExpectCode:     http.StatusMovedPermanently,
 		ExpectLocation: "https://jujucharms.com.test/u/bob/model-1",
 	})
@@ -45,10 +68,15 @@ func (s *apiSuite) TestGUI(c *gc.C) {
 func (s *apiSuite) TestGUINotFound(c *gc.C) {
 	p := s.Params
 	p.GUILocation = ""
-	hnd := s.NewAPIHTTPHandler(c, p)
+	handlers, err := jujuapi.NewAPIHandler(context.Background(), s.JIMM, p)
+	c.Assert(err, gc.Equals, nil)
+	var r httprouter.Router
+	for _, h := range handlers {
+		r.Handle(h.Method, h.Path, h.Handle)
+	}
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		URL:          fmt.Sprintf("/gui/%s", "000000000000-0000-0000-0000-00000000"),
-		Handler:      hnd,
+		Handler:      &r,
 		ExpectStatus: http.StatusNotFound,
 		ExpectBody: params.Error{
 			Code:    params.ErrNotFound,
@@ -105,7 +133,7 @@ func AssertRedirect(c *gc.C, p RedirectParams) {
 }
 
 func (s *apiSuite) TestModelCommands(c *gc.C) {
-	path := fmt.Sprintf("/model/%s/commands", s.Model.UUID)
+	path := fmt.Sprintf("/model/%s/commands", s.Model.UUID.String)
 	serverURL, err := url.Parse(s.HTTP.URL)
 	c.Assert(err, gc.Equals, nil)
 	u := url.URL{
@@ -127,7 +155,8 @@ func (s *apiSuite) TestModelCommands(c *gc.C) {
 	jsonConn := jsoncodec.NewWebsocketConn(conn)
 	err = jsonConn.Receive(&msg)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(msg.RedirectTo, gc.Equals, fmt.Sprintf("wss://%s/model/%s/commands", mongodoc.Addresses(s.Controller.HostPorts)[0], s.Model.UUID))
+	hp := s.Model.Controller.Addresses[0][0]
+	c.Assert(msg.RedirectTo, gc.Equals, fmt.Sprintf("wss://%s:%d/model/%s/commands", hp.Address.Value, hp.Port, s.Model.UUID.String))
 }
 
 func (s *apiSuite) TestModelCommandsModelNotFoundf(c *gc.C) {
@@ -136,7 +165,7 @@ func (s *apiSuite) TestModelCommandsModelNotFoundf(c *gc.C) {
 	u := url.URL{
 		Scheme: "ws",
 		Host:   serverURL.Host,
-		Path:   fmt.Sprintf("/models/%s/commands", s.Model.UUID),
+		Path:   fmt.Sprintf("/models/%s/commands", s.Model.UUID.String),
 	}
 
 	_, response, err := websocket.DefaultDialer.Dial(u.String(), nil)

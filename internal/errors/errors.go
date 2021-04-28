@@ -111,10 +111,13 @@ const (
 	CodeCloudRegionRequired Code = jujuparams.CodeCloudRegionRequired
 	CodeConnectionFailed    Code = "connection failed"
 	CodeDatabaseLocked      Code = "database locked"
+	CodeForbidden           Code = jujuparams.CodeForbidden
 	CodeIncompatibleClouds  Code = jujuparams.CodeIncompatibleClouds
+	CodeModelNotFound       Code = jujuparams.CodeModelNotFound
 	CodeNotFound            Code = jujuparams.CodeNotFound
 	CodeNotImplemented      Code = jujuparams.CodeNotImplemented
 	CodeNotSupported        Code = jujuparams.CodeNotSupported
+	CodeRedirect            Code = jujuparams.CodeRedirect
 	CodeServerConfiguration Code = "server configuration"
 	CodeStillAlive          Code = apiparams.CodeStillAlive
 	CodeUnauthorized        Code = jujuparams.CodeUnauthorized

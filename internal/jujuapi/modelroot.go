@@ -3,25 +3,25 @@
 package jujuapi
 
 import (
-	"github.com/CanonicalLtd/jimm/internal/jem"
+	jujuparams "github.com/juju/juju/apiserver/params"
+
+	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
-	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 )
 
 // modelRoot is the root for endpoints served on model connections.
 type modelRoot struct {
 	rpc.Root
 
-	jem          *jem.JEM
+	jimm         *jimm.JIMM
 	uuid         string
-	model        *mongodoc.Model
-	controller   *mongodoc.Controller
+	redirectInfo jujuparams.RedirectInfoResult
 	heartMonitor heartMonitor
 }
 
-func newModelRoot(jem *jem.JEM, hm heartMonitor, uuid string) *modelRoot {
+func newModelRoot(j *jimm.JIMM, hm heartMonitor, uuid string) *modelRoot {
 	r := &modelRoot{
-		jem:          jem,
+		jimm:         j,
 		uuid:         uuid,
 		heartMonitor: hm,
 	}

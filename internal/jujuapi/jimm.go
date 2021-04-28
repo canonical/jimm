@@ -9,14 +9,12 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/network"
 	"github.com/juju/names/v4"
-	"gopkg.in/errgo.v1"
 
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
-	"github.com/CanonicalLtd/jimm/internal/auth"
-	"github.com/CanonicalLtd/jimm/internal/conv"
-	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/db"
+	"github.com/CanonicalLtd/jimm/internal/dbmodel"
+	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
-	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -31,13 +29,9 @@ func init() {
 		removeControllerMethod := rpc.Method(r.RemoveController)
 		revokeAuditLogAccessMethod := rpc.Method(r.RevokeAuditLogAccess)
 		setControllerDeprecatedMethod := rpc.Method(r.SetControllerDeprecated)
-		userModelStatsMethod := rpc.Method(r.UserModelStats)
-
-		r.AddMethod("JIMM", 1, "UserModelStats", userModelStatsMethod)
 
 		r.AddMethod("JIMM", 2, "DisableControllerUUIDMasking", disableControllerUUIDMaskingMethod)
 		r.AddMethod("JIMM", 2, "ListControllers", listControllersMethod)
-		r.AddMethod("JIMM", 2, "UserModelStats", userModelStatsMethod)
 
 		r.AddMethod("JIMM", 3, "AddController", addControllerMethod)
 		r.AddMethod("JIMM", 3, "DisableControllerUUIDMasking", disableControllerUUIDMaskingMethod)
@@ -48,39 +42,18 @@ func init() {
 		r.AddMethod("JIMM", 3, "RevokeAuditLogAccess", revokeAuditLogAccessMethod)
 		r.AddMethod("JIMM", 3, "SetControllerDeprecated", setControllerDeprecatedMethod)
 
-		return []int{1, 2, 3}
+		return []int{2, 3}
 	}
-}
-
-// UserModelStats returns statistics about all the models that were created
-// by the currently authenticated user.
-func (r *controllerRoot) UserModelStats(ctx context.Context) (params.UserModelStatsResponse, error) {
-	models := make(map[string]params.ModelStats)
-	err := r.jem.ForEachModel(ctx, r.identity, jujuparams.ModelReadAccess, func(m *mongodoc.Model) error {
-		if m.Creator != r.identity.Id() {
-			return nil
-		}
-		models[m.UUID] = params.ModelStats{
-			Model:  userModelForModelDoc(m),
-			Counts: m.Counts,
-		}
-		return nil
-	})
-	if err != nil {
-		return params.UserModelStatsResponse{}, errgo.Mask(err)
-	}
-	return params.UserModelStatsResponse{
-		Models: models,
-	}, nil
 }
 
 // DisableControllerUUIDMasking ensures that the controller UUID returned
 // with any model information is the UUID of the juju controller that is
 // hosting the model, and not JAAS.
 func (r *controllerRoot) DisableControllerUUIDMasking(ctx context.Context) error {
-	err := auth.CheckACL(ctx, r.identity, []string{string(r.jem.ControllerAdmin())})
-	if err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	const op = errors.Op("jujuapi.DisableControllerUUIDMasking")
+
+	if r.user.ControllerAccess != "superuser" {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 	r.controllerUUIDMasking = false
 	return nil
@@ -89,14 +62,14 @@ func (r *controllerRoot) DisableControllerUUIDMasking(ctx context.Context) error
 // ListControllers returns the list of juju controllers hosting models
 // as part of this JAAS system.
 func (r *controllerRoot) ListControllers(ctx context.Context) (params.ListControllerResponse, error) {
-	err := auth.CheckACL(ctx, r.identity, []string{string(r.jem.ControllerAdmin())})
-	if errgo.Cause(err) == params.ErrUnauthorized {
+	const op = errors.Op("jujuapi.ListControllers")
+
+	if r.user.ControllerAccess != "superuser" {
 		// if the user isn't a controller admin return JAAS
 		// itself as the only controller.
-
-		srvVersion, err := r.jem.EarliestControllerVersion(ctx, r.identity)
+		srvVersion, err := r.jimm.EarliestControllerVersion(ctx)
 		if err != nil {
-			return params.ListControllerResponse{}, errgo.Mask(err)
+			return params.ListControllerResponse{}, errors.E(op, err)
 		}
 		return params.ListControllerResponse{
 			Controllers: []params.ControllerResponse{{
@@ -107,24 +80,26 @@ func (r *controllerRoot) ListControllers(ctx context.Context) (params.ListContro
 			}},
 		}, nil
 	}
-	if err != nil {
-		return params.ListControllerResponse{}, errgo.Mask(err)
-	}
 
 	var controllers []params.ControllerResponse
-	err = r.jem.ForEachController(ctx, r.identity, func(ctl *mongodoc.Controller) error {
-		controllers = append(controllers, params.ControllerResponse{
-			Path:             ctl.Path,
-			Public:           ctl.Public,
-			UnavailableSince: newTime(ctl.UnavailableSince.UTC()),
-			Location:         ctl.Location,
-			UUID:             ctl.UUID,
-			Version:          ctl.Version.String(),
-		})
+	err := r.jimm.Database.ForEachController(ctx, func(ctl *dbmodel.Controller) error {
+		var cr params.ControllerResponse
+		cr.Path = params.EntityPath{User: "admin", Name: params.Name(ctl.Name)}
+		cr.Public = true
+		cr.Location = map[string]string{
+			"cloud":  ctl.CloudName,
+			"region": ctl.CloudRegion,
+		}
+		if ctl.UnavailableSince.Valid {
+			cr.UnavailableSince = &ctl.UnavailableSince.Time
+		}
+		cr.UUID = ctl.UUID
+		cr.Version = ctl.AgentVersion
+		controllers = append(controllers, cr)
 		return nil
 	})
 	if err != nil {
-		return params.ListControllerResponse{}, errgo.Mask(err)
+		return params.ListControllerResponse{}, errors.E(op, err)
 	}
 	return params.ListControllerResponse{
 		Controllers: controllers,
@@ -134,65 +109,43 @@ func (r *controllerRoot) ListControllers(ctx context.Context) (params.ListContro
 // AddController allows adds a controller to the pool of controllers
 // available to JIMM.
 func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddControllerRequest) (apiparams.ControllerInfo, error) {
-	var addresses []string
-	if req.PublicAddress != "" {
-		addresses = append(addresses, req.PublicAddress)
-	}
-	addresses = append(addresses, req.APIAddresses...)
+	const op = errors.Op("jujuapi.AddController")
 
-	hps, err := mongodoc.ParseAddresses(addresses)
-	if err != nil {
-		return apiparams.ControllerInfo{}, errgo.WithCausef(err, params.ErrBadRequest, "")
-	}
-	for i, hp := range hps {
-		if network.DeriveAddressType(hp.Host) != network.HostName {
-			continue
-		}
-		if hp.Host != "localhost" {
-			// As it won't have been specified we'll assume that any DNS name, except
-			// localhost, is public.
-			hps[i].Scope = string(network.ScopePublic)
-		}
-	}
-
-	ctl := mongodoc.Controller{
-		Path: params.EntityPath{
-			User: r.jem.ControllerAdmin(),
-			Name: params.Name(req.Name),
-		},
-		CACert:        req.CACertificate,
-		HostPorts:     [][]mongodoc.HostPort{hps},
+	ctl := dbmodel.Controller{
+		Name:          req.Name,
+		PublicAddress: req.PublicAddress,
+		CACertificate: req.CACertificate,
 		AdminUser:     req.Username,
 		AdminPassword: req.Password,
-		Public:        true,
 	}
-
-	err = r.jem.AddController(ctx, r.identity, &ctl)
-	if errgo.Cause(err) == jem.ErrAPIConnection {
-		return apiparams.ControllerInfo{}, errgo.WithCausef(err, params.ErrBadRequest, "")
-	} else if err != nil {
-		return apiparams.ControllerInfo{}, errgo.Mask(err,
-			errgo.Is(params.ErrAlreadyExists),
-			errgo.Is(params.ErrForbidden),
-			errgo.Is(params.ErrUnauthorized),
-		)
+	nphps, err := network.ParseProviderHostPorts(req.APIAddresses...)
+	if err != nil {
+		return apiparams.ControllerInfo{}, errors.E(op, errors.CodeBadRequest, err)
 	}
-	var ci apiparams.ControllerInfo
-	writeControllerInfo(&ci, &ctl)
-	return ci, nil
+	for i := range nphps {
+		// Mark all the unknown scopes public.
+		if nphps[i].Scope == network.ScopeUnknown {
+			nphps[i].Scope = network.ScopePublic
+		}
+	}
+	ctl.Addresses = dbmodel.HostPorts{jujuparams.FromProviderHostPorts(nphps)}
+	if err := r.jimm.AddController(ctx, r.user, &ctl); err != nil {
+		return apiparams.ControllerInfo{}, errors.E(op, err)
+	}
+	return ctl.ToAPIControllerInfo(), nil
 }
 
 // ListControllersV3 returns the list of juju controllers hosting models
 // as part of this JAAS system.
 func (r *controllerRoot) ListControllersV3(ctx context.Context) (apiparams.ListControllersResponse, error) {
-	err := auth.CheckACL(ctx, r.identity, []string{string(r.jem.ControllerAdmin())})
-	if errgo.Cause(err) == params.ErrUnauthorized {
+	const op = errors.Op("jujuapi.ListControllersV3")
+
+	if r.user.ControllerAccess != "superuser" {
 		// if the user isn't a controller admin return JAAS
 		// itself as the only controller.
-
-		srvVersion, err := r.jem.EarliestControllerVersion(ctx, r.identity)
+		srvVersion, err := r.jimm.EarliestControllerVersion(ctx)
 		if err != nil {
-			return apiparams.ListControllersResponse{}, errgo.Mask(err)
+			return apiparams.ListControllersResponse{}, errors.E(op, err)
 		}
 		return apiparams.ListControllersResponse{
 			Controllers: []apiparams.ControllerInfo{{
@@ -206,20 +159,14 @@ func (r *controllerRoot) ListControllersV3(ctx context.Context) (apiparams.ListC
 			}},
 		}, nil
 	}
-	if err != nil {
-		return apiparams.ListControllersResponse{}, errgo.Mask(err)
-	}
 
 	var controllers []apiparams.ControllerInfo
-	err = r.jem.ForEachController(ctx, r.identity, func(ctl *mongodoc.Controller) error {
-		var ci apiparams.ControllerInfo
-		writeControllerInfo(&ci, ctl)
-
-		controllers = append(controllers, ci)
+	err := r.jimm.Database.ForEachController(ctx, func(ctl *dbmodel.Controller) error {
+		controllers = append(controllers, ctl.ToAPIControllerInfo())
 		return nil
 	})
 	if err != nil {
-		return apiparams.ListControllersResponse{}, errgo.Mask(err)
+		return apiparams.ListControllersResponse{}, errors.E(op, err)
 	}
 	return apiparams.ListControllersResponse{
 		Controllers: controllers,
@@ -228,38 +175,35 @@ func (r *controllerRoot) ListControllersV3(ctx context.Context) (apiparams.ListC
 
 // RemoveController removes a controller.
 func (r *controllerRoot) RemoveController(ctx context.Context, req apiparams.RemoveControllerRequest) (apiparams.ControllerInfo, error) {
-	ctl := mongodoc.Controller{
-		Path: params.EntityPath{
-			User: r.jem.ControllerAdmin(),
-			Name: params.Name(req.Name),
-		},
+	const op = errors.Op("jujuapi.RemoveController")
+
+	ctl := dbmodel.Controller{
+		Name: req.Name,
 	}
-	if err := r.jem.DeleteController(ctx, r.identity, &ctl, req.Force); err != nil {
-		return apiparams.ControllerInfo{}, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized), errgo.Is(params.ErrStillAlive))
+	if err := r.jimm.Database.GetController(ctx, &ctl); err != nil {
+		return apiparams.ControllerInfo{}, errors.E(op, err)
 	}
-	var info apiparams.ControllerInfo
-	writeControllerInfo(&info, &ctl)
-	return info, nil
+
+	if err := r.jimm.RemoveController(ctx, r.user, req.Name, req.Force); err != nil {
+		return apiparams.ControllerInfo{}, errors.E(op, err)
+	}
+	return ctl.ToAPIControllerInfo(), nil
 }
 
 // SetControllerDeprecated sets the deprecated status of a controller.
 func (r *controllerRoot) SetControllerDeprecated(ctx context.Context, req apiparams.SetControllerDeprecatedRequest) (apiparams.ControllerInfo, error) {
-	path := params.EntityPath{
-		User: r.jem.ControllerAdmin(),
-		Name: params.Name(req.Name),
+	const op = errors.Op("jujuapi.SetControllerDeprecated")
+
+	if err := r.jimm.SetControllerDeprecated(ctx, r.user, req.Name, req.Deprecated); err != nil {
+		return apiparams.ControllerInfo{}, errors.E(op, err)
 	}
-	if err := r.jem.SetControllerDeprecated(ctx, r.identity, path, req.Deprecated); err != nil {
-		return apiparams.ControllerInfo{}, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
+	ctl := dbmodel.Controller{
+		Name: req.Name,
 	}
-	ctl := mongodoc.Controller{
-		Path: path,
+	if err := r.jimm.Database.GetController(ctx, &ctl); err != nil {
+		return apiparams.ControllerInfo{}, errors.E(op, err)
 	}
-	if err := r.jem.GetController(ctx, r.identity, &ctl); err != nil {
-		return apiparams.ControllerInfo{}, errgo.Mask(err)
-	}
-	var info apiparams.ControllerInfo
-	writeControllerInfo(&info, &ctl)
-	return info, nil
+	return ctl.ToAPIControllerInfo(), nil
 }
 
 // maxLimit is the maximum number of audit-log entries that will be
@@ -268,48 +212,46 @@ const maxLimit = 50
 
 // FindAuditEvents finds the audit-log entries that match the given filter.
 func (r *controllerRoot) FindAuditEvents(ctx context.Context, req apiparams.FindAuditEventsRequest) (apiparams.AuditEvents, error) {
-	// Until the new database comes into effect the only supported
-	// queries are "after", "before", and limit.
-	var after, before time.Time
+	const op = errors.Op("jujuapi.FindAuditEvents")
+
+	var filter db.AuditLogFilter
 	var err error
 	if req.After != "" {
-		after, err = time.Parse(time.RFC3339, req.After)
+		filter.Start, err = time.Parse(time.RFC3339, req.After)
 		if err != nil {
-			return apiparams.AuditEvents{}, errgo.WithCausef(err, params.ErrBadRequest, `invalid "after" filter`)
+			return apiparams.AuditEvents{}, errors.E(op, err, errors.CodeBadRequest, `invalid "after" filter`)
 		}
 	}
 	if req.Before != "" {
-		before, err = time.Parse(time.RFC3339, req.Before)
+		filter.End, err = time.Parse(time.RFC3339, req.Before)
 		if err != nil {
-			return apiparams.AuditEvents{}, errgo.WithCausef(err, params.ErrBadRequest, `invalid "before" filter`)
+			return apiparams.AuditEvents{}, errors.E(op, err, errors.CodeBadRequest, `invalid "before" filter`)
 		}
 	}
 	if req.Tag != "" {
-		// Validate the requested Tag filter event though we don't use it
-		// yet.
-		if _, err := names.ParseTag(req.Tag); err != nil {
-			return apiparams.AuditEvents{}, errgo.WithCausef(err, params.ErrBadRequest, `invalid "tag" filter`)
+		tag, err := names.ParseTag(req.Tag)
+		if err != nil {
+			return apiparams.AuditEvents{}, errors.E(op, err, errors.CodeBadRequest, `invalid "tag" filter`)
 		}
+		filter.Tag = tag.String()
 	}
 	if req.UserTag != "" {
-		// Validate the requested UserTag filter event though we don't use
-		// it yet.
-		if _, err := names.ParseUserTag(req.UserTag); err != nil {
-			return apiparams.AuditEvents{}, errgo.WithCausef(err, params.ErrBadRequest, `invalid "user-tag" filter`)
+		tag, err := names.ParseUserTag(req.UserTag)
+		if err != nil {
+			return apiparams.AuditEvents{}, errors.E(op, err, errors.CodeBadRequest, `invalid "user-tag" filter`)
 		}
+		filter.UserTag = tag.String()
 	}
+	filter.Action = req.Action
 
 	limit := int(req.Limit)
 	if limit < 1 || limit > maxLimit {
 		limit = maxLimit
 	}
 
-	if err := auth.CheckIsUser(ctx, r.identity, r.jem.ControllerAdmin()); err != nil {
-		return apiparams.AuditEvents{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	entries, err := r.jem.DB.GetAuditEntries(ctx, after, before, "")
+	entries, err := r.jimm.FindAuditEvents(ctx, r.user, filter)
 	if err != nil {
-		return apiparams.AuditEvents{}, errgo.Mask(err)
+		return apiparams.AuditEvents{}, errors.E(op, err)
 	}
 
 	if len(entries) > limit {
@@ -318,39 +260,7 @@ func (r *controllerRoot) FindAuditEvents(ctx context.Context, req apiparams.Find
 
 	events := make([]apiparams.AuditEvent, len(entries))
 	for i, ent := range entries {
-		events[i].Time = ent.Content.Created()
-		u := names.NewUserTag(ent.Content.Common().Originator)
-		if u.Domain() == "" {
-			u = u.WithDomain("external")
-		}
-		events[i].UserTag = u.String()
-		switch e := ent.Content.(type) {
-		case *params.AuditModelCreated:
-			events[i].Tag = names.NewModelTag(e.UUID).String()
-			events[i].Action = "created"
-			events[i].Params = map[string]string{
-				"controller-name": e.ControllerPath,
-				"name":            e.ID,
-				"owner":           e.Owner,
-				"cloud":           e.Cloud,
-				"region":          e.Region,
-			}
-		case *params.AuditModelDestroyed:
-			events[i].Tag = names.NewModelTag(e.UUID).String()
-			events[i].Action = "deleted"
-		case *params.AuditCloudCreated:
-			events[i].Tag = names.NewCloudTag(e.Cloud).String()
-			events[i].Action = "created"
-			events[i].Params = map[string]string{
-				"region": e.Region,
-			}
-		case *params.AuditCloudRemoved:
-			events[i].Tag = names.NewCloudTag(e.Cloud).String()
-			events[i].Action = "deleted"
-			events[i].Params = map[string]string{
-				"region": e.Region,
-			}
-		}
+		events[i] = ent.ToAPIAuditEvent()
 	}
 	return apiparams.AuditEvents{
 		Events: events,
@@ -361,12 +271,14 @@ func (r *controllerRoot) FindAuditEvents(ctx context.Context, req apiparams.Find
 // level to the specified user. The only currently supported level is
 // "read". Only controller admin users can grant access to the audit log.
 func (r *controllerRoot) GrantAuditLogAccess(ctx context.Context, req apiparams.AuditLogAccessRequest) error {
-	if err := auth.CheckIsUser(ctx, r.identity, r.jem.ControllerAdmin()); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	_, err := conv.ParseUserTag(req.UserTag)
+	const op = errors.Op("jujuapi.GrantAuditLogAccess")
+
+	_, err := parseUserTag(req.UserTag)
 	if err != nil {
-		return errgo.WithCausef(err, params.ErrBadRequest, "")
+		return errors.E(op, err, errors.CodeBadRequest)
+	}
+	if r.user.ControllerAccess != "superuser" {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 	// TODO(mhilton) actually grant access to the user.
 	return nil
@@ -376,54 +288,15 @@ func (r *controllerRoot) GrantAuditLogAccess(ctx context.Context, req apiparams.
 // level from the specified user. The only currently supported level is
 // "read". Only controller admin users can revoke access to the audit log.
 func (r *controllerRoot) RevokeAuditLogAccess(ctx context.Context, req apiparams.AuditLogAccessRequest) error {
-	if err := auth.CheckIsUser(ctx, r.identity, r.jem.ControllerAdmin()); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	_, err := conv.ParseUserTag(req.UserTag)
+	const op = errors.Op("jujuapi.RevokeAuditLogAccess")
+
+	_, err := parseUserTag(req.UserTag)
 	if err != nil {
-		return errgo.WithCausef(err, params.ErrBadRequest, "")
+		return errors.E(op, err, errors.CodeBadRequest)
+	}
+	if r.user.ControllerAccess != "superuser" {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 	// TODO(mhilton) actually revoke access from the user.
 	return nil
-}
-
-func writeControllerInfo(ci *apiparams.ControllerInfo, ctl *mongodoc.Controller) {
-	ci.Name = string(ctl.Path.Name)
-	ci.UUID = ctl.UUID
-
-	// Assume the first hostname we find is the public address.
-OUTER:
-	for _, hps := range ctl.HostPorts {
-		for _, hp := range hps {
-			if network.DeriveAddressType(hp.Host) != network.HostName {
-				continue
-			}
-			if hp.Host == "localhost" {
-				continue
-			}
-			ci.PublicAddress = hp.Address()
-			break OUTER
-		}
-	}
-	ci.APIAddresses = mongodoc.Addresses(ctl.HostPorts)
-	ci.CACertificate = ctl.CACert
-	ci.CloudTag = names.NewCloudTag(ctl.Location["cloud"]).String()
-	ci.CloudRegion = ctl.Location["region"]
-	ci.Username = ctl.AdminUser
-	ci.AgentVersion = ctl.Version.String()
-	t := ctl.UnavailableSince.UTC()
-	if !t.IsZero() {
-		ci.Status = jujuparams.EntityStatus{
-			Status: "unavailable",
-			Since:  &t,
-		}
-	} else if ctl.Deprecated {
-		ci.Status = jujuparams.EntityStatus{
-			Status: "deprecated",
-		}
-	} else {
-		ci.Status = jujuparams.EntityStatus{
-			Status: "available",
-		}
-	}
 }

@@ -11,41 +11,19 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/rpc"
 	"github.com/juju/juju/rpc/jsoncodec"
-	"gopkg.in/errgo.v1"
 
-	apiparams "github.com/CanonicalLtd/jimm/api/params"
-	"github.com/CanonicalLtd/jimm/internal/apiconn"
-	"github.com/CanonicalLtd/jimm/internal/auth"
-	"github.com/CanonicalLtd/jimm/internal/conv"
-	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
+	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
-	"github.com/CanonicalLtd/jimm/params"
 )
 
 const (
 	requestTimeout        = 10 * time.Second
 	maxRequestConcurrency = 10
 )
-
-var errNotImplemented = errgo.New("not implemented")
-
-var errorCodes = map[error]string{
-	conv.ErrLocalUser:             jujuparams.CodeUserNotFound,
-	params.ErrAlreadyExists:       jujuparams.CodeAlreadyExists,
-	params.ErrBadRequest:          jujuparams.CodeBadRequest,
-	params.ErrForbidden:           jujuparams.CodeForbidden,
-	params.ErrMethodNotAllowed:    jujuparams.CodeMethodNotAllowed,
-	params.ErrNotFound:            jujuparams.CodeNotFound,
-	params.ErrModelNotFound:       jujuparams.CodeModelNotFound,
-	params.ErrUnauthorized:        jujuparams.CodeUnauthorized,
-	params.ErrCloudRegionRequired: jujuparams.CodeCloudRegionRequired,
-	params.ErrIncompatibleClouds:  jujuparams.CodeIncompatibleClouds,
-	params.ErrStillAlive:          apiparams.CodeStillAlive,
-	errNotImplemented:             jujuparams.CodeNotImplemented,
-}
 
 // mapError maps JEM errors to errors suitable for use with the juju API.
 func mapError(err error) *jujuparams.Error {
@@ -55,15 +33,9 @@ func mapError(err error) *jujuparams.Error {
 	// TODO the error mapper should really accept a context from the RPC package.
 	zapctx.Debug(context.TODO(), "rpc error", zaputil.Error(err))
 
-	if apierr, ok := errgo.Cause(err).(*apiconn.APIError); ok {
-		return apierr.ParamsError()
-	}
-	if perr, ok := errgo.Cause(err).(*jujuparams.Error); ok {
-		return perr
-	}
 	return &jujuparams.Error{
 		Message: err.Error(),
-		Code:    errorCodes[errgo.Cause(err)],
+		Code:    string(errors.ErrorCode(err)),
 	}
 }
 
@@ -120,12 +92,11 @@ var websocketUpgrader = websocket.Upgrader{
 }
 
 // newWSServer creates a new WebSocket server suitible for handling the API for modelUUID.
-func newWSServer(jem *jem.JEM, a *auth.Authenticator, jsParams jemserver.Params, modelUUID string) http.Handler {
+func newWSServer(jimm *jimm.JIMM, jsParams jemserver.Params, uuid string) http.Handler {
 	hnd := &wsHandler{
-		jem:       jem,
-		auth:      a,
+		jimm:      jimm,
 		params:    jsParams,
-		modelUUID: modelUUID,
+		modelUUID: uuid,
 	}
 	h := func(w http.ResponseWriter, req *http.Request) {
 		conn, err := websocketUpgrader.Upgrade(w, req, nil)
@@ -140,8 +111,7 @@ func newWSServer(jem *jem.JEM, a *auth.Authenticator, jsParams jemserver.Params,
 
 // wsHandler is a handler for a particular WebSocket connection.
 type wsHandler struct {
-	jem       *jem.JEM
-	auth      *auth.Authenticator
+	jimm      *jimm.JIMM
 	params    jemserver.Params
 	modelUUID string
 }
@@ -157,9 +127,9 @@ func (h *wsHandler) handle(ctx context.Context, wsConn *websocket.Conn) {
 	hm := newHeartMonitor(h.params.WebsocketRequestTimeout)
 	var root rpc.Root
 	if h.modelUUID == "" {
-		root = newControllerRoot(h.jem, h.auth, h.params, hm)
+		root = newControllerRoot(h.jimm, h.params, hm)
 	} else {
-		root = newModelRoot(h.jem, hm, h.modelUUID)
+		root = newModelRoot(h.jimm, hm, h.modelUUID)
 	}
 	defer root.Kill()
 	conn.ServeRoot(root, nil, func(err error) error {

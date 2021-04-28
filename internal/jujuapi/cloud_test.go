@@ -3,11 +3,9 @@
 package jujuapi_test
 
 import (
-	"context"
 	"fmt"
 	"sort"
 
-	"github.com/juju/juju/api/base"
 	cloudapi "github.com/juju/juju/api/cloud"
 	"github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
@@ -15,11 +13,6 @@ import (
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
-	errgo "gopkg.in/errgo.v1"
-
-	"github.com/CanonicalLtd/jimm/internal/jemtest"
-	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	"github.com/CanonicalLtd/jimm/params"
 )
 
 type cloudSuite struct {
@@ -27,87 +20,6 @@ type cloudSuite struct {
 }
 
 var _ = gc.Suite(&cloudSuite{})
-
-var defaultCloudTests = []struct {
-	about      string
-	cloudNames []string
-	expect     string
-}{{
-	about: "no controllers",
-}, {
-	about:      "one controller",
-	cloudNames: []string{"cloudname"},
-	expect:     "cloudname",
-}, {
-	about:      "two controllers, same cloud",
-	cloudNames: []string{"cloudname", "cloudname"},
-	expect:     "cloudname",
-}, {
-	about:      "two controllers, different cloud",
-	cloudNames: []string{"cloud1", "cloud2"},
-}, {
-	about:      "three controllers, some same",
-	cloudNames: []string{"cloud1", "cloud1", "cloud2"},
-}}
-
-func (s *cloudSuite) TestDefaultCloud(c *gc.C) {
-	ctx := context.Background()
-
-	conn := s.open(c, nil, "test")
-	defer conn.Close()
-	for i, test := range defaultCloudTests {
-		c.Logf("test %d: %s", i, test.about)
-		_, err := s.JEM.DB.Controllers().RemoveAll(nil)
-		c.Assert(err, gc.Equals, nil)
-		_, err = s.JEM.DB.CloudRegions().RemoveAll(nil)
-		c.Assert(err, gc.Equals, nil)
-		for j, cloud := range test.cloudNames {
-			ctlPath := params.EntityPath{User: "test", Name: params.Name(fmt.Sprintf("controller-%d", j))}
-			err := s.JEM.DB.InsertController(ctx, &mongodoc.Controller{
-				Path:   ctlPath,
-				ACL:    params.ACL{Read: []string{"everyone"}},
-				CACert: "cacert",
-				UUID:   fmt.Sprintf("uuid%d", j),
-				Public: true,
-			})
-			c.Assert(err, gc.Equals, nil)
-			err = s.JEM.DB.UpsertCloudRegion(ctx, &mongodoc.CloudRegion{
-				Cloud:              params.Cloud(cloud),
-				PrimaryControllers: []params.EntityPath{ctlPath},
-				ACL: params.ACL{
-					Read: []string{"everyone"},
-				},
-			})
-			c.Assert(err, gc.Equals, nil)
-		}
-		cloud, err := defaultCloud(conn)
-		if test.expect == "" {
-			c.Check(err, gc.ErrorMatches, `no default cloud \(not found\)`)
-			c.Assert(jujuparams.IsCodeNotFound(err), gc.Equals, true)
-			c.Check(cloud, gc.Equals, names.CloudTag{})
-			continue
-		}
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(cloud, gc.Equals, names.NewCloudTag(test.expect))
-	}
-}
-
-// defaultCloud implements the old DefaultCloud method that was removed
-// from cloud.Client.
-func defaultCloud(conn base.APICaller) (names.CloudTag, error) {
-	var result jujuparams.StringResult
-	if err := conn.APICall("Cloud", 3, "", "DefaultCloud", nil, &result); err != nil {
-		return names.CloudTag{}, errgo.Mask(err, errgo.Any)
-	}
-	if result.Error != nil {
-		return names.CloudTag{}, result.Error
-	}
-	cloudTag, err := names.ParseCloudTag(result.Result)
-	if err != nil {
-		return names.CloudTag{}, errgo.Mask(err)
-	}
-	return cloudTag, nil
-}
 
 func (s *cloudSuite) TestCloudCall(c *gc.C) {
 	conn := s.open(c, nil, "test")
@@ -168,31 +80,21 @@ func (s *cloudSuite) TestUserCredentials(c *gc.C) {
 }
 
 func (s *cloudSuite) TestUserCredentialsWithDomain(c *gc.C) {
-	ctx := context.Background()
-
-	_, err := s.JEM.UpdateCredential(ctx, jemtest.NewIdentity("test@domain"), &mongodoc.Credential{
-		Path: mongodoc.CredentialPath{
-			Cloud: "dummy",
-			EntityPath: mongodoc.EntityPath{
-				User: "test@domain",
-				Name: "cred1",
-			},
-		},
-		Type:  "credtype",
-		Label: "Credentials 1",
+	cct := names.NewCloudCredentialTag("dummy/test@domain/cred1")
+	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{
+		AuthType: "credtype",
 		Attributes: map[string]string{
 			"attr1": "val1",
 			"attr2": "val2",
 		},
-	}, 0)
-	c.Assert(err, gc.Equals, nil)
+	})
 	conn := s.open(c, nil, "test@domain")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
 	creds, err := client.UserCredentials(names.NewUserTag("test@domain"), names.NewCloudTag("dummy"))
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []names.CloudCredentialTag{
-		names.NewCloudCredentialTag("dummy/test@domain/cred1"),
+		cct,
 	})
 }
 
@@ -274,7 +176,7 @@ func (s *cloudSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
 	c.Assert(resp.Results, gc.HasLen, 3)
 	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `"not-a-cloud-credentials-tag" is not a valid tag`)
 	c.Assert(resp.Results[1].Error, gc.ErrorMatches, `unauthorized`)
-	c.Assert(resp.Results[2].Error, gc.ErrorMatches, `invalid name "bad-name-"`)
+	c.Assert(resp.Results[2].Error, gc.IsNil)
 }
 
 func (s *cloudSuite) TestUpdateCloudCredentialsForce(c *gc.C) {
@@ -453,18 +355,10 @@ func (s *cloudSuite) TestCredential(c *gc.C) {
 	cred2Tag := names.NewCloudCredentialTag("dummy/test@external/cred2")
 	cred2 := cloud.NewCredential("empty", nil)
 
-	cred5Tag := names.NewCloudCredentialTag("no-such-cloud/test@external/cred5")
-	cred5 := cloud.NewCredential("userpass", map[string]string{
-		"username": "cloud-user",
-		"password": "cloud-pass",
-	})
-
 	client := cloudapi.NewClient(conn)
 	_, err := client.UpdateCredentialsCheckModels(cred1Tag, cred1)
 	c.Assert(err, gc.Equals, nil)
 	_, err = client.UpdateCredentialsCheckModels(cred2Tag, cred2)
-	c.Assert(err, gc.Equals, nil)
-	_, err = client.UpdateCredentialsCheckModels(cred5Tag, cred5)
 	c.Assert(err, gc.Equals, nil)
 
 	creds, err := client.Credentials(
@@ -472,7 +366,6 @@ func (s *cloudSuite) TestCredential(c *gc.C) {
 		cred2Tag,
 		names.NewCloudCredentialTag("dummy/test@external/cred3"),
 		names.NewCloudCredentialTag("dummy/no-test@external/cred4"),
-		cred5Tag,
 		names.NewCloudCredentialTag("dummy/admin@local/cred6"),
 	)
 	c.Assert(err, gc.Equals, nil)
@@ -498,7 +391,7 @@ func (s *cloudSuite) TestCredential(c *gc.C) {
 		},
 	}, {
 		Error: &jujuparams.Error{
-			Message: `credential not found`,
+			Message: `cloudcredential "dummy/test@external/cred3" not found`,
 			Code:    jujuparams.CodeNotFound,
 		},
 	}, {
@@ -507,17 +400,9 @@ func (s *cloudSuite) TestCredential(c *gc.C) {
 			Code:    jujuparams.CodeUnauthorized,
 		},
 	}, {
-		Result: &jujuparams.CloudCredential{
-			AuthType: "userpass",
-			Redacted: []string{
-				"password",
-				"username",
-			},
-		},
-	}, {
 		Error: &jujuparams.Error{
-			Message: `unsupported local user`,
-			Code:    jujuparams.CodeUserNotFound,
+			Message: `unauthorized`,
+			Code:    jujuparams.CodeUnauthorized,
 		},
 	}})
 }
@@ -555,7 +440,7 @@ func (s *cloudSuite) TestRevokeCredential(c *gc.C) {
 	c.Assert(ccr, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Error: &jujuparams.Error{
 			Code:    jujuparams.CodeNotFound,
-			Message: `credential "dummy/test@external/cred" not found`,
+			Message: `cloudcredential "dummy/test@external/cred" not found`,
 		},
 	}})
 
@@ -630,7 +515,7 @@ func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
 		}},
 	}, &resp)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `cannot revoke because credential is in use on at least one model`)
+	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `cloud credential still used by 1 model\(s\)`)
 
 	resp.Results = nil
 	err = conn.APICall("Cloud", 3, "", "RevokeCredentialsCheckModels", jujuparams.RevokeCredentialArgs{
@@ -647,7 +532,7 @@ func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
 	c.Assert(ccr, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Error: &jujuparams.Error{
 			Code:    jujuparams.CodeNotFound,
-			Message: `credential "dummy/test@external/cred" not found`,
+			Message: `cloudcredential "dummy/test@external/cred" not found`,
 		},
 	}})
 
@@ -682,7 +567,7 @@ func (s *cloudSuite) TestAddCloudNoHostCloudRegion(c *gc.C) {
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
 	}, false)
-	c.Assert(err, gc.ErrorMatches, `cloud region required \(cloud region required\)`)
+	c.Assert(err, gc.ErrorMatches, `cloud host region not specified \(cloud region required\)`)
 	c.Assert(jujuparams.IsCodeCloudRegionRequired(err), gc.Equals, true)
 }
 
@@ -878,7 +763,7 @@ func (s *cloudSuite) TestRemoveCloudNotFound(c *gc.C) {
 	client := cloudapi.NewClient(conn)
 
 	err := client.RemoveCloud("test-cloud")
-	c.Assert(err, gc.ErrorMatches, `cloudregion not found`)
+	c.Assert(err, gc.ErrorMatches, `cloud "test-cloud" not found`)
 }
 
 func (s *cloudSuite) TestModifyCloudAccess(c *gc.C) {
@@ -971,8 +856,8 @@ func (s *cloudSuite) TestModifyCloudAccessUnauthorized(c *gc.C) {
 		}},
 	})
 
-	// Check that alice@external does not yet have access
-	conn2 := s.open(c, nil, "alice")
+	// Check that charlie@external does not yet have access
+	conn2 := s.open(c, nil, "charlie")
 	defer conn2.Close()
 	client2 := cloudapi.NewClient(conn2)
 	clouds, err = client2.Clouds()
@@ -980,7 +865,7 @@ func (s *cloudSuite) TestModifyCloudAccessUnauthorized(c *gc.C) {
 	_, ok := clouds[names.NewCloudTag("test-cloud")]
 	c.Assert(ok, gc.Equals, false, gc.Commentf("clouds: %#v", clouds))
 
-	err = client2.GrantCloud("alice@external", "add-model", "test-cloud")
+	err = client2.GrantCloud("charlie@external", "add-model", "test-cloud")
 	c.Assert(err, gc.ErrorMatches, `unauthorized`)
 }
 
@@ -1056,7 +941,7 @@ func (s *cloudSuite) TestCloudInfo(c *gc.C) {
 		}, {
 			Error: &jujuparams.Error{
 				Code:    "not found",
-				Message: "cloud not found",
+				Message: `cloud "no-such-cloud" not found`,
 			},
 		}, {
 			Error: &jujuparams.Error{
@@ -1101,6 +986,20 @@ func (s *cloudSuite) TestListCloudInfo(c *gc.C) {
 		Results: []jujuparams.ListCloudInfoResult{{
 			Result: &jujuparams.ListCloudInfo{
 				CloudDetails: jujuparams.CloudDetails{
+					Type:             "kubernetes",
+					AuthTypes:        []string{"certificate"},
+					Endpoint:         "https://0.1.2.3:5678",
+					IdentityEndpoint: "https://0.1.2.3:5679",
+					StorageEndpoint:  "https://0.1.2.3:5680",
+					Regions: []jujuparams.CloudRegion{{
+						Name: "default",
+					}},
+				},
+				Access: "admin",
+			},
+		}, {
+			Result: &jujuparams.ListCloudInfo{
+				CloudDetails: jujuparams.CloudDetails{
 					Type:             "dummy",
 					AuthTypes:        []string{"empty", "userpass"},
 					Endpoint:         "dummy-endpoint",
@@ -1114,20 +1013,6 @@ func (s *cloudSuite) TestListCloudInfo(c *gc.C) {
 					}},
 				},
 				Access: "add-model",
-			},
-		}, {
-			Result: &jujuparams.ListCloudInfo{
-				CloudDetails: jujuparams.CloudDetails{
-					Type:             "kubernetes",
-					AuthTypes:        []string{"certificate"},
-					Endpoint:         "https://0.1.2.3:5678",
-					IdentityEndpoint: "https://0.1.2.3:5679",
-					StorageEndpoint:  "https://0.1.2.3:5680",
-					Regions: []jujuparams.CloudRegion{{
-						Name: "default",
-					}},
-				},
-				Access: "admin",
 			},
 		}},
 	})
@@ -1146,6 +1031,20 @@ func (s *cloudSuite) TestListCloudInfo(c *gc.C) {
 		Results: []jujuparams.ListCloudInfoResult{{
 			Result: &jujuparams.ListCloudInfo{
 				CloudDetails: jujuparams.CloudDetails{
+					Type:             "kubernetes",
+					AuthTypes:        []string{"certificate"},
+					Endpoint:         "https://0.1.2.3:5678",
+					IdentityEndpoint: "https://0.1.2.3:5679",
+					StorageEndpoint:  "https://0.1.2.3:5680",
+					Regions: []jujuparams.CloudRegion{{
+						Name: "default",
+					}},
+				},
+				Access: "add-model",
+			},
+		}, {
+			Result: &jujuparams.ListCloudInfo{
+				CloudDetails: jujuparams.CloudDetails{
 					Type:             "dummy",
 					AuthTypes:        []string{"empty", "userpass"},
 					Endpoint:         "dummy-endpoint",
@@ -1156,20 +1055,6 @@ func (s *cloudSuite) TestListCloudInfo(c *gc.C) {
 						Endpoint:         "dummy-endpoint",
 						IdentityEndpoint: "dummy-identity-endpoint",
 						StorageEndpoint:  "dummy-storage-endpoint",
-					}},
-				},
-				Access: "add-model",
-			},
-		}, {
-			Result: &jujuparams.ListCloudInfo{
-				CloudDetails: jujuparams.CloudDetails{
-					Type:             "kubernetes",
-					AuthTypes:        []string{"certificate"},
-					Endpoint:         "https://0.1.2.3:5678",
-					IdentityEndpoint: "https://0.1.2.3:5679",
-					StorageEndpoint:  "https://0.1.2.3:5680",
-					Regions: []jujuparams.CloudRegion{{
-						Name: "default",
 					}},
 				},
 				Access: "add-model",

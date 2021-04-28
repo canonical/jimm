@@ -9,11 +9,10 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 	"github.com/rogpeppe/fastuuid"
-	"gopkg.in/errgo.v1"
 
+	"github.com/CanonicalLtd/jimm/internal/dbmodel"
+	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
-	"github.com/CanonicalLtd/jimm/internal/mongodoc"
-	"github.com/CanonicalLtd/jimm/params"
 	jimmversion "github.com/CanonicalLtd/jimm/version"
 )
 
@@ -92,7 +91,7 @@ func (r *controllerRoot) ConfigSet(ctx context.Context, args jujuparams.Controll
 
 // MongoVersion allows the introspection of the mongo version per controller.
 func (r *controllerRoot) MongoVersion(ctx context.Context) (jujuparams.StringResult, error) {
-	return r.jem.MongoVersion(ctx)
+	return jujuparams.StringResult{}, errors.E(errors.CodeNotImplemented)
 }
 
 // IdentityProviderURL returns the URL of the configured external identity
@@ -107,9 +106,11 @@ func (r *controllerRoot) IdentityProviderURL(ctx context.Context) (jujuparams.St
 // ControllerVersion returns the version information associated with this
 // controller binary.
 func (r *controllerRoot) ControllerVersion(ctx context.Context) (jujuparams.ControllerVersionResults, error) {
-	srvVersion, err := r.jem.EarliestControllerVersion(ctx, r.identity)
+	const op = errors.Op("jujuapi.ControllerVersion")
+
+	srvVersion, err := r.jimm.EarliestControllerVersion(ctx)
 	if err != nil {
-		return jujuparams.ControllerVersionResults{}, errgo.Mask(err)
+		return jujuparams.ControllerVersionResults{}, errors.E(op, err)
 	}
 	result := jujuparams.ControllerVersionResults{
 		Version:   srvVersion.String(),
@@ -119,6 +120,8 @@ func (r *controllerRoot) ControllerVersion(ctx context.Context) (jujuparams.Cont
 }
 
 func (r *controllerRoot) WatchModelSummaries(ctx context.Context) (jujuparams.SummaryWatcherID, error) {
+	const op = errors.Op("jujuapi.WatchModelSummaries")
+
 	// TODO(mhilton) move this somewhere where it will be reused accross connections
 	r.mu.Lock()
 	if r.generator == nil {
@@ -126,7 +129,7 @@ func (r *controllerRoot) WatchModelSummaries(ctx context.Context) (jujuparams.Su
 		r.generator, err = fastuuid.NewGenerator()
 		r.mu.Unlock()
 		if err != nil {
-			return jujuparams.SummaryWatcherID{}, errgo.Mask(err)
+			return jujuparams.SummaryWatcherID{}, errors.E(op, err)
 		}
 	} else {
 		r.mu.Unlock()
@@ -134,9 +137,9 @@ func (r *controllerRoot) WatchModelSummaries(ctx context.Context) (jujuparams.Su
 
 	id := fmt.Sprintf("%v", r.generator.Next())
 
-	watcher, err := newModelSummaryWatcher(ctx, id, r, r.jem.Pubsub())
+	watcher, err := newModelSummaryWatcher(ctx, id, r, r.jimm.Pubsub)
 	if err != nil {
-		return jujuparams.SummaryWatcherID{}, errgo.Mask(err)
+		return jujuparams.SummaryWatcherID{}, errors.E(op, err)
 	}
 	r.watchers.register(watcher)
 
@@ -151,16 +154,15 @@ func (r *controllerRoot) AllModels(ctx context.Context) (jujuparams.UserModelLis
 
 // allModels returns all the models the logged in user has access to.
 func (r *controllerRoot) allModels(ctx context.Context) (jujuparams.UserModelList, error) {
+	const op = errors.Op("jujuapi.AllModels")
+
 	var models []jujuparams.UserModel
-	err := r.jem.ForEachModel(ctx, r.identity, jujuparams.ModelReadAccess, func(model *mongodoc.Model) error {
-		models = append(models, jujuparams.UserModel{
-			Model:          userModelForModelDoc(model),
-			LastConnection: nil, // TODO (mhilton) work out how to record and set this.
-		})
+	err := r.jimm.ForEachUserModel(ctx, r.user, func(uma *dbmodel.UserModelAccess) error {
+		models = append(models, uma.ToJujuUserModel())
 		return nil
 	})
 	if err != nil {
-		return jujuparams.UserModelList{}, errgo.Mask(err)
+		return jujuparams.UserModelList{}, errors.E(op, err)
 	}
 	return jujuparams.UserModelList{
 		UserModels: models,
@@ -168,16 +170,23 @@ func (r *controllerRoot) allModels(ctx context.Context) (jujuparams.UserModelLis
 }
 
 func (r *controllerRoot) ModelStatus(ctx context.Context, args jujuparams.Entities) (jujuparams.ModelStatusResults, error) {
+	const op = errors.Op("jujuapi.ModelStatus")
+
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 	results := make([]jujuparams.ModelStatus, len(args.Entities))
 	for i, arg := range args.Entities {
 		mt, err := names.ParseModelTag(arg.Tag)
 		if err != nil {
-			results[i].Error = mapError(errgo.WithCausef(err, params.ErrBadRequest, ""))
+			results[i].Error = mapError(errors.E(op, err, errors.CodeBadRequest))
 			continue
 		}
-		results[i].Error = mapError(r.jem.GetModelStatus(ctx, r.identity, mt.Id(), &results[i], len(results) == 1))
+		status, err := r.jimm.ModelStatus(ctx, r.user, mt)
+		if err != nil {
+			results[i].Error = mapError(errors.E(op, err))
+			continue
+		}
+		results[i] = *status
 	}
 	return jujuparams.ModelStatusResults{
 		Results: results,
@@ -199,8 +208,5 @@ func (r *controllerRoot) ControllerConfig() (jujuparams.ControllerConfigResult, 
 // method. This always returns a permission error, as no user has admin
 // access to the controller.
 func (r *controllerRoot) ModelConfig() (jujuparams.ModelConfigResults, error) {
-	return jujuparams.ModelConfigResults{}, &jujuparams.Error{
-		Code:    jujuparams.CodeUnauthorized,
-		Message: "permission denied",
-	}
+	return jujuparams.ModelConfigResults{}, errors.E(errors.CodeUnauthorized, "permission denied")
 }

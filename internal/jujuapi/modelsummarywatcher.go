@@ -11,13 +11,12 @@ import (
 
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"go.uber.org/zap"
-	"gopkg.in/errgo.v1"
 
+	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
-	"github.com/CanonicalLtd/jimm/params"
 )
 
 func init() {
@@ -33,17 +32,21 @@ func init() {
 }
 
 func (r *controllerRoot) ModelSummaryWatcherNext(ctx context.Context, objID string) (jujuparams.SummaryWatcherNextResults, error) {
+	const op = errors.Op("jujuapi.ModelSummaryWatcherNext")
+
 	w, err := r.watchers.get(objID)
 	if err != nil {
-		return jujuparams.SummaryWatcherNextResults{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		return jujuparams.SummaryWatcherNextResults{}, errors.E(op, err)
 	}
 	return w.Next()
 }
 
 func (r *controllerRoot) ModelSummaryWatcherStop(ctx context.Context, objID string) error {
+	const op = errors.Op("jujuapi.ModelSummaryWatcherStop")
+
 	w, err := r.watchers.get(objID)
 	if err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		return errors.E(op, err)
 	}
 	return w.Stop()
 }
@@ -71,13 +74,9 @@ func (r *watcherRegistry) get(id string) (*modelSummaryWatcher, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	if r.watchers == nil {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "")
-	}
-
 	w, ok := r.watchers[id]
 	if !ok {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "")
+		return nil, errors.E(errors.CodeNotFound)
 	}
 	return w, nil
 }
@@ -102,7 +101,7 @@ func newModelSummaryWatcher(ctx context.Context, id string, root *controllerRoot
 
 	cleanupFunction, err := pubsub.SubscribeMatch(accessWatcher.match, watcher.pubsubHandler)
 	if err != nil {
-		return nil, errgo.Mask(err)
+		return nil, err
 	}
 	watcher.cleanup = cleanupFunction
 
@@ -194,7 +193,7 @@ func (w *modelAccessWatcher) loop() {
 func (w *modelAccessWatcher) do() error {
 	userModelList, err := w.modelGetterFunc(w.ctx)
 	if err != nil {
-		return errgo.Mask(err)
+		return err
 	}
 
 	models := make(map[string]bool)
