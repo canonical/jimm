@@ -659,7 +659,6 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 				ControllerTag: names.NewControllerTag(controller.UUID).String(),
 				Alias:         "test-controller-1",
 				Addrs:         []string{"test-public-address"},
-				CACert:        "test-ca-cert",
 			},
 			Macaroon: &macaroon.Macaroon{},
 			Offer: &jujuparams.ApplicationOfferDetails{
@@ -712,7 +711,6 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 				ControllerTag: names.NewControllerTag(controller.UUID).String(),
 				Alias:         "test-controller-1",
 				Addrs:         []string{"test-public-address"},
-				CACert:        "test-ca-cert",
 			},
 			Macaroon: &macaroon.Macaroon{},
 			Offer: &jujuparams.ApplicationOfferDetails{
@@ -1096,6 +1094,10 @@ func TestGetApplicationOffer(t *testing.T) {
 					"key1": "value1",
 					"key2": "value2",
 				},
+				Users: []jujuparams.OfferUserDetails{{
+					UserName: "everyone@external",
+					Access:   "read",
+				}},
 				Spaces: []jujuparams.RemoteSpace{{
 					CloudType:  "test-cloud-type",
 					Name:       "test-remote-space",
