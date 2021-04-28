@@ -33,7 +33,7 @@ func (j *JIMM) GetCloudCredential(ctx context.Context, user *dbmodel.User, tag n
 	const op = errors.Op("jimm.GetCloudCredential")
 
 	if user.ControllerAccess != "superuser" && user.Username != tag.Owner().Id() {
-		return nil, errors.E(op, errors.CodeUnauthorized)
+		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	var credential dbmodel.CloudCredential
@@ -68,7 +68,7 @@ func (j *JIMM) RevokeCloudCredential(ctx context.Context, user *dbmodel.User, ta
 	}
 
 	if user.Username != tag.Owner().Id() {
-		return fail(errors.E(op, errors.CodeUnauthorized))
+		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
 	}
 
 	var credential dbmodel.CloudCredential
@@ -166,7 +166,7 @@ func (j *JIMM) UpdateCloudCredential(ctx context.Context, u *dbmodel.User, args 
 	}
 
 	if u.ControllerAccess != "superuser" && u.Username != args.CredentialTag.Owner().Id() {
-		return fail(errors.E(op, errors.CodeUnauthorized))
+		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
 	}
 
 	var credential dbmodel.CloudCredential
@@ -362,11 +362,11 @@ func (j *JIMM) GetCloudCredentialAttributes(ctx context.Context, u *dbmodel.User
 	if hidden {
 		// Controller superusers cannot read hidden credential attributes.
 		if u.Username != cred.OwnerUsername {
-			return nil, nil, errors.E(op, errors.CodeUnauthorized)
+			return nil, nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 		}
 	} else {
 		if u.ControllerAccess != "superuser" && u.Username != cred.OwnerUsername {
-			return nil, nil, errors.E(op, errors.CodeUnauthorized)
+			return nil, nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 		}
 	}
 

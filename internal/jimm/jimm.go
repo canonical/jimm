@@ -275,7 +275,7 @@ func (j *JIMM) FindAuditEvents(ctx context.Context, user *dbmodel.User, filter d
 	const op = errors.Op("jimm.FindAuditEvents")
 
 	if user.ControllerAccess != "superuser" {
-		return nil, errors.E(op, errors.CodeUnauthorized)
+		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	var entries []dbmodel.AuditLogEntry
@@ -295,7 +295,7 @@ func (j *JIMM) ListControllers(ctx context.Context, user *dbmodel.User) ([]dbmod
 	const op = errors.Op("jimm.ListControllers")
 
 	if user.ControllerAccess != "superuser" {
-		return nil, errors.E(op, errors.CodeUnauthorized)
+		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	var controllers []dbmodel.Controller
@@ -316,7 +316,7 @@ func (j *JIMM) SetControllerDeprecated(ctx context.Context, user *dbmodel.User, 
 	const op = errors.Op("jimm.SetControllerDeprecated")
 
 	if user.ControllerAccess != "superuser" {
-		return errors.E(op, errors.CodeUnauthorized)
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	// Update the local database with the updated cloud definition. We
@@ -344,7 +344,7 @@ func (j *JIMM) RemoveController(ctx context.Context, user *dbmodel.User, control
 	const op = errors.Op("jimm.RemoveController")
 
 	if user.ControllerAccess != "superuser" {
-		return errors.E(op, errors.CodeUnauthorized)
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	// Update the local database with the updated cloud definition. We
@@ -362,7 +362,7 @@ func (j *JIMM) RemoveController(ctx context.Context, user *dbmodel.User, control
 		// if c.UnavailableSince is no valid, then we can't delete is
 		// if force is true, we can always delete is
 		if !(force || c.UnavailableSince.Valid) {
-			return errors.E(errors.CodeBadRequest, "controller is still alive")
+			return errors.E(errors.CodeStillAlive, "controller is still alive")
 		}
 
 		// Delete its models first.

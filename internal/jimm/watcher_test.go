@@ -525,7 +525,7 @@ var watcherTests = []struct {
 			},
 		}
 		err := db.GetModel(ctx, &model)
-		c.Check(err, qt.ErrorMatches, `record not found`)
+		c.Check(err, qt.ErrorMatches, `model not found`)
 		c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 	},
 }, {
@@ -606,7 +606,7 @@ var watcherTests = []struct {
 			},
 		}
 		err := db.GetModel(ctx, &model)
-		c.Check(err, qt.ErrorMatches, `record not found`)
+		c.Check(err, qt.ErrorMatches, `model not found`)
 		c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 	},
 }, {

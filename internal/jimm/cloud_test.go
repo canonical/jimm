@@ -663,7 +663,7 @@ var addHostedCloudTests = []struct {
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
 	},
-	expectError:     `unauthorized access`,
+	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
 }, {
 	name:      "CloudWithReservedName",
@@ -950,7 +950,7 @@ var grantCloudAccessTests = []struct {
 	cloud:           "test",
 	targetUsername:  "bob@external",
 	access:          "add-model",
-	expectError:     `unauthorized access`,
+	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
 }, {
 	name:           "DialError",
@@ -1192,7 +1192,7 @@ var revokeCloudAccessTests = []struct {
 	cloud:           "test",
 	targetUsername:  "bob@external",
 	access:          "add-model",
-	expectError:     `unauthorized access`,
+	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
 }, {
 	name:           "DialError",
@@ -1322,7 +1322,7 @@ var removeCloudTests = []struct {
 	env:             removeCloudTestEnv,
 	username:        "bob@external",
 	cloud:           "test",
-	expectError:     `unauthorized access`,
+	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
 }, {
 	name:        "DialError",
@@ -1567,7 +1567,7 @@ var updateCloudTests = []struct {
 	env:             updateCloudTestEnv,
 	username:        "bob@external",
 	cloud:           "dummy",
-	expectError:     `unauthorized access`,
+	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
 }, {
 	name:        "DialError",

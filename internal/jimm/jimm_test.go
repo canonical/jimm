@@ -135,7 +135,7 @@ func TestFindAuditEvents(t *testing.T) {
 		filter: db.AuditLogFilter{
 			Tag: "tag-1",
 		},
-		expectedError: "unauthorized access",
+		expectedError: "unauthorized",
 	}}
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
@@ -219,11 +219,11 @@ func TestListControllers(t *testing.T) {
 	}, {
 		about:         "add-model user can not list controllers",
 		user:          env.User("bob@external").DBObject(c, j.Database),
-		expectedError: "unauthorized access",
+		expectedError: "unauthorized",
 	}, {
 		about:         "user withouth access rights cannot list controllers",
 		user:          env.User("eve@external").DBObject(c, j.Database),
-		expectedError: "unauthorized access",
+		expectedError: "unauthorized",
 	}}
 
 	for _, test := range tests {
@@ -297,12 +297,12 @@ func TestSetControllerDeprecated(t *testing.T) {
 		deprecated: false,
 	}, {
 		about:         "add-model user cannot deprecate a controller",
-		expectedError: "unauthorized access",
+		expectedError: "unauthorized",
 		deprecated:    true,
 	}, {
 		about:         "user withouth access rights cannot deprecate a controller",
 		user:          env.User("eve@external").DBObject(c, j.Database),
-		expectedError: "unauthorized access",
+		expectedError: "unauthorized",
 		deprecated:    true,
 	}}
 
@@ -428,12 +428,12 @@ func TestRemoveController(t *testing.T) {
 	}, {
 		about:         "add-model user cannot remove a controller",
 		user:          "bob@external",
-		expectedError: "unauthorized access",
+		expectedError: "unauthorized",
 		force:         false,
 	}, {
 		about:         "user withouth access rights cannot remove a controller",
 		user:          "eve@external",
-		expectedError: "unauthorized access",
+		expectedError: "unauthorized",
 		force:         false,
 	}}
 

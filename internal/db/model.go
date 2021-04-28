@@ -64,6 +64,10 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model, options .
 	}
 
 	if err := db.First(&model).Error; err != nil {
+		err = dbError(err)
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return errors.E(op, err, "model not found")
+		}
 		return errors.E(op, dbError(err))
 	}
 	return nil

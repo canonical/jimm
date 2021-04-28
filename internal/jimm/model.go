@@ -54,11 +54,11 @@ func (a *ModelCreateArgs) FromJujuModelCreateArgs(args *jujuparams.ModelCreateAr
 	a.Config = args.Config
 	a.CloudRegion = args.CloudRegion
 	if args.CloudTag == "" {
-		return errors.E("cloud tag not specified")
+		return errors.E("no cloud specified for model; please specify one")
 	}
 	ct, err := names.ParseCloudTag(args.CloudTag)
 	if err != nil {
-		return errors.E(err, "invalid cloud tag")
+		return errors.E(err, errors.CodeBadRequest)
 	}
 	a.Cloud = ct
 
@@ -67,7 +67,7 @@ func (a *ModelCreateArgs) FromJujuModelCreateArgs(args *jujuparams.ModelCreateAr
 	}
 	ot, err := names.ParseUserTag(args.OwnerTag)
 	if err != nil {
-		return errors.E(err, "invalid owner tag")
+		return errors.E(err, errors.CodeBadRequest)
 	}
 	a.Owner = ot
 
@@ -219,7 +219,7 @@ func (b *modelBuilder) WithCloudRegion(region string) *modelBuilder {
 		}
 		// we looped through all cloud regions and could not find a match
 		if b.cloudRegionID == 0 {
-			b.err = errors.E(fmt.Sprintf("cloud region %s not found", region))
+			b.err = errors.E("cloudregion not found", errors.CodeNotFound)
 		}
 	} else {
 		b.err = errors.E("cloud not specified")
@@ -539,7 +539,7 @@ func (j *JIMM) AddModel(ctx context.Context, u *dbmodel.User, args *ModelCreateA
 	}
 
 	if owner.Username != u.Username && u.ControllerAccess != "superuser" {
-		return fail(errors.E(op, errors.CodeUnauthorized))
+		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
 	}
 
 	builder := newModelBuilder(ctx, j)
@@ -671,7 +671,7 @@ func (j *JIMM) ModelInfo(ctx context.Context, u *dbmodel.User, mt names.ModelTag
 	if modelUser.Access == "" {
 		// If the user doesn't have any access on the model return an
 		// unauthorized error
-		return nil, errors.E(op, errors.CodeUnauthorized)
+		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	// Non-admin users can only see their own user.
@@ -746,7 +746,7 @@ func (j *JIMM) ForEachModel(ctx context.Context, u *dbmodel.User, f func(*dbmode
 	const op = errors.Op("jimm.ForEachUserModel")
 
 	if u.ControllerAccess != "superuser" {
-		return errors.E(op, errors.CodeUnauthorized)
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	errStop := errors.E("stop")
@@ -1013,7 +1013,7 @@ func (j *JIMM) doModelAdmin(ctx context.Context, u *dbmodel.User, mt names.Model
 	if u.ControllerAccess != "superuser" && m.UserAccess(u) != "admin" {
 		// If the user doesn't have admin access on the model return
 		// an unauthorized error.
-		return errors.E(op, errors.CodeUnauthorized)
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	api, err := j.dial(ctx, &m.Controller, names.ModelTag{})
@@ -1046,6 +1046,10 @@ func (j *JIMM) ChangeModelCredential(ctx context.Context, user *dbmodel.User, mo
 	fail := func(err error) error {
 		ale.Params["err"] = err.Error()
 		return err
+	}
+
+	if user.ControllerAccess != "superuser" && user.Tag() != cloudCredentialTag.Owner() {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	credential := dbmodel.CloudCredential{}

@@ -950,7 +950,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 
 			tag := names.NewCloudCredentialTag("test-cloud/eve@external/test-credential-1")
 
-			return &u, tag, dbmodel.CloudCredential{}, "unauthorized access"
+			return &u, tag, dbmodel.CloudCredential{}, "unauthorized"
 		},
 	}, {
 		about: "credential not found",
@@ -1416,12 +1416,12 @@ var getCloudCredentialAttributesTests = []struct {
 	name:            "SuperUserWithHiddenUnauthorized",
 	username:        "alice@external",
 	hidden:          true,
-	expectError:     `unauthorized access`,
+	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
 }, {
 	name:            "OtherUserUnauthorized",
 	username:        "charlie@external",
-	expectError:     `unauthorized access`,
+	expectError:     `unauthorized`,
 	expectErrorCode: errors.CodeUnauthorized,
 }}
 
