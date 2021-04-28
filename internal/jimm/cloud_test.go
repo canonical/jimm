@@ -641,6 +641,8 @@ var addHostedCloudTests = []struct {
 				Priority: 1,
 			}},
 		}},
+		CACertificates: dbmodel.Strings{"CACERT"},
+		Config:         dbmodel.Map{"A": string("a")},
 		Users: []dbmodel.UserCloudAccess{{
 			Username: "bob@external",
 			User: dbmodel.User{

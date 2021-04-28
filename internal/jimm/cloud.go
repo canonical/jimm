@@ -276,7 +276,7 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, u *dbmodel.User, tag names.Cl
 		}}
 	}
 
-	if err := j.Database.SetCloud(ctx, &dbCloud); err != nil {
+	if err := j.Database.UpdateCloud(ctx, &dbCloud); err != nil {
 		// At this point the cloud has been created on the
 		// controller and we know something about it. Trying to
 		// undo that will probably make things worse.
