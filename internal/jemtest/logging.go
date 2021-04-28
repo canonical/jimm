@@ -5,12 +5,11 @@ import (
 	"strings"
 
 	"github.com/juju/loggo"
+	"github.com/juju/zaputil"
+	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	gc "gopkg.in/check.v1"
-
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
-	"github.com/CanonicalLtd/jimm/internal/zaputil"
 )
 
 // LoggingSuite is a replacement for github.com/juju/testing.LoggingSuite

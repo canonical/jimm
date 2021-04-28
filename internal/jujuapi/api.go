@@ -12,6 +12,8 @@ import (
 
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/rpc/jsoncodec"
+	"github.com/juju/zaputil"
+	"github.com/juju/zaputil/zapctx"
 	"github.com/julienschmidt/httprouter"
 	"go.uber.org/zap"
 	"gopkg.in/httprequest.v1"
@@ -21,8 +23,6 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
-	"github.com/CanonicalLtd/jimm/internal/zaputil"
 	"github.com/CanonicalLtd/jimm/params"
 )
 

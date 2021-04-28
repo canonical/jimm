@@ -16,6 +16,7 @@ import (
 
 	"github.com/gorilla/handlers"
 	vault "github.com/hashicorp/vault/api"
+	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/errgo.v1"
@@ -25,7 +26,6 @@ import (
 	jem "github.com/CanonicalLtd/jimm"
 	"github.com/CanonicalLtd/jimm/config"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
 )
 
