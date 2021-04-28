@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
@@ -71,55 +70,6 @@ func (d *Database) GetClouds(ctx context.Context) ([]dbmodel.Cloud, error) {
 	return clouds, nil
 }
 
-// SetCloud creates, or updates, the given cloud document. If the cloud
-// already exists it will be unaltered except for the addition of new
-// regions and users.
-func (d *Database) SetCloud(ctx context.Context, c *dbmodel.Cloud) error {
-	const op = errors.Op("db.SetCloud")
-	if err := d.ready(); err != nil {
-		return errors.E(op, err)
-	}
-
-	db := d.DB.WithContext(ctx)
-	err := db.Transaction(func(tx *gorm.DB) error {
-		err := tx.Omit("Regions").Omit("Users").Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "name"}},
-			DoNothing: true,
-		}).Create(c).Error
-		if err != nil {
-			return dbError(err)
-		}
-		// Merge the regions.
-		for i := range c.Regions {
-			c.Regions[i].CloudName = c.Name
-			err := tx.Clauses(clause.OnConflict{
-				Columns:   []clause.Column{{Name: "cloud_name"}, {Name: "name"}},
-				DoNothing: true,
-			}).Create(&c.Regions[i]).Error
-			if err != nil {
-				return dbError(err)
-			}
-		}
-
-		// Merge the users.
-		for i := range c.Users {
-			c.Users[i].CloudName = c.Name
-			err := tx.Clauses(clause.OnConflict{
-				Columns:   []clause.Column{{Name: "cloud_name"}, {Name: "username"}},
-				DoUpdates: clause.AssignmentColumns([]string{"updated_at", "access"}),
-			}).Create(&c.Users[i]).Error
-			if err != nil {
-				return dbError(err)
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return errors.E(op, err)
-	}
-	return nil
-}
-
 // UpdateCloud updates the database definition of the cloud to match the
 // given cloud. UpdateCloud does not update any user information.
 func (d *Database) UpdateCloud(ctx context.Context, c *dbmodel.Cloud) error {
@@ -159,6 +109,26 @@ func preloadCloud(prefix string, db *gorm.DB) *gorm.DB {
 	db = db.Preload(prefix + "Regions").Preload(prefix + "Regions.Controllers").Preload(prefix + "Regions.Controllers.Controller")
 	db = db.Preload(prefix + "Users").Preload(prefix + "Users.User")
 	return db
+}
+
+// AddCloudRegion adds a new cloud-region to a cloud. AddCloudRegion
+// returns an error with a code of CodeAlreadyExists if there is already a
+// region with the same name on the cloud.
+func (d *Database) AddCloudRegion(ctx context.Context, cr *dbmodel.CloudRegion) error {
+	const op = errors.Op("db.AddCloudRegion")
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	db := d.DB.WithContext(ctx)
+	if err := db.Create(cr).Error; err != nil {
+		err := dbError(err)
+		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
+			return errors.E(op, fmt.Sprintf("cloud-region %s/%s already exists", cr.CloudName, cr.Name), err)
+		}
+		return errors.E(op, err)
+	}
+	return nil
 }
 
 // FindRegion finds a region with the given name on a cloud with the given

@@ -13,6 +13,7 @@ import (
 	"github.com/juju/version"
 	"go.uber.org/zap"
 
+	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
@@ -45,7 +46,7 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 	}
 
 	if u.ControllerAccess != "superuser" {
-		return fail(errors.E(op, errors.CodeUnauthorized, "cannot add controller"))
+		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
 	}
 
 	api, err := j.dial(ctx, ctl, names.ModelTag{})
@@ -72,28 +73,14 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 		return fail(errors.E(op, err))
 	}
 
+	var dbClouds []dbmodel.Cloud
 	for tag, cld := range clouds {
 		ctx := zapctx.WithFields(ctx, zap.Stringer("tag", tag))
-		cloud := dbmodel.Cloud{
-			Name:             tag.Id(),
-			Type:             cld.Type,
-			HostCloudRegion:  cld.HostCloudRegion,
-			AuthTypes:        dbmodel.Strings(cld.AuthTypes),
-			Endpoint:         cld.Endpoint,
-			IdentityEndpoint: cld.IdentityEndpoint,
-			StorageEndpoint:  cld.StorageEndpoint,
-			CACertificates:   dbmodel.Strings(cld.CACertificates),
-			Config:           dbmodel.Map(cld.Config),
-			Users: []dbmodel.UserCloudAccess{{
-				User: dbmodel.User{
-					// "everyone@external" represents all authenticated
-					// users.
-					Username:    "everyone@external",
-					DisplayName: "everyone",
-				},
-				Access: "add-model",
-			}},
-		}
+
+		var cloud dbmodel.Cloud
+		cloud.FromJujuCloud(cld)
+		cloud.Name = tag.Id()
+
 		// If this cloud is not the one used by the controller model then
 		// it is only available to a subset of users.
 		if tag.String() != ms.CloudTag {
@@ -106,41 +93,71 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 				// later.
 				zapctx.Error(ctx, "cannot get cloud users", zap.Error(err))
 			}
+		} else {
+			cloud.Users = []dbmodel.UserCloudAccess{{
+				User: dbmodel.User{
+					Username: "everyone@external",
+				},
+				Access: "add-model",
+			}}
 		}
-
-		for _, r := range cld.Regions {
-			cr := dbmodel.CloudRegion{
-				CloudName:        cloud.Name,
-				Name:             r.Name,
-				Endpoint:         r.Endpoint,
-				IdentityEndpoint: r.IdentityEndpoint,
-				StorageEndpoint:  r.StorageEndpoint,
-				Config:           dbmodel.Map(cld.RegionConfig[r.Name]),
-			}
-
-			cloud.Regions = append(cloud.Regions, cr)
-		}
-
-		if err := j.Database.SetCloud(ctx, &cloud); err != nil {
-			return fail(errors.E(op, errors.Code(""), fmt.Sprintf("cannot load controller cloud %q", cloud.Name), err))
-		}
-
-		for _, cr := range cloud.Regions {
-			priority := dbmodel.CloudRegionControllerPrioritySupported
-			if tag.String() == ms.CloudTag && cr.Name == ms.CloudRegion {
-				priority = dbmodel.CloudRegionControllerPriorityDeployed
-			}
-			ctl.CloudRegions = append(ctl.CloudRegions, dbmodel.CloudRegionControllerPriority{
-				CloudRegionID: cr.ID,
-				Priority:      uint(priority),
-			})
-		}
+		dbClouds = append(dbClouds, cloud)
 	}
-
-	if err := j.Database.AddController(ctx, ctl); err != nil {
-		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
-			return fail(errors.E(op, err, fmt.Sprintf("controller %q already exists", ctl.Name)))
+	err = j.Database.Transaction(func(tx *db.Database) error {
+		for i := range dbClouds {
+			err := tx.AddCloud(ctx, &dbClouds[i])
+			if err != nil && errors.ErrorCode(err) != errors.CodeAlreadyExists {
+				return err
+			}
+			cloud := dbmodel.Cloud{
+				Name: dbClouds[i].Name,
+			}
+			if err := tx.GetCloud(ctx, &cloud); err != nil {
+				return err
+			}
+			for _, reg := range dbClouds[i].Regions {
+				if cloud.Region(reg.Name).ID != 0 {
+					continue
+				}
+				reg.CloudName = cloud.Name
+				if err := tx.AddCloudRegion(ctx, &reg); err != nil {
+					return err
+				}
+				cloud.Regions = append(cloud.Regions, reg)
+			}
+			for _, uca := range dbClouds[i].Users {
+				if cloud.UserAccess(&uca.User) != "" {
+					continue
+				}
+				uca.Username = uca.User.Username
+				uca.CloudName = cloud.Name
+				if err := tx.UpdateUserCloudAccess(ctx, &uca); err != nil {
+					return err
+				}
+				cloud.Users = append(cloud.Users, uca)
+			}
+			for _, cr := range dbClouds[i].Regions {
+				reg := cloud.Region(cr.Name)
+				priority := dbmodel.CloudRegionControllerPrioritySupported
+				if cloud.Name == ctl.CloudName && cr.Name == ctl.CloudRegion {
+					priority = dbmodel.CloudRegionControllerPriorityDeployed
+				}
+				ctl.CloudRegions = append(ctl.CloudRegions, dbmodel.CloudRegionControllerPriority{
+					CloudRegion: reg,
+					Priority:    uint(priority),
+				})
+			}
 		}
+		if err := tx.AddController(ctx, ctl); err != nil {
+			if errors.ErrorCode(err) == errors.CodeAlreadyExists {
+				return errors.E(op, err, fmt.Sprintf("controller %q already exists", ctl.Name))
+			}
+			return err
+		}
+		return nil
+	})
+
+	if err != nil {
 		return fail(errors.E(op, err))
 	}
 	ale.Success = true
