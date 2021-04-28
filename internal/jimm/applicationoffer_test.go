@@ -14,11 +14,9 @@ import (
 	"github.com/juju/charm/v8"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
-	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon.v2"
 	"gorm.io/gorm"
 
-	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
@@ -1820,12 +1818,7 @@ func TestOffer(t *testing.T) {
 			return nil
 		},
 		offer: func(context.Context, jujuparams.AddApplicationOffer) error {
-			return &apiconn.APIError{
-				Err: errgo.Err{
-					Message_:    "api error",
-					Underlying_: errgo.New("application offer already exists"),
-				},
-			}
+			return errors.E("application offer already exists")
 		},
 		createEnv: func(c *qt.C, db db.Database) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
@@ -1906,7 +1899,7 @@ func TestOffer(t *testing.T) {
 			offer := dbmodel.ApplicationOffer{}
 
 			return u, offerParams, offer, func(c *qt.C, err error) {
-				c.Assert(err, qt.ErrorMatches, "api error: application offer already exists")
+				c.Assert(err, qt.ErrorMatches, "application offer already exists")
 				c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeAlreadyExists)
 			}
 		},

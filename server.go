@@ -9,33 +9,21 @@ import (
 	"time"
 
 	vault "github.com/hashicorp/vault/api"
-	"github.com/juju/mgo/v2"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/jimm/internal/debugapi"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
-	v2 "github.com/CanonicalLtd/jimm/internal/v2"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
 var versions = map[string]jemserver.NewAPIHandlerFunc{
-	"v2":    v2.NewAPIHandler,
 	"debug": debugapi.NewAPIHandler,
 }
 
 // ServerParams holds configuration for a new API server.
 type ServerParams struct {
-	// DB holds the mongo database that will be used to
-	// store the JEM information.
-	DB *mgo.Database
-
-	// MaxMgoSessions holds the maximum number of sessions
-	// that will be held in the pool. The actual number of sessions
-	// may temporarily go above this.
-	MaxMgoSessions int
-
 	// ControllerAdmin holds the identity of the user
 	// or group that is allowed to create controllers.
 	ControllerAdmin params.User
