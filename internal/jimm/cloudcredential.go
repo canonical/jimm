@@ -50,7 +50,7 @@ func (j *JIMM) GetCloudCredential(ctx context.Context, user *dbmodel.User, tag n
 
 // RevokeCloudCredential checks that the credential with the given path
 // can be revoked  and revokes the credential.
-func (j *JIMM) RevokeCloudCredential(ctx context.Context, user *dbmodel.User, tag names.CloudCredentialTag) error {
+func (j *JIMM) RevokeCloudCredential(ctx context.Context, user *dbmodel.User, tag names.CloudCredentialTag, force bool) error {
 	const op = errors.Op("jimm.RevokeCloudCredential")
 
 	ale := dbmodel.AuditLogEntry{
@@ -76,6 +76,10 @@ func (j *JIMM) RevokeCloudCredential(ctx context.Context, user *dbmodel.User, ta
 
 	err := j.Database.GetCloudCredential(ctx, &credential)
 	if err != nil {
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			// It is not an error to revoke an non-existent credential
+			return nil
+		}
 		return fail(errors.E(op, err))
 	}
 
@@ -89,7 +93,7 @@ func (j *JIMM) RevokeCloudCredential(ctx context.Context, user *dbmodel.User, ta
 		return fail(errors.E(op, err))
 	}
 	// if the cloud credential is still used by any model we return an error
-	if len(models) > 0 {
+	if len(models) > 0 && !force {
 		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("cloud credential still used by %d model(s)", len(models)))
 	}
 
@@ -124,7 +128,7 @@ func (j *JIMM) RevokeCloudCredential(ctx context.Context, user *dbmodel.User, ta
 		return fail(errors.E(op, err))
 	}
 
-	err = j.Database.SetCloudCredential(ctx, &credential)
+	err = j.Database.DeleteCloudCredential(ctx, &credential)
 	if err != nil {
 		return fail(errors.E(op, err, "failed to revoke credential in local database"))
 	}
@@ -197,13 +201,10 @@ func (j *JIMM) UpdateCloudCredential(ctx context.Context, u *dbmodel.User, args 
 	if !args.SkipCheck {
 		err := j.forEachController(ctx, controllers, func(ctl *dbmodel.Controller, api API) error {
 			models, err := j.updateControllerCloudCredential(ctx, &credential, api.CheckCredentialModels)
-			if err != nil {
-				return err
-			}
 			resultMu.Lock()
 			defer resultMu.Unlock()
 			result = append(result, models...)
-			return nil
+			return err
 		})
 		if err != nil {
 			return fail(errors.E(op, err))

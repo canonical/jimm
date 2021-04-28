@@ -49,6 +49,7 @@ func (d *Database) GetCloudCredential(ctx context.Context, cred *dbmodel.CloudCr
 	}
 	db := d.DB.WithContext(ctx)
 	db = db.Preload("Cloud")
+	db = db.Preload("Models").Preload("Models.Users")
 	if err := db.Where("cloud_name = ? AND owner_username = ? AND name = ?", cred.CloudName, cred.OwnerUsername, cred.Name).First(&cred).Error; err != nil {
 		err := dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
@@ -93,6 +94,18 @@ func (d *Database) ForEachCloudCredential(ctx context.Context, username, cloud s
 	}
 	if err := rows.Err(); err != nil {
 		return errors.E(op, dbError(err))
+	}
+	return nil
+}
+
+// DeleteCloudCredential removes the given CloudCredential from the database.
+func (d *Database) DeleteCloudCredential(ctx context.Context, cred *dbmodel.CloudCredential) error {
+	const op = errors.Op("db.DeleteCloudCredential")
+
+	db := d.DB.WithContext(ctx)
+	if err := db.Delete(cred).Error; err != nil {
+		err = dbError(err)
+		return errors.E(op, err)
 	}
 	return nil
 }
