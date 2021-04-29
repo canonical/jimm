@@ -12,7 +12,7 @@ import (
 	"github.com/juju/juju/environs/config"
 	"github.com/juju/names/v4"
 	"github.com/juju/rpcreflect"
-	"github.com/juju/version"
+	"github.com/juju/version/v2"
 	"github.com/rogpeppe/fastuuid"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"

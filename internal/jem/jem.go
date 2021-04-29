@@ -17,7 +17,7 @@ import (
 	"github.com/juju/mgo/v2"
 	"github.com/juju/names/v4"
 	"github.com/juju/utils/v2/cache"
-	"github.com/juju/version"
+	"github.com/juju/version/v2"
 	"github.com/rogpeppe/fastuuid"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"

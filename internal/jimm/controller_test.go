@@ -15,7 +15,7 @@ import (
 	"github.com/juju/juju/core/status"
 	"github.com/juju/juju/version"
 	"github.com/juju/names/v4"
-	semversion "github.com/juju/version"
+	semversion "github.com/juju/version/v2"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"

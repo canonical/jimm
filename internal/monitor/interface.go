@@ -7,7 +7,7 @@ import (
 	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
-	"github.com/juju/version"
+	"github.com/juju/version/v2"
 
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"

@@ -9,7 +9,7 @@ import (
 
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/life"
-	"github.com/juju/version"
+	"github.com/juju/version/v2"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"

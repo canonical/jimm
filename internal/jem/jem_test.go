@@ -10,7 +10,7 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	jt "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
-	"github.com/juju/version"
+	"github.com/juju/version/v2"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
