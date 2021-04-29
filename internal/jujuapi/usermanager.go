@@ -6,13 +6,9 @@ import (
 	"context"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
-	"github.com/juju/juju/core/permission"
-	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
-	"github.com/CanonicalLtd/jimm/internal/conv"
+	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
-	"github.com/CanonicalLtd/jimm/params"
 )
 
 func init() {
@@ -37,22 +33,22 @@ func init() {
 
 // AddUser implements the UserManager facade's AddUser method.
 func (r *controllerRoot) AddUser(args jujuparams.AddUsers) (jujuparams.AddUserResults, error) {
-	return jujuparams.AddUserResults{}, params.ErrUnauthorized
+	return jujuparams.AddUserResults{}, errors.E(errors.CodeUnauthorized, "unauthorized")
 }
 
 // RemoveUser implements the UserManager facade's RemoveUser method.
 func (r *controllerRoot) RemoveUser(jujuparams.Entities) (jujuparams.ErrorResults, error) {
-	return jujuparams.ErrorResults{}, params.ErrUnauthorized
+	return jujuparams.ErrorResults{}, errors.E(errors.CodeUnauthorized, "unauthorized")
 }
 
 // EnableUser implements the UserManager facade's EnableUser method.
 func (r *controllerRoot) EnableUser(jujuparams.Entities) (jujuparams.ErrorResults, error) {
-	return jujuparams.ErrorResults{}, params.ErrUnauthorized
+	return jujuparams.ErrorResults{}, errors.E(errors.CodeUnauthorized, "unauthorized")
 }
 
 // DisableUser implements the UserManager facade's DisableUser method.
 func (r *controllerRoot) DisableUser(jujuparams.Entities) (jujuparams.ErrorResults, error) {
-	return jujuparams.ErrorResults{}, params.ErrUnauthorized
+	return jujuparams.ErrorResults{}, errors.E(errors.CodeUnauthorized, "unauthorized")
 }
 
 // UserInfo implements the UserManager facade's UserInfo method.
@@ -72,30 +68,20 @@ func (r *controllerRoot) UserInfo(ctx context.Context, req jujuparams.UserInfoRe
 }
 
 func (r *controllerRoot) userInfo(ctx context.Context, entity string) (*jujuparams.UserInfo, error) {
-	user, err := conv.ParseUserTag(entity)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(conv.ErrLocalUser))
-	}
-	if r.identity.Id() != string(user) {
-		return nil, params.ErrUnauthorized
-	}
-	return r.currentUser(r.identity)
-}
+	const op = errors.Op("jujuapi.UserInfo")
 
-func (r *controllerRoot) currentUser(id identchecker.ACLIdentity) (*jujuparams.UserInfo, error) {
-	userTag := conv.ToUserTag(params.User(id.Id()))
-	return &jujuparams.UserInfo{
-		// TODO(mhilton) a number of these fields should
-		// be fetched from the identity manager, but that
-		// will have to change to support getting them.
-		Username:    userTag.Id(),
-		DisplayName: userTag.Name(),
-		Access:      string(permission.AddModelAccess),
-		Disabled:    false,
-	}, nil
+	user, err := parseUserTag(entity)
+	if err != nil {
+		return nil, errors.E(op, err, errors.CodeBadRequest)
+	}
+	if r.user.Username != user.Id() {
+		return nil, errors.E(op, errors.CodeUnauthorized)
+	}
+	ui := r.user.ToJujuUserInfo()
+	return &ui, nil
 }
 
 // SetPassword implements the UserManager facade's SetPassword method.
 func (r *controllerRoot) SetPassword(jujuparams.EntityPasswords) (jujuparams.ErrorResults, error) {
-	return jujuparams.ErrorResults{}, params.ErrUnauthorized
+	return jujuparams.ErrorResults{}, errors.E(errors.CodeUnauthorized, "unauthorized")
 }

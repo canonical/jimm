@@ -100,7 +100,6 @@ type modelBuilder struct {
 
 	name          string
 	config        map[string]interface{}
-	user          *dbmodel.User
 	owner         *dbmodel.User
 	credential    *dbmodel.CloudCredential
 	controller    *dbmodel.Controller
@@ -278,12 +277,14 @@ func (b *modelBuilder) CreateDatabaseModel() *modelBuilder {
 	// by this point and a controller should've been selected
 	if b.controller == nil {
 		b.err = errors.E("unable to determine a suitable controller")
+		return b
 	}
 
 	if b.credential == nil {
 		// try to select a valid credential
 		if err := b.selectCloudCredentials(); err != nil {
 			b.err = errors.E(err, "could not select cloud credentials")
+			return b
 		}
 	}
 
@@ -382,22 +383,23 @@ func (b *modelBuilder) selectCloudRegion() error {
 }
 
 func (b *modelBuilder) selectCloudCredentials() error {
-	if b.user == nil {
+	if b.owner == nil {
 		return errors.E("user not specified")
 	}
 	if b.cloud == nil {
 		return errors.E("cloud not specified")
 	}
-	credentials, err := b.jimm.Database.GetUserCloudCredentials(b.ctx, b.user, b.cloud.Name)
+	credentials, err := b.jimm.Database.GetUserCloudCredentials(b.ctx, b.owner, b.cloud.Name)
 	if err != nil {
 		return errors.E(err, "failed to fetch user cloud credentials")
 	}
 	for _, credential := range credentials {
-		// consider only valid credentials
-		if credential.Valid.Valid && credential.Valid.Bool == true {
-			b.credential = &credential
-			return nil
+		// skip any credentials known to be invalid.
+		if credential.Valid.Valid && credential.Valid.Bool == false {
+			continue
 		}
+		b.credential = &credential
+		return nil
 	}
 	return errors.E("valid cloud credentials not found")
 }
@@ -1087,4 +1089,18 @@ func (j *JIMM) ChangeModelCredential(ctx context.Context, user *dbmodel.User, mo
 
 	ale.Success = true
 	return nil
+}
+
+// RedirectInfo gets the jujuparams.RedirectInfoResult that needs to be
+// sent to a client so that it can redirect to the controller hosting the
+// model.
+func (j *JIMM) RedirectInfo(ctx context.Context, mt names.ModelTag) (jujuparams.RedirectInfoResult, error) {
+	const op = errors.Op("jimm.RedirectInfo")
+
+	var m dbmodel.Model
+	m.SetTag(mt)
+	if err := j.Database.GetModel(ctx, &m); err != nil {
+		return jujuparams.RedirectInfoResult{}, errors.E(op, err)
+	}
+	return m.Controller.ToJujuRedirectInfoResult(), nil
 }

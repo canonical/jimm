@@ -3,6 +3,8 @@
 package jujuapi_test
 
 import (
+	"time"
+
 	"github.com/juju/juju/api/usermanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	jc "github.com/juju/testing/checkers"
@@ -69,10 +71,13 @@ func (s *usermanagerSuite) TestUserInfoSpecifiedUser(c *gc.C) {
 	users, err := client.UserInfo([]string{"alice@external"}, usermanager.AllUsers)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(len(users), gc.Equals, 1)
+	c.Assert(users[0].DateCreated.IsZero(), gc.Equals, false)
+	users[0].DateCreated = time.Time{}
+	users[0].LastConnection = nil
 	c.Assert(users[0], jc.DeepEquals, jujuparams.UserInfo{
 		Username:    "alice@external",
 		DisplayName: "alice",
-		Access:      "add-model",
+		Access:      "superuser",
 	})
 }
 
@@ -82,7 +87,7 @@ func (s *usermanagerSuite) TestUserInfoSpecifiedUsers(c *gc.C) {
 
 	client := usermanager.NewClient(conn)
 	users, err := client.UserInfo([]string{"alice@external", "bob@external"}, usermanager.AllUsers)
-	c.Assert(err, gc.ErrorMatches, "bob@external: unauthorized")
+	c.Assert(err, gc.ErrorMatches, "bob@external: unauthorized access")
 	c.Assert(users, gc.HasLen, 0)
 }
 
@@ -94,6 +99,8 @@ func (s *usermanagerSuite) TestUserInfoWithDomain(c *gc.C) {
 	users, err := client.UserInfo([]string{"alice@mydomain"}, usermanager.AllUsers)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(len(users), gc.Equals, 1)
+	c.Assert(users[0].DateCreated.IsZero(), gc.Equals, false)
+	users[0].DateCreated = time.Time{}
 	c.Assert(users[0], jc.DeepEquals, jujuparams.UserInfo{
 		Username:    "alice@mydomain",
 		DisplayName: "alice",

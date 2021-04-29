@@ -26,8 +26,8 @@ var _ = gc.Suite(&controllerrootSuite{})
 func (s *controllerrootSuite) TestServerVersion(c *gc.C) {
 	ctx := context.Background()
 
-	testVersion := version.MustParse("5.4.3")
-	err := s.JEM.SetControllerVersion(ctx, s.Controller.Path, testVersion)
+	s.Model.Controller.AgentVersion = "5.4.3"
+	err := s.JIMM.Database.UpdateController(ctx, &s.Model.Controller)
 	c.Assert(err, gc.Equals, nil)
 
 	conn := s.open(c, nil, "test")
@@ -35,12 +35,12 @@ func (s *controllerrootSuite) TestServerVersion(c *gc.C) {
 
 	v, ok := conn.ServerVersion()
 	c.Assert(ok, gc.Equals, true)
-	c.Assert(v, jc.DeepEquals, testVersion)
+	c.Assert(v, jc.DeepEquals, version.MustParse("5.4.3"))
 }
 
 func (s *controllerrootSuite) TestUnimplementedMethodFails(c *gc.C) {
 	conn := s.open(c, &api.Info{
-		ModelTag:  names.NewModelTag(s.Model.UUID),
+		ModelTag:  s.Model.Tag().(names.ModelTag),
 		SkipLogin: true,
 	}, "test")
 	defer conn.Close()

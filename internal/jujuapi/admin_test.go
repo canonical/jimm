@@ -6,11 +6,9 @@ import (
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/network"
-	"github.com/juju/juju/rpc"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
-	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon.v2"
 )
 
@@ -22,7 +20,7 @@ var _ = gc.Suite(&adminSuite{})
 
 func (s *adminSuite) TestOldAdminVersionFails(c *gc.C) {
 	conn := s.open(c, &api.Info{
-		ModelTag:  names.NewModelTag(s.Model.UUID),
+		ModelTag:  s.Model.Tag().(names.ModelTag),
 		SkipLogin: true,
 	}, "test")
 	defer conn.Close()
@@ -34,7 +32,7 @@ func (s *adminSuite) TestOldAdminVersionFails(c *gc.C) {
 
 func (s *adminSuite) TestAdminIDFails(c *gc.C) {
 	conn := s.open(c, &api.Info{
-		ModelTag:  names.NewModelTag(s.Model.UUID),
+		ModelTag:  s.Model.Tag().(names.ModelTag),
 		SkipLogin: true,
 	}, "test")
 	defer conn.Close()
@@ -52,9 +50,7 @@ func (s *adminSuite) TestLoginToController(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	var resp jujuparams.RedirectInfoResult
 	err = conn.APICall("Admin", 3, "", "RedirectInfo", nil, &resp)
-	rerr, ok := errgo.Cause(err).(*rpc.RequestError)
-	c.Assert(ok, gc.Equals, true)
-	c.Assert(rerr.Code, gc.Equals, jujuparams.CodeNotImplemented)
+	c.Assert(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotImplemented)
 }
 
 func (s *adminSuite) TestLoginToControllerWithInvalidMacaroon(c *gc.C) {
@@ -74,7 +70,7 @@ var _ = gc.Suite(&modelAdminSuite{})
 
 func (s *modelAdminSuite) TestLoginToModel(c *gc.C) {
 	conn := s.open(c, &api.Info{
-		ModelTag:  names.NewModelTag(s.Model.UUID),
+		ModelTag:  s.Model.Tag().(names.ModelTag),
 		SkipLogin: true,
 	}, "test")
 	defer conn.Close()
@@ -87,12 +83,9 @@ func (s *modelAdminSuite) TestLoginToModel(c *gc.C) {
 			MachineAddress: nphps[i].MachineAddress,
 			NetPort:        nphps[i].NetPort,
 		}
-		if nmhps[i].Scope == network.ScopeUnknown {
-			nmhps[i].Scope = network.ScopePublic
-		}
 	}
 	err = conn.Login(nil, "", "", nil)
-	c.Assert(errgo.Cause(err), jc.DeepEquals, &api.RedirectError{
+	c.Assert(err, jc.DeepEquals, &api.RedirectError{
 		Servers:        []network.MachineHostPorts{nmhps},
 		CACert:         s.APIInfo(c).CACert,
 		FollowRedirect: true,
@@ -101,7 +94,7 @@ func (s *modelAdminSuite) TestLoginToModel(c *gc.C) {
 
 func (s *modelAdminSuite) TestOldAdminVersionFails(c *gc.C) {
 	conn := s.open(c, &api.Info{
-		ModelTag:  names.NewModelTag(s.Model.UUID),
+		ModelTag:  s.Model.Tag().(names.ModelTag),
 		SkipLogin: true,
 	}, "test")
 	defer conn.Close()
@@ -113,7 +106,7 @@ func (s *modelAdminSuite) TestOldAdminVersionFails(c *gc.C) {
 
 func (s *modelAdminSuite) TestAdminIDFails(c *gc.C) {
 	conn := s.open(c, &api.Info{
-		ModelTag:  names.NewModelTag(s.Model.UUID),
+		ModelTag:  s.Model.Tag().(names.ModelTag),
 		SkipLogin: true,
 	}, "test")
 	defer conn.Close()

@@ -6,7 +6,6 @@ package jimmtest
 import (
 	"context"
 	"fmt"
-	"testing"
 	"time"
 
 	"gorm.io/driver/sqlite"
@@ -14,15 +13,22 @@ import (
 	"gorm.io/gorm/logger"
 )
 
+// A Tester is the test interface required by this package.
+type Tester interface {
+	Fatalf(format string, args ...interface{})
+	Logf(format string, args ...interface{})
+	Name() string
+}
+
 // A gormLogger is a gorm.Logger that is used in tests. It logs everything
 // to the test.
 type gormLogger struct {
-	t testing.TB
+	t Tester
 }
 
 // NewGormLogger returns a gorm logger.Interface that can be used in a test
 // All output is logged to the test.
-func NewGormLogger(t testing.TB) logger.Interface {
+func NewGormLogger(t Tester) logger.Interface {
 	return gormLogger{t: t}
 }
 
@@ -55,7 +61,7 @@ var _ logger.Interface = gormLogger{}
 
 // MemoryDB returns an in-memory gorm.DB for use in tests. The underlying
 // SQL database is an in-memory SQLite database.
-func MemoryDB(t testing.TB, nowFunc func() time.Time) *gorm.DB {
+func MemoryDB(t Tester, nowFunc func() time.Time) *gorm.DB {
 	cfg := gorm.Config{
 		Logger:  NewGormLogger(t),
 		NowFunc: nowFunc,

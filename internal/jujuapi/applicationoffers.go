@@ -4,15 +4,17 @@ package jujuapi
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/names/v4"
-	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/conv"
+	"github.com/CanonicalLtd/jimm/internal/dbmodel"
+	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
-	"github.com/CanonicalLtd/jimm/params"
 )
 
 func init() {
@@ -60,9 +62,29 @@ func (r *controllerRoot) Offer(ctx context.Context, args jujuparams.AddApplicati
 		Results: make([]jujuparams.ErrorResult, len(args.Offers)),
 	}
 	for i, addOfferParams := range args.Offers {
-		result.Results[i].Error = mapError(r.jem.Offer(ctx, r.identity, addOfferParams))
+		result.Results[i].Error = mapError(r.offer(ctx, addOfferParams))
 	}
 	return result, nil
+}
+
+func (r *controllerRoot) offer(ctx context.Context, args jujuparams.AddApplicationOffer) error {
+	const op = errors.Op("jujuapi.Offer")
+
+	mt, err := names.ParseModelTag(args.ModelTag)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	err = r.jimm.Offer(ctx, r.user, jimm.AddApplicationOfferParams{
+		ModelTag:               mt,
+		OfferName:              args.OfferName,
+		ApplicationName:        args.ApplicationName,
+		ApplicationDescription: args.ApplicationDescription,
+		Endpoints:              args.Endpoints,
+	})
+	if err != nil {
+		return errors.E(op, err)
+	}
+	return nil
 }
 
 // GetConsumeDetails implements the GetConsumeDetails procedure of the
@@ -72,30 +94,9 @@ func (r *controllerRoot) GetConsumeDetails(ctx context.Context, args jujuparams.
 		Results: make([]jujuparams.ConsumeOfferDetailsResult, len(args.OfferURLs)),
 	}
 	for i, offerURL := range args.OfferURLs {
-		ourl, err := crossmodel.ParseOfferURL(offerURL)
-		if err != nil {
-			results.Results[i].Error = mapError(errgo.WithCausef(err, params.ErrBadRequest, "cannot parse offer URL"))
-			continue
-		}
-
-		// Ensure the path is normalised.
-		if ourl.User == "" {
-			// If the model owner is not specified use the authenticated
-			// user.
-			ourl.User = conv.ToUserTag(params.User(r.identity.Id())).Id()
-		}
-
-		details := jujuparams.ConsumeOfferDetails{
-			Offer: &jujuparams.ApplicationOfferDetails{
-				OfferURL: ourl.AsLocal().Path(),
-			},
-		}
-
-		if err := r.jem.GetApplicationOfferConsumeDetails(ctx, r.identity, "", &details, args.BakeryVersion); err != nil {
-			results.Results[i].Error = mapError(err)
-		} else {
-			results.Results[i].ConsumeOfferDetails = details
-		}
+		var err error
+		results.Results[i].ConsumeOfferDetails, err = r.getConsumeDetails(ctx, r.user, args.BakeryVersion, offerURL)
+		results.Results[i].Error = mapError(err)
 	}
 	return results, nil
 }
@@ -106,54 +107,58 @@ func (r *controllerRoot) GetConsumeDetailsV3(ctx context.Context, args jujuparam
 	results := jujuparams.ConsumeOfferDetailsResults{
 		Results: make([]jujuparams.ConsumeOfferDetailsResult, len(args.OfferURLs.OfferURLs)),
 	}
-	for i, offerURL := range args.OfferURLs.OfferURLs {
-		ourl, err := crossmodel.ParseOfferURL(offerURL)
+
+	user := r.user
+	if args.UserTag != "" {
+		var err error
+		user, err = r.masquerade(ctx, args.UserTag)
 		if err != nil {
-			results.Results[i].Error = mapError(errgo.WithCausef(err, params.ErrBadRequest, "cannot parse offer URL"))
-			continue
+			return jujuparams.ConsumeOfferDetailsResults{}, err
 		}
+	}
 
-		// Ensure the path is normalised.
-		if ourl.User == "" {
-			// If the model owner is not specified use the authenticated
-			// user.
-			ourl.User = conv.ToUserTag(params.User(r.identity.Id())).Id()
-		}
-
-		details := jujuparams.ConsumeOfferDetails{
-			Offer: &jujuparams.ApplicationOfferDetails{
-				OfferURL: ourl.AsLocal().Path(),
-			},
-		}
-
-		var user params.User
-		if args.UserTag != "" {
-			uTag, err := names.ParseUserTag(args.UserTag)
-			if err != nil {
-				return jujuparams.ConsumeOfferDetailsResults{}, errgo.WithCausef(err, params.ErrBadRequest, "")
-			}
-			user, err = conv.FromUserTag(uTag)
-			if err != nil {
-				return jujuparams.ConsumeOfferDetailsResults{}, errgo.WithCausef(err, params.ErrBadRequest, "")
-			}
-		}
-
-		if err := r.jem.GetApplicationOfferConsumeDetails(ctx, r.identity, user, &details, args.OfferURLs.BakeryVersion); err != nil {
-			results.Results[i].Error = mapError(err)
-		} else {
-			results.Results[i].ConsumeOfferDetails = details
-		}
+	for i, offerURL := range args.OfferURLs.OfferURLs {
+		var err error
+		results.Results[i].ConsumeOfferDetails, err = r.getConsumeDetails(ctx, user, args.OfferURLs.BakeryVersion, offerURL)
+		results.Results[i].Error = mapError(err)
 	}
 	return results, nil
 }
 
+func (r *controllerRoot) getConsumeDetails(ctx context.Context, u *dbmodel.User, v bakery.Version, offerURL string) (jujuparams.ConsumeOfferDetails, error) {
+	const op = errors.Op("jujuapi.GetConsumeDetails")
+
+	ourl, err := crossmodel.ParseOfferURL(offerURL)
+	if err != nil {
+		return jujuparams.ConsumeOfferDetails{}, errors.E(op, "cannot parse offer URL", errors.CodeBadRequest, err)
+	}
+
+	// Ensure the path is normalised.
+	if ourl.User == "" {
+		// If the model owner is not specified use the specified user.
+		ourl.User = u.Username
+	}
+
+	details := jujuparams.ConsumeOfferDetails{
+		Offer: &jujuparams.ApplicationOfferDetails{
+			OfferURL: ourl.AsLocal().Path(),
+		},
+	}
+	if err := r.jimm.GetApplicationOfferConsumeDetails(ctx, u, &details, v); err != nil {
+		return jujuparams.ConsumeOfferDetails{}, errors.E(op, err)
+	}
+	return details, nil
+}
+
 // ListApplicationOffers returns all offers matching the specified filters.
 func (r *controllerRoot) ListApplicationOffers(ctx context.Context, args jujuparams.OfferFilters) (jujuparams.QueryApplicationOffersResults, error) {
+	const op = errors.Op("jujuapi.ListApplicationOffers")
 	results := jujuparams.QueryApplicationOffersResults{}
 
-	offers, err := r.jem.ListApplicationOffers(ctx, r.identity, args.Filters...)
+	// TODO(mhilton) check this is right.
+	offers, err := r.jimm.FindApplicationOffers(ctx, r.user, args.Filters...)
 	if err != nil {
-		return results, errgo.Mask(err)
+		return results, errors.E(op, err)
 	}
 	results.Results = offers
 
@@ -164,11 +169,12 @@ func (r *controllerRoot) ListApplicationOffers(ctx context.Context, args jujupar
 // as long as the user has read access to each offer. It also omits details
 // on users and connections.
 func (r *controllerRoot) FindApplicationOffers(ctx context.Context, args jujuparams.OfferFilters) (jujuparams.QueryApplicationOffersResults, error) {
+	const op = errors.Op("jujuapi.FindApplicationOffers")
 	results := jujuparams.QueryApplicationOffersResults{}
 
-	offers, err := r.jem.FindApplicationOffers(ctx, r.identity, args.Filters...)
+	offers, err := r.jimm.FindApplicationOffers(ctx, r.user, args.Filters...)
 	if err != nil {
-		return results, errgo.Mask(err)
+		return results, errors.E(op, err)
 	}
 	results.Results = offers
 
@@ -188,17 +194,25 @@ func (r *controllerRoot) ModifyOfferAccess(ctx context.Context, args jujuparams.
 }
 
 func (r *controllerRoot) modifyOfferAccess(ctx context.Context, change jujuparams.ModifyOfferAccess) error {
-	user, err := conv.ParseUserTag(change.UserTag)
+	const op = errors.Op("jujuapi.ModifyOfferAccess")
+
+	ut, err := parseUserTag(change.UserTag)
 	if err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrBadRequest), errgo.Is(conv.ErrLocalUser))
+		return errors.E(op, err, errors.CodeBadRequest)
 	}
 	switch change.Action {
 	case jujuparams.GrantOfferAccess:
-		return errgo.Mask(r.jem.GrantOfferAccess(ctx, r.identity, user, change.OfferURL, change.Access), errgo.Is(params.ErrNotFound), errgo.Is(params.ErrBadRequest))
+		if err := r.jimm.GrantOfferAccess(ctx, r.user, change.OfferURL, ut, change.Access); err != nil {
+			return errors.E(op, err)
+		}
+		return nil
 	case jujuparams.RevokeOfferAccess:
-		return errgo.Mask(r.jem.RevokeOfferAccess(ctx, r.identity, user, change.OfferURL, change.Access), errgo.Is(params.ErrNotFound), errgo.Is(params.ErrBadRequest))
+		if err := r.jimm.RevokeOfferAccess(ctx, r.user, change.OfferURL, ut, change.Access); err != nil {
+			return errors.E(op, err)
+		}
+		return nil
 	default:
-		return errgo.WithCausef(nil, params.ErrBadRequest, "unknown action %q", change.Action)
+		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("unknown action %q", change.Action))
 	}
 }
 
@@ -209,7 +223,7 @@ func (r *controllerRoot) DestroyOffers(ctx context.Context, args jujuparams.Dest
 	}
 
 	for i, offerURL := range args.OfferURLs {
-		results.Results[i].Error = mapError(r.jem.DestroyOffer(ctx, r.identity, offerURL, args.Force))
+		results.Results[i].Error = mapError(r.jimm.DestroyOffer(ctx, r.user, offerURL, args.Force))
 	}
 	return results, nil
 }
@@ -219,7 +233,7 @@ func (r *controllerRoot) ApplicationOffers(ctx context.Context, args jujuparams.
 		Results: make([]jujuparams.ApplicationOfferResult, len(args.OfferURLs)),
 	}
 	for i, offerURL := range args.OfferURLs {
-		details, err := r.jem.GetApplicationOffer(ctx, r.identity, offerURL)
+		details, err := r.jimm.GetApplicationOffer(ctx, r.user, offerURL)
 		result.Results[i] = jujuparams.ApplicationOfferResult{
 			Result: details,
 			Error:  mapError(err),
