@@ -98,7 +98,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 				Type: "test-provider",
 			}
 
-			_, err = j.AddModel(context.Background(), &u, &jimm.ModelCreateArgs{
+			mi, err := j.AddModel(context.Background(), &u, &jimm.ModelCreateArgs{
 				Name:            "test-model",
 				Owner:           names.NewUserTag(u.Username),
 				Cloud:           names.NewCloudTag(cloud.Name),
@@ -124,6 +124,25 @@ func TestUpdateCloudCredential(t *testing.T) {
 				"key1": "value1",
 				"key2": "value2",
 			}
+
+			m := dbmodel.Model{
+				UUID: sql.NullString{
+					String: mi.UUID,
+					Valid:  true,
+				},
+			}
+			err = j.Database.GetModel(context.Background(), &m)
+			c.Assert(err, qt.IsNil)
+			// Clear some fields we don't need.
+			// TODO(mhilton) don't fetch these in the first place.
+			m.Owner = dbmodel.User{}
+			m.Controller = dbmodel.Controller{}
+			m.CloudCredential = dbmodel.CloudCredential{}
+			m.CloudRegion = dbmodel.CloudRegion{}
+			m.Machines = nil
+			m.Users[0].User = dbmodel.User{}
+
+			expectedCredential.Models = []dbmodel.Model{m}
 
 			return &u, arg, expectedCredential, ""
 		},
@@ -355,7 +374,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 			err = j.Database.SetCloudCredential(context.Background(), &cred)
 			c.Assert(err, qt.Equals, nil)
 
-			_, err = j.AddModel(context.Background(), &u, &jimm.ModelCreateArgs{
+			mi, err := j.AddModel(context.Background(), &u, &jimm.ModelCreateArgs{
 				Name:            "test-model",
 				Owner:           names.NewUserTag("eve@external"),
 				Cloud:           names.NewCloudTag(cloud.Name),
@@ -374,6 +393,23 @@ func TestUpdateCloudCredential(t *testing.T) {
 					AuthType: "test-auth-type",
 				},
 			}
+			m := dbmodel.Model{
+				UUID: sql.NullString{
+					String: mi.UUID,
+					Valid:  true,
+				},
+			}
+			err = j.Database.GetModel(context.Background(), &m)
+			c.Assert(err, qt.IsNil)
+			// Clear some fields we don't need.
+			// TODO(mhilton) don't fetch these in the first place.
+			m.Owner = dbmodel.User{}
+			m.Controller = dbmodel.Controller{}
+			m.CloudCredential = dbmodel.CloudCredential{}
+			m.CloudRegion = dbmodel.CloudRegion{}
+			m.Machines = nil
+			m.Users[0].User = dbmodel.User{}
+
 			return &u, arg, dbmodel.CloudCredential{
 				Name:      "test-credential-1",
 				CloudName: cloud.Name,
@@ -387,6 +423,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 					"key2": "value2",
 				},
 				AuthType: "test-auth-type",
+				Models:   []dbmodel.Model{m},
 			}, ""
 		},
 	}, {
@@ -453,7 +490,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 				Type: "test-provider",
 			}
 
-			_, err = j.AddModel(context.Background(), &u, &jimm.ModelCreateArgs{
+			mi, err := j.AddModel(context.Background(), &u, &jimm.ModelCreateArgs{
 				Name:            "test-model",
 				Owner:           names.NewUserTag(u.Username),
 				Cloud:           names.NewCloudTag(cloud.Name),
@@ -480,6 +517,23 @@ func TestUpdateCloudCredential(t *testing.T) {
 				"key1": "value1",
 				"key2": "value2",
 			}
+			m := dbmodel.Model{
+				UUID: sql.NullString{
+					String: mi.UUID,
+					Valid:  true,
+				},
+			}
+			err = j.Database.GetModel(context.Background(), &m)
+			c.Assert(err, qt.IsNil)
+			// Clear some fields we don't need.
+			// TODO(mhilton) don't fetch these in the first place.
+			m.Owner = dbmodel.User{}
+			m.Controller = dbmodel.Controller{}
+			m.CloudCredential = dbmodel.CloudCredential{}
+			m.CloudRegion = dbmodel.CloudRegion{}
+			m.Machines = nil
+			m.Users[0].User = dbmodel.User{}
+			expectedCredential.Models = []dbmodel.Model{m}
 
 			return &u, arg, expectedCredential, ""
 		},
@@ -545,7 +599,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 				Name: "test-cloud",
 				Type: "test-provider",
 			}
-			_, err = j.AddModel(context.Background(), &u, &jimm.ModelCreateArgs{
+			mi, err := j.AddModel(context.Background(), &u, &jimm.ModelCreateArgs{
 				Name:            "test-model",
 				Owner:           names.NewUserTag(u.Username),
 				Cloud:           names.NewCloudTag(cloud.Name),
@@ -565,6 +619,24 @@ func TestUpdateCloudCredential(t *testing.T) {
 				},
 				SkipUpdate: true,
 			}
+
+			m := dbmodel.Model{
+				UUID: sql.NullString{
+					String: mi.UUID,
+					Valid:  true,
+				},
+			}
+			err = j.Database.GetModel(context.Background(), &m)
+			c.Assert(err, qt.IsNil)
+			// Clear some fields we don't need.
+			// TODO(mhilton) don't fetch these in the first place.
+			m.Owner = dbmodel.User{}
+			m.Controller = dbmodel.Controller{}
+			m.CloudCredential = dbmodel.CloudCredential{}
+			m.CloudRegion = dbmodel.CloudRegion{}
+			m.Machines = nil
+			m.Users[0].User = dbmodel.User{}
+			cred.Models = []dbmodel.Model{m}
 
 			return &u, arg, cred, ""
 		},
@@ -719,10 +791,10 @@ func TestRevokeCloudCredential(t *testing.T) {
 	tests := []struct {
 		about                  string
 		revokeCredentialErrors []error
-		createEnv              func(*qt.C, *jimm.JIMM) (*dbmodel.User, names.CloudCredentialTag, dbmodel.CloudCredential, string)
+		createEnv              func(*qt.C, *jimm.JIMM) (*dbmodel.User, names.CloudCredentialTag, string)
 	}{{
 		about: "credential revoked",
-		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.User, names.CloudCredentialTag, dbmodel.CloudCredential, string) {
+		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.User, names.CloudCredentialTag, string) {
 			u := dbmodel.User{
 				Username:         "alice@external",
 				ControllerAccess: "superuser",
@@ -784,13 +856,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 			}
 
 			tag := names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1")
-
-			expectedCredential := cred
-			expectedCredential.Valid = sql.NullBool{
-				Bool:  false,
-				Valid: true,
-			}
-			return &u, tag, expectedCredential, ""
+			return &u, tag, ""
 		},
 	}, {
 		about: "credential revoked - controller returns a not found error",
@@ -798,7 +864,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 			Message: "credential not found",
 			Code:    jujuparams.CodeNotFound,
 		}},
-		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.User, names.CloudCredentialTag, dbmodel.CloudCredential, string) {
+		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.User, names.CloudCredentialTag, string) {
 			u := dbmodel.User{
 				Username:         "alice@external",
 				ControllerAccess: "superuser",
@@ -860,17 +926,11 @@ func TestRevokeCloudCredential(t *testing.T) {
 			}
 
 			tag := names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1")
-
-			expectedCredential := cred
-			expectedCredential.Valid = sql.NullBool{
-				Bool:  false,
-				Valid: true,
-			}
-			return &u, tag, expectedCredential, ""
+			return &u, tag, ""
 		},
 	}, {
 		about: "credential still used by a model",
-		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.User, names.CloudCredentialTag, dbmodel.CloudCredential, string) {
+		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.User, names.CloudCredentialTag, string) {
 			u := dbmodel.User{
 				Username:         "alice@external",
 				ControllerAccess: "superuser",
@@ -937,11 +997,11 @@ func TestRevokeCloudCredential(t *testing.T) {
 
 			tag := names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1")
 
-			return &u, tag, dbmodel.CloudCredential{}, `cloud credential still used by 1 model\(s\)`
+			return &u, tag, `cloud credential still used by 1 model\(s\)`
 		},
 	}, {
 		about: "user not owner of credentials - unauthorizer error",
-		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.User, names.CloudCredentialTag, dbmodel.CloudCredential, string) {
+		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.User, names.CloudCredentialTag, string) {
 			u := dbmodel.User{
 				Username:         "alice@external",
 				ControllerAccess: "superuser",
@@ -950,25 +1010,12 @@ func TestRevokeCloudCredential(t *testing.T) {
 
 			tag := names.NewCloudCredentialTag("test-cloud/eve@external/test-credential-1")
 
-			return &u, tag, dbmodel.CloudCredential{}, "unauthorized"
-		},
-	}, {
-		about: "credential not found",
-		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.User, names.CloudCredentialTag, dbmodel.CloudCredential, string) {
-			u := dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "superuser",
-			}
-			c.Assert(j.Database.DB.Create(&u).Error, qt.IsNil)
-
-			tag := names.NewCloudCredentialTag("test-cloud/alice@external/no-such-credential")
-
-			return &u, tag, dbmodel.CloudCredential{}, `cloudcredential "test-cloud/alice@external/no-such-credential" not found`
+			return &u, tag, "unauthorized"
 		},
 	}, {
 		about:                  "error revoking credential on controller",
 		revokeCredentialErrors: []error{errors.E("test error")},
-		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.User, names.CloudCredentialTag, dbmodel.CloudCredential, string) {
+		createEnv: func(c *qt.C, j *jimm.JIMM) (*dbmodel.User, names.CloudCredentialTag, string) {
 			u := dbmodel.User{
 				Username:         "alice@external",
 				ControllerAccess: "superuser",
@@ -1026,7 +1073,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 
 			tag := names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1")
 
-			return &u, tag, dbmodel.CloudCredential{}, "test error"
+			return &u, tag, "test error"
 		},
 	}}
 	for _, test := range tests {
@@ -1103,20 +1150,16 @@ func TestRevokeCloudCredential(t *testing.T) {
 			err := j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
-			user, tag, expectedCredential, expectedError := test.createEnv(c, j)
+			user, tag, expectedError := test.createEnv(c, j)
 
-			err = j.RevokeCloudCredential(ctx, user, tag)
+			err = j.RevokeCloudCredential(ctx, user, tag, false)
 			if expectedError == "" {
 				c.Assert(err, qt.Equals, nil)
 
-				credential := dbmodel.CloudCredential{
-					Name:          expectedCredential.Name,
-					CloudName:     expectedCredential.CloudName,
-					OwnerUsername: expectedCredential.OwnerUsername,
-				}
+				var credential dbmodel.CloudCredential
+				credential.SetTag(tag)
 				err = j.Database.GetCloudCredential(ctx, &credential)
-				c.Assert(err, qt.Equals, nil)
-				c.Assert(credential, jimmtest.DBObjectEquals, expectedCredential)
+				c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 			} else {
 				c.Assert(err, qt.ErrorMatches, expectedError)
 			}
