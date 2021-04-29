@@ -32,6 +32,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
 	"github.com/CanonicalLtd/jimm/internal/jujuclient"
+	"github.com/CanonicalLtd/jimm/internal/logger"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 )
 
@@ -238,8 +239,9 @@ func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {
 	default:
 		return nil, errors.E(errors.CodeServerConfiguration, "unsupported DSN")
 	}
-	// TODO(mhilton) configure an appropriate gorm logger.
-	return gorm.Open(dialect, nil)
+	return gorm.Open(dialect, &gorm.Config{
+		Logger: logger.GormLogger{},
+	})
 }
 
 func newAuthenticator(ctx context.Context, _ *gorm.DB, p Params) (jimm.Authenticator, error) {
@@ -306,7 +308,7 @@ func newAuthenticator(ctx context.Context, _ *gorm.DB, p Params) (jimm.Authentic
 			IdentityClient: auth.IdentityClientV3{IdentityClient: candidClient},
 			Location:       "jimm",
 			// TODO(mhilton) set an appropriate logger.
-			Logger: nil,
+			Logger: logger.BakeryLogger{},
 		}),
 		ControllerAdmins: p.ControllerAdmins,
 	}, nil
