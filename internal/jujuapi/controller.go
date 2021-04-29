@@ -119,6 +119,8 @@ func (r *controllerRoot) ControllerVersion(ctx context.Context) (jujuparams.Cont
 	return result, nil
 }
 
+// WatchModelSummaries implements the WatchModelSummaries command on the
+// Controller facade.
 func (r *controllerRoot) WatchModelSummaries(ctx context.Context) (jujuparams.SummaryWatcherID, error) {
 	const op = errors.Op("jujuapi.WatchModelSummaries")
 
@@ -148,6 +150,7 @@ func (r *controllerRoot) WatchModelSummaries(ctx context.Context) (jujuparams.Su
 	}, nil
 }
 
+// AllModels implments the AllModels command on the Controller facade.
 func (r *controllerRoot) AllModels(ctx context.Context) (jujuparams.UserModelList, error) {
 	return r.allModels(ctx)
 }
@@ -169,6 +172,7 @@ func (r *controllerRoot) allModels(ctx context.Context) (jujuparams.UserModelLis
 	}, nil
 }
 
+// ModelStatus implements the ModelStatus command on the Controller facade.
 func (r *controllerRoot) ModelStatus(ctx context.Context, args jujuparams.Entities) (jujuparams.ModelStatusResults, error) {
 	const op = errors.Op("jujuapi.ModelStatus")
 

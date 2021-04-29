@@ -31,6 +31,9 @@ func init() {
 	}
 }
 
+// ModelSummaryWatcherNext implements the Next method on the
+// ModelSummaryWatcher facade. It returns the next set of model summaries
+// when they are available.
 func (r *controllerRoot) ModelSummaryWatcherNext(ctx context.Context, objID string) (jujuparams.SummaryWatcherNextResults, error) {
 	const op = errors.Op("jujuapi.ModelSummaryWatcherNext")
 
@@ -41,6 +44,8 @@ func (r *controllerRoot) ModelSummaryWatcherNext(ctx context.Context, objID stri
 	return w.Next()
 }
 
+// ModelSummaryWatcherStop implements the Stop method on the
+// ModelSummaryWatcher facade.
 func (r *controllerRoot) ModelSummaryWatcherStop(ctx context.Context, objID string) error {
 	const op = errors.Op("jujuapi.ModelSummaryWatcherStop")
 

@@ -26,6 +26,8 @@ import (
 	"github.com/CanonicalLtd/jimm/params"
 )
 
+// NewAPIHandler creates the httprequest handlers for the juju API
+// endpoints.
 func NewAPIHandler(ctx context.Context, jimm *jimm.JIMM, params jemserver.HandlerParams) ([]httprequest.Handler, error) {
 	srv := &httprequest.Server{
 		ErrorMapper: errorMapper,
