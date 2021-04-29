@@ -16,7 +16,6 @@ import (
 
 	"github.com/gorilla/handlers"
 	vault "github.com/hashicorp/vault/api"
-	"github.com/juju/mgo/v2"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/errgo.v1"
@@ -92,17 +91,6 @@ func readConfig(path string) (*config.Config, error) {
 }
 
 func startServer(ctx context.Context, eg *errgroup.Group, conf *config.Config) error {
-	zapctx.Debug(ctx, "connecting to mongo")
-	session, err := mgo.Dial(conf.MongoAddr)
-	if err != nil {
-		return errgo.Notef(err, "cannot dial mongo at %q", conf.MongoAddr)
-	}
-	defer session.Close()
-	if conf.DBName == "" {
-		conf.DBName = "jem"
-	}
-	db := session.DB(conf.DBName)
-
 	zapctx.Debug(ctx, "loading TLS configuration")
 	tlsConfig, err := conf.TLSConfig()
 	if err != nil {
@@ -126,8 +114,6 @@ func startServer(ctx context.Context, eg *errgroup.Group, conf *config.Config) e
 	}
 
 	cfg := jem.ServerParams{
-		DB:                      db,
-		MaxMgoSessions:          conf.MaxMgoSessions,
 		ControllerAdmin:         conf.ControllerAdmin,
 		IdentityLocation:        conf.IdentityLocation,
 		CharmstoreLocation:      conf.CharmstoreLocation,

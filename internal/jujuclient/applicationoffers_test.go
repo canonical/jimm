@@ -14,7 +14,6 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 )
 
@@ -32,7 +31,7 @@ func (s *applicationoffersSuite) SetUpTest(c *gc.C) {
 	ctx := context.Background()
 	err := s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
 		Name:     "test-model",
-		OwnerTag: conv.ToUserTag("test-user@external").String(),
+		OwnerTag: names.NewUserTag("test-user@external").String(),
 	}, &s.modelInfo)
 	c.Assert(err, gc.Equals, nil)
 }
