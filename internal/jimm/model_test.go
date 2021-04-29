@@ -15,7 +15,7 @@ import (
 	"github.com/juju/juju/apiserver/params"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
-	"github.com/juju/version"
+	"github.com/juju/version/v2"
 	"sigs.k8s.io/yaml"
 
 	"github.com/CanonicalLtd/jimm/internal/db"

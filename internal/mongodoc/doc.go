@@ -13,7 +13,7 @@ import (
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/network"
 	"github.com/juju/mgo/v2/bson"
-	"github.com/juju/version"
+	"github.com/juju/version/v2"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/params"
