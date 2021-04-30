@@ -781,3 +781,167 @@ func TestImportModel(t *testing.T) {
 		})
 	}
 }
+
+const testControllerConfigEnv = `
+users:
+- username: alice@external
+  controller-access: superuser
+- username: eve@external
+  controller-access: add-model
+- username: fred@external
+  controller-access: login
+`
+
+func TestSetControllerConfig(t *testing.T) {
+	c := qt.New(t)
+
+	tests := []struct {
+		about          string
+		user           string
+		args           jujuparams.ControllerConfigSet
+		expectedError  string
+		expectedConfig dbmodel.ControllerConfig
+	}{{
+		about: "admin allowed to set config",
+		user:  "alice@external",
+		args: jujuparams.ControllerConfigSet{
+			Config: map[string]interface{}{
+				"key1": "value1",
+				"key2": "value2",
+				"key3": "value3",
+			},
+		},
+		expectedConfig: dbmodel.ControllerConfig{
+			Name: "jimm",
+			Config: map[string]interface{}{
+				"key1": "value1",
+				"key2": "value2",
+				"key3": "value3",
+			},
+		},
+	}, {
+		about: "add-model user - unauthorized",
+		user:  "eve@external",
+		args: jujuparams.ControllerConfigSet{
+			Config: map[string]interface{}{
+				"key1": "value1",
+				"key2": "value2",
+				"key3": "value3",
+			},
+		},
+		expectedError: "unauthorized",
+	}, {
+		about: "login user - unauthorized",
+		user:  "fred@external",
+		args: jujuparams.ControllerConfigSet{
+			Config: map[string]interface{}{
+				"key1": "value1",
+				"key2": "value2",
+				"key3": "value3",
+			},
+		},
+		expectedError: "unauthorized",
+	}}
+
+	for _, test := range tests {
+		c.Run(test.about, func(c *qt.C) {
+			j := &jimm.JIMM{
+				Database: db.Database{
+					DB: jimmtest.MemoryDB(c, nil),
+				},
+			}
+			ctx := context.Background()
+			err := j.Database.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+
+			env := jimmtest.ParseEnvironment(c, testImportModelEnv)
+			env.PopulateDB(c, j.Database)
+
+			user := env.User(test.user).DBObject(c, j.Database)
+			err = j.SetControllerConfig(ctx, &user, test.args)
+			if test.expectedError == "" {
+				c.Assert(err, qt.IsNil)
+
+				cfg := dbmodel.ControllerConfig{
+					Name: "jimm",
+				}
+				err = j.Database.GetControllerConfig(ctx, &cfg)
+				c.Assert(err, qt.IsNil)
+				c.Assert(cfg, jimmtest.DBObjectEquals, test.expectedConfig)
+			} else {
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
+			}
+		})
+	}
+}
+
+func TestGetControllerConfig(t *testing.T) {
+	c := qt.New(t)
+
+	tests := []struct {
+		about          string
+		user           string
+		expectedError  string
+		expectedConfig dbmodel.ControllerConfig
+	}{{
+		about: "admin allowed to set config",
+		user:  "alice@external",
+		expectedConfig: dbmodel.ControllerConfig{
+			Name: "jimm",
+			Config: map[string]interface{}{
+				"key1": "value1",
+			},
+		},
+	}, {
+		about: "add-model user - unauthorized",
+		user:  "eve@external",
+		expectedConfig: dbmodel.ControllerConfig{
+			Name: "jimm",
+			Config: map[string]interface{}{
+				"key1": "value1",
+			},
+		},
+	}, {
+		about: "login user - unauthorized",
+		user:  "fred@external",
+		expectedConfig: dbmodel.ControllerConfig{
+			Name: "jimm",
+			Config: map[string]interface{}{
+				"key1": "value1",
+			},
+		},
+	}}
+
+	for _, test := range tests {
+		c.Run(test.about, func(c *qt.C) {
+			j := &jimm.JIMM{
+				Database: db.Database{
+					DB: jimmtest.MemoryDB(c, nil),
+				},
+			}
+			ctx := context.Background()
+			err := j.Database.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+
+			env := jimmtest.ParseEnvironment(c, testImportModelEnv)
+			env.PopulateDB(c, j.Database)
+
+			superuser := env.User("alice@external").DBObject(c, j.Database)
+			user := env.User(test.user).DBObject(c, j.Database)
+			err = j.SetControllerConfig(ctx, &superuser, jujuparams.ControllerConfigSet{
+				Config: map[string]interface{}{
+					"key1": "value1",
+				},
+			})
+			c.Assert(err, qt.Equals, nil)
+
+			cfg, err := j.GetControllerConfig(ctx, &user)
+			if test.expectedError == "" {
+				c.Assert(err, qt.IsNil)
+				c.Assert(cfg, jimmtest.DBObjectEquals, &test.expectedConfig)
+			} else {
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
+			}
+		})
+	}
+}

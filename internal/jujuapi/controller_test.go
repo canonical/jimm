@@ -32,7 +32,25 @@ func (s *controllerSuite) TestControllerConfig(c *gc.C) {
 	client := controllerapi.NewClient(conn)
 	conf, err := client.ControllerConfig()
 	c.Assert(err, gc.Equals, nil)
+	c.Assert(conf, jc.DeepEquals, controller.Config(map[string]interface{}{}))
+
+	adminConn := s.open(c, nil, "alice")
+	defer adminConn.Close()
+	err = adminConn.APICall("Controller", 9, "", "ConfigSet", jujuparams.ControllerConfigSet{
+		Config: map[string]interface{}{
+			"key1":           "value1",
+			"key2":           "value2",
+			"charmstore-url": "https://api.jujucharms.com/charmstore",
+			"metering-url":   "https://api.jujucharms.com/omnibus",
+		},
+	}, nil)
+	c.Assert(err, jc.ErrorIsNil)
+
+	conf, err = client.ControllerConfig()
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(conf, jc.DeepEquals, controller.Config(map[string]interface{}{
+		"key1":           "value1",
+		"key2":           "value2",
 		"charmstore-url": "https://api.jujucharms.com/charmstore",
 		"metering-url":   "https://api.jujucharms.com/omnibus",
 	}))
@@ -102,7 +120,7 @@ func (s *controllerSuite) TestModelStatus(c *gc.C) {
 }
 
 func (s *controllerSuite) TestConfigSet(c *gc.C) {
-	conn := s.open(c, nil, "bob")
+	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
 	err := conn.APICall("Controller", 5, "", "ConfigSet", jujuparams.ControllerConfigSet{}, nil)
@@ -110,6 +128,15 @@ func (s *controllerSuite) TestConfigSet(c *gc.C) {
 
 	err = conn.APICall("Controller", 9, "", "ConfigSet", jujuparams.ControllerConfigSet{}, nil)
 	c.Assert(err, jc.ErrorIsNil)
+
+	conn1 := s.open(c, nil, "bob")
+	defer conn1.Close()
+
+	err = conn1.APICall("Controller", 5, "", "ConfigSet", jujuparams.ControllerConfigSet{}, nil)
+	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+
+	err = conn1.APICall("Controller", 9, "", "ConfigSet", jujuparams.ControllerConfigSet{}, nil)
+	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
 func (s *controllerSuite) TestIdentityProviderURL(c *gc.C) {

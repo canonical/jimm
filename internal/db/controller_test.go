@@ -455,3 +455,63 @@ func (s *dbSuite) TestForEachControllerModel(c *qt.C) {
 		"00000002-0000-0000-0000-000000000004",
 	})
 }
+
+func TestUpsertControllerConfigUnconfiguredDatabase(t *testing.T) {
+	c := qt.New(t)
+
+	var d db.Database
+	err := d.UpsertControllerConfig(context.Background(), &dbmodel.ControllerConfig{})
+	c.Check(err, qt.ErrorMatches, `database not configured`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
+}
+
+func (s *dbSuite) TestControllerConfig(c *qt.C) {
+	ctx := context.Background()
+	err := s.Database.Migrate(context.Background(), true)
+	c.Assert(err, qt.Equals, nil)
+
+	config := dbmodel.ControllerConfig{
+		Name: "jimm",
+		Config: map[string]interface{}{
+			"key1": "value1",
+			"key2": "value2",
+		},
+	}
+	err = s.Database.UpsertControllerConfig(ctx, &config)
+	c.Assert(err, qt.IsNil)
+
+	config1 := dbmodel.ControllerConfig{
+		Name: "jimm",
+	}
+	err = s.Database.GetControllerConfig(ctx, &config1)
+	c.Assert(err, qt.IsNil)
+	c.Assert(config1, qt.DeepEquals, config)
+
+	config2 := config1
+	config2.Config = map[string]interface{}{
+		"key1": "value1.1",
+		"key2": "value2.1",
+		"key3": "value3",
+	}
+	err = s.Database.UpsertControllerConfig(ctx, &config2)
+	c.Assert(err, qt.IsNil)
+
+	err = s.Database.GetControllerConfig(ctx, &config1)
+	c.Assert(err, qt.IsNil)
+	c.Assert(config1, qt.DeepEquals, config2)
+
+	config3 := dbmodel.ControllerConfig{
+		Name: "unknown",
+	}
+	err = s.Database.GetControllerConfig(ctx, &config3)
+	c.Assert(err, qt.ErrorMatches, "controller config not found")
+}
+
+func TestGetControllerConfigUnconfiguredDatabase(t *testing.T) {
+	c := qt.New(t)
+
+	var d db.Database
+	err := d.GetControllerConfig(context.Background(), &dbmodel.ControllerConfig{})
+	c.Check(err, qt.ErrorMatches, `database not configured`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
+}
