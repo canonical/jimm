@@ -44,7 +44,6 @@ lxd_exec snap install vault
 lxc file push --uid 1000 --gid 1000 --mode 600 ${NETRC:-$HOME/.netrc} $container/home/ubuntu/.netrc
 lxd_exec_ubuntu mkdir -p /home/ubuntu/src
 tar c . | cwd=/home/ubuntu/src lxd_exec_ubuntu tar x
-cwd=/home/ubuntu/src lxd_exec_ubuntu go mod download
 
 cwd=/home/ubuntu/src lxd_exec_ubuntu make check
 cwd=/home/ubuntu/src lxd_exec_ubuntu make release
