@@ -12,6 +12,7 @@ import (
 	vault "github.com/hashicorp/vault/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
+	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
@@ -19,7 +20,6 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
 )
 
 // A JIMM provides the buisness logic for managing resources in the JAAS

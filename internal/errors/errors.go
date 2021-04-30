@@ -7,10 +7,10 @@ import (
 	"fmt"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
 )
 
 // An Error is an error in the JIMM system.

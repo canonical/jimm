@@ -21,13 +21,13 @@ import (
 
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
+	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/rpc"
-	"github.com/CanonicalLtd/jimm/internal/zapctx"
 )
 
 // A Dialer is an implementation of a jimm.Dialer that adapts a juju API
