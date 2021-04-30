@@ -707,6 +707,10 @@ func TestWatcher(t *testing.T) {
 						WatchAllModels_: func(context.Context) (string, error) {
 							return test.name, nil
 						},
+						ModelInfo_: func(_ context.Context, info *jujuparams.ModelInfo) error {
+							c.Check(info.UUID, qt.Equals, "00000002-0000-0000-0000-000000000002")
+							return errors.E(errors.CodeNotFound)
+						},
 					},
 				},
 			}
@@ -739,6 +743,141 @@ func TestWatcher(t *testing.T) {
 	}
 }
 
+var modelSummaryWatcherTests = []struct {
+	name           string
+	summaries      [][]jujuparams.ModelAbstract
+	checkPublisher func(*qt.C, *testPublisher)
+}{{
+	name: "ModelSummaries",
+	summaries: [][]jujuparams.ModelAbstract{{{
+		UUID:   "00000002-0000-0000-0000-000000000001",
+		Status: "test status",
+		Size: jujuparams.ModelSummarySize{
+			Applications: 1,
+			Machines:     2,
+			Containers:   3,
+			Units:        4,
+			Relations:    12,
+		},
+		Admins: []string{"alice@external", "bob"},
+	}, {
+		// this is a summary for an model unknown to jimm
+		// meaning its summary will not be published
+		// to the pubsub hub.
+		UUID:   "00000002-0000-0000-0000-000000000003",
+		Status: "test status 2",
+		Size: jujuparams.ModelSummarySize{
+			Applications: 5,
+			Machines:     4,
+			Containers:   3,
+			Units:        2,
+			Relations:    1,
+		},
+		Admins: []string{"bob@external"},
+	}}},
+	checkPublisher: func(c *qt.C, publisher *testPublisher) {
+		c.Assert(publisher.messages, qt.DeepEquals, []interface{}{
+			jujuparams.ModelAbstract{
+				UUID:   "00000002-0000-0000-0000-000000000001",
+				Status: "test status",
+				Size: jujuparams.ModelSummarySize{
+					Applications: 1,
+					Machines:     2,
+					Containers:   3,
+					Units:        4,
+					Relations:    12,
+				},
+				Admins: []string{"alice@external"},
+			},
+		})
+	},
+}}
+
+func TestModelSummaryWatcher(t *testing.T) {
+	c := qt.New(t)
+
+	for _, test := range modelSummaryWatcherTests {
+		c.Run(test.name, func(c *qt.C) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			nextC := make(chan []jujuparams.ModelAbstract)
+			var stopped uint32
+
+			publisher := &testPublisher{}
+
+			w := &jimm.Watcher{
+				Pubsub: publisher,
+				Database: db.Database{
+					DB: jimmtest.MemoryDB(c, nil),
+				},
+				Dialer: &jimmtest.Dialer{
+					API: &jimmtest.API{
+						WatchAllModelSummaries_: func(_ context.Context) (string, error) {
+							return test.name, nil
+						},
+						ModelSummaryWatcherNext_: func(ctx context.Context, id string) ([]jujuparams.ModelAbstract, error) {
+							if id != test.name {
+								return nil, errors.E("incorrect id")
+							}
+
+							select {
+							case <-ctx.Done():
+								return nil, ctx.Err()
+							case summaries, ok := <-nextC:
+								c.Logf("ModelSummaryWatcherNext received %#v, %v", summaries, ok)
+								if ok {
+									return summaries, nil
+								}
+								cancel()
+								<-ctx.Done()
+								return nil, ctx.Err()
+							}
+						},
+						ModelSummaryWatcherStop_: func(_ context.Context, id string) error {
+							if id != test.name {
+								return errors.E("incorrect id")
+							}
+							atomic.StoreUint32(&stopped, 1)
+							return nil
+						},
+						SupportsModelSummaryWatcher_: true,
+						ModelInfo_: func(_ context.Context, info *jujuparams.ModelInfo) error {
+							c.Check(info.UUID, qt.Equals, "00000002-0000-0000-0000-000000000002")
+							return errors.E(errors.CodeNotFound)
+						},
+					},
+				},
+			}
+
+			env := jimmtest.ParseEnvironment(c, testWatcherEnv)
+			err := w.Database.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+			env.PopulateDB(c, w.Database)
+
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err := w.WatchModelSummaries(ctx, time.Millisecond)
+				c.Check(err, qt.ErrorMatches, `context canceled`, qt.Commentf("unexpected error %s (%#v)", err, err))
+			}()
+
+			for _, summary := range test.summaries {
+				select {
+				case nextC <- summary:
+				case <-ctx.Done():
+					c.Fatal("context closed prematurely")
+				}
+			}
+			close(nextC)
+			wg.Wait()
+
+			test.checkPublisher(c, publisher)
+		})
+	}
+}
+
 func TestWatcherSetsControllerUnavailable(t *testing.T) {
 	c := qt.New(t)
 
@@ -746,6 +885,7 @@ func TestWatcherSetsControllerUnavailable(t *testing.T) {
 	defer cancel()
 
 	w := &jimm.Watcher{
+		Pubsub: &testPublisher{},
 		Database: db.Database{
 			DB: jimmtest.MemoryDB(c, nil),
 		},
@@ -785,6 +925,7 @@ func TestWatcherRemoveDyingModelsOnStartup(t *testing.T) {
 	defer cancel()
 
 	w := &jimm.Watcher{
+		Pubsub: &testPublisher{},
 		Database: db.Database{
 			DB: jimmtest.MemoryDB(c, nil),
 		},
@@ -868,6 +1009,7 @@ func TestWatcherIgnoreDeltasForModelsFromIncorrectController(t *testing.T) {
 
 	nextC := make(chan []jujuparams.Delta)
 	w := &jimm.Watcher{
+		Pubsub: &testPublisher{},
 		Database: db.Database{
 			DB: jimmtest.MemoryDB(c, nil),
 		},
@@ -969,4 +1111,19 @@ func TestWatcherIgnoreDeltasForModelsFromIncorrectController(t *testing.T) {
 	err = w.Database.GetModel(context.Background(), &m2)
 	c.Assert(err, qt.IsNil)
 	c.Check(m2, qt.DeepEquals, m1)
+}
+
+type testPublisher struct {
+	mu       sync.Mutex
+	messages []interface{}
+}
+
+func (p *testPublisher) Publish(model string, content interface{}) <-chan struct{} {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.messages = append(p.messages, content)
+
+	done := make(chan struct{})
+	close(done)
+	return done
 }
