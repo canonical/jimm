@@ -17,6 +17,8 @@ var vaultOnce sync.Once
 var vaultCmd *exec.Cmd
 var vaultErr error
 
+var vaultApproleOnce sync.Once
+
 // VaultClient returns a new vault client for use in a test. If there is an
 // error starting a dev vault server a log will be written to the given TB
 // and ok will be false. The started vault server will listen on the
@@ -44,10 +46,12 @@ func VaultClient(tb testing.TB) (client *vault.Client, path string, ok bool) {
 		return nil, "", false
 	}
 	client.SetToken(vaultRootToken)
+
 	if err := client.Sys().Mount("/"+tb.Name(), &vault.MountInput{Type: "kv"}); err != nil {
-		tb.Logf("error creating vault client: %s", err)
+		tb.Logf("error configuring vault: %s", err)
 		return nil, "", false
 	}
+
 	return client, tb.Name(), true
 }
 
