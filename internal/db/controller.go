@@ -145,3 +145,43 @@ func (d *Database) ForEachControllerModel(ctx context.Context, ctl *dbmodel.Cont
 	}
 	return nil
 }
+
+// UpsertControllerConfig upserts the controller config.
+func (d *Database) UpsertControllerConfig(ctx context.Context, cfg *dbmodel.ControllerConfig) error {
+	const op = errors.Op("db.UpsertControllerConfig")
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	if cfg.Name == "" {
+		return errors.E(op, errors.CodeBadRequest, `invalid config name ""`)
+	}
+
+	db := d.DB.WithContext(ctx)
+	if err := db.Save(cfg).Error; err != nil {
+		return errors.E(op)
+	}
+	return nil
+}
+
+func (d *Database) GetControllerConfig(ctx context.Context, cfg *dbmodel.ControllerConfig) error {
+	const op = errors.Op("db.GetControllerConfig")
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	if cfg.Name == "" {
+		return errors.E(op, errors.CodeNotFound, `invalid config name ""`)
+	}
+
+	db := d.DB.WithContext(ctx)
+	if err := db.Where("name = ?", cfg.Name).First(&cfg).Error; err != nil {
+		err := dbError(err)
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return errors.E(op, err, "controller config not found")
+		}
+		return errors.E(op, err)
+	}
+	return nil
+}
