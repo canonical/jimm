@@ -86,6 +86,12 @@ func init() {
 // settings. Only some settings can be changed after bootstrap.
 // JIMM does not support changing settings via ConfigSet.
 func (r *controllerRoot) ConfigSet(ctx context.Context, args jujuparams.ControllerConfigSet) error {
+	const op = errors.Op("jujuapi.ConfigSet")
+
+	err := r.jimm.SetControllerConfig(ctx, r.user, args)
+	if err != nil {
+		return errors.E(op, err)
+	}
 	return nil
 }
 
@@ -198,13 +204,17 @@ func (r *controllerRoot) ModelStatus(ctx context.Context, args jujuparams.Entiti
 }
 
 // ControllerConfig returns the controller's configuration.
-func (r *controllerRoot) ControllerConfig() (jujuparams.ControllerConfigResult, error) {
-	result := jujuparams.ControllerConfigResult{
-		Config: map[string]interface{}{
-			"charmstore-url": r.params.CharmstoreLocation,
-			"metering-url":   r.params.MeteringLocation,
-		},
+func (r *controllerRoot) ControllerConfig(ctx context.Context) (jujuparams.ControllerConfigResult, error) {
+	const op = errors.Op("jujuapi.ControllerConfig")
+
+	cfg, err := r.jimm.GetControllerConfig(ctx, r.user)
+	if err != nil {
+		return jujuparams.ControllerConfigResult{}, errors.E(op, err)
 	}
+	result := jujuparams.ControllerConfigResult{
+		Config: jujuparams.ControllerConfig(cfg.Config),
+	}
+
 	return result, nil
 }
 

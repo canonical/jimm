@@ -354,4 +354,14 @@ CREATE TABLE user_model_defaults (
 );
 CREATE INDEX idx_user_model_defaults_deleted_at ON user_model_defaults (deleted_at);
 
+CREATE TABLE controller_configs (
+	id BIGSERIAL PRIMARY KEY,
+	created_at TIMESTAMP WITH TIME ZONE,
+	updated_at TIMESTAMP WITH TIME ZONE,
+	deleted_at TIMESTAMP WITH TIME ZONE,
+	name TEXT NOT NULL,
+	config BYTEA,
+	UNIQUE(name)
+);
+
 UPDATE versions SET major=1, minor=0 WHERE component='jimmdb';

@@ -228,3 +228,25 @@ func TestToJujuRedirectInfoResult(t *testing.T) {
 		CACert: "ca-cert",
 	})
 }
+
+func TestControllerConfig(t *testing.T) {
+	c := qt.New(t)
+	db := gormDB(c)
+
+	cfg := dbmodel.ControllerConfig{
+		Name: "test-config",
+		Config: map[string]interface{}{
+			"key1": float64(1),
+			"key2": "test-value-2",
+			"key3": 42.0,
+		},
+	}
+	result := db.Create(&cfg)
+	c.Assert(result.Error, qt.IsNil)
+
+	var cfg2 dbmodel.ControllerConfig
+	result = db.Where("name = ?", "test-config").First(&cfg2)
+	c.Assert(result.Error, qt.IsNil)
+
+	c.Check(cfg2, qt.DeepEquals, cfg)
+}
