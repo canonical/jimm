@@ -363,4 +363,14 @@ CREATE TABLE controller_configs (
 	UNIQUE(name)
 );
 
+CREATE TABLE root_keys (
+	id BLOB NOT NULL PRIMARY KEY,
+	created_at DATETIME NOT NULL,
+	expires DATETIME NOT NULL,
+	root_key BLOB NOT NULL
+);
+
+CREATE INDEX idx_root_keys_created_at ON root_keys (created_at);
+CREATE INDEX idx_root_keys_expires ON root_keys (expires);
+
 UPDATE versions SET major=1, minor=0 WHERE component='jimmdb';
