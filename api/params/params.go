@@ -83,6 +83,9 @@ type AuditEvent struct {
 	// Action contains the action that occured on the entity.
 	Action string `json:"action"`
 
+	// Success indicates whether the action succeeded, or not.
+	Success bool `json:"success"`
+
 	// Params contains additional details for the audit entry. The contents
 	// will vary depending on the action and the entity.
 	Params map[string]string `json:"params"`

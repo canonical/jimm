@@ -46,12 +46,8 @@ func (e AuditLogEntry) ToAPIAuditEvent() apiparams.AuditEvent {
 	ale.Tag = e.Tag
 	ale.UserTag = e.UserTag
 	ale.Action = e.Action
+	ale.Success = e.Success
 	ale.Params = make(map[string]string)
-	if e.Success {
-		ale.Params["success"] = "true"
-	} else {
-		ale.Params["success"] = "false"
-	}
 	for k, v := range e.Params {
 		ale.Params[k] = v
 	}
