@@ -6,6 +6,7 @@ package jimm
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
@@ -219,6 +220,9 @@ type API interface {
 	// a ModelSummaryWatcher.
 	SupportsModelSummaryWatcher() bool
 
+	// Status returns the status of the juju model.
+	Status(ctx context.Context, patterns []string) (*jujuparams.FullStatus, error)
+
 	// UpdateCloud updates a cloud definition.
 	UpdateCloud(context.Context, names.CloudTag, jujuparams.Cloud) error
 
@@ -381,4 +385,36 @@ func (j *JIMM) RemoveController(ctx context.Context, user *dbmodel.User, control
 	}
 
 	return nil
+}
+
+// FullModelStatus returns the full status of the juju model.
+func (j *JIMM) FullModelStatus(ctx context.Context, user *dbmodel.User, modelTag names.ModelTag, patterns []string) (*jujuparams.FullStatus, error) {
+	const op = errors.Op("jimm.RemoveController")
+
+	if user.ControllerAccess != "superuser" {
+		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	model := dbmodel.Model{
+		UUID: sql.NullString{
+			String: modelTag.Id(),
+			Valid:  true,
+		},
+	}
+	err := j.Database.GetModel(ctx, &model)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	api, err := j.dial(ctx, &model.Controller, modelTag)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	status, err := api.Status(ctx, patterns)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	return status, nil
 }

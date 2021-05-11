@@ -3,6 +3,8 @@
 package api
 
 import (
+	jujuparams "github.com/juju/juju/apiserver/params"
+
 	"github.com/CanonicalLtd/jimm/api/params"
 )
 
@@ -81,4 +83,11 @@ func (c *Client) SetControllerDeprecated(req *params.SetControllerDeprecatedRequ
 	var info params.ControllerInfo
 	err := c.caller.APICall("JIMM", 3, "", "SetControllerDeprecated", req, &info)
 	return info, err
+}
+
+// FullModelStatus returns the full status of the juju model.
+func (c *Client) FullModelStatus(req *params.FullModelStatusRequest) (jujuparams.FullStatus, error) {
+	var status jujuparams.FullStatus
+	err := c.caller.APICall("JIMM", 3, "", "FullModelStatus", req, &status)
+	return status, err
 }
