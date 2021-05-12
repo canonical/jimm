@@ -29,6 +29,7 @@ func init() {
 		removeControllerMethod := rpc.Method(r.RemoveController)
 		revokeAuditLogAccessMethod := rpc.Method(r.RevokeAuditLogAccess)
 		setControllerDeprecatedMethod := rpc.Method(r.SetControllerDeprecated)
+		fullModelStatusMethod := rpc.Method(r.FullModelStatus)
 
 		r.AddMethod("JIMM", 2, "DisableControllerUUIDMasking", disableControllerUUIDMaskingMethod)
 		r.AddMethod("JIMM", 2, "ListControllers", listControllersMethod)
@@ -41,6 +42,7 @@ func init() {
 		r.AddMethod("JIMM", 3, "RemoveController", removeControllerMethod)
 		r.AddMethod("JIMM", 3, "RevokeAuditLogAccess", revokeAuditLogAccessMethod)
 		r.AddMethod("JIMM", 3, "SetControllerDeprecated", setControllerDeprecatedMethod)
+		r.AddMethod("JIMM", 3, "FullModelStatus", fullModelStatusMethod)
 
 		return []int{2, 3}
 	}
@@ -299,4 +301,21 @@ func (r *controllerRoot) RevokeAuditLogAccess(ctx context.Context, req apiparams
 	}
 	// TODO(mhilton) actually revoke access from the user.
 	return nil
+}
+
+// FullModelStatus returns the full status of the juju model.
+func (r *controllerRoot) FullModelStatus(ctx context.Context, req apiparams.FullModelStatusRequest) (jujuparams.FullStatus, error) {
+	const op = errors.Op("jujuapi.FullModelStatus")
+
+	mt, err := names.ParseModelTag(req.ModelTag)
+	if err != nil {
+		return jujuparams.FullStatus{}, errors.E(op, err, errors.CodeBadRequest)
+	}
+
+	status, err := r.jimm.FullModelStatus(ctx, r.user, mt, req.Patterns)
+	if err != nil {
+		return jujuparams.FullStatus{}, errors.E(op, err)
+	}
+
+	return *status, nil
 }

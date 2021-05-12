@@ -189,3 +189,9 @@ type SetControllerDeprecatedRequest struct {
 	// deprecated or not.
 	Deprecated bool `json:"deprecated"`
 }
+
+// FullModelStatusRequest is the request that is sent in a FullModelStatus method.
+type FullModelStatusRequest struct {
+	ModelTag string
+	Patterns []string
+}
