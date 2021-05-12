@@ -8,12 +8,12 @@ import (
 	"os"
 	"strings"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/aclstore/aclclient"
 	"github.com/juju/cmd"
 	"github.com/juju/gnuflag"
 	cookiejar "github.com/juju/persistent-cookiejar"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/jimm/jemclient"
 	"github.com/CanonicalLtd/jimm/params"

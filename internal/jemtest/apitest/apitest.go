@@ -7,9 +7,10 @@ import (
 	"net/http/httptest"
 
 	"github.com/canonical/candid/candidtest"
-	bakeryv3 "github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
-	httpbakeryv3 "github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
-	agentv3 "github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
 	"github.com/juju/aclstore"
 	controllerapi "github.com/juju/juju/api/controller"
 	"github.com/juju/juju/controller"
@@ -20,9 +21,6 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
-	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
-	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/jemerror"
@@ -114,7 +112,7 @@ func (s *APISuite) SetUpTest(c *gc.C) {
 	}
 
 	if s.Params.ThirdPartyLocator == nil {
-		s.Params.ThirdPartyLocator = s.Candid
+		s.Params.ThirdPartyLocator = auth.ThirdPartyLocatorV3{s.Candid}
 		s.AddCleanup(func(c *gc.C) {
 			s.Params.ThirdPartyLocator = nil
 		})
@@ -140,7 +138,7 @@ func (s *APISuite) SetUpTest(c *gc.C) {
 		bakery := identchecker.NewBakery(identchecker.BakeryParams{
 			Locator:        s.Params.ThirdPartyLocator,
 			Key:            key,
-			IdentityClient: s.Candid.CandidClient(s.Params.AgentUsername),
+			IdentityClient: auth.IdentityClientV3{s.Candid.CandidClient(s.Params.AgentUsername)},
 			Authorizer: identchecker.ACLAuthorizer{
 				GetACL: func(ctx context.Context, op bakery.Op) (acl []string, allowPublic bool, err error) {
 					if op == identchecker.LoginOp {
@@ -228,21 +226,21 @@ func (s *APISuite) NewAPIHTTPHandler(c *gc.C, p jemserver.HandlerParams) http.Ha
 
 // Client returns an httpbakery client suitable for use when creating a
 // juju API connection.
-func (s *APISuite) Client(username string) *httpbakeryv3.Client {
+func (s *APISuite) Client(username string) *httpbakery.Client {
 	cl := s.Candid.Client(username)
 
-	var cl3 httpbakeryv3.Client
+	var cl3 httpbakery.Client
 	cl3.Client = cl.Client
 	cl3.Logger = cl.Logger
 	if cl.Key != nil {
-		var kp bakeryv3.KeyPair
-		kp.Public.Key = bakeryv3.Key(cl.Key.Public.Key)
-		kp.Private.Key = bakeryv3.Key(cl.Key.Private.Key)
+		var kp bakery.KeyPair
+		kp.Public.Key = bakery.Key(cl.Key.Public.Key)
+		kp.Private.Key = bakery.Key(cl.Key.Private.Key)
 		cl3.Key = &kp
 
-		agentv3.SetUpAuth(&cl3, &agentv3.AuthInfo{
+		agent.SetUpAuth(&cl3, &agent.AuthInfo{
 			Key: cl3.Key,
-			Agents: []agentv3.Agent{{
+			Agents: []agent.Agent{{
 				URL:      s.Candid.URL.String(),
 				Username: username,
 			}},

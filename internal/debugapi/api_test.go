@@ -72,7 +72,7 @@ func (s *APISuite) TestPprofDeniedWithBadAuth(c *gc.C) {
 			Message: "unauthorized",
 			Code:    params.ErrUnauthorized,
 		},
-		Do: apitest.Do(s.Candid.Client("someone")),
+		Do: apitest.Do(s.Client("someone")),
 	})
 }
 
@@ -80,7 +80,7 @@ func (s *APISuite) TestPprofOKWithAdmin(c *gc.C) {
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.APIHandler,
 		URL:     "/debug/pprof/",
-		Do:      apitest.Do(s.Candid.Client(jemtest.ControllerAdmin)),
+		Do:      apitest.Do(s.Client(jemtest.ControllerAdmin)),
 	})
 	c.Assert(resp.Code, gc.Equals, http.StatusOK)
 	c.Assert(resp.HeaderMap.Get("Content-Type"), gc.Matches, "text/html.*")

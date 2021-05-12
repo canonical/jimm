@@ -5,10 +5,10 @@ package jujuapi
 import (
 	"context"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/permission"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"

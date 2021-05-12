@@ -8,10 +8,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	vault "github.com/hashicorp/vault/api"
 	"github.com/juju/mgo/v2"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
+	bakeryv2 "gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/jimm/internal/debugapi"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
@@ -60,7 +61,7 @@ type ServerParams struct {
 	// AgentUsername and AgentKey hold the credentials used for agent
 	// authentication.
 	AgentUsername string
-	AgentKey      *bakery.KeyPair
+	AgentKey      *bakeryv2.KeyPair
 
 	// RunMonitor specifies that the monitor worker should be run.
 	// This should always be set when running the server in production.

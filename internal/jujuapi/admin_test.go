@@ -3,6 +3,12 @@
 package jujuapi_test
 
 import (
+	"bytes"
+	"fmt"
+	"net/url"
+	"time"
+
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/network"
@@ -55,6 +61,35 @@ func (s *adminSuite) TestLoginToController(c *gc.C) {
 	rerr, ok := errgo.Cause(err).(*rpc.RequestError)
 	c.Assert(ok, gc.Equals, true)
 	c.Assert(rerr.Code, gc.Equals, jujuparams.CodeNotImplemented)
+}
+
+func (s *adminSuite) TestLoginWithNonAuthenticatingMacaroonSaved(c *gc.C) {
+	u, err := url.Parse(s.HTTP.URL)
+	c.Assert(err, gc.Equals, nil)
+	info := api.Info{
+		SkipLogin: true,
+		Addrs: []string{
+			u.Host,
+		},
+	}
+	client := s.Client("test")
+	opts := api.DialOpts{
+		InsecureSkipVerify: true,
+		BakeryClient:       client,
+	}
+	conn, err := api.Open(&info, opts)
+	c.Assert(err, gc.Equals, nil)
+	defer conn.Close()
+	// Add a macroon to the cookie jar that won't authenticate.
+	m, err := macaroon.New([]byte("test-macaroon-root-key"), []byte("test-macaroon-root-key-id"), "", macaroon.V1)
+	c.Assert(err, gc.Equals, nil)
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "time-before %s", time.Now().UTC().Add(24*time.Hour).Format(time.RFC3339Nano))
+	m.AddFirstPartyCaveat(buf.Bytes())
+	err = httpbakery.SetCookie(client.Client.Jar, conn.CookieURL(), nil, macaroon.Slice{m})
+	c.Assert(err, gc.Equals, nil)
+	err = conn.Login(nil, "", "", nil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *adminSuite) TestLoginToControllerWithInvalidMacaroon(c *gc.C) {

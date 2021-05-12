@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
 	vault "github.com/hashicorp/vault/api"
 	"github.com/juju/clock"
 	"github.com/juju/juju/api"
@@ -21,7 +22,6 @@ import (
 	"github.com/rogpeppe/fastuuid"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"

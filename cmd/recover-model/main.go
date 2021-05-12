@@ -15,8 +15,6 @@ import (
 	mgo "github.com/juju/mgo/v2"
 	"github.com/juju/names/v4"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/httpbakery"
-	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
 	"github.com/CanonicalLtd/jimm/config"
 	"github.com/CanonicalLtd/jimm/internal/jem"
@@ -61,18 +59,6 @@ func recoverModel(ctx context.Context, cfg *config.Config, controller, model str
 		cfg.DBName = "jem"
 	}
 	db := session.DB(cfg.DBName)
-
-	bclient := httpbakery.NewClient()
-	err = agent.SetUpAuth(bclient, &agent.AuthInfo{
-		Key: cfg.AgentKey,
-		Agents: []agent.Agent{{
-			URL:      cfg.IdentityLocation,
-			Username: cfg.AgentUsername,
-		}},
-	})
-	if err != nil {
-		return errgo.Notef(err, "cannot initialize agent")
-	}
 
 	p, err := jem.NewPool(ctx, jem.Params{
 		DB:              db,

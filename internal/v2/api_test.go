@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/juju/api"
 	controllerapi "github.com/juju/juju/api/controller"
@@ -20,7 +21,6 @@ import (
 	"go.uber.org/zap/zapcore"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
 	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
@@ -52,7 +52,7 @@ func (s *APISuite) client(user string, groups ...string) *jemclient.Client {
 	s.Candid.AddUser(user, groups...)
 	return jemclient.New(jemclient.NewParams{
 		BaseURL: s.HTTP.URL,
-		Client:  s.Candid.Client(user),
+		Client:  s.Client(user),
 	})
 }
 
@@ -153,7 +153,7 @@ func (s *APISuite) TestUnauthorized(c *gc.C) {
 				Code:    params.ErrUnauthorized,
 			},
 			ExpectStatus: http.StatusUnauthorized,
-			Do:           apitest.Do(s.Candid.Client(test.asUser)),
+			Do:           apitest.Do(s.Client(test.asUser)),
 		})
 	}
 }
@@ -310,7 +310,7 @@ func (s *APISuite) TestAddController(c *gc.C) {
 		if authUser == "" {
 			authUser = controllerPath.User
 		}
-		client := s.Candid.Client(string(authUser))
+		client := s.Client(string(authUser))
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Method:       "PUT",
 			Handler:      s.APIHandler,
@@ -398,7 +398,7 @@ func (s *APISuite) TestGetModelNotFound(c *gc.C) {
 			Code:    params.ErrNotFound,
 		},
 		ExpectStatus: http.StatusNotFound,
-		Do:           apitest.Do(s.Candid.Client("user")),
+		Do:           apitest.Do(s.Client("user")),
 	})
 
 	// If we're some different user, we get Unauthorized.
@@ -411,7 +411,7 @@ func (s *APISuite) TestGetModelNotFound(c *gc.C) {
 			Code:    params.ErrUnauthorized,
 		},
 		ExpectStatus: http.StatusUnauthorized,
-		Do:           apitest.Do(s.Candid.Client("other")),
+		Do:           apitest.Do(s.Client("other")),
 	})
 }
 
@@ -425,7 +425,7 @@ func (s *APISuite) TestDeleteModelNotFound(c *gc.C) {
 			Code:    params.ErrNotFound,
 		},
 		ExpectStatus: http.StatusNotFound,
-		Do:           apitest.Do(s.Candid.Client("user")),
+		Do:           apitest.Do(s.Client("user")),
 	})
 }
 
@@ -433,7 +433,7 @@ func (s *APISuite) TestDeleteModel(c *gc.C) {
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.APIHandler,
 		URL:     "/v2/model/" + s.Model.Path.String(),
-		Do:      apitest.Do(s.Candid.Client("bob")),
+		Do:      apitest.Do(s.Client("bob")),
 	})
 	c.Assert(resp.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %s", resp.Body.Bytes()))
 
@@ -443,7 +443,7 @@ func (s *APISuite) TestDeleteModel(c *gc.C) {
 		Handler:      s.APIHandler,
 		URL:          "/v2/model/" + s.Model.Path.String(),
 		ExpectStatus: http.StatusOK,
-		Do:           apitest.Do(s.Candid.Client("bob")),
+		Do:           apitest.Do(s.Client("bob")),
 	})
 	// Check that it doesn't exist anymore.
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -454,7 +454,7 @@ func (s *APISuite) TestDeleteModel(c *gc.C) {
 			Message: `model not found`,
 			Code:    params.ErrNotFound,
 		},
-		Do: apitest.Do(s.Candid.Client("bob")),
+		Do: apitest.Do(s.Client("bob")),
 	})
 }
 
@@ -468,7 +468,7 @@ func (s *APISuite) TestGetController(c *gc.C) {
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.APIHandler,
 		URL:     "/v2/controller/" + s.Controller.Path.String(),
-		Do:      apitest.Do(s.Candid.Client("alice")),
+		Do:      apitest.Do(s.Client("alice")),
 	})
 	c.Assert(resp.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %s", resp.Body.Bytes()))
 	var controllerInfo params.ControllerResponse
@@ -486,7 +486,7 @@ func (s *APISuite) TestGetControllerWithLocation(c *gc.C) {
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.APIHandler,
 		URL:     "/v2/controller/" + s.Controller.Path.String(),
-		Do:      apitest.Do(s.Candid.Client("alice")),
+		Do:      apitest.Do(s.Client("alice")),
 	})
 	c.Assert(resp.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %s", resp.Body.Bytes()))
 	var controllerInfo params.ControllerResponse
@@ -505,7 +505,7 @@ func (s *APISuite) TestGetControllerNotFound(c *gc.C) {
 			Code:    params.ErrNotFound,
 		},
 		ExpectStatus: http.StatusNotFound,
-		Do:           apitest.Do(s.Candid.Client("bob")),
+		Do:           apitest.Do(s.Client("bob")),
 	})
 
 	// Any other user just sees Unauthorized.
@@ -518,7 +518,7 @@ func (s *APISuite) TestGetControllerNotFound(c *gc.C) {
 			Code:    params.ErrUnauthorized,
 		},
 		ExpectStatus: http.StatusUnauthorized,
-		Do:           apitest.Do(s.Candid.Client("alice")),
+		Do:           apitest.Do(s.Client("alice")),
 	})
 }
 
@@ -532,7 +532,7 @@ func (s *APISuite) TestDeleteControllerNotFound(c *gc.C) {
 			Code:    params.ErrNotFound,
 		},
 		ExpectStatus: http.StatusNotFound,
-		Do:           apitest.Do(s.Candid.Client("bob")),
+		Do:           apitest.Do(s.Client("bob")),
 	})
 }
 
@@ -553,7 +553,7 @@ func (s *APISuite) TestDeleteController(c *gc.C) {
 			Message: `cannot delete controller while it is still alive`,
 			Code:    params.ErrStillAlive,
 		},
-		Do: apitest.Do(s.Candid.Client("alice")),
+		Do: apitest.Do(s.Client("alice")),
 	})
 
 	// Check that we can delete it with force flag.
@@ -562,7 +562,7 @@ func (s *APISuite) TestDeleteController(c *gc.C) {
 		Handler:      s.APIHandler,
 		URL:          "/v2/controller/" + s.Controller.Path.String() + "?force=true",
 		ExpectStatus: http.StatusOK,
-		Do:           apitest.Do(s.Candid.Client("alice")),
+		Do:           apitest.Do(s.Client("alice")),
 	})
 	// Check that it doesn't exist anymore.
 	err = s.JEM.DB.GetController(ctx, &s.Controller)
@@ -592,7 +592,7 @@ func (s *APISuite) TestNewModel(c *gc.C) {
 		ExpectBody: httptesting.BodyAsserter(func(_ *gc.C, body json.RawMessage) {
 			modelRespBody = body
 		}),
-		Do: apitest.Do(s.Candid.Client("bob")),
+		Do: apitest.Do(s.Client("bob")),
 	})
 	var modelResp params.ModelResponse
 	err := json.Unmarshal(modelRespBody, &modelResp)
@@ -796,7 +796,7 @@ func (s *APISuite) TestGetModelWhenControllerUnavailable(c *gc.C) {
 		ExpectBody: httptesting.BodyAsserter(func(_ *gc.C, body json.RawMessage) {
 			modelRespBody = body
 		}),
-		Do: apitest.Do(s.Candid.Client("bob")),
+		Do: apitest.Do(s.Client("bob")),
 	})
 	var modelResp params.ModelResponse
 	err = json.Unmarshal(modelRespBody, &modelResp)
@@ -891,7 +891,7 @@ func (s *APISuite) TestNewModelUnderGroup(c *gc.C) {
 		ExpectBody: httptesting.BodyAsserter(func(_ *gc.C, body json.RawMessage) {
 			modelRespBody = body
 		}),
-		Do: apitest.Do(s.Candid.Client("bob")),
+		Do: apitest.Do(s.Client("bob")),
 	})
 	var modelResp params.ModelResponse
 	err := json.Unmarshal(modelRespBody, &modelResp)
@@ -934,7 +934,7 @@ func (s *APISuite) TestNewModelWithInvalidControllerPath(c *gc.C) {
 				Code:    params.ErrBadRequest,
 			},
 			ExpectStatus: http.StatusBadRequest,
-			Do:           apitest.Do(s.Candid.Client("bob")),
+			Do:           apitest.Do(s.Client("bob")),
 		})
 	}
 }
@@ -958,7 +958,7 @@ func (s *APISuite) TestNewModelCannotOpenAPI(c *gc.C) {
 			Message: `cannot create model: cannot connect to controller: interaction required but not possible`,
 		},
 		ExpectStatus: http.StatusInternalServerError,
-		Do:           apitest.Do(s.Candid.Client("bob")),
+		Do:           apitest.Do(s.Client("bob")),
 	})
 }
 
@@ -979,7 +979,7 @@ func (s *APISuite) TestNewModelAlreadyExists(c *gc.C) {
 			Message: "already exists",
 		},
 		ExpectStatus: http.StatusForbidden,
-		Do:           apitest.Do(s.Candid.Client("bob")),
+		Do:           apitest.Do(s.Client("bob")),
 	}
 	httptesting.AssertJSONCall(c, p)
 }
@@ -1002,7 +1002,7 @@ func (s *APISuite) TestNewModelCannotCreate(c *gc.C) {
 			Message: `cannot create model: api error: failed to create config: creating config from values failed: config value expected '=', found "bad>"`,
 		},
 		ExpectStatus: http.StatusInternalServerError,
-		Do:           apitest.Do(s.Candid.Client("bob")),
+		Do:           apitest.Do(s.Client("bob")),
 	})
 
 	// Check that the model is not there (it was added temporarily during the call).
@@ -1015,7 +1015,7 @@ func (s *APISuite) TestNewModelCannotCreate(c *gc.C) {
 			Code:    params.ErrNotFound,
 		},
 		ExpectStatus: http.StatusNotFound,
-		Do:           apitest.Do(s.Candid.Client("bob")),
+		Do:           apitest.Do(s.Client("bob")),
 	})
 }
 
@@ -1035,7 +1035,7 @@ func (s *APISuite) TestNewModelUnauthorized(c *gc.C) {
 			Code:    params.ErrUnauthorized,
 		},
 		ExpectStatus: http.StatusUnauthorized,
-		Do:           apitest.Do(s.Candid.Client("other")),
+		Do:           apitest.Do(s.Client("other")),
 	})
 }
 
@@ -1481,7 +1481,7 @@ func (s *APISuite) TestGetModelName(c *gc.C) {
 			Name: string(s.Model.Path.Name),
 		},
 		ExpectStatus: http.StatusOK,
-		Do:           apitest.Do(s.Candid.Client("bob")),
+		Do:           apitest.Do(s.Client("bob")),
 	})
 
 	uuid1 := utils.MustNewUUID().String()
@@ -1491,7 +1491,7 @@ func (s *APISuite) TestGetModelName(c *gc.C) {
 		Handler:      s.APIHandler,
 		URL:          fmt.Sprintf("/v2/model-uuid/%v/name", uuid1),
 		ExpectStatus: http.StatusNotFound,
-		Do:           apitest.Do(s.Candid.Client("bob")),
+		Do:           apitest.Do(s.Client("bob")),
 		ExpectBody: params.Error{
 			Code:    "not found",
 			Message: fmt.Sprintf("model not found"),
@@ -1532,7 +1532,7 @@ func (s *APISuite) TestGetAuditEntriesNotAuthorized(c *gc.C) {
 			Code:    params.ErrUnauthorized,
 		},
 		ExpectStatus: http.StatusUnauthorized,
-		Do:           apitest.Do(s.Candid.Client("charlie")),
+		Do:           apitest.Do(s.Client("charlie")),
 	})
 }
 
@@ -1563,7 +1563,7 @@ func (s *APISuite) TestGetModelStatusesNotAuthorized(c *gc.C) {
 			Code:    params.ErrUnauthorized,
 		},
 		ExpectStatus: http.StatusUnauthorized,
-		Do:           apitest.Do(s.Candid.Client("bob")),
+		Do:           apitest.Do(s.Client("bob")),
 	})
 }
 

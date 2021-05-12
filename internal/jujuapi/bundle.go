@@ -3,10 +3,10 @@
 package jujuapi
 
 import (
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
 	"github.com/juju/juju/apiserver/facades/client/bundle"
 	"github.com/juju/juju/core/permission"
 	"github.com/juju/names/v4"
-	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
 )
