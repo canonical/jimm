@@ -49,10 +49,10 @@ func TestToAPIAuditEvent(t *testing.T) {
 		Tag:     names.NewModelTag("00000001-0000-0000-0000-0000-000000000008").String(),
 		UserTag: names.NewUserTag("bob@external").String(),
 		Action:  "created",
+		Success: true,
 		Params: map[string]string{
-			"a":       "b",
-			"c":       "d",
-			"success": "true",
+			"a": "b",
+			"c": "d",
 		},
 	})
 
@@ -63,10 +63,10 @@ func TestToAPIAuditEvent(t *testing.T) {
 		Tag:     names.NewModelTag("00000001-0000-0000-0000-0000-000000000008").String(),
 		UserTag: names.NewUserTag("bob@external").String(),
 		Action:  "created",
+		Success: false,
 		Params: map[string]string{
-			"a":       "b",
-			"c":       "d",
-			"success": "false",
+			"a": "b",
+			"c": "d",
 		},
 	})
 }

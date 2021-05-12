@@ -859,7 +859,7 @@ func TestModelSummaryWatcher(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err := w.WatchModelSummaries(ctx, time.Millisecond)
+				err := w.WatchAllModelSummaries(ctx, time.Millisecond)
 				c.Check(err, qt.ErrorMatches, `context canceled`, qt.Commentf("unexpected error %s (%#v)", err, err))
 			}()
 

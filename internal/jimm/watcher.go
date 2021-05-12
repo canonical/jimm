@@ -80,14 +80,14 @@ func (w *Watcher) Watch(ctx context.Context, interval time.Duration) error {
 	}
 }
 
-// WatchModelSummaries starts the watcher which connects to all known
+// WatchAllModelSummaries starts the watcher which connects to all known
 // controllers and monitors them for model summary updates.
-// WatchModelSummaries polls the database at the given
-// interval to find any new controllers to watch. WatchModelSummaries blocks
+// WatchAllModelSummaries polls the database at the given
+// interval to find any new controllers to watch. WatchAllModelSummaries blocks
 // until either the given context is closed, or there is an error querying
 // the database.
-func (w *Watcher) WatchModelSummaries(ctx context.Context, interval time.Duration) error {
-	const op = errors.Op("jimm.WatchModelSummaries")
+func (w *Watcher) WatchAllModelSummaries(ctx context.Context, interval time.Duration) error {
+	const op = errors.Op("jimm.WatchAllModelSummaries")
 
 	r := newRunner()
 	// Ensure that all started goroutines are completed before we return.
@@ -105,7 +105,7 @@ func (w *Watcher) WatchModelSummaries(ctx context.Context, interval time.Duratio
 			ctx := zapctx.WithFields(ctx, zap.String("controller", ctl.Name))
 			r.run(ctl.Name, func() {
 				zapctx.Info(ctx, "starting model summary watcher")
-				err := w.watchModelSummaries(ctx, ctl)
+				err := w.watchAllModelSummaries(ctx, ctl)
 				zapctx.Error(ctx, "model summary watcher stopped", zap.Error(err))
 			})
 			return nil
@@ -263,9 +263,9 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 	}
 }
 
-// watchModelSummaries connects to the given controller and watches the
+// watchAllModelSummaries connects to the given controller and watches the
 // summary updates.
-func (w *Watcher) watchModelSummaries(ctx context.Context, ctl *dbmodel.Controller) error {
+func (w *Watcher) watchAllModelSummaries(ctx context.Context, ctl *dbmodel.Controller) error {
 	const op = errors.Op("jimm.watchAllModelSummaries")
 
 	// connect to the controller
