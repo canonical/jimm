@@ -29,6 +29,8 @@ func init() {
 		removeControllerMethod := rpc.Method(r.RemoveController)
 		revokeAuditLogAccessMethod := rpc.Method(r.RevokeAuditLogAccess)
 		setControllerDeprecatedMethod := rpc.Method(r.SetControllerDeprecated)
+		fullModelStatusMethod := rpc.Method(r.FullModelStatus)
+		updateMigratedModelMethod := rpc.Method(r.UpdateMigratedModel)
 
 		r.AddMethod("JIMM", 2, "DisableControllerUUIDMasking", disableControllerUUIDMaskingMethod)
 		r.AddMethod("JIMM", 2, "ListControllers", listControllersMethod)
@@ -36,11 +38,13 @@ func init() {
 		r.AddMethod("JIMM", 3, "AddController", addControllerMethod)
 		r.AddMethod("JIMM", 3, "DisableControllerUUIDMasking", disableControllerUUIDMaskingMethod)
 		r.AddMethod("JIMM", 3, "FindAuditEvents", findAuditEventsMethod)
+		r.AddMethod("JIMM", 3, "FullModelStatus", fullModelStatusMethod)
 		r.AddMethod("JIMM", 3, "GrantAuditLogAccess", grantAuditLogAccessMethod)
 		r.AddMethod("JIMM", 3, "ListControllers", listControllersV3Method)
 		r.AddMethod("JIMM", 3, "RemoveController", removeControllerMethod)
 		r.AddMethod("JIMM", 3, "RevokeAuditLogAccess", revokeAuditLogAccessMethod)
 		r.AddMethod("JIMM", 3, "SetControllerDeprecated", setControllerDeprecatedMethod)
+		r.AddMethod("JIMM", 3, "UpdateMigratedModel", updateMigratedModelMethod)
 
 		return []int{2, 3}
 	}
@@ -298,5 +302,42 @@ func (r *controllerRoot) RevokeAuditLogAccess(ctx context.Context, req apiparams
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 	// TODO(mhilton) actually revoke access from the user.
+	return nil
+}
+
+// FullModelStatus returns the full status of the juju model.
+func (r *controllerRoot) FullModelStatus(ctx context.Context, req apiparams.FullModelStatusRequest) (jujuparams.FullStatus, error) {
+	const op = errors.Op("jujuapi.FullModelStatus")
+
+	mt, err := names.ParseModelTag(req.ModelTag)
+	if err != nil {
+		return jujuparams.FullStatus{}, errors.E(op, err, errors.CodeBadRequest)
+	}
+
+	status, err := r.jimm.FullModelStatus(ctx, r.user, mt, req.Patterns)
+	if err != nil {
+		return jujuparams.FullStatus{}, errors.E(op, err)
+	}
+
+	return *status, nil
+}
+
+// UpdateMigratedModel checks that the model has been migrated to the specified controller
+// and updates internal representation of the model.
+func (r *controllerRoot) UpdateMigratedModel(ctx context.Context, req apiparams.UpdateMigratedModelRequest) error {
+	const op = errors.Op("jujuapi.UpdateMigratedModel")
+
+	if r.user.ControllerAccess != "superuser" {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	mt, err := names.ParseModelTag(req.ModelTag)
+	if err != nil {
+		return errors.E(op, err, errors.CodeBadRequest)
+	}
+	err = r.jimm.UpdateMigratedModel(ctx, r.user, mt, req.TargetController)
+	if err != nil {
+		return errors.E(op, err)
+	}
 	return nil
 }

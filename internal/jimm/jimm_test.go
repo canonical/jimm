@@ -5,12 +5,15 @@ package jimm_test
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"os"
 	"testing"
 	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/names/v4"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
@@ -474,6 +477,152 @@ func TestRemoveController(t *testing.T) {
 				}
 				err = j.Database.GetController(ctx, &controller)
 				c.Assert(err, qt.ErrorMatches, "controller not found")
+			}
+		})
+	}
+}
+
+const fullModelStatusTestEnv = `clouds:
+- name: dummy
+  type: dummy
+  regions:
+  - name: dummy-region
+cloud-credentials:
+- owner: alice@external
+  name: cred-1
+  cloud: dummy
+users:
+- username: alice@external
+  controller-access: superuser
+- username: bob@external
+  controller-access: add-model
+- username: eve@external
+  controller-access: "no-access"
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: dummy
+  region: dummy-region
+models:
+- name: model-1
+  type: iaas
+  uuid: 00000002-0000-0000-0000-000000000001
+  controller: controller-1
+  default-series: warty
+  cloud: dummy
+  region: dummy-region
+  cloud-credential: cred-1
+  owner: alice@external
+  life: alive
+`
+
+func TestFullModelStatus(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+	now := time.Now().UTC().Round(time.Millisecond)
+
+	fullStatus := jujuparams.FullStatus{
+		Model: jujuparams.ModelStatusInfo{
+			Name:             "model-1",
+			Type:             "iaas",
+			CloudTag:         "cloud-dummy",
+			CloudRegion:      "dummy-region",
+			Version:          "2.9-rc7",
+			AvailableVersion: "",
+			ModelStatus: jujuparams.DetailedStatus{
+				Status: "available",
+				Info:   "",
+				Data:   map[string]interface{}{},
+			},
+			SLA: "unsupported",
+		},
+		Machines:           map[string]jujuparams.MachineStatus{},
+		Applications:       map[string]jujuparams.ApplicationStatus{},
+		RemoteApplications: map[string]jujuparams.RemoteApplicationStatus{},
+		Offers:             map[string]jujuparams.ApplicationOfferStatus{},
+		Relations:          []jujuparams.RelationStatus(nil),
+		Branches:           map[string]jujuparams.BranchStatus{},
+	}
+
+	tests := []struct {
+		about          string
+		user           string
+		modelUUID      string
+		statusFunc     func(context.Context, []string) (*jujuparams.FullStatus, error)
+		expectedStatus jujuparams.FullStatus
+		expectedError  string
+	}{{
+		about:     "superuser allowed to see full model status",
+		user:      "alice@external",
+		modelUUID: "00000002-0000-0000-0000-000000000001",
+		statusFunc: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
+			return &fullStatus, nil
+		},
+		expectedStatus: fullStatus,
+	}, {
+		about:     "model not found",
+		user:      "alice@external",
+		modelUUID: "00000002-0000-0000-0000-000000000002",
+		statusFunc: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
+			return &fullStatus, nil
+		},
+		expectedError: "model not found",
+	}, {
+		about:     "controller returns an error",
+		user:      "alice@external",
+		modelUUID: "00000002-0000-0000-0000-000000000001",
+		statusFunc: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
+			return nil, errors.New("an error")
+		},
+		expectedError: "an error",
+	}, {
+		about:     "add-model user not allowed to see full model status",
+		user:      "bob@external",
+		modelUUID: "00000002-0000-0000-0000-000000000001",
+		statusFunc: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
+			return &fullStatus, nil
+		},
+		expectedError: "unauthorized",
+	}, {
+		about:     "no-access user not allowed to see full model status",
+		user:      "eve@external",
+		modelUUID: "00000002-0000-0000-0000-000000000001",
+		statusFunc: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
+			return &fullStatus, nil
+		},
+		expectedError: "unauthorized",
+	}}
+
+	for _, test := range tests {
+		c.Run(test.about, func(c *qt.C) {
+			api := &jimmtest.API{
+				Status_: test.statusFunc,
+			}
+
+			j := &jimm.JIMM{
+				Database: db.Database{
+					DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+				},
+				Dialer: &jimmtest.Dialer{
+					API: api,
+				},
+			}
+
+			err := j.Database.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+
+			env := jimmtest.ParseEnvironment(c, removeControllerTestEnv)
+			env.PopulateDB(c, j.Database)
+
+			u := env.User(test.user).DBObject(c, j.Database)
+
+			status, err := j.FullModelStatus(ctx, &u, names.NewModelTag(test.modelUUID), nil)
+			if test.expectedError != "" {
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
+			} else {
+				c.Assert(err, qt.Equals, nil)
+				c.Assert(status, qt.DeepEquals, &test.expectedStatus)
 			}
 		})
 	}

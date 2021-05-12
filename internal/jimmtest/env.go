@@ -264,12 +264,14 @@ func (cc *CloudCredential) DBObject(c *qt.C, db db.Database) dbmodel.CloudCreden
 // A Controller represents the definition of a controller in a test
 // environment.
 type Controller struct {
-	Name         string                          `json:"name"`
-	UUID         string                          `json:"uuid"`
-	Cloud        string                          `json:"cloud"`
-	CloudRegion  string                          `json:"region"`
-	CloudRegions []CloudRegionControllerPriority `json:"cloud-regions"`
-	AgentVersion string                          `json:"agent-version"`
+	Name          string                          `json:"name"`
+	UUID          string                          `json:"uuid"`
+	Cloud         string                          `json:"cloud"`
+	CloudRegion   string                          `json:"region"`
+	CloudRegions  []CloudRegionControllerPriority `json:"cloud-regions"`
+	AgentVersion  string                          `json:"agent-version"`
+	AdminUser     string                          `json:"admin-user"`
+	AdminPassword string                          `json:"admin-password"`
 
 	env *Environment
 	dbo dbmodel.Controller
@@ -282,6 +284,8 @@ func (ctl *Controller) DBObject(c *qt.C, db db.Database) dbmodel.Controller {
 	ctl.dbo.Name = ctl.Name
 	ctl.dbo.UUID = ctl.UUID
 	ctl.dbo.AgentVersion = ctl.AgentVersion
+	ctl.dbo.AdminUser = ctl.AdminUser
+	ctl.dbo.AdminPassword = ctl.AdminPassword
 	ctl.dbo.CloudName = ctl.Cloud
 	ctl.dbo.CloudRegion = ctl.CloudRegion
 	ctl.dbo.CloudRegions = make([]dbmodel.CloudRegionControllerPriority, len(ctl.CloudRegions))

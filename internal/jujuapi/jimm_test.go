@@ -3,6 +3,9 @@
 package jujuapi_test
 
 import (
+	"time"
+
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	jujuversion "github.com/juju/juju/version"
@@ -12,6 +15,7 @@ import (
 
 	"github.com/CanonicalLtd/jimm/api"
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
+	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -393,4 +397,77 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			Params:  map[string]string{},
 		}},
 	})
+}
+
+func (s *jimmSuite) TestFullModelStatus(c *gc.C) {
+	s.AddController(c, "controller-1", s.APIInfo(c))
+	mt := s.AddModel(c, names.NewUserTag("charlie@external"), "model-1", names.NewCloudTag("dummy"), "dummy-region", s.Model2.CloudCredential.Tag().(names.CloudCredentialTag))
+
+	conn := s.open(c, nil, "bob")
+	defer conn.Close()
+	client := api.NewClient(conn)
+
+	_, err := client.FullModelStatus(&apiparams.FullModelStatusRequest{
+		ModelTag: "invalid-model-tag",
+	})
+	c.Assert(err, gc.ErrorMatches, `"invalid-model-tag" is not a valid tag \(bad request\)`)
+
+	_, err = client.FullModelStatus(&apiparams.FullModelStatusRequest{
+		ModelTag: mt.String(),
+	})
+	c.Assert(err, gc.ErrorMatches, "unauthorized.*")
+
+	conn = s.open(c, nil, "alice@external")
+	defer conn.Close()
+	client = api.NewClient(conn)
+
+	status, err := client.FullModelStatus(&apiparams.FullModelStatusRequest{
+		ModelTag: mt.String(),
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(status, jemtest.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(&time.Time{})), jujuparams.FullStatus{
+		Model: jujuparams.ModelStatusInfo{
+			Name:        "model-1",
+			Type:        "iaas",
+			CloudTag:    "cloud-dummy",
+			CloudRegion: "dummy-region",
+			Version:     "2.9-rc7",
+			ModelStatus: jujuparams.DetailedStatus{
+				Status: "available",
+			},
+			SLA: "unsupported",
+		},
+	})
+}
+func (s *jimmSuite) TestUpdateMigratedModel(c *gc.C) {
+	s.AddController(c, "controller-1", s.APIInfo(c))
+
+	// Open the API connection as user "bob".
+	conn := s.open(c, nil, "bob")
+	defer conn.Close()
+
+	req := apiparams.UpdateMigratedModelRequest{
+		ModelTag:         names.NewModelTag(s.Model2.UUID.String).String(),
+		TargetController: "controller-1",
+	}
+	err := conn.APICall("JIMM", 3, "", "UpdateMigratedModel", &req, nil)
+	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+
+	// Open the API connection as user "alice".
+	conn = s.open(c, nil, "alice")
+	defer conn.Close()
+
+	req = apiparams.UpdateMigratedModelRequest{
+		ModelTag:         names.NewModelTag(s.Model2.UUID.String).String(),
+		TargetController: "controller-1",
+	}
+	err = conn.APICall("JIMM", 3, "", "UpdateMigratedModel", &req, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	req = apiparams.UpdateMigratedModelRequest{
+		ModelTag:         "invalid-model-tag",
+		TargetController: "controller-1",
+	}
+	err = conn.APICall("JIMM", 3, "", "UpdateMigratedModel", &req, nil)
+	c.Assert(err, gc.ErrorMatches, `"invalid-model-tag" is not a valid tag \(bad request\)`)
 }
