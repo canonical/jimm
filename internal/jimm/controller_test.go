@@ -945,3 +945,145 @@ func TestGetControllerConfig(t *testing.T) {
 		})
 	}
 }
+
+const testUpdateMigratedModelEnv = `
+users:
+- username: alice@external
+  display-name: Alice
+  controller-access: superuser
+- username: bob@external
+  display-name: Bob
+  controller-access: add-model
+clouds:
+- name: test-cloud
+  type: test
+  regions:
+  - name: test-region
+cloud-credentials:
+- name: test-credential
+  cloud: test-cloud
+  owner: alice@external
+  type: empty
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-region-1
+  agent-version: 3.2.1
+- name: controller-2
+  uuid: 00000001-0000-0000-0000-000000000002
+  cloud: test-cloud
+  region: test-region-1
+  agent-version: 3.2.1
+  admin-user: alice@external
+  admin-password: c0ntr0113rs3cre7
+models:
+- name: model-1
+  type: iaas
+  uuid: 00000002-0000-0000-0000-000000000002
+  controller: controller-1
+  default-series: warty
+  cloud: test-cloud
+  region: test-region
+  cloud-credential: test-credential
+  owner: alice@external
+  life: alive
+  status:
+    status: available
+    info: "OK!"
+    since: 2020-02-20T20:02:20Z
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: write
+  - user: charlie@external
+    access: read
+  sla:
+    level: unsupported
+  agent-version: 1.2.3
+`
+
+func TestUpdateMigratedModel(t *testing.T) {
+	c := qt.New(t)
+
+	tests := []struct {
+		about            string
+		user             string
+		modelInfo        func(context.Context, *jujuparams.ModelInfo) error
+		model            names.ModelTag
+		targetController string
+		expectedError    string
+	}{{
+		about:         "add-model user not allowed to update migrated model",
+		user:          "bob@external",
+		expectedError: "unauthorized",
+	}, {
+		about:         "model not found",
+		user:          "alice@external",
+		model:         names.NewModelTag("unknown-model"),
+		expectedError: "model not found",
+	}, {
+		about:            "controller not found",
+		user:             "alice@external",
+		model:            names.NewModelTag("00000002-0000-0000-0000-000000000002"),
+		targetController: "no-such-controller",
+		expectedError:    "controller not found",
+	}, {
+		about:            "api returns an error",
+		user:             "alice@external",
+		model:            names.NewModelTag("00000002-0000-0000-0000-000000000002"),
+		targetController: "controller-2",
+		modelInfo: func(context.Context, *jujuparams.ModelInfo) error {
+			return errors.E("an error")
+		},
+		expectedError: "an error",
+	}, {
+		about:            "all ok",
+		user:             "alice@external",
+		model:            names.NewModelTag("00000002-0000-0000-0000-000000000002"),
+		targetController: "controller-2",
+		modelInfo: func(context.Context, *jujuparams.ModelInfo) error {
+			return nil
+		},
+	}}
+
+	for _, test := range tests {
+		c.Run(test.about, func(c *qt.C) {
+			j := &jimm.JIMM{
+				Database: db.Database{
+					DB: jimmtest.MemoryDB(c, nil),
+				},
+				Dialer: &jimmtest.Dialer{
+					API: &jimmtest.API{
+						ModelInfo_: test.modelInfo,
+					},
+				},
+			}
+			ctx := context.Background()
+			err := j.Database.Migrate(ctx, false)
+			c.Assert(err, qt.IsNil)
+
+			env := jimmtest.ParseEnvironment(c, testUpdateMigratedModelEnv)
+			env.PopulateDB(c, j.Database)
+
+			user := env.User(test.user).DBObject(c, j.Database)
+			err = j.UpdateMigratedModel(ctx, &user, test.model, test.targetController)
+			if test.expectedError != "" {
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
+			} else {
+				c.Assert(err, qt.Equals, nil)
+
+				model := dbmodel.Model{
+					UUID: sql.NullString{
+						String: test.model.Id(),
+						Valid:  true,
+					},
+				}
+				err = j.Database.GetModel(ctx, &model)
+				c.Assert(err, qt.Equals, nil)
+				c.Assert(model.Controller.Name, qt.Equals, test.targetController)
+			}
+		})
+	}
+}

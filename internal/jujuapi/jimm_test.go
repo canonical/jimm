@@ -439,3 +439,35 @@ func (s *jimmSuite) TestFullModelStatus(c *gc.C) {
 		},
 	})
 }
+func (s *jimmSuite) TestUpdateMigratedModel(c *gc.C) {
+	s.AddController(c, "controller-1", s.APIInfo(c))
+
+	// Open the API connection as user "bob".
+	conn := s.open(c, nil, "bob")
+	defer conn.Close()
+
+	req := apiparams.UpdateMigratedModelRequest{
+		ModelTag:         names.NewModelTag(s.Model2.UUID.String).String(),
+		TargetController: "controller-1",
+	}
+	err := conn.APICall("JIMM", 3, "", "UpdateMigratedModel", &req, nil)
+	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+
+	// Open the API connection as user "alice".
+	conn = s.open(c, nil, "alice")
+	defer conn.Close()
+
+	req = apiparams.UpdateMigratedModelRequest{
+		ModelTag:         names.NewModelTag(s.Model2.UUID.String).String(),
+		TargetController: "controller-1",
+	}
+	err = conn.APICall("JIMM", 3, "", "UpdateMigratedModel", &req, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	req = apiparams.UpdateMigratedModelRequest{
+		ModelTag:         "invalid-model-tag",
+		TargetController: "controller-1",
+	}
+	err = conn.APICall("JIMM", 3, "", "UpdateMigratedModel", &req, nil)
+	c.Assert(err, gc.ErrorMatches, `"invalid-model-tag" is not a valid tag \(bad request\)`)
+}

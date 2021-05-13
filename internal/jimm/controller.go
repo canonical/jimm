@@ -4,6 +4,7 @@ package jimm
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/version"
+	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
@@ -574,4 +576,63 @@ func (j *JIMM) GetControllerConfig(ctx context.Context, u *dbmodel.User) (*dbmod
 		return nil, err
 	}
 	return &config, nil
+}
+
+// UpdateMigratedModel asserts that the model has been migrated to the
+// specified controller and updates the internal model representation.
+func (j *JIMM) UpdateMigratedModel(ctx context.Context, u *dbmodel.User, modelTag names.ModelTag, targetControllerName string) error {
+	const op = errors.Op("jimm.UpdateMigratedModel")
+
+	if u.ControllerAccess != "superuser" {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	model := dbmodel.Model{
+		UUID: sql.NullString{
+			String: modelTag.Id(),
+			Valid:  true,
+		},
+	}
+	err := j.Database.GetModel(ctx, &model)
+	if err != nil {
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return errors.E(op, "model not found", errors.CodeModelNotFound)
+		}
+		return errors.E(op, err)
+	}
+
+	targetController := dbmodel.Controller{
+		Name: targetControllerName,
+	}
+	err = j.Database.GetController(ctx, &targetController)
+	if err != nil {
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return errors.E(op, "controller not found", errors.CodeNotFound)
+		}
+		return errors.E(op, err)
+	}
+
+	// check the model is known to the controller
+	api, err := j.dial(ctx, &targetController, names.ModelTag{})
+	if err != nil {
+		return errors.E(op, err)
+	}
+	defer api.Close()
+
+	err = api.ModelInfo(ctx, &jujuparams.ModelInfo{
+		UUID: modelTag.Id(),
+	})
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	model.Controller = targetController
+	model.ControllerID = targetController.ID
+	err = j.Database.UpdateModel(ctx, &model)
+	if err != nil {
+		zapctx.Error(ctx, "failed to update model", zap.String("model", model.UUID.String), zaputil.Error(err))
+		return errors.E(op, err)
+	}
+
+	return nil
 }
