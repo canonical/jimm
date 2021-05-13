@@ -7,10 +7,11 @@ import (
 	"path"
 	"testing"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
+	bakeryv2 "gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/jimm/config"
 )
@@ -134,12 +135,12 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 			Key: mustParseKey("+qNbDWly3kRTDVv2UN03hrv/CBt4W6nxY5dHdw+KJFA="),
 		},
 		AgentUsername: "agentuser",
-		AgentKey: &bakery.KeyPair{
-			Public: bakery.PublicKey{
-				Key: mustParseKey("+qNbDWly3kRTDVv2UN03hrv/CBt4W6nxY5dHdw+KJFA="),
+		AgentKey: &bakeryv2.KeyPair{
+			Public: bakeryv2.PublicKey{
+				Key: bakeryv2.Key(mustParseKey("+qNbDWly3kRTDVv2UN03hrv/CBt4W6nxY5dHdw+KJFA=")),
 			},
-			Private: bakery.PrivateKey{
-				mustParseKey("lsvcDkapKoFxIyjX9/eQgb3s41KVwPMISFwAJdVCZ70="),
+			Private: bakeryv2.PrivateKey{
+				Key: bakeryv2.Key(mustParseKey("lsvcDkapKoFxIyjX9/eQgb3s41KVwPMISFwAJdVCZ70=")),
 			},
 		},
 		ControllerUUID:       "00000000-0000-0000-0000-000000000000",

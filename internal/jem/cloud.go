@@ -6,10 +6,10 @@ import (
 	"context"
 	"strings"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
 	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"

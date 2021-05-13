@@ -9,14 +9,15 @@ import (
 
 	"github.com/canonical/candid/candidclient"
 	"github.com/canonical/candid/candidtest"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/checkers"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/mgorootkeystore"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
-	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
-	"gopkg.in/macaroon-bakery.v2/httpbakery"
+	bakeryv2 "gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon.v2"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
@@ -58,7 +59,7 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 				ExpiryDuration: 1 * time.Second,
 			},
 		),
-		Locator: s.idmSrv,
+		Locator: auth.ThirdPartyLocatorV3{s.idmSrv},
 		Key:     key,
 		IdentityClient: auth.NewIdentityClient(auth.IdentityClientParams{
 			CandidClient: idmClient,
@@ -209,7 +210,15 @@ func (s *authSuite) discharge(ctx context.Context, c *gc.C, m *bakery.Macaroon, 
 	s.idmSrv.AddUser(username, groups...)
 	s.idmSrv.SetDefaultUser(username)
 	cl := s.idmSrv.Client(username)
-	ms, err := cl.DischargeAll(ctx, m)
+
+	// Convert the v3 macaroon to a v2 one for using with the candid client.
+	buf, err := m.MarshalJSON()
+	c.Assert(err, gc.Equals, nil)
+	var m2 bakeryv2.Macaroon
+	err = m2.UnmarshalJSON(buf)
+	c.Assert(err, gc.Equals, nil)
+
+	ms, err := cl.DischargeAll(ctx, &m2)
 	c.Assert(err, gc.Equals, nil)
 	return ms
 }

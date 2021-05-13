@@ -20,6 +20,7 @@ import (
 
 	jem "github.com/CanonicalLtd/jimm"
 	"github.com/CanonicalLtd/jimm/cmd/jaas-admin/admincmd"
+	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/jemclient"
 	"github.com/CanonicalLtd/jimm/params"
@@ -118,7 +119,7 @@ func (s *commonSuite) newServer(c *gc.C, session *mgo.Session, idmSrv *candidtes
 		DB:                db,
 		ControllerAdmin:   adminUser,
 		IdentityLocation:  idmSrv.URL.String(),
-		ThirdPartyLocator: idmSrv,
+		ThirdPartyLocator: auth.ThirdPartyLocatorV3{idmSrv},
 		AgentUsername:     "agent",
 		AgentKey:          idmSrv.UserPublicKey("agent"),
 	}

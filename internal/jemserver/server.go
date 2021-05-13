@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/canonical/candid/candidclient"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/mgorootkeystore"
 	vault "github.com/hashicorp/vault/api"
 	"github.com/juju/aclstore"
@@ -21,9 +23,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
-	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
-	"gopkg.in/macaroon-bakery.v2/httpbakery"
+	bakeryv2 "gopkg.in/macaroon-bakery.v2/bakery"
+	httpbakeryv2 "gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/dashboard"
@@ -76,7 +77,7 @@ type Params struct {
 	// AgentUsername and AgentKey hold the credentials used for agent
 	// authentication.
 	AgentUsername string
-	AgentKey      *bakery.KeyPair
+	AgentKey      *bakeryv2.KeyPair
 
 	// RunMonitor specifies that the monitor worker should be run.
 	// This should always be set when running the server in production.
@@ -220,9 +221,7 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 		// but it probably doesn't matter, as nothing currently uses
 		// the macaroon location for anything.
 		Location: "jimm",
-
-		// TODO(mhilton): work out how to make the logger better.
-		Logger: nil,
+		Logger:   BakeryLogger{},
 	})
 
 	kvstore, err := mgosimplekv.NewStore(config.DB.C("acls"))
@@ -328,10 +327,10 @@ func monitorLeaseOwner(agentName string) (string, error) {
 	return fmt.Sprintf("%s-%x", agentName, buf), nil
 }
 
-func newIdentityClient(config Params) (*auth.IdentityClient, *httpbakery.Client, error) {
+func newIdentityClient(config Params) (*auth.IdentityClient, *httpbakeryv2.Client, error) {
 	// Note: no need for persistent cookies as we'll
 	// be able to recreate the macaroons on startup.
-	bclient := httpbakery.NewClient()
+	bclient := httpbakeryv2.NewClient()
 	bclient.Key = config.AgentKey
 	client, err := candidclient.New(candidclient.NewParams{
 		BaseURL:       config.IdentityLocation,
@@ -404,3 +403,19 @@ func (srv *Server) Close() error {
 func (srv *Server) Pool() *jem.Pool {
 	return srv.pool
 }
+
+// A BakeryLogger is an implementation of a bakery.Logger that logs using
+// zapctx.
+type BakeryLogger struct{}
+
+// Infof implements bakery.Logger, it logs at INFO level.
+func (BakeryLogger) Infof(ctx context.Context, f string, args ...interface{}) {
+	zapctx.Info(ctx, fmt.Sprintf(f, args...))
+}
+
+// Debugf implements bakery.Logger, it logs at DEBUG level.
+func (BakeryLogger) Debugf(ctx context.Context, f string, args ...interface{}) {
+	zapctx.Debug(ctx, fmt.Sprintf(f, args...))
+}
+
+var _ bakery.Logger = BakeryLogger{}

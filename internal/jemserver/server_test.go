@@ -17,8 +17,9 @@ import (
 	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
+	bakeryv2 "gopkg.in/macaroon-bakery.v2/bakery"
 
+	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/debugapi"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
@@ -206,7 +207,7 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	key, err := bakery.GenerateKey()
+	key, err := bakeryv2.GenerateKey()
 	c.Assert(err, gc.Equals, nil)
 
 	params := jemserver.Params{
@@ -263,7 +264,7 @@ func (s *aclSuite) SetUpTest(c *gc.C) {
 		DB:                s.Session.DB("jimmtest"),
 		ControllerAdmin:   jemtest.ControllerAdmin,
 		IdentityLocation:  s.Candid.URL.String(),
-		ThirdPartyLocator: s.Candid,
+		ThirdPartyLocator: auth.ThirdPartyLocatorV3{s.Candid},
 		AgentUsername:     "agent",
 		AgentKey:          s.Candid.UserPublicKey("agent"),
 	}

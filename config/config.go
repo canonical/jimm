@@ -10,12 +10,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/loggo"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
+	bakeryv2 "gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/jimm/params"
@@ -37,7 +38,7 @@ type Config struct {
 	CharmstoreLocation    string            `yaml:"charmstore-location"`
 	MeteringLocation      string            `yaml:"metering-location"`
 	AgentUsername         string            `yaml:"agent-username"`
-	AgentKey              *bakery.KeyPair   `yaml:"agent-key"`
+	AgentKey              *bakeryv2.KeyPair `yaml:"agent-key"`
 	AccessLog             string            `yaml:"access-log"`
 	Autocert              bool              `yaml:"autocert"`
 	AutocertURL           string            `yaml:"autocert-url"`

@@ -5,11 +5,11 @@ package jem
 import (
 	"context"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/conv"

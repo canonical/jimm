@@ -5,7 +5,7 @@ package jemtest
 import (
 	"context"
 
-	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
 )
 
 const ControllerAdmin = "controller-admin"
