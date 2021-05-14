@@ -13,7 +13,6 @@ require (
 	github.com/golang/mock v1.5.0 // indirect
 	github.com/google/go-cmp v0.5.4
 	github.com/google/uuid v1.1.2
-	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
 	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/vault/api v1.1.0
 	github.com/jackc/pgconn v1.7.0
@@ -55,7 +54,6 @@ require (
 	gopkg.in/juju/environschema.v1 v1.0.1-0.20201027142642-c89a4490670a
 	gopkg.in/macaroon-bakery.v2 v2.3.0
 	gopkg.in/macaroon.v2 v2.1.0
-	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
 	gorm.io/driver/postgres v1.0.5
 	gorm.io/driver/sqlite v1.1.4-0.20201029040614-e1caf3738eb9
