@@ -63,7 +63,7 @@ func (GormLogger) Trace(ctx context.Context, begin time.Time, fc func() (string,
 		return
 	}
 	fields := make([]zapcore.Field, 3, 4)
-	fields[0] = zap.Duration("time", time.Since(begin))
+	fields[0] = zap.Stringer("time", time.Since(begin))
 	sql, rows := fc()
 	fields[1] = zap.String("sql", sql)
 	fields[2] = zap.Int64("rows", rows)

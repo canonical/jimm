@@ -21,3 +21,15 @@ func NewListControllersCommandForTesting(store jujuclient.ClientStore, bClient *
 
 	return modelcmd.WrapBase(cmd)
 }
+
+func NewModelStatusCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+	cmd := &modelStatusCommand{
+		store: store,
+		dialOpts: &jujuapi.DialOpts{
+			InsecureSkipVerify: true,
+			BakeryClient:       bClient,
+		},
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
