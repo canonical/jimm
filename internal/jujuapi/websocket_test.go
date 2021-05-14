@@ -95,7 +95,7 @@ func (s *websocketSuite) TearDownTest(c *gc.C) {
 	s.CandidSuite.TearDownTest(c)
 }
 
-// open creates a new websockec connection to the test server, using the
+// open creates a new websocket connection to the test server, using the
 // connection info specified in info, authenticating as the given user.
 // If info is nil then default values will be used.
 func (s *websocketSuite) open(c *gc.C, info *api.Info, username string) api.Connection {
