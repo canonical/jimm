@@ -607,8 +607,8 @@ func (j *JEM) UpdateApplicationOffer(ctx context.Context, ctlPath params.EntityP
 	u.Set("application-name", offerDetails.ApplicationName)
 	u.Set("bindings", offerDetails.Bindings)
 	u.Set("charm-url", offerDetails.CharmURL)
-	u.Set("connections", offerDetails.Connections)
-	u.Set("endpoints", offerDetails.Endpoints)
+	u.Set("connections", offerConnectionsToMongodoc(offerDetails.Connections))
+	u.Set("endpoints", offerEndpointsToMongodoc(offerDetails.Endpoints))
 	u.Set("offer-name", offerDetails.OfferName)
 	u.Set("offer-url", offerDetails.OfferURL)
 
@@ -616,17 +616,54 @@ func (j *JEM) UpdateApplicationOffer(ctx context.Context, ctlPath params.EntityP
 }
 
 func offerDetailsToMongodoc(model *mongodoc.Model, offerDetails jujuparams.ApplicationOfferAdminDetails) mongodoc.ApplicationOffer {
-	endpoints := make([]mongodoc.RemoteEndpoint, len(offerDetails.Endpoints))
-	for i, endpoint := range offerDetails.Endpoints {
-		endpoints[i] = mongodoc.RemoteEndpoint{
+	return mongodoc.ApplicationOffer{
+		ModelUUID:              model.UUID,
+		ModelName:              string(model.Path.Name),
+		ControllerPath:         model.Controller,
+		OfferUUID:              offerDetails.OfferUUID,
+		OfferURL:               offerDetails.OfferURL,
+		OfferName:              offerDetails.OfferName,
+		OwnerName:              conv.ToUserTag(model.Path.User).Id(),
+		ApplicationName:        offerDetails.ApplicationName,
+		ApplicationDescription: offerDetails.ApplicationDescription,
+		Endpoints:              offerEndpointsToMongodoc(offerDetails.Endpoints),
+		Spaces:                 offerSpacesToMongodoc(offerDetails.Spaces),
+		Bindings:               offerDetails.Bindings,
+		Users:                  offerUsersToMongodoc(offerDetails.Users),
+		Connections:            offerConnectionsToMongodoc(offerDetails.Connections),
+	}
+}
+
+func offerConnectionsToMongodoc(connections []jujuparams.OfferConnection) []mongodoc.OfferConnection {
+	conns := make([]mongodoc.OfferConnection, len(connections))
+	for i, connection := range connections {
+		conns[i] = mongodoc.OfferConnection{
+			SourceModelTag: connection.SourceModelTag,
+			RelationId:     connection.RelationId,
+			Username:       connection.Username,
+			Endpoint:       connection.Endpoint,
+			IngressSubnets: connection.IngressSubnets,
+		}
+	}
+	return conns
+}
+
+func offerEndpointsToMongodoc(endpoints []jujuparams.RemoteEndpoint) []mongodoc.RemoteEndpoint {
+	eps := make([]mongodoc.RemoteEndpoint, len(endpoints))
+	for i, endpoint := range endpoints {
+		eps[i] = mongodoc.RemoteEndpoint{
 			Name:      endpoint.Name,
 			Role:      string(endpoint.Role),
 			Interface: endpoint.Interface,
 			Limit:     endpoint.Limit,
 		}
 	}
-	users := make(map[mongodoc.User]mongodoc.ApplicationOfferAccessPermission, len(offerDetails.Users))
-	for _, user := range offerDetails.Users {
+	return eps
+}
+
+func offerUsersToMongodoc(users []jujuparams.OfferUserDetails) map[mongodoc.User]mongodoc.ApplicationOfferAccessPermission {
+	accesses := make(map[mongodoc.User]mongodoc.ApplicationOfferAccessPermission, len(users))
+	for _, user := range users {
 		pu, err := conv.FromUserID(user.UserName)
 		if err != nil {
 			// If we can't parse the user, it's either a local user which
@@ -644,42 +681,20 @@ func offerDetailsToMongodoc(model *mongodoc.Model, offerDetails jujuparams.Appli
 		default:
 			continue
 		}
-		users[mongodoc.User(pu)] = access
+		accesses[mongodoc.User(pu)] = access
 	}
-	spaces := make([]mongodoc.RemoteSpace, len(offerDetails.Spaces))
-	for i, space := range offerDetails.Spaces {
-		spaces[i] = mongodoc.RemoteSpace{
+	return accesses
+}
+
+func offerSpacesToMongodoc(spaces []jujuparams.RemoteSpace) []mongodoc.RemoteSpace {
+	ss := make([]mongodoc.RemoteSpace, len(spaces))
+	for i, space := range spaces {
+		ss[i] = mongodoc.RemoteSpace{
 			CloudType:          space.CloudType,
 			Name:               space.Name,
 			ProviderId:         space.ProviderId,
 			ProviderAttributes: space.ProviderAttributes,
 		}
 	}
-	connections := make([]mongodoc.OfferConnection, len(offerDetails.Connections))
-	for i, connection := range offerDetails.Connections {
-		connections[i] = mongodoc.OfferConnection{
-			SourceModelTag: connection.SourceModelTag,
-			RelationId:     connection.RelationId,
-			Username:       connection.Username,
-			Endpoint:       connection.Endpoint,
-			IngressSubnets: connection.IngressSubnets,
-		}
-	}
-
-	return mongodoc.ApplicationOffer{
-		ModelUUID:              model.UUID,
-		ModelName:              string(model.Path.Name),
-		ControllerPath:         model.Controller,
-		OfferUUID:              offerDetails.OfferUUID,
-		OfferURL:               offerDetails.OfferURL,
-		OfferName:              offerDetails.OfferName,
-		OwnerName:              conv.ToUserTag(model.Path.User).Id(),
-		ApplicationName:        offerDetails.ApplicationName,
-		ApplicationDescription: offerDetails.ApplicationDescription,
-		Endpoints:              endpoints,
-		Spaces:                 spaces,
-		Bindings:               offerDetails.Bindings,
-		Users:                  users,
-		Connections:            connections,
-	}
+	return ss
 }
