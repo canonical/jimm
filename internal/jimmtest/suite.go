@@ -8,6 +8,7 @@ import (
 	"github.com/canonical/candid/candidtest"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/network"
@@ -135,8 +136,9 @@ type CandidSuite struct {
 	ControllerAdmins []string
 
 	// The following are created in SetUpTest
-	Candid        *candidtest.Server
-	Authenticator jimm.Authenticator
+	Candid          *candidtest.Server
+	CandidPublicKey string
+	Authenticator   jimm.Authenticator
 }
 
 func (s *CandidSuite) SetUpTest(c *gc.C) {
@@ -151,6 +153,12 @@ func (s *CandidSuite) SetUpTest(c *gc.C) {
 		}),
 		ControllerAdmins: s.ControllerAdmins,
 	}
+	tpi, err := httpbakery.ThirdPartyInfoForLocation(context.Background(), nil, s.Candid.URL.String())
+	c.Assert(err, gc.Equals, nil)
+	pk, err := tpi.PublicKey.MarshalText()
+	c.Assert(err, gc.Equals, nil)
+	s.CandidPublicKey = string(pk)
+
 }
 
 func (s *CandidSuite) TearDownTest(c *gc.C) {

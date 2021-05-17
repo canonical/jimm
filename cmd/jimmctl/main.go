@@ -24,6 +24,7 @@ func NewSuperCommand() *jujucmd.SuperCommand {
 		Doc:  jimmctlDoc,
 	})
 	jimmcmd.Register(cmd.NewListControllersCommand())
+	jimmcmd.Register(cmd.NewModelStatusCommand())
 	return jimmcmd
 }
 
