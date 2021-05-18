@@ -319,7 +319,7 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 	evs, err := client2.FindAuditEvents(&apiparams.FindAuditEventsRequest{})
 	c.Assert(err, gc.Equals, nil)
 
-	c.Check(evs, jc.DeepEquals, apiparams.AuditEvents{
+	expectedEvents := apiparams.AuditEvents{
 		Events: []apiparams.AuditEvent{{
 			Time:    evs.Events[0].Time,
 			Tag:     s.Model.Controller.Tag().String(),
@@ -396,7 +396,23 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			Success: true,
 			Params:  map[string]string{},
 		}},
+	}
+	c.Check(evs, jc.DeepEquals, expectedEvents)
+
+	// alice can grant bob access to audit log entries
+	err = client2.GrantAuditLogAccess(&apiparams.AuditLogAccessRequest{
+		UserTag: names.NewUserTag("bob@external").String(),
 	})
+	c.Assert(err, gc.Equals, nil)
+
+	// now bob can access audit events as well
+	conn3 := s.open(c, nil, "bob")
+	defer conn3.Close()
+	client3 := api.NewClient(conn3)
+
+	evs, err = client3.FindAuditEvents(&apiparams.FindAuditEventsRequest{})
+	c.Assert(err, gc.Equals, nil)
+	c.Check(evs, jc.DeepEquals, expectedEvents)
 }
 
 func (s *jimmSuite) TestFullModelStatus(c *gc.C) {
