@@ -278,7 +278,7 @@ func (j *JIMM) addAuditLogEntry(ale *dbmodel.AuditLogEntry) {
 func (j *JIMM) FindAuditEvents(ctx context.Context, user *dbmodel.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error) {
 	const op = errors.Op("jimm.FindAuditEvents")
 
-	if user.ControllerAccess != "superuser" {
+	if user.ControllerAccess != "superuser" && user.AuditLogAccess != "read" {
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 

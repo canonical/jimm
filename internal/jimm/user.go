@@ -6,6 +6,7 @@ import (
 	"context"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/names/v4"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
@@ -54,4 +55,62 @@ func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (
 		return tx.UpdateUser(ctx, &pu)
 	})
 	return u, nil
+}
+
+// GrantAuditLogAccess grants audit log access for the target user.
+func (j *JIMM) GrantAuditLogAccess(ctx context.Context, user *dbmodel.User, targetUserTag names.UserTag) error {
+	const op = errors.Op("jimm.GrantAuditLogAccess")
+
+	if user.ControllerAccess != "superuser" {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+	err := j.Database.Transaction(func(db *db.Database) error {
+
+		targetUser := dbmodel.User{}
+		targetUser.SetTag(targetUserTag)
+		err := j.Database.GetUser(ctx, &targetUser)
+		if err != nil {
+			return errors.E(err)
+		}
+		targetUser.AuditLogAccess = "read"
+		err = j.Database.UpdateUser(ctx, &targetUser)
+		if err != nil {
+			return errors.E(err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return errors.E(op, err)
+	}
+	return nil
+}
+
+// RevokeAuditLogAccess revokes audit log access for the target user.
+func (j *JIMM) RevokeAuditLogAccess(ctx context.Context, user *dbmodel.User, targetUserTag names.UserTag) error {
+	const op = errors.Op("jimm.RevokeAuditLogAccess")
+
+	if user.ControllerAccess != "superuser" {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+	err := j.Database.Transaction(func(db *db.Database) error {
+
+		targetUser := dbmodel.User{}
+		targetUser.SetTag(targetUserTag)
+		err := j.Database.GetUser(ctx, &targetUser)
+		if err != nil {
+			return errors.E(err)
+		}
+		targetUser.AuditLogAccess = ""
+		err = j.Database.UpdateUser(ctx, &targetUser)
+		if err != nil {
+			return errors.E(err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return errors.E(op, err)
+	}
+	return nil
 }

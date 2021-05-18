@@ -284,7 +284,16 @@ func (r *controllerRoot) GrantAuditLogAccess(ctx context.Context, req apiparams.
 	if r.user.ControllerAccess != "superuser" {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
-	// TODO(mhilton) actually grant access to the user.
+
+	ut, err := names.ParseUserTag(req.UserTag)
+	if err != nil {
+		return errors.E(op, errors.CodeBadRequest, "invalid user tag")
+	}
+
+	err = r.jimm.GrantAuditLogAccess(ctx, r.user, ut)
+	if err != nil {
+		return errors.E(op, err)
+	}
 	return nil
 }
 
@@ -301,7 +310,16 @@ func (r *controllerRoot) RevokeAuditLogAccess(ctx context.Context, req apiparams
 	if r.user.ControllerAccess != "superuser" {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
-	// TODO(mhilton) actually revoke access from the user.
+
+	ut, err := names.ParseUserTag(req.UserTag)
+	if err != nil {
+		return errors.E(op, errors.CodeBadRequest, "invalid user tag")
+	}
+
+	err = r.jimm.RevokeAuditLogAccess(ctx, r.user, ut)
+	if err != nil {
+		return errors.E(op, err)
+	}
 	return nil
 }
 
