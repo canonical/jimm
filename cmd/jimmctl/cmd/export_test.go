@@ -33,3 +33,27 @@ func NewModelStatusCommandForTesting(store jujuclient.ClientStore, bClient *http
 
 	return modelcmd.WrapBase(cmd)
 }
+
+func NewGrantAuditLogAccessCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+	cmd := &grantAuditLogAccessCommand{
+		store: store,
+		dialOpts: &jujuapi.DialOpts{
+			InsecureSkipVerify: true,
+			BakeryClient:       bClient,
+		},
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
+
+func NewRevokeAuditLogAccessCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+	cmd := &revokeAuditLogAccessCommand{
+		store: store,
+		dialOpts: &jujuapi.DialOpts{
+			InsecureSkipVerify: true,
+			BakeryClient:       bClient,
+		},
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
