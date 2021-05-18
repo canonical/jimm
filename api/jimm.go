@@ -34,7 +34,7 @@ func (c *Client) AddController(req *params.AddControllerRequest) (params.Control
 }
 
 // DisableControllerUUIDMasking disables UUID the masking of the real
-// controller UUID with JIMM's UUID in those response.
+// controller UUID with JIMM's UUID in responses.
 func (c *Client) DisableControllerUUIDMasking() error {
 	return c.caller.APICall("JIMM", 3, "", "DisableControllerUUIDMasking", nil, nil)
 }

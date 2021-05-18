@@ -33,3 +33,15 @@ func NewModelStatusCommandForTesting(store jujuclient.ClientStore, bClient *http
 
 	return modelcmd.WrapBase(cmd)
 }
+
+func NewDisableControllerUUIDMaskingCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+	cmd := &disableControllerUUIDMaskingCommand{
+		store: store,
+		dialOpts: &jujuapi.DialOpts{
+			InsecureSkipVerify: true,
+			BakeryClient:       bClient,
+		},
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
