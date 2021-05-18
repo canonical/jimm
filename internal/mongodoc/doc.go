@@ -555,11 +555,21 @@ type ApplicationOffer struct {
 
 // OfferConnection holds details about a connection to an offer.
 type OfferConnection struct {
-	SourceModelTag string   `bson:"source-model-tag"`
-	RelationId     int      `bson:"relation-id"`
-	Username       string   `bson:"username"`
-	Endpoint       string   `bson:"endpoint"`
-	IngressSubnets []string `bson:"ingress-subnets"`
+	SourceModelTag string                `bson:"source-model-tag"`
+	RelationId     int                   `bson:"relation-id"`
+	Username       string                `bson:"username"`
+	Endpoint       string                `bson:"endpoint"`
+	IngressSubnets []string              `bson:"ingress-subnets"`
+	Status         OfferConnectionStatus `bson:"status"`
+}
+
+// OfferConnectionStatus holds the status of an application
+// offer connection.
+type OfferConnectionStatus struct {
+	Status string
+	Info   string
+	Data   map[string]interface{}
+	Since  *time.Time
 }
 
 // RemoteSpace represents a space in some remote model.

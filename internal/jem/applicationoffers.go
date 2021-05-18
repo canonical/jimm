@@ -13,6 +13,7 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
 	"github.com/juju/charm/v8"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/core/status"
 	"github.com/juju/names/v4"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
@@ -378,6 +379,12 @@ func applicationOfferDocToDetails(id params.User, offerDoc *mongodoc.Application
 				Username:       connection.Username,
 				Endpoint:       connection.Endpoint,
 				IngressSubnets: connection.IngressSubnets,
+				Status: jujuparams.EntityStatus{
+					Status: status.Status(connection.Status.Status),
+					Info:   connection.Status.Info,
+					Data:   connection.Status.Data,
+					Since:  connection.Status.Since,
+				},
 			}
 		}
 	}
@@ -643,9 +650,19 @@ func offerConnectionsToMongodoc(connections []jujuparams.OfferConnection) []mong
 			Username:       connection.Username,
 			Endpoint:       connection.Endpoint,
 			IngressSubnets: connection.IngressSubnets,
+			Status:         offerConnectionStatusToMongodoc(connection.Status),
 		}
 	}
 	return conns
+}
+
+func offerConnectionStatusToMongodoc(status jujuparams.EntityStatus) mongodoc.OfferConnectionStatus {
+	return mongodoc.OfferConnectionStatus{
+		Status: status.Status.String(),
+		Info:   status.Info,
+		Data:   status.Data,
+		Since:  status.Since,
+	}
 }
 
 func offerEndpointsToMongodoc(endpoints []jujuparams.RemoteEndpoint) []mongodoc.RemoteEndpoint {

@@ -4,6 +4,7 @@ package jem_test
 
 import (
 	"context"
+	"time"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
@@ -537,6 +538,7 @@ func (s *applicationoffersSuite) TestFindApplicationOffers(c *gc.C) {
 
 func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
 	ctx := context.Background()
+	now := time.Now().Truncate(time.Millisecond)
 
 	err := s.JEM.Offer(ctx, jemtest.Bob, jujuparams.AddApplicationOffer{
 		ModelTag:        names.NewModelTag(s.Model.UUID).String(),
@@ -569,6 +571,27 @@ func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
 	err = s.JEM.DB.GetApplicationOffer(ctx, &offer2)
 	c.Assert(err, jc.ErrorIsNil)
 	err = s.JEM.DB.UpdateApplicationOffer(ctx, &offer2, new(jimmdb.Update).Set("users."+identchecker.Everyone, mongodoc.ApplicationOfferNoAccess), true)
+	c.Assert(err, jc.ErrorIsNil)
+
+	offer1.Connections = []mongodoc.OfferConnection{{
+		SourceModelTag: "source-test-tag",
+		RelationId:     1,
+		Username:       "test-username",
+		Endpoint:       "test-endpoint",
+		IngressSubnets: []string{"test-subnet1", "test-subnet2"},
+		Status: mongodoc.OfferConnectionStatus{
+			Status: "connected",
+			Info:   "this is just a test",
+			Data: map[string]interface{}{
+				"key1": 42.42,
+				"key2": "test",
+			},
+			Since: &now,
+		},
+	}}
+	u := new(jimmdb.Update).Set("connections", offer1.Connections)
+
+	err = s.JEM.DB.UpdateApplicationOffer(ctx, &offer1, u, true)
 	c.Assert(err, jc.ErrorIsNil)
 
 	// "unknown-user" does not have access to offer2
@@ -604,7 +627,7 @@ func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
 		Connections:     []jujuparams.OfferConnection{},
 	})
 
-	// "bpb" is admin and will see addition details of offer1
+	// "bob" is admin and will see addition details of offer1
 	offerDetails, err = s.JEM.GetApplicationOffer(ctx, jemtest.Bob, offer1.OfferURL)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(offerDetails, jc.DeepEquals, &jujuparams.ApplicationOfferAdminDetails{
@@ -634,7 +657,22 @@ func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
 		},
 		ApplicationName: offer1.ApplicationName,
 		CharmURL:        offer1.CharmURL,
-		Connections:     []jujuparams.OfferConnection{},
+		Connections: []jujuparams.OfferConnection{{
+			SourceModelTag: "source-test-tag",
+			RelationId:     1,
+			Username:       "test-username",
+			Endpoint:       "test-endpoint",
+			Status: jujuparams.EntityStatus{
+				Status: "connected",
+				Info:   "this is just a test",
+				Data: map[string]interface{}{
+					"key1": 42.42,
+					"key2": "test",
+				},
+				Since: &now,
+			},
+			IngressSubnets: []string{"test-subnet1", "test-subnet2"},
+		}},
 	})
 
 	// bob is admin but still cannot get application offers that do not exist

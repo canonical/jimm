@@ -10,4 +10,5 @@ var (
 	CredentialsRemoveController = (*JEM).credentialsRemoveController
 	SetCredentialUpdates        = (*JEM).setCredentialUpdates
 	UpdateControllerCredential  = (*JEM).updateControllerCredential
+	OfferConnectionsToMongodoc  = offerConnectionsToMongodoc
 )
