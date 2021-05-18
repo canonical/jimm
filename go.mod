@@ -14,6 +14,7 @@ require (
 	github.com/google/go-cmp v0.5.4
 	github.com/google/uuid v1.1.2
 	github.com/gorilla/websocket v1.4.2
+	github.com/gosuri/uitable v0.0.1
 	github.com/hashicorp/vault/api v1.1.0
 	github.com/jackc/pgconn v1.7.0
 	github.com/jackc/pgx/v4 v4.9.0
