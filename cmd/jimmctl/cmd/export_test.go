@@ -60,7 +60,18 @@ func NewRevokeAuditLogAccessCommandForTesting(store jujuclient.ClientStore, bCli
 
 func NewListAuditEventsCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
 	cmd := &listAuditEventsCommand{
+		store: store,
+		dialOpts: &jujuapi.DialOpts{
+			InsecureSkipVerify: true,
+			BakeryClient:       bClient,
+		},
+	}
 
+	return modelcmd.WrapBase(cmd)
+}
+
+func NewAddControllerCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+	cmd := &addControllerCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,

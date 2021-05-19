@@ -28,6 +28,7 @@ func NewSuperCommand() *jujucmd.SuperCommand {
 	jimmcmd.Register(cmd.NewRevokeAuditLogAccessCommand())
 	jimmcmd.Register(cmd.NewGrantAuditLogAccessCommand())
 	jimmcmd.Register(cmd.NewListAuditEventsCommand())
+	jimmcmd.Register(cmd.NewAddControllerCommand())
 	return jimmcmd
 }
 
