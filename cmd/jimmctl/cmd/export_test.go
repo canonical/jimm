@@ -93,3 +93,11 @@ func NewRemoveControllerCommandForTesting(store jujuclient.ClientStore, bClient 
 
 	return modelcmd.WrapBase(cmd)
 }
+
+func NewControllerInfoCommandForTesting(store jujuclient.ClientStore) cmd.Command {
+	cmd := &controllerInfoCommand{
+		store: store,
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
