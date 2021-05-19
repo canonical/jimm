@@ -23,12 +23,13 @@ func NewSuperCommand() *jujucmd.SuperCommand {
 		Name: "jimmctl",
 		Doc:  jimmctlDoc,
 	})
-	jimmcmd.Register(cmd.NewListControllersCommand())
-	jimmcmd.Register(cmd.NewModelStatusCommand())
-	jimmcmd.Register(cmd.NewRevokeAuditLogAccessCommand())
+	jimmcmd.Register(cmd.NewAddControllerCommand())
 	jimmcmd.Register(cmd.NewGrantAuditLogAccessCommand())
 	jimmcmd.Register(cmd.NewListAuditEventsCommand())
-	jimmcmd.Register(cmd.NewAddControllerCommand())
+	jimmcmd.Register(cmd.NewListControllersCommand())
+	jimmcmd.Register(cmd.NewModelStatusCommand())
+	jimmcmd.Register(cmd.NewRemoveControllerCommand())
+	jimmcmd.Register(cmd.NewRevokeAuditLogAccessCommand())
 	return jimmcmd
 }
 
