@@ -81,3 +81,15 @@ func NewAddControllerCommandForTesting(store jujuclient.ClientStore, bClient *ht
 
 	return modelcmd.WrapBase(cmd)
 }
+
+func NewRemoveControllerCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+	cmd := &removeControllerCommand{
+		store: store,
+		dialOpts: &jujuapi.DialOpts{
+			InsecureSkipVerify: true,
+			BakeryClient:       bClient,
+		},
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
