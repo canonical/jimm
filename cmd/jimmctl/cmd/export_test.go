@@ -101,3 +101,15 @@ func NewControllerInfoCommandForTesting(store jujuclient.ClientStore) cmd.Comman
 
 	return modelcmd.WrapBase(cmd)
 }
+
+func NewSetControllerDeprecatedCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+	cmd := &setControllerDeprecatedCommand{
+		store: store,
+		dialOpts: &jujuapi.DialOpts{
+			InsecureSkipVerify: true,
+			BakeryClient:       bClient,
+		},
+	}
+
+	return modelcmd.WrapBase(cmd)
+}

@@ -30,6 +30,7 @@ func NewSuperCommand() *jujucmd.SuperCommand {
 	jimmcmd.Register(cmd.NewModelStatusCommand())
 	jimmcmd.Register(cmd.NewRemoveControllerCommand())
 	jimmcmd.Register(cmd.NewRevokeAuditLogAccessCommand())
+	jimmcmd.Register(cmd.NewSetControllerDeprecatedCommand())
 	return jimmcmd
 }
 
