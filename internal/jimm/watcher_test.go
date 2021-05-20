@@ -136,7 +136,7 @@ models:
 var watcherTests = []struct {
 	name    string
 	deltas  [][]jujuparams.Delta
-	checkDB func(*qt.C, db.Database)
+	checkDB func(*qt.C, db.Database) bool
 }{{
 	name: "AddMachine",
 	deltas: [][]jujuparams.Delta{{{
@@ -155,7 +155,7 @@ var watcherTests = []struct {
 			Life: "alive",
 		},
 	}}},
-	checkDB: func(c *qt.C, db db.Database) {
+	checkDB: func(c *qt.C, db db.Database) bool {
 		ctx := context.Background()
 
 		model := dbmodel.Model{
@@ -173,7 +173,7 @@ var watcherTests = []struct {
 		}
 		err = db.GetMachine(ctx, &m)
 		c.Assert(err, qt.IsNil)
-		c.Check(m, jimmtest.DBObjectEquals, dbmodel.Machine{
+		return c.Check(m, jimmtest.DBObjectEquals, dbmodel.Machine{
 			ModelID:    model.ID,
 			MachineID:  "2",
 			InstanceID: "machine-2",
@@ -206,7 +206,7 @@ var watcherTests = []struct {
 			Life: "alive",
 		},
 	}}},
-	checkDB: func(c *qt.C, db db.Database) {
+	checkDB: func(c *qt.C, db db.Database) bool {
 		ctx := context.Background()
 
 		model := dbmodel.Model{
@@ -224,7 +224,7 @@ var watcherTests = []struct {
 		}
 		err = db.GetMachine(ctx, &m)
 		c.Assert(err, qt.IsNil)
-		c.Check(m, jimmtest.DBObjectEquals, dbmodel.Machine{
+		return c.Check(m, jimmtest.DBObjectEquals, dbmodel.Machine{
 			ModelID:   model.ID,
 			MachineID: "0",
 			Hardware: dbmodel.Hardware{
@@ -267,7 +267,7 @@ var watcherTests = []struct {
 			Id:        "0",
 		},
 	}}},
-	checkDB: func(c *qt.C, db db.Database) {
+	checkDB: func(c *qt.C, db db.Database) bool {
 		ctx := context.Background()
 
 		model := dbmodel.Model{
@@ -284,8 +284,11 @@ var watcherTests = []struct {
 			MachineID: "0",
 		}
 		err = db.GetMachine(ctx, &m)
-		c.Check(err, qt.ErrorMatches, `machine not found`)
-		c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+		success := c.Check(err, qt.ErrorMatches, `machine not found`)
+		if !success {
+			return success
+		}
+		return c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 	},
 }, {
 	name: "AddApplication",
@@ -299,7 +302,7 @@ var watcherTests = []struct {
 			Config:    map[string]interface{}{"a": "B"},
 		},
 	}}},
-	checkDB: func(c *qt.C, db db.Database) {
+	checkDB: func(c *qt.C, db db.Database) bool {
 		ctx := context.Background()
 
 		model := dbmodel.Model{
@@ -317,7 +320,7 @@ var watcherTests = []struct {
 		}
 		err = db.GetApplication(ctx, &app)
 		c.Assert(err, qt.IsNil)
-		c.Check(app, jimmtest.DBObjectEquals, dbmodel.Application{
+		return c.Check(app, jimmtest.DBObjectEquals, dbmodel.Application{
 			ModelID:  model.ID,
 			Name:     "app-3",
 			CharmURL: "ch:app-3",
@@ -339,7 +342,7 @@ var watcherTests = []struct {
 			WorkloadVersion: "2",
 		},
 	}}},
-	checkDB: func(c *qt.C, db db.Database) {
+	checkDB: func(c *qt.C, db db.Database) bool {
 		ctx := context.Background()
 
 		model := dbmodel.Model{
@@ -357,7 +360,7 @@ var watcherTests = []struct {
 		}
 		err = db.GetApplication(ctx, &app)
 		c.Assert(err, qt.IsNil)
-		c.Check(app, jimmtest.DBObjectEquals, dbmodel.Application{
+		return c.Check(app, jimmtest.DBObjectEquals, dbmodel.Application{
 			ModelID:         model.ID,
 			Name:            "app-1",
 			Exposed:         true,
@@ -376,7 +379,7 @@ var watcherTests = []struct {
 			Name:      "app-1",
 		},
 	}}},
-	checkDB: func(c *qt.C, db db.Database) {
+	checkDB: func(c *qt.C, db db.Database) bool {
 		ctx := context.Background()
 
 		model := dbmodel.Model{
@@ -393,8 +396,11 @@ var watcherTests = []struct {
 			Name:    "app-1",
 		}
 		err = db.GetApplication(ctx, &app)
-		c.Check(err, qt.ErrorMatches, `application not found`)
-		c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+		success := c.Check(err, qt.ErrorMatches, `application not found`)
+		if !success {
+			return success
+		}
+		return c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 	},
 }, {
 	name: "AddUnit",
@@ -409,7 +415,7 @@ var watcherTests = []struct {
 			MachineId:   "0",
 		},
 	}}},
-	checkDB: func(c *qt.C, db db.Database) {
+	checkDB: func(c *qt.C, db db.Database) bool {
 		ctx := context.Background()
 
 		model := dbmodel.Model{
@@ -427,7 +433,7 @@ var watcherTests = []struct {
 		}
 		err = db.GetUnit(ctx, &u)
 		c.Assert(err, qt.IsNil)
-		c.Check(u, jimmtest.DBObjectEquals, dbmodel.Unit{
+		return c.Check(u, jimmtest.DBObjectEquals, dbmodel.Unit{
 			ModelID:         model.ID,
 			Name:            "app-1/2",
 			ApplicationName: "app-1",
@@ -448,7 +454,7 @@ var watcherTests = []struct {
 			MachineId:   "0",
 		},
 	}}},
-	checkDB: func(c *qt.C, db db.Database) {
+	checkDB: func(c *qt.C, db db.Database) bool {
 		ctx := context.Background()
 
 		model := dbmodel.Model{
@@ -466,7 +472,7 @@ var watcherTests = []struct {
 		}
 		err = db.GetUnit(ctx, &u)
 		c.Assert(err, qt.IsNil)
-		c.Check(u, jimmtest.DBObjectEquals, dbmodel.Unit{
+		return c.Check(u, jimmtest.DBObjectEquals, dbmodel.Unit{
 			ModelID:         model.ID,
 			Name:            "app-1/0",
 			ApplicationName: "app-1",
@@ -483,7 +489,7 @@ var watcherTests = []struct {
 			Name:      "app-1/0",
 		},
 	}}},
-	checkDB: func(c *qt.C, db db.Database) {
+	checkDB: func(c *qt.C, db db.Database) bool {
 		ctx := context.Background()
 
 		model := dbmodel.Model{
@@ -500,8 +506,11 @@ var watcherTests = []struct {
 			Name:    "app-1/0",
 		}
 		err = db.GetUnit(ctx, &u)
-		c.Check(err, qt.ErrorMatches, `unit not found`)
-		c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+		success := c.Check(err, qt.ErrorMatches, `unit not found`)
+		if !success {
+			return success
+		}
+		return c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 	},
 }, {
 	name: "UnknownModelsIgnored",
@@ -513,7 +522,7 @@ var watcherTests = []struct {
 			Life:      "starting",
 		},
 	}}},
-	checkDB: func(c *qt.C, db db.Database) {
+	checkDB: func(c *qt.C, db db.Database) bool {
 		ctx := context.Background()
 
 		model := dbmodel.Model{
@@ -523,8 +532,11 @@ var watcherTests = []struct {
 			},
 		}
 		err := db.GetModel(ctx, &model)
-		c.Check(err, qt.ErrorMatches, `record not found`)
-		c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+		success := c.Check(err, qt.ErrorMatches, `record not found`)
+		if !success {
+			return success
+		}
+		return c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 	},
 }, {
 	name: "UpdateModel",
@@ -546,7 +558,7 @@ var watcherTests = []struct {
 			},
 		},
 	}}},
-	checkDB: func(c *qt.C, db db.Database) {
+	checkDB: func(c *qt.C, db db.Database) bool {
 		ctx := context.Background()
 
 		model := dbmodel.Model{
@@ -566,7 +578,7 @@ var watcherTests = []struct {
 		model.Applications = nil
 		model.Machines = nil
 		model.Users = nil
-		c.Check(model, jimmtest.DBObjectEquals, dbmodel.Model{
+		return c.Check(model, jimmtest.DBObjectEquals, dbmodel.Model{
 			UUID: sql.NullString{
 				String: "00000002-0000-0000-0000-000000000001",
 				Valid:  true,
@@ -594,7 +606,7 @@ var watcherTests = []struct {
 			ModelUUID: "00000002-0000-0000-0000-000000000002",
 		},
 	}}},
-	checkDB: func(c *qt.C, db db.Database) {
+	checkDB: func(c *qt.C, db db.Database) bool {
 		ctx := context.Background()
 
 		model := dbmodel.Model{
@@ -604,8 +616,11 @@ var watcherTests = []struct {
 			},
 		}
 		err := db.GetModel(ctx, &model)
-		c.Check(err, qt.ErrorMatches, `record not found`)
-		c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+		success := c.Check(err, qt.ErrorMatches, `record not found`)
+		if !success {
+			return success
+		}
+		return c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 	},
 }, {
 	name: "DeleteLivingModelFails",
@@ -615,7 +630,7 @@ var watcherTests = []struct {
 			ModelUUID: "00000002-0000-0000-0000-000000000001",
 		},
 	}}},
-	checkDB: func(c *qt.C, db db.Database) {
+	checkDB: func(c *qt.C, db db.Database) bool {
 		ctx := context.Background()
 
 		model := dbmodel.Model{
@@ -635,7 +650,7 @@ var watcherTests = []struct {
 		model.Applications = nil
 		model.Machines = nil
 		model.Users = nil
-		c.Check(model, jimmtest.DBObjectEquals, dbmodel.Model{
+		return c.Check(model, jimmtest.DBObjectEquals, dbmodel.Model{
 			UUID: sql.NullString{
 				String: "00000002-0000-0000-0000-000000000001",
 				Valid:  true,
@@ -732,7 +747,10 @@ func TestWatcher(t *testing.T) {
 			close(nextC)
 			wg.Wait()
 
-			test.checkDB(c, w.Database)
+			err = retryCheck(func() bool {
+				return test.checkDB(c, w.Database)
+			}, 10, 5*time.Millisecond)
+			c.Assert(err, qt.Equals, nil)
 		})
 	}
 }
@@ -764,14 +782,21 @@ func TestWatcherSetsControllerUnavailable(t *testing.T) {
 		c.Check(err, qt.ErrorMatches, `context canceled`, qt.Commentf("unexpected error %s (%#v)", err, err))
 	}()
 
-	<-time.After(5 * time.Millisecond)
+	now := time.Now().Add(-10 * time.Millisecond)
 	ctl := dbmodel.Controller{
 		Name: "controller-1",
 	}
-	err = w.Database.GetController(ctx, &ctl)
-	c.Assert(err, qt.IsNil)
-	c.Check(ctl.UnavailableSince.Valid, qt.Equals, true)
-	c.Check(ctl.UnavailableSince.Time.After(time.Now().Add(-10*time.Millisecond)), qt.Equals, true)
+	err = retryCheck(func() bool {
+		err := w.Database.GetController(ctx, &ctl)
+		c.Assert(err, qt.Equals, nil)
+		success := c.Check(ctl.UnavailableSince.Valid, qt.Equals, true)
+		if !success {
+			return success
+		}
+		return c.Check(ctl.UnavailableSince.Time.After(now), qt.Equals, true)
+	}, 10, 20*time.Millisecond)
+	c.Assert(err, qt.Equals, nil)
+
 	cancel()
 	wg.Wait()
 }
@@ -963,4 +988,16 @@ func TestWatcherIgnoreDeltasForModelsFromIncorrectController(t *testing.T) {
 	err = w.Database.GetModel(context.Background(), &m2)
 	c.Assert(err, qt.IsNil)
 	c.Check(m2, qt.DeepEquals, m1)
+}
+
+func retryCheck(check func() bool, n int, delay time.Duration) error {
+	var success bool
+	for i := 0; i < n; i++ {
+		time.Sleep(delay)
+		success = check()
+		if success {
+			return nil
+		}
+	}
+	return errors.E("timed out")
 }
