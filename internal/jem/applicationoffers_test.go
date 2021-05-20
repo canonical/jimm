@@ -4,7 +4,6 @@ package jem_test
 
 import (
 	"context"
-	"time"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
@@ -131,9 +130,8 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 				Interface: "http",
 			}},
 			Users: []jujuparams.OfferUserDetails{{
-				UserName:    "charlie@external",
-				DisplayName: "",
-				Access:      "consume",
+				UserName: "charlie@external",
+				Access:   "consume",
 			}},
 		},
 		ControllerInfo: &jujuparams.ExternalControllerInfo{
@@ -168,18 +166,12 @@ func (s *applicationoffersSuite) TestListApplicationOffers(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	offer1 := mongodoc.ApplicationOffer{
-		OfferURL: conv.ToOfferURL(s.Model.Path, "test-offer1"),
-	}
-	offer2 := mongodoc.ApplicationOffer{
-		OfferURL: conv.ToOfferURL(s.Model.Path, "test-offer2"),
-	}
-	err = s.JEM.DB.GetApplicationOffer(ctx, &offer1)
+	offer1, err := s.JEM.GetApplicationOffer(ctx, jemtest.Bob, conv.ToOfferURL(s.Model.Path, "test-offer1"))
 	c.Assert(err, jc.ErrorIsNil)
-	err = s.JEM.DB.GetApplicationOffer(ctx, &offer2)
+	offer2, err := s.JEM.GetApplicationOffer(ctx, jemtest.Bob, conv.ToOfferURL(s.Model.Path, "test-offer2"))
 	c.Assert(err, jc.ErrorIsNil)
 
-	err = s.JEM.DB.UpdateApplicationOffer(ctx, &offer1, new(jimmdb.Update).Set("users.charlie", mongodoc.ApplicationOfferReadAccess), true)
+	err = s.JEM.GrantOfferAccess(ctx, jemtest.Bob, params.User("charlie"), offer1.OfferURL, jujuparams.OfferReadAccess)
 	c.Assert(err, jc.ErrorIsNil)
 
 	results, err := s.JEM.ListApplicationOffers(ctx, jemtest.NewIdentity("unknown-user"), jujuparams.OfferFilter{
@@ -211,25 +203,22 @@ func (s *applicationoffersSuite) TestListApplicationOffers(c *gc.C) {
 				Interface: "http",
 				Limit:     0,
 			}},
-			Spaces:   []jujuparams.RemoteSpace{},
-			Bindings: offer1.Bindings,
+			Spaces:   nil,
+			Bindings: nil,
 			Users: []jujuparams.OfferUserDetails{{
-				UserName:    "bob@external",
-				DisplayName: "bob",
-				Access:      "admin",
+				UserName: "bob@external",
+				Access:   "admin",
 			}, {
-				UserName:    "charlie@external",
-				DisplayName: "charlie",
-				Access:      "read",
+				UserName: "charlie@external",
+				Access:   "read",
 			}, {
-				UserName:    "everyone@external",
-				DisplayName: "everyone",
-				Access:      "read",
+				UserName: "everyone@external",
+				Access:   "read",
 			}},
 		},
 		ApplicationName: offer1.ApplicationName,
 		CharmURL:        offer1.CharmURL,
-		Connections:     []jujuparams.OfferConnection{},
+		Connections:     nil,
 	}, {
 		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
 			SourceModelTag:         names.NewModelTag(s.Model.UUID).String(),
@@ -243,21 +232,19 @@ func (s *applicationoffersSuite) TestListApplicationOffers(c *gc.C) {
 				Interface: "http",
 				Limit:     0,
 			}},
-			Spaces:   []jujuparams.RemoteSpace{},
-			Bindings: offer2.Bindings,
+			Spaces:   nil,
+			Bindings: nil,
 			Users: []jujuparams.OfferUserDetails{{
-				UserName:    "bob@external",
-				DisplayName: "bob",
-				Access:      "admin",
+				UserName: "bob@external",
+				Access:   "admin",
 			}, {
-				UserName:    "everyone@external",
-				DisplayName: "everyone",
-				Access:      "read",
+				UserName: "everyone@external",
+				Access:   "read",
 			}},
 		},
 		ApplicationName: offer2.ApplicationName,
 		CharmURL:        offer2.CharmURL,
-		Connections:     []jujuparams.OfferConnection{},
+		Connections:     nil,
 	},
 	})
 
@@ -413,21 +400,15 @@ func (s *applicationoffersSuite) TestFindApplicationOffers(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	offer1 := mongodoc.ApplicationOffer{
-		OfferURL: conv.ToOfferURL(s.Model.Path, "test-offer1"),
-	}
-	offer2 := mongodoc.ApplicationOffer{
-		OfferURL: conv.ToOfferURL(s.Model.Path, "test-offer2"),
-	}
-	err = s.JEM.DB.GetApplicationOffer(ctx, &offer1)
+	offer1, err := s.JEM.GetApplicationOffer(ctx, jemtest.Bob, conv.ToOfferURL(s.Model.Path, "test-offer1"))
 	c.Assert(err, jc.ErrorIsNil)
-	err = s.JEM.DB.GetApplicationOffer(ctx, &offer2)
+	offer2, err := s.JEM.GetApplicationOffer(ctx, jemtest.Bob, conv.ToOfferURL(s.Model.Path, "test-offer2"))
 	c.Assert(err, jc.ErrorIsNil)
 
-	err = s.JEM.DB.UpdateApplicationOffer(ctx, &offer1, new(jimmdb.Update).Set("users.charlie", mongodoc.ApplicationOfferReadAccess), true)
+	err = s.JEM.GrantOfferAccess(ctx, jemtest.Bob, params.User("charlie"), offer1.OfferURL, jujuparams.OfferReadAccess)
 	c.Assert(err, jc.ErrorIsNil)
 
-	err = s.JEM.DB.UpdateApplicationOffer(ctx, &offer2, new(jimmdb.Update).Set("users."+identchecker.Everyone, mongodoc.ApplicationOfferNoAccess), true)
+	err = s.JEM.RevokeOfferAccess(ctx, jemtest.Bob, params.User(identchecker.Everyone), offer2.OfferURL, jujuparams.OfferReadAccess)
 	c.Assert(err, jc.ErrorIsNil)
 
 	results, err := s.JEM.FindApplicationOffers(ctx, jemtest.NewIdentity("unknown-user"), jujuparams.OfferFilter{
@@ -454,15 +435,13 @@ func (s *applicationoffersSuite) TestFindApplicationOffers(c *gc.C) {
 				Limit:     0,
 			}},
 			Spaces:   []jujuparams.RemoteSpace{},
-			Bindings: offer1.Bindings,
+			Bindings: nil,
 			Users: []jujuparams.OfferUserDetails{{
-				UserName:    "charlie@external",
-				DisplayName: "charlie",
-				Access:      "read",
+				UserName: "charlie@external",
+				Access:   "read",
 			}, {
-				UserName:    "everyone@external",
-				DisplayName: "everyone",
-				Access:      "read",
+				UserName: "everyone@external",
+				Access:   "read",
 			}},
 		},
 		ApplicationName: offer1.ApplicationName,
@@ -488,19 +467,16 @@ func (s *applicationoffersSuite) TestFindApplicationOffers(c *gc.C) {
 				Limit:     0,
 			}},
 			Spaces:   []jujuparams.RemoteSpace{},
-			Bindings: offer1.Bindings,
+			Bindings: nil,
 			Users: []jujuparams.OfferUserDetails{{
-				UserName:    "bob@external",
-				DisplayName: "bob",
-				Access:      "admin",
+				UserName: "bob@external",
+				Access:   "admin",
 			}, {
-				UserName:    "charlie@external",
-				DisplayName: "charlie",
-				Access:      "read",
+				UserName: "charlie@external",
+				Access:   "read",
 			}, {
-				UserName:    "everyone@external",
-				DisplayName: "everyone",
-				Access:      "read",
+				UserName: "everyone@external",
+				Access:   "read",
 			}},
 		},
 		ApplicationName: offer1.ApplicationName,
@@ -520,14 +496,10 @@ func (s *applicationoffersSuite) TestFindApplicationOffers(c *gc.C) {
 				Limit:     0,
 			}},
 			Spaces:   []jujuparams.RemoteSpace{},
-			Bindings: offer2.Bindings,
+			Bindings: nil,
 			Users: []jujuparams.OfferUserDetails{{
-				UserName:    "bob@external",
-				DisplayName: "bob",
-				Access:      "admin",
-			}, {
-				UserName:    "everyone@external",
-				DisplayName: "everyone",
+				UserName: "bob@external",
+				Access:   "admin",
 			}},
 		},
 		ApplicationName: offer2.ApplicationName,
@@ -538,7 +510,6 @@ func (s *applicationoffersSuite) TestFindApplicationOffers(c *gc.C) {
 
 func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
 	ctx := context.Background()
-	now := time.Now().Truncate(time.Millisecond)
 
 	err := s.JEM.Offer(ctx, jemtest.Bob, jujuparams.AddApplicationOffer{
 		ModelTag:        names.NewModelTag(s.Model.UUID).String(),
@@ -560,38 +531,12 @@ func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	offer1 := mongodoc.ApplicationOffer{
-		OfferURL: conv.ToOfferURL(s.Model.Path, "test-offer1"),
-	}
-	offer2 := mongodoc.ApplicationOffer{
-		OfferURL: conv.ToOfferURL(s.Model.Path, "test-offer2"),
-	}
-	err = s.JEM.DB.GetApplicationOffer(ctx, &offer1)
+	offer1, err := s.JEM.GetApplicationOffer(ctx, jemtest.Bob, conv.ToOfferURL(s.Model.Path, "test-offer1"))
 	c.Assert(err, jc.ErrorIsNil)
-	err = s.JEM.DB.GetApplicationOffer(ctx, &offer2)
-	c.Assert(err, jc.ErrorIsNil)
-	err = s.JEM.DB.UpdateApplicationOffer(ctx, &offer2, new(jimmdb.Update).Set("users."+identchecker.Everyone, mongodoc.ApplicationOfferNoAccess), true)
+	offer2, err := s.JEM.GetApplicationOffer(ctx, jemtest.Bob, conv.ToOfferURL(s.Model.Path, "test-offer2"))
 	c.Assert(err, jc.ErrorIsNil)
 
-	offer1.Connections = []mongodoc.OfferConnection{{
-		SourceModelTag: "source-test-tag",
-		RelationId:     1,
-		Username:       "test-username",
-		Endpoint:       "test-endpoint",
-		IngressSubnets: []string{"test-subnet1", "test-subnet2"},
-		Status: mongodoc.OfferConnectionStatus{
-			Status: "connected",
-			Info:   "this is just a test",
-			Data: map[string]interface{}{
-				"key1": 42.42,
-				"key2": "test",
-			},
-			Since: &now,
-		},
-	}}
-	u := new(jimmdb.Update).Set("connections", offer1.Connections)
-
-	err = s.JEM.DB.UpdateApplicationOffer(ctx, &offer1, u, true)
+	err = s.JEM.RevokeOfferAccess(ctx, jemtest.Bob, params.User(identchecker.Everyone), offer2.OfferURL, jujuparams.OfferReadAccess)
 	c.Assert(err, jc.ErrorIsNil)
 
 	// "unknown-user" does not have access to offer2
@@ -615,11 +560,10 @@ func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
 				Limit:     0,
 			}},
 			Spaces:   []jujuparams.RemoteSpace{},
-			Bindings: offer1.Bindings,
+			Bindings: nil,
 			Users: []jujuparams.OfferUserDetails{{
-				UserName:    "everyone@external",
-				DisplayName: "everyone",
-				Access:      "read",
+				UserName: "everyone@external",
+				Access:   "read",
 			}},
 		},
 		ApplicationName: offer1.ApplicationName,
@@ -644,35 +588,17 @@ func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
 				Limit:     0,
 			}},
 			Spaces:   []jujuparams.RemoteSpace{},
-			Bindings: offer1.Bindings,
+			Bindings: nil,
 			Users: []jujuparams.OfferUserDetails{{
-				UserName:    "bob@external",
-				DisplayName: "bob",
-				Access:      "admin",
+				UserName: "bob@external",
+				Access:   "admin",
 			}, {
-				UserName:    "everyone@external",
-				DisplayName: "everyone",
-				Access:      "read",
+				UserName: "everyone@external",
+				Access:   "read",
 			}},
 		},
 		ApplicationName: offer1.ApplicationName,
 		CharmURL:        offer1.CharmURL,
-		Connections: []jujuparams.OfferConnection{{
-			SourceModelTag: "source-test-tag",
-			RelationId:     1,
-			Username:       "test-username",
-			Endpoint:       "test-endpoint",
-			Status: jujuparams.EntityStatus{
-				Status: "connected",
-				Info:   "this is just a test",
-				Data: map[string]interface{}{
-					"key1": 42.42,
-					"key2": "test",
-				},
-				Since: &now,
-			},
-			IngressSubnets: []string{"test-subnet1", "test-subnet2"},
-		}},
 	})
 
 	// bob is admin but still cannot get application offers that do not exist
