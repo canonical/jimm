@@ -202,6 +202,13 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 	// without filters
 	offers, err := client.ListOffers()
 	c.Assert(err, gc.Equals, nil)
+	c.Assert(offers, gc.HasLen, 2)
+	c.Assert(offers[0], gc.Not(gc.IsNil))
+	c.Assert(offers[0].CharmURL, gc.Matches, `cs:quantal/wordpress-\d+`)
+	offers[0].CharmURL = ""
+	c.Assert(offers[1], gc.Not(gc.IsNil))
+	c.Assert(offers[1].CharmURL, gc.Matches, `cs:quantal/wordpress-\d+`)
+	offers[1].CharmURL = ""
 	c.Assert(offers, jc.DeepEquals, []*crossmodel.ApplicationOfferDetails{{
 		OfferName:              "test-offer1",
 		ApplicationName:        "test-app",
@@ -213,13 +220,11 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 			Interface: "http",
 		}},
 		Users: []crossmodel.OfferUserDetails{{
-			UserName:    "bob@external",
-			DisplayName: "bob",
-			Access:      "admin",
+			UserName: "bob@external",
+			Access:   "admin",
 		}, {
-			UserName:    "everyone@external",
-			DisplayName: "everyone",
-			Access:      "read",
+			UserName: "everyone@external",
+			Access:   "read",
 		}},
 	}, {
 		OfferName:              "test-offer2",
@@ -232,13 +237,11 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 			Interface: "http",
 		}},
 		Users: []crossmodel.OfferUserDetails{{
-			UserName:    "bob@external",
-			DisplayName: "bob",
-			Access:      "admin",
+			UserName: "bob@external",
+			Access:   "admin",
 		}, {
-			UserName:    "everyone@external",
-			DisplayName: "everyone",
-			Access:      "read",
+			UserName: "everyone@external",
+			Access:   "read",
 		}},
 	}})
 
@@ -248,6 +251,10 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 		OfferName:       "test-offer1",
 	})
 	c.Assert(err, gc.Equals, nil)
+	c.Assert(offers, gc.HasLen, 1)
+	c.Assert(offers[0], gc.Not(gc.IsNil))
+	c.Assert(offers[0].CharmURL, gc.Matches, `cs:quantal/wordpress-\d+`)
+	offers[0].CharmURL = ""
 	c.Assert(offers, jc.DeepEquals, []*crossmodel.ApplicationOfferDetails{{
 		OfferName:              "test-offer1",
 		ApplicationName:        "test-app",
@@ -259,13 +266,11 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 			Interface: "http",
 		}},
 		Users: []crossmodel.OfferUserDetails{{
-			UserName:    "bob@external",
-			DisplayName: "bob",
-			Access:      "admin",
+			UserName: "bob@external",
+			Access:   "admin",
 		}, {
-			UserName:    "everyone@external",
-			DisplayName: "everyone",
-			Access:      "read",
+			UserName: "everyone@external",
+			Access:   "read",
 		}},
 	}})
 }
@@ -407,6 +412,10 @@ func (s *applicationOffersSuite) TestFindApplicationOffers(c *gc.C) {
 		OfferName:       "test-offer1",
 	})
 	c.Assert(err, gc.Equals, nil)
+	c.Assert(offers, gc.HasLen, 1)
+	c.Assert(offers[0], gc.Not(gc.IsNil))
+	c.Assert(offers[0].CharmURL, gc.Matches, `cs:quantal/wordpress-\d+`)
+	offers[0].CharmURL = ""
 	c.Assert(offers, jc.DeepEquals, []*crossmodel.ApplicationOfferDetails{{
 		OfferName:              "test-offer1",
 		ApplicationName:        "test-app",
@@ -418,13 +427,11 @@ func (s *applicationOffersSuite) TestFindApplicationOffers(c *gc.C) {
 			Interface: "http",
 		}},
 		Users: []crossmodel.OfferUserDetails{{
-			UserName:    "bob@external",
-			DisplayName: "bob",
-			Access:      "admin",
+			UserName: "bob@external",
+			Access:   "admin",
 		}, {
-			UserName:    "everyone@external",
-			DisplayName: "everyone",
-			Access:      "read",
+			UserName: "everyone@external",
+			Access:   "read",
 		}},
 	}})
 
@@ -440,6 +447,10 @@ func (s *applicationOffersSuite) TestFindApplicationOffers(c *gc.C) {
 		OfferName:       "test-offer1",
 	})
 	c.Assert(err, gc.Equals, nil)
+	c.Assert(offers, gc.HasLen, 1)
+	c.Assert(offers[0], gc.Not(gc.IsNil))
+	c.Assert(offers[0].CharmURL, gc.Matches, `cs:quantal/wordpress-\d+`)
+	offers[0].CharmURL = ""
 	c.Assert(offers, jc.DeepEquals, []*crossmodel.ApplicationOfferDetails{{
 		OfferName:              "test-offer1",
 		ApplicationName:        "test-app",
@@ -451,9 +462,8 @@ func (s *applicationOffersSuite) TestFindApplicationOffers(c *gc.C) {
 			Interface: "http",
 		}},
 		Users: []crossmodel.OfferUserDetails{{
-			UserName:    "everyone@external",
-			DisplayName: "everyone",
-			Access:      "read",
+			UserName: "everyone@external",
+			Access:   "read",
 		}},
 	}})
 }
@@ -477,6 +487,9 @@ func (s *applicationOffersSuite) TestApplicationOffers(c *gc.C) {
 	url := "bob@external/model-1.test-offer1"
 	offer, err := client.ApplicationOffer(url)
 	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(offer, gc.Not(gc.IsNil))
+	c.Assert(offer.CharmURL, gc.Matches, `cs:quantal/wordpress-\d+`)
+	offer.CharmURL = ""
 	c.Assert(offer, jc.DeepEquals, &crossmodel.ApplicationOfferDetails{
 		OfferName:              "test-offer1",
 		ApplicationName:        "test-app",
@@ -488,13 +501,11 @@ func (s *applicationOffersSuite) TestApplicationOffers(c *gc.C) {
 			Interface: "http",
 		}},
 		Users: []crossmodel.OfferUserDetails{{
-			UserName:    "bob@external",
-			DisplayName: "bob",
-			Access:      "admin",
+			UserName: "bob@external",
+			Access:   "admin",
 		}, {
-			UserName:    "everyone@external",
-			DisplayName: "everyone",
-			Access:      "read",
+			UserName: "everyone@external",
+			Access:   "read",
 		}},
 	})
 
@@ -507,6 +518,9 @@ func (s *applicationOffersSuite) TestApplicationOffers(c *gc.C) {
 
 	offer, err = client2.ApplicationOffer(url)
 	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(offer, gc.Not(gc.IsNil))
+	c.Assert(offer.CharmURL, gc.Matches, `cs:quantal/wordpress-\d+`)
+	offer.CharmURL = ""
 	c.Assert(offer, jc.DeepEquals, &crossmodel.ApplicationOfferDetails{
 		OfferName:              "test-offer1",
 		ApplicationName:        "test-app",
@@ -518,9 +532,8 @@ func (s *applicationOffersSuite) TestApplicationOffers(c *gc.C) {
 			Interface: "http",
 		}},
 		Users: []crossmodel.OfferUserDetails{{
-			UserName:    "everyone@external",
-			DisplayName: "everyone",
-			Access:      "read",
+			UserName: "everyone@external",
+			Access:   "read",
 		}},
 	})
 }
