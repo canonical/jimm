@@ -87,6 +87,40 @@ func (c *Conn) GetApplicationOffer(ctx context.Context, info *jujuparams.Applica
 	return newAPIError(resp.Results[0].Error)
 }
 
+// GetApplicationOffers retrives the details of the multiple
+// ApplicationOffers. Each of ApplicationOfferAdminDetails must specify an
+// OfferURL the rest of the structure will be filled in by the API request.
+// GetApplicationOffesr uses the ApplicationOffers procedure on the
+// ApplicationOffers facade version 2.
+func (c *Conn) GetApplicationOffers(ctx context.Context, infos []*jujuparams.ApplicationOfferAdminDetails) error {
+	urls := make([]string, len(infos))
+	for i, info := range infos {
+		urls[i] = info.OfferURL
+	}
+	args := jujuparams.OfferURLs{
+		OfferURLs: urls,
+	}
+
+	var resp jujuparams.ApplicationOffersResults
+	err := c.APICall("ApplicationOffers", 2, "", "ApplicationOffers", &args, &resp)
+	if err != nil {
+		return newAPIError(err)
+	}
+	if len(resp.Results) != len(infos) {
+		return errgo.Newf("unexpected number of results (expected %d, got %d)", len(infos), len(resp.Results))
+	}
+	var firstError error
+	for i, _ := range infos {
+		if resp.Results[i].Error != nil && firstError == nil {
+			firstError = newAPIError(resp.Results[i].Error)
+		}
+		if resp.Results[i].Result != nil {
+			*infos[i] = *resp.Results[i].Result
+		}
+	}
+	return firstError
+}
+
 // GrantApplicationOfferAccess grants the specified permission to the
 // given user on the given application offer. GrantApplicationOfferAccess
 // uses the ModifyOfferAccess procedure on the ApplicationOffers facade

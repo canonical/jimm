@@ -183,16 +183,26 @@ func (j *JEM) ListApplicationOffers(ctx context.Context, id identchecker.ACLIden
 	uid := params.User(id.Id())
 
 	q := applicationOffersQuery(uid, mongodoc.ApplicationOfferAdminAccess, filters)
-	var offers []jujuparams.ApplicationOfferAdminDetails
+	controllerOffers := make(map[params.EntityPath][]mongodoc.ApplicationOffer)
 	err := j.DB.ForEachApplicationOffer(ctx, q, []string{"owner-name", "model-name", "offer-name"}, func(offer *mongodoc.ApplicationOffer) error {
-		offerDetails, err := j.getApplicationOfferDetails(ctx, uid, offer)
-		if err != nil {
-			return err
-		}
-		offers = append(offers, offerDetails)
+		offers := controllerOffers[offer.ControllerPath]
+		offers = append(offers, *offer)
+		controllerOffers[offer.ControllerPath] = offers
 		return nil
 	})
-	return offers, errgo.Mask(err)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	var offerDetails []jujuparams.ApplicationOfferAdminDetails
+	for controller, offers := range controllerOffers {
+		details, err := j.getApplicationOfferDetailsFromController(ctx, uid, controller, offers)
+		if err != nil {
+			return nil, errgo.Mask(err)
+		}
+		offerDetails = append(offerDetails, details...)
+	}
+
+	return offerDetails, nil
 }
 
 // FindApplicationOffers returns details of offers matching the specified filter.
@@ -204,16 +214,25 @@ func (j *JEM) FindApplicationOffers(ctx context.Context, id identchecker.ACLIden
 	}
 
 	q := applicationOffersQuery(uid, mongodoc.ApplicationOfferReadAccess, filters)
-	var offers []jujuparams.ApplicationOfferAdminDetails
+	controllerOffers := make(map[params.EntityPath][]mongodoc.ApplicationOffer)
 	err := j.DB.ForEachApplicationOffer(ctx, q, []string{"owner-name", "model-name", "offer-name"}, func(offer *mongodoc.ApplicationOffer) error {
-		offerDetails, err := j.getApplicationOfferDetails(ctx, uid, offer)
-		if err != nil {
-			return err
-		}
-		offers = append(offers, offerDetails)
+		offers := controllerOffers[offer.ControllerPath]
+		offers = append(offers, *offer)
+		controllerOffers[offer.ControllerPath] = offers
 		return nil
 	})
-	return offers, errgo.Mask(err)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	var offerDetails []jujuparams.ApplicationOfferAdminDetails
+	for controller, offers := range controllerOffers {
+		details, err := j.getApplicationOfferDetailsFromController(ctx, uid, controller, offers)
+		if err != nil {
+			return nil, errgo.Mask(err)
+		}
+		offerDetails = append(offerDetails, details...)
+	}
+	return offerDetails, errgo.Mask(err)
 }
 
 func applicationOffersQuery(u params.User, access mongodoc.ApplicationOfferAccessPermission, filters []jujuparams.OfferFilter) jimmdb.Query {
@@ -337,6 +356,46 @@ func (j *JEM) GetApplicationOffer(ctx context.Context, id identchecker.ACLIdenti
 		return nil, errgo.Mask(err)
 	}
 	return &offerDetails, nil
+}
+
+func (j *JEM) getApplicationOfferDetailsFromController(ctx context.Context, uid params.User, controllerPath params.EntityPath, offers []mongodoc.ApplicationOffer) ([]jujuparams.ApplicationOfferAdminDetails, error) {
+	conn, err := j.OpenAPI(ctx, controllerPath)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	defer conn.Close()
+
+	offerDetails := make([]*jujuparams.ApplicationOfferAdminDetails, len(offers))
+	for i, offer := range offers {
+		details := jujuparams.ApplicationOfferAdminDetails{
+			ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+				OfferURL: offer.OfferURL,
+			},
+		}
+		offerDetails[i] = &details
+	}
+
+	if err := conn.GetApplicationOffers(ctx, offerDetails); err != nil {
+		return nil, errgo.Mask(err)
+	}
+
+	results := make([]jujuparams.ApplicationOfferAdminDetails, len(offerDetails))
+	for i, details := range offerDetails {
+		details := *details
+
+		access := offers[i].Users[mongodoc.User(uid)]
+		if access == mongodoc.ApplicationOfferNoAccess {
+			access = offers[i].Users[identchecker.Everyone]
+		}
+
+		details.Users = filterApplicationOfferUsers(uid, access, details.Users)
+		if access != mongodoc.ApplicationOfferAdminAccess {
+			details.Connections = nil
+		}
+		results[i] = details
+	}
+
+	return results, nil
 }
 
 func (j *JEM) getApplicationOfferDetails(ctx context.Context, uid params.User, offer *mongodoc.ApplicationOffer) (jujuparams.ApplicationOfferAdminDetails, error) {
