@@ -13,23 +13,23 @@ plugs:
     - $HOME/.local/share/juju
 
 apps:
-  jaas:
-    command: bin/wrappers/jaas
+  jimmctl:
+    command: bin/wrappers/jimmctl
     plugs:
      - dot-local-share-juju
      - network
 
 parts:
-  jaas:
+  jimmctl:
     plugin: gomod
     source: ../..
     source-type: git
     go-packages:
-    - github.com/CanonicalLtd/jimm/cmd/jaas-admin
+    - github.com/CanonicalLtd/jimm/cmd/jimmctl
     go-private:
     - github.com/CanonicalLtd
     prime:
-     - bin/jaas-admin
+     - bin/jimmctl
     override-build: |
       set -ex
       GIT_COMMIT=`git -C $SNAPCRAFT_PART_SRC rev-parse --verify HEAD`
@@ -42,6 +42,6 @@ parts:
     plugin: dump
     source: files
     organize:
-      jaas.wrapper: bin/wrappers/jaas
+      jimmctl.wrapper: bin/wrappers/jimmctl
     prime:
-      - bin/wrappers/jaas
+      - bin/wrappers/jimmctl
