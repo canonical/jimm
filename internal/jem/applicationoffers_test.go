@@ -245,9 +245,7 @@ func (s *applicationoffersSuite) TestListApplicationOffers(c *gc.C) {
 		ApplicationName: offer2.ApplicationName,
 		CharmURL:        offer2.CharmURL,
 		Connections:     nil,
-	},
-	})
-
+	}})
 }
 
 func (s *applicationoffersSuite) TestModifyOfferAccess(c *gc.C) {
