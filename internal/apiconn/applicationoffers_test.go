@@ -724,3 +724,122 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetailsNotFound(c
 	err := s.conn.GetApplicationOfferConsumeDetails(context.Background(), params.User("test-user"), &info, bakery.Version2)
 	c.Check(err, gc.ErrorMatches, `api error: application offer "test-user@external/test-model.test-offer" not found`)
 }
+
+func (s *applicationoffersSuite) TestGetApplicationOffers(c *gc.C) {
+	modelState, err := s.StatePool.Get(s.modelInfo.UUID)
+	c.Assert(err, gc.Equals, nil)
+	defer modelState.Release()
+	f := factory.NewFactory(modelState.State, s.StatePool)
+	app1 := f.MakeApplication(c, &factory.ApplicationParams{
+		Name: "test-app1",
+		Charm: f.MakeCharm(c, &factory.CharmParams{
+			Name: "wordpress",
+		}),
+	})
+	f.MakeUnit(c, &factory.UnitParams{
+		Application: app1,
+	})
+	ep1, err := app1.Endpoint("url")
+	c.Assert(err, gc.Equals, nil)
+
+	app2 := f.MakeApplication(c, &factory.ApplicationParams{
+		Name: "test-app2",
+		Charm: f.MakeCharm(c, &factory.CharmParams{
+			Name: "wordpress",
+		}),
+	})
+	f.MakeUnit(c, &factory.UnitParams{
+		Application: app2,
+	})
+	ep2, err := app2.Endpoint("url")
+	c.Assert(err, gc.Equals, nil)
+
+	ctx := context.Background()
+	err = s.conn.Offer(ctx, jujuparams.AddApplicationOffer{
+		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
+		OfferName:       "test-offer1",
+		ApplicationName: "test-app1",
+		Endpoints: map[string]string{
+			ep1.Name: ep1.Name,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	err = s.conn.Offer(ctx, jujuparams.AddApplicationOffer{
+		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
+		OfferName:       "test-offer2",
+		ApplicationName: "test-app2",
+		Endpoints: map[string]string{
+			ep2.Name: ep2.Name,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	var info1 jujuparams.ApplicationOfferAdminDetails
+	info1.OfferURL = "test-user@external/test-model.test-offer1"
+	var info2 jujuparams.ApplicationOfferAdminDetails
+	info2.OfferURL = "test-user@external/test-model.test-offer2"
+	err = s.conn.GetApplicationOffers(ctx, []*jujuparams.ApplicationOfferAdminDetails{&info1, &info2})
+	c.Assert(err, gc.Equals, nil)
+
+	c.Check(info1.OfferUUID, gc.Not(gc.Equals), "")
+	info1.OfferUUID = ""
+	sort.Slice(info1.Users, func(i, j int) bool {
+		return info1.Users[i].UserName < info1.Users[j].UserName
+	})
+	c.Check(info1.CharmURL, gc.Matches, `cs:quantal/wordpress-[0-9]*`)
+	info1.CharmURL = ""
+	c.Check(info1, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetails{
+		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+			SourceModelTag:         names.NewModelTag(s.modelInfo.UUID).String(),
+			OfferURL:               "test-user@external/test-model.test-offer1",
+			OfferName:              "test-offer1",
+			ApplicationDescription: "A pretty popular blog engine",
+			Endpoints: []jujuparams.RemoteEndpoint{{
+				Name:      "url",
+				Role:      "provider",
+				Interface: "http",
+				Limit:     0,
+			}},
+			Users: []jujuparams.OfferUserDetails{{
+				UserName:    "admin",
+				DisplayName: "admin",
+				Access:      string(jujuparams.OfferAdminAccess),
+			}, {
+				UserName: "everyone@external",
+				Access:   string(jujuparams.OfferReadAccess),
+			}},
+		},
+		ApplicationName: "test-app1",
+	})
+
+	c.Check(info2.OfferUUID, gc.Not(gc.Equals), "")
+	info2.OfferUUID = ""
+	sort.Slice(info2.Users, func(i, j int) bool {
+		return info2.Users[i].UserName < info2.Users[j].UserName
+	})
+	c.Check(info2.CharmURL, gc.Matches, `cs:quantal/wordpress-[0-9]*`)
+	info2.CharmURL = ""
+	c.Check(info2, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetails{
+		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+			SourceModelTag:         names.NewModelTag(s.modelInfo.UUID).String(),
+			OfferURL:               "test-user@external/test-model.test-offer2",
+			OfferName:              "test-offer2",
+			ApplicationDescription: "A pretty popular blog engine",
+			Endpoints: []jujuparams.RemoteEndpoint{{
+				Name:      "url",
+				Role:      "provider",
+				Interface: "http",
+				Limit:     0,
+			}},
+			Users: []jujuparams.OfferUserDetails{{
+				UserName:    "admin",
+				DisplayName: "admin",
+				Access:      string(jujuparams.OfferAdminAccess),
+			}, {
+				UserName: "everyone@external",
+				Access:   string(jujuparams.OfferReadAccess),
+			}},
+		},
+		ApplicationName: "test-app2",
+	})
+}
