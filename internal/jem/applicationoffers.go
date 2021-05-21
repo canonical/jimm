@@ -415,6 +415,7 @@ func (j *JEM) GrantOfferAccess(ctx context.Context, id identchecker.ACLIdentity,
 		return errgo.Mask(err)
 	}
 
+	// then grant access in the jimm DB
 	u := new(jimmdb.Update).Set(mongodoc.User(user).FieldName("users"), permission)
 	if err := j.DB.UpdateApplicationOffer(ctx, &offer, u, true); err != nil {
 		return errgo.Mask(err)
@@ -462,13 +463,9 @@ func (j *JEM) RevokeOfferAccess(ctx context.Context, id identchecker.ACLIdentity
 		return errgo.WithCausef(nil, params.ErrBadRequest, "unknown permission level")
 	}
 
-	// first revoke access in the jimm DB
-	u := new(jimmdb.Update).Set(mongodoc.User(user).FieldName("users"), permission)
-	if err := j.DB.UpdateApplicationOffer(ctx, &offer, u, true); err != nil {
-		return errgo.Mask(err)
-	}
-
-	// then revoke on the actual controller
+	// revoke on the actual controller - should this fail
+	// the record of access remains in jimm and we can retry
+	// later
 	conn, err := j.OpenAPI(ctx, offer.ControllerPath)
 	if err != nil {
 		return errgo.Mask(err)
@@ -477,6 +474,12 @@ func (j *JEM) RevokeOfferAccess(ctx context.Context, id identchecker.ACLIdentity
 
 	err = conn.RevokeApplicationOfferAccess(ctx, offer.OfferURL, user, access)
 	if err != nil {
+		return errgo.Mask(err)
+	}
+
+	// then revoke access in the jimm DB
+	u := new(jimmdb.Update).Set(mongodoc.User(user).FieldName("users"), permission)
+	if err := j.DB.UpdateApplicationOffer(ctx, &offer, u, true); err != nil {
 		return errgo.Mask(err)
 	}
 
@@ -509,13 +512,9 @@ func (j *JEM) DestroyOffer(ctx context.Context, id identchecker.ACLIdentity, off
 	default:
 	}
 
-	// first remove application offer from the jimm DB
-	err = j.DB.RemoveApplicationOffer(ctx, &offer)
-	if err != nil {
-		return errgo.Mask(err)
-	}
-
-	// then remove from the actual controller
+	// first remove from the actual controller - should
+	// this fail, we can always retry because a record will
+	// still exist in jimm
 	conn, err := j.OpenAPI(ctx, offer.ControllerPath)
 	if err != nil {
 		return errgo.Mask(err)
@@ -529,6 +528,12 @@ func (j *JEM) DestroyOffer(ctx context.Context, id identchecker.ACLIdentity, off
 			zap.String("controller", offer.ControllerPath.String()),
 			zap.String("offer", offer.OfferURL),
 		)
+		return errgo.Mask(err)
+	}
+
+	// then remove application offer from the jimm DB
+	err = j.DB.RemoveApplicationOffer(ctx, &offer)
+	if err != nil {
 		return errgo.Mask(err)
 	}
 
