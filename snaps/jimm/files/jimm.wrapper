@@ -1,2 +1,0 @@
-#!/bin/sh
-$SNAP/bin/jemd $SNAP_DATA/config.yaml

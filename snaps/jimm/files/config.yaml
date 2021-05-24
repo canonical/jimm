@@ -1,4 +1,0 @@
-mongo-addr: localhost:27017
-api-addr: localhost:8080
-state-server-admin: admin
-identity-location: https://api.jujucharms.com/identity
