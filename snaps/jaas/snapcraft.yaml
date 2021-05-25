@@ -3,7 +3,7 @@ version: git
 summary: JAAS client
 description: Client for controlling JAAS multi-cloud juju controllers.
 grade: stable
-base: core18
+base: core20
 confinement: strict
 
 plugs:
@@ -21,22 +21,14 @@ apps:
 
 parts:
   jimmctl:
-    plugin: gomod
+    plugin: go
     source: ../..
     source-type: git
-    go-packages:
-    - github.com/CanonicalLtd/jimm/cmd/jimmctl
-    go-private:
-    - github.com/CanonicalLtd
     prime:
-     - bin/jimmctl
+    - bin/jimmctl
     override-build: |
-      set -ex
-      GIT_COMMIT=`git -C $SNAPCRAFT_PART_SRC rev-parse --verify HEAD`
-      GIT_VERSION=`git -C $SNAPCRAFT_PART_SRC describe --dirty`
-      cp version/init.go.tmpl version/init.go
-      gofmt -w -r "unknownVersion -> Version{GitCommit: \"${GIT_COMMIT}\", Version: \"${GIT_VERSION}\",}" version/init.go
-      snapcraftctl build
+      set -e
+      go install -mod readonly -p 16 -ldflags '-linkmode=external' github.com/CanonicalLtd/jimm/cmd/jimmctl
 
   files:
     plugin: dump
@@ -44,4 +36,4 @@ parts:
     organize:
       jimmctl.wrapper: bin/wrappers/jimmctl
     prime:
-      - bin/wrappers/jimmctl
+    - bin/wrappers/jimmctl
