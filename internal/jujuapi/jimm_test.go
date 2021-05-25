@@ -413,7 +413,7 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeUnauthorized)
 
 	mmclient := modelmanager.NewClient(conn)
-	err = mmclient.DestroyModel(names.NewModelTag(s.Model.UUID), nil, nil, nil)
+	err = mmclient.DestroyModel(names.NewModelTag(s.Model.UUID), nil, nil, nil, time.Minute)
 	c.Assert(err, gc.Equals, nil)
 
 	conn2 := s.open(c, nil, "alice")

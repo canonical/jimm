@@ -62,7 +62,7 @@ func (s *modelManagerSuite) TestDestroyModel(c *gc.C) {
 	_, err = client.ModelInfo([]names.ModelTag{names.NewModelTag(s.Model.UUID)})
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.JEM.DestroyModel(testContext, jemtest.Bob, &s.Model, nil, nil, nil)
+	err = s.JEM.DestroyModel(testContext, jemtest.Bob, &s.Model, nil, nil, nil, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	// Check the model is dying.
@@ -71,7 +71,7 @@ func (s *modelManagerSuite) TestDestroyModel(c *gc.C) {
 	c.Assert(s.Model.Life(), gc.Equals, "dying")
 
 	// Check that it can be destroyed twice.
-	err = s.JEM.DestroyModel(testContext, jemtest.Bob, &s.Model, nil, nil, nil)
+	err = s.JEM.DestroyModel(testContext, jemtest.Bob, &s.Model, nil, nil, nil, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	// Check the model is still dying.
@@ -106,7 +106,7 @@ func (s *modelManagerSuite) TestDestroyModelWithStorage(c *gc.C) {
 		}),
 	})
 
-	err = s.JEM.DestroyModel(testContext, jemtest.Bob, &s.Model, nil, nil, nil)
+	err = s.JEM.DestroyModel(testContext, jemtest.Bob, &s.Model, nil, nil, nil, nil)
 	c.Assert(err, jc.Satisfies, jujuparams.IsCodeHasPersistentStorage)
 }
 

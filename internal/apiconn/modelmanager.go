@@ -243,7 +243,7 @@ func (c *Conn) ValidateModelUpgrade(ctx context.Context, model names.ModelTag, f
 //  - ModelManager(7).DestroyModels
 //  - ModelManager(4).DestroyModels
 //  - ModelManager(2).DestroyModels
-func (c *Conn) DestroyModel(ctx context.Context, uuid string, destroyStorage *bool, force *bool, maxWait *time.Duration) error {
+func (c *Conn) DestroyModel(ctx context.Context, uuid string, destroyStorage *bool, force *bool, maxWait, timeout *time.Duration) error {
 	mt := names.NewModelTag(uuid)
 	args := jujuparams.DestroyModelsParams{
 		Models: []jujuparams.DestroyModelParams{{
@@ -251,6 +251,7 @@ func (c *Conn) DestroyModel(ctx context.Context, uuid string, destroyStorage *bo
 			DestroyStorage: destroyStorage,
 			Force:          force,
 			MaxWait:        maxWait,
+			Timeout:        timeout,
 		}},
 	}
 
