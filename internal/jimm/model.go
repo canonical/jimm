@@ -896,7 +896,7 @@ func (j *JIMM) RevokeModelAccess(ctx context.Context, u *dbmodel.User, mt names.
 // given user is not a controller superuser or a model admin an error
 // with a code of CodeUnauthorized is returned. Any error returned from
 // the juju API will not have it's code masked.
-func (j *JIMM) DestroyModel(ctx context.Context, u *dbmodel.User, mt names.ModelTag, destroyStorage, force *bool, maxWait *time.Duration) error {
+func (j *JIMM) DestroyModel(ctx context.Context, u *dbmodel.User, mt names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
 	const op = errors.Op("jimm.DestroyModel")
 
 	ale := dbmodel.AuditLogEntry{
@@ -916,7 +916,7 @@ func (j *JIMM) DestroyModel(ctx context.Context, u *dbmodel.User, mt names.Model
 	}
 
 	err := j.doModelAdmin(ctx, u, mt, func(m *dbmodel.Model, api API) error {
-		if err := api.DestroyModel(ctx, mt, destroyStorage, force, maxWait); err != nil {
+		if err := api.DestroyModel(ctx, mt, destroyStorage, force, maxWait, timeout); err != nil {
 			return err
 		}
 		m.Life = "dying"

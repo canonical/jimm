@@ -916,7 +916,7 @@ func (s *modelManagerSuite) TestDestroyModel(c *gc.C) {
 
 	client := modelmanager.NewClient(conn)
 	tag := s.Model.Tag().(names.ModelTag)
-	err := client.DestroyModel(tag, nil, nil, nil)
+	err := client.DestroyModel(tag, nil, nil, nil, time.Duration(0))
 	c.Assert(err, gc.Equals, nil)
 
 	// Check the model is now dying.
@@ -931,7 +931,7 @@ func (s *modelManagerSuite) TestDestroyModel(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// Make sure it's not an error if you destroy a model that't not there.
-	err = client.DestroyModel(s.Model.Tag().(names.ModelTag), nil, nil, nil)
+	err = client.DestroyModel(s.Model.Tag().(names.ModelTag), nil, nil, nil, time.Duration(0))
 	c.Assert(err, gc.Equals, nil)
 }
 
@@ -1131,7 +1131,7 @@ func (s *modelManagerStorageSuite) TestDestroyModelWithStorageError(c *gc.C) {
 
 	tag := s.Model.Tag().(names.ModelTag)
 	client := modelmanager.NewClient(conn)
-	err := client.DestroyModel(tag, nil, nil, nil)
+	err := client.DestroyModel(tag, nil, nil, nil, time.Duration(0))
 	c.Assert(err, jc.Satisfies, jujuparams.IsCodeHasPersistentStorage)
 
 	// Check the model is not now dying.
@@ -1148,7 +1148,7 @@ func (s *modelManagerStorageSuite) TestDestroyModelWithStorageDestroyStorageTrue
 
 	tag := s.Model.Tag().(names.ModelTag)
 	client := modelmanager.NewClient(conn)
-	err := client.DestroyModel(tag, newBool(true), nil, nil)
+	err := client.DestroyModel(tag, newBool(true), nil, nil, time.Duration(0))
 	c.Assert(err, gc.Equals, nil)
 
 	// Check the model is not now dying.
@@ -1165,7 +1165,7 @@ func (s *modelManagerStorageSuite) TestDestroyModelWithStorageDestroyStorageFals
 
 	tag := s.Model.Tag().(names.ModelTag)
 	client := modelmanager.NewClient(conn)
-	err := client.DestroyModel(tag, newBool(false), nil, nil)
+	err := client.DestroyModel(tag, newBool(false), nil, nil, time.Duration(0))
 	c.Assert(err, gc.Equals, nil)
 
 	// Check the model is not now dying.

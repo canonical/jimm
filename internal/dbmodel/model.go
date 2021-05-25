@@ -12,7 +12,7 @@ import (
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
 	"github.com/juju/names/v4"
-	"github.com/juju/version"
+	"github.com/juju/version/v2"
 	"gorm.io/gorm"
 
 	"github.com/CanonicalLtd/jimm/internal/errors"

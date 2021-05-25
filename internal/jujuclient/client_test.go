@@ -69,7 +69,7 @@ func (s *clientSuite) TestStatus(c *gc.C) {
 			Type:             "iaas",
 			CloudTag:         "cloud-dummy",
 			CloudRegion:      "dummy-region",
-			Version:          "2.9-rc7",
+			Version:          "2.9.3",
 			AvailableVersion: "",
 			ModelStatus: jujuparams.DetailedStatus{
 				Status: "available",

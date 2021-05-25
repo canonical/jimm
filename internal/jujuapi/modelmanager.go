@@ -279,7 +279,7 @@ func (r *controllerRoot) DestroyModelsV4(ctx context.Context, args jujuparams.De
 			continue
 		}
 
-		if err := r.jimm.DestroyModel(ctx, r.user, mt, model.DestroyStorage, model.Force, model.MaxWait); err != nil {
+		if err := r.jimm.DestroyModel(ctx, r.user, mt, model.DestroyStorage, model.Force, model.MaxWait, model.Timeout); err != nil {
 			if errors.ErrorCode(err) != errors.CodeNotFound {
 				// It isn't an error to try and destroy an already
 				// destroyed model.

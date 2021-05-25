@@ -15,7 +15,7 @@ import (
 	"github.com/juju/juju/apiserver/params"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
-	"github.com/juju/version"
+	"github.com/juju/version/v2"
 	"sigs.k8s.io/yaml"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
@@ -2234,13 +2234,14 @@ users:
 var destroyModelTests = []struct {
 	name            string
 	env             string
-	destroyModel    func(context.Context, names.ModelTag, *bool, *bool, *time.Duration) error
+	destroyModel    func(context.Context, names.ModelTag, *bool, *bool, *time.Duration, *time.Duration) error
 	dialError       error
 	username        string
 	uuid            string
 	destroyStorage  *bool
 	force           *bool
 	maxWait         *time.Duration
+	timeout         *time.Duration
 	expectError     string
 	expectErrorCode errors.Code
 }{{
@@ -2260,7 +2261,7 @@ var destroyModelTests = []struct {
 }, {
 	name: "Success",
 	env:  destroyModelTestEnv,
-	destroyModel: func(_ context.Context, mt names.ModelTag, destroyStorage, force *bool, maxWait *time.Duration) error {
+	destroyModel: func(_ context.Context, mt names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
 		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
 			return errors.E("incorrect model uuid")
 		}
@@ -2273,6 +2274,9 @@ var destroyModelTests = []struct {
 		if maxWait == nil || *maxWait != time.Second {
 			return errors.E("invalid maxWait")
 		}
+		if timeout == nil || *timeout != time.Second {
+			return errors.E("invalid timeout")
+		}
 		return nil
 	},
 	username:       "alice@external",
@@ -2280,10 +2284,11 @@ var destroyModelTests = []struct {
 	destroyStorage: newBool(true),
 	force:          newBool(false),
 	maxWait:        newDuration(time.Second),
+	timeout:        newDuration(time.Second),
 }, {
 	name: "SuperuserSuccess",
 	env:  destroyModelTestEnv,
-	destroyModel: func(_ context.Context, _ names.ModelTag, _, _ *bool, _ *time.Duration) error {
+	destroyModel: func(_ context.Context, _ names.ModelTag, _, _ *bool, _, _ *time.Duration) error {
 		return nil
 	},
 	username: "charlie@external",
@@ -2298,7 +2303,7 @@ var destroyModelTests = []struct {
 }, {
 	name: "APIError",
 	env:  destroyModelTestEnv,
-	destroyModel: func(_ context.Context, _ names.ModelTag, _, _ *bool, _ *time.Duration) error {
+	destroyModel: func(_ context.Context, _ names.ModelTag, _, _ *bool, _, _ *time.Duration) error {
 		return errors.E("api error")
 	},
 	username:    "charlie@external",
@@ -2332,7 +2337,7 @@ func TestDestroyModel(t *testing.T) {
 
 			u := env.User(test.username).DBObject(c, j.Database)
 
-			err = j.DestroyModel(ctx, &u, names.NewModelTag(test.uuid), test.destroyStorage, test.force, test.maxWait)
+			err = j.DestroyModel(ctx, &u, names.NewModelTag(test.uuid), test.destroyStorage, test.force, test.maxWait, test.timeout)
 			c.Assert(dialer.IsClosed(), qt.Equals, true)
 			if test.expectError != "" {
 				c.Check(err, qt.ErrorMatches, test.expectError)

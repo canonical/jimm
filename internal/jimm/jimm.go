@@ -133,7 +133,7 @@ type API interface {
 	DestroyApplicationOffer(context.Context, string, bool) error
 
 	// DestroyModel destroys a model.
-	DestroyModel(context.Context, names.ModelTag, *bool, *bool, *time.Duration) error
+	DestroyModel(context.Context, names.ModelTag, *bool, *bool, *time.Duration, *time.Duration) error
 
 	// DumpModel collects a database-agnostic dump of a model.
 	DumpModel(context.Context, names.ModelTag, bool) (string, error)
