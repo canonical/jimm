@@ -253,7 +253,7 @@ func (s *modelmanagerSuite) TestDestroyModel(c *gc.C) {
 	}, &info)
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.conn.DestroyModel(ctx, info.UUID, nil, nil, nil)
+	err = s.conn.DestroyModel(ctx, info.UUID, nil, nil, nil, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	err = s.conn.ModelInfo(ctx, &info)

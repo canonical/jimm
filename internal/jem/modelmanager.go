@@ -48,7 +48,7 @@ func (j *JEM) ValidateModelUpgrade(ctx context.Context, id identchecker.ACLIdent
 // DestroyModel destroys the specified model. The model will have its
 // Life set to dying, but won't be removed until it is removed from the
 // controller.
-func (j *JEM) DestroyModel(ctx context.Context, id identchecker.ACLIdentity, model *mongodoc.Model, destroyStorage *bool, force *bool, maxWait *time.Duration) error {
+func (j *JEM) DestroyModel(ctx context.Context, id identchecker.ACLIdentity, model *mongodoc.Model, destroyStorage *bool, force *bool, maxWait, timeout *time.Duration) error {
 	if err := j.GetModel(ctx, id, jujuparams.ModelAdminAccess, model); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
@@ -56,7 +56,7 @@ func (j *JEM) DestroyModel(ctx context.Context, id identchecker.ACLIdentity, mod
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	if err := conn.DestroyModel(ctx, model.UUID, destroyStorage, force, maxWait); err != nil {
+	if err := conn.DestroyModel(ctx, model.UUID, destroyStorage, force, maxWait, timeout); err != nil {
 		return errgo.Mask(err, apiconn.IsAPIError)
 	}
 	if err := j.SetModelLife(ctx, model.Controller, model.UUID, "dying"); err != nil {

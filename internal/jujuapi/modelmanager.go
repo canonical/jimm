@@ -254,8 +254,6 @@ func (r *controllerRoot) ListModels(ctx context.Context, _ jujuparams.Entity) (j
 
 // ModelInfo implements the ModelManager facade's ModelInfo method.
 func (r *controllerRoot) ModelInfo(ctx context.Context, args jujuparams.Entities) (jujuparams.ModelInfoResults, error) {
-	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
-	defer cancel()
 	results := make([]jujuparams.ModelInfoResult, len(args.Entities))
 	run := parallel.NewRun(maxRequestConcurrency)
 	for i, arg := range args.Entities {
@@ -363,7 +361,7 @@ func (r *controllerRoot) DestroyModelsV4(ctx context.Context, args jujuparams.De
 			continue
 		}
 
-		if err := r.jem.DestroyModel(ctx, r.identity, &mongodoc.Model{UUID: mt.Id()}, model.DestroyStorage, model.Force, model.MaxWait); err != nil {
+		if err := r.jem.DestroyModel(ctx, r.identity, &mongodoc.Model{UUID: mt.Id()}, model.DestroyStorage, model.Force, model.MaxWait, model.Timeout); err != nil {
 			if errgo.Cause(err) != params.ErrNotFound {
 				// It isn't an error to try and destroy an already
 				// destroyed model.
