@@ -13,7 +13,6 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
-	"github.com/juju/juju/version"
 	"github.com/juju/names/v4"
 	semversion "github.com/juju/version"
 
@@ -113,7 +112,7 @@ func TestAddController(t *testing.T) {
 				Status: "available",
 			}
 			ms.UserAccess = "admin"
-			ms.AgentVersion = &version.Current
+			ms.AgentVersion = newVersion("1.2.3")
 			return nil
 		},
 	}
@@ -451,7 +450,6 @@ func TestImportModel(t *testing.T) {
 	trueValue := true
 
 	now := time.Now().UTC().Truncate(time.Millisecond)
-	version := semversion.MustParse("2.1.0")
 
 	tests := []struct {
 		about          string
@@ -501,7 +499,7 @@ func TestImportModel(t *testing.T) {
 				Level: "essential",
 				Owner: "alice@external",
 			}
-			info.AgentVersion = &version
+			info.AgentVersion = newVersion("2.1.0")
 			return nil
 		},
 		deltas: []jujuparams.Delta{{

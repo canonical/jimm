@@ -243,7 +243,7 @@ func (c Connection) ValidateModelUpgrade(ctx context.Context, model names.ModelT
 //  - ModelManager(7).DestroyModels
 //  - ModelManager(4).DestroyModels
 //  - ModelManager(2).DestroyModels
-func (c Connection) DestroyModel(ctx context.Context, tag names.ModelTag, destroyStorage *bool, force *bool, maxWait *time.Duration) error {
+func (c Connection) DestroyModel(ctx context.Context, tag names.ModelTag, destroyStorage *bool, force *bool, maxWait, timeout *time.Duration) error {
 	const op = errors.Op("jujuclient.DestroyModel")
 	args := jujuparams.DestroyModelsParams{
 		Models: []jujuparams.DestroyModelParams{{
@@ -251,6 +251,7 @@ func (c Connection) DestroyModel(ctx context.Context, tag names.ModelTag, destro
 			DestroyStorage: destroyStorage,
 			Force:          force,
 			MaxWait:        maxWait,
+			Timeout:        timeout,
 		}},
 	}
 

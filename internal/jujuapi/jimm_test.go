@@ -309,7 +309,7 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeUnauthorized)
 
 	mmclient := modelmanager.NewClient(conn)
-	err = mmclient.DestroyModel(s.Model.Tag().(names.ModelTag), nil, nil, nil)
+	err = mmclient.DestroyModel(s.Model.Tag().(names.ModelTag), nil, nil, nil, time.Duration(0))
 	c.Assert(err, gc.Equals, nil)
 
 	conn2 := s.open(c, nil, "alice")
@@ -447,7 +447,7 @@ func (s *jimmSuite) TestFullModelStatus(c *gc.C) {
 			Type:        "iaas",
 			CloudTag:    "cloud-dummy",
 			CloudRegion: "dummy-region",
-			Version:     "2.9-rc7",
+			Version:     "2.9.3",
 			ModelStatus: jujuparams.DetailedStatus{
 				Status: "available",
 			},
