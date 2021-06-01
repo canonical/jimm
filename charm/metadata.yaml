@@ -1,33 +1,22 @@
+# Copyright 2021 Canonical Ltd
+# See LICENSE file for licensing details.
 name: jimm
-summary: JAAS Intelligent Model Manager.
-maintainer: JAAS Developers <jaas-dev@lists.launchpad.net>
 description: |
   Juju controller used by the JAAS service to manage models across a 
   number of clouds.
-tags:
-  - web_server
-subordinate: false
-series:
-  - focal
-  - bionic
-  - xenial
+summary: |
+  JAAS Intelligent Model Manager.
+
 provides:
   website:
     interface: http
-  nrpe:
-    interface: nrpe-external-master
+
 requires:
   db:
-    interface: mongodb
-  vault:
-    interface: vault-kv
-    optional: true
+    interface: pgsql
+
 resources:
-  service:
+  jimm-snap:
     type: file
-    filename: jimm.tar.xz
-    description: "jimm release tarball."
-  dashboard:
-    type: file
-    filename: dashboard.tar.xz
-    description: "juju dashboard tarball."
+    filename: jimm.snap
+    description: Snap containing the JIMM server.

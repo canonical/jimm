@@ -1,8 +1,0 @@
-JAAS Intelligent Model Manager
-==============================
-
-The JAAS Intelligent Model Manager provides a supervising controller
-interface for juju clients to use when connecting to JAAS. JIMM provides
-an interface for the controller level operations and redirects clients
-to a controller bootstrapped in one of a number of clouds for model
-level operations.
