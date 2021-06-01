@@ -114,7 +114,7 @@ type API struct {
 	ControllerModelSummary_            func(context.Context, *jujuparams.ModelSummary) error
 	CreateModel_                       func(context.Context, *jujuparams.ModelCreateArgs, *jujuparams.ModelInfo) error
 	DestroyApplicationOffer_           func(context.Context, string, bool) error
-	DestroyModel_                      func(context.Context, names.ModelTag, *bool, *bool, *time.Duration) error
+	DestroyModel_                      func(context.Context, names.ModelTag, *bool, *bool, *time.Duration, *time.Duration) error
 	DumpModel_                         func(context.Context, names.ModelTag, bool) (string, error)
 	DumpModelDB_                       func(context.Context, names.ModelTag) (map[string]interface{}, error)
 	FindApplicationOffers_             func(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error)
@@ -226,11 +226,11 @@ func (a *API) DestroyApplicationOffer(ctx context.Context, offerURL string, forc
 	return a.DestroyApplicationOffer_(ctx, offerURL, force)
 }
 
-func (a *API) DestroyModel(ctx context.Context, tag names.ModelTag, destroyStorage *bool, force *bool, maxWait *time.Duration) error {
+func (a *API) DestroyModel(ctx context.Context, tag names.ModelTag, destroyStorage *bool, force *bool, maxWait, timeout *time.Duration) error {
 	if a.DestroyModel_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
-	return a.DestroyModel_(ctx, tag, destroyStorage, force, maxWait)
+	return a.DestroyModel_(ctx, tag, destroyStorage, force, maxWait, timeout)
 }
 
 func (a *API) DumpModel(ctx context.Context, mt names.ModelTag, simplified bool) (string, error) {

@@ -211,7 +211,7 @@ func (s *modelmanagerSuite) TestDestroyModel(c *gc.C) {
 	}, &info)
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.API.DestroyModel(ctx, names.NewModelTag(info.UUID), nil, nil, nil)
+	err = s.API.DestroyModel(ctx, names.NewModelTag(info.UUID), nil, nil, nil, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	err = s.API.ModelInfo(ctx, &info)
