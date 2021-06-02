@@ -9,6 +9,7 @@ require (
 	github.com/docker/spdystream v0.0.0-20181023171402-6480d4af844c // indirect
 	github.com/frankban/quicktest v1.11.3
 	github.com/go-macaroon-bakery/macaroon-bakery/v3 v3.0.0-20210309064400-d73aa8f92aa2
+	github.com/gobwas/glob v0.2.4-0.20181002190808-e7a84e9525fe // indirect
 	github.com/golang/mock v1.5.0 // indirect
 	github.com/google/go-cmp v0.5.4
 	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
@@ -22,7 +23,7 @@ require (
 	github.com/juju/cmd v0.0.0-20200108104440-8e43f3faa5c9
 	github.com/juju/errors v0.0.0-20200330140219-3fe23663418f
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
-	github.com/juju/juju v0.0.0-20210525013243-16f33363aae9
+	github.com/juju/juju v0.0.0-20210602032945-35b0a573f039
 	github.com/juju/loggo v0.0.0-20200526014432-9ce3a2e09b5e
 	github.com/juju/mgo/v2 v2.0.0-20210414025616-e854c672032f
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
