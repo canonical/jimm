@@ -281,7 +281,7 @@ class TestCharm(unittest.TestCase):
         s.server_close()
         t.join()
         self.assertEqual(self.harness.charm.unit.status,
-                         ActiveStatus(""))
+                         ActiveStatus())
 
 
 class VersionHTTPRequestHandler(BaseHTTPRequestHandler):

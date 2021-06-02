@@ -126,7 +126,7 @@ class JimmCharm(SystemdCharm):
                 v = data.get("Version", "")
                 if v:
                     self.unit.set_workload_version(v)
-                self.unit.status = ActiveStatus("")
+                self.unit.status = ActiveStatus()
         except Exception as e:
             logger.error("getting version: %s (%s)", str(e), type(e))
             self.unit.status = MaintenanceStatus("starting")
