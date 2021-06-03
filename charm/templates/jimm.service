@@ -1,0 +1,16 @@
+[Unit]
+Description=JAAS Intelligent Model Manager
+Requires=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile={{conf_file}}
+EnvironmentFile={{db_file}}
+EnvironmentFile=-{{leader_file}}
+ExecStart=/snap/bin/jimm
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

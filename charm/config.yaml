@@ -1,82 +1,27 @@
+# Copyright 2021 Canonical Ltd
+# See LICENSE file for licensing details.
+
 options:
-  logging-level:
-    type: string
-    description: "logging level (debug, info, warn, error)"
-    default: ""
-  identity-location:
-    type: string
-    description: The location of the identity service.
-    default: "https://api.jujucharms.com/identity"
-  charmstore-location:
-    type: string
-    description: The location of the charmstore service.
-    default: "https://api.jujucharms.com/charmstore"
-  metering-location:
-    type: string
-    description: The location of the metering service.
-    default: "https://api.jujucharms.com/omnibus"
-  agent-username:
-    default: ""
-    type: string
-    description: Agent username on the identity manager.
-  agent-private-key:
-    default: ""
-    type: string
-    description: Agent private key.
-  agent-public-key:
-    default: ""
-    type: string
-    description: Agent public key.
-  controller-admin:
-    type: string
-    default: "yellow"
-    description: |
-      The user or group that has admin rights to manage controllers.
-  nagios_context:
-    default: "juju"
+  candid-agent-private-key:
     type: string
     description: |
-      Used by the nrpe subordinate charms.
-      A string that will be prepended to instance name to set the host name
-      in nagios. So for instance the hostname would be something like:
-          juju-myservice-0
-      If you're running multiple environments with the same services in them
-      this allows you to differentiate between them.
-  nagios_servicegroups:
-    default: ""
+      Private key of the agent user for accessing the candid API.
+  candid-agent-public-key:
     type: string
     description: |
-      A comma-separated list of nagios servicegroups.
-      If left empty, the nagios_context will be used as the servicegroup
-  controller-url:
-    default: "jimm.jujucharms.com"
-    type: string
-    description: The URL of the JIMM controller.
-  controller-uuid:
-    default: ""
-    type: string
-    description: The UUID that the JIMM controller claims to be.
-  max-mgo-sessions:
-    default: 0
-    type: int
-    description: |
-      The maximum number of concurrent MongoDB sessions that will be
-      created. The default value (0) means use the application default.
-  gui-location:
-    default: ""
+      Public key of the agent user for accessing the candid API.
+  candid-agent-username:
     type: string
     description: |
-      The URL to redirect users to if they wish to access the GUI for
-      the JIMM controller.
-  domain:
-    default: ""
+      Name of the agent user for accessing the candid API.
+  candid-url:
     type: string
-    description: Domain to log all users in to.
-  dbname:
-     default: "jem"
-     type: string
-     description: MongoDB database name to use.
-  juju-dashboard-location:
-    default: ""
+    description: URL of candid server 
+  controller-admins:
     type: string
-    description: URL of the Juju Dashboard for this controller.
+    description: |
+       Whitespace separated list of candid users (or groups) that are
+       made controller admins by default.
+  uuid:
+    type: string
+    description: The UUID advertised by the JIMM controller.
