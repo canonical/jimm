@@ -12,6 +12,7 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/charm/v8"
+	"github.com/juju/juju/apiserver/params"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 	"gopkg.in/macaroon.v2"
@@ -786,7 +787,59 @@ func TestGetApplicationOffer(t *testing.T) {
 			DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
 		},
 		Dialer: &jimmtest.Dialer{
-			API: &jimmtest.API{},
+			API: &jimmtest.API{
+				GetApplicationOffer_: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
+					details.ApplicationName = "test-app"
+					details.CharmURL = "cs:test-app:17"
+					details.Connections = []jujuparams.OfferConnection{{
+						SourceModelTag: "test-model-src",
+						RelationId:     1,
+						Username:       "unknown",
+						Endpoint:       "test-endpoint",
+					}}
+					details.ApplicationOfferDetails = jujuparams.ApplicationOfferDetails{
+						SourceModelTag:         names.NewModelTag("00000000-0000-0000-0000-0000-0000000000003").String(),
+						OfferUUID:              "00000000-0000-0000-0000-0000-0000000000011",
+						OfferURL:               "test-offer-url",
+						ApplicationDescription: "changed offer description",
+						Endpoints: []jujuparams.RemoteEndpoint{{
+							Name:      "test-endpoint",
+							Role:      charm.RoleRequirer,
+							Interface: "unknown",
+							Limit:     1,
+						}},
+						Spaces: []jujuparams.RemoteSpace{{
+							CloudType:  "test-cloud-type",
+							Name:       "test-remote-space",
+							ProviderId: "test-provider-id",
+							ProviderAttributes: map[string]interface{}{
+								"attr1": "value1",
+								"attr2": "value2",
+							},
+							Subnets: []jujuparams.Subnet{{
+								SpaceTag: "test-remote-space",
+								VLANTag:  1024,
+								Status:   "dead",
+							}},
+						}},
+						Bindings: map[string]string{
+							"key1": "value4",
+							"key2": "value5",
+						},
+						Users: []jujuparams.OfferUserDetails{{
+							UserName: "alice@external",
+							Access:   string(jujuparams.OfferAdminAccess),
+						}, {
+							UserName: "eve@external",
+							Access:   "read",
+						}, {
+							UserName: "admin",
+							Access:   "admin",
+						}},
+					}
+					return nil
+				},
+			},
 		},
 	}
 
@@ -918,58 +971,6 @@ func TestGetApplicationOffer(t *testing.T) {
 	err = j.Database.AddApplicationOffer(ctx, &offer)
 	c.Assert(err, qt.Equals, nil)
 
-	offer1 := dbmodel.ApplicationOffer{
-		ModelID:         1,
-		ApplicationName: "test-app",
-		Application: dbmodel.Application{
-			ID:       1,
-			ModelID:  1,
-			Name:     "test-app",
-			Exposed:  true,
-			CharmURL: "cs:test-app:17",
-		},
-		ApplicationDescription: "a test app offering 1",
-		Name:                   "test-application-offer-1",
-		UUID:                   "00000000-0000-0000-0000-0000-0000000000005",
-		URL:                    "test-offer-url-1",
-		Endpoints: []dbmodel.ApplicationOfferRemoteEndpoint{{
-			ApplicationOfferID: 2,
-			Name:               "test-endpoint",
-			Role:               "requirer",
-			Interface:          "unknown",
-			Limit:              1,
-		}},
-		Spaces: []dbmodel.ApplicationOfferRemoteSpace{{
-			ApplicationOfferID: 2,
-			CloudType:          "test-cloud-type",
-			Name:               "test-remote-space",
-			ProviderID:         "test-provider-id",
-			ProviderAttributes: dbmodel.Map{
-				"attr1": "value1",
-				"attr2": "value2",
-			},
-		}},
-		Bindings: dbmodel.StringMap{
-			"key1": "value1",
-			"key2": "value2",
-		},
-		Connections: []dbmodel.ApplicationOfferConnection{{
-			ApplicationOfferID: 2,
-			SourceModelTag:     "test-model-src",
-			RelationID:         1,
-			Username:           "unknown",
-			Endpoint:           "test-endpoint",
-		}},
-		Users: []dbmodel.UserApplicationOfferAccess{{
-			User: dbmodel.User{
-				Username: "everyone@external",
-			},
-			Access: string(jujuparams.OfferReadAccess),
-		}},
-	}
-	err = j.Database.AddApplicationOffer(ctx, &offer1)
-	c.Assert(err, qt.Equals, nil)
-
 	tests := []struct {
 		about                string
 		user                 *dbmodel.User
@@ -983,10 +984,9 @@ func TestGetApplicationOffer(t *testing.T) {
 		expectedOfferDetails: jujuparams.ApplicationOfferAdminDetails{
 			ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
 				SourceModelTag:         names.NewModelTag(model.UUID.String).String(),
-				OfferUUID:              offer.UUID,
-				OfferURL:               offer.URL,
-				OfferName:              offer.Name,
-				ApplicationDescription: offer.ApplicationDescription,
+				OfferUUID:              "00000000-0000-0000-0000-0000-0000000000011",
+				OfferURL:               "test-offer-url",
+				ApplicationDescription: "changed offer description",
 				Endpoints: []jujuparams.RemoteEndpoint{{
 					Name:      "test-endpoint",
 					Role:      "requirer",
@@ -994,8 +994,8 @@ func TestGetApplicationOffer(t *testing.T) {
 					Limit:     1,
 				}},
 				Bindings: map[string]string{
-					"key1": "value1",
-					"key2": "value2",
+					"key1": "value4",
+					"key2": "value5",
 				},
 				Users: []jujuparams.OfferUserDetails{{
 					UserName: "alice@external",
@@ -1012,10 +1012,15 @@ func TestGetApplicationOffer(t *testing.T) {
 						"attr1": "value1",
 						"attr2": "value2",
 					},
+					Subnets: []jujuparams.Subnet{{
+						SpaceTag: "test-remote-space",
+						VLANTag:  1024,
+						Status:   "dead",
+					}},
 				}},
 			},
-			ApplicationName: offer.Application.Name,
-			CharmURL:        offer.Application.CharmURL,
+			ApplicationName: "test-app",
+			CharmURL:        "cs:test-app:17",
 			Connections: []jujuparams.OfferConnection{{
 				SourceModelTag: "test-model-src",
 				RelationId:     1,
@@ -1030,10 +1035,9 @@ func TestGetApplicationOffer(t *testing.T) {
 		expectedOfferDetails: jujuparams.ApplicationOfferAdminDetails{
 			ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
 				SourceModelTag:         names.NewModelTag(model.UUID.String).String(),
-				OfferUUID:              offer.UUID,
-				OfferURL:               offer.URL,
-				OfferName:              offer.Name,
-				ApplicationDescription: offer.ApplicationDescription,
+				OfferUUID:              "00000000-0000-0000-0000-0000-0000000000011",
+				OfferURL:               "test-offer-url",
+				ApplicationDescription: "changed offer description",
 				Endpoints: []jujuparams.RemoteEndpoint{{
 					Name:      "test-endpoint",
 					Role:      "requirer",
@@ -1041,8 +1045,8 @@ func TestGetApplicationOffer(t *testing.T) {
 					Limit:     1,
 				}},
 				Bindings: map[string]string{
-					"key1": "value1",
-					"key2": "value2",
+					"key1": "value4",
+					"key2": "value5",
 				},
 				Users: []jujuparams.OfferUserDetails{{
 					UserName: "eve@external",
@@ -1056,10 +1060,15 @@ func TestGetApplicationOffer(t *testing.T) {
 						"attr1": "value1",
 						"attr2": "value2",
 					},
+					Subnets: []jujuparams.Subnet{{
+						SpaceTag: "test-remote-space",
+						VLANTag:  1024,
+						Status:   "dead",
+					}},
 				}},
 			},
-			ApplicationName: offer.Application.Name,
-			CharmURL:        offer.Application.CharmURL,
+			ApplicationName: "test-app",
+			CharmURL:        "cs:test-app:17",
 		},
 	}, {
 		about:         "user without access cannot get the application offer",
@@ -1071,44 +1080,6 @@ func TestGetApplicationOffer(t *testing.T) {
 		user:          &u1,
 		offerURL:      "offer-not-found",
 		expectedError: "application offer not found",
-	}, {
-		about:    "everybody has access to offer 1",
-		user:     &u2,
-		offerURL: "test-offer-url-1",
-		expectedOfferDetails: jujuparams.ApplicationOfferAdminDetails{
-			ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
-				SourceModelTag:         names.NewModelTag(model.UUID.String).String(),
-				OfferUUID:              offer1.UUID,
-				OfferURL:               offer1.URL,
-				OfferName:              offer1.Name,
-				ApplicationDescription: offer1.ApplicationDescription,
-				Endpoints: []jujuparams.RemoteEndpoint{{
-					Name:      "test-endpoint",
-					Role:      "requirer",
-					Interface: "unknown",
-					Limit:     1,
-				}},
-				Bindings: map[string]string{
-					"key1": "value1",
-					"key2": "value2",
-				},
-				Users: []jujuparams.OfferUserDetails{{
-					UserName: "everyone@external",
-					Access:   "read",
-				}},
-				Spaces: []jujuparams.RemoteSpace{{
-					CloudType:  "test-cloud-type",
-					Name:       "test-remote-space",
-					ProviderId: "test-provider-id",
-					ProviderAttributes: map[string]interface{}{
-						"attr1": "value1",
-						"attr2": "value2",
-					},
-				}},
-			},
-			ApplicationName: offer1.Application.Name,
-			CharmURL:        offer1.Application.CharmURL,
-		},
 	}}
 
 	for _, test := range tests {
@@ -2555,4 +2526,444 @@ func TestFindApplicationOffers(t *testing.T) {
 			}
 		})
 	}
+}
+
+const listApplicationsTestEnv = `clouds:
+- name: dummy
+  type: dummy
+  regions:
+  - name: dummy-region
+cloud-credentials:
+- owner: alice@external
+  name: cred-1
+  cloud: dummy
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: dummy
+  region: dummy-region
+models:
+- name: model-1
+  type: iaas
+  uuid: 00000002-0000-0000-0000-000000000001
+  controller: controller-1
+  default-series: warty
+  cloud: dummy
+  region: dummy-region
+  cloud-credential: cred-1
+  owner: bob@external
+  life: alive
+  status:
+    status: available
+    info: "OK!"
+    since: 2020-02-20T20:02:20Z
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: admin
+  - user: charlie@external
+    access: read
+  machines:
+  - id: 0
+    hardware:
+      arch: amd64
+      mem: 8096
+      root-disk: 10240
+      cores: 1
+    instance-id: 00000009-0000-0000-0000-0000000000000
+    display-name: Machine 0
+    status: available
+    message: OK!
+    has-vote: true
+    wants-vote: false
+    ha-primary: false
+  - id: 1
+    hardware:
+      arch: amd64
+      mem: 8096
+      root-disk: 10240
+      cores: 2
+    instance-id: 00000009-0000-0000-0000-0000000000001
+    display-name: Machine 1
+    status: available
+    message: OK!
+    has-vote: true
+    wants-vote: false
+    ha-primary: false
+  sla:
+    level: unsupported
+  agent-version: 1.2.3
+- name: model-2
+  type: iaas
+  uuid: 00000002-0000-0000-0000-000000000002
+  controller: controller-1
+  default-series: warty
+  cloud: dummy
+  region: dummy-region
+  cloud-credential: cred-1
+  owner: alice@external
+  life: alive
+  status:
+    status: available
+    info: "OK!"
+    since: 2020-02-20T20:02:20Z
+  users:
+  - user: alice@external
+    access: admin
+  - user: bob@external
+    access: write
+  - user: charlie@external
+    access: read
+  machines:
+  - id: 0
+    hardware:
+      arch: amd64
+      mem: 8096
+      root-disk: 10240
+      cores: 1
+    instance-id: 00000009-0000-0000-0000-0000000000000
+    display-name: Machine 0
+    status: available
+    message: OK!
+    has-vote: true
+    wants-vote: false
+    ha-primary: false
+  - id: 1
+    hardware:
+      arch: amd64
+      mem: 8096
+      root-disk: 10240
+      cores: 2
+    instance-id: 00000010-0000-0000-0000-0000000000001
+    display-name: Machine 1
+    status: available
+    message: OK!
+    has-vote: true
+    wants-vote: false
+    ha-primary: false
+  sla:
+    level: unsupported
+  agent-version: 1.2.3
+`
+
+func TestListApplicationOffers(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+	now := time.Now().UTC().Round(time.Millisecond)
+
+	db := db.Database{
+		DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+	}
+	err := db.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+	env := jimmtest.ParseEnvironment(c, listApplicationsTestEnv)
+	env.PopulateDB(c, db)
+
+	j := &jimm.JIMM{
+		Database: db,
+		Dialer: &jimmtest.Dialer{
+			API: &jimmtest.API{
+				ListApplicationOffers_: func(_ context.Context, filters []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
+					switch filters[0].ModelName {
+					case "model-1":
+						return []jujuparams.ApplicationOfferAdminDetails{{
+							ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+								SourceModelTag:         "00000011-0000-0000-0000-000000000001",
+								OfferUUID:              "00000012-0000-0000-0000-000000000001",
+								OfferURL:               "test-offer-url",
+								OfferName:              "offer-1",
+								ApplicationDescription: "app description 1",
+								Endpoints: []jujuparams.RemoteEndpoint{{
+									Name:      "test-endpoint",
+									Role:      "requirer",
+									Interface: "unknown",
+									Limit:     1,
+								}},
+								Bindings: map[string]string{
+									"key1": "value1",
+									"key2": "value2",
+								},
+								Users: []jujuparams.OfferUserDetails{{
+									UserName: "alice@external",
+									Access:   "admin",
+								}, {
+									UserName: "eve@external",
+									Access:   "read",
+								}, {
+									UserName: "bob@external",
+									Access:   "consume",
+								}},
+								Spaces: []jujuparams.RemoteSpace{{
+									CloudType:  "test-cloud-type",
+									Name:       "test-remote-space",
+									ProviderId: "test-provider-id",
+									ProviderAttributes: map[string]interface{}{
+										"attr1": "value1",
+										"attr2": "value2",
+									},
+								}},
+							},
+							ApplicationName: "application-1",
+							CharmURL:        "charm-1",
+							Connections: []jujuparams.OfferConnection{{
+								SourceModelTag: "00000011-0000-0000-0000-000000000001",
+								RelationId:     1,
+								Username:       "charlie@external",
+								Endpoint:       "an-endpoint",
+							}},
+						}, {
+							ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+								SourceModelTag:         "00000011-0000-0000-0000-000000000002",
+								OfferUUID:              "00000012-0000-0000-0000-000000000002",
+								OfferURL:               "test-offer-url",
+								OfferName:              "offer-2",
+								ApplicationDescription: "app description 2",
+								Endpoints: []jujuparams.RemoteEndpoint{{
+									Name:      "test-endpoint",
+									Role:      "requirer",
+									Interface: "unknown",
+									Limit:     1,
+								}},
+								Bindings: map[string]string{
+									"key1": "value1",
+									"key2": "value2",
+								},
+								Users: []jujuparams.OfferUserDetails{{
+									UserName: "alice@external",
+									Access:   "admin",
+								}, {
+									UserName: "eve@external",
+									Access:   "read",
+								}, {
+									UserName: "bob@external",
+									Access:   "consume",
+								}},
+								Spaces: []jujuparams.RemoteSpace{{
+									CloudType:  "test-cloud-type",
+									Name:       "test-remote-space",
+									ProviderId: "test-provider-id",
+									ProviderAttributes: map[string]interface{}{
+										"attr1": "value1",
+										"attr2": "value2",
+									},
+								}},
+							},
+							ApplicationName: "application-2",
+							CharmURL:        "charm-2",
+							Connections: []jujuparams.OfferConnection{{
+								SourceModelTag: "00000011-0000-0000-0000-000000000002",
+								RelationId:     2,
+								Username:       "charlie@external",
+								Endpoint:       "an-endpoint",
+							}},
+						}}, nil
+					case "model-2":
+						return []jujuparams.ApplicationOfferAdminDetails{{
+							ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
+								SourceModelTag:         "00000011-0000-0000-0000-000000000003",
+								OfferUUID:              "00000012-0000-0000-0000-000000000003",
+								OfferURL:               "test-offer-url",
+								OfferName:              "offer-3",
+								ApplicationDescription: "app description 3",
+								Endpoints: []jujuparams.RemoteEndpoint{{
+									Name:      "test-endpoint",
+									Role:      "requirer",
+									Interface: "unknown",
+									Limit:     1,
+								}},
+								Bindings: map[string]string{
+									"key1": "value1",
+									"key2": "value2",
+								},
+								Users: []jujuparams.OfferUserDetails{{
+									UserName: "alice@external",
+									Access:   "admin",
+								}, {
+									UserName: "eve@external",
+									Access:   "read",
+								}, {
+									UserName: "bob@external",
+									Access:   "consume",
+								}},
+								Spaces: []jujuparams.RemoteSpace{{
+									CloudType:  "test-cloud-type",
+									Name:       "test-remote-space",
+									ProviderId: "test-provider-id",
+									ProviderAttributes: map[string]interface{}{
+										"attr1": "value1",
+										"attr2": "value2",
+									},
+								}},
+							},
+							ApplicationName: "application-3",
+							CharmURL:        "charm-3",
+							Connections: []jujuparams.OfferConnection{{
+								SourceModelTag: "00000011-0000-0000-0000-000000000003",
+								RelationId:     3,
+								Username:       "charlie@external",
+								Endpoint:       "an-endpoint",
+							}},
+						}}, nil
+					}
+					return nil, nil
+				},
+			},
+		},
+	}
+
+	u := env.User("alice@external").DBObject(c, db)
+	_, err = j.ListApplicationOffers(ctx, &u)
+	c.Assert(err, qt.ErrorMatches, `at least one filter must be specified`)
+
+	_, err = j.ListApplicationOffers(ctx, &u, jujuparams.OfferFilter{})
+	c.Assert(err, qt.ErrorMatches, `application offer filter must specify a model name`)
+
+	filters := []jujuparams.OfferFilter{{
+		OwnerName: "bob@external",
+		ModelName: "model-1",
+	}, {
+		ModelName: "model-2",
+	}}
+
+	offers, err := j.ListApplicationOffers(ctx, &u, filters...)
+	c.Assert(err, qt.IsNil)
+
+	c.Check(offers, qt.DeepEquals, []jujuparams.ApplicationOfferAdminDetails{{
+		ApplicationOfferDetails: params.ApplicationOfferDetails{
+			SourceModelTag:         "00000011-0000-0000-0000-000000000003",
+			OfferUUID:              "00000012-0000-0000-0000-000000000003",
+			OfferURL:               "test-offer-url",
+			OfferName:              "offer-3",
+			ApplicationDescription: "app description 3",
+			Endpoints: []jujuparams.RemoteEndpoint{{
+				Name:      "test-endpoint",
+				Role:      "requirer",
+				Interface: "unknown",
+				Limit:     1,
+			}},
+			Bindings: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+			},
+			Users: []jujuparams.OfferUserDetails{{
+				UserName: "alice@external",
+				Access:   "admin",
+			}, {
+				UserName: "bob@external",
+				Access:   "consume",
+			}, {
+				UserName: "eve@external",
+				Access:   "read",
+			}},
+			Spaces: []jujuparams.RemoteSpace{{
+				CloudType:  "test-cloud-type",
+				Name:       "test-remote-space",
+				ProviderId: "test-provider-id",
+				ProviderAttributes: map[string]interface{}{
+					"attr1": "value1",
+					"attr2": "value2",
+				},
+			}},
+		},
+		ApplicationName: "application-3",
+		CharmURL:        "charm-3",
+		Connections: []params.OfferConnection{{
+			SourceModelTag: "00000011-0000-0000-0000-000000000003",
+			RelationId:     3,
+			Username:       "charlie@external",
+			Endpoint:       "an-endpoint",
+		}},
+	}, {
+		ApplicationOfferDetails: params.ApplicationOfferDetails{
+			SourceModelTag:         "00000011-0000-0000-0000-000000000001",
+			OfferUUID:              "00000012-0000-0000-0000-000000000001",
+			OfferURL:               "test-offer-url",
+			OfferName:              "offer-1",
+			ApplicationDescription: "app description 1",
+			Endpoints: []jujuparams.RemoteEndpoint{{
+				Name:      "test-endpoint",
+				Role:      "requirer",
+				Interface: "unknown",
+				Limit:     1,
+			}},
+			Bindings: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+			},
+			Users: []jujuparams.OfferUserDetails{{
+				UserName: "alice@external",
+				Access:   "admin",
+			}, {
+				UserName: "bob@external",
+				Access:   "consume",
+			}, {
+				UserName: "eve@external",
+				Access:   "read",
+			}},
+			Spaces: []jujuparams.RemoteSpace{{
+				CloudType:  "test-cloud-type",
+				Name:       "test-remote-space",
+				ProviderId: "test-provider-id",
+				ProviderAttributes: map[string]interface{}{
+					"attr1": "value1",
+					"attr2": "value2",
+				},
+			}},
+		},
+		ApplicationName: "application-1",
+		CharmURL:        "charm-1",
+		Connections: []params.OfferConnection{{
+			SourceModelTag: "00000011-0000-0000-0000-000000000001",
+			RelationId:     1,
+			Username:       "charlie@external",
+			Endpoint:       "an-endpoint",
+		}},
+	}, {
+		ApplicationOfferDetails: params.ApplicationOfferDetails{
+			SourceModelTag:         "00000011-0000-0000-0000-000000000002",
+			OfferUUID:              "00000012-0000-0000-0000-000000000002",
+			OfferURL:               "test-offer-url",
+			OfferName:              "offer-2",
+			ApplicationDescription: "app description 2",
+			Endpoints: []jujuparams.RemoteEndpoint{{
+				Name:      "test-endpoint",
+				Role:      "requirer",
+				Interface: "unknown",
+				Limit:     1,
+			}},
+			Bindings: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+			},
+			Users: []jujuparams.OfferUserDetails{{
+				UserName: "alice@external",
+				Access:   "admin",
+			}, {
+				UserName: "bob@external",
+				Access:   "consume",
+			}, {
+				UserName: "eve@external",
+				Access:   "read",
+			}},
+			Spaces: []jujuparams.RemoteSpace{{
+				CloudType:  "test-cloud-type",
+				Name:       "test-remote-space",
+				ProviderId: "test-provider-id",
+				ProviderAttributes: map[string]interface{}{
+					"attr1": "value1",
+					"attr2": "value2",
+				},
+			}},
+		},
+		ApplicationName: "application-2",
+		CharmURL:        "charm-2",
+		Connections: []params.OfferConnection{{
+			SourceModelTag: "00000011-0000-0000-0000-000000000002",
+			RelationId:     2,
+			Username:       "charlie@external",
+			Endpoint:       "an-endpoint",
+		}},
+	}})
 }

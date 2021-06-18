@@ -11,6 +11,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"gorm.io/gorm"
 
+	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
@@ -121,7 +122,7 @@ func (s *dbSuite) TestGetUserClouds(c *qt.C) {
 	ctx := context.Background()
 
 	u := dbmodel.User{
-		Username:    "everyone@external",
+		Username:    auth.Everyone,
 		DisplayName: "everyone",
 	}
 
@@ -157,7 +158,7 @@ func (s *dbSuite) TestGetUserClouds(c *qt.C) {
 	clouds, err = s.Database.GetUserClouds(ctx, &u)
 	c.Assert(err, qt.IsNil)
 	c.Check(clouds, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(gorm.Model{})), []dbmodel.UserCloudAccess{{
-		Username:  "everyone@external",
+		Username:  auth.Everyone,
 		CloudName: "test-cloud",
 		Cloud:     cl,
 		Access:    "add-model",

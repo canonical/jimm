@@ -17,6 +17,7 @@ import (
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 
+	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
@@ -179,7 +180,7 @@ func (j *JIMM) GetApplicationOfferConsumeDetails(ctx context.Context, user *dbmo
 
 	accessLevel := offer.UserAccess(user)
 	if accessLevel == "" {
-		accessLevel = offer.UserAccess(&dbmodel.User{Username: "everyone@external"})
+		accessLevel = offer.UserAccess(&dbmodel.User{Username: auth.Everyone})
 	}
 
 	switch accessLevel {
@@ -234,7 +235,7 @@ func filterApplicationOfferUsers(user *dbmodel.User, accessLevel string, users [
 		if strings.IndexByte(u.UserName, '@') < 0 {
 			continue
 		}
-		if accessLevel == string(jujuparams.OfferAdminAccess) || u.UserName == user.Username {
+		if accessLevel == string(jujuparams.OfferAdminAccess) || u.UserName == user.Username || u.UserName == auth.Everyone {
 			filtered = append(filtered, u)
 		}
 	}
@@ -261,13 +262,27 @@ func (j *JIMM) GetApplicationOffer(ctx context.Context, user *dbmodel.User, offe
 
 	accessLevel := offer.UserAccess(user)
 	if accessLevel == "" {
-		accessLevel = offer.UserAccess(&dbmodel.User{Username: "everyone@external"})
+		accessLevel = offer.UserAccess(&dbmodel.User{Username: auth.Everyone})
 	}
 	if accessLevel == "" {
 		return nil, errors.E(op, errors.CodeNotFound, "application offer not found")
 	}
 
-	offerDetails := offer.ToJujuApplicationOfferDetails()
+	// Always collect application-offer admin details from the
+	// controller. The all-watcher events do not include enough
+	// information to reasonably keep the local database up-to-date,
+	// and it would be non-trivial to make it do so.
+	api, err := j.dial(ctx, &offer.Model.Controller, names.ModelTag{})
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	defer api.Close()
+
+	var offerDetails jujuparams.ApplicationOfferAdminDetails
+	offerDetails.OfferURL = offerURL
+	if err := api.GetApplicationOffer(ctx, &offerDetails); err != nil {
+		return nil, errors.E(op, err)
+	}
 	offerDetails = filterApplicationOfferDetail(offerDetails, user, accessLevel)
 
 	return &offerDetails, nil
@@ -278,15 +293,7 @@ func filterApplicationOfferDetail(offerDetails jujuparams.ApplicationOfferAdminD
 	if accessLevel != string(jujuparams.OfferAdminAccess) {
 		offer.Connections = nil
 	}
-	if accessLevel != string(jujuparams.OfferAdminAccess) {
-		var users []jujuparams.OfferUserDetails
-		for _, ua := range offerDetails.Users {
-			if ua.UserName == user.Username || ua.UserName == "everyone@external" {
-				users = append(users, ua)
-			}
-		}
-		offer.Users = users
-	}
+	offer.Users = filterApplicationOfferUsers(user, accessLevel, offer.Users)
 	return offer
 }
 
@@ -635,6 +642,85 @@ func (j *JIMM) applicationOfferFilters(ctx context.Context, jujuFilters ...jujup
 
 	}
 	return filters, nil
+}
+
+// ListApplicationOffers returns details of offers matching the specified filter.
+func (j *JIMM) ListApplicationOffers(ctx context.Context, user *dbmodel.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
+	const op = errors.Op("jimm.ListApplicationOffers")
+
+	type modelKey struct {
+		name          string
+		ownerUsername string
+	}
+
+	if len(filters) == 0 {
+		return nil, errors.E(op, errors.CodeBadRequest, "at least one filter must be specified")
+	}
+
+	modelFilters := make(map[modelKey][]jujuparams.OfferFilter)
+	for _, f := range filters {
+		if f.ModelName == "" {
+			return nil, errors.E(op, "application offer filter must specify a model name")
+		}
+		if f.OwnerName == "" {
+			f.OwnerName = user.Username
+		}
+		m := modelKey{
+			name:          f.ModelName,
+			ownerUsername: f.OwnerName,
+		}
+		modelFilters[m] = append(modelFilters[m], f)
+	}
+
+	var offers []jujuparams.ApplicationOfferAdminDetails
+
+	var keys []modelKey
+	for k := range modelFilters {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].ownerUsername == keys[j].ownerUsername {
+			return keys[i].name < keys[j].name
+		}
+		return keys[i].ownerUsername < keys[j].ownerUsername
+	})
+
+	for _, k := range keys {
+		m := dbmodel.Model{
+			Name:          k.name,
+			OwnerUsername: k.ownerUsername,
+		}
+		offerDetails, err := j.listApplicationOffersForModel(ctx, user, &m, modelFilters[k])
+		if err != nil {
+			return nil, errors.E(op, err)
+		}
+		for _, offer := range offerDetails {
+			offer.Users = filterApplicationOfferUsers(user, "admin", offer.Users)
+			offers = append(offers, offer)
+		}
+	}
+	return offers, nil
+}
+
+func (j *JIMM) listApplicationOffersForModel(ctx context.Context, u *dbmodel.User, m *dbmodel.Model, filters []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
+	const op = errors.Op("jimm.listApplicationOffersForModel")
+
+	if err := j.Database.GetModel(ctx, m); err != nil {
+		return nil, errors.E(op, err)
+	}
+	if u.ControllerAccess != "superuser" && m.UserAccess(u) != "admin" {
+		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+	api, err := j.dial(ctx, &m.Controller, names.ModelTag{})
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	defer api.Close()
+	offers, err := api.ListApplicationOffers(ctx, filters)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	return offers, nil
 }
 
 func (j *JIMM) doApplicationOfferAdmin(ctx context.Context, u *dbmodel.User, offerURL string, f func(offer *dbmodel.ApplicationOffer, api API) error) error {

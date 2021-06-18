@@ -9,6 +9,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
@@ -39,7 +40,7 @@ func (s *dbSuite) TestAddCloud(c *qt.C) {
 		CACertificates: dbmodel.Strings{"CACERT 1", "CACERT 2"},
 		Users: []dbmodel.UserCloudAccess{{
 			User: dbmodel.User{
-				Username:    "everyone@external",
+				Username:    auth.Everyone,
 				DisplayName: "everyone",
 			},
 			Access: "add-model",
@@ -107,7 +108,7 @@ func (s *dbSuite) TestGetCloud(c *qt.C) {
 		CACertificates: dbmodel.Strings{"CACERT 1", "CACERT 2"},
 		Users: []dbmodel.UserCloudAccess{{
 			User: dbmodel.User{
-				Username:    "everyone@external",
+				Username:    auth.Everyone,
 				DisplayName: "everyone",
 			},
 			Access: "add-model",
@@ -155,7 +156,7 @@ func (s *dbSuite) TestGetClouds(c *qt.C) {
 		CACertificates: dbmodel.Strings{"CACERT 1", "CACERT 2"},
 		Users: []dbmodel.UserCloudAccess{{
 			User: dbmodel.User{
-				Username:    "everyone@external",
+				Username:    auth.Everyone,
 				DisplayName: "everyone",
 			},
 			Access: "add-model",
@@ -194,7 +195,7 @@ func (s *dbSuite) TestUpdateCloud(c *qt.C) {
 		CACertificates: dbmodel.Strings{"CACERT 1", "CACERT 2"},
 		Users: []dbmodel.UserCloudAccess{{
 			User: dbmodel.User{
-				Username:    "everyone@external",
+				Username:    auth.Everyone,
 				DisplayName: "everyone",
 			},
 			Access: "add-model",
@@ -471,7 +472,7 @@ func (s *dbSuite) TestDeleteCloud(c *qt.C) {
 		CACertificates: dbmodel.Strings{"CACERT 1", "CACERT 2"},
 		Users: []dbmodel.UserCloudAccess{{
 			User: dbmodel.User{
-				Username:    "everyone@external",
+				Username:    auth.Everyone,
 				DisplayName: "everyone",
 			},
 			Access: "add-model",
