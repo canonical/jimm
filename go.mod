@@ -10,8 +10,7 @@ require (
 	github.com/frankban/quicktest v1.11.3
 	github.com/go-macaroon-bakery/macaroon-bakery/v3 v3.0.0-20210309064400-d73aa8f92aa2
 	github.com/gobwas/glob v0.2.4-0.20181002190808-e7a84e9525fe // indirect
-	github.com/golang/mock v1.5.0 // indirect
-	github.com/google/go-cmp v0.5.4
+	github.com/google/go-cmp v0.5.5
 	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
 	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/vault/api v1.0.5-0.20200709165743-f98572ac11c9
@@ -23,7 +22,7 @@ require (
 	github.com/juju/cmd v0.0.0-20200108104440-8e43f3faa5c9
 	github.com/juju/errors v0.0.0-20200330140219-3fe23663418f
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
-	github.com/juju/juju v0.0.0-20210602032945-35b0a573f039
+	github.com/juju/juju v0.0.0-20210617000256-2fe7a0fc8773
 	github.com/juju/loggo v0.0.0-20200526014432-9ce3a2e09b5e
 	github.com/juju/mgo/v2 v2.0.0-20210414025616-e854c672032f
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
@@ -41,7 +40,7 @@ require (
 	github.com/prometheus/client_golang v1.7.1
 	github.com/rogpeppe/fastuuid v1.2.0
 	go.uber.org/zap v1.10.0
-	golang.org/x/crypto v0.0.0-20210506145944-38f3c27a63bf
+	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
 	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	golang.org/x/term v0.0.0-20210317153231-de623e64d2a6 // indirect
