@@ -11,6 +11,7 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 
+	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
@@ -78,7 +79,7 @@ func (j *JIMM) ForEachUserCloud(ctx context.Context, u *dbmodel.User, f func(*db
 
 	// Also include "public" clouds
 	everyone := dbmodel.User{
-		Username: "everyone@external",
+		Username: auth.Everyone,
 	}
 	clds, err = j.Database.GetUserClouds(ctx, &everyone)
 	if err != nil {
@@ -142,7 +143,7 @@ func cloudUserAccess(u *dbmodel.User, cl *dbmodel.Cloud) string {
 		if cu.Username == u.Username {
 			userAccess = cu.Access
 		}
-		if cu.Username == "everyone@external" {
+		if cu.Username == auth.Everyone {
 			everyoneAccess = cu.Access
 		}
 	}

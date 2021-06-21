@@ -155,8 +155,7 @@ func (r *controllerRoot) ListApplicationOffers(ctx context.Context, args jujupar
 	const op = errors.Op("jujuapi.ListApplicationOffers")
 	results := jujuparams.QueryApplicationOffersResults{}
 
-	// TODO(mhilton) check this is right.
-	offers, err := r.jimm.FindApplicationOffers(ctx, r.user, args.Filters...)
+	offers, err := r.jimm.ListApplicationOffers(ctx, r.user, args.Filters...)
 	if err != nil {
 		return results, errors.E(op, err)
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/juju/names/v4"
 	"gorm.io/gorm"
 
+	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
@@ -53,7 +54,7 @@ func TestGetCloud(t *testing.T) {
 		Name: "test-cloud-2",
 		Users: []dbmodel.UserCloudAccess{{
 			User: dbmodel.User{
-				Username: "everyone@external",
+				Username: auth.Everyone,
 			},
 			Access: "add-model",
 		}},
@@ -239,7 +240,7 @@ func TestForEachCloud(t *testing.T) {
 			Access: "add-model",
 		}, {
 			User: dbmodel.User{
-				Username: "everyone@external",
+				Username: auth.Everyone,
 			},
 			Access: "add-model",
 		}},
@@ -250,7 +251,7 @@ func TestForEachCloud(t *testing.T) {
 		Name: "test-cloud-3",
 		Users: []dbmodel.UserCloudAccess{{
 			User: dbmodel.User{
-				Username: "everyone@external",
+				Username: auth.Everyone,
 			},
 			Access: "add-model",
 		}},
@@ -488,14 +489,14 @@ func TestForEachCloud(t *testing.T) {
 				CreatedAt: now,
 				UpdatedAt: now,
 			},
-			Username: "everyone@external",
+			Username: auth.Everyone,
 			User: dbmodel.User{
 				Model: gorm.Model{
 					ID:        3,
 					CreatedAt: now,
 					UpdatedAt: now,
 				},
-				Username:         "everyone@external",
+				Username:         auth.Everyone,
 				ControllerAccess: "add-model",
 			},
 			CloudName: "test-cloud-2",
@@ -513,14 +514,14 @@ func TestForEachCloud(t *testing.T) {
 				CreatedAt: now,
 				UpdatedAt: now,
 			},
-			Username: "everyone@external",
+			Username: auth.Everyone,
 			User: dbmodel.User{
 				Model: gorm.Model{
 					ID:        3,
 					CreatedAt: now,
 					UpdatedAt: now,
 				},
-				Username:         "everyone@external",
+				Username:         auth.Everyone,
 				ControllerAccess: "add-model",
 			},
 			CloudName: "test-cloud-3",

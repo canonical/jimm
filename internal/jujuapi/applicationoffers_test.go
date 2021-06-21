@@ -12,8 +12,8 @@ import (
 	"github.com/juju/juju/testing/factory"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
+	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 )
 
@@ -146,7 +146,7 @@ func (s *applicationOffersSuite) TestGetConsumeDetails(c *gc.C) {
 				UserName: "bob@external",
 				Access:   "admin",
 			}, {
-				UserName: "everyone@external",
+				UserName: auth.Everyone,
 				Access:   "read",
 			}},
 		},
@@ -184,7 +184,7 @@ func (s *applicationOffersSuite) TestGetConsumeDetails(c *gc.C) {
 				UserName: "bob@external",
 				Access:   "admin",
 			}, {
-				UserName: "everyone@external",
+				UserName: auth.Everyone,
 				Access:   "read",
 			}},
 		},
@@ -234,6 +234,12 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 		OfferName:       "test-offer1",
 	})
 	c.Assert(err, gc.Equals, nil)
+
+	for _, offer := range offers {
+		// mask the charm URL as it changes depending on the test
+		// run order.
+		offer.CharmURL = ""
+	}
 	c.Assert(offers, jc.DeepEquals, []*crossmodel.ApplicationOfferDetails{{
 		OfferName:              "test-offer1",
 		ApplicationName:        "test-app",
@@ -245,11 +251,10 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 			Interface: "http",
 		}},
 		Users: []crossmodel.OfferUserDetails{{
-			UserName:    "bob@external",
-			DisplayName: "bob",
-			Access:      "admin",
+			UserName: "bob@external",
+			Access:   "admin",
 		}, {
-			UserName: "everyone@external",
+			UserName: auth.Everyone,
 			Access:   "read",
 		}},
 	}})
@@ -275,7 +280,7 @@ func (s *applicationOffersSuite) TestModifyOfferAccess(c *gc.C) {
 
 	offerURL := "bob@external/model-1.test-offer1"
 
-	err = client.RevokeOffer(identchecker.Everyone+"@external", "read", offerURL)
+	err = client.RevokeOffer(auth.Everyone, "read", offerURL)
 	c.Assert(err, jc.ErrorIsNil)
 
 	err = client.GrantOffer("test.user@external", "unknown", offerURL)
@@ -411,7 +416,7 @@ func (s *applicationOffersSuite) TestFindApplicationOffers(c *gc.C) {
 			DisplayName: "bob",
 			Access:      "admin",
 		}, {
-			UserName: "everyone@external",
+			UserName: auth.Everyone,
 			Access:   "read",
 		}},
 	}})
@@ -440,7 +445,7 @@ func (s *applicationOffersSuite) TestFindApplicationOffers(c *gc.C) {
 			Interface: "http",
 		}},
 		Users: []crossmodel.OfferUserDetails{{
-			UserName: "everyone@external",
+			UserName: auth.Everyone,
 			Access:   "read",
 		}},
 	}})
@@ -465,6 +470,9 @@ func (s *applicationOffersSuite) TestApplicationOffers(c *gc.C) {
 	url := "bob@external/model-1.test-offer1"
 	offer, err := client.ApplicationOffer(url)
 	c.Assert(err, jc.ErrorIsNil)
+
+	// mask the charm URL as it changes depending on the test run order.
+	offer.CharmURL = ""
 	c.Assert(offer, jc.DeepEquals, &crossmodel.ApplicationOfferDetails{
 		OfferName:              "test-offer1",
 		ApplicationName:        "test-app",
@@ -476,11 +484,10 @@ func (s *applicationOffersSuite) TestApplicationOffers(c *gc.C) {
 			Interface: "http",
 		}},
 		Users: []crossmodel.OfferUserDetails{{
-			UserName:    "bob@external",
-			DisplayName: "bob",
-			Access:      "admin",
+			UserName: "bob@external",
+			Access:   "admin",
 		}, {
-			UserName: "everyone@external",
+			UserName: auth.Everyone,
 			Access:   "read",
 		}},
 	})
@@ -494,6 +501,8 @@ func (s *applicationOffersSuite) TestApplicationOffers(c *gc.C) {
 
 	offer, err = client2.ApplicationOffer(url)
 	c.Assert(err, jc.ErrorIsNil)
+	// mask the charm URL as it changes depending on the test run order.
+	offer.CharmURL = ""
 	c.Assert(offer, jc.DeepEquals, &crossmodel.ApplicationOfferDetails{
 		OfferName:              "test-offer1",
 		ApplicationName:        "test-app",
@@ -505,7 +514,7 @@ func (s *applicationOffersSuite) TestApplicationOffers(c *gc.C) {
 			Interface: "http",
 		}},
 		Users: []crossmodel.OfferUserDetails{{
-			UserName: "everyone@external",
+			UserName: auth.Everyone,
 			Access:   "read",
 		}},
 	})

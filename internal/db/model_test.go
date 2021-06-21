@@ -194,6 +194,17 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 	eError, ok := err.(*errors.Error)
 	c.Assert(ok, qt.IsTrue)
 	c.Assert(eError.Code, qt.Equals, errors.CodeNotFound)
+
+	dbModel = dbmodel.Model{
+		Name:          model.Name,
+		OwnerUsername: model.OwnerUsername,
+	}
+	err = s.Database.GetModel(context.Background(), &dbModel)
+	c.Assert(err, qt.IsNil)
+	expectModel = model
+	expectModel.CloudRegion.Cloud = cloud
+	expectModel.CloudRegion.Cloud.Regions = nil
+	c.Assert(dbModel, jimmtest.DBObjectEquals, expectModel)
 }
 
 func (s *dbSuite) TestUpdateModel(c *qt.C) {

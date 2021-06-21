@@ -16,6 +16,9 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 )
 
+// Everyone is the juju username that represents all users.
+const Everyone = identchecker.Everyone + "@external"
+
 // An AuthenticationError is the error returned when the requested
 // authentication has failed.
 type AuthenticationError struct {

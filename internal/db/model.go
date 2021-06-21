@@ -53,6 +53,8 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model, options .
 		}
 	} else if model.ID != 0 {
 		db = db.Where("id = ?", model.ID)
+	} else if model.OwnerUsername != "" && model.Name != "" {
+		db = db.Where("owner_username = ? AND name = ?", model.OwnerUsername, model.Name)
 	} else {
 		return errors.E(op, "missing id or uuid", errors.CodeBadRequest)
 	}

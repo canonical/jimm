@@ -16,6 +16,7 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
+	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
@@ -98,7 +99,7 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 		} else {
 			cloud.Users = []dbmodel.UserCloudAccess{{
 				User: dbmodel.User{
-					Username: "everyone@external",
+					Username: auth.Everyone,
 				},
 				Access: "add-model",
 			}}
