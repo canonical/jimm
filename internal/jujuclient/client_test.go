@@ -8,6 +8,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/juju/apiserver/params"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/names/v4"
 	gc "gopkg.in/check.v1"
 
@@ -69,7 +70,7 @@ func (s *clientSuite) TestStatus(c *gc.C) {
 			Type:             "iaas",
 			CloudTag:         "cloud-dummy",
 			CloudRegion:      "dummy-region",
-			Version:          "2.9.3",
+			Version:          jujuversion.Current.String(),
 			AvailableVersion: "",
 			ModelStatus: jujuparams.DetailedStatus{
 				Status: "available",
