@@ -447,7 +447,7 @@ func (s *jimmSuite) TestFullModelStatus(c *gc.C) {
 			Type:        "iaas",
 			CloudTag:    "cloud-dummy",
 			CloudRegion: "dummy-region",
-			Version:     "2.9.3",
+			Version:     jujuversion.Current.String(),
 			ModelStatus: jujuparams.DetailedStatus{
 				Status: "available",
 			},
