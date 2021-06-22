@@ -2,53 +2,124 @@ package debugapi
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
 	"net/http"
+	"sync"
+	"time"
 
-	"github.com/juju/utils/v2/debugstatus"
-	"gopkg.in/httprequest.v1"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 
-	"github.com/CanonicalLtd/jimm/internal/jemserver"
 	"github.com/CanonicalLtd/jimm/version"
 )
 
-// NewAPIHandler returns a new API handler that serves the /debug
-// endpoints.
-func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httprequest.Handler, error) {
-	srv := &httprequest.Server{}
+// Handler returns an http.Handler to handle requests for /debug endpoints.
+func Handler(ctx context.Context, statusChecks map[string]StatusCheck) http.Handler {
+	mux := http.NewServeMux()
 
-	return srv.Handlers(func(p httprequest.Params) (*handler, context.Context, error) {
-		h := &handler{
-			params: params.Params,
+	// data for /debug/info
+	buf, err := json.Marshal(version.VersionInfo)
+	if err == nil {
+		mux.HandleFunc("/debug/info", func(w http.ResponseWriter, _ *http.Request) {
+			w.Write(buf)
+		})
+	} else {
+		// This should be impossible.
+		zapctx.Error(ctx, "cannot marshal version", zap.Error(err))
+	}
+
+	// /debug/status
+	mux.HandleFunc("/debug/status", statusHandler(statusChecks))
+
+	return mux
+}
+
+// statusHandler returns a http.HandlerFunc the performs the given status
+// checks.
+func statusHandler(checks map[string]StatusCheck) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		var mu sync.Mutex
+		results := make(map[string]statusResult, len(checks))
+		var wg sync.WaitGroup
+		wg.Add(len(checks))
+		for k, check := range checks {
+			k, check := k, check
+			go func() {
+				defer wg.Done()
+				result := statusResult{
+					Name: check.Name(),
+				}
+				start := time.Now()
+				v, err := check.Check(req.Context())
+				result.Duration = time.Since(start)
+				if err == nil {
+					result.Passed = true
+					result.Value = v
+				} else {
+					result.Value = err.Error()
+				}
+				mu.Lock()
+				defer mu.Unlock()
+				results[k] = result
+			}()
 		}
-		h.Handler = debugstatus.Handler{
-			Version:           debugstatus.Version(version.VersionInfo),
-			CheckPprofAllowed: func(req *http.Request) error { return h.checkIsAdmin(req.Context(), req) },
-			Check:             h.check,
+		wg.Wait()
+		buf, err := json.Marshal(results)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
-		return h, p.Context, nil
-	}), nil
+		w.Write(buf)
+	}
 }
 
-type handler struct {
-	debugstatus.Handler
-	params jemserver.Params
+// A statusResult is the type that represents the result of a status check
+// in the /debug/status response body.
+type statusResult struct {
+	Name     string
+	Value    interface{}
+	Passed   bool
+	Duration time.Duration
 }
 
-func (h *handler) checkIsAdmin(ctx context.Context, req *http.Request) error {
-	// TODO(mhilton) decide if this should be available.
-	return errors.New("pprof disabled")
+// A StatusCheck is a chack that is performed as part of the /debug/status endpoint
+type StatusCheck interface {
+	// Name is a human-readable name for the status check.
+	Name() string
+
+	// Check runs the actual check.
+	Check(ctx context.Context) (interface{}, error)
 }
 
-func (h *handler) check(ctx context.Context) map[string]debugstatus.CheckResult {
-	return debugstatus.Check(
-		ctx,
-		debugstatus.ServerStartTime,
-	)
+// MakeStatusCheck creates a status check with the given human readable
+// name which runs the given function.
+func MakeStatusCheck(name string, f func(context.Context) (interface{}, error)) StatusCheck {
+	return statusCheck{
+		name: name,
+		f:    f,
+	}
 }
 
-// Close implements io.Closer and is called by httprequest
-// when the request is complete.
-func (h *handler) Close() error {
-	return nil
+// A statusCheck is the implementation of statusCheck returned from
+// MakeStatusCheck.
+type statusCheck struct {
+	name string
+	f    func(context.Context) (interface{}, error)
 }
+
+// Name implements StatusCheck.Name.
+func (c statusCheck) Name() string {
+	return c.name
+}
+
+// Check implements StatusCheck.Check.
+func (c statusCheck) Check(ctx context.Context) (interface{}, error) {
+	return c.f(ctx)
+}
+
+var startTime = time.Now().UTC()
+
+// ServerStartTime is a StatusCheck that returns the server start time.
+var ServerStartTime = MakeStatusCheck("server start time", func(_ context.Context) (interface{}, error) {
+	return startTime, nil
+})

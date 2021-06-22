@@ -212,14 +212,12 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	}
 	s.jimm.VaultPath = p.VaultPath
 
-	handlers, err := debugapi.NewAPIHandler(ctx, jemserver.HandlerParams{})
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-	for _, hnd := range handlers {
-		s.router.Handle(hnd.Method, hnd.Path, hnd.Handle)
-	}
-	handlers, err = jujuapi.NewAPIHandler(ctx, &s.jimm, jemserver.HandlerParams{
+	debugHandler := debugapi.Handler(ctx, map[string]debugapi.StatusCheck{
+		"start_started": debugapi.ServerStartTime,
+	})
+	s.router.Handler("GET", "/debug/*path", debugHandler)
+
+	handlers, err := jujuapi.NewAPIHandler(ctx, &s.jimm, jemserver.HandlerParams{
 		Params: jemserver.Params{
 			ControllerUUID:          p.ControllerUUID,
 			WebsocketRequestTimeout: 10 * time.Minute,
