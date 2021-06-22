@@ -31,6 +31,7 @@ func Handler(ctx context.Context, loc string) http.Handler {
 	if loc == "" {
 		// If the location isn't configured then don't serve any
 		// content.
+		zapctx.Info(ctx, "dashboard location not configured")
 		return http.NotFoundHandler()
 	}
 
