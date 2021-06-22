@@ -14,7 +14,6 @@ import (
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
-	"github.com/CanonicalLtd/jimm/internal/dashboard"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	"github.com/CanonicalLtd/jimm/params"
 )
@@ -111,13 +110,6 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 		return nil, errgo.Newf("JEM server must serve at least one version of the API")
 	}
 	router := httprouter.New()
-
-	if config.JujuDashboardLocation != "" {
-		err := dashboard.Register(ctx, router, config.JujuDashboardLocation)
-		if err != nil {
-			return nil, errgo.Mask(err)
-		}
-	}
 
 	srv := &Server{
 		router:  router,

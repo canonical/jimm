@@ -27,6 +27,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/dashboard"
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/debugapi"
 	"github.com/CanonicalLtd/jimm/internal/errors"
@@ -99,6 +100,13 @@ type Params struct {
 	// VaultPath is the path on the vault server which hosts the kv
 	// secrets engine JIMM will use to store secrets.
 	VaultPath string
+
+	// DashboardLocation contains the location where the JAAS dashboard
+	// can be found. If this location parses as an absolute URL then
+	// requests to /dashboard will redirect to that URL. If this is a
+	// filesystem path then the dashboard files will be served from
+	// that path.
+	DashboardLocation string
 }
 
 // A Service is the implementation of a JIMM server.
@@ -223,7 +231,9 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	for _, hnd := range handlers {
 		s.router.Handle(hnd.Method, hnd.Path, hnd.Handle)
 	}
-
+	dhnd := dashboard.Handler(ctx, p.DashboardLocation)
+	s.router.Handler("GET", "/dashboard", dhnd)
+	s.router.Handler("GET", "/dashboard/*path", dhnd)
 	return s, nil
 }
 

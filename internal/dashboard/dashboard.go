@@ -1,9 +1,8 @@
 // Copyright 2020 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-// Package dashboard contains a single method that
-// registers a simple file server that serves files
-// for the Juju Dashboard.
+// Package dashboard contains a single function that creates a handler for
+// serving the JAAS Dashboard.
 package dashboard
 
 import (
@@ -14,75 +13,80 @@ import (
 	"os"
 	"path/filepath"
 	"text/template"
-	"time"
 
-	"github.com/julienschmidt/httprouter"
-	"gopkg.in/errgo.v1"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 )
 
 const (
-	dashboardPathPrefix = "dashboard"
+	dashboardPath = "/dashboard"
 )
 
-// Register registers a http handler the serves Juju Dashboard
-// files.
-func Register(ctx context.Context, router *httprouter.Router, dashboardLocation string) error {
-	u, err := url.Parse(dashboardLocation)
-	if err != nil {
-		return errgo.Mask(err)
+// Handler returns an http.Handler that serves the JAAS dashboard from the
+// specified location. If the location is an absolute URL then the returned
+// handler will redirect to that URL. If the location is a path on the disk
+// then the handler will serve the files from that path. Otherwise a
+// NotFoundHandler will be returned.
+func Handler(ctx context.Context, loc string) http.Handler {
+	if loc == "" {
+		// If the location isn't configured then don't serve any
+		// content.
+		zapctx.Info(ctx, "dashboard location not configured")
+		return http.NotFoundHandler()
 	}
-	if u.IsAbs() {
-		router.GET("/dashboard", func(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-			http.Redirect(w, req, dashboardLocation, http.StatusPermanentRedirect)
-		})
+
+	hnd := redirectHandler(ctx, loc)
+	if hnd == nil {
+		hnd = pathHandler(ctx, loc)
+	}
+	if hnd == nil {
+		hnd = http.NotFoundHandler()
+	}
+	return hnd
+}
+
+func redirectHandler(ctx context.Context, loc string) http.Handler {
+	u, err := url.Parse(loc)
+	if err != nil {
+		zapctx.Warn(ctx, "cannot parse location", zap.Error(err))
 		return nil
 	}
-	f, err := os.Open(dashboardLocation)
-	if err != nil {
-		return errgo.Mask(err)
-	}
-	defer f.Close()
-	fis, err := f.Readdir(0)
-	if err != nil {
-		return errgo.Mask(err)
-	}
-	for _, fi := range fis {
-		path := filepath.Join(dashboardLocation, fi.Name())
-		if fi.IsDir() {
-			router.ServeFiles("/"+fi.Name()+"/*filepath", http.Dir(path))
-			continue
-		}
-		serveFile := func(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-			http.ServeFile(w, req, path)
-		}
-		switch fi.Name() {
-		case "index.html":
-			// Use index.html to serve anything we don't otherwise know about.
-			router.GET("/"+dashboardPathPrefix, serveFile)
-			router.GET("/"+dashboardPathPrefix+"/*anything", serveFile)
-		case "config.js":
-			// Ignore any config.js file, use a rendered one instead.
-		case "config.js.go":
-			tmpl, err := template.ParseFiles(path)
-			if err != nil {
-				return errgo.Notef(err, "cannot parse dashboard configuration template")
-			}
-			var buf bytes.Buffer
-			err = tmpl.Execute(&buf, map[string]interface{}{
-				"baseAppURL":                "/" + dashboardPathPrefix + "/",
-				"identityProviderAvailable": true,
-				"isJuju":                    false,
-			})
-			if err != nil {
-				return errgo.Notef(err, "cannot execute dashboard configuration template")
-			}
-			serveConfig := func(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-				http.ServeContent(w, req, "config.js", time.Now(), bytes.NewReader(buf.Bytes()))
-			}
-			router.GET("/config.js", serveConfig)
-		default:
-			router.GET("/"+fi.Name(), serveFile)
-		}
+	if u.IsAbs() {
+		return http.RedirectHandler(loc, http.StatusPermanentRedirect)
 	}
 	return nil
+}
+
+func pathHandler(ctx context.Context, loc string) http.Handler {
+	info, err := os.Stat(loc)
+	if err != nil {
+		zapctx.Warn(ctx, "cannot load dashboard files", zap.Error(err))
+		return nil
+	}
+	if !info.IsDir() {
+		return nil
+	}
+	mux := http.NewServeMux()
+	t, err := template.ParseFiles(filepath.Join(loc, "config.js.go"))
+	if err == nil {
+		var buf bytes.Buffer
+		if err := t.Execute(&buf, configParams); err == nil {
+			content := buf.Bytes()
+			mux.HandleFunc("/config.js", func(w http.ResponseWriter, _ *http.Request) {
+				w.Write(content)
+			})
+		}
+	} else {
+		zapctx.Warn(ctx, "cannot parse template", zap.Error(err))
+	}
+	mux.Handle("/", http.FileServer(http.Dir(loc)))
+	return http.StripPrefix(dashboardPath, mux)
+}
+
+// configParams holds the parameters that need to be provided to the
+// config.js.go template for a JAAS dashboard deployement.
+var configParams = map[string]interface{}{
+	"baseAppURL":                dashboardPath + "/",
+	"identityProviderAvailable": true,
+	"isJuju":                    false,
 }

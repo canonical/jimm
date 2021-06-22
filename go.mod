@@ -41,7 +41,7 @@ require (
 	github.com/prometheus/common v0.29.0 // indirect
 	github.com/rogpeppe/fastuuid v1.2.0
 	go.uber.org/zap v1.10.0
-	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e
+	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e // indirect
 	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/net v0.0.0-20210614182718-04defd469f4e // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
@@ -54,7 +54,6 @@ require (
 	gopkg.in/juju/environschema.v1 v1.0.1-0.20201027142642-c89a4490670a
 	gopkg.in/macaroon-bakery.v2 v2.3.0
 	gopkg.in/macaroon.v2 v2.1.0
-	gopkg.in/yaml.v2 v2.4.0
 	gorm.io/driver/postgres v1.0.5
 	gorm.io/driver/sqlite v1.1.4-0.20201029040614-e1caf3738eb9
 	gorm.io/gorm v1.20.6
