@@ -22,7 +22,7 @@ require (
 	github.com/juju/cmd v0.0.0-20200108104440-8e43f3faa5c9
 	github.com/juju/errors v0.0.0-20200330140219-3fe23663418f
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
-	github.com/juju/juju v0.0.0-20210617000256-2fe7a0fc8773
+	github.com/juju/juju v0.0.0-20210621060204-d62cb9558de0
 	github.com/juju/loggo v0.0.0-20200526014432-9ce3a2e09b5e
 	github.com/juju/mgo/v2 v2.0.0-20210414025616-e854c672032f
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
