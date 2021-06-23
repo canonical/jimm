@@ -18,7 +18,6 @@ import (
 	"github.com/google/uuid"
 	vault "github.com/hashicorp/vault/api"
 	"github.com/juju/zaputil/zapctx"
-	"github.com/julienschmidt/httprouter"
 	"go.uber.org/zap"
 	httpbakeryv2 "gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
@@ -31,7 +30,6 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/debugapi"
 	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/jemserver"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
 	"github.com/CanonicalLtd/jimm/internal/jujuclient"
@@ -114,14 +112,12 @@ type Service struct {
 	jimm                 jimm.JIMM
 	vaultLifetimeWatcher *vault.LifetimeWatcher
 
-	// TODO(mhilton) without a REST-like API an httprouter is probably
-	// not necessary, replace with an http.ServeMux.
-	router httprouter.Router
+	mux http.ServeMux
 }
 
 // ServeHTTP implements http.Handler.
 func (s *Service) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	s.router.ServeHTTP(w, req)
+	s.mux.ServeHTTP(w, req)
 }
 
 // WatchControllers connects to all controllers and starts an AllWatcher
@@ -212,26 +208,20 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	}
 	s.jimm.VaultPath = p.VaultPath
 
-	debugHandler := debugapi.Handler(ctx, map[string]debugapi.StatusCheck{
-		"start_started": debugapi.ServerStartTime,
-	})
-	s.router.Handler("GET", "/debug/*path", debugHandler)
-
-	handlers, err := jujuapi.NewAPIHandler(ctx, &s.jimm, jemserver.HandlerParams{
-		Params: jemserver.Params{
-			ControllerUUID:          p.ControllerUUID,
-			WebsocketRequestTimeout: 10 * time.Minute,
-		},
-	})
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-	for _, hnd := range handlers {
-		s.router.Handle(hnd.Method, hnd.Path, hnd.Handle)
-	}
 	dhnd := dashboard.Handler(ctx, p.DashboardLocation)
-	s.router.Handler("GET", "/dashboard", dhnd)
-	s.router.Handler("GET", "/dashboard/*path", dhnd)
+	s.mux.Handle("/dashboard", dhnd)
+	s.mux.Handle("/dashboard/", dhnd)
+	s.mux.Handle("/debug/", debugapi.Handler(ctx, map[string]debugapi.StatusCheck{
+		"start_started": debugapi.ServerStartTime,
+	}))
+
+	params := jujuapi.Params{
+		ControllerUUID:   p.ControllerUUID,
+		IdentityLocation: p.CandidURL,
+	}
+	s.mux.Handle("/api", jujuapi.APIHandler(ctx, &s.jimm, params))
+	s.mux.Handle("/model/", jujuapi.ModelHandler(ctx, &s.jimm, params))
+
 	return s, nil
 }
 

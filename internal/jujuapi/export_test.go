@@ -9,18 +9,6 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 )
 
-type HeartMonitor heartMonitor
-
-var (
-	NewHeartMonitor = &newHeartMonitor
-)
-
-func InternalHeartMonitor(f func(time.Duration) HeartMonitor) func(time.Duration) heartMonitor {
-	return func(d time.Duration) heartMonitor {
-		return f(d)
-	}
-}
-
 func NewModelSummaryWatcher() *modelSummaryWatcher {
 	return &modelSummaryWatcher{
 		summaries: make(map[string]jujuparams.ModelAbstract),

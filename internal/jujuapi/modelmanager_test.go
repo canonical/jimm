@@ -1455,3 +1455,7 @@ func (s *modelManagerSuite) TestModelDefaults(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(values, jc.DeepEquals, config.ModelDefaultAttributes{})
 }
+
+func newBool(b bool) *bool {
+	return &b
+}

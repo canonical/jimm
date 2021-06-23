@@ -4,6 +4,8 @@ package jujuapi
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -13,19 +15,77 @@ import (
 	"github.com/juju/juju/rpc/jsoncodec"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 
+	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/jemserver"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
+	"github.com/CanonicalLtd/jimm/internal/jimmhttp"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 )
 
 const (
 	requestTimeout        = 10 * time.Second
 	maxRequestConcurrency = 10
+	pingTimeout           = 90 * time.Second
 )
 
-// mapError maps JEM errors to errors suitable for use with the juju API.
+// A root is an rpc.Root enhanced so that it can notify on ping requests.
+type root interface {
+	rpc.Root
+	setPingF(func())
+}
+
+// An apiServer is a jimmhttp.WSServer that serves the controller API.
+type apiServer struct {
+	jimm   *jimm.JIMM
+	params Params
+}
+
+// ServeWS implements jimmhttp.WSServer.
+func (s apiServer) ServeWS(_ context.Context, conn *websocket.Conn) {
+	serveRoot(context.Background(), newControllerRoot(s.jimm, s.params), conn)
+}
+
+type modelAPIServer struct {
+	jimm   *jimm.JIMM
+	params Params
+}
+
+// ServeWS implements jimmhttp.WSServer.
+func (s modelAPIServer) ServeWS(ctx context.Context, conn *websocket.Conn) {
+	uuid := jimmhttp.PathVarFromContext(ctx, "uuid")
+	ctx = zapctx.WithFields(context.Background(), zap.String("model-uuid", uuid))
+	root := newModelRoot(s.jimm, uuid)
+	serveRoot(ctx, root, conn)
+}
+
+// serveRoot serves an RPC root object on a websocket connection.
+func serveRoot(ctx context.Context, root root, wsConn *websocket.Conn) {
+	ctx = zapctx.WithFields(ctx, zap.Bool("websocket", true))
+
+	conn := rpc.NewConn(
+		jsoncodec.NewWebsocket(wsConn),
+		func() rpc.Recorder {
+			return recorder{
+				start: time.Now(),
+			}
+		},
+	)
+	conn.ServeRoot(root, nil, func(err error) error {
+		return mapError(err)
+	})
+	defer conn.Close()
+	t := time.AfterFunc(pingTimeout, func() {
+		zapctx.Info(ctx, "ping timeout")
+		conn.Close()
+	})
+	root.setPingF(func() { t.Reset(pingTimeout) })
+	conn.Start(ctx)
+	<-conn.Dead()
+}
+
+// mapError maps JIMM errors to errors suitable for use with the juju API.
 func mapError(err error) *jujuparams.Error {
 	if err == nil {
 		return nil
@@ -39,42 +99,43 @@ func mapError(err error) *jujuparams.Error {
 	}
 }
 
-// heartMonitor is a interface that will monitor a connection and fail it
-// if a heartbeat is not received within a certain time.
-type heartMonitor interface {
-	// Heartbeat signals to the HeartMonitor that the connection is still alive.
-	Heartbeat()
-
-	// Dead returns a channel that will be signalled if the heartbeat
-	// is not detected quickly enough.
-	Dead() <-chan time.Time
-
-	// Stop stops the HeartMonitor from monitoring. It return true if
-	// the connection is already dead when Stop was called.
-	Stop() bool
+// A modelCommandsServer serves the /commands server for a model.
+type modelCommandsServer struct {
+	jimm *jimm.JIMM
 }
 
-// timerHeartMonitor implements heartMonitor using a standard time.Timer.
-type timerHeartMonitor struct {
-	*time.Timer
-	duration time.Duration
-}
+// ServeWS implements jimmhttp.WSServer.
+func (s modelCommandsServer) ServeWS(ctx context.Context, conn *websocket.Conn) {
+	codec := jsoncodec.NewWebsocketConn(conn)
+	defer codec.Close()
 
-// Heartbeat implements HeartMonitor.Heartbeat.
-func (h timerHeartMonitor) Heartbeat() {
-	h.Timer.Reset(h.duration)
-}
+	uuid := jimmhttp.PathVarFromContext(ctx, "uuid")
+	m := dbmodel.Model{
+		UUID: sql.NullString{
+			String: uuid,
+			Valid:  uuid != "",
+		},
+	}
+	var msg interface{}
+	if err := s.jimm.Database.GetModel(context.Background(), &m); err == nil {
+		addr := m.Controller.PublicAddress
+		if addr == "" {
+			addr = fmt.Sprintf("%s:%d", m.Controller.Addresses[0][0].Value, m.Controller.Addresses[0][0].Port)
+		}
+		msg = struct {
+			RedirectTo string `json:"redirect-to"`
+		}{
+			RedirectTo: fmt.Sprintf("wss://%s/model/%s/commands", addr, uuid),
+		}
 
-// Dead implements HeartMonitor.Dead.
-func (h timerHeartMonitor) Dead() <-chan time.Time {
-	return h.Timer.C
-}
-
-// newHeartMonitor is defined as a variable so that it can be overriden in tests.
-var newHeartMonitor = func(d time.Duration) heartMonitor {
-	return timerHeartMonitor{
-		Timer:    time.NewTimer(d),
-		duration: d,
+	} else {
+		msg = jujuparams.CLICommandStatus{
+			Done:  true,
+			Error: mapError(err),
+		}
+	}
+	if err := codec.Send(msg); err != nil {
+		zapctx.Error(ctx, "cannot send commands response", zap.Error(err))
 	}
 }
 
@@ -89,60 +150,6 @@ var websocketUpgrader = websocket.Upgrader{
 	// fragmentation, we default to largeish frames.
 	ReadBufferSize:  websocketFrameSize,
 	WriteBufferSize: websocketFrameSize,
-}
-
-// newWSServer creates a new WebSocket server suitible for handling the API for modelUUID.
-func newWSServer(jimm *jimm.JIMM, jsParams jemserver.Params, uuid string) http.Handler {
-	hnd := &wsHandler{
-		jimm:      jimm,
-		params:    jsParams,
-		modelUUID: uuid,
-	}
-	h := func(w http.ResponseWriter, req *http.Request) {
-		conn, err := websocketUpgrader.Upgrade(w, req, nil)
-		if err != nil {
-			zapctx.Error(req.Context(), "cannot upgrade websocket", zaputil.Error(err))
-			return
-		}
-		hnd.handle(req.Context(), conn)
-	}
-	return http.HandlerFunc(h)
-}
-
-// wsHandler is a handler for a particular WebSocket connection.
-type wsHandler struct {
-	jimm      *jimm.JIMM
-	params    jemserver.Params
-	modelUUID string
-}
-
-// handle handles the connection.
-func (h *wsHandler) handle(ctx context.Context, wsConn *websocket.Conn) {
-	codec := jsoncodec.NewWebsocket(wsConn)
-	conn := rpc.NewConn(codec, func() rpc.Recorder {
-		return recorder{
-			start: time.Now(),
-		}
-	})
-	hm := newHeartMonitor(h.params.WebsocketRequestTimeout)
-	var root rpc.Root
-	if h.modelUUID == "" {
-		root = newControllerRoot(h.jimm, h.params, hm)
-	} else {
-		root = newModelRoot(h.jimm, hm, h.modelUUID)
-	}
-	defer root.Kill()
-	conn.ServeRoot(root, nil, func(err error) error {
-		return mapError(err)
-	})
-	defer conn.Close()
-	conn.Start(ctx)
-	select {
-	case <-hm.Dead():
-		zapctx.Info(ctx, "ping timeout")
-	case <-conn.Dead():
-		hm.Stop()
-	}
 }
 
 // recorder implements an rpc.Recorder.

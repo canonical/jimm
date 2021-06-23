@@ -7,12 +7,10 @@ import (
 	"sync"
 
 	"github.com/juju/names/v4"
-	"github.com/juju/rpcreflect"
 	"github.com/rogpeppe/fastuuid"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/jemserver"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
 )
@@ -21,10 +19,10 @@ import (
 type controllerRoot struct {
 	rpc.Root
 
-	params       jemserver.Params
-	jimm         *jimm.JIMM
-	heartMonitor heartMonitor
-	watchers     *watcherRegistry
+	params   Params
+	jimm     *jimm.JIMM
+	watchers *watcherRegistry
+	pingF    func()
 
 	// mu protects the fields below it
 	mu                    sync.Mutex
@@ -33,21 +31,21 @@ type controllerRoot struct {
 	generator             *fastuuid.Generator
 }
 
-func newControllerRoot(j *jimm.JIMM, p jemserver.Params, hm heartMonitor) *controllerRoot {
+func newControllerRoot(j *jimm.JIMM, p Params) *controllerRoot {
 	r := &controllerRoot{
-		params:       p,
-		jimm:         j,
-		heartMonitor: hm,
+		params: p,
+		jimm:   j,
 		watchers: &watcherRegistry{
 			watchers: make(map[string]*modelSummaryWatcher),
 		},
+		pingF:                 func() {},
 		controllerUUIDMasking: true,
 	}
 
 	r.AddMethod("Admin", 1, "Login", rpc.Method(unsupportedLogin))
 	r.AddMethod("Admin", 2, "Login", rpc.Method(unsupportedLogin))
 	r.AddMethod("Admin", 3, "Login", rpc.Method(r.Login))
-	r.AddMethod("Pinger", 1, "Ping", rpc.Method(ping))
+	r.AddMethod("Pinger", 1, "Ping", rpc.Method(r.Ping))
 	return r
 }
 
@@ -77,6 +75,8 @@ func (r *controllerRoot) masquerade(ctx context.Context, userTag string) (*dbmod
 	return &user, nil
 }
 
+// parseUserTag parses a names.UserTag and validates it is for an
+// identity-provider user.
 func parseUserTag(tag string) (names.UserTag, error) {
 	ut, err := names.ParseUserTag(tag)
 	if err != nil {
@@ -88,9 +88,7 @@ func parseUserTag(tag string) (names.UserTag, error) {
 	return ut, nil
 }
 
-// FindMethod implements rpcreflect.MethodFinder.
-func (r *controllerRoot) FindMethod(rootName string, version int, methodName string) (rpcreflect.MethodCaller, error) {
-	// update the heart monitor for every request received.
-	r.heartMonitor.Heartbeat()
-	return r.Root.FindMethod(rootName, version, methodName)
+// setPingF configures the function to call when an ping is received.
+func (r *controllerRoot) setPingF(f func()) {
+	r.pingF = f
 }
