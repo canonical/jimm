@@ -15,7 +15,6 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
-	"github.com/CanonicalLtd/jimm/params"
 )
 
 func init() {
@@ -63,9 +62,44 @@ func (r *controllerRoot) DisableControllerUUIDMasking(ctx context.Context) error
 	return nil
 }
 
+// LegacyListControllerResponse holds a list of controllers as returned
+// by the legacy JIMM.ListControllers API.
+type LegacyListControllerResponse struct {
+	Controllers []LegacyControllerResponse `json:"controllers"`
+}
+
+// LegacyControllerResponse holds information on a given Controller as
+// returned by the legacy JIMM.ListControllers API.
+type LegacyControllerResponse struct {
+	// Path holds the path of the controller.
+	Path string `json:"path"`
+
+	// ProviderType holds the kind of provider used
+	// by the Controller.
+	ProviderType string `json:"provider-type,omitempty"`
+
+	// Location holds location attributes associated with the controller.
+	Location map[string]string `json:"location,omitempty"`
+
+	// Public holds whether the controller is part of the public
+	// pool of controllers.
+	Public bool
+
+	// UnavailableSince holds the time that the JEM server
+	// noticed that the model's controller could not be
+	// contacted. It is empty when the model is available.
+	UnavailableSince *time.Time `json:"unavailable-since,omitempty"`
+
+	// UUID holds the controller's UUID.
+	UUID string `json:"uuid,omitempty"`
+
+	// Version holds the version of the controller.
+	Version string `json:"version,omitempty"`
+}
+
 // ListControllers returns the list of juju controllers hosting models
 // as part of this JAAS system.
-func (r *controllerRoot) ListControllers(ctx context.Context) (params.ListControllerResponse, error) {
+func (r *controllerRoot) ListControllers(ctx context.Context) (LegacyListControllerResponse, error) {
 	const op = errors.Op("jujuapi.ListControllers")
 
 	if r.user.ControllerAccess != "superuser" {
@@ -73,11 +107,11 @@ func (r *controllerRoot) ListControllers(ctx context.Context) (params.ListContro
 		// itself as the only controller.
 		srvVersion, err := r.jimm.EarliestControllerVersion(ctx)
 		if err != nil {
-			return params.ListControllerResponse{}, errors.E(op, err)
+			return LegacyListControllerResponse{}, errors.E(op, err)
 		}
-		return params.ListControllerResponse{
-			Controllers: []params.ControllerResponse{{
-				Path:    params.EntityPath{User: "admin", Name: "jaas"},
+		return LegacyListControllerResponse{
+			Controllers: []LegacyControllerResponse{{
+				Path:    "admin/jaas",
 				Public:  true,
 				UUID:    r.params.ControllerUUID,
 				Version: srvVersion.String(),
@@ -85,10 +119,10 @@ func (r *controllerRoot) ListControllers(ctx context.Context) (params.ListContro
 		}, nil
 	}
 
-	var controllers []params.ControllerResponse
+	var controllers []LegacyControllerResponse
 	err := r.jimm.Database.ForEachController(ctx, func(ctl *dbmodel.Controller) error {
-		var cr params.ControllerResponse
-		cr.Path = params.EntityPath{User: "admin", Name: params.Name(ctl.Name)}
+		var cr LegacyControllerResponse
+		cr.Path = "admin/" + ctl.Name
 		cr.Public = true
 		cr.Location = map[string]string{
 			"cloud":  ctl.CloudName,
@@ -103,9 +137,9 @@ func (r *controllerRoot) ListControllers(ctx context.Context) (params.ListContro
 		return nil
 	})
 	if err != nil {
-		return params.ListControllerResponse{}, errors.E(op, err)
+		return LegacyListControllerResponse{}, errors.E(op, err)
 	}
-	return params.ListControllerResponse{
+	return LegacyListControllerResponse{
 		Controllers: controllers,
 	}, nil
 }

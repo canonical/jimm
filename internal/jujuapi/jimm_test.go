@@ -16,7 +16,7 @@ import (
 	"github.com/CanonicalLtd/jimm/api"
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
-	"github.com/CanonicalLtd/jimm/params"
+	"github.com/CanonicalLtd/jimm/internal/jujuapi"
 )
 
 type jimmSuite struct {
@@ -38,25 +38,25 @@ func (s *jimmSuite) TestListControllers(c *gc.C) {
 	// Open the API connection as user "alice".
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
-	var resp params.ListControllerResponse
+	var resp jujuapi.LegacyListControllerResponse
 	err := conn.APICall("JIMM", 2, "", "ListControllers", nil, &resp)
 	c.Assert(err, gc.Equals, nil)
 
-	c.Assert(resp, jc.DeepEquals, params.ListControllerResponse{
-		Controllers: []params.ControllerResponse{{
-			Path:     params.EntityPath{"admin", "dummy-0"},
+	c.Assert(resp, jc.DeepEquals, jujuapi.LegacyListControllerResponse{
+		Controllers: []jujuapi.LegacyControllerResponse{{
+			Path:     "admin/dummy-0",
 			Location: map[string]string{"cloud": "dummy", "region": "dummy-region"},
 			Public:   true,
 			UUID:     s.Model.Controller.UUID,
 			Version:  s.Model.Controller.AgentVersion,
 		}, {
-			Path:     params.EntityPath{"admin", "dummy-1"},
+			Path:     "admin/dummy-1",
 			Location: map[string]string{"cloud": "dummy", "region": "dummy-region"},
 			Public:   true,
 			UUID:     s.Model.Controller.UUID,
 			Version:  s.Model.Controller.AgentVersion,
 		}, {
-			Path:     params.EntityPath{"admin", "dummy-2"},
+			Path:     "admin/dummy-2",
 			Location: map[string]string{"cloud": "dummy", "region": "dummy-region"},
 			Public:   true,
 			UUID:     s.Model.Controller.UUID,
@@ -72,13 +72,13 @@ func (s *jimmSuite) TestListControllersUnauthorizedUser(c *gc.C) {
 	// Open the API connection as user "bob".
 	conn := s.open(c, nil, "bob")
 	defer conn.Close()
-	var resp params.ListControllerResponse
+	var resp jujuapi.LegacyListControllerResponse
 	err := conn.APICall("JIMM", 2, "", "ListControllers", nil, &resp)
 	c.Assert(err, gc.Equals, nil)
 
-	c.Assert(resp, jc.DeepEquals, params.ListControllerResponse{
-		Controllers: []params.ControllerResponse{{
-			Path:    params.EntityPath{User: "admin", Name: "jaas"},
+	c.Assert(resp, jc.DeepEquals, jujuapi.LegacyListControllerResponse{
+		Controllers: []jujuapi.LegacyControllerResponse{{
+			Path:    "admin/jaas",
 			Public:  true,
 			UUID:    "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 			Version: jujuversion.Current.String(),
