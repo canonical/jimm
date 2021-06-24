@@ -12,7 +12,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jimmhttp"
 )
 
-var stripPathVarTests = []struct {
+var stripPathElementTests = []struct {
 	name       string
 	url        string
 	expectVar  string
@@ -44,17 +44,17 @@ var stripPathVarTests = []struct {
 	expectPath: "/bar",
 }}
 
-func TestStripPathVar(t *testing.T) {
+func TestStripPathElement(t *testing.T) {
 	c := qt.New(t)
 
-	for _, test := range stripPathVarTests {
+	for _, test := range stripPathElementTests {
 		c.Run(test.name, func(c *qt.C) {
 			var hnd http.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				c.Check(jimmhttp.PathVarFromContext(req.Context(), "key"), qt.Equals, test.expectVar)
+				c.Check(jimmhttp.PathElementFromContext(req.Context(), "key"), qt.Equals, test.expectVar)
 				c.Check(req.URL.Path, qt.Equals, test.expectPath)
 				c.Check(req.URL.RawPath, qt.Equals, "")
 			})
-			hnd = jimmhttp.StripPathVar("key", hnd)
+			hnd = jimmhttp.StripPathElement("key", hnd)
 
 			req, err := http.NewRequest("GET", test.url, nil)
 			c.Assert(err, qt.IsNil)

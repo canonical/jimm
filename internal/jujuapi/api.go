@@ -44,5 +44,5 @@ func ModelHandler(ctx context.Context, jimm *jimm.JIMM, p Params) http.Handler {
 		Upgrader: websocketUpgrader,
 		Server:   modelAPIServer{jimm: jimm},
 	})
-	return http.StripPrefix("/model", jimmhttp.StripPathVar("uuid", mux))
+	return http.StripPrefix("/model", jimmhttp.StripPathElement("uuid", mux))
 }

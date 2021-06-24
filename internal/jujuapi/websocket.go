@@ -54,7 +54,7 @@ type modelAPIServer struct {
 
 // ServeWS implements jimmhttp.WSServer.
 func (s modelAPIServer) ServeWS(ctx context.Context, conn *websocket.Conn) {
-	uuid := jimmhttp.PathVarFromContext(ctx, "uuid")
+	uuid := jimmhttp.PathElementFromContext(ctx, "uuid")
 	ctx = zapctx.WithFields(context.Background(), zap.String("model-uuid", uuid))
 	root := newModelRoot(s.jimm, uuid)
 	serveRoot(ctx, root, conn)
@@ -77,7 +77,7 @@ func serveRoot(ctx context.Context, root root, wsConn *websocket.Conn) {
 	})
 	defer conn.Close()
 	t := time.AfterFunc(pingTimeout, func() {
-		zapctx.Info(ctx, "ping timeout")
+		zapctx.Info(ctx, "ping timeout, closing connection")
 		conn.Close()
 	})
 	root.setPingF(func() { t.Reset(pingTimeout) })
@@ -109,7 +109,7 @@ func (s modelCommandsServer) ServeWS(ctx context.Context, conn *websocket.Conn) 
 	codec := jsoncodec.NewWebsocketConn(conn)
 	defer codec.Close()
 
-	uuid := jimmhttp.PathVarFromContext(ctx, "uuid")
+	uuid := jimmhttp.PathElementFromContext(ctx, "uuid")
 	m := dbmodel.Model{
 		UUID: sql.NullString{
 			String: uuid,

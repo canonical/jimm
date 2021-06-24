@@ -67,11 +67,27 @@ func TestWSHandlerPanic(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	_, _, err = conn.ReadMessage()
-	c.Assert(err, qt.ErrorMatches, `websocket: close 1006 \(abnormal closure\): unexpected EOF`)
+	c.Assert(err, qt.ErrorMatches, `websocket: close 1011 \(internal server error\): test`)
 }
 
 type panicServer struct{}
 
 func (s panicServer) ServeWS(ctx context.Context, conn *websocket.Conn) {
 	panic("test")
+}
+
+func TestWSHandlerNilServer(t *testing.T) {
+	c := qt.New(t)
+
+	hnd := &jimmhttp.WSHandler{}
+
+	srv := httptest.NewServer(hnd)
+	c.Cleanup(srv.Close)
+
+	var d websocket.Dialer
+	conn, _, err := d.Dial("ws"+strings.TrimPrefix(srv.URL, "http"), nil)
+	c.Assert(err, qt.IsNil)
+
+	_, _, err = conn.ReadMessage()
+	c.Assert(err, qt.ErrorMatches, `websocket: close 1000 \(normal\)`)
 }

@@ -4,7 +4,9 @@ package jimmhttp
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/juju/zaputil/zapctx"
@@ -20,7 +22,8 @@ type WSHandler struct {
 	// connection.
 	Upgrader websocket.Upgrader
 
-	// Server is the server that will be started by the handler.
+	// Server is the websocket server that will handle the websocket
+	// connection.
 	Server WSServer
 }
 
@@ -45,11 +48,20 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
 				zapctx.Error(ctx, "websocket panic", zap.Any("err", err), zap.Stack("stack"))
+				data := websocket.FormatCloseMessage(websocket.CloseInternalServerErr, fmt.Sprintf("%v", err))
+				if err := conn.WriteControl(websocket.CloseMessage, data, time.Time{}); err != nil {
+					zapctx.Error(ctx, "cannot write close message", zap.Error(err))
+				}
 			}
 		}()
-		if h.Server != nil {
-			h.Server.ServeWS(ctx, conn)
+		if h.Server == nil {
+			data := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
+			if err := conn.WriteControl(websocket.CloseMessage, data, time.Time{}); err != nil {
+				zapctx.Error(ctx, "cannot write close message", zap.Error(err))
+			}
+			return
 		}
+		h.Server.ServeWS(ctx, conn)
 	}()
 }
 

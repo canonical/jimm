@@ -12,18 +12,23 @@ import (
 
 type contextPathKey string
 
-// PathVarFromContext returns the value of the path element previously
-// extracted in a StripPathVar handler.
-func PathVarFromContext(ctx context.Context, key string) string {
+// PathElementFromContext returns the value of the path element previously
+// extracted in a StripPathElement handler.
+func PathElementFromContext(ctx context.Context, key string) string {
 	s, _ := ctx.Value(contextPathKey(key)).(string)
 	return s
 }
 
-// StripPathVar returns a handler that serves HTTP requests by removing the
-// first element from the request path and invoking the handler h. If a key
-// is specified the removed element will be stored in the context attached
-// to the request such that it cn be retrieved using PathVarFromContext.
-func StripPathVar(key string, h http.Handler) http.Handler {
+// StripPathElement returns a handler that serves HTTP requests by removing
+// the first element from the request path and invoking the handler h.
+//
+// If a key is specified the removed element will be stored in the context
+// attached to the request such that it can be retrieved using
+// PathElementFromContext.
+//
+// If the request URL contains a RawPath field then it will be cleared
+// before calling h.
+func StripPathElement(key string, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		v, p := splitPath(req.URL.Path)
 		req2 := new(http.Request)
