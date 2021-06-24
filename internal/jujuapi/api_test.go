@@ -10,22 +10,17 @@ import (
 	"net/url"
 
 	"github.com/gorilla/websocket"
-	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/rpc/jsoncodec"
-	"github.com/juju/testing/httptesting"
-	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/jemserver"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
-	"github.com/CanonicalLtd/jimm/params"
 )
 
 type apiSuite struct {
 	jimmtest.BootstrapSuite
 
-	Params     jemserver.HandlerParams
+	Params     jujuapi.Params
 	APIHandler http.Handler
 	HTTP       *httptest.Server
 }
@@ -36,14 +31,10 @@ func (s *apiSuite) SetUpTest(c *gc.C) {
 	s.BootstrapSuite.SetUpTest(c)
 	ctx := context.Background()
 
-	s.Params.GUILocation = "https://jujucharms.com.test"
-	handlers, err := jujuapi.NewAPIHandler(ctx, s.JIMM, s.Params)
-	c.Assert(err, gc.Equals, nil)
-	var r httprouter.Router
-	for _, h := range handlers {
-		r.Handle(h.Method, h.Path, h.Handle)
-	}
-	s.APIHandler = &r
+	mux := http.NewServeMux()
+	mux.Handle("/api", jujuapi.APIHandler(ctx, s.JIMM, s.Params))
+	mux.Handle("/model/", jujuapi.ModelHandler(ctx, s.JIMM, s.Params))
+	s.APIHandler = mux
 	s.HTTP = httptest.NewServer(s.APIHandler)
 }
 
@@ -55,81 +46,12 @@ func (s *apiSuite) TearDownTest(c *gc.C) {
 	s.BootstrapSuite.TearDownTest(c)
 }
 
-func (s *apiSuite) TestGUI(c *gc.C) {
-	AssertRedirect(c, RedirectParams{
-		Handler:        s.APIHandler,
-		Method:         "GET",
-		URL:            fmt.Sprintf("/gui/%s", s.Model.UUID.String),
-		ExpectCode:     http.StatusMovedPermanently,
-		ExpectLocation: "https://jujucharms.com.test/u/bob/model-1",
-	})
-}
-
-func (s *apiSuite) TestGUINotFound(c *gc.C) {
-	p := s.Params
-	p.GUILocation = ""
-	handlers, err := jujuapi.NewAPIHandler(context.Background(), s.JIMM, p)
-	c.Assert(err, gc.Equals, nil)
-	var r httprouter.Router
-	for _, h := range handlers {
-		r.Handle(h.Method, h.Path, h.Handle)
-	}
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		URL:          fmt.Sprintf("/gui/%s", "000000000000-0000-0000-0000-00000000"),
-		Handler:      &r,
-		ExpectStatus: http.StatusNotFound,
-		ExpectBody: params.Error{
-			Code:    params.ErrNotFound,
-			Message: "no GUI location specified",
-		},
-	})
-}
-
-func (s *apiSuite) TestGUIModelNotFound(c *gc.C) {
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		URL:          fmt.Sprintf("/gui/%s", "000000000000-0000-0000-0000-00000000"),
-		Handler:      s.APIHandler,
-		ExpectStatus: http.StatusNotFound,
-		ExpectBody: params.Error{
-			Code:    params.ErrNotFound,
-			Message: `model not found`,
-		},
-	})
-}
-
-func (s *apiSuite) TestGUIArchive(c *gc.C) {
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler:      s.APIHandler,
-		Method:       "GET",
-		URL:          "/gui-archive",
-		ExpectStatus: http.StatusOK,
-		ExpectBody:   jujuparams.GUIArchiveResponse{},
-	})
-}
-
 type RedirectParams struct {
 	Method         string
 	URL            string
 	Handler        http.Handler
 	ExpectCode     int
 	ExpectLocation string
-}
-
-// AssertRedirect checks that a handler returns a redirect
-func AssertRedirect(c *gc.C, p RedirectParams) {
-	if p.Method == "" {
-		p.Method = "GET"
-	}
-	req, err := http.NewRequest(p.Method, p.URL, nil)
-	c.Assert(err, gc.Equals, nil)
-	rr := httptest.NewRecorder()
-	p.Handler.ServeHTTP(rr, req)
-	if p.ExpectCode == 0 {
-		c.Assert(300 <= rr.Code && rr.Code < 400, gc.Equals, true, gc.Commentf("Expected redirect status (3XX), got %d", rr.Code))
-	} else {
-		c.Assert(rr.Code, gc.Equals, p.ExpectCode)
-	}
-	c.Assert(rr.HeaderMap.Get("Location"), gc.Equals, p.ExpectLocation)
 }
 
 func (s *apiSuite) TestModelCommands(c *gc.C) {

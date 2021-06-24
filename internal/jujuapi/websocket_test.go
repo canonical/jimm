@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"time"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
@@ -17,11 +16,9 @@ import (
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
-	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/jemserver"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
 )
@@ -30,7 +27,7 @@ type websocketSuite struct {
 	jimmtest.CandidSuite
 	jimmtest.BootstrapSuite
 
-	Params     jemserver.HandlerParams
+	Params     jujuapi.Params
 	APIHandler http.Handler
 	HTTP       *httptest.Server
 
@@ -49,18 +46,13 @@ func (s *websocketSuite) SetUpTest(c *gc.C) {
 
 	s.JIMM.Authenticator = s.Authenticator
 
-	s.Params.WebsocketRequestTimeout = time.Second
 	s.Params.ControllerUUID = "914487b5-60e7-42bb-bd63-1adc3fd3a388"
-	s.Params.CharmstoreLocation = "https://api.jujucharms.com/charmstore"
-	s.Params.MeteringLocation = "https://api.jujucharms.com/omnibus"
 	s.Params.IdentityLocation = s.Candid.URL.String()
-	handlers, err := jujuapi.NewAPIHandler(ctx, s.JIMM, s.Params)
-	c.Assert(err, gc.Equals, nil)
-	var r httprouter.Router
-	for _, h := range handlers {
-		r.Handle(h.Method, h.Path, h.Handle)
-	}
-	s.APIHandler = &r
+
+	mux := http.NewServeMux()
+	mux.Handle("/api", jujuapi.APIHandler(ctx, s.JIMM, s.Params))
+	mux.Handle("/model/", jujuapi.ModelHandler(ctx, s.JIMM, s.Params))
+	s.APIHandler = mux
 	s.HTTP = httptest.NewTLSServer(s.APIHandler)
 
 	s.Candid.AddUser("alice")
@@ -69,7 +61,7 @@ func (s *websocketSuite) SetUpTest(c *gc.C) {
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
 	s.Credential2 = new(dbmodel.CloudCredential)
 	s.Credential2.SetTag(cct)
-	err = s.JIMM.Database.GetCloudCredential(ctx, s.Credential2)
+	err := s.JIMM.Database.GetCloudCredential(ctx, s.Credential2)
 	c.Assert(err, gc.Equals, nil)
 
 	mt := s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag("dummy"), "dummy-region", cct)
