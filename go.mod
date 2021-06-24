@@ -25,7 +25,6 @@ require (
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
 	github.com/juju/juju v0.0.0-20210621060204-d62cb9558de0
 	github.com/juju/loggo v0.0.0-20200526014432-9ce3a2e09b5e
-	github.com/juju/mgo/v2 v2.0.0-20210414025616-e854c672032f
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
 	github.com/juju/names/v4 v4.0.0-20200929085019-be23e191fee0
 	github.com/juju/rpcreflect v0.0.0-20200416001309-bb46e9ba1476
@@ -34,7 +33,6 @@ require (
 	github.com/juju/version v0.0.0-20210303051006-2015802527a8
 	github.com/juju/version/v2 v2.0.0-20210319015800-dcfac8f4f057
 	github.com/juju/zaputil v0.0.0-20190326175239-ef53049637ac
-	github.com/julienschmidt/httprouter v1.3.0
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
 	github.com/prometheus/client_golang v1.11.0
 	github.com/prometheus/common v0.29.0 // indirect
@@ -49,8 +47,6 @@ require (
 	golang.org/x/tools v0.1.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 	gopkg.in/errgo.v1 v1.0.1
-	gopkg.in/httprequest.v1 v1.2.1
-	gopkg.in/juju/environschema.v1 v1.0.1-0.20201027142642-c89a4490670a
 	gopkg.in/macaroon-bakery.v2 v2.3.0
 	gopkg.in/macaroon.v2 v2.1.0
 	gorm.io/driver/postgres v1.0.5
