@@ -12,6 +12,7 @@ import urllib
 
 from jinja2 import Environment, FileSystemLoader
 
+from charmhelpers.contrib.charmsupport.nrpe import NRPE
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, ModelError, WaitingStatus
 
@@ -33,6 +34,7 @@ class JimmCharm(SystemdCharm):
         self.framework.observe(self.on.stop, self._on_stop)
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.framework.observe(self.on.upgrade_charm, self._on_upgrade_charm)
+        self.framework.observe(self.on.nrpe_relation_joined, self._on_nrpe_relation_joined)
         self.framework.observe(self.on.website_relation_joined, self._on_website_relation_joined)
         self._agent_filename = "/var/snap/jimm/common/agent.json"
         self._workload_filename = "/snap/bin/jimm"
@@ -130,6 +132,18 @@ class JimmCharm(SystemdCharm):
         except Exception as e:
             logger.error("getting version: %s (%s)", str(e), type(e))
             self.unit.status = MaintenanceStatus("starting")
+
+    def _on_nrpe_relation_joined(self, event):
+        """Connect a NRPE relation."""
+        nrpe = NRPE()
+        nrpe.add_check(
+            shortname="JIMM",
+            description="check JIMM running",
+            check_cmd='check_http -w 2 -c 10 -I {} -p 8080 -u /debug/info'.format(
+                self.model.get_binding(event.relation).network.ingress_address,
+            )
+        )
+        nrpe.write()
 
     def _on_website_relation_joined(self, event):
         """Connect a website relation."""
