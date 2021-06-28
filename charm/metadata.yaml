@@ -10,6 +10,8 @@ summary: |
 provides:
   website:
     interface: http
+  nrpe:
+    interface: nrpe-external-master
 
 requires:
   db:
