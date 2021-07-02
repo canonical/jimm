@@ -11,6 +11,7 @@ require (
 	github.com/frankban/quicktest v1.13.0
 	github.com/go-macaroon-bakery/macaroon-bakery/v3 v3.0.0-20210309064400-d73aa8f92aa2
 	github.com/gobwas/glob v0.2.4-0.20181002190808-e7a84e9525fe // indirect
+	github.com/golang/mock v1.6.0 // indirect
 	github.com/google/go-cmp v0.5.6
 	github.com/google/uuid v1.2.0
 	github.com/gorilla/websocket v1.4.2
@@ -19,11 +20,11 @@ require (
 	github.com/jackc/pgconn v1.7.0
 	github.com/jackc/pgx/v4 v4.9.0
 	github.com/juju/aclstore/v2 v2.1.0 // indirect
-	github.com/juju/charm/v8 v8.0.0-20210510114941-82380ab895dc
+	github.com/juju/charm/v8 v8.0.0-20210615153946-469f7216a7d5
 	github.com/juju/cmd v0.0.0-20200108104440-8e43f3faa5c9
 	github.com/juju/errors v0.0.0-20200330140219-3fe23663418f
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
-	github.com/juju/juju v0.0.0-20210621060204-d62cb9558de0
+	github.com/juju/juju v0.0.0-20210630005308-95b319ca0ac1
 	github.com/juju/loggo v0.0.0-20200526014432-9ce3a2e09b5e
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
 	github.com/juju/names/v4 v4.0.0-20200929085019-be23e191fee0
@@ -39,12 +40,11 @@ require (
 	github.com/rogpeppe/fastuuid v1.2.0
 	go.uber.org/zap v1.10.0
 	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e // indirect
-	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/net v0.0.0-20210614182718-04defd469f4e // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210616094352-59db8d763f22 // indirect
-	golang.org/x/term v0.0.0-20210317153231-de623e64d2a6 // indirect
-	golang.org/x/tools v0.1.0 // indirect
+	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
+	golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b // indirect
+	golang.org/x/tools v0.1.4 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 	gopkg.in/errgo.v1 v1.0.1
 	gopkg.in/macaroon-bakery.v2 v2.3.0
