@@ -635,6 +635,24 @@ func (s *modelManagerSuite) TestRevokeModelWrite(c *gc.C) {
 	})
 }
 
+func (s *modelManagerSuite) TestUserCanAlwaysRevokeTheirOwnAccess(c *gc.C) {
+	err := s.JEM.GrantModel(testContext, jemtest.Bob, &s.Model, "alice", "read")
+	c.Assert(err, gc.Equals, nil)
+	model1 := mongodoc.Model{Path: s.Model.Path}
+	err = s.JEM.DB.GetModel(testContext, &model1)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{
+		Read:  []string{"alice"},
+		Write: []string{},
+		Admin: []string{},
+	})
+	err = s.JEM.RevokeModel(testContext, jemtest.Alice, &s.Model, "alice", "read")
+	c.Assert(err, gc.Equals, nil)
+	err = s.JEM.DB.GetModel(testContext, &model1)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(model1.ACL, jc.DeepEquals, params.ACL{})
+}
+
 func (s *modelManagerSuite) TestRevokeModelControllerFailure(c *gc.C) {
 	err := s.JEM.GrantModel(testContext, jemtest.Bob, &s.Model, "alice", "write")
 	c.Assert(err, gc.Equals, nil)
