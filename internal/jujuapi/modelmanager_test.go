@@ -820,6 +820,34 @@ func (s *modelManagerSuite) TestGrantAndRevokeModel(c *gc.C) {
 	c.Assert(res[0].Error, gc.ErrorMatches, "unauthorized")
 }
 
+func (s *modelManagerSuite) TestUserRevokeOwnAccess(c *gc.C) {
+	conn := s.open(c, nil, "bob")
+	defer conn.Close()
+	client := modelmanager.NewClient(conn)
+
+	conn2 := s.open(c, nil, "charlie")
+	defer conn2.Close()
+	client2 := modelmanager.NewClient(conn2)
+
+	err := client.GrantModel("charlie@external", "read", s.Model.UUID.String)
+	c.Assert(err, gc.Equals, nil)
+
+	res, err := client2.ModelInfo([]names.ModelTag{names.NewModelTag(s.Model.UUID.String)})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(res, gc.HasLen, 1)
+	c.Assert(res[0].Error, gc.IsNil)
+	c.Assert(res[0].Result.UUID, gc.Equals, s.Model.UUID.String)
+
+	err = client2.RevokeModel("charlie@external", "read", s.Model.UUID.String)
+	c.Assert(err, gc.Equals, nil)
+
+	res, err = client2.ModelInfo([]names.ModelTag{names.NewModelTag(s.Model.UUID.String)})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(res, gc.HasLen, 1)
+	c.Assert(res[0].Error, gc.Not(gc.IsNil))
+	c.Assert(res[0].Error, gc.ErrorMatches, "unauthorized")
+}
+
 func (s *modelManagerSuite) TestModifyModelAccessErrors(c *gc.C) {
 	conn := s.open(c, nil, "bob")
 	defer conn.Close()
