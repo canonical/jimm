@@ -709,7 +709,12 @@ func (j *JEM) GrantModel(ctx context.Context, id identchecker.ACLIdentity, m *mo
 // RevokeModel revokes the given access for the given user on the given
 // model and updates the JEM database.
 func (j *JEM) RevokeModel(ctx context.Context, id identchecker.ACLIdentity, m *mongodoc.Model, user params.User, access jujuparams.UserAccessPermission) error {
-	if err := j.GetModel(ctx, id, jujuparams.ModelAdminAccess, m); err != nil {
+	requiredAccess := jujuparams.ModelAdminAccess
+	if id.Id() == string(user) {
+		// Always allow a user to revoke their own access.
+		requiredAccess = jujuparams.ModelReadAccess
+	}
+	if err := j.GetModel(ctx, id, requiredAccess, m); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	u := new(jimmdb.Update)
