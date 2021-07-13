@@ -2119,6 +2119,65 @@ var revokeModelAccessTests = []struct {
 		}},
 	},
 }, {
+	name: "UserRevokingOwnAccess",
+	env:  revokeModelAccessTestEnv,
+	revokeModelAccess: func(_ context.Context, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
+		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
+			return errors.E("bad model tag")
+		}
+		if ut.Id() != "charlie@external" {
+			return errors.E("bad user tag")
+		}
+		if access != "read" {
+			return errors.E("bad permission")
+		}
+		return nil
+	},
+	username:       "charlie@external",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "charlie@external",
+	access:         "read",
+	expectModel: dbmodel.Model{
+		Name: "model-1",
+		UUID: sql.NullString{
+			String: "00000002-0000-0000-0000-000000000001",
+			Valid:  true,
+		},
+		Owner: dbmodel.User{
+			Username:         "alice@external",
+			ControllerAccess: "add-model",
+		},
+		Controller: dbmodel.Controller{
+			Name:        "controller-1",
+			UUID:        "00000001-0000-0000-0000-000000000001",
+			CloudName:   "dummy",
+			CloudRegion: "dummy-region",
+		},
+		CloudRegion: dbmodel.CloudRegion{
+			Cloud: dbmodel.Cloud{
+				Name: "dummy",
+				Type: "dummy",
+			},
+			Name: "dummy-region",
+		},
+		CloudCredential: dbmodel.CloudCredential{
+			Name: "cred-1",
+		},
+		Users: []dbmodel.UserModelAccess{{
+			User: dbmodel.User{
+				Username:         "alice@external",
+				ControllerAccess: "add-model",
+			},
+			Access: "admin",
+		}, {
+			User: dbmodel.User{
+				Username:         "bob@external",
+				ControllerAccess: "add-model",
+			},
+			Access: "admin",
+		}},
+	},
+}, {
 	name:            "UserNotAuthorized",
 	env:             revokeModelAccessTestEnv,
 	username:        "charlie@external",

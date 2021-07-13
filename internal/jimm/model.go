@@ -830,12 +830,12 @@ func (j *JIMM) GrantModelAccess(ctx context.Context, u *dbmodel.User, mt names.M
 
 }
 
-// RevokeModelAccess revokes the given access level on the given model
-// from the given user. If the model is not found then an error with the
-// code CodeNotFound is returned. If the authenticated user does not
-// have admin access to the model then an error with the code
-// CodeUnauthorized is returned. If the ModifyModelAccess API call
-// retuns an error the error code is not masked.
+// RevokeModelAccess revokes the given access level on the given model from
+// the given user. If the model is not found then an error with the code
+// CodeNotFound is returned. If the authenticated user does not have admin
+// access to the model, and is not attempting to revoke their own access,
+// then an error with the code CodeUnauthorized is returned. If the
+// ModifyModelAccess API call retuns an error the error code is not masked.
 func (j *JIMM) RevokeModelAccess(ctx context.Context, u *dbmodel.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
 	const op = errors.Op("jimm.RevokeModelAccess")
 
@@ -851,7 +851,12 @@ func (j *JIMM) RevokeModelAccess(ctx context.Context, u *dbmodel.User, mt names.
 	}
 	defer j.addAuditLogEntry(&ale)
 
-	err := j.doModelAdmin(ctx, u, mt, func(m *dbmodel.Model, api API) error {
+	requiredAccess := "admin"
+	if u.Tag() == ut {
+		// If the user is attempting to revoke their own access.
+		requiredAccess = "read"
+	}
+	err := j.doModel(ctx, u, mt, requiredAccess, func(m *dbmodel.Model, api API) error {
 		targetUser := dbmodel.User{
 			Username: ut.Id(),
 		}
@@ -1004,7 +1009,11 @@ func (j *JIMM) ValidateModelUpgrade(ctx context.Context, u *dbmodel.User, mt nam
 // returned from the dial operation. If the given function returns an error
 // that error will be returned with the code unmasked.
 func (j *JIMM) doModelAdmin(ctx context.Context, u *dbmodel.User, mt names.ModelTag, f func(*dbmodel.Model, API) error) error {
-	const op = errors.Op("jimm.doModelAdmin")
+	return j.doModel(ctx, u, mt, "admin", f)
+}
+
+func (j *JIMM) doModel(ctx context.Context, u *dbmodel.User, mt names.ModelTag, access string, f func(*dbmodel.Model, API) error) error {
+	const op = errors.Op("jimm.doModel")
 
 	var m dbmodel.Model
 	m.SetTag(mt)
@@ -1012,8 +1021,8 @@ func (j *JIMM) doModelAdmin(ctx context.Context, u *dbmodel.User, mt names.Model
 	if err := j.Database.GetModel(ctx, &m); err != nil {
 		return errors.E(op, err)
 	}
-	if u.ControllerAccess != "superuser" && m.UserAccess(u) != "admin" {
-		// If the user doesn't have admin access on the model return
+	if u.ControllerAccess != "superuser" && !allowedModelAccess[access][m.UserAccess(u)] {
+		// If the user doesn't have correct access on the model return
 		// an unauthorized error.
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
@@ -1027,6 +1036,21 @@ func (j *JIMM) doModelAdmin(ctx context.Context, u *dbmodel.User, mt names.Model
 		return errors.E(op, err)
 	}
 	return nil
+}
+
+var allowedModelAccess = map[string]map[string]bool{
+	"admin": {
+		"admin": true,
+	},
+	"write": {
+		"admin": true,
+		"write": true,
+	},
+	"read": {
+		"admin": true,
+		"write": true,
+		"read":  true,
+	},
 }
 
 // ChangeModelCredential changes the credential used with a model on both
