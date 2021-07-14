@@ -121,7 +121,6 @@ func (c *Config) TLSConfig() (*tls.Config, error) {
 		if err := os.MkdirAll(cacheDir, 0700); err != nil {
 			return nil, errgo.Mask(err)
 		}
-		// TODO whitelist only some hosts (HostPolicy: autocert.HostWhitelist)
 		m := autocert.Manager{
 			Prompt: autocert.AcceptTOS,
 			Cache:  autocert.DirCache(cacheDir),

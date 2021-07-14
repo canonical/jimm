@@ -880,14 +880,14 @@ func assertConfig(config map[string]interface{}, fnc func(context.Context, *juju
 }
 
 const modelInfoTestEnv = `clouds:
-- name: dummy
-  type: dummy
+- name: test-cloud
+  type: test-provider
   regions:
-  - name: dummy-region
+  - name: test-cloud-region
 cloud-credentials:
 - owner: alice@external
   name: cred-1
-  cloud: dummy
+  cloud: test-cloud
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
@@ -897,8 +897,8 @@ models:
   uuid: 00000002-0000-0000-0000-000000000001
   controller: controller-1
   default-series: warty
-  cloud: dummy
-  region: dummy-region
+  cloud: test-cloud
+  region: test-cloud-region
   cloud-credential: cred-1
   owner: alice@external
   life: alive
@@ -962,11 +962,11 @@ var modelInfoTests = []struct {
 		Type:               "iaas",
 		UUID:               "00000002-0000-0000-0000-000000000001",
 		ControllerUUID:     "00000001-0000-0000-0000-000000000001",
-		ProviderType:       "dummy",
+		ProviderType:       "test-provider",
 		DefaultSeries:      "warty",
-		CloudTag:           names.NewCloudTag("dummy").String(),
-		CloudRegion:        "dummy-region",
-		CloudCredentialTag: names.NewCloudCredentialTag("dummy/alice@external/cred-1").String(),
+		CloudTag:           names.NewCloudTag("test-cloud").String(),
+		CloudRegion:        "test-cloud-region",
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
 		OwnerTag:           names.NewUserTag("alice@external").String(),
 		Life:               "alive",
 		Status: jujuparams.EntityStatus{
@@ -1016,11 +1016,11 @@ var modelInfoTests = []struct {
 		Type:               "iaas",
 		UUID:               "00000002-0000-0000-0000-000000000001",
 		ControllerUUID:     "00000001-0000-0000-0000-000000000001",
-		ProviderType:       "dummy",
+		ProviderType:       "test-provider",
 		DefaultSeries:      "warty",
-		CloudTag:           names.NewCloudTag("dummy").String(),
-		CloudRegion:        "dummy-region",
-		CloudCredentialTag: names.NewCloudCredentialTag("dummy/alice@external/cred-1").String(),
+		CloudTag:           names.NewCloudTag("test-cloud").String(),
+		CloudRegion:        "test-cloud-region",
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
 		OwnerTag:           names.NewUserTag("alice@external").String(),
 		Life:               "alive",
 		Status: jujuparams.EntityStatus{
@@ -1064,11 +1064,11 @@ var modelInfoTests = []struct {
 		Type:               "iaas",
 		UUID:               "00000002-0000-0000-0000-000000000001",
 		ControllerUUID:     "00000001-0000-0000-0000-000000000001",
-		ProviderType:       "dummy",
+		ProviderType:       "test-provider",
 		DefaultSeries:      "warty",
-		CloudTag:           names.NewCloudTag("dummy").String(),
-		CloudRegion:        "dummy-region",
-		CloudCredentialTag: names.NewCloudCredentialTag("dummy/alice@external/cred-1").String(),
+		CloudTag:           names.NewCloudTag("test-cloud").String(),
+		CloudRegion:        "test-cloud-region",
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
 		OwnerTag:           names.NewUserTag("alice@external").String(),
 		Life:               "alive",
 		Status: jujuparams.EntityStatus{
@@ -1134,14 +1134,14 @@ func TestModelInfo(t *testing.T) {
 }
 
 const modelStatusTestEnv = `clouds:
-- name: dummy
-  type: dummy
+- name: test-cloud
+  type: test-provider
   regions:
-  - name: dummy-region
+  - name: test-cloud-region
 cloud-credentials:
 - owner: alice@external
   name: cred-1
-  cloud: dummy
+  cloud: test-cloud
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
@@ -1151,8 +1151,8 @@ models:
   uuid: 00000002-0000-0000-0000-000000000001
   controller: controller-1
   default-series: warty
-  cloud: dummy
-  region: dummy-region
+  cloud: test-cloud
+  region: test-cloud-region
   cloud-credential: cred-1
   owner: alice@external
   users:
@@ -1260,14 +1260,14 @@ func TestModelStatus(t *testing.T) {
 }
 
 const forEachModelTestEnv = `clouds:
-- name: dummy
-  type: dummy
+- name: test-cloud
+  type: test-provider
   regions:
-  - name: dummy-region
+  - name: test-cloud-region
 cloud-credentials:
 - owner: alice@external
   name: cred-1
-  cloud: dummy
+  cloud: test-cloud
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
@@ -1277,8 +1277,8 @@ models:
   uuid: 00000002-0000-0000-0000-000000000001
   controller: controller-1
   default-series: warty
-  cloud: dummy
-  region: dummy-region
+  cloud: test-cloud
+  region: test-cloud-region
   cloud-credential: cred-1
   owner: alice@external
   life: alive
@@ -1326,8 +1326,8 @@ models:
   uuid: 00000002-0000-0000-0000-000000000002
   controller: controller-1
   default-series: warty
-  cloud: dummy
-  region: dummy-region
+  cloud: test-cloud
+  region: test-cloud-region
   cloud-credential: cred-1
   owner: alice@external
   life: alive
@@ -1375,8 +1375,8 @@ models:
   uuid: 00000002-0000-0000-0000-000000000003
   controller: controller-1
   default-series: warty
-  cloud: dummy
-  region: dummy-region
+  cloud: test-cloud
+  region: test-cloud-region
   cloud-credential: cred-1
   owner: alice@external
   life: alive
@@ -1424,8 +1424,8 @@ models:
   uuid: 00000002-0000-0000-0000-000000000004
   controller: controller-1
   default-series: warty
-  cloud: dummy
-  region: dummy-region
+  cloud: test-cloud
+  region: test-cloud-region
   cloud-credential: cred-1
   owner: alice@external
   life: alive
@@ -1505,11 +1505,11 @@ func TestForEachUserModel(t *testing.T) {
 			UUID:               "00000002-0000-0000-0000-000000000001",
 			Type:               "iaas",
 			ControllerUUID:     "00000001-0000-0000-0000-000000000001",
-			ProviderType:       "dummy",
+			ProviderType:       "test-provider",
 			DefaultSeries:      "warty",
-			CloudTag:           names.NewCloudTag("dummy").String(),
-			CloudRegion:        "dummy-region",
-			CloudCredentialTag: names.NewCloudCredentialTag("dummy/alice@external/cred-1").String(),
+			CloudTag:           names.NewCloudTag("test-cloud").String(),
+			CloudRegion:        "test-cloud-region",
+			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
 			OwnerTag:           names.NewUserTag("alice@external").String(),
 			Life:               "alive",
 			Status: jujuparams.EntityStatus{
@@ -1539,11 +1539,11 @@ func TestForEachUserModel(t *testing.T) {
 			UUID:               "00000002-0000-0000-0000-000000000002",
 			Type:               "iaas",
 			ControllerUUID:     "00000001-0000-0000-0000-000000000001",
-			ProviderType:       "dummy",
+			ProviderType:       "test-provider",
 			DefaultSeries:      "warty",
-			CloudTag:           names.NewCloudTag("dummy").String(),
-			CloudRegion:        "dummy-region",
-			CloudCredentialTag: names.NewCloudCredentialTag("dummy/alice@external/cred-1").String(),
+			CloudTag:           names.NewCloudTag("test-cloud").String(),
+			CloudRegion:        "test-cloud-region",
+			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
 			OwnerTag:           names.NewUserTag("alice@external").String(),
 			Life:               "alive",
 			Status: jujuparams.EntityStatus{
@@ -1573,11 +1573,11 @@ func TestForEachUserModel(t *testing.T) {
 			UUID:               "00000002-0000-0000-0000-000000000004",
 			Type:               "iaas",
 			ControllerUUID:     "00000001-0000-0000-0000-000000000001",
-			ProviderType:       "dummy",
+			ProviderType:       "test-provider",
 			DefaultSeries:      "warty",
-			CloudTag:           names.NewCloudTag("dummy").String(),
-			CloudRegion:        "dummy-region",
-			CloudCredentialTag: names.NewCloudCredentialTag("dummy/alice@external/cred-1").String(),
+			CloudTag:           names.NewCloudTag("test-cloud").String(),
+			CloudRegion:        "test-cloud-region",
+			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String(),
 			OwnerTag:           names.NewUserTag("alice@external").String(),
 			Life:               "alive",
 			Status: jujuparams.EntityStatus{
@@ -1645,14 +1645,14 @@ func TestForEachModel(t *testing.T) {
 }
 
 const grantModelAccessTestEnv = `clouds:
-- name: dummy
-  type: dummy
+- name: test-cloud
+  type: test-provider
   regions:
-  - name: dummy-region
+  - name: test-cloud-region
 cloud-credentials:
 - owner: alice@external
   name: cred-1
-  cloud: dummy
+  cloud: test-cloud
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
@@ -1660,8 +1660,8 @@ models:
 - name: model-1
   uuid: 00000002-0000-0000-0000-000000000001
   controller: controller-1
-  cloud: dummy
-  region: dummy-region
+  cloud: test-cloud
+  region: test-cloud-region
   cloud-credential: cred-1
   owner: alice@external
   users:
@@ -1726,10 +1726,10 @@ var grantModelAccessTests = []struct {
 		},
 		CloudRegion: dbmodel.CloudRegion{
 			Cloud: dbmodel.Cloud{
-				Name: "dummy",
-				Type: "dummy",
+				Name: "test-cloud",
+				Type: "test-provider",
 			},
-			Name: "dummy-region",
+			Name: "test-cloud-region",
 		},
 		CloudCredential: dbmodel.CloudCredential{
 			Name: "cred-1",
@@ -1835,14 +1835,14 @@ func TestGrantModelAccess(t *testing.T) {
 }
 
 const revokeModelAccessTestEnv = `clouds:
-- name: dummy
-  type: dummy
+- name: test-cloud
+  type: test-provider
   regions:
-  - name: dummy-region
+  - name: test-cloud-region
 cloud-credentials:
 - owner: alice@external
   name: cred-1
-  cloud: dummy
+  cloud: test-cloud
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
@@ -1850,8 +1850,8 @@ models:
 - name: model-1
   uuid: 00000002-0000-0000-0000-000000000001
   controller: controller-1
-  cloud: dummy
-  region: dummy-region
+  cloud: test-cloud
+  region: test-cloud-region
   cloud-credential: cred-1
   owner: alice@external
   users:
@@ -1918,10 +1918,10 @@ var revokeModelAccessTests = []struct {
 		},
 		CloudRegion: dbmodel.CloudRegion{
 			Cloud: dbmodel.Cloud{
-				Name: "dummy",
-				Type: "dummy",
+				Name: "test-cloud",
+				Type: "test-provider",
 			},
-			Name: "dummy-region",
+			Name: "test-cloud-region",
 		},
 		CloudCredential: dbmodel.CloudCredential{
 			Name: "cred-1",
@@ -1981,10 +1981,10 @@ var revokeModelAccessTests = []struct {
 		},
 		CloudRegion: dbmodel.CloudRegion{
 			Cloud: dbmodel.Cloud{
-				Name: "dummy",
-				Type: "dummy",
+				Name: "test-cloud",
+				Type: "test-provider",
 			},
-			Name: "dummy-region",
+			Name: "test-cloud-region",
 		},
 		CloudCredential: dbmodel.CloudCredential{
 			Name: "cred-1",
@@ -2044,10 +2044,10 @@ var revokeModelAccessTests = []struct {
 		},
 		CloudRegion: dbmodel.CloudRegion{
 			Cloud: dbmodel.Cloud{
-				Name: "dummy",
-				Type: "dummy",
+				Name: "test-cloud",
+				Type: "test-provider",
 			},
-			Name: "dummy-region",
+			Name: "test-cloud-region",
 		},
 		CloudCredential: dbmodel.CloudCredential{
 			Name: "cred-1",
@@ -2147,14 +2147,14 @@ func TestRevokeModelAccess(t *testing.T) {
 }
 
 const destroyModelTestEnv = `clouds:
-- name: dummy
-  type: dummy
+- name: test-cloud
+  type: test-provider
   regions:
-  - name: dummy-region
+  - name: test-cloud-region
 cloud-credentials:
 - owner: alice@external
   name: cred-1
-  cloud: dummy
+  cloud: test-cloud
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
@@ -2162,8 +2162,8 @@ models:
 - name: model-1
   uuid: 00000002-0000-0000-0000-000000000001
   controller: controller-1
-  cloud: dummy
-  region: dummy-region
+  cloud: test-cloud
+  region: test-cloud-region
   cloud-credential: cred-1
   owner: alice@external
   life: alive
@@ -2626,17 +2626,17 @@ func TestValidateModelUpgrade(t *testing.T) {
 }
 
 const updateModelCredentialTestEnv = `clouds:
-- name: dummy
-  type: dummy
+- name: test-cloud
+  type: test-provider
   regions:
-  - name: dummy-region
+  - name: test-cloud-region
 cloud-credentials:
 - owner: alice@external
   name: cred-2
-  cloud: dummy
+  cloud: test-cloud
 - owner: alice@external
   name: cred-1
-  cloud: dummy
+  cloud: test-cloud
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
@@ -2644,8 +2644,8 @@ models:
 - name: model-1
   uuid: 00000002-0000-0000-0000-000000000001
   controller: controller-1
-  cloud: dummy
-  region: dummy-region
+  cloud: test-cloud
+  region: test-cloud-region
   cloud-credential: cred-1
   owner: alice@external
   users:
@@ -2671,7 +2671,7 @@ var updateModelCredentialTests = []struct {
 	name: "success",
 	env:  updateModelCredentialTestEnv,
 	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-		if taggedCredential.Tag != "cloudcred-dummy_alice@external_cred-2" {
+		if taggedCredential.Tag != "cloudcred-test-cloud_alice@external_cred-2" {
 			return nil, errors.E("bad cloud credential tag")
 		}
 		return nil, nil
@@ -2680,13 +2680,13 @@ var updateModelCredentialTests = []struct {
 		if modelTag.Id() != "00000002-0000-0000-0000-000000000001" {
 			return errors.E("bad model tag")
 		}
-		if credentialTag.Id() != "dummy/alice@external/cred-2" {
+		if credentialTag.Id() != "test-cloud/alice@external/cred-2" {
 			return errors.E("bad cloud credential tag")
 		}
 		return nil
 	},
 	username:   "alice@external",
-	credential: "dummy/alice@external/cred-2",
+	credential: "test-cloud/alice@external/cred-2",
 	uuid:       "00000002-0000-0000-0000-000000000001",
 	expectModel: dbmodel.Model{
 		Name: "model-1",
@@ -2704,10 +2704,10 @@ var updateModelCredentialTests = []struct {
 		},
 		CloudRegion: dbmodel.CloudRegion{
 			Cloud: dbmodel.Cloud{
-				Name: "dummy",
-				Type: "dummy",
+				Name: "test-cloud",
+				Type: "test-provider",
 			},
-			Name: "dummy-region",
+			Name: "test-cloud-region",
 		},
 		CloudCredential: dbmodel.CloudCredential{
 			Name: "cred-2",
@@ -2730,7 +2730,7 @@ var updateModelCredentialTests = []struct {
 	name: "user not admin",
 	env:  updateModelCredentialTestEnv,
 	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-		if taggedCredential.Tag != "cloudcred-dummy_alice@external_cred-2" {
+		if taggedCredential.Tag != "cloudcred-test-cloud_alice@external_cred-2" {
 			return nil, errors.E("bad cloud credential tag")
 		}
 		return nil, nil
@@ -2739,13 +2739,13 @@ var updateModelCredentialTests = []struct {
 		if modelTag.Id() != "00000002-0000-0000-0000-000000000001" {
 			return errors.E("bad model tag")
 		}
-		if credentialTag.Id() != "dummy/alice@external/cred-2" {
+		if credentialTag.Id() != "test-cloud/alice@external/cred-2" {
 			return errors.E("bad cloud credential tag")
 		}
 		return nil
 	},
 	username:        "charlie@external",
-	credential:      "dummy/alice@external/cred-2",
+	credential:      "test-cloud/alice@external/cred-2",
 	uuid:            "00000002-0000-0000-0000-000000000001",
 	expectError:     "unauthorized access",
 	expectErrorCode: errors.CodeUnauthorized,
@@ -2753,7 +2753,7 @@ var updateModelCredentialTests = []struct {
 	name:            "model not found",
 	env:             updateModelCredentialTestEnv,
 	username:        "charlie@external",
-	credential:      "dummy/alice@external/cred-2",
+	credential:      "test-cloud/alice@external/cred-2",
 	uuid:            "00000002-0000-0000-0000-000000000002",
 	expectError:     "record not found",
 	expectErrorCode: errors.CodeNotFound,
@@ -2761,7 +2761,7 @@ var updateModelCredentialTests = []struct {
 	name: "credential not found",
 	env:  updateModelCredentialTestEnv,
 	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-		if taggedCredential.Tag != "cloudcred-dummy_alice@external_cred-2" {
+		if taggedCredential.Tag != "cloudcred-test-cloud_alice@external_cred-2" {
 			return nil, errors.E("bad cloud credential tag")
 		}
 		return nil, nil
@@ -2770,15 +2770,15 @@ var updateModelCredentialTests = []struct {
 		if modelTag.Id() != "00000002-0000-0000-0000-000000000001" {
 			return errors.E("bad model tag")
 		}
-		if credentialTag.Id() != "dummy/alice@external/cred-2" {
+		if credentialTag.Id() != "test-cloud/alice@external/cred-2" {
 			return errors.E("bad cloud credential tag")
 		}
 		return nil
 	},
 	username:        "alice@external",
-	credential:      "dummy/alice@external/cred-3",
+	credential:      "test-cloud/alice@external/cred-3",
 	uuid:            "00000002-0000-0000-0000-000000000001",
-	expectError:     `cloudcredential "dummy/alice@external/cred-3" not found`,
+	expectError:     `cloudcredential "test-cloud/alice@external/cred-3" not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name: "update credential returns an error",
@@ -2787,14 +2787,14 @@ var updateModelCredentialTests = []struct {
 		return nil, errors.E("an error")
 	},
 	username:    "alice@external",
-	credential:  "dummy/alice@external/cred-2",
+	credential:  "test-cloud/alice@external/cred-2",
 	uuid:        "00000002-0000-0000-0000-000000000001",
 	expectError: "an error",
 }, {
 	name: "change model credential returns an error",
 	env:  updateModelCredentialTestEnv,
 	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-		if taggedCredential.Tag != "cloudcred-dummy_alice@external_cred-2" {
+		if taggedCredential.Tag != "cloudcred-test-cloud_alice@external_cred-2" {
 			return nil, errors.E("bad cloud credential tag")
 		}
 		return nil, nil
@@ -2803,7 +2803,7 @@ var updateModelCredentialTests = []struct {
 		return errors.E("an error")
 	},
 	username:    "alice@external",
-	credential:  "dummy/alice@external/cred-2",
+	credential:  "test-cloud/alice@external/cred-2",
 	uuid:        "00000002-0000-0000-0000-000000000001",
 	expectError: "an error",
 }}

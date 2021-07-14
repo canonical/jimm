@@ -130,7 +130,7 @@ func (s *commonSuite) newServer(c *gc.C, session *mgo.Session, idmSrv *candidtes
 
 const sshKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDOjaOjVRHchF2RFCKQdgBqrIA5nOoqSprLK47l2th5I675jw+QYMIihXQaITss3hjrh3+5ITyBO41PS5rHLNGtlYUHX78p9CHNZsJqHl/z1Ub1tuMe+/5SY2MkDYzgfPtQtVsLasAIiht/5g78AMMXH3HeCKb9V9cP6/lPPq6mCMvg8TDLrPp/P2vlyukAsJYUvVgoaPDUBpedHbkMj07pDJqe4D7c0yEJ8hQo/6nS+3bh9Q1NvmVNsB1pbtk3RKONIiTAXYcjclmOljxxJnl1O50F5sOIi38vyl7Q63f6a3bXMvJEf1lnPNJKAxspIfEu8gRasny3FEsbHfrxEwVj rog@rog-x220"
 
-var dummyEnvConfig = map[string]interface{}{
+var sampleEnvConfig = map[string]interface{}{
 	"authorized-keys": sshKey,
 	"controller":      true,
 }
@@ -143,7 +143,7 @@ func (s *commonSuite) addModel(ctx context.Context, c *gc.C, pathStr, srvPathStr
 	c.Assert(err, gc.Equals, nil)
 
 	credPath := params.CredentialPath{
-		Cloud: "dummy",
+		Cloud: jemtest.TestCloudName,
 		User:  path.User,
 		Name:  params.CredentialName(credName),
 	}
@@ -161,7 +161,7 @@ func (s *commonSuite) addModel(ctx context.Context, c *gc.C, pathStr, srvPathStr
 			Name:       path.Name,
 			Controller: &srvPath,
 			Credential: credPath,
-			Config:     dummyEnvConfig,
+			Config:     sampleEnvConfig,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)

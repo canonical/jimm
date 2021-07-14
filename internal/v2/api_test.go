@@ -58,7 +58,7 @@ func (s *APISuite) client(user string, groups ...string) *jemclient.Client {
 
 const sshKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDOjaOjVRHchF2RFCKQdgBqrIA5nOoqSprLK47l2th5I675jw+QYMIihXQaITss3hjrh3+5ITyBO41PS5rHLNGtlYUHX78p9CHNZsJqHl/z1Ub1tuMe+/5SY2MkDYzgfPtQtVsLasAIiht/5g78AMMXH3HeCKb9V9cP6/lPPq6mCMvg8TDLrPp/P2vlyukAsJYUvVgoaPDUBpedHbkMj07pDJqe4D7c0yEJ8hQo/6nS+3bh9Q1NvmVNsB1pbtk3RKONIiTAXYcjclmOljxxJnl1O50F5sOIi38vyl7Q63f6a3bXMvJEf1lnPNJKAxspIfEu8gRasny3FEsbHfrxEwVj rog@rog-x220"
 
-var dummyModelConfig = map[string]interface{}{
+var sampleModelConfig = map[string]interface{}{
 	"authorized-keys": sshKey,
 	"controller":      true,
 }
@@ -78,7 +78,7 @@ var unauthorizedTests = []struct {
 	about:  "get controller as non-owner",
 	asUser: "other",
 	method: "GET",
-	path:   "/v2/controller/controller-admin/dummy-1",
+	path:   "/v2/controller/controller-admin/controller-1",
 }, {
 	about:  "new model as non-owner",
 	asUser: "other",
@@ -86,9 +86,9 @@ var unauthorizedTests = []struct {
 	path:   "/v2/model/bob",
 	body: params.NewModelInfo{
 		Name:       "newmodel",
-		Controller: &params.EntityPath{"alice", "dummy-1"},
+		Controller: &params.EntityPath{"alice", "controller-1"},
 		Credential: params.CredentialPath{
-			Cloud: "dummy",
+			Cloud: jemtest.TestCloudName,
 			User:  "bob",
 			Name:  "cred",
 		},
@@ -97,7 +97,7 @@ var unauthorizedTests = []struct {
 	about:  "set controller perm as non-owner",
 	asUser: "other",
 	method: "PUT",
-	path:   "/v2/controller/alice/dummy-1/perm",
+	path:   "/v2/controller/alice/controller-1/perm",
 	body:   params.ACL{},
 }, {
 	about:  "set model perm as non-owner",
@@ -109,7 +109,7 @@ var unauthorizedTests = []struct {
 	about:  "get controller perm as non-owner",
 	asUser: "other",
 	method: "GET",
-	path:   "/v2/controller/alice/dummy-1/perm",
+	path:   "/v2/controller/alice/controller-1/perm",
 }, {
 	about:  "get model perm as non-owner",
 	asUser: "other",
@@ -119,7 +119,7 @@ var unauthorizedTests = []struct {
 	about:  "get controller perm with ACL that allows us",
 	asUser: "charlie",
 	method: "GET",
-	path:   "/v2/controller/alice/dummy-1/perm",
+	path:   "/v2/controller/alice/controller-1/perm",
 }, {
 	about:  "get model perm with ACL that allows us",
 	asUser: "charlie",
@@ -129,7 +129,7 @@ var unauthorizedTests = []struct {
 	about:  "set deprecated status as non-owner",
 	asUser: "bob",
 	method: "PUT",
-	path:   "/v2/controller/alice/dummy-1/deprecated",
+	path:   "/v2/controller/alice/conntroller-1/deprecated",
 	body:   params.DeprecatedBody{},
 }}
 
@@ -357,7 +357,7 @@ func (s *APISuite) TestAddControllerDuplicate(c *gc.C) {
 			Public:         true,
 		},
 	})
-	c.Assert(err, gc.ErrorMatches, "Put http://.*/v2/controller/controller-admin/dummy-1: already exists")
+	c.Assert(err, gc.ErrorMatches, "Put http://.*/v2/controller/controller-admin/controller-1: already exists")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
 }
 
@@ -476,8 +476,8 @@ func (s *APISuite) TestGetController(c *gc.C) {
 	c.Assert(err, gc.IsNil, gc.Commentf("body: %s", resp.Body.String()))
 	c.Assert((*controllerInfo.UnavailableSince).UTC(), jc.DeepEquals, mongodoc.Time(t).UTC())
 	c.Assert(controllerInfo.Location, jc.DeepEquals, map[string]string{
-		"cloud":  "dummy",
-		"region": "dummy-region",
+		"cloud":  jemtest.TestCloudName,
+		"region": jemtest.TestCloudRegionName,
 	})
 	c.Logf("%#v", controllerInfo.Schema)
 }
@@ -585,9 +585,9 @@ func (s *APISuite) TestNewModel(c *gc.C) {
 			Controller: &s.Controller.Path,
 			Credential: s.Credential.Path.ToParams(),
 			Location: map[string]string{
-				"cloud": "dummy",
+				"cloud": jemtest.TestCloudName,
 			},
-			Config: dummyModelConfig,
+			Config: sampleModelConfig,
 		},
 		ExpectBody: httptesting.BodyAsserter(func(_ *gc.C, body json.RawMessage) {
 			modelRespBody = body
@@ -634,12 +634,12 @@ var newModelWithoutExplicitControllerTests = []struct {
 	info: params.NewModelInfo{
 		Name: "model-2",
 		Credential: params.CredentialPath{
-			Cloud: "dummy",
+			Cloud: jemtest.TestCloudName,
 			User:  "bob",
 			Name:  "cred",
 		},
 		Location: map[string]string{
-			"cloud": "dummy",
+			"cloud": jemtest.TestCloudName,
 		},
 		Config: map[string]interface{}{
 			"secret": "a secret",
@@ -651,7 +651,7 @@ var newModelWithoutExplicitControllerTests = []struct {
 	info: params.NewModelInfo{
 		Name: "model-3",
 		Credential: params.CredentialPath{
-			Cloud: "dummy",
+			Cloud: jemtest.TestCloudName,
 			User:  "bob",
 			Name:  "cred",
 		},
@@ -670,7 +670,7 @@ var newModelWithoutExplicitControllerTests = []struct {
 	info: params.NewModelInfo{
 		Name: "test-model",
 		Credential: params.CredentialPath{
-			Cloud: "dummy",
+			Cloud: jemtest.TestCloudName,
 			User:  "bob",
 			Name:  "cred",
 		},
@@ -689,7 +689,7 @@ var newModelWithoutExplicitControllerTests = []struct {
 	info: params.NewModelInfo{
 		Name: "model-3",
 		Credential: params.CredentialPath{
-			Cloud: "dummy",
+			Cloud: jemtest.TestCloudName,
 			User:  "bob",
 			Name:  "cred",
 		},
@@ -708,12 +708,12 @@ var newModelWithoutExplicitControllerTests = []struct {
 	info: params.NewModelInfo{
 		Name: "test-model",
 		Credential: params.CredentialPath{
-			Cloud: "dummy",
+			Cloud: jemtest.TestCloudName,
 			User:  "bob",
 			Name:  "cred",
 		},
 		Location: map[string]string{
-			"cloud.blah": "dummy",
+			"cloud.blah": jemtest.TestCloudName,
 		},
 		Config: map[string]interface{}{
 			"secret": "a secret",
@@ -727,7 +727,7 @@ var newModelWithoutExplicitControllerTests = []struct {
 	info: params.NewModelInfo{
 		Name: "model-3",
 		Credential: params.CredentialPath{
-			Cloud: "dummy",
+			Cloud: jemtest.TestCloudName,
 			User:  "bob",
 			Name:  "cred",
 		},
@@ -879,14 +879,14 @@ func (s *APISuite) TestNewModelUnderGroup(c *gc.C) {
 			Name:       params.Name("bar"),
 			Controller: &s.Controller.Path,
 			Credential: params.CredentialPath{
-				Cloud: "dummy",
+				Cloud: jemtest.TestCloudName,
 				User:  "beatles",
 				Name:  "cred",
 			},
 			Location: map[string]string{
-				"cloud": "dummy",
+				"cloud": jemtest.TestCloudName,
 			},
-			Config: dummyModelConfig,
+			Config: sampleModelConfig,
 		},
 		ExpectBody: httptesting.BodyAsserter(func(_ *gc.C, body json.RawMessage) {
 			modelRespBody = body
@@ -967,7 +967,7 @@ func (s *APISuite) TestNewModelAlreadyExists(c *gc.C) {
 		Name:       s.Model.Path.Name,
 		Controller: &s.Model.Controller,
 		Credential: s.Model.Credential.ToParams(),
-		Config:     dummyModelConfig,
+		Config:     sampleModelConfig,
 	}
 	p := httptesting.JSONCallParams{
 		Method:   "POST",
@@ -1028,7 +1028,7 @@ func (s *APISuite) TestNewModelUnauthorized(c *gc.C) {
 			Name:       "bar",
 			Controller: &s.Controller.Path,
 			Credential: s.Credential.Path.ToParams(),
-			Config:     dummyModelConfig,
+			Config:     sampleModelConfig,
 		},
 		ExpectBody: params.Error{
 			Message: `unauthorized`,
@@ -1042,12 +1042,12 @@ func (s *APISuite) TestNewModelUnauthorized(c *gc.C) {
 func (s *APISuite) TestListController(c *gc.C) {
 	ctx := context.Background()
 
-	c0 := mongodoc.Controller{Path: params.EntityPath{jemtest.ControllerAdmin, "dummy-0"}}
+	c0 := mongodoc.Controller{Path: params.EntityPath{jemtest.ControllerAdmin, "controller-0"}}
 	s.AddController(c, &c0)
 	unavailableTime := time.Now()
 	err := s.JEM.SetControllerUnavailableAt(ctx, s.Controller.Path, unavailableTime)
 	c.Assert(err, gc.Equals, nil)
-	c2 := mongodoc.Controller{Path: params.EntityPath{jemtest.ControllerAdmin, "dummy-2"}}
+	c2 := mongodoc.Controller{Path: params.EntityPath{jemtest.ControllerAdmin, "controller-2"}}
 	s.AddController(c, &c2)
 	err = s.JEM.SetControllerUnavailableAt(ctx, c2.Path, unavailableTime.Add(time.Second))
 	c.Assert(err, gc.Equals, nil)
@@ -1057,16 +1057,16 @@ func (s *APISuite) TestListController(c *gc.C) {
 	c.Assert(resp, jc.DeepEquals, &params.ListControllerResponse{
 		Controllers: []params.ControllerResponse{{
 			Path:     c0.Path,
-			Location: map[string]string{"cloud": "dummy", "region": "dummy-region"},
+			Location: map[string]string{"cloud": jemtest.TestCloudName, "region": jemtest.TestCloudRegionName},
 			Public:   true,
 		}, {
 			Path:             s.Controller.Path,
-			Location:         map[string]string{"cloud": "dummy", "region": "dummy-region"},
+			Location:         map[string]string{"cloud": jemtest.TestCloudName, "region": jemtest.TestCloudRegionName},
 			UnavailableSince: newTime(mongodoc.Time(unavailableTime).UTC()),
 			Public:           true,
 		}, {
 			Path:             c2.Path,
-			Location:         map[string]string{"cloud": "dummy", "region": "dummy-region"},
+			Location:         map[string]string{"cloud": jemtest.TestCloudName, "region": jemtest.TestCloudRegionName},
 			UnavailableSince: newTime(mongodoc.Time(unavailableTime.Add(time.Second)).UTC()),
 			Public:           true,
 		}},
@@ -1286,8 +1286,8 @@ func (s *APISuite) TestJujuStatus(c *gc.C) {
 		Status: jujuparams.FullStatus{
 			Model: jujuparams.ModelStatusInfo{
 				Name:        string(s.Model.Path.Name),
-				CloudTag:    names.NewCloudTag("dummy").String(),
-				CloudRegion: "dummy-region",
+				CloudTag:    names.NewCloudTag(jemtest.TestCloudName).String(),
+				CloudRegion: jemtest.TestCloudRegionName,
 				Version:     jujuversion.Current.String(),
 				ModelStatus: jujuparams.DetailedStatus{
 					Status: "available",
@@ -1316,8 +1316,8 @@ func (s *APISuite) TestJujuStatus(c *gc.C) {
 		Status: jujuparams.FullStatus{
 			Model: jujuparams.ModelStatusInfo{
 				Name:        string(s.Model.Path.Name),
-				CloudTag:    names.NewCloudTag("dummy").String(),
-				CloudRegion: "dummy-region",
+				CloudTag:    names.NewCloudTag(jemtest.TestCloudName).String(),
+				CloudRegion: jemtest.TestCloudRegionName,
 				Version:     jujuversion.Current.String(),
 				ModelStatus: jujuparams.DetailedStatus{
 					Status: "available",
@@ -1356,7 +1356,7 @@ func (s *APISuite) TestJujuStatus(c *gc.C) {
 func (s *APISuite) TestMigrate(c *gc.C) {
 	ctx := context.Background()
 
-	ctl2 := mongodoc.Controller{Path: params.EntityPath{User: "alice", Name: "dummy-2"}}
+	ctl2 := mongodoc.Controller{Path: params.EntityPath{User: "alice", Name: "controller-2"}}
 	s.AddController(c, &ctl2)
 
 	client := s.client(jemtest.ControllerAdmin)
@@ -1371,7 +1371,7 @@ func (s *APISuite) TestMigrate(c *gc.C) {
 		EntityPath: s.Model.Path,
 		Controller: ctl2.Path,
 	})
-	c.Assert(err, gc.ErrorMatches, `Post http://.*/v2/model/bob/model-1/migrate\?controller=alice%2Fdummy-2: cannot initiate migration: target prechecks failed: model with same UUID already exists \(.*\)`)
+	c.Assert(err, gc.ErrorMatches, `Post http://.*/v2/model/bob/model-1/migrate\?controller=alice%2Fcontroller-2: cannot initiate migration: target prechecks failed: model with same UUID already exists \(.*\)`)
 
 	// Patch out the API call and check that the controller gets changed.
 	s.PatchValue(v2.ControllerClientInitiateMigration, func(*controllerapi.Client, controllerapi.MigrationSpec) (string, error) {
@@ -1512,8 +1512,8 @@ func (s *APISuite) TestGetAuditEntries(c *gc.C) {
 			UUID:           s.Model.UUID,
 			Owner:          "bob",
 			Creator:        "bob",
-			Cloud:          "dummy",
-			Region:         "dummy-region",
+			Cloud:          jemtest.TestCloudName,
+			Region:         jemtest.TestCloudRegionName,
 			ControllerPath: s.Controller.Path.String(),
 			AuditEntryCommon: params.AuditEntryCommon{
 				Type_: params.AuditLogType(&params.AuditModelCreated{}),
@@ -1545,8 +1545,8 @@ func (s *APISuite) TestGetModelStatuses(c *gc.C) {
 	c.Assert(res, gc.DeepEquals, params.ModelStatuses{{
 		ID:         s.Model.Path.String(),
 		UUID:       s.Model.UUID,
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Cloud:      jemtest.TestCloudName,
+		Region:     jemtest.TestCloudRegionName,
 		Status:     "available",
 		Created:    res[0].Created,
 		Controller: s.Controller.Path.String(),
@@ -1578,10 +1578,10 @@ func (s *APISuite) TestMissingModels(c *gc.C) {
 		Models: []params.ModelStatus{{
 			ID:         "admin/controller",
 			UUID:       "deadbeef-0bad-400d-8000-4b1d0d06f00d",
-			Cloud:      "dummy",
-			Region:     "dummy-region",
+			Cloud:      jemtest.TestCloudName,
+			Region:     jemtest.TestCloudRegionName,
 			Status:     "available",
-			Controller: jemtest.ControllerAdmin + "/dummy-1",
+			Controller: jemtest.ControllerAdmin + "/controller-1",
 		}},
 	})
 }
@@ -1593,5 +1593,5 @@ func (s *APISuite) TestMissingModelsNotAuthorized(c *gc.C) {
 		EntityPath: s.Controller.Path,
 	})
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
-	c.Assert(err, gc.ErrorMatches, `Get http://.*/v2/controller/controller-admin/dummy-1/missing-models: admin access required`)
+	c.Assert(err, gc.ErrorMatches, `Get http://.*/v2/controller/controller-admin/controller-1/missing-models: admin access required`)
 }

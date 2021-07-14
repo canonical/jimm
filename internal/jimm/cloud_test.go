@@ -840,13 +840,13 @@ func TestAddHostedCloud(t *testing.T) {
 }
 
 const grantCloudAccessTestEnv = `clouds:
-- name: dummy
-  type: dummy
+- name: test-cloud
+  type: test-provider
   regions:
-  - name: dummy-region
+  - name: test-cloud-region
 - name: test
   type: kubernetes
-  host-cloud-region: dummy/dummy-region
+  host-cloud-region: test-cloud/test-cloud-region
   regions:
   - name: default
   users:
@@ -856,8 +856,8 @@ controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
   cloud-regions:
-  - cloud: dummy
-    region: dummy-region
+  - cloud: test-cloud
+    region: test-cloud-region
     priority: 10
   - cloud: test
     region: default
@@ -906,7 +906,7 @@ var grantCloudAccessTests = []struct {
 	expectCloud: dbmodel.Cloud{
 		Name:            "test",
 		Type:            "kubernetes",
-		HostCloudRegion: "dummy/dummy-region",
+		HostCloudRegion: "test-cloud/test-cloud-region",
 		Regions: []dbmodel.CloudRegion{{
 			Name: "default",
 			Controllers: []dbmodel.CloudRegionControllerPriority{{
@@ -1013,13 +1013,13 @@ func TestGrantCloudAccess(t *testing.T) {
 }
 
 const revokeCloudAccessTestEnv = `clouds:
-- name: dummy
-  type: dummy
+- name: test-cloud
+  type: test-provider
   regions:
-  - name: dummy-region
+  - name: test-cloud-region
 - name: test
   type: kubernetes
-  host-cloud-region: dummy/dummy-region
+  host-cloud-region: test-cloud/test-cloud-region
   regions:
   - name: default
   users:
@@ -1033,8 +1033,8 @@ controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
   cloud-regions:
-  - cloud: dummy
-    region: dummy-region
+  - cloud: test-cloud
+    region: test-cloud-region
     priority: 10
   - cloud: test
     region: default
@@ -1083,7 +1083,7 @@ var revokeCloudAccessTests = []struct {
 	expectCloud: dbmodel.Cloud{
 		Name:            "test",
 		Type:            "kubernetes",
-		HostCloudRegion: "dummy/dummy-region",
+		HostCloudRegion: "test-cloud/test-cloud-region",
 		Regions: []dbmodel.CloudRegion{{
 			Name: "default",
 			Controllers: []dbmodel.CloudRegionControllerPriority{{
@@ -1142,7 +1142,7 @@ var revokeCloudAccessTests = []struct {
 	expectCloud: dbmodel.Cloud{
 		Name:            "test",
 		Type:            "kubernetes",
-		HostCloudRegion: "dummy/dummy-region",
+		HostCloudRegion: "test-cloud/test-cloud-region",
 		Regions: []dbmodel.CloudRegion{{
 			Name: "default",
 			Controllers: []dbmodel.CloudRegionControllerPriority{{
@@ -1249,13 +1249,13 @@ func TestRevokeCloudAccess(t *testing.T) {
 }
 
 const removeCloudTestEnv = `clouds:
-- name: dummy
-  type: dummy
+- name: test-cloud
+  type: test-provider
   regions:
-  - name: dummy-region
+  - name: test-cloud-region
 - name: test
   type: kubernetes
-  host-cloud-region: dummy/dummy-region
+  host-cloud-region: test-cloud/test-cloud-region
   regions:
   - name: default
   users:
@@ -1267,8 +1267,8 @@ controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
   cloud-regions:
-  - cloud: dummy
-    region: dummy-region
+  - cloud: test-cloud
+    region: test-cloud-region
     priority: 10
   - cloud: test
     region: default
@@ -1372,13 +1372,13 @@ func TestRemoveCloud(t *testing.T) {
 }
 
 const updateCloudTestEnv = `clouds:
-- name: dummy
-  type: dummy
+- name: test-cloud
+  type: test-provider
   regions:
-  - name: dummy-region
+  - name: test-cloud-region
 - name: test
   type: kubernetes
-  host-cloud-region: dummy/dummy-region
+  host-cloud-region: test-cloud/test-cloud-region
   regions:
   - name: default
   users:
@@ -1390,8 +1390,8 @@ controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
   cloud-regions:
-  - cloud: dummy
-    region: dummy-region
+  - cloud: test-cloud
+    region: test-cloud-region
     priority: 10
   - cloud: test
     region: default
@@ -1422,40 +1422,40 @@ var updateCloudTests = []struct {
 	name: "SuccessPublicCloud",
 	env:  updateCloudTestEnv,
 	updateCloud: func(_ context.Context, ct names.CloudTag, c jujuparams.Cloud) error {
-		if ct.Id() != "dummy" {
+		if ct.Id() != "test-cloud" {
 			return errors.E("bad cloud tag")
 		}
 		return nil
 	},
 	username: "alice@external",
-	cloud:    "dummy",
+	cloud:    "test-cloud",
 	update: jujuparams.Cloud{
-		Type:             "dummy",
+		Type:             "test-provider",
 		AuthTypes:        []string{"empty", "userpass"},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://identity.example.com",
 		StorageEndpoint:  "https://storage.example.com",
 		Regions: []jujuparams.CloudRegion{{
-			Name:             "dummy-region",
+			Name:             "test-cloud-region",
 			Endpoint:         "https://region.example.com",
 			IdentityEndpoint: "https://identity.region.example.com",
 			StorageEndpoint:  "https://storage.region.example.com",
 		}, {
-			Name:             "dummy-region-2",
+			Name:             "test-cloud-region-2",
 			Endpoint:         "https://region2.example.com",
 			IdentityEndpoint: "https://identity.region2.example.com",
 			StorageEndpoint:  "https://storage.region2.example.com",
 		}},
 	},
 	expectCloud: dbmodel.Cloud{
-		Name:             "dummy",
-		Type:             "dummy",
+		Name:             "test-cloud",
+		Type:             "test-provider",
 		AuthTypes:        dbmodel.Strings{"empty", "userpass"},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://identity.example.com",
 		StorageEndpoint:  "https://storage.example.com",
 		Regions: []dbmodel.CloudRegion{{
-			Name:             "dummy-region",
+			Name:             "test-cloud-region",
 			Endpoint:         "https://region.example.com",
 			IdentityEndpoint: "https://identity.region.example.com",
 			StorageEndpoint:  "https://storage.region.example.com",
@@ -1467,7 +1467,7 @@ var updateCloudTests = []struct {
 				Priority: 10,
 			}},
 		}, {
-			Name:             "dummy-region-2",
+			Name:             "test-cloud-region-2",
 			Endpoint:         "https://region2.example.com",
 			IdentityEndpoint: "https://identity.region2.example.com",
 			StorageEndpoint:  "https://storage.region2.example.com",
@@ -1493,7 +1493,7 @@ var updateCloudTests = []struct {
 	cloud:    "test",
 	update: jujuparams.Cloud{
 		Type:             "kubernetes",
-		HostCloudRegion:  "dummy/dummy-region",
+		HostCloudRegion:  "test-cloud/test-cloud-region",
 		AuthTypes:        []string{"empty", "userpass"},
 		Endpoint:         "https://k8s.example.com",
 		IdentityEndpoint: "https://k8s.identity.example.com",
@@ -1505,7 +1505,7 @@ var updateCloudTests = []struct {
 	expectCloud: dbmodel.Cloud{
 		Name:             "test",
 		Type:             "kubernetes",
-		HostCloudRegion:  "dummy/dummy-region",
+		HostCloudRegion:  "test-cloud/test-cloud-region",
 		AuthTypes:        []string{"empty", "userpass"},
 		Endpoint:         "https://k8s.example.com",
 		IdentityEndpoint: "https://k8s.identity.example.com",
@@ -1542,7 +1542,7 @@ var updateCloudTests = []struct {
 	name:            "UserNotAuthorized",
 	env:             updateCloudTestEnv,
 	username:        "bob@external",
-	cloud:           "dummy",
+	cloud:           "test-cloud",
 	expectError:     `unauthorized access`,
 	expectErrorCode: errors.CodeUnauthorized,
 }, {
@@ -1550,7 +1550,7 @@ var updateCloudTests = []struct {
 	env:         updateCloudTestEnv,
 	dialError:   errors.E("test dial error"),
 	username:    "alice@external",
-	cloud:       "dummy",
+	cloud:       "test-cloud",
 	expectError: `test dial error`,
 }, {
 	name: "APIError",
@@ -1559,7 +1559,7 @@ var updateCloudTests = []struct {
 		return errors.E("test error")
 	},
 	username:    "alice@external",
-	cloud:       "dummy",
+	cloud:       "test-cloud",
 	expectError: `test error`,
 }}
 

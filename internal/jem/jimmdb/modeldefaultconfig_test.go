@@ -45,8 +45,8 @@ func (s *modelDefaultConfigSuite) checkDBOK(c *gc.C) {
 func (s *modelDefaultConfigSuite) TestUpsertModelDefaultConfig(c *gc.C) {
 	doc := mongodoc.CloudRegionDefaults{
 		User:   "bob",
-		Cloud:  "dummy",
-		Region: "dummy-region",
+		Cloud:  "test-cloud",
+		Region: "test-cloud-region",
 		Defaults: map[string]interface{}{
 			"a": "A",
 			"b": 11,
@@ -79,7 +79,7 @@ func (s *modelDefaultConfigSuite) TestUpsertModelDefaultConfig(c *gc.C) {
 func (s *modelDefaultConfigSuite) TestForEachModelDefaultConfig(c *gc.C) {
 	modelDefaultConfigs := []mongodoc.CloudRegionDefaults{{
 		User:   "alice",
-		Cloud:  "dummy",
+		Cloud:  "test-cloud",
 		Region: "",
 		Defaults: map[string]interface{}{
 			"a": "a",
@@ -95,8 +95,8 @@ func (s *modelDefaultConfigSuite) TestForEachModelDefaultConfig(c *gc.C) {
 		},
 	}, {
 		User:   "alice",
-		Cloud:  "dummy",
-		Region: "dummy-region",
+		Cloud:  "test-cloud",
+		Region: "test-cloud-region",
 		Defaults: map[string]interface{}{
 			"b": "B",
 			"c": "C",
@@ -120,7 +120,7 @@ func (s *modelDefaultConfigSuite) TestForEachModelDefaultConfig(c *gc.C) {
 	c.Check(expect, gc.HasLen, 0)
 
 	expect = []mongodoc.CloudRegionDefaults{modelDefaultConfigs[0], modelDefaultConfigs[2]}
-	err = s.database.ForEachModelDefaultConfig(testContext, jimmdb.Eq("cloud", "dummy"), []string{"region"}, func(m *mongodoc.CloudRegionDefaults) error {
+	err = s.database.ForEachModelDefaultConfig(testContext, jimmdb.Eq("cloud", "test-cloud"), []string{"region"}, func(m *mongodoc.CloudRegionDefaults) error {
 		if len(expect) < 1 {
 			return errgo.Newf("unexpected cloud-region-defaults \"%s-%s-%s\"", m.User, m.Cloud, m.Region)
 		}
@@ -143,8 +143,8 @@ func (s *modelDefaultConfigSuite) TestForEachModelDefaultConfig(c *gc.C) {
 func (s *modelDefaultConfigSuite) TestUpdateModelDefaultConfig(c *gc.C) {
 	doc := mongodoc.CloudRegionDefaults{
 		User:   "bob",
-		Cloud:  "dummy",
-		Region: "dummy-region",
+		Cloud:  "test-cloud",
+		Region: "test-cloud-region",
 		Defaults: map[string]interface{}{
 			"a": "A",
 			"b": 11,

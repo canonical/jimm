@@ -58,7 +58,7 @@ var setDeadTests = []struct {
 	about: "UpsertApplication",
 	run: func(db *jimmdb.Database) {
 		db.UpsertApplication(testContext, &mongodoc.Application{
-			Controller: "alice/dummy-1",
+			Controller: "alice/controller-1",
 			Info: &mongodoc.ApplicationInfo{
 				ModelUUID: "00000000-0000-0000-0000-000000000000",
 				Name:      "app",
@@ -76,7 +76,7 @@ var setDeadTests = []struct {
 	about: "RemoveApplication",
 	run: func(db *jimmdb.Database) {
 		db.RemoveApplication(testContext, &mongodoc.Application{
-			Controller: "alice/dummy-1",
+			Controller: "alice/controller-1",
 			Info: &mongodoc.ApplicationInfo{
 				ModelUUID: "00000000-0000-0000-0000-000000000000",
 				Name:      "app",
@@ -92,14 +92,14 @@ var setDeadTests = []struct {
 	about: "InsertApplicationOffer",
 	run: func(db *jimmdb.Database) {
 		db.InsertApplicationOffer(testContext, &mongodoc.ApplicationOffer{
-			OfferUUID: "dummy",
+			OfferUUID: "fake-uuid",
 		})
 	},
 }, {
 	about: "GetApplicationOffer",
 	run: func(db *jimmdb.Database) {
 		db.GetApplicationOffer(testContext, &mongodoc.ApplicationOffer{
-			OfferUUID: "dummy",
+			OfferUUID: "fake-uuid",
 		})
 	},
 }, {
@@ -111,14 +111,14 @@ var setDeadTests = []struct {
 	about: "UpdateApplicationOffer",
 	run: func(db *jimmdb.Database) {
 		db.UpdateApplicationOffer(testContext, &mongodoc.ApplicationOffer{
-			OfferUUID: "dummy",
+			OfferUUID: "fake-uuid",
 		}, fakeUpdate, true)
 	},
 }, {
 	about: "RemoveApplicationOffer",
 	run: func(db *jimmdb.Database) {
 		db.RemoveApplicationOffer(testContext, &mongodoc.ApplicationOffer{
-			OfferUUID: "dummy",
+			OfferUUID: "fake-uuid",
 		})
 	},
 }, {
@@ -135,14 +135,14 @@ var setDeadTests = []struct {
 	about: "InsertCloudRegion",
 	run: func(db *jimmdb.Database) {
 		db.InsertCloudRegion(testContext, &mongodoc.CloudRegion{
-			Cloud: "dummy",
+			Cloud: "fake-uuid",
 		})
 	},
 }, {
 	about: "GetCloudRegion",
 	run: func(db *jimmdb.Database) {
 		db.GetCloudRegion(testContext, &mongodoc.CloudRegion{
-			Cloud: "dummy",
+			Cloud: "fake-uuid",
 		})
 	},
 }, {
@@ -154,7 +154,7 @@ var setDeadTests = []struct {
 	about: "UpsertCloudRegion",
 	run: func(db *jimmdb.Database) {
 		db.UpsertCloudRegion(testContext, &mongodoc.CloudRegion{
-			Cloud: "dummy",
+			Cloud: "test-cloud",
 		})
 	},
 }, {
@@ -166,7 +166,7 @@ var setDeadTests = []struct {
 	about: "RemoveCloudRegion",
 	run: func(db *jimmdb.Database) {
 		db.RemoveCloudRegion(testContext, &mongodoc.CloudRegion{
-			Cloud: "dummy",
+			Cloud: "test-cloud",
 		})
 	},
 }, {
@@ -230,7 +230,7 @@ var setDeadTests = []struct {
 	about: "UpsertMachine",
 	run: func(db *jimmdb.Database) {
 		db.UpsertMachine(testContext, &mongodoc.Machine{
-			Controller: "alice/dummy-1",
+			Controller: "alice/controller-1",
 			Info: &jujuparams.MachineInfo{
 				ModelUUID: "00000000-0000-0000-0000-000000000000",
 				Id:        "0",
@@ -248,7 +248,7 @@ var setDeadTests = []struct {
 	about: "RemoveMachine",
 	run: func(db *jimmdb.Database) {
 		db.RemoveMachine(testContext, &mongodoc.Machine{
-			Controller: "alice/dummy-1",
+			Controller: "alice/controller-1",
 			Info: &jujuparams.MachineInfo{
 				ModelUUID: "00000000-0000-0000-0000-000000000000",
 				Id:        "0",

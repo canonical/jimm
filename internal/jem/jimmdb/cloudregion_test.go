@@ -70,14 +70,14 @@ func (s *cloudRegionSuite) TestGetCloudRegion(c *gc.C) {
 	ctx := context.Background()
 	cr1 := mongodoc.CloudRegion{
 		Cloud:        "test-cloud",
-		ProviderType: "dummy",
+		ProviderType: "test-provider",
 	}
 	err := s.database.InsertCloudRegion(testContext, &cr1)
 	c.Assert(err, gc.Equals, nil)
 	cr2 := mongodoc.CloudRegion{
 		Cloud:        "test-cloud",
-		Region:       "dummy-region",
-		ProviderType: "dummy",
+		Region:       "cloud-region",
+		ProviderType: "test-provider",
 	}
 	err = s.database.InsertCloudRegion(testContext, &cr2)
 	c.Assert(err, gc.Equals, nil)
@@ -87,17 +87,17 @@ func (s *cloudRegionSuite) TestGetCloudRegion(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Check(cr3, jc.DeepEquals, cr1)
 
-	cr4 := mongodoc.CloudRegion{Cloud: "test-cloud", Region: "dummy-region"}
+	cr4 := mongodoc.CloudRegion{Cloud: "test-cloud", Region: "cloud-region"}
 	err = s.database.GetCloudRegion(ctx, &cr4)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(cr4, jc.DeepEquals, cr2)
 
-	cr5 := mongodoc.CloudRegion{ProviderType: "dummy", Region: "dummy-region"}
+	cr5 := mongodoc.CloudRegion{ProviderType: "test-provider", Region: "cloud-region"}
 	err = s.database.GetCloudRegion(ctx, &cr5)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(cr5, jc.DeepEquals, cr2)
 
-	cr6 := mongodoc.CloudRegion{ProviderType: "dummy"}
+	cr6 := mongodoc.CloudRegion{ProviderType: "test-provider"}
 	err = s.database.GetCloudRegion(ctx, &cr6)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
@@ -109,11 +109,11 @@ func (s *cloudRegionSuite) TestGetCloudRegion(c *gc.C) {
 	err = s.database.GetCloudRegion(ctx, &cr8)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
-	cr9 := mongodoc.CloudRegion{ProviderType: "no-such-provider", Region: "dummy-region"}
+	cr9 := mongodoc.CloudRegion{ProviderType: "no-such-provider", Region: "cloud-region"}
 	err = s.database.GetCloudRegion(ctx, &cr9)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
-	cr10 := mongodoc.CloudRegion{ProviderType: "dummy", Region: "not-dummy-region"}
+	cr10 := mongodoc.CloudRegion{ProviderType: "test-provider", Region: "no-such-region"}
 	err = s.database.GetCloudRegion(ctx, &cr10)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
@@ -122,37 +122,37 @@ func (s *cloudRegionSuite) TestForEachCloudRegion(c *gc.C) {
 	ctx := context.Background()
 
 	cr1 := mongodoc.CloudRegion{
-		Cloud:        "dummy-1",
-		ProviderType: "dummy",
+		Cloud:        "cloud-1",
+		ProviderType: "test-provider",
 	}
 	err := s.database.InsertCloudRegion(testContext, &cr1)
 	c.Assert(err, gc.Equals, nil)
 
 	cr2 := mongodoc.CloudRegion{
-		Cloud:        "dummy-1",
+		Cloud:        "cloud-1",
 		Region:       "default",
-		ProviderType: "dummy",
+		ProviderType: "test-provider",
 	}
 	err = s.database.InsertCloudRegion(testContext, &cr2)
 	c.Assert(err, gc.Equals, nil)
 
 	cr3 := mongodoc.CloudRegion{
-		Cloud:        "dummy-2",
-		ProviderType: "dummy",
+		Cloud:        "cloud-2",
+		ProviderType: "test-provider",
 	}
 	err = s.database.InsertCloudRegion(testContext, &cr3)
 	c.Assert(err, gc.Equals, nil)
 
 	cr4 := mongodoc.CloudRegion{
-		Cloud:        "dummy-2",
+		Cloud:        "cloud-2",
 		Region:       "default",
-		ProviderType: "dummy",
+		ProviderType: "test-provider",
 	}
 	err = s.database.InsertCloudRegion(testContext, &cr4)
 	c.Assert(err, gc.Equals, nil)
 
 	expect := []mongodoc.CloudRegion{cr1, cr2}
-	err = s.database.ForEachCloudRegion(ctx, jimmdb.Eq("cloud", "dummy-1"), []string{"region"}, func(cr *mongodoc.CloudRegion) error {
+	err = s.database.ForEachCloudRegion(ctx, jimmdb.Eq("cloud", "cloud-1"), []string{"region"}, func(cr *mongodoc.CloudRegion) error {
 		if len(expect) < 1 {
 			return errgo.Newf("unexpected result %q", cr.Id)
 		}
@@ -164,7 +164,7 @@ func (s *cloudRegionSuite) TestForEachCloudRegion(c *gc.C) {
 	c.Check(expect, gc.HasLen, 0)
 
 	expect = []mongodoc.CloudRegion{cr1, cr2, cr3, cr4}
-	err = s.database.ForEachCloudRegion(ctx, jimmdb.Eq("providertype", "dummy"), []string{"cloud", "region"}, func(cr *mongodoc.CloudRegion) error {
+	err = s.database.ForEachCloudRegion(ctx, jimmdb.Eq("providertype", "test-provider"), []string{"cloud", "region"}, func(cr *mongodoc.CloudRegion) error {
 		if len(expect) < 1 {
 			return errgo.Newf("unexpected result %q", cr.Id)
 		}
@@ -176,7 +176,7 @@ func (s *cloudRegionSuite) TestForEachCloudRegion(c *gc.C) {
 	c.Check(expect, gc.HasLen, 0)
 
 	expect = []mongodoc.CloudRegion{}
-	err = s.database.ForEachCloudRegion(ctx, jimmdb.Eq("providertype", "not-dummy"), []string{"cloud", "region"}, func(cr *mongodoc.CloudRegion) error {
+	err = s.database.ForEachCloudRegion(ctx, jimmdb.Eq("providertype", "no-such-provider"), []string{"cloud", "region"}, func(cr *mongodoc.CloudRegion) error {
 		if len(expect) < 1 {
 			return errgo.Newf("unexpected result %q", cr.Id)
 		}
@@ -192,12 +192,12 @@ func (s *cloudRegionSuite) TestUpsertCloudRegion(c *gc.C) {
 	ctx := context.Background()
 
 	cr1 := mongodoc.CloudRegion{
-		Cloud:  "dummy-1",
-		Region: "dummy-region",
+		Cloud:  "cloud-1",
+		Region: "cloud-1-region",
 		ACL: params.ACL{
 			Read: []string{"everyone@external"},
 		},
-		ProviderType:         "dummy",
+		ProviderType:         "test-provider",
 		AuthTypes:            []string{"empty"},
 		Endpoint:             "https://example.com/endpoint",
 		IdentityEndpoint:     "https://example.com/identity-endpoint",
@@ -210,20 +210,20 @@ func (s *cloudRegionSuite) TestUpsertCloudRegion(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	cr2 := mongodoc.CloudRegion{
-		Cloud:  "dummy-1",
-		Region: "dummy-region",
+		Cloud:  "cloud-1",
+		Region: "cloud-1-region",
 	}
 	err = s.database.GetCloudRegion(ctx, &cr2)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(cr2, jc.DeepEquals, cr1)
 
 	cr3 := mongodoc.CloudRegion{
-		Cloud:  "dummy-1",
-		Region: "dummy-region",
+		Cloud:  "cloud-1",
+		Region: "cloud-1-region",
 		ACL: params.ACL{
 			Read: []string{"noone@external"},
 		},
-		ProviderType:         "dummy-2",
+		ProviderType:         "provider-2",
 		AuthTypes:            []string{"empty", "userpass"},
 		Endpoint:             "https://example.com/endpoint-2",
 		IdentityEndpoint:     "https://example.com/identity-endpoint-2",
@@ -236,20 +236,20 @@ func (s *cloudRegionSuite) TestUpsertCloudRegion(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	cr4 := mongodoc.CloudRegion{
-		Cloud:  "dummy-1",
-		Region: "dummy-region",
+		Cloud:  "cloud-1",
+		Region: "cloud-1-region",
 	}
 	err = s.database.GetCloudRegion(ctx, &cr4)
 	c.Assert(err, gc.Equals, nil)
 
 	c.Check(cr4, jc.DeepEquals, mongodoc.CloudRegion{
 		Id:     cr1.Id,
-		Cloud:  "dummy-1",
-		Region: "dummy-region",
+		Cloud:  "cloud-1",
+		Region: "cloud-1-region",
 		ACL: params.ACL{
 			Read: []string{"everyone@external"},
 		},
-		ProviderType:     "dummy-2",
+		ProviderType:     "provider-2",
 		AuthTypes:        []string{"empty", "userpass"},
 		Endpoint:         "https://example.com/endpoint-2",
 		IdentityEndpoint: "https://example.com/identity-endpoint-2",

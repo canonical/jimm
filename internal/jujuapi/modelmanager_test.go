@@ -52,11 +52,11 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 		Name:            "model-1",
 		UUID:            s.Model.UUID,
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
-		ProviderType:    "dummy",
+		ProviderType:    jemtest.TestProviderType,
 		DefaultSeries:   "focal",
-		Cloud:           "dummy",
-		CloudRegion:     "dummy-region",
-		CloudCredential: "dummy/bob@external/cred",
+		Cloud:           jemtest.TestCloudName,
+		CloudRegion:     jemtest.TestCloudRegionName,
+		CloudCredential: jemtest.TestCloudName + "/bob@external/cred",
 		Owner:           "bob@external",
 		Life:            "alive",
 		Status: base.Status{
@@ -80,11 +80,11 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 		Name:            "model-3",
 		UUID:            s.Model3.UUID,
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
-		ProviderType:    "dummy",
+		ProviderType:    jemtest.TestProviderType,
 		DefaultSeries:   "focal",
-		Cloud:           "dummy",
-		CloudRegion:     "dummy-region",
-		CloudCredential: "dummy/charlie@external/cred",
+		Cloud:           jemtest.TestCloudName,
+		CloudRegion:     jemtest.TestCloudRegionName,
+		CloudCredential: jemtest.TestCloudName + "/charlie@external/cred",
 		Owner:           "charlie@external",
 		Life:            "alive",
 		Status: base.Status{
@@ -126,11 +126,11 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 		Name:            "model-1",
 		UUID:            s.Model.UUID,
 		ControllerUUID:  "deadbeef-1bad-500d-9000-4b1d0d06f00d",
-		ProviderType:    "dummy",
+		ProviderType:    jemtest.TestProviderType,
 		DefaultSeries:   "focal",
-		Cloud:           "dummy",
-		CloudRegion:     "dummy-region",
-		CloudCredential: "dummy/bob@external/cred",
+		Cloud:           jemtest.TestCloudName,
+		CloudRegion:     jemtest.TestCloudRegionName,
+		CloudCredential: jemtest.TestCloudName + "/bob@external/cred",
 		Owner:           "bob@external",
 		Life:            "alive",
 		Status: base.Status{
@@ -154,11 +154,11 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 		Name:            "model-3",
 		UUID:            s.Model3.UUID,
 		ControllerUUID:  "deadbeef-1bad-500d-9000-4b1d0d06f00d",
-		ProviderType:    "dummy",
+		ProviderType:    jemtest.TestProviderType,
 		DefaultSeries:   "focal",
-		Cloud:           "dummy",
-		CloudRegion:     "dummy-region",
-		CloudCredential: "dummy/charlie@external/cred",
+		Cloud:           jemtest.TestCloudName,
+		CloudRegion:     jemtest.TestCloudRegionName,
+		CloudCredential: jemtest.TestCloudName + "/charlie@external/cred",
 		Owner:           "charlie@external",
 		Life:            "alive",
 		Status: base.Status{
@@ -272,9 +272,9 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			Name:               "model-1",
 			UUID:               s.Model.UUID,
 			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
-			ProviderType:       "dummy",
-			CloudTag:           "cloud-dummy",
-			CloudRegion:        "dummy-region",
+			ProviderType:       jemtest.TestProviderType,
+			CloudTag:           names.NewCloudTag(jemtest.TestCloudName).String(),
+			CloudRegion:        jemtest.TestCloudRegionName,
 			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential.Path).String(),
 			OwnerTag:           names.NewUserTag("bob@external").String(),
 			Life:               life.Alive,
@@ -299,9 +299,9 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			Name:               "model-3",
 			UUID:               s.Model3.UUID,
 			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
-			ProviderType:       "dummy",
-			CloudTag:           "cloud-dummy",
-			CloudRegion:        "dummy-region",
+			ProviderType:       jemtest.TestProviderType,
+			CloudTag:           names.NewCloudTag(jemtest.TestCloudName).String(),
+			CloudRegion:        jemtest.TestCloudRegionName,
 			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential2.Path).String(),
 			OwnerTag:           names.NewUserTag("charlie@external").String(),
 			Life:               life.Alive,
@@ -321,9 +321,9 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			Name:               "model-4",
 			UUID:               model4.UUID,
 			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
-			ProviderType:       "dummy",
-			CloudTag:           "cloud-dummy",
-			CloudRegion:        "dummy-region",
+			ProviderType:       jemtest.TestProviderType,
+			CloudTag:           names.NewCloudTag(jemtest.TestCloudName).String(),
+			CloudRegion:        jemtest.TestCloudRegionName,
 			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential2.Path).String(),
 			OwnerTag:           names.NewUserTag("charlie@external").String(),
 			Life:               life.Alive,
@@ -351,9 +351,9 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			Name:               "model-5",
 			UUID:               model5.UUID,
 			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
-			ProviderType:       "dummy",
-			CloudTag:           "cloud-dummy",
-			CloudRegion:        "dummy-region",
+			ProviderType:       jemtest.TestProviderType,
+			CloudTag:           names.NewCloudTag(jemtest.TestCloudName).String(),
+			CloudRegion:        jemtest.TestCloudRegionName,
 			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential2.Path).String(),
 			OwnerTag:           names.NewUserTag("charlie@external").String(),
 			Life:               life.Alive,
@@ -455,9 +455,9 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 			Name:               "model-1",
 			UUID:               s.Model.UUID,
 			ControllerUUID:     "deadbeef-1bad-500d-9000-4b1d0d06f00d",
-			ProviderType:       "dummy",
-			CloudTag:           "cloud-dummy",
-			CloudRegion:        "dummy-region",
+			ProviderType:       jemtest.TestProviderType,
+			CloudTag:           names.NewCloudTag(jemtest.TestCloudName).String(),
+			CloudRegion:        jemtest.TestCloudRegionName,
 			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential.Path).String(),
 			OwnerTag:           names.NewUserTag("bob@external").String(),
 			Life:               life.Alive,
@@ -477,9 +477,9 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 			Name:               "model-2",
 			UUID:               s.Model2.UUID,
 			ControllerUUID:     "deadbeef-1bad-500d-9000-4b1d0d06f00d",
-			ProviderType:       "dummy",
-			CloudTag:           "cloud-dummy",
-			CloudRegion:        "dummy-region",
+			ProviderType:       jemtest.TestProviderType,
+			CloudTag:           names.NewCloudTag(jemtest.TestCloudName).String(),
+			CloudRegion:        jemtest.TestCloudRegionName,
 			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential2.Path).String(),
 			OwnerTag:           names.NewUserTag("charlie@external").String(),
 			Life:               life.Alive,
@@ -499,9 +499,9 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 			Name:               "model-3",
 			UUID:               s.Model3.UUID,
 			ControllerUUID:     "deadbeef-1bad-500d-9000-4b1d0d06f00d",
-			ProviderType:       "dummy",
-			CloudTag:           "cloud-dummy",
-			CloudRegion:        "dummy-region",
+			ProviderType:       jemtest.TestProviderType,
+			CloudTag:           names.NewCloudTag(jemtest.TestCloudName).String(),
+			CloudRegion:        jemtest.TestCloudRegionName,
 			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential2.Path).String(),
 			OwnerTag:           names.NewUserTag("charlie@external").String(),
 			Life:               life.Alive,
@@ -533,9 +533,9 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 			Name:               "model-4",
 			UUID:               model4.UUID,
 			ControllerUUID:     "deadbeef-1bad-500d-9000-4b1d0d06f00d",
-			ProviderType:       "dummy",
-			CloudTag:           "cloud-dummy",
-			CloudRegion:        "dummy-region",
+			ProviderType:       jemtest.TestProviderType,
+			CloudTag:           names.NewCloudTag(jemtest.TestCloudName).String(),
+			CloudRegion:        jemtest.TestCloudRegionName,
 			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential2.Path).String(),
 			OwnerTag:           names.NewUserTag("charlie@external").String(),
 			Life:               life.Alive,
@@ -567,9 +567,9 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 			Name:               "model-5",
 			UUID:               model5.UUID,
 			ControllerUUID:     "deadbeef-1bad-500d-9000-4b1d0d06f00d",
-			ProviderType:       "dummy",
-			CloudTag:           "cloud-dummy",
-			CloudRegion:        "dummy-region",
+			ProviderType:       jemtest.TestProviderType,
+			CloudTag:           names.NewCloudTag(jemtest.TestCloudName).String(),
+			CloudRegion:        jemtest.TestCloudRegionName,
 			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential2.Path).String(),
 			OwnerTag:           names.NewUserTag("charlie@external").String(),
 			Life:               life.Alive,
@@ -619,9 +619,9 @@ func (s *modelManagerSuite) TestModelInfoForLegacyModel(c *gc.C) {
 			Name:               "model-1",
 			UUID:               s.Model.UUID,
 			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
-			ProviderType:       "dummy",
-			CloudTag:           "cloud-dummy",
-			CloudRegion:        "dummy-region",
+			ProviderType:       jemtest.TestProviderType,
+			CloudTag:           names.NewCloudTag(jemtest.TestCloudName).String(),
+			CloudRegion:        jemtest.TestCloudRegionName,
 			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential.Path).String(),
 			OwnerTag:           names.NewUserTag("bob@external").String(),
 			Life:               life.Alive,
@@ -645,8 +645,8 @@ func (s *modelManagerSuite) TestModelInfoForLegacyModel(c *gc.C) {
 	// Ensure the values in the database have been updated.
 	err = s.JEM.DB.GetModel(ctx, &model)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(model.Cloud, gc.Equals, params.Cloud("dummy"))
-	c.Assert(model.CloudRegion, gc.Equals, "dummy-region")
+	c.Assert(model.Cloud, gc.Equals, params.Cloud(jemtest.TestCloudName))
+	c.Assert(model.CloudRegion, gc.Equals, jemtest.TestCloudRegionName)
 	c.Assert(model.Credential.String(), gc.Equals, s.Credential.Path.String())
 	c.Assert(model.DefaultSeries, gc.Not(gc.Equals), "")
 }
@@ -679,9 +679,9 @@ func (s *modelManagerSuite) TestModelInfoForLegacyModelDisableControllerUUIDMask
 			Name:               "model-1",
 			UUID:               s.Model.UUID,
 			ControllerUUID:     s.Controller.UUID,
-			ProviderType:       "dummy",
-			CloudTag:           "cloud-dummy",
-			CloudRegion:        "dummy-region",
+			ProviderType:       jemtest.TestProviderType,
+			CloudTag:           names.NewCloudTag(jemtest.TestCloudName).String(),
+			CloudRegion:        jemtest.TestCloudRegionName,
 			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential.Path).String(),
 			OwnerTag:           names.NewUserTag("bob@external").String(),
 			Life:               life.Alive,
@@ -705,8 +705,8 @@ func (s *modelManagerSuite) TestModelInfoForLegacyModelDisableControllerUUIDMask
 	// Ensure the values in the database have been updated.
 	err = s.JEM.DB.GetModel(ctx, &model)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(model.Cloud, gc.Equals, params.Cloud("dummy"))
-	c.Assert(model.CloudRegion, gc.Equals, "dummy-region")
+	c.Assert(model.Cloud, gc.Equals, params.Cloud(jemtest.TestCloudName))
+	c.Assert(model.CloudRegion, gc.Equals, jemtest.TestCloudRegionName)
 	c.Assert(model.Credential.String(), gc.Equals, s.Credential.Path.String())
 	c.Assert(model.DefaultSeries, gc.Not(gc.Equals), "")
 }
@@ -717,12 +717,12 @@ func (s *modelManagerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 	hps, err := mongodoc.ParseAddresses([]string{proxy.Addr()})
 	c.Assert(err, gc.Equals, nil)
 	s.AddController(c, &mongodoc.Controller{
-		Path:      params.EntityPath{User: "alice", Name: "dummy-2"},
+		Path:      params.EntityPath{User: "alice", Name: "controller-2"},
 		HostPorts: [][]mongodoc.HostPort{hps},
 	})
 	model := mongodoc.Model{
 		Path:       params.EntityPath{User: "bob", Name: "model-2"},
-		Controller: params.EntityPath{User: "alice", Name: "dummy-2"},
+		Controller: params.EntityPath{User: "alice", Name: "controller-2"},
 	}
 	s.CreateModel(c, &model, nil, nil)
 
@@ -740,10 +740,10 @@ func (s *modelManagerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 			Name:               "model-2",
 			UUID:               model.UUID,
 			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
-			ProviderType:       "dummy",
-			CloudTag:           "cloud-dummy",
-			CloudRegion:        "dummy-region",
-			CloudCredentialTag: names.NewCloudCredentialTag("dummy/bob@external/cred").String(),
+			ProviderType:       jemtest.TestProviderType,
+			CloudTag:           names.NewCloudTag(jemtest.TestCloudName).String(),
+			CloudRegion:        jemtest.TestCloudRegionName,
+			CloudCredentialTag: names.NewCloudCredentialTag(jemtest.TestCloudName + "/bob@external/cred").String(),
 			OwnerTag:           names.NewUserTag("bob@external").String(),
 			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
@@ -774,10 +774,10 @@ func (s *modelManagerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 			Name:               "model-2",
 			UUID:               model.UUID,
 			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
-			ProviderType:       "dummy",
-			CloudTag:           "cloud-dummy",
-			CloudRegion:        "dummy-region",
-			CloudCredentialTag: names.NewCloudCredentialTag("dummy/bob@external/cred").String(),
+			ProviderType:       jemtest.TestProviderType,
+			CloudTag:           names.NewCloudTag(jemtest.TestCloudName).String(),
+			CloudRegion:        jemtest.TestCloudRegionName,
+			CloudCredentialTag: names.NewCloudCredentialTag(jemtest.TestCloudName + "/bob@external/cred").String(),
 			OwnerTag:           names.NewUserTag("bob@external").String(),
 			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
@@ -809,9 +809,9 @@ func (s *modelManagerSuite) TestModelInfoRequestTimeout(c *gc.C) {
 			Name:               "model-2",
 			UUID:               model.UUID,
 			ControllerUUID:     "914487b5-60e7-42bb-bd63-1adc3fd3a388",
-			ProviderType:       "dummy",
-			CloudTag:           "cloud-dummy",
-			CloudRegion:        "dummy-region",
+			ProviderType:       jemtest.TestProviderType,
+			CloudTag:           names.NewCloudTag(jemtest.TestCloudName).String(),
+			CloudRegion:        jemtest.TestCloudRegionName,
 			CloudCredentialTag: conv.ToCloudCredentialTag(s.Credential.Path).String(),
 			OwnerTag:           names.NewUserTag("bob@external").String(),
 			Life:               life.Alive,
@@ -840,8 +840,8 @@ func (s *modelManagerSuite) TestModelInfoDyingModelNotFound(c *gc.C) {
 		Controller:  s.Controller.Path,
 		Path:        params.EntityPath{User: "alice", Name: "model-1"},
 		UUID:        "00000000-0000-0000-0000-000000000007",
-		Cloud:       params.Cloud("dummy"),
-		CloudRegion: "dummy-region",
+		Cloud:       params.Cloud(jemtest.TestCloudName),
+		CloudRegion: jemtest.TestCloudRegionName,
 		Info: &mongodoc.ModelInfo{
 			Life: string(life.Dying),
 		},
@@ -881,77 +881,77 @@ var createModelTests = []struct {
 	about:         "success",
 	name:          "model",
 	ownerTag:      names.NewUserTag("bob@external").String(),
-	cloudTag:      names.NewCloudTag("dummy").String(),
-	credentialTag: "cloudcred-dummy_bob@external_cred",
+	cloudTag:      names.NewCloudTag(jemtest.TestCloudName).String(),
+	credentialTag: names.NewCloudCredentialTag(jemtest.TestCloudName + "/bob@external/cred").String(),
 }, {
 	about:         "unauthorized user",
 	name:          "model-2",
 	ownerTag:      names.NewUserTag("charlie@external").String(),
-	cloudTag:      names.NewCloudTag("dummy").String(),
-	credentialTag: "cloudcred-dummy_bob@external_cred",
+	cloudTag:      names.NewCloudTag(jemtest.TestCloudName).String(),
+	credentialTag: names.NewCloudCredentialTag(jemtest.TestCloudName + "/bob@external/cred").String(),
 	expectError:   `unauthorized \(unauthorized access\)`,
 }, {
 	about:         "existing model name",
 	name:          "model-1",
 	ownerTag:      names.NewUserTag("bob@external").String(),
-	cloudTag:      names.NewCloudTag("dummy").String(),
-	credentialTag: "cloudcred-dummy_bob@external_cred",
+	cloudTag:      names.NewCloudTag(jemtest.TestCloudName).String(),
+	credentialTag: names.NewCloudCredentialTag(jemtest.TestCloudName + "/bob@external/cred").String(),
 	expectError:   "already exists",
 }, {
 	about:         "no controller",
 	name:          "model-3",
 	ownerTag:      names.NewUserTag("bob@external").String(),
 	region:        "no-such-region",
-	cloudTag:      names.NewCloudTag("dummy").String(),
+	cloudTag:      names.NewCloudTag(jemtest.TestCloudName).String(),
 	credentialTag: "",
 	expectError:   `cloudregion not found \(not found\)`,
 }, {
 	about:         "local user",
 	name:          "model-4",
 	ownerTag:      names.NewUserTag("bob").String(),
-	cloudTag:      names.NewCloudTag("dummy").String(),
-	credentialTag: "cloudcred-dummy_bob@external_cred",
+	cloudTag:      names.NewCloudTag(jemtest.TestCloudName).String(),
+	credentialTag: names.NewCloudCredentialTag(jemtest.TestCloudName + "/bob@external/cred").String(),
 	expectError:   `unsupported local user \(user not found\)`,
 }, {
 	about:         "invalid user",
 	name:          "model-5",
 	ownerTag:      "user-bob/test@external",
-	cloudTag:      names.NewCloudTag("dummy").String(),
-	credentialTag: "cloudcred-dummy_bob@external_cred",
+	cloudTag:      names.NewCloudTag(jemtest.TestCloudName).String(),
+	credentialTag: names.NewCloudCredentialTag(jemtest.TestCloudName + "/bob@external/cred").String(),
 	expectError:   `"user-bob/test@external" is not a valid user tag \(bad request\)`,
 }, {
 	about:         "specific cloud",
 	name:          "model-6",
 	ownerTag:      names.NewUserTag("bob@external").String(),
-	cloudTag:      names.NewCloudTag("dummy").String(),
-	credentialTag: "cloudcred-dummy_bob@external_cred",
+	cloudTag:      names.NewCloudTag(jemtest.TestCloudName).String(),
+	credentialTag: names.NewCloudCredentialTag(jemtest.TestCloudName + "/bob@external/cred").String(),
 }, {
 	about:         "specific cloud and region",
 	name:          "model-7",
 	ownerTag:      names.NewUserTag("bob@external").String(),
-	cloudTag:      names.NewCloudTag("dummy").String(),
-	region:        "dummy-region",
-	credentialTag: "cloudcred-dummy_bob@external_cred",
+	cloudTag:      names.NewCloudTag(jemtest.TestCloudName).String(),
+	region:        jemtest.TestCloudRegionName,
+	credentialTag: names.NewCloudCredentialTag(jemtest.TestCloudName + "/bob@external/cred").String(),
 }, {
 	about:         "bad cloud tag",
 	name:          "model-8",
 	ownerTag:      names.NewUserTag("bob@external").String(),
 	cloudTag:      "not-a-cloud-tag",
-	credentialTag: "cloudcred-dummy_bob@external_cred1",
+	credentialTag: names.NewCloudCredentialTag(jemtest.TestCloudName + "/bob@external/cred1").String(),
 	expectError:   `invalid cloud tag: "not-a-cloud-tag" is not a valid tag \(bad request\)`,
 }, {
 	about:         "no cloud tag",
 	name:          "model-8",
 	ownerTag:      names.NewUserTag("bob@external").String(),
 	cloudTag:      "",
-	credentialTag: "cloudcred-dummy_bob@external_cred1",
+	credentialTag: names.NewCloudCredentialTag(jemtest.TestCloudName + "/bob@external/cred1").String(),
 	expectError:   `no cloud specified for model; please specify one`,
 }, {
 	about:    "no credential tag selects unambigous creds",
 	name:     "model-8",
 	ownerTag: names.NewUserTag("bob@external").String(),
-	cloudTag: names.NewCloudTag("dummy").String(),
-	region:   "dummy-region",
+	cloudTag: names.NewCloudTag(jemtest.TestCloudName).String(),
+	region:   jemtest.TestCloudRegionName,
 }}
 
 func (s *modelManagerSuite) TestCreateModel(c *gc.C) {
@@ -987,7 +987,7 @@ func (s *modelManagerSuite) TestCreateModel(c *gc.C) {
 			c.Assert(tag.String(), gc.Equals, test.credentialTag)
 		}
 		if test.cloudTag == "" {
-			c.Assert(mi.CloudTag, gc.Equals, "cloud-dummy")
+			c.Assert(mi.CloudTag, gc.Equals, names.NewCloudTag(jemtest.TestCloudName).String())
 		} else {
 			ct, err := names.ParseCloudTag(test.cloudTag)
 			c.Assert(err, gc.Equals, nil)
@@ -1278,7 +1278,7 @@ func (s *modelManagerSuite) TestChangeModelCredentialUnauthorizedModel(c *gc.C) 
 	defer conn.Close()
 
 	modelTag := names.NewModelTag(s.Model.UUID)
-	credTag := names.NewCloudCredentialTag("dummy/bob@external/cred2")
+	credTag := names.NewCloudCredentialTag(jemtest.TestCloudName + "/bob@external/cred2")
 	client := modelmanager.NewClient(conn)
 	err := client.ChangeModelCredential(modelTag, credTag)
 	c.Assert(err, gc.ErrorMatches, `unauthorized`)
@@ -1289,7 +1289,7 @@ func (s *modelManagerSuite) TestChangeModelCredentialUnauthorizedCredential(c *g
 	defer conn.Close()
 
 	modelTag := names.NewModelTag(s.Model.UUID)
-	credTag := names.NewCloudCredentialTag("dummy/alice@external/cred2")
+	credTag := names.NewCloudCredentialTag(jemtest.TestCloudName + "/alice@external/cred2")
 	client := modelmanager.NewClient(conn)
 	err := client.ChangeModelCredential(modelTag, credTag)
 	c.Assert(err, gc.ErrorMatches, `unauthorized`)
@@ -1300,7 +1300,7 @@ func (s *modelManagerSuite) TestChangeModelCredentialNotFoundModel(c *gc.C) {
 	defer conn.Close()
 
 	modelTag := names.NewModelTag("000000000-0000-0000-0000-000000000000")
-	credTag := names.NewCloudCredentialTag("dummy/bob@external/cred2")
+	credTag := names.NewCloudCredentialTag(jemtest.TestCloudName + "/bob@external/cred2")
 	client := modelmanager.NewClient(conn)
 	err := client.ChangeModelCredential(modelTag, credTag)
 	c.Assert(err, gc.ErrorMatches, `model not found`)
@@ -1311,7 +1311,7 @@ func (s *modelManagerSuite) TestChangeModelCredentialNotFoundCredential(c *gc.C)
 	defer conn.Close()
 
 	modelTag := names.NewModelTag(s.Model.UUID)
-	credTag := names.NewCloudCredentialTag("dummy/bob@external/cred2")
+	credTag := names.NewCloudCredentialTag(jemtest.TestCloudName + "/bob@external/cred2")
 	client := modelmanager.NewClient(conn)
 	err := client.ChangeModelCredential(modelTag, credTag)
 	c.Assert(err, gc.ErrorMatches, `credential not found`)
@@ -1322,7 +1322,7 @@ func (s *modelManagerSuite) TestChangeModelCredentialLocalUserCredential(c *gc.C
 	defer conn.Close()
 
 	modelTag := names.NewModelTag(s.Model.UUID)
-	credTag := names.NewCloudCredentialTag("dummy/bob/cred2")
+	credTag := names.NewCloudCredentialTag(jemtest.TestCloudName + "/bob/cred2")
 	client := modelmanager.NewClient(conn)
 	err := client.ChangeModelCredential(modelTag, credTag)
 	c.Assert(err, gc.ErrorMatches, `unsupported local user`)
@@ -1453,7 +1453,7 @@ func (s *caasModelManagerSuite) SetUpTest(c *gc.C) {
 		Type:            "kubernetes",
 		AuthTypes:       cloud.AuthTypes{cloud.UserPassAuthType},
 		Endpoint:        ksrv.URL,
-		HostCloudRegion: "dummy/dummy-region",
+		HostCloudRegion: jemtest.TestCloudName + "/" + jemtest.TestCloudRegionName,
 	}, false)
 	c.Assert(err, gc.Equals, nil)
 
@@ -1530,11 +1530,11 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 		UUID:            s.Model.UUID,
 		Type:            "iaas",
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
-		ProviderType:    "dummy",
+		ProviderType:    jemtest.TestProviderType,
 		DefaultSeries:   "focal",
-		Cloud:           "dummy",
-		CloudRegion:     "dummy-region",
-		CloudCredential: "dummy/bob@external/cred",
+		Cloud:           jemtest.TestCloudName,
+		CloudRegion:     jemtest.TestCloudRegionName,
+		CloudCredential: jemtest.TestCloudName + "/bob@external/cred",
 		Owner:           "bob@external",
 		Life:            "alive",
 		Status: base.Status{
@@ -1549,11 +1549,11 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 		UUID:            s.Model3.UUID,
 		Type:            "iaas",
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
-		ProviderType:    "dummy",
+		ProviderType:    jemtest.TestProviderType,
 		DefaultSeries:   "focal",
-		Cloud:           "dummy",
-		CloudRegion:     "dummy-region",
-		CloudCredential: "dummy/charlie@external/cred",
+		Cloud:           jemtest.TestCloudName,
+		CloudRegion:     jemtest.TestCloudRegionName,
+		CloudCredential: jemtest.TestCloudName + "/charlie@external/cred",
 		Owner:           "charlie@external",
 		Life:            "alive",
 		Status: base.Status{

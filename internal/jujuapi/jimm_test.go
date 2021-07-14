@@ -128,9 +128,9 @@ func (s *jimmSuite) TestUserModelStats(c *gc.C) {
 }
 
 func (s *jimmSuite) TestListControllers(c *gc.C) {
-	c0 := mongodoc.Controller{Path: params.EntityPath{User: jemtest.ControllerAdmin, Name: "dummy-0"}}
+	c0 := mongodoc.Controller{Path: params.EntityPath{User: jemtest.ControllerAdmin, Name: "controller-0"}}
 	s.AddController(c, &c0)
-	c2 := mongodoc.Controller{Path: params.EntityPath{User: jemtest.ControllerAdmin, Name: "dummy-2"}}
+	c2 := mongodoc.Controller{Path: params.EntityPath{User: jemtest.ControllerAdmin, Name: "controller-2"}}
 	s.AddController(c, &c2)
 
 	// Open the API connection as user "alice".
@@ -143,19 +143,19 @@ func (s *jimmSuite) TestListControllers(c *gc.C) {
 	c.Assert(resp, jc.DeepEquals, params.ListControllerResponse{
 		Controllers: []params.ControllerResponse{{
 			Path:     c0.Path,
-			Location: map[string]string{"cloud": "dummy", "region": "dummy-region"},
+			Location: map[string]string{"cloud": jemtest.TestCloudName, "region": jemtest.TestCloudRegionName},
 			Public:   true,
 			UUID:     c0.UUID,
 			Version:  c0.Version.String(),
 		}, {
 			Path:     s.Controller.Path,
-			Location: map[string]string{"cloud": "dummy", "region": "dummy-region"},
+			Location: map[string]string{"cloud": jemtest.TestCloudName, "region": jemtest.TestCloudRegionName},
 			Public:   true,
 			UUID:     s.Controller.UUID,
 			Version:  s.Controller.Version.String(),
 		}, {
 			Path:     c2.Path,
-			Location: map[string]string{"cloud": "dummy", "region": "dummy-region"},
+			Location: map[string]string{"cloud": jemtest.TestCloudName, "region": jemtest.TestCloudRegionName},
 			Public:   true,
 			UUID:     c2.UUID,
 			Version:  c2.Version.String(),
@@ -187,9 +187,9 @@ func (s *jimmSuite) TestListControllersUnauthorizedUser(c *gc.C) {
 }
 
 func (s *jimmSuite) TestListControllersV3(c *gc.C) {
-	c0 := mongodoc.Controller{Path: params.EntityPath{User: jemtest.ControllerAdmin, Name: "dummy-0"}}
+	c0 := mongodoc.Controller{Path: params.EntityPath{User: jemtest.ControllerAdmin, Name: "controller-0"}}
 	s.AddController(c, &c0)
-	c2 := mongodoc.Controller{Path: params.EntityPath{User: jemtest.ControllerAdmin, Name: "dummy-2"}}
+	c2 := mongodoc.Controller{Path: params.EntityPath{User: jemtest.ControllerAdmin, Name: "controller-2"}}
 	s.AddController(c, &c2)
 
 	conn := s.open(c, nil, "alice")
@@ -199,36 +199,36 @@ func (s *jimmSuite) TestListControllersV3(c *gc.C) {
 	cis, err := client.ListControllers()
 	c.Assert(err, gc.Equals, nil)
 	c.Check(cis, jc.DeepEquals, []apiparams.ControllerInfo{{
-		Name:          "dummy-0",
+		Name:          "controller-0",
 		UUID:          s.Controller.UUID,
 		APIAddresses:  []string{s.Controller.HostPorts[0][0].Address()},
 		CACertificate: s.Controller.CACert,
-		CloudTag:      "cloud-dummy",
-		CloudRegion:   "dummy-region",
+		CloudTag:      names.NewCloudTag(jemtest.TestCloudName).String(),
+		CloudRegion:   jemtest.TestCloudRegionName,
 		Username:      "admin",
 		AgentVersion:  s.Controller.Version.String(),
 		Status: jujuparams.EntityStatus{
 			Status: "available",
 		},
 	}, {
-		Name:          "dummy-1",
+		Name:          "controller-1",
 		UUID:          s.Controller.UUID,
 		APIAddresses:  []string{s.Controller.HostPorts[0][0].Address()},
 		CACertificate: s.Controller.CACert,
-		CloudTag:      "cloud-dummy",
-		CloudRegion:   "dummy-region",
+		CloudTag:      names.NewCloudTag(jemtest.TestCloudName).String(),
+		CloudRegion:   jemtest.TestCloudRegionName,
 		Username:      "admin",
 		AgentVersion:  s.Controller.Version.String(),
 		Status: jujuparams.EntityStatus{
 			Status: "available",
 		},
 	}, {
-		Name:          "dummy-2",
+		Name:          "controller-2",
 		UUID:          s.Controller.UUID,
 		APIAddresses:  []string{s.Controller.HostPorts[0][0].Address()},
 		CACertificate: s.Controller.CACert,
-		CloudTag:      "cloud-dummy",
-		CloudRegion:   "dummy-region",
+		CloudTag:      names.NewCloudTag(jemtest.TestCloudName).String(),
+		CloudRegion:   jemtest.TestCloudRegionName,
 		Username:      "admin",
 		AgentVersion:  s.Controller.Version.String(),
 		Status: jujuparams.EntityStatus{
@@ -238,9 +238,9 @@ func (s *jimmSuite) TestListControllersV3(c *gc.C) {
 }
 
 func (s *jimmSuite) TestListControllersV3Unauthorized(c *gc.C) {
-	c0 := mongodoc.Controller{Path: params.EntityPath{User: jemtest.ControllerAdmin, Name: "dummy-0"}}
+	c0 := mongodoc.Controller{Path: params.EntityPath{User: jemtest.ControllerAdmin, Name: "controller-0"}}
 	s.AddController(c, &c0)
-	c2 := mongodoc.Controller{Path: params.EntityPath{User: jemtest.ControllerAdmin, Name: "dummy-2"}}
+	c2 := mongodoc.Controller{Path: params.EntityPath{User: jemtest.ControllerAdmin, Name: "controller-2"}}
 	s.AddController(c, &c2)
 
 	conn := s.open(c, nil, "bob")
@@ -265,7 +265,7 @@ func (s *jimmSuite) TestAddController(c *gc.C) {
 	client := api.NewClient(conn)
 
 	acr := apiparams.AddControllerRequest{
-		Name:          "dummy-2",
+		Name:          "controller-2",
 		APIAddresses:  s.APIInfo(c).Addrs,
 		CACertificate: s.APIInfo(c).CACert,
 		Username:      s.APIInfo(c).Tag.Id(),
@@ -275,12 +275,12 @@ func (s *jimmSuite) TestAddController(c *gc.C) {
 	ci, err := client.AddController(&acr)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(ci, jc.DeepEquals, apiparams.ControllerInfo{
-		Name:          "dummy-2",
+		Name:          "controller-2",
 		UUID:          s.Controller.UUID,
 		APIAddresses:  s.APIInfo(c).Addrs,
 		CACertificate: s.APIInfo(c).CACert,
-		CloudTag:      "cloud-dummy",
-		CloudRegion:   "dummy-region",
+		CloudTag:      names.NewCloudTag(jemtest.TestCloudName).String(),
+		CloudRegion:   jemtest.TestCloudRegionName,
 		Username:      s.APIInfo(c).Tag.Id(),
 		AgentVersion:  s.Controller.Version.String(),
 		Status: jujuparams.EntityStatus{
@@ -295,7 +295,7 @@ func (s *jimmSuite) TestAddController(c *gc.C) {
 	conn = s.open(c, nil, "bob")
 	defer conn.Close()
 	client = api.NewClient(conn)
-	acr.Name = "dummy-3"
+	acr.Name = "controller-3"
 	_, err = client.AddController(&acr)
 	c.Check(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 	c.Check(jujuparams.IsCodeUnauthorized(err), gc.Equals, true)
@@ -307,7 +307,7 @@ func (s *jimmSuite) TestRemoveController(c *gc.C) {
 	client := api.NewClient(conn)
 
 	_, err := client.RemoveController(&apiparams.RemoveControllerRequest{
-		Name: "dummy-1",
+		Name: "controller-1",
 	})
 	c.Check(err, gc.ErrorMatches, `cannot delete controller while it is still alive \(still alive\)`)
 	c.Check(jujuparams.ErrCode(err), gc.Equals, apiparams.CodeStillAlive)
@@ -317,23 +317,23 @@ func (s *jimmSuite) TestRemoveController(c *gc.C) {
 	client2 := api.NewClient(conn2)
 
 	_, err = client2.RemoveController(&apiparams.RemoveControllerRequest{
-		Name: "dummy-1",
+		Name: "controller-1",
 	})
 	c.Check(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeUnauthorized)
 
 	ci, err := client.RemoveController(&apiparams.RemoveControllerRequest{
-		Name:  "dummy-1",
+		Name:  "controller-1",
 		Force: true,
 	})
 	c.Assert(err, gc.Equals, nil)
 	c.Check(ci, jc.DeepEquals, apiparams.ControllerInfo{
-		Name:          "dummy-1",
+		Name:          "controller-1",
 		UUID:          s.Controller.UUID,
 		APIAddresses:  s.APIInfo(c).Addrs,
 		CACertificate: s.APIInfo(c).CACert,
-		CloudTag:      "cloud-dummy",
-		CloudRegion:   "dummy-region",
+		CloudTag:      names.NewCloudTag(jemtest.TestCloudName).String(),
+		CloudRegion:   jemtest.TestCloudRegionName,
 		Username:      s.APIInfo(c).Tag.Id(),
 		AgentVersion:  s.Controller.Version.String(),
 		Status: jujuparams.EntityStatus{
@@ -348,17 +348,17 @@ func (s *jimmSuite) TestSetControllerDeprecated(c *gc.C) {
 	client := api.NewClient(conn)
 
 	ci, err := client.SetControllerDeprecated(&apiparams.SetControllerDeprecatedRequest{
-		Name:       "dummy-1",
+		Name:       "controller-1",
 		Deprecated: true,
 	})
 	c.Assert(err, gc.Equals, nil)
 	c.Check(ci, jc.DeepEquals, apiparams.ControllerInfo{
-		Name:          "dummy-1",
+		Name:          "controller-1",
 		UUID:          s.Controller.UUID,
 		APIAddresses:  s.APIInfo(c).Addrs,
 		CACertificate: s.APIInfo(c).CACert,
-		CloudTag:      "cloud-dummy",
-		CloudRegion:   "dummy-region",
+		CloudTag:      names.NewCloudTag(jemtest.TestCloudName).String(),
+		CloudRegion:   jemtest.TestCloudRegionName,
 		Username:      s.APIInfo(c).Tag.Id(),
 		AgentVersion:  s.Controller.Version.String(),
 		Status: jujuparams.EntityStatus{
@@ -367,17 +367,17 @@ func (s *jimmSuite) TestSetControllerDeprecated(c *gc.C) {
 	})
 
 	ci, err = client.SetControllerDeprecated(&apiparams.SetControllerDeprecatedRequest{
-		Name:       "dummy-1",
+		Name:       "controller-1",
 		Deprecated: false,
 	})
 	c.Assert(err, gc.Equals, nil)
 	c.Check(ci, jc.DeepEquals, apiparams.ControllerInfo{
-		Name:          "dummy-1",
+		Name:          "controller-1",
 		UUID:          s.Controller.UUID,
 		APIAddresses:  s.APIInfo(c).Addrs,
 		CACertificate: s.APIInfo(c).CACert,
-		CloudTag:      "cloud-dummy",
-		CloudRegion:   "dummy-region",
+		CloudTag:      names.NewCloudTag(jemtest.TestCloudName).String(),
+		CloudRegion:   jemtest.TestCloudRegionName,
 		Username:      s.APIInfo(c).Tag.Id(),
 		AgentVersion:  s.Controller.Version.String(),
 		Status: jujuparams.EntityStatus{
@@ -386,7 +386,7 @@ func (s *jimmSuite) TestSetControllerDeprecated(c *gc.C) {
 	})
 
 	ci, err = client.SetControllerDeprecated(&apiparams.SetControllerDeprecatedRequest{
-		Name:       "dummy-2",
+		Name:       "controller-2",
 		Deprecated: true,
 	})
 	c.Check(err, gc.ErrorMatches, `controller not found \(not found\)`)
@@ -396,7 +396,7 @@ func (s *jimmSuite) TestSetControllerDeprecated(c *gc.C) {
 	defer conn.Close()
 	client = api.NewClient(conn)
 	ci, err = client.SetControllerDeprecated(&apiparams.SetControllerDeprecatedRequest{
-		Name:       "dummy-1",
+		Name:       "controller-1",
 		Deprecated: true,
 	})
 	c.Check(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
@@ -432,9 +432,9 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			Params: map[string]string{
 				"owner":           "bob",
 				"name":            "bob/model-1",
-				"controller-name": "controller-admin/dummy-1",
-				"cloud":           "dummy",
-				"region":          "dummy-region",
+				"controller-name": "controller-admin/controller-1",
+				"cloud":           jemtest.TestCloudName,
+				"region":          jemtest.TestCloudRegionName,
 			},
 		}, {
 			Time:    evs.Events[1].Time,
@@ -444,9 +444,9 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			Params: map[string]string{
 				"owner":           "charlie",
 				"name":            "charlie/model-2",
-				"controller-name": "controller-admin/dummy-1",
-				"cloud":           "dummy",
-				"region":          "dummy-region",
+				"controller-name": "controller-admin/controller-1",
+				"cloud":           jemtest.TestCloudName,
+				"region":          jemtest.TestCloudRegionName,
 			},
 		}, {
 			Time:    evs.Events[2].Time,
@@ -456,9 +456,9 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			Params: map[string]string{
 				"owner":           "charlie",
 				"name":            "charlie/model-3",
-				"controller-name": "controller-admin/dummy-1",
-				"cloud":           "dummy",
-				"region":          "dummy-region",
+				"controller-name": "controller-admin/controller-1",
+				"cloud":           jemtest.TestCloudName,
+				"region":          jemtest.TestCloudRegionName,
 			},
 		}, {
 			Time:    evs.Events[3].Time,

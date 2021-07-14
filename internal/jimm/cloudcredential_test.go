@@ -1433,7 +1433,7 @@ func TestCloudCredentialVault(t *testing.T) {
 
 	env := jimmtest.ParseEnvironment(c, `clouds:
 - name: test
-  type: dummy
+  type: test-provider
   regions:
   - name: test-region
 `)
@@ -1467,7 +1467,7 @@ func TestCloudCredentialVault(t *testing.T) {
 		AuthType:      "userpass",
 		Cloud: dbmodel.Cloud{
 			Name: "test",
-			Type: "dummy",
+			Type: "test-provider",
 		},
 		AttributesInVault: true,
 	})
