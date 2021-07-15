@@ -30,12 +30,12 @@ func (s *dbSuite) TestAddCloud(c *qt.C) {
 
 	cl := dbmodel.Cloud{
 		Name:             "test-cloud",
-		Type:             "dummy",
+		Type:             "test-provider",
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://identity.example.com",
 		StorageEndpoint:  "https://storage.example.com",
 		Regions: []dbmodel.CloudRegion{{
-			Name: "dummy-region",
+			Name: "test-cloud-region",
 		}},
 		CACertificates: dbmodel.Strings{"CACERT 1", "CACERT 2"},
 		Users: []dbmodel.UserCloudAccess{{
@@ -98,12 +98,12 @@ func (s *dbSuite) TestGetCloud(c *qt.C) {
 
 	cl2 := dbmodel.Cloud{
 		Name:             "test-cloud",
-		Type:             "dummy",
+		Type:             "test-provider",
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://identity.example.com",
 		StorageEndpoint:  "https://storage.example.com",
 		Regions: []dbmodel.CloudRegion{{
-			Name: "dummy-region",
+			Name: "test-cloud-region",
 		}},
 		CACertificates: dbmodel.Strings{"CACERT 1", "CACERT 2"},
 		Users: []dbmodel.UserCloudAccess{{
@@ -146,12 +146,12 @@ func (s *dbSuite) TestGetClouds(c *qt.C) {
 
 	cl := dbmodel.Cloud{
 		Name:             "test-cloud",
-		Type:             "dummy",
+		Type:             "test-provider",
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://identity.example.com",
 		StorageEndpoint:  "https://storage.example.com",
 		Regions: []dbmodel.CloudRegion{{
-			Name: "dummy-region",
+			Name: "test-cloud-region",
 		}},
 		CACertificates: dbmodel.Strings{"CACERT 1", "CACERT 2"},
 		Users: []dbmodel.UserCloudAccess{{
@@ -185,12 +185,12 @@ func (s *dbSuite) TestUpdateCloud(c *qt.C) {
 
 	cl := dbmodel.Cloud{
 		Name:             "test-cloud",
-		Type:             "dummy",
+		Type:             "test-provider",
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://identity.example.com",
 		StorageEndpoint:  "https://storage.example.com",
 		Regions: []dbmodel.CloudRegion{{
-			Name: "dummy-region",
+			Name: "test-cloud-region",
 		}},
 		CACertificates: dbmodel.Strings{"CACERT 1", "CACERT 2"},
 		Users: []dbmodel.UserCloudAccess{{
@@ -229,7 +229,7 @@ func (s *dbSuite) TestUpdateCloud(c *qt.C) {
 	cl2.IdentityEndpoint = "https://new.identity.example.com"
 	cl2.StorageEndpoint = "https://new.storage.example.com"
 	cl2.Regions = append(cl2.Regions, dbmodel.CloudRegion{
-		Name:             "dummy-region-2",
+		Name:             "test-cloud-region-2",
 		Endpoint:         "https://new.region.example.com",
 		IdentityEndpoint: "https://new.region.identity.example.com",
 		StorageEndpoint:  "https://new.region.storage.example.com",
@@ -462,12 +462,12 @@ func (s *dbSuite) TestDeleteCloud(c *qt.C) {
 
 	cl := dbmodel.Cloud{
 		Name:             "test-cloud",
-		Type:             "dummy",
+		Type:             "test-provider",
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://identity.example.com",
 		StorageEndpoint:  "https://storage.example.com",
 		Regions: []dbmodel.CloudRegion{{
-			Name: "dummy-region",
+			Name: "test-cloud-region",
 		}},
 		CACertificates: dbmodel.Strings{"CACERT 1", "CACERT 2"},
 		Users: []dbmodel.UserCloudAccess{{

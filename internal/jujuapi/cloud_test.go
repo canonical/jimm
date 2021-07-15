@@ -13,6 +13,8 @@ import (
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
+
+	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 )
 
 type cloudSuite struct {
@@ -25,21 +27,21 @@ func (s *cloudSuite) TestCloudCall(c *gc.C) {
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
-	info, err := client.Cloud(names.NewCloudTag("dummy"))
+	info, err := client.Cloud(names.NewCloudTag(jimmtest.TestCloudName))
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(info, jc.DeepEquals, cloud.Cloud{
-		Name:      "dummy",
-		Type:      "dummy",
+		Name:      jimmtest.TestCloudName,
+		Type:      jimmtest.TestProviderType,
 		AuthTypes: cloud.AuthTypes{"empty", "userpass"},
 		Regions: []cloud.Region{{
-			Name:             "dummy-region",
-			Endpoint:         "dummy-endpoint",
-			IdentityEndpoint: "dummy-identity-endpoint",
-			StorageEndpoint:  "dummy-storage-endpoint",
+			Name:             jimmtest.TestCloudRegionName,
+			Endpoint:         jimmtest.TestCloudEndpoint,
+			IdentityEndpoint: jimmtest.TestCloudIdentityEndpoint,
+			StorageEndpoint:  jimmtest.TestCloudStorageEndpoint,
 		}},
-		Endpoint:         "dummy-endpoint",
-		IdentityEndpoint: "dummy-identity-endpoint",
-		StorageEndpoint:  "dummy-storage-endpoint",
+		Endpoint:         jimmtest.TestCloudEndpoint,
+		IdentityEndpoint: jimmtest.TestCloudIdentityEndpoint,
+		StorageEndpoint:  jimmtest.TestCloudStorageEndpoint,
 	})
 }
 
@@ -51,19 +53,19 @@ func (s *cloudSuite) TestClouds(c *gc.C) {
 	clouds, err := client.Clouds()
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(clouds, jc.DeepEquals, map[names.CloudTag]cloud.Cloud{
-		names.NewCloudTag("dummy"): {
-			Name:      "dummy",
-			Type:      "dummy",
+		names.NewCloudTag(jimmtest.TestCloudName): {
+			Name:      jimmtest.TestCloudName,
+			Type:      jimmtest.TestProviderType,
 			AuthTypes: cloud.AuthTypes{"empty", "userpass"},
 			Regions: []cloud.Region{{
-				Name:             "dummy-region",
-				Endpoint:         "dummy-endpoint",
-				IdentityEndpoint: "dummy-identity-endpoint",
-				StorageEndpoint:  "dummy-storage-endpoint",
+				Name:             jimmtest.TestCloudRegionName,
+				Endpoint:         jimmtest.TestCloudEndpoint,
+				IdentityEndpoint: jimmtest.TestCloudIdentityEndpoint,
+				StorageEndpoint:  jimmtest.TestCloudStorageEndpoint,
 			}},
-			Endpoint:         "dummy-endpoint",
-			IdentityEndpoint: "dummy-identity-endpoint",
-			StorageEndpoint:  "dummy-storage-endpoint",
+			Endpoint:         jimmtest.TestCloudEndpoint,
+			IdentityEndpoint: jimmtest.TestCloudIdentityEndpoint,
+			StorageEndpoint:  jimmtest.TestCloudStorageEndpoint,
 		},
 	})
 }
@@ -72,15 +74,15 @@ func (s *cloudSuite) TestUserCredentials(c *gc.C) {
 	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
-	creds, err := client.UserCredentials(names.NewUserTag("bob@external"), names.NewCloudTag("dummy"))
+	creds, err := client.UserCredentials(names.NewUserTag("bob@external"), names.NewCloudTag(jimmtest.TestCloudName))
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []names.CloudCredentialTag{
-		names.NewCloudCredentialTag("dummy/bob@external/cred"),
+		names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@external/cred"),
 	})
 }
 
 func (s *cloudSuite) TestUserCredentialsWithDomain(c *gc.C) {
-	cct := names.NewCloudCredentialTag("dummy/test@domain/cred1")
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/test@domain/cred1")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{
 		AuthType: "credtype",
 		Attributes: map[string]string{
@@ -91,7 +93,7 @@ func (s *cloudSuite) TestUserCredentialsWithDomain(c *gc.C) {
 	conn := s.open(c, nil, "test@domain")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
-	creds, err := client.UserCredentials(names.NewUserTag("test@domain"), names.NewCloudTag("dummy"))
+	creds, err := client.UserCredentials(names.NewUserTag("test@domain"), names.NewCloudTag(jimmtest.TestCloudName))
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []names.CloudCredentialTag{
 		cct,
@@ -104,7 +106,7 @@ func (s *cloudSuite) TestUserCredentialsErrors(c *gc.C) {
 	req := jujuparams.UserClouds{
 		UserClouds: []jujuparams.UserCloud{{
 			UserTag:  "not-a-user-tag",
-			CloudTag: "dummy",
+			CloudTag: jimmtest.TestCloudName,
 		}},
 	}
 	var resp jujuparams.StringsResults
@@ -118,7 +120,7 @@ func (s *cloudSuite) TestUpdateCloudCredentials(c *gc.C) {
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
-	credentialTag := names.NewCloudCredentialTag(fmt.Sprintf("dummy/test@external/cred3"))
+	credentialTag := names.NewCloudCredentialTag(fmt.Sprintf(jimmtest.TestCloudName + "/test@external/cred3"))
 	reqCreds := map[string]cloud.Credential{
 		credentialTag.String(): cloud.NewCredential("credtype", map[string]string{
 			"attr1": "val31",
@@ -130,12 +132,12 @@ func (s *cloudSuite) TestUpdateCloudCredentials(c *gc.C) {
 	c.Assert(res, gc.DeepEquals, []jujuparams.UpdateCredentialResult{{
 		CredentialTag: credentialTag.String(),
 	}})
-	creds, err := client.UserCredentials(names.NewUserTag("test@external"), names.NewCloudTag("dummy"))
+	creds, err := client.UserCredentials(names.NewUserTag("test@external"), names.NewCloudTag(jimmtest.TestCloudName))
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []names.CloudCredentialTag{credentialTag})
 	_, err = client.UpdateCredentialsCheckModels(credentialTag, cloud.NewCredential("credtype", map[string]string{"attr1": "val33", "attr2": "val34"}))
 	c.Assert(err, gc.Equals, nil)
-	creds, err = client.UserCredentials(names.NewUserTag("test@external"), names.NewCloudTag("dummy"))
+	creds, err = client.UserCredentials(names.NewUserTag("test@external"), names.NewCloudTag(jimmtest.TestCloudName))
 	c.Assert(err, gc.Equals, nil)
 	var _ = creds
 }
@@ -153,7 +155,7 @@ func (s *cloudSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
 				},
 			},
 		}, {
-			Tag: names.NewCloudCredentialTag("dummy/test2@external/cred1").String(),
+			Tag: names.NewCloudCredentialTag(jimmtest.TestCloudName + "/test2@external/cred1").String(),
 			Credential: jujuparams.CloudCredential{
 				AuthType: "credtype",
 				Attributes: map[string]string{
@@ -161,7 +163,7 @@ func (s *cloudSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
 				},
 			},
 		}, {
-			Tag: names.NewCloudCredentialTag("dummy/test@external/bad-name-").String(),
+			Tag: names.NewCloudCredentialTag(jimmtest.TestCloudName + "/test@external/bad-name-").String(),
 			Credential: jujuparams.CloudCredential{
 				AuthType: "credtype",
 				Attributes: map[string]string{
@@ -183,12 +185,12 @@ func (s *cloudSuite) TestUpdateCloudCredentialsForce(c *gc.C) {
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
-	credentialTag := names.NewCloudCredentialTag(fmt.Sprintf("dummy/test@external/cred3"))
+	credentialTag := names.NewCloudCredentialTag(fmt.Sprintf(jimmtest.TestCloudName + "/test@external/cred3"))
 	_, err := client.UpdateCredentialsCheckModels(credentialTag, cloud.NewCredential("userpass", map[string]string{"username": "a", "password": "b"}))
 	c.Assert(err, gc.Equals, nil)
 
 	mmclient := modelmanager.NewClient(conn)
-	_, err = mmclient.CreateModel("model1", "test@external", "dummy", "", credentialTag, nil)
+	_, err = mmclient.CreateModel("model1", "test@external", jimmtest.TestCloudName, "", credentialTag, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	args := jujuparams.UpdateCredentialArgs{
@@ -203,7 +205,7 @@ func (s *cloudSuite) TestUpdateCloudCredentialsForce(c *gc.C) {
 			},
 		}},
 	}
-	// First try without Force to sanity check that it should fail.
+	// First try without Force to check that it fails.
 	var resp jujuparams.UpdateCredentialResults
 	err = conn.APICall("Cloud", 3, "", "UpdateCredentialsCheckModels", args, &resp)
 	c.Assert(err, gc.Equals, nil)
@@ -227,7 +229,7 @@ func (s *cloudSuite) TestUpdateCloudCredentialsForce(c *gc.C) {
 	args.Force = true
 	err = conn.APICall("Cloud", 3, "", "UpdateCredentialsCheckModels", args, &resp)
 	c.Assert(err, gc.Equals, nil)
-	c.Check(resp.Results[0].Error, gc.ErrorMatches, `updating cloud credentials: validating credential "dummy/test@external/cred3" for cloud "dummy": supported auth-types \["empty" "userpass"\], "badauthtype" not supported`)
+	c.Check(resp.Results[0].Error, gc.ErrorMatches, `updating cloud credentials: validating credential "`+jimmtest.TestCloudName+`/test@external/cred3" for cloud "`+jimmtest.TestCloudName+`": supported auth-types \["empty" "userpass"\], "badauthtype" not supported`)
 
 	// Check that the credentials have been updated even though
 	// we got an error.
@@ -246,7 +248,7 @@ func (s *cloudSuite) TestCheckCredentialsModels(c *gc.C) {
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 
-	credTag := names.NewCloudCredentialTag("dummy/test@external/cred")
+	credTag := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/test@external/cred")
 	cred1 := cloud.NewCredential("userpass", map[string]string{
 		"username": "cloud-user",
 		"password": "cloud-pass",
@@ -257,10 +259,10 @@ func (s *cloudSuite) TestCheckCredentialsModels(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	mmclient := modelmanager.NewClient(conn)
-	model1, err := mmclient.CreateModel("model1", "test@external", "dummy", "", credTag, nil)
+	model1, err := mmclient.CreateModel("model1", "test@external", jimmtest.TestCloudName, "", credTag, nil)
 	c.Assert(err, gc.Equals, nil)
 
-	model2, err := mmclient.CreateModel("model2", "test@external", "dummy", "", credTag, nil)
+	model2, err := mmclient.CreateModel("model2", "test@external", jimmtest.TestCloudName, "", credTag, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	var resp jujuparams.UpdateCredentialResults
@@ -299,7 +301,7 @@ func (s *cloudSuite) TestCheckCredentialsModelsInvalidCreds(c *gc.C) {
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 
-	credTag := names.NewCloudCredentialTag("dummy/test@external/cred")
+	credTag := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/test@external/cred")
 	cred1 := cloud.NewCredential("userpass", map[string]string{
 		"username": "cloud-user",
 		"password": "cloud-pass",
@@ -310,7 +312,7 @@ func (s *cloudSuite) TestCheckCredentialsModelsInvalidCreds(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	mmclient := modelmanager.NewClient(conn)
-	model1, err := mmclient.CreateModel("model1", "test@external", "dummy", "", credTag, nil)
+	model1, err := mmclient.CreateModel("model1", "test@external", jimmtest.TestCloudName, "", credTag, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	var resp jujuparams.UpdateCredentialResults
@@ -327,14 +329,14 @@ func (s *cloudSuite) TestCheckCredentialsModelsInvalidCreds(c *gc.C) {
 	}, &resp)
 	c.Assert(resp, jc.DeepEquals, jujuparams.UpdateCredentialResults{
 		Results: []jujuparams.UpdateCredentialResult{{
-			CredentialTag: "cloudcred-dummy_test@external_cred",
+			CredentialTag: "cloudcred-" + jimmtest.TestCloudName + "_test@external_cred",
 			Error:         &jujuparams.Error{Message: "some models are no longer visible"},
 			Models: []jujuparams.UpdateCredentialModelResult{{
 				ModelUUID: model1.UUID,
 				ModelName: "model1",
 				Errors: []jujuparams.ErrorResult{{
 					Error: &jujuparams.Error{
-						Message: `validating credential "dummy/test@external/cred" for cloud "dummy": supported auth-types ["empty" "userpass"], "unknowntype" not supported`,
+						Message: `validating credential "` + jimmtest.TestCloudName + `/test@external/cred" for cloud "` + jimmtest.TestCloudName + `": supported auth-types ["empty" "userpass"], "unknowntype" not supported`,
 						Code:    "not supported",
 					},
 				}},
@@ -347,12 +349,12 @@ func (s *cloudSuite) TestCredential(c *gc.C) {
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 
-	cred1Tag := names.NewCloudCredentialTag("dummy/test@external/cred1")
+	cred1Tag := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/test@external/cred1")
 	cred1 := cloud.NewCredential("userpass", map[string]string{
 		"username": "cloud-user",
 		"password": "cloud-pass",
 	})
-	cred2Tag := names.NewCloudCredentialTag("dummy/test@external/cred2")
+	cred2Tag := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/test@external/cred2")
 	cred2 := cloud.NewCredential("empty", nil)
 
 	client := cloudapi.NewClient(conn)
@@ -364,9 +366,9 @@ func (s *cloudSuite) TestCredential(c *gc.C) {
 	creds, err := client.Credentials(
 		cred1Tag,
 		cred2Tag,
-		names.NewCloudCredentialTag("dummy/test@external/cred3"),
-		names.NewCloudCredentialTag("dummy/no-test@external/cred4"),
-		names.NewCloudCredentialTag("dummy/admin@local/cred6"),
+		names.NewCloudCredentialTag(jimmtest.TestCloudName+"/test@external/cred3"),
+		names.NewCloudCredentialTag(jimmtest.TestCloudName+"/no-test@external/cred4"),
+		names.NewCloudCredentialTag(jimmtest.TestCloudName+"/admin@local/cred6"),
 	)
 	c.Assert(err, gc.Equals, nil)
 	for i := range creds {
@@ -391,7 +393,7 @@ func (s *cloudSuite) TestCredential(c *gc.C) {
 		},
 	}, {
 		Error: &jujuparams.Error{
-			Message: `cloudcredential "dummy/test@external/cred3" not found`,
+			Message: `cloudcredential "` + jimmtest.TestCloudName + `/test@external/cred3" not found`,
 			Code:    jujuparams.CodeNotFound,
 		},
 	}, {
@@ -411,7 +413,7 @@ func (s *cloudSuite) TestRevokeCredential(c *gc.C) {
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
-	credTag := names.NewCloudCredentialTag("dummy/test@external/cred")
+	credTag := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/test@external/cred")
 	_, err := client.UpdateCredentialsCheckModels(
 		credTag,
 		cloud.NewCredential("empty", nil),
@@ -440,7 +442,7 @@ func (s *cloudSuite) TestRevokeCredential(c *gc.C) {
 	c.Assert(ccr, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Error: &jujuparams.Error{
 			Code:    jujuparams.CodeNotFound,
-			Message: `cloudcredential "dummy/test@external/cred" not found`,
+			Message: `cloudcredential "` + jimmtest.TestCloudName + `/test@external/cred" not found`,
 		},
 	}})
 
@@ -460,7 +462,7 @@ func (s *cloudSuite) TestAddCloud(c *gc.C) {
 		Endpoint:         "https://0.1.2.3:5678",
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
-		HostCloudRegion:  "dummy/dummy-region",
+		HostCloudRegion:  jimmtest.TestCloudName + "/" + jimmtest.TestCloudRegionName,
 	}, false)
 	c.Assert(err, gc.Equals, nil)
 	clouds, err := client.Clouds()
@@ -482,7 +484,7 @@ func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
-	credTag := names.NewCloudCredentialTag("dummy/test@external/cred")
+	credTag := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/test@external/cred")
 	_, err := client.UpdateCredentialsCheckModels(
 		credTag,
 		cloud.NewCredential("empty", nil),
@@ -504,7 +506,7 @@ func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
 	}})
 
 	mmclient := modelmanager.NewClient(conn)
-	_, err = mmclient.CreateModel("test", "test@external", "dummy", "dummy-region", credTag, nil)
+	_, err = mmclient.CreateModel("test", "test@external", jimmtest.TestCloudName, jimmtest.TestCloudRegionName, credTag, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	var resp jujuparams.ErrorResults
@@ -532,7 +534,7 @@ func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
 	c.Assert(ccr, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Error: &jujuparams.Error{
 			Code:    jujuparams.CodeNotFound,
-			Message: `cloudcredential "dummy/test@external/cred" not found`,
+			Message: `cloudcredential "` + jimmtest.TestCloudName + `/test@external/cred" not found`,
 		},
 	}})
 
@@ -551,7 +553,7 @@ func (s *cloudSuite) TestAddCloudError(c *gc.C) {
 		Endpoint:         "https://0.1.2.3:5678",
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
-		HostCloudRegion:  "dummy/dummy-region",
+		HostCloudRegion:  jimmtest.TestCloudName + "/" + jimmtest.TestCloudRegionName,
 	}, false)
 	c.Assert(err, gc.ErrorMatches, `invalid cloud: empty auth-types not valid`)
 }
@@ -578,7 +580,7 @@ func (s *cloudSuite) TestAddCloudBadName(c *gc.C) {
 	err := client.AddCloud(cloud.Cloud{
 		Name:             "aws",
 		Type:             "kubernetes",
-		HostCloudRegion:  "dummy/dummy-region",
+		HostCloudRegion:  jimmtest.TestCloudName + "/" + jimmtest.TestCloudRegionName,
 		Endpoint:         "https://0.1.2.3:5678",
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
@@ -590,7 +592,7 @@ func (s *cloudSuite) TestAddCredential(c *gc.C) {
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
-	credentialTag := names.NewCloudCredentialTag("dummy/test@external/cred3")
+	credentialTag := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/test@external/cred3")
 	err := client.AddCredential(
 		credentialTag.String(),
 		cloud.NewCredential(
@@ -602,13 +604,13 @@ func (s *cloudSuite) TestAddCredential(c *gc.C) {
 		),
 	)
 	c.Assert(err, gc.Equals, nil)
-	creds, err := client.CredentialContents("dummy", "cred3", true)
+	creds, err := client.CredentialContents(jimmtest.TestCloudName, "cred3", true)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []jujuparams.CredentialContentResult{{
 		Result: &jujuparams.ControllerCredentialInfo{
 			Content: jujuparams.CredentialContent{
 				Name:     "cred3",
-				Cloud:    "dummy",
+				Cloud:    jimmtest.TestCloudName,
 				AuthType: "userpass",
 				Attributes: map[string]string{
 					"username": "test-user",
@@ -628,13 +630,13 @@ func (s *cloudSuite) TestAddCredential(c *gc.C) {
 		),
 	)
 	c.Assert(err, gc.Equals, nil)
-	creds, err = client.CredentialContents("dummy", "cred3", true)
+	creds, err = client.CredentialContents(jimmtest.TestCloudName, "cred3", true)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []jujuparams.CredentialContentResult{{
 		Result: &jujuparams.ControllerCredentialInfo{
 			Content: jujuparams.CredentialContent{
 				Name:     "cred3",
-				Cloud:    "dummy",
+				Cloud:    jimmtest.TestCloudName,
 				AuthType: "userpass",
 				Attributes: map[string]string{
 					"username": "test-user2",
@@ -649,7 +651,7 @@ func (s *cloudSuite) TestCredentialContents(c *gc.C) {
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
-	credentialTag := names.NewCloudCredentialTag("dummy/test@external/cred3")
+	credentialTag := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/test@external/cred3")
 	err := client.AddCredential(
 		credentialTag.String(),
 		cloud.NewCredential(
@@ -661,13 +663,13 @@ func (s *cloudSuite) TestCredentialContents(c *gc.C) {
 		),
 	)
 	c.Assert(err, gc.Equals, nil)
-	creds, err := client.CredentialContents("dummy", "cred3", false)
+	creds, err := client.CredentialContents(jimmtest.TestCloudName, "cred3", false)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []jujuparams.CredentialContentResult{{
 		Result: &jujuparams.ControllerCredentialInfo{
 			Content: jujuparams.CredentialContent{
 				Name:     "cred3",
-				Cloud:    "dummy",
+				Cloud:    jimmtest.TestCloudName,
 				AuthType: "userpass",
 				Attributes: map[string]string{
 					"username": "test-user",
@@ -677,16 +679,16 @@ func (s *cloudSuite) TestCredentialContents(c *gc.C) {
 	}})
 
 	mmclient := modelmanager.NewClient(conn)
-	_, err = mmclient.CreateModel("model1", "test@external", "dummy", "", credentialTag, nil)
+	_, err = mmclient.CreateModel("model1", "test@external", jimmtest.TestCloudName, "", credentialTag, nil)
 	c.Assert(err, gc.Equals, nil)
 
-	creds, err = client.CredentialContents("dummy", "cred3", true)
+	creds, err = client.CredentialContents(jimmtest.TestCloudName, "cred3", true)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(creds, jc.DeepEquals, []jujuparams.CredentialContentResult{{
 		Result: &jujuparams.ControllerCredentialInfo{
 			Content: jujuparams.CredentialContent{
 				Name:     "cred3",
-				Cloud:    "dummy",
+				Cloud:    jimmtest.TestCloudName,
 				AuthType: "userpass",
 				Attributes: map[string]string{
 					"username": "test-user",
@@ -707,7 +709,7 @@ func (s *cloudSuite) TestCredentialContents(c *gc.C) {
 		Result: &jujuparams.ControllerCredentialInfo{
 			Content: jujuparams.CredentialContent{
 				Name:     "cred3",
-				Cloud:    "dummy",
+				Cloud:    jimmtest.TestCloudName,
 				AuthType: "userpass",
 				Attributes: map[string]string{
 					"username": "test-user",
@@ -733,7 +735,7 @@ func (s *cloudSuite) TestRemoveCloud(c *gc.C) {
 		Endpoint:         "https://0.1.2.3:5678",
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
-		HostCloudRegion:  "dummy/dummy-region",
+		HostCloudRegion:  jimmtest.TestCloudName + "/" + jimmtest.TestCloudRegionName,
 	}, false)
 	c.Assert(err, gc.Equals, nil)
 	clouds, err := client.Clouds()
@@ -777,7 +779,7 @@ func (s *cloudSuite) TestModifyCloudAccess(c *gc.C) {
 		Endpoint:         "https://0.1.2.3:5678",
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
-		HostCloudRegion:  "dummy/dummy-region",
+		HostCloudRegion:  jimmtest.TestCloudName + "/" + jimmtest.TestCloudRegionName,
 	}, false)
 	c.Assert(err, gc.Equals, nil)
 	clouds, err := client.Clouds()
@@ -839,7 +841,7 @@ func (s *cloudSuite) TestModifyCloudAccessUnauthorized(c *gc.C) {
 		Endpoint:         "https://0.1.2.3:5678",
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
-		HostCloudRegion:  "dummy/dummy-region",
+		HostCloudRegion:  jimmtest.TestCloudName + "/" + jimmtest.TestCloudRegionName,
 	}, false)
 	c.Assert(err, gc.Equals, nil)
 	clouds, err := client.Clouds()
@@ -895,7 +897,7 @@ func (s *cloudSuite) TestCloudInfo(c *gc.C) {
 		Endpoint:         "https://0.1.2.3:5678",
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
-		HostCloudRegion:  "dummy/dummy-region",
+		HostCloudRegion:  jimmtest.TestCloudName + "/" + jimmtest.TestCloudRegionName,
 	}, false)
 	c.Assert(err, gc.Equals, nil)
 
@@ -904,7 +906,7 @@ func (s *cloudSuite) TestCloudInfo(c *gc.C) {
 
 	args := jujuparams.Entities{
 		Entities: []jujuparams.Entity{{
-			Tag: names.NewCloudTag("dummy").String(),
+			Tag: names.NewCloudTag(jimmtest.TestCloudName).String(),
 		}, {
 			Tag: names.NewCloudTag("no-such-cloud").String(),
 		}, {
@@ -920,17 +922,17 @@ func (s *cloudSuite) TestCloudInfo(c *gc.C) {
 		Results: []jujuparams.CloudInfoResult{{
 			Result: &jujuparams.CloudInfo{
 				CloudDetails: jujuparams.CloudDetails{
-					Type:      "dummy",
+					Type:      jimmtest.TestProviderType,
 					AuthTypes: []string{"empty", "userpass"},
 					Regions: []jujuparams.CloudRegion{{
-						Name:             "dummy-region",
-						Endpoint:         "dummy-endpoint",
-						IdentityEndpoint: "dummy-identity-endpoint",
-						StorageEndpoint:  "dummy-storage-endpoint",
+						Name:             jimmtest.TestCloudRegionName,
+						Endpoint:         jimmtest.TestCloudEndpoint,
+						IdentityEndpoint: jimmtest.TestCloudIdentityEndpoint,
+						StorageEndpoint:  jimmtest.TestCloudStorageEndpoint,
 					}},
-					Endpoint:         "dummy-endpoint",
-					IdentityEndpoint: "dummy-identity-endpoint",
-					StorageEndpoint:  "dummy-storage-endpoint",
+					Endpoint:         jimmtest.TestCloudEndpoint,
+					IdentityEndpoint: jimmtest.TestCloudIdentityEndpoint,
+					StorageEndpoint:  jimmtest.TestCloudStorageEndpoint,
 				},
 				Users: []jujuparams.CloudUserInfo{{
 					UserName:    "bob@external",
@@ -968,7 +970,7 @@ func (s *cloudSuite) TestListCloudInfo(c *gc.C) {
 		Endpoint:         "https://0.1.2.3:5678",
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
-		HostCloudRegion:  "dummy/dummy-region",
+		HostCloudRegion:  jimmtest.TestCloudName + "/" + jimmtest.TestCloudRegionName,
 	}, false)
 	c.Assert(err, gc.Equals, nil)
 
@@ -1000,16 +1002,16 @@ func (s *cloudSuite) TestListCloudInfo(c *gc.C) {
 		}, {
 			Result: &jujuparams.ListCloudInfo{
 				CloudDetails: jujuparams.CloudDetails{
-					Type:             "dummy",
+					Type:             jimmtest.TestProviderType,
 					AuthTypes:        []string{"empty", "userpass"},
-					Endpoint:         "dummy-endpoint",
-					IdentityEndpoint: "dummy-identity-endpoint",
-					StorageEndpoint:  "dummy-storage-endpoint",
+					Endpoint:         jimmtest.TestCloudEndpoint,
+					IdentityEndpoint: jimmtest.TestCloudIdentityEndpoint,
+					StorageEndpoint:  jimmtest.TestCloudStorageEndpoint,
 					Regions: []jujuparams.CloudRegion{{
-						Name:             "dummy-region",
-						Endpoint:         "dummy-endpoint",
-						IdentityEndpoint: "dummy-identity-endpoint",
-						StorageEndpoint:  "dummy-storage-endpoint",
+						Name:             jimmtest.TestCloudRegionName,
+						Endpoint:         jimmtest.TestCloudEndpoint,
+						IdentityEndpoint: jimmtest.TestCloudIdentityEndpoint,
+						StorageEndpoint:  jimmtest.TestCloudStorageEndpoint,
 					}},
 				},
 				Access: "add-model",
@@ -1045,16 +1047,16 @@ func (s *cloudSuite) TestListCloudInfo(c *gc.C) {
 		}, {
 			Result: &jujuparams.ListCloudInfo{
 				CloudDetails: jujuparams.CloudDetails{
-					Type:             "dummy",
+					Type:             jimmtest.TestProviderType,
 					AuthTypes:        []string{"empty", "userpass"},
-					Endpoint:         "dummy-endpoint",
-					IdentityEndpoint: "dummy-identity-endpoint",
-					StorageEndpoint:  "dummy-storage-endpoint",
+					Endpoint:         jimmtest.TestCloudEndpoint,
+					IdentityEndpoint: jimmtest.TestCloudIdentityEndpoint,
+					StorageEndpoint:  jimmtest.TestCloudStorageEndpoint,
 					Regions: []jujuparams.CloudRegion{{
-						Name:             "dummy-region",
-						Endpoint:         "dummy-endpoint",
-						IdentityEndpoint: "dummy-identity-endpoint",
-						StorageEndpoint:  "dummy-storage-endpoint",
+						Name:             jimmtest.TestCloudRegionName,
+						Endpoint:         jimmtest.TestCloudEndpoint,
+						IdentityEndpoint: jimmtest.TestCloudIdentityEndpoint,
+						StorageEndpoint:  jimmtest.TestCloudStorageEndpoint,
 					}},
 				},
 				Access: "add-model",

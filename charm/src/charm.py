@@ -119,7 +119,7 @@ class JimmCharm(SystemdCharm):
             self.unit.status = BlockedStatus("waiting for database")
             return
         if not os.path.exists(self._env_filename("db")):
-            self.unit.status = WaitingStatus("waiting for database master")
+            self.unit.status = WaitingStatus("waiting for database")
             return
         try:
             url = "http://localhost:8080/debug/info"

@@ -15,6 +15,15 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 )
 
+const (
+	TestProviderType          = "dummy"
+	TestCloudName             = "dummy"
+	TestCloudRegionName       = "dummy-region"
+	TestCloudEndpoint         = "dummy-endpoint"
+	TestCloudIdentityEndpoint = "dummy-identity-endpoint"
+	TestCloudStorageEndpoint  = "dummy-storage-endpoint"
+)
+
 type Environment struct {
 	Clouds           []Cloud           `json:"clouds"`
 	CloudCredentials []CloudCredential `json:"cloud-credentials"`

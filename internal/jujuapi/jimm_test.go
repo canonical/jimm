@@ -16,6 +16,7 @@ import (
 	"github.com/CanonicalLtd/jimm/api"
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
+	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
 )
 
@@ -32,8 +33,8 @@ func (s *jimmSuite) TestJIMMFacadeVersion(c *gc.C) {
 }
 
 func (s *jimmSuite) TestListControllers(c *gc.C) {
-	s.AddController(c, "dummy-0", s.APIInfo(c))
-	s.AddController(c, "dummy-2", s.APIInfo(c))
+	s.AddController(c, "controller-0", s.APIInfo(c))
+	s.AddController(c, "controller-2", s.APIInfo(c))
 
 	// Open the API connection as user "alice".
 	conn := s.open(c, nil, "alice")
@@ -44,20 +45,20 @@ func (s *jimmSuite) TestListControllers(c *gc.C) {
 
 	c.Assert(resp, jc.DeepEquals, jujuapi.LegacyListControllerResponse{
 		Controllers: []jujuapi.LegacyControllerResponse{{
-			Path:     "admin/dummy-0",
-			Location: map[string]string{"cloud": "dummy", "region": "dummy-region"},
+			Path:     "admin/controller-0",
+			Location: map[string]string{"cloud": jimmtest.TestCloudName, "region": jimmtest.TestCloudRegionName},
 			Public:   true,
 			UUID:     s.Model.Controller.UUID,
 			Version:  s.Model.Controller.AgentVersion,
 		}, {
-			Path:     "admin/dummy-1",
-			Location: map[string]string{"cloud": "dummy", "region": "dummy-region"},
+			Path:     "admin/controller-1",
+			Location: map[string]string{"cloud": jimmtest.TestCloudName, "region": jimmtest.TestCloudRegionName},
 			Public:   true,
 			UUID:     s.Model.Controller.UUID,
 			Version:  s.Model.Controller.AgentVersion,
 		}, {
-			Path:     "admin/dummy-2",
-			Location: map[string]string{"cloud": "dummy", "region": "dummy-region"},
+			Path:     "admin/controller-2",
+			Location: map[string]string{"cloud": jimmtest.TestCloudName, "region": jimmtest.TestCloudRegionName},
 			Public:   true,
 			UUID:     s.Model.Controller.UUID,
 			Version:  s.Model.Controller.AgentVersion,
@@ -66,8 +67,8 @@ func (s *jimmSuite) TestListControllers(c *gc.C) {
 }
 
 func (s *jimmSuite) TestListControllersUnauthorizedUser(c *gc.C) {
-	s.AddController(c, "dummy-0", s.APIInfo(c))
-	s.AddController(c, "dummy-2", s.APIInfo(c))
+	s.AddController(c, "controller-0", s.APIInfo(c))
+	s.AddController(c, "controller-2", s.APIInfo(c))
 
 	// Open the API connection as user "bob".
 	conn := s.open(c, nil, "bob")
@@ -87,8 +88,8 @@ func (s *jimmSuite) TestListControllersUnauthorizedUser(c *gc.C) {
 }
 
 func (s *jimmSuite) TestListControllersV3(c *gc.C) {
-	s.AddController(c, "dummy-0", s.APIInfo(c))
-	s.AddController(c, "dummy-2", s.APIInfo(c))
+	s.AddController(c, "controller-0", s.APIInfo(c))
+	s.AddController(c, "controller-2", s.APIInfo(c))
 
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
@@ -97,36 +98,36 @@ func (s *jimmSuite) TestListControllersV3(c *gc.C) {
 	cis, err := client.ListControllers()
 	c.Assert(err, gc.Equals, nil)
 	c.Check(cis, jc.DeepEquals, []apiparams.ControllerInfo{{
-		Name:          "dummy-0",
+		Name:          "controller-0",
 		UUID:          s.Model.Controller.UUID,
 		APIAddresses:  s.APIInfo(c).Addrs,
 		CACertificate: s.APIInfo(c).CACert,
-		CloudTag:      "cloud-dummy",
-		CloudRegion:   "dummy-region",
+		CloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
+		CloudRegion:   jimmtest.TestCloudRegionName,
 		Username:      "admin",
 		AgentVersion:  s.Model.Controller.AgentVersion,
 		Status: jujuparams.EntityStatus{
 			Status: "available",
 		},
 	}, {
-		Name:          "dummy-1",
+		Name:          "controller-1",
 		UUID:          s.Model.Controller.UUID,
 		APIAddresses:  s.APIInfo(c).Addrs,
 		CACertificate: s.APIInfo(c).CACert,
-		CloudTag:      "cloud-dummy",
-		CloudRegion:   "dummy-region",
+		CloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
+		CloudRegion:   jimmtest.TestCloudRegionName,
 		Username:      "admin",
 		AgentVersion:  s.Model.Controller.AgentVersion,
 		Status: jujuparams.EntityStatus{
 			Status: "available",
 		},
 	}, {
-		Name:          "dummy-2",
+		Name:          "controller-2",
 		UUID:          s.Model.Controller.UUID,
 		APIAddresses:  s.APIInfo(c).Addrs,
 		CACertificate: s.APIInfo(c).CACert,
-		CloudTag:      "cloud-dummy",
-		CloudRegion:   "dummy-region",
+		CloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
+		CloudRegion:   jimmtest.TestCloudRegionName,
 		Username:      "admin",
 		AgentVersion:  s.Model.Controller.AgentVersion,
 		Status: jujuparams.EntityStatus{
@@ -136,8 +137,8 @@ func (s *jimmSuite) TestListControllersV3(c *gc.C) {
 }
 
 func (s *jimmSuite) TestListControllersV3Unauthorized(c *gc.C) {
-	s.AddController(c, "dummy-0", s.APIInfo(c))
-	s.AddController(c, "dummy-2", s.APIInfo(c))
+	s.AddController(c, "controller-0", s.APIInfo(c))
+	s.AddController(c, "controller-2", s.APIInfo(c))
 
 	conn := s.open(c, nil, "bob")
 	defer conn.Close()
@@ -161,7 +162,7 @@ func (s *jimmSuite) TestAddController(c *gc.C) {
 	client := api.NewClient(conn)
 
 	acr := apiparams.AddControllerRequest{
-		Name:          "dummy-2",
+		Name:          "controller-2",
 		APIAddresses:  s.APIInfo(c).Addrs,
 		CACertificate: s.APIInfo(c).CACert,
 		Username:      s.APIInfo(c).Tag.Id(),
@@ -171,12 +172,12 @@ func (s *jimmSuite) TestAddController(c *gc.C) {
 	ci, err := client.AddController(&acr)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(ci, jc.DeepEquals, apiparams.ControllerInfo{
-		Name:          "dummy-2",
+		Name:          "controller-2",
 		UUID:          s.Model.Controller.UUID,
 		APIAddresses:  s.APIInfo(c).Addrs,
 		CACertificate: s.APIInfo(c).CACert,
-		CloudTag:      "cloud-dummy",
-		CloudRegion:   "dummy-region",
+		CloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
+		CloudRegion:   jimmtest.TestCloudRegionName,
 		Username:      s.APIInfo(c).Tag.Id(),
 		AgentVersion:  s.Model.Controller.AgentVersion,
 		Status: jujuparams.EntityStatus{
@@ -185,13 +186,13 @@ func (s *jimmSuite) TestAddController(c *gc.C) {
 	})
 
 	_, err = client.AddController(&acr)
-	c.Check(err, gc.ErrorMatches, `controller "dummy-2" already exists \(already exists\)`)
+	c.Check(err, gc.ErrorMatches, `controller "controller-2" already exists \(already exists\)`)
 	c.Check(jujuparams.IsCodeAlreadyExists(err), gc.Equals, true)
 
 	conn = s.open(c, nil, "bob")
 	defer conn.Close()
 	client = api.NewClient(conn)
-	acr.Name = "dummy-3"
+	acr.Name = "controller-3"
 	_, err = client.AddController(&acr)
 	c.Check(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 	c.Check(jujuparams.IsCodeUnauthorized(err), gc.Equals, true)
@@ -203,7 +204,7 @@ func (s *jimmSuite) TestRemoveController(c *gc.C) {
 	client := api.NewClient(conn)
 
 	_, err := client.RemoveController(&apiparams.RemoveControllerRequest{
-		Name: "dummy-1",
+		Name: "controller-1",
 	})
 	c.Check(err, gc.ErrorMatches, `controller is still alive \(still alive\)`)
 	c.Check(jujuparams.ErrCode(err), gc.Equals, apiparams.CodeStillAlive)
@@ -213,23 +214,23 @@ func (s *jimmSuite) TestRemoveController(c *gc.C) {
 	client2 := api.NewClient(conn2)
 
 	_, err = client2.RemoveController(&apiparams.RemoveControllerRequest{
-		Name: "dummy-1",
+		Name: "controller-1",
 	})
 	c.Check(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeUnauthorized)
 
 	ci, err := client.RemoveController(&apiparams.RemoveControllerRequest{
-		Name:  "dummy-1",
+		Name:  "controller-1",
 		Force: true,
 	})
 	c.Assert(err, gc.Equals, nil)
 	c.Check(ci, jc.DeepEquals, apiparams.ControllerInfo{
-		Name:          "dummy-1",
+		Name:          "controller-1",
 		UUID:          s.Model.Controller.UUID,
 		APIAddresses:  s.APIInfo(c).Addrs,
 		CACertificate: s.APIInfo(c).CACert,
-		CloudTag:      "cloud-dummy",
-		CloudRegion:   "dummy-region",
+		CloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
+		CloudRegion:   jimmtest.TestCloudRegionName,
 		Username:      s.APIInfo(c).Tag.Id(),
 		AgentVersion:  s.Model.Controller.AgentVersion,
 		Status: jujuparams.EntityStatus{
@@ -244,17 +245,17 @@ func (s *jimmSuite) TestSetControllerDeprecated(c *gc.C) {
 	client := api.NewClient(conn)
 
 	ci, err := client.SetControllerDeprecated(&apiparams.SetControllerDeprecatedRequest{
-		Name:       "dummy-1",
+		Name:       "controller-1",
 		Deprecated: true,
 	})
 	c.Assert(err, gc.Equals, nil)
 	c.Check(ci, jc.DeepEquals, apiparams.ControllerInfo{
-		Name:          "dummy-1",
+		Name:          "controller-1",
 		UUID:          s.Model.Controller.UUID,
 		APIAddresses:  s.APIInfo(c).Addrs,
 		CACertificate: s.APIInfo(c).CACert,
-		CloudTag:      "cloud-dummy",
-		CloudRegion:   "dummy-region",
+		CloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
+		CloudRegion:   jimmtest.TestCloudRegionName,
 		Username:      s.APIInfo(c).Tag.Id(),
 		AgentVersion:  s.Model.Controller.AgentVersion,
 		Status: jujuparams.EntityStatus{
@@ -263,17 +264,17 @@ func (s *jimmSuite) TestSetControllerDeprecated(c *gc.C) {
 	})
 
 	ci, err = client.SetControllerDeprecated(&apiparams.SetControllerDeprecatedRequest{
-		Name:       "dummy-1",
+		Name:       "controller-1",
 		Deprecated: false,
 	})
 	c.Assert(err, gc.Equals, nil)
 	c.Check(ci, jc.DeepEquals, apiparams.ControllerInfo{
-		Name:          "dummy-1",
+		Name:          "controller-1",
 		UUID:          s.Model.Controller.UUID,
 		APIAddresses:  s.APIInfo(c).Addrs,
 		CACertificate: s.APIInfo(c).CACert,
-		CloudTag:      "cloud-dummy",
-		CloudRegion:   "dummy-region",
+		CloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
+		CloudRegion:   jimmtest.TestCloudRegionName,
 		Username:      s.APIInfo(c).Tag.Id(),
 		AgentVersion:  s.Model.Controller.AgentVersion,
 		Status: jujuparams.EntityStatus{
@@ -282,7 +283,7 @@ func (s *jimmSuite) TestSetControllerDeprecated(c *gc.C) {
 	})
 
 	ci, err = client.SetControllerDeprecated(&apiparams.SetControllerDeprecatedRequest{
-		Name:       "dummy-2",
+		Name:       "controller-2",
 		Deprecated: true,
 	})
 	c.Check(err, gc.ErrorMatches, `controller not found \(not found\)`)
@@ -292,7 +293,7 @@ func (s *jimmSuite) TestSetControllerDeprecated(c *gc.C) {
 	defer conn.Close()
 	client = api.NewClient(conn)
 	ci, err = client.SetControllerDeprecated(&apiparams.SetControllerDeprecatedRequest{
-		Name:       "dummy-1",
+		Name:       "controller-1",
 		Deprecated: true,
 	})
 	c.Check(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
@@ -327,7 +328,7 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			Action:  "add",
 			Success: true,
 			Params: map[string]string{
-				"name": "dummy-1",
+				"name": "controller-1",
 			},
 		}, {
 			Time:    evs.Events[1].Time,
@@ -346,11 +347,11 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			Action:  "create",
 			Success: true,
 			Params: map[string]string{
-				"cloud":            "cloud-dummy",
+				"cloud":            names.NewCloudTag(jimmtest.TestCloudName).String(),
 				"cloud-credential": s.Model.CloudCredential.Tag().String(),
 				"name":             "model-1",
 				"owner":            s.Model.Owner.Tag().String(),
-				"region":           "dummy-region",
+				"region":           jimmtest.TestCloudRegionName,
 			},
 		}, {
 			Time:    evs.Events[3].Time,
@@ -369,11 +370,11 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			Action:  "create",
 			Success: true,
 			Params: map[string]string{
-				"cloud":            "cloud-dummy",
+				"cloud":            names.NewCloudTag(jimmtest.TestCloudName).String(),
 				"cloud-credential": s.Model2.CloudCredential.Tag().String(),
 				"name":             "model-2",
 				"owner":            s.Model2.Owner.Tag().String(),
-				"region":           "dummy-region",
+				"region":           jimmtest.TestCloudRegionName,
 			},
 		}, {
 			Time:    evs.Events[5].Time,
@@ -382,11 +383,11 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			Action:  "create",
 			Success: true,
 			Params: map[string]string{
-				"cloud":            "cloud-dummy",
+				"cloud":            names.NewCloudTag(jimmtest.TestCloudName).String(),
 				"cloud-credential": s.Model3.CloudCredential.Tag().String(),
 				"name":             "model-3",
 				"owner":            s.Model3.Owner.Tag().String(),
-				"region":           "dummy-region",
+				"region":           jimmtest.TestCloudRegionName,
 			},
 		}, {
 			Time:    evs.Events[6].Time,
@@ -416,8 +417,8 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 }
 
 func (s *jimmSuite) TestFullModelStatus(c *gc.C) {
-	s.AddController(c, "controller-1", s.APIInfo(c))
-	mt := s.AddModel(c, names.NewUserTag("charlie@external"), "model-1", names.NewCloudTag("dummy"), "dummy-region", s.Model2.CloudCredential.Tag().(names.CloudCredentialTag))
+	s.AddController(c, "controller-2", s.APIInfo(c))
+	mt := s.AddModel(c, names.NewUserTag("charlie@external"), "model-1", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, s.Model2.CloudCredential.Tag().(names.CloudCredentialTag))
 
 	conn := s.open(c, nil, "bob")
 	defer conn.Close()
@@ -445,8 +446,8 @@ func (s *jimmSuite) TestFullModelStatus(c *gc.C) {
 		Model: jujuparams.ModelStatusInfo{
 			Name:        "model-1",
 			Type:        "iaas",
-			CloudTag:    "cloud-dummy",
-			CloudRegion: "dummy-region",
+			CloudTag:    names.NewCloudTag(jimmtest.TestCloudName).String(),
+			CloudRegion: jimmtest.TestCloudRegionName,
 			Version:     jujuversion.Current.String(),
 			ModelStatus: jujuparams.DetailedStatus{
 				Status: "available",
@@ -456,7 +457,7 @@ func (s *jimmSuite) TestFullModelStatus(c *gc.C) {
 	})
 }
 func (s *jimmSuite) TestUpdateMigratedModel(c *gc.C) {
-	s.AddController(c, "controller-1", s.APIInfo(c))
+	s.AddController(c, "controller-2", s.APIInfo(c))
 
 	// Open the API connection as user "bob".
 	conn := s.open(c, nil, "bob")

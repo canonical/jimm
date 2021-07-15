@@ -328,14 +328,14 @@ func TestSetControllerDeprecated(t *testing.T) {
 }
 
 const removeControllerTestEnv = `clouds:
-- name: dummy
-  type: dummy
+- name: test-cloud
+  type: test-provider
   regions:
-  - name: dummy-region
+  - name: test-cloud-region
 cloud-credentials:
 - owner: alice@external
   name: cred-1
-  cloud: dummy
+  cloud: test-cloud
 users:
 - username: alice@external
   controller-access: superuser
@@ -346,16 +346,16 @@ users:
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
-  cloud: dummy
-  region: dummy-region
+  cloud: test-cloud
+  region: test-cloud-region
 models:
 - name: model-1
   type: iaas
   uuid: 00000002-0000-0000-0000-000000000001
   controller: controller-1
   default-series: warty
-  cloud: dummy
-  region: dummy-region
+  cloud: test-cloud
+  region: test-cloud-region
   cloud-credential: cred-1
   owner: alice@external
   life: alive
@@ -483,14 +483,14 @@ func TestRemoveController(t *testing.T) {
 }
 
 const fullModelStatusTestEnv = `clouds:
-- name: dummy
-  type: dummy
+- name: test-cloud
+  type: test-provider
   regions:
-  - name: dummy-region
+  - name: test-cloud-region
 cloud-credentials:
 - owner: alice@external
   name: cred-1
-  cloud: dummy
+  cloud: test-cloud
 users:
 - username: alice@external
   controller-access: superuser
@@ -501,16 +501,16 @@ users:
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
-  cloud: dummy
-  region: dummy-region
+  cloud: test-cloud
+  region: test-cloud-region
 models:
 - name: model-1
   type: iaas
   uuid: 00000002-0000-0000-0000-000000000001
   controller: controller-1
   default-series: warty
-  cloud: dummy
-  region: dummy-region
+  cloud: test-cloud
+  region: test-cloud-region
   cloud-credential: cred-1
   owner: alice@external
   life: alive
@@ -526,8 +526,8 @@ func TestFullModelStatus(t *testing.T) {
 		Model: jujuparams.ModelStatusInfo{
 			Name:             "model-1",
 			Type:             "iaas",
-			CloudTag:         "cloud-dummy",
-			CloudRegion:      "dummy-region",
+			CloudTag:         "cloud-test-cloud",
+			CloudRegion:      "test-cloud-region",
 			Version:          "2.9-rc7",
 			AvailableVersion: "",
 			ModelStatus: jujuparams.DetailedStatus{

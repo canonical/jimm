@@ -57,20 +57,20 @@ func (s *websocketSuite) SetUpTest(c *gc.C) {
 
 	s.Candid.AddUser("alice")
 
-	cct := names.NewCloudCredentialTag("dummy/charlie@external/cred")
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
 	s.Credential2 = new(dbmodel.CloudCredential)
 	s.Credential2.SetTag(cct)
 	err := s.JIMM.Database.GetCloudCredential(ctx, s.Credential2)
 	c.Assert(err, gc.Equals, nil)
 
-	mt := s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag("dummy"), "dummy-region", cct)
+	mt := s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
 	s.Model2 = new(dbmodel.Model)
 	s.Model2.SetTag(mt)
 	err = s.JIMM.Database.GetModel(ctx, s.Model2)
 	c.Assert(err, gc.Equals, nil)
 
-	mt = s.AddModel(c, names.NewUserTag("charlie@external"), "model-3", names.NewCloudTag("dummy"), "dummy-region", cct)
+	mt = s.AddModel(c, names.NewUserTag("charlie@external"), "model-3", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
 	s.Model3 = new(dbmodel.Model)
 	s.Model3.SetTag(mt)
 	err = s.JIMM.Database.GetModel(ctx, s.Model3)

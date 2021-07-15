@@ -9,14 +9,15 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/cmd/jimmctl/cmd"
+	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 )
 
 var (
 	expectedModelStatusOutput = `model:
   name: model-2
   type: iaas
-  cloudtag: cloud-dummy
-  cloudregion: dummy-region
+  cloudtag: cloud-` + jimmtest.TestCloudName + `
+  cloudregion: ` + jimmtest.TestCloudRegionName + `
   version: .*
   availableversion: ""
   modelstatus:
@@ -51,9 +52,9 @@ var _ = gc.Suite(&modelStatusSuite{})
 func (s *modelStatusSuite) TestModelStatusSuperuser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
-	cct := names.NewCloudCredentialTag("dummy/charlie@external/cred")
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
-	mt := s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag("dummy"), "dummy-region", cct)
+	mt := s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
 
 	// alice is superuser
 	bClient := s.userBakeryClient("alice")
@@ -65,9 +66,9 @@ func (s *modelStatusSuite) TestModelStatusSuperuser(c *gc.C) {
 func (s *modelStatusSuite) TestModelStatus(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
-	cct := names.NewCloudCredentialTag("dummy/charlie@external/cred")
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
-	mt := s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag("dummy"), "dummy-region", cct)
+	mt := s.AddModel(c, names.NewUserTag("charlie@external"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
 
 	// bob is not superuser
 	bClient := s.userBakeryClient("bob")

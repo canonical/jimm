@@ -21,27 +21,27 @@ import (
 )
 
 const testWatcherEnv = `clouds:
-- name: dummy
-  type: dummy
+- name: test-cloud
+  type: test-provider
   regions:
-  - name: dummy-region
+  - name: test-cloud-region
 cloud-credentials:
 - owner: alice@external
   name: cred-1
-  cloud: dummy
+  cloud: test-cloud
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
-  cloud: dummy
-  region: dummy-region
+  cloud: test-cloud
+  region: test-cloud-region
 models:
 - name: model-1
   type: iaas
   uuid: 00000002-0000-0000-0000-000000000001
   controller: controller-1
   default-series: warty
-  cloud: dummy
-  region: dummy-region
+  cloud: test-cloud
+  region: test-cloud-region
   cloud-credential: cred-1
   owner: alice@external
   life: alive
@@ -128,8 +128,8 @@ models:
   uuid: 00000002-0000-0000-0000-000000000002
   controller: controller-1
   default-series: warty
-  cloud: dummy
-  region: dummy-region
+  cloud: test-cloud
+  region: test-cloud-region
   cloud-credential: cred-1
   owner: alice@external
   life: dying
@@ -971,31 +971,31 @@ func TestWatcherRemoveDyingModelsOnStartup(t *testing.T) {
 }
 
 const testWatcherIgnoreDeltasForModelsFromIncorrectControllerEnv = `clouds:
-- name: dummy
-  type: dummy
+- name: test-cloud
+  type: test-provider
   regions:
-  - name: dummy-region
+  - name: test-cloud-region
 cloud-credentials:
 - owner: alice@external
   name: cred-1
-  cloud: dummy
+  cloud: test-cloud
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
-  cloud: dummy
-  region: dummy-region
+  cloud: test-cloud
+  region: test-cloud-region
 - name: controller-2
   uuid: 00000001-0000-0000-0000-000000000002
-  cloud: dummy
-  region: dummy-region
+  cloud: test-cloud
+  region: test-cloud-region
 models:
 - name: model-1
   type: iaas
   uuid: 00000002-0000-0000-0000-000000000001
   controller: controller-1
   default-series: warty
-  cloud: dummy
-  region: dummy-region
+  cloud: test-cloud
+  region: test-cloud-region
   cloud-credential: cred-1
   owner: alice@external
   life: alive

@@ -14,6 +14,7 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
+	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 )
 
 type clientSuite struct {
@@ -25,7 +26,7 @@ var _ = gc.Suite(&clientSuite{})
 func (s *clientSuite) TestStatus(c *gc.C) {
 	ctx := context.Background()
 
-	cct := names.NewCloudCredentialTag("dummy/bob@external/pw1").String()
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@external/pw1").String()
 	cred := jujuparams.TaggedCredential{
 		Tag: cct,
 		Credential: jujuparams.CloudCredential{
@@ -68,8 +69,8 @@ func (s *clientSuite) TestStatus(c *gc.C) {
 		Model: jujuparams.ModelStatusInfo{
 			Name:             "model-1",
 			Type:             "iaas",
-			CloudTag:         "cloud-dummy",
-			CloudRegion:      "dummy-region",
+			CloudTag:         names.NewCloudTag(jimmtest.TestCloudName).String(),
+			CloudRegion:      jimmtest.TestCloudRegionName,
 			Version:          jujuversion.Current.String(),
 			AvailableVersion: "",
 			ModelStatus: jujuparams.DetailedStatus{
