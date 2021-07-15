@@ -129,7 +129,7 @@ func TestVault(t *testing.T) {
 	})
 
 	cloudClient := cloud.NewClient(conn)
-	tag := names.NewCloudCredentialTag("dummy/bob@external/test-1").String()
+	tag := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@external/test-1").String()
 	_, err = cloudClient.UpdateCloudsCredentials(map[string]jujucloud.Credential{
 		tag: jujucloud.NewCredential(jujucloud.UserPassAuthType, map[string]string{
 			"username": "test-user",
@@ -138,7 +138,7 @@ func TestVault(t *testing.T) {
 	}, false)
 	c.Assert(err, qt.IsNil)
 
-	s, err := vaultClient.Logical().Read(c.Name() + "/creds/dummy/bob@external/test-1")
+	s, err := vaultClient.Logical().Read(c.Name() + "/creds/" + jimmtest.TestCloudName + "/bob@external/test-1")
 	c.Assert(err, qt.IsNil)
 	c.Assert(s, qt.Not(qt.IsNil))
 	c.Check(s.Data, qt.DeepEquals, map[string]interface{}{

@@ -138,12 +138,12 @@ func (s *dbSuite) TestGetUserClouds(c *qt.C) {
 
 	cl := dbmodel.Cloud{
 		Name:             "test-cloud",
-		Type:             "dummy",
+		Type:             "test-provider",
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://identity.example.com",
 		StorageEndpoint:  "https://storage.example.com",
 		Regions: []dbmodel.CloudRegion{{
-			Name: "dummy-region",
+			Name: "test-cloud-region",
 		}},
 		CACertificates: dbmodel.Strings{"CACERT 1", "CACERT 2"},
 		Users: []dbmodel.UserCloudAccess{{

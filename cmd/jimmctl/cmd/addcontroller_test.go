@@ -13,6 +13,7 @@ import (
 
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
 	"github.com/CanonicalLtd/jimm/cmd/jimmctl/cmd"
+	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 )
 
 type addControllerSuite struct {
@@ -67,8 +68,8 @@ cacertificate: |
   hZuWHpuOT120okoutwuUSU9448cXLGZfoCZjjdMKXmOj8EEec1diDP4mhegYGezD
   LQRNNlaY2ajLt0paowf/Xxb8
   -----END CERTIFICATE-----
-cloudtag: cloud-dummy
-cloudregion: dummy-region
+cloudtag: cloud-`+jimmtest.TestCloudName+`
+cloudregion: `+jimmtest.TestCloudRegionName+`
 username: admin
 agentversion: .*
 status:

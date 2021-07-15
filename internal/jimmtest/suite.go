@@ -169,7 +169,7 @@ func (s *CandidSuite) TearDownTest(c *gc.C) {
 	}
 }
 
-// A JujuSuite is a suite that intialises a JIMM and adds the dummy juju
+// A JujuSuite is a suite that intialises a JIMM and adds the testing juju
 // controller.
 type JujuSuite struct {
 	jemtest.JujuConnSuite
@@ -182,7 +182,7 @@ func (s *JujuSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
 	s.JIMMSuite.SetUpTest(c)
 
-	s.AddController(c, "dummy-1", s.APIInfo(c))
+	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	//var wctx context.Context
 	//wctx, s.cancelWatcher = context.WithCancel(context.Background())
@@ -214,7 +214,7 @@ type BootstrapSuite struct {
 func (s *BootstrapSuite) SetUpTest(c *gc.C) {
 	s.JujuSuite.SetUpTest(c)
 
-	cct := names.NewCloudCredentialTag("dummy/bob@external/cred")
+	cct := names.NewCloudCredentialTag(TestCloudName + "/bob@external/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{
 		AuthType: "empty",
 	})
@@ -224,7 +224,7 @@ func (s *BootstrapSuite) SetUpTest(c *gc.C) {
 	err := s.JIMM.Database.GetCloudCredential(ctx, s.CloudCredential)
 	c.Assert(err, gc.Equals, nil)
 
-	mt := s.AddModel(c, names.NewUserTag("bob@external"), "model-1", names.NewCloudTag("dummy"), "dummy-region", cct)
+	mt := s.AddModel(c, names.NewUserTag("bob@external"), "model-1", names.NewCloudTag(TestCloudName), TestCloudRegionName, cct)
 	s.Model = new(dbmodel.Model)
 	s.Model.SetTag(mt)
 	err = s.JIMM.Database.GetModel(ctx, s.Model)

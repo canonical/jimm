@@ -47,8 +47,8 @@ func TestWatchAllModelSummaries(t *testing.T) {
 				Controller: controllerName,
 				Name:       "test-model",
 				Admins:     []string{"alice@external", "bob@external"},
-				Cloud:      "dummy",
-				Region:     "dummy-region",
+				Cloud:      "test-cloud",
+				Region:     "test-cloud-region",
 				Size: jujuparams.ModelSummarySize{
 					Machines:     0,
 					Containers:   0,
@@ -122,8 +122,8 @@ func TestWatchAllModelSummaries(t *testing.T) {
 				Removed:    false,
 				Controller: controllerName,
 				Name:       "test-model",
-				Cloud:      "dummy",
-				Region:     "dummy-region",
+				Cloud:      "test-cloud",
+				Region:     "test-cloud-region",
 				Admins:     []string{"alice@external", "bob@external"},
 				Size: jujuparams.ModelSummarySize{
 					Machines:     0,

@@ -267,7 +267,7 @@ class TestCharm(unittest.TestCase):
         self.harness.add_relation_unit(id, 'postgresql/0')
         self.harness.charm.on.update_status.emit()
         self.assertEqual(self.harness.charm.unit.status,
-                         WaitingStatus("waiting for database master"))
+                         WaitingStatus("waiting for database"))
         self.harness.update_relation_data(id, 'postgresql/0',
                                           {"master": "host=localhost port=5432"})
         self.harness.charm.on.update_status.emit()

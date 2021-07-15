@@ -16,6 +16,7 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
+	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 )
 
 type modelmanagerSuite struct {
@@ -35,15 +36,15 @@ func (s *modelmanagerSuite) TestCreateModel(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	c.Check(info.UUID, gc.Not(gc.Equals), "")
-	c.Check(info.CloudTag, gc.Equals, names.NewCloudTag("dummy").String())
-	c.Check(info.CloudRegion, gc.Equals, "dummy-region")
+	c.Check(info.CloudTag, gc.Equals, names.NewCloudTag(jimmtest.TestCloudName).String())
+	c.Check(info.CloudRegion, gc.Equals, jimmtest.TestCloudRegionName)
 	c.Check(info.DefaultSeries, gc.Equals, "focal")
 	c.Check(string(info.Life), gc.Equals, "alive")
 	c.Check(string(info.Status.Status), gc.Equals, "available")
 	c.Check(info.Status.Data, gc.IsNil)
 	c.Check(info.Status.Since.After(time.Now().Add(-10*time.Second)), gc.Equals, true)
 	c.Check(info.Type, gc.Equals, "iaas")
-	c.Check(info.ProviderType, gc.Equals, "dummy")
+	c.Check(info.ProviderType, gc.Equals, jimmtest.TestProviderType)
 }
 
 func (s *modelmanagerSuite) TestCreateModelError(c *gc.C) {
@@ -56,7 +57,7 @@ func (s *modelmanagerSuite) TestCreateModelError(c *gc.C) {
 		CloudTag: names.NewCloudTag("nosuchcloud").String(),
 	}, &info)
 	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
-	c.Check(err, gc.ErrorMatches, `cloud "nosuchcloud" not found, expected one of \["dummy"\] \(not found\)`)
+	c.Check(err, gc.ErrorMatches, `cloud "nosuchcloud" not found, expected one of \["`+jimmtest.TestCloudName+`"\] \(not found\)`)
 }
 
 func (s *modelmanagerSuite) TestGrantJIMMModelAdmin(c *gc.C) {
@@ -265,7 +266,7 @@ func (s *modelmanagerSuite) TestChangeModelCredential(c *gc.C) {
 	}, &info)
 	c.Assert(err, gc.Equals, nil)
 
-	ct := names.NewCloudCredentialTag("dummy/test-owner/test-credential")
+	ct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/test-owner/test-credential")
 	_, err = s.API.UpdateCredential(ctx, jujuparams.TaggedCredential{
 		Tag: ct.String(),
 		Credential: jujuparams.CloudCredential{

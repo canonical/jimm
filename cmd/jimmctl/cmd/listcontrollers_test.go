@@ -7,6 +7,7 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/cmd/jimmctl/cmd"
+	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 )
 
 var (
@@ -19,8 +20,8 @@ var (
     -----BEGIN CERTIFICATE-----
     .*
     -----END CERTIFICATE-----
-  cloudtag: cloud-dummy
-  cloudregion: dummy-region
+  cloudtag: cloud-` + jimmtest.TestCloudName + `
+  cloudregion: ` + jimmtest.TestCloudRegionName + `
   username: admin
   agentversion: .*
   status:
@@ -28,7 +29,7 @@ var (
     info: ""
     data: {}
     since: null
-- name: dummy-1
+- name: controller-1
   uuid: deadbeef-1bad-500d-9000-4b1d0d06f00d
   publicaddress: ""
   apiaddresses:
@@ -37,8 +38,8 @@ var (
     -----BEGIN CERTIFICATE-----
     .*
     -----END CERTIFICATE-----
-  cloudtag: cloud-dummy
-  cloudregion: dummy-region
+  cloudtag: cloud-` + jimmtest.TestCloudName + `
+  cloudregion: ` + jimmtest.TestCloudRegionName + `
   username: admin
   agentversion: .*
   status:
