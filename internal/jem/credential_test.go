@@ -40,9 +40,9 @@ func (s *credentialSuite) TestRevokeCredentialsInUse(c *gc.C) {
 		Path:           params.EntityPath{"bob", "newmodel"},
 		ControllerPath: s.Controller.Path,
 		Credential:     s.Credential.Path,
-		Cloud:          "dummy",
+		Cloud:          jemtest.TestCloudName,
 	}, nil)
-	c.Assert(err, gc.ErrorMatches, `credential dummy/bob/cred has been revoked`)
+	c.Assert(err, gc.ErrorMatches, `credential `+jemtest.TestCloudName+`/bob/cred has been revoked`)
 
 	// Check that the credential really has been revoked on the
 	// controller.
@@ -109,7 +109,7 @@ func (s *credentialSuite) TestUpdateCredential(c *gc.C) {
 			"username": "cloud-user",
 			"password": "cloud-pass",
 		},
-		ProviderType: "dummy",
+		ProviderType: jemtest.TestProviderType,
 	}, jem.CredentialUpdate)
 	c.Assert(err, gc.Equals, nil)
 
@@ -148,40 +148,40 @@ var credentialTests = []struct {
 	expectErrorCause error
 }{{
 	path: params.CredentialPath{
-		Cloud: "dummy",
+		Cloud: jemtest.TestCloudName,
 		User:  "bob",
 		Name:  "credential",
 	},
 }, {
 	path: params.CredentialPath{
-		Cloud: "dummy",
+		Cloud: jemtest.TestCloudName,
 		User:  "bob-group",
 		Name:  "credential",
 	},
 }, {
 	path: params.CredentialPath{
-		Cloud: "dummy",
+		Cloud: jemtest.TestCloudName,
 		User:  "alice",
 		Name:  "credential",
 	},
 	expectErrorCause: params.ErrUnauthorized,
 }, {
 	path: params.CredentialPath{
-		Cloud: "dummy",
+		Cloud: jemtest.TestCloudName,
 		User:  "bob",
 		Name:  "credential2",
 	},
 	expectErrorCause: params.ErrNotFound,
 }, {
 	path: params.CredentialPath{
-		Cloud: "dummy",
+		Cloud: jemtest.TestCloudName,
 		User:  "bob-group",
 		Name:  "credential2",
 	},
 	expectErrorCause: params.ErrNotFound,
 }, {
 	path: params.CredentialPath{
-		Cloud: "dummy",
+		Cloud: jemtest.TestCloudName,
 		User:  "alice",
 		Name:  "credential2",
 	},

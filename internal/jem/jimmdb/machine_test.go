@@ -47,9 +47,9 @@ func (s *machineSuite) checkDBOK(c *gc.C) {
 
 func (s *machineSuite) TestUpsertMachine(c *gc.C) {
 	m := mongodoc.Machine{
-		Controller: "alice/dummy-1",
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Controller: "alice/controller-1",
+		Cloud:      "test-cloud",
+		Region:     "test-cloud-region",
 		Info: &jujuparams.MachineInfo{
 			ModelUUID: "00000000-0000-0000-0000-00000000000a",
 			Id:        "0",
@@ -61,7 +61,7 @@ func (s *machineSuite) TestUpsertMachine(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	var m2 mongodoc.Machine
-	err = s.database.Machines().FindId("alice/dummy-1 00000000-0000-0000-0000-00000000000a 0").One(&m2)
+	err = s.database.Machines().FindId("alice/controller-1 00000000-0000-0000-0000-00000000000a 0").One(&m2)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(m2, jc.DeepEquals, m)
 
@@ -69,7 +69,7 @@ func (s *machineSuite) TestUpsertMachine(c *gc.C) {
 	err = s.database.UpsertMachine(testContext, &m)
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.database.Machines().FindId("alice/dummy-1 00000000-0000-0000-0000-00000000000a 0").One(&m2)
+	err = s.database.Machines().FindId("alice/controller-1 00000000-0000-0000-0000-00000000000a 0").One(&m2)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(m2, jc.DeepEquals, m)
 
@@ -81,27 +81,27 @@ func (s *machineSuite) TestUpsertMachine(c *gc.C) {
 
 func (s *machineSuite) TestForEachMachine(c *gc.C) {
 	machines := []mongodoc.Machine{{
-		Controller: "alice/dummy-1",
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Controller: "alice/controller-1",
+		Cloud:      "test-cloud",
+		Region:     "test-cloud-region",
 		Info: &jujuparams.MachineInfo{
 			ModelUUID: "00000000-0000-0000-0000-00000000000a",
 			Id:        "0",
 			Life:      life.Alive,
 		},
 	}, {
-		Controller: "alice/dummy-1",
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Controller: "alice/controller-1",
+		Cloud:      "test-cloud",
+		Region:     "test-cloud-region",
 		Info: &jujuparams.MachineInfo{
 			ModelUUID: "00000000-0000-0000-0000-00000000000b",
 			Id:        "0",
 			Life:      life.Alive,
 		},
 	}, {
-		Controller: "alice/dummy-1",
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Controller: "alice/controller-1",
+		Cloud:      "test-cloud",
+		Region:     "test-cloud-region",
 		Info: &jujuparams.MachineInfo{
 			ModelUUID: "00000000-0000-0000-0000-00000000000a",
 			Id:        "1",
@@ -148,9 +148,9 @@ func (s *machineSuite) TestForEachMachine(c *gc.C) {
 
 func (s *machineSuite) TestRemoveMachine(c *gc.C) {
 	m := mongodoc.Machine{
-		Controller: "alice/dummy-1",
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Controller: "alice/controller-1",
+		Cloud:      "test-cloud",
+		Region:     "test-cloud-region",
 		Info: &jujuparams.MachineInfo{
 			ModelUUID: "00000000-0000-0000-0000-00000000000a",
 			Id:        "0",
@@ -162,14 +162,14 @@ func (s *machineSuite) TestRemoveMachine(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	var m2 mongodoc.Machine
-	err = s.database.Machines().FindId("alice/dummy-1 00000000-0000-0000-0000-00000000000a 0").One(&m2)
+	err = s.database.Machines().FindId("alice/controller-1 00000000-0000-0000-0000-00000000000a 0").One(&m2)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(m2, jc.DeepEquals, m)
 
 	err = s.database.RemoveMachine(testContext, &m)
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.database.Machines().FindId("alice/dummy-1 00000000-0000-0000-0000-00000000000a 0").One(&m2)
+	err = s.database.Machines().FindId("alice/controller-1 00000000-0000-0000-0000-00000000000a 0").One(&m2)
 	c.Assert(err, gc.Equals, mgo.ErrNotFound)
 
 	err = s.database.RemoveMachine(testContext, &m)
@@ -180,27 +180,27 @@ func (s *machineSuite) TestRemoveMachine(c *gc.C) {
 
 func (s *machineSuite) TestRemoveMachines(c *gc.C) {
 	machines := []mongodoc.Machine{{
-		Controller: "alice/dummy-1",
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Controller: "alice/controller-1",
+		Cloud:      "test-cloud",
+		Region:     "test-cloud-region",
 		Info: &jujuparams.MachineInfo{
 			ModelUUID: "00000000-0000-0000-0000-00000000000a",
 			Id:        "0",
 			Life:      life.Alive,
 		},
 	}, {
-		Controller: "alice/dummy-1",
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Controller: "alice/controller-1",
+		Cloud:      "test-cloud",
+		Region:     "test-cloud-region",
 		Info: &jujuparams.MachineInfo{
 			ModelUUID: "00000000-0000-0000-0000-00000000000b",
 			Id:        "0",
 			Life:      life.Alive,
 		},
 	}, {
-		Controller: "alice/dummy-1",
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Controller: "alice/controller-1",
+		Cloud:      "test-cloud",
+		Region:     "test-cloud-region",
 		Info: &jujuparams.MachineInfo{
 			ModelUUID: "00000000-0000-0000-0000-00000000000a",
 			Id:        "1",

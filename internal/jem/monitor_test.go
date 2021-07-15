@@ -532,8 +532,8 @@ func (s *monitorUpdateSuite) TestUpdateMachineInfo(c *gc.C) {
 	c.Assert(docs, jc.DeepEquals, []mongodoc.Machine{{
 		Id:         s.Controller.Path.String() + " " + s.Model.UUID + " 0",
 		Controller: s.Controller.Path.String(),
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Cloud:      jemtest.TestCloudName,
+		Region:     jemtest.TestCloudRegionName,
 		Info: &jujuparams.MachineInfo{
 			ModelUUID: s.Model.UUID,
 			Id:        "0",
@@ -543,8 +543,8 @@ func (s *monitorUpdateSuite) TestUpdateMachineInfo(c *gc.C) {
 	}, {
 		Id:         s.Controller.Path.String() + " " + s.Model.UUID + " 1",
 		Controller: s.Controller.Path.String(),
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Cloud:      jemtest.TestCloudName,
+		Region:     jemtest.TestCloudRegionName,
 		Info: &jujuparams.MachineInfo{
 			ModelUUID: s.Model.UUID,
 			Id:        "1",
@@ -581,8 +581,8 @@ func (s *monitorUpdateSuite) TestUpdateMachineInfo(c *gc.C) {
 	c.Assert(docs, jc.DeepEquals, []mongodoc.Machine{{
 		Id:         s.Controller.Path.String() + " " + s.Model.UUID + " 0",
 		Controller: s.Controller.Path.String(),
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Cloud:      jemtest.TestCloudName,
+		Region:     jemtest.TestCloudRegionName,
 		Info: &jujuparams.MachineInfo{
 			ModelUUID: s.Model.UUID,
 			Id:        "0",
@@ -637,8 +637,8 @@ func (s *monitorUpdateSuite) TestUpdateApplicationInfo(c *gc.C) {
 	c.Assert(docs, jc.DeepEquals, []mongodoc.Application{{
 		Id:         s.Controller.Path.String() + " " + s.Model.UUID + " 0",
 		Controller: s.Controller.Path.String(),
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Cloud:      jemtest.TestCloudName,
+		Region:     jemtest.TestCloudRegionName,
 		Info: &mongodoc.ApplicationInfo{
 			ModelUUID: s.Model.UUID,
 			Name:      "0",
@@ -646,8 +646,8 @@ func (s *monitorUpdateSuite) TestUpdateApplicationInfo(c *gc.C) {
 	}, {
 		Id:         s.Controller.Path.String() + " " + s.Model.UUID + " 1",
 		Controller: s.Controller.Path.String(),
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Cloud:      jemtest.TestCloudName,
+		Region:     jemtest.TestCloudRegionName,
 		Info: &mongodoc.ApplicationInfo{
 			ModelUUID: s.Model.UUID,
 			Name:      "1",
@@ -680,8 +680,8 @@ func (s *monitorUpdateSuite) TestUpdateApplicationInfo(c *gc.C) {
 	c.Assert(docs, jc.DeepEquals, []mongodoc.Application{{
 		Id:         s.Controller.Path.String() + " " + s.Model.UUID + " 0",
 		Controller: s.Controller.Path.String(),
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Cloud:      jemtest.TestCloudName,
+		Region:     jemtest.TestCloudRegionName,
 		Info: &mongodoc.ApplicationInfo{
 			ModelUUID: s.Model.UUID,
 			Name:      "0",

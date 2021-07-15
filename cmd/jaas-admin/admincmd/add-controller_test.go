@@ -9,6 +9,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
+	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -38,7 +39,7 @@ func (s *addControllerSuite) TestAddController(c *gc.C) {
 		EntityPath: ctlPath,
 	})
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(ctl.Location, gc.DeepEquals, map[string]string{"cloud": "dummy", "region": "dummy-region"})
+	c.Assert(ctl.Location, gc.DeepEquals, map[string]string{"cloud": jemtest.TestCloudName, "region": jemtest.TestCloudRegionName})
 	c.Assert(ctl.Public, gc.DeepEquals, true)
 	perm, err := client.GetControllerPerm(ctx, &params.GetControllerPerm{
 		EntityPath: ctlPath,

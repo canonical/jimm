@@ -123,28 +123,28 @@ var createModelTests = []struct {
 	params: jem.CreateModelParams{
 		Path: params.EntityPath{"bob", ""},
 		Credential: mongodoc.CredentialPath{
-			Cloud: "dummy",
+			Cloud: jemtest.TestCloudName,
 			EntityPath: mongodoc.EntityPath{
 				User: "bob",
 				Name: "cred",
 			},
 		},
-		Cloud: "dummy",
+		Cloud: jemtest.TestCloudName,
 	},
 }, {
 	about: "success specified controller",
 	user:  "bob",
 	params: jem.CreateModelParams{
 		Path:           params.EntityPath{"bob", ""},
-		ControllerPath: params.EntityPath{jemtest.ControllerAdmin, "dummy-1"},
+		ControllerPath: params.EntityPath{jemtest.ControllerAdmin, "controller-1"},
 		Credential: mongodoc.CredentialPath{
-			Cloud: "dummy",
+			Cloud: jemtest.TestCloudName,
 			EntityPath: mongodoc.EntityPath{
 				User: "bob",
 				Name: "cred",
 			},
 		},
-		Cloud: "dummy",
+		Cloud: jemtest.TestCloudName,
 	},
 }, {
 	about: "success with region",
@@ -152,14 +152,14 @@ var createModelTests = []struct {
 	params: jem.CreateModelParams{
 		Path: params.EntityPath{"bob", ""},
 		Credential: mongodoc.CredentialPath{
-			Cloud: "dummy",
+			Cloud: jemtest.TestCloudName,
 			EntityPath: mongodoc.EntityPath{
 				User: "bob",
 				Name: "cred",
 			},
 		},
-		Cloud:  "dummy",
-		Region: "dummy-region",
+		Cloud:  jemtest.TestCloudName,
+		Region: jemtest.TestCloudRegionName,
 	},
 }, {
 	about: "unknown credential",
@@ -167,13 +167,13 @@ var createModelTests = []struct {
 	params: jem.CreateModelParams{
 		Path: params.EntityPath{"bob", ""},
 		Credential: mongodoc.CredentialPath{
-			Cloud: "dummy",
+			Cloud: jemtest.TestCloudName,
 			EntityPath: mongodoc.EntityPath{
 				User: "bob",
 				Name: "cred2",
 			},
 		},
-		Cloud: "dummy",
+		Cloud: jemtest.TestCloudName,
 	},
 	expectError:      `credential not found`,
 	expectErrorCause: params.ErrNotFound,
@@ -183,13 +183,13 @@ var createModelTests = []struct {
 	params: jem.CreateModelParams{
 		Path: params.EntityPath{"bob", "model-1"},
 		Credential: mongodoc.CredentialPath{
-			Cloud: "dummy",
+			Cloud: jemtest.TestCloudName,
 			EntityPath: mongodoc.EntityPath{
 				User: "bob",
 				Name: "cred",
 			},
 		},
-		Cloud: "dummy",
+		Cloud: jemtest.TestCloudName,
 	},
 	expectError:      `already exists`,
 	expectErrorCause: params.ErrAlreadyExists,
@@ -199,13 +199,13 @@ var createModelTests = []struct {
 	params: jem.CreateModelParams{
 		Path: params.EntityPath{"bob", ""},
 		Credential: mongodoc.CredentialPath{
-			Cloud: "dummy",
+			Cloud: jemtest.TestCloudName,
 			EntityPath: mongodoc.EntityPath{
 				User: "bob",
 				Name: "cred",
 			},
 		},
-		Cloud:  "dummy",
+		Cloud:  jemtest.TestCloudName,
 		Region: "not-a-region",
 	},
 	expectError: `cloudregion not found`,
@@ -214,10 +214,10 @@ var createModelTests = []struct {
 	user:  "bob",
 	params: jem.CreateModelParams{
 		Path:  params.EntityPath{"bob", ""},
-		Cloud: "dummy",
+		Cloud: jemtest.TestCloudName,
 	},
 	expectCredential: mongodoc.CredentialPath{
-		Cloud: "dummy",
+		Cloud: jemtest.TestCloudName,
 		EntityPath: mongodoc.EntityPath{
 			User: "bob",
 			Name: "cred",
@@ -228,7 +228,7 @@ var createModelTests = []struct {
 	user:  "alice",
 	params: jem.CreateModelParams{
 		Path:  params.EntityPath{"alice", ""},
-		Cloud: "dummy",
+		Cloud: jemtest.TestCloudName,
 	},
 	expectError:      `more than one possible credential to use`,
 	expectErrorCause: params.ErrAmbiguousChoice,
@@ -237,7 +237,7 @@ var createModelTests = []struct {
 	user:  "charlie",
 	params: jem.CreateModelParams{
 		Path:  params.EntityPath{"charlie", ""},
-		Cloud: "dummy",
+		Cloud: jemtest.TestCloudName,
 	},
 }}
 
@@ -271,7 +271,7 @@ func (s *modelManagerSuite) TestCreateModel(c *gc.C) {
 		c.Check(info.OwnerTag, gc.Equals, conv.ToUserTag(test.params.Path.User).String())
 		c.Check(info.UUID, gc.Not(gc.Equals), "")
 		c.Check(info.CloudTag, gc.Equals, conv.ToCloudTag(test.params.Cloud).String())
-		c.Check(info.CloudRegion, gc.Equals, "dummy-region")
+		c.Check(info.CloudRegion, gc.Equals, jemtest.TestCloudRegionName)
 		c.Check(info.DefaultSeries, gc.Not(gc.Equals), "")
 		c.Check(string(info.Life), gc.Equals, "alive")
 
@@ -308,7 +308,7 @@ func (s *modelManagerSuite) TestCreateModelWithPartiallyCreatedModel(c *gc.C) {
 		Path:           params.EntityPath{"bob", "model"},
 		ControllerPath: s.Controller.Path,
 		Credential:     s.Credential.Path,
-		Cloud:          "dummy",
+		Cloud:          jemtest.TestCloudName,
 	}, nil)
 	c.Assert(err, gc.Equals, nil)
 }
@@ -334,8 +334,8 @@ func (s *modelManagerSuite) TestCreateModelWithDeprecatedController(c *gc.C) {
 	// Sanity check that we can create the model while the controller is not deprecated.
 	err := s.JEM.CreateModel(testContext, jemtest.Bob, jem.CreateModelParams{
 		Path:   params.EntityPath{"bob", "model1"},
-		Cloud:  "dummy",
-		Region: "dummy-region",
+		Cloud:  jemtest.TestCloudName,
+		Region: jemtest.TestCloudRegionName,
 	}, nil)
 	c.Assert(err, gc.Equals, nil)
 
@@ -345,15 +345,15 @@ func (s *modelManagerSuite) TestCreateModelWithDeprecatedController(c *gc.C) {
 
 	err = s.JEM.CreateModel(testContext, jemtest.Bob, jem.CreateModelParams{
 		Path:   params.EntityPath{"bob", "model2"},
-		Cloud:  "dummy",
-		Region: "dummy-region",
+		Cloud:  jemtest.TestCloudName,
+		Region: jemtest.TestCloudRegionName,
 	}, nil)
 	c.Assert(err, gc.ErrorMatches, `cannot find suitable controller`)
 }
 
 func (s *modelManagerSuite) TestCreateModelWithMultipleControllers(c *gc.C) {
 	s.PatchValue(jem.Shuffle, func(int, func(int, int)) {})
-	ctlPath := params.EntityPath{"alice", "dummy-2"}
+	ctlPath := params.EntityPath{"alice", "controller-2"}
 	s.AddController(c, &mongodoc.Controller{
 		Path: ctlPath,
 	})
@@ -363,8 +363,8 @@ func (s *modelManagerSuite) TestCreateModelWithMultipleControllers(c *gc.C) {
 
 	err = s.JEM.CreateModel(testContext, jemtest.Bob, jem.CreateModelParams{
 		Path:   params.EntityPath{"bob", "model2"},
-		Cloud:  "dummy",
-		Region: "dummy-region",
+		Cloud:  jemtest.TestCloudName,
+		Region: jemtest.TestCloudRegionName,
 	}, nil)
 	c.Assert(err, gc.Equals, nil)
 	m := mongodoc.Model{Path: params.EntityPath{"bob", "model2"}}
@@ -377,8 +377,8 @@ func (s *modelManagerSuite) TestCreateModelWithUnreachableController(c *gc.C) {
 	// Sanity check that we can create the model while the controller is not deprecated.
 	err := s.JEM.CreateModel(testContext, jemtest.Bob, jem.CreateModelParams{
 		Path:   params.EntityPath{"bob", "model1"},
-		Cloud:  "dummy",
-		Region: "dummy-region",
+		Cloud:  jemtest.TestCloudName,
+		Region: jemtest.TestCloudRegionName,
 	}, nil)
 	c.Assert(err, gc.Equals, nil)
 
@@ -395,8 +395,8 @@ func (s *modelManagerSuite) TestCreateModelWithUnreachableController(c *gc.C) {
 
 	err = s.JEM.CreateModel(testContext, jemtest.Bob, jem.CreateModelParams{
 		Path:   params.EntityPath{"bob", "model2"},
-		Cloud:  "dummy",
-		Region: "dummy-region",
+		Cloud:  jemtest.TestCloudName,
+		Region: jemtest.TestCloudRegionName,
 	}, nil)
 	c.Assert(err, gc.ErrorMatches, `cannot create model: cannot connect to controller: validating info for opening an API connection: missing addresses not valid`)
 }

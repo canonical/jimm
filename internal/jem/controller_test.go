@@ -38,7 +38,7 @@ var addControllerTests = []struct {
 	about: "success",
 	id:    jemtest.Alice,
 	ctl: mongodoc.Controller{
-		Path:   params.EntityPath{"alice", "dummy-1"},
+		Path:   params.EntityPath{"alice", "controller-1"},
 		Public: true,
 	},
 }, {
@@ -46,7 +46,7 @@ var addControllerTests = []struct {
 	about: "duplicate",
 	id:    jemtest.Alice,
 	ctl: mongodoc.Controller{
-		Path:   params.EntityPath{"alice", "dummy-1"},
+		Path:   params.EntityPath{"alice", "controller-1"},
 		Public: true,
 	},
 	expectError:      `already exists`,
@@ -55,7 +55,7 @@ var addControllerTests = []struct {
 	about: "unauthorized",
 	id:    jemtest.Bob,
 	ctl: mongodoc.Controller{
-		Path:   params.EntityPath{"bob", "dummy-1"},
+		Path:   params.EntityPath{"bob", "controller-1"},
 		Public: true,
 	},
 	expectError:      `unauthorized`,
@@ -64,7 +64,7 @@ var addControllerTests = []struct {
 	about: "not public",
 	id:    jemtest.Alice,
 	ctl: mongodoc.Controller{
-		Path:   params.EntityPath{"alice", "dummy-2"},
+		Path:   params.EntityPath{"alice", "controller-2"},
 		Public: false,
 	},
 	expectError:      `cannot add private controller`,
@@ -73,7 +73,7 @@ var addControllerTests = []struct {
 	about: "wrong namespace",
 	id:    jemtest.Alice,
 	ctl: mongodoc.Controller{
-		Path:   params.EntityPath{"bob", "dummy-1"},
+		Path:   params.EntityPath{"bob", "controller-1"},
 		Public: true,
 	},
 	expectError:      `unauthorized`,
@@ -82,7 +82,7 @@ var addControllerTests = []struct {
 	about: "connect failure",
 	id:    jemtest.Alice,
 	ctl: mongodoc.Controller{
-		Path:          params.EntityPath{"alice", "dummy-2"},
+		Path:          params.EntityPath{"alice", "controller-2"},
 		AdminPassword: "not-the-password",
 		Public:        true,
 	},
@@ -306,12 +306,12 @@ func (s *controllerSuite) TestConnectMonitor(c *gc.C) {
 
 	// Remove the controller from known clouds.
 	_, err = s.JEM.DB.CloudRegions().UpdateAll(
-		jimmdb.Eq("cloud", "dummy"),
+		jimmdb.Eq("cloud", jemtest.TestCloudName),
 		new(jimmdb.Update).Pull("primarycontrollers", s.Controller.Path).Pull("secondarycontrollers", s.Controller.Path),
 	)
 	c.Assert(err, gc.Equals, nil)
 	cr := mongodoc.CloudRegion{
-		Cloud: "dummy",
+		Cloud: jemtest.TestCloudName,
 	}
 	err = s.JEM.DB.GetCloudRegion(testContext, &cr)
 	c.Assert(err, gc.Equals, nil)

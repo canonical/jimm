@@ -13,6 +13,15 @@ import (
 	"github.com/CanonicalLtd/jimm/params"
 )
 
+const (
+	TestProviderType          = "dummy"
+	TestCloudName             = "dummy"
+	TestCloudRegionName       = "dummy-region"
+	TestCloudEndpoint         = "dummy-endpoint"
+	TestCloudIdentityEndpoint = "dummy-identity-endpoint"
+	TestCloudStorageEndpoint  = "dummy-storage-endpoint"
+)
+
 type JEMSuite struct {
 	JujuConnSuite
 
@@ -155,7 +164,7 @@ func (s *BootstrapSuite) SetUpTest(c *gc.C) {
 	s.JEMSuite.SetUpTest(c)
 
 	s.Controller = mongodoc.Controller{
-		Path: params.EntityPath{User: ControllerAdmin, Name: "dummy-1"},
+		Path: params.EntityPath{User: ControllerAdmin, Name: "controller-1"},
 	}
 	s.AddController(c, &s.Controller)
 
@@ -189,13 +198,13 @@ func (s *BootstrapSuite) CreateModel(c *gc.C, m *mongodoc.Model, mi *jujuparams.
 func EmptyCredential(user, name string) mongodoc.Credential {
 	return mongodoc.Credential{
 		Path: mongodoc.CredentialPath{
-			Cloud: "dummy",
+			Cloud: TestCloudName,
 			EntityPath: mongodoc.EntityPath{
 				User: user,
 				Name: name,
 			},
 		},
 		Type:         "empty",
-		ProviderType: "dummy",
+		ProviderType: TestProviderType,
 	}
 }

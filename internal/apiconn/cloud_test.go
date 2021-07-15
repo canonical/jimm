@@ -61,7 +61,7 @@ func (s *cloudSuite) TestSupportsCheckCredentialsModels(c *gc.C) {
 func (s *cloudSuite) TestCheckCredentialModels(c *gc.C) {
 	cred := &mongodoc.Credential{
 		Path: mongodoc.CredentialPath{
-			Cloud: "dummy",
+			Cloud: jemtest.TestCloudName,
 			EntityPath: mongodoc.EntityPath{
 				User: "admin",
 				Name: "pw1",
@@ -82,7 +82,7 @@ func (s *cloudSuite) TestCheckCredentialModels(c *gc.C) {
 func (s *cloudSuite) TestUpdateCredential(c *gc.C) {
 	cred := &mongodoc.Credential{
 		Path: mongodoc.CredentialPath{
-			Cloud: "dummy",
+			Cloud: jemtest.TestCloudName,
 			EntityPath: mongodoc.EntityPath{
 				User: "admin",
 				Name: "pw1",
@@ -102,14 +102,14 @@ func (s *cloudSuite) TestUpdateCredential(c *gc.C) {
 	cred.Type = "bad-type"
 
 	models, err = s.conn.UpdateCredential(context.Background(), cred)
-	c.Assert(err, gc.ErrorMatches, `api error: updating cloud credentials: validating credential "dummy/admin@external/pw1" for cloud "dummy": supported auth-types \["empty" "userpass"\], "bad-type" not supported`)
+	c.Assert(err, gc.ErrorMatches, `api error: updating cloud credentials: validating credential "`+jemtest.TestCloudName+`/admin@external/pw1" for cloud "`+jemtest.TestCloudName+`": supported auth-types \["empty" "userpass"\], "bad-type" not supported`)
 	c.Assert(models, gc.HasLen, 0)
 }
 
 func (s *cloudSuite) TestRevokeCredential(c *gc.C) {
 	cred := &mongodoc.Credential{
 		Path: mongodoc.CredentialPath{
-			Cloud: "dummy",
+			Cloud: jemtest.TestCloudName,
 			EntityPath: mongodoc.EntityPath{
 				User: "admin",
 				Name: "pw1",
@@ -134,17 +134,17 @@ func (s *cloudSuite) TestClouds(c *gc.C) {
 	clouds, err := s.conn.Clouds(context.Background())
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(clouds, jc.DeepEquals, map[params.Cloud]jujuparams.Cloud{
-		"dummy": jujuparams.Cloud{
-			Type:             "dummy",
+		jemtest.TestCloudName: jujuparams.Cloud{
+			Type:             jemtest.TestProviderType,
 			AuthTypes:        []string{"empty", "userpass"},
-			Endpoint:         "dummy-endpoint",
-			IdentityEndpoint: "dummy-identity-endpoint",
-			StorageEndpoint:  "dummy-storage-endpoint",
+			Endpoint:         jemtest.TestCloudEndpoint,
+			IdentityEndpoint: jemtest.TestCloudIdentityEndpoint,
+			StorageEndpoint:  jemtest.TestCloudStorageEndpoint,
 			Regions: []jujuparams.CloudRegion{{
-				Name:             "dummy-region",
-				Endpoint:         "dummy-endpoint",
-				IdentityEndpoint: "dummy-identity-endpoint",
-				StorageEndpoint:  "dummy-storage-endpoint",
+				Name:             jemtest.TestCloudRegionName,
+				Endpoint:         jemtest.TestCloudEndpoint,
+				IdentityEndpoint: jemtest.TestCloudIdentityEndpoint,
+				StorageEndpoint:  jemtest.TestCloudStorageEndpoint,
 			}},
 			IsControllerCloud: true,
 		},
@@ -158,10 +158,10 @@ func (s *cloudSuite) TestCloud(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	var cloud jujuparams.Cloud
-	err = s.conn.Cloud(ctx, "dummy", &cloud)
+	err = s.conn.Cloud(ctx, jemtest.TestCloudName, &cloud)
 	c.Assert(err, gc.Equals, nil)
 
-	c.Check(cloud, jc.DeepEquals, clouds["dummy"])
+	c.Check(cloud, jc.DeepEquals, clouds[jemtest.TestCloudName])
 }
 
 func (s *cloudSuite) TestAddCloud(c *gc.C) {
@@ -172,7 +172,7 @@ func (s *cloudSuite) TestAddCloud(c *gc.C) {
 
 	ctx := context.Background()
 
-	err := s.conn.AddCloud(ctx, "dummy", cloud)
+	err := s.conn.AddCloud(ctx, jemtest.TestCloudName, cloud)
 	c.Assert(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeAlreadyExists)
 
 	err = s.conn.AddCloud(ctx, "test-cloud", cloud)
@@ -228,19 +228,19 @@ func (s *cloudSuite) TestRemoveCloud(c *gc.C) {
 func (s *cloudSuite) TestGrantCloudAccess(c *gc.C) {
 	err := s.conn.GrantCloudAccess(context.Background(), "no-such-cloud", "user", "add-model")
 	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
-	err = s.conn.GrantCloudAccess(context.Background(), "dummy", "user", "add-model")
+	err = s.conn.GrantCloudAccess(context.Background(), jemtest.TestCloudName, "user", "add-model")
 	c.Check(err, gc.Equals, nil)
 }
 
 func (s *cloudSuite) TestRevokeCloudAccess(c *gc.C) {
 	err := s.conn.RevokeCloudAccess(context.Background(), "no-such-cloud", "user", "add-model")
 	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
-	err = s.conn.GrantCloudAccess(context.Background(), "dummy", "user", "admin")
+	err = s.conn.GrantCloudAccess(context.Background(), jemtest.TestCloudName, "user", "admin")
 	c.Assert(err, gc.Equals, nil)
-	err = s.conn.RevokeCloudAccess(context.Background(), "dummy", "user", "admin")
+	err = s.conn.RevokeCloudAccess(context.Background(), jemtest.TestCloudName, "user", "admin")
 	c.Check(err, gc.Equals, nil)
-	err = s.conn.RevokeCloudAccess(context.Background(), "dummy", "user", "add-model")
+	err = s.conn.RevokeCloudAccess(context.Background(), jemtest.TestCloudName, "user", "add-model")
 	c.Check(err, gc.Equals, nil)
-	err = s.conn.RevokeCloudAccess(context.Background(), "dummy", "user", "add-model")
+	err = s.conn.RevokeCloudAccess(context.Background(), jemtest.TestCloudName, "user", "add-model")
 	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
 }

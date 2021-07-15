@@ -128,7 +128,7 @@ func (s *applicationOffersSuite) TestGetConsumeDetails(c *gc.C) {
 		ControllerInfo: &jujuparams.ExternalControllerInfo{
 			ControllerTag: names.NewControllerTag(s.Controller.UUID).String(),
 			Addrs:         info.Addrs,
-			Alias:         "dummy-1",
+			Alias:         "controller-1",
 			CACert:        caCert,
 		},
 	})
@@ -166,7 +166,7 @@ func (s *applicationOffersSuite) TestGetConsumeDetails(c *gc.C) {
 		ControllerInfo: &jujuparams.ExternalControllerInfo{
 			ControllerTag: names.NewControllerTag(s.Controller.UUID).String(),
 			Addrs:         info.Addrs,
-			Alias:         "dummy-1",
+			Alias:         "controller-1",
 			CACert:        caCert,
 		},
 	})

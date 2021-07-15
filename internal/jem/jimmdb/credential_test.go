@@ -45,7 +45,7 @@ func (s *credentialSuite) checkDBOK(c *gc.C) {
 }
 
 func (s *credentialSuite) TestUpsertCredential(c *gc.C) {
-	cPath := s.path(c, "dummy/bob/test")
+	cPath := s.path(c, "test-cloud/bob/test")
 	cred := mongodoc.Credential{
 		Id:   "ignored",
 		Path: cPath,
@@ -53,7 +53,7 @@ func (s *credentialSuite) TestUpsertCredential(c *gc.C) {
 	err := s.database.UpsertCredential(testContext, &cred)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(cred, jc.DeepEquals, mongodoc.Credential{
-		Id:   "dummy/bob/test",
+		Id:   "test-cloud/bob/test",
 		Path: cPath,
 	})
 
@@ -79,28 +79,28 @@ func (s *credentialSuite) TestUpsertCredential(c *gc.C) {
 
 func (s *credentialSuite) TestForEachCredential(c *gc.C) {
 	err := s.database.UpsertCredential(testContext, &mongodoc.Credential{
-		Path:  s.path(c, "dummy/bob/c1"),
+		Path:  s.path(c, "test-cloud/bob/c1"),
 		Type:  "empty",
 		Label: "l1",
 	})
 	c.Assert(err, gc.Equals, nil)
 	err = s.database.UpsertCredential(testContext, &mongodoc.Credential{
-		Path:  s.path(c, "dummy/bob/c2"),
+		Path:  s.path(c, "test-cloud/bob/c2"),
 		Type:  "userpass",
 		Label: "l2",
 	})
 	c.Assert(err, gc.Equals, nil)
 	err = s.database.UpsertCredential(testContext, &mongodoc.Credential{
-		Path:  s.path(c, "dummy/bob/c3"),
+		Path:  s.path(c, "test-cloud/bob/c3"),
 		Type:  "empty",
 		Label: "l3",
 	})
 	c.Assert(err, gc.Equals, nil)
 
 	paths := []mongodoc.CredentialPath{
-		s.path(c, "dummy/bob/c3"),
-		s.path(c, "dummy/bob/c1"),
-		s.path(c, "dummy/bob/c2"),
+		s.path(c, "test-cloud/bob/c3"),
+		s.path(c, "test-cloud/bob/c1"),
+		s.path(c, "test-cloud/bob/c2"),
 	}
 	f := func(cred *mongodoc.Credential) error {
 		if len(paths) == 0 || cred.Path != paths[0] {
@@ -121,7 +121,7 @@ func (s *credentialSuite) TestForEachCredential(c *gc.C) {
 
 func (s *credentialSuite) TestForEachCredentialReturnsError(c *gc.C) {
 	err := s.database.UpsertCredential(testContext, &mongodoc.Credential{
-		Path: s.path(c, "dummy/bob/c1"),
+		Path: s.path(c, "test-cloud/bob/c1"),
 	})
 	c.Assert(err, gc.Equals, nil)
 
@@ -131,7 +131,7 @@ func (s *credentialSuite) TestForEachCredentialReturnsError(c *gc.C) {
 		return testError
 	}
 
-	err = s.database.ForEachCredential(testContext, jimmdb.Eq("path.cloud", "dummy"), nil, f)
+	err = s.database.ForEachCredential(testContext, jimmdb.Eq("path.cloud", "test-cloud"), nil, f)
 	c.Assert(errgo.Cause(err), gc.Equals, testError)
 
 	s.checkDBOK(c)

@@ -340,8 +340,8 @@ func (s *internalSuite) TestModelRemovedWithFailedWatcher(c *gc.C) {
 
 	err = s.JEM.DB.UpsertApplication(testContext, &mongodoc.Application{
 		Controller: s.Controller.Path.String(),
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Cloud:      jemtest.TestCloudName,
+		Region:     jemtest.TestCloudRegionName,
 		Info: &mongodoc.ApplicationInfo{
 			ModelUUID: modelUUID,
 			Name:      "model-app",
@@ -351,8 +351,8 @@ func (s *internalSuite) TestModelRemovedWithFailedWatcher(c *gc.C) {
 
 	err = s.JEM.DB.UpsertMachine(testContext, &mongodoc.Machine{
 		Controller: s.Controller.Path.String(),
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Cloud:      jemtest.TestCloudName,
+		Region:     jemtest.TestCloudRegionName,
 		Info: &jujuparams.MachineInfo{
 			Id:        "some-machine-id",
 			ModelUUID: modelUUID,

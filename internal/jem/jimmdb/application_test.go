@@ -46,9 +46,9 @@ func (s *applicationSuite) checkDBOK(c *gc.C) {
 
 func (s *applicationSuite) TestUpsertApplication(c *gc.C) {
 	m := mongodoc.Application{
-		Controller: "alice/dummy-1",
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Controller: "alice/controller-1",
+		Cloud:      "test-cloud",
+		Region:     "test-cloud-region",
 		Info: &mongodoc.ApplicationInfo{
 			ModelUUID: "00000000-0000-0000-0000-00000000000a",
 			Name:      "app0",
@@ -60,7 +60,7 @@ func (s *applicationSuite) TestUpsertApplication(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	var m2 mongodoc.Application
-	err = s.database.Applications().FindId("alice/dummy-1 00000000-0000-0000-0000-00000000000a app0").One(&m2)
+	err = s.database.Applications().FindId("alice/controller-1 00000000-0000-0000-0000-00000000000a app0").One(&m2)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(m2, jc.DeepEquals, m)
 
@@ -68,7 +68,7 @@ func (s *applicationSuite) TestUpsertApplication(c *gc.C) {
 	err = s.database.UpsertApplication(testContext, &m)
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.database.Applications().FindId("alice/dummy-1 00000000-0000-0000-0000-00000000000a app0").One(&m2)
+	err = s.database.Applications().FindId("alice/controller-1 00000000-0000-0000-0000-00000000000a app0").One(&m2)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(m2, jc.DeepEquals, m)
 
@@ -80,27 +80,27 @@ func (s *applicationSuite) TestUpsertApplication(c *gc.C) {
 
 func (s *applicationSuite) TestForEachApplication(c *gc.C) {
 	applications := []mongodoc.Application{{
-		Controller: "alice/dummy-1",
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Controller: "alice/controller-1",
+		Cloud:      "test-cloud",
+		Region:     "test-cloud-region",
 		Info: &mongodoc.ApplicationInfo{
 			ModelUUID: "00000000-0000-0000-0000-00000000000a",
 			Name:      "app0",
 			Life:      life.Alive,
 		},
 	}, {
-		Controller: "alice/dummy-1",
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Controller: "alice/controller-1",
+		Cloud:      "test-cloud",
+		Region:     "test-cloud-region",
 		Info: &mongodoc.ApplicationInfo{
 			ModelUUID: "00000000-0000-0000-0000-00000000000b",
 			Name:      "app0",
 			Life:      life.Alive,
 		},
 	}, {
-		Controller: "alice/dummy-1",
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Controller: "alice/controller-1",
+		Cloud:      "test-cloud",
+		Region:     "test-cloud-region",
 		Info: &mongodoc.ApplicationInfo{
 			ModelUUID: "00000000-0000-0000-0000-00000000000a",
 			Name:      "app1",
@@ -147,9 +147,9 @@ func (s *applicationSuite) TestForEachApplication(c *gc.C) {
 
 func (s *applicationSuite) TestRemoveApplication(c *gc.C) {
 	m := mongodoc.Application{
-		Controller: "alice/dummy-1",
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Controller: "alice/controller-1",
+		Cloud:      "test-cloud",
+		Region:     "test-cloud-region",
 		Info: &mongodoc.ApplicationInfo{
 			ModelUUID: "00000000-0000-0000-0000-00000000000a",
 			Name:      "app0",
@@ -161,14 +161,14 @@ func (s *applicationSuite) TestRemoveApplication(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	var m2 mongodoc.Application
-	err = s.database.Applications().FindId("alice/dummy-1 00000000-0000-0000-0000-00000000000a app0").One(&m2)
+	err = s.database.Applications().FindId("alice/controller-1 00000000-0000-0000-0000-00000000000a app0").One(&m2)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(m2, jc.DeepEquals, m)
 
 	err = s.database.RemoveApplication(testContext, &m)
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.database.Applications().FindId("alice/dummy-1 00000000-0000-0000-0000-00000000000a app0").One(&m2)
+	err = s.database.Applications().FindId("alice/controller-1 00000000-0000-0000-0000-00000000000a app0").One(&m2)
 	c.Assert(err, gc.Equals, mgo.ErrNotFound)
 
 	err = s.database.RemoveApplication(testContext, &m)
@@ -179,27 +179,27 @@ func (s *applicationSuite) TestRemoveApplication(c *gc.C) {
 
 func (s *applicationSuite) TestRemoveApplications(c *gc.C) {
 	applications := []mongodoc.Application{{
-		Controller: "alice/dummy-1",
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Controller: "alice/controller-1",
+		Cloud:      "test-cloud",
+		Region:     "test-cloud-region",
 		Info: &mongodoc.ApplicationInfo{
 			ModelUUID: "00000000-0000-0000-0000-00000000000a",
 			Name:      "app0",
 			Life:      life.Alive,
 		},
 	}, {
-		Controller: "alice/dummy-1",
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Controller: "alice/controller-1",
+		Cloud:      "test-cloud",
+		Region:     "test-cloud-region",
 		Info: &mongodoc.ApplicationInfo{
 			ModelUUID: "00000000-0000-0000-0000-00000000000b",
 			Name:      "app0",
 			Life:      life.Alive,
 		},
 	}, {
-		Controller: "alice/dummy-1",
-		Cloud:      "dummy",
-		Region:     "dummy-region",
+		Controller: "alice/controller-1",
+		Cloud:      "test-cloud",
+		Region:     "test-cloud-region",
 		Info: &mongodoc.ApplicationInfo{
 			ModelUUID: "00000000-0000-0000-0000-00000000000a",
 			Name:      "app1",

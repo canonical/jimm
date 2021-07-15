@@ -32,7 +32,7 @@ func (s *cloudSuite) SetUpTest(c *gc.C) {
 	s.BootstrapSuite.SetUpTest(c)
 	s.KubernetesCloud = jujuparams.Cloud{
 		Type:             "kubernetes",
-		HostCloudRegion:  "dummy/dummy-region",
+		HostCloudRegion:  jemtest.TestCloudName + "/" + jemtest.TestCloudRegionName,
 		AuthTypes:        []string{"certificate"},
 		Endpoint:         "https://1.2.3.4:5678",
 		IdentityEndpoint: "https://1.2.3.4:5679",
@@ -48,7 +48,7 @@ func (s *cloudSuite) TestAddCloud(c *gc.C) {
 
 	err := s.JEM.AddHostedCloud(ctx, jemtest.Bob, "test-cloud", jujuparams.Cloud{
 		Type:             "kubernetes",
-		HostCloudRegion:  "dummy/dummy-region",
+		HostCloudRegion:  jemtest.TestCloudName + "/" + jemtest.TestCloudRegionName,
 		AuthTypes:        []string{"certificate"},
 		Endpoint:         "https://1.2.3.4:5678",
 		IdentityEndpoint: "https://1.2.3.4:5679",
@@ -95,7 +95,7 @@ func (s *cloudSuite) TestAddCloudWithRegions(c *gc.C) {
 	ctx := context.Background()
 	err := s.JEM.AddHostedCloud(ctx, jemtest.Bob, "test-cloud", jujuparams.Cloud{
 		Type:             "kubernetes",
-		HostCloudRegion:  "dummy/dummy-region",
+		HostCloudRegion:  jemtest.TestCloudName + "/" + jemtest.TestCloudRegionName,
 		AuthTypes:        []string{"certificate"},
 		Endpoint:         "https://1.2.3.4:5678",
 		IdentityEndpoint: "https://1.2.3.4:5679",
@@ -144,16 +144,16 @@ func (s *cloudSuite) TestAddCloudWithRegions(c *gc.C) {
 func (s *cloudSuite) TestAddCloudNameMatch(c *gc.C) {
 	ctx := context.Background()
 
-	err := s.JEM.AddHostedCloud(ctx, jemtest.Bob, "dummy", jujuparams.Cloud{
+	err := s.JEM.AddHostedCloud(ctx, jemtest.Bob, jemtest.TestCloudName, jujuparams.Cloud{
 		Type:             "kubernetes",
-		HostCloudRegion:  "dummy/dummy-region",
+		HostCloudRegion:  jemtest.TestCloudName + "/" + jemtest.TestCloudRegionName,
 		AuthTypes:        []string{"certificate"},
 		Endpoint:         "https://1.2.3.4:5678",
 		IdentityEndpoint: "https://1.2.3.4:5679",
 		StorageEndpoint:  "https://1.2.3.4:5680",
 		CACertificates:   []string{"This is a CA Certficiate (honest)"},
 	})
-	c.Assert(err, gc.ErrorMatches, `cloud "dummy" already exists`)
+	c.Assert(err, gc.ErrorMatches, `cloud "`+jemtest.TestCloudName+`" already exists`)
 }
 
 func (s *cloudSuite) TestAddCloudPublicNameMatch(c *gc.C) {
@@ -161,7 +161,7 @@ func (s *cloudSuite) TestAddCloudPublicNameMatch(c *gc.C) {
 
 	err := s.JEM.AddHostedCloud(ctx, jemtest.Bob, "aws-china", jujuparams.Cloud{
 		Type:             "kubernetes",
-		HostCloudRegion:  "dummy/dummy-region",
+		HostCloudRegion:  jemtest.TestCloudName + "/" + jemtest.TestCloudRegionName,
 		AuthTypes:        []string{"certificate"},
 		Endpoint:         "https://1.2.3.4:5678",
 		IdentityEndpoint: "https://1.2.3.4:5679",
@@ -196,7 +196,7 @@ func (s *cloudSuite) TestAddCloudControllerError(c *gc.C) {
 
 	err := s.JEM.AddHostedCloud(ctx, jemtest.Bob, "test-cloud", jujuparams.Cloud{
 		Type:             "kubernetes",
-		HostCloudRegion:  "dummy/dummy-region",
+		HostCloudRegion:  jemtest.TestCloudName + "/" + jemtest.TestCloudRegionName,
 		Endpoint:         "https://1.2.3.4:5678",
 		IdentityEndpoint: "https://1.2.3.4:5679",
 		StorageEndpoint:  "https://1.2.3.4:5680",
@@ -418,7 +418,7 @@ func (s *cloudSuite) TestRemoveCloudWithModel(c *gc.C) {
 		params.Cloud("test-cloud"),
 		jujuparams.Cloud{
 			Type:            "kubernetes",
-			HostCloudRegion: "dummy/dummy-region",
+			HostCloudRegion: jemtest.TestCloudName + "/" + jemtest.TestCloudRegionName,
 			AuthTypes:       []string{string(cloud.UserPassAuthType)},
 			Endpoint:        ksrv.URL,
 		},
@@ -455,23 +455,23 @@ func (s *cloudSuite) TestRemoveCloudWithModel(c *gc.C) {
 
 func (s *cloudSuite) TestGetCloud(c *gc.C) {
 	cloud := jem.Cloud{
-		Name: "dummy",
+		Name: jemtest.TestCloudName,
 	}
 
 	err := s.JEM.GetCloud(testContext, jemtest.Bob, &cloud)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(cloud, jc.DeepEquals, jem.Cloud{
-		Name:             "dummy",
-		Type:             "dummy",
+		Name:             jemtest.TestCloudName,
+		Type:             jemtest.TestProviderType,
 		AuthTypes:        []string{"empty", "userpass"},
-		Endpoint:         "dummy-endpoint",
-		IdentityEndpoint: "dummy-identity-endpoint",
-		StorageEndpoint:  "dummy-storage-endpoint",
+		Endpoint:         jemtest.TestCloudEndpoint,
+		IdentityEndpoint: jemtest.TestCloudIdentityEndpoint,
+		StorageEndpoint:  jemtest.TestCloudStorageEndpoint,
 		Regions: []jujuparams.CloudRegion{{
-			Name:             "dummy-region",
-			Endpoint:         "dummy-endpoint",
-			IdentityEndpoint: "dummy-identity-endpoint",
-			StorageEndpoint:  "dummy-storage-endpoint",
+			Name:             jemtest.TestCloudRegionName,
+			Endpoint:         jemtest.TestCloudEndpoint,
+			IdentityEndpoint: jemtest.TestCloudIdentityEndpoint,
+			StorageEndpoint:  jemtest.TestCloudStorageEndpoint,
 		}},
 		Users: []jujuparams.CloudUserInfo{{
 			UserName:    "bob@external",
@@ -481,14 +481,14 @@ func (s *cloudSuite) TestGetCloud(c *gc.C) {
 	})
 
 	cloud = jem.Cloud{
-		Name: "not-dummy",
+		Name: "no-such-cloud",
 	}
 	err = s.JEM.GetCloud(testContext, jemtest.Bob, &cloud)
 	c.Assert(err, gc.ErrorMatches, `cloud not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
 	cr := mongodoc.CloudRegion{
-		Cloud: "dummy-2",
+		Cloud: "cloud-2",
 		ACL: params.ACL{
 			Read: []string{"alice"},
 		},
@@ -497,7 +497,7 @@ func (s *cloudSuite) TestGetCloud(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	cloud = jem.Cloud{
-		Name: "dummy-2",
+		Name: "cloud-2",
 	}
 	err = s.JEM.GetCloud(testContext, jemtest.Bob, &cloud)
 	c.Assert(err, gc.ErrorMatches, `unauthorized`)
@@ -506,7 +506,7 @@ func (s *cloudSuite) TestGetCloud(c *gc.C) {
 
 func (s *cloudSuite) TestForEachCloud(c *gc.C) {
 	cr := mongodoc.CloudRegion{
-		Cloud: "dummy-2",
+		Cloud: "cloud-2",
 		ACL: params.ACL{
 			Read: []string{"alice"},
 		},
@@ -515,7 +515,7 @@ func (s *cloudSuite) TestForEachCloud(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	cloud := jem.Cloud{
-		Name: "dummy",
+		Name: jemtest.TestCloudName,
 	}
 	err = s.JEM.GetCloud(testContext, jemtest.Bob, &cloud)
 	c.Assert(err, gc.Equals, nil)

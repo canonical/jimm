@@ -54,7 +54,7 @@ func (s *jemVaultSuite) TestVaultCredentials(c *gc.C) {
 
 	cred1 := &mongodoc.Credential{
 		Path: mongodoc.CredentialPath{
-			Cloud: "dummy",
+			Cloud: jemtest.TestCloudName,
 			EntityPath: mongodoc.EntityPath{
 				User: "bob",
 				Name: "test-1",
@@ -69,7 +69,7 @@ func (s *jemVaultSuite) TestVaultCredentials(c *gc.C) {
 	_, err := s.JEM.UpdateCredential(ctx, jemtest.Bob, cred1, 0)
 	c.Assert(err, gc.Equals, nil)
 
-	secret, err := s.Params.VaultClient.Logical().Read("test/creds/dummy/bob/test-1")
+	secret, err := s.Params.VaultClient.Logical().Read("test/creds/" + jemtest.TestCloudName + "/bob/test-1")
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(secret, gc.Not(gc.IsNil))
 	c.Check(secret.Data, gc.DeepEquals, map[string]interface{}{
@@ -93,7 +93,7 @@ func (s *jemVaultSuite) TestVaultCredentials(c *gc.C) {
 
 	err = s.JEM.FillCredentialAttributes(ctx, &cred3)
 	c.Assert(err, gc.Equals, nil)
-	c.Check(cred3.Id, gc.Equals, "dummy/bob/test-1")
+	c.Check(cred3.Id, gc.Equals, jemtest.TestCloudName+"/bob/test-1")
 	cred3.Id = ""
 	cred3.AttributesInVault = false
 	c.Check(&cred3, gc.DeepEquals, cred1)

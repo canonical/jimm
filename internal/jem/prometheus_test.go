@@ -17,14 +17,15 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	gc "gopkg.in/check.v1"
 
+	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
 func (s *jemSuite) TestModelStats(c *gc.C) {
-	ctl2Id := params.EntityPath{User: "alice", Name: "dummy-2"}
+	ctl2Id := params.EntityPath{User: "alice", Name: "controller-2"}
 	s.AddController(c, &mongodoc.Controller{Path: ctl2Id})
-	ctl3Id := params.EntityPath{User: "alice", Name: "dummy-3"}
+	ctl3Id := params.EntityPath{User: "alice", Name: "controller-3"}
 	s.AddController(c, &mongodoc.Controller{Path: ctl3Id})
 
 	err := s.JEM.DB.InsertModel(testContext, &mongodoc.Model{
@@ -235,11 +236,11 @@ func (s *jemSuite) TestMachineStats(c *gc.C) {
 	}
 
 	expectCounts := map[labels]int{
-		{s.Controller.Path, "dummy", "dummy-region", status.Started}: 5,
-		{s.Controller.Path, "dummy", "dummy-region", status.Pending}: 3,
-		{s.Controller.Path, "dummy", "dummy-region", status.Stopped}: 2,
-		{s.Controller.Path, "dummy", "dummy-region", status.Down}:    1,
-		{ctl2Id, "dummy", "dummy-region", status.Pending}:            1,
+		{s.Controller.Path, jemtest.TestCloudName, jemtest.TestCloudRegionName, status.Started}: 5,
+		{s.Controller.Path, jemtest.TestCloudName, jemtest.TestCloudRegionName, status.Pending}: 3,
+		{s.Controller.Path, jemtest.TestCloudName, jemtest.TestCloudRegionName, status.Stopped}: 2,
+		{s.Controller.Path, jemtest.TestCloudName, jemtest.TestCloudRegionName, status.Down}:    1,
+		{ctl2Id, jemtest.TestCloudName, jemtest.TestCloudRegionName, status.Pending}:            1,
 	}
 	for label, count := range expectCounts {
 		name := fmt.Sprintf("jem_health_machines{cloud=%q,controller=%q,region=%q,status=%q}", label.cloud, label.controller, label.region, label.status)

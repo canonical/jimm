@@ -72,15 +72,15 @@ func (s *modelmanagerSuite) TestCreateModel(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	c.Check(info.UUID, gc.Not(gc.Equals), "")
-	c.Check(info.CloudTag, gc.Equals, names.NewCloudTag("dummy").String())
-	c.Check(info.CloudRegion, gc.Equals, "dummy-region")
+	c.Check(info.CloudTag, gc.Equals, names.NewCloudTag(jemtest.TestCloudName).String())
+	c.Check(info.CloudRegion, gc.Equals, jemtest.TestCloudRegionName)
 	c.Check(info.DefaultSeries, gc.Equals, "focal")
 	c.Check(string(info.Life), gc.Equals, "alive")
 	c.Check(string(info.Status.Status), gc.Equals, "available")
 	c.Check(info.Status.Data, gc.IsNil)
 	c.Check(info.Status.Since.After(time.Now().Add(-10*time.Second)), gc.Equals, true)
 	c.Check(info.Type, gc.Equals, "iaas")
-	c.Check(info.ProviderType, gc.Equals, "dummy")
+	c.Check(info.ProviderType, gc.Equals, jemtest.TestProviderType)
 }
 
 func (s *modelmanagerSuite) TestCreateModelError(c *gc.C) {
@@ -94,7 +94,7 @@ func (s *modelmanagerSuite) TestCreateModelError(c *gc.C) {
 	}, &info)
 	c.Check(apiconn.IsAPIError(err), gc.Equals, true)
 	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
-	c.Check(err, gc.ErrorMatches, `api error: cloud "nosuchcloud" not found, expected one of \["dummy"\] \(not found\)`)
+	c.Check(err, gc.ErrorMatches, `api error: cloud "nosuchcloud" not found, expected one of \["`+jemtest.TestCloudName+`"\] \(not found\)`)
 }
 
 func (s *modelmanagerSuite) TestGrantJIMMModelAdmin(c *gc.C) {

@@ -100,7 +100,7 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 		},
 		ControllerInfo: &jujuparams.ExternalControllerInfo{
 			ControllerTag: names.NewControllerTag(s.ControllerConfig.ControllerUUID()).String(),
-			Alias:         "dummy-1",
+			Alias:         "controller-1",
 			Addrs:         s.APIInfo(c).Addrs,
 			CACert:        s.Controller.CACert,
 		},
@@ -136,7 +136,7 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 		},
 		ControllerInfo: &jujuparams.ExternalControllerInfo{
 			ControllerTag: names.NewControllerTag(s.ControllerConfig.ControllerUUID()).String(),
-			Alias:         "dummy-1",
+			Alias:         "controller-1",
 			Addrs:         s.APIInfo(c).Addrs,
 			CACert:        s.Controller.CACert,
 		},

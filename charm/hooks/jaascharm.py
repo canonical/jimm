@@ -85,7 +85,7 @@ def install(binary=None):
         for name in tf.getnames():
             os.chown(os.path.join(new_resource_path, name), 0, 0)
 
-    # Sanity check that at least the service binary exists in the
+    # Check that at least the service binary exists in the
     # unarchived service resource.
     if not os.path.exists(os.path.join(new_resource_path, binary)):
         hookenv.status_set('blocked', 'no binary found in service resource')
