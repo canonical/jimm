@@ -14,13 +14,13 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
+	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	"github.com/CanonicalLtd/jimm/internal/jujuclient"
 )
 
 type jujuclientSuite struct {
-	jemtest.JujuConnSuite
+	jimmtest.JujuSuite
 
 	Dialer jimm.Dialer
 	API    jimm.API

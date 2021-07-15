@@ -15,7 +15,6 @@ import (
 
 	"github.com/CanonicalLtd/jimm/api"
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
-	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
 )
@@ -442,7 +441,7 @@ func (s *jimmSuite) TestFullModelStatus(c *gc.C) {
 		ModelTag: mt.String(),
 	})
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(status, jemtest.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(&time.Time{})), jujuparams.FullStatus{
+	c.Assert(status, jimmtest.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(&time.Time{})), jujuparams.FullStatus{
 		Model: jujuparams.ModelStatusInfo{
 			Name:        "model-1",
 			Type:        "iaas",

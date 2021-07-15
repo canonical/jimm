@@ -1,4 +1,4 @@
-package jemtest
+package jimmtest
 
 import (
 	"os"

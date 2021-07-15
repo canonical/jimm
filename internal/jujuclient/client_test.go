@@ -13,7 +13,6 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 )
 
@@ -65,7 +64,7 @@ func (s *clientSuite) TestStatus(c *gc.C) {
 
 	status, err := api.Status(ctx, []string{})
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(status, jemtest.CmpEquals(cmpopts.IgnoreTypes(&time.Time{})), &params.FullStatus{
+	c.Assert(status, jimmtest.CmpEquals(cmpopts.IgnoreTypes(&time.Time{})), &params.FullStatus{
 		Model: jujuparams.ModelStatusInfo{
 			Name:             "model-1",
 			Type:             "iaas",
