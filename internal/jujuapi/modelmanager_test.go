@@ -26,7 +26,6 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	"github.com/CanonicalLtd/jimm/internal/kubetest"
 )
@@ -44,7 +43,7 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 	client := modelmanager.NewClient(conn)
 	models, err := client.ListModelSummaries("bob", false)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(models, jemtest.CmpEquals(cmpopts.IgnoreTypes(&time.Time{})), []base.UserModelSummary{{
+	c.Assert(models, jimmtest.CmpEquals(cmpopts.IgnoreTypes(&time.Time{})), []base.UserModelSummary{{
 		Name:            "model-1",
 		UUID:            s.Model.UUID.String,
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",
@@ -124,7 +123,7 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 	client := modelmanager.NewClient(conn)
 	models, err := client.ListModelSummaries("bob", false)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(models, jemtest.CmpEquals(cmpopts.IgnoreTypes(&time.Time{})), []base.UserModelSummary{{
+	c.Assert(models, jimmtest.CmpEquals(cmpopts.IgnoreTypes(&time.Time{})), []base.UserModelSummary{{
 		Name:            "model-1",
 		UUID:            s.Model.UUID.String,
 		ControllerUUID:  "deadbeef-1bad-500d-9000-4b1d0d06f00d",
@@ -1274,7 +1273,7 @@ func (s *caasModelManagerSuite) TestListCAASModelSummaries(c *gc.C) {
 
 	models, err := client.ListModelSummaries("bob", false)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(models, jemtest.CmpEquals(cmpopts.IgnoreTypes(&time.Time{})), []base.UserModelSummary{{
+	c.Assert(models, jimmtest.CmpEquals(cmpopts.IgnoreTypes(&time.Time{})), []base.UserModelSummary{{
 		Name:            "k8s-model-1",
 		UUID:            mi.UUID,
 		ControllerUUID:  "914487b5-60e7-42bb-bd63-1adc3fd3a388",

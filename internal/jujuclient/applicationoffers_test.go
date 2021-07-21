@@ -15,7 +15,7 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
-	"github.com/CanonicalLtd/jimm/internal/jemtest"
+	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 )
 
 type applicationoffersSuite struct {
@@ -648,7 +648,7 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 	lessF := func(a, b jujuparams.OfferUserDetails) bool {
 		return a.UserName < b.UserName
 	}
-	c.Check(info, jemtest.CmpEquals(cmpopts.SortSlices(lessF)), jujuparams.ConsumeOfferDetails{
+	c.Check(info, jimmtest.CmpEquals(cmpopts.SortSlices(lessF)), jujuparams.ConsumeOfferDetails{
 		Offer: &jujuparams.ApplicationOfferDetails{
 			SourceModelTag:         names.NewModelTag(s.modelInfo.UUID).String(),
 			OfferURL:               "test-user@external/test-model.test-offer",

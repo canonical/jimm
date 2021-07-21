@@ -15,7 +15,6 @@ import (
 	"github.com/juju/utils/v2"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 )
 
@@ -142,7 +141,7 @@ func (s *modelmanagerSuite) TestGrantRevokeModel(c *gc.C) {
 	lessf := func(a, b jujuparams.ModelUserInfo) bool {
 		return a.UserName < b.UserName
 	}
-	c.Check(info.Users, jemtest.CmpEquals(cmpopts.SortSlices(lessf)), []jujuparams.ModelUserInfo{{
+	c.Check(info.Users, jimmtest.CmpEquals(cmpopts.SortSlices(lessf)), []jujuparams.ModelUserInfo{{
 		UserName:    "test-user@external",
 		DisplayName: "test-user",
 		Access:      "admin",
@@ -157,7 +156,7 @@ func (s *modelmanagerSuite) TestGrantRevokeModel(c *gc.C) {
 	err = s.API.ModelInfo(ctx, &info)
 	c.Assert(err, gc.Equals, nil)
 
-	c.Check(info.Users, jemtest.CmpEquals(cmpopts.SortSlices(lessf)), []jujuparams.ModelUserInfo{{
+	c.Check(info.Users, jimmtest.CmpEquals(cmpopts.SortSlices(lessf)), []jujuparams.ModelUserInfo{{
 		UserName:    "test-user@external",
 		DisplayName: "test-user",
 		Access:      "admin",

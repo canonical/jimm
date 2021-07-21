@@ -12,13 +12,13 @@ import (
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/network"
+	corejujutesting "github.com/juju/juju/juju/testing"
 	"github.com/juju/names/v4"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jujuclient"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
@@ -172,14 +172,26 @@ func (s *CandidSuite) TearDownTest(c *gc.C) {
 // A JujuSuite is a suite that intialises a JIMM and adds the testing juju
 // controller.
 type JujuSuite struct {
-	jemtest.JujuConnSuite
+	corejujutesting.JujuConnSuite
+	LoggingSuite
 	JIMMSuite
 
 	//cancelWatcher func()
 }
 
+func (s *JujuSuite) SetUpSuite(c *gc.C) {
+	s.JujuConnSuite.SetUpSuite(c)
+	s.LoggingSuite.SetUpSuite(c)
+}
+
+func (s *JujuSuite) TearDownSuite(c *gc.C) {
+	s.LoggingSuite.TearDownSuite(c)
+	s.JujuConnSuite.TearDownSuite(c)
+}
+
 func (s *JujuSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
+	s.LoggingSuite.SetUpTest(c)
 	s.JIMMSuite.SetUpTest(c)
 
 	s.AddController(c, "controller-1", s.APIInfo(c))
@@ -201,6 +213,7 @@ func (s *JujuSuite) TearDownTest(c *gc.C) {
 	//	s.cancelWatcher()
 	//}
 	s.JIMMSuite.TearDownTest(c)
+	s.LoggingSuite.TearDownTest(c)
 	s.JujuConnSuite.TearDownTest(c)
 }
 

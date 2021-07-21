@@ -23,7 +23,6 @@ import (
 	service "github.com/CanonicalLtd/jimm"
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	"github.com/CanonicalLtd/jimm/internal/jujuclient"
@@ -39,7 +38,7 @@ func (t *gcTester) Name() string {
 
 type jimmSuite struct {
 	jimmtest.CandidSuite
-	jemtest.JujuConnSuite
+	jimmtest.JujuSuite
 
 	Params      service.Params
 	HTTP        *httptest.Server
