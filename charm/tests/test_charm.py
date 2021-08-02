@@ -4,16 +4,19 @@
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
+import ipaddress
 import json
 import os
 import pathlib
 import shutil
+import socket
 import tempfile
 from threading import Thread
 import unittest
-from unittest.mock import Mock, call
+from unittest.mock import MagicMock, Mock, call
 
 from charm import JimmCharm
+import hvac
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.testing import Harness
 
@@ -243,6 +246,47 @@ class TestCharm(unittest.TestCase):
         data = self.harness.get_relation_data(id, self.harness.charm.unit.name)
         self.assertTrue(data)
         self.assertEqual(data["port"], "8080")
+
+    def test_vault_relation_joined(self):
+        self.harness.model.get_binding = MagicMock()
+        self.harness.model.get_binding().network.egress_subnets[0].network_address = \
+            ipaddress.IPv4Address('127.0.0.253')
+        id = self.harness.add_relation('vault', 'vault')
+        self.harness.add_relation_unit(id, 'vault/0')
+        data = self.harness.get_relation_data(id, self.harness.charm.unit.name)
+        self.assertTrue(data)
+        self.assertEqual(data["secret_backend"], '"charm-jimm-creds"')
+        self.assertEqual(data["hostname"], '"{}"'.format(socket.gethostname()))
+        self.assertEqual(data["access_address"], '"127.0.0.253"')
+        self.assertEqual(data["isolated"], "false")
+
+    def test_vault_relation_changed(self):
+        self.harness.charm._vault_secret_filename = os.path.join(self.tempdir.name, 'vault.json')
+        self.harness.model.get_binding = MagicMock()
+        self.harness.model.get_binding().network.egress_subnets[0].network_address = \
+            ipaddress.IPv4Address('127.0.0.253')
+        id = self.harness.add_relation('vault', 'vault')
+        self.harness.add_relation_unit(id, 'vault/0')
+        data = self.harness.get_relation_data(id, self.harness.charm.unit.name)
+        self.assertTrue(data)
+        hvac.Client = Mock()
+        hvac.Client(url="http://vault:8200", token="test-token").sys.unwrap = \
+            Mock(return_value={"data": {"secret_id": "test-secret"}})
+        self.harness.update_relation_data(id, 'vault/0', {
+            "vault_url": '"http://vault:8200"',
+            "{}_role_id".format(self.harness.model.unit.name): '"test-role-id"',
+            "{}_token".format(self.harness.model.unit.name): '"test-token"'})
+        with open(self.harness.charm._vault_secret_filename) as f:
+            data = json.load(f)
+        self.assertEqual(data, {"data": {"role_id": "test-role-id", "secret_id": "test-secret"}})
+        with open(self.harness.charm._env_filename("vault")) as f:
+            lines = f.readlines()
+        self.assertEquals(lines[0].strip(), "VAULT_ADDR=http://vault:8200")
+        self.assertEquals(lines[1].strip(), "VAULT_PATH=charm-jimm-creds")
+        self.assertEquals(
+            lines[2].strip(),
+            "VAULT_SECRET_FILE={}".format(self.harness.charm._vault_secret_filename))
+        self.assertEquals(lines[3].strip(), "VAULT_AUTH_PATH=/auth/approle/login")
 
     def test_stop(self):
         self.harness.charm.on.stop.emit()
