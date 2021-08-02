@@ -7,9 +7,11 @@
 import json
 import logging
 import os
+import socket
 import subprocess
 import urllib
 
+import hvac
 from jinja2 import Environment, FileSystemLoader
 
 from charmhelpers.contrib.charmsupport.nrpe import NRPE
@@ -36,7 +38,10 @@ class JimmCharm(SystemdCharm):
         self.framework.observe(self.on.upgrade_charm, self._on_upgrade_charm)
         self.framework.observe(self.on.nrpe_relation_joined, self._on_nrpe_relation_joined)
         self.framework.observe(self.on.website_relation_joined, self._on_website_relation_joined)
+        self.framework.observe(self.on.vault_relation_joined, self._on_vault_relation_joined)
+        self.framework.observe(self.on.vault_relation_changed, self._on_vault_relation_changed)
         self._agent_filename = "/var/snap/jimm/common/agent.json"
+        self._vault_secret_filename = "/var/snap/jimm/common/vault_secret.json"
         self._workload_filename = "/snap/bin/jimm"
 
     def _on_install(self, _):
@@ -149,6 +154,43 @@ class JimmCharm(SystemdCharm):
         """Connect a website relation."""
         event.relation.data[self.unit]["port"] = "8080"
 
+    def _on_vault_relation_joined(self, event):
+        event.relation.data[self.unit]['secret_backend'] = json.dumps("charm-jimm-creds")
+        event.relation.data[self.unit]['hostname'] = json.dumps(socket.gethostname())
+        event.relation.data[self.unit]['access_address'] = \
+            json.dumps(str(
+                self.model.get_binding(event.relation).network.egress_subnets[0].network_address))
+        event.relation.data[self.unit]['isolated'] = json.dumps(False)
+
+    def _on_vault_relation_changed(self, event):
+        if not os.path.exists(os.path.dirname(self._vault_secret_filename)):
+            # if the snap is yet to be installed wait for it.
+            event.defer()
+            return
+
+        addr = _json_data(event, 'vault_url')
+        if not addr:
+            return
+        role_id = _json_data(event, "{}_role_id".format(self.unit.name))
+        if not role_id:
+            return
+        token = _json_data(event, "{}_token".format(self.unit.name))
+        if not token:
+            return
+        client = hvac.Client(url=addr, token=token)
+        secret = client.sys.unwrap()
+        secret['data']['role_id'] = role_id
+        with open(self._vault_secret_filename, "wt") as f:
+            json.dump(secret, f)
+        args = {
+            "vault_secret_file": self._vault_secret_filename,
+            "vault_addr": addr,
+            "vault_auth_path": "/auth/approle/login",
+            "vault_path": "charm-jimm-creds"
+        }
+        with open(self._env_filename("vault"), "wt") as f:
+            f.write(self._render_template("jimm-vault.env", **args))
+
     def _install_snap(self):
         self.unit.status = MaintenanceStatus("installing snap")
         try:
@@ -182,7 +224,8 @@ class JimmCharm(SystemdCharm):
         args = {
             "conf_file": self._env_filename(),
             "db_file": self._env_filename("db"),
-            "leader_file": self._env_filename("leader")
+            "leader_file": self._env_filename("leader"),
+            "vault_file": self._env_filename("vault")
         }
         with open(self.service_file, "wt") as f:
             f.write(self._render_template('jimm.service', **args))
@@ -212,6 +255,14 @@ class JimmCharm(SystemdCharm):
         cmd = ['snap']
         cmd.extend(args)
         subprocess.run(cmd, capture_output=True, check=True)
+
+
+def _json_data(event, key):
+    logger.debug("getting relation data {}".format(key))
+    try:
+        return json.loads(event.relation.data[event.unit][key])
+    except KeyError:
+        return None
 
 
 if __name__ == "__main__":

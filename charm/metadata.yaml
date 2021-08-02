@@ -16,6 +16,9 @@ provides:
 requires:
   db:
     interface: pgsql
+  vault:
+    interface: vault-kv
+    optional: true
 
 resources:
   jimm-snap:
