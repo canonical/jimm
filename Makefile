@@ -23,29 +23,23 @@ define DEPENDENCIES
   $(GO_C)
 endef
 
-ifeq ($(VERSION),no)
-	VERSIONDEPS :=
-else
-	VERSIONDEPS := version/init.go
-endif
-
 default: build
 
-build: $(VERSIONDEPS)
+build: version/v/git-commit version/v/version
 	go build $(PROJECT)/...
 
-check: $(VERSIONDEPS)
+check: version/v/git-commit version/v/version
 	go test -p 1 -timeout 30m $(PROJECT)/...
 
-install: $(VERSIONDEPS)
+install: version/v/git-commit version/v/version
 	go install $(INSTALL_FLAGS) -v $(PROJECT)/...
 
 release: jimm-$(GIT_VERSION).tar.xz
 
 clean:
 	go clean $(PROJECT)/...
-	-$(RM) version/init.go
-	-$(RM) jemd
+	-$(RM) version/v/git-commit version/v/version
+	-$(RM) jimmsrv
 	-$(RM) -r jimm-release/
 	-$(RM) jimm-*.tar.xz
 
@@ -62,16 +56,19 @@ server: install
 	jemd cmd/jemd/config.yaml
 
 # Generate version information
-version/init.go: version/init.go.tmpl FORCE
-	gofmt -r "unknownVersion -> Version{GitCommit: \"${GIT_COMMIT}\", Version: \"${GIT_VERSION}\",}" $<  | tee $@ > /dev/null
+version/v/git-commit: FORCE
+	git rev-parse --verify HEAD > version/v/git-commit
 
-jemd: version/init.go
+version/v/version: FORCE
+	git describe --dirty > version/v/version
+
+jimmsrv: version/v/git-commit version/v/version
 	go build -tags release -v $(PROJECT)/cmd/jemd
 
-jimm-$(GIT_VERSION).tar.xz: jimm-release/bin/jemd
+jimm-$(GIT_VERSION).tar.xz: jimm-release/bin/jimmsrv
 	tar c -C jimm-release . | xz > $@
 
-jimm-release/bin/jemd: jemd
+jimm-release/bin/jimmsrv: jimmsrv
 	mkdir -p jimm-release/bin
 	cp jemd jimm-release/bin
 
@@ -94,7 +91,7 @@ else
 endif
 
 help:
-	@echo -e 'Identity service - list of make targets:\n'
+	@echo -e 'JIMM - list of make targets:\n'
 	@echo 'make - Build the package.'
 	@echo 'make check - Run tests.'
 	@echo 'make install - Install the package.'
