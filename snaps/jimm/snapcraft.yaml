@@ -23,9 +23,9 @@ parts:
     override-pull: |-
       set -e
       snapcraftctl pull
-      git -C $SNAPCRAFT_PART_SRC rev-parse --verify HEAD | tee $SNAPCRAFT_PART_SRC/version/v/git-commit
-      git -C $SNAPCRAFT_PART_SRC describe --dirty --abbrev=0 | tee $SNAPCRAFT_PART_SRC/version/v/version
-      snapcraftctl set-version `cat $SNAPCRAFT_PART_SRC/version/v/version`
+      git -C $SNAPCRAFT_PART_SRC rev-parse --verify HEAD | tee $SNAPCRAFT_PART_SRC/version/commit.txt
+      git -C $SNAPCRAFT_PART_SRC describe --dirty --abbrev=0 | tee $SNAPCRAFT_PART_SRC/version/version.txt
+      snapcraftctl set-version `cat $SNAPCRAFT_PART_SRC/version/version.txt`
     override-build: |-
       set -e
-      go install -mod readonly -p 16 -ldflags '-linkmode=external' github.com/CanonicalLtd/jimm/cmd/jimmsrv
+      go install -mod readonly -p 16 -ldflags '-linkmode=external' -tags version github.com/CanonicalLtd/jimm/cmd/jimmsrv
