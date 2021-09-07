@@ -8,3 +8,5 @@
 /snap/.snapcraft/
 /stage/
 /vendor
+/version/commit.txt
+/version/version.txt

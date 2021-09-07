@@ -25,20 +25,20 @@ endef
 
 default: build
 
-build: version/v/git-commit version/v/version
-	go build $(PROJECT)/...
+build: version/commit.txt version/version.txt
+	go build -tags version $(PROJECT)/...
 
-check: version/v/git-commit version/v/version
-	go test -p 1 -timeout 30m $(PROJECT)/...
+check: version/commit.txt version/version.txt
+	go test -p 1 -timeout 30m -tags version $(PROJECT)/...
 
-install: version/v/git-commit version/v/version
-	go install $(INSTALL_FLAGS) -v $(PROJECT)/...
+install: version/commit.txt version/version.txt
+	go install -tags version $(INSTALL_FLAGS) -v $(PROJECT)/...
 
 release: jimm-$(GIT_VERSION).tar.xz
 
 clean:
 	go clean $(PROJECT)/...
-	-$(RM) version/v/git-commit version/v/version
+	-$(RM) version/commit.txt version/version.txt
 	-$(RM) jimmsrv
 	-$(RM) -r jimm-release/
 	-$(RM) jimm-*.tar.xz
@@ -56,13 +56,13 @@ server: install
 	jemd cmd/jemd/config.yaml
 
 # Generate version information
-version/v/git-commit: FORCE
-	git rev-parse --verify HEAD > version/v/git-commit
+version/commit.txt: FORCE
+	git rev-parse --verify HEAD > version/commit.txt
 
-version/v/version: FORCE
-	git describe --dirty > version/v/version
+version/version.txt: FORCE
+	git describe --dirty > version/version.txt
 
-jimmsrv: version/v/git-commit version/v/version
+jimmsrv: version/commit.txt version/version.txt
 	go build -tags release -v $(PROJECT)/cmd/jemd
 
 jimm-$(GIT_VERSION).tar.xz: jimm-release/bin/jimmsrv
