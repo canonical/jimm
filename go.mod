@@ -3,7 +3,6 @@ module github.com/CanonicalLtd/jimm
 go 1.16
 
 require (
-	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/canonical/candid v1.4.2
 	github.com/canonical/go-dqlite v1.8.0
 	github.com/docker/spdystream v0.0.0-20181023171402-6480d4af844c // indirect
@@ -14,17 +13,17 @@ require (
 	github.com/google/go-cmp v0.5.5
 	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
 	github.com/gorilla/websocket v1.4.2
-	github.com/hashicorp/vault/api v1.0.5-0.20200709165743-f98572ac11c9
+	github.com/hashicorp/vault/api v1.1.1
 	github.com/jackc/pgconn v1.7.0
 	github.com/jackc/pgx/v4 v4.9.0
 	github.com/juju/aclstore v0.0.0-20180706073322-7fc1cdaacf01
-	github.com/juju/charm/v8 v8.0.0-20210615153946-469f7216a7d5
+	github.com/juju/charm/v8 v8.0.0-20210722102001-7d7bf2b0acef
 	github.com/juju/clock v0.0.0-20190205081909-9c5c9712527c
 	github.com/juju/cmd v0.0.0-20200108104440-8e43f3faa5c9
 	github.com/juju/errors v0.0.0-20200330140219-3fe23663418f
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
-	github.com/juju/juju v0.0.0-20210708071739-f4b4ab472fc0
-	github.com/juju/loggo v0.0.0-20200526014432-9ce3a2e09b5e
+	github.com/juju/juju v0.0.0-20210824095606-86d7f5193303
+	github.com/juju/loggo v0.0.0-20210728185423-eebad3a902c4
 	github.com/juju/mgo/v2 v2.0.0-20210414025616-e854c672032f
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
 	github.com/juju/mgosession/v2 v2.0.0
@@ -41,10 +40,8 @@ require (
 	github.com/prometheus/client_golang v1.7.1
 	github.com/rogpeppe/fastuuid v1.2.0
 	go.uber.org/zap v1.10.0
-	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e
-	golang.org/x/net v0.0.0-20210614182718-04defd469f4e // indirect
+	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
 	golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b // indirect
 	golang.org/x/tools v0.1.4 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
@@ -69,6 +66,6 @@ replace (
 	gopkg.in/yaml.v2 => github.com/juju/yaml v0.0.0-20200420012109-12a32b78de07
 )
 
-replace github.com/hashicorp/raft => github.com/juju/raft v2.0.0-20200420012049-88ad3b3f0a54+incompatible
-
 replace github.com/mattn/go-sqlite3 => github.com/mattn/go-sqlite3 v1.14.5
+
+replace github.com/hashicorp/raft-boltdb => github.com/juju/raft-boltdb v0.0.0-20200518034108-40b112c917c5
