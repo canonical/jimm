@@ -74,7 +74,7 @@ func (j *JEM) checkModelAccess(ctx context.Context, id identchecker.ACLIdentity,
 	// Currently in JAAS the namespace user has full access to the model.
 	acl := []string{string(m.Path.User)}
 	if allowControllerAdmin {
-		acl = append(acl, string(j.ControllerAdmin()))
+		acl = append(acl, j.ControllerAdmins()...)
 	}
 	switch access {
 	case jujuparams.ModelReadAccess:

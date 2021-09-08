@@ -51,10 +51,14 @@ type Handler struct {
 
 func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httprequest.Handler, error) {
 	// Ensure the required ACLs exist.
-	if err := params.ACLManager.CreateACL(ctx, auditLogACL, string(params.ControllerAdmin)); err != nil {
+	admins := make([]string, len(params.ControllerAdmins))
+	for i, v := range params.ControllerAdmins {
+		admins[i] = string(v)
+	}
+	if err := params.ACLManager.CreateACL(ctx, auditLogACL, admins...); err != nil {
 		return nil, errgo.Mask(err)
 	}
-	if err := params.ACLManager.CreateACL(ctx, logLevelACL, string(params.ControllerAdmin)); err != nil {
+	if err := params.ACLManager.CreateACL(ctx, logLevelACL, admins...); err != nil {
 		return nil, errgo.Mask(err)
 	}
 
@@ -256,7 +260,7 @@ func (h *Handler) ListModels(p httprequest.Params, arg *params.ListModels) (*par
 		return nil
 	}
 	if arg.All {
-		if err := auth.CheckIsUser(p.Context, h.id, h.jem.ControllerAdmin()); err != nil {
+		if err := auth.CheckACL(p.Context, h.id, h.jem.ControllerAdmins()); err != nil {
 			if errgo.Cause(err) == params.ErrUnauthorized {
 				return nil, errgo.WithCausef(nil, params.ErrUnauthorized, "admin access required to list all models")
 			}
@@ -458,7 +462,7 @@ func (h *Handler) JujuStatus(p httprequest.Params, arg *params.JujuStatus) (*par
 // controller to a different one. The migration will not have
 // completed by the time the Migrate call returns.
 func (h *Handler) Migrate(p httprequest.Params, arg *params.Migrate) error {
-	if err := auth.CheckIsUser(p.Context, h.id, h.config.ControllerAdmin); err != nil {
+	if err := auth.CheckACL(p.Context, h.id, h.jem.ControllerAdmins()); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	model := mongodoc.Model{Path: arg.EntityPath}
@@ -645,7 +649,7 @@ func (h *Handler) checkACL(ctx context.Context, aclName string) error {
 func (h *Handler) MissingModels(p httprequest.Params, arg *params.MissingModelsRequest) (params.MissingModels, error) {
 	var resp params.MissingModels
 
-	if err := auth.CheckIsUser(p.Context, h.id, h.jem.ControllerAdmin()); err != nil {
+	if err := auth.CheckACL(p.Context, h.id, h.jem.ControllerAdmins()); err != nil {
 		if errgo.Cause(err) == params.ErrUnauthorized {
 			return resp, errgo.WithCausef(nil, params.ErrUnauthorized, "admin access required")
 		}

@@ -39,9 +39,9 @@ type ServerParams struct {
 	// may temporarily go above this.
 	MaxMgoSessions int
 
-	// ControllerAdmin holds the identity of the user
-	// or group that is allowed to create controllers.
-	ControllerAdmin params.User
+	// ControllerAdmins holds the identity of the users or groups that
+	// is allowed to create controllers.
+	ControllerAdmins []params.User
 
 	// IdentityLocation holds the location of the third party identity service.
 	IdentityLocation string

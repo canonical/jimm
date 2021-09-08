@@ -40,7 +40,7 @@ func (s *jemSuite) TestPoolRequiresControllerAdmin(c *gc.C) {
 	pool, err := jem.NewPool(testContext, jem.Params{
 		DB: s.Session.DB("jem"),
 	})
-	c.Assert(err, gc.ErrorMatches, "no controller admin group specified")
+	c.Assert(err, gc.ErrorMatches, "no controller admin groups specified")
 	c.Assert(pool, gc.IsNil)
 }
 
@@ -50,9 +50,9 @@ func (s *jemSuite) TestPoolDoesNotReuseDeadConnection(c *gc.C) {
 	sessionPool := mgosession.NewPool(testContext, session.Session, 3)
 	defer sessionPool.Close()
 	pool, err := jem.NewPool(testContext, jem.Params{
-		DB:              session.DB("jem"),
-		ControllerAdmin: jemtest.ControllerAdmin,
-		SessionPool:     sessionPool,
+		DB:               session.DB("jem"),
+		ControllerAdmins: []params.User{jemtest.ControllerAdmin},
+		SessionPool:      sessionPool,
 	})
 	c.Assert(err, gc.Equals, nil)
 	defer pool.Close()
@@ -265,7 +265,7 @@ func addController(c *gc.C, path params.EntityPath, info *jujuapi.Info, jem *jem
 		AdminPassword: info.Password,
 		Public:        true,
 	}
-	err = jem.AddController(testContext, jemtest.NewIdentity(string(path.User), string(jem.ControllerAdmin())), ctl)
+	err = jem.AddController(testContext, jemtest.NewIdentity(string(path.User), jemtest.ControllerAdmin), ctl)
 	c.Assert(err, gc.Equals, nil)
 
 	return path

@@ -78,7 +78,7 @@ func (r *controllerRoot) UserModelStats(ctx context.Context) (params.UserModelSt
 // with any model information is the UUID of the juju controller that is
 // hosting the model, and not JAAS.
 func (r *controllerRoot) DisableControllerUUIDMasking(ctx context.Context) error {
-	err := auth.CheckACL(ctx, r.identity, []string{string(r.jem.ControllerAdmin())})
+	err := auth.CheckACL(ctx, r.identity, r.jem.ControllerAdmins())
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
@@ -89,7 +89,7 @@ func (r *controllerRoot) DisableControllerUUIDMasking(ctx context.Context) error
 // ListControllers returns the list of juju controllers hosting models
 // as part of this JAAS system.
 func (r *controllerRoot) ListControllers(ctx context.Context) (params.ListControllerResponse, error) {
-	err := auth.CheckACL(ctx, r.identity, []string{string(r.jem.ControllerAdmin())})
+	err := auth.CheckACL(ctx, r.identity, r.jem.ControllerAdmins())
 	if errgo.Cause(err) == params.ErrUnauthorized {
 		// if the user isn't a controller admin return JAAS
 		// itself as the only controller.
@@ -155,9 +155,10 @@ func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddCon
 		}
 	}
 
+	user := r.jem.ControllerAdmins()[0]
 	ctl := mongodoc.Controller{
 		Path: params.EntityPath{
-			User: r.jem.ControllerAdmin(),
+			User: params.User(user),
 			Name: params.Name(req.Name),
 		},
 		CACert:        req.CACertificate,
@@ -185,7 +186,7 @@ func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddCon
 // ListControllersV3 returns the list of juju controllers hosting models
 // as part of this JAAS system.
 func (r *controllerRoot) ListControllersV3(ctx context.Context) (apiparams.ListControllersResponse, error) {
-	err := auth.CheckACL(ctx, r.identity, []string{string(r.jem.ControllerAdmin())})
+	err := auth.CheckACL(ctx, r.identity, r.jem.ControllerAdmins())
 	if errgo.Cause(err) == params.ErrUnauthorized {
 		// if the user isn't a controller admin return JAAS
 		// itself as the only controller.
@@ -228,9 +229,10 @@ func (r *controllerRoot) ListControllersV3(ctx context.Context) (apiparams.ListC
 
 // RemoveController removes a controller.
 func (r *controllerRoot) RemoveController(ctx context.Context, req apiparams.RemoveControllerRequest) (apiparams.ControllerInfo, error) {
+	user := r.jem.ControllerAdmins()[0]
 	ctl := mongodoc.Controller{
 		Path: params.EntityPath{
-			User: r.jem.ControllerAdmin(),
+			User: params.User(user),
 			Name: params.Name(req.Name),
 		},
 	}
@@ -244,8 +246,9 @@ func (r *controllerRoot) RemoveController(ctx context.Context, req apiparams.Rem
 
 // SetControllerDeprecated sets the deprecated status of a controller.
 func (r *controllerRoot) SetControllerDeprecated(ctx context.Context, req apiparams.SetControllerDeprecatedRequest) (apiparams.ControllerInfo, error) {
+	user := r.jem.ControllerAdmins()[0]
 	path := params.EntityPath{
-		User: r.jem.ControllerAdmin(),
+		User: params.User(user),
 		Name: params.Name(req.Name),
 	}
 	if err := r.jem.SetControllerDeprecated(ctx, r.identity, path, req.Deprecated); err != nil {
@@ -304,7 +307,7 @@ func (r *controllerRoot) FindAuditEvents(ctx context.Context, req apiparams.Find
 		limit = maxLimit
 	}
 
-	if err := auth.CheckIsUser(ctx, r.identity, r.jem.ControllerAdmin()); err != nil {
+	if err := auth.CheckACL(ctx, r.identity, r.jem.ControllerAdmins()); err != nil {
 		return apiparams.AuditEvents{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	entries, err := r.jem.DB.GetAuditEntries(ctx, after, before, "")
@@ -361,7 +364,7 @@ func (r *controllerRoot) FindAuditEvents(ctx context.Context, req apiparams.Find
 // level to the specified user. The only currently supported level is
 // "read". Only controller admin users can grant access to the audit log.
 func (r *controllerRoot) GrantAuditLogAccess(ctx context.Context, req apiparams.AuditLogAccessRequest) error {
-	if err := auth.CheckIsUser(ctx, r.identity, r.jem.ControllerAdmin()); err != nil {
+	if err := auth.CheckACL(ctx, r.identity, r.jem.ControllerAdmins()); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	_, err := conv.ParseUserTag(req.UserTag)
@@ -376,7 +379,7 @@ func (r *controllerRoot) GrantAuditLogAccess(ctx context.Context, req apiparams.
 // level from the specified user. The only currently supported level is
 // "read". Only controller admin users can revoke access to the audit log.
 func (r *controllerRoot) RevokeAuditLogAccess(ctx context.Context, req apiparams.AuditLogAccessRequest) error {
-	if err := auth.CheckIsUser(ctx, r.identity, r.jem.ControllerAdmin()); err != nil {
+	if err := auth.CheckACL(ctx, r.identity, r.jem.ControllerAdmins()); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	_, err := conv.ParseUserTag(req.UserTag)

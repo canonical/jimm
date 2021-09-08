@@ -52,7 +52,11 @@ func (h *handler) checkIsAdmin(ctx context.Context, req *http.Request) error {
 	if err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}
-	return auth.CheckIsUser(ctx, id, h.params.ControllerAdmin)
+	admins := make([]string, len(h.params.ControllerAdmins))
+	for i, v := range h.params.ControllerAdmins {
+		admins[i] = string(v)
+	}
+	return auth.CheckACL(ctx, id, admins)
 }
 
 func (h *handler) check(ctx context.Context) map[string]debugstatus.CheckResult {

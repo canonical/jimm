@@ -33,6 +33,7 @@ type Config struct {
 	APIAddr   string `yaml:"api-addr"`
 	// TODO rename state-server-admin to controller-admin.
 	ControllerAdmin       params.User       `yaml:"state-server-admin"`
+	ControllerAdmins      []params.User     `yaml:"controller-admins"`
 	IdentityPublicKey     *bakery.PublicKey `yaml:"identity-public-key"`
 	IdentityLocation      string            `yaml:"identity-location"`
 	CharmstoreLocation    string            `yaml:"charmstore-location"`
@@ -86,7 +87,7 @@ func (c *Config) validate() error {
 	if c.APIAddr == "" {
 		missing = append(missing, "api-addr")
 	}
-	if c.ControllerAdmin == "" {
+	if c.ControllerAdmin == "" && len(c.ControllerAdmins) == 0 {
 		missing = append(missing, "state-server-admin")
 	}
 	if c.IdentityLocation == "" {

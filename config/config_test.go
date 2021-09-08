@@ -14,6 +14,7 @@ import (
 	bakeryv2 "gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/jimm/config"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 func TestPackage(t *testing.T) {
@@ -32,6 +33,9 @@ api-addr: blah:2324
 foo: 1
 bar: false
 state-server-admin: adminuser
+controller-admins:
+- admin1
+- admin2@external
 identity-location: localhost:18082
 charmstore-location: https://api.staging.jujucharms.com/charmstore
 metering-location: https://api.staging.jujucharms.com/metering
@@ -127,7 +131,10 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 		MongoAddr:       "localhost:23456",
 		APIAddr:         "blah:2324",
 		ControllerAdmin: "adminuser",
-
+		ControllerAdmins: []params.User{
+			"admin1",
+			"admin2@external",
+		},
 		IdentityLocation:   "localhost:18082",
 		CharmstoreLocation: "https://api.staging.jujucharms.com/charmstore",
 		MeteringLocation:   "https://api.staging.jujucharms.com/metering",

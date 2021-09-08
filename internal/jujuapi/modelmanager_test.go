@@ -113,7 +113,8 @@ func (s *modelManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c
 	err := conn1.APICall("JIMM", 2, "", "DisableControllerUUIDMasking", nil, nil)
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 
-	s.Candid.AddUser("bob", string(s.JEM.ControllerAdmin()))
+	adminGroup := s.JEM.ControllerAdmins()[0]
+	s.Candid.AddUser("bob", adminGroup)
 	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 	err = conn.APICall("JIMM", 2, "", "DisableControllerUUIDMasking", nil, nil)
@@ -432,7 +433,8 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	s.Candid.AddUser("bob", string(s.JEM.ControllerAdmin()))
+	adminGroup := s.JEM.ControllerAdmins()[0]
+	s.Candid.AddUser("bob", adminGroup)
 	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 	client := modelmanager.NewClient(conn)
@@ -664,7 +666,7 @@ func (s *modelManagerSuite) TestModelInfoForLegacyModelDisableControllerUUIDMask
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model.Cloud, gc.Equals, params.Cloud(""))
 
-	s.Candid.AddUser("bob", string(s.JEM.ControllerAdmin()))
+	s.Candid.AddUser("bob", s.JEM.ControllerAdmins()[0])
 	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 	client := modelmanager.NewClient(conn)

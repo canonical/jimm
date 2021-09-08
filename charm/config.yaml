@@ -27,11 +27,12 @@ options:
     default: ""
     type: string
     description: Agent public key.
-  controller-admin:
+  controller-admins:
     type: string
     default: "yellow"
     description: |
-      The user or group that has admin rights to manage controllers.
+      Comma separated list of users or groups that have admin rights to
+      manage controllers.
   nagios_context:
     default: "juju"
     type: string

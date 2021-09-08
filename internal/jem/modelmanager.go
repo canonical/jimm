@@ -505,7 +505,8 @@ func (j *JEM) GetModelInfo(ctx context.Context, id identchecker.ACLIdentity, inf
 	}
 
 	var canSeeUsers, canSeeMachines bool
-	adminACL := append(m.ACL.Admin, string(m.Path.User), string(j.ControllerAdmin()))
+	adminACL := append(m.ACL.Admin, string(m.Path.User))
+	adminACL = append(m.ACL.Admin, j.ControllerAdmins()...)
 	if err := auth.CheckACL(ctx, id, adminACL); err == nil {
 		canSeeUsers = true
 		canSeeMachines = true
@@ -748,7 +749,7 @@ func (j *JEM) RevokeModel(ctx context.Context, id identchecker.ACLIdentity, m *m
 // given user is not a controller admin then an error with a cause of
 // params.ErrUnauthorized will be retuned.
 func (j *JEM) GetModelStatuses(ctx context.Context, id identchecker.ACLIdentity) (params.ModelStatuses, error) {
-	if err := auth.CheckIsUser(ctx, id, j.ControllerAdmin()); err != nil {
+	if err := auth.CheckACL(ctx, id, j.ControllerAdmins()); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	var mss params.ModelStatuses

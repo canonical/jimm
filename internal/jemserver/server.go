@@ -55,9 +55,9 @@ type Params struct {
 	// may temporarily go above this.
 	MaxMgoSessions int
 
-	// ControllerAdmin holds the identity of the user
-	// or group that is allowed to create controllers.
-	ControllerAdmin params.User
+	// ControllerAdmins holds the identity of the users or groups that
+	// is allowed to create controllers.
+	ControllerAdmins []params.User
 
 	// IdentityLocation holds the location of the third party identity service.
 	IdentityLocation string
@@ -182,7 +182,7 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	jconfig := jem.Params{
 		DB:                  config.DB,
 		SessionPool:         sessionPool,
-		ControllerAdmin:     config.ControllerAdmin,
+		ControllerAdmins:    config.ControllerAdmins,
 		PublicCloudMetadata: publicCloudMetadata,
 		Pubsub:              config.Pubsub,
 	}
@@ -232,6 +232,11 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 
 	authenticator := auth.NewAuthenticator(bakery)
 
+	adminUsers := make([]string, len(config.ControllerAdmins))
+	for i, v := range config.ControllerAdmins {
+		adminUsers[i] = string(v)
+	}
+
 	aclManager, err := aclstore.NewManager(ctx, aclstore.Params{
 		Store:    aclStore,
 		RootPath: "/admin/acls",
@@ -244,7 +249,7 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 			httprequest.WriteJSON(w, status, body)
 			return nil, errgo.Mask(err, errgo.Any)
 		},
-		InitialAdminUsers: []string{string(config.ControllerAdmin)},
+		InitialAdminUsers: adminUsers,
 	})
 	if err != nil {
 		return nil, errgo.Mask(err)

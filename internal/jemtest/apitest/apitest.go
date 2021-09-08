@@ -26,6 +26,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jemerror"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 const ControllerUUID = "8e8e17d2-9267-489e-9850-767e317fe482"
@@ -174,7 +175,7 @@ func (s *APISuite) SetUpTest(c *gc.C) {
 				httprequest.WriteJSON(w, status, body)
 				return nil, errgo.Mask(err, errgo.Any)
 			},
-			InitialAdminUsers: []string{string(jem.ControllerAdmin())},
+			InitialAdminUsers: jem.ControllerAdmins(),
 		})
 		c.Assert(err, gc.Equals, nil)
 		s.AddCleanup(func(c *gc.C) {
@@ -182,10 +183,14 @@ func (s *APISuite) SetUpTest(c *gc.C) {
 		})
 	}
 
-	if s.Params.ControllerAdmin == "" {
-		s.Params.ControllerAdmin = jem.ControllerAdmin()
+	if len(s.Params.ControllerAdmins) == 0 {
+		admins := jem.ControllerAdmins()
+		s.Params.ControllerAdmins = make([]params.User, len(admins))
+		for i, v := range admins {
+			s.Params.ControllerAdmins[i] = params.User(v)
+		}
 		s.AddCleanup(func(c *gc.C) {
-			s.Params.ControllerAdmin = ""
+			s.Params.ControllerAdmins = nil
 		})
 	}
 

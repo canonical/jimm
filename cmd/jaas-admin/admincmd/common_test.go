@@ -117,7 +117,7 @@ func (s *commonSuite) newServer(c *gc.C, session *mgo.Session, idmSrv *candidtes
 	idmSrv.AddUser("agent", candidtest.GroupListGroup)
 	config := jem.ServerParams{
 		DB:                db,
-		ControllerAdmin:   adminUser,
+		ControllerAdmins:  []params.User{adminUser},
 		IdentityLocation:  idmSrv.URL.String(),
 		ThirdPartyLocator: auth.ThirdPartyLocatorV3{idmSrv},
 		AgentUsername:     "agent",

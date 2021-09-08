@@ -36,7 +36,7 @@ func (s *websocketSuite) SetUpTest(c *gc.C) {
 	s.Params.MeteringLocation = "https://api.jujucharms.com/omnibus"
 	s.BootstrapAPISuite.SetUpTest(c)
 
-	s.Candid.AddUser("alice", string(s.JEM.ControllerAdmin()))
+	s.Candid.AddUser("alice", s.JEM.ControllerAdmins()[0])
 
 	s.Credential2 = jemtest.EmptyCredential("charlie", "cred")
 	s.UpdateCredential(c, &s.Credential2)

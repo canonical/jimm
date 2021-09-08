@@ -125,10 +125,15 @@ func startServer(ctx context.Context, eg *errgroup.Group, conf *config.Config) e
 		conf.MaxMgoSessions = 100
 	}
 
+	admins := conf.ControllerAdmins
+	if conf.ControllerAdmin != "" {
+		admins = append(admins, conf.ControllerAdmin)
+	}
+
 	cfg := jem.ServerParams{
 		DB:                      db,
 		MaxMgoSessions:          conf.MaxMgoSessions,
-		ControllerAdmin:         conf.ControllerAdmin,
+		ControllerAdmins:        admins,
 		IdentityLocation:        conf.IdentityLocation,
 		CharmstoreLocation:      conf.CharmstoreLocation,
 		MeteringLocation:        conf.MeteringLocation,
