@@ -58,9 +58,9 @@ type Params struct {
 	// taken to be used in database operations.
 	SessionPool *mgosession.Pool
 
-	// ControllerAdmin holds the identity of the user
-	// or group that is allowed to create controllers.
-	ControllerAdmin params.User
+	// ControllerAdmin holds the identity of the users or groups that
+	// are allowed to create controllers.
+	ControllerAdmins []params.User
 
 	// PublicCloudMetadata contains the metadata details of all known
 	// public clouds.
@@ -113,8 +113,8 @@ var APIOpenTimeout = 15 * time.Second
 // bakery.Service.
 func NewPool(ctx context.Context, p Params) (*Pool, error) {
 	// TODO migrate database
-	if p.ControllerAdmin == "" {
-		return nil, errgo.Newf("no controller admin group specified")
+	if len(p.ControllerAdmins) == 0 {
+		return nil, errgo.Newf("no controller admin groups specified")
 	}
 	if p.SessionPool == nil {
 		return nil, errgo.Newf("no session pool provided")
@@ -218,8 +218,12 @@ func (j *JEM) Clone() *JEM {
 	}
 }
 
-func (j *JEM) ControllerAdmin() params.User {
-	return j.pool.config.ControllerAdmin
+func (j *JEM) ControllerAdmins() []string {
+	admins := make([]string, len(j.pool.config.ControllerAdmins))
+	for i, v := range j.pool.config.ControllerAdmins {
+		admins[i] = string(v)
+	}
+	return admins
 }
 
 // Close closes the JEM instance. This should be called when

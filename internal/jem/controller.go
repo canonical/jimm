@@ -68,7 +68,7 @@ func (j *JEM) AddController(ctx context.Context, id identchecker.ACLIdentity, ct
 
 	if ctl.Public {
 		// Only controller admins can create public controllers.
-		if err := auth.CheckIsUser(ctx, id, j.ControllerAdmin()); err != nil {
+		if err := auth.CheckACL(ctx, id, j.ControllerAdmins()); err != nil {
 			return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 		}
 	} else {
@@ -197,7 +197,7 @@ func (j *JEM) updateControllerCloud(
 // SetControllerDeprecated sets whether the given controller is deprecated.
 func (j *JEM) SetControllerDeprecated(ctx context.Context, id identchecker.ACLIdentity, ctlPath params.EntityPath, deprecated bool) error {
 	// Only a controller admin can mark a controller deprecated.
-	if err := auth.CheckIsUser(ctx, id, j.ControllerAdmin()); err != nil {
+	if err := auth.CheckACL(ctx, id, j.ControllerAdmins()); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 

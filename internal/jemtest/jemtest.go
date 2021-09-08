@@ -56,10 +56,10 @@ func (s *JEMSuite) SetUpTest(c *gc.C) {
 			s.Params.SessionPool = nil
 		})
 	}
-	if s.Params.ControllerAdmin == "" {
-		s.Params.ControllerAdmin = ControllerAdmin
+	if len(s.Params.ControllerAdmins) == 0 {
+		s.Params.ControllerAdmins = []params.User{ControllerAdmin}
 		s.AddCleanup(func(c *gc.C) {
-			s.Params.ControllerAdmin = ""
+			s.Params.ControllerAdmins = nil
 		})
 	}
 	var err error

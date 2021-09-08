@@ -124,7 +124,7 @@ func (j *JEM) GetApplicationOfferConsumeDetails(ctx context.Context, id identche
 
 	asUser := uid
 	if user != "" {
-		if err := auth.CheckIsUser(ctx, id, j.ControllerAdmin()); err != nil {
+		if err := auth.CheckACL(ctx, id, j.ControllerAdmins()); err != nil {
 			return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 		}
 		asUser = user

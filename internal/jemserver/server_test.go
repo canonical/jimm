@@ -39,8 +39,8 @@ var _ = gc.Suite(&serverSuite{})
 
 func (s *serverSuite) TestNewServerWithNoVersions(c *gc.C) {
 	params := jemserver.Params{
-		DB:              s.Session.DB("foo"),
-		ControllerAdmin: "controller-admin",
+		DB:               s.Session.DB("foo"),
+		ControllerAdmins: []params.User{"controller-admin"},
 	}
 	h, err := jemserver.New(testContext, params, nil)
 	c.Assert(err, gc.ErrorMatches, `JEM server must serve at least one version of the API`)
@@ -55,7 +55,7 @@ type versionResponse struct {
 func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	serverParams := jemserver.Params{
 		DB:               s.Session.DB("foo"),
-		ControllerAdmin:  "controller-admin",
+		ControllerAdmins: []params.User{"controller-admin"},
 		IdentityLocation: "http://0.1.2.3",
 	}
 	serveVersion := func(vers string) jemserver.NewAPIHandlerFunc {
@@ -137,7 +137,7 @@ func assertDoesNotServeVersion(c *gc.C, h http.Handler, vers string) {
 func (s *serverSuite) TestServerHasAccessControlAllowOrigin(c *gc.C) {
 	serverParams := jemserver.Params{
 		DB:               s.Session.DB("foo"),
-		ControllerAdmin:  "controller-admin",
+		ControllerAdmins: []params.User{"controller-admin"},
 		IdentityLocation: "http://0.1.2.3",
 	}
 	impl := map[string]jemserver.NewAPIHandlerFunc{
@@ -188,9 +188,9 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 	sessionPool := mgosession.NewPool(context.TODO(), s.Session, 1)
 	defer sessionPool.Close()
 	pool, err := jem.NewPool(context.TODO(), jem.Params{
-		DB:              db,
-		ControllerAdmin: "controller-admin",
-		SessionPool:     sessionPool,
+		DB:               db,
+		ControllerAdmins: []params.User{"controller-admin"},
+		SessionPool:      sessionPool,
 	})
 	c.Assert(err, gc.Equals, nil)
 	defer pool.Close()
@@ -215,7 +215,7 @@ func (s *serverSuite) TestServerRunsMonitor(c *gc.C) {
 		AgentUsername:    "foo",
 		AgentKey:         key,
 		RunMonitor:       true,
-		ControllerAdmin:  "controller-admin",
+		ControllerAdmins: []params.User{"controller-admin"},
 		IdentityLocation: "http://0.1.2.3",
 	}
 	// Patch the API opening timeout so that it doesn't take the
@@ -262,7 +262,7 @@ func (s *aclSuite) SetUpTest(c *gc.C) {
 	s.Candid.AddUser("agent", candidtest.GroupListGroup)
 	serverParams := jemserver.Params{
 		DB:                s.Session.DB("jimmtest"),
-		ControllerAdmin:   jemtest.ControllerAdmin,
+		ControllerAdmins:  []params.User{"controller-admin"},
 		IdentityLocation:  s.Candid.URL.String(),
 		ThirdPartyLocator: auth.ThirdPartyLocatorV3{s.Candid},
 		AgentUsername:     "agent",

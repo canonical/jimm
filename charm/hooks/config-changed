@@ -34,7 +34,7 @@ def config_changed():
 
     app_config = {
         'api-addr': ':{}'.format(HTTP_LISTEN_PORT),
-        'state-server-admin': config['controller-admin']
+        'controller-admins': [admin.strip() for admin in config['controller-admins'].split(",")]
     }
     if config['agent-private-key'] and config['agent-public-key']:
         app_config['agent-key'] = {
