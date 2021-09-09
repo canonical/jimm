@@ -24,6 +24,7 @@ func NewSuperCommand() *jujucmd.SuperCommand {
 		Doc:  jimmctlDoc,
 	})
 	jimmcmd.Register(cmd.NewAddControllerCommand())
+	jimmcmd.Register(cmd.NewControllerInfoCommand())
 	jimmcmd.Register(cmd.NewGrantAuditLogAccessCommand())
 	jimmcmd.Register(cmd.NewListAuditEventsCommand())
 	jimmcmd.Register(cmd.NewListControllersCommand())
