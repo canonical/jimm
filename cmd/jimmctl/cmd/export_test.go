@@ -113,3 +113,15 @@ func NewSetControllerDeprecatedCommandForTesting(store jujuclient.ClientStore, b
 
 	return modelcmd.WrapBase(cmd)
 }
+
+func NewImportModelCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+	cmd := &importModelCommand{
+		store: store,
+		dialOpts: &jujuapi.DialOpts{
+			InsecureSkipVerify: true,
+			BakeryClient:       bClient,
+		},
+	}
+
+	return modelcmd.WrapBase(cmd)
+}

@@ -393,7 +393,7 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 	}
 
 	if u.ControllerAccess != "superuser" {
-		return fail(errors.E(op, errors.CodeUnauthorized, "cannot import model"))
+		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
 	}
 
 	controller := dbmodel.Controller{

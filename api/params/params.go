@@ -206,3 +206,14 @@ type UpdateMigratedModelRequest struct {
 	// model has been migrated to.
 	TargetController string `json:"target-controller"`
 }
+
+// An ImportModelRequest holds a request to import a model running on the
+// specified controller such that the model is known to JIMM.
+type ImportModelRequest struct {
+	// Controller holds that name of the controller that is running the
+	// model.
+	Controller string `json:"controller"`
+
+	// ModelTag is the tag of the model that is to be imported.
+	ModelTag string `json:"model-tag"`
+}
