@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
-	"github.com/juju/cmd"
+	"github.com/juju/cmd/v3"
 	"github.com/juju/errors"
 	"github.com/juju/gnuflag"
 	jujucmd "github.com/juju/juju/cmd"

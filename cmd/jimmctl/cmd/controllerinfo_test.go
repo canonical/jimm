@@ -7,7 +7,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/juju/cmd/cmdtesting"
+	"github.com/juju/cmd/v3/cmdtesting"
 	"github.com/juju/juju/jujuclient"
 	gc "gopkg.in/check.v1"
 

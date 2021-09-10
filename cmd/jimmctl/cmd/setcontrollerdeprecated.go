@@ -3,7 +3,7 @@
 package cmd
 
 import (
-	"github.com/juju/cmd"
+	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
 	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"

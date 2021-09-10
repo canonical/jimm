@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	jujucmd "github.com/juju/cmd"
+	jujucmd "github.com/juju/cmd/v3"
 	"github.com/juju/loggo"
 
 	"github.com/CanonicalLtd/jimm/cmd/jimmctl/cmd"
