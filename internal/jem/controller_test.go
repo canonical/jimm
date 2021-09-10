@@ -9,6 +9,7 @@ import (
 	cloudapi "github.com/juju/juju/api/cloud"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/network"
+	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/version/v2"
 	gc "gopkg.in/check.v1"
@@ -368,4 +369,27 @@ func (s *controllerSuite) TestConnectMonitorConnectionFailure(c *gc.C) {
 	_, err = s.JEM.ConnectMonitor(testContext, s.Controller.Path)
 	c.Check(err, gc.ErrorMatches, `invalid entity name or password \(unauthorized access\)`)
 	c.Check(errgo.Cause(err), gc.Equals, jem.ErrAPIConnection)
+}
+
+func (s *controllerSuite) TestUpdateMigratedModel(c *gc.C) {
+	c2 := mongodoc.Controller{Path: params.EntityPath{User: jemtest.ControllerAdmin, Name: "controller-2"}}
+	s.AddController(c, &c2)
+
+	err := s.JEM.DB.UpdateModel(testContext, &s.Model, new(jimmdb.Update).Set("controller", c2.Path), true)
+	c.Assert(err, gc.Equals, nil)
+	c.Check(s.Model.Controller, jc.DeepEquals, c2.Path)
+
+	// bob is unauthorized
+	err = s.JEM.UpdateMigratedModel(testContext, jemtest.Bob, names.NewModelTag(s.Model.UUID), s.Controller.Path.Name)
+	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+
+	err = s.JEM.UpdateMigratedModel(testContext, jemtest.Alice, names.NewModelTag(s.Model.UUID), s.Controller.Path.Name)
+	c.Assert(err, gc.Equals, nil)
+
+	model := mongodoc.Model{
+		Path: s.Model.Path,
+	}
+	err = s.JEM.DB.GetModel(testContext, &model)
+	c.Assert(err, gc.Equals, nil)
+	c.Check(model.Controller, jc.DeepEquals, s.Controller.Path)
 }
