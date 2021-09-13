@@ -32,6 +32,7 @@ func init() {
 		revokeAuditLogAccessMethod := rpc.Method(r.RevokeAuditLogAccess)
 		setControllerDeprecatedMethod := rpc.Method(r.SetControllerDeprecated)
 		userModelStatsMethod := rpc.Method(r.UserModelStats)
+		updateMigratedModelMethod := rpc.Method(r.UpdateMigratedModel)
 
 		r.AddMethod("JIMM", 1, "UserModelStats", userModelStatsMethod)
 
@@ -47,6 +48,7 @@ func init() {
 		r.AddMethod("JIMM", 3, "RemoveController", removeControllerMethod)
 		r.AddMethod("JIMM", 3, "RevokeAuditLogAccess", revokeAuditLogAccessMethod)
 		r.AddMethod("JIMM", 3, "SetControllerDeprecated", setControllerDeprecatedMethod)
+		r.AddMethod("JIMM", 3, "UpdateMigratedModel", updateMigratedModelMethod)
 
 		return []int{1, 2, 3}
 	}
@@ -429,4 +431,18 @@ OUTER:
 			Status: "available",
 		}
 	}
+}
+
+// UpdateMigratedModel checks that the model has been migrated to the specified controller
+// and updates internal representation of the model.
+func (r *controllerRoot) UpdateMigratedModel(ctx context.Context, req apiparams.UpdateMigratedModelRequest) error {
+	mt, err := names.ParseModelTag(req.ModelTag)
+	if err != nil {
+		return errgo.WithCausef(err, params.ErrBadRequest, "")
+	}
+	err = r.jem.UpdateMigratedModel(ctx, r.identity, mt, params.Name(req.TargetController))
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	return nil
 }

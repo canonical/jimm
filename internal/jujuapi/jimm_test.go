@@ -468,3 +468,37 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 		}},
 	})
 }
+
+func (s *jimmSuite) TestUpdateMigratedModel(c *gc.C) {
+	c2 := mongodoc.Controller{Path: params.EntityPath{User: jemtest.ControllerAdmin, Name: "controller-2"}}
+	s.AddController(c, &c2)
+
+	// Open the API connection as user "bob".
+	conn := s.open(c, nil, "bob")
+	defer conn.Close()
+
+	req := apiparams.UpdateMigratedModelRequest{
+		ModelTag:         names.NewModelTag(s.Model2.UUID).String(),
+		TargetController: "controller-1",
+	}
+	err := conn.APICall("JIMM", 3, "", "UpdateMigratedModel", &req, nil)
+	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+
+	// Open the API connection as user "alice".
+	conn = s.open(c, nil, "alice")
+	defer conn.Close()
+
+	req = apiparams.UpdateMigratedModelRequest{
+		ModelTag:         names.NewModelTag(s.Model2.UUID).String(),
+		TargetController: "controller-1",
+	}
+	err = conn.APICall("JIMM", 3, "", "UpdateMigratedModel", &req, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	req = apiparams.UpdateMigratedModelRequest{
+		ModelTag:         "invalid-model-tag",
+		TargetController: "controller-1",
+	}
+	err = conn.APICall("JIMM", 3, "", "UpdateMigratedModel", &req, nil)
+	c.Assert(err, gc.ErrorMatches, `"invalid-model-tag" is not a valid tag \(bad request\)`)
+}

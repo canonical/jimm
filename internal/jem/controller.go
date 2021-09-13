@@ -360,3 +360,50 @@ func (j *JEM) clearCredentialUpdate(ctx context.Context, ctlPath params.EntityPa
 	err := j.DB.UpdateController(ctx, c, new(jimmdb.Update).Pull("updatecredentials", credPath), true)
 	return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 }
+
+// UpdateMigratedModel asserts that the model has been migrated to the
+// specified controller and updates the internal model representation.
+func (j *JEM) UpdateMigratedModel(ctx context.Context, id identchecker.ACLIdentity, modelTag names.ModelTag, targetControllerName params.Name) error {
+	if err := auth.CheckACL(ctx, id, j.ControllerAdmins()); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	model := mongodoc.Model{
+		UUID: modelTag.Id(),
+	}
+
+	if err := j.DB.GetModel(ctx, &model); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+
+	targetController := mongodoc.Controller{
+		Path: params.EntityPath{
+			Name: targetControllerName,
+		},
+	}
+
+	if err := j.DB.GetController(ctx, &targetController); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+
+	conn, err := j.OpenAPIFromDoc(ctx, &targetController)
+	if err != nil {
+		return errgo.Notef(err, "cannot connect to controller")
+	}
+	defer conn.Close()
+
+	err = conn.ModelInfo(ctx, &jujuparams.ModelInfo{
+		UUID: modelTag.Id(),
+	})
+	if err != nil {
+		return errgo.Mask(err, apiconn.IsAPIError)
+	}
+
+	update := new(jimmdb.Update).Set("controller", targetController.Path)
+	err = j.DB.UpdateModel(ctx, &model, update, false)
+	if err != nil {
+		zapctx.Error(ctx, "failed to update model", zap.String("model", model.UUID), zaputil.Error(err))
+		return errgo.Mask(err)
+	}
+
+	return nil
+}

@@ -186,3 +186,15 @@ type SetControllerDeprecatedRequest struct {
 	// deprecated or not.
 	Deprecated bool `json:"deprecated"`
 }
+
+// UpdateMigratedModelRequest holds a request to check
+// if the specified model has been migrated to the specified controller
+// and update the model accordingly.
+type UpdateMigratedModelRequest struct {
+	// ModelTag holds the tag of the model that has been migrated.
+	ModelTag string `json:"model-tag"`
+
+	// TargetController holds the name of the controller the
+	// model has been migrated to.
+	TargetController string `json:"target-controller"`
+}

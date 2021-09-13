@@ -180,7 +180,10 @@ func controllerQuery(c *mongodoc.Controller) Query {
 	case c == nil:
 		return nil
 	case !c.Path.IsZero():
-		return Eq("path", c.Path)
+		if c.Path.User != "" {
+			return Eq("path", c.Path)
+		}
+		return Eq("path.name", c.Path.Name)
 	case c.UUID != "":
 		return Eq("uuid", c.UUID)
 	default:
