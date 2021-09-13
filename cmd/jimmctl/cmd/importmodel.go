@@ -19,7 +19,7 @@ const importModelCommandDoc = `
 	import-model imports a model running on a controller to jimm.
 
 	Example:
-		jimmctl add-controller <controller name> <model-uuid>
+		jimmctl import-model <controller name> <model-uuid>
 `
 
 // NewImportModelCommand returns a command to import a model.

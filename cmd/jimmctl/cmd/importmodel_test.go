@@ -38,9 +38,15 @@ func (s *importModelSuite) TestImportModelSuperuser(c *gc.C) {
 	bClient := s.userBakeryClient("alice")
 	_, err = cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore, bClient), "controller-1", mt.Id())
 	c.Assert(err, gc.IsNil)
+
+	var model2 dbmodel.Model
+	model2.SetTag(mt)
+	err = s.JIMM.Database.GetModel(context.Background(), &model2)
+	c.Assert(err, gc.Equals, nil)
+	c.Check(model2.CreatedAt.After(model.CreatedAt), gc.Equals, true)
 }
 
-func (s *importModelSuite) TestImportModel(c *gc.C) {
+func (s *importModelSuite) TestImportModelUnauthorized(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@external/cred")

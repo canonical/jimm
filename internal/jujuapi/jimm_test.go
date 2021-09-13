@@ -16,6 +16,7 @@ import (
 
 	"github.com/CanonicalLtd/jimm/api"
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
+	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
 )
@@ -500,7 +501,7 @@ func (s *jimmSuite) TestImportModel(c *gc.C) {
 
 	req := apiparams.ImportModelRequest{
 		Controller: "controller-1",
-		ModelTag:   names.NewModelTag(s.Model2.UUID.String).String(),
+		ModelTag:   s.Model2.Tag().String(),
 	}
 	err = conn.APICall("JIMM", 3, "", "ImportModel", &req, nil)
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
@@ -511,6 +512,12 @@ func (s *jimmSuite) TestImportModel(c *gc.C) {
 
 	err = conn.APICall("JIMM", 3, "", "ImportModel", &req, nil)
 	c.Assert(err, gc.Equals, nil)
+
+	var model2 dbmodel.Model
+	model2.SetTag(s.Model2.Tag().(names.ModelTag))
+	err = s.JIMM.Database.GetModel(context.Background(), &model2)
+	c.Assert(err, gc.Equals, nil)
+	c.Check(model2.CreatedAt.After(s.Model2.CreatedAt), gc.Equals, true)
 
 	req = apiparams.ImportModelRequest{
 		Controller: "controller-1",
