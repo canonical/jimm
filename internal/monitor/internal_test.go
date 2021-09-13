@@ -1103,7 +1103,7 @@ func (s *internalSuite) TestAllMonitorWithRaceOnLeaseAcquisition(c *gc.C) {
 	waitEvent(c, apiOpened, "api open")
 	assertNoEvent(c, apiOpened, "api open")
 
-	// Sanity check that the lease is actually held by one of the two monitors.
+	// Check that the lease is actually held by one of the two monitors.
 	err := s.JEM.DB.GetController(testContext, &s.Controller)
 	c.Assert(err, gc.Equals, nil)
 	if s.Controller.MonitorLeaseExpiry.IsZero() {

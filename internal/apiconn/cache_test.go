@@ -138,7 +138,7 @@ func (s *cacheSuite) TestEvict(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(dialCount, gc.Equals, 1)
 
-	// Try again just to sanity check that we're caching it.
+	// Try again just to check that we're caching it.
 	conn1, err := cache.OpenAPI(context.Background(), "uuid", dial)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(dialCount, gc.Equals, 1)

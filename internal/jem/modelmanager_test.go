@@ -57,7 +57,7 @@ func (s *modelManagerSuite) TestDestroyModel(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
 
-	// Sanity check the model exists
+	// Check the model exists
 	client := modelmanagerapi.NewClient(conn)
 	_, err = client.ModelInfo([]names.ModelTag{names.NewModelTag(s.Model.UUID)})
 	c.Assert(err, gc.Equals, nil)
@@ -85,7 +85,7 @@ func (s *modelManagerSuite) TestDestroyModelWithStorage(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
 
-	// Sanity check the model exists
+	// Check the model exists
 	tag := names.NewModelTag(s.Model.UUID)
 	client := modelmanagerapi.NewClient(conn)
 	_, err = client.ModelInfo([]names.ModelTag{tag})
@@ -331,7 +331,7 @@ func (s *modelManagerSuite) TestCreateModelWithExistingModelInControllerOnly(c *
 }
 
 func (s *modelManagerSuite) TestCreateModelWithDeprecatedController(c *gc.C) {
-	// Sanity check that we can create the model while the controller is not deprecated.
+	// Check that we can create the model while the controller is not deprecated.
 	err := s.JEM.CreateModel(testContext, jemtest.Bob, jem.CreateModelParams{
 		Path:   params.EntityPath{"bob", "model1"},
 		Cloud:  jemtest.TestCloudName,
@@ -374,7 +374,7 @@ func (s *modelManagerSuite) TestCreateModelWithMultipleControllers(c *gc.C) {
 }
 
 func (s *modelManagerSuite) TestCreateModelWithUnreachableController(c *gc.C) {
-	// Sanity check that we can create the model while the controller is not deprecated.
+	// Check that we can create the model while the controller is not deprecated.
 	err := s.JEM.CreateModel(testContext, jemtest.Bob, jem.CreateModelParams{
 		Path:   params.EntityPath{"bob", "model1"},
 		Cloud:  jemtest.TestCloudName,

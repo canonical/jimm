@@ -301,7 +301,7 @@ func (s *cloudSuite) TestUpdateCloudCredentialsForce(c *gc.C) {
 			},
 		}},
 	}
-	// First try without Force to sanity check that it should fail.
+	// First try without Force to check that it should fail.
 	var resp jujuparams.UpdateCredentialResults
 	err = conn.APICall("Cloud", 3, "", "UpdateCredentialsCheckModels", args, &resp)
 	c.Assert(err, gc.Equals, nil)

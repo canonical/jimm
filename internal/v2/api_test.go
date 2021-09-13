@@ -539,7 +539,7 @@ func (s *APISuite) TestDeleteControllerNotFound(c *gc.C) {
 func (s *APISuite) TestDeleteController(c *gc.C) {
 	ctx := context.Background()
 
-	// Sanity check the controller exists.
+	// Check the controller exists.
 	err := s.JEM.DB.GetController(ctx, &s.Controller)
 	c.Assert(err, gc.Equals, nil)
 
