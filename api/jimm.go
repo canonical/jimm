@@ -91,3 +91,8 @@ func (c *Client) FullModelStatus(req *params.FullModelStatusRequest) (jujuparams
 	err := c.caller.APICall("JIMM", 3, "", "FullModelStatus", req, &status)
 	return status, err
 }
+
+// ImportModel imports a model running on a controller.
+func (c *Client) ImportModel(req *params.ImportModelRequest) error {
+	return c.caller.APICall("JIMM", 3, "", "ImportModel", req, nil)
+}

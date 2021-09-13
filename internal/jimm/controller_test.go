@@ -704,7 +704,7 @@ func TestImportModel(t *testing.T) {
 			info.OwnerTag = names.NewUserTag("alice@external").String()
 			return nil
 		},
-		expectedError: `cannot import model`,
+		expectedError: `unauthorized`,
 	}, {
 		about:          "model already exists",
 		user:           "alice@external",

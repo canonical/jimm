@@ -3,6 +3,7 @@
 package jujuapi_test
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/CanonicalLtd/jimm/api"
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
+	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
 )
@@ -455,6 +457,7 @@ func (s *jimmSuite) TestFullModelStatus(c *gc.C) {
 		},
 	})
 }
+
 func (s *jimmSuite) TestUpdateMigratedModel(c *gc.C) {
 	s.AddController(c, "controller-2", s.APIInfo(c))
 
@@ -485,5 +488,41 @@ func (s *jimmSuite) TestUpdateMigratedModel(c *gc.C) {
 		TargetController: "controller-1",
 	}
 	err = conn.APICall("JIMM", 3, "", "UpdateMigratedModel", &req, nil)
+	c.Assert(err, gc.ErrorMatches, `"invalid-model-tag" is not a valid tag \(bad request\)`)
+}
+
+func (s *jimmSuite) TestImportModel(c *gc.C) {
+	// Open the API connection as user "bob".
+	conn := s.open(c, nil, "bob")
+	defer conn.Close()
+
+	err := s.JIMM.Database.DeleteModel(context.Background(), s.Model2)
+	c.Assert(err, gc.Equals, nil)
+
+	req := apiparams.ImportModelRequest{
+		Controller: "controller-1",
+		ModelTag:   s.Model2.Tag().String(),
+	}
+	err = conn.APICall("JIMM", 3, "", "ImportModel", &req, nil)
+	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+
+	// Open the API connection as user "alice".
+	conn = s.open(c, nil, "alice")
+	defer conn.Close()
+
+	err = conn.APICall("JIMM", 3, "", "ImportModel", &req, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	var model2 dbmodel.Model
+	model2.SetTag(s.Model2.Tag().(names.ModelTag))
+	err = s.JIMM.Database.GetModel(context.Background(), &model2)
+	c.Assert(err, gc.Equals, nil)
+	c.Check(model2.CreatedAt.After(s.Model2.CreatedAt), gc.Equals, true)
+
+	req = apiparams.ImportModelRequest{
+		Controller: "controller-1",
+		ModelTag:   "invalid-model-tag",
+	}
+	err = conn.APICall("JIMM", 3, "", "ImportModel", &req, nil)
 	c.Assert(err, gc.ErrorMatches, `"invalid-model-tag" is not a valid tag \(bad request\)`)
 }

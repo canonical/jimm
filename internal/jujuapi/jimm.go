@@ -23,6 +23,7 @@ func init() {
 		disableControllerUUIDMaskingMethod := rpc.Method(r.DisableControllerUUIDMasking)
 		findAuditEventsMethod := rpc.Method(r.FindAuditEvents)
 		grantAuditLogAccessMethod := rpc.Method(r.GrantAuditLogAccess)
+		importModelMethod := rpc.Method(r.ImportModel)
 		listControllersMethod := rpc.Method(r.ListControllers)
 		listControllersV3Method := rpc.Method(r.ListControllersV3)
 		removeControllerMethod := rpc.Method(r.RemoveController)
@@ -39,6 +40,7 @@ func init() {
 		r.AddMethod("JIMM", 3, "FindAuditEvents", findAuditEventsMethod)
 		r.AddMethod("JIMM", 3, "FullModelStatus", fullModelStatusMethod)
 		r.AddMethod("JIMM", 3, "GrantAuditLogAccess", grantAuditLogAccessMethod)
+		r.AddMethod("JIMM", 3, "ImportModel", importModelMethod)
 		r.AddMethod("JIMM", 3, "ListControllers", listControllersV3Method)
 		r.AddMethod("JIMM", 3, "RemoveController", removeControllerMethod)
 		r.AddMethod("JIMM", 3, "RevokeAuditLogAccess", revokeAuditLogAccessMethod)
@@ -388,6 +390,23 @@ func (r *controllerRoot) UpdateMigratedModel(ctx context.Context, req apiparams.
 		return errors.E(op, err, errors.CodeBadRequest)
 	}
 	err = r.jimm.UpdateMigratedModel(ctx, r.user, mt, req.TargetController)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	return nil
+}
+
+// ImportModel imports a model already attached to a controller allowing
+// management of that model in JIMM.
+func (r *controllerRoot) ImportModel(ctx context.Context, req apiparams.ImportModelRequest) error {
+	const op = errors.Op("jujuapi.ImportModel")
+
+	mt, err := names.ParseModelTag(req.ModelTag)
+	if err != nil {
+		return errors.E(op, err, errors.CodeBadRequest)
+	}
+
+	err = r.jimm.ImportModel(ctx, r.user, req.Controller, mt)
 	if err != nil {
 		return errors.E(op, err)
 	}
