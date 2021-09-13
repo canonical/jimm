@@ -64,7 +64,7 @@ func (s *credentialSuite) TestRevokeCredentialsNotInUse(c *gc.C) {
 	err := s.JEM.DB.UpsertCredential(testContext, &cred)
 	c.Assert(err, gc.Equals, nil)
 
-	// Sanity check that we can get the credential.
+	// Check that we can get the credential.
 	err = s.JEM.DB.GetCredential(testContext, &cred)
 	c.Assert(err, gc.Equals, nil)
 
@@ -90,7 +90,7 @@ func (s *credentialSuite) TestRevokeCredentialsNotInUse(c *gc.C) {
 }
 
 func (s *credentialSuite) TestUpdateCredential(c *gc.C) {
-	// Sanity check the credential was deployed
+	// Check the credential was deployed
 	conn, err := s.JEM.OpenAPI(testContext, s.Controller.Path)
 	c.Assert(err, gc.Equals, nil)
 	client := cloudapi.NewClient(conn)

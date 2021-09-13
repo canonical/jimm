@@ -92,7 +92,7 @@ func TestDeleteModelRemovesMachinesAndApplications(t *testing.T) {
 	}
 	c.Assert(db.Create(&m).Error, qt.IsNil)
 
-	// Sanity check the applications and machines have been created.
+	// Check the applications and machines have been created.
 	var app1 dbmodel.Application
 	c.Assert(db.First(&app1).Error, qt.IsNil)
 	c.Check(app1.Name, qt.Equals, "app-1")

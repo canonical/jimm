@@ -239,7 +239,7 @@ func (s *controllerSuite) TestSetControllerDeprecated(c *gc.C) {
 }
 
 func (s *controllerSuite) TestDeleteController(c *gc.C) {
-	// sanity check the credential is linked to the controller
+	// Check the credential is linked to the controller
 	err := s.JEM.DB.GetCredential(testContext, &s.Credential)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(s.Credential.Controllers, jc.DeepEquals, []params.EntityPath{s.Controller.Path})

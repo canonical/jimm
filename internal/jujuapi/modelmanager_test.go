@@ -606,7 +606,7 @@ func (s *modelManagerSuite) TestModelInfoForLegacyModel(c *gc.C) {
 	err := s.JEM.DB.UpdateModel(ctx, &model, u, true)
 	c.Assert(err, gc.Equals, nil)
 
-	// Sanity check the required fields aren't present.
+	// Check the required fields aren't present.
 	err = s.JEM.DB.GetModel(ctx, &model)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model.Cloud, gc.Equals, params.Cloud(""))
@@ -661,7 +661,7 @@ func (s *modelManagerSuite) TestModelInfoForLegacyModelDisableControllerUUIDMask
 	err := s.JEM.DB.UpdateModel(ctx, &model, u, true)
 	c.Assert(err, gc.Equals, nil)
 
-	// Sanity check the required fields aren't present.
+	// Check the required fields aren't present.
 	err = s.JEM.DB.GetModel(ctx, &model)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(model.Cloud, gc.Equals, params.Cloud(""))
