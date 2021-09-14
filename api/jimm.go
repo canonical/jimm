@@ -96,3 +96,9 @@ func (c *Client) FullModelStatus(req *params.FullModelStatusRequest) (jujuparams
 func (c *Client) ImportModel(req *params.ImportModelRequest) error {
 	return c.caller.APICall("JIMM", 3, "", "ImportModel", req, nil)
 }
+
+// UpdateMigratedModel updates which controller a model is running on
+// following an external migration operation.
+func (c *Client) UpdateMigratedModel(req *params.UpdateMigratedModelRequest) error {
+	return c.caller.APICall("JIMM", 3, "", "UpdateMigratedModel", req, nil)
+}

@@ -15,43 +15,45 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/errors"
 )
 
-const importModelCommandDoc = `
-	import-model imports a model running on a controller to jimm.
+const updateMigratedModelCommandDoc = `
+	update-migrated-model updates a model known to JIMM that has
+	been migrated externally to a different JAAS controller.
 
 	Example:
-		jimmctl import-model <controller name> <model-uuid>
+		jimmctl update-migrated-model <controller name> <model-uuid>
 `
 
-// NewImportModelCommand returns a command to import a model.
-func NewImportModelCommand() cmd.Command {
-	cmd := &importModelCommand{
+// NewUpdateMigratedModelCommand returns a command to update the controller
+// running a model.
+func NewUpdateMigratedModelCommand() cmd.Command {
+	cmd := &updateMigratedModelCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-// importModelCommand imports a model.
-type importModelCommand struct {
+// updateMigratedModelCommand updates the controller running a model.
+type updateMigratedModelCommand struct {
 	modelcmd.ControllerCommandBase
 	store    jujuclient.ClientStore
 	dialOpts *jujuapi.DialOpts
 
-	req apiparams.ImportModelRequest
+	req apiparams.UpdateMigratedModelRequest
 }
 
 // Info implements the cmd.Command interface.
-func (c *importModelCommand) Info() *cmd.Info {
+func (c *updateMigratedModelCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "import-model",
+		Name:    "update-migrated-model",
 		Args:    "<controller name> <model uuid>",
-		Purpose: "Import a model to jimm",
-		Doc:     importModelCommandDoc,
+		Purpose: "Update the controller running a model.",
+		Doc:     updateMigratedModelCommandDoc,
 	})
 }
 
 // Init implements the cmd.Command interface.
-func (c *importModelCommand) Init(args []string) error {
+func (c *updateMigratedModelCommand) Init(args []string) error {
 	switch len(args) {
 	case 0:
 		return errors.E("controller not specified")
@@ -62,7 +64,7 @@ func (c *importModelCommand) Init(args []string) error {
 	case 2:
 	}
 
-	c.req.Controller = args[0]
+	c.req.TargetController = args[0]
 	if !names.IsValidModel(args[1]) {
 		return errors.E("invalid model uuid")
 	}
@@ -71,7 +73,7 @@ func (c *importModelCommand) Init(args []string) error {
 }
 
 // Run implements Command.Run.
-func (c *importModelCommand) Run(ctxt *cmd.Context) error {
+func (c *updateMigratedModelCommand) Run(ctxt *cmd.Context) error {
 	currentController, err := c.store.CurrentController()
 	if err != nil {
 		return errors.E(err, "could not determine controller")
@@ -83,7 +85,7 @@ func (c *importModelCommand) Run(ctxt *cmd.Context) error {
 	}
 
 	client := api.NewClient(apiCaller)
-	if err := client.ImportModel(&c.req); err != nil {
+	if err := client.UpdateMigratedModel(&c.req); err != nil {
 		return errors.E(err)
 	}
 	return nil
