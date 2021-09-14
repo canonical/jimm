@@ -40,6 +40,7 @@ type importModelCommand struct {
 	req apiparams.ImportModelRequest
 }
 
+// Info implements the cmd.Command interface.
 func (c *importModelCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:    "import-model",

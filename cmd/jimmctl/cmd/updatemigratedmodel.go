@@ -42,6 +42,7 @@ type updateMigratedModelCommand struct {
 	req apiparams.UpdateMigratedModelRequest
 }
 
+// Info implements the cmd.Command interface.
 func (c *updateMigratedModelCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:    "update-migrated-model",
