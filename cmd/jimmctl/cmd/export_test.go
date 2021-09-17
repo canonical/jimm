@@ -137,3 +137,15 @@ func NewUpdateMigratedModelCommandForTesting(store jujuclient.ClientStore, bClie
 
 	return modelcmd.WrapBase(cmd)
 }
+
+func NewImportCloudCredentialsCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+	cmd := &importCloudCredentialsCommand{
+		store: store,
+		dialOpts: &jujuapi.DialOpts{
+			InsecureSkipVerify: true,
+			BakeryClient:       bClient,
+		},
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
