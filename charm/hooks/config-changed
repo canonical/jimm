@@ -32,10 +32,14 @@ def config_changed():
         "metering-location",
     ]
 
+    admins = [admin.strip() for admin in config['controller-admins'].split(",")]
     app_config = {
         'api-addr': ':{}'.format(HTTP_LISTEN_PORT),
-        'controller-admins': [admin.strip() for admin in config['controller-admins'].split(",")]
+        'controller-admins': admins,
     }
+    if len(admins) > 0:
+        app_config['state-server-admin'] = admins[0]
+
     if config['agent-private-key'] and config['agent-public-key']:
         app_config['agent-key'] = {
             'private': config['agent-private-key'].strip(),
