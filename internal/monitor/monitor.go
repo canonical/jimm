@@ -199,21 +199,29 @@ func (m *allMonitor) startMonitors(ctx context.Context) error {
 
 		go func() {
 			strategy := retry.Regular{
-				Delay: time.Second,
+				Delay: 10 * time.Minute,
 			}
 			for a := strategy.Start(nil); a.Next(); {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
 				cleanup, err := m.jem.WatchAllModelSummaries(ctx, ctl.Path)
-				if err != nil {
-					if errgo.Cause(err) == jem.ModelSummaryWatcherNotSupportedError {
-						zapctx.Warn(ctx, "model summary watcher not supported", zaputil.Error(err))
-					} else {
-						zapctx.Error(ctx, "failed to start model summary watcher", zaputil.Error(err))
-					}
-				} else {
+				if err == nil {
 					m.mu.Lock()
 					defer m.mu.Unlock()
 					m.cleanups = append(m.cleanups, cleanup)
 					return
+				}
+
+				if errgo.Cause(err) == jem.ModelSummaryWatcherNotSupportedError {
+					// TODO (ashipika) should we quit retrying if the model
+					// summary watcher is not supported or keep retrying and
+					// hope the controller gets updated at some point in the future?
+					zapctx.Warn(ctx, "model summary watcher not supported", zaputil.Error(err))
+				} else {
+					zapctx.Error(ctx, "failed to start model summary watcher", zaputil.Error(err))
 				}
 			}
 		}()

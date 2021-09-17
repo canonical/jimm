@@ -45,6 +45,7 @@ func (r *controllerRoot) ModelSummaryWatcherStop(ctx context.Context, objID stri
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
+
 	return w.Stop()
 }
 
@@ -55,6 +56,19 @@ var (
 type watcherRegistry struct {
 	mu       sync.RWMutex
 	watchers map[string]*modelSummaryWatcher
+}
+
+func (r *watcherRegistry) stop() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for _, w := range r.watchers {
+		err := w.Stop()
+		if err != nil {
+			zapctx.Error(context.Background(), "failed to stop a model summary watcher", zaputil.Error(err))
+		}
+	}
+	r.watchers = nil
 }
 
 func (r *watcherRegistry) register(w *modelSummaryWatcher) {
@@ -82,7 +96,9 @@ func (r *watcherRegistry) get(id string) (*modelSummaryWatcher, error) {
 	return w, nil
 }
 
-func newModelSummaryWatcher(ctx context.Context, id string, root *controllerRoot, pubsub *pubsub.Hub) (*modelSummaryWatcher, error) {
+func newModelSummaryWatcher(id string, root *controllerRoot, pubsub *pubsub.Hub) (*modelSummaryWatcher, error) {
+	ctx, cancelContext := context.WithCancel(context.Background())
+
 	accessWatcher := &modelAccessWatcher{
 		ctx:             ctx,
 		modelGetterFunc: root.allModels,
@@ -102,9 +118,13 @@ func newModelSummaryWatcher(ctx context.Context, id string, root *controllerRoot
 
 	cleanupFunction, err := pubsub.SubscribeMatch(accessWatcher.match, watcher.pubsubHandler)
 	if err != nil {
+		cancelContext()
 		return nil, errgo.Mask(err)
 	}
-	watcher.cleanup = cleanupFunction
+	watcher.cleanup = func() {
+		cancelContext()
+		cleanupFunction()
+	}
 
 	return watcher, nil
 }
@@ -154,7 +174,9 @@ func (w *modelSummaryWatcher) Next() (jujuparams.SummaryWatcherNextResults, erro
 }
 
 func (w *modelSummaryWatcher) Stop() error {
-	w.cleanup()
+	if w.cleanup != nil {
+		w.cleanup()
+	}
 	return nil
 }
 
