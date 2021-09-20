@@ -134,7 +134,7 @@ func (r *controllerRoot) WatchModelSummaries(ctx context.Context) (jujuparams.Su
 
 	id := fmt.Sprintf("%v", r.generator.Next())
 
-	watcher, err := newModelSummaryWatcher(ctx, id, r, r.jem.Pubsub())
+	watcher, err := newModelSummaryWatcher(id, r, r.jem.Pubsub())
 	if err != nil {
 		return jujuparams.SummaryWatcherID{}, errgo.Mask(err)
 	}

@@ -89,6 +89,12 @@ func (r *controllerRoot) modelWithConnection(ctx context.Context, modelTag strin
 	return errgo.Mask(f(ctx, conn, &model), errgo.Any)
 }
 
+// Kill implements rpc.Root.
+func (r *controllerRoot) Kill() {
+	r.Root.Kill()
+	r.watchers.stop()
+}
+
 // FindMethod implements rpcreflect.MethodFinder.
 func (r *controllerRoot) FindMethod(rootName string, version int, methodName string) (rpcreflect.MethodCaller, error) {
 	// update the heart monitor for every request received.
