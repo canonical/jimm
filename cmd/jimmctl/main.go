@@ -26,6 +26,7 @@ func NewSuperCommand() *jujucmd.SuperCommand {
 	jimmcmd.Register(cmd.NewAddControllerCommand())
 	jimmcmd.Register(cmd.NewControllerInfoCommand())
 	jimmcmd.Register(cmd.NewGrantAuditLogAccessCommand())
+	jimmcmd.Register(cmd.NewImportCloudCredentialsCommand())
 	jimmcmd.Register(cmd.NewImportModelCommand())
 	jimmcmd.Register(cmd.NewListAuditEventsCommand())
 	jimmcmd.Register(cmd.NewListControllersCommand())
