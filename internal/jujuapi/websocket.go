@@ -38,13 +38,23 @@ type root interface {
 
 // An apiServer is a jimmhttp.WSServer that serves the controller API.
 type apiServer struct {
-	jimm   *jimm.JIMM
-	params Params
+	jimm    *jimm.JIMM
+	cleanup func()
+	params  Params
 }
 
 // ServeWS implements jimmhttp.WSServer.
 func (s apiServer) ServeWS(_ context.Context, conn *websocket.Conn) {
-	serveRoot(context.Background(), newControllerRoot(s.jimm, s.params), conn)
+	controllerRoot := newControllerRoot(s.jimm, s.params)
+	s.cleanup = controllerRoot.cleanup
+	serveRoot(context.Background(), controllerRoot, conn)
+}
+
+// Kill implements the rpc.Killer interface.
+func (s *apiServer) Kill() {
+	if s.cleanup != nil {
+		s.cleanup()
+	}
 }
 
 type modelAPIServer struct {

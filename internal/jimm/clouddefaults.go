@@ -7,7 +7,6 @@ import (
 
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
-	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
@@ -146,7 +145,7 @@ func (j *JIMM) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.User, cl
 		}
 	}
 	if err != nil {
-		return jujuparams.ModelDefaultsResult{}, errgo.Mask(err)
+		return jujuparams.ModelDefaultsResult{}, errors.E(op, err)
 	}
 	return result, nil
 }

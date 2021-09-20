@@ -321,6 +321,11 @@ func (w *Watcher) watchAllModelSummaries(ctx context.Context, ctl *dbmodel.Contr
 	}
 
 	for {
+		select {
+		case <-ctx.Done():
+			return errors.E(op, ctx.Err(), "context cancelled")
+		default:
+		}
 		// wait for updates from the all model summary watcher.
 		modelSummaries, err := api.ModelSummaryWatcherNext(ctx, id)
 		if err != nil {

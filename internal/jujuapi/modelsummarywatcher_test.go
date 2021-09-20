@@ -20,6 +20,7 @@ var _ = gc.Suite(&modelSummaryWatcherSuite{})
 
 func (s *modelSummaryWatcherSuite) TestModelSummaryWatcher(c *gc.C) {
 	watcher := jujuapi.NewModelSummaryWatcher()
+	defer watcher.Stop()
 
 	result, err := watcher.Next()
 	c.Assert(err, jc.ErrorIsNil)

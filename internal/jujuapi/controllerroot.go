@@ -32,12 +32,13 @@ type controllerRoot struct {
 }
 
 func newControllerRoot(j *jimm.JIMM, p Params) *controllerRoot {
+	watcherRegistry := &watcherRegistry{
+		watchers: make(map[string]*modelSummaryWatcher),
+	}
 	r := &controllerRoot{
-		params: p,
-		jimm:   j,
-		watchers: &watcherRegistry{
-			watchers: make(map[string]*modelSummaryWatcher),
-		},
+		params:                p,
+		jimm:                  j,
+		watchers:              watcherRegistry,
 		pingF:                 func() {},
 		controllerUUIDMasking: true,
 	}
@@ -91,4 +92,9 @@ func parseUserTag(tag string) (names.UserTag, error) {
 // setPingF configures the function to call when an ping is received.
 func (r *controllerRoot) setPingF(f func()) {
 	r.pingF = f
+}
+
+// cleanup releases all resources used by the controllerRoot.
+func (r *controllerRoot) cleanup() {
+	r.watchers.stop()
 }
