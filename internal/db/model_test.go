@@ -566,19 +566,19 @@ func (s *dbSuite) TestUpdateUserModelAccess(c *qt.C) {
 	c.Check(m.Users, jimmtest.DBObjectEquals, []dbmodel.UserModelAccess{{
 		User: dbmodel.User{
 			Username:         "alice@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		Access: "admin",
 	}, {
 		User: dbmodel.User{
 			Username:         "bob@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		Access: "write",
 	}, {
 		User: dbmodel.User{
 			Username:         "charlie@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		Access: "read",
 	}})
@@ -592,19 +592,19 @@ func (s *dbSuite) TestUpdateUserModelAccess(c *qt.C) {
 	c.Check(m.Users, jimmtest.DBObjectEquals, []dbmodel.UserModelAccess{{
 		User: dbmodel.User{
 			Username:         "alice@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		Access: "admin",
 	}, {
 		User: dbmodel.User{
 			Username:         "bob@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		Access: "read",
 	}, {
 		User: dbmodel.User{
 			Username:         "charlie@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		Access: "read",
 	}})
@@ -618,13 +618,13 @@ func (s *dbSuite) TestUpdateUserModelAccess(c *qt.C) {
 	c.Check(m.Users, jimmtest.DBObjectEquals, []dbmodel.UserModelAccess{{
 		User: dbmodel.User{
 			Username:         "alice@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		Access: "admin",
 	}, {
 		User: dbmodel.User{
 			Username:         "charlie@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		Access: "read",
 	}})

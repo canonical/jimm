@@ -2263,7 +2263,7 @@ func TestUpdateOffer(t *testing.T) {
 				Username: "eve@external",
 				User: dbmodel.User{
 					Username:         "eve@external",
-					ControllerAccess: "add-model",
+					ControllerAccess: "login",
 				},
 				ApplicationOfferID: 1,
 				Access:             "admin",
@@ -2271,7 +2271,7 @@ func TestUpdateOffer(t *testing.T) {
 				Username: "bob@external",
 				User: dbmodel.User{
 					Username:         "bob@external",
-					ControllerAccess: "add-model",
+					ControllerAccess: "login",
 				},
 				ApplicationOfferID: 1,
 				Access:             "consume",
@@ -2279,7 +2279,7 @@ func TestUpdateOffer(t *testing.T) {
 				Username: "fred@external",
 				User: dbmodel.User{
 					Username:         "fred@external",
-					ControllerAccess: "add-model",
+					ControllerAccess: "login",
 				},
 				ApplicationOfferID: 1,
 				Access:             "read",
@@ -2431,7 +2431,7 @@ func TestFindApplicationOffers(t *testing.T) {
 			Username: "eve@external",
 			User: dbmodel.User{
 				Username:         "eve@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			ApplicationOfferID: 1,
 			Access:             "admin",
@@ -2439,7 +2439,7 @@ func TestFindApplicationOffers(t *testing.T) {
 			Username: "bob@external",
 			User: dbmodel.User{
 				Username:         "bob@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			ApplicationOfferID: 1,
 			Access:             "consume",
@@ -2447,7 +2447,7 @@ func TestFindApplicationOffers(t *testing.T) {
 			Username: "fred@external",
 			User: dbmodel.User{
 				Username:         "fred@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			ApplicationOfferID: 1,
 			Access:             "read",

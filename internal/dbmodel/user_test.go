@@ -30,7 +30,7 @@ func TestUser(t *testing.T) {
 	result = db.Create(&u1)
 	c.Assert(result.Error, qt.IsNil)
 	c.Check(result.RowsAffected, qt.Equals, int64(1))
-	c.Check(u1.ControllerAccess, qt.Equals, "add-model")
+	c.Check(u1.ControllerAccess, qt.Equals, "login")
 
 	var u2 dbmodel.User
 	result = db.Where("username = ?", "bob@external").First(&u2)

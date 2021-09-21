@@ -369,7 +369,7 @@ func (s *dbSuite) TestUpdateUserCloudAccess(c *qt.C) {
 		Username: "alice@external",
 		User: dbmodel.User{
 			Username:         "alice@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		CloudName: "test-hosted",
 		Access:    "admin",
@@ -377,7 +377,7 @@ func (s *dbSuite) TestUpdateUserCloudAccess(c *qt.C) {
 		Username: "bob@external",
 		User: dbmodel.User{
 			Username:         "bob@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		CloudName: "test-hosted",
 		Access:    "add-model",
@@ -385,7 +385,7 @@ func (s *dbSuite) TestUpdateUserCloudAccess(c *qt.C) {
 		Username: "charlie@external",
 		User: dbmodel.User{
 			Username:         "charlie@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		CloudName: "test-hosted",
 		Access:    "add-model",
@@ -401,7 +401,7 @@ func (s *dbSuite) TestUpdateUserCloudAccess(c *qt.C) {
 		Username: "alice@external",
 		User: dbmodel.User{
 			Username:         "alice@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		CloudName: "test-hosted",
 		Access:    "admin",
@@ -409,7 +409,7 @@ func (s *dbSuite) TestUpdateUserCloudAccess(c *qt.C) {
 		Username: "bob@external",
 		User: dbmodel.User{
 			Username:         "bob@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		CloudName: "test-hosted",
 		Access:    "admin",
@@ -417,7 +417,7 @@ func (s *dbSuite) TestUpdateUserCloudAccess(c *qt.C) {
 		Username: "charlie@external",
 		User: dbmodel.User{
 			Username:         "charlie@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		CloudName: "test-hosted",
 		Access:    "add-model",
@@ -433,7 +433,7 @@ func (s *dbSuite) TestUpdateUserCloudAccess(c *qt.C) {
 		Username: "alice@external",
 		User: dbmodel.User{
 			Username:         "alice@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		CloudName: "test-hosted",
 		Access:    "admin",
@@ -441,7 +441,7 @@ func (s *dbSuite) TestUpdateUserCloudAccess(c *qt.C) {
 		Username: "charlie@external",
 		User: dbmodel.User{
 			Username:         "charlie@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		CloudName: "test-hosted",
 		Access:    "add-model",
