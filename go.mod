@@ -24,7 +24,7 @@ require (
 	github.com/juju/cmd/v3 v3.0.0-20210809234809-65029dab4cd0
 	github.com/juju/errors v0.0.0-20200330140219-3fe23663418f
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
-	github.com/juju/juju v0.0.0-20210824095606-86d7f5193303
+	github.com/juju/juju v0.0.0-20210910064014-ca9e03c060c1
 	github.com/juju/loggo v0.0.0-20210728185423-eebad3a902c4
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
 	github.com/juju/names/v4 v4.0.0-20200929085019-be23e191fee0
