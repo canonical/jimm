@@ -88,7 +88,7 @@ CREATE TABLE users (
 	display_name TEXT NOT NULL,
 	last_login TIMESTAMP WITH TIME ZONE,
 	disabled BOOLEAN,
-	controller_access TEXT NOT NULL DEFAULT 'add-model',
+	controller_access TEXT NOT NULL DEFAULT 'login',
 	audit_log_access TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX idx_users_deleted_at ON users (deleted_at);

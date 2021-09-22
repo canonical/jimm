@@ -209,7 +209,7 @@ const modifyControllerAccessEnv = `users:
 - username: bob@external
   controller-access: superuser
 - username: eve@external
-  controller-access: add-model
+  controller-access: login
 - username: fred@external
   controller-access: login
 - username: george@external
@@ -235,17 +235,11 @@ func TestGrantControllerAccess(t *testing.T) {
 		accessLevel:         "superuser",
 		expectedAccessLevel: "superuser",
 	}, {
-		about:               "grant add-model access",
-		user:                "alice@external",
-		accessUser:          "george@external",
-		accessLevel:         "add-model",
-		expectedAccessLevel: "add-model",
-	}, {
-		about:               "grant login access - users have add-model by default",
+		about:               "grant login access - users have login by default",
 		user:                "alice@external",
 		accessUser:          "george@external",
 		accessLevel:         "login",
-		expectedAccessLevel: "add-model",
+		expectedAccessLevel: "login",
 	}, {
 		about:         "invalid access level",
 		user:          "alice@external",
@@ -309,12 +303,6 @@ func TestRevokeControllerAccess(t *testing.T) {
 		user:                "alice@external",
 		accessUser:          "bob@external",
 		accessLevel:         "superuser",
-		expectedAccessLevel: "add-model",
-	}, {
-		about:               "revoke add-model access",
-		user:                "alice@external",
-		accessUser:          "bob@external",
-		accessLevel:         "add-model",
 		expectedAccessLevel: "login",
 	}, {
 		about:               "revoke login access",
@@ -374,7 +362,7 @@ users:
   controller-access: superuser
 - username: bob@external
   display-name: Bob
-  controller-access: add-model
+  controller-access: login
 clouds:
 - name: test-cloud
   type: test
@@ -634,7 +622,7 @@ func TestImportModel(t *testing.T) {
 				User: dbmodel.User{
 					Username:         "bob@external",
 					DisplayName:      "Bob",
-					ControllerAccess: "add-model",
+					ControllerAccess: "login",
 				},
 				Access: "read",
 			}},
@@ -785,7 +773,7 @@ users:
 - username: alice@external
   controller-access: superuser
 - username: eve@external
-  controller-access: add-model
+  controller-access: login
 - username: fred@external
   controller-access: login
 `
@@ -951,7 +939,7 @@ users:
   controller-access: superuser
 - username: bob@external
   display-name: Bob
-  controller-access: add-model
+  controller-access: login
 clouds:
 - name: test-cloud
   type: test
@@ -1084,4 +1072,51 @@ func TestUpdateMigratedModel(t *testing.T) {
 			}
 		})
 	}
+}
+
+const testGetControllerAccessEnv = `
+users:
+- username: alice@external
+  display-name: Alice
+  controller-access: superuser
+- username: bob@external
+  display-name: Bob
+  controller-access: login
+`
+
+func TestGetControllerAccess(t *testing.T) {
+	c := qt.New(t)
+
+	j := &jimm.JIMM{
+		Database: db.Database{
+			DB: jimmtest.MemoryDB(c, nil),
+		},
+	}
+	ctx := context.Background()
+	err := j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	env := jimmtest.ParseEnvironment(c, testGetControllerAccessEnv)
+	env.PopulateDB(c, j.Database)
+	user := env.User("alice@external").DBObject(c, j.Database)
+
+	access, err := j.GetControllerAccess(ctx, &user, names.NewUserTag("alice@external"))
+	c.Assert(err, qt.IsNil)
+	c.Check(access, qt.Equals, "superuser")
+
+	access, err = j.GetControllerAccess(ctx, &user, names.NewUserTag("bob@external"))
+	c.Assert(err, qt.IsNil)
+	c.Check(access, qt.Equals, "login")
+
+	access, err = j.GetControllerAccess(ctx, &user, names.NewUserTag("charlie@external"))
+	c.Assert(err, qt.IsNil)
+	c.Check(access, qt.Equals, "login")
+
+	user = env.User("bob@external").DBObject(c, j.Database)
+	access, err = j.GetControllerAccess(ctx, &user, names.NewUserTag("bob@external"))
+	c.Assert(err, qt.IsNil)
+	c.Check(access, qt.Equals, "login")
+
+	_, err = j.GetControllerAccess(ctx, &user, names.NewUserTag("alice@external"))
+	c.Assert(err, qt.ErrorMatches, "unauthorized")
 }

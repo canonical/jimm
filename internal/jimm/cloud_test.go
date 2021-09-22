@@ -97,7 +97,7 @@ func TestGetCloud(t *testing.T) {
 					UpdatedAt: now,
 				},
 				Username:         "alice@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			CloudName: "test-cloud-1",
 			Access:    "admin",
@@ -115,7 +115,7 @@ func TestGetCloud(t *testing.T) {
 					UpdatedAt: now,
 				},
 				Username:         "bob@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			CloudName: "test-cloud-1",
 			Access:    "add-model",
@@ -159,7 +159,7 @@ func TestGetCloud(t *testing.T) {
 					UpdatedAt: now,
 				},
 				Username:         "alice@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			CloudName: "test-cloud-1",
 			Access:    "admin",
@@ -177,7 +177,7 @@ func TestGetCloud(t *testing.T) {
 					UpdatedAt: now,
 				},
 				Username:         "bob@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			CloudName: "test-cloud-1",
 			Access:    "add-model",
@@ -292,7 +292,7 @@ func TestForEachCloud(t *testing.T) {
 					UpdatedAt: now,
 				},
 				Username:         "alice@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			CloudName: "test-cloud-1",
 			Access:    "admin",
@@ -310,7 +310,7 @@ func TestForEachCloud(t *testing.T) {
 					UpdatedAt: now,
 				},
 				Username:         "bob@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			CloudName: "test-cloud-1",
 			Access:    "add-model",
@@ -436,7 +436,7 @@ func TestForEachCloud(t *testing.T) {
 					UpdatedAt: now,
 				},
 				Username:         "alice@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			CloudName: "test-cloud-1",
 			Access:    "admin",
@@ -454,7 +454,7 @@ func TestForEachCloud(t *testing.T) {
 					UpdatedAt: now,
 				},
 				Username:         "bob@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			CloudName: "test-cloud-1",
 			Access:    "add-model",
@@ -479,7 +479,7 @@ func TestForEachCloud(t *testing.T) {
 					UpdatedAt: now,
 				},
 				Username:         "bob@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			CloudName: "test-cloud-2",
 			Access:    "add-model",
@@ -497,7 +497,7 @@ func TestForEachCloud(t *testing.T) {
 					UpdatedAt: now,
 				},
 				Username:         auth.Everyone,
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			CloudName: "test-cloud-2",
 			Access:    "add-model",
@@ -522,7 +522,7 @@ func TestForEachCloud(t *testing.T) {
 					UpdatedAt: now,
 				},
 				Username:         auth.Everyone,
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			CloudName: "test-cloud-3",
 			Access:    "add-model",
@@ -569,8 +569,6 @@ users:
 - username: alice@external
   controller-access: superuser
 - username: bob@external
-  controller-access: add-model
-- username: charlie@external
   controller-access: login
 `
 
@@ -648,26 +646,12 @@ var addHostedCloudTests = []struct {
 			Username: "bob@external",
 			User: dbmodel.User{
 				Username:         "bob@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			CloudName: "new-cloud",
 			Access:    "admin",
 		}},
 	},
-}, {
-	name:      "UserWithoutAccess",
-	username:  "charlie@external",
-	cloudName: "new-cloud",
-	cloud: jujuparams.Cloud{
-		Type:             "kubernetes",
-		HostCloudRegion:  "test-provider/test-region",
-		AuthTypes:        []string{"empty", "userpass"},
-		Endpoint:         "https://example.com",
-		IdentityEndpoint: "https://example.com/identity",
-		StorageEndpoint:  "https://example.com/storage",
-	},
-	expectError:     `unauthorized`,
-	expectErrorCode: errors.CodeUnauthorized,
 }, {
 	name:      "CloudWithReservedName",
 	username:  "bob@external",
@@ -932,7 +916,7 @@ var grantCloudAccessTests = []struct {
 			Username: "alice@external",
 			User: dbmodel.User{
 				Username:         "alice@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			CloudName: "test",
 			Access:    "admin",
@@ -940,7 +924,7 @@ var grantCloudAccessTests = []struct {
 			Username: "bob@external",
 			User: dbmodel.User{
 				Username:         "bob@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			CloudName: "test",
 			Access:    "add-model",
@@ -1113,7 +1097,7 @@ var revokeCloudAccessTests = []struct {
 			Username: "alice@external",
 			User: dbmodel.User{
 				Username:         "alice@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			CloudName: "test",
 			Access:    "admin",
@@ -1121,7 +1105,7 @@ var revokeCloudAccessTests = []struct {
 			Username: "bob@external",
 			User: dbmodel.User{
 				Username:         "bob@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			CloudName: "test",
 			Access:    "add-model",
@@ -1129,7 +1113,7 @@ var revokeCloudAccessTests = []struct {
 			Username: "charlie@external",
 			User: dbmodel.User{
 				Username:         "charlie@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			CloudName: "test",
 			Access:    "add-model",
@@ -1174,7 +1158,7 @@ var revokeCloudAccessTests = []struct {
 			Username: "alice@external",
 			User: dbmodel.User{
 				Username:         "alice@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			CloudName: "test",
 			Access:    "admin",
@@ -1182,7 +1166,7 @@ var revokeCloudAccessTests = []struct {
 			Username: "charlie@external",
 			User: dbmodel.User{
 				Username:         "charlie@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			CloudName: "test",
 			Access:    "add-model",
@@ -1559,7 +1543,7 @@ var updateCloudTests = []struct {
 			Username: "bob@external",
 			User: dbmodel.User{
 				Username:         "bob@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			CloudName: "test",
 			Access:    "admin",

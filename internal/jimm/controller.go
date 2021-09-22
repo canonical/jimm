@@ -238,9 +238,6 @@ const (
 	// loginAccess allows a user to log-ing into the subject.
 	loginAccess controllerAccessLevel = "login"
 
-	// addModelAccess allows user to add new models in subjects supporting it.
-	addModelAccess controllerAccessLevel = "add-model"
-
 	// superuserAccess allows user unrestricted permissions in the subject.
 	superuserAccess controllerAccessLevel = "superuser"
 )
@@ -248,7 +245,7 @@ const (
 // validate returns error if the current is not a valid access level.
 func (a controllerAccessLevel) validate() error {
 	switch a {
-	case noAccess, loginAccess, addModelAccess, superuserAccess:
+	case noAccess, loginAccess, superuserAccess:
 		return nil
 	}
 	return errors.E(fmt.Sprintf("invalid access level %q", a))
@@ -260,10 +257,8 @@ func (a controllerAccessLevel) value() int {
 		return 0
 	case loginAccess:
 		return 1
-	case addModelAccess:
-		return 2
 	case superuserAccess:
-		return 3
+		return 2
 	default:
 		return -1
 	}
@@ -350,10 +345,8 @@ func (j *JIMM) RevokeControllerAccess(ctx context.Context, u *dbmodel.User, acce
 	userAccess := noAccess
 	switch controllerAccessLevel(accessLevel) {
 	case loginAccess:
-	case addModelAccess:
-		userAccess = loginAccess
 	case superuserAccess:
-		userAccess = addModelAccess
+		userAccess = loginAccess
 	}
 
 	user := dbmodel.User{
@@ -369,6 +362,27 @@ func (j *JIMM) RevokeControllerAccess(ctx context.Context, u *dbmodel.User, acce
 		return errors.E(op, err)
 	}
 	return nil
+}
+
+// GetControllerAccess returns the JIMM controller access level for the
+// requested user.
+func (j *JIMM) GetControllerAccess(ctx context.Context, user *dbmodel.User, tag names.UserTag) (string, error) {
+	const op = errors.Op("jimm.GetControllerAccess")
+
+	if user.Username == tag.Id() {
+		return user.ControllerAccess, nil
+	}
+
+	if user.ControllerAccess != "superuser" {
+		return "", errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	var u dbmodel.User
+	u.SetTag(tag)
+	if err := j.Database.GetUser(ctx, &u); err != nil {
+		return "", errors.E(op, err)
+	}
+	return u.ControllerAccess, nil
 }
 
 // ImportModel imports model with the specified uuid from the controller.

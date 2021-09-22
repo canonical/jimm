@@ -91,7 +91,7 @@ func TestAuthenticator(t *testing.T) {
 
 	c.Check(conn.ControllerTag(), qt.Equals, names.NewControllerTag("6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11"))
 	c.Check(conn.AuthTag(), qt.Equals, names.NewUserTag("bob@external"))
-	c.Check(conn.ControllerAccess(), qt.Equals, "add-model")
+	c.Check(conn.ControllerAccess(), qt.Equals, "login")
 }
 
 func TestVault(t *testing.T) {
