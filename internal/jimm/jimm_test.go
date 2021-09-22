@@ -183,7 +183,7 @@ users:
 - username: alice@external
   controller-access: superuser
 - username: bob@external
-  controller-access: add-model
+  controller-access: login
 - username: eve@external
   controller-access: "no-access"
 `
@@ -262,7 +262,7 @@ users:
 - username: alice@external
   controller-access: superuser
 - username: bob@external
-  controller-access: add-model
+  controller-access: login
 - username: eve@external
   controller-access: "no-access"
 `
@@ -340,7 +340,7 @@ users:
 - username: alice@external
   controller-access: superuser
 - username: bob@external
-  controller-access: add-model
+  controller-access: login
 - username: eve@external
   controller-access: "no-access"
 controllers:
@@ -495,7 +495,7 @@ users:
 - username: alice@external
   controller-access: superuser
 - username: bob@external
-  controller-access: add-model
+  controller-access: login
 - username: eve@external
   controller-access: "no-access"
 controllers:

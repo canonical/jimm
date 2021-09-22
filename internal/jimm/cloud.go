@@ -204,7 +204,7 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, u *dbmodel.User, tag names.Cl
 		return err
 	}
 
-	if u.ControllerAccess != "add-model" && u.ControllerAccess != "superuser" {
+	if u.ControllerAccess != "login" && u.ControllerAccess != "superuser" {
 		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
 	}
 

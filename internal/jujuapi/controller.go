@@ -22,6 +22,7 @@ func init() {
 		configSetMethod := rpc.Method(r.ConfigSet)
 		controllerConfigMethod := rpc.Method(r.ControllerConfig)
 		controllerVersionMethod := rpc.Method(r.ControllerVersion)
+		getControllerAccessMethod := rpc.Method(r.GetControllerAccess)
 		identityProviderURLMethod := rpc.Method(r.IdentityProviderURL)
 		modelConfigMethod := rpc.Method(r.ModelConfig)
 		modelStatusMethod := rpc.Method(r.ModelStatus)
@@ -30,23 +31,27 @@ func init() {
 
 		r.AddMethod("Controller", 3, "AllModels", allModelsMethod)
 		r.AddMethod("Controller", 3, "ControllerConfig", controllerConfigMethod)
+		r.AddMethod("Controller", 3, "GetControllerAccess", getControllerAccessMethod)
 		r.AddMethod("Controller", 3, "ModelConfig", modelConfigMethod)
 		r.AddMethod("Controller", 3, "ModelStatus", modelStatusMethod)
 
 		r.AddMethod("Controller", 4, "AllModels", allModelsMethod)
 		r.AddMethod("Controller", 4, "ControllerConfig", controllerConfigMethod)
+		r.AddMethod("Controller", 4, "GetControllerAccess", getControllerAccessMethod)
 		r.AddMethod("Controller", 4, "ModelConfig", modelConfigMethod)
 		r.AddMethod("Controller", 4, "ModelStatus", modelStatusMethod)
 
 		r.AddMethod("Controller", 5, "AllModels", allModelsMethod)
 		r.AddMethod("Controller", 5, "ConfigSet", configSetMethod)
 		r.AddMethod("Controller", 5, "ControllerConfig", controllerConfigMethod)
+		r.AddMethod("Controller", 5, "GetControllerAccess", getControllerAccessMethod)
 		r.AddMethod("Controller", 5, "ModelConfig", modelConfigMethod)
 		r.AddMethod("Controller", 5, "ModelStatus", modelStatusMethod)
 
 		r.AddMethod("Controller", 6, "AllModels", allModelsMethod)
 		r.AddMethod("Controller", 6, "ConfigSet", configSetMethod)
 		r.AddMethod("Controller", 6, "ControllerConfig", controllerConfigMethod)
+		r.AddMethod("Controller", 6, "GetControllerAccess", getControllerAccessMethod)
 		r.AddMethod("Controller", 6, "ModelConfig", modelConfigMethod)
 		r.AddMethod("Controller", 6, "ModelStatus", modelStatusMethod)
 		r.AddMethod("Controller", 6, "MongoVersion", mongoVersionMethod)
@@ -54,6 +59,7 @@ func init() {
 		r.AddMethod("Controller", 7, "AllModels", allModelsMethod)
 		r.AddMethod("Controller", 7, "ConfigSet", configSetMethod)
 		r.AddMethod("Controller", 7, "ControllerConfig", controllerConfigMethod)
+		r.AddMethod("Controller", 7, "GetControllerAccess", getControllerAccessMethod)
 		r.AddMethod("Controller", 7, "IdentityProviderURL", identityProviderURLMethod)
 		r.AddMethod("Controller", 7, "ModelConfig", modelConfigMethod)
 		r.AddMethod("Controller", 7, "ModelStatus", modelStatusMethod)
@@ -63,6 +69,7 @@ func init() {
 		r.AddMethod("Controller", 8, "ConfigSet", configSetMethod)
 		r.AddMethod("Controller", 8, "ControllerConfig", controllerConfigMethod)
 		r.AddMethod("Controller", 8, "ControllerVersion", controllerVersionMethod)
+		r.AddMethod("Controller", 8, "GetControllerAccess", getControllerAccessMethod)
 		r.AddMethod("Controller", 8, "IdentityProviderURL", identityProviderURLMethod)
 		r.AddMethod("Controller", 8, "ModelConfig", modelConfigMethod)
 		r.AddMethod("Controller", 8, "ModelStatus", modelStatusMethod)
@@ -72,6 +79,7 @@ func init() {
 		r.AddMethod("Controller", 9, "ConfigSet", configSetMethod)
 		r.AddMethod("Controller", 9, "ControllerConfig", controllerConfigMethod)
 		r.AddMethod("Controller", 9, "ControllerVersion", controllerVersionMethod)
+		r.AddMethod("Controller", 9, "GetControllerAccess", getControllerAccessMethod)
 		r.AddMethod("Controller", 9, "IdentityProviderURL", identityProviderURLMethod)
 		r.AddMethod("Controller", 9, "ModelConfig", modelConfigMethod)
 		r.AddMethod("Controller", 9, "ModelStatus", modelStatusMethod)
@@ -223,4 +231,32 @@ func (r *controllerRoot) ControllerConfig(ctx context.Context) (jujuparams.Contr
 // access to the controller.
 func (r *controllerRoot) ModelConfig() (jujuparams.ModelConfigResults, error) {
 	return jujuparams.ModelConfigResults{}, errors.E(errors.CodeUnauthorized, "permission denied")
+}
+
+// GetControllerAccess returns the access level on the controller for
+// users.
+func (r *controllerRoot) GetControllerAccess(ctx context.Context, args jujuparams.Entities) (jujuparams.UserAccessResults, error) {
+	const op = errors.Op("jujuapi.GetControllerAccess")
+
+	results := make([]jujuparams.UserAccessResult, len(args.Entities))
+	for i, arg := range args.Entities {
+		tag, err := names.ParseUserTag(arg.Tag)
+		if err != nil {
+			results[i].Error = mapError(errors.E(op, err, errors.CodeBadRequest))
+			continue
+		}
+		access, err := r.jimm.GetControllerAccess(ctx, r.user, tag)
+		if err != nil {
+			results[i].Error = mapError(errors.E(op, err))
+			continue
+		}
+		results[i].Result = &jujuparams.UserAccess{
+			UserTag: tag.String(),
+			Access:  access,
+		}
+	}
+
+	return jujuparams.UserAccessResults{
+		Results: results,
+	}, nil
 }

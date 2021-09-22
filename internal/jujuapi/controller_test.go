@@ -173,6 +173,31 @@ func (s *controllerSuite) TestControllerVersion(c *gc.C) {
 	})
 }
 
+func (s *controllerSuite) TestControllerAccess(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := controllerapi.NewClient(conn)
+	access, err := client.GetControllerAccess("alice@external")
+	c.Assert(err, gc.Equals, nil)
+	c.Check(string(access), gc.Equals, "superuser")
+
+	access, err = client.GetControllerAccess("bob@external")
+	c.Assert(err, gc.Equals, nil)
+	c.Check(string(access), gc.Equals, "login")
+
+	conn = s.open(c, nil, "bob")
+	defer conn.Close()
+
+	client = controllerapi.NewClient(conn)
+	access, err = client.GetControllerAccess("bob@external")
+	c.Assert(err, gc.Equals, nil)
+	c.Check(string(access), gc.Equals, "login")
+
+	_, err = client.GetControllerAccess("alice@external")
+	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+}
+
 type watcherSuite struct {
 	websocketSuite
 }

@@ -240,7 +240,7 @@ machines:
 		},
 		Owner: dbmodel.User{
 			Username:         "alice@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -290,7 +290,7 @@ machines:
 		Users: []dbmodel.UserModelAccess{{
 			User: dbmodel.User{
 				Username:         "alice@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			Access: "admin",
 		}},
@@ -371,7 +371,7 @@ machines:
 		},
 		Owner: dbmodel.User{
 			Username:         "alice@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -421,7 +421,7 @@ machines:
 		Users: []dbmodel.UserModelAccess{{
 			User: dbmodel.User{
 				Username:         "alice@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			Access: "admin",
 		}},
@@ -460,7 +460,7 @@ users:
 - username: alice@external
   controller-access: superuser
 - username: bob@external
-  controller-access: add-model
+  controller-access: login
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
@@ -507,7 +507,7 @@ machines:
 		},
 		Owner: dbmodel.User{
 			Username:         "bob@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-2",
@@ -594,9 +594,9 @@ controllers:
     priority: 2
 users:
 - username: alice@external
-  controller-access: add-model
+  controller-access: login
 - username: bob@external
-  controller-access: add-model
+  controller-access: login
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
@@ -1760,7 +1760,7 @@ var grantModelAccessTests = []struct {
 		},
 		Owner: dbmodel.User{
 			Username:         "alice@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-1",
@@ -1781,19 +1781,19 @@ var grantModelAccessTests = []struct {
 		Users: []dbmodel.UserModelAccess{{
 			User: dbmodel.User{
 				Username:         "alice@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			Access: "admin",
 		}, {
 			User: dbmodel.User{
 				Username:         "charlie@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			Access: "write",
 		}, {
 			User: dbmodel.User{
 				Username:         "bob@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			Access: "write",
 		}},
@@ -1956,7 +1956,7 @@ var revokeModelAccessTests = []struct {
 		},
 		Owner: dbmodel.User{
 			Username:         "alice@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-1",
@@ -1977,19 +1977,19 @@ var revokeModelAccessTests = []struct {
 		Users: []dbmodel.UserModelAccess{{
 			User: dbmodel.User{
 				Username:         "alice@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			Access: "admin",
 		}, {
 			User: dbmodel.User{
 				Username:         "bob@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			Access: "write",
 		}, {
 			User: dbmodel.User{
 				Username:         "charlie@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			Access: "write",
 		}},
@@ -2021,7 +2021,7 @@ var revokeModelAccessTests = []struct {
 		},
 		Owner: dbmodel.User{
 			Username:         "alice@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-1",
@@ -2042,19 +2042,19 @@ var revokeModelAccessTests = []struct {
 		Users: []dbmodel.UserModelAccess{{
 			User: dbmodel.User{
 				Username:         "alice@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			Access: "admin",
 		}, {
 			User: dbmodel.User{
 				Username:         "bob@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			Access: "read",
 		}, {
 			User: dbmodel.User{
 				Username:         "charlie@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			Access: "write",
 		}},
@@ -2086,7 +2086,7 @@ var revokeModelAccessTests = []struct {
 		},
 		Owner: dbmodel.User{
 			Username:         "alice@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-1",
@@ -2107,13 +2107,13 @@ var revokeModelAccessTests = []struct {
 		Users: []dbmodel.UserModelAccess{{
 			User: dbmodel.User{
 				Username:         "alice@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			Access: "admin",
 		}, {
 			User: dbmodel.User{
 				Username:         "charlie@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			Access: "write",
 		}},
@@ -2145,7 +2145,7 @@ var revokeModelAccessTests = []struct {
 		},
 		Owner: dbmodel.User{
 			Username:         "alice@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-1",
@@ -2166,13 +2166,13 @@ var revokeModelAccessTests = []struct {
 		Users: []dbmodel.UserModelAccess{{
 			User: dbmodel.User{
 				Username:         "alice@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			Access: "admin",
 		}, {
 			User: dbmodel.User{
 				Username:         "bob@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			Access: "admin",
 		}},
@@ -2816,7 +2816,7 @@ var updateModelCredentialTests = []struct {
 		},
 		Owner: dbmodel.User{
 			Username:         "alice@external",
-			ControllerAccess: "add-model",
+			ControllerAccess: "login",
 		},
 		Controller: dbmodel.Controller{
 			Name:        "controller-1",
@@ -2837,13 +2837,13 @@ var updateModelCredentialTests = []struct {
 		Users: []dbmodel.UserModelAccess{{
 			User: dbmodel.User{
 				Username:         "alice@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			Access: "admin",
 		}, {
 			User: dbmodel.User{
 				Username:         "charlie@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			Access: "write",
 		}},

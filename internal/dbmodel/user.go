@@ -34,7 +34,7 @@ type User struct {
 
 	// ControllerAccess is the access level this user has on the JIMM
 	// controller. By default all users have "add-model" access.
-	ControllerAccess string `gorm:"not null;default:'add-model'"`
+	ControllerAccess string `gorm:"not null;default:'login'"`
 
 	// AuditLogAccess is the access level this user has on the JIMM audit
 	// log.

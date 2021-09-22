@@ -64,7 +64,7 @@ func TestAuthenticate(t *testing.T) {
 		Model:            u.Model,
 		Username:         "bob@external",
 		DisplayName:      "Bob",
-		ControllerAccess: "add-model",
+		ControllerAccess: "login",
 		LastLogin: sql.NullTime{
 			Time:  now,
 			Valid: true,

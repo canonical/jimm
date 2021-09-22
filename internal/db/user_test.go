@@ -45,7 +45,7 @@ func (s *dbSuite) TestGetUser(c *qt.C) {
 	}
 	err = s.Database.GetUser(ctx, &u)
 	c.Assert(err, qt.IsNil)
-	c.Check(u.ControllerAccess, qt.Equals, "add-model")
+	c.Check(u.ControllerAccess, qt.Equals, "login")
 
 	u2 := dbmodel.User{
 		Username: u.Username,
@@ -82,7 +82,7 @@ func (s *dbSuite) TestUpdateUser(c *qt.C) {
 	}
 	err = s.Database.GetUser(ctx, &u)
 	c.Assert(err, qt.IsNil)
-	c.Check(u.ControllerAccess, qt.Equals, "add-model")
+	c.Check(u.ControllerAccess, qt.Equals, "login")
 
 	u.ControllerAccess = "superuser"
 	u.Models = []dbmodel.UserModelAccess{{
@@ -306,7 +306,7 @@ models:
 			},
 			Owner: dbmodel.User{
 				Username:         "alice@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			Controller: dbmodel.Controller{
 				Name:        "test",
@@ -327,13 +327,13 @@ models:
 			Users: []dbmodel.UserModelAccess{{
 				User: dbmodel.User{
 					Username:         "alice@external",
-					ControllerAccess: "add-model",
+					ControllerAccess: "login",
 				},
 				Access: "admin",
 			}, {
 				User: dbmodel.User{
 					Username:         "bob@external",
-					ControllerAccess: "add-model",
+					ControllerAccess: "login",
 				},
 				Access: "write",
 			}},
@@ -348,7 +348,7 @@ models:
 			},
 			Owner: dbmodel.User{
 				Username:         "alice@external",
-				ControllerAccess: "add-model",
+				ControllerAccess: "login",
 			},
 			Controller: dbmodel.Controller{
 				Name:        "test",
@@ -369,13 +369,13 @@ models:
 			Users: []dbmodel.UserModelAccess{{
 				User: dbmodel.User{
 					Username:         "alice@external",
-					ControllerAccess: "add-model",
+					ControllerAccess: "login",
 				},
 				Access: "admin",
 			}, {
 				User: dbmodel.User{
 					Username:         "bob@external",
-					ControllerAccess: "add-model",
+					ControllerAccess: "login",
 				},
 				Access: "read",
 			}},
