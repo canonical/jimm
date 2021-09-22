@@ -4,16 +4,18 @@
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
+import io
 import ipaddress
 import json
 import os
 import pathlib
 import shutil
 import socket
+import tarfile
 import tempfile
 from threading import Thread
 import unittest
-from unittest.mock import MagicMock, Mock, call
+from unittest.mock import MagicMock, Mock, call, patch
 
 from charm import JimmCharm
 import hvac
@@ -28,20 +30,42 @@ class TestCharm(unittest.TestCase):
         self.harness.begin()
         self.harness.charm._snap = Mock()
         self.harness.charm._systemctl = Mock()
+        self.chownmock = patch("os.chown").start()
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
+        self.harness.charm._dashboard_path = self.tempdir.name + "/dashboard"
         shutil.copytree(os.path.join(self.harness.charm.charm_dir, "templates"),
                         os.path.join(self.tempdir.name, "templates"))
         self.harness.charm.framework.charm_dir = pathlib.Path(self.tempdir.name)
 
+    def dashboard_tarfile(self):
+        dashboard_archive = io.BytesIO()
+
+        data = bytes('Hello world', 'utf-8')
+        f = io.BytesIO(initial_bytes=data)
+        with tarfile.open(fileobj=dashboard_archive, mode='w:bz2') as tar:
+            info = tarfile.TarInfo('README.md')
+            info.size = len(data)
+            tar.addfile(info, f)
+            tar.close()
+
+        dashboard_archive.flush()
+        dashboard_archive.seek(0)
+        data = dashboard_archive.read()
+        return data
+
     def test_install(self):
         service_file = os.path.join(self.harness.charm.charm_dir, 'jimm.service')
         self.harness.add_resource("jimm-snap", "Test data")
+        self.harness.add_resource("dashboard", self.dashboard_tarfile())
         self.harness.charm.on.install.emit()
         self.assertTrue(os.path.exists(service_file))
         self.assertEqual(self.harness.charm._snap.call_args.args[0], "install")
         self.assertEqual(self.harness.charm._snap.call_args.args[1], "--dangerous")
         self.assertTrue(str(self.harness.charm._snap.call_args.args[2]).endswith("jimm.snap"))
+        self.chownmock.assert_has_calls([
+            call(self.tempdir.name + '/dashboard.new/README.md', 0, 0)
+        ])
 
     def test_start(self):
         self.harness.charm.on.start.emit()
@@ -63,11 +87,15 @@ class TestCharm(unittest.TestCase):
     def test_upgrade_charm(self):
         service_file = os.path.join(self.harness.charm.charm_dir, 'jimm.service')
         self.harness.add_resource("jimm-snap", "Test data")
+        self.harness.add_resource("dashboard", self.dashboard_tarfile())
         self.harness.charm.on.upgrade_charm.emit()
         self.assertTrue(os.path.exists(service_file))
         self.assertEqual(self.harness.charm._snap.call_args.args[0], 'install')
         self.assertEqual(self.harness.charm._snap.call_args.args[1], '--dangerous')
         self.assertTrue(str(self.harness.charm._snap.call_args.args[2]).endswith("jimm.snap"))
+        self.chownmock.assert_has_calls([
+            call(self.tempdir.name + '/dashboard.new/README.md', 0, 0)
+        ])
 
     def test_upgrade_charm_ready(self):
         service_file = os.path.join(self.harness.charm.charm_dir, 'jimm.service')
@@ -88,6 +116,7 @@ class TestCharm(unittest.TestCase):
 
     def test_config_changed(self):
         config_file = os.path.join(self.harness.charm.charm_dir, 'jimm.env')
+        os.mkdir(self.tempdir.name + "/dashboard")
         self.harness.update_config({
             "candid-url": "https://candid.example.com",
             "controller-admins": "user1 user2 group1",
@@ -97,14 +126,17 @@ class TestCharm(unittest.TestCase):
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 4)
+        self.assertEqual(len(lines), 6)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
         self.assertEqual(lines[3].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
+        self.assertEqual(lines[5].strip(),
+                         "JIMM_DASHBOARD_LOCATION=" + self.tempdir.name + "/dashboard")
 
     def test_config_changed_ready(self):
         config_file = os.path.join(self.harness.charm.charm_dir, 'jimm.env')
+        os.mkdir(self.tempdir.name + "/dashboard")
         with open(self.harness.charm._env_filename("db"), "wt") as f:
             f.write("test")
         self.harness.update_config({
@@ -116,11 +148,13 @@ class TestCharm(unittest.TestCase):
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 4)
+        self.assertEqual(len(lines), 6)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
         self.assertEqual(lines[3].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
+        self.assertEqual(lines[5].strip(),
+                         "JIMM_DASHBOARD_LOCATION=" + self.tempdir.name + "/dashboard")
 
     def test_config_changed_with_agent(self):
         config_file = os.path.join(self.harness.charm.charm_dir, 'jimm.env')
@@ -281,12 +315,12 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(data, {"data": {"role_id": "test-role-id", "secret_id": "test-secret"}})
         with open(self.harness.charm._env_filename("vault")) as f:
             lines = f.readlines()
-        self.assertEquals(lines[0].strip(), "VAULT_ADDR=http://vault:8200")
-        self.assertEquals(lines[1].strip(), "VAULT_PATH=charm-jimm-creds")
-        self.assertEquals(
+        self.assertEqual(lines[0].strip(), "VAULT_ADDR=http://vault:8200")
+        self.assertEqual(lines[1].strip(), "VAULT_PATH=charm-jimm-creds")
+        self.assertEqual(
             lines[2].strip(),
             "VAULT_SECRET_FILE={}".format(self.harness.charm._vault_secret_filename))
-        self.assertEquals(lines[3].strip(), "VAULT_AUTH_PATH=/auth/approle/login")
+        self.assertEqual(lines[3].strip(), "VAULT_AUTH_PATH=/auth/approle/login")
 
     def test_stop(self):
         self.harness.charm.on.stop.emit()

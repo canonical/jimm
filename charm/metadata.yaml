@@ -25,3 +25,7 @@ resources:
     type: file
     filename: jimm.snap
     description: Snap containing the JIMM server.
+  dashboard:
+    type: file
+    filename: dashboard.tar.bz2
+    description: "Tarball containing the Juju Dashboard."
