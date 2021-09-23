@@ -3,61 +3,111 @@
 package jimmtest
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
-	"sync"
+	"strings"
 	"testing"
 
-	vault "github.com/hashicorp/vault/api"
+	"github.com/hashicorp/vault/api"
+
+	"github.com/CanonicalLtd/jimm/internal/errors"
 )
+
+const VaultAuthPath = "/auth/approle/login"
 
 const vaultRootToken = "jimmtest-vault-root-token"
 
-var vaultOnce sync.Once
 var vaultCmd *exec.Cmd
-var vaultErr error
+var vaultRootClient *api.Client
 
-var vaultApproleOnce sync.Once
-
-// VaultClient returns a new vault client for use in a test. If there is an
-// error starting a dev vault server a log will be written to the given TB
-// and ok will be false. The started vault server will listen on the
-// address specified in VAULT_DEV_LISTEN_ADDRESS if there is one. The path
-// will be unique for each test.
-func VaultClient(tb testing.TB) (client *vault.Client, path string, ok bool) {
-	vaultOnce.Do(func() {
-		vaultCmd = exec.Command("vault", "server", "-dev", "-dev-no-store-token", "-dev-root-token-id="+vaultRootToken)
-		vaultErr = vaultCmd.Start()
-	})
-	if vaultErr != nil {
-		tb.Logf("error starting vault: %s", vaultErr)
-		return nil, "", false
+// StartVault starts and initialises a vault service.
+func StartVault() error {
+	if vaultCmd != nil {
+		return errors.E("vault already started")
 	}
-
-	cfg := vault.DefaultConfig()
+	vaultCmd = exec.Command("vault", "server", "-dev", "-dev-no-store-token", "-dev-root-token-id="+vaultRootToken)
+	if err := vaultCmd.Start(); err != nil {
+		return err
+	}
+	cfg := api.DefaultConfig()
 	if addr := os.Getenv("VAULT_DEV_LISTEN_ADDRESS"); addr != "" {
 		cfg.Address = "http://" + addr
 	} else {
 		cfg.Address = "http://127.0.0.1:8200"
 	}
-	client, err := vault.NewClient(cfg)
+	var err error
+	vaultRootClient, err = api.NewClient(cfg)
 	if err != nil {
-		tb.Logf("error creating vault client: %s", err)
-		return nil, "", false
+		return err
 	}
-	client.SetToken(vaultRootToken)
-
-	if err := client.Sys().Mount("/"+tb.Name(), &vault.MountInput{Type: "kv"}); err != nil {
-		tb.Logf("error configuring vault: %s", err)
-		return nil, "", false
+	vaultRootClient.SetToken(vaultRootToken)
+	err = vaultRootClient.Sys().EnableAuthWithOptions("approle", &api.EnableAuthOptions{
+		Type: "approle",
+	})
+	if err != nil {
+		return err
 	}
-
-	return client, tb.Name(), true
+	err = vaultRootClient.Sys().Mount("/kv", &api.MountInput{
+		Type: "kv",
+		Config: api.MountConfigInput{
+			Options: map[string]string{
+				"version": "1",
+			},
+		},
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-// VaultStop stops any running vault server. VaultStop must only be called
+const policyTemplate = `
+path "kv/%s/*" {
+    capabilities = ["create", "read", "update", "delete"]
+}
+`
+
+// VaultClient returns a new vault client for use in a test.
+func VaultClient(tb testing.TB) (client *api.Client, path string, creds map[string]interface{}, ok bool) {
+	if vaultRootClient == nil {
+		return nil, "", nil, false
+	}
+	name := strings.ReplaceAll(tb.Name(), "/", "_")
+	err := vaultRootClient.Sys().PutPolicy(name, fmt.Sprintf(policyTemplate, name))
+	if err != nil {
+		tb.Fatalf("error initialising policy: %s", err)
+	}
+	_, err = vaultRootClient.Logical().Write("/auth/approle/role/"+name, map[string]interface{}{
+		"token_ttl":      "30s",
+		"token_max_ttl":  "60s",
+		"token_policies": name,
+	})
+	if err != nil {
+		tb.Fatalf("error initialising approle: %s", err)
+	}
+	s, err := vaultRootClient.Logical().Read("/auth/approle/role/" + name + "/role-id")
+	if err != nil {
+		tb.Fatalf("error initialising approle: %s", err)
+	}
+	creds = make(map[string]interface{})
+	creds["role_id"] = s.Data["role_id"]
+	s, err = vaultRootClient.Logical().Write("/auth/approle/role/"+name+"/secret-id", nil)
+	if err != nil {
+		tb.Fatalf("error initialising approle: %s", err)
+	}
+	creds["secret_id"] = s.Data["secret_id"]
+	client, err = vaultRootClient.Clone()
+	if err != nil {
+		tb.Fatalf("error creating client: %s", err)
+	}
+	client.ClearToken()
+	return client, "/kv/" + name, creds, true
+}
+
+// StopVault stops any running vault server. VaultStop must only be called
 // once any tests that might be using the vault server have finished.
-func VaultStop() {
+func StopVault() {
 	if vaultCmd == nil {
 		return
 	}

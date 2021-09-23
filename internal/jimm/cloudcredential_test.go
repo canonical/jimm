@@ -1543,15 +1543,13 @@ func TestGetCloudCredentialAttributes(t *testing.T) {
 	}
 }
 
-func TestCloudCredentialVault(t *testing.T) {
-	vaultClient, vaultPath, ok := jimmtest.VaultClient(t)
-	if !ok {
-		t.Skip("vault not available")
-	}
-
+func TestCloudCredentialAttributeStore(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
+	attrStore := testCloudCredentialAttributeStore{
+		attrs: make(map[string]map[string]string),
+	}
 	j := &jimm.JIMM{
 		Database: db.Database{
 			DB: jimmtest.MemoryDB(c, nil),
@@ -1559,8 +1557,7 @@ func TestCloudCredentialVault(t *testing.T) {
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{},
 		},
-		VaultClient: vaultClient,
-		VaultPath:   vaultPath,
+		CloudCredentialAttributeStore: attrStore,
 	}
 	err := j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -1620,4 +1617,17 @@ func TestCloudCredentialVault(t *testing.T) {
 	attr, _, err = j.GetCloudCredentialAttributes(ctx, &u, &cred, true)
 	c.Assert(err, qt.IsNil)
 	c.Check(attr, qt.DeepEquals, args.Credential.Attributes)
+}
+
+type testCloudCredentialAttributeStore struct {
+	attrs map[string]map[string]string
+}
+
+func (s testCloudCredentialAttributeStore) Get(_ context.Context, tag names.CloudCredentialTag) (map[string]string, error) {
+	return s.attrs[tag.String()], nil
+}
+
+func (s testCloudCredentialAttributeStore) Put(_ context.Context, tag names.CloudCredentialTag, attr map[string]string) error {
+	s.attrs[tag.String()] = attr
+	return nil
 }
