@@ -780,6 +780,42 @@ func TestUpdateCloudCredential(t *testing.T) {
 	}
 }
 
+func TestUpdateCloudCredentialForUnknownUser(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	env := jimmtest.ParseEnvironment(c, `clouds:
+- name: test-cloud
+  type: `+jimmtest.TestProviderType+`
+  regions:
+  - name: default
+users:
+- username: alice@external
+  controller-access: superuser
+`)
+	j := &jimm.JIMM{
+		Database: db.Database{
+			DB: jimmtest.MemoryDB(c, nil),
+		},
+		Dialer: &jimmtest.Dialer{
+			API: &jimmtest.API{},
+		},
+	}
+
+	err := j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+	env.PopulateDB(c, j.Database)
+	u := env.User("alice@external").DBObject(c, j.Database)
+
+	_, err = j.UpdateCloudCredential(ctx, &u, jimm.UpdateCloudCredentialArgs{
+		CredentialTag: names.NewCloudCredentialTag("test-cloud/bob@external/test"),
+		Credential: jujuparams.CloudCredential{
+			AuthType: "empty",
+		},
+	})
+	c.Assert(err, qt.IsNil)
+}
+
 func TestRevokeCloudCredential(t *testing.T) {
 	c := qt.New(t)
 
