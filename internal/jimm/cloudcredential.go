@@ -169,8 +169,16 @@ func (j *JIMM) UpdateCloudCredential(ctx context.Context, u *dbmodel.User, args 
 		return result, err
 	}
 
-	if u.ControllerAccess != "superuser" && u.Username != args.CredentialTag.Owner().Id() {
-		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
+	if u.Tag() != args.CredentialTag.Owner() {
+		if u.ControllerAccess != "superuser" {
+			return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
+		}
+		// ensure the user we are adding the credential for exists.
+		var u2 dbmodel.User
+		u2.SetTag(args.CredentialTag.Owner())
+		if err := j.Database.GetUser(ctx, &u2); err != nil {
+			return fail(errors.E(op, err))
+		}
 	}
 
 	var credential dbmodel.CloudCredential
