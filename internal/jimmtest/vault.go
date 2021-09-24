@@ -14,6 +14,8 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/errors"
 )
 
+// VaultAuthPath contains the path that is configured automatically to
+// allow authentication.
 const VaultAuthPath = "/auth/approle/login"
 
 const vaultRootToken = "jimmtest-vault-root-token"
