@@ -427,8 +427,6 @@ func (r *controllerRoot) SetModelDefaults(ctx context.Context, args jujuparams.S
 
 // UnsetModelDefaults removes the specified default model settings.
 func (r *controllerRoot) UnsetModelDefaults(ctx context.Context, args jujuparams.UnsetModelDefaults) (jujuparams.ErrorResults, error) {
-	const op = errors.Op("jujuapi.ModelDefaultsForClouds")
-
 	results := make([]jujuparams.ErrorResult, len(args.Keys))
 	for i, key := range args.Keys {
 		cloudTag, err := names.ParseCloudTag(key.CloudTag)

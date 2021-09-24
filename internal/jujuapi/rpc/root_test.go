@@ -19,10 +19,9 @@ import (
 
 func TestRPC(t *testing.T) {
 	c := qt.New(t)
-	defer c.Done()
 
 	cl, srv := pipe()
-	c.Defer(func() {
+	c.Cleanup(func() {
 		if err := cl.Close(); err != nil {
 			c.Logf("error closing RPC connection: %s", err)
 		}
@@ -57,10 +56,9 @@ func TestRPC(t *testing.T) {
 
 func TestKill(t *testing.T) {
 	c := qt.New(t)
-	defer c.Done()
 
 	cl, srv := pipe()
-	c.Defer(func() {
+	c.Cleanup(func() {
 		if err := cl.Close(); err != nil {
 			c.Logf("error closing RPC connection: %s", err)
 		}

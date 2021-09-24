@@ -185,6 +185,7 @@ func TestGetCloud(t *testing.T) {
 	})
 
 	cld, err = j.GetCloud(ctx, charlie, names.NewCloudTag("test-cloud-2"))
+	c.Assert(err, qt.IsNil)
 	c.Check(cld, qt.DeepEquals, dbmodel.Cloud{
 		ID:        2,
 		CreatedAt: now,

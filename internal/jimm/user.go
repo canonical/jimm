@@ -54,6 +54,9 @@ func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (
 		pu.LastLogin.Valid = true
 		return tx.UpdateUser(ctx, &pu)
 	})
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
 	return u, nil
 }
 

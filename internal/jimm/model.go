@@ -395,7 +395,7 @@ func (b *modelBuilder) selectCloudCredentials() error {
 	}
 	for _, credential := range credentials {
 		// skip any credentials known to be invalid.
-		if credential.Valid.Valid && credential.Valid.Bool == false {
+		if credential.Valid.Valid && !credential.Valid.Bool {
 			continue
 		}
 		b.credential = &credential

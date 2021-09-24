@@ -48,7 +48,7 @@ func (c *setControllerDeprecatedCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:    "set-controller-deprecated",
 		Purpose: "Sets controller deprecated status.",
-		Doc:     grantAuditLogAccessDoc,
+		Doc:     setControllerDeprecatedDoc,
 	})
 }
 

@@ -563,6 +563,7 @@ func (s *dbSuite) TestUpdateUserModelAccess(c *qt.C) {
 	})
 	c.Assert(err, qt.Equals, nil)
 	err = s.Database.GetModel(ctx, &m)
+	c.Assert(err, qt.IsNil)
 	c.Check(m.Users, jimmtest.DBObjectEquals, []dbmodel.UserModelAccess{{
 		User: dbmodel.User{
 			Username:         "alice@external",
@@ -589,6 +590,7 @@ func (s *dbSuite) TestUpdateUserModelAccess(c *qt.C) {
 	err = s.Database.UpdateUserModelAccess(ctx, &uma)
 	c.Assert(err, qt.Equals, nil)
 	err = s.Database.GetModel(ctx, &m)
+	c.Assert(err, qt.IsNil)
 	c.Check(m.Users, jimmtest.DBObjectEquals, []dbmodel.UserModelAccess{{
 		User: dbmodel.User{
 			Username:         "alice@external",
@@ -615,6 +617,7 @@ func (s *dbSuite) TestUpdateUserModelAccess(c *qt.C) {
 	err = s.Database.UpdateUserModelAccess(ctx, &uma)
 	c.Assert(err, qt.Equals, nil)
 	err = s.Database.GetModel(ctx, &m)
+	c.Assert(err, qt.IsNil)
 	c.Check(m.Users, jimmtest.DBObjectEquals, []dbmodel.UserModelAccess{{
 		User: dbmodel.User{
 			Username:         "alice@external",

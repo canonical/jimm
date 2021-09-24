@@ -152,7 +152,7 @@ func (w *Watcher) checkControllerModels(ctx context.Context, ctl *dbmodel.Contro
 	err := w.Database.ForEachControllerModel(ctx, ctl, func(m *dbmodel.Model) error {
 		// models without a UUID are currently being initialised
 		// and we don't want to check for those yet.
-		if m.UUID.Valid == false {
+		if !m.UUID.Valid {
 			return nil
 		}
 
@@ -354,8 +354,6 @@ func (w *Watcher) watchAllModelSummaries(ctx context.Context, ctl *dbmodel.Contr
 }
 
 func (w *Watcher) handleDelta(ctx context.Context, modelIDf func(string) uint, d jujuparams.Delta) error {
-	const op = errors.Op("watcher.handleDelta")
-
 	eid := d.Entity.EntityId()
 	modelID := modelIDf(eid.ModelUUID)
 	if modelID == 0 {

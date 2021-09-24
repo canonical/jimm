@@ -176,7 +176,7 @@ func cloudUsers(ctx context.Context, api API, tag names.CloudTag) ([]dbmodel.Use
 	}
 	var users []dbmodel.UserCloudAccess
 	for _, u := range ci.Users {
-		if strings.Index(u.UserName, "@") < 0 {
+		if !strings.Contains(u.UserName, "@") {
 			// If the username doesn't contain an "@" the user is local
 			// to the controller and we don't want to propagate it.
 			continue
@@ -588,7 +588,7 @@ func (j *JIMM) GetControllerConfig(ctx context.Context, u *dbmodel.User) (*dbmod
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return &config, nil
 		}
-		return nil, err
+		return nil, errors.E(op, err)
 	}
 	return &config, nil
 }

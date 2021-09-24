@@ -840,7 +840,7 @@ func TestSetControllerConfig(t *testing.T) {
 			err := j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
-			env := jimmtest.ParseEnvironment(c, testImportModelEnv)
+			env := jimmtest.ParseEnvironment(c, testControllerConfigEnv)
 			env.PopulateDB(c, j.Database)
 
 			user := env.User(test.user).DBObject(c, j.Database)

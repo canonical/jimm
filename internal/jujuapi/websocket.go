@@ -58,8 +58,7 @@ func (s *apiServer) Kill() {
 }
 
 type modelAPIServer struct {
-	jimm   *jimm.JIMM
-	params Params
+	jimm *jimm.JIMM
 }
 
 // ServeWS implements jimmhttp.WSServer.

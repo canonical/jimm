@@ -51,6 +51,7 @@ func TestDebugStatus(t *testing.T) {
 
 	var v map[string]map[string]interface{}
 	err = json.Unmarshal(buf, &v)
+	c.Assert(err, qt.IsNil)
 	c.Check(v["start_time"]["Name"], qt.Equals, debugapi.ServerStartTime.Name())
 	c.Check(v["start_time"]["Value"], qt.Equals, startTime.(time.Time).Format(time.RFC3339Nano))
 	c.Check(v["start_time"]["Passed"], qt.Equals, true)
@@ -76,6 +77,7 @@ func TestDebugStatusStatusError(t *testing.T) {
 
 	var v map[string]map[string]interface{}
 	err = json.Unmarshal(buf, &v)
+	c.Assert(err, qt.IsNil)
 	c.Check(v["test"]["Name"], qt.Equals, "Test")
 	c.Check(v["test"]["Value"], qt.Equals, "test error")
 	c.Check(v["test"]["Passed"], qt.Equals, false)

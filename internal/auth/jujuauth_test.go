@@ -169,7 +169,7 @@ func TestAuthenticateLoginInvalidUsernameDeclared(t *testing.T) {
 	client := httpbakery.NewClient()
 	ms, err := client.DischargeAll(ctx, aerr.LoginResult.BakeryDischargeRequired)
 	c.Assert(err, qt.IsNil)
-	u, err = authenticator.Authenticate(ctx, &jujuparams.LoginRequest{Macaroons: []macaroon.Slice{ms}})
+	_, err = authenticator.Authenticate(ctx, &jujuparams.LoginRequest{Macaroons: []macaroon.Slice{ms}})
 	c.Assert(err, qt.ErrorMatches, `authenticated identity "A" cannot be used as juju username`)
 }
 

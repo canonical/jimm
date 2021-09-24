@@ -605,7 +605,7 @@ func TestFullModelStatus(t *testing.T) {
 			err := j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
-			env := jimmtest.ParseEnvironment(c, removeControllerTestEnv)
+			env := jimmtest.ParseEnvironment(c, fullModelStatusTestEnv)
 			env.PopulateDB(c, j.Database)
 
 			u := env.User(test.user).DBObject(c, j.Database)

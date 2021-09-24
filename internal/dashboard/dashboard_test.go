@@ -59,7 +59,7 @@ func TestDashboardRedirect(t *testing.T) {
 func TestDashboardFromPath(t *testing.T) {
 	c := qt.New(t)
 
-	dir := c.Mkdir()
+	dir := c.TempDir()
 	err := os.WriteFile(filepath.Join(dir, "config.js.go"), []byte(configFile), 0444)
 	c.Assert(err, qt.Equals, nil)
 	err = os.WriteFile(filepath.Join(dir, "index.html"), []byte(indexFile), 0444)
@@ -123,7 +123,7 @@ func TestInvalidLocation(t *testing.T) {
 func TestLocationNotDirectory(t *testing.T) {
 	c := qt.New(t)
 
-	dir := c.Mkdir()
+	dir := c.TempDir()
 	err := os.WriteFile(filepath.Join(dir, "test"), []byte(testFile), 0444)
 	c.Assert(err, qt.Equals, nil)
 
@@ -139,7 +139,7 @@ func TestLocationNotDirectory(t *testing.T) {
 func TestNoTemplate(t *testing.T) {
 	c := qt.New(t)
 
-	dir := c.Mkdir()
+	dir := c.TempDir()
 	err := os.WriteFile(filepath.Join(dir, "config.js"), []byte(testFile), 0444)
 	c.Assert(err, qt.Equals, nil)
 
