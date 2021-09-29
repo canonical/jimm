@@ -48,6 +48,7 @@ func StartVault() error {
 		Type: "approle",
 	})
 	if err != nil {
+		vaultRootClient = nil
 		return err
 	}
 	err = vaultRootClient.Sys().Mount("/kv", &api.MountInput{
@@ -59,6 +60,7 @@ func StartVault() error {
 		},
 	})
 	if err != nil {
+		vaultRootClient = nil
 		return err
 	}
 	return nil

@@ -5,6 +5,7 @@ package jimm_test
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -28,7 +29,10 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	jimmtest.StartVault()
+	err := jimmtest.StartVault()
+	if err != nil {
+		log.Printf("error starting vault: %s\n", err)
+	}
 	code := m.Run()
 	jimmtest.StopVault()
 	os.Exit(code)
