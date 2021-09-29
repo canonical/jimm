@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
-	vault "github.com/hashicorp/vault/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
@@ -43,12 +42,10 @@ type JIMM struct {
 	// this is not configured all connection attempts will fail.
 	Dialer Dialer
 
-	// VaultClient is the client for a vault server that is used to store
-	// secrets.
-	VaultClient *vault.Client
-
-	// VaultPath is the root path in the vault for JIMM's secrets.
-	VaultPath string
+	// CloudCredentialAttributeStore is a store for the attributes of a
+	// cloud credential. If this is not configured then the attributes
+	// are stored in the standard database.
+	CloudCredentialAttributeStore CloudCredentialAttributeStore
 
 	// Pubsub is a pub-sub hub used for buffering model summaries.
 	Pubsub *pubsub.Hub
@@ -417,4 +414,14 @@ func (j *JIMM) FullModelStatus(ctx context.Context, user *dbmodel.User, modelTag
 	}
 
 	return status, nil
+}
+
+// A CloudCredentialAttributeStore is a store for the attributes of a
+// CloudCredential.
+type CloudCredentialAttributeStore interface {
+	// Get retrieves the stored attributes of a cloud credential.
+	Get(context.Context, names.CloudCredentialTag) (map[string]string, error)
+
+	// Put stores the attributes of a cloud credential.
+	Put(context.Context, names.CloudCredentialTag, map[string]string) error
 }

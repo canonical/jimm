@@ -5,7 +5,7 @@ package jimm_test
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -25,11 +25,16 @@ import (
 
 	"github.com/CanonicalLtd/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
+	"github.com/CanonicalLtd/jimm/internal/vault"
 )
 
 func TestMain(m *testing.M) {
+	err := jimmtest.StartVault()
+	if err != nil {
+		log.Printf("error starting vault: %s\n", err)
+	}
 	code := m.Run()
-	jimmtest.VaultStop()
+	jimmtest.StopVault()
 	os.Exit(code)
 }
 
@@ -101,15 +106,9 @@ func TestVault(t *testing.T) {
 		ControllerUUID: "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
 	}
 	candid := startCandid(c, &p)
-	vaultClient := startVault(c, &p)
+	vaultClient, creds := startVault(c, &p)
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	c.Cleanup(cancel)
-	go func() {
-		c.Check(svc.WatchVaultToken(ctx), qt.Equals, context.Canceled)
-	}()
 
 	srv := httptest.NewTLSServer(svc)
 	c.Cleanup(srv.Close)
@@ -138,10 +137,15 @@ func TestVault(t *testing.T) {
 	}, false)
 	c.Assert(err, qt.IsNil)
 
-	s, err := vaultClient.Logical().Read(c.Name() + "/creds/" + jimmtest.TestCloudName + "/bob@external/test-1")
+	store := vault.VaultCloudCredentialAttributeStore{
+		Client:     vaultClient,
+		AuthSecret: creds,
+		AuthPath:   p.VaultAuthPath,
+		KVPath:     p.VaultPath,
+	}
+	attr, err := store.Get(context.Background(), names.NewCloudCredentialTag(jimmtest.TestCloudName+"/bob@external/test-1"))
 	c.Assert(err, qt.IsNil)
-	c.Assert(s, qt.Not(qt.IsNil))
-	c.Check(s.Data, qt.DeepEquals, map[string]interface{}{
+	c.Check(attr, qt.DeepEquals, map[string]string{
 		"username": "test-user",
 		"password": "test-secret",
 	})
@@ -194,49 +198,22 @@ func key(candid *candidtest.Server, user string) *bakery.KeyPair {
 	}
 }
 
-var policyTemplate = `
-path "%s/*" {
-  capabilities = ["create", "read", "update", "delete", "list"]
-}
-`[1:]
-
-func startVault(c *qt.C, p *jimm.Params) *vaultapi.Client {
-	client, path, ok := jimmtest.VaultClient(c)
+func startVault(c *qt.C, p *jimm.Params) (*vaultapi.Client, map[string]interface{}) {
+	client, path, creds, ok := jimmtest.VaultClient(c)
 	if !ok {
 		c.Skip("vault not available")
 	}
 	p.VaultAddress = client.Address()
 	p.VaultPath = path
 
-	auths, err := client.Sys().ListAuth()
-	c.Assert(err, qt.IsNil)
-	if _, ok := auths["approle"]; !ok {
-		err := client.Sys().EnableAuthWithOptions("approle", &vaultapi.EnableAuthOptions{Type: "approle"})
-		c.Assert(err, qt.IsNil)
-	}
-
-	err = client.Sys().PutPolicy(c.Name(), fmt.Sprintf(policyTemplate, path))
-	c.Assert(err, qt.IsNil)
-
 	authSecret := vaultapi.Secret{
-		Data: make(map[string]interface{}, 2),
+		Data: creds,
 	}
-	_, err = client.Logical().Write("/auth/approle/role/"+c.Name(), map[string]interface{}{
-		"token_policies": []string{c.Name()},
-	})
-	c.Assert(err, qt.IsNil)
-	s, err := client.Logical().Read("/auth/approle/role/" + c.Name() + "/role-id")
-	c.Assert(err, qt.IsNil)
-	authSecret.Data["role_id"] = s.Data["role_id"]
-	s, err = client.Logical().Write("/auth/approle/role/"+c.Name()+"/secret-id", nil)
-	c.Assert(err, qt.IsNil)
-	authSecret.Data["secret_id"] = s.Data["secret_id"]
-
 	buf, err := json.Marshal(authSecret)
 	c.Assert(err, qt.IsNil)
 	p.VaultSecretFile = filepath.Join(c.Mkdir(), "approle.json")
 	err = os.WriteFile(p.VaultSecretFile, buf, 0400)
 	c.Assert(err, qt.IsNil)
-	p.VaultAuthPath = "/auth/approle/login"
-	return client
+	p.VaultAuthPath = jimmtest.VaultAuthPath
+	return client, creds
 }

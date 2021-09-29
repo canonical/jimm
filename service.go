@@ -16,7 +16,7 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/google/uuid"
-	vault "github.com/hashicorp/vault/api"
+	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 	httpbakeryv2 "gopkg.in/macaroon-bakery.v2/httpbakery"
@@ -35,6 +35,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jujuclient"
 	"github.com/CanonicalLtd/jimm/internal/logger"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
+	"github.com/CanonicalLtd/jimm/internal/vault"
 )
 
 // A Params structure contains the parameters required to initialise a new
@@ -109,8 +110,7 @@ type Params struct {
 
 // A Service is the implementation of a JIMM server.
 type Service struct {
-	jimm                 jimm.JIMM
-	vaultLifetimeWatcher *vault.LifetimeWatcher
+	jimm jimm.JIMM
 
 	mux http.ServeMux
 }
@@ -138,32 +138,6 @@ func (s *Service) WatchControllers(ctx context.Context) error {
 func (s *Service) WatchModelSummaries(ctx context.Context) error {
 	// TODO(mhilton) need to create a way to watch these.
 	return nil
-}
-
-// WatchVaultToken watches the configured vault token and periodically
-// renews the token. WatchVaultToken finishes when the given context is
-// canceled, or there is an error renewing the token. If vault is not
-// configured then WatchVaultToken finishes immediately with a nil error.
-func (s *Service) WatchVaultToken(ctx context.Context) error {
-	if s.vaultLifetimeWatcher == nil {
-		return nil
-	}
-	ctxDoneC := ctx.Done()
-	go s.vaultLifetimeWatcher.Start()
-	for {
-		select {
-		case <-ctxDoneC:
-			s.vaultLifetimeWatcher.Stop()
-			ctxDoneC = nil
-		case err := <-s.vaultLifetimeWatcher.DoneCh():
-			if err != nil {
-				return err
-			}
-			return ctx.Err()
-		case ro := <-s.vaultLifetimeWatcher.RenewCh():
-			zapctx.Debug(ctx, "renewed auth secret", zap.Time("renewed-at", ro.RenewedAt))
-		}
-	}
 }
 
 // NewService creates a new Service using the given params.
@@ -202,11 +176,10 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
 	}
 
-	s.jimm.VaultClient, s.vaultLifetimeWatcher, err = newVaultClient(ctx, p)
+	s.jimm.CloudCredentialAttributeStore, err = newCloudCredentialAttributeStore(ctx, p)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	s.jimm.VaultPath = p.VaultPath
 
 	dhnd := dashboard.Handler(ctx, p.DashboardLocation)
 	s.mux.Handle("/dashboard", dhnd)
@@ -315,9 +288,9 @@ func newAuthenticator(ctx context.Context, db *db.Database, p Params) (jimm.Auth
 	}, nil
 }
 
-func newVaultClient(ctx context.Context, p Params) (*vault.Client, *vault.LifetimeWatcher, error) {
+func newCloudCredentialAttributeStore(ctx context.Context, p Params) (jimm.CloudCredentialAttributeStore, error) {
 	if p.VaultSecretFile == "" {
-		return nil, nil, nil
+		return nil, nil
 	}
 	zapctx.Info(ctx, "configuring vault client",
 		zap.String("VaultAddress", p.VaultAddress),
@@ -329,37 +302,27 @@ func newVaultClient(ctx context.Context, p Params) (*vault.Client, *vault.Lifeti
 
 	f, err := os.Open(p.VaultSecretFile)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	defer f.Close()
-	s, err := vault.ParseSecret(f)
+	s, err := vaultapi.ParseSecret(f)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	cfg := vault.DefaultConfig()
+	cfg := vaultapi.DefaultConfig()
 	if p.VaultAddress != "" {
 		cfg.Address = p.VaultAddress
 	}
 
-	client, err := vault.NewClient(cfg)
+	client, err := vaultapi.NewClient(cfg)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	if p.VaultAuthPath != "" {
-		s, err = client.Logical().Write(p.VaultAuthPath, s.Data)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-	tok, err := s.TokenID()
-	if err != nil {
-		return nil, nil, err
-	}
-	client.SetToken(tok)
-	watcher, err := client.NewLifetimeWatcher(&vault.LifetimeWatcherInput{Secret: s})
-	if err != nil {
-		return nil, nil, err
-	}
-	return client, watcher, nil
+	return &vault.VaultCloudCredentialAttributeStore{
+		Client:     client,
+		AuthSecret: s.Data,
+		AuthPath:   p.VaultAuthPath,
+		KVPath:     p.VaultPath,
+	}, nil
 }

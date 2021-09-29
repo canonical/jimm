@@ -6,14 +6,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"net/http"
-	"path"
 	"sort"
 	"strconv"
 	"sync"
 	"time"
 
-	vault "github.com/hashicorp/vault/api"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 
@@ -260,7 +257,7 @@ func (j *JIMM) UpdateCloudCredential(ctx context.Context, u *dbmodel.User, args 
 func (j *JIMM) updateCredential(ctx context.Context, credential *dbmodel.CloudCredential) error {
 	const op = errors.Op("jimm.updateCredential")
 
-	if j.VaultClient == nil {
+	if j.CloudCredentialAttributeStore == nil {
 		credential.AttributesInVault = false
 		if err := j.Database.SetCloudCredential(ctx, credential); err != nil {
 			return errors.E(op, err)
@@ -275,24 +272,7 @@ func (j *JIMM) updateCredential(ctx context.Context, credential *dbmodel.CloudCr
 		return errors.E(op, err)
 	}
 
-	data := make(map[string]interface{}, len(credential.Attributes))
-	for k, v := range credential.Attributes {
-		data[k] = v
-	}
-	logical := j.VaultClient.Logical()
-	pth := path.Join(j.vaultCredPath(credential))
-
-	var err error
-	if len(data) == 0 {
-		_, err = logical.Delete(pth)
-		if rerr, ok := err.(*vault.ResponseError); ok && rerr.StatusCode == http.StatusNotFound {
-			// Ignore the error if attempting to delete something that isn't there.
-			err = nil
-		}
-	} else {
-		_, err = logical.Write(pth, data)
-	}
-	if err != nil {
+	if err := j.CloudCredentialAttributeStore.Put(ctx, credential.Tag().(names.CloudCredentialTag), credential.Attributes); err != nil {
 		return errors.E(op, err)
 	}
 	return nil
@@ -408,43 +388,19 @@ func (j *JIMM) getCloudCredentialAttributes(ctx context.Context, cred *dbmodel.C
 		if err := j.Database.GetCloudCredential(ctx, cred); err != nil {
 			return nil, errors.E(op, err)
 		}
-	}
-	if !cred.AttributesInVault {
 		return map[string]string(cred.Attributes), nil
 	}
 
 	// Attributes have to be loaded from vault.
-	if j.VaultClient == nil {
+	if j.CloudCredentialAttributeStore == nil {
 		return nil, errors.E(op, errors.CodeServerConfiguration, "vault not configured")
 	}
-
-	logical := j.VaultClient.Logical()
-	secret, err := logical.Read(j.vaultCredPath(cred))
+	attr, err := j.CloudCredentialAttributeStore.Get(ctx, cred.Tag().(names.CloudCredentialTag))
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	if secret == nil {
-		// secret will be nil if it is not there. Return an error if we
-		// Don't expect the attributes to be empty.
-		if cred.AuthType == "empty" {
-			return nil, nil
-		}
-		return nil, errors.E(op, "credential attributes not found")
+	if len(attr) == 0 && cred.AuthType != "empty" {
+		return nil, errors.E(op, errors.CodeNotFound, "cloud-credential attributes not found")
 	}
-	attributes := make(map[string]string, len(secret.Data))
-	for k, v := range secret.Data {
-		// Nothing will be stored that isn't a string, so ignore anything
-		// that is a different type.
-		s, ok := v.(string)
-		if !ok {
-			continue
-		}
-		attributes[k] = s
-	}
-
-	return attributes, nil
-}
-
-func (j *JIMM) vaultCredPath(cred *dbmodel.CloudCredential) string {
-	return path.Join(j.VaultPath, "creds", cred.Path())
+	return attr, nil
 }

@@ -23,7 +23,11 @@ func main() {
 		return start(ctx, s)
 	})
 	err := s.Wait()
+
 	zapctx.Error(context.Background(), "shutdown", zap.Error(err))
+	if _, ok := err.(*service.SignalError); !ok {
+		os.Exit(1)
+	}
 }
 
 // start initialises the jimmsrv service.
@@ -48,7 +52,6 @@ func start(ctx context.Context, s *service.Service) error {
 		s.Go(func() error { return jimmsvc.WatchControllers(ctx) })
 	}
 	s.Go(func() error { return jimmsvc.WatchModelSummaries(ctx) })
-	s.Go(func() error { return jimmsvc.WatchVaultToken(ctx) })
 	// TODO(mhilton) access logs?
 	addr := os.Getenv("JIMM_LISTEN_ADDR")
 	if addr == "" {

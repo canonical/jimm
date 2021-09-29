@@ -6,7 +6,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"os"
 	"testing"
 	"time"
 
@@ -20,12 +19,6 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 )
-
-func TestMain(m *testing.M) {
-	code := m.Run()
-	jimmtest.VaultStop()
-	os.Exit(code)
-}
 
 func TestFindAuditEvents(t *testing.T) {
 	c := qt.New(t)
