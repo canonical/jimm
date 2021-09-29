@@ -53,7 +53,7 @@ var procTests = []struct {
 	expectResultType: reflect.TypeOf(S2{}),
 }, {
 	name:             "empty function",
-	f:                func() { return },
+	f:                func() {},
 	expectParamsType: nil,
 	expectResultType: nil,
 }, {

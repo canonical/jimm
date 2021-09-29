@@ -19,7 +19,7 @@ func TestWSHandler(t *testing.T) {
 	c := qt.New(t)
 
 	hnd := &jimmhttp.WSHandler{
-		Server: echoServer{},
+		Server: echoServer{t: c},
 	}
 
 	srv := httptest.NewServer(hnd)
@@ -40,7 +40,9 @@ func TestWSHandler(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 }
 
-type echoServer struct{}
+type echoServer struct {
+	t testing.TB
+}
 
 func (s echoServer) ServeWS(ctx context.Context, conn *websocket.Conn) {
 	for {
@@ -48,7 +50,10 @@ func (s echoServer) ServeWS(ctx context.Context, conn *websocket.Conn) {
 		if err == nil {
 			err = conn.WriteMessage(mt, p)
 		}
-		return
+		if err != nil {
+			s.t.Log(err)
+			return
+		}
 	}
 }
 

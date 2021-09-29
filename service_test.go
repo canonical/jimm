@@ -171,7 +171,7 @@ func startCandid(c *qt.C, p *jimm.Params) *candidtest.Server {
 		}},
 	})
 	c.Assert(err, qt.IsNil)
-	p.BakeryAgentFile = filepath.Join(c.Mkdir(), "agent.json")
+	p.BakeryAgentFile = filepath.Join(c.TempDir(), "agent.json")
 	err = os.WriteFile(p.BakeryAgentFile, buf, 0400)
 	c.Assert(err, qt.IsNil)
 	return candid
@@ -211,7 +211,7 @@ func startVault(c *qt.C, p *jimm.Params) (*vaultapi.Client, map[string]interface
 	}
 	buf, err := json.Marshal(authSecret)
 	c.Assert(err, qt.IsNil)
-	p.VaultSecretFile = filepath.Join(c.Mkdir(), "approle.json")
+	p.VaultSecretFile = filepath.Join(c.TempDir(), "approle.json")
 	err = os.WriteFile(p.VaultSecretFile, buf, 0400)
 	c.Assert(err, qt.IsNil)
 	p.VaultAuthPath = jimmtest.VaultAuthPath

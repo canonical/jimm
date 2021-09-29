@@ -327,6 +327,7 @@ func (s *cloudSuite) TestCheckCredentialsModelsInvalidCreds(c *gc.C) {
 			},
 		}},
 	}, &resp)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(resp, jc.DeepEquals, jujuparams.UpdateCredentialResults{
 		Results: []jujuparams.UpdateCredentialResult{{
 			CredentialTag: "cloudcred-" + jimmtest.TestCloudName + "_test@external_cred",

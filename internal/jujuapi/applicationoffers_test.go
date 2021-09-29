@@ -225,10 +225,10 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 	c.Assert(results[0].Error, gc.Equals, (*jujuparams.Error)(nil))
 
 	// without filters
-	offers, err := client.ListOffers()
+	_, err = client.ListOffers()
 	c.Assert(err, gc.ErrorMatches, `at least one filter must be specified \(bad request\)`)
 
-	offers, err = client.ListOffers(crossmodel.ApplicationOfferFilter{
+	offers, err := client.ListOffers(crossmodel.ApplicationOfferFilter{
 		ModelName:       s.Model.Name,
 		ApplicationName: "test-app",
 		OfferName:       "test-offer1",
@@ -392,10 +392,10 @@ func (s *applicationOffersSuite) TestFindApplicationOffers(c *gc.C) {
 	c.Assert(results[0].Error, gc.Equals, (*jujuparams.Error)(nil))
 
 	// without filters
-	offers, err := client.FindApplicationOffers()
+	_, err = client.FindApplicationOffers()
 	c.Assert(err, gc.ErrorMatches, "at least one filter must be specified")
 
-	offers, err = client.FindApplicationOffers(crossmodel.ApplicationOfferFilter{
+	offers, err := client.FindApplicationOffers(crossmodel.ApplicationOfferFilter{
 		ModelName:       s.Model.Name,
 		ApplicationName: "test-app",
 		OfferName:       "test-offer1",

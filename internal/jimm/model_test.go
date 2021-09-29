@@ -12,7 +12,6 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/juju/juju/apiserver/params"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/version/v2"
@@ -1558,7 +1557,7 @@ func TestForEachUserModel(t *testing.T) {
 				Since:  newDate(2020, 02, 20, 20, 02, 20, 0, time.UTC),
 			},
 			UserAccess: "admin",
-			Counts: []params.ModelEntityCount{{
+			Counts: []jujuparams.ModelEntityCount{{
 				Entity: "machines",
 				Count:  2,
 			}, {
@@ -1592,7 +1591,7 @@ func TestForEachUserModel(t *testing.T) {
 				Since:  newDate(2020, 02, 20, 20, 02, 20, 0, time.UTC),
 			},
 			UserAccess: "write",
-			Counts: []params.ModelEntityCount{{
+			Counts: []jujuparams.ModelEntityCount{{
 				Entity: "machines",
 				Count:  2,
 			}, {
@@ -1626,7 +1625,7 @@ func TestForEachUserModel(t *testing.T) {
 				Since:  newDate(2020, 02, 20, 20, 02, 20, 0, time.UTC),
 			},
 			UserAccess: "read",
-			Counts: []params.ModelEntityCount{{
+			Counts: []jujuparams.ModelEntityCount{{
 				Entity: "machines",
 				Count:  2,
 			}, {

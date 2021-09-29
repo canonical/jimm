@@ -122,5 +122,4 @@ func StopVault() {
 		return
 	}
 	vaultCmd = nil
-	return
 }

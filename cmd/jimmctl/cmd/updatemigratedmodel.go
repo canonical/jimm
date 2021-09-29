@@ -55,12 +55,12 @@ func (c *updateMigratedModelCommand) Info() *cmd.Info {
 // Init implements the cmd.Command interface.
 func (c *updateMigratedModelCommand) Init(args []string) error {
 	switch len(args) {
+	default:
+		return errors.E("too many args")
 	case 0:
 		return errors.E("controller not specified")
 	case 1:
 		return errors.E("model uuid not specified")
-	default:
-		return errors.E("too many args")
 	case 2:
 	}
 

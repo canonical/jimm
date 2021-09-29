@@ -7,7 +7,6 @@ import (
 	"os"
 
 	jujucmd "github.com/juju/cmd/v3"
-	"github.com/juju/loggo"
 
 	"github.com/CanonicalLtd/jimm/cmd/jimmctl/cmd"
 )
@@ -15,8 +14,6 @@ import (
 var jimmctlDoc = `
 jimmctl enables users to manage JIMM.
 `
-
-var log = loggo.GetLogger("jimmctl")
 
 func NewSuperCommand() *jujucmd.SuperCommand {
 	jimmcmd := jujucmd.NewSuperCommand(jujucmd.SuperCommandParams{

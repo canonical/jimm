@@ -12,7 +12,6 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/charm/v8"
-	"github.com/juju/juju/apiserver/params"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 	"gopkg.in/macaroon.v2"
@@ -2831,7 +2830,7 @@ func TestListApplicationOffers(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	c.Check(offers, qt.DeepEquals, []jujuparams.ApplicationOfferAdminDetails{{
-		ApplicationOfferDetails: params.ApplicationOfferDetails{
+		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
 			SourceModelTag:         "00000011-0000-0000-0000-000000000003",
 			OfferUUID:              "00000012-0000-0000-0000-000000000003",
 			OfferURL:               "test-offer-url",
@@ -2869,14 +2868,14 @@ func TestListApplicationOffers(t *testing.T) {
 		},
 		ApplicationName: "application-3",
 		CharmURL:        "charm-3",
-		Connections: []params.OfferConnection{{
+		Connections: []jujuparams.OfferConnection{{
 			SourceModelTag: "00000011-0000-0000-0000-000000000003",
 			RelationId:     3,
 			Username:       "charlie@external",
 			Endpoint:       "an-endpoint",
 		}},
 	}, {
-		ApplicationOfferDetails: params.ApplicationOfferDetails{
+		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
 			SourceModelTag:         "00000011-0000-0000-0000-000000000001",
 			OfferUUID:              "00000012-0000-0000-0000-000000000001",
 			OfferURL:               "test-offer-url",
@@ -2914,14 +2913,14 @@ func TestListApplicationOffers(t *testing.T) {
 		},
 		ApplicationName: "application-1",
 		CharmURL:        "charm-1",
-		Connections: []params.OfferConnection{{
+		Connections: []jujuparams.OfferConnection{{
 			SourceModelTag: "00000011-0000-0000-0000-000000000001",
 			RelationId:     1,
 			Username:       "charlie@external",
 			Endpoint:       "an-endpoint",
 		}},
 	}, {
-		ApplicationOfferDetails: params.ApplicationOfferDetails{
+		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
 			SourceModelTag:         "00000011-0000-0000-0000-000000000002",
 			OfferUUID:              "00000012-0000-0000-0000-000000000002",
 			OfferURL:               "test-offer-url",
@@ -2959,7 +2958,7 @@ func TestListApplicationOffers(t *testing.T) {
 		},
 		ApplicationName: "application-2",
 		CharmURL:        "charm-2",
-		Connections: []params.OfferConnection{{
+		Connections: []jujuparams.OfferConnection{{
 			SourceModelTag: "00000011-0000-0000-0000-000000000002",
 			RelationId:     2,
 			Username:       "charlie@external",

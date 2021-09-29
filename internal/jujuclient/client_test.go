@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/juju/juju/apiserver/params"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/names/v4"
@@ -64,7 +63,7 @@ func (s *clientSuite) TestStatus(c *gc.C) {
 
 	status, err := api.Status(ctx, []string{})
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(status, jimmtest.CmpEquals(cmpopts.IgnoreTypes(&time.Time{})), &params.FullStatus{
+	c.Assert(status, jimmtest.CmpEquals(cmpopts.IgnoreTypes(&time.Time{})), &jujuparams.FullStatus{
 		Model: jujuparams.ModelStatusInfo{
 			Name:             "model-1",
 			Type:             "iaas",

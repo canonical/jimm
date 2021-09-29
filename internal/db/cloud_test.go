@@ -365,6 +365,7 @@ func (s *dbSuite) TestUpdateUserCloudAccess(c *qt.C) {
 	})
 	c.Assert(err, qt.Equals, nil)
 	err = s.Database.GetCloud(ctx, &cld)
+	c.Assert(err, qt.IsNil)
 	c.Check(cld.Users, jimmtest.DBObjectEquals, []dbmodel.UserCloudAccess{{
 		Username: "alice@external",
 		User: dbmodel.User{
@@ -397,6 +398,7 @@ func (s *dbSuite) TestUpdateUserCloudAccess(c *qt.C) {
 	err = s.Database.UpdateUserCloudAccess(ctx, &uca)
 	c.Assert(err, qt.Equals, nil)
 	err = s.Database.GetCloud(ctx, &cld)
+	c.Assert(err, qt.IsNil)
 	c.Check(cld.Users, jimmtest.DBObjectEquals, []dbmodel.UserCloudAccess{{
 		Username: "alice@external",
 		User: dbmodel.User{
@@ -429,6 +431,7 @@ func (s *dbSuite) TestUpdateUserCloudAccess(c *qt.C) {
 	err = s.Database.UpdateUserCloudAccess(ctx, &uca)
 	c.Assert(err, qt.Equals, nil)
 	err = s.Database.GetCloud(ctx, &cld)
+	c.Assert(err, qt.IsNil)
 	c.Check(cld.Users, jimmtest.DBObjectEquals, []dbmodel.UserCloudAccess{{
 		Username: "alice@external",
 		User: dbmodel.User{

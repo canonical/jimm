@@ -10,10 +10,6 @@ func init() {
 	}
 }
 
-// ping implements the Pinger facade's Ping method. It doesn't do
-// anything.
-func ping() {}
-
 // Ping implemets the Pinger facade's Ping method on controller API
 // connections.
 func (r *controllerRoot) Ping() {
