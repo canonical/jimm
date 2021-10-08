@@ -18,7 +18,7 @@ lxc exec $container -- snap set system proxy.http=${http_proxy:-}
 lxc exec $container -- snap set system proxy.https=${https_proxy:-${http_proxy:-}}
 lxc exec $container -- snap install go --classic
 lxc exec $container -- snap install vault
-lxc exec $container -- snap install juju-db
+lxc exec $container -- snap install juju-db --channel 4.0/candidate
 if [ -n "${http_proxy:-}" ]; then
 	lxc exec \
 		--env HOME=/home/ubuntu \
