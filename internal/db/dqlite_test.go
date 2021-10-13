@@ -3,7 +3,7 @@
 // go-dqlite only works properly if the go-sqlite3 package is built with
 // the libsqlite3 tag.
 // +build libsqlite3
-//go:build !libsqlite3
+//go:build libsqlite3
 
 package db_test
 
