@@ -5,7 +5,6 @@ package cmd
 import (
 	"io/ioutil"
 
-	apiparams "github.com/CanonicalLtd/jimm/api/params"
 	"github.com/juju/cmd/v3"
 	"github.com/juju/errors"
 	"github.com/juju/gnuflag"
@@ -13,6 +12,8 @@ import (
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
 	"sigs.k8s.io/yaml"
+
+	apiparams "github.com/CanonicalLtd/jimm/api/params"
 )
 
 var (
@@ -20,9 +21,13 @@ var (
 	controller-info command writes controller information contained
 	in the juju client store to a yaml file.
 
+	If a --public-address flag is specified the output controller
+	information will include this public address. The controller
+	information will also omit the ca-certrificate.
+
 	Example:
 		jimmctl controller-info <name> <filename> 
-		jimmctl controller-info <name> <filename> 
+		jimmctl controller-info --public-address=<dns-name>:443 <name> <filename> 
 `
 )
 
@@ -43,6 +48,7 @@ type controllerInfoCommand struct {
 
 	store          jujuclient.ClientStore
 	controllerName string
+	publicAddress  string
 	file           cmd.FileVar
 }
 
@@ -57,6 +63,7 @@ func (c *controllerInfoCommand) Info() *cmd.Info {
 // SetFlags implements Command.SetFlags.
 func (c *controllerInfoCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
+	f.StringVar(&c.publicAddress, "public-address", "", "The preferred controller address for public access.")
 }
 
 // Init implements the cmd.Command interface.
@@ -87,7 +94,9 @@ func (c *controllerInfoCommand) Run(ctxt *cmd.Context) error {
 		Username:     account.User,
 		Password:     account.Password,
 	}
-	if controller.PublicDNSName != "" {
+	if c.publicAddress != "" {
+		info.PublicAddress = c.publicAddress
+	} else if controller.PublicDNSName != "" {
 		info.PublicAddress = controller.PublicDNSName
 	} else {
 		info.PublicAddress = controller.APIEndpoints[0]
