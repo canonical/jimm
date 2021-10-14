@@ -46,12 +46,15 @@ class JimmCharm(SystemdCharm):
         self._vault_secret_filename = "/var/snap/jimm/common/vault_secret.json"
         self._workload_filename = "/snap/bin/jimm"
         self._dashboard_path = "/var/snap/jimm/common/dashboard"
+        self._rsyslog_conf_path = "/etc/rsyslog.d/10-jimm.conf"
+        self._logrotate_conf_path = "/etc/logrotate.d/jimm"
 
     def _on_install(self, _):
         """Install the JIMM software."""
         self._write_service_file()
         self._install_snap()
         self._install_dashboard()
+        self._setup_logging()
         self._on_update_status(None)
 
     def _on_start(self, _):
@@ -66,6 +69,7 @@ class JimmCharm(SystemdCharm):
         self._write_service_file()
         self._install_snap()
         self._install_dashboard()
+        self._setup_logging()
         if self._ready():
             self.restart()
         self._on_update_status(None)
@@ -75,9 +79,10 @@ class JimmCharm(SystemdCharm):
         config."""
 
         args = {
+            "admins": self.config.get('controller-admins', ''),
             "bakery_agent_file": self._bakery_agent_file(),
             "candid_url": self.config.get('candid-url'),
-            "admins": self.config.get('controller-admins', ''),
+            "log_level": self.config.get('log-level'),
             "uuid": self.config.get('uuid')
         }
         if os.path.exists(self._dashboard_path):
@@ -236,6 +241,11 @@ class JimmCharm(SystemdCharm):
             if os.path.exists(self._dashboard_path):
                 os.rename(self._dashboard_path, old_dashboard_path)
             os.rename(new_dashboard_path, self._dashboard_path)
+
+    def _setup_logging(self):
+        """Install the logging configuration."""
+        shutil.copy(os.path.join(self.charm_dir, "files", "logrotate"), self._logrotate_conf_path)
+        shutil.copy(os.path.join(self.charm_dir, "files", "rsyslog"), self._rsyslog_conf_path)
 
     def _dashboard_resource_nonempty(self):
         dashboard_file = self.model.resources.fetch('dashboard')

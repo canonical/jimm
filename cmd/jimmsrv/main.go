@@ -32,6 +32,12 @@ func main() {
 
 // start initialises the jimmsrv service.
 func start(ctx context.Context, s *service.Service) error {
+	if logLevel := os.Getenv("JIMM_LOG_LEVEL"); logLevel != "" {
+		if err := zapctx.LogLevel.UnmarshalText([]byte(logLevel)); err != nil {
+			zapctx.Error(ctx, "cannot set log level", zap.Error(err))
+		}
+	}
+
 	jimmsvc, err := jimm.NewService(ctx, jimm.Params{
 		ControllerUUID:    os.Getenv("JIMM_UUID"),
 		DSN:               os.Getenv("JIMM_DSN"),
