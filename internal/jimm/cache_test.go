@@ -123,7 +123,9 @@ func TestCacheDialerCloseBrokenConnection(t *testing.T) {
 			// connection is good, so won't check for a
 			// failed connection until retrieving it
 			// from the cache.
-			IsBroken_: true,
+			Ping_: func(context.Context) error {
+				return errors.E("ping error")
+			},
 		},
 	}
 	testDialer := &countingDialer{
@@ -138,12 +140,10 @@ func TestCacheDialerCloseBrokenConnection(t *testing.T) {
 
 	api, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{})
 	c.Assert(err, qt.IsNil)
-	c.Check(api.IsBroken(), qt.Equals, true)
 	err = api.Close()
 	c.Assert(err, qt.IsNil)
 	api2, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{})
 	c.Assert(err, qt.IsNil)
-	c.Check(api2.IsBroken(), qt.Equals, true)
 	err = api2.Close()
 	c.Assert(err, qt.IsNil)
 

@@ -8,6 +8,8 @@ import (
 	"sync/atomic"
 
 	"github.com/juju/names/v4"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
@@ -58,20 +60,18 @@ func (d *cacheDialer) Dial(ctx context.Context, ctl *dbmodel.Controller, mt name
 func (d *cacheDialer) dial(ctx context.Context, ctl *dbmodel.Controller) (interface{}, error) {
 	d.mu.Lock()
 	capi, ok := d.conns[ctl.Name]
-	if ok && !capi.IsBroken() {
-		// connection is still good, return it.
-		d.mu.Unlock()
-		return capi, nil
-	}
 	if ok {
-		// The connection must be broken, evict from the cache.
-		delete(d.conns, ctl.Name)
+		if err := capi.Ping(ctx); err == nil {
+			d.mu.Unlock()
+			return capi, nil
+		} else {
+			zapctx.Warn(ctx, "cached connection failed", zap.Error(err))
+			delete(d.conns, ctl.Name)
+			capi.Close()
+		}
 	}
 	d.mu.Unlock()
-	if ok {
-		// If the connection was broken, close it.
-		capi.Close()
-	}
+
 	// We don't have a working connection to the controller, so dial one.
 	api, err := d.dialer.Dial(ctx, ctl, names.ModelTag{})
 	if err != nil {

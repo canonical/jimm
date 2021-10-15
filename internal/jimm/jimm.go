@@ -193,6 +193,9 @@ type API interface {
 	// Offer creates a new application-offer.
 	Offer(context.Context, jujuparams.AddApplicationOffer) error
 
+	// Ping tests the connection is working.
+	Ping(context.Context) error
+
 	// RemoveCloud removes a cloud.
 	RemoveCloud(context.Context, names.CloudTag) error
 

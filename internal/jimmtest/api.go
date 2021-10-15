@@ -133,6 +133,7 @@ type API struct {
 	ModelWatcherNext_                  func(ctx context.Context, id string) ([]jujuparams.Delta, error)
 	ModelWatcherStop_                  func(ctx context.Context, id string) error
 	Offer_                             func(context.Context, jujuparams.AddApplicationOffer) error
+	Ping_                              func(context.Context) error
 	RemoveCloud_                       func(context.Context, names.CloudTag) error
 	RevokeApplicationOfferAccess_      func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
 	RevokeCloudAccess_                 func(context.Context, names.CloudTag, names.UserTag, string) error
@@ -340,6 +341,13 @@ func (a *API) Offer(ctx context.Context, aao jujuparams.AddApplicationOffer) err
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return a.Offer_(ctx, aao)
+}
+
+func (a *API) Ping(ctx context.Context) error {
+	if a.Ping_ == nil {
+		return nil
+	}
+	return a.Ping_(ctx)
 }
 
 func (a *API) RemoveCloud(ctx context.Context, tag names.CloudTag) error {
