@@ -445,7 +445,7 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 
 	if b.credential != nil {
 		if err := b.updateCredential(b.ctx, api, b.credential); err != nil {
-			b.err = errors.E("failed to update cloud credential", err)
+			b.err = errors.E(fmt.Sprintf("failed to update cloud credential: %s", err), err)
 			return b
 		}
 	}

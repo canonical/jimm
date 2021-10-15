@@ -34,8 +34,12 @@ class TestCharm(unittest.TestCase):
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
         self.harness.charm._dashboard_path = self.tempdir.name + "/dashboard"
+        self.harness.charm._logrotate_conf_path = self.tempdir.name + "/lograte.conf"
+        self.harness.charm._rsyslog_conf_path = self.tempdir.name + "/rsyslog.conf"
         shutil.copytree(os.path.join(self.harness.charm.charm_dir, "templates"),
                         os.path.join(self.tempdir.name, "templates"))
+        shutil.copytree(os.path.join(self.harness.charm.charm_dir, "files"),
+                        os.path.join(self.tempdir.name, "files"))
         self.harness.charm.framework.charm_dir = pathlib.Path(self.tempdir.name)
 
     def dashboard_tarfile(self):
@@ -60,6 +64,8 @@ class TestCharm(unittest.TestCase):
         self.harness.add_resource("dashboard", self.dashboard_tarfile())
         self.harness.charm.on.install.emit()
         self.assertTrue(os.path.exists(service_file))
+        self.assertTrue(os.path.exists(self.harness.charm._logrotate_conf_path))
+        self.assertTrue(os.path.exists(self.harness.charm._rsyslog_conf_path))
         self.assertEqual(self.harness.charm._snap.call_args.args[0], "install")
         self.assertEqual(self.harness.charm._snap.call_args.args[1], "--dangerous")
         self.assertTrue(str(self.harness.charm._snap.call_args.args[2]).endswith("jimm.snap"))
@@ -90,6 +96,8 @@ class TestCharm(unittest.TestCase):
         self.harness.add_resource("dashboard", self.dashboard_tarfile())
         self.harness.charm.on.upgrade_charm.emit()
         self.assertTrue(os.path.exists(service_file))
+        self.assertTrue(os.path.exists(self.harness.charm._logrotate_conf_path))
+        self.assertTrue(os.path.exists(self.harness.charm._rsyslog_conf_path))
         self.assertEqual(self.harness.charm._snap.call_args.args[0], 'install')
         self.assertEqual(self.harness.charm._snap.call_args.args[1], '--dangerous')
         self.assertTrue(str(self.harness.charm._snap.call_args.args[2]).endswith("jimm.snap"))
@@ -120,19 +128,21 @@ class TestCharm(unittest.TestCase):
         self.harness.update_config({
             "candid-url": "https://candid.example.com",
             "controller-admins": "user1 user2 group1",
+            "log-level": "debug",
             "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
         })
         self.assertTrue(os.path.exists(config_file))
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 6)
+        self.assertEqual(len(lines), 8)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
-        self.assertEqual(lines[3].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
-        self.assertEqual(lines[5].strip(),
+        self.assertEqual(lines[4].strip(),
                          "JIMM_DASHBOARD_LOCATION=" + self.tempdir.name + "/dashboard")
+        self.assertEqual(lines[6].strip(), "JIMM_LOG_LEVEL=debug")
+        self.assertEqual(lines[7].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
 
     def test_config_changed_ready(self):
         config_file = os.path.join(self.harness.charm.charm_dir, 'jimm.env')
@@ -148,13 +158,14 @@ class TestCharm(unittest.TestCase):
         with open(config_file) as f:
             lines = f.readlines()
         os.unlink(config_file)
-        self.assertEqual(len(lines), 6)
+        self.assertEqual(len(lines), 8)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
-        self.assertEqual(lines[3].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
-        self.assertEqual(lines[5].strip(),
+        self.assertEqual(lines[4].strip(),
                          "JIMM_DASHBOARD_LOCATION=" + self.tempdir.name + "/dashboard")
+        self.assertEqual(lines[6].strip(), "JIMM_LOG_LEVEL=info")
+        self.assertEqual(lines[7].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
 
     def test_config_changed_with_agent(self):
         config_file = os.path.join(self.harness.charm.charm_dir, 'jimm.env')
@@ -176,12 +187,13 @@ class TestCharm(unittest.TestCase):
         self.assertTrue(os.path.exists(config_file))
         with open(config_file) as f:
             lines = f.readlines()
-        self.assertEqual(len(lines), 4)
+        self.assertEqual(len(lines), 6)
         self.assertEqual(lines[0].strip(),
                          "BAKERY_AGENT_FILE=" + self.harness.charm._agent_filename)
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
-        self.assertEqual(lines[3].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
+        self.assertEqual(lines[4].strip(), "JIMM_LOG_LEVEL=info")
+        self.assertEqual(lines[5].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
         self.harness.charm._agent_filename = \
             os.path.join(self.tempdir.name, "no-such-dir", "agent.json")
         self.harness.update_config({
@@ -194,11 +206,12 @@ class TestCharm(unittest.TestCase):
         })
         with open(config_file) as f:
             lines = f.readlines()
-        self.assertEqual(len(lines), 4)
+        self.assertEqual(len(lines), 6)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
-        self.assertEqual(lines[3].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
+        self.assertEqual(lines[4].strip(), "JIMM_LOG_LEVEL=info")
+        self.assertEqual(lines[5].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
 
     def test_leader_elected(self):
         leader_file = os.path.join(self.harness.charm.charm_dir, 'jimm-leader.env')

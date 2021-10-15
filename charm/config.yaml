@@ -20,8 +20,14 @@ options:
   controller-admins:
     type: string
     description: |
-       Whitespace separated list of candid users (or groups) that are
-       made controller admins by default.
+      Whitespace separated list of candid users (or groups) that are
+      made controller admins by default.
+  log-level:
+    type: string
+    description: |
+      Level to out log messages at, one of "debug", "info", "warn",
+      "error", "dpanic", "panic", and "fatal".
+    default: info
   nagios_context:
     default: "juju"
     type: string

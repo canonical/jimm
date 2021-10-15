@@ -1,0 +1,2 @@
+:programname, isequal, "jimmsrv" /var/log/jimm.log
+& stop
