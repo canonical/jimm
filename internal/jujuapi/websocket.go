@@ -89,6 +89,7 @@ func serveRoot(ctx context.Context, root root, wsConn *websocket.Conn) {
 		zapctx.Info(ctx, "ping timeout, closing connection")
 		conn.Close()
 	})
+	defer t.Stop()
 	root.setPingF(func() { t.Reset(pingTimeout) })
 	conn.Start(ctx)
 	<-conn.Dead()
