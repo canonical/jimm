@@ -5,6 +5,7 @@ package jimm
 import (
 	"context"
 	"database/sql"
+	"sort"
 	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
@@ -171,6 +172,41 @@ func (w *Watcher) checkControllerModels(ctx context.Context, ctl *dbmodel.Contro
 	return modelIDs, nil
 }
 
+// deltaPriority holds the priority order for processing deltas. This is to
+// ensure the database integrity when processing deltas. The higher the
+// value the higher the priority, this ensures all unmentioned entity kinds
+// are processed last.
+var deltaPriority = map[string]int{
+	"model":       4,
+	"machine":     3,
+	"application": 2,
+	"unit":        1,
+}
+
+type sortDeltas []jujuparams.Delta
+
+// Len implements sort.Interface.
+func (d sortDeltas) Len() int {
+	return len(d)
+}
+
+// Less implements sort.Interface.
+func (d sortDeltas) Less(i, j int) bool {
+	e1, e2 := d[i].Entity.EntityId(), d[j].Entity.EntityId()
+	if e1.ModelUUID != e2.ModelUUID {
+		return e1.ModelUUID < e2.ModelUUID
+	}
+	if e1.Kind != e2.Kind {
+		return deltaPriority[e1.Kind] > deltaPriority[e2.Kind]
+	}
+	return e1.Id < e2.Id
+}
+
+// Swap implements sort.Interface.
+func (d sortDeltas) Swap(i, j int) {
+	d[i], d[j] = d[j], d[i]
+}
+
 // watchController connects to the given controller and watches for model
 // changes on the controller.
 func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) error {
@@ -182,7 +218,6 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 		return errors.E(op, err)
 	}
 	defer api.Close()
-
 	// start the all watcher
 	id, err := api.WatchAllModels(ctx)
 	if err != nil {
@@ -191,7 +226,7 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 	defer api.AllModelWatcherStop(ctx, id)
 
 	checkDyingModel := func(m *dbmodel.Model) error {
-		if m.Life == "dying" {
+		if m.Life == "dying" || m.Life == "dead" {
 			// models that were in the dying state may no
 			// longer be on the controller, check if it should
 			// be immediately deleted.
@@ -248,7 +283,11 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 		if err != nil {
 			return errors.E(op, err)
 		}
+		sort.Sort(sortDeltas(deltas))
 		for _, d := range deltas {
+			eid := d.Entity.EntityId()
+			ctx := zapctx.WithFields(ctx, zap.String("model-uuid", eid.ModelUUID), zap.String("kind", eid.Kind), zap.String("id", eid.Id))
+			zapctx.Debug(ctx, "processing delta")
 			if err := w.handleDelta(ctx, modelIDf, d); err != nil {
 				return errors.E(op, err)
 			}
@@ -444,7 +483,7 @@ func (w *Watcher) deleteModel(ctx context.Context, model *dbmodel.Model) error {
 				return err
 			}
 		}
-		if model.Life != "dying" {
+		if model.Life != "dying" && model.Life != "dead" {
 			// If the model hasn't been marked as dying, don't remove it.
 			return nil
 		}
