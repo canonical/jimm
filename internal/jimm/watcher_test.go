@@ -567,6 +567,7 @@ var watcherTests = []struct {
 		model.Controller = dbmodel.Controller{}
 		model.Applications = nil
 		model.Machines = nil
+		model.Units = nil
 		model.Users = nil
 		c.Check(model, jimmtest.DBObjectEquals, dbmodel.Model{
 			UUID: sql.NullString{
@@ -636,6 +637,7 @@ var watcherTests = []struct {
 		model.Controller = dbmodel.Controller{}
 		model.Applications = nil
 		model.Machines = nil
+		model.Units = nil
 		model.Users = nil
 		c.Check(model, jimmtest.DBObjectEquals, dbmodel.Model{
 			UUID: sql.NullString{

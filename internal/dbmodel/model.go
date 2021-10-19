@@ -241,13 +241,12 @@ func (m Model) ToJujuModelSummary() jujuparams.ModelSummary {
 	ms.OwnerTag = m.Owner.Tag().String()
 	ms.Life = life.Value(m.Life)
 	ms.Status = m.Status.ToJujuEntityStatus()
-	var machines, cores, units int64
+	var machines, cores int64
 	for _, mach := range m.Machines {
 		machines += 1
 		if mach.Hardware.CPUCores.Valid {
 			cores += int64(mach.Hardware.CPUCores.Uint64)
 		}
-		units += int64(len(mach.Units))
 	}
 	ms.Counts = []jujuparams.ModelEntityCount{{
 		Entity: jujuparams.Machines,
@@ -257,7 +256,7 @@ func (m Model) ToJujuModelSummary() jujuparams.ModelSummary {
 		Count:  cores,
 	}, {
 		Entity: jujuparams.Units,
-		Count:  units,
+		Count:  int64(len(m.Units)),
 	}}
 
 	// JIMM doesn't store information about Migrations so this is omitted.

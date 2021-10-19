@@ -40,6 +40,34 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 
+	// Add some machines and units to test the counts.
+	ctx := context.Background()
+	err := s.JIMM.Database.UpdateMachine(ctx, &dbmodel.Machine{
+		ModelID:   s.Model.ID,
+		MachineID: "0",
+		Hardware: dbmodel.Hardware{
+			CPUCores: dbmodel.NullUint64{
+				Uint64: 2,
+				Valid:  true,
+			},
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.JIMM.Database.UpdateApplication(ctx, &dbmodel.Application{
+		ModelID: s.Model.ID,
+		Name:    "app",
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.JIMM.Database.UpdateUnit(ctx, &dbmodel.Unit{
+		ModelID:         s.Model.ID,
+		Name:            "app/1",
+		MachineID:       "0",
+		ApplicationName: "app",
+	})
+	c.Assert(err, gc.Equals, nil)
+
 	client := modelmanager.NewClient(conn)
 	models, err := client.ListModelSummaries("bob", false)
 	c.Assert(err, gc.Equals, nil)
@@ -61,13 +89,13 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 		ModelUserAccess: "admin",
 		Counts: []base.EntityCount{{
 			Entity: "machines",
-			Count:  0,
+			Count:  1,
 		}, {
 			Entity: "cores",
-			Count:  0,
+			Count:  2,
 		}, {
 			Entity: "units",
-			Count:  0,
+			Count:  1,
 		}},
 		AgentVersion: &jujuversion.Current,
 		Type:         "iaas",

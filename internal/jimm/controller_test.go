@@ -611,6 +611,12 @@ func TestImportModel(t *testing.T) {
 					Info:   "test-message",
 				},
 			}},
+			Units: []dbmodel.Unit{{
+				ApplicationName: "app-1",
+				MachineID:       "machine-1",
+				Name:            "app-1/1",
+				Life:            "starting",
+			}},
 			Users: []dbmodel.UserModelAccess{{
 				User: dbmodel.User{
 					Username:         "alice@external",
