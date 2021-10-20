@@ -63,6 +63,22 @@ func (s *controllerSuite) TestModelConfig(c *gc.C) {
 	_, err := client.ModelConfig()
 	c.Assert(err, gc.ErrorMatches, `permission denied \(unauthorized access\)`)
 	c.Assert(jujuparams.IsCodeUnauthorized(err), gc.Equals, true)
+
+	conn = s.open(c, nil, "alice")
+	defer conn.Close()
+	client = controllerapi.NewClient(conn)
+	_, err = client.ModelConfig()
+	c.Assert(err, gc.ErrorMatches, `not supported \(not supported\)`)
+	c.Assert(jujuparams.IsCodeNotSupported(err), gc.Equals, true)
+}
+
+func (s *controllerSuite) TestMongoVersion(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+	client := controllerapi.NewClient(conn)
+	_, err := client.MongoVersion()
+	c.Assert(err, gc.ErrorMatches, `not supported \(not supported\)`)
+	c.Assert(jujuparams.IsCodeNotSupported(err), gc.Equals, true)
 }
 
 func (s *controllerSuite) TestAllModels(c *gc.C) {
