@@ -103,9 +103,11 @@ func (r *controllerRoot) ConfigSet(ctx context.Context, args jujuparams.Controll
 	return nil
 }
 
-// MongoVersion allows the introspection of the mongo version per controller.
+// MongoVersion allows the introspection of the mongo version per
+// controller. This returns a not-supported error as JIMM does not use
+// mongodb for a database.
 func (r *controllerRoot) MongoVersion(ctx context.Context) (jujuparams.StringResult, error) {
-	return jujuparams.StringResult{}, errors.E(errors.CodeNotImplemented)
+	return jujuparams.StringResult{}, errors.E(errors.CodeNotSupported)
 }
 
 // IdentityProviderURL returns the URL of the configured external identity
@@ -227,10 +229,13 @@ func (r *controllerRoot) ControllerConfig(ctx context.Context) (jujuparams.Contr
 }
 
 // ModelConfig returns implements the controller facade's ModelConfig
-// method. This always returns a permission error, as no user has admin
-// access to the controller.
+// method. If the user is a controller superuser then this returns a
+// not-supported error, otherwise it returns permission denied.
 func (r *controllerRoot) ModelConfig() (jujuparams.ModelConfigResults, error) {
-	return jujuparams.ModelConfigResults{}, errors.E(errors.CodeUnauthorized, "permission denied")
+	if r.user.ControllerAccess != "superuser" {
+		return jujuparams.ModelConfigResults{}, errors.E(errors.CodeUnauthorized, "permission denied")
+	}
+	return jujuparams.ModelConfigResults{}, errors.E(errors.CodeNotSupported)
 }
 
 // GetControllerAccess returns the access level on the controller for
