@@ -234,7 +234,8 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 				UUID: m.UUID.String,
 			}
 			if err := api.ModelInfo(ctx, &mi); err != nil {
-				if errors.ErrorCode(err) == errors.CodeNotFound {
+				// Some versions of juju return unauthorized for models that cannot be found.
+				if errors.ErrorCode(err) == errors.CodeNotFound || errors.ErrorCode(err) == errors.CodeUnauthorized {
 					if err := w.Database.DeleteModel(ctx, m); err != nil {
 						return errors.E(op, err)
 					} else {

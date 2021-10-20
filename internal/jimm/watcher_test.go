@@ -133,6 +133,16 @@ models:
   cloud-credential: cred-1
   owner: alice@external
   life: dying
+- name: model-3
+  type: iaas
+  uuid: 00000002-0000-0000-0000-000000000003
+  controller: controller-1
+  default-series: warty
+  cloud: test-cloud
+  region: test-cloud-region
+  cloud-credential: cred-1
+  owner: alice@external
+  life: dead
 `
 
 var watcherTests = []struct {
@@ -509,7 +519,7 @@ var watcherTests = []struct {
 	name: "UnknownModelsIgnored",
 	deltas: [][]jujuparams.Delta{{{
 		Entity: &jujuparams.ModelUpdate{
-			ModelUUID: "00000002-0000-0000-0000-000000000003",
+			ModelUUID: "00000002-0000-0000-0000-000000000004",
 			Name:      "new-model",
 			Owner:     "charlie@external",
 			Life:      "starting",
@@ -520,7 +530,7 @@ var watcherTests = []struct {
 
 		model := dbmodel.Model{
 			UUID: sql.NullString{
-				String: "00000002-0000-0000-0000-000000000003",
+				String: "00000002-0000-0000-0000-000000000004",
 				Valid:  true,
 			},
 		}
@@ -603,6 +613,27 @@ var watcherTests = []struct {
 		model := dbmodel.Model{
 			UUID: sql.NullString{
 				String: "00000002-0000-0000-0000-000000000002",
+				Valid:  true,
+			},
+		}
+		err := db.GetModel(ctx, &model)
+		c.Check(err, qt.ErrorMatches, `model not found`)
+		c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+	},
+}, {
+	name: "DeleteDeadModel",
+	deltas: [][]jujuparams.Delta{{{
+		Removed: true,
+		Entity: &jujuparams.ModelUpdate{
+			ModelUUID: "00000002-0000-0000-0000-000000000003",
+		},
+	}}},
+	checkDB: func(c *qt.C, db db.Database) {
+		ctx := context.Background()
+
+		model := dbmodel.Model{
+			UUID: sql.NullString{
+				String: "00000002-0000-0000-0000-000000000003",
 				Valid:  true,
 			},
 		}
@@ -710,8 +741,16 @@ func TestWatcher(t *testing.T) {
 							return test.name, nil
 						},
 						ModelInfo_: func(_ context.Context, info *jujuparams.ModelInfo) error {
-							c.Check(info.UUID, qt.Equals, "00000002-0000-0000-0000-000000000002")
-							return errors.E(errors.CodeNotFound)
+							switch info.UUID {
+							case "00000002-0000-0000-0000-000000000002":
+								return errors.E(errors.CodeNotFound)
+							case "00000002-0000-0000-0000-000000000003":
+								return errors.E(errors.CodeUnauthorized)
+							default:
+								c.Errorf("unexpected model uuid: %s", info.UUID)
+								return errors.E("unexpected API call")
+							}
+
 						},
 					},
 				},
@@ -766,7 +805,7 @@ var modelSummaryWatcherTests = []struct {
 		// this is a summary for an model unknown to jimm
 		// meaning its summary will not be published
 		// to the pubsub hub.
-		UUID:   "00000002-0000-0000-0000-000000000003",
+		UUID:   "00000002-0000-0000-0000-000000000004",
 		Status: "test status 2",
 		Size: jujuparams.ModelSummarySize{
 			Applications: 5,
@@ -845,7 +884,12 @@ func TestModelSummaryWatcher(t *testing.T) {
 						},
 						SupportsModelSummaryWatcher_: true,
 						ModelInfo_: func(_ context.Context, info *jujuparams.ModelInfo) error {
-							c.Check(info.UUID, qt.Equals, "00000002-0000-0000-0000-000000000002")
+							switch info.UUID {
+							default:
+								c.Errorf("unexpected model uuid: %s", info.UUID)
+							case "00000002-0000-0000-0000-000000000002":
+							case "00000002-0000-0000-0000-000000000003":
+							}
 							return errors.E(errors.CodeNotFound)
 						},
 					},
@@ -939,7 +983,12 @@ func TestWatcherRemoveDyingModelsOnStartup(t *testing.T) {
 					return nil, ctx.Err()
 				},
 				ModelInfo_: func(_ context.Context, info *jujuparams.ModelInfo) error {
-					c.Check(info.UUID, qt.Equals, "00000002-0000-0000-0000-000000000002")
+					switch info.UUID {
+					default:
+						c.Errorf("unexpected model uuid: %s", info.UUID)
+					case "00000002-0000-0000-0000-000000000002":
+					case "00000002-0000-0000-0000-000000000003":
+					}
 					return errors.E(errors.CodeNotFound)
 				},
 				WatchAllModels_: func(ctx context.Context) (string, error) {
