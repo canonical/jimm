@@ -181,6 +181,7 @@ func preloadModel(prefix string, db *gorm.DB) *gorm.DB {
 	db = db.Preload(prefix + "CloudCredential")
 	db = db.Preload(prefix + "Applications")
 	db = db.Preload(prefix + "Machines")
+	db = db.Preload(prefix + "Units")
 	db = db.Preload(prefix + "Users").Preload(prefix + "Users.User")
 
 	return db
