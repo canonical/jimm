@@ -4,8 +4,10 @@ package jimmtest
 
 import (
 	"context"
+	"database/sql"
 	"strconv"
 	"strings"
+	"time"
 
 	qt "github.com/frankban/quicktest"
 	jujuparams "github.com/juju/juju/apiserver/params"
@@ -356,10 +358,19 @@ func (m *Model) DBObject(c *qt.C, db db.Database) dbmodel.Model {
 	}
 	m.dbo.Controller = m.env.Controller(m.Controller).DBObject(c, db)
 	for _, u := range m.Users {
-		m.dbo.Users = append(m.dbo.Users, dbmodel.UserModelAccess{
+		uma := dbmodel.UserModelAccess{
 			User:   m.env.User(u.User).DBObject(c, db),
 			Access: u.Access,
-		})
+		}
+		if u.LastConnection != "" {
+			if t, err := time.Parse(time.RFC3339, u.LastConnection); err == nil {
+				uma.LastConnection = sql.NullTime{
+					Time:  t,
+					Valid: true,
+				}
+			}
+		}
+		m.dbo.Users = append(m.dbo.Users, uma)
 	}
 	m.dbo.CloudRegion = m.env.Cloud(m.Cloud).DBObject(c, db).Region(m.CloudRegion)
 	m.dbo.CloudCredential = m.env.CloudCredential(m.Owner, m.Cloud, m.CloudCredential).DBObject(c, db)
@@ -413,8 +424,9 @@ func (u *User) DBObject(c *qt.C, db db.Database) dbmodel.User {
 
 // UserAccess represents user access to am object in a test environment.
 type UserAccess struct {
-	User   string `json:"user"`
-	Access string `json:"access"`
+	User           string `json:"user"`
+	Access         string `json:"access"`
+	LastConnection string `json:"last-connection"`
 }
 
 // ParseMachineHardware parses a string representation of a machine's

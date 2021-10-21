@@ -136,8 +136,22 @@ func (s *Service) WatchControllers(ctx context.Context) error {
 // the given context is canceled, or there is a fatal error watching model
 // summaries.
 func (s *Service) WatchModelSummaries(ctx context.Context) error {
-	// TODO(mhilton) need to create a way to watch these.
-	return nil
+	w := jimm.Watcher{
+		Database: s.jimm.Database,
+		Dialer:   s.jimm.Dialer,
+	}
+	return w.WatchAllModelSummaries(ctx, 10*time.Minute)
+}
+
+// PollModels regularly polls each known model to get required data not
+// included in the multiwatcher deltas. PollModels finishes when the given
+// context is canceled, or there is a fatal error polling models.
+func (s *Service) PollModels(ctx context.Context) error {
+	w := jimm.Watcher{
+		Database: s.jimm.Database,
+		Dialer:   s.jimm.Dialer,
+	}
+	return w.PollModels(ctx, 10*time.Minute)
 }
 
 // NewService creates a new Service using the given params.
@@ -281,8 +295,7 @@ func newAuthenticator(ctx context.Context, db *db.Database, p Params) (jimm.Auth
 			Key:            key,
 			IdentityClient: auth.IdentityClientV3{IdentityClient: candidClient},
 			Location:       "jimm",
-			// TODO(mhilton) set an appropriate logger.
-			Logger: logger.BakeryLogger{},
+			Logger:         logger.BakeryLogger{},
 		}),
 		ControllerAdmins: p.ControllerAdmins,
 	}, nil
