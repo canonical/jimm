@@ -2,7 +2,11 @@
 
 package jimm
 
-import "github.com/CanonicalLtd/jimm/internal/dbmodel"
+import (
+	"context"
+
+	"github.com/CanonicalLtd/jimm/internal/dbmodel"
+)
 
 var (
 	DetermineAccessLevelAfterRevoke = determineAccessLevelAfterRevoke
@@ -12,4 +16,8 @@ var (
 
 func (j *JIMM) AddAuditLogEntry(ale *dbmodel.AuditLogEntry) {
 	j.addAuditLogEntry(ale)
+}
+
+func (w *Watcher) PollControllerModels(ctx context.Context, ctl *dbmodel.Controller) {
+	w.pollControllerModels(ctx, ctl)
 }

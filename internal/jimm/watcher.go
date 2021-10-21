@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"sort"
+	"sync"
 	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
@@ -530,4 +531,106 @@ func (w *Watcher) updateUnit(ctx context.Context, unit *dbmodel.Unit, info *juju
 		return errors.E(op, err)
 	}
 	return nil
+}
+
+// PollModels periodically polls all the models on all controllers to
+// update fields that are not included in the watcher API.
+func (w *Watcher) PollModels(ctx context.Context, interval time.Duration) error {
+	const op = errors.Op("jimm.PollModels")
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		var wg sync.WaitGroup
+		err := w.Database.ForEachController(ctx, func(ctl *dbmodel.Controller) error {
+			wg.Add(1)
+			ctl1 := *ctl
+			ctx := zapctx.WithFields(ctx, zap.String("controller", ctl1.Name))
+			go func() {
+				defer wg.Done()
+				w.pollControllerModels(ctx, &ctl1)
+			}()
+			return nil
+		})
+		if err != nil && errors.ErrorCode(err) != errors.CodeDatabaseLocked {
+			return errors.E(op, err)
+		}
+
+		wg.Wait()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
+}
+
+func (w *Watcher) pollControllerModels(ctx context.Context, ctl *dbmodel.Controller) {
+	api, err := w.dialController(ctx, ctl)
+	if err != nil {
+		zapctx.Error(ctx, "cannot poll controller models", zap.Error(err))
+		return
+	}
+	var uuids []string
+	err = w.Database.ForEachControllerModel(ctx, ctl, func(m *dbmodel.Model) error {
+		// skip any models that are not fully created yet.
+		if m.UUID.Valid {
+			uuids = append(uuids, m.UUID.String)
+		}
+		return nil
+	})
+	if err != nil {
+		zapctx.Error(ctx, "cannot poll controller models", zap.Error(err))
+		return
+	}
+
+	for _, uuid := range uuids {
+		ctx := zapctx.WithFields(ctx, zap.String("model-uuid", uuid))
+		mi := jujuparams.ModelInfo{
+			UUID: uuid,
+		}
+		if err := api.ModelInfo(ctx, &mi); err != nil {
+			zapctx.Error(ctx, "cannot get model-info", zap.Error(err))
+			return
+		}
+
+		err := w.Database.Transaction(func(tx *db.Database) error {
+			m := dbmodel.Model{
+				UUID: sql.NullString{
+					String: uuid,
+					Valid:  true,
+				},
+			}
+			if err := tx.GetModel(ctx, &m); err != nil {
+				return err
+			}
+			for _, u := range mi.Users {
+				if u.LastConnection == nil {
+					continue
+				}
+				for _, uma := range m.Users {
+					if uma.Username != u.UserName {
+						continue
+					}
+					if uma.LastConnection.Valid && u.LastConnection.Before(uma.LastConnection.Time) {
+						continue
+					}
+					uma.User = dbmodel.User{}
+					uma.LastConnection = sql.NullTime{
+						Time:  *u.LastConnection,
+						Valid: true,
+					}
+					if err := tx.UpdateUserModelAccess(ctx, &uma); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			zapctx.Error(ctx, "error updating model", zap.Error(err))
+			return
+		}
+	}
 }

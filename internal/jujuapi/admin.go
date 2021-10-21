@@ -60,13 +60,16 @@ func (r *controllerRoot) Login(ctx context.Context, req jujuparams.LoginRequest)
 	if err != nil {
 		return jujuparams.LoginResult{}, errors.E(op, err)
 	}
+	aui := jujuparams.AuthUserInfo{
+		DisplayName:      u.DisplayName,
+		Identity:         u.Tag().String(),
+		ControllerAccess: u.ControllerAccess,
+	}
+	if u.LastLogin.Valid {
+		aui.LastConnection = &u.LastLogin.Time
+	}
 	return jujuparams.LoginResult{
-		UserInfo: &jujuparams.AuthUserInfo{
-			DisplayName: u.DisplayName,
-			Identity:    u.Tag().String(),
-			// TODO(mhilton) work out how to populate LastConnection.
-			ControllerAccess: u.ControllerAccess,
-		},
+		UserInfo:      &aui,
 		ControllerTag: names.NewControllerTag(r.params.ControllerUUID).String(),
 		Facades:       facades,
 		ServerVersion: srvVersion.String(),
