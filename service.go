@@ -34,6 +34,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
 	"github.com/CanonicalLtd/jimm/internal/jujuclient"
 	"github.com/CanonicalLtd/jimm/internal/logger"
+	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 	"github.com/CanonicalLtd/jimm/internal/vault"
 )
@@ -139,6 +140,7 @@ func (s *Service) WatchModelSummaries(ctx context.Context) error {
 	w := jimm.Watcher{
 		Database: s.jimm.Database,
 		Dialer:   s.jimm.Dialer,
+		Pubsub:   s.jimm.Pubsub,
 	}
 	return w.WatchAllModelSummaries(ctx, 10*time.Minute)
 }
@@ -167,6 +169,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		p.ControllerUUID = controllerUUID.String()
 	}
 	s.jimm.UUID = p.ControllerUUID
+	s.jimm.Pubsub = &pubsub.Hub{MaxConcurrency: 50}
 
 	if p.DSN == "" {
 		p.DSN = "file::memory:?mode=memory&cache=shared"
