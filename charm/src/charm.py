@@ -246,6 +246,7 @@ class JimmCharm(SystemdCharm):
         """Install the logging configuration."""
         shutil.copy(os.path.join(self.charm_dir, "files", "logrotate"), self._logrotate_conf_path)
         shutil.copy(os.path.join(self.charm_dir, "files", "rsyslog"), self._rsyslog_conf_path)
+        self._systemctl("restart", "rsyslog")
 
     def _dashboard_resource_nonempty(self):
         dashboard_file = self.model.resources.fetch('dashboard')
