@@ -54,6 +54,7 @@ type Config struct {
 	MaxPubsubConcurrency  int               `yaml:"max-pubsub-concurrency"`
 	JujuDashboardLocation string            `yaml:"juju-dashboard-location"`
 	Vault                 VaultConfig       `yaml:"vault"`
+	PublicDNSName         string            `yaml:"public-dns-name"`
 }
 
 // A VaultConfig contains the configuration settings for a vault server

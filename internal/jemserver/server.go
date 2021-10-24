@@ -117,6 +117,9 @@ type Params struct {
 
 	// VaultPath is the root path in the vault for JIMM's secrets.
 	VaultPath string
+
+	// PublicDNSName contains the DNS hostname of the JIMM service.
+	PublicDNSName string
 }
 
 // HandlerParams are the parameters used to initialize a handler.

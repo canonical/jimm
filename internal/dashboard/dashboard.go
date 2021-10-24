@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	dashboardPathPrefix = "dashboard"
+	dashboardPath = "/dashboard"
 )
 
 // Register registers a http handler the serves Juju Dashboard
@@ -58,8 +58,10 @@ func Register(ctx context.Context, router *httprouter.Router, dashboardLocation 
 		switch fi.Name() {
 		case "index.html":
 			// Use index.html to serve anything we don't otherwise know about.
-			router.GET("/"+dashboardPathPrefix, serveFile)
-			router.GET("/"+dashboardPathPrefix+"/*anything", serveFile)
+			router.GET(dashboardPath, serveFile)
+			router.NotFound = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				http.ServeFile(w, req, path)
+			})
 		case "config.js":
 			// Ignore any config.js file, use a rendered one instead.
 		case "config.js.go":
@@ -69,7 +71,7 @@ func Register(ctx context.Context, router *httprouter.Router, dashboardLocation 
 			}
 			var buf bytes.Buffer
 			err = tmpl.Execute(&buf, map[string]interface{}{
-				"baseAppURL":                "/" + dashboardPathPrefix + "/",
+				"baseAppURL":                "/",
 				"identityProviderAvailable": true,
 				"isJuju":                    false,
 			})

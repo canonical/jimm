@@ -75,6 +75,7 @@ func (r *controllerRoot) Login(ctx context.Context, req jujuparams.LoginRequest)
 		ControllerTag: names.NewControllerTag(r.params.ControllerUUID).String(),
 		Facades:       facades,
 		ServerVersion: srvVersion.String(),
+		PublicDNSName: r.params.PublicDNSName,
 	}, nil
 }
 
