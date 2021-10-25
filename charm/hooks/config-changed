@@ -30,6 +30,7 @@ def config_changed():
         "logging-level",
         "max-mgo-sessions",
         "metering-location",
+        "public-dns-name",
     ]
 
     admins = [admin.strip() for admin in config['controller-admins'].split(",")]
@@ -60,7 +61,7 @@ def config_changed():
         config_js_path = os.path.join(dashboard_path(), 'config.js')
         dashboard_context = {
             'base_controller_url': app_config['controller-url'],
-            'base_app_url': '/dashboard/',
+            'base_app_url': '/',
             'identity_provider_available': str(len(app_config['identity-location']) != 0).lower(),
         }
         templating.render(

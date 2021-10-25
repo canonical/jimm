@@ -104,6 +104,7 @@ vault:
   approle-role-id: 00000000-0000-0000-0000-000000000000
   approle-secret-id: 00000000-0000-0000-0000-000000000001
   kv-path: /kv/jimm
+public-dns-name: jimm.example.com
 `
 
 func (s *ConfigSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
@@ -163,6 +164,7 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 			ApproleSecretID: "00000000-0000-0000-0000-000000000001",
 			KVPath:          "/kv/jimm",
 		},
+		PublicDNSName: "jimm.example.com",
 	})
 }
 

@@ -152,6 +152,7 @@ func startServer(ctx context.Context, eg *errgroup.Group, conf *config.Config) e
 		JujuDashboardLocation: conf.JujuDashboardLocation,
 		VaultClient:           vaultClient,
 		VaultPath:             conf.Vault.KVPath,
+		PublicDNSName:         conf.PublicDNSName,
 	}
 
 	server, err := jem.NewServer(ctx, cfg)
