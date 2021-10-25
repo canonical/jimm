@@ -4,6 +4,7 @@ package dashboard_test
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,8 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/version/v2"
 
 	"github.com/CanonicalLtd/jimm/internal/dashboard"
 )
@@ -175,5 +178,14 @@ func TestGUIArchiveEndpoint(t *testing.T) {
 	c.Check(resp.StatusCode, qt.Equals, http.StatusOK)
 	buf, err := io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
-	c.Check(string(buf), qt.Equals, `[{"version":"0.8.1","sha256":"34388e4b0b3e68e2c2ba342cb45f0f21d248fd3c","current":true}]`)
+	var gar jujuparams.GUIArchiveResponse
+	err = json.Unmarshal(buf, &gar)
+	c.Assert(err, qt.IsNil)
+	c.Check(gar, qt.DeepEquals, jujuparams.GUIArchiveResponse{
+		Versions: []jujuparams.GUIArchiveVersion{{
+			Version: version.MustParse("0.8.1"),
+			SHA256:  "34388e4b0b3e68e2c2ba342cb45f0f21d248fd3c",
+			Current: true,
+		}},
+	})
 }

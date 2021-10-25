@@ -119,11 +119,13 @@ func Handler(ctx context.Context, loc string) http.Handler {
 				)
 				continue
 			}
-			versions := []jujuparams.GUIArchiveVersion{{
-				Version: ver,
-				SHA256:  fVersion.GitSHA,
-				Current: true,
-			}}
+			versions := jujuparams.GUIArchiveResponse{
+				Versions: []jujuparams.GUIArchiveVersion{{
+					Version: ver,
+					SHA256:  fVersion.GitSHA,
+					Current: true,
+				}},
+			}
 			data, err := json.Marshal(versions)
 			if err != nil {
 				zapctx.Error(ctx, "failed to marshal gui archive versions", zap.Error(err))
