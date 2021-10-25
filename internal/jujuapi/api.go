@@ -20,6 +20,10 @@ type Params struct {
 	// IdentityLocation holds the URL of the thrid-party identiry
 	// provider.
 	IdentityLocation string
+
+	// PublicDNSName is the name to advertise as the public address of
+	// the juju controller.
+	PublicDNSName string
 }
 
 // APIHandler returns an http Handler for the /api endpoint.

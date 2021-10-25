@@ -107,6 +107,10 @@ type Params struct {
 	// filesystem path then the dashboard files will be served from
 	// that path.
 	DashboardLocation string
+
+	// PublicDNSName is the name to advertise as the public address of
+	// the juju controller.
+	PublicDNSName string
 }
 
 // A Service is the implementation of a JIMM server.
@@ -198,9 +202,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err)
 	}
 
-	dhnd := dashboard.Handler(ctx, p.DashboardLocation)
-	s.mux.Handle("/dashboard", dhnd)
-	s.mux.Handle("/dashboard/", dhnd)
 	s.mux.Handle("/debug/", debugapi.Handler(ctx, map[string]debugapi.StatusCheck{
 		"start_started": debugapi.ServerStartTime,
 	}))
@@ -208,9 +209,12 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	params := jujuapi.Params{
 		ControllerUUID:   p.ControllerUUID,
 		IdentityLocation: p.CandidURL,
+		PublicDNSName:    p.PublicDNSName,
 	}
 	s.mux.Handle("/api", jujuapi.APIHandler(ctx, &s.jimm, params))
 	s.mux.Handle("/model/", jujuapi.ModelHandler(ctx, &s.jimm, params))
+	// If the request is not for a known path assume it is part of the dashboard.
+	s.mux.Handle("/", dashboard.Handler(ctx, p.DashboardLocation))
 
 	return s, nil
 }

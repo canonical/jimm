@@ -11,8 +11,10 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"text/template"
+	"time"
 
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -28,65 +30,78 @@ const (
 // then the handler will serve the files from that path. Otherwise a
 // NotFoundHandler will be returned.
 func Handler(ctx context.Context, loc string) http.Handler {
-	if loc == "" {
-		// If the location isn't configured then don't serve any
-		// content.
-		zapctx.Info(ctx, "dashboard location not configured")
-		return http.NotFoundHandler()
-	}
+	mux := http.NewServeMux()
 
-	hnd := redirectHandler(ctx, loc)
-	if hnd == nil {
-		hnd = pathHandler(ctx, loc)
-	}
-	if hnd == nil {
-		hnd = http.NotFoundHandler()
-	}
-	return hnd
-}
-
-func redirectHandler(ctx context.Context, loc string) http.Handler {
 	u, err := url.Parse(loc)
 	if err != nil {
 		zapctx.Warn(ctx, "cannot parse location", zap.Error(err))
-		return nil
 	}
-	if u.IsAbs() {
-		return http.RedirectHandler(loc, http.StatusPermanentRedirect)
+	if u != nil && u.IsAbs() {
+		mux.Handle(dashboardPath, http.RedirectHandler(loc, http.StatusPermanentRedirect))
+		return mux
 	}
-	return nil
-}
 
-func pathHandler(ctx context.Context, loc string) http.Handler {
-	info, err := os.Stat(loc)
+	f, err := os.Open(loc)
 	if err != nil {
-		zapctx.Warn(ctx, "cannot load dashboard files", zap.Error(err))
-		return nil
+		zapctx.Warn(ctx, "error reading dashboard path", zap.Error(err))
+		return mux
 	}
-	if !info.IsDir() {
-		return nil
+	defer f.Close()
+	des, err := f.ReadDir(0)
+	if err != nil {
+		zapctx.Warn(ctx, "error reading dashboard path", zap.Error(err))
+		return mux
 	}
-	mux := http.NewServeMux()
-	t, err := template.ParseFiles(filepath.Join(loc, "config.js.go"))
-	if err == nil {
-		var buf bytes.Buffer
-		if err := t.Execute(&buf, configParams); err == nil {
-			content := buf.Bytes()
-			mux.HandleFunc("/config.js", func(w http.ResponseWriter, _ *http.Request) {
-				w.Write(content)
-			})
+
+	for _, de := range des {
+		fn := filepath.Join(loc, de.Name())
+		if de.IsDir() {
+			mux.Handle(path.Join("/", de.Name(), "/"), http.FileServer(http.Dir(fn)))
+			continue
 		}
-	} else {
-		zapctx.Warn(ctx, "cannot parse template", zap.Error(err))
+		hnd := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			http.ServeFile(w, req, fn)
+		})
+		switch de.Name() {
+		case "index.html":
+			mux.Handle(dashboardPath, hnd)
+			// serve index.html if there is nothing better to serve.
+			mux.Handle("/", hnd)
+		case "config.js":
+			continue
+		case "config.js.go":
+			modTime := time.Now()
+			buf, err := os.ReadFile(fn)
+			if err != nil {
+				zapctx.Error(ctx, "error reading config.js.go", zap.Error(err))
+				continue
+			}
+			t, err := template.New("").Parse(string(buf))
+			if err != nil {
+				zapctx.Error(ctx, "error parsing config.js.go", zap.Error(err))
+				continue
+			}
+			var w bytes.Buffer
+			if err := t.Execute(&w, configParams); err != nil {
+				zapctx.Error(ctx, "error executing config.js.go", zap.Error(err))
+				continue
+			}
+			content := bytes.NewReader(w.Bytes())
+			mux.Handle("/config.js", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				http.ServeContent(w, req, "config.js", modTime, content)
+			}))
+		default:
+			mux.Handle(path.Join("/", de.Name()), hnd)
+		}
 	}
-	mux.Handle("/", http.FileServer(http.Dir(loc)))
-	return http.StripPrefix(dashboardPath, mux)
+
+	return mux
 }
 
 // configParams holds the parameters that need to be provided to the
 // config.js.go template for a JAAS dashboard deployement.
 var configParams = map[string]interface{}{
-	"baseAppURL":                dashboardPath + "/",
+	"baseAppURL":                "/",
 	"identityProviderAvailable": true,
 	"isJuju":                    false,
 }

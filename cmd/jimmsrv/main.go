@@ -50,6 +50,7 @@ func start(ctx context.Context, s *service.Service) error {
 		VaultAuthPath:     os.Getenv("VAULT_AUTH_PATH"),
 		VaultPath:         os.Getenv("VAULT_PATH"),
 		DashboardLocation: os.Getenv("JIMM_DASHBOARD_LOCATION"),
+		PublicDNSName:     os.Getenv("JIMM_DNS_NAME"),
 	})
 	if err != nil {
 		return err

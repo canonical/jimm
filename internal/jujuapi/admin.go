@@ -69,6 +69,7 @@ func (r *controllerRoot) Login(ctx context.Context, req jujuparams.LoginRequest)
 		aui.LastConnection = &u.LastLogin.Time
 	}
 	return jujuparams.LoginResult{
+		PublicDNSName: r.params.PublicDNSName,
 		UserInfo:      &aui,
 		ControllerTag: names.NewControllerTag(r.params.ControllerUUID).String(),
 		Facades:       facades,

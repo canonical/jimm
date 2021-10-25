@@ -17,14 +17,17 @@ import (
 )
 
 const (
-	configFile = `// eslint-disable-next-line no-unused-vars
-var jaasDashboardConfig = {
+	configFile = `var jujuDashboardConfig = {
   // API host to allow app to connect and retrieve models
-  baseControllerURL: "jimm.jujucharms.com",
+  baseControllerURL: null,
   // Configurable base url to allow deploying to different paths.
-  baseAppURL: "/dashboard",
+  baseAppURL: "{{.baseAppURL}}",
   // If true then identity will be provided by a third party provider.
-  identityProviderAvailable: true
+  identityProviderAvailable: {{.identityProviderAvailable}},
+  // Is this application being rendered in Juju and not JAAS. This flag should
+  // only be used for superficial updates like logos. Use feature detection
+  // for other environment features.
+  isJuju: {{.isJuju}},
 };
 `
 	indexFile = `Index File`
@@ -69,7 +72,7 @@ func TestDashboardFromPath(t *testing.T) {
 
 	hnd := dashboard.Handler(context.Background(), dir)
 	rr := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/dashboard/", nil)
+	req, err := http.NewRequest("GET", "/dashboard", nil)
 	c.Assert(err, qt.IsNil)
 	hnd.ServeHTTP(rr, req)
 	resp := rr.Result()
@@ -79,26 +82,29 @@ func TestDashboardFromPath(t *testing.T) {
 	c.Check(string(buf), qt.Equals, indexFile)
 
 	rr = httptest.NewRecorder()
-	req, err = http.NewRequest("GET", "/dashboard/config.js", nil)
+	req, err = http.NewRequest("GET", "/config.js", nil)
 	c.Assert(err, qt.IsNil)
 	hnd.ServeHTTP(rr, req)
 	resp = rr.Result()
 	c.Check(resp.StatusCode, qt.Equals, http.StatusOK)
 	buf, err = io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
-	c.Check(string(buf), qt.Equals, `// eslint-disable-next-line no-unused-vars
-var jaasDashboardConfig = {
+	c.Check(string(buf), qt.Equals, `var jujuDashboardConfig = {
   // API host to allow app to connect and retrieve models
-  baseControllerURL: "jimm.jujucharms.com",
+  baseControllerURL: null,
   // Configurable base url to allow deploying to different paths.
-  baseAppURL: "/dashboard",
+  baseAppURL: "/",
   // If true then identity will be provided by a third party provider.
-  identityProviderAvailable: true
+  identityProviderAvailable: true,
+  // Is this application being rendered in Juju and not JAAS. This flag should
+  // only be used for superficial updates like logos. Use feature detection
+  // for other environment features.
+  isJuju: false,
 };
 `)
 
 	rr = httptest.NewRecorder()
-	req, err = http.NewRequest("GET", "/dashboard/test", nil)
+	req, err = http.NewRequest("GET", "/test", nil)
 	c.Assert(err, qt.IsNil)
 	hnd.ServeHTTP(rr, req)
 	resp = rr.Result()
@@ -106,6 +112,16 @@ var jaasDashboardConfig = {
 	buf, err = io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
 	c.Check(string(buf), qt.Equals, testFile)
+
+	rr = httptest.NewRecorder()
+	req, err = http.NewRequest("GET", "/models/alice@external/test", nil)
+	c.Assert(err, qt.IsNil)
+	hnd.ServeHTTP(rr, req)
+	resp = rr.Result()
+	c.Check(resp.StatusCode, qt.Equals, http.StatusOK)
+	buf, err = io.ReadAll(resp.Body)
+	c.Assert(err, qt.IsNil)
+	c.Check(string(buf), qt.Equals, indexFile)
 }
 
 func TestInvalidLocation(t *testing.T) {
@@ -134,23 +150,4 @@ func TestLocationNotDirectory(t *testing.T) {
 	hnd.ServeHTTP(rr, req)
 	resp := rr.Result()
 	c.Check(resp.StatusCode, qt.Equals, http.StatusNotFound)
-}
-
-func TestNoTemplate(t *testing.T) {
-	c := qt.New(t)
-
-	dir := c.TempDir()
-	err := os.WriteFile(filepath.Join(dir, "config.js"), []byte(testFile), 0444)
-	c.Assert(err, qt.Equals, nil)
-
-	hnd := dashboard.Handler(context.Background(), dir)
-	rr := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/dashboard/config.js", nil)
-	c.Assert(err, qt.IsNil)
-	hnd.ServeHTTP(rr, req)
-	resp := rr.Result()
-	c.Check(resp.StatusCode, qt.Equals, http.StatusOK)
-	buf, err := io.ReadAll(resp.Body)
-	c.Assert(err, qt.IsNil)
-	c.Check(string(buf), qt.Equals, testFile)
 }

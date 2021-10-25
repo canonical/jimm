@@ -82,6 +82,7 @@ class JimmCharm(SystemdCharm):
             "admins": self.config.get('controller-admins', ''),
             "bakery_agent_file": self._bakery_agent_file(),
             "candid_url": self.config.get('candid-url'),
+            "dns_name": self.config.get('dns-name'),
             "log_level": self.config.get('log-level'),
             "uuid": self.config.get('uuid')
         }
