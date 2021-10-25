@@ -56,7 +56,8 @@ func Handler(ctx context.Context, loc string) http.Handler {
 	for _, de := range des {
 		fn := filepath.Join(loc, de.Name())
 		if de.IsDir() {
-			mux.Handle(path.Join("/", de.Name(), "/"), http.FileServer(http.Dir(fn)))
+			root := "/" + de.Name() + "/"
+			mux.Handle(root, http.StripPrefix(root, http.FileServer(http.Dir(fn))))
 			continue
 		}
 		hnd := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
