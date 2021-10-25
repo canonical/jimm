@@ -8,6 +8,7 @@ package dashboard
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"os"
@@ -16,6 +17,8 @@ import (
 	"text/template"
 	"time"
 
+	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/version/v2"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 )
@@ -90,6 +93,45 @@ func Handler(ctx context.Context, loc string) http.Handler {
 			content := bytes.NewReader(w.Bytes())
 			mux.Handle("/config.js", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				http.ServeContent(w, req, "config.js", modTime, content)
+			}))
+		case "version.json":
+			modTime := time.Now()
+			buf, err := os.ReadFile(fn)
+			if err != nil {
+				zapctx.Error(ctx, "error reading version.json", zap.Error(err))
+				continue
+			}
+			var fVersion struct {
+				Version string `json:"version`
+				GitSHA  string `json:"git-sha"`
+			}
+			err = json.Unmarshal(buf, &fVersion)
+			if err != nil {
+				zapctx.Error(ctx, "failed to unmarshal version.json", zap.Error(err))
+				continue
+			}
+			ver, err := version.Parse(fVersion.Version)
+			if err != nil {
+				zapctx.Error(ctx,
+					"invalid dashboard version number",
+					zap.Error(err),
+					zap.String("version", fVersion.Version),
+				)
+				continue
+			}
+			versions := []jujuparams.GUIArchiveVersion{{
+				Version: ver,
+				SHA256:  fVersion.GitSHA,
+				Current: true,
+			}}
+			data, err := json.Marshal(versions)
+			if err != nil {
+				zapctx.Error(ctx, "failed to marshal gui archive versions", zap.Error(err))
+				continue
+			}
+			content := bytes.NewReader(data)
+			mux.Handle("/gui-archive", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				http.ServeContent(w, req, "gui-archive.json", modTime, content)
 			}))
 		default:
 			mux.Handle(path.Join("/", de.Name()), hnd)

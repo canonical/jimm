@@ -30,8 +30,9 @@ const (
   isJuju: {{.isJuju}},
 };
 `
-	indexFile = `Index File`
-	testFile  = `TEST`
+	versionFile = `{"version": "0.8.1", "git-sha": "34388e4b0b3e68e2c2ba342cb45f0f21d248fd3c"}`
+	indexFile   = `Index File`
+	testFile    = `TEST`
 )
 
 func TestDashboardNotConfigured(t *testing.T) {
@@ -150,4 +151,29 @@ func TestLocationNotDirectory(t *testing.T) {
 	hnd.ServeHTTP(rr, req)
 	resp := rr.Result()
 	c.Check(resp.StatusCode, qt.Equals, http.StatusNotFound)
+}
+
+func TestGUIArchiveEndpoint(t *testing.T) {
+	c := qt.New(t)
+
+	dir := c.TempDir()
+	err := os.WriteFile(filepath.Join(dir, "config.js.go"), []byte(configFile), 0444)
+	c.Assert(err, qt.Equals, nil)
+	err = os.WriteFile(filepath.Join(dir, "index.html"), []byte(indexFile), 0444)
+	c.Assert(err, qt.Equals, nil)
+	err = os.WriteFile(filepath.Join(dir, "test"), []byte(testFile), 0444)
+	c.Assert(err, qt.Equals, nil)
+	err = os.WriteFile(filepath.Join(dir, "version.json"), []byte(versionFile), 0444)
+	c.Assert(err, qt.Equals, nil)
+
+	hnd := dashboard.Handler(context.Background(), dir)
+	rr := httptest.NewRecorder()
+	req, err := http.NewRequest("GET", "/gui-archive", nil)
+	c.Assert(err, qt.IsNil)
+	hnd.ServeHTTP(rr, req)
+	resp := rr.Result()
+	c.Check(resp.StatusCode, qt.Equals, http.StatusOK)
+	buf, err := io.ReadAll(resp.Body)
+	c.Assert(err, qt.IsNil)
+	c.Check(string(buf), qt.Equals, `[{"version":"0.8.1","sha256":"34388e4b0b3e68e2c2ba342cb45f0f21d248fd3c","current":true}]`)
 }
