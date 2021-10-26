@@ -4,6 +4,7 @@ package dashboard_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -12,7 +13,9 @@ import (
 	"os"
 	"path/filepath"
 
+	jujuparams "github.com/juju/juju/apiserver/params"
 	jc "github.com/juju/testing/checkers"
+	"github.com/juju/version/v2"
 	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
 
@@ -30,7 +33,8 @@ var jaasDashboardConfig = {
   identityProviderAvailable: true
 };
 `
-	indexFile = `Index File`
+	indexFile   = `Index File`
+	versionFile = `{"version": "0.8.1", "git-sha": "34388e4b0b3e68e2c2ba342cb45f0f21d248fd3c"}`
 )
 
 var _ = gc.Suite(&dashboardSuite{})
@@ -53,6 +57,10 @@ func (s *dashboardSuite) SetUpTest(c *gc.C) {
 
 	tmpFile = filepath.Join(dir, "index.html")
 	err = ioutil.WriteFile(tmpFile, []byte(indexFile), 0666)
+	c.Assert(err, jc.ErrorIsNil)
+
+	tmpFile = filepath.Join(dir, "version.json")
+	err = ioutil.WriteFile(tmpFile, []byte(versionFile), 0666)
 	c.Assert(err, jc.ErrorIsNil)
 
 	ctx := context.Background()
@@ -96,4 +104,26 @@ func (s *dashboardSuite) TestDashboardDefaultToIndex(c *gc.C) {
 	data, err := ioutil.ReadAll(response.Body)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(string(data), gc.Equals, indexFile)
+}
+
+func (s *dashboardSuite) TestGUIArchiveEndpoint(c *gc.C) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/gui-archive", s.server.URL), nil)
+	c.Assert(err, jc.ErrorIsNil)
+
+	response, err := http.DefaultClient.Do(req)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(response.StatusCode, gc.Equals, http.StatusOK)
+
+	data, err := ioutil.ReadAll(response.Body)
+	c.Assert(err, jc.ErrorIsNil)
+	var gar jujuparams.GUIArchiveResponse
+	err = json.Unmarshal(data, &gar)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Check(gar, jc.DeepEquals, jujuparams.GUIArchiveResponse{
+		Versions: []jujuparams.GUIArchiveVersion{{
+			Version: version.MustParse("0.8.1"),
+			SHA256:  "34388e4b0b3e68e2c2ba342cb45f0f21d248fd3c",
+			Current: true,
+		}},
+	})
 }
