@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 
-	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/rpc/jsoncodec"
 	"github.com/julienschmidt/httprouter"
 	"go.uber.org/zap"
@@ -103,16 +102,6 @@ func (h *handler) GUI(p httprequest.Params, arg *guiRequest) error {
 	}
 	http.Redirect(p.Response, p.Request, fmt.Sprintf("%s/u/%s/%s", h.params.GUILocation, m.Path.User, m.Path.Name), http.StatusMovedPermanently)
 	return nil
-}
-
-type guiArchiveRequest struct {
-	httprequest.Route `httprequest:"GET /gui-archive"`
-}
-
-// GUIArchive provides information on GUI versions for compatibility with Juju
-// controllers. In this case, no versions are returned.
-func (h *handler) GUIArchive(*guiArchiveRequest) (jujuparams.GUIArchiveResponse, error) {
-	return jujuparams.GUIArchiveResponse{}, nil
 }
 
 type modelCommandsRequest struct {
