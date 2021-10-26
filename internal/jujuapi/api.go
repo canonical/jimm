@@ -38,7 +38,6 @@ func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httpr
 			}, ctx, nil
 		}),
 		newWebSocketHandler(ctx, params),
-		newRootWebSocketHandler(ctx, params, "/"),
 		newRootWebSocketHandler(ctx, params, "/api"),
 	), nil
 }

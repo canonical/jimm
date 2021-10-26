@@ -80,6 +80,19 @@ func (s *dashboardSuite) TearDownTest(c *gc.C) {
 	}
 }
 
+func (s *dashboardSuite) TestDashboardRedirect(c *gc.C) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/dashboard", s.server.URL), nil)
+	c.Assert(err, jc.ErrorIsNil)
+
+	response, err := http.DefaultClient.Do(req)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(response.StatusCode, gc.Equals, http.StatusOK)
+
+	data, err := ioutil.ReadAll(response.Body)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(string(data), gc.Equals, indexFile)
+}
+
 func (s *dashboardSuite) TestDashboardConfigFile(c *gc.C) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/config.js", s.server.URL), nil)
 	c.Assert(err, jc.ErrorIsNil)
