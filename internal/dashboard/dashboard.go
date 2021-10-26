@@ -37,11 +37,12 @@ func Register(ctx context.Context, router *httprouter.Router, dashboardLocation 
 		return errgo.Mask(err)
 	}
 	if u.IsAbs() {
-		router.GET("/dashboard", func(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+		router.GET(dashboardPath, func(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 			http.Redirect(w, req, dashboardLocation, http.StatusPermanentRedirect)
 		})
 		return nil
 	}
+
 	f, err := os.Open(dashboardLocation)
 	if err != nil {
 		return errgo.Mask(err)
@@ -62,8 +63,13 @@ func Register(ctx context.Context, router *httprouter.Router, dashboardLocation 
 		}
 		switch fi.Name() {
 		case "index.html":
+			// Temporary redirect from /dashboard to /.
+			router.GET(dashboardPath, func(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+				http.Redirect(w, req, "/", http.StatusTemporaryRedirect)
+			})
+			// Serve index.html on /.
+			router.GET("/", serveFile)
 			// Use index.html to serve anything we don't otherwise know about.
-			router.GET(dashboardPath, serveFile)
 			router.NotFound = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				http.ServeFile(w, req, path)
 			})
