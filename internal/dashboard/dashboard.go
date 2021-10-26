@@ -68,9 +68,9 @@ func Handler(ctx context.Context, loc string) http.Handler {
 		})
 		switch de.Name() {
 		case "index.html":
-			mux.Handle(dashboardPath, hnd)
 			// serve index.html if there is nothing better to serve.
 			mux.Handle("/", hnd)
+			mux.Handle(dashboardPath, http.RedirectHandler("/", http.StatusSeeOther))
 		case "config.js":
 			continue
 		case "config.js.go":
