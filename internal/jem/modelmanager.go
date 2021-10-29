@@ -327,6 +327,27 @@ type createModelParams struct {
 }
 
 func (j *JEM) createModel(ctx context.Context, p createModelParams, info *jujuparams.ModelInfo) error {
+	errorChannel := make(chan error, 1)
+	go func() {
+		ctx := context.Background()
+		err := j.createModel1(ctx, p, info)
+		select {
+		case errorChannel <- err:
+		default:
+			zapctx.Warn(ctx, "failed to return the createModel result", zaputil.Error(err))
+		}
+	}()
+
+	select {
+	case err := <-errorChannel:
+		return err
+	case <-ctx.Done():
+		zapctx.Warn(ctx, "context cancelled")
+		return ctx.Err()
+	}
+}
+
+func (j *JEM) createModel1(ctx context.Context, p createModelParams, info *jujuparams.ModelInfo) error {
 	conn, err := j.OpenAPIFromDoc(ctx, p.controller)
 	if err != nil {
 		return errgo.Notef(err, "cannot connect to controller")
