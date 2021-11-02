@@ -27,20 +27,9 @@ func (d *Database) AddModel(ctx context.Context, model *dbmodel.Model) error {
 	return nil
 }
 
-// GetOption lets you specify which fields are to be populated when
-// fetching an object from the database.
-type GetOption func(*gorm.DB) *gorm.DB
-
-// AssociatedApplications populates the associated applications.
-func AssociatedApplications() GetOption {
-	return func(db *gorm.DB) *gorm.DB {
-		return db.Preload("Applications")
-	}
-}
-
 // GetModel returns model information based on the
 // model UUID.
-func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model, options ...GetOption) error {
+func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model) error {
 	const op = errors.Op("db.GetModel")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
@@ -60,10 +49,6 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model, options .
 	}
 
 	db = preloadModel("", db)
-
-	for _, option := range options {
-		db = option(db)
-	}
 
 	if err := db.First(&model).Error; err != nil {
 		err = dbError(err)
@@ -179,61 +164,11 @@ func preloadModel(prefix string, db *gorm.DB) *gorm.DB {
 	db = db.Preload(prefix + "Controller")
 	db = db.Preload(prefix + "CloudRegion").Preload(prefix + "CloudRegion.Cloud")
 	db = db.Preload(prefix + "CloudCredential")
-	db = db.Preload(prefix + "Applications")
 	db = db.Preload(prefix + "Machines")
 	db = db.Preload(prefix + "Units")
 	db = db.Preload(prefix + "Users").Preload(prefix + "Users.User")
 
 	return db
-}
-
-// GetApplication retrieves the application identified by ModelID and Name.
-func (d *Database) GetApplication(ctx context.Context, app *dbmodel.Application) error {
-	const op = errors.Op("db.GetApplication")
-
-	if err := d.ready(); err != nil {
-		return errors.E(op, err)
-	}
-
-	db := d.DB.WithContext(ctx)
-	if err := db.Where("model_id = ? AND name = ?", app.ModelID, app.Name).First(app).Error; err != nil {
-		err = dbError(err)
-		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return errors.E(op, err, "application not found")
-		}
-		return errors.E(op, err)
-	}
-	return nil
-}
-
-// DeleteApplication deletes the application identified by ModelID and Name.
-func (d *Database) DeleteApplication(ctx context.Context, app *dbmodel.Application) error {
-	const op = errors.Op("db.DeleteApplication")
-
-	if err := d.ready(); err != nil {
-		return errors.E(op, err)
-	}
-
-	db := d.DB.WithContext(ctx)
-	if err := db.Where("model_id = ? AND name = ?", app.ModelID, app.Name).Delete(&dbmodel.Application{}).Error; err != nil {
-		return errors.E(op, dbError(err))
-	}
-	return nil
-}
-
-// UpdateApplication updates the application information.
-func (d *Database) UpdateApplication(ctx context.Context, app *dbmodel.Application) error {
-	const op = errors.Op("db.UpdateApplication")
-
-	if err := d.ready(); err != nil {
-		return errors.E(op, err)
-	}
-
-	db := d.DB.WithContext(ctx)
-	if err := db.Save(app).Error; err != nil {
-		return errors.E(op, dbError(err))
-	}
-	return nil
 }
 
 // GetMachine retrieves a machine identified by ModelID and MachineID.

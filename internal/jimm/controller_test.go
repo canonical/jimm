@@ -592,14 +592,6 @@ func TestImportModel(t *testing.T) {
 				Level: "1",
 				Owner: "me",
 			},
-			Applications: []dbmodel.Application{{
-				CharmURL:        "cs:app-1",
-				Exposed:         true,
-				Life:            "alive",
-				MinUnits:        1,
-				Name:            "app-1",
-				WorkloadVersion: "2",
-			}},
 			Machines: []dbmodel.Machine{{
 				MachineID: "machine-1",
 				Life:      "alive",

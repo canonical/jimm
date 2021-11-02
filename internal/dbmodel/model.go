@@ -66,11 +66,11 @@ type Model struct {
 	// SLA contains the SLA of the model.
 	SLA SLA `gorm:"embedded;embeddedPrefix:sla_"`
 
-	// Applications are the applications attached to the model.
-	Applications []Application
-
 	// Machines are the machines attached to the model.
 	Machines []Machine
+
+	// Offers are the ApplicationOffers attached to the model.
+	Offers []ApplicationOffer
 
 	// Units are the units attached to the model.
 	Units []Unit
@@ -178,10 +178,10 @@ func (m Model) ToJujuModel() jujuparams.Model {
 }
 
 // ToJujuModelInfo converts a model into a jujuparams.ModelInfo. The model
-// must have its Applications, CloudRegion, CloudCredential, Controller,
-// Machines, Owner, and Users associations fetched. The ModelInfo is
-// created with admin-level data, it is the caller's responsibility to
-// filter any data that should not be returned.
+// must have its CloudRegion, CloudCredential, Controller, Machines, Owner,
+// and Users associations fetched. The ModelInfo is created with
+// admin-level data, it is the caller's responsibility to filter any data
+// that should not be returned.
 func (m Model) ToJujuModelInfo() jujuparams.ModelInfo {
 	var mi jujuparams.ModelInfo
 	mi.Name = m.Name
@@ -222,10 +222,10 @@ func (m Model) ToJujuModelInfo() jujuparams.ModelInfo {
 }
 
 // ToJujuModelSummary converts a model to a jujuparams.ModelSummary. The
-// model must have its Applications, CloudRegion, CloudCredential,
-// Controller, Machines, and Owner, associations fetched. The ModelSummary
-// will not include the UserAccess or UserLastConnection fields, it is the
-// caller's responsibility to complete these fields appropriately.
+// model must have its CloudRegion, CloudCredential, Controller, Machines,
+// and Owner, associations fetched. The ModelSummary will not include the
+// UserAccess or UserLastConnection fields, it is the caller's
+// responsibility to complete these fields appropriately.
 func (m Model) ToJujuModelSummary() jujuparams.ModelSummary {
 	var ms jujuparams.ModelSummary
 	ms.Name = m.Name
@@ -659,69 +659,6 @@ func (h Hardware) ToJujuMachineHardware() jujuparams.MachineHardware {
 	return mh
 }
 
-// An Application is an application in a model.
-type Application struct {
-	ID        uint `gorm:"primaryKey"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
-
-	// Model is the model that contains this application.
-	ModelID uint  `gorm:"not null;uniqueIndex:idx_application_model_id_name"`
-	Model   Model `gorm:"constraint:OnDelete:CASCADE"`
-
-	// Name is the name of the application.
-	Name string `gorm:"not null;uniqueIndex:idx_application_model_id_name"`
-
-	// Exposed is the exposed status of the application.
-	Exposed bool
-
-	// CharmURL contains the URL of the charm that supplies the
-	CharmURL string
-
-	// Life contains the life status of the application.
-	Life string
-
-	// MinUnits contains the minimum number of units required for the
-	// application.
-	MinUnits uint
-
-	// Constraints contains the application constraints.
-	Constraints Hardware `gorm:"embedded;embeddedPrefix:constraint_"`
-
-	// Config contains the application config.
-	Config Map
-
-	// Subordinate contains whether this application is a subordinate.
-	Subordinate bool
-
-	// Status contains the application status.
-	Status Status `gorm:"embedded;embeddedPrefix:status_"`
-
-	// WorkloadVersion contains the application's workload-version.
-	WorkloadVersion string
-
-	// Units are units of this application.
-	Units []Unit `gorm:"foreignKey:ModelID,ApplicationName;references:ModelID,Name"`
-
-	// Offers are offers for this application.
-	Offers []ApplicationOffer `gorm:"foreignKey:ModelID,ApplicationName;references:ModelID,Name"`
-}
-
-// FromJujuApplicationInfo sets the values of the Application from a juju
-// ApplicationInfo structure.
-func (a *Application) FromJujuApplicationInfo(info jujuparams.ApplicationInfo) {
-	a.Name = info.Name
-	a.Exposed = info.Exposed
-	a.CharmURL = info.CharmURL
-	a.Life = string(info.Life)
-	a.MinUnits = uint(info.MinUnits)
-	a.Constraints.FromJujuConstraintsValue(info.Constraints)
-	a.Config = Map(info.Config)
-	a.Subordinate = info.Subordinate
-	a.Status.FromJujuStatusInfo(info.Status)
-	a.WorkloadVersion = info.WorkloadVersion
-}
-
 // A Unit represents a unit of an application in a model.
 type Unit struct {
 	ID        uint `gorm:"primaryKey"`
@@ -734,7 +671,6 @@ type Unit struct {
 
 	// Application contains the application this unit belongs to.
 	ApplicationName string
-	Application     Application `gorm:"foreignKey:ModelID,ApplicationName;references:ModelID,Name"`
 
 	// Machine contains the machine this unit is deployed to.
 	MachineID string

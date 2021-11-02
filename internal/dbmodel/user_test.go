@@ -236,26 +236,22 @@ func TestUserApplicationOffers(t *testing.T) {
 		Controller:      ctl,
 		CloudRegion:     cl.Regions[0],
 		CloudCredential: cred,
-		Applications: []dbmodel.Application{{
-			Name: "app-1",
-			Offers: []dbmodel.ApplicationOffer{{
-				Name: "offer-1",
-				UUID: "00000004-0000-0000-0000-0000-000000000001",
-				Users: []dbmodel.UserApplicationOfferAccess{{
-					User:   u,
-					Access: "admin",
-				}},
+		Offers: []dbmodel.ApplicationOffer{{
+			Name: "offer-1",
+			UUID: "00000004-0000-0000-0000-0000-000000000001",
+			Users: []dbmodel.UserApplicationOfferAccess{{
+				User:   u,
+				Access: "admin",
 			}},
+			ApplicationName: "app-1",
 		}, {
-			Name: "app-2",
-			Offers: []dbmodel.ApplicationOffer{{
-				Name: "offer-1",
-				UUID: "00000004-0000-0000-0000-0000-000000000002",
-				Users: []dbmodel.UserApplicationOfferAccess{{
-					User:   u,
-					Access: "consume",
-				}},
+			Name: "offer-1",
+			UUID: "00000004-0000-0000-0000-0000-000000000002",
+			Users: []dbmodel.UserApplicationOfferAccess{{
+				User:   u,
+				Access: "consume",
 			}},
+			ApplicationName: "app-2",
 		}},
 	}
 
@@ -267,21 +263,21 @@ func TestUserApplicationOffers(t *testing.T) {
 
 	c.Check(offers, qt.DeepEquals, []dbmodel.UserApplicationOfferAccess{{
 		Model: gorm.Model{
-			ID:        m.Applications[0].Offers[0].Users[0].ID,
-			CreatedAt: m.Applications[0].Offers[0].Users[0].CreatedAt,
-			UpdatedAt: m.Applications[0].Offers[0].Users[0].UpdatedAt,
+			ID:        m.Offers[0].Users[0].ID,
+			CreatedAt: m.Offers[0].Users[0].CreatedAt,
+			UpdatedAt: m.Offers[0].Users[0].UpdatedAt,
 		},
 		Username:           u.Username,
-		ApplicationOfferID: m.Applications[0].Offers[0].ID,
+		ApplicationOfferID: m.Offers[0].ID,
 		Access:             "admin",
 	}, {
 		Model: gorm.Model{
-			ID:        m.Applications[1].Offers[0].Users[0].ID,
-			CreatedAt: m.Applications[1].Offers[0].Users[0].CreatedAt,
-			UpdatedAt: m.Applications[1].Offers[0].Users[0].UpdatedAt,
+			ID:        m.Offers[1].Users[0].ID,
+			CreatedAt: m.Offers[1].Users[0].CreatedAt,
+			UpdatedAt: m.Offers[1].Users[0].UpdatedAt,
 		},
 		Username:           u.Username,
-		ApplicationOfferID: m.Applications[1].Offers[0].ID,
+		ApplicationOfferID: m.Offers[1].ID,
 		Access:             "consume",
 	}})
 }

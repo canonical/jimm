@@ -9,7 +9,6 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	jujuparams "github.com/juju/juju/apiserver/params"
-	"github.com/juju/juju/core/constraints"
 	"github.com/juju/juju/core/instance"
 	"github.com/juju/names/v4"
 	"gorm.io/gorm"
@@ -79,11 +78,6 @@ func TestDeleteModelRemovesMachinesAndApplications(t *testing.T) {
 		Controller:      ctl,
 		CloudRegion:     cl.Regions[0],
 		CloudCredential: cred,
-		Applications: []dbmodel.Application{{
-			Name: "app-1",
-		}, {
-			Name: "app-2",
-		}},
 		Machines: []dbmodel.Machine{{
 			MachineID: "0",
 		}, {
@@ -92,17 +86,13 @@ func TestDeleteModelRemovesMachinesAndApplications(t *testing.T) {
 	}
 	c.Assert(db.Create(&m).Error, qt.IsNil)
 
-	// Check the applications and machines have been created.
-	var app1 dbmodel.Application
-	c.Assert(db.First(&app1).Error, qt.IsNil)
-	c.Check(app1.Name, qt.Equals, "app-1")
+	// Check the machines have been created.
 	var mach1 dbmodel.Machine
 	c.Assert(db.First(&mach1).Error, qt.IsNil)
 	c.Check(mach1.MachineID, qt.Equals, "0")
 
 	c.Assert(db.Delete(&m).Error, qt.IsNil)
 
-	c.Check(db.First(&dbmodel.Application{}).Error, qt.Equals, gorm.ErrRecordNotFound)
 	c.Check(db.First(&dbmodel.Machine{}).Error, qt.Equals, gorm.ErrRecordNotFound)
 }
 
@@ -135,32 +125,6 @@ func TestModel(t *testing.T) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Applications: []dbmodel.Application{{
-			Name:     "app-1",
-			Exposed:  true,
-			CharmURL: "ch:charm",
-			Life:     "alive",
-			MinUnits: 1,
-			Constraints: dbmodel.Hardware{
-				Arch: sql.NullString{
-					String: "amd64",
-					Valid:  true,
-				},
-			},
-			Config: dbmodel.Map(map[string]interface{}{
-				"a": "b",
-			}),
-			Subordinate: false,
-			Status: dbmodel.Status{
-				Status: "active",
-				Info:   "Unit Is Ready",
-				Since: sql.NullTime{
-					Time:  time.Now(),
-					Valid: true,
-				},
-			},
-			WorkloadVersion: "1.0.0",
-		}},
 		Machines: []dbmodel.Machine{{
 			MachineID: "0",
 			Hardware: dbmodel.Hardware{
@@ -199,7 +163,7 @@ func TestModel(t *testing.T) {
 		}},
 	}
 	c.Assert(db.Create(&m).Error, qt.IsNil)
-	m.Applications[0].Units = []dbmodel.Unit{{
+	m.Units = []dbmodel.Unit{{
 		Name:           "0",
 		Machine:        m.Machines[0],
 		Life:           "alive",
@@ -237,13 +201,13 @@ func TestModel(t *testing.T) {
 	c.Check(m.Machines[0].Units, qt.HasLen, 1)
 
 	var m2 dbmodel.Model
-	pdb := db.Preload("Applications").Preload("Applications.Units").Preload("Applications.Units.Machine")
-	pdb = pdb.Preload("CloudRegion")
+	pdb := db.Preload("CloudRegion")
 	pdb = pdb.Preload("CloudCredential").Preload("CloudCredential.Cloud").Preload("CloudCredential.Cloud.Regions").Preload("CloudCredential.Owner")
 	pdb = pdb.Preload("Controller")
 	pdb = pdb.Preload("Owner")
 	pdb = pdb.Preload("Machines").Preload("Machines.Units")
 	pdb = pdb.Preload("Users").Preload("Users.User")
+	pdb = pdb.Preload("Units").Preload("Units.Machine")
 	c.Assert(pdb.First(&m2).Error, qt.IsNil)
 	c.Check(m2, qt.DeepEquals, m)
 }
@@ -278,32 +242,6 @@ func TestToJujuModel(t *testing.T) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Applications: []dbmodel.Application{{
-			Name:     "app-1",
-			Exposed:  true,
-			CharmURL: "ch:charm",
-			Life:     "alive",
-			MinUnits: 1,
-			Constraints: dbmodel.Hardware{
-				Arch: sql.NullString{
-					String: "amd64",
-					Valid:  true,
-				},
-			},
-			Config: dbmodel.Map(map[string]interface{}{
-				"a": "b",
-			}),
-			Subordinate: false,
-			Status: dbmodel.Status{
-				Status: "active",
-				Info:   "Unit Is Ready",
-				Since: sql.NullTime{
-					Time:  now,
-					Valid: true,
-				},
-			},
-			WorkloadVersion: "1.0.0",
-		}},
 		Machines: []dbmodel.Machine{{
 			MachineID: "0",
 			Hardware: dbmodel.Hardware{
@@ -383,32 +321,6 @@ func TestUserModelAccessToJujuUserModel(t *testing.T) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Applications: []dbmodel.Application{{
-			Name:     "app-1",
-			Exposed:  true,
-			CharmURL: "ch:charm",
-			Life:     "alive",
-			MinUnits: 1,
-			Constraints: dbmodel.Hardware{
-				Arch: sql.NullString{
-					String: "amd64",
-					Valid:  true,
-				},
-			},
-			Config: dbmodel.Map(map[string]interface{}{
-				"a": "b",
-			}),
-			Subordinate: false,
-			Status: dbmodel.Status{
-				Status: "active",
-				Info:   "Unit Is Ready",
-				Since: sql.NullTime{
-					Time:  now,
-					Valid: true,
-				},
-			},
-			WorkloadVersion: "1.0.0",
-		}},
 		Machines: []dbmodel.Machine{{
 			MachineID: "0",
 			Hardware: dbmodel.Hardware{
@@ -500,32 +412,6 @@ func TestToJujuModelInfo(t *testing.T) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Applications: []dbmodel.Application{{
-			Name:     "app-1",
-			Exposed:  true,
-			CharmURL: "ch:charm",
-			Life:     "alive",
-			MinUnits: 1,
-			Constraints: dbmodel.Hardware{
-				Arch: sql.NullString{
-					String: "amd64",
-					Valid:  true,
-				},
-			},
-			Config: dbmodel.Map(map[string]interface{}{
-				"a": "b",
-			}),
-			Subordinate: false,
-			Status: dbmodel.Status{
-				Status: "active",
-				Info:   "Unit Is Ready",
-				Since: sql.NullTime{
-					Time:  now,
-					Valid: true,
-				},
-			},
-			WorkloadVersion: "1.0.0",
-		}},
 		Machines: []dbmodel.Machine{{
 			MachineID: "0",
 			Hardware: dbmodel.Hardware{
@@ -635,32 +521,6 @@ func TestWriteModelSummary(t *testing.T) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Applications: []dbmodel.Application{{
-			Name:     "app-1",
-			Exposed:  true,
-			CharmURL: "ch:charm",
-			Life:     "alive",
-			MinUnits: 1,
-			Constraints: dbmodel.Hardware{
-				Arch: sql.NullString{
-					String: "amd64",
-					Valid:  true,
-				},
-			},
-			Config: dbmodel.Map(map[string]interface{}{
-				"a": "b",
-			}),
-			Subordinate: false,
-			Status: dbmodel.Status{
-				Status: "active",
-				Info:   "Unit Is Ready",
-				Since: sql.NullTime{
-					Time:  now,
-					Valid: true,
-				},
-			},
-			WorkloadVersion: "1.0.0",
-		}},
 		Machines: []dbmodel.Machine{{
 			MachineID: "0",
 			Hardware: dbmodel.Hardware{
@@ -763,32 +623,6 @@ func TestUserModelAccessToJujuModelSummary(t *testing.T) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Applications: []dbmodel.Application{{
-			Name:     "app-1",
-			Exposed:  true,
-			CharmURL: "ch:charm",
-			Life:     "alive",
-			MinUnits: 1,
-			Constraints: dbmodel.Hardware{
-				Arch: sql.NullString{
-					String: "amd64",
-					Valid:  true,
-				},
-			},
-			Config: dbmodel.Map(map[string]interface{}{
-				"a": "b",
-			}),
-			Subordinate: false,
-			Status: dbmodel.Status{
-				Status: "active",
-				Info:   "Unit Is Ready",
-				Since: sql.NullTime{
-					Time:  now,
-					Valid: true,
-				},
-			},
-			WorkloadVersion: "1.0.0",
-		}},
 		Machines: []dbmodel.Machine{{
 			MachineID: "0",
 			Hardware: dbmodel.Hardware{
@@ -1130,70 +964,6 @@ func TestMachineFromJujuMachineInfo(t *testing.T) {
 		HasVote:   true,
 		WantsVote: true,
 		Series:    "warty",
-	})
-}
-
-func TestApplicationFromJujuApplicationInfo(t *testing.T) {
-	c := qt.New(t)
-	now := time.Now().UTC().Truncate(time.Millisecond)
-
-	arch := "amd64"
-	mem := uint64(8096)
-	rootDisk := uint64(10240)
-	info := jujuparams.ApplicationInfo{
-		Name:     "app-1",
-		Exposed:  true,
-		CharmURL: "cs:app-1",
-		Life:     "alive",
-		MinUnits: 3,
-		Constraints: constraints.Value{
-			Arch:     &arch,
-			Mem:      &mem,
-			RootDisk: &rootDisk,
-		},
-		Subordinate: false,
-		Status: jujuparams.StatusInfo{
-			Current: "idle",
-			Message: "okay",
-			Since:   &now,
-			Version: "1.2.3",
-		},
-		WorkloadVersion: "12",
-	}
-
-	application := dbmodel.Application{}
-	application.FromJujuApplicationInfo(info)
-	c.Assert(application, qt.DeepEquals, dbmodel.Application{
-		Name:     "app-1",
-		Exposed:  true,
-		CharmURL: "cs:app-1",
-		Life:     "alive",
-		MinUnits: 3,
-		Constraints: dbmodel.Hardware{
-			Arch: sql.NullString{
-				String: "amd64",
-				Valid:  true,
-			},
-			Mem: dbmodel.NullUint64{
-				Uint64: 8096,
-				Valid:  true,
-			},
-			RootDisk: dbmodel.NullUint64{
-				Uint64: 10240,
-				Valid:  true,
-			},
-		},
-		Subordinate: false,
-		Status: dbmodel.Status{
-			Status: "idle",
-			Info:   "okay",
-			Since: sql.NullTime{
-				Time:  now,
-				Valid: true,
-			},
-			Version: "1.2.3",
-		},
-		WorkloadVersion: "12",
 	})
 }
 

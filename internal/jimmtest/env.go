@@ -336,7 +336,6 @@ type Model struct {
 	DefaultSeries string                        `json:"default-series"`
 	Life          string                        `json:"life"`
 	Status        jujuparams.EntityStatus       `json:"status"`
-	Applications  []jujuparams.ApplicationInfo  `json:"applications"`
 	Machines      []jujuparams.ModelMachineInfo `json:"machines"`
 	Units         []jujuparams.UnitInfo         `json:"units"`
 	SLA           *jujuparams.ModelSLAInfo      `json:"sla"`
@@ -380,10 +379,6 @@ func (m *Model) DBObject(c *qt.C, db db.Database) dbmodel.Model {
 	m.dbo.Life = m.Life
 	m.dbo.Status.FromJujuEntityStatus(m.Status)
 	m.dbo.Status.Version = m.AgentVersion
-	m.dbo.Applications = make([]dbmodel.Application, len(m.Applications))
-	for i, app := range m.Applications {
-		m.dbo.Applications[i].FromJujuApplicationInfo(app)
-	}
 	m.dbo.Machines = make([]dbmodel.Machine, len(m.Machines))
 	for i, mach := range m.Machines {
 		m.dbo.Machines[i].FromJujuModelMachineInfo(mach)

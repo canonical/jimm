@@ -56,22 +56,6 @@ models:
     access: write
   - user: charlie@external
     access: read
-  applications:
-  - name: app-1
-    exposed: true
-    charm-url: cs:app-1
-    life: starting
-    min-units: 1
-    constraints:
-      arch: amd64
-      cores: 2
-      mem: 8096
-      root-disk: 10240
-    workload-version: 1    
-  - name: app-2
-    exposed: true
-    charm-url: ch:app-2
-    subordinate: true
   machines:
   - id: 0
     hardware:
@@ -323,20 +307,7 @@ var watcherTests = []struct {
 		err := db.GetModel(ctx, &model)
 		c.Assert(err, qt.IsNil)
 
-		app := dbmodel.Application{
-			ModelID: model.ID,
-			Name:    "app-3",
-		}
-		err = db.GetApplication(ctx, &app)
-		c.Assert(err, qt.IsNil)
-		c.Check(app, jimmtest.DBObjectEquals, dbmodel.Application{
-			ModelID:  model.ID,
-			Name:     "app-3",
-			CharmURL: "ch:app-3",
-			Life:     "starting",
-			MinUnits: 3,
-			Config:   dbmodel.Map{"a": "B"},
-		})
+		//TODO(mhilton) check something was done.
 	},
 }, {
 	name: "UpdateApplication",
@@ -362,22 +333,7 @@ var watcherTests = []struct {
 		}
 		err := db.GetModel(ctx, &model)
 		c.Assert(err, qt.IsNil)
-
-		app := dbmodel.Application{
-			ModelID: model.ID,
-			Name:    "app-1",
-		}
-		err = db.GetApplication(ctx, &app)
-		c.Assert(err, qt.IsNil)
-		c.Check(app, jimmtest.DBObjectEquals, dbmodel.Application{
-			ModelID:         model.ID,
-			Name:            "app-1",
-			Exposed:         true,
-			CharmURL:        "cs:app-1",
-			Life:            "alive",
-			MinUnits:        1,
-			WorkloadVersion: "2",
-		})
+		//TODO(mhilton) check something was done.
 	},
 }, {
 	name: "DeleteApplication",
@@ -399,14 +355,7 @@ var watcherTests = []struct {
 		}
 		err := db.GetModel(ctx, &model)
 		c.Assert(err, qt.IsNil)
-
-		app := dbmodel.Application{
-			ModelID: model.ID,
-			Name:    "app-1",
-		}
-		err = db.GetApplication(ctx, &app)
-		c.Check(err, qt.ErrorMatches, `application not found`)
-		c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+		// TODO(mhilton) check application offers are deleted
 	},
 }, {
 	name: "AddUnit",
@@ -575,7 +524,6 @@ var watcherTests = []struct {
 		model.CloudCredential = dbmodel.CloudCredential{}
 		model.CloudRegion = dbmodel.CloudRegion{}
 		model.Controller = dbmodel.Controller{}
-		model.Applications = nil
 		model.Machines = nil
 		model.Units = nil
 		model.Users = nil
@@ -666,7 +614,6 @@ var watcherTests = []struct {
 		model.CloudCredential = dbmodel.CloudCredential{}
 		model.CloudRegion = dbmodel.CloudRegion{}
 		model.Controller = dbmodel.Controller{}
-		model.Applications = nil
 		model.Machines = nil
 		model.Units = nil
 		model.Users = nil

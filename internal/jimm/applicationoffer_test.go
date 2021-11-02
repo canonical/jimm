@@ -112,11 +112,6 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database) 
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
-		Applications: []dbmodel.Application{{
-			Name:     "test-app",
-			Exposed:  true,
-			CharmURL: "cs:test-app:17",
-		}},
 	}
 	err = db.AddModel(ctx, &model)
 	c.Assert(err, qt.IsNil)
@@ -130,13 +125,7 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database) 
 		ModelID:         model.ID,
 		Model:           model,
 		ApplicationName: "test-app",
-		Application: dbmodel.Application{
-			ID:       1,
-			ModelID:  model.ID,
-			Name:     "test-app",
-			Exposed:  true,
-			CharmURL: "cs:test-app:17",
-		},
+		CharmURL:        "cs:test-app:17",
 		Users: []dbmodel.UserApplicationOfferAccess{{
 			Username: u.Username,
 			Access:   string(jujuparams.OfferAdminAccess),
@@ -550,11 +539,6 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
-		Applications: []dbmodel.Application{{
-			Name:     "test-app",
-			Exposed:  true,
-			CharmURL: "cs:test-app:17",
-		}},
 	}
 	err = db.AddModel(ctx, &model)
 	c.Assert(err, qt.Equals, nil)
@@ -565,13 +549,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 		ModelID:         model.ID,
 		Model:           model,
 		ApplicationName: "test-app",
-		Application: dbmodel.Application{
-			ID:       1,
-			ModelID:  model.ID,
-			Name:     "test-app",
-			Exposed:  true,
-			CharmURL: "cs:test-app:17",
-		},
+		CharmURL:        "cs:test-app:17",
 		Users: []dbmodel.UserApplicationOfferAccess{{
 			Username: u.Username,
 			Access:   string(jujuparams.OfferAdminAccess),
@@ -907,26 +885,15 @@ func TestGetApplicationOffer(t *testing.T) {
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
-		Applications: []dbmodel.Application{{
-			Name:     "test-app",
-			Exposed:  true,
-			CharmURL: "cs:test-app:17",
-		}},
 	}
 	err = j.Database.AddModel(ctx, &model)
 	c.Assert(err, qt.Equals, nil)
 
 	offer := dbmodel.ApplicationOffer{
-		ID:              1,
-		ModelID:         1,
-		ApplicationName: "test-app",
-		Application: dbmodel.Application{
-			ID:       1,
-			ModelID:  1,
-			Name:     "test-app",
-			Exposed:  true,
-			CharmURL: "cs:test-app:17",
-		},
+		ID:                     1,
+		ModelID:                1,
+		ApplicationName:        "test-app",
+		CharmURL:               "cs:test-app:17",
 		ApplicationDescription: "a test app offering",
 		Name:                   "test-application-offer",
 		UUID:                   "00000000-0000-0000-0000-0000-0000000000004",
@@ -1210,11 +1177,6 @@ func TestOffer(t *testing.T) {
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
-				Applications: []dbmodel.Application{{
-					Name:     "test-app",
-					Exposed:  true,
-					CharmURL: "cs:test-app:17",
-				}},
 				Users: []dbmodel.UserModelAccess{{
 					User:   u,
 					Access: "admin",
@@ -1234,16 +1196,10 @@ func TestOffer(t *testing.T) {
 			}
 
 			offer := dbmodel.ApplicationOffer{
-				ID:              1,
-				ModelID:         1,
-				ApplicationName: "test-app",
-				Application: dbmodel.Application{
-					ID:       1,
-					ModelID:  1,
-					Name:     "test-app",
-					Exposed:  true,
-					CharmURL: "cs:test-app:17",
-				},
+				ID:                     1,
+				ModelID:                1,
+				ApplicationName:        "test-app",
+				CharmURL:               "cs:test-app:17",
 				ApplicationDescription: "a test app offering",
 				UUID:                   "00000000-0000-0000-0000-0000-0000000000004",
 				URL:                    "test-offer-url",
@@ -1343,11 +1299,6 @@ func TestOffer(t *testing.T) {
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
-				Applications: []dbmodel.Application{{
-					Name:     "test-app",
-					Exposed:  true,
-					CharmURL: "cs:test-app:17",
-				}},
 				Users: []dbmodel.UserModelAccess{{
 					User:   u,
 					Access: "admin",
@@ -1436,11 +1387,6 @@ func TestOffer(t *testing.T) {
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
-				Applications: []dbmodel.Application{{
-					Name:     "test-app",
-					Exposed:  true,
-					CharmURL: "cs:test-app:17",
-				}},
 				Users: []dbmodel.UserModelAccess{{
 					User:   u,
 					Access: "admin",
@@ -1508,7 +1454,7 @@ func TestOffer(t *testing.T) {
 			return nil
 		},
 		offer: func(context.Context, jujuparams.AddApplicationOffer) error {
-			return nil
+			return errors.E(errors.CodeNotFound, "application test-app")
 		},
 		createEnv: func(c *qt.C, db db.Database) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
@@ -1584,7 +1530,8 @@ func TestOffer(t *testing.T) {
 			offer := dbmodel.ApplicationOffer{}
 
 			return u, offerParams, offer, func(c *qt.C, err error) {
-				c.Assert(err, qt.ErrorMatches, "application not found")
+				c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+				c.Assert(err, qt.ErrorMatches, "application test-app")
 			}
 		},
 	}, {
@@ -1657,11 +1604,6 @@ func TestOffer(t *testing.T) {
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
-				Applications: []dbmodel.Application{{
-					Name:     "test-app",
-					Exposed:  true,
-					CharmURL: "cs:test-app:17",
-				}},
 				Users: []dbmodel.UserModelAccess{{
 					User:   u,
 					Access: "admin",
@@ -1750,11 +1692,6 @@ func TestOffer(t *testing.T) {
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
-				Applications: []dbmodel.Application{{
-					Name:     "test-app",
-					Exposed:  true,
-					CharmURL: "cs:test-app:17",
-				}},
 				Users: []dbmodel.UserModelAccess{{
 					User:   u,
 					Access: "admin",
@@ -1843,11 +1780,6 @@ func TestOffer(t *testing.T) {
 				ControllerID:      controller.ID,
 				CloudRegionID:     cloud.Regions[0].ID,
 				CloudCredentialID: cred.ID,
-				Applications: []dbmodel.Application{{
-					Name:     "test-app",
-					Exposed:  true,
-					CharmURL: "cs:test-app:17",
-				}},
 				Users: []dbmodel.UserModelAccess{{
 					User:   u,
 					Access: "admin",
@@ -2210,18 +2142,12 @@ func TestUpdateOffer(t *testing.T) {
 			return env.applicationOffers[0].UUID, false
 		},
 		expectedOffer: dbmodel.ApplicationOffer{
-			ID:              1,
-			UUID:            "00000000-0000-0000-0000-0000-0000000000011",
-			URL:             "test-offer-url",
-			ModelID:         1,
-			ApplicationName: "test-app",
-			Application: dbmodel.Application{
-				ID:       1,
-				ModelID:  1,
-				Name:     "test-app",
-				Exposed:  true,
-				CharmURL: "cs:test-app:17",
-			},
+			ID:                     1,
+			UUID:                   "00000000-0000-0000-0000-0000-0000000000011",
+			URL:                    "test-offer-url",
+			ModelID:                1,
+			ApplicationName:        "test-app",
+			CharmURL:               "cs:test-app:17",
 			ApplicationDescription: "changed offer description",
 			Spaces: []dbmodel.ApplicationOfferRemoteSpace{{
 				ApplicationOfferID: 1,
@@ -2411,13 +2337,7 @@ func TestFindApplicationOffers(t *testing.T) {
 			},
 		},
 		ApplicationName: "test-app",
-		Application: dbmodel.Application{
-			ID:       1,
-			ModelID:  1,
-			Name:     "test-app",
-			Exposed:  true,
-			CharmURL: "cs:test-app:17",
-		},
+		CharmURL:        "cs:test-app:17",
 		Users: []dbmodel.UserApplicationOfferAccess{{
 			Username: "alice@external",
 			User: dbmodel.User{

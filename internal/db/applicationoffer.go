@@ -67,7 +67,6 @@ func (d *Database) GetApplicationOffer(ctx context.Context, offer *dbmodel.Appli
 	} else {
 		return errors.E(op, "missing offer UUID or URL")
 	}
-	db = db.Preload("Application")
 	db = db.Preload("Connections")
 	db = db.Preload("Endpoints")
 	db = db.Preload("Model").Preload("Model.Controller")

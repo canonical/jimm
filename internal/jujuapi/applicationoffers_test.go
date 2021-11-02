@@ -44,14 +44,6 @@ func (s *applicationOffersSuite) SetUpTest(c *gc.C) {
 	s.endpoint, err = app.Endpoint("url")
 	c.Assert(err, gc.Equals, nil)
 
-	// Also add the application to the database.
-	dbapp := dbmodel.Application{
-		ModelID: s.Model.ID,
-		Name:    "test-app",
-	}
-	err = s.JIMM.Database.UpdateApplication(context.Background(), &dbapp)
-	c.Assert(err, gc.Equals, nil)
-
 	machineID, err := unit.AssignedMachineId()
 	c.Assert(err, gc.Equals, nil)
 	dbmachine := dbmodel.Machine{
@@ -401,6 +393,10 @@ func (s *applicationOffersSuite) TestFindApplicationOffers(c *gc.C) {
 		OfferName:       "test-offer1",
 	})
 	c.Assert(err, gc.Equals, nil)
+	for _, offer := range offers {
+		// mask the charm URL as it changes depending on the test run order.
+		offer.CharmURL = ""
+	}
 	c.Assert(offers, jc.DeepEquals, []*crossmodel.ApplicationOfferDetails{{
 		OfferName:              "test-offer1",
 		ApplicationName:        "test-app",
@@ -434,6 +430,10 @@ func (s *applicationOffersSuite) TestFindApplicationOffers(c *gc.C) {
 		OfferName:       "test-offer1",
 	})
 	c.Assert(err, gc.Equals, nil)
+	for _, offer := range offers {
+		// mask the charm URL as it changes depending on the test run order.
+		offer.CharmURL = ""
+	}
 	c.Assert(offers, jc.DeepEquals, []*crossmodel.ApplicationOfferDetails{{
 		OfferName:              "test-offer1",
 		ApplicationName:        "test-app",

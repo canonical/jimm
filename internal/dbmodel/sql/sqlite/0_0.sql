@@ -147,41 +147,6 @@ CREATE TABLE models (
 	UNIQUE(owner_username, name)
 );
 
-CREATE TABLE applications (
-	id INTEGER PRIMARY KEY,
-	created_at DATETIME,
-	updated_at DATETIME,
-	model_id INTEGER NOT NULL REFERENCES models (id) ON DELETE CASCADE,
-	name TEXT NOT NULL,
-	exposed INTEGER NOT NULL,
-	charm_url TEXT NOT NULL,
-	life TEXT NOT NULL,
-	min_units INTEGER,
-	constraint_arch TEXT,
-	constraint_container TEXT,
-	constraint_mem INTEGER,
-	constraint_root_disk INTEGER,
-	constraint_root_disk_source TEXT,
-	constraint_cpu_cores INTEGER,
-	constraint_cpu_power INTEGER,
-	constraint_tags BLOB,
-	constraint_availability_zone TEXT,
-	constraint_zones BLOB,
-	constraint_instance_type TEXT,
-	constraint_spaces BLOB,
-	constraint_virt_type TEXT,
-	constraint_allocate_public_ip INTEGER,
-	config BLOB,
-	subordinate INTEGER NOT NULL,
-	status_status TEXT NOT NULL,
-	status_info TEXT NOT NULL,
-	status_data BLOB,
-	status_since DATETIME,
-	status_version TEXT NOT NULL,
-	workload_version TEXT NOT NULL,
-	UNIQUE (model_id, name)
-);
-
 CREATE TABLE application_offers (
 	id INTEGER PRIMARY KEY,
 	created_at DATETIME,
@@ -193,7 +158,7 @@ CREATE TABLE application_offers (
 	uuid TEXT NOT NULL UNIQUE,
 	url TEXT NOT NULl,
 	bindings BLOB,
-	FOREIGN KEY (model_id, application_name) REFERENCES applications (model_id, name) ON DELETE CASCADE,
+	charm_url TEXT NOT NULL,
 	UNIQUE (model_id, application_name, name)
 );
 
@@ -302,7 +267,6 @@ CREATE TABLE units (
 	agent_status_since DATETIME,
 	agent_status_version TEXT NOT NULL,
 	UNIQUE (model_id, name),
-	FOREIGN KEY (model_id, application_name) REFERENCES applications (model_id, name) ON DELETE CASCADE,
 	FOREIGN KEY (model_id, machine_id) REFERENCES machines (model_id, machine_id) ON DELETE CASCADE
 );
 
