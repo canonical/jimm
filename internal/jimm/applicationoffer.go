@@ -59,7 +59,7 @@ func (j *JIMM) Offer(ctx context.Context, user *dbmodel.User, offer AddApplicati
 			Valid:  true,
 		},
 	}
-	if err := j.Database.GetModel(ctx, &model, db.AssociatedApplications()); err != nil {
+	if err := j.Database.GetModel(ctx, &model); err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return fail(errors.E(op, err, "model not found"))
 		}
@@ -68,24 +68,6 @@ func (j *JIMM) Offer(ctx context.Context, user *dbmodel.User, offer AddApplicati
 
 	if model.UserAccess(user) != string(jujuparams.ModelAdminAccess) {
 		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
-	}
-
-	var application *dbmodel.Application
-	for _, a := range model.Applications {
-		if a.Name == offer.ApplicationName {
-			application = &a
-			break
-		}
-	}
-	if application == nil {
-		return fail(errors.E(op, errors.CodeNotFound, "application not found"))
-	}
-
-	for _, existingOffer := range application.Offers {
-		if offer.OfferName == existingOffer.Name {
-			// TODO(mhilton) juju recently changed to update the offer in this situation.
-			return fail(errors.E(op, errors.CodeAlreadyExists, "application offer already exists"))
-		}
 	}
 
 	api, err := j.dial(ctx, &model.Controller, names.ModelTag{})
@@ -535,7 +517,7 @@ func (j *JIMM) UpdateApplicationOffer(ctx context.Context, controller *dbmodel.C
 		return nil
 	}
 
-	api, err := j.dial(ctx, controller, offer.Application.Model.Tag().(names.ModelTag))
+	api, err := j.dial(ctx, controller, offer.Model.Tag().(names.ModelTag))
 	if err != nil {
 		return errors.E(op, err)
 	}

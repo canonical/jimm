@@ -147,41 +147,6 @@ CREATE TABLE models (
 	UNIQUE(owner_username, name)
 );
 
-CREATE TABLE applications (
-	id BIGSERIAL PRIMARY KEY,
-	created_at TIMESTAMP WITH TIME ZONE,
-	updated_at TIMESTAMP WITH TIME ZONE,
-	model_id BIGINT NOT NULL REFERENCES models (id) ON DELETE CASCADE,
-	name TEXT NOT NULL,
-	exposed BOOLEAN NOT NULL,
-	charm_url TEXT NOT NULL,
-	life TEXT NOT NULL,
-	min_units INTEGER,
-	constraint_arch TEXT,
-	constraint_container TEXT,
-	constraint_mem INTEGER,
-	constraint_root_disk INTEGER,
-	constraint_root_disk_source TEXT,
-	constraint_cpu_cores INTEGER,
-	constraint_cpu_power INTEGER,
-	constraint_tags BYTEA,
-	constraint_availability_zone TEXT,
-	constraint_zones BYTEA,
-	constraint_instance_type TEXT,
-	constraint_spaces BYTEA,
-	constraint_virt_type TEXT,
-	constraint_allocate_public_ip BOOLEAN,
-	config BYTEA,
-	subordinate BOOLEAN NOT NULL,
-	status_status TEXT NOT NULL,
-	status_info TEXT NOT NULL,
-	status_data BYTEA,
-	status_since TIMESTAMP WITH TIME ZONE,
-	status_version TEXT NOT NULL,
-	workload_version TEXT NOT NULL,
-	UNIQUE (model_id, name)
-);
-
 CREATE TABLE application_offers (
 	id BIGSERIAL PRIMARY KEY,
 	created_at TIMESTAMP WITH TIME ZONE,
@@ -193,7 +158,7 @@ CREATE TABLE application_offers (
 	uuid TEXT NOT NULL UNIQUE,
 	url TEXT NOT NULl,
 	bindings BYTEA,
-	FOREIGN KEY (model_id, application_name) REFERENCES applications (model_id, name) ON DELETE CASCADE,
+	charm_url TEXT NOT NULL,
 	UNIQUE (model_id, application_name, name)
 );
 
@@ -303,7 +268,6 @@ CREATE TABLE units (
 	agent_status_since TIMESTAMP WITH TIME ZONE,
 	agent_status_version TEXT NOT NULL,
 	UNIQUE (model_id, name),
-	FOREIGN KEY (model_id, application_name) REFERENCES applications (model_id, name) ON DELETE CASCADE,
 	FOREIGN KEY (model_id, machine_id) REFERENCES machines (model_id, machine_id) ON DELETE CASCADE
 );
 

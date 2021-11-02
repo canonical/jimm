@@ -54,12 +54,6 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.JIMM.Database.UpdateApplication(ctx, &dbmodel.Application{
-		ModelID: s.Model.ID,
-		Name:    "app",
-	})
-	c.Assert(err, gc.Equals, nil)
-
 	err = s.JIMM.Database.UpdateUnit(ctx, &dbmodel.Unit{
 		ModelID:         s.Model.ID,
 		Name:            "app/1",

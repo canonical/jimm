@@ -402,14 +402,10 @@ func (w *Watcher) handleDelta(ctx context.Context, modelIDf func(string) uint, d
 	}
 	switch eid.Kind {
 	case "application":
-		app := dbmodel.Application{
-			ModelID: modelID,
-			Name:    eid.Id,
-		}
 		if d.Removed {
-			return w.Database.DeleteApplication(ctx, &app)
+			// TODO(mhilton) update associated application-offers
 		}
-		return w.updateApplication(ctx, &app, d.Entity.(*jujuparams.ApplicationInfo))
+		return w.updateApplication(ctx, d.Entity.(*jujuparams.ApplicationInfo))
 	case "machine":
 		machine := dbmodel.Machine{
 			ModelID:   modelID,
@@ -440,21 +436,10 @@ func (w *Watcher) handleDelta(ctx context.Context, modelIDf func(string) uint, d
 	return nil
 }
 
-func (w *Watcher) updateApplication(ctx context.Context, app *dbmodel.Application, info *jujuparams.ApplicationInfo) error {
+func (w *Watcher) updateApplication(ctx context.Context, info *jujuparams.ApplicationInfo) error {
 	const op = errors.Op("watcher.updateApplication")
 
-	err := w.Database.Transaction(func(db *db.Database) error {
-		if err := db.GetApplication(ctx, app); err != nil {
-			if errors.ErrorCode(err) != errors.CodeNotFound {
-				return err
-			}
-		}
-		app.FromJujuApplicationInfo(*info)
-		return db.UpdateApplication(ctx, app)
-	})
-	if err != nil {
-		return errors.E(op, err)
-	}
+	// TODO(mhilton) update associated application-offers.
 	return nil
 }
 

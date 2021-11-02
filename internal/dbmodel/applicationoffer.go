@@ -25,7 +25,6 @@ type ApplicationOffer struct {
 
 	// Application is the application that this offer is for.
 	ApplicationName string
-	Application     Application `gorm:"foreignKey:ModelID,ApplicationName;references:ModelID,Name"`
 
 	ApplicationDescription string
 
@@ -52,6 +51,9 @@ type ApplicationOffer struct {
 
 	// Connections contains details about connections to the application offer.
 	Connections []ApplicationOfferConnection
+
+	// CharmURL is the URL of the charm deployed to the application.
+	CharmURL string `gorm:"column:charm_url"`
 }
 
 // Tag returns a names.Tag for the application-offer.
@@ -82,6 +84,7 @@ func (o *ApplicationOffer) FromJujuApplicationOfferAdminDetails(offerDetails juj
 	o.UUID = offerDetails.OfferUUID
 	o.URL = offerDetails.OfferURL
 	o.Bindings = offerDetails.Bindings
+	o.CharmURL = offerDetails.CharmURL
 
 	o.Endpoints = make([]ApplicationOfferRemoteEndpoint, len(offerDetails.Endpoints))
 	for i, endpoint := range offerDetails.Endpoints {
@@ -185,8 +188,8 @@ func (o *ApplicationOffer) ToJujuApplicationOfferDetails() jujuparams.Applicatio
 			Bindings:               o.Bindings,
 			Users:                  users,
 		},
-		ApplicationName: o.Application.Name,
-		CharmURL:        o.Application.CharmURL,
+		ApplicationName: o.ApplicationName,
+		CharmURL:        o.CharmURL,
 		Connections:     connections,
 	}
 }
