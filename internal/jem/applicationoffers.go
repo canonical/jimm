@@ -22,11 +22,33 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
+	"github.com/CanonicalLtd/jimm/internal/zaputil"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
 // Offer creates a new application offer.
 func (j *JEM) Offer(ctx context.Context, id identchecker.ACLIdentity, offer jujuparams.AddApplicationOffer) (err error) {
+	errorChannel := make(chan error, 1)
+	go func() {
+		ctx := context.Background()
+		err := j.offer1(ctx, id, offer)
+		select {
+		case errorChannel <- err:
+		default:
+			zapctx.Warn(ctx, "failed to return the offer result", zaputil.Error(err))
+		}
+	}()
+
+	select {
+	case err := <-errorChannel:
+		return err
+	case <-ctx.Done():
+		zapctx.Warn(ctx, "context cancelled")
+		return ctx.Err()
+	}
+}
+
+func (j *JEM) offer1(ctx context.Context, id identchecker.ACLIdentity, offer jujuparams.AddApplicationOffer) (err error) {
 	modelTag, err := names.ParseModelTag(offer.ModelTag)
 	if err != nil {
 		return errgo.WithCausef(err, params.ErrBadRequest, "")
