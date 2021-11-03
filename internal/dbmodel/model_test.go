@@ -9,7 +9,6 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	jujuparams "github.com/juju/juju/apiserver/params"
-	"github.com/juju/juju/core/instance"
 	"github.com/juju/names/v4"
 	"gorm.io/gorm"
 
@@ -63,39 +62,6 @@ func TestRecreateDeletedModel(t *testing.T) {
 	c.Assert(db.Create(&m2).Error, qt.IsNil)
 }
 
-func TestDeleteModelRemovesMachinesAndApplications(t *testing.T) {
-	c := qt.New(t)
-	db := gormDB(c)
-	cl, cred, ctl, u := initModelEnv(c, db)
-
-	m := dbmodel.Model{
-		Name:  "test-model",
-		Owner: u,
-		UUID: sql.NullString{
-			String: "00000001-0000-0000-0000-0000-000000000003",
-			Valid:  true,
-		},
-		Controller:      ctl,
-		CloudRegion:     cl.Regions[0],
-		CloudCredential: cred,
-		Machines: []dbmodel.Machine{{
-			MachineID: "0",
-		}, {
-			MachineID: "1",
-		}},
-	}
-	c.Assert(db.Create(&m).Error, qt.IsNil)
-
-	// Check the machines have been created.
-	var mach1 dbmodel.Machine
-	c.Assert(db.First(&mach1).Error, qt.IsNil)
-	c.Check(mach1.MachineID, qt.Equals, "0")
-
-	c.Assert(db.Delete(&m).Error, qt.IsNil)
-
-	c.Check(db.First(&dbmodel.Machine{}).Error, qt.Equals, gorm.ErrRecordNotFound)
-}
-
 func TestModel(t *testing.T) {
 	c := qt.New(t)
 	db := gormDB(c)
@@ -125,89 +91,19 @@ func TestModel(t *testing.T) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Machines: []dbmodel.Machine{{
-			MachineID: "0",
-			Hardware: dbmodel.Hardware{
-				Arch: sql.NullString{
-					String: "amd64",
-					Valid:  true,
-				},
-				Mem: dbmodel.NullUint64{
-					Uint64: 2000,
-					Valid:  true,
-				},
-			},
-			InstanceID:  "test-machine-0",
-			DisplayName: "Machine 0",
-			AgentStatus: dbmodel.Status{
-				Status: "started",
-				Since: sql.NullTime{
-					Time:  time.Now(),
-					Valid: true,
-				},
-				Version: "1.0.0",
-			},
-			InstanceStatus: dbmodel.Status{
-				Status: "running",
-				Info:   "ACTIVE",
-				Since: sql.NullTime{
-					Time:  time.Now(),
-					Valid: true,
-				},
-			},
-			Series: "warty",
-		}},
 		Users: []dbmodel.UserModelAccess{{
 			User:   u,
 			Access: "admin",
 		}},
 	}
 	c.Assert(db.Create(&m).Error, qt.IsNil)
-	m.Units = []dbmodel.Unit{{
-		Name:           "0",
-		Machine:        m.Machines[0],
-		Life:           "alive",
-		PublicAddress:  "100.100.100.100",
-		PrivateAddress: "10.10.10.10",
-		Ports: dbmodel.Ports{{
-			Protocol: "tcp",
-			Number:   8080,
-		}},
-		PortRanges: dbmodel.PortRanges{{
-			Protocol: "udp",
-			FromPort: 9000,
-			ToPort:   9090,
-		}},
-		Principal: "principal",
-		WorkloadStatus: dbmodel.Status{
-			Status: "active",
-			Info:   "OK",
-			Since: sql.NullTime{
-				Time:  time.Now(),
-				Valid: true,
-			},
-		},
-		AgentStatus: dbmodel.Status{
-			Status: "alive",
-			Since: sql.NullTime{
-				Time:  time.Now(),
-				Valid: true,
-			},
-			Version: "1.0.0",
-		},
-	}}
-	c.Assert(db.Save(&m).Error, qt.IsNil)
-	c.Assert(db.Model(&m.Machines[0]).Association("Units").Find(&m.Machines[0].Units), qt.IsNil)
-	c.Check(m.Machines[0].Units, qt.HasLen, 1)
 
 	var m2 dbmodel.Model
 	pdb := db.Preload("CloudRegion")
 	pdb = pdb.Preload("CloudCredential").Preload("CloudCredential.Cloud").Preload("CloudCredential.Cloud.Regions").Preload("CloudCredential.Owner")
 	pdb = pdb.Preload("Controller")
 	pdb = pdb.Preload("Owner")
-	pdb = pdb.Preload("Machines").Preload("Machines.Units")
 	pdb = pdb.Preload("Users").Preload("Users.User")
-	pdb = pdb.Preload("Units").Preload("Units.Machine")
 	c.Assert(pdb.First(&m2).Error, qt.IsNil)
 	c.Check(m2, qt.DeepEquals, m)
 }
@@ -242,38 +138,6 @@ func TestToJujuModel(t *testing.T) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Machines: []dbmodel.Machine{{
-			MachineID: "0",
-			Hardware: dbmodel.Hardware{
-				Arch: sql.NullString{
-					String: "amd64",
-					Valid:  true,
-				},
-				Mem: dbmodel.NullUint64{
-					Uint64: 2000,
-					Valid:  true,
-				},
-			},
-			InstanceID:  "test-machine-0",
-			DisplayName: "Machine 0",
-			AgentStatus: dbmodel.Status{
-				Status: "started",
-				Since: sql.NullTime{
-					Time:  now,
-					Valid: true,
-				},
-				Version: "1.0.0",
-			},
-			InstanceStatus: dbmodel.Status{
-				Status: "running",
-				Info:   "ACTIVE",
-				Since: sql.NullTime{
-					Time:  now,
-					Valid: true,
-				},
-			},
-			Series: "warty",
-		}},
 		Users: []dbmodel.UserModelAccess{{
 			Username: u.Username,
 			User:     u,
@@ -321,38 +185,6 @@ func TestUserModelAccessToJujuUserModel(t *testing.T) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Machines: []dbmodel.Machine{{
-			MachineID: "0",
-			Hardware: dbmodel.Hardware{
-				Arch: sql.NullString{
-					String: "amd64",
-					Valid:  true,
-				},
-				Mem: dbmodel.NullUint64{
-					Uint64: 2000,
-					Valid:  true,
-				},
-			},
-			InstanceID:  "test-machine-0",
-			DisplayName: "Machine 0",
-			AgentStatus: dbmodel.Status{
-				Status: "started",
-				Since: sql.NullTime{
-					Time:  now,
-					Valid: true,
-				},
-				Version: "1.0.0",
-			},
-			InstanceStatus: dbmodel.Status{
-				Status: "running",
-				Info:   "ACTIVE",
-				Since: sql.NullTime{
-					Time:  now,
-					Valid: true,
-				},
-			},
-			Series: "warty",
-		}},
 		Users: []dbmodel.UserModelAccess{{
 			Username: u.Username,
 			User:     u,
@@ -383,7 +215,7 @@ func TestUserModelAccessToJujuUserModel(t *testing.T) {
 	})
 }
 
-func TestToJujuModelInfo(t *testing.T) {
+func TestToJujuModelSummary(t *testing.T) {
 	c := qt.New(t)
 	db := gormDB(c)
 	cl, cred, ctl, u := initModelEnv(c, db)
@@ -412,151 +244,13 @@ func TestToJujuModelInfo(t *testing.T) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Machines: []dbmodel.Machine{{
-			MachineID: "0",
-			Hardware: dbmodel.Hardware{
-				Arch: sql.NullString{
-					String: "amd64",
-					Valid:  true,
-				},
-				Mem: dbmodel.NullUint64{
-					Uint64: 2000,
-					Valid:  true,
-				},
-			},
-			InstanceID:  "test-machine-0",
-			DisplayName: "Machine 0",
-			AgentStatus: dbmodel.Status{
-				Status: "started",
-				Since: sql.NullTime{
-					Time:  now,
-					Valid: true,
-				},
-				Version: "1.0.0",
-			},
-			InstanceStatus: dbmodel.Status{
-				Status: "running",
-				Info:   "ACTIVE",
-				Since: sql.NullTime{
-					Time:  now,
-					Valid: true,
-				},
-			},
-			Series: "warty",
-		}},
-		Users: []dbmodel.UserModelAccess{{
-			Username: u.Username,
-			User:     u,
-			Access:   "admin",
-		}},
-	}
-	m.CloudRegion.Cloud = cl
-
-	mi := m.ToJujuModelInfo()
-	c.Check(mi, qt.DeepEquals, jujuparams.ModelInfo{
-		Name:                    "test-model",
-		Type:                    "iaas",
-		UUID:                    "00000001-0000-0000-0000-0000-000000000001",
-		ControllerUUID:          "00000000-0000-0000-0000-0000-0000000000001",
-		IsController:            false,
-		ProviderType:            "test-provider",
-		DefaultSeries:           "warty",
-		CloudTag:                "cloud-test-cloud",
-		CloudRegion:             "test-region",
-		CloudCredentialTag:      "cloudcred-test-cloud_bob@external_test-cred",
-		CloudCredentialValidity: nil,
-		OwnerTag:                "user-bob@external",
-		Life:                    "alive",
-		Status: jujuparams.EntityStatus{
-			Status: "available",
-			Since:  &now,
-		},
-		Users: []jujuparams.ModelUserInfo{{
-			UserName: "bob@external",
-			Access:   "admin",
-		}},
-		Machines: []jujuparams.ModelMachineInfo{{
-			Id: "0",
-			Hardware: &jujuparams.MachineHardware{
-				Arch: &m.Machines[0].Hardware.Arch.String,
-				Mem:  &m.Machines[0].Hardware.Mem.Uint64,
-			},
-			InstanceId:  "test-machine-0",
-			DisplayName: "Machine 0",
-			Status:      "running",
-			Message:     "ACTIVE",
-		}},
-		SLA: &jujuparams.ModelSLAInfo{
-			Level: "unsupported",
-		},
-	})
-}
-
-func TestWriteModelSummary(t *testing.T) {
-	c := qt.New(t)
-	db := gormDB(c)
-	cl, cred, ctl, u := initModelEnv(c, db)
-	now := time.Now()
-	m := dbmodel.Model{
-		Name: "test-model",
-		UUID: sql.NullString{
-			String: "00000001-0000-0000-0000-0000-000000000001",
-			Valid:  true,
-		},
-		Owner:           u,
-		Controller:      ctl,
-		CloudRegion:     cl.Regions[0],
-		CloudCredential: cred,
-		Type:            "iaas",
-		IsController:    false,
-		DefaultSeries:   "warty",
-		Life:            "alive",
-		Status: dbmodel.Status{
-			Status: "available",
-			Since: sql.NullTime{
-				Time:  now,
-				Valid: true,
-			},
-		},
-		SLA: dbmodel.SLA{
-			Level: "unsupported",
-		},
-		Machines: []dbmodel.Machine{{
-			MachineID: "0",
-			Hardware: dbmodel.Hardware{
-				Arch: sql.NullString{
-					String: "amd64",
-					Valid:  true,
-				},
-				Mem: dbmodel.NullUint64{
-					Uint64: 2000,
-					Valid:  true,
-				},
-			},
-			InstanceID:  "test-machine-0",
-			DisplayName: "Machine 0",
-			AgentStatus: dbmodel.Status{
-				Status: "started",
-				Since: sql.NullTime{
-					Time:  now,
-					Valid: true,
-				},
-				Version: "1.0.0",
-			},
-			InstanceStatus: dbmodel.Status{
-				Status: "running",
-				Info:   "ACTIVE",
-				Since: sql.NullTime{
-					Time:  now,
-					Valid: true,
-				},
-			},
-			Series: "warty",
-		}},
 		Users: []dbmodel.UserModelAccess{{
 			Username: u.Username,
 			Access:   "admin",
 		}},
+		Machines: 1,
+		Cores:    2,
+		Units:    3,
 	}
 	m.CloudRegion.Cloud = cl
 
@@ -583,10 +277,10 @@ func TestWriteModelSummary(t *testing.T) {
 			Count:  1,
 		}, {
 			Entity: "cores",
-			Count:  0,
+			Count:  2,
 		}, {
 			Entity: "units",
-			Count:  0,
+			Count:  3,
 		}},
 		SLA: &jujuparams.ModelSLAInfo{
 			Level: "unsupported",
@@ -623,42 +317,13 @@ func TestUserModelAccessToJujuModelSummary(t *testing.T) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Machines: []dbmodel.Machine{{
-			MachineID: "0",
-			Hardware: dbmodel.Hardware{
-				Arch: sql.NullString{
-					String: "amd64",
-					Valid:  true,
-				},
-				Mem: dbmodel.NullUint64{
-					Uint64: 2000,
-					Valid:  true,
-				},
-			},
-			InstanceID:  "test-machine-0",
-			DisplayName: "Machine 0",
-			AgentStatus: dbmodel.Status{
-				Status: "started",
-				Since: sql.NullTime{
-					Time:  now,
-					Valid: true,
-				},
-				Version: "1.0.0",
-			},
-			InstanceStatus: dbmodel.Status{
-				Status: "running",
-				Info:   "ACTIVE",
-				Since: sql.NullTime{
-					Time:  now,
-					Valid: true,
-				},
-			},
-			Series: "warty",
-		}},
 		Users: []dbmodel.UserModelAccess{{
 			Username: u.Username,
 			Access:   "admin",
 		}},
+		Machines: 1,
+		Cores:    2,
+		Units:    3,
 	}
 	m.CloudRegion.Cloud = cl
 
@@ -695,10 +360,10 @@ func TestUserModelAccessToJujuModelSummary(t *testing.T) {
 			Count:  1,
 		}, {
 			Entity: "cores",
-			Count:  0,
+			Count:  2,
 		}, {
 			Entity: "units",
-			Count:  0,
+			Count:  3,
 		}},
 		SLA: &jujuparams.ModelSLAInfo{
 			Level: "unsupported",
@@ -827,25 +492,6 @@ func TestModelFromJujuModelInfo(t *testing.T) {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Machines: []dbmodel.Machine{{
-			MachineID: "0",
-			Hardware: dbmodel.Hardware{
-				Arch: sql.NullString{
-					String: "amd64",
-					Valid:  true,
-				},
-				Mem: dbmodel.NullUint64{
-					Uint64: 2000,
-					Valid:  true,
-				},
-			},
-			InstanceID:  "test-machine-0",
-			DisplayName: "Machine 0",
-			InstanceStatus: dbmodel.Status{
-				Status: "running",
-				Info:   "ACTIVE",
-			},
-		}},
 		Users: []dbmodel.UserModelAccess{{
 			Access: "admin",
 			User: dbmodel.User{
@@ -886,147 +532,6 @@ func TestModelFromJujuModelUpdate(t *testing.T) {
 		},
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
-		},
-	})
-}
-
-func TestMachineFromJujuMachineInfo(t *testing.T) {
-	c := qt.New(t)
-	now := time.Now().UTC().Truncate(time.Millisecond)
-
-	arch := "amd64"
-	mem := uint64(8096)
-	rootDisk := uint64(10240)
-	info := jujuparams.MachineInfo{
-		Id:         "0",
-		InstanceId: "machine-0",
-		AgentStatus: jujuparams.StatusInfo{
-			Current: "idle",
-			Message: "okay",
-			Since:   &now,
-			Version: "1.2.3",
-		},
-		InstanceStatus: jujuparams.StatusInfo{
-			Current: "running",
-			Message: "hello",
-			Since:   &now,
-			Version: "1.2.4",
-		},
-		Life:   "alive",
-		Series: "warty",
-		HardwareCharacteristics: &instance.HardwareCharacteristics{
-			Arch:     &arch,
-			Mem:      &mem,
-			RootDisk: &rootDisk,
-		},
-		HasVote:   true,
-		WantsVote: true,
-	}
-
-	machine := dbmodel.Machine{}
-	machine.FromJujuMachineInfo(info)
-	c.Assert(machine, qt.DeepEquals, dbmodel.Machine{
-		MachineID: "0",
-		Hardware: dbmodel.Hardware{
-			Arch: sql.NullString{
-				String: "amd64",
-				Valid:  true,
-			},
-			Mem: dbmodel.NullUint64{
-				Uint64: 8096,
-				Valid:  true,
-			},
-			RootDisk: dbmodel.NullUint64{
-				Uint64: 10240,
-				Valid:  true,
-			},
-		},
-		InstanceID: "machine-0",
-		AgentStatus: dbmodel.Status{
-			Status: "idle",
-			Info:   "okay",
-			Since: sql.NullTime{
-				Time:  now,
-				Valid: true,
-			},
-			Version: "1.2.3",
-		},
-		InstanceStatus: dbmodel.Status{
-			Status: "running",
-			Info:   "hello",
-			Since: sql.NullTime{
-				Time:  now,
-				Valid: true,
-			},
-			Version: "1.2.4",
-		},
-		Life:      "alive",
-		HasVote:   true,
-		WantsVote: true,
-		Series:    "warty",
-	})
-}
-
-func TestUnitFromJujuUnitInfo(t *testing.T) {
-	c := qt.New(t)
-	now := time.Now().UTC().Truncate(time.Millisecond)
-
-	info := jujuparams.UnitInfo{
-		Name:           "app-1/0",
-		Application:    "app-1",
-		Series:         "warty",
-		CharmURL:       "cs:app-1",
-		Life:           "alive",
-		PublicAddress:  "public-address",
-		PrivateAddress: "private-address",
-		MachineId:      "0",
-		Ports:          []jujuparams.Port{{Protocol: "tcp", Number: 8080}},
-		PortRanges:     []jujuparams.PortRange{{FromPort: 8080, ToPort: 8090, Protocol: "tcp"}},
-		Principal:      "Skinner",
-		Subordinate:    false,
-		WorkloadStatus: jujuparams.StatusInfo{
-			Current: "idle",
-			Message: "okay",
-			Since:   &now,
-			Version: "1.2.3",
-		},
-		AgentStatus: jujuparams.StatusInfo{
-			Current: "running",
-			Message: "hello",
-			Since:   &now,
-			Version: "1.2.4",
-		},
-	}
-
-	unit := dbmodel.Unit{}
-	unit.FromJujuUnitInfo(info)
-	c.Assert(unit, qt.DeepEquals, dbmodel.Unit{
-		Name:            "app-1/0",
-		ApplicationName: "app-1",
-		MachineID:       "0",
-		Life:            "alive",
-		PublicAddress:   "public-address",
-		PrivateAddress:  "private-address",
-		Ports:           dbmodel.Ports{{Protocol: "tcp", Number: 8080}},
-		PortRanges:      dbmodel.PortRanges{{FromPort: 8080, ToPort: 8090, Protocol: "tcp"}},
-		Principal:       "Skinner",
-		WorkloadStatus: dbmodel.Status{
-			Status: "idle",
-			Info:   "okay",
-			Since: sql.NullTime{
-				Time:  now,
-				Valid: true,
-			},
-			Version: "1.2.3",
-		},
-		AgentStatus: dbmodel.Status{
-			Status: "running",
-			Info:   "hello",
-			Since: sql.NullTime{
-				Time:  now,
-				Valid: true,
-			},
-			Version: "1.2.4",
 		},
 	})
 }

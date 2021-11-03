@@ -526,11 +526,15 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 		return errors.E(op, err)
 	}
 
-	modelIDf := func(uuid string) uint {
+	modelIDf := func(uuid string) *modelState {
 		if uuid == model.UUID.String {
-			return model.ID
+			return &modelState{
+				id:       model.ID,
+				machines: make(map[string]int64),
+				units:    make(map[string]bool),
+			}
 		}
-		return 0
+		return nil
 	}
 
 	w := &Watcher{

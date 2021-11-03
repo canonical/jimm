@@ -144,6 +144,9 @@ CREATE TABLE models (
 	status_version TEXT NOT NULL,
 	sla_level TEXT NOT NULL,
 	sla_owner TEXT NOT NULL,
+	cores BIGINT NOT NULL DEFAULT 0,
+	machines BIGINT NOT NULL DEFAULT 0,
+	units BIGINT NOT NULL DEFAULT 0,
 	UNIQUE(owner_username, name)
 );
 
@@ -202,74 +205,6 @@ CREATE TABLE application_offer_remote_spaces (
 	provider_attributes BYTEA
 );
 CREATE INDEX idx_application_offer_remote_spaces_deleted_at ON application_offer_remote_spaces (deleted_at);
-
-
-CREATE TABLE machines (
-	id BIGSERIAL PRIMARY KEY,
-	created_at TIMESTAMP WITH TIME ZONE,
-	updated_at TIMESTAMP WITH TIME ZONE,
-	model_id BIGINT NOT NULL REFERENCES models (id) ON DELETE CASCADE,
-	machine_id TEXT NOT NULL,
-	hw_arch TEXT,
-	hw_container TEXT,
-	hw_mem INTEGER,
-	hw_root_disk INTEGER,
-	hw_root_disk_source TEXT,
-	hw_cpu_cores INTEGER,
-	hw_cpu_power INTEGER,
-	hw_tags BYTEA,
-	hw_availability_zone TEXT,
-	hw_zones BYTEA,
-	hw_instance_type TEXT,
-	hw_spaces BYTEA,
-	hw_virt_type TEXT,
-	hw_allocate_public_ip BOOLEAN,
-	instance_id TEXT NOT NULL,
-	display_name TEXT NOT NULL,
-	agent_status_status TEXT NOT NULL,
-	agent_status_info TEXT NOT NULL,
-	agent_status_data BYTEA,
-	agent_status_since TIMESTAMP WITH TIME ZONE,
-	agent_status_version TEXT NOT NULL,
-	instance_status_status TEXT NOT NULL,
-	instance_status_info TEXT NOT NULL,
-	instance_status_data BYTEA,
-	instance_status_since TIMESTAMP WITH TIME ZONE,
-	instance_status_version TEXT NOT NULL,
-	life TEXT NOT NULL,
-	has_vote BOOLEAN NOT NULL,
-	wants_vote BOOLEAN NOT NULL,
-	series TEXT NOT NULL,
-	UNIQUE (model_id, machine_id)
-);
-
-CREATE TABLE units (
-	id BIGSERIAL PRIMARY KEY,
-	created_at TIMESTAMP WITH TIME ZONE,
-	updated_at TIMESTAMP WITH TIME ZONE,
-	model_id BIGINT NOT NULL REFERENCES models (id) ON DELETE CASCADE,
-	application_name TEXT NOT NULL,
-	machine_id TEXT NOT NULL,
-	name TEXT NOT NULL,
-	life TEXT NOT NULL,
-	public_address TEXT NOT NULL,
-	private_address TEXT NOT NULL,
-	ports BYTEA,
-	port_ranges BYTEA,
-	principal TEXT NOT NULL,
-	workload_status_status TEXT NOT NULL,
-	workload_status_info TEXT NOT NULL,
-	workload_status_data BYTEA,
-	workload_status_since TIMESTAMP WITH TIME ZONE,
-	workload_status_version TEXT NOT NULL,
-	agent_status_status TEXT NOT NULL,
-	agent_status_info TEXT NOT NULL,
-	agent_status_data BYTEA,
-	agent_status_since TIMESTAMP WITH TIME ZONE,
-	agent_status_version TEXT NOT NULL,
-	UNIQUE (model_id, name),
-	FOREIGN KEY (model_id, machine_id) REFERENCES machines (model_id, machine_id) ON DELETE CASCADE
-);
 
 CREATE TABLE user_application_offer_access (
 	id BIGSERIAL PRIMARY KEY,

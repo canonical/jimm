@@ -363,33 +363,6 @@ models:
     access: write
   - user: charlie@external
     access: read
-  machines:
-  - id: 0
-    hardware:
-      arch: amd64
-      mem: 8096
-      root-disk: 10240
-      cores: 1
-    instance-id: 00000009-0000-0000-0000-0000000000000
-    display-name: Machine 0
-    status: available
-    message: OK!
-    has-vote: true
-    wants-vote: false
-    ha-primary: false
-  - id: 1
-    hardware:
-      arch: amd64
-      mem: 8096
-      root-disk: 10240
-      cores: 2
-    instance-id: 00000009-0000-0000-0000-0000000000001
-    display-name: Machine 1
-    status: available
-    message: OK!
-    has-vote: true
-    wants-vote: false
-    ha-primary: false
   sla:
     level: unsupported
   agent-version: 1.2.3

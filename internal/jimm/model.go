@@ -4,7 +4,6 @@ package jimm
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"math/rand"
 	"sort"
@@ -646,47 +645,54 @@ func (j *JIMM) AddModel(ctx context.Context, u *dbmodel.User, args *ModelCreateA
 func (j *JIMM) ModelInfo(ctx context.Context, u *dbmodel.User, mt names.ModelTag) (*jujuparams.ModelInfo, error) {
 	const op = errors.Op("jimm.ModelInfo")
 
-	m := dbmodel.Model{
-		UUID: sql.NullString{
-			String: mt.Id(),
-			Valid:  true,
-		},
-	}
-
+	var m dbmodel.Model
+	m.SetTag(mt)
 	if err := j.Database.GetModel(ctx, &m); err != nil {
 		return nil, errors.E(op, err)
 	}
 
-	mi := m.ToJujuModelInfo()
-	var modelUser jujuparams.ModelUserInfo
-	for _, user := range mi.Users {
-		if user.UserName == u.Username {
-			modelUser = user
-		}
+	modelAccess := m.UserAccess(u)
+	if u.ControllerAccess == "superuser" {
+		modelAccess = "admin"
 	}
 
-	if u.ControllerAccess == "superuser" || modelUser.Access == "admin" {
-		// Admin users have access to all data unmodified.
-		return &mi, nil
-	}
-
-	if modelUser.Access == "" {
+	if modelAccess == "" {
 		// If the user doesn't have any access on the model return an
 		// unauthorized error
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	// Non-admin users can only see their own user.
-	mi.Users = []jujuparams.ModelUserInfo{modelUser}
+	api, err := j.dial(ctx, &m.Controller, names.ModelTag{})
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	defer api.Close()
 
-	if modelUser.Access != "write" {
+	mi := &jujuparams.ModelInfo{
+		UUID: mt.Id(),
+	}
+	if err := api.ModelInfo(ctx, mi); err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	users := make([]jujuparams.ModelUserInfo, 0, len(mi.Users))
+	for i := range mi.Users {
+		if !strings.Contains(mi.Users[i].UserName, "@") {
+			continue
+		}
+		if u.ControllerAccess == "superuser" || modelAccess == "admin" || mi.Users[i].UserName == u.Username {
+			users = append(users, mi.Users[i])
+		}
+	}
+	mi.Users = users
+
+	if u.ControllerAccess != "superuser" && modelAccess != "admin" && modelAccess != "write" {
 		// Users need "write" level access (or above) to see machine
-		// information. Note "admin" level users will have already
-		// returned data above.
+		// information.
 		mi.Machines = nil
 	}
 
-	return &mi, nil
+	return mi, nil
 }
 
 // ModelStatus returns a jujuparams.ModelStatus for the given model. If

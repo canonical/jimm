@@ -392,6 +392,16 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 			},
 		}, {
 			Time:    evs.Events[6].Time,
+			Tag:     s.Model3.Tag().String(),
+			UserTag: s.Model3.Owner.Tag().String(),
+			Action:  "grant",
+			Success: true,
+			Params: map[string]string{
+				"access": "read",
+				"user":   names.NewUserTag("bob@external").String(),
+			},
+		}, {
+			Time:    evs.Events[7].Time,
 			Tag:     s.Model.Tag().String(),
 			UserTag: s.Model.Owner.Tag().String(),
 			Action:  "destroy",

@@ -211,17 +211,6 @@ users:
   access: admin
 - user: bob
   access: read
-machines:
-- id: test-machine-id
-  hardware:
-    arch: amd64
-    mem: 8096
-    cores: 8
-  display-name: a test machine
-  status: running
-  message: a test message
-  has-vote: true
-  wants-vote: false
 `[1:])),
 	username: "alice@external",
 	args: jujuparams.ModelCreateArgs{
@@ -263,29 +252,6 @@ machines:
 			Status: "started",
 			Info:   "running a test",
 		},
-		Machines: []dbmodel.Machine{{
-			MachineID: "test-machine-id",
-			Hardware: dbmodel.Hardware{
-				Arch: sql.NullString{
-					String: "amd64",
-					Valid:  true,
-				},
-				Mem: dbmodel.NullUint64{
-					Uint64: 8096,
-					Valid:  true,
-				},
-				CPUCores: dbmodel.NullUint64{
-					Uint64: 8,
-					Valid:  true,
-				},
-			},
-			DisplayName: "a test machine",
-			InstanceStatus: dbmodel.Status{
-				Status: "running",
-				Info:   "a test message",
-			},
-			HasVote: true,
-		}},
 		Users: []dbmodel.UserModelAccess{{
 			User: dbmodel.User{
 				Username:         "alice@external",
@@ -342,17 +308,6 @@ users:
   access: admin
 - user: bob
   access: read
-machines:
-- id: test-machine-id
-  hardware:
-    arch: amd64
-    mem: 8096
-    cores: 8
-  display-name: a test machine
-  status: running
-  message: a test message
-  has-vote: true
-  wants-vote: false
 `[1:]),
 	username: "alice@external",
 	args: jujuparams.ModelCreateArgs{
@@ -394,29 +349,6 @@ machines:
 			Status: "started",
 			Info:   "running a test",
 		},
-		Machines: []dbmodel.Machine{{
-			MachineID: "test-machine-id",
-			Hardware: dbmodel.Hardware{
-				Arch: sql.NullString{
-					String: "amd64",
-					Valid:  true,
-				},
-				Mem: dbmodel.NullUint64{
-					Uint64: 8096,
-					Valid:  true,
-				},
-				CPUCores: dbmodel.NullUint64{
-					Uint64: 8,
-					Valid:  true,
-				},
-			},
-			DisplayName: "a test machine",
-			InstanceStatus: dbmodel.Status{
-				Status: "running",
-				Info:   "a test message",
-			},
-			HasVote: true,
-		}},
 		Users: []dbmodel.UserModelAccess{{
 			User: dbmodel.User{
 				Username:         "alice@external",
@@ -478,17 +410,6 @@ users:
   access: admin
 - user: bob
   access: read
-machines:
-- id: test-machine-id
-  hardware:
-    arch: amd64
-    mem: 8096
-    cores: 8
-  display-name: a test machine
-  status: running
-  message: a test message
-  has-vote: true
-  wants-vote: false
 `[1:]),
 	username: "alice@external",
 	args: jujuparams.ModelCreateArgs{
@@ -530,29 +451,6 @@ machines:
 			Status: "started",
 			Info:   "running a test",
 		},
-		Machines: []dbmodel.Machine{{
-			MachineID: "test-machine-id",
-			Hardware: dbmodel.Hardware{
-				Arch: sql.NullString{
-					String: "amd64",
-					Valid:  true,
-				},
-				Mem: dbmodel.NullUint64{
-					Uint64: 8096,
-					Valid:  true,
-				},
-				CPUCores: dbmodel.NullUint64{
-					Uint64: 8,
-					Valid:  true,
-				},
-			},
-			DisplayName: "a test machine",
-			InstanceStatus: dbmodel.Status{
-				Status: "running",
-				Info:   "a test message",
-			},
-			HasVote: true,
-		}},
 		Users: []dbmodel.UserModelAccess{{
 			User: dbmodel.User{
 				Username:         "alice@external",
@@ -614,17 +512,6 @@ users:
   access: admin
 - user: bob
   access: read
-machines:
-- id: test-machine-id
-  hardware:
-    arch: amd64
-    mem: 8096
-    cores: 8
-  display-name: a test machine
-  status: running
-  message: a test message
-  has-vote: true
-  wants-vote: false
 `[1:]),
 	username: "alice@external",
 	args: jujuparams.ModelCreateArgs{
@@ -740,17 +627,6 @@ users:
   access: admin
 - user: bob
   access: read
-machines:
-- id: test-machine-id
-  hardware:
-    arch: amd64
-    mem: 8096
-    cores: 8
-  display-name: a test machine
-  status: running
-  message: a test message
-  has-vote: true
-  wants-vote: false
 `[1:]),
 	username: "alice@external",
 	args: jujuparams.ModelCreateArgs{
@@ -809,17 +685,6 @@ users:
   access: admin
 - user: bob
   access: read
-machines:
-- id: test-machine-id
-  hardware:
-    arch: amd64
-    mem: 8096
-    cores: 8
-  display-name: a test machine
-  status: running
-  message: a test message
-  has-vote: true
-  wants-vote: false
 `[1:]),
 	username: "alice@external",
 	args: jujuparams.ModelCreateArgs{
@@ -948,33 +813,6 @@ models:
     access: write
   - user: charlie@external
     access: read
-  machines:
-  - id: 0
-    hardware:
-      arch: amd64
-      mem: 8096
-      root-disk: 10240
-      cores: 1
-    instance-id: 00000009-0000-0000-0000-0000000000000
-    display-name: Machine 0
-    status: available
-    message: OK!
-    has-vote: true
-    wants-vote: false
-    ha-primary: false
-  - id: 1
-    hardware:
-      arch: amd64
-      mem: 8096
-      root-disk: 10240
-      cores: 2
-    instance-id: 00000009-0000-0000-0000-0000000000001
-    display-name: Machine 1
-    status: available
-    message: OK!
-    has-vote: true
-    wants-vote: false
-    ha-primary: false
   sla:
     level: unsupported
   agent-version: 1.2.3
@@ -1147,7 +985,57 @@ func TestModelInfo(t *testing.T) {
 					DB: jimmtest.MemoryDB(c, nil),
 				},
 				Dialer: &jimmtest.Dialer{
-					API: &jimmtest.API{},
+					API: &jimmtest.API{
+						ModelInfo_: func(_ context.Context, mi *jujuparams.ModelInfo) error {
+							mi.Name = "model-1"
+							mi.Type = "iaas"
+							mi.ControllerUUID = "00000001-0000-0000-0000-000000000001"
+							mi.ProviderType = "test-provider"
+							mi.DefaultSeries = "warty"
+							mi.CloudTag = names.NewCloudTag("test-cloud").String()
+							mi.CloudRegion = "test-cloud-region"
+							mi.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@external/cred-1").String()
+							mi.OwnerTag = names.NewUserTag("alice@external").String()
+							mi.Life = "alive"
+							mi.Status = jujuparams.EntityStatus{
+								Status: "available",
+								Info:   "OK!",
+								Since:  newDate(2020, 2, 20, 20, 2, 20, 0, time.UTC),
+							}
+							mi.Users = []jujuparams.ModelUserInfo{{
+								UserName: "alice@external",
+								Access:   "admin",
+							}, {
+								UserName: "bob@external",
+								Access:   "write",
+							}, {
+								UserName: "charlie@external",
+								Access:   "read",
+							}}
+							mi.Machines = []jujuparams.ModelMachineInfo{{
+								Id:          "0",
+								Hardware:    jimmtest.ParseMachineHardware("arch=amd64 mem=8096 root-disk=10240 cores=1"),
+								InstanceId:  "00000009-0000-0000-0000-0000000000000",
+								DisplayName: "Machine 0",
+								Status:      "available",
+								Message:     "OK!",
+								HasVote:     true,
+							}, {
+								Id:          "1",
+								Hardware:    jimmtest.ParseMachineHardware("arch=amd64 mem=8096 root-disk=10240 cores=2"),
+								InstanceId:  "00000009-0000-0000-0000-0000000000001",
+								DisplayName: "Machine 1",
+								Status:      "available",
+								Message:     "OK!",
+								HasVote:     true,
+							}}
+							mi.SLA = &jujuparams.ModelSLAInfo{
+								Level: "unsupported",
+							}
+							mi.AgentVersion = newVersion("1.2.3")
+							return nil
+						},
+					},
 				},
 			}
 			err := j.Database.Migrate(ctx, false)
@@ -1330,36 +1218,12 @@ models:
     access: admin
   - user: bob@external
     access: admin
-  machines:
-  - id: 0
-    hardware:
-      arch: amd64
-      mem: 8096
-      root-disk: 10240
-      cores: 1
-    instance-id: 00000009-0000-0000-0000-0000000000000
-    display-name: Machine 0
-    status: available
-    message: OK!
-    has-vote: true
-    wants-vote: false
-    ha-primary: false
-  - id: 1
-    hardware:
-      arch: amd64
-      mem: 8096
-      root-disk: 10240
-      cores: 2
-    instance-id: 00000009-0000-0000-0000-0000000000001
-    display-name: Machine 1
-    status: available
-    message: OK!
-    has-vote: true
-    wants-vote: false
-    ha-primary: false
   sla:
     level: unsupported
   agent-version: 1.2.3
+  cores: 3
+  machines: 2
+  units: 4
 - name: model-2
   type: iaas
   uuid: 00000002-0000-0000-0000-000000000002
@@ -1379,36 +1243,11 @@ models:
     access: admin
   - user: bob@external
     access: write
-  machines:
-  - id: 0
-    hardware:
-      arch: amd64
-      mem: 8096
-      root-disk: 10240
-      cores: 1
-    instance-id: 0000000a-0000-0000-0000-0000000000000
-    display-name: Machine 0
-    status: available
-    message: OK!
-    has-vote: true
-    wants-vote: false
-    ha-primary: false
-  - id: 1
-    hardware:
-      arch: amd64
-      mem: 8096
-      root-disk: 10240
-      cores: 2
-    instance-id: 0000000a-0000-0000-0000-0000000000001
-    display-name: Machine 1
-    status: available
-    message: OK!
-    has-vote: true
-    wants-vote: false
-    ha-primary: false
   sla:
     level: unsupported
   agent-version: 1.2.3
+  cores: 3
+  machines: 2
 - name: model-3
   type: iaas
   uuid: 00000002-0000-0000-0000-000000000003
@@ -1428,36 +1267,11 @@ models:
     access: admin
   - user: bob@external
     access: ""
-  machines:
-  - id: 0
-    hardware:
-      arch: amd64
-      mem: 8096
-      root-disk: 10240
-      cores: 1
-    instance-id: 0000000b-0000-0000-0000-0000000000000
-    display-name: Machine 0
-    status: available
-    message: OK!
-    has-vote: true
-    wants-vote: false
-    ha-primary: false
-  - id: 1
-    hardware:
-      arch: amd64
-      mem: 8096
-      root-disk: 10240
-      cores: 2
-    instance-id: 0000000b-0000-0000-0000-0000000000001
-    display-name: Machine 1
-    status: available
-    message: OK!
-    has-vote: true
-    wants-vote: false
-    ha-primary: false
   sla:
     level: unsupported
   agent-version: 1.2.3
+  cores: 3
+  machines: 2
 - name: model-4
   type: iaas
   uuid: 00000002-0000-0000-0000-000000000004
@@ -1477,33 +1291,6 @@ models:
     access: admin
   - user: bob@external
     access: read
-  machines:
-  - id: 0
-    hardware:
-      arch: amd64
-      mem: 8096
-      root-disk: 10240
-      cores: 1
-    instance-id: 0000000c-0000-0000-0000-0000000000000
-    display-name: Machine 0
-    status: available
-    message: OK!
-    has-vote: true
-    wants-vote: false
-    ha-primary: false
-  - id: 1
-    hardware:
-      arch: amd64
-      mem: 8096
-      root-disk: 10240
-      cores: 2
-    instance-id: 0000000c-0000-0000-0000-0000000000001
-    display-name: Machine 1
-    status: available
-    message: OK!
-    has-vote: true
-    wants-vote: false
-    ha-primary: false
   sla:
     level: unsupported
   agent-version: 1.2.3
@@ -1565,7 +1352,7 @@ func TestForEachUserModel(t *testing.T) {
 				Count:  3,
 			}, {
 				Entity: "units",
-				Count:  0,
+				Count:  4,
 			}},
 			SLA: &jujuparams.ModelSLAInfo{
 				Level: "unsupported",
@@ -1627,10 +1414,10 @@ func TestForEachUserModel(t *testing.T) {
 			UserAccess: "read",
 			Counts: []jujuparams.ModelEntityCount{{
 				Entity: "machines",
-				Count:  2,
+				Count:  0,
 			}, {
 				Entity: "cores",
-				Count:  3,
+				Count:  0,
 			}, {
 				Entity: "units",
 				Count:  0,

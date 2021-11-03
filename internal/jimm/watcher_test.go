@@ -12,6 +12,8 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/core/instance"
+	"github.com/juju/names/v4"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
@@ -56,56 +58,8 @@ models:
     access: write
   - user: charlie@external
     access: read
-  machines:
-  - id: 0
-    hardware:
-      arch: amd64
-      mem: 8096
-      root-disk: 10240
-      cores: 1
-    instance-id: 00000009-0000-0000-0000-0000000000000
-    display-name: Machine 0
-    status: available
-    message: OK!
-    has-vote: true
-    wants-vote: false
-    ha-primary: false
-  - id: 1
-    hardware:
-      arch: amd64
-      mem: 8096
-      root-disk: 10240
-      cores: 2
-    instance-id: 00000009-0000-0000-0000-0000000000001
-    display-name: Machine 1
-    status: available
-    message: OK!
-    has-vote: true
-    wants-vote: false
-    ha-primary: false
   sla:
     level: unsupported
-  units:
-  - name: app-1/0
-    application: app-1
-    series: warty
-    charm-url: cs:app-1
-    life: starting
-    machine-id: 0
-    agent-status:
-      current: running
-      message: wotcha
-      version: "1.2.3"
-  - name: app-1/1
-    application: app-1
-    series: warty
-    charm-url: cs:app-1
-    life: stopping
-    machine-id: 1
-    agent-status:
-      current: stopping
-      message: hiya
-      version: "1.2.3"
   agent-version: 1.2.3
 - name: model-2
   type: iaas
@@ -131,26 +85,24 @@ models:
 
 var watcherTests = []struct {
 	name    string
+	initDB  func(*qt.C, db.Database)
 	deltas  [][]jujuparams.Delta
 	checkDB func(*qt.C, db.Database)
 }{{
 	name: "AddMachine",
-	deltas: [][]jujuparams.Delta{{{
-		Entity: &jujuparams.MachineInfo{
-			ModelUUID:  "00000002-0000-0000-0000-000000000001",
-			Id:         "2",
-			InstanceId: "machine-2",
-			AgentStatus: jujuparams.StatusInfo{
-				Current: "running",
-				Message: "hello",
+	deltas: [][]jujuparams.Delta{
+		{{
+			Entity: &jujuparams.MachineInfo{
+				ModelUUID:  "00000002-0000-0000-0000-000000000001",
+				Id:         "2",
+				InstanceId: "machine-2",
+				HardwareCharacteristics: &instance.HardwareCharacteristics{
+					CpuCores: newUint64(2),
+				},
 			},
-			InstanceStatus: jujuparams.StatusInfo{
-				Current: "starting",
-				Message: "hi",
-			},
-			Life: "alive",
-		},
-	}}},
+		}},
+		nil,
+	},
 	checkDB: func(c *qt.C, db db.Database) {
 		ctx := context.Background()
 
@@ -163,45 +115,30 @@ var watcherTests = []struct {
 		err := db.GetModel(ctx, &model)
 		c.Assert(err, qt.IsNil)
 
-		m := dbmodel.Machine{
-			ModelID:   model.ID,
-			MachineID: "2",
-		}
-		err = db.GetMachine(ctx, &m)
-		c.Assert(err, qt.IsNil)
-		c.Check(m, jimmtest.DBObjectEquals, dbmodel.Machine{
-			ModelID:    model.ID,
-			MachineID:  "2",
-			InstanceID: "machine-2",
-			AgentStatus: dbmodel.Status{
-				Status: "running",
-				Info:   "hello",
-			},
-			InstanceStatus: dbmodel.Status{
-				Status: "starting",
-				Info:   "hi",
-			},
-			Life: "alive",
-		})
+		c.Check(model.Machines, qt.Equals, int64(1))
+		c.Check(model.Cores, qt.Equals, int64(2))
 	},
 }, {
 	name: "UpdateMachine",
-	deltas: [][]jujuparams.Delta{{{
-		Entity: &jujuparams.MachineInfo{
-			ModelUUID:  "00000002-0000-0000-0000-000000000001",
-			Id:         "0",
-			InstanceId: "machine-0",
-			AgentStatus: jujuparams.StatusInfo{
-				Current: "running",
-				Message: "hello",
+	deltas: [][]jujuparams.Delta{
+		{{
+			Entity: &jujuparams.MachineInfo{
+				ModelUUID:  "00000002-0000-0000-0000-000000000001",
+				Id:         "0",
+				InstanceId: "machine-0",
 			},
-			InstanceStatus: jujuparams.StatusInfo{
-				Current: "starting",
-				Message: "hi",
+		}}, {{
+			Entity: &jujuparams.MachineInfo{
+				ModelUUID:  "00000002-0000-0000-0000-000000000001",
+				Id:         "0",
+				InstanceId: "machine-0",
+				HardwareCharacteristics: &instance.HardwareCharacteristics{
+					CpuCores: newUint64(4),
+				},
 			},
-			Life: "alive",
-		},
-	}}},
+		}},
+		nil,
+	},
 	checkDB: func(c *qt.C, db db.Database) {
 		ctx := context.Background()
 
@@ -214,87 +151,30 @@ var watcherTests = []struct {
 		err := db.GetModel(ctx, &model)
 		c.Assert(err, qt.IsNil)
 
-		m := dbmodel.Machine{
-			ModelID:   model.ID,
-			MachineID: "0",
-		}
-		err = db.GetMachine(ctx, &m)
-		c.Assert(err, qt.IsNil)
-		c.Check(m, jimmtest.DBObjectEquals, dbmodel.Machine{
-			ModelID:   model.ID,
-			MachineID: "0",
-			Hardware: dbmodel.Hardware{
-				Arch: sql.NullString{
-					String: "amd64",
-					Valid:  true,
-				},
-				Mem: dbmodel.NullUint64{
-					Uint64: 8096,
-					Valid:  true,
-				},
-				RootDisk: dbmodel.NullUint64{
-					Uint64: 10240,
-					Valid:  true,
-				},
-				CPUCores: dbmodel.NullUint64{
-					Uint64: 1,
-					Valid:  true,
-				},
-			},
-			InstanceID:  "machine-0",
-			DisplayName: "Machine 0",
-			AgentStatus: dbmodel.Status{
-				Status: "running",
-				Info:   "hello",
-			},
-			InstanceStatus: dbmodel.Status{
-				Status: "starting",
-				Info:   "hi",
-			},
-			Life: "alive",
-		})
+		c.Check(model.Machines, qt.Equals, int64(1))
+		c.Check(model.Cores, qt.Equals, int64(4))
 	},
 }, {
 	name: "DeleteMachine",
-	deltas: [][]jujuparams.Delta{{{
-		Removed: true,
-		Entity: &jujuparams.MachineInfo{
-			ModelUUID: "00000002-0000-0000-0000-000000000001",
-			Id:        "0",
-		},
-	}}},
-	checkDB: func(c *qt.C, db db.Database) {
-		ctx := context.Background()
-
-		model := dbmodel.Model{
-			UUID: sql.NullString{
-				String: "00000002-0000-0000-0000-000000000001",
-				Valid:  true,
+	deltas: [][]jujuparams.Delta{
+		{{
+			Entity: &jujuparams.MachineInfo{
+				ModelUUID:  "00000002-0000-0000-0000-000000000001",
+				Id:         "0",
+				InstanceId: "machine-0",
+				HardwareCharacteristics: &instance.HardwareCharacteristics{
+					CpuCores: newUint64(3),
+				},
 			},
-		}
-		err := db.GetModel(ctx, &model)
-		c.Assert(err, qt.IsNil)
-
-		m := dbmodel.Machine{
-			ModelID:   model.ID,
-			MachineID: "0",
-		}
-		err = db.GetMachine(ctx, &m)
-		c.Check(err, qt.ErrorMatches, `machine not found`)
-		c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+		}}, {{
+			Removed: true,
+			Entity: &jujuparams.MachineInfo{
+				ModelUUID: "00000002-0000-0000-0000-000000000001",
+				Id:        "0",
+			},
+		}},
+		nil,
 	},
-}, {
-	name: "AddApplication",
-	deltas: [][]jujuparams.Delta{{{
-		Entity: &jujuparams.ApplicationInfo{
-			ModelUUID: "00000002-0000-0000-0000-000000000001",
-			Name:      "app-3",
-			CharmURL:  "ch:app-3",
-			Life:      "starting",
-			MinUnits:  3,
-			Config:    map[string]interface{}{"a": "B"},
-		},
-	}}},
 	checkDB: func(c *qt.C, db db.Database) {
 		ctx := context.Background()
 
@@ -307,69 +187,63 @@ var watcherTests = []struct {
 		err := db.GetModel(ctx, &model)
 		c.Assert(err, qt.IsNil)
 
-		//TODO(mhilton) check something was done.
+		c.Check(model.Machines, qt.Equals, int64(0))
+		c.Check(model.Cores, qt.Equals, int64(0))
 	},
 }, {
 	name: "UpdateApplication",
-	deltas: [][]jujuparams.Delta{{{
-		Entity: &jujuparams.ApplicationInfo{
-			ModelUUID:       "00000002-0000-0000-0000-000000000001",
-			Name:            "app-1",
-			Exposed:         true,
-			CharmURL:        "cs:app-1",
-			Life:            "alive",
-			MinUnits:        1,
-			WorkloadVersion: "2",
-		},
-	}}},
-	checkDB: func(c *qt.C, db db.Database) {
+	initDB: func(c *qt.C, db db.Database) {
 		ctx := context.Background()
 
-		model := dbmodel.Model{
-			UUID: sql.NullString{
-				String: "00000002-0000-0000-0000-000000000001",
-				Valid:  true,
-			},
-		}
-		err := db.GetModel(ctx, &model)
+		var m dbmodel.Model
+		m.SetTag(names.NewModelTag("00000002-0000-0000-0000-000000000001"))
+		err := db.GetModel(ctx, &m)
 		c.Assert(err, qt.IsNil)
-		//TODO(mhilton) check something was done.
+
+		err = db.AddApplicationOffer(ctx, &dbmodel.ApplicationOffer{
+			ModelID:         m.ID,
+			UUID:            "00000010-0000-0000-0000-000000000001",
+			Name:            "offer-1",
+			ApplicationName: "app-1",
+		})
+		c.Assert(err, qt.IsNil)
 	},
-}, {
-	name: "DeleteApplication",
-	deltas: [][]jujuparams.Delta{{{
-		Removed: true,
-		Entity: &jujuparams.ApplicationInfo{
-			ModelUUID: "00000002-0000-0000-0000-000000000001",
-			Name:      "app-1",
-		},
-	}}},
+	deltas: [][]jujuparams.Delta{
+		{{
+			Entity: &jujuparams.ApplicationInfo{
+				ModelUUID:       "00000002-0000-0000-0000-000000000001",
+				Name:            "app-1",
+				Exposed:         true,
+				CharmURL:        "cs:app-1",
+				Life:            "alive",
+				MinUnits:        1,
+				WorkloadVersion: "2",
+			},
+		}},
+		nil,
+	},
 	checkDB: func(c *qt.C, db db.Database) {
 		ctx := context.Background()
 
-		model := dbmodel.Model{
-			UUID: sql.NullString{
-				String: "00000002-0000-0000-0000-000000000001",
-				Valid:  true,
-			},
-		}
-		err := db.GetModel(ctx, &model)
+		var m dbmodel.Model
+		m.SetTag(names.NewModelTag("00000002-0000-0000-0000-000000000001"))
+		err := db.GetModel(ctx, &m)
 		c.Assert(err, qt.IsNil)
-		// TODO(mhilton) check application offers are deleted
+
+		c.Assert(m.Offers, qt.HasLen, 1)
+		c.Assert(m.Offers[0].CharmURL, qt.Equals, "cs:app-1")
 	},
 }, {
 	name: "AddUnit",
-	deltas: [][]jujuparams.Delta{{{
-		Entity: &jujuparams.UnitInfo{
-			ModelUUID:   "00000002-0000-0000-0000-000000000001",
-			Name:        "app-1/2",
-			Application: "app-1",
-			Series:      "warty",
-			CharmURL:    "cs:app-1",
-			Life:        "starting",
-			MachineId:   "0",
-		},
-	}}},
+	deltas: [][]jujuparams.Delta{
+		{{
+			Entity: &jujuparams.UnitInfo{
+				ModelUUID: "00000002-0000-0000-0000-000000000001",
+				Name:      "app-1/2",
+			},
+		}},
+		nil,
+	},
 	checkDB: func(c *qt.C, db db.Database) {
 		ctx := context.Background()
 
@@ -382,33 +256,25 @@ var watcherTests = []struct {
 		err := db.GetModel(ctx, &model)
 		c.Assert(err, qt.IsNil)
 
-		u := dbmodel.Unit{
-			ModelID: model.ID,
-			Name:    "app-1/2",
-		}
-		err = db.GetUnit(ctx, &u)
-		c.Assert(err, qt.IsNil)
-		c.Check(u, jimmtest.DBObjectEquals, dbmodel.Unit{
-			ModelID:         model.ID,
-			Name:            "app-1/2",
-			ApplicationName: "app-1",
-			MachineID:       "0",
-			Life:            "starting",
-		})
+		c.Check(model.Units, qt.Equals, int64(1))
 	},
 }, {
 	name: "UpdateUnit",
-	deltas: [][]jujuparams.Delta{{{
-		Entity: &jujuparams.UnitInfo{
-			ModelUUID:   "00000002-0000-0000-0000-000000000001",
-			Name:        "app-1/0",
-			Application: "app-1",
-			Series:      "warty",
-			CharmURL:    "cs:app-1",
-			Life:        "alive",
-			MachineId:   "0",
-		},
-	}}},
+	deltas: [][]jujuparams.Delta{
+		{{
+			Entity: &jujuparams.UnitInfo{
+				ModelUUID: "00000002-0000-0000-0000-000000000001",
+				Name:      "app-1/2",
+			},
+		}},
+		{{
+			Entity: &jujuparams.UnitInfo{
+				ModelUUID: "00000002-0000-0000-0000-000000000001",
+				Name:      "app-1/2",
+			},
+		}},
+		nil,
+	},
 	checkDB: func(c *qt.C, db db.Database) {
 		ctx := context.Background()
 
@@ -421,29 +287,26 @@ var watcherTests = []struct {
 		err := db.GetModel(ctx, &model)
 		c.Assert(err, qt.IsNil)
 
-		u := dbmodel.Unit{
-			ModelID: model.ID,
-			Name:    "app-1/0",
-		}
-		err = db.GetUnit(ctx, &u)
-		c.Assert(err, qt.IsNil)
-		c.Check(u, jimmtest.DBObjectEquals, dbmodel.Unit{
-			ModelID:         model.ID,
-			Name:            "app-1/0",
-			ApplicationName: "app-1",
-			MachineID:       "0",
-			Life:            "alive",
-		})
+		c.Check(model.Units, qt.Equals, int64(1))
 	},
 }, {
 	name: "DeleteUnit",
-	deltas: [][]jujuparams.Delta{{{
-		Removed: true,
-		Entity: &jujuparams.UnitInfo{
-			ModelUUID: "00000002-0000-0000-0000-000000000001",
-			Name:      "app-1/0",
-		},
-	}}},
+	deltas: [][]jujuparams.Delta{
+		{{
+			Entity: &jujuparams.UnitInfo{
+				ModelUUID: "00000002-0000-0000-0000-000000000001",
+				Name:      "app-1/0",
+			},
+		}},
+		{{
+			Removed: true,
+			Entity: &jujuparams.UnitInfo{
+				ModelUUID: "00000002-0000-0000-0000-000000000001",
+				Name:      "app-1/0",
+			},
+		}},
+		nil,
+	},
 	checkDB: func(c *qt.C, db db.Database) {
 		ctx := context.Background()
 
@@ -456,24 +319,21 @@ var watcherTests = []struct {
 		err := db.GetModel(ctx, &model)
 		c.Assert(err, qt.IsNil)
 
-		u := dbmodel.Unit{
-			ModelID: model.ID,
-			Name:    "app-1/0",
-		}
-		err = db.GetUnit(ctx, &u)
-		c.Check(err, qt.ErrorMatches, `unit not found`)
-		c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+		c.Check(model.Units, qt.Equals, int64(0))
 	},
 }, {
 	name: "UnknownModelsIgnored",
-	deltas: [][]jujuparams.Delta{{{
-		Entity: &jujuparams.ModelUpdate{
-			ModelUUID: "00000002-0000-0000-0000-000000000004",
-			Name:      "new-model",
-			Owner:     "charlie@external",
-			Life:      "starting",
-		},
-	}}},
+	deltas: [][]jujuparams.Delta{
+		{{
+			Entity: &jujuparams.ModelUpdate{
+				ModelUUID: "00000002-0000-0000-0000-000000000004",
+				Name:      "new-model",
+				Owner:     "charlie@external",
+				Life:      "starting",
+			},
+		}},
+		nil,
+	},
 	checkDB: func(c *qt.C, db db.Database) {
 		ctx := context.Background()
 
@@ -489,24 +349,27 @@ var watcherTests = []struct {
 	},
 }, {
 	name: "UpdateModel",
-	deltas: [][]jujuparams.Delta{{{
-		Entity: &jujuparams.ModelUpdate{
-			ModelUUID:      "00000002-0000-0000-0000-000000000001",
-			Name:           "model-1",
-			Owner:          "alice@external",
-			Life:           "alive",
-			ControllerUUID: "00000001-0000-0000-0000-000000000001",
-			Status: jujuparams.StatusInfo{
-				Current: "available",
-				Message: "updated status message",
-				Version: "1.2.3",
+	deltas: [][]jujuparams.Delta{
+		{{
+			Entity: &jujuparams.ModelUpdate{
+				ModelUUID:      "00000002-0000-0000-0000-000000000001",
+				Name:           "model-1",
+				Owner:          "alice@external",
+				Life:           "alive",
+				ControllerUUID: "00000001-0000-0000-0000-000000000001",
+				Status: jujuparams.StatusInfo{
+					Current: "available",
+					Message: "updated status message",
+					Version: "1.2.3",
+				},
+				SLA: jujuparams.ModelSLAInfo{
+					Level: "1",
+					Owner: "me",
+				},
 			},
-			SLA: jujuparams.ModelSLAInfo{
-				Level: "1",
-				Owner: "me",
-			},
-		},
-	}}},
+		}},
+		nil,
+	},
 	checkDB: func(c *qt.C, db db.Database) {
 		ctx := context.Background()
 
@@ -524,8 +387,6 @@ var watcherTests = []struct {
 		model.CloudCredential = dbmodel.CloudCredential{}
 		model.CloudRegion = dbmodel.CloudRegion{}
 		model.Controller = dbmodel.Controller{}
-		model.Machines = nil
-		model.Units = nil
 		model.Users = nil
 		c.Check(model, jimmtest.DBObjectEquals, dbmodel.Model{
 			UUID: sql.NullString{
@@ -549,12 +410,15 @@ var watcherTests = []struct {
 	},
 }, {
 	name: "DeleteDyingModel",
-	deltas: [][]jujuparams.Delta{{{
-		Removed: true,
-		Entity: &jujuparams.ModelUpdate{
-			ModelUUID: "00000002-0000-0000-0000-000000000002",
-		},
-	}}},
+	deltas: [][]jujuparams.Delta{
+		{{
+			Removed: true,
+			Entity: &jujuparams.ModelUpdate{
+				ModelUUID: "00000002-0000-0000-0000-000000000002",
+			},
+		}},
+		nil,
+	},
 	checkDB: func(c *qt.C, db db.Database) {
 		ctx := context.Background()
 
@@ -570,12 +434,15 @@ var watcherTests = []struct {
 	},
 }, {
 	name: "DeleteDeadModel",
-	deltas: [][]jujuparams.Delta{{{
-		Removed: true,
-		Entity: &jujuparams.ModelUpdate{
-			ModelUUID: "00000002-0000-0000-0000-000000000003",
-		},
-	}}},
+	deltas: [][]jujuparams.Delta{
+		{{
+			Removed: true,
+			Entity: &jujuparams.ModelUpdate{
+				ModelUUID: "00000002-0000-0000-0000-000000000003",
+			},
+		}},
+		nil,
+	},
 	checkDB: func(c *qt.C, db db.Database) {
 		ctx := context.Background()
 
@@ -591,12 +458,15 @@ var watcherTests = []struct {
 	},
 }, {
 	name: "DeleteLivingModelFails",
-	deltas: [][]jujuparams.Delta{{{
-		Removed: true,
-		Entity: &jujuparams.ModelUpdate{
-			ModelUUID: "00000002-0000-0000-0000-000000000001",
-		},
-	}}},
+	deltas: [][]jujuparams.Delta{
+		{{
+			Removed: true,
+			Entity: &jujuparams.ModelUpdate{
+				ModelUUID: "00000002-0000-0000-0000-000000000001",
+			},
+		}},
+		nil,
+	},
 	checkDB: func(c *qt.C, db db.Database) {
 		ctx := context.Background()
 
@@ -614,8 +484,6 @@ var watcherTests = []struct {
 		model.CloudCredential = dbmodel.CloudCredential{}
 		model.CloudRegion = dbmodel.CloudRegion{}
 		model.Controller = dbmodel.Controller{}
-		model.Machines = nil
-		model.Units = nil
 		model.Users = nil
 		c.Check(model, jimmtest.DBObjectEquals, dbmodel.Model{
 			UUID: sql.NullString{
@@ -708,6 +576,10 @@ func TestWatcher(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 			env.PopulateDB(c, w.Database)
 
+			if test.initDB != nil {
+				test.initDB(c, w.Database)
+			}
+
 			var wg sync.WaitGroup
 			wg.Add(1)
 			go func() {
@@ -737,32 +609,35 @@ var modelSummaryWatcherTests = []struct {
 	checkPublisher func(*qt.C, *testPublisher)
 }{{
 	name: "ModelSummaries",
-	summaries: [][]jujuparams.ModelAbstract{{{
-		UUID:   "00000002-0000-0000-0000-000000000001",
-		Status: "test status",
-		Size: jujuparams.ModelSummarySize{
-			Applications: 1,
-			Machines:     2,
-			Containers:   3,
-			Units:        4,
-			Relations:    12,
-		},
-		Admins: []string{"alice@external", "bob"},
-	}, {
-		// this is a summary for an model unknown to jimm
-		// meaning its summary will not be published
-		// to the pubsub hub.
-		UUID:   "00000002-0000-0000-0000-000000000004",
-		Status: "test status 2",
-		Size: jujuparams.ModelSummarySize{
-			Applications: 5,
-			Machines:     4,
-			Containers:   3,
-			Units:        2,
-			Relations:    1,
-		},
-		Admins: []string{"bob@external"},
-	}}},
+	summaries: [][]jujuparams.ModelAbstract{
+		{{
+			UUID:   "00000002-0000-0000-0000-000000000001",
+			Status: "test status",
+			Size: jujuparams.ModelSummarySize{
+				Applications: 1,
+				Machines:     2,
+				Containers:   3,
+				Units:        4,
+				Relations:    12,
+			},
+			Admins: []string{"alice@external", "bob"},
+		}, {
+			// this is a summary for an model unknown to jimm
+			// meaning its summary will not be published
+			// to the pubsub hub.
+			UUID:   "00000002-0000-0000-0000-000000000004",
+			Status: "test status 2",
+			Size: jujuparams.ModelSummarySize{
+				Applications: 5,
+				Machines:     4,
+				Containers:   3,
+				Units:        2,
+				Relations:    1,
+			},
+			Admins: []string{"bob@external"},
+		}},
+		nil,
+	},
 	checkPublisher: func(c *qt.C, publisher *testPublisher) {
 		c.Assert(publisher.messages, qt.DeepEquals, []interface{}{
 			jujuparams.ModelAbstract{
@@ -1290,4 +1165,8 @@ func (p *testPublisher) Publish(model string, content interface{}) <-chan struct
 	done := make(chan struct{})
 	close(done)
 	return done
+}
+
+func newUint64(i uint64) *uint64 {
+	return &i
 }

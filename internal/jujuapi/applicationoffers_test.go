@@ -38,28 +38,10 @@ func (s *applicationOffersSuite) SetUpTest(c *gc.C) {
 			Name: "wordpress",
 		}),
 	})
-	unit := s.factory.MakeUnit(c, &factory.UnitParams{
+	s.factory.MakeUnit(c, &factory.UnitParams{
 		Application: app,
 	})
 	s.endpoint, err = app.Endpoint("url")
-	c.Assert(err, gc.Equals, nil)
-
-	machineID, err := unit.AssignedMachineId()
-	c.Assert(err, gc.Equals, nil)
-	dbmachine := dbmodel.Machine{
-		ModelID:   s.Model.ID,
-		MachineID: machineID,
-	}
-	err = s.JIMM.Database.UpdateMachine(context.Background(), &dbmachine)
-	c.Assert(err, gc.Equals, nil)
-
-	dbunit := dbmodel.Unit{
-		ModelID:         s.Model.ID,
-		ApplicationName: "test-app",
-		MachineID:       machineID,
-		Name:            unit.Name(),
-	}
-	err = s.JIMM.Database.UpdateUnit(context.Background(), &dbunit)
 	c.Assert(err, gc.Equals, nil)
 }
 
