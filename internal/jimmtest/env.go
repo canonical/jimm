@@ -332,14 +332,15 @@ type Model struct {
 	CloudCredential string       `json:"cloud-credential"`
 	Users           []UserAccess `json:"users"`
 
-	Type          string                        `json:"type"`
-	DefaultSeries string                        `json:"default-series"`
-	Life          string                        `json:"life"`
-	Status        jujuparams.EntityStatus       `json:"status"`
-	Machines      []jujuparams.ModelMachineInfo `json:"machines"`
-	Units         []jujuparams.UnitInfo         `json:"units"`
-	SLA           *jujuparams.ModelSLAInfo      `json:"sla"`
-	AgentVersion  string                        `json:"agent-version"`
+	Type          string                   `json:"type"`
+	DefaultSeries string                   `json:"default-series"`
+	Life          string                   `json:"life"`
+	Status        jujuparams.EntityStatus  `json:"status"`
+	SLA           *jujuparams.ModelSLAInfo `json:"sla"`
+	AgentVersion  string                   `json:"agent-version"`
+	Cores         int64                    `json:"cores"`
+	Machines      int64                    `json:"machines"`
+	Units         int64                    `json:"units"`
 
 	env *Environment
 	dbo dbmodel.Model
@@ -379,17 +380,13 @@ func (m *Model) DBObject(c *qt.C, db db.Database) dbmodel.Model {
 	m.dbo.Life = m.Life
 	m.dbo.Status.FromJujuEntityStatus(m.Status)
 	m.dbo.Status.Version = m.AgentVersion
-	m.dbo.Machines = make([]dbmodel.Machine, len(m.Machines))
-	for i, mach := range m.Machines {
-		m.dbo.Machines[i].FromJujuModelMachineInfo(mach)
-	}
-	m.dbo.Units = make([]dbmodel.Unit, len(m.Units))
-	for i, unit := range m.Units {
-		m.dbo.Units[i].FromJujuUnitInfo(unit)
-	}
 	if m.SLA != nil {
 		m.dbo.SLA.FromJujuModelSLAInfo(*m.SLA)
 	}
+	m.dbo.Cores = m.Cores
+	m.dbo.Machines = m.Machines
+	m.dbo.Units = m.Units
+
 	err := db.AddModel(context.Background(), &m.dbo)
 	c.Assert(err, qt.IsNil)
 	return m.dbo

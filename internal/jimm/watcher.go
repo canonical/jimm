@@ -5,7 +5,6 @@ package jimm
 import (
 	"context"
 	"database/sql"
-	"sort"
 	"sync"
 	"time"
 
@@ -144,12 +143,26 @@ func (w *Watcher) dialController(ctx context.Context, ctl *dbmodel.Controller) (
 	return api, nil
 }
 
-func (w *Watcher) checkControllerModels(ctx context.Context, ctl *dbmodel.Controller, checks ...func(*dbmodel.Model) error) (map[string]uint, error) {
+// A modelState holds the in-memory state of a model for the watcher.
+type modelState struct {
+	// id is the database id of the model.
+	id      uint
+	changed bool
+
+	// machines maps the Id of all the machines that have been seen to
+	// the number of cores reported.
+	machines map[string]int64
+
+	// units stores the ids of all units that have been seen.
+	units map[string]bool
+}
+
+func (w *Watcher) checkControllerModels(ctx context.Context, ctl *dbmodel.Controller, checks ...func(*dbmodel.Model) error) (map[string]*modelState, error) {
 	const op = errors.Op("jimm.checkControllerModels")
 
 	// modelIDs contains the set of models running on the
 	// controller that JIMM is interested in.
-	modelIDs := make(map[string]uint)
+	modelStates := make(map[string]*modelState)
 	// find all the models we expect to get deltas from initially.
 	err := w.Database.ForEachControllerModel(ctx, ctl, func(m *dbmodel.Model) error {
 		// models without a UUID are currently being initialised
@@ -164,48 +177,17 @@ func (w *Watcher) checkControllerModels(ctx context.Context, ctl *dbmodel.Contro
 				return errors.E(op, err)
 			}
 		}
-		modelIDs[m.UUID.String] = m.ID
+		modelStates[m.UUID.String] = &modelState{
+			id:       m.ID,
+			machines: make(map[string]int64),
+			units:    make(map[string]bool),
+		}
 		return nil
 	})
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	return modelIDs, nil
-}
-
-// deltaPriority holds the priority order for processing deltas. This is to
-// ensure the database integrity when processing deltas. The higher the
-// value the higher the priority, this ensures all unmentioned entity kinds
-// are processed last.
-var deltaPriority = map[string]int{
-	"model":       4,
-	"machine":     3,
-	"application": 2,
-	"unit":        1,
-}
-
-type sortDeltas []jujuparams.Delta
-
-// Len implements sort.Interface.
-func (d sortDeltas) Len() int {
-	return len(d)
-}
-
-// Less implements sort.Interface.
-func (d sortDeltas) Less(i, j int) bool {
-	e1, e2 := d[i].Entity.EntityId(), d[j].Entity.EntityId()
-	if e1.ModelUUID != e2.ModelUUID {
-		return e1.ModelUUID < e2.ModelUUID
-	}
-	if e1.Kind != e2.Kind {
-		return deltaPriority[e1.Kind] > deltaPriority[e2.Kind]
-	}
-	return e1.Id < e2.Id
-}
-
-// Swap implements sort.Interface.
-func (d sortDeltas) Swap(i, j int) {
-	d[i], d[j] = d[j], d[i]
+	return modelStates, nil
 }
 
 // watchController connects to the given controller and watches for model
@@ -250,18 +232,18 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 		return nil
 	}
 
-	// modelIDs contains the set of models running on the
+	// modelStates contains the set of models running on the
 	// controller that JIMM is interested in. The function also
 	// check for any dying models and deletes them where necessary.
-	modelIDs, err := w.checkControllerModels(ctx, ctl, checkDyingModel)
+	modelStates, err := w.checkControllerModels(ctx, ctl, checkDyingModel)
 	if err != nil {
 		return errors.E(op, err)
 	}
 
-	modelIDf := func(uuid string) uint {
-		modelID, ok := modelIDs[uuid]
+	modelStatef := func(uuid string) *modelState {
+		state, ok := modelStates[uuid]
 		if ok {
-			return modelID
+			return state
 		}
 		m := dbmodel.Model{
 			UUID: sql.NullString{
@@ -271,12 +253,19 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 			ControllerID: ctl.ID,
 		}
 		err := w.Database.GetModel(ctx, &m)
-		if err == nil || errors.ErrorCode(err) == errors.CodeNotFound {
-			modelIDs[uuid] = m.ID
-			return m.ID
+		if err == nil {
+			st := modelState{
+				id:       m.ID,
+				machines: make(map[string]int64),
+				units:    make(map[string]bool),
+			}
+			modelStates[uuid] = &st
+		} else if errors.ErrorCode(err) == errors.CodeNotFound {
+			modelStates[uuid] = nil
+		} else {
+			zapctx.Error(ctx, "cannot get model", zap.Error(err))
 		}
-		zapctx.Error(ctx, "cannot get model", zap.Error(err))
-		return 0
+		return modelStates[uuid]
 	}
 
 	for {
@@ -285,20 +274,47 @@ func (w *Watcher) watchController(ctx context.Context, ctl *dbmodel.Controller) 
 		if err != nil {
 			return errors.E(op, err)
 		}
-		sort.Sort(sortDeltas(deltas))
 		for _, d := range deltas {
 			eid := d.Entity.EntityId()
 			ctx := zapctx.WithFields(ctx, zap.String("model-uuid", eid.ModelUUID), zap.String("kind", eid.Kind), zap.String("id", eid.Id))
 			zapctx.Debug(ctx, "processing delta")
-			if err := w.handleDelta(ctx, modelIDf, d); err != nil {
+			if err := w.handleDelta(ctx, modelStatef, d); err != nil {
 				return errors.E(op, err)
 			}
 		}
-		for k, v := range modelIDs {
-			if v == 0 {
+		for k, v := range modelStates {
+			if v == nil {
 				// If we have cached not to process a model
 				// remove it so we check again next time.
-				delete(modelIDs, k)
+				delete(modelStates, k)
+				continue
+			}
+			if v.changed {
+				// Update changed model.
+				err := w.Database.Transaction(func(tx *db.Database) error {
+					m := dbmodel.Model{
+						ID: v.id,
+					}
+					if err := tx.GetModel(ctx, &m); err != nil {
+						return err
+					}
+					var machines, cores int64
+					for _, n := range v.machines {
+						machines++
+						cores += n
+					}
+					m.Cores = cores
+					m.Machines = machines
+					m.Units = int64(len(v.units))
+					if err := tx.UpdateModel(ctx, &m); err != nil {
+						return err
+					}
+					return nil
+				})
+				if err != nil {
+					zapctx.Error(ctx, "cannot get model for update", zap.Error(err))
+					continue
+				}
 			}
 		}
 	}
@@ -335,15 +351,15 @@ func (w *Watcher) watchAllModelSummaries(ctx context.Context, ctl *dbmodel.Contr
 
 	// modelIDs contains the set of models running on the
 	// controller that JIMM is interested in.
-	modelIDs, err := w.checkControllerModels(ctx, ctl)
+	modelStates, err := w.checkControllerModels(ctx, ctl)
 	if err != nil {
 		return errors.E(op, err)
 	}
 
 	modelIDf := func(uuid string) uint {
-		modelID, ok := modelIDs[uuid]
+		state, ok := modelStates[uuid]
 		if ok {
-			return modelID
+			return state.id
 		}
 		m := dbmodel.Model{
 			UUID: sql.NullString{
@@ -354,7 +370,9 @@ func (w *Watcher) watchAllModelSummaries(ctx context.Context, ctl *dbmodel.Contr
 		}
 		err := w.Database.GetModel(ctx, &m)
 		if err == nil || errors.ErrorCode(err) == errors.CodeNotFound {
-			modelIDs[uuid] = m.ID
+			modelStates[uuid] = &modelState{
+				id: m.ID,
+			}
 			return m.ID
 		}
 		zapctx.Error(ctx, "cannot get model", zap.Error(err))
@@ -394,69 +412,52 @@ func (w *Watcher) watchAllModelSummaries(ctx context.Context, ctl *dbmodel.Contr
 	}
 }
 
-func (w *Watcher) handleDelta(ctx context.Context, modelIDf func(string) uint, d jujuparams.Delta) error {
+func (w *Watcher) handleDelta(ctx context.Context, modelIDf func(string) *modelState, d jujuparams.Delta) error {
 	eid := d.Entity.EntityId()
-	modelID := modelIDf(eid.ModelUUID)
-	if modelID == 0 {
+	state := modelIDf(eid.ModelUUID)
+	if state == nil {
 		return nil
 	}
 	switch eid.Kind {
 	case "application":
 		if d.Removed {
-			// TODO(mhilton) update associated application-offers
+			return nil
 		}
-		return w.updateApplication(ctx, d.Entity.(*jujuparams.ApplicationInfo))
+		return w.updateApplication(ctx, state.id, d.Entity.(*jujuparams.ApplicationInfo))
 	case "machine":
-		machine := dbmodel.Machine{
-			ModelID:   modelID,
-			MachineID: eid.Id,
-		}
 		if d.Removed {
-			return w.Database.DeleteMachine(ctx, &machine)
+			state.changed = true
+			delete(state.machines, eid.Id)
+			return nil
 		}
-		return w.updateMachine(ctx, &machine, d.Entity.(*jujuparams.MachineInfo))
+		var cores int64
+		machine := d.Entity.(*jujuparams.MachineInfo)
+		if machine.HardwareCharacteristics != nil && machine.HardwareCharacteristics.CpuCores != nil {
+			cores = int64(*machine.HardwareCharacteristics.CpuCores)
+		}
+		sCores, ok := state.machines[eid.Id]
+		if !ok || sCores != cores {
+			state.machines[eid.Id] = cores
+			state.changed = true
+		}
 	case "model":
 		model := dbmodel.Model{
-			ID: modelID,
+			ID: state.id,
 		}
 		if d.Removed {
 			return w.deleteModel(ctx, &model)
 		}
 		return w.updateModel(ctx, &model, d.Entity.(*jujuparams.ModelUpdate))
 	case "unit":
-		unit := dbmodel.Unit{
-			ModelID: modelID,
-			Name:    eid.Id,
-		}
 		if d.Removed {
-			return w.Database.DeleteUnit(ctx, &unit)
+			state.changed = true
+			delete(state.units, eid.Id)
+			return nil
 		}
-		return w.updateUnit(ctx, &unit, d.Entity.(*jujuparams.UnitInfo))
-	}
-	return nil
-}
-
-func (w *Watcher) updateApplication(ctx context.Context, info *jujuparams.ApplicationInfo) error {
-	const op = errors.Op("watcher.updateApplication")
-
-	// TODO(mhilton) update associated application-offers.
-	return nil
-}
-
-func (w *Watcher) updateMachine(ctx context.Context, machine *dbmodel.Machine, info *jujuparams.MachineInfo) error {
-	const op = errors.Op("watcher.updateMachine")
-
-	err := w.Database.Transaction(func(db *db.Database) error {
-		if err := db.GetMachine(ctx, machine); err != nil {
-			if errors.ErrorCode(err) != errors.CodeNotFound {
-				return err
-			}
+		if !state.units[eid.Id] {
+			state.changed = true
+			state.units[eid.Id] = true
 		}
-		machine.FromJujuMachineInfo(*info)
-		return db.UpdateMachine(ctx, machine)
-	})
-	if err != nil {
-		return errors.E(op, err)
 	}
 	return nil
 }
@@ -500,20 +501,30 @@ func (w *Watcher) updateModel(ctx context.Context, model *dbmodel.Model, info *j
 	return nil
 }
 
-func (w *Watcher) updateUnit(ctx context.Context, unit *dbmodel.Unit, info *jujuparams.UnitInfo) error {
-	const op = errors.Op("watcher.updateUnit")
-
-	err := w.Database.Transaction(func(db *db.Database) error {
-		if err := db.GetUnit(ctx, unit); err != nil {
-			if errors.ErrorCode(err) != errors.CodeNotFound {
+func (w *Watcher) updateApplication(ctx context.Context, modelID uint, info *jujuparams.ApplicationInfo) error {
+	err := w.Database.Transaction(func(tx *db.Database) error {
+		m := dbmodel.Model{
+			ID: modelID,
+		}
+		if err := tx.GetModel(ctx, &m); err != nil {
+			return err
+		}
+		for _, o := range m.Offers {
+			if o.ApplicationName != info.Name {
+				continue
+			}
+			if o.CharmURL == info.CharmURL {
+				continue
+			}
+			o.CharmURL = info.CharmURL
+			if err := tx.UpdateApplicationOffer(ctx, &o); err != nil {
 				return err
 			}
 		}
-		unit.FromJujuUnitInfo(*info)
-		return db.UpdateUnit(ctx, unit)
+		return nil
 	})
 	if err != nil {
-		return errors.E(op, err)
+		zapctx.Error(ctx, "error updating application", zap.Error(err))
 	}
 	return nil
 }

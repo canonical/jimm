@@ -144,6 +144,9 @@ CREATE TABLE models (
 	status_version TEXT NOT NULL,
 	sla_level TEXT NOT NULL,
 	sla_owner TEXT NOT NULL,
+	cores BIGINT NOT NULL DEFAULT 0,
+	machines BIGINT NOT NULL DEFAULT 0,
+	units BIGINT NOT NULL DEFAULT 0,
 	UNIQUE(owner_username, name)
 );
 
@@ -201,74 +204,6 @@ CREATE TABLE application_offer_remote_spaces (
 	provider_attributes BLOB
 );
 CREATE INDEX idx_application_offer_remote_spaces_deleted_at ON application_offer_remote_spaces (deleted_at);
-
-
-CREATE TABLE machines (
-	id INTEGER PRIMARY KEY,
-	created_at DATETIME,
-	updated_at DATETIME,
-	model_id INTEGER NOT NULL REFERENCES models (id) ON DELETE CASCADE,
-	machine_id TEXT NOT NULL,
-	hw_arch TEXT,
-	hw_container TEXT,
-	hw_mem INTEGER,
-	hw_root_disk INTEGER,
-	hw_root_disk_source TEXT,
-	hw_cpu_cores INTEGER,
-	hw_cpu_power INTEGER,
-	hw_tags BLOB,
-	hw_availability_zone TEXT,
-	hw_zones BLOB,
-	hw_instance_type TEXT,
-	hw_spaces BLOB,
-	hw_virt_type TEXT,
-	hw_allocate_public_ip INTEGER,
-	instance_id TEXT NOT NULL,
-	display_name TEXT NOT NULL,
-	agent_status_status TEXT NOT NULL,
-	agent_status_info TEXT NOT NULL,
-	agent_status_data BLOB,
-	agent_status_since DATETIME,
-	agent_status_version TEXT NOT NULL,
-	instance_status_status TEXT NOT NULL,
-	instance_status_info TEXT NOT NULL,
-	instance_status_data BLOB,
-	instance_status_since DATETIME,
-	instance_status_version TEXT NOT NULL,
-	life TEXT NOT NULL,
-	has_vote INTEGER NOT NULL,
-	wants_vote INTEGER NOT NULL,
-	series TEXT NOT NULL,
-	UNIQUE (model_id, machine_id)
-);
-
-CREATE TABLE units (
-	id INTEGER PRIMARY KEY,
-	created_at DATETIME,
-	updated_at DATETIME,
-	model_id INTEGER NOT NULL REFERENCES models (id) ON DELETE CASCADE,
-	application_name TEXT NOT NULL,
-	machine_id TEXT NOT NULL,
-	name TEXT NOT NULL,
-	life TEXT NOT NULL,
-	public_address TEXT NOT NULL,
-	private_address TEXT NOT NULL,
-	ports BLOB,
-	port_ranges BLOB,
-	principal TEXT NOT NULL,
-	workload_status_status TEXT NOT NULL,
-	workload_status_info TEXT NOT NULL,
-	workload_status_data BLOB,
-	workload_status_since DATETIME,
-	workload_status_version TEXT NOT NULL,
-	agent_status_status TEXT NOT NULL,
-	agent_status_info TEXT NOT NULL,
-	agent_status_data BLOB,
-	agent_status_since DATETIME,
-	agent_status_version TEXT NOT NULL,
-	UNIQUE (model_id, name),
-	FOREIGN KEY (model_id, machine_id) REFERENCES machines (model_id, machine_id) ON DELETE CASCADE
-);
 
 CREATE TABLE user_application_offer_access (
 	id INTEGER PRIMARY KEY,

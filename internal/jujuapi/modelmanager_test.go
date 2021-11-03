@@ -4,7 +4,6 @@ package jujuapi_test
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -13,6 +12,7 @@ import (
 	"github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/cloud"
+	"github.com/juju/juju/core/instance"
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/model"
 	"github.com/juju/juju/core/status"
@@ -41,25 +41,11 @@ func (s *modelManagerSuite) TestListModelSummaries(c *gc.C) {
 	defer conn.Close()
 
 	// Add some machines and units to test the counts.
+	s.Model.Machines = 1
+	s.Model.Cores = 2
+	s.Model.Units = 1
 	ctx := context.Background()
-	err := s.JIMM.Database.UpdateMachine(ctx, &dbmodel.Machine{
-		ModelID:   s.Model.ID,
-		MachineID: "0",
-		Hardware: dbmodel.Hardware{
-			CPUCores: dbmodel.NullUint64{
-				Uint64: 2,
-				Valid:  true,
-			},
-		},
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	err = s.JIMM.Database.UpdateUnit(ctx, &dbmodel.Unit{
-		ModelID:         s.Model.ID,
-		Name:            "app/1",
-		MachineID:       "0",
-		ApplicationName: "app",
-	})
+	err := s.JIMM.Database.UpdateModel(ctx, s.Model)
 	c.Assert(err, gc.Equals, nil)
 
 	client := modelmanager.NewClient(conn)
@@ -231,82 +217,43 @@ func (s *modelManagerSuite) TestListModels(c *gc.C) {
 }
 
 func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
-	ctx := context.Background()
-
 	mt4 := s.AddModel(c, names.NewUserTag("charlie@external"), "model-4", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, s.Model2.CloudCredential.Tag().(names.CloudCredentialTag))
-	var model4 dbmodel.Model
-	model4.SetTag(mt4)
-	err := s.JIMM.Database.GetModel(ctx, &model4)
-	c.Assert(err, gc.Equals, nil)
-	err = s.JIMM.Database.UpdateUserModelAccess(ctx, &dbmodel.UserModelAccess{
-		ModelID:  model4.ID,
-		Username: "bob@external",
-		Access:   "write",
-	})
+	conn := s.open(c, nil, "charlie")
+	defer conn.Close()
+	client := modelmanager.NewClient(conn)
+	err := client.GrantModel("bob@external", "write", mt4.Id())
 	c.Assert(err, gc.Equals, nil)
 
 	mt5 := s.AddModel(c, names.NewUserTag("charlie@external"), "model-5", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, s.Model2.CloudCredential.Tag().(names.CloudCredentialTag))
-	var model5 dbmodel.Model
-	model5.SetTag(mt5)
-	err = s.JIMM.Database.GetModel(ctx, &model5)
-	c.Assert(err, gc.Equals, nil)
-	err = s.JIMM.Database.UpdateUserModelAccess(ctx, &dbmodel.UserModelAccess{
-		ModelID:  model5.ID,
-		Username: "bob@external",
-		Access:   "admin",
-	})
+	err = client.GrantModel("bob@external", "admin", mt5.Id())
 	c.Assert(err, gc.Equals, nil)
 
 	// Add some machines to one of the models
-	err = s.JIMM.Database.UpdateMachine(ctx, &dbmodel.Machine{
-		MachineID: "machine-0",
-		ModelID:   s.Model3.ID,
-	})
+	state, err := s.StatePool.Get(s.Model3.Tag().Id())
 	c.Assert(err, gc.Equals, nil)
-
-	err = s.JIMM.Database.UpdateMachine(ctx, &dbmodel.Machine{
-		ModelID:   s.Model3.ID,
-		MachineID: "machine-1",
-		Hardware: dbmodel.Hardware{
-			Arch: sql.NullString{
-				String: "bbc-micro",
-				Valid:  true,
-			},
+	f := factory.NewFactory(state.State, s.StatePool)
+	f.MakeMachine(c, nil)
+	f.MakeMachine(c, &factory.MachineParams{
+		Characteristics: &instance.HardwareCharacteristics{
+			Arch: newString("bbc-micro"),
 		},
 	})
+	f.MakeMachine(c, nil)
+
+	state, err = s.StatePool.Get(mt4.Id())
 	c.Assert(err, gc.Equals, nil)
-	err = s.JIMM.Database.UpdateMachine(ctx, &dbmodel.Machine{
-		ModelID:   s.Model3.ID,
-		MachineID: "machine-2",
-		Life:      "dead",
-	})
-	c.Assert(err, gc.Equals, nil)
-	err = s.JIMM.Database.UpdateMachine(ctx, &dbmodel.Machine{
-		MachineID: "machine-0",
-		ModelID:   model4.ID,
-	})
-	c.Assert(err, gc.Equals, nil)
-	err = s.JIMM.Database.UpdateMachine(ctx, &dbmodel.Machine{
-		ModelID:   model4.ID,
-		MachineID: "machine-1",
-		Hardware: dbmodel.Hardware{
-			Arch: sql.NullString{
-				String: "bbc-micro",
-				Valid:  true,
-			},
+	f = factory.NewFactory(state.State, s.StatePool)
+	f.MakeMachine(c, nil)
+	f.MakeMachine(c, &factory.MachineParams{
+		Characteristics: &instance.HardwareCharacteristics{
+			Arch: newString("bbc-micro"),
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
-	err = s.JIMM.Database.UpdateMachine(ctx, &dbmodel.Machine{
-		ModelID:   model4.ID,
-		MachineID: "machine-2",
-		Life:      "dead",
-	})
-	c.Assert(err, gc.Equals, nil)
+	f.MakeMachine(c, nil)
 
-	conn := s.open(c, nil, "bob")
+	conn = s.open(c, nil, "bob")
 	defer conn.Close()
-	client := modelmanager.NewClient(conn)
+	client = modelmanager.NewClient(conn)
 
 	models, err := client.ModelInfo([]names.ModelTag{
 		s.Model.Tag().(names.ModelTag),
@@ -318,7 +265,14 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	machineArch := "bbc-micro"
+	for i := range models {
+		if models[i].Result == nil {
+			continue
+		}
+		for j := range models[i].Result.Machines {
+			models[i].Result.Machines[j].InstanceId = ""
+		}
+	}
 	assertModelInfo(c, models, []jujuparams.ModelInfoResult{{
 		Result: &jujuparams.ModelInfo{
 			Name:               "model-1",
@@ -341,8 +295,9 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 				DisplayName: "bob",
 				Access:      jujuparams.ModelAdminAccess,
 			}},
-			AgentVersion: &jujuversion.Current,
-			Type:         "iaas",
+			AgentVersion:            &jujuversion.Current,
+			Type:                    "iaas",
+			CloudCredentialValidity: newBool(true),
 		},
 	}, {
 		Error: &jujuparams.Error{
@@ -367,12 +322,12 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 				Level: "unsupported",
 			},
 			Users: []jujuparams.ModelUserInfo{{
-				UserName:    "bob@external",
-				DisplayName: "bob",
-				Access:      jujuparams.ModelReadAccess,
+				UserName: "bob@external",
+				Access:   jujuparams.ModelReadAccess,
 			}},
-			AgentVersion: &jujuversion.Current,
-			Type:         "iaas",
+			AgentVersion:            &jujuversion.Current,
+			Type:                    "iaas",
+			CloudCredentialValidity: newBool(true),
 		},
 	}, {
 		Result: &jujuparams.ModelInfo{
@@ -382,7 +337,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
 			CloudRegion:        jimmtest.TestCloudRegionName,
-			CloudCredentialTag: model4.CloudCredential.Tag().String(),
+			CloudCredentialTag: s.Model2.CloudCredential.Tag().String(),
 			OwnerTag:           names.NewUserTag("charlie@external").String(),
 			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
@@ -392,24 +347,33 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 				Level: "unsupported",
 			},
 			Users: []jujuparams.ModelUserInfo{{
-				UserName:    "bob@external",
-				DisplayName: "bob",
-				Access:      jujuparams.ModelWriteAccess,
+				UserName: "bob@external",
+				Access:   jujuparams.ModelWriteAccess,
 			}},
 			Machines: []jujuparams.ModelMachineInfo{{
-				Id:       "machine-0",
-				Hardware: &jujuparams.MachineHardware{},
-			}, {
-				Id: "machine-1",
+				Id: "0",
 				Hardware: &jujuparams.MachineHardware{
-					Arch: &machineArch,
+					Arch: newString("amd64"),
+					Mem:  newUint64(64 * 1024 * 1024 * 1024),
 				},
+				Status: "pending",
 			}, {
-				Id:       "machine-2",
-				Hardware: &jujuparams.MachineHardware{},
+				Id: "1",
+				Hardware: &jujuparams.MachineHardware{
+					Arch: newString("bbc-micro"),
+				},
+				Status: "pending",
+			}, {
+				Id: "2",
+				Hardware: &jujuparams.MachineHardware{
+					Arch: newString("amd64"),
+					Mem:  newUint64(64 * 1024 * 1024 * 1024),
+				},
+				Status: "pending",
 			}},
-			AgentVersion: &jujuversion.Current,
-			Type:         "iaas",
+			AgentVersion:            &jujuversion.Current,
+			Type:                    "iaas",
+			CloudCredentialValidity: newBool(true),
 		},
 	}, {
 		Result: &jujuparams.ModelInfo{
@@ -419,7 +383,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
 			CloudRegion:        jimmtest.TestCloudRegionName,
-			CloudCredentialTag: model5.CloudCredential.Tag().String(),
+			CloudCredentialTag: s.Model2.CloudCredential.Tag().String(),
 			OwnerTag:           names.NewUserTag("charlie@external").String(),
 			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
@@ -429,15 +393,16 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 				Level: "unsupported",
 			},
 			Users: []jujuparams.ModelUserInfo{{
-				UserName: "charlie@external",
+				UserName: "bob@external",
 				Access:   jujuparams.ModelAdminAccess,
 			}, {
-				UserName:    "bob@external",
-				DisplayName: "bob",
+				UserName:    "charlie@external",
+				DisplayName: "charlie",
 				Access:      jujuparams.ModelAdminAccess,
 			}},
-			AgentVersion: &jujuversion.Current,
-			Type:         "iaas",
+			AgentVersion:            &jujuversion.Current,
+			Type:                    "iaas",
+			CloudCredentialValidity: newBool(true),
 		},
 	}, {
 		Error: &jujuparams.Error{
@@ -448,62 +413,32 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 }
 
 func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
-	ctx := context.Background()
-
 	mt4 := s.AddModel(c, names.NewUserTag("charlie@external"), "model-4", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, s.Model2.CloudCredential.Tag().(names.CloudCredentialTag))
-	var model4 dbmodel.Model
-	model4.SetTag(mt4)
-	err := s.JIMM.Database.GetModel(ctx, &model4)
-	c.Assert(err, gc.Equals, nil)
 
 	mt5 := s.AddModel(c, names.NewUserTag("charlie@external"), "model-5", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, s.Model2.CloudCredential.Tag().(names.CloudCredentialTag))
 
 	// Add some machines to one of the models
-	err = s.JIMM.Database.UpdateMachine(ctx, &dbmodel.Machine{
-		MachineID: "machine-0",
-		ModelID:   s.Model3.ID,
-	})
+	state, err := s.StatePool.Get(s.Model3.Tag().Id())
 	c.Assert(err, gc.Equals, nil)
+	f := factory.NewFactory(state.State, s.StatePool)
+	f.MakeMachine(c, nil)
+	f.MakeMachine(c, &factory.MachineParams{
+		Characteristics: &instance.HardwareCharacteristics{
+			Arch: newString("bbc-micro"),
+		},
+	})
+	f.MakeMachine(c, nil)
 
-	err = s.JIMM.Database.UpdateMachine(ctx, &dbmodel.Machine{
-		ModelID:   s.Model3.ID,
-		MachineID: "machine-1",
-		Hardware: dbmodel.Hardware{
-			Arch: sql.NullString{
-				String: "bbc-micro",
-				Valid:  true,
-			},
+	state, err = s.StatePool.Get(mt4.Id())
+	c.Assert(err, gc.Equals, nil)
+	f = factory.NewFactory(state.State, s.StatePool)
+	f.MakeMachine(c, nil)
+	f.MakeMachine(c, &factory.MachineParams{
+		Characteristics: &instance.HardwareCharacteristics{
+			Arch: newString("bbc-micro"),
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
-	err = s.JIMM.Database.UpdateMachine(ctx, &dbmodel.Machine{
-		ModelID:   s.Model3.ID,
-		MachineID: "machine-2",
-		Life:      "dead",
-	})
-	c.Assert(err, gc.Equals, nil)
-	err = s.JIMM.Database.UpdateMachine(ctx, &dbmodel.Machine{
-		MachineID: "machine-0",
-		ModelID:   model4.ID,
-	})
-	c.Assert(err, gc.Equals, nil)
-	err = s.JIMM.Database.UpdateMachine(ctx, &dbmodel.Machine{
-		ModelID:   model4.ID,
-		MachineID: "machine-1",
-		Hardware: dbmodel.Hardware{
-			Arch: sql.NullString{
-				String: "bbc-micro",
-				Valid:  true,
-			},
-		},
-	})
-	c.Assert(err, gc.Equals, nil)
-	err = s.JIMM.Database.UpdateMachine(ctx, &dbmodel.Machine{
-		ModelID:   model4.ID,
-		MachineID: "machine-2",
-		Life:      "dead",
-	})
-	c.Assert(err, gc.Equals, nil)
+	f.MakeMachine(c, nil)
 
 	s.Candid.AddUser("bob", "controller-admin")
 	conn := s.open(c, nil, "bob")
@@ -523,7 +458,14 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	machineArch := "bbc-micro"
+	for i := range models {
+		if models[i].Result == nil {
+			continue
+		}
+		for j := range models[i].Result.Machines {
+			models[i].Result.Machines[j].InstanceId = ""
+		}
+	}
 	assertModelInfo(c, models, []jujuparams.ModelInfoResult{{
 		Result: &jujuparams.ModelInfo{
 			Name:               "model-1",
@@ -546,8 +488,9 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 				DisplayName: "bob",
 				Access:      jujuparams.ModelAdminAccess,
 			}},
-			AgentVersion: &jujuversion.Current,
-			Type:         "iaas",
+			AgentVersion:            &jujuversion.Current,
+			Type:                    "iaas",
+			CloudCredentialValidity: newBool(true),
 		},
 	}, {
 		Result: &jujuparams.ModelInfo{
@@ -567,11 +510,13 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 				Level: "unsupported",
 			},
 			Users: []jujuparams.ModelUserInfo{{
-				UserName: "charlie@external",
-				Access:   jujuparams.ModelAdminAccess,
+				UserName:    "charlie@external",
+				DisplayName: "charlie",
+				Access:      jujuparams.ModelAdminAccess,
 			}},
-			AgentVersion: &jujuversion.Current,
-			Type:         "iaas",
+			AgentVersion:            &jujuversion.Current,
+			Type:                    "iaas",
+			CloudCredentialValidity: newBool(true),
 		},
 	}, {
 		Result: &jujuparams.ModelInfo{
@@ -591,37 +536,47 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 				Level: "unsupported",
 			},
 			Users: []jujuparams.ModelUserInfo{{
-				UserName: "charlie@external",
-				Access:   jujuparams.ModelAdminAccess,
+				UserName: "bob@external",
+				Access:   jujuparams.ModelReadAccess,
 			}, {
-				UserName:    "bob@external",
-				DisplayName: "bob",
-				Access:      jujuparams.ModelReadAccess,
+				UserName:    "charlie@external",
+				DisplayName: "charlie",
+				Access:      jujuparams.ModelAdminAccess,
 			}},
 			Machines: []jujuparams.ModelMachineInfo{{
-				Id:       "machine-0",
-				Hardware: &jujuparams.MachineHardware{},
-			}, {
-				Id: "machine-1",
+				Id: "0",
 				Hardware: &jujuparams.MachineHardware{
-					Arch: &machineArch,
+					Arch: newString("amd64"),
+					Mem:  newUint64(64 * 1024 * 1024 * 1024),
 				},
+				Status: "pending",
 			}, {
-				Id:       "machine-2",
-				Hardware: &jujuparams.MachineHardware{},
+				Id: "1",
+				Hardware: &jujuparams.MachineHardware{
+					Arch: newString("bbc-micro"),
+				},
+				Status: "pending",
+			}, {
+				Id: "2",
+				Hardware: &jujuparams.MachineHardware{
+					Arch: newString("amd64"),
+					Mem:  newUint64(64 * 1024 * 1024 * 1024),
+				},
+				Status: "pending",
 			}},
-			AgentVersion: &jujuversion.Current,
-			Type:         "iaas",
+			AgentVersion:            &jujuversion.Current,
+			Type:                    "iaas",
+			CloudCredentialValidity: newBool(true),
 		},
 	}, {
 		Result: &jujuparams.ModelInfo{
 			Name:               "model-4",
-			UUID:               model4.UUID.String,
+			UUID:               mt4.Id(),
 			ControllerUUID:     "deadbeef-1bad-500d-9000-4b1d0d06f00d",
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
 			CloudRegion:        jimmtest.TestCloudRegionName,
-			CloudCredentialTag: model4.CloudCredential.Tag().String(),
+			CloudCredentialTag: s.Model2.CloudCredential.Tag().String(),
 			OwnerTag:           names.NewUserTag("charlie@external").String(),
 			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
@@ -631,23 +586,34 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 				Level: "unsupported",
 			},
 			Users: []jujuparams.ModelUserInfo{{
-				UserName: "charlie@external",
-				Access:   jujuparams.ModelAdminAccess,
+				UserName:    "charlie@external",
+				DisplayName: "charlie",
+				Access:      jujuparams.ModelAdminAccess,
 			}},
 			Machines: []jujuparams.ModelMachineInfo{{
-				Id:       "machine-0",
-				Hardware: &jujuparams.MachineHardware{},
-			}, {
-				Id: "machine-1",
+				Id: "0",
 				Hardware: &jujuparams.MachineHardware{
-					Arch: &machineArch,
+					Arch: newString("amd64"),
+					Mem:  newUint64(64 * 1024 * 1024 * 1024),
 				},
+				Status: "pending",
 			}, {
-				Id:       "machine-2",
-				Hardware: &jujuparams.MachineHardware{},
+				Id: "1",
+				Hardware: &jujuparams.MachineHardware{
+					Arch: newString("bbc-micro"),
+				},
+				Status: "pending",
+			}, {
+				Id: "2",
+				Hardware: &jujuparams.MachineHardware{
+					Arch: newString("amd64"),
+					Mem:  newUint64(64 * 1024 * 1024 * 1024),
+				},
+				Status: "pending",
 			}},
-			AgentVersion: &jujuversion.Current,
-			Type:         "iaas",
+			AgentVersion:            &jujuversion.Current,
+			Type:                    "iaas",
+			CloudCredentialValidity: newBool(true),
 		},
 	}, {
 		Result: &jujuparams.ModelInfo{
@@ -657,7 +623,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 			ProviderType:       jimmtest.TestProviderType,
 			CloudTag:           names.NewCloudTag(jimmtest.TestCloudName).String(),
 			CloudRegion:        jimmtest.TestCloudRegionName,
-			CloudCredentialTag: model4.CloudCredential.Tag().String(),
+			CloudCredentialTag: s.Model2.CloudCredential.Tag().String(),
 			OwnerTag:           names.NewUserTag("charlie@external").String(),
 			Life:               life.Alive,
 			Status: jujuparams.EntityStatus{
@@ -667,11 +633,13 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 				Level: "unsupported",
 			},
 			Users: []jujuparams.ModelUserInfo{{
-				UserName: "charlie@external",
-				Access:   jujuparams.ModelAdminAccess,
+				UserName:    "charlie@external",
+				DisplayName: "charlie",
+				Access:      jujuparams.ModelAdminAccess,
 			}},
-			AgentVersion: &jujuversion.Current,
-			Type:         "iaas",
+			AgentVersion:            &jujuversion.Current,
+			Type:                    "iaas",
+			CloudCredentialValidity: newBool(true),
 		},
 	}, {
 		Error: &jujuparams.Error{
@@ -1508,4 +1476,12 @@ func (s *modelManagerSuite) TestModelDefaults(c *gc.C) {
 
 func newBool(b bool) *bool {
 	return &b
+}
+
+func newString(s string) *string {
+	return &s
+}
+
+func newUint64(i uint64) *uint64 {
+	return &i
 }

@@ -93,38 +93,6 @@ func initTestEnvironment(c *qt.C, db *db.Database) testEnvironment {
 		SLA: dbmodel.SLA{
 			Level: "unsupported",
 		},
-		Machines: []dbmodel.Machine{{
-			MachineID: "0",
-			Hardware: dbmodel.Hardware{
-				Arch: sql.NullString{
-					String: "amd64",
-					Valid:  true,
-				},
-				Mem: dbmodel.NullUint64{
-					Uint64: 2000,
-					Valid:  true,
-				},
-			},
-			InstanceID:  "test-machine-0",
-			DisplayName: "Machine 0",
-			AgentStatus: dbmodel.Status{
-				Status: "started",
-				Since: sql.NullTime{
-					Time:  time.Now(),
-					Valid: true,
-				},
-				Version: "1.0.0",
-			},
-			InstanceStatus: dbmodel.Status{
-				Status: "running",
-				Info:   "ACTIVE",
-				Since: sql.NullTime{
-					Time:  time.Now(),
-					Valid: true,
-				},
-			},
-			Series: "warty",
-		}},
 		Users: []dbmodel.UserModelAccess{{
 			User:   env.u,
 			Access: "admin",

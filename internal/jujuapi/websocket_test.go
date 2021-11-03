@@ -14,6 +14,7 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
 	"github.com/juju/juju/api"
+	"github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
 	gc "gopkg.in/check.v1"
@@ -75,11 +76,12 @@ func (s *websocketSuite) SetUpTest(c *gc.C) {
 	s.Model3.SetTag(mt)
 	err = s.JIMM.Database.GetModel(ctx, s.Model3)
 	c.Assert(err, gc.Equals, nil)
-	s.JIMM.Database.UpdateUserModelAccess(ctx, &dbmodel.UserModelAccess{
-		ModelID:  s.Model3.ID,
-		Username: "bob@external",
-		Access:   "read",
-	})
+
+	conn := s.open(c, nil, "charlie")
+	defer conn.Close()
+	client := modelmanager.NewClient(conn)
+	err = client.GrantModel("bob@external", "read", mt.Id())
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *websocketSuite) TearDownTest(c *gc.C) {
