@@ -110,12 +110,14 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 		for i := range dbClouds {
 			err := tx.AddCloud(ctx, &dbClouds[i])
 			if err != nil && errors.ErrorCode(err) != errors.CodeAlreadyExists {
+				zapctx.Error(ctx, "failed to add cloud", zaputil.Error(err))
 				return err
 			}
 			cloud := dbmodel.Cloud{
 				Name: dbClouds[i].Name,
 			}
 			if err := tx.GetCloud(ctx, &cloud); err != nil {
+				zapctx.Error(ctx, "failed to fetch the cloud", zaputil.Error(err), zap.String("cloud-name", dbClouds[i].Name))
 				return err
 			}
 			for _, reg := range dbClouds[i].Regions {
@@ -123,7 +125,8 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 					continue
 				}
 				reg.CloudName = cloud.Name
-				if err := tx.AddCloudRegion(ctx, &reg); err != nil {
+				if err := tx.AddCloudRegion(ctx, &reg); err != nil && errors.ErrorCode(err) != errors.CodeAlreadyExists {
+					zapctx.Error(ctx, "failed to add cloud region", zaputil.Error(err))
 					return err
 				}
 				cloud.Regions = append(cloud.Regions, reg)
@@ -135,6 +138,7 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 				uca.Username = uca.User.Username
 				uca.CloudName = cloud.Name
 				if err := tx.UpdateUserCloudAccess(ctx, &uca); err != nil {
+					zapctx.Error(ctx, "failed to update user cloud access", zaputil.Error(err))
 					return err
 				}
 				cloud.Users = append(cloud.Users, uca)
@@ -153,8 +157,10 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 		}
 		if err := tx.AddController(ctx, ctl); err != nil {
 			if errors.ErrorCode(err) == errors.CodeAlreadyExists {
+				zapctx.Error(ctx, "failed to add controller", zaputil.Error(err))
 				return errors.E(op, err, fmt.Sprintf("controller %q already exists", ctl.Name))
 			}
+			zapctx.Error(ctx, "failed to add controller", zaputil.Error(err))
 			return err
 		}
 		return nil
