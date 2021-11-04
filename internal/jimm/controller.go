@@ -108,24 +108,30 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 	}
 	err = j.Database.Transaction(func(tx *db.Database) error {
 		for i := range dbClouds {
-			err := tx.AddCloud(ctx, &dbClouds[i])
-			if err != nil && errors.ErrorCode(err) != errors.CodeAlreadyExists {
-				zapctx.Error(ctx, "failed to add cloud", zaputil.Error(err))
-				return err
-			}
 			cloud := dbmodel.Cloud{
 				Name: dbClouds[i].Name,
 			}
 			if err := tx.GetCloud(ctx, &cloud); err != nil {
-				zapctx.Error(ctx, "failed to fetch the cloud", zaputil.Error(err), zap.String("cloud-name", dbClouds[i].Name))
-				return err
+				if errors.ErrorCode(err) != errors.CodeNotFound {
+					zapctx.Error(ctx, "failed to fetch the cloud", zaputil.Error(err), zap.String("cloud-name", dbClouds[i].Name))
+					return err
+				}
+				err := tx.AddCloud(ctx, &dbClouds[i])
+				if err != nil && errors.ErrorCode(err) != errors.CodeAlreadyExists {
+					zapctx.Error(ctx, "failed to add cloud", zaputil.Error(err))
+					return err
+				}
+				if err := tx.GetCloud(ctx, &cloud); err != nil {
+					zapctx.Error(ctx, "failed to fetch the cloud", zaputil.Error(err), zap.String("cloud-name", dbClouds[i].Name))
+					return err
+				}
 			}
 			for _, reg := range dbClouds[i].Regions {
 				if cloud.Region(reg.Name).ID != 0 {
 					continue
 				}
 				reg.CloudName = cloud.Name
-				if err := tx.AddCloudRegion(ctx, &reg); err != nil && errors.ErrorCode(err) != errors.CodeAlreadyExists {
+				if err := tx.AddCloudRegion(ctx, &reg); err != nil {
 					zapctx.Error(ctx, "failed to add cloud region", zaputil.Error(err))
 					return err
 				}
