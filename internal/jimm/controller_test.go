@@ -135,13 +135,13 @@ func TestAddController(t *testing.T) {
 		ControllerAccess: "superuser",
 	}
 
-	ctl := dbmodel.Controller{
+	ctl1 := dbmodel.Controller{
 		Name:          "test-controller",
 		AdminUser:     "admin",
 		AdminPassword: "5ecret",
 		PublicAddress: "example.com:443",
 	}
-	err = j.AddController(context.Background(), &u, &ctl)
+	err = j.AddController(context.Background(), &u, &ctl1)
 	c.Assert(err, qt.IsNil)
 
 	ctl2 := dbmodel.Controller{
@@ -149,7 +149,24 @@ func TestAddController(t *testing.T) {
 	}
 	err = j.Database.GetController(ctx, &ctl2)
 	c.Assert(err, qt.IsNil)
-	c.Check(ctl2, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(dbmodel.CloudRegion{})), ctl)
+	c.Check(ctl2, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(dbmodel.CloudRegion{})), ctl1)
+
+	ctl3 := dbmodel.Controller{
+		Name:          "test-controller-2",
+		AdminUser:     "admin",
+		AdminPassword: "5ecret",
+		PublicAddress: "example.com:443",
+	}
+	err = j.AddController(context.Background(), &u, &ctl3)
+	c.Assert(err, qt.IsNil)
+
+	ctl4 := dbmodel.Controller{
+		Name: "test-controller-2",
+	}
+	err = j.Database.GetController(ctx, &ctl4)
+	c.Assert(err, qt.IsNil)
+	c.Check(ctl4, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(dbmodel.CloudRegion{})), ctl3)
+
 }
 
 const testEarliestControllerVersionEnv = `clouds:
