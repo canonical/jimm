@@ -194,33 +194,46 @@ func (b *modelBuilder) WithCloudRegion(region string) *modelBuilder {
 	if b.err != nil {
 		return b
 	}
-	if b.cloud != nil {
-		// loop through all cloud regions
-		for _, r := range b.cloud.Regions {
-			// if the region matches
-			if r.Name == region {
-				// consider all possible controlers for that region
-				regionControllers := r.Controllers
-				if len(regionControllers) == 0 {
-					b.err = errors.E(errors.CodeBadRequest, fmt.Sprintf("unsupported cloud region %s/%s", b.cloud.Name, region))
-				}
-				// shuffle controllers
-				shuffleRegionControllers(regionControllers)
-
-				// and sellect the first controller in the slice
-				b.cloudRegion = region
-				b.cloudRegionID = regionControllers[0].CloudRegionID
-				b.controller = &regionControllers[0].Controller
-
-				break
-			}
-		}
-		// we looped through all cloud regions and could not find a match
-		if b.cloudRegionID == 0 {
-			b.err = errors.E("cloudregion not found", errors.CodeNotFound)
-		}
-	} else {
+	if b.cloud == nil {
 		b.err = errors.E("cloud not specified")
+		return b
+	}
+	// if the region is not specified, we pick the first cloud region
+	// with any associated controllers
+	if region == "" {
+		for _, r := range b.cloud.Regions {
+			regionControllers := r.Controllers
+			if len(regionControllers) == 0 {
+				continue
+			}
+			region = r.Name
+		}
+	}
+	// loop through all cloud regions
+	for _, r := range b.cloud.Regions {
+		// if the region matches
+		if r.Name != region {
+			continue
+		}
+		// consider all possible controlers for that region
+		regionControllers := r.Controllers
+		if len(regionControllers) == 0 {
+			b.err = errors.E(errors.CodeBadRequest, fmt.Sprintf("unsupported cloud region %s/%s", b.cloud.Name, region))
+			return b
+		}
+		// shuffle controllers
+		shuffleRegionControllers(regionControllers)
+
+		// and sellect the first controller in the slice
+		b.cloudRegion = region
+		b.cloudRegionID = regionControllers[0].CloudRegionID
+		b.controller = &regionControllers[0].Controller
+
+		break
+	}
+	// we looped through all cloud regions and could not find a match
+	if b.cloudRegionID == 0 {
+		b.err = errors.E("cloudregion not found", errors.CodeNotFound)
 	}
 	return b
 }
@@ -303,6 +316,7 @@ func (b *modelBuilder) CreateDatabaseModel() *modelBuilder {
 		} else {
 			zapctx.Error(b.ctx, "failed to store model information", zaputil.Error(err))
 			b.err = errors.E(err, "failed to store model information")
+			return b
 		}
 	}
 	return b
@@ -572,14 +586,27 @@ func (j *JIMM) AddModel(ctx context.Context, u *dbmodel.User, args *ModelCreateA
 		builder = builder.WithConfig(cloudDefaults.Defaults)
 	}
 
+	if args.Cloud != (names.CloudTag{}) {
+		ale.Params["cloud"] = args.Cloud.String()
+		builder = builder.WithCloud(args.Cloud)
+		if err := builder.Error(); err != nil {
+			return fail(errors.E(op, err))
+		}
+	}
+	ale.Params["region"] = args.CloudRegion
+	builder = builder.WithCloudRegion(args.CloudRegion)
+	if err := builder.Error(); err != nil {
+		return fail(errors.E(op, err))
+	}
+
 	// fetch cloud region defaults
-	if args.Cloud != (names.CloudTag{}) && args.CloudRegion != "" {
+	if args.Cloud != (names.CloudTag{}) && builder.cloudRegion != "" {
 		cloudRegionDefaults := dbmodel.CloudDefaults{
 			Username: u.Username,
 			Cloud: dbmodel.Cloud{
 				Name: args.Cloud.Id(),
 			},
-			Region: args.CloudRegion,
+			Region: builder.cloudRegion,
 		}
 		err = j.Database.CloudDefaults(ctx, &cloudRegionDefaults)
 		if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
@@ -592,20 +619,6 @@ func (j *JIMM) AddModel(ctx context.Context, u *dbmodel.User, args *ModelCreateA
 	// overriding all defaults
 	builder = builder.WithConfig(args.Config)
 
-	if args.Cloud != (names.CloudTag{}) {
-		ale.Params["cloud"] = args.Cloud.String()
-		builder = builder.WithCloud(args.Cloud)
-		if err := builder.Error(); err != nil {
-			return fail(errors.E(op, err))
-		}
-	}
-	if args.CloudRegion != "" {
-		ale.Params["region"] = args.CloudRegion
-		builder = builder.WithCloudRegion(args.CloudRegion)
-		if err := builder.Error(); err != nil {
-			return fail(errors.E(op, err))
-		}
-	}
 	if args.CloudCredential != (names.CloudCredentialTag{}) {
 		ale.Params["cloud-credential"] = args.CloudCredential.String()
 		builder = builder.WithCloudCredential(args.CloudCredential)
