@@ -261,6 +261,124 @@ users:
 		}},
 	},
 }, {
+	name: "CreateModelWithoutCloudRegion",
+	env: `
+clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-region-1
+user-defaults:
+- user: alice@external
+  defaults:
+    key4: value4
+cloud-defaults:
+- user: alice@external
+  cloud: test-cloud
+  region: test-region-1
+  defaults:
+    key1: value1
+    key2: value2
+- user: alice@external
+  cloud: test-cloud
+  defaults:
+    key3: value3
+cloud-credentials:
+- name: test-credential-1
+  owner: alice@external
+  cloud: test-cloud
+  auth-type: empty
+controllers:
+- name: controller-1
+  uuid: 00000000-0000-0000-0000-0000-0000000000001
+  cloud: test-cloud
+  region: test-region-1
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 0
+- name: controller-2
+  uuid: 00000000-0000-0000-0000-0000-0000000000002
+  cloud: test-cloud
+  region: test-region-1
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 2
+`[1:],
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+		return nil, nil
+	},
+	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+		return nil
+	},
+	createModel: assertConfig(map[string]interface{}{
+		"key1": "value1",
+		"key2": "value2",
+		"key3": "value3",
+		"key4": "value4",
+	}, createModel(`
+uuid: 00000001-0000-0000-0000-0000-000000000001
+status:
+  status: started
+  info: running a test
+life: alive
+users:
+- user: alice@external
+  access: admin
+- user: bob
+  access: read
+`[1:])),
+	username: "alice@external",
+	args: jujuparams.ModelCreateArgs{
+		Name:     "test-model",
+		OwnerTag: names.NewUserTag("alice@external").String(),
+		CloudTag: names.NewCloudTag("test-cloud").String(),
+		// Creating a model without specifying the cloud region
+		CloudRegion:        "",
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
+	},
+	expectModel: dbmodel.Model{
+		Name: "test-model",
+		UUID: sql.NullString{
+			String: "00000001-0000-0000-0000-0000-000000000001",
+			Valid:  true,
+		},
+		Owner: dbmodel.User{
+			Username:         "alice@external",
+			ControllerAccess: "login",
+		},
+		Controller: dbmodel.Controller{
+			Name:        "controller-2",
+			UUID:        "00000000-0000-0000-0000-0000-0000000000002",
+			CloudName:   "test-cloud",
+			CloudRegion: "test-region-1",
+		},
+		CloudRegion: dbmodel.CloudRegion{
+			Cloud: dbmodel.Cloud{
+				Name: "test-cloud",
+				Type: "test-provider",
+			},
+			Name: "test-region-1",
+		},
+		CloudCredential: dbmodel.CloudCredential{
+			Name:     "test-credential-1",
+			AuthType: "empty",
+		},
+		Life: "alive",
+		Status: dbmodel.Status{
+			Status: "started",
+			Info:   "running a test",
+		},
+		Users: []dbmodel.UserModelAccess{{
+			User: dbmodel.User{
+				Username:         "alice@external",
+				ControllerAccess: "login",
+			},
+			Access: "admin",
+		}},
+	},
+}, {
 	name: "CreateModelWithCloud",
 	env: `
 clouds:
