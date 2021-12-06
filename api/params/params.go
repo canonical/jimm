@@ -8,6 +8,26 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 )
 
+// An AddCloudToControllerRequest is the request sent when adding a new cloud
+// to a specific controller.
+type AddCloudToControllerRequest struct {
+	jujuparams.AddCloudArgs
+
+	// ControllerName is the name of the controller to which the
+	// cloud should be added.
+	ControllerName string `json:"controller-name"`
+}
+
+// A RemoveCloudFromControllerRequest is the request sent when removing
+// cloud from a specific controller.
+type RemoveCloudFromControllerRequest struct {
+	// CloudTag is the tag of the cloud this controller is running in.
+	CloudTag string `json:"cloud-tag"`
+	// ControllerName is the name of the controller from which the
+	// cloud should be removed.
+	ControllerName string `json:"controller-name"`
+}
+
 // An AddControllerRequest is the request sent when adding a new controller
 // to JIMM.
 type AddControllerRequest struct {

@@ -31,6 +31,8 @@ func init() {
 		setControllerDeprecatedMethod := rpc.Method(r.SetControllerDeprecated)
 		fullModelStatusMethod := rpc.Method(r.FullModelStatus)
 		updateMigratedModelMethod := rpc.Method(r.UpdateMigratedModel)
+		addCloudToControllerMethod := rpc.Method(r.AddCloudToController)
+		removeCloudFromControllerMethod := rpc.Method(r.RemoveCloudFromController)
 
 		r.AddMethod("JIMM", 2, "DisableControllerUUIDMasking", disableControllerUUIDMaskingMethod)
 		r.AddMethod("JIMM", 2, "ListControllers", listControllersMethod)
@@ -46,6 +48,8 @@ func init() {
 		r.AddMethod("JIMM", 3, "RevokeAuditLogAccess", revokeAuditLogAccessMethod)
 		r.AddMethod("JIMM", 3, "SetControllerDeprecated", setControllerDeprecatedMethod)
 		r.AddMethod("JIMM", 3, "UpdateMigratedModel", updateMigratedModelMethod)
+		r.AddMethod("JIMM", 3, "AddCloudToController", addCloudToControllerMethod)
+		r.AddMethod("JIMM", 3, "RemoveCloudFromController", removeCloudFromControllerMethod)
 
 		return []int{2, 3}
 	}
@@ -144,6 +148,15 @@ func (r *controllerRoot) ListControllers(ctx context.Context) (LegacyListControl
 	return LegacyListControllerResponse{
 		Controllers: controllers,
 	}, nil
+}
+
+// AddCloudToController adds the specified cloud to a specific controller.
+func (r *controllerRoot) AddCloudToController(ctx context.Context, req apiparams.AddCloudToControllerRequest) error {
+	const op = errors.Op("jujuapi.AddCloudToController")
+	if err := r.jimm.AddHostedCloudToController(ctx, r.user, req.ControllerName, names.NewCloudTag(req.Name), req.Cloud); err != nil {
+		return errors.E(op, err)
+	}
+	return nil
 }
 
 // AddController allows adds a controller to the pool of controllers
@@ -408,6 +421,19 @@ func (r *controllerRoot) ImportModel(ctx context.Context, req apiparams.ImportMo
 
 	err = r.jimm.ImportModel(ctx, r.user, req.Controller, mt)
 	if err != nil {
+		return errors.E(op, err)
+	}
+	return nil
+}
+
+// RemoveCloudFromController removes the specified cloud from a specific controller.
+func (r *controllerRoot) RemoveCloudFromController(ctx context.Context, req apiparams.RemoveCloudFromControllerRequest) error {
+	const op = errors.Op("jujuapi.RemoveCloudFromController")
+	ct, err := names.ParseCloudTag(req.CloudTag)
+	if err != nil {
+		return errors.E(op, err, errors.CodeBadRequest)
+	}
+	if err := r.jimm.RemoveCloudFromController(ctx, r.user, req.ControllerName, ct); err != nil {
 		return errors.E(op, err)
 	}
 	return nil

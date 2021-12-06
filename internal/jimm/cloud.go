@@ -10,6 +10,8 @@ import (
 
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/names/v4"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/db"
@@ -175,6 +177,22 @@ var DefaultReservedCloudNames = []string{
 	"rackspace",
 }
 
+// AddHostedCloudToControler adds the cloud defined by the given tag and
+// cloud to the JAAS system. The cloud will be created on the specified
+// controller running on the requested host cloud-region and the cloud
+// created there. If the controller does not host the cloud-regions
+// an error with code of CodeNotFound will be returned. If the given
+// user does not have add-model access to JAAS then an error with a code of
+// CodeUnauthorized will be returned (please note this differs from juju
+// which requires admin controller access to create clouds). If the
+// requested cloud cannot be created on this JAAS system an error with a
+// code of CodeIncompatibleClouds will be returned. If there is an error
+// returned by the controller when creating the cloud then that error code
+// will be preserved.
+func (j *JIMM) AddHostedCloudToController(ctx context.Context, u *dbmodel.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud) error {
+	return j.addHostedCloud(ctx, u, tag, cloud, findController(controllerName))
+}
+
 // AddHostedCloud adds the cloud defined by the given tag and cloud to the
 // JAAS system. The cloud will be created on a controller running on the
 // requested host cloud-region and the cloud created there. If the given
@@ -186,6 +204,10 @@ var DefaultReservedCloudNames = []string{
 // returned by the controller when creating the cloud then that error code
 // will be preserved.
 func (j *JIMM) AddHostedCloud(ctx context.Context, u *dbmodel.User, tag names.CloudTag, cloud jujuparams.Cloud) error {
+	return j.addHostedCloud(ctx, u, tag, cloud, randomController())
+}
+
+func (j *JIMM) addHostedCloud(ctx context.Context, u *dbmodel.User, tag names.CloudTag, cloud jujuparams.Cloud, controllerSelectFunction func([]dbmodel.CloudRegionControllerPriority) (dbmodel.Controller, error)) error {
 	const op = errors.Op("jimm.AddHostedCloud")
 
 	ale := dbmodel.AuditLogEntry{
@@ -262,8 +284,12 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, u *dbmodel.User, tag names.Cl
 	}
 
 	// Create the cloud on a host.
-	shuffleRegionControllers(region.Controllers)
-	ccloud, err := j.addControllerCloud(ctx, &region.Controllers[0].Controller, u.Tag().(names.UserTag), tag, cloud)
+	controller, err := controllerSelectFunction(region.Controllers)
+	if err != nil {
+		return fail(errors.E(op, err))
+	}
+
+	ccloud, err := j.addControllerCloud(ctx, &controller, u.Tag().(names.UserTag), tag, cloud)
 	if err != nil {
 		// TODO(mhilton) remove the added cloud if adding it to the controller failed.
 		return fail(errors.E(op, err))
@@ -285,6 +311,25 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, u *dbmodel.User, tag names.Cl
 	}
 	ale.Success = true
 	return nil
+}
+
+func randomController() func(controllers []dbmodel.CloudRegionControllerPriority) (dbmodel.Controller, error) {
+	return func(controllers []dbmodel.CloudRegionControllerPriority) (dbmodel.Controller, error) {
+		shuffleRegionControllers(controllers)
+		return controllers[0].Controller, nil
+	}
+}
+
+func findController(controllerName string) func(controllers []dbmodel.CloudRegionControllerPriority) (dbmodel.Controller, error) {
+	return func(controllers []dbmodel.CloudRegionControllerPriority) (dbmodel.Controller, error) {
+		for _, crp := range controllers {
+			crp := crp
+			if crp.Controller.Name == controllerName {
+				return crp.Controller, nil
+			}
+		}
+		return dbmodel.Controller{}, errors.E("controller not found", errors.CodeNotFound)
+	}
 }
 
 // addControllerCloud creates the hosted cloud defined by the given tag and
@@ -473,7 +518,7 @@ func (j *JIMM) RevokeCloudAccess(ctx context.Context, u *dbmodel.User, ct names.
 // RemoveCloud removes the given cloud from JAAS If the cloud is not found
 // then an error with the code CodeNotFound is returned. If the
 // authenticated user does not have admin access to the cloud then an error
-// with the code CodeUnauthorized is returned. If the REmoveClouds API call
+// with the code CodeUnauthorized is returned. If the RemoveClouds API call
 // retuns an error the error code is not masked.
 func (j *JIMM) RemoveCloud(ctx context.Context, u *dbmodel.User, ct names.CloudTag) error {
 	const op = errors.Op("jimm.RemoveCloud")
@@ -587,6 +632,96 @@ func (j *JIMM) UpdateCloud(ctx context.Context, u *dbmodel.User, ct names.CloudT
 	if err != nil {
 		return fail(errors.E(op, err))
 	}
+	ale.Success = true
+	return nil
+}
+
+// RemoveCloudFromController removes the given cloud from the JAAS controller.
+// If the cloud or the controller are not found then an error with the code
+// CodeNotFound is returned. If the authenticated user does not have admin
+// access to the cloud then an error with the code CodeUnauthorized is returned.
+// If the RemoveClouds API call retuns an error the error code is not masked.
+func (j *JIMM) RemoveCloudFromController(ctx context.Context, u *dbmodel.User, controllerName string, ct names.CloudTag) error {
+	const op = errors.Op("jimm.RemoveCloudFromController")
+
+	ale := dbmodel.AuditLogEntry{
+		Time:    time.Now().UTC().Round(time.Millisecond),
+		Tag:     ct.String(),
+		UserTag: u.Tag().String(),
+		Action:  "remove",
+		Params: dbmodel.StringMap{
+			"controller": controllerName,
+			"cloud":      ct.String(),
+		},
+	}
+	defer j.addAuditLogEntry(&ale)
+
+	fail := func(err error) error {
+		ale.Params["err"] = err.Error()
+		return err
+	}
+
+	var cloud dbmodel.Cloud
+	cloud.SetTag(ct)
+
+	if err := j.Database.GetCloud(ctx, &cloud); err != nil {
+		return fail(errors.E(op, err))
+	}
+	if cloudUserAccess(u, &cloud) != "admin" {
+		// If the user doesn't have admin access on the cloud return
+		// an unauthorized error.
+		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
+	}
+
+	controllers := make(map[string]dbmodel.Controller)
+	for _, cr := range cloud.Regions {
+		for _, rc := range cr.Controllers {
+			controllers[rc.Controller.Name] = rc.Controller
+		}
+	}
+
+	controller, ok := controllers[controllerName]
+	if !ok {
+		zapctx.Error(ctx, "controller not found", zap.String("controller", controllerName))
+		return fail(errors.E(op, "cloud not hosted by controller", errors.CodeNotFound))
+	}
+
+	api, err := j.dial(ctx, &controller, names.ModelTag{})
+	if err != nil {
+		return fail(errors.E(op, err))
+	}
+	defer api.Close()
+
+	// Note: JIMM doesn't attempt to determine if the cloud is
+	// used by any models before attempting to remove it. JIMM
+	// relies on the controller failing the RemoveClouds API
+	// request if the cloud is in use.
+	if err := api.RemoveCloud(ctx, ct); err != nil {
+		return fail(errors.E(op, err))
+	}
+
+	delete(controllers, controllerName)
+
+	// if this was the only cloud controller, we delete the cloud
+	if len(controllers) == 0 {
+		if err := j.Database.DeleteCloud(ctx, &cloud); err != nil {
+			return fail(errors.E(op, err, "failed to delete cloud after updating controller"))
+		}
+		ale.Success = true
+		return nil
+	}
+
+	// otherwise we need to update the cloud by removing the controller
+	// from cloud regions
+	for _, cr := range cloud.Regions {
+		for _, crp := range cr.Controllers {
+			crp := crp
+			if err := j.Database.DeleteCloudRegionControllerPriority(ctx, &crp); err != nil {
+				return fail(errors.E(op, err, "cannot update database after updating controller"))
+			}
+		}
+	}
+
 	ale.Success = true
 	return nil
 }

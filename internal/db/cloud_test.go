@@ -8,6 +8,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"gorm.io/gorm"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/db"
@@ -500,4 +501,79 @@ func (s *dbSuite) TestDeleteCloud(c *qt.C) {
 	err = s.Database.GetCloud(ctx, &cl2)
 	c.Check(err, qt.ErrorMatches, `cloud "test-cloud" not found`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+}
+
+func TestDeleteCloudRegionControllerPriorityUnconfiguredDatabase(t *testing.T) {
+	c := qt.New(t)
+
+	var d db.Database
+	err := d.DeleteCloudRegionControllerPriority(context.Background(), nil)
+	c.Check(err, qt.ErrorMatches, `database not configured`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
+}
+
+func (s *dbSuite) TestDeleteCloudRegionControllerPriority(c *qt.C) {
+	ctx := context.Background()
+
+	crp := dbmodel.CloudRegionControllerPriority{
+		Model: gorm.Model{
+			ID: 1,
+		},
+	}
+
+	err := s.Database.DeleteCloudRegionControllerPriority(ctx, &crp)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
+
+	err = s.Database.Migrate(context.Background(), false)
+	c.Assert(err, qt.IsNil)
+
+	env := jimmtest.ParseEnvironment(c, `clouds:
+- name: test-controller-cloud
+  type: testp
+  regions:
+  - name: default
+- name: test-cloud-1
+  type: testp
+  regions:
+  - name: test-region-1
+- name: test-cloud-2
+  type: testp
+  regions:
+  - name: test-region-2
+controllers:
+- name: test
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-controller-cloud
+  region: default
+  cloud-regions:
+  - cloud: test-cloud-1
+    region: test-region-1
+    priority: 1
+  - cloud: test-cloud-2
+    region: test-region-2
+    priority: 1
+`)
+	env.PopulateDB(c, *s.Database)
+
+	cl := dbmodel.Cloud{
+		Name: "test-cloud-1",
+	}
+	err = s.Database.GetCloud(ctx, &cl)
+
+	crp = cl.Regions[0].Controllers[0]
+
+	err = s.Database.DeleteCloudRegionControllerPriority(ctx, &crp)
+	c.Assert(err, qt.IsNil)
+
+	cl2 := dbmodel.Cloud{
+		Name: cl.Name,
+	}
+	err = s.Database.GetCloud(ctx, &cl2)
+	c.Assert(err, qt.Equals, nil)
+
+	for _, cr := range cl2.Regions {
+		for _, controllerPriority := range cr.Controllers {
+			c.Assert(controllerPriority.ID, qt.Not(qt.Equals), crp.ID)
+		}
+	}
 }
