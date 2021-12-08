@@ -8,7 +8,9 @@ import (
 
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/juju/api/modelmanager"
+	"github.com/juju/juju/apiserver/common"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/cloud"
 	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
@@ -535,4 +537,82 @@ func (s *jimmSuite) TestImportModel(c *gc.C) {
 	}
 	err = conn.APICall("JIMM", 3, "", "ImportModel", &req, nil)
 	c.Assert(err, gc.ErrorMatches, `"invalid-model-tag" is not a valid tag \(bad request\)`)
+}
+
+func (s *jimmSuite) TestAddCloudToController(c *gc.C) {
+	ctx := context.Background()
+	u := dbmodel.User{
+		Username: "bob@external",
+	}
+	err := s.JIMM.Database.GetUser(ctx, &u)
+	c.Assert(err, gc.IsNil)
+
+	conn := s.open(c, nil, "bob@external")
+	defer conn.Close()
+
+	req := apiparams.AddCloudToControllerRequest{
+		ControllerName: "controller-1",
+		AddCloudArgs: jujuparams.AddCloudArgs{
+			Name: "test-cloud",
+			Cloud: common.CloudToParams(cloud.Cloud{
+				Name:             "test-cloud",
+				Type:             "kubernetes",
+				AuthTypes:        cloud.AuthTypes{cloud.CertificateAuthType},
+				Endpoint:         "https://0.1.2.3:5678",
+				IdentityEndpoint: "https://0.1.2.3:5679",
+				StorageEndpoint:  "https://0.1.2.3:5680",
+				HostCloudRegion:  jimmtest.TestCloudName + "/" + jimmtest.TestCloudRegionName,
+			}),
+		},
+	}
+	err = conn.APICall("JIMM", 3, "", "AddCloudToController", &req, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	cloud, err := s.JIMM.GetCloud(context.Background(), &u, names.NewCloudTag("test-cloud"))
+	c.Assert(err, gc.IsNil)
+	c.Assert(cloud.Name, gc.DeepEquals, "test-cloud")
+	c.Assert(cloud.Type, gc.DeepEquals, "kubernetes")
+}
+
+func (s *jimmSuite) TestRemoveCloudFromController(c *gc.C) {
+	ctx := context.Background()
+	u := dbmodel.User{
+		Username: "bob@external",
+	}
+	err := s.JIMM.Database.GetUser(ctx, &u)
+	c.Assert(err, gc.IsNil)
+
+	conn := s.open(c, nil, "bob@external")
+	defer conn.Close()
+
+	req := apiparams.AddCloudToControllerRequest{
+		ControllerName: "controller-1",
+		AddCloudArgs: jujuparams.AddCloudArgs{
+			Name: "test-cloud",
+			Cloud: common.CloudToParams(cloud.Cloud{
+				Name:             "test-cloud",
+				Type:             "kubernetes",
+				AuthTypes:        cloud.AuthTypes{cloud.CertificateAuthType},
+				Endpoint:         "https://0.1.2.3:5678",
+				IdentityEndpoint: "https://0.1.2.3:5679",
+				StorageEndpoint:  "https://0.1.2.3:5680",
+				HostCloudRegion:  jimmtest.TestCloudName + "/" + jimmtest.TestCloudRegionName,
+			}),
+		},
+	}
+	err = conn.APICall("JIMM", 3, "", "AddCloudToController", &req, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	_, err = s.JIMM.GetCloud(context.Background(), &u, names.NewCloudTag("test-cloud"))
+	c.Assert(err, gc.Equals, nil)
+
+	req1 := apiparams.RemoveCloudFromControllerRequest{
+		CloudTag:       names.NewCloudTag("test-cloud").String(),
+		ControllerName: "controller-1",
+	}
+	err = conn.APICall("JIMM", 3, "", "RemoveCloudFromController", &req1, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	_, err = s.JIMM.GetCloud(context.Background(), &u, names.NewCloudTag("test-cloud"))
+	c.Assert(err, gc.ErrorMatches, `cloud "test-cloud" not found`)
 }

@@ -71,7 +71,8 @@ func (d *Database) GetClouds(ctx context.Context) ([]dbmodel.Cloud, error) {
 }
 
 // UpdateCloud updates the database definition of the cloud to match the
-// given cloud. UpdateCloud does not update any user information.
+// given cloud. UpdateCloud does not update any user information, nor does
+// it remove any information - this is an additive method.
 func (d *Database) UpdateCloud(ctx context.Context, c *dbmodel.Cloud) error {
 	const op = errors.Op("db.UpdateCloud")
 	if err := d.ready(); err != nil {
@@ -175,6 +176,21 @@ func (d *Database) UpdateUserCloudAccess(ctx context.Context, a *dbmodel.UserClo
 // DeleteCloud deletes the given cloud.
 func (d *Database) DeleteCloud(ctx context.Context, c *dbmodel.Cloud) error {
 	const op = errors.Op("db.DeleteCloud")
+
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	db := d.DB.WithContext(ctx)
+	if err := db.Delete(c).Error; err != nil {
+		return errors.E(op, dbError(err))
+	}
+	return nil
+}
+
+// DeleteCloudRegionControllerPriority deletes the given cloud region controller priority entry.
+func (d *Database) DeleteCloudRegionControllerPriority(ctx context.Context, c *dbmodel.CloudRegionControllerPriority) error {
+	const op = errors.Op("db.DeleteCloudRegionControllerPriority")
 
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
