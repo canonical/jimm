@@ -6,6 +6,7 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/cmd/v3"
 	jujuapi "github.com/juju/juju/api"
+	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
 )
@@ -61,6 +62,19 @@ func NewRevokeAuditLogAccessCommandForTesting(store jujuclient.ClientStore, bCli
 func NewListAuditEventsCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
 	cmd := &listAuditEventsCommand{
 		store: store,
+		dialOpts: &jujuapi.DialOpts{
+			InsecureSkipVerify: true,
+			BakeryClient:       bClient,
+		},
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
+
+func NewAddCloudToControllerCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client, cloudByNameFunc func(string) (*cloud.Cloud, error)) cmd.Command {
+	cmd := &addCloudToControllerCommand{
+		store:           store,
+		cloudByNameFunc: cloudByNameFunc,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
 			BakeryClient:       bClient,

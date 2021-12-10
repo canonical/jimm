@@ -26,6 +26,11 @@ func NewClient(c APICaller) *Client {
 	return &Client{caller: c}
 }
 
+// AddCloudToController adds the specified cloud to a specific controller in JIMM.
+func (c *Client) AddCloudToController(req *params.AddCloudToControllerRequest) error {
+	return c.caller.APICall("JIMM", 3, "", "AddCloudToController", req, nil)
+}
+
 // AddController adds a new controller to JIMM.
 func (c *Client) AddController(req *params.AddControllerRequest) (params.ControllerInfo, error) {
 	var info params.ControllerInfo
