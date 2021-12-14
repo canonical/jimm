@@ -84,6 +84,24 @@ func NewAddCloudToControllerCommandForTesting(store jujuclient.ClientStore, bCli
 	return modelcmd.WrapBase(cmd)
 }
 
+type RemoveCloudFromControllerAPI = removeCloudFromControllerAPI
+
+func NewRemoveCloudFromControllerCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client, removeCloudFromControllerAPIFunc func() (RemoveCloudFromControllerAPI, error)) cmd.Command {
+	cmd := &removeCloudFromControllerCommand{
+		store: store,
+		dialOpts: &jujuapi.DialOpts{
+			InsecureSkipVerify: true,
+			BakeryClient:       bClient,
+		},
+		removeCloudFromControllerAPIFunc: removeCloudFromControllerAPIFunc,
+	}
+	if removeCloudFromControllerAPIFunc == nil {
+		cmd.removeCloudFromControllerAPIFunc = cmd.cloudAPI
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
+
 func NewAddControllerCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
 	cmd := &addControllerCommand{
 		store: store,

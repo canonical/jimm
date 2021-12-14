@@ -67,6 +67,11 @@ func (c *Client) ListControllers() ([]params.ControllerInfo, error) {
 	return resp.Controllers, err
 }
 
+// AddCloudToController adds the specified cloud to a specific controller in JIMM.
+func (c *Client) RemoveCloudFromController(req *params.RemoveCloudFromControllerRequest) error {
+	return c.caller.APICall("JIMM", 3, "", "RemoveCloudFromController", req, nil)
+}
+
 // RemoveController removes a controller from the JAAS system. Only
 // controllers that are unavailable can be removed, unless force is used.
 // The return value contains the details of the controller that was
