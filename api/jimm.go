@@ -26,6 +26,11 @@ func NewClient(c APICaller) *Client {
 	return &Client{caller: c}
 }
 
+// AddCloudToController adds the specified cloud to a specific controller in JIMM.
+func (c *Client) AddCloudToController(req *params.AddCloudToControllerRequest) error {
+	return c.caller.APICall("JIMM", 3, "", "AddCloudToController", req, nil)
+}
+
 // AddController adds a new controller to JIMM.
 func (c *Client) AddController(req *params.AddControllerRequest) (params.ControllerInfo, error) {
 	var info params.ControllerInfo
@@ -60,6 +65,11 @@ func (c *Client) ListControllers() ([]params.ControllerInfo, error) {
 	var resp params.ListControllersResponse
 	err := c.caller.APICall("JIMM", 3, "", "ListControllers", nil, &resp)
 	return resp.Controllers, err
+}
+
+// AddCloudToController adds the specified cloud to a specific controller in JIMM.
+func (c *Client) RemoveCloudFromController(req *params.RemoveCloudFromControllerRequest) error {
+	return c.caller.APICall("JIMM", 3, "", "RemoveCloudFromController", req, nil)
 }
 
 // RemoveController removes a controller from the JAAS system. Only
