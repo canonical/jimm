@@ -389,11 +389,11 @@ func (s *dbSuite) TestFindApplicationOffers(c *qt.C) {
 		},
 		expectedOffers: []dbmodel.ApplicationOffer{offer2, offer3},
 	}, {
-		about: "filter by first user ",
+		about: "filter by model admin user",
 		filters: []db.ApplicationOfferFilter{
 			db.ApplicationOfferFilterByUser(env.u.Username),
 		},
-		expectedOffers: []dbmodel.ApplicationOffer{offer1, offer2},
+		expectedOffers: []dbmodel.ApplicationOffer{offer1, offer2, offer3},
 	}, {
 		about: "filter by user - not found",
 		filters: []db.ApplicationOfferFilter{

@@ -69,7 +69,7 @@ func (d *Database) GetApplicationOffer(ctx context.Context, offer *dbmodel.Appli
 	}
 	db = db.Preload("Connections")
 	db = db.Preload("Endpoints")
-	db = db.Preload("Model").Preload("Model.Controller")
+	db = db.Preload("Model").Preload("Model.Controller").Preload("Model.Users")
 	db = db.Preload("Spaces")
 	db = db.Preload("Users").Preload("Users.User")
 	if err := db.First(&offer).Error; err != nil {
@@ -131,9 +131,11 @@ func ApplicationOfferFilterByApplication(applicationName string) ApplicationOffe
 // ApplicationOfferFilterByUser filters application offer accessible by the user.
 func ApplicationOfferFilterByUser(username string) ApplicationOfferFilter {
 	return func(db *gorm.DB) *gorm.DB {
-		db = db.Joins("LEFT JOIN user_application_offer_access AS users ON users.application_offer_id = offers.id AND users.username = ?", username)
+		db = db.Joins("LEFT JOIN user_application_offer_access AS offer_users ON offer_users.application_offer_id = offers.id AND offer_users.username = ?", username)
 		db = db.Joins("LEFT JOIN user_application_offer_access AS public ON public.application_offer_id = offers.id AND public.username = 'everyone@external'")
-		db = db.Where("users.access IN ('read', 'consume', 'admin') OR public.access IN ('read', 'consume', 'admin')")
+		db = db.Joins("LEFT JOIN user_model_access AS model_users ON model_users.model_id = offers.model_id AND model_users.username = ?", username)
+		db = db.Joins("LEFT JOIN users ON users.username = ?", username)
+		db = db.Where("offer_users.access IN ('read', 'consume', 'admin') OR public.access IN ('read', 'consume', 'admin') OR model_users.access = 'admin' OR users.controller_access = 'superuser'")
 		return db
 	}
 }

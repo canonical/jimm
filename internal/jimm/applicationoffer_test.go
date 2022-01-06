@@ -36,9 +36,9 @@ type environment struct {
 var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database) *environment {
 	env := environment{}
 
+	// Alice is a model admin, but not a superuser or offer admin.
 	u := dbmodel.User{
-		Username:         "alice@external",
-		ControllerAccess: "superuser",
+		Username: "alice@external",
 	}
 	c.Assert(db.DB.Create(&u).Error, qt.IsNil)
 
@@ -61,7 +61,21 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database) 
 		Username: "grant@external",
 	}
 	c.Assert(db.DB.Create(&u4).Error, qt.IsNil)
-	env.users = []dbmodel.User{u, u1, u2, u3, u4}
+
+	// Jane is an offer admin, but not a superuser or model admin.
+	u5 := dbmodel.User{
+		Username: "jane@external",
+	}
+	c.Assert(db.DB.Create(&u5).Error, qt.IsNil)
+
+	// Joe is a superuser, but not a model or offer admin.
+	u6 := dbmodel.User{
+		Username:         "joe@external",
+		ControllerAccess: "superuser",
+	}
+	c.Assert(db.DB.Create(&u6).Error, qt.IsNil)
+
+	env.users = []dbmodel.User{u, u1, u2, u3, u4, u5, u6}
 
 	cloud := dbmodel.Cloud{
 		Name: "test-cloud",
@@ -112,6 +126,10 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database) 
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
 		CloudCredentialID: cred.ID,
+		Users: []dbmodel.UserModelAccess{{
+			Username: u.Username,
+			Access:   "admin",
+		}},
 	}
 	err = db.AddModel(ctx, &model)
 	c.Assert(err, qt.IsNil)
@@ -127,9 +145,6 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database) 
 		ApplicationName: "test-app",
 		CharmURL:        "cs:test-app:17",
 		Users: []dbmodel.UserApplicationOfferAccess{{
-			Username: u.Username,
-			Access:   string(jujuparams.OfferAdminAccess),
-		}, {
 			Username: u1.Username,
 			Access:   string(jujuparams.OfferAdminAccess),
 		}, {
@@ -138,6 +153,9 @@ var initializeEnvironment = func(c *qt.C, ctx context.Context, db *db.Database) 
 		}, {
 			Username: u3.Username,
 			Access:   string(jujuparams.OfferReadAccess),
+		}, {
+			Username: u5.Username,
+			Access:   string(jujuparams.OfferAdminAccess),
 		}},
 	}
 	err = db.AddApplicationOffer(ctx, &offer)
@@ -169,9 +187,21 @@ func TestRevokeOfferAccess(t *testing.T) {
 		},
 		expectedError: "a silly error",
 	}, {
-		about: "admin revokes an admin user admin access - user keeps consume access",
+		about: "model admin revokes an admin user admin access - user keeps consume access",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[1], "test-offer-url", jujuparams.OfferAdminAccess
+		},
+		expectedAccesLevel: "consume",
+	}, {
+		about: "admin revokes an admin user admin access - user keeps consume access",
+		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+			return env.users[5], env.users[1], "test-offer-url", jujuparams.OfferAdminAccess
+		},
+		expectedAccesLevel: "consume",
+	}, {
+		about: "superuser revokes an admin user admin access - user keeps consume access",
+		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+			return env.users[6], env.users[1], "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedAccesLevel: "consume",
 	}, {
@@ -321,27 +351,39 @@ func TestGrantOfferAccess(t *testing.T) {
 		},
 		expectedError: "a silly error",
 	}, {
-		about: "admin grants an admin user admin access - admin user keeps admin",
+		about: "model admin grants an admin user admin access - admin user keeps admin",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[1], "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedAccesLevel: "admin",
 	}, {
-		about: "admin grants an admin user consume access - admin user keeps admin",
+		about: "model admin grants an admin user consume access - admin user keeps admin",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[1], "test-offer-url", jujuparams.OfferConsumeAccess
 		},
 		expectedAccesLevel: "admin",
 	}, {
-		about: "admin grants an admin user read access - admin user keeps admin",
+		about: "model admin grants an admin user read access - admin user keeps admin",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[1], "test-offer-url", jujuparams.OfferReadAccess
 		},
 		expectedAccesLevel: "admin",
 	}, {
-		about: "admin grants a consume user admin access - user gets admin access",
+		about: "model admin grants a consume user admin access - user gets admin access",
 		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
 			return env.users[0], env.users[2], "test-offer-url", jujuparams.OfferAdminAccess
+		},
+		expectedAccesLevel: "admin",
+	}, {
+		about: "admin grants a consume user admin access - user gets admin access",
+		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+			return env.users[5], env.users[2], "test-offer-url", jujuparams.OfferAdminAccess
+		},
+		expectedAccesLevel: "admin",
+	}, {
+		about: "superuser grants a consume user admin access - user gets admin access",
+		parameterFunc: func(env *environment) (dbmodel.User, dbmodel.User, string, jujuparams.OfferAccessPermission) {
+			return env.users[6], env.users[2], "test-offer-url", jujuparams.OfferAdminAccess
 		},
 		expectedAccesLevel: "admin",
 	}, {
@@ -2177,14 +2219,6 @@ func TestUpdateOffer(t *testing.T) {
 				Limit:              1,
 			}},
 			Users: []dbmodel.UserApplicationOfferAccess{{
-				Username: "alice@external",
-				User: dbmodel.User{
-					Username:         "alice@external",
-					ControllerAccess: "superuser",
-				},
-				ApplicationOfferID: 1,
-				Access:             "admin",
-			}, {
 				Username: "eve@external",
 				User: dbmodel.User{
 					Username:         "eve@external",
@@ -2208,6 +2242,14 @@ func TestUpdateOffer(t *testing.T) {
 				},
 				ApplicationOfferID: 1,
 				Access:             "read",
+			}, {
+				Username: "jane@external",
+				User: dbmodel.User{
+					Username:         "jane@external",
+					ControllerAccess: "login",
+				},
+				ApplicationOfferID: 1,
+				Access:             "admin",
 			}},
 		},
 	}, {
@@ -2339,14 +2381,6 @@ func TestFindApplicationOffers(t *testing.T) {
 		ApplicationName: "test-app",
 		CharmURL:        "cs:test-app:17",
 		Users: []dbmodel.UserApplicationOfferAccess{{
-			Username: "alice@external",
-			User: dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "superuser",
-			},
-			ApplicationOfferID: 1,
-			Access:             "admin",
-		}, {
 			Username: "eve@external",
 			User: dbmodel.User{
 				Username:         "eve@external",
@@ -2370,6 +2404,14 @@ func TestFindApplicationOffers(t *testing.T) {
 			},
 			ApplicationOfferID: 1,
 			Access:             "read",
+		}, {
+			Username: "jane@external",
+			User: dbmodel.User{
+				Username:         "jane@external",
+				ControllerAccess: "login",
+			},
+			ApplicationOfferID: 1,
+			Access:             "admin",
 		}},
 	}
 
@@ -2379,9 +2421,25 @@ func TestFindApplicationOffers(t *testing.T) {
 		expectedError string
 		expectedOffer *dbmodel.ApplicationOffer
 	}{{
-		about: "find an offer as admin",
+		about: "find an offer as model admin",
 		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
 			return env.users[0], "admin", []jujuparams.OfferFilter{{
+				OfferName: "test-offer",
+			}}
+		},
+		expectedOffer: &expectedOffer,
+	}, {
+		about: "find an offer as offer admin",
+		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
+			return env.users[5], "admin", []jujuparams.OfferFilter{{
+				OfferName: "test-offer",
+			}}
+		},
+		expectedOffer: &expectedOffer,
+	}, {
+		about: "find an offer as superuser",
+		parameterFunc: func(env *environment) (dbmodel.User, string, []jujuparams.OfferFilter) {
+			return env.users[6], "admin", []jujuparams.OfferFilter{{
 				OfferName: "test-offer",
 			}}
 		},
