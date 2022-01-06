@@ -561,6 +561,11 @@ func (j *JIMM) FindApplicationOffers(ctx context.Context, user *dbmodel.User, fi
 	offerDetails := make([]jujuparams.ApplicationOfferAdminDetails, len(offers))
 	for i, offer := range offers {
 		accessLevel := offer.UserAccess(user)
+		if user.ControllerAccess == "superuser" || offer.Model.UserAccess(user) == "admin" {
+			// If the user is a controller superuser or model admin, we want to
+			// fill the offer with the same details as for an offer admin.
+			accessLevel = "admin"
+		}
 		offerDetails[i] = offer.ToJujuApplicationOfferDetails()
 		offerDetails[i] = filterApplicationOfferDetail(offerDetails[i], user, accessLevel)
 	}
@@ -705,6 +710,13 @@ func (j *JIMM) listApplicationOffersForModel(ctx context.Context, u *dbmodel.Use
 	return offers, nil
 }
 
+// doApplicationOfferAdmin performs the given function on an applicaiton offer
+// only if the given user has admin access on the model of the offer, or is a
+// controller superuser. Otherwise an unauthorized error is returned.
+//
+// Note: The user does not need to have any access level on the offer itself.
+// As long as they are model admins or controller superusers they can also
+// manipulate the application offer as admins.
 func (j *JIMM) doApplicationOfferAdmin(ctx context.Context, u *dbmodel.User, offerURL string, f func(offer *dbmodel.ApplicationOffer, api API) error) error {
 	const op = errors.Op("jimm.doApplicationOfferAdmin")
 
@@ -715,8 +727,6 @@ func (j *JIMM) doApplicationOfferAdmin(ctx context.Context, u *dbmodel.User, off
 		return errors.E(op, err)
 	}
 	if u.ControllerAccess != "superuser" && offer.UserAccess(u) != "admin" && offer.Model.UserAccess(u) != "admin" {
-		// If the user doesn't have admin access on the application
-		// offer return an unauthorized error.
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 	api, err := j.dial(ctx, &offer.Model.Controller, names.ModelTag{})
