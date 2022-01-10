@@ -32,6 +32,8 @@ func NewSuperCommand() *jujucmd.SuperCommand {
 	jimmcmd.Register(cmd.NewRevokeAuditLogAccessCommand())
 	jimmcmd.Register(cmd.NewSetControllerDeprecatedCommand())
 	jimmcmd.Register(cmd.NewUpdateMigratedModelCommand())
+	jimmcmd.Register(cmd.NewAddCloudToControllerCommand())
+	jimmcmd.Register(cmd.NewRemoveCloudFromControllerCommand())
 	return jimmcmd
 }
 
