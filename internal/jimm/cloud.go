@@ -177,7 +177,7 @@ var DefaultReservedCloudNames = []string{
 	"rackspace",
 }
 
-// AddHostedCloudToControler adds the cloud defined by the given tag and
+// AddCloudToControler adds the cloud defined by the given tag and
 // cloud to the JAAS system. The cloud will be created on the specified
 // controller running on the requested host cloud-region and the cloud
 // created there. If the controller does not host the cloud-regions
@@ -189,8 +189,111 @@ var DefaultReservedCloudNames = []string{
 // code of CodeIncompatibleClouds will be returned. If there is an error
 // returned by the controller when creating the cloud then that error code
 // will be preserved.
-func (j *JIMM) AddHostedCloudToController(ctx context.Context, u *dbmodel.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud) error {
-	return j.addHostedCloud(ctx, u, tag, cloud, findController(controllerName))
+func (j *JIMM) AddCloudToController(ctx context.Context, u *dbmodel.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud) error {
+	const op = errors.Op("jimm.AddCloudToController")
+
+	ale := dbmodel.AuditLogEntry{
+		Time:    time.Now().UTC().Round(time.Millisecond),
+		Tag:     tag.String(),
+		UserTag: u.Tag().String(),
+		Action:  "add",
+		Params: dbmodel.StringMap{
+			"controller": controllerName,
+			"type":       cloud.Type,
+		},
+	}
+	defer j.addAuditLogEntry(&ale)
+	fail := func(err error) error {
+		ale.Params["err"] = err.Error()
+		return err
+	}
+
+	if u.ControllerAccess != "login" && u.ControllerAccess != "superuser" {
+		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
+	}
+
+	// Ensure the new cloud could not mask the name of a known public cloud.
+	reservedNames := j.ReservedCloudNames
+	if len(reservedNames) == 0 {
+		reservedNames = DefaultReservedCloudNames
+	}
+	for _, n := range reservedNames {
+		if tag.Id() == n {
+			return fail(errors.E(op, errors.CodeAlreadyExists, fmt.Sprintf("cloud %q already exists", tag.Id())))
+		}
+	}
+
+	if cloud.HostCloudRegion != "" {
+		parts := strings.SplitN(cloud.HostCloudRegion, "/", 2)
+		if len(parts) != 2 || parts[0] == "" {
+			return fail(errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion)))
+		}
+		region, err := j.Database.FindRegion(ctx, parts[0], parts[1])
+		if err != nil {
+			if errors.ErrorCode(err) == errors.CodeNotFound {
+				return fail(errors.E(op, err, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion)))
+			}
+			return fail(errors.E(op, err))
+		}
+
+		switch cloudUserAccess(u, &region.Cloud) {
+		case "admin", "add-model":
+		default:
+			return fail(errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion)))
+		}
+
+		if region.Cloud.HostCloudRegion != "" {
+			// Do not support creating a new cloud on an already hosted
+			// cloud.
+			return fail(errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion)))
+		}
+
+		found := false
+		for _, rc := range region.Controllers {
+			if rc.Controller.Name == controllerName {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fail(errors.E(op, errors.CodeNotFound, "controller not found"))
+		}
+	}
+
+	var dbCloud dbmodel.Cloud
+	dbCloud.FromJujuCloud(cloud)
+	dbCloud.Name = tag.Id()
+	dbCloud.Users = []dbmodel.UserCloudAccess{{
+		User:   *u,
+		Access: "admin",
+	}}
+
+	controller := dbmodel.Controller{
+		Name: controllerName,
+	}
+	err := j.Database.GetController(ctx, &controller)
+	if err != nil {
+		return fail(errors.E(op, errors.CodeNotFound, "controller not found"))
+	}
+
+	ccloud, err := j.addControllerCloud(ctx, &controller, u.Tag().(names.UserTag), tag, cloud)
+	if err != nil {
+		return fail(errors.E(op, err))
+	}
+
+	dbCloud.FromJujuCloud(*ccloud)
+	for i := range dbCloud.Regions {
+		dbCloud.Regions[i].Controllers = []dbmodel.CloudRegionControllerPriority{{
+			ControllerID: controller.ID,
+			Priority:     dbmodel.CloudRegionControllerPrioritySupported,
+		}}
+	}
+	if err := j.Database.AddCloud(ctx, &dbCloud); err != nil {
+		return fail(errors.E(op, err))
+	}
+
+	ale.Success = true
+	return nil
 }
 
 // AddHostedCloud adds the cloud defined by the given tag and cloud to the
@@ -204,10 +307,6 @@ func (j *JIMM) AddHostedCloudToController(ctx context.Context, u *dbmodel.User, 
 // returned by the controller when creating the cloud then that error code
 // will be preserved.
 func (j *JIMM) AddHostedCloud(ctx context.Context, u *dbmodel.User, tag names.CloudTag, cloud jujuparams.Cloud) error {
-	return j.addHostedCloud(ctx, u, tag, cloud, randomController())
-}
-
-func (j *JIMM) addHostedCloud(ctx context.Context, u *dbmodel.User, tag names.CloudTag, cloud jujuparams.Cloud, controllerSelectFunction func([]dbmodel.CloudRegionControllerPriority) (dbmodel.Controller, error)) error {
 	const op = errors.Op("jimm.AddHostedCloud")
 
 	ale := dbmodel.AuditLogEntry{
@@ -284,10 +383,8 @@ func (j *JIMM) addHostedCloud(ctx context.Context, u *dbmodel.User, tag names.Cl
 	}
 
 	// Create the cloud on a host.
-	controller, err := controllerSelectFunction(region.Controllers)
-	if err != nil {
-		return fail(errors.E(op, err))
-	}
+	shuffleRegionControllers(region.Controllers)
+	controller := region.Controllers[0].Controller
 
 	ccloud, err := j.addControllerCloud(ctx, &controller, u.Tag().(names.UserTag), tag, cloud)
 	if err != nil {
