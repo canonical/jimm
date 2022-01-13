@@ -546,6 +546,13 @@ const addHostedCloudTestEnv = `clouds:
   users:
   - user: alice@external
     access: admin
+- name: private-cloud2
+  type: test-provider3
+  regions:
+  - name: test-region-2
+  users:
+  - user: bob@external
+    access: admin
 - name: existing-cloud
   type: kubernetes
   host-cloud-region: test-provider/test-region
@@ -853,7 +860,7 @@ var addHostedCloudToControllerTests = []struct {
 		return nil
 	},
 	cloud_: func(_ context.Context, _ names.CloudTag, cld *jujuparams.Cloud) error {
-		cld.Type = "kubernetes"
+		cld.Type = "maas"
 		cld.HostCloudRegion = "test-provider/test-region"
 		cld.AuthTypes = []string{"empty", "userpass"}
 		cld.Endpoint = "https://example.com"
@@ -873,8 +880,7 @@ var addHostedCloudToControllerTests = []struct {
 	controllerName: "test-controller",
 	cloudName:      "new-cloud",
 	cloud: jujuparams.Cloud{
-		Type:             "kubernetes",
-		HostCloudRegion:  "test-provider/test-region",
+		Type:             "maas",
 		AuthTypes:        []string{"empty", "userpass"},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://example.com/identity",
@@ -882,7 +888,7 @@ var addHostedCloudToControllerTests = []struct {
 	},
 	expectCloud: dbmodel.Cloud{
 		Name:             "new-cloud",
-		Type:             "kubernetes",
+		Type:             "maas",
 		HostCloudRegion:  "test-provider/test-region",
 		AuthTypes:        []string{"empty", "userpass"},
 		Endpoint:         "https://example.com",
@@ -938,8 +944,8 @@ var addHostedCloudToControllerTests = []struct {
 		}
 		return nil
 	},
-	username:       "bob@external",
-	controllerName: "no-such-controlelr",
+	username:       "alice@external",
+	controllerName: "no-such-controller",
 	cloudName:      "new-cloud",
 	cloud: jujuparams.Cloud{
 		Type:             "kubernetes",
@@ -953,7 +959,7 @@ var addHostedCloudToControllerTests = []struct {
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name:           "CloudWithReservedName",
-	username:       "bob@external",
+	username:       "alice@external",
 	controllerName: "test-controller",
 	cloudName:      "aws",
 	cloud: jujuparams.Cloud{
@@ -967,38 +973,8 @@ var addHostedCloudToControllerTests = []struct {
 	expectError:     `cloud "aws" already exists`,
 	expectErrorCode: errors.CodeAlreadyExists,
 }, {
-	name:           "ExistingCloud",
-	username:       "bob@external",
-	controllerName: "test-controller",
-	cloudName:      "existing-cloud",
-	cloud: jujuparams.Cloud{
-		Type:             "kubernetes",
-		HostCloudRegion:  "test-provider/test-region",
-		AuthTypes:        []string{"empty", "userpass"},
-		Endpoint:         "https://example.com",
-		IdentityEndpoint: "https://example.com/identity",
-		StorageEndpoint:  "https://example.com/storage",
-	},
-	expectError:     `cloud "existing-cloud" already exists`,
-	expectErrorCode: errors.CodeAlreadyExists,
-}, {
-	name:           "InvalidCloudType",
-	username:       "bob@external",
-	controllerName: "test-controller",
-	cloudName:      "new-cloud",
-	cloud: jujuparams.Cloud{
-		Type:             "ec2",
-		HostCloudRegion:  "test-provider/test-region",
-		AuthTypes:        []string{"empty", "userpass"},
-		Endpoint:         "https://example.com",
-		IdentityEndpoint: "https://example.com/identity",
-		StorageEndpoint:  "https://example.com/storage",
-	},
-	expectError:     `unsupported cloud type "ec2"`,
-	expectErrorCode: errors.CodeIncompatibleClouds,
-}, {
 	name:           "HostCloudRegionNotFound",
-	username:       "bob@external",
+	username:       "alice@external",
 	controllerName: "test-controller",
 	cloudName:      "new-cloud",
 	cloud: jujuparams.Cloud{
@@ -1013,7 +989,7 @@ var addHostedCloudToControllerTests = []struct {
 	expectErrorCode: errors.CodeIncompatibleClouds,
 }, {
 	name:           "InvalidHostCloudRegion",
-	username:       "bob@external",
+	username:       "alice@external",
 	controllerName: "test-controller",
 	cloudName:      "new-cloud",
 	cloud: jujuparams.Cloud{
@@ -1028,18 +1004,18 @@ var addHostedCloudToControllerTests = []struct {
 	expectErrorCode: errors.CodeIncompatibleClouds,
 }, {
 	name:           "UserHasNoCloudAccess",
-	username:       "bob@external",
+	username:       "alice@external",
 	controllerName: "test-controller",
 	cloudName:      "new-cloud",
 	cloud: jujuparams.Cloud{
 		Type:             "kubernetes",
-		HostCloudRegion:  "test-provider2/test-region",
+		HostCloudRegion:  "test-provider3/test-region-3",
 		AuthTypes:        []string{"empty", "userpass"},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
 	},
-	expectError:     `unsupported cloud host region "test-provider2/test-region"`,
+	expectError:     `unsupported cloud host region "test-provider3/test-region-3"`,
 	expectErrorCode: errors.CodeIncompatibleClouds,
 }, {
 	name:           "HostCloudIsHosted",
@@ -1059,7 +1035,7 @@ var addHostedCloudToControllerTests = []struct {
 }, {
 	name:           "DialError",
 	dialError:      errors.E("dial error"),
-	username:       "bob@external",
+	username:       "alice@external",
 	controllerName: "test-controller",
 	cloudName:      "new-cloud",
 	cloud: jujuparams.Cloud{
@@ -1076,7 +1052,7 @@ var addHostedCloudToControllerTests = []struct {
 	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud) error {
 		return errors.E("addcloud error")
 	},
-	username:       "bob@external",
+	username:       "alice@external",
 	controllerName: "test-controller",
 	cloudName:      "new-cloud",
 	cloud: jujuparams.Cloud{
@@ -1090,7 +1066,7 @@ var addHostedCloudToControllerTests = []struct {
 	expectError: `addcloud error`,
 }}
 
-func TestAddHostedCloudToController(t *testing.T) {
+func TestAddCloudToController(t *testing.T) {
 	c := qt.New(t)
 
 	for _, test := range addHostedCloudToControllerTests {
@@ -1122,7 +1098,7 @@ func TestAddHostedCloudToController(t *testing.T) {
 
 			u := env.User(test.username).DBObject(c, j.Database)
 
-			err = j.AddHostedCloudToController(ctx, &u, test.controllerName, names.NewCloudTag(test.cloudName), test.cloud)
+			err = j.AddCloudToController(ctx, &u, test.controllerName, names.NewCloudTag(test.cloudName), test.cloud)
 			c.Assert(dialer.IsClosed(), qt.Equals, true)
 			if test.expectError != "" {
 				c.Check(err, qt.ErrorMatches, test.expectError)
@@ -1131,6 +1107,8 @@ func TestAddHostedCloudToController(t *testing.T) {
 				}
 				return
 			}
+			c.Assert(err, qt.IsNil)
+
 			cloud, err := j.GetCloud(ctx, &u, names.NewCloudTag(test.cloudName))
 			c.Assert(err, qt.IsNil)
 			c.Check(cloud, jimmtest.DBObjectEquals, test.expectCloud)
@@ -2045,7 +2023,7 @@ var removeCloudFromControllerTests = []struct {
 		c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 	},
 }, {
-	name:            "UserNotAuthorized",
+	name:            "UserNotAutfhorized",
 	env:             removeCloudFromControllerTestEnv,
 	username:        "bob@external",
 	cloud:           "test",
