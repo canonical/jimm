@@ -8,6 +8,7 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	jujuerrors "github.com/juju/errors"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/names/v4"
 
 	"github.com/CanonicalLtd/jimm/internal/errors"
@@ -15,7 +16,7 @@ import (
 
 // Offer creates a new ApplicationOffer on the controller. Offer uses the
 // Offer procedure on the ApplicationOffers facade version 2.
-func (c Connection) Offer(ctx context.Context, offer jujuparams.AddApplicationOffer) error {
+func (c Connection) Offer(ctx context.Context, offerURL crossmodel.OfferURL, offer jujuparams.AddApplicationOffer) error {
 	const op = errors.Op("jujuclient.Offer")
 	args := jujuparams.AddApplicationOffers{
 		Offers: []jujuparams.AddApplicationOffer{offer},
@@ -24,12 +25,39 @@ func (c Connection) Offer(ctx context.Context, offer jujuparams.AddApplicationOf
 	resp := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, 1),
 	}
-	err := c.client.Call(ctx, "ApplicationOffers", 2, "", "Offer", &args, &resp)
-	if err != nil {
-		return errors.E(op, jujuerrors.Cause(err))
-	}
-	if resp.Results[0].Error != nil {
-		return errors.E(op, resp.Results[0].Error)
+	if c.hasFacadeVersion("ApplicationOffers", 4) {
+		// Facade call version 4 will grant owner admin access to the
+		// created offer
+		err := c.client.Call(ctx, "ApplicationOffers", 4, "", "Offer", &args, &resp)
+		if err != nil {
+			return errors.E(op, jujuerrors.Cause(err))
+		}
+		if resp.Results[0].Error != nil {
+			return errors.E(op, resp.Results[0].Error)
+		}
+	} else {
+		ownerTag, err := names.ParseUserTag(offer.OwnerTag)
+		if err != nil {
+			return errors.E(op, errors.CodeBadRequest, err)
+		}
+
+		// Facade call version 2 will not grant owner admin access, so
+		// we have to do it ourselves.
+		err = c.client.Call(ctx, "ApplicationOffers", 2, "", "Offer", &args, &resp)
+		if err != nil {
+			return errors.E(op, jujuerrors.Cause(err))
+		}
+		if len(resp.Results) == 0 {
+			return errors.E(op, "unknown error - no results returned")
+		}
+		if resp.Results[0].Error != nil {
+			return errors.E(op, resp.Results[0].Error)
+		}
+
+		// Ensure the user creating the offer is an admin for the offer.
+		if err := c.GrantApplicationOfferAccess(ctx, offerURL.String(), ownerTag, jujuparams.OfferAdminAccess); err != nil {
+			return errors.E(op, err)
+		}
 	}
 	return nil
 }

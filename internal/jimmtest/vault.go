@@ -23,10 +23,29 @@ const vaultRootToken = "jimmtest-vault-root-token"
 var vaultCmd *exec.Cmd
 var vaultRootClient *api.Client
 
+func isVaultRunning() error {
+	if os.Getenv("VAULT_ADDR") == "" ||
+		os.Getenv("VAULT_AUTH_PATH") == "" ||
+		os.Getenv("VAULT_PATH") == "" ||
+		os.Getenv("VAULT_SECRET_FILE") == "" {
+		return errors.E("missing vault configuration")
+	}
+
+	statusCmd := exec.Command("vault", "status", "--format=json")
+	err := statusCmd.Run()
+	if err != nil {
+		return errors.E(err, "failed to get vault status")
+	}
+	return nil
+}
+
 // StartVault starts and initialises a vault service.
 func StartVault() error {
 	if vaultCmd != nil {
 		return errors.E("vault already started")
+	}
+	if isVaultRunning() != nil {
+		return errors.E("vault is running")
 	}
 	vaultCmd = exec.Command("vault", "server", "-dev", "-dev-no-store-token", "-dev-root-token-id="+vaultRootToken)
 	if err := vaultCmd.Start(); err != nil {
@@ -112,7 +131,7 @@ func VaultClient(tb testing.TB) (client *api.Client, path string, creds map[stri
 // StopVault stops any running vault server. VaultStop must only be called
 // once any tests that might be using the vault server have finished.
 func StopVault() {
-	if vaultCmd == nil {
+	if vaultCmd == nil || vaultCmd.Process == nil {
 		return
 	}
 	if err := vaultCmd.Process.Signal(os.Interrupt); err != nil {

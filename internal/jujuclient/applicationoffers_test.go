@@ -9,6 +9,7 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/juju/testing/factory"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
@@ -54,37 +55,60 @@ func (s *applicationoffersSuite) TestOffer(c *gc.C) {
 	ep, err := app.Endpoint("url")
 	c.Assert(err, gc.Equals, nil)
 
+	offerURL := crossmodel.OfferURL{
+		User:            "test-user@external",
+		ModelName:       s.modelInfo.Name,
+		ApplicationName: "test-offer",
+	}
+
 	ctx := context.Background()
-	err = s.API.Offer(ctx, jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
-		OfferName:       "test-offer",
-		ApplicationName: "test-app",
-		Endpoints: map[string]string{
-			ep.Name: ep.Name,
-		},
-	})
+	err = s.API.Offer(
+		ctx,
+		offerURL,
+		jujuparams.AddApplicationOffer{
+			ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
+			OfferName:       "test-offer",
+			ApplicationName: "test-app",
+			Endpoints: map[string]string{
+				ep.Name: ep.Name,
+			},
+		})
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.API.Offer(ctx, jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
-		OfferName:       "test-offer",
-		ApplicationName: "test-app",
-		Endpoints: map[string]string{
-			ep.Name: ep.Name,
+	err = s.API.Offer(
+		ctx,
+		offerURL,
+		jujuparams.AddApplicationOffer{
+			ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
+			OfferName:       "test-offer",
+			ApplicationName: "test-app",
+			Endpoints: map[string]string{
+				ep.Name: ep.Name,
+			},
 		},
-	})
+	)
 	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *applicationoffersSuite) TestOfferError(c *gc.C) {
-	err := s.API.Offer(context.Background(), jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
-		OfferName:       "test-offer",
-		ApplicationName: "test-app",
-		Endpoints: map[string]string{
-			"url": "url",
+	offerURL := crossmodel.OfferURL{
+		User:            "test-user@external",
+		ModelName:       s.modelInfo.Name,
+		ApplicationName: "test-offer",
+	}
+
+	err := s.API.Offer(
+		context.Background(),
+		offerURL,
+		jujuparams.AddApplicationOffer{
+			ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
+			OfferName:       "test-offer",
+			ApplicationName: "test-app",
+			Endpoints: map[string]string{
+				"url": "url",
+			},
 		},
-	})
+	)
 	c.Check(err, gc.ErrorMatches, `getting offered application test-app: application "test-app" not found`)
 }
 
@@ -122,18 +146,27 @@ func (s *applicationoffersSuite) TestListApplicationOffersMatching(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	ctx := context.Background()
-	err = s.API.Offer(ctx, jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
-		OfferName:       "test-offer",
-		ApplicationName: "test-app",
-		Endpoints: map[string]string{
-			ep.Name: ep.Name,
+	offerURL := crossmodel.OfferURL{
+		User:            "test-user@external",
+		ModelName:       s.modelInfo.Name,
+		ApplicationName: "test-offer",
+	}
+	err = s.API.Offer(
+		ctx,
+		offerURL,
+		jujuparams.AddApplicationOffer{
+			ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
+			OfferName:       "test-offer",
+			ApplicationName: "test-app",
+			Endpoints: map[string]string{
+				ep.Name: ep.Name,
+			},
 		},
-	})
+	)
 	c.Assert(err, gc.Equals, nil)
 
 	var info jujuparams.ApplicationOfferAdminDetails
-	info.OfferURL = "test-user@external/test-model.test-offer"
+	info.OfferURL = offerURL.String()
 	err = s.API.GetApplicationOffer(ctx, &info)
 	c.Assert(err, gc.Equals, nil)
 
@@ -165,14 +198,23 @@ func (s *applicationoffersSuite) TestListApplicationOffersNoMatch(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	ctx := context.Background()
-	err = s.API.Offer(ctx, jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
-		OfferName:       "test-offer",
-		ApplicationName: "test-app",
-		Endpoints: map[string]string{
-			ep.Name: ep.Name,
+	offerURL := crossmodel.OfferURL{
+		User:            "test-user@external",
+		ModelName:       s.modelInfo.Name,
+		ApplicationName: "test-offer",
+	}
+	err = s.API.Offer(
+		ctx,
+		offerURL,
+		jujuparams.AddApplicationOffer{
+			ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
+			OfferName:       "test-offer",
+			ApplicationName: "test-app",
+			Endpoints: map[string]string{
+				ep.Name: ep.Name,
+			},
 		},
-	})
+	)
 	c.Assert(err, gc.Equals, nil)
 
 	owner, err := names.ParseUserTag(s.modelInfo.OwnerTag)
@@ -220,18 +262,27 @@ func (s *applicationoffersSuite) TestFindApplicationOffersMatching(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	ctx := context.Background()
-	err = s.API.Offer(ctx, jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
-		OfferName:       "test-offer",
-		ApplicationName: "test-app",
-		Endpoints: map[string]string{
-			ep.Name: ep.Name,
+	offerURL := crossmodel.OfferURL{
+		User:            "test-user@external",
+		ModelName:       s.modelInfo.Name,
+		ApplicationName: "test-offer",
+	}
+	err = s.API.Offer(
+		ctx,
+		offerURL,
+		jujuparams.AddApplicationOffer{
+			ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
+			OfferName:       "test-offer",
+			ApplicationName: "test-app",
+			Endpoints: map[string]string{
+				ep.Name: ep.Name,
+			},
 		},
-	})
+	)
 	c.Assert(err, gc.Equals, nil)
 
 	var info jujuparams.ApplicationOfferAdminDetails
-	info.OfferURL = "test-user@external/test-model.test-offer"
+	info.OfferURL = offerURL.String()
 	err = s.API.GetApplicationOffer(ctx, &info)
 	c.Assert(err, gc.Equals, nil)
 
@@ -263,14 +314,23 @@ func (s *applicationoffersSuite) TestFindApplicationOffersNoMatch(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	ctx := context.Background()
-	err = s.API.Offer(ctx, jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
-		OfferName:       "test-offer",
-		ApplicationName: "test-app",
-		Endpoints: map[string]string{
-			ep.Name: ep.Name,
+	offerURL := crossmodel.OfferURL{
+		User:            "test-user@external",
+		ModelName:       s.modelInfo.Name,
+		ApplicationName: "test-offer",
+	}
+	err = s.API.Offer(
+		ctx,
+		offerURL,
+		jujuparams.AddApplicationOffer{
+			ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
+			OfferName:       "test-offer",
+			ApplicationName: "test-app",
+			Endpoints: map[string]string{
+				ep.Name: ep.Name,
+			},
 		},
-	})
+	)
 	c.Assert(err, gc.Equals, nil)
 
 	owner, err := names.ParseUserTag(s.modelInfo.OwnerTag)
@@ -302,18 +362,27 @@ func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	ctx := context.Background()
-	err = s.API.Offer(ctx, jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
-		OfferName:       "test-offer",
-		ApplicationName: "test-app",
-		Endpoints: map[string]string{
-			ep.Name: ep.Name,
+	offerURL := crossmodel.OfferURL{
+		User:            "test-user@external",
+		ModelName:       s.modelInfo.Name,
+		ApplicationName: "test-offer",
+	}
+	err = s.API.Offer(
+		ctx,
+		offerURL,
+		jujuparams.AddApplicationOffer{
+			ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
+			OfferName:       "test-offer",
+			ApplicationName: "test-app",
+			Endpoints: map[string]string{
+				ep.Name: ep.Name,
+			},
 		},
-	})
+	)
 	c.Assert(err, gc.Equals, nil)
 
 	var info jujuparams.ApplicationOfferAdminDetails
-	info.OfferURL = "test-user@external/test-model.test-offer"
+	info.OfferURL = offerURL.String()
 	err = s.API.GetApplicationOffer(ctx, &info)
 	c.Assert(err, gc.Equals, nil)
 
@@ -327,7 +396,7 @@ func (s *applicationoffersSuite) TestGetApplicationOffer(c *gc.C) {
 	c.Check(info, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetails{
 		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
 			SourceModelTag:         names.NewModelTag(s.modelInfo.UUID).String(),
-			OfferURL:               "test-user@external/test-model.test-offer",
+			OfferURL:               offerURL.String(),
 			OfferName:              "test-offer",
 			ApplicationDescription: "A pretty popular blog engine",
 			Endpoints: []jujuparams.RemoteEndpoint{{
@@ -376,23 +445,30 @@ func (s *applicationoffersSuite) TestGrantApplicationOfferAccess(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	ctx := context.Background()
-	err = s.API.Offer(ctx, jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
-		OfferName:       "test-offer",
-		ApplicationName: "test-app",
-		Endpoints: map[string]string{
-			ep.Name: ep.Name,
+	offerURL := crossmodel.OfferURL{
+		User:            "test-user@external",
+		ModelName:       s.modelInfo.Name,
+		ApplicationName: "test-offer",
+	}
+	err = s.API.Offer(
+		ctx,
+		offerURL,
+		jujuparams.AddApplicationOffer{
+			ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
+			OfferName:       "test-offer",
+			ApplicationName: "test-app",
+			Endpoints: map[string]string{
+				ep.Name: ep.Name,
+			},
 		},
-	})
+	)
 	c.Assert(err, gc.Equals, nil)
 
-	offerURL := "test-user@external/test-model.test-offer"
-
-	err = s.API.GrantApplicationOfferAccess(ctx, offerURL, names.NewUserTag("test-user-2@external"), jujuparams.OfferConsumeAccess)
+	err = s.API.GrantApplicationOfferAccess(ctx, offerURL.String(), names.NewUserTag("test-user-2@external"), jujuparams.OfferConsumeAccess)
 	c.Assert(err, gc.Equals, nil)
 
 	var info jujuparams.ApplicationOfferAdminDetails
-	info.OfferURL = offerURL
+	info.OfferURL = offerURL.String()
 	err = s.API.GetApplicationOffer(ctx, &info)
 	c.Assert(err, gc.Equals, nil)
 	c.Check(info.OfferUUID, gc.Not(gc.Equals), "")
@@ -405,7 +481,7 @@ func (s *applicationoffersSuite) TestGrantApplicationOfferAccess(c *gc.C) {
 	c.Check(info, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetails{
 		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
 			SourceModelTag:         names.NewModelTag(s.modelInfo.UUID).String(),
-			OfferURL:               "test-user@external/test-model.test-offer",
+			OfferURL:               offerURL.String(),
 			OfferName:              "test-offer",
 			ApplicationDescription: "A pretty popular blog engine",
 			Endpoints: []jujuparams.RemoteEndpoint{{
@@ -456,23 +532,30 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	ctx := context.Background()
-	err = s.API.Offer(ctx, jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
-		OfferName:       "test-offer",
-		ApplicationName: "test-app",
-		Endpoints: map[string]string{
-			ep.Name: ep.Name,
+	offerURL := crossmodel.OfferURL{
+		User:            "test-user@external",
+		ModelName:       s.modelInfo.Name,
+		ApplicationName: "test-offer",
+	}
+	err = s.API.Offer(
+		ctx,
+		offerURL,
+		jujuparams.AddApplicationOffer{
+			ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
+			OfferName:       "test-offer",
+			ApplicationName: "test-app",
+			Endpoints: map[string]string{
+				ep.Name: ep.Name,
+			},
 		},
-	})
+	)
 	c.Assert(err, gc.Equals, nil)
 
-	offerURL := "test-user@external/test-model.test-offer"
-
-	err = s.API.GrantApplicationOfferAccess(ctx, offerURL, names.NewUserTag("test-user-2@external"), jujuparams.OfferConsumeAccess)
+	err = s.API.GrantApplicationOfferAccess(ctx, offerURL.String(), names.NewUserTag("test-user-2@external"), jujuparams.OfferConsumeAccess)
 	c.Assert(err, gc.Equals, nil)
 
 	var info jujuparams.ApplicationOfferAdminDetails
-	info.OfferURL = offerURL
+	info.OfferURL = offerURL.String()
 	err = s.API.GetApplicationOffer(ctx, &info)
 	c.Assert(err, gc.Equals, nil)
 
@@ -510,7 +593,7 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
 		ApplicationName: "test-app",
 	})
 
-	err = s.API.RevokeApplicationOfferAccess(ctx, offerURL, names.NewUserTag("test-user-2@external"), jujuparams.OfferConsumeAccess)
+	err = s.API.RevokeApplicationOfferAccess(ctx, offerURL.String(), names.NewUserTag("test-user-2@external"), jujuparams.OfferConsumeAccess)
 	c.Assert(err, gc.Equals, nil)
 
 	err = s.API.GetApplicationOffer(ctx, &info)
@@ -525,7 +608,7 @@ func (s *applicationoffersSuite) TestRevokeApplicationOfferAccess(c *gc.C) {
 	c.Check(info, jc.DeepEquals, jujuparams.ApplicationOfferAdminDetails{
 		ApplicationOfferDetails: jujuparams.ApplicationOfferDetails{
 			SourceModelTag:         names.NewModelTag(s.modelInfo.UUID).String(),
-			OfferURL:               "test-user@external/test-model.test-offer",
+			OfferURL:               offerURL.String(),
 			OfferName:              "test-offer",
 			ApplicationDescription: "A pretty popular blog engine",
 			Endpoints: []jujuparams.RemoteEndpoint{{
@@ -576,14 +659,23 @@ func (s *applicationoffersSuite) TestDestroyApplicationOffer(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	ctx := context.Background()
-	err = s.API.Offer(ctx, jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
-		OfferName:       "test-offer",
-		ApplicationName: "test-app",
-		Endpoints: map[string]string{
-			ep.Name: ep.Name,
+	offerURL := crossmodel.OfferURL{
+		User:            "test-user@external",
+		ModelName:       s.modelInfo.Name,
+		ApplicationName: "test-offer",
+	}
+	err = s.API.Offer(
+		ctx,
+		offerURL,
+		jujuparams.AddApplicationOffer{
+			ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
+			OfferName:       "test-offer",
+			ApplicationName: "test-app",
+			Endpoints: map[string]string{
+				ep.Name: ep.Name,
+			},
 		},
-	})
+	)
 	c.Assert(err, gc.Equals, nil)
 
 	owner, err := names.ParseUserTag(s.modelInfo.OwnerTag)
@@ -595,8 +687,7 @@ func (s *applicationoffersSuite) TestDestroyApplicationOffer(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(offers, gc.HasLen, 1)
 
-	offerURL := "test-user@external/test-model.test-offer"
-	err = s.API.DestroyApplicationOffer(ctx, offerURL, false)
+	err = s.API.DestroyApplicationOffer(ctx, offerURL.String(), false)
 	c.Assert(err, gc.Equals, nil)
 
 	offers, err = s.API.ListApplicationOffers(ctx, []jujuparams.OfferFilter{{
@@ -625,14 +716,23 @@ func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetails(c *gc.C) 
 	c.Assert(err, gc.Equals, nil)
 
 	ctx := context.Background()
-	err = s.API.Offer(ctx, jujuparams.AddApplicationOffer{
-		ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
-		OfferName:       "test-offer",
-		ApplicationName: "test-app",
-		Endpoints: map[string]string{
-			ep.Name: ep.Name,
+	offerURL := crossmodel.OfferURL{
+		User:            "test-user@external",
+		ModelName:       s.modelInfo.Name,
+		ApplicationName: "test-offer",
+	}
+	err = s.API.Offer(
+		ctx,
+		offerURL,
+		jujuparams.AddApplicationOffer{
+			ModelTag:        names.NewModelTag(s.modelInfo.UUID).String(),
+			OfferName:       "test-offer",
+			ApplicationName: "test-app",
+			Endpoints: map[string]string{
+				ep.Name: ep.Name,
+			},
 		},
-	})
+	)
 	c.Assert(err, gc.Equals, nil)
 
 	var info jujuparams.ConsumeOfferDetails

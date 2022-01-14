@@ -26,6 +26,7 @@ import (
 // AddApplicationOfferParams holds parameters for the Offer method.
 type AddApplicationOfferParams struct {
 	ModelTag               names.ModelTag
+	OwnerTag               names.UserTag
 	OfferName              string
 	ApplicationName        string
 	ApplicationDescription string
@@ -44,6 +45,7 @@ func (j *JIMM) Offer(ctx context.Context, user *dbmodel.User, offer AddApplicati
 			"model":       offer.ModelTag.String(),
 			"name":        offer.OfferName,
 			"application": offer.ApplicationName,
+			"owner":       offer.OwnerTag.String(),
 		},
 	}
 	defer j.addAuditLogEntry(&ale)
@@ -70,26 +72,6 @@ func (j *JIMM) Offer(ctx context.Context, user *dbmodel.User, offer AddApplicati
 		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
 	}
 
-	api, err := j.dial(ctx, &model.Controller, names.ModelTag{})
-	if err != nil {
-		return errors.E(op, err)
-	}
-	defer api.Close()
-
-	err = api.Offer(ctx, jujuparams.AddApplicationOffer{
-		ModelTag:               offer.ModelTag.String(),
-		OfferName:              offer.OfferName,
-		ApplicationName:        offer.ApplicationName,
-		ApplicationDescription: offer.ApplicationDescription,
-		Endpoints:              offer.Endpoints,
-	})
-	if err != nil {
-		if strings.Contains(err.Error(), "application offer already exists") {
-			return fail(errors.E(op, err, errors.CodeAlreadyExists))
-		}
-		return fail(errors.E(op, err))
-	}
-
 	offerURL := crossmodel.OfferURL{
 		User:      model.OwnerUsername,
 		ModelName: model.Name,
@@ -98,11 +80,30 @@ func (j *JIMM) Offer(ctx context.Context, user *dbmodel.User, offer AddApplicati
 		ApplicationName: offer.OfferName,
 	}
 
-	// Ensure the user creating the offer is an admin for the offer.
-	if err := api.GrantApplicationOfferAccess(ctx, offerURL.String(), names.NewUserTag(user.Username), jujuparams.OfferAdminAccess); err != nil {
-		// TODO (ashipika) we could remove the offer from the controller, if we fail to grant
-		// access to it
-		zapctx.Error(ctx, "failed to grant application offer access to user", zaputil.Error(err))
+	api, err := j.dial(ctx, &model.Controller, names.ModelTag{})
+	if err != nil {
+		return errors.E(op, err)
+	}
+	defer api.Close()
+
+	ownerTag := offer.OwnerTag.String()
+	if ownerTag == "" {
+		ownerTag = user.Tag().String()
+	}
+	err = api.Offer(ctx,
+		offerURL,
+		jujuparams.AddApplicationOffer{
+			ModelTag:               offer.ModelTag.String(),
+			OwnerTag:               ownerTag,
+			OfferName:              offer.OfferName,
+			ApplicationName:        offer.ApplicationName,
+			ApplicationDescription: offer.ApplicationDescription,
+			Endpoints:              offer.Endpoints,
+		})
+	if err != nil {
+		if strings.Contains(err.Error(), "application offer already exists") {
+			return fail(errors.E(op, err, errors.CodeAlreadyExists))
+		}
 		return fail(errors.E(op, err))
 	}
 

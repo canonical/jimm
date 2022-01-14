@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/juju/version"
 	"github.com/juju/names/v4"
 
@@ -132,7 +133,7 @@ type API struct {
 	ModelSummaryWatcherStop_           func(context.Context, string) error
 	ModelWatcherNext_                  func(ctx context.Context, id string) ([]jujuparams.Delta, error)
 	ModelWatcherStop_                  func(ctx context.Context, id string) error
-	Offer_                             func(context.Context, jujuparams.AddApplicationOffer) error
+	Offer_                             func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error
 	Ping_                              func(context.Context) error
 	RemoveCloud_                       func(context.Context, names.CloudTag) error
 	RevokeApplicationOfferAccess_      func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
@@ -336,11 +337,11 @@ func (a *API) ModelSummaryWatcherStop(ctx context.Context, id string) error {
 	return a.ModelSummaryWatcherStop_(ctx, id)
 }
 
-func (a *API) Offer(ctx context.Context, aao jujuparams.AddApplicationOffer) error {
+func (a *API) Offer(ctx context.Context, offerURL crossmodel.OfferURL, aao jujuparams.AddApplicationOffer) error {
 	if a.Offer_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
-	return a.Offer_(ctx, aao)
+	return a.Offer_(ctx, offerURL, aao)
 }
 
 func (a *API) Ping(ctx context.Context) error {

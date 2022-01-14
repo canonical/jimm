@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -191,7 +192,7 @@ type API interface {
 	ModelWatcherStop(ctx context.Context, id string) error
 
 	// Offer creates a new application-offer.
-	Offer(context.Context, jujuparams.AddApplicationOffer) error
+	Offer(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error
 
 	// Ping tests the connection is working.
 	Ping(context.Context) error

@@ -13,6 +13,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/charm/v8"
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/names/v4"
 	"gopkg.in/macaroon.v2"
 	"gorm.io/gorm"
@@ -1111,7 +1112,7 @@ func TestOffer(t *testing.T) {
 		about                       string
 		getApplicationOffer         func(context.Context, *jujuparams.ApplicationOfferAdminDetails) error
 		grantApplicationOfferAccess func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
-		offer                       func(context.Context, jujuparams.AddApplicationOffer) error
+		offer                       func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error
 		createEnv                   func(*qt.C, db.Database) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error))
 	}{{
 		about: "all ok",
@@ -1163,7 +1164,7 @@ func TestOffer(t *testing.T) {
 		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
 			return nil
 		},
-		offer: func(context.Context, jujuparams.AddApplicationOffer) error {
+		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
 			return nil
 		},
 		createEnv: func(c *qt.C, db db.Database) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
@@ -1285,96 +1286,8 @@ func TestOffer(t *testing.T) {
 		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
 			return nil
 		},
-		offer: func(context.Context, jujuparams.AddApplicationOffer) error {
+		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
 			return errors.E("a silly error")
-		},
-		createEnv: func(c *qt.C, db db.Database) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
-			ctx := context.Background()
-
-			u := dbmodel.User{
-				Username:         "alice@external",
-				ControllerAccess: "superuser",
-			}
-			c.Assert(db.DB.Create(&u).Error, qt.IsNil)
-
-			cloud := dbmodel.Cloud{
-				Name: "test-cloud",
-				Type: "test-provider",
-				Regions: []dbmodel.CloudRegion{{
-					Name: "test-region-1",
-				}},
-				Users: []dbmodel.UserCloudAccess{{
-					Username: u.Username,
-				}},
-			}
-			c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
-
-			controller := dbmodel.Controller{
-				Name:        "test-controller-1",
-				UUID:        "00000000-0000-0000-0000-0000-0000000000001",
-				CloudName:   "test-cloud",
-				CloudRegion: "test-region-1",
-				CloudRegions: []dbmodel.CloudRegionControllerPriority{{
-					Priority:      0,
-					CloudRegionID: cloud.Regions[0].ID,
-				}},
-			}
-			err := db.AddController(ctx, &controller)
-			c.Assert(err, qt.Equals, nil)
-
-			cred := dbmodel.CloudCredential{
-				Name:          "test-credential-1",
-				CloudName:     cloud.Name,
-				OwnerUsername: u.Username,
-				AuthType:      "empty",
-			}
-			err = db.SetCloudCredential(ctx, &cred)
-			c.Assert(err, qt.Equals, nil)
-
-			model := dbmodel.Model{
-				Name: "test-model",
-				UUID: sql.NullString{
-					String: "00000000-0000-0000-0000-0000-0000000000003",
-					Valid:  true,
-				},
-				OwnerUsername:     u.Username,
-				ControllerID:      controller.ID,
-				CloudRegionID:     cloud.Regions[0].ID,
-				CloudCredentialID: cred.ID,
-				Users: []dbmodel.UserModelAccess{{
-					User:   u,
-					Access: "admin",
-				}},
-			}
-			err = db.AddModel(ctx, &model)
-			c.Assert(err, qt.Equals, nil)
-
-			offerParams := jimm.AddApplicationOfferParams{
-				ModelTag:               model.Tag().(names.ModelTag),
-				OfferName:              "test-app-offer",
-				ApplicationName:        "test-app",
-				ApplicationDescription: "a test app offering",
-				Endpoints: map[string]string{
-					"endpoint1": "url1",
-				},
-			}
-
-			offer := dbmodel.ApplicationOffer{}
-
-			return u, offerParams, offer, func(c *qt.C, err error) {
-				c.Assert(err, qt.ErrorMatches, "a silly error")
-			}
-		},
-	}, {
-		about: "fail to grant offer access on the controller",
-		getApplicationOffer: func(_ context.Context, details *jujuparams.ApplicationOfferAdminDetails) error {
-			return nil
-		},
-		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
-			return errors.E("a silly error")
-		},
-		offer: func(context.Context, jujuparams.AddApplicationOffer) error {
-			return nil
 		},
 		createEnv: func(c *qt.C, db db.Database) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
@@ -1461,7 +1374,7 @@ func TestOffer(t *testing.T) {
 		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
 			return nil
 		},
-		offer: func(context.Context, jujuparams.AddApplicationOffer) error {
+		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
 			return nil
 		},
 		createEnv: func(c *qt.C, db db.Database) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
@@ -1495,7 +1408,7 @@ func TestOffer(t *testing.T) {
 		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
 			return nil
 		},
-		offer: func(context.Context, jujuparams.AddApplicationOffer) error {
+		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
 			return errors.E(errors.CodeNotFound, "application test-app")
 		},
 		createEnv: func(c *qt.C, db db.Database) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
@@ -1584,7 +1497,7 @@ func TestOffer(t *testing.T) {
 		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
 			return nil
 		},
-		offer: func(context.Context, jujuparams.AddApplicationOffer) error {
+		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
 			return nil
 		},
 		createEnv: func(c *qt.C, db db.Database) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
@@ -1678,7 +1591,7 @@ func TestOffer(t *testing.T) {
 		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
 			return nil
 		},
-		offer: func(context.Context, jujuparams.AddApplicationOffer) error {
+		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
 			return nil
 		},
 		createEnv: func(c *qt.C, db db.Database) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
@@ -1766,7 +1679,7 @@ func TestOffer(t *testing.T) {
 		grantApplicationOfferAccess: func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error {
 			return nil
 		},
-		offer: func(context.Context, jujuparams.AddApplicationOffer) error {
+		offer: func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error {
 			return errors.E("application offer already exists")
 		},
 		createEnv: func(c *qt.C, db db.Database) (dbmodel.User, jimm.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
