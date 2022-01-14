@@ -20,12 +20,14 @@ require (
 	github.com/jackc/pgx/v4 v4.9.0
 	github.com/juju/aclstore/v2 v2.1.0 // indirect
 	github.com/juju/charm/v8 v8.0.0-20220207013334-ec6de7e9b78e
+	github.com/juju/cmd v0.0.0-20200108104440-8e43f3faa5c9 // indirect
 	github.com/juju/cmd/v3 v3.0.0-20220203030511-039f3566372a
 	github.com/juju/errors v0.0.0-20220316043928-e10eb17a9eeb
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
 	github.com/juju/juju v0.0.0-20220318053519-acb32588d175
 	github.com/juju/loggo v0.0.0-20210728185423-eebad3a902c4
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
+	github.com/juju/mutex v0.0.0-20180619145857-d21b13acf4bf // indirect
 	github.com/juju/names/v4 v4.0.0-20220207005702-9c6532a52823
 	github.com/juju/rpcreflect v0.0.0-20200416001309-bb46e9ba1476
 	github.com/juju/testing v0.0.0-20220203020004-a0ff61f03494

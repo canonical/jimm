@@ -572,8 +572,9 @@ github.com/juju/clock v0.0.0-20220202072423-1b0f830854c4/go.mod h1:zDZCPSgCJQINe
 github.com/juju/clock v0.0.0-20220203021603-d9deb868a28a h1:Az/6CM/P5guGHNy7r6TkOCctv3lDmN3W1uhku7QMupk=
 github.com/juju/clock v0.0.0-20220203021603-d9deb868a28a/go.mod h1:GZ/FY8Cqw3KHG6DwRVPUKbSPTAwyrU28xFi5cqZnLsc=
 github.com/juju/cmd v0.0.0-20171107070456-e74f39857ca0/go.mod h1:yWJQHl73rdSX4DHVKGqkAip+huBslxRwS8m9CrOLq18=
-github.com/juju/cmd v0.0.0-20180424151504-9ce53c6f9d00 h1:7S+FutBbPdRDL9tMG7WvPDu3Nw0PwAYAxNm0y4n8uL0=
 github.com/juju/cmd v0.0.0-20180424151504-9ce53c6f9d00/go.mod h1:yWJQHl73rdSX4DHVKGqkAip+huBslxRwS8m9CrOLq18=
+github.com/juju/cmd v0.0.0-20200108104440-8e43f3faa5c9 h1:1YF8UqrgBN0SCfyHDz3zZlFNA7M1XvR1PFVm/qAEC7g=
+github.com/juju/cmd v0.0.0-20200108104440-8e43f3faa5c9/go.mod h1:yWJQHl73rdSX4DHVKGqkAip+huBslxRwS8m9CrOLq18=
 github.com/juju/cmd/v3 v3.0.0-20220202061353-b1cc80b193b0/go.mod h1:EoGJiEG+vbMwO9l+Es0SDTlaQPjH6nLcnnc4NfZB3cY=
 github.com/juju/cmd/v3 v3.0.0-20220203030511-039f3566372a h1:AM+vpDMN8/hbgq/1JdWl+jGjBd098EACGlYErOoBnr4=
 github.com/juju/cmd/v3 v3.0.0-20220203030511-039f3566372a/go.mod h1:OwsFyKpl9Hz4oHdlZyVN2QFXjiwm5vSu/lShppBbwhI=
@@ -637,8 +638,9 @@ github.com/juju/mgotest v1.0.1/go.mod h1:vTaDufYul+Ps8D7bgseHjq87X8eu0ivlKLp9mVc
 github.com/juju/mgotest v1.0.2/go.mod h1:04v1Xi2RiTO3h77YWtaXB2LAaGRSSi+Vl4hOV1coD0k=
 github.com/juju/mgotest v1.0.3 h1:3UIS2cOSzE6qz/dtiLAaQew5AKYw/bRb++/lsB522HI=
 github.com/juju/mgotest v1.0.3/go.mod h1:Dnzi6seljG9GoZpqFdTqRV3ybB3UcIj+H8iQqy1so1A=
-github.com/juju/mutex v0.0.0-20171110020013-1fe2a4bf0a3a h1:fFpWkIPzpzxd3CC+qfU5adsawpG371Ie4TmRkhxwyNU=
 github.com/juju/mutex v0.0.0-20171110020013-1fe2a4bf0a3a/go.mod h1:Y3oOzHH8CQ0Ppt0oCKJ2JFO81/EsWenH5AEqigLH+yY=
+github.com/juju/mutex v0.0.0-20180619145857-d21b13acf4bf h1:2d3cilQly1OpAfZcn4QRuwDOdVoHsM4cDTkcKbmO760=
+github.com/juju/mutex v0.0.0-20180619145857-d21b13acf4bf/go.mod h1:Y3oOzHH8CQ0Ppt0oCKJ2JFO81/EsWenH5AEqigLH+yY=
 github.com/juju/mutex/v2 v2.0.0-20220128011612-57176ebdcfa3/go.mod h1:TTCG9BJD9rCC4DZFz3jA0QvCqFDHw8Eqz0jstwY7RTQ=
 github.com/juju/mutex/v2 v2.0.0-20220203023141-11eeddb42c6c h1:+wSxXZCFPw3Bs5ij3ZMV0njIKGVwl4+Ftb5vb0ij+7Y=
 github.com/juju/mutex/v2 v2.0.0-20220203023141-11eeddb42c6c/go.mod h1:jwCfBs/smYDaeZLqeaCi8CB8M+tOes4yf827HoOEoqk=
