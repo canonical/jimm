@@ -405,6 +405,10 @@ func (s *modelManagerSuite) TestGetModelInfo(c *gc.C) {
 	conn, err := s.JEM.OpenAPIFromDoc(testContext, &s.Controller)
 	c.Assert(err, gc.Equals, nil)
 	defer conn.Close()
+
+	err = s.JEM.GrantModel(testContext, jemtest.Bob, &s.Model, "alice@external", "admin")
+	c.Assert(err, gc.Equals, nil)
+
 	info := jujuparams.ModelInfo{
 		UUID: s.Model.UUID,
 	}
