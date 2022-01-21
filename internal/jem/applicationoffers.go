@@ -91,7 +91,7 @@ func (j *JEM) offer1(ctx context.Context, id identchecker.ACLIdentity, offer juj
 		return errgo.Mask(err, apiconn.IsAPIError)
 	}
 
-	doc := offerDetailsToMongodoc(&model, offerDetails)
+	doc := offerDetailsToMongodoc(ctx, &model, offerDetails)
 
 	err = j.DB.InsertApplicationOffer(ctx, &doc)
 	if err != nil {
@@ -659,15 +659,15 @@ func (j *JEM) UpdateApplicationOffer(ctx context.Context, ctlPath params.EntityP
 	u.Set("application-name", offerDetails.ApplicationName)
 	u.Set("bindings", offerDetails.Bindings)
 	u.Set("charm-url", offerDetails.CharmURL)
-	u.Set("connections", offerConnectionsToMongodoc(offerDetails.Connections))
-	u.Set("endpoints", offerEndpointsToMongodoc(offerDetails.Endpoints))
+	u.Set("connections", offerConnectionsToMongodoc(ctx, offerDetails.Connections))
+	u.Set("endpoints", offerEndpointsToMongodoc(ctx, offerDetails.Endpoints))
 	u.Set("offer-name", offerDetails.OfferName)
 	u.Set("offer-url", offerDetails.OfferURL)
 
 	return errgo.Mask(j.DB.UpdateApplicationOffer(ctx, &offer, u, false))
 }
 
-func offerDetailsToMongodoc(model *mongodoc.Model, offerDetails jujuparams.ApplicationOfferAdminDetails) mongodoc.ApplicationOffer {
+func offerDetailsToMongodoc(ctx context.Context, model *mongodoc.Model, offerDetails jujuparams.ApplicationOfferAdminDetails) mongodoc.ApplicationOffer {
 	return mongodoc.ApplicationOffer{
 		ModelUUID:              model.UUID,
 		ModelName:              string(model.Path.Name),
@@ -678,15 +678,15 @@ func offerDetailsToMongodoc(model *mongodoc.Model, offerDetails jujuparams.Appli
 		OwnerName:              conv.ToUserTag(model.Path.User).Id(),
 		ApplicationName:        offerDetails.ApplicationName,
 		ApplicationDescription: offerDetails.ApplicationDescription,
-		Endpoints:              offerEndpointsToMongodoc(offerDetails.Endpoints),
-		Spaces:                 offerSpacesToMongodoc(offerDetails.Spaces),
+		Endpoints:              offerEndpointsToMongodoc(ctx, offerDetails.Endpoints),
+		Spaces:                 offerSpacesToMongodoc(ctx, offerDetails.Spaces),
 		Bindings:               offerDetails.Bindings,
-		Users:                  offerUsersToMongodoc(offerDetails.Users),
-		Connections:            offerConnectionsToMongodoc(offerDetails.Connections),
+		Users:                  offerUsersToMongodoc(ctx, offerDetails.Users),
+		Connections:            offerConnectionsToMongodoc(ctx, offerDetails.Connections),
 	}
 }
 
-func offerConnectionsToMongodoc(connections []jujuparams.OfferConnection) []mongodoc.OfferConnection {
+func offerConnectionsToMongodoc(ctx context.Context, connections []jujuparams.OfferConnection) []mongodoc.OfferConnection {
 	conns := make([]mongodoc.OfferConnection, len(connections))
 	for i, connection := range connections {
 		conns[i] = mongodoc.OfferConnection{
@@ -695,13 +695,13 @@ func offerConnectionsToMongodoc(connections []jujuparams.OfferConnection) []mong
 			Username:       connection.Username,
 			Endpoint:       connection.Endpoint,
 			IngressSubnets: connection.IngressSubnets,
-			Status:         offerConnectionStatusToMongodoc(connection.Status),
+			Status:         offerConnectionStatusToMongodoc(ctx, connection.Status),
 		}
 	}
 	return conns
 }
 
-func offerConnectionStatusToMongodoc(status jujuparams.EntityStatus) mongodoc.OfferConnectionStatus {
+func offerConnectionStatusToMongodoc(ctx context.Context, status jujuparams.EntityStatus) mongodoc.OfferConnectionStatus {
 	return mongodoc.OfferConnectionStatus{
 		Status: status.Status.String(),
 		Info:   status.Info,
@@ -710,7 +710,7 @@ func offerConnectionStatusToMongodoc(status jujuparams.EntityStatus) mongodoc.Of
 	}
 }
 
-func offerEndpointsToMongodoc(endpoints []jujuparams.RemoteEndpoint) []mongodoc.RemoteEndpoint {
+func offerEndpointsToMongodoc(ctx context.Context, endpoints []jujuparams.RemoteEndpoint) []mongodoc.RemoteEndpoint {
 	eps := make([]mongodoc.RemoteEndpoint, len(endpoints))
 	for i, endpoint := range endpoints {
 		eps[i] = mongodoc.RemoteEndpoint{
@@ -723,13 +723,14 @@ func offerEndpointsToMongodoc(endpoints []jujuparams.RemoteEndpoint) []mongodoc.
 	return eps
 }
 
-func offerUsersToMongodoc(users []jujuparams.OfferUserDetails) map[mongodoc.User]mongodoc.ApplicationOfferAccessPermission {
+func offerUsersToMongodoc(ctx context.Context, users []jujuparams.OfferUserDetails) map[mongodoc.User]mongodoc.ApplicationOfferAccessPermission {
 	accesses := make(map[mongodoc.User]mongodoc.ApplicationOfferAccessPermission, len(users))
 	for _, user := range users {
 		pu, err := conv.FromUserID(user.UserName)
 		if err != nil {
 			// If we can't parse the user, it's either a local user which
 			// we don't store, or an invalid user which can't do anything.
+			zapctx.Warn(ctx, "cannot parse username", zap.String("username", user.UserName))
 			continue
 		}
 		var access mongodoc.ApplicationOfferAccessPermission
@@ -741,6 +742,7 @@ func offerUsersToMongodoc(users []jujuparams.OfferUserDetails) map[mongodoc.User
 		case string(jujuparams.OfferReadAccess):
 			access = mongodoc.ApplicationOfferReadAccess
 		default:
+			zapctx.Warn(ctx, "unknown access level", zap.String("level", user.Access))
 			continue
 		}
 		accesses[mongodoc.User(pu)] = access
@@ -748,7 +750,7 @@ func offerUsersToMongodoc(users []jujuparams.OfferUserDetails) map[mongodoc.User
 	return accesses
 }
 
-func offerSpacesToMongodoc(spaces []jujuparams.RemoteSpace) []mongodoc.RemoteSpace {
+func offerSpacesToMongodoc(ctx context.Context, spaces []jujuparams.RemoteSpace) []mongodoc.RemoteSpace {
 	ss := make([]mongodoc.RemoteSpace, len(spaces))
 	for i, space := range spaces {
 		ss[i] = mongodoc.RemoteSpace{

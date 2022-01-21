@@ -527,7 +527,7 @@ func (j *JEM) GetModelInfo(ctx context.Context, id identchecker.ACLIdentity, inf
 
 	var canSeeUsers, canSeeMachines bool
 	adminACL := append(m.ACL.Admin, string(m.Path.User))
-	adminACL = append(m.ACL.Admin, j.ControllerAdmins()...)
+	adminACL = append(adminACL, j.ControllerAdmins()...)
 	if err := auth.CheckACL(ctx, id, adminACL); err == nil {
 		canSeeUsers = true
 		canSeeMachines = true
