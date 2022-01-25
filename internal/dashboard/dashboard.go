@@ -40,6 +40,9 @@ func Register(ctx context.Context, router *httprouter.Router, dashboardLocation 
 		router.GET(dashboardPath, func(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 			http.Redirect(w, req, dashboardLocation, http.StatusPermanentRedirect)
 		})
+		router.GET("/", func(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		})
 		return nil
 	}
 
