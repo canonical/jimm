@@ -17,3 +17,9 @@ func (s *userSuite) TestToUserTag(c *gc.C) {
 	c.Assert(conv.ToUserTag(params.User("alice")).String(), gc.Equals, "user-alice@external")
 	c.Assert(conv.ToUserTag(params.User("alice@domain")).String(), gc.Equals, "user-alice@domain")
 }
+
+func (s *userSuite) TestFromUserID(c *gc.C) {
+	user, err := conv.FromUserID("user1@domain")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(user, gc.DeepEquals, params.User("user1"))
+}

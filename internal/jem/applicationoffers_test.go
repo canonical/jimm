@@ -656,3 +656,127 @@ func (s *applicationoffersSuite) TestUpdateApplicationOffer(c *gc.C) {
 	err = s.JEM.DB.GetApplicationOffer(ctx, &offer3)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
+
+func (s *applicationoffersSuite) TestGetApplicationOfferConsumeDetailsUserWithDomain(c *gc.C) {
+	ctx := context.Background()
+
+	s.JEM.GrantModel(ctx, jemtest.Bob, &s.Model, params.User("user1"), jujuparams.ModelAdminAccess)
+
+	err := s.JEM.Offer(ctx, jemtest.User1, jujuparams.AddApplicationOffer{
+		ModelTag:        names.NewModelTag(s.Model.UUID).String(),
+		OfferName:       "test-offer",
+		ApplicationName: "test-app",
+		Endpoints: map[string]string{
+			s.endpoint.Relation.Name: s.endpoint.Relation.Name,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	offerURL := conv.ToOfferURL(s.Model.Path, "test-offer")
+
+	d := jujuparams.ConsumeOfferDetails{
+		Offer: &jujuparams.ApplicationOfferDetails{
+			OfferURL: offerURL,
+		},
+	}
+	err = s.JEM.GetApplicationOfferConsumeDetails(ctx, jemtest.User1, "", &d, bakery.Version2)
+	c.Assert(err, gc.Equals, nil)
+
+	c.Check(d.Macaroon, gc.Not(gc.IsNil))
+	d.Macaroon = nil
+	c.Check(d.Offer.OfferUUID, gc.Matches, `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
+	d.Offer.OfferUUID = ""
+	c.Check(d, jc.DeepEquals, jujuparams.ConsumeOfferDetails{
+		Offer: &jujuparams.ApplicationOfferDetails{
+			SourceModelTag:         names.NewModelTag(s.Model.UUID).String(),
+			OfferURL:               offerURL,
+			OfferName:              "test-offer",
+			ApplicationDescription: "A pretty popular blog engine",
+			Endpoints: []jujuparams.RemoteEndpoint{{
+				Name:      "url",
+				Role:      charm.RoleProvider,
+				Interface: "http",
+			}},
+			Users: []jujuparams.OfferUserDetails{{
+				UserName: "everyone@external",
+				Access:   "read",
+			}, {
+				UserName: "user1@external",
+				Access:   "admin",
+			}},
+		},
+		ControllerInfo: &jujuparams.ExternalControllerInfo{
+			ControllerTag: names.NewControllerTag(s.ControllerConfig.ControllerUUID()).String(),
+			Alias:         "controller-1",
+			Addrs:         s.APIInfo(c).Addrs,
+			CACert:        s.Controller.CACert,
+		},
+	})
+
+	err = s.JEM.GrantOfferAccess(ctx, jemtest.User1, "charlie", offerURL, jujuparams.OfferConsumeAccess)
+	c.Assert(err, jc.ErrorIsNil)
+	err = s.JEM.GrantOfferAccess(ctx, jemtest.User1, "alice", offerURL, jujuparams.OfferAdminAccess)
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = s.JEM.GetApplicationOfferConsumeDetails(ctx, jemtest.Alice, "charlie", &d, bakery.Version2)
+	c.Assert(err, gc.Equals, nil)
+
+	c.Check(d.Macaroon, gc.Not(gc.IsNil))
+	d.Macaroon = nil
+	c.Check(d.Offer.OfferUUID, gc.Matches, `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
+	d.Offer.OfferUUID = ""
+	c.Check(d, jc.DeepEquals, jujuparams.ConsumeOfferDetails{
+		Offer: &jujuparams.ApplicationOfferDetails{
+			SourceModelTag:         names.NewModelTag(s.Model.UUID).String(),
+			OfferURL:               offerURL,
+			OfferName:              "test-offer",
+			ApplicationDescription: "A pretty popular blog engine",
+			Endpoints: []jujuparams.RemoteEndpoint{{
+				Name:      "url",
+				Role:      charm.RoleProvider,
+				Interface: "http",
+			}},
+			Users: []jujuparams.OfferUserDetails{{
+				UserName: "charlie@external",
+				Access:   "consume",
+			}},
+		},
+		ControllerInfo: &jujuparams.ExternalControllerInfo{
+			ControllerTag: names.NewControllerTag(s.ControllerConfig.ControllerUUID()).String(),
+			Alias:         "controller-1",
+			Addrs:         s.APIInfo(c).Addrs,
+			CACert:        s.Controller.CACert,
+		},
+	})
+
+	offer1 := mongodoc.ApplicationOffer{
+		OfferURL: offerURL,
+	}
+	err = s.JEM.DB.GetApplicationOffer(ctx, &offer1)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(offer1, gc.DeepEquals, mongodoc.ApplicationOffer{
+		ControllerPath:         s.Controller.Path,
+		ModelUUID:              s.Model.UUID,
+		ModelName:              string(s.Model.Path.Name),
+		OfferUUID:              offer1.OfferUUID,
+		OfferURL:               offerURL,
+		OfferName:              "test-offer",
+		OwnerName:              "bob@external",
+		ApplicationName:        "test-app",
+		ApplicationDescription: "A pretty popular blog engine",
+		Endpoints: []mongodoc.RemoteEndpoint{{
+			Name:      "url",
+			Role:      "provider",
+			Interface: "http",
+		}},
+		Users: mongodoc.ApplicationOfferAccessMap{
+			"everyone": mongodoc.ApplicationOfferReadAccess,
+			"user1":    mongodoc.ApplicationOfferAdminAccess,
+			"charlie":  mongodoc.ApplicationOfferConsumeAccess,
+			"alice":    mongodoc.ApplicationOfferAdminAccess,
+		},
+		Connections: []mongodoc.OfferConnection{},
+		Spaces:      []mongodoc.RemoteSpace{},
+		Bindings:    map[string]string{},
+	})
+}

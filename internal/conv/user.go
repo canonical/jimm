@@ -29,7 +29,7 @@ func FromUserTag(t names.UserTag) (params.User, error) {
 	if t.IsLocal() {
 		return "", errgo.WithCausef(nil, ErrLocalUser, "")
 	}
-	if t.Domain() == "external" {
+	if t.Domain() != "" {
 		return params.User(t.Name()), nil
 	}
 	return params.User(t.Id()), nil
