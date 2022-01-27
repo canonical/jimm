@@ -15,7 +15,9 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
+	"github.com/CanonicalLtd/jimm/internal/jemtest"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
+	"github.com/CanonicalLtd/jimm/params"
 )
 
 type applicationOffersSuite struct {
@@ -536,4 +538,173 @@ func (s *applicationOffersSuite) TestApplicationOffers(c *gc.C) {
 			Access:   "read",
 		}},
 	})
+}
+
+func (s *applicationOffersSuite) TestUpperCaseUsernames(c *gc.C) {
+	err := s.JEM.GrantModel(context.Background(), jemtest.Bob, &s.Model, params.User("EVE"), jujuparams.ModelAdminAccess)
+	c.Assert(err, gc.Equals, nil)
+
+	conn := s.open(c, nil, "EVE")
+	defer conn.Close()
+	client := applicationoffers.NewClient(conn)
+
+	results, err := client.Offer(s.Model.UUID, "test-app", []string{s.endpoint.Name}, "test-offer", "test offer description")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(results, gc.HasLen, 1)
+	c.Assert(results[0].Error, gc.Equals, (*jujuparams.Error)(nil))
+
+	ourl := &crossmodel.OfferURL{
+		User:            "bob@external",
+		ModelName:       "model-1",
+		ApplicationName: "test-offer",
+	}
+
+	err = client.GrantOffer("GEORGE@external", "admin", ourl.String())
+	c.Assert(err, gc.Equals, nil)
+
+	details, err := client.GetConsumeDetails(ourl.Path())
+	c.Assert(err, gc.Equals, nil)
+	c.Check(details.Macaroon, gc.Not(gc.IsNil))
+	details.Macaroon = nil
+	c.Check(details.Offer.OfferUUID, gc.Matches, `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
+	details.Offer.OfferUUID = ""
+	caCert, _ := s.ControllerConfig.CACert()
+	info := s.APIInfo(c)
+	c.Check(details, gc.DeepEquals, jujuparams.ConsumeOfferDetails{
+		Offer: &jujuparams.ApplicationOfferDetails{
+			SourceModelTag:         names.NewModelTag(s.Model.UUID).String(),
+			OfferURL:               ourl.Path(),
+			OfferName:              "test-offer",
+			ApplicationDescription: "test offer description",
+			Endpoints: []jujuparams.RemoteEndpoint{{
+				Name:      "url",
+				Role:      "provider",
+				Interface: "http",
+			}},
+			Users: []jujuparams.OfferUserDetails{{
+				UserName: "eve@external",
+				Access:   "admin",
+			}, {
+				UserName: "everyone@external",
+				Access:   "read",
+			}, {
+				UserName: "george@external",
+				Access:   "admin",
+			}},
+		},
+		ControllerInfo: &jujuparams.ExternalControllerInfo{
+			ControllerTag: names.NewControllerTag(s.Controller.UUID).String(),
+			Addrs:         info.Addrs,
+			Alias:         "controller-1",
+			CACert:        caCert,
+		},
+	})
+
+	connG := s.open(c, nil, "GEOrge")
+	defer connG.Close()
+	clientG := applicationoffers.NewClient(connG)
+
+	details, err = clientG.GetConsumeDetails(ourl.Path())
+	c.Assert(err, gc.Equals, nil)
+	c.Check(details.Macaroon, gc.Not(gc.IsNil))
+	details.Macaroon = nil
+	c.Check(details.Offer.OfferUUID, gc.Matches, `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
+	details.Offer.OfferUUID = ""
+	c.Check(details, gc.DeepEquals, jujuparams.ConsumeOfferDetails{
+		Offer: &jujuparams.ApplicationOfferDetails{
+			SourceModelTag:         names.NewModelTag(s.Model.UUID).String(),
+			OfferURL:               ourl.Path(),
+			OfferName:              "test-offer",
+			ApplicationDescription: "test offer description",
+			Endpoints: []jujuparams.RemoteEndpoint{{
+				Name:      "url",
+				Role:      "provider",
+				Interface: "http",
+			}},
+			Users: []jujuparams.OfferUserDetails{{
+				UserName: "eve@external",
+				Access:   "admin",
+			}, {
+				UserName: "everyone@external",
+				Access:   "read",
+			}, {
+				UserName: "george@external",
+				Access:   "admin",
+			}},
+		},
+		ControllerInfo: &jujuparams.ExternalControllerInfo{
+			ControllerTag: names.NewControllerTag(s.Controller.UUID).String(),
+			Addrs:         info.Addrs,
+			Alias:         "controller-1",
+			CACert:        caCert,
+		},
+	})
+
+	offers, err := clientG.ListOffers(crossmodel.ApplicationOfferFilter{
+		ApplicationName: "test-app",
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(offers[0].CharmURL, gc.Matches, `cs:quantal/wordpress-\d+`)
+	offers[0].CharmURL = ""
+	c.Assert(offers, gc.DeepEquals, []*crossmodel.ApplicationOfferDetails{{
+		OfferName:              "test-offer",
+		ApplicationName:        "test-app",
+		ApplicationDescription: "test offer description",
+		OfferURL:               ourl.String(),
+		Endpoints: []charm.Relation{{
+			Name:      "url",
+			Role:      "provider",
+			Interface: "http",
+		}},
+		Users: []crossmodel.OfferUserDetails{{
+			UserName: "eve@external",
+			Access:   "admin",
+		}, {
+			UserName: "everyone@external",
+			Access:   "read",
+		}, {
+			UserName: "george@external",
+			Access:   "admin",
+		}},
+	}})
+
+	err = clientG.RevokeOffer("eve@external", "admin", ourl.String())
+	c.Assert(err, gc.Equals, nil)
+
+	offers, err = clientG.FindApplicationOffers(crossmodel.ApplicationOfferFilter{
+		ApplicationName: "test-app",
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(offers[0].CharmURL, gc.Matches, `cs:quantal/wordpress-\d+`)
+	offers[0].CharmURL = ""
+	c.Assert(offers, gc.DeepEquals, []*crossmodel.ApplicationOfferDetails{{
+		OfferName:              "test-offer",
+		ApplicationName:        "test-app",
+		ApplicationDescription: "test offer description",
+		OfferURL:               ourl.String(),
+		Endpoints: []charm.Relation{{
+			Name:      "url",
+			Role:      "provider",
+			Interface: "http",
+		}},
+		Users: []crossmodel.OfferUserDetails{{
+			UserName: "eve@external",
+			Access:   "consume",
+		}, {
+			UserName: "everyone@external",
+			Access:   "read",
+		}, {
+			UserName: "george@external",
+			Access:   "admin",
+		}},
+	}})
+
+	err = clientG.DestroyOffers(false, ourl.String())
+	c.Assert(err, gc.Equals, nil)
+
+	offers, err = clientG.FindApplicationOffers(crossmodel.ApplicationOfferFilter{
+		ApplicationName: "test-app",
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(offers, gc.DeepEquals, []*crossmodel.ApplicationOfferDetails{})
 }
