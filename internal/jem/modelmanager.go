@@ -329,6 +329,9 @@ type createModelParams struct {
 func (j *JEM) createModel(ctx context.Context, p createModelParams, info *jujuparams.ModelInfo) error {
 	errorChannel := make(chan error, 1)
 	go func() {
+		j := j.Clone()
+		defer j.Close()
+
 		ctx := context.Background()
 		err := j.createModel1(ctx, p, info)
 		select {
@@ -342,7 +345,7 @@ func (j *JEM) createModel(ctx context.Context, p createModelParams, info *jujupa
 	case err := <-errorChannel:
 		return err
 	case <-ctx.Done():
-		zapctx.Warn(ctx, "context cancelled")
+		zapctx.Warn(ctx, "context cancelled", zaputil.Error(ctx.Err()))
 		return ctx.Err()
 	}
 }

@@ -115,7 +115,7 @@ func (j *JEM) GetApplicationOfferConsumeDetails(ctx context.Context, id identche
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 
-	uid := params.User(id.Id())
+	uid := params.User(strings.ToLower(id.Id()))
 	access := offer.Users[mongodoc.User(uid)]
 	if access < mongodoc.ApplicationOfferConsumeAccess {
 		// If the current user doesn't have access then check if it is
@@ -202,7 +202,7 @@ func filterApplicationOfferUsers(id params.User, a mongodoc.ApplicationOfferAcce
 
 // ListApplicationOffers returns details of offers matching the specified filter.
 func (j *JEM) ListApplicationOffers(ctx context.Context, id identchecker.ACLIdentity, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
-	uid := params.User(id.Id())
+	uid := params.User(strings.ToLower(id.Id()))
 
 	q := applicationOffersQuery(uid, mongodoc.ApplicationOfferAdminAccess, filters)
 	controllerOffers := make(map[params.EntityPath][]mongodoc.ApplicationOffer)
@@ -229,7 +229,7 @@ func (j *JEM) ListApplicationOffers(ctx context.Context, id identchecker.ACLIden
 
 // FindApplicationOffers returns details of offers matching the specified filter.
 func (j *JEM) FindApplicationOffers(ctx context.Context, id identchecker.ACLIdentity, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
-	uid := params.User(id.Id())
+	uid := params.User(strings.ToLower(id.Id()))
 
 	if len(filters) == 0 {
 		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "at least one filter must be specified")
@@ -356,7 +356,7 @@ func filterQuery(f jujuparams.OfferFilter) jimmdb.Query {
 
 // GetApplicationOffer returns details of the offer with the specified URL.
 func (j *JEM) GetApplicationOffer(ctx context.Context, id identchecker.ACLIdentity, offerURL string) (*jujuparams.ApplicationOfferAdminDetails, error) {
-	uid := params.User(id.Id())
+	uid := params.User(strings.ToLower(id.Id()))
 
 	offer := mongodoc.ApplicationOffer{
 		OfferURL: offerURL,
@@ -448,7 +448,8 @@ func (j *JEM) getApplicationOfferDetails(ctx context.Context, uid params.User, o
 
 // GrantOfferAccess grants rights for an application offer.
 func (j *JEM) GrantOfferAccess(ctx context.Context, id identchecker.ACLIdentity, user params.User, offerURL string, access jujuparams.OfferAccessPermission) (err error) {
-	uid := params.User(id.Id())
+	uid := params.User(strings.ToLower(id.Id()))
+	user = params.User(strings.ToLower(string(user)))
 
 	// first we need to fetch the offer to get it's UUID
 	var offer mongodoc.ApplicationOffer
@@ -506,7 +507,7 @@ func (j *JEM) GrantOfferAccess(ctx context.Context, id identchecker.ACLIdentity,
 
 // RevokeOfferAccess revokes rights for an application offer.
 func (j *JEM) RevokeOfferAccess(ctx context.Context, id identchecker.ACLIdentity, user params.User, offerURL string, access jujuparams.OfferAccessPermission) (err error) {
-	uid := params.User(id.Id())
+	uid := params.User(strings.ToLower(id.Id()))
 
 	// first we need to fetch the offer to get it's UUID
 	var offer mongodoc.ApplicationOffer
@@ -569,7 +570,7 @@ func (j *JEM) RevokeOfferAccess(ctx context.Context, id identchecker.ACLIdentity
 
 // DestroyOffer removes the application offer.
 func (j *JEM) DestroyOffer(ctx context.Context, id identchecker.ACLIdentity, offerURL string, force bool) (err error) {
-	uid := params.User(id.Id())
+	uid := params.User(strings.ToLower(id.Id()))
 
 	// first we need to fetch the offer to get it's UUID
 	var offer mongodoc.ApplicationOffer
@@ -726,7 +727,7 @@ func offerEndpointsToMongodoc(ctx context.Context, endpoints []jujuparams.Remote
 func offerUsersToMongodoc(ctx context.Context, users []jujuparams.OfferUserDetails) map[mongodoc.User]mongodoc.ApplicationOfferAccessPermission {
 	accesses := make(map[mongodoc.User]mongodoc.ApplicationOfferAccessPermission, len(users))
 	for _, user := range users {
-		pu, err := conv.FromUserID(user.UserName)
+		pu, err := conv.FromUserID(strings.ToLower(user.UserName))
 		if err != nil {
 			// If we can't parse the user, it's either a local user which
 			// we don't store, or an invalid user which can't do anything.
