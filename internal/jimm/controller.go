@@ -106,6 +106,16 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 		}
 		dbClouds = append(dbClouds, cloud)
 	}
+
+	credentialsStored := false
+	if j.CredentialStore != nil {
+		err := j.CredentialStore.PutControllerCredentials(ctx, ctl.Name, ctl.AdminUser, ctl.AdminPassword)
+		if err != nil {
+			return fail(errors.E(op, err))
+		}
+		credentialsStored = true
+	}
+
 	err = j.Database.Transaction(func(tx *db.Database) error {
 		for i := range dbClouds {
 			cloud := dbmodel.Cloud{
@@ -160,6 +170,12 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 					Priority:    uint(priority),
 				})
 			}
+		}
+		// if we already stored controller credentials in CredentialStore
+		// we should not store them plain text in JIMM's DB.
+		if credentialsStored {
+			ctl.AdminUser = ""
+			ctl.AdminPassword = ""
 		}
 		if err := tx.AddController(ctx, ctl); err != nil {
 			if errors.ErrorCode(err) == errors.CodeAlreadyExists {

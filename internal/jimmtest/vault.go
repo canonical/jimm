@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"testing"
 
 	"github.com/hashicorp/vault/api"
 
@@ -72,8 +71,13 @@ path "kv/%s/*" {
 }
 `
 
+type fatalF interface {
+	Name() string
+	Fatalf(format string, args ...interface{})
+}
+
 // VaultClient returns a new vault client for use in a test.
-func VaultClient(tb testing.TB) (client *api.Client, path string, creds map[string]interface{}, ok bool) {
+func VaultClient(tb fatalF) (client *api.Client, path string, creds map[string]interface{}, ok bool) {
 	if vaultRootClient == nil {
 		return nil, "", nil, false
 	}

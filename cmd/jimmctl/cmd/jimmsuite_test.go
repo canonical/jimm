@@ -59,7 +59,7 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 		Database: db.Database{
 			DB: jimmtest.MemoryDB(&gcTester{c}, nil),
 		},
-		Dialer: jujuclient.Dialer{},
+		Dialer: &jujuclient.Dialer{},
 	}
 	err := s.JIMM.Database.Migrate(context.Background(), true)
 	c.Assert(err, gc.Equals, nil)

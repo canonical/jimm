@@ -137,7 +137,7 @@ func TestVault(t *testing.T) {
 	}, false)
 	c.Assert(err, qt.IsNil)
 
-	store := vault.VaultCloudCredentialAttributeStore{
+	store := vault.VaultStore{
 		Client:     vaultClient,
 		AuthSecret: creds,
 		AuthPath:   p.VaultAuthPath,

@@ -20,7 +20,7 @@ import (
 )
 
 // GetCloudCredential retrieves the given credential from the database. The
-// returned credential will never contain any attrbiutes, see
+// returned credential will never contain any attributes, see
 // GetCloudCredentialAttributes to retrieve those. If credentials
 // identified by the given tag cannot be found then an errror with a code
 // of CodeNotFound will be returned. If the given user is not a controller
@@ -257,7 +257,7 @@ func (j *JIMM) UpdateCloudCredential(ctx context.Context, u *dbmodel.User, args 
 func (j *JIMM) updateCredential(ctx context.Context, credential *dbmodel.CloudCredential) error {
 	const op = errors.Op("jimm.updateCredential")
 
-	if j.CloudCredentialAttributeStore == nil {
+	if j.CredentialStore == nil {
 		credential.AttributesInVault = false
 		if err := j.Database.SetCloudCredential(ctx, credential); err != nil {
 			return errors.E(op, err)
@@ -272,7 +272,7 @@ func (j *JIMM) updateCredential(ctx context.Context, credential *dbmodel.CloudCr
 		return errors.E(op, err)
 	}
 
-	if err := j.CloudCredentialAttributeStore.Put(ctx, credential.Tag().(names.CloudCredentialTag), credential.Attributes); err != nil {
+	if err := j.CredentialStore.Put(ctx, credential.Tag().(names.CloudCredentialTag), credential.Attributes); err != nil {
 		return errors.E(op, err)
 	}
 	return nil
@@ -392,10 +392,10 @@ func (j *JIMM) getCloudCredentialAttributes(ctx context.Context, cred *dbmodel.C
 	}
 
 	// Attributes have to be loaded from vault.
-	if j.CloudCredentialAttributeStore == nil {
+	if j.CredentialStore == nil {
 		return nil, errors.E(op, errors.CodeServerConfiguration, "vault not configured")
 	}
-	attr, err := j.CloudCredentialAttributeStore.Get(ctx, cred.Tag().(names.CloudCredentialTag))
+	attr, err := j.CredentialStore.Get(ctx, cred.Tag().(names.CloudCredentialTag))
 	if err != nil {
 		return nil, errors.E(op, err)
 	}

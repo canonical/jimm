@@ -15,9 +15,14 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/errors"
 )
 
-// A VaultCloudCredentialAttributeStore is a CloudCredentialAttributeStore
-// that stores the cloud credentials in vault.
-type VaultCloudCredentialAttributeStore struct {
+const (
+	usernameKey = "username"
+	passwordKey = "password"
+)
+
+// A VaultStore stores cloud credential attributes and
+// controller credentials in vault.
+type VaultStore struct {
 	// Client contains the client used to communicate with the vault
 	// service. This client is not modified by the store.
 	Client *api.Client
@@ -42,7 +47,7 @@ type VaultCloudCredentialAttributeStore struct {
 
 // Get retrieves the attributes for the given cloud credential from a vault
 // service.
-func (s *VaultCloudCredentialAttributeStore) Get(ctx context.Context, tag names.CloudCredentialTag) (map[string]string, error) {
+func (s *VaultStore) Get(ctx context.Context, tag names.CloudCredentialTag) (map[string]string, error) {
 	const op = errors.Op("vault.Get")
 
 	client, err := s.client(ctx)
@@ -72,7 +77,7 @@ func (s *VaultCloudCredentialAttributeStore) Get(ctx context.Context, tag names.
 
 // Put stores the attributes associated with a cloud-credential in a vault
 // service.
-func (s *VaultCloudCredentialAttributeStore) Put(ctx context.Context, tag names.CloudCredentialTag, attr map[string]string) error {
+func (s *VaultStore) Put(ctx context.Context, tag names.CloudCredentialTag, attr map[string]string) error {
 	if len(attr) == 0 {
 		return s.delete(ctx, tag)
 	}
@@ -96,7 +101,7 @@ func (s *VaultCloudCredentialAttributeStore) Put(ctx context.Context, tag names.
 
 // delete removes the attributes associated with the cloud-credential in
 // the vault service.
-func (s *VaultCloudCredentialAttributeStore) delete(ctx context.Context, tag names.CloudCredentialTag) error {
+func (s *VaultStore) delete(ctx context.Context, tag names.CloudCredentialTag) error {
 	const op = errors.Op("vault.delete")
 
 	client, err := s.client(ctx)
@@ -114,9 +119,82 @@ func (s *VaultCloudCredentialAttributeStore) delete(ctx context.Context, tag nam
 	return nil
 }
 
+// GetControllerCredentials retrieves the credentials for the given controller from a vault
+// service.
+func (s *VaultStore) GetControllerCredentials(ctx context.Context, controllerName string) (string, string, error) {
+	const op = errors.Op("vault.GetControllerCredentials")
+
+	client, err := s.client(ctx)
+	if err != nil {
+		return "", "", errors.E(op, err)
+	}
+
+	secret, err := client.Logical().Read(s.controllerCredentialsPath(controllerName))
+	if err != nil {
+		return "", "", errors.E(op, err)
+	}
+	if secret == nil {
+		return "", "", nil
+	}
+	var username, password string
+	usernameI, ok := secret.Data[usernameKey]
+	if ok {
+		username = usernameI.(string)
+	}
+	passwordI, ok := secret.Data[passwordKey]
+	if ok {
+		password = passwordI.(string)
+	}
+	return username, password, nil
+}
+
+// PutControllerCredentials stores the controller credentials in a vault
+// service.
+func (s *VaultStore) PutControllerCredentials(ctx context.Context, controllerName string, username string, password string) error {
+	if username == "" || password == "" {
+		return s.deleteControllerCredentials(ctx, controllerName)
+	}
+
+	const op = errors.Op("vault.PutControllerCredentials")
+	client, err := s.client(ctx)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	data := map[string]interface{}{
+		usernameKey: username,
+		passwordKey: password,
+	}
+	_, err = client.Logical().Write(s.controllerCredentialsPath(controllerName), data)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	return nil
+}
+
+// deleteControllerCredentials removes the credentials associated with the controller in
+// the vault service.
+func (s *VaultStore) deleteControllerCredentials(ctx context.Context, controllerName string) error {
+	const op = errors.Op("vault.deleteControllerCredentials")
+
+	client, err := s.client(ctx)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	_, err = client.Logical().Delete(s.controllerCredentialsPath(controllerName))
+	if rerr, ok := err.(*api.ResponseError); ok && rerr.StatusCode == http.StatusNotFound {
+		// Ignore the error if attempting to delete something that isn't there.
+		err = nil
+	}
+	if err != nil {
+		return errors.E(op, err)
+	}
+	return nil
+}
+
 const ttlLeeway time.Duration = 5 * time.Second
 
-func (s *VaultCloudCredentialAttributeStore) client(ctx context.Context) (*api.Client, error) {
+func (s *VaultStore) client(ctx context.Context) (*api.Client, error) {
 	const op = errors.Op("vault.client")
 
 	s.mu.Lock()
@@ -147,6 +225,10 @@ func (s *VaultCloudCredentialAttributeStore) client(ctx context.Context) (*api.C
 	return s.client_, nil
 }
 
-func (s *VaultCloudCredentialAttributeStore) path(tag names.CloudCredentialTag) string {
+func (s *VaultStore) path(tag names.CloudCredentialTag) string {
 	return path.Join(s.KVPath, "creds", tag.Cloud().Id(), tag.Owner().Id(), tag.Name())
+}
+
+func (s *VaultStore) controllerCredentialsPath(controllerName string) string {
+	return path.Join(s.KVPath, "creds", controllerName)
 }
