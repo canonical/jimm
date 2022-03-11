@@ -40,6 +40,23 @@ func Register(ctx context.Context, router *httprouter.Router, dashboardLocation 
 		router.GET(dashboardPath, func(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 			http.Redirect(w, req, dashboardLocation, http.StatusPermanentRedirect)
 		})
+		versions := jujuparams.GUIArchiveResponse{
+			Versions: []jujuparams.GUIArchiveVersion{{
+				Version: version.Number{},
+				SHA256:  "",
+				Current: true,
+			}},
+		}
+		data, err := json.Marshal(versions)
+		if err != nil {
+			zapctx.Error(ctx, "failed to marshal gui archive versions", zap.Error(err))
+			return errgo.Mask(err)
+		}
+		content := bytes.NewReader(data)
+		serveContent := func(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+			http.ServeContent(w, req, "gui-archive.json", time.Now(), content)
+		}
+		router.GET("/gui-archive", serveContent)
 		router.GET("/", func(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		})

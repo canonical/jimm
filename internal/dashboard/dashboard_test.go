@@ -140,3 +140,33 @@ func (s *dashboardSuite) TestGUIArchiveEndpoint(c *gc.C) {
 		}},
 	})
 }
+
+func (s *dashboardSuite) TestRedirectGUIArchiveEndpoint(c *gc.C) {
+	ctx := context.Background()
+	router := httprouter.New()
+	err := dashboard.Register(ctx, router, "https://test.example.com")
+	c.Assert(err, jc.ErrorIsNil)
+
+	server := httptest.NewServer(router)
+	defer server.Close()
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/gui-archive", server.URL), nil)
+	c.Assert(err, jc.ErrorIsNil)
+
+	response, err := http.DefaultClient.Do(req)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(response.StatusCode, gc.Equals, http.StatusOK)
+
+	data, err := ioutil.ReadAll(response.Body)
+	c.Assert(err, jc.ErrorIsNil)
+	var gar jujuparams.GUIArchiveResponse
+	err = json.Unmarshal(data, &gar)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Check(gar, jc.DeepEquals, jujuparams.GUIArchiveResponse{
+		Versions: []jujuparams.GUIArchiveVersion{{
+			Version: version.Number{},
+			SHA256:  "",
+			Current: true,
+		}},
+	})
+}
