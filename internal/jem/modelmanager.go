@@ -4,7 +4,6 @@ package jem
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"time"
 
@@ -179,39 +178,21 @@ func (j *JEM) CreateModel(ctx context.Context, id identchecker.ACLIdentity, p Cr
 	if cred != nil {
 		credPath = cred.Path
 	}
-	// Create the model record in the database before actually
-	// creating the model on the controller. It will have an invalid
-	// UUID because it doesn't exist but that's better than creating
-	// a model that we can't add locally because the name
-	// already exists.
-	modelDoc := &mongodoc.Model{
+	// Check if a model with the same name already exists
+	modelDoc := mongodoc.Model{
+		Id:           p.Path.String(),
 		Path:         p.Path,
 		CreationTime: wallClock.Now(),
 		Creator:      id.Id(),
 		Credential:   credPath,
-		// Use a temporary UUID so that we can create two at the
-		// same time, because the uuid field must always be
-		// unique.
-		UUID: fmt.Sprintf("creating-%x", j.pool.uuidGenerator.Next()),
 	}
-
-	if err := j.DB.InsertModel(ctx, modelDoc); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
+	err = j.DB.GetModel(ctx, &modelDoc)
+	if err != nil && errgo.Cause(err) != params.ErrNotFound {
+		return errgo.Mask(err)
 	}
-
-	defer func() {
-		if err == nil {
-			return
-		}
-
-		// We're returning an error, so remove the model from the
-		// database. Note that this might leave the model around
-		// in the controller, but this should be rare and we can
-		// deal with it at model creation time later (see TODO below).
-		if err := j.DB.RemoveModel(ctx, modelDoc); err != nil {
-			zapctx.Error(ctx, "cannot remove model from database after error; leaked model", zaputil.Error(err))
-		}
-	}()
+	if err == nil {
+		return errgo.WithCausef(nil, params.ErrAlreadyExists, "")
+	}
 
 	if info == nil {
 		info = new(jujuparams.ModelInfo)
@@ -219,6 +200,8 @@ func (j *JEM) CreateModel(ctx context.Context, id identchecker.ACLIdentity, p Cr
 	cmp := createModelParams{
 		CreateModelParams: p,
 		cred:              cred,
+		model:             &modelDoc,
+		id:                id,
 	}
 	var ctlPath params.EntityPath
 	var firstError error
@@ -260,14 +243,14 @@ func (j *JEM) CreateModel(ctx context.Context, id identchecker.ACLIdentity, p Cr
 		return errgo.New("cannot find suitable controller")
 	}
 
-	// Now set the UUID to that of the actually created model,
-	// and update other attributes from the response too.
-	// Use Apply so that we can return a result that's consistent
-	// with Database.Model.
+	return nil
+}
+
+func (j *JEM) storeModelInformation(ctx context.Context, p createModelParams, info *jujuparams.ModelInfo) error {
 	update := new(jimmdb.Update)
 	update.Set("uuid", info.UUID)
-	update.Set("controller", ctlPath)
-	update.Set("controlleruuid", info.ControllerUUID)
+	update.Set("controller", p.controller.Path)
+	update.Set("controlleruuid", p.controller.UUID)
 	ct, err := names.ParseCloudTag(info.CloudTag)
 	if err != nil {
 		zapctx.Error(ctx, "bad data returned from controller", zap.Error(err))
@@ -300,17 +283,26 @@ func (j *JEM) CreateModel(ctx context.Context, id identchecker.ACLIdentity, p Cr
 	})
 	update.Set("type", info.Type)
 	update.Set("providertype", info.ProviderType)
-	if err := j.DB.UpdateModel(ctx, modelDoc, update, true); err != nil {
-		return errgo.Notef(err, "cannot update model %s in database", modelDoc.UUID)
+
+	p.model.UUID = info.UUID
+	if ierr := j.DB.InsertModel(ctx, p.model); ierr != nil {
+		return errgo.Mask(ierr, errgo.Is(params.ErrAlreadyExists))
 	}
-	j.DB.AppendAudit(ctx, id, &params.AuditModelCreated{
-		ID:             modelDoc.Id,
-		UUID:           modelDoc.UUID,
-		Owner:          string(modelDoc.Owner()),
-		Creator:        modelDoc.Creator,
-		ControllerPath: ctlPath.String(),
-		Cloud:          string(modelDoc.Cloud),
-		Region:         modelDoc.CloudRegion,
+	if err := j.DB.UpdateModel(ctx, p.model, update, true); err != nil {
+		if derr := j.DB.RemoveModel(ctx, p.model); derr != nil {
+			return errgo.Notef(err, "failed to remove partially created model %s", p.model.UUID)
+		}
+		return errgo.Notef(err, "cannot update model %s in database", p.model.UUID)
+	}
+
+	j.DB.AppendAudit(ctx, p.id, &params.AuditModelCreated{
+		ID:             p.model.Id,
+		UUID:           p.model.UUID,
+		Owner:          string(p.model.Owner()),
+		Creator:        p.model.Creator,
+		ControllerPath: p.controller.Path.String(),
+		Cloud:          string(p.model.Cloud),
+		Region:         p.model.CloudRegion,
 	})
 	return nil
 }
@@ -324,6 +316,8 @@ type createModelParams struct {
 
 	controller *mongodoc.Controller
 	cred       *mongodoc.Credential
+	model      *mongodoc.Model
+	id         identchecker.ACLIdentity
 }
 
 func (j *JEM) createModel(ctx context.Context, p createModelParams, info *jujuparams.ModelInfo) error {
@@ -414,6 +408,11 @@ func (j *JEM) createModel1(ctx context.Context, p createModelParams, info *jujup
 		// TODO (mhilton) ensure that this is flagged in some admin interface somewhere.
 		zapctx.Error(ctx, "leaked model", zap.Stringer("model", p.Path), zaputil.Error(err), zap.String("model-uuid", info.UUID))
 		return errgo.Notef(err, "cannot grant model access")
+	}
+
+	err = j.storeModelInformation(ctx, p, info)
+	if err != nil {
+		return errgo.Notef(err, "failed to store model information")
 	}
 
 	return nil
