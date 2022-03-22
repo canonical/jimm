@@ -5,7 +5,7 @@ package jujuclient_test
 import (
 	"context"
 
-	jujuparams "github.com/juju/juju/apiserver/params"
+	jujuparams "github.com/juju/juju/rpc/params"
 	gc "gopkg.in/check.v1"
 )
 

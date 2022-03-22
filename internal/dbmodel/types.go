@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	jujuparams "github.com/juju/juju/apiserver/params"
+	jujuparams "github.com/juju/juju/rpc/params"
 )
 
 // Strings is a data type that stores a slice of strings into a single

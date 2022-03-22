@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/juju/juju/api/base"
-	controllerapi "github.com/juju/juju/api/controller"
-	"github.com/juju/juju/api/modelmanager"
-	jujuparams "github.com/juju/juju/apiserver/params"
+	controllerapi "github.com/juju/juju/api/controller/controller"
+	"github.com/juju/juju/api/client/modelmanager"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/controller"
 	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/names/v4"

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net"
 
-	jujuparams "github.com/juju/juju/apiserver/params"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"gorm.io/gorm"
 

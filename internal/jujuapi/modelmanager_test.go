@@ -8,9 +8,9 @@ import (
 
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/juju/api/base"
-	cloudapi "github.com/juju/juju/api/cloud"
-	"github.com/juju/juju/api/modelmanager"
-	jujuparams "github.com/juju/juju/apiserver/params"
+	cloudapi "github.com/juju/juju/api/client/cloud"
+	"github.com/juju/juju/api/client/modelmanager"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/instance"
 	"github.com/juju/juju/core/life"

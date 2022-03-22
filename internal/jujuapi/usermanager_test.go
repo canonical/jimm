@@ -5,8 +5,8 @@ package jujuapi_test
 import (
 	"time"
 
-	"github.com/juju/juju/api/usermanager"
-	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/api/client/usermanager"
+	jujuparams "github.com/juju/juju/rpc/params"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 )

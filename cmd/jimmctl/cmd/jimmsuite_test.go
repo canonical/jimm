@@ -14,9 +14,9 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
 	"github.com/juju/juju/api"
-	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/network"
 	jjclient "github.com/juju/juju/jujuclient"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	gc "gopkg.in/check.v1"
 
