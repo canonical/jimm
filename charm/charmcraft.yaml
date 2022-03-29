@@ -1,6 +1,12 @@
 # Learn more about charmcraft.yaml configuration at:
 # https://juju.is/docs/sdk/charmcraft-config
 type: "charm"
+parts:
+  charm:
+    prime:
+    - ./templates
+    - ./files
+    - README.md
 bases:
   - build-on:
     - name: "ubuntu"
