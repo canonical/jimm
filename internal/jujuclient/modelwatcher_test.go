@@ -25,7 +25,7 @@ type modelWatcherSuite struct {
 func (s *modelWatcherSuite) SetUpTest(c *gc.C) {
 	s.JujuConnSuite.SetUpTest(c)
 
-	s.Dialer = jujuclient.Dialer{}
+	s.Dialer = &jujuclient.Dialer{}
 	var err error
 	info := s.APIInfo(c)
 	hpss := make(dbmodel.HostPorts, 0, len(info.Addrs))

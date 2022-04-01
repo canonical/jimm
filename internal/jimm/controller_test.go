@@ -21,6 +21,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
+	"github.com/CanonicalLtd/jimm/internal/vault"
 )
 
 func TestAddController(t *testing.T) {
@@ -166,7 +167,180 @@ func TestAddController(t *testing.T) {
 	err = j.Database.GetController(ctx, &ctl4)
 	c.Assert(err, qt.IsNil)
 	c.Check(ctl4, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(dbmodel.CloudRegion{})), ctl3)
+}
 
+func TestAddControllerWithVault(t *testing.T) {
+	c := qt.New(t)
+
+	jimmtest.StartVault()
+	defer jimmtest.StopVault()
+
+	client, path, creds, ok := jimmtest.VaultClient(c)
+	if !ok {
+		c.Skip("vault not available")
+	}
+	store := &vault.VaultStore{
+		Client:     client,
+		AuthSecret: creds,
+		AuthPath:   jimmtest.VaultAuthPath,
+		KVPath:     path,
+	}
+
+	now := time.Now().UTC().Round(time.Millisecond)
+	api := &jimmtest.API{
+		Clouds_: func(context.Context) (map[names.CloudTag]jujuparams.Cloud, error) {
+			clouds := map[names.CloudTag]jujuparams.Cloud{
+				names.NewCloudTag("aws"): jujuparams.Cloud{
+					Type:             "ec2",
+					AuthTypes:        []string{"userpass"},
+					Endpoint:         "https://example.com",
+					IdentityEndpoint: "https://identity.example.com",
+					StorageEndpoint:  "https://storage.example.com",
+					Regions: []jujuparams.CloudRegion{{
+						Name:             "eu-west-1",
+						Endpoint:         "https://eu-west-1.example.com",
+						IdentityEndpoint: "https://eu-west-1.identity.example.com",
+						StorageEndpoint:  "https://eu-west-1.storage.example.com",
+					}, {
+						Name:             "eu-west-2",
+						Endpoint:         "https://eu-west-2.example.com",
+						IdentityEndpoint: "https://eu-west-2.identity.example.com",
+						StorageEndpoint:  "https://eu-west-2.storage.example.com",
+					}},
+					CACertificates: []string{"CA CERT 1", "CA CERT 2"},
+					Config: map[string]interface{}{
+						"A": "a",
+						"B": 0xb,
+					},
+					RegionConfig: map[string]map[string]interface{}{
+						"eu-west-1": map[string]interface{}{
+							"B": 0xb0,
+							"C": "C",
+						},
+						"eu-west-2": map[string]interface{}{
+							"B": 0xb1,
+							"D": "D",
+						},
+					},
+				},
+				names.NewCloudTag("k8s"): jujuparams.Cloud{
+					Type:      "kubernetes",
+					AuthTypes: []string{"userpass"},
+					Endpoint:  "https://k8s.example.com",
+					Regions: []jujuparams.CloudRegion{{
+						Name: "default",
+					}},
+				},
+			}
+			return clouds, nil
+		},
+		CloudInfo_: func(_ context.Context, tag names.CloudTag, ci *jujuparams.CloudInfo) error {
+			if tag.Id() != "k8s" {
+				c.Errorf("CloudInfo called for unexpected cloud %q", tag)
+				return errors.E("unexpected cloud")
+			}
+			ci.Type = "kubernetes"
+			ci.AuthTypes = []string{"userpass"}
+			ci.Endpoint = "https://k8s.example.com"
+			ci.Regions = []jujuparams.CloudRegion{{
+				Name: "default",
+			}}
+			ci.Users = []jujuparams.CloudUserInfo{{
+				UserName:    "alice@external",
+				DisplayName: "Alice",
+				Access:      "admin",
+			}, {
+				UserName:    "bob@external",
+				DisplayName: "Bob",
+				Access:      "add-model",
+			}}
+			return nil
+		},
+		ControllerModelSummary_: func(_ context.Context, ms *jujuparams.ModelSummary) error {
+			ms.Name = "controller"
+			ms.UUID = "5fddf0ed-83d5-47e8-ae7b-a4b27fc04a9f"
+			ms.Type = "iaas"
+			ms.ControllerUUID = jimmtest.DefaultControllerUUID
+			ms.IsController = true
+			ms.ProviderType = "ec2"
+			ms.DefaultSeries = "warty"
+			ms.CloudTag = "cloud-aws"
+			ms.CloudRegion = "eu-west-1"
+			ms.OwnerTag = "user-admin"
+			ms.Life = "alive"
+			ms.Status = jujuparams.EntityStatus{
+				Status: "available",
+			}
+			ms.UserAccess = "admin"
+			ms.AgentVersion = newVersion("1.2.3")
+			return nil
+		},
+	}
+
+	j := &jimm.JIMM{
+		Database: db.Database{
+			DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
+		},
+		Dialer: &jimmtest.Dialer{
+			API: api,
+		},
+		CredentialStore: store,
+	}
+
+	ctx := context.Background()
+	err := j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	u := dbmodel.User{
+		Username:         "alice@external",
+		ControllerAccess: "superuser",
+	}
+
+	ctl1 := dbmodel.Controller{
+		Name:          "test-controller",
+		AdminUser:     "admin",
+		AdminPassword: "5ecret",
+		PublicAddress: "example.com:443",
+	}
+	err = j.AddController(context.Background(), &u, &ctl1)
+	c.Assert(err, qt.IsNil)
+	c.Assert(ctl1.AdminUser, qt.Equals, "")
+	c.Assert(ctl1.AdminPassword, qt.Equals, "")
+
+	ctl2 := dbmodel.Controller{
+		Name: "test-controller",
+	}
+	err = j.Database.GetController(ctx, &ctl2)
+	c.Assert(err, qt.IsNil)
+	c.Check(ctl2, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(dbmodel.CloudRegion{})), ctl1)
+
+	username, password, err := store.GetControllerCredentials(ctx, ctl1.Name)
+	c.Assert(err, qt.IsNil)
+	c.Assert(username, qt.Equals, "admin")
+	c.Assert(password, qt.Equals, "5ecret")
+
+	ctl3 := dbmodel.Controller{
+		Name:          "test-controller-2",
+		AdminUser:     "admin",
+		AdminPassword: "5ecretToo",
+		PublicAddress: "example.com:443",
+	}
+	err = j.AddController(context.Background(), &u, &ctl3)
+	c.Assert(err, qt.IsNil)
+	c.Assert(ctl3.AdminUser, qt.Equals, "")
+	c.Assert(ctl3.AdminPassword, qt.Equals, "")
+
+	ctl4 := dbmodel.Controller{
+		Name: "test-controller-2",
+	}
+	err = j.Database.GetController(ctx, &ctl4)
+	c.Assert(err, qt.IsNil)
+	c.Check(ctl4, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreTypes(dbmodel.CloudRegion{})), ctl3)
+
+	username, password, err = store.GetControllerCredentials(ctx, ctl4.Name)
+	c.Assert(err, qt.IsNil)
+	c.Assert(username, qt.Equals, "admin")
+	c.Assert(password, qt.Equals, "5ecretToo")
 }
 
 const testEarliestControllerVersionEnv = `clouds:

@@ -1553,7 +1553,7 @@ func TestCloudCredentialAttributeStore(t *testing.T) {
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{},
 		},
-		CloudCredentialAttributeStore: attrStore,
+		CredentialStore: attrStore,
 	}
 	err := j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -1626,4 +1626,12 @@ func (s testCloudCredentialAttributeStore) Get(_ context.Context, tag names.Clou
 func (s testCloudCredentialAttributeStore) Put(_ context.Context, tag names.CloudCredentialTag, attr map[string]string) error {
 	s.attrs[tag.String()] = attr
 	return nil
+}
+
+func (s testCloudCredentialAttributeStore) GetControllerCredentials(ctx context.Context, controllerName string) (string, string, error) {
+	return "", "", errors.E(errors.CodeNotImplemented)
+}
+
+func (s testCloudCredentialAttributeStore) PutControllerCredentials(ctx context.Context, controllerName string, username string, password string) error {
+	return errors.E(errors.CodeNotImplemented)
 }

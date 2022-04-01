@@ -22,6 +22,24 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
 )
 
+// A CredentialStore is a store for the attributes of a
+// CloudCredential and controller credentials.
+type CredentialStore interface {
+	// Get retrieves the stored attributes of a cloud credential.
+	Get(context.Context, names.CloudCredentialTag) (map[string]string, error)
+
+	// Put stores the attributes of a cloud credential.
+	Put(context.Context, names.CloudCredentialTag, map[string]string) error
+
+	// GetControllerCredentials retrieves the credentials for the given controller from a vault
+	// service.
+	GetControllerCredentials(ctx context.Context, controllerName string) (string, string, error)
+
+	// PutControllerCredentials stores the controller credentials in a vault
+	// service.
+	PutControllerCredentials(ctx context.Context, controllerName string, username string, password string) error
+}
+
 // A JIMM provides the buisness logic for managing resources in the JAAS
 // system. A single JIMM instance is shared by all concurrent API
 // connections therefore the JIMM object itself does not contain any per-
@@ -42,10 +60,11 @@ type JIMM struct {
 	// this is not configured all connection attempts will fail.
 	Dialer Dialer
 
-	// CloudCredentialAttributeStore is a store for the attributes of a
-	// cloud credential. If this is not configured then the attributes
+	// CredentialStore is a store for the attributes of a
+	// cloud credential and controller credentials. If this is
+	// not configured then the attributes
 	// are stored in the standard database.
-	CloudCredentialAttributeStore CloudCredentialAttributeStore
+	CredentialStore CredentialStore
 
 	// Pubsub is a pub-sub hub used for buffering model summaries.
 	Pubsub *pubsub.Hub
@@ -417,14 +436,4 @@ func (j *JIMM) FullModelStatus(ctx context.Context, user *dbmodel.User, modelTag
 	}
 
 	return status, nil
-}
-
-// A CloudCredentialAttributeStore is a store for the attributes of a
-// CloudCredential.
-type CloudCredentialAttributeStore interface {
-	// Get retrieves the stored attributes of a cloud credential.
-	Get(context.Context, names.CloudCredentialTag) (map[string]string, error)
-
-	// Put stores the attributes of a cloud credential.
-	Put(context.Context, names.CloudCredentialTag, map[string]string) error
 }

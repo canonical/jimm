@@ -17,6 +17,7 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/google/uuid"
 	vaultapi "github.com/hashicorp/vault/api"
+	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 	httpbakeryv2 "gopkg.in/macaroon-bakery.v2/httpbakery"
@@ -38,6 +39,24 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 	"github.com/CanonicalLtd/jimm/internal/vault"
 )
+
+// A VaultStore is a store for the attributes of a
+// CloudCredential and controller credentials.
+type VaultStore interface {
+	// Get retrieves the stored attributes of a cloud credential.
+	Get(context.Context, names.CloudCredentialTag) (map[string]string, error)
+
+	// Put stores the attributes of a cloud credential.
+	Put(context.Context, names.CloudCredentialTag, map[string]string) error
+
+	// GetControllerCredentials retrieves the credentials for the given controller from a vault
+	// service.
+	GetControllerCredentials(ctx context.Context, controllerName string) (string, string, error)
+
+	// PutControllerCredentials stores the controller credentials in a vault
+	// service.
+	PutControllerCredentials(ctx context.Context, controllerName string, username string, password string) error
+}
 
 // A Params structure contains the parameters required to initialise a new
 // Service.
@@ -192,14 +211,19 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err)
 	}
 
-	s.jimm.Dialer = jujuclient.Dialer{}
-	if !p.DisableConnectionCache {
-		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
-	}
-
-	s.jimm.CloudCredentialAttributeStore, err = newCloudCredentialAttributeStore(ctx, p)
+	vs, err := newVaultStore(ctx, p)
 	if err != nil {
 		return nil, errors.E(op, err)
+	}
+	if vs != nil {
+		s.jimm.CredentialStore = vs
+	}
+
+	s.jimm.Dialer = &jujuclient.Dialer{
+		ControllerCredentialsStore: vs,
+	}
+	if !p.DisableConnectionCache {
+		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
 	}
 
 	s.mux.Handle("/debug/", debugapi.Handler(ctx, map[string]debugapi.StatusCheck{
@@ -308,7 +332,7 @@ func newAuthenticator(ctx context.Context, db *db.Database, p Params) (jimm.Auth
 	}, nil
 }
 
-func newCloudCredentialAttributeStore(ctx context.Context, p Params) (jimm.CloudCredentialAttributeStore, error) {
+func newVaultStore(ctx context.Context, p Params) (VaultStore, error) {
 	if p.VaultSecretFile == "" {
 		return nil, nil
 	}
@@ -339,7 +363,7 @@ func newCloudCredentialAttributeStore(ctx context.Context, p Params) (jimm.Cloud
 	if err != nil {
 		return nil, err
 	}
-	return &vault.VaultCloudCredentialAttributeStore{
+	return &vault.VaultStore{
 		Client:     client,
 		AuthSecret: s.Data,
 		AuthPath:   p.VaultAuthPath,

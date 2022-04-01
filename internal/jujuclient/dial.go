@@ -30,12 +30,25 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/rpc"
 )
 
+// A ControllerCredentialsStore is a store for controller credentials.
+type ControllerCredentialsStore interface {
+	// GetControllerCredentials retrieves the credentials for the given controller from a vault
+	// service.
+	GetControllerCredentials(ctx context.Context, controllerName string) (string, string, error)
+
+	// PutControllerCredentials stores the controller credentials in a vault
+	// service.
+	PutControllerCredentials(ctx context.Context, controllerName string, username string, password string) error
+}
+
 // A Dialer is an implementation of a jimm.Dialer that adapts a juju API
 // connection to provide a jimm API.
-type Dialer struct{}
+type Dialer struct {
+	ControllerCredentialsStore ControllerCredentialsStore
+}
 
 // Dial implements jimm.Dialer.
-func (Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag) (jimm.API, error) {
+func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag) (jimm.API, error) {
 	const op = errors.Op("jujuclient.Dial")
 
 	var tlsConfig *tls.Config
@@ -77,9 +90,24 @@ func (Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.
 		return nil, errors.E(op, errors.CodeConnectionFailed, err)
 	}
 
+	username := ctl.AdminUser
+	password := ctl.AdminPassword
+	if d.ControllerCredentialsStore != nil {
+		u, p, err := d.ControllerCredentialsStore.GetControllerCredentials(ctx, ctl.Name)
+		if err != nil {
+			return nil, errors.E(op, errors.CodeNotFound)
+		}
+		if u != "" {
+			username = u
+		}
+		if password != "" {
+			password = p
+		}
+	}
+
 	args := jujuparams.LoginRequest{
-		AuthTag:       names.NewUserTag(ctl.AdminUser).String(),
-		Credentials:   ctl.AdminPassword,
+		AuthTag:       names.NewUserTag(username).String(),
+		Credentials:   password,
 		ClientVersion: "2.9.0", // claim to be a 2.9 client.
 	}
 

@@ -52,7 +52,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		Database: db.Database{
 			DB: MemoryDB(cTester{c}, nil),
 		},
-		Dialer: jujuclient.Dialer{},
+		Dialer: &jujuclient.Dialer{},
 		Pubsub: new(pubsub.Hub),
 		UUID:   ControllerUUID,
 	}
