@@ -5,7 +5,7 @@ package jujuapi
 import (
 	"context"
 
-	jujuparams "github.com/juju/juju/apiserver/params"
+	jujuparams "github.com/juju/juju/rpc/params"
 
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"

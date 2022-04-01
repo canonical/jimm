@@ -7,7 +7,7 @@ import (
 	stderrors "errors"
 	"sort"
 
-	jujuparams "github.com/juju/juju/apiserver/params"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/rpc"
 	"github.com/juju/names/v4"
 

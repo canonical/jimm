@@ -6,7 +6,7 @@ package errors
 import (
 	"fmt"
 
-	jujuparams "github.com/juju/juju/apiserver/params"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 

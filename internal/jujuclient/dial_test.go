@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	jujuparams "github.com/juju/juju/apiserver/params"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/network"
 	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/names/v4"

@@ -5,7 +5,7 @@ package params
 import (
 	"time"
 
-	jujuparams "github.com/juju/juju/apiserver/params"
+	jujuparams "github.com/juju/juju/rpc/params"
 )
 
 // An AddCloudToControllerRequest is the request sent when adding a new cloud

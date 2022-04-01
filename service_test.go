@@ -19,7 +19,7 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/juju/juju/api"
-	"github.com/juju/juju/api/cloud"
+	"github.com/juju/juju/api/client/cloud"
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/names/v4"
 

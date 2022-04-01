@@ -3,7 +3,7 @@
 package api
 
 import (
-	jujuparams "github.com/juju/juju/apiserver/params"
+	jujuparams "github.com/juju/juju/rpc/params"
 
 	"github.com/CanonicalLtd/jimm/api/params"
 )

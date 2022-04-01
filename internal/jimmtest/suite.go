@@ -10,7 +10,7 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/juju/api"
-	jujuparams "github.com/juju/juju/apiserver/params"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/network"
 	corejujutesting "github.com/juju/juju/juju/testing"
 	"github.com/juju/names/v4"
