@@ -21,6 +21,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
+	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemtest"
@@ -288,6 +289,105 @@ func (s *modelManagerSuite) TestCreateModel(c *gc.C) {
 			c.Check(m.Credential, jc.DeepEquals, test.params.Credential)
 		}
 	}
+}
+
+func newTestModelCreateAPI(ctx context.Context, conn *apiconn.Conn, waitChannel, doneChannel chan bool) *testModelCreateAPI {
+	return &testModelCreateAPI{
+		Conn:        conn,
+		waitChannel: waitChannel,
+		doneChannel: doneChannel,
+	}
+}
+
+type testModelCreateAPI struct {
+	*apiconn.Conn
+	waitChannel chan bool
+	doneChannel chan bool
+}
+
+func (t *testModelCreateAPI) CreateModel(ctx context.Context, params *jujuparams.ModelCreateArgs, info *jujuparams.ModelInfo) error {
+	defer func() {
+		t.doneChannel <- true
+	}()
+	<-t.waitChannel
+	return t.Conn.CreateModel(ctx, params, info)
+}
+
+func (s *modelManagerSuite) TestCreateModelWithTimeout(c *gc.C) {
+	now := bson.Now()
+	s.PatchValue(jem.WallClock, testclock.NewClock(now))
+
+	// Add two credentials for alice.
+	cred1 := jemtest.EmptyCredential("alice", "cred1")
+	err := s.JEM.DB.UpsertCredential(testContext, &cred1)
+	c.Assert(err, gc.Equals, nil)
+	cred2 := jemtest.EmptyCredential("alice", "cred2")
+	err = s.JEM.DB.UpsertCredential(testContext, &cred2)
+	c.Assert(err, gc.Equals, nil)
+
+	params := jem.CreateModelParams{
+		Path: params.EntityPath{"bob", "test"},
+		Credential: mongodoc.CredentialPath{
+			Cloud: jemtest.TestCloudName,
+			EntityPath: mongodoc.EntityPath{
+				User: "bob",
+				Name: "cred",
+			},
+		},
+		Cloud: jemtest.TestCloudName,
+	}
+
+	waitChannel := make(chan bool)
+	doneChannel := make(chan bool)
+	s.PatchValue(&jem.OpenModelCreateAPI, func(ctx context.Context, j *jem.JEM, controller *mongodoc.Controller) (jem.ModelCreateAPI, error) {
+		conn, err := j.OpenAPIFromDoc(ctx, controller)
+		if err != nil {
+			return nil, err
+		}
+		return newTestModelCreateAPI(ctx, conn, waitChannel, doneChannel), nil
+	})
+
+	testContext, cancelContextFunc := context.WithTimeout(testContext, 500*time.Millisecond)
+
+	var info jujuparams.ModelInfo
+	// let's call the CreateModel function now, which will try to
+	// create a model async. So timing out the context will cause
+	// the create model request to JEM to fail, but model creating
+	// at juju controller should continue in the background.
+	err = s.JEM.CreateModel(testContext, jemtest.NewIdentity("bob"), params, &info)
+
+	// now let's cancel the context - e.g the request timed out.
+	cancelContextFunc()
+
+	// and now we can continue - send a bool on the wait channel causing
+	// the CreateModel to be called on the controller connection.
+	waitChannel <- true
+	// and wait for the call to finish.
+	<-doneChannel
+
+	c.Assert(err, gc.ErrorMatches, "cannot create model: context deadline exceeded")
+	c.Check(info.Name, gc.Equals, string(params.Path.Name))
+	c.Check(info.OwnerTag, gc.Equals, conv.ToUserTag(params.Path.User).String())
+	c.Check(info.UUID, gc.Not(gc.Equals), "")
+	c.Check(info.CloudTag, gc.Equals, conv.ToCloudTag(params.Cloud).String())
+	c.Check(info.CloudRegion, gc.Equals, jemtest.TestCloudRegionName)
+	c.Check(info.DefaultSeries, gc.Not(gc.Equals), "")
+	c.Check(string(info.Life), gc.Equals, "alive")
+
+	m := mongodoc.Model{
+		Path: params.Path,
+	}
+	for i := 0; i < 10; i++ {
+		err = s.JEM.DB.GetModel(testContext, &m)
+		if err == nil {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	c.Assert(err, gc.Equals, nil)
+	c.Check(m.Creator, gc.Equals, "bob")
+	c.Check(m.CreationTime.Equal(now), gc.Equals, true)
+	c.Check(m.Credential, jc.DeepEquals, params.Credential)
 }
 
 func (s *modelManagerSuite) TestCreateModelWithPartiallyCreatedModel(c *gc.C) {
