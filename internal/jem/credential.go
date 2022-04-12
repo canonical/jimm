@@ -356,7 +356,7 @@ func (j *JEM) checkCredentialOnController(ctx context.Context, ctlPath params.En
 // on the models updated.
 func (j *JEM) updateControllerCredential(
 	ctx context.Context,
-	conn *apiconn.Conn,
+	conn ModelCreateAPI,
 	ctlPath params.EntityPath,
 	cred *mongodoc.Credential,
 ) ([]jujuparams.UpdateCredentialModelResult, error) {

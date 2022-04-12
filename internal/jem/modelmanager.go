@@ -322,12 +322,12 @@ type createModelParams struct {
 
 func (j *JEM) createModel(ctx context.Context, p createModelParams, info *jujuparams.ModelInfo) error {
 	errorChannel := make(chan error, 1)
-	go func() {
-		j := j.Clone()
-		defer j.Close()
 
+	jem := j.Clone()
+	go func() {
+		defer jem.Close()
 		ctx := context.Background()
-		err := j.createModel1(ctx, p, info)
+		err := jem.createModel1(ctx, p, info)
 		select {
 		case errorChannel <- err:
 		default:
@@ -344,8 +344,24 @@ func (j *JEM) createModel(ctx context.Context, p createModelParams, info *jujupa
 	}
 }
 
+// OpenModelCreateAPI is a function used by JEM to open a new
+// connection to the Juju controller that will be used
+// to create a model.
+var OpenModelCreateAPI = func(ctx context.Context, j *JEM, controller *mongodoc.Controller) (ModelCreateAPI, error) {
+	return j.OpenAPIFromDoc(ctx, controller)
+}
+
+// ModelCreateAPI represents a connection to the Juju controller API
+// that JEM can use to create a new model.
+type ModelCreateAPI interface {
+	Close() error
+	CreateModel(context.Context, *jujuparams.ModelCreateArgs, *jujuparams.ModelInfo) error
+	UpdateCredential(context.Context, *mongodoc.Credential) ([]jujuparams.UpdateCredentialModelResult, error)
+	GrantJIMMModelAdmin(context.Context, string) error
+}
+
 func (j *JEM) createModel1(ctx context.Context, p createModelParams, info *jujuparams.ModelInfo) error {
-	conn, err := j.OpenAPIFromDoc(ctx, p.controller)
+	conn, err := OpenModelCreateAPI(ctx, j, p.controller)
 	if err != nil {
 		return errgo.Notef(err, "cannot connect to controller")
 	}
@@ -353,7 +369,6 @@ func (j *JEM) createModel1(ctx context.Context, p createModelParams, info *jujup
 
 	var cloudCredentialTag string
 	if p.cred != nil {
-
 		if _, err := j.updateControllerCredential(ctx, conn, p.controller.Path, p.cred); err != nil {
 			return errgo.WithCausef(err, errInvalidModelParams, "cannot add credential")
 		}
@@ -414,7 +429,6 @@ func (j *JEM) createModel1(ctx context.Context, p createModelParams, info *jujup
 	if err != nil {
 		return errgo.Notef(err, "failed to store model information")
 	}
-
 	return nil
 }
 
