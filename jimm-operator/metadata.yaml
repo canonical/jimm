@@ -1,0 +1,36 @@
+# Copyright 2022 Canonical Ltd
+# See LICENSE file for licensing details.
+
+# For a complete list of supported options, see:
+# https://juju.is/docs/sdk/metadata-reference
+name: jimm-k8s
+display-name: |
+  JIMM
+description: |
+  Juju controller used by the JAAS service to manage models across a 
+  number of clouds.
+summary: |
+  JAAS Intelligent Model Manager.
+
+peers:
+  jimm:
+    interface: jimm
+
+provides:
+  website:
+    interface: http
+  nrpe:
+    interface: nrpe-external-master
+
+containers:
+  jimm:
+    resource: jimm-image
+
+resources:
+  dashboard:
+    type: file
+    filename: dashboard.tar.xz
+    description: "juju dashboard tarball."
+  jimm-image:
+    type: oci-image
+    description: OCI image for JIMM.
