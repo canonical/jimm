@@ -10,7 +10,6 @@ Fixes _JIRA/GitHub issue number_
 - [ ] Documentation updated
 - [ ] Covered by unit tests
 - [ ] Covered by integration tests
-- [ ] Has no regression with UI
 
 ## Test instructions
 <!-- *(optional)* Describe any non-standard test instructions and configuration settings. Delete this section if not applicable. -->
