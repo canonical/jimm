@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
-	jujuparams "github.com/juju/juju/apiserver/params"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/names/v4"
 
@@ -52,6 +52,14 @@ func init() {
 		r.AddMethod("ApplicationOffers", 3, "FindApplicationOffers", findOffersMethod)
 		r.AddMethod("ApplicationOffers", 3, "ApplicationOffers", applicationOffersMethod)
 
+		r.AddMethod("ApplicationOffers", 4, "Offer", offerMethod)
+		r.AddMethod("ApplicationOffers", 4, "GetConsumeDetails", getConsumeDetailsMethodV3)
+		r.AddMethod("ApplicationOffers", 4, "ListApplicationOffers", listOffersMethod)
+		r.AddMethod("ApplicationOffers", 4, "ModifyOfferAccess", modifyOfferAccessMethod)
+		r.AddMethod("ApplicationOffers", 4, "DestroyOffers", destroyOffersMethod)
+		r.AddMethod("ApplicationOffers", 4, "FindApplicationOffers", findOffersMethod)
+		r.AddMethod("ApplicationOffers", 4, "ApplicationOffers", applicationOffersMethod)
+
 		return []int{1, 2, 3}
 	}
 }
@@ -72,10 +80,15 @@ func (r *controllerRoot) offer(ctx context.Context, args jujuparams.AddApplicati
 
 	mt, err := names.ParseModelTag(args.ModelTag)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(op, errors.CodeBadRequest, err)
+	}
+	offerOwnerTag, err := names.ParseUserTag(args.OwnerTag)
+	if err != nil {
+		return errors.E(op, errors.CodeBadRequest, err)
 	}
 	err = r.jimm.Offer(ctx, r.user, jimm.AddApplicationOfferParams{
 		ModelTag:               mt,
+		OwnerTag:               offerOwnerTag,
 		OfferName:              args.OfferName,
 		ApplicationName:        args.ApplicationName,
 		ApplicationDescription: args.ApplicationDescription,

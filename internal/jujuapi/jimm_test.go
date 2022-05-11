@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/juju/juju/api/modelmanager"
+	"github.com/juju/juju/api/client/modelmanager"
 	"github.com/juju/juju/apiserver/common"
-	jujuparams "github.com/juju/juju/apiserver/params"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/cloud"
 	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/names/v4"

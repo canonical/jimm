@@ -9,7 +9,7 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	jujuparams "github.com/juju/juju/apiserver/params"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 
 	"github.com/CanonicalLtd/jimm/internal/db"

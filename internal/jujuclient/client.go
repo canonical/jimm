@@ -6,7 +6,7 @@ import (
 	"context"
 
 	jujuerrors "github.com/juju/errors"
-	jujuparams "github.com/juju/juju/apiserver/params"
+	jujuparams "github.com/juju/juju/rpc/params"
 
 	"github.com/CanonicalLtd/jimm/internal/errors"
 )

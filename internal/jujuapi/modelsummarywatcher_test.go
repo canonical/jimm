@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	jujuparams "github.com/juju/juju/apiserver/params"
+	jujuparams "github.com/juju/juju/rpc/params"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 

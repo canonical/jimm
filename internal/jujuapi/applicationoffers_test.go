@@ -5,9 +5,9 @@ import (
 	"context"
 
 	"github.com/juju/charm/v8"
-	"github.com/juju/juju/api/applicationoffers"
-	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/api/client/applicationoffers"
 	"github.com/juju/juju/core/crossmodel"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
 	"github.com/juju/juju/testing/factory"
 	jc "github.com/juju/testing/checkers"
@@ -56,37 +56,37 @@ func (s *applicationOffersSuite) TearDownTest(c *gc.C) {
 }
 
 func (s *applicationOffersSuite) TestOffer(c *gc.C) {
-	conn := s.open(c, nil, "bob")
+	conn := s.open(c, nil, "bob@external")
 	defer conn.Close()
 	client := applicationoffers.NewClient(conn)
 
-	results, err := client.Offer(s.Model.UUID.String, "test-app", []string{s.endpoint.Name}, "test-offer", "test offer description")
+	results, err := client.Offer(s.Model.UUID.String, "test-app", []string{s.endpoint.Name}, "bob@external", "test-offer", "test offer description")
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(results, gc.HasLen, 1)
 	c.Assert(results[0].Error, gc.Equals, (*jujuparams.Error)(nil))
 
-	results, err = client.Offer(s.Model.UUID.String, "no-such-app", []string{s.endpoint.Name}, "test-offer", "test offer description")
+	results, err = client.Offer(s.Model.UUID.String, "no-such-app", []string{s.endpoint.Name}, "bob@external", "test-offer", "test offer description")
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(results, gc.HasLen, 1)
 	c.Assert(results[0].Error, gc.Not(gc.IsNil))
 	c.Assert(results[0].Error.Code, gc.Equals, "not found")
 
-	conn1 := s.open(c, nil, "charlie")
+	conn1 := s.open(c, nil, "charlie@external")
 	defer conn1.Close()
 	client1 := applicationoffers.NewClient(conn1)
 
-	results, err = client1.Offer(s.Model.UUID.String, "test-app", []string{s.endpoint.Name}, "test-offer-2", "test offer description")
+	results, err = client1.Offer(s.Model.UUID.String, "test-app", []string{s.endpoint.Name}, "bob@external", "test-offer-2", "test offer description")
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(results, gc.HasLen, 1)
 	c.Assert(results[0].Error.Code, gc.Equals, "unauthorized access")
 }
 
 func (s *applicationOffersSuite) TestGetConsumeDetails(c *gc.C) {
-	conn := s.open(c, nil, "bob")
+	conn := s.open(c, nil, "bob@external")
 	defer conn.Close()
 	client := applicationoffers.NewClient(conn)
 
-	results, err := client.Offer(s.Model.UUID.String, "test-app", []string{s.endpoint.Name}, "test-offer", "test offer description")
+	results, err := client.Offer(s.Model.UUID.String, "test-app", []string{s.endpoint.Name}, "bob@external", "test-offer", "test offer description")
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(results, gc.HasLen, 1)
 	c.Assert(results[0].Error, gc.Equals, (*jujuparams.Error)(nil))
@@ -172,7 +172,7 @@ func (s *applicationOffersSuite) TestGetConsumeDetails(c *gc.C) {
 }
 
 func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
-	conn := s.open(c, nil, "bob")
+	conn := s.open(c, nil, "bob@external")
 	defer conn.Close()
 	client := applicationoffers.NewClient(conn)
 
@@ -180,6 +180,7 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 		s.Model.UUID.String,
 		"test-app",
 		[]string{s.endpoint.Name},
+		"bob@external",
 		"test-offer1",
 		"test offer 1 description",
 	)
@@ -191,6 +192,7 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 		s.Model.UUID.String,
 		"test-app",
 		[]string{s.endpoint.Name},
+		"bob@external",
 		"test-offer2",
 		"test offer 2 description",
 	)
@@ -237,7 +239,7 @@ func (s *applicationOffersSuite) TestListApplicationOffers(c *gc.C) {
 func (s *applicationOffersSuite) TestModifyOfferAccess(c *gc.C) {
 	ctx := context.Background()
 
-	conn := s.open(c, nil, "bob")
+	conn := s.open(c, nil, "bob@external")
 	defer conn.Close()
 	client := applicationoffers.NewClient(conn)
 
@@ -245,6 +247,7 @@ func (s *applicationOffersSuite) TestModifyOfferAccess(c *gc.C) {
 		s.Model.UUID.String,
 		"test-app",
 		[]string{s.endpoint.Name},
+		"bob@external",
 		"test-offer1",
 		"test offer 1 description",
 	)
@@ -293,7 +296,7 @@ func (s *applicationOffersSuite) TestModifyOfferAccess(c *gc.C) {
 }
 
 func (s *applicationOffersSuite) TestDestroyOffers(c *gc.C) {
-	conn := s.open(c, nil, "bob")
+	conn := s.open(c, nil, "bob@external")
 	defer conn.Close()
 	client := applicationoffers.NewClient(conn)
 
@@ -301,6 +304,7 @@ func (s *applicationOffersSuite) TestDestroyOffers(c *gc.C) {
 		s.Model.UUID.String,
 		"test-app",
 		[]string{s.endpoint.Name},
+		"bob@external",
 		"test-offer1",
 		"test offer 1 description",
 	)
@@ -318,7 +322,7 @@ func (s *applicationOffersSuite) TestDestroyOffers(c *gc.C) {
 	err = client.DestroyOffers(true, "bob@external/model-1.test-offer2")
 	c.Assert(err, gc.ErrorMatches, "application offer not found")
 
-	conn2 := s.open(c, nil, "charlie")
+	conn2 := s.open(c, nil, "charlie@external")
 	defer conn2.Close()
 	client2 := applicationoffers.NewClient(conn2)
 
@@ -339,7 +343,7 @@ func (s *applicationOffersSuite) TestDestroyOffers(c *gc.C) {
 }
 
 func (s *applicationOffersSuite) TestFindApplicationOffers(c *gc.C) {
-	conn := s.open(c, nil, "bob")
+	conn := s.open(c, nil, "bob@external")
 	defer conn.Close()
 	client := applicationoffers.NewClient(conn)
 
@@ -347,6 +351,7 @@ func (s *applicationOffersSuite) TestFindApplicationOffers(c *gc.C) {
 		s.Model.UUID.String,
 		"test-app",
 		[]string{s.endpoint.Name},
+		"bob@external",
 		"test-offer1",
 		"test offer 1 description",
 	)
@@ -358,6 +363,7 @@ func (s *applicationOffersSuite) TestFindApplicationOffers(c *gc.C) {
 		s.Model.UUID.String,
 		"test-app",
 		[]string{s.endpoint.Name},
+		"bob@external",
 		"test-offer2",
 		"test offer 2 description",
 	)
@@ -401,7 +407,7 @@ func (s *applicationOffersSuite) TestFindApplicationOffers(c *gc.C) {
 
 	// by default each offer is publicly readable -> charlie should be
 	// able to find it
-	conn2 := s.open(c, nil, "charlie")
+	conn2 := s.open(c, nil, "charlie@external")
 	defer conn2.Close()
 	client2 := applicationoffers.NewClient(conn2)
 
@@ -434,7 +440,7 @@ func (s *applicationOffersSuite) TestFindApplicationOffers(c *gc.C) {
 }
 
 func (s *applicationOffersSuite) TestApplicationOffers(c *gc.C) {
-	conn := s.open(c, nil, "bob")
+	conn := s.open(c, nil, "bob@external")
 	defer conn.Close()
 	client := applicationoffers.NewClient(conn)
 
@@ -442,6 +448,7 @@ func (s *applicationOffersSuite) TestApplicationOffers(c *gc.C) {
 		s.Model.UUID.String,
 		"test-app",
 		[]string{s.endpoint.Name},
+		"bob@external",
 		"test-offer1",
 		"test offer 1 description",
 	)
@@ -477,7 +484,7 @@ func (s *applicationOffersSuite) TestApplicationOffers(c *gc.C) {
 	_, err = client.ApplicationOffer("charlie@external/model-1.test-offer2")
 	c.Assert(err, gc.ErrorMatches, "application offer not found")
 
-	conn2 := s.open(c, nil, "charlie")
+	conn2 := s.open(c, nil, "charlie@external")
 	defer conn2.Close()
 	client2 := applicationoffers.NewClient(conn2)
 
