@@ -1,6 +1,6 @@
 -- 0_0.sql initialises an empty database.
 
-CREATE TABLE audit_log (
+CREATE TABLE IF NOT EXISTS audit_log (
 	id BIGSERIAL PRIMARY KEY,
 	created_at TIMESTAMP WITH TIME ZONE,
 	updated_at TIMESTAMP WITH TIME ZONE,
@@ -12,13 +12,13 @@ CREATE TABLE audit_log (
 	success BOOLEAN,
 	params BYTEA
 );
-CREATE INDEX idx_audit_log_deleted_at ON audit_log (deleted_at);
-CREATE INDEX idx_audit_log_time ON audit_log (time);
-CREATE INDEX idx_audit_log_tag ON audit_log (tag);
-CREATE INDEX idx_audit_log_user_tag ON audit_log (user_tag);
-CREATE INDEX idx_audit_log_action ON audit_log (action);
+CREATE INDEX IF NOT EXISTS idx_audit_log_deleted_at ON audit_log (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_audit_log_time ON audit_log (time);
+CREATE INDEX IF NOT EXISTS idx_audit_log_tag ON audit_log (tag);
+CREATE INDEX IF NOT EXISTS idx_audit_log_user_tag ON audit_log (user_tag);
+CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log (action);
 
-CREATE TABLE clouds (
+CREATE TABLE IF NOT EXISTS clouds (
 	id SERIAL PRIMARY KEY,
 	created_at TIMESTAMP WITH TIME ZONE,
 	updated_at TIMESTAMP WITH TIME ZONE,
@@ -33,7 +33,7 @@ CREATE TABLE clouds (
 	config BYTEA
 );
 
-CREATE TABLE cloud_regions (
+CREATE TABLE IF NOT EXISTS cloud_regions (
 	id SERIAL PRIMARY KEY,
 	created_at TIMESTAMP WITH TIME ZONE,
 	updated_at TIMESTAMP WITH TIME ZONE,
@@ -46,9 +46,9 @@ CREATE TABLE cloud_regions (
 	config BYTEA,
 	UNIQUE(cloud_name, name)
 );
-CREATE INDEX idx_cloud_regions_deleted_at ON cloud_regions (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_cloud_regions_deleted_at ON cloud_regions (deleted_at);
 
-CREATE TABLE controllers (
+CREATE TABLE IF NOT EXISTS controllers (
 	id SERIAL PRIMARY KEY,
 	created_at TIMESTAMP WITH TIME ZONE,
 	updated_at TIMESTAMP WITH TIME ZONE,
@@ -66,9 +66,9 @@ CREATE TABLE controllers (
 	addresses BYTEA,
 	unavailable_since TIMESTAMP WITH TIME ZONE
 );
-CREATE INDEX idx_controllers_deleted_at ON controllers (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_controllers_deleted_at ON controllers (deleted_at);
 
-CREATE TABLE cloud_region_controller_priorities (
+CREATE TABLE IF NOT EXISTS cloud_region_controller_priorities (
 	id SERIAL PRIMARY KEY,
 	created_at TIMESTAMP WITH TIME ZONE,
 	updated_at TIMESTAMP WITH TIME ZONE,
@@ -77,9 +77,9 @@ CREATE TABLE cloud_region_controller_priorities (
 	controller_id INTEGER NOT NULL REFERENCES controllers (id) ON DELETE CASCADE,
 	priority INTEGER NOT NULL
 );
-CREATE INDEX idx_cloud_region_controller_priorities_deleted_at ON cloud_region_controller_priorities (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_cloud_region_controller_priorities_deleted_at ON cloud_region_controller_priorities (deleted_at);
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
 	id BIGSERIAL PRIMARY KEY,
 	created_at TIMESTAMP WITH TIME ZONE,
 	updated_at TIMESTAMP WITH TIME ZONE,
@@ -91,9 +91,9 @@ CREATE TABLE users (
 	controller_access TEXT NOT NULL DEFAULT 'login',
 	audit_log_access TEXT NOT NULL DEFAULT ''
 );
-CREATE INDEX idx_users_deleted_at ON users (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_users_deleted_at ON users (deleted_at);
 
-CREATE TABLE cloud_credentials (
+CREATE TABLE IF NOT EXISTS cloud_credentials (
 	id BIGSERIAL PRIMARY KEY,
 	created_at TIMESTAMP WITH TIME ZONE,
 	updated_at TIMESTAMP WITH TIME ZONE,
@@ -108,9 +108,9 @@ CREATE TABLE cloud_credentials (
 	valid BOOLEAN,
 	UNIQUE(cloud_name, owner_username, name)
 );
-CREATE INDEX idx_cloud_credentials_deleted_at ON cloud_credentials (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_cloud_credentials_deleted_at ON cloud_credentials (deleted_at);
 
-CREATE TABLE cloud_defaults (
+CREATE TABLE IF NOT EXISTS cloud_defaults (
 	id BIGSERIAL PRIMARY KEY,
 	created_at TIMESTAMP WITH TIME ZONE,
 	updated_at TIMESTAMP WITH TIME ZONE,
@@ -121,9 +121,9 @@ CREATE TABLE cloud_defaults (
 	defaults BYTEA,
 	UNIQUE (username, cloud_id, region)
 );
-CREATE INDEX idx_cloud_defaults_deleted_at ON cloud_defaults (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_cloud_defaults_deleted_at ON cloud_defaults (deleted_at);
 
-CREATE TABLE models (
+CREATE TABLE IF NOT EXISTS models (
 	id BIGSERIAL PRIMARY KEY,
 	created_at TIMESTAMP WITH TIME ZONE,
 	updated_at TIMESTAMP WITH TIME ZONE,
@@ -150,7 +150,7 @@ CREATE TABLE models (
 	UNIQUE(owner_username, name)
 );
 
-CREATE TABLE application_offers (
+CREATE TABLE IF NOT EXISTS application_offers (
 	id BIGSERIAL PRIMARY KEY,
 	created_at TIMESTAMP WITH TIME ZONE,
 	updated_at TIMESTAMP WITH TIME ZONE,
@@ -165,7 +165,7 @@ CREATE TABLE application_offers (
 	UNIQUE (model_id, application_name, name)
 );
 
-CREATE TABLE application_offer_connections (
+CREATE TABLE IF NOT EXISTS application_offer_connections (
 	id BIGSERIAL PRIMARY KEY,
 	created_at TIMESTAMP WITH TIME ZONE,
 	updated_at TIMESTAMP WITH TIME ZONE,
@@ -177,10 +177,10 @@ CREATE TABLE application_offer_connections (
 	endpoint TEXT NOT NULL,
 	ingress_subnets BYTEA
 );
-CREATE INDEX idx_application_offer_connections_deleted_at ON application_offer_connections (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_application_offer_connections_deleted_at ON application_offer_connections (deleted_at);
 
 
-CREATE TABLE application_offer_remote_endpoints (
+CREATE TABLE IF NOT EXISTS application_offer_remote_endpoints (
 	id BIGSERIAL PRIMARY KEY,
 	created_at TIMESTAMP WITH TIME ZONE,
 	updated_at TIMESTAMP WITH TIME ZONE,
@@ -191,9 +191,9 @@ CREATE TABLE application_offer_remote_endpoints (
 	interface TEXT NOT NULL,
 	"limit" INTEGER NOT NULL
 );
-CREATE INDEX idx_application_offer_remote_endpoints_deleted_at ON application_offer_remote_endpoints (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_application_offer_remote_endpoints_deleted_at ON application_offer_remote_endpoints (deleted_at);
 
-CREATE TABLE application_offer_remote_spaces (
+CREATE TABLE IF NOT EXISTS application_offer_remote_spaces (
 	id BIGSERIAL PRIMARY KEY,
 	created_at TIMESTAMP WITH TIME ZONE,
 	updated_at TIMESTAMP WITH TIME ZONE,
@@ -204,9 +204,9 @@ CREATE TABLE application_offer_remote_spaces (
 	provider_id TEXT NOT NULL,
 	provider_attributes BYTEA
 );
-CREATE INDEX idx_application_offer_remote_spaces_deleted_at ON application_offer_remote_spaces (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_application_offer_remote_spaces_deleted_at ON application_offer_remote_spaces (deleted_at);
 
-CREATE TABLE user_application_offer_access (
+CREATE TABLE IF NOT EXISTS user_application_offer_access (
 	id BIGSERIAL PRIMARY KEY,
 	created_at TIMESTAMP WITH TIME ZONE,
 	updated_at TIMESTAMP WITH TIME ZONE,
@@ -216,9 +216,9 @@ CREATE TABLE user_application_offer_access (
 	access TEXT NOT NULL,
 	UNIQUE (username, application_offer_id)
 );
-CREATE INDEX idx_user_application_offer_access_deleted_at ON user_application_offer_access (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_user_application_offer_access_deleted_at ON user_application_offer_access (deleted_at);
 
-CREATE TABLE user_cloud_access (
+CREATE TABLE IF NOT EXISTS user_cloud_access (
 	id BIGSERIAL PRIMARY KEY,
 	created_at TIMESTAMP WITH TIME ZONE,
 	updated_at TIMESTAMP WITH TIME ZONE,
@@ -228,9 +228,9 @@ CREATE TABLE user_cloud_access (
 	access TEXT NOT NULL,
 	UNIQUE (username, cloud_name)
 );
-CREATE INDEX idx_user_cloud_access_deleted_at ON user_cloud_access (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_user_cloud_access_deleted_at ON user_cloud_access (deleted_at);
 
-CREATE TABLE user_model_access (
+CREATE TABLE IF NOT EXISTS user_model_access (
 	id BIGSERIAL PRIMARY KEY,
 	created_at TIMESTAMP WITH TIME ZONE,
 	updated_at TIMESTAMP WITH TIME ZONE,
@@ -241,9 +241,9 @@ CREATE TABLE user_model_access (
 	last_connection TIMESTAMP WITH TIME ZONE,
 	UNIQUE (username, model_id)
 );
-CREATE INDEX idx_user_model_access_deleted_at ON user_model_access (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_user_model_access_deleted_at ON user_model_access (deleted_at);
 
-CREATE TABLE user_model_defaults (
+CREATE TABLE IF NOT EXISTS user_model_defaults (
 	id BIGSERIAL PRIMARY KEY,
 	created_at TIMESTAMP WITH TIME ZONE,
 	updated_at TIMESTAMP WITH TIME ZONE,
@@ -251,9 +251,9 @@ CREATE TABLE user_model_defaults (
 	username TEXT NOT NULL UNIQUE REFERENCES users (username),
 	defaults BYTEA
 );
-CREATE INDEX idx_user_model_defaults_deleted_at ON user_model_defaults (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_user_model_defaults_deleted_at ON user_model_defaults (deleted_at);
 
-CREATE TABLE controller_configs (
+CREATE TABLE IF NOT EXISTS controller_configs (
 	id BIGSERIAL PRIMARY KEY,
 	created_at TIMESTAMP WITH TIME ZONE,
 	updated_at TIMESTAMP WITH TIME ZONE,
@@ -263,14 +263,14 @@ CREATE TABLE controller_configs (
 	UNIQUE(name)
 );
 
-CREATE TABLE root_keys (
+CREATE TABLE IF NOT EXISTS root_keys (
 	id BYTEA NOT NULL PRIMARY KEY,
 	created_at TIMESTAMP WITH TIME ZONE NOT NULL,
 	expires TIMESTAMP WITH TIME ZONE  NOT NULL,
 	root_key BYTEA NOT NULL
 );
 
-CREATE INDEX idx_root_keys_created_at ON root_keys (created_at);
-CREATE INDEX idx_root_keys_expires ON root_keys (expires);
+CREATE INDEX IF NOT EXISTS idx_root_keys_created_at ON root_keys (created_at);
+CREATE INDEX IF NOT EXISTS idx_root_keys_expires ON root_keys (expires);
 
 UPDATE versions SET major=1, minor=0 WHERE component='jimmdb';
