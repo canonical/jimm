@@ -1,6 +1,9 @@
 # Learn more about charmcraft.yaml configuration at:
 # https://juju.is/docs/sdk/charmcraft-config
 type: "charm"
+parts:
+  charm:
+    charm-python-packages: [setuptools]
 bases:
   - build-on:
     - name: "ubuntu"

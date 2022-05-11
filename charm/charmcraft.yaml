@@ -7,6 +7,7 @@ parts:
     - ./templates
     - ./files
     - README.md
+    charm-python-packages: [setuptools]
 bases:
   - build-on:
     - name: "ubuntu"
