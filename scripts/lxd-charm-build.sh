@@ -48,8 +48,9 @@ lxd_exec_ubuntu mkdir -p /home/ubuntu/src
 echo "Transfer data"
 tar c -C `dirname $0`/.. . | cwd=/home/ubuntu/src lxd_exec_ubuntu tar x
 
-echo "Charmcraft build $(lxd_exec_ubuntu whoami)"
-cwd=/home/ubuntu/src/charm lxd_exec_ubuntu sudo charmcraft pack --verbose --destructive-mode
+
+echo "Charmcraft build"
+cwd=/home/ubuntu/src/charm lxd_exec_ubuntu sudo -E charmcraft pack --verbose --destructive-mode
 echo "Find file"
 charmfile=`lxd_exec_ubuntu find /home/ubuntu/src -name "${charm_name}_*.charm"| head -1`
 echo "Pull file"
