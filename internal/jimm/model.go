@@ -215,7 +215,7 @@ func (b *modelBuilder) WithCloudRegion(region string) *modelBuilder {
 		if r.Name != region {
 			continue
 		}
-		// consider all possible controlers for that region
+		// consider all possible controllers for that region
 		regionControllers := r.Controllers
 		if len(regionControllers) == 0 {
 			b.err = errors.E(errors.CodeBadRequest, fmt.Sprintf("unsupported cloud region %s/%s", b.cloud.Name, region))
@@ -224,7 +224,7 @@ func (b *modelBuilder) WithCloudRegion(region string) *modelBuilder {
 		// shuffle controllers
 		shuffleRegionControllers(regionControllers)
 
-		// and sellect the first controller in the slice
+		// and select the first controller in the slice
 		b.cloudRegion = region
 		b.cloudRegionID = regionControllers[0].CloudRegionID
 		b.controller = &regionControllers[0].Controller
