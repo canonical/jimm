@@ -331,8 +331,11 @@ func (b *modelBuilder) Cleanup() {
 	if b.model == nil {
 		return
 	}
-	if derr := b.jimm.Database.DeleteModel(b.ctx, b.model); derr != nil {
-		zapctx.Error(b.ctx, "failed to delete model", zap.String("model", b.model.Name), zap.String("owner", b.model.Owner.Username), zaputil.Error(derr))
+	// the model should be deleted from the database regardless of the request
+	// context expiration
+	ctx := context.Background()
+	if derr := b.jimm.Database.DeleteModel(ctx, b.model); derr != nil {
+		zapctx.Error(ctx, "failed to delete model", zap.String("model", b.model.Name), zap.String("owner", b.model.Owner.Username), zaputil.Error(derr))
 	}
 }
 

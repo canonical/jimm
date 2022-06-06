@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/rpc"
 	"github.com/juju/juju/rpc/jsoncodec"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	requestTimeout        = 10 * time.Second
+	requestTimeout        = 30 * time.Second
 	maxRequestConcurrency = 10
 	pingTimeout           = 90 * time.Second
 )
