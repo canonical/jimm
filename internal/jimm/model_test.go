@@ -2889,6 +2889,133 @@ func TestUpdateModelCredential(t *testing.T) {
 	}
 }
 
+func TestAddModelDeletedController(t *testing.T) {
+	c := qt.New(t)
+
+	api := &jimmtest.API{
+		UpdateCredential_: func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+			return nil, nil
+		},
+		GrantJIMMModelAdmin_: func(context.Context, names.ModelTag) error {
+			return nil
+		},
+		CreateModel_: createModel(`
+uuid: 00000001-0000-0000-0000-0000-000000000004
+status:
+  status: started
+  info: running a test
+life: alive
+users:
+- user: alice@external
+  access: admin
+- user: bob
+  access: read
+`[1:]),
+	}
+
+	j := &jimm.JIMM{
+		Database: db.Database{
+			DB: jimmtest.MemoryDB(c, nil),
+		},
+		Dialer: &jimmtest.Dialer{
+			API: api,
+		},
+	}
+	ctx := context.Background()
+	err := j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	envDefinition := `
+clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-region-1
+  - name: test-region-2
+user-defaults:
+- user: alice@external
+  controller-access: superuser
+cloud-credentials:
+- name: test-credential-1
+  owner: alice@external
+  cloud: test-cloud
+  auth-type: empty
+controllers:
+- name: controller-1
+  uuid: 00000000-0000-0000-0000-0000-0000000000001
+  cloud: test-cloud
+  region: test-region-1
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 10
+- name: controller-2
+  uuid: 00000000-0000-0000-0000-0000-0000000000002
+  cloud: test-cloud
+  region: test-region-2
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-2
+    priority: 2
+- name: controller-3
+  uuid: 00000000-0000-0000-0000-0000-0000000000003
+  cloud: test-cloud
+  region: test-region-1
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 1
+`
+	env := jimmtest.ParseEnvironment(c, envDefinition)
+	env.PopulateDB(c, j.Database)
+
+	u := env.User("alice@external").DBObject(c, j.Database)
+
+	controller := dbmodel.Controller{
+		Name: "controller-1",
+	}
+	err = j.Database.GetController(ctx, &controller)
+	c.Assert(err, qt.IsNil)
+
+	err = j.Database.DeleteController(ctx, &controller)
+	c.Assert(err, qt.IsNil)
+
+	args := jimm.ModelCreateArgs{}
+	err = args.FromJujuModelCreateArgs(&jujuparams.ModelCreateArgs{
+		Name:               "test-model",
+		OwnerTag:           names.NewUserTag("alice@external").String(),
+		CloudTag:           names.NewCloudTag("test-cloud").String(),
+		CloudRegion:        "test-region-1",
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
+	})
+	c.Assert(err, qt.IsNil)
+
+	// According to controller priority for test-region-1, we would
+	// expect JIMM to use controller-1, but since it was deleted
+	// we expect it to use controller-3.
+	// Before the fix for the soft-delete cascade, this would error
+	// out failing to store the model information. The
+	// cloud region controller priority entry associated
+	// with controller-1 would not be deleted, so JIMM
+	// tried to use controller-1 and failed because
+	// cloud region controller priority entry returned
+	// an empty controller.
+	m, err := j.AddModel(context.Background(), &u, &args)
+	c.Assert(err, qt.IsNil)
+
+	// fetch model from storage
+	model := dbmodel.Model{
+		UUID: sql.NullString{
+			String: m.UUID,
+			Valid:  true,
+		},
+	}
+	err = j.Database.GetModel(context.Background(), &model)
+	c.Assert(err, qt.IsNil)
+	// and assert that controller-3 was used.
+	c.Assert(model.Controller.Name, qt.Equals, "controller-3")
+}
+
 func newBool(b bool) *bool {
 	return &b
 }
