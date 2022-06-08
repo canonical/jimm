@@ -98,3 +98,19 @@ func (r *controllerRoot) setPingF(f func()) {
 func (r *controllerRoot) cleanup() {
 	r.watchers.stop()
 }
+
+func (r *controllerRoot) setupUUIDGenerator() error {
+	if r.generator != nil {
+		return nil
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	var err error
+	r.generator, err = fastuuid.NewGenerator()
+	if err != nil {
+		return errors.E(err)
+	}
+	return nil
+}

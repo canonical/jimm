@@ -3,11 +3,10 @@
 package jujuapi
 
 import (
-	"context"
-	"time"
-
 	jujuparams "github.com/juju/juju/rpc/params"
 )
+
+var NewModelAccessWatcher = newModelAccessWatcher
 
 func NewModelSummaryWatcher() *modelSummaryWatcher {
 	return &modelSummaryWatcher{
@@ -17,15 +16,6 @@ func NewModelSummaryWatcher() *modelSummaryWatcher {
 
 func PublishToWatcher(w *modelSummaryWatcher, model string, data interface{}) {
 	w.pubsubHandler(model, data)
-}
-
-func NewModelAccessWatcher(ctx context.Context, period time.Duration, modelGetterFunc func(context.Context) (jujuparams.UserModelList, error)) *modelAccessWatcher {
-	return &modelAccessWatcher{
-		ctx:             ctx,
-		modelGetterFunc: modelGetterFunc,
-		period:          period,
-		models:          make(map[string]bool),
-	}
 }
 
 func ModelAccessWatcherMatch(w *modelAccessWatcher, model string) bool {

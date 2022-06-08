@@ -9,8 +9,8 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/juju/api/client/modelmanager"
 	"github.com/juju/juju/apiserver/common"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/cloud"
+	jujuparams "github.com/juju/juju/rpc/params"
 	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
@@ -28,12 +28,6 @@ type jimmSuite struct {
 }
 
 var _ = gc.Suite(&jimmSuite{})
-
-func (s *jimmSuite) TestJIMMFacadeVersion(c *gc.C) {
-	conn := s.open(c, nil, "test")
-	defer conn.Close()
-	c.Assert(conn.AllFacadeVersions()["JIMM"], jc.DeepEquals, []int{2, 3})
-}
 
 func (s *jimmSuite) TestListControllers(c *gc.C) {
 	s.AddController(c, "controller-0", s.APIInfo(c))

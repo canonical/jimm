@@ -100,14 +100,14 @@ func (r *watcherRegistry) get(id string) (*modelSummaryWatcher, error) {
 	return w, nil
 }
 
-func newModelSummaryWatcher(ctx context.Context, id string, root *controllerRoot, pubsub *pubsub.Hub) (*modelSummaryWatcher, error) {
+func newModelSummaryWatcher(ctx context.Context, id string, root *controllerRoot, pubsub *pubsub.Hub, modelGetterFunc func(context.Context) ([]string, error)) (*modelSummaryWatcher, error) {
 	const op = errors.Op("jujuapi.newModelSummaryWatcher")
 
 	ctx, cancelContext := context.WithCancel(ctx)
 
 	accessWatcher := &modelAccessWatcher{
 		ctx:             ctx,
-		modelGetterFunc: root.allModels,
+		modelGetterFunc: modelGetterFunc,
 		period:          defaultModelAccessWatcherPeriod,
 	}
 	err := accessWatcher.do()
@@ -186,9 +186,18 @@ func (w *modelSummaryWatcher) Stop() error {
 	return nil
 }
 
+func newModelAccessWatcher(ctx context.Context, period time.Duration, modelGetterFunc func(context.Context) ([]string, error)) *modelAccessWatcher {
+	return &modelAccessWatcher{
+		ctx:             ctx,
+		modelGetterFunc: modelGetterFunc,
+		period:          period,
+		models:          make(map[string]bool),
+	}
+}
+
 type modelAccessWatcher struct {
 	ctx             context.Context
-	modelGetterFunc func(context.Context) (jujuparams.UserModelList, error)
+	modelGetterFunc func(context.Context) ([]string, error)
 	period          time.Duration
 
 	mu     sync.RWMutex
@@ -220,14 +229,14 @@ func (w *modelAccessWatcher) loop() {
 }
 
 func (w *modelAccessWatcher) do() error {
-	userModelList, err := w.modelGetterFunc(w.ctx)
+	modelUUIDList, err := w.modelGetterFunc(w.ctx)
 	if err != nil {
 		return err
 	}
 
 	models := make(map[string]bool)
-	for _, model := range userModelList.UserModels {
-		models[model.Model.UUID] = true
+	for _, modelUUID := range modelUUIDList {
+		models[modelUUID] = true
 	}
 
 	w.mu.Lock()

@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/juju/juju/api/base"
-	controllerapi "github.com/juju/juju/api/controller/controller"
 	"github.com/juju/juju/api/client/modelmanager"
-	jujuparams "github.com/juju/juju/rpc/params"
+	controllerapi "github.com/juju/juju/api/controller/controller"
 	"github.com/juju/juju/controller"
+	jujuparams "github.com/juju/juju/rpc/params"
 	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
@@ -267,6 +267,62 @@ func (s *watcherSuite) TestWatchModelSummaries(c *gc.C) {
 
 	var watcherID jujuparams.SummaryWatcherID
 	err := conn.APICall("Controller", 9, "", "WatchModelSummaries", nil, &watcherID)
+	c.Assert(err, jc.ErrorIsNil)
+
+	var summaries jujuparams.SummaryWatcherNextResults
+	err = conn.APICall("ModelSummaryWatcher", 1, watcherID.WatcherID, "Next", nil, &summaries)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(summaries.Models, gc.DeepEquals, expectedModels)
+
+	err = conn.APICall("ModelSummaryWatcher", 1, watcherID.WatcherID, "Stop", nil, nil)
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = conn.APICall("ModelSummaryWatcher", 1, "unknown-id", "Next", nil, &summaries)
+	c.Assert(err, gc.ErrorMatches, `not found \(not found\)`)
+}
+
+func (s *watcherSuite) TestWatchAllModelSummaries(c *gc.C) {
+	c.Logf("models: %v %v", s.Model.UUID.String, s.Model3.UUID.String)
+
+	done := s.JIMM.Pubsub.Publish(s.Model.UUID.String, jujuparams.ModelAbstract{
+		UUID:  s.Model.UUID.String,
+		Cloud: "test-cloud",
+		Name:  "test-name-1",
+	})
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		c.Fatalf("timed out")
+	}
+	done = s.JIMM.Pubsub.Publish(s.Model3.UUID.String, jujuparams.ModelAbstract{
+		UUID:  s.Model3.UUID.String,
+		Cloud: "test-cloud",
+		Name:  "test-name-3",
+	})
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		c.Fatalf("timed out")
+	}
+
+	expectedModels := []jujuparams.ModelAbstract{{
+		UUID:  s.Model.UUID.String,
+		Cloud: "test-cloud",
+		Name:  "test-name-1",
+	}, {
+		UUID:  s.Model3.UUID.String,
+		Cloud: "test-cloud",
+		Name:  "test-name-3",
+	}}
+	sort.Slice(expectedModels, func(i, j int) bool {
+		return expectedModels[i].UUID < expectedModels[j].UUID
+	})
+
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	var watcherID jujuparams.SummaryWatcherID
+	err := conn.APICall("Controller", 9, "", "WatchAllModelSummaries", nil, &watcherID)
 	c.Assert(err, jc.ErrorIsNil)
 
 	var summaries jujuparams.SummaryWatcherNextResults

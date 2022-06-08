@@ -8,8 +8,8 @@ import (
 
 	cloudapi "github.com/juju/juju/api/client/cloud"
 	"github.com/juju/juju/api/client/modelmanager"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/cloud"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
@@ -556,7 +556,7 @@ func (s *cloudSuite) TestAddCloudError(c *gc.C) {
 		StorageEndpoint:  "https://0.1.2.3:5680",
 		HostCloudRegion:  jimmtest.TestCloudName + "/" + jimmtest.TestCloudRegionName,
 	}, false)
-	c.Assert(err, gc.ErrorMatches, `invalid cloud: empty auth-types not valid`)
+	c.Assert(err, gc.ErrorMatches, `invalid cloud: empty auth-types not valid.*`)
 }
 
 func (s *cloudSuite) TestAddCloudNoHostCloudRegion(c *gc.C) {
