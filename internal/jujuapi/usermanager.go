@@ -19,6 +19,7 @@ func init() {
 		removeUserMethod := rpc.Method(r.RemoveUser)
 		setPasswordMethod := rpc.Method(r.SetPassword)
 		userInfoMethod := rpc.Method(r.UserInfo)
+		resetPasswordMethod := rpc.Method(r.ResetPassword)
 
 		r.AddMethod("UserManager", 1, "AddUser", addUserMethod)
 		r.AddMethod("UserManager", 1, "DisableUser", disableUserMethod)
@@ -26,6 +27,14 @@ func init() {
 		r.AddMethod("UserManager", 1, "RemoveUser", removeUserMethod)
 		r.AddMethod("UserManager", 1, "SetPassword", setPasswordMethod)
 		r.AddMethod("UserManager", 1, "UserInfo", userInfoMethod)
+
+		r.AddMethod("UserManager", 2, "AddUser", addUserMethod)
+		r.AddMethod("UserManager", 2, "DisableUser", disableUserMethod)
+		r.AddMethod("UserManager", 2, "EnableUser", enableUserMethod)
+		r.AddMethod("UserManager", 2, "RemoveUser", removeUserMethod)
+		r.AddMethod("UserManager", 2, "SetPassword", setPasswordMethod)
+		r.AddMethod("UserManager", 2, "UserInfo", userInfoMethod)
+		r.AddMethod("UserManager", 2, "ResetPassword", resetPasswordMethod)
 
 		return []int{1}
 	}
@@ -83,5 +92,11 @@ func (r *controllerRoot) userInfo(ctx context.Context, entity string) (*jujupara
 
 // SetPassword implements the UserManager facade's SetPassword method.
 func (r *controllerRoot) SetPassword(jujuparams.EntityPasswords) (jujuparams.ErrorResults, error) {
+	return jujuparams.ErrorResults{}, errors.E(errors.CodeUnauthorized, "unauthorized")
+}
+
+// ResetPassword implements the UserManager facade's ResetPassword method.
+func (r *controllerRoot) ResetPassword(jujuparams.Entities) (jujuparams.ErrorResults, error) {
+	// JIMM does not support resetting user's password.
 	return jujuparams.ErrorResults{}, errors.E(errors.CodeUnauthorized, "unauthorized")
 }

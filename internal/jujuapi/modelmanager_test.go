@@ -301,7 +301,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			SupportedFeatures: []jujuparams.SupportedFeature{{
 				Name:        "juju",
 				Description: "the version of Juju used by the model",
-				Version:     "2.9.27",
+				Version:     "2.9.31",
 			}},
 		},
 	}, {
@@ -336,7 +336,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			SupportedFeatures: []jujuparams.SupportedFeature{{
 				Name:        "juju",
 				Description: "the version of Juju used by the model",
-				Version:     "2.9.27",
+				Version:     "2.9.31",
 			}},
 		},
 	}, {
@@ -387,7 +387,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			SupportedFeatures: []jujuparams.SupportedFeature{{
 				Name:        "juju",
 				Description: "the version of Juju used by the model",
-				Version:     "2.9.27",
+				Version:     "2.9.31",
 			}},
 		},
 	}, {
@@ -421,7 +421,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			SupportedFeatures: []jujuparams.SupportedFeature{{
 				Name:        "juju",
 				Description: "the version of Juju used by the model",
-				Version:     "2.9.27",
+				Version:     "2.9.31",
 			}},
 		},
 	}, {
@@ -514,7 +514,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 			SupportedFeatures: []jujuparams.SupportedFeature{{
 				Name:        "juju",
 				Description: "the version of Juju used by the model",
-				Version:     "2.9.27",
+				Version:     "2.9.31",
 			}},
 		},
 	}, {
@@ -545,7 +545,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 			SupportedFeatures: []jujuparams.SupportedFeature{{
 				Name:        "juju",
 				Description: "the version of Juju used by the model",
-				Version:     "2.9.27",
+				Version:     "2.9.31",
 			}},
 		},
 	}, {
@@ -600,7 +600,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 			SupportedFeatures: []jujuparams.SupportedFeature{{
 				Name:        "juju",
 				Description: "the version of Juju used by the model",
-				Version:     "2.9.27",
+				Version:     "2.9.31",
 			}},
 		},
 	}, {
@@ -652,7 +652,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 			SupportedFeatures: []jujuparams.SupportedFeature{{
 				Name:        "juju",
 				Description: "the version of Juju used by the model",
-				Version:     "2.9.27",
+				Version:     "2.9.31",
 			}},
 		},
 	}, {
@@ -683,7 +683,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 			SupportedFeatures: []jujuparams.SupportedFeature{{
 				Name:        "juju",
 				Description: "the version of Juju used by the model",
-				Version:     "2.9.27",
+				Version:     "2.9.31",
 			}},
 		},
 	}, {

@@ -8,7 +8,6 @@ import (
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
-	"github.com/rogpeppe/fastuuid"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
@@ -28,6 +27,7 @@ func init() {
 		modelStatusMethod := rpc.Method(r.ModelStatus)
 		mongoVersionMethod := rpc.Method(r.MongoVersion)
 		watchModelSummariesMethod := rpc.Method(r.WatchModelSummaries)
+		watchAllModelSummariesMethod := rpc.Method(r.WatchAllModelSummaries)
 
 		r.AddMethod("Controller", 3, "AllModels", allModelsMethod)
 		r.AddMethod("Controller", 3, "ControllerConfig", controllerConfigMethod)
@@ -85,8 +85,31 @@ func init() {
 		r.AddMethod("Controller", 9, "ModelStatus", modelStatusMethod)
 		r.AddMethod("Controller", 9, "MongoVersion", mongoVersionMethod)
 		r.AddMethod("Controller", 9, "WatchModelSummaries", watchModelSummariesMethod)
+		r.AddMethod("Controller", 9, "WatchAllModelSummaries", watchAllModelSummariesMethod)
 
-		return []int{3, 4, 5, 6, 7, 8, 9}
+		r.AddMethod("Controller", 10, "AllModels", allModelsMethod)
+		r.AddMethod("Controller", 10, "ConfigSet", configSetMethod)
+		r.AddMethod("Controller", 10, "ControllerConfig", controllerConfigMethod)
+		r.AddMethod("Controller", 10, "ControllerVersion", controllerVersionMethod)
+		r.AddMethod("Controller", 10, "GetControllerAccess", getControllerAccessMethod)
+		r.AddMethod("Controller", 10, "IdentityProviderURL", identityProviderURLMethod)
+		r.AddMethod("Controller", 10, "ModelConfig", modelConfigMethod)
+		r.AddMethod("Controller", 10, "ModelStatus", modelStatusMethod)
+		r.AddMethod("Controller", 10, "MongoVersion", mongoVersionMethod)
+		r.AddMethod("Controller", 10, "WatchModelSummaries", watchModelSummariesMethod)
+
+		r.AddMethod("Controller", 11, "AllModels", allModelsMethod)
+		r.AddMethod("Controller", 11, "ConfigSet", configSetMethod)
+		r.AddMethod("Controller", 11, "ControllerConfig", controllerConfigMethod)
+		r.AddMethod("Controller", 11, "ControllerVersion", controllerVersionMethod)
+		r.AddMethod("Controller", 11, "GetControllerAccess", getControllerAccessMethod)
+		r.AddMethod("Controller", 11, "IdentityProviderURL", identityProviderURLMethod)
+		r.AddMethod("Controller", 11, "ModelConfig", modelConfigMethod)
+		r.AddMethod("Controller", 11, "ModelStatus", modelStatusMethod)
+		r.AddMethod("Controller", 11, "MongoVersion", mongoVersionMethod)
+		r.AddMethod("Controller", 11, "WatchModelSummaries", watchModelSummariesMethod)
+
+		return []int{3, 4, 5, 6, 7, 8, 9, 10, 11}
 	}
 }
 
@@ -140,22 +163,64 @@ func (r *controllerRoot) ControllerVersion(ctx context.Context) (jujuparams.Cont
 func (r *controllerRoot) WatchModelSummaries(ctx context.Context) (jujuparams.SummaryWatcherID, error) {
 	const op = errors.Op("jujuapi.WatchModelSummaries")
 
-	// TODO(mhilton) move this somewhere where it will be reused accross connections
-	r.mu.Lock()
-	if r.generator == nil {
-		var err error
-		r.generator, err = fastuuid.NewGenerator()
-		r.mu.Unlock()
-		if err != nil {
-			return jujuparams.SummaryWatcherID{}, errors.E(op, err)
-		}
-	} else {
-		r.mu.Unlock()
+	err := r.setupUUIDGenerator()
+	if err != nil {
+		return jujuparams.SummaryWatcherID{}, errors.E(op, err)
 	}
 
 	id := fmt.Sprintf("%v", r.generator.Next())
 
-	watcher, err := newModelSummaryWatcher(ctx, id, r, r.jimm.Pubsub)
+	getModels := func(ctx context.Context) ([]string, error) {
+		models, err := r.allModels(ctx)
+		if err != nil {
+			return nil, errors.E(err)
+		}
+		modelUUIDs := make([]string, len(models.UserModels))
+		for i, model := range models.UserModels {
+			modelUUIDs[i] = model.UUID
+		}
+		return modelUUIDs, nil
+	}
+	watcher, err := newModelSummaryWatcher(ctx, id, r, r.jimm.Pubsub, getModels)
+	if err != nil {
+		return jujuparams.SummaryWatcherID{}, errors.E(op, err)
+	}
+	r.watchers.register(watcher)
+
+	return jujuparams.SummaryWatcherID{
+		WatcherID: id,
+	}, nil
+}
+
+// WatchAllModelSummaries implements the WatchAllModelSummaries command on the
+// Controller facade.
+func (r *controllerRoot) WatchAllModelSummaries(ctx context.Context) (jujuparams.SummaryWatcherID, error) {
+	const op = errors.Op("jujuapi.WatchAllModelSummaries")
+
+	if r.user.ControllerAccess != "superuser" {
+		return jujuparams.SummaryWatcherID{}, errors.E(errors.CodeUnauthorized, "permission denied")
+	}
+
+	err := r.setupUUIDGenerator()
+	if err != nil {
+		return jujuparams.SummaryWatcherID{}, errors.E(op, err)
+	}
+
+	id := fmt.Sprintf("%v", r.generator.Next())
+
+	getAllModels := func(ctx context.Context) ([]string, error) {
+		var modelUUIDs []string
+		err := r.jimm.ForEachModel(ctx, r.user, func(uma *dbmodel.UserModelAccess) error {
+			modelUUIDs = append(modelUUIDs, uma.ToJujuUserModel().UUID)
+			return nil
+		})
+		if err != nil {
+			return nil, errors.E(op, err)
+		}
+		return modelUUIDs, nil
+	}
+
+	watcher, err := newModelSummaryWatcher(ctx, id, r, r.jimm.Pubsub, getAllModels)
 	if err != nil {
 		return jujuparams.SummaryWatcherID{}, errors.E(op, err)
 	}

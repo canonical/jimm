@@ -70,11 +70,7 @@ func (s *modelSummaryWatcherSuite) TestModelAccessWatcher(c *gc.C) {
 	match := jujuapi.ModelAccessWatcherMatch(watcher, "model1")
 	c.Assert(match, jc.IsFalse)
 
-	modelGetter.setModels([]jujuparams.UserModel{{
-		Model: jujuparams.Model{UUID: "model1"},
-	}, {
-		Model: jujuparams.Model{UUID: "model2"},
-	}})
+	modelGetter.setModels([]string{"model1", "model2"})
 
 	select {
 	case <-modelGetter.calledChan:
@@ -93,11 +89,7 @@ func (s *modelSummaryWatcherSuite) TestModelAccessWatcher(c *gc.C) {
 
 	cancelFunc()
 
-	modelGetter.setModels([]jujuparams.UserModel{{
-		Model: jujuparams.Model{UUID: "model1"},
-	}, {
-		Model: jujuparams.Model{UUID: "model3"},
-	}})
+	modelGetter.setModels([]string{"model1", "model3"})
 
 	<-time.After(200 * time.Millisecond)
 
@@ -107,26 +99,24 @@ func (s *modelSummaryWatcherSuite) TestModelAccessWatcher(c *gc.C) {
 
 type testModelGetter struct {
 	mu         sync.Mutex
-	models     []jujuparams.UserModel
+	models     []string
 	called     bool
 	calledChan chan bool
 }
 
-func (t *testModelGetter) setModels(models []jujuparams.UserModel) {
+func (t *testModelGetter) setModels(models []string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.models = models
 	t.called = false
 }
 
-func (t *testModelGetter) getModels(_ context.Context) (jujuparams.UserModelList, error) {
+func (t *testModelGetter) getModels(_ context.Context) ([]string, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.called == false {
 		t.calledChan <- true
 	}
 	t.called = true
-	return jujuparams.UserModelList{
-		UserModels: t.models,
-	}, nil
+	return t.models, nil
 }

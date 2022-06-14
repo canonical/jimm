@@ -10,8 +10,7 @@ require (
 	github.com/frankban/quicktest v1.13.0
 	github.com/go-macaroon-bakery/macaroon-bakery/v3 v3.0.0-20220204130128-afeebcc9521d
 	github.com/gobwas/glob v0.2.4-0.20181002190808-e7a84e9525fe // indirect
-	github.com/golang/mock v1.6.0 // indirect
-	github.com/google/go-cmp v0.5.7
+	github.com/google/go-cmp v0.5.8
 	github.com/google/uuid v1.2.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/gosuri/uitable v0.0.1
@@ -19,16 +18,16 @@ require (
 	github.com/jackc/pgconn v1.7.0
 	github.com/jackc/pgx/v4 v4.9.0
 	github.com/juju/aclstore/v2 v2.1.0 // indirect
-	github.com/juju/charm/v8 v8.0.0-20220207013334-ec6de7e9b78e
+	github.com/juju/charm/v8 v8.0.0-20220509231111-ed6d505a46f4
 	github.com/juju/cmd v0.0.0-20200108104440-8e43f3faa5c9 // indirect
 	github.com/juju/cmd/v3 v3.0.0-20220203030511-039f3566372a
 	github.com/juju/errors v0.0.0-20220316043928-e10eb17a9eeb
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
-	github.com/juju/juju v0.0.0-20220318053519-acb32588d175
+	github.com/juju/juju v0.0.0-20220525044642-0f2ce8e528a6
 	github.com/juju/loggo v0.0.0-20210728185423-eebad3a902c4
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
 	github.com/juju/mutex v0.0.0-20180619145857-d21b13acf4bf // indirect
-	github.com/juju/names/v4 v4.0.0-20220207005702-9c6532a52823
+	github.com/juju/names/v4 v4.0.0-20220518060443-d77cb46f6093
 	github.com/juju/rpcreflect v0.0.0-20200416001309-bb46e9ba1476
 	github.com/juju/testing v0.0.0-20220203020004-a0ff61f03494
 	github.com/juju/utils v0.0.0-20200604140309-9d78121a29e0 // indirect

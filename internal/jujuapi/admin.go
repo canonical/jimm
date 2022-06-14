@@ -7,8 +7,8 @@ import (
 	stderrors "errors"
 	"sort"
 
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/rpc"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
