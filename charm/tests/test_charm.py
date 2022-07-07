@@ -149,6 +149,31 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(lines[9].strip(), "JIMM_LOG_LEVEL=debug")
         self.assertEqual(lines[10].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
 
+    def test_config_changed_redirect_to_dashboard(self):
+        config_file = os.path.join(self.harness.charm.charm_dir, 'jimm.env')
+        self.harness.update_config({
+            "candid-url": "https://candid.example.com",
+            "controller-admins": "user1 user2 group1",
+            "dns-name": "jimm.example.com",
+            "log-level": "debug",
+            "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
+            "juju-dashboard-location": "https://test.jaas.ai/models"
+        })
+        self.assertTrue(os.path.exists(config_file))
+        with open(config_file) as f:
+            lines = f.readlines()
+        os.unlink(config_file)
+        self.assertEqual(len(lines), 11)
+        self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
+        self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
+        self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
+        self.assertEqual(lines[4].strip(),
+                         "JIMM_DASHBOARD_LOCATION=https://test.jaas.ai/models")
+        self.assertEqual(lines[7].strip(),
+                         "JIMM_DNS_NAME=" + "jimm.example.com")
+        self.assertEqual(lines[9].strip(), "JIMM_LOG_LEVEL=debug")
+        self.assertEqual(lines[10].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
+
     def test_config_changed_ready(self):
         config_file = os.path.join(self.harness.charm.charm_dir, 'jimm.env')
         os.mkdir(self.tempdir.name + "/dashboard")
@@ -190,15 +215,17 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(data["key"]["private"], "agent-private-key")
 
         self.assertTrue(os.path.exists(config_file))
+
         with open(config_file) as f:
             lines = f.readlines()
-        self.assertEqual(len(lines), 7)
+        self.assertEqual(len(lines), 9)
         self.assertEqual(lines[0].strip(),
                          "BAKERY_AGENT_FILE=" + self.harness.charm._agent_filename)
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
-        self.assertEqual(lines[5].strip(), "JIMM_LOG_LEVEL=info")
-        self.assertEqual(lines[6].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
+        self.assertEqual(lines[4].strip(), "JIMM_DASHBOARD_LOCATION=https://jaas.ai/models")
+        self.assertEqual(lines[7].strip(), "JIMM_LOG_LEVEL=info")
+        self.assertEqual(lines[8].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
 
         self.harness.charm._agent_filename = \
             os.path.join(self.tempdir.name, "no-such-dir", "agent.json")
@@ -212,12 +239,13 @@ class TestCharm(unittest.TestCase):
         })
         with open(config_file) as f:
             lines = f.readlines()
-        self.assertEqual(len(lines), 7)
+        self.assertEqual(len(lines), 9)
         self.assertEqual(lines[0].strip(), "BAKERY_AGENT_FILE=")
         self.assertEqual(lines[1].strip(), "CANDID_URL=https://candid.example.com")
         self.assertEqual(lines[2].strip(), "JIMM_ADMINS=user1 user2 group1")
-        self.assertEqual(lines[5].strip(), "JIMM_LOG_LEVEL=info")
-        self.assertEqual(lines[6].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
+        self.assertEqual(lines[4].strip(), "JIMM_DASHBOARD_LOCATION=https://jaas.ai/models")
+        self.assertEqual(lines[7].strip(), "JIMM_LOG_LEVEL=info")
+        self.assertEqual(lines[8].strip(), "JIMM_UUID=caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa")
 
     def test_leader_elected(self):
         leader_file = os.path.join(self.harness.charm.charm_dir, 'jimm-leader.env')
@@ -379,6 +407,29 @@ class TestCharm(unittest.TestCase):
         t.join()
         self.assertEqual(self.harness.charm.unit.status,
                          ActiveStatus())
+
+    def test_dashboard_relation_joined(self):
+        harness = Harness(JimmCharm)
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.set_leader(True)
+        harness.update_config({
+            "dns-name": "https://jimm.example.com",
+            "candid-agent-username": "username@candid",
+            "candid-agent-private-key": "agent-private-key",
+            "candid-agent-public-key": "agent-public-key",
+            "candid-url": "https://candid.example.com",
+            "controller-admins": "user1 user2 group1",
+            "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
+        })
+
+        id = harness.add_relation('dashboard', 'juju-dashboard')
+        harness.add_relation_unit(id, 'juju-dashboard/0')
+        data = harness.get_relation_data(id, "jimm")
+        self.assertTrue(data)
+        self.assertEqual(data["controller-url"], "https://jimm.example.com")
+        self.assertEqual(data["identity-provider-url"], "https://candid.example.com")
+        self.assertEqual(data["is-juju"], "False")
 
 
 class VersionHTTPRequestHandler(BaseHTTPRequestHandler):

@@ -337,3 +337,26 @@ class TestCharm(unittest.TestCase):
         dashboard_archive.seek(0)
         data = dashboard_archive.read()
         return data
+
+    def test_dashboard_relation_joined(self):
+        harness = Harness(JimmOperatorCharm)
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.set_leader(True)
+        harness.update_config({
+            "dns-name": "https://jimm.example.com",
+            "candid-agent-username": "username@candid",
+            "candid-agent-private-key": "agent-private-key",
+            "candid-agent-public-key": "agent-public-key",
+            "candid-url": "https://candid.example.com",
+            "controller-admins": "user1 user2 group1",
+            "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
+        })
+
+        id = harness.add_relation('dashboard', 'juju-dashboard')
+        harness.add_relation_unit(id, 'juju-dashboard/0')
+        data = harness.get_relation_data(id, "jimm-k8s")
+        self.assertTrue(data)
+        self.assertEqual(data["controller-url"], "https://jimm.example.com")
+        self.assertEqual(data["identity-provider-url"], "https://candid.example.com")
+        self.assertEqual(data["is-juju"], "False")

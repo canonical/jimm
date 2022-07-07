@@ -67,6 +67,8 @@ class JimmOperatorCharm(CharmBase):
         self.framework.observe(self.on.stop, self._on_stop)
         self.framework.observe(self.on.nrpe_relation_joined, self._on_nrpe_relation_joined)
         self.framework.observe(self.on.website_relation_joined, self._on_website_relation_joined)
+        self.framework.observe(self.on.dashboard_relation_joined,
+                               self._on_dashboard_relation_joined)
 
         self._agent_filename = '/root/config/agent.json'
         self._vault_secret_filename = '/root/config/vault_secret.json'
@@ -178,7 +180,7 @@ class JimmOperatorCharm(CharmBase):
             'JIMM_DNS_NAME': self.config.get('dns-name', ''),
             'JIMM_LOG_LEVEL': self.config.get('log-level', ''),
             'JIMM_UUID': self.config.get('uuid', ''),
-            'JIMM_DASHBOARD_LOCATION': 'https://jaas.ai/models',
+            'JIMM_DASHBOARD_LOCATION': self.config.get('juju-dashboard-location', 'https://jaas.ai/models'),
             'JIMM_LISTEN_ADDR': ':8080'
         }
         dsn = self.config.get('dsn', '')
@@ -257,6 +259,14 @@ class JimmOperatorCharm(CharmBase):
     def _on_update_status(self, _):
         '''Update the status of the charm.'''
         self._ready()
+
+    @log_event_handler
+    def _on_dashboard_relation_joined(self, event):
+        event.relation.data[self.app].update({
+            'controller-url': self.config['dns-name'],
+            'identity-provider-url': self.config['candid-url'],
+            'is-juju': str(False),
+        })
 
     def _ready(self):
         container = self.unit.get_container(WORKLOAD_CONTAINER)

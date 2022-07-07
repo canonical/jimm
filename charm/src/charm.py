@@ -42,6 +42,8 @@ class JimmCharm(SystemdCharm):
         self.framework.observe(self.on.website_relation_joined, self._on_website_relation_joined)
         self.framework.observe(self.on.vault_relation_joined, self._on_vault_relation_joined)
         self.framework.observe(self.on.vault_relation_changed, self._on_vault_relation_changed)
+        self.framework.observe(self.on.dashboard_relation_joined,
+                               self._on_dashboard_relation_joined)
         self._agent_filename = "/var/snap/jimm/common/agent.json"
         self._vault_secret_filename = "/var/snap/jimm/common/vault_secret.json"
         self._workload_filename = "/snap/bin/jimm"
@@ -84,7 +86,8 @@ class JimmCharm(SystemdCharm):
             "candid_url": self.config.get('candid-url'),
             "dns_name": self.config.get('dns-name'),
             "log_level": self.config.get('log-level'),
-            "uuid": self.config.get('uuid')
+            "uuid": self.config.get('uuid'),
+            "dashboard_location": self.config.get('juju-dashboard-location')
         }
         if os.path.exists(self._dashboard_path):
             args["dashboard_location"] = self._dashboard_path
@@ -308,6 +311,13 @@ class JimmCharm(SystemdCharm):
         cmd = ['snap']
         cmd.extend(args)
         subprocess.run(cmd, capture_output=True, check=True)
+
+    def _on_dashboard_relation_joined(self, event):
+        event.relation.data[self.app].update({
+            'controller-url': self.config['dns-name'],
+            'identity-provider-url': self.config['candid-url'],
+            'is-juju': str(False),
+        })
 
 
 def _json_data(event, key):

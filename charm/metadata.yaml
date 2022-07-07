@@ -12,6 +12,8 @@ provides:
     interface: http
   nrpe:
     interface: nrpe-external-master
+  dashboard:
+    interface: juju-dashboard
 
 requires:
   db:
