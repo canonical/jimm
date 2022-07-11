@@ -64,7 +64,8 @@ class TestCharm(unittest.TestCase):
                         'JIMM_DASHBOARD_LOCATION': 'https://jaas.ai/models',
                         'JIMM_LISTEN_ADDR': ':8080',
                         'JIMM_LOG_LEVEL': 'info',
-                        'JIMM_UUID': '1234567890'
+                        'JIMM_UUID': '1234567890',
+                        'JIMM_WATCH_CONTROLLERS': '1'
                     }
                 }
             }}
@@ -97,7 +98,8 @@ class TestCharm(unittest.TestCase):
                         'JIMM_DASHBOARD_LOCATION': 'https://jaas.ai/models',
                         'JIMM_LISTEN_ADDR': ':8080',
                         'JIMM_LOG_LEVEL': 'info',
-                        'JIMM_UUID': '1234567890'
+                        'JIMM_UUID': '1234567890',
+                        'JIMM_WATCH_CONTROLLERS': '1'
                     }
                 }
             }}
@@ -162,8 +164,8 @@ class TestCharm(unittest.TestCase):
         container = self.harness.model.unit.get_container("jimm")
         self.harness.charm.on.jimm_pebble_ready.emit(container)
 
-        self.harness.update_config(MINIMAL_CONFIG)
         self.harness.set_leader(True)
+        self.harness.update_config(MINIMAL_CONFIG)
 
         self.harness.charm.on.leader_elected.emit()
 
@@ -179,9 +181,9 @@ class TestCharm(unittest.TestCase):
                     'command': '/root/jimmsrv',
                     'environment': {
                         'CANDID_URL': 'test-candid-url',
+                        'JIMM_DASHBOARD_LOCATION': 'https://jaas.ai/models',
                         'JIMM_DNS_NAME': 'jimm.testing',
                         'JIMM_DSN': 'test-dsn',
-                        'JIMM_DASHBOARD_LOCATION': 'https://jaas.ai/models',
                         'JIMM_LISTEN_ADDR': ':8080',
                         'JIMM_LOG_LEVEL': 'info',
                         'JIMM_UUID': '1234567890',
@@ -313,6 +315,10 @@ class TestCharm(unittest.TestCase):
         )
         self.assertEqual(
             container.exists('/root/dashboard/README.md'),
+            True
+        )
+        self.assertEqual(
+            container.exists('/root/dashboard/hash'),
             True
         )
 

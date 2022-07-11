@@ -21,6 +21,7 @@ import json
 import os
 import tarfile
 import tempfile
+import hashlib
 
 import hvac
 
@@ -70,29 +71,37 @@ class JimmOperatorCharm(CharmBase):
         self.framework.observe(self.on.dashboard_relation_joined,
                                self._on_dashboard_relation_joined)
 
+        self._local_agent_filename = 'agent.json'
+        self._local_vault_secret_filename = 'vault_secret.js'
         self._agent_filename = '/root/config/agent.json'
         self._vault_secret_filename = '/root/config/vault_secret.json'
         self._dashboard_path = '/root/dashboard'
+        self._dashboard_hash_path = '/root/dashboard/hash'
 
     @log_event_handler
     def _on_jimm_pebble_ready(self, event):
-        self._on_config_changed(event)
+        self._update_workload(event)
 
     @log_event_handler
     def _on_config_changed(self, event):
-        self._update_workload({}, event)
-        self._apply_vault_config(event)
-        self._install_dashboard(event)
+        self._update_workload(event)
+
+    @log_event_handler
+    def _on_leader_elected(self, event):
+        self._update_workload(event)
 
     @log_event_handler
     def _on_website_relation_joined(self, event):
         '''Connect a website relation.'''
+
+        # we set the port in the unit bucket.
         event.relation.data[self.unit]['port'] = '8080'
 
     @log_event_handler
     def _on_nrpe_relation_joined(self, event):
         '''Connect a NRPE relation.'''
 
+        # use the nrpe library to handle the relation.
         nrpe = NRPE()
         nrpe.add_check(
             shortname='JIMM',
@@ -103,77 +112,58 @@ class JimmOperatorCharm(CharmBase):
         )
         nrpe.write()
 
-    def _bakery_agent_file(self, event):
-        url = self.config.get('candid-url', '')
-        username = self.config.get('candid-agent-username', '')
-        private_key = self.config.get('candid-agent-private-key', '')
-        public_key = self.config.get('candid-agent-public-key', '')
-        if not url or not username or not private_key or not public_key:
-            return ''
-        data = {
-            'key': {'public': public_key, 'private': private_key},
-            'agents': [{'url': url, 'username': username}]
-        }
-        agent_data = json.dumps(data)
-        self._push_to_workload(self._agent_filename, agent_data, event)
+    def _ensure_bakery_agent_file(self, event):
+        # we create the file containing agent keys if needed.
+        if not self._path_exists_in_workload(self._agent_filename):
+            url = self.config.get('candid-url', '')
+            username = self.config.get('candid-agent-username', '')
+            private_key = self.config.get('candid-agent-private-key', '')
+            public_key = self.config.get('candid-agent-public-key', '')
+            if not url or not username or not private_key or not public_key:
+                return ''
+            data = {
+                'key': {'public': public_key, 'private': private_key},
+                'agents': [{'url': url, 'username': username}]
+            }
+            agent_data = json.dumps(data)
 
-        return self._agent_filename
+            self._push_to_workload(self._agent_filename, agent_data, event)
 
-    def _apply_vault_config(self, event):
+    def _ensure_vault_config(self, event):
         addr = self.config.get('vault-url', '')
         if not addr:
             return
-        role_id = self.config.get('vault-role-id', '')
-        if not role_id:
-            return
-        token = self.config.get('vault-token', '')
-        if not token:
-            return
-        client = hvac.Client(url=addr, token=token)
-        secret = client.sys.unwrap()
-        secret['data']['role_id'] = role_id
 
-        secret_data = json.dumps(secret)
-        self._push_to_workload(self._vault_secret_filename, secret_data, event)
+        # we create the file containing vault secretes if needed.
+        if not self._path_exists_in_workload(self._vault_secret_filename):
+            role_id = self.config.get('vault-role-id', '')
+            if not role_id:
+                return
+            token = self.config.get('vault-token', '')
+            if not token:
+                return
+            client = hvac.Client(url=addr, token=token)
+            secret = client.sys.unwrap()
+            secret['data']['role_id'] = role_id
 
-        args = {
-            'VAULT_ADDR': addr,
-            'VAULT_PATH': 'charm-jimm-creds',
-            'VAULT_SECRET_FILE': self._vault_secret_filename,
-            'VAULT_AUTH_PATH': '/auth/approle/login'
-        }
-        self._update_workload(args, event)
+            secret_data = json.dumps(secret)
+            self._push_to_workload(self._vault_secret_filename, secret_data, event)
 
-    @log_event_handler
-    def _on_leader_elected(self, event):
-        ''' Update JIMM configuration that comes from unit
-        leadership. '''
-
-        args = {'JIMM_WATCH_CONTROLLERS': ''}
-        if self.model.unit.is_leader():
-            args['JIMM_WATCH_CONTROLLERS'] = '1'
-
-        self._update_workload(args, event)
-
-    def _push_to_workload(self, filename, content, event):
-        ''' Create file on the workload container with
-        the specified content. '''
-
-        container = self.unit.get_container(WORKLOAD_CONTAINER)
-        if container.can_connect():
-            container.push(filename, content, make_dirs=True)
-        else:
-            logger.info('workload container not ready - defering')
-            event.defer()
-
-    def _update_workload(self, envdata: dict, event):
+    def _update_workload(self, event):
         '''' Update workload with all available configuration
         data. '''
 
         container = self.unit.get_container(WORKLOAD_CONTAINER)
+        if not container.can_connect():
+            logger.info("cannot connect to the workload container - deffering the event")
+            event.defer()
+            return
+
+        self._ensure_bakery_agent_file(event)
+        self._ensure_vault_config(event)
+        self._install_dashboard(event)
 
         config_values = {
-            'BAKERY_AGENT_FILE': self._bakery_agent_file(event),
             'CANDID_PUBLIC_KEY': self.config.get('candid-public-key', ''),
             'CANDID_URL': self.config.get('candid-url', ''),
             'JIMM_ADMINS': self.config.get('controller-admins', ''),
@@ -181,47 +171,59 @@ class JimmOperatorCharm(CharmBase):
             'JIMM_LOG_LEVEL': self.config.get('log-level', ''),
             'JIMM_UUID': self.config.get('uuid', ''),
             'JIMM_DASHBOARD_LOCATION': self.config.get('juju-dashboard-location', 'https://jaas.ai/models'),
-            'JIMM_LISTEN_ADDR': ':8080'
+            'JIMM_LISTEN_ADDR': ':8080',
         }
+        if container.exists(self._agent_filename):
+            config_values['BAKERY_AGENT_FILE'] = self._agent_filename
+
+        if container.exists(self._vault_secret_filename):
+            config_values['VAULT_ADDR'] = self.config.get('vault-url', '')
+            config_values['VAULT_PATH'] = 'charm-jimm-creds'
+            config_values['VAULT_SECRET_FILE'] = self._vault_secret_filename
+            config_values['VAULT_AUTH_PATH'] = '/auth/approle/login'
+
+        if self.model.unit.is_leader():
+            config_values['JIMM_WATCH_CONTROLLERS'] = '1'
+
         dsn = self.config.get('dsn', '')
         if dsn:
             config_values['JIMM_DSN'] = dsn
             self._create_postgres_schema(dsn)
 
-        # apply specified environment data
-        config_values.update(envdata)
+        if container.exists(self._dashboard_path):
+            config_values['JIMM_DASHBOARD_LOCATION'] = self._dashboard_path
+
         # remove empty configuration values
         config_values = {key: value for key, value in config_values.items() if value}
 
-        if container.can_connect():
-            pebble_layer = {
-                'summary': 'jimm layer',
-                'description': 'pebble config layer for jimm',
-                'services': {
-                    'jimm': {
-                        'override': 'merge',
-                        'summary': 'JAAS Intelligent Model Manager',
-                        'command': '/root/jimmsrv',
-                        'startup': 'disabled',
-                        'environment': config_values,
-                    }
-                },
-                'checks': {
-                    'jimm-check': {
-                        'override': 'replace',
-                        'period': '1m',
-                        'http': {
-                            'url': 'http://localhost:8080/debug/status'
-                        }
+        pebble_layer = {
+            'summary': 'jimm layer',
+            'description': 'pebble config layer for jimm',
+            'services': {
+                'jimm': {
+                       'override': 'merge',
+                       'summary': 'JAAS Intelligent Model Manager',
+                       'command': '/root/jimmsrv',
+                       'startup': 'disabled',
+                       'environment': config_values,
+                }
+            },
+            'checks': {
+                'jimm-check': {
+                    'override': 'replace',
+                    'period': '1m',
+                    'http': {
+                        'url': 'http://localhost:8080/debug/status'
                     }
                 }
             }
-            container.add_layer('jimm', pebble_layer, combine=True)
-            if self._ready():
-                if container.get_service('jimm').is_running():
-                    container.replan()
-                else:
-                    container.start('jimm')
+        }
+        container.add_layer('jimm', pebble_layer, combine=True)
+        if self._ready():
+            if container.get_service('jimm').is_running():
+                container.replan()
+            else:
+                container.start('jimm')
             self.unit.status = ActiveStatus('running')
         else:
             logger.info('workload container not ready - defering')
@@ -297,76 +299,119 @@ class JimmOperatorCharm(CharmBase):
             self.unit.status = WaitingStatus('waiting for jimm workload')
             return False
 
-    def _dashboard_resource_nonempty(self):
-        try:
-            dashboard_file = self.model.resources.fetch('dashboard')
-            if dashboard_file:
-                return os.path.getsize(dashboard_file) != 0
-            return False
-        except:
-            return False
-
     def _install_dashboard(self, event):
         container = self.unit.get_container(WORKLOAD_CONTAINER)
 
+        # if we can't connect to the container we should defer
+        # this event.
         if not container.can_connect():
-            return
+            event.defer()
 
+        # fetch the resource filename
         try:
-            path = self.model.resources.fetch("dashboard")
+            dashboard_file = self.model.resources.fetch("dashboard")
         except ModelError:
-            path = None
+            dashboard_file = None
 
-        if not path:
+        # if the resource is not specified, we can return
+        # as there is nothing to install.
+        if not dashboard_file:
             return
 
-        if not self._dashboard_resource_nonempty():
+        # if the resource file is empty, we can return
+        # as there is nothing to install.
+        if os.path.getsize(dashboard_file) == 0:
+            return
+
+        dashboard_changed = False
+
+        # compute the hash of the dashboard tarball.
+        dashboard_hash = self._hash(dashboard_file)
+
+        # check if we the file containing the dashboard
+        # hash exists.
+        if container.exists(self._dashboard_hash_path):
+            # if it does, compare the stored hash with the
+            # hash of the dashboard tarball.
+            hash = container.pull(self._dashboard_hash_path)
+            existing_hash = str(hash.read())
+            # if the two hashes do not match
+            # the resource must have changed.
+            if not dashboard_hash == existing_hash:
+                dashboard_changed = True
+        else:
+            dashboard_changed = True
+
+        # if the resource file has not changed, we can
+        # return as there is no need to push the same
+        # dashboard content to the container.
+        if not dashboard_changed:
             return
 
         self.unit.status = MaintenanceStatus("installing dashboard")
 
+        # create a temporary directory.
         with tempfile.TemporaryDirectory() as tmpdir:
-            if container.exists(self._dashboard_path):
-                container.remove_path(self._dashboard_path)
-
-            with tarfile.open(path, mode="r:bz2") as tf:
-                names = tf.getnames()
+            # untar the dashboard tarball.
+            with tarfile.open(dashboard_file, mode="r:bz2") as tf:
                 tf.extractall(tmpdir)
-                for name in names:
-                    workload_name = os.path.join(self._dashboard_path, name)
-                    operator_name = os.path.join(tmpdir, name)
 
-                    container.make_dir(os.path.dirname(workload_name), make_parents=True)
-                    f = open(operator_name)
-                    container.push(workload_name, f)
-                    f.close()
+                # remove the existing dashboard from the workload/
+                if container.exists(self._dashboard_path):
+                    container.remove_path(self._dashboard_path)
 
-                    # os.chown(workload_name, 0, 0)
+                # push the untared dashboard to the container.
+                container.push_path(os.path.join(tmpdir, '*'), self._dashboard_path)
+                # push the hash of the new dashboard to the container.
+                container.push(self._dashboard_hash_path, dashboard_hash)
 
-            args = {'JIMM_DASHBOARD_LOCATION': self._dashboard_path}
-            self._update_workload(args, event)
+    def _path_exists_in_workload(self, path: str):
+        ''' Returns true if the specified path exists in the
+        workload container. '''
+        container = self.unit.get_container(WORKLOAD_CONTAINER)
+        if container.can_connect():
+            return container.exists(path)
+        return False
+
+    def _push_to_workload(self, filename, content, event):
+        ''' Create file on the workload container with
+        the specified content. '''
+
+        container = self.unit.get_container(WORKLOAD_CONTAINER)
+        if container.can_connect():
+            logger.info('pushing file {} to the workload containe'.format(filename))
+            container.push(filename, content, make_dirs=True)
+        else:
+            logger.info('workload container not ready - defering')
+            event.defer()
 
     def _create_postgres_schema(self, dsn):
         container = self.unit.get_container(WORKLOAD_CONTAINER)
 
-        if not container.can_connect():
-            return
-
-        if not container.exists('/root/sql/postgres'):
-            return
-
+        # only the leader should be able to create the schema.
         if not self.unit.is_leader():
             return
 
+        # if we can't connect to the container, then return.
+        if not container.can_connect():
+            return
+
+        # if the folder with sql files does not exists, we return.
+        if not container.exists('/root/sql/postgres'):
+            return
+
+        # get the jimm peer relation.
         jimm_relation = self.model.get_relation("jimm")
+        # if it does not exist, return.
         if not jimm_relation:
             return
-
+        # if relation already contains 'schema-created' that
+        # means the schema has already been created.
         if self.app not in jimm_relation.data:
-            return
+            if 'schema-created' in jimm_relation.data[self.app]:
+                return
 
-        if 'schema-created' in jimm_relation.data[self.app]:
-            return
+        # otherwise run through schema creation steps.
 
         self._run_sql(container, dsn, '/root/sql/postgres/versions.sql')
 
@@ -374,6 +419,8 @@ class JimmOperatorCharm(CharmBase):
         for file in sql_files:
             self._run_sql(container, dsn, file.path)
 
+        # and store 'schema-created' in relation data signaling
+        # that the schema has been created.
         jimm_relation.data[self.app].update({'schema-created': "done"})
 
     def _run_sql(self, container, dsn, filename):
@@ -385,6 +432,18 @@ class JimmOperatorCharm(CharmBase):
             logger.error('error running sql {}. error code {}'.format(filename, e.exit_code))
             for line in e.stderr.splitlines():
                 logger.error('    %s', line)
+
+    def _hash(self, filename):
+        BUF_SIZE = 65536
+        md5 = hashlib.md5()
+
+        with open(filename, 'rb') as f:
+            while True:
+                data = f.read(BUF_SIZE)
+                if not data:
+                    break
+                md5.update(data)
+            return md5.hexdigest()
 
 
 if __name__ == '__main__':
