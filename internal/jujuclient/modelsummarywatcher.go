@@ -14,7 +14,7 @@ import (
 // SupportsModelSummaryWatcher reports whether the controller supports
 // the Controller.WatchAllModelSummaries method.
 func (c Connection) SupportsModelSummaryWatcher() bool {
-	return c.hasFacadeVersion("Controller", 9)
+	return c.hasFacadeVersion("Controller", 9) || c.hasFacadeVersion("Controller", 11)
 }
 
 // WatchAllModelSummaries initialises a new AllModelSummaryWatcher. On
@@ -24,7 +24,7 @@ func (c Connection) SupportsModelSummaryWatcher() bool {
 func (c Connection) WatchAllModelSummaries(ctx context.Context) (string, error) {
 	const op = errors.Op("jujuclient.WatchAllModelSummaries")
 	var resp jujuparams.SummaryWatcherID
-	if err := c.client.Call(ctx, "Controller", 9, "", "WatchAllModelSummaries", nil, &resp); err != nil {
+	if err := c.CallHighestFacadeVersion(ctx, "Controller", []int{11, 9}, "", "WatchAllModelSummaries", nil, &resp); err != nil {
 		return "", errors.E(op, jujuerrors.Cause(err))
 	}
 	return resp.WatcherID, nil

@@ -54,18 +54,20 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 
 	api, err := j.dial(ctx, ctl, names.ModelTag{})
 	if err != nil {
-		return fail(errors.E(op, err))
+		zapctx.Error(ctx, "failed to dial the controller", zaputil.Error(err))
+		return fail(errors.E(op, err, "failed to dial the controller"))
 	}
 	defer api.Close()
 	ale.Tag = names.NewControllerTag(ctl.UUID).String()
 
 	var ms jujuparams.ModelSummary
 	if err := api.ControllerModelSummary(ctx, &ms); err != nil {
-		return fail(errors.E(op, err))
+		zapctx.Error(ctx, "failed to get model summary", zaputil.Error(err))
+		return fail(errors.E(op, err, "failed to get model summary"))
 	}
 	ct, err := names.ParseCloudTag(ms.CloudTag)
 	if err != nil {
-		return fail(errors.E(op, err))
+		return fail(errors.E(op, err, "failed to parse the cloud tag"))
 	}
 	ctl.CloudName = ct.Id()
 	ctl.CloudRegion = ms.CloudRegion
@@ -73,7 +75,7 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 
 	clouds, err := api.Clouds(ctx)
 	if err != nil {
-		return fail(errors.E(op, err))
+		return fail(errors.E(op, err, "failed to fetch controller clouds"))
 	}
 
 	var dbClouds []dbmodel.Cloud
@@ -111,7 +113,7 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 	if j.CredentialStore != nil {
 		err := j.CredentialStore.PutControllerCredentials(ctx, ctl.Name, ctl.AdminUser, ctl.AdminPassword)
 		if err != nil {
-			return fail(errors.E(op, err))
+			return fail(errors.E(op, err, "failed to store controller credentials"))
 		}
 		credentialsStored = true
 	}
