@@ -12,7 +12,6 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-
 from charm import JimmOperatorCharm
 from ops.testing import Harness
 
@@ -164,6 +163,10 @@ class TestCharm(unittest.TestCase):
         container = self.harness.model.unit.get_container("jimm")
         self.harness.charm.on.jimm_pebble_ready.emit(container)
 
+        rel_id = self.harness.add_relation('dashboard', 'juju-dashboard')
+        self.harness.add_relation_unit(rel_id, 'juju-dashboard/0')
+
+
         self.harness.set_leader(True)
         self.harness.update_config(MINIMAL_CONFIG)
 
@@ -201,7 +204,7 @@ class TestCharm(unittest.TestCase):
         container = self.harness.model.unit.get_container('jimm')
         self.harness.charm.on.jimm_pebble_ready.emit(container)
 
-        rel_id = self.harness.add_relation('website', 'haproxu')
+        rel_id = self.harness.add_relation('website', 'haproxy')
         self.harness.add_relation_unit(rel_id, 'haproxy/0')
 
         rel_data = self.harness.get_relation_data(

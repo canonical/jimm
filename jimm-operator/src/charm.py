@@ -16,20 +16,20 @@
 
 
 import functools
-import logging
+import hashlib
 import json
+import logging
 import os
 import tarfile
 import tempfile
-import hashlib
 
 import hvac
-
-from ops.charm import CharmBase
-from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus, ModelError
 from charmhelpers.contrib.charmsupport.nrpe import NRPE
 from ops import pebble
+from ops.charm import CharmBase
+from ops.main import main
+from ops.model import (ActiveStatus, BlockedStatus, MaintenanceStatus,
+                       ModelError, WaitingStatus)
 
 logger = logging.getLogger(__name__)
 
@@ -228,6 +228,16 @@ class JimmOperatorCharm(CharmBase):
         else:
             logger.info('workload container not ready - defering')
             event.defer()
+
+        dashboard_relation = self.model.get_relation("dashboard")
+        if dashboard_relation:
+            dashboard_relation.data[self.app].update({
+                'controller-url': self.config['dns-name'],
+                'identity-provider-url': self.config['candid-url'],
+                'is-juju': str(False),
+            })
+
+
 
     @log_event_handler
     def _on_start(self, _):

@@ -10,15 +10,15 @@ import os
 import shutil
 import socket
 import subprocess
-import urllib
 import tarfile
+import urllib
 
 import hvac
-from jinja2 import Environment, FileSystemLoader
-
 from charmhelpers.contrib.charmsupport.nrpe import NRPE
+from jinja2 import Environment, FileSystemLoader
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, ModelError, WaitingStatus
+from ops.model import (ActiveStatus, BlockedStatus, MaintenanceStatus,
+                       ModelError, WaitingStatus)
 
 from systemd import SystemdCharm
 
@@ -96,6 +96,14 @@ class JimmCharm(SystemdCharm):
         if self._ready():
             self.restart()
         self._on_update_status(None)
+
+        dashboard_relation = self.model.get_relation("dashboard")
+        if dashboard_relation:
+            dashboard_relation.data[self.app].update({
+                'controller-url': self.config['dns-name'],
+                'identity-provider-url': self.config['candid-url'],
+                'is-juju': str(False),
+            })
 
     def _on_leader_elected(self, _):
         """Update the JIMM configuration that comes from unit
