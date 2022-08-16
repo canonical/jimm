@@ -15,12 +15,14 @@ import (
 	"fmt"
 	"net/url"
 	"path"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
+	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
@@ -69,6 +71,9 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 		// If there is a public-address configured it is almost
 		// certainly the one we want to use, try it first.
 		client, err = dialer.Dial(ctx, websocketURL(ctl.PublicAddress, modelTag))
+		if err != nil {
+			zapctx.Error(ctx, "failed to dial public address", zaputil.Error(err))
+		}
 	}
 	if client == nil {
 		var urls []string
@@ -108,7 +113,7 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 	args := jujuparams.LoginRequest{
 		AuthTag:       names.NewUserTag(username).String(),
 		Credentials:   password,
-		ClientVersion: "2.9.0", // claim to be a 2.9 client.
+		ClientVersion: "2.9.33", // claim to be a 2.9.33 client.
 	}
 
 	var res jujuparams.LoginResult
@@ -202,8 +207,8 @@ func dialAll(ctx context.Context, dialer *rpc.Dialer, urls []string) (*rpc.Clien
 	return client, nil
 }
 
-const pingTimeout = 30 * time.Second
-const pingInterval = time.Minute
+const pingTimeout = 15 * time.Second
+const pingInterval = 30 * time.Second
 
 // monitor runs in the background ensuring the client connection is kept alive.
 func monitor(client *rpc.Client, doneC <-chan struct{}, broken *uint32) {
@@ -266,4 +271,16 @@ func (c Connection) IsBroken() bool {
 // facade at the given version.
 func (c Connection) hasFacadeVersion(facade string, version int) bool {
 	return c.facadeVersions[fmt.Sprintf("%s\x1f%d", facade, version)]
+}
+
+// CallHighestFacadeVersion calls the specified method on the highest supported version of
+// the facade.
+func (c Connection) CallHighestFacadeVersion(ctx context.Context, facade string, versions []int, id, method string, args, resp interface{}) error {
+	sort.Sort(sort.Reverse(sort.IntSlice(versions)))
+	for _, version := range versions {
+		if c.hasFacadeVersion(facade, version) {
+			return c.client.Call(ctx, facade, version, id, method, args, resp)
+		}
+	}
+	return errors.E(fmt.Sprintf("facade %v version %v not supported", facade, versions))
 }

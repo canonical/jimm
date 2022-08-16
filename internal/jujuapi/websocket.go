@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	requestTimeout        = 30 * time.Second
+	requestTimeout        = 1 * time.Minute
 	maxRequestConcurrency = 10
 	pingTimeout           = 90 * time.Second
 )
