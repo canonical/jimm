@@ -6,9 +6,11 @@ import (
 	"context"
 	"time"
 
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/network"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
+	"github.com/juju/zaputil"
+	"github.com/juju/zaputil/zapctx"
 
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
 	"github.com/CanonicalLtd/jimm/internal/db"
@@ -183,6 +185,7 @@ func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddCon
 	}
 	ctl.Addresses = dbmodel.HostPorts{jujuparams.FromProviderHostPorts(nphps)}
 	if err := r.jimm.AddController(ctx, r.user, &ctl); err != nil {
+		zapctx.Error(ctx, "failed to add controller", zaputil.Error(err))
 		return apiparams.ControllerInfo{}, errors.E(op, err)
 	}
 	return ctl.ToAPIControllerInfo(), nil

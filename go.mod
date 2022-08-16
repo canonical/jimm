@@ -3,6 +3,7 @@ module github.com/CanonicalLtd/jimm
 go 1.16
 
 require (
+	cloud.google.com/go/compute v1.8.0 // indirect
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/canonical/candid v1.10.1
 	github.com/canonical/go-dqlite v1.8.0
@@ -11,7 +12,7 @@ require (
 	github.com/go-macaroon-bakery/macaroon-bakery/v3 v3.0.0-20220204130128-afeebcc9521d
 	github.com/gobwas/glob v0.2.4-0.20181002190808-e7a84e9525fe // indirect
 	github.com/google/go-cmp v0.5.8
-	github.com/google/uuid v1.2.0
+	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/gosuri/uitable v0.0.1
 	github.com/hashicorp/vault/api v1.1.0
@@ -40,7 +41,7 @@ require (
 	github.com/prometheus/common v0.29.0 // indirect
 	github.com/rogpeppe/fastuuid v1.2.0
 	go.uber.org/zap v1.10.0
-	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 	gopkg.in/juju/names.v2 v2.0.0-20190813004204-e057c73bd1be // indirect
 	gopkg.in/macaroon-bakery.v2 v2.3.0

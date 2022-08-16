@@ -7,15 +7,15 @@ import (
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	jujuerrors "github.com/juju/errors"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/crossmodel"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 
 	"github.com/CanonicalLtd/jimm/internal/errors"
 )
 
 // Offer creates a new ApplicationOffer on the controller. Offer uses the
-// Offer procedure on the ApplicationOffers facade version 2.
+// Offer procedure on the ApplicationOffers facade.
 func (c Connection) Offer(ctx context.Context, offerURL crossmodel.OfferURL, offer jujuparams.AddApplicationOffer) error {
 	const op = errors.Op("jujuclient.Offer")
 	args := jujuparams.AddApplicationOffers{
@@ -64,7 +64,7 @@ func (c Connection) Offer(ctx context.Context, offerURL crossmodel.OfferURL, off
 
 // ListApplicationOffers lists ApplicationOffers on the controller matching
 // the given filters. ListApplicationOffers uses the ListApplicationOffers
-// procedure on the ApplicationOffers facade version 2.
+// procedure on the ApplicationOffers facade.
 func (c Connection) ListApplicationOffers(ctx context.Context, filters []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
 	const op = errors.Op("jujuclient.ListApplicationOffers")
 	args := jujuparams.OfferFilters{
@@ -72,7 +72,7 @@ func (c Connection) ListApplicationOffers(ctx context.Context, filters []jujupar
 	}
 
 	var resp jujuparams.QueryApplicationOffersResults
-	err := c.client.Call(ctx, "ApplicationOffers", 2, "", "ListApplicationOffers", &args, &resp)
+	err := c.CallHighestFacadeVersion(ctx, "ApplicationOffers", []int{4, 2}, "", "ListApplicationOffers", &args, &resp)
 	if err != nil {
 		return nil, errors.E(op, jujuerrors.Cause(err))
 	}
@@ -81,7 +81,7 @@ func (c Connection) ListApplicationOffers(ctx context.Context, filters []jujupar
 
 // FindApplicationOffers finds ApplicationOffers on the controller matching
 // the given filters. FindApplicationOffers uses the FindApplicationOffers
-// procedure on the ApplicationOffers facade version 2.
+// procedure on the ApplicationOffers facade.
 func (c Connection) FindApplicationOffers(ctx context.Context, filters []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetails, error) {
 	const op = errors.Op("jujuclient.FindApplicationOffers")
 	args := jujuparams.OfferFilters{
@@ -89,7 +89,7 @@ func (c Connection) FindApplicationOffers(ctx context.Context, filters []jujupar
 	}
 
 	var resp jujuparams.QueryApplicationOffersResults
-	err := c.client.Call(ctx, "ApplicationOffers", 2, "", "FindApplicationOffers", &args, &resp)
+	err := c.CallHighestFacadeVersion(ctx, "ApplicationOffers", []int{4, 2}, "", "FindApplicationOffers", &args, &resp)
 	if err != nil {
 		return nil, errors.E(op, jujuerrors.Cause(err))
 	}
@@ -100,7 +100,7 @@ func (c Connection) FindApplicationOffers(ctx context.Context, filters []jujupar
 // ApplicationOffer. The given ApplicationOfferAdminDetails must specify an
 // OfferURL the rest of the structure will be filled in by the API request.
 // GetApplicationOffer uses the ApplicationOffers procedure on the
-// ApplicationOffers facade version 2.
+// ApplicationOffers facade.
 func (c Connection) GetApplicationOffer(ctx context.Context, info *jujuparams.ApplicationOfferAdminDetails) error {
 	const op = errors.Op("jujuclient.GetApplicationOffer")
 	args := jujuparams.OfferURLs{
@@ -110,7 +110,7 @@ func (c Connection) GetApplicationOffer(ctx context.Context, info *jujuparams.Ap
 	resp := jujuparams.ApplicationOffersResults{
 		Results: make([]jujuparams.ApplicationOfferResult, 1),
 	}
-	err := c.client.Call(ctx, "ApplicationOffers", 2, "", "ApplicationOffers", &args, &resp)
+	err := c.CallHighestFacadeVersion(ctx, "ApplicationOffers", []int{4, 2}, "", "ApplicationOffers", &args, &resp)
 	if err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}
@@ -123,8 +123,7 @@ func (c Connection) GetApplicationOffer(ctx context.Context, info *jujuparams.Ap
 
 // GrantApplicationOfferAccess grants the specified permission to the
 // given user on the given application offer. GrantApplicationOfferAccess
-// uses the ModifyOfferAccess procedure on the ApplicationOffers facade
-// version 2.
+// uses the ModifyOfferAccess procedure on the ApplicationOffers facade..
 func (c Connection) GrantApplicationOfferAccess(ctx context.Context, offerURL string, user names.UserTag, access jujuparams.OfferAccessPermission) error {
 	const op = errors.Op("jujuclient.GrantApplicationOfferAccess")
 	args := jujuparams.ModifyOfferAccessRequest{
@@ -139,7 +138,7 @@ func (c Connection) GrantApplicationOfferAccess(ctx context.Context, offerURL st
 	resp := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, 1),
 	}
-	err := c.client.Call(ctx, "ApplicationOffers", 2, "", "ModifyOfferAccess", &args, &resp)
+	err := c.CallHighestFacadeVersion(ctx, "ApplicationOffers", []int{4, 2}, "", "ModifyOfferAccess", &args, &resp)
 	if err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}
@@ -151,8 +150,7 @@ func (c Connection) GrantApplicationOfferAccess(ctx context.Context, offerURL st
 
 // RevokeApplicationOfferAccess revokes the specified permission from the
 // given user on the given application offer. RevokeApplicationOfferAccess
-// uses the ModifyOfferAccess procedure on the ApplicationOffers facade
-// version 1.
+// uses the ModifyOfferAccess procedure on the ApplicationOffers facade.
 func (c Connection) RevokeApplicationOfferAccess(ctx context.Context, offerURL string, user names.UserTag, access jujuparams.OfferAccessPermission) error {
 	const op = errors.Op("jujuclient.RevokeApplicationOfferAccess")
 	args := jujuparams.ModifyOfferAccessRequest{
@@ -167,7 +165,7 @@ func (c Connection) RevokeApplicationOfferAccess(ctx context.Context, offerURL s
 	resp := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, 1),
 	}
-	err := c.client.Call(ctx, "ApplicationOffers", 2, "", "ModifyOfferAccess", &args, &resp)
+	err := c.CallHighestFacadeVersion(ctx, "ApplicationOffers", []int{4, 2}, "", "ModifyOfferAccess", &args, &resp)
 	if err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}
@@ -179,7 +177,7 @@ func (c Connection) RevokeApplicationOfferAccess(ctx context.Context, offerURL s
 
 // DestroyApplicationOffer destroys the given application offer.
 // DestroyApplicationOffer uses the DestroyOffers procedure
-// from the ApplicationOffers facade version 2.
+// from the ApplicationOffers facade.
 func (c Connection) DestroyApplicationOffer(ctx context.Context, offer string, force bool) error {
 	const op = errors.Op("jujuclient.DestroyApplicationOffer")
 	args := jujuparams.DestroyApplicationOffers{
@@ -190,7 +188,7 @@ func (c Connection) DestroyApplicationOffer(ctx context.Context, offer string, f
 	resp := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, 1),
 	}
-	err := c.client.Call(ctx, "ApplicationOffers", 2, "", "DestroyOffers", &args, &resp)
+	err := c.CallHighestFacadeVersion(ctx, "ApplicationOffers", []int{4, 2}, "", "DestroyOffers", &args, &resp)
 	if err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}
@@ -204,7 +202,7 @@ func (c Connection) DestroyApplicationOffer(ctx context.Context, offer string, f
 // consume an application offer. The given ConsumeOfferDetails structure
 // must include an Offer.OfferURL and the rest of the structure will be
 // filled in by the API call. GetApplicationOfferConsumeDetails uses the
-// GetConsumeDetails procedure on the ApplicationOffers facade version 3.
+// GetConsumeDetails procedure on the ApplicationOffers facade.
 func (c Connection) GetApplicationOfferConsumeDetails(ctx context.Context, user names.UserTag, info *jujuparams.ConsumeOfferDetails, v bakery.Version) error {
 	const op = errors.Op("jujuclient.GetApplicationOfferConsumeDetails")
 	args := jujuparams.ConsumeOfferDetailsArg{
@@ -218,7 +216,7 @@ func (c Connection) GetApplicationOfferConsumeDetails(ctx context.Context, user 
 	resp := jujuparams.ConsumeOfferDetailsResults{
 		Results: make([]jujuparams.ConsumeOfferDetailsResult, 1),
 	}
-	err := c.client.Call(ctx, "ApplicationOffers", 3, "", "GetConsumeDetails", &args, &resp)
+	err := c.CallHighestFacadeVersion(ctx, "ApplicationOffers", []int{4, 3}, "", "GetConsumeDetails", &args, &resp)
 	if err != nil {
 		return errors.E(op, jujuerrors.Cause(err))
 	}
