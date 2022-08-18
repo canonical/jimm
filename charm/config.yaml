@@ -47,6 +47,11 @@ options:
     description: |
       A comma-separated list of nagios servicegroups.
       If left empty, the nagios_context will be used as the servicegroup
-  uuid:
+  uuid: 
     type: string
     description: The UUID advertised by the JIMM controller.
+  juju-dashboard-location:
+    type: string
+    default: https://jaas.ai/models
+    description: URL of the Juju Dashboard for this controller.
+

@@ -65,3 +65,7 @@ options:
   dsn:
     type: string
     description: DSN string.
+  juju-dashboard-location:
+    type: string
+    default: https://jaas.ai/models
+    description: URL of the Juju Dashboard for this controller.

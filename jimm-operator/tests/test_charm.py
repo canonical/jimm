@@ -12,7 +12,6 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-
 from charm import JimmOperatorCharm
 from ops.testing import Harness
 
@@ -64,7 +63,8 @@ class TestCharm(unittest.TestCase):
                         'JIMM_DASHBOARD_LOCATION': 'https://jaas.ai/models',
                         'JIMM_LISTEN_ADDR': ':8080',
                         'JIMM_LOG_LEVEL': 'info',
-                        'JIMM_UUID': '1234567890'
+                        'JIMM_UUID': '1234567890',
+                        'JIMM_WATCH_CONTROLLERS': '1'
                     }
                 }
             }}
@@ -97,7 +97,8 @@ class TestCharm(unittest.TestCase):
                         'JIMM_DASHBOARD_LOCATION': 'https://jaas.ai/models',
                         'JIMM_LISTEN_ADDR': ':8080',
                         'JIMM_LOG_LEVEL': 'info',
-                        'JIMM_UUID': '1234567890'
+                        'JIMM_UUID': '1234567890',
+                        'JIMM_WATCH_CONTROLLERS': '1'
                     }
                 }
             }}
@@ -162,8 +163,12 @@ class TestCharm(unittest.TestCase):
         container = self.harness.model.unit.get_container("jimm")
         self.harness.charm.on.jimm_pebble_ready.emit(container)
 
-        self.harness.update_config(MINIMAL_CONFIG)
+        rel_id = self.harness.add_relation('dashboard', 'juju-dashboard')
+        self.harness.add_relation_unit(rel_id, 'juju-dashboard/0')
+
+
         self.harness.set_leader(True)
+        self.harness.update_config(MINIMAL_CONFIG)
 
         self.harness.charm.on.leader_elected.emit()
 
@@ -179,9 +184,9 @@ class TestCharm(unittest.TestCase):
                     'command': '/root/jimmsrv',
                     'environment': {
                         'CANDID_URL': 'test-candid-url',
+                        'JIMM_DASHBOARD_LOCATION': 'https://jaas.ai/models',
                         'JIMM_DNS_NAME': 'jimm.testing',
                         'JIMM_DSN': 'test-dsn',
-                        'JIMM_DASHBOARD_LOCATION': 'https://jaas.ai/models',
                         'JIMM_LISTEN_ADDR': ':8080',
                         'JIMM_LOG_LEVEL': 'info',
                         'JIMM_UUID': '1234567890',
@@ -199,7 +204,7 @@ class TestCharm(unittest.TestCase):
         container = self.harness.model.unit.get_container('jimm')
         self.harness.charm.on.jimm_pebble_ready.emit(container)
 
-        rel_id = self.harness.add_relation('website', 'haproxu')
+        rel_id = self.harness.add_relation('website', 'haproxy')
         self.harness.add_relation_unit(rel_id, 'haproxy/0')
 
         rel_data = self.harness.get_relation_data(
@@ -315,6 +320,10 @@ class TestCharm(unittest.TestCase):
             container.exists('/root/dashboard/README.md'),
             True
         )
+        self.assertEqual(
+            container.exists('/root/dashboard/hash'),
+            True
+        )
 
         readme_data = container.pull('/root/dashboard/README.md')
         self.assertEqual(
@@ -337,3 +346,26 @@ class TestCharm(unittest.TestCase):
         dashboard_archive.seek(0)
         data = dashboard_archive.read()
         return data
+
+    def test_dashboard_relation_joined(self):
+        harness = Harness(JimmOperatorCharm)
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        harness.set_leader(True)
+        harness.update_config({
+            "dns-name": "https://jimm.example.com",
+            "candid-agent-username": "username@candid",
+            "candid-agent-private-key": "agent-private-key",
+            "candid-agent-public-key": "agent-public-key",
+            "candid-url": "https://candid.example.com",
+            "controller-admins": "user1 user2 group1",
+            "uuid": "caaa4ba4-e2b5-40dd-9bf3-2bd26d6e17aa",
+        })
+
+        id = harness.add_relation('dashboard', 'juju-dashboard')
+        harness.add_relation_unit(id, 'juju-dashboard/0')
+        data = harness.get_relation_data(id, "jimm-k8s")
+        self.assertTrue(data)
+        self.assertEqual(data["controller-url"], "https://jimm.example.com")
+        self.assertEqual(data["identity-provider-url"], "https://candid.example.com")
+        self.assertEqual(data["is-juju"], "False")
