@@ -23,6 +23,10 @@ MINIMAL_CONFIG = {
 }
 
 
+class mockExec():
+    def wait_output():
+        return True
+
 class TestCharm(unittest.TestCase):
     def setUp(self):
         self.maxDiff = None
@@ -37,6 +41,9 @@ class TestCharm(unittest.TestCase):
         self.harness.charm.framework.charm_dir = pathlib.Path(self.tempdir.name)
 
         self.harness.container_pebble_ready('jimm')
+        
+        rel_id = self.harness.add_relation('ingress', 'nginx-ingress')
+        self.harness.add_relation_unit(rel_id, 'nginx-ingress/0')
 
     def test_on_pebble_ready(self):
         self.harness.update_config(MINIMAL_CONFIG)
@@ -278,7 +285,10 @@ class TestCharm(unittest.TestCase):
             }
         )
 
-    def test_install_dashboard(self):
+    @patch('ops.model.Container.exec')
+    def test_install_dashboard(self, exec):
+        exec.unwrap.return_value = mockExec()
+
         container = self.harness.model.unit.get_container("jimm")
 
         self.harness.add_resource("dashboard", self.dashboard_tarfile())
@@ -317,7 +327,7 @@ class TestCharm(unittest.TestCase):
             True
         )
         self.assertEqual(
-            container.exists('/root/dashboard/README.md'),
+            container.exists('/root/dashboard/dashboard.tar.bz2'),
             True
         )
         self.assertEqual(
@@ -325,11 +335,6 @@ class TestCharm(unittest.TestCase):
             True
         )
 
-        readme_data = container.pull('/root/dashboard/README.md')
-        self.assertEqual(
-            readme_data.read(),
-            'Hello world'
-        )
 
     def dashboard_tarfile(self):
         dashboard_archive = io.BytesIO()
