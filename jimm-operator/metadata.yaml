@@ -24,6 +24,10 @@ provides:
   dashboard:
     interface: juju-dashboard
 
+requires:
+  ingress:
+    interface: ingress
+
 containers:
   jimm:
     resource: jimm-image

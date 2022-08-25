@@ -25,6 +25,7 @@ import tempfile
 
 import hvac
 from charmhelpers.contrib.charmsupport.nrpe import NRPE
+from charms.nginx_ingress_integrator.v0.ingress import IngressRequires
 from ops import pebble
 from ops.charm import CharmBase
 from ops.main import main
@@ -70,6 +71,12 @@ class JimmOperatorCharm(CharmBase):
         self.framework.observe(self.on.website_relation_joined, self._on_website_relation_joined)
         self.framework.observe(self.on.dashboard_relation_joined,
                                self._on_dashboard_relation_joined)
+        self.ingress = IngressRequires(
+            self, {
+                "service-hostname": self.config.get('dns-name',''),
+                "service-name": self.app.name,
+                "service-port": 8080
+            })
 
         self._local_agent_filename = 'agent.json'
         self._local_vault_secret_filename = 'vault_secret.js'
@@ -162,6 +169,8 @@ class JimmOperatorCharm(CharmBase):
         self._ensure_bakery_agent_file(event)
         self._ensure_vault_config(event)
         self._install_dashboard(event)
+
+        self.ingress.update_config({"service-hostname": self.config.get('dns-name', '')})
 
         config_values = {
             'CANDID_PUBLIC_KEY': self.config.get('candid-public-key', ''),
@@ -360,20 +369,25 @@ class JimmOperatorCharm(CharmBase):
 
         self.unit.status = MaintenanceStatus("installing dashboard")
 
-        # create a temporary directory.
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # untar the dashboard tarball.
-            with tarfile.open(dashboard_file, mode="r:bz2") as tf:
-                tf.extractall(tmpdir)
+        # remove the existing dashboard from the workload/
+        if container.exists(self._dashboard_path):
+            container.remove_path(self._dashboard_path)
+        
+        container.make_dir(self._dashboard_path, make_parents=True)
 
-                # remove the existing dashboard from the workload/
-                if container.exists(self._dashboard_path):
-                    container.remove_path(self._dashboard_path)
+        logger.error('pushing file {} to {}'.format(dashboard_file, os.path.join(self._dashboard_path, 'dashboard.tar.bz2')))
+        with open(dashboard_file, 'rb') as f:
+            container.push(os.path.join(self._dashboard_path, 'dashboard.tar.bz2'), f)
 
-                # push the untared dashboard to the container.
-                container.push_path(os.path.join(tmpdir, '*'), self._dashboard_path)
-                # push the hash of the new dashboard to the container.
-                container.push(self._dashboard_hash_path, dashboard_hash)
+        process = container.exec(['tar', 'xvf', os.path.join(self._dashboard_path, 'dashboard.tar.bz2'), '-C', self._dashboard_path])
+        try:
+            process.wait_output()
+        except pebble.ExecError as e:
+            logger.error('error running untaring the dashboard. error code {}'.format(e.exit_code))
+            for line in e.stderr.splitlines():
+                logger.error('    %s', line)
+        
+        self._push_to_workload(self._dashboard_hash_path, dashboard_hash, event)
 
     def _path_exists_in_workload(self, path: str):
         ''' Returns true if the specified path exists in the
