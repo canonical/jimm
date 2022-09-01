@@ -213,7 +213,7 @@ func (c Connection) ControllerModelSummary(ctx context.Context, ms *jujuparams.M
 func (c Connection) ValidateModelUpgrade(ctx context.Context, model names.ModelTag, force bool) error {
 	const op = errors.Op("jujuclient.ValidateModelUpgrade")
 	args := jujuparams.ValidateModelUpgradeParams{
-		Models: []jujuparams.ValidateModelUpgradeParam{{
+		Models: []jujuparams.ModelParam{{
 			ModelTag: model.String(),
 		}},
 		Force: force,

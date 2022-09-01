@@ -3,7 +3,7 @@
 
 set -eu
 
-charm_name=jimm
+charm_name=juju-jimm
 image=${image:-ubuntu:20.04}
 container=${container:-${charm_name}-charm-`uuidgen`}
 
