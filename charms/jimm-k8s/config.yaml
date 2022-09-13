@@ -62,9 +62,6 @@ options:
   vault-token:
     type: string
     description: Vault Token.
-  dsn:
-    type: string
-    description: DSN string.
   juju-dashboard-location:
     type: string
     default: https://jaas.ai/models
