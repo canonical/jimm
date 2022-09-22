@@ -3,7 +3,7 @@
 
 set -eu
 
-charm_name=jimm-k8s
+charm_name=juju-jimm-k8s
 image=${image:-ubuntu:20.04}
 container=${container:-${charm_name}-charm-`uuidgen`}
 
@@ -49,8 +49,8 @@ echo "Transfer data"
 tar c -C `dirname $0`/.. . | cwd=/home/ubuntu/src lxd_exec_ubuntu tar x
 
 echo "Charmcraft build"
-cwd=/home/ubuntu/src/jimm-operator lxd_exec_ubuntu sudo -E charmcraft pack --verbose --destructive-mode
+cwd=/home/ubuntu/src/charms/jimm-k8s lxd_exec_ubuntu sudo -E charmcraft pack --verbose --destructive-mode
 echo "Find file"
-charmfile=`lxd_exec_ubuntu find /home/ubuntu/src -name "${charm_name}_*.charm"| head -1`
+charmfile=`lxd_exec_ubuntu find /home/ubuntu/src/charms/jimm-k8s -name "${charm_name}_*.charm"| head -1`
 echo "Pull file"
 lxc file pull $container$charmfile .

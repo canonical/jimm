@@ -1,6 +1,6 @@
 # Copyright 2021 Canonical Ltd
 # See LICENSE file for licensing details.
-name: jimm
+name: juju-jimm
 description: |
   Juju controller used by the JAAS service to manage models across a 
   number of clouds.

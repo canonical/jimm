@@ -3,7 +3,7 @@
 
 # For a complete list of supported options, see:
 # https://juju.is/docs/sdk/metadata-reference
-name: jimm-k8s
+name: juju-jimm-k8s
 display-name: |
   JIMM
 description: |
