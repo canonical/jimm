@@ -15,7 +15,6 @@ FROM build as build-with-github-auth
 ARG AUTH_TYPE
 ARG GIT_COMMIT
 ARG VERSION
-ARG TAGS
 WORKDIR /usr/src/jimm
 SHELL ["/bin/bash", "-c"]
 COPY . .
@@ -32,7 +31,8 @@ RUN --mount=type=secret,id=ghuser \
     git config --global --add url."git@github.com:".insteadOf "https://github.com/" && \
     echo "SSH auth selected"; \
     fi
-RUN ./scripts/set-version.sh
+RUN echo "${GIT_COMMIT}" | tee ./version/commit.txt
+RUN echo "${VERSION}" | tee ./version/version.txt
 RUN --mount=type=ssh source /root/.gvm/scripts/gvm && go mod vendor
 RUN --mount=type=ssh source /root/.gvm/scripts/gvm && go build -o jimmsrv -race -v -a -mod vendor ./cmd/jimmsrv
 

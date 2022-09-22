@@ -1,0 +1,129 @@
+def jimmImageBuildNumber
+def jimmSnapBuildNumber
+def jimmCharmBuildNumber
+def jimmCharmK8SBuildNumber
+
+def candidImageBuildNumber
+def candidSnapBuildNumber
+def candidCharmBuildNumber
+def candidCharmK8SBuildNumber
+
+pipeline {
+    agent any
+
+    
+    stages {
+        stage('BUILD JIMM SNAP'){
+            steps{
+                script{
+                    def result=build job: 'build-snaps-jimm'
+                    jimmSnapBuildNumber = result.getNumber()
+                }
+            }
+        }
+        stage('BUILD CANDID SNAP'){
+            steps{
+                script{
+                    def result=build job: 'build-snaps-candid'
+                    candidSnapBuildNumber = result.getNumber()
+                }
+            }
+        }
+        stage('BUILD CANDID OCI IMAGE'){
+            steps{
+                script{
+                    def result=build job: 'build-oci-image-candid'
+                    candidImageBuildNumber = result.getNumber()
+                }
+            }
+        }
+        stage('BUILD JIMM OCI IMAGE'){
+            steps{
+                script{
+                    def result=build job: 'build-oci-image-jimm'
+                    jimmImageBuildNumber = result.getNumber()
+                }
+            }
+        }
+        stage('BUILD CANDID CHARM'){
+            steps{
+                script{
+                    def result=build job: 'build-charm-candid'
+                    candidCharmBuildNumber = result.getNumber()
+                }
+            }
+        }
+        stage('BUILD CANDID K8S CHARM'){
+            steps{
+                script{
+                    def result=build job: 'build-charm-candid-k8s'
+                    candidCharmK8SBuildNumber = result.getNumber()
+                }
+            }
+        }
+        stage('BUILD JIMM CHARM'){
+            steps{
+                script{
+                    def result=build job: 'build-charm-jimm'
+                    jimmCharmBuildNumber = result.getNumber()
+                }
+            }
+        }
+        stage('BUILD JIMM K8S CHARM'){
+            steps{
+                script{
+                    def result=build job: 'build-charm-jimm-k8s'
+                    jimmCharmK8SBuildNumber = result.getNumber()
+                }
+            }
+        }
+        stage('GATHER ARTIFACTS'){
+            steps{
+                dir ("${env.WORKSPACE}/build"){
+                    copyArtifacts projectName: 'build-snaps-candid',
+                                fingerprintArtifacts: true,
+                                filter: '*.snap',
+                                selector: specific("${candidSnapBuildNumber}")
+                    copyArtifacts projectName: 'build-snaps-jimm',
+                                fingerprintArtifacts: true,
+                                filter: '*.snap',
+                                selector: specific("${jimmSnapBuildNumber}")
+                    
+                    copyArtifacts projectName: 'build-oci-image-candid',
+                                fingerprintArtifacts: true,
+                                filter: 'candid-image.tar.gz',
+                                selector: specific("${candidImageBuildNumber}")
+                    copyArtifacts projectName: 'build-oci-image-jimm',
+                                fingerprintArtifacts: true,
+                                filter: 'jimm-image.tar.gz',
+                                selector: specific("${jimmImageBuildNumber}")
+                    
+                    copyArtifacts projectName: 'build-charm-candid',
+                                fingerprintArtifacts: true,
+                                filter: 'candid_ubuntu-20.04-amd64.charm',
+                                selector: specific("${candidCharmBuildNumber}")
+                    copyArtifacts projectName: 'build-charm-candid-k8s',
+                                fingerprintArtifacts: true,
+                                filter: 'candid-k8s_ubuntu-20.04-amd64.charm',
+                                selector: specific("${candidCharmK8SBuildNumber}")
+                                
+                    copyArtifacts projectName: 'build-charm-jimm',
+                                fingerprintArtifacts: true,
+                                filter: 'juju-jimm_ubuntu-20.04-amd64.charm',
+                                selector: specific("${jimmCharmBuildNumber}")
+                    copyArtifacts projectName: 'build-charm-jimm-k8s',
+                                fingerprintArtifacts: true,
+                                filter: 'juju-jimm-k8s_ubuntu-20.04-amd64.charm',
+                                selector: specific("${jimmCharmK8SBuildNumber}")
+                }
+                
+                script{
+                    sh """
+                        tar czvf jaas-bundle.tar.gz build/
+                    """
+                }
+                archiveArtifacts artifacts: 'jaas-bundle.tar.gz', fingerprint: true, followSymlinks: false, onlyIfSuccessful: true
+            }
+        }
+    }
+}

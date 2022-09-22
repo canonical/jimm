@@ -1,0 +1,22 @@
+name: BuildSnap
+on:
+  workflow_dispatch:
+env:
+  GH_AUTH: ${{ secrets.GH_AUTH }}
+
+jobs:
+  build-snap:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - run: git fetch --prune --unshallow
+      - uses: ./.github/workflows/setupgo118amd64
+      - run: sudo snap install snapcraft --channel=7.x/stable --classic
+      - run: mkdir -p snap
+      - run: cp ./snaps/jimm/snapcraft.yaml ./snap/snapcraft.yaml
+      - run: snapcraft --destructive-mode
+      - uses: actions/upload-artifact@v3
+        with:
+          name: jimm-snap
+          path: ./*.snap
+          if-no-files-found: error

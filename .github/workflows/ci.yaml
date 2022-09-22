@@ -1,0 +1,55 @@
+name: CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+env:
+  GH_AUTH: ${{ secrets.GH_AUTH }}
+
+jobs:
+  lint:
+    runs-on: ubuntu-20.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/workflows/setupgo118amd64
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          # Optional: version of golangci-lint to use in form of v1.2 or v1.2.3 or `latest` to use the latest version
+          version: latest
+          skip-pkg-cache: true
+          skip-build-cache: true
+
+  build_test:
+    name: Build and Test
+    needs:
+      - lint
+    runs-on: ubuntu-20.04
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5432:5432
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install dependencies
+        run: sudo apt-get update -y && sudo apt-get install -y gcc git-core
+      - uses: ./.github/workflows/setupgo118amd64
+      - name: Build and Test
+        run: go test -mod readonly ./...
+        env:
+          JIMM_DSN: postgresql://postgres:password@localhost:5432/jimm
+          PGHOST: localhost
+          PGPASSWORD: password
+          PGSSLMODE: disable
+          PGUSER: postgres
+          PGPORT: 5432
