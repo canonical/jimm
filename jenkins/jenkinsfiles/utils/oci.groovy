@@ -16,6 +16,12 @@ void buildImage() {
     """
 }
 
+void saveImage() {
+    sh """
+        docker save jimm:latest | gzip > jimm-latest-image.tar.gz
+    """
+}
+
 /**
  * Scans an image using trivvy.
  */
