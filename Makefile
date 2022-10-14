@@ -35,7 +35,7 @@ build: $(VERSIONDEPS)
 	go build $(PROJECT)/...
 
 check: $(VERSIONDEPS)
-	go test $(PROJECT)/...
+	go test -p 1 $(PROJECT)/...
 
 install: $(VERSIONDEPS)
 	go install $(INSTALL_FLAGS) -v $(PROJECT)/...
@@ -66,7 +66,7 @@ version/init.go: version/init.go.tmpl FORCE
 	gofmt -r "unknownVersion -> Version{GitCommit: \"${GIT_COMMIT}\", Version: \"${GIT_VERSION}\",}" $<  | tee $@ > /dev/null
 
 jemd: version/init.go
-	go build -v $(PROJECT)/cmd/jemd
+	go build -tags release -v $(PROJECT)/cmd/jemd
 
 jimm-$(GIT_VERSION).tar.xz: jimm-release/bin/jemd
 	tar c -C jimm-release . | xz > $@

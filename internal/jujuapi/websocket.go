@@ -13,7 +13,9 @@ import (
 	"github.com/juju/juju/rpc/jsoncodec"
 	"gopkg.in/errgo.v1"
 
+	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/conv"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
@@ -30,6 +32,7 @@ const (
 var errNotImplemented = errgo.New("not implemented")
 
 var errorCodes = map[error]string{
+	conv.ErrLocalUser:             jujuparams.CodeUserNotFound,
 	params.ErrAlreadyExists:       jujuparams.CodeAlreadyExists,
 	params.ErrBadRequest:          jujuparams.CodeBadRequest,
 	params.ErrForbidden:           jujuparams.CodeForbidden,
@@ -38,6 +41,7 @@ var errorCodes = map[error]string{
 	params.ErrModelNotFound:       jujuparams.CodeModelNotFound,
 	params.ErrUnauthorized:        jujuparams.CodeUnauthorized,
 	params.ErrCloudRegionRequired: jujuparams.CodeCloudRegionRequired,
+	params.ErrIncompatibleClouds:  jujuparams.CodeIncompatibleClouds,
 	errNotImplemented:             jujuparams.CodeNotImplemented,
 }
 
@@ -48,6 +52,10 @@ func mapError(err error) *jujuparams.Error {
 	}
 	// TODO the error mapper should really accept a context from the RPC package.
 	zapctx.Debug(context.TODO(), "rpc error", zaputil.Error(err))
+
+	if apierr, ok := errgo.Cause(err).(*apiconn.APIError); ok {
+		return apierr.ParamsError()
+	}
 	if perr, ok := errgo.Cause(err).(*jujuparams.Error); ok {
 		return perr
 	}
@@ -110,9 +118,8 @@ var websocketUpgrader = websocket.Upgrader{
 }
 
 // newWSServer creates a new WebSocket server suitible for handling the API for modelUUID.
-func newWSServer(ctx context.Context, jem *jem.JEM, a *auth.Authenticator, jsParams jemserver.Params, modelUUID string) http.Handler {
+func newWSServer(jem *jem.JEM, a *auth.Authenticator, jsParams jemserver.Params, modelUUID string) http.Handler {
 	hnd := &wsHandler{
-		context:   ctx,
 		jem:       jem,
 		auth:      a,
 		params:    jsParams,
@@ -121,18 +128,16 @@ func newWSServer(ctx context.Context, jem *jem.JEM, a *auth.Authenticator, jsPar
 	h := func(w http.ResponseWriter, req *http.Request) {
 		conn, err := websocketUpgrader.Upgrade(w, req, nil)
 		if err != nil {
-			zapctx.Error(ctx, "cannot upgrade websocket", zaputil.Error(err))
+			zapctx.Error(req.Context(), "cannot upgrade websocket", zaputil.Error(err))
 			return
 		}
-		hnd.handle(conn)
+		hnd.handle(req.Context(), conn)
 	}
 	return http.HandlerFunc(h)
 }
 
 // wsHandler is a handler for a particular WebSocket connection.
 type wsHandler struct {
-	// TODO Make the context per-RPC-call instead of global across the handler.
-	context   context.Context
 	jem       *jem.JEM
 	auth      *auth.Authenticator
 	params    jemserver.Params
@@ -140,7 +145,7 @@ type wsHandler struct {
 }
 
 // handle handles the connection.
-func (h *wsHandler) handle(wsConn *websocket.Conn) {
+func (h *wsHandler) handle(ctx context.Context, wsConn *websocket.Conn) {
 	codec := jsoncodec.NewWebsocket(wsConn)
 	conn := rpc.NewConn(codec, func() rpc.Recorder {
 		return recorder{
@@ -159,10 +164,10 @@ func (h *wsHandler) handle(wsConn *websocket.Conn) {
 		return mapError(err)
 	})
 	defer conn.Close()
-	conn.Start(h.context)
+	conn.Start(ctx)
 	select {
 	case <-hm.Dead():
-		zapctx.Info(h.context, "ping timeout")
+		zapctx.Info(ctx, "ping timeout")
 	case <-conn.Dead():
 		hm.Stop()
 	}

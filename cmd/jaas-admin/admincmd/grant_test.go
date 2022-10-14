@@ -31,63 +31,66 @@ func (s *grantSuite) TestGrant(c *gc.C) {
 	c.Assert(stderr, gc.Equals, "")
 	s.addModel(ctx, c, "bob/foo", "bob/foo", "cred")
 
-	stdout, stderr, code = run(c, c.MkDir(), "revoke", "--controller", "bob/foo", "everyone")
-	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
-	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "")
-
-	// Check that alice can't get controller or model.
-	s.idmSrv.RemoveUsers()
-	aliceClient := s.jemClient("alice")
-	_, err := aliceClient.GetController(ctx, &params.GetController{
-		EntityPath: params.EntityPath{
-			User: "bob",
-			Name: "foo",
-		},
-	})
-	c.Assert(err, gc.ErrorMatches, "Get .*/v2/controller/bob/foo: unauthorized")
-	_, err = aliceClient.GetModel(ctx, &params.GetModel{
-		EntityPath: params.EntityPath{
-			User: "bob",
-			Name: "foo",
-		},
-	})
-	c.Assert(err, gc.ErrorMatches, "Get .*/v2/model/bob/foo: unauthorized")
-
-	s.idmSrv.AddUser("bob", adminUser)
-	s.idmSrv.SetDefaultUser("bob")
-
-	// Add alice to model permissions list.
-	stdout, stderr, code = run(c, c.MkDir(),
-		"grant",
-		"bob/foo",
-		"alice",
-	)
-	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
-	c.Assert(stdout, gc.Equals, "")
-	c.Assert(stderr, gc.Equals, "")
-
-	s.idmSrv.RemoveUsers()
-	aliceClient = s.jemClient("alice")
-
-	// Check that alice can get model but not controller.
-	_, err = aliceClient.GetController(ctx, &params.GetController{
-		EntityPath: params.EntityPath{
-			User: "bob",
-			Name: "foo",
-		},
-	})
-	c.Assert(err, gc.ErrorMatches, "Get .*/v2/controller/bob/foo: unauthorized")
-	_, err = aliceClient.GetModel(ctx, &params.GetModel{
+	client := s.jemClient("bob")
+	acl, err := client.GetControllerPerm(ctx, &params.GetControllerPerm{
 		EntityPath: params.EntityPath{
 			User: "bob",
 			Name: "foo",
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
+	c.Assert(acl, jc.DeepEquals, params.ACL{Read: []string{"everyone"}})
 
-	s.idmSrv.AddUser("bob", adminUser)
-	s.idmSrv.SetDefaultUser("bob")
+	stdout, stderr, code = run(c, c.MkDir(), "revoke", "--controller", "bob/foo", "everyone")
+	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
+	c.Assert(stdout, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, "")
+
+	// Check that alice can't get controller or model.
+	acl, err = client.GetControllerPerm(ctx, &params.GetControllerPerm{
+		EntityPath: params.EntityPath{
+			User: "bob",
+			Name: "foo",
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(acl, jc.DeepEquals, params.ACL{})
+
+	acl, err = client.GetModelPerm(ctx, &params.GetModelPerm{
+		EntityPath: params.EntityPath{
+			User: "bob",
+			Name: "foo",
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(acl, jc.DeepEquals, params.ACL{})
+
+	// Add alice to model permissions list.
+	stdout, stderr, code = run(c, c.MkDir(),
+		"grant", "bob/foo", "alice",
+	)
+	c.Assert(code, gc.Equals, 0, gc.Commentf("stderr: %s", stderr))
+	c.Assert(stdout, gc.Equals, "")
+	c.Assert(stderr, gc.Equals, "")
+
+	// Check that alice can get model but not controller.
+	acl, err = client.GetModelPerm(ctx, &params.GetModelPerm{
+		EntityPath: params.EntityPath{
+			User: "bob",
+			Name: "foo",
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(acl, jc.DeepEquals, params.ACL{Read: []string{"alice"}})
+
+	acl, err = client.GetControllerPerm(ctx, &params.GetControllerPerm{
+		EntityPath: params.EntityPath{
+			User: "bob",
+			Name: "foo",
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(acl, jc.DeepEquals, params.ACL{})
 
 	// Add alice to controller permissions list.
 	stdout, stderr, code = run(c, c.MkDir(),
@@ -100,20 +103,15 @@ func (s *grantSuite) TestGrant(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	s.idmSrv.RemoveUsers()
-	aliceClient = s.jemClient("alice")
-
 	// Check that alice can now access the controller.
-	_, err = aliceClient.GetController(ctx, &params.GetController{
+	acl, err = client.GetControllerPerm(ctx, &params.GetControllerPerm{
 		EntityPath: params.EntityPath{
 			User: "bob",
 			Name: "foo",
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-
-	s.idmSrv.AddUser("bob", adminUser)
-	s.idmSrv.SetDefaultUser("bob")
+	c.Assert(acl, jc.DeepEquals, params.ACL{Read: []string{"alice"}})
 
 	// Set the users to a new set.
 	stdout, stderr, code = run(c, c.MkDir(),
@@ -126,10 +124,7 @@ func (s *grantSuite) TestGrant(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "")
 	c.Assert(stderr, gc.Equals, "")
 
-	s.idmSrv.RemoveUsers()
-	bobClient := s.jemClient("bob")
-
-	acl, err := bobClient.GetModelPerm(ctx, &params.GetModelPerm{
+	acl, err = client.GetModelPerm(ctx, &params.GetModelPerm{
 		EntityPath: params.EntityPath{
 			User: "bob",
 			Name: "foo",

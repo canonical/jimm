@@ -14,27 +14,26 @@ import (
 	jujuparams "github.com/juju/juju/apiserver/params"
 	"github.com/juju/juju/core/status"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/jimm/internal/auth"
-	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
 func (s *jemSuite) TestModelStats(c *gc.C) {
-	ctx := auth.ContextWithUser(testContext, "bob")
+	ctl2Id := params.EntityPath{User: "alice", Name: "dummy-2"}
+	s.AddController(c, &mongodoc.Controller{Path: ctl2Id})
+	ctl3Id := params.EntityPath{User: "alice", Name: "dummy-3"}
+	s.AddController(c, &mongodoc.Controller{Path: ctl3Id})
 
-	ctl1Id := s.addController(c, params.EntityPath{"bob", "controller1"})
-	ctl2Id := s.addController(c, params.EntityPath{"bob", "controller2"})
-	s.addController(c, params.EntityPath{"bob", "controller3"})
-	err := s.jem.DB.AddModel(ctx, &mongodoc.Model{
+	err := s.JEM.DB.InsertModel(testContext, &mongodoc.Model{
 		Path: params.EntityPath{
 			User: "bob",
-			Name: "model1",
+			Name: "model-2",
 		},
 		UUID:       "201852f4-022d-4f98-9b63-a6ff52c0798e",
-		Controller: ctl1Id,
+		Controller: s.Controller.Path,
 		Counts: map[params.EntityCount]params.Count{
 			params.ApplicationCount: {
 				Current: 20,
@@ -52,13 +51,13 @@ func (s *jemSuite) TestModelStats(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.jem.DB.AddModel(ctx, &mongodoc.Model{
+	err = s.JEM.DB.InsertModel(testContext, &mongodoc.Model{
 		Path: params.EntityPath{
 			User: "bob",
-			Name: "model2",
+			Name: "model-3",
 		},
 		UUID:       "4cb1030f-d59d-4c8c-bac7-eb8166c54eb0",
-		Controller: ctl1Id,
+		Controller: s.Controller.Path,
 		Counts: map[params.EntityCount]params.Count{
 			params.ApplicationCount: {
 				Current: 0,
@@ -76,10 +75,10 @@ func (s *jemSuite) TestModelStats(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.jem.DB.AddModel(ctx, &mongodoc.Model{
+	err = s.JEM.DB.InsertModel(testContext, &mongodoc.Model{
 		Path: params.EntityPath{
 			User: "bob",
-			Name: "model3",
+			Name: "model-4",
 		},
 		UUID:       "05d96523-4f3c-48f8-aab7-43aafb12bbc7",
 		Controller: ctl2Id,
@@ -100,11 +99,11 @@ func (s *jemSuite) TestModelStats(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	stats := s.pool.ModelStats(testContext)
+	stats := s.Pool.ModelStats(testContext)
 	err = prometheus.Register(stats)
 	c.Assert(err, gc.Equals, nil)
 	defer prometheus.Unregister(stats)
-	srv := httptest.NewServer(prometheus.Handler())
+	srv := httptest.NewServer(promhttp.Handler())
 	defer srv.Close()
 	resp, err := http.Get(srv.URL)
 	c.Assert(err, gc.Equals, nil)
@@ -136,7 +135,7 @@ func (s *jemSuite) TestModelStats(c *gc.C) {
 	expectCounts := map[string]int{
 		"applications_running":  30,
 		"controllers_running":   3,
-		"models_running":        3,
+		"models_running":        4,
 		"active_models_running": 2,
 		"units_running":         50,
 		"machines_running":      22,
@@ -148,139 +147,62 @@ func (s *jemSuite) TestModelStats(c *gc.C) {
 }
 
 func (s *jemSuite) TestMachineStats(c *gc.C) {
-	ctx := auth.ContextWithUser(testContext, "bob")
+	ctl2Id := params.EntityPath{"bob", "controller2"}
+	s.AddController(c, &mongodoc.Controller{Path: ctl2Id})
 
-	ctl1Id := s.addController(c, params.EntityPath{"bob", "controller1"})
-	ctl2Id := s.addController(c, params.EntityPath{"bob", "controller2"})
-	err := jem.UpdateCredential(s.jem.DB, testContext, &mongodoc.Credential{
-		Path: mgoCredentialPath("dummy", "bob", "cred1"),
-		Type: "empty",
-	})
-	c.Assert(err, gc.Equals, nil)
-	m1, err := s.jem.CreateModel(ctx, jem.CreateModelParams{
-		Path:           params.EntityPath{"bob", "model1"},
-		ControllerPath: ctl1Id,
-		Credential:     credentialPath("dummy", "bob", "cred1"),
-		Cloud:          "dummy",
-	})
-	c.Assert(err, gc.Equals, nil)
-	m2, err := s.jem.CreateModel(ctx, jem.CreateModelParams{
-		Path:           params.EntityPath{"bob", "model2"},
-		ControllerPath: ctl1Id,
-		Credential:     credentialPath("dummy", "bob", "cred1"),
-		Cloud:          "dummy",
-	})
-	c.Assert(err, gc.Equals, nil)
-	m3, err := s.jem.CreateModel(ctx, jem.CreateModelParams{
-		Path:           params.EntityPath{"bob", "model3"},
-		ControllerPath: ctl2Id,
-		Credential:     credentialPath("dummy", "bob", "cred1"),
-		Cloud:          "dummy",
-	})
-	c.Assert(err, gc.Equals, nil)
+	model2 := mongodoc.Model{Path: params.EntityPath{"bob", "model2"}}
+	s.CreateModel(c, &model2, nil, nil)
+	model3 := mongodoc.Model{
+		Path:       params.EntityPath{"bob", "model3"},
+		Controller: ctl2Id,
+	}
+	s.CreateModel(c, &model3, nil, nil)
 
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
+	statuses := []status.Status{
+		status.Started,
+		status.Pending,
+		status.Stopped,
+		status.Down,
+		status.Started,
+		status.Pending,
+		status.Stopped,
+		status.Started,
+		status.Pending,
+		status.Started,
+	}
+	for i, st := range statuses {
+		err := s.JEM.UpdateMachineInfo(testContext, s.Controller.Path, &jujuparams.MachineInfo{
+			Id:        fmt.Sprintf("%d", i),
+			ModelUUID: s.Model.UUID,
+			AgentStatus: jujuparams.StatusInfo{
+				Current: st,
+			},
+		})
+		c.Assert(err, gc.Equals, nil)
+	}
+
+	err := s.JEM.UpdateMachineInfo(testContext, s.Controller.Path, &jujuparams.MachineInfo{
 		Id:        "0",
-		ModelUUID: m1.UUID,
+		ModelUUID: model2.UUID,
 		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Started,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
-		Id:        "1",
-		ModelUUID: m1.UUID,
-		AgentStatus: jujuparams.StatusInfo{
-			Current: status.Pending,
-		},
-	})
-	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
-		Id:        "2",
-		ModelUUID: m1.UUID,
-		AgentStatus: jujuparams.StatusInfo{
-			Current: status.Stopped,
-		},
-	})
-	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
-		Id:        "3",
-		ModelUUID: m1.UUID,
-		AgentStatus: jujuparams.StatusInfo{
-			Current: status.Down,
-		},
-	})
-	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
-		Id:        "4",
-		ModelUUID: m1.UUID,
-		AgentStatus: jujuparams.StatusInfo{
-			Current: status.Started,
-		},
-	})
-	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
-		Id:        "5",
-		ModelUUID: m1.UUID,
-		AgentStatus: jujuparams.StatusInfo{
-			Current: status.Pending,
-		},
-	})
-	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
-		Id:        "6",
-		ModelUUID: m1.UUID,
-		AgentStatus: jujuparams.StatusInfo{
-			Current: status.Stopped,
-		},
-	})
-	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
-		Id:        "7",
-		ModelUUID: m1.UUID,
-		AgentStatus: jujuparams.StatusInfo{
-			Current: status.Started,
-		},
-	})
-	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
-		Id:        "8",
-		ModelUUID: m1.UUID,
-		AgentStatus: jujuparams.StatusInfo{
-			Current: status.Pending,
-		},
-	})
-	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
-		Id:        "9",
-		ModelUUID: m1.UUID,
-		AgentStatus: jujuparams.StatusInfo{
-			Current: status.Started,
-		},
-	})
-	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl1Id, &jujuparams.MachineInfo{
+	err = s.JEM.UpdateMachineInfo(testContext, ctl2Id, &jujuparams.MachineInfo{
 		Id:        "0",
-		ModelUUID: m2.UUID,
-		AgentStatus: jujuparams.StatusInfo{
-			Current: status.Started,
-		},
-	})
-	c.Assert(err, gc.Equals, nil)
-	err = s.jem.UpdateMachineInfo(ctx, ctl2Id, &jujuparams.MachineInfo{
-		Id:        "0",
-		ModelUUID: m3.UUID,
+		ModelUUID: model3.UUID,
 		AgentStatus: jujuparams.StatusInfo{
 			Current: status.Pending,
 		},
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	stats := s.pool.MachineStats(ctx)
+	stats := s.Pool.MachineStats(testContext)
 	err = prometheus.Register(stats)
 	c.Assert(err, gc.Equals, nil)
 	defer prometheus.Unregister(stats)
-	srv := httptest.NewServer(prometheus.Handler())
+	srv := httptest.NewServer(promhttp.Handler())
 	defer srv.Close()
 	resp, err := http.Get(srv.URL)
 	c.Assert(err, gc.Equals, nil)
@@ -313,11 +235,11 @@ func (s *jemSuite) TestMachineStats(c *gc.C) {
 	}
 
 	expectCounts := map[labels]int{
-		{ctl1Id, "dummy", "dummy-region", status.Started}: 5,
-		{ctl1Id, "dummy", "dummy-region", status.Pending}: 3,
-		{ctl1Id, "dummy", "dummy-region", status.Stopped}: 2,
-		{ctl1Id, "dummy", "dummy-region", status.Down}:    1,
-		{ctl2Id, "dummy", "dummy-region", status.Pending}: 1,
+		{s.Controller.Path, "dummy", "dummy-region", status.Started}: 5,
+		{s.Controller.Path, "dummy", "dummy-region", status.Pending}: 3,
+		{s.Controller.Path, "dummy", "dummy-region", status.Stopped}: 2,
+		{s.Controller.Path, "dummy", "dummy-region", status.Down}:    1,
+		{ctl2Id, "dummy", "dummy-region", status.Pending}:            1,
 	}
 	for label, count := range expectCounts {
 		name := fmt.Sprintf("jem_health_machines{cloud=%q,controller=%q,region=%q,status=%q}", label.cloud, label.controller, label.region, label.status)

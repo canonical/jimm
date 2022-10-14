@@ -7,19 +7,16 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/canonical/candid/candidclient"
 	"github.com/juju/utils"
 	"go.uber.org/zap"
-	candidclient "gopkg.in/CanonicalLtd/candidclient.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
-	"gopkg.in/macaroon-bakery.v2/bakery/mgorootkeystore"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon.v2"
-	"gopkg.in/mgo.v2"
 
-	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
@@ -45,25 +42,24 @@ func NewAuthenticator(b *identchecker.Bakery) *Authenticator {
 // otherwise the original context is returned unchanged. If the returned
 // macaroon is non-nil then it should be sent to the client and if
 // discharged can be used to gain access.
-func (a *Authenticator) Authenticate(ctx context.Context, v bakery.Version, mss []macaroon.Slice) (context.Context, *bakery.Macaroon, error) {
-
+func (a *Authenticator) Authenticate(ctx context.Context, v bakery.Version, mss []macaroon.Slice) (identchecker.ACLIdentity, *bakery.Macaroon, error) {
 	ai, verr := a.bakery.Checker.Auth(mss...).Allow(ctx, identchecker.LoginOp)
 	if verr == nil {
 		servermon.AuthenticationSuccessCount.Inc()
-		return context.WithValue(ctx, authKey{}, ai.Identity), nil, nil
+		return ai.Identity.(identchecker.ACLIdentity), nil, nil
 	}
 	if !bakery.IsDischargeRequiredError(errgo.Cause(verr)) {
 		servermon.AuthenticationFailCount.Inc()
-		return ctx, nil, errgo.Mask(verr, errgo.Is(params.ErrUnauthorized))
+		return nil, nil, errgo.Mask(verr, errgo.Is(params.ErrUnauthorized))
 	}
 
 	derr := errgo.Cause(verr).(*bakery.DischargeRequiredError)
 	// Macaroon verification failed: mint a new macaroon.
 	m, err := a.bakery.Oven.NewMacaroon(ctx, v, derr.Caveats, derr.Ops...)
 	if err != nil {
-		return ctx, nil, errgo.Notef(err, "cannot mint macaroon")
+		return nil, nil, errgo.Notef(err, "cannot mint macaroon")
 	}
-	return ctx, m, verr
+	return nil, m, verr
 }
 
 // AuthenticateRequest is used to authenticate and http.Request. If the
@@ -71,10 +67,10 @@ func (a *Authenticator) Authenticate(ctx context.Context, v bakery.Version, mss 
 // authorization information attached, otherwise the original context
 // will be returned unchanged. If a discharge is required the returned
 // error will be a discharge required error.
-func (a *Authenticator) AuthenticateRequest(ctx context.Context, req *http.Request) (context.Context, error) {
-	ctx, m, err := a.Authenticate(ctx, httpbakery.RequestVersion(req), httpbakery.RequestMacaroons(req))
+func (a *Authenticator) AuthenticateRequest(ctx context.Context, req *http.Request) (identchecker.ACLIdentity, error) {
+	id, m, err := a.Authenticate(ctx, httpbakery.RequestVersion(req), httpbakery.RequestMacaroons(req))
 	if m == nil {
-		return ctx, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+		return id, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	// Request that this macaroon be supplied for all requests
 	// to the whole handler. We use a relative path because
@@ -96,36 +92,25 @@ func (a *Authenticator) AuthenticateRequest(ctx context.Context, req *http.Reque
 		CookieNameSuffix: "authn",
 		Request:          req,
 	})
-	return ctx, dischargeErr
+	return nil, dischargeErr
 }
 
-type authKey struct{}
-
-func fromContext(ctx context.Context) identchecker.ACLIdentity {
-	if aid, _ := ctx.Value(authKey{}).(identchecker.ACLIdentity); aid != nil {
-		return aid
-	}
-	return noIdentity{}
+// CheckIsUser checks whether the given identity can act as the given
+// user. It returns params.ErrUnauthorized if not.
+func CheckIsUser(ctx context.Context, id identchecker.ACLIdentity, user params.User) error {
+	return CheckACL(ctx, id, []string{string(user)})
 }
 
-// CheckIsUser checks whether the currently authenticated user can
-// act as the given name.
-func CheckIsUser(ctx context.Context, user params.User) error {
-	return CheckACL(ctx, []string{string(user)})
-}
-
-// CheckACL checks whether the currently authenticated user is
-// allowed to access an entity with the given ACL.
-// It returns params.ErrUnauthorized if not.
-func CheckACL(ctx context.Context, acl []string) error {
-	aid := fromContext(ctx)
-	ok, err := aid.Allow(ctx, acl)
+// CheckACL checks whether the the given identity is allowed to access an
+// entity with the given ACL. It returns params.ErrUnauthorized if not.
+func CheckACL(ctx context.Context, id identchecker.ACLIdentity, acl []string) error {
+	ok, err := id.Allow(ctx, acl)
 	if err != nil {
 		return errgo.Notef(err, "cannot check permissions")
 	}
 	if !ok {
 		zapctx.Debug(ctx, "user not authorized",
-			zap.String("user", aid.Id()),
+			zap.String("user", id.Id()),
 			zap.Strings("acl", acl),
 		)
 		return params.ErrUnauthorized
@@ -139,114 +124,20 @@ type ACLEntity interface {
 	Owner() params.User
 }
 
-// CheckCanRead checks whether the current user is allowed to read the
+// CheckCanRead checks whether the given identity is allowed to read the
 // given entity. The owner is always allowed to access an entity,
 // regardless of its ACL.
-func CheckCanRead(ctx context.Context, e ACLEntity) error {
+func CheckCanRead(ctx context.Context, id identchecker.ACLIdentity, e ACLEntity) error {
 	acl := append([]string{string(e.Owner())}, e.GetACL().Read...)
-	return CheckACL(ctx, acl)
+	return CheckACL(ctx, id, acl)
 }
 
 // CheckIsAdmin checks whether the current user is an admin on the given
 // entity. The owner is always allowed to access an entity, regardless of
 // its ACL.
-func CheckIsAdmin(ctx context.Context, e ACLEntity) error {
+func CheckIsAdmin(ctx context.Context, id identchecker.ACLIdentity, e ACLEntity) error {
 	acl := append([]string{string(e.Owner())}, e.GetACL().Admin...)
-	return CheckACL(ctx, acl)
-}
-
-// Username returns the name of the user authenticated on the given
-// context. If no user is authenticated then an empty string is returned.
-func Username(ctx context.Context) string {
-	return fromContext(ctx).Id()
-}
-
-type testIdentity []string
-
-func (a testIdentity) Allow(_ context.Context, acl []string) (bool, error) {
-	for _, g := range acl {
-		if g == "everyone" {
-			return true, nil
-		}
-		for _, allowg := range a {
-			if allowg == g {
-				return true, nil
-			}
-		}
-	}
-	return false, nil
-}
-
-func (a testIdentity) Id() string {
-	return a[0]
-}
-
-func (a testIdentity) Domain() string {
-	return ""
-}
-
-// ContextWithUser returns the given context as if it had been returned
-// from Authenticate with the given authenticated user
-// and as if the user was a member of all the given groups.
-func ContextWithUser(ctx context.Context, username string, groups ...string) context.Context {
-	groups = append([]string{username}, groups...)
-	return context.WithValue(ctx, authKey{}, testIdentity(groups))
-}
-
-type noIdentity struct{}
-
-func (noIdentity) Id() string {
-	return ""
-}
-
-func (noIdentity) Domain() string {
-	return ""
-}
-
-func (noIdentity) Allow(context.Context, []string) (bool, error) {
-	return false, nil
-}
-
-type RootKeyStoreParams struct {
-	// Pool contains the mgo session pool used by the application.
-	Pool *mgosession.Pool
-
-	// RootKeys contains an mgorootkeystore.RootKeys from which
-	// stores can be derived.
-	RootKeys *mgorootkeystore.RootKeys
-
-	// Policy contains the root key policy used by the application.
-	Policy mgorootkeystore.Policy
-
-	// Collection contains the mgo Collection that contains the root keys.
-	Collection *mgo.Collection
-}
-
-// RootKeyStore implements a bakery.RootKeyStore using an underlying
-// mgorootkeysstore.RootKeys.
-type RootKeyStore struct {
-	p RootKeyStoreParams
-}
-
-// NewRootKeyStore creates a new RootKeyStore.
-func NewRootKeyStore(p RootKeyStoreParams) *RootKeyStore {
-	return &RootKeyStore{p: p}
-}
-
-// Get implements bakery.RootKeyStore.Get.
-func (s *RootKeyStore) Get(ctx context.Context, id []byte) ([]byte, error) {
-	session := s.p.Pool.Session(ctx)
-	defer session.Close()
-
-	return s.p.RootKeys.NewStore(s.p.Collection.With(session), s.p.Policy).Get(ctx, id)
-}
-
-// RootKey implements bakery.RootKeyStore.RootKey.
-func (s *RootKeyStore) RootKey(ctx context.Context) ([]byte, []byte, error) {
-	session := s.p.Pool.Session(ctx)
-	defer session.Close()
-
-	return s.p.RootKeys.NewStore(s.p.Collection.With(session), s.p.Policy).RootKey(ctx)
+	return CheckACL(ctx, id, acl)
 }
 
 type IdentityClientParams struct {

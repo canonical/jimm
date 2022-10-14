@@ -2,11 +2,13 @@ name: jimm
 summary: JAAS Intelligent Model Manager.
 maintainer: JAAS Developers <jaas-dev@lists.launchpad.net>
 description: |
-  Juju controller used by the JAAS service to manage models accross a number of clouds.
+  Juju controller used by the JAAS service to manage models across a 
+  number of clouds.
 tags:
   - web_server
 subordinate: false
 series:
+  - focal
   - bionic
   - xenial
 provides:
@@ -17,8 +19,15 @@ provides:
 requires:
   db:
     interface: mongodb
+  vault:
+    interface: vault-kv
+    optional: true
 resources:
   service:
     type: file
     filename: jimm.tar.xz
     description: "jimm release tarball."
+  dashboard:
+    type: file
+    filename: dashboard.tar.xz
+    description: "juju dashboard tarball."

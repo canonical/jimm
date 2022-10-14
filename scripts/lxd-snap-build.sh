@@ -4,7 +4,7 @@
 set -eu
 
 snap_name=${snap_name:-jimm}
-image=${image:-ubuntu:18.04}
+image=${image:-ubuntu:20.04}
 container=${container:-${snap_name}-snap-`uuidgen`}
 
 lxd_exec() {

@@ -90,10 +90,15 @@ tls-key: |
 controller-uuid: 00000000-0000-0000-0000-000000000000
 max-mgo-sessions: 200
 gui-location: https://jujucharms.com
-usage-sender-url: https://jujucharms.com/omnibus/v2
-usage-sender-spool-dir: /tmp/12345
 domain: test-domain
 public-cloud-metadata: cloud-metadata.yaml
+max-pubsub-concurrency: 42
+vault:
+  address: http://localhost:8200
+  approle-path: /auth/approle
+  approle-role-id: 00000000-0000-0000-0000-000000000000
+  approle-secret-id: 00000000-0000-0000-0000-000000000001
+  kv-path: /kv/jimm
 `
 
 func (s *ConfigSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
@@ -137,13 +142,19 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 				mustParseKey("lsvcDkapKoFxIyjX9/eQgb3s41KVwPMISFwAJdVCZ70="),
 			},
 		},
-		ControllerUUID:      "00000000-0000-0000-0000-000000000000",
-		MaxMgoSessions:      200,
-		GUILocation:         "https://jujucharms.com",
-		UsageSenderURL:      "https://jujucharms.com/omnibus/v2",
-		UsageSenderSpoolDir: "/tmp/12345",
-		Domain:              "test-domain",
-		PublicCloudMetadata: "cloud-metadata.yaml",
+		ControllerUUID:       "00000000-0000-0000-0000-000000000000",
+		MaxMgoSessions:       200,
+		GUILocation:          "https://jujucharms.com",
+		Domain:               "test-domain",
+		PublicCloudMetadata:  "cloud-metadata.yaml",
+		MaxPubsubConcurrency: 42,
+		Vault: config.VaultConfig{
+			Address:         "http://localhost:8200",
+			ApprolePath:     "/auth/approle",
+			ApproleRoleID:   "00000000-0000-0000-0000-000000000000",
+			ApproleSecretID: "00000000-0000-0000-0000-000000000001",
+			KVPath:          "/kv/jimm",
+		},
 	})
 }
 

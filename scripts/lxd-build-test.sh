@@ -3,11 +3,11 @@
 
 set -eu
 
-image=${image:-ubuntu:16.04}
+image=${image:-ubuntu:20.04}
 container=${container:-jimm-test-`uuidgen`}
 packages="build-essential bzr git make mongodb"
 
-lxc launch -e ubuntu:16.04 $container
+lxc launch -e ${image} $container
 trap "lxc delete --force $container" EXIT
 
 lxc exec $container -- sh -c 'while [ ! -f /var/lib/cloud/instance/boot-finished ]; do sleep 0.1; done'
@@ -17,6 +17,7 @@ lxc exec --env http_proxy=${http_proxy:-} --env no_proxy=${no_proxy:-} $containe
 lxc exec $container -- snap set system proxy.http=${http_proxy:-}
 lxc exec $container -- snap set system proxy.https=${https_proxy:-${http_proxy:-}}
 lxc exec $container -- snap install go --classic
+lxc exec $container -- snap install vault
 if [ -n "${http_proxy:-}" ]; then
 	lxc exec \
 		--env HOME=/home/ubuntu \

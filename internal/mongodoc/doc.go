@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
@@ -13,6 +14,7 @@ import (
 	"github.com/juju/juju/core/network"
 	"github.com/juju/version"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/jimm/params"
 )
@@ -84,7 +86,7 @@ type Controller struct {
 
 	// UpdateCredentials holds a list of credentials which require
 	// updates on this controller.
-	UpdateCredentials []params.CredentialPath `bson:",omitempty"`
+	UpdateCredentials []CredentialPath `bson:",omitempty"`
 
 	// Location holds the location of the controller. The only key
 	// values currently supported are "cloud" and "region". All
@@ -120,6 +122,10 @@ type ControllerStats struct {
 	// MachineCount holds the number of machines hosted in the controller.
 	// This includes all machines, not just top level instances.
 	MachineCount int
+
+	// ApplicationOfferCount hols the numer of application offers
+	// hoster in the controller.
+	ApplicationOfferCount int
 }
 
 type UserInfo struct {
@@ -209,6 +215,9 @@ type Model struct {
 	// controller.
 	Controller params.EntityPath
 
+	// ControllerUUID holds the UUID of the model's controller.
+	ControllerUUID string `bson:",omitempty"`
+
 	// EntityPath holds the local user and name given to the
 	// model, denormalized from Id for convenience
 	// and ease of indexing. Its string value is used as the Id value.
@@ -268,14 +277,10 @@ type Model struct {
 	CloudRegion string `bson:",omitempty"`
 
 	// Credential holds a reference to the credential used to create the model.
-	Credential params.CredentialPath
+	Credential CredentialPath
 
 	// DefaultSeries holds the default series for the model.
 	DefaultSeries string
-
-	// UsageSenderCredentials prove that we are authorized to send usage
-	// information for this model.
-	UsageSenderCredentials []byte
 
 	// Status holds the current status of the model
 	Info *ModelInfo `bson:",omitempty"`
@@ -443,7 +448,7 @@ type Credential struct {
 	Label string
 
 	// Attributes holds the credential attributes.
-	Attributes map[string]string
+	Attributes map[string]string `bson:",omitempty"`
 
 	// Controllers holds the controllers to which this credential has
 	// been uploaded.
@@ -451,6 +456,14 @@ type Credential struct {
 
 	// Revoked records that the credential has been revoked.
 	Revoked bool
+
+	// AttributesInVault records that the actual credential attributes are
+	// stored in a seperate vault.
+	AttributesInVault bool
+
+	// ProviderType holds the provider type of the cloud that this
+	// credential is for.
+	ProviderType string
 }
 
 // Owner returns the owner of the credentials.
@@ -514,3 +527,158 @@ func ParseAddresses(addresses []string) ([]HostPort, error) {
 	}
 	return hps, nil
 }
+
+// ApplicationOffer represents a cross model application offer.
+type ApplicationOffer struct {
+	ModelUUID string `bson:"model-uuid"`
+	ModelName string `bson:"model-name"`
+	// ControllerPath contains the path of the controller that owns the
+	// application offer.
+	ControllerPath params.EntityPath `bson:"controller-path"`
+
+	OfferUUID string `bson:"_id"`
+	// OfferURL is the URL of the offer. The OfferURL is normalised such
+	// that it includes the owner ID, but it does not include the
+	// controller name.
+	OfferURL               string                    `bson:"offer-url"`
+	OfferName              string                    `bson:"offer-name"`
+	OwnerName              string                    `bson:"owner-name"`
+	ApplicationName        string                    `bson:"application-name"`
+	ApplicationDescription string                    `bson:"application-description"`
+	CharmURL               string                    `bson:"charm-url"`
+	Endpoints              []RemoteEndpoint          `bson:"endpoints"`
+	Spaces                 []RemoteSpace             `bson:"spaces"`
+	Bindings               map[string]string         `bson:"bindings"`
+	Users                  ApplicationOfferAccessMap `bson:"users,omitempty"`
+	Connections            []OfferConnection         `bson:"connections"`
+}
+
+// OfferConnection holds details about a connection to an offer.
+type OfferConnection struct {
+	SourceModelTag string   `bson:"source-model-tag"`
+	RelationId     int      `bson:"relation-id"`
+	Username       string   `bson:"username"`
+	Endpoint       string   `bson:"endpoint"`
+	IngressSubnets []string `bson:"ingress-subnets"`
+}
+
+// RemoteSpace represents a space in some remote model.
+type RemoteSpace struct {
+	CloudType          string                 `bson:"cloud-type"`
+	Name               string                 `bson:"name"`
+	ProviderId         string                 `bson:"provider-id"`
+	ProviderAttributes map[string]interface{} `bson:"provider-attributes"`
+}
+
+// RemoteEndpoint represents a remote application endpoint.
+type RemoteEndpoint struct {
+	Name      string `bson:"name"`
+	Role      string `bson:"role"`
+	Interface string `bson:"interface"`
+	Limit     int    `bson:"limit"`
+}
+
+// ApplicationOfferAccessPermission holds the access permission level.
+type ApplicationOfferAccessPermission int
+
+// String implements fmt.Stringer.
+func (p ApplicationOfferAccessPermission) String() string {
+	switch p {
+	case ApplicationOfferReadAccess:
+		return string(jujuparams.OfferReadAccess)
+	case ApplicationOfferConsumeAccess:
+		return string(jujuparams.OfferConsumeAccess)
+	case ApplicationOfferAdminAccess:
+		return string(jujuparams.OfferAdminAccess)
+	default:
+		return ""
+	}
+}
+
+const (
+	ApplicationOfferNoAccess ApplicationOfferAccessPermission = iota
+	ApplicationOfferReadAccess
+	ApplicationOfferConsumeAccess
+	ApplicationOfferAdminAccess
+)
+
+type CloudRegionDefaults struct {
+	User     string                 `bson:"user"`
+	Cloud    string                 `bson:"cloud"`
+	Region   string                 `bson:"region"`
+	Defaults map[string]interface{} `bson:"defaults"`
+}
+
+// An ApplicationOfferAccessMap is a map from user to AccessPermission.
+type ApplicationOfferAccessMap map[User]ApplicationOfferAccessPermission
+
+// GetBSON implements bson.Getter.
+func (m ApplicationOfferAccessMap) GetBSON() (interface{}, error) {
+	if m == nil {
+		return nil, nil
+	}
+	b := make(map[string]ApplicationOfferAccessPermission, len(m))
+	for k, v := range m {
+		b[tildeEscape.Replace(string(k))] = v
+	}
+	return b, nil
+}
+
+// SetBSON implements bson.Setter.
+func (m *ApplicationOfferAccessMap) SetBSON(raw bson.Raw) error {
+	b := make(map[string]ApplicationOfferAccessPermission)
+	if err := raw.Unmarshal(&b); err != nil {
+		return err
+	}
+	if len(b) == 0 {
+		return nil
+	}
+	if *m == nil {
+		*m = make(ApplicationOfferAccessMap, len(b))
+	}
+	for k, v := range b {
+		(*m)[User(tildeUnescape.Replace(k))] = v
+	}
+	return nil
+}
+
+// A User represents a user in the database. A User automatically escapes
+// any chararacters in the username that are not valid field names making
+// a user suitable for use in map keys.
+type User string
+
+// GetBSON implements bson.Getter.
+func (u User) GetBSON() (interface{}, error) {
+	return tildeEscape.Replace(string(u)), nil
+}
+
+// SetBSON implements bson.Setter.
+func (u *User) SetBSON(r bson.Raw) error {
+	var s string
+	if err := r.Unmarshal(&s); err != nil {
+		return err
+	}
+	*u = User(tildeUnescape.Replace(s))
+	return nil
+}
+
+// FieldName returns the field name for this user. Any givne prefix strings
+// are the fields names of the embedded documents that are hold the field.
+func (u User) FieldName(prefix ...string) string {
+	prefix = append(prefix, tildeEscape.Replace(string(u)))
+	return strings.Join(prefix, ".")
+}
+
+// tildeEscape escapes strings with the following translation:
+//
+//     ~ -> ~0
+//     $ -> ~1
+//     . -> ~2
+var tildeEscape = strings.NewReplacer("~", "~0", "$", "~1", ".", "~2")
+
+// tildeUnescape unescapes strings with the following translation:
+//
+//     ~0 -> ~
+//     ~1 -> $
+//     ~2 -> .
+var tildeUnescape = strings.NewReplacer("~0", "~", "~1", "$", "~2", ".")

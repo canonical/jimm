@@ -12,8 +12,8 @@ import (
 	"github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
 	envconfig "github.com/juju/juju/environs/config"
+	"github.com/juju/names/v4"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/juju/names.v3"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 	mgo "gopkg.in/mgo.v2"
@@ -78,8 +78,6 @@ func recoverModel(ctx context.Context, cfg *config.Config, controller, model str
 		DB:              db,
 		SessionPool:     mgosession.NewPool(ctx, session, 100),
 		ControllerAdmin: cfg.ControllerAdmin,
-		UsageSenderURL:  cfg.UsageSenderURL,
-		Client:          bclient,
 	})
 	if err != nil {
 		return errgo.Notef(err, "cannot access JIMM database")
@@ -118,14 +116,7 @@ func recoverModel(ctx context.Context, cfg *config.Config, controller, model str
 			return errgo.Mask(err)
 		}
 		doc.Controller = cPath
-		if uac := p.UsageAuthorizationClient(); uac != nil {
-			var err error
-			doc.UsageSenderCredentials, err = uac.GetCredentials(ctx, string(doc.Path.User))
-			if err != nil {
-				return errgo.Notef(err, "cannot create usage sender credentials")
-			}
-		}
-		return errgo.Mask(j.DB.AddModel(ctx, doc))
+		return errgo.Mask(j.DB.InsertModel(ctx, doc))
 	}
 
 	return errgo.Newf("cannot find model %q", model)
@@ -201,10 +192,12 @@ func mongodocFromModelInfo(ctx context.Context, mi *jujuparams.ModelInfo) (*mong
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	cred := params.CredentialPath{
-		Cloud: params.Cloud(cct.Cloud().Id()),
-		User:  params.User(strings.TrimSuffix(cct.Owner().Id(), "@external")),
-		Name:  params.CredentialName(cct.Name()),
+	cred := mongodoc.CredentialPath{
+		Cloud: cct.Cloud().Id(),
+		EntityPath: mongodoc.EntityPath{
+			User: strings.TrimSuffix(cct.Owner().Id(), "@external"),
+			Name: cct.Name(),
+		},
 	}
 
 	return &mongodoc.Model{

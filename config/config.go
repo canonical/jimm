@@ -21,33 +21,60 @@ import (
 	"github.com/CanonicalLtd/jimm/params"
 )
 
-var logger = loggo.GetLogger("jem.config")
+var (
+	logger                   = loggo.GetLogger("jem.config")
+	defaultPubsubConcurrency = 100
+)
 
 type Config struct {
 	MongoAddr string `yaml:"mongo-addr"`
 	DBName    string `yaml:"dbname"`
 	APIAddr   string `yaml:"api-addr"`
 	// TODO rename state-server-admin to controller-admin.
-	ControllerAdmin     params.User       `yaml:"state-server-admin"`
-	IdentityPublicKey   *bakery.PublicKey `yaml:"identity-public-key"`
-	IdentityLocation    string            `yaml:"identity-location"`
-	CharmstoreLocation  string            `yaml:"charmstore-location"`
-	MeteringLocation    string            `yaml:"metering-location"`
-	AgentUsername       string            `yaml:"agent-username"`
-	AgentKey            *bakery.KeyPair   `yaml:"agent-key"`
-	AccessLog           string            `yaml:"access-log"`
-	Autocert            bool              `yaml:"autocert"`
-	AutocertURL         string            `yaml:"autocert-url"`
-	TLSCert             string            `yaml:"tls-cert"`
-	TLSKey              string            `yaml:"tls-key"`
-	ControllerUUID      string            `yaml:"controller-uuid"`
-	MaxMgoSessions      int               `yaml:"max-mgo-sessions"`
-	GUILocation         string            `yaml:"gui-location"`
-	LoggingLevel        zapcore.Level     `yaml:"logging-level"`
-	UsageSenderURL      string            `yaml:"usage-sender-url,omitempty"`
-	UsageSenderSpoolDir string            `yaml:"usage-sender-spool-dir,omitempty"`
-	Domain              string            `yaml:"domain"`
-	PublicCloudMetadata string            `yaml:"public-cloud-metadata"`
+	ControllerAdmin       params.User       `yaml:"state-server-admin"`
+	IdentityPublicKey     *bakery.PublicKey `yaml:"identity-public-key"`
+	IdentityLocation      string            `yaml:"identity-location"`
+	CharmstoreLocation    string            `yaml:"charmstore-location"`
+	MeteringLocation      string            `yaml:"metering-location"`
+	AgentUsername         string            `yaml:"agent-username"`
+	AgentKey              *bakery.KeyPair   `yaml:"agent-key"`
+	AccessLog             string            `yaml:"access-log"`
+	Autocert              bool              `yaml:"autocert"`
+	AutocertURL           string            `yaml:"autocert-url"`
+	TLSCert               string            `yaml:"tls-cert"`
+	TLSKey                string            `yaml:"tls-key"`
+	ControllerUUID        string            `yaml:"controller-uuid"`
+	MaxMgoSessions        int               `yaml:"max-mgo-sessions"`
+	GUILocation           string            `yaml:"gui-location"`
+	LoggingLevel          zapcore.Level     `yaml:"logging-level"`
+	Domain                string            `yaml:"domain"`
+	PublicCloudMetadata   string            `yaml:"public-cloud-metadata"`
+	MaxPubsubConcurrency  int               `yaml:"max-pubsub-concurrency"`
+	JujuDashboardLocation string            `yaml:"juju-dashboard-location"`
+	Vault                 VaultConfig       `yaml:"vault"`
+}
+
+// A VaultConfig contains the configuration settings for a vault server
+// that will be used to store cloud credentials.
+type VaultConfig struct {
+	// Address is the address of the vault server.
+	Address string `yaml:"address"`
+
+	// ApprolePath is the path on the vault server of the approle
+	// authentication service.
+	ApprolePath string `yaml:"approle-path"`
+
+	// ApproleRoleID contains the role_id to use for approle
+	// authentication.
+	ApproleRoleID string `yaml:"approle-role-id"`
+
+	// ApproleSecretID contains the secret_id to use for approle
+	// authentication.
+	ApproleSecretID string `yaml:"approle-secret-id"`
+
+	// KVPath is the root path of the KV store assigned to the JIMM
+	// application.
+	KVPath string `yaml:"kv-path"`
 }
 
 func (c *Config) validate() error {
@@ -69,6 +96,9 @@ func (c *Config) validate() error {
 	}
 	if len(missing) != 0 {
 		return fmt.Errorf("missing fields %s in config file", strings.Join(missing, ", "))
+	}
+	if c.MaxPubsubConcurrency == 0 {
+		c.MaxPubsubConcurrency = defaultPubsubConcurrency
 	}
 	return nil
 }

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/juju/aclstore"
-	cloudapi "github.com/juju/juju/api/cloud"
 	controllerapi "github.com/juju/juju/api/controller"
 	modelmanagerapi "github.com/juju/juju/api/modelmanager"
 	jujuparams "github.com/juju/juju/apiserver/params"
@@ -16,14 +15,12 @@ import (
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/juju/names.v3"
+	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 
-	"github.com/CanonicalLtd/jimm/internal/apiconn"
 	"github.com/CanonicalLtd/jimm/internal/auth"
-	"github.com/CanonicalLtd/jimm/internal/ctxutil"
 	"github.com/CanonicalLtd/jimm/internal/jem"
+	"github.com/CanonicalLtd/jimm/internal/jem/jimmdb"
 	"github.com/CanonicalLtd/jimm/internal/jemerror"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
@@ -44,6 +41,7 @@ const (
 var controllerClientInitiateMigration = (*controllerapi.Client).InitiateMigration
 
 type Handler struct {
+	id         identchecker.ACLIdentity
 	jem        *jem.JEM
 	cancel     context.CancelFunc
 	config     jemserver.Params
@@ -65,21 +63,17 @@ func NewAPIHandler(ctx context.Context, params jemserver.HandlerParams) ([]httpr
 	}
 
 	return srv.Handlers(func(p httprequest.Params) (*Handler, context.Context, error) {
-		// Time out all requests after 30s. Do this before joining
-		// the contexts because p.Context is likely to have a done
-		// channel already and context.WithTimeout will be more efficient
-		// in that case than working on the custom context type returned
-		// from ctxutil.Join.
+		// Time out all requests after 30s.
 		ctx, cancel := context.WithTimeout(p.Context, 30*time.Second)
-		ctx = ctxutil.Join(ctx, p.Context)
 		zapctx.Debug(ctx, "HTTP request", zap.String("method", p.Request.Method), zap.Stringer("url", p.Request.URL))
 
 		// All requests require an authenticated client.
-		ctx, err := params.Authenticator.AuthenticateRequest(ctx, p.Request)
+		id, err := params.Authenticator.AuthenticateRequest(ctx, p.Request)
 		if err != nil {
 			return nil, ctx, errgo.Mask(err, errgo.Any)
 		}
 		h := &Handler{
+			id:         id,
 			jem:        params.JEMPool.JEM(ctx),
 			config:     params.Params,
 			cancel:     cancel,
@@ -105,28 +99,12 @@ func (h *Handler) Close() error {
 // making the WhoAmI call.
 func (h *Handler) WhoAmI(p httprequest.Params, arg *params.WhoAmI) (params.WhoAmIResponse, error) {
 	return params.WhoAmIResponse{
-		User: auth.Username(p.Context),
+		User: h.id.Id(),
 	}, nil
 }
 
 // AddController adds a new controller.
 func (h *Handler) AddController(p httprequest.Params, arg *params.AddController) error {
-	if err := auth.CheckIsUser(p.Context, arg.User); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	if !arg.Info.Public {
-		return errgo.WithCausef(nil, params.ErrForbidden, "cannot add private controller")
-	}
-	if err := auth.CheckIsUser(p.Context, h.jem.ControllerAdmin()); err != nil {
-		if errgo.Cause(err) == params.ErrUnauthorized {
-			return errgo.WithCausef(nil, params.ErrUnauthorized, "admin access required to add public controllers")
-		}
-		return errgo.Mask(err)
-	}
-	if len(arg.Info.HostPorts) == 0 {
-		return badRequestf(nil, "no host-ports in request")
-	}
-
 	hps, err := mongodoc.ParseAddresses(arg.Info.HostPorts)
 	if err != nil {
 		return errgo.WithCausef(err, params.ErrBadRequest, "")
@@ -141,15 +119,10 @@ func (h *Handler) AddController(p httprequest.Params, arg *params.AddController)
 			hps[i].Scope = string(network.ScopePublic)
 		}
 	}
-
 	if arg.Info.User == "" {
-		return badRequestf(nil, "no user in request")
+		return errgo.WithCausef(nil, params.ErrBadRequest, "no user in request")
 	}
-	if !names.IsValidModel(arg.Info.ControllerUUID) {
-		return badRequestf(nil, "bad model UUID in request")
-	}
-
-	ctl := &mongodoc.Controller{
+	ctl := mongodoc.Controller{
 		Path:          arg.EntityPath,
 		CACert:        arg.Info.CACert,
 		HostPorts:     [][]mongodoc.HostPort{hps},
@@ -158,147 +131,29 @@ func (h *Handler) AddController(p httprequest.Params, arg *params.AddController)
 		UUID:          arg.Info.ControllerUUID,
 		Public:        arg.Info.Public,
 	}
-	zapctx.Debug(p.Context, "dialling controller")
-	// Attempt to connect to the controller before accepting it.
-	conn, err := h.jem.OpenAPIFromDoc(p.Context, ctl)
-	if err != nil {
-		zapctx.Info(p.Context, "cannot open API", zaputil.Error(err))
-		return badRequestf(err, "cannot connect to controller")
+	err = h.jem.AddController(p.Context, h.id, &ctl)
+	switch errgo.Cause(err) {
+	case jem.ErrAPIConnection:
+		return errgo.WithCausef(err, params.ErrBadRequest, "")
+	default:
+		return errgo.Mask(
+			err,
+			errgo.Is(params.ErrAlreadyExists),
+			errgo.Is(params.ErrForbidden),
+			errgo.Is(params.ErrUnauthorized),
+		)
 	}
-	defer conn.Close()
-	ctl.UUID = conn.ControllerTag().Id()
-	if v, ok := conn.ServerVersion(); ok {
-		ctl.Version = &v
-	}
-	// Find out where the controller model is.
-	mi, err := controllerModelInfo(conn, arg.Info.User)
-	if err != nil {
-		return badRequestf(err, "cannot get controller model details")
-	}
-	cloud, err := names.ParseCloudTag(mi.CloudTag)
-	if err != nil {
-		return badRequestf(err, "bad data from controller")
-	}
-	location := map[string]string{
-		"cloud": cloud.Id(),
-	}
-	if mi.CloudRegion != "" {
-		location["region"] = mi.CloudRegion
-	}
-	ctl.Location = location
-
-	// Find out the cloud information.
-	clouds, err := cloudapi.NewClient(conn).Clouds()
-	if err != nil {
-		return errgo.Notef(err, "cannot get clouds")
-	}
-
-	var cloudRegions []mongodoc.CloudRegion
-	for k, v := range clouds {
-		cr := mongodoc.CloudRegion{
-			Cloud:              params.Cloud(k.Id()),
-			Endpoint:           v.Endpoint,
-			IdentityEndpoint:   v.IdentityEndpoint,
-			StorageEndpoint:    v.StorageEndpoint,
-			ProviderType:       v.Type,
-			CACertificates:     v.CACertificates,
-			PrimaryControllers: []params.EntityPath{ctl.Path},
-			ACL: params.ACL{
-				Read: []string{"everyone"},
-			},
-		}
-		for _, at := range v.AuthTypes {
-			cr.AuthTypes = append(cr.AuthTypes, string(at))
-		}
-		cloudRegions = append(cloudRegions, cr)
-		for _, reg := range v.Regions {
-			cr := mongodoc.CloudRegion{
-				Cloud:            params.Cloud(k.Id()),
-				Region:           reg.Name,
-				Endpoint:         reg.Endpoint,
-				IdentityEndpoint: reg.IdentityEndpoint,
-				StorageEndpoint:  reg.StorageEndpoint,
-				ACL: params.ACL{
-					Read: []string{"everyone"},
-				},
-			}
-			if ctl.Location["cloud"] == k.Id() && ctl.Location["region"] == reg.Name {
-				cr.PrimaryControllers = []params.EntityPath{ctl.Path}
-			} else {
-				cr.SecondaryControllers = []params.EntityPath{ctl.Path}
-			}
-			cloudRegions = append(cloudRegions, cr)
-		}
-	}
-
-	// Update addresses from latest known in controller. Note that
-	// conn.APIHostPorts is always guaranteed to include the actual
-	// address we succeeded in connecting to.
-	ctl.HostPorts = mongodocAPIHostPorts(conn.APIHostPorts())
-
-	if err := h.jem.DB.AddController(p.Context, ctl); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
-	}
-	if err := h.jem.DB.UpdateCloudRegions(p.Context, cloudRegions); err != nil {
-		return errgo.Mask(err)
-	}
-	return nil
-}
-
-// controllerModelInfo returns the model info for the controller model.
-func controllerModelInfo(conn *apiconn.Conn, user string) (*jujuparams.ModelInfo, error) {
-	client := modelmanagerapi.NewClient(conn)
-	models, err := client.ListModels(user)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	for _, m := range models {
-		if m.Name != "controller" {
-			continue
-		}
-		mir, err := client.ModelInfo([]names.ModelTag{names.NewModelTag(m.UUID)})
-		if err != nil {
-			return nil, errgo.Mask(err)
-		}
-		if mir[0].Error != nil {
-			return nil, errgo.Mask(mir[0].Error)
-		}
-		return mir[0].Result, nil
-	}
-	return nil, errgo.New("controller model not found")
-}
-
-// mongodocAPIHostPorts returns the given API addresses prepared
-// for storage in the database.
-//
-// It removes unusable addresses and marks any scope-unknown
-// addresses as public so that the clients using only public-scoped
-// addresses will use them.
-func mongodocAPIHostPorts(nmhpss []network.MachineHostPorts) [][]mongodoc.HostPort {
-	hpss := make([][]mongodoc.HostPort, 0, len(nmhpss))
-	for _, nmhps := range nmhpss {
-		nhps := nmhps.HostPorts().FilterUnusable()
-		if len(nhps) == 0 {
-			continue
-		}
-		hps := make([]mongodoc.HostPort, len(nhps))
-		for i, nhp := range nhps {
-			hps[i].SetJujuHostPort(nhp)
-			if hps[i].Scope == string(network.ScopeUnknown) {
-				// This is needed because network.NewHostPort returns
-				// scope unknown for DNS names.
-				hps[i].Scope = string(network.ScopePublic)
-			}
-		}
-		hpss = append(hpss, hps)
-	}
-	return hpss
 }
 
 // GetController returns information on a controller.
 func (h *Handler) GetController(p httprequest.Params, arg *params.GetController) (*params.ControllerResponse, error) {
-	ctl, err := h.jem.Controller(p.Context, arg.EntityPath)
-	if err != nil {
+	ctl := &mongodoc.Controller{Path: arg.EntityPath}
+	if err := h.jem.GetController(p.Context, h.id, ctl); err != nil {
+		if errgo.Cause(err) == params.ErrNotFound {
+			if !(auth.CheckIsUser(p.Context, h.id, ctl.Path.User) == nil) {
+				err = params.ErrUnauthorized
+			}
+		}
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	return &params.ControllerResponse{
@@ -311,40 +166,25 @@ func (h *Handler) GetController(p httprequest.Params, arg *params.GetController)
 
 // DeleteController removes an existing controller.
 func (h *Handler) DeleteController(p httprequest.Params, arg *params.DeleteController) error {
-	// Check if user has permissions.
-	if err := auth.CheckIsUser(p.Context, arg.EntityPath.User); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	if !arg.Force {
-		ctl, err := h.jem.DB.Controller(p.Context, arg.EntityPath)
-		if err != nil {
-			return errgo.Mask(err, errgo.Is(params.ErrNotFound))
-		}
-		if ctl.UnavailableSince.IsZero() {
-			return errgo.WithCausef(nil, params.ErrStillAlive, "cannot delete controller while it is still alive")
-		}
-	}
-	if err := h.jem.DB.DeleteController(p.Context, arg.EntityPath); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-	if err := h.jem.DB.DeleteControllerFromCloudRegions(p.Context, arg.EntityPath); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-	return nil
+	err := h.jem.DeleteController(p.Context, h.id, &mongodoc.Controller{Path: arg.EntityPath}, arg.Force)
+	return errgo.Mask(err,
+		errgo.Is(params.ErrUnauthorized),
+		errgo.Is(params.ErrNotFound),
+		errgo.Is(params.ErrStillAlive),
+	)
 }
 
 // GetModel returns information on a given model.
 func (h *Handler) GetModel(p httprequest.Params, arg *params.GetModel) (*params.ModelResponse, error) {
-	if err := h.jem.DB.CheckReadACL(p.Context, h.jem.DB.Models(), arg.EntityPath); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	m := mongodoc.Model{Path: arg.EntityPath}
+	if err := h.jem.GetModel(p.Context, h.id, jujuparams.ModelReadAccess, &m); err != nil {
+		if errgo.Cause(err) == params.ErrNotFound && auth.CheckIsUser(p.Context, h.id, arg.EntityPath.User) != nil {
+			err = errgo.WithCausef(nil, params.ErrUnauthorized, "")
+		}
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-
-	m, err := h.jem.DB.Model(p.Context, arg.EntityPath)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-	ctl, err := h.jem.DB.Controller(p.Context, m.Controller)
-	if err != nil {
+	ctl := mongodoc.Controller{Path: m.Controller}
+	if err := h.jem.DB.GetController(p.Context, &ctl); err != nil {
 		return nil, errgo.Mask(err)
 	}
 
@@ -365,13 +205,11 @@ func (h *Handler) GetModel(p httprequest.Params, arg *params.GetModel) (*params.
 
 // DeleteModel deletes an model from JEM.
 func (h *Handler) DeleteModel(p httprequest.Params, arg *params.DeleteModel) error {
-	if err := auth.CheckIsUser(p.Context, arg.EntityPath.User); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	m := mongodoc.Model{Path: arg.EntityPath}
+	if err := h.jem.GetModel(p.Context, h.id, jujuparams.ModelAdminAccess, &m); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
-	if err := h.jem.DB.DeleteModel(p.Context, arg.EntityPath); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrForbidden))
-	}
-	return nil
+	return errgo.Mask(h.jem.DB.RemoveModel(p.Context, &m))
 }
 
 // ListModels returns all the models stored in JEM.
@@ -388,35 +226,20 @@ func (h *Handler) ListModels(p httprequest.Params, arg *params.ListModels) (*par
 	// controllers, and gathering results to do only a few
 	// concurrent queries.
 	controllers := make(map[params.EntityPath]mongodoc.Controller)
-	iter := h.jem.DB.Controllers().Find(nil).Sort("_id").Iter()
-	var ctl mongodoc.Controller
-	for iter.Next(&ctl) {
-		controllers[ctl.Path] = ctl
-	}
-	if err := iter.Err(); err != nil {
+	err := h.jem.DB.ForEachController(p.Context, nil, []string{"_id"}, func(ctl *mongodoc.Controller) error {
+		controllers[ctl.Path] = *ctl
+		return nil
+	})
+	if err != nil {
 		return nil, errgo.Notef(err, "cannot get controllers")
 	}
 
-	iter = h.jem.DB.Models().Find(nil).Sort("_id").Iter()
-	var modelIter entityIter
-	if arg.All {
-		if err := auth.CheckIsUser(p.Context, h.jem.ControllerAdmin()); err != nil {
-			if errgo.Cause(err) == params.ErrUnauthorized {
-				return nil, errgo.WithCausef(nil, params.ErrUnauthorized, "admin access required to list all models")
-			}
-			return nil, errgo.Mask(err)
-		}
-		modelIter = mgoIter{iter}
-	} else {
-		modelIter = h.jem.DB.NewCanReadIter(p.Context, iter)
-	}
 	var models []params.ModelResponse
-	var m mongodoc.Model
-	for modelIter.Next(&m) {
+	f := func(m *mongodoc.Model) error {
 		ctl, ok := controllers[m.Controller]
 		if !ok {
 			zapctx.Error(p.Context, "model has invalid controller value", zap.Stringer("model", m.Path), zap.Stringer("controller", m.Controller))
-			continue
+			return nil
 		}
 		models = append(models, params.ModelResponse{
 			Path:             m.Path,
@@ -430,9 +253,22 @@ func (h *Handler) ListModels(p httprequest.Params, arg *params.ListModels) (*par
 			Counts:           m.Counts,
 			Creator:          m.Creator,
 		})
+		return nil
 	}
-	if err := modelIter.Err(); err != nil {
-		return nil, errgo.Notef(err, "cannot get models")
+	if arg.All {
+		if err := auth.CheckIsUser(p.Context, h.id, h.jem.ControllerAdmin()); err != nil {
+			if errgo.Cause(err) == params.ErrUnauthorized {
+				return nil, errgo.WithCausef(nil, params.ErrUnauthorized, "admin access required to list all models")
+			}
+			return nil, errgo.Mask(err)
+		}
+		if err := h.jem.DB.ForEachModel(p.Context, nil, []string{"_id"}, f); err != nil {
+			return nil, errgo.Mask(err)
+		}
+	} else {
+		if err := h.jem.ForEachModel(p.Context, h.id, jujuparams.ModelReadAccess, f); err != nil {
+			return nil, errgo.Mask(err)
+		}
 	}
 	return &params.ListModelsResponse{
 		Models: models,
@@ -445,18 +281,17 @@ func (h *Handler) ListModels(p httprequest.Params, arg *params.ListModels) (*par
 func (h *Handler) ListController(p httprequest.Params, arg *params.ListController) (*params.ListControllerResponse, error) {
 	var controllers []params.ControllerResponse
 
-	iter := h.jem.DB.NewCanReadIter(p.Context, h.jem.DB.Controllers().Find(nil).Sort("_id").Iter())
-	var ctl mongodoc.Controller
-	for iter.Next(&ctl) {
+	err := h.jem.ForEachController(p.Context, h.id, func(ctl *mongodoc.Controller) error {
 		controllers = append(controllers, params.ControllerResponse{
 			Path:             ctl.Path,
 			Public:           ctl.Public,
 			UnavailableSince: newTime(ctl.UnavailableSince.UTC()),
 			Location:         ctl.Location,
 		})
-	}
-	if err := iter.Err(); err != nil {
-		return nil, errgo.Notef(err, "cannot get models")
+		return nil
+	})
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot get controllers")
 	}
 	return &params.ListControllerResponse{
 		Controllers: controllers,
@@ -487,14 +322,14 @@ func (h *Handler) NewModel(p httprequest.Params, args *params.NewModel) (*params
 	}
 
 	modelPath := params.EntityPath{args.User, args.Info.Name}
-	_, err = h.jem.CreateModel(p.Context, jem.CreateModelParams{
+	err = h.jem.CreateModel(p.Context, h.id, jem.CreateModelParams{
 		Path:           modelPath,
 		ControllerPath: ctlPath,
-		Credential:     args.Info.Credential,
+		Credential:     mongodoc.CredentialPathFromParams(args.Info.Credential),
 		Cloud:          lp.cloud,
 		Region:         lp.region,
 		Attributes:     args.Info.Config,
-	})
+	}, nil)
 	if err != nil {
 		return nil, errgo.Mask(err,
 			errgo.Is(params.ErrNotFound),
@@ -522,10 +357,9 @@ func (h *Handler) SetControllerPerm(p httprequest.Params, arg *params.SetControl
 	return h.setPerm(p.Context, h.jem.DB.Controllers(), arg.EntityPath, arg.ACL)
 }
 
-// SetModelPerm sets the permissions on a controller entity.
-// Only the owner (arg.EntityPath.User) can change the permissions
-// on an an entity. The owner can always read an entity, even
-// if it has empty ACL.
+// SetModelPerm sets the permissions on a model entity. Only the owner
+// (arg.EntityPath.User) can change the permissions on an entity. The
+// owner can always read an entity, even if it has empty ACL.
 // TODO remove this.
 func (h *Handler) SetModelPerm(p httprequest.Params, arg *params.SetModelPerm) error {
 	// TODO revoke access from all the users that currently
@@ -536,11 +370,11 @@ func (h *Handler) SetModelPerm(p httprequest.Params, arg *params.SetModelPerm) e
 
 func (h *Handler) setPerm(ctx context.Context, coll *mgo.Collection, path params.EntityPath, acl params.ACL) error {
 	// Only path.User (or members thereof) can change permissions.
-	if err := auth.CheckIsUser(ctx, path.User); err != nil {
+	if err := auth.CheckIsUser(ctx, h.id, path.User); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	zapctx.Info(ctx, "set perm", zap.String("collection", coll.Name), zap.Stringer("entity", path), zap.Any("acl", acl))
-	if err := coll.UpdateId(path.String(), bson.D{{"$set", bson.D{{"acl", acl}}}}); err != nil {
+	if err := coll.UpdateId(path.String(), new(jimmdb.Update).Set("acl", acl)); err != nil {
 		if err == mgo.ErrNotFound {
 			return params.ErrNotFound
 		}
@@ -552,36 +386,40 @@ func (h *Handler) setPerm(ctx context.Context, coll *mgo.Collection, path params
 // GetControllerPerm returns the ACL for a given controller.
 // Only the owner (arg.EntityPath.User) can read the ACL.
 func (h *Handler) GetControllerPerm(p httprequest.Params, arg *params.GetControllerPerm) (params.ACL, error) {
-	return h.getPerm(p.Context, h.jem.DB.Controllers(), arg.EntityPath)
+	// Only the owner can read the permissions.
+	if err := auth.CheckIsUser(p.Context, h.id, arg.User); err != nil {
+		return params.ACL{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	ctl := mongodoc.Controller{
+		Path: arg.EntityPath,
+	}
+	if err := h.jem.GetController(p.Context, h.id, &ctl); err != nil {
+		return params.ACL{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	return ctl.ACL, nil
 }
 
 // GetModelPerm returns the ACL for a given model.
 // Only the owner (arg.EntityPath.User) can read the ACL.
 func (h *Handler) GetModelPerm(p httprequest.Params, arg *params.GetModelPerm) (params.ACL, error) {
-	return h.getPerm(p.Context, h.jem.DB.Models(), arg.EntityPath)
-}
-
-func (h *Handler) getPerm(ctx context.Context, coll *mgo.Collection, path params.EntityPath) (params.ACL, error) {
-	// Only the owner can read permissions.
-	if err := auth.CheckIsUser(ctx, path.User); err != nil {
+	// Only the owner can read the permissions.
+	if err := auth.CheckIsUser(p.Context, h.id, arg.User); err != nil {
 		return params.ACL{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	acl, err := h.jem.DB.GetACL(ctx, coll, path)
-	if err != nil {
-		return params.ACL{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	m := mongodoc.Model{
+		Path: arg.EntityPath,
 	}
-	return acl, nil
+	if err := h.jem.GetModel(p.Context, h.id, jujuparams.ModelAdminAccess, &m); err != nil {
+		return params.ACL{}, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+	return m.ACL, nil
 }
 
 // UpdateCredential stores the provided credential under the provided,
 // user, cloud and name. If there is already a credential with that name
 // it is overwritten.
 func (h *Handler) UpdateCredential(p httprequest.Params, arg *params.UpdateCredential) error {
-	// Only the owner can set credentials.
-	if err := auth.CheckIsUser(p.Context, arg.User); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	_, err := h.jem.UpdateCredential(p.Context, &mongodoc.Credential{
+	_, err := h.jem.UpdateCredential(p.Context, h.id, &mongodoc.Credential{
 		Path:       mongodoc.CredentialPathFromParams(arg.CredentialPath),
 		Type:       arg.Credential.AuthType,
 		Attributes: arg.Credential.Attributes,
@@ -594,11 +432,13 @@ func (h *Handler) UpdateCredential(p httprequest.Params, arg *params.UpdateCrede
 
 // JujuStatus retrieves and returns the status of the specifed model.
 func (h *Handler) JujuStatus(p httprequest.Params, arg *params.JujuStatus) (*params.JujuStatusResponse, error) {
-	if err := auth.CheckIsUser(p.Context, h.config.ControllerAdmin); err != nil {
-		if err := h.jem.DB.CheckReadACL(p.Context, h.jem.DB.Models(), arg.EntityPath); err != nil {
-			return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-		}
+	m := mongodoc.Model{
+		Path: arg.EntityPath,
 	}
+	if err := h.jem.GetModel(p.Context, h.id, jujuparams.ModelReadAccess, &m); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	}
+
 	conn, err := h.jem.OpenModelAPI(p.Context, arg.EntityPath)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
@@ -618,11 +458,11 @@ func (h *Handler) JujuStatus(p httprequest.Params, arg *params.JujuStatus) (*par
 // controller to a different one. The migration will not have
 // completed by the time the Migrate call returns.
 func (h *Handler) Migrate(p httprequest.Params, arg *params.Migrate) error {
-	if err := auth.CheckIsUser(p.Context, h.config.ControllerAdmin); err != nil {
+	if err := auth.CheckIsUser(p.Context, h.id, h.config.ControllerAdmin); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	model, err := h.jem.DB.Model(p.Context, arg.EntityPath)
-	if err != nil {
+	model := mongodoc.Model{Path: arg.EntityPath}
+	if err := h.jem.DB.GetModel(p.Context, &model); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	conn, err := h.jem.OpenAPI(p.Context, model.Controller)
@@ -630,8 +470,8 @@ func (h *Handler) Migrate(p httprequest.Params, arg *params.Migrate) error {
 		return errgo.Mask(err)
 	}
 	defer conn.Close()
-	ctl, err := h.jem.Controller(p.Context, arg.Controller)
-	if err != nil {
+	ctl := mongodoc.Controller{Path: arg.Controller}
+	if err := h.jem.DB.GetController(p.Context, &ctl); err != nil {
 		return errgo.NoteMask(err, "cannot access destination controller", errgo.Is(params.ErrNotFound))
 	}
 	zapctx.Debug(p.Context, "about to call InitiateMigration")
@@ -647,7 +487,7 @@ func (h *Handler) Migrate(p httprequest.Params, arg *params.Migrate) error {
 	if err != nil {
 		return errgo.Notef(err, "cannot initiate migration")
 	}
-	if err := h.jem.DB.SetModelController(p.Context, arg.EntityPath, arg.Controller); err != nil {
+	if err := h.jem.DB.UpdateModel(p.Context, &model, new(jimmdb.Update).Set("controller", arg.Controller), true); err != nil {
 		// This is a problem, because we can't undo the migration now,
 		// so just shout about it.
 		zapctx.Error(p.Context, "cannot update model database entry", zap.Stringer("model", arg.EntityPath), zap.Stringer("controller", arg.Controller))
@@ -669,18 +509,15 @@ func (h *Handler) LogLevel(p httprequest.Params, _ *params.LogLevel) (params.Lev
 }
 
 func (h *Handler) SetControllerDeprecated(p httprequest.Params, req *params.SetControllerDeprecated) error {
-	if err := auth.CheckIsUser(p.Context, req.EntityPath.User); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	if err := h.jem.DB.SetControllerDeprecated(p.Context, req.EntityPath, req.Body.Deprecated); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	if err := h.jem.SetControllerDeprecated(p.Context, h.id, req.EntityPath, req.Body.Deprecated); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	return nil
 }
 
 func (h *Handler) GetControllerDeprecated(p httprequest.Params, req *params.GetControllerDeprecated) (*params.DeprecatedBody, error) {
-	ctl, err := h.jem.Controller(p.Context, req.EntityPath)
-	if err != nil {
+	ctl := mongodoc.Controller{Path: req.EntityPath}
+	if err := h.jem.GetController(p.Context, h.id, &ctl); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 	return &params.DeprecatedBody{
@@ -738,9 +575,9 @@ func cloudAndRegion(loc map[string]string) (locationParams, error) {
 
 // entityIter is an iterator over a set of entities.
 type entityIter interface {
-	Next(item auth.ACLEntity) bool
-	Close() error
-	Err() error
+	Next(ctx context.Context, item auth.ACLEntity) bool
+	Close(ctx context.Context) error
+	Err(ctx context.Context) error
 }
 
 // mgoIter is an adapter to convert a *mgo.Iter into an entityIter.
@@ -750,15 +587,23 @@ type mgoIter struct {
 
 // Next implements entityIter.Next by wrapping *mgo.Next using the
 // auth.ACLEntity type.
-func (it mgoIter) Next(item auth.ACLEntity) bool {
+func (it mgoIter) Next(_ context.Context, item auth.ACLEntity) bool {
 	return it.Iter.Next(item)
+}
+
+func (it mgoIter) Close(_ context.Context) error {
+	return it.Iter.Close()
+}
+
+func (it mgoIter) Err(_ context.Context) error {
+	return it.Iter.Err()
 }
 
 // GetModelName returns the name of the model identified by the provided uuid.
 func (h *Handler) GetModelName(p httprequest.Params, arg *params.ModelNameRequest) (params.ModelNameResponse, error) {
-	m, err := h.jem.DB.ModelFromUUID(p.Context, arg.UUID)
-	if err != nil {
-		return params.ModelNameResponse{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	m := mongodoc.Model{UUID: arg.UUID}
+	if err := h.jem.GetModel(p.Context, h.id, jujuparams.ModelReadAccess, &m); err != nil {
+		return params.ModelNameResponse{}, errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrUnauthorized))
 	}
 
 	return params.ModelNameResponse{
@@ -780,12 +625,9 @@ func (h *Handler) GetAuditEntries(p httprequest.Params, arg *params.AuditLogRequ
 
 // GetModelStatuses return the list of all models created between 2 dates (or all).
 func (h *Handler) GetModelStatuses(p httprequest.Params, arg *params.ModelStatusesRequest) (params.ModelStatuses, error) {
-	if err := auth.CheckIsUser(p.Context, h.config.ControllerAdmin); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
-	}
-	entries, err := h.jem.DB.GetModelStatuses(p.Context)
+	entries, err := h.jem.GetModelStatuses(p.Context, h.id)
 	if err != nil {
-		return nil, errgo.Mask(err)
+		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	return entries, nil
 }
@@ -795,7 +637,7 @@ func (h *Handler) checkACL(ctx context.Context, aclName string) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	return errgo.Mask(auth.CheckACL(ctx, acl), errgo.Is(params.ErrUnauthorized))
+	return errgo.Mask(auth.CheckACL(ctx, h.id, acl), errgo.Is(params.ErrUnauthorized))
 }
 
 // MissingModels returns a list of models present on the given controller
@@ -803,7 +645,7 @@ func (h *Handler) checkACL(ctx context.Context, aclName string) error {
 func (h *Handler) MissingModels(p httprequest.Params, arg *params.MissingModelsRequest) (params.MissingModels, error) {
 	var resp params.MissingModels
 
-	if err := auth.CheckIsUser(p.Context, h.jem.ControllerAdmin()); err != nil {
+	if err := auth.CheckIsUser(p.Context, h.id, h.jem.ControllerAdmin()); err != nil {
 		if errgo.Cause(err) == params.ErrUnauthorized {
 			return resp, errgo.WithCausef(nil, params.ErrUnauthorized, "admin access required")
 		}
@@ -825,7 +667,8 @@ func (h *Handler) MissingModels(p httprequest.Params, arg *params.MissingModelsR
 
 	for _, ms := range mss {
 		// Check that a model with the same UUID exists.
-		_, err := h.jem.DB.ModelFromUUID(p.Context, ms.UUID)
+		m := mongodoc.Model{UUID: ms.UUID}
+		err := h.jem.DB.GetModel(p.Context, &m)
 		if err == nil {
 			continue
 		}

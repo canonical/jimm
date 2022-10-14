@@ -9,12 +9,12 @@ import (
 	"github.com/juju/juju/cloud"
 	jujujujutesting "github.com/juju/juju/testing"
 	jujutesting "github.com/juju/juju/testing"
+	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
 	"github.com/juju/version"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	names "gopkg.in/juju/names.v3"
 
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
@@ -109,14 +109,6 @@ func (s jemShimWithUpdateNotify) SetControllerAvailable(ctx context.Context, ctl
 	return nil
 }
 
-func (s jemShimWithUpdateNotify) SetControllerVersion(ctx context.Context, ctlPath params.EntityPath, v version.Number) error {
-	if err := s.jemInterface.SetControllerVersion(ctx, ctlPath, v); err != nil {
-		return err
-	}
-	s.changed <- "controller version"
-	return nil
-}
-
 func (s jemShimWithUpdateNotify) SetModelInfo(ctx context.Context, ctlPath params.EntityPath, uuid string, info *mongodoc.ModelInfo) error {
 	if err := s.jemInterface.SetModelInfo(ctx, ctlPath, uuid, info); err != nil {
 		return err
@@ -156,6 +148,15 @@ func (s jemShimWithUpdateNotify) AcquireMonitorLease(ctx context.Context, ctlPat
 	}
 	s.changed <- "lease acquired"
 	return t, err
+}
+
+func (s jemShimWithUpdateNotify) UpdateApplicationOffer(ctx context.Context, ctlPath params.EntityPath, offerUUID string, removed bool) error {
+	err := s.jemInterface.UpdateApplicationOffer(ctx, ctlPath, offerUUID, removed)
+	if err != nil {
+		return err
+	}
+	s.changed <- "application offer"
+	return nil
 }
 
 type jemShimWithAPIOpener struct {
@@ -208,6 +209,7 @@ type jemShimInMemory struct {
 	applications                map[string]map[applicationId]*mongodoc.Application
 	controllerUpdateCredentials map[params.EntityPath]bool
 	cloudRegions                map[string]*mongodoc.CloudRegion
+	applicationOffers           map[string]bool
 }
 
 var _ jemInterface = (*jemShimInMemory)(nil)
@@ -220,6 +222,7 @@ func newJEMShimInMemory() *jemShimInMemory {
 		machines:                    make(map[string]map[machineId]*mongodoc.Machine),
 		applications:                make(map[string]map[applicationId]*mongodoc.Application),
 		cloudRegions:                make(map[string]*mongodoc.CloudRegion),
+		applicationOffers:           make(map[string]bool),
 	}
 }
 
@@ -289,16 +292,6 @@ func (s *jemShimInMemory) SetControllerUnavailableAt(ctx context.Context, ctlPat
 	ctl, ok := s.controllers[ctlPath]
 	if ok && ctl.UnavailableSince.IsZero() {
 		ctl.UnavailableSince = mongodoc.Time(t)
-	}
-	return nil
-}
-
-func (s *jemShimInMemory) SetControllerVersion(ctx context.Context, ctlPath params.EntityPath, v version.Number) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	ctl, ok := s.controllers[ctlPath]
-	if ok {
-		ctl.Version = &v
 	}
 	return nil
 }
@@ -424,13 +417,6 @@ func (s *jemShimInMemory) ModelUUIDsForController(ctx context.Context, ctlPath p
 	return uuids, nil
 }
 
-func (s *jemShimInMemory) ControllerUpdateCredentials(_ context.Context, ctlPath params.EntityPath) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.controllerUpdateCredentials[ctlPath] = true
-	return nil
-}
-
 func (s *jemShimInMemory) OpenAPI(context.Context, params.EntityPath) (jujuAPI, error) {
 	return nil, errgo.New("jemShimInMemory doesn't implement OpenAPI")
 }
@@ -454,20 +440,28 @@ func (s *jemShimInMemory) AcquireMonitorLease(ctx context.Context, ctlPath param
 	return ctl.MonitorLeaseExpiry, nil
 }
 
-func (s *jemShimInMemory) UpdateCloudRegions(ctx context.Context, cloudRegions []mongodoc.CloudRegion) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for k, cloudRegion := range cloudRegions {
-		id := cloudRegion.GetId()
-		if cr, ok := s.cloudRegions[id]; ok {
-			cr.PrimaryControllers = append(cr.PrimaryControllers, cloudRegion.PrimaryControllers...)
-			cr.SecondaryControllers = append(cr.SecondaryControllers, cloudRegion.SecondaryControllers...)
-			continue
-		}
-		s.cloudRegions[id] = &cloudRegions[k]
-	}
+func (j jemShimInMemory) WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityPath) (func() error, error) {
+	return func() error { return nil }, nil
+}
 
+func (j jemShimInMemory) UpdateApplicationOffer(ctx context.Context, ctlPath params.EntityPath, offerUUID string, removed bool) error {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+
+	if removed {
+		delete(j.applicationOffers, offerUUID)
+	} else {
+		j.applicationOffers[offerUUID] = true
+	}
 	return nil
+}
+
+type jemShimWithoutModelSummaryWatcher struct {
+	jemInterface
+}
+
+func (j jemShimWithoutModelSummaryWatcher) WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityPath) (func() error, error) {
+	return func() error { return nil }, nil
 }
 
 type jujuAPIShims struct {
@@ -565,10 +559,6 @@ func (s *jujuAPIShim) ServerVersion() (version.Number, bool) {
 	return s.serverVersion, true
 }
 
-func (s *jujuAPIShim) Clouds() (map[names.CloudTag]cloud.Cloud, error) {
-	return s.clouds, nil
-}
-
 type watcherShim struct {
 	jujuAPIShim *jujuAPIShim
 	mu          sync.Mutex
@@ -596,5 +586,27 @@ func (s *watcherShim) Stop() error {
 	s.jujuAPIShim.shims.mu.Lock()
 	s.jujuAPIShim.shims.watcherCount--
 	s.jujuAPIShim.shims.mu.Unlock()
+	return nil
+}
+
+func newUpdateOfferShim(jem jemInterface, notify func()) updateOfferShim {
+	return updateOfferShim{
+		jemInterface: jem,
+		notify:       notify,
+	}
+}
+
+type updateOfferShim struct {
+	jemInterface
+
+	notify func()
+}
+
+func (s updateOfferShim) UpdateApplicationOffer(ctx context.Context, ctlPath params.EntityPath, offerUUID string, removed bool) error {
+	err := s.jemInterface.UpdateApplicationOffer(ctx, ctlPath, offerUUID, removed)
+	if err != nil {
+		return err
+	}
+	s.notify()
 	return nil
 }

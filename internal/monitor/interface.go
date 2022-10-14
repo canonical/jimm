@@ -7,9 +7,7 @@ import (
 	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
-	"github.com/juju/juju/cloud"
 	"github.com/juju/version"
-	names "gopkg.in/juju/names.v3"
 
 	"github.com/CanonicalLtd/jimm/internal/mongodoc"
 	"github.com/CanonicalLtd/jimm/params"
@@ -42,9 +40,6 @@ type jemInterface interface {
 	// SetControllerAvailable marks the given controller as available.
 	// This method does not return an error when the controller doesn't exist.
 	SetControllerAvailable(ctx context.Context, ctlPath params.EntityPath) error
-
-	// SetControllerVersion sets the controller version of the given controller.
-	SetControllerVersion(ctx context.Context, ctlPath params.EntityPath, v version.Number) error
 
 	// SetModelLife sets the Life field of all models controlled
 	// by the given controller that have the given UUID.
@@ -106,15 +101,16 @@ type jemInterface interface {
 	// an error with a jem.ErrLeaseUnavailable cause will be returned.
 	AcquireMonitorLease(ctx context.Context, ctlPath params.EntityPath, oldExpiry time.Time, oldOwner string, newExpiry time.Time, newOwner string) (time.Time, error)
 
-	// ControllerUpdateCredentials updates the given controller by updating
-	// all credentials listed in ctl.UpdateCredentials.
-	ControllerUpdateCredentials(ctx context.Context, ctlPath params.EntityPath) error
-
 	// Controller retrieve the controller based on the controller path.
 	Controller(ctx context.Context, ctlPath params.EntityPath) (*mongodoc.Controller, error)
 
-	// UpdateCloudRegions updates the cloud/region.
-	UpdateCloudRegions(ctx context.Context, cloudRegions []mongodoc.CloudRegion) error
+	// WatchAllModelSummaries starts watching the summary updates from
+	// the controller.
+	WatchAllModelSummaries(ctx context.Context, ctlPath params.EntityPath) (func() error, error)
+
+	// UpdateApplicationOffer fetches offer details from the controller and updates the
+	// application offer in JIMM DB.
+	UpdateApplicationOffer(ctx context.Context, ctlPath params.EntityPath, offerUUID string, removed bool) error
 }
 
 // jujuAPI represents an API connection to a Juju controller.
@@ -135,9 +131,6 @@ type jujuAPI interface {
 
 	// ServerVersion holds the version of the API server that we are connected to.
 	ServerVersion() (version.Number, bool)
-
-	// Clouds gets the clouds supported by the controller.
-	Clouds() (map[names.CloudTag]cloud.Cloud, error)
 }
 
 // allWatcher represents a watcher of all events on a controller.

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	vault "github.com/hashicorp/vault/api"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/mgo.v2"
@@ -15,7 +16,8 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/debugapi"
 	"github.com/CanonicalLtd/jimm/internal/jemserver"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
-	"github.com/CanonicalLtd/jimm/internal/v2"
+	"github.com/CanonicalLtd/jimm/internal/pubsub"
+	v2 "github.com/CanonicalLtd/jimm/internal/v2"
 	"github.com/CanonicalLtd/jimm/params"
 )
 
@@ -76,14 +78,6 @@ type ServerParams struct {
 	// used with this controller.
 	GUILocation string
 
-	// UsageSenderURL holds the URL where we obtain authorization
-	// to collect and report usage metrics.
-	UsageSenderURL string
-
-	// UsageSenderSpoolPath holds the path to a directory where the usage
-	// send worker will store metrics.
-	UsageSenderSpoolPath string
-
 	// Domain holds the domain to which users must belong, not
 	// including the leading "@". If this is empty, users may be in
 	// any domain.
@@ -93,6 +87,19 @@ type ServerParams struct {
 	// the public cloud metadata. If this is empty or the file
 	// doesn't exist the default public cloud information is used.
 	PublicCloudMetadata string
+
+	// JujuDashboardLocation contains the path to the folder
+	// where the Juju Dashboard tarball was extracted.
+	JujuDashboardLocation string
+
+	Pubsub *pubsub.Hub
+
+	// VaultClient is the (optional) vault client to use to store
+	// cloud credentials.
+	VaultClient *vault.Client
+
+	// VaultPath is the root path in the vault for JIMM's secrets.
+	VaultPath string
 }
 
 // HandleCloser represents an HTTP handler that can

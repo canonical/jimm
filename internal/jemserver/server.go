@@ -9,15 +9,16 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/canonical/candid/candidclient"
+	vault "github.com/hashicorp/vault/api"
 	"github.com/juju/aclstore"
 	"github.com/juju/juju/cloud"
 	"github.com/juju/simplekv/mgosimplekv"
 	"github.com/julienschmidt/httprouter"
 	"github.com/prometheus/client_golang/prometheus"
-	candidclient "gopkg.in/CanonicalLtd/candidclient.v1"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/juju/worker.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/bakery/mgorootkeystore"
@@ -25,18 +26,15 @@ import (
 	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
+	"github.com/CanonicalLtd/jimm/internal/dashboard"
 	"github.com/CanonicalLtd/jimm/internal/jem"
 	"github.com/CanonicalLtd/jimm/internal/jemerror"
 	"github.com/CanonicalLtd/jimm/internal/mgosession"
 	"github.com/CanonicalLtd/jimm/internal/monitor"
-	"github.com/CanonicalLtd/jimm/internal/usagesender"
+	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	"github.com/CanonicalLtd/jimm/internal/zapctx"
 	"github.com/CanonicalLtd/jimm/internal/zaputil"
 	"github.com/CanonicalLtd/jimm/params"
-)
-
-var (
-	usageSenderPeriod = 5 * time.Minute
 )
 
 // NewAPIHandlerFunc is a function that returns set of httprequest
@@ -96,14 +94,6 @@ type Params struct {
 	// used with this controller.
 	GUILocation string
 
-	// UsageSenderURL holds the URL where we obtain authorization
-	// to collect and report usage metrics.
-	UsageSenderURL string
-
-	// UsageSenderSpoolPath holds the path to a directory where the usage
-	// send worker will store metrics.
-	UsageSenderSpoolPath string
-
 	// Domain holds the domain to which users must belong, not
 	// including the leading "@". If this is empty, users may be in
 	// any domain.
@@ -113,6 +103,19 @@ type Params struct {
 	// the public cloud metadata. If this is empty or the file
 	// doesn't exist the default public cloud information is used.
 	PublicCloudMetadata string
+
+	// JujuDashboardLocation contains the path to the folder
+	// where the Juju Dashboard tarball was extracted.
+	JujuDashboardLocation string
+
+	Pubsub *pubsub.Hub
+
+	// VaultClient is the (optional) vault client to use to store
+	// cloud credentials.
+	VaultClient *vault.Client
+
+	// VaultPath is the root path in the vault for JIMM's secrets.
+	VaultPath string
 }
 
 // HandlerParams are the parameters used to initialize a handler.
@@ -141,7 +144,6 @@ type Server struct {
 	auth            *auth.Authenticator
 	sessionPool     *mgosession.Pool
 	monitor         *monitor.Monitor
-	usageSender     worker.Worker
 	jemModelStats   *jem.ModelStats
 	jemMachineStats *jem.MachineStats
 }
@@ -157,7 +159,7 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	if config.MaxMgoSessions <= 0 {
 		config.MaxMgoSessions = 1
 	}
-	identityClient, bclient, err := newIdentityClient(config)
+	identityClient, _, err := newIdentityClient(config)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -180,9 +182,8 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 		DB:                  config.DB,
 		SessionPool:         sessionPool,
 		ControllerAdmin:     config.ControllerAdmin,
-		UsageSenderURL:      config.UsageSenderURL,
-		Client:              bclient,
 		PublicCloudMetadata: publicCloudMetadata,
+		Pubsub:              config.Pubsub,
 	}
 	p, err := jem.NewPool(ctx, jconfig)
 	if err != nil {
@@ -191,14 +192,14 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	jem := p.JEM(ctx)
 	defer jem.Close()
 
+	rks := mgorootkeystore.NewRootKeys(100)
+	if err := rks.EnsureIndex(jem.DB.Macaroons()); err != nil {
+		return nil, errgo.Notef(err, "cannot make macaroon store")
+	}
+
 	bakery := identchecker.NewBakery(identchecker.BakeryParams{
-		RootKeyStore: auth.NewRootKeyStore(auth.RootKeyStoreParams{
-			Pool:     sessionPool,
-			RootKeys: mgorootkeystore.NewRootKeys(100),
-			Policy: mgorootkeystore.Policy{
-				ExpiryDuration: 24 * time.Hour,
-			},
-			Collection: jem.DB.Macaroons(),
+		RootKeyStore: rks.NewStore(jem.DB.Macaroons(), mgorootkeystore.Policy{
+			ExpiryDuration: 24 * time.Hour,
 		}),
 
 		Locator:        config.ThirdPartyLocator,
@@ -236,21 +237,30 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 		Store:    aclStore,
 		RootPath: "/admin/acls",
 		Authenticate: func(ctx context.Context, w http.ResponseWriter, req *http.Request) (aclstore.Identity, error) {
-			ctx, err := authenticator.AuthenticateRequest(ctx, req)
-			if err != nil {
-				status, body := jemerror.Mapper(ctx, err)
-				httprequest.WriteJSON(w, status, body)
-				return nil, errgo.Mask(err, errgo.Any)
+			id, err := authenticator.AuthenticateRequest(ctx, req)
+			if err == nil {
+				return id, nil
 			}
-			return identity{ctx}, nil
+			status, body := jemerror.Mapper(ctx, err)
+			httprequest.WriteJSON(w, status, body)
+			return nil, errgo.Mask(err, errgo.Any)
 		},
 		InitialAdminUsers: []string{string(config.ControllerAdmin)},
 	})
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
+	router := httprouter.New()
+
+	if config.JujuDashboardLocation != "" {
+		err = dashboard.Register(ctx, router, config.JujuDashboardLocation)
+		if err != nil {
+			return nil, errgo.Mask(err)
+		}
+	}
+
 	srv := &Server{
-		router:      httprouter.New(),
+		router:      router,
 		auth:        authenticator,
 		pool:        p,
 		sessionPool: sessionPool,
@@ -263,23 +273,10 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 		}
 		srv.monitor = monitor.New(ctx, p, owner)
 	}
-	if config.UsageSenderURL != "" {
-		worker, err := usagesender.NewSendModelUsageWorker(usagesender.SendModelUsageWorkerConfig{
-			OmnibusURL:     config.UsageSenderURL,
-			Pool:           p,
-			Period:         usageSenderPeriod,
-			Context:        ctx,
-			SpoolDirectory: config.UsageSenderSpoolPath,
-		})
-		if err != nil {
-			return nil, errgo.Mask(err)
-		}
-		srv.usageSender = worker
-	}
 	srv.router.Handler("GET", "/admin/acls/*path", aclManager)
 	srv.router.Handler("POST", "/admin/acls/*path", aclManager)
 	srv.router.Handler("PUT", "/admin/acls/*path", aclManager)
-	srv.router.Handler("GET", "/metrics", prometheus.Handler())
+	srv.router.Handler("GET", "/metrics", promhttp.Handler())
 	for name, newAPI := range versions {
 		handlers, err := newAPI(ctx, HandlerParams{
 			Params:        config,
@@ -321,20 +318,6 @@ func New(ctx context.Context, config Params, versions map[string]NewAPIHandlerFu
 	}
 
 	return srv, nil
-}
-
-type identity struct {
-	ctx context.Context
-}
-
-func (i identity) Allow(_ context.Context, acl []string) (bool, error) {
-	if err := auth.CheckACL(i.ctx, acl); err != nil {
-		if errgo.Cause(err) == params.ErrUnauthorized {
-			return false, nil
-		}
-		return false, errgo.Mask(err)
-	}
-	return true, nil
 }
 
 func monitorLeaseOwner(agentName string) (string, error) {
@@ -379,6 +362,15 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// TODO: in handlers, look up methods for this request path and return only those methods here.
 	header.Set("Access-Control-Allow-Methods", "DELETE,GET,HEAD,PUT,POST,OPTIONS")
 	header.Set("Access-Control-Expose-Headers", "WWW-Authenticate")
+
+	// Get an mgo session for use in all database operations with this request.
+	ctx, close := srv.sessionPool.ContextWithSession(req.Context())
+	defer close()
+	s := srv.sessionPool.Session(ctx)
+	defer s.Close()
+	ctx = mgorootkeystore.ContextWithMgoSession(ctx, s)
+	req = req.WithContext(ctx)
+
 	srv.router.ServeHTTP(w, req)
 }
 
@@ -400,11 +392,6 @@ func (srv *Server) Close() error {
 		srv.monitor.Kill()
 		if err := srv.monitor.Wait(); err != nil {
 			zapctx.Warn(srv.context, "error shutting down monitor", zaputil.Error(err))
-		}
-	}
-	if srv.usageSender != nil {
-		if err := worker.Stop(srv.usageSender); err != nil {
-			zapctx.Warn(srv.context, "error shutting down usage sender", zaputil.Error(err))
 		}
 	}
 	srv.pool.Close()

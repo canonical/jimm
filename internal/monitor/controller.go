@@ -8,6 +8,7 @@ import (
 	"time"
 
 	jujuparams "github.com/juju/juju/apiserver/params"
+	"github.com/juju/juju/core/instance"
 	"github.com/juju/utils/parallel"
 	"go.uber.org/zap"
 	"gopkg.in/errgo.v1"
@@ -262,74 +263,6 @@ func (m *controllerMonitor) connected(ctx context.Context, conn jujuAPI) error {
 	if err := m.jem.SetControllerAvailable(ctx, m.ctlPath); err != nil {
 		return errgo.Notef(err, "cannot set controller availability")
 	}
-	if err := m.jem.ControllerUpdateCredentials(ctx, m.ctlPath); err != nil {
-		return errgo.Notef(err, "cannot update credentials")
-	}
-	// It's sufficient to update the server version only when we connect
-	// because if the server version changes, the API connection
-	// will be broken.
-	if v, ok := conn.ServerVersion(); ok {
-		if err := m.jem.SetControllerVersion(ctx, m.ctlPath, v); err != nil {
-			return errgo.Notef(err, "cannot set controller verision")
-		}
-	}
-	// Get the controller's supported regions, again this only needs
-	// to be done at connection time as we assume that a controller's
-	// supported regions won't change without an upgrade.
-
-	// Find out the cloud information.
-	clouds, err := conn.Clouds()
-	if err != nil {
-		return errgo.Notef(err, "cannot get clouds")
-	}
-
-	ctl, err := m.jem.Controller(ctx, m.ctlPath)
-	if err != nil {
-		return errgo.Notef(err, "cannot get controller")
-	}
-
-	var cloudRegions []mongodoc.CloudRegion
-	for k, v := range clouds {
-		cr := mongodoc.CloudRegion{
-			Cloud:              params.Cloud(k.Id()),
-			Endpoint:           v.Endpoint,
-			IdentityEndpoint:   v.IdentityEndpoint,
-			StorageEndpoint:    v.StorageEndpoint,
-			ProviderType:       v.Type,
-			CACertificates:     v.CACertificates,
-			PrimaryControllers: []params.EntityPath{ctl.Path},
-			ACL: params.ACL{
-				Read: []string{"everyone"},
-			},
-		}
-		for _, at := range v.AuthTypes {
-			cr.AuthTypes = append(cr.AuthTypes, string(at))
-		}
-		cloudRegions = append(cloudRegions, cr)
-		for _, reg := range v.Regions {
-			cr := mongodoc.CloudRegion{
-				Cloud:            params.Cloud(k.Id()),
-				Region:           reg.Name,
-				Endpoint:         reg.Endpoint,
-				IdentityEndpoint: reg.IdentityEndpoint,
-				StorageEndpoint:  reg.StorageEndpoint,
-				ACL: params.ACL{
-					Read: []string{"everyone"},
-				},
-			}
-			if ctl.Location["cloud"] == k.Id() && ctl.Location["region"] == reg.Name {
-				cr.PrimaryControllers = []params.EntityPath{ctl.Path}
-			} else {
-				cr.SecondaryControllers = []params.EntityPath{ctl.Path}
-			}
-			cloudRegions = append(cloudRegions, cr)
-		}
-	}
-	// Note: if regions change (other than by adding new regions), then the controller
-	// won't be removed from regions that are no longer supported
-	if err := m.jem.UpdateCloudRegions(ctx, cloudRegions); err != nil {
-		return errgo.Mask(err)
-	}
 
 	// Remove all the known machines and applications for the controller. The ones
 	// that still exist will be updated in the first deltas.
@@ -522,6 +455,10 @@ type modelInfo struct {
 	// changed holds information about what's changed
 	// in the model since the last set of deltas.
 	changed modelChange
+
+	// machineHardware holds a map from a machine Id to the machine's
+	// hardware characteristics.
+	machineHardware map[string]*instance.HardwareCharacteristics
 }
 
 func (info *modelInfo) adjustCount(kind params.EntityCount, n int) {
@@ -534,6 +471,23 @@ func (info *modelInfo) adjustCount(kind params.EntityCount, n int) {
 func (info *modelInfo) setInfo(modelInfo *jujuparams.ModelUpdate) {
 	info.changed |= infoChange
 	info.info = modelInfo
+}
+
+func (info *modelInfo) setMachineHardware(id string, hw *instance.HardwareCharacteristics) int {
+	getCores := func(h *instance.HardwareCharacteristics) int {
+		if h == nil || h.CpuCores == nil {
+			return 0
+		}
+		return int(*h.CpuCores)
+	}
+	oldCount := getCores(info.machineHardware[id])
+	newCount := getCores(hw)
+	if hw == nil {
+		delete(info.machineHardware, id)
+	} else {
+		info.machineHardware[id] = hw
+	}
+	return newCount - oldCount
 }
 
 func newWatcherState(ctx context.Context, j jemInterface, ctlPath params.EntityPath) *watcherState {
@@ -584,11 +538,22 @@ func (w *watcherState) addDelta(ctx context.Context, d jujuparams.Delta) error {
 		// TODO for top level machines, increment instance count?
 		delta := w.adjustCount(&w.stats.MachineCount, d)
 		w.modelInfo(e.ModelUUID).adjustCount(params.MachineCount, delta)
+		var coreDelta int
 		if d.Removed {
+			coreDelta = w.modelInfo(e.ModelUUID).setMachineHardware(e.Id, nil)
 			e.Life = "dead"
+		} else {
+			coreDelta = w.modelInfo(e.ModelUUID).setMachineHardware(e.Id, e.HardwareCharacteristics)
 		}
+		w.modelInfo(e.ModelUUID).adjustCount(params.CoreCount, coreDelta)
 		w.runner.Do(func() error {
 			return w.jem.UpdateMachineInfo(ctx, w.ctlPath, e)
+		})
+	case *jujuparams.ApplicationOfferInfo:
+		delta := w.adjustCount(&w.stats.ApplicationOfferCount, d)
+		w.modelInfo(e.ModelUUID).adjustCount(params.ApplicationOfferCount, delta)
+		w.runner.Do(func() error {
+			return w.jem.UpdateApplicationOffer(ctx, w.ctlPath, e.OfferUUID, d.Removed)
 		})
 	default:
 		zapctx.Debug(ctx, "unknown entity", zap.Bool("removed", d.Removed), zap.String("type", fmt.Sprintf("%T", e)))
@@ -609,10 +574,12 @@ func (w watcherState) modelInfo(uuid string) *modelInfo {
 			// update the counts even if no entities are created.
 			changed: ^0,
 			counts: map[params.EntityCount]int{
+				params.CoreCount:        0,
 				params.UnitCount:        0,
 				params.MachineCount:     0,
 				params.ApplicationCount: 0,
 			},
+			machineHardware: make(map[string]*instance.HardwareCharacteristics),
 		}
 		w.models[uuid] = info
 	}

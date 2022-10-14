@@ -6,18 +6,19 @@ import (
 	"fmt"
 
 	"github.com/juju/cmd"
-	"github.com/juju/juju/cmd/modelcmd"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/jimm/params"
 )
 
 type controllersCommand struct {
-	commandBase
+	*commandBase
 }
 
-func newControllersCommand() cmd.Command {
-	return modelcmd.WrapBase(&controllersCommand{})
+func newControllersCommand(c *commandBase) cmd.Command {
+	return &controllersCommand{
+		commandBase: c,
+	}
 }
 
 var controllersDoc = `

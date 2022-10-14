@@ -48,6 +48,10 @@ options:
     description: |
       A comma-separated list of nagios servicegroups.
       If left empty, the nagios_context will be used as the servicegroup
+  controller-url:
+    default: "jimm.jujucharms.com"
+    type: string
+    description: The URL of the JIMM controller.
   controller-uuid:
     default: ""
     type: string
@@ -64,10 +68,6 @@ options:
     description: |
       The URL to redirect users to if they wish to access the GUI for
       the JIMM controller.
-  usage-sender-url:
-    default: ""
-    type: string
-    description: Location of the omnibus service.
   domain:
     default: ""
     type: string
@@ -76,3 +76,7 @@ options:
      default: "jem"
      type: string
      description: MongoDB database name to use.
+  juju-dashboard-location:
+    default: ""
+    type: string
+    description: URL of the Juju Dashboard for this controller.
