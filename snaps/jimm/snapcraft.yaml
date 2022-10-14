@@ -1,10 +1,10 @@
 name: jimm
-version: git
 summary: Juju Intelligent Model Manager
 description: Multi-cloud controller for managing JAAS models.
 grade: stable
 base: core20
 confinement: strict
+adopt-info: jimmsrv # Version our app via set-version within an override
 
 apps:
   jimm:
@@ -16,7 +16,7 @@ apps:
 parts:
   jimmsrv:
     plugin: go
-    source: ../..
+    source: ./
     build-packages:
     - git
     - gcc
