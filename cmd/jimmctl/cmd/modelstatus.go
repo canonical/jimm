@@ -63,7 +63,7 @@ func (c *modelStatusCommand) SetFlags(f *gnuflag.FlagSet) {
 
 // Init implements the cmd.Command interface.
 func (c *modelStatusCommand) Init(args []string) error {
-	if len(args) < 0 {
+	if len(args) < 1 {
 		return errors.E("missing model uuid")
 	}
 	c.modelUUID, args = args[0], args[1:]
