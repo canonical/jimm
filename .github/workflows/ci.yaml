@@ -53,6 +53,8 @@ jobs:
       - name: Install vault
         run: sudo snap install vault --classic
       - uses: ./.github/workflows/setupgo118amd64
+      - name: Install openfga
+        run: go install github.com/openfga/openfga/cmd/openfga@latest
       - name: Build and Test
         run: go test -mod readonly ./...
         env:

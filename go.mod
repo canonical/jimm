@@ -37,11 +37,13 @@ require (
 	github.com/juju/version/v2 v2.0.0-20220204124744-fc9915e3d935
 	github.com/juju/zaputil v0.0.0-20190326175239-ef53049637ac
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
+	github.com/openfga/go-sdk v0.1.1
 	github.com/prometheus/client_golang v1.11.0
 	github.com/prometheus/common v0.29.0 // indirect
 	github.com/rogpeppe/fastuuid v1.2.0
 	go.uber.org/zap v1.10.0
-	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
+	golang.org/x/net v0.2.0 // indirect
+	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 	gopkg.in/juju/names.v2 v2.0.0-20190813004204-e057c73bd1be // indirect
 	gopkg.in/macaroon-bakery.v2 v2.3.0

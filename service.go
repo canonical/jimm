@@ -5,6 +5,7 @@ package jimm
 import (
 	"context"
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
@@ -19,6 +20,8 @@ import (
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
+	openfga "github.com/openfga/go-sdk"
+	"github.com/openfga/go-sdk/credentials"
 	"go.uber.org/zap"
 	httpbakeryv2 "gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
@@ -56,6 +59,14 @@ type VaultStore interface {
 	// PutControllerCredentials stores the controller credentials in a vault
 	// service.
 	PutControllerCredentials(ctx context.Context, controllerName string, username string, password string) error
+}
+
+// OpenFGAParams holds parameters needed to connect to the OpenFGA server.
+type OpenFGAParams struct {
+	Scheme string
+	Host   string
+	Store  string
+	Token  string
 }
 
 // A Params structure contains the parameters required to initialise a new
@@ -130,6 +141,9 @@ type Params struct {
 	// PublicDNSName is the name to advertise as the public address of
 	// the juju controller.
 	PublicDNSName string
+
+	// Parameters used to initialize connection to an OpenFGA server.
+	OpenFGAParams OpenFGAParams
 }
 
 // A Service is the implementation of a JIMM server.
@@ -217,6 +231,14 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	}
 	if vs != nil {
 		s.jimm.CredentialStore = vs
+	}
+
+	openFGAclient, err := newOpenFGAClient(ctx, p)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	if openFGAclient != nil {
+		s.jimm.OpenFGAClient = *openFGAclient
 	}
 
 	s.jimm.Dialer = &jujuclient.Dialer{
@@ -369,4 +391,45 @@ func newVaultStore(ctx context.Context, p Params) (VaultStore, error) {
 		AuthPath:   p.VaultAuthPath,
 		KVPath:     p.VaultPath,
 	}, nil
+}
+
+func newOpenFGAClient(ctx context.Context, p Params) (*openfga.APIClient, error) {
+	if p.OpenFGAParams.Host == "" {
+		return nil, nil
+	}
+	zapctx.Info(ctx, "configuring OpenFGA client",
+		zap.String("OpenFGA host", p.OpenFGAParams.Host),
+		zap.String("OpenFGA scheme", p.OpenFGAParams.Scheme),
+		zap.String("OpenFGA store", p.OpenFGAParams.Store),
+	)
+
+	config := openfga.Configuration{
+		ApiScheme: p.OpenFGAParams.Scheme,
+		ApiHost:   p.OpenFGAParams.Host, // required, define without the scheme (e.g. api.fga.example instead of https://api.fga.example)
+		StoreId:   p.OpenFGAParams.Store,
+	}
+	if p.OpenFGAParams.Token != "" {
+		config.Credentials = &credentials.Credentials{
+			Method: credentials.CredentialsMethodApiToken,
+			Config: &credentials.Config{
+				ApiToken: p.OpenFGAParams.Token,
+			},
+		}
+	}
+	configuration, err := openfga.NewConfiguration(config)
+	if err != nil {
+		return nil, err
+	}
+	client := openfga.NewAPIClient(configuration)
+
+	_, response, err := client.OpenFgaApi.ListStores(ctx).Execute()
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode != http.StatusOK {
+		body, _ := ioutil.ReadAll(response.Body)
+		return nil, errors.E("failed to contact the OpenFga server: received %v: %s", response.StatusCode, string(body))
+	}
+
+	return client, nil
 }
