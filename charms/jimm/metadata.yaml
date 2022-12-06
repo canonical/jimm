@@ -21,6 +21,8 @@ requires:
   vault:
     interface: vault-kv
     optional: true
+  openfga:
+    interface: openfga
 
 resources:
   jimm-snap:
