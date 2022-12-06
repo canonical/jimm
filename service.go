@@ -5,6 +5,7 @@ package jimm
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -67,6 +68,7 @@ type OpenFGAParams struct {
 	Host   string
 	Store  string
 	Token  string
+	Port   string
 }
 
 // A Params structure contains the parameters required to initialise a new
@@ -405,7 +407,7 @@ func newOpenFGAClient(ctx context.Context, p Params) (*openfga.APIClient, error)
 
 	config := openfga.Configuration{
 		ApiScheme: p.OpenFGAParams.Scheme,
-		ApiHost:   p.OpenFGAParams.Host, // required, define without the scheme (e.g. api.fga.example instead of https://api.fga.example)
+		ApiHost:   fmt.Sprintf("%s:%s", p.OpenFGAParams.Host, p.OpenFGAParams.Port), // required, define without the scheme (e.g. api.fga.example instead of https://api.fga.example)
 		StoreId:   p.OpenFGAParams.Store,
 	}
 	if p.OpenFGAParams.Token != "" {

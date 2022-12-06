@@ -4,10 +4,15 @@ type: "charm"
 parts:
   charm:
     charm-python-packages: [setuptools]
+    build-packages:
+      - libffi-dev
+      - libssl-dev
+      - rustc
+      - cargo
 bases:
   - build-on:
-    - name: "ubuntu"
-      channel: "20.04"
+      - name: "ubuntu"
+        channel: "20.04"
     run-on:
-    - name: "ubuntu"
-      channel: "20.04"
+      - name: "ubuntu"
+        channel: "20.04"

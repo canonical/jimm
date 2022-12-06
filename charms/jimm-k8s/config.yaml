@@ -25,9 +25,6 @@ options:
     description: |
       Whitespace separated list of candid users (or groups) that are
       made controller admins by default.
-  dns-name:
-    type: string
-    description: Public DNS hostname that JIMM is being served from.
   log-level:
     type: string
     description: |

@@ -17,7 +17,6 @@ from ops.testing import Harness
 
 MINIMAL_CONFIG = {
     "uuid": "1234567890",
-    "dns-name": "jimm.testing",
     "candid-url": "test-candid-url",
 }
 
@@ -69,8 +68,8 @@ class TestCharm(unittest.TestCase):
                         "command": "/root/jimmsrv",
                         "environment": {
                             "CANDID_URL": "test-candid-url",
-                            "JIMM_DNS_NAME": "jimm.testing",
                             "JIMM_DASHBOARD_LOCATION": "https://jaas.ai/models",
+                            "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
                             "JIMM_LISTEN_ADDR": ":8080",
                             "JIMM_LOG_LEVEL": "info",
                             "JIMM_UUID": "1234567890",
@@ -104,8 +103,8 @@ class TestCharm(unittest.TestCase):
                         "command": "/root/jimmsrv",
                         "environment": {
                             "CANDID_URL": "test-candid-url",
-                            "JIMM_DNS_NAME": "jimm.testing",
                             "JIMM_DASHBOARD_LOCATION": "https://jaas.ai/models",
+                            "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
                             "JIMM_LISTEN_ADDR": ":8080",
                             "JIMM_LOG_LEVEL": "info",
                             "JIMM_UUID": "1234567890",
@@ -123,7 +122,6 @@ class TestCharm(unittest.TestCase):
         self.harness.update_config(
             {
                 "uuid": "1234567890",
-                "dns-name": "jimm.testing",
                 "candid-url": "test-candid-url",
                 "candid-agent-username": "test-username",
                 "candid-agent-public-key": "test-public-key",
@@ -148,8 +146,8 @@ class TestCharm(unittest.TestCase):
                         "environment": {
                             "BAKERY_AGENT_FILE": "/root/config/agent.json",
                             "CANDID_URL": "test-candid-url",
-                            "JIMM_DNS_NAME": "jimm.testing",
                             "JIMM_DASHBOARD_LOCATION": "https://jaas.ai/models",
+                            "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
                             "JIMM_LISTEN_ADDR": ":8080",
                             "JIMM_LOG_LEVEL": "info",
                             "JIMM_UUID": "1234567890",
@@ -173,59 +171,6 @@ class TestCharm(unittest.TestCase):
             },
         )
 
-    def test_on_leader_elected(self):
-        container = self.harness.model.unit.get_container("jimm")
-        self.harness.charm.on.jimm_pebble_ready.emit(container)
-
-        rel_id = self.harness.add_relation("dashboard", "juju-dashboard")
-        self.harness.add_relation_unit(rel_id, "juju-dashboard/0")
-
-        self.harness.set_leader(True)
-        self.harness.update_config(MINIMAL_CONFIG)
-
-        self.harness.charm.on.leader_elected.emit()
-
-        # Check the that the plan was updated
-        plan = self.harness.get_container_pebble_plan("jimm")
-        self.assertEqual(
-            plan.to_dict(),
-            {
-                "services": {
-                    "jimm": {
-                        "summary": "JAAS Intelligent Model Manager",
-                        "startup": "disabled",
-                        "override": "merge",
-                        "command": "/root/jimmsrv",
-                        "environment": {
-                            "CANDID_URL": "test-candid-url",
-                            "JIMM_DASHBOARD_LOCATION": "https://jaas.ai/models",
-                            "JIMM_DNS_NAME": "jimm.testing",
-                            "JIMM_LISTEN_ADDR": ":8080",
-                            "JIMM_LOG_LEVEL": "info",
-                            "JIMM_UUID": "1234567890",
-                            "JIMM_WATCH_CONTROLLERS": "1",
-                        },
-                    }
-                }
-            },
-        )
-
-    def test_on_website_relation_joined(self):
-        self.harness.disable_hooks()
-        self.harness.update_config(MINIMAL_CONFIG)
-        self.harness.enable_hooks()
-
-        container = self.harness.model.unit.get_container("jimm")
-        self.harness.charm.on.jimm_pebble_ready.emit(container)
-
-        rel_id = self.harness.add_relation("website", "haproxy")
-        self.harness.add_relation_unit(rel_id, "haproxy/0")
-
-        rel_data = self.harness.get_relation_data(
-            rel_id, self.harness.charm.unit.name
-        )
-        self.assertEqual(rel_data.get("port"), "8080")
-
     @patch("hvac.Client.sys")
     def test_vault_configuration(self, client):
         client.unwrap.return_value = {
@@ -239,7 +184,6 @@ class TestCharm(unittest.TestCase):
         self.harness.update_config(
             {
                 "uuid": "1234567890",
-                "dns-name": "jimm.testing",
                 "candid-url": "test-candid-url",
                 "vault-url": "test-vault-url",
                 "vault-role-id": "test-vault-role-id",
@@ -264,8 +208,8 @@ class TestCharm(unittest.TestCase):
                         "command": "/root/jimmsrv",
                         "environment": {
                             "CANDID_URL": "test-candid-url",
-                            "JIMM_DNS_NAME": "jimm.testing",
                             "JIMM_DASHBOARD_LOCATION": "https://jaas.ai/models",
+                            "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
                             "JIMM_LISTEN_ADDR": ":8080",
                             "JIMM_LOG_LEVEL": "info",
                             "JIMM_UUID": "1234567890",
@@ -312,9 +256,9 @@ class TestCharm(unittest.TestCase):
                         "command": "/root/jimmsrv",
                         "environment": {
                             "CANDID_URL": "test-candid-url",
-                            "JIMM_DNS_NAME": "jimm.testing",
                             "JIMM_LISTEN_ADDR": ":8080",
                             "JIMM_DASHBOARD_LOCATION": "/root/dashboard",
+                            "JIMM_DNS_NAME": "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
                             "JIMM_LOG_LEVEL": "info",
                             "JIMM_UUID": "1234567890",
                         },
@@ -346,15 +290,16 @@ class TestCharm(unittest.TestCase):
         data = dashboard_archive.read()
         return data
 
-    @patch("charm.pgsql.client._get_pgsql_leader_data")
-    def test_dashboard_relation_joined(self, client):
+    def test_dashboard_relation_joined(self):
         harness = Harness(JimmOperatorCharm)
         self.addCleanup(harness.cleanup)
+
+        id = harness.add_relation("jimm", "juju-jimm")
+        harness.add_relation_unit(id, "juju-jimm/1")
         harness.begin()
         harness.set_leader(True)
         harness.update_config(
             {
-                "dns-name": "https://jimm.example.com",
                 "candid-agent-username": "username@candid",
                 "candid-agent-private-key": "agent-private-key",
                 "candid-agent-public-key": "agent-public-key",
@@ -366,10 +311,13 @@ class TestCharm(unittest.TestCase):
 
         id = harness.add_relation("dashboard", "juju-dashboard")
         harness.add_relation_unit(id, "juju-dashboard/0")
-        data = harness.get_relation_data(id, "jimm-k8s")
+        data = harness.get_relation_data(id, "juju-jimm-k8s")
 
         self.assertTrue(data)
-        self.assertEqual(data["controller-url"], "https://jimm.example.com")
+        self.assertEqual(
+            data["controller-url"],
+            "juju-jimm-k8s-0.juju-jimm-k8s-endpoints.None.svc.cluster.local",
+        )
         self.assertEqual(
             data["identity-provider-url"], "https://candid.example.com"
         )
