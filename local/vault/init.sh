@@ -14,10 +14,9 @@ echo "token" | vault login -
 export VAULT_ADDR="http://localhost:8200"
 
 echo "Enabling AppRole auth"
-# Enable auth
 vault auth enable approle
+
 echo "Creating jimm-app AppRole"
-# Create role
 vault write auth/approle/role/jimm-app \
     secret_id_ttl=10m \
     token_num_uses=10 \
