@@ -17,20 +17,25 @@ dependencies. **Note: Go 1.11 or greater needed.**
 
 ## Development environment
 
+### Local:
 A couple of system packages are required in order to set up a development
 environment. To install them, run the following:
+`make sysdeps`
 
-    make sysdeps
-
-At this point, from the root of this branch, run the command::
-
-    make install
+At this point, from the root of this branch, run the command:
+`make install`
 
 The command above builds and installs the JIMM binaries, and places
 them in `$GOPATH/bin`. This is the list of the installed commands:
 
 - jemd: start the JIMM server;
 - jaas-admin: perform admin commands on JIMM;
+
+### Docker-compose:
+Simply run docker-compose up.
+#### Helpful
+To access vault, the URL is:
+`localhost:8200/ui` and the root key is `token`.
 
 ## Testing
 
