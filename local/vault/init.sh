@@ -3,7 +3,8 @@
 # See https://developer.hashicorp.com/vault/docs/secrets/databases/postgresql 
 # for info on db engine.
 
-# We use dev for custom root token via env only, otherwise rest is prod emulated.
+# Dev mode defaults some addresses, but also enables us
+# to have a custom root key & automatically unsealed vault.
 vault server -dev -config=/vault/config/vault.hcl &
 sleep 2
 
