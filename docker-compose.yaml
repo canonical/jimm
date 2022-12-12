@@ -78,16 +78,3 @@ services:
     depends_on:
       db:
         condition: service_healthy
-
-
-  # myvault:
-  #     image: vault
-  #     container_name: myvault
-  #     ports:
-  #       - "127.0.0.1:8200:8200"
-  #     volumes:
-  #       - ./file:/vault/file:rw
-  #       - ./config:/vault/config:rw
-  #     cap_add:
-  #       - IPC_LOCK
-  #     entrypoint: vault server -config=/vault/config/vault.json
