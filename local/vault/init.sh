@@ -1,8 +1,5 @@
 #!/bin/sh
 
-# See https://developer.hashicorp.com/vault/docs/secrets/databases/postgresql 
-# for info on db engine.
-
 # Dev mode defaults some addresses, but also enables us
 # to have a custom root key & automatically unsealed vault.
 vault server -dev -config=/vault/config/vault.hcl &
