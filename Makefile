@@ -28,6 +28,9 @@ default: build
 build: version/commit.txt version/version.txt
 	go build -tags version $(PROJECT)/...
 
+build/server: version/commit.txt version/version.txt
+	go build -tags version ./cmd/jimmsrv
+
 check: version/commit.txt version/version.txt
 	go test -p 1 -timeout 30m -tags version $(PROJECT)/...
 
@@ -60,7 +63,11 @@ version/commit.txt: FORCE
 	git rev-parse --verify HEAD > version/commit.txt
 
 version/version.txt: FORCE
-	git describe --dirty > version/version.txt
+	if [ -z "$(GIT_VERSION)" ]; then \
+        echo "dev" > version/version.txt; \
+    else \
+        echo $(GIT_VERSION) > version/version.txt; \
+    fi
 
 jimmsrv: version/commit.txt version/version.txt
 	go build -tags release -v $(PROJECT)/cmd/jemd

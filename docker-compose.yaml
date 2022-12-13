@@ -1,39 +1,41 @@
 version: "3.9"
 
 services:
-  # jimm:
-  #   image: cosmtrek/air
-  #   # working_dir value has to be the same of mapped volume
-  #   working_dir: /jimm
-  #   ports:
-  #     - 8080:8080
-  #   environment:
-  #     JIMM_UUID: ""
-  #     JIMM_DSN: "postgresql://${USER:-admin}:testing@db/${USER:-admin}"
-  #     CANDID_URL: ""
-  #     CANDID_PUBLIC_KEY: ""
-  #     BAKERY_AGENT_FILE: ""
-  #     JIMM_ADMINS: ""
-  #     VAULT_SECRET_FILE: ""
-  #     VAULT_ADDR: ""
-  #     VAULT_AUTH_PATH: ""
-  #     VAULT_PATH: ""
-  #     JIMM_DASHBOARD_LOCATION: ""
-  #     JIMM_DNS_NAME: ""
-  #     JIMM_WATCH_CONTROLLERS: ""
-  #     JIMM_LISTEN_ADDR: "127.0.0.1:8080"
-  #     JIMM_TEST_PGXDSN: ""
-  #     TEST_LOGGING_CONFIG: ""
-  #   volumes:
-  #     - ./:/jimm/
-  #   healthcheck:
-  #     test: [ "CMD", "curl", "http://localhost:8080" ]
-  #     interval: 5s
-  #     timeout: 5s
-  #     retries: 5
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
+  jimm:
+    image: cosmtrek/air
+    # working_dir value has to be the same of mapped volume
+    working_dir: /jimm
+    container_name: jimmy
+    ports:
+      - 8080:8080
+    environment:
+      JIMM_UUID: "diglett-123-diglett-456-diglett"
+      JIMM_DSN: "postgresql://jimm:jimm@db/jimm"
+      CANDID_URL: ""
+      CANDID_PUBLIC_KEY: ""
+      BAKERY_AGENT_FILE: ""
+      JIMM_ADMINS: "diglett"
+      VAULT_ADDR: ""
+      VAULT_PATH: ""
+      VAULT_SECRET_FILE: "/vault/approle.yaml"
+      VAULT_AUTH_PATH: ""
+      # JIMM_DASHBOARD_LOCATION: ""
+      JIMM_DNS_NAME: ""
+      JIMM_WATCH_CONTROLLERS: ""
+      JIMM_LISTEN_ADDR: "127.0.0.1:8080"
+      JIMM_TEST_PGXDSN: ""
+      TEST_LOGGING_CONFIG: ""
+    volumes:
+      - ./:/jimm/
+      - ./local/vault/approle.yaml:/vault/approle.yaml:rw
+    healthcheck:
+      test: [ "CMD", "curl", "http://localhost:8080" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      db:
+        condition: service_healthy
 
   db:
     image: postgres
@@ -75,6 +77,8 @@ services:
     volumes:
       - ./local/vault/vault.hcl:/vault/config/vault.hcl
       - ./local/vault/init.sh:/vault/init.sh
+      - ./local/vault/policy.hcl:/vault/policy.hcl
+      - ./local/vault/approle.yaml:/vault/approle.yaml
     command: /vault/init.sh
     depends_on:
       db:
