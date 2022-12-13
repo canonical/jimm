@@ -79,6 +79,11 @@ jimm-release/bin/jimmsrv: jimmsrv
 	mkdir -p jimm-release/bin
 	cp jemd jimm-release/bin
 
+pull/candid:
+	-git clone https://github.com/canonical/candid.git ./tmp/candid
+	(cd ./tmp/candid && make image auth=pat)
+	docker image ls candid
+
 # Install packages required to develop JIMM and run tests.
 APT_BASED := $(shell command -v apt-get >/dev/null; echo $$?)
 sysdeps:

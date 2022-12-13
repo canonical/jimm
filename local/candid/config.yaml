@@ -1,0 +1,20 @@
+listen-address: :8081
+location: 'http://candid:8081'
+private-addr: "127.0.0.1"
+logging-config: "DEBUG"
+storage:
+    type: memory # TODO(ale8k): Update to postgres
+public-key: t+tDlpLbpAhjF7mWVOtLCG77J7lfhAstxUgozfbyXgo= # TODO(ale8k): Automate this via bakery-keygen
+private-key: gRTKlnH5znntCsQ65H644Jzgf3UPInTBmjerBdhANz4=
+identity-providers:
+- type: static
+  name: jimmstatic
+  domain: jimm
+  users:
+    user1:
+      name: jimm
+      email: jimm@jimm.com
+      password: jimm
+      groups: [jimmgroup]
+  hidden: false
+  require-mfa: false
