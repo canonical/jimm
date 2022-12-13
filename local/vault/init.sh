@@ -31,11 +31,6 @@ vault policy write jimm-app /vault/policy.hcl
 
 echo "Creating jimm-app AppRole"
 vault write auth/approle/role/jimm-app \
-    secret_id_ttl=10h \
-    token_num_uses=10 \
-    token_ttl=10h \
-    token_max_ttl=30m \
-    secret_id_num_uses=40 \
     policies=jimm-app
 
 
