@@ -18,7 +18,6 @@ export VAULT_ADDR="http://localhost:8200"
 # Makes reading easier.
 export VAULT_FORMAT=json
 
-
 # AppRole auth is what we use in JIMM, an awesome tutorial
 # on how this is setup can be found below.
 # HOW-TO: https://developer.hashicorp.com/vault/docs/auth/approle
@@ -32,30 +31,27 @@ vault policy write jimm-app /vault/policy.hcl
 
 echo "Creating jimm-app AppRole"
 vault write auth/approle/role/jimm-app \
-    secret_id_ttl=10m \
+    secret_id_ttl=10h \
     token_num_uses=10 \
-    token_ttl=20m \
+    token_ttl=10h \
     token_max_ttl=30m \
     secret_id_num_uses=40 \
     policies=jimm-app
 
 
+# We mimic the normal flow just for reference. Ultimately we passed to secret itself.
+# This is because our flow looks at a raw unwrapped secret, rather than carefully
+# extracting the role id & secret id from the unwrapped token in cubbyhole.
 JIMM_ROLE_ID=$(vault read auth/approle/role/jimm-app/role-id | jq -r '.data.role_id')
 echo "AppRole created, role ID is: $JIMM_ROLE_ID"
-JIMM_SECRET_ID=$(vault write -force  auth/approle/role/jimm-app/secret-id | jq -r '.data.secret_id')
-echo "SecretID applied, secret ID is: $JIMM_SECRET_ID"
+JIMM_SECRET_WRAPPED=$(vault write -wrap-ttl=10h -force auth/approle/role/jimm-app/secret-id | jq -r '.wrap_info.token')
+echo "SecretID applied & wrapped in cubbyhole for 10h, token is: $JIMM_SECRET_WRAPPED"
+
 # Enable the KV at the defined policy path
 echo "Enabling KV at policy path /jimm-kv"
 echo "/jimm-kv accessible by policy jimm-app"
 vault secrets enable -path /jimm-kv kv
 echo "Creating approle auth file."
-tee /vault/approle.yaml << END
-vault:
-    address: http://vault:8200
-    approle-path: /auth/approle
-    approle-role-id: $JIMM_ROLE_ID
-    approle-secret-id: $JIMM_SECRET_ID
-    kv-path: /jimm-kv/
-END
+VAULT_TOKEN=$JIMM_SECRET_WRAPPED vault unwrap > /vault/approle.yaml
 
 wait
