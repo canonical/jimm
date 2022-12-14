@@ -13,7 +13,7 @@ services:
       JIMM_DSN: "postgresql://jimm:jimm@db/jimm"
       CANDID_URL: "http://candid:8081"
       # Hardcoded pre-generated key, see ./local/candid/config.yaml
-      CANDID_PUBLIC_KEY: "t+tDlpLbpAhjF7mWVOtLCG77J7lfhAstxUgozfbyXgo="
+      CANDID_PUBLIC_KEY: "CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk="
       # Not needed for local test (yet).
       # BAKERY_AGENT_FILE: ""
       JIMM_ADMINS: "diglett"
@@ -91,6 +91,8 @@ services:
     image: candid:latest
     container_name: candid
     command: "/etc/candid/config.yaml"
+    expose:
+      - 8081
     ports:
       - 8081:8081
     volumes:
