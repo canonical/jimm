@@ -19,7 +19,3 @@ CREATE TABLE vault_ha_locks (
   valid_until                                 TIMESTAMP WITH TIME ZONE NOT NULL,
   CONSTRAINT ha_key PRIMARY KEY (ha_key)
 );
-
-
--- INSERT INTO root_keys(id, created_at, expires, root_key) SELECT id, created, expires, rootkey FROM rootkeys;
--- INSERT INTO rootkeys(id, created, expires, rootkey) SELECT id, created_at, expires, root_key FROM root_keys ON CONFLICT DO NOTHING;

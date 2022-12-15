@@ -13,7 +13,5 @@ until eval curl --output /dev/null --silent --fail http://localhost:8081/debug/s
     sleep 1
 done
 echo "Server appears to have started."
-
-
-
+# If any further configuration to the IdP is required, it can now be done via this script.
 wait
