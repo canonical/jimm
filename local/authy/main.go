@@ -171,7 +171,9 @@ func main() {
 		fmt.Println("failed to discharge macaroons:", err)
 	}
 
-	maccaroonieswoonies, _ := json.MarshalIndent(discharged, " ", "  ")
+	maccaroonieswoonies, _ := json.Marshal(discharged)
+	fmt.Println()
 	fmt.Println(string(maccaroonieswoonies))
-
+	fmt.Println()
+	fmt.Println("Copy the macaroons, head to the JIMMY postman collection and update your local collection variable for API_AUTH.")
 }

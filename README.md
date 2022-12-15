@@ -32,16 +32,7 @@ them in `$GOPATH/bin`. This is the list of the installed commands:
 - jaas-admin: perform admin commands on JIMM;
 
 ### Docker-compose:
-We need to pull candid and build it locally such that our environment is bleeding edge, to do so, run:
-`make pull/candid`
-> This will clone candid into `./tmp`
-> And then go on to build the image.
-> This will be used as the target for the docker-compose's candid build (local).
-
-Finally, simply run docker-compose up.
-#### Helpful
-To access vault UI, the URL is:
-`localhost:8200/ui` and the root key is `token`.
+See [here](./local/README.md) on how to get started.
 
 ## Testing
 

@@ -84,6 +84,9 @@ pull/candid:
 	(cd ./tmp/candid && make image auth=pat)
 	docker image ls candid
 
+get-local-auth:
+	@go run ./local/authy
+
 # Install packages required to develop JIMM and run tests.
 APT_BASED := $(shell command -v apt-get >/dev/null; echo $$?)
 sysdeps:
@@ -112,6 +115,8 @@ help:
 	@echo 'make sysdeps - Install the development environment system packages.'
 	@echo 'make format - Format the source files.'
 	@echo 'make simplify - Format and simplify the source files.'
+	@echo 'make pull/candid - Pull candid for local development environment.'
+	@echo 'make get-local-auth - Get local auth to the API WSS endpoint locally.'
 
 .PHONY: build check install release clean format server simplify sysdeps help FORCE
 
