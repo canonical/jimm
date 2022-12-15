@@ -11,9 +11,9 @@ services:
     environment:
       JIMM_UUID: "diglett-123-diglett-456-diglett"
       JIMM_DSN: "postgresql://jimm:jimm@db/jimm"
-      CANDID_URL: "http://candid:8081"
+      CANDID_URL: "http://0.0.0.0:8081" # For external client redirects (in the case of compose and running outside)
       # Hardcoded pre-generated key, see ./local/candid/config.yaml
-      # CANDID_PUBLIC_KEY: "CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk="
+      CANDID_PUBLIC_KEY: "CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk="
       # Not needed for local test (yet).
       # BAKERY_AGENT_FILE: ""
       JIMM_ADMINS: "jimm"

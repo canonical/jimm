@@ -6,7 +6,7 @@ auth-username: admin
 auth-password: password
 listen-address: 0.0.0.0:8081
 location: 'http://0.0.0.0:8081'
-private-addr: candid
+private-addr: "0.0.0.0"
 private-key: 8PjzjakvIlh3BVFKe8axinRDutF6EDIfjtuf4+JaNow=
 public-key: CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk=
 access-log: access.log
