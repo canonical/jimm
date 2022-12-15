@@ -33,8 +33,13 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Printf("error starting vault: %s\n", err)
 	}
+	defer jimmtest.StopVault()
+	err = jimmtest.StartOpenFGA()
+	if err != nil {
+		log.Printf("error starting OpenFGA: %s\n", err)
+	}
+	defer jimmtest.StopOpenFGA()
 	code := m.Run()
-	jimmtest.StopVault()
 	os.Exit(code)
 }
 
@@ -149,6 +154,44 @@ func TestVault(t *testing.T) {
 		"username": "test-user",
 		"password": "test-secret",
 	})
+}
+
+func TestOpenFGA(t *testing.T) {
+	c := qt.New(t)
+
+	p := jimm.Params{
+		ControllerUUID: "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		OpenFGAParams: jimm.OpenFGAParams{
+			Scheme: "http",
+			Host:   "127.0.0.1:8082",
+		},
+	}
+	candid := startCandid(c, &p)
+	svc, err := jimm.NewService(context.Background(), p)
+	c.Assert(err, qt.IsNil)
+
+	srv := httptest.NewTLSServer(svc)
+	c.Cleanup(srv.Close)
+	info := api.Info{
+		Addrs: []string{srv.Listener.Addr().String()},
+	}
+
+	conn, err := api.Open(&info, api.DialOpts{
+		BakeryClient:       userClient(candid, "bob"),
+		InsecureSkipVerify: true,
+	})
+	c.Assert(err, qt.IsNil)
+	c.Cleanup(func() {
+		if err := conn.Close(); err != nil {
+			c.Logf("closing connection: %s", err)
+		}
+	})
+
+	// TODO (ashipika): For now we just assert that we can
+	// connect to the started OpenFGA instance. Once we
+	// have implemented proper facades, this test needs
+	// to be modified to assert that JIMM is able to
+	// interact with OpenFGA.
 }
 
 func startCandid(c *qt.C, p *jimm.Params) *candidtest.Server {

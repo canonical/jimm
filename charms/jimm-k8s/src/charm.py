@@ -22,11 +22,29 @@ import logging
 import os
 
 import hvac
-import pgsql
-from charmhelpers.contrib.charmsupport.nrpe import NRPE
-from charms.nginx_ingress_integrator.v0.ingress import IngressRequires
+from charms.data_platform_libs.v0.database_requires import (
+    DatabaseEvent,
+    DatabaseRequires,
+)
+from charms.openfga_k8s.v0.openfga import (
+    OpenFGARequires,
+    OpenFGAStoreCreateEvent,
+)
+from charms.tls_certificates_interface.v1.tls_certificates import (
+    CertificateAvailableEvent,
+    CertificateExpiringEvent,
+    CertificateRevokedEvent,
+    TLSCertificatesRequiresV1,
+    generate_csr,
+    generate_private_key,
+)
+from charms.traefik_k8s.v1.ingress import (
+    IngressPerAppReadyEvent,
+    IngressPerAppRequirer,
+    IngressPerAppRevokedEvent,
+)
 from ops import pebble
-from ops.charm import CharmBase
+from ops.charm import CharmBase, RelationChangedEvent, RelationJoinedEvent
 from ops.framework import StoredState
 from ops.main import main
 from ops.model import (
@@ -36,30 +54,35 @@ from ops.model import (
     ModelError,
     WaitingStatus,
 )
+from state import PeerRelationState, RelationNotReadyError
 
 logger = logging.getLogger(__name__)
 
 WORKLOAD_CONTAINER = "jimm"
 
-REQUIRED_SETTINGS = ["JIMM_UUID", "JIMM_DNS_NAME", "JIMM_DSN", "CANDID_URL"]
+REQUIRED_SETTINGS = [
+    "JIMM_UUID",
+    "JIMM_DNS_NAME",
+    "JIMM_DSN",
+    "CANDID_URL",
+]
 
-
-def log_event_handler(method):
-    @functools.wraps(method)
-    def decorated(self, event):
-        logger.debug("running {}".format(method.__name__))
-        try:
-            return method(self, event)
-        finally:
-            logger.debug("completed {}".format(method.__name__))
-
-    return decorated
+STATE_KEY_CA = "ca"
+STATE_KEY_CERTIFICATE = "certificate"
+STATE_KEY_CHAIN = "chain"
+STATE_KEY_CSR = "csr"
+STATE_KEY_DSN = "dsn"
+STATE_KEY_DNS_NAME = "dns"
+STATE_KEY_PRIVATE_KEY = "private-key"
+OPENFGA_STORE_ID = "openfga-store-id"
+OPENFGA_TOKEN = "openfga-token"
+OPENFGA_ADDRESS = "openfga-address"
+OPENFGA_PORT = "openfga-port"
+OPENFGA_SCHEME = "openfga-scheme"
 
 
 class JimmOperatorCharm(CharmBase):
     """JIMM Operator Charm."""
-
-    _stored = StoredState()
 
     def __init__(self, *args):
         super().__init__(*args)
@@ -71,37 +94,59 @@ class JimmOperatorCharm(CharmBase):
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.stop, self._on_stop)
-        self.framework.observe(
-            self.on.nrpe_relation_joined, self._on_nrpe_relation_joined
-        )
-        self.framework.observe(
-            self.on.website_relation_joined, self._on_website_relation_joined
-        )
+
         self.framework.observe(
             self.on.dashboard_relation_joined,
             self._on_dashboard_relation_joined,
         )
 
-        # ingress relation
-        self.ingress = IngressRequires(
+        # Certificates relation
+        self.certificates = TLSCertificatesRequiresV1(self, "certificates")
+        self.framework.observe(
+            self.on.certificates_relation_joined,
+            self._on_certificates_relation_joined,
+        )
+        self.framework.observe(
+            self.certificates.on.certificate_available,
+            self._on_certificate_available,
+        )
+        self.framework.observe(
+            self.certificates.on.certificate_expiring,
+            self._on_certificate_expiring,
+        )
+        self.framework.observe(
+            self.certificates.on.certificate_revoked,
+            self._on_certificate_revoked,
+        )
+
+        # Ingress relation
+        self.ingress = IngressPerAppRequirer(self, port=8080)
+        self.framework.observe(self.ingress.on.ready, self._on_ingress_ready)
+        self.framework.observe(
+            self.ingress.on.revoked, self._on_ingress_revoked
+        )
+
+        # Database relation
+        self.database = DatabaseRequires(
             self,
-            {
-                "service-hostname": self.config.get("dns-name", ""),
-                "service-name": self.app.name,
-                "service-port": 8080,
-            },
-        )
-
-        self._stored.set_default(db_uri=None)
-
-        # database relation
-        self.db = pgsql.PostgreSQLClient(self, "db")
-        self.framework.observe(
-            self.db.on.database_relation_joined,
-            self._on_database_relation_joined,
+            relation_name="database",
+            database_name="jimm",
         )
         self.framework.observe(
-            self.db.on.master_changed, self._on_master_changed
+            self.database.on.database_created, self._on_database_event
+        )
+        self.framework.observe(
+            self.database.on.endpoints_changed,
+            self._on_database_event,
+        )
+        self.framework.observe(
+            self.on.database_relation_broken, self._on_database_relation_broken
+        )
+
+        self.openfga = OpenFGARequires(self, "jimm")
+        self.framework.observe(
+            self.openfga.on.openfga_store_created,
+            self._on_openfga_store_created,
         )
 
         self._local_agent_filename = "agent.json"
@@ -111,39 +156,28 @@ class JimmOperatorCharm(CharmBase):
         self._dashboard_path = "/root/dashboard"
         self._dashboard_hash_path = "/root/dashboard/hash"
 
-    @log_event_handler
+        self.state = PeerRelationState(self.model, self.app, "jimm")
+
     def _on_jimm_pebble_ready(self, event):
         self._update_workload(event)
 
-    @log_event_handler
     def _on_config_changed(self, event):
         self._update_workload(event)
 
-    @log_event_handler
     def _on_leader_elected(self, event):
+        if self.unit.is_leader():
+            try:
+                # generate the private key if one is not present in the
+                # application data bucket of the peer relation
+                if not self.state.get(STATE_KEY_PRIVATE_KEY):
+                    private_key: bytes = generate_private_key(key_size=4096)
+                    self.state.set(STATE_KEY_PRIVATE_KEY, private_key.decode())
+
+            except RelationNotReadyError:
+                event.defer()
+                return
+
         self._update_workload(event)
-
-    @log_event_handler
-    def _on_website_relation_joined(self, event):
-        """Connect a website relation."""
-
-        # we set the port in the unit bucket.
-        event.relation.data[self.unit]["port"] = "8080"
-
-    @log_event_handler
-    def _on_nrpe_relation_joined(self, event):
-        """Connect a NRPE relation."""
-
-        # use the nrpe library to handle the relation.
-        nrpe = NRPE()
-        nrpe.add_check(
-            shortname="JIMM",
-            description="check JIMM running",
-            check_cmd="check_http -w 2 -c 10 -I {} -p 8080 -u /debug/info".format(
-                self.model.get_binding(event.relation).network.ingress_address,
-            ),
-        )
-        nrpe.write()
 
     def _ensure_bakery_agent_file(self, event):
         # we create the file containing agent keys if needed.
@@ -191,7 +225,7 @@ class JimmOperatorCharm(CharmBase):
         container = self.unit.get_container(WORKLOAD_CONTAINER)
         if not container.can_connect():
             logger.info(
-                "cannot connect to the workload container - deffering the event"
+                "cannot connect to the workload container - deferring the event"
             )
             event.defer()
             return
@@ -200,15 +234,23 @@ class JimmOperatorCharm(CharmBase):
         self._ensure_vault_config(event)
         self._install_dashboard(event)
 
-        self.ingress.update_config(
-            {"service-hostname": self.config.get("dns-name", "")}
+        dnsname = "{}.{}-endpoints.{}.svc.cluster.local".format(
+            self.unit.name.replace("/", "-"), self.app.name, self.model.name
         )
+        dsn = ""
+        try:
+            if self.state.get(STATE_KEY_DNS_NAME):
+                dnsname = self.state.get(STATE_KEY_DNS_NAME)
+            dsn = self.state.get(STATE_KEY_DSN)
+        except RelationNotReadyError:
+            event.defer()
+            return
 
         config_values = {
             "CANDID_PUBLIC_KEY": self.config.get("candid-public-key", ""),
             "CANDID_URL": self.config.get("candid-url", ""),
             "JIMM_ADMINS": self.config.get("controller-admins", ""),
-            "JIMM_DNS_NAME": self.config.get("dns-name", ""),
+            "JIMM_DNS_NAME": dnsname,
             "JIMM_LOG_LEVEL": self.config.get("log-level", ""),
             "JIMM_UUID": self.config.get("uuid", ""),
             "JIMM_DASHBOARD_LOCATION": self.config.get(
@@ -216,8 +258,8 @@ class JimmOperatorCharm(CharmBase):
             ),
             "JIMM_LISTEN_ADDR": ":8080",
         }
-        if self._stored.db_uri:
-            config_values["JIMM_DSN"] = "pgx:{}".format(self._stored.db_uri)
+        if dsn:
+            config_values["JIMM_DSN"] = dsn
 
         if container.exists(self._agent_filename):
             config_values["BAKERY_AGENT_FILE"] = self._agent_filename
@@ -274,33 +316,16 @@ class JimmOperatorCharm(CharmBase):
         if dashboard_relation:
             dashboard_relation.data[self.app].update(
                 {
-                    "controller-url": self.config["dns-name"],
+                    "controller-url": dnsname,
                     "identity-provider-url": self.config["candid-url"],
                     "is-juju": str(False),
                 }
             )
 
-    @log_event_handler
-    def _on_start(self, _):
+    def _on_start(self, event):
         """Start JIMM."""
-        container = self.unit.get_container(WORKLOAD_CONTAINER)
-        if container.can_connect():
-            plan = container.get_plan()
-            if plan.services.get("jimm") is None:
-                logger.error("waiting for service")
-                self.unit.status = WaitingStatus("waiting for service")
-                return False
+        self._update_workload(event)
 
-            env_vars = plan.services.get("jimm").environment
-            for setting in REQUIRED_SETTINGS:
-                if not env_vars.get(setting, ""):
-                    self.unit.status = BlockedStatus(
-                        "{} configuration value not set".format(setting),
-                    )
-                    return False
-            container.start("jimm")
-
-    @log_event_handler
     def _on_stop(self, _):
         """Stop JIMM."""
         container = self.unit.get_container(WORKLOAD_CONTAINER)
@@ -308,48 +333,58 @@ class JimmOperatorCharm(CharmBase):
             container.stop()
         self._ready()
 
-    @log_event_handler
     def _on_update_status(self, _):
         """Update the status of the charm."""
         self._ready()
 
-    @log_event_handler
-    def _on_dashboard_relation_joined(self, event):
+    def _on_dashboard_relation_joined(self, event: RelationJoinedEvent):
+        dnsname = "{}.{}-endpoints.{}.svc.cluster.local".format(
+            self.unit.name.replace("/", "-"), self.app.name, self.model.name
+        )
+        try:
+            if self.state.get(STATE_KEY_DNS_NAME):
+                dnsname = self.state.get(STATE_KEY_DNS_NAME)
+        except RelationNotReadyError:
+            event.defer()
+            return
+
         event.relation.data[self.app].update(
             {
-                "controller-url": self.config["dns-name"],
+                "controller-url": dnsname,
                 "identity-provider-url": self.config["candid-url"],
                 "is-juju": str(False),
             }
         )
 
-    def _on_database_relation_joined(
-        self, event: pgsql.DatabaseRelationJoinedEvent
-    ) -> None:
-        """
-        Handles determining if the database has finished setup, once setup is complete
-        a master/standby may join / change in consequent events.
-        """
-        logging.info("(postgresql) RELATION_JOINED event fired.")
+    def _on_database_event(self, event: DatabaseEvent) -> None:
+        """Database event handler."""
 
-        if self.model.unit.is_leader():
-            event.database = "jimm"
-        elif event.database != "jimm":
+        # get the first endpoint from a comma separate list
+        ep = event.endpoints.split(",", 1)[0]
+        # compose the db connection string
+        uri = f"postgresql://{event.username}:{event.password}@{ep}/openfga"
+
+        # record the connection string
+        try:
+            self.state.set(STATE_KEY_DSN, uri)
+        except RelationNotReadyError:
             event.defer()
-
-    def _on_master_changed(self, event: pgsql.MasterChangedEvent) -> None:
-        """
-        Handles master units of postgres joining / changing.
-        The internal snap configuration is updated to reflect this.
-        """
-        logging.info("(postgresql) MASTER_CHANGED event fired.")
-
-        if event.database != "jimm":
-            logging.debug("Database setup not complete yet, returning.")
             return
 
-        if event.master:
-            self._stored.db_uri = str(event.master.uri)
+        self._update_workload(event)
+
+    def _on_database_relation_broken(self, event: DatabaseEvent) -> None:
+        """Database relation broken handler."""
+
+        # when the database relation is broken, we unset the
+        # connection string and schema-created from the application
+        # bucket of the peer relation
+        try:
+            self.state.unset(STATE_KEY_DSN)
+        except RelationNotReadyError:
+            event.defer()
+            return
+        self._update_workload(event)
 
     def _ready(self):
         container = self.unit.get_container(WORKLOAD_CONTAINER)
@@ -499,6 +534,158 @@ class JimmOperatorCharm(CharmBase):
                     break
                 md5.update(data)
             return md5.hexdigest()
+
+    def _on_openfga_store_created(self, event: OpenFGAStoreCreateEvent):
+        if not event.store_id:
+            return
+
+        if self.unit.is_leader():
+            try:
+                self.state.set(OPENFGA_STORE_ID, event.store_id)
+                self.state.set(OPENFGA_TOKEN, event.token)
+                self.state.set(OPENFGA_ADDRESS, event.address)
+                self.state.set(OPENFGA_PORT, event.port)
+                self.state.set(OPENFGA_SCHEME, event.scheme)
+            except RelationNotReadyError:
+                event.defer()
+                return
+
+        self._update_workload()
+
+    def _on_certificates_relation_joined(
+        self, event: RelationJoinedEvent
+    ) -> None:
+        if not self.unit.is_leader():
+            return
+
+        dnsname = "{}.{}-endpoints.{}.svc.cluster.local".format(
+            self.unit.name.replace("/", "-"),
+            self.app.name,
+            self.model.name,
+        )
+        try:
+            if self.state.get(STATE_KEY_DNS_NAME):
+                dnsname = self.state.get(STATE_KEY_DNS_NAME)
+
+            private_key = self.state.get(STATE_KEY_PRIVATE_KEY)
+            csr = generate_csr(
+                private_key=private_key.encode(),
+                subject=dnsname,
+            )
+
+            self.state.set(STATE_KEY_CSR, csr.decode())
+
+            self.certificates.request_certificate_creation(
+                certificate_signing_request=csr
+            )
+        except RelationNotReadyError:
+            event.defer()
+            return
+
+    def _on_certificate_available(
+        self, event: CertificateAvailableEvent
+    ) -> None:
+        if self.unit.is_leader():
+            try:
+                self.state.set(STATE_KEY_CERTIFICATE, event.certificate)
+                self.state.set(STATE_KEY_CA, event.ca)
+                self.state.set(STATE_KEY_CHAIN, event.chain)
+
+            except RelationNotReadyError:
+                event.defer()
+                return
+
+        self._update_workload(event)
+
+    def _on_certificate_expiring(
+        self, event: CertificateExpiringEvent
+    ) -> None:
+        if self.unit.is_leader():
+            old_csr = ""
+            private_key = ""
+            dnsname = "{}.{}-endpoints.{}.svc.cluster.local".format(
+                self.unit.name.replace("/", "-"),
+                self.app.name,
+                self.model.name,
+            )
+            try:
+                old_csr = self.state.get(STATE_KEY_CSR)
+                private_key = self.state.get(STATE_KEY_PRIVATE_KEY)
+                if self.state.get(STATE_KEY_DNS_NAME):
+                    dnsname = self.state.get(STATE_KEY_DNS_NAME)
+
+                new_csr = generate_csr(
+                    private_key=private_key.encode(),
+                    subject=dnsname,
+                )
+                self.certificates.request_certificate_renewal(
+                    old_certificate_signing_request=old_csr,
+                    new_certificate_signing_request=new_csr,
+                )
+                self.state.set(STATE_KEY_CSR, new_csr.decode())
+            except RelationNotReadyError:
+                event.defer()
+                return
+
+        self._update_workload()
+
+    def _on_certificate_revoked(self, event: CertificateRevokedEvent) -> None:
+        if self.unit.is_leader():
+            old_csr = ""
+            private_key = ""
+            dnsname = "{}.{}-endpoints.{}.svc.cluster.local".format(
+                self.unit.name.replace("/", "-"),
+                self.app.name,
+                self.model.name,
+            )
+            try:
+                old_csr = self.state.get(STATE_KEY_CSR)
+                private_key = self.state.get(STATE_KEY_PRIVATE_KEY)
+                if self.state.get(STATE_KEY_DNS_NAME):
+                    dnsname = self.state.get(STATE_KEY_DNS_NAME)
+            except RelationNotReadyError:
+                event.defer()
+                return
+
+            new_csr = generate_csr(
+                private_key=private_key.encode(),
+                subject=dnsname,
+            )
+            self.certificates.request_certificate_renewal(
+                old_certificate_signing_request=old_csr,
+                new_certificate_signing_request=new_csr,
+            )
+            try:
+                self.state.set(STATE_KEY_CSR, new_csr.decode())
+                self.state.unset(
+                    STATE_KEY_CERTIFICATE, STATE_KEY_CA, STATE_KEY_CHAIN
+                )
+            except RelationNotReadyError:
+                event.defer()
+                return
+
+        self.unit.status = WaitingStatus("Waiting for new certificate")
+        self._update_workload()
+
+    def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
+        if self.unit.is_leader():
+            try:
+                self.state.set(STATE_KEY_DNS_NAME, event.url)
+            except RelationNotReadyError:
+                event.defer()
+                return
+
+        self._update_workload(event)
+
+    def _on_ingress_revoked(self, event: IngressPerAppRevokedEvent):
+        if self.unit.is_leader():
+            try:
+                self.state.unset(STATE_KEY_DNS_NAME)
+            except RelationNotReadyError:
+                event.defer()
+                return
+
+        self._update_workload(event)
 
 
 if __name__ == "__main__":

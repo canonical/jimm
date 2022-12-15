@@ -10,10 +10,11 @@ import (
 	"time"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/crossmodel"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
+	openfga "github.com/openfga/go-sdk"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
@@ -41,7 +42,7 @@ type CredentialStore interface {
 	PutControllerCredentials(ctx context.Context, controllerName string, username string, password string) error
 }
 
-// A JIMM provides the buisness logic for managing resources in the JAAS
+// A JIMM provides the business logic for managing resources in the JAAS
 // system. A single JIMM instance is shared by all concurrent API
 // connections therefore the JIMM object itself does not contain any per-
 // request state.
@@ -77,6 +78,10 @@ type JIMM struct {
 
 	// UUID holds the UUID of the JIMM controller.
 	UUID string
+
+	// OpenFGAClient holds the client used to interact
+	// with the OpenFGA ReBAC system.
+	OpenFGAClient openfga.APIClient
 }
 
 // An Authenticator authenticates login requests.

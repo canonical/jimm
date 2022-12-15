@@ -17,18 +17,21 @@ peers:
     interface: jimm
 
 provides:
-  website:
-    interface: http
-  nrpe:
-    interface: nrpe-external-master
   dashboard:
     interface: juju-dashboard
 
 requires:
   ingress:
     interface: ingress
-  db:
-    interface: pgsql
+    limit: 1
+  database:
+    interface: postgresql_client
+    limit: 1
+  openfga:
+    interface: openfga
+    limit: 1
+  certificates:
+    interface: tls-certificates
     limit: 1
 
 containers:
