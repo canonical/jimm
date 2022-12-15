@@ -56,6 +56,7 @@ func start(ctx context.Context, s *service.Service) error {
 			Host:   os.Getenv("OPENFGA_HOST"),
 			Store:  os.Getenv("OPENFGA_STORE"),
 			Token:  os.Getenv("OPENFGA_TOKEN"),
+			Port:   os.Getenv("OPENFGA_PORT"),
 		},
 	})
 	if err != nil {
