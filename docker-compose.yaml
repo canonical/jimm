@@ -29,10 +29,10 @@ services:
       JIMM_TEST_PGXDSN: ""
       TEST_LOGGING_CONFIG: ""
 
-      OPENFGA_SCHEME: ""
-      OPENFGA_HOST: ""
-      OPENFGA_STORE: ""
-      OPENFGA_TOKEN: ""
+      OPENFGA_SCHEME: "http"
+      OPENFGA_HOST: "openfga:8080"
+      OPENFGA_STORE: "jimm"
+      OPENFGA_TOKEN: "jimm"
     volumes:
       - ./:/jimm/
       - ./local/vault/approle.yaml:/vault/approle.yaml:rw
@@ -125,6 +125,9 @@ services:
   openfga:
     image: openfga/openfga:latest
     container_name: openfga
+    environment:
+      OPENFGA_AUTHN_METHOD: "preshared"
+      OPENFGA_AUTHN_PRESHARED_KEYS: "jimm"
     command: run --datastore-engine postgres --datastore-uri 'postgresql://jimm:jimm@db/jimm?sslmode=disable'
     ports:
       - 8080:8080
