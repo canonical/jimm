@@ -28,6 +28,9 @@ default: build
 build: version/commit.txt version/version.txt
 	go build -tags version $(PROJECT)/...
 
+build/server: version/commit.txt version/version.txt
+	go build -tags version ./cmd/jimmsrv
+
 check: version/commit.txt version/version.txt
 	go test -p 1 -timeout 30m -tags version $(PROJECT)/...
 
@@ -60,7 +63,11 @@ version/commit.txt: FORCE
 	git rev-parse --verify HEAD > version/commit.txt
 
 version/version.txt: FORCE
-	git describe --dirty > version/version.txt
+	if [ -z "$(GIT_VERSION)" ]; then \
+        echo "dev" > version/version.txt; \
+    else \
+        echo $(GIT_VERSION) > version/version.txt; \
+    fi
 
 jimmsrv: version/commit.txt version/version.txt
 	go build -tags release -v $(PROJECT)/cmd/jemd
@@ -71,6 +78,14 @@ jimm-$(GIT_VERSION).tar.xz: jimm-release/bin/jimmsrv
 jimm-release/bin/jimmsrv: jimmsrv
 	mkdir -p jimm-release/bin
 	cp jemd jimm-release/bin
+
+pull/candid:
+	-git clone https://github.com/canonical/candid.git ./tmp/candid
+	(cd ./tmp/candid && make image auth=pat)
+	docker image ls candid
+
+get-local-auth:
+	@go run ./local/authy
 
 # Install packages required to develop JIMM and run tests.
 APT_BASED := $(shell command -v apt-get >/dev/null; echo $$?)
@@ -100,6 +115,8 @@ help:
 	@echo 'make sysdeps - Install the development environment system packages.'
 	@echo 'make format - Format the source files.'
 	@echo 'make simplify - Format and simplify the source files.'
+	@echo 'make pull/candid - Pull candid for local development environment.'
+	@echo 'make get-local-auth - Get local auth to the API WSS endpoint locally.'
 
 .PHONY: build check install release clean format server simplify sysdeps help FORCE
 
