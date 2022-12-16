@@ -262,7 +262,10 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	s.mux.Handle("/api", jujuapi.APIHandler(ctx, &s.jimm, params))
 	s.mux.Handle("/model/", jujuapi.ModelHandler(ctx, &s.jimm, params))
 	// If the request is not for a known path assume it is part of the dashboard.
-	s.mux.Handle("/", dashboard.Handler(ctx, p.DashboardLocation))
+	// If dashboard location env var is not defined, do not handle a dashboard.
+	if p.DashboardLocation != "" {
+		s.mux.Handle("/", dashboard.Handler(ctx, p.DashboardLocation))
+	}
 
 	return s, nil
 }
@@ -375,6 +378,7 @@ func newVaultStore(ctx context.Context, p Params) (VaultStore, error) {
 	defer f.Close()
 	s, err := vaultapi.ParseSecret(f)
 	if err != nil {
+		zapctx.Error(ctx, "failed to parse vault secret from file")
 		return nil, err
 	}
 
