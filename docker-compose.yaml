@@ -28,6 +28,11 @@ services:
       JIMM_LISTEN_ADDR: "0.0.0.0:8080"
       JIMM_TEST_PGXDSN: ""
       TEST_LOGGING_CONFIG: ""
+
+      OPENFGA_SCHEME: ""
+      OPENFGA_HOST: ""
+      OPENFGA_STORE: ""
+      OPENFGA_TOKEN: ""
     volumes:
       - ./:/jimm/
       - ./local/vault/approle.yaml:/vault/approle.yaml:rw

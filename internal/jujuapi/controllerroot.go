@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/juju/names/v4"
+	openfga "github.com/openfga/go-sdk"
 	"github.com/rogpeppe/fastuuid"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
@@ -29,6 +30,7 @@ type controllerRoot struct {
 	user                  *dbmodel.User
 	controllerUUIDMasking bool
 	generator             *fastuuid.Generator
+	ofgaApi               openfga.OpenFgaApi
 }
 
 func newControllerRoot(j *jimm.JIMM, p Params) *controllerRoot {
@@ -41,6 +43,7 @@ func newControllerRoot(j *jimm.JIMM, p Params) *controllerRoot {
 		watchers:              watcherRegistry,
 		pingF:                 func() {},
 		controllerUUIDMasking: true,
+		ofgaApi:               j.OpenFGAClient.OpenFgaApi,
 	}
 
 	r.AddMethod("Admin", 1, "Login", rpc.Method(unsupportedLogin))
