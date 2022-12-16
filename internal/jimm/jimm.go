@@ -81,7 +81,7 @@ type JIMM struct {
 
 	// OpenFGAClient holds the client used to interact
 	// with the OpenFGA ReBAC system.
-	OpenFGAClient openfga.APIClient
+	OpenFGAClient *openfga.APIClient
 }
 
 // An Authenticator authenticates login requests.

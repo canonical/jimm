@@ -6,7 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -240,8 +240,9 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err)
 	}
 	if openFGAclient != nil {
-		s.jimm.OpenFGAClient = *openFGAclient
+		s.jimm.OpenFGAClient = openFGAclient
 	}
+	ensureJIMMAuthorisationModel(openFGAclient)
 
 	s.jimm.Dialer = &jujuclient.Dialer{
 		ControllerCredentialsStore: vs,
@@ -268,6 +269,12 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	}
 
 	return s, nil
+}
+
+// ensureJIMMAuthorisationModel ensures that the authorisation model, as defined by JIMM,
+// exists at startup. If it doesn't, it will attempt to create it.
+func ensureJIMMAuthorisationModel(c *openfga.APIClient) {
+
 }
 
 func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {
@@ -412,7 +419,9 @@ func newOpenFGAClient(ctx context.Context, p Params) (*openfga.APIClient, error)
 	config := openfga.Configuration{
 		ApiScheme: p.OpenFGAParams.Scheme,
 		ApiHost:   fmt.Sprintf("%s:%s", p.OpenFGAParams.Host, p.OpenFGAParams.Port), // required, define without the scheme (e.g. api.fga.example instead of https://api.fga.example)
-		StoreId:   p.OpenFGAParams.Store,
+		// Note: Funnily enough, even though it says 'StoreId', it actually means 'StoreName', and it is subject to change
+		// on each create...
+		StoreId: p.OpenFGAParams.Store,
 	}
 	if p.OpenFGAParams.Token != "" {
 		config.Credentials = &credentials.Credentials{
@@ -427,14 +436,46 @@ func newOpenFGAClient(ctx context.Context, p Params) (*openfga.APIClient, error)
 		return nil, err
 	}
 	client := openfga.NewAPIClient(configuration)
+	api := client.OpenFgaApi
 
-	_, response, err := client.OpenFgaApi.ListStores(ctx).Execute()
+	listStoreResp, response, err := api.ListStores(ctx).Execute()
 	if err != nil {
 		return nil, err
 	}
+	body, _ := io.ReadAll(response.Body)
 	if response.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(response.Body)
 		return nil, errors.E("failed to contact the OpenFga server: received %v: %s", response.StatusCode, string(body))
+	}
+
+	// Check for current stores
+	currentStores := listStoreResp.GetStores()
+
+	// If the len is 0, we know we need a store for JIMM.
+	if len(currentStores) == 0 {
+		zapctx.Info(ctx, fmt.Sprintf("%s store does not exist. Attempting to create it.", client.GetStoreId()))
+		createStoreReq := *openfga.NewCreateStoreRequest()
+		createStoreReq.SetName(client.GetStoreId())
+		res, _, err := api.CreateStore(ctx).Body(createStoreReq).Execute()
+
+		if err != nil {
+			zapctx.Error(ctx, "failed to create store", zap.Error(err))
+		} else {
+			zapctx.Info(
+				ctx,
+				"store created",
+				zap.String("id", res.GetId()),
+				zap.String("name", res.GetName()),
+				zap.String("created_at", res.GetCreatedAt().String()),
+				zap.String("updated_at", res.GetUpdatedAt().String()),
+			)
+			// Now to ensure this is consistently retrievable, we store a mapping of store name<->id
+			// TODO(ale8k): Store in db
+		}
+	} else {
+		zapctx.Info(ctx, fmt.Sprintf("stores exist, checking for %s", client.GetStoreId()))
+		// TODO(ale8k): Retrieve our store from DB and compare IDs.
+		// for _, s := range currentStores {
+		// }
 	}
 
 	return client, nil
