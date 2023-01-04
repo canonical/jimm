@@ -54,8 +54,7 @@ CREATE TABLE controllers (
 	updated_at DATETIME,
 	deleted_at DATETIME,
 	name TEXT NOT NULL UNIQUE,
-	uuid TEXT NOT NULL,
-	admin_user TEXT NOT NULL,
+	uuid TEXT NOT NULL,admin_user TEXT NOT NULL,
 	admin_password TEXT NOT NULL,
 	ca_certificate TEXT NOT NULL,
 	public_address TEXT NOT NULL,
@@ -271,5 +270,15 @@ CREATE TABLE root_keys (
 
 CREATE INDEX idx_root_keys_created_at ON root_keys (created_at);
 CREATE INDEX idx_root_keys_expires ON root_keys (expires);
+
+CREATE TABLE groups (
+	id INTEGER PRIMARY KEY,
+	created_at DATETIME,
+	updated_at DATETIME,
+	deleted_at DATETIME,
+	name TEXT NOT NULL UNIQUE
+);
+
+CREATE INDEX idx_group_deleted_at ON groups (deleted_at);
 
 UPDATE versions SET major=1, minor=0 WHERE component='jimmdb';
