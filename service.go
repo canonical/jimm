@@ -64,11 +64,12 @@ type VaultStore interface {
 
 // OpenFGAParams holds parameters needed to connect to the OpenFGA server.
 type OpenFGAParams struct {
-	Scheme string
-	Host   string
-	Store  string
-	Token  string
-	Port   string
+	Scheme    string
+	Host      string
+	Store     string
+	AuthModel string
+	Token     string
+	Port      string
 }
 
 // A Params structure contains the parameters required to initialise a new
@@ -419,9 +420,7 @@ func newOpenFGAClient(ctx context.Context, p Params) (*openfga.APIClient, error)
 	config := openfga.Configuration{
 		ApiScheme: p.OpenFGAParams.Scheme,
 		ApiHost:   fmt.Sprintf("%s:%s", p.OpenFGAParams.Host, p.OpenFGAParams.Port), // required, define without the scheme (e.g. api.fga.example instead of https://api.fga.example)
-		// Note: Funnily enough, even though it says 'StoreId', it actually means 'StoreName', and it is subject to change
-		// on each create...
-		StoreId: p.OpenFGAParams.Store,
+		StoreId:   p.OpenFGAParams.Store,
 	}
 	if p.OpenFGAParams.Token != "" {
 		config.Credentials = &credentials.Credentials{
@@ -438,7 +437,7 @@ func newOpenFGAClient(ctx context.Context, p Params) (*openfga.APIClient, error)
 	client := openfga.NewAPIClient(configuration)
 	api := client.OpenFgaApi
 
-	listStoreResp, response, err := api.ListStores(ctx).Execute()
+	_, response, err := api.ListStores(ctx).Execute()
 	if err != nil {
 		return nil, err
 	}
@@ -447,35 +446,12 @@ func newOpenFGAClient(ctx context.Context, p Params) (*openfga.APIClient, error)
 		return nil, errors.E("failed to contact the OpenFga server: received %v: %s", response.StatusCode, string(body))
 	}
 
-	// Check for current stores
-	currentStores := listStoreResp.GetStores()
-
-	// If the len is 0, we know we need a store for JIMM.
-	if len(currentStores) == 0 {
-		zapctx.Info(ctx, fmt.Sprintf("%s store does not exist. Attempting to create it.", client.GetStoreId()))
-		createStoreReq := *openfga.NewCreateStoreRequest()
-		createStoreReq.SetName(client.GetStoreId())
-		res, _, err := api.CreateStore(ctx).Body(createStoreReq).Execute()
-
-		if err != nil {
-			zapctx.Error(ctx, "failed to create store", zap.Error(err))
-		} else {
-			zapctx.Info(
-				ctx,
-				"store created",
-				zap.String("id", res.GetId()),
-				zap.String("name", res.GetName()),
-				zap.String("created_at", res.GetCreatedAt().String()),
-				zap.String("updated_at", res.GetUpdatedAt().String()),
-			)
-			// Now to ensure this is consistently retrievable, we store a mapping of store name<->id
-			// TODO(ale8k): Store in db
-		}
+	storeResp, _, err := api.GetStore(ctx).Execute()
+	if err != nil {
+		zapctx.Error(ctx, "could not retrieve store.", zap.Error(err))
+		return nil, errors.E("could not retrieve store")
 	} else {
-		zapctx.Info(ctx, fmt.Sprintf("stores exist, checking for %s", client.GetStoreId()))
-		// TODO(ale8k): Retrieve our store from DB and compare IDs.
-		// for _, s := range currentStores {
-		// }
+		zapctx.Info(ctx, "store appears to exist", zap.String("store-name", *storeResp.Name))
 	}
 
 	return client, nil

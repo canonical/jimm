@@ -52,11 +52,12 @@ func start(ctx context.Context, s *service.Service) error {
 		DashboardLocation: os.Getenv("JIMM_DASHBOARD_LOCATION"),
 		PublicDNSName:     os.Getenv("JIMM_DNS_NAME"),
 		OpenFGAParams: jimm.OpenFGAParams{
-			Scheme: os.Getenv("OPENFGA_SCHEME"),
-			Host:   os.Getenv("OPENFGA_HOST"),
-			Store:  os.Getenv("OPENFGA_STORE"),
-			Token:  os.Getenv("OPENFGA_TOKEN"),
-			Port:   os.Getenv("OPENFGA_PORT"),
+			Scheme:    os.Getenv("OPENFGA_SCHEME"),
+			Host:      os.Getenv("OPENFGA_HOST"),
+			Store:     os.Getenv("OPENFGA_STORE"),
+			AuthModel: os.Getenv("OPENFGA_AUTH_MODEL"),
+			Token:     os.Getenv("OPENFGA_TOKEN"),
+			Port:      os.Getenv("OPENFGA_PORT"),
 		},
 	})
 	if err != nil {

@@ -31,7 +31,8 @@ services:
 
       OPENFGA_SCHEME: "http"
       OPENFGA_HOST: "openfga:8080"
-      OPENFGA_STORE: "jimm"
+      OPENFGA_STORE: "01GP1254CHWJC1MNGVB0WDG1T0"
+      OPENFGA_AUTH_MODEL: "01GP1EC038KHGB6JJ2XXXXCXKB"
       OPENFGA_TOKEN: "jimm"
     volumes:
       - ./:/jimm/
@@ -43,6 +44,8 @@ services:
       retries: 5
     depends_on:
       db:
+        condition: service_healthy
+      openfga:
         condition: service_healthy
 
   db:
@@ -122,8 +125,20 @@ services:
       db:
         condition: service_healthy
 
+  insert-hardcoded-store: 
+    image: governmentpaas/psql
+    container_name: insert-hardcoded-store
+    command: psql -Atx postgresql://jimm:jimm@db/jimm?sslmode=disable -c "INSERT INTO store (id,name,created_at,updated_at) VALUES ('01GP1254CHWJC1MNGVB0WDG1T0','jimm',NOW(),NOW());"
+    depends_on:
+      migrateopenfga:
+        condition: service_completed_successfully
+
   openfga:
-    image: openfga/openfga:latest
+    # We use our 'image' to mimic juju standard.
+    # image: openfga/openfga:latest
+    build: 
+      context: .
+      dockerfile: ./local/openfga/Dockerfile
     container_name: openfga
     environment:
       OPENFGA_AUTHN_METHOD: "preshared"
@@ -135,8 +150,31 @@ services:
     depends_on:
       migrateopenfga:
         condition: service_completed_successfully
+      insert-hardcoded-store:
+        condition: service_completed_successfully
     healthcheck:
-      test: [ "CMD", "curl", "http://localhost:8080/healthz" ]
+      test: [ "CMD", "curl", "http://0.0.0.0:8080/healthz" ]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+
+  # Adds the auth model and updates its authorisation model id to be the expected hard-coded id such that our local JIMM can utilise it for queries.
+  # The auth model json is retrieved from file via volume mount.
+  insert-hardcoded-auth-model:
+    image: governmentpaas/psql
+    container_name: insert-hardcoded-auth-model
+    volumes:
+      - ./local/openfga/authorisation_model.json:/authorisation_model.json
+    command: > 
+      sh -c "
+      apk update &&
+      apk add curl &&
+      curl -X POST -H 'Content-Type: application/json' -H 'Authorization: Bearer jimm' openfga:8080/stores/01GP1254CHWJC1MNGVB0WDG1T0/authorization-models -d \"$(cat ./authorisation_model.json)\" &&
+      psql -Atx postgresql://jimm:jimm@db/jimm?sslmode=disable -c \"UPDATE authorization_model SET authorization_model_id = '01GP1EC038KHGB6JJ2XXXXCXKB' WHERE store = '01GP1254CHWJC1MNGVB0WDG1T0';\"
+    depends_on:
+      openfga:
+        condition: service_healthy
+
+
+
+        
