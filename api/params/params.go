@@ -237,3 +237,18 @@ type ImportModelRequest struct {
 	// ModelTag is the tag of the model that is to be imported.
 	ModelTag string `json:"model-tag"`
 }
+
+// AddGroupRequest holds a request to add a group.
+type AddGroupRequest struct {
+	// Name holds the name of the group.
+	Name string `json:"name"`
+}
+
+// RenameGroupRequest holds a request to rename a group.
+type RenameGroupRequest struct {
+	// Name holds the name of the group.
+	Name string `json:"name"`
+
+	// NewName holds the new name of the group.
+	NewName string `json:"new-name"`
+}

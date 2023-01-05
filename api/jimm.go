@@ -112,3 +112,8 @@ func (c *Client) ImportModel(req *params.ImportModelRequest) error {
 func (c *Client) UpdateMigratedModel(req *params.UpdateMigratedModelRequest) error {
 	return c.caller.APICall("JIMM", 3, "", "UpdateMigratedModel", req, nil)
 }
+
+// AddGroup adds the group to JIMM.
+func (c *Client) AddGroup(req *params.AddGroupRequest) error {
+	return c.caller.APICall("JIMM", 4, "", "AddGroup", req, nil)
+}
