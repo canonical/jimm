@@ -2,30 +2,9 @@ package jujuapi
 
 import (
 	"context"
-
-	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
 )
 
-func init() {
-	// Access Facade, OpenFga - https://warthogs.atlassian.net/browse/CSS-2431
-	// Will ultimately replace ./usermanager.go
-	facadeInit["Access"] = func(r *controllerRoot) []int {
-
-		r.AddMethod("Access", 1, "AddGroup", rpc.Method(r.AddGroup))
-		r.AddMethod("Access", 1, "RemoveGroup", rpc.Method(r.RemoveGroup))
-		r.AddMethod("Access", 1, "RenameGroup", rpc.Method(r.RenameGroup))
-		r.AddMethod("Access", 1, "ListGroups", rpc.Method(r.ListGroups))
-
-		r.AddMethod("Access", 1, "AddRelation", rpc.Method(r.AddRelation))
-		r.AddMethod("Access", 1, "RemoveRelation", rpc.Method(r.RemoveRelation))
-		r.AddMethod("Access", 1, "CheckRelation", rpc.Method(r.CheckRelation))
-		r.AddMethod("Access", 1, "ListRelations", rpc.Method(r.ListRelations))
-
-		r.AddMethod("Access", 1, "GetAuthorisationModel", rpc.Method(r.GetAuthorisationModel))
-
-		return []int{1}
-	}
-}
+// access_control contains the primary RPC commands for handling ReBAC within JIMM via the JIMM facade itself.
 
 // AddGroup creates a new relational access control group tuple
 // within OpenFGA.
