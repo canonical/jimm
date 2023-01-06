@@ -36,6 +36,7 @@ func init() {
 		addCloudToControllerMethod := rpc.Method(r.AddCloudToController)
 		removeCloudFromControllerMethod := rpc.Method(r.RemoveCloudFromController)
 		addGroupMethod := rpc.Method(r.AddGroup)
+		renameGroupMethod := rpc.Method(r.RenameGroup)
 
 		r.AddMethod("JIMM", 2, "DisableControllerUUIDMasking", disableControllerUUIDMaskingMethod)
 		r.AddMethod("JIMM", 2, "ListControllers", listControllersMethod)
@@ -68,6 +69,7 @@ func init() {
 		r.AddMethod("JIMM", 4, "AddCloudToController", addCloudToControllerMethod)
 		r.AddMethod("JIMM", 4, "RemoveCloudFromController", removeCloudFromControllerMethod)
 		r.AddMethod("JIMM", 4, "AddGroup", addGroupMethod)
+		r.AddMethod("JIMM", 4, "RenameGroup", renameGroupMethod)
 
 		return []int{2, 3, 4}
 	}
@@ -479,8 +481,14 @@ func (r *controllerRoot) RenameGroup(ctx context.Context, req apiparams.RenameGr
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	if err := r.jimm.Database.AddGroup(ctx, req.Name); err != nil {
-		zapctx.Error(ctx, "failed to add group", zaputil.Error(err))
+	group, err := r.jimm.Database.GetGroup(ctx, req.Name)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	group.Name = req.NewName
+
+	if err := r.jimm.Database.UpdateGroup(ctx, group); err != nil {
+		zapctx.Error(ctx, "failed to rename group", zaputil.Error(err))
 		return errors.E(op, err)
 	}
 	return nil

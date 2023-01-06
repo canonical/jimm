@@ -117,3 +117,8 @@ func (c *Client) UpdateMigratedModel(req *params.UpdateMigratedModelRequest) err
 func (c *Client) AddGroup(req *params.AddGroupRequest) error {
 	return c.caller.APICall("JIMM", 4, "", "AddGroup", req, nil)
 }
+
+// RenameGroup renames a group.
+func (c *Client) RenameGroup(req *params.RenameGroupRequest) error {
+	return c.caller.APICall("JIMM", 4, "", "RenameGroup", req, nil)
+}
