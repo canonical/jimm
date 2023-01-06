@@ -268,7 +268,6 @@ type Group struct {
 	Name      string `json:"name"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
-	// TODO(ale8k): Should we list how many users are in the group? Is that helpful?
 }
 
 // ListGroupResponse returns the group tuples currently residing within OpenFGA.
@@ -287,9 +286,8 @@ type ListGroupResponse struct {
 // We've further only considered single updates as of now, but
 // TODO: discuss if we should accept bulk here. It shouldn't be difficult to add either.
 type ModifyRelationRequest struct {
-	// User represents a user, or group of users (in our use case)
-	// that we wish to apply a relational tuple to.
-	User string `json:"user"`
+	// Object represents an OFGA object that we wish to apply a relational tuple to.
+	Object string `json:"user"`
 	// Relation is exactly that, the kind of relation this request modifies.
 	Relation string `json:"relation"`
 	// The target object is the kind of object we wish to create/remove a tuple for with

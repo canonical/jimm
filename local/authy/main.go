@@ -149,7 +149,7 @@ func PostLoginForm(username, password string) ResponseHandler {
 func main() {
 	rpcclient, err := (&rpc.Dialer{}).Dial(context.TODO(), "ws://0.0.0.0:17070/api")
 	if err != nil {
-		log.Fatal("oh noes, ", err)
+		log.Fatal("failed to dial controller:", err)
 	}
 	respres := jujuparams.LoginResult{}
 
