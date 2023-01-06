@@ -35,6 +35,8 @@ func init() {
 		updateMigratedModelMethod := rpc.Method(r.UpdateMigratedModel)
 		addCloudToControllerMethod := rpc.Method(r.AddCloudToController)
 		removeCloudFromControllerMethod := rpc.Method(r.RemoveCloudFromController)
+		addGroupMethod := rpc.Method(r.AddGroup)
+		renameGroupMethod := rpc.Method(r.RenameGroup)
 
 		r.AddMethod("JIMM", 2, "DisableControllerUUIDMasking", disableControllerUUIDMaskingMethod)
 		r.AddMethod("JIMM", 2, "ListControllers", listControllersMethod)
@@ -69,9 +71,9 @@ func init() {
 		r.AddMethod("JIMM", 4, "RemoveCloudFromController", removeCloudFromControllerMethod)
 
 		// JIMM ReBAC RPC
-		r.AddMethod("JIMM", 4, "AddGroup", rpc.Method(r.AddGroup))
+		r.AddMethod("JIMM", 4, "AddGroup", addGroupMethod)
 		r.AddMethod("JIMM", 4, "RemoveGroup", rpc.Method(r.RemoveGroup))
-		r.AddMethod("JIMM", 4, "RenameGroup", rpc.Method(r.RenameGroup))
+		r.AddMethod("JIMM", 4, "RenameGroup", renameGroupMethod)
 		r.AddMethod("JIMM", 4, "ListGroups", rpc.Method(r.ListGroups))
 
 		r.AddMethod("JIMM", 4, "AddRelation", rpc.Method(r.AddRelation))

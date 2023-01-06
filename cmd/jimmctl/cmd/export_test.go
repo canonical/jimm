@@ -193,3 +193,15 @@ func NewAddGroupCommandForTesting(store jujuclient.ClientStore, bClient *httpbak
 
 	return modelcmd.WrapBase(cmd)
 }
+
+func NewRenameGroupCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+	cmd := &renameGroupCommand{
+		store: store,
+		dialOpts: &jujuapi.DialOpts{
+			InsecureSkipVerify: true,
+			BakeryClient:       bClient,
+		},
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
