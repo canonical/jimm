@@ -34,6 +34,7 @@ func NewSuperCommand() *jujucmd.SuperCommand {
 	jimmcmd.Register(cmd.NewUpdateMigratedModelCommand())
 	jimmcmd.Register(cmd.NewAddCloudToControllerCommand())
 	jimmcmd.Register(cmd.NewRemoveCloudFromControllerCommand())
+	jimmcmd.Register(cmd.NewAuthCommand())
 	return jimmcmd
 }
 
