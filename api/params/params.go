@@ -240,9 +240,16 @@ type ImportModelRequest struct {
 
 // Authorisation request parameters / responses:
 
-// ModifyGroupRequest holds a request to modify a group.
+// AddGroupRequest holds a request to add a group.
 // This may be add/remove/rename.
-type ModifyGroupRequest struct {
+type AddGroupRequest struct {
+	// Name holds the name of the group.
+	Name string `json:"name"`
+}
+
+// DeleteGroupRequest holds a request to delete a group.
+// This may be add/remove/rename.
+type DeleteGroupRequest struct {
 	// Name holds the name of the group.
 	Name string `json:"name"`
 }

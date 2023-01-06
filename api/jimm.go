@@ -117,17 +117,17 @@ func (c *Client) UpdateMigratedModel(req *params.UpdateMigratedModelRequest) err
 
 // User Groups
 // AddGroup adds the group to JIMM.
-func (c *Client) AddGroup(req *params.ModifyGroupRequest) error {
+func (c *Client) AddGroup(req *params.AddGroupRequest) error {
 	return c.caller.APICall("JIMM", 4, "", "AddGroup", req, nil)
 }
 
 // RemoveGroup removes the group from JIMM.
-func (c *Client) RemoveGroup(req *params.ModifyGroupRequest) error {
+func (c *Client) RemoveGroup(req *params.DeleteGroupRequest) error {
 	return c.caller.APICall("JIMM", 4, "", "RemoveGroup", req, nil)
 }
 
 // RenameGroup renames the group in JIMM.
-func (c *Client) RenameGroup(req *params.ModifyGroupRequest) error {
+func (c *Client) RenameGroup(req *params.RenameGroupRequest) error {
 	return c.caller.APICall("JIMM", 4, "", "RenameGroup", req, nil)
 }
 

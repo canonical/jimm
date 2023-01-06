@@ -14,13 +14,13 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
-	openfga "github.com/openfga/go-sdk"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
+	ofgaClient "github.com/CanonicalLtd/jimm/internal/openfga"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
 )
 
@@ -81,7 +81,7 @@ type JIMM struct {
 
 	// OpenFGAClient holds the client used to interact
 	// with the OpenFGA ReBAC system.
-	OpenFGAClient *openfga.APIClient
+	OpenFGAClient *ofgaClient.OFGAClient
 }
 
 // An Authenticator authenticates login requests.

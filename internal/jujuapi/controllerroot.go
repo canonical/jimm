@@ -7,13 +7,13 @@ import (
 	"sync"
 
 	"github.com/juju/names/v4"
-	openfga "github.com/openfga/go-sdk"
 	"github.com/rogpeppe/fastuuid"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
+	ofgaClient "github.com/CanonicalLtd/jimm/internal/openfga"
 )
 
 // controllerRoot is the root for endpoints served on controller connections.
@@ -30,7 +30,7 @@ type controllerRoot struct {
 	user                  *dbmodel.User
 	controllerUUIDMasking bool
 	generator             *fastuuid.Generator
-	ofgaApi               openfga.OpenFgaApi
+	ofgaClient            *ofgaClient.OFGAClient
 }
 
 func newControllerRoot(j *jimm.JIMM, p Params) *controllerRoot {
@@ -43,7 +43,7 @@ func newControllerRoot(j *jimm.JIMM, p Params) *controllerRoot {
 		watchers:              watcherRegistry,
 		pingF:                 func() {},
 		controllerUUIDMasking: true,
-		ofgaApi:               j.OpenFGAClient.OpenFgaApi,
+		ofgaClient:            j.OpenFGAClient,
 	}
 
 	r.AddMethod("Admin", 1, "Login", rpc.Method(unsupportedLogin))

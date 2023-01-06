@@ -39,6 +39,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
 	"github.com/CanonicalLtd/jimm/internal/jujuclient"
 	"github.com/CanonicalLtd/jimm/internal/logger"
+	ofgaClient "github.com/CanonicalLtd/jimm/internal/openfga"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 	"github.com/CanonicalLtd/jimm/internal/vault"
@@ -243,7 +244,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	if openFGAclient != nil {
 		s.jimm.OpenFGAClient = openFGAclient
 	}
-	ensureJIMMAuthorisationModel(openFGAclient)
+	// ensureJIMMAuthorisationModel(openFGAclient)
 
 	s.jimm.Dialer = &jujuclient.Dialer{
 		ControllerCredentialsStore: vs,
@@ -407,7 +408,7 @@ func newVaultStore(ctx context.Context, p Params) (VaultStore, error) {
 	}, nil
 }
 
-func newOpenFGAClient(ctx context.Context, p Params) (*openfga.APIClient, error) {
+func newOpenFGAClient(ctx context.Context, p Params) (*ofgaClient.OFGAClient, error) {
 	if p.OpenFGAParams.Host == "" {
 		return nil, nil
 	}
@@ -453,6 +454,5 @@ func newOpenFGAClient(ctx context.Context, p Params) (*openfga.APIClient, error)
 	} else {
 		zapctx.Info(ctx, "store appears to exist", zap.String("store-name", *storeResp.Name))
 	}
-
-	return client, nil
+	return ofgaClient.NewOpenFGAClient(client.OpenFgaApi, p.OpenFGAParams.AuthModel), nil
 }
