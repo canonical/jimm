@@ -43,7 +43,9 @@ func newControllerRoot(j *jimm.JIMM, p Params) *controllerRoot {
 		watchers:              watcherRegistry,
 		pingF:                 func() {},
 		controllerUUIDMasking: true,
-		ofgaClient:            j.OpenFGAClient,
+	}
+	if j != nil && j.OpenFGAClient != nil {
+		r.ofgaClient = j.OpenFGAClient
 	}
 
 	r.AddMethod("Admin", 1, "Login", rpc.Method(unsupportedLogin))

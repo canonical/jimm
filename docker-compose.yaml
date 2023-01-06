@@ -37,6 +37,7 @@ services:
     volumes:
       - ./:/jimm/
       - ./local/vault/approle.yaml:/vault/approle.yaml:rw
+      - ./local/vault/roleid.txt:/vault/roleid.txt:rw
     healthcheck:
       test: [ "CMD", "curl", "http://localhost:8080" ]
       interval: 5s
@@ -90,6 +91,7 @@ services:
       - ./local/vault/init.sh:/vault/init.sh
       - ./local/vault/policy.hcl:/vault/policy.hcl
       - ./local/vault/approle.yaml:/vault/approle.yaml
+      - ./local/vault/roleid.txt:/vault/roleid.txt:rw
     command: /vault/init.sh
     depends_on:
       db:
@@ -171,10 +173,8 @@ services:
       apk add curl &&
       curl -X POST -H 'Content-Type: application/json' -H 'Authorization: Bearer jimm' openfga:8080/stores/01GP1254CHWJC1MNGVB0WDG1T0/authorization-models -d \"$(cat ./authorisation_model.json)\" &&
       psql -Atx postgresql://jimm:jimm@db/jimm?sslmode=disable -c \"UPDATE authorization_model SET authorization_model_id = '01GP1EC038KHGB6JJ2XXXXCXKB' WHERE store = '01GP1254CHWJC1MNGVB0WDG1T0';\"
+      "
     depends_on:
       openfga:
         condition: service_healthy
-
-
-
         

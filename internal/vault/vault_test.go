@@ -4,7 +4,6 @@ package vault_test
 
 import (
 	"context"
-	"log"
 	"os"
 	"testing"
 
@@ -16,24 +15,19 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	err := jimmtest.StartVault()
-	if err != nil {
-		log.Printf("error starting vault: %s\n", err)
-	}
 	code := m.Run()
-	jimmtest.StopVault()
 	os.Exit(code)
 }
 
 func newStore(t testing.TB) *vault.VaultStore {
-	client, path, creds, ok := jimmtest.VaultClient(t)
+	client, path, creds, ok := jimmtest.VaultClient(t, "../../")
 	if !ok {
 		t.Skip("vault not available")
 	}
 	return &vault.VaultStore{
 		Client:     client,
 		AuthSecret: creds,
-		AuthPath:   jimmtest.VaultAuthPath,
+		AuthPath:   "/auth/approle/login",
 		KVPath:     path,
 	}
 }
