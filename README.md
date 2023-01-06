@@ -43,8 +43,6 @@ This can be installed via: `sudo snap install juju-db`.
 However, the rest of the suite which relies on PostgreSQL, OpenFGA and Hashicorp Vault is dockerised
 and as such you may simple run `docker compose up` to be development Q&A and integration test ready.
 
-
-
 ### Manual commands
 The tests utilise [go.check](http://labix.org/gocheck) for suites and you may run tests individually like so: 
 ```bash
@@ -53,6 +51,8 @@ $ go test -check.f MyTestSuite
 $ go test -check.f "Test.*Works"
 $ go test -check.f "MyTestSuite.Test.*Works"
 ```
+
+For more verbose output, use `-check.v` and `-check.vv`
 
 
 ### Make
