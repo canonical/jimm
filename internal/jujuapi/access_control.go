@@ -2,13 +2,28 @@ package jujuapi
 
 import (
 	"context"
+
+	apiparams "github.com/CanonicalLtd/jimm/api/params"
+	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/juju/zaputil"
+	"github.com/juju/zaputil/zapctx"
 )
 
 // access_control contains the primary RPC commands for handling ReBAC within JIMM via the JIMM facade itself.
 
 // AddGroup creates a new relational access control group tuple
-// within OpenFGA.
-func (r *controllerRoot) AddGroup(ctx context.Context) error {
+// within OpenFGA and updates the database with the initial display name for
+// this group.
+func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupRequest) error {
+	const op = errors.Op("jujuapi.AddGroup")
+	if r.user.ControllerAccess != "superuser" {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	if err := r.jimm.Database.AddGroup(ctx, req.Name); err != nil {
+		zapctx.Error(ctx, "failed to add group", zaputil.Error(err))
+		return errors.E(op, err)
+	}
 	return nil
 }
 
@@ -19,8 +34,19 @@ func (r *controllerRoot) RemoveGroup(ctx context.Context) error {
 }
 
 // RenameGroup renames a relational access control group tuple
-// within OpenFGA.
-func (r *controllerRoot) RenameGroup(ctx context.Context) error {
+// within OpenFGA. It adds a "new" group to the database whilst maintaining
+// the current group unique ID within OpenFGA.
+// TODO(ales): Use the ofga client wrapper available on controllerRoot to grab ID
+func (r *controllerRoot) RenameGroup(ctx context.Context, req apiparams.RenameGroupRequest) error {
+	const op = errors.Op("jujuapi.RenameGroup")
+	if r.user.ControllerAccess != "superuser" {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	if err := r.jimm.Database.AddGroup(ctx, req.Name); err != nil {
+		zapctx.Error(ctx, "failed to add group", zaputil.Error(err))
+		return errors.E(op, err)
+	}
 	return nil
 }
 

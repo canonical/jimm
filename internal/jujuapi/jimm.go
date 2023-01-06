@@ -35,7 +35,6 @@ func init() {
 		updateMigratedModelMethod := rpc.Method(r.UpdateMigratedModel)
 		addCloudToControllerMethod := rpc.Method(r.AddCloudToController)
 		removeCloudFromControllerMethod := rpc.Method(r.RemoveCloudFromController)
-		addGroupMethod := rpc.Method(r.AddGroup)
 
 		r.AddMethod("JIMM", 2, "DisableControllerUUIDMasking", disableControllerUUIDMaskingMethod)
 		r.AddMethod("JIMM", 2, "ListControllers", listControllersMethod)
@@ -70,8 +69,7 @@ func init() {
 		r.AddMethod("JIMM", 4, "RemoveCloudFromController", removeCloudFromControllerMethod)
 
 		// JIMM ReBAC RPC
-		// TODO(alex): come back change this once u move it over
-		r.AddMethod("JIMM", 4, "AddGroup", addGroupMethod)
+		r.AddMethod("JIMM", 4, "AddGroup", rpc.Method(r.AddGroup))
 		r.AddMethod("JIMM", 4, "RemoveGroup", rpc.Method(r.RemoveGroup))
 		r.AddMethod("JIMM", 4, "RenameGroup", rpc.Method(r.RenameGroup))
 		r.AddMethod("JIMM", 4, "ListGroups", rpc.Method(r.ListGroups))
@@ -83,7 +81,7 @@ func init() {
 
 		r.AddMethod("JIMM", 4, "GetAuthorisationModel", rpc.Method(r.GetAuthorisationModel))
 
-		r.AddMethod("JIMM", 4, "AddGroup")
+		r.AddMethod("JIMM", 4, "AddGroup", rpc.Method(r.AddGroup))
 
 		return []int{2, 3, 4}
 	}
@@ -469,34 +467,6 @@ func (r *controllerRoot) RemoveCloudFromController(ctx context.Context, req apip
 		return errors.E(op, err, errors.CodeBadRequest)
 	}
 	if err := r.jimm.RemoveCloudFromController(ctx, r.user, req.ControllerName, ct); err != nil {
-		return errors.E(op, err)
-	}
-	return nil
-}
-
-// AddGroup adds a group to JIMM.
-func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupRequest) error {
-	const op = errors.Op("jujuapi.AddGroup")
-	if r.user.ControllerAccess != "superuser" {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-
-	if err := r.jimm.Database.AddGroup(ctx, req.Name); err != nil {
-		zapctx.Error(ctx, "failed to add group", zaputil.Error(err))
-		return errors.E(op, err)
-	}
-	return nil
-}
-
-// RenameGroup renames a group.
-func (r *controllerRoot) RenameGroup(ctx context.Context, req apiparams.RenameGroupRequest) error {
-	const op = errors.Op("jujuapi.RenameGroup")
-	if r.user.ControllerAccess != "superuser" {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-
-	if err := r.jimm.Database.AddGroup(ctx, req.Name); err != nil {
-		zapctx.Error(ctx, "failed to add group", zaputil.Error(err))
 		return errors.E(op, err)
 	}
 	return nil
