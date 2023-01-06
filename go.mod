@@ -3,22 +3,20 @@ module github.com/CanonicalLtd/jimm
 go 1.16
 
 require (
-	cloud.google.com/go/compute v1.8.0 // indirect
 	github.com/boltdb/bolt v1.3.1 // indirect
-	github.com/canonical/candid v1.10.1
-	github.com/canonical/go-dqlite v1.8.0
+	github.com/canonical/candid v1.12.2
+	github.com/canonical/go-dqlite v1.11.5
 	github.com/canonical/go-service v1.0.0
-	github.com/frankban/quicktest v1.13.0
-	github.com/go-macaroon-bakery/macaroon-bakery/v3 v3.0.0-20220204130128-afeebcc9521d
+	github.com/frankban/quicktest v1.14.4
+	github.com/go-macaroon-bakery/macaroon-bakery/v3 v3.0.1
 	github.com/gobwas/glob v0.2.4-0.20181002190808-e7a84e9525fe // indirect
-	github.com/google/go-cmp v0.5.8
+	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
-	github.com/gorilla/websocket v1.4.2
-	github.com/gosuri/uitable v0.0.1
-	github.com/hashicorp/vault/api v1.1.0
-	github.com/jackc/pgconn v1.7.0
-	github.com/jackc/pgx/v4 v4.9.0
-	github.com/juju/aclstore/v2 v2.1.0 // indirect
+	github.com/gorilla/websocket v1.5.0
+	github.com/gosuri/uitable v0.0.4
+	github.com/hashicorp/vault/api v1.8.2
+	github.com/jackc/pgconn v1.13.0
+	github.com/jackc/pgx/v4 v4.17.2
 	github.com/juju/charm/v8 v8.0.0-20220509231111-ed6d505a46f4
 	github.com/juju/cmd v0.0.0-20200108104440-8e43f3faa5c9 // indirect
 	github.com/juju/cmd/v3 v3.0.0-20220203030511-039f3566372a
@@ -38,20 +36,18 @@ require (
 	github.com/juju/zaputil v0.0.0-20190326175239-ef53049637ac
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
 	github.com/openfga/go-sdk v0.1.1
-	github.com/prometheus/client_golang v1.11.0
-	github.com/prometheus/common v0.29.0 // indirect
+	github.com/prometheus/client_golang v1.14.0
 	github.com/rogpeppe/fastuuid v1.2.0
-	go.uber.org/zap v1.10.0
+	go.uber.org/zap v1.24.0
 	golang.org/x/net v0.2.0 // indirect
-	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
+	golang.org/x/sync v0.1.0
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
-	gopkg.in/juju/names.v2 v2.0.0-20190813004204-e057c73bd1be // indirect
 	gopkg.in/macaroon-bakery.v2 v2.3.0
 	gopkg.in/macaroon.v2 v2.1.0
 	gorm.io/driver/postgres v1.0.5
 	gorm.io/driver/sqlite v1.1.4-0.20201029040614-e1caf3738eb9
 	gorm.io/gorm v1.20.6
-	sigs.k8s.io/yaml v1.2.0
+	sigs.k8s.io/yaml v1.3.0
 )
 
 replace (
