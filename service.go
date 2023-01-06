@@ -17,6 +17,7 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/dbrootkeystore"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
 	"github.com/google/uuid"
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/juju/names/v4"
@@ -24,8 +25,6 @@ import (
 	openfga "github.com/openfga/go-sdk"
 	"github.com/openfga/go-sdk/credentials"
 	"go.uber.org/zap"
-	httpbakeryv2 "gopkg.in/macaroon-bakery.v2/httpbakery"
-	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -324,7 +323,7 @@ func newAuthenticator(ctx context.Context, db *db.Database, p Params) (jimm.Auth
 		})
 	}
 
-	bClient := httpbakeryv2.NewClient()
+	bClient := httpbakery.NewClient()
 	var agentUsername string
 	if p.BakeryAgentFile != "" {
 		data, err := os.ReadFile(p.BakeryAgentFile)
@@ -360,7 +359,7 @@ func newAuthenticator(ctx context.Context, db *db.Database, p Params) (jimm.Auth
 			}),
 			Locator:        httpbakery.NewThirdPartyLocator(nil, tps),
 			Key:            key,
-			IdentityClient: auth.IdentityClientV3{IdentityClient: candidClient},
+			IdentityClient: candidClient,
 			Location:       "jimm",
 			Logger:         logger.BakeryLogger{},
 		}),
