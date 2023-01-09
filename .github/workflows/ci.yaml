@@ -30,19 +30,19 @@ jobs:
     #    needs:
     #      - lint
     runs-on: ubuntu-20.04
-    services:
-      postgres:
-        image: postgres
-        env:
-          POSTGRES_PASSWORD: password
-        ports:
-          - 5432:5432
-        # Set health checks to wait until postgres has started
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+    # services:
+    #   postgres:
+    #     image: postgres
+    #     env:
+    #       POSTGRES_PASSWORD: password
+    #     ports:
+    #       - 5432:5432
+    #     # Set health checks to wait until postgres has started
+    #     options: >-
+    #       --health-cmd pg_isready
+    #       --health-interval 10s
+    #       --health-timeout 5s
+    #       --health-retries 5
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies
@@ -72,9 +72,9 @@ jobs:
       - name: Build and Test
         run: go test -mod readonly ./...
         env:
-          JIMM_DSN: postgresql://postgres:password@localhost:5432/jimm
+          JIMM_DSN: postgresql://jimm:jimm@localhost:5432/jimm
           PGHOST: localhost
-          PGPASSWORD: password
+          PGPASSWORD: jimm
           PGSSLMODE: disable
-          PGUSER: postgres
+          PGUSER: jimm
           PGPORT: 5432
