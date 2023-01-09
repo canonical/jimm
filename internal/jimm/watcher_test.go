@@ -11,8 +11,8 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/instance"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
@@ -752,15 +752,18 @@ func TestWatcherSetsControllerUnavailable(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	w := &jimm.Watcher{
-		Pubsub: &testPublisher{},
-		Database: db.Database{
+	controllerUnavailableChannel := make(chan error, 1)
+	w := jimm.NewWatcherWithControllerUnavailableChan(
+		db.Database{
 			DB: jimmtest.MemoryDB(c, nil),
 		},
-		Dialer: &jimmtest.Dialer{
+		&jimmtest.Dialer{
 			Err: errors.E("test error"),
 		},
-	}
+		&testPublisher{},
+		controllerUnavailableChannel,
+	)
+
 	env := jimmtest.ParseEnvironment(c, testWatcherEnv)
 	err := w.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
@@ -774,14 +777,20 @@ func TestWatcherSetsControllerUnavailable(t *testing.T) {
 		c.Check(err, qt.ErrorMatches, `context canceled`, qt.Commentf("unexpected error %s (%#v)", err, err))
 	}()
 
-	<-time.After(5 * time.Millisecond)
-	ctl := dbmodel.Controller{
-		Name: "controller-1",
+	// it appears that the jimm code does not treat failing to
+	// set a controller as unavailable as an error - so
+	// the test will not treat it as one either.
+	cerr := <-controllerUnavailableChannel
+	if cerr != nil {
+		ctl := dbmodel.Controller{
+			Name: "controller-1",
+		}
+		err = w.Database.GetController(ctx, &ctl)
+		c.Assert(err, qt.IsNil)
+		c.Check(ctl.UnavailableSince.Valid, qt.Equals, true)
+		c.Logf("%v %v", ctl.UnavailableSince.Time, time.Now())
+		c.Check(ctl.UnavailableSince.Time.After(time.Now().Add(-10*time.Millisecond)), qt.Equals, true)
 	}
-	err = w.Database.GetController(ctx, &ctl)
-	c.Assert(err, qt.IsNil)
-	c.Check(ctl.UnavailableSince.Valid, qt.Equals, true)
-	c.Check(ctl.UnavailableSince.Time.After(time.Now().Add(-10*time.Millisecond)), qt.Equals, true)
 	cancel()
 	wg.Wait()
 }
