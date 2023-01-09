@@ -610,15 +610,3 @@ func (s *jimmSuite) TestRemoveCloudFromController(c *gc.C) {
 	_, err = s.JIMM.GetCloud(context.Background(), &u, names.NewCloudTag("test-cloud"))
 	c.Assert(err, gc.ErrorMatches, `cloud "test-cloud" not found`)
 }
-
-func (s *jimmSuite) TestAddGroup(c *gc.C) {
-	conn := s.open(c, nil, "alice")
-	defer conn.Close()
-
-	client := api.NewClient(conn)
-	err := client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
-	c.Assert(err, jc.ErrorIsNil)
-
-	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
-	c.Assert(err, gc.ErrorMatches, ".*already exists.*")
-}

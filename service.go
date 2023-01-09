@@ -6,7 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -38,6 +38,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
 	"github.com/CanonicalLtd/jimm/internal/jujuclient"
 	"github.com/CanonicalLtd/jimm/internal/logger"
+	ofgaClient "github.com/CanonicalLtd/jimm/internal/openfga"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 	"github.com/CanonicalLtd/jimm/internal/vault"
@@ -63,11 +64,12 @@ type VaultStore interface {
 
 // OpenFGAParams holds parameters needed to connect to the OpenFGA server.
 type OpenFGAParams struct {
-	Scheme string
-	Host   string
-	Store  string
-	Token  string
-	Port   string
+	Scheme    string
+	Host      string
+	Store     string
+	AuthModel string
+	Token     string
+	Port      string
 }
 
 // A Params structure contains the parameters required to initialise a new
@@ -239,8 +241,9 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err)
 	}
 	if openFGAclient != nil {
-		s.jimm.OpenFGAClient = *openFGAclient
+		s.jimm.OpenFGAClient = openFGAclient
 	}
+	// ensureJIMMAuthorisationModel(openFGAclient)
 
 	s.jimm.Dialer = &jujuclient.Dialer{
 		ControllerCredentialsStore: vs,
@@ -261,9 +264,18 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	s.mux.Handle("/api", jujuapi.APIHandler(ctx, &s.jimm, params))
 	s.mux.Handle("/model/", jujuapi.ModelHandler(ctx, &s.jimm, params))
 	// If the request is not for a known path assume it is part of the dashboard.
-	s.mux.Handle("/", dashboard.Handler(ctx, p.DashboardLocation))
+	// If dashboard location env var is not defined, do not handle a dashboard.
+	if p.DashboardLocation != "" {
+		s.mux.Handle("/", dashboard.Handler(ctx, p.DashboardLocation))
+	}
 
 	return s, nil
+}
+
+// ensureJIMMAuthorisationModel ensures that the authorisation model, as defined by JIMM,
+// exists at startup. If it doesn't, it will attempt to create it.
+func ensureJIMMAuthorisationModel(c *openfga.APIClient) {
+
 }
 
 func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {
@@ -374,6 +386,7 @@ func newVaultStore(ctx context.Context, p Params) (VaultStore, error) {
 	defer f.Close()
 	s, err := vaultapi.ParseSecret(f)
 	if err != nil {
+		zapctx.Error(ctx, "failed to parse vault secret from file")
 		return nil, err
 	}
 
@@ -394,7 +407,7 @@ func newVaultStore(ctx context.Context, p Params) (VaultStore, error) {
 	}, nil
 }
 
-func newOpenFGAClient(ctx context.Context, p Params) (*openfga.APIClient, error) {
+func newOpenFGAClient(ctx context.Context, p Params) (*ofgaClient.OFGAClient, error) {
 	if p.OpenFGAParams.Host == "" {
 		return nil, nil
 	}
@@ -422,15 +435,23 @@ func newOpenFGAClient(ctx context.Context, p Params) (*openfga.APIClient, error)
 		return nil, err
 	}
 	client := openfga.NewAPIClient(configuration)
+	api := client.OpenFgaApi
 
-	_, response, err := client.OpenFgaApi.ListStores(ctx).Execute()
+	_, response, err := api.ListStores(ctx).Execute()
 	if err != nil {
 		return nil, err
 	}
+	body, _ := io.ReadAll(response.Body)
 	if response.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(response.Body)
 		return nil, errors.E("failed to contact the OpenFga server: received %v: %s", response.StatusCode, string(body))
 	}
 
-	return client, nil
+	storeResp, _, err := api.GetStore(ctx).Execute()
+	if err != nil {
+		zapctx.Error(ctx, "could not retrieve store.", zap.Error(err))
+		return nil, errors.E("could not retrieve store")
+	} else {
+		zapctx.Info(ctx, "store appears to exist", zap.String("store-name", *storeResp.Name))
+	}
+	return ofgaClient.NewOpenFGAClient(client.OpenFgaApi, p.OpenFGAParams.AuthModel), nil
 }

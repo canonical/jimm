@@ -13,6 +13,8 @@ import (
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 
 	"github.com/CanonicalLtd/jimm/internal/cloudcred"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
@@ -258,6 +260,7 @@ func (j *JIMM) updateCredential(ctx context.Context, credential *dbmodel.CloudCr
 	const op = errors.Op("jimm.updateCredential")
 
 	if j.CredentialStore == nil {
+		zapctx.Debug(ctx, "credential store is nil!")
 		credential.AttributesInVault = false
 		if err := j.Database.SetCloudCredential(ctx, credential); err != nil {
 			return errors.E(op, err)
@@ -269,12 +272,17 @@ func (j *JIMM) updateCredential(ctx context.Context, credential *dbmodel.CloudCr
 	credential1.Attributes = nil
 	credential1.AttributesInVault = true
 	if err := j.Database.SetCloudCredential(ctx, &credential1); err != nil {
+		zapctx.Error(ctx, "failed to store credential id", zap.Error(err))
 		return errors.E(op, err)
 	}
 
 	if err := j.CredentialStore.Put(ctx, credential.Tag().(names.CloudCredentialTag), credential.Attributes); err != nil {
+		zapctx.Error(ctx, "failed to store credentials", zap.Error(err))
 		return errors.E(op, err)
 	}
+
+	zapctx.Info(ctx, "credential store location", zap.Bool("vault", credential.AttributesInVault))
+
 	return nil
 }
 
