@@ -54,6 +54,7 @@ jobs:
         run: |
           git clone https://github.com/canonical/candid.git ./tmp/candid
           cd ./tmp/candid
+          DOCKER_BUILDKIT=1 \
           docker build \
           --build-arg AUTH_TYPE=pat \
           --cache-from candid:latest \
