@@ -4,6 +4,7 @@
 echo "Entrypoint being overriden for local environment."
 
 # Grab curl quickly.
+apt update
 apt install curl -y
 /root/candidsrv /etc/candid/config.yaml &
 

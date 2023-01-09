@@ -81,8 +81,6 @@ func init() {
 
 		r.AddMethod("JIMM", 4, "GetAuthorisationModel", rpc.Method(r.GetAuthorisationModel))
 
-		r.AddMethod("JIMM", 4, "AddGroup", rpc.Method(r.AddGroup))
-
 		return []int{2, 3, 4}
 	}
 }
