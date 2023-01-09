@@ -21,10 +21,16 @@ var (
 `
 
 	addGroupDoc = `
-	add-group command adds group to jimm.
+	add command adds group to jimm.
 
 	Example:
 		jimmctl auth group add <name> 
+`
+	renameGroupDoc = `
+	rename command renames a group in jimm.
+
+	Example:
+		jimmctl auth group rename <name> <new name>
 `
 )
 
@@ -36,6 +42,7 @@ func NewGroupCommand() *jujucmdv3.SuperCommand {
 		Purpose: "Group management.",
 	})
 	cmd.Register(newAddGroupCommand())
+	cmd.Register(newRenameGroupCommand())
 
 	return cmd
 }
@@ -98,6 +105,73 @@ func (c *addGroupCommand) Run(ctxt *cmd.Context) error {
 
 	client := api.NewClient(apiCaller)
 	err = client.AddGroup(&params)
+	if err != nil {
+		return errors.E(err)
+	}
+
+	return nil
+}
+
+// newRenameGroupCommand returns a command to rename a group.
+func newRenameGroupCommand() cmd.Command {
+	cmd := &renameGroupCommand{
+		store: jujuclient.NewFileClientStore(),
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
+
+// renameGroupCommand renames a group.
+type renameGroupCommand struct {
+	modelcmd.ControllerCommandBase
+	out cmd.Output
+
+	store    jujuclient.ClientStore
+	dialOpts *jujuapi.DialOpts
+
+	name    string
+	newName string
+}
+
+func (c *renameGroupCommand) Info() *cmd.Info {
+	return jujucmd.Info(&cmd.Info{
+		Name:    "rename",
+		Purpose: "Rename a group",
+		Doc:     renameGroupDoc,
+	})
+}
+
+// Init implements the cmd.Command interface.
+func (c *renameGroupCommand) Init(args []string) error {
+	if len(args) < 2 {
+		return errors.E("group name not specified")
+	}
+	c.name, c.newName, args = args[0], args[1], args[2:]
+	if len(args) > 0 {
+		return errors.E("too many args")
+	}
+	return nil
+}
+
+// Run implements Command.Run.
+func (c *renameGroupCommand) Run(ctxt *cmd.Context) error {
+	currentController, err := c.store.CurrentController()
+	if err != nil {
+		return errors.E(err, "could not determine controller")
+	}
+
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", c.dialOpts)
+	if err != nil {
+		return err
+	}
+
+	params := apiparams.RenameGroupRequest{
+		Name:    c.name,
+		NewName: c.newName,
+	}
+
+	client := api.NewClient(apiCaller)
+	err = client.RenameGroup(&params)
 	if err != nil {
 		return errors.E(err)
 	}
