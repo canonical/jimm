@@ -130,3 +130,25 @@ func (s *accessControlSuite) TestAddRelationTagValidation(c *gc.C) {
 		}
 	}
 }
+
+func (s *accessControlSuite) TestRenameGroup(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := api.NewClient(conn)
+
+	err := client.RenameGroup(&apiparams.RenameGroupRequest{
+		Name:    "test-group",
+		NewName: "renamed-group",
+	})
+	c.Assert(err, gc.ErrorMatches, ".*not found.*")
+
+	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = client.RenameGroup(&apiparams.RenameGroupRequest{
+		Name:    "test-group",
+		NewName: "renamed-group",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+}

@@ -37,17 +37,20 @@ func (r *controllerRoot) RemoveGroup(ctx context.Context) error {
 }
 
 // RenameGroup renames a group within JIMMs DB for reference by OpenFGA.
-// It adds a "new" group to the database whilst maintaining
-// the current group unique ID within OpenFGA.
-// TODO(ales): Use the ofga client wrapper available on controllerRoot to grab ID
 func (r *controllerRoot) RenameGroup(ctx context.Context, req apiparams.RenameGroupRequest) error {
 	const op = errors.Op("jujuapi.RenameGroup")
 	if r.user.ControllerAccess != "superuser" {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	if err := r.jimm.Database.AddGroup(ctx, req.Name); err != nil {
-		zapctx.Error(ctx, "failed to add group", zaputil.Error(err))
+	group, err := r.jimm.Database.GetGroup(ctx, req.Name)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	group.Name = req.NewName
+
+	if err := r.jimm.Database.UpdateGroup(ctx, group); err != nil {
+		zapctx.Error(ctx, "failed to rename group", zaputil.Error(err))
 		return errors.E(op, err)
 	}
 	return nil
