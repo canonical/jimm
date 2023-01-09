@@ -264,7 +264,8 @@ type RenameGroupRequest struct {
 type RemoveGroupRequest struct {
 	// Name holds the name of the group.
 	Name string `json:"name"`
-	
+}
+
 // Group holds the details of a group currently residing in JIMM.
 type Group struct {
 	Name      string `json:"name"`

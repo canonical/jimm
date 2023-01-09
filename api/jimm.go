@@ -129,6 +129,7 @@ func (c *Client) RenameGroup(req *params.RenameGroupRequest) error {
 // RenameGroup removes a group to JIMM.
 func (c *Client) RemoveGroup(req *params.RemoveGroupRequest) error {
 	return c.caller.APICall("JIMM", 4, "", "RemoveGroup", req, nil)
+}
 
 // ListGroups lists the groups in JIMM.
 func (c *Client) ListGroups() ([]params.Group, error) {
