@@ -98,7 +98,7 @@ func (o *OFGAClient) AddRelations(ctx context.Context, keys ...openfga.TupleKey)
 // See: CreateTupleKey for creating keys.
 //
 // You may read via pagination utilising the token returned from the request.
-func (o *OFGAClient) ReadRelations(ctx context.Context, key openfga.TupleKey, pageSize int32, paginationToken string) (*ReadResponse, error) {
+func (o *OFGAClient) ReadRelatedObjects(ctx context.Context, key openfga.TupleKey, pageSize int32, paginationToken string) (*ReadResponse, error) {
 	keys := []openfga.TupleKey{}
 	res, err := o.getRelatedObjects(ctx, key, pageSize, paginationToken)
 	if err != nil {

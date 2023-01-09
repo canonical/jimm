@@ -21,7 +21,6 @@ services:
       VAULT_PATH: "/jimm-kv/"
       VAULT_SECRET_FILE: "/vault/approle.yaml"
       VAULT_AUTH_PATH: "/auth/approle/login"
-      # Where we gonna grab this?...
       # JIMM_DASHBOARD_LOCATION: ""
       JIMM_DNS_NAME: "127.0.0.1:17070"
       JIMM_WATCH_CONTROLLERS: ""
