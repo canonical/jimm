@@ -36,21 +36,14 @@ func (s *accessControlSuite) TestAddRelationSucceeds(c *gc.C) {
 	defer conn.Close()
 	client := api.NewClient(conn)
 	uuid1, _ := uuid.NewRandom()
-	user1 := fmt.Sprintf("user:%s", uuid1)
-	uuid2, _ := uuid.NewRandom()
-	user2 := fmt.Sprintf("user:%s", uuid2)
+	user1 := fmt.Sprintf("user:user-%s", uuid1)
 
 	goodParams := &apiparams.AddRelationRequest{
 		Tuples: []apiparams.RelationshipTuple{
 			{
 				Object:       user1,
-				Relation:     "member",
-				TargetObject: "group:yolo",
-			},
-			{
-				Object:       user2,
-				Relation:     "member",
-				TargetObject: "group:digbigletts",
+				Relation:     "administrator",
+				TargetObject: "controller:yolo",
 			},
 		},
 	}
@@ -58,27 +51,22 @@ func (s *accessControlSuite) TestAddRelationSucceeds(c *gc.C) {
 	err := client.AddRelation(goodParams)
 	c.Assert(err, gc.IsNil)
 
-	changes, _, err := s.OFGAApi.ReadChanges(ctx).Type_("group").Execute()
+	changes, _, err := s.OFGAApi.ReadChanges(ctx).Type_("controller").Execute()
 	c.Assert(err, gc.IsNil)
 
 	lastChange := changes.GetChanges()[len(changes.GetChanges())-1].GetTupleKey()
-	c.Assert(lastChange.GetUser(), gc.Equals, user2)
-
-	secondToLastChange := changes.GetChanges()[len(changes.GetChanges())-2].GetTupleKey()
-	c.Assert(secondToLastChange.GetUser(), gc.Equals, user1)
+	c.Assert(lastChange.GetUser(), gc.Equals, fmt.Sprintf("user:%s", uuid1))
 }
 
 func (s *accessControlSuite) TestAddRelationFailsWhenObjectDoesNotExistOnAuthorisationModel(c *gc.C) {
-	// ctx := context.Background()
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 	client := api.NewClient(conn)
-	uuid1, _ := uuid.NewRandom()
-	group1 := fmt.Sprintf("group:%s", uuid1)
+	model1 := fmt.Sprintf("model:%s", "model-f47ac10b-58cc-4372-a567-0e02b2c3d479")
 	badParams := &apiparams.AddRelationRequest{
 		Tuples: []apiparams.RelationshipTuple{
 			{
-				Object:       group1,
+				Object:       model1,
 				Relation:     "member",
 				TargetObject: "missingobjecttype:yolo22",
 			},
@@ -87,4 +75,58 @@ func (s *accessControlSuite) TestAddRelationFailsWhenObjectDoesNotExistOnAuthori
 	err := client.AddRelation(badParams)
 	c.Assert(err, gc.NotNil)
 	c.Assert(strings.Contains(err.Error(), "type_not_found"), gc.Equals, true)
+}
+
+func (s *accessControlSuite) TestAddRelationTagValidation(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+	client := api.NewClient(conn)
+
+	type tuple struct {
+		user     string
+		relation string
+		object   string
+	}
+	type tagTest struct {
+		input tuple
+		want  string
+		err   bool
+	}
+
+	getUuid := func() uuid.UUID {
+		uuid, _ := uuid.NewRandom()
+		return uuid
+	}
+
+	tagTests := []tagTest{
+		{input: tuple{"diglett:diglett", "member", "group:yolo22"}, want: ".*failed to validate tag for object:.*", err: true},
+		{input: tuple{fmt.Sprintf("user:user-%s", getUuid()), "member", "group:yolo22"}, err: false},
+		{input: tuple{fmt.Sprintf("user:user-%s@external", getUuid()), "member", "group:yolo22"}, err: false},
+		{input: tuple{"user:userr-alex", "member", "group:yolo22"}, want: ".*failed to validate tag for object:.*", err: true},
+		{input: tuple{fmt.Sprintf("model:model-%s", getUuid()), "member", "group:yolo22"}, err: false},
+		{input: tuple{fmt.Sprintf("user:user-%s@external", getUuid()), "member", "group:yolo22"}, err: false},
+		{input: tuple{"model:modelly-model", "member", "group:yolo22"}, want: ".*failed to validate tag for object:.*", err: true},
+		{input: tuple{fmt.Sprintf("controller:controller-%s", getUuid()), "member", "group:yolo22"}, err: false},
+		{input: tuple{"model:controlly-wolly", "member", "group:yolo22"}, want: ".*failed to validate tag for object:.*", err: true},
+		{input: tuple{fmt.Sprintf("group:group-%s", getUuid()), "member", "group:yolo22"}, err: false},
+		{input: tuple{"group:groupy-woopy", "member", "group:yolo22"}, want: ".*failed to validate tag for object:.*", err: true},
+	}
+
+	for _, tc := range tagTests {
+		err := client.AddRelation(&apiparams.AddRelationRequest{
+			Tuples: []apiparams.RelationshipTuple{
+				{
+					Object:       tc.input.user,
+					Relation:     tc.input.relation,
+					TargetObject: tc.input.object,
+				},
+			},
+		})
+		if tc.err {
+			c.Assert(err, gc.NotNil)
+			c.Assert(err, gc.ErrorMatches, tc.want)
+		} else {
+			c.Assert(err, gc.IsNil)
+		}
+	}
 }

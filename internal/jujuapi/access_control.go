@@ -7,6 +7,7 @@ import (
 
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
 	"github.com/CanonicalLtd/jimm/internal/errors"
+	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
@@ -61,10 +62,6 @@ func (r *controllerRoot) ListGroups(ctx context.Context) error {
 // within OpenFGA.
 func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelationRequest) error {
 	const op = errors.Op("jujuapi.AddRelation")
-	// names.UserTag  // user:<name>@<domain>
-	// names.ModelTag // model:<model uuid>
-	// names.ControllerTag
-	// names.ApplicationOfferTag
 
 	extractTag := func(key string) (names.Tag, error) {
 		k := strings.Split(key, ":")
@@ -80,6 +77,8 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 			return names.ParseControllerTag(objectId)
 		case "applicationoffer":
 			return names.ParseApplicationTag(objectId)
+		case "group":
+			return jimmnames.ParseGroupTag(objectId)
 		default:
 			return nil, err
 		}
@@ -109,6 +108,8 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 			userObject = fmt.Sprintf("controller:%s", t.Id())
 		case names.ApplicationOfferTag:
 			userObject = fmt.Sprintf("applicationoffer:%s", t.Id())
+		case jimmnames.GroupTag:
+			userObject = fmt.Sprintf("group:%s", t.Id())
 		}
 
 		keys = append(keys, ofc.CreateTupleKey(userObject, t.Relation, t.TargetObject))
