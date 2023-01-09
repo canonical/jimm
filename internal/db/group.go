@@ -55,3 +55,18 @@ func (d *Database) UpdateGroup(ctx context.Context, group *dbmodel.GroupEntry) e
 	}
 	return nil
 }
+
+// RemoveGroup removes the group identified by its ID.
+func (d *Database) RemoveGroup(ctx context.Context, group *dbmodel.GroupEntry) error {
+	const op = errors.Op("db.RemoveGroup")
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+	if group.ID == 0 {
+		return errors.E(errors.CodeNotFound)
+	}
+	if err := d.DB.WithContext(ctx).Delete(group).Error; err != nil {
+		return errors.E(op, dbError(err))
+	}
+	return nil
+}

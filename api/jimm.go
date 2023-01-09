@@ -122,3 +122,8 @@ func (c *Client) AddGroup(req *params.AddGroupRequest) error {
 func (c *Client) RenameGroup(req *params.RenameGroupRequest) error {
 	return c.caller.APICall("JIMM", 4, "", "RenameGroup", req, nil)
 }
+
+// Remove removes a group.
+func (c *Client) RemoveGroup(req *params.RemoveGroupRequest) error {
+	return c.caller.APICall("JIMM", 4, "", "RemoveGroup", req, nil)
+}

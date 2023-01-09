@@ -644,3 +644,23 @@ func (s *jimmSuite) TestRenameGroup(c *gc.C) {
 	})
 	c.Assert(err, jc.ErrorIsNil)
 }
+
+func (s *jimmSuite) TestRemoveGroup(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := api.NewClient(conn)
+
+	err := client.RemoveGroup(&apiparams.RemoveGroupRequest{
+		Name: "test-group",
+	})
+	c.Assert(err, gc.ErrorMatches, ".*not found.*")
+
+	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = client.RemoveGroup(&apiparams.RemoveGroupRequest{
+		Name: "test-group",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+}

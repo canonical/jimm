@@ -32,6 +32,12 @@ var (
 	Example:
 		jimmctl auth group rename <name> <new name>
 `
+	removeGroupDoc = `
+	rename command removes a group in jimm.
+
+	Example:
+		jimmctl auth group remove <name>
+`
 )
 
 // NewGroupCommand returns a command for group management.
@@ -43,6 +49,7 @@ func NewGroupCommand() *jujucmdv3.SuperCommand {
 	})
 	cmd.Register(newAddGroupCommand())
 	cmd.Register(newRenameGroupCommand())
+	cmd.Register(newRemoveGroupCommand())
 
 	return cmd
 }
@@ -172,6 +179,71 @@ func (c *renameGroupCommand) Run(ctxt *cmd.Context) error {
 
 	client := api.NewClient(apiCaller)
 	err = client.RenameGroup(&params)
+	if err != nil {
+		return errors.E(err)
+	}
+
+	return nil
+}
+
+// newRemoveGroupCommand returns a command to Remove a group.
+func newRemoveGroupCommand() cmd.Command {
+	cmd := &RemoveGroupCommand{
+		store: jujuclient.NewFileClientStore(),
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
+
+// RemoveGroupCommand Removes a group.
+type RemoveGroupCommand struct {
+	modelcmd.ControllerCommandBase
+	out cmd.Output
+
+	store    jujuclient.ClientStore
+	dialOpts *jujuapi.DialOpts
+
+	name string
+}
+
+func (c *RemoveGroupCommand) Info() *cmd.Info {
+	return jujucmd.Info(&cmd.Info{
+		Name:    "Remove",
+		Purpose: "Remove a group",
+		Doc:     removeGroupDoc,
+	})
+}
+
+// Init implements the cmd.Command interface.
+func (c *RemoveGroupCommand) Init(args []string) error {
+	if len(args) < 1 {
+		return errors.E("group name not specified")
+	}
+	c.name, args = args[0], args[1:]
+	if len(args) > 0 {
+		return errors.E("too many args")
+	}
+	return nil
+}
+
+// Run implements Command.Run.
+func (c *RemoveGroupCommand) Run(ctxt *cmd.Context) error {
+	currentController, err := c.store.CurrentController()
+	if err != nil {
+		return errors.E(err, "could not determine controller")
+	}
+
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", c.dialOpts)
+	if err != nil {
+		return err
+	}
+
+	params := apiparams.RemoveGroupRequest{
+		Name: c.name,
+	}
+
+	client := api.NewClient(apiCaller)
+	err = client.RemoveGroup(&params)
 	if err != nil {
 		return errors.E(err)
 	}

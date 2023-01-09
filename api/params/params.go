@@ -252,3 +252,8 @@ type RenameGroupRequest struct {
 	// NewName holds the new name of the group.
 	NewName string `json:"new-name"`
 }
+
+type RemoveGroupRequest struct {
+	// Name holds the name of the group.
+	Name string `json:"name"`
+}

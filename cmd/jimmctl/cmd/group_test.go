@@ -58,3 +58,24 @@ func (s *groupSuite) TestRenameGroup(c *gc.C) {
 	_, err := cmdtesting.RunCommand(c, cmd.NewRenameGroupCommandForTesting(s.ClientStore, bClient), "test-group", "renamed-group")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
+
+func (s *groupSuite) TestRemoveGroupSuperuser(c *gc.C) {
+	// alice is superuser
+	bClient := s.userBakeryClient("alice")
+
+	err := s.jimmSuite.JIMM.Database.AddGroup(context.TODO(), "test-group")
+	c.Assert(err, gc.IsNil)
+
+	_, err = cmdtesting.RunCommand(c, cmd.NewRemoveGroupCommandForTesting(s.ClientStore, bClient), "test-group")
+	c.Assert(err, gc.IsNil)
+
+	_, err = s.jimmSuite.JIMM.Database.GetGroup(context.TODO(), "test-group")
+	c.Assert(err, gc.ErrorMatches, "record not found")
+}
+
+func (s *groupSuite) TestRemoveGroup(c *gc.C) {
+	// bob is not superuser
+	bClient := s.userBakeryClient("bob")
+	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveGroupCommandForTesting(s.ClientStore, bClient), "test-group")
+	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+}
