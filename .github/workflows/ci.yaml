@@ -60,7 +60,6 @@ jobs:
           --cache-from candid:latest \
           --secret id=ghuser,env=GH_USER \
           --secret id=ghpat,env=GH_AUTH \
-          --ssh default \
           . -f ./Dockerfile -t candid
           docker image ls candid
       - name: Start test environment
