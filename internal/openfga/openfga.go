@@ -6,18 +6,6 @@ import (
 	openfga "github.com/openfga/go-sdk"
 )
 
-type OFGAClient struct {
-	api         openfga.OpenFgaApi
-	AuthModelId string
-}
-
-// ReadResponse takes what is necessary from the underlying OFGA ReadResponse and simplifies it
-// into a safe ready-to-use response.
-type ReadResponse struct {
-	Keys            []openfga.TupleKey
-	PaginationToken string
-}
-
 // OFGAClient contains convenient utility methods for interacting
 // with OpenFGA from OUR usecase. It wraps the provided pre-generated client
 // from OpenFGA.
@@ -32,12 +20,26 @@ type ReadResponse struct {
 //
 // In the above scenario, alex becomes an administrator due the the 'user' aka group:yellow being
 // an administrator.
+type OFGAClient struct {
+	api         openfga.OpenFgaApi
+	AuthModelId string
+}
+
+// ReadResponse takes what is necessary from the underlying OFGA ReadResponse and simplifies it
+// into a safe ready-to-use response.
+type ReadResponse struct {
+	Keys            []openfga.TupleKey
+	PaginationToken string
+}
+
+// NewOpenFGAClient returns a wrapped OpenFGA API client ensuring all calls are made to the provided
+// authorisation model (id) and returns what is necessary.
 func NewOpenFGAClient(a openfga.OpenFgaApi, authModelId string) *OFGAClient {
 	return &OFGAClient{api: a, AuthModelId: authModelId}
 }
 
-// addUsersToObject adds user(s) to the specified object by the specified relation within the tuple keys given.
-func (o *OFGAClient) addUsersToObject(ctx context.Context, t ...openfga.TupleKey) error {
+// addRelation adds user(s) to the specified object by the specified relation within the tuple keys given.
+func (o *OFGAClient) addRelation(ctx context.Context, t ...openfga.TupleKey) error {
 	wr := openfga.NewWriteRequest()
 	wr.SetAuthorizationModelId(o.AuthModelId)
 	keys := openfga.NewTupleKeys(t)
@@ -49,13 +51,13 @@ func (o *OFGAClient) addUsersToObject(ctx context.Context, t ...openfga.TupleKey
 	return nil
 }
 
-// getUsersObjects returns all objects where the user has a valid relation to them.
+// getRelatedObjects returns all objects where the user has a valid relation to them.
 // Such as all the groups a user resides in.
 //
 // The underlying tuple is managed by this method and as such you need only provide the "tuple_key" segment. See CreateTupleKey
 //
 // The results may be paginated via a pageSize and the initial returned pagination token from the first request.
-func (o *OFGAClient) getUsersObjects(ctx context.Context, t openfga.TupleKey, pageSize int32, paginationToken string) (*openfga.ReadResponse, error) {
+func (o *OFGAClient) getRelatedObjects(ctx context.Context, t openfga.TupleKey, pageSize int32, paginationToken string) (*openfga.ReadResponse, error) {
 	rr := openfga.NewReadRequest()
 
 	if pageSize != 0 {
@@ -86,7 +88,7 @@ func (o *OFGAClient) CreateTupleKey(object string, relation string, targetObject
 
 // AddRelations creates a tuple(s) from the provided keys. See CreateTupleKey for creating keys.
 func (o *OFGAClient) AddRelations(ctx context.Context, keys ...openfga.TupleKey) error {
-	return o.addUsersToObject(ctx, keys...)
+	return o.addRelation(ctx, keys...)
 }
 
 // ReadRelations reads a relation(s) from the provided key where a match can be found.
@@ -98,7 +100,7 @@ func (o *OFGAClient) AddRelations(ctx context.Context, keys ...openfga.TupleKey)
 // You may read via pagination utilising the token returned from the request.
 func (o *OFGAClient) ReadRelations(ctx context.Context, key openfga.TupleKey, pageSize int32, paginationToken string) (*ReadResponse, error) {
 	keys := []openfga.TupleKey{}
-	res, err := o.getUsersObjects(ctx, key, pageSize, paginationToken)
+	res, err := o.getRelatedObjects(ctx, key, pageSize, paginationToken)
 	if err != nil {
 		return nil, err
 	}

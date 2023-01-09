@@ -13,13 +13,13 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type OpenFGATestSuite struct {
+type openFGATestSuite struct {
 	suite.Suite
 	ofgaClient *ofga.OFGAClient
 	ofgaApi    openfga.OpenFgaApi
 }
 
-func (suite *OpenFGATestSuite) SetupSuite() {
+func (suite *openFGATestSuite) SetupSuite() {
 	cfg, _ := openfga.NewConfiguration(openfga.Configuration{
 		ApiScheme: "http",
 		ApiHost:   "localhost:8080",
@@ -36,7 +36,7 @@ func (suite *OpenFGATestSuite) SetupSuite() {
 
 }
 
-func (suite *OpenFGATestSuite) TestCreateTupleKey() {
+func (suite *openFGATestSuite) TestCreateTupleKey() {
 	t := suite.T()
 	key := suite.ofgaClient.CreateTupleKey("user:diglett", "legendary", "pokemon:earth")
 	assert.Equal(t, "user:diglett", key.GetUser())
@@ -44,7 +44,7 @@ func (suite *OpenFGATestSuite) TestCreateTupleKey() {
 	assert.Equal(t, "pokemon:earth", key.GetObject())
 }
 
-func (suite *OpenFGATestSuite) TestWritingTuplesToOFGADetectsBadObjects() {
+func (suite *openFGATestSuite) TestWritingTuplesToOFGADetectsBadObjects() {
 	t := suite.T()
 	ctx := context.Background()
 	key1 := suite.ofgaClient.CreateTupleKey("user:diglett", "legendary", "pokemon:earth")
@@ -62,7 +62,7 @@ func (suite *OpenFGATestSuite) TestWritingTuplesToOFGADetectsBadObjects() {
 	assert.ErrorContains(t, serr, "pokemon")
 }
 
-func (suite *OpenFGATestSuite) TestWritingTuplesToOFGADetectsSucceeds() {
+func (suite *openFGATestSuite) TestWritingTuplesToOFGADetectsSucceeds() {
 	t := suite.T()
 	ctx := context.Background()
 
@@ -87,5 +87,5 @@ func (suite *OpenFGATestSuite) TestWritingTuplesToOFGADetectsSucceeds() {
 }
 
 func TestOpenFGATestSuite(t *testing.T) {
-	suite.Run(t, new(OpenFGATestSuite))
+	suite.Run(t, new(openFGATestSuite))
 }

@@ -178,9 +178,6 @@ func (c *Client) ListRelations() error {
 
 // GetAuthorisationModel returns the current authorisation model within
 // OpenFGA.
-//
-// TODO(ale8k): This is kinda dangerous and should probably be gated by a
-// debug flag rather than just authn.
 func (c *Client) GetAuthorisationModel() error {
 	return c.caller.APICall("JIMM", 4, "", "GetAuthorisationModel", nil, nil)
 }

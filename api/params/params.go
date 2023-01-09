@@ -241,14 +241,12 @@ type ImportModelRequest struct {
 // Authorisation request parameters / responses:
 
 // AddGroupRequest holds a request to add a group.
-// This may be add/remove/rename.
 type AddGroupRequest struct {
 	// Name holds the name of the group.
 	Name string `json:"name"`
 }
 
 // DeleteGroupRequest holds a request to delete a group.
-// This may be add/remove/rename.
 type DeleteGroupRequest struct {
 	// Name holds the name of the group.
 	Name string `json:"name"`
@@ -263,7 +261,7 @@ type RenameGroupRequest struct {
 	NewName string `json:"new-name"`
 }
 
-// Group holds the details of a group currently residing in OpenFGA.
+// Group holds the details of a group currently residing in JIMM.
 type Group struct {
 	Name      string `json:"name"`
 	CreatedAt string `json:"created_at"`
