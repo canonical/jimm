@@ -5,7 +5,6 @@ package jimm_test
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -17,7 +16,6 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
-	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/client/cloud"
 	jujucloud "github.com/juju/juju/cloud"
@@ -29,16 +27,6 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	err := jimmtest.StartVault()
-	if err != nil {
-		log.Printf("error starting vault: %s\n", err)
-	}
-	defer jimmtest.StopVault()
-	err = jimmtest.StartOpenFGA()
-	if err != nil {
-		log.Printf("error starting OpenFGA: %s\n", err)
-	}
-	defer jimmtest.StopOpenFGA()
 	code := m.Run()
 	os.Exit(code)
 }
@@ -108,10 +96,15 @@ func TestVault(t *testing.T) {
 	c := qt.New(t)
 
 	p := jimm.Params{
-		ControllerUUID: "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		ControllerUUID:  "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		VaultAddress:    "http://localhost:8200",
+		VaultAuthPath:   "/auth/approle/login",
+		VaultPath:       "/jimm-kv/",
+		VaultSecretFile: "./local/vault/approle.yaml",
 	}
 	candid := startCandid(c, &p)
-	vaultClient, creds := startVault(c, &p)
+	vaultClient, _, creds, _ := jimmtest.VaultClient(c, ".")
+
 	svc, err := jimm.NewService(context.Background(), p)
 	c.Assert(err, qt.IsNil)
 
@@ -162,8 +155,11 @@ func TestOpenFGA(t *testing.T) {
 	p := jimm.Params{
 		ControllerUUID: "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
 		OpenFGAParams: jimm.OpenFGAParams{
-			Scheme: "http",
-			Host:   "127.0.0.1:8082",
+			Scheme:    "http",
+			Host:      "127.0.0.1:8080",
+			Token:     "jimm",                       // Hardcoded token from docker-compose
+			Store:     "01GP1254CHWJC1MNGVB0WDG1T0", // Hardcoded store-id from docker-compose
+			AuthModel: "01GP1EC038KHGB6JJ2XXXXCXKB", // Hardcoded auth model id from docker-compose
 		},
 	}
 	candid := startCandid(c, &p)
@@ -239,24 +235,4 @@ func key(candid *candidtest.Server, user string) *bakery.KeyPair {
 		Public:  bakery.PublicKey{Key: bakery.Key(key.Public.Key)},
 		Private: bakery.PrivateKey{Key: bakery.Key(key.Private.Key)},
 	}
-}
-
-func startVault(c *qt.C, p *jimm.Params) (*vaultapi.Client, map[string]interface{}) {
-	client, path, creds, ok := jimmtest.VaultClient(c)
-	if !ok {
-		c.Skip("vault not available")
-	}
-	p.VaultAddress = client.Address()
-	p.VaultPath = path
-
-	authSecret := vaultapi.Secret{
-		Data: creds,
-	}
-	buf, err := json.Marshal(authSecret)
-	c.Assert(err, qt.IsNil)
-	p.VaultSecretFile = filepath.Join(c.TempDir(), "approle.json")
-	err = os.WriteFile(p.VaultSecretFile, buf, 0400)
-	c.Assert(err, qt.IsNil)
-	p.VaultAuthPath = jimmtest.VaultAuthPath
-	return client, creds
 }

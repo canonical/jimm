@@ -52,19 +52,20 @@ func start(ctx context.Context, s *service.Service) error {
 		DashboardLocation: os.Getenv("JIMM_DASHBOARD_LOCATION"),
 		PublicDNSName:     os.Getenv("JIMM_DNS_NAME"),
 		OpenFGAParams: jimm.OpenFGAParams{
-			Scheme: os.Getenv("OPENFGA_SCHEME"),
-			Host:   os.Getenv("OPENFGA_HOST"),
-			Store:  os.Getenv("OPENFGA_STORE"),
-			Token:  os.Getenv("OPENFGA_TOKEN"),
-			Port:   os.Getenv("OPENFGA_PORT"),
+			Scheme:    os.Getenv("OPENFGA_SCHEME"),
+			Host:      os.Getenv("OPENFGA_HOST"),
+			Store:     os.Getenv("OPENFGA_STORE"),
+			AuthModel: os.Getenv("OPENFGA_AUTH_MODEL"),
+			Token:     os.Getenv("OPENFGA_TOKEN"),
+			Port:      os.Getenv("OPENFGA_PORT"),
 		},
 	})
 	if err != nil {
 		return err
 	}
 	if os.Getenv("JIMM_WATCH_CONTROLLERS") != "" {
-		s.Go(func() error { return jimmsvc.WatchControllers(ctx) })
-		s.Go(func() error { return jimmsvc.PollModels(ctx) })
+		s.Go(func() error { return jimmsvc.WatchControllers(ctx) }) // Deletes dead/dying models, updates model config.
+		s.Go(func() error { return jimmsvc.PollModels(ctx) })       // Poll for access control changes on the controller.
 	}
 	s.Go(func() error { return jimmsvc.WatchModelSummaries(ctx) })
 	// TODO(mhilton) access logs?

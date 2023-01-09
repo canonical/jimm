@@ -10,9 +10,9 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	semversion "github.com/juju/version"
 
@@ -172,17 +172,14 @@ func TestAddController(t *testing.T) {
 func TestAddControllerWithVault(t *testing.T) {
 	c := qt.New(t)
 
-	jimmtest.StartVault()
-	defer jimmtest.StopVault()
-
-	client, path, creds, ok := jimmtest.VaultClient(c)
+	client, path, creds, ok := jimmtest.VaultClient(c, "../../")
 	if !ok {
 		c.Skip("vault not available")
 	}
 	store := &vault.VaultStore{
 		Client:     client,
 		AuthSecret: creds,
-		AuthPath:   jimmtest.VaultAuthPath,
+		AuthPath:   "/auth/approle/login",
 		KVPath:     path,
 	}
 

@@ -113,7 +113,71 @@ func (c *Client) UpdateMigratedModel(req *params.UpdateMigratedModelRequest) err
 	return c.caller.APICall("JIMM", 3, "", "UpdateMigratedModel", req, nil)
 }
 
+// Authorisation RPC commands
+
+// User Groups
 // AddGroup adds the group to JIMM.
 func (c *Client) AddGroup(req *params.AddGroupRequest) error {
 	return c.caller.APICall("JIMM", 4, "", "AddGroup", req, nil)
+}
+
+// RemoveGroup removes the group from JIMM.
+func (c *Client) RemoveGroup(req *params.DeleteGroupRequest) error {
+	return c.caller.APICall("JIMM", 4, "", "RemoveGroup", req, nil)
+}
+
+// RenameGroup renames the group in JIMM.
+func (c *Client) RenameGroup(req *params.RenameGroupRequest) error {
+	return c.caller.APICall("JIMM", 4, "", "RenameGroup", req, nil)
+}
+
+// RenameGroup renames the group in JIMM.
+func (c *Client) ListGroups() ([]params.Group, error) {
+	var resp params.ListGroupResponse
+	err := c.caller.APICall("JIMM", 4, "", "ListGroups", nil, &resp)
+	return resp.Groups, err
+}
+
+// Tuple management
+
+// AddRelation adds a relational tuple in JIMM.
+func (c *Client) AddRelation(req *params.ModifyRelationRequest) error {
+	return c.caller.APICall("JIMM", 4, "", "AddRelation", req, nil)
+}
+
+// RemoveRelation removes a relational tuple in JIMM.
+func (c *Client) RemoveRelation(req *params.ModifyRelationRequest) error {
+	return c.caller.APICall("JIMM", 4, "", "RemoveRelation", req, nil)
+}
+
+// CheckRelation verifies that the object graph reaches the provided
+// relation for a given user/group, relation and target object.
+// This object could be another group, model, controller, etc.
+// This command corresponds directly to:
+// https://openfga.dev/api/service#/Relationship%20Queries/Check
+func (c *Client) CheckRelation() error {
+	return c.caller.APICall("JIMM", 4, "", "CheckRelation", nil, nil)
+}
+
+// ListRelations returns all objects where the relation matches the parameterised
+// query.
+// For example:
+// Given we have a model tuple A
+// and a relation of 'write' (which points to users)
+// We may query model:a relation:write to retrieves all the users
+// with write access.
+//
+// See https://openfga.dev/api/service#/Relationship%20Queries/Expand
+// for more.
+// TODO(ale8k): Confirm this is what we want.
+func (c *Client) ListRelations() error {
+	return c.caller.APICall("JIMM", 4, "", "ListRelations", nil, nil)
+}
+
+// Auth model management
+
+// GetAuthorisationModel returns the current authorisation model within
+// OpenFGA.
+func (c *Client) GetAuthorisationModel() error {
+	return c.caller.APICall("JIMM", 4, "", "GetAuthorisationModel", nil, nil)
 }

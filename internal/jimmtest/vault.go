@@ -3,92 +3,13 @@
 package jimmtest
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
-	"strings"
+	"path"
 
 	"github.com/hashicorp/vault/api"
-
-	"github.com/CanonicalLtd/jimm/internal/errors"
 )
-
-// VaultAuthPath contains the path that is configured automatically to
-// allow authentication.
-const VaultAuthPath = "/auth/approle/login"
-
-const vaultRootToken = "jimmtest-vault-root-token"
-
-var vaultCmd *exec.Cmd
-var vaultRootClient *api.Client
-
-func checkVaultRunning() error {
-	if os.Getenv("VAULT_ADDR") == "" ||
-		os.Getenv("VAULT_AUTH_PATH") == "" ||
-		os.Getenv("VAULT_PATH") == "" ||
-		os.Getenv("VAULT_SECRET_FILE") == "" {
-		return errors.E("missing vault configuration")
-	}
-
-	statusCmd := exec.Command("vault", "status", "--format=json")
-	err := statusCmd.Run()
-	if err != nil {
-		return errors.E(err, "failed to get vault status")
-	}
-	return nil
-}
-
-// StartVault starts and initialises a vault service.
-func StartVault() error {
-	if vaultCmd != nil {
-		return errors.E("vault already started")
-	}
-	if checkVaultRunning() != nil {
-		return errors.E("vault is running")
-	}
-	vaultCmd = exec.Command("vault", "server", "-dev", "-dev-no-store-token", "-dev-root-token-id="+vaultRootToken)
-	if err := vaultCmd.Start(); err != nil {
-		return err
-	}
-	cfg := api.DefaultConfig()
-	if addr := os.Getenv("VAULT_DEV_LISTEN_ADDRESS"); addr != "" {
-		cfg.Address = "http://" + addr
-	} else {
-		cfg.Address = "http://127.0.0.1:8200"
-	}
-	var err error
-	vaultRootClient, err = api.NewClient(cfg)
-	if err != nil {
-		return err
-	}
-	vaultRootClient.SetToken(vaultRootToken)
-	err = vaultRootClient.Sys().EnableAuthWithOptions("approle", &api.EnableAuthOptions{
-		Type: "approle",
-	})
-	if err != nil {
-		vaultRootClient = nil
-		return err
-	}
-	err = vaultRootClient.Sys().Mount("/kv", &api.MountInput{
-		Type: "kv",
-		Config: api.MountConfigInput{
-			Options: map[string]string{
-				"version": "1",
-			},
-		},
-	})
-	if err != nil {
-		vaultRootClient = nil
-		return err
-	}
-	return nil
-}
-
-const policyTemplate = `
-path "kv/%s/*" {
-    capabilities = ["create", "read", "update", "delete"]
-}
-`
 
 type fatalF interface {
 	Name() string
@@ -96,53 +17,24 @@ type fatalF interface {
 }
 
 // VaultClient returns a new vault client for use in a test.
-func VaultClient(tb fatalF) (client *api.Client, path string, creds map[string]interface{}, ok bool) {
-	if vaultRootClient == nil {
-		return nil, "", nil, false
-	}
-	name := strings.ReplaceAll(tb.Name(), "/", "_")
-	err := vaultRootClient.Sys().PutPolicy(name, fmt.Sprintf(policyTemplate, name))
-	if err != nil {
-		tb.Fatalf("error initialising policy: %s", err)
-	}
-	_, err = vaultRootClient.Logical().Write("/auth/approle/role/"+name, map[string]interface{}{
-		"token_ttl":      "30s",
-		"token_max_ttl":  "60s",
-		"token_policies": name,
-	})
-	if err != nil {
-		tb.Fatalf("error initialising approle: %s", err)
-	}
-	s, err := vaultRootClient.Logical().Read("/auth/approle/role/" + name + "/role-id")
-	if err != nil {
-		tb.Fatalf("error initialising approle: %s", err)
-	}
-	creds = make(map[string]interface{})
-	creds["role_id"] = s.Data["role_id"]
-	s, err = vaultRootClient.Logical().Write("/auth/approle/role/"+name+"/secret-id", nil)
-	if err != nil {
-		tb.Fatalf("error initialising approle: %s", err)
-	}
-	creds["secret_id"] = s.Data["secret_id"]
-	client, err = vaultRootClient.Clone()
-	if err != nil {
-		tb.Fatalf("error creating client: %s", err)
-	}
-	client.ClearToken()
-	return client, "/kv/" + name, creds, true
-}
+func VaultClient(tb fatalF, prefix string) (*api.Client, string, map[string]interface{}, bool) {
+	cfg := api.DefaultConfig()
+	cfg.Address = "http://localhost:8200"
+	vaultClient, _ := api.NewClient(cfg)
 
-// StopVault stops any running vault server. VaultStop must only be called
-// once any tests that might be using the vault server have finished.
-func StopVault() {
-	if vaultCmd == nil || vaultCmd.Process == nil {
-		return
+	b, err := os.ReadFile(path.Join(prefix, "./local/vault/approle.yaml"))
+	if err != nil {
+		fmt.Println("we got file?")
 	}
-	if err := vaultCmd.Process.Signal(os.Interrupt); err != nil {
-		return
+
+	creds := make(map[string]interface{})
+	var vaultAPISecret api.Secret
+	err = json.Unmarshal(b, &vaultAPISecret)
+	if err != nil {
+		fmt.Println("error?")
 	}
-	if err := vaultCmd.Wait(); err != nil {
-		return
-	}
-	vaultCmd = nil
+	creds["role_id"] = vaultAPISecret.Data["role_id"]
+	creds["secret_id"] = vaultAPISecret.Data["secret_id"]
+
+	return vaultClient, "/jimm-kv/", creds, true
 }
