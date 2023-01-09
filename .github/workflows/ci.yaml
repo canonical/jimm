@@ -53,15 +53,15 @@ jobs:
       - name: Pull candid repo for test environment
         run: |
           git clone https://github.com/canonical/candid.git ./tmp/candid
-	        cd ./tmp/candid
+          cd ./tmp/candid
           docker build \
-            --build-arg AUTH_TYPE=pat \
-            --cache-from candid:latest \
-            --secret id=ghuser,env=GH_USER \
-            --secret id=ghpat,env=GH_AUTH \
-            --ssh default \
-            . -f ./Dockerfile -t candid
-	        docker image ls candid
+          --build-arg AUTH_TYPE=pat \
+          --cache-from candid:latest \
+          --secret id=ghuser,env=GH_USER \
+          --secret id=ghpat,env=GH_AUTH \
+          --ssh default \
+          . -f ./Dockerfile -t candid
+          docker image ls candid
       - name: Start test environment
         run: docker compose up -d
       # - name: Install vault
