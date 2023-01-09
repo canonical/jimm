@@ -2,11 +2,16 @@ package jujuapi
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
 	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/juju/names/v4"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
+	openfga "github.com/openfga/go-sdk"
+	"go.uber.org/zap"
 )
 
 // access_control contains the primary RPC commands for handling ReBAC within JIMM via the JIMM facade itself.
@@ -54,8 +59,67 @@ func (r *controllerRoot) ListGroups(ctx context.Context) error {
 
 // AddRelation creates a tuple between two objects [if applicable]
 // within OpenFGA.
-func (r *controllerRoot) AddRelation(ctx context.Context) error {
-	return errors.E("Not implemented.")
+func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelationRequest) error {
+	const op = errors.Op("jujuapi.AddRelation")
+	// names.UserTag  // user:<name>@<domain>
+	// names.ModelTag // model:<model uuid>
+	// names.ControllerTag
+	// names.ApplicationOfferTag
+
+	extractTag := func(key string) (names.Tag, error) {
+		k := strings.Split(key, ":")
+		objectType := k[0]
+		objectId := k[1]
+		err := errors.E(op, "could not determine tag type")
+		switch objectType {
+		case "user":
+			return names.ParseUserTag(objectId)
+		case "model":
+			return names.ParseModelTag(objectId)
+		case "controller":
+			return names.ParseControllerTag(objectId)
+		case "applicationoffer":
+			return names.ParseApplicationTag(objectId)
+		default:
+			return nil, err
+		}
+	}
+
+	ofc := r.ofgaClient
+	keys := []openfga.TupleKey{}
+	for _, t := range req.Tuples {
+		userObject := ""
+		// We manually validate the user object as OpenFGA doesn't currently run
+		// the auth model against it to verify it is a valid object type.
+		tag, err := extractTag(t.Object)
+		if err != nil {
+			return errors.E(op, fmt.Sprintf("failed to validate tag for object: %s", t.Object), err)
+		}
+		// Now we know the tag is valid, we can go ahead and format it into a valid OpenFGA
+		// object type and id
+		switch t := tag.(type) {
+		case names.UserTag:
+			userObject = fmt.Sprintf("%s:%s", "user", t.Name())
+			if t.Domain() != "" {
+				userObject = fmt.Sprintf("%s@%s", userObject, t.Domain())
+			}
+		case names.ModelTag:
+			userObject = fmt.Sprintf("model:%s", t.Id())
+		case names.ControllerTag:
+			userObject = fmt.Sprintf("controller:%s", t.Id())
+		case names.ApplicationOfferTag:
+			userObject = fmt.Sprintf("applicationoffer:%s", t.Id())
+		}
+
+		keys = append(keys, ofc.CreateTupleKey(userObject, t.Relation, t.TargetObject))
+	}
+
+	err := r.ofgaClient.AddRelations(ctx, keys...)
+	if err != nil {
+		zapctx.Error(ctx, "failed to add tuple(s)", zap.NamedError("add-relation-error", err))
+		return errors.E(op, err)
+	}
+	return nil
 }
 
 // RemoveRelation removes a tuple between two objects [if applicable]
