@@ -6,8 +6,8 @@ import (
 	"context"
 	"fmt"
 
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/network"
+	jujuparams "github.com/juju/juju/rpc/params"
 	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
@@ -100,17 +100,14 @@ func (t *cExtended) Name() string {
 }
 
 func (s *dialSuite) TestDialWithCredentialsStoredInVault(c *gc.C) {
-	jimmtest.StartVault()
-	defer jimmtest.StopVault()
-
-	client, path, creds, ok := jimmtest.VaultClient(&cExtended{c})
+	client, path, creds, ok := jimmtest.VaultClient(&cExtended{c}, "../../")
 	if !ok {
 		c.Skip("vault not available")
 	}
 	store := &vault.VaultStore{
 		Client:     client,
 		AuthSecret: creds,
-		AuthPath:   jimmtest.VaultAuthPath,
+		AuthPath:   "/auth/approle/login",
 		KVPath:     path,
 	}
 

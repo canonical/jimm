@@ -238,8 +238,16 @@ type ImportModelRequest struct {
 	ModelTag string `json:"model-tag"`
 }
 
+// Authorisation request parameters / responses:
+
 // AddGroupRequest holds a request to add a group.
 type AddGroupRequest struct {
+	// Name holds the name of the group.
+	Name string `json:"name"`
+}
+
+// DeleteGroupRequest holds a request to delete a group.
+type DeleteGroupRequest struct {
 	// Name holds the name of the group.
 	Name string `json:"name"`
 }
@@ -256,4 +264,35 @@ type RenameGroupRequest struct {
 type RemoveGroupRequest struct {
 	// Name holds the name of the group.
 	Name string `json:"name"`
+	
+// Group holds the details of a group currently residing in JIMM.
+type Group struct {
+	Name      string `json:"name"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+// ListGroupResponse returns the group tuples currently residing within OpenFGA.
+type ListGroupResponse struct {
+	Groups []Group `json:"name"`
+}
+
+// ModifyRelationRequest holds a request to modify a relation (tuple).
+// This is an abstracted concept from OpenFGA as OpenFGA works with tuples
+// which implicitly bind to one another, from a users perspective this may
+// appear confusing, and as they only care about scenarios such as:
+//
+// 'adding/removing/modifying a user from/to a group/auth set'
+// It is better to restrict this down.
+//
+// We've further only considered single updates as of now, but
+// TODO: discuss if we should accept bulk here. It shouldn't be difficult to add either.
+type ModifyRelationRequest struct {
+	// Object represents an OFGA object that we wish to apply a relational tuple to.
+	Object string `json:"user"`
+	// Relation is exactly that, the kind of relation this request modifies.
+	Relation string `json:"relation"`
+	// The target object is the kind of object we wish to create/remove a tuple for with
+	// the provided relation.
+	TargetObject string `json:"object"`
 }

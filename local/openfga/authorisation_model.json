@@ -1,0 +1,142 @@
+{
+    "type_definitions": [
+        {
+            "type": "user",
+            "relations": {}
+        },
+        {
+            "type": "group",
+            "relations": {
+                "member": {
+                    "this": {}
+                }
+            }
+        },
+        {
+            "type": "controller",
+            "relations": {
+                "administrator": {
+                    "this": {}
+                }
+            }
+        },
+        {
+            "type": "model",
+            "relations": {
+                "controller": {
+                    "this": {}
+                },
+                "administrator": {
+                    "union": {
+                        "child": [
+                            {
+                                "this": {}
+                            },
+                            {
+                                "tupleToUserset": {
+                                    "tupleset": {
+                                        "object": "",
+                                        "relation": "controller"
+                                    },
+                                    "computedUserset": {
+                                        "object": "",
+                                        "relation": "administrator"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                "writer": {
+                    "union": {
+                        "child": [
+                            {
+                                "this": {}
+                            },
+                            {
+                                "computedUserset": {
+                                    "object": "",
+                                    "relation": "administrator"
+                                }
+                            }
+                        ]
+                    }
+                },
+                "reader": {
+                    "union": {
+                        "child": [
+                            {
+                                "this": {}
+                            },
+                            {
+                                "computedUserset": {
+                                    "object": "",
+                                    "relation": "writer"
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "type": "applicationoffer",
+            "relations": {
+                "controller": {
+                    "this": {}
+                },
+                "administrator": {
+                    "union": {
+                        "child": [
+                            {
+                                "this": {}
+                            },
+                            {
+                                "tupleToUserset": {
+                                    "tupleset": {
+                                        "object": "",
+                                        "relation": "controller"
+                                    },
+                                    "computedUserset": {
+                                        "object": "",
+                                        "relation": "administrator"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                "consumer": {
+                    "union": {
+                        "child": [
+                            {
+                                "this": {}
+                            },
+                            {
+                                "computedUserset": {
+                                    "object": "",
+                                    "relation": "administrator"
+                                }
+                            }
+                        ]
+                    }
+                },
+                "reader": {
+                    "union": {
+                        "child": [
+                            {
+                                "this": {}
+                            },
+                            {
+                                "computedUserset": {
+                                    "object": "",
+                                    "relation": "consumer"
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    ]
+}

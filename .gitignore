@@ -10,3 +10,7 @@
 /vendor
 /version/commit.txt
 /version/version.txt
+/tmp
+/local/vault/approle.yaml
+local/vault/approle.yaml
+local/vault/roleid.txt

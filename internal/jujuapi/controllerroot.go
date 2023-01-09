@@ -13,6 +13,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
+	ofgaClient "github.com/CanonicalLtd/jimm/internal/openfga"
 )
 
 // controllerRoot is the root for endpoints served on controller connections.
@@ -29,6 +30,7 @@ type controllerRoot struct {
 	user                  *dbmodel.User
 	controllerUUIDMasking bool
 	generator             *fastuuid.Generator
+	ofgaClient            *ofgaClient.OFGAClient
 }
 
 func newControllerRoot(j *jimm.JIMM, p Params) *controllerRoot {
@@ -41,6 +43,9 @@ func newControllerRoot(j *jimm.JIMM, p Params) *controllerRoot {
 		watchers:              watcherRegistry,
 		pingF:                 func() {},
 		controllerUUIDMasking: true,
+	}
+	if j != nil && j.OpenFGAClient != nil {
+		r.ofgaClient = j.OpenFGAClient
 	}
 
 	r.AddMethod("Admin", 1, "Login", rpc.Method(unsupportedLogin))
