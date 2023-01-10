@@ -15,10 +15,16 @@ import urllib
 
 import hvac
 from charmhelpers.contrib.charmsupport.nrpe import NRPE
+from charms.openfga_k8s.v0.openfga import OpenFGARequires, OpenFGAStoreCreateEvent
 from jinja2 import Environment, FileSystemLoader
 from ops.main import main
-from ops.model import (ActiveStatus, BlockedStatus, MaintenanceStatus,
-                       ModelError, WaitingStatus)
+from ops.model import (
+    ActiveStatus,
+    BlockedStatus,
+    MaintenanceStatus,
+    ModelError,
+    WaitingStatus,
+)
 
 from systemd import SystemdCharm
 
@@ -31,25 +37,42 @@ class JimmCharm(SystemdCharm):
     def __init__(self, *args):
         super().__init__(*args)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
-        self.framework.observe(self.on.db_relation_changed, self._on_db_relation_changed)
+        self.framework.observe(
+            self.on.db_relation_changed, self._on_db_relation_changed
+        )
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.stop, self._on_stop)
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.framework.observe(self.on.upgrade_charm, self._on_upgrade_charm)
-        self.framework.observe(self.on.nrpe_relation_joined, self._on_nrpe_relation_joined)
-        self.framework.observe(self.on.website_relation_joined, self._on_website_relation_joined)
-        self.framework.observe(self.on.vault_relation_joined, self._on_vault_relation_joined)
-        self.framework.observe(self.on.vault_relation_changed, self._on_vault_relation_changed)
-        self.framework.observe(self.on.dashboard_relation_joined,
-                               self._on_dashboard_relation_joined)
+        self.framework.observe(
+            self.on.nrpe_relation_joined, self._on_nrpe_relation_joined
+        )
+        self.framework.observe(
+            self.on.website_relation_joined, self._on_website_relation_joined
+        )
+        self.framework.observe(
+            self.on.vault_relation_joined, self._on_vault_relation_joined
+        )
+        self.framework.observe(
+            self.on.vault_relation_changed, self._on_vault_relation_changed
+        )
+        self.framework.observe(
+            self.on.dashboard_relation_joined, self._on_dashboard_relation_joined
+        )
         self._agent_filename = "/var/snap/jimm/common/agent.json"
         self._vault_secret_filename = "/var/snap/jimm/common/vault_secret.json"
         self._workload_filename = "/snap/bin/jimm"
         self._dashboard_path = "/var/snap/jimm/common/dashboard"
         self._rsyslog_conf_path = "/etc/rsyslog.d/10-jimm.conf"
         self._logrotate_conf_path = "/etc/logrotate.d/jimm"
+
+        self.openfga = OpenFGARequires(self, "jimm")
+        self.framework.observe(
+            self.openfga.on.openfga_store_created,
+            self._on_openfga_store_created,
+        )
 
     def _on_install(self, _):
         """Install the JIMM software."""
@@ -81,29 +104,33 @@ class JimmCharm(SystemdCharm):
         config."""
 
         args = {
-            "admins": self.config.get('controller-admins', ''),
+            "admins": self.config.get("controller-admins", ""),
             "bakery_agent_file": self._bakery_agent_file(),
-            "candid_url": self.config.get('candid-url'),
-            "dns_name": self.config.get('dns-name'),
-            "log_level": self.config.get('log-level'),
-            "uuid": self.config.get('uuid'),
-            "dashboard_location": self.config.get('juju-dashboard-location')
+            "candid_url": self.config.get("candid-url"),
+            "dns_name": self.config.get("dns-name"),
+            "log_level": self.config.get("log-level"),
+            "uuid": self.config.get("uuid"),
+            "dashboard_location": self.config.get("juju-dashboard-location"),
         }
         if os.path.exists(self._dashboard_path):
             args["dashboard_location"] = self._dashboard_path
+
         with open(self._env_filename(), "wt") as f:
-            f.write(self._render_template('jimm.env', **args))
+            f.write(self._render_template("jimm.env", **args))
+
         if self._ready():
             self.restart()
         self._on_update_status(None)
 
         dashboard_relation = self.model.get_relation("dashboard")
         if dashboard_relation:
-            dashboard_relation.data[self.app].update({
-                'controller-url': self.config['dns-name'],
-                'identity-provider-url': self.config['candid-url'],
-                'is-juju': str(False),
-            })
+            dashboard_relation.data[self.app].update(
+                {
+                    "controller-url": self.config["dns-name"],
+                    "identity-provider-url": self.config["candid-url"],
+                    "is-juju": str(False),
+                }
+            )
 
     def _on_leader_elected(self, _):
         """Update the JIMM configuration that comes from unit
@@ -127,7 +154,7 @@ class JimmCharm(SystemdCharm):
             return
         args = {"dsn": "pgx:" + dsn}
         with open(self._env_filename("db"), "wt") as f:
-            f.write(self._render_template('jimm-db.env', **args))
+            f.write(self._render_template("jimm-db.env", **args))
         if self._ready():
             self.restart()
         self._on_update_status(None)
@@ -168,9 +195,9 @@ class JimmCharm(SystemdCharm):
         nrpe.add_check(
             shortname="JIMM",
             description="check JIMM running",
-            check_cmd='check_http -w 2 -c 10 -I {} -p 8080 -u /debug/info'.format(
+            check_cmd="check_http -w 2 -c 10 -I {} -p 8080 -u /debug/info".format(
                 self.model.get_binding(event.relation).network.ingress_address,
-            )
+            ),
         )
         nrpe.write()
 
@@ -179,12 +206,18 @@ class JimmCharm(SystemdCharm):
         event.relation.data[self.unit]["port"] = "8080"
 
     def _on_vault_relation_joined(self, event):
-        event.relation.data[self.unit]['secret_backend'] = json.dumps("charm-jimm-creds")
-        event.relation.data[self.unit]['hostname'] = json.dumps(socket.gethostname())
-        event.relation.data[self.unit]['access_address'] = \
-            json.dumps(str(
-                self.model.get_binding(event.relation).network.egress_subnets[0].network_address))
-        event.relation.data[self.unit]['isolated'] = json.dumps(False)
+        event.relation.data[self.unit]["secret_backend"] = json.dumps(
+            "charm-jimm-creds"
+        )
+        event.relation.data[self.unit]["hostname"] = json.dumps(socket.gethostname())
+        event.relation.data[self.unit]["access_address"] = json.dumps(
+            str(
+                self.model.get_binding(event.relation)
+                .network.egress_subnets[0]
+                .network_address
+            )
+        )
+        event.relation.data[self.unit]["isolated"] = json.dumps(False)
 
     def _on_vault_relation_changed(self, event):
         if not os.path.exists(os.path.dirname(self._vault_secret_filename)):
@@ -192,7 +225,7 @@ class JimmCharm(SystemdCharm):
             event.defer()
             return
 
-        addr = _json_data(event, 'vault_url')
+        addr = _json_data(event, "vault_url")
         if not addr:
             return
         role_id = _json_data(event, "{}_role_id".format(self.unit.name))
@@ -203,14 +236,14 @@ class JimmCharm(SystemdCharm):
             return
         client = hvac.Client(url=addr, token=token)
         secret = client.sys.unwrap()
-        secret['data']['role_id'] = role_id
+        secret["data"]["role_id"] = role_id
         with open(self._vault_secret_filename, "wt") as f:
             json.dump(secret, f)
         args = {
             "vault_secret_file": self._vault_secret_filename,
             "vault_addr": addr,
             "vault_auth_path": "/auth/approle/login",
-            "vault_path": "charm-jimm-creds"
+            "vault_path": "charm-jimm-creds",
         }
         with open(self._env_filename("vault"), "wt") as f:
             f.write(self._render_template("jimm-vault.env", **args))
@@ -224,7 +257,7 @@ class JimmCharm(SystemdCharm):
         if not path:
             self.unit.status = BlockedStatus("waiting for jimm-snap resource")
             return
-        self._snap('install', '--dangerous', path)
+        self._snap("install", "--dangerous", path)
 
     def _install_dashboard(self):
         try:
@@ -236,8 +269,8 @@ class JimmCharm(SystemdCharm):
             return
 
         if self._dashboard_resource_nonempty():
-            new_dashboard_path = self._dashboard_path + '.new'
-            old_dashboard_path = self._dashboard_path + '.old'
+            new_dashboard_path = self._dashboard_path + ".new"
+            old_dashboard_path = self._dashboard_path + ".old"
             shutil.rmtree(new_dashboard_path, ignore_errors=True)
             shutil.rmtree(old_dashboard_path, ignore_errors=True)
             os.mkdir(new_dashboard_path)
@@ -256,26 +289,31 @@ class JimmCharm(SystemdCharm):
 
     def _setup_logging(self):
         """Install the logging configuration."""
-        shutil.copy(os.path.join(self.charm_dir, "files", "logrotate"), self._logrotate_conf_path)
-        shutil.copy(os.path.join(self.charm_dir, "files", "rsyslog"), self._rsyslog_conf_path)
+        shutil.copy(
+            os.path.join(self.charm_dir, "files", "logrotate"),
+            self._logrotate_conf_path,
+        )
+        shutil.copy(
+            os.path.join(self.charm_dir, "files", "rsyslog"), self._rsyslog_conf_path
+        )
         self._systemctl("restart", "rsyslog")
 
     def _dashboard_resource_nonempty(self):
-        dashboard_file = self.model.resources.fetch('dashboard')
+        dashboard_file = self.model.resources.fetch("dashboard")
         if dashboard_file:
             return os.path.getsize(dashboard_file) != 0
         return False
 
     def _bakery_agent_file(self):
-        url = self.config.get('candid-url', '')
-        username = self.config.get('candid-agent-username', '')
-        private_key = self.config.get('candid-agent-private-key', '')
-        public_key = self.config.get('candid-agent-public-key', '')
+        url = self.config.get("candid-url", "")
+        username = self.config.get("candid-agent-username", "")
+        private_key = self.config.get("candid-agent-private-key", "")
+        public_key = self.config.get("candid-agent-public-key", "")
         if not url or not username or not private_key or not public_key:
             return ""
         data = {
             "key": {"public": public_key, "private": private_key},
-            "agents": [{"url": url, "username": username}]
+            "agents": [{"url": url, "username": username}],
         }
         try:
             with open(self._agent_filename, "wt") as f:
@@ -289,14 +327,15 @@ class JimmCharm(SystemdCharm):
             "conf_file": self._env_filename(),
             "db_file": self._env_filename("db"),
             "leader_file": self._env_filename("leader"),
-            "vault_file": self._env_filename("vault")
+            "vault_file": self._env_filename("vault"),
+            "openfga_file": self._env_filename("openfga"),
         }
         with open(self.service_file, "wt") as f:
-            f.write(self._render_template('jimm.service', **args))
+            f.write(self._render_template("jimm.service", **args))
 
     def _render_template(self, name, **kwargs):
         """Load the template with the given name."""
-        loader = FileSystemLoader(os.path.join(self.charm_dir, 'templates'))
+        loader = FileSystemLoader(os.path.join(self.charm_dir, "templates"))
         env = Environment(loader=loader)
         return env.get_template(name).render(**kwargs)
 
@@ -316,16 +355,33 @@ class JimmCharm(SystemdCharm):
         return self.charm_dir.joinpath(filename)
 
     def _snap(self, *args):
-        cmd = ['snap']
+        cmd = ["snap"]
         cmd.extend(args)
         subprocess.run(cmd, capture_output=True, check=True)
 
     def _on_dashboard_relation_joined(self, event):
-        event.relation.data[self.app].update({
-            'controller-url': self.config['dns-name'],
-            'identity-provider-url': self.config['candid-url'],
-            'is-juju': str(False),
-        })
+        event.relation.data[self.app].update(
+            {
+                "controller-url": self.config["dns-name"],
+                "identity-provider-url": self.config["candid-url"],
+                "is-juju": str(False),
+            }
+        )
+
+    def _on_openfga_store_created(self, event: OpenFGAStoreCreateEvent):
+        if not event.store_id:
+            return
+
+        args = {
+            "openfga_host": event.address,
+            "openfga_port": event.port,
+            "openfga_scheme": event.scheme,
+            "openfga_store": event.store_id,
+            "openfga_token": event.token,
+        }
+
+        with open(self._env_filename("openfga"), "wt") as f:
+            f.write(self._render_template("jimm-openfga.env", **args))
 
 
 def _json_data(event, key):
