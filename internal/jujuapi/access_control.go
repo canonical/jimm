@@ -4,6 +4,7 @@ import (
 	"context"
 
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
+	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
@@ -51,8 +52,22 @@ func (r *controllerRoot) RenameGroup(ctx context.Context, req apiparams.RenameGr
 }
 
 // ListGroup lists relational access control groups within JIMMs DB.
-func (r *controllerRoot) ListGroups(ctx context.Context) error {
-	return errors.E("Not implemented.")
+func (r *controllerRoot) ListGroups(ctx context.Context) (apiparams.ListGroupResponse, error) {
+	const op = errors.Op("jujuapi.ListGroups")
+	if r.user.ControllerAccess != "superuser" {
+		return apiparams.ListGroupResponse{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	var groups []apiparams.Group
+	err := r.jimm.Database.ForEachGroup(ctx, func(ctl *dbmodel.GroupEntry) error {
+		groups = append(groups, ctl.ToAPIGroupEntry())
+		return nil
+	})
+	if err != nil {
+		return apiparams.ListGroupResponse{}, errors.E(op, err)
+	}
+
+	return apiparams.ListGroupResponse{Groups: groups}, nil
 }
 
 // AddRelation creates a tuple between two objects [if applicable]

@@ -4,6 +4,7 @@ package jujuapi_test
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -609,4 +610,81 @@ func (s *jimmSuite) TestRemoveCloudFromController(c *gc.C) {
 
 	_, err = s.JIMM.GetCloud(context.Background(), &u, names.NewCloudTag("test-cloud"))
 	c.Assert(err, gc.ErrorMatches, `cloud "test-cloud" not found`)
+}
+
+func (s *jimmSuite) TestAddGroup(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := api.NewClient(conn)
+	err := client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
+	c.Assert(err, gc.ErrorMatches, ".*already exists.*")
+}
+
+func (s *jimmSuite) TestRenameGroup(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := api.NewClient(conn)
+
+	err := client.RenameGroup(&apiparams.RenameGroupRequest{
+		Name:    "test-group",
+		NewName: "renamed-group",
+	})
+	c.Assert(err, gc.ErrorMatches, ".*not found.*")
+
+	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = client.RenameGroup(&apiparams.RenameGroupRequest{
+		Name:    "test-group",
+		NewName: "renamed-group",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+}
+
+func (s *jimmSuite) TestRemoveGroup(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := api.NewClient(conn)
+
+	err := client.RemoveGroup(&apiparams.RemoveGroupRequest{
+		Name: "test-group",
+	})
+	c.Assert(err, gc.ErrorMatches, ".*not found.*")
+
+	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = client.RemoveGroup(&apiparams.RemoveGroupRequest{
+		Name: "test-group",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+}
+
+func (s *jimmSuite) TestListGroups(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := api.NewClient(conn)
+
+	for i := 0; i < 3; i++ {
+		err := client.AddGroup(&apiparams.AddGroupRequest{Name: fmt.Sprint("test-group", i)})
+		c.Assert(err, jc.ErrorIsNil)
+	}
+	err := client.AddGroup(&apiparams.AddGroupRequest{Name: "aaaFinalGroup"})
+	c.Assert(err, jc.ErrorIsNil)
+
+	groups, err := client.ListGroups()
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(len(groups), gc.Equals, 4)
+	// groups should be returned in ascending order of name
+	c.Assert(groups[0].Name, gc.Equals, "aaaFinalGroup")
+	c.Assert(groups[1].Name, gc.Equals, "test-group0")
+	c.Assert(groups[2].Name, gc.Equals, "test-group1")
+	c.Assert(groups[3].Name, gc.Equals, "test-group2")
 }
