@@ -15,15 +15,22 @@ var (
 )
 
 // GroupTag represents a group.
-// Implement juju names.Tag
+// Implements juju names.Tag
 type GroupTag struct {
 	name string
 }
 
-func (t GroupTag) Id() string     { return t.name }
-func (t GroupTag) Kind() string   { return GroupTagKind }
+// Id implements juju names.Tag
+func (t GroupTag) Id() string { return t.name }
+
+// Kind implements juju names.Tag
+func (t GroupTag) Kind() string { return GroupTagKind }
+
+// String implements juju names.Tag
 func (t GroupTag) String() string { return GroupTagKind + "-" + t.Id() }
 
+// NewGroupTag creates a valid GroupTag if it is possible to parse
+// the provided tag.
 func NewGroupTag(groupName string) GroupTag {
 	parts := validGroupName.FindStringSubmatch(groupName)
 	if len(parts) != 1 {
@@ -46,6 +53,7 @@ func ParseGroupTag(tag string) (GroupTag, error) {
 	return gt, nil
 }
 
+// IsValidGroup verifies the id of the tag is valid according to a regex internally.
 func IsValidGroup(id string) bool {
 	return validGroupName.MatchString(id)
 }
