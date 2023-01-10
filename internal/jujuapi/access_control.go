@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
+	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
 	"github.com/juju/names/v4"
@@ -65,6 +66,7 @@ func (r *controllerRoot) ListGroups(ctx context.Context) error {
 // within OpenFGA.
 func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelationRequest) error {
 	const op = errors.Op("jujuapi.AddRelation")
+	db := r.jimm.Database
 
 	extractTag := func(key string) (names.Tag, error) {
 		k := strings.Split(key, ":")
@@ -72,15 +74,15 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 		objectId := k[1]
 		err := errors.E(op, "could not determine tag type")
 		switch objectType {
-		case "user":
+		case names.UserTagKind:
 			return names.ParseUserTag(objectId)
-		case "model":
+		case names.ModelTagKind:
 			return names.ParseModelTag(objectId)
-		case "controller":
+		case names.ControllerTagKind:
 			return names.ParseControllerTag(objectId)
-		case "applicationoffer":
-			return names.ParseApplicationTag(objectId)
-		case "group":
+		case names.ApplicationOfferTagKind:
+			return names.ParseApplicationOfferTag(objectId)
+		case jimmnames.GroupTagKind:
 			return jimmnames.ParseGroupTag(objectId)
 		default:
 			return nil, err
@@ -98,15 +100,31 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 			return errors.E(op, fmt.Sprintf("failed to validate tag for object: %s", t.Object), err)
 		}
 		// Now we know the tag is valid, we can go ahead and format it into a valid OpenFGA
-		// object type and id
+		// object type and id, however, the id provided by the user is resolved from NAME to
+		// UUID bar actual users.
 		switch t := tag.(type) {
 		case names.UserTag:
+			u := dbmodel.User{Username: t.Id()}
+			// Get the user or create if necessary
+			err := db.GetUser(ctx, &u)
+			if err != nil {
+				return errors.E(op, err)
+			}
+			// If all is OK, create tuple key
 			userObject = fmt.Sprintf("%s:%s", "user", t.Name())
 			if t.Domain() != "" {
 				userObject = fmt.Sprintf("%s@%s", userObject, t.Domain())
 			}
+
 		case names.ModelTag:
 			userObject = fmt.Sprintf("model:%s", t.Id())
+			// m := dbmodel.Model{
+			// 	UUID: sql.NullString{
+			// 		String: t.Id(),
+			// 		Valid:  true,
+			// 	},
+			// }
+			// err = r.jimm.Database.GetModel(ctx, &m)
 		case names.ControllerTag:
 			userObject = fmt.Sprintf("controller:%s", t.Id())
 		case names.ApplicationOfferTag:

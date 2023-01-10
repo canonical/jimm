@@ -7,6 +7,7 @@ import (
 
 	"github.com/CanonicalLtd/jimm/api"
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
+	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/google/uuid"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
@@ -30,13 +31,13 @@ func (s *accessControlSuite) TestAddGroup(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, ".*already exists.*")
 }
 
-func (s *accessControlSuite) TestAddRelationSucceeds(c *gc.C) {
+func (s *accessControlSuite) TestAddRelationSucceedsForUsers(c *gc.C) {
 	ctx := context.Background()
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 	client := api.NewClient(conn)
 	uuid1, _ := uuid.NewRandom()
-	user1 := fmt.Sprintf("user:user-%s", uuid1)
+	user1 := fmt.Sprintf("user:user-%s@external", uuid1)
 
 	goodParams := &apiparams.AddRelationRequest{
 		Tuples: []apiparams.RelationshipTuple{
@@ -55,7 +56,12 @@ func (s *accessControlSuite) TestAddRelationSucceeds(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	lastChange := changes.GetChanges()[len(changes.GetChanges())-1].GetTupleKey()
-	c.Assert(lastChange.GetUser(), gc.Equals, fmt.Sprintf("user:%s", uuid1))
+	c.Assert(lastChange.GetUser(), gc.Equals, fmt.Sprintf("user:%s@external", uuid1))
+
+	// Now assert the user has in fact been created in DB
+	u := dbmodel.User{Username: fmt.Sprintf("%s@external", uuid1)}
+	err = s.JIMM.Database.GetUserNoCreate(ctx, &u)
+	c.Assert(err, gc.IsNil)
 }
 
 func (s *accessControlSuite) TestAddRelationFailsWhenObjectDoesNotExistOnAuthorisationModel(c *gc.C) {
@@ -113,7 +119,8 @@ func (s *accessControlSuite) TestAddRelationTagValidation(c *gc.C) {
 		{input: tuple{"group:groupy-woopy", "member", "group:yolo22"}, want: ".*failed to validate tag for object:.*", err: true},
 
 		// Relation propagation tests
-		{input: tuple{"group:pokemon#member", "member", "group:legendaries"}, err: false},
+		{input: tuple{fmt.Sprintf("group:group-%s#member", getUuid()), "member", "group:legendaries"}, err: false},
+		{input: tuple{"group:groupy-woopy-pokemon#member", "member", "group:legendaries"}, want: ".*failed to validate tag for object:.*", err: true},
 	}
 
 	for _, tc := range tagTests {
