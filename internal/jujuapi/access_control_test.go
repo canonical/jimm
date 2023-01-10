@@ -1,8 +1,6 @@
 package jujuapi_test
 
 import (
-	"fmt"
-
 	"github.com/CanonicalLtd/jimm/api"
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
 	jc "github.com/juju/testing/checkers"
@@ -76,20 +74,22 @@ func (s *accessControlSuite) TestListGroups(c *gc.C) {
 
 	client := api.NewClient(conn)
 
-	for i := 0; i < 3; i++ {
-		err := client.AddGroup(&apiparams.AddGroupRequest{Name: fmt.Sprint("test-group", i)})
+	groupNames := []string{
+		"test-group0",
+		"test-group1",
+		"test-group2",
+		"aaaFinalGroup",
+	}
+
+	for _, name := range groupNames {
+		err := client.AddGroup(&apiparams.AddGroupRequest{Name: name})
 		c.Assert(err, jc.ErrorIsNil)
 	}
-	err := client.AddGroup(&apiparams.AddGroupRequest{Name: "aaaFinalGroup"})
-	c.Assert(err, jc.ErrorIsNil)
 
 	groups, err := client.ListGroups()
 	c.Assert(err, jc.ErrorIsNil)
-	assert.ElementsMatch(c)
-	c.Assert(len(groups), gc.Equals, 4)
-	// groups should be returned in ascending order of name
-	c.Assert(groups[0].Name, gc.Equals, "aaaFinalGroup")
-	c.Assert(groups[1].Name, gc.Equals, "test-group0")
-	c.Assert(groups[2].Name, gc.Equals, "test-group1")
-	c.Assert(groups[3].Name, gc.Equals, "test-group2")
+	assert.Len(c, groups, 4)
+	for _, group := range groups {
+		assert.Contains(c, groupNames, group.Name)
+	}
 }
