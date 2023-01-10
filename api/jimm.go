@@ -121,12 +121,12 @@ func (c *Client) AddGroup(req *params.AddGroupRequest) error {
 	return c.caller.APICall("JIMM", 4, "", "AddGroup", req, nil)
 }
 
-// RenameGroup renames a group to JIMM.
+// RenameGroup renames a group in JIMM.
 func (c *Client) RenameGroup(req *params.RenameGroupRequest) error {
 	return c.caller.APICall("JIMM", 4, "", "RenameGroup", req, nil)
 }
 
-// RenameGroup removes a group to JIMM.
+// RemoveGroup removes a group in JIMM.
 func (c *Client) RemoveGroup(req *params.RemoveGroupRequest) error {
 	return c.caller.APICall("JIMM", 4, "", "RemoveGroup", req, nil)
 }
