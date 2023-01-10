@@ -25,7 +25,7 @@ func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupReq
 	return nil
 }
 
-// RenameGroup renames a group.
+// RenameGroup renames a group within JIMMs DB for reference by OpenFGA.
 func (r *controllerRoot) RenameGroup(ctx context.Context, req apiparams.RenameGroupRequest) error {
 	const op = errors.Op("jujuapi.RenameGroup")
 	if r.user.ControllerAccess != "superuser" {

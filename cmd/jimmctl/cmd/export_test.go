@@ -207,7 +207,7 @@ func NewRenameGroupCommandForTesting(store jujuclient.ClientStore, bClient *http
 }
 
 func NewRemoveGroupCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
-	cmd := &RemoveGroupCommand{
+	cmd := &removeGroupCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,

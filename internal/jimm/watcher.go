@@ -36,6 +36,8 @@ type Watcher struct {
 	// Pubsub is a pub-sub hub used to publish and subscribe
 	// model summaries.
 	Pubsub Publisher
+
+	controllerUnavailableChan chan error
 }
 
 // Watch starts the watcher which connects to all known controllers and
@@ -134,8 +136,15 @@ func (w *Watcher) dialController(ctx context.Context, ctl *dbmodel.Controller) (
 	if err != nil {
 		if !ctl.UnavailableSince.Valid {
 			ctl.UnavailableSince = db.Now()
-			if err := w.Database.UpdateController(ctx, ctl); err != nil {
+			var err error
+			if err = w.Database.UpdateController(ctx, ctl); err != nil {
 				zapctx.Error(ctx, "cannot set controller unavailable", zap.Error(err))
+			}
+			if w.controllerUnavailableChan != nil {
+				select {
+				case w.controllerUnavailableChan <- err:
+				default:
+				}
 			}
 		}
 		return nil, errors.E(op, err)
@@ -330,8 +339,15 @@ func (w *Watcher) watchAllModelSummaries(ctx context.Context, ctl *dbmodel.Contr
 	if err != nil {
 		if !ctl.UnavailableSince.Valid {
 			ctl.UnavailableSince = db.Now()
-			if err := w.Database.UpdateController(ctx, ctl); err != nil {
+			var err error
+			if err = w.Database.UpdateController(ctx, ctl); err != nil {
 				zapctx.Error(ctx, "cannot set controller unavailable", zap.Error(err))
+			}
+			if w.controllerUnavailableChan != nil {
+				select {
+				case w.controllerUnavailableChan <- err:
+				default:
+				}
 			}
 		}
 		return errors.E(op, err)
