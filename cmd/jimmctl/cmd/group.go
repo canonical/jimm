@@ -188,15 +188,15 @@ func (c *renameGroupCommand) Run(ctxt *cmd.Context) error {
 
 // newRemoveGroupCommand returns a command to Remove a group.
 func newRemoveGroupCommand() cmd.Command {
-	cmd := &RemoveGroupCommand{
+	cmd := &removeGroupCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-// RemoveGroupCommand Removes a group.
-type RemoveGroupCommand struct {
+// removeGroupCommand Removes a group.
+type removeGroupCommand struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output
 
@@ -206,7 +206,7 @@ type RemoveGroupCommand struct {
 	name string
 }
 
-func (c *RemoveGroupCommand) Info() *cmd.Info {
+func (c *removeGroupCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:    "Remove",
 		Purpose: "Remove a group",
@@ -215,7 +215,7 @@ func (c *RemoveGroupCommand) Info() *cmd.Info {
 }
 
 // Init implements the cmd.Command interface.
-func (c *RemoveGroupCommand) Init(args []string) error {
+func (c *removeGroupCommand) Init(args []string) error {
 	if len(args) < 1 {
 		return errors.E("group name not specified")
 	}
@@ -227,7 +227,7 @@ func (c *RemoveGroupCommand) Init(args []string) error {
 }
 
 // Run implements Command.Run.
-func (c *RemoveGroupCommand) Run(ctxt *cmd.Context) error {
+func (c *removeGroupCommand) Run(ctxt *cmd.Context) error {
 	currentController, err := c.store.CurrentController()
 	if err != nil {
 		return errors.E(err, "could not determine controller")
