@@ -99,6 +99,7 @@ func (s *accessControlSuite) TestAddRelationTagValidation(c *gc.C) {
 	}
 
 	tagTests := []tagTest{
+		// Generic relation tests
 		{input: tuple{"diglett:diglett", "member", "group:yolo22"}, want: ".*failed to validate tag for object:.*", err: true},
 		{input: tuple{fmt.Sprintf("user:user-%s", getUuid()), "member", "group:yolo22"}, err: false},
 		{input: tuple{fmt.Sprintf("user:user-%s@external", getUuid()), "member", "group:yolo22"}, err: false},
@@ -110,6 +111,9 @@ func (s *accessControlSuite) TestAddRelationTagValidation(c *gc.C) {
 		{input: tuple{"model:controlly-wolly", "member", "group:yolo22"}, want: ".*failed to validate tag for object:.*", err: true},
 		{input: tuple{fmt.Sprintf("group:group-%s", getUuid()), "member", "group:yolo22"}, err: false},
 		{input: tuple{"group:groupy-woopy", "member", "group:yolo22"}, want: ".*failed to validate tag for object:.*", err: true},
+
+		// Relation propagation tests
+		{input: tuple{"group:pokemon#member", "member", "group:legendaries"}, err: false},
 	}
 
 	for _, tc := range tagTests {

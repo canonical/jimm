@@ -10,7 +10,7 @@ const (
 )
 
 var (
-	validGroupNameSnippet = "[a-zA-Z0-9][a-zA-Z0-9.+-]*[a-zA-Z0-9]"
+	validGroupNameSnippet = "[a-zA-Z0-9][a-zA-Z0-9.#+-]*[a-zA-Z0-9]"
 	validGroupName        = regexp.MustCompile("^" + validGroupNameSnippet + "$")
 )
 
