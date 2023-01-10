@@ -93,3 +93,30 @@ func (s *dbSuite) TestUpdateGroup(c *qt.C) {
 	c.Check(err, qt.IsNil)
 	c.Assert(ge2, qt.DeepEquals, ge1)
 }
+
+func (s *dbSuite) TestRemoveGroup(c *qt.C) {
+	err := s.Database.RemoveGroup(context.Background(), &dbmodel.GroupEntry{})
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
+
+	err = s.Database.Migrate(context.Background(), false)
+	c.Assert(err, qt.IsNil)
+
+	ge := &dbmodel.GroupEntry{
+		Name: "test-group",
+	}
+
+	err = s.Database.RemoveGroup(context.Background(), ge)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+
+	err = s.Database.AddGroup(context.Background(), ge.Name)
+	c.Assert(err, qt.IsNil)
+
+	ge1, err := s.Database.GetGroup(context.Background(), ge.Name)
+	c.Assert(err, qt.IsNil)
+
+	err = s.Database.RemoveGroup(context.Background(), ge1)
+	c.Check(err, qt.IsNil)
+
+	_, err = s.Database.GetGroup(context.Background(), ge.Name)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+}

@@ -53,8 +53,12 @@ func (r *controllerRoot) RemoveGroup(ctx context.Context, req apiparams.RemoveGr
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
+	group, err := r.jimm.Database.GetGroup(ctx, req.Name)
+	if err != nil {
+		return errors.E(op, err)
+	}
 	//TODO(Kian): Also remove all tuples containing group with confirmation message in the CLI.
-	if err := r.jimm.Database.RemoveGroup(ctx, req.Name); err != nil {
+	if err := r.jimm.Database.RemoveGroup(ctx, group); err != nil {
 		zapctx.Error(ctx, "failed to remove group", zaputil.Error(err))
 		return errors.E(op, err)
 	}
