@@ -35,6 +35,8 @@ func init() {
 		updateMigratedModelMethod := rpc.Method(r.UpdateMigratedModel)
 		addCloudToControllerMethod := rpc.Method(r.AddCloudToController)
 		removeCloudFromControllerMethod := rpc.Method(r.RemoveCloudFromController)
+		addGroupMethod := rpc.Method(r.AddGroup)
+		renameGroupMethod := rpc.Method(r.RenameGroup)
 
 		r.AddMethod("JIMM", 2, "DisableControllerUUIDMasking", disableControllerUUIDMaskingMethod)
 		r.AddMethod("JIMM", 2, "ListControllers", listControllersMethod)
@@ -53,7 +55,35 @@ func init() {
 		r.AddMethod("JIMM", 3, "AddCloudToController", addCloudToControllerMethod)
 		r.AddMethod("JIMM", 3, "RemoveCloudFromController", removeCloudFromControllerMethod)
 
-		return []int{2, 3}
+		// JIMM Generic RPC
+		r.AddMethod("JIMM", 4, "AddController", addControllerMethod)
+		r.AddMethod("JIMM", 4, "DisableControllerUUIDMasking", disableControllerUUIDMaskingMethod)
+		r.AddMethod("JIMM", 4, "FindAuditEvents", findAuditEventsMethod)
+		r.AddMethod("JIMM", 4, "FullModelStatus", fullModelStatusMethod)
+		r.AddMethod("JIMM", 4, "GrantAuditLogAccess", grantAuditLogAccessMethod)
+		r.AddMethod("JIMM", 4, "ImportModel", importModelMethod)
+		r.AddMethod("JIMM", 4, "ListControllers", listControllersV3Method)
+		r.AddMethod("JIMM", 4, "RemoveController", removeControllerMethod)
+		r.AddMethod("JIMM", 4, "RevokeAuditLogAccess", revokeAuditLogAccessMethod)
+		r.AddMethod("JIMM", 4, "SetControllerDeprecated", setControllerDeprecatedMethod)
+		r.AddMethod("JIMM", 4, "UpdateMigratedModel", updateMigratedModelMethod)
+		r.AddMethod("JIMM", 4, "AddCloudToController", addCloudToControllerMethod)
+		r.AddMethod("JIMM", 4, "RemoveCloudFromController", removeCloudFromControllerMethod)
+
+		// JIMM ReBAC RPC
+		r.AddMethod("JIMM", 4, "AddGroup", addGroupMethod)
+		r.AddMethod("JIMM", 4, "RemoveGroup", rpc.Method(r.RemoveGroup))
+		r.AddMethod("JIMM", 4, "RenameGroup", renameGroupMethod)
+		r.AddMethod("JIMM", 4, "ListGroups", rpc.Method(r.ListGroups))
+
+		r.AddMethod("JIMM", 4, "AddRelation", rpc.Method(r.AddRelation))
+		r.AddMethod("JIMM", 4, "RemoveRelation", rpc.Method(r.RemoveRelation))
+		r.AddMethod("JIMM", 4, "CheckRelation", rpc.Method(r.CheckRelation))
+		r.AddMethod("JIMM", 4, "ListRelations", rpc.Method(r.ListRelations))
+
+		r.AddMethod("JIMM", 4, "GetAuthorisationModel", rpc.Method(r.GetAuthorisationModel))
+
+		return []int{2, 3, 4}
 	}
 }
 

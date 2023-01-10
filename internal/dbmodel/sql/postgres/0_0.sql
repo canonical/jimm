@@ -273,4 +273,15 @@ CREATE TABLE IF NOT EXISTS root_keys (
 CREATE INDEX IF NOT EXISTS idx_root_keys_created_at ON root_keys (created_at);
 CREATE INDEX IF NOT EXISTS idx_root_keys_expires ON root_keys (expires);
 
+CREATE TABLE IF NOT EXISTS groups (
+	id BIGSERIAL PRIMARY KEY,
+	created_at TIMESTAMP WITH TIME ZONE,
+	updated_at TIMESTAMP WITH TIME ZONE,
+	deleted_at TIMESTAMP WITH TIME ZONE,
+	name TEXT NOT NULL UNIQUE
+);
+CREATE INDEX IF NOT EXISTS idx_group_deleted_at ON groups (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_group_name ON groups (name);
+
 UPDATE versions SET major=1, minor=0 WHERE component='jimmdb';
+
