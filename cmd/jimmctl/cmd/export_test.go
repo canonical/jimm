@@ -217,3 +217,15 @@ func NewRemoveGroupCommandForTesting(store jujuclient.ClientStore, bClient *http
 
 	return modelcmd.WrapBase(cmd)
 }
+
+func NewListGroupsCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+	cmd := &listGroupsCommand{
+		store: store,
+		dialOpts: &jujuapi.DialOpts{
+			InsecureSkipVerify: true,
+			BakeryClient:       bClient,
+		},
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
