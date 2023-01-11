@@ -92,7 +92,7 @@ func ResolveTupleObject(db db.Database, tag string) (string, error) {
 		userName := trailer
 		zapctx.Debug(
 			ctx,
-			"mapping JIMM tags to Juju tags for tag kind: user",
+			"Resolving JIMM tags to Juju tags for tag kind: user",
 			zap.String("user-name", userName),
 		)
 		return names.UserTagKind + "-" + trailer, nil
@@ -113,7 +113,7 @@ func ResolveTupleObject(db db.Database, tag string) (string, error) {
 			controller := dbmodel.Controller{Name: controllerName}
 			zapctx.Debug(
 				ctx,
-				"mapping JIMM tags to Juju tags for tag kind: controller",
+				"Resolving JIMM tags to Juju tags for tag kind: controller",
 				zap.String("controller-name", controllerName),
 			)
 			err := db.GetController(ctx, &controller)
@@ -125,8 +125,8 @@ func ResolveTupleObject(db db.Database, tag string) (string, error) {
 			controller := dbmodel.Controller{UUID: trailer}
 			zapctx.Debug(
 				ctx,
-				"mapping JIMM tags to Juju tags for tag kind: controller",
-				zap.String("controller-name", controllerName),
+				"Tag appears to already be a UUID: controller",
+				zap.String("controller-name", trailer),
 			)
 			err := db.GetController(ctx, &controller)
 			if err != nil {
@@ -155,7 +155,7 @@ func ResolveTupleObject(db db.Database, tag string) (string, error) {
 			modelName := sm2[1]
 			zapctx.Debug(
 				ctx,
-				"mapping JIMM tags to Juju tags for tag kind: model",
+				"Resolving JIMM tags to Juju tags for tag kind: model",
 				zap.String("controller-name", controllerName),
 				zap.String("controller-user", controllerUser),
 				zap.String("model-name", modelName),
@@ -184,6 +184,11 @@ func ResolveTupleObject(db db.Database, tag string) (string, error) {
 			muuid = model.UUID.String
 		} else {
 			model := dbmodel.Model{UUID: sql.NullString{String: trailer}}
+			zapctx.Debug(
+				ctx,
+				"Tag appears to already be a UUID: model",
+				zap.String("model-name", trailer),
+			)
 			err = db.GetModel(ctx, &model)
 			if err != nil {
 				zapctx.Debug(ctx, "?????????????????????????????????????????")
@@ -212,7 +217,7 @@ func ResolveTupleObject(db db.Database, tag string) (string, error) {
 		applicationOfferName := sm3[1]
 		zapctx.Debug(
 			ctx,
-			"mapping JIMM tags to Juju tags for tag kind: applicationoffer",
+			"Resolving JIMM tags to Juju tags for tag kind: applicationoffer",
 			zap.String("controller-name", controllerName),
 			zap.String("controller-user", controllerUser),
 			zap.String("model-name", modelName),
