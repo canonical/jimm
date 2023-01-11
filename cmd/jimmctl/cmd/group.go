@@ -149,6 +149,7 @@ type renameGroupCommand struct {
 	newName string
 }
 
+// Info implements the cmd.Command interface.
 func (c *renameGroupCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:    "rename",
