@@ -100,7 +100,7 @@ func TestVault(t *testing.T) {
 		VaultAddress:    "http://localhost:8200",
 		VaultAuthPath:   "/auth/approle/login",
 		VaultPath:       "/jimm-kv/",
-		VaultSecretFile: "./local/vault/approle.yaml",
+		VaultSecretFile: "./local/vault/approle.json",
 	}
 	candid := startCandid(c, &p)
 	vaultClient, _, creds, _ := jimmtest.VaultClient(c, ".")
