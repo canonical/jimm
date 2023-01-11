@@ -12,8 +12,8 @@ import (
 )
 
 // AddModel stores the model information.
-// - returns an error with code errors.CodeAlreadyExists if
-//   model with the same name already exists.
+//   - returns an error with code errors.CodeAlreadyExists if
+//     model with the same name already exists.
 func (d *Database) AddModel(ctx context.Context, model *dbmodel.Model) error {
 	const op = errors.Op("db.AddModel")
 	if err := d.ready(); err != nil {
@@ -37,9 +37,8 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model) error {
 	db := d.DB.WithContext(ctx)
 	if model.UUID.Valid {
 		db = db.Where("uuid = ?", model.UUID.String)
-		if model.ControllerID != 0 {
-			db = db.Where("controller_id = ?", model.ControllerID)
-		}
+	} else if model.ControllerID != 0 {
+		db = db.Where("controller_id = ?", model.ControllerID)
 	} else if model.ID != 0 {
 		db = db.Where("id = ?", model.ID)
 	} else if model.OwnerUsername != "" && model.Name != "" {
