@@ -217,6 +217,7 @@ type removeGroupCommand struct {
 	name string
 }
 
+// Info implements the cmd.Command interface.
 func (c *removeGroupCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:    "Remove",
@@ -289,15 +290,6 @@ func (c *listGroupsCommand) Info() *cmd.Info {
 		Purpose: "List all groups",
 		Doc:     listGroupsDoc,
 	})
-}
-
-// Init implements the cmd.Command interface.
-func (c *listGroupsCommand) Init(args []string) error {
-	c.name, args = args[0], args[1:]
-	if len(args) > 0 {
-		return errors.E("too many args")
-	}
-	return nil
 }
 
 // SetFlags implements Command.SetFlags.
