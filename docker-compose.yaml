@@ -19,7 +19,7 @@ services:
       JIMM_ADMINS: "jimm"
       VAULT_ADDR: "http://vault:8200"
       VAULT_PATH: "/jimm-kv/"
-      VAULT_SECRET_FILE: "/vault/approle.yaml"
+      VAULT_SECRET_FILE: "/vault/approle.json"
       VAULT_AUTH_PATH: "/auth/approle/login"
       # Where we gonna grab this?...
       # JIMM_DASHBOARD_LOCATION: ""
@@ -30,7 +30,7 @@ services:
       TEST_LOGGING_CONFIG: ""
     volumes:
       - ./:/jimm/
-      - ./local/vault/approle.yaml:/vault/approle.yaml:rw
+      - ./local/vault/approle.json:/vault/approle.json:rw
     healthcheck:
       test: [ "CMD", "curl", "http://localhost:8080" ]
       interval: 5s
@@ -81,7 +81,7 @@ services:
       - ./local/vault/vault.hcl:/vault/config/vault.hcl
       - ./local/vault/init.sh:/vault/init.sh
       - ./local/vault/policy.hcl:/vault/policy.hcl
-      - ./local/vault/approle.yaml:/vault/approle.yaml
+      - ./local/vault/approle.json:/vault/approle.json
     command: /vault/init.sh
     depends_on:
       db:

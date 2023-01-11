@@ -47,6 +47,6 @@ echo "Enabling KV at policy path /jimm-kv"
 echo "/jimm-kv accessible by policy jimm-app"
 vault secrets enable -path /jimm-kv kv
 echo "Creating approle auth file."
-VAULT_TOKEN=$JIMM_SECRET_WRAPPED vault unwrap > /vault/approle.yaml
+VAULT_TOKEN=$JIMM_SECRET_WRAPPED vault unwrap > /vault/approle.json
 
 wait
