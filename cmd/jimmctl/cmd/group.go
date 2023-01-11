@@ -83,6 +83,7 @@ type addGroupCommand struct {
 	name string
 }
 
+// Info implements the cmd.Command interface.
 func (c *addGroupCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:    "add",
@@ -281,6 +282,7 @@ type listGroupsCommand struct {
 	name string
 }
 
+// Info implements the cmd.Command interface.
 func (c *listGroupsCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:    "List",
