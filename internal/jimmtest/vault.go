@@ -22,7 +22,7 @@ func VaultClient(tb fatalF, prefix string) (*api.Client, string, map[string]inte
 	cfg.Address = "http://localhost:8200"
 	vaultClient, _ := api.NewClient(cfg)
 
-	b, err := os.ReadFile(path.Join(prefix, "./local/vault/approle.yaml"))
+	b, err := os.ReadFile(path.Join(prefix, "./local/vault/approle.json"))
 	if err != nil {
 		fmt.Println("we got file?")
 	}

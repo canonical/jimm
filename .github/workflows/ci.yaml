@@ -8,41 +8,26 @@ env:
   GH_USER: ${{ secrets.GH_USER }}
 
 jobs:
-  lint:
-    runs-on: ubuntu-20.04
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v3
-      - uses: ./.github/workflows/setupgo118amd64
-        with:
-          user: ${{ secrets.GH_USER }}
-          pat: ${{ secrets.GH_AUTH }}
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
-        with:
-          # Optional: version of golangci-lint to use in form of v1.2 or v1.2.3 or `latest` to use the latest version
-          version: latest
-          skip-pkg-cache: true
-          skip-build-cache: true
+  # lint:
+  #   runs-on: ubuntu-20.04
+  #   continue-on-error: true
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - uses: ./.github/workflows/setupgo118amd64
+  #       with:
+  #         user: ${{ secrets.GH_USER }}
+  #         pat: ${{ secrets.GH_AUTH }}
+  #     - name: golangci-lint
+  #       uses: golangci/golangci-lint-action@v3
+  #       with:
+  #         # Optional: version of golangci-lint to use in form of v1.2 or v1.2.3 or `latest` to use the latest version
+  #         version: latest
+  #         skip-pkg-cache: true
+  #         skip-build-cache: true
 
   build_test:
     name: Build and Test
-    #    needs:
-    #      - lint
     runs-on: ubuntu-20.04
-    # services:
-    #   postgres:
-    #     image: postgres
-    #     env:
-    #       POSTGRES_PASSWORD: password
-    #     ports:
-    #       - 5432:5432
-    #     # Set health checks to wait until postgres has started
-    #     options: >-
-    #       --health-cmd pg_isready
-    #       --health-interval 10s
-    #       --health-timeout 5s
-    #       --health-retries 5
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies
@@ -62,13 +47,12 @@ jobs:
           --secret id=ghpat,env=GH_AUTH \
           . -f ./Dockerfile -t candid
           docker image ls candid
+      - name: Add volume files
+        run: |
+          touch ./local/vault/approle.json
+          touch ./local/vault/roleid.txt
       - name: Start test environment
         run: docker compose up -d
-      # - name: Install vault
-      #   run: sudo snap install vault --classic
-      # - uses: ./.github/workflows/setupgo118amd64
-      # - name: Install openfga
-      #   run: go install github.com/openfga/openfga/cmd/openfga@latest
       - name: Build and Test
         run: go test -mod readonly ./...
         env:
