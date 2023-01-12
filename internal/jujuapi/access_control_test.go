@@ -4,7 +4,6 @@ import (
 	"github.com/CanonicalLtd/jimm/api"
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
 	jc "github.com/juju/testing/checkers"
-	"github.com/stretchr/testify/assert"
 	gc "gopkg.in/check.v1"
 )
 
@@ -88,8 +87,10 @@ func (s *accessControlSuite) TestListGroups(c *gc.C) {
 
 	groups, err := client.ListGroups()
 	c.Assert(err, jc.ErrorIsNil)
-	assert.Len(c, groups, 4)
-	for _, group := range groups {
-		assert.Contains(c, groupNames, group.Name)
-	}
+	c.Assert(groups, gc.HasLen, 4)
+	// groups should be returned in ascending order of name
+	c.Assert(groups[0].Name, gc.Equals, "aaaFinalGroup")
+	c.Assert(groups[1].Name, gc.Equals, "test-group0")
+	c.Assert(groups[2].Name, gc.Equals, "test-group1")
+	c.Assert(groups[3].Name, gc.Equals, "test-group2")
 }
