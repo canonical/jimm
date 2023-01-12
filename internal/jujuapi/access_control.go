@@ -3,7 +3,6 @@ package jujuapi
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -24,8 +23,8 @@ import (
 
 // access_control contains the primary RPC commands for handling ReBAC within JIMM via the JIMM facade itself.
 
-var (
-	tagKindMatcher          = regexp.MustCompile(`.*?([^\s][^-]*)(\-(.*?)\z)`)
+var ( // .*?([^\s][^-]*)(\-)([a-z0-9]*)(#[a-z]*)
+	tagKindMatcher          = regexp.MustCompile(`^([^\s][^-]*)(\-)([a-z0-9-@:/.]*)([#a-z]*)$`)
 	controllerMatcher       = regexp.MustCompile(`.*?([^:|/]*)`)
 	controllerUserMatcher   = regexp.MustCompile(`\:(.*?)\/`)
 	controllerModelMatcher  = regexp.MustCompile(`\/(.*?)([\.]|\z)`)
@@ -110,11 +109,23 @@ func (r *controllerRoot) ListGroups(ctx context.Context) (apiparams.ListGroupRes
 // If the JIMM tag is aleady of juju string tag form, the transformation is left alone.
 //
 // In both cases though, the resource the tag pertains to is validated to exist within the database.
-func ResolveTupleObject(db db.Database, tag string) (string, error) {
+func ResolveTupleObject(db db.Database, tag string) (string, string, error) {
 	ctx := context.Background()
+	// Splits the tag, of form akin to: group-hi34#yolo
+	// into:
+	// group 1: group
+	// group 2: -
+	// group 3: hi34
+	// group 4: #yolo
+	// We do this as we require the juju tag validation, but to also return the
+	// relation specifier (#yolo)
 	tagKindSubMatch := tagKindMatcher.FindStringSubmatch(tag)
+	if len(tagKindSubMatch) != 5 {
+		return "", "", errors.E("failed to detect valid tag string")
+	}
 	tagKind := tagKindSubMatch[1]
 	trailer := tagKindSubMatch[3]
+	relationSpecifier := tagKindSubMatch[4]
 
 	switch tagKind {
 	case names.UserTagKind:
@@ -125,16 +136,15 @@ func ResolveTupleObject(db db.Database, tag string) (string, error) {
 			"Resolving JIMM tags to Juju tags for tag kind: user",
 			zap.String("user-name", userName),
 		)
-		return names.NewUserTag(trailer).String(), nil
+		return names.NewUserTag(trailer).String(), relationSpecifier, nil
 
 	case jimmnames.GroupTagKind:
-		// TODO(ale8k): Ask ales why group has no UUID?
-		// Also why it returns the entry rather than puts the entry in a pointer
 		entry, err := db.GetGroup(ctx, trailer)
 		if err != nil {
-			return tag, errors.E("user group does not exist")
+			return tag, relationSpecifier, errors.E("user group does not exist")
 		}
-		return jimmnames.NewGroupTag(entry.Name).String(), nil
+
+		return jimmnames.NewGroupTag(strconv.FormatUint(uint64(entry.ID), 10)).String(), relationSpecifier, nil
 
 	case names.ControllerTagKind:
 		controllerName := controllerMatcher.FindString(trailer)
@@ -149,7 +159,7 @@ func ResolveTupleObject(db db.Database, tag string) (string, error) {
 			)
 			err := db.GetController(ctx, &controller)
 			if err != nil {
-				return tag, errors.E("controller does not exist")
+				return tag, relationSpecifier, errors.E("controller does not exist")
 			}
 			cuuid = controller.UUID
 		} else {
@@ -161,15 +171,14 @@ func ResolveTupleObject(db db.Database, tag string) (string, error) {
 			)
 			err := db.GetController(ctx, &controller)
 			if err != nil {
-				return tag, errors.E("controller does not exist")
+				return tag, relationSpecifier, errors.E("controller does not exist")
 			}
 			cuuid = controller.UUID
 		}
 
-		return names.NewControllerTag(cuuid).String(), nil
+		return names.NewControllerTag(cuuid).String(), relationSpecifier, nil
 
 	case names.ModelTagKind:
-		// Determine if this is a UUID or JIMM tag
 		muuid := ""
 
 		if _, err := uuid.Parse(trailer); err != nil {
@@ -177,10 +186,10 @@ func ResolveTupleObject(db db.Database, tag string) (string, error) {
 			var sm []string
 			var sm2 []string
 			if sm = controllerUserMatcher.FindStringSubmatch(trailer); len(sm) < 2 {
-				return tag, errors.E("could not find controller user in tag")
+				return tag, relationSpecifier, errors.E("could not find controller user in tag")
 			}
 			if sm2 = controllerModelMatcher.FindStringSubmatch(trailer); len(sm2) < 2 {
-				return tag, errors.E("could not find controller model in tag")
+				return tag, relationSpecifier, errors.E("could not find controller model in tag")
 			}
 			controllerName := controllerMatcher.FindString(trailer)
 			controllerUser := sm[1]
@@ -199,19 +208,19 @@ func ResolveTupleObject(db db.Database, tag string) (string, error) {
 			controller := dbmodel.Controller{Name: controllerName}
 			err := db.GetController(ctx, &controller)
 			if err != nil {
-				return tag, errors.E("controller does not exist")
+				return tag, relationSpecifier, errors.E("controller does not exist")
 			}
 			// TODO(ale8k): Investigate why when querying with model name as emptry string
 			// it's somehow getting the model anyway...
 			if modelName == "" {
-				return tag, errors.E("model not found")
+				return tag, relationSpecifier, errors.E("model not found")
 			}
 			// This combination of ControllerID, OwnerUsername and ModelName *should* be universally unique
 			// We query models separately as to not preload the models on the controller.
 			model := dbmodel.Model{ControllerID: controller.ID, OwnerUsername: controllerUser, Name: modelName}
 			err = db.GetModel(ctx, &model)
 			if err != nil {
-				return tag, errors.E("model not found")
+				return tag, relationSpecifier, errors.E("model not found")
 			}
 			muuid = model.UUID.String
 		} else {
@@ -223,15 +232,14 @@ func ResolveTupleObject(db db.Database, tag string) (string, error) {
 			)
 			err = db.GetModel(ctx, &model)
 			if err != nil {
-				return tag, errors.E("model not found")
+				return tag, relationSpecifier, errors.E("model not found")
 			}
 			muuid = model.UUID.String
 		}
 
-		return names.NewModelTag(muuid).String(), nil
+		return names.NewModelTag(muuid).String(), relationSpecifier, nil
 
 	case names.ApplicationOfferTagKind:
-		// Determine if this is a UUID or JIMM tag
 		auuid := ""
 
 		if _, err := uuid.Parse(trailer); err != nil {
@@ -240,13 +248,13 @@ func ResolveTupleObject(db db.Database, tag string) (string, error) {
 			var sm2 []string
 			var sm3 []string
 			if sm = controllerUserMatcher.FindStringSubmatch(trailer); len(sm) < 2 {
-				return tag, errors.E("could not find controller user in tag")
+				return tag, relationSpecifier, errors.E("could not find controller user in tag")
 			}
 			if sm2 = controllerModelMatcher.FindStringSubmatch(trailer); len(sm2) < 2 {
-				return tag, errors.E("could not find controller model in tag")
+				return tag, relationSpecifier, errors.E("could not find controller model in tag")
 			}
 			if sm3 = applicationOfferMatcher.FindStringSubmatch(trailer); len(sm2) < 2 {
-				return tag, errors.E("could not find application offer in tag")
+				return tag, relationSpecifier, errors.E("could not find application offer in tag")
 			}
 			controllerName := controllerMatcher.FindString(trailer)
 			controllerUser := sm[1]
@@ -263,26 +271,26 @@ func ResolveTupleObject(db db.Database, tag string) (string, error) {
 			// This is simply for validation purposes and to be 100% certain
 			offerURL, err := crossmodel.ParseOfferURL(trailer)
 			if err != nil {
-				return tag, errors.E("failed to parse offer url")
+				return tag, relationSpecifier, errors.E("failed to parse offer url")
 			}
 			offer := dbmodel.ApplicationOffer{URL: offerURL.String()}
 			err = db.GetApplicationOffer(ctx, &offer)
 			if err != nil {
-				return tag, errors.E("applicationoffer not found")
+				return tag, relationSpecifier, errors.E("applicationoffer not found")
 			}
 			auuid = offer.UUID
 		} else {
 			offer := dbmodel.ApplicationOffer{UUID: trailer}
 			err = db.GetApplicationOffer(ctx, &offer)
 			if err != nil {
-				return tag, errors.E("applicationoffer not found")
+				return tag, relationSpecifier, errors.E("applicationoffer not found")
 			}
 			auuid = offer.UUID
 
 		}
-		return jimmnames.NewApplicationOfferTag(auuid).String(), nil
+		return jimmnames.NewApplicationOfferTag(auuid).String(), relationSpecifier, nil
 	}
-	return tag, errors.E("failed to map tag")
+	return tag, relationSpecifier, errors.E("failed to map tag")
 }
 
 // JujuTagFromTuple attempts to parse the provided key
@@ -308,20 +316,21 @@ func JujuTagFromTuple(objectType string, objectId string) (names.Tag, error) {
 // ensuring the resource exists for said tag.
 //
 // This key may be in the form of either a JIMM tag string or Juju tag string.
-func ParseTag(db db.Database, key string) (names.Tag, error) {
+func ParseTag(db db.Database, key string) (names.Tag, string, error) {
 	ctx := context.Background()
 	tupleKeySplit := strings.SplitN(key, ":", 2)
 	if len(tupleKeySplit) != 2 {
-		return nil, errors.E("tag does not have tuple key delimiter")
+		return nil, "", errors.E("tag does not have tuple key delimiter")
 	}
 	kind := tupleKeySplit[0]
 	tagString := tupleKeySplit[1]
-	tagString, err := ResolveTupleObject(db, tagString)
+	tagString, relationSpecifier, err := ResolveTupleObject(db, tagString)
 	if err != nil {
 		zapctx.Debug(ctx, "failed to resolve tuple object", zap.Error(err))
-		return nil, errors.E("failed to resolve tuple object: " + err.Error())
+		return nil, "", errors.E("failed to resolve tuple object: " + err.Error())
 	}
-	return JujuTagFromTuple(kind, tagString)
+	tag, err := JujuTagFromTuple(kind, tagString)
+	return tag, relationSpecifier, err
 }
 
 // AddRelation creates a tuple between two objects [if applicable]
@@ -333,12 +342,12 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 	ofc := r.ofgaClient
 	keys := make([]openfga.TupleKey, 0, len(req.Tuples))
 	for _, t := range req.Tuples {
-		objectTag, err := ParseTag(db, t.Object)
+		objectTag, objectTagRelationSpecifier, err := ParseTag(db, t.Object)
 		if err != nil {
 			zapctx.Debug(ctx, "failed to parse tuple user key", zap.String("key", t.Object), zap.Error(err))
 			return errors.E("failed to parse tuple user key: " + t.Object)
 		}
-		targetObject, err := ParseTag(db, t.TargetObject)
+		targetObject, targetObjectRelationSpecifier, err := ParseTag(db, t.TargetObject)
 		if err != nil {
 			zapctx.Debug(ctx, "failed to parse tuple object key", zap.String("key", t.TargetObject), zap.Error(err))
 			return errors.E("failed to parse tuple object key: " + t.TargetObject)
@@ -346,9 +355,9 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 		keys = append(
 			keys,
 			ofc.CreateTupleKey(
-				fmt.Sprintf("%s:%s", objectTag.Kind(), objectTag.Id()),
+				objectTag.Kind()+":"+objectTag.Id()+objectTagRelationSpecifier,
 				t.Relation,
-				fmt.Sprintf("%s:%s", targetObject.Kind(), targetObject.Id()),
+				targetObject.Kind()+":"+targetObject.Id()+targetObjectRelationSpecifier,
 			),
 		)
 	}
