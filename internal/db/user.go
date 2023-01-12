@@ -36,7 +36,7 @@ func (d *Database) GetUser(ctx context.Context, u *dbmodel.User) error {
 	return nil
 }
 
-// GetUser loads the user details for the user identified by username. It
+// GetUserNoCreate loads the user details for the user identified by username. It
 // will not create a user if the user cannot be found.
 //
 // GetUser returns an error with CodeNotFound if the username is invalid.

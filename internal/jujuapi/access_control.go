@@ -24,6 +24,14 @@ import (
 
 // access_control contains the primary RPC commands for handling ReBAC within JIMM via the JIMM facade itself.
 
+var (
+	tagKindMatcher          = regexp.MustCompile(`.*?([^\s][^-]*)(\-(.*?)\z)`)
+	controllerMatcher       = regexp.MustCompile(`.*?([^:|/]*)`)
+	controllerUserMatcher   = regexp.MustCompile(`\:(.*?)\/`)
+	controllerModelMatcher  = regexp.MustCompile(`\/(.*?)([\.]|\z)`)
+	applicationOfferMatcher = regexp.MustCompile(`\.(.*?)\z`)
+)
+
 // AddGroup creates a group within JIMMs DB for reference by OpenFGA.
 func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupRequest) error {
 	const op = errors.Op("jujuapi.AddGroup")
@@ -76,12 +84,6 @@ func (r *controllerRoot) ListGroups(ctx context.Context) error {
 // In both cases though, the resource the tag pertains to is validated to exist within the database.
 func ResolveTupleObject(db db.Database, tag string) (string, error) {
 	ctx := context.Background()
-	tagKindMatcher := regexp.MustCompile(`.*?([^\s][^-]*)(\-(.*?)\z)`)
-	controllerMatcher := regexp.MustCompile(`.*?([^:|/]*)`)
-	controllerUserMatcher := regexp.MustCompile(`\:(.*?)\/`)
-	controllerModelMatcher := regexp.MustCompile(`\/(.*?)([\.]|\z)`)
-	applicationOfferMatcher := regexp.MustCompile(`\.(.*?)\z`)
-
 	tagKindSubMatch := tagKindMatcher.FindStringSubmatch(tag)
 	tagKind := tagKindSubMatch[1]
 	trailer := tagKindSubMatch[3]
@@ -95,7 +97,7 @@ func ResolveTupleObject(db db.Database, tag string) (string, error) {
 			"Resolving JIMM tags to Juju tags for tag kind: user",
 			zap.String("user-name", userName),
 		)
-		return names.UserTagKind + "-" + trailer, nil
+		return names.NewUserTag(trailer).String(), nil
 
 	case jimmnames.GroupTagKind:
 		// TODO(ale8k): Ask ales why group has no UUID?
@@ -104,7 +106,8 @@ func ResolveTupleObject(db db.Database, tag string) (string, error) {
 		if err != nil {
 			return tag, errors.E("user group does not exist")
 		}
-		return jimmnames.GroupTagKind + "-" + entry.Name, nil
+		return jimmnames.NewGroupTag(entry.Name).String(), nil
+
 	case names.ControllerTagKind:
 		controllerName := controllerMatcher.FindString(trailer)
 		cuuid := ""
@@ -135,7 +138,8 @@ func ResolveTupleObject(db db.Database, tag string) (string, error) {
 			cuuid = controller.UUID
 		}
 
-		return names.ControllerTagKind + "-" + cuuid, nil
+		return names.NewControllerTag(cuuid).String(), nil
+
 	case names.ModelTagKind:
 		// Determine if this is a UUID or JIMM tag
 		muuid := ""
@@ -191,49 +195,64 @@ func ResolveTupleObject(db db.Database, tag string) (string, error) {
 			)
 			err = db.GetModel(ctx, &model)
 			if err != nil {
-				zapctx.Debug(ctx, "?????????????????????????????????????????")
 				return tag, errors.E("model not found")
 			}
 			muuid = model.UUID.String
 		}
-		return names.ModelTagKind + "-" + muuid, nil
+
+		return names.NewModelTag(muuid).String(), nil
 
 	case names.ApplicationOfferTagKind:
-		var sm []string
-		var sm2 []string
-		var sm3 []string
-		if sm = controllerUserMatcher.FindStringSubmatch(trailer); len(sm) < 2 {
-			return tag, errors.E("could not find controller user in tag")
+		// Determine if this is a UUID or JIMM tag
+		auuid := ""
+
+		if _, err := uuid.Parse(trailer); err != nil {
+
+			var sm []string
+			var sm2 []string
+			var sm3 []string
+			if sm = controllerUserMatcher.FindStringSubmatch(trailer); len(sm) < 2 {
+				return tag, errors.E("could not find controller user in tag")
+			}
+			if sm2 = controllerModelMatcher.FindStringSubmatch(trailer); len(sm2) < 2 {
+				return tag, errors.E("could not find controller model in tag")
+			}
+			if sm3 = applicationOfferMatcher.FindStringSubmatch(trailer); len(sm2) < 2 {
+				return tag, errors.E("could not find application offer in tag")
+			}
+			controllerName := controllerMatcher.FindString(trailer)
+			controllerUser := sm[1]
+			modelName := sm2[1]
+			applicationOfferName := sm3[1]
+			zapctx.Debug(
+				ctx,
+				"Resolving JIMM tags to Juju tags for tag kind: applicationoffer",
+				zap.String("controller-name", controllerName),
+				zap.String("controller-user", controllerUser),
+				zap.String("model-name", modelName),
+				zap.String("application-offer-name", applicationOfferName),
+			)
+			// This is simply for validation purposes and to be 100% certain
+			offerURL, err := crossmodel.ParseOfferURL(trailer)
+			if err != nil {
+				return tag, errors.E("failed to parse offer url")
+			}
+			offer := dbmodel.ApplicationOffer{URL: offerURL.String()}
+			err = db.GetApplicationOffer(ctx, &offer)
+			if err != nil {
+				return tag, errors.E("applicationoffer not found")
+			}
+			auuid = offer.UUID
+		} else {
+			offer := dbmodel.ApplicationOffer{UUID: trailer}
+			err = db.GetApplicationOffer(ctx, &offer)
+			if err != nil {
+				return tag, errors.E("applicationoffer not found")
+			}
+			auuid = offer.UUID
+
 		}
-		if sm2 = controllerModelMatcher.FindStringSubmatch(trailer); len(sm2) < 2 {
-			return tag, errors.E("could not find controller model in tag")
-		}
-		if sm3 = applicationOfferMatcher.FindStringSubmatch(trailer); len(sm2) < 2 {
-			return tag, errors.E("could not find application offer in tag")
-		}
-		controllerName := controllerMatcher.FindString(trailer)
-		controllerUser := sm[1]
-		modelName := sm2[1]
-		applicationOfferName := sm3[1]
-		zapctx.Debug(
-			ctx,
-			"Resolving JIMM tags to Juju tags for tag kind: applicationoffer",
-			zap.String("controller-name", controllerName),
-			zap.String("controller-user", controllerUser),
-			zap.String("model-name", modelName),
-			zap.String("application-offer-name", applicationOfferName),
-		)
-		// This is simply for validation purposes and to be 100% certain
-		offerURL, err := crossmodel.ParseOfferURL(trailer)
-		if err != nil {
-			return tag, errors.E("failed to parse offer url")
-		}
-		offer := dbmodel.ApplicationOffer{URL: offerURL.String()}
-		err = db.GetApplicationOffer(ctx, &offer)
-		if err != nil {
-			return tag, errors.E("applicationoffer not found")
-		}
-		return names.ApplicationOfferTagKind + "-" + offer.UUID, nil
+		return jimmnames.NewApplicationOfferTag(auuid).String(), nil
 	}
 	return tag, errors.E("failed to map tag")
 }
@@ -241,7 +260,6 @@ func ResolveTupleObject(db db.Database, tag string) (string, error) {
 // ParseJujuTag attempts to parse the provided key
 // into a juju tag, and returns an error if this is not possible.
 func MapTupleObjectToJujuTag(objectType string, objectId string) (names.Tag, error) {
-	err := errors.E("could not determine tag type")
 	switch objectType {
 	case names.UserTagKind:
 		return names.ParseUserTag(objectId)
@@ -250,11 +268,11 @@ func MapTupleObjectToJujuTag(objectType string, objectId string) (names.Tag, err
 	case names.ControllerTagKind:
 		return names.ParseControllerTag(objectId)
 	case names.ApplicationOfferTagKind:
-		return names.ParseApplicationOfferTag(objectId)
+		return jimmnames.ParseApplicationOfferTag(objectId)
 	case jimmnames.GroupTagKind:
 		return jimmnames.ParseGroupTag(objectId)
 	default:
-		return nil, err
+		return nil, errors.E("could not determine tag type")
 	}
 }
 
@@ -285,7 +303,7 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 	db := r.jimm.Database
 
 	ofc := r.ofgaClient
-	keys := []openfga.TupleKey{}
+	keys := make([]openfga.TupleKey, 0, len(req.Tuples))
 	for _, t := range req.Tuples {
 		objectTag, err := ParseTag(db, t.Object)
 		if err != nil {
