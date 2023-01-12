@@ -37,12 +37,15 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model) error {
 	db := d.DB.WithContext(ctx)
 	if model.UUID.Valid {
 		db = db.Where("uuid = ?", model.UUID.String)
-	} else if model.ControllerID != 0 {
-		db = db.Where("controller_id = ?", model.ControllerID)
+		if model.ControllerID != 0 {
+			db = db.Where("controller_id = ?", model.ControllerID)
+		}
 	} else if model.ID != 0 {
 		db = db.Where("id = ?", model.ID)
 	} else if model.OwnerUsername != "" && model.Name != "" {
 		db = db.Where("owner_username = ? AND name = ?", model.OwnerUsername, model.Name)
+	} else if model.ControllerID != 0 {
+		db = db.Where("controller_id = ?", model.ControllerID)
 	} else {
 		return errors.E(op, "missing id or uuid", errors.CodeBadRequest)
 	}
