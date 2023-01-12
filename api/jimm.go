@@ -141,12 +141,12 @@ func (c *Client) ListGroups() ([]params.Group, error) {
 // Tuple management
 
 // AddRelation adds a relational tuple in JIMM.
-func (c *Client) AddRelation(req *params.ModifyRelationRequest) error {
+func (c *Client) AddRelation(req *params.AddRelationRequest) error {
 	return c.caller.APICall("JIMM", 4, "", "AddRelation", req, nil)
 }
 
 // RemoveRelation removes a relational tuple in JIMM.
-func (c *Client) RemoveRelation(req *params.ModifyRelationRequest) error {
+func (c *Client) RemoveRelation(req *params.RemoveRelationRequest) error {
 	return c.caller.APICall("JIMM", 4, "", "RemoveRelation", req, nil)
 }
 
