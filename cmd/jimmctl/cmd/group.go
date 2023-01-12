@@ -5,6 +5,7 @@ package cmd
 import (
 	"github.com/juju/cmd/v3"
 	jujucmdv3 "github.com/juju/cmd/v3"
+	"github.com/juju/gnuflag"
 	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
@@ -38,6 +39,13 @@ var (
 	Example:
 		jimmctl auth group remove <name>
 `
+
+	listGroupsDoc = `
+	list command lists all groups in jimm.
+
+	Example:
+		jimmctl auth group list
+`
 )
 
 // NewGroupCommand returns a command for group management.
@@ -50,6 +58,7 @@ func NewGroupCommand() *jujucmdv3.SuperCommand {
 	cmd.Register(newAddGroupCommand())
 	cmd.Register(newRenameGroupCommand())
 	cmd.Register(newRemoveGroupCommand())
+	cmd.Register(newListGroupsCommand())
 
 	return cmd
 }
@@ -74,6 +83,7 @@ type addGroupCommand struct {
 	name string
 }
 
+// Info implements the cmd.Command interface.
 func (c *addGroupCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:    "add",
@@ -207,6 +217,7 @@ type removeGroupCommand struct {
 	name string
 }
 
+// Info implements the cmd.Command interface.
 func (c *removeGroupCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:    "Remove",
@@ -245,6 +256,78 @@ func (c *removeGroupCommand) Run(ctxt *cmd.Context) error {
 
 	client := api.NewClient(apiCaller)
 	err = client.RemoveGroup(&params)
+	if err != nil {
+		return errors.E(err)
+	}
+
+	return nil
+}
+
+// newListGroupsCommand returns a command to list all groups.
+func newListGroupsCommand() cmd.Command {
+	cmd := &listGroupsCommand{
+		store: jujuclient.NewFileClientStore(),
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
+
+// listGroupsCommand Lists all groups.
+type listGroupsCommand struct {
+	modelcmd.ControllerCommandBase
+	out cmd.Output
+
+	store    jujuclient.ClientStore
+	dialOpts *jujuapi.DialOpts
+
+	name string
+}
+
+// Info implements the cmd.Command interface.
+func (c *listGroupsCommand) Info() *cmd.Info {
+	return jujucmd.Info(&cmd.Info{
+		Name:    "List",
+		Purpose: "List all groups",
+		Doc:     listGroupsDoc,
+	})
+}
+
+// Init implements the cmd.Command interface.
+func (c *listGroupsCommand) Init(args []string) error {
+	if len(args) > 1 {
+		return errors.E("too many args")
+	}
+	return nil
+}
+
+// SetFlags implements Command.SetFlags.
+func (c *listGroupsCommand) SetFlags(f *gnuflag.FlagSet) {
+	c.CommandBase.SetFlags(f)
+	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
+		"yaml": cmd.FormatYaml,
+		"json": cmd.FormatJson,
+	})
+}
+
+// Run implements Command.Run.
+func (c *listGroupsCommand) Run(ctxt *cmd.Context) error {
+	currentController, err := c.store.CurrentController()
+	if err != nil {
+		return errors.E(err, "could not determine controller")
+	}
+
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", c.dialOpts)
+	if err != nil {
+		return err
+	}
+
+	client := api.NewClient(apiCaller)
+	groups, err := client.ListGroups()
+	if err != nil {
+		return errors.E(err)
+	}
+
+	err = c.out.Write(ctxt, groups)
 	if err != nil {
 		return errors.E(err)
 	}

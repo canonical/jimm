@@ -66,3 +66,31 @@ func (s *accessControlSuite) TestRemoveGroup(c *gc.C) {
 	})
 	c.Assert(err, jc.ErrorIsNil)
 }
+
+func (s *accessControlSuite) TestListGroups(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := api.NewClient(conn)
+
+	groupNames := []string{
+		"test-group0",
+		"test-group1",
+		"test-group2",
+		"aaaFinalGroup",
+	}
+
+	for _, name := range groupNames {
+		err := client.AddGroup(&apiparams.AddGroupRequest{Name: name})
+		c.Assert(err, jc.ErrorIsNil)
+	}
+
+	groups, err := client.ListGroups()
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(groups, gc.HasLen, 4)
+	// groups should be returned in ascending order of name
+	c.Assert(groups[0].Name, gc.Equals, "aaaFinalGroup")
+	c.Assert(groups[1].Name, gc.Equals, "test-group0")
+	c.Assert(groups[2].Name, gc.Equals, "test-group1")
+	c.Assert(groups[3].Name, gc.Equals, "test-group2")
+}
