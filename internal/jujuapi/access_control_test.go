@@ -40,33 +40,55 @@ func (s *accessControlSuite) TestResolveTupleObjectHandlesErrors(c *gc.C) {
 	ctx := context.Background()
 	uuid, _ := uuid.NewRandom()
 	db := s.JIMM.Database
-
 	_, _, controller, _, model, offer := createTestControllerEnvironment(ctx, uuid.String(), c, db)
 
-	_, err := jujuapi.ResolveTupleObject(db, "unknowntag-blabla")
-	c.Assert(err, gc.ErrorMatches, "failed to map tag")
+	type test struct {
+		input string
+		want  string
+	}
 
-	_, err = jujuapi.ResolveTupleObject(db, "group-myspecialpokemon-his-name-is-youguessedit-diglett")
-	c.Assert(err, gc.ErrorMatches, "user group does not exist")
-
-	_, err = jujuapi.ResolveTupleObject(db, "controller-mycontroller-that-does-not-exist")
-	c.Assert(err, gc.ErrorMatches, "controller does not exist")
-
-	_, err = jujuapi.ResolveTupleObject(db, "model-mycontroller-that-does-not-exist/mymodel")
-	c.Assert(err, gc.ErrorMatches, "could not find controller user in tag")
-
-	_, err = jujuapi.ResolveTupleObject(db, "model-"+controller.Name+":alex/")
-	c.Assert(err, gc.ErrorMatches, "model not found")
-
-	_, err = jujuapi.ResolveTupleObject(db, "applicationoffer-"+controller.Name+":alex/"+model.Name+"."+offer.Name+"fluff")
-	c.Assert(err, gc.ErrorMatches, "applicationoffer not found")
+	tests := []test{
+		// Resolves bad tuple objects in general
+		{
+			input: "unknowntag-blabla",
+			want:  "failed to map tag",
+		},
+		// Resolves bad groups where they do not exist
+		{
+			input: "group-myspecialpokemon-his-name-is-youguessedit-diglett",
+			want:  "user group does not exist",
+		},
+		// Resolves bad controllers where they do not exist
+		{
+			input: "controller-mycontroller-that-does-not-exist",
+			want:  "controller does not exist",
+		},
+		// Resolves bad models where the user cannot be obtained from the JIMM tag
+		{
+			input: "model-mycontroller-that-does-not-exist/mymodel",
+			want:  "could not find controller user in tag",
+		},
+		// Resolves bad models where it cannot be found on the specified controller
+		{
+			input: "model-" + controller.Name + ":alex/",
+			want:  "model not found",
+		},
+		// Resolves bad applicationoffers where it cannot be found on the specified controller/model combo
+		{
+			input: "applicationoffer-" + controller.Name + ":alex/" + model.Name + "." + offer.Name + "fluff",
+			want:  "applicationoffer not found",
+		},
+	}
+	for _, tc := range tests {
+		_, err := jujuapi.ResolveTupleObject(db, tc.input)
+		c.Assert(err, gc.ErrorMatches, tc.want)
+	}
 }
 
 func (s *accessControlSuite) TestResolveTupleObjectMapsUsers(c *gc.C) {
 	db := s.JIMM.Database
 	tag, err := jujuapi.ResolveTupleObject(db, "user-alex@externally-werly")
 	c.Assert(err, gc.IsNil)
-	// The username will go through further validation via juju tags
 	c.Assert(tag, gc.Equals, "user-alex@externally-werly")
 }
 
@@ -128,29 +150,27 @@ func (s *accessControlSuite) TestResolveTupleObjectMapsApplicationOffersUUIDs(c 
 	c.Assert(jujuTag, gc.Equals, "applicationoffer-"+offer.UUID)
 }
 
-func (s *accessControlSuite) TestMapTupleObjectToJujuTag(c *gc.C) {
+func (s *accessControlSuite) TestJujuTagFromTuple(c *gc.C) {
 	uuid, _ := uuid.NewRandom()
-	tag, err := jujuapi.MapTupleObjectToJujuTag("user", "user-ale8k@external")
+	tag, err := jujuapi.JujuTagFromTuple("user", "user-ale8k@external")
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag.Id(), gc.Equals, "ale8k@external")
 
-	tag, err = jujuapi.MapTupleObjectToJujuTag("group", "group-mygroup")
+	tag, err = jujuapi.JujuTagFromTuple("group", "group-mygroup")
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag.Id(), gc.Equals, "mygroup")
 
-	tag, err = jujuapi.MapTupleObjectToJujuTag("controller", "controller-"+uuid.String())
+	tag, err = jujuapi.JujuTagFromTuple("controller", "controller-"+uuid.String())
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag.Id(), gc.Equals, uuid.String())
 
-	tag, err = jujuapi.MapTupleObjectToJujuTag("model", "model-"+uuid.String())
+	tag, err = jujuapi.JujuTagFromTuple("model", "model-"+uuid.String())
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag.Id(), gc.Equals, uuid.String())
 
-	// TODO(ale8k): Ask ales what to do here, the applicationoffer tag kind is just 'name', not UUID
-	// should make a custom tag for this?
-	// tag, err = jujuapi.MapTupleObjectToJujuTag("applicationoffer:applicationoffer-" + uuid.String())
-	// c.Assert(err, gc.IsNil)
-	// c.Assert(tag.Id(), gc.Equals, uuid.String())
+	tag, err = jujuapi.JujuTagFromTuple("applicationoffer", "applicationoffer-"+uuid.String())
+	c.Assert(err, gc.IsNil)
+	c.Assert(tag.Id(), gc.Equals, uuid.String())
 }
 
 func (s *accessControlSuite) TestParseTag(c *gc.C) {
@@ -175,6 +195,14 @@ func (s *accessControlSuite) TestParseTag(c *gc.C) {
 	c.Assert(tag.Kind(), gc.Equals, names.ModelTagKind)
 }
 
+// TestAddRelation currently verifies the current test cases: (TODO: Should we verify group -> N?)
+// user -> group
+// user -> controller (name)
+// user -> controller (uuid)
+// user -> model (name)
+// user -> model (uuid)
+// user -> applicationoffer (name)
+// user -> applicationoffer (uuid)
 func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 	ctx := context.Background()
 	conn := s.open(c, nil, "alice")
@@ -183,7 +211,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 	db := s.JIMM.Database
 
 	uuid, _ := uuid.NewRandom()
-	user, _, controller, _, model, _ := createTestControllerEnvironment(ctx, uuid.String(), c, db)
+	user, _, controller, _, model, offer := createTestControllerEnvironment(ctx, uuid.String(), c, db)
 	db.AddGroup(ctx, "test-group")
 
 	type tuple struct {
@@ -276,6 +304,32 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 			}(),
 			err:         false,
 			changesType: "model",
+		},
+		// Test user -> applicationoffer by name
+		{
+			input: tuple{"user:user-" + user.Username, "consumer", "applicationoffer:applicationoffer-" + controller.Name + ":" + user.Username + "/" + model.Name + ".offer1"},
+			want: func() openfga.TupleKey {
+				k := openfga.NewTupleKey()
+				k.SetUser("user:" + user.Username)
+				k.SetRelation("consumer")
+				k.SetObject("applicationoffer:" + offer.UUID)
+				return *k
+			}(),
+			err:         false,
+			changesType: "applicationoffer",
+		},
+		// Test user -> applicationoffer by UUID
+		{
+			input: tuple{"user:user-" + user.Username, "consumer", "applicationoffer:applicationoffer-" + offer.UUID},
+			want: func() openfga.TupleKey {
+				k := openfga.NewTupleKey()
+				k.SetUser("user:" + user.Username)
+				k.SetRelation("consumer")
+				k.SetObject("applicationoffer:" + offer.UUID)
+				return *k
+			}(),
+			err:         false,
+			changesType: "applicationoffer",
 		},
 	}
 

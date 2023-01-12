@@ -13,6 +13,8 @@ func validKinds(kind string) bool {
 	switch kind {
 	case GroupTagKind:
 		return true
+	case ApplicationOfferTagKind:
+		return true
 	}
 	return false
 }
@@ -50,6 +52,11 @@ func ParseTag(tag string) (names.Tag, error) {
 			return nil, invalidTagError(tag, kind)
 		}
 		return NewGroupTag(id), nil
+	case ApplicationOfferTagKind:
+		if !IsValidApplicationOfferTag(id) {
+			return nil, invalidTagError(tag, kind)
+		}
+		return NewApplicationOfferTag(id), nil
 	}
 	return nil, errors.New("couldn't parse tag")
 }

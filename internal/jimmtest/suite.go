@@ -53,7 +53,7 @@ type JIMMSuite struct {
 func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	ofgaAPI, ofgaClient := ofga.SetupTestOFGAClient()
 	s.OFGAApi = ofgaAPI
-	// Setup OpenFGA
+	// Setup OpenFGA.
 	s.JIMM = &jimm.JIMM{
 		Database: db.Database{
 			DB: MemoryDB(cTester{c}, nil),
