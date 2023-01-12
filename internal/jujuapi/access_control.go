@@ -25,11 +25,6 @@ func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupReq
 	return nil
 }
 
-// RemoveGroup removes a group within JIMMs DB for reference by OpenFGA.
-func (r *controllerRoot) RemoveGroup(ctx context.Context) error {
-	return nil
-}
-
 // RenameGroup renames a group within JIMMs DB for reference by OpenFGA.
 func (r *controllerRoot) RenameGroup(ctx context.Context, req apiparams.RenameGroupRequest) error {
 	const op = errors.Op("jujuapi.RenameGroup")
@@ -45,6 +40,25 @@ func (r *controllerRoot) RenameGroup(ctx context.Context, req apiparams.RenameGr
 
 	if err := r.jimm.Database.UpdateGroup(ctx, group); err != nil {
 		zapctx.Error(ctx, "failed to rename group", zaputil.Error(err))
+		return errors.E(op, err)
+	}
+	return nil
+}
+
+// RemoveGroup removes a group within JIMMs DB for reference by OpenFGA.
+func (r *controllerRoot) RemoveGroup(ctx context.Context, req apiparams.RemoveGroupRequest) error {
+	const op = errors.Op("jujuapi.RemoveGroup")
+	if r.user.ControllerAccess != "superuser" {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	group, err := r.jimm.Database.GetGroup(ctx, req.Name)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	//TODO(Kian): Also remove all tuples containing group with confirmation message in the CLI.
+	if err := r.jimm.Database.RemoveGroup(ctx, group); err != nil {
+		zapctx.Error(ctx, "failed to remove group", zaputil.Error(err))
 		return errors.E(op, err)
 	}
 	return nil

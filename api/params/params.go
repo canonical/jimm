@@ -246,12 +246,6 @@ type AddGroupRequest struct {
 	Name string `json:"name"`
 }
 
-// DeleteGroupRequest holds a request to delete a group.
-type DeleteGroupRequest struct {
-	// Name holds the name of the group.
-	Name string `json:"name"`
-}
-
 // RenameGroupRequest holds a request to rename a group.
 type RenameGroupRequest struct {
 	// Name holds the name of the group.
@@ -259,6 +253,12 @@ type RenameGroupRequest struct {
 
 	// NewName holds the new name of the group.
 	NewName string `json:"new-name"`
+}
+
+// RemoveGroupRequest holds a request to remove a group.
+type RemoveGroupRequest struct {
+	// Name holds the name of the group.
+	Name string `json:"name"`
 }
 
 // Group holds the details of a group currently residing in JIMM.
