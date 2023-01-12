@@ -183,7 +183,7 @@ func ResolveTupleObject(db db.Database, tag string) (string, error) {
 			}
 			muuid = model.UUID.String
 		} else {
-			model := dbmodel.Model{UUID: sql.NullString{String: trailer}}
+			model := dbmodel.Model{UUID: sql.NullString{String: trailer, Valid: true}}
 			zapctx.Debug(
 				ctx,
 				"Tag appears to already be a UUID: model",
