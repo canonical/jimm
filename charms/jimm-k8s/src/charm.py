@@ -15,13 +15,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-import functools
 import hashlib
 import json
 import logging
 import os
 
 import hvac
+import requests
 from charms.data_platform_libs.v0.database_requires import (
     DatabaseEvent,
     DatabaseRequires,
@@ -44,7 +44,7 @@ from charms.traefik_k8s.v1.ingress import (
     IngressPerAppRevokedEvent,
 )
 from ops import pebble
-from ops.charm import CharmBase, RelationChangedEvent, RelationJoinedEvent
+from ops.charm import ActionEvent, CharmBase, RelationJoinedEvent
 from ops.framework import StoredState
 from ops.main import main
 from ops.model import (
@@ -74,11 +74,13 @@ STATE_KEY_CSR = "csr"
 STATE_KEY_DSN = "dsn"
 STATE_KEY_DNS_NAME = "dns"
 STATE_KEY_PRIVATE_KEY = "private-key"
+
 OPENFGA_STORE_ID = "openfga-store-id"
 OPENFGA_TOKEN = "openfga-token"
 OPENFGA_ADDRESS = "openfga-address"
 OPENFGA_PORT = "openfga-port"
 OPENFGA_SCHEME = "openfga-scheme"
+OPENFGA_AUTH_MODEL_ID = "openfga-auth-model"
 
 
 class JimmOperatorCharm(CharmBase):
@@ -143,10 +145,17 @@ class JimmOperatorCharm(CharmBase):
             self.on.database_relation_broken, self._on_database_relation_broken
         )
 
+        # OpenFGA relation
         self.openfga = OpenFGARequires(self, "jimm")
         self.framework.observe(
             self.openfga.on.openfga_store_created,
             self._on_openfga_store_created,
+        )
+
+        # create-authorization-model action
+        self.framework.observe(
+            self.on.create_authorization_model_action,
+            self._on_create_authorization_model_action,
         )
 
         self._local_agent_filename = "agent.json"
@@ -238,10 +247,24 @@ class JimmOperatorCharm(CharmBase):
             self.unit.name.replace("/", "-"), self.app.name, self.model.name
         )
         dsn = ""
+        openfga_store_id = ""
+        openfga_auth_model_id = ""
+        openfga_token = ""
+        openfga_address = ""
+        openfga_port = ""
+        openfga_scheme = ""
         try:
             if self.state.get(STATE_KEY_DNS_NAME):
                 dnsname = self.state.get(STATE_KEY_DNS_NAME)
             dsn = self.state.get(STATE_KEY_DSN)
+
+            openfga_store_id = self.state.get(OPENFGA_STORE_ID)
+            openfga_auth_model_id = self.state.get(OPENFGA_AUTH_MODEL_ID)
+            openfga_token = self.state.get(OPENFGA_TOKEN)
+            openfga_address = self.state.get(OPENFGA_ADDRESS)
+            openfga_port = self.state.get(OPENFGA_PORT)
+            openfga_scheme = self.state.get(OPENFGA_SCHEME)
+
         except RelationNotReadyError:
             event.defer()
             return
@@ -257,6 +280,12 @@ class JimmOperatorCharm(CharmBase):
                 "juju-dashboard-location", "https://jaas.ai/models"
             ),
             "JIMM_LISTEN_ADDR": ":8080",
+            "OPENFGA_STORE": openfga_store_id,
+            "OPENFGA_AUTH_MODEL": openfga_auth_model_id,
+            "OPENFGA_HOST": openfga_address,
+            "OPENFGA_SCHEME": openfga_scheme,
+            "OPENFGA_TOKEN": openfga_token,
+            "OPENFGA_PORT": openfga_port,
         }
         if dsn:
             config_values["JIMM_DSN"] = dsn
@@ -362,8 +391,9 @@ class JimmOperatorCharm(CharmBase):
         # get the first endpoint from a comma separate list
         ep = event.endpoints.split(",", 1)[0]
         # compose the db connection string
-        uri = f"postgresql://{event.username}:{event.password}@{ep}/openfga"
+        uri = f"postgresql://{event.username}:{event.password}@{ep}/jimm"
 
+        logger.info("received database uri: {}".format(uri))
         # record the connection string
         try:
             self.state.set(STATE_KEY_DSN, uri)
@@ -550,7 +580,7 @@ class JimmOperatorCharm(CharmBase):
                 event.defer()
                 return
 
-        self._update_workload()
+        self._update_workload(event)
 
     def _on_certificates_relation_joined(
         self, event: RelationJoinedEvent
@@ -686,6 +716,70 @@ class JimmOperatorCharm(CharmBase):
                 return
 
         self._update_workload(event)
+
+    def _on_create_authorization_model_action(self, event: ActionEvent):
+        model = event.params["model"]
+        if not model:
+            event.fail("authorization model not specified")
+            return
+        modelJSON = json.loads(model)
+
+        try:
+            openfga_store_id = self.state.get(OPENFGA_STORE_ID)
+            openfga_token = self.state.get(OPENFGA_TOKEN)
+            openfga_address = self.state.get(OPENFGA_ADDRESS)
+            openfga_port = self.state.get(OPENFGA_PORT)
+            openfga_scheme = self.state.get(OPENFGA_SCHEME)
+
+            if (
+                not openfga_address
+                or not openfga_port
+                or not openfga_scheme
+                or not openfga_token
+                or not openfga_store_id
+            ):
+                event.fail("missing openfga relation")
+                return
+
+            url = "{}://{}:{}/stores/{}/authorization-models".format(
+                openfga_scheme,
+                openfga_address,
+                openfga_port,
+                openfga_store_id,
+            )
+            headers = {"Content-Type": "application/json"}
+            if openfga_token:
+                headers["Authorization"] = "Bearer {}".format(openfga_token)
+
+            # do the post request
+            logger.info("posting to {}, with headers {}".format(url, headers))
+            response = requests.post(
+                url,
+                json=modelJSON,
+                headers=headers,
+                verify=False,
+            )
+            if not response.ok:
+                event.fail(
+                    "failed to create the authorization model: {}".format(
+                        response.text
+                    ),
+                )
+                return
+            data = response.json()
+            authorization_model_id = data.get("authorization_model_id", "")
+            if not authorization_model_id:
+                event.fail(
+                    "response does not contain authorization model id: {}".format(
+                        response.text
+                    )
+                )
+                return
+            self.state.set(OPENFGA_AUTH_MODEL_ID, authorization_model_id)
+            self._update_workload(event)
+        except RelationNotReadyError:
+            event.defer()
+            return
 
 
 if __name__ == "__main__":
