@@ -46,11 +46,6 @@ func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupReq
 	return nil
 }
 
-// RemoveGroup removes a group within JIMMs DB for reference by OpenFGA.
-func (r *controllerRoot) RemoveGroup(ctx context.Context) error {
-	return nil
-}
-
 // RenameGroup renames a group within JIMMs DB for reference by OpenFGA.
 func (r *controllerRoot) RenameGroup(ctx context.Context, req apiparams.RenameGroupRequest) error {
 	const op = errors.Op("jujuapi.RenameGroup")
@@ -71,9 +66,42 @@ func (r *controllerRoot) RenameGroup(ctx context.Context, req apiparams.RenameGr
 	return nil
 }
 
+// RemoveGroup removes a group within JIMMs DB for reference by OpenFGA.
+func (r *controllerRoot) RemoveGroup(ctx context.Context, req apiparams.RemoveGroupRequest) error {
+	const op = errors.Op("jujuapi.RemoveGroup")
+	if r.user.ControllerAccess != "superuser" {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	group, err := r.jimm.Database.GetGroup(ctx, req.Name)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	//TODO(Kian): Also remove all tuples containing group with confirmation message in the CLI.
+	if err := r.jimm.Database.RemoveGroup(ctx, group); err != nil {
+		zapctx.Error(ctx, "failed to remove group", zaputil.Error(err))
+		return errors.E(op, err)
+	}
+	return nil
+}
+
 // ListGroup lists relational access control groups within JIMMs DB.
-func (r *controllerRoot) ListGroups(ctx context.Context) error {
-	return errors.E("Not implemented.")
+func (r *controllerRoot) ListGroups(ctx context.Context) (apiparams.ListGroupResponse, error) {
+	const op = errors.Op("jujuapi.ListGroups")
+	if r.user.ControllerAccess != "superuser" {
+		return apiparams.ListGroupResponse{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	var groups []apiparams.Group
+	err := r.jimm.Database.ForEachGroup(ctx, func(ctl *dbmodel.GroupEntry) error {
+		groups = append(groups, ctl.ToAPIGroupEntry())
+		return nil
+	})
+	if err != nil {
+		return apiparams.ListGroupResponse{}, errors.E(op, err)
+	}
+
+	return apiparams.ListGroupResponse{Groups: groups}, nil
 }
 
 // ResolveTupleObject resolves JIMM tag [of any kind available] (i.e., controller-mycontroller:alex@external/mymodel.myoffer)

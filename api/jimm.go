@@ -121,17 +121,17 @@ func (c *Client) AddGroup(req *params.AddGroupRequest) error {
 	return c.caller.APICall("JIMM", 4, "", "AddGroup", req, nil)
 }
 
-// RemoveGroup removes the group from JIMM.
-func (c *Client) RemoveGroup(req *params.DeleteGroupRequest) error {
-	return c.caller.APICall("JIMM", 4, "", "RemoveGroup", req, nil)
-}
-
-// RenameGroup renames the group in JIMM.
+// RenameGroup renames a group in JIMM.
 func (c *Client) RenameGroup(req *params.RenameGroupRequest) error {
 	return c.caller.APICall("JIMM", 4, "", "RenameGroup", req, nil)
 }
 
-// RenameGroup renames the group in JIMM.
+// RemoveGroup removes a group in JIMM.
+func (c *Client) RemoveGroup(req *params.RemoveGroupRequest) error {
+	return c.caller.APICall("JIMM", 4, "", "RemoveGroup", req, nil)
+}
+
+// ListGroups lists the groups in JIMM.
 func (c *Client) ListGroups() ([]params.Group, error) {
 	var resp params.ListGroupResponse
 	err := c.caller.APICall("JIMM", 4, "", "ListGroups", nil, &resp)
