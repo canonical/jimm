@@ -19,7 +19,7 @@ services:
       JIMM_ADMINS: "jimm"
       VAULT_ADDR: "http://vault:8200"
       VAULT_PATH: "/jimm-kv/"
-      VAULT_SECRET_FILE: "/vault/approle.yaml"
+      VAULT_SECRET_FILE: "/vault/approle.json"
       VAULT_AUTH_PATH: "/auth/approle/login"
       # JIMM_DASHBOARD_LOCATION: ""
       JIMM_DNS_NAME: "127.0.0.1:17070"
@@ -35,7 +35,7 @@ services:
       OPENFGA_TOKEN: "jimm"
     volumes:
       - ./:/jimm/
-      - ./local/vault/approle.yaml:/vault/approle.yaml:rw
+      - ./local/vault/approle.json:/vault/approle.json:rw
       - ./local/vault/roleid.txt:/vault/roleid.txt:rw
     healthcheck:
       test: [ "CMD", "curl", "http://localhost:8080" ]
@@ -89,7 +89,7 @@ services:
       - ./local/vault/vault.hcl:/vault/config/vault.hcl
       - ./local/vault/init.sh:/vault/init.sh
       - ./local/vault/policy.hcl:/vault/policy.hcl
-      - ./local/vault/approle.yaml:/vault/approle.yaml
+      - ./local/vault/approle.json:/vault/approle.json
       - ./local/vault/roleid.txt:/vault/roleid.txt:rw
     command: /vault/init.sh
     depends_on:

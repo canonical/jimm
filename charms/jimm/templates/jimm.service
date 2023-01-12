@@ -9,6 +9,7 @@ EnvironmentFile={{conf_file}}
 EnvironmentFile={{db_file}}
 EnvironmentFile=-{{leader_file}}
 EnvironmentFile=-{{vault_file}}
+EnvironmentFile=-{{openfga_file}}
 ExecStart=/snap/bin/jimm
 Restart=on-failure
 RestartSec=10s
