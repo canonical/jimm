@@ -53,18 +53,3 @@ func TestIsValidGroupId(t *testing.T) {
 	s = r.FindString("1010#member")
 	assert.Equal(t, "1010#member", s)
 }
-
-// -([]string) {
-// 	+([]string) (len=5) {
-// 	+ (string) (len=14) "group-1#member",
-// 	+ (string) (len=5) "group",
-// 	+ (string) (len=1) "-",
-// 	+ (string) (len=1) "1",
-// 	+ (string) (len=7) "#member"
-// 	 }
-
-func TestYolo(t *testing.T) {
-	tagKindMatcher := regexp.MustCompile(`^([^\s][^-]*)(\-)([a-z0-9-]*)([#a-z]*)$`)
-	tagKindSubMatch := tagKindMatcher.FindStringSubmatch("group-1")
-	assert.Equal(t, []string{}, tagKindSubMatch)
-}
