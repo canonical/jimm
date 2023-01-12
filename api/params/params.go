@@ -288,3 +288,7 @@ type RelationshipTuple struct {
 type AddRelationRequest struct {
 	Tuples []RelationshipTuple
 }
+
+type RemoveRelationRequest struct {
+	Tuples []RelationshipTuple
+}

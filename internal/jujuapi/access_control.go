@@ -12,6 +12,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
+	ofgaClient "github.com/CanonicalLtd/jimm/internal/openfga"
 	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
 	"github.com/google/uuid"
 	"github.com/juju/juju/core/crossmodel"
@@ -306,24 +307,16 @@ func ParseTag(db db.Database, key string) (names.Tag, error) {
 	return MapTupleObjectToJujuTag(kind, tagString)
 }
 
-// AddRelation creates a tuple between two objects [if applicable]
-// within OpenFGA.
-func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelationRequest) error {
-	const op = errors.Op("jujuapi.AddRelation")
-	db := r.jimm.Database
-
-	ofc := r.ofgaClient
-	keys := []openfga.TupleKey{}
-	for _, t := range req.Tuples {
+func CreateTuples(ofc *ofgaClient.OFGAClient, db db.Database, tuples []apiparams.RelationshipTuple) ([]openfga.TupleKey, error) {
+	keys := make([]openfga.TupleKey, 0, len(tuples))
+	for _, t := range tuples {
 		objectTag, err := ParseTag(db, t.Object)
 		if err != nil {
-			zapctx.Debug(ctx, "failed to parse tuple user key", zap.String("key", t.Object), zap.Error(err))
-			return errors.E("failed to parse tuple user key: " + t.Object)
+			return nil, errors.E("failed to parse tuple user key: " + t.Object)
 		}
 		targetObject, err := ParseTag(db, t.TargetObject)
 		if err != nil {
-			zapctx.Debug(ctx, "failed to parse tuple object key", zap.String("key", t.TargetObject), zap.Error(err))
-			return errors.E("failed to parse tuple object key: " + t.TargetObject)
+			return nil, errors.E("failed to parse tuple object key: " + t.TargetObject)
 		}
 		keys = append(
 			keys,
@@ -334,10 +327,24 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 			),
 		)
 	}
+	return keys, nil
+}
+
+// AddRelation creates a tuple between two objects [if applicable]
+// within OpenFGA.
+func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelationRequest) error {
+	const op = errors.Op("jujuapi.AddRelation")
+	db := r.jimm.Database
+	ofc := r.ofgaClient
+	keys, err := CreateTuples(ofc, db, req.Tuples)
+	if err != nil {
+		zapctx.Debug(ctx, err.Error())
+		return err
+	}
 	if l := len(keys); l == 0 || l > 25 {
 		return errors.E("length of" + strconv.Itoa(l) + "is not valid, please do not provide more than 25 tuple keys")
 	}
-	err := r.ofgaClient.AddRelations(ctx, keys...)
+	err = r.ofgaClient.AddRelations(ctx, keys...)
 	if err != nil {
 		zapctx.Error(ctx, "failed to add tuple(s)", zap.NamedError("add-relation-error", err))
 		return errors.E(op, err)
@@ -347,8 +354,24 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 
 // RemoveRelation removes a tuple between two objects [if applicable]
 // within OpenFGA.
-func (r *controllerRoot) RemoveRelation(ctx context.Context) error {
-	return errors.E("Not implemented.")
+func (r *controllerRoot) RemoveRelation(ctx context.Context, req apiparams.RemoveRelationRequest) error {
+	const op = errors.Op("jujuapi.RemoveRelation")
+	db := r.jimm.Database
+	ofc := r.ofgaClient
+	keys, err := CreateTuples(ofc, db, req.Tuples)
+	if err != nil {
+		zapctx.Debug(ctx, err.Error())
+		return err
+	}
+	if l := len(keys); l == 0 || l > 25 {
+		return errors.E("length of" + strconv.Itoa(l) + "is not valid, please do not provide more than 25 tuple keys")
+	}
+	err = r.ofgaClient.DeleteRelations(ctx, keys...)
+	if err != nil {
+		zapctx.Error(ctx, "failed to delete tuple(s)", zap.NamedError("delete-relation-error", err))
+		return errors.E(op, err)
+	}
+	return nil
 }
 
 // CheckRelation performs an authorisation check for a particular group/user tuple
