@@ -150,25 +150,25 @@ func (s *accessControlSuite) TestResolveTupleObjectMapsApplicationOffersUUIDs(c 
 	c.Assert(jujuTag, gc.Equals, "applicationoffer-"+offer.UUID)
 }
 
-func (s *accessControlSuite) TestMapTupleObjectToJujuTag(c *gc.C) {
+func (s *accessControlSuite) TestJujuTagFromTuple(c *gc.C) {
 	uuid, _ := uuid.NewRandom()
-	tag, err := jujuapi.MapTupleObjectToJujuTag("user", "user-ale8k@external")
+	tag, err := jujuapi.JujuTagFromTuple("user", "user-ale8k@external")
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag.Id(), gc.Equals, "ale8k@external")
 
-	tag, err = jujuapi.MapTupleObjectToJujuTag("group", "group-mygroup")
+	tag, err = jujuapi.JujuTagFromTuple("group", "group-mygroup")
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag.Id(), gc.Equals, "mygroup")
 
-	tag, err = jujuapi.MapTupleObjectToJujuTag("controller", "controller-"+uuid.String())
+	tag, err = jujuapi.JujuTagFromTuple("controller", "controller-"+uuid.String())
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag.Id(), gc.Equals, uuid.String())
 
-	tag, err = jujuapi.MapTupleObjectToJujuTag("model", "model-"+uuid.String())
+	tag, err = jujuapi.JujuTagFromTuple("model", "model-"+uuid.String())
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag.Id(), gc.Equals, uuid.String())
 
-	tag, err = jujuapi.MapTupleObjectToJujuTag("applicationoffer", "applicationoffer-"+uuid.String())
+	tag, err = jujuapi.JujuTagFromTuple("applicationoffer", "applicationoffer-"+uuid.String())
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag.Id(), gc.Equals, uuid.String())
 }
@@ -461,6 +461,8 @@ func createTestControllerEnvironment(ctx context.Context, uuid string, c *gc.C, 
 	c.Assert(len(offer.UUID), gc.Equals, 36)
 
 	return u, cloud, controller, cred, model, offer
+}
+
 func (s *accessControlSuite) TestRemoveGroup(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()

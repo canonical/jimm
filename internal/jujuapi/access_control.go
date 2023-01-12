@@ -285,9 +285,9 @@ func ResolveTupleObject(db db.Database, tag string) (string, error) {
 	return tag, errors.E("failed to map tag")
 }
 
-// ParseJujuTag attempts to parse the provided key
+// JujuTagFromTuple attempts to parse the provided key
 // into a juju tag, and returns an error if this is not possible.
-func MapTupleObjectToJujuTag(objectType string, objectId string) (names.Tag, error) {
+func JujuTagFromTuple(objectType string, objectId string) (names.Tag, error) {
 	switch objectType {
 	case names.UserTagKind:
 		return names.ParseUserTag(objectId)
@@ -321,7 +321,7 @@ func ParseTag(db db.Database, key string) (names.Tag, error) {
 		zapctx.Debug(ctx, "failed to resolve tuple object", zap.Error(err))
 		return nil, errors.E("failed to resolve tuple object: " + err.Error())
 	}
-	return MapTupleObjectToJujuTag(kind, tagString)
+	return JujuTagFromTuple(kind, tagString)
 }
 
 // AddRelation creates a tuple between two objects [if applicable]
