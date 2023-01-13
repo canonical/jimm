@@ -10,18 +10,18 @@ const (
 )
 
 var (
-	validGroupNameSnippet = "[a-zA-Z0-9][a-zA-Z0-9.#+-]*[a-zA-Z0-9]"
-	validGroupName        = regexp.MustCompile("^" + validGroupNameSnippet + "$")
+	validGroupIdSnippet = `^[1-9][0-9]*(#|\z)[a-z]*$`
+	validGroupId        = regexp.MustCompile(validGroupIdSnippet)
 )
 
 // GroupTag represents a group.
 // Implements juju names.Tag
 type GroupTag struct {
-	name string
+	id string
 }
 
 // Id implements juju names.Tag
-func (t GroupTag) Id() string { return t.name }
+func (t GroupTag) Id() string { return t.id }
 
 // Kind implements juju names.Tag
 func (t GroupTag) Kind() string { return GroupTagKind }
@@ -31,13 +31,14 @@ func (t GroupTag) String() string { return GroupTagKind + "-" + t.Id() }
 
 // NewGroupTag creates a valid GroupTag if it is possible to parse
 // the provided tag.
-func NewGroupTag(groupName string) GroupTag {
-	parts := validGroupName.FindStringSubmatch(groupName)
-	if len(parts) != 1 {
-		panic(fmt.Sprintf("invalid group tag %q", groupName))
+func NewGroupTag(groupId string) GroupTag {
+	id := validGroupId.FindString(groupId)
+
+	if id == "" {
+		panic(fmt.Sprintf("invalid group tag %q", groupId))
 	}
 
-	return GroupTag{name: parts[0]}
+	return GroupTag{id: id}
 }
 
 // ParseGroupTag parses a user group string.
@@ -53,7 +54,7 @@ func ParseGroupTag(tag string) (GroupTag, error) {
 	return gt, nil
 }
 
-// IsValidGroup verifies the id of the tag is valid according to a regex internally.
-func IsValidGroup(id string) bool {
-	return validGroupName.MatchString(id)
+// IsValidGroupId verifies the id of the tag is valid according to a regex internally.
+func IsValidGroupId(id string) bool {
+	return validGroupId.MatchString(id)
 }

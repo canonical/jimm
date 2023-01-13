@@ -3,6 +3,7 @@ package jujuapi_test
 import (
 	"context"
 	"database/sql"
+	"strconv"
 	"time"
 
 	"github.com/CanonicalLtd/jimm/api"
@@ -80,24 +81,29 @@ func (s *accessControlSuite) TestResolveTupleObjectHandlesErrors(c *gc.C) {
 		},
 	}
 	for _, tc := range tests {
-		_, err := jujuapi.ResolveTupleObject(db, tc.input)
+		_, _, err := jujuapi.ResolveTupleObject(db, tc.input)
 		c.Assert(err, gc.ErrorMatches, tc.want)
 	}
 }
 
 func (s *accessControlSuite) TestResolveTupleObjectMapsUsers(c *gc.C) {
 	db := s.JIMM.Database
-	tag, err := jujuapi.ResolveTupleObject(db, "user-alex@externally-werly")
+	tag, specifier, err := jujuapi.ResolveTupleObject(db, "user-alex@externally-werly#member")
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag, gc.Equals, "user-alex@externally-werly")
+	c.Assert(specifier, gc.Equals, "#member")
 }
 
 func (s *accessControlSuite) TestResolveTupleObjectMapsGroups(c *gc.C) {
+	ctx := context.Background()
 	db := s.JIMM.Database
 	db.AddGroup(context.Background(), "myhandsomegroupofdigletts")
-	tag, err := jujuapi.ResolveTupleObject(db, "group-myhandsomegroupofdigletts")
+	group, err := db.GetGroup(ctx, "myhandsomegroupofdigletts")
 	c.Assert(err, gc.IsNil)
-	c.Assert(tag, gc.Equals, "group-myhandsomegroupofdigletts")
+	tag, specifier, err := jujuapi.ResolveTupleObject(db, "group-"+strconv.FormatUint(uint64(group.ID), 10)+"#member")
+	c.Assert(err, gc.IsNil)
+	c.Assert(tag, gc.Equals, "group-"+strconv.FormatUint(uint64(group.ID), 10))
+	c.Assert(specifier, gc.Equals, "#member")
 }
 
 func (s *accessControlSuite) TestResolveTupleObjectMapsControllerUUIDs(c *gc.C) {
@@ -119,9 +125,10 @@ func (s *accessControlSuite) TestResolveTupleObjectMapsControllerUUIDs(c *gc.C) 
 	err = db.AddController(ctx, &controller)
 	c.Assert(err, gc.IsNil)
 
-	tag, err := jujuapi.ResolveTupleObject(db, "controller-mycontroller")
+	tag, specifier, err := jujuapi.ResolveTupleObject(db, "controller-mycontroller#administrator")
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag, gc.Equals, "controller-"+uuid.String())
+	c.Assert(specifier, gc.Equals, "#administrator")
 }
 
 func (s *accessControlSuite) TestResolveTupleObjectMapsModelUUIDs(c *gc.C) {
@@ -129,12 +136,13 @@ func (s *accessControlSuite) TestResolveTupleObjectMapsModelUUIDs(c *gc.C) {
 	db := s.JIMM.Database
 	uuid, _ := uuid.NewRandom()
 	user, _, controller, _, model, _ := createTestControllerEnvironment(ctx, uuid.String(), c, db)
-	jimmTag := "model-" + controller.Name + ":" + user.Username + "/" + model.Name
+	jimmTag := "model-" + controller.Name + ":" + user.Username + "/" + model.Name + "#administrator"
 
-	jujuTag, err := jujuapi.ResolveTupleObject(db, jimmTag)
+	jujuTag, specifier, err := jujuapi.ResolveTupleObject(db, jimmTag)
 
 	c.Assert(err, gc.IsNil)
 	c.Assert(jujuTag, gc.Equals, "model-"+model.UUID.String)
+	c.Assert(specifier, gc.Equals, "#administrator")
 }
 
 func (s *accessControlSuite) TestResolveTupleObjectMapsApplicationOffersUUIDs(c *gc.C) {
@@ -142,12 +150,13 @@ func (s *accessControlSuite) TestResolveTupleObjectMapsApplicationOffersUUIDs(c 
 	db := s.JIMM.Database
 	uuid, _ := uuid.NewRandom()
 	user, _, controller, _, model, offer := createTestControllerEnvironment(ctx, uuid.String(), c, db)
-	jimmTag := "applicationoffer-" + controller.Name + ":" + user.Username + "/" + model.Name + "." + offer.Name
+	jimmTag := "applicationoffer-" + controller.Name + ":" + user.Username + "/" + model.Name + "." + offer.Name + "#administrator"
 
-	jujuTag, err := jujuapi.ResolveTupleObject(db, jimmTag)
+	jujuTag, specifier, err := jujuapi.ResolveTupleObject(db, jimmTag)
 
 	c.Assert(err, gc.IsNil)
 	c.Assert(jujuTag, gc.Equals, "applicationoffer-"+offer.UUID)
+	c.Assert(specifier, gc.Equals, "#administrator")
 }
 
 func (s *accessControlSuite) TestJujuTagFromTuple(c *gc.C) {
@@ -156,9 +165,9 @@ func (s *accessControlSuite) TestJujuTagFromTuple(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag.Id(), gc.Equals, "ale8k@external")
 
-	tag, err = jujuapi.JujuTagFromTuple("group", "group-mygroup")
+	tag, err = jujuapi.JujuTagFromTuple("group", "group-1")
 	c.Assert(err, gc.IsNil)
-	c.Assert(tag.Id(), gc.Equals, "mygroup")
+	c.Assert(tag.Id(), gc.Equals, "1")
 
 	tag, err = jujuapi.JujuTagFromTuple("controller", "controller-"+uuid.String())
 	c.Assert(err, gc.IsNil)
@@ -178,24 +187,27 @@ func (s *accessControlSuite) TestParseTag(c *gc.C) {
 	db := s.JIMM.Database
 	uuid, _ := uuid.NewRandom()
 	user, _, controller, _, model, _ := createTestControllerEnvironment(ctx, uuid.String(), c, db)
-	jimmTag := "model:model-" + controller.Name + ":" + user.Username + "/" + model.Name
+	jimmTag := "model:model-" + controller.Name + ":" + user.Username + "/" + model.Name + "#administrator"
 
 	// JIMM tag syntax for models
-	tag, err := jujuapi.ParseTag(db, jimmTag)
+	tag, specifier, err := jujuapi.ParseTag(db, jimmTag)
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag.Kind(), gc.Equals, names.ModelTagKind)
 	c.Assert(tag.Id(), gc.Equals, uuid.String())
+	c.Assert(specifier, gc.Equals, "#administrator")
 
-	jujuTag := "model:model-" + uuid.String()
+	jujuTag := "model:model-" + uuid.String() + "#administrator"
 
 	// Juju tag syntax for models
-	tag, err = jujuapi.ParseTag(db, jujuTag)
+	tag, specifier, err = jujuapi.ParseTag(db, jujuTag)
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag.Id(), gc.Equals, uuid.String())
 	c.Assert(tag.Kind(), gc.Equals, names.ModelTagKind)
+	c.Assert(specifier, gc.Equals, "#administrator")
 }
 
-// TestAddRelation currently verifies the current test cases: (TODO: Should we verify group -> N?)
+// TestAddRelation currently verifies the following test cases,
+// when new relation control is to be added, please update this comment:
 // user -> group
 // user -> controller (name)
 // user -> controller (uuid)
@@ -203,6 +215,13 @@ func (s *accessControlSuite) TestParseTag(c *gc.C) {
 // user -> model (uuid)
 // user -> applicationoffer (name)
 // user -> applicationoffer (uuid)
+// group -> controller (name)
+// group -> controller (uuid)
+// group -> model (name)
+// group -> model (uuid)
+// group -> applicationoffer (name)
+// group -> applicationoffer (uuid)
+// group#member -> group
 func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 	ctx := context.Background()
 	conn := s.open(c, nil, "alice")
@@ -212,8 +231,16 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 
 	uuid, _ := uuid.NewRandom()
 	user, _, controller, _, model, offer := createTestControllerEnvironment(ctx, uuid.String(), c, db)
-	db.AddGroup(ctx, "test-group")
 
+	db.AddGroup(ctx, "test-group")
+	group, err := db.GetGroup(ctx, "test-group")
+	c.Assert(err, gc.IsNil)
+
+	db.AddGroup(ctx, "test-group2")
+	group2, err := db.GetGroup(ctx, "test-group2")
+	c.Assert(err, gc.IsNil)
+
+	c.Assert(err, gc.IsNil)
 	type tuple struct {
 		user     string
 		relation string
@@ -253,25 +280,25 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 			err:         false,
 			changesType: "controller",
 		},
-		// Test user -> group
+		//Test user -> group
 		{
-			input: tuple{"user:user-" + user.Username, "member", "group:group-" + "test-group"},
+			input: tuple{"user:user-" + user.Username, "member", "group:group-" + group.Name},
 			want: func() openfga.TupleKey {
 				k := openfga.NewTupleKey()
 				k.SetUser("user:" + user.Username)
 				k.SetRelation("member")
-				k.SetObject("group:" + "test-group")
+				k.SetObject("group:" + strconv.FormatUint(uint64(group.ID), 10))
 				return *k
 			}(),
 			err:         false,
 			changesType: "group",
 		},
-		// Test group -> controller
+		//Test group -> controller
 		{
 			input: tuple{"group:group-" + "test-group", "administrator", "controller:controller-" + controller.UUID},
 			want: func() openfga.TupleKey {
 				k := openfga.NewTupleKey()
-				k.SetUser("group:" + "test-group")
+				k.SetUser("group:" + strconv.FormatUint(uint64(group.ID), 10))
 				k.SetRelation("administrator")
 				k.SetObject("controller:" + controller.UUID)
 				return *k
@@ -279,7 +306,7 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 			err:         false,
 			changesType: "controller",
 		},
-		// Test user -> model by name
+		//Test user -> model by name
 		{
 			input: tuple{"user:user-" + user.Username, "writer", "model:model-" + controller.Name + ":" + user.Username + "/" + model.Name},
 			want: func() openfga.TupleKey {
@@ -331,13 +358,104 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 			err:         false,
 			changesType: "applicationoffer",
 		},
+		// Test group -> controller by name
+		{
+			input: tuple{"group:group-" + group.Name + "#member", "administrator", "controller:controller-" + controller.Name},
+			want: func() openfga.TupleKey {
+				k := openfga.NewTupleKey()
+				k.SetUser("group:" + strconv.FormatUint(uint64(group.ID), 10) + "#member")
+				k.SetRelation("administrator")
+				k.SetObject("controller:" + controller.UUID)
+				return *k
+			}(),
+			err:         false,
+			changesType: "controller",
+		},
+		// Test group -> controller by UUID
+		{
+			input: tuple{"group:group-" + group.Name + "#member", "administrator", "controller:controller-" + controller.UUID},
+			want: func() openfga.TupleKey {
+				k := openfga.NewTupleKey()
+				k.SetUser("group:" + strconv.FormatUint(uint64(group.ID), 10) + "#member")
+				k.SetRelation("administrator")
+				k.SetObject("controller:" + controller.UUID)
+				return *k
+			}(),
+			err:         false,
+			changesType: "controller",
+		},
+		// Test group -> model by name
+		{
+			input: tuple{"group:group-" + group.Name + "#member", "writer", "model:model-" + controller.Name + ":" + user.Username + "/" + model.Name},
+			want: func() openfga.TupleKey {
+				k := openfga.NewTupleKey()
+				k.SetUser("group:" + strconv.FormatUint(uint64(group.ID), 10) + "#member")
+				k.SetRelation("writer")
+				k.SetObject("model:" + model.UUID.String)
+				return *k
+			}(),
+			err:         false,
+			changesType: "model",
+		},
+		// Test group -> model by UUID
+		{
+			input: tuple{"group:group-" + group.Name + "#member", "writer", "model:model-" + model.UUID.String},
+			want: func() openfga.TupleKey {
+				k := openfga.NewTupleKey()
+				k.SetUser("group:" + strconv.FormatUint(uint64(group.ID), 10) + "#member")
+				k.SetRelation("writer")
+				k.SetObject("model:" + model.UUID.String)
+				return *k
+			}(),
+			err:         false,
+			changesType: "model",
+		},
+		// Test group -> applicationoffer by name
+		{
+			input: tuple{"group:group-" + group.Name + "#member", "consumer", "applicationoffer:applicationoffer-" + controller.Name + ":" + user.Username + "/" + model.Name + ".offer1"},
+			want: func() openfga.TupleKey {
+				k := openfga.NewTupleKey()
+				k.SetUser("group:" + strconv.FormatUint(uint64(group.ID), 10) + "#member")
+				k.SetRelation("consumer")
+				k.SetObject("applicationoffer:" + offer.UUID)
+				return *k
+			}(),
+			err:         false,
+			changesType: "applicationoffer",
+		},
+		// Test group -> applicationoffer by UUID
+		{
+			input: tuple{"group:group-" + group.Name + "#member", "consumer", "applicationoffer:applicationoffer-" + offer.UUID},
+			want: func() openfga.TupleKey {
+				k := openfga.NewTupleKey()
+				k.SetUser("group:" + strconv.FormatUint(uint64(group.ID), 10) + "#member")
+				k.SetRelation("consumer")
+				k.SetObject("applicationoffer:" + offer.UUID)
+				return *k
+			}(),
+			err:         false,
+			changesType: "applicationoffer",
+		},
+		// Test group -> group
+		{
+			input: tuple{"group:group-" + group.Name + "#member", "member", "group:group-" + group2.Name},
+			want: func() openfga.TupleKey {
+				k := openfga.NewTupleKey()
+				k.SetUser("group:" + strconv.FormatUint(uint64(group.ID), 10) + "#member")
+				k.SetRelation("member")
+				k.SetObject("group:" + strconv.FormatUint(uint64(group2.ID), 10))
+				return *k
+			}(),
+			err:         false,
+			changesType: "group",
+		},
 	}
 
 	for i, tc := range tagTests {
 		if i != 0 {
 			wr := openfga.NewWriteRequest()
 			keys := openfga.NewTupleKeysWithDefaults()
-			keys.SetTupleKeys([]openfga.TupleKey{tagTests[i-1].want})
+			keys.SetTupleKeys([]openfga.TupleKey{tagTests[i].want})
 			wr.SetDeletes(*keys)
 			s.OFGAApi.Write(context.Background()).Body(*wr).Execute()
 		}

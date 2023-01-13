@@ -36,12 +36,12 @@ func (d *Database) GetUser(ctx context.Context, u *dbmodel.User) error {
 	return nil
 }
 
-// GetUserNoCreate loads the user details for the user identified by username. It
+// FetchUser loads the user details for the user identified by username. It
 // will not create a user if the user cannot be found.
 //
-// GetUser returns an error with CodeNotFound if the username is invalid.
-func (d *Database) GetUserNoCreate(ctx context.Context, u *dbmodel.User) error {
-	const op = errors.Op("db.GetUserNoCreate")
+// FetchUser returns an error with CodeNotFound if the username is invalid.
+func (d *Database) FetchUser(ctx context.Context, u *dbmodel.User) error {
+	const op = errors.Op("db.FetchUser")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
