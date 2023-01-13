@@ -51,6 +51,19 @@ func (o *OFGAClient) addRelation(ctx context.Context, t ...openfga.TupleKey) err
 	return nil
 }
 
+// deleteRelation deletes user(s) from the specified object by the specified relation within the tuple keys given.
+func (o *OFGAClient) deleteRelation(ctx context.Context, t ...openfga.TupleKey) error {
+	wr := openfga.NewWriteRequest()
+	wr.SetAuthorizationModelId(o.AuthModelId)
+	keys := openfga.NewTupleKeys(t)
+	wr.SetDeletes(*keys)
+	_, _, err := o.api.Write(ctx).Body(*wr).Execute()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // getRelatedObjects returns all objects where the user has a valid relation to them.
 // Such as all the groups a user resides in.
 //
@@ -89,6 +102,11 @@ func (o *OFGAClient) CreateTupleKey(object string, relation string, targetObject
 // AddRelations creates a tuple(s) from the provided keys. See CreateTupleKey for creating keys.
 func (o *OFGAClient) AddRelations(ctx context.Context, keys ...openfga.TupleKey) error {
 	return o.addRelation(ctx, keys...)
+}
+
+// AddRelations creates a tuple(s) from the provided keys. See CreateTupleKey for creating keys.
+func (o *OFGAClient) DeleteRelations(ctx context.Context, keys ...openfga.TupleKey) error {
+	return o.deleteRelation(ctx, keys...)
 }
 
 // ReadRelations reads a relation(s) from the provided key where a match can be found.

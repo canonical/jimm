@@ -2,15 +2,35 @@ package jujuapi
 
 import (
 	"context"
+	"database/sql"
+	"regexp"
+	"strconv"
+	"strings"
 
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
+	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
+	ofgaClient "github.com/CanonicalLtd/jimm/internal/openfga"
+	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
+	"github.com/google/uuid"
+	"github.com/juju/juju/core/crossmodel"
+	"github.com/juju/names/v4"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
+	openfga "github.com/openfga/go-sdk"
+	"go.uber.org/zap"
 )
 
 // access_control contains the primary RPC commands for handling ReBAC within JIMM via the JIMM facade itself.
+
+var ( // .*?([^\s][^-]*)(\-)([a-z0-9]*)(#[a-z]*)
+	tagKindMatcher          = regexp.MustCompile(`^([^\s][^-]*)(\-)([a-z0-9-@:/.]*)([#a-z]*)$`)
+	controllerMatcher       = regexp.MustCompile(`.*?([^:|/]*)`)
+	controllerUserMatcher   = regexp.MustCompile(`\:(.*?)\/`)
+	controllerModelMatcher  = regexp.MustCompile(`\/(.*?)([\.]|\z)`)
+	applicationOfferMatcher = regexp.MustCompile(`\.(.*?)\z`)
+)
 
 // AddGroup creates a group within JIMMs DB for reference by OpenFGA.
 func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupRequest) error {
@@ -84,16 +104,301 @@ func (r *controllerRoot) ListGroups(ctx context.Context) (apiparams.ListGroupRes
 	return apiparams.ListGroupResponse{Groups: groups}, nil
 }
 
+// ResolveTupleObject resolves JIMM tag [of any kind available] (i.e., controller-mycontroller:alex@external/mymodel.myoffer)
+// into a juju string tag (i.e., controller-<controller uuid>).
+//
+// If the JIMM tag is aleady of juju string tag form, the transformation is left alone.
+//
+// In both cases though, the resource the tag pertains to is validated to exist within the database.
+func ResolveTupleObject(db db.Database, tag string) (string, string, error) {
+	ctx := context.Background()
+	// Splits the tag, of form akin to: group-hi34#yolo
+	// into:
+	// group 1: group
+	// group 2: -
+	// group 3: hi34
+	// group 4: #yolo
+	// We do this as we require the juju tag validation, but to also return the
+	// relation specifier (#yolo)
+	tagKindSubMatch := tagKindMatcher.FindStringSubmatch(tag)
+	if len(tagKindSubMatch) != 5 {
+		return "", "", errors.E("failed to detect valid tag string")
+	}
+	tagKind := tagKindSubMatch[1]
+	trailer := tagKindSubMatch[3]
+	relationSpecifier := tagKindSubMatch[4]
+
+	switch tagKind {
+	case names.UserTagKind:
+		// Users are a different case, as we only care for the trailer
+		userName := trailer
+		zapctx.Debug(
+			ctx,
+			"Resolving JIMM tags to Juju tags for tag kind: user",
+			zap.String("user-name", userName),
+		)
+		return names.NewUserTag(trailer).String(), relationSpecifier, nil
+
+	case jimmnames.GroupTagKind:
+		entry, err := db.GetGroup(ctx, trailer)
+		if err != nil {
+			return tag, relationSpecifier, errors.E("user group does not exist")
+		}
+
+		return jimmnames.NewGroupTag(strconv.FormatUint(uint64(entry.ID), 10)).String(), relationSpecifier, nil
+
+	case names.ControllerTagKind:
+		controllerName := controllerMatcher.FindString(trailer)
+		cuuid := ""
+
+		if _, err := uuid.Parse(trailer); err != nil {
+			controller := dbmodel.Controller{Name: controllerName}
+			zapctx.Debug(
+				ctx,
+				"Resolving JIMM tags to Juju tags for tag kind: controller",
+				zap.String("controller-name", controllerName),
+			)
+			err := db.GetController(ctx, &controller)
+			if err != nil {
+				return tag, relationSpecifier, errors.E("controller does not exist")
+			}
+			cuuid = controller.UUID
+		} else {
+			controller := dbmodel.Controller{UUID: trailer}
+			zapctx.Debug(
+				ctx,
+				"Tag appears to already be a UUID: controller",
+				zap.String("controller-name", trailer),
+			)
+			err := db.GetController(ctx, &controller)
+			if err != nil {
+				return tag, relationSpecifier, errors.E("controller does not exist")
+			}
+			cuuid = controller.UUID
+		}
+
+		return names.NewControllerTag(cuuid).String(), relationSpecifier, nil
+
+	case names.ModelTagKind:
+		muuid := ""
+
+		if _, err := uuid.Parse(trailer); err != nil {
+
+			var sm []string
+			var sm2 []string
+			if sm = controllerUserMatcher.FindStringSubmatch(trailer); len(sm) < 2 {
+				return tag, relationSpecifier, errors.E("could not find controller user in tag")
+			}
+			if sm2 = controllerModelMatcher.FindStringSubmatch(trailer); len(sm2) < 2 {
+				return tag, relationSpecifier, errors.E("could not find controller model in tag")
+			}
+			controllerName := controllerMatcher.FindString(trailer)
+			controllerUser := sm[1]
+			modelName := sm2[1]
+			zapctx.Debug(
+				ctx,
+				"Resolving JIMM tags to Juju tags for tag kind: model",
+				zap.String("controller-name", controllerName),
+				zap.String("controller-user", controllerUser),
+				zap.String("model-name", modelName),
+			)
+
+			// We only care about the controller ID to ensure
+			// an absolute unique combination when querying
+			// the model
+			controller := dbmodel.Controller{Name: controllerName}
+			err := db.GetController(ctx, &controller)
+			if err != nil {
+				return tag, relationSpecifier, errors.E("controller does not exist")
+			}
+			// TODO(ale8k): Investigate why when querying with model name as emptry string
+			// it's somehow getting the model anyway...
+			if modelName == "" {
+				return tag, relationSpecifier, errors.E("model not found")
+			}
+			// This combination of ControllerID, OwnerUsername and ModelName *should* be universally unique
+			// We query models separately as to not preload the models on the controller.
+			model := dbmodel.Model{ControllerID: controller.ID, OwnerUsername: controllerUser, Name: modelName}
+			err = db.GetModel(ctx, &model)
+			if err != nil {
+				return tag, relationSpecifier, errors.E("model not found")
+			}
+			muuid = model.UUID.String
+		} else {
+			model := dbmodel.Model{UUID: sql.NullString{String: trailer, Valid: true}}
+			zapctx.Debug(
+				ctx,
+				"Tag appears to already be a UUID: model",
+				zap.String("model-name", trailer),
+			)
+			err = db.GetModel(ctx, &model)
+			if err != nil {
+				return tag, relationSpecifier, errors.E("model not found")
+			}
+			muuid = model.UUID.String
+		}
+
+		return names.NewModelTag(muuid).String(), relationSpecifier, nil
+
+	case names.ApplicationOfferTagKind:
+		auuid := ""
+
+		if _, err := uuid.Parse(trailer); err != nil {
+
+			var sm []string
+			var sm2 []string
+			var sm3 []string
+			if sm = controllerUserMatcher.FindStringSubmatch(trailer); len(sm) < 2 {
+				return tag, relationSpecifier, errors.E("could not find controller user in tag")
+			}
+			if sm2 = controllerModelMatcher.FindStringSubmatch(trailer); len(sm2) < 2 {
+				return tag, relationSpecifier, errors.E("could not find controller model in tag")
+			}
+			if sm3 = applicationOfferMatcher.FindStringSubmatch(trailer); len(sm2) < 2 {
+				return tag, relationSpecifier, errors.E("could not find application offer in tag")
+			}
+			controllerName := controllerMatcher.FindString(trailer)
+			controllerUser := sm[1]
+			modelName := sm2[1]
+			applicationOfferName := sm3[1]
+			zapctx.Debug(
+				ctx,
+				"Resolving JIMM tags to Juju tags for tag kind: applicationoffer",
+				zap.String("controller-name", controllerName),
+				zap.String("controller-user", controllerUser),
+				zap.String("model-name", modelName),
+				zap.String("application-offer-name", applicationOfferName),
+			)
+			// This is simply for validation purposes and to be 100% certain
+			offerURL, err := crossmodel.ParseOfferURL(trailer)
+			if err != nil {
+				return tag, relationSpecifier, errors.E("failed to parse offer url")
+			}
+			offer := dbmodel.ApplicationOffer{URL: offerURL.String()}
+			err = db.GetApplicationOffer(ctx, &offer)
+			if err != nil {
+				return tag, relationSpecifier, errors.E("applicationoffer not found")
+			}
+			auuid = offer.UUID
+		} else {
+			offer := dbmodel.ApplicationOffer{UUID: trailer}
+			err = db.GetApplicationOffer(ctx, &offer)
+			if err != nil {
+				return tag, relationSpecifier, errors.E("applicationoffer not found")
+			}
+			auuid = offer.UUID
+
+		}
+		return jimmnames.NewApplicationOfferTag(auuid).String(), relationSpecifier, nil
+	}
+	return tag, relationSpecifier, errors.E("failed to map tag")
+}
+
+// JujuTagFromTuple attempts to parse the provided key
+// into a juju tag, and returns an error if this is not possible.
+func JujuTagFromTuple(objectType string, objectId string) (names.Tag, error) {
+	switch objectType {
+	case names.UserTagKind:
+		return names.ParseUserTag(objectId)
+	case names.ModelTagKind:
+		return names.ParseModelTag(objectId)
+	case names.ControllerTagKind:
+		return names.ParseControllerTag(objectId)
+	case names.ApplicationOfferTagKind:
+		return jimmnames.ParseApplicationOfferTag(objectId)
+	case jimmnames.GroupTagKind:
+		return jimmnames.ParseGroupTag(objectId)
+	default:
+		return nil, errors.E("could not determine tag type")
+	}
+}
+
+// ParseTag attempts to parse the provided key into a tag whilst additionally
+// ensuring the resource exists for said tag.
+//
+// This key may be in the form of either a JIMM tag string or Juju tag string.
+func ParseTag(db db.Database, key string) (names.Tag, string, error) {
+	ctx := context.Background()
+	tupleKeySplit := strings.SplitN(key, ":", 2)
+	if len(tupleKeySplit) != 2 {
+		return nil, "", errors.E("tag does not have tuple key delimiter")
+	}
+	kind := tupleKeySplit[0]
+	tagString := tupleKeySplit[1]
+	tagString, relationSpecifier, err := ResolveTupleObject(db, tagString)
+	if err != nil {
+		zapctx.Debug(ctx, "failed to resolve tuple object", zap.Error(err))
+		return nil, "", errors.E("failed to resolve tuple object: " + err.Error())
+	}
+	tag, err := JujuTagFromTuple(kind, tagString)
+	return tag, relationSpecifier, err
+}
+
+func createTupleKeys(ofc *ofgaClient.OFGAClient, db db.Database, tuples []apiparams.RelationshipTuple) ([]openfga.TupleKey, error) {
+	keys := make([]openfga.TupleKey, 0, len(tuples))
+	for _, t := range tuples {
+		objectTag, objectTagRelationSpecifier, err := ParseTag(db, t.Object)
+		if err != nil {
+			return nil, err
+		}
+		targetObject, targetObjectRelationSpecifier, err := ParseTag(db, t.TargetObject)
+		if err != nil {
+			return nil, err
+		}
+		keys = append(
+			keys,
+			ofc.CreateTupleKey(
+				objectTag.Kind()+":"+objectTag.Id()+objectTagRelationSpecifier,
+				t.Relation,
+				targetObject.Kind()+":"+targetObject.Id()+targetObjectRelationSpecifier,
+			),
+		)
+	}
+	return keys, nil
+}
+
 // AddRelation creates a tuple between two objects [if applicable]
 // within OpenFGA.
-func (r *controllerRoot) AddRelation(ctx context.Context) error {
-	return errors.E("Not implemented.")
+func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelationRequest) error {
+	const op = errors.Op("jujuapi.AddRelation")
+	db := r.jimm.Database
+	ofc := r.ofgaClient
+	keys, err := createTupleKeys(ofc, db, req.Tuples)
+	if err != nil {
+		zapctx.Debug(ctx, err.Error())
+		return err
+	}
+	if l := len(keys); l == 0 || l > 25 {
+		return errors.E("length of" + strconv.Itoa(l) + "is not valid, please do not provide more than 25 tuple keys")
+	}
+	err = r.ofgaClient.AddRelations(ctx, keys...)
+	if err != nil {
+		zapctx.Error(ctx, "failed to add tuple(s)", zap.NamedError("add-relation-error", err))
+		return errors.E(op, err)
+	}
+	return nil
 }
 
 // RemoveRelation removes a tuple between two objects [if applicable]
 // within OpenFGA.
-func (r *controllerRoot) RemoveRelation(ctx context.Context) error {
-	return errors.E("Not implemented.")
+func (r *controllerRoot) RemoveRelation(ctx context.Context, req apiparams.RemoveRelationRequest) error {
+	const op = errors.Op("jujuapi.RemoveRelation")
+	db := r.jimm.Database
+	ofc := r.ofgaClient
+	keys, err := createTupleKeys(ofc, db, req.Tuples)
+	if err != nil {
+		zapctx.Debug(ctx, err.Error())
+		return err
+	}
+	if l := len(keys); l == 0 || l > 25 {
+		return errors.E("length of" + strconv.Itoa(l) + "is not valid, please do not provide more than 25 tuple keys")
+	}
+	err = r.ofgaClient.DeleteRelations(ctx, keys...)
+	if err != nil {
+		zapctx.Error(ctx, "failed to delete tuple(s)", zap.NamedError("delete-relation-error", err))
+		return errors.E(op, err)
+	}
+	return nil
 }
 
 // CheckRelation performs an authorisation check for a particular group/user tuple

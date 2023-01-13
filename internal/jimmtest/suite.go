@@ -14,6 +14,7 @@ import (
 	corejujutesting "github.com/juju/juju/juju/testing"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
+	openfga "github.com/openfga/go-sdk"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
@@ -21,6 +22,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jujuclient"
+	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
 )
 
@@ -45,16 +47,21 @@ type JIMMSuite struct {
 	JIMM *jimm.JIMM
 
 	AdminUser *dbmodel.User
+	OFGAApi   openfga.OpenFgaApi
 }
 
 func (s *JIMMSuite) SetUpTest(c *gc.C) {
+	ofgaAPI, ofgaClient := ofga.SetupTestOFGAClient()
+	s.OFGAApi = ofgaAPI
+	// Setup OpenFGA.
 	s.JIMM = &jimm.JIMM{
 		Database: db.Database{
 			DB: MemoryDB(cTester{c}, nil),
 		},
-		Dialer: &jujuclient.Dialer{},
-		Pubsub: new(pubsub.Hub),
-		UUID:   ControllerUUID,
+		Dialer:        &jujuclient.Dialer{},
+		Pubsub:        new(pubsub.Hub),
+		UUID:          ControllerUUID,
+		OpenFGAClient: ofgaClient,
 	}
 	ctx := context.Background()
 	err := s.JIMM.Database.Migrate(ctx, false)

@@ -36,6 +36,27 @@ func (d *Database) GetUser(ctx context.Context, u *dbmodel.User) error {
 	return nil
 }
 
+// FetchUser loads the user details for the user identified by username. It
+// will not create a user if the user cannot be found.
+//
+// FetchUser returns an error with CodeNotFound if the username is invalid.
+func (d *Database) FetchUser(ctx context.Context, u *dbmodel.User) error {
+	const op = errors.Op("db.FetchUser")
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	if u.Username == "" {
+		return errors.E(op, errors.CodeNotFound, `invalid username ""`)
+	}
+
+	db := d.DB.WithContext(ctx)
+	if err := db.Where("username = ?", u.Username).First(&u).Error; err != nil {
+		return errors.E(op, err)
+	}
+	return nil
+}
+
 // GetUserClouds gets all the UserCloudAccess records associated with the
 // given user.
 func (d *Database) GetUserClouds(ctx context.Context, u *dbmodel.User) ([]dbmodel.UserCloudAccess, error) {
