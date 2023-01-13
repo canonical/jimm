@@ -325,16 +325,16 @@ func ParseTag(db db.Database, key string) (names.Tag, error) {
 	return JujuTagFromTuple(kind, tagString)
 }
 
-func CreateTuples(ofc *ofgaClient.OFGAClient, db db.Database, tuples []apiparams.RelationshipTuple) ([]openfga.TupleKey, error) {
+func createTupleKeys(ofc *ofgaClient.OFGAClient, db db.Database, tuples []apiparams.RelationshipTuple) ([]openfga.TupleKey, error) {
 	keys := make([]openfga.TupleKey, 0, len(tuples))
 	for _, t := range tuples {
 		objectTag, err := ParseTag(db, t.Object)
 		if err != nil {
-			return nil, errors.E("failed to parse tuple user key: " + t.Object)
+			return nil, err
 		}
 		targetObject, err := ParseTag(db, t.TargetObject)
 		if err != nil {
-			return nil, errors.E("failed to parse tuple object key: " + t.TargetObject)
+			return nil, err
 		}
 		keys = append(
 			keys,
@@ -354,7 +354,7 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 	const op = errors.Op("jujuapi.AddRelation")
 	db := r.jimm.Database
 	ofc := r.ofgaClient
-	keys, err := CreateTuples(ofc, db, req.Tuples)
+	keys, err := CreateTupleKeys(ofc, db, req.Tuples)
 	if err != nil {
 		zapctx.Debug(ctx, err.Error())
 		return err
@@ -376,7 +376,7 @@ func (r *controllerRoot) RemoveRelation(ctx context.Context, req apiparams.Remov
 	const op = errors.Op("jujuapi.RemoveRelation")
 	db := r.jimm.Database
 	ofc := r.ofgaClient
-	keys, err := CreateTuples(ofc, db, req.Tuples)
+	keys, err := CreateTupleKeys(ofc, db, req.Tuples)
 	if err != nil {
 		zapctx.Debug(ctx, err.Error())
 		return err
