@@ -57,12 +57,12 @@ func (s *accessControlSuite) TestResolveTupleObjectHandlesErrors(c *gc.C) {
 		// Resolves bad groups where they do not exist
 		{
 			input: "group-myspecialpokemon-his-name-is-youguessedit-diglett",
-			want:  "group does not exist",
+			want:  "group not found",
 		},
 		// Resolves bad controllers where they do not exist
 		{
 			input: "controller-mycontroller-that-does-not-exist",
-			want:  "controller does not exist",
+			want:  "controller not found",
 		},
 		// Resolves bad models where the user cannot be obtained from the JIMM tag
 		{
@@ -77,7 +77,7 @@ func (s *accessControlSuite) TestResolveTupleObjectHandlesErrors(c *gc.C) {
 		// Resolves bad applicationoffers where it cannot be found on the specified controller/model combo
 		{
 			input: "applicationoffer-" + controller.Name + ":alex/" + model.Name + "." + offer.Name + "fluff",
-			want:  "applicationoffer not found",
+			want:  "application offer not found",
 		},
 	}
 	for _, tc := range tests {

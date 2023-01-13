@@ -152,7 +152,6 @@ func ResolveTupleObject(db db.Database, tag string) (string, string, error) {
 
 	switch matches[1] {
 	case names.UserTagKind:
-		// Users are a different case, as we only care for the trailer
 		zapctx.Debug(
 			ctx,
 			"Resolving JIMM tags to Juju tags for tag kind: user",
@@ -168,7 +167,7 @@ func ResolveTupleObject(db db.Database, tag string) (string, string, error) {
 		)
 		entry, err := db.GetGroup(ctx, trailer)
 		if err != nil {
-			return tag, relationSpecifier, errors.E("group does not exist")
+			return tag, relationSpecifier, errors.E("group not found")
 		}
 		return jimmnames.NewGroupTag(strconv.FormatUint(uint64(entry.ID), 10)).String(), relationSpecifier, nil
 
@@ -187,7 +186,7 @@ func ResolveTupleObject(db db.Database, tag string) (string, string, error) {
 
 		err := db.GetController(ctx, &controller)
 		if err != nil {
-			return tag, relationSpecifier, errors.E("controller does not exist")
+			return tag, relationSpecifier, errors.E("controller not found")
 		}
 		return names.NewControllerTag(controller.UUID).String(), relationSpecifier, nil
 
@@ -204,7 +203,7 @@ func ResolveTupleObject(db db.Database, tag string) (string, string, error) {
 			controller := dbmodel.Controller{Name: controllerName}
 			err := db.GetController(ctx, &controller)
 			if err != nil {
-				return tag, relationSpecifier, errors.E("controller does not exist")
+				return tag, relationSpecifier, errors.E("controller not found")
 			}
 			model.ControllerID = controller.ID
 			model.OwnerUsername = userName
@@ -237,7 +236,7 @@ func ResolveTupleObject(db db.Database, tag string) (string, string, error) {
 
 		err := db.GetApplicationOffer(ctx, &offer)
 		if err != nil {
-			return tag, relationSpecifier, errors.E("applicationoffer not found")
+			return tag, relationSpecifier, errors.E("application offer not found")
 		}
 
 		return jimmnames.NewApplicationOfferTag(offer.UUID).String(), relationSpecifier, nil
