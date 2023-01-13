@@ -23,11 +23,34 @@ import (
 
 // access_control contains the primary RPC commands for handling ReBAC within JIMM via the JIMM facade itself.
 
-var ( // .*?([^\s][^-]*)(\-)([a-z0-9]*)(#[a-z]*)
-	tagKindMatcher          = regexp.MustCompile(`^([^\s][^-]*)(\-)([a-z0-9-@:/.]*)([#a-z]*)$`)
-	controllerMatcher       = regexp.MustCompile(`.*?([^:|/]*)`)
-	controllerUserMatcher   = regexp.MustCompile(`\:(.*?)\/`)
-	controllerModelMatcher  = regexp.MustCompile(`\/(.*?)([\.]|\z)`)
+var (
+	// tagKindMatcher ensures the initial incoming tag, without the tuple object type prefix (type:)
+	// can be parsed into specific subgroups.
+	// Take the following tag (the relation specifier is added to demonstrate the point only):
+	// "controller-controller:alice@external/model.applicationoffer#relation"
+	// It would be broken up into the following groups on a submatch:
+	// - 0: "controller-controller:alice@external/model.applicationoffer#relation"
+	// - 1: "controller"
+	// - 2: "-"
+	// - 3: "controller:alice@external/model.applicationoffer"
+	// - 4: "#relation"
+	// Groups 3 and 4 are used as 'trailer' and 'relationSpecifier', to format the tuple ultimately
+	// into a valid Juju(or JIMM) tag of format: <kind>-<id>[#specifier]
+	// The following regexes do not care for the relation specifier as we propogate it back up the callstack
+	// to be appended to the final tuple object key.
+	tagKindMatcher = regexp.MustCompile(`^([^\s][^-]*)(\-)([a-z0-9-@:/.]*)([#a-z]*)$`)
+	// controllerMatcher uses the trailer to find the 'controller' segment (i.e., controller:)
+	// If a user sends "controller:alice@external/", it is capable of retrieving the controller still, denoted by the "/"
+	// character matcher.
+	controllerMatcher = regexp.MustCompile(`.*?([^:|/]*)`)
+	// controllerUserMatcher retrieves the user from the trailer by matching
+	// anything between ":" and "/".
+	controllerUserMatcher = regexp.MustCompile(`\:(.*?)\/`)
+	// controllerModelMatcher retrieves the model from the trailer by matching
+	// anything between "/" and "." or EOL.
+	controllerModelMatcher = regexp.MustCompile(`\/(.*?)([\.]|\z)`)
+	// applicationOfferMatcher retrieves the applicationoffer from the trailer by matching
+	// anything between "." and EOL.
 	applicationOfferMatcher = regexp.MustCompile(`\.(.*?)\z`)
 )
 
@@ -111,14 +134,6 @@ func (r *controllerRoot) ListGroups(ctx context.Context) (apiparams.ListGroupRes
 // In both cases though, the resource the tag pertains to is validated to exist within the database.
 func ResolveTupleObject(db db.Database, tag string) (string, string, error) {
 	ctx := context.Background()
-	// Splits the tag, of form akin to: group-hi34#yolo
-	// into:
-	// group 1: group
-	// group 2: -
-	// group 3: hi34
-	// group 4: #yolo
-	// We do this as we require the juju tag validation, but to also return the
-	// relation specifier (#yolo)
 	tagKindSubMatch := tagKindMatcher.FindStringSubmatch(tag)
 	if len(tagKindSubMatch) != 5 {
 		return "", "", errors.E("failed to detect valid tag string")
