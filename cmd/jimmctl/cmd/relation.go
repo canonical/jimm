@@ -91,15 +91,15 @@ func NewRelationCommand() *jujucmdv3.SuperCommand {
 
 // newRelationCommand returns a command to add a relation.
 func newRelationCommand() cmd.Command {
-	cmd := &addrelationCommand{
+	cmd := &addRelationCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-// addrelationCommand adds a relation.
-type addrelationCommand struct {
+// addRelationCommand adds a relation.
+type addRelationCommand struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output
 
@@ -115,7 +115,7 @@ type addrelationCommand struct {
 }
 
 // Info implements the cmd.Command interface.
-func (c *addrelationCommand) Info() *cmd.Info {
+func (c *addRelationCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:    "add",
 		Purpose: "Add relation to jimm",
@@ -124,7 +124,7 @@ func (c *addrelationCommand) Info() *cmd.Info {
 }
 
 // Init implements the cmd.Command interface.
-func (c *addrelationCommand) Init(args []string) error {
+func (c *addRelationCommand) Init(args []string) error {
 	if c.filename != "" {
 		return nil
 	}
@@ -147,7 +147,7 @@ func (c *addrelationCommand) Init(args []string) error {
 }
 
 // SetFlags implements Command.SetFlags.
-func (c *addrelationCommand) SetFlags(f *gnuflag.FlagSet) {
+func (c *addRelationCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
 	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
 		"yaml":    cmd.FormatYaml,
@@ -172,7 +172,7 @@ func readTupleFile(filename string) ([]apiparams.RelationshipTuple, error) {
 }
 
 // Run implements Command.Run.
-func (c *addrelationCommand) Run(ctxt *cmd.Context) error {
+func (c *addRelationCommand) Run(ctxt *cmd.Context) error {
 	currentController, err := c.store.CurrentController()
 	if err != nil {
 		return errors.E(err, "could not determine controller")
