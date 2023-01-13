@@ -3,6 +3,7 @@ package jujuapi
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -24,34 +25,23 @@ import (
 // access_control contains the primary RPC commands for handling ReBAC within JIMM via the JIMM facade itself.
 
 var (
-	// tagKindMatcher ensures the initial incoming tag, without the tuple object type prefix (type:)
-	// can be parsed into specific subgroups.
-	// Take the following tag (the relation specifier is added to demonstrate the point only):
-	// "controller-controller:alice@external/model.applicationoffer#relation"
-	// It would be broken up into the following groups on a submatch:
-	// - 0: "controller-controller:alice@external/model.applicationoffer#relation"
-	// - 1: "controller"
-	// - 2: "-"
-	// - 3: "controller:alice@external/model.applicationoffer"
-	// - 4: "#relation"
-	// Groups 3 and 4 are used as 'trailer' and 'relationSpecifier', to format the tuple ultimately
-	// into a valid Juju(or JIMM) tag of format: <kind>-<id>[#specifier]
-	// The following regexes do not care for the relation specifier as we propogate it back up the callstack
-	// to be appended to the final tuple object key.
-	tagKindMatcher = regexp.MustCompile(`^([^\s][^-]*)(\-)([a-z0-9-@:/.]*)([#a-z]*)$`)
-	// controllerMatcher uses the trailer to find the 'controller' segment (i.e., controller:)
-	// If a user sends "controller:alice@external/", it is capable of retrieving the controller still, denoted by the "/"
-	// character matcher.
-	controllerMatcher = regexp.MustCompile(`.*?([^:|/]*)`)
-	// controllerUserMatcher retrieves the user from the trailer by matching
-	// anything between ":" and "/".
-	controllerUserMatcher = regexp.MustCompile(`\:(.*?)\/`)
-	// controllerModelMatcher retrieves the model from the trailer by matching
-	// anything between "/" and "." or EOL.
-	controllerModelMatcher = regexp.MustCompile(`\/(.*?)([\.]|\z)`)
-	// applicationOfferMatcher retrieves the applicationoffer from the trailer by matching
-	// anything between "." and EOL.
-	applicationOfferMatcher = regexp.MustCompile(`\.(.*?)\z`)
+	// Matches juju uris AND jimm user/group tags
+	// Performs a single match and breaks the juju URI into 10 groups, each successive group is XORD to ensure we can run
+	// this just once.
+	// The groups are as so:
+	// [0] - tag
+	// [1] - A single "-", ignored
+	// [2] - Controller name OR user name OR group name
+	// [3] - A single ":", ignored
+	// [4] - Controller user / model owner
+	// [5] - A single "/", ignored
+	// [6] - Model name
+	// [7] - A single ".", ignored
+	// [8] - Application offer name
+	// [9] - Relation specifier (i.e., #member)
+	// A complete matcher example would look like so with square-brackets denoting groups and paranthsis denoting index:
+	// (0)[controller](1)[-](2)[controller-1](3)[:](4)[alice@external-place](5)[/](6)[model-1](7)[.](8)[offer-1](9)[#relation-specifier]"
+	jujuURIMatcher = regexp.MustCompile(`([a-zA-Z0-9]*)(\-|\z)([a-zA-Z0-9-@]*)(\:|)([a-zA-Z0-9-@]*)(\/|)([a-zA-Z0-9-]*)(\.|)([a-zA-Z0-9-]*)([a-zA-Z#]*|\z)\z`)
 )
 
 // AddGroup creates a group within JIMMs DB for reference by OpenFGA.
@@ -134,176 +124,117 @@ func (r *controllerRoot) ListGroups(ctx context.Context) (apiparams.ListGroupRes
 // In both cases though, the resource the tag pertains to is validated to exist within the database.
 func ResolveTupleObject(db db.Database, tag string) (string, string, error) {
 	ctx := context.Background()
-	tagKindSubMatch := tagKindMatcher.FindStringSubmatch(tag)
-	if len(tagKindSubMatch) != 5 {
-		return "", "", errors.E("failed to detect valid tag string")
+	matches := jujuURIMatcher.FindStringSubmatch(tag)
+	resourceUUID := ""
+	trailer := ""
+	// We first attempt to see if group3 is a uuid
+	if _, err := uuid.Parse(matches[3]); err == nil {
+		// We know it's a UUID
+		resourceUUID = matches[3]
+	} else {
+		// We presume it's a user or a group
+		trailer = matches[3]
 	}
-	tagKind := tagKindSubMatch[1]
-	trailer := tagKindSubMatch[3]
-	relationSpecifier := tagKindSubMatch[4]
 
-	switch tagKind {
+	// Matchers along the way to determine segments of the string, they'll be empty
+	// if the match has failed
+	controllerName := matches[3]
+	userName := matches[5]
+	modelName := matches[7]
+	offerName := matches[9]
+	relationSpecifier := matches[10]
+
+	switch matches[1] {
 	case names.UserTagKind:
 		// Users are a different case, as we only care for the trailer
-		userName := trailer
 		zapctx.Debug(
 			ctx,
 			"Resolving JIMM tags to Juju tags for tag kind: user",
-			zap.String("user-name", userName),
+			zap.String("user-name", trailer),
 		)
 		return names.NewUserTag(trailer).String(), relationSpecifier, nil
 
 	case jimmnames.GroupTagKind:
+		zapctx.Debug(
+			ctx,
+			"Resolving JIMM tags to Juju tags for tag kind: group",
+			zap.String("group-name", trailer),
+		)
 		entry, err := db.GetGroup(ctx, trailer)
 		if err != nil {
-			return tag, relationSpecifier, errors.E("user group does not exist")
+			return tag, relationSpecifier, errors.E("group does not exist")
 		}
-
 		return jimmnames.NewGroupTag(strconv.FormatUint(uint64(entry.ID), 10)).String(), relationSpecifier, nil
 
 	case names.ControllerTagKind:
-		controllerName := controllerMatcher.FindString(trailer)
-		cuuid := ""
+		zapctx.Debug(
+			ctx,
+			"Resolving JIMM tags to Juju tags for tag kind: controller",
+		)
+		controller := dbmodel.Controller{}
 
-		if _, err := uuid.Parse(trailer); err != nil {
-			controller := dbmodel.Controller{Name: controllerName}
-			zapctx.Debug(
-				ctx,
-				"Resolving JIMM tags to Juju tags for tag kind: controller",
-				zap.String("controller-name", controllerName),
-			)
-			err := db.GetController(ctx, &controller)
-			if err != nil {
-				return tag, relationSpecifier, errors.E("controller does not exist")
-			}
-			cuuid = controller.UUID
-		} else {
-			controller := dbmodel.Controller{UUID: trailer}
-			zapctx.Debug(
-				ctx,
-				"Tag appears to already be a UUID: controller",
-				zap.String("controller-name", trailer),
-			)
-			err := db.GetController(ctx, &controller)
-			if err != nil {
-				return tag, relationSpecifier, errors.E("controller does not exist")
-			}
-			cuuid = controller.UUID
+		if resourceUUID != "" {
+			controller.UUID = resourceUUID
+		} else if controllerName != "" {
+			controller.Name = controllerName
 		}
 
-		return names.NewControllerTag(cuuid).String(), relationSpecifier, nil
+		err := db.GetController(ctx, &controller)
+		if err != nil {
+			return tag, relationSpecifier, errors.E("controller does not exist")
+		}
+		return names.NewControllerTag(controller.UUID).String(), relationSpecifier, nil
 
 	case names.ModelTagKind:
-		muuid := ""
+		zapctx.Debug(
+			ctx,
+			"Resolving JIMM tags to Juju tags for tag kind: model",
+		)
+		model := dbmodel.Model{}
 
-		if _, err := uuid.Parse(trailer); err != nil {
-
-			var sm []string
-			var sm2 []string
-			if sm = controllerUserMatcher.FindStringSubmatch(trailer); len(sm) < 2 {
-				return tag, relationSpecifier, errors.E("could not find controller user in tag")
-			}
-			if sm2 = controllerModelMatcher.FindStringSubmatch(trailer); len(sm2) < 2 {
-				return tag, relationSpecifier, errors.E("could not find controller model in tag")
-			}
-			controllerName := controllerMatcher.FindString(trailer)
-			controllerUser := sm[1]
-			modelName := sm2[1]
-			zapctx.Debug(
-				ctx,
-				"Resolving JIMM tags to Juju tags for tag kind: model",
-				zap.String("controller-name", controllerName),
-				zap.String("controller-user", controllerUser),
-				zap.String("model-name", modelName),
-			)
-
-			// We only care about the controller ID to ensure
-			// an absolute unique combination when querying
-			// the model
+		if resourceUUID != "" {
+			model.UUID = sql.NullString{String: resourceUUID, Valid: true}
+		} else if controllerName != "" && userName != "" && modelName != "" {
 			controller := dbmodel.Controller{Name: controllerName}
 			err := db.GetController(ctx, &controller)
 			if err != nil {
 				return tag, relationSpecifier, errors.E("controller does not exist")
 			}
-			// TODO(ale8k): Investigate why when querying with model name as emptry string
-			// it's somehow getting the model anyway...
-			if modelName == "" {
-				return tag, relationSpecifier, errors.E("model not found")
-			}
-			// This combination of ControllerID, OwnerUsername and ModelName *should* be universally unique
-			// We query models separately as to not preload the models on the controller.
-			model := dbmodel.Model{ControllerID: controller.ID, OwnerUsername: controllerUser, Name: modelName}
-			err = db.GetModel(ctx, &model)
-			if err != nil {
-				return tag, relationSpecifier, errors.E("model not found")
-			}
-			muuid = model.UUID.String
-		} else {
-			model := dbmodel.Model{UUID: sql.NullString{String: trailer, Valid: true}}
-			zapctx.Debug(
-				ctx,
-				"Tag appears to already be a UUID: model",
-				zap.String("model-name", trailer),
-			)
-			err = db.GetModel(ctx, &model)
-			if err != nil {
-				return tag, relationSpecifier, errors.E("model not found")
-			}
-			muuid = model.UUID.String
+			model.ControllerID = controller.ID
+			model.OwnerUsername = userName
+			model.Name = modelName
 		}
 
-		return names.NewModelTag(muuid).String(), relationSpecifier, nil
+		err := db.GetModel(ctx, &model)
+		if err != nil {
+			return tag, relationSpecifier, errors.E("model not found")
+		}
+
+		return names.NewModelTag(model.UUID.String).String(), relationSpecifier, nil
 
 	case names.ApplicationOfferTagKind:
-		auuid := ""
+		zapctx.Debug(
+			ctx,
+			"Resolving JIMM tags to Juju tags for tag kind: applicationoffer",
+		)
+		offer := dbmodel.ApplicationOffer{}
 
-		if _, err := uuid.Parse(trailer); err != nil {
-
-			var sm []string
-			var sm2 []string
-			var sm3 []string
-			if sm = controllerUserMatcher.FindStringSubmatch(trailer); len(sm) < 2 {
-				return tag, relationSpecifier, errors.E("could not find controller user in tag")
-			}
-			if sm2 = controllerModelMatcher.FindStringSubmatch(trailer); len(sm2) < 2 {
-				return tag, relationSpecifier, errors.E("could not find controller model in tag")
-			}
-			if sm3 = applicationOfferMatcher.FindStringSubmatch(trailer); len(sm2) < 2 {
-				return tag, relationSpecifier, errors.E("could not find application offer in tag")
-			}
-			controllerName := controllerMatcher.FindString(trailer)
-			controllerUser := sm[1]
-			modelName := sm2[1]
-			applicationOfferName := sm3[1]
-			zapctx.Debug(
-				ctx,
-				"Resolving JIMM tags to Juju tags for tag kind: applicationoffer",
-				zap.String("controller-name", controllerName),
-				zap.String("controller-user", controllerUser),
-				zap.String("model-name", modelName),
-				zap.String("application-offer-name", applicationOfferName),
-			)
-			// This is simply for validation purposes and to be 100% certain
-			offerURL, err := crossmodel.ParseOfferURL(trailer)
+		if resourceUUID != "" {
+			offer.UUID = resourceUUID
+		} else if controllerName != "" && userName != "" && modelName != "" && offerName != "" {
+			offerURL, err := crossmodel.ParseOfferURL(fmt.Sprintf("%s:%s/%s.%s", controllerName, userName, modelName, offerName))
 			if err != nil {
 				return tag, relationSpecifier, errors.E("failed to parse offer url")
 			}
-			offer := dbmodel.ApplicationOffer{URL: offerURL.String()}
-			err = db.GetApplicationOffer(ctx, &offer)
-			if err != nil {
-				return tag, relationSpecifier, errors.E("applicationoffer not found")
-			}
-			auuid = offer.UUID
-		} else {
-			offer := dbmodel.ApplicationOffer{UUID: trailer}
-			err = db.GetApplicationOffer(ctx, &offer)
-			if err != nil {
-				return tag, relationSpecifier, errors.E("applicationoffer not found")
-			}
-			auuid = offer.UUID
-
+			offer.URL = offerURL.String()
 		}
-		return jimmnames.NewApplicationOfferTag(auuid).String(), relationSpecifier, nil
+
+		err := db.GetApplicationOffer(ctx, &offer)
+		if err != nil {
+			return tag, relationSpecifier, errors.E("applicationoffer not found")
+		}
+
+		return jimmnames.NewApplicationOfferTag(offer.UUID).String(), relationSpecifier, nil
 	}
 	return tag, relationSpecifier, errors.E("failed to map tag")
 }

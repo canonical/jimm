@@ -57,7 +57,7 @@ func (s *accessControlSuite) TestResolveTupleObjectHandlesErrors(c *gc.C) {
 		// Resolves bad groups where they do not exist
 		{
 			input: "group-myspecialpokemon-his-name-is-youguessedit-diglett",
-			want:  "user group does not exist",
+			want:  "group does not exist",
 		},
 		// Resolves bad controllers where they do not exist
 		{
@@ -67,7 +67,7 @@ func (s *accessControlSuite) TestResolveTupleObjectHandlesErrors(c *gc.C) {
 		// Resolves bad models where the user cannot be obtained from the JIMM tag
 		{
 			input: "model-mycontroller-that-does-not-exist/mymodel",
-			want:  "could not find controller user in tag",
+			want:  "model not found",
 		},
 		// Resolves bad models where it cannot be found on the specified controller
 		{
