@@ -8,7 +8,6 @@ import (
 	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
 	"github.com/google/uuid"
 	openfga "github.com/openfga/go-sdk"
-	"github.com/openfga/go-sdk/credentials"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -20,19 +19,9 @@ type openFGATestSuite struct {
 }
 
 func (suite *openFGATestSuite) SetupSuite() {
-	cfg, _ := openfga.NewConfiguration(openfga.Configuration{
-		ApiScheme: "http",
-		ApiHost:   "localhost:8080",
-		StoreId:   "01GP1254CHWJC1MNGVB0WDG1T0",
-		Credentials: &credentials.Credentials{
-			Method: credentials.CredentialsMethodApiToken,
-			Config: &credentials.Config{
-				ApiToken: "jimm",
-			},
-		},
-	})
-	suite.ofgaApi = openfga.NewAPIClient(cfg).OpenFgaApi
-	suite.ofgaClient = ofga.NewOpenFGAClient(suite.ofgaApi, "01GP1EC038KHGB6JJ2XXXXCXKB")
+	api, client := ofga.SetupTestOFGAClient()
+	suite.ofgaApi = api
+	suite.ofgaClient = client
 
 }
 

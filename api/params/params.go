@@ -273,22 +273,18 @@ type ListGroupResponse struct {
 	Groups []Group `json:"name"`
 }
 
-// ModifyRelationRequest holds a request to modify a relation (tuple).
-// This is an abstracted concept from OpenFGA as OpenFGA works with tuples
-// which implicitly bind to one another, from a users perspective this may
-// appear confusing, and as they only care about scenarios such as:
-//
-// 'adding/removing/modifying a user from/to a group/auth set'
-// It is better to restrict this down.
-//
-// We've further only considered single updates as of now, but
-// TODO: discuss if we should accept bulk here. It shouldn't be difficult to add either.
-type ModifyRelationRequest struct {
+// RelationshipTuple represents a OpenFGA Tuple.
+type RelationshipTuple struct {
 	// Object represents an OFGA object that we wish to apply a relational tuple to.
-	Object string `json:"user"`
+	Object string `json:"object"`
 	// Relation is exactly that, the kind of relation this request modifies.
 	Relation string `json:"relation"`
-	// The target object is the kind of object we wish to create/remove a tuple for with
+	// TargetObject is the kind of object we wish to create/remove a tuple for/with
 	// the provided relation.
-	TargetObject string `json:"object"`
+	TargetObject string `json:"target_object"`
+}
+
+// AddRelationRequest holds the tuples to be added to OpenFGA in an AddRelation request.
+type AddRelationRequest struct {
+	Tuples []RelationshipTuple
 }
