@@ -6,7 +6,12 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 )
 
-var NewModelAccessWatcher = newModelAccessWatcher
+var (
+	NewModelAccessWatcher = newModelAccessWatcher
+	JujuTagFromTuple      = jujuTagFromTuple
+	ParseTag              = parseTag
+	ResolveTupleObject    = resolveTupleObject
+)
 
 func NewModelSummaryWatcher() *modelSummaryWatcher {
 	return &modelSummaryWatcher{
