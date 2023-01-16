@@ -10,3 +10,5 @@
 /vendor
 /version/commit.txt
 /version/version.txt
+/tmp
+/local/vault/approle.yaml
