@@ -361,6 +361,9 @@ func createTupleKeys(ofc *ofgaClient.OFGAClient, db db.Database, tuples []apipar
 // within OpenFGA.
 func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelationRequest) error {
 	const op = errors.Op("jujuapi.AddRelation")
+	if r.user.ControllerAccess != "superuser" {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
 	db := r.jimm.Database
 	ofc := r.ofgaClient
 	keys, err := createTupleKeys(ofc, db, req.Tuples)
@@ -383,6 +386,9 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 // within OpenFGA.
 func (r *controllerRoot) RemoveRelation(ctx context.Context, req apiparams.RemoveRelationRequest) error {
 	const op = errors.Op("jujuapi.RemoveRelation")
+	if r.user.ControllerAccess != "superuser" {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
 	db := r.jimm.Database
 	ofc := r.ofgaClient
 	keys, err := createTupleKeys(ofc, db, req.Tuples)

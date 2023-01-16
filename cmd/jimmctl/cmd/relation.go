@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/juju/cmd/v3"
-	jujucmdv3 "github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
 	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
@@ -23,29 +22,22 @@ var (
 	relationDoc = `
 	relation command enables relation management for jimm
 `
-
-	addRelationDoc = `
-	add command adds relation to jimm.
-
-	Example:
-		jimmctl auth relation add <object> <relation> <target_object>
-		jimmctl auth relation add -f <filename>
-
-		-f		Read from a file where filename is the location of a JSON encoded file of the form:
+	genericConstraintsDoc = `
+	-f		Read from a file where filename is the location of a JSON encoded file of the form:
 		[
 			{
-				"object":"user:mike",
+				"object":"user:user-mike",
 				"relation":"member",
-				"target_object":"group:yellow"
+				"target_object":"group:group-yellow"
 			},
 			{
-				"object":"user:alice",
+				"object":"user:user-alice",
 				"relation":"member",
-				"target_object":"group:yellow"
+				"target_object":"group:group-yellow"
 			}
 		]
 
-		Certain constraints apply when creating a relation, namely:
+		Certain constraints apply when creating/removing a relation, namely:
 		Object may be one of:
 
 		user tag
@@ -74,23 +66,40 @@ var (
 		reader
 		consumer
 		administrator 
-`
+	`
+
+	addRelationDoc = `
+	add command adds relation to jimm.
+
+	Example:
+		jimmctl auth relation add <object> <relation> <target_object>
+		jimmctl auth relation add -f <filename>
+	` + genericConstraintsDoc
+
+	removeRelationDoc = `
+	remove command removes a relation from jimm.
+
+	Example:
+		jimmctl auth relation remove <object> <relation> <target_object>
+		jimmctl auth relation remove -f <filename>
+	` + genericConstraintsDoc
 )
 
 // NewRelationCommand returns a command for relation management.
-func NewRelationCommand() *jujucmdv3.SuperCommand {
-	cmd := jujucmd.NewSuperCommand(jujucmdv3.SuperCommandParams{
+func NewRelationCommand() *cmd.SuperCommand {
+	cmd := jujucmd.NewSuperCommand(cmd.SuperCommandParams{
 		Name:    "relation",
 		Doc:     relationDoc,
 		Purpose: "relation management.",
 	})
-	cmd.Register(newRelationCommand())
+	cmd.Register(newAddRelationCommand())
+	cmd.Register(newRemoveRelationCommand())
 
 	return cmd
 }
 
-// newRelationCommand returns a command to add a relation.
-func newRelationCommand() cmd.Command {
+// newAddRelationCommand returns a command to add a relation.
+func newAddRelationCommand() cmd.Command {
 	cmd := &addRelationCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
@@ -132,7 +141,7 @@ func (c *addRelationCommand) Init(args []string) error {
 	default:
 		return errors.E("too many args")
 	case 0:
-		return errors.E("object")
+		return errors.E("object not specified")
 	case 1:
 		return errors.E("relation not specified")
 	case 2:
@@ -154,7 +163,7 @@ func (c *addRelationCommand) SetFlags(f *gnuflag.FlagSet) {
 		"json":    cmd.FormatJson,
 		"tabular": formatTabular,
 	})
-	f.StringVar(&c.filename, "filename", "", "file location of JSON encoded tuples")
+	f.StringVar(&c.filename, "f", "", "file location of JSON encoded tuples")
 }
 
 func readTupleFile(filename string) ([]apiparams.RelationshipTuple, error) {
@@ -184,7 +193,7 @@ func (c *addRelationCommand) Run(ctxt *cmd.Context) error {
 	}
 
 	var params apiparams.AddRelationRequest
-	if c.filename != "" {
+	if c.filename == "" {
 		params.Tuples = append(params.Tuples, apiparams.RelationshipTuple{
 			Object:       c.object,
 			Relation:     c.relation,
@@ -193,12 +202,115 @@ func (c *addRelationCommand) Run(ctxt *cmd.Context) error {
 	} else {
 		params.Tuples, err = readTupleFile(c.filename)
 		if err != nil {
-			return nil
+			return err
 		}
 	}
 
 	client := api.NewClient(apiCaller)
 	err = client.AddRelation(&params)
+	if err != nil {
+		return errors.E(err)
+	}
+
+	return nil
+}
+
+// newRemoveRelationCommand returns a command to remove a relation.
+func newRemoveRelationCommand() cmd.Command {
+	cmd := &removeRelationCommand{
+		store: jujuclient.NewFileClientStore(),
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
+
+// removeRelationCommand removes a relation.
+type removeRelationCommand struct {
+	modelcmd.ControllerCommandBase
+	out cmd.Output
+
+	store    jujuclient.ClientStore
+	dialOpts *jujuapi.DialOpts
+
+	//Naming follows OpenFGA convention
+	object       string //object
+	relation     string
+	targetObject string //target_object
+
+	filename string //optional
+}
+
+// Info implements the cmd.Command interface.
+func (c *removeRelationCommand) Info() *cmd.Info {
+	return jujucmd.Info(&cmd.Info{
+		Name:    "remove",
+		Purpose: "Remove relation to jimm",
+		Doc:     removeRelationDoc,
+	})
+}
+
+// Init implements the cmd.Command interface.
+func (c *removeRelationCommand) Init(args []string) error {
+	if c.filename != "" {
+		return nil
+	}
+	switch len(args) {
+	default:
+		return errors.E("too many args")
+	case 0:
+		return errors.E("object not specified")
+	case 1:
+		return errors.E("relation not specified")
+	case 2:
+		return errors.E("target object not specified")
+	case 3:
+	}
+	c.object, c.relation, c.targetObject, args = args[0], args[1], args[2], args[3:]
+	if len(args) > 0 {
+		return errors.E("too many args")
+	}
+	return nil
+}
+
+// SetFlags implements Command.SetFlags.
+func (c *removeRelationCommand) SetFlags(f *gnuflag.FlagSet) {
+	c.CommandBase.SetFlags(f)
+	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
+		"yaml":    cmd.FormatYaml,
+		"json":    cmd.FormatJson,
+		"tabular": formatTabular,
+	})
+	f.StringVar(&c.filename, "f", "", "file location of JSON encoded tuples")
+}
+
+// Run implements Command.Run.
+func (c *removeRelationCommand) Run(ctxt *cmd.Context) error {
+	currentController, err := c.store.CurrentController()
+	if err != nil {
+		return errors.E(err, "could not determine controller")
+	}
+
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", c.dialOpts)
+	if err != nil {
+		return err
+	}
+
+	var params apiparams.RemoveRelationRequest
+	if c.filename == "" {
+		params.Tuples = append(params.Tuples, apiparams.RelationshipTuple{
+			Object:       c.object,
+			Relation:     c.relation,
+			TargetObject: c.targetObject,
+		})
+	} else {
+		params.Tuples, err = readTupleFile(c.filename)
+		if err != nil {
+			return err
+		}
+	}
+
+	client := api.NewClient(apiCaller)
+	err = client.RemoveRelation(&params)
 	if err != nil {
 		return errors.E(err)
 	}
