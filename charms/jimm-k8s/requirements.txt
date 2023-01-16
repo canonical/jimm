@@ -6,3 +6,4 @@ charmhelpers >= 0.20.22
 hvac >= 0.11.0
 jsonschema >= 3.2.0
 cryptography >= 3.4.8
+requests >= 2.25.1
