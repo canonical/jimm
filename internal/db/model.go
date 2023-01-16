@@ -45,6 +45,7 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model) error {
 	} else if model.OwnerUsername != "" && model.Name != "" {
 		db = db.Where("owner_username = ? AND name = ?", model.OwnerUsername, model.Name)
 	} else if model.ControllerID != 0 {
+		// TODO(ales): fix ordering of where fields and handle error to represent what is *actually* required.
 		db = db.Where("controller_id = ?", model.ControllerID)
 	} else {
 		return errors.E(op, "missing id or uuid", errors.CodeBadRequest)
