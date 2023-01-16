@@ -267,8 +267,7 @@ func JujuTagFromTuple(objectType string, objectId string) (names.Tag, error) {
 // ensuring the resource exists for said tag.
 //
 // This key may be in the form of either a JIMM tag string or Juju tag string.
-func ParseTag(db db.Database, key string) (names.Tag, string, error) {
-	ctx := context.Background()
+func ParseTag(ctx context.Context, db db.Database, key string) (names.Tag, string, error) {
 	tupleKeySplit := strings.SplitN(key, ":", 2)
 	if len(tupleKeySplit) != 2 {
 		return nil, "", errors.E("tag does not have tuple key delimiter")
@@ -293,15 +292,15 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 	ofc := r.ofgaClient
 	keys := make([]openfga.TupleKey, 0, len(req.Tuples))
 	for _, t := range req.Tuples {
-		objectTag, objectTagRelationSpecifier, err := ParseTag(db, t.Object)
+		objectTag, objectTagRelationSpecifier, err := ParseTag(ctx, db, t.Object)
 		if err != nil {
 			zapctx.Debug(ctx, "failed to parse tuple user key", zap.String("key", t.Object), zap.Error(err))
-			return errors.E("failed to parse tuple user key: " + t.Object)
+			return errors.E(op, errors.CodeFailedToParseTupleKey, err, "failed to parse tuple user key: "+t.Object)
 		}
-		targetObject, targetObjectRelationSpecifier, err := ParseTag(db, t.TargetObject)
+		targetObject, targetObjectRelationSpecifier, err := ParseTag(ctx, db, t.TargetObject)
 		if err != nil {
 			zapctx.Debug(ctx, "failed to parse tuple object key", zap.String("key", t.TargetObject), zap.Error(err))
-			return errors.E("failed to parse tuple object key: " + t.TargetObject)
+			return errors.E(op, errors.CodeFailedToParseTupleKey, err, "failed to parse tuple object key: "+t.TargetObject)
 		}
 		keys = append(
 			keys,
