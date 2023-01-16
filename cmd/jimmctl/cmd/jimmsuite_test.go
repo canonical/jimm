@@ -26,6 +26,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	"github.com/CanonicalLtd/jimm/internal/jujuclient"
+	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
 )
 
 type gcTester struct {
@@ -70,12 +71,23 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 		CandidPublicKey:  s.CandidPublicKey,
 		ControllerAdmins: []string{"admin"},
 		DSN:              fmt.Sprintf("file:%s?mode=memory&cache=shared", c.TestName()),
+		OpenFGAParams: service.OpenFGAParams{
+			Scheme:    ofga.OpenFGATestConfig.ApiScheme,
+			Host:      ofga.OpenFGATestConfig.ApiHost,
+			Store:     ofga.OpenFGATestConfig.StoreId,
+			Token:     ofga.OpenFGATestConfig.Credentials.Config.ApiToken,
+			AuthModel: ofga.OpenFGATestAuthModel,
+		},
 	}
 	srv, err := service.NewService(ctx, s.Params)
 	c.Assert(err, gc.Equals, nil)
 	s.Service = srv
 
 	s.HTTP = httptest.NewTLSServer(srv)
+
+	ofgaAPI, ofgaClient := ofga.SetupTestOFGAClient()
+	s.OFGAApi = ofgaAPI
+	s.JIMM.OpenFGAClient = ofgaClient
 
 	s.AdminUser = &dbmodel.User{
 		Username:         "alice@external",
