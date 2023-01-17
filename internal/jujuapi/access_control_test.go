@@ -190,7 +190,7 @@ func (s *accessControlSuite) TestParseTag(c *gc.C) {
 	jimmTag := "model:model-" + controller.Name + ":" + user.Username + "/" + model.Name + "#administrator"
 
 	// JIMM tag syntax for models
-	tag, specifier, err := jujuapi.ParseTag(db, jimmTag)
+	tag, specifier, err := jujuapi.ParseTag(ctx, db, jimmTag)
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag.Kind(), gc.Equals, names.ModelTagKind)
 	c.Assert(tag.Id(), gc.Equals, uuid.String())
@@ -199,7 +199,7 @@ func (s *accessControlSuite) TestParseTag(c *gc.C) {
 	jujuTag := "model:model-" + uuid.String() + "#administrator"
 
 	// Juju tag syntax for models
-	tag, specifier, err = jujuapi.ParseTag(db, jujuTag)
+	tag, specifier, err = jujuapi.ParseTag(ctx, db, jujuTag)
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag.Id(), gc.Equals, uuid.String())
 	c.Assert(tag.Kind(), gc.Equals, names.ModelTagKind)

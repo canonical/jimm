@@ -28,7 +28,7 @@ class PeerRelationState:
         model: Model,
         app: Application,
         relation_name: str,
-        defaults: dict[str:str] = None,
+        defaults: dict = None,
     ):
         self._model = model
         self._app = app
@@ -58,7 +58,7 @@ class PeerRelationState:
             raise RelationNotReadyError
         else:
             for key in keys:
-                relation.data[self._app].pop(key)
+                relation.data[self._app].pop(key, None)
 
     def get(self, key: str) -> str:
         relation = self._get_relation()

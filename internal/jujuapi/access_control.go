@@ -8,12 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	apiparams "github.com/CanonicalLtd/jimm/api/params"
-	"github.com/CanonicalLtd/jimm/internal/db"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	ofgaClient "github.com/CanonicalLtd/jimm/internal/openfga"
-	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
 	"github.com/google/uuid"
 	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/names/v4"
@@ -21,6 +15,13 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	openfga "github.com/openfga/go-sdk"
 	"go.uber.org/zap"
+
+	apiparams "github.com/CanonicalLtd/jimm/api/params"
+	"github.com/CanonicalLtd/jimm/internal/db"
+	"github.com/CanonicalLtd/jimm/internal/dbmodel"
+	"github.com/CanonicalLtd/jimm/internal/errors"
+	ofgaClient "github.com/CanonicalLtd/jimm/internal/openfga"
+	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
 )
 
 // access_control contains the primary RPC commands for handling ReBAC within JIMM via the JIMM facade itself.
@@ -123,13 +124,13 @@ func (r *controllerRoot) ListGroups(ctx context.Context) (apiparams.ListGroupRes
 	return apiparams.ListGroupResponse{Groups: groups}, nil
 }
 
-// ResolveTupleObject resolves JIMM tag [of any kind available] (i.e., controller-mycontroller:alex@external/mymodel.myoffer)
+// resolveTupleObject resolves JIMM tag [of any kind available] (i.e., controller-mycontroller:alex@external/mymodel.myoffer)
 // into a juju string tag (i.e., controller-<controller uuid>).
 //
 // If the JIMM tag is aleady of juju string tag form, the transformation is left alone.
 //
 // In both cases though, the resource the tag pertains to is validated to exist within the database.
-func ResolveTupleObject(db db.Database, tag string) (string, string, error) {
+func resolveTupleObject(db db.Database, tag string) (string, string, error) {
 	ctx := context.Background()
 	matches := jujuURIMatcher.FindStringSubmatch(tag)
 	resourceUUID := ""
@@ -245,9 +246,9 @@ func ResolveTupleObject(db db.Database, tag string) (string, string, error) {
 	return tag, relationSpecifier, errors.E("failed to map tag")
 }
 
-// JujuTagFromTuple attempts to parse the provided key
+// jujuTagFromTuple attempts to parse the provided objectId
 // into a juju tag, and returns an error if this is not possible.
-func JujuTagFromTuple(objectType string, objectId string) (names.Tag, error) {
+func jujuTagFromTuple(objectType string, objectId string) (names.Tag, error) {
 	switch objectType {
 	case names.UserTagKind:
 		return names.ParseUserTag(objectId)
@@ -264,35 +265,34 @@ func JujuTagFromTuple(objectType string, objectId string) (names.Tag, error) {
 	}
 }
 
-// ParseTag attempts to parse the provided key into a tag whilst additionally
+// parseTag attempts to parse the provided key into a tag whilst additionally
 // ensuring the resource exists for said tag.
 //
 // This key may be in the form of either a JIMM tag string or Juju tag string.
-func ParseTag(db db.Database, key string) (names.Tag, string, error) {
-	ctx := context.Background()
+func parseTag(ctx context.Context, db db.Database, key string) (names.Tag, string, error) {
 	tupleKeySplit := strings.SplitN(key, ":", 2)
 	if len(tupleKeySplit) != 2 {
 		return nil, "", errors.E("tag does not have tuple key delimiter")
 	}
 	kind := tupleKeySplit[0]
 	tagString := tupleKeySplit[1]
-	tagString, relationSpecifier, err := ResolveTupleObject(db, tagString)
+	tagString, relationSpecifier, err := resolveTupleObject(db, tagString)
 	if err != nil {
 		zapctx.Debug(ctx, "failed to resolve tuple object", zap.Error(err))
 		return nil, "", errors.E("failed to resolve tuple object: " + err.Error())
 	}
-	tag, err := JujuTagFromTuple(kind, tagString)
+	tag, err := jujuTagFromTuple(kind, tagString)
 	return tag, relationSpecifier, err
 }
 
-func createTupleKeys(ofc *ofgaClient.OFGAClient, db db.Database, tuples []apiparams.RelationshipTuple) ([]openfga.TupleKey, error) {
+func createTupleKeys(ctx context.Context, ofc *ofgaClient.OFGAClient, db db.Database, tuples []apiparams.RelationshipTuple) ([]openfga.TupleKey, error) {
 	keys := make([]openfga.TupleKey, 0, len(tuples))
 	for _, t := range tuples {
-		objectTag, objectTagRelationSpecifier, err := ParseTag(db, t.Object)
+		objectTag, objectTagRelationSpecifier, err := parseTag(ctx, db, t.Object)
 		if err != nil {
 			return nil, err
 		}
-		targetObject, targetObjectRelationSpecifier, err := ParseTag(db, t.TargetObject)
+		targetObject, targetObjectRelationSpecifier, err := parseTag(ctx, db, t.TargetObject)
 		if err != nil {
 			return nil, err
 		}
@@ -317,7 +317,7 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 	}
 	db := r.jimm.Database
 	ofc := r.ofgaClient
-	keys, err := createTupleKeys(ofc, db, req.Tuples)
+	keys, err := createTupleKeys(ctx, ofc, db, req.Tuples)
 	if err != nil {
 		zapctx.Debug(ctx, err.Error())
 		return err
@@ -342,7 +342,7 @@ func (r *controllerRoot) RemoveRelation(ctx context.Context, req apiparams.Remov
 	}
 	db := r.jimm.Database
 	ofc := r.ofgaClient
-	keys, err := createTupleKeys(ofc, db, req.Tuples)
+	keys, err := createTupleKeys(ctx, ofc, db, req.Tuples)
 	if err != nil {
 		zapctx.Debug(ctx, err.Error())
 		return err
