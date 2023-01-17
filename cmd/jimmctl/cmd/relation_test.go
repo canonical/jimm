@@ -16,7 +16,7 @@ import (
 )
 
 type relationSuite struct {
-	jimmSuite
+	fgaSuite
 }
 
 var _ = gc.Suite(&relationSuite{})

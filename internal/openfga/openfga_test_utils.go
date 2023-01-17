@@ -1,6 +1,9 @@
 package openfga
 
 import (
+	"context"
+
+	"github.com/jackc/pgx/v4"
 	openfga "github.com/openfga/go-sdk"
 	"github.com/openfga/go-sdk/credentials"
 )
@@ -24,4 +27,15 @@ func SetupTestOFGAClient() (openfga.OpenFgaApi, *OFGAClient) {
 	api := openfga.NewAPIClient(cfg).OpenFgaApi
 	client := NewOpenFGAClient(api, OpenFGATestAuthModel)
 	return api, client
+}
+
+func TruncateOpenFgaTuples(ctx context.Context) error {
+	conn, err := pgx.Connect(context.Background(), "postgresql://jimm:jimm@localhost/jimm")
+	if err != nil {
+		return err
+	}
+	defer conn.Close(ctx)
+	conn.Exec(ctx, "TRUNCATE TABLE tuple;")
+	conn.Exec(ctx, "TRUNCATE TABLE changelog;")
+	return nil
 }

@@ -22,6 +22,11 @@ func (suite *openFGATestSuite) SetupSuite() {
 	api, client := ofga.SetupTestOFGAClient()
 	suite.ofgaApi = api
 	suite.ofgaClient = client
+}
+
+func (suite *openFGATestSuite) TearDownTest() {
+	err := ofga.TruncateOpenFgaTuples()
+	assert.NoError(c, err)
 
 }
 
@@ -111,6 +116,26 @@ func (suite *openFGATestSuite) TestDeletingTuplesToOFGADetectsSucceeds() {
 	lastKey := lastInsertedTuple.GetTupleKey()
 	assert.Equal(t, user2, lastKey.GetUser())
 	assert.Equal(t, openfga.DELETE, lastInsertedTuple.GetOperation())
+}
+
+func (suite *openFGATestSuite) TestDeletingAllTuples() {
+	t := suite.T()
+	ctx := context.Background()
+
+	//Create tuples before writing to db
+	uuid1, _ := uuid.NewRandom()
+	user1 := fmt.Sprintf("user:%s", uuid1)
+	key1 := suite.ofgaClient.CreateTupleKey(user1, "member", "group:pokemon")
+	uuid2, _ := uuid.NewRandom()
+	user2 := fmt.Sprintf("user:%s", uuid2)
+	key2 := suite.ofgaClient.CreateTupleKey(user2, "member", "group:pokemon")
+
+	err := suite.ofgaClient.AddRelations(ctx, key1, key2)
+	assert.NoError(t, err)
+
+	err = suite.ofgaClient.DeleteAllTuples(ctx)
+	assert.NoError(t, err)
+
 }
 
 func TestOpenFGATestSuite(t *testing.T) {
