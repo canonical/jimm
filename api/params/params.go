@@ -286,5 +286,15 @@ type RelationshipTuple struct {
 
 // AddRelationRequest holds the tuples to be added to OpenFGA in an AddRelation request.
 type AddRelationRequest struct {
-	Tuples []RelationshipTuple
+	Tuples []RelationshipTuple `json:"tuples"`
+}
+
+// CheckRelationRequest holds a tuple containg the object, target object and relation that we wish
+// verify authorisation with.
+type CheckRelationRequest struct {
+	Tuple RelationshipTuple `json:"tuple"`
+}
+
+type CheckRelationResponse struct {
+	Allowed bool `json:"allowed"`
 }

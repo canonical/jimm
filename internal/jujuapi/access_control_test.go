@@ -481,6 +481,41 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 	}
 }
 
+func (s *accessControlSuite) TestCheckRelation(c *gc.C) {
+	ctx := context.Background()
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+	client := api.NewClient(conn)
+	db := s.JIMM.Database
+	ofgaClient := s.JIMM.OpenFGAClient
+
+	err := db.AddGroup(ctx, "test-group")
+	c.Assert(err, gc.IsNil)
+	group, err := db.GetGroup(ctx, "test-group")
+	c.Assert(err, gc.IsNil)
+
+	uuid, _ := uuid.NewRandom()
+	id := uuid.String()
+	user, _, controller, _, _, _ := createTestControllerEnvironment(ctx, id, c, db)
+
+	err = ofgaClient.AddRelations(ctx, ofgaClient.CreateTupleKey("user:user-"+user.Username+id, "member", "group:group-"+strconv.FormatUint(uint64(group.ID), 10)))
+	c.Assert(err, gc.IsNil)
+
+	err = ofgaClient.AddRelations(ctx, ofgaClient.CreateTupleKey("group:group-"+strconv.FormatUint(uint64(group.ID), 10)+"#member", "administrator", "controller:controller-"+controller.UUID))
+	c.Assert(err, gc.IsNil)
+
+	res, err := client.CheckRelation(&apiparams.CheckRelationRequest{
+		Tuple: apiparams.RelationshipTuple{
+			Object:       "user:user-" + user.Username + id,
+			Relation:     "administrator",
+			TargetObject: "controller:controller-" + controller.Name,
+		},
+	})
+	c.Assert(err, gc.IsNil)
+	c.Assert(res.Allowed, gc.Equals, true)
+
+}
+
 func (s *accessControlSuite) TestRenameGroup(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()

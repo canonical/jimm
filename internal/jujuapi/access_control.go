@@ -269,17 +269,19 @@ func jujuTagFromTuple(objectType string, objectId string) (names.Tag, error) {
 //
 // This key may be in the form of either a JIMM tag string or Juju tag string.
 func parseTag(ctx context.Context, db db.Database, key string) (names.Tag, string, error) {
+	const op = errors.Op("jujuapi.parseTag")
 	tupleKeySplit := strings.SplitN(key, ":", 2)
 	if len(tupleKeySplit) != 2 {
-		return nil, "", errors.E("tag does not have tuple key delimiter")
+		return nil, "", errors.E(op, errors.CodeFailedToParseTupleKey, "tag does not have tuple key delimiter")
 	}
 	kind := tupleKeySplit[0]
 	tagString := tupleKeySplit[1]
 	tagString, relationSpecifier, err := resolveTupleObject(db, tagString)
 	if err != nil {
 		zapctx.Debug(ctx, "failed to resolve tuple object", zap.Error(err))
-		return nil, "", errors.E("failed to resolve tuple object: " + err.Error())
+		return nil, "", errors.E(op, errors.CodeFailedToResolveTupleResource, err)
 	}
+	zapctx.Debug(ctx, "resolved JIMM tag", zap.String("tag", tagString), zap.String("relation-specifier", relationSpecifier))
 	tag, err := jujuTagFromTuple(kind, tagString)
 	return tag, relationSpecifier, err
 }
@@ -289,26 +291,29 @@ func parseTag(ctx context.Context, db db.Database, key string) (names.Tag, strin
 func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelationRequest) error {
 	const op = errors.Op("jujuapi.AddRelation")
 	db := r.jimm.Database
-
 	ofc := r.ofgaClient
+
+	parseTagError := func(msg string, key string, err error) error {
+		zapctx.Debug(ctx, "failed to parse tuple key", zap.String("key", key), zap.Error(err))
+		return errors.E(errors.Op("jujuapi.parseTag"), errors.CodeFailedToParseTupleKey, err, "failed to parse tuple user key: "+key)
+	}
+
 	keys := make([]openfga.TupleKey, 0, len(req.Tuples))
 	for _, t := range req.Tuples {
 		objectTag, objectTagRelationSpecifier, err := parseTag(ctx, db, t.Object)
 		if err != nil {
-			zapctx.Debug(ctx, "failed to parse tuple user key", zap.String("key", t.Object), zap.Error(err))
-			return errors.E(op, errors.CodeFailedToParseTupleKey, err, "failed to parse tuple user key: "+t.Object)
+			return parseTagError("failed to parse tuple user key", t.Object, err)
 		}
-		targetObject, targetObjectRelationSpecifier, err := parseTag(ctx, db, t.TargetObject)
+		targetObjectTag, targetObjectTagRelationSpecifier, err := parseTag(ctx, db, t.TargetObject)
 		if err != nil {
-			zapctx.Debug(ctx, "failed to parse tuple object key", zap.String("key", t.TargetObject), zap.Error(err))
-			return errors.E(op, errors.CodeFailedToParseTupleKey, err, "failed to parse tuple object key: "+t.TargetObject)
+			return parseTagError("failed to parse tuple object key", t.TargetObject, err)
 		}
 		keys = append(
 			keys,
 			ofc.CreateTupleKey(
 				objectTag.Kind()+":"+objectTag.Id()+objectTagRelationSpecifier,
 				t.Relation,
-				targetObject.Kind()+":"+targetObject.Id()+targetObjectRelationSpecifier,
+				targetObjectTag.Kind()+":"+targetObjectTag.Id()+targetObjectTagRelationSpecifier,
 			),
 		)
 	}
@@ -318,7 +323,7 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 	err := r.ofgaClient.AddRelations(ctx, keys...)
 	if err != nil {
 		zapctx.Error(ctx, "failed to add tuple(s)", zap.NamedError("add-relation-error", err))
-		return errors.E(op, err)
+		return errors.E(op, errors.CodeOpenFGARequestFailed, err)
 	}
 	return nil
 }
@@ -330,10 +335,39 @@ func (r *controllerRoot) RemoveRelation(ctx context.Context) error {
 }
 
 // CheckRelation performs an authorisation check for a particular group/user tuple
-// against another tuple (This may be many tuples however, also known as a contextual tuple set.) within OpenFGA.
+// against another tuple within OpenFGA.
 // This corresponds directly to /stores/{store_id}/check.
-func (r *controllerRoot) CheckRelation(ctx context.Context) error {
-	return errors.E("Not implemented.")
+func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckRelationRequest) (apiparams.CheckRelationResponse, error) {
+	const op = errors.Op("jujuapi.CheckRelation")
+	checkResp := apiparams.CheckRelationResponse{Allowed: false}
+	c := r.ofgaClient
+	db := r.jimm.Database
+	t := req.Tuple
+	objectTag, objectTagRelationSpecifier, err := parseTag(ctx, db, t.Object)
+	if err != nil {
+		return checkResp, errors.E(op, err)
+	}
+
+	targetObjectTag, targetObjectTagRelationSpecifier, err := parseTag(ctx, db, t.TargetObject)
+	if err != nil {
+		return checkResp, errors.E(op, err)
+	}
+
+	allowed, resolution, err := c.CheckRelation(ctx, c.CreateTupleKey(
+		objectTag.Kind()+":"+objectTag.Id()+objectTagRelationSpecifier,
+		t.Relation,
+		targetObjectTag.Kind()+":"+targetObjectTag.Id()+targetObjectTagRelationSpecifier,
+	), false)
+	if err != nil {
+		zapctx.Error(ctx, "failed to check relation", zap.NamedError("check-relation-error", err))
+		return checkResp, errors.E(op, errors.CodeOpenFGARequestFailed, err)
+	}
+
+	zapctx.Debug(ctx, "check request", zap.String("allowed", strconv.FormatBool(allowed)), zap.String("reason", resolution))
+	if allowed {
+		checkResp.Allowed = allowed
+	}
+	return checkResp, nil
 }
 
 // ListRelations TODO(ale8k): Confirm validity / need for this when using /expand or [EXPERIMENTAL] /list-objects
