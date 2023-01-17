@@ -31,11 +31,9 @@ func (d *Database) GetGroup(ctx context.Context, name string) (*dbmodel.GroupEnt
 	if err := d.ready(); err != nil {
 		return nil, errors.E(op, err)
 	}
-	ge := dbmodel.GroupEntry{
-		Name: name,
-	}
+	ge := dbmodel.GroupEntry{}
 
-	if err := d.DB.WithContext(ctx).First(&ge).Error; err != nil {
+	if err := d.DB.WithContext(ctx).Where("Name = ?", name).First(&ge).Error; err != nil {
 		return nil, errors.E(op, dbError(err))
 	}
 	return &ge, nil

@@ -63,6 +63,14 @@ func (s *dbSuite) TestGetGroup(c *qt.C) {
 	c.Check(err, qt.IsNil)
 	c.Assert(ge.ID, qt.Equals, uint(1))
 	c.Assert(ge.Name, qt.Equals, "test-group")
+
+	err = s.Database.AddGroup(context.Background(), "test-group1")
+	c.Assert(err, qt.IsNil)
+
+	ge, err = s.Database.GetGroup(context.Background(), "test-group1")
+	c.Check(err, qt.IsNil)
+	c.Assert(ge.ID, qt.Equals, uint(2))
+	c.Assert(ge.Name, qt.Equals, "test-group1")
 }
 
 func (s *dbSuite) TestUpdateGroup(c *qt.C) {
