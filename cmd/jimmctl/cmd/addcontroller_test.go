@@ -36,7 +36,7 @@ func (s *addControllerSuite) TestAddControllerSuperuser(c *gc.C) {
 
 	// alice is superuser
 	bClient := s.userBakeryClient("alice")
-	context, err := cmdtesting.RunCommand(c, cmd.NewAddControllerCommandForTesting(s.ClientStore, bClient), tmpfile)
+	context, err := cmdtesting.RunCommand(c, cmd.NewAddControllerCommandForTesting(s.ClientStore(), bClient), tmpfile)
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(context), gc.Matches, `name: controller-1
 uuid: deadbeef-1bad-500d-9000-4b1d0d06f00d
@@ -94,7 +94,7 @@ func (s *addControllerSuite) TestAddController(c *gc.C) {
 
 	// bob is not superuser
 	bClient := s.userBakeryClient("bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewAddControllerCommandForTesting(s.ClientStore, bClient), tmpfile)
+	_, err := cmdtesting.RunCommand(c, cmd.NewAddControllerCommandForTesting(s.ClientStore(), bClient), tmpfile)
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 

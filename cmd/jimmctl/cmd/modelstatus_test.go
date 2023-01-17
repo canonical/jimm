@@ -58,7 +58,7 @@ func (s *modelStatusSuite) TestModelStatusSuperuser(c *gc.C) {
 
 	// alice is superuser
 	bClient := s.userBakeryClient("alice")
-	context, err := cmdtesting.RunCommand(c, cmd.NewModelStatusCommandForTesting(s.ClientStore, bClient), mt.Id())
+	context, err := cmdtesting.RunCommand(c, cmd.NewModelStatusCommandForTesting(s.ClientStore(), bClient), mt.Id())
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(context), gc.Matches, expectedModelStatusOutput)
 }
@@ -72,6 +72,6 @@ func (s *modelStatusSuite) TestModelStatus(c *gc.C) {
 
 	// bob is not superuser
 	bClient := s.userBakeryClient("bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewModelStatusCommandForTesting(s.ClientStore, bClient), mt.Id())
+	_, err := cmdtesting.RunCommand(c, cmd.NewModelStatusCommandForTesting(s.ClientStore(), bClient), mt.Id())
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
