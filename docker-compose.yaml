@@ -144,7 +144,9 @@ services:
     environment:
       OPENFGA_AUTHN_METHOD: "preshared"
       OPENFGA_AUTHN_PRESHARED_KEYS: "jimm"
-    command: run --datastore-engine postgres --datastore-uri 'postgresql://jimm:jimm@db/jimm?sslmode=disable'
+      OPENFGA_DATASTORE_ENGINE: "postgres"
+      OPENFGA_DATASTORE_URI: "postgresql://jimm:jimm@db/jimm?sslmode=disable"
+    command: run
     ports:
       - 8080:8080
       - 3000:3000
