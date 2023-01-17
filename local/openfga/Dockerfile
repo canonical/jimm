@@ -4,6 +4,6 @@ RUN apt-get -qq update && apt-get -qq install -y ca-certificates curl
 EXPOSE 8081
 EXPOSE 8080
 WORKDIR /app
-COPY --from=openfga/openfga:v0.2.5 /openfga /app/openfga
-COPY --from=openfga/openfga:v0.2.5 /assets /app/assets
+COPY --from=openfga/openfga:v0.3.1 /openfga /app/openfga
+COPY --from=openfga/openfga:v0.3.1 /assets /app/assets
 ENTRYPOINT ["/app/openfga"]

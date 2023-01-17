@@ -41,7 +41,7 @@ func (suite *openFGATestSuite) TestWritingTuplesToOFGADetectsBadObjects() {
 	key3 := suite.ofgaClient.CreateTupleKey("user:dugtrio", "legendary", "pokemon:fire")
 
 	err := suite.ofgaClient.AddRelations(ctx, key1, key2, key3)
-	fgaErrCode, _ := openfga.NewErrorCodeFromValue("type_not_found")
+	fgaErrCode, _ := openfga.NewErrorCodeFromValue("validation_error")
 	serr, ok := err.(openfga.FgaApiValidationError)
 	assert.True(t, ok)
 	assert.Equal(t, 400, serr.ResponseStatusCode())
