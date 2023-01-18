@@ -104,7 +104,7 @@ func (o *OFGAClient) AddRelations(ctx context.Context, keys ...openfga.TupleKey)
 	return o.addRelation(ctx, keys...)
 }
 
-// AddRelations creates a tuple(s) from the provided keys. See CreateTupleKey for creating keys.
+// DeleteRelations deletes tuple(s) from the OpenFGA database based on the keys provided.
 func (o *OFGAClient) DeleteRelations(ctx context.Context, keys ...openfga.TupleKey) error {
 	return o.deleteRelation(ctx, keys...)
 }
@@ -140,37 +140,4 @@ func (o *OFGAClient) ReadRelatedObjects(ctx context.Context, key openfga.TupleKe
 	}
 
 	return &ReadResponse{Keys: keys, PaginationToken: token}, nil
-}
-
-// DeleteAllTuples removes all existing tuples.
-func (o *OFGAClient) DeleteAllTuples(ctx context.Context) error {
-	var allTuples []openfga.TupleKey
-	rr := openfga.NewReadRequest()
-	rr.SetPageSize(25)
-	rr.SetAuthorizationModelId(o.AuthModelId)
-	readResponse, _, err := o.api.Read(ctx).Body(*rr).Execute()
-	if err != nil {
-		return err
-	}
-	var continuationToken string
-	for ok := true; ok; ok = (*readResponse.ContinuationToken != continuationToken) {
-		for _, tuple := range *readResponse.Tuples {
-			allTuples = append(allTuples, *tuple.Key)
-		}
-		if len(allTuples) > 0 {
-			err = o.deleteRelation(ctx, allTuples...)
-			if err != nil {
-				return err
-			}
-		}
-		allTuples = []openfga.TupleKey{}
-		continuationToken = *readResponse.ContinuationToken
-		rr.SetContinuationToken(continuationToken)
-		readResponse, _, err = o.api.Read(ctx).Body(*rr).Execute()
-		if err != nil {
-			return err
-		}
-
-	}
-	return nil
 }

@@ -285,16 +285,20 @@ func parseTag(ctx context.Context, db db.Database, key string) (names.Tag, strin
 	return tag, relationSpecifier, err
 }
 
+// createTupleKeys is a helper function used to translate a list of tuples sent from the client into a list of
+// openfga tuple types. The raw tuples from the client are parsed and converted to their unique tags.
 func createTupleKeys(ctx context.Context, ofc *ofgaClient.OFGAClient, db db.Database, tuples []apiparams.RelationshipTuple) ([]openfga.TupleKey, error) {
 	keys := make([]openfga.TupleKey, 0, len(tuples))
 	for _, t := range tuples {
 		objectTag, objectTagRelationSpecifier, err := parseTag(ctx, db, t.Object)
 		if err != nil {
-			return nil, err
+			zapctx.Debug(ctx, "failed to parse tuple user key", zap.String("key", t.Object), zap.Error(err))
+			return nil, errors.E(errors.CodeFailedToParseTupleKey, err, "failed to parse tuple user key: "+t.Object)
 		}
 		targetObject, targetObjectRelationSpecifier, err := parseTag(ctx, db, t.TargetObject)
 		if err != nil {
-			return nil, err
+			zapctx.Debug(ctx, "failed to parse tuple object key", zap.String("key", t.TargetObject), zap.Error(err))
+			return nil, errors.E(errors.CodeFailedToParseTupleKey, err, "failed to parse tuple object key: "+t.TargetObject)
 		}
 		keys = append(
 			keys,
@@ -320,10 +324,10 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 	keys, err := createTupleKeys(ctx, ofc, db, req.Tuples)
 	if err != nil {
 		zapctx.Debug(ctx, err.Error())
-		return err
+		return errors.E(op, err)
 	}
 	if l := len(keys); l == 0 || l > 25 {
-		return errors.E("length of" + strconv.Itoa(l) + "is not valid, please do not provide more than 25 tuple keys")
+		return errors.E(op, "length of"+strconv.Itoa(l)+"is not valid, please do not provide more than 25 tuple keys")
 	}
 	err = r.ofgaClient.AddRelations(ctx, keys...)
 	if err != nil {
@@ -345,10 +349,10 @@ func (r *controllerRoot) RemoveRelation(ctx context.Context, req apiparams.Remov
 	keys, err := createTupleKeys(ctx, ofc, db, req.Tuples)
 	if err != nil {
 		zapctx.Debug(ctx, err.Error())
-		return err
+		return errors.E(op, err)
 	}
 	if l := len(keys); l == 0 || l > 25 {
-		return errors.E("length of" + strconv.Itoa(l) + "is not valid, please do not provide more than 25 tuple keys")
+		return errors.E(op, "length of"+strconv.Itoa(l)+"is not valid, please do not provide more than 25 tuple keys")
 	}
 	err = r.ofgaClient.DeleteRelations(ctx, keys...)
 	if err != nil {
