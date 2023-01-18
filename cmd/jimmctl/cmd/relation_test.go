@@ -7,9 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/google/uuid"
 	"github.com/juju/cmd/v3/cmdtesting"
-	openfga "github.com/openfga/go-sdk"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/cmd/jimmctl/cmd"
@@ -24,10 +22,8 @@ var _ = gc.Suite(&relationSuite{})
 func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := s.userBakeryClient("alice")
-	uuid1, _ := uuid.NewRandom()
-	uuid2, _ := uuid.NewRandom()
-	group1 := fmt.Sprintf("test%s", uuid1)
-	group2 := fmt.Sprintf("test%s", uuid2)
+	group1 := "testGroup1"
+	group2 := "testGroup2"
 	type tuple struct {
 		user     string
 		relation string
@@ -81,18 +77,21 @@ func (s *relationSuite) TestMissingParamsAddRelationSuperuser(c *gc.C) {
 func (s *relationSuite) TestAddRelationViaFileSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := s.userBakeryClient("alice")
+	group1 := "testGroup1"
+	group2 := "testGroup2"
+	group3 := "testGroup3"
 
-	_, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), "test-group1")
+	_, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), group1)
 	c.Assert(err, gc.IsNil)
-	_, err = cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), "test-group2")
+	_, err = cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), group2)
 	c.Assert(err, gc.IsNil)
-	_, err = cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), "test-group2")
+	_, err = cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), group3)
 	c.Assert(err, gc.IsNil)
 
 	file, err := os.CreateTemp(".", "relations.json")
 	c.Assert(err, gc.IsNil)
 	defer os.Remove(file.Name())
-	testRelations := "[{\"object\":\"group:group-test1\",\"relation\":\"member\",\"target_object\":\"group:group-test3\"},{\"object\":\"group:group-test2\",\"relation\":\"member\",\"target_object\":\"group:group-test3\"}]"
+	testRelations := "[{\"object\":\"group:group-" + group1 + "\",\"relation\":\"member\",\"target_object\":\"group:group-" + group3 + "\"},{\"object\":\"group:group-" + group2 + "\",\"relation\":\"member\",\"target_object\":\"group:group-" + group3 + "\"}]"
 	_, err = file.Write([]byte(testRelations))
 	c.Assert(err, gc.IsNil)
 
@@ -114,10 +113,8 @@ func (s *relationSuite) TestAddRelation(c *gc.C) {
 func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := s.userBakeryClient("alice")
-	uuid1, _ := uuid.NewRandom()
-	uuid2, _ := uuid.NewRandom()
-	group1 := fmt.Sprintf("test%s", uuid1)
-	group2 := fmt.Sprintf("test%s", uuid2)
+	group1 := "testGroup1"
+	group2 := "testGroup2"
 	type tuple struct {
 		user     string
 		relation string
@@ -129,21 +126,18 @@ func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 		err      bool
 		message  string
 	}{
-		{testName: "Remove Group Relation", input: tuple{user: "group:group-" + group1 + "#member", relation: "member", target: "group:group-" + group2 + "#member"}, err: false},
-	}
-
-	err := s.jimmSuite.JIMM.Database.AddGroup(context.Background(), group1)
-	c.Assert(err, gc.IsNil)
-	err = s.jimmSuite.JIMM.Database.AddGroup(context.Background(), group2)
-	//var tuples []openfga.TupleKey
-	for _, test := range tests {
-		tuple := openfga.TupleKey{User: &test.input.user, Relation: &test.input.relation, Object: &test.input.target}
-		err = s.jimmSuite.JIMM.OpenFGAClient.AddRelations(context.Background(), tuple)
-		//tuples := append(tuples, tuple)
-		c.Assert(err, gc.IsNil)
+		{testName: "Remove Group Relation", input: tuple{user: "group:group-" + group1 + "#member", relation: "member", target: "group:group-" + group2}, err: false},
 	}
 
 	//Create groups and relation
+	err := s.jimmSuite.JIMM.Database.AddGroup(context.Background(), group1)
+	c.Assert(err, gc.IsNil)
+	err = s.jimmSuite.JIMM.Database.AddGroup(context.Background(), group2)
+	c.Assert(err, gc.IsNil)
+	for _, tc := range tests {
+		_, err := cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), tc.input.user, tc.input.relation, tc.input.target)
+		c.Assert(err, gc.IsNil)
+	}
 
 	for _, tc := range tests {
 		_, err := cmdtesting.RunCommand(c, cmd.NewRemoveRelationCommandForTesting(s.ClientStore(), bClient), tc.input.user, tc.input.relation, tc.input.target)
@@ -162,14 +156,25 @@ func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := s.userBakeryClient("alice")
+	group1 := "testGroup1"
+	group2 := "testGroup2"
+	group3 := "testGroup3"
 
-	//Add relations
+	_, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), group1)
+	c.Assert(err, gc.IsNil)
+	_, err = cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), group2)
+	c.Assert(err, gc.IsNil)
+	_, err = cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), group3)
+	c.Assert(err, gc.IsNil)
 
 	file, err := os.CreateTemp(".", "relations.json")
 	c.Assert(err, gc.IsNil)
 	defer os.Remove(file.Name())
-	testRelations := "[{\"object\":\"group:group-test1\",\"relation\":\"member\",\"target_object\":\"group:group-test3\"},{\"object\":\"group:group-test2\",\"relation\":\"member\",\"target_object\":\"group:group-test3\"}]"
+	testRelations := "[{\"object\":\"group:group-" + group1 + "\",\"relation\":\"member\",\"target_object\":\"group:group-" + group3 + "\"},{\"object\":\"group:group-" + group2 + "\",\"relation\":\"member\",\"target_object\":\"group:group-" + group3 + "\"}]"
 	_, err = file.Write([]byte(testRelations))
+	c.Assert(err, gc.IsNil)
+
+	_, err = cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), "-f", file.Name())
 	c.Assert(err, gc.IsNil)
 
 	_, err = cmdtesting.RunCommand(c, cmd.NewRemoveRelationCommandForTesting(s.ClientStore(), bClient), "-f", file.Name())

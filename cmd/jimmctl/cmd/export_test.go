@@ -243,7 +243,7 @@ func NewAddRelationCommandForTesting(store jujuclient.ClientStore, bClient *http
 }
 
 func NewRemoveRelationCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
-	cmd := &addRelationCommand{
+	cmd := &removeRelationCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,
