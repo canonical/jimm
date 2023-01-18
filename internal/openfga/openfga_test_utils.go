@@ -13,8 +13,12 @@ import (
 	gc "gopkg.in/check.v1"
 )
 
-var OpenFGATestAuthModel = "01GP1EC038KHGB6JJ2XXXXCXKB"
-
+// SetupTestOFGAClient is intended to be used per test, in that it
+// creates a store based on the current tests name and is expected to
+// be a single use instance (due to the initial removing of a store).
+//
+// The benefit of not cleaning up the store immediately afterwards,
+// enables the debugging of created tuples in test development.
 func SetupTestOFGAClient(c *gc.C) (openfga.OpenFgaApi, *OFGAClient) {
 	ctx := context.Background()
 
@@ -66,6 +70,11 @@ func SetupTestOFGAClient(c *gc.C) (openfga.OpenFgaApi, *OFGAClient) {
 	return client.OpenFgaApi, wrapperClient
 }
 
+// RemoveStore removes an OpenFGA store (via db) by NAME.
+// Currently, OpenFGA does not support this as it is expected to remove a store by ID.
+//
+// However, in a testing scenario, we want a simple and quick solution to cleanup
+// a store per test,
 func RemoveStore(ctx context.Context, name string) error {
 	conn, err := pgx.Connect(context.Background(), "postgresql://jimm:jimm@localhost/jimm")
 	if err != nil {
@@ -79,6 +88,8 @@ func RemoveStore(ctx context.Context, name string) error {
 	return nil
 }
 
+// CreateStore adds a store to OpenFGA (via db), circumventing the superficial rules
+// set in their server around character limit (64).
 func CreateStore(ctx context.Context, name string, id string) error {
 	conn, err := pgx.Connect(context.Background(), "postgresql://jimm:jimm@localhost/jimm")
 	if err != nil {
