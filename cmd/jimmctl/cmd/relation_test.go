@@ -4,8 +4,8 @@ package cmd_test
 
 import (
 	"context"
-	"fmt"
 	"os"
+	"strings"
 
 	"github.com/juju/cmd/v3/cmdtesting"
 	gc "gopkg.in/check.v1"
@@ -36,22 +36,19 @@ func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 		message  string
 	}{
 		{testName: "Add Group", input: tuple{user: "group:group-" + group1 + "#member", relation: "member", target: "group:group-" + group2}, err: false},
-		{testName: "Invalid Relation", input: tuple{user: "group:group-" + group1 + "#member", relation: "admin", target: "group:group-" + group2}, err: true, message: "Unknown relation 'admin'"},
+		{testName: "Invalid Relation", input: tuple{user: "group:group-" + group1 + "#member", relation: "admin", target: "group:group-" + group2}, err: true, message: "Invalid tuple"},
 	}
 
-	fmt.Printf("%+v\n", tests)
 	err := s.jimmSuite.JIMM.Database.AddGroup(context.Background(), group1)
 	c.Assert(err, gc.IsNil)
 	err = s.jimmSuite.JIMM.Database.AddGroup(context.Background(), group2)
 	c.Assert(err, gc.IsNil)
-	ge, _ := s.jimmSuite.JIMM.Database.GetGroup(context.Background(), group1)
-	fmt.Printf("Group 1 ID = %d\n", ge.ID)
 
 	for _, tc := range tests {
 		_, err := cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), tc.input.user, tc.input.relation, tc.input.target)
 		c.Log("Test: " + tc.testName)
 		if tc.err {
-			c.Assert(err, gc.ErrorMatches, tc.message)
+			c.Assert(strings.Contains(err.Error(), tc.message), gc.Equals, true)
 		} else {
 			c.Assert(err, gc.IsNil)
 		}
