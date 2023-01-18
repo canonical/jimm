@@ -498,10 +498,10 @@ func (s *accessControlSuite) TestCheckRelation(c *gc.C) {
 	id := uuid.String()
 	user, _, controller, _, _, _ := createTestControllerEnvironment(ctx, id, c, db)
 
-	err = ofgaClient.AddRelations(ctx, ofgaClient.CreateTupleKey("user:user-"+user.Username+id, "member", "group:group-"+strconv.FormatUint(uint64(group.ID), 10)))
+	err = ofgaClient.AddRelations(ctx, ofgaClient.CreateTupleKey("user:"+user.Username+id, "member", "group:"+strconv.FormatUint(uint64(group.ID), 10)))
 	c.Assert(err, gc.IsNil)
 
-	err = ofgaClient.AddRelations(ctx, ofgaClient.CreateTupleKey("group:group-"+strconv.FormatUint(uint64(group.ID), 10)+"#member", "administrator", "controller:controller-"+controller.UUID))
+	err = ofgaClient.AddRelations(ctx, ofgaClient.CreateTupleKey("group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member", "administrator", "controller:"+controller.UUID))
 	c.Assert(err, gc.IsNil)
 
 	res, err := client.CheckRelation(&apiparams.CheckRelationRequest{

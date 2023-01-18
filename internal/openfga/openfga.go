@@ -3,7 +3,9 @@ package openfga
 import (
 	"context"
 
+	"github.com/juju/zaputil/zapctx"
 	openfga "github.com/openfga/go-sdk"
+	"go.uber.org/zap"
 )
 
 // OFGAClient contains convenient utility methods for interacting
@@ -79,14 +81,22 @@ func (o *OFGAClient) getRelatedObjects(ctx context.Context, t openfga.TupleKey, 
 
 // checkRelation verifies that object a, is reachable, via unions or direct relations to object b
 func (o *OFGAClient) checkRelation(ctx context.Context, t openfga.TupleKey, trace bool) (bool, string, error) {
+	zapctx.Debug(
+		ctx,
+		"check request internal",
+		zap.String("tuple object", t.GetUser()),
+		zap.String("tuple relation", t.GetRelation()),
+		zap.String("tuple target object", t.GetObject()),
+	)
 	cr := openfga.NewCheckRequest()
 	cr.SetAuthorizationModelId(o.AuthModelId)
 	cr.SetTupleKey(t)
 	cr.SetTrace(trace)
-	checkres, _, err := o.api.Check(ctx).Body(*cr).Execute()
+	checkres, httpres, err := o.api.Check(ctx).Body(*cr).Execute()
 	if err != nil {
 		return false, "", err
 	}
+	zapctx.Debug(ctx, "check request internal resp code", zap.Int("code", httpres.StatusCode))
 	allowed := checkres.GetAllowed()
 	resolution := checkres.GetResolution()
 	return allowed, resolution, nil

@@ -343,6 +343,7 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 	c := r.ofgaClient
 	db := r.jimm.Database
 	t := req.Tuple
+
 	objectTag, objectTagRelationSpecifier, err := parseTag(ctx, db, t.Object)
 	if err != nil {
 		return checkResp, errors.E(op, err)
@@ -363,10 +364,10 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 		return checkResp, errors.E(op, errors.CodeOpenFGARequestFailed, err)
 	}
 
-	zapctx.Debug(ctx, "check request", zap.String("allowed", strconv.FormatBool(allowed)), zap.String("reason", resolution))
 	if allowed {
 		checkResp.Allowed = allowed
 	}
+	zapctx.Debug(ctx, "check request", zap.String("allowed", strconv.FormatBool(allowed)), zap.String("reason", resolution))
 	return checkResp, nil
 }
 
