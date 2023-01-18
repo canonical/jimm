@@ -97,10 +97,11 @@ func (s *accessControlSuite) TestResolveTupleObjectMapsUsers(c *gc.C) {
 func (s *accessControlSuite) TestResolveTupleObjectMapsGroups(c *gc.C) {
 	ctx := context.Background()
 	db := s.JIMM.Database
-	db.AddGroup(context.Background(), "myhandsomegroupofdigletts")
-	group, err := db.GetGroup(ctx, "myhandsomegroupofdigletts")
+	groupName := "myhandsomegroupofdigletts"
+	db.AddGroup(context.Background(), groupName)
+	group, err := db.GetGroup(ctx, groupName)
 	c.Assert(err, gc.IsNil)
-	tag, specifier, err := jujuapi.ResolveTupleObject(db, "group-"+strconv.FormatUint(uint64(group.ID), 10)+"#member")
+	tag, specifier, err := jujuapi.ResolveTupleObject(db, "group-"+groupName+"#member")
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag, gc.Equals, "group-"+strconv.FormatUint(uint64(group.ID), 10))
 	c.Assert(specifier, gc.Equals, "#member")
