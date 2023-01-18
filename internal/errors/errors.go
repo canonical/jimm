@@ -56,11 +56,11 @@ func (e *Error) ErrorCode() string {
 // is constructed by processing the given arguments. The meaning of the
 // arguments is as follows:
 //
-//     errors.Op   - string representation of the operation being
-//                   performed.
-//     errors.Code - string code classifying the error.
-//     error       - underlying error that caused the new error.
-//     string      - A human readable message describing the error.
+//	errors.Op   - string representation of the operation being
+//	              performed.
+//	errors.Code - string code classifying the error.
+//	error       - underlying error that caused the new error.
+//	string      - A human readable message describing the error.
 //
 // E will panic if no arguments are provided.
 func E(args ...interface{}) error {
@@ -106,22 +106,23 @@ type Op string
 type Code string
 
 const (
-	CodeAlreadyExists       Code = jujuparams.CodeAlreadyExists
-	CodeBadRequest          Code = jujuparams.CodeBadRequest
-	CodeCloudRegionRequired Code = jujuparams.CodeCloudRegionRequired
-	CodeConnectionFailed    Code = "connection failed"
-	CodeDatabaseLocked      Code = "database locked"
-	CodeForbidden           Code = jujuparams.CodeForbidden
-	CodeIncompatibleClouds  Code = jujuparams.CodeIncompatibleClouds
-	CodeModelNotFound       Code = jujuparams.CodeModelNotFound
-	CodeNotFound            Code = jujuparams.CodeNotFound
-	CodeNotImplemented      Code = jujuparams.CodeNotImplemented
-	CodeNotSupported        Code = jujuparams.CodeNotSupported
-	CodeRedirect            Code = jujuparams.CodeRedirect
-	CodeServerConfiguration Code = "server configuration"
-	CodeStillAlive          Code = apiparams.CodeStillAlive
-	CodeUnauthorized        Code = jujuparams.CodeUnauthorized
-	CodeUpgradeInProgress   Code = jujuparams.CodeUpgradeInProgress
+	CodeAlreadyExists         Code = jujuparams.CodeAlreadyExists
+	CodeBadRequest            Code = jujuparams.CodeBadRequest
+	CodeCloudRegionRequired   Code = jujuparams.CodeCloudRegionRequired
+	CodeConnectionFailed      Code = "connection failed"
+	CodeDatabaseLocked        Code = "database locked"
+	CodeForbidden             Code = jujuparams.CodeForbidden
+	CodeIncompatibleClouds    Code = jujuparams.CodeIncompatibleClouds
+	CodeModelNotFound         Code = jujuparams.CodeModelNotFound
+	CodeNotFound              Code = jujuparams.CodeNotFound
+	CodeNotImplemented        Code = jujuparams.CodeNotImplemented
+	CodeNotSupported          Code = jujuparams.CodeNotSupported
+	CodeRedirect              Code = jujuparams.CodeRedirect
+	CodeServerConfiguration   Code = "server configuration"
+	CodeStillAlive            Code = apiparams.CodeStillAlive
+	CodeUnauthorized          Code = jujuparams.CodeUnauthorized
+	CodeUpgradeInProgress     Code = jujuparams.CodeUpgradeInProgress
+	CodeFailedToParseTupleKey Code = "failed to parse tuple object key"
 )
 
 // ErrorCode returns the error code from the given error.

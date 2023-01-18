@@ -57,17 +57,17 @@ func (s *accessControlSuite) TestResolveTupleObjectHandlesErrors(c *gc.C) {
 		// Resolves bad groups where they do not exist
 		{
 			input: "group-myspecialpokemon-his-name-is-youguessedit-diglett",
-			want:  "user group does not exist",
+			want:  "group not found",
 		},
 		// Resolves bad controllers where they do not exist
 		{
 			input: "controller-mycontroller-that-does-not-exist",
-			want:  "controller does not exist",
+			want:  "controller not found",
 		},
 		// Resolves bad models where the user cannot be obtained from the JIMM tag
 		{
 			input: "model-mycontroller-that-does-not-exist/mymodel",
-			want:  "could not find controller user in tag",
+			want:  "model not found",
 		},
 		// Resolves bad models where it cannot be found on the specified controller
 		{
@@ -77,7 +77,7 @@ func (s *accessControlSuite) TestResolveTupleObjectHandlesErrors(c *gc.C) {
 		// Resolves bad applicationoffers where it cannot be found on the specified controller/model combo
 		{
 			input: "applicationoffer-" + controller.Name + ":alex/" + model.Name + "." + offer.Name + "fluff",
-			want:  "applicationoffer not found",
+			want:  "application offer not found",
 		},
 	}
 	for _, tc := range tests {
@@ -190,7 +190,7 @@ func (s *accessControlSuite) TestParseTag(c *gc.C) {
 	jimmTag := "model:model-" + controller.Name + ":" + user.Username + "/" + model.Name + "#administrator"
 
 	// JIMM tag syntax for models
-	tag, specifier, err := jujuapi.ParseTag(db, jimmTag)
+	tag, specifier, err := jujuapi.ParseTag(ctx, db, jimmTag)
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag.Kind(), gc.Equals, names.ModelTagKind)
 	c.Assert(tag.Id(), gc.Equals, uuid.String())
@@ -199,7 +199,7 @@ func (s *accessControlSuite) TestParseTag(c *gc.C) {
 	jujuTag := "model:model-" + uuid.String() + "#administrator"
 
 	// Juju tag syntax for models
-	tag, specifier, err = jujuapi.ParseTag(db, jujuTag)
+	tag, specifier, err = jujuapi.ParseTag(ctx, db, jujuTag)
 	c.Assert(err, gc.IsNil)
 	c.Assert(tag.Id(), gc.Equals, uuid.String())
 	c.Assert(tag.Kind(), gc.Equals, names.ModelTagKind)
