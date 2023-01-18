@@ -95,6 +95,7 @@ require (
 	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/duo-labs/webauthn v0.0.0-20220815211337-00c9fb5711f5 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
+	github.com/dustinkirkland/golang-petname v0.0.0-20191129215211-8e5a1ed0cff0 // indirect
 	github.com/envoyproxy/go-control-plane v0.10.2-0.20220325020618-49ff273808a1 // indirect
 	github.com/envoyproxy/protoc-gen-validate v0.6.1 // indirect
 	github.com/fatih/color v1.9.0 // indirect

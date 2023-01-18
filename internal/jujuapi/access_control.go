@@ -248,6 +248,7 @@ func resolveTupleObject(db db.Database, tag string) (string, string, error) {
 
 		err := db.GetApplicationOffer(ctx, &offer)
 		if err != nil {
+			zapctx.Debug(ctx, "alex here man", zap.Any("heeeeeeere", offer.URL))
 			return tag, relationSpecifier, errors.E("application offer not found")
 		}
 
