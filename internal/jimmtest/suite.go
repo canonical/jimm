@@ -51,7 +51,8 @@ type JIMMSuite struct {
 }
 
 func (s *JIMMSuite) SetUpTest(c *gc.C) {
-	ofgaAPI, ofgaClient := ofga.SetupTestOFGAClient()
+	ofgaAPI, ofgaClient := ofga.SetupTestOFGAClient(c)
+
 	s.OFGAApi = ofgaAPI
 	// Setup OpenFGA.
 	s.JIMM = &jimm.JIMM{
@@ -182,8 +183,6 @@ type JujuSuite struct {
 	corejujutesting.JujuConnSuite
 	LoggingSuite
 	JIMMSuite
-
-	//cancelWatcher func()
 }
 
 func (s *JujuSuite) SetUpSuite(c *gc.C) {
@@ -202,23 +201,9 @@ func (s *JujuSuite) SetUpTest(c *gc.C) {
 	s.JIMMSuite.SetUpTest(c)
 
 	s.AddController(c, "controller-1", s.APIInfo(c))
-
-	//var wctx context.Context
-	//wctx, s.cancelWatcher = context.WithCancel(context.Background())
-	//w := &jimm.Watcher{
-	//	Database: s.JIMM.Database,
-	//	Dialer:   s.JIMM.Dialer,
-	//}
-	//go func() {
-	//	err := w.Watch(wctx, time.Second)
-	//	c.Logf("watcher stopped: %s", err)
-	//}()
 }
 
 func (s *JujuSuite) TearDownTest(c *gc.C) {
-	//if s.cancelWatcher != nil {
-	//	s.cancelWatcher()
-	//}
 	s.JIMMSuite.TearDownTest(c)
 	s.LoggingSuite.TearDownTest(c)
 	s.JujuConnSuite.TearDownTest(c)

@@ -26,19 +26,23 @@ func (d *Database) AddGroup(ctx context.Context, name string) error {
 }
 
 // GetGroup returns a GroupEntry with the specified name.
-func (d *Database) GetGroup(ctx context.Context, name string) (*dbmodel.GroupEntry, error) {
+func (d *Database) GetGroup(ctx context.Context, group *dbmodel.GroupEntry) error {
 	const op = errors.Op("db.GetGroup")
 	if err := d.ready(); err != nil {
-		return nil, errors.E(op, err)
-	}
-	ge := dbmodel.GroupEntry{
-		Name: name,
+		return errors.E(op, err)
 	}
 
-	if err := d.DB.WithContext(ctx).First(&ge).Error; err != nil {
-		return nil, errors.E(op, dbError(err))
+	db := d.DB.WithContext(ctx)
+	if group.ID != 0 {
+		db = db.Where("id = ?", group.ID)
 	}
-	return &ge, nil
+	if group.Name != "" {
+		db = db.Where("name = ?", group.Name)
+	}
+	if err := db.First(&group).Error; err != nil {
+		return errors.E(op, dbError(err))
+	}
+	return nil
 }
 
 // ForEachGroup iterates through every group calling the given function
