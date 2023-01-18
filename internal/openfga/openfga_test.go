@@ -25,8 +25,10 @@ func (suite *openFGATestSuite) SetupSuite() {
 }
 
 func (suite *openFGATestSuite) TearDownTest() {
-	err := ofga.TruncateOpenFgaTuples()
-	assert.NoError(c, err)
+	err := ofga.TruncateOpenFgaTuples(context.Background())
+	if err != nil {
+		//TODO(Kian): Log that cleanup failed
+	}
 
 }
 
