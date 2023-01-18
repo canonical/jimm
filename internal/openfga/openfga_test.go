@@ -25,7 +25,7 @@ func (suite *openFGATestSuite) SetUpTest(c *gc.C) {
 }
 
 func (suite *openFGATestSuite) TestCreateTupleKey(c *gc.C) {
-	key := suite.ofgaClient.CreateTupleKey("user:diglett", "legendary", "pokemon:earth")
+	key := ofga.CreateTupleKey("user:diglett", "legendary", "pokemon:earth")
 	c.Assert("user:diglett", gc.Equals, key.GetUser())
 	c.Assert("legendary", gc.Equals, key.GetRelation())
 	c.Assert("pokemon:earth", gc.Equals, key.GetObject())
@@ -33,9 +33,9 @@ func (suite *openFGATestSuite) TestCreateTupleKey(c *gc.C) {
 
 func (suite *openFGATestSuite) TestWritingTuplesToOFGADetectsBadObjects(c *gc.C) {
 	ctx := context.Background()
-	key1 := suite.ofgaClient.CreateTupleKey("user:diglett", "legendary", "pokemon:earth")
-	key2 := suite.ofgaClient.CreateTupleKey("user:diglett", "awesome", "pokemon:earth")
-	key3 := suite.ofgaClient.CreateTupleKey("user:dugtrio", "legendary", "pokemon:fire")
+	key1 := ofga.CreateTupleKey("user:diglett", "legendary", "pokemon:earth")
+	key2 := ofga.CreateTupleKey("user:diglett", "awesome", "pokemon:earth")
+	key3 := ofga.CreateTupleKey("user:dugtrio", "legendary", "pokemon:fire")
 
 	err := suite.ofgaClient.AddRelations(ctx, key1, key2, key3)
 	fgaErrCode, _ := openfga.NewErrorCodeFromValue("validation_error")
@@ -52,11 +52,11 @@ func (suite *openFGATestSuite) TestWritingTuplesToOFGADetectsSucceeds(c *gc.C) {
 
 	uuid1, _ := uuid.NewRandom()
 	user1 := fmt.Sprintf("user:%s", uuid1)
-	key1 := suite.ofgaClient.CreateTupleKey(user1, "member", "group:pokemon")
+	key1 := ofga.CreateTupleKey(user1, "member", "group:pokemon")
 
 	uuid2, _ := uuid.NewRandom()
 	user2 := fmt.Sprintf("user:%s", uuid2)
-	key2 := suite.ofgaClient.CreateTupleKey(user2, "member", "group:pokemon")
+	key2 := ofga.CreateTupleKey(user2, "member", "group:pokemon")
 
 	err := suite.ofgaClient.AddRelations(ctx, key1, key2)
 	c.Assert(err, gc.IsNil)
