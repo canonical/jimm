@@ -3,6 +3,10 @@
 package jujuapi
 
 import (
+	"context"
+
+	"github.com/CanonicalLtd/jimm/internal/db"
+	"github.com/CanonicalLtd/jimm/internal/jimm"
 	jujuparams "github.com/juju/juju/rpc/params"
 )
 
@@ -29,4 +33,13 @@ func ModelAccessWatcherMatch(w *modelAccessWatcher, model string) bool {
 
 func RunModelAccessWatcher(w *modelAccessWatcher) {
 	go w.loop()
+}
+
+func ToJAASTag(db db.Database, tag string) (string, error) {
+	c := controllerRoot{
+		jimm: &jimm.JIMM{
+			Database: db,
+		},
+	}
+	return c.toJAASTag(context.Background(), tag)
 }
