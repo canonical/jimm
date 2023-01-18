@@ -288,3 +288,16 @@ type RelationshipTuple struct {
 type AddRelationRequest struct {
 	Tuples []RelationshipTuple
 }
+
+// ListRelationshipTuplesRequests holds the request information to list tuples.
+type ListRelationshipTuplesRequest struct {
+	Tuple             RelationshipTuple `json:"tuple,omitempty"`
+	PageSize          int32             `json:"page_size,omitempty"`
+	ContinuationToken string            `json:"continuation_token,omitempty"`
+}
+
+// ListRelationshipTuplesResponse holds the response of the ListRelationshipTuples method.
+type ListRelationshipTuplesResponse struct {
+	Tuples            []RelationshipTuple `json:"tuples,omitempty"`
+	ContinuationToken string              `json:"continuation_token,omitempty"`
+}
