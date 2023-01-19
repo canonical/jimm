@@ -580,25 +580,13 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 	}
 
 	for _, tc := range tagTests {
-		err := client.AddRelation(&apiparams.AddRelationRequest{
-			Tuples: []apiparams.RelationshipTuple{
-				{
-					Object:       tc.input.user,
-					Relation:     tc.input.relation,
-					TargetObject: tc.input.object,
-				},
-			},
-		})
-		if tc.err {
-			c.Assert(err, gc.NotNil)
-			c.Assert(err, gc.ErrorMatches, tc.want)
-		} else {
-			c.Assert(err, gc.IsNil)
-			changes, _, err := s.OFGAApi.ReadChanges(ctx).Type_(tc.changesType).Execute()
-			c.Assert(err, gc.IsNil)
-			key := changes.GetChanges()[len(changes.GetChanges())-1].GetTupleKey()
-			c.Assert(key, gc.DeepEquals, tc.want)
-		}
+		ofgaClient := s.JIMM.OpenFGAClient
+		err := ofgaClient.AddRelations(context.Background(), tc.want)
+		c.Assert(err, gc.IsNil)
+		changes, _, err := s.OFGAApi.ReadChanges(ctx).Type_(tc.changesType).Execute()
+		c.Assert(err, gc.IsNil)
+		key := changes.GetChanges()[len(changes.GetChanges())-1].GetTupleKey()
+		c.Assert(key, gc.DeepEquals, tc.want)
 
 		err = client.RemoveRelation(&apiparams.RemoveRelationRequest{
 			Tuples: []apiparams.RelationshipTuple{
@@ -616,7 +604,10 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 			c.Assert(err, gc.IsNil)
 			changes, _, err := s.OFGAApi.ReadChanges(ctx).Type_(tc.changesType).Execute()
 			c.Assert(err, gc.IsNil)
-			key := changes.GetChanges()[len(changes.GetChanges())-1].GetTupleKey()
+			change := changes.GetChanges()[len(changes.GetChanges())-1]
+			operation := change.GetOperation()
+			c.Assert(operation, gc.Equals, openfga.DELETE)
+			key := change.GetTupleKey()
 			c.Assert(key, gc.DeepEquals, tc.want)
 		}
 	}
