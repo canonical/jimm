@@ -113,7 +113,7 @@ func (o *OFGAClient) AddRelations(ctx context.Context, keys ...openfga.TupleKey)
 	return o.addRelation(ctx, keys...)
 }
 
-// AddRelations creates a tuple(s) from the provided keys. See CreateTupleKey for creating keys.
+// RemoveRelation creates a tuple(s) from the provided keys. See CreateTupleKey for creating keys.
 func (o *OFGAClient) RemoveRelation(ctx context.Context, keys ...openfga.TupleKey) error {
 	return o.removeRelation(ctx, keys...)
 }
