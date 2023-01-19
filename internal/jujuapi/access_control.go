@@ -105,7 +105,7 @@ func (r *controllerRoot) RemoveGroup(ctx context.Context, req apiparams.RemoveGr
 		return errors.E(op, err)
 	}
 	//TODO(Kian): Also remove all tuples containing group with confirmation message in the CLI.
-	err := r.removeRelatedTuples(req.Name)
+	err = r.removeRelatedTuples(req.Name)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -533,6 +533,6 @@ func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apipara
 
 // removeRelatedTuples removes all tuples that contain object as either the source/target
 // of tuple.
-func (r *controllerRoot) removeRelatedTuples(object string) {
-
+func (r *controllerRoot) removeRelatedTuples(object string) error {
+	return nil
 }
