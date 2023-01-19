@@ -22,7 +22,6 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
-	ofgaClient "github.com/CanonicalLtd/jimm/internal/openfga"
 	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
 )
 
@@ -296,29 +295,6 @@ func parseTag(ctx context.Context, db db.Database, key string) (names.Tag, strin
 	return tag, relationSpecifier, err
 }
 
-func createTupleKeys(ctx context.Context, ofc *ofgaClient.OFGAClient, db db.Database, tuples []apiparams.RelationshipTuple) ([]openfga.TupleKey, error) {
-	keys := make([]openfga.TupleKey, 0, len(tuples))
-	for _, t := range tuples {
-		objectTag, objectTagRelationSpecifier, err := parseTag(ctx, db, t.Object)
-		if err != nil {
-			return nil, err
-		}
-		targetObject, targetObjectRelationSpecifier, err := parseTag(ctx, db, t.TargetObject)
-		if err != nil {
-			return nil, err
-		}
-		keys = append(
-			keys,
-			ofga.CreateTupleKey(
-				objectTag.Kind()+":"+objectTag.Id()+objectTagRelationSpecifier,
-				t.Relation,
-				targetObject.Kind()+":"+targetObject.Id()+targetObjectRelationSpecifier,
-			),
-		)
-	}
-	return keys, nil
-}
-
 // AddRelation creates a tuple between two objects [if applicable]
 // within OpenFGA.
 func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelationRequest) error {
@@ -326,15 +302,9 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 	if r.user.ControllerAccess != "superuser" {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
-	db := r.jimm.Database
-	ofc := r.ofgaClient
-	keys, err := createTupleKeys(ctx, ofc, db, req.Tuples)
+	keys, err := r.createTupleKeys(ctx, req.Tuples)
 	if err != nil {
-		zapctx.Debug(ctx, err.Error())
-		return err
-	}
-	if l := len(keys); l == 0 || l > 25 {
-		return errors.E("length of" + strconv.Itoa(l) + "is not valid, please do not provide more than 25 tuple keys")
+		return errors.E(err)
 	}
 	err = r.ofgaClient.AddRelations(ctx, keys...)
 	if err != nil {
@@ -348,17 +318,11 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 // within OpenFGA.
 func (r *controllerRoot) RemoveRelation(ctx context.Context, req apiparams.RemoveRelationRequest) error {
 	const op = errors.Op("jujuapi.RemoveRelation")
-	db := r.jimm.Database
-	ofc := r.ofgaClient
-	keys, err := createTupleKeys(ctx, ofc, db, req.Tuples)
+	keys, err := r.createTupleKeys(ctx, req.Tuples)
 	if err != nil {
-		zapctx.Debug(ctx, err.Error())
-		return err
+		return errors.E(op, err)
 	}
-	if l := len(keys); l == 0 || l > 25 {
-		return errors.E("length of" + strconv.Itoa(l) + "is not valid, please do not provide more than 25 tuple keys")
-	}
-	err = r.ofgaClient.DeleteRelations(ctx, keys...)
+	err = r.ofgaClient.RemoveRelation(ctx, keys...)
 	if err != nil {
 		zapctx.Error(ctx, "failed to delete tuple(s)", zap.NamedError("delete-relation-error", err))
 		return errors.E(op, err)
@@ -371,6 +335,20 @@ func (r *controllerRoot) RemoveRelation(ctx context.Context, req apiparams.Remov
 // This corresponds directly to /stores/{store_id}/check.
 func (r *controllerRoot) CheckRelation(ctx context.Context) error {
 	return errors.E("Not implemented.")
+}
+
+// createTupleKeys translate the api request struct containing tuples to a slice of openfga tuple keys.
+// This method utilises the parseTuple method which does all the heavy lifting.
+func (r *controllerRoot) createTupleKeys(ctx context.Context, tuples []apiparams.RelationshipTuple) ([]openfga.TupleKey, error) {
+	keys := make([]openfga.TupleKey, 0, len(tuples))
+	for _, tuple := range tuples {
+		key, err := r.parseTuple(ctx, tuple)
+		if err != nil {
+			errors.E(err)
+		}
+		keys = append(keys, *key)
+	}
+	return keys, nil
 }
 
 func (r *controllerRoot) parseTuple(ctx context.Context, tuple apiparams.RelationshipTuple) (*openfga.TupleKey, error) {
