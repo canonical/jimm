@@ -304,7 +304,7 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 	if r.user.ControllerAccess != "superuser" {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
-	keys, err := r.createTupleKeys(ctx, req.Tuples)
+	keys, err := r.parseTuples(ctx, req.Tuples)
 	if err != nil {
 		return errors.E(err)
 	}
@@ -323,7 +323,7 @@ func (r *controllerRoot) RemoveRelation(ctx context.Context, req apiparams.Remov
 	if r.user.ControllerAccess != "superuser" {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
-	keys, err := r.createTupleKeys(ctx, req.Tuples)
+	keys, err := r.parseTuples(ctx, req.Tuples)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -363,9 +363,9 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 	return checkResp, nil
 }
 
-// createTupleKeys translate the api request struct containing tuples to a slice of openfga tuple keys.
+// parseTuples translate the api request struct containing tuples to a slice of openfga tuple keys.
 // This method utilises the parseTuple method which does all the heavy lifting.
-func (r *controllerRoot) createTupleKeys(ctx context.Context, tuples []apiparams.RelationshipTuple) ([]openfga.TupleKey, error) {
+func (r *controllerRoot) parseTuples(ctx context.Context, tuples []apiparams.RelationshipTuple) ([]openfga.TupleKey, error) {
 	keys := make([]openfga.TupleKey, 0, len(tuples))
 	for _, tuple := range tuples {
 		key, err := r.parseTuple(ctx, tuple)

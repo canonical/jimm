@@ -71,7 +71,7 @@ func (s *openFGATestSuite) TestWritingTuplesToOFGADetectsSucceeds(c *gc.C) {
 	c.Assert(user2, gc.Equals, lastInsertedTuple.GetUser())
 }
 
-func (suite *openFGATestSuite) TestDeletingTuplesFromOFGASucceeds(c *gc.C) {
+func (suite *openFGATestSuite) TestRemovingTuplesFromOFGASucceeds(c *gc.C) {
 	ctx := context.Background()
 
 	//Create tuples before writing to db
