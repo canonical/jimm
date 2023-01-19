@@ -146,8 +146,8 @@ func (c *Client) AddRelation(req *params.AddRelationRequest) error {
 }
 
 // RemoveRelation removes a relational tuple in JIMM.
-func (c *Client) RemoveRelation() error {
-	return c.caller.APICall("JIMM", 4, "", "RemoveRelation", nil, nil)
+func (c *Client) RemoveRelation(req *params.RemoveRelationRequest) error {
+	return c.caller.APICall("JIMM", 4, "", "RemoveRelation", req, nil)
 }
 
 // CheckRelation verifies that the object graph reaches the provided
