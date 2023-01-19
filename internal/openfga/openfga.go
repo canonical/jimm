@@ -3,7 +3,11 @@ package openfga
 import (
 	"context"
 
+	"github.com/juju/zaputil/zapctx"
 	openfga "github.com/openfga/go-sdk"
+	"go.uber.org/zap"
+
+	"github.com/CanonicalLtd/jimm/internal/errors"
 )
 
 // OFGAClient contains convenient utility methods for interacting
@@ -51,6 +55,19 @@ func (o *OFGAClient) addRelation(ctx context.Context, t ...openfga.TupleKey) err
 	return nil
 }
 
+// removeRelation deletes user(s) from the specified object by the specified relation within the tuple keys given.
+func (o *OFGAClient) removeRelation(ctx context.Context, t ...openfga.TupleKey) error {
+	wr := openfga.NewWriteRequest()
+	wr.SetAuthorizationModelId(o.AuthModelId)
+	keys := openfga.NewTupleKeys(t)
+	wr.SetDeletes(*keys)
+	_, _, err := o.api.Write(ctx).Body(*wr).Execute()
+	if err != nil {
+		return errors.E(err)
+	}
+	return nil
+}
+
 // getRelatedObjects returns all objects where the user has a valid relation to them.
 // Such as all the groups a user resides in.
 //
@@ -79,6 +96,30 @@ func (o *OFGAClient) getRelatedObjects(ctx context.Context, t *openfga.TupleKey,
 	return &readres, nil
 }
 
+// checkRelation verifies that object a, is reachable, via unions or direct relations to object b
+func (o *OFGAClient) checkRelation(ctx context.Context, t openfga.TupleKey, trace bool) (bool, string, error) {
+	zapctx.Debug(
+		ctx,
+		"check request internal",
+		zap.String("tuple object", t.GetUser()),
+		zap.String("tuple relation", t.GetRelation()),
+		zap.String("tuple target object", t.GetObject()),
+	)
+	cr := openfga.NewCheckRequest()
+	cr.SetAuthorizationModelId(o.AuthModelId)
+	cr.SetTupleKey(t)
+	cr.SetTrace(trace)
+	checkres, httpres, err := o.api.Check(ctx).Body(*cr).Execute()
+	if err != nil {
+		return false, "", err
+	}
+	zapctx.Debug(ctx, "check request internal resp code", zap.Int("code", httpres.StatusCode))
+	allowed := checkres.GetAllowed()
+	resolution := checkres.GetResolution()
+	return allowed, resolution, nil
+
+}
+
 // CreateTuple wraps the underlying ofga tuple into a convenient ease-of-use method
 func CreateTupleKey(object string, relation string, targetObject string) openfga.TupleKey {
 	k := openfga.NewTupleKey()
@@ -97,6 +138,11 @@ func CreateTupleKey(object string, relation string, targetObject string) openfga
 // AddRelations creates a tuple(s) from the provided keys. See CreateTupleKey for creating keys.
 func (o *OFGAClient) AddRelations(ctx context.Context, keys ...openfga.TupleKey) error {
 	return o.addRelation(ctx, keys...)
+}
+
+// RemoveRelation creates a tuple(s) from the provided keys. See CreateTupleKey for creating keys.
+func (o *OFGAClient) RemoveRelation(ctx context.Context, keys ...openfga.TupleKey) error {
+	return o.removeRelation(ctx, keys...)
 }
 
 // ReadRelations reads a relation(s) from the provided key where a match can be found.
@@ -130,4 +176,14 @@ func (o *OFGAClient) ReadRelatedObjects(ctx context.Context, key *openfga.TupleK
 	}
 
 	return &ReadResponse{Keys: keys, PaginationToken: token}, nil
+}
+
+// CheckRelation verifies that a user (or object) is allowed to access the target object by the specified relation.
+//
+// It will return:
+// - A bool of simply true or false, denoting authorisation
+// - A string (if trace is true) explaining WHY this is true [in the case the check succeeds, otherwise an empty string]
+// - An error in the event something is wrong when contacting OpenFGA
+func (o *OFGAClient) CheckRelation(ctx context.Context, key openfga.TupleKey, trace bool) (bool, string, error) {
+	return o.checkRelation(ctx, key, trace)
 }
