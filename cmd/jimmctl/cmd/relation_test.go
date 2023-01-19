@@ -35,8 +35,8 @@ func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 		err      bool
 		message  string
 	}{
-		{testName: "Add Group", input: tuple{user: "group:group-" + group1 + "#member", relation: "member", target: "group:group-" + group2}, err: false},
-		{testName: "Invalid Relation", input: tuple{user: "group:group-" + group1 + "#member", relation: "admin", target: "group:group-" + group2}, err: true, message: "Invalid tuple"},
+		{testName: "Add Group", input: tuple{user: "group-" + group1 + "#member", relation: "member", target: "group-" + group2}, err: false},
+		{testName: "Invalid Relation", input: tuple{user: "group-" + group1 + "#member", relation: "admin", target: "group-" + group2}, err: true, message: "Invalid tuple"},
 	}
 
 	err := s.jimmSuite.JIMM.Database.AddGroup(context.Background(), group1)
@@ -88,7 +88,7 @@ func (s *relationSuite) TestAddRelationViaFileSuperuser(c *gc.C) {
 	file, err := os.CreateTemp(".", "relations.json")
 	c.Assert(err, gc.IsNil)
 	defer os.Remove(file.Name())
-	testRelations := "[{\"object\":\"group:group-" + group1 + "\",\"relation\":\"member\",\"target_object\":\"group:group-" + group3 + "\"},{\"object\":\"group:group-" + group2 + "\",\"relation\":\"member\",\"target_object\":\"group:group-" + group3 + "\"}]"
+	testRelations := "[{\"object\":\"group-" + group1 + "\",\"relation\":\"member\",\"target_object\":\"group-" + group3 + "\"},{\"object\":\"group-" + group2 + "\",\"relation\":\"member\",\"target_object\":\"group-" + group3 + "\"}]"
 	_, err = file.Write([]byte(testRelations))
 	c.Assert(err, gc.IsNil)
 
@@ -123,7 +123,7 @@ func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 		err      bool
 		message  string
 	}{
-		{testName: "Remove Group Relation", input: tuple{user: "group:group-" + group1 + "#member", relation: "member", target: "group:group-" + group2}, err: false},
+		{testName: "Remove Group Relation", input: tuple{user: "group-" + group1 + "#member", relation: "member", target: "group-" + group2}, err: false},
 	}
 
 	//Create groups and relation
@@ -167,7 +167,7 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 	file, err := os.CreateTemp(".", "relations.json")
 	c.Assert(err, gc.IsNil)
 	defer os.Remove(file.Name())
-	testRelations := "[{\"object\":\"group:group-" + group1 + "\",\"relation\":\"member\",\"target_object\":\"group:group-" + group3 + "\"},{\"object\":\"group:group-" + group2 + "\",\"relation\":\"member\",\"target_object\":\"group:group-" + group3 + "\"}]"
+	testRelations := "[{\"object\":\"group-" + group1 + "\",\"relation\":\"member\",\"target_object\":\"group-" + group3 + "\"},{\"object\":\"group-" + group2 + "\",\"relation\":\"member\",\"target_object\":\"group-" + group3 + "\"}]"
 	_, err = file.Write([]byte(testRelations))
 	c.Assert(err, gc.IsNil)
 

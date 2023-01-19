@@ -51,7 +51,7 @@ type JIMMSuite struct {
 }
 
 func (s *JIMMSuite) SetUpTest(c *gc.C) {
-	ofgaAPI, ofgaClient := ofga.SetupTestOFGAClient(c)
+	ofgaAPI, ofgaClient, _ := ofga.SetupTestOFGAClient(c)
 
 	s.OFGAApi = ofgaAPI
 	// Setup OpenFGA.

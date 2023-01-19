@@ -4,7 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path"
+	"path/filepath"
+	"sync"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/oklog/ulid/v2"
@@ -13,13 +17,59 @@ import (
 	gc "gopkg.in/check.v1"
 )
 
+var (
+	authDefinitions    = []openfga.TypeDefinition{}
+	calcDefinitionOnce sync.Once
+)
+
+func getAuthModelDefinition(c *gc.C) []openfga.TypeDefinition {
+	calcDefinitionOnce.Do(func() {
+		desiredFolder := "local"
+		authPath := ""
+		pwd, err := os.Getwd()
+		c.Assert(err, gc.IsNil)
+		for ok := true; ok; {
+			if pwd == "/" {
+				break
+			}
+			files, err := ioutil.ReadDir(pwd)
+			c.Assert(err, gc.IsNil)
+
+			for _, f := range files {
+				if f.Name() == desiredFolder {
+					ok = true
+					authPath = pwd
+				}
+			}
+			// Move up a directory
+			pwd = filepath.Dir(pwd)
+		}
+		c.Assert(authPath, gc.Not(gc.Equals), "")
+
+		b, err := os.ReadFile(path.Join(authPath, "/local/openfga/authorisation_model.json"))
+		c.Assert(err, gc.IsNil)
+		wrapper := make(map[string]interface{})
+		err = json.Unmarshal(b, &wrapper)
+		c.Assert(err, gc.IsNil)
+
+		b, err = json.Marshal(wrapper["type_definitions"])
+		c.Assert(err, gc.IsNil)
+
+		err = json.Unmarshal(b, &authDefinitions)
+		c.Assert(err, gc.IsNil)
+	})
+
+	return authDefinitions
+
+}
+
 // SetupTestOFGAClient is intended to be used per test, in that it
 // creates a store based on the current tests name and is expected to
 // be a single use instance (due to the initial removing of a store).
 //
 // The benefit of not cleaning up the store immediately afterwards,
 // enables the debugging of created tuples in test development.
-func SetupTestOFGAClient(c *gc.C) (openfga.OpenFgaApi, *OFGAClient) {
+func SetupTestOFGAClient(c *gc.C) (openfga.OpenFgaApi, *OFGAClient, *openfga.Configuration) {
 	ctx := context.Background()
 
 	openFGATestConfig := openfga.Configuration{
@@ -47,27 +97,15 @@ func SetupTestOFGAClient(c *gc.C) (openfga.OpenFgaApi, *OFGAClient) {
 	client.SetStoreId(uuid)
 	api := client.OpenFgaApi
 
-	b, err := os.ReadFile("../../local/openfga/authorisation_model.json")
-	c.Assert(err, gc.IsNil)
-	wrapper := make(map[string]interface{})
-	err = json.Unmarshal(b, &wrapper)
-	c.Assert(err, gc.IsNil)
-
-	b, err = json.Marshal(wrapper["type_definitions"])
-	c.Assert(err, gc.IsNil)
-
-	definitions := []openfga.TypeDefinition{}
-	err = json.Unmarshal(b, &definitions)
-	c.Assert(err, gc.IsNil)
-
 	ar := openfga.NewWriteAuthorizationModelRequest()
-	ar.SetTypeDefinitions(definitions)
+	ar.SetTypeDefinitions(getAuthModelDefinition(c))
 
 	amr, _, err := api.WriteAuthorizationModel(ctx).Body(*ar).Execute()
 	c.Assert(err, gc.IsNil)
 
 	wrapperClient := NewOpenFGAClient(client.OpenFgaApi, amr.GetAuthorizationModelId())
-	return client.OpenFgaApi, wrapperClient
+	cfg.StoreId = uuid
+	return client.OpenFgaApi, wrapperClient, cfg
 }
 
 // RemoveStore removes an OpenFGA store (via db) by NAME.

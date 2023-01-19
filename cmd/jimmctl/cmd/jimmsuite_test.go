@@ -65,6 +65,10 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 	err := s.JIMM.Database.Migrate(context.Background(), true)
 	c.Assert(err, gc.Equals, nil)
 
+	ofgaAPI, ofgaClient, cfg := ofga.SetupTestOFGAClient(c)
+	s.OFGAApi = ofgaAPI
+	s.JIMM.OpenFGAClient = ofgaClient
+
 	s.Params = service.Params{
 		ControllerUUID:   "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		CandidURL:        s.Candid.URL.String(),
@@ -72,11 +76,11 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 		ControllerAdmins: []string{"admin"},
 		DSN:              fmt.Sprintf("file:%s?mode=memory&cache=shared", c.TestName()),
 		OpenFGAParams: service.OpenFGAParams{
-			Scheme:    ofga.OpenFGATestConfig.ApiScheme,
-			Host:      ofga.OpenFGATestConfig.ApiHost,
-			Store:     ofga.OpenFGATestConfig.StoreId,
-			Token:     ofga.OpenFGATestConfig.Credentials.Config.ApiToken,
-			AuthModel: ofga.OpenFGATestAuthModel,
+			Scheme:    cfg.ApiScheme,
+			Host:      cfg.ApiHost,
+			Store:     cfg.StoreId,
+			Token:     cfg.Credentials.Config.ApiToken,
+			AuthModel: ofgaClient.AuthModelId,
 		},
 	}
 	srv, err := service.NewService(ctx, s.Params)
@@ -84,10 +88,6 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 	s.Service = srv
 
 	s.HTTP = httptest.NewTLSServer(srv)
-
-	ofgaAPI, ofgaClient := ofga.SetupTestOFGAClient()
-	s.OFGAApi = ofgaAPI
-	s.JIMM.OpenFGAClient = ofgaClient
 
 	s.AdminUser = &dbmodel.User{
 		Username:         "alice@external",
