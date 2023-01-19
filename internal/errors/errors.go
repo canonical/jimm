@@ -106,23 +106,25 @@ type Op string
 type Code string
 
 const (
-	CodeAlreadyExists         Code = jujuparams.CodeAlreadyExists
-	CodeBadRequest            Code = jujuparams.CodeBadRequest
-	CodeCloudRegionRequired   Code = jujuparams.CodeCloudRegionRequired
-	CodeConnectionFailed      Code = "connection failed"
-	CodeDatabaseLocked        Code = "database locked"
-	CodeForbidden             Code = jujuparams.CodeForbidden
-	CodeIncompatibleClouds    Code = jujuparams.CodeIncompatibleClouds
-	CodeModelNotFound         Code = jujuparams.CodeModelNotFound
-	CodeNotFound              Code = jujuparams.CodeNotFound
-	CodeNotImplemented        Code = jujuparams.CodeNotImplemented
-	CodeNotSupported          Code = jujuparams.CodeNotSupported
-	CodeRedirect              Code = jujuparams.CodeRedirect
-	CodeServerConfiguration   Code = "server configuration"
-	CodeStillAlive            Code = apiparams.CodeStillAlive
-	CodeUnauthorized          Code = jujuparams.CodeUnauthorized
-	CodeUpgradeInProgress     Code = jujuparams.CodeUpgradeInProgress
-	CodeFailedToParseTupleKey Code = "failed to parse tuple object key"
+	CodeAlreadyExists                Code = jujuparams.CodeAlreadyExists
+	CodeBadRequest                   Code = jujuparams.CodeBadRequest
+	CodeCloudRegionRequired          Code = jujuparams.CodeCloudRegionRequired
+	CodeConnectionFailed             Code = "connection failed"
+	CodeDatabaseLocked               Code = "database locked"
+	CodeForbidden                    Code = jujuparams.CodeForbidden
+	CodeIncompatibleClouds           Code = jujuparams.CodeIncompatibleClouds
+	CodeModelNotFound                Code = jujuparams.CodeModelNotFound
+	CodeNotFound                     Code = jujuparams.CodeNotFound
+	CodeNotImplemented               Code = jujuparams.CodeNotImplemented
+	CodeNotSupported                 Code = jujuparams.CodeNotSupported
+	CodeRedirect                     Code = jujuparams.CodeRedirect
+	CodeServerConfiguration          Code = "server configuration"
+	CodeStillAlive                   Code = apiparams.CodeStillAlive
+	CodeUnauthorized                 Code = jujuparams.CodeUnauthorized
+	CodeUpgradeInProgress            Code = jujuparams.CodeUpgradeInProgress
+	CodeFailedToParseTupleKey        Code = "failed to parse tuple object key"
+	CodeFailedToResolveTupleResource Code = "failed resolve resource"
+	CodeOpenFGARequestFailed         Code = "failed request to OpenFGA"
 )
 
 // ErrorCode returns the error code from the given error.
