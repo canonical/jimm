@@ -42,8 +42,7 @@ func init() {
 		addRelationMethod := rpc.Method(r.AddRelation)
 		removeRelationMethod := rpc.Method(r.RemoveRelation)
 		checkRelationMethod := rpc.Method(r.CheckRelation)
-		listRelationsMethod := rpc.Method(r.ListRelations)
-		getAuthorisationModelMethod := rpc.Method(r.GetAuthorisationModel)
+		listRelationshipTuplesMethod := rpc.Method(r.ListRelationshipTuples)
 
 		r.AddMethod("JIMM", 2, "DisableControllerUUIDMasking", disableControllerUUIDMaskingMethod)
 		r.AddMethod("JIMM", 2, "ListControllers", listControllersMethod)
@@ -84,8 +83,7 @@ func init() {
 		r.AddMethod("JIMM", 4, "AddRelation", addRelationMethod)
 		r.AddMethod("JIMM", 4, "RemoveRelation", removeRelationMethod)
 		r.AddMethod("JIMM", 4, "CheckRelation", checkRelationMethod)
-		r.AddMethod("JIMM", 4, "ListRelations", listRelationsMethod)
-		r.AddMethod("JIMM", 4, "GetAuthorisationModel", getAuthorisationModelMethod)
+		r.AddMethod("JIMM", 4, "ListRelationshipTuples", listRelationshipTuplesMethod)
 
 		return []int{2, 3, 4}
 	}

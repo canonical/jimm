@@ -47,30 +47,39 @@ func (s *dbSuite) TestAddGroup(c *qt.C) {
 }
 
 func (s *dbSuite) TestGetGroup(c *qt.C) {
-	_, err := s.Database.GetGroup(context.Background(), "test-group")
+	err := s.Database.GetGroup(context.Background(), &dbmodel.GroupEntry{
+		Name: "test-group",
+	})
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
 
 	err = s.Database.Migrate(context.Background(), false)
 	c.Assert(err, qt.IsNil)
 
-	_, err = s.Database.GetGroup(context.Background(), "test-group")
+	group := &dbmodel.GroupEntry{
+		Name: "test-group",
+	}
+	err = s.Database.GetGroup(context.Background(), group)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	err = s.Database.AddGroup(context.TODO(), "test-group")
 	c.Assert(err, qt.IsNil)
 
-	ge, err := s.Database.GetGroup(context.Background(), "test-group")
+	err = s.Database.GetGroup(context.Background(), group)
 	c.Check(err, qt.IsNil)
-	c.Assert(ge.ID, qt.Equals, uint(1))
-	c.Assert(ge.Name, qt.Equals, "test-group")
+	c.Assert(group.ID, qt.Equals, uint(1))
+	c.Assert(group.Name, qt.Equals, "test-group")
 
 	err = s.Database.AddGroup(context.Background(), "test-group1")
 	c.Assert(err, qt.IsNil)
 
-	ge, err = s.Database.GetGroup(context.Background(), "test-group1")
+	group = &dbmodel.GroupEntry{
+		Name: "test-group1",
+	}
+
+	err = s.Database.GetGroup(context.Background(), group)
 	c.Check(err, qt.IsNil)
-	c.Assert(ge.ID, qt.Equals, uint(2))
-	c.Assert(ge.Name, qt.Equals, "test-group1")
+	c.Assert(group.ID, qt.Equals, uint(2))
+	c.Assert(group.Name, qt.Equals, "test-group1")
 }
 
 func (s *dbSuite) TestUpdateGroup(c *qt.C) {
@@ -90,14 +99,20 @@ func (s *dbSuite) TestUpdateGroup(c *qt.C) {
 	err = s.Database.AddGroup(context.Background(), "test-group")
 	c.Assert(err, qt.IsNil)
 
-	ge1, err := s.Database.GetGroup(context.Background(), "test-group")
+	ge1 := &dbmodel.GroupEntry{
+		Name: "test-group",
+	}
+	err = s.Database.GetGroup(context.Background(), ge1)
 	c.Assert(err, qt.IsNil)
 
 	ge1.Name = "renamed-group"
 	err = s.Database.UpdateGroup(context.Background(), ge1)
 	c.Check(err, qt.IsNil)
 
-	ge2, err := s.Database.GetGroup(context.Background(), "renamed-group")
+	ge2 := &dbmodel.GroupEntry{
+		Name: "renamed-group",
+	}
+	err = s.Database.GetGroup(context.Background(), ge2)
 	c.Check(err, qt.IsNil)
 	c.Assert(ge2, qt.DeepEquals, ge1)
 }
@@ -112,19 +127,21 @@ func (s *dbSuite) TestRemoveGroup(c *qt.C) {
 	ge := &dbmodel.GroupEntry{
 		Name: "test-group",
 	}
-
 	err = s.Database.RemoveGroup(context.Background(), ge)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	err = s.Database.AddGroup(context.Background(), ge.Name)
 	c.Assert(err, qt.IsNil)
 
-	ge1, err := s.Database.GetGroup(context.Background(), ge.Name)
+	ge1 := &dbmodel.GroupEntry{
+		Name: "test-group",
+	}
+	err = s.Database.GetGroup(context.Background(), ge1)
 	c.Assert(err, qt.IsNil)
 
 	err = s.Database.RemoveGroup(context.Background(), ge1)
 	c.Check(err, qt.IsNil)
 
-	_, err = s.Database.GetGroup(context.Background(), ge.Name)
+	err = s.Database.GetGroup(context.Background(), ge1)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }

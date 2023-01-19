@@ -159,25 +159,9 @@ func (c *Client) CheckRelation() error {
 	return c.caller.APICall("JIMM", 4, "", "CheckRelation", nil, nil)
 }
 
-// ListRelations returns all objects where the relation matches the parameterised
-// query.
-// For example:
-// Given we have a model tuple A
-// and a relation of 'write' (which points to users)
-// We may query model:a relation:write to retrieves all the users
-// with write access.
-//
-// See https://openfga.dev/api/service#/Relationship%20Queries/Expand
-// for more.
-// TODO(ale8k): Confirm this is what we want.
-func (c *Client) ListRelations() error {
-	return c.caller.APICall("JIMM", 4, "", "ListRelations", nil, nil)
-}
-
-// Auth model management
-
-// GetAuthorisationModel returns the current authorisation model within
-// OpenFGA.
-func (c *Client) GetAuthorisationModel() error {
-	return c.caller.APICall("JIMM", 4, "", "GetAuthorisationModel", nil, nil)
+// ListRelationshipTuples returns a list of tuples matching the specified criteria.
+func (c *Client) ListRelationshipTuples(req *params.ListRelationshipTuplesRequest) (*params.ListRelationshipTuplesResponse, error) {
+	var response params.ListRelationshipTuplesResponse
+	err := c.caller.APICall("JIMM", 4, "", "ListRelationshipTuples", req, &response)
+	return &response, err
 }

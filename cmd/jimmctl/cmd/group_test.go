@@ -11,6 +11,7 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/cmd/jimmctl/cmd"
+	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 )
 
 type groupSuite struct {
@@ -25,7 +26,8 @@ func (s *groupSuite) TestAddGroupSuperuser(c *gc.C) {
 	_, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), "test-group")
 	c.Assert(err, gc.IsNil)
 
-	group, err := s.jimmSuite.JIMM.Database.GetGroup(context.TODO(), "test-group")
+	group := &dbmodel.GroupEntry{Name: "test-group"}
+	err = s.jimmSuite.JIMM.Database.GetGroup(context.TODO(), group)
 	c.Assert(err, gc.IsNil)
 	c.Assert(group.ID, gc.Equals, uint(1))
 	c.Assert(group.Name, gc.Equals, "test-group")
@@ -48,7 +50,8 @@ func (s *groupSuite) TestRenameGroupSuperuser(c *gc.C) {
 	_, err = cmdtesting.RunCommand(c, cmd.NewRenameGroupCommandForTesting(s.ClientStore(), bClient), "test-group", "renamed-group")
 	c.Assert(err, gc.IsNil)
 
-	group, err := s.jimmSuite.JIMM.Database.GetGroup(context.TODO(), "renamed-group")
+	group := &dbmodel.GroupEntry{Name: "renamed-group"}
+	err = s.jimmSuite.JIMM.Database.GetGroup(context.TODO(), group)
 	c.Assert(err, gc.IsNil)
 	c.Assert(group.ID, gc.Equals, uint(1))
 	c.Assert(group.Name, gc.Equals, "renamed-group")
@@ -71,7 +74,8 @@ func (s *groupSuite) TestRemoveGroupSuperuser(c *gc.C) {
 	_, err = cmdtesting.RunCommand(c, cmd.NewRemoveGroupCommandForTesting(s.ClientStore(), bClient), "test-group")
 	c.Assert(err, gc.IsNil)
 
-	_, err = s.jimmSuite.JIMM.Database.GetGroup(context.TODO(), "test-group")
+	group := &dbmodel.GroupEntry{Name: "test-group"}
+	err = s.jimmSuite.JIMM.Database.GetGroup(context.TODO(), group)
 	c.Assert(err, gc.ErrorMatches, "record not found")
 }
 

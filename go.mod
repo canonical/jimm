@@ -47,7 +47,11 @@ require (
 	sigs.k8s.io/yaml v1.3.0
 )
 
-require gopkg.in/errgo.v1 v1.0.1
+require (
+	github.com/oklog/ulid/v2 v2.1.0
+	github.com/stretchr/testify v1.8.1
+	gopkg.in/errgo.v1 v1.0.1
+)
 
 require (
 	cloud.google.com/go/compute v1.9.0 // indirect
@@ -246,8 +250,6 @@ require (
 	github.com/soheilhy/cmux v0.1.5 // indirect
 	github.com/spf13/cobra v1.2.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/stretchr/objx v0.5.0 // indirect
-	github.com/stretchr/testify v1.8.1 // indirect
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20201229170055-e5319fda7802 // indirect
 	github.com/urfave/cli v1.22.5 // indirect
 	github.com/vishvananda/netlink v1.1.1-0.20201029203352-d40f9887b852 // indirect

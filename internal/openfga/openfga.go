@@ -70,7 +70,7 @@ func (o *OFGAClient) deleteRelation(ctx context.Context, t ...openfga.TupleKey) 
 // The underlying tuple is managed by this method and as such you need only provide the "tuple_key" segment. See CreateTupleKey
 //
 // The results may be paginated via a pageSize and the initial returned pagination token from the first request.
-func (o *OFGAClient) getRelatedObjects(ctx context.Context, t openfga.TupleKey, pageSize int32, paginationToken string) (*openfga.ReadResponse, error) {
+func (o *OFGAClient) getRelatedObjects(ctx context.Context, t *openfga.TupleKey, pageSize int32, paginationToken string) (*openfga.ReadResponse, error) {
 	rr := openfga.NewReadRequest()
 
 	if pageSize != 0 {
@@ -82,7 +82,9 @@ func (o *OFGAClient) getRelatedObjects(ctx context.Context, t openfga.TupleKey, 
 	}
 
 	rr.SetAuthorizationModelId(o.AuthModelId)
-	rr.SetTupleKey(t)
+	if t != nil {
+		rr.SetTupleKey(*t)
+	}
 	readres, _, err := o.api.Read(ctx).Body(*rr).Execute()
 	if err != nil {
 		return nil, err
@@ -91,10 +93,16 @@ func (o *OFGAClient) getRelatedObjects(ctx context.Context, t openfga.TupleKey, 
 }
 
 // CreateTuple wraps the underlying ofga tuple into a convenient ease-of-use method
-func (o *OFGAClient) CreateTupleKey(object string, relation string, targetObject string) openfga.TupleKey {
+func CreateTupleKey(object string, relation string, targetObject string) openfga.TupleKey {
 	k := openfga.NewTupleKey()
-	k.SetUser(object)
-	k.SetRelation(relation)
+	// in some cases specifying the object is not required
+	if object != "" {
+		k.SetUser(object)
+	}
+	// in some cases specifying the relation is not required
+	if relation != "" {
+		k.SetRelation(relation)
+	}
 	k.SetObject(targetObject)
 	return *k
 }
@@ -116,7 +124,7 @@ func (o *OFGAClient) DeleteRelations(ctx context.Context, keys ...openfga.TupleK
 // See: CreateTupleKey for creating keys.
 //
 // You may read via pagination utilising the token returned from the request.
-func (o *OFGAClient) ReadRelatedObjects(ctx context.Context, key openfga.TupleKey, pageSize int32, paginationToken string) (*ReadResponse, error) {
+func (o *OFGAClient) ReadRelatedObjects(ctx context.Context, key *openfga.TupleKey, pageSize int32, paginationToken string) (*ReadResponse, error) {
 	keys := []openfga.TupleKey{}
 	res, err := o.getRelatedObjects(ctx, key, pageSize, paginationToken)
 	if err != nil {
@@ -126,7 +134,7 @@ func (o *OFGAClient) ReadRelatedObjects(ctx context.Context, key openfga.TupleKe
 	if ok {
 		t := *tupes
 		for i := 0; i < len(t); i++ {
-			key, ok := t[0].GetKeyOk()
+			key, ok := t[i].GetKeyOk()
 			if ok {
 				keys = append(keys, *key)
 			}
