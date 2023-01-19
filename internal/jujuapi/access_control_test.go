@@ -63,6 +63,41 @@ func (s *accessControlSuite) TestRemoveGroup(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 }
 
+func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
+	ctx := context.Background()
+	db := s.JIMM.Database
+
+	user, group, controller, model, _, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	defer closeClient()
+
+	db.AddGroup(ctx, "test-group2")
+	group2 := &dbmodel.GroupEntry{
+		Name: "test-group2",
+	}
+	err := db.GetGroup(ctx, group2)
+	c.Assert(err, gc.IsNil)
+
+	tuples := []apiparams.RelationshipTuple{
+		//This tuple should remain as it has no relation to group
+		{Object: user.DisplayName, Relation: "member", TargetObject: group2.Name},
+		// Below tuples should all be removed as they relate to group
+		{Object: user.DisplayName, Relation: "member", TargetObject: group.Name},
+		{Object: group2.Name + "#member", Relation: "member", TargetObject: group.Name},
+		{Object: group.Name, Relation: "administrator", TargetObject: controller.Name},
+		{Object: group.Name, Relation: "writer", TargetObject: model.Name},
+	}
+
+	err = client.AddRelation(&apiparams.AddRelationRequest{Tuples: tuples})
+	c.Assert(err, gc.IsNil)
+
+	err = client.RemoveGroup(&apiparams.RemoveGroupRequest{Name: group.Name})
+	c.Assert(err, gc.IsNil)
+
+	resp, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{})
+	c.Assert(resp.Tuples, gc.DeepEquals, tuples[1])
+
+}
+
 func (s *accessControlSuite) TestRenameGroup(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
