@@ -15,11 +15,13 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	openfga "github.com/openfga/go-sdk"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
+	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
 	ofgaClient "github.com/CanonicalLtd/jimm/internal/openfga"
 	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
 )
@@ -73,7 +75,10 @@ func (r *controllerRoot) RenameGroup(ctx context.Context, req apiparams.RenameGr
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	group, err := r.jimm.Database.GetGroup(ctx, req.Name)
+	group := &dbmodel.GroupEntry{
+		Name: req.Name,
+	}
+	err := r.jimm.Database.GetGroup(ctx, group)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -93,7 +98,10 @@ func (r *controllerRoot) RemoveGroup(ctx context.Context, req apiparams.RemoveGr
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	group, err := r.jimm.Database.GetGroup(ctx, req.Name)
+	group := &dbmodel.GroupEntry{
+		Name: req.Name,
+	}
+	err := r.jimm.Database.GetGroup(ctx, group)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -167,7 +175,10 @@ func resolveTupleObject(db db.Database, tag string) (string, string, error) {
 			"Resolving JIMM tags to Juju tags for tag kind: group",
 			zap.String("group-name", trailer),
 		)
-		entry, err := db.GetGroup(ctx, trailer)
+		entry := &dbmodel.GroupEntry{
+			Name: trailer,
+		}
+		err := db.GetGroup(ctx, entry)
 		if err != nil {
 			return tag, relationSpecifier, errors.E("group not found")
 		}
@@ -270,12 +281,12 @@ func jujuTagFromTuple(objectType string, objectId string) (names.Tag, error) {
 //
 // This key may be in the form of either a JIMM tag string or Juju tag string.
 func parseTag(ctx context.Context, db db.Database, key string) (names.Tag, string, error) {
-	tupleKeySplit := strings.SplitN(key, ":", 2)
+	tupleKeySplit := strings.SplitN(key, "-", 2)
 	if len(tupleKeySplit) != 2 {
 		return nil, "", errors.E("tag does not have tuple key delimiter")
 	}
 	kind := tupleKeySplit[0]
-	tagString := tupleKeySplit[1]
+	tagString := key
 	tagString, relationSpecifier, err := resolveTupleObject(db, tagString)
 	if err != nil {
 		zapctx.Debug(ctx, "failed to resolve tuple object", zap.Error(err))
@@ -298,7 +309,7 @@ func createTupleKeys(ctx context.Context, ofc *ofgaClient.OFGAClient, db db.Data
 		}
 		keys = append(
 			keys,
-			ofc.CreateTupleKey(
+			ofga.CreateTupleKey(
 				objectTag.Kind()+":"+objectTag.Id()+objectTagRelationSpecifier,
 				t.Relation,
 				targetObject.Kind()+":"+targetObject.Id()+targetObjectRelationSpecifier,
@@ -312,6 +323,9 @@ func createTupleKeys(ctx context.Context, ofc *ofgaClient.OFGAClient, db db.Data
 // within OpenFGA.
 func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelationRequest) error {
 	const op = errors.Op("jujuapi.AddRelation")
+	if r.user.ControllerAccess != "superuser" {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
 	db := r.jimm.Database
 	ofc := r.ofgaClient
 	keys, err := createTupleKeys(ctx, ofc, db, req.Tuples)
@@ -359,18 +373,157 @@ func (r *controllerRoot) CheckRelation(ctx context.Context) error {
 	return errors.E("Not implemented.")
 }
 
-// ListRelations TODO(ale8k): Confirm validity / need for this when using /expand or [EXPERIMENTAL] /list-objects
-//
-// See: https://openfga.dev/api/service#/Relationship%20Queries/Expand
-func (r *controllerRoot) ListRelations(ctx context.Context) error {
-	return errors.E("Not implemented.")
+func (r *controllerRoot) parseTuple(ctx context.Context, tuple apiparams.RelationshipTuple) (*openfga.TupleKey, error) {
+	const op = errors.Op("jujuapi.parseTuple")
+	var objectString, targetString string
+	if tuple.TargetObject == "" {
+		return nil, errors.E(op, errors.CodeBadRequest, "target object not specified")
+	}
+	if tuple.TargetObject != "" {
+		targetObject, targetObjectRelationSpecifier, err := parseTag(ctx, r.jimm.Database, tuple.TargetObject)
+		if err != nil {
+			zapctx.Debug(ctx, "failed to parse tuple object key", zap.String("key", tuple.TargetObject), zap.Error(err))
+			return nil, errors.E(op, errors.CodeFailedToParseTupleKey, err, "failed to parse tuple object key: "+tuple.TargetObject)
+		}
+		targetString = targetObject.Kind() + ":" + targetObject.Id() + targetObjectRelationSpecifier
+	}
+	if tuple.Object != "" {
+		objectTag, objectTagRelationSpecifier, err := parseTag(ctx, r.jimm.Database, tuple.Object)
+		if err != nil {
+			zapctx.Debug(ctx, "failed to parse tuple user key", zap.String("key", tuple.Object), zap.Error(err))
+			return nil, errors.E(op, errors.CodeFailedToParseTupleKey, err, "failed to parse tuple user key: "+tuple.Object)
+		}
+		objectString = objectTag.Kind() + ":" + objectTag.Id() + objectTagRelationSpecifier
+	}
+
+	t := ofga.CreateTupleKey(
+		objectString,
+		tuple.Relation,
+		targetString,
+	)
+	return &t, nil
 }
 
-// GetAuthorisationModel retrieves a GET for an authorisation model in the JIMM store
-// by name.
-//
-// TODO(ale8k): Confirm web team can/is happy to display this.
-// TODO(ale8k): Should this be paginated? Probably not?
-func (r *controllerRoot) GetAuthorisationModel(ctx context.Context) error {
-	return errors.E("Not implemented.")
+func (r *controllerRoot) toJAASTag(ctx context.Context, tag string) (string, error) {
+	tokens := strings.Split(tag, ":")
+	if len(tokens) != 2 {
+		return "", errors.E("unexpected tag format")
+	}
+	tokens2 := strings.Split(tokens[1], "#")
+	if len(tokens2) == 0 || len(tokens2) > 2 {
+		return "", errors.E("unexpected tag format")
+	}
+	switch tokens[0] {
+	case names.UserTagKind:
+		return names.UserTagKind + "-" + tokens[1], nil
+	case names.ControllerTagKind:
+		controller := dbmodel.Controller{
+			UUID: tokens2[0],
+		}
+		err := r.jimm.Database.GetController(ctx, &controller)
+		if err != nil {
+			return "", errors.E(err, "failed to fetch controller information")
+		}
+		controllerString := names.ControllerTagKind + "-" + controller.Name
+		if len(tokens2) == 2 {
+			controllerString = controllerString + "#" + tokens2[1]
+		}
+		return controllerString, nil
+	case names.ModelTagKind:
+		model := dbmodel.Model{
+			UUID: sql.NullString{
+				String: tokens2[0],
+				Valid:  true,
+			},
+		}
+		err := r.jimm.Database.GetModel(ctx, &model)
+		if err != nil {
+			return "", errors.E(err, "failed to fetch model information")
+		}
+		modelString := names.ModelTagKind + "-" + model.Controller.Name + ":" + model.OwnerUsername + "/" + model.Name
+		if len(tokens2) == 2 {
+			modelString = modelString + "#" + tokens2[1]
+		}
+		return modelString, nil
+	case names.ApplicationOfferTagKind:
+		ao := dbmodel.ApplicationOffer{
+			UUID: tokens2[0],
+		}
+		err := r.jimm.Database.GetApplicationOffer(ctx, &ao)
+		if err != nil {
+			return "", errors.E(err, "failed to fetch application offer information")
+		}
+		aoString := names.ApplicationOfferTagKind + "-" + ao.Model.Controller.Name + ":" + ao.Model.OwnerUsername + "/" + ao.Model.Name + "." + ao.Name
+		if len(tokens2) == 2 {
+			aoString = aoString + "#" + tokens2[1]
+		}
+		return aoString, nil
+	case jimmnames.GroupTagKind:
+		id, err := strconv.ParseUint(tokens2[0], 10, 32)
+		if err != nil {
+			return "", errors.E(err, "failed to parse group id")
+		}
+		group := dbmodel.GroupEntry{
+			Model: gorm.Model{
+				ID: uint(id),
+			},
+		}
+		err = r.jimm.Database.GetGroup(ctx, &group)
+		if err != nil {
+			return "", errors.E(err, "failed to fetch group information")
+		}
+		groupString := jimmnames.GroupTagKind + "-" + group.Name
+		if len(tokens2) == 2 {
+			groupString = groupString + "#" + tokens2[1]
+		}
+		return groupString, nil
+	default:
+		return "", errors.E("unexpected tag kind: " + tokens[0])
+	}
+}
+
+// ListRelationshipTuples returns a list of tuples matching the specified filter.
+func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apiparams.ListRelationshipTuplesRequest) (apiparams.ListRelationshipTuplesResponse, error) {
+	const op = errors.Op("jujuapi.ListRelationshipTuples")
+	var returnValue apiparams.ListRelationshipTuplesResponse
+
+	if r.user.ControllerAccess != "superuser" {
+		return returnValue, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	var key *openfga.TupleKey
+	var err error
+	if req.Tuple.TargetObject != "" {
+		key, err = r.parseTuple(ctx, req.Tuple)
+		if err != nil {
+			if errors.ErrorCode(err) == errors.CodeFailedToParseTupleKey {
+				return returnValue, errors.E(op, errors.CodeBadRequest, "failed to parse the tuple key")
+			}
+			return returnValue, errors.E(op, err)
+		}
+	}
+	response, err := r.ofgaClient.ReadRelatedObjects(ctx, key, req.PageSize, req.ContinuationToken)
+	if err != nil {
+		return returnValue, errors.E(op, err)
+	}
+	tuples := make([]apiparams.RelationshipTuple, len(response.Keys))
+	for i, t := range response.Keys {
+		object, err := r.toJAASTag(ctx, t.GetUser())
+		if err != nil {
+			return returnValue, errors.E(op, err)
+		}
+		target, err := r.toJAASTag(ctx, t.GetObject())
+		if err != nil {
+			return returnValue, errors.E(op, err)
+		}
+		tuples[i] = apiparams.RelationshipTuple{
+			Object:       object,
+			Relation:     t.GetRelation(),
+			TargetObject: target,
+		}
+	}
+	return apiparams.ListRelationshipTuplesResponse{
+		Tuples:            tuples,
+		ContinuationToken: response.PaginationToken,
+	}, nil
 }
