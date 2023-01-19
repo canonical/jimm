@@ -55,7 +55,7 @@ func TestRecreateDeletedModel(t *testing.T) {
 		CloudRegion:     cl.Regions[0],
 		CloudCredential: cred,
 	}
-	c.Check(db.Create(&m2).Error, qt.ErrorMatches, `UNIQUE constraint failed: models.owner_username, models.name`)
+	c.Check(db.Create(&m2).Error, qt.ErrorMatches, `UNIQUE constraint failed: models.controller_id, models.owner_username, models.name`)
 
 	c.Assert(db.Delete(&m1).Error, qt.IsNil)
 	c.Check(db.First(&m1).Error, qt.Equals, gorm.ErrRecordNotFound)
@@ -106,6 +106,113 @@ func TestModel(t *testing.T) {
 	pdb = pdb.Preload("Users").Preload("Users.User")
 	c.Assert(pdb.First(&m2).Error, qt.IsNil)
 	c.Check(m2, qt.DeepEquals, m)
+}
+
+func TestModelUniqueConstraint(t *testing.T) {
+	c := qt.New(t)
+	db := gormDB(c)
+	cl1, cred1, ctl1, u := initModelEnv(c, db)
+
+	cl2 := dbmodel.Cloud{
+		Name: "test-cloud-2",
+		Type: "test-provider",
+		Regions: []dbmodel.CloudRegion{{
+			Name: "test-region-2",
+		}},
+	}
+	c.Assert(db.Create(&cl2).Error, qt.IsNil)
+
+	cred2 := dbmodel.CloudCredential{
+		Name:     "test-cred-2",
+		Cloud:    cl2,
+		Owner:    u,
+		AuthType: "empty",
+	}
+	c.Assert(db.Create(&cred2).Error, qt.IsNil)
+
+	ctl2 := dbmodel.Controller{
+		Name:        "test-controller-2",
+		UUID:        "00000000-0000-0000-0000-0000-0000000000002",
+		CloudName:   cl2.Name,
+		CloudRegion: "test-region",
+	}
+	c.Assert(db.Create(&ctl2).Error, qt.IsNil)
+
+	m1 := dbmodel.Model{
+		Name: "staging",
+		UUID: sql.NullString{
+			String: "00000001-0000-0000-0000-0000-000000000001",
+			Valid:  true,
+		},
+		Owner:           u,
+		Controller:      ctl1,
+		CloudRegion:     cl1.Regions[0],
+		CloudCredential: cred1,
+		Type:            "iaas",
+		IsController:    false,
+		DefaultSeries:   "warty",
+		Life:            "alive",
+		Status: dbmodel.Status{
+			Status: "available",
+			Since: sql.NullTime{
+				Time:  time.Now(),
+				Valid: true,
+			},
+		},
+		SLA: dbmodel.SLA{
+			Level: "unsupported",
+		},
+		Users: []dbmodel.UserModelAccess{{
+			User:   u,
+			Access: "admin",
+		}},
+	}
+	c.Assert(db.Create(&m1).Error, qt.IsNil)
+
+	m2 := dbmodel.Model{
+		Name: "staging",
+		UUID: sql.NullString{
+			String: "00000001-0000-0000-0000-0000-000000000002",
+			Valid:  true,
+		},
+		Owner:           u,
+		Controller:      ctl2,
+		CloudRegion:     cl2.Regions[0],
+		CloudCredential: cred2,
+		Type:            "iaas",
+		IsController:    false,
+		DefaultSeries:   "jammy",
+		Life:            "alive",
+		Status: dbmodel.Status{
+			Status: "available",
+			Since: sql.NullTime{
+				Time:  time.Now(),
+				Valid: true,
+			},
+		},
+		SLA: dbmodel.SLA{
+			Level: "unsupported",
+		},
+		Users: []dbmodel.UserModelAccess{{
+			User:   u,
+			Access: "admin",
+		}},
+	}
+	c.Assert(db.Create(&m2).Error, qt.IsNil)
+
+	m3 := dbmodel.Model{
+		UUID: sql.NullString{
+			String: "00000001-0000-0000-0000-0000-000000000001",
+			Valid:  true,
+		},
+	}
+	pdb := db.Preload("CloudRegion")
+	pdb = pdb.Preload("CloudCredential").Preload("CloudCredential.Cloud").Preload("CloudCredential.Cloud.Regions").Preload("CloudCredential.Owner")
+	pdb = pdb.Preload("Controller")
+	pdb = pdb.Preload("Owner")
+	pdb = pdb.Preload("Users").Preload("Users.User")
+	c.Assert(pdb.First(&m3).Error, qt.IsNil)
+	c.Check(m3, qt.DeepEquals, m1)
 }
 
 func TestToJujuModel(t *testing.T) {
