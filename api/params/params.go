@@ -295,6 +295,8 @@ type CheckRelationRequest struct {
 	Tuple RelationshipTuple `json:"tuple"`
 }
 
+// CheckRelationResponse simple responds with an object containing a boolean of 'allowed' or not
+// when a check for access is requested.
 type CheckRelationResponse struct {
 	Allowed bool `json:"allowed"`
 }
