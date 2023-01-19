@@ -21,7 +21,7 @@ type openFGATestSuite struct {
 var _ = gc.Suite(&openFGATestSuite{})
 
 func (s *openFGATestSuite) SetUpTest(c *gc.C) {
-	api, client := ofga.SetupTestOFGAClient(c)
+	api, client, _ := ofga.SetupTestOFGAClient(c)
 	s.ofgaApi = api
 	s.ofgaClient = client
 }

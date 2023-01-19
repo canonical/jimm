@@ -176,7 +176,7 @@ func (o *OFGAClient) DeleteAllTuples(ctx context.Context) error {
 			allTuples = append(allTuples, *tuple.Key)
 		}
 		if len(allTuples) > 0 {
-			err = o.deleteRelation(ctx, allTuples...)
+			err = o.removeRelation(ctx, allTuples...)
 			if err != nil {
 				return err
 			}
