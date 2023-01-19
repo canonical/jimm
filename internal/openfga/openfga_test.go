@@ -3,6 +3,7 @@ package openfga_test
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
@@ -70,6 +71,39 @@ func (s *openFGATestSuite) TestWritingTuplesToOFGADetectsSucceeds(c *gc.C) {
 	c.Assert(user2, gc.Equals, lastInsertedTuple.GetUser())
 }
 
+func (suite *openFGATestSuite) TestRemovingTuplesFromOFGASucceeds(c *gc.C) {
+	ctx := context.Background()
+
+	//Create tuples before writing to db
+	user1 := "user:bob"
+	key1 := ofga.CreateTupleKey(user1, "member", "group:pokemon")
+	user2 := "user:alice"
+	key2 := ofga.CreateTupleKey(user2, "member", "group:pokemon")
+
+	//Delete before insert should fail
+	err := suite.ofgaClient.RemoveRelation(ctx, key1, key2)
+	c.Assert(strings.Contains(err.Error(), "cannot delete a tuple which does not exist"), gc.Equals, true)
+
+	err = suite.ofgaClient.AddRelations(ctx, key1, key2)
+	c.Assert(err, gc.IsNil)
+
+	//Delete after insert should succeed.
+	err = suite.ofgaClient.RemoveRelation(ctx, key1, key2)
+	c.Assert(err, gc.IsNil)
+	changes, _, err := suite.ofgaApi.ReadChanges(ctx).Type_("group").Execute()
+	c.Assert(err, gc.IsNil)
+
+	secondToLastInsertedTuple := changes.GetChanges()[len(changes.GetChanges())-2]
+	secondLastKey := secondToLastInsertedTuple.GetTupleKey()
+	c.Assert(user1, gc.Equals, secondLastKey.GetUser())
+	c.Assert(openfga.DELETE, gc.Equals, secondToLastInsertedTuple.GetOperation())
+
+	lastInsertedTuple := changes.GetChanges()[len(changes.GetChanges())-1]
+	lastKey := lastInsertedTuple.GetTupleKey()
+	c.Assert(user2, gc.Equals, lastKey.GetUser())
+	c.Assert(openfga.DELETE, gc.Equals, lastInsertedTuple.GetOperation())
+}
+
 func (s *openFGATestSuite) TestCheckRelationSucceeds(c *gc.C) {
 	ctx := context.Background()
 
@@ -84,7 +118,6 @@ func (s *openFGATestSuite) TestCheckRelationSucceeds(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, true)
 	c.Assert(resoution, gc.Equals, ".(direct).group:1#member.(direct).")
-
 }
 
 func Test(t *testing.T) {

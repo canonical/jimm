@@ -6,6 +6,8 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	openfga "github.com/openfga/go-sdk"
 	"go.uber.org/zap"
+
+	"github.com/CanonicalLtd/jimm/internal/errors"
 )
 
 // OFGAClient contains convenient utility methods for interacting
@@ -49,6 +51,19 @@ func (o *OFGAClient) addRelation(ctx context.Context, t ...openfga.TupleKey) err
 	_, _, err := o.api.Write(ctx).Body(*wr).Execute()
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+// removeRelation deletes user(s) from the specified object by the specified relation within the tuple keys given.
+func (o *OFGAClient) removeRelation(ctx context.Context, t ...openfga.TupleKey) error {
+	wr := openfga.NewWriteRequest()
+	wr.SetAuthorizationModelId(o.AuthModelId)
+	keys := openfga.NewTupleKeys(t)
+	wr.SetDeletes(*keys)
+	_, _, err := o.api.Write(ctx).Body(*wr).Execute()
+	if err != nil {
+		return errors.E(err)
 	}
 	return nil
 }
@@ -123,6 +138,11 @@ func CreateTupleKey(object string, relation string, targetObject string) openfga
 // AddRelations creates a tuple(s) from the provided keys. See CreateTupleKey for creating keys.
 func (o *OFGAClient) AddRelations(ctx context.Context, keys ...openfga.TupleKey) error {
 	return o.addRelation(ctx, keys...)
+}
+
+// RemoveRelation creates a tuple(s) from the provided keys. See CreateTupleKey for creating keys.
+func (o *OFGAClient) RemoveRelation(ctx context.Context, keys ...openfga.TupleKey) error {
+	return o.removeRelation(ctx, keys...)
 }
 
 // ReadRelations reads a relation(s) from the provided key where a match can be found.

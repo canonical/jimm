@@ -301,6 +301,11 @@ type CheckRelationResponse struct {
 	Allowed bool `json:"allowed"`
 }
 
+// RemoveRelationRequest holds the request information to remove tuples.
+type RemoveRelationRequest struct {
+	Tuples []RelationshipTuple
+}
+
 // ListRelationshipTuplesRequests holds the request information to list tuples.
 type ListRelationshipTuplesRequest struct {
 	Tuple             RelationshipTuple `json:"tuple,omitempty"`

@@ -304,22 +304,11 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 	if r.user.ControllerAccess != "superuser" {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
-
-	keys := make([]openfga.TupleKey, 0, len(req.Tuples))
-	for _, t := range req.Tuples {
-		parsedTuple, err := r.parseTuple(ctx, t)
-		if err != nil {
-			return errors.E(op, errors.CodeFailedToParseTupleKey, err)
-		}
-		keys = append(
-			keys,
-			*parsedTuple,
-		)
+	keys, err := r.parseTuples(ctx, req.Tuples)
+	if err != nil {
+		return errors.E(err)
 	}
-	if l := len(keys); l == 0 || l > 25 {
-		return errors.E("length of" + strconv.Itoa(l) + "is not valid, please do not provide more than 25 tuple keys")
-	}
-	err := r.ofgaClient.AddRelations(ctx, keys...)
+	err = r.ofgaClient.AddRelations(ctx, keys...)
 	if err != nil {
 		zapctx.Error(ctx, "failed to add tuple(s)", zap.NamedError("add-relation-error", err))
 		return errors.E(op, errors.CodeOpenFGARequestFailed, err)
@@ -329,8 +318,21 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 
 // RemoveRelation removes a tuple between two objects [if applicable]
 // within OpenFGA.
-func (r *controllerRoot) RemoveRelation(ctx context.Context) error {
-	return errors.E("Not implemented.")
+func (r *controllerRoot) RemoveRelation(ctx context.Context, req apiparams.RemoveRelationRequest) error {
+	const op = errors.Op("jujuapi.RemoveRelation")
+	if r.user.ControllerAccess != "superuser" {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+	keys, err := r.parseTuples(ctx, req.Tuples)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	err = r.ofgaClient.RemoveRelation(ctx, keys...)
+	if err != nil {
+		zapctx.Error(ctx, "failed to delete tuple(s)", zap.NamedError("remove-relation-error", err))
+		return errors.E(op, err)
+	}
+	return nil
 }
 
 // CheckRelation performs an authorisation check for a particular group/user tuple
@@ -359,6 +361,20 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 	}
 	zapctx.Debug(ctx, "check request", zap.String("allowed", strconv.FormatBool(allowed)), zap.String("reason", resolution))
 	return checkResp, nil
+}
+
+// parseTuples translate the api request struct containing tuples to a slice of openfga tuple keys.
+// This method utilises the parseTuple method which does all the heavy lifting.
+func (r *controllerRoot) parseTuples(ctx context.Context, tuples []apiparams.RelationshipTuple) ([]openfga.TupleKey, error) {
+	keys := make([]openfga.TupleKey, 0, len(tuples))
+	for _, tuple := range tuples {
+		key, err := r.parseTuple(ctx, tuple)
+		if err != nil {
+			errors.E(err)
+		}
+		keys = append(keys, *key)
+	}
+	return keys, nil
 }
 
 // parseTuple takes the initial tuple from a relational request and ensures that
