@@ -299,6 +299,9 @@ func parseTag(ctx context.Context, db db.Database, key string) (names.Tag, strin
 // within OpenFGA.
 func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelationRequest) error {
 	const op = errors.Op("jujuapi.AddRelation")
+	if r.user.ControllerAccess != "superuser" {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
 	db := r.jimm.Database
 
 	keys := make([]openfga.TupleKey, 0, len(req.Tuples))
@@ -458,8 +461,11 @@ func (r *controllerRoot) toJAASTag(ctx context.Context, tag string) (string, err
 // ListRelationshipTuples returns a list of tuples matching the specified filter.
 func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apiparams.ListRelationshipTuplesRequest) (apiparams.ListRelationshipTuplesResponse, error) {
 	const op = errors.Op("jujuapi.ListRelationshipTuples")
-
 	var returnValue apiparams.ListRelationshipTuplesResponse
+
+	if r.user.ControllerAccess != "superuser" {
+		return returnValue, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
 
 	var key *openfga.TupleKey
 	var err error
