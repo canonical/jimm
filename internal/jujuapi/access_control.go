@@ -324,7 +324,7 @@ func (r *controllerRoot) RemoveRelation(ctx context.Context, req apiparams.Remov
 	}
 	err = r.ofgaClient.RemoveRelation(ctx, keys...)
 	if err != nil {
-		zapctx.Error(ctx, "failed to delete tuple(s)", zap.NamedError("delete-relation-error", err))
+		zapctx.Error(ctx, "failed to delete tuple(s)", zap.NamedError("remove-relation-error", err))
 		return errors.E(op, err)
 	}
 	return nil
