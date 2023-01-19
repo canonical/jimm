@@ -697,10 +697,18 @@ clouds:
   type: test-provider
   regions:
   - name: test-region-1
+- name: test-cloud-2
+  type: test-provider
+  regions:
+  - name: test-region-2
 cloud-credentials:
 - name: test-credential-1
   owner: alice@external
   cloud: test-cloud
+  auth-type: empty
+- name: test-credential-2
+  owner: alice@external
+  cloud: test-cloud-2
   auth-type: empty
 controllers:
 - name: controller-1
@@ -713,12 +721,12 @@ controllers:
     priority: 0
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-000000000002
-  cloud: test-cloud
-  region: test-region-1
+  cloud: test-cloud-2
+  region: test-region-2
   cloud-regions:
-  - cloud: test-cloud
-    region: test-region-1
-    priority: 2
+  - cloud: test-cloud-2
+    region: test-region-2
+    priority: 1
 models:
 - name: test-model
   owner: alice@external
