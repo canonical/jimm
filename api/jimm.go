@@ -155,8 +155,10 @@ func (c *Client) RemoveRelation() error {
 // This object could be another group, model, controller, etc.
 // This command corresponds directly to:
 // https://openfga.dev/api/service#/Relationship%20Queries/Check
-func (c *Client) CheckRelation() error {
-	return c.caller.APICall("JIMM", 4, "", "CheckRelation", nil, nil)
+func (c *Client) CheckRelation(req *params.CheckRelationRequest) (params.CheckRelationResponse, error) {
+	var checkResp params.CheckRelationResponse
+	err := c.caller.APICall("JIMM", 4, "", "CheckRelation", req, &checkResp)
+	return checkResp, err
 }
 
 // ListRelationshipTuples returns a list of tuples matching the specified criteria.
