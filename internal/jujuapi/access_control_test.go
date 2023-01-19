@@ -12,7 +12,7 @@ import (
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
 	openfga "github.com/openfga/go-sdk"
-	. "gopkg.in/check.v1"
+	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/api"
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
@@ -25,13 +25,13 @@ type accessControlSuite struct {
 	websocketSuite
 }
 
-var _ = Suite(&accessControlSuite{})
+var _ = gc.Suite(&accessControlSuite{})
 
 /*
  Group facade related tests
 */
 
-func (s *accessControlSuite) TestAddGroup(c *C) {
+func (s *accessControlSuite) TestAddGroup(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -40,10 +40,10 @@ func (s *accessControlSuite) TestAddGroup(c *C) {
 	c.Assert(err, jc.ErrorIsNil)
 
 	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
-	c.Assert(err, ErrorMatches, ".*already exists.*")
+	c.Assert(err, gc.ErrorMatches, ".*already exists.*")
 }
 
-func (s *accessControlSuite) TestRemoveGroup(c *C) {
+func (s *accessControlSuite) TestRemoveGroup(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -52,7 +52,7 @@ func (s *accessControlSuite) TestRemoveGroup(c *C) {
 	err := client.RemoveGroup(&apiparams.RemoveGroupRequest{
 		Name: "test-group",
 	})
-	c.Assert(err, ErrorMatches, ".*not found.*")
+	c.Assert(err, gc.ErrorMatches, ".*not found.*")
 
 	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
 	c.Assert(err, jc.ErrorIsNil)
@@ -63,7 +63,7 @@ func (s *accessControlSuite) TestRemoveGroup(c *C) {
 	c.Assert(err, jc.ErrorIsNil)
 }
 
-func (s *accessControlSuite) TestRenameGroup(c *C) {
+func (s *accessControlSuite) TestRenameGroup(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -73,7 +73,7 @@ func (s *accessControlSuite) TestRenameGroup(c *C) {
 		Name:    "test-group",
 		NewName: "renamed-group",
 	})
-	c.Assert(err, ErrorMatches, ".*not found.*")
+	c.Assert(err, gc.ErrorMatches, ".*not found.*")
 
 	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
 	c.Assert(err, jc.ErrorIsNil)
@@ -85,7 +85,7 @@ func (s *accessControlSuite) TestRenameGroup(c *C) {
 	c.Assert(err, jc.ErrorIsNil)
 }
 
-func (s *accessControlSuite) TestListGroups(c *C) {
+func (s *accessControlSuite) TestListGroups(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -105,12 +105,12 @@ func (s *accessControlSuite) TestListGroups(c *C) {
 
 	groups, err := client.ListGroups()
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(groups, HasLen, 4)
+	c.Assert(groups, gc.HasLen, 4)
 	// groups should be returned in ascending order of name
-	c.Assert(groups[0].Name, Equals, "aaaFinalGroup")
-	c.Assert(groups[1].Name, Equals, "test-group0")
-	c.Assert(groups[2].Name, Equals, "test-group1")
-	c.Assert(groups[3].Name, Equals, "test-group2")
+	c.Assert(groups[0].Name, gc.Equals, "aaaFinalGroup")
+	c.Assert(groups[1].Name, gc.Equals, "test-group0")
+	c.Assert(groups[2].Name, gc.Equals, "test-group1")
+	c.Assert(groups[3].Name, gc.Equals, "test-group2")
 }
 
 /*
@@ -133,7 +133,7 @@ func (s *accessControlSuite) TestListGroups(c *C) {
 // group -> applicationoffer (name)
 // group -> applicationoffer (uuid)
 // group#member -> group
-func (s *accessControlSuite) TestAddRelation(c *C) {
+func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 	ctx := context.Background()
 	db := s.JIMM.Database
 
@@ -145,9 +145,9 @@ func (s *accessControlSuite) TestAddRelation(c *C) {
 		Name: "test-group2",
 	}
 	err := db.GetGroup(ctx, group2)
-	c.Assert(err, IsNil)
+	c.Assert(err, gc.IsNil)
 
-	c.Assert(err, IsNil)
+	c.Assert(err, gc.IsNil)
 	type tuple struct {
 		user     string
 		relation string
@@ -350,19 +350,19 @@ func (s *accessControlSuite) TestAddRelation(c *C) {
 			},
 		})
 		if tc.err {
-			c.Assert(err, NotNil)
-			c.Assert(err, ErrorMatches, tc.want)
+			c.Assert(err, gc.NotNil)
+			c.Assert(err, gc.ErrorMatches, tc.want)
 		} else {
-			c.Assert(err, IsNil)
+			c.Assert(err, gc.IsNil)
 			changes, _, err := s.OFGAApi.ReadChanges(ctx).Type_(tc.changesType).Execute()
-			c.Assert(err, IsNil)
+			c.Assert(err, gc.IsNil)
 			key := changes.GetChanges()[len(changes.GetChanges())-1].GetTupleKey()
-			c.Assert(key, DeepEquals, tc.want)
+			c.Assert(key, gc.DeepEquals, tc.want)
 		}
 	}
 }
 
-func (s *accessControlSuite) TestJAASTag(c *C) {
+func (s *accessControlSuite) TestJAASTag(c *gc.C) {
 	ctx := context.Background()
 	db := s.JIMM.Database
 
@@ -392,16 +392,16 @@ func (s *accessControlSuite) TestJAASTag(c *C) {
 	for _, test := range tests {
 		t, err := jujuapi.ToJAASTag(db, test.tag)
 		if test.expectedError != "" {
-			c.Assert(err, ErrorMatches, test.expectedError)
+			c.Assert(err, gc.ErrorMatches, test.expectedError)
 		} else {
-			c.Assert(err, IsNil)
-			c.Assert(t, Equals, test.expectedJAASTag)
+			c.Assert(err, gc.IsNil)
+			c.Assert(t, gc.Equals, test.expectedJAASTag)
 		}
 
 	}
 }
 
-func (s *accessControlSuite) TestListRelationshipTuples(c *C) {
+func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 	ctx := context.Background()
 	user, _, controller, model, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
@@ -445,7 +445,7 @@ func (s *accessControlSuite) TestListRelationshipTuples(c *C) {
 
 }
 
-func (s *accessControlSuite) TestCheckRelationOfferReaderFlow(c *C) {
+func (s *accessControlSuite) TestCheckRelationOfferReaderFlow(c *gc.C) {
 	ctx := context.Background()
 	ofgaClient := s.JIMM.OpenFGAClient
 
@@ -471,7 +471,7 @@ func (s *accessControlSuite) TestCheckRelationOfferReaderFlow(c *C) {
 		userToGroupOfferReader,
 		groupToOfferReader,
 	)
-	c.Assert(err, IsNil)
+	c.Assert(err, gc.IsNil)
 
 	type test struct {
 		input openfga.TupleKey
@@ -501,12 +501,12 @@ func (s *accessControlSuite) TestCheckRelationOfferReaderFlow(c *C) {
 			},
 		}
 		res, err := client.CheckRelation(&req)
-		c.Assert(err, IsNil)
-		c.Assert(res.Allowed, Equals, tc.want)
+		c.Assert(err, gc.IsNil)
+		c.Assert(res.Allowed, gc.Equals, tc.want)
 	}
 }
 
-func (s *accessControlSuite) TestCheckRelationOfferConsumerFlow(c *C) {
+func (s *accessControlSuite) TestCheckRelationOfferConsumerFlow(c *gc.C) {
 	ctx := context.Background()
 	ofgaClient := s.JIMM.OpenFGAClient
 
@@ -531,7 +531,7 @@ func (s *accessControlSuite) TestCheckRelationOfferConsumerFlow(c *C) {
 		userToGroupOfferConsumer,
 		groupToOfferConsumer,
 	)
-	c.Assert(err, IsNil)
+	c.Assert(err, gc.IsNil)
 
 	type test struct {
 		input openfga.TupleKey
@@ -560,12 +560,12 @@ func (s *accessControlSuite) TestCheckRelationOfferConsumerFlow(c *C) {
 			},
 		}
 		res, err := client.CheckRelation(&req)
-		c.Assert(err, IsNil)
-		c.Assert(res.Allowed, Equals, tc.want)
+		c.Assert(err, gc.IsNil)
+		c.Assert(res.Allowed, gc.Equals, tc.want)
 	}
 }
 
-func (s *accessControlSuite) TestCheckRelationModelReaderFlow(c *C) {
+func (s *accessControlSuite) TestCheckRelationModelReaderFlow(c *gc.C) {
 	ctx := context.Background()
 	ofgaClient := s.JIMM.OpenFGAClient
 
@@ -592,7 +592,7 @@ func (s *accessControlSuite) TestCheckRelationModelReaderFlow(c *C) {
 		userToGroupModelReader,
 		groupToModelReader,
 	)
-	c.Assert(err, IsNil)
+	c.Assert(err, gc.IsNil)
 
 	type test struct {
 		input openfga.TupleKey
@@ -621,12 +621,12 @@ func (s *accessControlSuite) TestCheckRelationModelReaderFlow(c *C) {
 			},
 		}
 		res, err := client.CheckRelation(&req)
-		c.Assert(err, IsNil)
-		c.Assert(res.Allowed, Equals, tc.want)
+		c.Assert(err, gc.IsNil)
+		c.Assert(res.Allowed, gc.Equals, tc.want)
 	}
 }
 
-func (s *accessControlSuite) TestCheckRelationModelWriterFlow(c *C) {
+func (s *accessControlSuite) TestCheckRelationModelWriterFlow(c *gc.C) {
 	ctx := context.Background()
 	ofgaClient := s.JIMM.OpenFGAClient
 
@@ -651,7 +651,7 @@ func (s *accessControlSuite) TestCheckRelationModelWriterFlow(c *C) {
 		userToGroupModelWriter,
 		groupToModelWriter,
 	)
-	c.Assert(err, IsNil)
+	c.Assert(err, gc.IsNil)
 
 	type test struct {
 		input openfga.TupleKey
@@ -680,12 +680,12 @@ func (s *accessControlSuite) TestCheckRelationModelWriterFlow(c *C) {
 			},
 		}
 		res, err := client.CheckRelation(&req)
-		c.Assert(err, IsNil)
-		c.Assert(res.Allowed, Equals, tc.want)
+		c.Assert(err, gc.IsNil)
+		c.Assert(res.Allowed, gc.Equals, tc.want)
 	}
 }
 
-func (s *accessControlSuite) TestCheckRelationControllerAdministratorFlow(c *C) {
+func (s *accessControlSuite) TestCheckRelationControllerAdministratorFlow(c *gc.C) {
 	ctx := context.Background()
 	ofgaClient := s.JIMM.OpenFGAClient
 
@@ -719,7 +719,7 @@ func (s *accessControlSuite) TestCheckRelationControllerAdministratorFlow(c *C) 
 		controllerToModelAdmin,
 		controllerToAppOfferAdmin,
 	)
-	c.Assert(err, IsNil)
+	c.Assert(err, gc.IsNil)
 
 	type test struct {
 		input openfga.TupleKey
@@ -768,8 +768,8 @@ func (s *accessControlSuite) TestCheckRelationControllerAdministratorFlow(c *C) 
 			},
 		}
 		res, err := client.CheckRelation(&req)
-		c.Assert(err, IsNil)
-		c.Assert(res.Allowed, Equals, tc.want)
+		c.Assert(err, gc.IsNil)
+		c.Assert(res.Allowed, gc.Equals, tc.want)
 	}
 }
 
@@ -777,7 +777,7 @@ func (s *accessControlSuite) TestCheckRelationControllerAdministratorFlow(c *C) 
  None-facade related tests
 */
 
-func (s *accessControlSuite) TestResolveTupleObjectHandlesErrors(c *C) {
+func (s *accessControlSuite) TestResolveTupleObjectHandlesErrors(c *gc.C) {
 	ctx := context.Background()
 	db := s.JIMM.Database
 
@@ -823,19 +823,19 @@ func (s *accessControlSuite) TestResolveTupleObjectHandlesErrors(c *C) {
 	}
 	for _, tc := range tests {
 		_, _, err := jujuapi.ResolveTupleObject(db, tc.input)
-		c.Assert(err, ErrorMatches, tc.want)
+		c.Assert(err, gc.ErrorMatches, tc.want)
 	}
 }
 
-func (s *accessControlSuite) TestResolveTupleObjectMapsUsers(c *C) {
+func (s *accessControlSuite) TestResolveTupleObjectMapsUsers(c *gc.C) {
 	db := s.JIMM.Database
 	tag, specifier, err := jujuapi.ResolveTupleObject(db, "user-alex@externally-werly#member")
-	c.Assert(err, IsNil)
-	c.Assert(tag, Equals, "user-alex@externally-werly")
-	c.Assert(specifier, Equals, "#member")
+	c.Assert(err, gc.IsNil)
+	c.Assert(tag, gc.Equals, "user-alex@externally-werly")
+	c.Assert(specifier, gc.Equals, "#member")
 }
 
-func (s *accessControlSuite) TestResolveTupleObjectMapsGroups(c *C) {
+func (s *accessControlSuite) TestResolveTupleObjectMapsGroups(c *gc.C) {
 	ctx := context.Background()
 	db := s.JIMM.Database
 	db.AddGroup(context.Background(), "myhandsomegroupofdigletts")
@@ -843,14 +843,14 @@ func (s *accessControlSuite) TestResolveTupleObjectMapsGroups(c *C) {
 		Name: "myhandsomegroupofdigletts",
 	}
 	err := db.GetGroup(ctx, group)
-	c.Assert(err, IsNil)
+	c.Assert(err, gc.IsNil)
 	tag, specifier, err := jujuapi.ResolveTupleObject(db, "group-"+group.Name+"#member")
-	c.Assert(err, IsNil)
-	c.Assert(tag, Equals, "group-"+strconv.FormatUint(uint64(group.ID), 10))
-	c.Assert(specifier, Equals, "#member")
+	c.Assert(err, gc.IsNil)
+	c.Assert(tag, gc.Equals, "group-"+strconv.FormatUint(uint64(group.ID), 10))
+	c.Assert(specifier, gc.Equals, "#member")
 }
 
-func (s *accessControlSuite) TestResolveTupleObjectMapsControllerUUIDs(c *C) {
+func (s *accessControlSuite) TestResolveTupleObjectMapsControllerUUIDs(c *gc.C) {
 	ctx := context.Background()
 	db := s.JIMM.Database
 
@@ -858,7 +858,7 @@ func (s *accessControlSuite) TestResolveTupleObjectMapsControllerUUIDs(c *C) {
 		Name: "test-cloud",
 	}
 	err := db.AddCloud(context.Background(), &cloud)
-	c.Assert(err, IsNil)
+	c.Assert(err, gc.IsNil)
 
 	uuid, _ := uuid.NewRandom()
 	controller := dbmodel.Controller{
@@ -867,15 +867,15 @@ func (s *accessControlSuite) TestResolveTupleObjectMapsControllerUUIDs(c *C) {
 		CloudName: "test-cloud",
 	}
 	err = db.AddController(ctx, &controller)
-	c.Assert(err, IsNil)
+	c.Assert(err, gc.IsNil)
 
 	tag, specifier, err := jujuapi.ResolveTupleObject(db, "controller-mycontroller#administrator")
-	c.Assert(err, IsNil)
-	c.Assert(tag, Equals, "controller-"+uuid.String())
-	c.Assert(specifier, Equals, "#administrator")
+	c.Assert(err, gc.IsNil)
+	c.Assert(tag, gc.Equals, "controller-"+uuid.String())
+	c.Assert(specifier, gc.Equals, "#administrator")
 }
 
-func (s *accessControlSuite) TestResolveTupleObjectMapsModelUUIDs(c *C) {
+func (s *accessControlSuite) TestResolveTupleObjectMapsModelUUIDs(c *gc.C) {
 	ctx := context.Background()
 	db := s.JIMM.Database
 
@@ -886,12 +886,12 @@ func (s *accessControlSuite) TestResolveTupleObjectMapsModelUUIDs(c *C) {
 
 	jujuTag, specifier, err := jujuapi.ResolveTupleObject(db, jimmTag)
 
-	c.Assert(err, IsNil)
-	c.Assert(jujuTag, Equals, "model-"+model.UUID.String)
-	c.Assert(specifier, Equals, "#administrator")
+	c.Assert(err, gc.IsNil)
+	c.Assert(jujuTag, gc.Equals, "model-"+model.UUID.String)
+	c.Assert(specifier, gc.Equals, "#administrator")
 }
 
-func (s *accessControlSuite) TestResolveTupleObjectMapsApplicationOffersUUIDs(c *C) {
+func (s *accessControlSuite) TestResolveTupleObjectMapsApplicationOffersUUIDs(c *gc.C) {
 	ctx := context.Background()
 	db := s.JIMM.Database
 
@@ -902,35 +902,35 @@ func (s *accessControlSuite) TestResolveTupleObjectMapsApplicationOffersUUIDs(c 
 
 	jujuTag, specifier, err := jujuapi.ResolveTupleObject(db, jimmTag)
 
-	c.Assert(err, IsNil)
-	c.Assert(jujuTag, Equals, "applicationoffer-"+offer.UUID)
-	c.Assert(specifier, Equals, "#administrator")
+	c.Assert(err, gc.IsNil)
+	c.Assert(jujuTag, gc.Equals, "applicationoffer-"+offer.UUID)
+	c.Assert(specifier, gc.Equals, "#administrator")
 }
 
-func (s *accessControlSuite) TestJujuTagFromTuple(c *C) {
+func (s *accessControlSuite) TestJujuTagFromTuple(c *gc.C) {
 	uuid, _ := uuid.NewRandom()
 	tag, err := jujuapi.JujuTagFromTuple("user", "user-ale8k@external")
-	c.Assert(err, IsNil)
-	c.Assert(tag.Id(), Equals, "ale8k@external")
+	c.Assert(err, gc.IsNil)
+	c.Assert(tag.Id(), gc.Equals, "ale8k@external")
 
 	tag, err = jujuapi.JujuTagFromTuple("group", "group-1")
-	c.Assert(err, IsNil)
-	c.Assert(tag.Id(), Equals, "1")
+	c.Assert(err, gc.IsNil)
+	c.Assert(tag.Id(), gc.Equals, "1")
 
 	tag, err = jujuapi.JujuTagFromTuple("controller", "controller-"+uuid.String())
-	c.Assert(err, IsNil)
-	c.Assert(tag.Id(), Equals, uuid.String())
+	c.Assert(err, gc.IsNil)
+	c.Assert(tag.Id(), gc.Equals, uuid.String())
 
 	tag, err = jujuapi.JujuTagFromTuple("model", "model-"+uuid.String())
-	c.Assert(err, IsNil)
-	c.Assert(tag.Id(), Equals, uuid.String())
+	c.Assert(err, gc.IsNil)
+	c.Assert(tag.Id(), gc.Equals, uuid.String())
 
 	tag, err = jujuapi.JujuTagFromTuple("applicationoffer", "applicationoffer-"+uuid.String())
-	c.Assert(err, IsNil)
-	c.Assert(tag.Id(), Equals, uuid.String())
+	c.Assert(err, gc.IsNil)
+	c.Assert(tag.Id(), gc.Equals, uuid.String())
 }
 
-func (s *accessControlSuite) TestParseTag(c *C) {
+func (s *accessControlSuite) TestParseTag(c *gc.C) {
 	ctx := context.Background()
 	db := s.JIMM.Database
 
@@ -941,19 +941,19 @@ func (s *accessControlSuite) TestParseTag(c *C) {
 
 	// JIMM tag syntax for models
 	tag, specifier, err := jujuapi.ParseTag(ctx, db, jimmTag)
-	c.Assert(err, IsNil)
-	c.Assert(tag.Kind(), Equals, names.ModelTagKind)
-	c.Assert(tag.Id(), Equals, model.UUID.String)
-	c.Assert(specifier, Equals, "#administrator")
+	c.Assert(err, gc.IsNil)
+	c.Assert(tag.Kind(), gc.Equals, names.ModelTagKind)
+	c.Assert(tag.Id(), gc.Equals, model.UUID.String)
+	c.Assert(specifier, gc.Equals, "#administrator")
 
 	jujuTag := "model-" + model.UUID.String + "#administrator"
 
 	// Juju tag syntax for models
 	tag, specifier, err = jujuapi.ParseTag(ctx, db, jujuTag)
-	c.Assert(err, IsNil)
-	c.Assert(tag.Id(), Equals, model.UUID.String)
-	c.Assert(tag.Kind(), Equals, names.ModelTagKind)
-	c.Assert(specifier, Equals, "#administrator")
+	c.Assert(err, gc.IsNil)
+	c.Assert(tag.Id(), gc.Equals, model.UUID.String)
+	c.Assert(tag.Kind(), gc.Equals, names.ModelTagKind)
+	c.Assert(specifier, gc.Equals, "#administrator")
 }
 
 // createTestControllerEnvironment is a utility function creating the necessary components of adding a:
@@ -973,7 +973,7 @@ func (s *accessControlSuite) TestParseTag(c *C) {
 //
 // TODO(ale8k): Make this an implicit thing on the JIMM suite per test & refactor the current state.
 // and make the suite argument an interface of the required calls we use here.
-func createTestControllerEnvironment(ctx context.Context, c *C, s *accessControlSuite) (
+func createTestControllerEnvironment(ctx context.Context, c *gc.C, s *accessControlSuite) (
 	dbmodel.User,
 	dbmodel.GroupEntry,
 	dbmodel.Controller,
@@ -986,16 +986,16 @@ func createTestControllerEnvironment(ctx context.Context, c *C, s *accessControl
 
 	db := s.JIMM.Database
 	err := db.AddGroup(ctx, "test-group")
-	c.Assert(err, IsNil)
+	c.Assert(err, gc.IsNil)
 	group := dbmodel.GroupEntry{Name: "test-group"}
 	err = db.GetGroup(ctx, &group)
-	c.Assert(err, IsNil)
+	c.Assert(err, gc.IsNil)
 
 	u := dbmodel.User{
 		Username:         petname.Generate(2, "-") + "@external",
 		ControllerAccess: "superuser",
 	}
-	c.Assert(db.DB.Create(&u).Error, IsNil)
+	c.Assert(db.DB.Create(&u).Error, gc.IsNil)
 
 	cloud := dbmodel.Cloud{
 		Name: petname.Generate(2, "-"),
@@ -1004,7 +1004,7 @@ func createTestControllerEnvironment(ctx context.Context, c *C, s *accessControl
 			Name: petname.Generate(2, "-"),
 		}},
 	}
-	c.Assert(db.DB.Create(&cloud).Error, IsNil)
+	c.Assert(db.DB.Create(&cloud).Error, gc.IsNil)
 	id, _ := uuid.NewRandom()
 	controller := dbmodel.Controller{
 		Name:        petname.Generate(2, "-"),
@@ -1017,7 +1017,7 @@ func createTestControllerEnvironment(ctx context.Context, c *C, s *accessControl
 		}},
 	}
 	err = db.AddController(ctx, &controller)
-	c.Assert(err, IsNil)
+	c.Assert(err, gc.IsNil)
 
 	cred := dbmodel.CloudCredential{
 		Name:          petname.Generate(2, "-"),
@@ -1026,7 +1026,7 @@ func createTestControllerEnvironment(ctx context.Context, c *C, s *accessControl
 		AuthType:      "empty",
 	}
 	err = db.SetCloudCredential(ctx, &cred)
-	c.Assert(err, IsNil)
+	c.Assert(err, gc.IsNil)
 
 	model := dbmodel.Model{
 		Name: petname.Generate(2, "-"),
@@ -1049,11 +1049,11 @@ func createTestControllerEnvironment(ctx context.Context, c *C, s *accessControl
 	}
 
 	err = db.AddModel(ctx, &model)
-	c.Assert(err, IsNil)
+	c.Assert(err, gc.IsNil)
 
 	offerName := petname.Generate(2, "-")
 	offerURL, err := crossmodel.ParseOfferURL(controller.Name + ":" + u.Username + "/" + model.Name + "." + offerName)
-	c.Assert(err, IsNil)
+	c.Assert(err, gc.IsNil)
 
 	offer := dbmodel.ApplicationOffer{
 		UUID:            id.String(),
@@ -1063,8 +1063,8 @@ func createTestControllerEnvironment(ctx context.Context, c *C, s *accessControl
 		URL:             offerURL.String(),
 	}
 	err = db.AddApplicationOffer(context.Background(), &offer)
-	c.Assert(err, IsNil)
-	c.Assert(len(offer.UUID), Equals, 36)
+	c.Assert(err, gc.IsNil)
+	c.Assert(len(offer.UUID), gc.Equals, 36)
 
 	conn := s.open(c, nil, "alice")
 	client := api.NewClient(conn)

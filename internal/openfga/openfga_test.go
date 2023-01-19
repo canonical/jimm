@@ -8,7 +8,7 @@ import (
 	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
 	"github.com/google/uuid"
 	openfga "github.com/openfga/go-sdk"
-	. "gopkg.in/check.v1"
+	gc "gopkg.in/check.v1"
 )
 
 type openFGATestSuite struct {
@@ -16,22 +16,22 @@ type openFGATestSuite struct {
 	ofgaApi    openfga.OpenFgaApi
 }
 
-var _ = Suite(&openFGATestSuite{})
+var _ = gc.Suite(&openFGATestSuite{})
 
-func (s *openFGATestSuite) SetUpTest(c *C) {
+func (s *openFGATestSuite) SetUpTest(c *gc.C) {
 	api, client := ofga.SetupTestOFGAClient(c)
 	s.ofgaApi = api
 	s.ofgaClient = client
 }
 
-func (s *openFGATestSuite) TestCreateTupleKey(c *C) {
+func (s *openFGATestSuite) TestCreateTupleKey(c *gc.C) {
 	key := ofga.CreateTupleKey("user:diglett", "legendary", "pokemon:earth")
-	c.Assert("user:diglett", Equals, key.GetUser())
-	c.Assert("legendary", Equals, key.GetRelation())
-	c.Assert("pokemon:earth", Equals, key.GetObject())
+	c.Assert("user:diglett", gc.Equals, key.GetUser())
+	c.Assert("legendary", gc.Equals, key.GetRelation())
+	c.Assert("pokemon:earth", gc.Equals, key.GetObject())
 }
 
-func (s *openFGATestSuite) TestWritingTuplesToOFGADetectsBadObjects(c *C) {
+func (s *openFGATestSuite) TestWritingTuplesToOFGADetectsBadObjects(c *gc.C) {
 	ctx := context.Background()
 	key1 := ofga.CreateTupleKey("user:diglett", "legendary", "pokemon:earth")
 	key2 := ofga.CreateTupleKey("user:diglett", "awesome", "pokemon:earth")
@@ -40,14 +40,14 @@ func (s *openFGATestSuite) TestWritingTuplesToOFGADetectsBadObjects(c *C) {
 	err := s.ofgaClient.AddRelations(ctx, key1, key2, key3)
 	fgaErrCode, _ := openfga.NewErrorCodeFromValue("validation_error")
 	serr, ok := err.(openfga.FgaApiValidationError)
-	c.Assert(ok, Equals, true)
-	c.Assert(400, Equals, serr.ResponseStatusCode())
-	c.Assert("POST", Equals, serr.RequestMethod())
-	c.Assert("Write", Equals, serr.EndpointCategory())
-	c.Assert(*fgaErrCode, Equals, serr.ResponseCode())
+	c.Assert(ok, gc.Equals, true)
+	c.Assert(400, gc.Equals, serr.ResponseStatusCode())
+	c.Assert("POST", gc.Equals, serr.RequestMethod())
+	c.Assert("Write", gc.Equals, serr.EndpointCategory())
+	c.Assert(*fgaErrCode, gc.Equals, serr.ResponseCode())
 }
 
-func (s *openFGATestSuite) TestWritingTuplesToOFGADetectsSucceeds(c *C) {
+func (s *openFGATestSuite) TestWritingTuplesToOFGADetectsSucceeds(c *gc.C) {
 	ctx := context.Background()
 
 	uuid1, _ := uuid.NewRandom()
@@ -59,34 +59,34 @@ func (s *openFGATestSuite) TestWritingTuplesToOFGADetectsSucceeds(c *C) {
 	key2 := ofga.CreateTupleKey(user2, "member", "group:pokemon")
 
 	err := s.ofgaClient.AddRelations(ctx, key1, key2)
-	c.Assert(err, IsNil)
+	c.Assert(err, gc.IsNil)
 	changes, _, err := s.ofgaApi.ReadChanges(ctx).Type_("group").Execute()
-	c.Assert(err, IsNil)
+	c.Assert(err, gc.IsNil)
 
 	secondToLastInsertedTuple := changes.GetChanges()[len(changes.GetChanges())-2].GetTupleKey()
-	c.Assert(user1, Equals, secondToLastInsertedTuple.GetUser())
+	c.Assert(user1, gc.Equals, secondToLastInsertedTuple.GetUser())
 
 	lastInsertedTuple := changes.GetChanges()[len(changes.GetChanges())-1].GetTupleKey()
-	c.Assert(user2, Equals, lastInsertedTuple.GetUser())
+	c.Assert(user2, gc.Equals, lastInsertedTuple.GetUser())
 }
 
-func (s *openFGATestSuite) TestCheckRelationSucceeds(c *C) {
+func (s *openFGATestSuite) TestCheckRelationSucceeds(c *gc.C) {
 	ctx := context.Background()
 
 	userToGroup := ofga.CreateTupleKey("user:a-handsome-diglett", "member", "group:1")
 	groupToController := ofga.CreateTupleKey("group:1#member", "administrator", "controller:imauuid")
 
 	err := s.ofgaClient.AddRelations(ctx, userToGroup, groupToController)
-	c.Assert(err, IsNil)
+	c.Assert(err, gc.IsNil)
 
 	checkTuple := ofga.CreateTupleKey("user:a-handsome-diglett", "administrator", "controller:imauuid")
 	allowed, resoution, err := s.ofgaClient.CheckRelation(ctx, checkTuple, true)
-	c.Assert(err, IsNil)
-	c.Assert(allowed, Equals, true)
-	c.Assert(resoution, Equals, ".(direct).group:1#member.(direct).")
+	c.Assert(err, gc.IsNil)
+	c.Assert(allowed, gc.Equals, true)
+	c.Assert(resoution, gc.Equals, ".(direct).group:1#member.(direct).")
 
 }
 
 func Test(t *testing.T) {
-	TestingT(t)
+	gc.TestingT(t)
 }
