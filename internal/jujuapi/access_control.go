@@ -318,6 +318,9 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 // within OpenFGA.
 func (r *controllerRoot) RemoveRelation(ctx context.Context, req apiparams.RemoveRelationRequest) error {
 	const op = errors.Op("jujuapi.RemoveRelation")
+	if r.user.ControllerAccess != "superuser" {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
 	keys, err := r.createTupleKeys(ctx, req.Tuples)
 	if err != nil {
 		return errors.E(op, err)
