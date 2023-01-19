@@ -289,6 +289,7 @@ type AddRelationRequest struct {
 	Tuples []RelationshipTuple
 }
 
+// RemoveRelationRequest holds the request information to remove tuples.
 type RemoveRelationRequest struct {
 	Tuples []RelationshipTuple
 }

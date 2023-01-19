@@ -3,6 +3,7 @@ package openfga_test
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -20,7 +21,7 @@ type openFGATestSuite struct {
 var _ = gc.Suite(&openFGATestSuite{})
 
 func (suite *openFGATestSuite) SetUpTest(c *gc.C) {
-	api, client := ofga.SetupTestOFGAClient(c)
+	api, client, _ := ofga.SetupTestOFGAClient(c)
 	suite.ofgaApi = api
 	suite.ofgaClient = client
 }
@@ -71,28 +72,24 @@ func (suite *openFGATestSuite) TestWritingTuplesToOFGADetectsSucceeds(c *gc.C) {
 	c.Assert(user2, gc.Equals, lastInsertedTuple.GetUser())
 }
 
-func (suite *openFGATestSuite) TestDeletingTuplesToOFGADetectsSucceeds(c *gc.C) {
+func (suite *openFGATestSuite) TestDeletingTuplesFromOFGASucceeds(c *gc.C) {
 	ctx := context.Background()
 
 	//Create tuples before writing to db
-	uuid1, _ := uuid.NewRandom()
-	user1 := fmt.Sprintf("user:%s", uuid1)
+	user1 := "user:bob"
 	key1 := ofga.CreateTupleKey(user1, "member", "group:pokemon")
-	uuid2, _ := uuid.NewRandom()
-	user2 := fmt.Sprintf("user:%s", uuid2)
+	user2 := "user:alice"
 	key2 := ofga.CreateTupleKey(user2, "member", "group:pokemon")
 
 	//Delete before insert should fail
-	err := suite.ofgaClient.DeleteRelations(ctx, key1, key2)
-	_, ok := err.(openfga.FgaApiValidationError)
-	c.Assert(ok, gc.Equals, true)
-	c.Assert(err, gc.ErrorMatches, "cannot delete a tuple which does not exist")
+	err := suite.ofgaClient.RemoveRelation(ctx, key1, key2)
+	c.Assert(strings.Contains(err.Error(), "cannot delete a tuple which does not exist"), gc.Equals, true)
 
 	err = suite.ofgaClient.AddRelations(ctx, key1, key2)
 	c.Assert(err, gc.IsNil)
 
 	//Delete after insert should succeed.
-	err = suite.ofgaClient.DeleteRelations(ctx, key1, key2)
+	err = suite.ofgaClient.RemoveRelation(ctx, key1, key2)
 	c.Assert(err, gc.IsNil)
 	changes, _, err := suite.ofgaApi.ReadChanges(ctx).Type_("group").Execute()
 	c.Assert(err, gc.IsNil)
