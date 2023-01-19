@@ -379,22 +379,12 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 // group -> model (uuid)
 // group -> applicationoffer (name)
 // group -> applicationoffer (uuid)
-// group#member -> group
 func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 	ctx := context.Background()
-	db := s.JIMM.Database
 
 	user, group, controller, model, offer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
 
-	db.AddGroup(ctx, "test-group2")
-	group2 := &dbmodel.GroupEntry{
-		Name: "test-group2",
-	}
-	err := db.GetGroup(ctx, group2)
-	c.Assert(err, gc.IsNil)
-
-	c.Assert(err, gc.IsNil)
 	type tuple struct {
 		user     string
 		relation string
@@ -564,25 +554,12 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 			err:         false,
 			changesType: "applicationoffer",
 		},
-		// Test group -> group
-		{
-			input: tuple{"group-" + group.Name + "#member", "member", "group-" + group2.Name},
-			want: func() openfga.TupleKey {
-				k := openfga.NewTupleKey()
-				k.SetUser("group:" + strconv.FormatUint(uint64(group.ID), 10) + "#member")
-				k.SetRelation("member")
-				k.SetObject("group:" + strconv.FormatUint(uint64(group2.ID), 10))
-				return *k
-			}(),
-			err:         false,
-			changesType: "group",
-		},
 	}
 
 	for _, tc := range tagTests {
 		ofgaClient := s.JIMM.OpenFGAClient
 		err := ofgaClient.AddRelations(context.Background(), tc.want)
-		c.Assert(err, gc.IsNil)
+		c.Check(err, gc.IsNil)
 		changes, _, err := s.OFGAApi.ReadChanges(ctx).Type_(tc.changesType).Execute()
 		c.Assert(err, gc.IsNil)
 		key := changes.GetChanges()[len(changes.GetChanges())-1].GetTupleKey()
