@@ -104,8 +104,7 @@ func (r *controllerRoot) RemoveGroup(ctx context.Context, req apiparams.RemoveGr
 	if err != nil {
 		return errors.E(op, err)
 	}
-	//TODO(Kian): Also remove all tuples containing group with confirmation message in the CLI.
-	err = r.removeRelatedTuples(req.Name)
+	err = r.removeRelatedTuples(ctx, "group-"+req.Name)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -547,11 +546,40 @@ func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apipara
 	}, nil
 }
 
-// removeRelatedTuples removes all tuples that contain object as either the source/target
-// of tuple.
-func (r *controllerRoot) removeRelatedTuples(object string) error {
+// removeRelatedTuples takes a string and resolves it to a resource, implying that the string
+// must be a valid resource string e.g. "controller-name", "group-name". We then remove all
+// tuples that contain said resource as either the source/target (or in OpenFGA terms user/object) of a tuple.
+func (r *controllerRoot) removeRelatedTuples(ctx context.Context, value string) error {
+	const op = errors.Op("jujuapi.removeRelatedTuples")
+	tuple := apiparams.RelationshipTuple{TargetObject: value}
+	tupleKey, err := r.parseTuple(ctx, tuple)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	//Remove Object side
 	pageSize := 50
-	parseTag(ctx, r.jimm.Database, tuple.TargetObject)
+	//Wrap the below in a loop / make generic function to get all from paginated calls.
+	resp, err := r.ofgaClient.ReadRelatedObjects(ctx, tupleKey, int32(pageSize), "")
+	if err != nil {
+		return errors.E(op, err)
+	}
+	err = r.ofgaClient.RemoveRelation(ctx, resp.Keys...)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	//Remove user side
+	//Wrap the below in a loop / make generic function to get all from paginated calls.
+	newKey := ofga.CreateTupleKey(*tupleKey.Object, "", "")
+	resp, err = r.ofgaClient.ReadRelatedObjects(ctx, &newKey, int32(pageSize), "")
+	if err != nil {
+		return errors.E(op, err)
+	}
+	err = r.ofgaClient.RemoveRelation(ctx, resp.Keys...)
+	if err != nil {
+		return errors.E(op, err)
+	}
 
 	return nil
 }

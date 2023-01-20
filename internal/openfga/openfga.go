@@ -2,7 +2,6 @@ package openfga
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/juju/zaputil/zapctx"
 	openfga "github.com/openfga/go-sdk"
@@ -123,10 +122,6 @@ func (o *OFGAClient) checkRelation(ctx context.Context, t openfga.TupleKey, trac
 
 // CreateTuple wraps the underlying ofga tuple into a convenient ease-of-use method
 func CreateTupleKey(object string, relation string, targetObject string) openfga.TupleKey {
-	fmt.Println("Object = ", object)
-	fmt.Println("Relation = ", relation)
-	fmt.Println("Target = ", targetObject)
-
 	k := openfga.NewTupleKey()
 	// in some cases specifying the object is not required
 	if object != "" {
