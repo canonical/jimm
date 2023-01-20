@@ -207,10 +207,9 @@ type removeRelationCommand struct {
 	store    jujuclient.ClientStore
 	dialOpts *jujuapi.DialOpts
 
-	//Naming follows OpenFGA convention
-	object       string //object
+	object       string
 	relation     string
-	targetObject string //target_object
+	targetObject string
 
 	filename string //optional
 }
