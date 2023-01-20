@@ -1,4 +1,4 @@
-package openfga
+package jimmtest
 
 import (
 	"context"
@@ -15,6 +15,9 @@ import (
 	openfga "github.com/openfga/go-sdk"
 	"github.com/openfga/go-sdk/credentials"
 	gc "gopkg.in/check.v1"
+
+	"github.com/CanonicalLtd/jimm/internal/errors"
+	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
 )
 
 var (
@@ -69,7 +72,7 @@ func getAuthModelDefinition(c *gc.C) []openfga.TypeDefinition {
 //
 // The benefit of not cleaning up the store immediately afterwards,
 // enables the debugging of created tuples in test development.
-func SetupTestOFGAClient(c *gc.C) (openfga.OpenFgaApi, *OFGAClient, *openfga.Configuration) {
+func SetupTestOFGAClient(c *gc.C) (openfga.OpenFgaApi, *ofga.OFGAClient, *openfga.Configuration) {
 	ctx := context.Background()
 
 	openFGATestConfig := openfga.Configuration{
@@ -103,7 +106,7 @@ func SetupTestOFGAClient(c *gc.C) (openfga.OpenFgaApi, *OFGAClient, *openfga.Con
 	amr, _, err := api.WriteAuthorizationModel(ctx).Body(*ar).Execute()
 	c.Assert(err, gc.IsNil)
 
-	wrapperClient := NewOpenFGAClient(client.OpenFgaApi, amr.GetAuthorizationModelId())
+	wrapperClient := ofga.NewOpenFGAClient(client.OpenFgaApi, amr.GetAuthorizationModelId())
 	cfg.StoreId = uuid
 	return client.OpenFgaApi, wrapperClient, cfg
 }
@@ -116,12 +119,12 @@ func SetupTestOFGAClient(c *gc.C) (openfga.OpenFgaApi, *OFGAClient, *openfga.Con
 func RemoveStore(ctx context.Context, name string) error {
 	conn, err := pgx.Connect(context.Background(), "postgresql://jimm:jimm@localhost/jimm")
 	if err != nil {
-		return err
+		return errors.E(err)
 	}
 	defer conn.Close(ctx)
 	_, err = conn.Exec(ctx, fmt.Sprintf("DELETE FROM store WHERE name = '%s';", name))
 	if err != nil {
-		return err
+		return errors.E(err)
 	}
 	return nil
 }
@@ -131,7 +134,7 @@ func RemoveStore(ctx context.Context, name string) error {
 func CreateStore(ctx context.Context, name string, id string) error {
 	conn, err := pgx.Connect(context.Background(), "postgresql://jimm:jimm@localhost/jimm")
 	if err != nil {
-		return err
+		return errors.E(err)
 	}
 	defer conn.Close(ctx)
 	_, err = conn.Exec(
@@ -144,7 +147,7 @@ func CreateStore(ctx context.Context, name string, id string) error {
 		),
 	)
 	if err != nil {
-		return err
+		return errors.E(err)
 	}
 	return nil
 }
@@ -152,43 +155,10 @@ func CreateStore(ctx context.Context, name string, id string) error {
 func TruncateOpenFgaTuples(ctx context.Context) error {
 	conn, err := pgx.Connect(context.Background(), "postgresql://jimm:jimm@localhost/jimm")
 	if err != nil {
-		return err
+		return errors.E(err)
 	}
 	defer conn.Close(ctx)
 	conn.Exec(ctx, "TRUNCATE TABLE tuple;")
 	conn.Exec(ctx, "TRUNCATE TABLE changelog;")
-	return nil
-}
-
-// DeleteAllTuples removes all existing tuples.
-func (o *OFGAClient) DeleteAllTuples(ctx context.Context) error {
-	var allTuples []openfga.TupleKey
-	rr := openfga.NewReadRequest()
-	rr.SetPageSize(25)
-	rr.SetAuthorizationModelId(o.AuthModelId)
-	readResponse, _, err := o.api.Read(ctx).Body(*rr).Execute()
-	if err != nil {
-		return err
-	}
-	var continuationToken string
-	for ok := true; ok; ok = (*readResponse.ContinuationToken != continuationToken) {
-		for _, tuple := range *readResponse.Tuples {
-			allTuples = append(allTuples, *tuple.Key)
-		}
-		if len(allTuples) > 0 {
-			err = o.removeRelation(ctx, allTuples...)
-			if err != nil {
-				return err
-			}
-		}
-		allTuples = []openfga.TupleKey{}
-		continuationToken = *readResponse.ContinuationToken
-		rr.SetContinuationToken(continuationToken)
-		readResponse, _, err = o.api.Read(ctx).Body(*rr).Execute()
-		if err != nil {
-			return err
-		}
-
-	}
 	return nil
 }

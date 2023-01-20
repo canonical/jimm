@@ -22,7 +22,6 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jujuclient"
-	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
 )
 
@@ -51,7 +50,7 @@ type JIMMSuite struct {
 }
 
 func (s *JIMMSuite) SetUpTest(c *gc.C) {
-	ofgaAPI, ofgaClient, _ := ofga.SetupTestOFGAClient(c)
+	ofgaAPI, ofgaClient, _ := SetupTestOFGAClient(c)
 
 	s.OFGAApi = ofgaAPI
 	// Setup OpenFGA.

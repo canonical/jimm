@@ -26,7 +26,6 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	"github.com/CanonicalLtd/jimm/internal/jujuclient"
-	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
 )
 
 type gcTester struct {
@@ -65,7 +64,7 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 	err := s.JIMM.Database.Migrate(context.Background(), true)
 	c.Assert(err, gc.Equals, nil)
 
-	ofgaAPI, ofgaClient, cfg := ofga.SetupTestOFGAClient(c)
+	ofgaAPI, ofgaClient, cfg := jimmtest.SetupTestOFGAClient(c)
 	s.OFGAApi = ofgaAPI
 	s.JIMM.OpenFGAClient = ofgaClient
 

@@ -10,6 +10,7 @@ import (
 	openfga "github.com/openfga/go-sdk"
 	gc "gopkg.in/check.v1"
 
+	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
 )
 
@@ -21,7 +22,7 @@ type openFGATestSuite struct {
 var _ = gc.Suite(&openFGATestSuite{})
 
 func (s *openFGATestSuite) SetUpTest(c *gc.C) {
-	api, client, _ := ofga.SetupTestOFGAClient(c)
+	api, client, _ := jimmtest.SetupTestOFGAClient(c)
 	s.ofgaApi = api
 	s.ofgaClient = client
 }
@@ -119,24 +120,6 @@ func (s *openFGATestSuite) TestCheckRelationSucceeds(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, true)
 	c.Assert(resoution, gc.Equals, ".(direct).group:1#member.(direct).")
-}
-
-func (suite *openFGATestSuite) TestDeletingAllTuples(c *gc.C) {
-	ctx := context.Background()
-
-	//Create tuples before writing to db
-	uuid1, _ := uuid.NewRandom()
-	user1 := fmt.Sprintf("user:%s", uuid1)
-	key1 := ofga.CreateTupleKey(user1, "member", "group:pokemon")
-	uuid2, _ := uuid.NewRandom()
-	user2 := fmt.Sprintf("user:%s", uuid2)
-	key2 := ofga.CreateTupleKey(user2, "member", "group:pokemon")
-
-	err := suite.ofgaClient.AddRelations(ctx, key1, key2)
-	c.Assert(err, gc.IsNil)
-
-	err = suite.ofgaClient.DeleteAllTuples(ctx)
-	c.Assert(err, gc.IsNil)
 }
 
 func Test(t *testing.T) {
