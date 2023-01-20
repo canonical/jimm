@@ -412,6 +412,234 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 	}
 }
 
+// TestRemoveRelation currently verifies the following test cases,
+// similar to the TestAddRelation but instead we add the relations and then
+// remove them.
+// When new relation control is to be added, please update this comment:
+// user -> group
+// user -> controller (name)
+// user -> controller (uuid)
+// user -> model (name)
+// user -> model (uuid)
+// user -> applicationoffer (name)
+// user -> applicationoffer (uuid)
+// group -> controller (name)
+// group -> controller (uuid)
+// group -> model (name)
+// group -> model (uuid)
+// group -> applicationoffer (name)
+// group -> applicationoffer (uuid)
+func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
+	ctx := context.Background()
+
+	user, group, controller, model, offer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	defer closeClient()
+
+	type tuple struct {
+		user     string
+		relation string
+		object   string
+	}
+	type tagTest struct {
+		input       tuple
+		want        openfga.TupleKey
+		err         bool
+		changesType string
+	}
+
+	tagTests := []tagTest{
+		// Test user -> controller by name
+		{
+			input: tuple{"user-" + user.Username, "administrator", "controller-" + controller.Name},
+			want: ofga.CreateTupleKey(
+				"user:"+user.Username,
+				"administrator",
+				"controller:"+controller.UUID,
+			),
+			err:         false,
+			changesType: "controller",
+		},
+		// Test user -> controller by UUID
+		{
+			input: tuple{"user-" + user.Username, "administrator", "controller-" + controller.UUID},
+			want: ofga.CreateTupleKey(
+				"user:"+user.Username,
+				"administrator",
+				"controller:"+controller.UUID,
+			),
+			err:         false,
+			changesType: "controller",
+		},
+		//Test user -> group
+		{
+			input: tuple{"user-" + user.Username, "member", "group-" + group.Name},
+			want: ofga.CreateTupleKey(
+				"user:"+user.Username,
+				"member",
+				"group:"+strconv.FormatUint(uint64(group.ID), 10),
+			),
+			err:         false,
+			changesType: "group",
+		},
+		//Test group -> controller
+		{
+			input: tuple{"group-" + "test-group", "administrator", "controller-" + controller.UUID},
+			want: ofga.CreateTupleKey(
+				"group:"+strconv.FormatUint(uint64(group.ID), 10),
+				"administrator",
+				"controller:"+controller.UUID,
+			),
+			err:         false,
+			changesType: "controller",
+		},
+		//Test user -> model by name
+		{
+			input: tuple{"user-" + user.Username, "writer", "model-" + controller.Name + ":" + user.Username + "/" + model.Name},
+			want: ofga.CreateTupleKey(
+				"user:"+user.Username,
+				"writer",
+				"model:"+model.UUID.String,
+			),
+			err:         false,
+			changesType: "model",
+		},
+		// Test user -> model by UUID
+		{
+			input: tuple{"user-" + user.Username, "writer", "model-" + model.UUID.String},
+			want: ofga.CreateTupleKey(
+				"user:"+user.Username,
+				"writer",
+				"model:"+model.UUID.String,
+			),
+			err:         false,
+			changesType: "model",
+		},
+		// Test user -> applicationoffer by name
+		{
+			input: tuple{"user-" + user.Username, "consumer", "applicationoffer-" + controller.Name + ":" + user.Username + "/" + model.Name + "." + offer.Name},
+			want: ofga.CreateTupleKey(
+				"user:"+user.Username,
+				"consumer",
+				"applicationoffer:"+offer.UUID,
+			),
+			err:         false,
+			changesType: "applicationoffer",
+		},
+		// Test user -> applicationoffer by UUID
+		{
+			input: tuple{"user-" + user.Username, "consumer", "applicationoffer-" + offer.UUID},
+			want: ofga.CreateTupleKey(
+				"user:"+user.Username,
+				"consumer",
+				"applicationoffer:"+offer.UUID,
+			),
+			err:         false,
+			changesType: "applicationoffer",
+		},
+		// Test group -> controller by name
+		{
+			input: tuple{"group-" + group.Name + "#member", "administrator", "controller-" + controller.Name},
+			want: ofga.CreateTupleKey(
+				"group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member",
+				"administrator",
+				"controller:"+controller.UUID,
+			),
+			err:         false,
+			changesType: "controller",
+		},
+		// Test group -> controller by UUID
+		{
+			input: tuple{"group-" + group.Name + "#member", "administrator", "controller-" + controller.UUID},
+			want: ofga.CreateTupleKey(
+				"group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member",
+				"administrator",
+				"controller:"+controller.UUID,
+			),
+			err:         false,
+			changesType: "controller",
+		},
+		// Test group -> model by name
+		{
+			input: tuple{"group-" + group.Name + "#member", "writer", "model-" + controller.Name + ":" + user.Username + "/" + model.Name},
+			want: ofga.CreateTupleKey(
+				"group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member",
+				"writer",
+				"model:"+model.UUID.String,
+			),
+			err:         false,
+			changesType: "model",
+		},
+		// Test group -> model by UUID
+		{
+			input: tuple{"group-" + group.Name + "#member", "writer", "model-" + model.UUID.String},
+			want: ofga.CreateTupleKey(
+				"group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member",
+				"writer",
+				"model:"+model.UUID.String,
+			),
+			err:         false,
+			changesType: "model",
+		},
+		// Test group -> applicationoffer by name
+		{
+			input: tuple{"group-" + group.Name + "#member", "consumer", "applicationoffer-" + controller.Name + ":" + user.Username + "/" + model.Name + "." + offer.Name},
+			want: ofga.CreateTupleKey(
+				"group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member",
+				"consumer",
+				"applicationoffer:"+offer.UUID,
+			),
+			err:         false,
+			changesType: "applicationoffer",
+		},
+		// Test group -> applicationoffer by UUID
+		{
+			input: tuple{"group-" + group.Name + "#member", "consumer", "applicationoffer-" + offer.UUID},
+			want: func() openfga.TupleKey {
+				return ofga.CreateTupleKey(
+					"group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member",
+					"consumer",
+					"applicationoffer:"+offer.UUID,
+				)
+			}(),
+			err:         false,
+			changesType: "applicationoffer",
+		},
+	}
+
+	for _, tc := range tagTests {
+		ofgaClient := s.JIMM.OpenFGAClient
+		err := ofgaClient.AddRelations(context.Background(), tc.want)
+		c.Check(err, gc.IsNil)
+		changes, _, err := s.OFGAApi.ReadChanges(ctx).Type_(tc.changesType).Execute()
+		c.Assert(err, gc.IsNil)
+		key := changes.GetChanges()[len(changes.GetChanges())-1].GetTupleKey()
+		c.Assert(key, gc.DeepEquals, tc.want)
+
+		err = client.RemoveRelation(&apiparams.RemoveRelationRequest{
+			Tuples: []apiparams.RelationshipTuple{
+				{
+					Object:       tc.input.user,
+					Relation:     tc.input.relation,
+					TargetObject: tc.input.object,
+				},
+			},
+		})
+		if tc.err {
+			c.Assert(err, gc.NotNil)
+			c.Assert(err, gc.ErrorMatches, tc.want)
+		} else {
+			c.Assert(err, gc.IsNil)
+			changes, _, err := s.OFGAApi.ReadChanges(ctx).Type_(tc.changesType).Execute()
+			c.Assert(err, gc.IsNil)
+			change := changes.GetChanges()[len(changes.GetChanges())-1]
+			operation := change.GetOperation()
+			c.Assert(operation, gc.Equals, openfga.DELETE)
+			key := change.GetTupleKey()
+			c.Assert(key, gc.DeepEquals, tc.want)
+		}
+	}
+}
+
 func (s *accessControlSuite) TestJAASTag(c *gc.C) {
 	ctx := context.Background()
 	db := s.JIMM.Database

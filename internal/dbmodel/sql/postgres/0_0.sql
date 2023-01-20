@@ -147,7 +147,7 @@ CREATE TABLE IF NOT EXISTS models (
 	cores BIGINT NOT NULL DEFAULT 0,
 	machines BIGINT NOT NULL DEFAULT 0,
 	units BIGINT NOT NULL DEFAULT 0,
-	UNIQUE(owner_username, name)
+	UNIQUE(controller_id, owner_username, name)
 );
 
 CREATE TABLE IF NOT EXISTS application_offers (
