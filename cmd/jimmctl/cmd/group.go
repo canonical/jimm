@@ -87,7 +87,7 @@ type addGroupCommand struct {
 func (c *addGroupCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:    "add",
-		Purpose: "Add group to jimm",
+		Purpose: "Add group to jimm.",
 		Doc:     addGroupDoc,
 	})
 }
@@ -154,7 +154,7 @@ type renameGroupCommand struct {
 func (c *renameGroupCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:    "rename",
-		Purpose: "Rename a group",
+		Purpose: "Rename a group.",
 		Doc:     renameGroupDoc,
 	})
 }
@@ -221,7 +221,7 @@ type removeGroupCommand struct {
 func (c *removeGroupCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:    "Remove",
-		Purpose: "Remove a group",
+		Purpose: "Remove a group.",
 		Doc:     removeGroupDoc,
 	})
 }
@@ -287,7 +287,7 @@ type listGroupsCommand struct {
 func (c *listGroupsCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:    "List",
-		Purpose: "List all groups",
+		Purpose: "List all groups.",
 		Doc:     listGroupsDoc,
 	})
 }

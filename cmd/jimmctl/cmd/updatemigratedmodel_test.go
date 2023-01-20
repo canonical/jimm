@@ -35,7 +35,7 @@ func (s *updateMigratedModelSuite) TestUpdateMigratedModelSuperuser(c *gc.C) {
 
 	// alice is superuser
 	bClient := s.userBakeryClient("alice")
-	_, err = cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore, bClient), "controller-2", mt.Id())
+	_, err = cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore(), bClient), "controller-2", mt.Id())
 	c.Assert(err, gc.IsNil)
 
 	// Check the model has moved controller.
@@ -55,30 +55,30 @@ func (s *updateMigratedModelSuite) TestUpdateMigratedModelUnauthorized(c *gc.C) 
 
 	// bob is not superuser
 	bClient := s.userBakeryClient("bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore, bClient), "controller-1", mt.Id())
+	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore(), bClient), "controller-1", mt.Id())
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
 func (s *updateMigratedModelSuite) TestUpdateMigratedModelNoController(c *gc.C) {
 	bClient := s.userBakeryClient("bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore, bClient))
+	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore(), bClient))
 	c.Assert(err, gc.ErrorMatches, `controller not specified`)
 }
 
 func (s *updateMigratedModelSuite) TestUpdateMigratedModelNoModelUUID(c *gc.C) {
 	bClient := s.userBakeryClient("bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore, bClient), "controller-id")
+	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore(), bClient), "controller-id")
 	c.Assert(err, gc.ErrorMatches, `model uuid not specified`)
 }
 
 func (s *updateMigratedModelSuite) TestUpdateMigratedModelInvalidModelUUID(c *gc.C) {
 	bClient := s.userBakeryClient("bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore, bClient), "controller-id", "not-a-uuid")
+	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore(), bClient), "controller-id", "not-a-uuid")
 	c.Assert(err, gc.ErrorMatches, `invalid model uuid`)
 }
 
 func (s *updateMigratedModelSuite) TestUpdateMigratedModelTooManyArgs(c *gc.C) {
 	bClient := s.userBakeryClient("bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore, bClient), "controller-id", "not-a-uuid", "spare-argument")
+	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore(), bClient), "controller-id", "not-a-uuid", "spare-argument")
 	c.Assert(err, gc.ErrorMatches, `too many args`)
 }

@@ -44,7 +44,7 @@ type jimmSuite struct {
 	HTTP        *httptest.Server
 	Service     *service.Service
 	AdminUser   *dbmodel.User
-	ClientStore *jjclient.MemStore
+	ClientStore func() *jjclient.MemStore
 	JIMM        *jimm.JIMM
 }
 
@@ -64,12 +64,23 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 	err := s.JIMM.Database.Migrate(context.Background(), true)
 	c.Assert(err, gc.Equals, nil)
 
+	ofgaAPI, ofgaClient, cfg := jimmtest.SetupTestOFGAClient(c)
+	s.OFGAApi = ofgaAPI
+	s.JIMM.OpenFGAClient = ofgaClient
+
 	s.Params = service.Params{
 		ControllerUUID:   "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		CandidURL:        s.Candid.URL.String(),
 		CandidPublicKey:  s.CandidPublicKey,
 		ControllerAdmins: []string{"admin"},
 		DSN:              fmt.Sprintf("file:%s?mode=memory&cache=shared", c.TestName()),
+		OpenFGAParams: service.OpenFGAParams{
+			Scheme:    cfg.ApiScheme,
+			Host:      cfg.ApiHost,
+			Store:     cfg.StoreId,
+			Token:     cfg.Credentials.Config.ApiToken,
+			AuthModel: ofgaClient.AuthModelId,
+		},
 	}
 	srv, err := service.NewService(ctx, s.Params)
 	c.Assert(err, gc.Equals, nil)
@@ -97,13 +108,16 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	s.ClientStore = jjclient.NewMemStore()
-	s.ClientStore.CurrentControllerName = "JIMM"
-	s.ClientStore.Controllers["JIMM"] = jjclient.ControllerDetails{
-		ControllerUUID: "914487b5-60e7-42bb-bd63-1adc3fd3a388",
-		APIEndpoints:   []string{u.Host},
-		PublicDNSName:  s.HTTP.URL,
-		CACert:         w.String(),
+	s.ClientStore = func() *jjclient.MemStore {
+		store := jjclient.NewMemStore()
+		store.CurrentControllerName = "JIMM"
+		store.Controllers["JIMM"] = jjclient.ControllerDetails{
+			ControllerUUID: "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+			APIEndpoints:   []string{u.Host},
+			PublicDNSName:  s.HTTP.URL,
+			CACert:         w.String(),
+		}
+		return store
 	}
 }
 

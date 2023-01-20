@@ -49,7 +49,7 @@ func (s *importCloudCredentialsSuite) TestImportCloudCredentials(c *gc.C) {
 
 	// alice is superuser
 	bClient := s.userBakeryClient("alice")
-	_, err = cmdtesting.RunCommand(c, cmd.NewImportCloudCredentialsCommandForTesting(s.ClientStore, bClient), tmpfile)
+	_, err = cmdtesting.RunCommand(c, cmd.NewImportCloudCredentialsCommandForTesting(s.ClientStore(), bClient), tmpfile)
 	c.Assert(err, gc.IsNil)
 
 	cred1 := dbmodel.CloudCredential{

@@ -21,7 +21,8 @@ type controllerInfoSuite struct {
 var _ = gc.Suite(&controllerInfoSuite{})
 
 func (s *controllerInfoSuite) TestControllerInfo(c *gc.C) {
-	s.ClientStore.Controllers["controller-1"] = jujuclient.ControllerDetails{
+	store := s.ClientStore()
+	store.Controllers["controller-1"] = jujuclient.ControllerDetails{
 		APIEndpoints:  []string{"127.0.0.1:17070"},
 		PublicDNSName: "controller1.example.com",
 		CACert: `-----BEGIN CERTIFICATE-----
@@ -49,7 +50,7 @@ func (s *controllerInfoSuite) TestControllerInfo(c *gc.C) {
   LQRNNlaY2ajLt0paowf/Xxb8
   -----END CERTIFICATE-----`,
 	}
-	s.ClientStore.Accounts["controller-1"] = jujuclient.AccountDetails{
+	store.Accounts["controller-1"] = jujuclient.AccountDetails{
 		User:     "test-user",
 		Password: "super-secret-password",
 	}
@@ -60,7 +61,7 @@ func (s *controllerInfoSuite) TestControllerInfo(c *gc.C) {
 
 	fname := path.Join(dir, "test.yaml")
 
-	_, err = cmdtesting.RunCommand(c, cmd.NewControllerInfoCommandForTesting(s.ClientStore), "controller-1", fname)
+	_, err = cmdtesting.RunCommand(c, cmd.NewControllerInfoCommandForTesting(store), "controller-1", fname)
 	c.Assert(err, gc.IsNil)
 
 	data, err := ioutil.ReadFile(fname)
@@ -75,7 +76,8 @@ username: test-user
 }
 
 func (s *controllerInfoSuite) TestControllerInfoSpecifiedPublicAddress(c *gc.C) {
-	s.ClientStore.Controllers["controller-1"] = jujuclient.ControllerDetails{
+	store := s.ClientStore()
+	store.Controllers["controller-1"] = jujuclient.ControllerDetails{
 		APIEndpoints: []string{"127.0.0.1:17070"},
 		CACert: `-----BEGIN CERTIFICATE-----
   MIID/jCCAmagAwIBAgIVANxsMrzsXrdpjjUoxWQm1RCkmWcqMA0GCSqGSIb3DQEB
@@ -102,7 +104,7 @@ func (s *controllerInfoSuite) TestControllerInfoSpecifiedPublicAddress(c *gc.C) 
   LQRNNlaY2ajLt0paowf/Xxb8
   -----END CERTIFICATE-----`,
 	}
-	s.ClientStore.Accounts["controller-1"] = jujuclient.AccountDetails{
+	store.Accounts["controller-1"] = jujuclient.AccountDetails{
 		User:     "test-user",
 		Password: "super-secret-password",
 	}
@@ -113,7 +115,7 @@ func (s *controllerInfoSuite) TestControllerInfoSpecifiedPublicAddress(c *gc.C) 
 
 	fname := path.Join(dir, "test.yaml")
 
-	_, err = cmdtesting.RunCommand(c, cmd.NewControllerInfoCommandForTesting(s.ClientStore), "--public-address=controller2.example.com", "controller-1", fname)
+	_, err = cmdtesting.RunCommand(c, cmd.NewControllerInfoCommandForTesting(store), "--public-address=controller2.example.com", "controller-1", fname)
 	c.Assert(err, gc.IsNil)
 
 	data, err := ioutil.ReadFile(fname)

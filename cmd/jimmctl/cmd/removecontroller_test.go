@@ -21,7 +21,7 @@ func (s *removeControllerSuite) TestRemoveControllerSuperuser(c *gc.C) {
 
 	// alice is superuser
 	bClient := s.userBakeryClient("alice")
-	context, err := cmdtesting.RunCommand(c, cmd.NewRemoveControllerCommandForTesting(s.ClientStore, bClient), "controller-1", "--force")
+	context, err := cmdtesting.RunCommand(c, cmd.NewRemoveControllerCommandForTesting(s.ClientStore(), bClient), "controller-1", "--force")
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(context), gc.Matches, `name: controller-1
 uuid: deadbeef-1bad-500d-9000-4b1d0d06f00d
@@ -70,6 +70,6 @@ func (s *removeControllerSuite) TestRemoveController(c *gc.C) {
 
 	// bob is not superuser
 	bClient := s.userBakeryClient("bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveControllerCommandForTesting(s.ClientStore, bClient), "controller-1", "--force")
+	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveControllerCommandForTesting(s.ClientStore(), bClient), "controller-1", "--force")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
