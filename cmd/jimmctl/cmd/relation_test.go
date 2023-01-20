@@ -44,18 +44,19 @@ func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 	err = s.jimmSuite.JIMM.Database.AddGroup(context.Background(), group2)
 	c.Assert(err, gc.IsNil)
 
-	for _, tc := range tests {
+	for i, tc := range tests {
 		_, err := cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), tc.input.user, tc.input.relation, tc.input.target)
 		c.Log("Test: " + tc.testName)
 		if tc.err {
 			c.Assert(strings.Contains(err.Error(), tc.message), gc.Equals, true)
 		} else {
 			c.Assert(err, gc.IsNil)
+			resp, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), nil, 50, "")
+			c.Assert(err, gc.IsNil)
+			c.Assert(len(resp.Keys), gc.Equals, i+1)
 		}
 	}
 
-	//TODO:(Kian) a nice check here would be to use the CheckRelation method once it is implemented.
-	//_, err = s.jimmSuite.JIMM.OpenFGAClient.CheckRelation(context.TODO(), "test-group", "test-group2")
 }
 
 func (s *relationSuite) TestMissingParamsAddRelationSuperuser(c *gc.C) {
@@ -88,16 +89,16 @@ func (s *relationSuite) TestAddRelationViaFileSuperuser(c *gc.C) {
 	file, err := os.CreateTemp(".", "relations.json")
 	c.Assert(err, gc.IsNil)
 	defer os.Remove(file.Name())
-	testRelations := "[{\"object\":\"group-" + group1 + "\",\"relation\":\"member\",\"target_object\":\"group-" + group3 + "\"},{\"object\":\"group-" + group2 + "\",\"relation\":\"member\",\"target_object\":\"group-" + group3 + "\"}]"
+	testRelations := `[{"object":"group-` + group1 + `","relation":"member","target_object":"group-` + group3 + `"},{"object":"group-` + group2 + `","relation":"member","target_object":"group-` + group3 + `"}]`
 	_, err = file.Write([]byte(testRelations))
 	c.Assert(err, gc.IsNil)
 
 	_, err = cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), "-f", file.Name())
 	c.Assert(err, gc.IsNil)
 
-	//TODO:(Kian) a nice check here would be to use the CheckRelation method once it is implemented.
-	//_, err = s.jimmSuite.JIMM.OpenFGAClient.CheckRelation(context.TODO(), "test-group", "test-group2")
-	//c.Assert(err, gc.ErrorMatches, "record not found")
+	resp, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), nil, 50, "")
+	c.Assert(err, gc.IsNil)
+	c.Assert(len(resp.Keys), gc.Equals, 2)
 }
 
 func (s *relationSuite) TestAddRelation(c *gc.C) {
@@ -131,9 +132,11 @@ func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	err = s.jimmSuite.JIMM.Database.AddGroup(context.Background(), group2)
 	c.Assert(err, gc.IsNil)
+	var totalKeys int
 	for _, tc := range tests {
 		_, err := cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), tc.input.user, tc.input.relation, tc.input.target)
 		c.Assert(err, gc.IsNil)
+		totalKeys++
 	}
 
 	for _, tc := range tests {
@@ -143,11 +146,12 @@ func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 			c.Assert(err, gc.ErrorMatches, tc.message)
 		} else {
 			c.Assert(err, gc.IsNil)
+			resp, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), nil, 50, "")
+			c.Assert(err, gc.IsNil)
+			totalKeys--
+			c.Assert(len(resp.Keys), gc.Equals, totalKeys)
 		}
 	}
-
-	//TODO:(Kian) a nice check here would be to use the CheckRelation method once it is implemented.
-	//_, err = s.jimmSuite.JIMM.OpenFGAClient.CheckRelation(context.TODO(), "test-group", "test-group2")
 }
 
 func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
@@ -167,7 +171,7 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 	file, err := os.CreateTemp(".", "relations.json")
 	c.Assert(err, gc.IsNil)
 	defer os.Remove(file.Name())
-	testRelations := "[{\"object\":\"group-" + group1 + "\",\"relation\":\"member\",\"target_object\":\"group-" + group3 + "\"},{\"object\":\"group-" + group2 + "\",\"relation\":\"member\",\"target_object\":\"group-" + group3 + "\"}]"
+	testRelations := `[{"object":"group-` + group1 + `","relation":"member","target_object":"group-` + group3 + `"},{"object":"group-` + group2 + `","relation":"member","target_object":"group-` + group3 + `"}]`
 	_, err = file.Write([]byte(testRelations))
 	c.Assert(err, gc.IsNil)
 
@@ -177,9 +181,9 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 	_, err = cmdtesting.RunCommand(c, cmd.NewRemoveRelationCommandForTesting(s.ClientStore(), bClient), "-f", file.Name())
 	c.Assert(err, gc.IsNil)
 
-	//TODO:(Kian) a nice check here would be to use the CheckRelation method once it is implemented.
-	//_, err = s.jimmSuite.JIMM.OpenFGAClient.CheckRelation(context.TODO(), "test-group", "test-group2")
-	//c.Assert(err, gc.ErrorMatches, "record not found")
+	resp, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), nil, 50, "")
+	c.Assert(err, gc.IsNil)
+	c.Assert(len(resp.Keys), gc.Equals, 0)
 }
 
 func (s *relationSuite) TestRemoveRelation(c *gc.C) {
