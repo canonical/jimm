@@ -43,11 +43,11 @@ E.g. "user-Alice" or "controller-MyController"
 Certain constraints apply when creating/removing a relation, namely:
 Object may be one of:
 
-	user tag 				= "user-<name>"
-	group tag 				= "group-<name>"
-	controller tag 			= "controller-<name>"
-	model tag 				= "model-<name>"
-	application offer tag 	= "offer-<name>"
+	user tag				= "user-<name>"
+	group tag				= "group-<name>"
+	controller tag			= "controller-<name>"
+	model tag				= "model-<name>"
+	application offer tag	= "offer-<name>"
 
 If target_object is a group, the relation can only be:
 
