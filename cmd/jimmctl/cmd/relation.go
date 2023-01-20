@@ -75,7 +75,7 @@ Additionally, if the object is a group, a userset can be applied by adding #memb
 
 	group-TeamA#member administrator controller-MyController
 
-This will grant/revoke access from users that are members of TeamA as administrators of MyController.
+This will grant/revoke the relation to all users within TeamA.
 `
 
 	addRelationDoc = `
