@@ -101,8 +101,7 @@ func (s *relationSuite) TestAddRelationViaFileSuperuser(c *gc.C) {
 	c.Assert(len(resp.Keys), gc.Equals, 2)
 }
 
-func (s *relationSuite) TestAddRelation(c *gc.C) {
-	// bob is not superuser
+func (s *relationSuite) TestAddRelationRejectsUnauthorisedUsers(c *gc.C) {
 	bClient := s.userBakeryClient("bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), "test-group1", "member", "test-group2")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
@@ -155,7 +154,6 @@ func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 }
 
 func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
-	// alice is superuser
 	bClient := s.userBakeryClient("alice")
 	group1 := "testGroup1"
 	group2 := "testGroup2"
