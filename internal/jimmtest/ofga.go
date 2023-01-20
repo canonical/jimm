@@ -152,6 +152,7 @@ func CreateStore(ctx context.Context, name string, id string) error {
 	return nil
 }
 
+// TruncateOpenFgaTuples truncates the tuple and changelog tables used by openFGA.
 func TruncateOpenFgaTuples(ctx context.Context) error {
 	conn, err := pgx.Connect(context.Background(), "postgresql://jimm:jimm@localhost/jimm")
 	if err != nil {
