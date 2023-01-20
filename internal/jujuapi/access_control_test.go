@@ -77,7 +77,7 @@ func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
 	err := db.GetGroup(ctx, group2)
 	c.Assert(err, gc.IsNil)
 
-	tuples := []apiparams.RelationshipTuple{
+	input := []apiparams.RelationshipTuple{
 		//This tuple should remain as it has no relation to group
 		{Object: user.DisplayName, Relation: "member", TargetObject: group2.Name},
 		// Below tuples should all be removed as they relate to group
@@ -86,15 +86,30 @@ func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
 		{Object: group.Name, Relation: "administrator", TargetObject: controller.Name},
 		{Object: group.Name, Relation: "writer", TargetObject: model.Name},
 	}
+	_ = input
 
-	err = client.AddRelation(&apiparams.AddRelationRequest{Tuples: tuples})
+	tuples := []openfga.TupleKey{
+		//This tuple should remain as it has no relation to group
+		ofga.CreateTupleKey("user:"+user.Username, "member", "group:"+strconv.FormatUint(uint64(group2.ID), 10)),
+		// Below tuples should all be removed as they relate to group
+		ofga.CreateTupleKey("user:"+user.Username, "member", "group:"+strconv.FormatUint(uint64(group.ID), 10)),
+		ofga.CreateTupleKey("group:"+strconv.FormatUint(uint64(group2.ID), 10)+"#member", "member", "group:"+strconv.FormatUint(uint64(group.ID), 10)),
+		ofga.CreateTupleKey("group:"+strconv.FormatUint(uint64(group2.ID), 10), "administrator", "controller:"+controller.UUID),
+		ofga.CreateTupleKey("group:"+strconv.FormatUint(uint64(group2.ID), 10), "writer", "model:"+model.UUID.String),
+	}
+
+	want := apiparams.RelationshipTuple{Object: user.DisplayName, Relation: "member", TargetObject: group2.Name}
+
+	err = s.JIMM.OpenFGAClient.AddRelations(context.Background(), tuples...)
 	c.Assert(err, gc.IsNil)
 
 	err = client.RemoveGroup(&apiparams.RemoveGroupRequest{Name: group.Name})
 	c.Assert(err, gc.IsNil)
 
 	resp, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{})
-	c.Assert(resp.Tuples, gc.DeepEquals, tuples[1])
+	c.Assert(err, gc.IsNil)
+	c.Assert(len(resp.Tuples), gc.Equals, 1)
+	c.Assert(resp.Tuples[0], gc.DeepEquals, want)
 
 }
 

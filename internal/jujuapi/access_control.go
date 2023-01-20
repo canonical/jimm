@@ -377,7 +377,7 @@ func (r *controllerRoot) parseTuple(ctx context.Context, tuple apiparams.Relatio
 	// the object and target object, but changing the message and key
 	// to be specific to the erroneous offender.
 	parseTagError := func(msg string, key string, err error) error {
-		zapctx.Debug(ctx, msg, zap.String("key", key), zap.Error(err))
+		zapctx.Debug(ctx, msg, zap.String("key = ", key), zap.Error(err))
 		return errors.E(op, errors.CodeFailedToParseTupleKey, err, msg+key)
 	}
 
@@ -534,5 +534,8 @@ func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apipara
 // removeRelatedTuples removes all tuples that contain object as either the source/target
 // of tuple.
 func (r *controllerRoot) removeRelatedTuples(object string) error {
+	pageSize := 50
+	parseTag(ctx, r.jimm.Database, tuple.TargetObject)
+
 	return nil
 }
