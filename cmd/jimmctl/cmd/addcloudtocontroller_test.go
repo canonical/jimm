@@ -93,7 +93,7 @@ clouds:
 	bClient := s.userBakeryClient("bob@external")
 
 	// Running the command succeeds
-	_, err := cmdtesting.RunCommand(c, cmd.NewAddCloudToControllerCommandForTesting(s.ClientStore, bClient, nil), "controller-1", "test-hosted-cloud", "--cloud="+tmpfile)
+	_, err := cmdtesting.RunCommand(c, cmd.NewAddCloudToControllerCommandForTesting(s.ClientStore(), bClient, nil), "controller-1", "test-hosted-cloud", "--cloud="+tmpfile)
 	c.Assert(err, gc.IsNil)
 
 	// The cloud is there
@@ -118,7 +118,7 @@ func (s *addCloudToControllerSuite) TestAddCloudToControllerExisting(c *gc.C) {
 			HostCloudRegion: "kubernetes/default",
 		}, nil
 	}
-	_, err := cmdtesting.RunCommand(c, cmd.NewAddCloudToControllerCommandForTesting(s.ClientStore, bClient, cloudByNameFunc), "controller-1", "test-hosted-cloud-2")
+	_, err := cmdtesting.RunCommand(c, cmd.NewAddCloudToControllerCommandForTesting(s.ClientStore(), bClient, cloudByNameFunc), "controller-1", "test-hosted-cloud-2")
 	c.Assert(err, gc.IsNil)
 }
 
@@ -127,7 +127,7 @@ func (s *addCloudToControllerSuite) TestAddCloudToControllerExistingNotFound(c *
 		return nil, errors.E("not found")
 	}
 	bClient := s.userBakeryClient("bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewAddCloudToControllerCommandForTesting(s.ClientStore, bClient, cloudByNameFunc), "controller-1", "test-cloud")
+	_, err := cmdtesting.RunCommand(c, cmd.NewAddCloudToControllerCommandForTesting(s.ClientStore(), bClient, cloudByNameFunc), "controller-1", "test-cloud")
 	c.Assert(err, gc.ErrorMatches, "could not find existing cloud, please provide a cloud file")
 }
 
@@ -144,7 +144,7 @@ clouds:
 	defer cleanupFunc()
 
 	bClient := s.userBakeryClient("bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewAddCloudToControllerCommandForTesting(s.ClientStore, bClient, nil), "controller-1", "test-cloud", "--cloud="+tmpfile)
+	_, err := cmdtesting.RunCommand(c, cmd.NewAddCloudToControllerCommandForTesting(s.ClientStore(), bClient, nil), "controller-1", "test-cloud", "--cloud="+tmpfile)
 	c.Assert(err, gc.ErrorMatches, ".* cloud .* not found in file .*")
 }
 

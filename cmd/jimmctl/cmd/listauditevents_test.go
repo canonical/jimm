@@ -27,7 +27,7 @@ func (s *listAuditEventsSuite) TestListAuditEventsSuperuser(c *gc.C) {
 
 	// alice is superuser
 	bClient := s.userBakeryClient("alice")
-	context, err := cmdtesting.RunCommand(c, cmd.NewListAuditEventsCommandForTesting(s.ClientStore, bClient))
+	context, err := cmdtesting.RunCommand(c, cmd.NewListAuditEventsCommandForTesting(s.ClientStore(), bClient))
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(context), gc.Matches, `events:
 - time: .*
@@ -68,6 +68,6 @@ func (s *listAuditEventsSuite) TestListAuditEventsStatus(c *gc.C) {
 
 	// bob is not superuser
 	bClient := s.userBakeryClient("bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewListAuditEventsCommandForTesting(s.ClientStore, bClient))
+	_, err := cmdtesting.RunCommand(c, cmd.NewListAuditEventsCommandForTesting(s.ClientStore(), bClient))
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }

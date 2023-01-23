@@ -6,10 +6,12 @@ import (
 	"strings"
 	"testing"
 
-	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
 	"github.com/google/uuid"
 	openfga "github.com/openfga/go-sdk"
 	gc "gopkg.in/check.v1"
+
+	"github.com/CanonicalLtd/jimm/internal/jimmtest"
+	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
 )
 
 type openFGATestSuite struct {
@@ -20,7 +22,7 @@ type openFGATestSuite struct {
 var _ = gc.Suite(&openFGATestSuite{})
 
 func (s *openFGATestSuite) SetUpTest(c *gc.C) {
-	api, client := ofga.SetupTestOFGAClient(c)
+	api, client, _ := jimmtest.SetupTestOFGAClient(c)
 	s.ofgaApi = api
 	s.ofgaClient = client
 }

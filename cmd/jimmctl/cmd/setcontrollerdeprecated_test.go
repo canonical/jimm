@@ -21,7 +21,7 @@ func (s *setControllerDeprecatedSuite) TestSetControllerDeprecatedSuperuser(c *g
 
 	// alice is superuser
 	bClient := s.userBakeryClient("alice")
-	context, err := cmdtesting.RunCommand(c, cmd.NewSetControllerDeprecatedCommandForTesting(s.ClientStore, bClient), "controller-1")
+	context, err := cmdtesting.RunCommand(c, cmd.NewSetControllerDeprecatedCommandForTesting(s.ClientStore(), bClient), "controller-1")
 	c.Assert(err, gc.IsNil)
 	c.Assert(cmdtesting.Stdout(context), gc.Matches, `name: controller-1
 uuid: deadbeef-1bad-500d-9000-4b1d0d06f00d
@@ -70,6 +70,6 @@ func (s *setControllerDeprecatedSuite) TestSetControllerDeprecated(c *gc.C) {
 
 	// bob is not superuser
 	bClient := s.userBakeryClient("bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewSetControllerDeprecatedCommandForTesting(s.ClientStore, bClient), "controller-1")
+	_, err := cmdtesting.RunCommand(c, cmd.NewSetControllerDeprecatedCommandForTesting(s.ClientStore(), bClient), "controller-1")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }

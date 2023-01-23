@@ -28,7 +28,7 @@ func (s *removeCloudFromControllerSuite) TestRemoveCloudFromController(c *gc.C) 
 	bClient := s.userBakeryClient("alice@external")
 
 	command := cmd.NewRemoveCloudFromControllerCommandForTesting(
-		s.ClientStore,
+		s.ClientStore(),
 		bClient,
 		func() (cmd.RemoveCloudFromControllerAPI, error) {
 			return s.api, nil
@@ -50,7 +50,7 @@ func (s *removeCloudFromControllerSuite) TestRemoveCloudFromControllerWrongArgum
 	bClient := s.userBakeryClient("alice@external")
 
 	command := cmd.NewRemoveCloudFromControllerCommandForTesting(
-		s.ClientStore,
+		s.ClientStore(),
 		bClient,
 		func() (cmd.RemoveCloudFromControllerAPI, error) {
 			return s.api, nil
@@ -65,7 +65,7 @@ func (s *removeCloudFromControllerSuite) TestRemoveCloudFromControllerCloudNotFo
 	bClient := s.userBakeryClient("alice@external")
 
 	command := cmd.NewRemoveCloudFromControllerCommandForTesting(
-		s.ClientStore,
+		s.ClientStore(),
 		bClient,
 		nil)
 	_, err := cmdtesting.RunCommand(c, command, "controller-1", "test-cloud")

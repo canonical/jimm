@@ -44,8 +44,12 @@ func newControllerRoot(j *jimm.JIMM, p Params) *controllerRoot {
 		pingF:                 func() {},
 		controllerUUIDMasking: true,
 	}
+	//TODO: (Kian/Alex): The below is not doing anything, if the client OpenFGAClient is nil then r.ofgaClient will remain as a nil value.
+	//Add an else{} to log a warning? Where would we log to.
 	if j != nil && j.OpenFGAClient != nil {
 		r.ofgaClient = j.OpenFGAClient
+	} else {
+		//panic("OpenFGA not setup")
 	}
 
 	r.AddMethod("Admin", 1, "Login", rpc.Method(unsupportedLogin))
