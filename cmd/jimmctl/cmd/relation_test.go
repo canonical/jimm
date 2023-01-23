@@ -295,3 +295,16 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 		fmt.Sprintf(cmd.AccessMessage, userToCheck, modelToCheck, "reader", cmd.AccessResultAllowed),
 	)
 }
+
+func (s *relationSuite) TestCheckRelation(c *gc.C) {
+	// bob is not superuser
+	bClient := s.userBakeryClient("bob")
+	_, err := cmdtesting.RunCommand(
+		c,
+		cmd.NewCheckRelationCommandForTesting(s.ClientStore(), bClient),
+		"diglett",
+		"reader",
+		"dugtrio",
+	)
+	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+}
