@@ -20,69 +20,88 @@ import (
 
 var (
 	relationDoc = `
-	relation command enables relation management for jimm
+relation command enables relation management for jimm
 `
 	genericConstraintsDoc = `
-	-f		Read from a file where filename is the location of a JSON encoded file of the form:
-		[
-			{
-				"object":"user:user-mike",
-				"relation":"member",
-				"target_object":"group:group-yellow"
-			},
-			{
-				"object":"user:user-alice",
-				"relation":"member",
-				"target_object":"group:group-yellow"
-			}
-		]
+The object and target object must be of the form <tag>-<objectname> or <tag>-<object-uuid>
+E.g. "user-Alice" or "controller-MyController"
 
-		Certain constraints apply when creating/removing a relation, namely:
-		Object may be one of:
+-f		Read from a file where filename is the location of a JSON encoded file of the form:
+	[
+		{
+			"object":"user-mike",
+			"relation":"member",
+			"target_object":"group-yellow"
+		},
+		{
+			"object":"user-alice",
+			"relation":"member",
+			"target_object":"group-yellow"
+		}
+	]
 
-		user tag
-		group tag
-		controller tag
-		model tag
-		application offer tag
+Certain constraints apply when creating/removing a relation, namely:
+Object may be one of:
 
-		If target_object is a group, the relation can only be:
+	user tag				= "user-<name>"
+	group tag				= "group-<name>"
+	controller tag			= "controller-<name>"
+	model tag				= "model-<name>"
+	application offer tag	= "offer-<name>"
 
-		member
+If target_object is a group, the relation can only be:
 
-		If target_object is a controller, the relation can be one of:
+	member
 
-		loginer
-		administrator
+If target_object is a controller, the relation can be one of:
 
-		If target_object is a model, the relation can be one of:
+	loginer
+	administrator
 
-		reader
-		writer
-		administrator
+If target_object is a model, the relation can be one of:
 
-		If target_object is an application offer, the relation can be one of:
+	reader
+	writer
+	administrator
 
-		reader
-		consumer
-		administrator 
-	`
+If target_object is an application offer, the relation can be one of:
+
+	reader
+	consumer
+	administrator 
+
+
+Additionally, if the object is a group, a userset can be applied by adding #member as follows:
+
+	group-TeamA#member administrator controller-MyController
+
+This will grant/revoke the relation to all users within TeamA.
+`
 
 	addRelationDoc = `
-	add command adds relation to jimm.
+add command adds relation to jimm.
 
-	Example:
-		jimmctl auth relation add <object> <relation> <target_object>
-		jimmctl auth relation add -f <filename>
-	` + genericConstraintsDoc
+Example:
+	jimmctl auth relation add <object> <relation> <target_object>
+	jimmctl auth relation add -f <filename>
+` + genericConstraintsDoc +
+		`
+Examples:
+jimmctl auth relation add user-Alice member group-MyGroup
+jimmctl auth relation add group-MyTeam#member loginer controller-MyController
+`
 
 	removeRelationDoc = `
-	remove command removes a relation from jimm.
+remove command removes a relation from jimm.
 
-	Example:
-		jimmctl auth relation remove <object> <relation> <target_object>
-		jimmctl auth relation remove -f <filename>
-	` + genericConstraintsDoc
+Example:
+	jimmctl auth relation remove <object> <relation> <target_object>
+	jimmctl auth relation remove -f <filename>
+	` + genericConstraintsDoc +
+		`
+Examples:
+jimmctl auth relation remove user-Alice member group-MyGroup
+jimmctl auth relation remove group-MyTeam#member loginer controller-MyController`
 )
 
 // NewRelationCommand returns a command for relation management.
