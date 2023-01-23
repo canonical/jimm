@@ -4,6 +4,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 
 	"github.com/juju/cmd/v3"
@@ -16,6 +17,14 @@ import (
 	"github.com/CanonicalLtd/jimm/api"
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
 	"github.com/CanonicalLtd/jimm/internal/errors"
+)
+
+const (
+	// AccessMessage is an informative message sent back to the user denoting the access for a particular resource.
+	// The final format string holds either an AccessResultAllowed or AccessResultDenied.
+	AccessMessage       = "access check for %s on resource %s with role %s is %s"
+	AccessResultAllowed = "allowed"
+	AccessResultDenied  = "not allowed"
 )
 
 var (
@@ -102,6 +111,8 @@ Example:
 Examples:
 jimmctl auth relation remove user-Alice member group-MyGroup
 jimmctl auth relation remove group-MyTeam#member loginer controller-MyController`
+
+	checkRelationDoc = ``
 )
 
 // NewRelationCommand returns a command for relation management.
@@ -113,6 +124,7 @@ func NewRelationCommand() *cmd.SuperCommand {
 	})
 	cmd.Register(newAddRelationCommand())
 	cmd.Register(newRemoveRelationCommand())
+	cmd.Register(newCheckRelationCommand())
 
 	return cmd
 }
@@ -298,6 +310,76 @@ func (c *removeRelationCommand) Run(ctxt *cmd.Context) error {
 		return errors.E(err)
 	}
 
+	return nil
+}
+
+// checkRelationCommand holds the fields required to check a relation.
+type checkRelationCommand struct {
+	modelcmd.ControllerCommandBase
+	out cmd.Output
+
+	store    jujuclient.ClientStore
+	dialOpts *jujuapi.DialOpts
+
+	object       string
+	relation     string
+	targetObject string
+}
+
+// newCheckRelationCommand
+func newCheckRelationCommand() cmd.Command {
+	cmd := &checkRelationCommand{
+		store: jujuclient.NewFileClientStore(),
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
+
+// Info implements the cmd.Command interface.
+func (c *checkRelationCommand) Info() *cmd.Info {
+	return jujucmd.Info(&cmd.Info{
+		Name:    "check",
+		Purpose: "Check access to a resource.",
+		Doc:     checkRelationDoc,
+	})
+}
+
+// Init implements the cmd.Command interface.
+func (c *checkRelationCommand) Init(args []string) error {
+	err := verifyTupleArguments(args)
+	if err != nil {
+		return errors.E(err)
+	}
+	c.object, c.relation, c.targetObject = args[0], args[1], args[2]
+	return nil
+}
+
+// Run implements Command.Run.
+func (c *checkRelationCommand) Run(ctxt *cmd.Context) error {
+	currentController, err := c.store.CurrentController()
+	if err != nil {
+		return errors.E(err, "could not determine controller")
+	}
+
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", c.dialOpts)
+	if err != nil {
+		return err
+	}
+	client := api.NewClient(apiCaller)
+
+	resp, err := client.CheckRelation(&apiparams.CheckRelationRequest{
+		Tuple: apiparams.RelationshipTuple{Object: c.object, Relation: c.relation, TargetObject: c.targetObject},
+	})
+	if err != nil {
+		return err
+	}
+	accessMsg := AccessResultDenied
+	if resp.Allowed {
+		accessMsg = AccessResultAllowed
+	}
+
+	msg := fmt.Sprintf(AccessMessage, c.object, c.targetObject, c.relation, accessMsg)
+	ctxt.Stdout.Write([]byte(msg))
 	return nil
 }
 

@@ -4,13 +4,21 @@ package cmd_test
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
+	petname "github.com/dustinkirkland/golang-petname"
+	"github.com/google/uuid"
 	"github.com/juju/cmd/v3/cmdtesting"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/cmd/jimmctl/cmd"
+	"github.com/CanonicalLtd/jimm/internal/dbmodel"
+	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
 )
 
 type relationSuite struct {
@@ -189,4 +197,101 @@ func (s *relationSuite) TestRemoveRelation(c *gc.C) {
 	bClient := s.userBakeryClient("bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveRelationCommandForTesting(s.ClientStore(), bClient), "test-group1", "member", "test-group2")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+}
+
+func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
+	ctx := context.TODO()
+	bClient := s.userBakeryClient("alice")
+	ofgaClient := s.JIMM.OpenFGAClient
+
+	// Add some resources to check against
+	db := s.JIMM.Database
+	err := db.AddGroup(ctx, "test-group")
+	c.Assert(err, gc.IsNil)
+	group := dbmodel.GroupEntry{Name: "test-group"}
+	err = db.GetGroup(ctx, &group)
+	c.Assert(err, gc.IsNil)
+
+	u := dbmodel.User{
+		Username:         petname.Generate(2, "-") + "@external",
+		ControllerAccess: "superuser",
+	}
+	c.Assert(db.DB.Create(&u).Error, gc.IsNil)
+
+	cloud := dbmodel.Cloud{
+		Name: petname.Generate(2, "-"),
+		Type: "aws",
+		Regions: []dbmodel.CloudRegion{{
+			Name: petname.Generate(2, "-"),
+		}},
+	}
+	c.Assert(db.DB.Create(&cloud).Error, gc.IsNil)
+	id, _ := uuid.NewRandom()
+	controller := dbmodel.Controller{
+		Name:        petname.Generate(2, "-"),
+		UUID:        id.String(),
+		CloudName:   cloud.Name,
+		CloudRegion: cloud.Regions[0].Name,
+		CloudRegions: []dbmodel.CloudRegionControllerPriority{{
+			Priority:      0,
+			CloudRegionID: cloud.Regions[0].ID,
+		}},
+	}
+	err = db.AddController(ctx, &controller)
+	c.Assert(err, gc.IsNil)
+
+	cred := dbmodel.CloudCredential{
+		Name:          petname.Generate(2, "-"),
+		CloudName:     cloud.Name,
+		OwnerUsername: u.Username,
+		AuthType:      "empty",
+	}
+	err = db.SetCloudCredential(ctx, &cred)
+	c.Assert(err, gc.IsNil)
+
+	model := dbmodel.Model{
+		Name: petname.Generate(2, "-"),
+		UUID: sql.NullString{
+			String: id.String(),
+			Valid:  true,
+		},
+		OwnerUsername:     u.Username,
+		ControllerID:      controller.ID,
+		CloudRegionID:     cloud.Regions[0].ID,
+		CloudCredentialID: cred.ID,
+		Life:              "alive",
+		Status: dbmodel.Status{
+			Status: "available",
+			Since: sql.NullTime{
+				Time:  time.Now().UTC().Truncate(time.Millisecond),
+				Valid: true,
+			},
+		},
+	}
+
+	err = db.AddModel(ctx, &model)
+	c.Assert(err, gc.IsNil)
+
+	err = ofgaClient.AddRelations(ctx,
+		ofga.CreateTupleKey("user:"+u.Username, "member", "group:"+strconv.FormatUint(uint64(group.ID), 10)),
+		ofga.CreateTupleKey("group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member", "reader", "model:"+model.UUID.String),
+	)
+	c.Assert(err, gc.IsNil)
+	userToCheck := "user-" + u.Username
+	modelToCheck := "model-" + controller.Name + ":" + u.Username + "/" + model.Name
+	cmdCtx, err := cmdtesting.RunCommand(
+		c,
+		cmd.NewCheckRelationCommandForTesting(s.ClientStore(), bClient),
+		userToCheck,
+		"reader",
+		modelToCheck,
+	)
+
+	c.Assert(err, gc.IsNil)
+
+	c.Assert(
+		strings.TrimRight(cmdtesting.Stdout(cmdCtx), "\n"),
+		gc.Equals,
+		fmt.Sprintf(cmd.AccessMessage, userToCheck, modelToCheck, "reader", cmd.AccessResultAllowed),
+	)
 }
