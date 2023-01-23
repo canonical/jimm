@@ -277,6 +277,8 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 		ofga.CreateTupleKey("group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member", "reader", "model:"+model.UUID.String),
 	)
 	c.Assert(err, gc.IsNil)
+
+	// Test reader is OK
 	userToCheck := "user-" + u.Username
 	modelToCheck := "model-" + controller.Name + ":" + u.Username + "/" + model.Name
 	cmdCtx, err := cmdtesting.RunCommand(
@@ -294,6 +296,23 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 		gc.Equals,
 		fmt.Sprintf(cmd.AccessMessage, userToCheck, modelToCheck, "reader", cmd.AccessResultAllowed),
 	)
+
+	// Test writer is NOT OK
+	cmdCtx, err = cmdtesting.RunCommand(
+		c,
+		cmd.NewCheckRelationCommandForTesting(s.ClientStore(), bClient),
+		userToCheck,
+		"writer",
+		modelToCheck,
+	)
+	c.Assert(err, gc.IsNil)
+
+	c.Assert(
+		strings.TrimRight(cmdtesting.Stdout(cmdCtx), "\n"),
+		gc.Equals,
+		fmt.Sprintf(cmd.AccessMessage, userToCheck, modelToCheck, "writer", cmd.AccessResultDenied),
+	)
+
 }
 
 func (s *relationSuite) TestCheckRelation(c *gc.C) {
