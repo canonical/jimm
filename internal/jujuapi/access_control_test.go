@@ -78,9 +78,9 @@ func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	tuples := []openfga.TupleKey{
-		//This tuple should remain as it has no relation to group
+		//This tuple should remain as it has no relation to group2
 		ofga.CreateTupleKey("user:"+user.Username, "member", "group:"+strconv.FormatUint(uint64(group.ID), 10)),
-		// Below tuples should all be removed as they relate to group
+		// Below tuples should all be removed as they relate to group2
 		ofga.CreateTupleKey("user:"+user.Username, "member", "group:"+strconv.FormatUint(uint64(group2.ID), 10)),
 		ofga.CreateTupleKey("group:"+strconv.FormatUint(uint64(group2.ID), 10)+"#member", "member", "group:"+strconv.FormatUint(uint64(group.ID), 10)),
 		ofga.CreateTupleKey("group:"+strconv.FormatUint(uint64(group2.ID), 10)+"#member", "administrator", "controller:"+controller.UUID),
