@@ -51,6 +51,9 @@ var (
 	// So if a group, user, UUID, controller name comes in, it will always be index 3 for them
 	// and if a relation specifier is present, it will always be index 10
 	jujuURIMatcher = regexp.MustCompile(`([a-zA-Z0-9]*)(\-|\z)([a-zA-Z0-9-@]*)(\:|)([a-zA-Z0-9-@]*)(\/|)([a-zA-Z0-9-]*)(\.|)([a-zA-Z0-9-]*)([a-zA-Z#]*|\z)\z`)
+
+	// ResourceTypes contains a list of all resource kinds (i.e. tags) used throughout JIMM.
+	ResourceTypes = [...]string{names.UserTagKind, names.ModelTagKind, names.ControllerTagKind, names.ApplicationOfferTagKind, jimmnames.GroupTagKind}
 )
 
 // AddGroup creates a group within JIMMs DB for reference by OpenFGA.
@@ -546,39 +549,43 @@ func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apipara
 	}, nil
 }
 
-// removeRelatedTuples takes a string and resolves it to a resource, implying that the string
-// must be a valid resource string e.g. "controller-name", "group-name". We then remove all
-// tuples that contain said resource as either the source/target (or in OpenFGA terms user/object) of a tuple.
-func (r *controllerRoot) removeRelatedTuples(ctx context.Context, value string) error {
+// removeRelatedTuples takes a string and resolves it to a resource, implying that tag
+// must be a valid resource string e.g. "controller-name", "group-name". We then remove all tuples
+// that contain said resource as either the source/target (or in OpenFGA terms user/object), where appropriate.
+// Note that only groups/users can be on the left hand side of a tuple.
+func (r *controllerRoot) removeRelatedTuples(ctx context.Context, tag string) error {
 	const op = errors.Op("jujuapi.removeRelatedTuples")
-	tuple := apiparams.RelationshipTuple{TargetObject: value}
-	tupleKey, err := r.parseTuple(ctx, tuple)
+
+	resource, resourceRelationSpecifier, err := parseTag(ctx, r.jimm.Database, tag)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	if resourceRelationSpecifier != "" {
+		return errors.E(op, "A relation specifier should not be provider e.g. #member")
+	}
+	objectSearch := ofga.CreateTupleKey("", "", resource.Kind()+":"+resource.Id())
+
+	// Remove results based on object side search.
+	err = r.ofgaClient.RemoveTuples(ctx, objectSearch)
 	if err != nil {
 		return errors.E(op, err)
 	}
 
-	//Remove Object side
-	pageSize := 50
-	//Wrap the below in a loop / make generic function to get all from paginated calls.
-	resp, err := r.ofgaClient.ReadRelatedObjects(ctx, tupleKey, int32(pageSize), "")
-	if err != nil {
-		return errors.E(op, err)
-	}
-	err = r.ofgaClient.RemoveRelation(ctx, resp.Keys...)
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	//Remove user side
-	//Wrap the below in a loop / make generic function to get all from paginated calls.
-	newKey := ofga.CreateTupleKey(*tupleKey.Object, "", "")
-	resp, err = r.ofgaClient.ReadRelatedObjects(ctx, &newKey, int32(pageSize), "")
-	if err != nil {
-		return errors.E(op, err)
-	}
-	err = r.ofgaClient.RemoveRelation(ctx, resp.Keys...)
-	if err != nil {
-		return errors.E(op, err)
+	// Remove results based on user side search.
+	if resource.Kind() == jimmnames.GroupTagKind || resource.Kind() == names.UserTagKind {
+		user := *objectSearch.Object
+		if resource.Kind() == jimmnames.GroupTagKind {
+			user = *objectSearch.Object + "#member"
+		}
+		// We need to loop through all resource types because the OpenFGA Read API does not provide
+		// means for only specifying a user resource, it must be paired with an object type.
+		for _, kind := range ResourceTypes {
+			newKey := ofga.CreateTupleKey(user, "", kind+":")
+			err = r.ofgaClient.RemoveTuples(ctx, newKey)
+			if err != nil {
+				return errors.E(op, err)
+			}
+		}
 	}
 
 	return nil
