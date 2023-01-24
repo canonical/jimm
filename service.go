@@ -247,7 +247,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	if openFGAclient != nil {
 		s.jimm.OpenFGAClient = openFGAclient
 	}
-	// ensureJIMMAuthorisationModel(openFGAclient)
 
 	s.jimm.Dialer = &jujuclient.Dialer{
 		ControllerCredentialsStore: vs,
@@ -280,12 +279,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	}
 
 	return s, nil
-}
-
-// ensureJIMMAuthorisationModel ensures that the authorisation model, as defined by JIMM,
-// exists at startup. If it doesn't, it will attempt to create it.
-func ensureJIMMAuthorisationModel(c *openfga.APIClient) {
-
 }
 
 func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {
