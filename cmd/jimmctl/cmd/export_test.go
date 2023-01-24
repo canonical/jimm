@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	AccessMessage       = accessMessage
+	AccessMessage       = accessMessageFormat
 	AccessResultAllowed = accessResultAllowed
 	AccessResultDenied  = accessResultDenied
 )

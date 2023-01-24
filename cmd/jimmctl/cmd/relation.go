@@ -23,9 +23,9 @@ import (
 )
 
 const (
-	// AccessMessage is an informative message sent back to the user denoting the access for a particular resource.
+	// accessMessageFormat is an informative message sent back to the user denoting the access for a particular resource.
 	// The final format string holds either an AccessResultAllowed or AccessResultDenied.
-	accessMessage       = "access check for %s on resource %s with role %s is %s"
+	accessMessageFormat = "access check for %s on resource %s with role %s is %s"
 	accessResultAllowed = "allowed"
 	accessResultDenied  = "not allowed"
 	defaultPageSize     = 50
@@ -364,7 +364,7 @@ func (ar *accessResult) setMessage() *accessResult {
 	if ar.Allowed {
 		accessMsg = accessResultAllowed
 	}
-	ar.Msg = fmt.Sprintf(accessMessage, t.Object, t.TargetObject, t.Relation, accessMsg)
+	ar.Msg = fmt.Sprintf(accessMessageFormat, t.Object, t.TargetObject, t.Relation, accessMsg)
 	return ar
 }
 
@@ -422,7 +422,7 @@ func formatCheckRelationString(writer io.Writer, value interface{}) error {
 		accessMsg = accessResultAllowed
 	}
 
-	msg := fmt.Sprintf(accessMessage, t.Object, t.TargetObject, t.Relation, accessMsg)
+	msg := fmt.Sprintf(accessMessageFormat, t.Object, t.TargetObject, t.Relation, accessMsg)
 	writer.Write([]byte(msg))
 	return nil
 }
