@@ -368,6 +368,7 @@ user-eve@external   	administrator	applicationoffer-test-controller-1:alice@exte
 `)
 }
 
+// TODO: remove boilerplate of env setup and use initialiseEnvironment
 func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	ctx := context.TODO()
 	bClient := s.userBakeryClient("alice")
