@@ -3,7 +3,6 @@ package jujuapi_test
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -99,7 +98,6 @@ func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
 	resp, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{})
 	c.Assert(err, gc.IsNil)
 	c.Assert(len(resp.Tuples), gc.Equals, 1)
-	c.Log(fmt.Sprintf("Res: %+v\n", resp.Tuples))
 	c.Assert(resp.Tuples[0], gc.DeepEquals, want)
 
 }
@@ -1260,8 +1258,8 @@ func (s *accessControlSuite) TestRemoveRelatedTuples(c *gc.C) {
 	}
 
 	check("controller-"+controller.Name, 5)
-	check("model-"+model.Name, 4)
-	check("applicationoffer-"+offer.URL, 3)
+	check("model-"+controller.Name+":"+user.Username+"/"+model.Name, 4)
+	check("applicationoffer-"+controller.Name+":"+user.Username+"/"+model.Name+"."+offer.Name, 3)
 	check("group-"+group.Name, 1)
 	check("user-"+user.Username, 0)
 }
