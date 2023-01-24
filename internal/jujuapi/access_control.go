@@ -248,7 +248,8 @@ func resolveTupleObject(db db.Database, tag string) (string, string, error) {
 		} else if controllerName != "" && userName != "" && modelName != "" && offerName != "" {
 			offerURL, err := crossmodel.ParseOfferURL(fmt.Sprintf("%s:%s/%s.%s", controllerName, userName, modelName, offerName))
 			if err != nil {
-				return tag, relationSpecifier, errors.E("failed to parse offer url")
+				zapctx.Debug(ctx, "failed to parse application offer url", zap.String("url", fmt.Sprintf("%s:%s/%s.%s", controllerName, userName, modelName, offerName)), zaputil.Error(err))
+				return tag, relationSpecifier, errors.E("failed to parse offer url", err)
 			}
 			offer.URL = offerURL.String()
 		}
@@ -260,7 +261,7 @@ func resolveTupleObject(db db.Database, tag string) (string, string, error) {
 
 		return jimmnames.NewApplicationOfferTag(offer.UUID).String(), relationSpecifier, nil
 	}
-	return tag, relationSpecifier, errors.E("failed to map tag")
+	return "", "", errors.E("failed to map tag " + matches[1])
 }
 
 // jujuTagFromTuple attempts to parse the provided objectId
@@ -289,7 +290,7 @@ func jujuTagFromTuple(objectType string, objectId string) (names.Tag, error) {
 func parseTag(ctx context.Context, db db.Database, key string) (names.Tag, string, error) {
 	op := errors.Op("jujuapi.parseTag")
 	tupleKeySplit := strings.SplitN(key, "-", 2)
-	if len(tupleKeySplit) != 2 {
+	if len(tupleKeySplit) < 2 {
 		return nil, "", errors.E(op, errors.CodeFailedToParseTupleKey, "tag does not have tuple key delimiter")
 	}
 	kind := tupleKeySplit[0]
@@ -301,6 +302,10 @@ func parseTag(ctx context.Context, db db.Database, key string) (names.Tag, strin
 	}
 	zapctx.Debug(ctx, "resolved JIMM tag", zap.String("tag", tagString), zap.String("relation-specifier", relationSpecifier))
 	tag, err := jujuTagFromTuple(kind, tagString)
+	if err != nil {
+		zapctx.Debug(ctx, "failed to create a juju tag", zaputil.Error(err))
+		return nil, "", errors.E(op, err)
+	}
 	return tag, relationSpecifier, err
 }
 
@@ -310,6 +315,9 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 	const op = errors.Op("jujuapi.AddRelation")
 	if r.user.ControllerAccess != "superuser" {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+	if r.ofgaClient == nil {
+		return errors.E(op, "jimm not connected to openfga", errors.CodeNotSupported)
 	}
 	keys, err := r.parseTuples(ctx, req.Tuples)
 	if err != nil {
@@ -329,6 +337,9 @@ func (r *controllerRoot) RemoveRelation(ctx context.Context, req apiparams.Remov
 	const op = errors.Op("jujuapi.RemoveRelation")
 	if r.user.ControllerAccess != "superuser" {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+	if r.ofgaClient == nil {
+		return errors.E(op, "jimm not connected to openfga", errors.CodeNotSupported)
 	}
 	keys, err := r.parseTuples(ctx, req.Tuples)
 	if err != nil {
@@ -351,14 +362,16 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 	if r.user.ControllerAccess != "superuser" {
 		return checkResp, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
-	c := r.ofgaClient
+	if r.ofgaClient == nil {
+		return checkResp, errors.E(op, "jimm not connected to openfga", errors.CodeNotSupported)
+	}
 
 	parsedTuple, err := r.parseTuple(ctx, req.Tuple)
 	if err != nil {
 		return checkResp, errors.E(op, errors.CodeFailedToParseTupleKey, err)
 	}
 
-	allowed, resolution, err := c.CheckRelation(ctx, *parsedTuple, false)
+	allowed, resolution, err := r.ofgaClient.CheckRelation(ctx, *parsedTuple, false)
 	if err != nil {
 		zapctx.Error(ctx, "failed to check relation", zap.NamedError("check-relation-error", err))
 		return checkResp, errors.E(op, errors.CodeOpenFGARequestFailed, err)
@@ -377,7 +390,7 @@ func (r *controllerRoot) parseTuples(ctx context.Context, tuples []apiparams.Rel
 	for _, tuple := range tuples {
 		key, err := r.parseTuple(ctx, tuple)
 		if err != nil {
-			errors.E(err)
+			return nil, errors.E(err)
 		}
 		keys = append(keys, *key)
 	}
@@ -396,7 +409,7 @@ func (r *controllerRoot) parseTuple(ctx context.Context, tuple apiparams.Relatio
 	// to be specific to the erroneous offender.
 	parseTagError := func(msg string, key string, err error) error {
 		zapctx.Debug(ctx, msg, zap.String("key = ", key), zap.Error(err))
-		return errors.E(op, errors.CodeFailedToParseTupleKey, err, msg+key)
+		return errors.E(op, errors.CodeFailedToParseTupleKey, err, msg+" "+key)
 	}
 
 	if tuple.TargetObject == "" {
@@ -510,6 +523,9 @@ func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apipara
 
 	if r.user.ControllerAccess != "superuser" {
 		return returnValue, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+	if r.ofgaClient == nil {
+		return returnValue, errors.E(op, "jimm not connected to openfga", errors.CodeNotSupported)
 	}
 
 	var key *openfga.TupleKey

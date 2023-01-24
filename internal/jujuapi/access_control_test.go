@@ -1060,7 +1060,7 @@ func (s *accessControlSuite) TestResolveTupleObjectHandlesErrors(c *gc.C) {
 		// Resolves bad tuple objects in general
 		{
 			input: "unknowntag-blabla",
-			want:  "failed to map tag",
+			want:  "failed to map tag unknowntag",
 		},
 		// Resolves bad groups where they do not exist
 		{
