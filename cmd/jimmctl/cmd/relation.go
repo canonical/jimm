@@ -15,7 +15,6 @@ import (
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
-	"gopkg.in/yaml.v3"
 
 	"github.com/CanonicalLtd/jimm/api"
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
@@ -391,8 +390,8 @@ func (c *checkRelationCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
 	c.out.AddFlags(f, "smart", map[string]cmd.Formatter{
 		"smart": formatCheckRelationString,
-		"json":  formatCheckRelationJSON,
-		"yaml":  formatCheckRelationYAML,
+		"json":  cmd.FormatJson,
+		"yaml":  cmd.FormatYaml,
 	})
 }
 
@@ -415,43 +414,7 @@ func formatCheckRelationString(writer io.Writer, value interface{}) error {
 	if !ok {
 		return errors.E("failed to parse access result")
 	}
-	t := accessResult.Tuple
-
-	accessMsg := accessResultDenied
-	if accessResult.Allowed {
-		accessMsg = accessResultAllowed
-	}
-
-	msg := fmt.Sprintf(accessMessageFormat, t.Object, t.TargetObject, t.Relation, accessMsg)
-	writer.Write([]byte(msg))
-	return nil
-}
-
-func formatCheckRelationJSON(writer io.Writer, value interface{}) error {
-	accessResult, ok := value.(accessResult)
-	if !ok {
-		return errors.E("failed to parse access result")
-	}
-
-	b, err := json.Marshal((&accessResult).setMessage())
-	if err != nil {
-		errors.E("failed to produce json", err)
-	}
-	writer.Write(b)
-	return nil
-}
-
-func formatCheckRelationYAML(writer io.Writer, value interface{}) error {
-	accessResult, ok := value.(accessResult)
-	if !ok {
-		return errors.E("failed to parse access result")
-	}
-
-	b, err := yaml.Marshal((&accessResult).setMessage())
-	if err != nil {
-		errors.E("failed to produce json", err)
-	}
-	writer.Write(b)
+	writer.Write([]byte((&accessResult).setMessage().Msg))
 	return nil
 }
 
@@ -474,10 +437,10 @@ func (c *checkRelationCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return err
 	}
-	c.out.Write(ctxt, accessResult{
+	c.out.Write(ctxt, *(&accessResult{
 		Tuple:   c.tuple,
 		Allowed: resp.Allowed,
-	})
+	}).setMessage())
 	return nil
 }
 

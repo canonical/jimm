@@ -17,6 +17,7 @@ import (
 	"github.com/juju/cmd/v3/cmdtesting"
 	jujuparams "github.com/juju/juju/rpc/params"
 	gc "gopkg.in/check.v1"
+	yamlv2 "gopkg.in/yaml.v2"
 	"gopkg.in/yaml.v3"
 
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
@@ -503,7 +504,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	c.Assert(
-		cmdtesting.Stdout(cmdCtx),
+		strings.TrimRight(cmdtesting.Stdout(cmdCtx), "\n"),
 		gc.Equals,
 		string(b),
 	)
@@ -520,11 +521,13 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	)
 	c.Assert(err, gc.IsNil)
 
+	// Create identical test output as we expect the CLI to return
+	// via marshalling and umarshalling.
 	res = cmdtesting.Stdout(cmdCtx)
 	ar = cmd.AccessResult{}
-	err = yaml.Unmarshal([]byte(res), &ar)
+	err = yamlv2.Unmarshal([]byte(res), &ar)
 	c.Assert(err, gc.IsNil)
-	b, err = yaml.Marshal(ar)
+	b, err = yamlv2.Marshal(ar)
 	c.Assert(err, gc.IsNil)
 
 	c.Assert(
