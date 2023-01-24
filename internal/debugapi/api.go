@@ -2,15 +2,12 @@ package debugapi
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
-	"github.com/juju/zaputil/zapctx"
-	"go.uber.org/zap"
 
 	"github.com/CanonicalLtd/jimm/version"
 )
@@ -73,66 +70,6 @@ func (dh *DebugHandler) Status(w http.ResponseWriter, r *http.Request) {
 	}
 	wg.Wait()
 	render.JSON(w, r, results)
-}
-
-// Handler returns an http.Handler to handle requests for /debug endpoints.
-func Handler(ctx context.Context, statusChecks map[string]StatusCheck) http.Handler {
-	mux := http.NewServeMux()
-
-	// data for /debug/info
-	buf, err := json.Marshal(version.VersionInfo)
-	if err == nil {
-		mux.HandleFunc("/debug/info", func(w http.ResponseWriter, _ *http.Request) {
-			w.Write(buf)
-		})
-	} else {
-		// This should be impossible.
-		zapctx.Error(ctx, "cannot marshal version", zap.Error(err))
-	}
-
-	// /debug/status
-	mux.HandleFunc("/debug/status", statusHandler(statusChecks))
-
-	return mux
-}
-
-// statusHandler returns a http.HandlerFunc the performs the given status
-// checks.
-func statusHandler(checks map[string]StatusCheck) http.HandlerFunc {
-	return func(w http.ResponseWriter, req *http.Request) {
-		var mu sync.Mutex
-		results := make(map[string]statusResult, len(checks))
-		var wg sync.WaitGroup
-		wg.Add(len(checks))
-		for k, check := range checks {
-			k, check := k, check
-			go func() {
-				defer wg.Done()
-				result := statusResult{
-					Name: check.Name(),
-				}
-				start := time.Now()
-				v, err := check.Check(req.Context())
-				result.Duration = time.Since(start)
-				if err == nil {
-					result.Passed = true
-					result.Value = v
-				} else {
-					result.Value = err.Error()
-				}
-				mu.Lock()
-				defer mu.Unlock()
-				results[k] = result
-			}()
-		}
-		wg.Wait()
-		buf, err := json.Marshal(results)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Write(buf)
-	}
 }
 
 // A statusResult is the type that represents the result of a status check

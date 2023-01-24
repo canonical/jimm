@@ -270,6 +270,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		IdentityLocation: p.CandidURL,
 		PublicDNSName:    p.PublicDNSName,
 	}
+
 	s.mux.Handle("/api", jujuapi.APIHandler(ctx, &s.jimm, params))
 	s.mux.Handle("/model/", jujuapi.ModelHandler(ctx, &s.jimm, params))
 	// If the request is not for a known path assume it is part of the dashboard.
