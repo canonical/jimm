@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/canonical/candid/candidclient"
+	"github.com/go-chi/chi/v5"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/dbrootkeystore"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
@@ -153,7 +154,7 @@ type Params struct {
 type Service struct {
 	jimm jimm.JIMM
 
-	mux http.ServeMux
+	mux *chi.Mux
 }
 
 // ServeHTTP implements http.Handler.
@@ -201,6 +202,9 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	const op = errors.Op("NewService")
 
 	s := new(Service)
+	s.mux = chi.NewRouter()
+	mux := s.mux
+
 	if p.ControllerUUID == "" {
 		controllerUUID, err := uuid.NewRandom()
 		if err != nil {
@@ -252,9 +256,15 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
 	}
 
-	s.mux.Handle("/debug/", debugapi.Handler(ctx, map[string]debugapi.StatusCheck{
-		"start_started": debugapi.ServerStartTime,
-	}))
+	mux.Mount(
+		"/debug",
+		(&debugapi.DebugHandler{
+			Router: chi.NewRouter(),
+			StatusChecks: map[string]debugapi.StatusCheck{
+				"start_time": debugapi.ServerStartTime,
+			},
+		}).Routes(),
+	)
 
 	params := jujuapi.Params{
 		ControllerUUID:   p.ControllerUUID,
