@@ -553,6 +553,7 @@ func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apipara
 // must be a valid resource string e.g. "controller-name", "group-name". We then remove all tuples
 // that contain said resource as either the source/target (or in OpenFGA terms user/object), where appropriate.
 // Note that only groups/users can be on the left hand side of a tuple.
+// Note that this call is slow because it makes repeated calls to the OpenFGA server.
 func (r *controllerRoot) removeRelatedTuples(ctx context.Context, tag string) error {
 	const op = errors.Op("jujuapi.removeRelatedTuples")
 

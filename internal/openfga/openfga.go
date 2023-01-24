@@ -2,7 +2,6 @@ package openfga
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/juju/zaputil/zapctx"
 	openfga "github.com/openfga/go-sdk"
