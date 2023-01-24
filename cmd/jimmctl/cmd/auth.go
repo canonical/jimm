@@ -17,6 +17,7 @@ func NewAuthCommand() *jujucmd.SuperCommand {
 		Purpose: "Authorisation model management.",
 	})
 	cmd.Register(NewGroupCommand())
+	cmd.Register(NewRelationCommand())
 
 	return cmd
 }
