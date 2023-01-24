@@ -253,3 +253,15 @@ func NewRemoveRelationCommandForTesting(store jujuclient.ClientStore, bClient *h
 
 	return modelcmd.WrapBase(cmd)
 }
+
+func NewListRelationsCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+	cmd := &listRelationsCommand{
+		store: store,
+		dialOpts: &jujuapi.DialOpts{
+			InsecureSkipVerify: true,
+			BakeryClient:       bClient,
+		},
+	}
+
+	return modelcmd.WrapBase(cmd)
+}

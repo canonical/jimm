@@ -276,12 +276,12 @@ type ListGroupResponse struct {
 // RelationshipTuple represents a OpenFGA Tuple.
 type RelationshipTuple struct {
 	// Object represents an OFGA object that we wish to apply a relational tuple to.
-	Object string `json:"object"`
+	Object string `json:"object" yaml:"object"`
 	// Relation is exactly that, the kind of relation this request modifies.
-	Relation string `json:"relation"`
+	Relation string `json:"relation" yaml:"relation"`
 	// TargetObject is the kind of object we wish to create/remove a tuple for/with
 	// the provided relation.
-	TargetObject string `json:"target_object"`
+	TargetObject string `json:"target_object" yaml:"target_object"`
 }
 
 // AddRelationRequest holds the tuples to be added to OpenFGA in an AddRelation request.

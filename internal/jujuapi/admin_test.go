@@ -4,8 +4,8 @@ package jujuapi_test
 
 import (
 	"github.com/juju/juju/api"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/network"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"

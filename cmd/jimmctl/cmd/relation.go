@@ -4,8 +4,11 @@ package cmd
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"os"
 
+	"github.com/gosuri/uitable"
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
 	jujuapi "github.com/juju/juju/api"
@@ -17,6 +20,8 @@ import (
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 )
+
+const defaultPageSize = 50
 
 var (
 	relationDoc = `
@@ -101,7 +106,23 @@ Example:
 		`
 Examples:
 jimmctl auth relation remove user-Alice member group-MyGroup
-jimmctl auth relation remove group-MyTeam#member loginer controller-MyController`
+jimmctl auth relation remove group-MyTeam#member loginer controller-MyController
+`
+
+	listRelationsDoc = `
+list relations known to jimm. Using the "target", "relation"
+and "object" flags, only those relations matching the filter
+will be returned.
+Example
+	 jimmctl auth relation list
+		returns the list of all relations
+	 jimmctl auth relation list --target <target_object>
+		returns the list of relations, where target object
+		matches the specified one
+	 jimmctl auth relation list --target <target_object>  --relation <relation
+		returns the list of relations, where target object
+		and relation match the specified ones
+	`
 )
 
 // NewRelationCommand returns a command for relation management.
@@ -113,6 +134,7 @@ func NewRelationCommand() *cmd.SuperCommand {
 	})
 	cmd.Register(newAddRelationCommand())
 	cmd.Register(newRemoveRelationCommand())
+	cmd.Register(newListRelationsCommand())
 
 	return cmd
 }
@@ -167,9 +189,8 @@ func (c *addRelationCommand) Init(args []string) error {
 func (c *addRelationCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
 	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
-		"yaml":    cmd.FormatYaml,
-		"json":    cmd.FormatJson,
-		"tabular": formatTabular,
+		"yaml": cmd.FormatYaml,
+		"json": cmd.FormatJson,
 	})
 	f.StringVar(&c.filename, "f", "", "file location of JSON encoded tuples")
 }
@@ -259,9 +280,8 @@ func (c *removeRelationCommand) Init(args []string) error {
 func (c *removeRelationCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
 	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
-		"yaml":    cmd.FormatYaml,
-		"json":    cmd.FormatJson,
-		"tabular": formatTabular,
+		"yaml": cmd.FormatYaml,
+		"json": cmd.FormatJson,
 	})
 	f.StringVar(&c.filename, "f", "", "file location of JSON encoded tuples")
 }
@@ -330,5 +350,118 @@ func verifyTupleArguments(args []string) error {
 		return errors.E("target object not specified")
 	case 3:
 	}
+	return nil
+}
+
+// newListRelationsCommand returns a command to list relations.
+func newListRelationsCommand() cmd.Command {
+	cmd := &listRelationsCommand{
+		store: jujuclient.NewFileClientStore(),
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
+
+// listRelationsCommand adds a relation.
+type listRelationsCommand struct {
+	modelcmd.ControllerCommandBase
+	out cmd.Output
+
+	store    jujuclient.ClientStore
+	dialOpts *jujuapi.DialOpts
+
+	tuple apiparams.RelationshipTuple
+}
+
+// Info implements the cmd.Command interface.
+func (c *listRelationsCommand) Info() *cmd.Info {
+	return jujucmd.Info(&cmd.Info{
+		Name:    "list",
+		Purpose: "List relations.",
+		Doc:     listRelationsDoc,
+	})
+}
+
+// Init implements the cmd.Command interface.
+func (c *listRelationsCommand) Init(args []string) error {
+	if len(args) > 0 {
+		return errors.E("too many args")
+	}
+	return nil
+}
+
+// SetFlags implements Command.SetFlags.
+func (c *listRelationsCommand) SetFlags(f *gnuflag.FlagSet) {
+	c.CommandBase.SetFlags(f)
+	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
+		"yaml":    cmd.FormatYaml,
+		"json":    cmd.FormatJson,
+		"tabular": formatRelationsTabular,
+	})
+	f.StringVar(&c.tuple.Object, "object", "", "relation object")
+	f.StringVar(&c.tuple.Relation, "relation", "", "relation name")
+	f.StringVar(&c.tuple.TargetObject, "target", "", "relation target object")
+}
+
+// Run implements Command.Run.
+func (c *listRelationsCommand) Run(ctxt *cmd.Context) error {
+	currentController, err := c.store.CurrentController()
+	if err != nil {
+		return errors.E(err, "could not determine controller")
+	}
+
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", c.dialOpts)
+	if err != nil {
+		return err
+	}
+
+	client := api.NewClient(apiCaller)
+	params := apiparams.ListRelationshipTuplesRequest{
+		Tuple:    c.tuple,
+		PageSize: defaultPageSize,
+	}
+	result, err := fetchRelations(client, params, "")
+	if err != nil {
+		return errors.E(err)
+	}
+
+	err = c.out.Write(ctxt, result.Tuples)
+	if err != nil {
+		return errors.E(err)
+	}
+
+	return nil
+}
+
+func fetchRelations(client *api.Client, params apiparams.ListRelationshipTuplesRequest, continuationToken string) (*apiparams.ListRelationshipTuplesResponse, error) {
+	response, err := client.ListRelationshipTuples(&params)
+	if err != nil {
+		return nil, errors.E(err)
+	}
+	if response.ContinuationToken != "" {
+		response1, err := fetchRelations(client, params, response.ContinuationToken)
+		if err != nil {
+			return nil, errors.E(err)
+		}
+		response.Tuples = append(response.Tuples, response1.Tuples...)
+	}
+	return response, nil
+}
+
+func formatRelationsTabular(writer io.Writer, value interface{}) error {
+	tuples, ok := value.([]apiparams.RelationshipTuple)
+	if !ok {
+		return errors.E(fmt.Sprintf("expected value of type %T, got %T", tuples, value))
+	}
+
+	table := uitable.New()
+	table.MaxColWidth = 80
+	table.Wrap = true
+
+	table.AddRow("Object", "Relation", "Target Object")
+	for _, tuple := range tuples {
+		table.AddRow(tuple.Object, tuple.Relation, tuple.TargetObject)
+	}
+	fmt.Fprint(writer, table)
 	return nil
 }
