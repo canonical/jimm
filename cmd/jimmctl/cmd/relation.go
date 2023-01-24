@@ -5,6 +5,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/juju/cmd/v3"
@@ -13,6 +14,7 @@ import (
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
+	"gopkg.in/yaml.v3"
 
 	"github.com/CanonicalLtd/jimm/api"
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
@@ -22,9 +24,9 @@ import (
 const (
 	// AccessMessage is an informative message sent back to the user denoting the access for a particular resource.
 	// The final format string holds either an AccessResultAllowed or AccessResultDenied.
-	AccessMessage       = "access check for %s on resource %s with role %s is %s"
-	AccessResultAllowed = "allowed"
-	AccessResultDenied  = "not allowed"
+	accessMessage       = "access check for %s on resource %s with role %s is %s"
+	accessResultAllowed = "allowed"
+	accessResultDenied  = "not allowed"
 )
 
 var (
@@ -77,7 +79,7 @@ If target_object is an application offer, the relation can be one of:
 
 	reader
 	consumer
-	administrator 
+	administrator
 
 
 Additionally, if the object is a group, a userset can be applied by adding #member as follows:
@@ -112,7 +114,16 @@ Examples:
 jimmctl auth relation remove user-Alice member group-MyGroup
 jimmctl auth relation remove group-MyTeam#member loginer controller-MyController`
 
-	checkRelationDoc = ``
+	checkRelationDoc = `
+Verifies the access between resources.
+
+Example:
+jimmctl auth relation check user-alice@external administrator controller-aws-controller-1
+
+Example:
+	jimmctl auth relation add <object> <relation> <target_object>
+	jimmctl auth relation add -f <filename>
+	`
 )
 
 // NewRelationCommand returns a command for relation management.
@@ -316,14 +327,29 @@ func (c *removeRelationCommand) Run(ctxt *cmd.Context) error {
 // checkRelationCommand holds the fields required to check a relation.
 type checkRelationCommand struct {
 	modelcmd.ControllerCommandBase
-	out cmd.Output
-
+	out      cmd.Output
 	store    jujuclient.ClientStore
 	dialOpts *jujuapi.DialOpts
 
-	object       string
-	relation     string
-	targetObject string
+	tuple apiparams.RelationshipTuple
+}
+
+// accessResult holds the accessCheck result to be passed to a formatter
+type accessResult struct {
+	Msg     string                      `yaml:"result" json:"result"`
+	Tuple   apiparams.RelationshipTuple `yaml:"tuple" json:"tuple"`
+	Allowed bool                        `yaml:"allowed" json:"allowed"`
+}
+
+func (ar *accessResult) setMessage() *accessResult {
+	t := ar.Tuple
+
+	accessMsg := accessResultDenied
+	if ar.Allowed {
+		accessMsg = accessResultAllowed
+	}
+	ar.Msg = fmt.Sprintf(accessMessage, t.Object, t.TargetObject, t.Relation, accessMsg)
+	return ar
 }
 
 // newCheckRelationCommand
@@ -344,13 +370,72 @@ func (c *checkRelationCommand) Info() *cmd.Info {
 	})
 }
 
+// SetFlags implements Command.SetFlags.
+func (c *checkRelationCommand) SetFlags(f *gnuflag.FlagSet) {
+	c.CommandBase.SetFlags(f)
+	c.out.AddFlags(f, "smart", map[string]cmd.Formatter{
+		"smart": formatCheckRelationString,
+		"json":  formatCheckRelationJSON,
+		"yaml":  formatCheckRelationYAML,
+	})
+}
+
 // Init implements the cmd.Command interface.
 func (c *checkRelationCommand) Init(args []string) error {
 	err := verifyTupleArguments(args)
 	if err != nil {
 		return errors.E(err)
 	}
-	c.object, c.relation, c.targetObject = args[0], args[1], args[2]
+	c.tuple = apiparams.RelationshipTuple{
+		Object:       args[0],
+		Relation:     args[1],
+		TargetObject: args[2],
+	}
+	return nil
+}
+
+func formatCheckRelationString(writer io.Writer, value interface{}) error {
+	accessResult, ok := value.(accessResult)
+	if !ok {
+		return errors.E("failed to parse access result")
+	}
+	t := accessResult.Tuple
+
+	accessMsg := accessResultDenied
+	if accessResult.Allowed {
+		accessMsg = accessResultAllowed
+	}
+
+	msg := fmt.Sprintf(accessMessage, t.Object, t.TargetObject, t.Relation, accessMsg)
+	writer.Write([]byte(msg))
+	return nil
+}
+
+func formatCheckRelationJSON(writer io.Writer, value interface{}) error {
+	accessResult, ok := value.(accessResult)
+	if !ok {
+		return errors.E("failed to parse access result")
+	}
+
+	b, err := json.Marshal((&accessResult).setMessage())
+	if err != nil {
+		errors.E("failed to produce json", err)
+	}
+	writer.Write(b)
+	return nil
+}
+
+func formatCheckRelationYAML(writer io.Writer, value interface{}) error {
+	accessResult, ok := value.(accessResult)
+	if !ok {
+		return errors.E("failed to parse access result")
+	}
+
+	b, err := yaml.Marshal((&accessResult).setMessage())
+	if err != nil {
+		errors.E("failed to produce json", err)
+	}
+	writer.Write(b)
 	return nil
 }
 
@@ -368,18 +453,15 @@ func (c *checkRelationCommand) Run(ctxt *cmd.Context) error {
 	client := api.NewClient(apiCaller)
 
 	resp, err := client.CheckRelation(&apiparams.CheckRelationRequest{
-		Tuple: apiparams.RelationshipTuple{Object: c.object, Relation: c.relation, TargetObject: c.targetObject},
+		Tuple: c.tuple,
 	})
 	if err != nil {
 		return err
 	}
-	accessMsg := AccessResultDenied
-	if resp.Allowed {
-		accessMsg = AccessResultAllowed
-	}
-
-	msg := fmt.Sprintf(AccessMessage, c.object, c.targetObject, c.relation, accessMsg)
-	ctxt.Stdout.Write([]byte(msg))
+	c.out.Write(ctxt, accessResult{
+		Tuple:   c.tuple,
+		Allowed: resp.Allowed,
+	})
 	return nil
 }
 

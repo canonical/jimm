@@ -11,6 +11,14 @@ import (
 	"github.com/juju/juju/jujuclient"
 )
 
+var (
+	AccessMessage       = accessMessage
+	AccessResultAllowed = accessResultAllowed
+	AccessResultDenied  = accessResultDenied
+)
+
+type AccessResult = accessResult
+
 func NewListControllersCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
 	cmd := &listControllersCommand{
 		store: store,

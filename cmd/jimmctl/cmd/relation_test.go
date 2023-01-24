@@ -5,6 +5,7 @@ package cmd_test
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -15,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/juju/cmd/v3/cmdtesting"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/yaml.v3"
 
 	"github.com/CanonicalLtd/jimm/cmd/jimmctl/cmd"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
@@ -311,6 +313,56 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 		strings.TrimRight(cmdtesting.Stdout(cmdCtx), "\n"),
 		gc.Equals,
 		fmt.Sprintf(cmd.AccessMessage, userToCheck, modelToCheck, "writer", cmd.AccessResultDenied),
+	)
+
+	// Test format JSON
+	cmdCtx, err = cmdtesting.RunCommand(
+		c,
+		cmd.NewCheckRelationCommandForTesting(s.ClientStore(), bClient),
+		userToCheck,
+		"reader",
+		modelToCheck,
+		"--format",
+		"json",
+	)
+	c.Assert(err, gc.IsNil)
+
+	res := cmdtesting.Stdout(cmdCtx)
+	ar := cmd.AccessResult{}
+	err = json.Unmarshal([]byte(res), &ar)
+	c.Assert(err, gc.IsNil)
+	b, err := json.Marshal(ar)
+	c.Assert(err, gc.IsNil)
+
+	c.Assert(
+		cmdtesting.Stdout(cmdCtx),
+		gc.Equals,
+		string(b),
+	)
+
+	// Test format YAML
+	cmdCtx, err = cmdtesting.RunCommand(
+		c,
+		cmd.NewCheckRelationCommandForTesting(s.ClientStore(), bClient),
+		userToCheck,
+		"reader",
+		modelToCheck,
+		"--format",
+		"yaml",
+	)
+	c.Assert(err, gc.IsNil)
+
+	res = cmdtesting.Stdout(cmdCtx)
+	ar = cmd.AccessResult{}
+	err = yaml.Unmarshal([]byte(res), &ar)
+	c.Assert(err, gc.IsNil)
+	b, err = yaml.Marshal(ar)
+	c.Assert(err, gc.IsNil)
+
+	c.Assert(
+		cmdtesting.Stdout(cmdCtx),
+		gc.Equals,
+		string(b),
 	)
 
 }
