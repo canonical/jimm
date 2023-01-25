@@ -36,6 +36,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/debugapi"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
+	"github.com/CanonicalLtd/jimm/internal/jimmhttp"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
 	"github.com/CanonicalLtd/jimm/internal/jujuclient"
 	"github.com/CanonicalLtd/jimm/internal/logger"
@@ -203,7 +204,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 
 	s := new(Service)
 	s.mux = chi.NewRouter()
-	mux := s.mux
 
 	if p.ControllerUUID == "" {
 		controllerUUID, err := uuid.NewRandom()
@@ -255,14 +255,17 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
 	}
 
-	mux.Mount(
+	mountHandler := func(path string, h jimmhttp.JIMMHttpHandler) {
+		s.mux.Mount(path, h.Routes())
+	}
+
+	mountHandler(
 		"/debug",
-		(&debugapi.DebugHandler{
-			Router: chi.NewRouter(),
-			StatusChecks: map[string]debugapi.StatusCheck{
+		debugapi.NewDebugHandler(
+			map[string]debugapi.StatusCheck{
 				"start_time": debugapi.ServerStartTime,
 			},
-		}).Routes(),
+		),
 	)
 
 	params := jujuapi.Params{

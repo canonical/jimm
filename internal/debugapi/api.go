@@ -12,13 +12,20 @@ import (
 	"github.com/CanonicalLtd/jimm/version"
 )
 
-// DebugHandler
+// DebugHandler holds the grouped router to be mounted and
+// any service checks we wish to register.
+// Implements jimmhttp.JIMMHttpHandler
 type DebugHandler struct {
 	Router       *chi.Mux
 	StatusChecks map[string]StatusCheck
 }
 
-// Routes
+// NewDebugHandler returns a new debug handler
+func NewDebugHandler(statusChecks map[string]StatusCheck) *DebugHandler {
+	return &DebugHandler{Router: chi.NewRouter(), StatusChecks: statusChecks}
+}
+
+// Routes returns the grouped routers routes with group specific middlewares.
 func (dh *DebugHandler) Routes() chi.Router {
 	dh.SetupMiddleware()
 	dh.Router.Get("/info", dh.Info)
@@ -26,7 +33,7 @@ func (dh *DebugHandler) Routes() chi.Router {
 	return dh.Router
 }
 
-// SetupMiddleware
+// SetupMiddleware applies middlewares.
 func (dh *DebugHandler) SetupMiddleware() {
 	dh.Router.Use(
 		render.SetContentType(
@@ -35,12 +42,12 @@ func (dh *DebugHandler) SetupMiddleware() {
 	)
 }
 
-// Info handles /info
+// Info handles /info, returning the current version of the server.
 func (dh *DebugHandler) Info(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, version.VersionInfo)
 }
 
-// Status handles /status
+// Status handles /status, returning the currently registered status checks.
 func (dh *DebugHandler) Status(w http.ResponseWriter, r *http.Request) {
 	checks := dh.StatusChecks
 	var mu sync.Mutex

@@ -48,6 +48,9 @@ require (
 )
 
 require (
+	github.com/dustinkirkland/golang-petname v0.0.0-20191129215211-8e5a1ed0cff0
+	github.com/go-chi/chi/v5 v5.0.8
+	github.com/go-chi/render v1.0.2
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/stretchr/testify v1.8.1
 	gopkg.in/errgo.v1 v1.0.1
@@ -96,7 +99,6 @@ require (
 	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/duo-labs/webauthn v0.0.0-20220815211337-00c9fb5711f5 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
-	github.com/dustinkirkland/golang-petname v0.0.0-20191129215211-8e5a1ed0cff0 // indirect
 	github.com/envoyproxy/go-control-plane v0.10.2-0.20220325020618-49ff273808a1 // indirect
 	github.com/envoyproxy/protoc-gen-validate v0.6.1 // indirect
 	github.com/fatih/color v1.9.0 // indirect
@@ -105,8 +107,6 @@ require (
 	github.com/fullstorydev/grpcurl v1.8.1 // indirect
 	github.com/fxamacker/cbor/v2 v2.4.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
-	github.com/go-chi/chi/v5 v5.0.8 // indirect
-	github.com/go-chi/render v1.0.2 // indirect
 	github.com/go-logr/logr v1.2.2 // indirect
 	github.com/go-macaroon-bakery/macaroonpb v1.0.0 // indirect
 	github.com/godbus/dbus/v5 v5.0.4 // indirect
