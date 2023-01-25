@@ -11,6 +11,14 @@ import (
 	"github.com/juju/juju/jujuclient"
 )
 
+var (
+	AccessMessage       = accessMessageFormat
+	AccessResultAllowed = accessResultAllowed
+	AccessResultDenied  = accessResultDenied
+)
+
+type AccessResult = accessResult
+
 func NewListControllersCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
 	cmd := &listControllersCommand{
 		store: store,
@@ -256,6 +264,18 @@ func NewRemoveRelationCommandForTesting(store jujuclient.ClientStore, bClient *h
 
 func NewListRelationsCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
 	cmd := &listRelationsCommand{
+		store: store,
+		dialOpts: &jujuapi.DialOpts{
+			InsecureSkipVerify: true,
+			BakeryClient:       bClient,
+		},
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
+
+func NewCheckRelationCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+	cmd := &checkRelationCommand{
 		store: store,
 		dialOpts: &jujuapi.DialOpts{
 			InsecureSkipVerify: true,

@@ -21,7 +21,14 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/errors"
 )
 
-const defaultPageSize = 50
+const (
+	// accessMessageFormat is an informative message sent back to the user denoting the access for a particular resource.
+	// The final format string holds either an AccessResultAllowed or AccessResultDenied.
+	accessMessageFormat = "access check for %s on resource %s with role %s is %s"
+	accessResultAllowed = "allowed"
+	accessResultDenied  = "not allowed"
+	defaultPageSize     = 50
+)
 
 var (
 	relationDoc = `
@@ -73,7 +80,7 @@ If target_object is an application offer, the relation can be one of:
 
 	reader
 	consumer
-	administrator 
+	administrator
 
 
 Additionally, if the object is a group, a userset can be applied by adding #member as follows:
@@ -106,23 +113,33 @@ Example:
 		`
 Examples:
 jimmctl auth relation remove user-Alice member group-MyGroup
-jimmctl auth relation remove group-MyTeam#member loginer controller-MyController
-`
+jimmctl auth relation remove group-MyTeam#member loginer controller-MyController`
+
+	checkRelationDoc = `
+Verifies the access between resources.
+
+Example:
+jimmctl auth relation check user-alice@external administrator controller-aws-controller-1
+
+Example:
+	jimmctl auth relation add <object> <relation> <target_object>
+	jimmctl auth relation add -f <filename>
+	`
 
 	listRelationsDoc = `
 list relations known to jimm. Using the "target", "relation"
 and "object" flags, only those relations matching the filter
 will be returned.
-Example
-	 jimmctl auth relation list
+Example:
+		jimmctl auth relation list
 		returns the list of all relations
-	 jimmctl auth relation list --target <target_object>
+		jimmctl auth relation list --target <target_object>
 		returns the list of relations, where target object
 		matches the specified one
-	 jimmctl auth relation list --target <target_object>  --relation <relation
+		jimmctl auth relation list --target <target_object>  --relation <relation
 		returns the list of relations, where target object
 		and relation match the specified ones
-	`
+		`
 )
 
 // NewRelationCommand returns a command for relation management.
@@ -134,6 +151,7 @@ func NewRelationCommand() *cmd.SuperCommand {
 	})
 	cmd.Register(newAddRelationCommand())
 	cmd.Register(newRemoveRelationCommand())
+	cmd.Register(newCheckRelationCommand())
 	cmd.Register(newListRelationsCommand())
 
 	return cmd
@@ -318,6 +336,111 @@ func (c *removeRelationCommand) Run(ctxt *cmd.Context) error {
 		return errors.E(err)
 	}
 
+	return nil
+}
+
+// checkRelationCommand holds the fields required to check a relation.
+type checkRelationCommand struct {
+	modelcmd.ControllerCommandBase
+	out      cmd.Output
+	store    jujuclient.ClientStore
+	dialOpts *jujuapi.DialOpts
+
+	tuple apiparams.RelationshipTuple
+}
+
+// accessResult holds the accessCheck result to be passed to a formatter
+type accessResult struct {
+	Msg     string                      `yaml:"result" json:"result"`
+	Tuple   apiparams.RelationshipTuple `yaml:"tuple" json:"tuple"`
+	Allowed bool                        `yaml:"allowed" json:"allowed"`
+}
+
+func (ar *accessResult) setMessage() *accessResult {
+	t := ar.Tuple
+
+	accessMsg := accessResultDenied
+	if ar.Allowed {
+		accessMsg = accessResultAllowed
+	}
+	ar.Msg = fmt.Sprintf(accessMessageFormat, t.Object, t.TargetObject, t.Relation, accessMsg)
+	return ar
+}
+
+// newCheckRelationCommand
+func newCheckRelationCommand() cmd.Command {
+	cmd := &checkRelationCommand{
+		store: jujuclient.NewFileClientStore(),
+	}
+
+	return modelcmd.WrapBase(cmd)
+}
+
+// Info implements the cmd.Command interface.
+func (c *checkRelationCommand) Info() *cmd.Info {
+	return jujucmd.Info(&cmd.Info{
+		Name:    "check",
+		Purpose: "Check access to a resource.",
+		Doc:     checkRelationDoc,
+	})
+}
+
+// SetFlags implements Command.SetFlags.
+func (c *checkRelationCommand) SetFlags(f *gnuflag.FlagSet) {
+	c.CommandBase.SetFlags(f)
+	c.out.AddFlags(f, "smart", map[string]cmd.Formatter{
+		"smart": formatCheckRelationString,
+		"json":  cmd.FormatJson,
+		"yaml":  cmd.FormatYaml,
+	})
+}
+
+// Init implements the cmd.Command interface.
+func (c *checkRelationCommand) Init(args []string) error {
+	err := verifyTupleArguments(args)
+	if err != nil {
+		return errors.E(err)
+	}
+	c.tuple = apiparams.RelationshipTuple{
+		Object:       args[0],
+		Relation:     args[1],
+		TargetObject: args[2],
+	}
+	return nil
+}
+
+func formatCheckRelationString(writer io.Writer, value interface{}) error {
+	accessResult, ok := value.(accessResult)
+	if !ok {
+		return errors.E("failed to parse access result")
+	}
+	writer.Write([]byte((&accessResult).setMessage().Msg))
+	return nil
+}
+
+// Run implements Command.Run.
+func (c *checkRelationCommand) Run(ctxt *cmd.Context) error {
+	currentController, err := c.store.CurrentController()
+	if err != nil {
+		return errors.E(err, "could not determine controller")
+	}
+
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", c.dialOpts)
+	if err != nil {
+		return err
+	}
+	client := api.NewClient(apiCaller)
+
+	resp, err := client.CheckRelation(&apiparams.CheckRelationRequest{
+		Tuple: c.tuple,
+	})
+	if err != nil {
+		return err
+	}
+	c.out.Write(ctxt, *(&accessResult{
+		Tuple:   c.tuple,
+		Allowed: resp.Allowed,
+	}).setMessage())
 	return nil
 }
 
