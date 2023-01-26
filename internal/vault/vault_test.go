@@ -127,6 +127,7 @@ func TestPutJWKS(t *testing.T) {
 	ctx := context.Background()
 
 	store := newStore(c)
+	resetJWKS(c, store)
 
 	err := store.PutJWKS(ctx, time.Now().AddDate(0, 3, 1))
 	c.Assert(err, qt.IsNil)
@@ -137,6 +138,8 @@ func TestGetJWKS(t *testing.T) {
 	ctx := context.Background()
 
 	store := newStore(c)
+	resetJWKS(c, store)
+
 	store.PutJWKS(ctx, time.Now().AddDate(0, 3, 1))
 
 	ks, err := store.GetJWKS(ctx)
@@ -155,8 +158,9 @@ func TestGetJWKS(t *testing.T) {
 func TestGetJWKSExpiry(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
-
 	store := newStore(c)
+	resetJWKS(c, store)
+
 	store.PutJWKS(ctx, time.Now().AddDate(0, 3, 1))
 	expiry, err := store.getJWKSExpiry(ctx)
 	c.Assert(err, qt.IsNil)
@@ -172,15 +176,7 @@ func TestStartJWKSRotatorWithNoJWKSInTheStore(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 	store := newStore(c)
-
-	vc, err := store.client(ctx)
-	c.Check(err, qt.IsNil)
-
-	_, err = vc.Logical().Delete(store.getJWKSExpiryPath())
-	c.Check(err, qt.IsNil)
-
-	_, err = vc.Logical().Delete(store.getJWKSPath())
-	c.Check(err, qt.IsNil)
+	resetJWKS(c, store)
 
 	cron, id, err := store.StartJWKSRotator(ctx, "@every 1s", time.Now())
 	c.Assert(cron.Entry(id).Valid(), qt.IsTrue)
@@ -207,17 +203,10 @@ func TestStartJWKSRotatorRotatesAJWKS(t *testing.T) {
 	ctx := context.Background()
 	store := newStore(c)
 
-	vc, err := store.client(ctx)
-	c.Check(err, qt.IsNil)
-
 	// So, we first put a fresh JWKS in the store
-	_, err = vc.Logical().Delete(store.getJWKSExpiryPath())
-	c.Check(err, qt.IsNil)
+	resetJWKS(c, store)
 
-	_, err = vc.Logical().Delete(store.getJWKSPath())
-	c.Check(err, qt.IsNil)
-
-	err = store.PutJWKS(ctx, time.Now())
+	err := store.PutJWKS(ctx, time.Now())
 	c.Check(err, qt.IsNil)
 
 	getKID := func() string {
@@ -248,4 +237,15 @@ func TestStartJWKSRotatorRotatesAJWKS(t *testing.T) {
 
 	// And simply compare them
 	c.Assert(initialKeyId, qt.Not(qt.Equals), newKeyId)
+}
+
+func resetJWKS(c *qt.C, store *VaultStore) {
+	vc, err := store.client(context.Background())
+	c.Check(err, qt.IsNil)
+
+	_, err = vc.Logical().Delete(store.getJWKSExpiryPath())
+	c.Check(err, qt.IsNil)
+
+	_, err = vc.Logical().Delete(store.getJWKSPath())
+	c.Check(err, qt.IsNil)
 }

@@ -386,7 +386,7 @@ func (s *VaultStore) generateJWK(ctx context.Context) (jwk.Key, error) {
 		return nil, errors.E(op, err)
 	}
 
-	jwks, err := jwk.FromRaw(keySet)
+	jwks, err := jwk.FromRaw(keySet.PublicKey)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
