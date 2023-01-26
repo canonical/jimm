@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/vault/api"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
+	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
@@ -400,7 +401,7 @@ func (s *VaultStore) generateJWK(ctx context.Context) (jwk.Key, error) {
 		return nil, errors.E(op, err)
 	}
 
-	err = jwks.Set("alg", "RS256")
+	err = jwks.Set("alg", jwa.RS256)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
