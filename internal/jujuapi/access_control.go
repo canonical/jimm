@@ -408,7 +408,7 @@ func (r *controllerRoot) parseTuple(ctx context.Context, tuple apiparams.Relatio
 	// the object and target object, but changing the message and key
 	// to be specific to the erroneous offender.
 	parseTagError := func(msg string, key string, err error) error {
-		zapctx.Debug(ctx, msg, zap.String("key = ", key), zap.Error(err))
+		zapctx.Debug(ctx, msg, zap.String("key", key), zap.Error(err))
 		return errors.E(op, errors.CodeFailedToParseTupleKey, err, msg+" "+key)
 	}
 
@@ -565,22 +565,21 @@ func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apipara
 	}, nil
 }
 
-// removeRelatedTuples takes a string and resolves it to a resource, implying that tag
-// must be a valid resource string e.g. "controller-name", "group-name". We then remove all tuples
-// that contain said resource as either the source/target (or in OpenFGA terms user/object), where appropriate.
-// Note that only groups/users can be on the left hand side of a tuple.
+// removeRelatedTuples removes all openFGA tuples that contain tag.
+// This is done by parsing tag i.e. ensuring tag is valid "group-Name" or "controll-MyController".
+// Then by querying for all tuples that contain the desired resource and deleting them.
 // Note that this call is slow because it makes repeated calls to the OpenFGA server.
 func (r *controllerRoot) removeRelatedTuples(ctx context.Context, tag string) error {
 	const op = errors.Op("jujuapi.removeRelatedTuples")
 
-	resource, resourceRelationSpecifier, err := parseTag(ctx, r.jimm.Database, tag)
+	parsedTag, resourceRelationSpecifier, err := parseTag(ctx, r.jimm.Database, tag)
 	if err != nil {
 		return errors.E(op, err)
 	}
 	if resourceRelationSpecifier != "" {
-		return errors.E(op, "A relation specifier should not be provider e.g. #member")
+		return errors.E(op, "A relation specifier should not be provided e.g. #member")
 	}
-	objectSearch := ofga.CreateTupleKey("", "", resource.Kind()+":"+resource.Id())
+	objectSearch := ofga.CreateTupleKey("", "", parsedTag.Kind()+":"+parsedTag.Id())
 
 	// Remove results based on object side search.
 	err = r.ofgaClient.RemoveTuples(ctx, objectSearch)
@@ -589,9 +588,9 @@ func (r *controllerRoot) removeRelatedTuples(ctx context.Context, tag string) er
 	}
 
 	// Remove results based on user side search.
-	if resource.Kind() == jimmnames.GroupTagKind || resource.Kind() == names.UserTagKind {
+	if parsedTag.Kind() == jimmnames.GroupTagKind || parsedTag.Kind() == names.UserTagKind {
 		user := *objectSearch.Object
-		if resource.Kind() == jimmnames.GroupTagKind {
+		if parsedTag.Kind() == jimmnames.GroupTagKind {
 			user = *objectSearch.Object + "#member"
 		}
 		// We need to loop through all resource types because the OpenFGA Read API does not provide
