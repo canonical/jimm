@@ -266,23 +266,25 @@ func (s *VaultStore) PutJWKS(ctx context.Context, expiry time.Time) error {
 		return errors.E(op, err)
 	}
 
-	// Set private RSA key
-	_, err = client.Logical().Write(
-		// We persist in a similar folder to the controller credentials, but sub-route
-		// to .well-known for further extensions and mental clarity within our vault.
-		s.getJWKSPrivateKeyPath(),
-		map[string]interface{}{"key": privKeyPem},
-	)
-	if err != nil {
-		return errors.E(op, err)
-	}
-
 	// Set expiry
 	_, err = client.Logical().Write(
 		s.getJWKSExpiryPath(),
 		map[string]interface{}{
 			"jwks-expiry": expiry,
 		},
+	)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	// Now we are safe to store private key, as it is expected to expire
+
+	// Set private RSA key
+	_, err = client.Logical().Write(
+		// We persist in a similar folder to the controller credentials, but sub-route
+		// to .well-known for further extensions and mental clarity within our vault.
+		s.getJWKSPrivateKeyPath(),
+		map[string]interface{}{"key": privKeyPem},
 	)
 	if err != nil {
 		return errors.E(op, err)
