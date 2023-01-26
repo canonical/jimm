@@ -4,13 +4,17 @@ package vault
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"net/http"
 	"path"
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/vault/api"
 	"github.com/juju/names/v4"
+	"github.com/lestrrat-go/jwx/v2/jwk"
 
 	"github.com/CanonicalLtd/jimm/internal/errors"
 )
@@ -170,6 +174,93 @@ func (s *VaultStore) PutControllerCredentials(ctx context.Context, controllerNam
 		return errors.E(op, err)
 	}
 	return nil
+}
+
+// PutJWKS puts a fresh set of RS256 keys in vault for use in JWKS signing/decoding.
+//
+// The pathing is similar to the controllers credentials
+// in that we understand RS256 keys as credentials, rather than crytographic keys.
+func (s *VaultStore) PutJWKS(ctx context.Context) error {
+	const op = errors.Op("vault.PutJWKS")
+
+	client, err := s.client(ctx)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	jwks, err := s.generateJWKS(ctx)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	jwksMap, err := jwks.AsMap(ctx)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	keysSetMap := make(map[string]interface{})
+	keysSetMap["keys"] = []map[string]interface{}{jwksMap}
+
+	_, err = client.Logical().Write(
+		// We persist in a similar folder to the controller credentials, but sub-route
+		// to .well-known for further extensions and mental clarity within our vault.
+		path.Join(s.KVPath, "creds", ".well-known", "jwks"),
+		keysSetMap,
+	)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	return nil
+
+}
+
+// generateJWKS generates a new set of JWKS using RSA256[4096]
+//
+// TODO(ale8k)[possibly?]:
+// For now, there's a single key, and this is probably OK. But possibly extend
+// this to container many at some point differentiated by KIDs.
+//
+// We also currently don't use x5c and x5t for validation and expect users
+// to use e and n for validation.
+// https://stackoverflow.com/questions/61395261/how-to-validate-signature-of-jwt-from-jwks-without-x5c
+func (s *VaultStore) generateJWKS(ctx context.Context) (jwk.Key, error) {
+	const op = errors.Op("vault.generateJWKS")
+
+	// Due to the sensitivity of controllers, it is best we allow a larger encryption bit size
+	// and accept any negligible wire cost.
+	keySet, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	// We also use the same methodology of generating UUIDs for our KID
+	kid, err := uuid.NewRandom()
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	jwks, err := jwk.FromRaw(keySet)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	err = jwks.Set("kid", kid.String())
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	err = jwks.Set("use", "sig")
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	err = jwks.Set("alg", "RS256")
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	return jwks, nil
 }
 
 // deleteControllerCredentials removes the credentials associated with the controller in

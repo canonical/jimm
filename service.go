@@ -21,7 +21,6 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
 	"github.com/google/uuid"
 	vaultapi "github.com/hashicorp/vault/api"
-	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
 	openfga "github.com/openfga/go-sdk"
 	"github.com/openfga/go-sdk/credentials"
@@ -44,25 +43,8 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 	"github.com/CanonicalLtd/jimm/internal/vault"
+	"github.com/CanonicalLtd/jimm/internal/wellknownapi"
 )
-
-// A VaultStore is a store for the attributes of a
-// CloudCredential and controller credentials.
-type VaultStore interface {
-	// Get retrieves the stored attributes of a cloud credential.
-	Get(context.Context, names.CloudCredentialTag) (map[string]string, error)
-
-	// Put stores the attributes of a cloud credential.
-	Put(context.Context, names.CloudCredentialTag, map[string]string) error
-
-	// GetControllerCredentials retrieves the credentials for the given controller from a vault
-	// service.
-	GetControllerCredentials(ctx context.Context, controllerName string) (string, string, error)
-
-	// PutControllerCredentials stores the controller credentials in a vault
-	// service.
-	PutControllerCredentials(ctx context.Context, controllerName string, username string, password string) error
-}
 
 // OpenFGAParams holds parameters needed to connect to the OpenFGA server.
 type OpenFGAParams struct {
@@ -267,6 +249,10 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 			},
 		),
 	)
+	mountHandler(
+		"/.well-known",
+		wellknownapi.NewWellKnownHandler(s.jimm.CredentialStore),
+	)
 
 	params := jujuapi.Params{
 		ControllerUUID:   p.ControllerUUID,
@@ -374,7 +360,7 @@ func newAuthenticator(ctx context.Context, db *db.Database, p Params) (jimm.Auth
 	}, nil
 }
 
-func newVaultStore(ctx context.Context, p Params) (VaultStore, error) {
+func newVaultStore(ctx context.Context, p Params) (jimm.CredentialStore, error) {
 	if p.VaultSecretFile == "" {
 		return nil, nil
 	}
@@ -406,6 +392,7 @@ func newVaultStore(ctx context.Context, p Params) (VaultStore, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &vault.VaultStore{
 		Client:     client,
 		AuthSecret: s.Data,

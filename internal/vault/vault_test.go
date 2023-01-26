@@ -1,6 +1,6 @@
 // Copyright 2021 Canonical Ltd.
 
-package vault_test
+package vault
 
 import (
 	"context"
@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/google/uuid"
 	"github.com/juju/names/v4"
 
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
-	"github.com/CanonicalLtd/jimm/internal/vault"
 )
 
 func TestMain(m *testing.M) {
@@ -19,12 +19,12 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func newStore(t testing.TB) *vault.VaultStore {
+func newStore(t testing.TB) *VaultStore {
 	client, path, creds, ok := jimmtest.VaultClient(t, "../../")
 	if !ok {
 		t.Skip("vault not available")
 	}
-	return &vault.VaultStore{
+	return &VaultStore{
 		Client:     client,
 		AuthSecret: creds,
 		AuthPath:   "/auth/approle/login",
@@ -93,4 +93,31 @@ func TestVaultControllerCredentialsStoreRoundTrip(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Check(u, qt.Equals, "")
 	c.Check(p, qt.Equals, "")
+}
+
+func TestGenerateJWKS(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	store := newStore(c)
+	jwk, err := store.generateJWKS(ctx)
+	c.Assert(err, qt.IsNil)
+
+	// kid
+	_, err = uuid.Parse(jwk.KeyID())
+	c.Assert(err, qt.IsNil)
+	// use
+	c.Assert(jwk.KeyUsage(), qt.Equals, "sig")
+	// alg
+	c.Assert(jwk.Algorithm().String(), qt.Equals, "RS256")
+}
+
+func TestPutJWKS(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	store := newStore(c)
+
+	err := store.PutJWKS(ctx)
+	c.Assert(err, qt.IsNil)
 }

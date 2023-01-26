@@ -10,9 +10,9 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
@@ -1633,5 +1633,9 @@ func (s testCloudCredentialAttributeStore) GetControllerCredentials(ctx context.
 }
 
 func (s testCloudCredentialAttributeStore) PutControllerCredentials(ctx context.Context, controllerName string, username string, password string) error {
+	return errors.E(errors.CodeNotImplemented)
+}
+
+func (s testCloudCredentialAttributeStore) PutJWKS(ctx context.Context) error {
 	return errors.E(errors.CodeNotImplemented)
 }

@@ -40,6 +40,9 @@ type CredentialStore interface {
 	// PutControllerCredentials stores the controller credentials in a vault
 	// service.
 	PutControllerCredentials(ctx context.Context, controllerName string, username string, password string) error
+
+	// PutJWKS puts a generated RS256[4096 bit] JWKS without x5c or x5t into the credential store.
+	PutJWKS(ctx context.Context) error
 }
 
 // A JIMM provides the business logic for managing resources in the JAAS
