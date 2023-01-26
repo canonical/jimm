@@ -14,6 +14,7 @@ import (
 	"github.com/juju/juju/core/status"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
+	"github.com/lestrrat-go/jwx/v2/jwk"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
@@ -1637,5 +1638,12 @@ func (s testCloudCredentialAttributeStore) PutControllerCredentials(ctx context.
 }
 
 func (s testCloudCredentialAttributeStore) PutJWKS(ctx context.Context) error {
+	return errors.E(errors.CodeNotImplemented)
+}
+
+func (s testCloudCredentialAttributeStore) GetJWKS(ctx context.Context) (jwk.Set, error) {
+	return nil, errors.E(errors.CodeNotImplemented)
+}
+func (s testCloudCredentialAttributeStore) StartJWKSRotator(ctx context.Context, cron string) error {
 	return errors.E(errors.CodeNotImplemented)
 }

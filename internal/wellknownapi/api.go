@@ -3,6 +3,7 @@ package wellknownapi
 import (
 	"net/http"
 
+	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
@@ -41,9 +42,11 @@ func (wkh *WellKnownHandler) SetupMiddleware() {
 // The purpose of this is to allow juju controllers to retrieve the public key from JIMM
 // and decode the presented forwarded JWT.
 func (wkh *WellKnownHandler) JWKS(w http.ResponseWriter, r *http.Request) {
-	render.JSON(w, r, "")
-}
-
-func (wkh *WellKnownHandler) k() {
-
+	const op = errors.Op("wellknownapi.JWKS")
+	ctx := r.Context()
+	ks, err := wkh.CredentialStore.GetJWKS(ctx)
+	if err != nil {
+		render.JSON(w, r, errors.E(op, "jwks retrieval failure", "failed to retrieve JWKS", err))
+	}
+	render.JSON(w, r, ks)
 }

@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"encoding/json"
 	"net/http"
 	"path"
 	"sync"
@@ -14,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/vault/api"
 	"github.com/juju/names/v4"
+	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
 	"github.com/CanonicalLtd/jimm/internal/errors"
@@ -176,7 +178,43 @@ func (s *VaultStore) PutControllerCredentials(ctx context.Context, controllerNam
 	return nil
 }
 
-// PutJWKS puts a fresh set of RS256 keys in vault for use in JWKS signing/decoding.
+// GetJWKS returns the current key set stored within the credential store.
+func (s *VaultStore) GetJWKS(ctx context.Context) (jwk.Set, error) {
+	const op = errors.Op("vault.GetJWKS")
+
+	client, err := s.client(ctx)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	secret, err := client.Logical().Read(s.getJWKSPath())
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	// This is how the current version of vaults API Read works,
+	// if the secret is not present on the path, it will instead return
+	// nil for the secret and a nil error. So we must check for this.
+	if secret == nil {
+		msg := "no JWKS exists yet."
+		zapctx.Debug(ctx, msg)
+		return nil, errors.E(op, "no jwks exists", msg)
+	}
+
+	b, err := json.Marshal(secret.Data)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	ks, err := jwk.ParseString(string(b))
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	return ks, nil
+}
+
+// PutJWKS puts a generated RS256[4096 bit] JWKS without x5c or x5t into the credential store.
 //
 // The pathing is similar to the controllers credentials
 // in that we understand RS256 keys as credentials, rather than crytographic keys.
@@ -193,33 +231,47 @@ func (s *VaultStore) PutJWKS(ctx context.Context) error {
 		return errors.E(op, err)
 	}
 
-	jwksMap, err := jwks.AsMap(ctx)
+	ks := jwk.NewSet()
+	err = ks.AddKey(jwks)
 	if err != nil {
 		return errors.E(op, err)
 	}
 
-	keysSetMap := make(map[string]interface{})
-	keysSetMap["keys"] = []map[string]interface{}{jwksMap}
+	b, err := json.Marshal(ks)
+	if err != nil {
+		return errors.E(op, err)
+	}
 
-	_, err = client.Logical().Write(
+	_, err = client.Logical().WriteBytes(
 		// We persist in a similar folder to the controller credentials, but sub-route
 		// to .well-known for further extensions and mental clarity within our vault.
-		path.Join(s.KVPath, "creds", ".well-known", "jwks"),
-		keysSetMap,
+		s.getJWKSPath(),
+		b,
 	)
 	if err != nil {
 		return errors.E(op, err)
 	}
 
 	return nil
+}
 
+// StartJWKSRotator starts a simple routine which checks the vaults TTL for the JWKS on a defined CRON
+// if the key set is within 1 day of expiry, it will rotate the keys.
+func (s *VaultStore) StartJWKSRotator(ctx context.Context, cron string) error {
+	return nil
+}
+
+// getJWKSPath returns a hardcoded suffixed vault path (dependent on
+// the initial KVPath) to the .well-known JWKS location.
+func (s *VaultStore) getJWKSPath() string {
+	return path.Join(s.KVPath, "creds", ".well-known", "jwks")
 }
 
 // generateJWKS generates a new set of JWKS using RSA256[4096]
 //
 // TODO(ale8k)[possibly?]:
 // For now, there's a single key, and this is probably OK. But possibly extend
-// this to container many at some point differentiated by KIDs.
+// this to contain many at some point differentiated by KIDs.
 //
 // We also currently don't use x5c and x5t for validation and expect users
 // to use e and n for validation.

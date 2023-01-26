@@ -14,6 +14,7 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
+	"github.com/lestrrat-go/jwx/v2/jwk"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
@@ -43,6 +44,13 @@ type CredentialStore interface {
 
 	// PutJWKS puts a generated RS256[4096 bit] JWKS without x5c or x5t into the credential store.
 	PutJWKS(ctx context.Context) error
+
+	// GetJWKS returns the current key set stored within the credential store.
+	GetJWKS(ctx context.Context) (jwk.Set, error)
+
+	// StartJWKSRotator starts a simple routine which checks the vaults TTL for the JWKS on a defined CRON
+	// if the key set is within 1 day of expiry, it will rotate the keys.
+	StartJWKSRotator(ctx context.Context, cron string) error
 }
 
 // A JIMM provides the business logic for managing resources in the JAAS

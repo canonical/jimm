@@ -10,6 +10,8 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 	"github.com/juju/names/v4"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwk"
 
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 )
@@ -95,6 +97,13 @@ func TestVaultControllerCredentialsStoreRoundTrip(t *testing.T) {
 	c.Check(p, qt.Equals, "")
 }
 
+func TestGetJWKSPath(t *testing.T) {
+	c := qt.New(t)
+
+	store := newStore(c)
+	c.Assert(store.getJWKSPath(), qt.Equals, store.KVPath+"creds/.well-known/jwks")
+}
+
 func TestGenerateJWKS(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
@@ -109,7 +118,7 @@ func TestGenerateJWKS(t *testing.T) {
 	// use
 	c.Assert(jwk.KeyUsage(), qt.Equals, "sig")
 	// alg
-	c.Assert(jwk.Algorithm().String(), qt.Equals, "RS256")
+	c.Assert(jwk.Algorithm(), qt.Equals, jwa.RS256)
 }
 
 func TestPutJWKS(t *testing.T) {
@@ -120,4 +129,24 @@ func TestPutJWKS(t *testing.T) {
 
 	err := store.PutJWKS(ctx)
 	c.Assert(err, qt.IsNil)
+}
+
+func TestGetJWKS(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	store := newStore(c)
+	store.PutJWKS(ctx)
+
+	ks, err := store.GetJWKS(ctx)
+	c.Assert(err, qt.IsNil)
+	ki := ks.Keys(ctx)
+	ki.Next(ctx)
+	key := ki.Pair().Value.(jwk.Key)
+
+	_, err = uuid.Parse(key.KeyID())
+	c.Assert(err, qt.IsNil)
+
+	c.Assert(key.KeyUsage(), qt.Equals, "sig")
+	c.Assert(key.Algorithm(), qt.Equals, jwa.RS256)
 }
