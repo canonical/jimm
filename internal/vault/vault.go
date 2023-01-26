@@ -7,7 +7,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"path"
 	"sync"
@@ -289,7 +288,6 @@ func (s *VaultStore) StartJWKSRotator(ctx context.Context, cronSpec string, init
 	)
 	putJwks := func() {
 		err := s.PutJWKS(ctx, initialExpiryIfNotExists)
-		fmt.Println("do i work 2", err)
 		zapctx.Debug(ctx, "set a new JWKS")
 		if err != nil {
 			zapctx.Error(
@@ -305,7 +303,6 @@ func (s *VaultStore) StartJWKSRotator(ctx context.Context, cronSpec string, init
 		expires, err := s.getJWKSExpiry(ctx)
 
 		if err != nil {
-			fmt.Println("do i work 1")
 			zapctx.Debug(ctx, "failed to get expiry", zap.Error(err))
 			putJwks()
 		}
