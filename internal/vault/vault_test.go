@@ -108,8 +108,8 @@ func TestGetJWKSPath(t *testing.T) {
 func TestGenerateJWKS(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
-
 	store := newStore(c)
+
 	jwk, privKeyPem, err := store.generateJWK(ctx)
 	c.Assert(err, qt.IsNil)
 
@@ -128,7 +128,6 @@ func TestGenerateJWKS(t *testing.T) {
 func TestPutJWKS(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
-
 	store := newStore(c)
 	resetJWKS(c, store)
 
@@ -139,7 +138,6 @@ func TestPutJWKS(t *testing.T) {
 func TestGetJWKS(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
-
 	store := newStore(c)
 	resetJWKS(c, store)
 
@@ -205,10 +203,9 @@ func TestStartJWKSRotatorRotatesAJWKS(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 	store := newStore(c)
-
-	// So, we first put a fresh JWKS in the store
 	resetJWKS(c, store)
 
+	// So, we first put a fresh JWKS in the store
 	err := store.PutJWKS(ctx, time.Now())
 	c.Check(err, qt.IsNil)
 
