@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"path"
 	"sync"
@@ -17,6 +18,8 @@ import (
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/robfig/cron/v3"
+	"go.uber.org/zap"
 
 	"github.com/CanonicalLtd/jimm/internal/errors"
 )
@@ -218,7 +221,15 @@ func (s *VaultStore) GetJWKS(ctx context.Context) (jwk.Set, error) {
 //
 // The pathing is similar to the controllers credentials
 // in that we understand RS256 keys as credentials, rather than crytographic keys.
-func (s *VaultStore) PutJWKS(ctx context.Context) error {
+//
+// TODO(ale8k)[possibly?]:
+// For now, there's a single key, and this is probably OK. But possibly extend
+// this to contain many at some point differentiated by KIDs.
+//
+// We also currently don't use x5c and x5t for validation and expect users
+// to use e and n for validation.
+// https://stackoverflow.com/questions/61395261/how-to-validate-signature-of-jwt-from-jwks-without-x5c
+func (s *VaultStore) PutJWKS(ctx context.Context, expiry time.Time) error {
 	const op = errors.Op("vault.PutJWKS")
 
 	client, err := s.client(ctx)
@@ -226,13 +237,13 @@ func (s *VaultStore) PutJWKS(ctx context.Context) error {
 		return errors.E(op, err)
 	}
 
-	jwks, err := s.generateJWKS(ctx)
+	k, err := s.generateJWK(ctx)
 	if err != nil {
 		return errors.E(op, err)
 	}
 
 	ks := jwk.NewSet()
-	err = ks.AddKey(jwks)
+	err = ks.AddKey(k)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -242,6 +253,7 @@ func (s *VaultStore) PutJWKS(ctx context.Context) error {
 		return errors.E(op, err)
 	}
 
+	// Set key
 	_, err = client.Logical().WriteBytes(
 		// We persist in a similar folder to the controller credentials, but sub-route
 		// to .well-known for further extensions and mental clarity within our vault.
@@ -252,31 +264,115 @@ func (s *VaultStore) PutJWKS(ctx context.Context) error {
 		return errors.E(op, err)
 	}
 
+	// Set expiry
+	_, err = client.Logical().Write(
+		s.getJWKSExpiryPath(),
+		map[string]interface{}{
+			"jwks-expiry": expiry,
+		},
+	)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
 	return nil
 }
 
 // StartJWKSRotator starts a simple routine which checks the vaults TTL for the JWKS on a defined CRON
 // if the key set is within 1 day of expiry, it will rotate the keys.
-func (s *VaultStore) StartJWKSRotator(ctx context.Context, cron string) error {
-	return nil
+//
+// The CRON will be dependent on UTC.
+func (s *VaultStore) StartJWKSRotator(ctx context.Context, cronSpec string, initialExpiryIfNotExists time.Time) (*cron.Cron, cron.EntryID, error) {
+	const op = errors.Op("vault.StartJWKSRotator")
+	c := cron.New(
+		cron.WithLocation(time.UTC),
+	)
+	putJwks := func() {
+		err := s.PutJWKS(ctx, initialExpiryIfNotExists)
+		fmt.Println("do i work 2", err)
+		zapctx.Debug(ctx, "set a new JWKS")
+		if err != nil {
+			zapctx.Error(
+				ctx,
+				"security failure",
+				zap.Any("op", op),
+				zap.String("security-failure", "failed to put JWKS"),
+			)
+			return
+		}
+	}
+	id, err := c.AddFunc(cronSpec, func() {
+		expires, err := s.getJWKSExpiry(ctx)
+
+		if err != nil {
+			fmt.Println("do i work 1")
+			zapctx.Debug(ctx, "failed to get expiry", zap.Error(err))
+			putJwks()
+		}
+		// If we recieve the expiry, we make a simple check 3 months ahead.
+		now := time.Now().UTC()
+		if now.After(expires) {
+			putJwks()
+		}
+	})
+	if err != nil {
+		return c, 0, errors.E(op, "cron failure", "failed to initialise JWKS rotator cron", err)
+	}
+	c.Start()
+	return c, id, nil
+}
+
+// getJWKSExpiry returns the current expiry for JIMM's JWKS.
+func (s *VaultStore) getJWKSExpiry(ctx context.Context) (time.Time, error) {
+	const op = errors.Op("vault.getJWKSExpiry")
+	now := time.Now()
+	client, err := s.client(ctx)
+	if err != nil {
+		return now, errors.E(op, err)
+	}
+
+	secret, err := client.Logical().Read(s.getJWKSExpiryPath())
+	if err != nil {
+		return now, errors.E(op, err)
+	}
+
+	if secret == nil {
+		msg := "no JWKS exists yet."
+		zapctx.Debug(ctx, msg)
+		return now, errors.E(op, "no jwks exists", msg)
+	}
+
+	expiry, ok := secret.Data["jwks-expiry"].(string)
+	if !ok {
+		return now, errors.E(op, "failed to retrieve expiry")
+	}
+
+	t, err := time.Parse(time.RFC3339, expiry)
+	if err != nil {
+		return now, errors.E(op, err)
+	}
+
+	return t, nil
+}
+
+// getWellKnownPath returns a hard coded path to the .well-known credentials.
+func (s *VaultStore) getWellKnownPath() string {
+	return path.Join(s.KVPath, "creds", ".well-known")
 }
 
 // getJWKSPath returns a hardcoded suffixed vault path (dependent on
 // the initial KVPath) to the .well-known JWKS location.
 func (s *VaultStore) getJWKSPath() string {
-	return path.Join(s.KVPath, "creds", ".well-known", "jwks")
+	return path.Join(s.getWellKnownPath(), "jwks.json")
 }
 
-// generateJWKS generates a new set of JWKS using RSA256[4096]
-//
-// TODO(ale8k)[possibly?]:
-// For now, there's a single key, and this is probably OK. But possibly extend
-// this to contain many at some point differentiated by KIDs.
-//
-// We also currently don't use x5c and x5t for validation and expect users
-// to use e and n for validation.
-// https://stackoverflow.com/questions/61395261/how-to-validate-signature-of-jwt-from-jwks-without-x5c
-func (s *VaultStore) generateJWKS(ctx context.Context) (jwk.Key, error) {
+// getJWKSPath returns the path to the jwks expiry secret.
+func (s *VaultStore) getJWKSExpiryPath() string {
+	return path.Join(s.getWellKnownPath(), "jwks-expiry")
+}
+
+// generateJWKS generates a new set of JWK using RSA256[4096]
+func (s *VaultStore) generateJWK(ctx context.Context) (jwk.Key, error) {
 	const op = errors.Op("vault.generateJWKS")
 
 	// Due to the sensitivity of controllers, it is best we allow a larger encryption bit size

@@ -53,6 +53,7 @@ require (
 	github.com/go-chi/render v1.0.2
 	github.com/lestrrat-go/jwx/v2 v2.0.8
 	github.com/oklog/ulid/v2 v2.1.0
+	github.com/robfig/cron/v3 v3.0.0
 	github.com/stretchr/testify v1.8.1
 	gopkg.in/errgo.v1 v1.0.1
 	gopkg.in/yaml.v2 v2.4.0

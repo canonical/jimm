@@ -6,6 +6,7 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
@@ -101,7 +102,7 @@ func TestGetJWKSPath(t *testing.T) {
 	c := qt.New(t)
 
 	store := newStore(c)
-	c.Assert(store.getJWKSPath(), qt.Equals, store.KVPath+"creds/.well-known/jwks")
+	c.Assert(store.getJWKSPath(), qt.Equals, store.KVPath+"creds/.well-known/jwks.json")
 }
 
 func TestGenerateJWKS(t *testing.T) {
@@ -109,7 +110,7 @@ func TestGenerateJWKS(t *testing.T) {
 	ctx := context.Background()
 
 	store := newStore(c)
-	jwk, err := store.generateJWKS(ctx)
+	jwk, err := store.generateJWK(ctx)
 	c.Assert(err, qt.IsNil)
 
 	// kid
@@ -127,7 +128,7 @@ func TestPutJWKS(t *testing.T) {
 
 	store := newStore(c)
 
-	err := store.PutJWKS(ctx)
+	err := store.PutJWKS(ctx, time.Now().AddDate(0, 3, 1))
 	c.Assert(err, qt.IsNil)
 }
 
@@ -136,7 +137,7 @@ func TestGetJWKS(t *testing.T) {
 	ctx := context.Background()
 
 	store := newStore(c)
-	store.PutJWKS(ctx)
+	store.PutJWKS(ctx, time.Now().AddDate(0, 3, 1))
 
 	ks, err := store.GetJWKS(ctx)
 	c.Assert(err, qt.IsNil)
@@ -149,4 +150,102 @@ func TestGetJWKS(t *testing.T) {
 
 	c.Assert(key.KeyUsage(), qt.Equals, "sig")
 	c.Assert(key.Algorithm(), qt.Equals, jwa.RS256)
+}
+
+func TestGetJWKSExpiry(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	store := newStore(c)
+	store.PutJWKS(ctx, time.Now().AddDate(0, 3, 1))
+	expiry, err := store.getJWKSExpiry(ctx)
+	c.Assert(err, qt.IsNil)
+	// We really care just for the month, not exact Us, but we use RFC3339
+	// everywhere, so it made sense to just use it here.
+	c.Assert(expiry.Month(), qt.Equals, time.Now().AddDate(0, 3, 1).Month())
+}
+
+// This test is difficult to gauge, as it is truly only time based.
+// As such we take a -3 deficit to our total suites test time.
+// But this is a fair usecase for time-based-testing.
+func TestStartJWKSRotatorWithNoJWKSInTheStore(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+	store := newStore(c)
+
+	vc, err := store.client(ctx)
+	c.Check(err, qt.IsNil)
+
+	_, err = vc.Logical().Delete(store.getJWKSExpiryPath())
+	c.Check(err, qt.IsNil)
+
+	_, err = vc.Logical().Delete(store.getJWKSPath())
+	c.Check(err, qt.IsNil)
+
+	cron, id, err := store.StartJWKSRotator(ctx, "@every 1s", time.Now())
+	c.Assert(cron.Entry(id).Valid(), qt.IsTrue)
+	c.Assert(err, qt.IsNil)
+	time.Sleep(time.Second * 3)
+	defer cron.Stop()
+
+	ks, err := store.GetJWKS(ctx)
+	c.Assert(err, qt.IsNil)
+
+	ki := ks.Keys(ctx)
+	ki.Next(ctx)
+	key := ki.Pair().Value.(jwk.Key)
+	_, err = uuid.Parse(key.KeyID())
+	c.Assert(err, qt.IsNil)
+}
+
+// Due to the nature of this test, we do not test exact times (as it will vary drastically machine to machine)
+// But rather just ensure the JWKS has infact updated.
+//
+// So I suppose this test is "best effort", but will only ever pass if the code is truly OK.
+func TestStartJWKSRotatorRotatesAJWKS(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+	store := newStore(c)
+
+	vc, err := store.client(ctx)
+	c.Check(err, qt.IsNil)
+
+	// So, we first put a fresh JWKS in the store
+	_, err = vc.Logical().Delete(store.getJWKSExpiryPath())
+	c.Check(err, qt.IsNil)
+
+	_, err = vc.Logical().Delete(store.getJWKSPath())
+	c.Check(err, qt.IsNil)
+
+	err = store.PutJWKS(ctx, time.Now())
+	c.Check(err, qt.IsNil)
+
+	getKID := func() string {
+		ks, err := store.GetJWKS(ctx)
+		c.Check(err, qt.IsNil)
+
+		ki := ks.Keys(ctx)
+		ki.Next(ctx)
+		key := ki.Pair().Value.(jwk.Key)
+		_, err = uuid.Parse(key.KeyID())
+		c.Check(err, qt.IsNil)
+		return key.KeyID()
+	}
+
+	// Retrieve said JWKS & store it's UUID
+	initialKeyId := getKID()
+
+	// Start up the rotator, and wait a long-enough-ish time
+	// for a new key to rotate
+	cron, id, err := store.StartJWKSRotator(ctx, "@every 1s", time.Now())
+	c.Check(cron.Entry(id).Valid(), qt.IsTrue)
+	c.Check(err, qt.IsNil)
+	time.Sleep(time.Second * 3)
+	defer cron.Stop()
+
+	// Get the new rotated KID
+	newKeyId := getKID()
+
+	// And simply compare them
+	c.Assert(initialKeyId, qt.Not(qt.Equals), newKeyId)
 }

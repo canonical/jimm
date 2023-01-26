@@ -249,6 +249,13 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 			},
 		),
 	)
+
+	// TODO: Should we track the cron in the DB? Not sure if there's a point
+	// as it'll be cleaned up automagically anyways.
+	if _, _, err := vs.StartJWKSRotator(ctx, "@daily", time.Now().AddDate(0, 3, 1)); err != nil {
+		zapctx.Error(ctx, "failed to start jwks rotator", zap.Error(err))
+		os.Exit(3)
+	}
 	mountHandler(
 		"/.well-known",
 		wellknownapi.NewWellKnownHandler(s.jimm.CredentialStore),
