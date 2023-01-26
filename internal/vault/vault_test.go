@@ -110,7 +110,7 @@ func TestGenerateJWKS(t *testing.T) {
 	ctx := context.Background()
 
 	store := newStore(c)
-	jwk, err := store.generateJWK(ctx)
+	jwk, privKeyPem, err := store.generateJWK(ctx)
 	c.Assert(err, qt.IsNil)
 
 	// kid
@@ -120,6 +120,9 @@ func TestGenerateJWKS(t *testing.T) {
 	c.Assert(jwk.KeyUsage(), qt.Equals, "sig")
 	// alg
 	c.Assert(jwk.Algorithm(), qt.Equals, jwa.RS256)
+
+	// It's fine for us to just test the key exists.
+	c.Assert(string(privKeyPem), qt.Contains, "-----BEGIN RSA PRIVATE KEY-----")
 }
 
 func TestPutJWKS(t *testing.T) {
@@ -247,5 +250,8 @@ func resetJWKS(c *qt.C, store *VaultStore) {
 	c.Check(err, qt.IsNil)
 
 	_, err = vc.Logical().Delete(store.getJWKSPath())
+	c.Check(err, qt.IsNil)
+
+	_, err = vc.Logical().Delete(store.getJWKSPrivateKeyPath())
 	c.Check(err, qt.IsNil)
 }

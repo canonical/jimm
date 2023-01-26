@@ -6,7 +6,9 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"net/http"
 	"path"
 	"sync"
@@ -237,7 +239,7 @@ func (s *VaultStore) PutJWKS(ctx context.Context, expiry time.Time) error {
 		return errors.E(op, err)
 	}
 
-	k, err := s.generateJWK(ctx)
+	k, privKeyPem, err := s.generateJWK(ctx)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -259,6 +261,17 @@ func (s *VaultStore) PutJWKS(ctx context.Context, expiry time.Time) error {
 		// to .well-known for further extensions and mental clarity within our vault.
 		s.getJWKSPath(),
 		b,
+	)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	// Set private RSA key
+	_, err = client.Logical().Write(
+		// We persist in a similar folder to the controller credentials, but sub-route
+		// to .well-known for further extensions and mental clarity within our vault.
+		s.getJWKSPrivateKeyPath(),
+		map[string]interface{}{"key": privKeyPem},
 	)
 	if err != nil {
 		return errors.E(op, err)
@@ -364,49 +377,65 @@ func (s *VaultStore) getJWKSPath() string {
 	return path.Join(s.getWellKnownPath(), "jwks.json")
 }
 
+// getJWKSPath returns a hardcoded suffixed vault path (dependent on
+// the initial KVPath) to the .well-known JWKS location.
+func (s *VaultStore) getJWKSPrivateKeyPath() string {
+	return path.Join(s.getWellKnownPath(), "jwks-key.pem")
+}
+
 // getJWKSPath returns the path to the jwks expiry secret.
 func (s *VaultStore) getJWKSExpiryPath() string {
 	return path.Join(s.getWellKnownPath(), "jwks-expiry")
 }
 
 // generateJWKS generates a new set of JWK using RSA256[4096]
-func (s *VaultStore) generateJWK(ctx context.Context) (jwk.Key, error) {
+//
+// It will return a jwk.Key containing the public key
+// and a PEM encoded private key for JWT signing.
+func (s *VaultStore) generateJWK(ctx context.Context) (jwk.Key, []byte, error) {
 	const op = errors.Op("vault.generateJWKS")
 
 	// Due to the sensitivity of controllers, it is best we allow a larger encryption bit size
 	// and accept any negligible wire cost.
 	keySet, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, nil, errors.E(op, err)
 	}
+
+	privateKeyPEM := pem.EncodeToMemory(
+		&pem.Block{
+			Type:  "RSA PRIVATE KEY",
+			Bytes: x509.MarshalPKCS1PrivateKey(keySet),
+		},
+	)
 
 	// We also use the same methodology of generating UUIDs for our KID
 	kid, err := uuid.NewRandom()
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, nil, errors.E(op, err)
 	}
 
 	jwks, err := jwk.FromRaw(keySet.PublicKey)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, nil, errors.E(op, err)
 	}
 
 	err = jwks.Set("kid", kid.String())
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, nil, errors.E(op, err)
 	}
 
 	err = jwks.Set("use", "sig")
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, nil, errors.E(op, err)
 	}
 
 	err = jwks.Set("alg", jwa.RS256)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, nil, errors.E(op, err)
 	}
 
-	return jwks, nil
+	return jwks, privateKeyPEM, nil
 }
 
 // deleteControllerCredentials removes the credentials associated with the controller in
