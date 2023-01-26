@@ -52,6 +52,9 @@ type CredentialStore interface {
 	// StartJWKSRotator starts a simple routine which checks the vaults TTL for the JWKS on a defined CRON
 	// if the key set is within 1 day of expiry, it will rotate the keys.
 	StartJWKSRotator(ctx context.Context, cronSpec string, expiry time.Time) (*cron.Cron, cron.EntryID, error)
+
+	// GetJWKSPrivateKey returns the current private key for the active JWKS
+	GetJWKSPrivateKey(ctx context.Context) ([]byte, error)
 }
 
 // A JIMM provides the business logic for managing resources in the JAAS

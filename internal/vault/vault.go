@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"net/http"
@@ -335,6 +336,37 @@ func (s *VaultStore) StartJWKSRotator(ctx context.Context, cronSpec string, init
 	return c, id, nil
 }
 
+// GetJWKSPrivateKey returns the current private key for the active JWKS
+func (s *VaultStore) GetJWKSPrivateKey(ctx context.Context) ([]byte, error) {
+	const op = errors.Op("vault.GetJWKSPrivateKey")
+
+	client, err := s.client(ctx)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	secret, err := client.Logical().Read(s.getJWKSPrivateKeyPath())
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	if secret == nil {
+		msg := "no JWKS exists yet."
+		zapctx.Debug(ctx, msg)
+		return nil, errors.E(op, "no jwks exists", msg)
+	}
+
+	keyPemB64 := secret.Data["key"].(string)
+
+	keyPem, err := base64.StdEncoding.DecodeString(keyPemB64)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	return keyPem, nil
+
+}
+
 // getJWKSExpiry returns the current expiry for JIMM's JWKS.
 func (s *VaultStore) getJWKSExpiry(ctx context.Context) (time.Time, error) {
 	const op = errors.Op("vault.getJWKSExpiry")
@@ -421,18 +453,17 @@ func (s *VaultStore) generateJWK(ctx context.Context) (jwk.Key, []byte, error) {
 	if err != nil {
 		return nil, nil, errors.E(op, err)
 	}
-
-	err = jwks.Set("kid", kid.String())
+	err = jwks.Set(jwk.KeyIDKey, kid.String())
 	if err != nil {
 		return nil, nil, errors.E(op, err)
 	}
 
-	err = jwks.Set("use", "sig")
+	err = jwks.Set(jwk.KeyUsageKey, "sig") // Couldn't find const for this...
 	if err != nil {
 		return nil, nil, errors.E(op, err)
 	}
 
-	err = jwks.Set("alg", jwa.RS256)
+	err = jwks.Set(jwk.AlgorithmKey, jwa.RS256)
 	if err != nil {
 		return nil, nil, errors.E(op, err)
 	}
