@@ -71,7 +71,7 @@ func (s *groupSuite) TestRemoveGroupSuperuser(c *gc.C) {
 	err := s.jimmSuite.JIMM.Database.AddGroup(context.TODO(), "test-group")
 	c.Assert(err, gc.IsNil)
 
-	_, err = cmdtesting.RunCommand(c, cmd.NewRemoveGroupCommandForTesting(s.ClientStore(), bClient), "test-group")
+	_, err = cmdtesting.RunCommand(c, cmd.NewRemoveGroupCommandForTesting(s.ClientStore(), bClient), "test-group", "-y")
 	c.Assert(err, gc.IsNil)
 
 	group := &dbmodel.GroupEntry{Name: "test-group"}
@@ -79,10 +79,18 @@ func (s *groupSuite) TestRemoveGroupSuperuser(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, "record not found")
 }
 
+func (s *groupSuite) TestRemoveGroupWithoutFlag(c *gc.C) {
+	// alice is superuser
+	bClient := s.userBakeryClient("alice")
+
+	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveGroupCommandForTesting(s.ClientStore(), bClient), "test-group")
+	c.Assert(err.Error(), gc.Matches, "EOF")
+}
+
 func (s *groupSuite) TestRemoveGroup(c *gc.C) {
 	// bob is not superuser
 	bClient := s.userBakeryClient("bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveGroupCommandForTesting(s.ClientStore(), bClient), "test-group")
+	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveGroupCommandForTesting(s.ClientStore(), bClient), "test-group", "-y")
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
