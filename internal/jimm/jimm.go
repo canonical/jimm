@@ -15,7 +15,6 @@ import (
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwk"
-	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
@@ -49,9 +48,8 @@ type CredentialStore interface {
 	// GetJWKS returns the current key set stored within the credential store.
 	GetJWKS(ctx context.Context) (jwk.Set, error)
 
-	// StartJWKSRotator starts a simple routine which checks the vaults TTL for the JWKS on a defined CRON
-	// if the key set is within 1 day of expiry, it will rotate the keys.
-	StartJWKSRotator(ctx context.Context, cronSpec string, expiry time.Time) (*cron.Cron, cron.EntryID, error)
+	// StartJWKSRotator starts a simple routine which checks the vaults TTL for the JWKS on a ticker.
+	StartJWKSRotator(ctx context.Context, checkRotateRequired *time.Ticker, initialRotateRequiredTime time.Time) (func(), error)
 
 	// GetJWKSPrivateKey returns the current private key for the active JWKS
 	GetJWKSPrivateKey(ctx context.Context) ([]byte, error)

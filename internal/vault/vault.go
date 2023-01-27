@@ -21,7 +21,6 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
-	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
 
 	"github.com/CanonicalLtd/jimm/internal/errors"
@@ -294,17 +293,18 @@ func (s *VaultStore) PutJWKS(ctx context.Context, expiry time.Time) error {
 	return nil
 }
 
-// StartJWKSRotator starts a simple routine which checks the vaults TTL for the JWKS on a defined CRON
-// if the key set is within 1 day of expiry, it will rotate the keys.
+// StartJWKSRotator starts a simple routine which checks the vaults TTL for the JWKS on a ticker
+// if the key set is within 1 day of rotation required time, it will rotate the keys.
 //
-// The CRON will be dependent on UTC.
-func (s *VaultStore) StartJWKSRotator(ctx context.Context, cronSpec string, initialExpiryIfNotExists time.Time) (*cron.Cron, cron.EntryID, error) {
+// It closure that may be called to stop the rotation ticker.
+func (s *VaultStore) StartJWKSRotator(ctx context.Context, checkRotateRequired *time.Ticker, initialRotateRequiredTime time.Time) (func(), error) {
 	const op = errors.Op("vault.StartJWKSRotator")
-	c := cron.New(
-		cron.WithLocation(time.UTC),
-	)
+
+	// ticker := time.NewTicker(checkRotateRequired)
+	done := make(chan bool)
+
 	putJwks := func() {
-		err := s.PutJWKS(ctx, initialExpiryIfNotExists)
+		err := s.PutJWKS(ctx, initialRotateRequiredTime)
 		zapctx.Debug(ctx, "set a new JWKS")
 		if err != nil {
 			zapctx.Error(
@@ -316,24 +316,32 @@ func (s *VaultStore) StartJWKSRotator(ctx context.Context, cronSpec string, init
 			return
 		}
 	}
-	id, err := c.AddFunc(cronSpec, func() {
-		expires, err := s.getJWKSExpiry(ctx)
 
-		if err != nil {
-			zapctx.Debug(ctx, "failed to get expiry", zap.Error(err))
-			putJwks()
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case <-checkRotateRequired.C:
+				expires, err := s.getJWKSExpiry(ctx)
+
+				if err != nil {
+					zapctx.Debug(ctx, "failed to get expiry", zap.Error(err))
+					putJwks()
+				}
+				// If we recieve the expiry, we make a simple check 3 months ahead.
+				now := time.Now().UTC()
+				if now.After(expires) {
+					putJwks()
+				}
+			}
 		}
-		// If we recieve the expiry, we make a simple check 3 months ahead.
-		now := time.Now().UTC()
-		if now.After(expires) {
-			putJwks()
-		}
-	})
-	if err != nil {
-		return c, 0, errors.E(op, "cron failure", "failed to initialise JWKS rotator cron", err)
-	}
-	c.Start()
-	return c, id, nil
+	}()
+
+	return func() {
+		checkRotateRequired.Stop()
+		done <- true
+	}, nil
 }
 
 // GetJWKSPrivateKey returns the current private key for the active JWKS

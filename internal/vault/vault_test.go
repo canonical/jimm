@@ -182,12 +182,10 @@ func TestStartJWKSRotatorWithNoJWKSInTheStore(t *testing.T) {
 	store := newStore(c)
 	resetJWKS(c, store)
 
-	cron, id, err := store.StartJWKSRotator(ctx, "@every 1s", time.Now())
-	c.Assert(cron.Entry(id).Valid(), qt.IsTrue)
+	stopRotator, err := store.StartJWKSRotator(ctx, time.NewTicker(time.Second), time.Now())
 	c.Assert(err, qt.IsNil)
-	time.Sleep(time.Second * 3)
-	defer cron.Stop()
-
+	time.Sleep(time.Second)
+	stopRotator()
 	ks, err := store.GetJWKS(ctx)
 	c.Assert(err, qt.IsNil)
 
@@ -229,11 +227,10 @@ func TestStartJWKSRotatorRotatesAJWKS(t *testing.T) {
 
 	// Start up the rotator, and wait a long-enough-ish time
 	// for a new key to rotate
-	cron, id, err := store.StartJWKSRotator(ctx, "@every 1s", time.Now())
-	c.Check(cron.Entry(id).Valid(), qt.IsTrue)
-	c.Check(err, qt.IsNil)
-	time.Sleep(time.Second * 3)
-	defer cron.Stop()
+	stopRotator, err := store.StartJWKSRotator(ctx, time.NewTicker(time.Second), time.Now())
+	c.Assert(err, qt.IsNil)
+	time.Sleep(time.Second)
+	stopRotator()
 
 	// Get the new rotated KID
 	newKeyId := getKID()
