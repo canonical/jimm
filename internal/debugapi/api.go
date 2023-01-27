@@ -2,75 +2,81 @@ package debugapi
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"sync"
 	"time"
 
-	"github.com/juju/zaputil/zapctx"
-	"go.uber.org/zap"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/render"
 
 	"github.com/CanonicalLtd/jimm/version"
 )
 
-// Handler returns an http.Handler to handle requests for /debug endpoints.
-func Handler(ctx context.Context, statusChecks map[string]StatusCheck) http.Handler {
-	mux := http.NewServeMux()
-
-	// data for /debug/info
-	buf, err := json.Marshal(version.VersionInfo)
-	if err == nil {
-		mux.HandleFunc("/debug/info", func(w http.ResponseWriter, _ *http.Request) {
-			w.Write(buf)
-		})
-	} else {
-		// This should be impossible.
-		zapctx.Error(ctx, "cannot marshal version", zap.Error(err))
-	}
-
-	// /debug/status
-	mux.HandleFunc("/debug/status", statusHandler(statusChecks))
-
-	return mux
+// DebugHandler holds the grouped router to be mounted and
+// any service checks we wish to register.
+// Implements jimmhttp.JIMMHttpHandler
+type DebugHandler struct {
+	Router       *chi.Mux
+	StatusChecks map[string]StatusCheck
 }
 
-// statusHandler returns a http.HandlerFunc the performs the given status
-// checks.
-func statusHandler(checks map[string]StatusCheck) http.HandlerFunc {
-	return func(w http.ResponseWriter, req *http.Request) {
-		var mu sync.Mutex
-		results := make(map[string]statusResult, len(checks))
-		var wg sync.WaitGroup
-		wg.Add(len(checks))
-		for k, check := range checks {
-			k, check := k, check
-			go func() {
-				defer wg.Done()
-				result := statusResult{
-					Name: check.Name(),
-				}
-				start := time.Now()
-				v, err := check.Check(req.Context())
-				result.Duration = time.Since(start)
-				if err == nil {
-					result.Passed = true
-					result.Value = v
-				} else {
-					result.Value = err.Error()
-				}
-				mu.Lock()
-				defer mu.Unlock()
-				results[k] = result
-			}()
-		}
-		wg.Wait()
-		buf, err := json.Marshal(results)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Write(buf)
+// NewDebugHandler returns a new debug handler
+func NewDebugHandler(statusChecks map[string]StatusCheck) *DebugHandler {
+	return &DebugHandler{Router: chi.NewRouter(), StatusChecks: statusChecks}
+}
+
+// Routes returns the grouped routers routes with group specific middlewares.
+func (dh *DebugHandler) Routes() chi.Router {
+	dh.SetupMiddleware()
+	dh.Router.Get("/info", dh.Info)
+	dh.Router.Get("/status", dh.Status)
+	return dh.Router
+}
+
+// SetupMiddleware applies middlewares.
+func (dh *DebugHandler) SetupMiddleware() {
+	dh.Router.Use(
+		render.SetContentType(
+			render.ContentTypeJSON,
+		),
+	)
+}
+
+// Info handles /info, returning the current version of the server.
+func (dh *DebugHandler) Info(w http.ResponseWriter, r *http.Request) {
+	render.JSON(w, r, version.VersionInfo)
+}
+
+// Status handles /status, returning the currently registered status checks.
+func (dh *DebugHandler) Status(w http.ResponseWriter, r *http.Request) {
+	checks := dh.StatusChecks
+	var mu sync.Mutex
+	results := make(map[string]statusResult, len(checks))
+	var wg sync.WaitGroup
+	wg.Add(len(checks))
+	for k, check := range checks {
+		k, check := k, check
+		go func() {
+			defer wg.Done()
+			result := statusResult{
+				Name: check.Name(),
+			}
+			start := time.Now()
+			v, err := check.Check(r.Context())
+			result.Duration = time.Since(start)
+			if err == nil {
+				result.Passed = true
+				result.Value = v
+			} else {
+				result.Value = err.Error()
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			results[k] = result
+		}()
 	}
+	wg.Wait()
+	render.JSON(w, r, results)
 }
 
 // A statusResult is the type that represents the result of a status check

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/canonical/candid/candidclient"
+	"github.com/go-chi/chi/v5"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/dbrootkeystore"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
@@ -35,6 +36,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/debugapi"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
+	"github.com/CanonicalLtd/jimm/internal/jimmhttp"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
 	"github.com/CanonicalLtd/jimm/internal/jujuclient"
 	"github.com/CanonicalLtd/jimm/internal/logger"
@@ -153,7 +155,7 @@ type Params struct {
 type Service struct {
 	jimm jimm.JIMM
 
-	mux http.ServeMux
+	mux *chi.Mux
 }
 
 // ServeHTTP implements http.Handler.
@@ -201,6 +203,8 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	const op = errors.Op("NewService")
 
 	s := new(Service)
+	s.mux = chi.NewRouter()
+
 	if p.ControllerUUID == "" {
 		controllerUUID, err := uuid.NewRandom()
 		if err != nil {
@@ -243,7 +247,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	if openFGAclient != nil {
 		s.jimm.OpenFGAClient = openFGAclient
 	}
-	// ensureJIMMAuthorisationModel(openFGAclient)
 
 	s.jimm.Dialer = &jujuclient.Dialer{
 		ControllerCredentialsStore: vs,
@@ -252,15 +255,25 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
 	}
 
-	s.mux.Handle("/debug/", debugapi.Handler(ctx, map[string]debugapi.StatusCheck{
-		"start_started": debugapi.ServerStartTime,
-	}))
+	mountHandler := func(path string, h jimmhttp.JIMMHttpHandler) {
+		s.mux.Mount(path, h.Routes())
+	}
+
+	mountHandler(
+		"/debug",
+		debugapi.NewDebugHandler(
+			map[string]debugapi.StatusCheck{
+				"start_time": debugapi.ServerStartTime,
+			},
+		),
+	)
 
 	params := jujuapi.Params{
 		ControllerUUID:   p.ControllerUUID,
 		IdentityLocation: p.CandidURL,
 		PublicDNSName:    p.PublicDNSName,
 	}
+
 	s.mux.Handle("/api", jujuapi.APIHandler(ctx, &s.jimm, params))
 	s.mux.Handle("/model/", jujuapi.ModelHandler(ctx, &s.jimm, params))
 	// If the request is not for a known path assume it is part of the dashboard.
@@ -270,12 +283,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	}
 
 	return s, nil
-}
-
-// ensureJIMMAuthorisationModel ensures that the authorisation model, as defined by JIMM,
-// exists at startup. If it doesn't, it will attempt to create it.
-func ensureJIMMAuthorisationModel(c *openfga.APIClient) {
-
 }
 
 func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {
