@@ -32,6 +32,14 @@ func NewJWKSService(credStore credentials.CredentialStore) *JWKSService {
 // if the key set is within 1 day of rotation required time, it will rotate the keys.
 //
 // It closure that may be called to stop the rotation ticker.
+//
+// TODO(ale8k)[possibly?]:
+// For now, there's a single key, and this is probably OK. But possibly extend
+// this to contain many at some point differentiated by KIDs.
+//
+// We also currently don't use x5c and x5t for validation and expect users
+// to use e and n for validation.
+// https://stackoverflow.com/questions/61395261/how-to-validate-signature-of-jwt-from-jwks-without-x5c
 func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequired *time.Ticker, initialRotateRequiredTime time.Time) (func(), error) {
 	const op = errors.Op("vault.StartJWKSRotator")
 	done := make(chan bool)

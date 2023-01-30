@@ -279,14 +279,6 @@ func (s *VaultStore) GetJWKSExpiry(ctx context.Context) (time.Time, error) {
 //
 // The pathing is similar to the controllers credentials
 // in that we understand RS256 keys as credentials, rather than crytographic keys.
-//
-// TODO(ale8k)[possibly?]:
-// For now, there's a single key, and this is probably OK. But possibly extend
-// this to contain many at some point differentiated by KIDs.
-//
-// We also currently don't use x5c and x5t for validation and expect users
-// to use e and n for validation.
-// https://stackoverflow.com/questions/61395261/how-to-validate-signature-of-jwt-from-jwks-without-x5c
 func (s *VaultStore) PutJWKS(ctx context.Context, jwks jwk.Set) error {
 	const op = errors.Op("vault.PutJWKS")
 

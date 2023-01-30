@@ -17,7 +17,6 @@ import (
 	"github.com/juju/names/v4"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
-	"github.com/lestrrat-go/jwx/v2/jwt"
 
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 )
@@ -57,6 +56,20 @@ func getJWKS(c *qt.C) jwk.Set {
 	`)
 	c.Assert(err, qt.IsNil)
 	return set
+}
+
+func resetJWKS(c *qt.C, store *VaultStore) {
+	vc, err := store.client(context.Background())
+	c.Check(err, qt.IsNil)
+
+	_, err = vc.Logical().Delete(store.getJWKSExpiryPath())
+	c.Check(err, qt.IsNil)
+
+	_, err = vc.Logical().Delete(store.getJWKSPath())
+	c.Check(err, qt.IsNil)
+
+	_, err = vc.Logical().Delete(store.getJWKSPrivateKeyPath())
+	c.Check(err, qt.IsNil)
 }
 
 func TestVaultCloudCredentialAttributeStoreRoundTrip(t *testing.T) {
@@ -122,24 +135,13 @@ func TestVaultControllerCredentialsStoreRoundTrip(t *testing.T) {
 	c.Check(p, qt.Equals, "")
 }
 
-func TestPutJWKS(t *testing.T) {
-	c := qt.New(t)
-	ctx := context.Background()
-	store := newStore(c)
-	resetJWKS(c, store)
-
-	err := store.PutJWKS(ctx, getJWKS(c))
-	c.Assert(err, qt.IsNil)
-}
-
-func TestGetJWKS(t *testing.T) {
+func TestGetAndPutJWKS(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 	store := newStore(c)
 	resetJWKS(c, store)
 
 	store.PutJWKS(ctx, getJWKS(c))
-
 	ks, err := store.GetJWKS(ctx)
 	c.Assert(err, qt.IsNil)
 	ki := ks.Keys(ctx)
@@ -153,7 +155,7 @@ func TestGetJWKS(t *testing.T) {
 	c.Assert(key.Algorithm(), qt.Equals, jwa.RS256)
 }
 
-func TestGetJWKSExpiry(t *testing.T) {
+func TestGetAndPutJWKSExpiry(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 	store := newStore(c)
@@ -167,141 +169,23 @@ func TestGetJWKSExpiry(t *testing.T) {
 	c.Assert(expiry.Month(), qt.Equals, time.Now().AddDate(0, 3, 1).Month())
 }
 
-func TestGetJWKSPrivateKey(t *testing.T) {
+func TestGetAndPutJWKSPrivateKey(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 	store := newStore(c)
 	resetJWKS(c, store)
 	keySet, err := rsa.GenerateKey(rand.Reader, 4096)
 	c.Assert(err, qt.IsNil)
-
 	privateKeyPEM := pem.EncodeToMemory(
 		&pem.Block{
 			Type:  "RSA PRIVATE KEY",
 			Bytes: x509.MarshalPKCS1PrivateKey(keySet),
 		},
 	)
+
 	store.PutJWKSPrivateKey(ctx, privateKeyPEM)
 	store.PutJWKS(ctx, getJWKS(c))
 	keyPem, err := store.GetJWKSPrivateKey(ctx)
 	c.Assert(err, qt.IsNil)
 	c.Assert(string(keyPem), qt.Contains, "-----BEGIN RSA PRIVATE KEY-----")
-}
-
-// This can be considered an e2e test for the JWKS EP and our current credential storage.
-// It verifies signatures do work as intended.
-//
-// This is also how I would imagine a juju controller would run through the process
-// of verification without the use of x5t & x5c.
-//
-// As we often just forget these processes I've left neatly organised /**/ comments
-// denoting each segment of the process.
-func TestSigningAJWT(t *testing.T) {
-	c := qt.New(t)
-	ctx := context.Background()
-	store := newStore(c)
-	resetJWKS(c, store)
-	err := store.PutJWKS(ctx, getJWKS(c))
-	c.Check(err, qt.IsNil)
-	jwtId := "1234-1234-1234-1234"
-
-	/*
-		Server gets public only JWKS from store
-	*/
-	set, err := store.GetJWKS(ctx)
-	c.Assert(err, qt.IsNil)
-
-	/*
-		Server gets JWKS Public key ID from retrieved JWKS
-	*/
-	key, ok := set.Key(0) // Fine for test, we know there's only one.
-	c.Assert(ok, qt.IsTrue)
-	jwksKid := key.KeyID()
-	c.Check(jwksKid, qt.HasLen, 36) // Our UUIDs are always 36len
-
-	/*
-		Server gets private key for said public JWKS from store
-
-		Our keys are persisted in PEM (passphraseless but we could add a passphrase?) B64 for consistency across the wire.
-
-		TODO@ales@kian: Shall we use passphrases on the current keysets private key, is it worth it?
-	*/
-	privKeyPem, err := store.GetJWKSPrivateKey(ctx)
-	c.Check(err, qt.IsNil)
-
-	/*
-		Server decodes the PEM encoded private key
-	*/
-	block, _ := pem.Decode([]byte(privKeyPem))
-	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-	c.Check(err, qt.IsNil)
-
-	/*
-		Server sets up a signing key from the decoded PEM private key
-		and manually sets the algorithm and keyid
-	*/
-	signingKey, err := jwk.FromRaw(privKey)
-	signingKey.Set(jwk.AlgorithmKey, jwa.RS256)
-	signingKey.Set(jwk.KeyIDKey, jwksKid)
-	c.Assert(err, qt.IsNil)
-
-	/*
-		Server sets up a JWT
-	*/
-	token, err := jwt.NewBuilder().
-		Issuer("jimmy").
-		Audience([]string{"controller-somecontroller"}).
-		Subject("user-alice@external").
-		Issuer("jimm").
-		JwtID(jwtId).
-		Claim("access", map[string]interface{}{ // It is important to send it as 'interface', as private claims can be string, num or bool
-			"controller-1234-1234-1234": "administrator",
-			"model-1234-1234-1234":      "administrator",
-		}).
-		Build()
-	c.Check(err, qt.IsNil)
-
-	/*
-		Server now signs the JWT with the prepared signing key, based on the current active JWKS
-	*/
-	freshJwt, err := jwt.Sign(token, jwt.WithKey(jwa.RS256, signingKey))
-	c.Check(err, qt.IsNil)
-	/*
-		Server makes request to controller with the JWT
-	*/
-
-	/*
-		Juju controller:
-		1. Recieves request (hypothetically)
-		2. Checks it's jws.Cache for a JWKS (and if not present, gets a fresh set) (hypothetically)
-		3. Verifies JWT using the JWKS
-		4. Goes on to do what it does...
-	*/
-	verifiedToken, err := jwt.Parse(
-		freshJwt,
-		jwt.WithKeySet(set),
-	)
-	c.Assert(err, qt.IsNil)
-	// The token irritatingly has no exported fields. And as cmp cannot handle unexported,
-	// we test one, by, one...
-	c.Assert(verifiedToken.JwtID(), qt.Equals, token.JwtID())
-	c.Assert(verifiedToken.Issuer(), qt.Equals, token.Issuer())
-	c.Assert(verifiedToken.Audience(), qt.DeepEquals, token.Audience())
-	c.Assert(verifiedToken.Subject(), qt.Equals, token.Subject())
-	c.Assert(verifiedToken.PrivateClaims(), qt.DeepEquals, token.PrivateClaims())
-
-}
-
-func resetJWKS(c *qt.C, store *VaultStore) {
-	vc, err := store.client(context.Background())
-	c.Check(err, qt.IsNil)
-
-	_, err = vc.Logical().Delete(store.getJWKSExpiryPath())
-	c.Check(err, qt.IsNil)
-
-	_, err = vc.Logical().Delete(store.getJWKSPath())
-	c.Check(err, qt.IsNil)
-
-	_, err = vc.Logical().Delete(store.getJWKSPrivateKeyPath())
-	c.Check(err, qt.IsNil)
 }
