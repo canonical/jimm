@@ -84,7 +84,7 @@ func (s *groupSuite) TestRemoveGroupWithoutFlag(c *gc.C) {
 	bClient := s.userBakeryClient("alice")
 
 	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveGroupCommandForTesting(s.ClientStore(), bClient), "test-group")
-	c.Assert(err.Error(), gc.Matches, "EOF")
+	c.Assert(err.Error(), gc.Matches, "Failed to read from input.")
 }
 
 func (s *groupSuite) TestRemoveGroup(c *gc.C) {
