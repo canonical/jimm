@@ -8,24 +8,25 @@ import (
 	"encoding/pem"
 	"time"
 
-	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/jimm/credentials"
 	"github.com/google/uuid"
 	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"go.uber.org/zap"
+
+	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/CanonicalLtd/jimm/internal/jimm/credentials"
 )
 
 // JWKSService handles the creation, rotation and retrieval of JWKS for JIMM.
 // It utilises the underlying credential store currently in effect.
 type JWKSService struct {
-	CredentialStore credentials.CredentialStore
+	credentialStore credentials.CredentialStore
 }
 
 // NewJWKSService returns a new JWKS service for handling JIMMs JWKS.
 func NewJWKSService(credStore credentials.CredentialStore) *JWKSService {
-	return &JWKSService{CredentialStore: credStore}
+	return &JWKSService{credentialStore: credStore}
 }
 
 // StartJWKSRotator starts a simple routine which checks the vaults TTL for the JWKS on a ticker
@@ -40,11 +41,10 @@ func NewJWKSService(credStore credentials.CredentialStore) *JWKSService {
 // We also currently don't use x5c and x5t for validation and expect users
 // to use e and n for validation.
 // https://stackoverflow.com/questions/61395261/how-to-validate-signature-of-jwt-from-jwks-without-x5c
-func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequired *time.Ticker, initialRotateRequiredTime time.Time) (func(), error) {
+func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequired *time.Ticker, initialRotateRequiredTime time.Time) error {
 	const op = errors.Op("vault.StartJWKSRotator")
-	done := make(chan bool)
 
-	credStore := jwks.CredentialStore
+	credStore := jwks.credentialStore
 
 	putJwks := func() {
 		set, key, err := jwks.generateJWK(ctx)
@@ -101,8 +101,6 @@ func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequir
 	go func() {
 		for {
 			select {
-			case <-done:
-				return
 			case <-checkRotateRequired.C:
 				expires, err := credStore.GetJWKSExpiry(ctx)
 
@@ -115,14 +113,14 @@ func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequir
 				if now.After(expires) {
 					putJwks()
 				}
+			case <-ctx.Done():
+				return
 			}
+
 		}
 	}()
 
-	return func() {
-		checkRotateRequired.Stop()
-		done <- true
-	}, nil
+	return nil
 }
 
 // generateJWKS generates a new set of JWK using RSA256[4096]

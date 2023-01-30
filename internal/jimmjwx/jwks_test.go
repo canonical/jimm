@@ -2,17 +2,20 @@ package jimmjwx
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"path"
 	"testing"
 	"time"
 
-	"github.com/CanonicalLtd/jimm/internal/jimmtest"
-	"github.com/CanonicalLtd/jimm/internal/vault"
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
+	"github.com/hashicorp/vault/api"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
+
+	"github.com/CanonicalLtd/jimm/internal/vault"
 )
 
 func TestMain(m *testing.M) {
@@ -20,8 +23,37 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+// TODO: alex remove these and fix import cycle ...
+type fatalF interface {
+	Name() string
+	Fatalf(format string, args ...interface{})
+}
+
+// VaultClient returns a new vault client for use in a test.
+func vaultClient(tb fatalF, prefix string) (*api.Client, string, map[string]interface{}, bool) {
+	cfg := api.DefaultConfig()
+	cfg.Address = "http://localhost:8200"
+	vaultClient, _ := api.NewClient(cfg)
+
+	b, err := os.ReadFile(path.Join(prefix, "./local/vault/approle.json"))
+	if err != nil {
+		fmt.Println("we got file?")
+	}
+
+	creds := make(map[string]interface{})
+	var vaultAPISecret api.Secret
+	err = json.Unmarshal(b, &vaultAPISecret)
+	if err != nil {
+		fmt.Println("error?")
+	}
+	creds["role_id"] = vaultAPISecret.Data["role_id"]
+	creds["secret_id"] = vaultAPISecret.Data["secret_id"]
+
+	return vaultClient, "/jimm-kv/", creds, true
+}
+
 func newStore(t testing.TB) *vault.VaultStore {
-	client, path, creds, ok := jimmtest.VaultClient(t, "../../")
+	client, path, creds, ok := vaultClient(t, "../../")
 	if !ok {
 		t.Skip("vault not available")
 	}
@@ -97,15 +129,15 @@ func TestGenerateJWKS(t *testing.T) {
 // But this is a fair usecase for time-based-testing.
 func TestStartJWKSRotatorWithNoJWKSInTheStore(t *testing.T) {
 	c := qt.New(t)
-	ctx := context.Background()
+	ctx, cancelCtx := context.WithCancel(context.Background())
 	store := newStore(c)
 	resetJWKS(c, store)
 	svc := NewJWKSService(store)
 
-	stopRotator, err := svc.StartJWKSRotator(ctx, time.NewTicker(time.Second), time.Now())
+	err := svc.StartJWKSRotator(ctx, time.NewTicker(time.Second), time.Now())
 	c.Assert(err, qt.IsNil)
 	time.Sleep(time.Second)
-	stopRotator()
+	cancelCtx()
 	ks, err := store.GetJWKS(ctx)
 	c.Assert(err, qt.IsNil)
 
@@ -122,7 +154,7 @@ func TestStartJWKSRotatorWithNoJWKSInTheStore(t *testing.T) {
 // So I suppose this test is "best effort", but will only ever pass if the code is truly OK.
 func TestStartJWKSRotatorRotatesAJWKS(t *testing.T) {
 	c := qt.New(t)
-	ctx := context.Background()
+	ctx, cancelCtx := context.WithCancel(context.Background())
 	store := newStore(c)
 	resetJWKS(c, store)
 	svc := NewJWKSService(store)
@@ -148,10 +180,10 @@ func TestStartJWKSRotatorRotatesAJWKS(t *testing.T) {
 
 	// Start up the rotator, and wait a long-enough-ish time
 	// for a new key to rotate
-	stopRotator, err := svc.StartJWKSRotator(ctx, time.NewTicker(time.Second), time.Now())
+	err = svc.StartJWKSRotator(ctx, time.NewTicker(time.Second), time.Now())
 	c.Assert(err, qt.IsNil)
 	time.Sleep(time.Second)
-	stopRotator()
+	cancelCtx()
 
 	// Get the new rotated KID
 	newKeyId := getKID()

@@ -37,6 +37,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	jimmcreds "github.com/CanonicalLtd/jimm/internal/jimm/credentials"
 	"github.com/CanonicalLtd/jimm/internal/jimmhttp"
+	"github.com/CanonicalLtd/jimm/internal/jimmjwx"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
 	"github.com/CanonicalLtd/jimm/internal/jujuclient"
 	"github.com/CanonicalLtd/jimm/internal/logger"
@@ -181,6 +182,11 @@ func (s *Service) PollModels(ctx context.Context) error {
 	return w.PollModels(ctx, 10*time.Minute)
 }
 
+// StartJWKSRotator see internal/jimmjwx/jwks.go for details.
+func (s *Service) StartJWKSRotator(ctx context.Context, checkRotateRequired *time.Ticker, initialRotateRequiredTime time.Time) error {
+	return s.jimm.JWKService.StartJWKSRotator(ctx, checkRotateRequired, initialRotateRequiredTime)
+}
+
 // NewService creates a new Service using the given params.
 func NewService(ctx context.Context, p Params) (*Service, error) {
 	const op = errors.Op("NewService")
@@ -238,6 +244,10 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
 	}
 
+	if s.jimm.CredentialStore != nil {
+		s.jimm.JWKService = jimmjwx.NewJWKSService(s.jimm.CredentialStore)
+	}
+
 	mountHandler := func(path string, h jimmhttp.JIMMHttpHandler) {
 		s.mux.Mount(path, h.Routes())
 	}
@@ -250,12 +260,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 			},
 		),
 	)
-
-	// TODO: Have ticker stopped on graceful shutdown using closure func
-	// if _, err := vs.StartJWKSRotator(ctx, time.NewTicker(time.Hour), time.Now().AddDate(0, 3, 1)); err != nil {
-	// 	zapctx.Error(ctx, "failed to start jwks rotator", zap.Error(err))
-	// 	os.Exit(3)
-	// }
 	mountHandler(
 		"/.well-known",
 		wellknownapi.NewWellKnownHandler(s.jimm.CredentialStore),

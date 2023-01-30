@@ -21,6 +21,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm/credentials"
+	"github.com/CanonicalLtd/jimm/internal/jimmjwx"
 	ofgaClient "github.com/CanonicalLtd/jimm/internal/openfga"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
 )
@@ -65,6 +66,8 @@ type JIMM struct {
 	// OpenFGAClient holds the client used to interact
 	// with the OpenFGA ReBAC system.
 	OpenFGAClient *ofgaClient.OFGAClient
+
+	JWKService *jimmjwx.JWKSService
 }
 
 // An Authenticator authenticates login requests.
