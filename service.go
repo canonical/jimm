@@ -35,6 +35,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/debugapi"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
+	jimmcreds "github.com/CanonicalLtd/jimm/internal/jimm/credentials"
 	"github.com/CanonicalLtd/jimm/internal/jimmhttp"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
 	"github.com/CanonicalLtd/jimm/internal/jujuclient"
@@ -251,10 +252,10 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	)
 
 	// TODO: Have ticker stopped on graceful shutdown using closure func
-	if _, err := vs.StartJWKSRotator(ctx, time.NewTicker(time.Hour), time.Now().AddDate(0, 3, 1)); err != nil {
-		zapctx.Error(ctx, "failed to start jwks rotator", zap.Error(err))
-		os.Exit(3)
-	}
+	// if _, err := vs.StartJWKSRotator(ctx, time.NewTicker(time.Hour), time.Now().AddDate(0, 3, 1)); err != nil {
+	// 	zapctx.Error(ctx, "failed to start jwks rotator", zap.Error(err))
+	// 	os.Exit(3)
+	// }
 	mountHandler(
 		"/.well-known",
 		wellknownapi.NewWellKnownHandler(s.jimm.CredentialStore),
@@ -366,7 +367,7 @@ func newAuthenticator(ctx context.Context, db *db.Database, p Params) (jimm.Auth
 	}, nil
 }
 
-func newVaultStore(ctx context.Context, p Params) (jimm.CredentialStore, error) {
+func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, error) {
 	if p.VaultSecretFile == "" {
 		return nil, nil
 	}

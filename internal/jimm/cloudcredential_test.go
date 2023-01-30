@@ -1637,13 +1637,25 @@ func (s testCloudCredentialAttributeStore) PutControllerCredentials(ctx context.
 	return errors.E(errors.CodeNotImplemented)
 }
 
-func (s testCloudCredentialAttributeStore) PutJWKS(ctx context.Context) error {
-	return errors.E(errors.CodeNotImplemented)
-}
-
 func (s testCloudCredentialAttributeStore) GetJWKS(ctx context.Context) (jwk.Set, error) {
 	return nil, errors.E(errors.CodeNotImplemented)
 }
-func (s testCloudCredentialAttributeStore) StartJWKSRotator(ctx context.Context, cron string) error {
+
+func (s testCloudCredentialAttributeStore) GetJWKSPrivateKey(ctx context.Context) ([]byte, error) {
+	return nil, errors.E(errors.CodeNotImplemented)
+}
+
+func (s testCloudCredentialAttributeStore) GetJWKSExpiry(ctx context.Context) (time.Time, error) {
+	return time.Now(), errors.E(errors.CodeNotImplemented)
+}
+
+func (s testCloudCredentialAttributeStore) PutJWKS(ctx context.Context, jwks jwk.Set) error {
+	return errors.E(errors.CodeNotImplemented)
+}
+func (s testCloudCredentialAttributeStore) PutJWKSPrivateKey(ctx context.Context, pem []byte) error {
+	return errors.E(errors.CodeNotImplemented)
+}
+
+func (s testCloudCredentialAttributeStore) PutJWKSExpiry(ctx context.Context, expiry time.Time) error {
 	return errors.E(errors.CodeNotImplemented)
 }

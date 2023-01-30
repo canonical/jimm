@@ -4,6 +4,8 @@ package vault
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"os"
@@ -36,6 +38,25 @@ func newStore(t testing.TB) *VaultStore {
 		AuthPath:   "/auth/approle/login",
 		KVPath:     path,
 	}
+}
+
+func getJWKS(c *qt.C) jwk.Set {
+	set, err := jwk.ParseString(`
+	{
+		"keys": [
+		  {
+			"alg": "RS256",
+			"kty": "RSA",
+			"use": "sig",
+			"n": "yeNlzlub94YgerT030codqEztjfU_S6X4DbDA_iVKkjAWtYfPHDzz_sPCT1Axz6isZdf3lHpq_gYX4Sz-cbe4rjmigxUxr-FgKHQy3HeCdK6hNq9ASQvMK9LBOpXDNn7mei6RZWom4wo3CMvvsY1w8tjtfLb-yQwJPltHxShZq5-ihC9irpLI9xEBTgG12q5lGIFPhTl_7inA1PFK97LuSLnTJzW0bj096v_TMDg7pOWm_zHtF53qbVsI0e3v5nmdKXdFf9BjIARRfVrbxVxiZHjU6zL6jY5QJdh1QCmENoejj_ytspMmGW7yMRxzUqgxcAqOBpVm0b-_mW3HoBdjQ",
+			"e": "AQAB",
+			"kid": "32d2b213-d3fe-436c-9d4c-67a673890620"
+		  }
+		]
+	}
+	`)
+	c.Assert(err, qt.IsNil)
+	return set
 }
 
 func TestVaultCloudCredentialAttributeStoreRoundTrip(t *testing.T) {
@@ -101,40 +122,13 @@ func TestVaultControllerCredentialsStoreRoundTrip(t *testing.T) {
 	c.Check(p, qt.Equals, "")
 }
 
-func TestGetJWKSPath(t *testing.T) {
-	c := qt.New(t)
-
-	store := newStore(c)
-	c.Assert(store.getJWKSPath(), qt.Equals, store.KVPath+"creds/.well-known/jwks.json")
-}
-
-func TestGenerateJWKS(t *testing.T) {
-	c := qt.New(t)
-	ctx := context.Background()
-	store := newStore(c)
-
-	jwk, privKeyPem, err := store.generateJWK(ctx)
-	c.Assert(err, qt.IsNil)
-
-	// kid
-	_, err = uuid.Parse(jwk.KeyID())
-	c.Assert(err, qt.IsNil)
-	// use
-	c.Assert(jwk.KeyUsage(), qt.Equals, "sig")
-	// alg
-	c.Assert(jwk.Algorithm(), qt.Equals, jwa.RS256)
-
-	// It's fine for us to just test the key exists.
-	c.Assert(string(privKeyPem), qt.Contains, "-----BEGIN RSA PRIVATE KEY-----")
-}
-
 func TestPutJWKS(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 	store := newStore(c)
 	resetJWKS(c, store)
 
-	err := store.PutJWKS(ctx, time.Now().AddDate(0, 3, 1))
+	err := store.PutJWKS(ctx, getJWKS(c))
 	c.Assert(err, qt.IsNil)
 }
 
@@ -144,7 +138,7 @@ func TestGetJWKS(t *testing.T) {
 	store := newStore(c)
 	resetJWKS(c, store)
 
-	store.PutJWKS(ctx, time.Now().AddDate(0, 3, 1))
+	store.PutJWKS(ctx, getJWKS(c))
 
 	ks, err := store.GetJWKS(ctx)
 	c.Assert(err, qt.IsNil)
@@ -165,78 +159,12 @@ func TestGetJWKSExpiry(t *testing.T) {
 	store := newStore(c)
 	resetJWKS(c, store)
 
-	store.PutJWKS(ctx, time.Now().AddDate(0, 3, 1))
-	expiry, err := store.getJWKSExpiry(ctx)
+	store.PutJWKSExpiry(ctx, time.Now().AddDate(0, 3, 1))
+	expiry, err := store.GetJWKSExpiry(ctx)
 	c.Assert(err, qt.IsNil)
 	// We really care just for the month, not exact Us, but we use RFC3339
 	// everywhere, so it made sense to just use it here.
 	c.Assert(expiry.Month(), qt.Equals, time.Now().AddDate(0, 3, 1).Month())
-}
-
-// This test is difficult to gauge, as it is truly only time based.
-// As such we take a -3 deficit to our total suites test time.
-// But this is a fair usecase for time-based-testing.
-func TestStartJWKSRotatorWithNoJWKSInTheStore(t *testing.T) {
-	c := qt.New(t)
-	ctx := context.Background()
-	store := newStore(c)
-	resetJWKS(c, store)
-
-	stopRotator, err := store.StartJWKSRotator(ctx, time.NewTicker(time.Second), time.Now())
-	c.Assert(err, qt.IsNil)
-	time.Sleep(time.Second)
-	stopRotator()
-	ks, err := store.GetJWKS(ctx)
-	c.Assert(err, qt.IsNil)
-
-	ki := ks.Keys(ctx)
-	ki.Next(ctx)
-	key := ki.Pair().Value.(jwk.Key)
-	_, err = uuid.Parse(key.KeyID())
-	c.Assert(err, qt.IsNil)
-}
-
-// Due to the nature of this test, we do not test exact times (as it will vary drastically machine to machine)
-// But rather just ensure the JWKS has infact updated.
-//
-// So I suppose this test is "best effort", but will only ever pass if the code is truly OK.
-func TestStartJWKSRotatorRotatesAJWKS(t *testing.T) {
-	c := qt.New(t)
-	ctx := context.Background()
-	store := newStore(c)
-	resetJWKS(c, store)
-
-	// So, we first put a fresh JWKS in the store
-	err := store.PutJWKS(ctx, time.Now())
-	c.Check(err, qt.IsNil)
-
-	getKID := func() string {
-		ks, err := store.GetJWKS(ctx)
-		c.Check(err, qt.IsNil)
-
-		ki := ks.Keys(ctx)
-		ki.Next(ctx)
-		key := ki.Pair().Value.(jwk.Key)
-		_, err = uuid.Parse(key.KeyID())
-		c.Check(err, qt.IsNil)
-		return key.KeyID()
-	}
-
-	// Retrieve said JWKS & store it's UUID
-	initialKeyId := getKID()
-
-	// Start up the rotator, and wait a long-enough-ish time
-	// for a new key to rotate
-	stopRotator, err := store.StartJWKSRotator(ctx, time.NewTicker(time.Second), time.Now())
-	c.Assert(err, qt.IsNil)
-	time.Sleep(time.Second)
-	stopRotator()
-
-	// Get the new rotated KID
-	newKeyId := getKID()
-
-	// And simply compare them
-	c.Assert(initialKeyId, qt.Not(qt.Equals), newKeyId)
 }
 
 func TestGetJWKSPrivateKey(t *testing.T) {
@@ -244,8 +172,17 @@ func TestGetJWKSPrivateKey(t *testing.T) {
 	ctx := context.Background()
 	store := newStore(c)
 	resetJWKS(c, store)
+	keySet, err := rsa.GenerateKey(rand.Reader, 4096)
+	c.Assert(err, qt.IsNil)
 
-	store.PutJWKS(ctx, time.Now().AddDate(0, 3, 1))
+	privateKeyPEM := pem.EncodeToMemory(
+		&pem.Block{
+			Type:  "RSA PRIVATE KEY",
+			Bytes: x509.MarshalPKCS1PrivateKey(keySet),
+		},
+	)
+	store.PutJWKSPrivateKey(ctx, privateKeyPEM)
+	store.PutJWKS(ctx, getJWKS(c))
 	keyPem, err := store.GetJWKSPrivateKey(ctx)
 	c.Assert(err, qt.IsNil)
 	c.Assert(string(keyPem), qt.Contains, "-----BEGIN RSA PRIVATE KEY-----")
@@ -264,7 +201,7 @@ func TestSigningAJWT(t *testing.T) {
 	ctx := context.Background()
 	store := newStore(c)
 	resetJWKS(c, store)
-	err := store.PutJWKS(ctx, time.Now().UTC().AddDate(0, 3, 1))
+	err := store.PutJWKS(ctx, getJWKS(c))
 	c.Check(err, qt.IsNil)
 	jwtId := "1234-1234-1234-1234"
 

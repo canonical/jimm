@@ -4,24 +4,17 @@ package vault
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
-	"encoding/pem"
 	"net/http"
 	"path"
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/hashicorp/vault/api"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
-	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
-	"go.uber.org/zap"
 
 	"github.com/CanonicalLtd/jimm/internal/errors"
 )
@@ -219,131 +212,6 @@ func (s *VaultStore) GetJWKS(ctx context.Context) (jwk.Set, error) {
 	return ks, nil
 }
 
-// PutJWKS puts a generated RS256[4096 bit] JWKS without x5c or x5t into the credential store.
-//
-// The pathing is similar to the controllers credentials
-// in that we understand RS256 keys as credentials, rather than crytographic keys.
-//
-// TODO(ale8k)[possibly?]:
-// For now, there's a single key, and this is probably OK. But possibly extend
-// this to contain many at some point differentiated by KIDs.
-//
-// We also currently don't use x5c and x5t for validation and expect users
-// to use e and n for validation.
-// https://stackoverflow.com/questions/61395261/how-to-validate-signature-of-jwt-from-jwks-without-x5c
-func (s *VaultStore) PutJWKS(ctx context.Context, expiry time.Time) error {
-	const op = errors.Op("vault.PutJWKS")
-
-	client, err := s.client(ctx)
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	k, privKeyPem, err := s.generateJWK(ctx)
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	ks := jwk.NewSet()
-	err = ks.AddKey(k)
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	b, err := json.Marshal(ks)
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	// Set key
-	_, err = client.Logical().WriteBytes(
-		// We persist in a similar folder to the controller credentials, but sub-route
-		// to .well-known for further extensions and mental clarity within our vault.
-		s.getJWKSPath(),
-		b,
-	)
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	// Set expiry
-	_, err = client.Logical().Write(
-		s.getJWKSExpiryPath(),
-		map[string]interface{}{
-			"jwks-expiry": expiry,
-		},
-	)
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	// Now we are safe to store private key, as it is expected to expire
-
-	// Set private RSA key
-	_, err = client.Logical().Write(
-		// We persist in a similar folder to the controller credentials, but sub-route
-		// to .well-known for further extensions and mental clarity within our vault.
-		s.getJWKSPrivateKeyPath(),
-		map[string]interface{}{"key": privKeyPem},
-	)
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	return nil
-}
-
-// StartJWKSRotator starts a simple routine which checks the vaults TTL for the JWKS on a ticker
-// if the key set is within 1 day of rotation required time, it will rotate the keys.
-//
-// It closure that may be called to stop the rotation ticker.
-func (s *VaultStore) StartJWKSRotator(ctx context.Context, checkRotateRequired *time.Ticker, initialRotateRequiredTime time.Time) (func(), error) {
-	const op = errors.Op("vault.StartJWKSRotator")
-
-	// ticker := time.NewTicker(checkRotateRequired)
-	done := make(chan bool)
-
-	putJwks := func() {
-		err := s.PutJWKS(ctx, initialRotateRequiredTime)
-		zapctx.Debug(ctx, "set a new JWKS")
-		if err != nil {
-			zapctx.Error(
-				ctx,
-				"security failure",
-				zap.Any("op", op),
-				zap.String("security-failure", "failed to put JWKS"),
-			)
-			return
-		}
-	}
-
-	go func() {
-		for {
-			select {
-			case <-done:
-				return
-			case <-checkRotateRequired.C:
-				expires, err := s.getJWKSExpiry(ctx)
-
-				if err != nil {
-					zapctx.Debug(ctx, "failed to get expiry", zap.Error(err))
-					putJwks()
-				}
-				// If we recieve the expiry, we make a simple check 3 months ahead.
-				now := time.Now().UTC()
-				if now.After(expires) {
-					putJwks()
-				}
-			}
-		}
-	}()
-
-	return func() {
-		checkRotateRequired.Stop()
-		done <- true
-	}, nil
-}
-
 // GetJWKSPrivateKey returns the current private key for the active JWKS
 func (s *VaultStore) GetJWKSPrivateKey(ctx context.Context) ([]byte, error) {
 	const op = errors.Op("vault.GetJWKSPrivateKey")
@@ -372,11 +240,10 @@ func (s *VaultStore) GetJWKSPrivateKey(ctx context.Context) ([]byte, error) {
 	}
 
 	return keyPem, nil
-
 }
 
-// getJWKSExpiry returns the current expiry for JIMM's JWKS.
-func (s *VaultStore) getJWKSExpiry(ctx context.Context) (time.Time, error) {
+// GetJWKSExpiry returns the current expiry for JIMM's JWKS.
+func (s *VaultStore) GetJWKSExpiry(ctx context.Context) (time.Time, error) {
 	const op = errors.Op("vault.getJWKSExpiry")
 	now := time.Now()
 	client, err := s.client(ctx)
@@ -408,6 +275,84 @@ func (s *VaultStore) getJWKSExpiry(ctx context.Context) (time.Time, error) {
 	return t, nil
 }
 
+// PutJWKS puts a JWKS into the credential store.
+//
+// The pathing is similar to the controllers credentials
+// in that we understand RS256 keys as credentials, rather than crytographic keys.
+//
+// TODO(ale8k)[possibly?]:
+// For now, there's a single key, and this is probably OK. But possibly extend
+// this to contain many at some point differentiated by KIDs.
+//
+// We also currently don't use x5c and x5t for validation and expect users
+// to use e and n for validation.
+// https://stackoverflow.com/questions/61395261/how-to-validate-signature-of-jwt-from-jwks-without-x5c
+func (s *VaultStore) PutJWKS(ctx context.Context, jwks jwk.Set) error {
+	const op = errors.Op("vault.PutJWKS")
+
+	client, err := s.client(ctx)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	jwksJson, err := json.Marshal(jwks)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	_, err = client.Logical().WriteBytes(
+		// We persist in a similar folder to the controller credentials, but sub-route
+		// to .well-known for further extensions and mental clarity within our vault.
+		s.getJWKSPath(),
+		jwksJson,
+	)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	return nil
+}
+
+// PutJWKSPrivateKey persists the private key associated with the current JWKS within the store.
+func (s *VaultStore) PutJWKSPrivateKey(ctx context.Context, pem []byte) error {
+	const op = errors.Op("vault.PutJWKSPrivateKey")
+
+	client, err := s.client(ctx)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	if _, err := client.Logical().Write(
+		// We persist in a similar folder to the controller credentials, but sub-route
+		// to .well-known for further extensions and mental clarity within our vault.
+		s.getJWKSPrivateKeyPath(),
+		map[string]interface{}{"key": pem},
+	); err != nil {
+		return errors.E(op, err)
+	}
+	return nil
+}
+
+// PutJWKSExpiry sets the expiry time for the current JWKS within the store.
+func (s *VaultStore) PutJWKSExpiry(ctx context.Context, expiry time.Time) error {
+	const op = errors.Op("vault.PutJWKSExpiry")
+
+	client, err := s.client(ctx)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	if _, err := client.Logical().Write(
+		s.getJWKSExpiryPath(),
+		map[string]interface{}{
+			"jwks-expiry": expiry,
+		},
+	); err != nil {
+		return errors.E(op, err)
+	}
+	return nil
+}
+
 // getWellKnownPath returns a hard coded path to the .well-known credentials.
 func (s *VaultStore) getWellKnownPath() string {
 	return path.Join(s.KVPath, "creds", ".well-known")
@@ -428,55 +373,6 @@ func (s *VaultStore) getJWKSPrivateKeyPath() string {
 // getJWKSPath returns the path to the jwks expiry secret.
 func (s *VaultStore) getJWKSExpiryPath() string {
 	return path.Join(s.getWellKnownPath(), "jwks-expiry")
-}
-
-// generateJWKS generates a new set of JWK using RSA256[4096]
-//
-// It will return a jwk.Key containing the public key
-// and a PEM encoded private key for JWT signing.
-func (s *VaultStore) generateJWK(ctx context.Context) (jwk.Key, []byte, error) {
-	const op = errors.Op("vault.generateJWKS")
-
-	// Due to the sensitivity of controllers, it is best we allow a larger encryption bit size
-	// and accept any negligible wire cost.
-	keySet, err := rsa.GenerateKey(rand.Reader, 4096)
-	if err != nil {
-		return nil, nil, errors.E(op, err)
-	}
-
-	privateKeyPEM := pem.EncodeToMemory(
-		&pem.Block{
-			Type:  "RSA PRIVATE KEY",
-			Bytes: x509.MarshalPKCS1PrivateKey(keySet),
-		},
-	)
-
-	// We also use the same methodology of generating UUIDs for our KID
-	kid, err := uuid.NewRandom()
-	if err != nil {
-		return nil, nil, errors.E(op, err)
-	}
-
-	jwks, err := jwk.FromRaw(keySet.PublicKey)
-	if err != nil {
-		return nil, nil, errors.E(op, err)
-	}
-	err = jwks.Set(jwk.KeyIDKey, kid.String())
-	if err != nil {
-		return nil, nil, errors.E(op, err)
-	}
-
-	err = jwks.Set(jwk.KeyUsageKey, "sig") // Couldn't find const for this...
-	if err != nil {
-		return nil, nil, errors.E(op, err)
-	}
-
-	err = jwks.Set(jwk.AlgorithmKey, jwa.RS256)
-	if err != nil {
-		return nil, nil, errors.E(op, err)
-	}
-
-	return jwks, privateKeyPEM, nil
 }
 
 // deleteControllerCredentials removes the credentials associated with the controller in

@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/CanonicalLtd/jimm/internal/errors"
-	"github.com/CanonicalLtd/jimm/internal/jimm"
+	"github.com/CanonicalLtd/jimm/internal/jimm/credentials"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 )
@@ -14,11 +14,11 @@ import (
 // Implements jimmhttp.JIMMHttpHandler
 type WellKnownHandler struct {
 	Router          *chi.Mux
-	CredentialStore jimm.CredentialStore
+	CredentialStore credentials.CredentialStore
 }
 
 // NewWellKnownHandler returns a new WellKnownHandler
-func NewWellKnownHandler(cs jimm.CredentialStore) *WellKnownHandler {
+func NewWellKnownHandler(cs credentials.CredentialStore) *WellKnownHandler {
 	return &WellKnownHandler{Router: chi.NewRouter(), CredentialStore: cs}
 }
 

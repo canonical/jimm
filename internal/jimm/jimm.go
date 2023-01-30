@@ -14,46 +14,16 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
-	"github.com/lestrrat-go/jwx/v2/jwk"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/CanonicalLtd/jimm/internal/jimm/credentials"
 	ofgaClient "github.com/CanonicalLtd/jimm/internal/openfga"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
 )
-
-// A CredentialStore is a store for the attributes of a
-// CloudCredential and controller credentials.
-type CredentialStore interface {
-	// Get retrieves the stored attributes of a cloud credential.
-	Get(context.Context, names.CloudCredentialTag) (map[string]string, error)
-
-	// Put stores the attributes of a cloud credential.
-	Put(context.Context, names.CloudCredentialTag, map[string]string) error
-
-	// GetControllerCredentials retrieves the credentials for the given controller from a vault
-	// service.
-	GetControllerCredentials(ctx context.Context, controllerName string) (string, string, error)
-
-	// PutControllerCredentials stores the controller credentials in a vault
-	// service.
-	PutControllerCredentials(ctx context.Context, controllerName string, username string, password string) error
-
-	// PutJWKS puts a generated RS256[4096 bit] JWKS without x5c or x5t into the credential store.
-	PutJWKS(ctx context.Context, expiry time.Time) error
-
-	// GetJWKS returns the current key set stored within the credential store.
-	GetJWKS(ctx context.Context) (jwk.Set, error)
-
-	// StartJWKSRotator starts a simple routine which checks the vaults TTL for the JWKS on a ticker.
-	StartJWKSRotator(ctx context.Context, checkRotateRequired *time.Ticker, initialRotateRequiredTime time.Time) (func(), error)
-
-	// GetJWKSPrivateKey returns the current private key for the active JWKS
-	GetJWKSPrivateKey(ctx context.Context) ([]byte, error)
-}
 
 // A JIMM provides the business logic for managing resources in the JAAS
 // system. A single JIMM instance is shared by all concurrent API
@@ -79,7 +49,7 @@ type JIMM struct {
 	// cloud credential and controller credentials. If this is
 	// not configured then the attributes
 	// are stored in the standard database.
-	CredentialStore CredentialStore
+	CredentialStore credentials.CredentialStore
 
 	// Pubsub is a pub-sub hub used for buffering model summaries.
 	Pubsub *pubsub.Hub
