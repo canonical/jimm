@@ -52,8 +52,8 @@ var (
 	// and if a relation specifier is present, it will always be index 10
 	jujuURIMatcher = regexp.MustCompile(`([a-zA-Z0-9]*)(\-|\z)([a-zA-Z0-9-@]*)(\:|)([a-zA-Z0-9-@]*)(\/|)([a-zA-Z0-9-]*)(\.|)([a-zA-Z0-9-]*)([a-zA-Z#]*|\z)\z`)
 
-	// ResourceTypes contains a list of all resource kinds (i.e. tags) used throughout JIMM.
-	ResourceTypes = [...]string{names.UserTagKind, names.ModelTagKind, names.ControllerTagKind, names.ApplicationOfferTagKind, jimmnames.GroupTagKind}
+	// resourceTypes contains a list of all resource kinds (i.e. tags) used throughout JIMM.
+	resourceTypes = [...]string{names.UserTagKind, names.ModelTagKind, names.ControllerTagKind, names.ApplicationOfferTagKind, jimmnames.GroupTagKind}
 )
 
 // AddGroup creates a group within JIMMs DB for reference by OpenFGA.
@@ -577,7 +577,7 @@ func (r *controllerRoot) removeRelatedTuples(ctx context.Context, tag string) er
 		return errors.E(op, err)
 	}
 	if resourceRelationSpecifier != "" {
-		return errors.E(op, "A relation specifier should not be provided e.g. #member")
+		return errors.E(op, errors.CodeBadRequest, "A relation specifier should not be provided e.g. #member")
 	}
 	objectSearch := ofga.CreateTupleKey("", "", parsedTag.Kind()+":"+parsedTag.Id())
 
@@ -595,7 +595,7 @@ func (r *controllerRoot) removeRelatedTuples(ctx context.Context, tag string) er
 		}
 		// We need to loop through all resource types because the OpenFGA Read API does not provide
 		// means for only specifying a user resource, it must be paired with an object type.
-		for _, kind := range ResourceTypes {
+		for _, kind := range resourceTypes {
 			newKey := ofga.CreateTupleKey(user, "", kind+":")
 			err = r.ofgaClient.RemoveTuples(ctx, newKey)
 			if err != nil {

@@ -88,9 +88,18 @@ func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
 	}
 
 	want := apiparams.RelationshipTuple{Object: "user-" + user.Username, Relation: "member", TargetObject: "group-" + group.Name}
+	checkAccessTupleController := apiparams.RelationshipTuple{Object: want.Object, Relation: "administrator", TargetObject: "controller-" + controller.UUID}
+	checkAccessTupleModel := apiparams.RelationshipTuple{Object: want.Object, Relation: "writer", TargetObject: "model-" + model.UUID.String}
 
 	err = s.JIMM.OpenFGAClient.AddRelations(context.Background(), tuples...)
 	c.Assert(err, gc.IsNil)
+	//Check user has access to model and controller through group2
+	checkResp, err := client.CheckRelation(&apiparams.CheckRelationRequest{Tuple: checkAccessTupleController})
+	c.Assert(err, gc.IsNil)
+	c.Assert(checkResp.Allowed, gc.Equals, true)
+	checkResp, err = client.CheckRelation(&apiparams.CheckRelationRequest{Tuple: checkAccessTupleModel})
+	c.Assert(err, gc.IsNil)
+	c.Assert(checkResp.Allowed, gc.Equals, true)
 
 	err = client.RemoveGroup(&apiparams.RemoveGroupRequest{Name: group2.Name})
 	c.Assert(err, gc.IsNil)
@@ -100,6 +109,13 @@ func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
 	c.Assert(len(resp.Tuples), gc.Equals, 1)
 	c.Assert(resp.Tuples[0], gc.DeepEquals, want)
 
+	//Check user access has been revoked.
+	checkResp, err = client.CheckRelation(&apiparams.CheckRelationRequest{Tuple: checkAccessTupleController})
+	c.Assert(err, gc.IsNil)
+	c.Assert(checkResp.Allowed, gc.Equals, false)
+	checkResp, err = client.CheckRelation(&apiparams.CheckRelationRequest{Tuple: checkAccessTupleModel})
+	c.Assert(err, gc.IsNil)
+	c.Assert(checkResp.Allowed, gc.Equals, false)
 }
 
 func (s *accessControlSuite) TestRenameGroup(c *gc.C) {
