@@ -51,9 +51,12 @@ require (
 	github.com/dustinkirkland/golang-petname v0.0.0-20191129215211-8e5a1ed0cff0
 	github.com/go-chi/chi/v5 v5.0.8
 	github.com/go-chi/render v1.0.2
+	github.com/juju/http v0.0.0-20201019013536-69ae1d429836
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/stretchr/testify v1.8.1
 	gopkg.in/errgo.v1 v1.0.1
+	gopkg.in/yaml.v2 v2.4.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -299,8 +302,6 @@ require (
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/api v0.23.4 // indirect
 	k8s.io/apiextensions-apiserver v0.21.10 // indirect
 	k8s.io/apimachinery v0.23.4 // indirect
