@@ -3,6 +3,10 @@
 package cmd
 
 import (
+	"bufio"
+	"fmt"
+	"strings"
+
 	"github.com/juju/cmd/v3"
 	jujucmdv3 "github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
@@ -18,33 +22,36 @@ import (
 
 var (
 	groupDoc = `
-	group command enables group management for jimm
+group command enables group management for jimm
 `
 
 	addGroupDoc = `
-	add command adds group to jimm.
+add command adds group to jimm.
 
-	Example:
-		jimmctl auth group add <name> 
+Example:
+	jimmctl auth group add <name> 
 `
 	renameGroupDoc = `
-	rename command renames a group in jimm.
+rename command renames a group in jimm.
 
-	Example:
-		jimmctl auth group rename <name> <new name>
+Example:
+	jimmctl auth group rename <name> <new name>
 `
 	removeGroupDoc = `
-	rename command removes a group in jimm.
+rename command removes a group in jimm.
 
-	Example:
-		jimmctl auth group remove <name>
+Usage:
+-y	Remove group without promping for confirmation
+
+Example:
+	jimmctl auth group remove <name>
 `
 
 	listGroupsDoc = `
-	list command lists all groups in jimm.
+list command lists all groups in jimm.
 
-	Example:
-		jimmctl auth group list
+Example:
+	jimmctl auth group list
 `
 )
 
@@ -214,13 +221,14 @@ type removeGroupCommand struct {
 	store    jujuclient.ClientStore
 	dialOpts *jujuapi.DialOpts
 
-	name string
+	name  string
+	force bool
 }
 
 // Info implements the cmd.Command interface.
 func (c *removeGroupCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "Remove",
+		Name:    "remove",
 		Purpose: "Remove a group.",
 		Doc:     removeGroupDoc,
 	})
@@ -238,11 +246,37 @@ func (c *removeGroupCommand) Init(args []string) error {
 	return nil
 }
 
+// SetFlags implements Command.SetFlags.
+func (c *removeGroupCommand) SetFlags(f *gnuflag.FlagSet) {
+	c.CommandBase.SetFlags(f)
+	c.out.AddFlags(f, "smart", map[string]cmd.Formatter{
+		"smart": cmd.FormatSmart,
+	})
+	f.BoolVar(&c.force, "y", false, "delete group without prompt")
+}
+
 // Run implements Command.Run.
 func (c *removeGroupCommand) Run(ctxt *cmd.Context) error {
 	currentController, err := c.store.CurrentController()
 	if err != nil {
 		return errors.E(err, "could not determine controller")
+	}
+
+	if !c.force {
+		reader := bufio.NewReader(ctxt.Stdin)
+		// Using Fprintf over c.out.write to avoid printing a new line.
+		_, err := fmt.Fprintf(ctxt.Stdout, "This will also delele all associated relations.\nConfirm you would like to delete group %q (y/N): ", c.name)
+		if err != nil {
+			return err
+		}
+		text, err := reader.ReadString('\n')
+		if err != nil {
+			return errors.E(err, "Failed to read from input.")
+		}
+		text = strings.Replace(text, "\n", "", -1)
+		if !(text == "y" || text == "Y") {
+			return nil
+		}
 	}
 
 	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", c.dialOpts)
@@ -286,7 +320,7 @@ type listGroupsCommand struct {
 // Info implements the cmd.Command interface.
 func (c *listGroupsCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:    "List",
+		Name:    "list",
 		Purpose: "List all groups.",
 		Doc:     listGroupsDoc,
 	})

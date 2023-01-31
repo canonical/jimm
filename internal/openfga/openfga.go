@@ -187,3 +187,27 @@ func (o *OFGAClient) ReadRelatedObjects(ctx context.Context, key *openfga.TupleK
 func (o *OFGAClient) CheckRelation(ctx context.Context, key openfga.TupleKey, trace bool) (bool, string, error) {
 	return o.checkRelation(ctx, key, trace)
 }
+
+// RemoveTuples iteratively reads through all the tuples with the parameters as supplied by key and deletes them.
+func (o *OFGAClient) RemoveTuples(ctx context.Context, key openfga.TupleKey) error {
+	pageSize := 50
+	var token string
+	var resp *ReadResponse
+	var err error
+	for ok := true; ok; ok = (token != resp.PaginationToken) {
+		if resp != nil {
+			token = resp.PaginationToken
+		}
+		resp, err = o.ReadRelatedObjects(ctx, &key, int32(pageSize), token)
+		if err != nil {
+			return err
+		}
+		if len(resp.Keys) > 0 {
+			err = o.RemoveRelation(ctx, resp.Keys...)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
