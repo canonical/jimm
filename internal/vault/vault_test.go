@@ -58,20 +58,6 @@ func getJWKS(c *qt.C) jwk.Set {
 	return set
 }
 
-func resetJWKS(c *qt.C, store *VaultStore) {
-	vc, err := store.client(context.Background())
-	c.Check(err, qt.IsNil)
-
-	_, err = vc.Logical().Delete(store.getJWKSExpiryPath())
-	c.Check(err, qt.IsNil)
-
-	_, err = vc.Logical().Delete(store.getJWKSPath())
-	c.Check(err, qt.IsNil)
-
-	_, err = vc.Logical().Delete(store.getJWKSPrivateKeyPath())
-	c.Check(err, qt.IsNil)
-}
-
 func TestVaultCloudCredentialAttributeStoreRoundTrip(t *testing.T) {
 	c := qt.New(t)
 
@@ -139,7 +125,8 @@ func TestGetAndPutJWKS(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 	store := newStore(c)
-	resetJWKS(c, store)
+	err := store.CleanupJWKS(ctx)
+	c.Assert(err, qt.IsNil)
 
 	store.PutJWKS(ctx, getJWKS(c))
 	ks, err := store.GetJWKS(ctx)
@@ -159,7 +146,8 @@ func TestGetAndPutJWKSExpiry(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 	store := newStore(c)
-	resetJWKS(c, store)
+	err := store.CleanupJWKS(ctx)
+	c.Assert(err, qt.IsNil)
 
 	store.PutJWKSExpiry(ctx, time.Now().AddDate(0, 3, 1))
 	expiry, err := store.GetJWKSExpiry(ctx)
@@ -173,7 +161,8 @@ func TestGetAndPutJWKSPrivateKey(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 	store := newStore(c)
-	resetJWKS(c, store)
+	err := store.CleanupJWKS(ctx)
+	c.Assert(err, qt.IsNil)
 	keySet, err := rsa.GenerateKey(rand.Reader, 4096)
 	c.Assert(err, qt.IsNil)
 	privateKeyPEM := pem.EncodeToMemory(

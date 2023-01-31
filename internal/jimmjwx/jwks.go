@@ -45,58 +45,43 @@ func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequir
 
 	credStore := jwks.credentialStore
 
-	putJwks := func() {
+	// For logging and monitoring purposes, we have the rotator spit errors into
+	// this buffered channel ((size * amount) * 2 of errors we are currently aware of and doubling it to prevent blocks)
+	errorChan := make(chan error, 8)
+
+	// putJwks simply attempts the process of setting up the JWKS suite
+	// and all secrets required for JIMM to sign JWTs and clients to verify
+	// JWTs from JIMM.
+	putJwks := func(expires time.Time) error {
 		set, key, err := jwks.generateJWK(ctx)
 		if err != nil {
-			zapctx.Error(
-				ctx,
-				"security failure",
-				zap.Any("op", op),
-				zap.String("security-failure", "failed to generate jwks"),
-				zap.Error(err),
-			)
-			return
+			return err
 		}
 
 		err = credStore.PutJWKS(ctx, set)
 		if err != nil {
-			zapctx.Error(
-				ctx,
-				"security failure",
-				zap.Any("op", op),
-				zap.String("security-failure", "failed to put JWKS"),
-			)
-			return
+			return err
 		}
 
 		err = credStore.PutJWKSPrivateKey(ctx, key)
 		if err != nil {
-			zapctx.Error(
-				ctx,
-				"security failure",
-				zap.Any("op", op),
-				zap.String("security-failure", "failed to put JWKS private key"),
-				zap.Error(err),
-			)
-			return
+			return err
 		}
 
-		err = credStore.PutJWKSExpiry(ctx, initialRotateRequiredTime)
+		err = credStore.PutJWKSExpiry(ctx, expires)
 		if err != nil {
-			zapctx.Error(
-				ctx,
-				"security failure",
-				zap.Any("op", op),
-				zap.String("security-failure", "failed to put JWKS expiry time key"),
-				zap.Error(err),
-			)
-			return
+			return err
 		}
 
 		zapctx.Debug(ctx, "set a new JWKS")
-
+		return nil
 	}
 
+	// The rotation method is as follows, if an expiry is not present, we know
+	// this is the first attempt to set the initial JWKS (or it may be subsequent from erroneous attempts).
+	// As the next attempt comes around, it is a simple check if the times is after the current.
+	//
+	// In this case we generate a new set, which should expire in 3 months.
 	go func() {
 		for {
 			select {
@@ -105,21 +90,44 @@ func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequir
 
 				if err != nil {
 					zapctx.Debug(ctx, "failed to get expiry", zap.Error(err))
-					putJwks()
+					err = putJwks(initialRotateRequiredTime)
+					if err != nil {
+						credStore.CleanupJWKS(ctx)
+						errorChan <- err
+					}
 				} else {
-					// If we recieve the expiry, we make a simple check 3 months ahead.
+					// Check it has expired.
 					now := time.Now().UTC()
 					if now.After(expires) {
-						putJwks()
+						// In theory, an error should not happen anymore as the necessary
+						// components exist from the previous failed expiry attempt.
+						err = putJwks(time.Now().UTC().AddDate(0, 3, 0))
+						if err != nil {
+							credStore.CleanupJWKS(ctx)
+							errorChan <- err
+						}
 					}
 				}
 
 			case <-ctx.Done():
+				zapctx.Debug(ctx, "Shutdown for JWKS rotator complete.")
 				return
 			}
 
 		}
 	}()
+
+	// If for any reason the rotator has an error, we simply receive the error
+	// in another routine dedicated to logging said errors.
+	go func(errChan <-chan error) {
+		err := <-errChan
+		zapctx.Error(
+			ctx,
+			"security failure",
+			zap.Any("op", op),
+			zap.NamedError("jwks-error", err),
+		)
+	}(errorChan)
 
 	return nil
 }

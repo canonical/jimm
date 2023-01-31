@@ -65,21 +65,6 @@ func newStore(t testing.TB) *vault.VaultStore {
 	}
 }
 
-func resetJWKS(c *qt.C, store *vault.VaultStore) {
-	client := store.Client
-	client.SetToken("token")
-	wellKnownPath := path.Join(store.KVPath, "creds", ".well-known")
-	jwksJsonPath := path.Join(wellKnownPath, "jwks.json")
-	jwksKeyPath := path.Join(wellKnownPath, "jwks-key.pem")
-	jwkExpiryPath := path.Join(wellKnownPath, "jwks-expiry")
-	_, err := client.Logical().Delete(jwkExpiryPath)
-	c.Check(err, qt.IsNil)
-	_, err = client.Logical().Delete(jwksJsonPath)
-	c.Check(err, qt.IsNil)
-	_, err = client.Logical().Delete(jwksKeyPath)
-	c.Check(err, qt.IsNil)
-}
-
 func getJWKS(c *qt.C) jwk.Set {
 	set, err := jwk.ParseString(`
 	{
@@ -125,19 +110,20 @@ func TestGenerateJWKS(t *testing.T) {
 }
 
 // This test is difficult to gauge, as it is truly only time based.
-// As such, it will retry
+// As such, it will retry 60 times on a 500ms basis.
 func TestStartJWKSRotatorWithNoJWKSInTheStore(t *testing.T) {
 	c := qt.New(t)
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	defer cancelCtx()
 	store := newStore(c)
-	resetJWKS(c, store)
+	err := store.CleanupJWKS(ctx)
+	c.Assert(err, qt.IsNil)
+
 	svc := NewJWKSService(store)
 
-	tick := make(chan time.Time, 2)
+	tick := make(chan time.Time, 1)
 	tick <- time.Now()
-	tick <- time.Now()
-	err := svc.StartJWKSRotator(ctx, tick, time.Now().AddDate(0, 3, 0))
+	err = svc.StartJWKSRotator(ctx, tick, time.Now().AddDate(0, 3, 0))
 	c.Assert(err, qt.IsNil)
 
 	var ks jwk.Set
@@ -149,7 +135,6 @@ func TestStartJWKSRotatorWithNoJWKSInTheStore(t *testing.T) {
 			continue
 		}
 		if ks != nil {
-
 			break
 		}
 	}
@@ -170,11 +155,13 @@ func TestStartJWKSRotatorRotatesAJWKS(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	defer cancelCtx()
 	store := newStore(c)
-	resetJWKS(c, store)
+	err := store.CleanupJWKS(ctx)
+	c.Assert(err, qt.IsNil)
+
 	svc := NewJWKSService(store)
 
 	// So, we first put a fresh JWKS in the store
-	err := store.PutJWKS(ctx, getJWKS(c))
+	err = store.PutJWKS(ctx, getJWKS(c))
 	c.Check(err, qt.IsNil)
 
 	// Get the key we're aware of right now

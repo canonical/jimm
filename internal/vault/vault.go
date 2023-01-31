@@ -176,6 +176,22 @@ func (s *VaultStore) PutControllerCredentials(ctx context.Context, controllerNam
 	return nil
 }
 
+// CleanupJWKS removes all secrets associated with the JWKS process.
+func (s *VaultStore) CleanupJWKS(ctx context.Context) error {
+	const op = errors.Op("vault.CleanupJWKS")
+
+	client, err := s.client(ctx)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	// Vault does not return errors on deletion requests where
+	// the secret does not exist. As such we just return the last known error.
+	client.Logical().Delete(s.getJWKSExpiryPath())
+	client.Logical().Delete(s.getJWKSPath())
+	_, err = client.Logical().Delete(s.getJWKSPrivateKeyPath())
+	return err
+}
+
 // GetJWKS returns the current key set stored within the credential store.
 func (s *VaultStore) GetJWKS(ctx context.Context) (jwk.Set, error) {
 	const op = errors.Op("vault.GetJWKS")
@@ -242,7 +258,7 @@ func (s *VaultStore) GetJWKSPrivateKey(ctx context.Context) ([]byte, error) {
 	return keyPem, nil
 }
 
-// GetJWKSExpiry returns the current expiry for JIMM's JWKS.
+// GetJWKSExpiry returns the expiry of the active JWKS.
 func (s *VaultStore) GetJWKSExpiry(ctx context.Context) (time.Time, error) {
 	const op = errors.Op("vault.getJWKSExpiry")
 	now := time.Now()
