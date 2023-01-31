@@ -1659,3 +1659,7 @@ func (s testCloudCredentialAttributeStore) PutJWKSPrivateKey(ctx context.Context
 func (s testCloudCredentialAttributeStore) PutJWKSExpiry(ctx context.Context, expiry time.Time) error {
 	return errors.E(errors.CodeNotImplemented)
 }
+
+func (s testCloudCredentialAttributeStore) CleanupJWKS(ctx context.Context) error {
+	return errors.E(errors.CodeNotImplemented)
+}

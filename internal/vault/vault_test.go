@@ -1,6 +1,6 @@
 // Copyright 2021 Canonical Ltd.
 
-package vault
+package vault_test
 
 import (
 	"context"
@@ -19,6 +19,7 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
+	"github.com/CanonicalLtd/jimm/internal/vault"
 )
 
 func TestMain(m *testing.M) {
@@ -26,12 +27,12 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func newStore(t testing.TB) *VaultStore {
+func newStore(t testing.TB) *vault.VaultStore {
 	client, path, creds, ok := jimmtest.VaultClient(t, "../../")
 	if !ok {
 		t.Skip("vault not available")
 	}
-	return &VaultStore{
+	return &vault.VaultStore{
 		Client:     client,
 		AuthSecret: creds,
 		AuthPath:   "/auth/approle/login",
