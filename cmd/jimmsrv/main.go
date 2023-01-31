@@ -69,7 +69,7 @@ func start(ctx context.Context, s *service.Service) error {
 	}
 	s.Go(func() error { return jimmsvc.WatchModelSummaries(ctx) })
 	s.Go(func() error {
-		return jimmsvc.StartJWKSRotator(ctx, time.NewTicker(time.Hour), time.Now().UTC().AddDate(0, 3, 0))
+		return jimmsvc.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
 	})
 	// TODO(mhilton) access logs?
 	addr := os.Getenv("JIMM_LISTEN_ADDR")

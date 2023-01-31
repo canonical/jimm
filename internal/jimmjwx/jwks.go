@@ -29,10 +29,9 @@ func NewJWKSService(credStore credentials.CredentialStore) *JWKSService {
 	return &JWKSService{credentialStore: credStore}
 }
 
-// StartJWKSRotator starts a simple routine which checks the vaults TTL for the JWKS on a ticker
-// if the key set is within 1 day of rotation required time, it will rotate the keys.
-//
-// It closure that may be called to stop the rotation ticker.
+// StartJWKSRotator starts a simple routine which checks the vaults TTL for the JWKS on a ticker.C.
+// It is expected that this routine will be cleaned up alongside other background services sharing
+// the same cancellable context.
 //
 // TODO(ale8k)[possibly?]:
 // For now, there's a single key, and this is probably OK. But possibly extend
@@ -41,7 +40,7 @@ func NewJWKSService(credStore credentials.CredentialStore) *JWKSService {
 // We also currently don't use x5c and x5t for validation and expect users
 // to use e and n for validation.
 // https://stackoverflow.com/questions/61395261/how-to-validate-signature-of-jwt-from-jwks-without-x5c
-func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequired *time.Ticker, initialRotateRequiredTime time.Time) error {
+func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequired <-chan time.Time, initialRotateRequiredTime time.Time) error {
 	const op = errors.Op("vault.StartJWKSRotator")
 
 	credStore := jwks.credentialStore
@@ -101,18 +100,20 @@ func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequir
 	go func() {
 		for {
 			select {
-			case <-checkRotateRequired.C:
+			case <-checkRotateRequired:
 				expires, err := credStore.GetJWKSExpiry(ctx)
 
 				if err != nil {
 					zapctx.Debug(ctx, "failed to get expiry", zap.Error(err))
 					putJwks()
+				} else {
+					// If we recieve the expiry, we make a simple check 3 months ahead.
+					now := time.Now().UTC()
+					if now.After(expires) {
+						putJwks()
+					}
 				}
-				// If we recieve the expiry, we make a simple check 3 months ahead.
-				now := time.Now().UTC()
-				if now.After(expires) {
-					putJwks()
-				}
+
 			case <-ctx.Done():
 				return
 			}

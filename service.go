@@ -183,7 +183,7 @@ func (s *Service) PollModels(ctx context.Context) error {
 }
 
 // StartJWKSRotator see internal/jimmjwx/jwks.go for details.
-func (s *Service) StartJWKSRotator(ctx context.Context, checkRotateRequired *time.Ticker, initialRotateRequiredTime time.Time) error {
+func (s *Service) StartJWKSRotator(ctx context.Context, checkRotateRequired <-chan time.Time, initialRotateRequiredTime time.Time) error {
 	return s.jimm.JWKService.StartJWKSRotator(ctx, checkRotateRequired, initialRotateRequiredTime)
 }
 

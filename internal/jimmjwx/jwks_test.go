@@ -125,25 +125,38 @@ func TestGenerateJWKS(t *testing.T) {
 }
 
 // This test is difficult to gauge, as it is truly only time based.
-// As such we take a -3 deficit to our total suites test time.
-// But this is a fair usecase for time-based-testing.
+// As such, it will retry
 func TestStartJWKSRotatorWithNoJWKSInTheStore(t *testing.T) {
 	c := qt.New(t)
 	ctx, cancelCtx := context.WithCancel(context.Background())
+	defer cancelCtx()
 	store := newStore(c)
 	resetJWKS(c, store)
 	svc := NewJWKSService(store)
 
-	err := svc.StartJWKSRotator(ctx, time.NewTicker(time.Second), time.Now())
-	c.Assert(err, qt.IsNil)
-	time.Sleep(time.Second)
-	cancelCtx()
-	ks, err := store.GetJWKS(ctx)
+	tick := make(chan time.Time, 2)
+	tick <- time.Now()
+	tick <- time.Now()
+	err := svc.StartJWKSRotator(ctx, tick, time.Now().AddDate(0, 3, 0))
 	c.Assert(err, qt.IsNil)
 
-	ki := ks.Keys(ctx)
-	ki.Next(ctx)
-	key := ki.Pair().Value.(jwk.Key)
+	var ks jwk.Set
+	// We retry 500ms * 60 (30s)
+	for i := 0; i < 60; i++ {
+		if ks == nil {
+			ks, err = store.GetJWKS(ctx)
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
+		if ks != nil {
+
+			break
+		}
+	}
+
+	c.Assert(err, qt.IsNil)
+	key, ok := ks.Key(0)
+	c.Assert(ok, qt.IsTrue)
 	_, err = uuid.Parse(key.KeyID())
 	c.Assert(err, qt.IsNil)
 }
@@ -155,6 +168,7 @@ func TestStartJWKSRotatorWithNoJWKSInTheStore(t *testing.T) {
 func TestStartJWKSRotatorRotatesAJWKS(t *testing.T) {
 	c := qt.New(t)
 	ctx, cancelCtx := context.WithCancel(context.Background())
+	defer cancelCtx()
 	store := newStore(c)
 	resetJWKS(c, store)
 	svc := NewJWKSService(store)
@@ -163,31 +177,25 @@ func TestStartJWKSRotatorRotatesAJWKS(t *testing.T) {
 	err := store.PutJWKS(ctx, getJWKS(c))
 	c.Check(err, qt.IsNil)
 
-	getKID := func() string {
-		ks, err := store.GetJWKS(ctx)
-		c.Check(err, qt.IsNil)
-
-		ki := ks.Keys(ctx)
-		ki.Next(ctx)
-		key := ki.Pair().Value.(jwk.Key)
-		_, err = uuid.Parse(key.KeyID())
-		c.Check(err, qt.IsNil)
-		return key.KeyID()
-	}
-
-	// Retrieve said JWKS & store it's UUID
-	initialKeyId := getKID()
-
-	// Start up the rotator, and wait a long-enough-ish time
-	// for a new key to rotate
-	err = svc.StartJWKSRotator(ctx, time.NewTicker(time.Second), time.Now())
+	// Get the key we're aware of right now
+	ks, err := store.GetJWKS(ctx)
 	c.Assert(err, qt.IsNil)
-	time.Sleep(time.Second)
-	cancelCtx()
+	initialKey, ok := ks.Key(0)
+	c.Assert(ok, qt.IsTrue)
 
-	// Get the new rotated KID
-	newKeyId := getKID()
+	// Start up the rotator
+	err = svc.StartJWKSRotator(ctx, time.NewTicker(time.Second).C, time.Now())
+	c.Assert(err, qt.IsNil)
 
-	// And simply compare them
-	c.Assert(initialKeyId, qt.Not(qt.Equals), newKeyId)
+	// We retry 500ms * 60 (30s) to test the diff
+	for i := 0; i < 60; i++ {
+		time.Sleep(500 * time.Millisecond)
+		ks2, err := store.GetJWKS(ctx)
+		c.Assert(err, qt.IsNil)
+		newKey, ok := ks2.Key(0)
+		c.Assert(ok, qt.IsTrue)
+		if initialKey.KeyID() == newKey.KeyID() {
+			break
+		}
+	}
 }
