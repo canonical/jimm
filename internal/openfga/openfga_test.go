@@ -3,6 +3,7 @@ package openfga_test
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -120,6 +121,24 @@ func (s *openFGATestSuite) TestCheckRelationSucceeds(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, true)
 	c.Assert(resoution, gc.Equals, ".(direct).group:1#member.(direct).")
+}
+
+func (s *openFGATestSuite) TestRemoveTuplesSucceeds(c *gc.C) {
+
+	// Test a large number of tuples
+	for i := 0; i < 150; i++ {
+		key := ofga.CreateTupleKey("user:test"+strconv.Itoa(i), "member", "group:1")
+		err := s.ofgaClient.AddRelations(context.Background(), key)
+		c.Assert(err, gc.IsNil)
+	}
+
+	key := ofga.CreateTupleKey("", "", "group:1")
+	err := s.ofgaClient.RemoveTuples(context.Background(), key)
+	c.Assert(err, gc.IsNil)
+	res, err := s.ofgaClient.ReadRelatedObjects(context.Background(), nil, 50, "")
+	c.Assert(err, gc.IsNil)
+	c.Assert(len(res.Keys), gc.Equals, 0)
+
 }
 
 func Test(t *testing.T) {
