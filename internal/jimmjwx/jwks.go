@@ -53,7 +53,7 @@ func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequir
 	// and all secrets required for JIMM to sign JWTs and clients to verify
 	// JWTs from JIMM.
 	putJwks := func(expires time.Time) error {
-		set, key, err := jwks.generateJWK(ctx)
+		set, key, err := generateJWK(ctx)
 		if err != nil {
 			return err
 		}
@@ -137,7 +137,7 @@ func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequir
 //
 // It will return a jwk.Set containing the public key
 // and a PEM encoded private key for JWT signing.
-func (s *JWKSService) generateJWK(ctx context.Context) (jwk.Set, []byte, error) {
+func generateJWK(ctx context.Context) (jwk.Set, []byte, error) {
 	const op = errors.Op("vault.generateJWKS")
 
 	// Due to the sensitivity of controllers, it is best we allow a larger encryption bit size

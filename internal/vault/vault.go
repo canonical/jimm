@@ -188,8 +188,10 @@ func (s *VaultStore) CleanupJWKS(ctx context.Context) error {
 	// the secret does not exist. As such we just return the last known error.
 	client.Logical().Delete(s.getJWKSExpiryPath())
 	client.Logical().Delete(s.getJWKSPath())
-	_, err = client.Logical().Delete(s.getJWKSPrivateKeyPath())
-	return err
+	if _, err = client.Logical().Delete(s.getJWKSPrivateKeyPath()); err != nil {
+		return errors.E(op, err)
+	}
+	return nil
 }
 
 // GetJWKS returns the current key set stored within the credential store.
@@ -243,9 +245,9 @@ func (s *VaultStore) GetJWKSPrivateKey(ctx context.Context) ([]byte, error) {
 	}
 
 	if secret == nil {
-		msg := "no JWKS exists yet."
+		msg := "no JWKS private key exists yet."
 		zapctx.Debug(ctx, msg)
-		return nil, errors.E(op, "no jwks exists", msg)
+		return nil, errors.E(op, errors.CodeNotFound, msg)
 	}
 
 	keyPemB64 := secret.Data["key"].(string)
@@ -273,9 +275,9 @@ func (s *VaultStore) GetJWKSExpiry(ctx context.Context) (time.Time, error) {
 	}
 
 	if secret == nil {
-		msg := "no JWKS exists yet."
+		msg := "no JWKS expiry exists yet."
 		zapctx.Debug(ctx, msg)
-		return now, errors.E(op, "no jwks exists", msg)
+		return now, errors.E(op, errors.CodeNotFound, msg)
 	}
 
 	expiry, ok := secret.Data["jwks-expiry"].(string)

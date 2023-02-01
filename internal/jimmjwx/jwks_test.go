@@ -1,20 +1,18 @@
-package jimmjwx
+package jimmjwx_test
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"os"
-	"path"
 	"testing"
 	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
-	"github.com/hashicorp/vault/api"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
+	"github.com/CanonicalLtd/jimm/internal/jimmjwx"
+	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	"github.com/CanonicalLtd/jimm/internal/vault"
 )
 
@@ -23,37 +21,9 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// TODO: alex remove these and fix import cycle ...
-type fatalF interface {
-	Name() string
-	Fatalf(format string, args ...interface{})
-}
-
-// VaultClient returns a new vault client for use in a test.
-func vaultClient(tb fatalF, prefix string) (*api.Client, string, map[string]interface{}, bool) {
-	cfg := api.DefaultConfig()
-	cfg.Address = "http://localhost:8200"
-	vaultClient, _ := api.NewClient(cfg)
-
-	b, err := os.ReadFile(path.Join(prefix, "./local/vault/approle.json"))
-	if err != nil {
-		fmt.Println("we got file?")
-	}
-
-	creds := make(map[string]interface{})
-	var vaultAPISecret api.Secret
-	err = json.Unmarshal(b, &vaultAPISecret)
-	if err != nil {
-		fmt.Println("error?")
-	}
-	creds["role_id"] = vaultAPISecret.Data["role_id"]
-	creds["secret_id"] = vaultAPISecret.Data["secret_id"]
-
-	return vaultClient, "/jimm-kv/", creds, true
-}
-
 func newStore(t testing.TB) *vault.VaultStore {
-	client, path, creds, ok := vaultClient(t, "../../")
+	client, path, creds, ok := jimmtest.VaultClient(t, "../../")
+
 	if !ok {
 		t.Skip("vault not available")
 	}
@@ -87,10 +57,8 @@ func getJWKS(c *qt.C) jwk.Set {
 func TestGenerateJWKS(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
-	store := newStore(c)
-	svc := NewJWKSService(store)
 
-	jwks, privKeyPem, err := svc.generateJWK(ctx)
+	jwks, privKeyPem, err := jimmjwx.GenerateJWK(ctx)
 	c.Assert(err, qt.IsNil)
 
 	jwksIter := jwks.Keys(ctx)
@@ -119,7 +87,7 @@ func TestStartJWKSRotatorWithNoJWKSInTheStore(t *testing.T) {
 	err := store.CleanupJWKS(ctx)
 	c.Assert(err, qt.IsNil)
 
-	svc := NewJWKSService(store)
+	svc := jimmjwx.NewJWKSService(store)
 
 	tick := make(chan time.Time, 1)
 	tick <- time.Now()
@@ -158,7 +126,7 @@ func TestStartJWKSRotatorRotatesAJWKS(t *testing.T) {
 	err := store.CleanupJWKS(ctx)
 	c.Assert(err, qt.IsNil)
 
-	svc := NewJWKSService(store)
+	svc := jimmjwx.NewJWKSService(store)
 
 	// So, we first put a fresh JWKS in the store
 	err = store.PutJWKS(ctx, getJWKS(c))
