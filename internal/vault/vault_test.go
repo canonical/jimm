@@ -151,13 +151,14 @@ func TestGetAndPutJWKSExpiry(t *testing.T) {
 	err := store.CleanupJWKS(ctx)
 	c.Assert(err, qt.IsNil)
 
-	err = store.PutJWKSExpiry(ctx, time.Now().AddDate(0, 3, 1))
+	expectedExpiry := time.Now().AddDate(0, 3, 1)
+	err = store.PutJWKSExpiry(ctx, expectedExpiry)
 	c.Assert(err, qt.IsNil)
 	expiry, err := store.GetJWKSExpiry(ctx)
 	c.Assert(err, qt.IsNil)
 	// We really care just for the month, not exact Us, but we use RFC3339
 	// everywhere, so it made sense to just use it here.
-	c.Assert(expiry.Month(), qt.Equals, time.Now().AddDate(0, 3, 1).Month())
+	c.Assert(expiry.Month(), qt.Equals, expectedExpiry)
 }
 
 func TestGetAndPutJWKSPrivateKey(t *testing.T) {
