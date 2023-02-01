@@ -212,7 +212,7 @@ func (s *VaultStore) GetJWKS(ctx context.Context) (jwk.Set, error) {
 	if secret == nil {
 		msg := "no JWKS exists yet."
 		zapctx.Debug(ctx, msg)
-		return nil, errors.E(op, "no jwks exists", msg)
+		return nil, errors.E(op, errors.CodeNotFound, msg)
 	}
 
 	b, err := json.Marshal(secret.Data)

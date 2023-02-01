@@ -73,7 +73,7 @@ func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequir
 			return err
 		}
 
-		zapctx.Debug(ctx, "set a new JWKS")
+		zapctx.Debug(ctx, "set a new JWKS", zap.String("expiry", expires.String()))
 		return nil
 	}
 
@@ -106,6 +106,7 @@ func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequir
 							credStore.CleanupJWKS(ctx)
 							errorChan <- err
 						}
+						zapctx.Debug(ctx, "set a new JWKS", zap.String("expiry", expires.String()))
 					}
 				}
 

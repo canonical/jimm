@@ -1,3 +1,4 @@
+// Copyright 2023 CanonicalLtd.
 package wellknownapi_test
 
 import (
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	"github.com/CanonicalLtd/jimm/internal/vault"
 	"github.com/CanonicalLtd/jimm/internal/wellknownapi"
@@ -58,7 +60,8 @@ func setupHandlerAndRecorder(c *qt.C, path string, store *vault.VaultStore) *htt
 	return rr
 }
 
-// 404: In the event the JWKS cannot be found.
+// 404: In the event the JWKS cannot be found expliciticly from
+// the credential store.
 func TestWellknownAPIJWKSJSONHandles404(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
@@ -74,9 +77,9 @@ func TestWellknownAPIJWKSJSONHandles404(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(code, qt.Equals, http.StatusNotFound)
 	c.Assert(b, qt.JSONEquals, map[string]any{
-		"Code":    "",
+		"Code":    errors.CodeNotFound,
 		"Err":     nil,
-		"Message": "failed to retrieve JWKS",
+		"Message": "JWKS does not exist yet",
 		"Op":      "wellknownapi.JWKS",
 	})
 }
@@ -103,7 +106,7 @@ func TestWellknownAPIJWKSJSONHandles500(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(code, qt.Equals, http.StatusInternalServerError)
 	c.Assert(b, qt.JSONEquals, map[string]any{
-		"Code":    "",
+		"Code":    errors.CodeJWKSRetrievalFailed,
 		"Err":     nil,
 		"Message": "something went wrong...",
 		"Op":      "wellknownapi.JWKS",

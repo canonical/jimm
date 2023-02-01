@@ -129,7 +129,8 @@ func TestGetAndPutJWKS(t *testing.T) {
 	err := store.CleanupJWKS(ctx)
 	c.Assert(err, qt.IsNil)
 
-	store.PutJWKS(ctx, getJWKS(c))
+	err = store.PutJWKS(ctx, getJWKS(c))
+	c.Assert(err, qt.IsNil)
 	ks, err := store.GetJWKS(ctx)
 	c.Assert(err, qt.IsNil)
 	ki := ks.Keys(ctx)
@@ -150,7 +151,8 @@ func TestGetAndPutJWKSExpiry(t *testing.T) {
 	err := store.CleanupJWKS(ctx)
 	c.Assert(err, qt.IsNil)
 
-	store.PutJWKSExpiry(ctx, time.Now().AddDate(0, 3, 1))
+	err = store.PutJWKSExpiry(ctx, time.Now().AddDate(0, 3, 1))
+	c.Assert(err, qt.IsNil)
 	expiry, err := store.GetJWKSExpiry(ctx)
 	c.Assert(err, qt.IsNil)
 	// We really care just for the month, not exact Us, but we use RFC3339
@@ -173,8 +175,10 @@ func TestGetAndPutJWKSPrivateKey(t *testing.T) {
 		},
 	)
 
-	store.PutJWKSPrivateKey(ctx, privateKeyPEM)
-	store.PutJWKS(ctx, getJWKS(c))
+	err = store.PutJWKSPrivateKey(ctx, privateKeyPEM)
+	c.Assert(err, qt.IsNil)
+	err = store.PutJWKS(ctx, getJWKS(c))
+	c.Assert(err, qt.IsNil)
 	keyPem, err := store.GetJWKSPrivateKey(ctx)
 	c.Assert(err, qt.IsNil)
 	c.Assert(string(keyPem), qt.Contains, "-----BEGIN RSA PRIVATE KEY-----")

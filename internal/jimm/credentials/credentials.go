@@ -1,3 +1,4 @@
+// Copyright 2023 CanonicalLtd.
 package credentials
 
 import (
