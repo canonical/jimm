@@ -158,7 +158,7 @@ func TestGetAndPutJWKSExpiry(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	// We really care just for the month, not exact Us, but we use RFC3339
 	// everywhere, so it made sense to just use it here.
-	c.Assert(expiry.Month(), qt.Equals, expectedExpiry)
+	c.Assert(expiry.Month(), qt.Equals, expectedExpiry.Month())
 }
 
 func TestGetAndPutJWKSPrivateKey(t *testing.T) {
