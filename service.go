@@ -21,7 +21,6 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
 	"github.com/google/uuid"
 	vaultapi "github.com/hashicorp/vault/api"
-	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
 	openfga "github.com/openfga/go-sdk"
 	"github.com/openfga/go-sdk/credentials"
@@ -36,7 +35,9 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/debugapi"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
+	jimmcreds "github.com/CanonicalLtd/jimm/internal/jimm/credentials"
 	"github.com/CanonicalLtd/jimm/internal/jimmhttp"
+	"github.com/CanonicalLtd/jimm/internal/jimmjwx"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
 	"github.com/CanonicalLtd/jimm/internal/jujuclient"
 	"github.com/CanonicalLtd/jimm/internal/logger"
@@ -44,25 +45,8 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 	"github.com/CanonicalLtd/jimm/internal/vault"
+	"github.com/CanonicalLtd/jimm/internal/wellknownapi"
 )
-
-// A VaultStore is a store for the attributes of a
-// CloudCredential and controller credentials.
-type VaultStore interface {
-	// Get retrieves the stored attributes of a cloud credential.
-	Get(context.Context, names.CloudCredentialTag) (map[string]string, error)
-
-	// Put stores the attributes of a cloud credential.
-	Put(context.Context, names.CloudCredentialTag, map[string]string) error
-
-	// GetControllerCredentials retrieves the credentials for the given controller from a vault
-	// service.
-	GetControllerCredentials(ctx context.Context, controllerName string) (string, string, error)
-
-	// PutControllerCredentials stores the controller credentials in a vault
-	// service.
-	PutControllerCredentials(ctx context.Context, controllerName string, username string, password string) error
-}
 
 // OpenFGAParams holds parameters needed to connect to the OpenFGA server.
 type OpenFGAParams struct {
@@ -198,6 +182,11 @@ func (s *Service) PollModels(ctx context.Context) error {
 	return w.PollModels(ctx, 10*time.Minute)
 }
 
+// StartJWKSRotator see internal/jimmjwx/jwks.go for details.
+func (s *Service) StartJWKSRotator(ctx context.Context, checkRotateRequired <-chan time.Time, initialRotateRequiredTime time.Time) error {
+	return s.jimm.JWKService.StartJWKSRotator(ctx, checkRotateRequired, initialRotateRequiredTime)
+}
+
 // NewService creates a new Service using the given params.
 func NewService(ctx context.Context, p Params) (*Service, error) {
 	const op = errors.Op("NewService")
@@ -255,6 +244,10 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
 	}
 
+	if s.jimm.CredentialStore != nil {
+		s.jimm.JWKService = jimmjwx.NewJWKSService(s.jimm.CredentialStore)
+	}
+
 	mountHandler := func(path string, h jimmhttp.JIMMHttpHandler) {
 		s.mux.Mount(path, h.Routes())
 	}
@@ -266,6 +259,10 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 				"start_time": debugapi.ServerStartTime,
 			},
 		),
+	)
+	mountHandler(
+		"/.well-known",
+		wellknownapi.NewWellKnownHandler(s.jimm.CredentialStore),
 	)
 
 	params := jujuapi.Params{
@@ -374,7 +371,7 @@ func newAuthenticator(ctx context.Context, db *db.Database, p Params) (jimm.Auth
 	}, nil
 }
 
-func newVaultStore(ctx context.Context, p Params) (VaultStore, error) {
+func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, error) {
 	if p.VaultSecretFile == "" {
 		return nil, nil
 	}
@@ -406,6 +403,7 @@ func newVaultStore(ctx context.Context, p Params) (VaultStore, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &vault.VaultStore{
 		Client:     client,
 		AuthSecret: s.Data,

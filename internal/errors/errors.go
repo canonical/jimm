@@ -125,6 +125,7 @@ const (
 	CodeFailedToParseTupleKey        Code = "failed to parse tuple object key"
 	CodeFailedToResolveTupleResource Code = "failed resolve resource"
 	CodeOpenFGARequestFailed         Code = "failed request to OpenFGA"
+	CodeJWKSRetrievalFailed          Code = "jwks retrieval failure"
 )
 
 // ErrorCode returns the error code from the given error.

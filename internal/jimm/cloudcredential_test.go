@@ -10,10 +10,11 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
+	"github.com/lestrrat-go/jwx/v2/jwk"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
@@ -1633,5 +1634,32 @@ func (s testCloudCredentialAttributeStore) GetControllerCredentials(ctx context.
 }
 
 func (s testCloudCredentialAttributeStore) PutControllerCredentials(ctx context.Context, controllerName string, username string, password string) error {
+	return errors.E(errors.CodeNotImplemented)
+}
+
+func (s testCloudCredentialAttributeStore) GetJWKS(ctx context.Context) (jwk.Set, error) {
+	return nil, errors.E(errors.CodeNotImplemented)
+}
+
+func (s testCloudCredentialAttributeStore) GetJWKSPrivateKey(ctx context.Context) ([]byte, error) {
+	return nil, errors.E(errors.CodeNotImplemented)
+}
+
+func (s testCloudCredentialAttributeStore) GetJWKSExpiry(ctx context.Context) (time.Time, error) {
+	return time.Now(), errors.E(errors.CodeNotImplemented)
+}
+
+func (s testCloudCredentialAttributeStore) PutJWKS(ctx context.Context, jwks jwk.Set) error {
+	return errors.E(errors.CodeNotImplemented)
+}
+func (s testCloudCredentialAttributeStore) PutJWKSPrivateKey(ctx context.Context, pem []byte) error {
+	return errors.E(errors.CodeNotImplemented)
+}
+
+func (s testCloudCredentialAttributeStore) PutJWKSExpiry(ctx context.Context, expiry time.Time) error {
+	return errors.E(errors.CodeNotImplemented)
+}
+
+func (s testCloudCredentialAttributeStore) CleanupJWKS(ctx context.Context) error {
 	return errors.E(errors.CodeNotImplemented)
 }

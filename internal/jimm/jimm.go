@@ -20,27 +20,11 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/CanonicalLtd/jimm/internal/jimm/credentials"
+	"github.com/CanonicalLtd/jimm/internal/jimmjwx"
 	ofgaClient "github.com/CanonicalLtd/jimm/internal/openfga"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
 )
-
-// A CredentialStore is a store for the attributes of a
-// CloudCredential and controller credentials.
-type CredentialStore interface {
-	// Get retrieves the stored attributes of a cloud credential.
-	Get(context.Context, names.CloudCredentialTag) (map[string]string, error)
-
-	// Put stores the attributes of a cloud credential.
-	Put(context.Context, names.CloudCredentialTag, map[string]string) error
-
-	// GetControllerCredentials retrieves the credentials for the given controller from a vault
-	// service.
-	GetControllerCredentials(ctx context.Context, controllerName string) (string, string, error)
-
-	// PutControllerCredentials stores the controller credentials in a vault
-	// service.
-	PutControllerCredentials(ctx context.Context, controllerName string, username string, password string) error
-}
 
 // A JIMM provides the business logic for managing resources in the JAAS
 // system. A single JIMM instance is shared by all concurrent API
@@ -66,7 +50,7 @@ type JIMM struct {
 	// cloud credential and controller credentials. If this is
 	// not configured then the attributes
 	// are stored in the standard database.
-	CredentialStore CredentialStore
+	CredentialStore credentials.CredentialStore
 
 	// Pubsub is a pub-sub hub used for buffering model summaries.
 	Pubsub *pubsub.Hub
@@ -82,6 +66,8 @@ type JIMM struct {
 	// OpenFGAClient holds the client used to interact
 	// with the OpenFGA ReBAC system.
 	OpenFGAClient *ofgaClient.OFGAClient
+
+	JWKService *jimmjwx.JWKSService
 }
 
 // An Authenticator authenticates login requests.
