@@ -595,6 +595,10 @@ func TestWatcher(t *testing.T) {
 					c.Fatal("context closed prematurely")
 				}
 			}
+			// TODO (alesstimec) this test needs a proper fix. We need to
+			// make sure all deltas have been processed before closing the
+			// channel.
+			time.Sleep(time.Second)
 			close(nextC)
 			wg.Wait()
 

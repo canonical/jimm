@@ -11,11 +11,12 @@ import (
 	"time"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/crossmodel"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/db"
@@ -139,6 +140,20 @@ func (j *JIMM) Offer(ctx context.Context, user *dbmodel.User, offer AddApplicati
 	if err != nil {
 		zapctx.Error(ctx, "failed to store the created application offer", zaputil.Error(err))
 		return fail(errors.E(op, err))
+	}
+
+	if j.OpenFGAClient != nil {
+		if err := j.OpenFGAClient.AddControllerApplicationOffer(
+			ctx,
+			model.Controller.Tag().(names.ControllerTag),
+			doc.Tag().(names.ApplicationOfferTag),
+		); err != nil {
+			zapctx.Error(
+				ctx,
+				"cannot add relation between controller and application offer",
+				zap.String("controller", model.Controller.UUID),
+				zap.String("application-offer", doc.UUID))
+		}
 	}
 
 	ale.Success = true
@@ -483,6 +498,18 @@ func (j *JIMM) DestroyOffer(ctx context.Context, user *dbmodel.User, offerURL st
 		if err := j.Database.DeleteApplicationOffer(ctx, offer); err != nil {
 			return err
 		}
+		if j.OpenFGAClient != nil {
+			if err := j.OpenFGAClient.RemoveApplicationOffer(
+				ctx,
+				offer.Tag().(names.ApplicationOfferTag),
+			); err != nil {
+				zapctx.Error(
+					ctx,
+					"cannot remove application offer",
+					zap.String("application-offer", offer.UUID))
+			}
+		}
+
 		return nil
 	})
 	if err != nil {
