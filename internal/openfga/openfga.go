@@ -1,13 +1,17 @@
+// Copyright 2023 CanonicalLtd.
+
 package openfga
 
 import (
 	"context"
 
+	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
 	openfga "github.com/openfga/go-sdk"
 	"go.uber.org/zap"
 
 	"github.com/CanonicalLtd/jimm/internal/errors"
+	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 )
 
 // OFGAClient contains convenient utility methods for interacting
@@ -208,6 +212,66 @@ func (o *OFGAClient) RemoveTuples(ctx context.Context, key openfga.TupleKey) err
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+// AddControllerModel adds a relation between a controller and a model.
+func (o *OFGAClient) AddControllerModel(ctx context.Context, controller names.ControllerTag, model names.ModelTag) error {
+	if err := o.AddRelations(
+		ctx,
+		CreateTupleKey(
+			ofganames.ControllerTag(controller),
+			"controller",
+			ofganames.ModelTag(model),
+		),
+	); err != nil {
+		return errors.E(err)
+	}
+	return nil
+}
+
+// RemoveModel removes a model.
+func (o *OFGAClient) RemoveModel(ctx context.Context, model names.ModelTag) error {
+	if err := o.RemoveTuples(
+		ctx,
+		CreateTupleKey(
+			"",
+			"",
+			ofganames.ModelTag(model),
+		),
+	); err != nil {
+		return errors.E(err)
+	}
+	return nil
+}
+
+// AddControllerApplicationOffer adds a relation between a controller and an application offer.
+func (o *OFGAClient) AddControllerApplicationOffer(ctx context.Context, controller names.ControllerTag, offer names.ApplicationOfferTag) error {
+	if err := o.AddRelations(
+		ctx,
+		CreateTupleKey(
+			ofganames.ControllerTag(controller),
+			"controller",
+			ofganames.ApplicationOfferTag(offer),
+		),
+	); err != nil {
+		return errors.E(err)
+	}
+	return nil
+}
+
+// RemoveApplicationOffer removes an application offer.
+func (o *OFGAClient) RemoveApplicationOffer(ctx context.Context, offer names.ApplicationOfferTag) error {
+	if err := o.RemoveTuples(
+		ctx,
+		CreateTupleKey(
+			"",
+			"",
+			ofganames.ApplicationOfferTag(offer),
+		),
+	); err != nil {
+		return errors.E(err)
 	}
 	return nil
 }

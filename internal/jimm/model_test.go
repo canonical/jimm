@@ -10,6 +10,7 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
+	gomock "github.com/golang/mock/gomock"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -871,6 +872,122 @@ func TestAddModel(t *testing.T) {
 	}
 }
 
+func TestAddModelWithOpenFGAClient(t *testing.T) {
+	c := qt.New(t)
+
+	envString := `
+clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-region-1
+user-defaults:
+- user: alice@external
+  defaults:
+    key4: value4
+cloud-defaults:
+- user: alice@external
+  cloud: test-cloud
+  region: test-region-1
+  defaults:
+    key1: value1
+    key2: value2
+- user: alice@external
+  cloud: test-cloud
+  defaults:
+    key3: value3
+cloud-credentials:
+- name: test-credential-1
+  owner: alice@external
+  cloud: test-cloud
+  auth-type: empty
+controllers:
+- name: controller-1
+  uuid: 00000000-0000-0000-0000-0000-0000000000001
+  cloud: test-cloud
+  region: test-region-1
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 0
+- name: controller-2
+  uuid: 00000000-0000-0000-0000-0000-0000000000002
+  cloud: test-cloud
+  region: test-region-1
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 2
+`[1:]
+
+	api := &jimmtest.API{
+		UpdateCredential_: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+			return nil, nil
+		},
+		GrantJIMMModelAdmin_: func(_ context.Context, _ names.ModelTag) error {
+			return nil
+		},
+		CreateModel_: assertConfig(map[string]interface{}{
+			"key1": "value1",
+			"key2": "value2",
+			"key3": "value3",
+			"key4": "value4",
+		}, createModel(`
+uuid: 00000001-0000-0000-0000-0000-000000000001
+status:
+  status: started
+  info: running a test
+life: alive
+users:
+- user: alice@external
+  access: admin
+- user: bob
+  access: read
+`[1:])),
+	}
+
+	ctrl := gomock.NewController(t)
+	mockOpenFGAClient := NewMockReBACClient(ctrl)
+	j := &jimm.JIMM{
+		Database: db.Database{
+			DB: jimmtest.MemoryDB(c, nil),
+		},
+		Dialer: &jimmtest.Dialer{
+			API:  api,
+			UUID: "00000000-0000-0000-0000-0000-0000000000002",
+		},
+		OpenFGAClient: mockOpenFGAClient,
+	}
+	ctx := context.Background()
+	err := j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+
+	env := jimmtest.ParseEnvironment(c, envString)
+	env.PopulateDB(c, j.Database)
+
+	u := env.User("alice@external").DBObject(c, j.Database)
+	args := jimm.ModelCreateArgs{}
+	err = args.FromJujuModelCreateArgs(&jujuparams.ModelCreateArgs{
+		Name:               "test-model",
+		OwnerTag:           names.NewUserTag("alice@external").String(),
+		CloudTag:           names.NewCloudTag("test-cloud").String(),
+		CloudRegion:        "test-region-1",
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
+	})
+	c.Assert(err, qt.IsNil)
+
+	// we expect a call to add a controller model relation in openfga. If that call
+	// does not occur, this test will fail.
+	mockOpenFGAClient.EXPECT().AddControllerModel(
+		ctx,
+		names.NewControllerTag("00000000-0000-0000-0000-0000-0000000000002"),
+		names.NewModelTag("00000001-0000-0000-0000-0000-000000000001"),
+	)
+
+	_, err = j.AddModel(context.Background(), &u, &args)
+	c.Assert(err, qt.IsNil)
+}
+
 func createModel(template string) func(context.Context, *jujuparams.ModelCreateArgs, *jujuparams.ModelInfo) error {
 	var tmi jujuparams.ModelInfo
 	err := yaml.Unmarshal([]byte(template), &tmi)
@@ -1305,7 +1422,7 @@ func TestModelStatus(t *testing.T) {
 				c.Check(ms, qt.CmpEquals(cmpopts.EquateEmpty()), test.expectModelStatus)
 			}
 
-			c.Check(dialer.IsClosed(), qt.Equals, true)
+			c.Check(dialer.IsClosed(), qt.IsTrue)
 		})
 	}
 }
@@ -1768,7 +1885,7 @@ func TestGrantModelAccess(t *testing.T) {
 			u := env.User(test.username).DBObject(c, j.Database)
 
 			err = j.GrantModelAccess(ctx, &u, names.NewModelTag(test.uuid), names.NewUserTag(test.targetUsername), jujuparams.UserAccessPermission(test.access))
-			c.Assert(dialer.IsClosed(), qt.Equals, true)
+			c.Assert(dialer.IsClosed(), qt.IsTrue)
 			if test.expectError != "" {
 				c.Check(err, qt.ErrorMatches, test.expectError)
 				if test.expectErrorCode != "" {
@@ -2147,7 +2264,7 @@ func TestRevokeModelAccess(t *testing.T) {
 			u := env.User(test.username).DBObject(c, j.Database)
 
 			err = j.RevokeModelAccess(ctx, &u, names.NewModelTag(test.uuid), names.NewUserTag(test.targetUsername), jujuparams.UserAccessPermission(test.access))
-			c.Assert(dialer.IsClosed(), qt.Equals, true)
+			c.Assert(dialer.IsClosed(), qt.IsTrue)
 			if test.expectError != "" {
 				c.Check(err, qt.ErrorMatches, test.expectError)
 				if test.expectErrorCode != "" {
@@ -2309,7 +2426,7 @@ func TestDestroyModel(t *testing.T) {
 			u := env.User(test.username).DBObject(c, j.Database)
 
 			err = j.DestroyModel(ctx, &u, names.NewModelTag(test.uuid), test.destroyStorage, test.force, test.maxWait, test.timeout)
-			c.Assert(dialer.IsClosed(), qt.Equals, true)
+			c.Assert(dialer.IsClosed(), qt.IsTrue)
 			if test.expectError != "" {
 				c.Check(err, qt.ErrorMatches, test.expectError)
 				if test.expectErrorCode != "" {
@@ -2329,6 +2446,69 @@ func TestDestroyModel(t *testing.T) {
 			c.Check(m.Life, qt.Equals, "dying")
 		})
 	}
+}
+
+func TestDestroyModelWithOpenFGAClient(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	env := jimmtest.ParseEnvironment(c, destroyModelTestEnv)
+	dialer := &jimmtest.Dialer{
+		API: &jimmtest.API{
+			DestroyModel_: func(_ context.Context, mt names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
+				if mt.Id() != "00000002-0000-0000-0000-000000000001" {
+					return errors.E("incorrect model uuid")
+				}
+				if destroyStorage == nil || *destroyStorage != true {
+					return errors.E("invalid destroyStorage")
+				}
+				if force == nil || *force != false {
+					return errors.E("invalid force")
+				}
+				if maxWait == nil || *maxWait != time.Second {
+					return errors.E("invalid maxWait")
+				}
+				if timeout == nil || *timeout != time.Second {
+					return errors.E("invalid timeout")
+				}
+				return nil
+			},
+		},
+	}
+	ctrl := gomock.NewController(t)
+	mockOpenFGAClient := NewMockReBACClient(ctrl)
+	j := &jimm.JIMM{
+		Database: db.Database{
+			DB: jimmtest.MemoryDB(c, nil),
+		},
+		Dialer:        dialer,
+		OpenFGAClient: mockOpenFGAClient,
+	}
+	err := j.Database.Migrate(ctx, false)
+	c.Assert(err, qt.IsNil)
+	env.PopulateDB(c, j.Database)
+
+	u := env.User("alice@external").DBObject(c, j.Database)
+
+	// we expect a call to openfga to remove the destroyed model. If this
+	// call does not occur, the test will fail.
+	mockOpenFGAClient.EXPECT().RemoveModel(
+		ctx,
+		names.NewModelTag("00000002-0000-0000-0000-000000000001"),
+	)
+
+	err = j.DestroyModel(
+		ctx,
+		&u,
+		names.NewModelTag("00000002-0000-0000-0000-000000000001"),
+		newBool(true),
+		newBool(false),
+		newDuration(time.Second),
+		newDuration(time.Second),
+	)
+	c.Assert(dialer.IsClosed(), qt.IsTrue)
+	c.Assert(err, qt.IsNil)
+
 }
 
 var dumpModelTests = []struct {
@@ -2427,7 +2607,7 @@ func TestDumpModel(t *testing.T) {
 			u := env.User(test.username).DBObject(c, j.Database)
 
 			s, err := j.DumpModel(ctx, &u, names.NewModelTag(test.uuid), test.simplified)
-			c.Assert(dialer.IsClosed(), qt.Equals, true)
+			c.Assert(dialer.IsClosed(), qt.IsTrue)
 			if test.expectError != "" {
 				c.Check(err, qt.ErrorMatches, test.expectError)
 				if test.expectErrorCode != "" {
@@ -2532,7 +2712,7 @@ func TestDumpModelDB(t *testing.T) {
 			u := env.User(test.username).DBObject(c, j.Database)
 
 			dump, err := j.DumpModelDB(ctx, &u, names.NewModelTag(test.uuid))
-			c.Assert(dialer.IsClosed(), qt.Equals, true)
+			c.Assert(dialer.IsClosed(), qt.IsTrue)
 			if test.expectError != "" {
 				c.Check(err, qt.ErrorMatches, test.expectError)
 				if test.expectErrorCode != "" {
@@ -2642,7 +2822,7 @@ func TestValidateModelUpgrade(t *testing.T) {
 			u := env.User(test.username).DBObject(c, j.Database)
 
 			err = j.ValidateModelUpgrade(ctx, &u, names.NewModelTag(test.uuid), test.force)
-			c.Assert(dialer.IsClosed(), qt.Equals, true)
+			c.Assert(dialer.IsClosed(), qt.IsTrue)
 			if test.expectError != "" {
 				c.Check(err, qt.ErrorMatches, test.expectError)
 				if test.expectErrorCode != "" {
@@ -2875,7 +3055,7 @@ func TestUpdateModelCredential(t *testing.T) {
 				names.NewModelTag(test.uuid),
 				names.NewCloudCredentialTag(test.credential),
 			)
-			c.Assert(dialer.IsClosed(), qt.Equals, true)
+			c.Assert(dialer.IsClosed(), qt.IsTrue)
 			if test.expectError != "" {
 				c.Check(err, qt.ErrorMatches, test.expectError)
 				if test.expectErrorCode != "" {

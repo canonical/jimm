@@ -15,6 +15,7 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/api"
+	"github.com/CanonicalLtd/jimm/api/params"
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
@@ -87,9 +88,10 @@ func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
 		ofga.CreateTupleKey("group:"+strconv.FormatUint(uint64(group2.ID), 10)+"#member", "writer", "model:"+model.UUID.String),
 	}
 
-	want := apiparams.RelationshipTuple{Object: "user-" + user.Username, Relation: "member", TargetObject: "group-" + group.Name}
-	checkAccessTupleController := apiparams.RelationshipTuple{Object: want.Object, Relation: "administrator", TargetObject: "controller-" + controller.UUID}
-	checkAccessTupleModel := apiparams.RelationshipTuple{Object: want.Object, Relation: "writer", TargetObject: "model-" + model.UUID.String}
+	u := "user-" + user.Username
+
+	checkAccessTupleController := apiparams.RelationshipTuple{Object: u, Relation: "administrator", TargetObject: "controller-" + controller.UUID}
+	checkAccessTupleModel := apiparams.RelationshipTuple{Object: u, Relation: "writer", TargetObject: "model-" + model.UUID.String}
 
 	err = s.JIMM.OpenFGAClient.AddRelations(context.Background(), tuples...)
 	c.Assert(err, gc.IsNil)
@@ -106,8 +108,29 @@ func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
 
 	resp, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{})
 	c.Assert(err, gc.IsNil)
-	c.Assert(len(resp.Tuples), gc.Equals, 1)
-	c.Assert(resp.Tuples[0], gc.DeepEquals, want)
+	c.Assert(len(resp.Tuples), gc.Equals, 4)
+	c.Assert(
+		resp.Tuples,
+		gc.DeepEquals,
+		// the first three tuples reflect the three models created
+		// during the test suite setup
+		[]params.RelationshipTuple{{
+			Object:       "controller-controller-1",
+			Relation:     "controller",
+			TargetObject: "model-controller-1:bob@external/model-1",
+		}, {
+			Object:       "controller-controller-1",
+			Relation:     "controller",
+			TargetObject: "model-controller-1:charlie@external/model-2",
+		}, {
+			Object:       "controller-controller-1",
+			Relation:     "controller",
+			TargetObject: "model-controller-1:charlie@external/model-3",
+		}, {
+			Object:       "user-" + user.Username,
+			Relation:     "member",
+			TargetObject: "group-test-group",
+		}})
 
 	//Check user access has been revoked.
 	checkResp, err = client.CheckRelation(&apiparams.CheckRelationRequest{Tuple: checkAccessTupleController})
@@ -711,12 +734,14 @@ func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 		Relation:     "administrator",
 		TargetObject: "applicationoffer-" + controller.Name + ":" + user.Username + "/" + model.Name + "." + applicationOffer.Name,
 	}}
+
 	err = client.AddRelation(&apiparams.AddRelationRequest{Tuples: tuples})
 	c.Assert(err, jc.ErrorIsNil)
 
 	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{})
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(response.Tuples, jc.DeepEquals, tuples)
+	// first three tuples created during setup test
+	c.Assert(response.Tuples[3:], jc.DeepEquals, tuples)
 
 	response, err = client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{
 		Tuple: apiparams.RelationshipTuple{
@@ -1273,11 +1298,21 @@ func (s *accessControlSuite) TestRemoveRelatedTuples(c *gc.C) {
 		c.Assert(len(resp.Tuples), gc.Equals, count)
 	}
 
-	check("controller-"+controller.Name, 5)
-	check("model-"+controller.Name+":"+user.Username+"/"+model.Name, 4)
-	check("applicationoffer-"+controller.Name+":"+user.Username+"/"+model.Name+"."+offer.Name, 3)
-	check("group-"+group.Name, 1)
-	check("user-"+user.Username, 0)
+	// 8.. 3 created when three models are created during
+	// setup of the suite
+	check("controller-"+controller.Name, 8)
+	// 7.. 3 created when three models are created during
+	// setup of the suite
+	check("model-"+controller.Name+":"+user.Username+"/"+model.Name, 7)
+	// 6.. 3 created when three models are created during
+	// setup of the suite
+	check("applicationoffer-"+controller.Name+":"+user.Username+"/"+model.Name+"."+offer.Name, 6)
+	// 4.. 3 created when three models are created during
+	// setup of the suite
+	check("group-"+group.Name, 4)
+	// 3.. 3 created when three models are created during
+	// setup of the suite
+	check("user-"+user.Username, 3)
 }
 
 // createTestControllerEnvironment is a utility function creating the necessary components of adding a:

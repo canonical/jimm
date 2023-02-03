@@ -7,8 +7,8 @@ import (
 	"fmt"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/crossmodel"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
