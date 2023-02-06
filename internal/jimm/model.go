@@ -645,6 +645,21 @@ func (j *JIMM) AddModel(ctx context.Context, u *dbmodel.User, args *ModelCreateA
 		return fail(errors.E(op, err))
 	}
 
+	if j.OpenFGAClient != nil {
+		if err := j.OpenFGAClient.AddControllerModel(
+			ctx,
+			builder.controller.Tag().(names.ControllerTag),
+			builder.model.Tag().(names.ModelTag),
+		); err != nil {
+			zapctx.Error(
+				ctx,
+				"failed to add controller-model relation",
+				zap.String("controller", builder.controller.UUID),
+				zap.String("model", builder.model.UUID.String),
+			)
+		}
+	}
+
 	mi := builder.JujuModelInfo()
 	ale.Tag = names.NewModelTag(mi.UUID).String()
 	ale.Success = true
@@ -942,6 +957,7 @@ func (j *JIMM) DestroyModel(ctx context.Context, u *dbmodel.User, mt names.Model
 		ale.Params["force"] = strconv.FormatBool(*force)
 	}
 
+	var model names.ModelTag
 	err := j.doModelAdmin(ctx, u, mt, func(m *dbmodel.Model, api API) error {
 		if err := api.DestroyModel(ctx, mt, destroyStorage, force, maxWait, timeout); err != nil {
 			return err
@@ -952,7 +968,7 @@ func (j *JIMM) DestroyModel(ctx context.Context, u *dbmodel.User, mt names.Model
 			// monitor should catch it.
 			zapctx.Error(ctx, "failed to store model change", zaputil.Error(err))
 		}
-
+		model = m.Tag().(names.ModelTag)
 		return nil
 	})
 	if err != nil {
@@ -960,6 +976,10 @@ func (j *JIMM) DestroyModel(ctx context.Context, u *dbmodel.User, mt names.Model
 		return errors.E(op, err)
 	}
 	ale.Success = true
+
+	if j.OpenFGAClient != nil && model.Id() != "" {
+		j.OpenFGAClient.RemoveModel(ctx, model)
+	}
 	return nil
 }
 

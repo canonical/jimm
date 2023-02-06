@@ -1,13 +1,17 @@
+// Copyright 2023 CanonicalLtd.
+
 package openfga
 
 import (
 	"context"
 
+	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
 	openfga "github.com/openfga/go-sdk"
 	"go.uber.org/zap"
 
 	"github.com/CanonicalLtd/jimm/internal/errors"
+	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 )
 
 // OFGAClient contains convenient utility methods for interacting
@@ -186,4 +190,88 @@ func (o *OFGAClient) ReadRelatedObjects(ctx context.Context, key *openfga.TupleK
 // - An error in the event something is wrong when contacting OpenFGA
 func (o *OFGAClient) CheckRelation(ctx context.Context, key openfga.TupleKey, trace bool) (bool, string, error) {
 	return o.checkRelation(ctx, key, trace)
+}
+
+// RemoveTuples iteratively reads through all the tuples with the parameters as supplied by key and deletes them.
+func (o *OFGAClient) RemoveTuples(ctx context.Context, key openfga.TupleKey) error {
+	pageSize := 50
+	var token string
+	var resp *ReadResponse
+	var err error
+	for ok := true; ok; ok = (token != resp.PaginationToken) {
+		if resp != nil {
+			token = resp.PaginationToken
+		}
+		resp, err = o.ReadRelatedObjects(ctx, &key, int32(pageSize), token)
+		if err != nil {
+			return err
+		}
+		if len(resp.Keys) > 0 {
+			err = o.RemoveRelation(ctx, resp.Keys...)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// AddControllerModel adds a relation between a controller and a model.
+func (o *OFGAClient) AddControllerModel(ctx context.Context, controller names.ControllerTag, model names.ModelTag) error {
+	if err := o.AddRelations(
+		ctx,
+		CreateTupleKey(
+			ofganames.ControllerTag(controller),
+			"controller",
+			ofganames.ModelTag(model),
+		),
+	); err != nil {
+		return errors.E(err)
+	}
+	return nil
+}
+
+// RemoveModel removes a model.
+func (o *OFGAClient) RemoveModel(ctx context.Context, model names.ModelTag) error {
+	if err := o.RemoveTuples(
+		ctx,
+		CreateTupleKey(
+			"",
+			"",
+			ofganames.ModelTag(model),
+		),
+	); err != nil {
+		return errors.E(err)
+	}
+	return nil
+}
+
+// AddControllerApplicationOffer adds a relation between a controller and an application offer.
+func (o *OFGAClient) AddControllerApplicationOffer(ctx context.Context, controller names.ControllerTag, offer names.ApplicationOfferTag) error {
+	if err := o.AddRelations(
+		ctx,
+		CreateTupleKey(
+			ofganames.ControllerTag(controller),
+			"controller",
+			ofganames.ApplicationOfferTag(offer),
+		),
+	); err != nil {
+		return errors.E(err)
+	}
+	return nil
+}
+
+// RemoveApplicationOffer removes an application offer.
+func (o *OFGAClient) RemoveApplicationOffer(ctx context.Context, offer names.ApplicationOfferTag) error {
+	if err := o.RemoveTuples(
+		ctx,
+		CreateTupleKey(
+			"",
+			"",
+			ofganames.ApplicationOfferTag(offer),
+		),
+	); err != nil {
+		return errors.E(err)
+	}
+	return nil
 }

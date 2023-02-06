@@ -13,7 +13,6 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
-	ofgaClient "github.com/CanonicalLtd/jimm/internal/openfga"
 )
 
 // controllerRoot is the root for endpoints served on controller connections.
@@ -30,7 +29,7 @@ type controllerRoot struct {
 	user                  *dbmodel.User
 	controllerUUIDMasking bool
 	generator             *fastuuid.Generator
-	ofgaClient            *ofgaClient.OFGAClient
+	ofgaClient            jimm.ReBACClient
 }
 
 func newControllerRoot(j *jimm.JIMM, p Params) *controllerRoot {

@@ -4,7 +4,6 @@ package jimmtest
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path"
 
@@ -24,14 +23,15 @@ func VaultClient(tb fatalF, prefix string) (*api.Client, string, map[string]inte
 
 	b, err := os.ReadFile(path.Join(prefix, "./local/vault/approle.json"))
 	if err != nil {
-		fmt.Println("we got file?")
+		wd, _ := os.Getwd()
+		panic("cannot read " + path.Join(prefix, "./local/vault/approle.json") + " " + wd)
 	}
 
 	creds := make(map[string]interface{})
 	var vaultAPISecret api.Secret
 	err = json.Unmarshal(b, &vaultAPISecret)
 	if err != nil {
-		fmt.Println("error?")
+		panic("cannot unmarshal vault secret")
 	}
 	creds["role_id"] = vaultAPISecret.Data["role_id"]
 	creds["secret_id"] = vaultAPISecret.Data["secret_id"]

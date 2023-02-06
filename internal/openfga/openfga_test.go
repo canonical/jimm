@@ -3,15 +3,18 @@ package openfga_test
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/juju/names/v4"
 	openfga "github.com/openfga/go-sdk"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
+	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 )
 
 type openFGATestSuite struct {
@@ -120,6 +123,126 @@ func (s *openFGATestSuite) TestCheckRelationSucceeds(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, true)
 	c.Assert(resoution, gc.Equals, ".(direct).group:1#member.(direct).")
+}
+
+func (s *openFGATestSuite) TestRemoveTuplesSucceeds(c *gc.C) {
+
+	// Test a large number of tuples
+	for i := 0; i < 150; i++ {
+		key := ofga.CreateTupleKey("user:test"+strconv.Itoa(i), "member", "group:1")
+		err := s.ofgaClient.AddRelations(context.Background(), key)
+		c.Assert(err, gc.IsNil)
+	}
+
+	key := ofga.CreateTupleKey("", "", "group:1")
+	err := s.ofgaClient.RemoveTuples(context.Background(), key)
+	c.Assert(err, gc.IsNil)
+	res, err := s.ofgaClient.ReadRelatedObjects(context.Background(), nil, 50, "")
+	c.Assert(err, gc.IsNil)
+	c.Assert(len(res.Keys), gc.Equals, 0)
+
+}
+
+func (s *openFGATestSuite) TestAddControllerModel(c *gc.C) {
+	modelUUID, err := uuid.NewRandom()
+	c.Assert(err, gc.IsNil)
+	controllerUUID, err := uuid.NewRandom()
+	c.Assert(err, gc.IsNil)
+
+	controller := names.NewControllerTag(controllerUUID.String())
+	model := names.NewModelTag(modelUUID.String())
+
+	err = s.ofgaClient.AddControllerModel(context.Background(), controller, model)
+	c.Assert(err, gc.IsNil)
+
+	key := ofga.CreateTupleKey(
+		ofganames.ControllerTag(controller),
+		"controller",
+		ofganames.ModelTag(model),
+	)
+	allowed, _, err := s.ofgaClient.CheckRelation(context.Background(), key, false)
+	c.Assert(err, gc.IsNil)
+	c.Assert(allowed, gc.Equals, true)
+}
+
+func (s *openFGATestSuite) TestRemoveModel(c *gc.C) {
+	modelUUID, err := uuid.NewRandom()
+	c.Assert(err, gc.IsNil)
+	controllerUUID, err := uuid.NewRandom()
+	c.Assert(err, gc.IsNil)
+
+	controller := names.NewControllerTag(controllerUUID.String())
+	model := names.NewModelTag(modelUUID.String())
+
+	err = s.ofgaClient.AddControllerModel(context.Background(), controller, model)
+	c.Assert(err, gc.IsNil)
+
+	key := ofga.CreateTupleKey(
+		ofganames.ControllerTag(controller),
+		"controller",
+		ofganames.ModelTag(model),
+	)
+	allowed, _, err := s.ofgaClient.CheckRelation(context.Background(), key, false)
+	c.Assert(err, gc.IsNil)
+	c.Assert(allowed, gc.Equals, true)
+
+	err = s.ofgaClient.RemoveModel(context.Background(), model)
+	c.Assert(err, gc.IsNil)
+
+	allowed, _, err = s.ofgaClient.CheckRelation(context.Background(), key, false)
+	c.Assert(err, gc.IsNil)
+	c.Assert(allowed, gc.Equals, false)
+}
+
+func (s *openFGATestSuite) TestAddControllerApplicationOffer(c *gc.C) {
+	offerUUID, err := uuid.NewRandom()
+	c.Assert(err, gc.IsNil)
+	controllerUUID, err := uuid.NewRandom()
+	c.Assert(err, gc.IsNil)
+
+	controller := names.NewControllerTag(controllerUUID.String())
+	offer := names.NewApplicationOfferTag(offerUUID.String())
+
+	err = s.ofgaClient.AddControllerApplicationOffer(context.Background(), controller, offer)
+	c.Assert(err, gc.IsNil)
+
+	key := ofga.CreateTupleKey(
+		ofganames.ControllerTag(controller),
+		"controller",
+		ofganames.ApplicationOfferTag(offer),
+	)
+	allowed, _, err := s.ofgaClient.CheckRelation(context.Background(), key, false)
+	c.Assert(err, gc.IsNil)
+	c.Assert(allowed, gc.Equals, true)
+}
+
+func (s *openFGATestSuite) TestRemoveApplicationOffer(c *gc.C) {
+	offerUUID, err := uuid.NewRandom()
+	c.Assert(err, gc.IsNil)
+	controllerUUID, err := uuid.NewRandom()
+	c.Assert(err, gc.IsNil)
+
+	controller := names.NewControllerTag(controllerUUID.String())
+	offer := names.NewApplicationOfferTag(offerUUID.String())
+
+	err = s.ofgaClient.AddControllerApplicationOffer(context.Background(), controller, offer)
+	c.Assert(err, gc.IsNil)
+
+	key := ofga.CreateTupleKey(
+		ofganames.ControllerTag(controller),
+		"controller",
+		ofganames.ApplicationOfferTag(offer),
+	)
+	allowed, _, err := s.ofgaClient.CheckRelation(context.Background(), key, false)
+	c.Assert(err, gc.IsNil)
+	c.Assert(allowed, gc.Equals, true)
+
+	err = s.ofgaClient.RemoveApplicationOffer(context.Background(), offer)
+	c.Assert(err, gc.IsNil)
+
+	allowed, _, err = s.ofgaClient.CheckRelation(context.Background(), key, false)
+	c.Assert(err, gc.IsNil)
+	c.Assert(allowed, gc.Equals, false)
 }
 
 func Test(t *testing.T) {

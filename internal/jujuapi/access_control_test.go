@@ -15,6 +15,7 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/api"
+	"github.com/CanonicalLtd/jimm/api/params"
 	apiparams "github.com/CanonicalLtd/jimm/api/params"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
@@ -61,6 +62,83 @@ func (s *accessControlSuite) TestRemoveGroup(c *gc.C) {
 		Name: "test-group",
 	})
 	c.Assert(err, jc.ErrorIsNil)
+}
+
+func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
+	ctx := context.Background()
+	db := s.JIMM.Database
+
+	user, group, controller, model, _, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	defer closeClient()
+
+	db.AddGroup(ctx, "test-group2")
+	group2 := &dbmodel.GroupEntry{
+		Name: "test-group2",
+	}
+	err := db.GetGroup(ctx, group2)
+	c.Assert(err, gc.IsNil)
+
+	tuples := []openfga.TupleKey{
+		//This tuple should remain as it has no relation to group2
+		ofga.CreateTupleKey("user:"+user.Username, "member", "group:"+strconv.FormatUint(uint64(group.ID), 10)),
+		// Below tuples should all be removed as they relate to group2
+		ofga.CreateTupleKey("user:"+user.Username, "member", "group:"+strconv.FormatUint(uint64(group2.ID), 10)),
+		ofga.CreateTupleKey("group:"+strconv.FormatUint(uint64(group2.ID), 10)+"#member", "member", "group:"+strconv.FormatUint(uint64(group.ID), 10)),
+		ofga.CreateTupleKey("group:"+strconv.FormatUint(uint64(group2.ID), 10)+"#member", "administrator", "controller:"+controller.UUID),
+		ofga.CreateTupleKey("group:"+strconv.FormatUint(uint64(group2.ID), 10)+"#member", "writer", "model:"+model.UUID.String),
+	}
+
+	u := "user-" + user.Username
+
+	checkAccessTupleController := apiparams.RelationshipTuple{Object: u, Relation: "administrator", TargetObject: "controller-" + controller.UUID}
+	checkAccessTupleModel := apiparams.RelationshipTuple{Object: u, Relation: "writer", TargetObject: "model-" + model.UUID.String}
+
+	err = s.JIMM.OpenFGAClient.AddRelations(context.Background(), tuples...)
+	c.Assert(err, gc.IsNil)
+	//Check user has access to model and controller through group2
+	checkResp, err := client.CheckRelation(&apiparams.CheckRelationRequest{Tuple: checkAccessTupleController})
+	c.Assert(err, gc.IsNil)
+	c.Assert(checkResp.Allowed, gc.Equals, true)
+	checkResp, err = client.CheckRelation(&apiparams.CheckRelationRequest{Tuple: checkAccessTupleModel})
+	c.Assert(err, gc.IsNil)
+	c.Assert(checkResp.Allowed, gc.Equals, true)
+
+	err = client.RemoveGroup(&apiparams.RemoveGroupRequest{Name: group2.Name})
+	c.Assert(err, gc.IsNil)
+
+	resp, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{})
+	c.Assert(err, gc.IsNil)
+	c.Assert(len(resp.Tuples), gc.Equals, 4)
+	c.Assert(
+		resp.Tuples,
+		gc.DeepEquals,
+		// the first three tuples reflect the three models created
+		// during the test suite setup
+		[]params.RelationshipTuple{{
+			Object:       "controller-controller-1",
+			Relation:     "controller",
+			TargetObject: "model-controller-1:bob@external/model-1",
+		}, {
+			Object:       "controller-controller-1",
+			Relation:     "controller",
+			TargetObject: "model-controller-1:charlie@external/model-2",
+		}, {
+			Object:       "controller-controller-1",
+			Relation:     "controller",
+			TargetObject: "model-controller-1:charlie@external/model-3",
+		}, {
+			Object:       "user-" + user.Username,
+			Relation:     "member",
+			TargetObject: "group-test-group",
+		}})
+
+	//Check user access has been revoked.
+	checkResp, err = client.CheckRelation(&apiparams.CheckRelationRequest{Tuple: checkAccessTupleController})
+	c.Assert(err, gc.IsNil)
+	c.Assert(checkResp.Allowed, gc.Equals, false)
+	checkResp, err = client.CheckRelation(&apiparams.CheckRelationRequest{Tuple: checkAccessTupleModel})
+	c.Assert(err, gc.IsNil)
+	c.Assert(checkResp.Allowed, gc.Equals, false)
 }
 
 func (s *accessControlSuite) TestRenameGroup(c *gc.C) {
@@ -656,12 +734,14 @@ func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 		Relation:     "administrator",
 		TargetObject: "applicationoffer-" + controller.Name + ":" + user.Username + "/" + model.Name + "." + applicationOffer.Name,
 	}}
+
 	err = client.AddRelation(&apiparams.AddRelationRequest{Tuples: tuples})
 	c.Assert(err, jc.ErrorIsNil)
 
 	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{})
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(response.Tuples, jc.DeepEquals, tuples)
+	// first three tuples created during setup test
+	c.Assert(response.Tuples[3:], jc.DeepEquals, tuples)
 
 	response, err = client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{
 		Tuple: apiparams.RelationshipTuple{
@@ -1182,6 +1262,57 @@ func (s *accessControlSuite) TestParseTag(c *gc.C) {
 	c.Assert(tag.Id(), gc.Equals, model.UUID.String)
 	c.Assert(tag.Kind(), gc.Equals, names.ModelTagKind)
 	c.Assert(specifier, gc.Equals, "#administrator")
+}
+
+func (s *accessControlSuite) TestRemoveRelatedTuples(c *gc.C) {
+	ctx := context.Background()
+	db := s.JIMM.Database
+
+	user, group, controller, model, offer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	defer closeClient()
+
+	db.AddGroup(ctx, "test-group2")
+	group2 := &dbmodel.GroupEntry{
+		Name: "test-group2",
+	}
+	err := db.GetGroup(ctx, group2)
+	c.Assert(err, gc.IsNil)
+
+	tuples := []openfga.TupleKey{
+		ofga.CreateTupleKey("user:"+user.Username, "member", "group:"+strconv.FormatUint(uint64(group.ID), 10)),
+		ofga.CreateTupleKey("user:"+user.Username, "member", "group:"+strconv.FormatUint(uint64(group2.ID), 10)),
+		ofga.CreateTupleKey("user:"+user.Username, "consumer", "applicationoffer:"+offer.UUID),
+		ofga.CreateTupleKey("group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member", "member", "group:"+strconv.FormatUint(uint64(group2.ID), 10)),
+		ofga.CreateTupleKey("group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member", "administrator", "controller:"+controller.UUID),
+		ofga.CreateTupleKey("group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member", "writer", "model:"+model.UUID.String),
+	}
+
+	err = s.JIMM.OpenFGAClient.AddRelations(context.Background(), tuples...)
+	c.Assert(err, gc.IsNil)
+
+	check := func(tag string, count int) {
+		err = jujuapi.RemoveRelatedTuples(db, s.JIMM.OpenFGAClient, tag)
+		c.Assert(err, gc.IsNil)
+		resp, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{})
+		c.Assert(err, gc.IsNil)
+		c.Assert(len(resp.Tuples), gc.Equals, count)
+	}
+
+	// 8.. 3 created when three models are created during
+	// setup of the suite
+	check("controller-"+controller.Name, 8)
+	// 7.. 3 created when three models are created during
+	// setup of the suite
+	check("model-"+controller.Name+":"+user.Username+"/"+model.Name, 7)
+	// 6.. 3 created when three models are created during
+	// setup of the suite
+	check("applicationoffer-"+controller.Name+":"+user.Username+"/"+model.Name+"."+offer.Name, 6)
+	// 4.. 3 created when three models are created during
+	// setup of the suite
+	check("group-"+group.Name, 4)
+	// 3.. 3 created when three models are created during
+	// setup of the suite
+	check("user-"+user.Username, 3)
 }
 
 // createTestControllerEnvironment is a utility function creating the necessary components of adding a:

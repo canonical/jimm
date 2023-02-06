@@ -1,5 +1,7 @@
 // Copyright 2020 Canonical Ltd.
 
+//go:generate mockgen -source=jimm.go -destination=mocks_test.go --package jimm_test
+
 // Package jimm contains the business logic used to manage clouds,
 // cloudcredentials and models.
 package jimm
@@ -14,32 +16,40 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
+	openfga "github.com/openfga/go-sdk"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
-	ofgaClient "github.com/CanonicalLtd/jimm/internal/openfga"
+	"github.com/CanonicalLtd/jimm/internal/jimm/credentials"
+	"github.com/CanonicalLtd/jimm/internal/jimmjwx"
+	jimmopenfga "github.com/CanonicalLtd/jimm/internal/openfga"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
 )
 
-// A CredentialStore is a store for the attributes of a
-// CloudCredential and controller credentials.
-type CredentialStore interface {
-	// Get retrieves the stored attributes of a cloud credential.
-	Get(context.Context, names.CloudCredentialTag) (map[string]string, error)
-
-	// Put stores the attributes of a cloud credential.
-	Put(context.Context, names.CloudCredentialTag, map[string]string) error
-
-	// GetControllerCredentials retrieves the credentials for the given controller from a vault
-	// service.
-	GetControllerCredentials(ctx context.Context, controllerName string) (string, string, error)
-
-	// PutControllerCredentials stores the controller credentials in a vault
-	// service.
-	PutControllerCredentials(ctx context.Context, controllerName string, username string, password string) error
+// ReBACClient holds the interface of a client JIMM uses to interact
+// with the relational based access control system.
+type ReBACClient interface {
+	// AddRelations creates a tuple(s) from the provided keys. See CreateTupleKey for creating keys.
+	AddRelations(ctx context.Context, keys ...openfga.TupleKey) error
+	// RemoveRelation creates a tuple(s) from the provided keys. See CreateTupleKey for creating keys.
+	RemoveRelation(ctx context.Context, keys ...openfga.TupleKey) error
+	// ReadRelations reads a relation(s) from the provided key where a match can be found.
+	ReadRelatedObjects(ctx context.Context, key *openfga.TupleKey, pageSize int32, paginationToken string) (*jimmopenfga.ReadResponse, error)
+	// CheckRelation verifies that a user (or object) is allowed to access the target object by the specified relation.
+	CheckRelation(ctx context.Context, key openfga.TupleKey, trace bool) (bool, string, error)
+	// RemoveTuples iteratively reads through all the tuples with the parameters as supplied by key and deletes them.
+	RemoveTuples(ctx context.Context, key openfga.TupleKey) error
+	// AddControllerModel adds a relation between a controller and a model.
+	AddControllerModel(ctx context.Context, controller names.ControllerTag, model names.ModelTag) error
+	// RemoveModel removes a model.
+	RemoveModel(ctx context.Context, model names.ModelTag) error
+	// AddControllerApplicationOffer adds a relation between a controller and an application offer.
+	AddControllerApplicationOffer(ctx context.Context, controller names.ControllerTag, offer names.ApplicationOfferTag) error
+	// RemoveApplicationOffer removes an application offer.
+	RemoveApplicationOffer(ctx context.Context, offer names.ApplicationOfferTag) error
 }
 
 // A JIMM provides the business logic for managing resources in the JAAS
@@ -66,7 +76,7 @@ type JIMM struct {
 	// cloud credential and controller credentials. If this is
 	// not configured then the attributes
 	// are stored in the standard database.
-	CredentialStore CredentialStore
+	CredentialStore credentials.CredentialStore
 
 	// Pubsub is a pub-sub hub used for buffering model summaries.
 	Pubsub *pubsub.Hub
@@ -81,7 +91,9 @@ type JIMM struct {
 
 	// OpenFGAClient holds the client used to interact
 	// with the OpenFGA ReBAC system.
-	OpenFGAClient *ofgaClient.OFGAClient
+	OpenFGAClient ReBACClient
+
+	JWKService *jimmjwx.JWKSService
 }
 
 // An Authenticator authenticates login requests.
