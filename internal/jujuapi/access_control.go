@@ -1,3 +1,5 @@
+// Copyright 2023 CanonicalLtd.
+
 package jujuapi
 
 import (
@@ -13,7 +15,6 @@ import (
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
-	openfga "github.com/openfga/go-sdk"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 
@@ -22,6 +23,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
+	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
 )
 
@@ -107,7 +109,7 @@ func (r *controllerRoot) RemoveGroup(ctx context.Context, req apiparams.RemoveGr
 	if err != nil {
 		return errors.E(op, err)
 	}
-	err = r.removeRelatedTuples(ctx, "group-"+req.Name)
+	err = r.ofgaClient.RemoveGroup(ctx, group.Tag().(jimmnames.GroupTag))
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -138,13 +140,13 @@ func (r *controllerRoot) ListGroups(ctx context.Context) (apiparams.ListGroupRes
 	return apiparams.ListGroupResponse{Groups: groups}, nil
 }
 
-// resolveTupleObject resolves JIMM tag [of any kind available] (i.e., controller-mycontroller:alex@external/mymodel.myoffer)
+// resolveTag resolves JIMM tag [of any kind available] (i.e., controller-mycontroller:alex@external/mymodel.myoffer)
 // into a juju string tag (i.e., controller-<controller uuid>).
 //
 // If the JIMM tag is aleady of juju string tag form, the transformation is left alone.
 //
 // In both cases though, the resource the tag pertains to is validated to exist within the database.
-func resolveTupleObject(db db.Database, tag string) (string, string, error) {
+func resolveTag(db db.Database, tag string) (*ofganames.Tag, error) {
 	ctx := context.Background()
 	matches := jujuURIMatcher.FindStringSubmatch(tag)
 	resourceUUID := ""
@@ -164,7 +166,11 @@ func resolveTupleObject(db db.Database, tag string) (string, string, error) {
 	userName := matches[5]
 	modelName := matches[7]
 	offerName := matches[9]
-	relationSpecifier := matches[10]
+	relationString := strings.TrimLeft(matches[10], "#")
+	relation, err := ofganames.ParseRelation(relationString)
+	if err != nil {
+		return nil, errors.E("failed to parse relation", errors.CodeBadRequest)
+	}
 
 	switch matches[1] {
 	case names.UserTagKind:
@@ -173,7 +179,7 @@ func resolveTupleObject(db db.Database, tag string) (string, string, error) {
 			"Resolving JIMM tags to Juju tags for tag kind: user",
 			zap.String("user-name", trailer),
 		)
-		return names.NewUserTag(trailer).String(), relationSpecifier, nil
+		return ofganames.FromTagWithRelation(names.NewUserTag(trailer), relation), nil
 
 	case jimmnames.GroupTagKind:
 		zapctx.Debug(
@@ -186,9 +192,9 @@ func resolveTupleObject(db db.Database, tag string) (string, string, error) {
 		}
 		err := db.GetGroup(ctx, entry)
 		if err != nil {
-			return tag, relationSpecifier, errors.E("group not found")
+			return nil, errors.E("group not found")
 		}
-		return jimmnames.NewGroupTag(strconv.FormatUint(uint64(entry.ID), 10)).String(), relationSpecifier, nil
+		return ofganames.FromTagWithRelation(jimmnames.NewGroupTag(strconv.FormatUint(uint64(entry.ID), 10)), relation), nil
 
 	case names.ControllerTagKind:
 		zapctx.Debug(
@@ -205,9 +211,9 @@ func resolveTupleObject(db db.Database, tag string) (string, string, error) {
 
 		err := db.GetController(ctx, &controller)
 		if err != nil {
-			return tag, relationSpecifier, errors.E("controller not found")
+			return nil, errors.E("controller not found")
 		}
-		return names.NewControllerTag(controller.UUID).String(), relationSpecifier, nil
+		return ofganames.FromTagWithRelation(names.NewControllerTag(controller.UUID), relation), nil
 
 	case names.ModelTagKind:
 		zapctx.Debug(
@@ -222,7 +228,7 @@ func resolveTupleObject(db db.Database, tag string) (string, string, error) {
 			controller := dbmodel.Controller{Name: controllerName}
 			err := db.GetController(ctx, &controller)
 			if err != nil {
-				return tag, relationSpecifier, errors.E("controller not found")
+				return nil, errors.E("controller not found")
 			}
 			model.ControllerID = controller.ID
 			model.OwnerUsername = userName
@@ -231,10 +237,10 @@ func resolveTupleObject(db db.Database, tag string) (string, string, error) {
 
 		err := db.GetModel(ctx, &model)
 		if err != nil {
-			return tag, relationSpecifier, errors.E("model not found")
+			return nil, errors.E("model not found")
 		}
 
-		return names.NewModelTag(model.UUID.String).String(), relationSpecifier, nil
+		return ofganames.FromTagWithRelation(names.NewModelTag(model.UUID.String), relation), nil
 
 	case names.ApplicationOfferTagKind:
 		zapctx.Debug(
@@ -249,64 +255,40 @@ func resolveTupleObject(db db.Database, tag string) (string, string, error) {
 			offerURL, err := crossmodel.ParseOfferURL(fmt.Sprintf("%s:%s/%s.%s", controllerName, userName, modelName, offerName))
 			if err != nil {
 				zapctx.Debug(ctx, "failed to parse application offer url", zap.String("url", fmt.Sprintf("%s:%s/%s.%s", controllerName, userName, modelName, offerName)), zaputil.Error(err))
-				return tag, relationSpecifier, errors.E("failed to parse offer url", err)
+				return nil, errors.E("failed to parse offer url", err)
 			}
 			offer.URL = offerURL.String()
 		}
 
 		err := db.GetApplicationOffer(ctx, &offer)
 		if err != nil {
-			return tag, relationSpecifier, errors.E("application offer not found")
+			return nil, errors.E("application offer not found")
 		}
 
-		return jimmnames.NewApplicationOfferTag(offer.UUID).String(), relationSpecifier, nil
+		return ofganames.FromTagWithRelation(names.NewApplicationOfferTag(offer.UUID), relation), nil
 	}
-	return "", "", errors.E("failed to map tag " + matches[1])
-}
-
-// jujuTagFromTuple attempts to parse the provided objectId
-// into a juju tag, and returns an error if this is not possible.
-func jujuTagFromTuple(objectType string, objectId string) (names.Tag, error) {
-	switch objectType {
-	case names.UserTagKind:
-		return names.ParseUserTag(objectId)
-	case names.ModelTagKind:
-		return names.ParseModelTag(objectId)
-	case names.ControllerTagKind:
-		return names.ParseControllerTag(objectId)
-	case names.ApplicationOfferTagKind:
-		return jimmnames.ParseApplicationOfferTag(objectId)
-	case jimmnames.GroupTagKind:
-		return jimmnames.ParseGroupTag(objectId)
-	default:
-		return nil, errors.E("could not determine tag type")
-	}
+	return nil, errors.E("failed to map tag " + matches[1])
 }
 
 // parseTag attempts to parse the provided key into a tag whilst additionally
 // ensuring the resource exists for said tag.
 //
 // This key may be in the form of either a JIMM tag string or Juju tag string.
-func parseTag(ctx context.Context, db db.Database, key string) (names.Tag, string, error) {
+func parseTag(ctx context.Context, db db.Database, key string) (*ofganames.Tag, error) {
 	op := errors.Op("jujuapi.parseTag")
 	tupleKeySplit := strings.SplitN(key, "-", 2)
 	if len(tupleKeySplit) < 2 {
-		return nil, "", errors.E(op, errors.CodeFailedToParseTupleKey, "tag does not have tuple key delimiter")
+		return nil, errors.E(op, errors.CodeFailedToParseTupleKey, "tag does not have tuple key delimiter")
 	}
-	kind := tupleKeySplit[0]
 	tagString := key
-	tagString, relationSpecifier, err := resolveTupleObject(db, tagString)
+	tag, err := resolveTag(db, tagString)
 	if err != nil {
 		zapctx.Debug(ctx, "failed to resolve tuple object", zap.Error(err))
-		return nil, "", errors.E(op, errors.CodeFailedToResolveTupleResource, err)
+		return nil, errors.E(op, errors.CodeFailedToResolveTupleResource, err)
 	}
-	zapctx.Debug(ctx, "resolved JIMM tag", zap.String("tag", tagString), zap.String("relation-specifier", relationSpecifier))
-	tag, err := jujuTagFromTuple(kind, tagString)
-	if err != nil {
-		zapctx.Debug(ctx, "failed to create a juju tag", zaputil.Error(err))
-		return nil, "", errors.E(op, err)
-	}
-	return tag, relationSpecifier, err
+	zapctx.Debug(ctx, "resolved JIMM tag", zap.String("tag", tag.String()))
+
+	return tag, nil
 }
 
 // AddRelation creates a tuple between two objects [if applicable]
@@ -385,8 +367,8 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 
 // parseTuples translate the api request struct containing tuples to a slice of openfga tuple keys.
 // This method utilises the parseTuple method which does all the heavy lifting.
-func (r *controllerRoot) parseTuples(ctx context.Context, tuples []apiparams.RelationshipTuple) ([]openfga.TupleKey, error) {
-	keys := make([]openfga.TupleKey, 0, len(tuples))
+func (r *controllerRoot) parseTuples(ctx context.Context, tuples []apiparams.RelationshipTuple) ([]ofga.Tuple, error) {
+	keys := make([]ofga.Tuple, 0, len(tuples))
 	for _, tuple := range tuples {
 		key, err := r.parseTuple(ctx, tuple)
 		if err != nil {
@@ -400,9 +382,16 @@ func (r *controllerRoot) parseTuples(ctx context.Context, tuples []apiparams.Rel
 // parseTuple takes the initial tuple from a relational request and ensures that
 // whatever format, be it JAAS or Juju tag, is resolved to the correct identifier
 // to be persisted within OpenFGA.
-func (r *controllerRoot) parseTuple(ctx context.Context, tuple apiparams.RelationshipTuple) (*openfga.TupleKey, error) {
+func (r *controllerRoot) parseTuple(ctx context.Context, tuple apiparams.RelationshipTuple) (*ofga.Tuple, error) {
 	const op = errors.Op("jujuapi.parseTuple")
-	var objectString, targetString string
+
+	relation, err := ofganames.ParseRelation(tuple.Relation)
+	if err != nil {
+		return nil, errors.E(op, err, errors.CodeBadRequest)
+	}
+	t := ofga.Tuple{
+		Relation: relation,
+	}
 
 	// Wraps the general error that will be sent for both
 	// the object and target object, but changing the message and key
@@ -416,57 +405,44 @@ func (r *controllerRoot) parseTuple(ctx context.Context, tuple apiparams.Relatio
 		return nil, errors.E(op, errors.CodeBadRequest, "target object not specified")
 	}
 	if tuple.TargetObject != "" {
-		targetObject, targetObjectRelationSpecifier, err := parseTag(ctx, r.jimm.Database, tuple.TargetObject)
+		targetTag, err := parseTag(ctx, r.jimm.Database, tuple.TargetObject)
 		if err != nil {
 			return nil, parseTagError("failed to parse tuple target object key", tuple.TargetObject, err)
 		}
-		targetString = targetObject.Kind() + ":" + targetObject.Id() + targetObjectRelationSpecifier
+		t.Target = targetTag
 	}
 	if tuple.Object != "" {
-		objectTag, objectTagRelationSpecifier, err := parseTag(ctx, r.jimm.Database, tuple.Object)
+		objectTag, err := parseTag(ctx, r.jimm.Database, tuple.Object)
 		if err != nil {
 			return nil, parseTagError("failed to parse tuple object key", tuple.Object, err)
 		}
-		objectString = objectTag.Kind() + ":" + objectTag.Id() + objectTagRelationSpecifier
+		t.Object = objectTag
 	}
 
-	t := ofga.CreateTupleKey(
-		objectString,
-		tuple.Relation,
-		targetString,
-	)
 	return &t, nil
 }
 
-func (r *controllerRoot) toJAASTag(ctx context.Context, tag string) (string, error) {
-	tokens := strings.Split(tag, ":")
-	if len(tokens) != 2 {
-		return "", errors.E("unexpected tag format")
-	}
-	tokens2 := strings.Split(tokens[1], "#")
-	if len(tokens2) == 0 || len(tokens2) > 2 {
-		return "", errors.E("unexpected tag format")
-	}
-	switch tokens[0] {
+func (r *controllerRoot) toJAASTag(ctx context.Context, tag *ofganames.Tag) (string, error) {
+	switch tag.Kind() {
 	case names.UserTagKind:
-		return names.UserTagKind + "-" + tokens[1], nil
+		return names.UserTagKind + "-" + tag.Id(), nil
 	case names.ControllerTagKind:
 		controller := dbmodel.Controller{
-			UUID: tokens2[0],
+			UUID: tag.Id(),
 		}
 		err := r.jimm.Database.GetController(ctx, &controller)
 		if err != nil {
 			return "", errors.E(err, "failed to fetch controller information")
 		}
 		controllerString := names.ControllerTagKind + "-" + controller.Name
-		if len(tokens2) == 2 {
-			controllerString = controllerString + "#" + tokens2[1]
+		if tag.Relation() != "" {
+			controllerString = controllerString + "#" + tag.Relation()
 		}
 		return controllerString, nil
 	case names.ModelTagKind:
 		model := dbmodel.Model{
 			UUID: sql.NullString{
-				String: tokens2[0],
+				String: tag.Id(),
 				Valid:  true,
 			},
 		}
@@ -475,27 +451,27 @@ func (r *controllerRoot) toJAASTag(ctx context.Context, tag string) (string, err
 			return "", errors.E(err, "failed to fetch model information")
 		}
 		modelString := names.ModelTagKind + "-" + model.Controller.Name + ":" + model.OwnerUsername + "/" + model.Name
-		if len(tokens2) == 2 {
-			modelString = modelString + "#" + tokens2[1]
+		if tag.Relation() != "" {
+			modelString = modelString + "#" + tag.Relation()
 		}
 		return modelString, nil
 	case names.ApplicationOfferTagKind:
 		ao := dbmodel.ApplicationOffer{
-			UUID: tokens2[0],
+			UUID: tag.Id(),
 		}
 		err := r.jimm.Database.GetApplicationOffer(ctx, &ao)
 		if err != nil {
 			return "", errors.E(err, "failed to fetch application offer information")
 		}
 		aoString := names.ApplicationOfferTagKind + "-" + ao.Model.Controller.Name + ":" + ao.Model.OwnerUsername + "/" + ao.Model.Name + "." + ao.Name
-		if len(tokens2) == 2 {
-			aoString = aoString + "#" + tokens2[1]
+		if tag.Relation() != "" {
+			aoString = aoString + "#" + tag.Relation()
 		}
 		return aoString, nil
 	case jimmnames.GroupTagKind:
-		id, err := strconv.ParseUint(tokens2[0], 10, 32)
+		id, err := strconv.ParseUint(tag.Id(), 10, 32)
 		if err != nil {
-			return "", errors.E(err, "failed to parse group id")
+			return "", errors.E(err, fmt.Sprintf("failed to parse group id: %v", tag.Id()))
 		}
 		group := dbmodel.GroupEntry{
 			Model: gorm.Model{
@@ -507,12 +483,25 @@ func (r *controllerRoot) toJAASTag(ctx context.Context, tag string) (string, err
 			return "", errors.E(err, "failed to fetch group information")
 		}
 		groupString := jimmnames.GroupTagKind + "-" + group.Name
-		if len(tokens2) == 2 {
-			groupString = groupString + "#" + tokens2[1]
+		if tag.Relation() != "" {
+			groupString = groupString + "#" + tag.Relation()
 		}
 		return groupString, nil
+	case names.CloudTagKind:
+		cloud := dbmodel.Cloud{
+			Name: tag.Id(),
+		}
+		err := r.jimm.Database.GetCloud(ctx, &cloud)
+		if err != nil {
+			return "", errors.E(err, "failed to fetch group information")
+		}
+		cloudString := names.CloudTagKind + "-" + cloud.Name
+		if tag.Relation() != "" {
+			cloudString = cloudString + "#" + tag.Relation()
+		}
+		return cloudString, nil
 	default:
-		return "", errors.E("unexpected tag kind: " + tokens[0])
+		return "", errors.E(fmt.Sprintf("unexpected tag kind: %v", tag.Kind()))
 	}
 }
 
@@ -528,7 +517,7 @@ func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apipara
 		return returnValue, errors.E(op, "jimm not connected to openfga", errors.CodeNotSupported)
 	}
 
-	var key *openfga.TupleKey
+	var key *ofga.Tuple
 	var err error
 	if req.Tuple.TargetObject != "" {
 		key, err = r.parseTuple(ctx, req.Tuple)
@@ -543,19 +532,19 @@ func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apipara
 	if err != nil {
 		return returnValue, errors.E(op, err)
 	}
-	tuples := make([]apiparams.RelationshipTuple, len(response.Keys))
-	for i, t := range response.Keys {
-		object, err := r.toJAASTag(ctx, t.GetUser())
+	tuples := make([]apiparams.RelationshipTuple, len(response.Tuples))
+	for i, t := range response.Tuples {
+		object, err := r.toJAASTag(ctx, t.Object)
 		if err != nil {
 			return returnValue, errors.E(op, err)
 		}
-		target, err := r.toJAASTag(ctx, t.GetObject())
+		target, err := r.toJAASTag(ctx, t.Target)
 		if err != nil {
 			return returnValue, errors.E(op, err)
 		}
 		tuples[i] = apiparams.RelationshipTuple{
 			Object:       object,
-			Relation:     t.GetRelation(),
+			Relation:     string(t.Relation),
 			TargetObject: target,
 		}
 	}
@@ -563,46 +552,4 @@ func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apipara
 		Tuples:            tuples,
 		ContinuationToken: response.PaginationToken,
 	}, nil
-}
-
-// removeRelatedTuples removes all openFGA tuples that contain tag.
-// This is done by parsing tag i.e. ensuring tag is valid "group-Name" or "controll-MyController".
-// Then by querying for all tuples that contain the desired resource and deleting them.
-// Note that this call is slow because it makes repeated calls to the OpenFGA server.
-func (r *controllerRoot) removeRelatedTuples(ctx context.Context, tag string) error {
-	const op = errors.Op("jujuapi.removeRelatedTuples")
-
-	parsedTag, resourceRelationSpecifier, err := parseTag(ctx, r.jimm.Database, tag)
-	if err != nil {
-		return errors.E(op, err)
-	}
-	if resourceRelationSpecifier != "" {
-		return errors.E(op, errors.CodeBadRequest, "A relation specifier should not be provided e.g. #member")
-	}
-	objectSearch := ofga.CreateTupleKey("", "", parsedTag.Kind()+":"+parsedTag.Id())
-
-	// Remove results based on object side search.
-	err = r.ofgaClient.RemoveTuples(ctx, objectSearch)
-	if err != nil {
-		return errors.E(op, err)
-	}
-
-	// Remove results based on user side search.
-	if parsedTag.Kind() == jimmnames.GroupTagKind || parsedTag.Kind() == names.UserTagKind {
-		user := *objectSearch.Object
-		if parsedTag.Kind() == jimmnames.GroupTagKind {
-			user = *objectSearch.Object + "#member"
-		}
-		// We need to loop through all resource types because the OpenFGA Read API does not provide
-		// means for only specifying a user resource, it must be paired with an object type.
-		for _, kind := range resourceTypes {
-			newKey := ofga.CreateTupleKey(user, "", kind+":")
-			err = r.ofgaClient.RemoveTuples(ctx, newKey)
-			if err != nil {
-				return errors.E(op, err)
-			}
-		}
-	}
-
-	return nil
 }

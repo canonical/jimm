@@ -3,10 +3,14 @@
 package dbmodel
 
 import (
+	"fmt"
 	"time"
 
-	apiparams "github.com/CanonicalLtd/jimm/api/params"
+	"github.com/juju/names/v4"
 	"gorm.io/gorm"
+
+	apiparams "github.com/CanonicalLtd/jimm/api/params"
+	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
 )
 
 // A GroupEntry holds information about a user group.
@@ -31,4 +35,9 @@ func (g GroupEntry) ToAPIGroupEntry() apiparams.Group {
 // GroupEntry records.
 func (GroupEntry) TableName() string {
 	return "groups"
+}
+
+// Tag implements the names.Tag interface.
+func (g *GroupEntry) Tag() names.Tag {
+	return jimmnames.NewGroupTag(fmt.Sprintf("%d", g.ID))
 }

@@ -5,38 +5,166 @@
 package names
 
 import (
-	"fmt"
+	"strings"
 
+	"github.com/CanonicalLtd/jimm/internal/errors"
 	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
 	"github.com/juju/names/v4"
 )
 
-// UserTag returns a string containing the
-// OpenFGA tag for the user based on the username.
-func UserTag(user names.UserTag) string {
-	return fmt.Sprintf("user:%s", user.Id())
+// Relation holds the type of tag relation.
+type Relation string
+
+// String implements the Stringer interface.
+func (r Relation) String() string {
+	return string(r)
 }
 
-// GroupTag returns a string containing the
-// OpenFGA tag for the group based on its id.
-func GroupTag(group jimmnames.GroupTag) string {
-	return fmt.Sprintf("group:%s", group.Id())
+var (
+	// MemberRelation represents a member relation between entities.
+	MemberRelation Relation = "member"
+	// AdministratorRelation represents an administrator relation between entities.
+	AdministratorRelation Relation = "administrator"
+	// ControllerRelation represents a controller relation between entities.
+	ControllerRelation Relation = "controller"
+	// ConsumerRelation represents a consumer relation between entities.
+	ConsumerRelation Relation = "consumer"
+	// ReaderRelation represents a reader relation between entities.
+	ReaderRelation Relation = "reader"
+	// WriterRelation represents a writer relation between entities.
+	WriterRelation Relation = "writer"
+	// CanAddModelRelation represents a can_addmodel relation between entities.
+	CanAddModelRelation Relation = "can_addmodel"
+)
+
+// Tag represents a an entity tag as used by JIMM in OpenFGA.
+type Tag struct {
+	kind     string
+	id       string
+	relation Relation
 }
 
-// ControllerTag returns a string containing the
-// OpenFGA tag for the controller based on its uuid.
-func ControllerTag(controller names.ControllerTag) string {
-	return fmt.Sprintf("controller:%s", controller.Id())
+// String returns a string representation of the tag.
+func (t *Tag) String() string {
+	if t.relation == "" {
+		return string(t.kind) + ":" + t.id
+	}
+	return t.kind + ":" + t.id + "#" + t.relation.String()
 }
 
-// ModelTag returns a string containing the
-// OpenFGA tag for the controller based on its uuid.
-func ModelTag(model names.ModelTag) string {
-	return fmt.Sprintf("model:%s", model.Id())
+// Id returns the tag id.
+func (t *Tag) Id() string {
+	return t.id
 }
 
-// ApplicationOfferTag returns a string containing the
-// OpenFGA tag for the applicatio offer based on its uuid.
-func ApplicationOfferTag(offer names.ApplicationOfferTag) string {
-	return fmt.Sprintf("applicationoffer:%s", offer.Id())
+// Kind returns the tag kind.
+func (t *Tag) Kind() string {
+	return t.kind
+}
+
+// Relation returns the tag relation.
+func (t *Tag) Relation() string {
+	return t.relation.String()
+}
+
+// ResourceTag represents an entity tag that implements
+// a method returning entity's id and kind.
+type ResourceTag interface {
+	names.UserTag |
+		jimmnames.GroupTag |
+		names.ControllerTag |
+		names.ModelTag |
+		names.ApplicationOfferTag |
+		names.CloudTag
+
+	Id() string
+	Kind() string
+}
+
+// FromResourceWithRelationTag converts a resource tag to an OpenFGA tag
+// and adds a relation to it.
+func FromTagWithRelation[RT ResourceTag](t RT, relation Relation) *Tag {
+	tag := FromTag(t)
+	tag.relation = relation
+	return tag
+}
+
+// FromTag converts a resource tag to an OpenFGA tag.
+func FromTag[RT ResourceTag](t RT) *Tag {
+	tag := &Tag{
+		id:   t.Id(),
+		kind: t.Kind(),
+	}
+	return tag
+}
+
+// FromString converts an entity tag to an OpenFGA tag.
+func FromString(t string) (*Tag, error) {
+	tokens := strings.Split(t, ":")
+	if len(tokens) != 2 {
+		return nil, errors.E("unexpected tag format")
+	}
+	idTokens := strings.Split(tokens[1], "#")
+	switch tokens[0] {
+	case names.UserTagKind, jimmnames.GroupTagKind,
+		names.ControllerTagKind, names.ModelTagKind,
+		names.ApplicationOfferTagKind, names.CloudTagKind:
+		switch len(idTokens) {
+		case 1:
+			return &Tag{
+				kind: tokens[0],
+				id:   tokens[1],
+			}, nil
+		case 2:
+			return &Tag{
+				kind:     tokens[0],
+				id:       idTokens[0],
+				relation: Relation(idTokens[1]),
+			}, nil
+		default:
+			return nil, errors.E("invalid relation specifier")
+		}
+	default:
+		return nil, errors.E("unknown tag kind")
+	}
+}
+
+// BlankKindTag returns a tag of the specified kind with a blank id.
+// This function should only be used when removing relations to a specific
+// resource (e.g. we want to remove all controller relations to a specific
+// applicationoffer resource, so we specify user as BlankKindTag("controller"))
+func BlankKindTag(kind string) (*Tag, error) {
+	switch kind {
+	case names.UserTagKind, jimmnames.GroupTagKind,
+		names.ControllerTagKind, names.ModelTagKind,
+		names.ApplicationOfferTagKind, names.CloudTagKind:
+		return &Tag{
+			kind: kind,
+		}, nil
+	default:
+		return nil, errors.E("unknown tag kind")
+	}
+}
+
+// ParseRelation parses the relation string
+func ParseRelation(relationString string) (Relation, error) {
+	switch relationString {
+	case "":
+		return Relation(""), nil
+	case MemberRelation.String():
+		return MemberRelation, nil
+	case AdministratorRelation.String():
+		return AdministratorRelation, nil
+	case ConsumerRelation.String():
+		return ConsumerRelation, nil
+	case ReaderRelation.String():
+		return ReaderRelation, nil
+	case WriterRelation.String():
+		return WriterRelation, nil
+	case CanAddModelRelation.String():
+		return CanAddModelRelation, nil
+	default:
+		return Relation(""), errors.E("unknown relation")
+
+	}
 }

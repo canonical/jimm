@@ -12,7 +12,27 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
+	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
 )
+
+var (
+	// resourceTypes contains a list of all resource kinds (i.e. tags) used throughout JIMM.
+	resourceTypes = [...]string{names.UserTagKind, names.ModelTagKind, names.ControllerTagKind, names.ApplicationOfferTagKind, jimmnames.GroupTagKind}
+)
+
+// Tuple represents a relation between an object and a target.
+type Tuple struct {
+	Object   *ofganames.Tag
+	Relation ofganames.Relation
+	Target   *ofganames.Tag
+}
+
+// ReadResponse takes what is necessary from the underlying OFGA ReadResponse and simplifies it
+// into a safe ready-to-use response.
+type ReadResponse struct {
+	Tuples          []Tuple
+	PaginationToken string
+}
 
 // OFGAClient contains convenient utility methods for interacting
 // with OpenFGA from OUR usecase. It wraps the provided pre-generated client
@@ -33,13 +53,6 @@ type OFGAClient struct {
 	AuthModelId string
 }
 
-// ReadResponse takes what is necessary from the underlying OFGA ReadResponse and simplifies it
-// into a safe ready-to-use response.
-type ReadResponse struct {
-	Keys            []openfga.TupleKey
-	PaginationToken string
-}
-
 // NewOpenFGAClient returns a wrapped OpenFGA API client ensuring all calls are made to the provided
 // authorisation model (id) and returns what is necessary.
 func NewOpenFGAClient(a openfga.OpenFgaApi, authModelId string) *OFGAClient {
@@ -47,10 +60,16 @@ func NewOpenFGAClient(a openfga.OpenFgaApi, authModelId string) *OFGAClient {
 }
 
 // addRelation adds user(s) to the specified object by the specified relation within the tuple keys given.
-func (o *OFGAClient) addRelation(ctx context.Context, t ...openfga.TupleKey) error {
+func (o *OFGAClient) addRelation(ctx context.Context, tuples ...Tuple) error {
 	wr := openfga.NewWriteRequest()
 	wr.SetAuthorizationModelId(o.AuthModelId)
-	keys := openfga.NewTupleKeys(t)
+
+	tupleKeys := make([]openfga.TupleKey, len(tuples))
+	for i, tuple := range tuples {
+		tupleKeys[i] = createTupleKey(tuple)
+	}
+
+	keys := openfga.NewTupleKeys(tupleKeys)
 	wr.SetWrites(*keys)
 	_, _, err := o.api.Write(ctx).Body(*wr).Execute()
 	if err != nil {
@@ -60,10 +79,16 @@ func (o *OFGAClient) addRelation(ctx context.Context, t ...openfga.TupleKey) err
 }
 
 // removeRelation deletes user(s) from the specified object by the specified relation within the tuple keys given.
-func (o *OFGAClient) removeRelation(ctx context.Context, t ...openfga.TupleKey) error {
+func (o *OFGAClient) removeRelation(ctx context.Context, tuples ...Tuple) error {
 	wr := openfga.NewWriteRequest()
 	wr.SetAuthorizationModelId(o.AuthModelId)
-	keys := openfga.NewTupleKeys(t)
+
+	tupleKeys := make([]openfga.TupleKey, len(tuples))
+	for i, tuple := range tuples {
+		tupleKeys[i] = createTupleKey(tuple)
+	}
+
+	keys := openfga.NewTupleKeys(tupleKeys)
 	wr.SetDeletes(*keys)
 	_, _, err := o.api.Write(ctx).Body(*wr).Execute()
 	if err != nil {
@@ -78,7 +103,7 @@ func (o *OFGAClient) removeRelation(ctx context.Context, t ...openfga.TupleKey) 
 // The underlying tuple is managed by this method and as such you need only provide the "tuple_key" segment. See CreateTupleKey
 //
 // The results may be paginated via a pageSize and the initial returned pagination token from the first request.
-func (o *OFGAClient) getRelatedObjects(ctx context.Context, t *openfga.TupleKey, pageSize int32, paginationToken string) (*openfga.ReadResponse, error) {
+func (o *OFGAClient) getRelatedObjects(ctx context.Context, tuple *Tuple, pageSize int32, paginationToken string) (*openfga.ReadResponse, error) {
 	rr := openfga.NewReadRequest()
 
 	if pageSize != 0 {
@@ -90,8 +115,9 @@ func (o *OFGAClient) getRelatedObjects(ctx context.Context, t *openfga.TupleKey,
 	}
 
 	rr.SetAuthorizationModelId(o.AuthModelId)
-	if t != nil {
-		rr.SetTupleKey(*t)
+	if tuple != nil {
+		t := createTupleKey(*tuple)
+		rr.SetTupleKey(t)
 	}
 	readres, _, err := o.api.Read(ctx).Body(*rr).Execute()
 	if err != nil {
@@ -101,16 +127,17 @@ func (o *OFGAClient) getRelatedObjects(ctx context.Context, t *openfga.TupleKey,
 }
 
 // checkRelation verifies that object a, is reachable, via unions or direct relations to object b
-func (o *OFGAClient) checkRelation(ctx context.Context, t openfga.TupleKey, trace bool) (bool, string, error) {
+func (o *OFGAClient) checkRelation(ctx context.Context, tuple Tuple, trace bool) (bool, string, error) {
 	zapctx.Debug(
 		ctx,
 		"check request internal",
-		zap.String("tuple object", t.GetUser()),
-		zap.String("tuple relation", t.GetRelation()),
-		zap.String("tuple target object", t.GetObject()),
+		zap.String("tuple object", tuple.Object.String()),
+		zap.String("tuple relation", tuple.Relation.String()),
+		zap.String("tuple target object", tuple.Target.String()),
 	)
 	cr := openfga.NewCheckRequest()
 	cr.SetAuthorizationModelId(o.AuthModelId)
+	t := createTupleKey(tuple)
 	cr.SetTupleKey(t)
 	cr.SetTrace(trace)
 	checkres, httpres, err := o.api.Check(ctx).Body(*cr).Execute()
@@ -124,29 +151,29 @@ func (o *OFGAClient) checkRelation(ctx context.Context, t openfga.TupleKey, trac
 
 }
 
-// CreateTuple wraps the underlying ofga tuple into a convenient ease-of-use method
-func CreateTupleKey(object string, relation string, targetObject string) openfga.TupleKey {
+// createTuple wraps the underlying ofga tuple into a convenient ease-of-use method
+func createTupleKey(tuple Tuple) openfga.TupleKey {
 	k := openfga.NewTupleKey()
 	// in some cases specifying the object is not required
-	if object != "" {
-		k.SetUser(object)
+	if tuple.Object != nil {
+		k.SetUser(tuple.Object.String())
 	}
 	// in some cases specifying the relation is not required
-	if relation != "" {
-		k.SetRelation(relation)
+	if tuple.Relation != "" {
+		k.SetRelation(string(tuple.Relation))
 	}
-	k.SetObject(targetObject)
+	k.SetObject(tuple.Target.String())
 	return *k
 }
 
 // AddRelations creates a tuple(s) from the provided keys. See CreateTupleKey for creating keys.
-func (o *OFGAClient) AddRelations(ctx context.Context, keys ...openfga.TupleKey) error {
-	return o.addRelation(ctx, keys...)
+func (o *OFGAClient) AddRelations(ctx context.Context, tuples ...Tuple) error {
+	return o.addRelation(ctx, tuples...)
 }
 
 // RemoveRelation creates a tuple(s) from the provided keys. See CreateTupleKey for creating keys.
-func (o *OFGAClient) RemoveRelation(ctx context.Context, keys ...openfga.TupleKey) error {
-	return o.removeRelation(ctx, keys...)
+func (o *OFGAClient) RemoveRelation(ctx context.Context, tuples ...Tuple) error {
+	return o.removeRelation(ctx, tuples...)
 }
 
 // ReadRelations reads a relation(s) from the provided key where a match can be found.
@@ -156,19 +183,31 @@ func (o *OFGAClient) RemoveRelation(ctx context.Context, keys ...openfga.TupleKe
 // See: CreateTupleKey for creating keys.
 //
 // You may read via pagination utilising the token returned from the request.
-func (o *OFGAClient) ReadRelatedObjects(ctx context.Context, key *openfga.TupleKey, pageSize int32, paginationToken string) (*ReadResponse, error) {
-	keys := []openfga.TupleKey{}
-	res, err := o.getRelatedObjects(ctx, key, pageSize, paginationToken)
+func (o *OFGAClient) ReadRelatedObjects(ctx context.Context, tuple *Tuple, pageSize int32, paginationToken string) (*ReadResponse, error) {
+	keys := []Tuple{}
+	res, err := o.getRelatedObjects(ctx, tuple, pageSize, paginationToken)
 	if err != nil {
-		return nil, err
+		return nil, errors.E(err)
 	}
-	tupes, ok := res.GetTuplesOk()
+	tuples, ok := res.GetTuplesOk()
 	if ok {
-		t := *tupes
+		t := *tuples
 		for i := 0; i < len(t); i++ {
 			key, ok := t[i].GetKeyOk()
 			if ok {
-				keys = append(keys, *key)
+				user, err := ofganames.FromString(key.GetUser())
+				if err != nil {
+					return nil, errors.E(err)
+				}
+				target, err := ofganames.FromString(key.GetObject())
+				if err != nil {
+					return nil, errors.E(err)
+				}
+				keys = append(keys, Tuple{
+					Object:   user,
+					Relation: ofganames.Relation(key.GetRelation()),
+					Target:   target,
+				})
 			}
 		}
 	}
@@ -179,7 +218,7 @@ func (o *OFGAClient) ReadRelatedObjects(ctx context.Context, key *openfga.TupleK
 		token = *t
 	}
 
-	return &ReadResponse{Keys: keys, PaginationToken: token}, nil
+	return &ReadResponse{Tuples: keys, PaginationToken: token}, nil
 }
 
 // CheckRelation verifies that a user (or object) is allowed to access the target object by the specified relation.
@@ -188,12 +227,12 @@ func (o *OFGAClient) ReadRelatedObjects(ctx context.Context, key *openfga.TupleK
 // - A bool of simply true or false, denoting authorisation
 // - A string (if trace is true) explaining WHY this is true [in the case the check succeeds, otherwise an empty string]
 // - An error in the event something is wrong when contacting OpenFGA
-func (o *OFGAClient) CheckRelation(ctx context.Context, key openfga.TupleKey, trace bool) (bool, string, error) {
-	return o.checkRelation(ctx, key, trace)
+func (o *OFGAClient) CheckRelation(ctx context.Context, tuple Tuple, trace bool) (bool, string, error) {
+	return o.checkRelation(ctx, tuple, trace)
 }
 
-// RemoveTuples iteratively reads through all the tuples with the parameters as supplied by key and deletes them.
-func (o *OFGAClient) RemoveTuples(ctx context.Context, key openfga.TupleKey) error {
+// removeTuples iteratively reads through all the tuples with the parameters as supplied by key and deletes them.
+func (o *OFGAClient) removeTuples(ctx context.Context, tuple *Tuple) error {
 	pageSize := 50
 	var token string
 	var resp *ReadResponse
@@ -202,12 +241,12 @@ func (o *OFGAClient) RemoveTuples(ctx context.Context, key openfga.TupleKey) err
 		if resp != nil {
 			token = resp.PaginationToken
 		}
-		resp, err = o.ReadRelatedObjects(ctx, &key, int32(pageSize), token)
+		resp, err = o.ReadRelatedObjects(ctx, tuple, int32(pageSize), token)
 		if err != nil {
 			return err
 		}
-		if len(resp.Keys) > 0 {
-			err = o.RemoveRelation(ctx, resp.Keys...)
+		if len(resp.Tuples) > 0 {
+			err = o.RemoveRelation(ctx, resp.Tuples...)
 			if err != nil {
 				return err
 			}
@@ -220,11 +259,11 @@ func (o *OFGAClient) RemoveTuples(ctx context.Context, key openfga.TupleKey) err
 func (o *OFGAClient) AddControllerModel(ctx context.Context, controller names.ControllerTag, model names.ModelTag) error {
 	if err := o.AddRelations(
 		ctx,
-		CreateTupleKey(
-			ofganames.ControllerTag(controller),
-			"controller",
-			ofganames.ModelTag(model),
-		),
+		Tuple{
+			Object:   ofganames.FromTag(controller),
+			Relation: ofganames.ControllerRelation,
+			Target:   ofganames.FromTag(model),
+		},
 	); err != nil {
 		return errors.E(err)
 	}
@@ -233,13 +272,11 @@ func (o *OFGAClient) AddControllerModel(ctx context.Context, controller names.Co
 
 // RemoveModel removes a model.
 func (o *OFGAClient) RemoveModel(ctx context.Context, model names.ModelTag) error {
-	if err := o.RemoveTuples(
+	if err := o.removeTuples(
 		ctx,
-		CreateTupleKey(
-			"",
-			"",
-			ofganames.ModelTag(model),
-		),
+		&Tuple{
+			Target: ofganames.FromTag(model),
+		},
 	); err != nil {
 		return errors.E(err)
 	}
@@ -250,11 +287,11 @@ func (o *OFGAClient) RemoveModel(ctx context.Context, model names.ModelTag) erro
 func (o *OFGAClient) AddControllerApplicationOffer(ctx context.Context, controller names.ControllerTag, offer names.ApplicationOfferTag) error {
 	if err := o.AddRelations(
 		ctx,
-		CreateTupleKey(
-			ofganames.ControllerTag(controller),
-			"controller",
-			ofganames.ApplicationOfferTag(offer),
-		),
+		Tuple{
+			Object:   ofganames.FromTag(controller),
+			Relation: ofganames.ControllerRelation,
+			Target:   ofganames.FromTag(offer),
+		},
 	); err != nil {
 		return errors.E(err)
 	}
@@ -263,15 +300,43 @@ func (o *OFGAClient) AddControllerApplicationOffer(ctx context.Context, controll
 
 // RemoveApplicationOffer removes an application offer.
 func (o *OFGAClient) RemoveApplicationOffer(ctx context.Context, offer names.ApplicationOfferTag) error {
-	if err := o.RemoveTuples(
+	if err := o.removeTuples(
 		ctx,
-		CreateTupleKey(
-			"",
-			"",
-			ofganames.ApplicationOfferTag(offer),
-		),
+		&Tuple{
+			Target: ofganames.FromTag(offer),
+		},
 	); err != nil {
 		return errors.E(err)
+	}
+	return nil
+}
+
+// RemoveGroup removes a group.
+func (o *OFGAClient) RemoveGroup(ctx context.Context, group jimmnames.GroupTag) error {
+	if err := o.removeTuples(
+		ctx,
+		&Tuple{
+			Relation: ofganames.MemberRelation,
+			Target:   ofganames.FromTag(group),
+		},
+	); err != nil {
+		return errors.E(err)
+	}
+	// We need to loop through all resource types because the OpenFGA Read API does not provide
+	// means for only specifying a user resource, it must be paired with an object type.
+	for _, kind := range resourceTypes {
+		kt, err := ofganames.BlankKindTag(kind)
+		if err != nil {
+			return errors.E(err)
+		}
+		newKey := &Tuple{
+			Object: ofganames.FromTagWithRelation(group, ofganames.MemberRelation),
+			Target: kt,
+		}
+		err = o.removeTuples(ctx, newKey)
+		if err != nil {
+			return errors.E(err)
+		}
 	}
 	return nil
 }

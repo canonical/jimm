@@ -12,12 +12,12 @@ import (
 	dbmodel "github.com/CanonicalLtd/jimm/internal/dbmodel"
 	jimm "github.com/CanonicalLtd/jimm/internal/jimm"
 	openfga "github.com/CanonicalLtd/jimm/internal/openfga"
+	names "github.com/CanonicalLtd/jimm/pkg/names"
 	bakery "github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	gomock "github.com/golang/mock/gomock"
 	crossmodel "github.com/juju/juju/core/crossmodel"
 	params "github.com/juju/juju/rpc/params"
 	v4 "github.com/juju/names/v4"
-	go_sdk "github.com/openfga/go-sdk"
 )
 
 // MockReBACClient is a mock of ReBACClient interface.
@@ -72,7 +72,7 @@ func (mr *MockReBACClientMockRecorder) AddControllerModel(ctx, controller, model
 }
 
 // AddRelations mocks base method.
-func (m *MockReBACClient) AddRelations(ctx context.Context, keys ...go_sdk.TupleKey) error {
+func (m *MockReBACClient) AddRelations(ctx context.Context, keys ...openfga.Tuple) error {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{ctx}
 	for _, a := range keys {
@@ -91,7 +91,7 @@ func (mr *MockReBACClientMockRecorder) AddRelations(ctx interface{}, keys ...int
 }
 
 // CheckRelation mocks base method.
-func (m *MockReBACClient) CheckRelation(ctx context.Context, key go_sdk.TupleKey, trace bool) (bool, string, error) {
+func (m *MockReBACClient) CheckRelation(ctx context.Context, key openfga.Tuple, trace bool) (bool, string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CheckRelation", ctx, key, trace)
 	ret0, _ := ret[0].(bool)
@@ -107,7 +107,7 @@ func (mr *MockReBACClientMockRecorder) CheckRelation(ctx, key, trace interface{}
 }
 
 // ReadRelatedObjects mocks base method.
-func (m *MockReBACClient) ReadRelatedObjects(ctx context.Context, key *go_sdk.TupleKey, pageSize int32, paginationToken string) (*openfga.ReadResponse, error) {
+func (m *MockReBACClient) ReadRelatedObjects(ctx context.Context, key *openfga.Tuple, pageSize int32, paginationToken string) (*openfga.ReadResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ReadRelatedObjects", ctx, key, pageSize, paginationToken)
 	ret0, _ := ret[0].(*openfga.ReadResponse)
@@ -135,6 +135,20 @@ func (mr *MockReBACClientMockRecorder) RemoveApplicationOffer(ctx, offer interfa
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveApplicationOffer", reflect.TypeOf((*MockReBACClient)(nil).RemoveApplicationOffer), ctx, offer)
 }
 
+// RemoveGroup mocks base method.
+func (m *MockReBACClient) RemoveGroup(ctx context.Context, group names.GroupTag) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveGroup", ctx, group)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveGroup indicates an expected call of RemoveGroup.
+func (mr *MockReBACClientMockRecorder) RemoveGroup(ctx, group interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveGroup", reflect.TypeOf((*MockReBACClient)(nil).RemoveGroup), ctx, group)
+}
+
 // RemoveModel mocks base method.
 func (m *MockReBACClient) RemoveModel(ctx context.Context, model v4.ModelTag) error {
 	m.ctrl.T.Helper()
@@ -150,7 +164,7 @@ func (mr *MockReBACClientMockRecorder) RemoveModel(ctx, model interface{}) *gomo
 }
 
 // RemoveRelation mocks base method.
-func (m *MockReBACClient) RemoveRelation(ctx context.Context, keys ...go_sdk.TupleKey) error {
+func (m *MockReBACClient) RemoveRelation(ctx context.Context, keys ...openfga.Tuple) error {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{ctx}
 	for _, a := range keys {
@@ -166,20 +180,6 @@ func (mr *MockReBACClientMockRecorder) RemoveRelation(ctx interface{}, keys ...i
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{ctx}, keys...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveRelation", reflect.TypeOf((*MockReBACClient)(nil).RemoveRelation), varargs...)
-}
-
-// RemoveTuples mocks base method.
-func (m *MockReBACClient) RemoveTuples(ctx context.Context, key go_sdk.TupleKey) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RemoveTuples", ctx, key)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// RemoveTuples indicates an expected call of RemoveTuples.
-func (mr *MockReBACClientMockRecorder) RemoveTuples(ctx, key interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveTuples", reflect.TypeOf((*MockReBACClient)(nil).RemoveTuples), ctx, key)
 }
 
 // MockAuthenticator is a mock of Authenticator interface.
