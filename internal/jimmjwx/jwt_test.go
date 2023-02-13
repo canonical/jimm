@@ -11,7 +11,7 @@ import (
 	qt "github.com/frankban/quicktest"
 )
 
-func TestBob(t *testing.T) {
+func TestRegisterJWKSCacheRegistersTheCacheSuccessfully(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
@@ -37,29 +37,18 @@ func TestBob(t *testing.T) {
 	srv := httptest.NewTLSServer(svc)
 	c.Cleanup(func() { srv.Close() })
 
+	// Setup JWKSService
 	jwksService := jimmjwx.NewJWKSService(store)
+	// Start rotator
 	startAndTestRotator(c, ctx, store, jwksService)
-	jwtService := jimmjwx.NewJWTService(jwksService)
+	// Setup JWTService
 	u, _ := url.Parse(srv.URL)
-	jwtService.RegisterJWKSCache(ctx, u.Host, srv.Client())
+	jwtService := jimmjwx.NewJWTService(jwksService, u.Host, store)
 
-	// svc, err := jimm.NewService(context.Background(), p)
-	// c.Assert(err, qt.IsNil)
+	// Test RegisterJWKSCache does register the public key just setup
+	jwtService.RegisterJWKSCache(ctx, srv.Client())
 
-	// srv := httptest.NewTLSServer(svc)
-	// c.Cleanup(func() { srv.Close() })
-
-	// rr := httptest.NewRecorder()
-
-	// req, err := http.NewRequest("GET", "/.well-known/jwks.json", nil)
-	// c.Assert(err, qt.IsNil)
-	// svc.ServeHTTP(rr, req)
-
-	// res := rr.Result().Body
-	// defer res.Close()
-	// body, err := io.ReadAll(res)
-	// c.Assert(err, qt.IsNil)
-
-	// fmt.Println(string(body))
-	// c.Fail()
+	set, err := jwtService.Cache.Get(ctx, "https://"+u.Host+"/.well-known/jwks.json")
+	c.Assert(err, qt.IsNil)
+	c.Assert(set.Len(), qt.Equals, 1)
 }
