@@ -3,6 +3,7 @@ package jimmjwx_test
 import (
 	"context"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/CanonicalLtd/jimm"
@@ -39,7 +40,8 @@ func TestBob(t *testing.T) {
 	jwksService := jimmjwx.NewJWKSService(store)
 	startAndTestRotator(c, ctx, store, jwksService)
 	jwtService := jimmjwx.NewJWTService(jwksService)
-	jwtService.RegisterJWKSCache(ctx, srv.URL)
+	u, _ := url.Parse(srv.URL)
+	jwtService.RegisterJWKSCache(ctx, u.Host, srv.Client())
 
 	// svc, err := jimm.NewService(context.Background(), p)
 	// c.Assert(err, qt.IsNil)

@@ -18,18 +18,14 @@ func NewJWTService(jwksService *JWKSService) *JWTService {
 	return &JWTService{jwksService: jwksService}
 }
 
-func (j *JWTService) RegisterJWKSCache(ctx context.Context, wellknownHost string) {
+// RegisterJWKSCache registers a cache to refresh the public key persisted by JIMM's
+// JWKSService. It calls JIMM's JWKSService endpoint the same as any other ordinary
+// client would.
+func (j *JWTService) RegisterJWKSCache(ctx context.Context, wellknownHost string, client *http.Client) {
 	cache := jwk.NewCache(ctx)
-	// The default config here is perfectly fine for this use-case and we
-	// only wish to append TLS (given that it is provided and we require it)
-	transport := http.DefaultTransport.(*http.Transport).Clone()
 
-	client := &http.Client{
-		Transport: transport,
-	}
-
-	_ = cache.Register(wellknownHost+"/.well-known/jwks.json", jwk.WithHTTPClient(client))
-	if _, err := cache.Refresh(ctx, wellknownHost+"/.well-known/jwks.json"); err != nil {
+	_ = cache.Register("https://"+wellknownHost+"/.well-known/jwks.json", jwk.WithHTTPClient(client))
+	if _, err := cache.Refresh(ctx, "https://"+wellknownHost+"/.well-known/jwks.json"); err != nil {
 		// url is not a valid JWKS
 		panic(err)
 	}
