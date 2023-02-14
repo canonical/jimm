@@ -2,13 +2,14 @@ package jimmjwx_test
 
 import (
 	"context"
-	"net/http/httptest"
 	"net/url"
+	"os"
 	"testing"
+	"time"
 
-	"github.com/CanonicalLtd/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jimmjwx"
 	qt "github.com/frankban/quicktest"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
 func TestRegisterJWKSCacheRegistersTheCacheSuccessfully(t *testing.T) {
@@ -17,25 +18,7 @@ func TestRegisterJWKSCacheRegistersTheCacheSuccessfully(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	store := newStore(c)
-	// Ensure store is wiped
-	err := store.CleanupJWKS(ctx)
-	c.Assert(err, qt.IsNil)
-
-	// Setup service for self-call
-	p := jimm.Params{
-		ControllerUUID:  "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
-		VaultAddress:    "http://localhost:8200",
-		VaultAuthPath:   "/auth/approle/login",
-		VaultPath:       "/jimm-kv/",
-		VaultSecretFile: "../../local/vault/approle.json",
-	}
-
-	svc, err := jimm.NewService(context.Background(), p)
-	c.Assert(err, qt.IsNil)
-
-	srv := httptest.NewTLSServer(svc)
-	c.Cleanup(func() { srv.Close() })
+	_, srv, store := setupService(ctx, c)
 
 	// Setup JWKSService
 	jwksService := jimmjwx.NewJWKSService(store)
@@ -43,7 +26,7 @@ func TestRegisterJWKSCacheRegistersTheCacheSuccessfully(t *testing.T) {
 	startAndTestRotator(c, ctx, store, jwksService)
 	// Setup JWTService
 	u, _ := url.Parse(srv.URL)
-	jwtService := jimmjwx.NewJWTService(jwksService, u.Host, store)
+	jwtService := jimmjwx.NewJWTService(u.Host, store)
 
 	// Test RegisterJWKSCache does register the public key just setup
 	jwtService.RegisterJWKSCache(ctx, srv.Client())
@@ -51,4 +34,113 @@ func TestRegisterJWKSCacheRegistersTheCacheSuccessfully(t *testing.T) {
 	set, err := jwtService.Cache.Get(ctx, "https://"+u.Host+"/.well-known/jwks.json")
 	c.Assert(err, qt.IsNil)
 	c.Assert(set.Len(), qt.Equals, 1)
+}
+
+func TestNewJWTIsParsableByExponent(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Set env for 'fake' service
+	c.Assert(os.Setenv("JIMM_DNS_NAME", "127.0.0.1:17070"), qt.IsNil)
+	c.Assert(os.Setenv("JIMM_JWT_EXPIRY", "10s"), qt.IsNil)
+	c.Cleanup(func() {
+		os.Clearenv()
+	})
+
+	_, srv, store := setupService(ctx, c)
+
+	// Setup JWKSService
+	jwksService := jimmjwx.NewJWKSService(store)
+	// Start rotator
+	startAndTestRotator(c, ctx, store, jwksService)
+	// Setup JWTService
+	u, _ := url.Parse(srv.URL)
+	jwtService := jimmjwx.NewJWTService(u.Host, store)
+	// Setup JWKS Cache
+	jwtService.RegisterJWKSCache(ctx, srv.Client())
+
+	// Mint a new JWT
+	tok, err := jwtService.NewJWT(ctx, jimmjwx.JWTParams{
+		Controller: "controller-my-diglett-controller",
+		User:       "diglett@external",
+		Access: map[string]string{
+			"controller": "superuser",
+			"model":      "administrator",
+		},
+	})
+	c.Assert(err, qt.IsNil)
+
+	// Retrieve pubkey from cache
+	set, err := jwtService.Cache.Get(ctx, "https://"+u.Host+"/.well-known/jwks.json")
+	c.Assert(err, qt.IsNil)
+
+	// Test the token parses
+	token, err := jwt.Parse(
+		tok,
+		jwt.WithKeySet(set),
+	)
+	c.Assert(err, qt.IsNil)
+
+	// Test token has what we want
+	c.Assert(token.Audience()[0], qt.Equals, "controller-my-diglett-controller")
+	c.Assert(token.Subject(), qt.Equals, "diglett@external")
+	accessClaim, ok := token.Get("access")
+	c.Assert(ok, qt.IsTrue)
+	c.Assert(accessClaim, qt.DeepEquals, map[string]any{
+		"controller": "superuser",
+		"model":      "administrator",
+	})
+	c.Assert(token.Issuer(), qt.Equals, "127.0.0.1:17070")
+}
+
+func TestNewJWTExpires(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Set env for 'fake' service
+	c.Assert(os.Setenv("JIMM_DNS_NAME", "127.0.0.1:17070"), qt.IsNil)
+	c.Assert(os.Setenv("JIMM_JWT_EXPIRY", "1ns"), qt.IsNil)
+	c.Cleanup(func() {
+		os.Clearenv()
+	})
+
+	_, srv, store := setupService(ctx, c)
+
+	// Setup JWKSService
+	jwksService := jimmjwx.NewJWKSService(store)
+	// Start rotator
+	startAndTestRotator(c, ctx, store, jwksService)
+	// Setup JWTService
+	u, _ := url.Parse(srv.URL)
+	jwtService := jimmjwx.NewJWTService(u.Host, store)
+	// Setup JWKS Cache
+	jwtService.RegisterJWKSCache(ctx, srv.Client())
+
+	// Mint a new JWT
+	tok, err := jwtService.NewJWT(ctx, jimmjwx.JWTParams{
+		Controller: "controller-my-diglett-controller",
+		User:       "diglett@external",
+		Access: map[string]string{
+			"controller": "superuser",
+			"model":      "administrator",
+		},
+	})
+	c.Assert(err, qt.IsNil)
+
+	// Retrieve pubkey from cache
+	set, err := jwtService.Cache.Get(ctx, "https://"+u.Host+"/.well-known/jwks.json")
+	c.Assert(err, qt.IsNil)
+
+	time.Sleep(time.Nanosecond * 10)
+
+	// Test the token fails to parse
+	_, err = jwt.Parse(
+		tok,
+		jwt.WithKeySet(set),
+	)
+	c.Assert(err, qt.ErrorMatches, `"exp" not satisfied`)
 }

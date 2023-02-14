@@ -2,6 +2,7 @@ package jimmjwx_test
 
 import (
 	"context"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -9,6 +10,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
+	"github.com/CanonicalLtd/jimm"
+	"github.com/CanonicalLtd/jimm/internal/jimm/credentials"
 	"github.com/CanonicalLtd/jimm/internal/jimmjwx"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	"github.com/CanonicalLtd/jimm/internal/vault"
@@ -49,7 +52,7 @@ func getJWKS(c *qt.C) jwk.Set {
 
 // startTestRotator starts a rotator, returning the ks that has been found
 // it does not guarantee the keyset has any keys!
-func startAndTestRotator(c *qt.C, ctx context.Context, store *vault.VaultStore, svc *jimmjwx.JWKSService) jwk.Set {
+func startAndTestRotator(c *qt.C, ctx context.Context, store credentials.CredentialStore, svc *jimmjwx.JWKSService) jwk.Set {
 	err := store.CleanupJWKS(ctx)
 	c.Assert(err, qt.IsNil)
 
@@ -76,4 +79,28 @@ func startAndTestRotator(c *qt.C, ctx context.Context, store *vault.VaultStore, 
 	_, err = uuid.Parse(key.KeyID())
 	c.Assert(err, qt.IsNil)
 	return ks
+}
+
+// setupService sets up a JIMM service with the correct params to connect to vault. It also ensures
+// that vault is wiped each time this is called. The test server is cleaned up on test completion.
+func setupService(ctx context.Context, c *qt.C) (*jimm.Service, *httptest.Server, credentials.CredentialStore) {
+	store := newStore(c)
+	// Ensure store is wiped
+	err := store.CleanupJWKS(ctx)
+	c.Assert(err, qt.IsNil)
+
+	svc, err := jimm.NewService(context.Background(), jimm.Params{
+		ControllerUUID:  "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		VaultAddress:    "http://localhost:8200",
+		VaultAuthPath:   "/auth/approle/login",
+		VaultPath:       "/jimm-kv/",
+		VaultSecretFile: "../../local/vault/approle.json",
+	},
+	)
+	c.Assert(err, qt.IsNil)
+
+	srv := httptest.NewTLSServer(svc)
+	c.Cleanup(func() { srv.Close() })
+
+	return svc, srv, store
 }

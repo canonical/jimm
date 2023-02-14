@@ -5,6 +5,8 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"net/http"
+	"os"
+	"time"
 
 	"github.com/CanonicalLtd/jimm/internal/jimm/credentials"
 	"github.com/google/uuid"
@@ -16,10 +18,9 @@ import (
 // JWTService manages the creation of JWTs that are inteded to be issued
 // by JIMM.
 type JWTService struct {
-	jwksService *JWKSService
-	Cache       *jwk.Cache
-	host        string
-	store       credentials.CredentialStore
+	Cache *jwk.Cache
+	host  string
+	store credentials.CredentialStore
 }
 
 type JWTParams struct {
@@ -28,12 +29,12 @@ type JWTParams struct {
 	// User is the "sub" of the JWT
 	User string
 	// Access is a claim of key/values denoting what the user wishes to access
-	Access map[string]any
+	Access map[string]string
 }
 
 // NewJWTService returns a new JWT service for handling JIMMs JWTs.
-func NewJWTService(jwksService *JWKSService, host string, store credentials.CredentialStore) *JWTService {
-	return &JWTService{jwksService: jwksService, host: host, store: store}
+func NewJWTService(host string, store credentials.CredentialStore) *JWTService {
+	return &JWTService{host: host, store: store}
 }
 
 // RegisterJWKSCache registers a cache to refresh the public key persisted by JIMM's
@@ -42,8 +43,8 @@ func NewJWTService(jwksService *JWKSService, host string, store credentials.Cred
 func (j *JWTService) RegisterJWKSCache(ctx context.Context, client *http.Client) {
 	j.Cache = jwk.NewCache(ctx)
 
-	_ = j.Cache.Register("https://"+j.host+"/.well-known/jwks.json", jwk.WithHTTPClient(client))
-	if _, err := j.Cache.Refresh(ctx, "https://"+j.host+"/.well-known/jwks.json"); err != nil {
+	_ = j.Cache.Register(j.getJWKSEndpoint(), jwk.WithHTTPClient(client))
+	if _, err := j.Cache.Refresh(ctx, j.getJWKSEndpoint()); err != nil {
 		// url is not a valid JWKS
 		panic(err)
 	}
@@ -54,10 +55,22 @@ func (j *JWTService) RegisterJWKSCache(ctx context.Context, client *http.Client)
 //   - The Issuer is resolved from this function.
 //   - The JWT ID should be cached and validated on each call, where the client verifies it has not been used before.
 //     Once the JWT has expired for said ID, the client can clean up their blacklist.
-func (j *JWTService) NewJWT(ctx context.Context, params JWTParams) (jwt.Token, error) {
+//
+// The current usecase of these JWTs is expected that NO session tokens will be generated
+// and instead, a new JWT will be issued each time containing the required claims for
+// authz.
+func (j *JWTService) NewJWT(ctx context.Context, params JWTParams) ([]byte, error) {
 	if jti, err := j.generateJTI(ctx); err != nil {
 		return nil, err
 	} else {
+
+		jwkSet, err := j.Cache.Get(ctx, j.getJWKSEndpoint())
+		if err != nil {
+		}
+
+		pubKey, ok := jwkSet.Key(jwkSet.Len() - 1)
+		if !ok {
+		}
 
 		pkeyPem, err := j.store.GetJWKSPrivateKey(ctx)
 		if err != nil {
@@ -73,25 +86,33 @@ func (j *JWTService) NewJWT(ctx context.Context, params JWTParams) (jwt.Token, e
 		if err != nil {
 		}
 
+		expiryDuration, err := time.ParseDuration(os.Getenv("JIMM_JWT_EXPIRY"))
+		if err != nil {
+		}
+
 		signingKey.Set(jwk.AlgorithmKey, jwa.RS256)
-		signingKey.Set(jwk.KeyIDKey, <set kid here>)// TODO set kid from cached jwks alex
+		signingKey.Set(jwk.KeyIDKey, pubKey.KeyID())
 
 		token, err := jwt.NewBuilder().
 			Audience([]string{params.Controller}).
 			Subject(params.User).
-			Issuer("jimm"). // Resolve current host name from os.Getenv alex
+			Issuer(os.Getenv("JIMM_DNS_NAME")).
 			JwtID(jti).
 			Claim("access", params.Access).
+			Expiration(time.Now().Add(expiryDuration)).
 			Build()
+		if err != nil {
+		}
 
-		// jwt.Sign(
-		// 	token,
-		// 	jwt.WithKey(
-		// 		jwa.RS256,
+		freshToken, err := jwt.Sign(
+			token,
+			jwt.WithKey(
+				jwa.RS256,
+				signingKey,
+			),
+		)
 
-		// 		)
-		// 	)
-		return token, err
+		return freshToken, err
 	}
 }
 
@@ -103,4 +124,8 @@ func (j *JWTService) generateJTI(ctx context.Context) (string, error) {
 		return "", err
 	}
 	return id.String(), nil
+}
+
+func (j *JWTService) getJWKSEndpoint() string {
+	return "https://" + j.host + "/.well-known/jwks.json"
 }
