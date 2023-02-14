@@ -2,7 +2,6 @@ package openfga_test
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -15,6 +14,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
 	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
+	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
 )
 
 type openFGATestSuite struct {
@@ -30,39 +30,26 @@ func (s *openFGATestSuite) SetUpTest(c *gc.C) {
 	s.ofgaClient = client
 }
 
-func (s *openFGATestSuite) TestCreateTupleKey(c *gc.C) {
-	key := ofga.CreateTupleKey("user:diglett", "legendary", "pokemon:earth")
-	c.Assert("user:diglett", gc.Equals, key.GetUser())
-	c.Assert("legendary", gc.Equals, key.GetRelation())
-	c.Assert("pokemon:earth", gc.Equals, key.GetObject())
-}
-
-func (s *openFGATestSuite) TestWritingTuplesToOFGADetectsBadObjects(c *gc.C) {
+func (s *openFGATestSuite) TestWritingTuplesToOFGASucceeds(c *gc.C) {
 	ctx := context.Background()
-	key1 := ofga.CreateTupleKey("user:diglett", "legendary", "pokemon:earth")
-	key2 := ofga.CreateTupleKey("user:diglett", "awesome", "pokemon:earth")
-	key3 := ofga.CreateTupleKey("user:dugtrio", "legendary", "pokemon:fire")
 
-	err := s.ofgaClient.AddRelations(ctx, key1, key2, key3)
-	fgaErrCode, _ := openfga.NewErrorCodeFromValue("validation_error")
-	serr, ok := err.(openfga.FgaApiValidationError)
-	c.Assert(ok, gc.Equals, true)
-	c.Assert(400, gc.Equals, serr.ResponseStatusCode())
-	c.Assert("POST", gc.Equals, serr.RequestMethod())
-	c.Assert("Write", gc.Equals, serr.EndpointCategory())
-	c.Assert(*fgaErrCode, gc.Equals, serr.ResponseCode())
-}
-
-func (s *openFGATestSuite) TestWritingTuplesToOFGADetectsSucceeds(c *gc.C) {
-	ctx := context.Background()
+	groupid := "1"
 
 	uuid1, _ := uuid.NewRandom()
-	user1 := fmt.Sprintf("user:%s", uuid1)
-	key1 := ofga.CreateTupleKey(user1, "member", "group:pokemon")
+	user1 := names.NewUserTag(uuid1.String())
+	key1 := ofga.Tuple{
+		Object:   ofganames.FromTag(user1),
+		Relation: "member",
+		Target:   ofganames.FromTag(jimmnames.NewGroupTag(groupid)),
+	}
 
 	uuid2, _ := uuid.NewRandom()
-	user2 := fmt.Sprintf("user:%s", uuid2)
-	key2 := ofga.CreateTupleKey(user2, "member", "group:pokemon")
+	user2 := names.NewUserTag(uuid2.String())
+	key2 := ofga.Tuple{
+		Object:   ofganames.FromTag(user2),
+		Relation: "member",
+		Target:   ofganames.FromTag(jimmnames.NewGroupTag(groupid)),
+	}
 
 	err := s.ofgaClient.AddRelations(ctx, key1, key2)
 	c.Assert(err, gc.IsNil)
@@ -70,20 +57,31 @@ func (s *openFGATestSuite) TestWritingTuplesToOFGADetectsSucceeds(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	secondToLastInsertedTuple := changes.GetChanges()[len(changes.GetChanges())-2].GetTupleKey()
-	c.Assert(user1, gc.Equals, secondToLastInsertedTuple.GetUser())
+	c.Assert(ofganames.FromTag(user1).String(), gc.Equals, secondToLastInsertedTuple.GetUser())
 
 	lastInsertedTuple := changes.GetChanges()[len(changes.GetChanges())-1].GetTupleKey()
-	c.Assert(user2, gc.Equals, lastInsertedTuple.GetUser())
+	c.Assert(ofganames.FromTag(user2).String(), gc.Equals, lastInsertedTuple.GetUser())
 }
 
 func (suite *openFGATestSuite) TestRemovingTuplesFromOFGASucceeds(c *gc.C) {
 	ctx := context.Background()
 
+	groupid := "2"
+
 	//Create tuples before writing to db
-	user1 := "user:bob"
-	key1 := ofga.CreateTupleKey(user1, "member", "group:pokemon")
-	user2 := "user:alice"
-	key2 := ofga.CreateTupleKey(user2, "member", "group:pokemon")
+	user1 := ofganames.FromTag(names.NewUserTag("bob"))
+	key1 := ofga.Tuple{
+		Object:   user1,
+		Relation: "member",
+		Target:   ofganames.FromTag(jimmnames.NewGroupTag(groupid)),
+	}
+
+	user2 := ofganames.FromTag(names.NewUserTag("alice"))
+	key2 := ofga.Tuple{
+		Object:   user2,
+		Relation: "member",
+		Target:   ofganames.FromTag(jimmnames.NewGroupTag(groupid)),
+	}
 
 	//Delete before insert should fail
 	err := suite.ofgaClient.RemoveRelation(ctx, key1, key2)
@@ -100,46 +98,71 @@ func (suite *openFGATestSuite) TestRemovingTuplesFromOFGASucceeds(c *gc.C) {
 
 	secondToLastInsertedTuple := changes.GetChanges()[len(changes.GetChanges())-2]
 	secondLastKey := secondToLastInsertedTuple.GetTupleKey()
-	c.Assert(user1, gc.Equals, secondLastKey.GetUser())
+	c.Assert(user1.String(), gc.Equals, secondLastKey.GetUser())
 	c.Assert(openfga.DELETE, gc.Equals, secondToLastInsertedTuple.GetOperation())
 
 	lastInsertedTuple := changes.GetChanges()[len(changes.GetChanges())-1]
 	lastKey := lastInsertedTuple.GetTupleKey()
-	c.Assert(user2, gc.Equals, lastKey.GetUser())
+	c.Assert(user2.String(), gc.Equals, lastKey.GetUser())
 	c.Assert(openfga.DELETE, gc.Equals, lastInsertedTuple.GetOperation())
 }
 
 func (s *openFGATestSuite) TestCheckRelationSucceeds(c *gc.C) {
 	ctx := context.Background()
 
-	userToGroup := ofga.CreateTupleKey("user:a-handsome-diglett", "member", "group:1")
-	groupToController := ofga.CreateTupleKey("group:1#member", "administrator", "controller:imauuid")
+	groupid := "3"
+	controllerUUID, _ := uuid.NewRandom()
+	controller := names.NewControllerTag(controllerUUID.String())
+
+	user := ofganames.FromTag(names.NewUserTag("eve"))
+	userToGroup := ofga.Tuple{
+		Object:   user,
+		Relation: "member",
+		Target:   ofganames.FromTag(jimmnames.NewGroupTag(groupid)),
+	}
+	groupToController := ofga.Tuple{
+		Object:   ofganames.FromTagWithRelation(jimmnames.NewGroupTag(groupid), ofganames.MemberRelation),
+		Relation: "administrator",
+		Target:   ofganames.FromTag(controller),
+	}
 
 	err := s.ofgaClient.AddRelations(ctx, userToGroup, groupToController)
 	c.Assert(err, gc.IsNil)
 
-	checkTuple := ofga.CreateTupleKey("user:a-handsome-diglett", "administrator", "controller:imauuid")
+	checkTuple := ofga.Tuple{
+		Object:   user,
+		Relation: "administrator",
+		Target:   ofganames.FromTag(controller),
+	}
 	allowed, resoution, err := s.ofgaClient.CheckRelation(ctx, checkTuple, true)
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, true)
-	c.Assert(resoution, gc.Equals, ".(direct).group:1#member.(direct).")
+	c.Assert(resoution, gc.Equals, ".(direct).group:"+groupid+"#member.(direct).")
 }
 
 func (s *openFGATestSuite) TestRemoveTuplesSucceeds(c *gc.C) {
+	groupid := "4"
 
 	// Test a large number of tuples
 	for i := 0; i < 150; i++ {
-		key := ofga.CreateTupleKey("user:test"+strconv.Itoa(i), "member", "group:1")
+		key := ofga.Tuple{
+			Object:   ofganames.FromTag(names.NewUserTag("test" + strconv.Itoa(i))),
+			Relation: "member",
+			Target:   ofganames.FromTag(jimmnames.NewGroupTag(groupid)),
+		}
 		err := s.ofgaClient.AddRelations(context.Background(), key)
 		c.Assert(err, gc.IsNil)
 	}
 
-	key := ofga.CreateTupleKey("", "", "group:1")
-	err := s.ofgaClient.RemoveTuples(context.Background(), key)
+	checkKey := ofga.Tuple{
+		Target: ofganames.FromTag(jimmnames.NewGroupTag(groupid)),
+	}
+	c.Logf("checking for tuple %v\n", checkKey)
+	err := s.ofgaClient.RemoveTuples(context.Background(), &checkKey)
 	c.Assert(err, gc.IsNil)
 	res, err := s.ofgaClient.ReadRelatedObjects(context.Background(), nil, 50, "")
 	c.Assert(err, gc.IsNil)
-	c.Assert(len(res.Keys), gc.Equals, 0)
+	c.Assert(len(res.Tuples), gc.Equals, 0)
 
 }
 
@@ -155,11 +178,11 @@ func (s *openFGATestSuite) TestAddControllerModel(c *gc.C) {
 	err = s.ofgaClient.AddControllerModel(context.Background(), controller, model)
 	c.Assert(err, gc.IsNil)
 
-	key := ofga.CreateTupleKey(
-		ofganames.ControllerTag(controller),
-		"controller",
-		ofganames.ModelTag(model),
-	)
+	key := ofga.Tuple{
+		Object:   ofganames.FromTag(controller),
+		Relation: "controller",
+		Target:   ofganames.FromTag(model),
+	}
 	allowed, _, err := s.ofgaClient.CheckRelation(context.Background(), key, false)
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, true)
@@ -177,11 +200,11 @@ func (s *openFGATestSuite) TestRemoveModel(c *gc.C) {
 	err = s.ofgaClient.AddControllerModel(context.Background(), controller, model)
 	c.Assert(err, gc.IsNil)
 
-	key := ofga.CreateTupleKey(
-		ofganames.ControllerTag(controller),
-		"controller",
-		ofganames.ModelTag(model),
-	)
+	key := ofga.Tuple{
+		Object:   ofganames.FromTag(controller),
+		Relation: "controller",
+		Target:   ofganames.FromTag(model),
+	}
 	allowed, _, err := s.ofgaClient.CheckRelation(context.Background(), key, false)
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, true)
@@ -206,11 +229,11 @@ func (s *openFGATestSuite) TestAddControllerApplicationOffer(c *gc.C) {
 	err = s.ofgaClient.AddControllerApplicationOffer(context.Background(), controller, offer)
 	c.Assert(err, gc.IsNil)
 
-	key := ofga.CreateTupleKey(
-		ofganames.ControllerTag(controller),
-		"controller",
-		ofganames.ApplicationOfferTag(offer),
-	)
+	key := ofga.Tuple{
+		Object:   ofganames.FromTag(controller),
+		Relation: "controller",
+		Target:   ofganames.FromTag(offer),
+	}
 	allowed, _, err := s.ofgaClient.CheckRelation(context.Background(), key, false)
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, true)
@@ -228,11 +251,11 @@ func (s *openFGATestSuite) TestRemoveApplicationOffer(c *gc.C) {
 	err = s.ofgaClient.AddControllerApplicationOffer(context.Background(), controller, offer)
 	c.Assert(err, gc.IsNil)
 
-	key := ofga.CreateTupleKey(
-		ofganames.ControllerTag(controller),
-		"controller",
-		ofganames.ApplicationOfferTag(offer),
-	)
+	key := ofga.Tuple{
+		Object:   ofganames.FromTag(controller),
+		Relation: "controller",
+		Target:   ofganames.FromTag(offer),
+	}
 	allowed, _, err := s.ofgaClient.CheckRelation(context.Background(), key, false)
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, true)

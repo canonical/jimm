@@ -16,7 +16,6 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
-	openfga "github.com/openfga/go-sdk"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
@@ -27,21 +26,20 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jimmjwx"
 	jimmopenfga "github.com/CanonicalLtd/jimm/internal/openfga"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
+	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
 )
 
 // ReBACClient holds the interface of a client JIMM uses to interact
 // with the relational based access control system.
 type ReBACClient interface {
 	// AddRelations creates a tuple(s) from the provided keys. See CreateTupleKey for creating keys.
-	AddRelations(ctx context.Context, keys ...openfga.TupleKey) error
+	AddRelations(ctx context.Context, keys ...jimmopenfga.Tuple) error
 	// RemoveRelation creates a tuple(s) from the provided keys. See CreateTupleKey for creating keys.
-	RemoveRelation(ctx context.Context, keys ...openfga.TupleKey) error
+	RemoveRelation(ctx context.Context, keys ...jimmopenfga.Tuple) error
 	// ReadRelations reads a relation(s) from the provided key where a match can be found.
-	ReadRelatedObjects(ctx context.Context, key *openfga.TupleKey, pageSize int32, paginationToken string) (*jimmopenfga.ReadResponse, error)
+	ReadRelatedObjects(ctx context.Context, key *jimmopenfga.Tuple, pageSize int32, paginationToken string) (*jimmopenfga.ReadResponse, error)
 	// CheckRelation verifies that a user (or object) is allowed to access the target object by the specified relation.
-	CheckRelation(ctx context.Context, key openfga.TupleKey, trace bool) (bool, string, error)
-	// RemoveTuples iteratively reads through all the tuples with the parameters as supplied by key and deletes them.
-	RemoveTuples(ctx context.Context, key openfga.TupleKey) error
+	CheckRelation(ctx context.Context, key jimmopenfga.Tuple, trace bool) (bool, string, error)
 	// AddControllerModel adds a relation between a controller and a model.
 	AddControllerModel(ctx context.Context, controller names.ControllerTag, model names.ModelTag) error
 	// RemoveModel removes a model.
@@ -50,6 +48,8 @@ type ReBACClient interface {
 	AddControllerApplicationOffer(ctx context.Context, controller names.ControllerTag, offer names.ApplicationOfferTag) error
 	// RemoveApplicationOffer removes an application offer.
 	RemoveApplicationOffer(ctx context.Context, offer names.ApplicationOfferTag) error
+	// RemoveGroup removes a group.
+	RemoveGroup(ctx context.Context, group jimmnames.GroupTag) error
 }
 
 // A JIMM provides the business logic for managing resources in the JAAS
