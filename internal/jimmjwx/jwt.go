@@ -8,11 +8,14 @@ import (
 	"os"
 	"time"
 
+	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm/credentials"
 	"github.com/google/uuid"
+	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
+	"go.uber.org/zap"
 )
 
 // JWTService manages the creation of JWTs that are inteded to be issued
@@ -50,7 +53,7 @@ func (j *JWTService) RegisterJWKSCache(ctx context.Context, client *http.Client)
 	}
 }
 
-// NewJWT creates a new JWT to be represent a users access within a controller.
+// NewJWT creates a new JWT to represent a users access within a controller.
 //
 //   - The Issuer is resolved from this function.
 //   - The JWT ID should be cached and validated on each call, where the client verifies it has not been used before.
@@ -63,31 +66,43 @@ func (j *JWTService) NewJWT(ctx context.Context, params JWTParams) ([]byte, erro
 	if jti, err := j.generateJTI(ctx); err != nil {
 		return nil, err
 	} else {
+		zapctx.Debug(ctx, "issueing a new JWT", zap.Any("params", params))
 
 		jwkSet, err := j.Cache.Get(ctx, j.getJWKSEndpoint())
 		if err != nil {
+			return nil, err
 		}
 
 		pubKey, ok := jwkSet.Key(jwkSet.Len() - 1)
 		if !ok {
+			zapctx.Error(ctx, "no jwk found")
+			return nil, errors.E("no jwk found")
 		}
 
 		pkeyPem, err := j.store.GetJWKSPrivateKey(ctx)
 		if err != nil {
+			zapctx.Error(ctx, "failed to retrieve private key", zap.Error(err))
+			return nil, err
 		}
 
 		block, _ := pem.Decode([]byte(pkeyPem))
 
 		pkeyDecoded, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 		if err != nil {
+			zapctx.Error(ctx, "failed to parse private key", zap.Error(err))
+			return nil, err
 		}
 
 		signingKey, err := jwk.FromRaw(pkeyDecoded)
 		if err != nil {
+			zapctx.Error(ctx, "failed to create signing key", zap.Error(err))
+			return nil, err
 		}
 
 		expiryDuration, err := time.ParseDuration(os.Getenv("JIMM_JWT_EXPIRY"))
 		if err != nil {
+			zapctx.Error(ctx, "failed to get JIMM_JWT_EXPIRY environment variable", zap.Error(err))
+			return nil, err
 		}
 
 		signingKey.Set(jwk.AlgorithmKey, jwa.RS256)
@@ -102,6 +117,8 @@ func (j *JWTService) NewJWT(ctx context.Context, params JWTParams) ([]byte, erro
 			Expiration(time.Now().Add(expiryDuration)).
 			Build()
 		if err != nil {
+			zapctx.Error(ctx, "failed to create token", zap.Error(err))
+			return nil, err
 		}
 
 		freshToken, err := jwt.Sign(
@@ -111,6 +128,10 @@ func (j *JWTService) NewJWT(ctx context.Context, params JWTParams) ([]byte, erro
 				signingKey,
 			),
 		)
+		if err != nil {
+			zapctx.Error(ctx, "failed to sign token", zap.Error(err))
+			return nil, err
+		}
 
 		return freshToken, err
 	}
