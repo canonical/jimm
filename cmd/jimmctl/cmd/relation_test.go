@@ -88,7 +88,7 @@ func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 			c.Assert(err, gc.IsNil)
 			resp, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), nil, 50, "")
 			c.Assert(err, gc.IsNil)
-			c.Assert(len(resp.Tuples), gc.Equals, i+1)
+			c.Assert(len(resp.Tuples), gc.Equals, i+2)
 		}
 	}
 
@@ -133,7 +133,7 @@ func (s *relationSuite) TestAddRelationViaFileSuperuser(c *gc.C) {
 
 	resp, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), nil, 50, "")
 	c.Assert(err, gc.IsNil)
-	c.Assert(len(resp.Tuples), gc.Equals, 2)
+	c.Assert(len(resp.Tuples), gc.Equals, 3)
 }
 
 func (s *relationSuite) TestAddRelationRejectsUnauthorisedUsers(c *gc.C) {
@@ -166,7 +166,7 @@ func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	err = s.jimmSuite.JIMM.Database.AddGroup(context.Background(), group2)
 	c.Assert(err, gc.IsNil)
-	var totalKeys int
+	totalKeys := 1
 	for _, tc := range tests {
 		_, err := cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), tc.input.user, tc.input.relation, tc.input.target)
 		c.Assert(err, gc.IsNil)
@@ -216,7 +216,13 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 
 	resp, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), nil, 50, "")
 	c.Assert(err, gc.IsNil)
-	c.Assert(len(resp.Tuples), gc.Equals, 0)
+	c.Logf("existing relations %v", resp.Tuples)
+	// only one relation should exist
+	c.Assert(resp.Tuples, gc.DeepEquals, []ofga.Tuple{{
+		Object:   ofganames.FromTag(names.NewUserTag("admin")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.FromTag(names.NewControllerTag(s.Params.ControllerUUID)),
+	}})
 }
 
 func (s *relationSuite) TestRemoveRelation(c *gc.C) {
@@ -365,9 +371,23 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 	}
 
-	expectedJSONData, err := json.Marshal(relations)
+	expectedJSONData, err := json.Marshal(append(
+		[]apiparams.RelationshipTuple{{
+			Object:       "user-admin",
+			Relation:     "administrator",
+			TargetObject: "controller-jimm",
+		}},
+		relations...,
+	))
 	c.Assert(err, gc.IsNil)
-	expectedYAMLData, err := yaml.Marshal(relations)
+	expectedYAMLData, err := yaml.Marshal(append(
+		[]apiparams.RelationshipTuple{{
+			Object:       "user-admin",
+			Relation:     "administrator",
+			TargetObject: "controller-jimm",
+		}},
+		relations...,
+	))
 	c.Assert(err, gc.IsNil)
 
 	context, err := cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient), "--format", "json")
@@ -380,14 +400,19 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 
 	context, err = cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient), "--format", "tabular")
 	c.Assert(err, gc.IsNil)
-	c.Assert(cmdtesting.Stdout(context), gc.Equals, `Object              	Relation     	Target Object                                                            
+	c.Assert(
+		cmdtesting.Stdout(context),
+		gc.Equals,
+		`Object              	Relation     	Target Object                                                            
+user-admin          	administrator	controller-jimm                                                          
 user-alice@external 	member       	group-group-1                                                            
 user-eve@external   	member       	group-group-2                                                            
 group-group-2#member	member       	group-group-3                                                            
 group-group-3#member	administrator	controller-test-controller-1                                             
 group-group-1#member	administrator	model-test-controller-1:alice@external/test-model-1                      
 user-eve@external   	administrator	applicationoffer-test-controller-1:alice@external/test-model-1.testoffer1
-`)
+`,
+	)
 }
 
 func createTupleKey(object, relation, target string) openfga.TupleKey {
