@@ -427,6 +427,9 @@ func (r *controllerRoot) toJAASTag(ctx context.Context, tag *ofganames.Tag) (str
 	case names.UserTagKind:
 		return names.UserTagKind + "-" + tag.Id(), nil
 	case names.ControllerTagKind:
+		if tag.Id() == r.params.ControllerUUID {
+			return "controller-jimm", nil
+		}
 		controller := dbmodel.Controller{
 			UUID: tag.Id(),
 		}
