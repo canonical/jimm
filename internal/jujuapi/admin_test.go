@@ -6,7 +6,6 @@ import (
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/core/network"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon.v2"
@@ -20,7 +19,7 @@ var _ = gc.Suite(&adminSuite{})
 
 func (s *adminSuite) TestOldAdminVersionFails(c *gc.C) {
 	conn := s.open(c, &api.Info{
-		ModelTag:  s.Model.Tag().(names.ModelTag),
+		ModelTag:  s.Model.ResourceTag(),
 		SkipLogin: true,
 	}, "test")
 	defer conn.Close()
@@ -32,7 +31,7 @@ func (s *adminSuite) TestOldAdminVersionFails(c *gc.C) {
 
 func (s *adminSuite) TestAdminIDFails(c *gc.C) {
 	conn := s.open(c, &api.Info{
-		ModelTag:  s.Model.Tag().(names.ModelTag),
+		ModelTag:  s.Model.ResourceTag(),
 		SkipLogin: true,
 	}, "test")
 	defer conn.Close()
@@ -70,7 +69,7 @@ var _ = gc.Suite(&modelAdminSuite{})
 
 func (s *modelAdminSuite) TestLoginToModel(c *gc.C) {
 	conn := s.open(c, &api.Info{
-		ModelTag:  s.Model.Tag().(names.ModelTag),
+		ModelTag:  s.Model.ResourceTag(),
 		SkipLogin: true,
 	}, "test")
 	defer conn.Close()
@@ -94,7 +93,7 @@ func (s *modelAdminSuite) TestLoginToModel(c *gc.C) {
 
 func (s *modelAdminSuite) TestOldAdminVersionFails(c *gc.C) {
 	conn := s.open(c, &api.Info{
-		ModelTag:  s.Model.Tag().(names.ModelTag),
+		ModelTag:  s.Model.ResourceTag(),
 		SkipLogin: true,
 	}, "test")
 	defer conn.Close()
@@ -106,7 +105,7 @@ func (s *modelAdminSuite) TestOldAdminVersionFails(c *gc.C) {
 
 func (s *modelAdminSuite) TestAdminIDFails(c *gc.C) {
 	conn := s.open(c, &api.Info{
-		ModelTag:  s.Model.Tag().(names.ModelTag),
+		ModelTag:  s.Model.ResourceTag(),
 		SkipLogin: true,
 	}, "test")
 	defer conn.Close()

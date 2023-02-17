@@ -6,9 +6,9 @@ import (
 	"database/sql"
 	"time"
 
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/version/v2"
 	"gorm.io/gorm"
@@ -82,6 +82,14 @@ type Model struct {
 
 // Tag returns a names.Tag for the model.
 func (m Model) Tag() names.Tag {
+	return m.ResourceTag()
+}
+
+// ResourceTag returns a tag for the model.  This method
+// is intended to be used in places where we expect to see
+// a concrete type names.ModelTag instead of the
+// names.Tag interface.
+func (m Model) ResourceTag() names.ModelTag {
 	if m.UUID.Valid {
 		return names.NewModelTag(m.UUID.String)
 	}

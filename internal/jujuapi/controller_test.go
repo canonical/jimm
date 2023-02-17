@@ -46,6 +46,7 @@ func (s *controllerSuite) TestControllerConfig(c *gc.C) {
 	}, nil)
 	c.Assert(err, jc.ErrorIsNil)
 
+	client = controllerapi.NewClient(adminConn)
 	conf, err = client.ControllerConfig()
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(conf, jc.DeepEquals, controller.Config(map[string]interface{}{
@@ -61,8 +62,8 @@ func (s *controllerSuite) TestModelConfig(c *gc.C) {
 	defer conn.Close()
 	client := controllerapi.NewClient(conn)
 	_, err := client.ModelConfig()
-	c.Assert(err, gc.ErrorMatches, `permission denied \(unauthorized access\)`)
-	c.Assert(jujuparams.IsCodeUnauthorized(err), gc.Equals, true)
+	c.Assert(err, gc.ErrorMatches, `not supported \(not supported\)`)
+	c.Assert(jujuparams.IsCodeNotSupported(err), gc.Equals, true)
 
 	conn = s.open(c, nil, "alice")
 	defer conn.Close()
@@ -108,7 +109,7 @@ func (s *controllerSuite) TestModelStatus(c *gc.C) {
 		ModelStatus(tags ...names.ModelTag) ([]base.ModelStatus, error)
 	}
 	doTest := func(client modelStatuser) {
-		models, err := client.ModelStatus(s.Model.Tag().(names.ModelTag), s.Model3.Tag().(names.ModelTag))
+		models, err := client.ModelStatus(s.Model.ResourceTag(), s.Model3.ResourceTag())
 		c.Assert(err, gc.Equals, nil)
 		c.Assert(models, gc.HasLen, 2)
 		c.Check(models[0], jc.DeepEquals, base.ModelStatus{
@@ -123,7 +124,7 @@ func (s *controllerSuite) TestModelStatus(c *gc.C) {
 			ModelType:          "iaas",
 		})
 		c.Check(models[1].Error, gc.ErrorMatches, `unauthorized`)
-		status, err := client.ModelStatus(s.Model2.Tag().(names.ModelTag))
+		status, err := client.ModelStatus(s.Model2.ResourceTag())
 		c.Assert(err, gc.Equals, nil)
 		c.Assert(status, gc.HasLen, 1)
 		c.Check(status[0].Error, gc.ErrorMatches, "unauthorized")

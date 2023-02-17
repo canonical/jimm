@@ -4,6 +4,7 @@ package openfga
 
 import (
 	"context"
+	"strings"
 
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
@@ -283,13 +284,13 @@ func (o *OFGAClient) RemoveModel(ctx context.Context, model names.ModelTag) erro
 	return nil
 }
 
-// AddControllerApplicationOffer adds a relation between a controller and an application offer.
-func (o *OFGAClient) AddControllerApplicationOffer(ctx context.Context, controller names.ControllerTag, offer names.ApplicationOfferTag) error {
+// AddModelApplicationOffer adds a relation between a model and an application offer.
+func (o *OFGAClient) AddModelApplicationOffer(ctx context.Context, model names.ModelTag, offer names.ApplicationOfferTag) error {
 	if err := o.AddRelations(
 		ctx,
 		Tuple{
-			Object:   ofganames.FromTag(controller),
-			Relation: ofganames.ControllerRelation,
+			Object:   ofganames.FromTag(model),
+			Relation: ofganames.ModelRelation,
 			Target:   ofganames.FromTag(offer),
 		},
 	); err != nil {
@@ -337,6 +338,53 @@ func (o *OFGAClient) RemoveGroup(ctx context.Context, group jimmnames.GroupTag) 
 		if err != nil {
 			return errors.E(err)
 		}
+	}
+	return nil
+}
+
+// RemoveCloud removes a cloud.
+func (o *OFGAClient) RemoveCloud(ctx context.Context, cloud names.CloudTag) error {
+	if err := o.removeTuples(
+		ctx,
+		&Tuple{
+			Target: ofganames.FromTag(cloud),
+		},
+	); err != nil {
+		return errors.E(err)
+	}
+	return nil
+}
+
+// AddCloudController adds a controller relation between a controller and
+// a cloud.
+func (o *OFGAClient) AddCloudController(ctx context.Context, cloud names.CloudTag, controller names.ControllerTag) error {
+	if err := o.addRelation(ctx, Tuple{
+		Object:   ofganames.FromTag(controller),
+		Relation: ofganames.ControllerRelation,
+		Target:   ofganames.FromTag(cloud),
+	}); err != nil {
+		// if the tuple already exist we don't return an error.
+		if strings.Contains(err.Error(), "cannot write a tuple which already exists") {
+			return nil
+		}
+		return errors.E(err)
+	}
+	return nil
+}
+
+// AddController adds a controller relation between JIMM and the added controller. Meaning
+// JIMM admins also have administrator access to the added controller
+func (o *OFGAClient) AddController(ctx context.Context, jimm names.ControllerTag, controller names.ControllerTag) error {
+	if err := o.addRelation(ctx, Tuple{
+		Object:   ofganames.FromTag(jimm),
+		Relation: ofganames.ControllerRelation,
+		Target:   ofganames.FromTag(controller),
+	}); err != nil {
+		// if the tuple already exist we don't return an error.
+		if strings.Contains(err.Error(), "cannot write a tuple which already exists") {
+			return nil
+		}
+		return errors.E(err)
 	}
 	return nil
 }

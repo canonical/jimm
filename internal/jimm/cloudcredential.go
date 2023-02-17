@@ -276,7 +276,7 @@ func (j *JIMM) updateCredential(ctx context.Context, credential *dbmodel.CloudCr
 		return errors.E(op, err)
 	}
 
-	if err := j.CredentialStore.Put(ctx, credential.Tag().(names.CloudCredentialTag), credential.Attributes); err != nil {
+	if err := j.CredentialStore.Put(ctx, credential.ResourceTag(), credential.Attributes); err != nil {
 		zapctx.Error(ctx, "failed to store credentials", zap.Error(err))
 		return errors.E(op, err)
 	}
@@ -403,7 +403,7 @@ func (j *JIMM) getCloudCredentialAttributes(ctx context.Context, cred *dbmodel.C
 	if j.CredentialStore == nil {
 		return nil, errors.E(op, errors.CodeServerConfiguration, "vault not configured")
 	}
-	attr, err := j.CredentialStore.Get(ctx, cred.Tag().(names.CloudCredentialTag))
+	attr, err := j.CredentialStore.Get(ctx, cred.ResourceTag())
 	if err != nil {
 		return nil, errors.E(op, err)
 	}

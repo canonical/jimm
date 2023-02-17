@@ -15,6 +15,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
+	"github.com/CanonicalLtd/jimm/internal/openfga"
 )
 
 func init() {
@@ -222,7 +223,7 @@ func (r *controllerRoot) UserCredentials(ctx context.Context, userclouds jujupar
 			results[i].Error = mapError(errors.E(op, err, errors.CodeBadRequest))
 			continue
 		}
-		err = r.jimm.ForEachUserCloudCredential(ctx, user, cld, func(c *dbmodel.CloudCredential) error {
+		err = r.jimm.ForEachUserCloudCredential(ctx, user.User, cld, func(c *dbmodel.CloudCredential) error {
 			results[i].Result = append(results[i].Result, c.Tag().String())
 			return nil
 		})
@@ -258,7 +259,7 @@ func (r *controllerRoot) revokeCredential(ctx context.Context, tag string, force
 	if err != nil {
 		return errors.E(op, err, errors.CodeBadRequest)
 	}
-	if err := r.jimm.RevokeCloudCredential(ctx, r.user, ct, force); err != nil {
+	if err := r.jimm.RevokeCloudCredential(ctx, r.user.User, ct, force); err != nil {
 		return errors.E(op, err)
 	}
 	return nil
@@ -289,14 +290,14 @@ func (r *controllerRoot) credential(ctx context.Context, cloudCredentialTag stri
 		return nil, errors.E(op, err, errors.CodeBadRequest)
 	}
 
-	cred, err := r.jimm.GetCloudCredential(ctx, r.user, cct)
+	cred, err := r.jimm.GetCloudCredential(ctx, r.user.User, cct)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
 	cc := jujuparams.CloudCredential{
 		AuthType: cred.AuthType,
 	}
-	cc.Attributes, cc.Redacted, err = r.jimm.GetCloudCredentialAttributes(ctx, r.user, cred, false)
+	cc.Attributes, cc.Redacted, err = r.jimm.GetCloudCredentialAttributes(ctx, r.user.User, cred, false)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -355,6 +356,32 @@ func (r *controllerRoot) AddCredentials(ctx context.Context, args jujuparams.Tag
 	return results, nil
 }
 
+func userModelAccess(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error) {
+	isAdmin, err := openfga.IsAdministrator(ctx, user, model)
+	if err != nil {
+		return "", errors.E(err)
+	}
+	if isAdmin {
+		return "admin", nil
+	}
+	hasWriteAccess, err := user.IsModelWriter(ctx, model)
+	if err != nil {
+		return "", errors.E(err)
+	}
+	if hasWriteAccess {
+		return "write", nil
+	}
+	hasReadAccess, err := user.IsModelReader(ctx, model)
+	if err != nil {
+		return "", errors.E(err)
+	}
+	if hasReadAccess {
+		return "read", nil
+	}
+
+	return "", nil
+}
+
 // CredentialContents implements the CredentialContents method of the Cloud (v5) facade.
 func (r *controllerRoot) CredentialContents(ctx context.Context, args jujuparams.CloudCredentialArgs) (jujuparams.CredentialContentResults, error) {
 	const op = errors.Op("jujuapi.CredentialContents")
@@ -369,15 +396,19 @@ func (r *controllerRoot) CredentialContents(ctx context.Context, args jujuparams
 			content.Valid = &c.Valid.Bool
 		}
 		var err error
-		content.Attributes, _, err = r.jimm.GetCloudCredentialAttributes(ctx, r.user, c, args.IncludeSecrets)
+		content.Attributes, _, err = r.jimm.GetCloudCredentialAttributes(ctx, r.user.User, c, args.IncludeSecrets)
 		if err != nil {
-			return nil, err
+			return nil, errors.E(err)
 		}
 		mas := make([]jujuparams.ModelAccess, len(c.Models))
 		for i, m := range c.Models {
+			userModelAccess, err := userModelAccess(ctx, r.user, m.ResourceTag())
+			if err != nil {
+				return nil, errors.E(err)
+			}
 			mas[i] = jujuparams.ModelAccess{
 				Model:  m.Name,
-				Access: m.UserAccess(r.user),
+				Access: userModelAccess,
 			}
 		}
 		return &jujuparams.ControllerCredentialInfo{
@@ -389,7 +420,7 @@ func (r *controllerRoot) CredentialContents(ctx context.Context, args jujuparams
 	results := make([]jujuparams.CredentialContentResult, len(args.Credentials))
 	for i, arg := range args.Credentials {
 		cct := names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", arg.CloudName, r.user.Username, arg.CredentialName))
-		cred, err := r.jimm.GetCloudCredential(ctx, r.user, cct)
+		cred, err := r.jimm.GetCloudCredential(ctx, r.user.User, cct)
 		if err != nil {
 			results[i].Error = mapError(errors.E(op, err))
 			continue
@@ -403,7 +434,7 @@ func (r *controllerRoot) CredentialContents(ctx context.Context, args jujuparams
 		return jujuparams.CredentialContentResults{Results: results}, nil
 	}
 
-	err := r.jimm.ForEachUserCloudCredential(ctx, r.user, names.CloudTag{}, func(c *dbmodel.CloudCredential) error {
+	err := r.jimm.ForEachUserCloudCredential(ctx, r.user.User, names.CloudTag{}, func(c *dbmodel.CloudCredential) error {
 		var result jujuparams.CredentialContentResult
 		var err error
 		result.Result, err = credentialContents(c)
@@ -458,28 +489,32 @@ func (r *controllerRoot) ModifyCloudAccess(ctx context.Context, args jujuparams.
 
 func (r *controllerRoot) modifyCloudAccess(ctx context.Context, change jujuparams.ModifyCloudAccess) error {
 	const op = errors.Op("jujuapi.ModiftCloudAccess")
+	// TODO (alesstimec) granting and revoking access tbd in a followup
+	return errors.E(errors.CodeNotImplemented)
 
-	user, err := parseUserTag(change.UserTag)
-	if err != nil {
-		return errors.E(op, err)
-	}
-	cloudTag, err := names.ParseCloudTag(change.CloudTag)
-	if err != nil {
-		return errors.E(op, errors.CodeBadRequest, err)
-	}
-	var modifyf func(context.Context, *dbmodel.User, names.CloudTag, names.UserTag, string) error
-	switch change.Action {
-	case jujuparams.GrantCloudAccess:
-		modifyf = r.jimm.GrantCloudAccess
-	case jujuparams.RevokeCloudAccess:
-		modifyf = r.jimm.RevokeCloudAccess
-	default:
-		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("unsupported modify cloud action %q", change.Action))
-	}
-	if err := modifyf(ctx, r.user, cloudTag, user, change.Access); err != nil {
-		return errors.E(op, err)
-	}
-	return nil
+	/*
+		user, err := parseUserTag(change.UserTag)
+		if err != nil {
+			return errors.E(op, err)
+		}
+		cloudTag, err := names.ParseCloudTag(change.CloudTag)
+		if err != nil {
+			return errors.E(op, errors.CodeBadRequest, err)
+		}
+		var modifyf func(context.Context, *dbmodel.User, names.CloudTag, names.UserTag, string) error
+		switch change.Action {
+		case jujuparams.GrantCloudAccess:
+			modifyf = r.jimm.GrantCloudAccess
+		case jujuparams.RevokeCloudAccess:
+			modifyf = r.jimm.RevokeCloudAccess
+		default:
+			return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("unsupported modify cloud action %q", change.Action))
+		}
+		if err := modifyf(ctx, r.user, cloudTag, user, change.Access); err != nil {
+			return errors.E(op, err)
+		}
+		return nil
+	*/
 }
 
 // UpdateCredentialsCheckModels updates a set of cloud credentials' content.
@@ -512,7 +547,7 @@ func (r *controllerRoot) updateCredential(ctx context.Context, cred jujuparams.T
 	if err != nil {
 		return nil, errors.E(err, errors.CodeBadRequest)
 	}
-	return r.jimm.UpdateCloudCredential(ctx, r.user, jimm.UpdateCloudCredentialArgs{
+	return r.jimm.UpdateCloudCredential(ctx, r.user.User, jimm.UpdateCloudCredentialArgs{
 		CredentialTag: tag,
 		Credential:    cred.Credential,
 		SkipCheck:     skipCheck,
@@ -579,7 +614,7 @@ func (r *controllerRoot) ListCloudInfo(ctx context.Context, args jujuparams.List
 		results = append(results, jujuparams.ListCloudInfoResult{
 			Result: &jujuparams.ListCloudInfo{
 				CloudDetails: c.ToJujuCloudDetails(),
-				Access:       c.UserAccess(r.user),
+				Access:       jimm.ToCloudAccessString(r.user.GetCloudAccess(ctx, c.ResourceTag())),
 			},
 		})
 		return nil

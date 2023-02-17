@@ -36,7 +36,18 @@ func TestMain(m *testing.M) {
 func TestDefaultService(t *testing.T) {
 	c := qt.New(t)
 
-	svc, err := jimm.NewService(context.Background(), jimm.Params{})
+	_, ofgaClient, cfg, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
+	svc, err := jimm.NewService(context.Background(), jimm.Params{
+		OpenFGAParams: jimm.OpenFGAParams{
+			Scheme:    cfg.ApiScheme,
+			Host:      cfg.ApiHost,
+			Store:     cfg.StoreId,
+			Token:     cfg.Credentials.Config.ApiToken,
+			AuthModel: ofgaClient.AuthModelId,
+		},
+	})
 	c.Assert(err, qt.IsNil)
 	rr := httptest.NewRecorder()
 	req, err := http.NewRequest("GET", "/debug/info", nil)
@@ -49,9 +60,19 @@ func TestDefaultService(t *testing.T) {
 func TestAuthenticator(t *testing.T) {
 	c := qt.New(t)
 
+	_, ofgaClient, cfg, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
 	p := jimm.Params{
 		ControllerUUID:   "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
 		ControllerAdmins: []string{"admin"},
+		OpenFGAParams: jimm.OpenFGAParams{
+			Scheme:    cfg.ApiScheme,
+			Host:      cfg.ApiHost,
+			Store:     cfg.StoreId,
+			Token:     cfg.Credentials.Config.ApiToken,
+			AuthModel: ofgaClient.AuthModelId,
+		},
 	}
 	candid := startCandid(c, &p)
 	svc, err := jimm.NewService(context.Background(), p)
@@ -97,12 +118,22 @@ func TestAuthenticator(t *testing.T) {
 func TestVault(t *testing.T) {
 	c := qt.New(t)
 
+	_, ofgaClient, cfg, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
 	p := jimm.Params{
 		ControllerUUID:  "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
 		VaultAddress:    "http://localhost:8200",
 		VaultAuthPath:   "/auth/approle/login",
 		VaultPath:       "/jimm-kv/",
 		VaultSecretFile: "./local/vault/approle.json",
+		OpenFGAParams: jimm.OpenFGAParams{
+			Scheme:    cfg.ApiScheme,
+			Host:      cfg.ApiHost,
+			Store:     cfg.StoreId,
+			Token:     cfg.Credentials.Config.ApiToken,
+			AuthModel: ofgaClient.AuthModelId,
+		},
 	}
 	candid := startCandid(c, &p)
 	vaultClient, _, creds, _ := jimmtest.VaultClient(c, ".")
@@ -154,14 +185,17 @@ func TestVault(t *testing.T) {
 func TestOpenFGA(t *testing.T) {
 	c := qt.New(t)
 
+	_, ofgaClient, cfg, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
 	p := jimm.Params{
 		ControllerUUID: "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
 		OpenFGAParams: jimm.OpenFGAParams{
-			Scheme:    "http",
-			Host:      "127.0.0.1:8080",
-			Token:     "jimm",                       // Hardcoded token from docker-compose
-			Store:     "01GP1254CHWJC1MNGVB0WDG1T0", // Hardcoded store-id from docker-compose
-			AuthModel: "01GP1EC038KHGB6JJ2XXXXCXKB", // Hardcoded auth model id from docker-compose
+			Scheme:    cfg.ApiScheme,
+			Host:      cfg.ApiHost,
+			Store:     cfg.StoreId,
+			Token:     cfg.Credentials.Config.ApiToken,
+			AuthModel: ofgaClient.AuthModelId,
 		},
 		ControllerAdmins: []string{"alice", "eve"},
 	}
@@ -195,7 +229,7 @@ func TestOpenFGA(t *testing.T) {
 			&dbmodel.User{Username: username},
 			client,
 		)
-		allowed, err := user.ControllerAdministrator(context.Background(), names.NewControllerTag(p.ControllerUUID))
+		allowed, err := openfga.IsAdministrator(context.Background(), user, names.NewControllerTag(p.ControllerUUID))
 		c.Assert(err, qt.IsNil)
 		c.Assert(allowed, qt.IsTrue)
 	}

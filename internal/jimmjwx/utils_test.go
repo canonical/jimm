@@ -89,12 +89,22 @@ func setupService(ctx context.Context, c *qt.C) (*jimm.Service, *httptest.Server
 	err := store.CleanupJWKS(ctx)
 	c.Assert(err, qt.IsNil)
 
+	_, ofgaClient, cfg, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
 	svc, err := jimm.NewService(context.Background(), jimm.Params{
 		ControllerUUID:  "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
 		VaultAddress:    "http://localhost:8200",
 		VaultAuthPath:   "/auth/approle/login",
 		VaultPath:       "/jimm-kv/",
 		VaultSecretFile: "../../local/vault/approle.json",
+		OpenFGAParams: jimm.OpenFGAParams{
+			Scheme:    cfg.ApiScheme,
+			Host:      cfg.ApiHost,
+			Store:     cfg.StoreId,
+			Token:     cfg.Credentials.Config.ApiToken,
+			AuthModel: ofgaClient.AuthModelId,
+		},
 	},
 	)
 	c.Assert(err, qt.IsNil)

@@ -292,9 +292,9 @@ models:
   - user: bob@external
     access: "read"
 `)
-	env.PopulateDB(c, *s.Database)
+	env.PopulateDB(c, *s.Database, nil)
 
-	u := env.User("bob@external").DBObject(c, *s.Database)
+	u := env.User("bob@external").DBObject(c, *s.Database, nil)
 	models, err := s.Database.GetUserModels(ctx, &u)
 	c.Assert(err, qt.IsNil)
 	c.Check(models, jimmtest.DBObjectEquals, []dbmodel.UserModelAccess{{

@@ -10,13 +10,13 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
+	openfga "github.com/CanonicalLtd/jimm/internal/openfga"
 )
 
 func TestAuthenticateNoAuthenticator(t *testing.T) {
@@ -44,10 +44,12 @@ func TestAuthenticate(t *testing.T) {
 	err := j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
-	auth.User = &dbmodel.User{
-		Username:         "bob@external",
-		DisplayName:      "Bob",
-		ControllerAccess: "superuser",
+	auth.User = &openfga.User{
+		User: &dbmodel.User{
+			Username:         "bob@external",
+			DisplayName:      "Bob",
+			ControllerAccess: "superuser",
+		},
 	}
 	u, err := j.Authenticate(ctx, nil)
 	c.Assert(err, qt.IsNil)
@@ -105,7 +107,7 @@ func TestAuditLogAccess(t *testing.T) {
 
 	// admin user can grant other users audit log access (even if the
 	// user does not exist yet).
-	err = j.GrantAuditLogAccess(ctx, &adminUser, user.Tag().(names.UserTag))
+	err = j.GrantAuditLogAccess(ctx, &adminUser, user.ResourceTag())
 	c.Assert(err, qt.Equals, nil)
 
 	err = j.Database.GetUser(ctx, &user)
@@ -113,7 +115,7 @@ func TestAuditLogAccess(t *testing.T) {
 	c.Assert(user.AuditLogAccess, qt.Equals, "read")
 
 	// admin user can revoke other users audit log access.
-	err = j.RevokeAuditLogAccess(ctx, &adminUser, user.Tag().(names.UserTag))
+	err = j.RevokeAuditLogAccess(ctx, &adminUser, user.ResourceTag())
 	c.Assert(err, qt.Equals, nil)
 
 	err = j.Database.GetUser(ctx, &user)
@@ -121,10 +123,10 @@ func TestAuditLogAccess(t *testing.T) {
 	c.Assert(user.AuditLogAccess, qt.Equals, "")
 
 	// non-admin user cannot grant/revoken audt log access
-	err = j.GrantAuditLogAccess(ctx, &user, adminUser.Tag().(names.UserTag))
+	err = j.GrantAuditLogAccess(ctx, &user, adminUser.ResourceTag())
 	c.Assert(err, qt.ErrorMatches, "unauthorized")
 
 	// admin user can revoke other users audit log access.
-	err = j.RevokeAuditLogAccess(ctx, &user, adminUser.Tag().(names.UserTag))
+	err = j.RevokeAuditLogAccess(ctx, &user, adminUser.ResourceTag())
 	c.Assert(err, qt.ErrorMatches, "unauthorized")
 }

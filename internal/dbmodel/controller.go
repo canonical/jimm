@@ -82,6 +82,14 @@ type Controller struct {
 
 // Tag returns a names.Tag for this controller.
 func (c Controller) Tag() names.Tag {
+	return c.ResourceTag()
+}
+
+// ResourceTag returns a tag for this controller. This method
+// is intended to be used in places where we expect to see
+// a concrete type names.ControllerTag instead of the
+// names.Tag interface.
+func (c Controller) ResourceTag() names.ControllerTag {
 	return names.NewControllerTag(c.UUID)
 }
 

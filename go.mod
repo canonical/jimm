@@ -51,8 +51,8 @@ require (
 	github.com/dustinkirkland/golang-petname v0.0.0-20191129215211-8e5a1ed0cff0
 	github.com/go-chi/chi/v5 v5.0.8
 	github.com/go-chi/render v1.0.2
-  github.com/juju/http v0.0.0-20201019013536-69ae1d429836
 	github.com/golang/mock v1.6.0
+	github.com/juju/http v0.0.0-20201019013536-69ae1d429836
 	github.com/lestrrat-go/jwx/v2 v2.0.8
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/stretchr/testify v1.8.1

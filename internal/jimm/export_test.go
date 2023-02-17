@@ -5,6 +5,9 @@ package jimm
 import (
 	"context"
 
+	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/names/v4"
+
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 )
@@ -12,7 +15,6 @@ import (
 var (
 	DetermineAccessLevelAfterRevoke = determineAccessLevelAfterRevoke
 	DetermineAccessLevelAfterGrant  = determineAccessLevelAfterGrant
-	FilterApplicationOfferDetail    = filterApplicationOfferDetail
 )
 
 func (j *JIMM) AddAuditLogEntry(ale *dbmodel.AuditLogEntry) {
@@ -30,4 +32,8 @@ func NewWatcherWithControllerUnavailableChan(db db.Database, dialer Dialer, pubs
 		Dialer:                    dialer,
 		controllerUnavailableChan: testChannel,
 	}
+}
+
+func (j *JIMM) ListApplicationOfferUsers(ctx context.Context, offer names.ApplicationOfferTag, user *dbmodel.User, accessLevel string) ([]jujuparams.OfferUserDetails, error) {
+	return j.listApplicationOfferUsers(ctx, offer, user, accessLevel)
 }

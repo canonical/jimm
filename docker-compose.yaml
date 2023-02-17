@@ -120,14 +120,14 @@ services:
       retries: 5
 
   migrateopenfga:
-    image: openfga/openfga:latest
+    image: openfga/openfga:v0.3.4
     container_name: migrateopenfga
     command: migrate --datastore-engine postgres --datastore-uri 'postgresql://jimm:jimm@db/jimm?sslmode=disable'
     depends_on:
       db:
         condition: service_healthy
 
-  insert-hardcoded-store: 
+  insert-hardcoded-store:
     image: governmentpaas/psql
     container_name: insert-hardcoded-store
     command: psql -Atx postgresql://jimm:jimm@db/jimm?sslmode=disable -c "INSERT INTO store (id,name,created_at,updated_at) VALUES ('01GP1254CHWJC1MNGVB0WDG1T0','jimm',NOW(),NOW());"
@@ -138,7 +138,7 @@ services:
   openfga:
     # We use our 'image' to mimic juju standard.
     # image: openfga/openfga:latest
-    build: 
+    build:
       context: .
       dockerfile: ./local/openfga/Dockerfile
     container_name: openfga
@@ -169,14 +169,8 @@ services:
     container_name: insert-hardcoded-auth-model
     volumes:
       - ./local/openfga/authorisation_model.json:/authorisation_model.json
-    command: > 
-      sh -c "
-      apk update &&
-      apk add curl &&
-      curl -X POST -H 'Content-Type: application/json' -H 'Authorization: Bearer jimm' openfga:8080/stores/01GP1254CHWJC1MNGVB0WDG1T0/authorization-models -d \"$(cat ./authorisation_model.json)\" &&
-      psql -Atx postgresql://jimm:jimm@db/jimm?sslmode=disable -c \"UPDATE authorization_model SET authorization_model_id = '01GP1EC038KHGB6JJ2XXXXCXKB' WHERE store = '01GP1254CHWJC1MNGVB0WDG1T0';\"
-      "
+    command: >
+      sh -c " apk update && apk add curl && curl -X POST -H 'Content-Type: application/json' -H 'Authorization: Bearer jimm' openfga:8080/stores/01GP1254CHWJC1MNGVB0WDG1T0/authorization-models -d \"$(cat ./authorisation_model.json)\" && psql -Atx postgresql://jimm:jimm@db/jimm?sslmode=disable -c \"UPDATE authorization_model SET authorization_model_id = '01GP1EC038KHGB6JJ2XXXXCXKB' WHERE store = '01GP1254CHWJC1MNGVB0WDG1T0';\" "
     depends_on:
       openfga:
         condition: service_healthy
-        

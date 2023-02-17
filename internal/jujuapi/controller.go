@@ -8,10 +8,13 @@ import (
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
+	"github.com/CanonicalLtd/jimm/internal/openfga"
 	jimmversion "github.com/CanonicalLtd/jimm/version"
 )
 
@@ -282,7 +285,26 @@ func (r *controllerRoot) ModelStatus(ctx context.Context, args jujuparams.Entiti
 func (r *controllerRoot) ControllerConfig(ctx context.Context) (jujuparams.ControllerConfigResult, error) {
 	const op = errors.Op("jujuapi.ControllerConfig")
 
-	cfg, err := r.jimm.GetControllerConfig(ctx, r.user)
+	isAdmin, err := openfga.IsAdministrator(ctx, r.user, r.jimm.ResourceTag())
+	if err != nil {
+		zapctx.Error(ctx, "failed to check access rights", zap.Error(err))
+		return jujuparams.ControllerConfigResult{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+	if !isAdmin {
+		isControllerAdmin, err := openfga.IsAdministrator(ctx, r.user, names.NewControllerTag(r.params.ControllerUUID))
+		if err != nil {
+			zapctx.Error(ctx, "failed to check access rights", zap.Error(err))
+			return jujuparams.ControllerConfigResult{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		}
+		isAdmin = isControllerAdmin
+	}
+	if !isAdmin {
+		return jujuparams.ControllerConfigResult{
+			Config: jujuparams.ControllerConfig{},
+		}, nil
+	}
+
+	cfg, err := r.jimm.GetControllerConfig(ctx, r.user.User)
 	if err != nil {
 		return jujuparams.ControllerConfigResult{}, errors.E(op, err)
 	}
@@ -294,12 +316,16 @@ func (r *controllerRoot) ControllerConfig(ctx context.Context) (jujuparams.Contr
 }
 
 // ModelConfig returns implements the controller facade's ModelConfig
-// method. If the user is a controller superuser then this returns a
-// not-supported error, otherwise it returns permission denied.
+// method.
+// Before:
+//
+//	If the user is a controller superuser then this returns a
+//	not-supported error, otherwise it returns permission denied.
+//
+// Now:
+//
+//	This method returns a not-supported error.
 func (r *controllerRoot) ModelConfig() (jujuparams.ModelConfigResults, error) {
-	if r.user.ControllerAccess != "superuser" {
-		return jujuparams.ModelConfigResults{}, errors.E(errors.CodeUnauthorized, "permission denied")
-	}
 	return jujuparams.ModelConfigResults{}, errors.E(errors.CodeNotSupported)
 }
 

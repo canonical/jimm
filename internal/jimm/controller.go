@@ -20,6 +20,8 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/CanonicalLtd/jimm/internal/openfga"
+	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 )
 
 // AddController adds the specified controller to JIMM. Only
@@ -30,7 +32,7 @@ import (
 // code of CodeAlreadyExists will be returned. If the controller cannot be
 // contacted then an error with a code of CodeConnectionFailed will be
 // returned.
-func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.Controller) error {
+func (j *JIMM) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller) error {
 	const op = errors.Op("jimm.AddController")
 
 	ale := dbmodel.AuditLogEntry{
@@ -48,7 +50,11 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 		return err
 	}
 
-	if u.ControllerAccess != "superuser" {
+	isJIMMAdmin, err := openfga.IsAdministrator(ctx, u, j.ResourceTag())
+	if err != nil {
+		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
+	}
+	if !isJIMMAdmin {
 		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
 	}
 
@@ -100,6 +106,7 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 			}
 		} else {
 			cloud.Users = []dbmodel.UserCloudAccess{{
+				Username: auth.Everyone,
 				User: dbmodel.User{
 					Username: auth.Everyone,
 				},
@@ -193,6 +200,61 @@ func (j *JIMM) AddController(ctx context.Context, u *dbmodel.User, ctl *dbmodel.
 	if err != nil {
 		return fail(errors.E(op, err))
 	}
+
+	for _, cloud := range dbClouds {
+		// Add controller relation between the cloud and the added controller.
+		err = j.OpenFGAClient.AddCloudController(ctx, cloud.ResourceTag(), ctl.ResourceTag())
+		if err != nil {
+			zapctx.Error(
+				ctx,
+				"failed to add controller relation between controller and cloud",
+				zap.String("controller", ctl.ResourceTag().Id()),
+				zap.String("cloud", cloud.ResourceTag().Id()),
+				zap.Error(err),
+			)
+		}
+
+		for _, uca := range cloud.Users {
+			cloudUser := openfga.NewUser(
+				&dbmodel.User{
+					Username: uca.Username,
+				},
+				j.OpenFGAClient,
+			)
+			relation, err := ToCloudRelation(uca.Access)
+			if err != nil {
+				zapctx.Error(
+					ctx,
+					"failed to parse user cloud access",
+					zap.String("user", uca.Username),
+					zap.String("access", uca.Access),
+					zap.Error(err),
+				)
+			} else {
+				if err := cloudUser.SetCloudAccess(ctx, cloud.ResourceTag(), relation); err != nil {
+					zapctx.Error(
+						ctx,
+						"failed to set cloud access",
+						zap.String("user", uca.Username),
+						zap.String("access", uca.Access),
+						zap.Error(err),
+					)
+				}
+			}
+		}
+	}
+
+	// Finally add a controller relation between JIMM and the added controller.
+	err = j.OpenFGAClient.AddController(ctx, j.ResourceTag(), ctl.ResourceTag())
+	if err != nil {
+		zapctx.Error(
+			ctx,
+			"failed to add controller relation between JIMM and controller",
+			zap.String("controller", ctl.ResourceTag().Id()),
+			zap.Error(err),
+		)
+	}
+
 	ale.Success = true
 	return nil
 }
@@ -212,6 +274,7 @@ func cloudUsers(ctx context.Context, api API, tag names.CloudTag) ([]dbmodel.Use
 			continue
 		}
 		users = append(users, dbmodel.UserCloudAccess{
+			Username: u.UserName,
 			User: dbmodel.User{
 				Username:    u.UserName,
 				DisplayName: u.DisplayName,
@@ -304,7 +367,7 @@ func (j *JIMM) GrantControllerAccess(ctx context.Context, u *dbmodel.User, acces
 		Action:  "grant",
 		Params: dbmodel.StringMap{
 			"access":     accessLevel,
-			"controller": names.NewControllerTag(j.UUID).String(),
+			"controller": j.ResourceTag().String(),
 			"user":       accessUserTag.String(),
 		},
 	}
@@ -354,7 +417,7 @@ func (j *JIMM) RevokeControllerAccess(ctx context.Context, u *dbmodel.User, acce
 		Action:  "revoke",
 		Params: dbmodel.StringMap{
 			"access":     accessLevel,
-			"controller": names.NewControllerTag(j.UUID).String(),
+			"controller": j.ResourceTag().String(),
 			"user":       accessUserTag.String(),
 		},
 	}
@@ -396,32 +459,57 @@ func (j *JIMM) RevokeControllerAccess(ctx context.Context, u *dbmodel.User, acce
 
 // GetControllerAccess returns the JIMM controller access level for the
 // requested user.
-func (j *JIMM) GetControllerAccess(ctx context.Context, user *dbmodel.User, tag names.UserTag) (string, error) {
+func (j *JIMM) GetControllerAccess(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error) {
 	const op = errors.Op("jimm.GetControllerAccess")
 
-	if user.Username == tag.Id() {
-		return user.ControllerAccess, nil
+	// First we check if the authenticated user is a JIMM administrator.
+	isControllerAdmin, err := openfga.IsAdministrator(ctx, user, j.ResourceTag())
+	if err != nil {
+		zapctx.Error(ctx, "failed to check access rights", zap.Error(err))
+		return "", errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	if user.ControllerAccess != "superuser" {
+	// If the authenticated user is requesting the access level
+	// for him/her-self then we return that - either the user
+	// is a JIMM admin (aka "superuser"), or they have a "login"
+	// access level.
+	if user.Username == tag.Id() {
+		if isControllerAdmin {
+			return "superuser", nil
+		}
+		return "login", nil
+	}
+
+	// Only JIMM administrators are allowed to see the access
+	// level of somebody else.
+	if !isControllerAdmin {
 		return "", errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	var u dbmodel.User
 	u.SetTag(tag)
-	if err := j.Database.GetUser(ctx, &u); err != nil {
+	tagUser := openfga.NewUser(&u, j.OpenFGAClient)
+
+	// Check if the user is jimm administrator.
+	isAdmin, err := openfga.IsAdministrator(ctx, tagUser, j.ResourceTag())
+	if err != nil {
+		zapctx.Error(ctx, "failed to check access rights", zap.Error(err))
 		return "", errors.E(op, err)
 	}
-	return u.ControllerAccess, nil
+	if isAdmin {
+		return "superuser", nil
+	}
+
+	return "login", nil
 }
 
 // ImportModel imports model with the specified uuid from the controller.
-func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName string, modelTag names.ModelTag) error {
+func (j *JIMM) ImportModel(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag) error {
 	const op = errors.Op("jimm.ImportModel")
 
 	ale := dbmodel.AuditLogEntry{
 		Time:    time.Now().UTC().Round(time.Millisecond),
-		UserTag: u.Tag().String(),
+		UserTag: user.Tag().String(),
 		Action:  "import",
 		Tag:     modelTag.String(),
 		Params: dbmodel.StringMap{
@@ -436,14 +524,18 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 		return err
 	}
 
-	if u.ControllerAccess != "superuser" {
+	isJIMMAdmin, err := openfga.IsAdministrator(ctx, user, j.ResourceTag())
+	if err != nil {
+		return fail(errors.E(op, err))
+	}
+	if !isJIMMAdmin {
 		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
 	}
 
 	controller := dbmodel.Controller{
 		Name: controllerName,
 	}
-	err := j.Database.GetController(ctx, &controller)
+	err = j.Database.GetController(ctx, &controller)
 	if err != nil {
 		return errors.E(op, err)
 	}
@@ -484,6 +576,17 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 	}
 	model.OwnerUsername = owner.Username
 	model.Owner = owner
+
+	ownerUser := openfga.NewUser(&owner, j.OpenFGAClient)
+	if err := ownerUser.SetModelAccess(ctx, modelTag, ofganames.AdministratorRelation); err != nil {
+		zapctx.Error(
+			ctx,
+			"failed to set model admin",
+			zap.String("owner", owner.Username),
+			zap.String("model", modelTag.String()),
+			zap.Error(err),
+		)
+	}
 
 	// fetch cloud credential used by the model
 	credentialTag, err := names.ParseCloudCredentialTag(modelInfo.CloudCredentialTag)
@@ -529,6 +632,23 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 		}
 		model.Users[i].Username = u.Username
 		model.Users[i].User = u
+
+		relation, err := ToModelRelation(userAccess.Access)
+		if err != nil {
+			return errors.E(op, err)
+		}
+
+		modelUser := openfga.NewUser(&u, j.OpenFGAClient)
+		if err := modelUser.SetModelAccess(ctx, modelTag, relation); err != nil {
+			zapctx.Error(
+				ctx,
+				"failed to set model access",
+				zap.String("user", u.Username),
+				zap.String("access", userAccess.Access),
+				zap.String("model", modelTag.String()),
+				zap.Error(err),
+			)
+		}
 	}
 
 	err = j.Database.AddModel(ctx, &model)
@@ -581,14 +701,18 @@ func (j *JIMM) ImportModel(ctx context.Context, u *dbmodel.User, controllerName 
 
 // SetControllerConfig changes the value of specified controller configuration
 // settings.
-func (j *JIMM) SetControllerConfig(ctx context.Context, u *dbmodel.User, args jujuparams.ControllerConfigSet) error {
+func (j *JIMM) SetControllerConfig(ctx context.Context, u *openfga.User, args jujuparams.ControllerConfigSet) error {
 	const op = errors.Op("jimm.SetControllerConfig")
 
-	if u.ControllerAccess != "superuser" {
+	isControllerAdmin, err := openfga.IsAdministrator(ctx, u, j.ResourceTag())
+	if err != nil {
+		return errors.E(op, err)
+	}
+	if !isControllerAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
-	err := j.Database.Transaction(func(tx *db.Database) error {
+	err = j.Database.Transaction(func(tx *db.Database) error {
 		config := dbmodel.ControllerConfig{
 			Name: "jimm",
 		}
@@ -629,10 +753,14 @@ func (j *JIMM) GetControllerConfig(ctx context.Context, u *dbmodel.User) (*dbmod
 
 // UpdateMigratedModel asserts that the model has been migrated to the
 // specified controller and updates the internal model representation.
-func (j *JIMM) UpdateMigratedModel(ctx context.Context, u *dbmodel.User, modelTag names.ModelTag, targetControllerName string) error {
+func (j *JIMM) UpdateMigratedModel(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetControllerName string) error {
 	const op = errors.Op("jimm.UpdateMigratedModel")
 
-	if u.ControllerAccess != "superuser" {
+	isControllerAdmin, err := openfga.IsAdministrator(ctx, user, j.ResourceTag())
+	if err != nil {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+	if !isControllerAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
@@ -642,7 +770,7 @@ func (j *JIMM) UpdateMigratedModel(ctx context.Context, u *dbmodel.User, modelTa
 			Valid:  true,
 		},
 	}
-	err := j.Database.GetModel(ctx, &model)
+	err = j.Database.GetModel(ctx, &model)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return errors.E(op, "model not found", errors.CodeModelNotFound)

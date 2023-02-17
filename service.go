@@ -223,14 +223,12 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	if openFGAclient != nil {
-		s.jimm.OpenFGAClient = openFGAclient
-		if err := ensureControllerAdministrators(ctx, openFGAclient, p.ControllerUUID, p.ControllerAdmins); err != nil {
-			return nil, errors.E(op, err, "failed to ensure controller admins")
-		}
+	s.jimm.OpenFGAClient = openFGAclient
+	if err := ensureControllerAdministrators(ctx, openFGAclient, p.ControllerUUID, p.ControllerAdmins); err != nil {
+		return nil, errors.E(op, err, "failed to ensure controller admins")
 	}
 
-	s.jimm.Authenticator, err = newAuthenticator(ctx, &s.jimm.Database, p)
+	s.jimm.Authenticator, err = newAuthenticator(ctx, &s.jimm.Database, openFGAclient, p)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -307,7 +305,7 @@ func openDB(ctx context.Context, dsn string) (*gorm.DB, error) {
 	})
 }
 
-func newAuthenticator(ctx context.Context, db *db.Database, p Params) (jimm.Authenticator, error) {
+func newAuthenticator(ctx context.Context, db *db.Database, client *ofgaClient.OFGAClient, p Params) (jimm.Authenticator, error) {
 	if p.CandidURL == "" {
 		// No authenticator configured
 		return nil, nil
@@ -374,6 +372,7 @@ func newAuthenticator(ctx context.Context, db *db.Database, p Params) (jimm.Auth
 			Logger:         logger.BakeryLogger{},
 		}),
 		ControllerAdmins: p.ControllerAdmins,
+		Client:           client,
 	}, nil
 }
 
@@ -420,7 +419,7 @@ func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, er
 
 func newOpenFGAClient(ctx context.Context, p Params) (*ofgaClient.OFGAClient, error) {
 	if p.OpenFGAParams.Host == "" {
-		return nil, nil
+		return nil, errors.E("missing OpenFGA configuration")
 	}
 	zapctx.Info(ctx, "configuring OpenFGA client",
 		zap.String("OpenFGA host", p.OpenFGAParams.Host),
@@ -477,7 +476,7 @@ func ensureControllerAdministrators(ctx context.Context, client *ofgaClient.OFGA
 	for _, username := range admins {
 		userTag := names.NewUserTag(username)
 		user := ofgaClient.NewUser(&dbmodel.User{Username: userTag.Id()}, client)
-		isAdmin, err := user.ControllerAdministrator(ctx, controller)
+		isAdmin, err := ofgaClient.IsAdministrator(ctx, user, controller)
 		if err != nil {
 			return errors.E(err)
 		}

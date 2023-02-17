@@ -17,6 +17,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
+	"github.com/CanonicalLtd/jimm/internal/openfga"
 )
 
 func init() {
@@ -95,7 +96,11 @@ func init() {
 func (r *controllerRoot) DisableControllerUUIDMasking(ctx context.Context) error {
 	const op = errors.Op("jujuapi.DisableControllerUUIDMasking")
 
-	if r.user.ControllerAccess != "superuser" {
+	isControllerAdmin, err := openfga.IsAdministrator(ctx, r.user, names.NewControllerTag(r.jimm.UUID))
+	if err != nil {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+	if !isControllerAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 	r.controllerUUIDMasking = false
@@ -142,7 +147,11 @@ type LegacyControllerResponse struct {
 func (r *controllerRoot) ListControllers(ctx context.Context) (LegacyListControllerResponse, error) {
 	const op = errors.Op("jujuapi.ListControllers")
 
-	if r.user.ControllerAccess != "superuser" {
+	isControllerAdmin, err := openfga.IsAdministrator(ctx, r.user, names.NewControllerTag(r.jimm.UUID))
+	if err != nil {
+		return LegacyListControllerResponse{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+	if !isControllerAdmin {
 		// if the user isn't a controller admin return JAAS
 		// itself as the only controller.
 		srvVersion, err := r.jimm.EarliestControllerVersion(ctx)
@@ -160,7 +169,7 @@ func (r *controllerRoot) ListControllers(ctx context.Context) (LegacyListControl
 	}
 
 	var controllers []LegacyControllerResponse
-	err := r.jimm.Database.ForEachController(ctx, func(ctl *dbmodel.Controller) error {
+	err = r.jimm.Database.ForEachController(ctx, func(ctl *dbmodel.Controller) error {
 		var cr LegacyControllerResponse
 		cr.Path = "admin/" + ctl.Name
 		cr.Public = true
@@ -228,7 +237,11 @@ func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddCon
 func (r *controllerRoot) ListControllersV3(ctx context.Context) (apiparams.ListControllersResponse, error) {
 	const op = errors.Op("jujuapi.ListControllersV3")
 
-	if r.user.ControllerAccess != "superuser" {
+	isControllerAdmin, err := openfga.IsAdministrator(ctx, r.user, names.NewControllerTag(r.jimm.UUID))
+	if err != nil {
+		return apiparams.ListControllersResponse{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+	if !isControllerAdmin {
 		// if the user isn't a controller admin return JAAS
 		// itself as the only controller.
 		srvVersion, err := r.jimm.EarliestControllerVersion(ctx)
@@ -249,7 +262,7 @@ func (r *controllerRoot) ListControllersV3(ctx context.Context) (apiparams.ListC
 	}
 
 	var controllers []apiparams.ControllerInfo
-	err := r.jimm.Database.ForEachController(ctx, func(ctl *dbmodel.Controller) error {
+	err = r.jimm.Database.ForEachController(ctx, func(ctl *dbmodel.Controller) error {
 		controllers = append(controllers, ctl.ToAPIControllerInfo())
 		return nil
 	})
@@ -361,24 +374,28 @@ func (r *controllerRoot) FindAuditEvents(ctx context.Context, req apiparams.Find
 func (r *controllerRoot) GrantAuditLogAccess(ctx context.Context, req apiparams.AuditLogAccessRequest) error {
 	const op = errors.Op("jujuapi.GrantAuditLogAccess")
 
-	_, err := parseUserTag(req.UserTag)
-	if err != nil {
-		return errors.E(op, err, errors.CodeBadRequest)
-	}
-	if r.user.ControllerAccess != "superuser" {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
+	// TODO (alesstimec) Once we've added audit logs to openfga, change this bit.
+	return errors.E(errors.CodeNotImplemented)
+	/*
+		_, err := parseUserTag(req.UserTag)
+		if err != nil {
+			return errors.E(op, err, errors.CodeBadRequest)
+		}
+		if r.user.ControllerAccess != "superuser" {
+			return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		}
 
-	ut, err := names.ParseUserTag(req.UserTag)
-	if err != nil {
-		return errors.E(op, errors.CodeBadRequest, "invalid user tag")
-	}
+		ut, err := names.ParseUserTag(req.UserTag)
+		if err != nil {
+			return errors.E(op, errors.CodeBadRequest, "invalid user tag")
+		}
 
-	err = r.jimm.GrantAuditLogAccess(ctx, r.user, ut)
-	if err != nil {
-		return errors.E(op, err)
-	}
-	return nil
+		err = r.jimm.GrantAuditLogAccess(ctx, r.user, ut)
+		if err != nil {
+			return errors.E(op, err)
+		}
+		return nil
+	*/
 }
 
 // RevokeAuditLogAccess revokes access to the audit log at the specified
@@ -387,24 +404,28 @@ func (r *controllerRoot) GrantAuditLogAccess(ctx context.Context, req apiparams.
 func (r *controllerRoot) RevokeAuditLogAccess(ctx context.Context, req apiparams.AuditLogAccessRequest) error {
 	const op = errors.Op("jujuapi.RevokeAuditLogAccess")
 
-	_, err := parseUserTag(req.UserTag)
-	if err != nil {
-		return errors.E(op, err, errors.CodeBadRequest)
-	}
-	if r.user.ControllerAccess != "superuser" {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
+	// TODO (alesstimec) Once we've added audit logs to openfga, change this bit.
+	return errors.E(errors.CodeNotImplemented)
+	/*
+		_, err := parseUserTag(req.UserTag)
+		if err != nil {
+			return errors.E(op, err, errors.CodeBadRequest)
+		}
+		if r.user.ControllerAccess != "superuser" {
+			return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		}
 
-	ut, err := names.ParseUserTag(req.UserTag)
-	if err != nil {
-		return errors.E(op, errors.CodeBadRequest, "invalid user tag")
-	}
+		ut, err := names.ParseUserTag(req.UserTag)
+		if err != nil {
+			return errors.E(op, errors.CodeBadRequest, "invalid user tag")
+		}
 
-	err = r.jimm.RevokeAuditLogAccess(ctx, r.user, ut)
-	if err != nil {
-		return errors.E(op, err)
-	}
-	return nil
+		err = r.jimm.RevokeAuditLogAccess(ctx, r.user, ut)
+		if err != nil {
+			return errors.E(op, err)
+		}
+		return nil
+	*/
 }
 
 // FullModelStatus returns the full status of the juju model.

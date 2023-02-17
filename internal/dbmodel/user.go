@@ -56,6 +56,14 @@ type User struct {
 
 // Tag returns a names.Tag for the user.
 func (u User) Tag() names.Tag {
+	return u.ResourceTag()
+}
+
+// ResourceTag returns a tag for the user.  This method
+// is intended to be used in places where we expect to see
+// a concrete type names.UserTag instead of the
+// names.Tag interface.
+func (u User) ResourceTag() names.UserTag {
 	return names.NewUserTag(u.Username)
 }
 

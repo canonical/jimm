@@ -58,6 +58,14 @@ type ApplicationOffer struct {
 
 // Tag returns a names.Tag for the application-offer.
 func (o ApplicationOffer) Tag() names.Tag {
+	return o.ResourceTag()
+}
+
+// ResourceTag returns the tag for the application-offer. This method
+// is intended to be used in places where we expect to see
+// a concrete type names.ApplicationOfferTag instead of the
+// names.Tag interface.
+func (o ApplicationOffer) ResourceTag() names.ApplicationOfferTag {
 	return names.NewApplicationOfferTag(o.UUID)
 }
 

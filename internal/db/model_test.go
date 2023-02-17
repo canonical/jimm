@@ -542,7 +542,7 @@ func (s *dbSuite) TestUpdateUserModelAccess(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	env := jimmtest.ParseEnvironment(c, testUpdateUserModelAccessEnv)
-	env.PopulateDB(c, *s.Database)
+	env.PopulateDB(c, *s.Database, nil)
 
 	m := dbmodel.Model{
 		UUID: sql.NullString{
@@ -553,7 +553,7 @@ func (s *dbSuite) TestUpdateUserModelAccess(c *qt.C) {
 	err = s.Database.GetModel(ctx, &m)
 	c.Assert(err, qt.IsNil)
 
-	charlie := env.User("charlie@external").DBObject(c, *s.Database)
+	charlie := env.User("charlie@external").DBObject(c, *s.Database, nil)
 
 	// Add a new user
 	err = s.Database.UpdateUserModelAccess(ctx, &dbmodel.UserModelAccess{
@@ -698,7 +698,7 @@ func (s *dbSuite) TestForEachModel(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	env := jimmtest.ParseEnvironment(c, testForEachModelEnv)
-	env.PopulateDB(c, *s.Database)
+	env.PopulateDB(c, *s.Database, nil)
 
 	testError := errors.E("test error")
 	err = s.Database.ForEachModel(ctx, func(m *dbmodel.Model) error {

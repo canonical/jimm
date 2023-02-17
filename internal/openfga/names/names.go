@@ -27,6 +27,8 @@ var (
 	AdministratorRelation Relation = "administrator"
 	// ControllerRelation represents a controller relation between entities.
 	ControllerRelation Relation = "controller"
+	// ModelRelation represents a model relation between entities.
+	ModelRelation Relation = "model"
 	// ConsumerRelation represents a consumer relation between entities.
 	ConsumerRelation Relation = "consumer"
 	// ReaderRelation represents a reader relation between entities.
@@ -35,6 +37,8 @@ var (
 	WriterRelation Relation = "writer"
 	// CanAddModelRelation represents a can_addmodel relation between entities.
 	CanAddModelRelation Relation = "can_addmodel"
+	// NoRelation is returned when there is no relation.
+	NoRelation Relation = ""
 )
 
 // Tag represents a an entity tag as used by JIMM in OpenFGA.
@@ -67,9 +71,9 @@ func (t *Tag) Relation() string {
 	return t.relation.String()
 }
 
-// ResourceTag represents an entity tag that implements
+// ResourceTagger represents an entity tag that implements
 // a method returning entity's id and kind.
-type ResourceTag interface {
+type ResourceTagger interface {
 	names.UserTag |
 		jimmnames.GroupTag |
 		names.ControllerTag |
@@ -83,14 +87,14 @@ type ResourceTag interface {
 
 // FromResourceWithRelationTag converts a resource tag to an OpenFGA tag
 // and adds a relation to it.
-func FromTagWithRelation[RT ResourceTag](t RT, relation Relation) *Tag {
+func FromTagWithRelation[RT ResourceTagger](t RT, relation Relation) *Tag {
 	tag := FromTag(t)
 	tag.relation = relation
 	return tag
 }
 
 // FromTag converts a resource tag to an OpenFGA tag.
-func FromTag[RT ResourceTag](t RT) *Tag {
+func FromTag[RT ResourceTagger](t RT) *Tag {
 	tag := &Tag{
 		id:   t.Id(),
 		kind: t.Kind(),
