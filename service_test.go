@@ -22,7 +22,9 @@ import (
 	"github.com/juju/names/v4"
 
 	"github.com/CanonicalLtd/jimm"
+	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
+	"github.com/CanonicalLtd/jimm/internal/openfga"
 	"github.com/CanonicalLtd/jimm/internal/vault"
 )
 
@@ -161,6 +163,7 @@ func TestOpenFGA(t *testing.T) {
 			Store:     "01GP1254CHWJC1MNGVB0WDG1T0", // Hardcoded store-id from docker-compose
 			AuthModel: "01GP1EC038KHGB6JJ2XXXXCXKB", // Hardcoded auth model id from docker-compose
 		},
+		ControllerAdmins: []string{"alice", "eve"},
 	}
 	candid := startCandid(c, &p)
 	svc, err := jimm.NewService(context.Background(), p)
@@ -183,11 +186,19 @@ func TestOpenFGA(t *testing.T) {
 		}
 	})
 
-	// TODO (ashipika): For now we just assert that we can
-	// connect to the started OpenFGA instance. Once we
-	// have implemented proper facades, this test needs
-	// to be modified to assert that JIMM is able to
-	// interact with OpenFGA.
+	client, err := jimm.NewOpenFGAClient(context.Background(), p)
+	c.Assert(err, qt.IsNil)
+
+	// assert controller admins have been created in openfga
+	for _, username := range []string{"alice", "eve"} {
+		user := openfga.NewUser(
+			&dbmodel.User{Username: username},
+			client,
+		)
+		allowed, err := user.ControllerAdministrator(context.Background(), names.NewControllerTag(p.ControllerUUID))
+		c.Assert(err, qt.IsNil)
+		c.Assert(allowed, qt.IsTrue)
+	}
 }
 
 func startCandid(c *qt.C, p *jimm.Params) *candidtest.Server {

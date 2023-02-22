@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +15,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/juju/cmd/v3/cmdtesting"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/names/v4"
+	openfga "github.com/openfga/go-sdk"
 	gc "gopkg.in/check.v1"
 	yamlv2 "gopkg.in/yaml.v2"
 	"gopkg.in/yaml.v3"
@@ -25,6 +26,8 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
+	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
+	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
 )
 
 type relationSuite struct {
@@ -49,8 +52,25 @@ func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 		err      bool
 		message  string
 	}{
-		{testName: "Add Group", input: tuple{user: "group-" + group1 + "#member", relation: "member", target: "group-" + group2}, err: false},
-		{testName: "Invalid Relation", input: tuple{user: "group-" + group1 + "#member", relation: "admin", target: "group-" + group2}, err: true, message: "Invalid tuple"},
+		{
+			testName: "Add Group",
+			input: tuple{
+				user:     "group-" + group1 + "#member",
+				relation: "member",
+				target:   "group-" + group2,
+			},
+			err: false,
+		},
+		{
+			testName: "Invalid Relation",
+			input: tuple{
+				user:     "group-" + group1 + "#member",
+				relation: "admin",
+				target:   "group-" + group2,
+			},
+			err:     true,
+			message: "unknown relation",
+		},
 	}
 
 	err := s.jimmSuite.JIMM.Database.AddGroup(context.Background(), group1)
@@ -62,12 +82,13 @@ func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 		_, err := cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), tc.input.user, tc.input.relation, tc.input.target)
 		c.Log("Test: " + tc.testName)
 		if tc.err {
+			c.Logf("error message: %s", err.Error())
 			c.Assert(strings.Contains(err.Error(), tc.message), gc.Equals, true)
 		} else {
 			c.Assert(err, gc.IsNil)
 			resp, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), nil, 50, "")
 			c.Assert(err, gc.IsNil)
-			c.Assert(len(resp.Keys), gc.Equals, i+1)
+			c.Assert(len(resp.Tuples), gc.Equals, i+2)
 		}
 	}
 
@@ -112,7 +133,7 @@ func (s *relationSuite) TestAddRelationViaFileSuperuser(c *gc.C) {
 
 	resp, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), nil, 50, "")
 	c.Assert(err, gc.IsNil)
-	c.Assert(len(resp.Keys), gc.Equals, 2)
+	c.Assert(len(resp.Tuples), gc.Equals, 3)
 }
 
 func (s *relationSuite) TestAddRelationRejectsUnauthorisedUsers(c *gc.C) {
@@ -145,7 +166,7 @@ func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	err = s.jimmSuite.JIMM.Database.AddGroup(context.Background(), group2)
 	c.Assert(err, gc.IsNil)
-	var totalKeys int
+	totalKeys := 1
 	for _, tc := range tests {
 		_, err := cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), tc.input.user, tc.input.relation, tc.input.target)
 		c.Assert(err, gc.IsNil)
@@ -162,7 +183,7 @@ func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 			resp, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), nil, 50, "")
 			c.Assert(err, gc.IsNil)
 			totalKeys--
-			c.Assert(len(resp.Keys), gc.Equals, totalKeys)
+			c.Assert(len(resp.Tuples), gc.Equals, totalKeys)
 		}
 	}
 }
@@ -195,7 +216,13 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 
 	resp, err := s.jimmSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), nil, 50, "")
 	c.Assert(err, gc.IsNil)
-	c.Assert(len(resp.Keys), gc.Equals, 0)
+	c.Logf("existing relations %v", resp.Tuples)
+	// only one relation should exist
+	c.Assert(resp.Tuples, gc.DeepEquals, []ofga.Tuple{{
+		Object:   ofganames.FromTag(names.NewUserTag("admin")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.FromTag(names.NewControllerTag(s.Params.ControllerUUID)),
+	}})
 }
 
 func (s *relationSuite) TestRemoveRelation(c *gc.C) {
@@ -344,9 +371,23 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 	}
 
-	expectedJSONData, err := json.Marshal(relations)
+	expectedJSONData, err := json.Marshal(append(
+		[]apiparams.RelationshipTuple{{
+			Object:       "user-admin",
+			Relation:     "administrator",
+			TargetObject: "controller-jimm",
+		}},
+		relations...,
+	))
 	c.Assert(err, gc.IsNil)
-	expectedYAMLData, err := yaml.Marshal(relations)
+	expectedYAMLData, err := yaml.Marshal(append(
+		[]apiparams.RelationshipTuple{{
+			Object:       "user-admin",
+			Relation:     "administrator",
+			TargetObject: "controller-jimm",
+		}},
+		relations...,
+	))
 	c.Assert(err, gc.IsNil)
 
 	context, err := cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient), "--format", "json")
@@ -359,14 +400,33 @@ func (s *relationSuite) TestListRelations(c *gc.C) {
 
 	context, err = cmdtesting.RunCommand(c, cmd.NewListRelationsCommandForTesting(s.ClientStore(), bClient), "--format", "tabular")
 	c.Assert(err, gc.IsNil)
-	c.Assert(cmdtesting.Stdout(context), gc.Equals, `Object              	Relation     	Target Object                                                            
+	c.Assert(
+		cmdtesting.Stdout(context),
+		gc.Equals,
+		`Object              	Relation     	Target Object                                                            
+user-admin          	administrator	controller-jimm                                                          
 user-alice@external 	member       	group-group-1                                                            
 user-eve@external   	member       	group-group-2                                                            
 group-group-2#member	member       	group-group-3                                                            
 group-group-3#member	administrator	controller-test-controller-1                                             
 group-group-1#member	administrator	model-test-controller-1:alice@external/test-model-1                      
 user-eve@external   	administrator	applicationoffer-test-controller-1:alice@external/test-model-1.testoffer1
-`)
+`,
+	)
+}
+
+func createTupleKey(object, relation, target string) openfga.TupleKey {
+	k := openfga.NewTupleKey()
+	// in some cases specifying the object is not required
+	if object != "" {
+		k.SetUser(object)
+	}
+	// in some cases specifying the relation is not required
+	if relation != "" {
+		k.SetRelation(relation)
+	}
+	k.SetObject(target)
+	return *k
 }
 
 // TODO: remove boilerplate of env setup and use initialiseEnvironment
@@ -444,8 +504,16 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	err = ofgaClient.AddRelations(ctx,
-		ofga.CreateTupleKey("user:"+u.Username, "member", "group:"+strconv.FormatUint(uint64(group.ID), 10)),
-		ofga.CreateTupleKey("group:"+strconv.FormatUint(uint64(group.ID), 10)+"#member", "reader", "model:"+model.UUID.String),
+		ofga.Tuple{
+			Object:   ofganames.FromTag(u.Tag().(names.UserTag)),
+			Relation: "member",
+			Target:   ofganames.FromTag(group.Tag().(jimmnames.GroupTag)),
+		},
+		ofga.Tuple{
+			Object:   ofganames.FromTagWithRelation(group.Tag().(jimmnames.GroupTag), ofganames.MemberRelation),
+			Relation: "reader",
+			Target:   ofganames.FromTag(model.Tag().(names.ModelTag)),
+		},
 	)
 	c.Assert(err, gc.IsNil)
 

@@ -21,6 +21,7 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
 	"github.com/google/uuid"
 	vaultapi "github.com/hashicorp/vault/api"
+	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
 	openfga "github.com/openfga/go-sdk"
 	"github.com/openfga/go-sdk/credentials"
@@ -32,6 +33,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/dashboard"
 	"github.com/CanonicalLtd/jimm/internal/db"
+	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/debugapi"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
@@ -42,6 +44,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jujuclient"
 	"github.com/CanonicalLtd/jimm/internal/logger"
 	ofgaClient "github.com/CanonicalLtd/jimm/internal/openfga"
+	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 	"github.com/CanonicalLtd/jimm/internal/vault"
@@ -216,6 +219,17 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err)
 	}
 
+	openFGAclient, err := newOpenFGAClient(ctx, p)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	if openFGAclient != nil {
+		s.jimm.OpenFGAClient = openFGAclient
+		if err := ensureControllerAdministrators(ctx, openFGAclient, p.ControllerUUID, p.ControllerAdmins); err != nil {
+			return nil, errors.E(op, err, "failed to ensure controller admins")
+		}
+	}
+
 	s.jimm.Authenticator, err = newAuthenticator(ctx, &s.jimm.Database, p)
 	if err != nil {
 		return nil, errors.E(op, err)
@@ -227,14 +241,6 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	}
 	if vs != nil {
 		s.jimm.CredentialStore = vs
-	}
-
-	openFGAclient, err := newOpenFGAClient(ctx, p)
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-	if openFGAclient != nil {
-		s.jimm.OpenFGAClient = openFGAclient
 	}
 
 	s.jimm.Dialer = &jujuclient.Dialer{
@@ -459,4 +465,32 @@ func newOpenFGAClient(ctx context.Context, p Params) (*ofgaClient.OFGAClient, er
 		zapctx.Info(ctx, "store appears to exist", zap.String("store-name", *storeResp.Name))
 	}
 	return ofgaClient.NewOpenFGAClient(client.OpenFgaApi, p.OpenFGAParams.AuthModel), nil
+}
+
+// ensureControllerAdministrators ensures that listed users have admin access to the JIMM controller.
+// This method checks if these users already have administrator access to the JIMM controller,
+// otherwise it will add a direct administrator relation between each user and the JIMM
+// controller.
+func ensureControllerAdministrators(ctx context.Context, client *ofgaClient.OFGAClient, controllerUUID string, admins []string) error {
+	controller := names.NewControllerTag(controllerUUID)
+	tuples := []ofgaClient.Tuple{}
+	for _, username := range admins {
+		userTag := names.NewUserTag(username)
+		user := ofgaClient.NewUser(&dbmodel.User{Username: userTag.Id()}, client)
+		isAdmin, err := user.ControllerAdministrator(ctx, controller)
+		if err != nil {
+			return errors.E(err)
+		}
+		if !isAdmin {
+			tuples = append(tuples, ofgaClient.Tuple{
+				Object:   ofganames.FromTag(userTag),
+				Relation: ofganames.AdministratorRelation,
+				Target:   ofganames.FromTag(controller),
+			})
+		}
+	}
+	if len(tuples) == 0 {
+		return nil
+	}
+	return client.AddRelations(ctx, tuples...)
 }
