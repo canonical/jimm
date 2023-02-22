@@ -26,6 +26,7 @@ services:
       JIMM_WATCH_CONTROLLERS: ""
       JIMM_LISTEN_ADDR: "0.0.0.0:8080"
       JIMM_TEST_PGXDSN: ""
+      JIMM_JWT_EXPIRY: 30s
       TEST_LOGGING_CONFIG: ""
 
       OPENFGA_SCHEME: "http"
