@@ -1,3 +1,5 @@
+// Copyright 2023 Canonical Ltd.
+
 package jimmjwx
 
 import (
@@ -26,6 +28,8 @@ type JWTService struct {
 	store credentials.CredentialStore
 }
 
+// JWTParams are the necessary params to issue a ready-to-go JWT targeted
+// at a Juju controller.
 type JWTParams struct {
 	// Controller is the "aud" of the JWT
 	Controller string
@@ -66,7 +70,7 @@ func (j *JWTService) NewJWT(ctx context.Context, params JWTParams) ([]byte, erro
 	if jti, err := j.generateJTI(ctx); err != nil {
 		return nil, err
 	} else {
-		zapctx.Debug(ctx, "issueing a new JWT", zap.Any("params", params))
+		zapctx.Debug(ctx, "issuing a new JWT", zap.Any("params", params))
 
 		jwkSet, err := j.Cache.Get(ctx, j.getJWKSEndpoint())
 		if err != nil {
