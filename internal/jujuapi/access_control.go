@@ -63,6 +63,10 @@ var (
 func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupRequest) error {
 	const op = errors.Op("jujuapi.AddGroup")
 
+	if !jimmnames.IsValidGroupName(req.Name) {
+		return errors.E(op, errors.CodeBadRequest, "invalid group name")
+	}
+
 	isAdmin, err := openfga.IsAdministrator(ctx, r.user, r.jimm.ResourceTag())
 	if err != nil {
 		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
@@ -82,6 +86,10 @@ func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupReq
 // RenameGroup renames a group within JIMMs DB for reference by OpenFGA.
 func (r *controllerRoot) RenameGroup(ctx context.Context, req apiparams.RenameGroupRequest) error {
 	const op = errors.Op("jujuapi.RenameGroup")
+
+	if !jimmnames.IsValidGroupName(req.NewName) {
+		return errors.E(op, errors.CodeBadRequest, "invalid group name")
+	}
 
 	isAdmin, err := openfga.IsAdministrator(ctx, r.user, r.jimm.ResourceTag())
 	if err != nil {

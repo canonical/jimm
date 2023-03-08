@@ -53,3 +53,56 @@ func TestIsValidGroupId(t *testing.T) {
 	s = r.FindString("1010#member")
 	assert.Equal(t, "1010#member", s)
 }
+
+func TestIsValidGroupName(t *testing.T) {
+	tests := []struct {
+		name             string
+		expectedValidity bool
+	}{{
+		name:             "group-1",
+		expectedValidity: true,
+	}, {
+		name:             "Group1",
+		expectedValidity: true,
+	}, {
+		name:             "1group",
+		expectedValidity: false,
+	}, {
+		name:             ".group",
+		expectedValidity: false,
+	}, {
+		name:             "group.A",
+		expectedValidity: true,
+	}, {
+		name:             "group.A1",
+		expectedValidity: true,
+	}, {
+		name:             "group_test_a_1",
+		expectedValidity: true,
+	}, {
+		name:             "group+a",
+		expectedValidity: false,
+	}, {
+		name:             "Test.Group.1.A",
+		expectedValidity: true,
+	}, {
+		name:             "",
+		expectedValidity: false,
+	}, {
+		name:             "short",
+		expectedValidity: false,
+	}, {
+		name:             "short1",
+		expectedValidity: true,
+	}, {
+		name:             "short_",
+		expectedValidity: false,
+	}}
+
+	for _, test := range tests {
+		t.Logf("testing group name %q, expected validity %v", test.name, test.expectedValidity)
+
+		valid := IsValidGroupName(test.name)
+		assert.Equal(t, valid, test.expectedValidity)
+	}
+}

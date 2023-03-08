@@ -10,6 +10,7 @@ const (
 )
 
 var (
+	validGroupName      = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9._-]{4,}[a-zA-Z0-9]$")
 	validGroupIdSnippet = `^[1-9][0-9]*(#|\z)[a-z]*$`
 	validGroupId        = regexp.MustCompile(validGroupIdSnippet)
 )
@@ -57,4 +58,15 @@ func ParseGroupTag(tag string) (GroupTag, error) {
 // IsValidGroupId verifies the id of the tag is valid according to a regex internally.
 func IsValidGroupId(id string) bool {
 	return validGroupId.MatchString(id)
+}
+
+// IsValidGroupName verifies the name of the group is valid
+// according to the group name regexp.
+// A valid group name:
+// - starts with an upper- or lower-case character
+// - ends with an upper- or lower-case character or a number
+// - may contain ., _, or -
+// - must at least 6 characters long.
+func IsValidGroupName(name string) bool {
+	return validGroupName.MatchString(name)
 }
