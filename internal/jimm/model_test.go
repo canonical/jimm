@@ -812,7 +812,7 @@ users:
 		CloudRegion:        "test-region-1",
 		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@external/test-credential-1").String(),
 	},
-	expectError: "failed to update cloud credential: a silly error",
+	expectError: "failed to update cloud credential",
 }}
 
 func TestAddModel(t *testing.T) {
