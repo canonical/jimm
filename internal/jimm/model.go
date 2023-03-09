@@ -84,17 +84,13 @@ func (a *ModelCreateArgs) FromJujuModelCreateArgs(args *jujuparams.ModelCreateAr
 	return nil
 }
 
-func newModelBuilder(ctx context.Context, j *JIMM) *modelBuilder {
-	return &modelBuilder{
-		ctx:  ctx,
+func newModel(j *JIMM) *model {
+	return &model{
 		jimm: j,
 	}
 }
 
-type modelBuilder struct {
-	ctx context.Context
-	err error
-
+type model struct {
 	jimm *JIMM
 
 	name          string
@@ -109,13 +105,7 @@ type modelBuilder struct {
 	modelInfo     *jujuparams.ModelInfo
 }
 
-// Error returns the error that occured in the process
-// of adding a new model.
-func (b *modelBuilder) Error() error {
-	return b.err
-}
-
-func (b *modelBuilder) jujuModelCreateArgs() (*jujuparams.ModelCreateArgs, error) {
+func (b *model) jujuModelCreateArgs() (*jujuparams.ModelCreateArgs, error) {
 	if b.name == "" {
 		return nil, errors.E("model name not specified")
 	}
@@ -142,61 +132,48 @@ func (b *modelBuilder) jujuModelCreateArgs() (*jujuparams.ModelCreateArgs, error
 	}, nil
 }
 
-// WithOwner returns a builder with the specified owner.
-func (b *modelBuilder) WithOwner(owner *dbmodel.User) *modelBuilder {
-	if b.err != nil {
-		return b
-	}
+// setOwner sets the owner for the new model.
+func (b *model) setOwner(ctx context.Context, owner *dbmodel.User) error {
 	b.owner = owner
-	return b
+	return nil
 }
 
-// WithName returns a builder with the specified model name.
-func (b *modelBuilder) WithName(name string) *modelBuilder {
-	if b.err != nil {
-		return b
-	}
+// setName sets the name for the new model.
+func (b *model) setName(ctx context.Context, name string) error {
 	b.name = name
-	return b
+	return nil
 }
 
-// WithConfig returns a builder with the specified model config.
-func (b *modelBuilder) WithConfig(cfg map[string]interface{}) *modelBuilder {
+// setConfig sets config values for the new model.
+func (b *model) setConfig(ctx context.Context, cfg map[string]interface{}) error {
 	if b.config == nil {
 		b.config = make(map[string]interface{})
 	}
 	for key, value := range cfg {
 		b.config[key] = value
 	}
-	return b
+	return nil
 }
 
-// WithCloud returns a builder with the specified cloud.
-func (b *modelBuilder) WithCloud(cloud names.CloudTag) *modelBuilder {
-	if b.err != nil {
-		return b
-	}
+// setCloud sets the cloud for the new model.
+func (b *model) setCloud(ctx context.Context, cloud names.CloudTag) error {
+
 	c := dbmodel.Cloud{
 		Name: cloud.Id(),
 	}
 
-	if err := b.jimm.Database.GetCloud(b.ctx, &c); err != nil {
-		b.err = err
-		return b
+	if err := b.jimm.Database.GetCloud(ctx, &c); err != nil {
+		return errors.E(err)
 	}
 	b.cloud = &c
 
-	return b
+	return nil
 }
 
-// WithCloudRegion returns a builder with the specified cloud region.
-func (b *modelBuilder) WithCloudRegion(region string) *modelBuilder {
-	if b.err != nil {
-		return b
-	}
+// setCloudRegion sets the cloud region for the new model.
+func (b *model) setCloudRegion(ctx context.Context, region string) error {
 	if b.cloud == nil {
-		b.err = errors.E("cloud not specified")
-		return b
+		return errors.E("cloud not specified")
 	}
 	// if the region is not specified, we pick the first cloud region
 	// with any associated controllers
@@ -218,8 +195,7 @@ func (b *modelBuilder) WithCloudRegion(region string) *modelBuilder {
 		// consider all possible controllers for that region
 		regionControllers := r.Controllers
 		if len(regionControllers) == 0 {
-			b.err = errors.E(errors.CodeBadRequest, fmt.Sprintf("unsupported cloud region %s/%s", b.cloud.Name, region))
-			return b
+			return errors.E(errors.CodeBadRequest, fmt.Sprintf("unsupported cloud region %s/%s", b.cloud.Name, region))
 		}
 		// shuffle controllers
 		shuffleRegionControllers(regionControllers)
@@ -233,44 +209,35 @@ func (b *modelBuilder) WithCloudRegion(region string) *modelBuilder {
 	}
 	// we looped through all cloud regions and could not find a match
 	if b.cloudRegionID == 0 {
-		b.err = errors.E("cloudregion not found", errors.CodeNotFound)
+		return errors.E("cloudregion not found", errors.CodeNotFound)
 	}
-	return b
+	return nil
 }
 
-// WithCloudCredential returns a builder with the specified cloud credentials.
-func (b *modelBuilder) WithCloudCredential(credentialTag names.CloudCredentialTag) *modelBuilder {
-	if b.err != nil {
-		return b
-	}
+// setCloudCredential sets the specified cloud credentials to be used to create the model.
+func (b *model) setCloudCredential(ctx context.Context, credentialTag names.CloudCredentialTag) error {
 	credential := dbmodel.CloudCredential{
 		Name:          credentialTag.Name(),
 		CloudName:     credentialTag.Cloud().Id(),
 		OwnerUsername: credentialTag.Owner().Id(),
 	}
-	err := b.jimm.Database.GetCloudCredential(b.ctx, &credential)
+	err := b.jimm.Database.GetCloudCredential(ctx, &credential)
 	if err != nil {
-		b.err = errors.E(err, fmt.Sprintf("failed to fetch cloud credentials %s", credential.Path()))
+		return errors.E(err, fmt.Sprintf("failed to fetch cloud credentials %s", credential.Path()))
 	}
 	b.credential = &credential
-	return b
+	return nil
 }
 
-// CreateDatabaseModel stores temporary model information.
-func (b *modelBuilder) CreateDatabaseModel() *modelBuilder {
-	if b.err != nil {
-		return b
-	}
-
+// createDatabaseModel stores temporary model information.
+func (b *model) createDatabaseModel(ctx context.Context) error {
 	// if model name is not specified we error and abort
 	if b.name == "" {
-		b.err = errors.E("model name not specified")
-		return b
+		return errors.E("model name not specified")
 	}
 	// if the model owner is not specified we error and abort
 	if b.owner == nil {
-		b.err = errors.E("owner not specified")
-		return b
+		return errors.E("owner not specified")
 	}
 	// if at this point the cloud region is not specified we
 	// try to select a region/controller among the available
@@ -279,24 +246,21 @@ func (b *modelBuilder) CreateDatabaseModel() *modelBuilder {
 		// if selectCloudRegion returns an error that means we have
 		// no regions/controllers for the specified cloud - we
 		// error and abort
-		if err := b.selectCloudRegion(); err != nil {
-			b.err = errors.E(err)
-			return b
+		if err := b.selectCloudRegion(ctx); err != nil {
+			return errors.E(err)
 		}
 	}
 	// if controller is still not selected, there's nothing
 	// we can do - either a cloud or a cloud region was specified
 	// by this point and a controller should've been selected
 	if b.controller == nil {
-		b.err = errors.E("unable to determine a suitable controller")
-		return b
+		return errors.E("unable to determine a suitable controller")
 	}
 
 	if b.credential == nil {
 		// try to select a valid credential
-		if err := b.selectCloudCredentials(); err != nil {
-			b.err = errors.E(err, "could not select cloud credentials")
-			return b
+		if err := b.selectCloudCredentials(ctx); err != nil {
+			return errors.E(err, "could not select cloud credentials")
 		}
 	}
 
@@ -308,26 +272,21 @@ func (b *modelBuilder) CreateDatabaseModel() *modelBuilder {
 		CloudRegionID:     b.cloudRegionID,
 	}
 
-	err := b.jimm.Database.AddModel(b.ctx, b.model)
+	err := b.jimm.Database.AddModel(ctx, b.model)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
-			b.err = errors.E(err, fmt.Sprintf("model %s/%s already exists", b.owner.Username, b.name))
-			return b
+			return errors.E(err, fmt.Sprintf("model %s/%s already exists", b.owner.Username, b.name))
 		} else {
-			zapctx.Error(b.ctx, "failed to store model information", zaputil.Error(err))
-			b.err = errors.E(err, "failed to store model information")
-			return b
+			zapctx.Error(ctx, "failed to store model information", zaputil.Error(err))
+			return errors.E(err, "failed to store model information")
 		}
 	}
-	return b
+	return nil
 }
 
-// Cleanup deletes temporary model information if there was an
+// cleanup deletes temporary model information if there was an
 // error in the process of creating model.
-func (b *modelBuilder) Cleanup() {
-	if b.err == nil {
-		return
-	}
+func (b *model) cleanup() {
 	if b.model == nil {
 		return
 	}
@@ -339,14 +298,10 @@ func (b *modelBuilder) Cleanup() {
 	}
 }
 
-func (b *modelBuilder) UpdateDatabaseModel() *modelBuilder {
-	if b.err != nil {
-		return b
-	}
+func (b *model) updateDatabaseModel(ctx context.Context) error {
 	err := b.model.FromJujuModelInfo(*b.modelInfo)
 	if err != nil {
-		b.err = errors.E(err, "failed to convert model info")
-		return b
+		return errors.E(err, "failed to convert model info")
 	}
 	b.model.ControllerID = b.controller.ID
 	// we know which credentials and cloud region was used
@@ -357,21 +312,19 @@ func (b *modelBuilder) UpdateDatabaseModel() *modelBuilder {
 	b.model.CloudCredential = dbmodel.CloudCredential{}
 	b.model.CloudRegion = dbmodel.CloudRegion{}
 
-	err = b.filterModelUserAccesses()
+	err = b.filterModelUserAccesses(ctx)
 	if err != nil {
-		b.err = errors.E(err)
-		return b
+		return errors.E(err)
 	}
 
-	err = b.jimm.Database.UpdateModel(b.ctx, b.model)
+	err = b.jimm.Database.UpdateModel(ctx, b.model)
 	if err != nil {
-		b.err = errors.E(err, "failed to store model information")
-		return b
+		return errors.E(err, "failed to store model information")
 	}
-	return b
+	return nil
 }
 
-func (b *modelBuilder) selectCloudRegion() error {
+func (b *model) selectCloudRegion(ctx context.Context) error {
 	if b.cloudRegionID != 0 {
 		return nil
 	}
@@ -398,14 +351,14 @@ func (b *modelBuilder) selectCloudRegion() error {
 	return nil
 }
 
-func (b *modelBuilder) selectCloudCredentials() error {
+func (b *model) selectCloudCredentials(ctx context.Context) error {
 	if b.owner == nil {
 		return errors.E("user not specified")
 	}
 	if b.cloud == nil {
 		return errors.E("cloud not specified")
 	}
-	credentials, err := b.jimm.Database.GetUserCloudCredentials(b.ctx, b.owner, b.cloud.Name)
+	credentials, err := b.jimm.Database.GetUserCloudCredentials(ctx, b.owner, b.cloud.Name)
 	if err != nil {
 		return errors.E(err, "failed to fetch user cloud credentials")
 	}
@@ -420,7 +373,7 @@ func (b *modelBuilder) selectCloudCredentials() error {
 	return errors.E("valid cloud credentials not found")
 }
 
-func (b *modelBuilder) filterModelUserAccesses() error {
+func (b *model) filterModelUserAccesses(ctx context.Context) error {
 	a := []dbmodel.UserModelAccess{}
 	for _, access := range b.model.Users {
 		access := access
@@ -431,8 +384,8 @@ func (b *modelBuilder) filterModelUserAccesses() error {
 		}
 
 		// fetch user information
-		if err := b.jimm.Database.GetUser(b.ctx, &access.User); err != nil {
-			return errors.E(err)
+		if err := b.jimm.Database.GetUser(ctx, &access.User); err != nil {
+			return errors.E(err, "failed to ensure user exists in the database", zap.String("user", access.Username))
 		}
 		a = append(a, access)
 	}
@@ -440,40 +393,36 @@ func (b *modelBuilder) filterModelUserAccesses() error {
 	return nil
 }
 
-// CreateControllerModel uses provided information to create a new
+// createControllerModel uses provided information to create a new
 // model on the selected controller.
-func (b *modelBuilder) CreateControllerModel() *modelBuilder {
-	if b.err != nil {
-		return b
-	}
-
+func (b *model) createControllerModel(ctx context.Context) error {
 	if b.model == nil {
-		b.err = errors.E("model not specified")
-		return b
+		return errors.E("model not specified")
 	}
 
-	api, err := b.jimm.dial(b.ctx, b.controller, names.ModelTag{})
+	api, err := b.jimm.dial(ctx, b.controller, names.ModelTag{})
 	if err != nil {
-		b.err = errors.E(err)
-		return b
+		zapctx.Error(ctx, "failed to dial controller", zap.Error(err))
+		return errors.E(err, "failed to dial controller")
 	}
 	defer api.Close()
 
 	if b.credential != nil {
-		if err := b.updateCredential(b.ctx, api, b.credential); err != nil {
-			b.err = errors.E(fmt.Sprintf("failed to update cloud credential: %s", err), err)
-			return b
+		if err := b.updateCredential(ctx, api, b.credential); err != nil {
+			zapctx.Error(ctx, "failed to update cloud credential", zap.Error(err))
+			return errors.E("failed to update cloud credential", err)
 		}
 	}
 
 	args, err := b.jujuModelCreateArgs()
 	if err != nil {
-		b.err = errors.E(err)
-		return b
+		zapctx.Error(ctx, "failed to prepare model create arguments", zap.Error(err))
+		return errors.E(err, "failed to prepare model create arguments")
 	}
 
 	var info jujuparams.ModelInfo
-	if err := api.CreateModel(b.ctx, args, &info); err != nil {
+	if err := api.CreateModel(ctx, args, &info); err != nil {
+		zapctx.Error(ctx, "failed to create model", zap.Error(err))
 		switch jujuparams.ErrCode(err) {
 		case jujuparams.CodeAlreadyExists:
 			// The model already exists in the controller but it didn't
@@ -485,16 +434,15 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 			// the operation to delete a model isn't synchronous even
 			// for empty models. We could also have a worker that deletes
 			// empty models that don't appear in the database.
-			b.err = errors.E(err, errors.CodeAlreadyExists, "model name in use")
+			return errors.E(err, errors.CodeAlreadyExists, "model name in use")
 		case jujuparams.CodeUpgradeInProgress:
-			b.err = errors.E(err, "upgrade in progress")
+			return errors.E(err, "upgrade in progress")
 		default:
 			// The model couldn't be created because of an
 			// error in the request, don't try another
 			// controller.
-			b.err = errors.E(err, errors.CodeBadRequest)
+			return errors.E(err, errors.CodeBadRequest)
 		}
-		return b
 	}
 
 	// Grant JIMM admin access to the model. Note that if this fails,
@@ -502,31 +450,46 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 	// will remain on the controller and will trigger the "already exists
 	// in the backend controller" message above when the user
 	// attempts to create a model with the same name again.
-	if err := api.GrantJIMMModelAdmin(b.ctx, names.NewModelTag(info.UUID)); err != nil {
-		zapctx.Error(b.ctx, "leaked model", zap.String("model", info.UUID), zaputil.Error(err))
-		b.err = errors.E(err)
-		return b
+	if err := api.GrantJIMMModelAdmin(ctx, names.NewModelTag(info.UUID)); err != nil {
+		zapctx.Error(ctx, "leaked model", zap.String("model", info.UUID), zaputil.Error(err))
+		return errors.E(err)
 	}
 
 	b.modelInfo = &info
-	return b
+	return nil
 }
 
-func (b *modelBuilder) updateCredential(ctx context.Context, api API, cred *dbmodel.CloudCredential) error {
+func (b *model) updateCredential(ctx context.Context, api API, cred *dbmodel.CloudCredential) error {
 	var err error
 	cred1 := *cred
 	cred1.Attributes, err = b.jimm.getCloudCredentialAttributes(ctx, cred)
 	if err != nil {
-		return err
+		return errors.E(err)
 	}
 
 	_, err = b.jimm.updateControllerCloudCredential(ctx, &cred1, api.UpdateCredential)
-	return err
+	if err != nil {
+		return errors.E(err)
+	}
+	return nil
 }
 
 // JujuModelInfo returns model information returned by the controller.
-func (b *modelBuilder) JujuModelInfo() *jujuparams.ModelInfo {
+func (b *model) JujuModelInfo() *jujuparams.ModelInfo {
 	return b.modelInfo
+}
+
+func (b *model) setConfigFromFunction(ctx context.Context, getConfigFunction func(ctx context.Context) (map[string]interface{}, error)) error {
+	// fetch user model defaults
+	config, err := getConfigFunction(ctx)
+	if err != nil {
+		return errors.E(err)
+	}
+	err = b.setConfig(ctx, config)
+	if err != nil {
+		return errors.E(err)
+	}
+	return nil
 }
 
 // AddModel adds the specified model to JIMM.
@@ -545,6 +508,7 @@ func (j *JIMM) AddModel(ctx context.Context, u *dbmodel.User, args *ModelCreateA
 	defer j.addAuditLogEntry(&ale)
 
 	fail := func(err error) (*jujuparams.ModelInfo, error) {
+		zapctx.Error(ctx, "failed to add a model", zaputil.Error(err))
 		ale.Params["err"] = err.Error()
 		return nil, err
 	}
@@ -560,92 +524,112 @@ func (j *JIMM) AddModel(ctx context.Context, u *dbmodel.User, args *ModelCreateA
 		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
 	}
 
-	builder := newModelBuilder(ctx, j)
-	builder = builder.WithOwner(&owner)
-	builder = builder.WithName(args.Name)
-	if err := builder.Error(); err != nil {
-		return fail(errors.E(op, err))
+	model := newModel(j)
+	err = model.setOwner(ctx, &owner)
+	if err != nil {
+		return fail(errors.E(op, err, "failed to set model owner"))
+	}
+	err = model.setName(ctx, args.Name)
+	if err != nil {
+		return fail(errors.E(op, err, "failed to set model name"))
 	}
 
 	// fetch user model defaults
-	userConfig, err := j.UserModelDefaults(ctx, u)
-	if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
-		return fail(errors.E(op, "failed to fetch cloud defaults"))
+	err = model.setConfigFromFunction(ctx, func(ctx context.Context) (map[string]interface{}, error) {
+		config, err := j.UserModelDefaults(ctx, u)
+		if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
+			return nil, errors.E("failed to fetch user model defaults")
+		}
+		return config, nil
+	})
+	if err != nil {
+		return fail(errors.E(op, err, "failed to set user defaults"))
 	}
-	builder = builder.WithConfig(userConfig)
 
 	// fetch cloud defaults
 	if args.Cloud != (names.CloudTag{}) {
-		cloudDefaults := dbmodel.CloudDefaults{
-			Username: u.Username,
-			Cloud: dbmodel.Cloud{
-				Name: args.Cloud.Id(),
-			},
+		err = model.setConfigFromFunction(ctx, func(ctx context.Context) (map[string]interface{}, error) {
+			cloudDefaults := dbmodel.CloudDefaults{
+				Username: u.Username,
+				Cloud: dbmodel.Cloud{
+					Name: args.Cloud.Id(),
+				},
+			}
+			err = j.Database.CloudDefaults(ctx, &cloudDefaults)
+			if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
+				return nil, errors.E("failed to fetch cloud defaults")
+			}
+			return cloudDefaults.Defaults, nil
+		})
+		if err != nil {
+			return fail(errors.E(op, err, "failed to set cloud defaults"))
 		}
-		err = j.Database.CloudDefaults(ctx, &cloudDefaults)
-		if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
-			return fail(errors.E(op, "failed to fetch cloud defaults"))
-		}
-		builder = builder.WithConfig(cloudDefaults.Defaults)
-	}
 
-	if args.Cloud != (names.CloudTag{}) {
 		ale.Params["cloud"] = args.Cloud.String()
-		builder = builder.WithCloud(args.Cloud)
-		if err := builder.Error(); err != nil {
-			return fail(errors.E(op, err))
+		err = model.setCloud(ctx, args.Cloud)
+		if err != nil {
+			return fail(errors.E(op, err, "failed to set cloud"))
 		}
 	}
 	ale.Params["region"] = args.CloudRegion
-	builder = builder.WithCloudRegion(args.CloudRegion)
-	if err := builder.Error(); err != nil {
-		return fail(errors.E(op, err))
+	err = model.setCloudRegion(ctx, args.CloudRegion)
+	if err != nil {
+		return fail(errors.E(op, err, "failed to set cloud region"))
 	}
 
 	// fetch cloud region defaults
-	if args.Cloud != (names.CloudTag{}) && builder.cloudRegion != "" {
-		cloudRegionDefaults := dbmodel.CloudDefaults{
-			Username: u.Username,
-			Cloud: dbmodel.Cloud{
-				Name: args.Cloud.Id(),
-			},
-			Region: builder.cloudRegion,
+	if args.Cloud != (names.CloudTag{}) && model.cloudRegion != "" {
+		err = model.setConfigFromFunction(ctx, func(ctx context.Context) (map[string]interface{}, error) {
+			cloudRegionDefaults := dbmodel.CloudDefaults{
+				Username: u.Username,
+				Cloud: dbmodel.Cloud{
+					Name: args.Cloud.Id(),
+				},
+				Region: model.cloudRegion,
+			}
+			err = j.Database.CloudDefaults(ctx, &cloudRegionDefaults)
+			if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
+				return nil, errors.E(err, "failed to fetch cloud defaults")
+			}
+			return cloudRegionDefaults.Defaults, nil
+		})
+		if err != nil {
+			return fail(errors.E(op, err, "failed to set cloud region defaults"))
 		}
-		err = j.Database.CloudDefaults(ctx, &cloudRegionDefaults)
-		if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
-			return fail(errors.E(op, "failed to fetch cloud defaults"))
-		}
-		builder = builder.WithConfig(cloudRegionDefaults.Defaults)
 	}
 
 	// last but not least, use the provided config values
 	// overriding all defaults
-	builder = builder.WithConfig(args.Config)
+	err = model.setConfig(ctx, args.Config)
+	if err != nil {
+		return fail(errors.E(op, err, "failed to set model config"))
+	}
 
 	if args.CloudCredential != (names.CloudCredentialTag{}) {
 		ale.Params["cloud-credential"] = args.CloudCredential.String()
-		builder = builder.WithCloudCredential(args.CloudCredential)
-		if err := builder.Error(); err != nil {
-			return fail(errors.E(op, err))
+		err = model.setCloudCredential(ctx, args.CloudCredential)
+		if err != nil {
+			return fail(errors.E(op, err, "failed to set cloud credentials"))
 		}
 	}
-	builder = builder.CreateDatabaseModel()
-	if err := builder.Error(); err != nil {
-		return fail(errors.E(op, err))
-	}
-	defer builder.Cleanup()
-
-	builder = builder.CreateControllerModel()
-	if err := builder.Error(); err != nil {
+	err = model.createDatabaseModel(ctx)
+	if err != nil {
 		return fail(errors.E(op, err))
 	}
 
-	builder = builder.UpdateDatabaseModel()
-	if err := builder.Error(); err != nil {
+	err = model.createControllerModel(ctx)
+	if err != nil {
+		model.cleanup()
 		return fail(errors.E(op, err))
 	}
 
-	mi := builder.JujuModelInfo()
+	err = model.updateDatabaseModel(ctx)
+	if err != nil {
+		model.cleanup()
+		return fail(errors.E(op, err, "failed to update model"))
+	}
+
+	mi := model.JujuModelInfo()
 	ale.Tag = names.NewModelTag(mi.UUID).String()
 	ale.Success = true
 
