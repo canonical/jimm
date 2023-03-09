@@ -11,10 +11,13 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/names/v4"
 	"sigs.k8s.io/yaml"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
+	"github.com/CanonicalLtd/jimm/internal/openfga"
+	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 )
 
 const (
@@ -117,35 +120,49 @@ func (e *Environment) User(name string) *User {
 	return &e.Users[len(e.Users)-1]
 }
 
-func (e *Environment) PopulateDB(c *qt.C, db db.Database) {
+func (e *Environment) AddJIMMRelations(c *qt.C, jimmTag names.ControllerTag, db db.Database, client *openfga.OFGAClient) {
+	for _, user := range e.Users {
+		if user.ControllerAccess == "superuser" {
+			dbUser := user.DBObject(c, db, client)
+			u := openfga.NewUser(&dbUser, client)
+			err := u.SetControllerAccess(context.Background(), jimmTag, ofganames.AdministratorRelation)
+			c.Assert(err, qt.IsNil)
+		}
+	}
+	for _, controller := range e.Controllers {
+		client.AddController(context.Background(), jimmTag, controller.dbo.ResourceTag())
+	}
+}
+
+func (e *Environment) PopulateDB(c *qt.C, db db.Database, client *openfga.OFGAClient) {
 	for i := range e.Users {
 		e.Users[i].env = e
-		e.Users[i].DBObject(c, db)
+		e.Users[i].DBObject(c, db, client)
 	}
 
 	for i := range e.Clouds {
 		e.Clouds[i].env = e
-		e.Clouds[i].DBObject(c, db)
+		e.Clouds[i].DBObject(c, db, client)
 	}
 	for i := range e.CloudCredentials {
 		e.CloudCredentials[i].env = e
-		e.CloudCredentials[i].DBObject(c, db)
+		e.CloudCredentials[i].DBObject(c, db, client)
 	}
 	for i := range e.CloudDefaults {
 		e.CloudDefaults[i].env = e
-		e.CloudDefaults[i].DBObject(c, db)
+		e.CloudDefaults[i].DBObject(c, db, client)
 	}
 	for i := range e.Controllers {
 		e.Controllers[i].env = e
-		e.Controllers[i].DBObject(c, db)
+		e.Controllers[i].DBObject(c, db, client)
 	}
 	for i := range e.Models {
 		e.Models[i].env = e
-		e.Models[i].DBObject(c, db)
+		e.Models[i].DBObject(c, db, client)
 	}
 	for i := range e.UserDefaults {
 		e.UserDefaults[i].env = e
-		e.UserDefaults[i].DBObject(c, db)
+		e.UserDefaults[i].DBObject(c, db, client)
 	}
 }
 
@@ -158,12 +175,12 @@ type UserDefaults struct {
 	dbo dbmodel.UserModelDefaults
 }
 
-func (cd *UserDefaults) DBObject(c *qt.C, db db.Database) dbmodel.UserModelDefaults {
+func (cd *UserDefaults) DBObject(c *qt.C, db db.Database, client *openfga.OFGAClient) dbmodel.UserModelDefaults {
 	if cd.dbo.ID != 0 {
 		return cd.dbo
 	}
 
-	cd.dbo.User = cd.env.User(cd.User).DBObject(c, db)
+	cd.dbo.User = cd.env.User(cd.User).DBObject(c, db, client)
 	cd.dbo.Defaults = cd.Defaults
 
 	err := db.SetUserModelDefaults(context.Background(), &cd.dbo)
@@ -182,13 +199,13 @@ type CloudDefaults struct {
 	dbo dbmodel.CloudDefaults
 }
 
-func (cd *CloudDefaults) DBObject(c *qt.C, db db.Database) dbmodel.CloudDefaults {
+func (cd *CloudDefaults) DBObject(c *qt.C, db db.Database, client *openfga.OFGAClient) dbmodel.CloudDefaults {
 	if cd.dbo.ID != 0 {
 		return cd.dbo
 	}
 
-	cd.dbo.User = cd.env.User(cd.User).DBObject(c, db)
-	cd.dbo.Cloud = cd.env.Cloud(cd.Cloud).DBObject(c, db)
+	cd.dbo.User = cd.env.User(cd.User).DBObject(c, db, client)
+	cd.dbo.Cloud = cd.env.Cloud(cd.Cloud).DBObject(c, db, client)
 	cd.dbo.Region = cd.Region
 	cd.dbo.Defaults = cd.Defaults
 
@@ -217,7 +234,7 @@ type CloudRegion struct {
 
 // DBObject returns a database object for the specified cloud, suitable
 // for adding to the database.
-func (cl *Cloud) DBObject(c *qt.C, db db.Database) dbmodel.Cloud {
+func (cl *Cloud) DBObject(c *qt.C, db db.Database, client *openfga.OFGAClient) dbmodel.Cloud {
 	if cl.dbo.ID != 0 {
 		return cl.dbo
 	}
@@ -231,10 +248,25 @@ func (cl *Cloud) DBObject(c *qt.C, db db.Database) dbmodel.Cloud {
 		})
 	}
 	for _, u := range cl.Users {
+		dbUser := cl.env.User(u.User).DBObject(c, db, client)
 		cl.dbo.Users = append(cl.dbo.Users, dbmodel.UserCloudAccess{
-			User:   cl.env.User(u.User).DBObject(c, db),
+			User:   dbUser,
 			Access: u.Access,
 		})
+		var relation ofganames.Relation
+		switch u.Access {
+		case "admin":
+			relation = ofganames.AdministratorRelation
+		case "add-model":
+			relation = ofganames.CanAddModelRelation
+		default:
+			c.Fatalf("unknown cloud access level: %s", u.Access)
+		}
+		if client != nil {
+			user := openfga.NewUser(&dbUser, client)
+			err := user.SetCloudAccess(context.Background(), cl.dbo.ResourceTag(), relation)
+			c.Assert(err, qt.IsNil)
+		}
 	}
 
 	err := db.AddCloud(context.Background(), &cl.dbo)
@@ -255,14 +287,14 @@ type CloudCredential struct {
 	dbo dbmodel.CloudCredential
 }
 
-func (cc *CloudCredential) DBObject(c *qt.C, db db.Database) dbmodel.CloudCredential {
+func (cc *CloudCredential) DBObject(c *qt.C, db db.Database, client *openfga.OFGAClient) dbmodel.CloudCredential {
 	if cc.dbo.ID != 0 {
 		return cc.dbo
 	}
 	cc.dbo.Name = cc.Name
-	cc.dbo.Cloud = cc.env.Cloud(cc.Cloud).DBObject(c, db)
+	cc.dbo.Cloud = cc.env.Cloud(cc.Cloud).DBObject(c, db, client)
 	cc.dbo.CloudName = cc.dbo.Cloud.Name
-	cc.dbo.Owner = cc.env.User(cc.Owner).DBObject(c, db)
+	cc.dbo.Owner = cc.env.User(cc.Owner).DBObject(c, db, client)
 	cc.dbo.OwnerUsername = cc.dbo.Owner.Username
 	cc.dbo.AuthType = cc.AuthType
 	cc.dbo.Attributes = cc.Attributes
@@ -288,7 +320,7 @@ type Controller struct {
 	dbo dbmodel.Controller
 }
 
-func (ctl *Controller) DBObject(c *qt.C, db db.Database) dbmodel.Controller {
+func (ctl *Controller) DBObject(c *qt.C, db db.Database, client *openfga.OFGAClient) dbmodel.Controller {
 	if ctl.dbo.ID != 0 {
 		return ctl.dbo
 	}
@@ -301,7 +333,7 @@ func (ctl *Controller) DBObject(c *qt.C, db db.Database) dbmodel.Controller {
 	ctl.dbo.CloudRegion = ctl.CloudRegion
 	ctl.dbo.CloudRegions = make([]dbmodel.CloudRegionControllerPriority, len(ctl.CloudRegions))
 	for i, cr := range ctl.CloudRegions {
-		cl := ctl.env.Cloud(cr.Cloud).DBObject(c, db)
+		cl := ctl.env.Cloud(cr.Cloud).DBObject(c, db, client)
 		ctl.dbo.CloudRegions[i] = dbmodel.CloudRegionControllerPriority{
 			CloudRegion: cl.Region(cr.Region),
 			Priority:    cr.Priority,
@@ -310,6 +342,20 @@ func (ctl *Controller) DBObject(c *qt.C, db db.Database) dbmodel.Controller {
 
 	err := db.AddController(context.Background(), &ctl.dbo)
 	c.Assert(err, qt.IsNil)
+
+	if ctl.dbo.AdminUser != "" && client != nil {
+		user := openfga.NewUser(&dbmodel.User{
+			Username: ctl.dbo.AdminUser,
+		}, client)
+		err = user.SetControllerAccess(context.Background(), ctl.dbo.ResourceTag(), ofganames.AdministratorRelation)
+		c.Assert(err, qt.IsNil)
+	}
+
+	if client != nil {
+		err = client.AddCloudController(context.Background(), names.NewCloudTag(ctl.Cloud), ctl.dbo.ResourceTag())
+		c.Assert(err, qt.IsNil)
+	}
+
 	return ctl.dbo
 }
 
@@ -346,20 +392,27 @@ type Model struct {
 	dbo dbmodel.Model
 }
 
-func (m *Model) DBObject(c *qt.C, db db.Database) dbmodel.Model {
+func (m *Model) DBObject(c *qt.C, db db.Database, client *openfga.OFGAClient) dbmodel.Model {
 	if m.dbo.ID != 0 {
 		return m.dbo
 	}
 	m.dbo.Name = m.Name
-	m.dbo.Owner = m.env.User(m.Owner).DBObject(c, db)
+	m.dbo.Owner = m.env.User(m.Owner).DBObject(c, db, client)
 	if m.UUID != "" {
 		m.dbo.UUID.String = m.UUID
 		m.dbo.UUID.Valid = true
 	}
-	m.dbo.Controller = m.env.Controller(m.Controller).DBObject(c, db)
+
+	if client != nil {
+		owner := openfga.NewUser(&m.dbo.Owner, client)
+		err := owner.SetModelAccess(context.Background(), m.dbo.ResourceTag(), ofganames.AdministratorRelation)
+		c.Assert(err, qt.IsNil)
+	}
+
+	m.dbo.Controller = m.env.Controller(m.Controller).DBObject(c, db, client)
 	for _, u := range m.Users {
 		uma := dbmodel.UserModelAccess{
-			User:   m.env.User(u.User).DBObject(c, db),
+			User:   m.env.User(u.User).DBObject(c, db, client),
 			Access: u.Access,
 		}
 		if u.LastConnection != "" {
@@ -371,9 +424,26 @@ func (m *Model) DBObject(c *qt.C, db db.Database) dbmodel.Model {
 			}
 		}
 		m.dbo.Users = append(m.dbo.Users, uma)
+
+		var relation ofganames.Relation
+		switch u.Access {
+		case "admin":
+			relation = ofganames.AdministratorRelation
+		case "write":
+			relation = ofganames.WriterRelation
+		case "read":
+			relation = ofganames.ReaderRelation
+		default:
+			c.Fatalf("unknown model access: %s %s", uma.User.Username, u.Access)
+		}
+		if client != nil {
+			user := openfga.NewUser(&uma.User, client)
+			err := user.SetModelAccess(context.Background(), m.dbo.ResourceTag(), relation)
+			c.Assert(err, qt.IsNil)
+		}
 	}
-	m.dbo.CloudRegion = m.env.Cloud(m.Cloud).DBObject(c, db).Region(m.CloudRegion)
-	m.dbo.CloudCredential = m.env.CloudCredential(m.Owner, m.Cloud, m.CloudCredential).DBObject(c, db)
+	m.dbo.CloudRegion = m.env.Cloud(m.Cloud).DBObject(c, db, client).Region(m.CloudRegion)
+	m.dbo.CloudCredential = m.env.CloudCredential(m.Owner, m.Cloud, m.CloudCredential).DBObject(c, db, client)
 
 	m.dbo.Type = m.Type
 	m.dbo.DefaultSeries = m.DefaultSeries
@@ -389,6 +459,11 @@ func (m *Model) DBObject(c *qt.C, db db.Database) dbmodel.Model {
 
 	err := db.AddModel(context.Background(), &m.dbo)
 	c.Assert(err, qt.IsNil)
+
+	if client != nil {
+		err = client.AddControllerModel(context.Background(), m.dbo.Controller.ResourceTag(), m.dbo.ResourceTag())
+		c.Assert(err, qt.IsNil)
+	}
 	return m.dbo
 }
 
@@ -401,7 +476,7 @@ type User struct {
 	dbo dbmodel.User
 }
 
-func (u *User) DBObject(c *qt.C, db db.Database) dbmodel.User {
+func (u *User) DBObject(c *qt.C, db db.Database, client *openfga.OFGAClient) dbmodel.User {
 	if u.dbo.ID != 0 {
 		return u.dbo
 	}

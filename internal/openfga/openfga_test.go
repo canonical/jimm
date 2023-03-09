@@ -25,7 +25,8 @@ type openFGATestSuite struct {
 var _ = gc.Suite(&openFGATestSuite{})
 
 func (s *openFGATestSuite) SetUpTest(c *gc.C) {
-	api, client, _ := jimmtest.SetupTestOFGAClient(c)
+	api, client, _, err := jimmtest.SetupTestOFGAClient(c.TestName())
+	c.Assert(err, gc.IsNil)
 	s.ofgaApi = api
 	s.ofgaClient = client
 }
@@ -137,7 +138,7 @@ func (s *openFGATestSuite) TestCheckRelationSucceeds(c *gc.C) {
 	allowed, resoution, err := s.ofgaClient.CheckRelation(ctx, checkTuple, true)
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, true)
-	c.Assert(resoution, gc.Equals, ".(direct).group:"+groupid+"#member.(direct).")
+	c.Assert(resoution, gc.Equals, ".union.0(direct).group:"+groupid+"#member.(direct).")
 }
 
 func (s *openFGATestSuite) TestRemoveTuplesSucceeds(c *gc.C) {
@@ -217,21 +218,21 @@ func (s *openFGATestSuite) TestRemoveModel(c *gc.C) {
 	c.Assert(allowed, gc.Equals, false)
 }
 
-func (s *openFGATestSuite) TestAddControllerApplicationOffer(c *gc.C) {
+func (s *openFGATestSuite) TestAddModelApplicationOffer(c *gc.C) {
 	offerUUID, err := uuid.NewRandom()
 	c.Assert(err, gc.IsNil)
-	controllerUUID, err := uuid.NewRandom()
+	modelUUID, err := uuid.NewRandom()
 	c.Assert(err, gc.IsNil)
 
-	controller := names.NewControllerTag(controllerUUID.String())
+	model := names.NewModelTag(modelUUID.String())
 	offer := names.NewApplicationOfferTag(offerUUID.String())
 
-	err = s.ofgaClient.AddControllerApplicationOffer(context.Background(), controller, offer)
+	err = s.ofgaClient.AddModelApplicationOffer(context.Background(), model, offer)
 	c.Assert(err, gc.IsNil)
 
 	key := ofga.Tuple{
-		Object:   ofganames.FromTag(controller),
-		Relation: "controller",
+		Object:   ofganames.FromTag(model),
+		Relation: "model",
 		Target:   ofganames.FromTag(offer),
 	}
 	allowed, _, err := s.ofgaClient.CheckRelation(context.Background(), key, false)
@@ -242,18 +243,18 @@ func (s *openFGATestSuite) TestAddControllerApplicationOffer(c *gc.C) {
 func (s *openFGATestSuite) TestRemoveApplicationOffer(c *gc.C) {
 	offerUUID, err := uuid.NewRandom()
 	c.Assert(err, gc.IsNil)
-	controllerUUID, err := uuid.NewRandom()
+	modelUUID, err := uuid.NewRandom()
 	c.Assert(err, gc.IsNil)
 
-	controller := names.NewControllerTag(controllerUUID.String())
+	model := names.NewModelTag(modelUUID.String())
 	offer := names.NewApplicationOfferTag(offerUUID.String())
 
-	err = s.ofgaClient.AddControllerApplicationOffer(context.Background(), controller, offer)
+	err = s.ofgaClient.AddModelApplicationOffer(context.Background(), model, offer)
 	c.Assert(err, gc.IsNil)
 
 	key := ofga.Tuple{
-		Object:   ofganames.FromTag(controller),
-		Relation: "controller",
+		Object:   ofganames.FromTag(model),
+		Relation: "model",
 		Target:   ofganames.FromTag(offer),
 	}
 	allowed, _, err := s.ofgaClient.CheckRelation(context.Background(), key, false)
@@ -266,6 +267,161 @@ func (s *openFGATestSuite) TestRemoveApplicationOffer(c *gc.C) {
 	allowed, _, err = s.ofgaClient.CheckRelation(context.Background(), key, false)
 	c.Assert(err, gc.IsNil)
 	c.Assert(allowed, gc.Equals, false)
+}
+
+func (s *openFGATestSuite) TestRemoveGroup(c *gc.C) {
+	group1 := jimmnames.NewGroupTag("1")
+	group2 := jimmnames.NewGroupTag("2")
+	alice := names.NewUserTag("alice@external")
+	adam := names.NewUserTag("adam@external")
+
+	tuples := []ofga.Tuple{{
+		Object:   ofganames.FromTag(alice),
+		Relation: ofganames.MemberRelation,
+		Target:   ofganames.FromTag(group1),
+	}, {
+		Object:   ofganames.FromTag(adam),
+		Relation: ofganames.MemberRelation,
+		Target:   ofganames.FromTag(group2),
+	}, {
+		Object:   ofganames.FromTagWithRelation(group1, ofganames.MemberRelation),
+		Relation: ofganames.MemberRelation,
+		Target:   ofganames.FromTag(group2),
+	}}
+
+	err := s.ofgaClient.AddRelations(context.Background(), tuples...)
+	c.Assert(err, gc.Equals, nil)
+
+	allowed, _, err := s.ofgaClient.CheckRelation(
+		context.TODO(),
+		ofga.Tuple{
+			Object:   ofganames.FromTag(alice),
+			Relation: ofganames.MemberRelation,
+			Target:   ofganames.FromTag(group2),
+		},
+		false,
+	)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(allowed, gc.Equals, true)
+
+	err = s.ofgaClient.RemoveGroup(context.Background(), group1)
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.ofgaClient.RemoveGroup(context.Background(), group1)
+	c.Assert(err, gc.Equals, nil)
+
+	allowed, _, err = s.ofgaClient.CheckRelation(
+		context.TODO(),
+		ofga.Tuple{
+			Object:   ofganames.FromTag(alice),
+			Relation: ofganames.MemberRelation,
+			Target:   ofganames.FromTag(group2),
+		},
+		false,
+	)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(allowed, gc.Equals, false)
+}
+
+func (s *openFGATestSuite) TestRemoveCloud(c *gc.C) {
+	cloud1 := names.NewCloudTag("cloud-1")
+
+	alice := names.NewUserTag("alice@external")
+	adam := names.NewUserTag("adam@external")
+
+	tuples := []ofga.Tuple{{
+		Object:   ofganames.FromTag(alice),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.FromTag(cloud1),
+	}, {
+		Object:   ofganames.FromTag(adam),
+		Relation: ofganames.CanAddModelRelation,
+		Target:   ofganames.FromTag(cloud1),
+	}}
+
+	err := s.ofgaClient.AddRelations(context.Background(), tuples...)
+	c.Assert(err, gc.Equals, nil)
+
+	checks := []ofga.Tuple{{
+		Object:   ofganames.FromTag(alice),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.FromTag(cloud1),
+	}, {
+		Object:   ofganames.FromTag(alice),
+		Relation: ofganames.CanAddModelRelation,
+		Target:   ofganames.FromTag(cloud1),
+	}, {
+		Object:   ofganames.FromTag(adam),
+		Relation: ofganames.CanAddModelRelation,
+		Target:   ofganames.FromTag(cloud1),
+	}}
+	for _, check := range checks {
+		allowed, _, err := s.ofgaClient.CheckRelation(context.TODO(), check, false)
+		c.Assert(err, gc.Equals, nil)
+		c.Assert(allowed, gc.Equals, true)
+	}
+
+	err = s.ofgaClient.RemoveCloud(context.Background(), cloud1)
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.ofgaClient.RemoveCloud(context.Background(), cloud1)
+	c.Assert(err, gc.Equals, nil)
+
+	for _, check := range checks {
+		allowed, _, err := s.ofgaClient.CheckRelation(context.TODO(), check, false)
+		c.Assert(err, gc.Equals, nil)
+		c.Assert(allowed, gc.Equals, false)
+	}
+}
+
+func (s *openFGATestSuite) TestAddCloudController(c *gc.C) {
+	cloud := names.NewCloudTag("cloud-1")
+	controller := names.NewControllerTag(uuid.NewString())
+
+	check := ofga.Tuple{
+		Object:   ofganames.FromTag(controller),
+		Relation: ofganames.ControllerRelation,
+		Target:   ofganames.FromTag(cloud),
+	}
+
+	allowed, _, err := s.ofgaClient.CheckRelation(context.Background(), check, false)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(allowed, gc.Equals, false)
+
+	err = s.ofgaClient.AddCloudController(context.Background(), cloud, controller)
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.ofgaClient.AddCloudController(context.Background(), cloud, controller)
+	c.Assert(err, gc.Equals, nil)
+
+	allowed, _, err = s.ofgaClient.CheckRelation(context.Background(), check, false)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(allowed, gc.Equals, true)
+}
+
+func (s *openFGATestSuite) TestAddController(c *gc.C) {
+	jimm := names.NewControllerTag(uuid.NewString())
+	controller := names.NewControllerTag(uuid.NewString())
+
+	check := ofga.Tuple{
+		Object:   ofganames.FromTag(jimm),
+		Relation: ofganames.ControllerRelation,
+		Target:   ofganames.FromTag(controller),
+	}
+
+	allowed, _, err := s.ofgaClient.CheckRelation(context.Background(), check, false)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(allowed, gc.Equals, false)
+
+	err = s.ofgaClient.AddController(context.Background(), jimm, controller)
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.ofgaClient.AddController(context.Background(), jimm, controller)
+	c.Assert(err, gc.Equals, nil)
+
+	allowed, _, err = s.ofgaClient.CheckRelation(context.Background(), check, false)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(allowed, gc.Equals, true)
 }
 
 func Test(t *testing.T) {

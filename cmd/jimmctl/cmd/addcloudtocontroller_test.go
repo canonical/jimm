@@ -9,12 +9,15 @@ import (
 
 	"github.com/juju/cmd/v3/cmdtesting"
 	"github.com/juju/juju/cloud"
+	"github.com/juju/names/v4"
 
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/cmd/jimmctl/cmd"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/CanonicalLtd/jimm/internal/openfga"
+	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 )
 
 type addCloudToControllerSuite struct {
@@ -26,7 +29,7 @@ var _ = gc.Suite(&addCloudToControllerSuite{})
 func (s *addCloudToControllerSuite) SetUpTest(c *gc.C) {
 	s.jimmSuite.SetUpTest(c)
 
-	// add some users
+	// We add user bob, who is a JIMM administrator.
 	err := s.JIMM.Database.UpdateUser(context.Background(), &dbmodel.User{
 		DisplayName:      "Bob",
 		Username:         "bob@external",
@@ -34,7 +37,7 @@ func (s *addCloudToControllerSuite) SetUpTest(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 
-	// add a cloud
+	// We add a test-cloud cloud.
 	info := s.APIInfo(c)
 	err = s.JIMM.Database.AddCloud(context.Background(), &dbmodel.Cloud{
 		Name:    "test-cloud",
@@ -46,7 +49,21 @@ func (s *addCloudToControllerSuite) SetUpTest(c *gc.C) {
 	region, err := s.JIMM.Database.FindRegion(context.Background(), "kubernetes", "default")
 	c.Assert(err, gc.IsNil)
 
-	// add 2 controllers
+	// We grant user bob administrator access to JIMM and the added
+	// test-cloud.
+	bob := openfga.NewUser(
+		&dbmodel.User{
+			Username: "bob@external",
+		},
+		s.JIMM.OpenFGAClient,
+	)
+	err = bob.SetControllerAccess(context.Background(), s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
+	c.Assert(err, gc.IsNil)
+	err = bob.SetCloudAccess(context.Background(), names.NewCloudTag("test-cloud"), ofganames.AdministratorRelation)
+	c.Assert(err, gc.IsNil)
+
+	// We add two controllers controller-1 and controller-2 using the
+	// test-cloud.
 	err = s.JIMM.Database.AddController(context.Background(), &dbmodel.Controller{
 		Name:          "controller-1",
 		CACertificate: info.CACert,
@@ -62,6 +79,10 @@ func (s *addCloudToControllerSuite) SetUpTest(c *gc.C) {
 		}},
 	})
 	c.Assert(err, gc.IsNil)
+
+	err = s.JIMM.OpenFGAClient.AddController(context.Background(), s.JIMM.ResourceTag(), names.NewControllerTag("00000001-0000-0000-0000-000000000001"))
+	c.Assert(err, gc.IsNil)
+
 	err = s.JIMM.Database.AddController(context.Background(), &dbmodel.Controller{
 		Name:          "controller-2",
 		CACertificate: info.CACert,
@@ -76,6 +97,9 @@ func (s *addCloudToControllerSuite) SetUpTest(c *gc.C) {
 			Priority:    10,
 		}},
 	})
+	c.Assert(err, gc.IsNil)
+
+	err = s.JIMM.OpenFGAClient.AddController(context.Background(), s.JIMM.ResourceTag(), names.NewControllerTag("00000001-0000-0000-0000-000000000002"))
 	c.Assert(err, gc.IsNil)
 }
 

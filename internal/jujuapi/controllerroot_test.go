@@ -7,7 +7,6 @@ import (
 
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/version/v2"
 	gc "gopkg.in/check.v1"
@@ -36,7 +35,7 @@ func (s *controllerrootSuite) TestServerVersion(c *gc.C) {
 
 func (s *controllerrootSuite) TestUnimplementedMethodFails(c *gc.C) {
 	conn := s.open(c, &api.Info{
-		ModelTag:  s.Model.Tag().(names.ModelTag),
+		ModelTag:  s.Model.ResourceTag(),
 		SkipLogin: true,
 	}, "test")
 	defer conn.Close()

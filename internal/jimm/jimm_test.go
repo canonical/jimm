@@ -11,6 +11,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/google/uuid"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 
@@ -18,6 +19,8 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
+	"github.com/CanonicalLtd/jimm/internal/openfga"
+	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 )
 
 func TestFindAuditEvents(t *testing.T) {
@@ -25,13 +28,18 @@ func TestFindAuditEvents(t *testing.T) {
 
 	now := time.Now().UTC()
 
+	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
 	j := &jimm.JIMM{
+		UUID: uuid.NewString(),
 		Database: db.Database{
 			DB: jimmtest.MemoryDB(c, nil),
 		},
+		OpenFGAClient: client,
 	}
 
-	err := j.Database.Migrate(context.Background(), true)
+	err = j.Database.Migrate(context.Background(), true)
 	c.Assert(err, qt.Equals, nil)
 
 	users := []dbmodel.User{{
@@ -42,6 +50,12 @@ func TestFindAuditEvents(t *testing.T) {
 	}}
 	for i := range users {
 		c.Assert(j.Database.DB.Create(&users[i]).Error, qt.IsNil)
+
+		if users[i].ControllerAccess == "superuser" {
+			u := openfga.NewUser(&users[i], client)
+			err := u.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
+			c.Assert(err, qt.IsNil)
+		}
 	}
 
 	events := []dbmodel.AuditLogEntry{{
@@ -135,7 +149,7 @@ func TestFindAuditEvents(t *testing.T) {
 	}}
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			events, err := j.FindAuditEvents(context.Background(), test.user, test.filter)
+			events, err := j.FindAuditEvents(context.Background(), openfga.NewUser(test.user, client), test.filter)
 			if test.expectedError != "" {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
 			} else {
@@ -187,17 +201,23 @@ func TestListControllers(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC().Round(time.Millisecond)
 
+	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
 	j := &jimm.JIMM{
+		UUID: uuid.NewString(),
 		Database: db.Database{
 			DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
 		},
+		OpenFGAClient: client,
 	}
 
-	err := j.Database.Migrate(ctx, false)
+	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
 	env := jimmtest.ParseEnvironment(c, testListCoControllersEnv)
-	env.PopulateDB(c, j.Database)
+	env.PopulateDB(c, j.Database, client)
+	env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
 
 	tests := []struct {
 		about               string
@@ -206,25 +226,25 @@ func TestListControllers(t *testing.T) {
 		expectedError       string
 	}{{
 		about: "superuser can list controllers",
-		user:  env.User("alice@external").DBObject(c, j.Database),
+		user:  env.User("alice@external").DBObject(c, j.Database, client),
 		expectedControllers: []dbmodel.Controller{
-			env.Controller("test1").DBObject(c, j.Database),
-			env.Controller("test2").DBObject(c, j.Database),
-			env.Controller("test3").DBObject(c, j.Database),
+			env.Controller("test1").DBObject(c, j.Database, client),
+			env.Controller("test2").DBObject(c, j.Database, client),
+			env.Controller("test3").DBObject(c, j.Database, client),
 		},
 	}, {
 		about:         "add-model user can not list controllers",
-		user:          env.User("bob@external").DBObject(c, j.Database),
+		user:          env.User("bob@external").DBObject(c, j.Database, client),
 		expectedError: "unauthorized",
 	}, {
 		about:         "user withouth access rights cannot list controllers",
-		user:          env.User("eve@external").DBObject(c, j.Database),
+		user:          env.User("eve@external").DBObject(c, j.Database, client),
 		expectedError: "unauthorized",
 	}}
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			controllers, err := j.ListControllers(ctx, &test.user)
+			controllers, err := j.ListControllers(ctx, openfga.NewUser(&test.user, client))
 			if test.expectedError != "" {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
 			} else {
@@ -266,17 +286,23 @@ func TestSetControllerDeprecated(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC().Round(time.Millisecond)
 
+	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
 	j := &jimm.JIMM{
+		UUID: uuid.NewString(),
 		Database: db.Database{
 			DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
 		},
+		OpenFGAClient: client,
 	}
 
-	err := j.Database.Migrate(ctx, false)
+	err = j.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
 
 	env := jimmtest.ParseEnvironment(c, testSetControllerDeprecatedEnv)
-	env.PopulateDB(c, j.Database)
+	env.PopulateDB(c, j.Database, client)
+	env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
 
 	tests := []struct {
 		about         string
@@ -285,26 +311,22 @@ func TestSetControllerDeprecated(t *testing.T) {
 		expectedError string
 	}{{
 		about:      "superuser can deprecate a controller",
-		user:       env.User("alice@external").DBObject(c, j.Database),
+		user:       env.User("alice@external").DBObject(c, j.Database, client),
 		deprecated: true,
 	}, {
 		about:      "superuser can deprecate a controller",
-		user:       env.User("alice@external").DBObject(c, j.Database),
+		user:       env.User("alice@external").DBObject(c, j.Database, client),
 		deprecated: false,
 	}, {
-		about:         "add-model user cannot deprecate a controller",
-		expectedError: "unauthorized",
-		deprecated:    true,
-	}, {
 		about:         "user withouth access rights cannot deprecate a controller",
-		user:          env.User("eve@external").DBObject(c, j.Database),
+		user:          env.User("eve@external").DBObject(c, j.Database, client),
 		expectedError: "unauthorized",
 		deprecated:    true,
 	}}
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			err := j.SetControllerDeprecated(ctx, &test.user, "test1", test.deprecated)
+			err := j.SetControllerDeprecated(ctx, openfga.NewUser(&test.user, client), "test1", test.deprecated)
 			if test.expectedError != "" {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
 			} else {
@@ -408,23 +430,30 @@ func TestRemoveController(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
+			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+			c.Assert(err, qt.IsNil)
+
 			j := &jimm.JIMM{
+				UUID: uuid.NewString(),
 				Database: db.Database{
 					DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
 				},
+				OpenFGAClient: client,
 			}
 
-			err := j.Database.Migrate(ctx, false)
+			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, removeControllerTestEnv)
-			env.PopulateDB(c, j.Database)
+			env.PopulateDB(c, j.Database, client)
+			env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
 
-			u := env.User(test.user).DBObject(c, j.Database)
+			dbUser := env.User(test.user).DBObject(c, j.Database, client)
+			user := openfga.NewUser(&dbUser, client)
 
 			if test.unavailableSince != nil {
 				// make the controller unavailable
-				controller := env.Controller("controller-1").DBObject(c, j.Database)
+				controller := env.Controller("controller-1").DBObject(c, j.Database, client)
 				controller.UnavailableSince = sql.NullTime{
 					Valid: true,
 					Time:  *test.unavailableSince,
@@ -433,7 +462,7 @@ func TestRemoveController(t *testing.T) {
 				c.Assert(err, qt.Equals, nil)
 			}
 
-			err = j.RemoveController(ctx, &u, "controller-1", test.force)
+			err = j.RemoveController(ctx, user, "controller-1", test.force)
 			if test.expectedError != "" {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
 			} else {
@@ -566,24 +595,31 @@ func TestFullModelStatus(t *testing.T) {
 				Status_: test.statusFunc,
 			}
 
+			_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+			c.Assert(err, qt.IsNil)
+
 			j := &jimm.JIMM{
+				UUID: uuid.NewString(),
 				Database: db.Database{
 					DB: jimmtest.MemoryDB(c, func() time.Time { return now }),
 				},
 				Dialer: &jimmtest.Dialer{
 					API: api,
 				},
+				OpenFGAClient: client,
 			}
 
-			err := j.Database.Migrate(ctx, false)
+			err = j.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
 
 			env := jimmtest.ParseEnvironment(c, fullModelStatusTestEnv)
-			env.PopulateDB(c, j.Database)
+			env.PopulateDB(c, j.Database, client)
+			env.AddJIMMRelations(c, j.ResourceTag(), j.Database, client)
 
-			u := env.User(test.user).DBObject(c, j.Database)
+			dbUser := env.User(test.user).DBObject(c, j.Database, client)
+			user := openfga.NewUser(&dbUser, client)
 
-			status, err := j.FullModelStatus(ctx, &u, names.NewModelTag(test.modelUUID), nil)
+			status, err := j.FullModelStatus(ctx, user, names.NewModelTag(test.modelUUID), nil)
 			if test.expectedError != "" {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
 			} else {

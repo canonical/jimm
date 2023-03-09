@@ -17,7 +17,24 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/CanonicalLtd/jimm/internal/openfga"
+	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 )
+
+func (j *JIMM) getUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error) {
+	accessLevel := user.GetCloudAccess(ctx, cloud)
+	if accessLevel == ofganames.NoRelation {
+		everyoneTag := names.NewUserTag(auth.Everyone)
+		everyone := openfga.NewUser(
+			&dbmodel.User{
+				Username: everyoneTag.Id(),
+			},
+			j.OpenFGAClient,
+		)
+		accessLevel = everyone.GetCloudAccess(ctx, cloud)
+	}
+	return ToCloudAccessString(accessLevel), nil
+}
 
 // GetCloud retrieves the cloud for the given cloud tag. If the cloud
 // cannot be found then an error with the code CodeNotFound is
@@ -25,26 +42,36 @@ import (
 // error with a code of CodeUnauthorized is returned. If the user only has
 // add-model access to the cloud then the returned Users field will only
 // contain the authentcated user.
-func (j *JIMM) GetCloud(ctx context.Context, u *dbmodel.User, tag names.CloudTag) (dbmodel.Cloud, error) {
+func (j *JIMM) GetCloud(ctx context.Context, u *openfga.User, tag names.CloudTag) (dbmodel.Cloud, error) {
 	const op = errors.Op("jimm.GetCloud")
+
 	var cl dbmodel.Cloud
 	cl.SetTag(tag)
 
 	if err := j.Database.GetCloud(ctx, &cl); err != nil {
 		return cl, errors.E(op, err)
 	}
-	switch cloudUserAccess(u, &cl) {
+
+	accessLevel, err := j.getUserCloudAccess(ctx, u, tag)
+	if err != nil {
+		if err != nil {
+			return dbmodel.Cloud{}, errors.E(op, err)
+		}
+	}
+
+	switch accessLevel {
+	case "":
+		return dbmodel.Cloud{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	case "admin":
 		return cl, nil
-	case "add-model":
+	default:
+		// at this point the user must have add-model permission on the cloud
 		cl.Users = []dbmodel.UserCloudAccess{{
 			Username: u.Username,
-			User:     *u,
+			User:     *u.User,
 			Access:   "add-model",
 		}}
 		return cl, nil
-	default:
-		return cl, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 }
 
@@ -56,49 +83,58 @@ func (j *JIMM) GetCloud(ctx context.Context, u *dbmodel.User, tag names.CloudTag
 // true then f will be called with all clouds known to JIMM. If f returns
 // an error then iteration will stop immediately and the error will be
 // returned unchanged. The given function should not update the database.
-func (j *JIMM) ForEachUserCloud(ctx context.Context, u *dbmodel.User, f func(*dbmodel.Cloud) error) error {
+func (j *JIMM) ForEachUserCloud(ctx context.Context, user *openfga.User, f func(*dbmodel.Cloud) error) error {
 	const op = errors.Op("jimm.ForEachUserCloud")
 
-	clds, err := j.Database.GetUserClouds(ctx, u)
+	clouds, err := j.Database.GetClouds(ctx)
 	if err != nil {
 		return errors.E(op, err, "cannot load clouds")
 	}
-	seen := make(map[string]bool, len(clds))
-	for _, uca := range clds {
-		cld := uca.Cloud
-		if uca.Access != "admin" {
-			cld.Users = []dbmodel.UserCloudAccess{{
-				Username: u.Username,
-				User:     *u,
-				Access:   uca.Access,
+	seen := make(map[string]bool, len(clouds))
+	for _, cloud := range clouds {
+		userAccess := ToCloudAccessString(user.GetCloudAccess(ctx, cloud.ResourceTag()))
+		if userAccess == "" {
+			// If user does not have access to the cloud,
+			// we skip this cloud.
+			continue
+		}
+		// If user is not a cloud admin they will only see themselves as users.
+		if userAccess != "admin" {
+			cloud.Users = []dbmodel.UserCloudAccess{{
+				Username: user.Username,
+				User:     *user.User,
+				Access:   userAccess,
 			}}
 		}
-		if err := f(&cld); err != nil {
+		if err := f(&cloud); err != nil {
 			return err
 		}
-		seen[cld.Name] = true
+		seen[cloud.Name] = true
 	}
 
 	// Also include "public" clouds
-	everyone := dbmodel.User{
+	everyoneDB := dbmodel.User{
 		Username: auth.Everyone,
 	}
-	clds, err = j.Database.GetUserClouds(ctx, &everyone)
-	if err != nil {
-		return errors.E(op, err, "cannot load clouds")
-	}
-	for _, uca := range clds {
-		if seen[uca.CloudName] {
+	everyone := openfga.NewUser(&everyoneDB, j.OpenFGAClient)
+
+	for _, cloud := range clouds {
+		if seen[cloud.Name] {
 			continue
 		}
-		cld := uca.Cloud
+		userAccess := ToCloudAccessString(everyone.GetCloudAccess(ctx, cloud.ResourceTag()))
+		if userAccess == "" {
+			// if user does not have access to the cloud,
+			// we skip this cloud
+			continue
+		}
 		// For public clouds a user can only ever see themselves.
-		cld.Users = []dbmodel.UserCloudAccess{{
-			Username: u.Username,
-			User:     *u,
-			Access:   uca.Access,
+		cloud.Users = []dbmodel.UserCloudAccess{{
+			Username: user.Username,
+			User:     *user.User,
+			Access:   userAccess,
 		}}
-		if err := f(&cld); err != nil {
+		if err := f(&cloud); err != nil {
 			return err
 		}
 	}
@@ -111,10 +147,14 @@ func (j *JIMM) ForEachUserCloud(ctx context.Context, u *dbmodel.User, f func(*db
 // error is returned unmodified. If the given user is not a controller
 // superuser then an error with the code CodeUnauthorized is returned. The
 // given function should not update the database.
-func (j *JIMM) ForEachCloud(ctx context.Context, u *dbmodel.User, f func(*dbmodel.Cloud) error) error {
+func (j *JIMM) ForEachCloud(ctx context.Context, user *openfga.User, f func(*dbmodel.Cloud) error) error {
 	const op = errors.Op("jimm.ForEachCloud")
 
-	if u.ControllerAccess != "superuser" {
+	isControllerAdmin, err := openfga.IsAdministrator(ctx, user, j.ResourceTag())
+	if err != nil {
+		return errors.E(op, err)
+	}
+	if !isControllerAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
@@ -129,30 +169,6 @@ func (j *JIMM) ForEachCloud(ctx context.Context, u *dbmodel.User, f func(*dbmode
 		}
 	}
 	return nil
-}
-
-// cloudUserAccess determines the level of access the given user has on the
-// given cloud. The cloud object must have had its users association
-// loaded.
-func cloudUserAccess(u *dbmodel.User, cl *dbmodel.Cloud) string {
-	if u.ControllerAccess == "superuser" {
-		// A controller superuser automatically has admin access to a
-		// cloud.
-		return "admin"
-	}
-	var userAccess, everyoneAccess string
-	for _, cu := range cl.Users {
-		if cu.Username == u.Username {
-			userAccess = cu.Access
-		}
-		if cu.Username == auth.Everyone {
-			everyoneAccess = cu.Access
-		}
-	}
-	if userAccess == "" {
-		userAccess = everyoneAccess
-	}
-	return userAccess
 }
 
 // DefaultReservedCloudNames contains a list of cloud names that are used
@@ -177,7 +193,7 @@ var DefaultReservedCloudNames = []string{
 	"rackspace",
 }
 
-// AddCloudToControler adds the cloud defined by the given tag and
+// AddCloudToController adds the cloud defined by the given tag and
 // cloud to the JAAS system. The cloud will be created on the specified
 // controller running on the requested host cloud-region and the cloud
 // created there. If the controller does not host the cloud-regions
@@ -189,13 +205,13 @@ var DefaultReservedCloudNames = []string{
 // code of CodeIncompatibleClouds will be returned. If there is an error
 // returned by the controller when creating the cloud then that error code
 // will be preserved.
-func (j *JIMM) AddCloudToController(ctx context.Context, u *dbmodel.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud) error {
+func (j *JIMM) AddCloudToController(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud) error {
 	const op = errors.Op("jimm.AddCloudToController")
 
 	ale := dbmodel.AuditLogEntry{
 		Time:    time.Now().UTC().Round(time.Millisecond),
 		Tag:     tag.String(),
-		UserTag: u.Tag().String(),
+		UserTag: user.Tag().String(),
 		Action:  "add",
 		Params: dbmodel.StringMap{
 			"controller": controllerName,
@@ -208,7 +224,26 @@ func (j *JIMM) AddCloudToController(ctx context.Context, u *dbmodel.User, contro
 		return err
 	}
 
-	if u.ControllerAccess != "login" && u.ControllerAccess != "superuser" {
+	controller := dbmodel.Controller{
+		Name: controllerName,
+	}
+	err := j.Database.GetController(ctx, &controller)
+	if err != nil {
+		return fail(errors.E(op, errors.CodeNotFound, "controller not found"))
+	}
+
+	// NOTE (alesstimec) Previously the code checked:
+	//  u.ControllerAccess != "login" && u.ControllerAccess != "superuser"
+	// I have changed this to require the user to be controller administrator
+	// which contradicts the godoc of this method. We will need to
+	// reconsider which is the right approach and either change this
+	// check or the godoc.
+	isAdministrator, err := openfga.IsAdministrator(ctx, user, controller.ResourceTag())
+	if err != nil {
+		return fail(errors.E(op, err))
+	}
+
+	if !isAdministrator {
 		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
 	}
 
@@ -235,10 +270,12 @@ func (j *JIMM) AddCloudToController(ctx context.Context, u *dbmodel.User, contro
 			}
 			return fail(errors.E(op, err))
 		}
+		allowedAddModel, err := user.IsAllowedAddModel(ctx, region.Cloud.ResourceTag())
+		if err != nil {
+			return fail(errors.E(op, err))
+		}
 
-		switch cloudUserAccess(u, &region.Cloud) {
-		case "admin", "add-model":
-		default:
+		if !allowedAddModel {
 			return fail(errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion)))
 		}
 
@@ -263,20 +300,13 @@ func (j *JIMM) AddCloudToController(ctx context.Context, u *dbmodel.User, contro
 	var dbCloud dbmodel.Cloud
 	dbCloud.FromJujuCloud(cloud)
 	dbCloud.Name = tag.Id()
+	// TODO (alesstimec) remove as this will no longer be needed.
 	dbCloud.Users = []dbmodel.UserCloudAccess{{
-		User:   *u,
+		User:   *user.User,
 		Access: "admin",
 	}}
 
-	controller := dbmodel.Controller{
-		Name: controllerName,
-	}
-	err := j.Database.GetController(ctx, &controller)
-	if err != nil {
-		return fail(errors.E(op, errors.CodeNotFound, "controller not found"))
-	}
-
-	ccloud, err := j.addControllerCloud(ctx, &controller, u.Tag().(names.UserTag), tag, cloud)
+	ccloud, err := j.addControllerCloud(ctx, &controller, user.ResourceTag(), tag, cloud)
 	if err != nil {
 		return fail(errors.E(op, err))
 	}
@@ -290,6 +320,17 @@ func (j *JIMM) AddCloudToController(ctx context.Context, u *dbmodel.User, contro
 	}
 	if err := j.Database.AddCloud(ctx, &dbCloud); err != nil {
 		return fail(errors.E(op, err))
+	}
+
+	err = j.OpenFGAClient.AddCloudController(ctx, dbCloud.ResourceTag(), controller.ResourceTag())
+	if err != nil {
+		zapctx.Error(
+			ctx,
+			"failed to add controller relation between controller and cloud",
+			zap.String("controller", controller.ResourceTag().Id()),
+			zap.String("cloud", dbCloud.ResourceTag().Id()),
+			zap.Error(err),
+		)
 	}
 
 	ale.Success = true
@@ -306,13 +347,13 @@ func (j *JIMM) AddCloudToController(ctx context.Context, u *dbmodel.User, contro
 // code of CodeIncompatibleClouds will be returned. If there is an error
 // returned by the controller when creating the cloud then that error code
 // will be preserved.
-func (j *JIMM) AddHostedCloud(ctx context.Context, u *dbmodel.User, tag names.CloudTag, cloud jujuparams.Cloud) error {
+func (j *JIMM) AddHostedCloud(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujuparams.Cloud) error {
 	const op = errors.Op("jimm.AddHostedCloud")
 
 	ale := dbmodel.AuditLogEntry{
 		Time:    time.Now().UTC().Round(time.Millisecond),
 		Tag:     tag.String(),
-		UserTag: u.Tag().String(),
+		UserTag: user.Tag().String(),
 		Action:  "add",
 		Params: dbmodel.StringMap{
 			"type":              cloud.Type,
@@ -325,9 +366,10 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, u *dbmodel.User, tag names.Cl
 		return err
 	}
 
-	if u.ControllerAccess != "login" && u.ControllerAccess != "superuser" {
-		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
-	}
+	// NOTE (alesstimec) The default JIMM access right for every user is
+	// "login". Previously the code checked:
+	//  u.ControllerAccess != "login" && u.ControllerAccess != "superuser"
+	// so this check was removed.
 
 	// Ensure the new cloud could not mask the name of a known public cloud.
 	reservedNames := j.ReservedCloudNames
@@ -358,10 +400,19 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, u *dbmodel.User, tag names.Cl
 		return fail(errors.E(op, err))
 	}
 
-	switch cloudUserAccess(u, &region.Cloud) {
-	case "admin", "add-model":
-	default:
-		return fail(errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion)))
+	allowedAddModel, err := user.IsAllowedAddModel(ctx, region.Cloud.ResourceTag())
+	if err != nil {
+		return fail(errors.E(op, err))
+	}
+	if !allowedAddModel {
+		everyone := openfga.NewUser(&dbmodel.User{Username: auth.Everyone}, j.OpenFGAClient)
+		everyonewAllowedAddModel, err := everyone.IsAllowedAddModel(ctx, region.Cloud.ResourceTag())
+		if err != nil {
+			return fail(errors.E(op, err))
+		}
+		if !everyonewAllowedAddModel {
+			return fail(errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud host region %q", cloud.HostCloudRegion)))
+		}
 	}
 
 	if region.Cloud.HostCloudRegion != "" {
@@ -374,8 +425,9 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, u *dbmodel.User, tag names.Cl
 	var dbCloud dbmodel.Cloud
 	dbCloud.FromJujuCloud(cloud)
 	dbCloud.Name = tag.Id()
+	// NOTE (alesstimec) this will no longer be needed.
 	dbCloud.Users = []dbmodel.UserCloudAccess{{
-		User:   *u,
+		User:   *user.User,
 		Access: "admin",
 	}}
 	if err := j.Database.AddCloud(ctx, &dbCloud); err != nil {
@@ -386,7 +438,7 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, u *dbmodel.User, tag names.Cl
 	shuffleRegionControllers(region.Controllers)
 	controller := region.Controllers[0].Controller
 
-	ccloud, err := j.addControllerCloud(ctx, &controller, u.Tag().(names.UserTag), tag, cloud)
+	ccloud, err := j.addControllerCloud(ctx, &controller, user.ResourceTag(), tag, cloud)
 	if err != nil {
 		// TODO(mhilton) remove the added cloud if adding it to the controller failed.
 		return fail(errors.E(op, err))
@@ -405,6 +457,27 @@ func (j *JIMM) AddHostedCloud(ctx context.Context, u *dbmodel.User, tag names.Cl
 		// controller and we know something about it. Trying to
 		// undo that will probably make things worse.
 		return fail(errors.E(op, err))
+	}
+
+	err = j.OpenFGAClient.AddCloudController(ctx, dbCloud.ResourceTag(), controller.ResourceTag())
+	if err != nil {
+		zapctx.Error(
+			ctx,
+			"failed to add controller relation between controller and cloud",
+			zap.String("controller", controller.ResourceTag().Id()),
+			zap.String("cloud", dbCloud.ResourceTag().Id()),
+			zap.Error(err),
+		)
+	}
+	err = user.SetCloudAccess(ctx, dbCloud.ResourceTag(), ofganames.AdministratorRelation)
+	if err != nil {
+		zapctx.Error(
+			ctx,
+			"failed to add user as cloud admin",
+			zap.String("user", user.Username),
+			zap.String("cloud", dbCloud.ResourceTag().Id()),
+			zap.Error(err),
+		)
 	}
 	ale.Success = true
 	return nil
@@ -445,6 +518,7 @@ func (j *JIMM) addControllerCloud(ctx context.Context, ctl *dbmodel.Controller, 
 	if err := api.AddCloud(ctx, tag, cloud); err != nil {
 		return nil, errors.E(op, err)
 	}
+	// TODO (alesstimec) This will no longer be needed.
 	if err := api.GrantCloudAccess(ctx, tag, ut, "admin"); err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -452,6 +526,7 @@ func (j *JIMM) addControllerCloud(ctx context.Context, ctl *dbmodel.Controller, 
 	if err := api.Cloud(ctx, tag, &result); err != nil {
 		return nil, errors.E(op, err)
 	}
+
 	return &result, nil
 }
 
@@ -467,7 +542,7 @@ func (j *JIMM) addControllerCloud(ctx context.Context, ctl *dbmodel.Controller, 
 // the cloud then the returned error will have the same code as the error
 // returned from the dial operation. If the given function returns an error
 // that error will be returned with the code unmasked.
-func (j *JIMM) doCloudAdmin(ctx context.Context, u *dbmodel.User, ct names.CloudTag, f func(*dbmodel.Cloud, API) error) error {
+func (j *JIMM) doCloudAdmin(ctx context.Context, u *openfga.User, ct names.CloudTag, f func(*dbmodel.Cloud, API) error) error {
 	const op = errors.Op("jimm.doCloudAdmin")
 
 	var c dbmodel.Cloud
@@ -476,7 +551,12 @@ func (j *JIMM) doCloudAdmin(ctx context.Context, u *dbmodel.User, ct names.Cloud
 	if err := j.Database.GetCloud(ctx, &c); err != nil {
 		return errors.E(op, err)
 	}
-	if cloudUserAccess(u, &c) != "admin" {
+
+	isCloudAdministrator, err := openfga.IsAdministrator(ctx, u, c.ResourceTag())
+	if err != nil {
+		return errors.E(op, err)
+	}
+	if !isCloudAdministrator {
 		// If the user doesn't have admin access on the cloud return
 		// an unauthorized error.
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
@@ -506,50 +586,54 @@ func (j *JIMM) doCloudAdmin(ctx context.Context, u *dbmodel.User, ct names.Cloud
 func (j *JIMM) GrantCloudAccess(ctx context.Context, u *dbmodel.User, ct names.CloudTag, ut names.UserTag, access string) error {
 	const op = errors.Op("jimm.GrantCloudAccess")
 
-	ale := dbmodel.AuditLogEntry{
-		Time:    time.Now().UTC().Round(time.Millisecond),
-		Tag:     ct.String(),
-		UserTag: u.Tag().String(),
-		Action:  "grant",
-		Params: dbmodel.StringMap{
-			"user":   ut.String(),
-			"access": access,
-		},
-	}
-	defer j.addAuditLogEntry(&ale)
+	// TODO (alesstimec) granting and revoking access tbd in a followup
+	return errors.E(errors.CodeNotImplemented)
+	/*
+		ale := dbmodel.AuditLogEntry{
+			Time:    time.Now().UTC().Round(time.Millisecond),
+			Tag:     ct.String(),
+			UserTag: u.Tag().String(),
+			Action:  "grant",
+			Params: dbmodel.StringMap{
+				"user":   ut.String(),
+				"access": access,
+			},
+		}
+		defer j.addAuditLogEntry(&ale)
 
-	err := j.doCloudAdmin(ctx, u, ct, func(c *dbmodel.Cloud, api API) error {
-		targetUser := dbmodel.User{
-			Username: ut.Id(),
-		}
-		if err := j.Database.GetUser(ctx, &targetUser); err != nil {
-			return err
-		}
-		if err := api.GrantCloudAccess(ctx, ct, ut, access); err != nil {
-			return err
-		}
-		var uca dbmodel.UserCloudAccess
-		for _, a := range c.Users {
-			if a.Username == targetUser.Username {
-				uca = a
-				break
+		err := j.doCloudAdmin(ctx, u, ct, func(c *dbmodel.Cloud, api API) error {
+			targetUser := dbmodel.User{
+				Username: ut.Id(),
 			}
-		}
-		uca.User = targetUser
-		uca.Cloud = *c
-		uca.Access = access
+			if err := j.Database.GetUser(ctx, &targetUser); err != nil {
+				return err
+			}
+			if err := api.GrantCloudAccess(ctx, ct, ut, access); err != nil {
+				return err
+			}
+			var uca dbmodel.UserCloudAccess
+			for _, a := range c.Users {
+				if a.Username == targetUser.Username {
+					uca = a
+					break
+				}
+			}
+			uca.User = targetUser
+			uca.Cloud = *c
+			uca.Access = access
 
-		if err := j.Database.UpdateUserCloudAccess(ctx, &uca); err != nil {
-			return errors.E(op, err, "cannot update database after updating controller")
+			if err := j.Database.UpdateUserCloudAccess(ctx, &uca); err != nil {
+				return errors.E(op, err, "cannot update database after updating controller")
+			}
+			return nil
+		})
+		if err != nil {
+			ale.Params["err"] = err.Error()
+			return errors.E(op, err)
 		}
+		ale.Success = true
 		return nil
-	})
-	if err != nil {
-		ale.Params["err"] = err.Error()
-		return errors.E(op, err)
-	}
-	ale.Success = true
-	return nil
+	*/
 }
 
 // RevokeCloudAccess revokes the given access level on the given cloud from
@@ -561,55 +645,60 @@ func (j *JIMM) GrantCloudAccess(ctx context.Context, u *dbmodel.User, ct names.C
 func (j *JIMM) RevokeCloudAccess(ctx context.Context, u *dbmodel.User, ct names.CloudTag, ut names.UserTag, access string) error {
 	const op = errors.Op("jimm.RevokeCloudAccess")
 
-	ale := dbmodel.AuditLogEntry{
-		Time:    time.Now().UTC().Round(time.Millisecond),
-		Tag:     ct.String(),
-		UserTag: u.Tag().String(),
-		Action:  "revoke",
-		Params: dbmodel.StringMap{
-			"user":   ut.String(),
-			"access": access,
-		},
-	}
-	defer j.addAuditLogEntry(&ale)
+	// TODO (alesstimec) granting and revoking access tbd in a followup
+	return errors.E(errors.CodeNotImplemented)
 
-	err := j.doCloudAdmin(ctx, u, ct, func(c *dbmodel.Cloud, api API) error {
-		targetUser := dbmodel.User{
-			Username: ut.Id(),
+	/*
+		ale := dbmodel.AuditLogEntry{
+			Time:    time.Now().UTC().Round(time.Millisecond),
+			Tag:     ct.String(),
+			UserTag: u.Tag().String(),
+			Action:  "revoke",
+			Params: dbmodel.StringMap{
+				"user":   ut.String(),
+				"access": access,
+			},
 		}
-		if err := j.Database.GetUser(ctx, &targetUser); err != nil {
-			return err
-		}
-		if err := api.RevokeCloudAccess(ctx, ct, ut, access); err != nil {
-			return err
-		}
-		var uca dbmodel.UserCloudAccess
-		for _, a := range c.Users {
-			if a.Username == targetUser.Username {
-				uca = a
-				break
+		defer j.addAuditLogEntry(&ale)
+
+		err := j.doCloudAdmin(ctx, u, ct, func(c *dbmodel.Cloud, api API) error {
+			targetUser := dbmodel.User{
+				Username: ut.Id(),
 			}
-		}
-		uca.User = targetUser
-		uca.Cloud = *c
-		switch access {
-		case "admin":
-			uca.Access = "add-model"
-		default:
-			uca.Access = ""
-		}
+			if err := j.Database.GetUser(ctx, &targetUser); err != nil {
+				return err
+			}
+			if err := api.RevokeCloudAccess(ctx, ct, ut, access); err != nil {
+				return err
+			}
+			var uca dbmodel.UserCloudAccess
+			for _, a := range c.Users {
+				if a.Username == targetUser.Username {
+					uca = a
+					break
+				}
+			}
+			uca.User = targetUser
+			uca.Cloud = *c
+			switch access {
+			case "admin":
+				uca.Access = "add-model"
+			default:
+				uca.Access = ""
+			}
 
-		if err := j.Database.UpdateUserCloudAccess(ctx, &uca); err != nil {
-			return errors.E(op, err, "cannot update database after updating controller")
+			if err := j.Database.UpdateUserCloudAccess(ctx, &uca); err != nil {
+				return errors.E(op, err, "cannot update database after updating controller")
+			}
+			return nil
+		})
+		if err != nil {
+			ale.Params["err"] = err.Error()
+			return errors.E(op, err)
 		}
+		ale.Success = true
 		return nil
-	})
-	if err != nil {
-		ale.Params["err"] = err.Error()
-		return errors.E(op, err)
-	}
-	ale.Success = true
-	return nil
+	*/
 }
 
 // RemoveCloud removes the given cloud from JAAS If the cloud is not found
@@ -617,7 +706,7 @@ func (j *JIMM) RevokeCloudAccess(ctx context.Context, u *dbmodel.User, ct names.
 // authenticated user does not have admin access to the cloud then an error
 // with the code CodeUnauthorized is returned. If the RemoveClouds API call
 // retuns an error the error code is not masked.
-func (j *JIMM) RemoveCloud(ctx context.Context, u *dbmodel.User, ct names.CloudTag) error {
+func (j *JIMM) RemoveCloud(ctx context.Context, u *openfga.User, ct names.CloudTag) error {
 	const op = errors.Op("jimm.RemoveCloud")
 
 	ale := dbmodel.AuditLogEntry{
@@ -641,6 +730,10 @@ func (j *JIMM) RemoveCloud(ctx context.Context, u *dbmodel.User, ct names.CloudT
 		if err := j.Database.DeleteCloud(ctx, c); err != nil {
 			return errors.E(op, err, "cannot update database after updating controller")
 		}
+
+		if err := j.OpenFGAClient.RemoveCloud(ctx, ct); err != nil {
+			zapctx.Error(ctx, "failed to remove cloud from openfga", zap.String("cloud", ct.Id()), zap.Error(err))
+		}
 		return nil
 	})
 	if err != nil {
@@ -656,7 +749,7 @@ func (j *JIMM) RemoveCloud(ctx context.Context, u *dbmodel.User, ct names.CloudT
 // an admin on the cloud an error is returned with a code of
 // CodeUnauthorized. If the cloud with the given name cannot be found then
 // an error with the code CodeNotFound is returned.
-func (j *JIMM) UpdateCloud(ctx context.Context, u *dbmodel.User, ct names.CloudTag, cloud jujuparams.Cloud) error {
+func (j *JIMM) UpdateCloud(ctx context.Context, u *openfga.User, ct names.CloudTag, cloud jujuparams.Cloud) error {
 	const op = errors.Op("jimm.UpdateCloud")
 
 	ale := dbmodel.AuditLogEntry{
@@ -677,7 +770,11 @@ func (j *JIMM) UpdateCloud(ctx context.Context, u *dbmodel.User, ct names.CloudT
 	if err := j.Database.GetCloud(ctx, &c); err != nil {
 		return fail(errors.E(op, err))
 	}
-	if cloudUserAccess(u, &c) != "admin" {
+	cloudAccess, err := j.getUserCloudAccess(ctx, u, c.ResourceTag())
+	if err != nil {
+		return fail(errors.E(op, err))
+	}
+	if cloudAccess != "admin" {
 		// If the user doesn't have admin access on the cloud return
 		// an unauthorized error.
 		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
@@ -695,7 +792,7 @@ func (j *JIMM) UpdateCloud(ctx context.Context, u *dbmodel.User, ct names.CloudT
 		}
 	}
 
-	err := j.forEachController(ctx, controllers, func(ctl *dbmodel.Controller, api API) error {
+	err = j.forEachController(ctx, controllers, func(ctl *dbmodel.Controller, api API) error {
 		return api.UpdateCloud(ctx, ct, cloud)
 	})
 	if err != nil {
@@ -738,7 +835,7 @@ func (j *JIMM) UpdateCloud(ctx context.Context, u *dbmodel.User, ct names.CloudT
 // CodeNotFound is returned. If the authenticated user does not have admin
 // access to the cloud then an error with the code CodeUnauthorized is returned.
 // If the RemoveClouds API call retuns an error the error code is not masked.
-func (j *JIMM) RemoveCloudFromController(ctx context.Context, u *dbmodel.User, controllerName string, ct names.CloudTag) error {
+func (j *JIMM) RemoveCloudFromController(ctx context.Context, u *openfga.User, controllerName string, ct names.CloudTag) error {
 	const op = errors.Op("jimm.RemoveCloudFromController")
 
 	ale := dbmodel.AuditLogEntry{
@@ -764,7 +861,12 @@ func (j *JIMM) RemoveCloudFromController(ctx context.Context, u *dbmodel.User, c
 	if err := j.Database.GetCloud(ctx, &cloud); err != nil {
 		return fail(errors.E(op, err))
 	}
-	if cloudUserAccess(u, &cloud) != "admin" {
+
+	isAdministrator, err := openfga.IsAdministrator(ctx, u, ct)
+	if err != nil {
+		return fail(errors.E(op, err, errors.CodeUnauthorized, "unauthorized"))
+	}
+	if !isAdministrator {
 		// If the user doesn't have admin access on the cloud return
 		// an unauthorized error.
 		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
@@ -779,7 +881,6 @@ func (j *JIMM) RemoveCloudFromController(ctx context.Context, u *dbmodel.User, c
 
 	controller, ok := controllers[controllerName]
 	if !ok {
-		zapctx.Error(ctx, "controller not found", zap.String("controller", controllerName))
 		return fail(errors.E(op, "cloud not hosted by controller", errors.CodeNotFound))
 	}
 
@@ -817,6 +918,10 @@ func (j *JIMM) RemoveCloudFromController(ctx context.Context, u *dbmodel.User, c
 				return fail(errors.E(op, err, "cannot update database after updating controller"))
 			}
 		}
+	}
+
+	if err := j.OpenFGAClient.RemoveCloud(ctx, ct); err != nil {
+		zapctx.Error(ctx, "failed to remove cloud", zap.String("cloud", ct.String()), zap.Error(err))
 	}
 
 	ale.Success = true

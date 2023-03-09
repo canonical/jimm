@@ -56,6 +56,14 @@ type Cloud struct {
 
 // Tag returns a names.Tag for this cloud.
 func (c Cloud) Tag() names.Tag {
+	return c.ResourceTag()
+}
+
+// ResourceTag returns a tag for this cloud.  This method
+// is intended to be used in places where we expect to see
+// a concrete type names.CloudTag instead of the
+// names.Tag interface.
+func (c Cloud) ResourceTag() names.CloudTag {
 	return names.NewCloudTag(c.Name)
 }
 

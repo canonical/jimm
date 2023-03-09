@@ -574,7 +574,7 @@ func TestWatcher(t *testing.T) {
 			env := jimmtest.ParseEnvironment(c, testWatcherEnv)
 			err := w.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
-			env.PopulateDB(c, w.Database)
+			env.PopulateDB(c, w.Database, nil)
 
 			if test.initDB != nil {
 				test.initDB(c, w.Database)
@@ -725,7 +725,7 @@ func TestModelSummaryWatcher(t *testing.T) {
 			env := jimmtest.ParseEnvironment(c, testWatcherEnv)
 			err := w.Database.Migrate(ctx, false)
 			c.Assert(err, qt.IsNil)
-			env.PopulateDB(c, w.Database)
+			env.PopulateDB(c, w.Database, nil)
 
 			var wg sync.WaitGroup
 			wg.Add(1)
@@ -771,7 +771,7 @@ func TestWatcherSetsControllerUnavailable(t *testing.T) {
 	env := jimmtest.ParseEnvironment(c, testWatcherEnv)
 	err := w.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
-	env.PopulateDB(c, w.Database)
+	env.PopulateDB(c, w.Database, nil)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -835,7 +835,7 @@ func TestWatcherRemoveDyingModelsOnStartup(t *testing.T) {
 	env := jimmtest.ParseEnvironment(c, testWatcherEnv)
 	err := w.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
-	env.PopulateDB(c, w.Database)
+	env.PopulateDB(c, w.Database, nil)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -937,7 +937,7 @@ func TestWatcherIgnoreDeltasForModelsFromIncorrectController(t *testing.T) {
 	env := jimmtest.ParseEnvironment(c, testWatcherIgnoreDeltasForModelsFromIncorrectControllerEnv)
 	err := w.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
-	env.PopulateDB(c, w.Database)
+	env.PopulateDB(c, w.Database, nil)
 
 	m1 := dbmodel.Model{
 		UUID: sql.NullString{
@@ -1106,9 +1106,9 @@ func TestPollControllerModel(t *testing.T) {
 	env := jimmtest.ParseEnvironment(c, pollControllerModelEnv)
 	err := w.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
-	env.PopulateDB(c, w.Database)
+	env.PopulateDB(c, w.Database, nil)
 
-	ctl := env.Controller("controller-1").DBObject(c, w.Database)
+	ctl := env.Controller("controller-1").DBObject(c, w.Database, nil)
 	w.PollControllerModels(ctx, &ctl)
 
 	m1 := dbmodel.Model{

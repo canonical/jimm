@@ -11,6 +11,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/CanonicalLtd/jimm/internal/openfga"
 )
 
 // Authenticate processes the given LoginRequest using the configured
@@ -20,7 +21,7 @@ import (
 // details. If the authenticator returns a user with ControllerAccess set
 // to "superuser" then the authenticated user will be considered a
 // superuser for this session, this will not be persisted.
-func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*dbmodel.User, error) {
+func (j *JIMM) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*openfga.User, error) {
 	const op = errors.Op("jimm.Authenticate")
 	if j == nil || j.Authenticator == nil {
 		return nil, errors.E(op, errors.CodeServerConfiguration, "authenticator not configured")

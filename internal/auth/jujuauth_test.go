@@ -19,10 +19,14 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 )
 
 func TestAuthenticateLogin(t *testing.T) {
 	c := qt.New(t)
+
+	_, ofgaclient, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
 
 	discharger := bakerytest.NewDischarger(nil)
 	c.Cleanup(discharger.Close)
@@ -32,6 +36,7 @@ func TestAuthenticateLogin(t *testing.T) {
 		},
 	)
 	authenticator := auth.JujuAuthenticator{
+		Client: ofgaclient,
 		Bakery: identchecker.NewBakery(identchecker.BakeryParams{
 			Locator:        discharger,
 			Key:            bakery.MustGenerateKey(),
@@ -54,7 +59,7 @@ func TestAuthenticateLogin(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Check(u.LastLogin.Valid, qt.Equals, false)
 	u.LastLogin = sql.NullTime{}
-	c.Check(u, qt.DeepEquals, &dbmodel.User{
+	c.Check(u.User, qt.DeepEquals, &dbmodel.User{
 		Username:    "alice@external",
 		DisplayName: "alice",
 	})
@@ -62,6 +67,9 @@ func TestAuthenticateLogin(t *testing.T) {
 
 func TestAuthenticateLoginWithDomain(t *testing.T) {
 	c := qt.New(t)
+
+	_, ofgaclient, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
 
 	discharger := bakerytest.NewDischarger(nil)
 	c.Cleanup(discharger.Close)
@@ -71,6 +79,7 @@ func TestAuthenticateLoginWithDomain(t *testing.T) {
 		},
 	)
 	authenticator := auth.JujuAuthenticator{
+		Client: ofgaclient,
 		Bakery: identchecker.NewBakery(identchecker.BakeryParams{
 			Locator:        discharger,
 			Key:            bakery.MustGenerateKey(),
@@ -93,7 +102,7 @@ func TestAuthenticateLoginWithDomain(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Check(u.LastLogin.Valid, qt.Equals, false)
 	u.LastLogin = sql.NullTime{}
-	c.Check(u, qt.DeepEquals, &dbmodel.User{
+	c.Check(u.User, qt.DeepEquals, &dbmodel.User{
 		Username:    "alice@mydomain",
 		DisplayName: "alice",
 	})
@@ -101,6 +110,9 @@ func TestAuthenticateLoginWithDomain(t *testing.T) {
 
 func TestAuthenticateLoginSuperuser(t *testing.T) {
 	c := qt.New(t)
+
+	_, ofgaclient, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
 
 	discharger := bakerytest.NewDischarger(nil)
 	c.Cleanup(discharger.Close)
@@ -110,6 +122,7 @@ func TestAuthenticateLoginSuperuser(t *testing.T) {
 		},
 	)
 	authenticator := auth.JujuAuthenticator{
+		Client: ofgaclient,
 		Bakery: identchecker.NewBakery(identchecker.BakeryParams{
 			Locator:        discharger,
 			Key:            bakery.MustGenerateKey(),
@@ -133,7 +146,7 @@ func TestAuthenticateLoginSuperuser(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Check(u.LastLogin.Valid, qt.Equals, false)
 	u.LastLogin = sql.NullTime{}
-	c.Check(u, qt.DeepEquals, &dbmodel.User{
+	c.Check(u.User, qt.DeepEquals, &dbmodel.User{
 		Username:         "bob@external",
 		DisplayName:      "bob",
 		ControllerAccess: "superuser",
@@ -143,6 +156,9 @@ func TestAuthenticateLoginSuperuser(t *testing.T) {
 func TestAuthenticateLoginInvalidUsernameDeclared(t *testing.T) {
 	c := qt.New(t)
 
+	_, ofgaclient, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
+
 	discharger := bakerytest.NewDischarger(nil)
 	c.Cleanup(discharger.Close)
 	discharger.CheckerP = httpbakery.ThirdPartyCaveatCheckerPFunc(
@@ -151,6 +167,7 @@ func TestAuthenticateLoginInvalidUsernameDeclared(t *testing.T) {
 		},
 	)
 	authenticator := auth.JujuAuthenticator{
+		Client: ofgaclient,
 		Bakery: identchecker.NewBakery(identchecker.BakeryParams{
 			Locator:        discharger,
 			Key:            bakery.MustGenerateKey(),

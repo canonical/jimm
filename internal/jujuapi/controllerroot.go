@@ -13,6 +13,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
+	"github.com/CanonicalLtd/jimm/internal/openfga"
 )
 
 // controllerRoot is the root for endpoints served on controller connections.
@@ -26,10 +27,9 @@ type controllerRoot struct {
 
 	// mu protects the fields below it
 	mu                    sync.Mutex
-	user                  *dbmodel.User
+	user                  *openfga.User
 	controllerUUIDMasking bool
 	generator             *fastuuid.Generator
-	ofgaClient            jimm.ReBACClient
 }
 
 func newControllerRoot(j *jimm.JIMM, p Params) *controllerRoot {
@@ -42,13 +42,6 @@ func newControllerRoot(j *jimm.JIMM, p Params) *controllerRoot {
 		watchers:              watcherRegistry,
 		pingF:                 func() {},
 		controllerUUIDMasking: true,
-	}
-	//TODO: (Kian/Alex): The below is not doing anything, if the client OpenFGAClient is nil then r.ofgaClient will remain as a nil value.
-	//Add an else{} to log a warning? Where would we log to.
-	if j != nil && j.OpenFGAClient != nil {
-		r.ofgaClient = j.OpenFGAClient
-	} else {
-		//panic("OpenFGA not setup")
 	}
 
 	r.AddMethod("Admin", 1, "Login", rpc.Method(unsupportedLogin))
@@ -63,7 +56,7 @@ func newControllerRoot(j *jimm.JIMM, p Params) *controllerRoot {
 // controller user and that the requested is a valid JAAS user. If these
 // conditions are met then masquarade returns a replacement user to use in
 // JIMM requests.
-func (r *controllerRoot) masquerade(ctx context.Context, userTag string) (*dbmodel.User, error) {
+func (r *controllerRoot) masquerade(ctx context.Context, userTag string) (*openfga.User, error) {
 	ut, err := parseUserTag(userTag)
 	if err != nil {
 		return nil, errors.E(errors.CodeBadRequest, err)
@@ -81,7 +74,7 @@ func (r *controllerRoot) masquerade(ctx context.Context, userTag string) (*dbmod
 	if err := r.jimm.Database.GetUser(ctx, &user); err != nil {
 		return nil, err
 	}
-	return &user, nil
+	return openfga.NewUser(&user, r.jimm.OpenFGAClient), nil
 }
 
 // parseUserTag parses a names.UserTag and validates it is for an

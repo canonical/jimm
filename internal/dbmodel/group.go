@@ -3,7 +3,7 @@
 package dbmodel
 
 import (
-	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/juju/names/v4"
@@ -39,5 +39,13 @@ func (GroupEntry) TableName() string {
 
 // Tag implements the names.Tag interface.
 func (g *GroupEntry) Tag() names.Tag {
-	return jimmnames.NewGroupTag(fmt.Sprintf("%d", g.ID))
+	return g.ResourceTag()
+}
+
+// ResourceTag returns a tag for this group. This method
+// is intended to be used in places where we expect to see
+// a concrete type names.GroupTag instead of the
+// names.Tag interface.
+func (g *GroupEntry) ResourceTag() jimmnames.GroupTag {
+	return jimmnames.NewGroupTag(strconv.Itoa(int(g.ID)))
 }

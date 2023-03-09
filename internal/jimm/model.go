@@ -19,6 +19,8 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/CanonicalLtd/jimm/internal/openfga"
+	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 )
 
 // shuffle is used to randomize the order in which possible controllers
@@ -530,7 +532,7 @@ func (b *modelBuilder) JujuModelInfo() *jujuparams.ModelInfo {
 }
 
 // AddModel adds the specified model to JIMM.
-func (j *JIMM) AddModel(ctx context.Context, u *dbmodel.User, args *ModelCreateArgs) (_ *jujuparams.ModelInfo, err error) {
+func (j *JIMM) AddModel(ctx context.Context, u *openfga.User, args *ModelCreateArgs) (_ *jujuparams.ModelInfo, err error) {
 	const op = errors.Op("jimm.AddModel")
 
 	ale := dbmodel.AuditLogEntry{
@@ -556,7 +558,14 @@ func (j *JIMM) AddModel(ctx context.Context, u *dbmodel.User, args *ModelCreateA
 		return fail(errors.E(op, err))
 	}
 
-	if owner.Username != u.Username && u.ControllerAccess != "superuser" {
+	isControllerAdmin, err := openfga.IsAdministrator(ctx, u, j.ResourceTag())
+	if err != nil {
+		zapctx.Error(ctx, "failed to check for controller admin access", zap.Error(err))
+		return fail(errors.E(op, err))
+	}
+
+	// Only JIMM admins are able to add models on behalf of other users.
+	if owner.Username != u.Username && !isControllerAdmin {
 		return fail(errors.E(op, errors.CodeUnauthorized, "unauthorized"))
 	}
 
@@ -568,7 +577,7 @@ func (j *JIMM) AddModel(ctx context.Context, u *dbmodel.User, args *ModelCreateA
 	}
 
 	// fetch user model defaults
-	userConfig, err := j.UserModelDefaults(ctx, u)
+	userConfig, err := j.UserModelDefaults(ctx, u.User)
 	if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
 		return fail(errors.E(op, "failed to fetch cloud defaults"))
 	}
@@ -645,24 +654,31 @@ func (j *JIMM) AddModel(ctx context.Context, u *dbmodel.User, args *ModelCreateA
 		return fail(errors.E(op, err))
 	}
 
-	if j.OpenFGAClient != nil {
-		if err := j.OpenFGAClient.AddControllerModel(
-			ctx,
-			builder.controller.Tag().(names.ControllerTag),
-			builder.model.Tag().(names.ModelTag),
-		); err != nil {
-			zapctx.Error(
-				ctx,
-				"failed to add controller-model relation",
-				zap.String("controller", builder.controller.UUID),
-				zap.String("model", builder.model.UUID.String),
-			)
-		}
-	}
-
 	mi := builder.JujuModelInfo()
 	ale.Tag = names.NewModelTag(mi.UUID).String()
 	ale.Success = true
+
+	if err := j.OpenFGAClient.AddControllerModel(
+		ctx,
+		builder.controller.ResourceTag(),
+		builder.model.ResourceTag(),
+	); err != nil {
+		zapctx.Error(
+			ctx,
+			"failed to add controller-model relation",
+			zap.String("controller", builder.controller.UUID),
+			zap.String("model", builder.model.UUID.String),
+		)
+	}
+	err = openfga.NewUser(&owner, j.OpenFGAClient).SetModelAccess(ctx, names.NewModelTag(mi.UUID), ofganames.AdministratorRelation)
+	if err != nil {
+		zapctx.Error(
+			ctx,
+			"failed to add administrator relation",
+			zap.String("user", owner.Tag().String()),
+			zap.String("model", builder.model.UUID.String),
+		)
+	}
 
 	return mi, nil
 }
@@ -673,7 +689,7 @@ func (j *JIMM) AddModel(ctx context.Context, u *dbmodel.User, args *ModelCreateA
 // error will have the code CodeNotFound. If the given user does not have
 // access to the model then the returned error will have the code
 // CodeUnauthorized.
-func (j *JIMM) ModelInfo(ctx context.Context, u *dbmodel.User, mt names.ModelTag) (*jujuparams.ModelInfo, error) {
+func (j *JIMM) ModelInfo(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error) {
 	const op = errors.Op("jimm.ModelInfo")
 
 	var m dbmodel.Model
@@ -682,11 +698,10 @@ func (j *JIMM) ModelInfo(ctx context.Context, u *dbmodel.User, mt names.ModelTag
 		return nil, errors.E(op, err)
 	}
 
-	modelAccess := m.UserAccess(u)
-	if u.ControllerAccess == "superuser" {
-		modelAccess = "admin"
+	modelAccess, err := j.getUserModelAccess(ctx, u, mt)
+	if err != nil {
+		return nil, errors.E(op, err)
 	}
-
 	if modelAccess == "" {
 		// If the user doesn't have any access on the model return an
 		// unauthorized error
@@ -706,18 +721,48 @@ func (j *JIMM) ModelInfo(ctx context.Context, u *dbmodel.User, mt names.ModelTag
 		return nil, errors.E(op, err)
 	}
 
-	users := make([]jujuparams.ModelUserInfo, 0, len(mi.Users))
-	for i := range mi.Users {
-		if !strings.Contains(mi.Users[i].UserName, "@") {
+	userAccess := make(map[string]string)
+
+	for _, relation := range []ofganames.Relation{
+		// Here we list possible relation in decreasing level
+		// of access privilege.
+		ofganames.AdministratorRelation,
+		ofganames.WriterRelation,
+		ofganames.ReaderRelation,
+	} {
+		usersWithSpecifiedRelation, err := openfga.ListUsersWithAccess(ctx, j.OpenFGAClient, mt, relation)
+		if err != nil {
+			return nil, errors.E(op, err)
+		}
+		for _, user := range usersWithSpecifiedRelation {
+			// Since we are checking user relations in decreasing level of
+			// access privilege, we want to make sure the user has not
+			// already been recorded with a higher access level.
+			if _, ok := userAccess[user.Username]; !ok {
+				userAccess[user.Username] = ToModelAccessString(relation)
+			}
+		}
+	}
+
+	users := make([]jujuparams.ModelUserInfo, 0, len(userAccess))
+	for username, access := range userAccess {
+		// If the user does not contain an "@" sign (no domain), it means
+		// this is a local user of this controller and JIMM does not
+		// care or know about local users - only Candid users are
+		// relevant.
+		if !strings.Contains(username, "@") {
 			continue
 		}
-		if u.ControllerAccess == "superuser" || modelAccess == "admin" || mi.Users[i].UserName == u.Username {
-			users = append(users, mi.Users[i])
+		if modelAccess == "admin" || username == u.Username {
+			users = append(users, jujuparams.ModelUserInfo{
+				UserName: username,
+				Access:   jujuparams.UserAccessPermission(access),
+			})
 		}
 	}
 	mi.Users = users
 
-	if u.ControllerAccess != "superuser" && modelAccess != "admin" && modelAccess != "write" {
+	if modelAccess != "admin" && modelAccess != "write" {
 		// Users need "write" level access (or above) to see machine
 		// information.
 		mi.Machines = nil
@@ -730,7 +775,7 @@ func (j *JIMM) ModelInfo(ctx context.Context, u *dbmodel.User, mt names.ModelTag
 // the model doesn't exist then the returned error will have the code
 // CodeNotFound, If the given user does not have admin access to the model
 // then the returned error will have the code CodeUnauthorized.
-func (j *JIMM) ModelStatus(ctx context.Context, u *dbmodel.User, mt names.ModelTag) (*jujuparams.ModelStatus, error) {
+func (j *JIMM) ModelStatus(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelStatus, error) {
 	const op = errors.Op("jimm.ModelStatus")
 
 	var ms jujuparams.ModelStatus
@@ -753,25 +798,39 @@ func (j *JIMM) ModelStatus(ctx context.Context, u *dbmodel.User, mt names.ModelT
 // the system. If the given function returns an error the error will be
 // returned unmodified and iteration will stop immediately. The given
 // function should not update the database.
-func (j *JIMM) ForEachUserModel(ctx context.Context, u *dbmodel.User, f func(*dbmodel.UserModelAccess) error) error {
+func (j *JIMM) ForEachUserModel(ctx context.Context, u *openfga.User, f func(*dbmodel.UserModelAccess) error) error {
 	const op = errors.Op("jimm.ForEachUserModel")
 
-	models, err := j.Database.GetUserModels(ctx, u)
-	if err != nil {
+	errStop := errors.E("stop")
+	var iterErr error
+	err := j.Database.ForEachModel(ctx, func(m *dbmodel.Model) error {
+		model := *m
+
+		access, err := j.getUserModelAccess(ctx, u, model.ResourceTag())
+		if err != nil {
+			return errors.E(op, err)
+		}
+		if access == "read" || access == "write" || access == "admin" {
+			uma := dbmodel.UserModelAccess{
+				Access: access,
+				Model_: model,
+			}
+			if err := f(&uma); err != nil {
+				iterErr = err
+				return errStop
+			}
+			return nil
+		}
+		return nil
+	})
+	switch err {
+	case nil:
+		return nil
+	case errStop:
+		return iterErr
+	default:
 		return errors.E(op, err)
 	}
-
-	for _, m := range models {
-		switch m.Access {
-		default:
-			continue
-		case "read", "write", "admin":
-		}
-		if err := f(&m); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // ForEachModel calls the given function once for each model in the system.
@@ -781,16 +840,20 @@ func (j *JIMM) ForEachUserModel(ctx context.Context, u *dbmodel.User, f func(*db
 // the user is not a controller admin. If the given function returns an
 // error the error will be returned unmodified and iteration will stop
 // immediately. The given function should not update the database.
-func (j *JIMM) ForEachModel(ctx context.Context, u *dbmodel.User, f func(*dbmodel.UserModelAccess) error) error {
-	const op = errors.Op("jimm.ForEachUserModel")
+func (j *JIMM) ForEachModel(ctx context.Context, u *openfga.User, f func(*dbmodel.UserModelAccess) error) error {
+	const op = errors.Op("jimm.ForEachModel")
 
-	if u.ControllerAccess != "superuser" {
+	isControllerAdmin, err := openfga.IsAdministrator(ctx, u, j.ResourceTag())
+	if err != nil {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+	if !isControllerAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	errStop := errors.E("stop")
 	var iterErr error
-	err := j.Database.ForEachModel(ctx, func(m *dbmodel.Model) error {
+	err = j.Database.ForEachModel(ctx, func(m *dbmodel.Model) error {
 		uma := dbmodel.UserModelAccess{
 			Access: "admin",
 			Model_: *m,
@@ -820,51 +883,57 @@ func (j *JIMM) ForEachModel(ctx context.Context, u *dbmodel.User, f func(*dbmode
 func (j *JIMM) GrantModelAccess(ctx context.Context, u *dbmodel.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
 	const op = errors.Op("jimm.GrantModelAccess")
 
-	ale := dbmodel.AuditLogEntry{
-		Time:    time.Now().UTC().Round(time.Millisecond),
-		Tag:     mt.String(),
-		UserTag: u.Tag().String(),
-		Action:  "grant",
-		Params: dbmodel.StringMap{
-			"user":   ut.String(),
-			"access": string(access),
-		},
-	}
-	defer j.addAuditLogEntry(&ale)
+	// TODO (alesstimec) granting and revoking access tbd in a followup
+	return errors.E(errors.CodeNotImplemented)
+	/*
+	   	ale := dbmodel.AuditLogEntry{
+	   		Time:    time.Now().UTC().Round(time.Millisecond),
+	   		Tag:     mt.String(),
+	   		UserTag: u.Tag().String(),
+	   		Action:  "grant",
+	   		Params: dbmodel.StringMap{
+	   			"user":   ut.String(),
+	   			"access": string(access),
+	   		},
+	   	}
 
-	err := j.doModelAdmin(ctx, u, mt, func(m *dbmodel.Model, api API) error {
-		targetUser := dbmodel.User{
-			Username: ut.Id(),
-		}
-		if err := j.Database.GetUser(ctx, &targetUser); err != nil {
-			return err
-		}
-		if err := api.GrantModelAccess(ctx, mt, ut, access); err != nil {
-			return err
-		}
-		var uma dbmodel.UserModelAccess
-		for _, a := range m.Users {
-			if a.Username == targetUser.Username {
-				uma = a
-				break
-			}
-		}
-		uma.User = targetUser
-		uma.Model_ = *m
-		uma.Access = string(access)
+	   defer j.addAuditLogEntry(&ale)
 
-		if err := j.Database.UpdateUserModelAccess(ctx, &uma); err != nil {
-			return errors.E(op, err, "cannot update database after updating controller")
-		}
-		return nil
-	})
-	if err != nil {
-		ale.Params["err"] = err.Error()
-		return errors.E(op, err)
-	}
-	ale.Success = true
-	return nil
+	   	err := j.doModelAdmin(ctx, u, mt, func(m *dbmodel.Model, api API) error {
+	   		targetUser := dbmodel.User{
+	   			Username: ut.Id(),
+	   		}
+	   		if err := j.Database.GetUser(ctx, &targetUser); err != nil {
+	   			return err
+	   		}
+	   		if err := api.GrantModelAccess(ctx, mt, ut, access); err != nil {
+	   			return err
+	   		}
+	   		var uma dbmodel.UserModelAccess
+	   		for _, a := range m.Users {
+	   			if a.Username == targetUser.Username {
+	   				uma = a
+	   				break
+	   			}
+	   		}
+	   		uma.User = targetUser
+	   		uma.Model_ = *m
+	   		uma.Access = string(access)
 
+	   		if err := j.Database.UpdateUserModelAccess(ctx, &uma); err != nil {
+	   			return errors.E(op, err, "cannot update database after updating controller")
+	   		}
+	   		return nil
+	   	})
+
+	   	if err != nil {
+	   		ale.Params["err"] = err.Error()
+	   		return errors.E(op, err)
+	   	}
+
+	   ale.Success = true
+	   return nil
+	*/
 }
 
 // RevokeModelAccess revokes the given access level on the given model from
@@ -876,69 +945,73 @@ func (j *JIMM) GrantModelAccess(ctx context.Context, u *dbmodel.User, mt names.M
 func (j *JIMM) RevokeModelAccess(ctx context.Context, u *dbmodel.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
 	const op = errors.Op("jimm.RevokeModelAccess")
 
-	ale := dbmodel.AuditLogEntry{
-		Time:    time.Now().UTC().Round(time.Millisecond),
-		Tag:     mt.String(),
-		UserTag: u.Tag().String(),
-		Action:  "revoke",
-		Params: dbmodel.StringMap{
-			"user":   ut.String(),
-			"access": string(access),
-		},
-	}
-	defer j.addAuditLogEntry(&ale)
+	// TODO (alesstimec) granting and revoking access tbd in a followup
+	return errors.E(errors.CodeNotImplemented)
+	/*
+		ale := dbmodel.AuditLogEntry{
+			Time:    time.Now().UTC().Round(time.Millisecond),
+			Tag:     mt.String(),
+			UserTag: u.Tag().String(),
+			Action:  "revoke",
+			Params: dbmodel.StringMap{
+				"user":   ut.String(),
+				"access": string(access),
+			},
+		}
+		defer j.addAuditLogEntry(&ale)
 
-	requiredAccess := "admin"
-	if u.Tag() == ut {
-		// If the user is attempting to revoke their own access.
-		requiredAccess = "read"
-	}
-	err := j.doModel(ctx, u, mt, requiredAccess, func(m *dbmodel.Model, api API) error {
-		targetUser := dbmodel.User{
-			Username: ut.Id(),
+		requiredAccess := "admin"
+		if u.Tag() == ut {
+			// If the user is attempting to revoke their own access.
+			requiredAccess = "read"
 		}
-		if err := j.Database.GetUser(ctx, &targetUser); err != nil {
-			return err
-		}
-		if err := api.RevokeModelAccess(ctx, mt, ut, access); err != nil {
-			return err
-		}
-		var uma dbmodel.UserModelAccess
-		for _, a := range m.Users {
-			if a.Username == targetUser.Username {
-				uma = a
-				break
+		err := j.doModel(ctx, u, mt, requiredAccess, func(m *dbmodel.Model, api API) error {
+			targetUser := dbmodel.User{
+				Username: ut.Id(),
 			}
-		}
-		uma.User = targetUser
-		uma.Model_ = *m
-		switch access {
-		case "admin":
-			uma.Access = "write"
-		case "write":
-			uma.Access = "read"
-		default:
-			uma.Access = ""
-		}
+			if err := j.Database.GetUser(ctx, &targetUser); err != nil {
+				return err
+			}
+			if err := api.RevokeModelAccess(ctx, mt, ut, access); err != nil {
+				return err
+			}
+			var uma dbmodel.UserModelAccess
+			for _, a := range m.Users {
+				if a.Username == targetUser.Username {
+					uma = a
+					break
+				}
+			}
+			uma.User = targetUser
+			uma.Model_ = *m
+			switch access {
+			case "admin":
+				uma.Access = "write"
+			case "write":
+				uma.Access = "read"
+			default:
+				uma.Access = ""
+			}
 
-		if err := j.Database.UpdateUserModelAccess(ctx, &uma); err != nil {
-			return errors.E(op, err, "cannot update database after updating controller")
+			if err := j.Database.UpdateUserModelAccess(ctx, &uma); err != nil {
+				return errors.E(op, err, "cannot update database after updating controller")
+			}
+			return nil
+		})
+		if err != nil {
+			ale.Params["err"] = err.Error()
+			return errors.E(op, err)
 		}
+		ale.Success = true
 		return nil
-	})
-	if err != nil {
-		ale.Params["err"] = err.Error()
-		return errors.E(op, err)
-	}
-	ale.Success = true
-	return nil
+	*/
 }
 
 // DestroyModel starts the process of destroying the given model. If the
 // given user is not a controller superuser or a model admin an error
 // with a code of CodeUnauthorized is returned. Any error returned from
 // the juju API will not have it's code masked.
-func (j *JIMM) DestroyModel(ctx context.Context, u *dbmodel.User, mt names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
+func (j *JIMM) DestroyModel(ctx context.Context, u *openfga.User, mt names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
 	const op = errors.Op("jimm.DestroyModel")
 
 	ale := dbmodel.AuditLogEntry{
@@ -957,7 +1030,6 @@ func (j *JIMM) DestroyModel(ctx context.Context, u *dbmodel.User, mt names.Model
 		ale.Params["force"] = strconv.FormatBool(*force)
 	}
 
-	var model names.ModelTag
 	err := j.doModelAdmin(ctx, u, mt, func(m *dbmodel.Model, api API) error {
 		if err := api.DestroyModel(ctx, mt, destroyStorage, force, maxWait, timeout); err != nil {
 			return err
@@ -968,7 +1040,6 @@ func (j *JIMM) DestroyModel(ctx context.Context, u *dbmodel.User, mt names.Model
 			// monitor should catch it.
 			zapctx.Error(ctx, "failed to store model change", zaputil.Error(err))
 		}
-		model = m.Tag().(names.ModelTag)
 		return nil
 	})
 	if err != nil {
@@ -977,9 +1048,11 @@ func (j *JIMM) DestroyModel(ctx context.Context, u *dbmodel.User, mt names.Model
 	}
 	ale.Success = true
 
-	if j.OpenFGAClient != nil && model.Id() != "" {
-		j.OpenFGAClient.RemoveModel(ctx, model)
-	}
+	// NOTE (alesstimec) If we remove OpenFGA relation now, the user
+	// will no longer be authorised to check for model status (which
+	// will show the model as dying for a bit, until the Juju controller
+	// completes the model destuction).
+
 	return nil
 }
 
@@ -987,7 +1060,7 @@ func (j *JIMM) DestroyModel(ctx context.Context, u *dbmodel.User, mt names.Model
 // juju controller. If simplified is true a simpllified dump is requested.
 // If the given user is not a controller superuser or a model admin an
 // error with the code CodeUnauthorized is returned.
-func (j *JIMM) DumpModel(ctx context.Context, u *dbmodel.User, mt names.ModelTag, simplified bool) (string, error) {
+func (j *JIMM) DumpModel(ctx context.Context, u *openfga.User, mt names.ModelTag, simplified bool) (string, error) {
 	const op = errors.Op("jimm.DumpModel")
 
 	var dump string
@@ -1005,7 +1078,7 @@ func (j *JIMM) DumpModel(ctx context.Context, u *dbmodel.User, mt names.ModelTag
 // DumpModelDB retrieves a database dump of the given model from its juju
 // controller. If the given user is not a controller superuser or a model
 // admin an error with the code CodeUnauthorized is returned.
-func (j *JIMM) DumpModelDB(ctx context.Context, u *dbmodel.User, mt names.ModelTag) (map[string]interface{}, error) {
+func (j *JIMM) DumpModelDB(ctx context.Context, u *openfga.User, mt names.ModelTag) (map[string]interface{}, error) {
 	const op = errors.Op("jimm.DumpModelDB")
 
 	var dump map[string]interface{}
@@ -1025,8 +1098,8 @@ func (j *JIMM) DumpModelDB(ctx context.Context, u *dbmodel.User, mt names.ModelT
 // admin then an error with the code CodeUnauthorized is returned. Any
 // error returned from the API will have the code maintained therefore if
 // the controller doesn't support the ValidateModelUpgrades command the
-// CodeNotImplemented error code will be propergated back to the client.
-func (j *JIMM) ValidateModelUpgrade(ctx context.Context, u *dbmodel.User, mt names.ModelTag, force bool) error {
+// CodeNotImplemented error code will be propagated back to the client.
+func (j *JIMM) ValidateModelUpgrade(ctx context.Context, u *openfga.User, mt names.ModelTag, force bool) error {
 	const op = errors.Op("jimm.ValidateModelUpgrade")
 
 	err := j.doModelAdmin(ctx, u, mt, func(_ *dbmodel.Model, api API) error {
@@ -1050,11 +1123,16 @@ func (j *JIMM) ValidateModelUpgrade(ctx context.Context, u *dbmodel.User, mt nam
 // the model then the returned error will have the same code as the error
 // returned from the dial operation. If the given function returns an error
 // that error will be returned with the code unmasked.
-func (j *JIMM) doModelAdmin(ctx context.Context, u *dbmodel.User, mt names.ModelTag, f func(*dbmodel.Model, API) error) error {
+func (j *JIMM) doModelAdmin(ctx context.Context, u *openfga.User, mt names.ModelTag, f func(*dbmodel.Model, API) error) error {
 	return j.doModel(ctx, u, mt, "admin", f)
 }
 
-func (j *JIMM) doModel(ctx context.Context, u *dbmodel.User, mt names.ModelTag, access string, f func(*dbmodel.Model, API) error) error {
+func (j *JIMM) getUserModelAccess(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error) {
+	accessLevel := user.GetModelAccess(ctx, model)
+	return ToModelAccessString(accessLevel), nil
+}
+
+func (j *JIMM) doModel(ctx context.Context, u *openfga.User, mt names.ModelTag, access string, f func(*dbmodel.Model, API) error) error {
 	const op = errors.Op("jimm.doModel")
 
 	var m dbmodel.Model
@@ -1063,7 +1141,12 @@ func (j *JIMM) doModel(ctx context.Context, u *dbmodel.User, mt names.ModelTag, 
 	if err := j.Database.GetModel(ctx, &m); err != nil {
 		return errors.E(op, err)
 	}
-	if u.ControllerAccess != "superuser" && !allowedModelAccess[access][m.UserAccess(u)] {
+
+	accessLevel, err := j.getUserModelAccess(ctx, u, mt)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	if !allowedModelAccess[access][accessLevel] {
 		// If the user doesn't have correct access on the model return
 		// an unauthorized error.
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
@@ -1097,7 +1180,7 @@ var allowedModelAccess = map[string]map[string]bool{
 
 // ChangeModelCredential changes the credential used with a model on both
 // the controller and the local database.
-func (j *JIMM) ChangeModelCredential(ctx context.Context, user *dbmodel.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error {
+func (j *JIMM) ChangeModelCredential(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error {
 	const op = errors.Op("jimm.ChangeModelCredential")
 
 	ale := dbmodel.AuditLogEntry{
@@ -1116,14 +1199,20 @@ func (j *JIMM) ChangeModelCredential(ctx context.Context, user *dbmodel.User, mo
 		return err
 	}
 
-	if user.ControllerAccess != "superuser" && user.Tag() != cloudCredentialTag.Owner() {
+	isControllerAdmin, err := openfga.IsAdministrator(ctx, user, j.ResourceTag())
+	if err != nil {
+		zapctx.Error(ctx, "failed to check access rights", zap.Error(err))
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	if !isControllerAdmin && user.Tag() != cloudCredentialTag.Owner() {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	credential := dbmodel.CloudCredential{}
 	credential.SetTag(cloudCredentialTag)
 
-	err := j.Database.GetCloudCredential(ctx, &credential)
+	err = j.Database.GetCloudCredential(ctx, &credential)
 	if err != nil {
 		return fail(errors.E(op, err))
 	}

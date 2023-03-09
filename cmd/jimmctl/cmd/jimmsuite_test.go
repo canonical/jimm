@@ -26,6 +26,8 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	"github.com/CanonicalLtd/jimm/internal/jujuclient"
+	"github.com/CanonicalLtd/jimm/internal/openfga"
+	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 )
 
 type gcTester struct {
@@ -55,21 +57,25 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 	s.CandidSuite.SetUpTest(c)
 	s.JujuConnSuite.SetUpTest(c)
 
+	ofgaAPI, ofgaClient, cfg, err := jimmtest.SetupTestOFGAClient(c.TestName())
+	c.Assert(err, gc.Equals, nil)
+	s.OFGAApi = ofgaAPI
+	s.OFGAClient = ofgaClient
+	s.OFGAConfig = cfg
+
 	s.JIMM = &jimm.JIMM{
+		UUID: "914487b5-60e7-42bb-bd63-1adc3fd3a388",
 		Database: db.Database{
 			DB: jimmtest.MemoryDB(&gcTester{c}, nil),
 		},
-		Dialer: &jujuclient.Dialer{},
+		Dialer:        &jujuclient.Dialer{},
+		OpenFGAClient: ofgaClient,
 	}
-	err := s.JIMM.Database.Migrate(context.Background(), true)
+	err = s.JIMM.Database.Migrate(context.Background(), true)
 	c.Assert(err, gc.Equals, nil)
 
-	ofgaAPI, ofgaClient, cfg := jimmtest.SetupTestOFGAClient(c)
-	s.OFGAApi = ofgaAPI
-	s.JIMM.OpenFGAClient = ofgaClient
-
 	s.Params = service.Params{
-		ControllerUUID:   "914487b5-60e7-42bb-bd63-1adc3fd3a388",
+		ControllerUUID:   s.JIMM.UUID,
 		CandidURL:        s.Candid.URL.String(),
 		CandidPublicKey:  s.CandidPublicKey,
 		ControllerAdmins: []string{"admin"},
@@ -94,6 +100,10 @@ func (s *jimmSuite) SetUpTest(c *gc.C) {
 		LastLogin:        db.Now(),
 	}
 	err = s.JIMM.Database.GetUser(ctx, s.AdminUser)
+	c.Assert(err, gc.Equals, nil)
+
+	alice := openfga.NewUser(s.AdminUser, ofgaClient)
+	err = alice.SetControllerAccess(context.Background(), s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, gc.Equals, nil)
 
 	s.Candid.AddUser("alice")
@@ -164,7 +174,8 @@ func (s *jimmSuite) AddController(c *gc.C, name string, info *api.Info) {
 			Port:    hp.Port(),
 		}})
 	}
-	err := s.JIMM.AddController(context.Background(), s.AdminUser, ctl)
+	user := openfga.NewUser(s.AdminUser, s.OFGAClient)
+	err := s.JIMM.AddController(context.Background(), user, ctl)
 	c.Assert(err, gc.Equals, nil)
 }
 
@@ -185,12 +196,15 @@ func (s *jimmSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag,
 
 func (s *jimmSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud names.CloudTag, region string, cred names.CloudCredentialTag) names.ModelTag {
 	ctx := context.Background()
-	u := dbmodel.User{
-		Username: owner.Id(),
-	}
-	err := s.JIMM.Database.GetUser(ctx, &u)
+	u := openfga.NewUser(
+		&dbmodel.User{
+			Username: owner.Id(),
+		},
+		s.OFGAClient,
+	)
+	err := s.JIMM.Database.GetUser(ctx, u.User)
 	c.Assert(err, gc.Equals, nil)
-	mi, err := s.JIMM.AddModel(ctx, &u, &jimm.ModelCreateArgs{
+	mi, err := s.JIMM.AddModel(ctx, u, &jimm.ModelCreateArgs{
 		Name:            name,
 		Owner:           owner,
 		Cloud:           cloud,

@@ -52,7 +52,7 @@ func (d *Database) UpdateApplicationOffer(ctx context.Context, offer *dbmodel.Ap
 }
 
 // GetApplicationOffer returns application offer information based on the
-// offer UUID.
+// offer UUID or URL.
 func (d *Database) GetApplicationOffer(ctx context.Context, offer *dbmodel.ApplicationOffer) error {
 	const op = errors.Op("db.GetApplicationOffer")
 	if err := d.ready(); err != nil {

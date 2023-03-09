@@ -1,7 +1,5 @@
 // Copyright 2020 Canonical Ltd.
 
-//go:generate mockgen -source=jimm.go -destination=mocks_test.go --package jimm_test
-
 // Package jimm contains the business logic used to manage clouds,
 // cloudcredentials and models.
 package jimm
@@ -24,33 +22,10 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm/credentials"
 	"github.com/CanonicalLtd/jimm/internal/jimmjwx"
+	"github.com/CanonicalLtd/jimm/internal/openfga"
 	jimmopenfga "github.com/CanonicalLtd/jimm/internal/openfga"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
-	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
 )
-
-// ReBACClient holds the interface of a client JIMM uses to interact
-// with the relational based access control system.
-type ReBACClient interface {
-	// AddRelations creates a tuple(s) from the provided keys. See CreateTupleKey for creating keys.
-	AddRelations(ctx context.Context, keys ...jimmopenfga.Tuple) error
-	// RemoveRelation creates a tuple(s) from the provided keys. See CreateTupleKey for creating keys.
-	RemoveRelation(ctx context.Context, keys ...jimmopenfga.Tuple) error
-	// ReadRelations reads a relation(s) from the provided key where a match can be found.
-	ReadRelatedObjects(ctx context.Context, key *jimmopenfga.Tuple, pageSize int32, paginationToken string) (*jimmopenfga.ReadResponse, error)
-	// CheckRelation verifies that a user (or object) is allowed to access the target object by the specified relation.
-	CheckRelation(ctx context.Context, key jimmopenfga.Tuple, trace bool) (bool, string, error)
-	// AddControllerModel adds a relation between a controller and a model.
-	AddControllerModel(ctx context.Context, controller names.ControllerTag, model names.ModelTag) error
-	// RemoveModel removes a model.
-	RemoveModel(ctx context.Context, model names.ModelTag) error
-	// AddControllerApplicationOffer adds a relation between a controller and an application offer.
-	AddControllerApplicationOffer(ctx context.Context, controller names.ControllerTag, offer names.ApplicationOfferTag) error
-	// RemoveApplicationOffer removes an application offer.
-	RemoveApplicationOffer(ctx context.Context, offer names.ApplicationOfferTag) error
-	// RemoveGroup removes a group.
-	RemoveGroup(ctx context.Context, group jimmnames.GroupTag) error
-}
 
 // A JIMM provides the business logic for managing resources in the JAAS
 // system. A single JIMM instance is shared by all concurrent API
@@ -91,16 +66,21 @@ type JIMM struct {
 
 	// OpenFGAClient holds the client used to interact
 	// with the OpenFGA ReBAC system.
-	OpenFGAClient ReBACClient
+	OpenFGAClient *openfga.OFGAClient
 
 	JWKService *jimmjwx.JWKSService
+}
+
+// ResourceTag returns JIMM's controller tag stating its UUID.
+func (j *JIMM) ResourceTag() names.ControllerTag {
+	return names.NewControllerTag(j.UUID)
 }
 
 // An Authenticator authenticates login requests.
 type Authenticator interface {
 	// Authenticate processes the given LoginRequest and returns the user
 	// that has authenticated.
-	Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*dbmodel.User, error)
+	Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*jimmopenfga.User, error)
 }
 
 // dial dials the controller and model specified by the given Controller
@@ -312,15 +292,22 @@ func (j *JIMM) addAuditLogEntry(ale *dbmodel.AuditLogEntry) {
 }
 
 // FindAuditEvents returns audit events matching the given filter.
-func (j *JIMM) FindAuditEvents(ctx context.Context, user *dbmodel.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error) {
+func (j *JIMM) FindAuditEvents(ctx context.Context, user *openfga.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error) {
 	const op = errors.Op("jimm.FindAuditEvents")
 
-	if user.ControllerAccess != "superuser" && user.AuditLogAccess != "read" {
+	// NOTE (alesstimec): for now only the admin user will have access
+	// 	to audit logs. Once we've added access logs to the openfga access control
+	// 	this should be changed.
+	isControllerAdmin, err := openfga.IsAdministrator(ctx, user, j.ResourceTag())
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	if !isControllerAdmin {
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	var entries []dbmodel.AuditLogEntry
-	err := j.Database.ForEachAuditLogEntry(ctx, filter, func(entry *dbmodel.AuditLogEntry) error {
+	err = j.Database.ForEachAuditLogEntry(ctx, filter, func(entry *dbmodel.AuditLogEntry) error {
 		entries = append(entries, *entry)
 		return nil
 	})
@@ -332,15 +319,19 @@ func (j *JIMM) FindAuditEvents(ctx context.Context, user *dbmodel.User, filter d
 }
 
 // ListControllers returns a list of controllers the user has access to.
-func (j *JIMM) ListControllers(ctx context.Context, user *dbmodel.User) ([]dbmodel.Controller, error) {
+func (j *JIMM) ListControllers(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error) {
 	const op = errors.Op("jimm.ListControllers")
 
-	if user.ControllerAccess != "superuser" {
+	isControllerAdmin, err := openfga.IsAdministrator(ctx, user, j.ResourceTag())
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	if !isControllerAdmin {
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	var controllers []dbmodel.Controller
-	err := j.Database.ForEachController(ctx, func(c *dbmodel.Controller) error {
+	err = j.Database.ForEachController(ctx, func(c *dbmodel.Controller) error {
 		controllers = append(controllers, *c)
 		return nil
 	})
@@ -353,17 +344,21 @@ func (j *JIMM) ListControllers(ctx context.Context, user *dbmodel.User) ([]dbmod
 
 // SetControllerDeprecated records if the controller is to be deprecated.
 // No new models or clouds can be added to a deprecated controller.
-func (j *JIMM) SetControllerDeprecated(ctx context.Context, user *dbmodel.User, controllerName string, deprecated bool) error {
+func (j *JIMM) SetControllerDeprecated(ctx context.Context, user *openfga.User, controllerName string, deprecated bool) error {
 	const op = errors.Op("jimm.SetControllerDeprecated")
 
-	if user.ControllerAccess != "superuser" {
+	isControllerAdmin, err := openfga.IsAdministrator(ctx, user, j.ResourceTag())
+	if err != nil {
+		return errors.E(op, err)
+	}
+	if !isControllerAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	// Update the local database with the updated cloud definition. We
 	// do this in a transaction so that the local view cannot finish in
 	// an inconsistent state.
-	err := j.Database.Transaction(func(db *db.Database) error {
+	err = j.Database.Transaction(func(db *db.Database) error {
 		c := dbmodel.Controller{
 			Name: controllerName,
 		}
@@ -381,17 +376,21 @@ func (j *JIMM) SetControllerDeprecated(ctx context.Context, user *dbmodel.User, 
 }
 
 // RemoveController removes a controller.
-func (j *JIMM) RemoveController(ctx context.Context, user *dbmodel.User, controllerName string, force bool) error {
+func (j *JIMM) RemoveController(ctx context.Context, user *openfga.User, controllerName string, force bool) error {
 	const op = errors.Op("jimm.RemoveController")
 
-	if user.ControllerAccess != "superuser" {
+	isControllerAdmin, err := openfga.IsAdministrator(ctx, user, j.ResourceTag())
+	if err != nil {
+		return errors.E(op, err)
+	}
+	if !isControllerAdmin {
 		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	// Update the local database with the updated cloud definition. We
 	// do this in a transaction so that the local view cannot finish in
 	// an inconsistent state.
-	err := j.Database.Transaction(func(db *db.Database) error {
+	err = j.Database.Transaction(func(db *db.Database) error {
 		c := dbmodel.Controller{
 			Name: controllerName,
 		}
@@ -425,10 +424,14 @@ func (j *JIMM) RemoveController(ctx context.Context, user *dbmodel.User, control
 }
 
 // FullModelStatus returns the full status of the juju model.
-func (j *JIMM) FullModelStatus(ctx context.Context, user *dbmodel.User, modelTag names.ModelTag, patterns []string) (*jujuparams.FullStatus, error) {
+func (j *JIMM) FullModelStatus(ctx context.Context, user *openfga.User, modelTag names.ModelTag, patterns []string) (*jujuparams.FullStatus, error) {
 	const op = errors.Op("jimm.RemoveController")
 
-	if user.ControllerAccess != "superuser" {
+	isControllerAdmin, err := openfga.IsAdministrator(ctx, user, j.ResourceTag())
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+	if !isControllerAdmin {
 		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
@@ -438,7 +441,7 @@ func (j *JIMM) FullModelStatus(ctx context.Context, user *dbmodel.User, modelTag
 			Valid:  true,
 		},
 	}
-	err := j.Database.GetModel(ctx, &model)
+	err = j.Database.GetModel(ctx, &model)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}

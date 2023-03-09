@@ -13,6 +13,7 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/CanonicalLtd/jimm/internal/openfga"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 )
 
@@ -35,11 +36,15 @@ func (*AuthenticationError) Error() string {
 type JujuAuthenticator struct {
 	Bakery           *identchecker.Bakery
 	ControllerAdmins []string
+	Client           *openfga.OFGAClient
 }
 
 // Authenticate implements jimm.Authenticator.
-func (a JujuAuthenticator) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*dbmodel.User, error) {
+func (a JujuAuthenticator) Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*openfga.User, error) {
 	const op = errors.Op("auth.Authenticate")
+	if a.Client == nil {
+		return nil, errors.E(op, errors.CodeServerConfiguration, "openfga client not configured")
+	}
 	if a.Bakery == nil {
 		return nil, errors.E(op, errors.CodeServerConfiguration, "bakery not configured")
 	}
@@ -78,5 +83,5 @@ func (a JujuAuthenticator) Authenticate(ctx context.Context, req *jujuparams.Log
 			u.ControllerAccess = "superuser"
 		}
 	}
-	return u, nil
+	return openfga.NewUser(u, a.Client), nil
 }

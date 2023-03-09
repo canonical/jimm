@@ -279,7 +279,7 @@ controllers:
     region: test-region
     priority: 1
 `)
-	env.PopulateDB(c, *s.Database)
+	env.PopulateDB(c, *s.Database, nil)
 
 	cr, err := s.Database.FindRegion(ctx, "testp", "test-region")
 	c.Assert(err, qt.IsNil)
@@ -348,7 +348,7 @@ func (s *dbSuite) TestUpdateUserCloudAccess(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 
 	env := jimmtest.ParseEnvironment(c, testUpdateUserCloudAccessEnv)
-	env.PopulateDB(c, *s.Database)
+	env.PopulateDB(c, *s.Database, nil)
 
 	cld := dbmodel.Cloud{
 		Name: "test-hosted",
@@ -356,7 +356,7 @@ func (s *dbSuite) TestUpdateUserCloudAccess(c *qt.C) {
 	err = s.Database.GetCloud(ctx, &cld)
 	c.Assert(err, qt.IsNil)
 
-	charlie := env.User("charlie@external").DBObject(c, *s.Database)
+	charlie := env.User("charlie@external").DBObject(c, *s.Database, nil)
 
 	// Add a new user
 	err = s.Database.UpdateUserCloudAccess(ctx, &dbmodel.UserCloudAccess{
@@ -553,7 +553,7 @@ controllers:
     region: test-region-2
     priority: 1
 `)
-	env.PopulateDB(c, *s.Database)
+	env.PopulateDB(c, *s.Database, nil)
 
 	cl := dbmodel.Cloud{
 		Name: "test-cloud-1",

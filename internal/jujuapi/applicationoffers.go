@@ -11,10 +11,10 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi/rpc"
+	"github.com/CanonicalLtd/jimm/internal/openfga"
 )
 
 func init() {
@@ -138,7 +138,7 @@ func (r *controllerRoot) GetConsumeDetailsV3(ctx context.Context, args jujuparam
 	return results, nil
 }
 
-func (r *controllerRoot) getConsumeDetails(ctx context.Context, u *dbmodel.User, v bakery.Version, offerURL string) (jujuparams.ConsumeOfferDetails, error) {
+func (r *controllerRoot) getConsumeDetails(ctx context.Context, u *openfga.User, v bakery.Version, offerURL string) (jujuparams.ConsumeOfferDetails, error) {
 	const op = errors.Op("jujuapi.GetConsumeDetails")
 
 	ourl, err := crossmodel.ParseOfferURL(offerURL)

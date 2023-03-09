@@ -281,7 +281,7 @@ func (s *dbSuite) TestForEachCloudCredential(c *qt.C) {
 	env := jimmtest.ParseEnvironment(c, forEachCloudCredentialEnv)
 	err := s.Database.Migrate(ctx, false)
 	c.Assert(err, qt.IsNil)
-	env.PopulateDB(c, *s.Database)
+	env.PopulateDB(c, *s.Database, nil)
 
 	for _, test := range forEachCloudCredentialTests {
 		c.Run(test.name, func(c *qt.C) {

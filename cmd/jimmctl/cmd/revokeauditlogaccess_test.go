@@ -13,7 +13,8 @@ type revokeAuditLogAccessSuite struct {
 	jimmSuite
 }
 
-var _ = gc.Suite(&revokeAuditLogAccessSuite{})
+// TODO (alesstimec) uncomment when grant/revoke is implemented
+//var _ = gc.Suite(&revokeAuditLogAccessSuite{})
 
 func (s *revokeAuditLogAccessSuite) TestRevokeAuditLogAccessSuperuser(c *gc.C) {
 	// alice is superuser

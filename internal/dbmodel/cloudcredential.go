@@ -47,6 +47,14 @@ type CloudCredential struct {
 
 // Tag returns a names.Tag for the cloud-credential.
 func (c CloudCredential) Tag() names.Tag {
+	return c.ResourceTag()
+}
+
+// ResourceTag returns a tag for the cloud-credential.  This method
+// is intended to be used in places where we expect to see
+// a concrete type names.CloudCredentialTag instead of the
+// names.Tag interface.
+func (c CloudCredential) ResourceTag() names.CloudCredentialTag {
 	return names.NewCloudCredentialTag(fmt.Sprintf("%s/%s/%s", c.CloudName, c.OwnerUsername, c.Name))
 }
 
