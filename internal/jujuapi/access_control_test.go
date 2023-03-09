@@ -821,23 +821,23 @@ func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 
 	err := client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
 	c.Assert(err, jc.ErrorIsNil)
-	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "green"})
+	err = client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
 	c.Assert(err, jc.ErrorIsNil)
 
 	tuples := []apiparams.RelationshipTuple{{
-		Object:       "group-green#member",
+		Object:       "group-orange#member",
 		Relation:     "member",
 		TargetObject: "group-yellow",
 	}, {
 		Object:       "user-" + user.Username,
 		Relation:     "member",
-		TargetObject: "group-green",
+		TargetObject: "group-orange",
 	}, {
 		Object:       "group-yellow#member",
 		Relation:     "administrator",
 		TargetObject: "controller-" + controller.Name,
 	}, {
-		Object:       "group-green#member",
+		Object:       "group-orange#member",
 		Relation:     "administrator",
 		TargetObject: "applicationoffer-" + controller.Name + ":" + user.Username + "/" + model.Name + "." + applicationOffer.Name,
 	}}
