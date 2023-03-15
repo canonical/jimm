@@ -71,7 +71,7 @@ func (o *OFGAClient) addRelation(ctx context.Context, tuples ...Tuple) error {
 
 	tupleKeys := make([]openfga.TupleKey, len(tuples))
 	for i, tuple := range tuples {
-		tupleKeys[i] = createTupleKey(tuple)
+		tupleKeys[i] = tuple.toOpenFGATuple()
 	}
 
 	keys := openfga.NewTupleKeys(tupleKeys)
@@ -90,7 +90,7 @@ func (o *OFGAClient) removeRelation(ctx context.Context, tuples ...Tuple) error 
 
 	tupleKeys := make([]openfga.TupleKey, len(tuples))
 	for i, tuple := range tuples {
-		tupleKeys[i] = createTupleKey(tuple)
+		tupleKeys[i] = tuple.toOpenFGATuple()
 	}
 
 	keys := openfga.NewTupleKeys(tupleKeys)
@@ -120,8 +120,7 @@ func (o *OFGAClient) getRelatedObjects(ctx context.Context, tuple *Tuple, pageSi
 	}
 
 	if tuple != nil {
-		t := createTupleKey(*tuple)
-		rr.SetTupleKey(t)
+		rr.SetTupleKey(tuple.toOpenFGATuple())
 	}
 	readres, _, err := o.api.Read(ctx).Body(*rr).Execute()
 	if err != nil {
@@ -139,7 +138,7 @@ func (o *OFGAClient) checkRelation(ctx context.Context, tuple Tuple, trace bool)
 		zap.String("tuple relation", tuple.Relation.String()),
 		zap.String("tuple target object", tuple.Target.String()),
 	)
-	cr := openfga.NewCheckRequest(createTupleKey(tuple))
+	cr := openfga.NewCheckRequest(tuple.toOpenFGATuple())
 	cr.SetAuthorizationModelId(o.AuthModelId)
 
 	cr.SetTrace(trace)
