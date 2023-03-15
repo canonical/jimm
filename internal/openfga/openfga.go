@@ -28,6 +28,10 @@ type Tuple struct {
 	Target   *ofganames.Tag
 }
 
+func (t Tuple) toOpenFGATuple() openfga.TupleKey {
+	return createTupleKey(t)
+}
+
 // ReadResponse takes what is necessary from the underlying OFGA ReadResponse and simplifies it
 // into a safe ready-to-use response.
 type ReadResponse struct {
@@ -115,7 +119,6 @@ func (o *OFGAClient) getRelatedObjects(ctx context.Context, tuple *Tuple, pageSi
 		rr.SetContinuationToken(paginationToken)
 	}
 
-	rr.SetAuthorizationModelId(o.AuthModelId)
 	if tuple != nil {
 		t := createTupleKey(*tuple)
 		rr.SetTupleKey(t)
@@ -136,10 +139,9 @@ func (o *OFGAClient) checkRelation(ctx context.Context, tuple Tuple, trace bool)
 		zap.String("tuple relation", tuple.Relation.String()),
 		zap.String("tuple target object", tuple.Target.String()),
 	)
-	cr := openfga.NewCheckRequest()
+	cr := openfga.NewCheckRequest(createTupleKey(tuple))
 	cr.SetAuthorizationModelId(o.AuthModelId)
-	t := createTupleKey(tuple)
-	cr.SetTupleKey(t)
+
 	cr.SetTrace(trace)
 	checkres, httpres, err := o.api.Check(ctx).Body(*cr).Execute()
 	if err != nil {
@@ -149,7 +151,41 @@ func (o *OFGAClient) checkRelation(ctx context.Context, tuple Tuple, trace bool)
 	allowed := checkres.GetAllowed()
 	resolution := checkres.GetResolution()
 	return allowed, resolution, nil
+}
 
+// listObjects lists all the object IDs a user has access to via the specified relation
+// It is experimental and subject to context deadlines. See: https://openfga.dev/docs/interacting/relationship-queries#summary
+//
+// The arguments for this call also slightly differ, as it is not an ordinary tuple to be set. The target object
+// must NOT include the ID, i.e.,
+//
+//   - "group:" vs "group:mygroup", where "mygroup" is the ID and the correct objType would be "group".
+func (o *OFGAClient) listObjects(ctx context.Context, user string, relation string, objType string, contextualTuples []Tuple) (objectIds []string, err error) {
+	zapctx.Debug(
+		ctx,
+		"list request internal",
+	)
+	lor := openfga.NewListObjectsRequest(objType, relation, user)
+	lor.SetAuthorizationModelId(o.AuthModelId)
+
+	if len(contextualTuples) > 0 {
+		keys := make([]openfga.TupleKey, len(contextualTuples))
+
+		for i, ct := range contextualTuples {
+			keys[i] = ct.toOpenFGATuple()
+		}
+
+		lor.SetContextualTuples(*openfga.NewContextualTupleKeys(keys))
+	}
+
+	listres, httpres, err := o.api.ListObjects(ctx).Body(*lor).Execute()
+	if err != nil {
+		return
+	}
+
+	zapctx.Debug(ctx, "list request internal resp code", zap.Int("code", httpres.StatusCode))
+	objectIds = listres.GetObjects()
+	return
 }
 
 // createTuple wraps the underlying ofga tuple into a convenient ease-of-use method
@@ -175,6 +211,11 @@ func (o *OFGAClient) AddRelations(ctx context.Context, tuples ...Tuple) error {
 // RemoveRelation creates a tuple(s) from the provided keys. See CreateTupleKey for creating keys.
 func (o *OFGAClient) RemoveRelation(ctx context.Context, tuples ...Tuple) error {
 	return o.removeRelation(ctx, tuples...)
+}
+
+// ListObjects returns all object IDs of <objType> that a user has the relation <relation> to.
+func (o *OFGAClient) ListObjects(ctx context.Context, user string, relation string, objType string, contextualTuples []Tuple) ([]string, error) {
+	return o.listObjects(ctx, user, relation, objType, contextualTuples)
 }
 
 // ReadRelations reads a relation(s) from the provided key where a match can be found.

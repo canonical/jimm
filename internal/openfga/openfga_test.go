@@ -424,6 +424,54 @@ func (s *openFGATestSuite) TestAddController(c *gc.C) {
 	c.Assert(allowed, gc.Equals, true)
 }
 
+func (s *openFGATestSuite) TestListObjectsWithContextualTuples(c *gc.C) {
+	ctx := context.TODO()
+
+	modelUUIDs := []string{
+		"10000000-0000-0000-0000-000000000000",
+		"20000000-0000-0000-0000-000000000000",
+		"30000000-0000-0000-0000-000000000000",
+	}
+
+	expected := make([]string, len(modelUUIDs))
+	for i, v := range modelUUIDs {
+		expected[i] = "model:" + v
+	}
+
+	ids, err := s.ofgaClient.ListObjects(ctx, "user:alice", "reader", "model", []ofga.Tuple{
+		{
+			Object:   ofganames.FromTag(names.NewUserTag("alice")),
+			Relation: ofganames.ReaderRelation,
+			Target:   ofganames.FromTag(names.NewModelTag(modelUUIDs[0])),
+		},
+		// Reader to model via group
+		{
+			Object:   ofganames.FromTag(names.NewUserTag("alice")),
+			Relation: ofganames.MemberRelation,
+			Target:   ofganames.FromTag(jimmnames.NewGroupTag("1")),
+		},
+		{
+			Object:   ofganames.FromTagWithRelation(jimmnames.NewGroupTag("1"), ofganames.MemberRelation),
+			Relation: ofganames.ReaderRelation,
+			Target:   ofganames.FromTag(names.NewModelTag(modelUUIDs[1])),
+		},
+		// Reader to model via administrator of controller
+		{
+			Object:   ofganames.FromTag(names.NewUserTag("alice")),
+			Relation: ofganames.AdministratorRelation,
+			Target:   ofganames.FromTag(names.NewControllerTag("00000000-0000-0000-0000-000000000000")),
+		},
+		{
+			Object:   ofganames.FromTag(names.NewControllerTag("00000000-0000-0000-0000-000000000000")),
+			Relation: ofganames.ControllerRelation,
+			Target:   ofganames.FromTag(names.NewModelTag(modelUUIDs[2])),
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	c.Assert(ids, gc.DeepEquals, expected)
+}
+
 func Test(t *testing.T) {
 	gc.TestingT(t)
 }

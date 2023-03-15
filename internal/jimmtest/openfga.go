@@ -145,12 +145,11 @@ func SetupTestOFGAClient(names ...string) (openfga.OpenFgaApi, *ofga.OFGAClient,
 	client.SetStoreId(uuid)
 	api := client.OpenFgaApi
 
-	ar := openfga.NewWriteAuthorizationModelRequest()
 	typeDefinitions, err := getAuthModelDefinition()
+	ar := openfga.NewWriteAuthorizationModelRequest(typeDefinitions)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	ar.SetTypeDefinitions(typeDefinitions)
 
 	amr, _, err := api.WriteAuthorizationModel(ctx).Body(*ar).Execute()
 	if err != nil {
