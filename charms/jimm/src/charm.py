@@ -215,6 +215,13 @@ class JimmCharm(SystemdCharm):
         with open(self._env_filename("vault"), "wt") as f:
             f.write(self._render_template("jimm-vault.env", **args))
 
+    def _is_snap_installed(self):
+        exitok = 0
+        try:
+            return self._snap('list', 'jimm') is None
+        except subprocess.CalledProcessError as cpe:
+            return cpe.returncode == exitok
+
     def _install_snap(self):
         self.unit.status = MaintenanceStatus("installing snap")
         try:
@@ -224,6 +231,9 @@ class JimmCharm(SystemdCharm):
         if not path:
             self.unit.status = BlockedStatus("waiting for jimm-snap resource")
             return
+
+        if self._is_snap_installed():
+            self._snap('remove', 'jimm')
         self._snap('install', '--dangerous', path)
 
     def _install_dashboard(self):
