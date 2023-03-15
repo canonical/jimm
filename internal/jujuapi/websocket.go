@@ -154,7 +154,7 @@ func (s modelCommandsServer) ServeWS(ctx context.Context, clientConn *websocket.
 		sendClientError(err)
 	}
 	controllerSocket := controllerConn.GetClient().GetSocket()
-	jimmRPC.ManInTheMiddle(ctx, clientConn, controllerSocket)
+	jimmRPC.ProxySockets(ctx, clientConn, controllerSocket)
 }
 
 // Use a 64k frame size for the websockets while we need to deal
