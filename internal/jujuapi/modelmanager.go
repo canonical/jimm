@@ -173,7 +173,7 @@ func (r *controllerRoot) DestroyModels(ctx context.Context, args jujuparams.Enti
 			DestroyStorage: &destroyStorage,
 		}
 	}
-	return r.DestroyModelsV4(ctx, jujuparams.DestroyModelsParams{models})
+	return r.DestroyModelsV4(ctx, jujuparams.DestroyModelsParams{Models: models})
 }
 
 // ListModelSummaries returns summaries for all the models that that

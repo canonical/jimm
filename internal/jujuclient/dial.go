@@ -95,6 +95,7 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 		return nil, errors.E(op, errors.CodeConnectionFailed, err)
 	}
 
+	// TODO(Kian): If logging in for the MITM service, authentication should be done via a JWT.
 	username := ctl.AdminUser
 	password := ctl.AdminPassword
 	if d.ControllerCredentialsStore != nil {
@@ -251,6 +252,10 @@ type Connection struct {
 
 	monitorC chan struct{}
 	broken   *uint32
+}
+
+func (c Connection) GetClient() *rpc.Client {
+	return c.client
 }
 
 // Close closes the connection.

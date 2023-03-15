@@ -5,7 +5,6 @@ package jujuapi
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/juju/juju/rpc"
 	"github.com/juju/juju/rpc/jsoncodec"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/names/v4"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -21,6 +21,8 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jimmhttp"
+	"github.com/CanonicalLtd/jimm/internal/jujuclient"
+	jimmRPC "github.com/CanonicalLtd/jimm/internal/rpc"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 )
 
@@ -115,10 +117,7 @@ type modelCommandsServer struct {
 }
 
 // ServeWS implements jimmhttp.WSServer.
-func (s modelCommandsServer) ServeWS(ctx context.Context, conn *websocket.Conn) {
-	codec := jsoncodec.NewWebsocketConn(conn)
-	defer codec.Close()
-
+func (s modelCommandsServer) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
 	uuid := jimmhttp.PathElementFromContext(ctx, "uuid")
 	m := dbmodel.Model{
 		UUID: sql.NullString{
@@ -126,27 +125,36 @@ func (s modelCommandsServer) ServeWS(ctx context.Context, conn *websocket.Conn) 
 			Valid:  uuid != "",
 		},
 	}
-	var msg interface{}
-	if err := s.jimm.Database.GetModel(context.Background(), &m); err == nil {
-		addr := m.Controller.PublicAddress
-		if addr == "" {
-			addr = fmt.Sprintf("%s:%d", m.Controller.Addresses[0][0].Value, m.Controller.Addresses[0][0].Port)
-		}
-		msg = struct {
-			RedirectTo string `json:"redirect-to"`
-		}{
-			RedirectTo: fmt.Sprintf("wss://%s/model/%s/commands", addr, uuid),
-		}
-
-	} else {
-		msg = jujuparams.CLICommandStatus{
+	sendClientError := func(err error) {
+		msg := jujuparams.CLICommandStatus{
 			Done:  true,
 			Error: mapError(err),
 		}
+		if err := clientConn.WriteJSON(msg); err != nil {
+			zapctx.Error(ctx, "cannot send commands response", zap.Error(err))
+		}
 	}
-	if err := codec.Send(msg); err != nil {
-		zapctx.Error(ctx, "cannot send commands response", zap.Error(err))
+	// TODO(Kian) Change redirect to a MITM
+	if err := s.jimm.Database.GetModel(context.Background(), &m); err != nil {
+		sendClientError(err)
+		return
 	}
+
+	api, err := s.jimm.Dialer.Dial(ctx, &m.Controller, names.NewModelTag(uuid))
+	if err != nil {
+		zapctx.Error(ctx, "cannot dial controller", zap.String("controller", m.Controller.Name), zap.Error(err))
+		sendClientError(err)
+		return
+	}
+	defer api.Close()
+	controllerConn, ok := api.(jujuclient.Connection)
+	if !ok {
+		zapctx.Error(ctx, "cannot grab client from connection")
+		err := errors.E("Failed to communicate with controller")
+		sendClientError(err)
+	}
+	controllerSocket := controllerConn.GetClient().GetSocket()
+	jimmRPC.ManInTheMiddle(ctx, clientConn, controllerSocket)
 }
 
 // Use a 64k frame size for the websockets while we need to deal

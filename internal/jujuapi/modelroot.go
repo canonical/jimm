@@ -28,6 +28,7 @@ func newModelRoot(j *jimm.JIMM, uuid string) *modelRoot {
 	r.AddMethod("Admin", 1, "Login", rpc.Method(unsupportedLogin))
 	r.AddMethod("Admin", 2, "Login", rpc.Method(unsupportedLogin))
 	r.AddMethod("Admin", 3, "Login", rpc.Method(r.Login))
+	// TODO(Kian): Remove the RedirectInfo facade
 	r.AddMethod("Admin", 3, "RedirectInfo", rpc.Method(r.RedirectInfo))
 	r.AddMethod("Pinger", 1, "Ping", rpc.Method(r.Ping))
 	return r

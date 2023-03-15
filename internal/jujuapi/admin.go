@@ -82,6 +82,7 @@ func (r *modelRoot) Login(ctx context.Context, req jujuparams.LoginRequest) (juj
 	const op = errors.Op("jujuapi.ModelLogin")
 
 	var err error
+	// TODO(Kian): Change/remove redirect here to MITM
 	r.redirectInfo, err = r.jimm.RedirectInfo(ctx, names.NewModelTag(r.uuid))
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {

@@ -153,6 +153,10 @@ func (c *Client) handleResponse(msg *message) {
 	}
 }
 
+func (c *Client) GetSocket() *websocket.Conn {
+	return c.conn
+}
+
 // Call makes an RPC call to the server. Call sends the request message to
 // the server and waits for the response to be returned or the context to
 // be canceled.
