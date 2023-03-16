@@ -147,13 +147,14 @@ func (s modelCommandsServer) ServeWS(ctx context.Context, clientConn *websocket.
 		return
 	}
 	defer api.Close()
-	controllerConn, ok := api.(jujuclient.Connection)
+	controllerConn, ok := api.(*jujuclient.Connection)
 	if !ok {
 		zapctx.Error(ctx, "cannot grab client from connection")
 		err := errors.E("Failed to communicate with controller")
 		sendClientError(err)
 	}
-	controllerSocket := controllerConn.GetClient().GetSocket()
+	controllerSocket := controllerConn.GetClient().GetConn()
+	// TODO: check error here
 	jimmRPC.ProxySockets(ctx, clientConn, controllerSocket)
 }
 

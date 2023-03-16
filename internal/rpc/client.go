@@ -153,7 +153,7 @@ func (c *Client) handleResponse(msg *message) {
 	}
 }
 
-func (c *Client) GetSocket() *websocket.Conn {
+func (c *Client) GetConn() *websocket.Conn {
 	return c.conn
 }
 

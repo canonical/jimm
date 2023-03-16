@@ -2,9 +2,9 @@ package rpc
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/gorilla/websocket"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
@@ -23,36 +23,53 @@ import (
 func ProxySockets(ctx context.Context, connClient, connController *websocket.Conn) error {
 	for {
 		msg := new(message)
+		fmt.Printf("Proxy reading\n")
 		if err := connClient.ReadJSON(msg); err != nil {
+			fmt.Printf("Error read client - %s\n", err.Error())
 			return err
 		}
+
+		fmt.Printf("Proxy read from client: %+v\n", msg)
 		if msg.RequestID == 0 {
+			fmt.Printf("Error request id = 0")
 			return errors.E("Received invalid RPC message")
 		}
-		if !msg.isRequest() {
-			zapctx.Error(ctx, "received response", zap.Any("message", msg))
-			connClient.WriteJSON(message{
-				RequestID: msg.RequestID,
-				Error:     "not supported",
-				ErrorCode: jujuparams.CodeNotSupported,
-			})
-			continue
-		}
+
+		// if !msg.isRequest() {
+		// 	zapctx.Error(ctx, "received response", zap.Any("message", msg))
+		// 	connClient.WriteJSON(message{
+		// 		RequestID: msg.RequestID,
+		// 		Error:     "not supported",
+		// 		ErrorCode: jujuparams.CodeNotSupported,
+		// 	})
+		// 	continue
+		// }
+		fmt.Printf("Forwarding request to controller %+v\n", msg)
+
 		zapctx.Info(ctx, "forwarding request", zap.Any("message", msg))
+		msg.Type = "ProxyType"
 		if err := connController.WriteJSON(msg); err != nil {
+			fmt.Printf("Error from controller - %s\n", err.Error())
 			zapctx.Error(ctx, "cannot forward request", zap.Error(err))
 			return err
 		}
+
 		response := new(message)
 		// TODO(Kian): If we receive a permissions error below we will need a new error code and the calling
 		// function should recalculate permissions, re-do login and perform the request again.
+		fmt.Printf("Proxy reading from controller\n")
 		if err := connController.ReadJSON(response); err != nil {
+			fmt.Printf("Error from controller - %s\n", err.Error())
 			return err
 		}
+		fmt.Printf("Proxy read %+v from controller, writing to client.\n", response)
+
 		zapctx.Info(ctx, "received controller response", zap.Any("message", response))
 		if err := connClient.WriteJSON(response); err != nil {
+			fmt.Printf("Error write client - %s\n", err.Error())
 			zapctx.Error(ctx, "cannot return response", zap.Error(err))
 			return err
 		}
+		fmt.Printf("Proxy wrote %+v back to the client.\n", response)
 	}
 }
