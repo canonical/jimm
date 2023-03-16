@@ -247,9 +247,9 @@ func ListUsersWithAccess[T ofganames.ResourceTagger](ctx context.Context, client
 
 func listUsersWithAccess(ctx context.Context, client *OFGAClient, tuple openfga.TupleKey) ([]string, error) {
 	// we create an expand request
-	er := openfga.NewExpandRequest()
+	er := openfga.NewExpandRequest(tuple)
 	er.SetAuthorizationModelId(client.AuthModelId)
-	er.SetTupleKey(tuple)
+
 	res, _, err := client.api.Expand(ctx).Body(*er).Execute()
 	if err != nil {
 		zapctx.Error(ctx, "failed to query for related object", zap.Error(err))
