@@ -247,6 +247,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	if !p.DisableConnectionCache {
 		s.jimm.Dialer = jimm.CacheDialer(s.jimm.Dialer)
 	}
+	s.jimm.ProxyDialer = &jujuclient.ProxyDialer{}
 
 	if s.jimm.CredentialStore != nil {
 		s.jimm.JWKService = jimmjwx.NewJWKSService(s.jimm.CredentialStore)

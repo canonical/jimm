@@ -2,7 +2,7 @@ package rpc
 
 import (
 	"context"
-	"fmt"
+	"sync"
 
 	"github.com/gorilla/websocket"
 	"github.com/juju/zaputil/zapctx"
@@ -18,58 +18,62 @@ import (
 // Closing the websockets should be handled by the calling function.
 //
 // Note that this function assumes half-duplex communication i.e. a client sends a request and
-// expects a reply from the server. For a true mitm implementation, separate routines must
-// be implemented for client->server and server->client.
+// expects a reply from the server as is done by Juju.
 func ProxySockets(ctx context.Context, connClient, connController *websocket.Conn) error {
+	errChannel := make(chan error)
+	// Use a wait group to ensure we don't leak the Go routine.
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		proxy(ctx, connClient, connController, errChannel)
+	}()
+	var err error
+	select {
+	case err = <-errChannel:
+	case <-ctx.Done():
+		err = errors.E("Context cancelled")
+		connClient.Close()
+		connController.Close()
+		<-errChannel
+	}
+	wg.Wait()
+	return err
+}
+
+func proxy(ctx context.Context, connClient, connController *websocket.Conn, errChan chan<- error) {
+	var err error
 	for {
 		msg := new(message)
-		fmt.Printf("Proxy reading\n")
-		if err := connClient.ReadJSON(msg); err != nil {
-			fmt.Printf("Error read client - %s\n", err.Error())
-			return err
+		if err = connClient.ReadJSON(msg); err != nil {
+			zapctx.Error(ctx, "error reading from client", zap.Error(err))
+			break
 		}
 
-		fmt.Printf("Proxy read from client: %+v\n", msg)
 		if msg.RequestID == 0 {
-			fmt.Printf("Error request id = 0")
-			return errors.E("Received invalid RPC message")
+			err = errors.E("Received invalid RPC message")
+			break
 		}
-
-		// if !msg.isRequest() {
-		// 	zapctx.Error(ctx, "received response", zap.Any("message", msg))
-		// 	connClient.WriteJSON(message{
-		// 		RequestID: msg.RequestID,
-		// 		Error:     "not supported",
-		// 		ErrorCode: jujuparams.CodeNotSupported,
-		// 	})
-		// 	continue
-		// }
-		fmt.Printf("Forwarding request to controller %+v\n", msg)
 
 		zapctx.Info(ctx, "forwarding request", zap.Any("message", msg))
-		msg.Type = "ProxyType"
-		if err := connController.WriteJSON(msg); err != nil {
-			fmt.Printf("Error from controller - %s\n", err.Error())
+		if err = connController.WriteJSON(msg); err != nil {
 			zapctx.Error(ctx, "cannot forward request", zap.Error(err))
-			return err
+			break
 		}
 
 		response := new(message)
 		// TODO(Kian): If we receive a permissions error below we will need a new error code and the calling
 		// function should recalculate permissions, re-do login and perform the request again.
-		fmt.Printf("Proxy reading from controller\n")
-		if err := connController.ReadJSON(response); err != nil {
-			fmt.Printf("Error from controller - %s\n", err.Error())
-			return err
+		if err = connController.ReadJSON(response); err != nil {
+			zapctx.Error(ctx, "error reading from controller", zap.Error(err))
+			break
 		}
-		fmt.Printf("Proxy read %+v from controller, writing to client.\n", response)
 
 		zapctx.Info(ctx, "received controller response", zap.Any("message", response))
-		if err := connClient.WriteJSON(response); err != nil {
-			fmt.Printf("Error write client - %s\n", err.Error())
+		if err = connClient.WriteJSON(response); err != nil {
 			zapctx.Error(ctx, "cannot return response", zap.Error(err))
-			return err
+			break
 		}
-		fmt.Printf("Proxy wrote %+v back to the client.\n", response)
 	}
+	errChan <- err
 }

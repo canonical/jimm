@@ -70,7 +70,7 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 	if ctl.PublicAddress != "" {
 		// If there is a public-address configured it is almost
 		// certainly the one we want to use, try it first.
-		client, err = dialer.Dial(ctx, websocketURL(ctl.PublicAddress, modelTag))
+		client, err = dialer.Dial(ctx, websocketURL(ctl.PublicAddress, modelTag), false)
 		if err != nil {
 			zapctx.Error(ctx, "failed to dial public address", zaputil.Error(err))
 		}
@@ -95,7 +95,6 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 		return nil, errors.E(op, errors.CodeConnectionFailed, err)
 	}
 
-	// TODO(Kian): If logging in for the MITM service, authentication should be done via a JWT.
 	username := ctl.AdminUser
 	password := ctl.AdminPassword
 	if d.ControllerCredentialsStore != nil {
@@ -110,6 +109,113 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 			password = p
 		}
 	}
+
+	args := jujuparams.LoginRequest{
+		AuthTag:       names.NewUserTag(username).String(),
+		Credentials:   password,
+		ClientVersion: "2.9.33", // claim to be a 2.9.33 client.
+	}
+
+	var res jujuparams.LoginResult
+	if err := client.Call(ctx, "Admin", 3, "", "Login", args, &res); err != nil {
+		client.Close()
+		return nil, errors.E(op, errors.CodeConnectionFailed, "authentication failed", err)
+	}
+
+	ct, err := names.ParseControllerTag(res.ControllerTag)
+	if err == nil {
+		ctl.SetTag(ct)
+	}
+	if res.ServerVersion != "" {
+		ctl.AgentVersion = res.ServerVersion
+	}
+	ctl.Addresses = dbmodel.HostPorts(res.Servers)
+	facades := make(map[string]bool)
+	for _, fv := range res.Facades {
+		for _, v := range fv.Versions {
+			facades[fmt.Sprintf("%s\x1f%d", fv.Name, v)] = true
+		}
+	}
+
+	monitorC := make(chan struct{})
+	broken := new(uint32)
+	go monitor(client, monitorC, broken)
+	return &Connection{
+		client:         client,
+		userTag:        args.AuthTag,
+		facadeVersions: facades,
+		monitorC:       monitorC,
+		broken:         broken,
+	}, nil
+}
+
+type ProxyDialer struct {
+}
+
+// Dial implements jimm.Dialer.
+// This dialer is useful when proxying a client connection through to a controller.
+// It eliminates some of the underlying checks so that messages can cleanly be passed between
+// a client and controller
+func (d *ProxyDialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag) (jimm.API, error) {
+	const op = errors.Op("jujuclient.Dial")
+
+	var tlsConfig *tls.Config
+	if ctl.CACertificate != "" {
+		cp := x509.NewCertPool()
+		cp.AppendCertsFromPEM([]byte(ctl.CACertificate))
+		tlsConfig = &tls.Config{
+			RootCAs: cp,
+		}
+	}
+	dialer := rpc.Dialer{
+		TLSConfig: tlsConfig,
+	}
+
+	var client *rpc.Client
+	var err error
+	if ctl.PublicAddress != "" {
+		// If there is a public-address configured it is almost
+		// certainly the one we want to use, try it first.
+		client, err = dialer.Dial(ctx, websocketURL(ctl.PublicAddress, modelTag), true)
+		if err != nil {
+			zapctx.Error(ctx, "failed to dial public address", zaputil.Error(err))
+		}
+	}
+	if client == nil {
+		var urls []string
+		for _, hps := range ctl.Addresses {
+			for _, hp := range hps {
+				if hp.Scope != "public" && hp.Scope != "" {
+					continue
+				}
+				urls = append(urls, websocketURL(fmt.Sprintf("%s:%d", hp.Value, hp.Port), modelTag))
+			}
+		}
+		var err2 error
+		client, err2 = dialAll(ctx, &dialer, urls)
+		if err == nil {
+			err = err2
+		}
+	}
+	if client == nil {
+		return nil, errors.E(op, errors.CodeConnectionFailed, err)
+	}
+
+	// TODO(Kian): Change the below to login via a JWT token.
+	username := ctl.AdminUser
+	password := ctl.AdminPassword
+	// if d.ControllerCredentialsStore != nil {
+	// 	u, p, err := d.ControllerCredentialsStore.GetControllerCredentials(ctx, ctl.Name)
+	// 	if err != nil {
+	// 		return nil, errors.E(op, errors.CodeNotFound)
+	// 	}
+	// 	if u != "" {
+	// 		username = u
+	// 	}
+	// 	if password != "" {
+	// 		password = p
+	// 	}
+	// }
 
 	args := jujuparams.LoginRequest{
 		AuthTag:       names.NewUserTag(username).String(),
@@ -183,7 +289,7 @@ func dialAll(ctx context.Context, dialer *rpc.Dialer, urls []string) (*rpc.Clien
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			cl, dErr := dialer.Dial(ctx, url)
+			cl, dErr := dialer.Dial(ctx, url, false)
 			if dErr != nil {
 				errOnce.Do(func() {
 					err = dErr

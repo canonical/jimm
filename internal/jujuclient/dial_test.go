@@ -132,7 +132,7 @@ func (s *dialSuite) TestDialWithCredentialsStoredInVault(c *gc.C) {
 		ControllerCredentialsStore: store,
 	}
 
-	api, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{})
+	api, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{}, false)
 	c.Assert(err, gc.Equals, nil)
 	defer api.Close()
 	c.Check(ctl.UUID, gc.Equals, "deadbeef-1bad-500d-9000-4b1d0d06f00d")

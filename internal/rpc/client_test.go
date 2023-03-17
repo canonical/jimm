@@ -7,7 +7,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -28,7 +27,7 @@ func TestDialError(t *testing.T) {
 	defer srv.Close()
 	d := *srv.dialer
 	d.TLSConfig = nil
-	_, err := d.Dial(context.Background(), srv.URL)
+	_, err := d.Dial(context.Background(), srv.URL, false)
 	c.Assert(err, qt.ErrorMatches, `tls: failed to verify certificate: x509: certificate signed by unknown authority`)
 }
 
@@ -37,7 +36,7 @@ func TestDial(t *testing.T) {
 
 	srv := newServer(echo)
 	defer srv.Close()
-	conn, err := srv.dialer.Dial(context.Background(), srv.URL)
+	conn, err := srv.dialer.Dial(context.Background(), srv.URL, false)
 	c.Assert(err, qt.IsNil)
 	defer conn.Close()
 }
@@ -47,7 +46,7 @@ func TestCallSuccess(t *testing.T) {
 
 	srv := newServer(echo)
 	defer srv.Close()
-	conn, err := srv.dialer.Dial(context.Background(), srv.URL)
+	conn, err := srv.dialer.Dial(context.Background(), srv.URL, false)
 	c.Assert(err, qt.IsNil)
 	defer conn.Close()
 
@@ -65,7 +64,7 @@ func TestCallCanceledContext(t *testing.T) {
 
 	srv := newServer(echo)
 	defer srv.Close()
-	conn, err := srv.dialer.Dial(context.Background(), srv.URL)
+	conn, err := srv.dialer.Dial(context.Background(), srv.URL, false)
 	c.Assert(err, qt.IsNil)
 	defer conn.Close()
 
@@ -94,7 +93,7 @@ func TestCallClosedWithoutResponse(t *testing.T) {
 		return errors.E("test error")
 	})
 	defer srv.Close()
-	conn, err := srv.dialer.Dial(context.Background(), srv.URL)
+	conn, err := srv.dialer.Dial(context.Background(), srv.URL, false)
 	c.Assert(err, qt.IsNil)
 	defer conn.Close()
 
@@ -127,7 +126,7 @@ func TestCallErrorResponse(t *testing.T) {
 		return echo(conn)
 	})
 	defer srv.Close()
-	conn, err := srv.dialer.Dial(context.Background(), srv.URL)
+	conn, err := srv.dialer.Dial(context.Background(), srv.URL, false)
 	c.Assert(err, qt.IsNil)
 	defer conn.Close()
 
@@ -168,7 +167,7 @@ func TestClientReceiveRequest(t *testing.T) {
 		return echo(conn)
 	})
 	defer srv.Close()
-	conn, err := srv.dialer.Dial(context.Background(), srv.URL)
+	conn, err := srv.dialer.Dial(context.Background(), srv.URL, false)
 	c.Assert(err, qt.IsNil)
 	defer conn.Close()
 
@@ -198,7 +197,7 @@ func TestClientReceiveInvalidMessage(t *testing.T) {
 		return echo(conn)
 	})
 	defer srv.Close()
-	conn, err := srv.dialer.Dial(context.Background(), srv.URL)
+	conn, err := srv.dialer.Dial(context.Background(), srv.URL, false)
 	c.Assert(err, qt.IsNil)
 	defer conn.Close()
 
@@ -208,78 +207,73 @@ func TestClientReceiveInvalidMessage(t *testing.T) {
 	c.Check(res, qt.Equals, "")
 }
 
-func TestAlexDiglett(t *testing.T) {
-	c := qt.New(t)
-
-	controller := server{}
-
-	controller.Server = httptest.NewTLSServer(
-		handleWS(
-			func(connClient *websocket.Conn) error {
-				return echo(connClient)
-			},
-		),
-	)
-	controller.URL = "ws" + strings.TrimPrefix(controller.Server.URL, "http")
-	cp := x509.NewCertPool()
-	cp.AddCert(controller.Certificate())
-	controller.dialer = &rpc.Dialer{
-		TLSConfig: &tls.Config{
-			RootCAs: cp,
-		},
-	}
-
-	controllerClient, err := controller.dialer.Dial(context.Background(), controller.URL)
-	c.Assert(err, qt.IsNil)
-
-	srvJIMM := newServer(func(connClient *websocket.Conn) error {
-		return rpc.ProxySockets(context.Background(), connClient, controllerClient.GetConn())
-	})
-
-	srvClient, _ := srvJIMM.dialer.Dial(context.Background(), srvJIMM.URL)
-	msg := rpc.Message{RequestID: 1, Type: "TestType", Request: "TestReq"}
-	srvClient.GetConn().WriteJSON(msg)
-	srvClient.GetConn().ReadMessage()
-
-}
-
+// TestProxySockets uses dialers with proxy set to true to ignore the extra abstractions
+// normally used on top of websockets.
 func TestProxySockets(t *testing.T) {
 	c := qt.New(t)
 
-	ctx := context.TODO()
+	ctx := context.Background()
 
 	srvController := newServer(func(conn *websocket.Conn) error {
 		return echo(conn)
 	})
 
 	srvJIMM := newServer(func(connClient *websocket.Conn) error {
-		controllerClient, err := srvController.dialer.Dial(ctx, srvController.URL)
+		controllerClient, err := srvController.dialer.Dial(ctx, srvController.URL, true)
 		c.Assert(err, qt.IsNil)
 		defer controllerClient.Close()
 		connController := controllerClient.GetConn()
+		return rpc.ProxySockets(ctx, connClient, connController)
+	})
+
+	defer srvController.Close()
+	defer srvJIMM.Close()
+	client, err := srvJIMM.dialer.Dial(ctx, srvJIMM.URL, true)
+	c.Assert(err, qt.IsNil)
+	defer client.Close()
+
+	ws := client.GetConn()
+	p := json.RawMessage(`{"Key":"TestVal"}`)
+	msg := rpc.Message{RequestID: 1, Type: "TestType", Request: "TestReq", Params: p}
+	err = ws.WriteJSON(&msg)
+	c.Assert(err, qt.IsNil)
+	resp := rpc.Message{}
+	err = ws.ReadJSON(&resp)
+	c.Assert(err, qt.IsNil)
+	c.Assert(resp.Response, qt.DeepEquals, msg.Params)
+}
+
+func TestCancelProxySockets(t *testing.T) {
+	c := qt.New(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	srvController := newServer(func(conn *websocket.Conn) error {
+		return echo(conn)
+	})
+
+	readyChan := make(chan int)
+	errChan := make(chan error)
+	srvJIMM := newServer(func(connClient *websocket.Conn) error {
+		controllerClient, err := srvController.dialer.Dial(ctx, srvController.URL, true)
+		c.Assert(err, qt.IsNil)
+		defer controllerClient.Close()
+		connController := controllerClient.GetConn()
+		readyChan <- 1
 		err = rpc.ProxySockets(ctx, connClient, connController)
-		fmt.Println("Proxy error -", err)
+		errChan <- err
 		return err
 	})
 
 	defer srvController.Close()
 	defer srvJIMM.Close()
-	client, err := srvJIMM.dialer.Dial(ctx, srvJIMM.URL)
+	client, err := srvJIMM.dialer.Dial(ctx, srvJIMM.URL, true)
 	c.Assert(err, qt.IsNil)
 	defer client.Close()
-
-	ws := client.GetConn()
-	p := json.RawMessage(`{"Key": "TestVal"}`)
-	msg := rpc.Message{RequestID: 1, Type: "TestType", Request: "TestReq", Params: p}
-	fmt.Printf("Writing message: %+v\n", msg)
-	err = ws.WriteJSON(&msg)
-	c.Assert(err, qt.IsNil)
-	resp := rpc.Message{}
-	fmt.Printf("Reading response\n")
-	err = ws.ReadJSON(&resp)
-	fmt.Printf("Got response: %+v\n", resp)
-	c.Assert(err, qt.IsNil)
-	c.Assert(resp.Params, qt.Equals, p)
+	<-readyChan
+	cancel()
+	err = <-errChan
+	c.Assert(err.Error(), qt.Equals, "Context cancelled")
 }
 
 type server struct {
@@ -329,37 +323,17 @@ func handleWS(f func(*websocket.Conn) error) http.Handler {
 func echo(c *websocket.Conn) error {
 	for {
 		msg := make(map[string]interface{})
-		fmt.Printf("Echo server awaiting msg.\n")
 		if err := c.ReadJSON(&msg); err != nil {
 			return err
 		}
-		fmt.Printf("Received %+v on echo server\n", msg)
 		delete(msg, "type")
 		delete(msg, "version")
 		delete(msg, "id")
 		delete(msg, "request")
 		msg["response"] = msg["params"]
 		delete(msg, "params")
-		fmt.Printf("Writing %+v on echo server\n", msg)
-		diglett := make(map[string]interface{})
-		// diglett["request-id"] = 10
-		diglett["version"] = 10
-		// diglett["response"] = msg["response"]
-		diglett["name"] = "diglett"
-		//{"name":"diglett","response":"diglett"}
-		blah, err := json.Marshal(diglett)
-		if err != nil {
-			fmt.Println("Marshal err", err)
+		if err := c.WriteJSON(msg); err != nil {
+			return err
 		}
-		fmt.Printf("Sending - %s\n", blah)
-		err = c.WriteMessage(1, blah)
-		if err != nil {
-			fmt.Println("Write message err", err)
-		}
-		// if err := c.WriteJSON(msg); err != nil {
-		// 	fmt.Printf("Error writing in echo service - %s\n", err.Error())
-		// 	return err
-		// }
-		fmt.Printf("Writing msg echo server done.\n")
 	}
 }
