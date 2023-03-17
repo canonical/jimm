@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"context"
-	"sync"
 
 	"github.com/gorilla/websocket"
 	"github.com/juju/zaputil/zapctx"
@@ -20,13 +19,9 @@ import (
 // Note that this function assumes half-duplex communication i.e. a client sends a request and
 // expects a reply from the server as is done by Juju.
 func ProxySockets(ctx context.Context, connClient, connController *websocket.Conn) error {
-	errChannel := make(chan error)
-	// Use a wait group to ensure we don't leak the Go routine.
-	var wg sync.WaitGroup
-	wg.Add(1)
+	errChannel := make(chan error, 1)
 	go func() {
-		defer wg.Done()
-		proxy(ctx, connClient, connController, errChannel)
+		errChannel <- proxy(ctx, connClient, connController)
 	}()
 	var err error
 	select {
@@ -35,45 +30,40 @@ func ProxySockets(ctx context.Context, connClient, connController *websocket.Con
 		err = errors.E("Context cancelled")
 		connClient.Close()
 		connController.Close()
-		<-errChannel
 	}
-	wg.Wait()
 	return err
 }
 
-func proxy(ctx context.Context, connClient, connController *websocket.Conn, errChan chan<- error) {
-	var err error
+func proxy(ctx context.Context, connClient, connController *websocket.Conn) error {
 	for {
 		msg := new(message)
-		if err = connClient.ReadJSON(msg); err != nil {
+		if err := connClient.ReadJSON(msg); err != nil {
 			zapctx.Error(ctx, "error reading from client", zap.Error(err))
-			break
+			return err
 		}
-
 		if msg.RequestID == 0 {
-			err = errors.E("Received invalid RPC message")
-			break
+			err := errors.E("Received invalid RPC message")
+			return err
 		}
 
 		zapctx.Info(ctx, "forwarding request", zap.Any("message", msg))
-		if err = connController.WriteJSON(msg); err != nil {
+		if err := connController.WriteJSON(msg); err != nil {
 			zapctx.Error(ctx, "cannot forward request", zap.Error(err))
-			break
+			return err
 		}
 
 		response := new(message)
 		// TODO(Kian): If we receive a permissions error below we will need a new error code and the calling
 		// function should recalculate permissions, re-do login and perform the request again.
-		if err = connController.ReadJSON(response); err != nil {
+		if err := connController.ReadJSON(response); err != nil {
 			zapctx.Error(ctx, "error reading from controller", zap.Error(err))
-			break
+			return err
 		}
 
 		zapctx.Info(ctx, "received controller response", zap.Any("message", response))
-		if err = connClient.WriteJSON(response); err != nil {
+		if err := connClient.WriteJSON(response); err != nil {
 			zapctx.Error(ctx, "cannot return response", zap.Error(err))
-			break
+			return err
 		}
 	}
-	errChan <- err
 }
