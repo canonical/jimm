@@ -1249,6 +1249,7 @@ func (j *JIMM) ChangeModelCredential(ctx context.Context, user *openfga.User, mo
 // RedirectInfo gets the jujuparams.RedirectInfoResult that needs to be
 // sent to a client so that it can redirect to the controller hosting the
 // model.
+// TODO(Kian): Remove the below.
 func (j *JIMM) RedirectInfo(ctx context.Context, mt names.ModelTag) (jujuparams.RedirectInfoResult, error) {
 	const op = errors.Op("jimm.RedirectInfo")
 

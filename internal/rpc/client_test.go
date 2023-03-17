@@ -27,7 +27,7 @@ func TestDialError(t *testing.T) {
 	defer srv.Close()
 	d := *srv.dialer
 	d.TLSConfig = nil
-	_, err := d.Dial(context.Background(), srv.URL, false)
+	_, err := d.Dial(context.Background(), srv.URL)
 	c.Assert(err, qt.ErrorMatches, `tls: failed to verify certificate: x509: certificate signed by unknown authority`)
 }
 
@@ -36,7 +36,7 @@ func TestDial(t *testing.T) {
 
 	srv := newServer(echo)
 	defer srv.Close()
-	conn, err := srv.dialer.Dial(context.Background(), srv.URL, false)
+	conn, err := srv.dialer.Dial(context.Background(), srv.URL)
 	c.Assert(err, qt.IsNil)
 	defer conn.Close()
 }
@@ -46,7 +46,7 @@ func TestCallSuccess(t *testing.T) {
 
 	srv := newServer(echo)
 	defer srv.Close()
-	conn, err := srv.dialer.Dial(context.Background(), srv.URL, false)
+	conn, err := srv.dialer.Dial(context.Background(), srv.URL)
 	c.Assert(err, qt.IsNil)
 	defer conn.Close()
 
@@ -64,7 +64,7 @@ func TestCallCanceledContext(t *testing.T) {
 
 	srv := newServer(echo)
 	defer srv.Close()
-	conn, err := srv.dialer.Dial(context.Background(), srv.URL, false)
+	conn, err := srv.dialer.Dial(context.Background(), srv.URL)
 	c.Assert(err, qt.IsNil)
 	defer conn.Close()
 
@@ -93,7 +93,7 @@ func TestCallClosedWithoutResponse(t *testing.T) {
 		return errors.E("test error")
 	})
 	defer srv.Close()
-	conn, err := srv.dialer.Dial(context.Background(), srv.URL, false)
+	conn, err := srv.dialer.Dial(context.Background(), srv.URL)
 	c.Assert(err, qt.IsNil)
 	defer conn.Close()
 
@@ -126,7 +126,7 @@ func TestCallErrorResponse(t *testing.T) {
 		return echo(conn)
 	})
 	defer srv.Close()
-	conn, err := srv.dialer.Dial(context.Background(), srv.URL, false)
+	conn, err := srv.dialer.Dial(context.Background(), srv.URL)
 	c.Assert(err, qt.IsNil)
 	defer conn.Close()
 
@@ -167,7 +167,7 @@ func TestClientReceiveRequest(t *testing.T) {
 		return echo(conn)
 	})
 	defer srv.Close()
-	conn, err := srv.dialer.Dial(context.Background(), srv.URL, false)
+	conn, err := srv.dialer.Dial(context.Background(), srv.URL)
 	c.Assert(err, qt.IsNil)
 	defer conn.Close()
 
@@ -197,7 +197,7 @@ func TestClientReceiveInvalidMessage(t *testing.T) {
 		return echo(conn)
 	})
 	defer srv.Close()
-	conn, err := srv.dialer.Dial(context.Background(), srv.URL, false)
+	conn, err := srv.dialer.Dial(context.Background(), srv.URL)
 	c.Assert(err, qt.IsNil)
 	defer conn.Close()
 
@@ -219,20 +219,18 @@ func TestProxySockets(t *testing.T) {
 	})
 
 	srvJIMM := newServer(func(connClient *websocket.Conn) error {
-		controllerClient, err := srvController.dialer.Dial(ctx, srvController.URL, true)
+		connController, err := srvController.dialer.BasicDial(ctx, srvController.URL)
 		c.Assert(err, qt.IsNil)
-		defer controllerClient.Close()
-		connController := controllerClient.GetConn()
+		defer connController.Close()
 		return rpc.ProxySockets(ctx, connClient, connController)
 	})
 
 	defer srvController.Close()
 	defer srvJIMM.Close()
-	client, err := srvJIMM.dialer.Dial(ctx, srvJIMM.URL, true)
+	ws, err := srvJIMM.dialer.BasicDial(ctx, srvJIMM.URL)
 	c.Assert(err, qt.IsNil)
-	defer client.Close()
+	defer ws.Close()
 
-	ws := client.GetConn()
 	p := json.RawMessage(`{"Key":"TestVal"}`)
 	msg := rpc.Message{RequestID: 1, Type: "TestType", Request: "TestReq", Params: p}
 	err = ws.WriteJSON(&msg)
@@ -255,10 +253,8 @@ func TestCancelProxySockets(t *testing.T) {
 	readyChan := make(chan int)
 	errChan := make(chan error)
 	srvJIMM := newServer(func(connClient *websocket.Conn) error {
-		controllerClient, err := srvController.dialer.Dial(ctx, srvController.URL, true)
+		connController, err := srvController.dialer.BasicDial(ctx, srvController.URL)
 		c.Assert(err, qt.IsNil)
-		defer controllerClient.Close()
-		connController := controllerClient.GetConn()
 		readyChan <- 1
 		err = rpc.ProxySockets(ctx, connClient, connController)
 		errChan <- err
@@ -267,9 +263,9 @@ func TestCancelProxySockets(t *testing.T) {
 
 	defer srvController.Close()
 	defer srvJIMM.Close()
-	client, err := srvJIMM.dialer.Dial(ctx, srvJIMM.URL, true)
+	ws, err := srvJIMM.dialer.BasicDial(ctx, srvJIMM.URL)
 	c.Assert(err, qt.IsNil)
-	defer client.Close()
+	defer ws.Close()
 	<-readyChan
 	cancel()
 	err = <-errChan

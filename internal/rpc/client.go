@@ -45,7 +45,23 @@ type Dialer struct {
 }
 
 // Dial establishes a new client RPC connection to the given URL.
-func (d Dialer) Dial(ctx context.Context, url string, proxy bool) (*Client, error) {
+func (d Dialer) Dial(ctx context.Context, url string) (*Client, error) {
+	conn, err := d.BasicDial(ctx, url)
+	if err != nil {
+		return nil, err
+	}
+	cl := &Client{
+		conn:   conn,
+		closed: make(chan struct{}),
+		msgs:   make(map[uint64]inflight),
+	}
+	go cl.recv()
+
+	return cl, nil
+}
+
+// BasicDial is similar to Dial but returns a raw websocket instead of a client.
+func (d Dialer) BasicDial(ctx context.Context, url string) (*websocket.Conn, error) {
 	const op = errors.Op("rpc.Dial")
 
 	dialer := websocket.Dialer{
@@ -55,18 +71,7 @@ func (d Dialer) Dial(ctx context.Context, url string, proxy bool) (*Client, erro
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
-	cl := &Client{
-		conn:  conn,
-		proxy: proxy,
-	}
-	// When proxying a connection handle reads separately.
-	if !proxy {
-		cl.closed = make(chan struct{})
-		cl.msgs = make(map[uint64]inflight)
-		go cl.recv()
-	}
-
-	return cl, nil
+	return conn, nil
 }
 
 type inflight struct {
@@ -78,8 +83,6 @@ type inflight struct {
 type Client struct {
 	conn   *websocket.Conn
 	closed chan struct{}
-	// Whether the client is used as part of a proxy connection.
-	proxy bool
 
 	mu    sync.Mutex
 	reqID uint64

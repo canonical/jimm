@@ -147,7 +147,7 @@ func postLoginForm(username, password string) responseHandler {
 // A simple script to gather an initial macaroon on start to authenticate against JIMM with
 // in a local environment.
 func main() {
-	rpcclient, err := (&rpc.Dialer{}).Dial(context.TODO(), "ws://0.0.0.0:17070/api", false)
+	rpcclient, err := (&rpc.Dialer{}).Dial(context.TODO(), "ws://0.0.0.0:17070/api")
 	if err != nil {
 		log.Fatal("failed to dial controller:", err)
 	}

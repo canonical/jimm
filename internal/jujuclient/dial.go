@@ -20,6 +20,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/gorilla/websocket"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil"
@@ -70,7 +71,7 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 	if ctl.PublicAddress != "" {
 		// If there is a public-address configured it is almost
 		// certainly the one we want to use, try it first.
-		client, err = dialer.Dial(ctx, websocketURL(ctl.PublicAddress, modelTag), false)
+		client, err = dialer.Dial(ctx, websocketURL(ctl.PublicAddress, modelTag))
 		if err != nil {
 			zapctx.Error(ctx, "failed to dial public address", zaputil.Error(err))
 		}
@@ -149,15 +150,10 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 	}, nil
 }
 
-type ProxyDialer struct {
-}
-
-// Dial implements jimm.Dialer.
-// This dialer is useful when proxying a client connection through to a controller.
-// It eliminates some of the underlying checks so that messages can cleanly be passed between
-// a client and controller
-func (d *ProxyDialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag) (jimm.API, error) {
-	const op = errors.Op("jujuclient.Dial")
+// ProxyDial is similar to the other dial methods but returns a raw websocket
+// that can be used as is.
+func ProxyDial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag) (*websocket.Conn, error) {
+	const op = errors.Op("jujuclient.ProxyDial")
 
 	var tlsConfig *tls.Config
 	if ctl.CACertificate != "" {
@@ -171,17 +167,17 @@ func (d *ProxyDialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTa
 		TLSConfig: tlsConfig,
 	}
 
-	var client *rpc.Client
+	var conn *websocket.Conn
 	var err error
 	if ctl.PublicAddress != "" {
 		// If there is a public-address configured it is almost
 		// certainly the one we want to use, try it first.
-		client, err = dialer.Dial(ctx, websocketURL(ctl.PublicAddress, modelTag), true)
+		conn, err = dialer.BasicDial(ctx, websocketURL(ctl.PublicAddress, modelTag))
 		if err != nil {
 			zapctx.Error(ctx, "failed to dial public address", zaputil.Error(err))
 		}
 	}
-	if client == nil {
+	if conn == nil {
 		var urls []string
 		for _, hps := range ctl.Addresses {
 			for _, hp := range hps {
@@ -192,68 +188,16 @@ func (d *ProxyDialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTa
 			}
 		}
 		var err2 error
-		client, err2 = dialAll(ctx, &dialer, urls)
+		conn, err2 = basicDialAll(ctx, &dialer, urls)
 		if err == nil {
 			err = err2
 		}
 	}
-	if client == nil {
+	if conn == nil {
 		return nil, errors.E(op, errors.CodeConnectionFailed, err)
 	}
+	return conn, nil
 
-	// TODO(Kian): Change the below to login via a JWT token.
-	username := ctl.AdminUser
-	password := ctl.AdminPassword
-	// if d.ControllerCredentialsStore != nil {
-	// 	u, p, err := d.ControllerCredentialsStore.GetControllerCredentials(ctx, ctl.Name)
-	// 	if err != nil {
-	// 		return nil, errors.E(op, errors.CodeNotFound)
-	// 	}
-	// 	if u != "" {
-	// 		username = u
-	// 	}
-	// 	if password != "" {
-	// 		password = p
-	// 	}
-	// }
-
-	args := jujuparams.LoginRequest{
-		AuthTag:       names.NewUserTag(username).String(),
-		Credentials:   password,
-		ClientVersion: "2.9.33", // claim to be a 2.9.33 client.
-	}
-
-	var res jujuparams.LoginResult
-	if err := client.Call(ctx, "Admin", 3, "", "Login", args, &res); err != nil {
-		client.Close()
-		return nil, errors.E(op, errors.CodeConnectionFailed, "authentication failed", err)
-	}
-
-	ct, err := names.ParseControllerTag(res.ControllerTag)
-	if err == nil {
-		ctl.SetTag(ct)
-	}
-	if res.ServerVersion != "" {
-		ctl.AgentVersion = res.ServerVersion
-	}
-	ctl.Addresses = dbmodel.HostPorts(res.Servers)
-	facades := make(map[string]bool)
-	for _, fv := range res.Facades {
-		for _, v := range fv.Versions {
-			facades[fmt.Sprintf("%s\x1f%d", fv.Name, v)] = true
-		}
-	}
-
-	monitorC := make(chan struct{})
-	broken := new(uint32)
-	go monitor(client, monitorC, broken)
-	return &Connection{
-		client:         client,
-		userTag:        args.AuthTag,
-		facadeVersions: facades,
-		monitorC:       monitorC,
-		broken:         broken,
-	}, nil
 }
 
 func websocketURL(s string, mt names.ModelTag) string {
@@ -274,22 +218,64 @@ func dialAll(ctx context.Context, dialer *rpc.Dialer, urls []string) (*rpc.Clien
 	if len(urls) == 0 {
 		return nil, errors.E("no urls to dial")
 	}
+	res, err := dialAllHelper(ctx, dialer, urls, false)
+	client, ok := res.(*rpc.Client)
+	if !ok {
+		zapctx.Error(ctx, "Failed to get client type")
+		res.Close()
+		return nil, errors.E("Failed to get client type")
+	}
+	if client == nil {
+		return nil, err
+	}
+	return client, nil
+}
 
+// basicDialAll is similar to dialAll but returns a raw websocket connection instead of a client.
+func basicDialAll(ctx context.Context, dialer *rpc.Dialer, urls []string) (*websocket.Conn, error) {
+	if len(urls) == 0 {
+		return nil, errors.E("no urls to dial")
+	}
+	res, err := dialAllHelper(ctx, dialer, urls, true)
+	conn, ok := res.(*websocket.Conn)
+	if !ok {
+		zapctx.Error(ctx, "Failed to get conn type")
+		res.Close()
+		return nil, errors.E("Failed to get conn type")
+	}
+	if conn == nil {
+		return nil, err
+	}
+	return conn, nil
+}
+
+type Connecter interface {
+	Close() error
+}
+
+// dialAllHelper simultaneously dials all given urls and returns an object that can be a client or a
+// websocket depending on the value passed into basic.
+func dialAllHelper(ctx context.Context, dialer *rpc.Dialer, urls []string, basic bool) (Connecter, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	var clientOnce, errOnce sync.Once
-	var client *rpc.Client
 	var err error
 	var wg sync.WaitGroup
-
+	var res Connecter
 	for _, url := range urls {
 		zapctx.Info(ctx, "dialing", zap.String("url", url))
 		url := url
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			cl, dErr := dialer.Dial(ctx, url, false)
+			var dErr error
+			var cl Connecter
+			if basic {
+				cl, dErr = dialer.BasicDial(ctx, url)
+			} else {
+				cl, dErr = dialer.Dial(ctx, url)
+			}
 			if dErr != nil {
 				errOnce.Do(func() {
 					err = dErr
@@ -298,7 +284,7 @@ func dialAll(ctx context.Context, dialer *rpc.Dialer, urls []string) (*rpc.Clien
 			}
 			var keep bool
 			clientOnce.Do(func() {
-				client = cl
+				res = cl
 				keep = true
 				cancel()
 			})
@@ -308,10 +294,7 @@ func dialAll(ctx context.Context, dialer *rpc.Dialer, urls []string) (*rpc.Clien
 		}()
 	}
 	wg.Wait()
-	if client == nil {
-		return nil, err
-	}
-	return client, nil
+	return res, err
 }
 
 const pingTimeout = 15 * time.Second

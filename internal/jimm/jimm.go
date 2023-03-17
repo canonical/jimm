@@ -47,10 +47,6 @@ type JIMM struct {
 	// this is not configured all connection attempts will fail.
 	Dialer Dialer
 
-	// ProxyDialer is a variant of Dialer that is used to contact Juju controllers
-	// when a client connection will be proxied through to the controller.
-	ProxyDialer Dialer
-
 	// CredentialStore is a store for the attributes of a
 	// cloud credential and controller credentials. If this is
 	// not configured then the attributes

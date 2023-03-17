@@ -96,6 +96,7 @@ func (r *modelRoot) Login(ctx context.Context, req jujuparams.LoginRequest) (juj
 }
 
 // RedirectInfo implements the RedirectInfo method on the Admin facade.
+// TODO(Kian): Remove the below.
 func (r *modelRoot) RedirectInfo(ctx context.Context) (jujuparams.RedirectInfoResult, error) {
 	const op = errors.Op("jujuapi.RedirectInfo")
 

@@ -140,22 +140,15 @@ func (s modelCommandsServer) ServeWS(ctx context.Context, clientConn *websocket.
 		return
 	}
 
-	api, err := s.jimm.Dialer.Dial(ctx, &m.Controller, names.NewModelTag(uuid))
+	controllerConn, err := jujuclient.ProxyDial(ctx, &m.Controller, names.NewModelTag(uuid))
 	if err != nil {
 		zapctx.Error(ctx, "cannot dial controller", zap.String("controller", m.Controller.Name), zap.Error(err))
 		sendClientError(err)
 		return
 	}
-	defer api.Close()
-	controllerConn, ok := api.(*jujuclient.Connection)
-	if !ok {
-		zapctx.Error(ctx, "cannot grab client from connection")
-		err := errors.E("Failed to communicate with controller")
-		sendClientError(err)
-	}
-	controllerSocket := controllerConn.GetClient().GetConn()
+	defer controllerConn.Close()
 	// TODO: check error here
-	jimmRPC.ProxySockets(ctx, clientConn, controllerSocket)
+	jimmRPC.ProxySockets(ctx, clientConn, controllerConn)
 }
 
 // Use a 64k frame size for the websockets while we need to deal
