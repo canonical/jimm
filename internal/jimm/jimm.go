@@ -69,6 +69,8 @@ type JIMM struct {
 	OpenFGAClient *openfga.OFGAClient
 
 	JWKService *jimmjwx.JWKSService
+
+	JWTService *jimmjwx.JWTService
 }
 
 // ResourceTag returns JIMM's controller tag stating its UUID.

@@ -5,7 +5,9 @@ package jujuapi
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -21,7 +23,10 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jimmhttp"
+	"github.com/CanonicalLtd/jimm/internal/jimmjwx"
 	"github.com/CanonicalLtd/jimm/internal/jujuclient"
+	"github.com/CanonicalLtd/jimm/internal/openfga"
+	ofgaNames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 	jimmRPC "github.com/CanonicalLtd/jimm/internal/rpc"
 	"github.com/CanonicalLtd/jimm/internal/servermon"
 )
@@ -139,16 +144,94 @@ func (s modelCommandsServer) ServeWS(ctx context.Context, clientConn *websocket.
 		sendClientError(err)
 		return
 	}
-
-	controllerConn, err := jujuclient.ProxyDial(ctx, &m.Controller, names.NewModelTag(uuid))
+	mt := names.NewModelTag(uuid)
+	controllerConn, err := jujuclient.ProxyDial(ctx, &m.Controller, mt)
 	if err != nil {
 		zapctx.Error(ctx, "cannot dial controller", zap.String("controller", m.Controller.Name), zap.Error(err))
 		sendClientError(err)
 		return
 	}
 	defer controllerConn.Close()
-	// TODO: check error here
-	jimmRPC.ProxySockets(ctx, clientConn, controllerConn)
+	var user *openfga.User
+	var authErr error
+	var accessMapCache map[string]string
+	var once sync.Once
+	var callCount int
+	// Note: The authFunc could be generalised as a callback that receives every request/response msg
+	// and then decides what to do with it. Currently it acts only as a callback when auth info is needed.
+	authFunc := func(req *jujuparams.LoginRequest, errMap map[string]interface{}) ([]byte, error) {
+		// Authorize the user and ensure certain checks are only done once.
+		once.Do(func() {
+			if req == nil {
+				errors.E("Missing login request.")
+			}
+			user, authErr = s.jimm.Authenticator.Authenticate(ctx, req)
+			if authErr != nil {
+				return
+			}
+			var modelAccess string
+			modelAccess, authErr = s.jimm.GetUserModelAccess(ctx, user, mt)
+			if authErr != nil {
+				return
+			}
+			accessMapCache[mt.String()] = modelAccess
+			// Get the user's access to the JIMM controller, because all users have login access to controllers controlled by JIMM
+			// but only JIMM admins have admin access on other controllers.
+			var controllerAccess string
+			controllerAccess, authErr = s.jimm.GetControllerAccess(ctx, user, user.ResourceTag())
+			if authErr != nil {
+				return
+			}
+			// TODO(Kian): Change below to actual controller tag
+			accessMapCache["controller-"+m.Controller.UUID] = controllerAccess
+		})
+		if authErr != nil {
+			return nil, authErr
+		}
+		if errMap != nil {
+			var err error
+			accessMapCache, err = checkPermission(ctx, user, accessMapCache, errMap)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		jwt, err := s.jimm.JWTService.NewJWT(ctx, jimmjwx.JWTParams{
+			Controller: m.Controller.UUID,
+			User:       user.Username,
+			Access:     accessMapCache,
+		})
+		if err != nil {
+			return nil, err
+		}
+		callCount++
+		if callCount >= 10 {
+			return nil, errors.E("Permission check limit exceeded")
+		}
+		return jwt, nil
+	}
+	jimmRPC.ProxySockets(ctx, clientConn, controllerConn, authFunc)
+}
+
+func checkPermission(ctx context.Context, user *openfga.User, cachedPerms map[string]string, desiredPerms map[string]interface{}) (map[string]string, error) {
+	for key, val := range desiredPerms {
+		if _, ok := cachedPerms[key]; !ok {
+			stringVal, ok := val.(string)
+			if !ok {
+				return nil, errors.E("Failed to get permission assertion.")
+			}
+			check, _, err := openfga.CheckRelation(ctx, user, key, ofgaNames.Relation(stringVal))
+			if err != nil {
+				return cachedPerms, err
+			}
+			if !check {
+				err := errors.E(fmt.Sprintf("Missing permission for %s:%s", key, val))
+				return cachedPerms, err
+			}
+			cachedPerms[key] = stringVal
+		}
+	}
+	return cachedPerms, nil
 }
 
 // Use a 64k frame size for the websockets while we need to deal

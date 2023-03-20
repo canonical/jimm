@@ -250,6 +250,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 
 	if s.jimm.CredentialStore != nil {
 		s.jimm.JWKService = jimmjwx.NewJWKSService(s.jimm.CredentialStore)
+		s.jimm.JWTService = jimmjwx.NewJWTService(p.PublicDNSName, s.jimm.CredentialStore)
 	}
 
 	mountHandler := func(path string, h jimmhttp.JIMMHttpHandler) {

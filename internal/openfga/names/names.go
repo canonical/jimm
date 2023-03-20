@@ -102,8 +102,8 @@ func FromTag[RT ResourceTagger](t RT) *Tag {
 	return tag
 }
 
-// FromString converts an entity tag to an OpenFGA tag.
-func FromString(t string) (*Tag, error) {
+// TagFromString converts an entity tag to an OpenFGA tag.
+func TagFromString(t string) (*Tag, error) {
 	tokens := strings.Split(t, ":")
 	if len(tokens) != 2 {
 		return nil, errors.E("unexpected tag format")

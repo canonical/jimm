@@ -698,7 +698,7 @@ func (j *JIMM) ModelInfo(ctx context.Context, u *openfga.User, mt names.ModelTag
 		return nil, errors.E(op, err)
 	}
 
-	modelAccess, err := j.getUserModelAccess(ctx, u, mt)
+	modelAccess, err := j.GetUserModelAccess(ctx, u, mt)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -806,7 +806,7 @@ func (j *JIMM) ForEachUserModel(ctx context.Context, u *openfga.User, f func(*db
 	err := j.Database.ForEachModel(ctx, func(m *dbmodel.Model) error {
 		model := *m
 
-		access, err := j.getUserModelAccess(ctx, u, model.ResourceTag())
+		access, err := j.GetUserModelAccess(ctx, u, model.ResourceTag())
 		if err != nil {
 			return errors.E(op, err)
 		}
@@ -1127,7 +1127,7 @@ func (j *JIMM) doModelAdmin(ctx context.Context, u *openfga.User, mt names.Model
 	return j.doModel(ctx, u, mt, "admin", f)
 }
 
-func (j *JIMM) getUserModelAccess(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error) {
+func (j *JIMM) GetUserModelAccess(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error) {
 	accessLevel := user.GetModelAccess(ctx, model)
 	return ToModelAccessString(accessLevel), nil
 }
@@ -1142,7 +1142,7 @@ func (j *JIMM) doModel(ctx context.Context, u *openfga.User, mt names.ModelTag, 
 		return errors.E(op, err)
 	}
 
-	accessLevel, err := j.getUserModelAccess(ctx, u, mt)
+	accessLevel, err := j.GetUserModelAccess(ctx, u, mt)
 	if err != nil {
 		return errors.E(op, err)
 	}

@@ -196,11 +196,11 @@ func (o *OFGAClient) ReadRelatedObjects(ctx context.Context, tuple *Tuple, pageS
 		for i := 0; i < len(t); i++ {
 			key, ok := t[i].GetKeyOk()
 			if ok {
-				user, err := ofganames.FromString(key.GetUser())
+				user, err := ofganames.TagFromString(key.GetUser())
 				if err != nil {
 					return nil, errors.E(err)
 				}
-				target, err := ofganames.FromString(key.GetObject())
+				target, err := ofganames.TagFromString(key.GetObject())
 				if err != nil {
 					return nil, errors.E(err)
 				}

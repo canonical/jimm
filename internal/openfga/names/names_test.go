@@ -80,7 +80,7 @@ func (s *namesSuite) TestFromOpenFGATag(c *gc.C) {
 	}}
 	for i, test := range tests {
 		c.Logf("running test %d: %s", i, test.input)
-		result, err := ofganames.FromString(test.input)
+		result, err := ofganames.TagFromString(test.input)
 		if test.expectedError != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectedError)
 		} else {
