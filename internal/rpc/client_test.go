@@ -15,6 +15,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/gorilla/websocket"
+	"github.com/juju/juju/rpc/params"
 
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/rpc"
@@ -222,7 +223,10 @@ func TestProxySockets(t *testing.T) {
 		connController, err := srvController.dialer.BasicDial(ctx, srvController.URL)
 		c.Assert(err, qt.IsNil)
 		defer connController.Close()
-		return rpc.ProxySockets(ctx, connClient, connController)
+		authFunc := func(req *params.LoginRequest, errMap map[string]interface{}) ([]byte, error) {
+			return nil, nil
+		}
+		return rpc.ProxySockets(ctx, connClient, connController, authFunc)
 	})
 
 	defer srvController.Close()
@@ -256,7 +260,10 @@ func TestCancelProxySockets(t *testing.T) {
 		connController, err := srvController.dialer.BasicDial(ctx, srvController.URL)
 		c.Assert(err, qt.IsNil)
 		readyChan <- 1
-		err = rpc.ProxySockets(ctx, connClient, connController)
+		authFunc := func(req *params.LoginRequest, errMap map[string]interface{}) ([]byte, error) {
+			return nil, nil
+		}
+		err = rpc.ProxySockets(ctx, connClient, connController, authFunc)
 		errChan <- err
 		return err
 	})

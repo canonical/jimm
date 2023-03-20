@@ -139,7 +139,6 @@ func (s modelCommandsServer) ServeWS(ctx context.Context, clientConn *websocket.
 			zapctx.Error(ctx, "cannot send commands response", zap.Error(err))
 		}
 	}
-	// TODO(Kian) Change redirect to a MITM
 	if err := s.jimm.Database.GetModel(context.Background(), &m); err != nil {
 		sendClientError(err)
 		return
@@ -182,8 +181,7 @@ func (s modelCommandsServer) ServeWS(ctx context.Context, clientConn *websocket.
 			if authErr != nil {
 				return
 			}
-			// TODO(Kian): Change below to actual controller tag
-			accessMapCache["controller-"+m.Controller.UUID] = controllerAccess
+			accessMapCache[m.Controller.Tag().String()] = controllerAccess
 		})
 		if authErr != nil {
 			return nil, authErr
@@ -210,7 +208,8 @@ func (s modelCommandsServer) ServeWS(ctx context.Context, clientConn *websocket.
 		}
 		return jwt, nil
 	}
-	jimmRPC.ProxySockets(ctx, clientConn, controllerConn, authFunc)
+	err = jimmRPC.ProxySockets(ctx, clientConn, controllerConn, authFunc)
+	sendClientError(err)
 }
 
 func checkPermission(ctx context.Context, user *openfga.User, cachedPerms map[string]string, desiredPerms map[string]interface{}) (map[string]string, error) {

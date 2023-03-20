@@ -62,25 +62,24 @@ func proxy(ctx context.Context, connClient, connController *websocket.Conn, f Au
 			loginMsg = msg
 		}
 
-		// Loop the request to the controller in case we get an permissionDenied error.
+		// Loop the request to the controller in cases where we get an permission denied error.
+	login:
 		response := new(message)
-		for {
-			zapctx.Info(ctx, "forwarding request", zap.Any("message", msg))
-			if err := connController.WriteJSON(msg); err != nil {
-				zapctx.Error(ctx, "cannot forward request", zap.Error(err))
-				return err
-			}
+		zapctx.Info(ctx, "forwarding request", zap.Any("message", msg))
+		if err := connController.WriteJSON(msg); err != nil {
+			zapctx.Error(ctx, "cannot forward request", zap.Error(err))
+			return err
+		}
 
-			if err := connController.ReadJSON(response); err != nil {
-				zapctx.Error(ctx, "error reading from controller", zap.Error(err))
+		if err := connController.ReadJSON(response); err != nil {
+			zapctx.Error(ctx, "error reading from controller", zap.Error(err))
+			return err
+		}
+		if response.ErrorCode == "PermissionAssertionRequireError" {
+			if err := redoLogin(ctx, loginMsg, response, connController, f); err != nil {
 				return err
-			}
-			if response.ErrorCode == "PermissionAssertionRequireError" {
-				if err := redoLogin(ctx, loginMsg, response, connClient, connController, f); err != nil {
-					return err
-				}
 			} else {
-				break
+				goto login
 			}
 		}
 
@@ -92,7 +91,7 @@ func proxy(ctx context.Context, connClient, connController *websocket.Conn, f Au
 	}
 }
 
-func redoLogin(ctx context.Context, loginMsg *message, resp *message, connClient, connController *websocket.Conn, f AuthFunc) error {
+func redoLogin(ctx context.Context, loginMsg *message, resp *message, connController *websocket.Conn, f AuthFunc) error {
 	err := addJWT(loginMsg, resp.ErrorInfo, f)
 	if err != nil {
 		return err
@@ -102,12 +101,10 @@ func redoLogin(ctx context.Context, loginMsg *message, resp *message, connClient
 		zapctx.Error(ctx, "cannot send new login", zap.Error(err))
 		return err
 	}
-	if err := connClient.ReadJSON(loginMsg); err != nil {
+	if err := connController.ReadJSON(loginMsg); err != nil {
 		zapctx.Error(ctx, "error login response from controller", zap.Error(err))
 		return err
 	}
-	// TODO(Kian): Add logic to determine if login was successful.
-	// This response won't be forwarded back to the client.
 	return nil
 }
 
