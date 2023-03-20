@@ -20,7 +20,7 @@ func (c Connection) Status(ctx context.Context, patterns []string) (*jujuparams.
 	}
 
 	out := jujuparams.FullStatus{}
-	if err := c.CallHighestFacadeVersion(ctx, "Client", []int{5, 3}, "", "FullStatus", &p, &out); err != nil {
+	if err := c.CallHighestFacadeVersion(ctx, "Client", []int{6, 3}, "", "FullStatus", &p, &out); err != nil {
 		return nil, errors.E(op, jujuerrors.Cause(err))
 	}
 

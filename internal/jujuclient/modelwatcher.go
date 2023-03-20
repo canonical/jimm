@@ -16,7 +16,7 @@ import (
 func (c Connection) WatchAll(ctx context.Context) (string, error) {
 	const op = errors.Op("jujuclient.WatchAll")
 	var resp jujuparams.AllWatcherId
-	if err := c.CallHighestFacadeVersion(ctx, "Client", []int{5, 1}, "", "WatchAll", nil, &resp); err != nil {
+	if err := c.CallHighestFacadeVersion(ctx, "Client", []int{6, 1}, "", "WatchAll", nil, &resp); err != nil {
 		return "", errors.E(op, jujuerrors.Cause(err))
 	}
 	return resp.AllWatcherId, nil
