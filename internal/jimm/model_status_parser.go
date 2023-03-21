@@ -25,11 +25,11 @@ import (
 // If a result is erroneous, for example, bad data type parsing, the resulting struct field
 // Errors will contain a map from model UUID -> []error. Otherwise, the Results field
 // will contain model UUID -> []Jq result.
-func (j *JIMM) QueryModels(ctx context.Context, user *openfga.User, jqQuery string) (*params.CrossModelJqQueryResponse, error) {
+func (j *JIMM) QueryModelsJq(ctx context.Context, user *openfga.User, jqQuery string) (params.CrossModelQueryResponse, error) {
 	op := errors.Op("QueryModels")
-	results := &params.CrossModelJqQueryResponse{
+	results := params.CrossModelQueryResponse{
 		Results: make(map[string][]any),
-		Errors:  make(map[string][]error),
+		Errors:  make(map[string][]string),
 	}
 
 	query, err := gojq.Parse(jqQuery)
@@ -84,14 +84,14 @@ func (j *JIMM) QueryModels(ctx context.Context, user *openfga.User, jqQuery stri
 		modelStatus, err := getModelStatus(id)
 		if err != nil {
 			zapctx.Error(ctx, "failed to get model status", zap.String("model-uuid", id))
-			results.Errors[id] = append(results.Errors[id], err)
+			results.Errors[id] = append(results.Errors[id], err.Error())
 			continue
 		}
 		formatter := status.NewStatusFormatter(modelStatus, true)
 		formattedStatus, err := formatter.Format()
 		if err != nil {
 			zapctx.Error(ctx, "failed to format status", zap.String("model-uuid", id))
-			results.Errors[id] = append(results.Errors[id], err)
+			results.Errors[id] = append(results.Errors[id], err.Error())
 			continue
 		}
 		// We could use output.NewFormatter() from 3.0+ juju/juju, but ultimately
@@ -100,7 +100,7 @@ func (j *JIMM) QueryModels(ctx context.Context, user *openfga.User, jqQuery stri
 		fb, err := json.Marshal(formattedStatus)
 		if err != nil {
 			zapctx.Error(ctx, "failed to marshal formatted status", zap.String("model-uuid", id))
-			results.Errors[id] = append(results.Errors[id], err)
+			results.Errors[id] = append(results.Errors[id], err.Error())
 			continue
 		}
 		tempMap := make(map[string]any)
@@ -116,7 +116,7 @@ func (j *JIMM) QueryModels(ctx context.Context, user *openfga.User, jqQuery stri
 			}
 
 			if err, ok := v.(error); ok {
-				results.Errors[id] = append(results.Errors[id], err)
+				results.Errors[id] = append(results.Errors[id], "jq error: "+err.Error())
 				continue
 			}
 

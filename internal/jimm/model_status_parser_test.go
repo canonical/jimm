@@ -278,7 +278,7 @@ var model3 = getFullStatus("model-3", map[string]jujuparams.ApplicationStatus{},
 	nil,
 )
 
-func TestQueryModels(t *testing.T) {
+func TestQueryModelsJq(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
@@ -379,7 +379,7 @@ func TestQueryModels(t *testing.T) {
 	// Tests:
 
 	// Query for all models only.
-	res, err := j.QueryModels(ctx, alice, ".model")
+	res, err := j.QueryModelsJq(ctx, alice, ".model")
 	c.Assert(err, qt.IsNil)
 	b, _ := json.Marshal(res)
 	fmt.Println(string(b))
@@ -434,24 +434,14 @@ func TestQueryModels(t *testing.T) {
 		},
 		"errors": {
 			"40000000-0000-0000-0000-000000000000": [
-				{
-					"Op": "db.GetModel",
-					"Code": "not found",
-					"Message": "model not found",
-					"Err": {
-						"Op": "",
-						"Code": "not found",
-						"Message": "",
-						"Err": {}
-					}
-				}
+				"model not found"
 			]
 		}
 	}	
 	`, qt.JSONEquals, res)
 
 	// Query all applications across all models.
-	res, err = j.QueryModels(ctx, alice, ".applications")
+	res, err = j.QueryModelsJq(ctx, alice, ".applications")
 	c.Assert(err, qt.IsNil)
 	c.Assert(`
 	{
@@ -594,17 +584,7 @@ func TestQueryModels(t *testing.T) {
 		},
 		"errors": {
 			"40000000-0000-0000-0000-000000000000": [
-				{
-					"Op": "db.GetModel",
-					"Code": "not found",
-					"Message": "model not found",
-					"Err": {
-						"Op": "",
-						"Code": "not found",
-						"Message": "",
-						"Err": {}
-					}
-				}
+				"model not found"
 			]
 		}
 	}

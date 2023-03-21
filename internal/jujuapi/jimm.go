@@ -4,6 +4,7 @@ package jujuapi
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/juju/juju/core/network"
@@ -44,6 +45,7 @@ func init() {
 		removeRelationMethod := rpc.Method(r.RemoveRelation)
 		checkRelationMethod := rpc.Method(r.CheckRelation)
 		listRelationshipTuplesMethod := rpc.Method(r.ListRelationshipTuples)
+		crossModelQueryMethod := rpc.Method(r.CrossModelQuery)
 
 		r.AddMethod("JIMM", 2, "DisableControllerUUIDMasking", disableControllerUUIDMaskingMethod)
 		r.AddMethod("JIMM", 2, "ListControllers", listControllersMethod)
@@ -85,6 +87,8 @@ func init() {
 		r.AddMethod("JIMM", 4, "RemoveRelation", removeRelationMethod)
 		r.AddMethod("JIMM", 4, "CheckRelation", checkRelationMethod)
 		r.AddMethod("JIMM", 4, "ListRelationshipTuples", listRelationshipTuplesMethod)
+		// JIMM Cross-model queries
+		r.AddMethod("JIMM", 4, "CrossModelQuery", crossModelQueryMethod)
 
 		return []int{2, 3, 4}
 	}
@@ -493,4 +497,19 @@ func (r *controllerRoot) RemoveCloudFromController(ctx context.Context, req apip
 		return errors.E(op, err)
 	}
 	return nil
+}
+
+// CrossModelQuery enables users to query all of their available models and each entity within the model.
+//
+// The query will run against output exactly like "juju status --format json", but for each of their models.
+func (r *controllerRoot) CrossModelQuery(ctx context.Context, req apiparams.CrossModelQueryRequest) (apiparams.CrossModelQueryResponse, error) {
+	const op = errors.Op("jujuapi.CrossModelQuery")
+	switch strings.TrimSpace(strings.ToLower(req.Type)) {
+	case "jq":
+		return r.jimm.QueryModelsJq(ctx, r.user, req.Query)
+	case "jimmsql":
+		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.CodeNotImplemented)
+	default:
+		return apiparams.CrossModelQueryResponse{}, errors.E(op, errors.Code("invalid query type"), "unable to query models")
+	}
 }

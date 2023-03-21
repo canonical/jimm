@@ -621,3 +621,76 @@ func (s *jimmSuite) TestRemoveCloudFromController(c *gc.C) {
 	_, err = s.JIMM.GetCloud(context.Background(), user, names.NewCloudTag("test-cloud"))
 	c.Assert(err, gc.ErrorMatches, `cloud "test-cloud" not found`)
 }
+
+func (s *jimmSuite) TestCrossModelQuery(c *gc.C) {
+	s.AddController(c, "controller-2", s.APIInfo(c))
+	s.AddModel(
+		c,
+		names.NewUserTag("charlie@external"),
+		"model-20",
+		names.NewCloudTag(jimmtest.TestCloudName),
+		jimmtest.TestCloudRegionName,
+		s.Model2.CloudCredential.ResourceTag(),
+	)
+	s.AddModel(
+		c,
+		names.NewUserTag("charlie@external"),
+		"model-21",
+		names.NewCloudTag(jimmtest.TestCloudName),
+		jimmtest.TestCloudRegionName,
+		s.Model2.CloudCredential.ResourceTag(),
+	)
+	s.AddModel(
+		c,
+		names.NewUserTag("charlie@external"),
+		"model-22",
+		names.NewCloudTag(jimmtest.TestCloudName),
+		jimmtest.TestCloudRegionName,
+		s.Model2.CloudCredential.ResourceTag(),
+	)
+
+	conn := s.open(c, nil, "charlie")
+	defer conn.Close()
+	client := api.NewClient(conn)
+
+	_, err := client.CrossModelQuery(&apiparams.CrossModelQueryRequest{
+		Type:  "some-type-not-supported",
+		Query: ".",
+	})
+	c.Assert(err, gc.ErrorMatches, `unable to query models \(invalid query type\)`)
+
+	_, err = client.CrossModelQuery(&apiparams.CrossModelQueryRequest{
+		Type:  "jimmsql",
+		Query: ".",
+	})
+	c.Assert(err, gc.ErrorMatches, `not implemented \(not implemented\)`)
+
+	res, err := client.CrossModelQuery(&apiparams.CrossModelQueryRequest{
+		Type:  "jq",
+		Query: ".",
+	})
+	c.Assert(err, gc.IsNil)
+	c.Assert(res.Results, gc.HasLen, 5)
+	c.Assert(res.Errors, gc.HasLen, 0)
+
+	// Query with broken jq, this JQ will run against each model and return the same error
+	res, err = client.CrossModelQuery(&apiparams.CrossModelQueryRequest{
+		Type:  "jq",
+		Query: "dig-lett",
+	})
+	c.Assert(err, gc.IsNil)
+	c.Assert(res.Results, gc.HasLen, 0)
+	c.Assert(res.Errors, gc.HasLen, 5)
+	for _, errString := range res.Errors {
+		c.Assert(errString[0], gc.Equals, "jq error: function not defined: lett/0")
+	}
+
+	// Query for two very specific models
+	res, err = client.CrossModelQuery(&apiparams.CrossModelQueryRequest{
+		Type:  "jq",
+		Query: "select((.model.name==\"model-21\") or .model.name==\"model-22\")",
+	})
+	c.Assert(err, gc.IsNil)
+	c.Assert(res.Results, gc.HasLen, 2)
+	c.Assert(res.Errors, gc.HasLen, 0)
+}
