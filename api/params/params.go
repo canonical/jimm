@@ -318,3 +318,12 @@ type ListRelationshipTuplesResponse struct {
 	Tuples            []RelationshipTuple `json:"tuples,omitempty"`
 	ContinuationToken string              `json:"continuation_token,omitempty"`
 }
+
+// CrossModelJqQueryResponse holds results for a cross-model query that has been filtered utilising JQ.
+// It has two fields:
+//   - Results - A map of each iterated JQ output result. The key for this map is the model UUID.
+//   - Errors - A map of each iterated JQ *or* Status call error. The key for this map is the model UUID.
+type CrossModelJqQueryResponse struct {
+	Results map[string][]any   `json:"results"`
+	Errors  map[string][]error `json:"errors"`
+}

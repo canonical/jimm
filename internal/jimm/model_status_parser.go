@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/CanonicalLtd/jimm/api/params"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/openfga"
@@ -13,15 +14,10 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/juju/juju/cmd/juju/status"
-	"github.com/juju/juju/rpc/params"
+	rpcparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
 )
-
-type jqResults struct {
-	Results map[string][]any   `json:"results"`
-	Errors  map[string][]error `json:"errors"`
-}
 
 // QueryModels queries every model available to a given user.
 //
@@ -29,9 +25,9 @@ type jqResults struct {
 // If a result is erroneous, for example, bad data type parsing, the resulting struct field
 // Errors will contain a map from model UUID -> []error. Otherwise, the Results field
 // will contain model UUID -> []Jq result.
-func (j *JIMM) QueryModels(ctx context.Context, user *openfga.User, jqQuery string) (*jqResults, error) {
-	op := errors.Op("todo")
-	results := &jqResults{
+func (j *JIMM) QueryModels(ctx context.Context, user *openfga.User, jqQuery string) (*params.CrossModelJqQueryResponse, error) {
+	op := errors.Op("QueryModels")
+	results := &params.CrossModelJqQueryResponse{
 		Results: make(map[string][]any),
 		Errors:  make(map[string][]error),
 	}
@@ -52,7 +48,7 @@ func (j *JIMM) QueryModels(ctx context.Context, user *openfga.User, jqQuery stri
 		modelUUIDs[i] = strings.Split(modelUUIDs[i], ":")[1]
 	}
 
-	getModelStatus := func(modelUUID string) (*params.FullStatus, error) {
+	getModelStatus := func(modelUUID string) (*rpcparams.FullStatus, error) {
 		model := dbmodel.Model{
 			UUID: sql.NullString{String: modelUUID, Valid: true},
 		}
@@ -84,20 +80,18 @@ func (j *JIMM) QueryModels(ctx context.Context, user *openfga.User, jqQuery stri
 		return modelStatus, nil
 	}
 
-	// In return struct, have separate field of errors and results
-	// errors field map of model uuid -> error.String()
 	for _, id := range modelUUIDs {
 		modelStatus, err := getModelStatus(id)
 		if err != nil {
-			// What to do with these errors?
-			// TODO(ale8k): Add metrics for failures on this call
+			zapctx.Error(ctx, "failed to get model status", zap.String("model-uuid", id))
+			results.Errors[id] = append(results.Errors[id], err)
 			continue
 		}
 		formatter := status.NewStatusFormatter(modelStatus, true)
 		formattedStatus, err := formatter.Format()
 		if err != nil {
-			// What to do with these errors?
-			// TODO(ale8k): Add metrics for failures on this call
+			zapctx.Error(ctx, "failed to format status", zap.String("model-uuid", id))
+			results.Errors[id] = append(results.Errors[id], err)
 			continue
 		}
 		// We could use output.NewFormatter() from 3.0+ juju/juju, but ultimately
@@ -105,8 +99,8 @@ func (j *JIMM) QueryModels(ctx context.Context, user *openfga.User, jqQuery stri
 		// *should* be OK. But TODO: make sure this is fine.
 		fb, err := json.Marshal(formattedStatus)
 		if err != nil {
-			// What to do with these errors?
-			// TODO(ale8k): Add metrics for failures on this call
+			zapctx.Error(ctx, "failed to marshal formatted status", zap.String("model-uuid", id))
+			results.Errors[id] = append(results.Errors[id], err)
 			continue
 		}
 		tempMap := make(map[string]any)

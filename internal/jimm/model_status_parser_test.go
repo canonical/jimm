@@ -2,6 +2,8 @@ package jimm_test
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -141,7 +143,7 @@ var model1 = getFullStatus("model-1", map[string]jujuparams.ApplicationStatus{
 			"db": {"myapp"},
 		},
 		Units: map[string]jujuparams.UnitStatus{
-			"myapp/0": jujuparams.UnitStatus{
+			"myapp/0": {
 				AgentStatus: jujuparams.DetailedStatus{
 					Status:  "idle",
 					Version: "2.9.37",
@@ -166,10 +168,10 @@ var model1 = getFullStatus("model-1", map[string]jujuparams.ApplicationStatus{
 	},
 },
 	map[string]jujuparams.RemoteApplicationStatus{
-		"postgresql": jujuparams.RemoteApplicationStatus{
+		"postgresql": {
 			OfferURL: "lxdcloud:admin/db.postgresql",
 			Endpoints: []jujuparams.RemoteEndpoint{
-				jujuparams.RemoteEndpoint{
+				{
 					Name:      "db",
 					Interface: "pgsql",
 					Role:      "provider",
@@ -191,6 +193,7 @@ var model1 = getFullStatus("model-1", map[string]jujuparams.ApplicationStatus{
 //
 // TODO(ale8k): How do we simulate storage? As this is just status... See newstatusformatter line 62, so we can test the below.
 // Additionally, it has persistent volumes (filesystem).
+// See: https://warthogs.atlassian.net/browse/CSS-3478
 var model2 = getFullStatus("model-2", map[string]jujuparams.ApplicationStatus{
 	"hello-kubecon": {
 		Charm:         "hello-kubecon",
@@ -209,7 +212,7 @@ var model2 = getFullStatus("model-2", map[string]jujuparams.ApplicationStatus{
 		},
 		Relations: map[string][]string{},
 		Units: map[string]jujuparams.UnitStatus{
-			"hello-kubecon/0": jujuparams.UnitStatus{
+			"hello-kubecon/0": {
 				AgentStatus: jujuparams.DetailedStatus{
 					Status:  "allocating",
 					Version: "2.9.37",
@@ -246,7 +249,7 @@ var model2 = getFullStatus("model-2", map[string]jujuparams.ApplicationStatus{
 		},
 		Relations: map[string][]string{},
 		Units: map[string]jujuparams.UnitStatus{
-			"nginx-ingress-integrator/0": jujuparams.UnitStatus{
+			"nginx-ingress-integrator/0": {
 				AgentStatus: jujuparams.DetailedStatus{
 					Status:  "idle",
 					Version: "2.9.37",
@@ -275,7 +278,7 @@ var model3 = getFullStatus("model-3", map[string]jujuparams.ApplicationStatus{},
 	nil,
 )
 
-func TestSomething(t *testing.T) {
+func TestQueryModels(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
@@ -324,10 +327,12 @@ func TestSomething(t *testing.T) {
 		"10000000-0000-0000-0000-000000000000",
 		"20000000-0000-0000-0000-000000000000",
 		"30000000-0000-0000-0000-000000000000",
+		"40000000-0000-0000-0000-000000000000", // Erroneous model (doesn't exist).
 	}
 
 	c.Assert(j.OpenFGAClient.AddRelations(ctx,
 		[]ofga.Tuple{
+			// Reader to model via direct relation
 			{
 				Object:   ofganames.FromTag(names.NewUserTag("alice@external")),
 				Relation: ofganames.ReaderRelation,
@@ -355,6 +360,12 @@ func TestSomething(t *testing.T) {
 				Relation: ofganames.ControllerRelation,
 				Target:   ofganames.FromTag(names.NewModelTag(modelUUIDs[2])),
 			},
+			// Reader to model via direct relation that does NOT exist
+			{
+				Object:   ofganames.FromTag(names.NewUserTag("alice@external")),
+				Relation: ofganames.ReaderRelation,
+				Target:   ofganames.FromTag(names.NewModelTag(modelUUIDs[3])),
+			},
 		}...,
 	), qt.Equals, nil)
 
@@ -370,6 +381,8 @@ func TestSomething(t *testing.T) {
 	// Query for all models only.
 	res, err := j.QueryModels(ctx, alice, ".model")
 	c.Assert(err, qt.IsNil)
+	b, _ := json.Marshal(res)
+	fmt.Println(string(b))
 	c.Assert(`
 	{
 		"results": {
@@ -419,8 +432,181 @@ func TestSomething(t *testing.T) {
 			}
 			]
 		},
-		"errors": {}
-		}	
+		"errors": {
+			"40000000-0000-0000-0000-000000000000": [
+				{
+					"Op": "db.GetModel",
+					"Code": "not found",
+					"Message": "model not found",
+					"Err": {
+						"Op": "",
+						"Code": "not found",
+						"Message": "",
+						"Err": {}
+					}
+				}
+			]
+		}
+	}	
 	`, qt.JSONEquals, res)
-	t.Fail()
+
+	// Query all applications across all models.
+	res, err = j.QueryModels(ctx, alice, ".applications")
+	c.Assert(err, qt.IsNil)
+	c.Assert(`
+	{
+		"results": {
+		  "10000000-0000-0000-0000-000000000000": [
+			{
+			  "myapp": {
+				"address": "10.152.183.177",
+				"application-status": {
+				  "current": "idle",
+				  "since": "0001-01-01 00:00:00Z"
+				},
+				"charm": "myapp",
+				"charm-name": "myapp",
+				"charm-origin": "charmhub",
+				"charm-rev": -1,
+				"endpoint-bindings": {
+				  "": "alpha",
+				  "db": "alpha",
+				  "ingress": "alpha",
+				  "myapp": "alpha"
+				},
+				"exposed": false,
+				"os": "kubernetes",
+				"provider-id": "10000000-0000-0000-0000-000000000000",
+				"relations": {
+				  "db": [
+					"myapp"
+				  ]
+				},
+				"scale": 1,
+				"series": "kubernetes",
+				"units": {
+				  "myapp/0": {
+					"address": "10.1.160.61",
+					"juju-status": {
+					  "current": "idle",
+					  "since": "0001-01-01 00:00:00Z",
+					  "version": "2.9.37"
+					},
+					"leader": true,
+					"provider-id": "myapp-0",
+					"workload-status": {
+					  "current": "blocked",
+					  "message": "waiting for db relation",
+					  "since": "0001-01-01 00:00:00Z"
+					}
+				  }
+				}
+			  }
+			}
+		  ],
+		  "20000000-0000-0000-0000-000000000000": [
+			{
+			  "hello-kubecon": {
+				"address": "10.152.183.177",
+				"application-status": {
+				  "current": "waiting",
+				  "message": "installing agent",
+				  "since": "0001-01-01 00:00:00Z"
+				},
+				"charm": "hello-kubecon",
+				"charm-channel": "idk",
+				"charm-name": "hello-kubecon",
+				"charm-origin": "charmhub",
+				"charm-profile": "idk",
+				"charm-rev": -1,
+				"charm-version": "17",
+				"endpoint-bindings": {
+				  "": "alpha",
+				  "ingress": "alpha"
+				},
+				"exposed": false,
+				"os": "kubernetes",
+				"provider-id": "20000000-0000-0000-0000-000000000000",
+				"scale": 1,
+				"series": "kubernetes",
+				"units": {
+				  "hello-kubecon/0": {
+					"address": "10.1.160.62",
+					"juju-status": {
+					  "current": "allocating",
+					  "since": "0001-01-01 00:00:00Z",
+					  "version": "2.9.37"
+					},
+					"leader": true,
+					"provider-id": "hello-kubecon-0",
+					"workload-status": {
+					  "current": "waiting",
+					  "message": "installing agent",
+					  "since": "0001-01-01 00:00:00Z"
+					}
+				  }
+				}
+			  },
+			  "nginx-ingress-integrator": {
+				"address": "10.152.183.167",
+				"application-status": {
+				  "current": "active",
+				  "since": "0001-01-01 00:00:00Z"
+				},
+				"charm": "nginx-ingress-integrator",
+				"charm-channel": "idk",
+				"charm-name": "nginx-ingress-integrator",
+				"charm-origin": "charmhub",
+				"charm-profile": "idk",
+				"charm-rev": -1,
+				"charm-version": "54",
+				"endpoint-bindings": {
+				  "": "alpha",
+				  "ingress": "alpha"
+				},
+				"exposed": true,
+				"os": "kubernetes",
+				"provider-id": "20000000-0000-0000-0000-000000000000",
+				"scale": 1,
+				"series": "kubernetes",
+				"units": {
+				  "nginx-ingress-integrator/0": {
+					"address": "10.1.160.63",
+					"juju-status": {
+					  "current": "idle",
+					  "since": "0001-01-01 00:00:00Z",
+					  "version": "2.9.37"
+					},
+					"leader": true,
+					"provider-id": "nginx-ingress-integrator-0",
+					"workload-status": {
+					  "current": "active",
+					  "since": "0001-01-01 00:00:00Z"
+					}
+				  }
+				}
+			  }
+			}
+		  ],
+		  "30000000-0000-0000-0000-000000000000": [
+			{}
+		  ]
+		},
+		"errors": {
+			"40000000-0000-0000-0000-000000000000": [
+				{
+					"Op": "db.GetModel",
+					"Code": "not found",
+					"Message": "model not found",
+					"Err": {
+						"Op": "",
+						"Code": "not found",
+						"Message": "",
+						"Err": {}
+					}
+				}
+			]
+		}
+	}
+	`, qt.JSONEquals, res)
 }
