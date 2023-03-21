@@ -2,8 +2,6 @@ package jimm_test
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
@@ -381,8 +379,6 @@ func TestQueryModelsJq(t *testing.T) {
 	// Query for all models only.
 	res, err := j.QueryModelsJq(ctx, alice, ".model")
 	c.Assert(err, qt.IsNil)
-	b, _ := json.Marshal(res)
-	fmt.Println(string(b))
 	c.Assert(`
 	{
 		"results": {
