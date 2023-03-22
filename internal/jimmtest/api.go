@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/crossmodel"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/version"
 	"github.com/juju/names/v4"
 
@@ -86,11 +86,23 @@ func (w apiWrapper) Close() error {
 	return w.API.Close()
 }
 
+// ModelDialerMap enables the dialing of many models on the same controller,
+// it is designed such that should you need to query multiple models, you can.
+type ModelDialerMap map[string]jimm.Dialer
+
+// Dial implements jimm.Dialer.
+func (m ModelDialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag) (jimm.API, error) {
+	if d, ok := m[mt.Id()]; ok {
+		return d.Dial(ctx, ctl, mt)
+	}
+	return nil, errors.E(fmt.Sprintf("dialer not configured for controller %s", ctl.Name))
+}
+
 // A DialerMap implements a jimm.Dialer that uses a different Dialer for
 // each controller. The DialerMap is keyed by controller name.
 type DialerMap map[string]jimm.Dialer
 
-// Dialer implements jimm.Dialer.
+// Dial implements jimm.Dialer.
 func (m DialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag) (jimm.API, error) {
 	if d, ok := m[ctl.Name]; ok {
 		return d.Dial(ctx, ctl, mt)

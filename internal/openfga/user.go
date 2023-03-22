@@ -151,6 +151,11 @@ func (u *User) SetApplicationOfferAccess(ctx context.Context, resource names.App
 	return setResourceAccess(ctx, u, resource, relation)
 }
 
+// ListModels returns a slice of model UUIDs this user has at least reader access to.
+func (u *User) ListModels(ctx context.Context) ([]string, error) {
+	return u.client.ListObjects(ctx, ofganames.FromTag(u.ResourceTag()).String(), ofganames.ReaderRelation.String(), "model", nil)
+}
+
 type administratorT interface {
 	names.ControllerTag | names.ModelTag | names.ApplicationOfferTag | names.CloudTag
 

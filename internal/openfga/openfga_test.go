@@ -471,7 +471,13 @@ func (s *openFGATestSuite) TestListObjectsWithContextualTuples(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	c.Assert(ids, gc.DeepEquals, expected)
+	c.Assert(cmp.Equal(
+		ids,
+		expected,
+		cmpopts.SortSlices(func(want string, expected string) bool {
+			return want < expected
+		}),
+	), gc.Equals, true)
 }
 
 func (s *openFGATestSuite) TestListObjectsWithPeristedTuples(c *gc.C) {

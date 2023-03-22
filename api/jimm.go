@@ -67,7 +67,7 @@ func (c *Client) ListControllers() ([]params.ControllerInfo, error) {
 	return resp.Controllers, err
 }
 
-// AddCloudToController adds the specified cloud to a specific controller in JIMM.
+// RemoveCloudFromController removes the specified cloud from a specific controller.
 func (c *Client) RemoveCloudFromController(req *params.RemoveCloudFromControllerRequest) error {
 	return c.caller.APICall("JIMM", 3, "", "RemoveCloudFromController", req, nil)
 }
@@ -165,5 +165,14 @@ func (c *Client) CheckRelation(req *params.CheckRelationRequest) (params.CheckRe
 func (c *Client) ListRelationshipTuples(req *params.ListRelationshipTuplesRequest) (*params.ListRelationshipTuplesResponse, error) {
 	var response params.ListRelationshipTuplesResponse
 	err := c.caller.APICall("JIMM", 4, "", "ListRelationshipTuples", req, &response)
+	return &response, err
+}
+
+// CrossModelQuery enables users to query all of their available models and each entity within the model.
+//
+// The query will run against output exactly like "juju status --format json", but for each of their models.
+func (c *Client) CrossModelQuery(req *params.CrossModelQueryRequest) (*params.CrossModelQueryResponse, error) {
+	var response params.CrossModelQueryResponse
+	err := c.caller.APICall("JIMM", 4, "", "CrossModelQuery", req, &response)
 	return &response, err
 }
