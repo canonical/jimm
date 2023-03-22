@@ -33,7 +33,7 @@ import (
 	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 )
 
-const jujuVersion = "2.9.42"
+const jujuVersion = "2.9.43"
 
 type modelManagerSuite struct {
 	websocketSuite
