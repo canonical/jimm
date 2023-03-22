@@ -4,37 +4,74 @@ import (
 	"context"
 	"crypto/tls"
 	"path"
+	"sync"
+	"syscall"
 
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"time"
 
+	service "github.com/canonical/go-service"
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/websocket"
 	jujuhttp "github.com/juju/http"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
+	"github.com/lestrrat-go/jwx/v2/jwk"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 
 	"github.com/CanonicalLtd/jimm/internal/errors"
+	"github.com/CanonicalLtd/jimm/internal/jimm/credentials"
+	"github.com/CanonicalLtd/jimm/internal/jimmjwx"
+	"github.com/CanonicalLtd/jimm/internal/wellknownapi"
 )
 
 const websocketFrameSize = 65536
 
 type config struct {
-	CACertificateFile string     `yaml:"ca-cert-file"`
-	CertificateFile   string     `yaml:"cert-file"`
-	KeyFile           string     `yaml:"key-file"`
-	Controller        controller `yaml:"controller"`
+	Hostname        string     `yaml:"hostname"`
+	CertificateFile string     `yaml:"cert-file"`
+	KeyFile         string     `yaml:"key-file"`
+	Controller      controller `yaml:"controller"`
 }
 
 type controller struct {
+	UUID          string   `yaml:"uuid"`
 	APIEndpoints  []string `yaml:"api-endpoints"`
 	CACertificate string   `yaml:"ca-cert"`
+}
+
+type loginRequest struct {
+	jujuparams.LoginRequest
+
+	Token string `json:"token"`
+}
+
+// A message encodes a single message received, over an RPC
+// connection. It contains the union of fields in a request or response
+// message.
+type message struct {
+	RequestID uint64                 `json:"request-id,omitempty"`
+	Type      string                 `json:"type,omitempty"`
+	Version   int                    `json:"version,omitempty"`
+	ID        string                 `json:"id,omitempty"`
+	Request   string                 `json:"request,omitempty"`
+	Params    json.RawMessage        `json:"params,omitempty"`
+	Error     string                 `json:"error,omitempty"`
+	ErrorCode string                 `json:"error-code,omitempty"`
+	ErrorInfo map[string]interface{} `json:"error-info,omitempty"`
+	Response  json.RawMessage        `json:"response,omitempty"`
+}
+
+// isRequest returns whether the message is a request
+func (m message) isRequest() bool {
+	return m.Type != "" && m.Request != ""
 }
 
 var websocketUpgrader = websocket.Upgrader{
@@ -46,7 +83,7 @@ var websocketUpgrader = websocket.Upgrader{
 }
 
 type wsServer interface {
-	ServeWS(context.Context, *websocket.Conn, *websocket.Conn)
+	ServeWS(context.Context, string, *websocket.Conn, *websocket.Conn)
 }
 
 type wsHandler struct {
@@ -60,6 +97,7 @@ type wsHandler struct {
 // been started.
 func (ws *wsHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
+	modelUUID := chi.URLParam(req, "modelUUID")
 
 	connClient, err := websocketUpgrader.Upgrade(w, req, nil)
 	if err != nil {
@@ -97,34 +135,35 @@ func (ws *wsHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 			return
 		}
-		ws.server.ServeWS(ctx, connClient, connController)
+		ws.server.ServeWS(ctx, modelUUID, connClient, connController)
 	}()
 }
 
-// A message encodes a single message sent, or received, over an RPC
-// connection. It contains the union of fields in a request or response
-// message.
-type message struct {
-	RequestID uint64                 `json:"request-id,omitempty"`
-	Type      string                 `json:"type,omitempty"`
-	Version   int                    `json:"version,omitempty"`
-	ID        string                 `json:"id,omitempty"`
-	Request   string                 `json:"request,omitempty"`
-	Params    json.RawMessage        `json:"params,omitempty"`
-	Error     string                 `json:"error,omitempty"`
-	ErrorCode string                 `json:"error-code,omitempty"`
-	ErrorInfo map[string]interface{} `json:"error-info,omitempty"`
-	Response  json.RawMessage        `json:"response,omitempty"`
+type wsMITM struct {
+	controllerUUID string
+	hostname       string
+	jwtService     *jimmjwx.JWTService
 }
 
-// isRequest returns whether the message is a request
-func (m message) isRequest() bool {
-	return m.Type != "" && m.Request != ""
-}
+func (ws *wsMITM) ServeWS(ctx context.Context, modelUUID string, connClient, connController *websocket.Conn) {
+	access := map[string]string{
+		names.NewControllerTag(ws.controllerUUID).String(): "admin",
+	}
+	if modelUUID != "" {
+		access[names.NewModelTag(modelUUID).String()] = "admin"
+	}
+	jwt, err := ws.jwtService.NewJWT(ctx, jimmjwx.JWTParams{
+		Controller: ws.controllerUUID,
+		User:       "controller-jimm",
+		Access:     access,
+	})
+	if err != nil {
+		zapctx.Error(ctx, "failed to create a jwt", zap.Error(err))
+		ws.handleError(err, connClient)
+		return
+	}
+	jwtString := base64.StdEncoding.EncodeToString(jwt)
 
-type wsMITM struct{}
-
-func (ws *wsMITM) ServeWS(ctx context.Context, connClient, connController *websocket.Conn) {
 	for {
 		msg := new(message)
 		if err := connClient.ReadJSON(msg); err != nil {
@@ -148,7 +187,32 @@ func (ws *wsMITM) ServeWS(ctx context.Context, connClient, connController *webso
 			})
 			continue
 		}
-		zapctx.Info(ctx, "forwarding request", zap.Any("message", msg))
+		// If this is a login request we need to augment it with the
+		// JWT.
+		if msg.Type == "Admin" && msg.Request == "Login" {
+			// First we unmarshal the existing LoginRequest.
+			var lr jujuparams.LoginRequest
+			if err := json.Unmarshal(msg.Params, &lr); err != nil {
+				ws.handleError(err, connClient)
+				break
+			}
+
+			// Add the JWT as base64 encoded string.
+			loginRequest := loginRequest{
+				LoginRequest: lr,
+				Token:        jwtString,
+			}
+			// Marshal it again to JSON.
+			data, err := json.Marshal(loginRequest)
+			if err != nil {
+				ws.handleError(err, connClient)
+				break
+			}
+			// And add it to the message.
+			msg.Params = data
+		}
+
+		zapctx.Error(ctx, "forwarding request", zap.Any("message", msg))
 		err := connController.WriteJSON(msg)
 		if err != nil {
 			zapctx.Error(ctx, "cannot forward request", zap.Error(err))
@@ -177,50 +241,116 @@ func (ws *wsMITM) handleError(err error, conn *websocket.Conn) {
 	conn.Close()
 }
 
-// MITM service
-func newService(ctx context.Context, controllerURL string, controllerTLS *tls.Config) *service {
-	dialer := websocket.Dialer{
-		TLSClientConfig: controllerTLS,
-	}
-	s := &service{
-		mux: chi.NewMux(),
-		dialFunc: func(ctx context.Context, requestPath string, header *http.Header) (*websocket.Conn, *http.Response, error) {
-			zapctx.Info(ctx, "dialing", zap.String("url", "wss://"+path.Join(controllerURL, requestPath)))
-			return dialer.DialContext(ctx, "wss://"+path.Join(controllerURL, requestPath), nil)
+type handlerParams struct {
+	hostname       string
+	controllerUUID string
+	dialFunc       func(ctx context.Context, requestPath string, header *http.Header) (*websocket.Conn, *http.Response, error)
+	jwtService     *jimmjwx.JWTService
+}
+
+func newHandler(p handlerParams) http.Handler {
+	return &wsHandler{
+		dialFunc: p.dialFunc,
+		server: &wsMITM{
+			hostname:       p.hostname,
+			controllerUUID: p.controllerUUID,
+			jwtService:     p.jwtService,
 		},
 	}
-
-	s.mux.Handle("/api", s.newAPIHandler(ctx))
-	s.mux.Handle("/model/*", s.newModelHandler(ctx))
-
-	return s
 }
 
-type service struct {
-	mux      *chi.Mux
-	dialFunc func(context.Context, string, *http.Header) (*websocket.Conn, *http.Response, error)
+type inMemoryCredentialStore struct {
+	credentials.CredentialStore
+
+	mu         sync.RWMutex
+	jwks       jwk.Set
+	privateKey []byte
+	expiry     time.Time
 }
 
-// ServeHTTP implements http.Handler.
-func (s *service) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	s.mux.ServeHTTP(w, req)
+// CleanupJWKS removes all secrets associated with the JWKS process.
+func (s *inMemoryCredentialStore) CleanupJWKS(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.jwks = nil
+	s.privateKey = nil
+	s.expiry = time.Time{}
+
+	return nil
 }
 
-func (s *service) newAPIHandler(ctx context.Context) http.Handler {
-	return &wsHandler{
-		dialFunc: s.dialFunc,
-		server:   &wsMITM{},
+// GetJWKS returns the current key set stored within the credential store.
+func (s *inMemoryCredentialStore) GetJWKS(ctx context.Context) (jwk.Set, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.jwks == nil {
+		return nil, errors.E(errors.CodeNotFound)
 	}
+	jwks := s.jwks
+	return jwks, nil
 }
 
-func (s *service) newModelHandler(ctx context.Context) http.Handler {
-	return &wsHandler{
-		dialFunc: s.dialFunc,
-		server:   &wsMITM{},
+// GetJWKSPrivateKey returns the current private key for the active JWKS
+func (s *inMemoryCredentialStore) GetJWKSPrivateKey(ctx context.Context) ([]byte, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.privateKey == nil || len(s.privateKey) == 0 {
+		return nil, errors.E(errors.CodeNotFound)
 	}
+
+	pk := make([]byte, len(s.privateKey))
+	copy(pk, s.privateKey)
+
+	return pk, nil
 }
-func main() {
-	fmt.Println("started")
+
+// GetJWKSExpiry returns the expiry of the active JWKS.
+func (s *inMemoryCredentialStore) GetJWKSExpiry(ctx context.Context) (time.Time, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.expiry.IsZero() {
+		return time.Time{}, errors.E(errors.CodeNotFound)
+	}
+
+	return s.expiry, nil
+}
+
+// PutJWKS puts a generated RS256[4096 bit] JWKS without x5c or x5t into the credential store.
+func (s *inMemoryCredentialStore) PutJWKS(ctx context.Context, jwks jwk.Set) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.jwks = jwks
+
+	return nil
+}
+
+// PutJWKSPrivateKey persists the private key associated with the current JWKS within the store.
+func (s *inMemoryCredentialStore) PutJWKSPrivateKey(ctx context.Context, pem []byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.privateKey = make([]byte, len(pem))
+	copy(s.privateKey, pem)
+
+	return nil
+}
+
+// PutJWKSExpiry sets the expiry time for the current JWKS within the store.
+func (s *inMemoryCredentialStore) PutJWKSExpiry(ctx context.Context, expiry time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.expiry = expiry
+
+	return nil
+}
+
+func start(ctx context.Context, s *service.Service) error {
 	args := os.Args[1:]
 	if len(args) != 1 {
 		fmt.Println("./mitm <config file>")
@@ -238,6 +368,8 @@ func main() {
 		os.Exit(-1)
 	}
 
+	controllerURL := config.Controller.APIEndpoints[0]
+
 	tlsConfig := jujuhttp.SecureTLSConfig()
 	if config.Controller.CACertificate != "" {
 		cp := x509.NewCertPool()
@@ -245,12 +377,96 @@ func main() {
 		tlsConfig.RootCAs = cp
 		tlsConfig.ServerName = "juju-apiserver"
 	}
-	s := newService(context.Background(), config.Controller.APIEndpoints[0], tlsConfig)
+	dialer := websocket.Dialer{
+		TLSClientConfig: tlsConfig,
+	}
+	dialFunc := func(ctx context.Context, requestPath string, header *http.Header) (*websocket.Conn, *http.Response, error) {
+		zapctx.Info(ctx, "dialing", zap.String("url", "wss://"+path.Join(controllerURL, requestPath)))
+		return dialer.DialContext(ctx, "wss://"+path.Join(controllerURL, requestPath), nil)
+	}
 
-	err = http.ListenAndServeTLS(":17071", config.CertificateFile, config.KeyFile, s)
+	mux := chi.NewMux()
+
+	st := &inMemoryCredentialStore{}
+	jwtService := jimmjwx.NewJWTService(config.Hostname, st)
+	jwksService := jimmjwx.NewJWKSService(st)
+	s.Go(func() error {
+		return jwksService.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
+	})
+
+	mux.Handle("/api", newHandler(handlerParams{
+		controllerUUID: config.Controller.UUID,
+		hostname:       config.Hostname,
+		dialFunc:       dialFunc,
+		jwtService:     jwtService,
+	}))
+	mux.Handle("/model/{modelUUID}/*", newHandler(handlerParams{
+		controllerUUID: config.Controller.UUID,
+		hostname:       config.Hostname,
+		dialFunc:       dialFunc,
+		jwtService:     jwtService,
+	}))
+	mux.Mount("/.well-known", wellknownapi.NewWellKnownHandler(st).Routes())
+	mux.Handle("/*", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		zapctx.Error(req.Context(), "cannot handle request", zap.String("path", req.URL.String()))
+		w.WriteHeader(http.StatusNotFound)
+	}))
+
+	serverCert, err := tls.LoadX509KeyPair(config.CertificateFile, config.KeyFile)
 	if err != nil {
-		fmt.Printf("cannot listen to port 17071: %v\n", err)
+		fmt.Println(err)
 		os.Exit(-1)
 	}
-	fmt.Println("exiting")
+
+	tlscfg := jujuhttp.SecureTLSConfig()
+	tlscfg.Certificates = []tls.Certificate{serverCert}
+	httpsrv := &http.Server{
+		Addr:      ":17071",
+		Handler:   mux,
+		TLSConfig: tlscfg,
+	}
+	s.OnShutdown(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		httpsrv.Shutdown(ctx)
+	})
+	s.Go(func() error {
+		return httpsrv.ListenAndServeTLS("", "")
+	})
+	fmt.Println("started")
+
+	tlsConfig = &tls.Config{
+		InsecureSkipVerify: true,
+	}
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
+		Timeout: 15 * time.Second,
+	}
+	jwtService.RegisterJWKSCache(ctx, client)
+
+	return nil
+}
+
+func main() {
+	if err := os.Setenv("JIMM_JWT_EXPIRY", "24h"); err != nil {
+
+		os.Exit(1)
+	}
+
+	if err := zapctx.LogLevel.UnmarshalText([]byte("debug")); err != nil {
+		zapctx.Error(context.TODO(), "cannot set log level", zap.Error(err))
+	}
+
+	ctx, s := service.NewService(context.Background(), os.Interrupt, syscall.SIGTERM)
+	s.Go(func() error {
+		return start(ctx, s)
+	})
+	err := s.Wait()
+
+	zapctx.Error(context.Background(), "shutdown", zap.Error(err))
+	if _, ok := err.(*service.SignalError); !ok {
+		os.Exit(1)
+	}
 }

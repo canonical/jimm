@@ -31,26 +31,7 @@ func NewJWKSService(credStore credentials.CredentialStore) *JWKSService {
 	return &JWKSService{credentialStore: credStore}
 }
 
-// StartJWKSRotator starts a simple routine which checks the vaults TTL for the JWKS on a ticker.C.
-// It is expected that this routine will be cleaned up alongside other background services sharing
-// the same cancellable context.
-//
-// TODO(ale8k)[possibly?]:
-// For now, there's a single key, and this is probably OK. But possibly extend
-// this to contain many at some point differentiated by KIDs.
-//
-// We also currently don't use x5c and x5t for validation and expect users
-// to use e and n for validation.
-// https://stackoverflow.com/questions/61395261/how-to-validate-signature-of-jwt-from-jwks-without-x5c
-func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequired <-chan time.Time, initialRotateRequiredTime time.Time) error {
-	const op = errors.Op("vault.StartJWKSRotator")
-
-	credStore := jwks.credentialStore
-
-	// For logging and monitoring purposes, we have the rotator spit errors into
-	// this buffered channel ((size * amount) * 2 of errors we are currently aware of and doubling it to prevent blocks)
-	errorChan := make(chan error, 8)
-
+func rotateJWKS(ctx context.Context, credStore credentials.CredentialStore, initialExpiryTime time.Time) error {
 	// putJwks simply attempts the process of setting up the JWKS suite
 	// and all secrets required for JIMM to sign JWTs and clients to verify
 	// JWTs from JIMM.
@@ -79,6 +60,55 @@ func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequir
 		return nil
 	}
 
+	expires, err := credStore.GetJWKSExpiry(ctx)
+	if err != nil {
+		zapctx.Debug(ctx, "failed to get expiry", zap.Error(err))
+		err = putJwks(initialExpiryTime)
+		if err != nil {
+			credStore.CleanupJWKS(ctx)
+			return errors.E(err)
+		}
+	} else {
+		// Check it has expired.
+		now := time.Now().UTC()
+		if now.After(expires) {
+			// In theory, an error should not happen anymore as the necessary
+			// components exist from the previous failed expiry attempt.
+			err = putJwks(time.Now().UTC().AddDate(0, 3, 0))
+			if err != nil {
+				credStore.CleanupJWKS(ctx)
+				return errors.E(err)
+			}
+			zapctx.Debug(ctx, "set a new JWKS", zap.String("expiry", expires.String()))
+		}
+	}
+	return nil
+}
+
+// StartJWKSRotator starts a simple routine which checks the vaults TTL for the JWKS on a ticker.C.
+// It is expected that this routine will be cleaned up alongside other background services sharing
+// the same cancellable context.
+//
+// TODO(ale8k)[possibly?]:
+// For now, there's a single key, and this is probably OK. But possibly extend
+// this to contain many at some point differentiated by KIDs.
+//
+// We also currently don't use x5c and x5t for validation and expect users
+// to use e and n for validation.
+// https://stackoverflow.com/questions/61395261/how-to-validate-signature-of-jwt-from-jwks-without-x5c
+func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequired <-chan time.Time, initialRotateRequiredTime time.Time) error {
+	const op = errors.Op("vault.StartJWKSRotator")
+
+	credStore := jwks.credentialStore
+
+	// For logging and monitoring purposes, we have the rotator spit errors into
+	// this buffered channel ((size * amount) * 2 of errors we are currently aware of and doubling it to prevent blocks)
+	errorChan := make(chan error, 8)
+
+	if err := rotateJWKS(ctx, credStore, initialRotateRequiredTime); err != nil {
+		return errors.E(op, err)
+	}
+
 	// The rotation method is as follows, if an expiry is not present, we know
 	// this is the first attempt to set the initial JWKS (or it may be subsequent from erroneous attempts).
 	// As the next attempt comes around, it is a simple check if the times is after the current.
@@ -88,28 +118,8 @@ func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequir
 		for {
 			select {
 			case <-checkRotateRequired:
-				expires, err := credStore.GetJWKSExpiry(ctx)
-
-				if err != nil {
-					zapctx.Debug(ctx, "failed to get expiry", zap.Error(err))
-					err = putJwks(initialRotateRequiredTime)
-					if err != nil {
-						credStore.CleanupJWKS(ctx)
-						errorChan <- err
-					}
-				} else {
-					// Check it has expired.
-					now := time.Now().UTC()
-					if now.After(expires) {
-						// In theory, an error should not happen anymore as the necessary
-						// components exist from the previous failed expiry attempt.
-						err = putJwks(time.Now().UTC().AddDate(0, 3, 0))
-						if err != nil {
-							credStore.CleanupJWKS(ctx)
-							errorChan <- err
-						}
-						zapctx.Debug(ctx, "set a new JWKS", zap.String("expiry", expires.String()))
-					}
+				if err := rotateJWKS(ctx, credStore, initialRotateRequiredTime); err != nil {
+					errorChan <- err
 				}
 
 			case <-ctx.Done():

@@ -10,19 +10,20 @@ apps:
   jimm:
     command: bin/jimmsrv
     plugs:
-     - network
-     - network-bind
+      - network
+      - network-bind
 
 parts:
   jimmsrv:
     plugin: go
     source: ./
     build-packages:
-    - git
-    - gcc
+      - git
+      - gcc
     override-pull: |-
       set -e
       snapcraftctl pull
+      mkdir $SNAPCRAFT_PART_SRC/version
       git -C $SNAPCRAFT_PART_SRC rev-parse --verify HEAD | tee $SNAPCRAFT_PART_SRC/version/commit.txt
       git -C $SNAPCRAFT_PART_SRC describe --dirty --abbrev=0 | tee $SNAPCRAFT_PART_SRC/version/version.txt
       snapcraftctl set-version `cat $SNAPCRAFT_PART_SRC/version/version.txt`
