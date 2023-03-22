@@ -115,6 +115,9 @@ func (j *JIMM) QueryModelsJq(ctx context.Context, user *openfga.User, jqQuery st
 				break
 			}
 
+			// Jq errors can range from one failure in an iterative query to an entirely broken
+			// query. As such, we simply append all to the errors field and continue to collect
+			// both erreoneous and valid query results.
 			if err, ok := v.(error); ok {
 				results.Errors[id] = append(results.Errors[id], "jq error: "+err.Error())
 				continue
