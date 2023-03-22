@@ -585,4 +585,69 @@ func TestQueryModelsJq(t *testing.T) {
 		}
 	}
 	`, qt.JSONEquals, res)
+
+	// Query specifically for models including the app "nginx-ingress-integrator"
+	res, err = j.QueryModelsJq(ctx, alice, ".applications | with_entries(select(.key==\"nginx-ingress-integrator\"))")
+	c.Assert(err, qt.IsNil)
+	c.Assert(`
+	{
+		"results": {
+		  "10000000-0000-0000-0000-000000000000": [
+			{}
+		  ],
+		  "20000000-0000-0000-0000-000000000000": [
+			{
+			  "nginx-ingress-integrator": {
+				"address": "10.152.183.167",
+				"application-status": {
+				  "current": "active",
+				  "since": "0001-01-01 00:00:00Z"
+				},
+				"charm": "nginx-ingress-integrator",
+				"charm-channel": "idk",
+				"charm-name": "nginx-ingress-integrator",
+				"charm-origin": "charmhub",
+				"charm-profile": "idk",
+				"charm-rev": -1,
+				"charm-version": "54",
+				"endpoint-bindings": {
+				  "": "alpha",
+				  "ingress": "alpha"
+				},
+				"exposed": true,
+				"os": "kubernetes",
+				"provider-id": "20000000-0000-0000-0000-000000000000",
+				"scale": 1,
+				"series": "kubernetes",
+				"units": {
+				  "nginx-ingress-integrator/0": {
+					"address": "10.1.160.63",
+					"juju-status": {
+					  "current": "idle",
+					  "since": "0001-01-01 00:00:00Z",
+					  "version": "2.9.37"
+					},
+					"leader": true,
+					"provider-id": "nginx-ingress-integrator-0",
+					"workload-status": {
+					  "current": "active",
+					  "since": "0001-01-01 00:00:00Z"
+					}
+				  }
+				}
+			  }
+			}
+		  ],
+		  "30000000-0000-0000-0000-000000000000": [
+			{}
+		  ]
+		},
+		"errors": {
+			"40000000-0000-0000-0000-000000000000": [
+				"model not found"
+			]
+		}
+	}
+	`, qt.JSONEquals, res)
+
 }
