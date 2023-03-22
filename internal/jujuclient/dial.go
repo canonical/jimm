@@ -219,10 +219,13 @@ func dialAll(ctx context.Context, dialer *rpc.Dialer, urls []string) (*rpc.Clien
 		return nil, errors.E("no urls to dial")
 	}
 	res, err := dialAllHelper(ctx, dialer, urls, false)
+	// Validate the underlying type and then check it's not nil.
 	client, ok := res.(*rpc.Client)
 	if !ok {
+		if err != nil {
+			return nil, err
+		}
 		zapctx.Error(ctx, "Failed to get client type")
-		res.Close()
 		return nil, errors.E("Failed to get client type")
 	}
 	if client == nil {
@@ -237,10 +240,13 @@ func basicDialAll(ctx context.Context, dialer *rpc.Dialer, urls []string) (*webs
 		return nil, errors.E("no urls to dial")
 	}
 	res, err := dialAllHelper(ctx, dialer, urls, true)
+	// Validate the underlying type and then check it's not nil.
 	conn, ok := res.(*websocket.Conn)
 	if !ok {
+		if err != nil {
+			return nil, err
+		}
 		zapctx.Error(ctx, "Failed to get conn type")
-		res.Close()
 		return nil, errors.E("Failed to get conn type")
 	}
 	if conn == nil {
@@ -255,6 +261,8 @@ type Connecter interface {
 
 // dialAllHelper simultaneously dials all given urls and returns an object that can be a client or a
 // websocket depending on the value passed into basic.
+// dialAllHelper can return an error and a valid connector if an error occured during one of the
+// connection calls.
 func dialAllHelper(ctx context.Context, dialer *rpc.Dialer, urls []string, basic bool) (Connecter, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -270,11 +278,11 @@ func dialAllHelper(ctx context.Context, dialer *rpc.Dialer, urls []string, basic
 		go func() {
 			defer wg.Done()
 			var dErr error
-			var cl Connecter
+			var connector Connecter
 			if basic {
-				cl, dErr = dialer.BasicDial(ctx, url)
+				connector, dErr = dialer.BasicDial(ctx, url)
 			} else {
-				cl, dErr = dialer.Dial(ctx, url)
+				connector, dErr = dialer.Dial(ctx, url)
 			}
 			if dErr != nil {
 				errOnce.Do(func() {
@@ -284,12 +292,12 @@ func dialAllHelper(ctx context.Context, dialer *rpc.Dialer, urls []string, basic
 			}
 			var keep bool
 			clientOnce.Do(func() {
-				res = cl
+				res = connector
 				keep = true
 				cancel()
 			})
 			if !keep {
-				cl.Close()
+				connector.Close()
 			}
 		}()
 	}

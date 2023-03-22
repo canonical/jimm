@@ -4,6 +4,7 @@ package jujuapi_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -71,14 +72,29 @@ func (s *apiSuite) TestModelCommands(c *gc.C) {
 	c.Assert(response.StatusCode, gc.Equals, http.StatusSwitchingProtocols)
 	defer conn.Close()
 
-	msg := struct {
-		RedirectTo string `json:"redirect-to"`
-	}{}
+	type message struct {
+		RequestID uint64                 `json:"request-id,omitempty"`
+		Type      string                 `json:"type,omitempty"`
+		Version   int                    `json:"version,omitempty"`
+		ID        string                 `json:"id,omitempty"`
+		Request   string                 `json:"request,omitempty"`
+		Params    json.RawMessage        `json:"params,omitempty"`
+		Error     string                 `json:"error,omitempty"`
+		ErrorCode string                 `json:"error-code,omitempty"`
+		ErrorInfo map[string]interface{} `json:"error-info,omitempty"`
+		Response  json.RawMessage        `json:"response,omitempty"`
+	}
+
+	msg := &message{Type: "Test"}
 	jsonConn := jsoncodec.NewWebsocketConn(conn)
+	err = jsonConn.Send(msg)
+	// err = jsonConn.Receive(&msg)
+	c.Assert(err, gc.Equals, nil)
+	msg = new(message)
 	err = jsonConn.Receive(&msg)
 	c.Assert(err, gc.Equals, nil)
 	hp := s.Model.Controller.Addresses[0][0]
-	c.Assert(msg.RedirectTo, gc.Equals, fmt.Sprintf("wss://%s:%d/model/%s/commands", hp.Address.Value, hp.Port, s.Model.UUID.String))
+	c.Assert(msg.Type, gc.Equals, fmt.Sprintf("wss://%s:%d/model/%s/commands", hp.Address.Value, hp.Port, s.Model.UUID.String))
 }
 
 func (s *apiSuite) TestModelCommandsModelNotFoundf(c *gc.C) {
