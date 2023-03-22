@@ -13,7 +13,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/errors"
 )
 
-type AuthFunc func(req *params.LoginRequest, errMap map[string]interface{}) ([]byte, error)
+type GetTokenFunc func(req *params.LoginRequest, errMap map[string]interface{}) ([]byte, error)
 
 // ProxySockets takes two websocket connections, the first between a client and JIMM
 // and the second between JIMM and a controller and acts as a man-in-the-middle forwarding
@@ -23,7 +23,7 @@ type AuthFunc func(req *params.LoginRequest, errMap map[string]interface{}) ([]b
 //
 // Note that this function assumes half-duplex communication i.e. a client sends a request and
 // expects a reply from the server as is done by Juju.
-func ProxySockets(ctx context.Context, connClient, connController *websocket.Conn, f AuthFunc) error {
+func ProxySockets(ctx context.Context, connClient, connController *websocket.Conn, f GetTokenFunc) error {
 	errChannel := make(chan error, 1)
 	go func() {
 		errChannel <- proxy(ctx, connClient, connController, f)
@@ -46,7 +46,7 @@ type loginRequest struct {
 	Token string `json:"token"`
 }
 
-func proxy(ctx context.Context, connClient, connController *websocket.Conn, f AuthFunc) error {
+func proxy(ctx context.Context, connClient, connController *websocket.Conn, f GetTokenFunc) error {
 	var loginMsg *message
 	var skipClientRead bool
 	// readCallback is called after a message is read whether from the client or the controller.
@@ -112,7 +112,7 @@ func proxy(ctx context.Context, connClient, connController *websocket.Conn, f Au
 	}
 }
 
-func addJWT(msg *message, permissions map[string]interface{}, f AuthFunc) error {
+func addJWT(msg *message, permissions map[string]interface{}, f GetTokenFunc) error {
 	// First we unmarshal the existing LoginRequest.
 	if msg == nil {
 		return errors.E("nil messsage")

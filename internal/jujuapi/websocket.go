@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -151,28 +150,30 @@ func (s modelCommandsServer) ServeWS(ctx context.Context, clientConn *websocket.
 		return
 	}
 	defer controllerConn.Close()
+	authFunc := s.jwtGenerator(ctx, &m)
+	err = jimmRPC.ProxySockets(ctx, clientConn, controllerConn, authFunc)
+	sendClientError(err)
+}
+
+func (s modelCommandsServer) jwtGenerator(ctx context.Context, m *dbmodel.Model) jimmRPC.GetTokenFunc {
 	var user *openfga.User
-	var authErr error
 	var accessMapCache map[string]string
-	var once sync.Once
 	var callCount int
-	// Note: The authFunc could be generalised as a callback that receives every request/response msg
-	// and then decides what to do with it. Currently it acts only as a callback when auth info is needed.
-	authFunc := func(req *jujuparams.LoginRequest, errMap map[string]interface{}) ([]byte, error) {
-		// Authorize the user and ensure certain checks are only done once.
-		// TODO(Kian): Do an authenticate check every time a login request comes through.
-		once.Do(func() {
-			if req == nil {
-				errors.E("Missing login request.")
-			}
+	var authorized bool
+	return func(req *jujuparams.LoginRequest, errMap map[string]interface{}) ([]byte, error) {
+		if req != nil {
+			// Recreate the accessMapCache to prevent leaking permissions across multiple login requests.
+			accessMapCache = make(map[string]string)
+			var authErr error
 			user, authErr = s.jimm.Authenticator.Authenticate(ctx, req)
 			if authErr != nil {
-				return
+				return nil, authErr
 			}
 			var modelAccess string
+			mt := m.ResourceTag()
 			modelAccess, authErr = s.jimm.GetUserModelAccess(ctx, user, mt)
 			if authErr != nil {
-				return
+				return nil, authErr
 			}
 			accessMapCache[mt.String()] = modelAccess
 			// Get the user's access to the JIMM controller, because all users have login access to controllers controlled by JIMM
@@ -180,12 +181,17 @@ func (s modelCommandsServer) ServeWS(ctx context.Context, clientConn *websocket.
 			var controllerAccess string
 			controllerAccess, authErr = s.jimm.GetControllerAccess(ctx, user, user.ResourceTag())
 			if authErr != nil {
-				return
+				return nil, authErr
 			}
 			accessMapCache[m.Controller.Tag().String()] = controllerAccess
-		})
-		if authErr != nil {
-			return nil, authErr
+			authorized = true
+		}
+		if callCount >= 10 {
+			return nil, errors.E("Permission check limit exceeded")
+		}
+		callCount++
+		if !authorized {
+			return nil, errors.E("Authorization missing.")
 		}
 		if errMap != nil {
 			var err error
@@ -194,23 +200,16 @@ func (s modelCommandsServer) ServeWS(ctx context.Context, clientConn *websocket.
 				return nil, err
 			}
 		}
-
 		jwt, err := s.jimm.JWTService.NewJWT(ctx, jimmjwx.JWTParams{
 			Controller: m.Controller.UUID,
-			User:       user.Username,
+			User:       user.Tag().String(),
 			Access:     accessMapCache,
 		})
 		if err != nil {
 			return nil, err
 		}
-		callCount++
-		if callCount >= 10 {
-			return nil, errors.E("Permission check limit exceeded")
-		}
 		return jwt, nil
 	}
-	err = jimmRPC.ProxySockets(ctx, clientConn, controllerConn, authFunc)
-	sendClientError(err)
 }
 
 func checkPermission(ctx context.Context, user *openfga.User, cachedPerms map[string]string, desiredPerms map[string]interface{}) (map[string]string, error) {
