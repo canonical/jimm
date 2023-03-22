@@ -801,7 +801,7 @@ var createModelTests = []struct {
 	region:        "no-such-region",
 	cloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
 	credentialTag: "",
-	expectError:   `failed to set cloud region \(not found\)`,
+	expectError:   `cloudregion not found \(not found\)`,
 }, {
 	about:         "local user",
 	name:          "model-4",
