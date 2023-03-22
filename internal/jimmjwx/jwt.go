@@ -13,6 +13,8 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm/credentials"
 	"github.com/google/uuid"
+	"github.com/juju/clock"
+	"github.com/juju/retry"
 	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
@@ -51,10 +53,22 @@ func (j *JWTService) RegisterJWKSCache(ctx context.Context, client *http.Client)
 	j.Cache = jwk.NewCache(ctx)
 
 	_ = j.Cache.Register(j.getJWKSEndpoint(), jwk.WithHTTPClient(client))
-	if _, err := j.Cache.Refresh(ctx, j.getJWKSEndpoint()); err != nil {
-		// url is not a valid JWKS
-		panic(err)
+
+	err := retry.Call(retry.CallArgs{
+		Func: func() error {
+			if _, err := j.Cache.Refresh(ctx, j.getJWKSEndpoint()); err != nil {
+				return err
+			}
+			return nil
+		},
+		Attempts: 10,
+		Delay:    2 * time.Second,
+		Clock:    clock.WallClock,
+	})
+	if err != nil {
+		panic(err.Error())
 	}
+
 }
 
 // NewJWT creates a new JWT to represent a users access within a controller.
