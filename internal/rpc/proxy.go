@@ -48,22 +48,45 @@ type loginRequest struct {
 
 func proxy(ctx context.Context, connClient, connController *websocket.Conn, f AuthFunc) error {
 	var loginMsg *message
-	for {
-		msg := new(message)
-		if err := connClient.ReadJSON(msg); err != nil {
-			zapctx.Error(ctx, "error reading from client", zap.Error(err))
-			return err
-		}
-		// Add JWT to message
+	var skipClientRead bool
+	// readCallback is called after a message is read whether from the client or the controller.
+	// it return a boolean indicating whether to continue and an error.
+	readCallback := func(msg *message) (bool, error) {
+		// Handle login requests from client
 		if msg.Type == "Admin" && msg.Request == "Login" {
 			if err := addJWT(msg, nil, f); err != nil {
-				return err
+				return false, err
 			}
 			loginMsg = msg
+			return false, nil
+		}
+		// Handle permission denied from controller - repeat login.
+		if msg.ErrorCode == "PermissionAssertionRequireError" {
+			if err := addJWT(loginMsg, msg.ErrorInfo, f); err != nil {
+				return false, err
+			}
+			skipClientRead = true
+			return true, nil
+		}
+		return false, nil
+	}
+
+	for {
+		var msg *message
+		if skipClientRead {
+			msg = loginMsg
+			skipClientRead = false
+		} else {
+			msg = new(message)
+			if err := connClient.ReadJSON(msg); err != nil {
+				zapctx.Error(ctx, "error reading from client", zap.Error(err))
+				return err
+			}
+			if _, err := readCallback(msg); err != nil {
+				return err
+			}
 		}
 
-		// Loop the request to the controller in cases where we get an permission denied error.
-	login:
 		response := new(message)
 		zapctx.Info(ctx, "forwarding request", zap.Any("message", msg))
 		if err := connController.WriteJSON(msg); err != nil {
@@ -75,12 +98,10 @@ func proxy(ctx context.Context, connClient, connController *websocket.Conn, f Au
 			zapctx.Error(ctx, "error reading from controller", zap.Error(err))
 			return err
 		}
-		if response.ErrorCode == "PermissionAssertionRequireError" {
-			if err := redoLogin(ctx, loginMsg, response, connController, f); err != nil {
-				return err
-			} else {
-				goto login
-			}
+		if proxyContinue, err := readCallback(response); err != nil {
+			return err
+		} else if proxyContinue {
+			continue
 		}
 
 		zapctx.Info(ctx, "received controller response", zap.Any("message", response))
@@ -91,25 +112,11 @@ func proxy(ctx context.Context, connClient, connController *websocket.Conn, f Au
 	}
 }
 
-func redoLogin(ctx context.Context, loginMsg *message, resp *message, connController *websocket.Conn, f AuthFunc) error {
-	err := addJWT(loginMsg, resp.ErrorInfo, f)
-	if err != nil {
-		return err
-	}
-	zapctx.Info(ctx, "Performing new login", zap.Any("message", loginMsg))
-	if err := connController.WriteJSON(loginMsg); err != nil {
-		zapctx.Error(ctx, "cannot send new login", zap.Error(err))
-		return err
-	}
-	if err := connController.ReadJSON(loginMsg); err != nil {
-		zapctx.Error(ctx, "error login response from controller", zap.Error(err))
-		return err
-	}
-	return nil
-}
-
 func addJWT(msg *message, permissions map[string]interface{}, f AuthFunc) error {
 	// First we unmarshal the existing LoginRequest.
+	if msg == nil {
+		return errors.E("nil messsage")
+	}
 	var lr params.LoginRequest
 	if err := json.Unmarshal(msg.Params, &lr); err != nil {
 		return err

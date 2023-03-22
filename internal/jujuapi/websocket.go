@@ -160,6 +160,7 @@ func (s modelCommandsServer) ServeWS(ctx context.Context, clientConn *websocket.
 	// and then decides what to do with it. Currently it acts only as a callback when auth info is needed.
 	authFunc := func(req *jujuparams.LoginRequest, errMap map[string]interface{}) ([]byte, error) {
 		// Authorize the user and ensure certain checks are only done once.
+		// TODO(Kian): Do an authenticate check every time a login request comes through.
 		once.Do(func() {
 			if req == nil {
 				errors.E("Missing login request.")
