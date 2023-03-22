@@ -42,6 +42,16 @@ func TestDial(t *testing.T) {
 	defer conn.Close()
 }
 
+func TestBasicDial(t *testing.T) {
+	c := qt.New(t)
+
+	srv := newServer(echo)
+	defer srv.Close()
+	conn, err := srv.dialer.BasicDial(context.Background(), srv.URL)
+	c.Assert(err, qt.IsNil)
+	defer conn.Close()
+}
+
 func TestCallSuccess(t *testing.T) {
 	c := qt.New(t)
 
