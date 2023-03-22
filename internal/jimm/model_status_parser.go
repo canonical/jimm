@@ -15,7 +15,6 @@ import (
 
 	"github.com/juju/juju/cmd/juju/status"
 	rpcparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
 )
 
@@ -58,14 +57,7 @@ func (j *JIMM) QueryModelsJq(ctx context.Context, user *openfga.User, jqQuery st
 			return nil, err
 		}
 
-		// We use ParseModelTag instead of NewModelTag such that the regex runs for added safety.
-		tag, err := names.ParseModelTag("model-" + model.UUID.String)
-		if err != nil {
-			zapctx.Error(ctx, "failed to parse model tag from UUID", zap.String("model-uuid", modelUUID), zap.Error(err))
-			return nil, err
-		}
-
-		api, err := j.dial(ctx, &model.Controller, tag)
+		api, err := j.dial(ctx, &model.Controller, model.ResourceTag())
 		if err != nil {
 			zapctx.Error(ctx, "failed to dial controller for model", zap.String("controller-uuid", model.Controller.UUID), zap.String("model-uuid", modelUUID), zap.Error(err))
 			return nil, err
