@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
 	"github.com/juju/names/v4"
 	openfga "github.com/openfga/go-sdk"
@@ -422,6 +424,117 @@ func (s *openFGATestSuite) TestAddController(c *gc.C) {
 	allowed, _, err = s.ofgaClient.CheckRelation(context.Background(), check, false)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(allowed, gc.Equals, true)
+}
+
+func (s *openFGATestSuite) TestListObjectsWithContextualTuples(c *gc.C) {
+	ctx := context.TODO()
+
+	modelUUIDs := []string{
+		"10000000-0000-0000-0000-000000000000",
+		"20000000-0000-0000-0000-000000000000",
+		"30000000-0000-0000-0000-000000000000",
+	}
+
+	expected := make([]string, len(modelUUIDs))
+	for i, v := range modelUUIDs {
+		expected[i] = "model:" + v
+	}
+
+	ids, err := s.ofgaClient.ListObjects(ctx, "user:alice", "reader", "model", []ofga.Tuple{
+		{
+			Object:   ofganames.FromTag(names.NewUserTag("alice")),
+			Relation: ofganames.ReaderRelation,
+			Target:   ofganames.FromTag(names.NewModelTag(modelUUIDs[0])),
+		},
+		// Reader to model via group
+		{
+			Object:   ofganames.FromTag(names.NewUserTag("alice")),
+			Relation: ofganames.MemberRelation,
+			Target:   ofganames.FromTag(jimmnames.NewGroupTag("1")),
+		},
+		{
+			Object:   ofganames.FromTagWithRelation(jimmnames.NewGroupTag("1"), ofganames.MemberRelation),
+			Relation: ofganames.ReaderRelation,
+			Target:   ofganames.FromTag(names.NewModelTag(modelUUIDs[1])),
+		},
+		// Reader to model via administrator of controller
+		{
+			Object:   ofganames.FromTag(names.NewUserTag("alice")),
+			Relation: ofganames.AdministratorRelation,
+			Target:   ofganames.FromTag(names.NewControllerTag("00000000-0000-0000-0000-000000000000")),
+		},
+		{
+			Object:   ofganames.FromTag(names.NewControllerTag("00000000-0000-0000-0000-000000000000")),
+			Relation: ofganames.ControllerRelation,
+			Target:   ofganames.FromTag(names.NewModelTag(modelUUIDs[2])),
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	c.Assert(cmp.Equal(
+		ids,
+		expected,
+		cmpopts.SortSlices(func(want string, expected string) bool {
+			return want < expected
+		}),
+	), gc.Equals, true)
+}
+
+func (s *openFGATestSuite) TestListObjectsWithPeristedTuples(c *gc.C) {
+	ctx := context.TODO()
+
+	modelUUIDs := []string{
+		"10000000-0000-0000-0000-000000000000",
+		"20000000-0000-0000-0000-000000000000",
+		"30000000-0000-0000-0000-000000000000",
+	}
+
+	expected := make([]string, len(modelUUIDs))
+	for i, v := range modelUUIDs {
+		expected[i] = "model:" + v
+	}
+
+	c.Assert(s.ofgaClient.AddRelations(ctx,
+		[]ofga.Tuple{
+			{
+				Object:   ofganames.FromTag(names.NewUserTag("alice")),
+				Relation: ofganames.ReaderRelation,
+				Target:   ofganames.FromTag(names.NewModelTag(modelUUIDs[0])),
+			},
+			// Reader to model via group
+			{
+				Object:   ofganames.FromTag(names.NewUserTag("alice")),
+				Relation: ofganames.MemberRelation,
+				Target:   ofganames.FromTag(jimmnames.NewGroupTag("1")),
+			},
+			{
+				Object:   ofganames.FromTagWithRelation(jimmnames.NewGroupTag("1"), ofganames.MemberRelation),
+				Relation: ofganames.ReaderRelation,
+				Target:   ofganames.FromTag(names.NewModelTag(modelUUIDs[1])),
+			},
+			// Reader to model via administrator of controller
+			{
+				Object:   ofganames.FromTag(names.NewUserTag("alice")),
+				Relation: ofganames.AdministratorRelation,
+				Target:   ofganames.FromTag(names.NewControllerTag("00000000-0000-0000-0000-000000000000")),
+			},
+			{
+				Object:   ofganames.FromTag(names.NewControllerTag("00000000-0000-0000-0000-000000000000")),
+				Relation: ofganames.ControllerRelation,
+				Target:   ofganames.FromTag(names.NewModelTag(modelUUIDs[2])),
+			},
+		}...,
+	), gc.Equals, nil)
+
+	ids, err := s.ofgaClient.ListObjects(ctx, "user:alice", "reader", "model", nil)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(cmp.Equal(
+		ids,
+		expected,
+		cmpopts.SortSlices(func(want string, expected string) bool {
+			return want < expected
+		}),
+	), gc.Equals, true)
 }
 
 func Test(t *testing.T) {

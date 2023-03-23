@@ -73,6 +73,7 @@ func (t *Tag) Relation() string {
 
 // ResourceTagger represents an entity tag that implements
 // a method returning entity's id and kind.
+// TODO(ale8k): Rename this to remove the "er", "er" should only apply to interfaces with a single method.
 type ResourceTagger interface {
 	names.UserTag |
 		jimmnames.GroupTag |

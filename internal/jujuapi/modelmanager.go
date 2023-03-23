@@ -243,7 +243,7 @@ func (r *controllerRoot) ModelInfo(ctx context.Context, args jujuparams.Entities
 func (r *controllerRoot) CreateModel(ctx context.Context, args jujuparams.ModelCreateArgs) (jujuparams.ModelInfo, error) {
 	const op = errors.Op("jujuapi.CreateModel")
 
-	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	var mca jimm.ModelCreateArgs

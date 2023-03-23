@@ -151,6 +151,11 @@ func (u *User) SetApplicationOfferAccess(ctx context.Context, resource names.App
 	return setResourceAccess(ctx, u, resource, relation)
 }
 
+// ListModels returns a slice of model UUIDs this user has at least reader access to.
+func (u *User) ListModels(ctx context.Context) ([]string, error) {
+	return u.client.ListObjects(ctx, ofganames.FromTag(u.ResourceTag()).String(), ofganames.ReaderRelation.String(), "model", nil)
+}
+
 type administratorT interface {
 	names.ControllerTag | names.ModelTag | names.ApplicationOfferTag | names.CloudTag
 
@@ -272,9 +277,9 @@ func ListUsersWithAccess[T ofganames.ResourceTagger](ctx context.Context, client
 
 func listUsersWithAccess(ctx context.Context, client *OFGAClient, tuple openfga.TupleKey) ([]string, error) {
 	// we create an expand request
-	er := openfga.NewExpandRequest()
+	er := openfga.NewExpandRequest(tuple)
 	er.SetAuthorizationModelId(client.AuthModelId)
-	er.SetTupleKey(tuple)
+
 	res, _, err := client.api.Expand(ctx).Body(*er).Execute()
 	if err != nil {
 		zapctx.Error(ctx, "failed to query for related object", zap.Error(err))

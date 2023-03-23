@@ -213,7 +213,7 @@ func (c Connection) ControllerModelSummary(ctx context.Context, ms *jujuparams.M
 func (c Connection) ValidateModelUpgrade(ctx context.Context, model names.ModelTag, force bool) error {
 	const op = errors.Op("jujuclient.ValidateModelUpgrade")
 	args := jujuparams.ValidateModelUpgradeParams{
-		Models: []jujuparams.ValidateModelUpgradeParam{{
+		Models: []jujuparams.ModelParam{{
 			ModelTag: model.String(),
 		}},
 		Force: force,
@@ -234,10 +234,10 @@ func (c Connection) ValidateModelUpgrade(ctx context.Context, model names.ModelT
 // DestroyModel starts the destruction of the given model. This method uses
 // the highest available method from:
 //
-//  - ModelManager(9).DestroyModels
-//  - ModelManager(7).DestroyModels
-//  - ModelManager(4).DestroyModels
-//  - ModelManager(2).DestroyModels
+//   - ModelManager(9).DestroyModels
+//   - ModelManager(7).DestroyModels
+//   - ModelManager(4).DestroyModels
+//   - ModelManager(2).DestroyModels
 func (c Connection) DestroyModel(ctx context.Context, tag names.ModelTag, destroyStorage *bool, force *bool, maxWait, timeout *time.Duration) error {
 	const op = errors.Op("jujuclient.DestroyModel")
 	args := jujuparams.DestroyModelsParams{
