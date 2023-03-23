@@ -11,7 +11,6 @@ import (
 	"net/url"
 
 	"github.com/gorilla/websocket"
-	"github.com/juju/juju/rpc/jsoncodec"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
@@ -86,12 +85,12 @@ func (s *apiSuite) TestModelCommands(c *gc.C) {
 	}
 
 	msg := &message{Type: "Test"}
-	jsonConn := jsoncodec.NewWebsocketConn(conn)
-	err = jsonConn.Send(msg)
+	err = conn.WriteJSON(msg)
 	// err = jsonConn.Receive(&msg)
 	c.Assert(err, gc.Equals, nil)
-	msg = new(message)
-	err = jsonConn.Receive(&msg)
+	rcv := make(map[string]interface{})
+	err = conn.ReadJSON(&rcv)
+	fmt.Printf("Result: \n\n\n========%+v\n\n", rcv)
 	c.Assert(err, gc.Equals, nil)
 	hp := s.Model.Controller.Addresses[0][0]
 	c.Assert(msg.Type, gc.Equals, fmt.Sprintf("wss://%s:%d/model/%s/commands", hp.Address.Value, hp.Port, s.Model.UUID.String))

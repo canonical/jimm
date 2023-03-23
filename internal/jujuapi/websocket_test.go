@@ -144,9 +144,3 @@ func (s *websocketSuite) open(c *gc.C, info *api.Info, username string) api.Conn
 	c.Assert(err, gc.Equals, nil)
 	return conn
 }
-
-func (s *websocketSuite) TestJwtGenerator(c *gc.C) {
-	ctx := context.Background()
-
-	jwtGenFunc := jujuapi.GetJwtGenerator(s.JIMM, ctx, s.Model)
-}

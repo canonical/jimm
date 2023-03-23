@@ -92,7 +92,7 @@ func (j *JIMM) JwtGenerator(ctx context.Context, m *dbmodel.Model) jimmRPC.GetTo
 	var user *openfga.User
 	var accessMapCache map[string]string
 	var callCount int
-	var authorized bool
+	var authorised bool
 	// Take a login request and a map of desired permissions and return a JWT with the desired permissions.
 	// Errors if any of the desired permissions cannot be satisfied.
 	return func(req *jujuparams.LoginRequest, errMap map[string]interface{}) ([]byte, error) {
@@ -119,13 +119,13 @@ func (j *JIMM) JwtGenerator(ctx context.Context, m *dbmodel.Model) jimmRPC.GetTo
 				return nil, authErr
 			}
 			accessMapCache[m.Controller.Tag().String()] = controllerAccess
-			authorized = true
+			authorised = true
 		}
 		if callCount >= 10 {
 			return nil, errors.E("Permission check limit exceeded")
 		}
 		callCount++
-		if !authorized {
+		if !authorised {
 			return nil, errors.E("Authorization missing.")
 		}
 		if errMap != nil {

@@ -59,18 +59,6 @@ func (s *apiServer) Kill() {
 	}
 }
 
-type modelAPIServer struct {
-	jimm *jimm.JIMM
-}
-
-// ServeWS implements jimmhttp.WSServer.
-func (s modelAPIServer) ServeWS(ctx context.Context, conn *websocket.Conn) {
-	uuid := jimmhttp.PathElementFromContext(ctx, "uuid")
-	ctx = zapctx.WithFields(context.Background(), zap.String("model-uuid", uuid))
-	root := newModelRoot(s.jimm, uuid)
-	serveRoot(ctx, root, conn)
-}
-
 // serveRoot serves an RPC root object on a websocket connection.
 func serveRoot(ctx context.Context, root root, wsConn *websocket.Conn) {
 	ctx = zapctx.WithFields(ctx, zap.Bool("websocket", true))
@@ -111,13 +99,14 @@ func mapError(err error) *jujuparams.Error {
 	}
 }
 
-// A modelCommandsServer serves the /commands server for a model.
-type modelCommandsServer struct {
+// A modelProxyServer serves the /commands and /api server for a model by
+// proxying all requests through to the controller.
+type modelProxyServer struct {
 	jimm *jimm.JIMM
 }
 
 // ServeWS implements jimmhttp.WSServer.
-func (s modelCommandsServer) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
+func (s modelProxyServer) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
 	uuid := jimmhttp.PathElementFromContext(ctx, "uuid")
 	m := dbmodel.Model{
 		UUID: sql.NullString{
@@ -139,7 +128,8 @@ func (s modelCommandsServer) ServeWS(ctx context.Context, clientConn *websocket.
 		return
 	}
 	mt := names.NewModelTag(uuid)
-	controllerConn, err := jujuclient.ProxyDial(ctx, &m.Controller, mt)
+	finalPath := jimmhttp.PathElementFromContext(ctx, "finalPath")
+	controllerConn, err := jujuclient.ProxyDial(ctx, &m.Controller, mt, finalPath)
 	if err != nil {
 		zapctx.Error(ctx, "cannot dial controller", zap.String("controller", m.Controller.Name), zap.Error(err))
 		sendClientError(err)

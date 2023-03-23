@@ -15,8 +15,3 @@ func init() {
 func (r *controllerRoot) Ping() {
 	r.pingF()
 }
-
-// Ping implemets the Pinger facade's Ping method on model API connections.
-func (r *modelRoot) Ping() {
-	r.pingF()
-}

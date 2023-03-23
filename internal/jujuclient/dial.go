@@ -71,7 +71,7 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 	if ctl.PublicAddress != "" {
 		// If there is a public-address configured it is almost
 		// certainly the one we want to use, try it first.
-		client, err = dialer.Dial(ctx, websocketURL(ctl.PublicAddress, modelTag))
+		client, err = dialer.Dial(ctx, websocketURL(ctl.PublicAddress, modelTag, ""))
 		if err != nil {
 			zapctx.Error(ctx, "failed to dial public address", zaputil.Error(err))
 		}
@@ -83,7 +83,7 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 				if hp.Scope != "public" && hp.Scope != "" {
 					continue
 				}
-				urls = append(urls, websocketURL(fmt.Sprintf("%s:%d", hp.Value, hp.Port), modelTag))
+				urls = append(urls, websocketURL(fmt.Sprintf("%s:%d", hp.Value, hp.Port), modelTag, ""))
 			}
 		}
 		var err2 error
@@ -152,7 +152,9 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 
 // ProxyDial is similar to the other dial methods but returns a raw websocket
 // that can be used as is.
-func ProxyDial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag) (*websocket.Conn, error) {
+// Whereas Dial always dials the /api endpont, ProxyDial accepts the endpoints to dial,
+// normally /api or /commands.
+func ProxyDial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, finalPath string) (*websocket.Conn, error) {
 	const op = errors.Op("jujuclient.ProxyDial")
 
 	var tlsConfig *tls.Config
@@ -172,7 +174,7 @@ func ProxyDial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.Mode
 	if ctl.PublicAddress != "" {
 		// If there is a public-address configured it is almost
 		// certainly the one we want to use, try it first.
-		conn, err = dialer.BasicDial(ctx, websocketURL(ctl.PublicAddress, modelTag))
+		conn, err = dialer.BasicDial(ctx, websocketURL(ctl.PublicAddress, modelTag, finalPath))
 		if err != nil {
 			zapctx.Error(ctx, "failed to dial public address", zaputil.Error(err))
 		}
@@ -184,7 +186,7 @@ func ProxyDial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.Mode
 				if hp.Scope != "public" && hp.Scope != "" {
 					continue
 				}
-				urls = append(urls, websocketURL(fmt.Sprintf("%s:%d", hp.Value, hp.Port), modelTag))
+				urls = append(urls, websocketURL(fmt.Sprintf("%s:%d", hp.Value, hp.Port), modelTag, finalPath))
 			}
 		}
 		var err2 error
@@ -200,7 +202,7 @@ func ProxyDial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.Mode
 
 }
 
-func websocketURL(s string, mt names.ModelTag) string {
+func websocketURL(s string, mt names.ModelTag, finalPath string) string {
 	u := url.URL{
 		Scheme: "wss",
 		Host:   s,
@@ -208,7 +210,11 @@ func websocketURL(s string, mt names.ModelTag) string {
 	if mt.Id() != "" {
 		u.Path = path.Join(u.Path, "model", mt.Id())
 	}
-	u.Path = path.Join(u.Path, "api")
+	if finalPath == "" {
+		u.Path = path.Join(u.Path, "api")
+	} else {
+		u.Path = path.Join(u.Path, finalPath)
+	}
 	return u.String()
 }
 
