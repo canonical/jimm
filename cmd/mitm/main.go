@@ -154,7 +154,7 @@ func (ws *wsMITM) ServeWS(ctx context.Context, modelUUID string, connClient, con
 	}
 	jwt, err := ws.jwtService.NewJWT(ctx, jimmjwx.JWTParams{
 		Controller: ws.controllerUUID,
-		User:       "controller-jimm",
+		User:       "user-fred",
 		Access:     access,
 	})
 	if err != nil {
@@ -421,7 +421,7 @@ func start(ctx context.Context, s *service.Service) error {
 	tlscfg := jujuhttp.SecureTLSConfig()
 	tlscfg.Certificates = []tls.Certificate{serverCert}
 	httpsrv := &http.Server{
-		Addr:      ":17071",
+		Addr:      ":443",
 		Handler:   mux,
 		TLSConfig: tlscfg,
 	}

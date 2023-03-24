@@ -19,21 +19,34 @@ To run the service you will need a running Juju controller a self-signed key, ce
 ```
 To generate the self signed CA, cert and key please follow one of the many tutorials Google has on offer. Once can also use the tool inside tools/make-certs.go. This can be done with `go build ./tools` which will generate a `caCert.crt`, a `cert.crt` and a `myKey.key`. Point your config file to these files. Next you can run the following commands to add the CA cert to your cert pool.
 ```
-sudo cp tools/jimmqa.crt /usr/local/share/ca-certificates
+sudo cp caCert.crt /usr/local/share/ca-certificates
 sudo update-ca-certificates 
 ```
 
-The controller part, you can get from your local controllers.yaml file located in `~/.local/share/juju`. Find the entry corresponding to the controller you intend to use and copy the needed data into the configuration file.
+The controller part, you can get from your local controllers.yaml file located in `~/.local/share/juju`. Find the entry corresponding to the controller you intend to use and copy the needed data into the configuration file. Note that setting up the controller is described in further detail below.
 
 ## Controller Setup
 To setup the Juju controller from a development branch, clone the desired repo/fork and switch to the desired branch and run 
 `make go-install`
-Then, assuming `$GOPATH/bin` is in your PATH (you can confirm this by running `juju --version` to confirm the juju version is the same as the built source) you can bootstrap a controller with `juju bootstrap --config jwt-refresh-url=127.0.0.1:17071 localhost <controller-name>`
+Then, assuming `$GOPATH/bin` is in your PATH (you can confirm this by running `juju --version` to confirm the juju version is the same as the built source) you can bootstrap a controller with `juju bootstrap --config jwt-refresh-url=https://127.0.0.1 localhost <controller-name>`
 
-Note: There is currently an issue that the controller cannot hit the ip:port combo because of the following warning
+Note: The path to the mitm service cannot contain a port otherwise the Juju controller will report the following:
 `machine-0: 10:51:23 WARNING juju.apiserver failed to refresh jwt cache: failed to fetch "127.0.0.1:17071/.well-known/jwks.json": failed to fetch "127.0.0.1:17071/.well-known/jwks.json": parse "127.0.0.1:17071/.well-known/jwks.json": first path segment in URL cannot contain colon`
 
-Another issue is that a controller in LXD will be unable to communicate to a server on localhost without some ip table tweaks.
+After the controller has started we will add a [proxy](https://linuxcontainers.org/lxd/docs/master/reference/devices_proxy/) to the lxc container to allow the controller to make requests to the host's mitm service in order to obtain the JWKS key set.
+Run `lxc list` and find the name of the machine running the juju controller, this will resemble "juju-d5ede3-0"
+Then run `lxc config device add <instance-name> myproxy proxy listen=tcp:0.0.0.0:443 connect=tcp:127.0.0.1:443 bind=instance`
+
+Next the CA Cert we generated previously needs to be added to the controller. This can be done with the following commands
+```
+# Copy the cert into the container and update
+lxc file push ./caCert.crt <instance-name>/
+lxc shell <instance-name>
+update-ca-certificates
+# Restart the container for the controller to update its certs.
+lxc stop <instance-name>
+lxc start <instance-name>
+```
 
 ## JWT
 
@@ -48,7 +61,9 @@ The service also serves a set of `.well-known` endpoints serving the JWKS that c
 
 ## Running the service
 
-To run the service run: `go run main.go <path to configuration yaml>`.
+To run the service run: 
+`go build ./cmd/mitm`
+`sudo ./mitm <path to configuration yaml>`
 
 ## Testing the service
 
