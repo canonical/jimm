@@ -388,7 +388,7 @@ func start(ctx context.Context, s *service.Service) error {
 	mux := chi.NewMux()
 
 	st := &inMemoryCredentialStore{}
-	jwtService := jimmjwx.NewJWTService(config.Hostname, st)
+	jwtService := jimmjwx.NewJWTService(config.Hostname, st, true)
 	jwksService := jimmjwx.NewJWKSService(st)
 	s.Go(func() error {
 		return jwksService.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
@@ -431,7 +431,9 @@ func start(ctx context.Context, s *service.Service) error {
 		httpsrv.Shutdown(ctx)
 	})
 	s.Go(func() error {
-		return httpsrv.ListenAndServeTLS("", "")
+		err := httpsrv.ListenAndServeTLS("", "")
+		fmt.Printf("Listen and serve error: %s\n", err.Error())
+		return err
 	})
 	fmt.Println("started")
 

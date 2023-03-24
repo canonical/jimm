@@ -144,3 +144,6 @@ func (s *websocketSuite) open(c *gc.C, info *api.Info, username string) api.Conn
 	c.Assert(err, gc.Equals, nil)
 	return conn
 }
+
+// TODO(Kian): Test that the websocket proxies the message through to a controller.
+// This may need to be an integration/BDD test that actually spins up a Juju 3.2 controller.

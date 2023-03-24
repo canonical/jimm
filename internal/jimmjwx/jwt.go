@@ -27,6 +27,7 @@ import (
 type JWTService struct {
 	Cache *jwk.Cache
 	host  string
+	https bool
 	store credentials.CredentialStore
 }
 
@@ -42,8 +43,8 @@ type JWTParams struct {
 }
 
 // NewJWTService returns a new JWT service for handling JIMMs JWTs.
-func NewJWTService(host string, store credentials.CredentialStore) *JWTService {
-	return &JWTService{host: host, store: store}
+func NewJWTService(host string, store credentials.CredentialStore, https bool) *JWTService {
+	return &JWTService{host: host, store: store, https: https}
 }
 
 // RegisterJWKSCache registers a cache to refresh the public key persisted by JIMM's
@@ -52,11 +53,11 @@ func NewJWTService(host string, store credentials.CredentialStore) *JWTService {
 func (j *JWTService) RegisterJWKSCache(ctx context.Context, client *http.Client) {
 	j.Cache = jwk.NewCache(ctx)
 
-	_ = j.Cache.Register(j.getJWKSEndpoint(), jwk.WithHTTPClient(client))
+	_ = j.Cache.Register(j.getJWKSEndpoint(j.https), jwk.WithHTTPClient(client))
 
 	err := retry.Call(retry.CallArgs{
 		Func: func() error {
-			if _, err := j.Cache.Refresh(ctx, j.getJWKSEndpoint()); err != nil {
+			if _, err := j.Cache.Refresh(ctx, j.getJWKSEndpoint(j.https)); err != nil {
 				return err
 			}
 			return nil
@@ -86,7 +87,7 @@ func (j *JWTService) NewJWT(ctx context.Context, params JWTParams) ([]byte, erro
 	} else {
 		zapctx.Debug(ctx, "issuing a new JWT", zap.Any("params", params))
 
-		jwkSet, err := j.Cache.Get(ctx, j.getJWKSEndpoint())
+		jwkSet, err := j.Cache.Get(ctx, j.getJWKSEndpoint(j.https))
 		if err != nil {
 			return nil, err
 		}
@@ -165,6 +166,10 @@ func (j *JWTService) generateJTI(ctx context.Context) (string, error) {
 	return id.String(), nil
 }
 
-func (j *JWTService) getJWKSEndpoint() string {
-	return "https://" + j.host + "/.well-known/jwks.json"
+func (j *JWTService) getJWKSEndpoint(secure bool) string {
+	scheme := "https://"
+	if !secure {
+		scheme = "http://"
+	}
+	return scheme + j.host + "/.well-known/jwks.json"
 }

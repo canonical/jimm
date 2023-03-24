@@ -4,6 +4,7 @@ package jimm
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -136,6 +137,9 @@ type Params struct {
 
 	// Parameters used to initialize connection to an OpenFGA server.
 	OpenFGAParams OpenFGAParams
+
+	// LocalPort is the port JIMM is listening on.
+	LocalPort string
 }
 
 // A Service is the implementation of a JIMM server.
@@ -188,6 +192,20 @@ func (s *Service) PollModels(ctx context.Context) error {
 // StartJWKSRotator see internal/jimmjwx/jwks.go for details.
 func (s *Service) StartJWKSRotator(ctx context.Context, checkRotateRequired <-chan time.Time, initialRotateRequiredTime time.Time) error {
 	return s.jimm.JWKService.StartJWKSRotator(ctx, checkRotateRequired, initialRotateRequiredTime)
+}
+
+// RegisterJwksCache registers the JWKS Cache with JIMM's JWT service.
+func (s *Service) RegisterJwksCache(ctx context.Context) {
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: true,
+	}
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
+		Timeout: 15 * time.Second,
+	}
+	s.jimm.JWTService.RegisterJWKSCache(ctx, client)
 }
 
 // NewService creates a new Service using the given params.
@@ -250,7 +268,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 
 	if s.jimm.CredentialStore != nil {
 		s.jimm.JWKService = jimmjwx.NewJWKSService(s.jimm.CredentialStore)
-		s.jimm.JWTService = jimmjwx.NewJWTService(p.PublicDNSName, s.jimm.CredentialStore)
+		s.jimm.JWTService = jimmjwx.NewJWTService("localhost:"+p.LocalPort, s.jimm.CredentialStore, false)
 	}
 
 	mountHandler := func(path string, h jimmhttp.JIMMHttpHandler) {

@@ -2,40 +2,31 @@
 
 package jimm_test
 
-import (
-	"context"
-	"testing"
+// TODO(Kian): We could use a test as below to unit test the
+// auth function returned by JwtGenerator and ensure it correctly
+// generates a JWT. The JWTGenerator requires the JIMM server to have
+// a JWT service and cache setup, so we could either turn this into
+// an interface and mock it or have the test start a full JIMM server.
+// func TestJwtGenerator(t *testing.T) {
+// 	c := qt.New(t)
 
-	qt "github.com/frankban/quicktest"
-	"github.com/google/uuid"
-	jujuparams "github.com/juju/juju/rpc/params"
+// 	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
+// 	c.Assert(err, qt.IsNil)
 
-	"github.com/CanonicalLtd/jimm/internal/db"
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
-	"github.com/CanonicalLtd/jimm/internal/jimm"
-	"github.com/CanonicalLtd/jimm/internal/jimmtest"
-)
-
-func TestJwtGenerator(t *testing.T) {
-	c := qt.New(t)
-
-	_, client, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
-	j := &jimm.JIMM{
-		UUID: uuid.NewString(),
-		Database: db.Database{
-			DB: jimmtest.MemoryDB(c, nil),
-		},
-		OpenFGAClient: client,
-		JWTService:    nil,
-	}
-	ctx := context.Background()
-	m := &dbmodel.Model{}
-	authFunc := j.JwtGenerator(ctx, m)
-	loginReq := new(jujuparams.LoginRequest)
-	desiredPerms := map[string]interface{}{"model-<uuid>": "writer", "applicationoffer-<uuid>": "consumer"}
-	token, err := authFunc(loginReq, desiredPerms)
-	c.Assert(err, qt.IsNil)
-	//Check token is valid and has correct assertions.
-}
+// 	j := &jimm.JIMM{
+// 		UUID: uuid.NewString(),
+// 		Database: db.Database{
+// 			DB: jimmtest.MemoryDB(c, nil),
+// 		},
+// 		OpenFGAClient: client,
+// 		JWTService:    jimmjwx.NewJWTService(,),
+// 	}
+// 	ctx := context.Background()
+// 	m := &dbmodel.Model{}
+// 	authFunc := j.JwtGenerator(ctx, m)
+// 	loginReq := new(jujuparams.LoginRequest)
+// 	desiredPerms := map[string]interface{}{"model-123": "writer", "applicationoffer-123": "consumer"}
+// 	token, err := authFunc(loginReq, desiredPerms)
+// 	c.Assert(err, qt.IsNil)
+// 	//Check token is valid and has correct assertions.
+// }
