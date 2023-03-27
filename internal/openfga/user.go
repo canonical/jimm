@@ -184,12 +184,10 @@ func checkRelation[T ofganames.ResourceTagger](ctx context.Context, u *User, res
 // CheckRelation accepts a resource as a string and checks if the user has the specified relation to the resource.
 // The resource string will be converted to a tag. In cases where one already has a resource tag, consider using
 // the convenience functions like `IsModelWriter` or `IsApplicationOfferConsumer`.
-func CheckRelation(ctx context.Context, u *User, resource string, relation ofganames.Relation) (bool, string, error) {
+func CheckRelation(ctx context.Context, u *User, resource names.Tag, relation ofganames.Relation) (bool, string, error) {
 	var tag *ofganames.Tag
 	var err error
-	if tag, err = ofganames.TagFromString(resource); err != nil {
-		return false, "", err
-	}
+	tag = ofganames.FromGenericTag(resource)
 	isAllowed, resolution, err := u.client.checkRelation(
 		ctx,
 		Tuple{

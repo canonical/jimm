@@ -26,7 +26,7 @@ func TestRegisterJWKSCacheRegistersTheCacheSuccessfully(t *testing.T) {
 	startAndTestRotator(c, ctx, store, jwksService)
 	// Setup JWTService
 	u, _ := url.Parse(srv.URL)
-	jwtService := jimmjwx.NewJWTService(u.Host, store, false)
+	jwtService := jimmjwx.NewJWTService(u.Host, store, true)
 
 	// Test RegisterJWKSCache does register the public key just setup
 	jwtService.RegisterJWKSCache(ctx, srv.Client())

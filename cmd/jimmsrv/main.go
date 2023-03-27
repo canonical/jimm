@@ -46,6 +46,7 @@ func start(ctx context.Context, s *service.Service) error {
 	_, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		zapctx.Error(ctx, "cannot parse port from address", zap.String("Address", addr), zap.Error(err))
+		return err
 	}
 	jimmsvc, err := jimm.NewService(ctx, jimm.Params{
 		ControllerUUID:    os.Getenv("JIMM_UUID"),

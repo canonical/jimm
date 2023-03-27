@@ -1127,6 +1127,7 @@ func (j *JIMM) doModelAdmin(ctx context.Context, u *openfga.User, mt names.Model
 	return j.doModel(ctx, u, mt, "admin", f)
 }
 
+// GetUserModelAccess returns the access level a user has against a specific model.
 func (j *JIMM) GetUserModelAccess(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error) {
 	accessLevel := user.GetModelAccess(ctx, model)
 	return ToModelAccessString(accessLevel), nil

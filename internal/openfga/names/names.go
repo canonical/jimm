@@ -94,8 +94,18 @@ func FromTagWithRelation[RT ResourceTagger](t RT, relation Relation) *Tag {
 	return tag
 }
 
-// FromTag converts a resource tag to an OpenFGA tag.
+// FromTag converts a resource tag to an OpenFGA tag where the resource tag is limited to
+// specific types of tags.
 func FromTag[RT ResourceTagger](t RT) *Tag {
+	tag := &Tag{
+		id:   t.Id(),
+		kind: t.Kind(),
+	}
+	return tag
+}
+
+// FromGenericTag converts any tag implementing the names.tag interface to an OpenFGA tag.
+func FromGenericTag(t names.Tag) *Tag {
 	tag := &Tag{
 		id:   t.Id(),
 		kind: t.Kind(),

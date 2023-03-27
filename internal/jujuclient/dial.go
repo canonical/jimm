@@ -13,6 +13,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"io"
 	"net/url"
 	"path"
 	"sort"
@@ -174,37 +175,30 @@ func ProxyDial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.Mode
 		TLSConfig: tlsConfig,
 	}
 
-	var conn *websocket.Conn
-	var err error
 	if ctl.PublicAddress != "" {
 		// If there is a public-address configured it is almost
 		// certainly the one we want to use, try it first.
-		conn, err = dialer.BasicDial(ctx, websocketURL(ctl.PublicAddress, modelTag, finalPath))
+		conn, err := dialer.BasicDial(ctx, websocketURL(ctl.PublicAddress, modelTag, finalPath))
 		if err != nil {
 			zapctx.Error(ctx, "failed to dial public address", zaputil.Error(err))
+		} else {
+			return conn, nil
 		}
 	}
-	if conn == nil {
-		var urls []string
-		for _, hps := range ctl.Addresses {
-			for _, hp := range hps {
-				if hp.Scope != "public" && hp.Scope != "" {
-					continue
-				}
-				urls = append(urls, websocketURL(fmt.Sprintf("%s:%d", hp.Value, hp.Port), modelTag, finalPath))
+	var urls []string
+	for _, hps := range ctl.Addresses {
+		for _, hp := range hps {
+			if hp.Scope != "public" && hp.Scope != "" {
+				continue
 			}
-		}
-		var err2 error
-		conn, err2 = basicDialAll(ctx, &dialer, urls)
-		if err == nil {
-			err = err2
+			urls = append(urls, websocketURL(fmt.Sprintf("%s:%d", hp.Value, hp.Port), modelTag, finalPath))
 		}
 	}
-	if conn == nil {
-		return nil, errors.E(op, errors.CodeConnectionFailed, err)
+	conn, err := basicDialAll(ctx, &dialer, urls)
+	if err != nil {
+		return nil, err
 	}
 	return conn, nil
-
 }
 
 func websocketURL(s string, mt names.ModelTag, finalPath string) string {
@@ -230,7 +224,7 @@ func dialAll(ctx context.Context, dialer *rpc.Dialer, urls []string) (*rpc.Clien
 		return nil, errors.E("no urls to dial")
 	}
 	res, err := dialAllHelper(ctx, dialer, urls, false)
-	// Validate the underlying type and then check it's not nil.
+	// Check the client first because dialAllHelper can return a valid client and an error
 	client, ok := res.(*rpc.Client)
 	if !ok {
 		if err != nil {
@@ -251,7 +245,7 @@ func basicDialAll(ctx context.Context, dialer *rpc.Dialer, urls []string) (*webs
 		return nil, errors.E("no urls to dial")
 	}
 	res, err := dialAllHelper(ctx, dialer, urls, true)
-	// Validate the underlying type and then check it's not nil.
+	// Check the conn first because dialAllHelper can return a valid conn and an error
 	conn, ok := res.(*websocket.Conn)
 	if !ok {
 		if err != nil {
@@ -266,22 +260,18 @@ func basicDialAll(ctx context.Context, dialer *rpc.Dialer, urls []string) (*webs
 	return conn, nil
 }
 
-type Connecter interface {
-	Close() error
-}
-
 // dialAllHelper simultaneously dials all given urls and returns an object that can be a client or a
 // websocket depending on the value passed into basic.
 // dialAllHelper can return an error and a valid connector if an error occured during one of the
 // connection calls.
-func dialAllHelper(ctx context.Context, dialer *rpc.Dialer, urls []string, basic bool) (Connecter, error) {
+func dialAllHelper(ctx context.Context, dialer *rpc.Dialer, urls []string, basic bool) (io.Closer, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	var clientOnce, errOnce sync.Once
 	var err error
 	var wg sync.WaitGroup
-	var res Connecter
+	var res io.Closer
 	for _, url := range urls {
 		zapctx.Info(ctx, "dialing", zap.String("url", url))
 		url := url
@@ -289,7 +279,7 @@ func dialAllHelper(ctx context.Context, dialer *rpc.Dialer, urls []string, basic
 		go func() {
 			defer wg.Done()
 			var dErr error
-			var connector Connecter
+			var connector io.Closer
 			if basic {
 				connector, dErr = dialer.BasicDial(ctx, url)
 			} else {
@@ -360,10 +350,6 @@ type Connection struct {
 
 	monitorC chan struct{}
 	broken   *uint32
-}
-
-func (c Connection) GetClient() *rpc.Client {
-	return c.client
 }
 
 // Close closes the connection.

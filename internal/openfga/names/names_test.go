@@ -45,6 +45,17 @@ func (s *namesSuite) TestFromResourceTag(c *gc.C) {
 	c.Assert(result, gc.DeepEquals, ofganames.NewTag("1", jimmnames.GroupTagKind, ""))
 }
 
+func (s *namesSuite) TestFromGenericResourceTag(c *gc.C) {
+	id, err := uuid.NewRandom()
+	c.Assert(err, gc.IsNil)
+
+	result := ofganames.FromGenericTag(names.NewControllerTag(id.String()))
+	c.Assert(result, gc.DeepEquals, ofganames.NewTag(id.String(), names.ControllerTagKind, ""))
+
+	result = ofganames.FromGenericTag(names.NewModelTag(id.String()))
+	c.Assert(result, gc.DeepEquals, ofganames.NewTag(id.String(), names.ModelTagKind, ""))
+}
+
 func (s *namesSuite) TestFromOpenFGATag(c *gc.C) {
 	id, err := uuid.NewRandom()
 	c.Assert(err, gc.IsNil)
