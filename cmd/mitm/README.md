@@ -28,24 +28,34 @@ The controller part, you can get from your local controllers.yaml file located i
 ## Controller Setup
 To setup the Juju controller from a development branch, clone the desired repo/fork and switch to the desired branch and run 
 `make go-install`
-Then, assuming `$GOPATH/bin` is in your PATH (you can confirm this by running `juju --version` to confirm the juju version is the same as the built source) you can bootstrap a controller with `juju bootstrap --config jwt-refresh-url=https://127.0.0.1 localhost <controller-name>`
+Then, assuming `$GOPATH/bin` is in your PATH (you can confirm this by running `juju --version` to confirm the juju version is the same as the built source).
+Now you can bootstrap a controller by running,
+```
+juju bootstrap --config login-token-refresh-url=https://127.0.0.1 localhost <controller-name>
+```
 
 Note: The path to the mitm service cannot contain a port otherwise the Juju controller will report the following:
 `machine-0: 10:51:23 WARNING juju.apiserver failed to refresh jwt cache: failed to fetch "127.0.0.1:17071/.well-known/jwks.json": failed to fetch "127.0.0.1:17071/.well-known/jwks.json": parse "127.0.0.1:17071/.well-known/jwks.json": first path segment in URL cannot contain colon`
 
 After the controller has started we will add a [proxy](https://linuxcontainers.org/lxd/docs/master/reference/devices_proxy/) to the lxc container to allow the controller to make requests to the host's mitm service in order to obtain the JWKS key set.
-Run `lxc list` and find the name of the machine running the juju controller, this will resemble "juju-d5ede3-0"
-Then run `lxc config device add <instance-name> myproxy proxy listen=tcp:0.0.0.0:443 connect=tcp:127.0.0.1:443 bind=instance`
+Run 
+```
+lxc list # Get name of the machine running the juju controller, this will resemble "juju-d5ede3-0"
+export TEST_JUJU_CTRL=<instance-name> # This will make subsequent requests easier
+lxc config device add "${TEST_JUJU_CTRL}" myproxy proxy listen=tcp:0.0.0.0:443 connect=tcp:127.0.0.1:443 bind=instance
+```
 
 Next the CA Cert we generated previously needs to be added to the controller. This can be done with the following commands
 ```
 # Copy the cert into the container and update
-lxc file push ./caCert.crt <instance-name>/
-lxc shell <instance-name>
+lxc file push ./caCert.crt "${TEST_JUJU_CTRL}"/
+lxc shell "${TEST_JUJU_CTRL}"
+cp /caCert.crt /usr/local/share/ca-certificates
 update-ca-certificates
+exit
 # Restart the container for the controller to update its certs.
-lxc stop <instance-name>
-lxc start <instance-name>
+lxc stop "${TEST_JUJU_CTRL}"
+lxc start "${TEST_JUJU_CTRL}"
 ```
 
 ## JWT
@@ -62,8 +72,10 @@ The service also serves a set of `.well-known` endpoints serving the JWKS that c
 ## Running the service
 
 To run the service run: 
-`go build ./cmd/mitm`
-`sudo ./mitm <path to configuration yaml>`
+```
+go build ./cmd/mitm
+sudo ./mitm <path to configuration yaml>
+```
 
 ## Testing the service
 
