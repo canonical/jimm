@@ -136,8 +136,8 @@ func (s modelProxyServer) ServeWS(ctx context.Context, clientConn *websocket.Con
 		return
 	}
 	defer controllerConn.Close()
-	authFunc := s.jimm.JwtGenerator(ctx, &m)
-	err = jimmRPC.ProxySockets(ctx, clientConn, controllerConn, authFunc)
+	jwtGenerator := jimm.NewJwtAuthorizer(s.jimm, &m)
+	err = jimmRPC.ProxySockets(ctx, clientConn, controllerConn, &jwtGenerator)
 	sendClientError(err)
 }
 

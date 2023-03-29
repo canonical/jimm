@@ -218,8 +218,12 @@ func TestClientReceiveInvalidMessage(t *testing.T) {
 	c.Check(res, qt.Equals, "")
 }
 
-// TestProxySockets uses dialers with proxy set to true to ignore the extra abstractions
-// normally used on top of websockets.
+type testTokenGenerator struct{}
+
+func (p *testTokenGenerator) MakeToken(ctx context.Context, req *params.LoginRequest, permissionMap map[string]interface{}) ([]byte, error) {
+	return nil, nil
+}
+
 func TestProxySockets(t *testing.T) {
 	c := qt.New(t)
 
@@ -233,10 +237,8 @@ func TestProxySockets(t *testing.T) {
 		connController, err := srvController.dialer.BasicDial(ctx, srvController.URL)
 		c.Assert(err, qt.IsNil)
 		defer connController.Close()
-		authFunc := func(req *params.LoginRequest, errMap map[string]interface{}) ([]byte, error) {
-			return nil, nil
-		}
-		return rpc.ProxySockets(ctx, connClient, connController, authFunc)
+		testTokenGen := testTokenGenerator{}
+		return rpc.ProxySockets(ctx, connClient, connController, &testTokenGen)
 	})
 
 	defer srvController.Close()
@@ -270,10 +272,8 @@ func TestCancelProxySockets(t *testing.T) {
 		connController, err := srvController.dialer.BasicDial(ctx, srvController.URL)
 		c.Assert(err, qt.IsNil)
 		readyChan <- 1
-		authFunc := func(req *params.LoginRequest, errMap map[string]interface{}) ([]byte, error) {
-			return nil, nil
-		}
-		err = rpc.ProxySockets(ctx, connClient, connController, authFunc)
+		testTokenGen := testTokenGenerator{}
+		err = rpc.ProxySockets(ctx, connClient, connController, &testTokenGen)
 		errChan <- err
 		return err
 	})

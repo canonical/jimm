@@ -13,7 +13,17 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/errors"
 )
 
-type GetTokenFunc func(req *params.LoginRequest, errMap map[string]interface{}) ([]byte, error)
+// TokenGenerator generates a JWT token.
+type TokenGenerator interface {
+	MakeToken(ctx context.Context, req *params.LoginRequest, permissionMap map[string]interface{}) ([]byte, error)
+}
+
+type proxyInfo struct {
+	connController *websocket.Conn
+	connClient     *websocket.Conn
+	tokenGen       TokenGenerator
+	loginMsg       *message
+}
 
 // ProxySockets takes two websocket connections, the first between a client and JIMM
 // and the second between JIMM and a controller and acts as a man-in-the-middle forwarding
@@ -23,16 +33,18 @@ type GetTokenFunc func(req *params.LoginRequest, errMap map[string]interface{}) 
 //
 // Note that this function assumes half-duplex communication i.e. a client sends a request and
 // expects a reply from the server as is done by Juju.
-func ProxySockets(ctx context.Context, connClient, connController *websocket.Conn, f GetTokenFunc) error {
+func ProxySockets(ctx context.Context, connClient, connController *websocket.Conn, tokenGen TokenGenerator) error {
+	const op = errors.Op("rpc.ProxySockets")
 	errChannel := make(chan error, 1)
+	proxyInfo := proxyInfo{connController: connController, connClient: connClient, tokenGen: tokenGen}
 	go func() {
-		errChannel <- proxy(ctx, connClient, connController, f)
+		errChannel <- proxyInfo.proxy(ctx)
 	}()
 	var err error
 	select {
 	case err = <-errChannel:
 	case <-ctx.Done():
-		err = errors.E("Context cancelled")
+		err = errors.E(op, "Context cancelled")
 		connClient.Close()
 		connController.Close()
 	}
@@ -46,82 +58,87 @@ type loginRequest struct {
 	Token string `json:"token"`
 }
 
-func proxy(ctx context.Context, connClient, connController *websocket.Conn, f GetTokenFunc) error {
-	var loginMsg *message
-	var skipClientRead bool
-	// readCallback is called after a message is read whether from the client or the controller.
-	// it return a boolean indicating whether to continue and an error.
-	readCallback := func(msg *message) (bool, error) {
-		// Handle login requests from client
-		if msg.Type == "Admin" && msg.Request == "Login" {
-			if err := addJWT(msg, nil, f); err != nil {
-				return false, err
-			}
-			loginMsg = msg
-			return false, nil
-		}
-		// Handle permission denied from controller - repeat login.
-		if msg.ErrorCode == "PermissionAssertionRequireError" {
-			if err := addJWT(loginMsg, msg.ErrorInfo, f); err != nil {
-				return false, err
-			}
-			skipClientRead = true
-			return true, nil
-		}
-		return false, nil
-	}
-
+func (p proxyInfo) proxy(ctx context.Context) error {
 	for {
-		var msg *message
-		if skipClientRead {
-			msg = loginMsg
-			skipClientRead = false
-		} else {
-			msg = new(message)
-			if err := connClient.ReadJSON(msg); err != nil {
-				zapctx.Error(ctx, "error reading from client", zap.Error(err))
+		msg := new(message)
+		if err := p.connClient.ReadJSON(msg); err != nil {
+			zapctx.Error(ctx, "error reading from client", zap.Error(err))
+			return err
+		}
+		// Add JWT if the user is sending a login request.
+		if msg.Type == "Admin" && msg.Request == "Login" {
+			if err := p.addJWT(ctx, true, msg, nil); err != nil {
 				return err
 			}
-			if _, err := readCallback(msg); err != nil {
-				return err
-			}
+			// Store the login request for later.
+			p.loginMsg = msg
 		}
 
+		// Loop the request to the controller in cases where we get an permission denied error.
+	login:
 		response := new(message)
 		zapctx.Info(ctx, "forwarding request", zap.Any("message", msg))
-		if err := connController.WriteJSON(msg); err != nil {
+		if err := p.connController.WriteJSON(msg); err != nil {
 			zapctx.Error(ctx, "cannot forward request", zap.Error(err))
 			return err
 		}
 
-		if err := connController.ReadJSON(response); err != nil {
+		if err := p.connController.ReadJSON(response); err != nil {
 			zapctx.Error(ctx, "error reading from controller", zap.Error(err))
 			return err
 		}
-		if proxyContinue, err := readCallback(response); err != nil {
-			return err
-		} else if proxyContinue {
-			continue
+		// TODO(Kian): Check for juju.errors CodeAccessRequired
+		if response.ErrorCode == "PermissionAssertionRequireError" {
+			if err := p.redoLogin(ctx, response); err != nil {
+				return err
+			} else {
+				goto login
+			}
 		}
-
+		modifyControllerResponse(response)
 		zapctx.Info(ctx, "received controller response", zap.Any("message", response))
-		if err := connClient.WriteJSON(response); err != nil {
+		if err := p.connClient.WriteJSON(response); err != nil {
 			zapctx.Error(ctx, "cannot return response", zap.Error(err))
 			return err
 		}
 	}
 }
 
-func addJWT(msg *message, permissions map[string]interface{}, f GetTokenFunc) error {
+func (p proxyInfo) redoLogin(ctx context.Context, resp *message) error {
+	err := p.addJWT(ctx, false, p.loginMsg, resp.ErrorInfo)
+	if err != nil {
+		return err
+	}
+	zapctx.Info(ctx, "Performing new login", zap.Any("message", p.loginMsg))
+	if err := p.connController.WriteJSON(p.loginMsg); err != nil {
+		zapctx.Error(ctx, "cannot send new login", zap.Error(err))
+		return err
+	}
+	if err := p.connController.ReadJSON(p.loginMsg); err != nil {
+		zapctx.Error(ctx, "error login response from controller", zap.Error(err))
+		return err
+	}
+	return nil
+}
+
+// addJWT adds a JWT token to the the provided message.
+func (p proxyInfo) addJWT(ctx context.Context, performLogin bool, msg *message, permissions map[string]interface{}) error {
+	const op = errors.Op("rpc.addJWT")
 	// First we unmarshal the existing LoginRequest.
 	if msg == nil {
-		return errors.E("nil messsage")
+		return errors.E(op, "nil messsage")
 	}
 	var lr params.LoginRequest
 	if err := json.Unmarshal(msg.Params, &lr); err != nil {
 		return err
 	}
-	jwt, err := f(&lr, permissions)
+	var loginMsg *params.LoginRequest
+	if performLogin {
+		loginMsg = &lr
+	} else {
+		loginMsg = nil
+	}
+	jwt, err := p.tokenGen.MakeToken(ctx, loginMsg, permissions)
 	if err != nil {
 		return err
 	}
@@ -138,5 +155,23 @@ func addJWT(msg *message, permissions map[string]interface{}, f GetTokenFunc) er
 	}
 	// And add it to the message.
 	msg.Params = data
+	return nil
+}
+
+func modifyControllerResponse(msg *message) error {
+	var response map[string]interface{}
+	err := json.Unmarshal(msg.Response, &response)
+	if err != nil {
+		return err
+	}
+	// Delete servers block so that juju client's don't get redirected.
+	if _, ok := response["servers"]; ok {
+		delete(response, "servers")
+	}
+	newResp, err := json.Marshal(response)
+	if err != nil {
+		return err
+	}
+	msg.Response = newResp
 	return nil
 }

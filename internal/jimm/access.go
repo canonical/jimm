@@ -99,14 +99,17 @@ func NewJwtAuthorizer(jimm *JIMM, model *dbmodel.Model) JwtGenerator {
 	return JwtGenerator{jimm: jimm, model: model}
 }
 
-// GenJwt takes a login request and a map of needed permissions and returns a JWT token if the user satisfies
+// MakeToken takes a login request and a map of needed permissions and returns a JWT token if the user satisfies
 // all the needed permissions. A loginRequest object should be provided on the first invocation of this function
 // after which point subsequent calls can provide a nil object.
 // Note that this function is not thread-safe and should only be called by a single Go routine at a time.
-func (auth *JwtGenerator) GenJwt(ctx context.Context, req *jujuparams.LoginRequest, permissionMap map[string]interface{}) ([]byte, error) {
-	const op = errors.Op("jimm.GenJwt")
+func (auth *JwtGenerator) MakeToken(ctx context.Context, req *jujuparams.LoginRequest, permissionMap map[string]interface{}) ([]byte, error) {
+	const op = errors.Op("jimm.MakeToken")
 
-	if req != nil {
+	if auth.user == nil || req != nil {
+		if req == nil {
+			return nil, errors.E(op, "Missing login request.")
+		}
 		// Recreate the accessMapCache to prevent leaking permissions across multiple login requests.
 		auth.accessMapCache = make(map[string]string)
 		var authErr error
