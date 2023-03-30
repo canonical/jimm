@@ -14,8 +14,10 @@ import (
 	"crypto/x509"
 	"fmt"
 	"net/url"
+	"os"
 	"path"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -64,6 +66,9 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 		cp.AppendCertsFromPEM([]byte(ctl.CACertificate))
 		tlsConfig = &tls.Config{
 			RootCAs: cp,
+		}
+		if strings.ToLower(strings.TrimSpace(os.Getenv("JIMM_SKIP_HOSTNAME_VERIFICATION_JUJU_CLIENT"))) == "true" {
+			tlsConfig.InsecureSkipVerify = true
 		}
 	}
 	dialer := rpc.Dialer{
