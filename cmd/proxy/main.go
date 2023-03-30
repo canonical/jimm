@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"path"
+	"sync"
 	"syscall"
 
 	"crypto/x509"
@@ -143,114 +144,190 @@ type wsMITM struct {
 	controllerUUID string
 	hostname       string
 	jwtService     *jimmjwx.JWTService
+
+	mu           sync.Mutex
+	loginMessage *message
 }
 
-func (ws *wsMITM) ServeWS(ctx context.Context, modelUUID string, connClient, connController *websocket.Conn) {
-	access := map[string]string{
-		names.NewControllerTag(ws.controllerUUID).String(): "superuser",
-	}
-	if modelUUID != "" {
-		access[names.NewModelTag(modelUUID).String()] = "admin"
-	}
+func (ws *wsMITM) mintJWT(ctx context.Context, accessMap map[string]string) (string, error) {
 	jwt, err := ws.jwtService.NewJWT(ctx, jimmjwx.JWTParams{
 		Controller: ws.controllerUUID,
 		User:       "user-fred@external",
-		Access:     access,
+		Access:     accessMap,
 	})
 	if err != nil {
-		zapctx.Error(ctx, "failed to create a jwt", zap.Error(err))
-		ws.handleError(err, connClient)
-		return
+		return "", errors.E(err, "failed to create a JWT")
 	}
-	jwtString := base64.StdEncoding.EncodeToString(jwt)
+	return base64.StdEncoding.EncodeToString(jwt), nil
+}
+
+func isLoginRequest(msg *message) bool {
+	return msg.Type == "Admin" && msg.Request == "Login"
+}
+
+func (ws *wsMITM) doLogin(ctx context.Context, request *message, accessMap map[string]string, connController *websocket.Conn) (*message, error) {
+	ws.mu.Lock()
+	defer ws.mu.Unlock()
+	ws.loginMessage = request
+
+	// First we unmarshal the existing LoginRequest.
+	var lReq jujuparams.LoginRequest
+	if err := json.Unmarshal(request.Params, &lReq); err != nil {
+		zapctx.Error(ctx, "failed to unmarshal the login request")
+		return nil, errors.E(err)
+	}
+
+	jwtString, err := ws.mintJWT(ctx, accessMap)
+	if err != nil {
+		zapctx.Error(ctx, "failed to mint a JWT")
+		return nil, errors.E(err)
+	}
+
+	// Add the JWT as base64 encoded string.
+	loginRequest := loginRequest{
+		LoginRequest: lReq,
+		Token:        jwtString,
+	}
+	// Marshal it again to JSON.
+	data, err := json.Marshal(loginRequest)
+	if err != nil {
+		zapctx.Error(ctx, "failed to marshal the login request")
+		return nil, errors.E(err, "failed to marshal login request data")
+	}
+	// And add it to the message.
+	request.Params = data
+
+	zapctx.Error(ctx, "forwarding login request", zap.Any("request", request))
+	err = connController.WriteJSON(request)
+	if err != nil {
+		zapctx.Error(ctx, "failed to forward login request", zap.Error(err))
+		return nil, errors.E(err)
+	}
+	response := new(message)
+	if err := connController.ReadJSON(response); err != nil {
+		zapctx.Error(ctx, "failed to read JSON response", zap.Error(err))
+		return nil, errors.E(err, "failed to read response")
+	}
+
+	// First we unmarshal the existing LoginRequest.
+	var lResp jujuparams.LoginResult
+	if err := json.Unmarshal(response.Response, &lResp); err != nil {
+		zapctx.Error(ctx, "failed to unmarshal login result", zap.Any("message", response), zap.Error(err))
+		return nil, errors.E(err, "failed to unmarshal login result")
+	}
+
+	lResp.PublicDNSName = ws.hostname
+	lResp.Servers = nil
+	lResp.ControllerTag = names.NewControllerTag(ws.mimtUUID).String()
+
+	// Marshal it again to JSON.
+	data, err = json.Marshal(lResp)
+	if err != nil {
+		zapctx.Error(ctx, "failed to marshal login result", zap.Error(err))
+		return nil, errors.E(err, "failed to marshal login result")
+	}
+	response.Response = data
+
+	return response, nil
+}
+
+func (ws *wsMITM) handleMessage(ctx context.Context, request *message, accessMap map[string]string, connController *websocket.Conn) (*message, error) {
+	if request.RequestID == 0 {
+		// Use a 0 request ID to indicate that the message
+		// received was not a valid RPC message.
+		return nil, errors.E("received invalid RPC message")
+	}
+	if !request.isRequest() {
+		zapctx.Error(ctx, "received response", zap.Any("message", request))
+		return nil, errors.E("received response from client")
+	}
+
+	// If this is a login request we need to augment it with the
+	// JWT.
+	if isLoginRequest(request) {
+		response, err := ws.doLogin(ctx, request, accessMap, connController)
+		if err != nil {
+			zapctx.Error(ctx, "failed to perform login", zap.Error(err))
+			return nil, errors.E(err, "failed to forward the login request")
+		}
+		return response, nil
+	}
+
+	zapctx.Error(ctx, "forwarding request", zap.Any("request", request))
+	err := connController.WriteJSON(request)
+	if err != nil {
+		zapctx.Error(ctx, "failed to forward request", zap.Error(err))
+		return nil, errors.E(err)
+	}
+	response := new(message)
+	if err := connController.ReadJSON(response); err != nil {
+		zapctx.Error(ctx, "failed to read JSON response", zap.Error(err))
+		return nil, errors.E(err, "failed to read response")
+	}
+
+	zapctx.Error(ctx, "received response", zap.Any("response", response))
+
+	var er jujuparams.ErrorResults
+	err = json.Unmarshal(response.Response, &er)
+	if err != nil {
+		zapctx.Error(ctx, "failed to read response error")
+		return nil, errors.E(err, "failed to read response errors")
+	}
+	requiredPermissions := make(map[string]string)
+	for _, e := range er.Results {
+		zapctx.Error(ctx, "received error", zap.Any("error", e))
+		if e.Error != nil && e.Error.Code == "access required" {
+			for k, v := range e.Error.Info {
+				accessLevel, ok := v.(string)
+				if !ok {
+					return nil, errors.E("unknown permission level")
+				}
+				requiredPermissions[k] = accessLevel
+			}
+		}
+	}
+	if len(requiredPermissions) > 0 {
+		zapctx.Error(ctx, "XXX additional permissions", zap.Any("permissions", requiredPermissions))
+		for k, v := range requiredPermissions {
+			accessMap[k] = v
+		}
+
+		if ws.loginMessage == nil {
+			zapctx.Error(ctx, "need to re-login, but login was never called")
+			return nil, errors.E("need to re-login, but login was never called")
+		}
+		if _, err := ws.doLogin(ctx, ws.loginMessage, accessMap, connController); err != nil {
+			zapctx.Error(ctx, "re-login failed", zap.Error(err))
+			return nil, errors.E("re-login failed")
+		}
+		return ws.handleMessage(ctx, request, accessMap, connController)
+	}
+
+	zapctx.Info(ctx, "received controller response", zap.Any("message", response))
+	return response, nil
+}
+
+func (ws *wsMITM) ServeWS(ctx context.Context, modelUUID string, connClient, connController *websocket.Conn) {
+	accessMap := map[string]string{
+		names.NewControllerTag(ws.controllerUUID).String(): "superuser",
+	}
+	if modelUUID != "" {
+		accessMap[names.NewModelTag(modelUUID).String()] = "admin"
+	}
 
 	for {
-		msg := new(message)
-		if err := connClient.ReadJSON(msg); err != nil {
+		request := new(message)
+		if err := connClient.ReadJSON(request); err != nil {
 			ws.handleError(err, connClient)
 			break
 		}
-		if msg.RequestID == 0 {
-			// Use a 0 request ID to indicate that the message
-			// received was not a valid RPC message.
+
+		response, err := ws.handleMessage(ctx, request, accessMap, connController)
+		if err != nil {
 			ws.handleError(errors.E("received invalid RPC message"), connClient)
 			break
 		}
-		if !msg.isRequest() {
-			// we received a response from the client which is not
-			// supported
-			zapctx.Error(ctx, "received response", zap.Any("message", msg))
-			connClient.WriteJSON(message{
-				RequestID: msg.RequestID,
-				Error:     "not supported",
-				ErrorCode: jujuparams.CodeNotSupported,
-			})
-			continue
-		}
-		// If this is a login request we need to augment it with the
-		// JWT.
-		if msg.Type == "Admin" && msg.Request == "Login" {
-			zapctx.Error(ctx, "XXX forwarding login request")
-			// First we unmarshal the existing LoginRequest.
-			var lr jujuparams.LoginRequest
-			if err := json.Unmarshal(msg.Params, &lr); err != nil {
-				ws.handleError(err, connClient)
-				break
-			}
 
-			// Add the JWT as base64 encoded string.
-			loginRequest := loginRequest{
-				LoginRequest: lr,
-				Token:        jwtString,
-			}
-			// Marshal it again to JSON.
-			data, err := json.Marshal(loginRequest)
-			if err != nil {
-				ws.handleError(err, connClient)
-				break
-			}
-			// And add it to the message.
-			msg.Params = data
-		}
-
-		zapctx.Error(ctx, "forwarding request", zap.Any("message", msg))
-		err := connController.WriteJSON(msg)
-		if err != nil {
-			zapctx.Error(ctx, "cannot forward request", zap.Error(err))
-			ws.handleError(err, connClient)
-			break
-		}
-		response := new(message)
-		if err := connController.ReadJSON(response); err != nil {
-			zapctx.Error(ctx, "failed to read JSON response", zap.Error(err))
-			ws.handleError(err, connClient)
-			break
-		}
-
-		if msg.Type == "Admin" && msg.Request == "Login" {
-			zapctx.Error(ctx, "XXX handling login response")
-			// First we unmarshal the existing LoginRequest.
-			var lr jujuparams.LoginResult
-			if err := json.Unmarshal(response.Response, &lr); err != nil {
-				zapctx.Error(ctx, "failed to unmarshal login result", zap.Any("message", response), zap.Error(err))
-				ws.handleError(err, connClient)
-				break
-			}
-
-			lr.PublicDNSName = ws.hostname
-			lr.Servers = nil
-			lr.ControllerTag = names.NewControllerTag(ws.mimtUUID).String()
-
-			// Marshal it again to JSON.
-			data, err := json.Marshal(lr)
-			if err != nil {
-				zapctx.Error(ctx, "failed to marshal login result", zap.Error(err))
-				ws.handleError(err, connClient)
-				break
-			}
-			response.Response = data
-		}
-		zapctx.Info(ctx, "received controller response", zap.Any("message", response))
 		connClient.WriteJSON(response)
 		if err != nil {
 			zapctx.Error(ctx, "cannot return response", zap.Error(err))
