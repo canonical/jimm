@@ -1,3 +1,4 @@
+hostname: <ip>:443
 ca-cert-file: <CA cert file path>
 cert-file: <cert file path>
 key-file: <key file path>

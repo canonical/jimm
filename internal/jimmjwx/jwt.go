@@ -56,6 +56,12 @@ func (j *JWTService) RegisterJWKSCache(ctx context.Context, client *http.Client)
 
 	err := retry.Call(retry.CallArgs{
 		Func: func() error {
+			zapctx.Info(ctx, "cache refresh")
+			select {
+			case <-ctx.Done():
+				return nil
+			default:
+			}
 			if _, err := j.Cache.Refresh(ctx, j.getJWKSEndpoint()); err != nil {
 				return err
 			}
@@ -64,6 +70,7 @@ func (j *JWTService) RegisterJWKSCache(ctx context.Context, client *http.Client)
 		Attempts: 10,
 		Delay:    2 * time.Second,
 		Clock:    clock.WallClock,
+		Stop:     ctx.Done(),
 	})
 	if err != nil {
 		panic(err.Error())

@@ -11,7 +11,7 @@ To run the service you will need a running Juju controller a self-signed key, ce
     ca-cert-file: <CA cert file path>
     cert-file: <cert file path>
     key-file: <key file path>
-    hostname: 127.0.0.1:17071
+    hostname: 127.0.0.1:443
     controller:
         uuid: <uuid of the controller>
         api-endpoints: [<list of controller endpoints>]
@@ -35,7 +35,7 @@ juju bootstrap --config login-token-refresh-url=https://127.0.0.1 localhost <con
 ```
 
 Note: The path to the mitm service cannot contain a port otherwise the Juju controller will report the following:
-`machine-0: 10:51:23 WARNING juju.apiserver failed to refresh jwt cache: failed to fetch "127.0.0.1:17071/.well-known/jwks.json": failed to fetch "127.0.0.1:17071/.well-known/jwks.json": parse "127.0.0.1:17071/.well-known/jwks.json": first path segment in URL cannot contain colon`
+`machine-0: 10:51:23 WARNING juju.apiserver failed to refresh jwt cache: failed to fetch "127.0.0.1:443/.well-known/jwks.json": failed to fetch "127.0.0.1:443/.well-known/jwks.json": parse "127.0.0.1:443/.well-known/jwks.json": first path segment in URL cannot contain colon`
 
 After the controller has started we will add a [proxy](https://linuxcontainers.org/lxd/docs/master/reference/devices_proxy/) to the lxc container to allow the controller to make requests to the host's mitm service in order to obtain the JWKS key set.
 Run 
@@ -68,6 +68,14 @@ When forwarding the `Login` call on the `Admin` facade, the service will add a `
 
 The service also serves a set of `.well-known` endpoints serving the JWKS that can be used to validate the JWT.
 
+### In-memory JWT storage
+
+Since the service currently stores the JWKS data in memory, every time we restart the service a new JWKS set will be created. Since the juju controller caches the JWKS data, every time we restart the service, we also need to restart the Juju controller. Run:
+```
+    # Restart the container for the controller to update its certs.
+    lxc stop <instance-name>
+    lxc start <instance-name>
+```
 
 ## Running the service
 
@@ -79,5 +87,5 @@ sudo ./mitm <path to configuration yaml>
 
 ## Testing the service
 
-To test a juju client with the service run `juju login localhost:17071 -c mitm --debug`
-This will connect to the mitm server at localhost:17071 and you should see trace logs come through on the terminal running the man-in-the-middle-server.
+To test a juju client with the service run `juju login localhost:443 -c mitm --debug`
+This will connect to the mitm server at localhost:443 and you should see trace logs come through on the terminal running the man-in-the-middle-server.
