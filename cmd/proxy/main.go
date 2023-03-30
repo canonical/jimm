@@ -156,7 +156,7 @@ func (ws *wsMITM) ServeWS(ctx context.Context, modelUUID string, connClient, con
 	}
 	jwt, err := ws.jwtService.NewJWT(ctx, jimmjwx.JWTParams{
 		Controller: ws.controllerUUID,
-		User:       "user-fred",
+		User:       "user-fred@external",
 		Access:     access,
 	})
 	if err != nil {
