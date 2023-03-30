@@ -649,5 +649,4 @@ func TestQueryModelsJq(t *testing.T) {
 		}
 	}
 	`, qt.JSONEquals, res)
-
 }
