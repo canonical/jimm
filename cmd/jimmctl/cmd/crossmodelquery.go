@@ -3,8 +3,6 @@
 package cmd
 
 import (
-	"github.com/CanonicalLtd/jimm/api"
-	apiparams "github.com/CanonicalLtd/jimm/api/params"
 	"github.com/juju/cmd/v3"
 	"github.com/juju/errors"
 	"github.com/juju/gnuflag"
@@ -12,6 +10,9 @@ import (
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
+
+	"github.com/CanonicalLtd/jimm/api"
+	apiparams "github.com/CanonicalLtd/jimm/api/params"
 )
 
 var (
@@ -24,15 +25,10 @@ the collated query responses for each model.
 The query will run against the exact output of "juju status --format json",
 as such you can format your query against an output like this.
 
-The default query format is jq.
-
-NOTE: JIMMSQL is currently UNIMPLEMENTED.
+The queries will expect a JQ query string.
 
 Example:
-	jimmctl query-models '<query>' 
-	jimmctl query-models '<query>' --type jq
-	jimmctl query-models '<query>' --type jimmsql --format json
-	jimmctl query-models '<query>' --type jq --format yaml
+	jimmctl query-models '.applications | with_entries(select(.key=="nginx-ingress-integrator"))'
 `
 )
 
@@ -74,7 +70,6 @@ func (c *crossModelQueryCommand) Init(args []string) error {
 // SetFlags implements modelcmd.Command.
 func (c *crossModelQueryCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
-	f.StringVar(&c.queryType, "type", "", "The type of query to be used, can be one of: <jq>, <jimmsql>.")
 	c.out.AddFlags(f, "json", map[string]cmd.Formatter{
 		"yaml": cmd.FormatYaml,
 		"json": cmd.FormatJson,
