@@ -1,4 +1,4 @@
-# Man-in-the-middle Proof of Concept Service for a Juju Controller
+# Proof of Concept Proxy Service for a Juju Controller
 
 ## Introduction
 
@@ -11,7 +11,8 @@ To run the service you will need a running Juju controller a self-signed key, ce
     ca-cert-file: <CA cert file path>
     cert-file: <cert file path>
     key-file: <key file path>
-    hostname: 127.0.0.1:443
+    hostname: localhost
+    uuid: <uuid of the proxy service - arbitrary>
     controller:
         uuid: <uuid of the controller>
         api-endpoints: [<list of controller endpoints>]
@@ -34,10 +35,10 @@ Now you can bootstrap a controller by running,
 juju bootstrap --config login-token-refresh-url=https://127.0.0.1 localhost <controller-name>
 ```
 
-Note: The path to the mitm service cannot contain a port otherwise the Juju controller will report the following:
+Note: The path to the proxy service cannot contain a port otherwise the Juju controller will report the following:
 `machine-0: 10:51:23 WARNING juju.apiserver failed to refresh jwt cache: failed to fetch "127.0.0.1:443/.well-known/jwks.json": failed to fetch "127.0.0.1:443/.well-known/jwks.json": parse "127.0.0.1:443/.well-known/jwks.json": first path segment in URL cannot contain colon`
 
-After the controller has started we will add a [proxy](https://linuxcontainers.org/lxd/docs/master/reference/devices_proxy/) to the lxc container to allow the controller to make requests to the host's mitm service in order to obtain the JWKS key set.
+After the controller has started we will add a [proxy](https://linuxcontainers.org/lxd/docs/master/reference/devices_proxy/) to the lxc container to allow the controller to make requests to the host's proxy service in order to obtain the JWKS key set.
 Run 
 ```
 lxc list # Get name of the machine running the juju controller, this will resemble "juju-d5ede3-0"
@@ -81,11 +82,11 @@ Since the service currently stores the JWKS data in memory, every time we restar
 
 To run the service run: 
 ```
-go build ./cmd/mitm
-sudo ./mitm <path to configuration yaml>
+go build ./cmd/proxy
+sudo ./proxy <path to configuration yaml>
 ```
 
 ## Testing the service
 
-To test a juju client with the service run `juju login localhost:443 -c mitm --debug`
-This will connect to the mitm server at localhost:443 and you should see trace logs come through on the terminal running the man-in-the-middle-server.
+To test a juju client with the service run `juju login localhost:443 -c proxy --debug`
+This will connect to the proxy server at localhost:443 and you should see trace logs come through on the terminal running the proxy server.
