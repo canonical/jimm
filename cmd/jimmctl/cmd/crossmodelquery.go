@@ -17,22 +17,22 @@ import (
 var (
 	// stdinMarkers contains file names that are taken to be stdin.
 	crossModelQueryDoc = `
-	query-models command queries all models available to the current user
-	performing the query against each model status individually, returning
-	the collated query responses for each model.
+query-models command queries all models available to the current user
+performing the query against each model status individually, returning
+the collated query responses for each model.
 
-	The query will run against the exact output of "juju status --format json",
-	as such you can format your query against an output like this.
+The query will run against the exact output of "juju status --format json",
+as such you can format your query against an output like this.
 
-	The default query format is jq.
+The default query format is jq.
 
-	NOTE: JIMMSQL is currently UNIMPLEMENTED.
+NOTE: JIMMSQL is currently UNIMPLEMENTED.
 
-	Example:
-		jimmctl query-models '<query>' 
-		jimmctl query-models '<query>' --type jq
-		jimmctl query-models '<query>' --type jimmsql --format json
-		jimmctl query-models '<query>' --type jq --format yaml
+Example:
+	jimmctl query-models '<query>' 
+	jimmctl query-models '<query>' --type jq
+	jimmctl query-models '<query>' --type jimmsql --format json
+	jimmctl query-models '<query>' --type jq --format yaml
 `
 )
 
