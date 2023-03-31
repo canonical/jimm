@@ -14,3 +14,9 @@
 /local/vault/approle.json
 local/vault/approle.json
 local/vault/roleid.txt
+
+*.crt
+*.key
+*.csr
+jimmctl
+qa-controller
