@@ -9,7 +9,6 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 
-	"github.com/CanonicalLtd/jimm/internal/dbmodel"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimmjwx"
 	"github.com/CanonicalLtd/jimm/internal/openfga"
@@ -56,6 +55,16 @@ func ToModelAccessString(relation ofganames.Relation) string {
 	}
 }
 
+// ToModelAccessString maps relation to a controller access string.
+func ToControllerAccessString(relation ofganames.Relation) string {
+	switch relation {
+	case ofganames.AdministratorRelation:
+		return "superuser"
+	default:
+		return "login"
+	}
+}
+
 // ToCloudRelation returns a valid relation for the cloud. Access level
 // string can be either "admin", in which case the administrator relation
 // is returned, or "add-model", in which case the can_addmodel relation is
@@ -85,28 +94,41 @@ func ToModelRelation(accessLevel string) (ofganames.Relation, error) {
 	}
 }
 
+// TokenGenerator generates a JWT token.
+type TokenGenerator interface {
+	MakeToken(ctx context.Context, initialLogin bool, req *jujuparams.LoginRequest, permissionMap map[string]interface{}) ([]byte, error)
+	SetTags(mt names.ModelTag, ct names.ControllerTag)
+}
+
 // JwtGenerator provides the necessary state and methods to authorize a user and generate JWT tokens.
 type JwtGenerator struct {
 	jimm           *JIMM
 	accessMapCache map[string]string
-	model          *dbmodel.Model
+	mt             names.ModelTag
+	ct             names.ControllerTag
 	user           *openfga.User
 	callCount      int
 }
 
-// NewJwtAuthorizer returns a new JwtAuthorizer struct
-func NewJwtAuthorizer(jimm *JIMM, model *dbmodel.Model) JwtGenerator {
-	return JwtGenerator{jimm: jimm, model: model}
+// NewJwtGenerator returns a new JwtAuthorizer struct
+func NewJwtGenerator(jimm *JIMM) JwtGenerator {
+	return JwtGenerator{jimm: jimm}
+}
+
+// SetTags implements TokenGenerator
+func (auth *JwtGenerator) SetTags(mt names.ModelTag, ct names.ControllerTag) {
+	auth.mt = mt
+	auth.ct = ct
 }
 
 // MakeToken takes a login request and a map of needed permissions and returns a JWT token if the user satisfies
 // all the needed permissions. A loginRequest object should be provided on the first invocation of this function
 // after which point subsequent calls can provide a nil object.
 // Note that this function is not thread-safe and should only be called by a single Go routine at a time.
-func (auth *JwtGenerator) MakeToken(ctx context.Context, req *jujuparams.LoginRequest, permissionMap map[string]interface{}) ([]byte, error) {
+func (auth *JwtGenerator) MakeToken(ctx context.Context, initialLogin bool, req *jujuparams.LoginRequest, permissionMap map[string]interface{}) ([]byte, error) {
 	const op = errors.Op("jimm.MakeToken")
 
-	if auth.user == nil || req != nil {
+	if initialLogin {
 		if req == nil {
 			return nil, errors.E(op, "Missing login request.")
 		}
@@ -118,20 +140,22 @@ func (auth *JwtGenerator) MakeToken(ctx context.Context, req *jujuparams.LoginRe
 			return nil, authErr
 		}
 		var modelAccess string
-		mt := auth.model.ResourceTag()
-		modelAccess, authErr = auth.jimm.GetUserModelAccess(ctx, auth.user, mt)
+		if auth.mt.Id() == "" {
+			return nil, errors.E(op, "Desired Model not set")
+		}
+		modelAccess, authErr = auth.jimm.GetUserModelAccess(ctx, auth.user, auth.mt)
 		if authErr != nil {
 			return nil, authErr
 		}
-		auth.accessMapCache[names.ModelTagKind] = modelAccess
+		auth.accessMapCache[auth.mt.String()] = modelAccess
 		// Get the user's access to the JIMM controller, because all users have login access to controllers controlled by JIMM
 		// but only JIMM admins have admin access on other controllers.
 		var controllerAccess string
-		controllerAccess, authErr = auth.jimm.GetControllerAccess(ctx, auth.user, auth.user.ResourceTag())
+		controllerAccess, authErr = auth.jimm.GetControllerAccess(ctx, auth.user, auth.ct)
 		if authErr != nil {
 			return nil, authErr
 		}
-		auth.accessMapCache[names.ControllerTagKind] = controllerAccess
+		auth.accessMapCache[auth.ct.String()] = controllerAccess
 	}
 	if auth.callCount >= 10 {
 		return nil, errors.E(op, "Permission check limit exceeded")
@@ -148,7 +172,7 @@ func (auth *JwtGenerator) MakeToken(ctx context.Context, req *jujuparams.LoginRe
 		}
 	}
 	jwt, err := auth.jimm.JWTService.NewJWT(ctx, jimmjwx.JWTParams{
-		Controller: auth.model.Controller.UUID,
+		Controller: auth.ct.Id(),
 		User:       auth.user.Tag().String(),
 		Access:     auth.accessMapCache,
 	})

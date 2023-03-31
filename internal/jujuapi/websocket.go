@@ -126,57 +126,41 @@ func modelInfoFromPath(path string) (uuid string, finalPath string, err error) {
 
 // ServeWS implements jimmhttp.WSServer.
 func (s modelProxyServer) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
-	sendClientError := func(err error) {
-		msg := jujuparams.CLICommandStatus{
-			Done:  true,
-			Error: mapError(err),
+	jwtGenerator := jimm.NewJwtGenerator(s.jimm)
+	connectionFunc := controllerConnectionFunc(s, jwtGenerator)
+	jimmRPC.ProxySockets(ctx, clientConn, &jwtGenerator, connectionFunc)
+}
+
+// controllerConnectionFunc returns a function that will be used to
+// connect to a controller when a client makes a request.
+func controllerConnectionFunc(s modelProxyServer, jwtGenerator jimm.JwtGenerator) func(context.Context) (*websocket.Conn, error) {
+	connectToControllerFunc := func(ctx context.Context) (*websocket.Conn, error) {
+		const op = errors.Op("proxy.controllerConnectionFunc")
+		path := jimmhttp.PathElementFromContext(ctx, "path")
+		uuid, finalPath, err := modelInfoFromPath(path)
+		if err != nil {
+			return nil, errors.E(op, err)
 		}
-		// jujuparams.RequestError
-		// type myError struct {
-		// 	Error string `json:"error"`
-		// }
-		// msg := myError{
-		// 	Error: "My Test Error",
-		// }
-		zapctx.Error(ctx, "Error was", zap.Any("Error", err))
-		zapctx.Error(ctx, "Sending error to client", zap.Any("Message", msg))
-		if err := clientConn.WriteJSON(mapError(err)); err != nil {
-			zapctx.Error(ctx, "cannot send commands response", zap.Error(err))
+		m := dbmodel.Model{
+			UUID: sql.NullString{
+				String: uuid,
+				Valid:  uuid != "",
+			},
 		}
+		if err := s.jimm.Database.GetModel(context.Background(), &m); err != nil {
+			zapctx.Error(ctx, "failed to find model", zap.String("uuid", uuid), zap.Error(err))
+			return nil, errors.E(err, errors.CodeNotFound)
+		}
+		jwtGenerator.SetTags(m.ResourceTag(), m.Controller.ResourceTag())
+		mt := names.NewModelTag(uuid)
+		controllerConn, err := jujuclient.ProxyDial(ctx, &m.Controller, mt, finalPath)
+		if err != nil {
+			zapctx.Error(ctx, "cannot dial controller", zap.String("controller", m.Controller.Name), zap.Error(err))
+			return nil, err
+		}
+		return controllerConn, nil
 	}
-	zapctx.Debug(context.Background(), "Dugtrio")
-	path := jimmhttp.PathElementFromContext(ctx, "path")
-	uuid, finalPath, err := modelInfoFromPath(path)
-	if err != nil {
-		sendClientError(err)
-		return
-	}
-	zapctx.Debug(ctx, "Socket info", zap.String("uuid", uuid), zap.String("finalPath", finalPath))
-	m := dbmodel.Model{
-		UUID: sql.NullString{
-			String: uuid,
-			Valid:  uuid != "",
-		},
-	}
-	if err := s.jimm.Database.GetModel(context.Background(), &m); err != nil {
-		zapctx.Debug(ctx, "Model doesn't exist")
-		sendClientError(err)
-		return
-	}
-	mt := names.NewModelTag(uuid)
-	zapctx.Debug(ctx, "Calling ProxyDial")
-	controllerConn, err := jujuclient.ProxyDial(ctx, &m.Controller, mt, finalPath)
-	if err != nil {
-		zapctx.Error(ctx, "cannot dial controller", zap.String("controller", m.Controller.Name), zap.Error(err))
-		sendClientError(err)
-		return
-	}
-	defer controllerConn.Close()
-	jwtGenerator := jimm.NewJwtAuthorizer(s.jimm, &m)
-	zapctx.Error(ctx, "Starting Proxy Sockets")
-	err = jimmRPC.ProxySockets(ctx, clientConn, controllerConn, &jwtGenerator)
-	zapctx.Error(ctx, "After Proxy Sockets")
-	// sendClientError(err)
+	return connectToControllerFunc
 }
 
 // Use a 64k frame size for the websockets while we need to deal

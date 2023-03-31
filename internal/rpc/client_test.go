@@ -16,6 +16,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/gorilla/websocket"
 	"github.com/juju/juju/rpc/params"
+	"github.com/juju/names/v4"
 
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/rpc"
@@ -220,8 +221,11 @@ func TestClientReceiveInvalidMessage(t *testing.T) {
 
 type testTokenGenerator struct{}
 
-func (p *testTokenGenerator) MakeToken(ctx context.Context, req *params.LoginRequest, permissionMap map[string]interface{}) ([]byte, error) {
+func (p *testTokenGenerator) MakeToken(ctx context.Context, initialLogin bool, req *params.LoginRequest, permissionMap map[string]interface{}) ([]byte, error) {
 	return nil, nil
+}
+
+func (p *testTokenGenerator) SetTags(names.ModelTag, names.ControllerTag) {
 }
 
 func TestProxySockets(t *testing.T) {
@@ -232,13 +236,17 @@ func TestProxySockets(t *testing.T) {
 	srvController := newServer(func(conn *websocket.Conn) error {
 		return echo(conn)
 	})
-
+	errChan := make(chan error)
 	srvJIMM := newServer(func(connClient *websocket.Conn) error {
-		connController, err := srvController.dialer.BasicDial(ctx, srvController.URL)
-		c.Assert(err, qt.IsNil)
-		defer connController.Close()
 		testTokenGen := testTokenGenerator{}
-		return rpc.ProxySockets(ctx, connClient, connController, &testTokenGen)
+		f := func(context.Context) (*websocket.Conn, error) {
+			connController, err := srvController.dialer.BasicDial(ctx, srvController.URL)
+			c.Assert(err, qt.IsNil)
+			return connController, nil
+		}
+		err := rpc.ProxySockets(ctx, connClient, &testTokenGen, f)
+		errChan <- err
+		return err
 	})
 
 	defer srvController.Close()
@@ -255,6 +263,8 @@ func TestProxySockets(t *testing.T) {
 	err = ws.ReadJSON(&resp)
 	c.Assert(err, qt.IsNil)
 	c.Assert(resp.Response, qt.DeepEquals, msg.Params)
+	ws.Close()
+	<-errChan // Ensure go routines are cleaned up
 }
 
 func TestCancelProxySockets(t *testing.T) {
@@ -266,14 +276,15 @@ func TestCancelProxySockets(t *testing.T) {
 		return echo(conn)
 	})
 
-	readyChan := make(chan int)
 	errChan := make(chan error)
 	srvJIMM := newServer(func(connClient *websocket.Conn) error {
-		connController, err := srvController.dialer.BasicDial(ctx, srvController.URL)
-		c.Assert(err, qt.IsNil)
-		readyChan <- 1
 		testTokenGen := testTokenGenerator{}
-		err = rpc.ProxySockets(ctx, connClient, connController, &testTokenGen)
+		f := func(context.Context) (*websocket.Conn, error) {
+			connController, err := srvController.dialer.BasicDial(ctx, srvController.URL)
+			c.Assert(err, qt.IsNil)
+			return connController, nil
+		}
+		err := rpc.ProxySockets(ctx, connClient, &testTokenGen, f)
 		errChan <- err
 		return err
 	})
@@ -283,7 +294,6 @@ func TestCancelProxySockets(t *testing.T) {
 	ws, err := srvJIMM.dialer.BasicDial(ctx, srvJIMM.URL)
 	c.Assert(err, qt.IsNil)
 	defer ws.Close()
-	<-readyChan
 	cancel()
 	err = <-errChan
 	c.Assert(err.Error(), qt.Equals, "Context cancelled")
