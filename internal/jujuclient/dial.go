@@ -14,10 +14,8 @@ import (
 	"crypto/x509"
 	"fmt"
 	"net/url"
-	"os"
 	"path"
 	"sort"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -66,9 +64,6 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 		cp.AppendCertsFromPEM([]byte(ctl.CACertificate))
 		tlsConfig = &tls.Config{
 			RootCAs: cp,
-		}
-		if strings.ToLower(strings.TrimSpace(os.Getenv("JIMM_SKIP_HOSTNAME_VERIFICATION_JUJU_CLIENT"))) == "true" {
-			tlsConfig.InsecureSkipVerify = true
 		}
 	}
 	dialer := rpc.Dialer{
@@ -287,6 +282,7 @@ func (c Connection) hasFacadeVersion(facade string, version int) bool {
 // the facade.
 func (c Connection) CallHighestFacadeVersion(ctx context.Context, facade string, versions []int, id, method string, args, resp interface{}) error {
 	sort.Sort(sort.Reverse(sort.IntSlice(versions)))
+
 	for _, version := range versions {
 		if c.hasFacadeVersion(facade, version) {
 			return c.client.Call(ctx, facade, version, id, method, args, resp)

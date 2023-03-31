@@ -54,10 +54,6 @@ services:
       OPENFGA_STORE: "01GP1254CHWJC1MNGVB0WDG1T0"
       OPENFGA_AUTH_MODEL: "01GP1EC038KHGB6JJ2XXXXCXKB"
       OPENFGA_TOKEN: "jimm"
-
-      # Skip hostname verification when JIMM uses the jujuclient to contact a controller and it's self-signed CA cert
-      # does not match it's host. For local dev only.
-      JIMM_SKIP_HOSTNAME_VERIFICATION_JUJU_CLIENT: true
     volumes:
       - ./:/jimm/
       - ./local/vault/approle.json:/vault/approle.json:rw

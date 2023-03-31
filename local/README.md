@@ -50,14 +50,25 @@ The `request name` represents the literal WS endpoint, i.e., `API = /api`.
 # Q/A Using jimmctl
 Steps:
 
-0. `juju unregister <jimm controller name>`                         - Unregister any other local JIMM you have.
+Manual:
+0. `juju unregister jimm-dev`                                       - Unregister any other local JIMM you have.
 1. `juju login jimm.localhost -c jimm-dev`                          - Login to local JIMM. You don't have to do this, you will be logged in automatically.
 2. `juju bootstrap microk8s qa-controller`                          - Bootstrap a Q/A controller.
 3. `go build ./cmd/jimmctl`                                         - Build CLI tool.
 4. `juju switch jimm-dev`                                           - Switch back to JIMM controller.
 5. `./jimmctl controller-info qa-controller ./qa-controller.yaml`   - Get Q/A controller info.
+5.1. Modify qa-controller.yaml public address to "juju-apiserver:17070"
+5.2. Run `docker compose exec -it jimm bash` and update the /etc/hosts to have the api-addresses point to "juju-apiserver"
 6. `./jimmctl add-controller ./qa-controller.yaml`                  - Add Q/A controller to JIMM.
+7. `juju update-credentials microk8s --controller jimm-dev`         - Add client credentials for qa-controller's cloud (microk8s) to JIMM's controller credential list. 
+8. `juju add-model test`                                            - Adds a model to qa-controller via JIMM.
 
+Semi-automated:
+0. `juju unregister jimm-dev`                                       - Unregister any other local JIMM you have.
+1. `juju login jimm.localhost -c jimm-dev`                          - Login to local JIMM. (If you name the controller jimm-dev, the script will pick it up!)
+2. `juju bootstrap microk8s qa-controller`                          - Bootstrap a Q/A controller. (If you name the controller qa-controller and the cloud is microk8s, the script will pick it up!)
+3. `./local/jimm/add-controller.sh`                                 - A local script to do many of the manual steps for us. See script for more details.
+4. `juju add-model test`                                            - Adds a model to qa-controller via JIMM.
 
 # Helpful tidbits!
 > Note: For any secure step to work, ensure you've run the local traefik certs script!

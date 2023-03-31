@@ -19,3 +19,4 @@ local/vault/roleid.txt
 *.key
 *.csr
 jimmctl
+qa-controller
