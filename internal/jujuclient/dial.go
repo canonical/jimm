@@ -105,7 +105,7 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 		if u != "" {
 			username = u
 		}
-		if password != "" {
+		if p != "" {
 			password = p
 		}
 	}
