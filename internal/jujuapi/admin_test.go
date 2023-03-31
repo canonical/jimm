@@ -4,9 +4,7 @@ package jujuapi_test
 
 import (
 	"github.com/juju/juju/api"
-	"github.com/juju/juju/core/network"
 	jujuparams "github.com/juju/juju/rpc/params"
-	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon.v2"
 )
@@ -16,29 +14,6 @@ type adminSuite struct {
 }
 
 var _ = gc.Suite(&adminSuite{})
-
-func (s *adminSuite) TestOldAdminVersionFails(c *gc.C) {
-	conn := s.open(c, &api.Info{
-		ModelTag:  s.Model.ResourceTag(),
-		SkipLogin: true,
-	}, "test")
-	defer conn.Close()
-	var resp jujuparams.RedirectInfoResult
-	err := conn.APICall("Admin", 2, "", "Login", nil, &resp)
-	c.Assert(err, gc.ErrorMatches, `JIMM does not support login from old clients \(not supported\)`)
-	c.Assert(resp, jc.DeepEquals, jujuparams.RedirectInfoResult{})
-}
-
-func (s *adminSuite) TestAdminIDFails(c *gc.C) {
-	conn := s.open(c, &api.Info{
-		ModelTag:  s.Model.ResourceTag(),
-		SkipLogin: true,
-	}, "test")
-	defer conn.Close()
-	var resp jujuparams.RedirectInfoResult
-	err := conn.APICall("Admin", 3, "Object ID", "Login", nil, &resp)
-	c.Assert(err, gc.ErrorMatches, "id not found")
-}
 
 func (s *adminSuite) TestLoginToController(c *gc.C) {
 	conn := s.open(c, &api.Info{
@@ -59,57 +34,4 @@ func (s *adminSuite) TestLoginToControllerWithInvalidMacaroon(c *gc.C) {
 		Macaroons: []macaroon.Slice{{invalidMacaroon}},
 	}, "test")
 	conn.Close()
-}
-
-type modelAdminSuite struct {
-	websocketSuite
-}
-
-var _ = gc.Suite(&modelAdminSuite{})
-
-func (s *modelAdminSuite) TestLoginToModel(c *gc.C) {
-	conn := s.open(c, &api.Info{
-		ModelTag:  s.Model.ResourceTag(),
-		SkipLogin: true,
-	}, "test")
-	defer conn.Close()
-	nphps, err := network.ParseProviderHostPorts(s.APIInfo(c).Addrs...)
-	c.Assert(err, gc.Equals, nil)
-	nmhps := make(network.MachineHostPorts, len(nphps))
-	// Change all unknown scopes to public.
-	for i := range nphps {
-		nmhps[i] = network.MachineHostPort{
-			MachineAddress: nphps[i].MachineAddress,
-			NetPort:        nphps[i].NetPort,
-		}
-	}
-	err = conn.Login(nil, "", "", nil)
-	c.Assert(err, jc.DeepEquals, &api.RedirectError{
-		Servers:        []network.MachineHostPorts{nmhps},
-		CACert:         s.APIInfo(c).CACert,
-		FollowRedirect: true,
-	})
-}
-
-func (s *modelAdminSuite) TestOldAdminVersionFails(c *gc.C) {
-	conn := s.open(c, &api.Info{
-		ModelTag:  s.Model.ResourceTag(),
-		SkipLogin: true,
-	}, "test")
-	defer conn.Close()
-	var resp jujuparams.RedirectInfoResult
-	err := conn.APICall("Admin", 2, "", "Login", nil, &resp)
-	c.Assert(err, gc.ErrorMatches, `JIMM does not support login from old clients \(not supported\)`)
-	c.Assert(resp, jc.DeepEquals, jujuparams.RedirectInfoResult{})
-}
-
-func (s *modelAdminSuite) TestAdminIDFails(c *gc.C) {
-	conn := s.open(c, &api.Info{
-		ModelTag:  s.Model.ResourceTag(),
-		SkipLogin: true,
-	}, "test")
-	defer conn.Close()
-	var resp jujuparams.RedirectInfoResult
-	err := conn.APICall("Admin", 3, "Object ID", "Login", nil, &resp)
-	c.Assert(err, gc.ErrorMatches, "id not found")
 }

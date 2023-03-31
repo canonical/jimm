@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -105,30 +106,65 @@ type modelProxyServer struct {
 	jimm *jimm.JIMM
 }
 
+func modelInfoFromPath(path string) (uuid string, finalPath string, err error) {
+	if path[0] == '/' {
+		path = path[1:]
+	}
+	parts := strings.Split(path, "/")
+	if len(parts) != 3 {
+		return "", "", errors.E("Invalid path")
+	}
+	prefix := parts[0]
+	uuid = parts[1]
+	finalPath = parts[2]
+	if prefix != "model" {
+		return "", "", errors.E("Invalid path prefix")
+	}
+	err = nil
+	return
+}
+
 // ServeWS implements jimmhttp.WSServer.
 func (s modelProxyServer) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
-	uuid := jimmhttp.PathElementFromContext(ctx, "uuid")
+	sendClientError := func(err error) {
+		msg := jujuparams.CLICommandStatus{
+			Done:  true,
+			Error: mapError(err),
+		}
+		// jujuparams.RequestError
+		// type myError struct {
+		// 	Error string `json:"error"`
+		// }
+		// msg := myError{
+		// 	Error: "My Test Error",
+		// }
+		zapctx.Error(ctx, "Error was", zap.Any("Error", err))
+		zapctx.Error(ctx, "Sending error to client", zap.Any("Message", msg))
+		if err := clientConn.WriteJSON(mapError(err)); err != nil {
+			zapctx.Error(ctx, "cannot send commands response", zap.Error(err))
+		}
+	}
+	zapctx.Debug(context.Background(), "Dugtrio")
+	path := jimmhttp.PathElementFromContext(ctx, "path")
+	uuid, finalPath, err := modelInfoFromPath(path)
+	if err != nil {
+		sendClientError(err)
+		return
+	}
+	zapctx.Debug(ctx, "Socket info", zap.String("uuid", uuid), zap.String("finalPath", finalPath))
 	m := dbmodel.Model{
 		UUID: sql.NullString{
 			String: uuid,
 			Valid:  uuid != "",
 		},
 	}
-	sendClientError := func(err error) {
-		msg := jujuparams.CLICommandStatus{
-			Done:  true,
-			Error: mapError(err),
-		}
-		if err := clientConn.WriteJSON(msg); err != nil {
-			zapctx.Error(ctx, "cannot send commands response", zap.Error(err))
-		}
-	}
 	if err := s.jimm.Database.GetModel(context.Background(), &m); err != nil {
+		zapctx.Debug(ctx, "Model doesn't exist")
 		sendClientError(err)
 		return
 	}
 	mt := names.NewModelTag(uuid)
-	finalPath := jimmhttp.PathElementFromContext(ctx, "finalPath")
+	zapctx.Debug(ctx, "Calling ProxyDial")
 	controllerConn, err := jujuclient.ProxyDial(ctx, &m.Controller, mt, finalPath)
 	if err != nil {
 		zapctx.Error(ctx, "cannot dial controller", zap.String("controller", m.Controller.Name), zap.Error(err))
@@ -137,8 +173,10 @@ func (s modelProxyServer) ServeWS(ctx context.Context, clientConn *websocket.Con
 	}
 	defer controllerConn.Close()
 	jwtGenerator := jimm.NewJwtAuthorizer(s.jimm, &m)
+	zapctx.Error(ctx, "Starting Proxy Sockets")
 	err = jimmRPC.ProxySockets(ctx, clientConn, controllerConn, &jwtGenerator)
-	sendClientError(err)
+	zapctx.Error(ctx, "After Proxy Sockets")
+	// sendClientError(err)
 }
 
 // Use a 64k frame size for the websockets while we need to deal

@@ -16,6 +16,9 @@ import (
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
+	jc "github.com/juju/testing/checkers"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
@@ -143,4 +146,36 @@ func (s *websocketSuite) open(c *gc.C, info *api.Info, username string) api.Conn
 	})
 	c.Assert(err, gc.Equals, nil)
 	return conn
+}
+
+type proxySuite struct {
+	websocketSuite
+}
+
+var _ = gc.Suite(&proxySuite{})
+
+func (s *proxySuite) TestConnectToModel(c *gc.C) {
+	conn := s.open(c, &api.Info{
+		ModelTag:  s.Model.ResourceTag(),
+		SkipLogin: true,
+	}, "test")
+
+	defer conn.Close()
+	var resp map[string]interface{}
+	err := conn.APICall("Admin", 2, "", "Login", nil, &resp)
+	c.Assert(err, gc.ErrorMatches, `JIMM does not support login from old clients \(not supported\)`)
+	c.Assert(resp, jc.DeepEquals, jujuparams.RedirectInfoResult{})
+}
+
+func (s *proxySuite) TestConnectToModelAutomaticLogin(c *gc.C) {
+	conn := s.open(c, &api.Info{
+		ModelTag:  s.Model.ResourceTag(),
+		SkipLogin: true,
+	}, "test")
+
+	defer conn.Close()
+	var resp map[string]interface{}
+	err := conn.APICall("Admin", 2, "", "Login", nil, &resp)
+	c.Assert(err, gc.ErrorMatches, `JIMM does not support login from old clients \(not supported\)`)
+	c.Assert(resp, jc.DeepEquals, jujuparams.RedirectInfoResult{})
 }

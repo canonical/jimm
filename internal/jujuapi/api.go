@@ -9,6 +9,7 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jimmhttp"
+	"github.com/juju/zaputil/zapctx"
 )
 
 // A Params object holds the paramaters needed to configure the API
@@ -40,13 +41,11 @@ func APIHandler(ctx context.Context, jimm *jimm.JIMM, p Params) http.Handler {
 // ModelHandler creates an http.Handler for "/model" endpoints.
 func ModelHandler(ctx context.Context, jimm *jimm.JIMM, p Params) http.Handler {
 	mux := http.NewServeMux()
-	mux.Handle("/commands", &jimmhttp.WSHandler{
+	mux.Handle("/", &jimmhttp.WSHandler{
 		Upgrader: websocketUpgrader,
 		Server:   modelProxyServer{jimm: jimm},
 	})
-	mux.Handle("/api", &jimmhttp.WSHandler{
-		Upgrader: websocketUpgrader,
-		Server:   modelProxyServer{jimm: jimm},
-	})
-	return http.StripPrefix("/model", jimmhttp.StripPathElement("uuid", jimmhttp.StripPathElement("finalPath", mux)))
+	zapctx.Debug(context.Background(), "Diglett2")
+	http.StripPrefix("/model", jimmhttp.StripPathElement("uuid", jimmhttp.StripPathElement("finalPath", mux)))
+	return mux
 }

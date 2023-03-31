@@ -33,7 +33,7 @@ type WSHandler struct {
 // been started.
 func (h *WSHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
-
+	ctx = context.WithValue(ctx, contextPathKey("path"), req.URL.Path)
 	conn, err := h.Upgrader.Upgrade(w, req, nil)
 	if err != nil {
 		// If the upgrader returns an error it will have written an
