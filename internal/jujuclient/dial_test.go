@@ -100,6 +100,7 @@ func (t *cExtended) Name() string {
 }
 
 func (s *dialSuite) TestDialWithCredentialsStoredInVault(c *gc.C) {
+	ctx := context.Background()
 	client, path, creds, ok := jimmtest.VaultClient(&cExtended{c}, "../../")
 	if !ok {
 		c.Skip("vault not available")
@@ -121,7 +122,7 @@ func (s *dialSuite) TestDialWithCredentialsStoredInVault(c *gc.C) {
 	}
 
 	err := store.PutControllerCredentials(
-		context.Background(),
+		ctx,
 		ctl.Name,
 		info.Tag.Id(),
 		info.Password,
@@ -132,14 +133,25 @@ func (s *dialSuite) TestDialWithCredentialsStoredInVault(c *gc.C) {
 		ControllerCredentialsStore: store,
 	}
 
-	api, err := dialer.Dial(context.Background(), &ctl, names.ModelTag{})
+	// Test
+
+	// Check dial is OK
+	api, err := dialer.Dial(ctx, &ctl, names.ModelTag{})
 	c.Assert(err, gc.Equals, nil)
 	defer api.Close()
+	// Check UUID matches expected
 	c.Check(ctl.UUID, gc.Equals, "deadbeef-1bad-500d-9000-4b1d0d06f00d")
+	// Check agent version matches expected
 	c.Check(ctl.AgentVersion, gc.Equals, jujuversion.Current.String())
 	addrs := make([]string, len(ctl.Addresses))
 	for i, addr := range ctl.Addresses {
 		addrs[i] = fmt.Sprintf("%s:%d", addr[0].Value, addr[0].Port)
 	}
 	c.Check(addrs, gc.DeepEquals, info.Addrs)
+
+	// Gather credentials from vault
+	usr, pwd, err := store.GetControllerCredentials(ctx, ctl.Name)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(usr, gc.Equals, info.Tag.Id())
+	c.Assert(pwd, gc.Equals, info.Password)
 }
