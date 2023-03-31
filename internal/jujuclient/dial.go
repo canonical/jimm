@@ -32,6 +32,11 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/rpc"
 )
 
+const (
+	// JIMM claims to be a 2.9.33 client.
+	jujuClientVersion = "2.9.33"
+)
+
 // A ControllerCredentialsStore is a store for controller credentials.
 type ControllerCredentialsStore interface {
 	// GetControllerCredentials retrieves the credentials for the given controller from a vault
@@ -113,7 +118,7 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 	args := jujuparams.LoginRequest{
 		AuthTag:       names.NewUserTag(username).String(),
 		Credentials:   password,
-		ClientVersion: "2.9.33", // claim to be a 2.9.33 client.
+		ClientVersion: jujuClientVersion,
 	}
 
 	var res jujuparams.LoginResult

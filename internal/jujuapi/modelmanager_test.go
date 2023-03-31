@@ -30,6 +30,8 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/kubetest"
 )
 
+const jujuVersion = "2.9.42"
+
 type modelManagerSuite struct {
 	websocketSuite
 }
@@ -301,7 +303,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			SupportedFeatures: []jujuparams.SupportedFeature{{
 				Name:        "juju",
 				Description: "the version of Juju used by the model",
-				Version:     "2.9.31",
+				Version:     jujuVersion,
 			}},
 		},
 	}, {
@@ -336,7 +338,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			SupportedFeatures: []jujuparams.SupportedFeature{{
 				Name:        "juju",
 				Description: "the version of Juju used by the model",
-				Version:     "2.9.31",
+				Version:     jujuVersion,
 			}},
 		},
 	}, {
@@ -387,7 +389,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			SupportedFeatures: []jujuparams.SupportedFeature{{
 				Name:        "juju",
 				Description: "the version of Juju used by the model",
-				Version:     "2.9.31",
+				Version:     jujuVersion,
 			}},
 		},
 	}, {
@@ -421,7 +423,7 @@ func (s *modelManagerSuite) TestModelInfo(c *gc.C) {
 			SupportedFeatures: []jujuparams.SupportedFeature{{
 				Name:        "juju",
 				Description: "the version of Juju used by the model",
-				Version:     "2.9.31",
+				Version:     jujuVersion,
 			}},
 		},
 	}, {
@@ -514,7 +516,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 			SupportedFeatures: []jujuparams.SupportedFeature{{
 				Name:        "juju",
 				Description: "the version of Juju used by the model",
-				Version:     "2.9.31",
+				Version:     jujuVersion,
 			}},
 		},
 	}, {
@@ -545,7 +547,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 			SupportedFeatures: []jujuparams.SupportedFeature{{
 				Name:        "juju",
 				Description: "the version of Juju used by the model",
-				Version:     "2.9.31",
+				Version:     jujuVersion,
 			}},
 		},
 	}, {
@@ -600,7 +602,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 			SupportedFeatures: []jujuparams.SupportedFeature{{
 				Name:        "juju",
 				Description: "the version of Juju used by the model",
-				Version:     "2.9.31",
+				Version:     jujuVersion,
 			}},
 		},
 	}, {
@@ -652,7 +654,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 			SupportedFeatures: []jujuparams.SupportedFeature{{
 				Name:        "juju",
 				Description: "the version of Juju used by the model",
-				Version:     "2.9.31",
+				Version:     jujuVersion,
 			}},
 		},
 	}, {
@@ -683,7 +685,7 @@ func (s *modelManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
 			SupportedFeatures: []jujuparams.SupportedFeature{{
 				Name:        "juju",
 				Description: "the version of Juju used by the model",
-				Version:     "2.9.31",
+				Version:     jujuVersion,
 			}},
 		},
 	}, {
@@ -730,7 +732,7 @@ var createModelTests = []struct {
 	region:        "no-such-region",
 	cloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
 	credentialTag: "",
-	expectError:   `cloudregion not found \(not found\)`,
+	expectError:   `failed to set cloud region \(not found\)`,
 }, {
 	about:         "local user",
 	name:          "model-4",

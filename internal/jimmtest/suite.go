@@ -10,9 +10,9 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/juju/api"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/core/network"
 	corejujutesting "github.com/juju/juju/juju/testing"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 	gc "gopkg.in/check.v1"
 
@@ -146,9 +146,9 @@ func (s *CandidSuite) SetUpTest(c *gc.C) {
 	s.Candid.AddUser("agent-user", candidtest.GroupListGroup)
 	s.Authenticator = auth.JujuAuthenticator{
 		Bakery: identchecker.NewBakery(identchecker.BakeryParams{
-			Locator:        auth.ThirdPartyLocatorV3{s.Candid},
+			Locator:        s.Candid,
 			Key:            bakery.MustGenerateKey(),
-			IdentityClient: auth.IdentityClientV3{s.Candid.CandidClient("agent-user")},
+			IdentityClient: s.Candid.CandidClient("agent-user"),
 			Location:       "jimmtest",
 		}),
 		ControllerAdmins: s.ControllerAdmins,
