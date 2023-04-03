@@ -276,6 +276,12 @@ var model3 = getFullStatus("model-3", map[string]jujuparams.ApplicationStatus{},
 	nil,
 )
 
+//	- 					"since":   string("0001-01-01 00:00:00Z"),
+//	+ 					"since":   string("31 Dec 0000 23:58:45-00:01"),
+//
+// "since":   string("31 Dec 0000 23:58:45-00:01"),
+// "since":   string("31 Dec 0000 23:58:45-00:01"),
+// "since":   string("31 Dec 0000 23:58:45-00:01"),
 func TestQueryModelsJq(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
@@ -385,7 +391,7 @@ func TestQueryModelsJq(t *testing.T) {
 			"10000000-0000-0000-0000-000000000000": [
 			{
 				"cloud": "microk8s",
-				"controller": "",
+				"controller": "controller-1",
 				"model-status": {
 				"current": "available",
 				"since": "0001-01-01 00:00:00Z"
@@ -400,7 +406,7 @@ func TestQueryModelsJq(t *testing.T) {
 			"20000000-0000-0000-0000-000000000000": [
 			{
 				"cloud": "microk8s",
-				"controller": "",
+				"controller": "controller-1",
 				"model-status": {
 				"current": "available",
 				"since": "0001-01-01 00:00:00Z"
@@ -415,7 +421,7 @@ func TestQueryModelsJq(t *testing.T) {
 			"30000000-0000-0000-0000-000000000000": [
 			{
 				"cloud": "microk8s",
-				"controller": "",
+				"controller": "controller-1",
 				"model-status": {
 				"current": "available",
 				"since": "0001-01-01 00:00:00Z"
