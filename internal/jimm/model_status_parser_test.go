@@ -385,7 +385,7 @@ func TestQueryModelsJq(t *testing.T) {
 			"10000000-0000-0000-0000-000000000000": [
 			{
 				"cloud": "microk8s",
-				"controller": "",
+				"controller": "controller-1",
 				"model-status": {
 				"current": "available",
 				"since": "0001-01-01 00:00:00Z"
@@ -400,7 +400,7 @@ func TestQueryModelsJq(t *testing.T) {
 			"20000000-0000-0000-0000-000000000000": [
 			{
 				"cloud": "microk8s",
-				"controller": "",
+				"controller": "controller-1",
 				"model-status": {
 				"current": "available",
 				"since": "0001-01-01 00:00:00Z"
@@ -415,7 +415,7 @@ func TestQueryModelsJq(t *testing.T) {
 			"30000000-0000-0000-0000-000000000000": [
 			{
 				"cloud": "microk8s",
-				"controller": "",
+				"controller": "controller-1",
 				"model-status": {
 				"current": "available",
 				"since": "0001-01-01 00:00:00Z"
