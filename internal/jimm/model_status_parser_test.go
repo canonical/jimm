@@ -276,12 +276,6 @@ var model3 = getFullStatus("model-3", map[string]jujuparams.ApplicationStatus{},
 	nil,
 )
 
-//	- 					"since":   string("0001-01-01 00:00:00Z"),
-//	+ 					"since":   string("31 Dec 0000 23:58:45-00:01"),
-//
-// "since":   string("31 Dec 0000 23:58:45-00:01"),
-// "since":   string("31 Dec 0000 23:58:45-00:01"),
-// "since":   string("31 Dec 0000 23:58:45-00:01"),
 func TestQueryModelsJq(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
