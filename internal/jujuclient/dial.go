@@ -194,6 +194,7 @@ func ProxyDial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.Mode
 			urls = append(urls, websocketURL(fmt.Sprintf("%s:%d", hp.Value, hp.Port), modelTag, finalPath))
 		}
 	}
+	zapctx.Debug(ctx, "Dialling all URLs", zap.Any("urls", urls))
 	conn, err := basicDialAll(ctx, &dialer, urls)
 	if err != nil {
 		return nil, err
@@ -224,12 +225,11 @@ func dialAll(ctx context.Context, dialer *rpc.Dialer, urls []string) (*rpc.Clien
 		return nil, errors.E("no urls to dial")
 	}
 	res, err := dialAllHelper(ctx, dialer, urls, false)
-	// Check the client first because dialAllHelper can return a valid client and an error
+	if err != nil {
+		return nil, err
+	}
 	client, ok := res.(*rpc.Client)
 	if !ok {
-		if err != nil {
-			return nil, err
-		}
 		zapctx.Error(ctx, "Failed to get client type")
 		return nil, errors.E("Failed to get client type")
 	}
@@ -245,12 +245,11 @@ func basicDialAll(ctx context.Context, dialer *rpc.Dialer, urls []string) (*webs
 		return nil, errors.E("no urls to dial")
 	}
 	res, err := dialAllHelper(ctx, dialer, urls, true)
-	// Check the conn first because dialAllHelper can return a valid conn and an error
+	if err != nil {
+		return nil, err
+	}
 	conn, ok := res.(*websocket.Conn)
 	if !ok {
-		if err != nil {
-			return nil, err
-		}
 		zapctx.Error(ctx, "Failed to get conn type")
 		return nil, errors.E("Failed to get conn type")
 	}
@@ -303,7 +302,10 @@ func dialAllHelper(ctx context.Context, dialer *rpc.Dialer, urls []string, basic
 		}()
 	}
 	wg.Wait()
-	return res, err
+	if res != nil {
+		return res, nil
+	}
+	return nil, err
 }
 
 const pingTimeout = 15 * time.Second

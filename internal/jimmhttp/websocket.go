@@ -42,27 +42,25 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	servermon.ConcurrentWebsocketConnections.Inc()
-	go func() {
-		defer conn.Close()
-		defer servermon.ConcurrentWebsocketConnections.Dec()
-		defer func() {
-			if err := recover(); err != nil {
-				zapctx.Error(ctx, "websocket panic", zap.Any("err", err), zap.Stack("stack"))
-				data := websocket.FormatCloseMessage(websocket.CloseInternalServerErr, fmt.Sprintf("%v", err))
-				if err := conn.WriteControl(websocket.CloseMessage, data, time.Time{}); err != nil {
-					zapctx.Error(ctx, "cannot write close message", zap.Error(err))
-				}
-			}
-		}()
-		if h.Server == nil {
-			data := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
+	defer conn.Close()
+	defer servermon.ConcurrentWebsocketConnections.Dec()
+	defer func() {
+		if err := recover(); err != nil {
+			zapctx.Error(ctx, "websocket panic", zap.Any("err", err), zap.Stack("stack"))
+			data := websocket.FormatCloseMessage(websocket.CloseInternalServerErr, fmt.Sprintf("%v", err))
 			if err := conn.WriteControl(websocket.CloseMessage, data, time.Time{}); err != nil {
 				zapctx.Error(ctx, "cannot write close message", zap.Error(err))
 			}
-			return
 		}
-		h.Server.ServeWS(ctx, conn)
 	}()
+	if h.Server == nil {
+		data := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
+		if err := conn.WriteControl(websocket.CloseMessage, data, time.Time{}); err != nil {
+			zapctx.Error(ctx, "cannot write close message", zap.Error(err))
+		}
+		return
+	}
+	h.Server.ServeWS(ctx, conn)
 }
 
 // A WSServer is a websocket server.

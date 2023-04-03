@@ -9,7 +9,6 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jimmhttp"
-	"github.com/juju/zaputil/zapctx"
 )
 
 // A Params object holds the paramaters needed to configure the API
@@ -45,7 +44,6 @@ func ModelHandler(ctx context.Context, jimm *jimm.JIMM, p Params) http.Handler {
 		Upgrader: websocketUpgrader,
 		Server:   modelProxyServer{jimm: jimm},
 	})
-	zapctx.Debug(context.Background(), "Diglett2")
 	http.StripPrefix("/model", jimmhttp.StripPathElement("uuid", jimmhttp.StripPathElement("finalPath", mux)))
 	return mux
 }

@@ -13,6 +13,8 @@ import (
 
 	"github.com/gorilla/websocket"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 
 	"github.com/CanonicalLtd/jimm/internal/errors"
 )
@@ -60,15 +62,16 @@ func (d Dialer) Dial(ctx context.Context, url string) (*Client, error) {
 	return cl, nil
 }
 
-// BasicDial is similar to Dial but returns a raw websocket instead of a client.
+// BasicDial dials a url and returns a websocket.
 func (d Dialer) BasicDial(ctx context.Context, url string) (*websocket.Conn, error) {
 	const op = errors.Op("rpc.Dial")
 
 	dialer := websocket.Dialer{
 		TLSClientConfig: d.TLSConfig,
 	}
-	conn, _, err := dialer.DialContext(ctx, url, nil)
+	conn, _, err := dialer.DialContext(context.Background(), url, nil)
 	if err != nil {
+		zapctx.Error(ctx, "BasicDial failed", zap.Error(err))
 		return nil, errors.E(op, err)
 	}
 	return conn, nil

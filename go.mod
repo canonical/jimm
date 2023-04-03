@@ -52,7 +52,9 @@ require (
 	github.com/go-chi/chi/v5 v5.0.8
 	github.com/go-chi/render v1.0.2
 	github.com/itchyny/gojq v0.12.12
+	github.com/juju/clock v1.0.2
 	github.com/juju/http v0.0.0-20201019013536-69ae1d429836
+	github.com/juju/retry v1.0.0
 	github.com/lestrrat-go/jwx/v2 v2.0.8
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/stretchr/testify v1.8.1
@@ -194,7 +196,6 @@ require (
 	github.com/juju/ansiterm v1.0.0 // indirect
 	github.com/juju/blobstore/v2 v2.0.0 // indirect
 	github.com/juju/charmrepo/v6 v6.0.3 // indirect
-	github.com/juju/clock v1.0.2 // indirect
 	github.com/juju/collections v1.0.2 // indirect
 	github.com/juju/description/v3 v3.0.13 // indirect
 	github.com/juju/featureflag v1.0.0 // indirect
@@ -218,7 +219,6 @@ require (
 	github.com/juju/pubsub/v2 v2.0.0 // indirect
 	github.com/juju/ratelimit v1.0.2 // indirect
 	github.com/juju/replicaset/v2 v2.0.2 // indirect
-	github.com/juju/retry v1.0.0 // indirect
 	github.com/juju/rfc/v2 v2.0.0 // indirect
 	github.com/juju/romulus v1.0.0 // indirect
 	github.com/juju/schema v1.0.1 // indirect

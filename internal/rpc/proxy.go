@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	stderrors "errors"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -11,6 +12,7 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
+	"github.com/CanonicalLtd/jimm/internal/auth"
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 )
@@ -46,6 +48,13 @@ func (c *writeLockConn) sendError(err error, req *message) {
 	if msg != nil {
 		c.writeJson(msg)
 	}
+}
+
+func (c *writeLockConn) sendMessage(responseData json.RawMessage, request *message) {
+	msg := new(message)
+	msg.RequestID = request.RequestID
+	msg.Response = responseData
+	c.writeJson(msg)
 }
 
 type inflightMsgs struct {
@@ -99,35 +108,54 @@ type clientProxy struct {
 // start begins the client->controller proxier.
 func (p *clientProxy) start(ctx context.Context) error {
 	const op = errors.Op("rpc.clientProxy.start")
+	const initialLogin = true
 	defer func() {
 		if p.controller != nil {
 			p.controller.conn.Close()
 		}
 	}()
 	for {
+		zapctx.Debug(ctx, "Reading on client connection")
 		msg := new(message)
-		if err := p.client.readJson(msg); err != nil {
+		if err := p.client.readJson(&msg); err != nil {
 			zapctx.Error(ctx, "clientProxy error reading from src", zap.Error(err))
 			return err
 		}
+		zapctx.Debug(ctx, "Read message from client", zap.Any("message", msg))
 		err := p.makeControllerConnection(ctx)
 		if err != nil {
 			zapctx.Error(ctx, "error connecting to controller", zap.Error(err))
 			p.client.sendError(err, msg)
 			return err
 		}
+		// All requests should be proxied as transparently as possible through to the controller
+		// except for auth related requests like Login because JIMM is auth gateway.
 		if msg.Type == "Admin" && msg.Request == "Login" {
-			if err := addJWT(ctx, true, msg, nil, p.tokenGen); err != nil {
+			zapctx.Debug(ctx, "Login request found, adding JWT")
+			if err := addJWT(ctx, initialLogin, msg, nil, p.tokenGen); err != nil {
+				zapctx.Error(ctx, "Failed to add JWT", zap.Error(err))
+				var aerr *auth.AuthenticationError
+				if stderrors.As(err, &aerr) {
+					res, err := json.Marshal(aerr.LoginResult)
+					if err != nil {
+						p.client.sendError(err, msg)
+						return err
+					}
+					p.client.sendMessage(res, msg)
+					continue
+				}
 				p.client.sendError(err, msg)
 				continue
 			}
 		}
 		if msg.RequestID == 0 {
+			zapctx.Error(ctx, "Invalid request ID 0")
 			err := errors.E(op, "Invalid request ID 0")
 			p.client.sendError(err, msg)
 			continue
 		}
 		p.msgs.addMessage(msg)
+		zapctx.Debug(ctx, "Writing to controller")
 		if err := p.controller.writeJson(msg); err != nil {
 			zapctx.Error(ctx, "clientProxy error writing to dst", zap.Error(err))
 			p.client.sendError(err, msg)
@@ -160,6 +188,7 @@ func (p *clientProxy) makeControllerConnection(ctx context.Context) error {
 		defer p.wg.Done()
 		p.errChan <- controllerToClient.start(ctx)
 	}()
+	zapctx.Debug(ctx, "Successfully made controller connection")
 	return nil
 }
 
@@ -176,13 +205,17 @@ type controllerProxy struct {
 // start implements the controller->client proxier.
 func (p *controllerProxy) start(ctx context.Context) error {
 	for {
+		zapctx.Debug(ctx, "Reading on controller connection")
 		msg := new(message)
 		if err := p.controller.readJson(msg); err != nil {
 			zapctx.Error(ctx, "controllerProxy error reading from src", zap.Error(err))
 			return err
 		}
+		zapctx.Debug(ctx, "Received message from controller", zap.Any("Message", msg))
 		if msg.ErrorCode == "access required" {
+			zapctx.Error(ctx, "Access Required error")
 			if err := p.redoLogin(ctx, msg); err != nil {
+				zapctx.Error(ctx, "Failed to redo login", zap.Error(err))
 				p.client.sendError(err, msg)
 				p.msgs.removeMessage(msg)
 				continue
@@ -194,9 +227,14 @@ func (p *controllerProxy) start(ctx context.Context) error {
 			}
 			continue
 		} else {
-			modifyControllerResponse(msg)
+			if err := modifyControllerResponse(msg); err != nil {
+				zapctx.Error(ctx, "Failed to modify message", zap.Error(err))
+				p.client.sendError(err, msg)
+				return err
+			}
 			p.msgs.removeMessage(msg)
 		}
+		zapctx.Debug(ctx, "Writing modified message to client", zap.Any("Message", msg))
 		if err := p.client.writeJson(msg); err != nil {
 			zapctx.Error(ctx, "controllerProxy error writing to dst", zap.Error(err))
 			return err
@@ -206,6 +244,7 @@ func (p *controllerProxy) start(ctx context.Context) error {
 
 func (p *controllerProxy) redoLogin(ctx context.Context, resp *message) error {
 	const op = errors.Op("rpc.redoLogin")
+	const initialLogin = false
 	var loginMsg *message
 	if msg, ok := p.msgs.messages[0]; ok {
 		loginMsg = msg
@@ -213,19 +252,19 @@ func (p *controllerProxy) redoLogin(ctx context.Context, resp *message) error {
 	if loginMsg == nil {
 		return errors.E(op, errors.CodeUnauthorized, "Haven't received login yet")
 	}
-	err := addJWT(ctx, false, loginMsg, resp.ErrorInfo, p.tokenGen)
+	err := addJWT(ctx, initialLogin, loginMsg, resp.ErrorInfo, p.tokenGen)
 	if err != nil {
 		return err
 	}
 	zapctx.Info(ctx, "Performing new login", zap.Any("message", loginMsg))
 	if err := p.controller.writeJson(loginMsg); err != nil {
-		zapctx.Error(ctx, "cannot send new login", zap.Error(err))
 		return err
 	}
 	return nil
 }
 
 // addJWT adds a JWT token to the the provided message.
+// If initialLogin is set the user will be authenticated.
 func addJWT(ctx context.Context, initialLogin bool, msg *message, permissions map[string]interface{}, tokenGen jimm.TokenGenerator) error {
 	const op = errors.Op("rpc.addJWT")
 	// First we unmarshal the existing LoginRequest.
@@ -238,6 +277,7 @@ func addJWT(ctx context.Context, initialLogin bool, msg *message, permissions ma
 	}
 	jwt, err := tokenGen.MakeToken(ctx, initialLogin, &lr, permissions)
 	if err != nil {
+		zapctx.Error(ctx, "FAILED TO MAKE TOKEN", zap.Error(err))
 		return err
 	}
 	jwtString := base64.StdEncoding.EncodeToString(jwt)
@@ -268,7 +308,6 @@ func createErrResponse(err error, req *message) *message {
 // tokenGen is used to authenticate the user and generate JWT token.
 // connectController provides the function to return a connection to the desired controller endpoint.
 func ProxySockets(ctx context.Context, connClient *websocket.Conn, tokenGen jimm.TokenGenerator, connectController func(context.Context) (*websocket.Conn, error)) error {
-	const op = errors.Op("rpc.ProxySockets")
 	errChan := make(chan error, 2)
 	msgInFlight := inflightMsgs{messages: make(map[uint64]*message)}
 	client := writeLockConn{conn: connClient}
@@ -283,7 +322,7 @@ func ProxySockets(ctx context.Context, connClient *websocket.Conn, tokenGen jimm
 	}
 	clProxy.wg.Add(1)
 	go func() {
-		clProxy.wg.Done()
+		defer clProxy.wg.Done()
 		errChan <- clProxy.start(ctx)
 	}()
 	var err error
@@ -291,8 +330,9 @@ func ProxySockets(ctx context.Context, connClient *websocket.Conn, tokenGen jimm
 	// No cleanup is needed on error, when the client closes the connection
 	// all go routines will proceed to error and exit.
 	case err = <-errChan:
+		zapctx.Debug(ctx, "Proxy error", zap.Error(err))
 	case <-ctx.Done():
-		err = errors.E(op, "Context cancelled")
+		zapctx.Debug(ctx, "Context cancelled")
 		connClient.Close()
 		clProxy.mu.Lock()
 		clProxy.closed = true

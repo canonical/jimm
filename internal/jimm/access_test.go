@@ -7,6 +7,8 @@ package jimm_test
 // generates a JWT. The JWTGenerator requires the JIMM server to have
 // a JWT service and cache setup, so we could either turn this into
 // an interface and mock it or have the test start a full JIMM server.
+// Also required an interface for authentication, mocked or Candid.
+// This is already tested in an integration test in jujuapi/websocket_test.go
 // func TestJwtGenerator(t *testing.T) {
 // 	c := qt.New(t)
 

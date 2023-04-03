@@ -148,8 +148,10 @@ func (auth *JwtGenerator) MakeToken(ctx context.Context, initialLogin bool, req 
 			return nil, authErr
 		}
 		auth.accessMapCache[auth.mt.String()] = modelAccess
-		// Get the user's access to the JIMM controller, because all users have login access to controllers controlled by JIMM
-		// but only JIMM admins have admin access on other controllers.
+
+		if auth.ct.Id() == "" {
+			return nil, errors.E(op, "Desired Controller not set")
+		}
 		var controllerAccess string
 		controllerAccess, authErr = auth.jimm.GetControllerAccess(ctx, auth.user, auth.ct)
 		if authErr != nil {

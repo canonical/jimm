@@ -107,6 +107,9 @@ type modelProxyServer struct {
 }
 
 func modelInfoFromPath(path string) (uuid string, finalPath string, err error) {
+	if path == "" {
+		return "", "", errors.E("Empty path")
+	}
 	if path[0] == '/' {
 		path = path[1:]
 	}
@@ -127,13 +130,14 @@ func modelInfoFromPath(path string) (uuid string, finalPath string, err error) {
 // ServeWS implements jimmhttp.WSServer.
 func (s modelProxyServer) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
 	jwtGenerator := jimm.NewJwtGenerator(s.jimm)
-	connectionFunc := controllerConnectionFunc(s, jwtGenerator)
+	connectionFunc := controllerConnectionFunc(s, &jwtGenerator)
+	zapctx.Debug(ctx, "Starting proxier")
 	jimmRPC.ProxySockets(ctx, clientConn, &jwtGenerator, connectionFunc)
 }
 
 // controllerConnectionFunc returns a function that will be used to
 // connect to a controller when a client makes a request.
-func controllerConnectionFunc(s modelProxyServer, jwtGenerator jimm.JwtGenerator) func(context.Context) (*websocket.Conn, error) {
+func controllerConnectionFunc(s modelProxyServer, jwtGenerator *jimm.JwtGenerator) func(context.Context) (*websocket.Conn, error) {
 	connectToControllerFunc := func(ctx context.Context) (*websocket.Conn, error) {
 		const op = errors.Op("proxy.controllerConnectionFunc")
 		path := jimmhttp.PathElementFromContext(ctx, "path")
@@ -153,6 +157,7 @@ func controllerConnectionFunc(s modelProxyServer, jwtGenerator jimm.JwtGenerator
 		}
 		jwtGenerator.SetTags(m.ResourceTag(), m.Controller.ResourceTag())
 		mt := names.NewModelTag(uuid)
+		zapctx.Debug(ctx, "Dialing Controller", zap.String("path", path))
 		controllerConn, err := jujuclient.ProxyDial(ctx, &m.Controller, mt, finalPath)
 		if err != nil {
 			zapctx.Error(ctx, "cannot dial controller", zap.String("controller", m.Controller.Name), zap.Error(err))

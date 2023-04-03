@@ -23,7 +23,6 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jimm/credentials"
 	"github.com/CanonicalLtd/jimm/internal/jimmjwx"
 	"github.com/CanonicalLtd/jimm/internal/openfga"
-	jimmopenfga "github.com/CanonicalLtd/jimm/internal/openfga"
 	"github.com/CanonicalLtd/jimm/internal/pubsub"
 )
 
@@ -82,7 +81,7 @@ func (j *JIMM) ResourceTag() names.ControllerTag {
 type Authenticator interface {
 	// Authenticate processes the given LoginRequest and returns the user
 	// that has authenticated.
-	Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*jimmopenfga.User, error)
+	Authenticate(ctx context.Context, req *jujuparams.LoginRequest) (*openfga.User, error)
 }
 
 // dial dials the controller and model specified by the given Controller

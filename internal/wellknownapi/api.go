@@ -53,6 +53,12 @@ func (wkh *WellKnownHandler) SetupMiddleware() {
 func (wkh *WellKnownHandler) JWKS(w http.ResponseWriter, r *http.Request) {
 	const op = errors.Op("wellknownapi.JWKS")
 	ctx := r.Context()
+	if wkh == nil || wkh.CredentialStore == nil {
+		zapctx.Error(ctx, "nil reference in JWKS handler")
+		w.WriteHeader(http.StatusInternalServerError)
+		render.JSON(w, r, errors.E(op, errors.CodeJWKSRetrievalFailed, "JWKS does not exist"))
+		return
+	}
 	ks, err := wkh.CredentialStore.GetJWKS(ctx)
 
 	if err != nil && errors.ErrorCode(err) == errors.CodeNotFound {
