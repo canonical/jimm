@@ -47,39 +47,21 @@ func (j *JIMM) QueryModelsJq(ctx context.Context, user *openfga.User, jqQuery st
 		modelUUIDs[i] = strings.Split(modelUUIDs[i], ":")[1]
 	}
 
-	// getModelStatus returns the model status for the provided modelUUID, additionally,
-	// it returns the controller name that this model belongs to so that the name
-	// may be passed to the formatter.
-	getModelStatus := func(modelUUID string) (*rpcparams.FullStatus, string, error) {
-		model := dbmodel.Model{
-			UUID: sql.NullString{String: modelUUID, Valid: true},
-		}
-
-		if err := j.Database.GetModel(ctx, &model); err != nil {
-			zapctx.Error(ctx, "failed to retrieve model", zap.String("model-uuid", modelUUID))
-			return nil, "", err
-		}
-
-		api, err := j.dial(ctx, &model.Controller, model.ResourceTag())
-		if err != nil {
-			zapctx.Error(ctx, "failed to dial controller for model", zap.String("controller-uuid", model.Controller.UUID), zap.String("model-uuid", modelUUID), zap.Error(err))
-			return nil, "", err
-		}
-		defer api.Close()
-
-		modelStatus, err := api.Status(ctx, nil)
-		if err != nil {
-			zapctx.Error(ctx, "failed to call FullStatus", zap.String("controller-uuid", model.Controller.UUID), zap.String("model-uuid", modelUUID), zap.Error(err))
-			return nil, "", err
-		}
-		return modelStatus, model.Controller.Name, nil
-	}
+	// Set up a formatterParamsRetriever to handle the heavy lifting
+	// of each facade call and type conversion.
+	retriever := newFormatterParamsRetriever(j)
 
 	for _, id := range modelUUIDs {
-		// Retrieve the model's *current* status.
-		modelStatus, controllerName, err := getModelStatus(id)
+
+		if err := retriever.LoadModel(ctx, id); err != nil {
+			zapctx.Error(ctx, "failed to load model into the formatter", zap.String("model-uuid", id))
+			results.Errors[id] = append(results.Errors[id], err.Error())
+			continue
+		}
+
+		controllerName, modelStatus, err := retriever.GetParams(ctx)
 		if err != nil {
-			zapctx.Error(ctx, "failed to get model status", zap.String("model-uuid", id))
+			zapctx.Error(ctx, "failed to get status formatter params", zap.String("model-uuid", id))
 			results.Errors[id] = append(results.Errors[id], err.Error())
 			continue
 		}
@@ -132,4 +114,82 @@ func (j *JIMM) QueryModelsJq(ctx context.Context, user *openfga.User, jqQuery st
 		}
 	}
 	return results, nil
+}
+
+// formatterParamsRetriever is a self-contained block of
+// parameter retrieval for Juju's status.NewStatusFormatter.
+//
+// It handles the retrieval of all parameters to properly format them into
+// sensible outputs.
+//
+// First, call LoadModel, this will retrieve a model from JIMM's database.
+// Next, simply call GetParams.
+type formatterParamsRetriever struct {
+	model *dbmodel.Model
+	jimm  *JIMM
+	api   API
+}
+
+// newFormatterParamsRetriever returns a formatterParamsRetriever.
+func newFormatterParamsRetriever(j *JIMM) *formatterParamsRetriever {
+	return &formatterParamsRetriever{
+		jimm: j,
+	}
+}
+
+// GetParams retrieves the required parameters for the Juju status formatter from the currently
+// loaded model. See formatterParamsRetriever.LoadModel for more information.
+func (f *formatterParamsRetriever) GetParams(ctx context.Context) (string, *rpcparams.FullStatus, error) {
+	op := errors.Op("formatterParamsRetirever.GetParams")
+	if f.model == nil {
+		return "", nil, errors.E(op, "no model loaded")
+	}
+
+	err := f.dialModel(ctx)
+	if err != nil {
+		return "", nil, err
+	}
+	defer f.api.Close()
+
+	modelStatus, err := f.getModelStatus(ctx)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return f.model.Controller.Name, modelStatus, nil
+}
+
+// LoadModel loads the model by UUID from the database into the formatterParamsRetriever.
+// This MUST be called before attempting to GetParams().
+func (f *formatterParamsRetriever) LoadModel(ctx context.Context, modelUUID string) error {
+	model := dbmodel.Model{
+		UUID: sql.NullString{String: modelUUID, Valid: true},
+	}
+
+	if err := f.jimm.Database.GetModel(ctx, &model); err != nil {
+		zapctx.Error(ctx, "failed to retrieve model", zap.String("model-uuid", modelUUID))
+		return err
+	}
+	f.model = &model
+	return nil
+}
+
+// dialModel dials the model currently loaded into the formatterParamsRetriever.
+func (f *formatterParamsRetriever) dialModel(ctx context.Context) error {
+	api, err := f.jimm.dial(ctx, &f.model.Controller, f.model.ResourceTag())
+	if err != nil {
+		zapctx.Error(ctx, "failed to dial controller for model", zap.String("controller-uuid", f.model.Controller.UUID), zap.String("model-uuid", f.model.UUID.String), zap.Error(err))
+	}
+	f.api = api
+	return err
+}
+
+// getModelStatus calls the FullStatus facade to return the full status for the current model
+// loaded in the formatterParamsRetriever.
+func (f *formatterParamsRetriever) getModelStatus(ctx context.Context) (*rpcparams.FullStatus, error) {
+	modelStatus, err := f.api.Status(ctx, nil)
+	if err != nil {
+		zapctx.Error(ctx, "failed to call FullStatus", zap.String("controller-uuid", f.model.Controller.UUID), zap.String("model-uuid", f.model.UUID.String), zap.Error(err))
+	}
+	return modelStatus, err
 }
