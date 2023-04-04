@@ -64,7 +64,7 @@ func (d Dialer) Dial(ctx context.Context, url string) (*Client, error) {
 
 // BasicDial dials a url and returns a websocket.
 func (d Dialer) BasicDial(ctx context.Context, url string) (*websocket.Conn, error) {
-	const op = errors.Op("rpc.Dial")
+	const op = errors.Op("rpc.BasicDial")
 
 	dialer := websocket.Dialer{
 		TLSClientConfig: d.TLSConfig,

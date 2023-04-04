@@ -57,7 +57,7 @@ func TestNewJWTIsParsableByExponent(t *testing.T) {
 	startAndTestRotator(c, ctx, store, jwksService)
 	// Setup JWTService
 	u, _ := url.Parse(srv.URL)
-	jwtService := jimmjwx.NewJWTService(u.Host, store, false)
+	jwtService := jimmjwx.NewJWTService(u.Host, store, true)
 	// Setup JWKS Cache
 	jwtService.RegisterJWKSCache(ctx, srv.Client())
 
@@ -116,7 +116,7 @@ func TestNewJWTExpires(t *testing.T) {
 	startAndTestRotator(c, ctx, store, jwksService)
 	// Setup JWTService
 	u, _ := url.Parse(srv.URL)
-	jwtService := jimmjwx.NewJWTService(u.Host, store, false)
+	jwtService := jimmjwx.NewJWTService(u.Host, store, true)
 	// Setup JWKS Cache
 	jwtService.RegisterJWKSCache(ctx, srv.Client())
 

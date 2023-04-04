@@ -45,57 +45,6 @@ func (s *apiSuite) TearDownTest(c *gc.C) {
 	s.BootstrapSuite.TearDownTest(c)
 }
 
-type RedirectParams struct {
-	Method         string
-	URL            string
-	Handler        http.Handler
-	ExpectCode     int
-	ExpectLocation string
-}
-
-// TODO(Kian): This test should ensure that the websocket proxies the message through to a controller.
-// This may need to be an integration/BDD test that actually spins up a Juju 3.2 controller.
-// Alternatively we could spin up a fake controller that just echoes messages.
-// func (s *apiSuite) TestModelCommands(c *gc.C) {
-// 	path := fmt.Sprintf("/model/%s/commands", s.Model.UUID.String)
-// 	serverURL, err := url.Parse(s.HTTP.URL)
-// 	c.Assert(err, gc.Equals, nil)
-// 	u := url.URL{
-// 		Scheme: "ws",
-// 		Host:   serverURL.Host,
-// 		Path:   path,
-// 	}
-
-// 	conn, response, err := websocket.DefaultDialer.Dial(u.String(), nil)
-// 	if err != nil {
-// 		c.Assert(err, gc.Equals, nil)
-// 	}
-// 	c.Assert(response.StatusCode, gc.Equals, http.StatusSwitchingProtocols)
-// 	defer conn.Close()
-
-// 	type message struct {
-// 		RequestID uint64                 `json:"request-id,omitempty"`
-// 		Type      string                 `json:"type,omitempty"`
-// 		Version   int                    `json:"version,omitempty"`
-// 		ID        string                 `json:"id,omitempty"`
-// 		Request   string                 `json:"request,omitempty"`
-// 		Params    json.RawMessage        `json:"params,omitempty"`
-// 		Error     string                 `json:"error,omitempty"`
-// 		ErrorCode string                 `json:"error-code,omitempty"`
-// 		ErrorInfo map[string]interface{} `json:"error-info,omitempty"`
-// 		Response  json.RawMessage        `json:"response,omitempty"`
-// 	}
-
-// 	msg := &message{Type: "Test"}
-// 	err = conn.WriteJSON(msg)
-// 	c.Assert(err, gc.Equals, nil)
-// 	rcv := make(map[string]interface{})
-// 	err = conn.ReadJSON(&rcv)
-// 	c.Assert(err, gc.Equals, nil)
-// 	hp := s.Model.Controller.Addresses[0][0]
-// 	c.Assert(msg.Type, gc.Equals, fmt.Sprintf("wss://%s:%d/model/%s/commands", hp.Address.Value, hp.Port, s.Model.UUID.String))
-// }
-
 func (s *apiSuite) TestModelCommandsModelNotFoundf(c *gc.C) {
 	serverURL, err := url.Parse(s.HTTP.URL)
 	c.Assert(err, gc.Equals, nil)

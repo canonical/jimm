@@ -17,7 +17,7 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 )
 
-// TODO(Kian): Remove this once Juju updates their side.
+// TODO(Kian): Remove this once we update our Juju library.
 type loginRequest struct {
 	params.LoginRequest
 	Token string `json:"token"`
@@ -308,6 +308,7 @@ func createErrResponse(err error, req *message) *message {
 // tokenGen is used to authenticate the user and generate JWT token.
 // connectController provides the function to return a connection to the desired controller endpoint.
 func ProxySockets(ctx context.Context, connClient *websocket.Conn, tokenGen jimm.TokenGenerator, connectController func(context.Context) (*websocket.Conn, error)) error {
+	const op = errors.Op("rpc.ProxySockets")
 	errChan := make(chan error, 2)
 	msgInFlight := inflightMsgs{messages: make(map[uint64]*message)}
 	client := writeLockConn{conn: connClient}
@@ -332,6 +333,7 @@ func ProxySockets(ctx context.Context, connClient *websocket.Conn, tokenGen jimm
 	case err = <-errChan:
 		zapctx.Debug(ctx, "Proxy error", zap.Error(err))
 	case <-ctx.Done():
+		err = errors.E(op, "Context cancelled")
 		zapctx.Debug(ctx, "Context cancelled")
 		connClient.Close()
 		clProxy.mu.Lock()
