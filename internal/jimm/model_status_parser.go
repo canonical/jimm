@@ -76,6 +76,7 @@ func (j *JIMM) QueryModelsJq(ctx context.Context, user *openfga.User, jqQuery st
 	}
 
 	for _, id := range modelUUIDs {
+		// Retrieve the model's *current* status.
 		modelStatus, controllerName, err := getModelStatus(id)
 		if err != nil {
 			zapctx.Error(ctx, "failed to get model status", zap.String("model-uuid", id))
