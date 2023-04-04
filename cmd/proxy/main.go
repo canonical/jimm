@@ -33,6 +33,7 @@ import (
 const websocketFrameSize = 65536
 
 type config struct {
+	UUID            string     `yaml:"uuid"`
 	Hostname        string     `yaml:"hostname"`
 	CertificateFile string     `yaml:"cert-file"`
 	KeyFile         string     `yaml:"key-file"`
@@ -138,6 +139,7 @@ func (ws *wsHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 type wsMITM struct {
+	mimtUUID       string
 	controllerUUID string
 	hostname       string
 	jwtService     *jimmjwx.JWTService
@@ -145,14 +147,14 @@ type wsMITM struct {
 
 func (ws *wsMITM) ServeWS(ctx context.Context, modelUUID string, connClient, connController *websocket.Conn) {
 	access := map[string]string{
-		names.NewControllerTag(ws.controllerUUID).String(): "admin",
+		names.NewControllerTag(ws.controllerUUID).String(): "superuser",
 	}
 	if modelUUID != "" {
 		access[names.NewModelTag(modelUUID).String()] = "admin"
 	}
 	jwt, err := ws.jwtService.NewJWT(ctx, jimmjwx.JWTParams{
 		Controller: ws.controllerUUID,
-		User:       "controller-jimm",
+		User:       "user-fred@external",
 		Access:     access,
 	})
 	if err != nil {
@@ -188,6 +190,7 @@ func (ws *wsMITM) ServeWS(ctx context.Context, modelUUID string, connClient, con
 		// If this is a login request we need to augment it with the
 		// JWT.
 		if msg.Type == "Admin" && msg.Request == "Login" {
+			zapctx.Error(ctx, "XXX forwarding login request")
 			// First we unmarshal the existing LoginRequest.
 			var lr jujuparams.LoginRequest
 			if err := json.Unmarshal(msg.Params, &lr); err != nil {
@@ -219,8 +222,33 @@ func (ws *wsMITM) ServeWS(ctx context.Context, modelUUID string, connClient, con
 		}
 		response := new(message)
 		if err := connController.ReadJSON(response); err != nil {
+			zapctx.Error(ctx, "failed to read JSON response", zap.Error(err))
 			ws.handleError(err, connClient)
 			break
+		}
+
+		if msg.Type == "Admin" && msg.Request == "Login" {
+			zapctx.Error(ctx, "XXX handling login response")
+			// First we unmarshal the existing LoginRequest.
+			var lr jujuparams.LoginResult
+			if err := json.Unmarshal(response.Response, &lr); err != nil {
+				zapctx.Error(ctx, "failed to unmarshal login result", zap.Any("message", response), zap.Error(err))
+				ws.handleError(err, connClient)
+				break
+			}
+
+			lr.PublicDNSName = ws.hostname
+			lr.Servers = nil
+			lr.ControllerTag = names.NewControllerTag(ws.mimtUUID).String()
+
+			// Marshal it again to JSON.
+			data, err := json.Marshal(lr)
+			if err != nil {
+				zapctx.Error(ctx, "failed to marshal login result", zap.Error(err))
+				ws.handleError(err, connClient)
+				break
+			}
+			response.Response = data
 		}
 		zapctx.Info(ctx, "received controller response", zap.Any("message", response))
 		connClient.WriteJSON(response)
@@ -241,6 +269,7 @@ func (ws *wsMITM) handleError(err error, conn *websocket.Conn) {
 
 type handlerParams struct {
 	hostname       string
+	mitmUUID       string
 	controllerUUID string
 	dialFunc       func(ctx context.Context, requestPath string, header *http.Header) (*websocket.Conn, *http.Response, error)
 	jwtService     *jimmjwx.JWTService
@@ -251,6 +280,7 @@ func newHandler(p handlerParams) http.Handler {
 		dialFunc: p.dialFunc,
 		server: &wsMITM{
 			hostname:       p.hostname,
+			mimtUUID:       p.mitmUUID,
 			controllerUUID: p.controllerUUID,
 			jwtService:     p.jwtService,
 		},
@@ -302,12 +332,14 @@ func start(ctx context.Context, s *service.Service) error {
 	})
 
 	mux.Handle("/api", newHandler(handlerParams{
+		mitmUUID:       config.UUID,
 		controllerUUID: config.Controller.UUID,
 		hostname:       config.Hostname,
 		dialFunc:       dialFunc,
 		jwtService:     jwtService,
 	}))
 	mux.Handle("/model/{modelUUID}/*", newHandler(handlerParams{
+		mitmUUID:       config.UUID,
 		controllerUUID: config.Controller.UUID,
 		hostname:       config.Hostname,
 		dialFunc:       dialFunc,
@@ -328,7 +360,7 @@ func start(ctx context.Context, s *service.Service) error {
 	tlscfg := jujuhttp.SecureTLSConfig()
 	tlscfg.Certificates = []tls.Certificate{serverCert}
 	httpsrv := &http.Server{
-		Addr:      ":17071",
+		Addr:      ":443",
 		Handler:   mux,
 		TLSConfig: tlscfg,
 	}
@@ -364,16 +396,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	ctx, s := service.NewService(context.Background(), os.Interrupt, syscall.SIGTERM)
+
 	if err := zapctx.LogLevel.UnmarshalText([]byte("debug")); err != nil {
-		zapctx.Error(context.TODO(), "cannot set log level", zap.Error(err))
+		zapctx.Error(ctx, "cannot set log level", zap.Error(err))
 	}
 
-	ctx, s := service.NewService(context.Background(), os.Interrupt, syscall.SIGTERM)
 	s.Go(func() error {
 		return start(ctx, s)
 	})
 	err := s.Wait()
-
 	zapctx.Error(context.Background(), "shutdown", zap.Error(err))
 	if _, ok := err.(*service.SignalError); !ok {
 		os.Exit(1)

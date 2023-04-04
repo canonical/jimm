@@ -378,6 +378,7 @@ func (c Connection) hasFacadeVersion(facade string, version int) bool {
 // the facade.
 func (c Connection) CallHighestFacadeVersion(ctx context.Context, facade string, versions []int, id, method string, args, resp interface{}) error {
 	sort.Sort(sort.Reverse(sort.IntSlice(versions)))
+
 	for _, version := range versions {
 		if c.hasFacadeVersion(facade, version) {
 			return c.client.Call(ctx, facade, version, id, method, args, resp)

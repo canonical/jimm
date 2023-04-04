@@ -93,21 +93,36 @@ func createCerts() error {
 	if err != nil {
 		return err
 	}
-	err = pem.Encode(os.Stdout, &pem.Block{
+	certFile, err := os.Create("./cert.crt")
+	if err != nil {
+		return err
+	}
+	defer certFile.Close()
+	err = pem.Encode(certFile, &pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: certBytes,
 	})
 	if err != nil {
 		return err
 	}
-	err = pem.Encode(os.Stdout, &pem.Block{
+	caCertFile, err := os.Create("./caCert.crt")
+	if err != nil {
+		return err
+	}
+	defer caCertFile.Close()
+	err = pem.Encode(caCertFile, &pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: rootCertBytes,
 	})
 	if err != nil {
 		return err
 	}
-	err = pem.Encode(os.Stdout, &pem.Block{
+	keyFile, err := os.Create("./myKey.key")
+	if err != nil {
+		return err
+	}
+	defer keyFile.Close()
+	err = pem.Encode(keyFile, &pem.Block{
 		Type:  "EC PRIVATE KEY",
 		Bytes: keyBytes,
 	})

@@ -285,3 +285,15 @@ func NewCheckRelationCommandForTesting(store jujuclient.ClientStore, bClient *ht
 
 	return modelcmd.WrapBase(cmd)
 }
+
+func NewCrossModelQueryCommandForTesting(store jujuclient.ClientStore, bClient *httpbakery.Client) cmd.Command {
+	cmd := &crossModelQueryCommand{
+		store: store,
+		dialOpts: &jujuapi.DialOpts{
+			InsecureSkipVerify: true,
+			BakeryClient:       bClient,
+		},
+	}
+
+	return modelcmd.WrapBase(cmd)
+}

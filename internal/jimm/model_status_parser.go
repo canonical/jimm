@@ -47,39 +47,51 @@ func (j *JIMM) QueryModelsJq(ctx context.Context, user *openfga.User, jqQuery st
 		modelUUIDs[i] = strings.Split(modelUUIDs[i], ":")[1]
 	}
 
-	getModelStatus := func(modelUUID string) (*rpcparams.FullStatus, error) {
+	// getModelStatus returns the model status for the provided modelUUID, additionally,
+	// it returns the controller name that this model belongs to so that the name
+	// may be passed to the formatter.
+	getModelStatus := func(modelUUID string) (*rpcparams.FullStatus, string, error) {
 		model := dbmodel.Model{
 			UUID: sql.NullString{String: modelUUID, Valid: true},
 		}
 
 		if err := j.Database.GetModel(ctx, &model); err != nil {
 			zapctx.Error(ctx, "failed to retrieve model", zap.String("model-uuid", modelUUID))
-			return nil, err
+			return nil, "", err
 		}
 
 		api, err := j.dial(ctx, &model.Controller, model.ResourceTag())
 		if err != nil {
 			zapctx.Error(ctx, "failed to dial controller for model", zap.String("controller-uuid", model.Controller.UUID), zap.String("model-uuid", modelUUID), zap.Error(err))
-			return nil, err
+			return nil, "", err
 		}
 		defer api.Close()
 
 		modelStatus, err := api.Status(ctx, nil)
 		if err != nil {
 			zapctx.Error(ctx, "failed to call FullStatus", zap.String("controller-uuid", model.Controller.UUID), zap.String("model-uuid", modelUUID), zap.Error(err))
-			return nil, err
+			return nil, "", err
 		}
-		return modelStatus, nil
+		return modelStatus, model.Controller.Name, nil
 	}
 
 	for _, id := range modelUUIDs {
-		modelStatus, err := getModelStatus(id)
+		modelStatus, controllerName, err := getModelStatus(id)
 		if err != nil {
 			zapctx.Error(ctx, "failed to get model status", zap.String("model-uuid", id))
 			results.Errors[id] = append(results.Errors[id], err.Error())
 			continue
 		}
-		formatter := status.NewStatusFormatter(modelStatus, true)
+
+		// We use very specific formatting parameters to ensure like-for-like output
+		// with the default juju client installation performing a "status --format json".
+		formatter := status.NewStatusFormatter(status.NewStatusFormatterParams{
+			ControllerName: controllerName,
+			Status:         modelStatus,
+			ShowRelations:  true,
+			ISOTime:        true,
+		})
+
 		formattedStatus, err := formatter.Format()
 		if err != nil {
 			zapctx.Error(ctx, "failed to format status", zap.String("model-uuid", id))
