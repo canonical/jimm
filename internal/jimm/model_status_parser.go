@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/juju/juju/cmd/juju/status"
+	"github.com/juju/juju/cmd/juju/storage"
 	rpcparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/zaputil/zapctx"
 )
@@ -59,7 +60,7 @@ func (j *JIMM) QueryModelsJq(ctx context.Context, user *openfga.User, jqQuery st
 			continue
 		}
 
-		controllerName, modelStatus, err := retriever.GetParams(ctx)
+		controllerName, modelStatus, combinedStorage, err := retriever.GetParams(ctx)
 		if err != nil {
 			zapctx.Error(ctx, "failed to get status formatter params", zap.String("model-uuid", id))
 			results.Errors[id] = append(results.Errors[id], err.Error())
@@ -71,6 +72,7 @@ func (j *JIMM) QueryModelsJq(ctx context.Context, user *openfga.User, jqQuery st
 		formatter := status.NewStatusFormatter(status.NewStatusFormatterParams{
 			ControllerName: controllerName,
 			Status:         modelStatus,
+			Storage:        combinedStorage,
 			ShowRelations:  true,
 			ISOTime:        true,
 		})
@@ -139,24 +141,29 @@ func newFormatterParamsRetriever(j *JIMM) *formatterParamsRetriever {
 
 // GetParams retrieves the required parameters for the Juju status formatter from the currently
 // loaded model. See formatterParamsRetriever.LoadModel for more information.
-func (f *formatterParamsRetriever) GetParams(ctx context.Context) (string, *rpcparams.FullStatus, error) {
+func (f *formatterParamsRetriever) GetParams(ctx context.Context) (string, *rpcparams.FullStatus, *storage.CombinedStorage, error) {
 	op := errors.Op("formatterParamsRetirever.GetParams")
 	if f.model == nil {
-		return "", nil, errors.E(op, "no model loaded")
+		return "", nil, nil, errors.E(op, "no model loaded")
 	}
 
 	err := f.dialModel(ctx)
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 	defer f.api.Close()
 
 	modelStatus, err := f.getModelStatus(ctx)
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 
-	return f.model.Controller.Name, modelStatus, nil
+	combinedStorage, err := f.getCombinedStorageInfo(ctx)
+	if err != nil {
+		return "", nil, nil, err
+	}
+
+	return f.model.Controller.Name, modelStatus, combinedStorage, nil
 }
 
 // LoadModel loads the model by UUID from the database into the formatterParamsRetriever.
@@ -192,4 +199,12 @@ func (f *formatterParamsRetriever) getModelStatus(ctx context.Context) (*rpcpara
 		zapctx.Error(ctx, "failed to call FullStatus", zap.String("controller-uuid", f.model.Controller.UUID), zap.String("model-uuid", f.model.UUID.String), zap.Error(err))
 	}
 	return modelStatus, err
+}
+
+func (f *formatterParamsRetriever) getCombinedStorageInfo(ctx context.Context) (*storage.CombinedStorage, error) {
+	var err error
+	combinedStorage := &storage.CombinedStorage{}
+
+	return combinedStorage, err
+
 }

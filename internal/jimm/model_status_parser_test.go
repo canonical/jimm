@@ -649,4 +649,28 @@ func TestQueryModelsJq(t *testing.T) {
 		}
 	}
 	`, qt.JSONEquals, res)
+
+	// Query specifically for storage on this model.
+	res, err = j.QueryModelsJq(ctx, alice, ".storage")
+	c.Assert(err, qt.IsNil)
+	c.Assert(`
+	{
+		"results": {
+		  "10000000-0000-0000-0000-000000000000": [
+			{}
+		  ],
+		  "20000000-0000-0000-0000-000000000000": [
+			{}
+		  ],
+		  "30000000-0000-0000-0000-000000000000": [
+			{}
+		  ]
+		},
+		"errors": {
+			"40000000-0000-0000-0000-000000000000": [
+				"model not found"
+			]
+		}
+	}
+	`, qt.JSONEquals, res)
 }
