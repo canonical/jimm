@@ -13,6 +13,7 @@ import (
 	"github.com/itchyny/gojq"
 	"go.uber.org/zap"
 
+	jujucmd "github.com/juju/cmd/v3"
 	"github.com/juju/juju/cmd/juju/status"
 	"github.com/juju/juju/cmd/juju/storage"
 	rpcparams "github.com/juju/juju/rpc/params"
@@ -54,13 +55,7 @@ func (j *JIMM) QueryModelsJq(ctx context.Context, user *openfga.User, jqQuery st
 
 	for _, id := range modelUUIDs {
 
-		if err := retriever.LoadModel(ctx, id); err != nil {
-			zapctx.Error(ctx, "failed to load model into the formatter", zap.String("model-uuid", id))
-			results.Errors[id] = append(results.Errors[id], err.Error())
-			continue
-		}
-
-		controllerName, modelStatus, combinedStorage, err := retriever.GetParams(ctx)
+		controllerName, modelStatus, combinedStorage, err := retriever.GetParams(ctx, id)
 		if err != nil {
 			zapctx.Error(ctx, "failed to get status formatter params", zap.String("model-uuid", id))
 			results.Errors[id] = append(results.Errors[id], err.Error())
@@ -141,10 +136,9 @@ func newFormatterParamsRetriever(j *JIMM) *formatterParamsRetriever {
 
 // GetParams retrieves the required parameters for the Juju status formatter from the currently
 // loaded model. See formatterParamsRetriever.LoadModel for more information.
-func (f *formatterParamsRetriever) GetParams(ctx context.Context) (string, *rpcparams.FullStatus, *storage.CombinedStorage, error) {
-	op := errors.Op("formatterParamsRetirever.GetParams")
-	if f.model == nil {
-		return "", nil, nil, errors.E(op, "no model loaded")
+func (f *formatterParamsRetriever) GetParams(ctx context.Context, modelUUID string) (string, *rpcparams.FullStatus, *storage.CombinedStorage, error) {
+	if err := f.loadModel(ctx, modelUUID); err != nil {
+		return "", nil, nil, err
 	}
 
 	err := f.dialModel(ctx)
@@ -168,7 +162,7 @@ func (f *formatterParamsRetriever) GetParams(ctx context.Context) (string, *rpcp
 
 // LoadModel loads the model by UUID from the database into the formatterParamsRetriever.
 // This MUST be called before attempting to GetParams().
-func (f *formatterParamsRetriever) LoadModel(ctx context.Context, modelUUID string) error {
+func (f *formatterParamsRetriever) loadModel(ctx context.Context, modelUUID string) error {
 	model := dbmodel.Model{
 		UUID: sql.NullString{String: modelUUID, Valid: true},
 	}
@@ -202,9 +196,50 @@ func (f *formatterParamsRetriever) getModelStatus(ctx context.Context) (*rpcpara
 }
 
 func (f *formatterParamsRetriever) getCombinedStorageInfo(ctx context.Context) (*storage.CombinedStorage, error) {
-	var err error
-	combinedStorage := &storage.CombinedStorage{}
+	storageAPI := newStorageListAPI(ctx, f.api)
 
-	return combinedStorage, err
+	// We use cmdCtx lightly, it's simply passed to the params but is only used for some
+	// logging.
+	cmdCtx, _ := jujucmd.DefaultContext()
 
+	return storage.GetCombinedStorageInfo(storage.GetCombinedStorageInfoParams{
+		Context:         cmdCtx,
+		APIClient:       &storageAPI,
+		Ids:             []string{},
+		WantStorage:     true,
+		WantVolumes:     true,
+		WantFilesystems: true,
+	})
+}
+
+// storageListAPI acts as a wrapper over our implementation of the juju client, seen in ./internal/jujuclient.
+// This enables us to use storage.GetCombinedStorageInfo without having to c/p the logic we require.
+type storageListAPI struct {
+	ctx context.Context
+	api API
+}
+
+// newStorageListAPI returns a new storageListAPI.
+func newStorageListAPI(ctx context.Context, api API) storageListAPI {
+	return storageListAPI{ctx, api}
+}
+
+// ListStorageDetails implements storage.StorageListAPI. (From Juju)
+func (s *storageListAPI) ListStorageDetails() ([]rpcparams.StorageDetails, error) {
+	return s.api.ListStorageDetails(s.ctx)
+}
+
+// ListFilesystems implements storage.StorageListAPI. (From Juju)
+func (s *storageListAPI) ListFilesystems(machines []string) ([]rpcparams.FilesystemDetailsListResult, error) {
+	return s.api.ListFilesystems(s.ctx, machines)
+}
+
+// ListVolumes implements storage.StorageListAPI. (From Juju)
+func (s *storageListAPI) ListVolumes(machines []string) ([]rpcparams.VolumeDetailsListResult, error) {
+	return s.api.ListVolumes(s.ctx, machines)
+}
+
+// Close implements storage.StorageListAPI. (From Juju)
+func (s *storageListAPI) Close() error {
+	return s.api.Close()
 }

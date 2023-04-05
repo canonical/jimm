@@ -7,11 +7,14 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
+	"github.com/juju/juju/core/life"
+	"github.com/juju/juju/core/status"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v4"
 
 	"github.com/CanonicalLtd/jimm/internal/db"
 	"github.com/CanonicalLtd/jimm/internal/dbmodel"
+	"github.com/CanonicalLtd/jimm/internal/errors"
 	"github.com/CanonicalLtd/jimm/internal/jimm"
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	"github.com/CanonicalLtd/jimm/internal/openfga"
@@ -72,6 +75,20 @@ models:
 - name: model-3
   type: iaas
   uuid: 30000000-0000-0000-0000-000000000000
+  controller: controller-1
+  default-series: warty
+  cloud: test-cloud
+  region: test-cloud-region
+  cloud-credential: cred-1
+  owner: alice@external
+  life: alive
+  status:
+    status: available
+    info: "OK!"
+    since: 2020-02-20T20:02:20Z
+- name: model-5
+  type: iaas
+  uuid: 50000000-0000-0000-0000-000000000000
   controller: controller-1
   default-series: warty
   cloud: test-cloud
@@ -276,6 +293,11 @@ var model3 = getFullStatus("model-3", map[string]jujuparams.ApplicationStatus{},
 	nil,
 )
 
+// Model5 holds an empty model, but it's API returns an error for storage
+var model5 = getFullStatus("model-5", map[string]jujuparams.ApplicationStatus{},
+	nil,
+)
+
 func TestQueryModelsJq(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
@@ -296,6 +318,43 @@ func TestQueryModelsJq(t *testing.T) {
 					Status_: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
 						return &model1, nil
 					},
+					ListFilesystems_: func(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
+						return []jujuparams.FilesystemDetailsListResult{
+							{
+								Result: []jujuparams.FilesystemDetails{
+									{
+										FilesystemTag: "filesystem-myapp-0-0",
+										VolumeTag:     "volume-myapp-0-0",
+										Info: jujuparams.FilesystemInfo{
+											Size:         4096,
+											Pool:         "pool-1",
+											FilesystemId: "da64ec3c-0cf7-42f2-9951-35a5a3eaadc1",
+										},
+										Life: life.Alive,
+										Status: jujuparams.EntityStatus{
+											Status: status.Active,
+											Since:  &now,
+										},
+										UnitAttachments: map[string]jujuparams.FilesystemAttachmentDetails{
+											"filesystem-myapp-0-1": {
+												FilesystemAttachmentInfo: jujuparams.FilesystemAttachmentInfo{
+													MountPoint: "/home/ubuntu/myapp/.data",
+													ReadOnly:   false,
+												},
+												Life: "alive",
+											},
+										},
+									},
+								},
+							},
+						}, nil
+					},
+					ListVolumes_: func(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
+						return []jujuparams.VolumeDetailsListResult{}, nil
+					},
+					ListStorageDetails_: func(ctx context.Context) ([]jujuparams.StorageDetails, error) {
+						return []jujuparams.StorageDetails{}, nil
+					},
 				},
 			},
 			"20000000-0000-0000-0000-000000000000": &jimmtest.Dialer{
@@ -303,12 +362,46 @@ func TestQueryModelsJq(t *testing.T) {
 					Status_: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
 						return &model2, nil
 					},
+					ListFilesystems_: func(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
+						return []jujuparams.FilesystemDetailsListResult{}, nil
+					},
+					ListVolumes_: func(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
+						return []jujuparams.VolumeDetailsListResult{}, nil
+					},
+					ListStorageDetails_: func(ctx context.Context) ([]jujuparams.StorageDetails, error) {
+						return []jujuparams.StorageDetails{}, nil
+					},
 				},
 			},
 			"30000000-0000-0000-0000-000000000000": &jimmtest.Dialer{
 				API: &jimmtest.API{
 					Status_: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
 						return &model3, nil
+					},
+					ListFilesystems_: func(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
+						return []jujuparams.FilesystemDetailsListResult{}, nil
+					},
+					ListVolumes_: func(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
+						return []jujuparams.VolumeDetailsListResult{}, nil
+					},
+					ListStorageDetails_: func(ctx context.Context) ([]jujuparams.StorageDetails, error) {
+						return []jujuparams.StorageDetails{}, nil
+					},
+				},
+			},
+			"50000000-0000-0000-0000-000000000000": &jimmtest.Dialer{
+				API: &jimmtest.API{
+					Status_: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
+						return &model5, nil
+					},
+					ListFilesystems_: func(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
+						return []jujuparams.FilesystemDetailsListResult{}, errors.E("forcing an error on model 5")
+					},
+					ListVolumes_: func(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
+						return []jujuparams.VolumeDetailsListResult{}, nil
+					},
+					ListStorageDetails_: func(ctx context.Context) ([]jujuparams.StorageDetails, error) {
+						return []jujuparams.StorageDetails{}, nil
 					},
 				},
 			},
@@ -326,6 +419,7 @@ func TestQueryModelsJq(t *testing.T) {
 		"20000000-0000-0000-0000-000000000000",
 		"30000000-0000-0000-0000-000000000000",
 		"40000000-0000-0000-0000-000000000000", // Erroneous model (doesn't exist).
+		"50000000-0000-0000-0000-000000000000", // Erroneous model (storage errors).
 	}
 
 	c.Assert(j.OpenFGAClient.AddRelations(ctx,
@@ -335,6 +429,11 @@ func TestQueryModelsJq(t *testing.T) {
 				Object:   ofganames.FromTag(names.NewUserTag("alice@external")),
 				Relation: ofganames.ReaderRelation,
 				Target:   ofganames.FromTag(names.NewModelTag(modelUUIDs[0])),
+			},
+			{
+				Object:   ofganames.FromTag(names.NewUserTag("alice@external")),
+				Relation: ofganames.ReaderRelation,
+				Target:   ofganames.FromTag(names.NewModelTag(modelUUIDs[4])),
 			},
 			// Reader to model via group
 			{
@@ -431,6 +530,9 @@ func TestQueryModelsJq(t *testing.T) {
 		"errors": {
 			"40000000-0000-0000-0000-000000000000": [
 				"model not found"
+			],
+			"50000000-0000-0000-0000-000000000000": [
+				"forcing an error on model 5"
 			]
 		}
 	}	
@@ -581,6 +683,9 @@ func TestQueryModelsJq(t *testing.T) {
 		"errors": {
 			"40000000-0000-0000-0000-000000000000": [
 				"model not found"
+			],
+			"50000000-0000-0000-0000-000000000000": [
+				"forcing an error on model 5"
 			]
 		}
 	}
@@ -645,6 +750,9 @@ func TestQueryModelsJq(t *testing.T) {
 		"errors": {
 			"40000000-0000-0000-0000-000000000000": [
 				"model not found"
+			],
+			"50000000-0000-0000-0000-000000000000": [
+				"forcing an error on model 5"
 			]
 		}
 	}
@@ -657,7 +765,30 @@ func TestQueryModelsJq(t *testing.T) {
 	{
 		"results": {
 		  "10000000-0000-0000-0000-000000000000": [
-			{}
+			{
+			  "filesystems": {
+				"myapp/0/0": {
+				  "Attachments": {
+					"containers": {
+					  "myapp/0/1": {
+						"life": "alive",
+						"mount-point": "/home/ubuntu/myapp/.data",
+						"read-only": false
+					  }
+					}
+				  },
+				  "life": "alive",
+				  "pool": "pool-1",
+				  "provider-id": "da64ec3c-0cf7-42f2-9951-35a5a3eaadc1",
+				  "size": 4096,
+				  "status": {
+					"current": "active",
+					"since": "31 Dec 0000 23:58:45-00:01"
+				  },
+				  "volume": "myapp/0/0"
+				}
+			  }
+			}
 		  ],
 		  "20000000-0000-0000-0000-000000000000": [
 			{}
@@ -667,10 +798,14 @@ func TestQueryModelsJq(t *testing.T) {
 		  ]
 		},
 		"errors": {
-			"40000000-0000-0000-0000-000000000000": [
-				"model not found"
-			]
+		  "40000000-0000-0000-0000-000000000000": [
+			"model not found"
+		  ],
+		  "50000000-0000-0000-0000-000000000000": [
+			"forcing an error on model 5"
+		]
 		}
 	}
 	`, qt.JSONEquals, res)
+
 }
