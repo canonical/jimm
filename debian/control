@@ -1,0 +1,25 @@
+Source: jimm
+Maintainer: Thomas Cuthbert <thomas.cuthbert@canonical.com>
+Uploaders: Thomas Cuthbert <thomas.cuthbert@canonical.com>
+Section: devel
+Priority: optional
+Build-Depends: debhelper (>= 11),
+               dh-golang,
+               golang-any,
+               ca-certificates, git,
+Standards-Version: 4.6.0
+Vcs-Git: https://github.com/canonical/jimm
+Rules-Requires-Root: no
+XS-Go-Import-Path: github.com/CanonicalLtd/jimm
+
+Package: jimmctl
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Built-Using: ${misc:Built-Using}
+Description: The jimmctl binary package
+
+Package: jimmsrv
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Built-Using: ${misc:Built-Using}
+Description: The jimmsrv binary package and service files
