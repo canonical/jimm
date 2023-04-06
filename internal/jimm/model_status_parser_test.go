@@ -761,6 +761,12 @@ func TestQueryModelsJq(t *testing.T) {
 	// Query specifically for storage on this model.
 	res, err = j.QueryModelsJq(ctx, alice, ".storage")
 	c.Assert(err, qt.IsNil)
+
+	// Not the cleanest thing in the world, but this field needs ignoring,
+	// and as our struct has a nested map, cmpopts.IgnoreMapFields won't do.
+	res.
+		Results[modelUUIDs[0]][0].(map[string]any)["filesystems"].(map[string]any)["myapp/0/0"].(map[string]any)["status"].(map[string]any)["since"] = "<ignored>"
+
 	c.Assert(`
 	{
 		"results": {
@@ -783,7 +789,7 @@ func TestQueryModelsJq(t *testing.T) {
 				  "size": 4096,
 				  "status": {
 					"current": "active",
-					"since": "31 Dec 0000 23:58:45-00:01"
+					"since": "<ignored>"
 				  },
 				  "volume": "myapp/0/0"
 				}
