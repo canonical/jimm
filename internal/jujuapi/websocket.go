@@ -6,14 +6,13 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
-	"strings"
+	"regexp"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/juju/juju/rpc"
 	"github.com/juju/juju/rpc/jsoncodec"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v4"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -106,25 +105,18 @@ type modelProxyServer struct {
 	jimm *jimm.JIMM
 }
 
+var extractPathInfo = regexp.MustCompile(`^\/model\/([a-f0-9\-]+)\/(.*)$`)
+
+// modelInfoFromPath takes a path to a model endpoint and returns the uuid
+// and final path element. I.e. /model/<uuid>/api return <uuid>,api,err
+// Note that validating the uuid does not take place.
 func modelInfoFromPath(path string) (uuid string, finalPath string, err error) {
-	if path == "" {
-		return "", "", errors.E("Empty path")
+	// Then we don't need to do the parts stuff we know the uuid is a v4 uuid, so:
+	match := extractPathInfo.FindAllStringSubmatch(path, -1)
+	if len(match) != 1 || len(match[0]) != 3 {
+		return "", "", errors.E("invalid path")
 	}
-	if path[0] == '/' {
-		path = path[1:]
-	}
-	parts := strings.Split(path, "/")
-	if len(parts) != 3 {
-		return "", "", errors.E("Invalid path")
-	}
-	prefix := parts[0]
-	uuid = parts[1]
-	finalPath = parts[2]
-	if prefix != "model" {
-		return "", "", errors.E("Invalid path prefix")
-	}
-	err = nil
-	return
+	return match[0][1], match[0][2], nil
 }
 
 // ServeWS implements jimmhttp.WSServer.
@@ -141,8 +133,10 @@ func controllerConnectionFunc(s modelProxyServer, jwtGenerator *jimm.JwtGenerato
 	connectToControllerFunc := func(ctx context.Context) (*websocket.Conn, error) {
 		const op = errors.Op("proxy.controllerConnectionFunc")
 		path := jimmhttp.PathElementFromContext(ctx, "path")
+		zapctx.Debug(ctx, "grabbing model info from path", zap.String("path", path))
 		uuid, finalPath, err := modelInfoFromPath(path)
 		if err != nil {
+			zapctx.Error(ctx, "error parsing path", zap.Error(err))
 			return nil, errors.E(op, err)
 		}
 		m := dbmodel.Model{
@@ -156,7 +150,7 @@ func controllerConnectionFunc(s modelProxyServer, jwtGenerator *jimm.JwtGenerato
 			return nil, errors.E(err, errors.CodeNotFound)
 		}
 		jwtGenerator.SetTags(m.ResourceTag(), m.Controller.ResourceTag())
-		mt := names.NewModelTag(uuid)
+		mt := m.ResourceTag()
 		zapctx.Debug(ctx, "Dialing Controller", zap.String("path", path))
 		controllerConn, err := jujuclient.ProxyDial(ctx, &m.Controller, mt, finalPath)
 		if err != nil {

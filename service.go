@@ -137,9 +137,6 @@ type Params struct {
 
 	// Parameters used to initialize connection to an OpenFGA server.
 	OpenFGAParams OpenFGAParams
-
-	// LocalPort is the port JIMM is listening on.
-	LocalPort string
 }
 
 // A Service is the implementation of a JIMM server.
@@ -268,7 +265,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 
 	if s.jimm.CredentialStore != nil {
 		s.jimm.JWKService = jimmjwx.NewJWKSService(s.jimm.CredentialStore)
-		s.jimm.JWTService = jimmjwx.NewJWTService("localhost:"+p.LocalPort, s.jimm.CredentialStore, false)
+		s.jimm.JWTService = jimmjwx.NewJWTService(p.PublicDNSName, s.jimm.CredentialStore, false)
 	}
 
 	mountHandler := func(path string, h jimmhttp.JIMMHttpHandler) {

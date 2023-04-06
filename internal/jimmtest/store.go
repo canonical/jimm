@@ -10,6 +10,9 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwk"
 )
 
+// InMemoryCredentialStore implements CredentialStore but only implements
+// JWKS methods in order to use it as an in memory credential store replacing
+// vault for tests.
 type InMemoryCredentialStore struct {
 	credentials.CredentialStore
 
@@ -43,7 +46,7 @@ func (s *InMemoryCredentialStore) GetJWKS(ctx context.Context) (jwk.Set, error) 
 	return jwks, nil
 }
 
-// GetJWKSPrivateKey returns the current private key for the active JWKS
+// GetJWKSPrivateKey returns the current private key for the active JWKS.
 func (s *InMemoryCredentialStore) GetJWKSPrivateKey(ctx context.Context) ([]byte, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

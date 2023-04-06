@@ -15,6 +15,7 @@ var (
 	NewModelAccessWatcher = newModelAccessWatcher
 	ParseTag              = parseTag
 	ResolveTag            = resolveTag
+	ModelInfoFromPath     = modelInfoFromPath
 )
 
 func NewModelSummaryWatcher() *modelSummaryWatcher {

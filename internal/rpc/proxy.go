@@ -29,10 +29,12 @@ type writeLockConn struct {
 	conn *websocket.Conn
 }
 
+// readJson allows for non-concurrent reads on the websocket.
 func (c *writeLockConn) readJson(v interface{}) error {
 	return c.conn.ReadJSON(v)
 }
 
+// writeJson allows for concurrent writes on the websocket.
 func (c *writeLockConn) writeJson(v interface{}) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -89,7 +91,7 @@ func (msgs *inflightMsgs) getMessage(key uint64) *message {
 	return msg
 }
 
-// clientProxy proxies messages from client->controller
+// clientProxy proxies messages from client->controller.
 type clientProxy struct {
 	// mu synchronises changes to closed and dst, dst is is only created
 	// at some unspecified point in the future after a client request.
@@ -165,6 +167,8 @@ func (p *clientProxy) start(ctx context.Context) error {
 	}
 }
 
+// makeControllerConnection dials a controller and starts a go routine for
+// proxying requests from the controller to the client.
 func (p *clientProxy) makeControllerConnection(ctx context.Context) error {
 	const op = errors.Op("rpc.makeControllerConnection")
 	p.mu.Lock()
@@ -212,9 +216,16 @@ func (p *controllerProxy) start(ctx context.Context) error {
 			return err
 		}
 		zapctx.Debug(ctx, "Received message from controller", zap.Any("Message", msg))
-		if msg.ErrorCode == "access required" {
+		permissionsRequired, err := p.checkPermissionsRequired(ctx, msg)
+		if err != nil {
+			zapctx.Error(ctx, "failed to determine if more permissions required", zap.Error(err))
+			p.client.sendError(err, msg)
+			p.msgs.removeMessage(msg)
+			continue
+		}
+		if permissionsRequired != nil {
 			zapctx.Error(ctx, "Access Required error")
-			if err := p.redoLogin(ctx, msg); err != nil {
+			if err := p.redoLogin(ctx, permissionsRequired); err != nil {
 				zapctx.Error(ctx, "Failed to redo login", zap.Error(err))
 				p.client.sendError(err, msg)
 				p.msgs.removeMessage(msg)
@@ -242,7 +253,43 @@ func (p *controllerProxy) start(ctx context.Context) error {
 	}
 }
 
-func (p *controllerProxy) redoLogin(ctx context.Context, resp *message) error {
+// checkPermissionsRequired returns a nil map if no permissions are required.
+func (p *controllerProxy) checkPermissionsRequired(ctx context.Context, msg *message) (map[string]any, error) {
+	var er params.ErrorResults
+	err := json.Unmarshal(msg.Response, &er)
+	if err != nil {
+		zapctx.Error(ctx, "failed to read response error")
+		return nil, errors.E(err, "failed to read response errors")
+	}
+	// Instantiate later because we won't always need the map.
+	var permissionMap map[string]any
+	// Check for errors that may be a result of a bulk request.
+	for _, e := range er.Results {
+		zapctx.Debug(ctx, "received error", zap.Any("error", e))
+		if e.Error != nil && e.Error.Code == "access required" {
+			for k, v := range e.Error.Info {
+				accessLevel, ok := v.(string)
+				if !ok {
+					return nil, errors.E("unknown permission level")
+				}
+				if permissionMap == nil {
+					permissionMap = make(map[string]any)
+				}
+				permissionMap[k] = accessLevel
+			}
+		}
+	}
+	// Check for errors that may be a result of a normal request.
+	if msg.ErrorCode == "access required" {
+		if permissionMap != nil {
+			zapctx.Error(ctx, "detected access required error in two places")
+		}
+		permissionMap = msg.ErrorInfo
+	}
+	return permissionMap, nil
+}
+
+func (p *controllerProxy) redoLogin(ctx context.Context, permissions map[string]any) error {
 	const op = errors.Op("rpc.redoLogin")
 	const initialLogin = false
 	var loginMsg *message
@@ -252,7 +299,7 @@ func (p *controllerProxy) redoLogin(ctx context.Context, resp *message) error {
 	if loginMsg == nil {
 		return errors.E(op, errors.CodeUnauthorized, "Haven't received login yet")
 	}
-	err := addJWT(ctx, initialLogin, loginMsg, resp.ErrorInfo, p.tokenGen)
+	err := addJWT(ctx, initialLogin, loginMsg, permissions, p.tokenGen)
 	if err != nil {
 		return err
 	}
@@ -273,12 +320,12 @@ func addJWT(ctx context.Context, initialLogin bool, msg *message, permissions ma
 	}
 	var lr params.LoginRequest
 	if err := json.Unmarshal(msg.Params, &lr); err != nil {
-		return err
+		return errors.E(op, err)
 	}
 	jwt, err := tokenGen.MakeToken(ctx, initialLogin, &lr, permissions)
 	if err != nil {
-		zapctx.Error(ctx, "FAILED TO MAKE TOKEN", zap.Error(err))
-		return err
+		zapctx.Error(ctx, "failed to make token", zap.Error(err))
+		return errors.E(op, err)
 	}
 	jwtString := base64.StdEncoding.EncodeToString(jwt)
 	// Add the JWT as base64 encoded string.
@@ -289,7 +336,7 @@ func addJWT(ctx context.Context, initialLogin bool, msg *message, permissions ma
 	// Marshal it again to JSON.
 	data, err := json.Marshal(loginRequest)
 	if err != nil {
-		return err
+		return errors.E(op, err)
 	}
 	// And add it to the message.
 	msg.Params = data

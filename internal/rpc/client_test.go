@@ -48,7 +48,7 @@ func TestBasicDial(t *testing.T) {
 
 	srv := newServer(echo)
 	defer srv.Close()
-	conn, err := srv.dialer.BasicDial(context.Background(), srv.URL)
+	conn, err := srv.dialer.DialWebsocket(context.Background(), srv.URL)
 	c.Assert(err, qt.IsNil)
 	defer conn.Close()
 }
@@ -240,7 +240,7 @@ func TestProxySockets(t *testing.T) {
 	srvJIMM := newServer(func(connClient *websocket.Conn) error {
 		testTokenGen := testTokenGenerator{}
 		f := func(context.Context) (*websocket.Conn, error) {
-			connController, err := srvController.dialer.BasicDial(ctx, srvController.URL)
+			connController, err := srvController.dialer.DialWebsocket(ctx, srvController.URL)
 			c.Assert(err, qt.IsNil)
 			return connController, nil
 		}
@@ -251,7 +251,7 @@ func TestProxySockets(t *testing.T) {
 
 	defer srvController.Close()
 	defer srvJIMM.Close()
-	ws, err := srvJIMM.dialer.BasicDial(ctx, srvJIMM.URL)
+	ws, err := srvJIMM.dialer.DialWebsocket(ctx, srvJIMM.URL)
 	c.Assert(err, qt.IsNil)
 	defer ws.Close()
 
@@ -280,7 +280,7 @@ func TestCancelProxySockets(t *testing.T) {
 	srvJIMM := newServer(func(connClient *websocket.Conn) error {
 		testTokenGen := testTokenGenerator{}
 		f := func(context.Context) (*websocket.Conn, error) {
-			connController, err := srvController.dialer.BasicDial(ctx, srvController.URL)
+			connController, err := srvController.dialer.DialWebsocket(ctx, srvController.URL)
 			c.Assert(err, qt.IsNil)
 			return connController, nil
 		}
@@ -291,7 +291,7 @@ func TestCancelProxySockets(t *testing.T) {
 
 	defer srvController.Close()
 	defer srvJIMM.Close()
-	ws, err := srvJIMM.dialer.BasicDial(ctx, srvJIMM.URL)
+	ws, err := srvJIMM.dialer.DialWebsocket(ctx, srvJIMM.URL)
 	c.Assert(err, qt.IsNil)
 	defer ws.Close()
 	cancel()

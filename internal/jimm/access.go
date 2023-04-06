@@ -96,7 +96,11 @@ func ToModelRelation(accessLevel string) (ofganames.Relation, error) {
 
 // TokenGenerator generates a JWT token.
 type TokenGenerator interface {
+	// MakeToken authorizes a user if initialLogin is set to true using the information in req.
+	// It then checks that a user has all the default permissions rquired and then checks for
+	// permissions as required by permissionMap. It then returns a JWT token.
 	MakeToken(ctx context.Context, initialLogin bool, req *jujuparams.LoginRequest, permissionMap map[string]interface{}) ([]byte, error)
+	// SetTags sets the desired model and controller tags that this TokenGenerator is valid for.
 	SetTags(mt names.ModelTag, ct names.ControllerTag)
 }
 
@@ -194,20 +198,22 @@ func checkPermission(ctx context.Context, user *openfga.User, cachedPerms map[st
 		if _, ok := cachedPerms[key]; !ok {
 			stringVal, ok := val.(string)
 			if !ok {
-				return nil, errors.E(op, "Failed to get permission assertion.")
+				return nil, errors.E(op, fmt.Sprintf("failed to get permission assertion: expected %T, got %T", stringVal, val))
 			}
 			tag, err := names.ParseTag(key)
 			if err != nil {
-				err := errors.E(op, fmt.Sprintf("Failed to parse tag %s", key))
-				return cachedPerms, err
+				return cachedPerms, errors.E(op, fmt.Sprintf("failed to parse tag %s", key))
 			}
-			check, _, err := openfga.CheckRelation(ctx, user, tag, ofganames.Relation(stringVal))
+			relation, err := ofganames.ConvertJujuRelation(stringVal)
 			if err != nil {
-				return cachedPerms, err
+				return cachedPerms, errors.E(op, fmt.Sprintf("failed to parse relation %s", stringVal), err)
+			}
+			check, _, err := openfga.CheckRelation(ctx, user, tag, relation)
+			if err != nil {
+				return cachedPerms, errors.E(op, err)
 			}
 			if !check {
-				err := errors.E(op, fmt.Sprintf("Missing permission for %s:%s", key, val))
-				return cachedPerms, err
+				return cachedPerms, errors.E(op, fmt.Sprintf("Missing permission for %s:%s", key, val))
 			}
 			cachedPerms[key] = stringVal
 		}

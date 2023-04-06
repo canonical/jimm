@@ -48,7 +48,7 @@ type Dialer struct {
 
 // Dial establishes a new client RPC connection to the given URL.
 func (d Dialer) Dial(ctx context.Context, url string) (*Client, error) {
-	conn, err := d.BasicDial(ctx, url)
+	conn, err := d.DialWebsocket(ctx, url)
 	if err != nil {
 		return nil, err
 	}
@@ -62,8 +62,8 @@ func (d Dialer) Dial(ctx context.Context, url string) (*Client, error) {
 	return cl, nil
 }
 
-// BasicDial dials a url and returns a websocket.
-func (d Dialer) BasicDial(ctx context.Context, url string) (*websocket.Conn, error) {
+// DialWebsocket dials a url and returns a websocket.
+func (d Dialer) DialWebsocket(ctx context.Context, url string) (*websocket.Conn, error) {
 	const op = errors.Op("rpc.BasicDial")
 
 	dialer := websocket.Dialer{
@@ -163,10 +163,6 @@ func (c *Client) handleResponse(msg *message) {
 		*waiter.msg = msg
 		close(waiter.ch)
 	}
-}
-
-func (c *Client) GetConn() *websocket.Conn {
-	return c.conn
 }
 
 // Call makes an RPC call to the server. Call sends the request message to

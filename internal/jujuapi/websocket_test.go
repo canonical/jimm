@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/pem"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -28,7 +29,6 @@ import (
 	"github.com/CanonicalLtd/jimm/internal/jimmtest"
 	"github.com/CanonicalLtd/jimm/internal/jujuapi"
 	"github.com/CanonicalLtd/jimm/internal/openfga"
-	ofga "github.com/CanonicalLtd/jimm/internal/openfga"
 	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 	"github.com/CanonicalLtd/jimm/internal/wellknownapi"
 )
@@ -219,7 +219,7 @@ func (s *proxySuite) TestConnectToModel(c *gc.C) {
 func (s *proxySuite) TestConnectToModelAndLogin(c *gc.C) {
 	ctx := context.Background()
 	alice := names.NewUserTag("alice")
-	aliceUser := ofga.NewUser(&dbmodel.User{Username: alice.Id()}, s.JIMM.OpenFGAClient)
+	aliceUser := openfga.NewUser(&dbmodel.User{Username: alice.Id()}, s.JIMM.OpenFGAClient)
 	err := aliceUser.SetControllerAccess(ctx, s.Model.Controller.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, gc.IsNil)
 	conn, err := s.openNoAssert(c, &api.Info{
@@ -250,4 +250,38 @@ func (s *proxySuite) TestConnectToModelNoBakeryClient(c *gc.C) {
 		BakeryClient:       nil,
 	})
 	c.Assert(err, gc.ErrorMatches, "interaction required but not possible")
+}
+
+type pathTestSuite struct{}
+
+var _ = gc.Suite(&pathTestSuite{})
+
+func (s *pathTestSuite) Test(c *gc.C) {
+
+	testUUID := "059744f6-26d2-4f00-92be-5df97fccbb97"
+	tests := []struct {
+		path      string
+		uuid      string
+		finalPath string
+		fail      bool
+	}{
+		{path: fmt.Sprintf("/model/%s/api", testUUID), uuid: testUUID, finalPath: "api", fail: false},
+		{path: fmt.Sprintf("/model/%s/api/", testUUID), uuid: testUUID, finalPath: "api/", fail: false},
+		{path: fmt.Sprintf("/model/%s/api/foo", testUUID), uuid: testUUID, finalPath: "api/foo", fail: false},
+		{path: fmt.Sprintf("/model/%s/commands", testUUID), uuid: testUUID, finalPath: "commands", fail: false},
+		{path: "/model/123/commands", uuid: "123", finalPath: "commands", fail: false},
+		{path: fmt.Sprintf("/controller/%s/commands", testUUID), fail: true},
+		{path: fmt.Sprintf("/controller/%s/", testUUID), fail: true},
+		{path: "/controller", fail: true},
+	}
+	for _, test := range tests {
+		uuid, finalPath, err := jujuapi.ModelInfoFromPath(test.path)
+		if !test.fail {
+			c.Assert(err, gc.IsNil)
+			c.Assert(uuid, gc.Equals, test.uuid)
+			c.Assert(finalPath, gc.Equals, test.finalPath)
+		} else {
+			c.Assert(err, gc.NotNil)
+		}
+	}
 }

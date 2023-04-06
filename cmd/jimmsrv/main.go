@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -43,11 +42,6 @@ func start(ctx context.Context, s *service.Service) error {
 	if addr == "" {
 		addr = ":http-alt"
 	}
-	_, port, err := net.SplitHostPort(addr)
-	if err != nil {
-		zapctx.Error(ctx, "cannot parse port from address", zap.String("Address", addr), zap.Error(err))
-		return err
-	}
 	jimmsvc, err := jimm.NewService(ctx, jimm.Params{
 		ControllerUUID:    os.Getenv("JIMM_UUID"),
 		DSN:               os.Getenv("JIMM_DSN"),
@@ -61,7 +55,6 @@ func start(ctx context.Context, s *service.Service) error {
 		VaultPath:         os.Getenv("VAULT_PATH"),
 		DashboardLocation: os.Getenv("JIMM_DASHBOARD_LOCATION"),
 		PublicDNSName:     os.Getenv("JIMM_DNS_NAME"),
-		LocalPort:         port,
 		OpenFGAParams: jimm.OpenFGAParams{
 			Scheme:    os.Getenv("OPENFGA_SCHEME"),
 			Host:      os.Getenv("OPENFGA_HOST"),

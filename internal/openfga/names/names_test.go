@@ -11,6 +11,7 @@ import (
 	ofganames "github.com/CanonicalLtd/jimm/internal/openfga/names"
 	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
 	"github.com/google/uuid"
+	"github.com/juju/juju/core/permission"
 )
 
 func Test(t *testing.T) {
@@ -97,6 +98,26 @@ func (s *namesSuite) TestFromOpenFGATag(c *gc.C) {
 		} else {
 			c.Assert(err, gc.IsNil)
 			c.Assert(result, gc.DeepEquals, test.expected)
+		}
+	}
+}
+
+func (s *namesSuite) TestConvertJujuRelation(c *gc.C) {
+	// unusedAccessLevels are access levels that are not
+	// represented in JIMM's OpenFGA model and should return
+	// an error.
+	unusedAccessLevels := map[permission.Access]struct{}{
+		permission.NoAccess:        {},
+		permission.SuperuserAccess: {},
+		permission.LoginAccess:     {},
+	}
+	for i, level := range permission.AllAccessLevels {
+		c.Logf("running test %d: %s", i, level)
+		_, err := ofganames.ConvertJujuRelation(string(level))
+		if _, ok := unusedAccessLevels[level]; ok {
+			c.Assert(err, gc.NotNil)
+		} else {
+			c.Assert(err, gc.IsNil)
 		}
 	}
 }

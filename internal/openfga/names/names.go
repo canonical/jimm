@@ -9,6 +9,7 @@ import (
 
 	"github.com/CanonicalLtd/jimm/internal/errors"
 	jimmnames "github.com/CanonicalLtd/jimm/pkg/names"
+	"github.com/juju/juju/core/permission"
 	"github.com/juju/names/v4"
 )
 
@@ -158,6 +159,31 @@ func BlankKindTag(kind string) (*Tag, error) {
 		}, nil
 	default:
 		return nil, errors.E("unknown tag kind")
+	}
+}
+
+// ConvertJujuRelation takes a juju relation string and converts it to
+// one appropriate for use with OpenFGA.
+func ConvertJujuRelation(relation string) (Relation, error) {
+	switch relation {
+	case string(permission.AdminAccess):
+		return AdministratorRelation, nil
+	case string(permission.ReadAccess):
+		return ReaderRelation, nil
+	case string(permission.WriteAccess):
+		return WriterRelation, nil
+	case string(permission.ConsumeAccess):
+		return ConsumerRelation, nil
+	case string(permission.AddModelAccess):
+		return CanAddModelRelation, nil
+	// Below are controller specific permissions that
+	// are not represented in JIMM's OpenFGA model.
+	case string(permission.LoginAccess):
+		return NoRelation, errors.E("login access unused")
+	case string(permission.SuperuserAccess):
+		return NoRelation, errors.E("superuser access unused")
+	default:
+		return NoRelation, errors.E("unknown relation")
 	}
 }
 
