@@ -55,7 +55,7 @@ func (j *JIMM) QueryModelsJq(ctx context.Context, user *openfga.User, jqQuery st
 
 	for _, id := range modelUUIDs {
 
-		controllerName, modelStatus, combinedStorage, err := retriever.GetParams(ctx, id)
+		params, err := retriever.GetParams(ctx, id)
 		if err != nil {
 			zapctx.Error(ctx, "failed to get status formatter params", zap.String("model-uuid", id))
 			results.Errors[id] = append(results.Errors[id], err.Error())
@@ -64,13 +64,7 @@ func (j *JIMM) QueryModelsJq(ctx context.Context, user *openfga.User, jqQuery st
 
 		// We use very specific formatting parameters to ensure like-for-like output
 		// with the default juju client installation performing a "status --format json".
-		formatter := status.NewStatusFormatter(status.NewStatusFormatterParams{
-			ControllerName: controllerName,
-			Status:         modelStatus,
-			Storage:        combinedStorage,
-			ShowRelations:  true,
-			ISOTime:        true,
-		})
+		formatter := status.NewStatusFormatter(*params)
 
 		formattedStatus, err := formatter.Format()
 		if err != nil {
@@ -136,28 +130,34 @@ func newFormatterParamsRetriever(j *JIMM) *formatterParamsRetriever {
 
 // GetParams retrieves the required parameters for the Juju status formatter from the currently
 // loaded model. See formatterParamsRetriever.LoadModel for more information.
-func (f *formatterParamsRetriever) GetParams(ctx context.Context, modelUUID string) (string, *rpcparams.FullStatus, *storage.CombinedStorage, error) {
+func (f *formatterParamsRetriever) GetParams(ctx context.Context, modelUUID string) (*status.NewStatusFormatterParams, error) {
 	if err := f.loadModel(ctx, modelUUID); err != nil {
-		return "", nil, nil, err
+		return nil, err
 	}
 
 	err := f.dialModel(ctx)
 	if err != nil {
-		return "", nil, nil, err
+		return nil, err
 	}
 	defer f.api.Close()
 
 	modelStatus, err := f.getModelStatus(ctx)
 	if err != nil {
-		return "", nil, nil, err
+		return nil, err
 	}
 
 	combinedStorage, err := f.getCombinedStorageInfo(ctx)
 	if err != nil {
-		return "", nil, nil, err
+		return nil, err
 	}
 
-	return f.model.Controller.Name, modelStatus, combinedStorage, nil
+	return &status.NewStatusFormatterParams{
+		ControllerName: f.model.Controller.Name,
+		Status:         modelStatus,
+		Storage:        combinedStorage,
+		ShowRelations:  true,
+		ISOTime:        true,
+	}, nil
 }
 
 // LoadModel loads the model by UUID from the database into the formatterParamsRetriever.
