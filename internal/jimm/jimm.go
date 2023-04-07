@@ -258,6 +258,17 @@ type API interface {
 
 	// WatchAllModels creates a megawatcher.
 	WatchAllModels(context.Context) (string, error)
+
+	// ListFilesystems lists filesystems for desired machines.
+	// If no machines provided, a list of all filesystems is returned.
+	ListFilesystems(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error)
+
+	// ListVolumes lists volumes for desired machines.
+	// If no machines provided, a list of all volumes is returned.
+	ListVolumes(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error)
+
+	// ListStorageDetails lists all storage.
+	ListStorageDetails(ctx context.Context) ([]jujuparams.StorageDetails, error)
 }
 
 // forEachController runs a given function on multiple controllers
