@@ -23,11 +23,14 @@ services:
     
   jimm:
     image: cosmtrek/air
+    # extra_hosts:
+    # - "host.docker.internal:host-gateway"
     # working_dir value has to be the same of mapped volume
+    hostname: jimm.localhost
     working_dir: /jimm
     container_name: jimmy
     ports:
-      - 17070:8080
+      - 17070:80
     environment:
       JIMM_UUID: "3217dbc9-8ea9-4381-9e97-01eab0b3f6bb"
       JIMM_DSN: "postgresql://jimm:jimm@db/jimm"
@@ -42,9 +45,9 @@ services:
       VAULT_SECRET_FILE: "/vault/approle.json"
       VAULT_AUTH_PATH: "/auth/approle/login"
       # JIMM_DASHBOARD_LOCATION: ""
-      JIMM_DNS_NAME: "127.0.0.1:8080"
+      JIMM_DNS_NAME: "jimm.localhost"
       JIMM_WATCH_CONTROLLERS: ""
-      JIMM_LISTEN_ADDR: "0.0.0.0:8080"
+      JIMM_LISTEN_ADDR: "0.0.0.0:80"
       JIMM_TEST_PGXDSN: ""
       JIMM_JWT_EXPIRY: 30s
       TEST_LOGGING_CONFIG: ""
@@ -59,7 +62,7 @@ services:
       - ./local/vault/approle.json:/vault/approle.json:rw
       - ./local/vault/roleid.txt:/vault/roleid.txt:rw
     healthcheck:
-      test: [ "CMD", "curl", "http://localhost:8080" ]
+      test: [ "CMD", "curl", "http://jimm.localhost:80" ]
       interval: 5s
       timeout: 5s
       retries: 5

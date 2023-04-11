@@ -105,18 +105,27 @@ type modelProxyServer struct {
 	jimm *jimm.JIMM
 }
 
-var extractPathInfo = regexp.MustCompile(`^\/model\/([a-f0-9\-]+)\/(.*)$`)
+var extractPathInfo = regexp.MustCompile(`^\/?model\/(?P<modeluuid>\w{8}-\w{4}-\w{4}-\w{4}-\w{12})\/(?P<finalPath>.*)$`)
+var modelIndex = mustGetSubexpIndex(extractPathInfo, "modeluuid")
+var finalPathIndex = mustGetSubexpIndex(extractPathInfo, "finalPath")
+
+func mustGetSubexpIndex(regex *regexp.Regexp, name string) int {
+	index := regex.SubexpIndex(name)
+	if index == -1 {
+		panic("failed to find subexp index")
+	}
+	return index
+}
 
 // modelInfoFromPath takes a path to a model endpoint and returns the uuid
 // and final path element. I.e. /model/<uuid>/api return <uuid>,api,err
-// Note that validating the uuid does not take place.
+// Basic validation of the uuid takes place.
 func modelInfoFromPath(path string) (uuid string, finalPath string, err error) {
-	// Then we don't need to do the parts stuff we know the uuid is a v4 uuid, so:
-	match := extractPathInfo.FindAllStringSubmatch(path, -1)
-	if len(match) != 1 || len(match[0]) != 3 {
+	matches := extractPathInfo.FindStringSubmatch(path)
+	if len(matches) != 3 {
 		return "", "", errors.E("invalid path")
 	}
-	return match[0][1], match[0][2], nil
+	return matches[modelIndex], matches[finalPathIndex], nil
 }
 
 // ServeWS implements jimmhttp.WSServer.
